@@ -1,0 +1,212 @@
+﻿ ALTER PROCEDURE [dbo].[OAS_Report_GetTotalTicket]      
+	@NormalLicensee VARCHAR(1000),  
+	@Operator  VARCHAR(1000),  
+	@FromDate  SMALLDATETIME,    
+	@ToDate   SMALLDATETIME,    
+	@SportID  INT    = 0,  
+	@GroupBy  TINYINT   = 1,
+	@Debug			BIT = 0
+AS      
+  
+/*  
+ * Created by : [20111219@Kos]  
+ * Task  : Get total tickets of operators and licensees  
+ * DB   : DB052.bodb02  
+ * Revisions :  
+ *  20120221@Henry: FDL billing 222223, 733333, 222225, 722222, 755555, Indo from the 1st Feb 2012; 789y from the 1st March 2012
+	20120302@Henry: Turn hard-code into table
+	20120405@Henry: Get resellerID to calculate the rate
+	20120515@Henry: exclude customercategory 28 - BARM
+	20120704@Henry: Map Licensee with System
+ * Param's Explanation:    
+ *  - @NormalLicensee : List of normal licensee ID separated by ','  
+ *  - @Operator   : List of operator ID separated by ','  
+ *  - @FromDate   : From date   
+ *  - @ToDate   : To date  
+ *  - @SportID   : Sport type ID  
+ *  - @bettype   : Bet type ID  
+ *  - @ReportBy   : 0 : All, 1 : Live, 2 : Non-live  
+ *  - @GroupBy   : 1 : Daily, 2 : Monthly  
+ */  
+    
+BEGIN      
+
+declare @sql varchar(8000)
+SELECT @sql = 'SET NOCOUNT ON  ' + char(13)
+
+--declare
+SELECT @sql = @sql + '--Declare variable:' + char(13)
+
+SELECT @sql = @sql +	
+				'DECLARE @data AS TABLE (WinlostDate SMALLDATETIME, ResellerID INT, LicenseeID INT, betcount INT)  ' + char(13) +
+				'DECLARE @tmpLicenseeReseller AS TABLE (ResellerID INT, LicenseeID INT) ' + char(13) 
+				
+     
+-- Normal licensees  
+IF LTRIM(RTRIM(ISNULL(@NormalLicensee,''))) <> ''
+BEGIN
+	SELECT @sql = @sql + '--Get normal licensee list:' + char(13)
+	SELECT @sql = @sql +
+					'INSERT INTO @tmpLicenseeReseller (ResellerID,LicenseeID) ' + char(13) +
+					'SELECT lr.ResellerID,lr.LicenseeID '+ char(13) +
+					'FROM'+ char(13) +
+						'bodb_licensee.dbo.LicenseeReseller lr (NOLOCK)'+ char(13) +
+						'INNER JOIN bodb_licensee.dbo.Resellers r WITH (NOLOCK) ON lr.ResellerID = r.ResellerID' + char(13) +
+					'WHERE' + char(13) +
+						'r.ResellerID <> 3 AND' + char(13) +
+						'lr.LicenseeID IN (' + @NormalLicensee + ')' + char(13) 
+END
+
+-- Operator
+IF LTRIM(RTRIM(ISNULL(@Operator,''))) <> ''
+BEGIN
+	SELECT @sql = @sql + '--Get Operator list:' + char(13)
+	SELECT @sql = @sql + 
+					'INSERT INTO @tmpLicenseeReseller (ResellerID, LicenseeID)   ' + char(13) +
+					'SELECT lr.ResellerID, lr.LicenseeID   ' + char(13) +
+					'FROM ' + char(13) +
+						'bodb_licensee.dbo.LicenseeReseller lr (NOLOCK)' + char(13) +
+						'INNER JOIN bodb_licensee.dbo.Resellers r WITH (NOLOCK) ON lr.ResellerID = r.ResellerID' + char(13) +
+					'WHERE ' + char(13) +
+						'r.ResellerID IN (' + @Operator + ')' + char(13) 
+END
+
+--exclude BA & IBC & PIH...
+SELECT @sql = @sql + '--Exclude BA & IBC & PIH...' + char(13)
+SELECT @sql = @sql + 
+				'IF EXISTS(SELECT 1 FROM @tmpLicenseeReseller lr INNER JOIN bodb_licensee.dbo.licensees l WITH (nolock) ON lr.licenseeid=l.licenseeid  WHERE l.IsDeposit=1 AND lr.ResellerID<>3)' + char(13) +
+				'BEGIN' + char(13) +
+					'INSERT INTO @data' + char(13) +
+					'SELECT  b.rptDate,lr.ResellerID,lr.licenseeid, SUM(BetCount) AS betcount ' + char(13) +
+					'FROM @tmpLicenseeReseller lr' + char(13) +
+						'INNER JOIN bodb_licensee.dbo.licensees lic WITH ( NOLOCK) ON lic.licenseeid=lr.licenseeid'+ char(13) +
+						'INNER JOIN bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) ON lr.LicenseeID = b.siteID' + char(13) +
+						'INNER JOIN bodb_Licensee.dbo.SystemLicensee sl (NOLOCK) ON lic.LicenseeID=sl.LicenseeID ' + char(13) +
+						'INNER JOIN bodb_Licensee.dbo.Systems s (NOLOCK) ON sl.SystemID=s.ID '+ char(13) +
+						'LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID' + char(13) +
+					'WHERE' + char(13) +
+						'b.rptDate BETWEEN ''' + convert(varchar(10),@FromDate, 120) + ''' AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
+						'AND lr.ResellerID<>3' + char(13) + --BA
+						'AND lic.isdeposit=1'+ char(13) +
+						'AND sl.IsActive = 1' + char(13) +
+						'AND s.SystemName=''OAS''' + char(13) +
+						--'AND lic.IsActive=1'+ char(13) +
+						--'AND lic.IsOneWorkActive=1'+ char(13) +
+						'AND ''' + convert(varchar(10),@FromDate, 120) + ''' >= isnull(lic.AffectedDate,''1999-01-01'')' + char(13) +
+						'AND b.status NOT IN (-1,103) ' + char(13) +
+						'AND CurrencyID<>20 ' + char(13) +
+						'AND (b.bettype < 31 OR bettype BETWEEN 121 AND 999)' + char(13) +
+						CASE WHEN @SportID<>0 THEN 'AND b.bettype NOT IN (9,29) AND l.Sporttype = ' + convert(varchar(10), @SportID) ELSE '' END + char(13) +
+						
+					'GROUP BY b.rptDate, lr.ResellerID, lr.licenseeid' + char(13) +
+				'END' + char(13) 
+
+--BA
+SELECT @sql = @sql + '--BA selection' + char(13)
+SELECT @sql = @sql + 
+				'IF EXISTS(SELECT 1 FROM @tmpLicenseeReseller WHERE ResellerID = 3)' + char(13) +
+				'BEGIN' + char(13) +
+					'INSERT INTO @data' + char(13) +
+					'SELECT b.rptDate, lr.ResellerID,lr.licenseeid, SUM(BetCount) AS betcount' + char(13) +
+					'FROM @tmpLicenseeReseller lr' + char(13) +
+						'INNER JOIN bodb_licensee.dbo.licensees lic WITH ( NOLOCK) ON lic.licenseeid=lr.licenseeid'+ char(13) +
+						'INNER JOIN bodb_Licensee.dbo.SystemLicensee sl (NOLOCK) ON lic.LicenseeID=sl.LicenseeID ' + char(13) +
+						'INNER JOIN bodb_Licensee.dbo.Systems s (NOLOCK) ON sl.SystemID=s.ID '+ char(13) +
+						'INNER JOIN bodb_Licensee.dbo.rpt_Betting_BA b WITH ( NOLOCK) ON lr.LicenseeID = b.siteID' + char(13) +
+						'LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID' + char(13) +
+					'WHERE' + char(13) +
+						'b.rptDate BETWEEN ''' + convert(varchar(10),@FromDate, 120) + ''' AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
+						'AND lr.ResellerID=3'+ char(13) +
+						'AND lic.isdeposit=1'+ char(13) +
+						'AND sl.IsActive = 1' + char(13) +
+						'AND s.SystemName=''OAS''' + char(13) +
+						--'AND lic.IsActive=1'+ char(13) +
+						--'AND lic.IsOneWorkActive=1'+ char(13) +
+						'AND ''' + convert(varchar(10),@FromDate, 120) + ''' >= isnull(lic.AffectedDate,''1999-01-01'')' + char(13) +
+						'AND b.status NOT IN (-1,103) ' + char(13) +
+						'AND CurrencyID<>20 ' + char(13) +
+						CASE WHEN @SportID<>0 THEN 'AND b.bettype NOT IN (9,29)  AND l.Sporttype = ' + convert(varchar(10), @SportID)  ELSE '' END + char(13) +
+											
+					'GROUP BY b.rptDate, lr.ResellerID, lr.licenseeid' + char(13) +
+				'END' + char(13) 
+				
+--FDL + PIH...
+SELECT @sql = @sql + '--FDL + PIH selection ...' + char(13)
+SELECT @sql = @sql + 				
+				'IF EXISTS(SELECT 1 FROM @tmpLicenseeReseller lr inner JOIN bodb_licensee.dbo.licensees l WITH (nolock) ON lr.licenseeid=l.licenseeid where l.IsDeposit=0)' + char(13) +
+				'BEGIN' + char(13) +
+					'INSERT INTO @data' + char(13) +
+					'SELECT b.rptDate,lr.ResellerID,lr.LicenseeID ,SUM(BetCount) AS betcount' + char(13) +
+					'FROM @tmpLicenseeReseller lr ' + char(13) +
+						'INNER JOIN bodb_Licensee.dbo.labels lb WITH (NOLOCK) ON lr.LicenseeID=lb.LicenseeID' + char(13) +
+						'INNER JOIN bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) ON b.siteID=lb.LabelID' + char(13) +
+						'LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID' + char(13) +
+					'WHERE' + char(13) +	
+						'b.rptDate BETWEEN ''' + convert(varchar(10),@FromDate, 120) + ''' AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
+						'AND b.status NOT IN (-1,103) ' + char(13) +
+						'AND lr.ResellerID<>3' + char(13) + --BA
+						'AND ''' + convert(varchar(10),@FromDate, 120) + ''' >= isnull(lb.AffectedDate,''1999-01-01'')' + char(13) +
+						'AND CurrencyID<>20 ' + char(13) +
+						'AND isnull(b.customercategory,-1) NOT IN (27,28) ' + char(13) +
+						'AND (b.bettype < 31 OR bettype BETWEEN 121 AND 999)' + char(13) +
+						CASE WHEN @SportID<>0 THEN 'AND b.bettype NOT IN (9,29) AND l.Sporttype = ' + convert(varchar(10), @SportID)  ELSE '' END + char(13) +
+						
+					'GROUP BY b.rptDate,lr.ResellerID,lr.LicenseeID ' + char(13) +	
+				'END' + char(13) 
+				
+
+--Show data
+/*
+SELECT @sql = @sql + '--Show the data' + char(13)
+SELECT @sql = @sql + 
+			'SELECT ' + char(13) +
+				CASE 
+					WHEN @GroupBy = 1 THEN 'CONVERT(VARCHAR(8),d.winlostdate,112) ' 
+					WHEN @GroupBy = 2 THEN 'CONVERT(VARCHAR(6),d.winlostdate,112)'
+					END + ' GroupBy,' + char(13) +
+				'ISNULL(SUM(d.betcount),0) AS BetCount ' + char(13) +
+			'FROM @data d ' + char(13) +	
+			'GROUP BY ' + char(13) +	
+				CASE 
+					WHEN @GroupBy = 1 THEN 'CONVERT(VARCHAR(8),d.winlostdate,112) ' 
+					WHEN @GroupBy = 2 THEN 'CONVERT(VARCHAR(6),d.winlostdate,112)'
+					END + char(13) +
+			'ORDER BY GroupBy' + char(13) 
+*/ 
+SELECT @sql = @sql + 
+			'SELECT ' + char(13) +
+				CASE 
+					WHEN @GroupBy = 1 THEN 'CONVERT(VARCHAR(8),d.winlostdate,112) ' 
+					WHEN @GroupBy = 2 THEN 'CONVERT(VARCHAR(6),d.winlostdate,112)'
+					END + ' GroupBy,' + char(13) +
+				'r.ResellerID,r.ResellerName,' + char(13) +
+				'CASE WHEN r.ResellerType = 2 THEN '''' ELSE l.LicenseeName END AS LicenseeName,' + char(13) +
+				'ISNULL(SUM(d.betcount), 0) AS BetCount' + char(13) +
+			'FROM' + char(13) +
+				'@data d ' + char(13) +
+				'INNER JOIN bodb_licensee.dbo.Resellers r WITH (NOLOCK) ON r.ResellerID = d.ResellerID  ' + char(13) +
+				'LEFT JOIN bodb_licensee.dbo.Licensees l WITH (NOLOCK) ON l.LicenseeID = d.LicenseeID ' + char(13) +
+			'GROUP BY ' + char(13) +
+			CASE 
+					WHEN @GroupBy = 1 THEN 'CONVERT(VARCHAR(8),d.winlostdate,112) ' 
+					WHEN @GroupBy = 2 THEN 'CONVERT(VARCHAR(6),d.winlostdate,112)'
+					END + char(13) +
+			' ,r.ResellerID,r.ResellerName, CASE WHEN r.ResellerType = 2 THEN '''' ELSE l.LicenseeName END ' + char(13) +
+			'ORDER BY ' + char(13) +
+			CASE 
+					WHEN @GroupBy = 1 THEN 'CONVERT(VARCHAR(8),d.winlostdate,112) ' 
+					WHEN @GroupBy = 2 THEN 'CONVERT(VARCHAR(6),d.winlostdate,112)'
+					END + char(13) +
+			',r.ResellerName, CASE WHEN r.ResellerType = 2 THEN '''' ELSE l.LicenseeName END'
+	
+IF (@debug = 1) PRINT @sql
+ELSE EXEC(@sql)
+
+  
+
+  
+END  
+GO
+GRANT EXECUTE ON [dbo].[OAS_Report_GetTotalTicket] TO [bodbAdminNet] 
+GO
+GRANT VIEW DEFINITION ON [dbo].[OAS_Report_GetTotalTicket] TO [vnteam]   
