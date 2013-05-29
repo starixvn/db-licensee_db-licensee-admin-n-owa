@@ -9,6 +9,7 @@
  @ShowBA		BIT=0,
  @ShowLC		BIT=0,
  @ShowVS		BIT=1,
+ @ShowCS		BIT=1,
  @SportID		INT=0,
  @bettype		INT=0,
  @ReportType	TINYINT=0,  
@@ -30,6 +31,7 @@ AS
 	- 20120815@Henry: add live casino
 	- 20120905@Henry: add Virtual Sports
 	- 20121128@Henry: use new table LicenseeBATransaction_active to get bettrans BA tickets
+	- 20130529@Jim: add RNG Casino 
 		
 	Param's Explanation:  
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;  
@@ -40,6 +42,8 @@ AS
 	  + @ShowNG: Show Number game bets
 	  + @ShowBA: Show Bet Aggregator bets (combined with Sportsbook or Number Game)
 	  + @ShowLC: Show Live casino
+	  + @ShowVS: Show Live Virtual Sport
+	  + @ShowCS: Show Live  RNG Casino
 	  + @MoveBetsDay: The day we move tickets to bettrans14
 */  
 BEGIN  
@@ -124,7 +128,7 @@ BEGIN
 				'GROUP BY b.winlostdate, t.LicenseeID,s.currency, b.bettype  , b.statusID'	+ char(13)		
 				
 	END	
-	IF @ShowSB = 1 OR @ShowNG = 1 OR @ShowRB = 1 OR @ShowLC = 1 OR @ShowVS = 1
+	IF (@ShowSB = 1 OR @ShowNG = 1 OR @ShowRB = 1 OR @ShowLC = 1 OR @ShowVS = 1 OR @ShowCS=1)
 	BEGIN
 		SELECT @sql = @sql + '--bettrans others exclude BA' + char(13)
 		SELECT @sql = @sql +
@@ -155,6 +159,7 @@ BEGIN
 						CASE WHEN @ShowRB = 1 THEN ' OR b.bettype BETWEEN 31 AND 33' ELSE '' END + 
 						CASE WHEN @ShowLC=1 THEN ' OR b.bettype BETWEEN 1101 AND 1199' ELSE ''END+char(13)+
 						CASE WHEN @ShowVS=1 THEN ' OR b.bettype BETWEEN 1201 AND 1299' ELSE ''END+char(13)+
+						CASE WHEN @ShowCS=1 THEN ' OR b.bettype =71' ELSE ''END+char(13)+
 						CASE WHEN @ShowNG = 1 THEN ' OR b.bettype BETWEEN 81 AND 120' ELSE '' END + ')' + char(13) +
 					CASE WHEN @bettype <> 0 THEN ' AND b.bettype = ' + convert(varchar(10), @Bettype)  ELSE '' END + char(13) +
 					'AND BA.transid IS NULL'	 + char(13) +	
@@ -203,7 +208,7 @@ BEGIN
 	END		
 	
 	--exclude BA tickets
-	IF (@showSB = 1 or @ShowRB = 1 or @ShowNG = 1 or @ShowLC = 1 or @ShowVS = 1)
+	IF (@showSB = 1 or @ShowRB = 1 or @ShowNG = 1 or @ShowLC = 1 or @ShowVS = 1 or @ShowCS=1)
 	BEGIN
 		SELECT @sql = @sql + '--exclude BA rpt_Betting' + char(13)
 		SELECT @sql = @sql +
@@ -229,6 +234,7 @@ BEGIN
 						CASE WHEN @ShowRB = 1 THEN ' OR b.bettype BETWEEN 31 AND 33' ELSE '' END + 
 						CASE WHEN @ShowLC=1 THEN ' OR b.bettype BETWEEN 1101 AND 1199' ELSE ''END+char(13)+
 						CASE WHEN @ShowVS=1 THEN ' OR b.bettype BETWEEN 1201 AND 1299' ELSE ''END+char(13)+
+						CASE WHEN @ShowCS=1 THEN ' OR b.bettype =71' ELSE ''END+char(13)+
 						CASE WHEN @ShowNG = 1 THEN ' OR b.bettype BETWEEN 81 AND 120' ELSE '' END + ')' + char(13) +
 					CASE WHEN @Currency <> 0 THEN 'AND CurrencyID=' + convert(varchar(10), @Currency) ELSE '' END + char(13) +
 					CASE WHEN @excludeTest=1 THEN 'AND CurrencyID<>20' ELSE '' END + char(13) +

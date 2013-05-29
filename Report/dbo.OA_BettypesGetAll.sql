@@ -4,7 +4,8 @@
 	@ShowNG BIT = 0,
 	@ShowBA BIT = 0,
 	@ShowLC BIT = 0,
-	@ShowVS	BIT = 0
+	@ShowVS	BIT = 0,
+	@ShowCS BIT = 0
 AS
 /*    
  Created : Kos    
@@ -18,6 +19,7 @@ AS
     - 20120821@Henry: add showLC to filter Live Casino bettype
     - 20120905@Henry: add Virtual Sports
 	- 20120912@Jim : correct bettype name ( for virtual sport) 
+	- 20130529@Jim: add RNG Casino 	
 */  
 
 BEGIN  
@@ -41,6 +43,8 @@ BEGIN
 			(@ShowLC=1 AND typeid BETWEEN 1101 AND 1199)
 			OR
 			(@ShowVS=1 AND typeid BETWEEN 1201 AND 1299)
+			OR 
+			(@ShowCS=1 AND typeid=71)
 		)
 	
 END  

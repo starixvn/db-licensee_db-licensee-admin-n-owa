@@ -9,6 +9,7 @@
  @ShowBA		BIT=0,
  @ShowLC		BIT=0,
  @ShowVS		BIT=0,
+ @ShowCS		BIT=0,
  @SportID		INT=0,
  @BettypeID		INT=0,
  @ReportType	TINYINT=1,  
@@ -24,6 +25,7 @@ AS
    
     Revisions:  
 	20121231@Henry: Enhance Performance
+	20130529@Jim: support RNG Casino
 	Param's Explanation:  
 	  + @Licensee : a string of list LicenseeID,separate by ','
 	  + @Currency :  0- All Currencies
@@ -36,6 +38,7 @@ AS
 	  + @ShowBA: Show Bet Aggregator bets (combined with Sportsbook or Number Game)
 	  + @ShowLC: Show Live casino
 	  + @ShowVS: Show Virtual Sports
+	  + @ShowCS: Show RNG Casino 
 	  +@SportID :
 			0  : selected all sporttype 
 	  +@BettypeID : 
@@ -193,7 +196,7 @@ BEGIN
 	END
 	
 	--exclude BA tickets
-	IF (@showSB = 1 or @ShowRB = 1 or @ShowNG = 1 or @ShowLC = 1 or @ShowVS = 1)
+	IF (@showSB = 1 or @ShowRB = 1 or @ShowNG = 1 or @ShowLC = 1 or @ShowVS = 1 or @ShowCS=1)
 	BEGIN
 		INSERT INTO #Temp  (LicenseeID ,ReportType,Currency,TurnOver,Winlost,LicenseeWL,WinlossRB,AmtDueToBA,AmtDueToRB,CommBA,CommRB,Company,Playercomm,Betcount)
 		SELECT 
@@ -241,6 +244,7 @@ BEGIN
 				OR(@showRB=1 AND b.bettype BETWEEN 31 AND 33)
 				OR(@showNG=1 AND b.bettype BETWEEN 81 AND 120)
 				OR(@showLC=1 AND b.bettype BETWEEN 1101 AND 1199)
+				OR(@showCS=1 AND b.bettype =71 ) -- RNG Casino
 				OR(@showVS=1 AND b.bettype BETWEEN 1201 AND 1299)
 				)	
 		GROUP BY b.siteID, CONVERT(VARCHAR(6),b.rptDate,112) , b.status,b.currencyID
@@ -407,7 +411,7 @@ BEGIN
 	END
 	
 	--exclude BA tickets
-	IF (@showSB = 1 or @ShowRB = 1 or @ShowNG = 1 or @ShowLC = 1 or @ShowVS = 1)
+	IF (@showSB = 1 or @ShowRB = 1 or @ShowNG = 1 or @ShowLC = 1 or @ShowVS = 1 OR @ShowCS=1)
 	BEGIN
 		INSERT INTO #WinLoss  
 		SELECT 
@@ -526,6 +530,7 @@ BEGIN
 				OR(@showNG=1 AND b.bettype BETWEEN 81 AND 120)
 				OR(@showLC=1 AND b.bettype BETWEEN 1101 AND 1199)
 				OR(@showVS=1 AND b.bettype BETWEEN 1201 AND 1299)
+				OR(@showCS=1 AND b.bettype =71)
 				)	
 		GROUP BY b.siteID, CONVERT(VARCHAR(6),b.rptDate,112) , b.status
 	END	
