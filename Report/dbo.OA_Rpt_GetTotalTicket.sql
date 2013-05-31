@@ -32,6 +32,7 @@ AS
     - 20120816@Henry: add ShowLiveCasino 
     - 20120905@Henry: add Virtual Sports
 	- 20130529@Jim:   add RNG Casino 
+	- 20130531@Jim: fix bug wrong @fromdate variable  
 	Param's Explanation:    
 	+ @ReportBy 1-Live; 2-Non-Live; 0: All;  
 	+ @GroupBy 1-Daily; 2-Monthly
@@ -58,7 +59,7 @@ SELECT @sql = @sql + '--Declare variable:' + char(13)
 
 SELECT @sql = @sql +	
 				'DECLARE @data AS TABLE (WinlostDate SMALLDATETIME ,ResellerID INT,LicenseeID INT, betcount INT) ' + char(13) +
-				'DECLARE @tmpLicenseeReseller AS TABLE (ResellerID INT ,LicenseeID INT)' + char(13) +
+				'DECLARE @tmpLicenseeReseller AS TABLE (ResellerID INT ,LicenseeID INT,AffectedDate Datetime)' + char(13) +
 				'DECLARE @i INT' + char(13) +
 				'DECLARE @tempBettype AS TABLE (bettype INT PRIMARY KEY)' + char(13) 
 				
@@ -69,8 +70,10 @@ IF LTRIM(RTRIM(ISNULL(@NormalLicensee,''))) <> ''
 BEGIN
 	SELECT @sql = @sql + '--Get normal licensee list:' + char(13)
 	SELECT @sql = @sql + 
-					'INSERT INTO @tmpLicenseeReseller (ResellerID,LicenseeID)' + char(13) +
-					'SELECT lr.ResellerID,lr.LicenseeID FROM bodb_licensee.dbo.LicenseeReseller lr (NOLOCK)' + char(13) +
+					'INSERT INTO @tmpLicenseeReseller (ResellerID,LicenseeID,AffectedDate)' + char(13) +
+					'SELECT lr.ResellerID,lr.LicenseeID ,
+					CASE WHEN '''+CONVERT(VARCHAR(10),@fromdate,120)+'''<=l.AffectedDate THEN l.AffectedDate ELSE '''+CONVERT(VARCHAR(10),@fromdate,120)+'''END '+ char(13) +
+					'FROM bodb_licensee.dbo.LicenseeReseller lr (NOLOCK)' + char(13) +
 					'INNER JOIN bodb_licensee.dbo.Resellers r WITH (NOLOCK) ON lr.ResellerID = r.ResellerID' + char(13) +
 					'INNER JOIN ' + char(13) +
 					'( ' + char(13) +
@@ -82,6 +85,7 @@ BEGIN
 							'FROM bodb_Licensee.dbo.OA_UserLicensees WITH(NOLOCK)	' + char(13) +
 						'WHERE UserID = ' + convert(varchar(20), @UserID)	+ char(13) +
 					')  ulr ON lr.ResellerID = ulr.ResellerID AND lr.LicenseeID = ulr.LicenseeID'	+ char(13) +
+					'INNER JOIN bodb_licensee.dbo.Licensees l WITH (NOLOCK ) ON ulr.LicenseeID=l.LicenseeID'+char(13)+
 					'WHERE  r.ResellerID <> 3 AND' + char(13) +
 					'		lr.LicenseeID IN (' + @NormalLicensee + ')'  + char(13) 
 END
@@ -104,6 +108,7 @@ BEGIN
 						'FROM bodb_Licensee.dbo.OA_UserLicensees WITH(NOLOCK)	' + char(13) +
 						'WHERE UserID = ' + convert(varchar(20), @UserID)	+ char(13) +
 					')  ulr ON lr.ResellerID = ulr.ResellerID AND lr.LicenseeID = ulr.LicenseeID'	+ char(13) +
+					'INNER JOIN bodb_licensee.dbo.Licensees l WITH (NOLOCK ) ON ulr.LicenseeID=l.LicenseeID'+char(13)+
 					'WHERE  r.ResellerID = 3 AND' + char(13) +
 					'		lr.LicenseeID IN (' + @BALicensee + ')'  + char(13) 
 END
@@ -125,10 +130,10 @@ BEGIN
 						'INNER JOIN bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) ON lr.LicenseeID = b.siteID' + char(13) +
 						'LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID' + char(13) +
 					'WHERE ' + char(13) +
-						'b.rptDate BETWEEN ''' + convert(varchar(10),@FromDate, 120) + ''' AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
+						'b.rptDate BETWEEN lr.AffectedDate  AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
 						'AND lr.ResellerID<>3' + char(13) + --BA
 						'AND lic.isdeposit=1'+ char(13) +
-						'AND ''' + convert(varchar(10),@FromDate, 120) + ''' >= isnull(lic.AffectedDate,''1999-01-01'')' + char(13) +
+						--'AND ''' + convert(varchar(10),@FromDate, 120) + ''' >= isnull(lic.AffectedDate,''1999-01-01'')' + char(13) +
 						'AND b.status NOT IN (-1,103) ' + char(13) +
 						'AND CurrencyID<>20 ' + char(13) +
 						'AND (b.bettype < ' + CASE WHEN @ShowSB=1 THEN + ' 31 OR b.bettype BETWEEN 121 AND 999' ELSE '0' END +
@@ -159,10 +164,10 @@ BEGIN
 						'INNER JOIN bodb_Licensee.dbo.rpt_Betting_BA b WITH ( NOLOCK) ON lr.LicenseeID = b.siteID' + char(13) +
 						'LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID' + char(13) +
 					'WHERE ' + char(13) +
-						'b.rptDate BETWEEN ''' + convert(varchar(10),@FromDate, 120) + ''' AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
+						'b.rptDate BETWEEN lr.AffectedDate AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
 						'AND lr.ResellerID=3'+ char(13) +
 						'AND lic.isdeposit=1'+ char(13) +
-						'AND ''' + convert(varchar(10),@FromDate, 120) + ''' >= isnull(lic.AffectedDate,''1999-01-01'')' + char(13) +
+						--'AND ''' + convert(varchar(10),@FromDate, 120) + ''' >= isnull(lic.AffectedDate,''1999-01-01'')' + char(13) +
 						'AND b.status NOT IN (-1,103) ' + char(13) +
 						'AND CurrencyID<>20 ' + char(13) +
 						CASE WHEN @bettype<>0 THEN 'AND b.bettype = ' + convert(varchar(10), @Bettype)  ELSE '' END + char(13) +	
@@ -186,11 +191,11 @@ BEGIN
 					'INNER JOIN bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) ON b.siteID=lb.LabelID' + char(13) +
 						'LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID' + char(13) +
 					'WHERE ' + char(13) +
-						'b.rptDate BETWEEN ''' + convert(varchar(10),@FromDate, 120) + ''' AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
+						'b.rptDate BETWEEN lr.AffectedDate AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
 						'AND b.status NOT IN (-1,103) ' + char(13) +
 						'AND lr.ResellerID<>3' + char(13) + --BA
 						--'AND b.siteID IN (SELECT LicenseeID FROM @creditSite)' + char(13) +
-						'AND ''' + convert(varchar(10),@FromDate, 120) + ''' >= isnull(lb.AffectedDate,''1999-01-01'')' + char(13) +
+						--'AND ''' + convert(varchar(10),@FromDate, 120) + ''' >= isnull(lb.AffectedDate,''1999-01-01'')' + char(13) +
 						'AND CurrencyID<>20 ' + char(13) +
 						'AND isnull(b.customercategory,-1) NOT IN (27,28) ' + char(13) +
 						'AND (b.bettype < ' + CASE WHEN @ShowSB=1 THEN + ' 31 OR b.bettype BETWEEN 121 AND 999' ELSE '0' END +
@@ -252,8 +257,6 @@ SELECT @sql = @sql +
 					WHEN @GroupBy = 2 THEN 'CONVERT(VARCHAR(6),d.winlostdate,112)'
 					END + char(13) +
 			',r.ResellerName, l.LicenseeName ' + char(13) 
-				
-				
 
 IF (@debug = 1) PRINT @sql
 ELSE EXEC(@sql)

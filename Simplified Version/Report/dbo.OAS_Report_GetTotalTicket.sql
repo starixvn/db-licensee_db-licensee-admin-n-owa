@@ -18,6 +18,7 @@ AS
 	20120405@Henry: Get resellerID to calculate the rate
 	20120515@Henry: exclude customercategory 28 - BARM
 	20120704@Henry: Map Licensee with System
+	20130531@Jim: fix bug wrong @fromdate variable
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
  *  - @Operator   : List of operator ID separated by ','  
@@ -39,7 +40,7 @@ SELECT @sql = @sql + '--Declare variable:' + char(13)
 
 SELECT @sql = @sql +	
 				'DECLARE @data AS TABLE (WinlostDate SMALLDATETIME, ResellerID INT, LicenseeID INT, betcount INT)  ' + char(13) +
-				'DECLARE @tmpLicenseeReseller AS TABLE (ResellerID INT, LicenseeID INT) ' + char(13) 
+				'DECLARE @tmpLicenseeReseller AS TABLE (ResellerID INT, LicenseeID INT,AffectedDate Datetime) ' + char(13) 
 				
      
 -- Normal licensees  
@@ -47,10 +48,12 @@ IF LTRIM(RTRIM(ISNULL(@NormalLicensee,''))) <> ''
 BEGIN
 	SELECT @sql = @sql + '--Get normal licensee list:' + char(13)
 	SELECT @sql = @sql +
-					'INSERT INTO @tmpLicenseeReseller (ResellerID,LicenseeID) ' + char(13) +
-					'SELECT lr.ResellerID,lr.LicenseeID '+ char(13) +
+					'INSERT INTO @tmpLicenseeReseller (ResellerID,LicenseeID,AffectedDate) ' + char(13) +
+					'SELECT lr.ResellerID,lr.LicenseeID ,
+					CASE WHEN '''+CONVERT(VARCHAR(10),@fromdate,120)+'''<=l.AffectedDate THEN l.AffectedDate ELSE '''+CONVERT(VARCHAR(10),@fromdate,120)+'''END '+ char(13) +
 					'FROM'+ char(13) +
 						'bodb_licensee.dbo.LicenseeReseller lr (NOLOCK)'+ char(13) +
+						'INNER JOIN bodb_licensee.dbo.Licensees l WITH (NOLOCK) ON lr.LicenseeID=l.LicenseeID'+char(13)+
 						'INNER JOIN bodb_licensee.dbo.Resellers r WITH (NOLOCK) ON lr.ResellerID = r.ResellerID' + char(13) +
 					'WHERE' + char(13) +
 						'r.ResellerID <> 3 AND' + char(13) +
@@ -62,10 +65,12 @@ IF LTRIM(RTRIM(ISNULL(@Operator,''))) <> ''
 BEGIN
 	SELECT @sql = @sql + '--Get Operator list:' + char(13)
 	SELECT @sql = @sql + 
-					'INSERT INTO @tmpLicenseeReseller (ResellerID, LicenseeID)   ' + char(13) +
-					'SELECT lr.ResellerID, lr.LicenseeID   ' + char(13) +
+					'INSERT INTO @tmpLicenseeReseller (ResellerID, LicenseeID,AffectedDate)   ' + char(13) +
+					'SELECT lr.ResellerID, lr.LicenseeID   ,
+							CASE WHEN  '''+CONVERT(VARCHAR(10),@fromdate,120)+'''<=l.AffectedDate THEN l.AffectedDate ELSE '''+CONVERT(VARCHAR(10),@fromdate,120)+'''END'+ char(13) +
 					'FROM ' + char(13) +
 						'bodb_licensee.dbo.LicenseeReseller lr (NOLOCK)' + char(13) +
+						'INNER JOIN bodb_licensee.dbo.Licensees l WITH (NOLOCK) ON lr.LicenseeID=l.LicenseeID'+char(13)+
 						'INNER JOIN bodb_licensee.dbo.Resellers r WITH (NOLOCK) ON lr.ResellerID = r.ResellerID' + char(13) +
 					'WHERE ' + char(13) +
 						'r.ResellerID IN (' + @Operator + ')' + char(13) 
@@ -85,14 +90,14 @@ SELECT @sql = @sql +
 						'INNER JOIN bodb_Licensee.dbo.Systems s (NOLOCK) ON sl.SystemID=s.ID '+ char(13) +
 						'LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID' + char(13) +
 					'WHERE' + char(13) +
-						'b.rptDate BETWEEN ''' + convert(varchar(10),@FromDate, 120) + ''' AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
+						'b.rptDate BETWEEN  lr.AffectedDate  AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
 						'AND lr.ResellerID<>3' + char(13) + --BA
 						'AND lic.isdeposit=1'+ char(13) +
 						'AND sl.IsActive = 1' + char(13) +
 						'AND s.SystemName=''OAS''' + char(13) +
 						--'AND lic.IsActive=1'+ char(13) +
 						--'AND lic.IsOneWorkActive=1'+ char(13) +
-						'AND ''' + convert(varchar(10),@FromDate, 120) + ''' >= isnull(lic.AffectedDate,''1999-01-01'')' + char(13) +
+						---'AND ''' + convert(varchar(10),@FromDate, 120) + ''' >= isnull(lic.AffectedDate,''1999-01-01'')' + char(13) +
 						'AND b.status NOT IN (-1,103) ' + char(13) +
 						'AND CurrencyID<>20 ' + char(13) +
 						'AND (b.bettype < 31 OR bettype BETWEEN 121 AND 999)' + char(13) +
@@ -115,14 +120,14 @@ SELECT @sql = @sql +
 						'INNER JOIN bodb_Licensee.dbo.rpt_Betting_BA b WITH ( NOLOCK) ON lr.LicenseeID = b.siteID' + char(13) +
 						'LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID' + char(13) +
 					'WHERE' + char(13) +
-						'b.rptDate BETWEEN ''' + convert(varchar(10),@FromDate, 120) + ''' AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
+						'b.rptDate BETWEEN lr.AffectedDate AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
 						'AND lr.ResellerID=3'+ char(13) +
 						'AND lic.isdeposit=1'+ char(13) +
 						'AND sl.IsActive = 1' + char(13) +
 						'AND s.SystemName=''OAS''' + char(13) +
 						--'AND lic.IsActive=1'+ char(13) +
 						--'AND lic.IsOneWorkActive=1'+ char(13) +
-						'AND ''' + convert(varchar(10),@FromDate, 120) + ''' >= isnull(lic.AffectedDate,''1999-01-01'')' + char(13) +
+						---'AND ''' + convert(varchar(10),@FromDate, 120) + ''' >= isnull(lic.AffectedDate,''1999-01-01'')' + char(13) +
 						'AND b.status NOT IN (-1,103) ' + char(13) +
 						'AND CurrencyID<>20 ' + char(13) +
 						CASE WHEN @SportID<>0 THEN 'AND b.bettype NOT IN (9,29)  AND l.Sporttype = ' + convert(varchar(10), @SportID)  ELSE '' END + char(13) +
@@ -142,10 +147,10 @@ SELECT @sql = @sql +
 						'INNER JOIN bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) ON b.siteID=lb.LabelID' + char(13) +
 						'LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID' + char(13) +
 					'WHERE' + char(13) +	
-						'b.rptDate BETWEEN ''' + convert(varchar(10),@FromDate, 120) + ''' AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
+						'b.rptDate BETWEEN lr.AffectedDate AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
 						'AND b.status NOT IN (-1,103) ' + char(13) +
 						'AND lr.ResellerID<>3' + char(13) + --BA
-						'AND ''' + convert(varchar(10),@FromDate, 120) + ''' >= isnull(lb.AffectedDate,''1999-01-01'')' + char(13) +
+						---'AND ''' + convert(varchar(10),@FromDate, 120) + ''' >= isnull(lb.AffectedDate,''1999-01-01'')' + char(13) +
 						'AND CurrencyID<>20 ' + char(13) +
 						'AND isnull(b.customercategory,-1) NOT IN (27,28) ' + char(13) +
 						'AND (b.bettype < 31 OR bettype BETWEEN 121 AND 999)' + char(13) +
