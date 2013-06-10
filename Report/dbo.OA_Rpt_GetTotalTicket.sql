@@ -1,4 +1,12 @@
-﻿ALTER PROCEDURE [dbo].[OA_Rpt_GetTotalTicket]    
+﻿USE [bodb02]
+GO
+/****** Object:  StoredProcedure [dbo].[OA_Rpt_GetTotalTicket_xtest]    Script Date: 06/10/2013 05:28:41 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+/****** Object:  Stored Procedure dbo.OA_Rpt_GetTotalTicket_xtest    Script Date: 2013-06-05 4:42:56 PM ******/
+ALTER PROCEDURE [dbo].[OA_Rpt_GetTotalTicket]    
 	@NormalLicensee VARCHAR(1000),
 	@BALicensee VARCHAR(1000),
 	@FromDate		SMALLDATETIME,  
@@ -93,24 +101,26 @@ END
 --2 BA Licensee
 IF LTRIM(RTRIM(ISNULL(@BALicensee,''))) <> ''
 BEGIN
-	SELECT @sql = @sql + '--Get BA licensee list:' + char(13)
-	SELECT @sql = @sql + 
-					'INSERT INTO @tmpLicenseeReseller (ResellerID,LicenseeID)' + char(13) +
-					'SELECT lr.ResellerID,lr.LicenseeID FROM bodb_licensee.dbo.LicenseeReseller lr (NOLOCK)' + char(13) +
-					'INNER JOIN bodb_licensee.dbo.Resellers r WITH (NOLOCK) ON lr.ResellerID = r.ResellerID' + char(13) +
-					'INNER JOIN ' + char(13) +
-					'( ' + char(13) +
-						'SELECT	gl.ResellerID,gl.LicenseeID ' + char(13) +
-						'FROM bodb_Licensee.dbo.OA_GroupLicensees AS gl WITH(NOLOCK) ' + char(13) +
-						'INNER JOIN bodb_Licensee.dbo.OA_Users AS u WITH(NOLOCK) ON gl.GroupID=u.GroupID AND u.UserID = ' + convert(varchar(20), @UserID) + char(13) +
-						'UNION' + char(13) +
-						'SELECT	ResellerID,LicenseeID ' + char(13) +
-						'FROM bodb_Licensee.dbo.OA_UserLicensees WITH(NOLOCK)	' + char(13) +
-						'WHERE UserID = ' + convert(varchar(20), @UserID)	+ char(13) +
-					')  ulr ON lr.ResellerID = ulr.ResellerID AND lr.LicenseeID = ulr.LicenseeID'	+ char(13) +
+    SELECT @sql = @sql + '--Get BA licensee list:' + char(13)
+    SELECT @sql = @sql + 
+                    'INSERT INTO @tmpLicenseeReseller (ResellerID,LicenseeID,AffectedDate)' + char(13) +
+                    'SELECT lr.ResellerID,lr.LicenseeID ,
+					CASE WHEN '''+CONVERT(VARCHAR(10),@fromdate,120)+'''<=l.AffectedDate THEN l.AffectedDate ELSE '''+CONVERT(VARCHAR(10),@fromdate,120)+'''END '+ char(13) +
+					'FROM bodb_licensee.dbo.LicenseeReseller lr (NOLOCK)' + char(13) +
+                    'INNER JOIN bodb_licensee.dbo.Resellers r WITH (NOLOCK) ON lr.ResellerID = r.ResellerID' + char(13) +
+                    'INNER JOIN ' + char(13) +
+                    '( ' + char(13) +
+                        'SELECT    gl.ResellerID,gl.LicenseeID ' + char(13) +
+                        'FROM bodb_Licensee.dbo.OA_GroupLicensees AS gl WITH(NOLOCK) ' + char(13) +
+                        'INNER JOIN bodb_Licensee.dbo.OA_Users AS u WITH(NOLOCK) ON gl.GroupID=u.GroupID AND u.UserID = ' + convert(varchar(20), @UserID) + char(13) +
+                        'UNION' + char(13) +
+                        'SELECT    ResellerID,LicenseeID ' + char(13) +
+                        'FROM bodb_Licensee.dbo.OA_UserLicensees WITH(NOLOCK)    ' + char(13) +
+                        'WHERE UserID = ' + convert(varchar(20), @UserID)    + char(13) +
+                    ')  ulr ON lr.ResellerID = ulr.ResellerID AND lr.LicenseeID = ulr.LicenseeID'    + char(13) +
 					'INNER JOIN bodb_licensee.dbo.Licensees l WITH (NOLOCK ) ON ulr.LicenseeID=l.LicenseeID'+char(13)+
-					'WHERE  r.ResellerID = 3 AND' + char(13) +
-					'		lr.LicenseeID IN (' + @BALicensee + ')'  + char(13) 
+                    'WHERE  r.ResellerID = 3 AND' + char(13) +
+                    '        lr.LicenseeID IN (' + @BALicensee + ')'  + char(13) 
 END
 				
 
@@ -261,13 +271,9 @@ SELECT @sql = @sql +
 IF (@debug = 1) PRINT @sql
 ELSE EXEC(@sql)
 
-
-
-   
-
 END
 
 GO
 GRANT EXECUTE ON [dbo].[OA_Rpt_GetTotalTicket] TO [bodbAdminNet]
 GO
-GRANT VIEW DEFINITION ON [dbo].[OA_Rpt_GetTotalTicket] TO [vnteam]  
+GRANT VIEW DEFINITION ON [dbo].[OA_Rpt_GetTotalTicket] TO [vnteam] 
