@@ -14,6 +14,7 @@ AS
 	- 20121127@Henry: reset official launch date for Alog to 23/Nov/2012
 	- 20121213@Henry: reset official launch date for Bodog to 05/Nov/2012
 	- 20121213@henry: change to use Effectivedate from LicenseeProduct3rd instead of hard-code
+	- 20130612@Jim: change condition for AffectedDate,EffectiveDate
 	
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
@@ -27,7 +28,7 @@ BEGIN
 
 SET NOCOUNT ON
 
-DECLARE @tmpLicenseeReseller AS TABLE (ResellerID INT, LicenseeID INT)
+DECLARE @tmpLicenseeReseller AS TABLE (ResellerID INT, LicenseeID INT,AffectedDate Datetime)
 
 CREATE TABLE #Data (winlostdate  DATETIME, Currency  INT,  ResellerID int, LicenseeID int,turnover MONEY, MemberWinloss MONEY,LicenseeWL MONEY, Betcount INT)
 CREATE TABLE #Result (ResellerID INT,LicenseeID int,turnover MONEY, MemberWinloss MONEY,GrossWinloss MONEY, DistributorRevenue MONEY, Betcount INT,LupineRevenue MONEY, OneworksRevenue MONEY,DistributorsChargeRate MONEY, LupineChargeRate MONEY,OneworksChargeRate MONEY)
@@ -36,11 +37,13 @@ DECLARE @Exchange TABLE(ExchangeDate SMALLDATETIME, ExchangeId INT,  EUR FLOAT, 
 --Get normal licensee list:
 IF LTRIM(RTRIM(ISNULL(@NormalLicensee,''))) <> ''
 BEGIN
-	INSERT INTO @tmpLicenseeReseller (ResellerID,LicenseeID)
-	SELECT lr.ResellerID,lr.LicenseeID
+	INSERT INTO @tmpLicenseeReseller (ResellerID,LicenseeID,AffectedDate)
+	SELECT lr.ResellerID,lr.LicenseeID,
+			CASE WHEN @fromdate<=l.AffectedDate THEN l.AffectedDate ELSE @fromdate END AffectedDate
 	FROM	
 		bodb_licensee.dbo.LicenseeReseller lr (NOLOCK)
 		INNER JOIN bodb_licensee.dbo.Resellers r WITH (NOLOCK) ON lr.ResellerID = r.ResellerID
+		INNER JOIN bodb_licensee.dbo.Licensees l WITH (NOLOCK) ON lr.LicenseeID=l.LicenseeID
 	WHERE
 		r.ResellerID <> 3 
 		AND lr.LicenseeID IN (SELECT RTRIM(LTRIM(VAL)) FROM strSplit(@NormalLicensee,','))	
@@ -49,11 +52,13 @@ END
 -- Operator
 IF LTRIM(RTRIM(ISNULL(@Operator,''))) <> ''
 BEGIN
-	INSERT INTO @tmpLicenseeReseller (ResellerID, LicenseeID)   
-	SELECT lr.ResellerID, lr.LicenseeID   
+	INSERT INTO @tmpLicenseeReseller (ResellerID, LicenseeID,AffectedDate)   
+	SELECT lr.ResellerID, lr.LicenseeID,
+			CASE WHEN @fromdate<=l.AffectedDate THEN l.AffectedDate ELSE @fromdate END AffectedDate 
 	FROM 
 		bodb_licensee.dbo.LicenseeReseller lr (NOLOCK)
 		INNER JOIN bodb_licensee.dbo.Resellers r WITH (NOLOCK) ON lr.ResellerID = r.ResellerID
+		INNER JOIN bodb_licensee.dbo.Licensees l WITH (NOLOCK) ON lr.LicenseeID=l.LicenseeID
 	WHERE
 		r.ResellerID IN (SELECT RTRIM(LTRIM(VAL)) FROM strSplit(@Operator,','))		
 END
@@ -70,17 +75,16 @@ BEGIN
 		INNER JOIN bodb_Licensee.dbo.Systems s (NOLOCK) ON sl.SystemID=s.ID
 		INNER JOIN bodb_Licensee.dbo.LicenseeProduct3rd p (NOLOCK) ON lic.LicenseeID=p.LicenseeID AND p.ProductID=2
 	WHERE
-		b.rptDate BETWEEN @FromDate AND @ToDate
+		b.rptDate BETWEEN lr.AffectedDate AND @ToDate
 		AND lr.ResellerID<>3
 		AND lic.isdeposit=1
 		AND sl.IsActive = 1
 		AND s.SystemName='OAS'
 		--AND @FromDate >= isnull(lic.AffectedDate,'1999-01-01')
-		AND b.rptDate >= isnull(lic.AffectedDate,'1999-01-01')
 		AND b.status NOT IN (-1,103)
 		AND CurrencyID<>20
 		AND bettype BETWEEN 81 AND 120
-		AND b.rptDate >= isnull(p.EffectiveDate, '1999-01-01')
+		AND b.rptDate > isnull(p.EffectiveDate, @ToDate)
 	GROUP BY b.rptDate,b.currencyID, lr.ResellerID, lr.licenseeid
 END
 
@@ -95,12 +99,10 @@ BEGIN
 		INNER JOIN bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) ON b.siteID=lb.LabelID
 		INNER JOIN bodb_Licensee.dbo.LicenseeProduct3rd p (NOLOCK) ON lr.LicenseeID=p.LicenseeID AND p.ProductID=2
 	WHERE
-		b.rptDate BETWEEN @FromDate AND @ToDate
-		AND b.rptDate >= isnull(p.EffectiveDate,'1999-01-01')
+		b.rptDate BETWEEN lr.AffectedDate AND @ToDate
+		AND b.rptDate > isnull(p.EffectiveDate,@ToDate)
 		AND b.status NOT IN (-1,103)
 		AND lr.ResellerID IN (4,8)
-		--AND @FromDate >= isnull(lb.AffectedDate,'1999-01-01')
-		AND b.rptDate >= isnull(lb.AffectedDate,'1999-01-01')
 		AND CurrencyID<>20
 		AND bettype BETWEEN 81 AND 120
 		AND b.customercategory NOT IN (27,28) 

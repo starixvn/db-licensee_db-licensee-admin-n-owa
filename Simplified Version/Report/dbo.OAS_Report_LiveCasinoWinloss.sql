@@ -18,7 +18,8 @@ AS
  * Revisions :  
 	- 20121105@Henry: using new table ResellerProductChargeByDateRange 	
 	- 20130219@Jim: add more filter for Licensee From table LicenseeProduct3rd
-	-20130405@Jim: only Baccarat data included in the report
+	- 20130405@Jim: only Baccarat data included in the report
+	- 20130612@Jim: change condition for AffectedDate
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
  *  - @Operator   : List of operator ID separated by ','  
@@ -75,7 +76,7 @@ BEGIN
 		INNER JOIN bodb_licensee.dbo.LicenseeProduct3rd p WITH (NOLOCK) ON lic.LicenseeID=p.LicenseeID AND p.ProductID=4
 	WHERE
 		b.rptDate BETWEEN @FromDate AND @ToDate
-		AND b.rptDate >= isnull(p.EffectiveDate,'1999-01-01')
+		AND b.rptDate > isnull(p.EffectiveDate,@ToDate)
 		AND lr.ResellerID<>3
 		AND lic.isdeposit=1
 		AND sl.IsActive = 1
@@ -100,7 +101,7 @@ BEGIN
 		INNER JOIN bodb_licensee.dbo.LicenseeProduct3rd p WITH (NOLOCK) ON lr.LicenseeID=p.LicenseeID AND p.ProductID=4
 	WHERE
 		b.rptDate BETWEEN @FromDate AND @ToDate
-		AND b.rptDate >= isnull(p.EffectiveDate,'1999-01-01')
+		AND b.rptDate > isnull(p.EffectiveDate,@ToDate)
 		AND b.status NOT IN (-1,103)
 		AND lr.ResellerID<>3
 		--AND @FromDate >= isnull(lb.AffectedDate,'1999-01-01')
