@@ -85,8 +85,6 @@ BEGIN
 		AND lic.isdeposit=1
 		AND sl.IsActive = 1
 		AND s.SystemName='OA'
-		--AND @FromDate >= isnull(lic.AffectedDate,'1999-01-01')
-		AND b.rptDate >= isnull(lic.AffectedDate,'1999-01-01')
 		AND b.status NOT IN (-1,103)
 		AND CurrencyID<>20
 		AND bettype=1101
@@ -108,8 +106,6 @@ BEGIN
 		AND b.rptDate > =isnull(p.EffectiveDate,DATEADD(DAY,1,@ToDate))
 		AND b.status NOT IN (-1,103)
 		AND lr.ResellerID<>3
-		--AND @FromDate >= isnull(lb.AffectedDate,'1999-01-01')
-		AND b.rptDate >= isnull(lb.AffectedDate,'1999-01-01')
 		AND CurrencyID<>20
 		AND b.bettype=1101
 		--AND bettype BETWEEN 1101 AND 1199
