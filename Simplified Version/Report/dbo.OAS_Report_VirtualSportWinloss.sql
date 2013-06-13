@@ -77,15 +77,17 @@ END
 IF EXISTS(SELECT 1 FROM @tmpLicenseeReseller lr INNER JOIN bodb_licensee.dbo.licensees l WITH (nolock) ON lr.licenseeid=l.licenseeid  WHERE l.IsDeposit=1 AND lr.ResellerID<>3)
 BEGIN
 	INSERT INTO #Data
-	SELECT  b.rptDate,b.currencyID,lr.ResellerID,lr.licenseeid,SUM(Turnover) as Turnover, SUM(Winloss) AS MemberWinloss,SUM(BetCount) AS betcount
+	SELECT  b.rptDate,b.currencyID,lr.ResellerID,lr.licenseeid,SUM(Turnover) as Turnover, SUM(b.Winloss) AS MemberWinloss,SUM(BetCount) AS betcount
 	FROM @tmpLicenseeReseller lr
 		INNER JOIN bodb_licensee.dbo.licensees lic WITH ( NOLOCK) ON lic.licenseeid=lr.licenseeid
 		INNER JOIN bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) ON lr.LicenseeID = b.siteID
 		INNER JOIN bodb_Licensee.dbo.SystemLicensee sl (NOLOCK) ON lic.LicenseeID=sl.LicenseeID
 		INNER JOIN bodb_Licensee.dbo.Systems s (NOLOCK) ON sl.SystemID=s.ID
 		INNER JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
+		INNER JOIN bodb_licensee.dbo.LicenseeProduct3rd p WITH (NOLOCK) ON lr.LicenseeID=p.LicenseeID AND p.ProductID=5
 	WHERE
 		b.rptDate BETWEEN lr.AffectedDate AND @ToDate
+		AND b.rptDate >= isnull(p.EffectiveDate,DATEADD(DAY,1,@ToDate))
 		AND lr.ResellerID<>3
 		AND lic.isdeposit=1
 		AND sl.IsActive = 1
@@ -101,13 +103,15 @@ END
 IF EXISTS(SELECT 1 FROM @tmpLicenseeReseller lr inner JOIN bodb_licensee.dbo.licensees l WITH (nolock) ON lr.licenseeid=l.licenseeid where l.IsDeposit=0)
 BEGIN
 	INSERT INTO #Data
-	SELECT  b.rptDate,b.currencyID,lr.ResellerID,lr.licenseeid,SUM(Turnover) as Turnover, SUM(Winloss) AS MemberWinloss,SUM(BetCount) AS betcount
+	SELECT  b.rptDate,b.currencyID,lr.ResellerID,lr.licenseeid,SUM(Turnover) as Turnover, SUM(b.Winloss) AS MemberWinloss,SUM(BetCount) AS betcount
 	FROM @tmpLicenseeReseller lr
 		INNER JOIN bodb_Licensee.dbo.labels lb WITH (NOLOCK) ON lr.LicenseeID=lb.LicenseeID
 		INNER JOIN bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) ON b.siteID=lb.LabelID
 		INNER JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
+		INNER JOIN bodb_licensee.dbo.LicenseeProduct3rd p WITH (NOLOCK) ON lr.LicenseeID=p.LicenseeID AND p.ProductID=5
 	WHERE
 		b.rptDate BETWEEN lr.AffectedDate AND @ToDate
+		AND b.rptDate >= isnull(p.EffectiveDate,DATEADD(DAY,1,@ToDate))
 		AND b.status NOT IN (-1,103)
 		AND lr.ResellerID<>3
 		AND CurrencyID<>20
