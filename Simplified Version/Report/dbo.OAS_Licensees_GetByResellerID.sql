@@ -33,7 +33,7 @@ CREATE TABLE #Data (ResellerID int,ResellerName varchar(50), ResellerType INT,Re
 DECLARE @ProductID INT
   
 INSERT INTO #Data  (ResellerID,ResellerName, ResellerType,ResellerDescription,LicenseeID, LicenseeName,LicenseeDescription)
-SELECT   
+SELECT  
 	r.ResellerID,  
 	r.ResellerName,  
 	r.ResellerType,
@@ -80,7 +80,7 @@ BEGIN
 
 END
 
-SELECT * FROM #Data
+SELECT DISTINCT * FROM #Data
 
 DROP TABLE #Data
 
