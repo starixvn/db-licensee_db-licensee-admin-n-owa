@@ -1,5 +1,5 @@
 ﻿ALTER  PROCEDURE [dbo].[OA_Rpt_LicWinloss_Summary2]  
- @Licensee	VARCHAR(1000),
+ @Licensee	VARCHAR(1000)='',
  @Currency		INT = 0,
  @FromDate		SMALLDATETIME,  
  @ToDate		SMALLDATETIME,   
