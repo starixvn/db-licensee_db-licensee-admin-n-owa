@@ -61,7 +61,7 @@ WHERE
 	AND s.SystemName='OAS'
 	AND ((@ExcludeBA=0) OR (@ExcludeBA=1 AND r.ResellerID <> 3))
 	AND ((@ExcludeTest=0) OR (@ExcludeTest=1 AND r.ResellerID <> 6))
-	AND (ISNULL(@ProductCode,0)=0 OR (ISNULL(@ProductCode,0)<>0 AND ISNULL(ld.EffectiveDate,0)<>0))
+	AND (ISNULL(LTRIM(RTRIM(@ProductCode)),'')='' OR (ISNULL(LTRIM(RTRIM(@ProductCode)),''))<>'' AND ISNULL(ld.EffectiveDate,0)<>0))
 ORDER BY l.IsDeposit DESC,r.ResellerName, l.LicenseeName
 
 SET @ProductCode = ISNULL(LTRIM(RTRIM(@ProductCode)),'')
