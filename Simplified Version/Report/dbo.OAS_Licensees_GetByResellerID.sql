@@ -21,6 +21,7 @@ AS
 	- 20120828@Henry: add 2 more params @ExcludeBA and @ExcludeTest
 	- 20120917@Henry: add param @ProductCode
 	- 20130222@Scott: add filter LicenseeProduct3rd.EffectiveDate <> null
+	- 20130621@Jim: fix bug wrong conditiion when inner join with table licenseeProduct3rd
  * Param's Explanation:    
  *  - @ResellerID : Reseller ID (0 : All reseller)  
  *	- @ExcludeBA: to exclude BA Licensees (Starlit)
@@ -45,9 +46,9 @@ FROM
 	dbo.Licensees AS l WITH (NOLOCK)   
 	INNER JOIN dbo.LicenseeReseller AS ls WITH (NOLOCK) ON l.LicenseeID = ls.LicenseeID AND (@ResellerID = 0 OR ls.ResellerID = @ResellerID)  
 	INNER JOIN dbo.Resellers AS r WITH (NOLOCK)	ON r.ResellerID = ls.ResellerID  
-	INNER JOIN SystemLicensee sl (NOLOCK) ON l.LicenseeID=sl.LicenseeID 
-	INNER JOIN Systems s (NOLOCK) ON sl.SystemID=s.ID 
-	INNER JOIN dbo.LicenseeProduct3rd ld WITH (NOLOCK) ON l.LicenseeID=ld.LicenseeID
+	INNER JOIN SystemLicensee AS sl (NOLOCK) ON l.LicenseeID=sl.LicenseeID 
+	INNER JOIN Systems AS s (NOLOCK) ON sl.SystemID=s.ID 
+	LEFT JOIN dbo.LicenseeProduct3rd AS  ld WITH (NOLOCK) ON l.LicenseeID=ld.LicenseeID
 WHERE 
 	(
 		l.IsDeposit = 1  
@@ -60,7 +61,7 @@ WHERE
 	AND s.SystemName='OAS'
 	AND ((@ExcludeBA=0) OR (@ExcludeBA=1 AND r.ResellerID <> 3))
 	AND ((@ExcludeTest=0) OR (@ExcludeTest=1 AND r.ResellerID <> 6))
-	AND ISNULL(ld.EffectiveDate,0)<>0
+	AND (ISNULL(@ProductCode,0)=0 OR (ISNULL(@ProductCode,0)<>0 AND ISNULL(ld.EffectiveDate,0)<>0))
 ORDER BY l.IsDeposit DESC,r.ResellerName, l.LicenseeName
 
 SET @ProductCode = ISNULL(LTRIM(RTRIM(@ProductCode)),'')
