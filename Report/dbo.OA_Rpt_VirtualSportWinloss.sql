@@ -20,6 +20,7 @@ AS
 	- 20121105@Henry: using new table ResellerProductChargeByDateRange 	
 	- 20121116@Jim: add @betlist input parameter and use @sporttype intead of @SportList
 	- 20121129@Henry: add more columns
+	- 20130624@Jim: Break down licensees under Boping 
  
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
@@ -37,7 +38,7 @@ SET NOCOUNT ON
 DECLARE @tmpLicenseeReseller AS TABLE (ResellerID INT, LicenseeID INT)
 
 CREATE TABLE #Data (winlostdate  DATETIME, Currency  INT,  ResellerID int, LicenseeID int,turnover MONEY, MemberWinloss MONEY, Betcount INT)
-CREATE TABLE #Result (ResellerID INT,LicenseeID int,turnover MONEY, MemberWinloss MONEY,GrossWinloss MONEY,DistributorRevenue MONEY, Betcount INT,OneworksIncome MONEY,AmtDueToInspired MONEY,DistributorsChargeRate MONEY,OneworksChargeRate MONEY, InspiredChargeRate MONEY)
+CREATE TABLE #Result (ResellerID INT,LicenseeID int,winlostdate  varchar(6),turnover MONEY, MemberWinloss MONEY,GrossWinloss MONEY,DistributorRevenue MONEY, Betcount INT,OneworksIncome MONEY,AmtDueToInspired MONEY,DistributorsChargeRate MONEY,OneworksChargeRate MONEY, InspiredChargeRate MONEY)
 
 
 --Get normal licensee list:
@@ -121,9 +122,11 @@ SELECT * INTO #TempExchange
 FROM Lrf_f_GetExchangeDaily(@FromDate,@ToDate)
 WHERE exchangeid IN (SELECT DISTINCT Currency FROM #Data)
 
-INSERT INTO #Result(ResellerID,LicenseeID,turnover, MemberWinloss,GrossWinloss,DistributorRevenue, Betcount,OneworksIncome,AmtDueToInspired,DistributorsChargeRate,OneworksChargeRate, InspiredChargeRate)
+INSERT INTO #Result(ResellerID,LicenseeID,winlostdate,turnover, MemberWinloss,GrossWinloss,DistributorRevenue, Betcount,OneworksIncome,AmtDueToInspired,DistributorsChargeRate,OneworksChargeRate, InspiredChargeRate)
 SELECT	
-	r.ResellerID,d.LicenseeID,
+	r.ResellerID,
+	d.LicenseeID,
+	Convert(varchar(6),d.winlostdate,112) as winlostdate,
 	CAST(isnull(SUM(d.turnover * e.EUR),0) AS MONEY) AS Turnover,
 	CAST(isnull(SUM(d.MemberWinloss * e.EUR),0) AS MONEY) AS MemberWinloss,
 	CAST(CASE WHEN isnull(SUM(d.MemberWinloss * e.EUR),0) > 0 THEN 0 ELSE -1 * isnull(SUM(d.MemberWinloss * e.EUR),0) END AS money) AS GrossWinloss,
@@ -141,12 +144,13 @@ FROM #Data d
 	LEFT JOIN bodb_licensee.dbo.ResellerProductChargeByDateRange INS ON d.ResellerID = INS.ResellerID AND INS.PartyID = 2 AND INS.ProductID = 5 AND d.winlostdate BETWEEN INS.FromDate AND INS.ToDate	
 	LEFT JOIN bodb_licensee.dbo.ResellerProductChargeByDateRange DI ON d.ResellerID = DI.ResellerID AND DI.PartyID = 4 AND DI.ProductID = 5 AND d.winlostdate BETWEEN DI.FromDate AND DI.ToDate
 GROUP BY
-	r.ResellerID,d.LicenseeID,DI.ChargeRate,OW.ChargeRate,INS.ChargeRate
+	r.ResellerID,d.LicenseeID,Convert(varchar(6),d.winlostdate,112),DI.ChargeRate,OW.ChargeRate,INS.ChargeRate
 	
 --return the result
 SELECT	
 	r.ResellerID,r.ResellerName,
-	CASE WHEN r.ResellerType = 2 THEN '' ELSE l.LicenseeName END AS LicenseeName,
+	CASE WHEN (r.ResellerType = 2 and re.resellerID<>7) THEN '' ELSE l.LicenseeName END AS LicenseeName,
+	re.winlostdate,
 	r.ResellerType,
 	ISNULL(SUM(re.betcount), 0) AS BetCount,
 	CAST(isnull(SUM(re.turnover),0) AS MONEY) AS Turnover,
@@ -163,9 +167,9 @@ FROM #Result re
 	LEFT JOIN bodb_licensee.dbo.Licensees l WITH (NOLOCK) ON l.LicenseeID = re.LicenseeID
 		
 GROUP BY
-	r.ResellerType,r.ResellerID,r.ResellerName, CASE WHEN r.ResellerType = 2 THEN '' ELSE l.LicenseeName END,DistributorsChargeRate, OneworksChargeRate, InspiredChargeRate	
+	r.ResellerType,r.ResellerID,r.ResellerName,re.winlostdate,CASE WHEN (r.ResellerType = 2 and re.resellerID<>7) THEN '' ELSE l.LicenseeName END,DistributorsChargeRate, OneworksChargeRate, InspiredChargeRate	
 ORDER BY
-	r.ResellerType DESC,r.ResellerName, CASE WHEN r.ResellerType = 2 THEN '' ELSE l.LicenseeName END
+	r.ResellerType DESC,r.ResellerName, CASE WHEN (r.ResellerType = 2 and re.resellerID<>7) THEN '' ELSE l.LicenseeName END
 			
 DROP TABLE	#Data
 DROP TABLE	#Result

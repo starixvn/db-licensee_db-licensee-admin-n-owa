@@ -19,6 +19,7 @@ AS
  * Revisions :  
 	- 20121105@Henry: using new table ResellerProductChargeByDateRange 	
 	- 20130508@Jim: add filter for bettype 
+	- 20130624@Jim: Break down licensees under Boping 
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
  *  - @Operator   : List of operator ID separated by ','  
@@ -35,7 +36,7 @@ SET NOCOUNT ON
 DECLARE @tmpLicenseeReseller AS TABLE (ResellerID INT, LicenseeID INT)
 
 CREATE TABLE #Data (winlostdate  DATETIME, Currency  INT, bettype INT, ResellerID int, LicenseeID int,turnover MONEY, MemberWinloss MONEY, Betcount INT)
-CREATE TABLE #Result (ResellerID INT,LicenseeID int,turnover MONEY, MemberWinloss MONEY,GrossWinloss MONEY, DistributorRevenue MONEY, Betcount INT,StarExpressRevenue MONEY, OneworksRevenue MONEY,DistributorsChargeRate MONEY, StarExpressChargeRate MONEY,OneworksChargeRate MONEY)
+CREATE TABLE #Result (ResellerID INT,LicenseeID int,winlostdate  varchar(6),turnover MONEY, MemberWinloss MONEY,GrossWinloss MONEY, DistributorRevenue MONEY, Betcount INT,StarExpressRevenue MONEY, OneworksRevenue MONEY,DistributorsChargeRate MONEY, StarExpressChargeRate MONEY,OneworksChargeRate MONEY)
 
 --Get normal licensee list:
 IF LTRIM(RTRIM(ISNULL(@NormalLicensee,''))) <> ''
@@ -114,10 +115,12 @@ SELECT * INTO #TempExchange
 FROM Lrf_f_GetExchangeDaily(@FromDate,@ToDate)
 WHERE exchangeid IN (SELECT DISTINCT Currency FROM #Data)
 
-INSERT INTO #Result(ResellerID,LicenseeID,turnover, MemberWinloss,GrossWinloss, DistributorRevenue, Betcount,StarExpressRevenue,OneworksRevenue,DistributorsChargeRate, StarExpressChargeRate,OneworksChargeRate)
+INSERT INTO #Result(ResellerID,LicenseeID,winlostdate,turnover, MemberWinloss,GrossWinloss, DistributorRevenue, Betcount,StarExpressRevenue,OneworksRevenue,DistributorsChargeRate, StarExpressChargeRate,OneworksChargeRate)
 SELECT	
-	r.ResellerID,d.LicenseeID,
-	CAST(isnull(SUM(d.turnover * e.EUR),0) AS MONEY) AS Turnover,
+	r.ResellerID
+	,d.LicenseeID
+	,Convert(varchar(6),d.winlostdate,112) as winlostdate
+	,CAST(isnull(SUM(d.turnover * e.EUR),0) AS MONEY) AS Turnover,
 	CAST(isnull(SUM(d.MemberWinloss * e.EUR),0) AS MONEY) AS MemberWinloss,
 	CAST(CASE WHEN isnull(SUM(d.MemberWinloss * e.EUR),0) > 0 THEN 0 ELSE -1 * isnull(SUM(d.MemberWinloss * e.EUR),0) END AS money) AS GrossWinloss,
 	CAST(CASE WHEN isnull(SUM(d.MemberWinloss * e.EUR),0) > 0 THEN 0 ELSE -1 * isnull(SUM(d.MemberWinloss * e.EUR * isnull(DI.ChargeRate,0)),0) END AS money) AS DistributorRevenue,
@@ -135,12 +138,13 @@ FROM #Data d
 	LEFT JOIN bodb_licensee.dbo.ResellerProductChargeByDateRange DI ON d.ResellerID = DI.ResellerID AND DI.PartyID = 4 AND DI.ProductID = 4 AND d.winlostdate BETWEEN DI.FromDate AND DI.ToDate
 WHERE ((@GameType= 0 AND d.bettype IN (1101,1102)) OR (@GameType<>0 AND d.bettype=@GameType))
 GROUP BY
-	r.ResellerID,d.LicenseeID,DI.ChargeRate,STAR.ChargeRate,OW.ChargeRate
+	r.ResellerID,d.LicenseeID,Convert(varchar(6),d.winlostdate,112),DI.ChargeRate,STAR.ChargeRate,OW.ChargeRate
 	
 --return the result
 SELECT	
 	r.ResellerID,r.ResellerName,r.ResellerType,
-	CASE WHEN r.ResellerType = 2 THEN '' ELSE l.LicenseeName END AS LicenseeName,
+	CASE WHEN (r.ResellerType = 2 AND r.ResellerID<>7) THEN '' ELSE l.LicenseeName END AS LicenseeName,
+	re.winlostdate,
 	ISNULL(SUM(re.betcount), 0) AS BetCount,
 	CAST(isnull(SUM(re.turnover),0) AS MONEY) AS Turnover,
 	CAST(isnull(SUM(re.MemberWinloss),0) AS MONEY) AS MemberWinloss,
@@ -156,10 +160,10 @@ FROM #Result re
 	LEFT JOIN bodb_licensee.dbo.Licensees l WITH (NOLOCK) ON l.LicenseeID = re.LicenseeID
 
 GROUP BY
-	r.ResellerType,r.ResellerID,r.ResellerName, CASE WHEN r.ResellerType = 2 THEN '' ELSE l.LicenseeName END,
-	DistributorsChargeRate,StarExpressChargeRate,OneworksChargeRate	
+	r.ResellerType,r.ResellerID,r.ResellerName,CASE WHEN (r.ResellerType = 2 AND r.ResellerID<>7) THEN '' ELSE l.LicenseeName END,
+	re.winlostdate,DistributorsChargeRate,StarExpressChargeRate,OneworksChargeRate	
 ORDER BY
-	r.ResellerType DESC,r.ResellerName,DistributorsChargeRate DESC, CASE WHEN r.ResellerType = 2 THEN '' ELSE l.LicenseeName END
+	r.ResellerType DESC,r.ResellerName,re.winlostdate,DistributorsChargeRate DESC, CASE WHEN (r.ResellerType = 2 AND r.ResellerID<>7) THEN '' ELSE l.LicenseeName END
 			
 DROP TABLE	#Data
 DROP TABLE	#Result
