@@ -180,7 +180,7 @@ BEGIN
 						CASE WHEN @ShowVS = 1 THEN ' OR b.bettype BETWEEN 1201 AND 1299' ELSE ''END+char(13)+
 						--CASE WHEN @ShowCS = 1 THEN ' OR b.bettype =71' ELSE ''END+char(13)+
 						CASE WHEN @ShowNG = 1 THEN ' OR b.bettype BETWEEN 81 AND 120' ELSE '' END + ')' + char(13) +
-					CASE WHEN @ShowCS = 1 THEN 'OR ( b.matchid =71 AND b.bettype =71)' ELSE ''END+char(13)+
+					CASE WHEN @ShowCS = 1 THEN 'OR ( b.matchid in (0,71) AND b.bettype =71)' ELSE ''END+char(13)+
 					CASE WHEN @bettype <> 0 THEN ' AND b.bettype = ' + convert(varchar(10), @Bettype)  ELSE '' END + char(13) +
 					'AND BA.transid IS NULL'	 + char(13) +	
 					CASE WHEN @SportID<>0 THEN 'AND ((b.bettype=10 AND l.Sporttype = ' + convert(varchar(10), @SportID) + ') OR (b.bettype NOT IN (9,29,10) AND b.bettype NOT BETWEEN 31 AND 120 AND m.sporttype = ' + convert(varchar(10), @SportID) + '))  ' ELSE '' END + char(13) +
