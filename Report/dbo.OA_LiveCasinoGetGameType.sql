@@ -11,7 +11,7 @@ AS
     DB  : DB052.bodb02    
      
     Revisions:      
-   
+		-20130719@Jim: add more bettype live baccarat , live 
 */  
 
 BEGIN  
@@ -21,10 +21,12 @@ BEGIN
 		typenamee AS GametypeName
 	FROM bettype WITH (NOLOCK)
 	WHERE 
-		typeid IN (1101,1102)
+		typeid IN (1101,1102,1103,1104)
 	/*
-	1101:Baccarat
-	1102:Roulette
+	1101:Party Baccarat
+	1102:Party Roulette
+	1103:Live Baccarat
+	1104:Live Roulette
 	*/
 END  
 GO
