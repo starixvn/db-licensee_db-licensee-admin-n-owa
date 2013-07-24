@@ -3,6 +3,8 @@ set QUOTED_IDENTIFIER ON
 go
 
 ALTER PROCEDURE [dbo].[OAS_Licensees_GetByResellerID]   
+	@FromDate SMALLDATETIME,
+	@ToDate   SMALLDATETIME,	
 	@ResellerID INT = 0,
 	@ExcludeBA BIT = 0,
 	@ExcludeTest BIT = 1,
@@ -22,6 +24,8 @@ AS
 	- 20120917@Henry: add param @ProductCode
 	- 20130222@Scott: add filter LicenseeProduct3rd.EffectiveDate <> null
 	- 20130621@Jim: fix bug wrong conditiion when inner join with table licenseeProduct3rd
+	- 20130724@Jim:  PIH and Starlit are no longer ONEWorks licensees since July 1st 2013
+	
  * Param's Explanation:    
  *  - @ResellerID : Reseller ID (0 : All reseller)  
  *	- @ExcludeBA: to exclude BA Licensees (Starlit)
@@ -29,6 +33,8 @@ AS
  */  
   
 SET NOCOUNT ON  
+
+SELECT @Fromdate=ltrim(rtrim(@Fromdate)),@Todate=ltrim(rtrim(@Todate))
 
 CREATE TABLE #Data (ResellerID int,ResellerName varchar(50), ResellerType INT,ResellerDescription varchar(100),LicenseeID INT, LicenseeName varchar(50),LicenseeDescription varchar(100))
 DECLARE @ProductID INT
@@ -61,7 +67,7 @@ WHERE
 	AND s.SystemName='OAS'
 	AND ((@ExcludeBA=0) OR (@ExcludeBA=1 AND r.ResellerID <> 3))
 	AND ((@ExcludeTest=0) OR (@ExcludeTest=1 AND r.ResellerID <> 6))
-	AND (ISNULL(LTRIM(RTRIM(@ProductCode)),'')='' OR (ISNULL(LTRIM(RTRIM(@ProductCode)),''))<>'' AND ISNULL(ld.EffectiveDate,0)<>0))
+	AND (ISNULL(LTRIM(RTRIM(@ProductCode)),'')='' OR (ISNULL(LTRIM(RTRIM(@ProductCode)),''))<>'' AND ISNULL(ld.EffectiveDate,0)<>0)
 ORDER BY l.IsDeposit DESC,r.ResellerName, l.LicenseeName
 
 SET @ProductCode = ISNULL(LTRIM(RTRIM(@ProductCode)),'')
@@ -80,7 +86,11 @@ BEGIN
 	END
 
 END
-
+IF @FromDate>='2013-07-01'
+	BEGIN
+		DELETE FROM #Data 
+		WHERE ResellerID IN (3,8) -- remove Starlit,PIH
+	END 
 SELECT DISTINCT * FROM #Data
 
 DROP TABLE #Data

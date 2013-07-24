@@ -15,6 +15,7 @@ AS
 	- 20121213@Henry: reset official launch date for Bodog to 05/Nov/2012
 	- 20121213@henry: change to use Effectivedate from LicenseeProduct3rd instead of hard-code
 	- 20130612@Jim: change condition for AffectedDate,EffectiveDate
+	- 20130724@Jim:  PIH and Starlit are no longer ONEWorks licensees since July 1st 2013
 	
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
@@ -109,6 +110,12 @@ BEGIN
 	GROUP BY b.rptDate,b.currencyID, lr.ResellerID, lr.licenseeid	
 END
 
+IF @FromDate>='2013-07-01'
+	BEGIN
+		DELETE FROM @tmpLicenseeReseller
+		WHERE ResellerID IN (3,8) -- remove Starlit,PIH
+	END 
+	
 CREATE NONCLUSTERED INDEX IDX_Currency ON #Data(Currency,winlostdate)
 
 INSERT INTO @Exchange(ExchangeDate,ExchangeId,EUR)

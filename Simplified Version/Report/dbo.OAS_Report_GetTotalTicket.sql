@@ -19,6 +19,7 @@ AS
 	20120515@Henry: exclude customercategory 28 - BARM
 	20120704@Henry: Map Licensee with System
 	20130531@Jim: fix bug wrong @fromdate variable
+	20130724@Jim:  PIH and Starlit are no longer ONEWorks licensees since July 1st 2013
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
  *  - @Operator   : List of operator ID separated by ','  
@@ -75,7 +76,10 @@ BEGIN
 					'WHERE ' + char(13) +
 						'r.ResellerID IN (' + @Operator + ')' + char(13) 
 END
-
+IF @Fromdate>='2013-07-01'
+BEGIN 
+	SELECT @sql = @sql + 'DELETE FROM @tmpLicenseeReseller WHERE ResellerID IN (3,8)'
+END 
 --exclude BA & IBC & PIH...
 SELECT @sql = @sql + '--Exclude BA & IBC & PIH...' + char(13)
 SELECT @sql = @sql + 
