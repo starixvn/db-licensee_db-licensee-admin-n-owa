@@ -20,6 +20,7 @@ AS
 	- 20130219@Jim: add more filter for Licensee From table LicenseeProduct3rd
 	- 20130405@Jim: only Baccarat data included in the report
 	- 20130612@Jim: change condition for AffectedDate
+	- 20130724@Jim:  PIH and Starlit are no longer ONEWorks licensees since July 1st 2013
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
  *  - @Operator   : List of operator ID separated by ','  
@@ -66,7 +67,11 @@ BEGIN
 	WHERE
 		r.ResellerID IN (SELECT RTRIM(LTRIM(VAL)) FROM strSplit(@Operator,','))		
 END
-  
+
+IF @Fromdate>='2013-07-01'
+BEGIN 
+		DELETE FROM @tmpLicenseeReseller WHERE ResellerID IN (3,8)
+END 
 --exclude BA & IBC & PIH...
 IF EXISTS(SELECT 1 FROM @tmpLicenseeReseller lr INNER JOIN bodb_licensee.dbo.licensees l WITH (nolock) ON lr.licenseeid=l.licenseeid  WHERE l.IsDeposit=1 AND lr.ResellerID<>3)
 BEGIN
