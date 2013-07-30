@@ -33,7 +33,6 @@ AS
  */  
   
 SET NOCOUNT ON  
-
 SELECT @Fromdate=ltrim(rtrim(@Fromdate)),@Todate=ltrim(rtrim(@Todate))
 
 CREATE TABLE #Data (ResellerID int,ResellerName varchar(50), ResellerType INT,ResellerDescription varchar(100),LicenseeID INT, LicenseeName varchar(50),LicenseeDescription varchar(100))
@@ -54,7 +53,7 @@ FROM
 	INNER JOIN dbo.Resellers AS r WITH (NOLOCK)	ON r.ResellerID = ls.ResellerID  
 	INNER JOIN SystemLicensee AS sl (NOLOCK) ON l.LicenseeID=sl.LicenseeID 
 	INNER JOIN Systems AS s (NOLOCK) ON sl.SystemID=s.ID 
-	LEFT JOIN dbo.LicenseeProduct3rd AS  ld WITH (NOLOCK) ON l.LicenseeID=ld.LicenseeID
+	LEFT JOIN dbo.LicenseeProduct3rd AS  ld WITH (NOLOCK) ON l.LicenseeID=ld.LicenseeID 
 WHERE 
 	(
 		l.IsDeposit = 1  
@@ -67,8 +66,8 @@ WHERE
 	AND s.SystemName='OAS'
 	AND ((@ExcludeBA=0) OR (@ExcludeBA=1 AND r.ResellerID <> 3))
 	AND ((@ExcludeTest=0) OR (@ExcludeTest=1 AND r.ResellerID <> 6))
-	AND (ISNULL(LTRIM(RTRIM(@ProductCode)),'')='' OR (ISNULL(LTRIM(RTRIM(@ProductCode)),''))<>'' AND ISNULL(ld.EffectiveDate,0)<>0)
-ORDER BY l.IsDeposit DESC,r.ResellerName, l.LicenseeName
+	AND (ISNULL(LTRIM(RTRIM(@ProductCode)),'')='' OR (ISNULL(LTRIM(RTRIM(@ProductCode)),''))<>'')
+ORDER BY l.IsDeposit DESC,r.ResellerName, l.LicenseeName,EffectiveDate
 
 SET @ProductCode = ISNULL(LTRIM(RTRIM(@ProductCode)),'')
 IF @ProductCode <> '' AND EXISTS(SELECT 1 FROM Product3rd WITH (NOLOCK) WHERE ProductPrefix = @ProductCode)
@@ -78,7 +77,10 @@ BEGIN
 		DELETE FROM #Data WHERE ResellerID = 3
 		SELECT @ProductID = ProductID FROM Product3rd WITH (NOLOCK) WHERE ProductPrefix = @ProductCode
 		
-		DELETE FROM #Data WHERE LicenseeID NOT IN (SELECT LicenseeID FROM LicenseeProduct3rd WITH (NOLOCK) WHERE ProductID=@ProductID) AND ResellerID NOT IN (4,8) --FDL, PIH
+		DELETE FROM #Data 
+		WHERE LicenseeID NOT IN (SELECT LicenseeID FROM LicenseeProduct3rd WITH (NOLOCK) WHERE ProductID=@ProductID AND ISNULL(EffectiveDate,0)<>0) 
+		AND ResellerID NOT IN (4,8) --FDL, PIH
+		
 	END
 	ELSE
 	BEGIN
@@ -94,6 +96,7 @@ IF @FromDate>='2013-07-01'
 SELECT DISTINCT * FROM #Data
 
 DROP TABLE #Data
+
 
 GO
 GRANT EXECUTE ON [dbo].[OAS_Licensees_GetByResellerID] TO [bodbAdminNet] 
