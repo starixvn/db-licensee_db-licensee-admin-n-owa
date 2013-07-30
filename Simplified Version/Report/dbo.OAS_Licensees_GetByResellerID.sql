@@ -2,6 +2,7 @@
 set QUOTED_IDENTIFIER ON
 go
 
+
 ALTER PROCEDURE [dbo].[OAS_Licensees_GetByResellerID]   
 	@FromDate SMALLDATETIME,
 	@ToDate   SMALLDATETIME,	
@@ -25,6 +26,7 @@ AS
 	- 20130222@Scott: add filter LicenseeProduct3rd.EffectiveDate <> null
 	- 20130621@Jim: fix bug wrong conditiion when inner join with table licenseeProduct3rd
 	- 20130724@Jim:  PIH and Starlit are no longer ONEWorks licensees since July 1st 2013
+	- 20130730@Jim: fix bug (exclude all licensee whose EffectiveDate is null )
 	
  * Param's Explanation:    
  *  - @ResellerID : Reseller ID (0 : All reseller)  
@@ -97,10 +99,10 @@ SELECT DISTINCT * FROM #Data
 
 DROP TABLE #Data
 
-
 GO
 GRANT EXECUTE ON [dbo].[OAS_Licensees_GetByResellerID] TO [bodbAdminNet] 
 GO
 GRANT VIEW DEFINITION ON [dbo].[OAS_Licensees_GetByResellerID] TO [vnteam]        
   
+
 
