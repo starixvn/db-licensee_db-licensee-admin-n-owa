@@ -54,7 +54,7 @@ SELECT @sql = @sql +'/* improve performance */
 					'SELECT b.rptDate,b.SiteID,SUM(b.betcount)'+char(13)+
 					'FROM bodb_licensee.dbo.rpt_betting b WITH (NOLOCK)'+char(13)+
 						'LEFT JOIN bodb02.dbo.League l WITH (NOLOCK) ON b.leagueid=l.leagueid'+char(13)+
-					'WHERE rptDate >= ''' + CONVERT(varchar(10),@FromDate, 120) + ''' AND rptDate <= ''' + CONVERT(varchar(10),@ToDate, 120) + ''''+char(13)+ 
+					'WHERE b.rptDate >= ''' + CONVERT(varchar(10),@FromDate, 120) + ''' AND rptDate <= ''' + CONVERT(varchar(10),@ToDate, 120) + ''''+char(13)+ 
 						'AND b.status NOT IN (-1,103)'+char(13)+
 						 'AND b.CurrencyID<>20'+char(13)+ 
 						 'AND ISNULL(b.CustomerCategory,0) not in (27,28)'+char(13)+
