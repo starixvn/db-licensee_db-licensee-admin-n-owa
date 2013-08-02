@@ -1,4 +1,8 @@
-﻿ ALTER PROCEDURE [dbo].[OAS_Report_GetTotalTicket]      
+﻿set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+go
+
+ ALTER PROCEDURE [dbo].[OAS_Report_GetTotalTicket]      
 	@NormalLicensee VARCHAR(1000),  
 	@Operator  VARCHAR(1000),  
 	@FromDate  SMALLDATETIME,    
@@ -20,6 +24,7 @@ AS
 	20120704@Henry: Map Licensee with System
 	20130531@Jim: fix bug wrong @fromdate variable
 	20130724@Jim:  PIH and Starlit are no longer ONEWorks licensees since July 1st 2013
+	20130721@Jim: improve performance 
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
  *  - @Operator   : List of operator ID separated by ','  
@@ -43,7 +48,21 @@ SELECT @sql = @sql +
 				'DECLARE @data AS TABLE (WinlostDate SMALLDATETIME, ResellerID INT, LicenseeID INT, betcount INT)  ' + char(13) +
 				'DECLARE @tmpLicenseeReseller AS TABLE (ResellerID INT, LicenseeID INT,AffectedDate Datetime) ' + char(13) 
 				
-     
+SELECT @sql = @sql +'CREATE TABLE #tmpBetting(rptDate datetime,siteID INT,betcount INT)'+char(13)
+SELECT @sql = @sql +'/* improve performance */
+					INSERT INTO  #tmpBetting(rptDate,siteID,betcount)'+char(13)+
+					'SELECT b.rptDate,b.SiteID,SUM(b.betcount)'+char(13)+
+					'FROM bodb_licensee.dbo.rpt_betting b WITH (NOLOCK)'+char(13)+
+						'LEFT JOIN bodb02.dbo.League l WITH (NOLOCK) ON b.leagueid=l.leagueid'+char(13)+
+					'WHERE rptDate >= ''' + CONVERT(varchar(10),@FromDate, 120) + ''' AND rptDate <= ''' + CONVERT(varchar(10),@ToDate, 120) + ''''+char(13)+ 
+						'AND b.status NOT IN (-1,103)'+char(13)+
+						 'AND b.CurrencyID<>20'+char(13)+ 
+						 'AND b.CustomerCategory not in (27,28)'+char(13)+
+						 'AND (b.bettype<31 OR b.bettype BETWEEN 121 AND 999)' + char(13)+
+					CASE WHEN @SportID<>0 THEN 'AND b.bettype NOT IN (9,29) AND l.Sporttype = ' + convert(varchar(10), @SportID)  ELSE '' END + char(13)+
+						'GROUP BY b.rptDate,b.SiteID
+						/* End improve */'
+					
 -- Normal licensees  
 IF LTRIM(RTRIM(ISNULL(@NormalLicensee,''))) <> ''
 BEGIN
@@ -89,24 +108,15 @@ SELECT @sql = @sql +
 					'SELECT  b.rptDate,lr.ResellerID,lr.licenseeid, SUM(BetCount) AS betcount ' + char(13) +
 					'FROM @tmpLicenseeReseller lr' + char(13) +
 						'INNER JOIN bodb_licensee.dbo.licensees lic WITH ( NOLOCK) ON lic.licenseeid=lr.licenseeid'+ char(13) +
-						'INNER JOIN bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) ON lr.LicenseeID = b.siteID' + char(13) +
+						'INNER JOIN #tmpBetting b WITH ( NOLOCK) ON lr.LicenseeID = b.siteID' + char(13) +
 						'INNER JOIN bodb_Licensee.dbo.SystemLicensee sl (NOLOCK) ON lic.LicenseeID=sl.LicenseeID ' + char(13) +
 						'INNER JOIN bodb_Licensee.dbo.Systems s (NOLOCK) ON sl.SystemID=s.ID '+ char(13) +
-						'LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID' + char(13) +
 					'WHERE' + char(13) +
 						'b.rptDate BETWEEN  lr.AffectedDate  AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
 						'AND lr.ResellerID<>3' + char(13) + --BA
 						'AND lic.isdeposit=1'+ char(13) +
 						'AND sl.IsActive = 1' + char(13) +
 						'AND s.SystemName=''OAS''' + char(13) +
-						--'AND lic.IsActive=1'+ char(13) +
-						--'AND lic.IsOneWorkActive=1'+ char(13) +
-						---'AND ''' + convert(varchar(10),@FromDate, 120) + ''' >= isnull(lic.AffectedDate,''1999-01-01'')' + char(13) +
-						'AND b.status NOT IN (-1,103) ' + char(13) +
-						'AND CurrencyID<>20 ' + char(13) +
-						'AND (b.bettype < 31 OR bettype BETWEEN 121 AND 999)' + char(13) +
-						CASE WHEN @SportID<>0 THEN 'AND b.bettype NOT IN (9,29) AND l.Sporttype = ' + convert(varchar(10), @SportID) ELSE '' END + char(13) +
-						
 					'GROUP BY b.rptDate, lr.ResellerID, lr.licenseeid' + char(13) +
 				'END' + char(13) 
 
@@ -129,9 +139,6 @@ SELECT @sql = @sql +
 						'AND lic.isdeposit=1'+ char(13) +
 						'AND sl.IsActive = 1' + char(13) +
 						'AND s.SystemName=''OAS''' + char(13) +
-						--'AND lic.IsActive=1'+ char(13) +
-						--'AND lic.IsOneWorkActive=1'+ char(13) +
-						---'AND ''' + convert(varchar(10),@FromDate, 120) + ''' >= isnull(lic.AffectedDate,''1999-01-01'')' + char(13) +
 						'AND b.status NOT IN (-1,103) ' + char(13) +
 						'AND CurrencyID<>20 ' + char(13) +
 						CASE WHEN @SportID<>0 THEN 'AND b.bettype NOT IN (9,29)  AND l.Sporttype = ' + convert(varchar(10), @SportID)  ELSE '' END + char(13) +
@@ -148,40 +155,13 @@ SELECT @sql = @sql +
 					'SELECT b.rptDate,lr.ResellerID,lr.LicenseeID ,SUM(BetCount) AS betcount' + char(13) +
 					'FROM @tmpLicenseeReseller lr ' + char(13) +
 						'INNER JOIN bodb_Licensee.dbo.labels lb WITH (NOLOCK) ON lr.LicenseeID=lb.LicenseeID' + char(13) +
-						'INNER JOIN bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) ON b.siteID=lb.LabelID' + char(13) +
-						'LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID' + char(13) +
+						'INNER JOIN #tmpBetting b WITH ( NOLOCK) ON b.siteID=lb.LabelID' + char(13) +
 					'WHERE' + char(13) +	
 						'b.rptDate BETWEEN lr.AffectedDate AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
-						'AND b.status NOT IN (-1,103) ' + char(13) +
 						'AND lr.ResellerID<>3' + char(13) + --BA
-						---'AND ''' + convert(varchar(10),@FromDate, 120) + ''' >= isnull(lb.AffectedDate,''1999-01-01'')' + char(13) +
-						'AND CurrencyID<>20 ' + char(13) +
-						'AND isnull(b.customercategory,-1) NOT IN (27,28) ' + char(13) +
-						'AND (b.bettype < 31 OR bettype BETWEEN 121 AND 999)' + char(13) +
-						CASE WHEN @SportID<>0 THEN 'AND b.bettype NOT IN (9,29) AND l.Sporttype = ' + convert(varchar(10), @SportID)  ELSE '' END + char(13) +
-						
 					'GROUP BY b.rptDate,lr.ResellerID,lr.LicenseeID ' + char(13) +	
 				'END' + char(13) 
-				
 
---Show data
-/*
-SELECT @sql = @sql + '--Show the data' + char(13)
-SELECT @sql = @sql + 
-			'SELECT ' + char(13) +
-				CASE 
-					WHEN @GroupBy = 1 THEN 'CONVERT(VARCHAR(8),d.winlostdate,112) ' 
-					WHEN @GroupBy = 2 THEN 'CONVERT(VARCHAR(6),d.winlostdate,112)'
-					END + ' GroupBy,' + char(13) +
-				'ISNULL(SUM(d.betcount),0) AS BetCount ' + char(13) +
-			'FROM @data d ' + char(13) +	
-			'GROUP BY ' + char(13) +	
-				CASE 
-					WHEN @GroupBy = 1 THEN 'CONVERT(VARCHAR(8),d.winlostdate,112) ' 
-					WHEN @GroupBy = 2 THEN 'CONVERT(VARCHAR(6),d.winlostdate,112)'
-					END + char(13) +
-			'ORDER BY GroupBy' + char(13) 
-*/ 
 SELECT @sql = @sql + 
 			'SELECT ' + char(13) +
 				CASE 
@@ -206,13 +186,11 @@ SELECT @sql = @sql +
 					WHEN @GroupBy = 1 THEN 'CONVERT(VARCHAR(8),d.winlostdate,112) ' 
 					WHEN @GroupBy = 2 THEN 'CONVERT(VARCHAR(6),d.winlostdate,112)'
 					END + char(13) +
-			',r.ResellerName, CASE WHEN r.ResellerType = 2 THEN '''' ELSE l.LicenseeName END'
-	
+			',r.ResellerName, CASE WHEN r.ResellerType = 2 THEN '''' ELSE l.LicenseeName END'+char(13)
+			
+SELECT @sql = @sql +'DROP TABLE #tmpBetting'	
 IF (@debug = 1) PRINT @sql
 ELSE EXEC(@sql)
-
-  
-
   
 END  
 GO
