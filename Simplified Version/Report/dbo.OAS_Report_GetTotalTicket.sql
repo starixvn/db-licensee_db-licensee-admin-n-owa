@@ -57,7 +57,7 @@ SELECT @sql = @sql +'/* improve performance */
 					'WHERE rptDate >= ''' + CONVERT(varchar(10),@FromDate, 120) + ''' AND rptDate <= ''' + CONVERT(varchar(10),@ToDate, 120) + ''''+char(13)+ 
 						'AND b.status NOT IN (-1,103)'+char(13)+
 						 'AND b.CurrencyID<>20'+char(13)+ 
-						 'AND b.CustomerCategory not in (27,28)'+char(13)+
+						 'AND ISNULL(b.CustomerCategory,0) not in (27,28)'+char(13)+
 						 'AND (b.bettype<31 OR b.bettype BETWEEN 121 AND 999)' + char(13)+
 					CASE WHEN @SportID<>0 THEN 'AND b.bettype NOT IN (9,29) AND l.Sporttype = ' + convert(varchar(10), @SportID)  ELSE '' END + char(13)+
 						'GROUP BY b.rptDate,b.SiteID
