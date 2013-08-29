@@ -11,6 +11,7 @@ AS
  20120319@Henry: hard-code Boping to not show 
  20120621@Jim: optimize code
  20130724@Jim:  PIH and Starlit are no longer ONEWorks licensees since July 1st 2013
+ 20130829@Jim: Remove Cozni from licensee list in Total Transaction report from 1st August 2013.
  */  
   
 SET NOCOUNT ON  
@@ -31,11 +32,10 @@ WHERE
 	sl.IsActive=1
 	AND s.SystemName='OAS'
 
-IF @FromDate>='2013-07-01'
-	BEGIN
-		DELETE FROM #tmpResellerList 
-		WHERE ResellerID IN (3,8) -- remove Starlit,PIH
-	END 
+DELETE FROM #tmpResellerList 
+WHERE (@FromDate>='2013-07-01' AND ResellerID IN (3,8))
+	  OR (@FromDate>='2013-08-01' AND ResellerID =5)
+
 SELECT 
 	ResellerID,  
 	ResellerName,  
