@@ -34,7 +34,7 @@ WHERE
 
 DELETE FROM #tmpResellerList 
 WHERE (@FromDate>='2013-07-01' AND ResellerID IN (3,8))
-	  OR (@FromDate>='2013-08-01' AND ResellerID =5)
+	  OR (@FromDate>='2013-08-01' AND ResellerID IN (3,5,8))
 
 SELECT 
 	ResellerID,  

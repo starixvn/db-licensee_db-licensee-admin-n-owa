@@ -2,7 +2,7 @@
 set QUOTED_IDENTIFIER ON
 go
 
- ALTER PROCEDURE [dbo].[OAS_Report_GetTotalTicket]      
+ ALTER   PROCEDURE [dbo].[OAS_Report_GetTotalTicket]      
 	@NormalLicensee VARCHAR(1000),  
 	@Operator  VARCHAR(1000),  
 	@FromDate  SMALLDATETIME,    
@@ -25,6 +25,7 @@ AS
 	20130531@Jim: fix bug wrong @fromdate variable
 	20130724@Jim:  PIH and Starlit are no longer ONEWorks licensees since July 1st 2013
 	20130721@Jim: improve performance 
+	20130830@Jim: Remove Cozni from licensee list in Total Transaction report from 1st August 2013.
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
  *  - @Operator   : List of operator ID separated by ','  
@@ -95,6 +96,12 @@ BEGIN
 					'WHERE ' + char(13) +
 						'r.ResellerID IN (' + @Operator + ')' + char(13) 
 END
+SELECT @sql = @sql +
+'DELETE FROM @tmpLicenseeReseller 
+WHERE (
+		('''+convert(varchar(10),@Fromdate,120)+'''>=''2013-07-01'' AND ResellerID IN (3,8) ) OR ('''+convert(varchar(10),@Fromdate,120)+'''>=''2013-08-01'' AND ResellerID in (3,5,8 ))
+		)'+char(13)
+
 IF @Fromdate>='2013-07-01'
 BEGIN 
 	SELECT @sql = @sql + 'DELETE FROM @tmpLicenseeReseller WHERE ResellerID IN (3,8)'
