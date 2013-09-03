@@ -99,7 +99,7 @@ END
 SELECT @sql = @sql +
 'DELETE FROM @tmpLicenseeReseller 
 WHERE (
-		('''+convert(varchar(10),@Fromdate,120)+'''BETWEEN ''2013-07-01'' AND ''2013-07-30''  AND ResellerID IN (3,8) ) OR ('''+convert(varchar(10),@Fromdate,120)+'''>=''2013-08-01'' AND ResellerID in (3,5,8 ))
+		('''+convert(varchar(10),@Fromdate,120)+'''BETWEEN ''2013-07-01'' AND ''2013-07-31''  AND ResellerID IN (3,8) ) OR ('''+convert(varchar(10),@Fromdate,120)+'''>=''2013-08-01'' AND ResellerID in (3,5,8 ))
 		)'+char(13)
 
 IF @Fromdate>='2013-07-01'

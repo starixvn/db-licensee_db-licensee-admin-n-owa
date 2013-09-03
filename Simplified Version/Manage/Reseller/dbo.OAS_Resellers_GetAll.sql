@@ -33,7 +33,7 @@ WHERE
 	AND s.SystemName='OAS'
 
 DELETE FROM #tmpResellerList 
-WHERE (@FromDate BETWEEN '2013-07-01' AND '2013-07-30' AND ResellerID IN (3,8))
+WHERE (@FromDate BETWEEN '2013-07-01' AND '2013-07-31' AND ResellerID IN (3,8))
 	  OR (@FromDate>='2013-08-01' AND ResellerID IN (3,5,8))
 
 SELECT 
