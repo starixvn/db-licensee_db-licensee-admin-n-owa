@@ -3,6 +3,7 @@ set QUOTED_IDENTIFIER ON
 go
 
 
+
  ALTER   PROCEDURE [dbo].[OA_Rpt_VirtualSportWinloss]      
 	@NormalLicensee VARCHAR(1000),  
 	@Operator  VARCHAR(1000),  
@@ -22,6 +23,7 @@ AS
 	- 20121116@Jim: add @betlist input parameter and use @sporttype intead of @SportList
 	- 20121129@Henry: add more columns
 	- 20130624@Jim: Break down licensees under Boping 
+	- 20130904@Jim: add more sporttype, bettype in the result
  
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
@@ -152,7 +154,7 @@ GROUP BY
 --return the result
 SELECT	
 	r.ResellerID,r.ResellerName,
-	CASE WHEN (r.ResellerType = 2 and re.resellerID<>7) THEN '' ELSE l.LicenseeName END AS LicenseeName,
+	CASE WHEN (r.ResellerType = 2 and re.resellerID NOT IN (1,7)) THEN '' ELSE l.LicenseeName END AS LicenseeName,
 	re.winlostdate,
 	r.ResellerType,
 	re.sporttype,
@@ -172,13 +174,14 @@ FROM #Result re
 	LEFT JOIN bodb_licensee.dbo.Licensees l WITH (NOLOCK) ON l.LicenseeID = re.LicenseeID
 		
 GROUP BY
-	r.ResellerType,r.ResellerID,r.ResellerName,re.sporttype,re.bettype,re.winlostdate,CASE WHEN (r.ResellerType = 2 and re.resellerID<>7) THEN '' ELSE l.LicenseeName END,DistributorsChargeRate, OneworksChargeRate, InspiredChargeRate	
+	r.ResellerType,r.ResellerID,r.ResellerName,re.sporttype,re.bettype,re.winlostdate,CASE WHEN (r.ResellerType = 2 and re.resellerID NOT IN (1,7)) THEN '' ELSE l.LicenseeName END,DistributorsChargeRate, OneworksChargeRate, InspiredChargeRate	
 ORDER BY
-	r.ResellerID,r.ResellerType DESC,r.ResellerName, CASE WHEN (r.ResellerType = 2 and re.resellerID<>7) THEN '' ELSE l.LicenseeName END,re.sporttype,re.bettype
+	r.ResellerID,r.ResellerType DESC,r.ResellerName, CASE WHEN (r.ResellerType = 2 and re.resellerID NOT IN (1,7)) THEN '' ELSE l.LicenseeName END,re.sporttype,re.bettype
 			
 DROP TABLE	#Data
 DROP TABLE	#Result
 DROP TABLE #TempExchange
 			
 END  
+
 
