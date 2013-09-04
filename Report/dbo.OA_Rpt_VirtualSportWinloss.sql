@@ -2,7 +2,8 @@
 set QUOTED_IDENTIFIER ON
 go
 
- ALTER PROCEDURE [dbo].[OA_Rpt_VirtualSportWinloss]      
+
+ ALTER   PROCEDURE [dbo].[OA_Rpt_VirtualSportWinloss]      
 	@NormalLicensee VARCHAR(1000),  
 	@Operator  VARCHAR(1000),  
 	@FromDate  SMALLDATETIME,    
@@ -37,8 +38,8 @@ SET NOCOUNT ON
 
 DECLARE @tmpLicenseeReseller AS TABLE (ResellerID INT, LicenseeID INT)
 
-CREATE TABLE #Data (winlostdate  DATETIME, Currency  INT,  ResellerID int, LicenseeID int,turnover MONEY, MemberWinloss MONEY, Betcount INT)
-CREATE TABLE #Result (ResellerID INT,LicenseeID int,winlostdate  varchar(6),turnover MONEY, MemberWinloss MONEY,GrossWinloss MONEY,DistributorRevenue MONEY, Betcount INT,OneworksIncome MONEY,AmtDueToInspired MONEY,DistributorsChargeRate MONEY,OneworksChargeRate MONEY, InspiredChargeRate MONEY)
+CREATE TABLE #Data (winlostdate  DATETIME, Currency  INT,  ResellerID int, LicenseeID int,Sporttype int,bettype INT,turnover MONEY, MemberWinloss MONEY, Betcount INT)
+CREATE TABLE #Result (ResellerID INT,LicenseeID int,sporttype int,bettype int ,winlostdate  varchar(6),turnover MONEY, MemberWinloss MONEY,GrossWinloss MONEY,DistributorRevenue MONEY, Betcount INT,OneworksIncome MONEY,AmtDueToInspired MONEY,DistributorsChargeRate MONEY,OneworksChargeRate MONEY, InspiredChargeRate MONEY)
 
 
 --Get normal licensee list:
@@ -70,7 +71,7 @@ END
 IF EXISTS(SELECT 1 FROM @tmpLicenseeReseller lr INNER JOIN bodb_licensee.dbo.licensees l WITH (nolock) ON lr.licenseeid=l.licenseeid  WHERE l.IsDeposit=1 AND lr.ResellerID<>3)
 BEGIN
 	INSERT INTO #Data
-	SELECT  b.rptDate,b.currencyID,lr.ResellerID,lr.licenseeid,SUM(Turnover) as Turnover, SUM(Winloss) AS MemberWinloss,SUM(BetCount) AS betcount
+	SELECT  b.rptDate,b.currencyID,lr.ResellerID,lr.licenseeid,l.sporttype, b.bettype,SUM(Turnover) as Turnover, SUM(Winloss) AS MemberWinloss,SUM(BetCount) AS betcount
 	FROM @tmpLicenseeReseller lr
 		INNER JOIN bodb_licensee.dbo.licensees lic WITH ( NOLOCK) ON lic.licenseeid=lr.licenseeid
 		INNER JOIN bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) ON lr.LicenseeID = b.siteID
@@ -90,14 +91,14 @@ BEGIN
 		AND bettype BETWEEN 1201 AND 1299
 		AND (@Sporttype=0 OR ( @Sporttype<>0 AND l.Sporttype=@Sporttype)) 
 		AND (@bettype=0 OR (b.bettype=@bettype AND @bettype<>0))
-	GROUP BY b.rptDate,b.currencyID, lr.ResellerID, lr.licenseeid
+	GROUP BY b.rptDate,b.currencyID, lr.ResellerID, lr.licenseeid,l.sporttype, b.bettype
 END
 
 --FDL + PIH...
 IF EXISTS(SELECT 1 FROM @tmpLicenseeReseller lr inner JOIN bodb_licensee.dbo.licensees l WITH (nolock) ON lr.licenseeid=l.licenseeid where l.IsDeposit=0)
 BEGIN
 	INSERT INTO #Data
-	SELECT  b.rptDate,b.currencyID,lr.ResellerID,lr.licenseeid,SUM(Turnover) as Turnover, SUM(Winloss) AS MemberWinloss,SUM(BetCount) AS betcount
+	SELECT  b.rptDate,b.currencyID,lr.ResellerID,lr.licenseeid,l.sporttype, b.bettype,SUM(Turnover) as Turnover, SUM(Winloss) AS MemberWinloss,SUM(BetCount) AS betcount
 	FROM @tmpLicenseeReseller lr
 		INNER JOIN bodb_Licensee.dbo.labels lb WITH (NOLOCK) ON lr.LicenseeID=lb.LicenseeID
 		INNER JOIN bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) ON b.siteID=lb.LabelID
@@ -113,7 +114,7 @@ BEGIN
 		AND b.customercategory NOT IN (27,28) 
 		AND (@Sporttype=0 OR ( @Sporttype<>0 AND l.Sporttype=@Sporttype)) 
 		AND (@bettype=0 OR (b.bettype=@bettype AND @bettype<>0))
-	GROUP BY b.rptDate,b.currencyID, lr.ResellerID, lr.licenseeid	
+	GROUP BY b.rptDate,b.currencyID, lr.ResellerID, lr.licenseeid,l.sporttype, b.bettype	
 END
 
 CREATE NONCLUSTERED INDEX IDX_Currency ON #Data(Currency)
@@ -122,14 +123,16 @@ SELECT * INTO #TempExchange
 FROM Lrf_f_GetExchangeDaily(@FromDate,@ToDate)
 WHERE exchangeid IN (SELECT DISTINCT Currency FROM #Data)
 
-INSERT INTO #Result(ResellerID,LicenseeID,winlostdate,turnover, MemberWinloss,GrossWinloss,DistributorRevenue, Betcount,OneworksIncome,AmtDueToInspired,DistributorsChargeRate,OneworksChargeRate, InspiredChargeRate)
+INSERT INTO #Result(ResellerID,LicenseeID,sporttype,bettype,winlostdate,turnover, MemberWinloss,GrossWinloss,DistributorRevenue, Betcount,OneworksIncome,AmtDueToInspired,DistributorsChargeRate,OneworksChargeRate, InspiredChargeRate)
 SELECT	
 	r.ResellerID,
 	d.LicenseeID,
+	d.sporttype,
+	d.bettype,
 	Convert(varchar(6),d.winlostdate,112) as winlostdate,
 	CAST(isnull(SUM(d.turnover * e.EUR),0) AS MONEY) AS Turnover,
 	CAST(isnull(SUM(d.MemberWinloss * e.EUR),0) AS MONEY) AS MemberWinloss,
-	CAST(CASE WHEN isnull(SUM(d.MemberWinloss * e.EUR),0) > 0 THEN 0 ELSE -1 * isnull(SUM(d.MemberWinloss * e.EUR),0) END AS money) AS GrossWinloss,
+	CAST( -1 * isnull(SUM(d.MemberWinloss * e.EUR),0) AS money) AS GrossWinloss,
 	CAST(CASE WHEN isnull(SUM(d.MemberWinloss * e.EUR),0) > 0 THEN 0 ELSE -1 * isnull(SUM(d.MemberWinloss * e.EUR * isnull(DI.ChargeRate,0)),0) END AS money) AS DistributorRevenue,
 	ISNULL(SUM(d.betcount), 0) AS BetCount,
 	CAST(CASE WHEN isnull(SUM(-1 * d.MemberWinloss * e.EUR * OW.ChargeRate),0) < 0 THEN 0 ELSE isnull(SUM(-1 * d.MemberWinloss * e.EUR * OW.ChargeRate),0) END AS money) AS OneworksIncome,
@@ -144,7 +147,7 @@ FROM #Data d
 	LEFT JOIN bodb_licensee.dbo.ResellerProductChargeByDateRange INS ON d.ResellerID = INS.ResellerID AND INS.PartyID = 2 AND INS.ProductID = 5 AND d.winlostdate BETWEEN INS.FromDate AND INS.ToDate	
 	LEFT JOIN bodb_licensee.dbo.ResellerProductChargeByDateRange DI ON d.ResellerID = DI.ResellerID AND DI.PartyID = 4 AND DI.ProductID = 5 AND d.winlostdate BETWEEN DI.FromDate AND DI.ToDate
 GROUP BY
-	r.ResellerID,d.LicenseeID,Convert(varchar(6),d.winlostdate,112),DI.ChargeRate,OW.ChargeRate,INS.ChargeRate
+	r.ResellerID,d.LicenseeID,d.sporttype,d.bettype,Convert(varchar(6),d.winlostdate,112),DI.ChargeRate,OW.ChargeRate,INS.ChargeRate
 	
 --return the result
 SELECT	
@@ -152,6 +155,8 @@ SELECT
 	CASE WHEN (r.ResellerType = 2 and re.resellerID<>7) THEN '' ELSE l.LicenseeName END AS LicenseeName,
 	re.winlostdate,
 	r.ResellerType,
+	re.sporttype,
+	re.bettype,
 	ISNULL(SUM(re.betcount), 0) AS BetCount,
 	CAST(isnull(SUM(re.turnover),0) AS MONEY) AS Turnover,
 	CAST(isnull(SUM(re.MemberWinloss),0) AS MONEY) AS MemberWinloss,
@@ -167,16 +172,13 @@ FROM #Result re
 	LEFT JOIN bodb_licensee.dbo.Licensees l WITH (NOLOCK) ON l.LicenseeID = re.LicenseeID
 		
 GROUP BY
-	r.ResellerType,r.ResellerID,r.ResellerName,re.winlostdate,CASE WHEN (r.ResellerType = 2 and re.resellerID<>7) THEN '' ELSE l.LicenseeName END,DistributorsChargeRate, OneworksChargeRate, InspiredChargeRate	
+	r.ResellerType,r.ResellerID,r.ResellerName,re.sporttype,re.bettype,re.winlostdate,CASE WHEN (r.ResellerType = 2 and re.resellerID<>7) THEN '' ELSE l.LicenseeName END,DistributorsChargeRate, OneworksChargeRate, InspiredChargeRate	
 ORDER BY
-	r.ResellerType DESC,r.ResellerName, CASE WHEN (r.ResellerType = 2 and re.resellerID<>7) THEN '' ELSE l.LicenseeName END
+	r.ResellerID,r.ResellerType DESC,r.ResellerName, CASE WHEN (r.ResellerType = 2 and re.resellerID<>7) THEN '' ELSE l.LicenseeName END,re.sporttype,re.bettype
 			
 DROP TABLE	#Data
 DROP TABLE	#Result
 DROP TABLE #TempExchange
 			
 END  
-GO
-GRANT EXECUTE ON [dbo].[OA_Rpt_VirtualSportWinloss] TO [bodbAdminNet] 
-GO
-GRANT VIEW DEFINITION ON [dbo].[OA_Rpt_VirtualSportWinloss] TO [vnteam]     
+
