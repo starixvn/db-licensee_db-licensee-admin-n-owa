@@ -64,7 +64,12 @@ BEGIN
 	WHERE
 		r.ResellerID IN (SELECT RTRIM(LTRIM(VAL)) FROM strSplit(@Operator,','))		
 END
-  
+
+DELETE FROM @tmpLicenseeReseller
+WHERE (@FromDate BETWEEN '2013-07-01' AND '2013-07-31' AND ResellerID IN (3,8))
+	  OR (@FromDate>='2013-08-01' AND ResellerID IN (3,7,8))
+	
+	
 --exclude BA & IBC & PIH...
 IF EXISTS(SELECT 1 FROM @tmpLicenseeReseller lr INNER JOIN bodb_licensee.dbo.licensees l WITH (nolock) ON lr.licenseeid=l.licenseeid  WHERE l.IsDeposit=1 AND lr.ResellerID<>3)
 BEGIN
@@ -111,10 +116,7 @@ BEGIN
 	GROUP BY b.rptDate,b.currencyID, lr.ResellerID, lr.licenseeid	
 END
 
-DELETE FROM @tmpLicenseeReseller
-WHERE (@FromDate BETWEEN '2013-07-01' AND '2013-07-31' AND ResellerID IN (3,8))
-	  OR (@FromDate>='2013-08-01' AND ResellerID IN (3,7,8))
-	
+
 CREATE NONCLUSTERED INDEX IDX_Currency ON #Data(Currency,winlostdate)
 
 INSERT INTO @Exchange(ExchangeDate,ExchangeId,EUR)
