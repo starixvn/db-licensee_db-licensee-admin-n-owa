@@ -27,6 +27,7 @@ AS
 	- 20130621@Jim: fix bug wrong conditiion when inner join with table licenseeProduct3rd
 	- 20130724@Jim:  PIH and Starlit are no longer ONEWorks licensees since July 1st 2013
 	- 20130730@Jim: fix bug (exclude all licensee whose EffectiveDate is null )
+	- 20130905@Jim:Boping is no longer ONEWorks licensee since August 1st 2013
 	
  * Param's Explanation:    
  *  - @ResellerID : Reseller ID (0 : All reseller)  
@@ -90,11 +91,10 @@ BEGIN
 	END
 
 END
-IF @FromDate>='2013-07-01'
-	BEGIN
-		DELETE FROM #Data 
-		WHERE ResellerID IN (3,8) -- remove Starlit,PIH
-	END 
+DELETE FROM #Data
+WHERE (@FromDate BETWEEN '2013-07-01' AND '2013-07-31' AND ResellerID IN (3,8))
+	  OR (@FromDate>='2013-08-01' AND ResellerID IN (3,7,8))
+
 SELECT DISTINCT * FROM #Data
 
 DROP TABLE #Data

@@ -16,6 +16,7 @@ AS
 	- 20121213@henry: change to use Effectivedate from LicenseeProduct3rd instead of hard-code
 	- 20130612@Jim: change condition for AffectedDate,EffectiveDate
 	- 20130724@Jim:  PIH and Starlit are no longer ONEWorks licensees since July 1st 2013
+	- 20130905@Jim:Boping is no longer ONEWorks licensee since August 1st 2013
 	
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
@@ -110,11 +111,9 @@ BEGIN
 	GROUP BY b.rptDate,b.currencyID, lr.ResellerID, lr.licenseeid	
 END
 
-IF @FromDate>='2013-07-01'
-	BEGIN
-		DELETE FROM @tmpLicenseeReseller
-		WHERE ResellerID IN (3,8) -- remove Starlit,PIH
-	END 
+DELETE FROM @tmpLicenseeReseller
+WHERE (@FromDate BETWEEN '2013-07-01' AND '2013-07-31' AND ResellerID IN (3,8))
+	  OR (@FromDate>='2013-08-01' AND ResellerID IN (3,7,8))
 	
 CREATE NONCLUSTERED INDEX IDX_Currency ON #Data(Currency,winlostdate)
 

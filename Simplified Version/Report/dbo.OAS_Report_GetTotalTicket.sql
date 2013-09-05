@@ -26,6 +26,7 @@ AS
 	20130724@Jim:  PIH and Starlit are no longer ONEWorks licensees since July 1st 2013
 	20130721@Jim: improve performance 
 	20130830@Jim: Remove Cozni from licensee list in Total Transaction report from 1st August 2013.
+	20130905@Jim: Boping is no longer ONEWorks licensee since August 1st 2013
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
  *  - @Operator   : List of operator ID separated by ','  
@@ -99,7 +100,7 @@ END
 SELECT @sql = @sql +
 'DELETE FROM @tmpLicenseeReseller 
 WHERE (
-		('''+convert(varchar(10),@Fromdate,120)+'''BETWEEN ''2013-07-01'' AND ''2013-07-31''  AND ResellerID IN (3,8) ) OR ('''+convert(varchar(10),@Fromdate,120)+'''>=''2013-08-01'' AND ResellerID in (3,5,8 ))
+		('''+convert(varchar(10),@Fromdate,120)+'''BETWEEN ''2013-07-01'' AND ''2013-07-31''  AND ResellerID IN (3,8) ) OR ('''+convert(varchar(10),@Fromdate,120)+'''>=''2013-08-01'' AND ResellerID in (3,5,7,8 ))
 		)'+char(13)
 
 IF @Fromdate>='2013-07-01'
