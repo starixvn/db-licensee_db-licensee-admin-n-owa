@@ -16,6 +16,7 @@ AS
 	- 20121129@Henry: add more columns
 	- 20130613@Jim: change condition for Affectivedate
 	- 20130724@Jim:  PIH and Starlit are no longer ONEWorks licensees since July 1st 2013
+	- 20130905@Jim:  Boping is no longer ONEWorks licensee since August 1st 2013
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
  *  - @Operator   : List of operator ID separated by ','  
@@ -74,11 +75,9 @@ BEGIN
 		r.ResellerID IN (SELECT RTRIM(LTRIM(VAL)) FROM strSplit(@Operator,','))		
 END
 
-IF @FromDate>='2013-07-01'
-	BEGIN
-		DELETE FROM @tmpLicenseeReseller
-		WHERE ResellerID IN (3,8) -- remove Starlit,PIH
-	END
+DELETE FROM @tmpLicenseeReseller
+WHERE (@FromDate BETWEEN '2013-07-01' AND '2013-07-31' AND ResellerID IN (3,8))
+	  OR (@FromDate>='2013-08-01' AND ResellerID IN (3,7,8))
 	
 --exclude BA & IBC & PIH...
 IF EXISTS(SELECT 1 FROM @tmpLicenseeReseller lr INNER JOIN bodb_licensee.dbo.licensees l WITH (nolock) ON lr.licenseeid=l.licenseeid  WHERE l.IsDeposit=1 AND lr.ResellerID<>3)
