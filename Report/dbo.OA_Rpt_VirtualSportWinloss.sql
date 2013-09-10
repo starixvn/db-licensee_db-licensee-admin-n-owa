@@ -135,10 +135,10 @@ SELECT
 	CAST(isnull(SUM(d.turnover * e.EUR),0) AS MONEY) AS Turnover,
 	CAST(isnull(SUM(d.MemberWinloss * e.EUR),0) AS MONEY) AS MemberWinloss,
 	CAST( -1 * isnull(SUM(d.MemberWinloss * e.EUR),0) AS money) AS GrossWinloss,
-	CAST(CASE WHEN isnull(SUM(d.MemberWinloss * e.EUR),0) > 0 THEN 0 ELSE -1 * isnull(SUM(d.MemberWinloss * e.EUR * isnull(DI.ChargeRate,0)),0) END AS money) AS DistributorRevenue,
+	CAST( -1 * isnull(SUM(d.MemberWinloss * e.EUR * isnull(DI.ChargeRate,0)),0)  AS money) AS DistributorRevenue,
 	ISNULL(SUM(d.betcount), 0) AS BetCount,
-	CAST(CASE WHEN isnull(SUM(-1 * d.MemberWinloss * e.EUR * OW.ChargeRate),0) < 0 THEN 0 ELSE isnull(SUM(-1 * d.MemberWinloss * e.EUR * OW.ChargeRate),0) END AS money) AS OneworksIncome,
-	CAST(CASE WHEN isnull(SUM(-1 * d.MemberWinloss * e.EUR * INS.ChargeRate),0) < 0 THEN 0 ELSE isnull(SUM(-1 * d.MemberWinloss * e.EUR * INS.ChargeRate),0) END AS money) AS AmtDueToInspired,
+	CAST(isnull(SUM(-1 * d.MemberWinloss * e.EUR * OW.ChargeRate),0)  AS money) AS OneworksIncome,
+	CAST(isnull(SUM(-1 * d.MemberWinloss * e.EUR * INS.ChargeRate),0) AS money) AS AmtDueToInspired,
 	isnull(DI.ChargeRate,0) as DistributorsChargeRate,
 	isnull(OW.ChargeRate,0) as OneworksChargeRate ,
 	isnull(INS.ChargeRate,0) as InspiredChargeRate
