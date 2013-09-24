@@ -25,7 +25,7 @@ BEGIN
 
 	DECLARE @tmpLicensee TABLE (LicenseeID INT)
 	INSERT INTO @tmpLicensee
-	SELECT lr1.LicenseeID FROM LicenseeReseller lr1 WHERE lr1.ResellerID IN (5,7)
+	SELECT lr1.LicenseeID FROM LicenseeReseller lr1 (NOLOCK) WHERE lr1.ResellerID IN (5,7)
 
 	SELECT l.LicenseeID, L.LicenseeName
 	FROM LicenseeProduct3rd lp (NOLOCK)
