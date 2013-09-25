@@ -31,7 +31,7 @@ BEGIN
 	SELECT l.LicenseeID, L.LicenseeName
 	FROM LicenseeProduct3rd lp (NOLOCK)
 		INNER JOIN Licensees L (NOLOCK) ON L.LicenseeID = lp.LicenseeID
-		INNER JOIN SystemLicensee sl ON sl.LicenseeID = L.LicenseeID
+		INNER JOIN SystemLicensee sl ON sl.LicenseeID = L.LicenseeID AND sl.IsActive = 1
 		INNER JOIN Systems s (NOLOCK) ON sl.SystemID=s.ID 
 	WHERE lp.ProductID = 3
 		AND s.SystemName LIKE 'OAS'
