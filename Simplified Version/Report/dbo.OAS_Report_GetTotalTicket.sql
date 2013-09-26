@@ -27,6 +27,7 @@ AS
 	20130721@Jim: improve performance 
 	20130830@Jim: Remove Cozni from licensee list in Total Transaction report from 1st August 2013.
 	20130905@Jim: Boping is no longer ONEWorks licensee since August 1st 2013
+	20130923@Victor: BA belongs to FDL from Aug 1st 2013 (except Boping BAs)
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
  *  - @Operator   : List of operator ID separated by ','  
@@ -38,7 +39,7 @@ AS
  *  - @GroupBy   : 1 : Daily, 2 : Monthly  
  */  
     
-BEGIN      
+BEGIN     
 
 declare @sql varchar(8000)
 SELECT @sql = 'SET NOCOUNT ON  ' + char(13)
@@ -100,13 +101,9 @@ END
 SELECT @sql = @sql +
 'DELETE FROM @tmpLicenseeReseller 
 WHERE (
-		('''+convert(varchar(10),@Fromdate,120)+'''BETWEEN ''2013-07-01'' AND ''2013-07-31''  AND ResellerID IN (3,8) ) OR ('''+convert(varchar(10),@Fromdate,120)+'''>=''2013-08-01'' AND ResellerID in (3,5,7,8 ))
+		('''+convert(varchar(10),@Fromdate,120)+'''BETWEEN ''2013-07-01'' AND ''2013-07-31''  AND ResellerID IN (3,8) ) OR ('''+convert(varchar(10),@Fromdate,120)+'''>=''2013-08-01'' AND ResellerID in (5,7,8 ))
 		)'+char(13)
 
-IF @Fromdate>='2013-07-01'
-BEGIN 
-	SELECT @sql = @sql + 'DELETE FROM @tmpLicenseeReseller WHERE ResellerID IN (3,8)'
-END 
 --exclude BA & IBC & PIH...
 SELECT @sql = @sql + '--Exclude BA & IBC & PIH...' + char(13)
 SELECT @sql = @sql + 
@@ -128,6 +125,14 @@ SELECT @sql = @sql +
 					'GROUP BY b.rptDate, lr.ResellerID, lr.licenseeid' + char(13) +
 				'END' + char(13) 
 
+-- Remove Boping licensees from BA (FDL) licensees
+IF (@FromDate >= CAST('2013-08-01' AS SMALLDATETIME))
+BEGIN
+	SELECT @sql = @sql +	'DELETE FROM @tmpLicenseeReseller' + CHAR(13) +
+							'WHERE LicenseeID IN (SELECT lr1.LicenseeID ' + CHAR(13) +
+												'FROM bodb_licensee.dbo.LicenseeReseller lr1 (NOLOCK) ' + CHAR(13) +
+												'WHERE lr1.ResellerID IN (7)) AND ResellerID = 3' + CHAR(13)
+END
 --BA
 SELECT @sql = @sql + '--BA selection' + char(13)
 SELECT @sql = @sql + 
@@ -176,7 +181,8 @@ SELECT @sql = @sql +
 					WHEN @GroupBy = 1 THEN 'CONVERT(VARCHAR(8),d.winlostdate,112) ' 
 					WHEN @GroupBy = 2 THEN 'CONVERT(VARCHAR(6),d.winlostdate,112)'
 					END + ' GroupBy,' + char(13) +
-				'r.ResellerID,r.ResellerName,' + char(13) +
+				'r.ResellerID,' + CHAR(13) +
+				'CASE WHEN (r.ResellerID = 3 AND CAST('''+CAST(@FromDate AS VARCHAR)+''' AS SMALLDATETIME)>=''2013-08-01'') THEN ''BA (FDL)'' ELSE r.ResellerName END AS ResellerName,' + char(13) +
 				'CASE WHEN r.ResellerType = 2 THEN '''' ELSE l.LicenseeName END AS LicenseeName,' + char(13) +
 				'ISNULL(SUM(d.betcount), 0) AS BetCount' + char(13) +
 			'FROM' + char(13) +
