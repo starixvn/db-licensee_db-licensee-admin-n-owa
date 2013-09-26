@@ -26,6 +26,7 @@ Params explanation:
 		1 - No draw (only win and loss tickets are calculated) 
 		2 - No draw for Turnover only (the draw tickets will be calculated in the Total Trans, Turnover of these tickets will not be calculated)
 Revisions:  
+	20130926@Victor: fix bug turnover for HalfWin/HalfLose tickets
   
 
 */
@@ -42,6 +43,8 @@ BEGIN
 		BAComm 			MONEY,
 		AmountBA		MONEY
 	)
+
+	
 
 	DECLARE @tempAg	TABLE( custID INT,currency INT)  
 	DECLARE @LicenseeName VARCHAR(50)
@@ -82,7 +85,15 @@ BEGIN
 			SELECT   
 				b.winlostdate,  
 				b.currency,
-				SUM(CASE WHEN @DrawFilter = 2 AND b.statusID = 111 THEN 0 ELSE b.stake END) AS TurnOver, 
+				SUM(b.stake*CASE 
+						WHEN @DrawFilter IN (1,2) THEN
+						CASE 
+							WHEN b.statusID = 111 THEN 0 
+							WHEN (b.statusID IN (112,113) AND ABS(b.modds) = 0.25 AND b.bettype IN (1,3,7,8,17,18)) THEN 0.5
+							ELSE 1 
+						END
+						ELSE 1 
+					END) AS TurnOver, 
 				COUNT(b.transid) AS TotalTrans,
 				SUM(b.winlost - b.actual_stake + PlayerComm) AS CustomerWL,
 				SUM(comm) AS BAComm, 
@@ -112,7 +123,15 @@ BEGIN
 		SELECT 
 			b.winlostdate,  
 			b.currency,
-			SUM(CASE WHEN @DrawFilter = 2 AND b.statusID = 111 THEN 0 ELSE b.turnover END) AS TurnOver, 
+			SUM(b.turnover*	CASE 
+								WHEN @DrawFilter IN (1,2) THEN
+								CASE 
+									WHEN b.statusID = 111 THEN 0 
+									WHEN b.statusID IN (114,115) THEN 0.5
+									ELSE 1 
+								END
+								ELSE 1 
+							END) AS TurnOver, 
 			SUM(b.BetCount) AS TotalTrans,
 			SUM(b.winlost + b.playerComm) AS CustomerWL,
 			SUM(comm) AS BAComm, 
@@ -132,6 +151,13 @@ BEGIN
 	END 
 	CREATE NONCLUSTERED INDEX IDX_Index_BA ON #BAWinLoss(Currency)	
 
+	-- Remove data before AffectedDate
+	DECLARE @AffectedDate DATETIME
+	SELECT @AffectedDate = AffectedDate FROM bodb_licensee.dbo.Licensees (NOLOCK) WHERE LicenseeID = @licenseeId
+	
+	DELETE FROM #BAWinLoss WHERE WLDate < @AffectedDate
+
+
 	SELECT exchangedate, ExchangeId, Code,  
 		CASE @ExchangeID
 			WHEN 'USD' THEN USD
@@ -139,7 +165,7 @@ BEGIN
 			ELSE CNY
 		END AS ExRate
 	INTO #TempExchange 									   
-	FROM IMS_f_ExchangeDailySel(@FromDate,@ToDate)						   
+	FROM Lrf_f_GetExchangeDaily(@FromDate,@ToDate)						   
 	WHERE exchangeid IN (SELECT DISTINCT Currency FROM #BAWinLoss)
 
 	-- Show Result
