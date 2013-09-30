@@ -28,7 +28,11 @@ AS
 	- 20130724@Jim:  PIH and Starlit are no longer ONEWorks licensees since July 1st 2013
 	- 20130730@Jim: fix bug (exclude all licensee whose EffectiveDate is null )
 	- 20130905@Jim:Boping is no longer ONEWorks licensee since August 1st 2013
+<<<<<<< HEAD
 	- 20130926@Jim: Cozni is no longer ONEWorks licensee since August 1st 2013.
+=======
+	- 20130923@Victor: Starlit becomes FDL (BA) from Aug 1st 2013
+>>>>>>> ab38d0a5ede11058cf4c858934f1ea498402a7b9
 	
  * Param's Explanation:    
  *  - @ResellerID : Reseller ID (0 : All reseller)  
@@ -92,9 +96,28 @@ BEGIN
 	END
 
 END
+
+-- Remove Starlit, PIH, Boping, Cozni by date range
 DELETE FROM #Data
 WHERE (@FromDate BETWEEN '2013-07-01' AND '2013-07-31' AND ResellerID IN (3,8))
+<<<<<<< HEAD
 	  OR (@FromDate>='2013-08-01' AND ResellerID IN (3,5,7,8))
+=======
+	  OR (@FromDate>='2013-08-01' AND ResellerID IN (5,7,8))
+
+-- Remove direct licensees
+DECLARE @DirectLics TABLE (ResellerID INT)
+
+INSERT INTO @DirectLics
+SELECT DISTINCT r.ResellerID 
+FROM LicenseeReseller lr (NOLOCK)
+	INNER JOIN Resellers r (NOLOCK) ON lr.ResellerID = r.ResellerID
+	INNER JOIN Licensees l (NOLOCK) ON l.LicenseeID = lr.LicenseeID
+WHERE 
+	l.LicenseeName = r.ResellerName
+
+DELETE FROM #Data WHERE ResellerID IN (SELECT ResellerID FROM @DirectLics)
+>>>>>>> ab38d0a5ede11058cf4c858934f1ea498402a7b9
 
 SELECT DISTINCT * FROM #Data
 
