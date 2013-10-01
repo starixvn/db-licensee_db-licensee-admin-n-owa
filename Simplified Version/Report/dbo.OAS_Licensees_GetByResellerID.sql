@@ -1,7 +1,10 @@
-﻿set ANSI_NULLS ON
-set QUOTED_IDENTIFIER ON
-go
+﻿USE [bodb_Licensee]
+GO
 
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
 
 ALTER PROCEDURE [dbo].[OAS_Licensees_GetByResellerID]   
 	@FromDate SMALLDATETIME,
@@ -114,11 +117,7 @@ DELETE FROM #Data WHERE ResellerID IN (SELECT ResellerID FROM @DirectLics)
 SELECT DISTINCT * FROM #Data
 
 DROP TABLE #Data
-
 GO
-GRANT EXECUTE ON [dbo].[OAS_Licensees_GetByResellerID] TO [bodbAdminNet] 
+GRANT EXECUTE ON [dbo].[OAS_Licensees_GetByResellerID] TO [bodbAdminNet] AS [dbo]
 GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_Licensees_GetByResellerID] TO [vnteam]        
-  
-
-
+GRANT VIEW DEFINITION ON [dbo].[OAS_Licensees_GetByResellerID] TO [vnteam] AS [dbo]
