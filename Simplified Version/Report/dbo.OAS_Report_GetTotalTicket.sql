@@ -28,6 +28,7 @@ AS
 	20130830@Jim: Remove Cozni from licensee list in Total Transaction report from 1st August 2013.
 	20130905@Jim: Boping is no longer ONEWorks licensee since August 1st 2013
 	20130923@Victor: BA belongs to FDL from Aug 1st 2013 (except Boping BAs)
+	20131016@Victor: Show licensees detail under BA (FDL)
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
  *  - @Operator   : List of operator ID separated by ','  
@@ -183,7 +184,7 @@ SELECT @sql = @sql +
 					END + ' GroupBy,' + char(13) +
 				'r.ResellerID,' + CHAR(13) +
 				'CASE WHEN (r.ResellerID = 3 AND CAST('''+CAST(@FromDate AS VARCHAR)+''' AS SMALLDATETIME)>=''2013-08-01'') THEN ''BA (FDL)'' ELSE r.ResellerName END AS ResellerName,' + char(13) +
-				'CASE WHEN r.ResellerType = 2 THEN '''' ELSE l.LicenseeName END AS LicenseeName,' + char(13) +
+				'CASE WHEN (r.ResellerType = 2 AND r.ResellerID != 3) THEN '''' ELSE l.LicenseeName END AS LicenseeName,' + char(13) +
 				'ISNULL(SUM(d.betcount), 0) AS BetCount' + char(13) +
 			'FROM' + char(13) +
 				'@data d ' + char(13) +
@@ -194,13 +195,13 @@ SELECT @sql = @sql +
 					WHEN @GroupBy = 1 THEN 'CONVERT(VARCHAR(8),d.winlostdate,112) ' 
 					WHEN @GroupBy = 2 THEN 'CONVERT(VARCHAR(6),d.winlostdate,112)'
 					END + char(13) +
-			' ,r.ResellerID,r.ResellerName, CASE WHEN r.ResellerType = 2 THEN '''' ELSE l.LicenseeName END ' + char(13) +
+			' ,r.ResellerID,r.ResellerName, CASE WHEN (r.ResellerType = 2 AND r.ResellerID != 3) THEN '''' ELSE l.LicenseeName END ' + char(13) +
 			'ORDER BY ' + char(13) +
 			CASE 
 					WHEN @GroupBy = 1 THEN 'CONVERT(VARCHAR(8),d.winlostdate,112) ' 
 					WHEN @GroupBy = 2 THEN 'CONVERT(VARCHAR(6),d.winlostdate,112)'
 					END + char(13) +
-			',r.ResellerName, CASE WHEN r.ResellerType = 2 THEN '''' ELSE l.LicenseeName END'+char(13)
+			',r.ResellerName, CASE WHEN (r.ResellerType = 2 AND r.ResellerID != 3) THEN '''' ELSE l.LicenseeName END'+char(13)
 			
 SELECT @sql = @sql +'DROP TABLE #tmpBetting'	
 IF (@debug = 1) PRINT @sql
