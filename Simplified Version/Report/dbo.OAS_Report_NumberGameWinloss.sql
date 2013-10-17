@@ -18,6 +18,7 @@ AS
 	- 20130724@Jim:  PIH and Starlit are no longer ONEWorks licensees since July 1st 2013
 	- 20130905@Jim:Boping is no longer ONEWorks licensee since August 1st 2013
 	- 20130926@Jim:Cozni is no longer ONEWorks licensee since August 1st 2013.
+	- 20131017@Victor: OW charge licensees directly from Oct 01 2013
 	
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
@@ -69,6 +70,16 @@ END
 DELETE FROM @tmpLicenseeReseller
 WHERE (@FromDate BETWEEN '2013-07-01' AND '2013-07-31' AND ResellerID IN (3,8))
 	  OR (@FromDate>='2013-08-01' AND ResellerID IN (3,5,7,8))
+
+
+-- Remove reseller that are diabled for Number Game
+DELETE FROM @tmpLicenseeReseller
+WHERE ResellerID IN(SELECT DISTINCT ObjectID 
+					FROM bodb_licensee.dbo.LicenseeEventLog (NOLOCK) 
+					WHERE SystemID = 4 -- OAS
+						AND ProductID = 2 -- NG 
+						AND ActionID = 5 
+						AND (@FromDate >= FromDate AND (ToDate IS NULL OR @ToDate <= ToDate)))
 	
 	
 --exclude BA & IBC & PIH...
@@ -146,7 +157,15 @@ FROM #Data d
 	LEFT JOIN bodb_licensee.dbo.ResellerProductChargeByDateRange DI ON d.ResellerID = DI.ResellerID AND DI.PartyID = 4 AND DI.ProductID = 2 AND d.winlostdate BETWEEN DI.FromDate AND DI.ToDate
 GROUP BY
 	r.ResellerID,d.LicenseeID,DI.ChargeRate,LUP.ChargeRate,OW.ChargeRate
-	
+
+-- Check Lupine party
+DECLARE @PartyTerminated BIT
+SET @PartyTerminated = 0
+IF EXISTS (SELECT TOP 1 1 	FROM bodb_licensee.dbo.LicenseeEventLog (NOLOCK) WHERE SystemID = 4 AND ActionID = 3 AND ObjectID = 3 
+													AND (@FromDate >= FromDate AND (ToDate IS NULL OR @ToDate <= ToDate)))
+	SET @PartyTerminated = 1
+
+
 --return the result
 SELECT	
 	r.ResellerID,r.ResellerName,r.ResellerType,
@@ -157,7 +176,10 @@ SELECT
 	CAST(isnull(SUM(re.GrossWinloss),0) AS MONEY) AS GrossWinloss,
 	CAST(isnull(SUM(re.DistributorRevenue),0) AS MONEY) AS DistributorRevenue,
 	CAST(CASE WHEN r.ResellerType = 1 THEN isnull(SUM(re.LupineRevenue),0) WHEN r.ResellerType = 2 THEN isnull(SUM(re.GrossWinloss),0) * LupineChargeRate END  AS MONEY) AS LupineRevenue,
-	CAST(CASE WHEN r.ResellerType = 1 THEN isnull(SUM(re.OneworksRevenue),0) WHEN r.ResellerType = 2 THEN isnull(SUM(re.GrossWinloss),0) * LupineChargeRate * OneworksChargeRate END  AS MONEY) AS OneworksRevenue,
+	CAST(CASE 
+			WHEN r.ResellerType = 1 THEN isnull(SUM(re.OneworksRevenue),0) 
+			WHEN r.ResellerType = 2 THEN isnull(SUM(re.GrossWinloss),0) * OneworksChargeRate * CASE WHEN @PartyTerminated = 0 THEN LupineChargeRate ELSE 1 END
+		END  AS MONEY) AS OneworksRevenue,
 	DistributorsChargeRate,
 	LupineChargeRate,
 	OneworksChargeRate

@@ -29,7 +29,7 @@ AS
 	- 20130730@Jim: fix bug (exclude all licensee whose EffectiveDate is null )
 	- 20130905@Jim:Boping is no longer ONEWorks licensee since August 1st 2013
 	- 20130926@Jim: Cozni is no longer ONEWorks licensee since August 1st 2013.
-	
+	- 20131017@Victor: Remove FDL reseller
  * Param's Explanation:    
  *  - @ResellerID : Reseller ID (0 : All reseller)  
  *	- @ExcludeBA: to exclude BA Licensees (Starlit)
@@ -92,9 +92,20 @@ BEGIN
 	END
 
 END
+
 DELETE FROM #Data
 WHERE (@FromDate BETWEEN '2013-07-01' AND '2013-07-31' AND ResellerID IN (3,8))
 	  OR (@FromDate>='2013-08-01' AND ResellerID IN (3,5,7,8))
+
+
+-- Remove reseller that are diabled for specific ProductID
+DELETE FROM #Data
+WHERE ResellerID IN(SELECT DISTINCT ObjectID 
+					FROM LicenseeEventLog (NOLOCK)
+					WHERE SystemID = 4 
+						AND ProductID = @ProductID 
+						AND ActionID = 5 
+						AND (@FromDate >= FromDate AND @ToDate <= ToDate))
 
 SELECT DISTINCT * FROM #Data
 
