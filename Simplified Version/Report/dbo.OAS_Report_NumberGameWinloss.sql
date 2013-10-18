@@ -19,6 +19,7 @@ AS
 	- 20130905@Jim:Boping is no longer ONEWorks licensee since August 1st 2013
 	- 20130926@Jim:Cozni is no longer ONEWorks licensee since August 1st 2013.
 	- 20131017@Victor: OW charge licensees directly from Oct 01 2013
+	- 20131018@Victor: Fix zero OneWorks revenue issue
 	
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
@@ -136,6 +137,13 @@ SELECT ExchangeDate,ExchangeId,EUR
 FROM Lrf_f_GetExchangeDaily(@FromDate,@ToDate)
 WHERE exchangeid IN (SELECT DISTINCT Currency FROM #Data)
 
+-- Check Lupine party
+DECLARE @PartyTerminated BIT
+SET @PartyTerminated = 0
+IF EXISTS (SELECT TOP 1 1 	FROM bodb_licensee.dbo.LicenseeEventLog (NOLOCK) WHERE SystemID = 4 AND ActionID = 3 AND ObjectID = 3 
+													AND (@FromDate >= FromDate AND (ToDate IS NULL OR @ToDate <= ToDate)))
+	SET @PartyTerminated = 1
+
 INSERT INTO #Result(ResellerID,LicenseeID,turnover, MemberWinloss,GrossWinloss, DistributorRevenue, Betcount,LupineRevenue,OneworksRevenue,DistributorsChargeRate, LupineChargeRate,OneworksChargeRate)
 SELECT	
 	r.ResellerID,d.LicenseeID,
@@ -145,7 +153,11 @@ SELECT
 	CAST(CASE WHEN isnull(SUM(d.MemberWinloss * e.EUR),0) > 0 THEN 0 ELSE -1 * isnull(SUM(d.MemberWinloss * e.EUR * isnull(DI.ChargeRate,0)),0) END AS money) AS DistributorRevenue,
 	ISNULL(SUM(d.betcount), 0) AS BetCount,
 	CAST(CASE WHEN isnull(SUM(-1 * d.MemberWinloss * e.EUR),0) < 0 THEN 0 ELSE -1 * isnull(SUM(d.MemberWinloss * e.EUR * isnull(DI.ChargeRate,0) * isnull(LUP.ChargeRate,0) ),0) END AS money) AS LupineRevenue,
-	CAST(CASE WHEN isnull(SUM(-1 * d.MemberWinloss * e.EUR),0) < 0 THEN 0 ELSE isnull(SUM(-1 * d.MemberWinloss * e.EUR * isnull(DI.ChargeRate,0) * isnull(LUP.ChargeRate,0) * isnull(OW.ChargeRate,0)),0) END AS money) AS OneworksRevenue,
+	CAST(CASE 
+			WHEN isnull(SUM(-1 * d.MemberWinloss * e.EUR),0) < 0 THEN 0 
+			ELSE isnull(SUM(-1 * d.MemberWinloss * e.EUR * isnull(OW.ChargeRate,0) * CASE WHEN @PartyTerminated = 0 THEN isnull(DI.ChargeRate,0) * isnull(LUP.ChargeRate,0) ELSE 1 END
+			),0) 
+		END AS money) AS OneworksRevenue,
 	isnull(DI.ChargeRate,0) as DistributorsChargeRate,
 	isnull(LUP.ChargeRate,0) as LupineChargeRate,
 	isnull(OW.ChargeRate,0) as OneworksChargeRate
@@ -158,12 +170,7 @@ FROM #Data d
 GROUP BY
 	r.ResellerID,d.LicenseeID,DI.ChargeRate,LUP.ChargeRate,OW.ChargeRate
 
--- Check Lupine party
-DECLARE @PartyTerminated BIT
-SET @PartyTerminated = 0
-IF EXISTS (SELECT TOP 1 1 	FROM bodb_licensee.dbo.LicenseeEventLog (NOLOCK) WHERE SystemID = 4 AND ActionID = 3 AND ObjectID = 3 
-													AND (@FromDate >= FromDate AND (ToDate IS NULL OR @ToDate <= ToDate)))
-	SET @PartyTerminated = 1
+
 
 
 --return the result
