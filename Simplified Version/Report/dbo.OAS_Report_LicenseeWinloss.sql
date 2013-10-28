@@ -21,6 +21,7 @@ AS
  * -	20120704@Henry: Map Licensee with System
  * -	20120803@Henry: fix the commission formula
  * -    20131028@Victor: Add ExchangeRate to result table
+ * -    20131028@Victor: Use the end of month Exchange Rate for daily report
  * Param's Explanation:    
  *  - @ID   : Licensee ID or operator ID  
  *  - @Type   : 1 : licensee, 2 : operator  
@@ -248,29 +249,18 @@ BEGIN
 END   
 
 -- Exchange by Date
+
+DECLARE @ExDate smalldatetime
+
+SELECT @ExDate = CASE 
+					 WHEN DATEDIFF(month,@TDate,GETDATE()) <= 0 THEN GETDATE() 
+					 ELSE DATEADD(day,-1,DATEADD(month,1,'01 '+SUBSTRING(CONVERT(VARCHAR(11),@TDate,106),4,8)))
+				 END
+
 SELECT * INTO #TempExchange 
-FROM Lrf_f_GetExchangeDaily(@FDate,	CASE 
-										WHEN DATEDIFF(month,@TDate,GETDATE()) <= 0 THEN GETDATE() 
-										ELSE DATEADD(day,-1,DATEADD(month,1,'01 '+SUBSTRING(CONVERT(VARCHAR(11),@TDate,106),4,8)))
-									END)
+FROM Lrf_f_GetExchangeDaily(@ExDate,@ExDate)
 WHERE exchangeid IN (SELECT DISTINCT Currency FROM #SAgWinLoss)
 
--- Update ExRate if ReportType = 2 (Monthly)
-IF (@ReportType = 2)
-BEGIN
-	;WITH LastDateOfMonth AS
-	(
-		SELECT CONVERT(VARCHAR(6), Exchangedate, 112)  [Month], MAX(Exchangedate) as MaxDate
-		FROM #TempExchange t
-		GROUP BY CONVERT(VARCHAR(6), Exchangedate, 112)
-	)
-	
-	UPDATE t1
-	SET MYR = t2.MYR, USD = t2.USD, EUR = t2.EUR, CNY = t2.CNY
-	FROM #TempExchange t1
-		INNER JOIN #TempExchange t2 ON t1.ExchangeID = t2.ExchangeId 
-								AND t2.ExchangeDate = (SELECT MaxDate FROM LastDateOfMonth WHERE [Month] = CONVERT(VARCHAR(6), t1.Exchangedate, 112))
-END
 
 SELECT     
 	CASE   
@@ -316,7 +306,7 @@ SELECT
 FROM   
 	 #SAgWinLoss w     
 	 INNER JOIN #TempExchange e 
-	 ON w.currency = e.ExchangeId AND w.winlostdate = e.ExchangeDate
+	 ON w.currency = e.ExchangeId
 GROUP BY     
 	 Currency,  
 	 CASE   
