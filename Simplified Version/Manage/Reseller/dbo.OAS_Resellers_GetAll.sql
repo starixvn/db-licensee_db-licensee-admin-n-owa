@@ -14,6 +14,7 @@ AS
  20130829@Jim: Remove Cozni from licensee list in Total Transaction report from 1st August 2013.
  20130905@Jim:Boping is no longer ONEWorks licensee since August 1st 2013
  20130923@Victor: Starlit becomes FDL (BA) from Aug 1st 2013, Remove Direct Licensees from the list
+ 20131028@Victor: Disable FDL from Oct 1st 2013
  */  
   
 SET NOCOUNT ON  
@@ -38,6 +39,7 @@ WHERE
 DELETE FROM #tmpResellerList 
 WHERE (@FromDate BETWEEN '2013-07-01' AND '2013-07-31' AND ResellerID IN (3,8))
 	  OR (@FromDate>='2013-08-01' AND ResellerID IN (5,7,8))
+	  OR (@FromDate>='2013-10-01' AND ResellerID = 4)
 
 -- Remove direct licensees
 DECLARE @DirectLics TABLE (ResellerID INT)
