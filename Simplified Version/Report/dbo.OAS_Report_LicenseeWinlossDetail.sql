@@ -17,6 +17,7 @@ AS
     DB: DB052.bodb02 
    
     Revisions:  
+	  + 20131028@Victor: Use end of month Exchange Rate for converting data to base currency
 		
 	Param's Explanation:  
 	  + @CustID: SuperID  
@@ -206,10 +207,20 @@ BEGIN
 	
  END
   
- 
-SELECT * INTO #TempExchange 
-FROM Lrf_f_GetExchangeDaily(@FromDate,@ToDate)
-WHERE exchangeid IN (SELECT DISTINCT Currency FROM @SAgWinLoss)
+ -- Exchange by Date
+
+ DECLARE @ExDate smalldatetime
+
+ SELECT @ExDate = CASE 
+					WHEN DATEDIFF(month,@ToDate,GETDATE()) <= 0 THEN GETDATE() 
+					ELSE DATEADD(day,-1,DATEADD(month,1,'01 '+SUBSTRING(CONVERT(VARCHAR(11),@ToDate,106),4,8)))
+				END
+
+ SELECT * INTO #TempExchange 
+ FROM Lrf_f_GetExchangeDaily(@ExDate,@ExDate)
+ WHERE exchangeid IN (SELECT DISTINCT Currency FROM @SAgWinLoss)
+
+
  
   --exclude betcount=0 AND turnover = 0
  SELECT 
@@ -218,6 +229,9 @@ WHERE exchangeid IN (SELECT DISTINCT Currency FROM @SAgWinLoss)
 	w.currency,
 	CASE WHEN w.Currency = 51 THEN @VNDCurrencyName 
 			ELSE e.Code END AS CurrencyName,
+	e.EUR AS EURExRate,
+	e.USD AS USDExRate,
+	e.MYR AS MYRExRate,
 	SUM(TurnOver)	AS Turnover,   
 	SUM(Winlost)		AS Winlost,  
 	SUM(LicenseeWL) AS LicenseeWL,
@@ -244,10 +258,13 @@ WHERE exchangeid IN (SELECT DISTINCT Currency FROM @SAgWinLoss)
 	CAST(SUM(Playercomm * e.EUR) AS MONEY) AS PlayercommEUR
  FROM	@SAgWinLoss w   
 		INNER JOIN #TempExchange e
-		ON w.winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
+		ON w.currency = e.ExchangeId
   GROUP BY w.currency,w.custid, w.username,
 			CASE WHEN w.Currency = 51 THEN @VNDCurrencyName 
-			ELSE e.Code END
+			ELSE e.Code END,
+			e.EUR,
+			e.USD,
+			e.MYR 
   ORDER BY w.currency
   
 DROP TABLE #TempExchange
