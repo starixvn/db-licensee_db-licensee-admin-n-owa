@@ -18,6 +18,7 @@ AS
    
     Revisions:  
 	  + 20131028@Victor: Use end of month Exchange Rate for converting data to base currency
+	  + 20131031@Victor: Fix Exchange Rate by date query
 		
 	Param's Explanation:  
 	  + @CustID: SuperID  
@@ -211,10 +212,10 @@ BEGIN
 
  DECLARE @ExDate smalldatetime
 
- SELECT @ExDate = CASE 
-					WHEN DATEDIFF(month,@ToDate,GETDATE()) <= 0 THEN GETDATE() 
-					ELSE DATEADD(day,-1,DATEADD(month,1,'01 '+SUBSTRING(CONVERT(VARCHAR(11),@ToDate,106),4,8)))
-				END
+ SELECT @ExDate = CONVERT(VARCHAR(10),	CASE 
+											WHEN DATEDIFF(month,@ToDate,GETDATE()) <= 0 THEN GETDATE() 
+											ELSE DATEADD(day,-1,DATEADD(month,1,'01 '+SUBSTRING(CONVERT(VARCHAR(11),@ToDate,106),4,8)))
+										END,120)
 
  SELECT * INTO #TempExchange 
  FROM Lrf_f_GetExchangeDaily(@ExDate,@ExDate)

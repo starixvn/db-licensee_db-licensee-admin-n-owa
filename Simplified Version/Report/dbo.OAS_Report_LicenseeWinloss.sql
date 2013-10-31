@@ -22,6 +22,7 @@ AS
  * -	20120803@Henry: fix the commission formula
  * -    20131028@Victor: Add ExchangeRate to result table
  * -    20131028@Victor: Use the end of month Exchange Rate for daily report
+ * -    20131031@Victor: Fix Exchange Rate by date query
  * Param's Explanation:    
  *  - @ID   : Licensee ID or operator ID  
  *  - @Type   : 1 : licensee, 2 : operator  
@@ -252,10 +253,10 @@ END
 
 DECLARE @ExDate smalldatetime
 
-SELECT @ExDate = CASE 
-					 WHEN DATEDIFF(month,@TDate,GETDATE()) <= 0 THEN GETDATE() 
-					 ELSE DATEADD(day,-1,DATEADD(month,1,'01 '+SUBSTRING(CONVERT(VARCHAR(11),@TDate,106),4,8)))
-				 END
+SELECT @ExDate = CONVERT(VARCHAR(10), CASE 
+										  WHEN DATEDIFF(month,@TDate,GETDATE()) <= 0 THEN GETDATE() 
+										  ELSE DATEADD(day,-1,DATEADD(month,1,'01 '+SUBSTRING(CONVERT(VARCHAR(11),@TDate,106),4,8)))
+									  END,120)
 
 SELECT * INTO #TempExchange 
 FROM Lrf_f_GetExchangeDaily(@ExDate,@ExDate)
