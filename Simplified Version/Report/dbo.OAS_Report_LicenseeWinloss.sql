@@ -20,6 +20,8 @@ AS
  * -    20120214@Jim: change to use  table ExchangeDaily by use function Lrf_f_GetExchangeDaily   
  * -    20120704@Henry: Map Licensee with System
  * -    20120803@Henry: fix the commission formula
+ * -	20131101@Victor: Add exchange rate to result table 
+ * -	
  * Param's Explanation:    
  *  - @ID   : Licensee ID or operator ID  
  *  - @Type   : 1 : licensee, 2 : operator  
@@ -251,10 +253,19 @@ BEGIN
     DELETE FROM #SAgWinLoss WHERE Currency = 20  
 END   
 
+-- Exchange by Date
+
+DECLARE @ExDate smalldatetime
+
+SELECT @ExDate = CONVERT(VARCHAR(10), CASE 
+										  WHEN DATEDIFF(month,@TDate,GETDATE()) <= 0 THEN GETDATE() 
+										  ELSE DATEADD(day,-1,DATEADD(month,1,'01 '+SUBSTRING(CONVERT(VARCHAR(11),@TDate,106),4,8)))
+									  END,120)
+
 SELECT * INTO #TempExchange 
-FROM Lrf_f_GetExchangeDaily(@FDate,@TDate)
+FROM Lrf_f_GetExchangeDaily(@ExDate,@ExDate)
 WHERE exchangeid IN (SELECT DISTINCT Currency FROM #SAgWinLoss)
-  
+
 SELECT     
     CASE   
     WHEN @ReportType = 1 THEN CONVERT(VARCHAR(8), w.winlostdate, 112)    
@@ -265,7 +276,10 @@ SELECT
     CASE   
     WHEN Currency = 51 THEN @VNDCurrencyName   
     ELSE e.Code   
-    END currencyName,  
+    END currencyName, 
+	e.EUR AS EURExRate,
+	e.USD AS USDExRate,
+	e.MYR AS MYRExRate, 
     SUM(TurnOver) AS Turnover,     
     SUM(Winlost) AS Winlost,    
     SUM(LicenseeWL) AS LicenseeWL,  
@@ -296,7 +310,7 @@ SELECT
 FROM   
      #SAgWinLoss w     
      INNER JOIN #TempExchange e 
-     ON w.winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId  
+     ON w.currency = e.ExchangeId  
 GROUP BY     
      Currency,  
      CASE   
@@ -307,7 +321,10 @@ GROUP BY
      CASE   
         WHEN Currency = 51 THEN @VNDCurrencyName   
         ELSE e.Code   
-     END  
+     END,
+	 e.EUR,
+	 e.USD,
+	 e.MYR  
 ORDER BY ReportType    
    
 DROP TABLE #SAgWinLoss
