@@ -1,6 +1,11 @@
-﻿set ANSI_NULLS ON
-set QUOTED_IDENTIFIER ON
-go
+﻿USE [bodb02]
+GO
+
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
 
  ALTER PROCEDURE [dbo].[OAS_Report_LiveCasinoWinloss]      
 	@NormalLicensee VARCHAR(1000),  
@@ -24,6 +29,7 @@ AS
 	- 20130905@Jim: Boping is no longer ONEWorks licensee since August 1st 2013
 	- 20131017@Victor: OW charge licensees directly from Oct 01 2013
 	- 20131018@Victor: Fix zero OneWorks revenue issue
+	- 20140114@Jim: support to view multi bettype
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
  *  - @Operator   : List of operator ID separated by ','  
@@ -104,8 +110,7 @@ BEGIN
 		AND s.SystemName='OA'
 		AND b.status NOT IN (-1,103)
 		AND CurrencyID<>20
-		AND bettype=1101
-		--AND bettype BETWEEN 1101 AND 1199
+		AND ((bettype BETWEEN 1101 AND 1199 AND @GameType=0) OR (bettype=@GameType))
 	GROUP BY b.rptDate,b.currencyID, lr.ResellerID, lr.licenseeid
 END
 
@@ -124,8 +129,7 @@ BEGIN
 		AND b.status NOT IN (-1,103)
 		AND lr.ResellerID<>3
 		AND CurrencyID<>20
-		AND b.bettype=1101
-		--AND bettype BETWEEN 1101 AND 1199
+		AND ((bettype BETWEEN 1101 AND 1199 AND @GameType=0) OR (bettype=@GameType))
 		AND b.customercategory NOT IN (27,28) 
 	GROUP BY b.rptDate,b.currencyID, lr.ResellerID, lr.licenseeid	
 END
@@ -202,8 +206,8 @@ ORDER BY
 DROP TABLE	#Data
 DROP TABLE	#Result
 DROP TABLE #TempExchange
-END  
+END
 GO
-GRANT EXECUTE ON [dbo].[OAS_Report_LiveCasinoWinloss] TO [bodbAdminNet] 
+GRANT EXECUTE ON [dbo].[OAS_Report_LiveCasinoWinloss] TO [bodbAdminNet] AS [dbo]
 GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_Report_LiveCasinoWinloss] TO [vnteam]       
+GRANT VIEW DEFINITION ON [dbo].[OAS_Report_LiveCasinoWinloss] TO [vnteam] AS [dbo]
