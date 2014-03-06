@@ -1,10 +1,11 @@
 USE [bodb02]
 GO
-
+/****** Object:  StoredProcedure [dbo].[OA_Rpt_LicPerformance_TurnOver]    Script Date: 3/6/2014 10:57:56 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+/****** Object:  Stored Procedure dbo.OA_Rpt_LicPerformance_TurnOver    Script Date: 3/4/2014 4:17:39 PM ******/
 
 ALTER  PROCEDURE [dbo].[OA_Rpt_LicPerformance_TurnOver]  
 	@Licensee VARCHAR(1000)='',
@@ -94,7 +95,7 @@ BEGIN
 	FROM bodb_Licensee.dbo.Licensees l (NOLOCK)
 	WHERE l.LicenseeID IN (SELECT VAL FROM strSplit(@Licensee,','))  
 	
-	WHILE (@sdate<=@ToDate )	
+	WHILE (@sdate<DATEADD(m,1,@ToDate) )	
 	BEGIN 
 		INSERT INTO #MY(sDate)
 		SELECT @sdate
@@ -244,7 +245,6 @@ BEGIN
 	DROP TABLE #MY
 
 END
-
 GO
 GRANT EXECUTE ON [dbo].[OA_Rpt_LicPerformance_TurnOver] TO [bodbAdminNet]
 GO

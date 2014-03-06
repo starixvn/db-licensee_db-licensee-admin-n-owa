@@ -110,7 +110,7 @@ BEGIN
 	FROM bodb_Licensee.dbo.Licensees l (NOLOCK)
 	WHERE l.LicenseeID IN (SELECT VAL FROM strSplit(@Licensee,','))  
 	
-	WHILE (@sdate<=@ToDate )	
+	WHILE (@sdate<DATEADD(m,1,@ToDate) )	
 	BEGIN 
 		INSERT INTO #MY(sDate)
 		SELECT @sdate
@@ -127,8 +127,8 @@ BEGIN
 			-SUM(b.winloss
 				* CASE WHEN @ProductCode='SB' THEN @sb_fee
 					   WHEN (@ProductCode='NG' AND b.siteID=12) THEN @ng_fee_haifa
-					   WHEN  (@ProductCode='NG' AND b.siteID=1 AND rptDate>'2012-09-01')  THEN @ng_fee_12bet
-					   WHEN  (@ProductCode='NG' AND b.siteID NOT IN (1,12) OR (@ProductCode='NG' AND b.siteID=1 AND rptDate<='2012-09-01')
+					   WHEN  (@ProductCode='NG' AND b.siteID=1 AND rptDate<'2012-09-01')  THEN  @ng_fee_12bet
+					   WHEN  (@ProductCode='NG' AND b.siteID NOT IN (1,12) OR (@ProductCode='NG' AND b.siteID=1 AND rptDate>='2012-09-01')
 							  ) THEN @ng_fee
 					   WHEN  @ProductCode='VS' THEN @vs_fee
 					   WHEN  @ProductCode='LC' THEN  @lc_fee
@@ -168,7 +168,12 @@ BEGIN
 						SELECT DISTINCT currencyID 
 						FROM #Temp
 						)
-
+	IF (@isconvert=0)
+		BEGIN
+			UPDATE #Exchange
+			SET Rate=1
+		END
+	
 	INSERT INTO #rptLicFee(Licensee,rptDate,Fee)
 	SELECT 
 		l.LicenseeName,
@@ -222,12 +227,7 @@ BEGIN
 	DROP TABLE #tmpLicensee
 	DROP TABLE #MY
 END
-
 GO
 GRANT EXECUTE ON [dbo].[OA_Rpt_LicPerformance_LicensingFee] TO [bodbAdminNet]
 GO
 GRANT VIEW DEFINITION ON [dbo].[OA_Rpt_LicPerformance_LicensingFee] TO [vnteam]
-
-
-
-
