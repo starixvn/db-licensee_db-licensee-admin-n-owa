@@ -301,32 +301,20 @@ BEGIN
 		ISNULL(SUM(re.betcount), 0) AS BetCount,
 		CAST(isnull(SUM(re.turnover),0) AS MONEY) AS Turnover,
 		CAST(isnull(SUM(re.MemberWinloss),0) AS MONEY) AS MemberWinloss,
-		CAST(isnull(SUM(re.GrossWinloss),0) AS MONEY) AS LicenseeWinloss,
-		--CAST(isnull(SUM(re.DistributorRevenue),0) AS MONEY) AS DistributorRevenue,
-		--CAST(isnull(SUM(re.OneworksIncome),0) AS MONEY) AS OneworksIncome,
-		--CAST(isnull(SUM(re.AmtDueToInspired),0) AS MONEY) AS AmtDueToInspired,
-		CAST(ABS(SUM(re.AmtDueToInspired-re.OneworksIncome)) AS money) AS OneworksRevenue,
+		CAST(isnull(SUM(re.GrossWinloss),0) AS MONEY) AS LicenseeWinloss,		
+		CAST(SUM(re.OneworksIncome-re.AmtDueToInspired) AS money) AS OneworksRevenue,
 
 		--EUR
 		CAST(isnull(SUM(re.turnover * e.EUR),0) AS MONEY) AS TurnoverEUR,
 		CAST(isnull(SUM(re.MemberWinloss * e.EUR),0) AS MONEY) AS MemberWinlossEUR,
 		CAST(isnull(SUM(re.GrossWinloss * e.EUR),0) AS MONEY) AS LicenseeWinlossEUR,
-		--CAST(isnull(SUM(re.DistributorRevenue * e.EUR),0) AS MONEY) AS DistributorRevenueEUR,
-		--CAST(isnull(SUM(re.OneworksIncome * e.EUR),0) AS MONEY) AS OneworksIncomeEUR,
-		--CAST(isnull(SUM(re.AmtDueToInspired * e.EUR),0) AS MONEY) AS AmtDueToInspiredEUR,
-		CAST(ABS(SUM(re.AmtDueToInspired-re.OneworksIncome)) * e.EUR AS money) AS OneworksRevenueEUR,
+		CAST(SUM(re.OneworksIncome-re.AmtDueToInspired) * e.EUR AS money) AS OneworksRevenueEUR,
+
 		--USD
 		CAST(isnull(SUM(re.turnover * e.USD),0) AS MONEY) AS TurnoverUSD,
 		CAST(isnull(SUM(re.MemberWinloss * e.USD),0) AS MONEY) AS MemberWinlossUSD,
 		CAST(isnull(SUM(re.GrossWinloss * e.USD),0) AS MONEY) AS LicenseeWinlossUSD,
-		--CAST(isnull(SUM(re.DistributorRevenue * e.USD),0) AS MONEY) AS DistributorRevenueUSD,
-		--CAST(isnull(SUM(re.OneworksIncome * e.USD),0) AS MONEY) AS OneworksIncomeUSD,
-		--CAST(isnull(SUM(re.AmtDueToInspired * e.USD),0) AS MONEY) AS AmtDueToInspiredUSD
-		CAST(ABS(SUM(re.AmtDueToInspired-re.OneworksIncome)) * e.USD AS money) AS OneworksRevenueUSD
-
-		--DistributorsChargeRate,
-		--OneworksChargeRate,
-		--InspiredChargeRate
+		CAST(SUM(re.OneworksIncome-re.AmtDueToInspired) * e.USD AS money) AS OneworksRevenueUSD
 	FROM #Result re
 		INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON p.PartyID = re.ResellerID
 		INNER JOIN bodb_licensee.dbo.Resellers r WITH (NOLOCK) ON p.OldRefID = r.ResellerID
