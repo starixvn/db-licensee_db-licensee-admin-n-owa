@@ -318,9 +318,8 @@ BEGIN
 		INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON p.PartyID = re.ResellerID
 		INNER JOIN bodb_licensee.dbo.Resellers r WITH (NOLOCK) ON p.OldRefID = r.ResellerID
 		LEFT JOIN bodb_licensee.dbo.OAS_Party p1 WITH (NOLOCK) ON p1.PartyID = re.LicenseeID
-	GROUP BY		
-		DistributorsChargeRate, StarExpressChargeRate, OneworksChargeRate,
-		CONVERT(VARCHAR(6),winlostdate,112),re.Currency,e.code,e.EUR,e.USD
+	GROUP BY				
+		CONVERT(VARCHAR(6),winlostdate,112),re.Currency,e.code,e.EUR
 	IF EXISTS(SELECT 1 FROM @tmpLicenseeReseller tlr
 							INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd1 (NOLOCK)
 							ON tlr.FromPartyID = pd1.PartyID
