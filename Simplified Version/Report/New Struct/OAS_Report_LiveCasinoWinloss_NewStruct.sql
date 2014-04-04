@@ -22,7 +22,8 @@ AS
  * Task  : Get Winloss report for Live Casino (compatible with the new structure)
  * DB   : DB052.bodb02
  * Revisions :  
-	-20140104@Florent: Apply new report template
+	- 20140104@Florent: Apply new report template
+	- 20140404@Florent: Fix group by currency for Credit Licensees
  	
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  

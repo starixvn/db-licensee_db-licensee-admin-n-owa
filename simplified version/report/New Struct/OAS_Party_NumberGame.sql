@@ -14,6 +14,7 @@ AS
  * Task  : Get all licensees (compatible with the new structure) for NumberGame Winloss report 
  * DB   : DB052.bodb_Licensee  
  * Revisions :  
+	- 20140404: hard code for Boping
  	
  * Param's Explanation:    
  * 
@@ -21,19 +22,21 @@ AS
  
 BEGIN
 	SET NOCOUNT ON  
-	SELECT DISTINCT ci.FromParty AS PartyID,
+	SELECT DISTINCT case when p1.PartyName='Boping' then p1.PartyID else  ci.FromParty end AS PartyID,
 				CASE 
 					WHEN p.PartyName='IBC' THEN r.ResellerName
 					WHEN p.PartyName='18bb' THEN r.ResellerName
+					WHEN p1.PartyName='Boping' THEN p1.PartyName
 					ELSE p.PartyName 
 				END AS PartyName
 		FROM OAS_ChargeInfo ci (NOLOCK) 
 			INNER JOIN OAS_Party p (NOLOCK) ON ci.FromParty = p.PartyID
+			INNER JOIN OAS_Party p1 (NOLOCK) ON ci.toParty = p1.PartyID
 			LEFT JOIN dbo.LicenseeReseller lr WITH (NOLOCK) ON p.OldRefID=lr.LicenseeID
 			LEFT JOIN dbo.Resellers r WITH (NOLOCK) ON lr.ResellerID=r.ResellerID
 		WHERE ci.ProductID = 2
-		and p.PartyType=1						
-		ORDER BY ci.FromParty ASC
+		and p.PartyType=1
+		ORDER BY PartyName asc 
 END
 GO
 GRANT EXECUTE ON [dbo].[OAS_Party_NumberGame] TO [bodbLicenseeNet] 
