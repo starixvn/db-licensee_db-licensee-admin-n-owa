@@ -13,7 +13,7 @@ ALTER PROCEDURE [dbo].[OAS_Report_NumberGameWinloss_NewStruct]
 	@FromDate  SMALLDATETIME,    
 	@ToDate   SMALLDATETIME    
 AS  
-  
+     
 /*  
  * Created by : 20131213@Francis 
  * Task  : Get Winloss report for Number Game (compatible with the new structure)
