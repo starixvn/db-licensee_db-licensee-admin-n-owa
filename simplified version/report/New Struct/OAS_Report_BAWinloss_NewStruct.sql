@@ -157,7 +157,6 @@ BEGIN
 	CREATE NONCLUSTERED INDEX IDX_Index_BA ON #BAWinLoss(Currency)	
 
 	-- Remove data before AffectedDate
-	--THIS HAVE TO BE TESTED WITH DATA AGAIN
 	DECLARE @AffectedDate DATETIME
 	SELECT @AffectedDate = FromDate
 	FROM bodb_licensee.dbo.OAS_ChargeInfo (NOLOCK) 
