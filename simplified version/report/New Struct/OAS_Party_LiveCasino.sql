@@ -19,7 +19,7 @@ AS
  * Param's Explanation:    
  * 
  */  
- 
+   
 BEGIN
 	SET NOCOUNT ON  
 	SELECT DISTINCT case when p1.PartyName='Boping' then p1.PartyID else  ci.FromParty end AS PartyID,
