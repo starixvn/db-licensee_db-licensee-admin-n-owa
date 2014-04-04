@@ -3,6 +3,8 @@ GO
 /****** Object:  StoredProcedure [dbo].[OA_Rpt_LicenseeCurrencyWinloss_xtest]    Script Date: 06/10/2013 06:30:42 ******/
 SET ANSI_NULLS ON
 GO
+
+
 SET QUOTED_IDENTIFIER ON
 GO
 /****** Object:  Stored Procedure dbo.OA_Rpt_LicenseeCurrencyWinloss_xtest    Script Date: 2013-06-05 4:42:57 PM ******/
