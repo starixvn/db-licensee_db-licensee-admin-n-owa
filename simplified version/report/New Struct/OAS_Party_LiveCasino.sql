@@ -8,7 +8,7 @@ GO
 
 ALTER PROCEDURE [dbo].[OAS_Party_LiveCasino]
 AS  
-  
+       
 /*  
  * Created by : 20140328@Florent 
  * Task  : Get all licensees (compatible with the new structure) for Live Casino Winloss report 
