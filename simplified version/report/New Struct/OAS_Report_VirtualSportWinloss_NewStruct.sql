@@ -1,6 +1,6 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[OAS_Report_VirtualSportWinloss_NewStruct]    Script Date: 07/04/2014 10:10:31 AM ******/
+/****** Object:  StoredProcedure [dbo].[OAS_Report_VirtualSportWinloss_NewStruct]    Script Date: 07/04/2014 11:08:43 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -22,7 +22,7 @@ AS
  * Task  : Get Winloss report for Virtual Sports (compatible with the new structure)
  * DB   : DB052.bodb02
  * Revisions :  
-	-20140331@Florent: change way to display
+	-20140331@Florent: Aplly new report template
  	
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
@@ -33,8 +33,7 @@ BEGIN
 
 	SET NOCOUNT ON
 	
-	DECLARE @tmpLicenseeReseller AS TABLE (FromPartyID INT, ToPartyID INT, FromDate DateTime, OldRefID INT)
-	
+	DECLARE @tmpLicenseeReseller AS TABLE (FromPartyID INT, ToPartyID INT, FromDate DateTime, OldRefID INT)	
 	DECLARE @sporttype TABLE(sporttype INT)
 	
 	CREATE TABLE #Data (winlostdate  DATETIME, Currency  INT,  FromPartyID int, ToPartyID int, TurnOver MONEY, MemberWinloss MONEY, Betcount INT)
@@ -59,7 +58,7 @@ BEGIN
 	END
 
 	--hard code get licensee depend boping
-	DECLARE @LicBoping int =0
+	DECLARE @LicBoping int =0,@isDeposit int =0
 	SELECT @LicBoping=PartyID FROM bodb_licensee.dbo.OAS_Party with (nolock) WHERE PartyName='Boping'
 
 	--Get normal licensee list	
@@ -131,6 +130,7 @@ BEGIN
 	 		AND lr.ToPartyID NOT IN (SELECT PartyID FROM @tmpTable)
 			AND (@Currency=0 OR  b.CurrencyID =@Currency)
 		GROUP BY b.rptDate, b.CurrencyID, lr.ToPartyID, lr.FromPartyID
+		set @isDeposit=1
 	END	
 
 	--For Credit Licensees
@@ -229,9 +229,7 @@ BEGIN
 
 
 	--return the result for deposit licensee
-	IF EXISTS(SELECT 1 FROM @tmpLicenseeReseller tlr INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd1 (NOLOCK)
-					   ON tlr.FromPartyID = pd1.PartyID
-					   WHERE pd1.IsDeposit = 1 AND tlr.ToPartyID NOT IN (SELECT PartyID FROM @tmpTable))
+	IF @isDeposit=1
 	SELECT	
 		CONVERT(VARCHAR(6),winlostdate,112) AS Winlostdate,
 		re.Currency,e.code CurrencyName ,e.EUR,
@@ -257,10 +255,8 @@ BEGIN
 		LEFT JOIN bodb_licensee.dbo.OAS_Party p1 WITH (NOLOCK) ON p1.PartyID = re.LicenseeID
 	GROUP BY		
 		re.Currency,e.EUR,e.code,e.USD,CONVERT(VARCHAR(6),winlostdate,112)
-	IF EXISTS(SELECT 1 FROM @tmpLicenseeReseller tlr
-							INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd1 (NOLOCK)
-							ON tlr.FromPartyID = pd1.PartyID
-							WHERE pd1.IsDeposit = 0)
+	--for credit
+	IF @isDeposit=0
 	SELECT	
 		CONVERT(VARCHAR(6),winlostdate,112) AS Winlostdate,
 		'EUR' CurrencyName ,1 EUR,
