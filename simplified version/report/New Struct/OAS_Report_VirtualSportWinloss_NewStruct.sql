@@ -1,6 +1,6 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[OAS_Report_VirtualSportWinloss_NewStruct]    Script Date: 01/04/2014 5:31:01 PM ******/
+/****** Object:  StoredProcedure [dbo].[OAS_Report_VirtualSportWinloss_NewStruct]    Script Date: 07/04/2014 10:10:31 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -22,9 +22,8 @@ AS
  * Task  : Get Winloss report for Virtual Sports (compatible with the new structure)
  * DB   : DB052.bodb02
  * Revisions :  
-	- 20140104@Florent: Apply new report template
-	- 20140404@Florent: Fix remove group by currency for credit Licensees
- 	  
+	-20140331@Florent: change way to display
+ 	
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
  *  - @Operator   : List of operator ID separated by ','. Direct Licensees also include in this list.
@@ -292,6 +291,7 @@ BEGIN
 	DROP TABLE	#Exchange
 	
 END  
+
 GO
 GRANT EXECUTE ON [dbo].[OAS_Report_VirtualSportWinloss_NewStruct] TO [bodbLicenseeNet] 
 GRANT EXECUTE ON [dbo].[OAS_Report_VirtualSportWinloss_NewStruct] TO bodbAdminNet 

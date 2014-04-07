@@ -1,6 +1,6 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[OAS_Report_LiveCasinoWinloss_NewStruct]    Script Date: 04/04/2014 10:29:34 AM ******/
+/****** Object:  StoredProcedure [dbo].[OAS_Report_LiveCasinoWinloss_NewStruct]    Script Date: 07/04/2014 10:11:02 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -22,9 +22,8 @@ AS
  * Task  : Get Winloss report for Live Casino (compatible with the new structure)
  * DB   : DB052.bodb02
  * Revisions :  
-	- 20140104@Florent: Apply new report template
-	- 20140404@Florent: Fix group by currency for Credit Licensees
- 	  
+	-20140104@Florent: Apply new report template
+ 	
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
  *  - @Operator   : List of operator ID separated by ','. Direct Licensees also include in this list.
@@ -53,7 +52,7 @@ BEGIN
 		   WHERE PartyName IN ('Starlit','BA(FDL)')
 	
 		--hard code get licensee depend boping
-	DECLARE @LicBoping int =0
+	DECLARE @LicBoping int =0,@isDeposit int =0
 	SELECT @LicBoping=PartyID FROM bodb_licensee.dbo.OAS_Party with (nolock) WHERE PartyName='Boping'
 
 
@@ -124,29 +123,8 @@ BEGIN
 	 		AND lr.ToPartyID NOT IN (SELECT PartyID FROM @tmpTable)
 			AND (@Currency=0 OR  b.CurrencyID =@Currency)
 		GROUP BY b.rptDate, b.CurrencyID, lr.ToPartyID, lr.FromPartyID
-	END
-	
-	/*
-	--For direct Licensees
-	IF EXISTS(SELECT 1 FROM @tmpLicenseeReseller1 tlr INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd1 (NOLOCK)
-					   ON tlr.FromPartyID = pd1.PartyID
-					   WHERE pd1.IsDeposit = 1 AND tlr.ToPartyID NOT IN (SELECT PartyID FROM @tmpTable))
-	BEGIN
-		INSERT INTO #Data1 (winlostdate, Currency,  FromPartyID, ToPartyID, TurnOver, MemberWinloss, Betcount)
-		SELECT  b.rptDate, b.currencyID, lr.FromPartyID, lr.ToPartyID, SUM(Turnover) AS TurnOver, SUM(b.Winloss) AS MemberWinloss, SUM(BetCount) AS BetCount
-		FROM bodb_Licensee.dbo.rpt_Betting b (NOLOCK) INNER JOIN @tmpLicenseeReseller1 lr 
-			ON b.SiteID = lr.OldRefID INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd (NOLOCK) 
-			ON lr.FromPartyID = pd.PartyID			
-		WHERE pd.IsDeposit = 1 
-	 		AND b.rptDate BETWEEN lr.FromDate AND @ToDate
-			AND b.status NOT IN (-1,103)
-			AND CurrencyID<>20
-			AND ((bettype BETWEEN 1101 AND 1199 AND @GameType=0) OR (bettype=@GameType))
-			--Exclude Licensees from Starlit, BA(FDL)
-	 		AND lr.ToPartyID NOT IN (SELECT PartyID FROM @tmpTable)
-		GROUP BY b.rptDate, b.CurrencyID, lr.ToPartyID, lr.FromPartyID
-	END
-	*/
+		set @isDeposit=1
+	END	
 
 	--For Credit Licensees
 	IF EXISTS(SELECT 1 FROM @tmpLicenseeReseller tlr
@@ -288,9 +266,7 @@ BEGIN
 	END
 	
 	--return the result for deposit Lics
-	IF EXISTS(SELECT 1 FROM @tmpLicenseeReseller tlr INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd1 (NOLOCK)
-					   ON tlr.FromPartyID = pd1.PartyID
-					   WHERE pd1.IsDeposit = 1 AND tlr.ToPartyID NOT IN (SELECT PartyID FROM @tmpTable))
+	IF (@isDeposit=1)
 	SELECT	
 		CONVERT(VARCHAR(6),winlostdate,112)   AS Winlostdate,
 		re.Currency,e.code currencyName,e.EUR,		
@@ -318,12 +294,11 @@ BEGIN
 		INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON p.PartyID = re.ResellerID
 		INNER JOIN bodb_licensee.dbo.Resellers r WITH (NOLOCK) ON p.OldRefID = r.ResellerID
 		LEFT JOIN bodb_licensee.dbo.OAS_Party p1 WITH (NOLOCK) ON p1.PartyID = re.LicenseeID
-	GROUP BY				
-		CONVERT(VARCHAR(6),winlostdate,112),re.Currency,e.code,e.EUR
-	IF EXISTS(SELECT 1 FROM @tmpLicenseeReseller tlr
-							INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd1 (NOLOCK)
-							ON tlr.FromPartyID = pd1.PartyID
-							WHERE pd1.IsDeposit = 0)
+	GROUP BY
+		CONVERT(VARCHAR(6),winlostdate,112),re.Currency,e.code,e.EUR,e.USD
+
+	--credit
+	IF(@isDeposit=0)
 	SELECT	
 		CONVERT(VARCHAR(6),winlostdate,112)   AS Winlostdate,
 		'EUR' currencyName, 1 EUR,		
