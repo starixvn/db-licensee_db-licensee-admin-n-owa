@@ -19,19 +19,17 @@ AS
  * Task  : Get Winloss report for Number Game (compatible with the new structure)
  * DB   : DB052.bodb02
  * Revisions :  
-	-20140327@Florent: change way to display
+	-20140327@Florent: Apply new report template
+	-20140411@Florent: Show Boping in one total line
+	-20140416@Florent: change condition of time range 
  	
  * Param's Explanation:    
- *  - @NormalLicensee : List of normal licensee ID separated by ','  
- *  - @Operator   : List of operator ID separated by ','. Direct Licensees also include in this list.
  */  
  
 BEGIN
-	SET NOCOUNT ON
-	--select @FromDate='2013-07-01 00:00:00',@ToDate='2013-09-30 00:00:00'
-	--DECLARE @Exchange TABLE(ExchangeDate SMALLDATETIME, ExchangeId INT, EUR FLOAT,USD FLOAT, PRIMARY KEY(ExchangeDate,ExchangeId))	
+	SET NOCOUNT ON	
 	
-	DECLARE @tmpLicenseeReseller AS TABLE (FromPartyID INT, ToPartyID INT, FromDate DateTime, OldRefID INT)		
+	DECLARE @tmpLicenseeReseller AS TABLE (FromPartyID INT, ToPartyID INT, FromDate DateTime,ToDate datetime, OldRefID INT)		
 
 	CREATE TABLE #Data (winlostdate  DATETIME, Currency  INT,  FromPartyID int, ToPartyID int, TurnOver MONEY, MemberWinloss MONEY, LicenseeWL MONEY, Betcount INT)		
 	
@@ -44,15 +42,17 @@ BEGIN
 		   WHERE PartyName IN ('Starlit','BA(FDL)')
 	
 	--hard code get licensee depend boping
-	DECLARE @LicBoping int =0,@isDeposit int =0
+	DECLARE @LicBoping int =0,@isDeposit int =0, @isBoping INT =0
 	SELECT @LicBoping=PartyID FROM bodb_licensee.dbo.OAS_Party with (nolock) WHERE PartyName='Boping'
 
 	--Get normal licensee list	
 	IF (@LicBoping!=@PartyID)
 	BEGIN
-		INSERT INTO @tmpLicenseeReseller (FromPartyID, ToPartyID, FromDate, OldRefID)
+		INSERT INTO @tmpLicenseeReseller (FromPartyID, ToPartyID, FromDate,ToDate, OldRefID)
 		SELECT DISTINCT ci.FromParty, ci.ToParty, 
-		CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END, p.OldRefID
+		CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
+		case WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END,
+		p.OldRefID
 		FROM bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) 
 			INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK)ON ci.FromParty = p.PartyID
 		WHERE (@FromDate BETWEEN ci.FromDate AND ci.ToDate OR 
@@ -61,11 +61,13 @@ BEGIN
 			AND ci.ProductID = 2
 			and ci.FromParty =@PartyID			
 	END	
-	ELSE
+	ELSE --for Boping's Licensee
 	BEGIN
-		INSERT INTO @tmpLicenseeReseller (FromPartyID, ToPartyID, FromDate, OldRefID)
+		INSERT INTO @tmpLicenseeReseller (FromPartyID, ToPartyID, FromDate,ToDate, OldRefID)
 		SELECT DISTINCT ci.FromParty, ci.ToParty, 
-		CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END, p.OldRefID
+		CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
+		case WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END,
+		p.OldRefID
 		FROM bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) 
 			INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK)ON ci.FromParty = p.PartyID
 		WHERE (@FromDate BETWEEN ci.FromDate AND ci.ToDate OR 
@@ -73,6 +75,7 @@ BEGIN
 			AND ci.ChargeType = 1
 			AND ci.ProductID = 2
 			and ci.ToParty =@PartyID
+		set @isBoping=1
 	END	
 
 	-- For Deposit Licensees
@@ -106,7 +109,7 @@ BEGIN
 			INNER JOIN @tmpLicenseeReseller lr ON b.SiteID = lr.OldRefID 
 			INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd (NOLOCK) ON lr.FromPartyID = pd.PartyID				
 		WHERE pd.IsDeposit = 1 
-	 		AND b.rptDate BETWEEN lr.FromDate AND @ToDate
+	 		AND b.rptDate BETWEEN lr.FromDate AND lr.ToDate
 			AND b.status NOT IN (-1,103)
 			AND CurrencyID<>20
 			AND bettype BETWEEN 81 AND 120
@@ -147,7 +150,7 @@ BEGIN
 			INNER JOIN bodb_Licensee.dbo.labels lb (NOLOCK) ON lr.OldRefID = lb.LicenseeID 
 			INNER JOIN bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) ON b.siteID = lb.LabelID
 		WHERE pd.IsDeposit = 0 
-	 		AND b.rptDate BETWEEN lr.FromDate AND @ToDate
+	 		AND b.rptDate BETWEEN lr.FromDate AND lr.ToDate
 			AND b.status NOT IN (-1,103)
 			AND CurrencyID<>20
 			AND bettype BETWEEN 81 AND 120
@@ -161,9 +164,16 @@ BEGIN
 
 	--get specified exchange value in time range
 	--INSERT INTO @Exchange(ExchangeDate,ExchangeId,EUR,USD)
+	DECLARE @ExDate smalldatetime
+	SELECT @ExDate = CONVERT(VARCHAR(10), CASE 
+											WHEN DATEDIFF(month,@ToDate,GETDATE()) <= 0 THEN GETDATE() 
+											ELSE DATEADD(day,-1,DATEADD(month,1,'01 '+SUBSTRING(CONVERT(VARCHAR(11),@ToDate,106),4,8)))
+										  END,120)
+	
 	SELECT *
 	INTO #Exchange
-	FROM Lrf_f_GetExchangeDaily(@FromDate,@ToDate)
+	--FROM Lrf_f_GetExchangeDaily(@FromDate,@ToDate)
+	FROM Lrf_f_GetExchangeDaily(@ExDate,@ExDate) -- get exchange rate in last day of month
 	WHERE exchangeid IN (SELECT DISTINCT Currency FROM #Data)
 	
 	--check whether Lupine is terminated in the time range
@@ -211,9 +221,7 @@ BEGIN
 			isnull(LUP.Rate,0) as LupineChargeRate,
 			isnull(OW.Rate,0) as OneworksChargeRate
 			,winlostdate,d.Currency
-		FROM #Data d
-			--INNER JOIN bodb_licensee.dbo.Resellers r WITH (NOLOCK) ON r.ResellerID = d.ResellerID
-			INNER JOIN #Exchange e ON d.winlostdate = e.ExchangeDate AND d.currency = e.ExchangeId
+		FROM #Data d						
 			LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo DI ON 
 					d.ToPartyID = DI.ToParty AND d.FromPartyID = DI.FromParty 
 					AND DI.ProductID = 2 
@@ -232,9 +240,9 @@ BEGIN
 		SELECT	
 			d.ToPartyID, d.FromPartyID,
 			CAST(isnull(SUM(d.TurnOver ),0) AS MONEY) AS TurnOver,
-			--MemberWinloss is often < 0
+			
 			CAST(isnull(SUM(d.MemberWinloss ),0) AS MONEY) AS MemberWinloss,
-			--IF MemberWinloss is < 0 (that means Licensees' GrossWinLoss > 0)
+			
 			CAST(-1 * isnull(SUM(d.MemberWinloss ),0) AS money) AS GrossWinloss,
 			CAST(-1 * isnull(SUM(d.MemberWinloss  * isnull(DI.Rate,0)),0)AS money) AS DistributorRevenue,
 			ISNULL(SUM(d.betcount), 0) AS BetCount,
@@ -247,9 +255,7 @@ BEGIN
 			CAST (0 AS money) as LupineChargeRate,
 			isnull(OW.Rate,0) as OneworksChargeRate
 			,winlostdate,d.Currency
-		FROM #Data d
-			--INNER JOIN bodb_licensee.dbo.Resellers r WITH (NOLOCK) ON r.ResellerID = d.ResellerID
-			INNER JOIN #Exchange e ON d.winlostdate = e.ExchangeDate AND d.currency = e.ExchangeId
+		FROM #Data d						
 			LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo DI ON 
 					d.ToPartyID = DI.ToParty AND d.FromPartyID = DI.FromParty 
 					AND DI.ProductID = 2 
@@ -259,70 +265,103 @@ BEGIN
 		GROUP BY
 			d.ToPartyID, d.FromPartyID, DI.Rate, OW.Rate,winlostdate,d.Currency
 	END	
+
 	--return the result for deposit Licensee
-	IF @isDeposit=1
+	IF (@isDeposit=1 AND @isBoping=0) -- normal Licensees and not Boping's
 	SELECT	
 		CONVERT(VARCHAR(6),winlostdate,112)   AS Winlostdate,
-		re.Currency,e.code currencyName,e.EUR,
-		ISNULL(SUM(re.betcount), 0) AS BetCount,
+		re.Currency,
+		CASE WHEN re.Currency = 20 THEN 'UUS'
+			WHEN re.Currency = 51 THEN 'INH'
+			ELSE e.Code 
+		END AS CurrencyName,
+		e.EUR,
+		SUM(re.betcount) AS BetCount,
 		--base
-		CAST(isnull(SUM(re.turnover),0) AS MONEY) AS Turnover,
-		CAST(isnull(SUM(re.MemberWinloss),0) AS MONEY) AS MemberWinloss,
-		CAST(SUM(re.GrossWinloss)AS MONEY) AS LicenseeWinloss,
-		CAST(SUM(re.OneworksRevenue) AS MONEY) AS OneworksRevenue,
+		SUM(re.turnover) AS Turnover,
+		SUM(re.MemberWinloss) AS MemberWinloss,
+		SUM(re.GrossWinloss) AS LicenseeWinloss,
+		SUM(re.OneworksRevenue) AS OneworksRevenue,
 		--EUR
 
-		CAST(isnull(SUM(re.turnover * e
-		.EUR),0) AS MONEY) AS TurnoverEUR,
-		CAST(isnull(SUM(re.MemberWinloss * e.EUR),0) AS MONEY) AS MemberWinlossEUR,
-		CAST(SUM(re.GrossWinloss * e.EUR) AS MONEY) AS LicenseeWinlossEUR,
-		CAST(SUM(re.OneworksRevenue * e.EUR) AS MONEY) AS OneworksRevenueEUR,
+		SUM(re.turnover * e.EUR) AS TurnoverEUR,
+		SUM(re.MemberWinloss * e.EUR) AS MemberWinlossEUR,
+		SUM(re.GrossWinloss * e.EUR) AS LicenseeWinlossEUR,
+		SUM(re.OneworksRevenue * e.EUR) AS OneworksRevenueEUR,
 
 		--USD
 
-		CAST(isnull(SUM(re.turnover * e.USD),0) AS MONEY) AS TurnoverUSD,
-		CAST(isnull(SUM(re.MemberWinloss * e.USD),0) AS MONEY) AS MemberWinlossUSD,
-		CAST(SUM(re.GrossWinloss * e.USD) AS MONEY) AS LicenseeWinlossUSD,
-		CAST(SUM(re.OneworksRevenue * e.USD) AS MONEY) AS OneworksRevenueUSD
+		SUM(re.turnover * e.USD) AS TurnoverUSD,
+		SUM(re.MemberWinloss * e.USD) AS MemberWinlossUSD,
+		SUM(re.GrossWinloss * e.USD) AS LicenseeWinlossUSD,
+		SUM(re.OneworksRevenue * e.USD) AS OneworksRevenueUSD
 	FROM #Result re
-		INNER JOIN #Exchange e ON re.winlostdate = e.ExchangeDate AND re.currency = e.ExchangeId
-		INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON p.PartyID = re.ResellerID
-		INNER JOIN bodb_licensee.dbo.Resellers r WITH (NOLOCK) ON p.OldRefID = r.ResellerID		
-		LEFT JOIN bodb_licensee.dbo.OAS_Party p1 WITH (NOLOCK) ON p1.PartyID = re.LicenseeID
+		INNER JOIN #Exchange e ON re.currency = e.ExchangeId		
 	GROUP BY
 		re.Currency,e.EUR,e.code,CONVERT(VARCHAR(6),winlostdate,112)
-	IF @isDeposit=0
+
+	IF (@isDeposit=0 or @isBoping=1)--credit licensee or Boping Licensee
 	BEGIN
-		SELECT	
-		CONVERT(VARCHAR(6),winlostdate,112)   AS Winlostdate,
-		'EUR' currencyName,1 EUR,
-		ISNULL(SUM(re.betcount), 0) AS BetCount,
-		--base in EUR
-		CAST(isnull(SUM(re.turnover * e.EUR),0) AS MONEY) AS Turnover,
-		CAST(isnull(SUM(re.MemberWinloss * e.EUR),0) AS MONEY) AS MemberWinloss,
-		CAST(SUM(re.GrossWinloss * e.EUR)AS MONEY) AS LicenseeWinloss,
-		CAST(SUM(re.OneworksRevenue * e.EUR) AS MONEY) AS OneworksRevenue,
-		--EUR
-
-		CAST(isnull(SUM(re.turnover * e
-		.EUR),0) AS MONEY) AS TurnoverEUR,
-		CAST(isnull(SUM(re.MemberWinloss * e.EUR),0) AS MONEY) AS MemberWinlossEUR,
-		CAST(SUM(re.GrossWinloss * e.EUR) AS MONEY) AS LicenseeWinlossEUR,
-		CAST(SUM(re.OneworksRevenue * e.EUR) AS MONEY) AS OneworksRevenueEUR,
-
-		--USD
-
-		CAST(isnull(SUM(re.turnover * e.USD),0) AS MONEY) AS TurnoverUSD,
-		CAST(isnull(SUM(re.MemberWinloss * e.USD),0) AS MONEY) AS MemberWinlossUSD,
-		CAST(SUM(re.GrossWinloss * e.USD) AS MONEY) AS LicenseeWinlossUSD,
-		CAST(SUM(re.OneworksRevenue * e.USD) AS MONEY) AS OneworksRevenueUSD
-	FROM #Result re
-		INNER JOIN #Exchange e ON re.winlostdate = e.ExchangeDate AND re.currency = e.ExchangeId
-		INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON p.PartyID = re.ResellerID
-		INNER JOIN bodb_licensee.dbo.Resellers r WITH (NOLOCK) ON p.OldRefID = r.ResellerID		
-		LEFT JOIN bodb_licensee.dbo.OAS_Party p1 WITH (NOLOCK) ON p1.PartyID = re.LicenseeID
-	GROUP BY
-		CONVERT(VARCHAR(6),winlostdate,112)
+		SELECT A.Winlostdate,A.currencyName,A.EUR,
+				SUM(A.BetCount)			AS BetCount ,
+				SUM(A.Turnover)			AS Turnover ,
+				SUM(A.MemberWinloss)	AS MemberWinloss,
+				SUM(A.LicenseeWinloss)	AS LicenseeWinloss,
+				SUM(A.OneworksRevenue)	AS OneworksRevenue,
+				--EUR
+				SUM(A.TurnoverEUR)		AS TurnoverEUR,
+				SUM(A.MemberWinlossEUR) AS MemberWinlossEUR,
+				SUM(A.LicenseeWinlossEUR) AS LicenseeWinlossEUR,
+				SUM(A.OneworksRevenueEUR) AS OneworksRevenueEUR,
+				--USD
+				SUM(A.TurnoverUSD) AS TurnoverUSD,
+				SUM(A.MemberWinlossUSD) AS MemberWinlossUSD,
+				SUM(A.LicenseeWinlossUSD) AS LicenseeWinlossUSD,
+				SUM(A.OneworksRevenueUSD) AS OneworksRevenueUSD
+		FROM (
+				SELECT	
+				CONVERT(VARCHAR(6),winlostdate,112)   AS Winlostdate,
+				'EUR' currencyName,1 EUR,
+				ISNULL(SUM(re.betcount), 0) AS BetCount,
+				--base in EUR
+				SUM(re.turnover * e.EUR) AS Turnover,
+				CASE WHEN SUM(re.MemberWinloss * e.EUR) > 0 AND @isBoping = 1 THEN 0
+					 ELSE SUM(re.MemberWinloss * e.EUR)
+					 END AS MemberWinloss,
+				CASE WHEN SUM(re.GrossWinloss * e.EUR) < 0 AND @isBoping = 1 THEN 0
+							  ELSE SUM(re.GrossWinloss * e.EUR)
+							  END AS LicenseeWinloss,
+				CASE WHEN SUM(re.OneworksRevenue * e.EUR) < 0 AND @isBoping = 1 THEN 0
+							  ELSE SUM(re.OneworksRevenue * e.EUR)
+							  END AS OneworksRevenue,
+				--EUR
+				SUM(re.turnover * e.EUR)  AS TurnoverEUR,
+				CASE WHEN SUM(re.MemberWinloss * e.EUR) > 0 AND @isBoping = 1 THEN 0 
+					 ELSE SUM(re.MemberWinloss * e.EUR)
+					 END						AS MemberWinlossEUR,
+				CASE WHEN SUM(re.GrossWinloss * e.EUR) < 0 AND @isBoping = 1 THEN 0
+							  ELSE SUM(re.GrossWinloss * e.EUR)
+							  END AS LicenseeWinlossEUR,
+				CASE WHEN SUM(re.OneworksRevenue * e.EUR) < 0 AND @isBoping = 1 THEN 0
+							  ELSE SUM(re.OneworksRevenue * e.EUR)
+							  END AS OneworksRevenueEUR,
+				--USD
+				SUM(re.turnover * e.USD) AS TurnoverUSD,
+				CASE WHEN SUM(re.MemberWinloss * e.USD) > 0 AND @isBoping = 1 THEN 0
+					 ELSE SUM(re.MemberWinloss * e.USD)
+					 END						 AS MemberWinlossUSD,
+				CASE WHEN SUM(re.GrossWinloss * e.USD ) < 0 AND @isBoping = 1 THEN 0
+							  ELSE SUM(re.GrossWinloss * e.USD)
+							  END AS LicenseeWinlossUSD,
+				CASE WHEN SUM(re.OneworksRevenue * e.USD) < 0 AND @isBoping = 1 THEN 0 
+							  ELSE SUM(re.OneworksRevenue * e.USD)
+							  END AS OneworksRevenueUSD
+			FROM #Result re
+				INNER JOIN #Exchange e ON re.currency = e.ExchangeId				
+			GROUP BY
+				RE.LicenseeID,CONVERT(VARCHAR(6),winlostdate,112)
+		) A
+		GROUP BY A.Winlostdate,A.currencyName,A.EUR
 	END
 	DROP TABLE	#Data
 	DROP TABLE  #Exchange
