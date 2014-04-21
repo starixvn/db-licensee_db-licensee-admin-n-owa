@@ -1,16 +1,18 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[OAS_Report_VirtualSportWinloss_NewStruct]    Script Date: 07/04/2014 11:08:43 AM ******/
+/****** Object:  StoredProcedure [dbo].[OAS_Report_VirtualSportWinloss_NewStruct]    Script Date: 21/04/2014 10:47:11 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
 
+/****** Object:  Stored Procedure dbo.OAS_Report_VirtualSportWinloss_NewStruct    Script Date: 4/14/2014 13:15:15  ******/
+
 
 ALTER PROCEDURE [dbo].[OAS_Report_VirtualSportWinloss_NewStruct]      
 	@PartyID    INT,  
     @Currency  INT = 0,  
-	@drawfilter  SMALLINT = 1, 
+	@drawfilter  SMALLINT = 0, 
 	@FromDate  SMALLDATETIME,    
 	@ToDate   SMALLDATETIME,    
 	@SportList	VARCHAR(1000)
@@ -23,7 +25,8 @@ AS
  * DB   : DB052.bodb02
  * Revisions :  
 	-20140331@Florent: Aplly new report template
-	-20140416@Florent: change condition of time range 
+	-20140416@Florent: Change condition of time range 
+	-20140410@Francis: Alter @drawfilter param's value to 0,1,2
  	
  * Param's Explanation:    
  *  
@@ -103,7 +106,7 @@ BEGIN
 		SELECT  b.rptDate, b.currencyID, lr.FromPartyID, lr.ToPartyID, 
 				 SUM(Turnover * 
 				CASE   
-					WHEN @drawfilter IN (2, 3) THEN  
+					WHEN @drawfilter IN (1, 2) THEN  
 					CASE   
 						WHEN b.status = 111 THEN 0  
 						WHEN (b.status = 114 OR b.status = 115) THEN 0.5  
@@ -114,7 +117,7 @@ BEGIN
 		 ) AS TurnOver,
 		SUM(b.Winloss) AS MemberWinloss,
 		SUM(BetCount * CASE   
-						WHEN @drawfilter = 2 THEN  
+						WHEN @drawfilter = 1 THEN  
 							CASE   
 							WHEN b.status = 111 THEN 0  
 							ELSE 1   
@@ -147,7 +150,7 @@ BEGIN
 		SELECT  b.rptDate, b.currencyID, lr.FromPartyID, lr.ToPartyID, 
 		 SUM(Turnover * 
 				CASE   
-					WHEN @drawfilter IN (2, 3) THEN  
+					WHEN @drawfilter IN (1, 2) THEN  
 					CASE   
 						WHEN b.status = 111 THEN 0  
 						WHEN (b.status = 114 OR b.status = 115) THEN 0.5  
@@ -158,7 +161,7 @@ BEGIN
 		 ) AS TurnOver
 		, SUM(b.Winloss) AS MemberWinloss, 
 		SUM(BetCount * CASE   
-						WHEN @drawfilter = 2 THEN  
+						WHEN @drawfilter = 1 THEN  
 							CASE   
 							WHEN b.status = 111 THEN 0  
 							ELSE 1   
@@ -191,8 +194,13 @@ BEGIN
 										  END,120)
 	
 	SELECT *
-	INTO #Exchange	
+	INTO #Exchange1	
 	FROM Lrf_f_GetExchangeDaily(@ExDate,@ExDate) -- get exchange rate in last day of month
+	WHERE exchangeid IN (SELECT DISTINCT Currency FROM #Data)
+
+	SELECT *
+	INTO #Exchange	
+	FROM Lrf_f_GetExchangeDaily(@FromDate,@ToDate) -- get exchange rate in last day of month
 	WHERE exchangeid IN (SELECT DISTINCT Currency FROM #Data)
 	
 	--For Normal Licensees
@@ -247,7 +255,8 @@ BEGIN
 			WHEN re.Currency = 51 THEN 'INH'
 			ELSE e.Code 
 		END AS CurrencyName
-		 ,e.EUR,
+		 ,
+		ISNULL(e1.EUR,0) EUR,
 		SUM(re.betcount) AS BetCount,
 
 		SUM(re.turnover)AS Turnover,
@@ -259,16 +268,17 @@ BEGIN
 		SUM(re.turnover * e.EUR) AS TurnoverEUR,
 		SUM(re.MemberWinloss * e.EUR) AS MemberWinlossEUR,
 		SUM(re.GrossWinloss * e.EUR) AS LicenseeWinlossEUR,
-		SUM(re.OneworksIncome-re.AmtDueToInspired) * e.EUR AS OneworksRevenueEUR,
+		SUM(re.OneworksIncome* e.EUR-re.AmtDueToInspired* e.EUR)  AS OneworksRevenueEUR,
 		--USD
 		SUM(re.turnover * e.USD) AS TurnoverUSD,
 		SUM(re.MemberWinloss * e.USD) AS MemberWinlossUSD,
 		SUM(re.GrossWinloss * e.USD) AS LicenseeWinlossUSD,
-		SUM(re.OneworksIncome-re.AmtDueToInspired) * e.USD AS OneworksRevenueUSD
+		SUM(re.OneworksIncome* e.USD -re.AmtDueToInspired* e.USD ) AS OneworksRevenueUSD
 	FROM #Result re
-		INNER JOIN #Exchange e ON re.currency = e.ExchangeId
+		INNER JOIN #Exchange e ON re.currency = e.ExchangeId AND re.winlostdate=e.ExchangeDate
+		LEFT JOIN #Exchange1 e1 ON re.currency = e1.ExchangeId
 	GROUP BY		
-		re.Currency,e.EUR,e.code,e.USD,CONVERT(VARCHAR(6),winlostdate,112)
+		re.Currency,ISNULL(e1.EUR,0),e.code,CONVERT(VARCHAR(6),winlostdate,112)
 
 	--for credit
 	IF (@isDeposit=0 or @isBoping=1) --credit Licensee or Boping
@@ -293,15 +303,14 @@ BEGIN
 		SUM(re.GrossWinloss * e.USD) AS LicenseeWinlossUSD,
 		SUM(re.OneworksIncome* e.USD-re.AmtDueToInspired* e.USD) AS OneworksRevenueUSD
 	FROM #Result re
-		INNER JOIN #Exchange e ON re.currency = e.ExchangeId		
+		INNER JOIN #Exchange e ON re.currency = e.ExchangeId AND re.winlostdate=e.ExchangeDate		
 	GROUP BY		
 		CONVERT(VARCHAR(6),winlostdate,112)		
 	DROP TABLE	#Data
 	DROP TABLE	#Result
 	DROP TABLE	#Exchange
-	
+	DROP TABLE	#Exchange1	
 END  
-
 GO
 GRANT EXECUTE ON [dbo].[OAS_Report_VirtualSportWinloss_NewStruct] TO [bodbLicenseeNet] 
 GRANT EXECUTE ON [dbo].[OAS_Report_VirtualSportWinloss_NewStruct] TO bodbAdminNet 

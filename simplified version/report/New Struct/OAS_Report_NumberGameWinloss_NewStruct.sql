@@ -1,6 +1,6 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[OAS_Report_NumberGameWinloss_NewStruct]    Script Date: 07/04/2014 10:08:55 AM ******/
+/****** Object:  StoredProcedure [dbo].[OAS_Report_NumberGameWinloss_NewStruct]    Script Date: 21/04/2014 10:46:53 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -9,7 +9,7 @@ GO
 ALTER PROCEDURE [dbo].[OAS_Report_NumberGameWinloss_NewStruct]  
 	@PartyID    INT,  
     @Currency  INT = 0,  
-	@drawfilter  SMALLINT = 1, 
+	@drawfilter  SMALLINT = 0, 
 	@FromDate  SMALLDATETIME,                                                                                              
 	@ToDate   SMALLDATETIME    
 AS  
@@ -21,7 +21,8 @@ AS
  * Revisions :  
 	-20140327@Florent: Apply new report template
 	-20140411@Florent: Show Boping in one total line
-	-20140416@Florent: change condition of time range 
+	-20140416@Florent: Change condition of time range 
+	-20140410@Francis: Alter @drawfilter param's value to 0,1,2
  	
  * Param's Explanation:    
  */  
@@ -87,7 +88,7 @@ BEGIN
 		SELECT  b.rptDate, b.currencyID, lr.FromPartyID, lr.ToPartyID,
 		 SUM(Turnover * 
 				CASE   
-					WHEN @drawfilter IN (2, 3) THEN  
+					WHEN @drawfilter IN (1, 2) THEN  
 					CASE   
 						WHEN b.status = 111 THEN 0  
 						WHEN (b.status = 114 OR b.status = 115) THEN 0.5  
@@ -98,7 +99,7 @@ BEGIN
 		 ) AS TurnOver, 
 		 SUM(b.Winloss) AS MemberWinloss, SUM(winlossA) AS LicenseeWL, 
 		 SUM(BetCount * CASE   
-						WHEN @drawfilter = 2 THEN  
+						WHEN @drawfilter = 1 THEN  
 							CASE   
 							WHEN b.status = 111 THEN 0  
 							ELSE 1   
@@ -129,7 +130,7 @@ BEGIN
 		INSERT INTO #Data (winlostdate, Currency,  FromPartyID, ToPartyID, TurnOver, MemberWinloss, LicenseeWL, Betcount)
 		SELECT  b.rptDate, b.currencyID, lr.FromPartyID, lr.ToPartyID,
 				SUM(Turnover* CASE   
-					WHEN @drawfilter IN (2, 3) THEN  
+					WHEN @drawfilter IN (1, 2) THEN  
 					CASE   
 						WHEN b.status = 111 THEN 0  
 						WHEN (b.status = 114 OR b.status = 115) THEN 0.5  
@@ -138,7 +139,7 @@ BEGIN
 				ELSE 1   
 				END) AS TurnOver, SUM(b.Winloss) AS MemberWinloss, 0 AS LicenseeWL, 
 				SUM(BetCount* CASE   
-								WHEN @drawfilter = 2 THEN  
+								WHEN @drawfilter = 1 THEN  
 									CASE   
 									WHEN b.status = 111 THEN 0  
 									ELSE 1   
@@ -171,11 +172,16 @@ BEGIN
 										  END,120)
 	
 	SELECT *
-	INTO #Exchange
+	INTO #Exchange1
 	--FROM Lrf_f_GetExchangeDaily(@FromDate,@ToDate)
 	FROM Lrf_f_GetExchangeDaily(@ExDate,@ExDate) -- get exchange rate in last day of month
 	WHERE exchangeid IN (SELECT DISTINCT Currency FROM #Data)
 	
+	SELECT *
+	INTO #Exchange	
+	FROM Lrf_f_GetExchangeDaily(@FromDate,@ToDate) -- get exchange rate in last day of month
+	WHERE exchangeid IN (SELECT DISTINCT Currency FROM #Data)
+		
 	--check whether Lupine is terminated in the time range
 	DECLARE @PartyTerminated BIT
 	SET @PartyTerminated = 0
@@ -275,7 +281,7 @@ BEGIN
 			WHEN re.Currency = 51 THEN 'INH'
 			ELSE e.Code 
 		END AS CurrencyName,
-		e.EUR,
+		ISNULL(e1.EUR,0) EUR,
 		SUM(re.betcount) AS BetCount,
 		--base
 		SUM(re.turnover) AS Turnover,
@@ -296,9 +302,10 @@ BEGIN
 		SUM(re.GrossWinloss * e.USD) AS LicenseeWinlossUSD,
 		SUM(re.OneworksRevenue * e.USD) AS OneworksRevenueUSD
 	FROM #Result re
-		INNER JOIN #Exchange e ON re.currency = e.ExchangeId		
+		INNER JOIN #Exchange e ON re.currency = e.ExchangeId AND re.winlostdate=e.ExchangeDate
+		LEFT JOIN #Exchange1 e1 ON re.currency = e1.ExchangeId 
 	GROUP BY
-		re.Currency,e.EUR,e.code,CONVERT(VARCHAR(6),winlostdate,112)
+		re.Currency,ISNULL(e1.EUR,0),e.code,CONVERT(VARCHAR(6),winlostdate,112)
 
 	IF (@isDeposit=0 or @isBoping=1)--credit licensee or Boping Licensee
 	BEGIN
@@ -357,7 +364,7 @@ BEGIN
 							  ELSE SUM(re.OneworksRevenue * e.USD)
 							  END AS OneworksRevenueUSD
 			FROM #Result re
-				INNER JOIN #Exchange e ON re.currency = e.ExchangeId				
+				INNER JOIN #Exchange e ON re.currency = e.ExchangeId AND re.winlostdate=e.ExchangeDate				
 			GROUP BY
 				RE.LicenseeID,CONVERT(VARCHAR(6),winlostdate,112)
 		) A
@@ -365,8 +372,10 @@ BEGIN
 	END
 	DROP TABLE	#Data
 	DROP TABLE  #Exchange
+	DROP TABLE  #Exchange1
 	DROP TABLE	#Result
 END  
+
 
 GO
 GRANT EXECUTE ON [dbo].[OAS_Report_NumberGameWinloss_NewStruct] TO [bodbLicenseeNet] 
