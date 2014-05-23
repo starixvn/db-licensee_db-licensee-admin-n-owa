@@ -29,20 +29,20 @@ AS
 	  + @Currency : 0-All Currencies
 	  +	@drawfilter: 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
 	  + @excludeTest: remove currency UUS
-	  +@ProductCode : string,
+	  + @ProductCode : string,
 	  + @MoveBetsDay: The day we move tickets to bettrans14
 	 
 */  
 
 /*
 exec  OA_Rpt_LicPerformance_LicensingMargin
-	@Licensee='1,3,4,5,6,7,8,9,10,11,12,13,14,15,16',
-	@Currency = 0,
-	@FromDate ='2013-04-01',
-	@ToDate ='2014-04-30',
-	@ProductCode ='SB',
-	@drawfilter  = 1 ,
-	@excludeTest = 0
+		@Licensee='1,3,4,5,6,7,8,9,10,11,12,13,14,15,16',
+		@Currency = 0,
+		@FromDate ='2013-04-01',
+		@ToDate ='2014-04-30',
+		@ProductCode ='SB',
+		@drawfilter  = 1 ,
+		@excludeTest = 0
 */
 BEGIN  
 	SET NOCOUNT ON  
@@ -64,13 +64,7 @@ BEGIN
 	CREATE  TABLE #tmpLicensee(
 			LicenseeID INT
 	)  
-	
-	CREATE TABLE #Exchange (
-		ExchangeDate DATE,
-		ExchangeId INT,
-		Rate FLOAT,
-		PRIMARY KEY(ExchangeDate,ExchangeId)
-	)	
+		
 	CREATE TABLE #MY(
 		sDate DATETIME
 		)
@@ -120,7 +114,7 @@ BEGIN
 		ORDER BY b.siteID,
 			     b.rptDate
 	END	
-	IF  @ProductCode IN ('SB','NG','LC','VS','CS')
+	IF  @ProductCode IN ('SB','NG','LC','VS','CS','RB')
 	BEGIN
 		INSERT INTO #Temp  (LicenseeID ,rptDate,CurrencyID,winloss,TurnOver)
 		SELECT 
@@ -147,6 +141,7 @@ BEGIN
 				OR(@ProductCode='LC' AND b.bettype BETWEEN 1101 AND 1199)
 				OR(@ProductCode='VS' AND b.bettype BETWEEN 1201 AND 1299)
 				OR(@ProductCode='CS' AND b.bettype =71)
+				OR(@ProductCode='RB' AND b.bettype BETWEEN 31 AND 33)
 				)	
 			AND (@Currency=0 OR (@Currency<>0 AND b.CurrencyID=@Currency))  
 			AND (@excludeTest=0 OR (@excludeTest=1 AND b.CurrencyID<>20)) 
@@ -160,11 +155,17 @@ BEGIN
 	SELECT 
 		l.LicenseeName,
 		dbo.fnFormatDate(t.rptdate) rptDate,
+		CASE WHEN ISNULL(SUM(TurnOver),0)=0 THEN 0  
+			ELSE 
+				-SUM(Winloss)/SUM(Turnover) 
+			END Margin
+		/*				
 		SUM( CASE WHEN ISNULL(TurnOver,0)=0 THEN 0 
 				  ELSE 
 						-t.Winloss/TurnOver
 				   END
 			) margin
+			*/
 	FROM #Temp t
 		INNER JOIN bodb_licensee.dbo.Licensees l WITH (NOLOCK) ON t.LicenseeId=l.LicenseeId
 	GROUP BY 
@@ -174,19 +175,19 @@ BEGIN
 		dbo.fnFormatDate(t.rptdate)
 	
 	--------------------------------- view result  -------------------------------------------
-	SELECT @cols= STUFF((SELECT ',' + QUOTENAME(seq )
+	SELECT @cols= STUFF((SELECT ',' + QUOTENAME(seq)
                     FROM 
                     (
-                      select dbo.fnFormatDate(sdate) seq
-                     from #MY
+                      SELECT dbo.fnFormatDate(sdate) seq
+                      FROM #MY
                     )d
-					FOR XML PATH(''), TYPE
+					FOR XML PATH(''),TYPE
 					).value('.', 'NVARCHAR(MAX)') 
-				,1,1,'')
+				    ,1,1,'')
 	SET @query='select Licensee,' + @cols + ' 
             from
             (
-              select s.Licensee, s.margin,seq
+              select s.Licensee,s.margin,s.seq
               from
               (
                 select Licensee,margin
@@ -198,13 +199,12 @@ BEGIN
             pivot 
             (
                 max(margin)
-                for seq in (' + CONVERT(VARCHAR(1000),@cols) + ')
+                for seq in (' + convert(varchar(1000),@cols) + ')
             ) p '
 			--print (@query)
 	EXECUTE sp_executesql @query;
 				
 	DROP TABLE #rptLicMargin
-	DROP TABLE #Exchange
 	DROP TABLE #Temp
 	DROP TABLE #tmpLicensee
 	DROP TABLE #MY
