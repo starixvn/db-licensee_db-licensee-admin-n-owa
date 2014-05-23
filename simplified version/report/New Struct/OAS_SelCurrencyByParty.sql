@@ -23,16 +23,21 @@ Param's Explanation:
 SET NOCOUNT ON
 BEGIN
 	declare @temp as table (currency int)
+	DECLARE @LicBoping INT 
+	SELECT @LicBoping=PartyID FROM bodb_licensee.dbo.OAS_Party WHERE PartyName='Boping'
 
-	insert into @temp
-		SELECT 
-			distinct Currency 
-		FROM bodb_Licensee.dbo.LicenseeCust lc (nolock)
-			INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON lc.LicenseeID=p.OldRefID
-		WHERE 
-			p.PartyID = @PartyID
-			AND (@excludeTest=0 OR (@excludeTest=1 AND Currency <> 20))	
-	
+	IF (@LicBoping!=@PartyID)
+	BEGIN
+		INSERT INTO @temp
+			SELECT 
+				distinct Currency 
+			FROM bodb_Licensee.dbo.LicenseeCust lc (nolock)
+				INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON lc.LicenseeID=p.OldRefID
+			WHERE 
+				p.PartyID = @PartyID
+				AND (@excludeTest=0 OR (@excludeTest=1 AND Currency <> 20))	
+	END
+
 	SELECT 
 		t.currency, 
 		CASE 

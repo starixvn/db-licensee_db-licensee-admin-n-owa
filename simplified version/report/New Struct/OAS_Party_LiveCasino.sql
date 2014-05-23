@@ -8,7 +8,7 @@ GO
 
 ALTER PROCEDURE [dbo].[OAS_Party_LiveCasino]
 AS  
-  
+
 /*  
  * Created by : 20140328@Florent 
  * Task  : Get all licensees (compatible with the new structure) for Live Casino Winloss report 
@@ -19,7 +19,7 @@ AS
  * Param's Explanation:    
  * 
  */  
- 
+            
 BEGIN
 	SET NOCOUNT ON  
 	SELECT DISTINCT case when p1.PartyName='Boping' then p1.PartyID else  ci.FromParty end AS PartyID,
