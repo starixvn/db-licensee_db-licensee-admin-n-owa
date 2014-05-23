@@ -6,7 +6,6 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
--- for test
 ALTER  PROCEDURE [dbo].[OA_Rpt_LicPerformance_LicensingMargin]  
 	@Licensee VARCHAR(1000)='',
 	@Currency INT = 0,
