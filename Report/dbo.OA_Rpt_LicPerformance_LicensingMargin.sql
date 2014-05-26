@@ -123,13 +123,18 @@ BEGIN
 	SELECT l.LicenseeID
 	FROM bodb_Licensee.dbo.Licensees l (NOLOCK)
 	WHERE l.LicenseeID IN (SELECT VAL FROM strSplit(@Licensee,','))  
-	
-	WHILE (month(@sdate)<=month(@ToDate) OR year(@sdate)<year(@ToDate))	
+	/*
+	WHILE ((month(@sdate)<=month(@ToDate) AND  year(@sdate)<=year(@ToDate)) OR
+			 (year(@sdate)<=year(@ToDate) )
+			 )	
+			 */
+	WHILE ((month(@sdate)<=month(@ToDate) AND year(@sdate)=year(@ToDate)) OR ( year(@sdate)<year(@ToDate)))
 	BEGIN 
 		INSERT INTO #MY(sDate)
 		SELECT @sdate
 		SET @sdate=DATEADD(m,1,@sdate)
 	END
+
 	IF @ProductCode='BA'
 	BEGIN 
 		INSERT INTO #Temp  (LicenseeID ,rptDate,CurrencyID,winloss,TurnOver)
@@ -213,7 +218,7 @@ BEGIN
 		dbo.fnFormatDate(t.rptdate)
 	ORDER BY  l.LicenseeName,
 		dbo.fnFormatDate(t.rptdate)
-	
+
 	--------------------------------- view result  -------------------------------------------
 	SELECT @cols= STUFF((SELECT ',' + QUOTENAME(seq)
                     FROM 
