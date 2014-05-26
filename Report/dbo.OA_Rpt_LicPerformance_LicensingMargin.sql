@@ -35,13 +35,13 @@ AS
 
 /*
 exec  OA_Rpt_LicPerformance_LicensingMargin
-		@Licensee='1',
-		@Currency = 0,
-		@FromDate ='2014-01-01',
-		@ToDate ='2014-04-30',
-		@ProductCode ='SB',
-		@drawfilter  = 1 ,
-		@excludeTest = 1
+		@Licensee=N'58,1,4,2,14,6,85,74,101,98,78,90,84,22,109,67,23,76,108,30,111,25,72,107,94,19,86,110,89,79,80,93,17,83,77,12,91,82,7,3,9,8,15,10,97,81,21,70'
+		,@Currency=0
+		,@fromdate='2013-09-01 00:00:00'
+		,@todate='2014-05-26 00:00:00'
+		,@ProductCode=N'SB'
+		,@drawfilter=1
+		,@excludeTest=1
 */
 BEGIN  
 	SET NOCOUNT ON  
@@ -67,13 +67,58 @@ BEGIN
 	CREATE TABLE #MY(
 		sDate DATETIME
 		)
+	CREATE TABLE #bettype (bettype INT)	
+	
 	DECLARE @cols AS NVARCHAR(MAX),
 			@query  AS NVARCHAR(MAX),
 			@sdate  AS DATETIME 
 	SELECT  @cols=NULL,
 		    @query=NULL,
 		    @sdate=@FromDate
+	IF 	@ProductCode='SB' 
+		BEGIN 
+			INSERT INTO #bettype (bettype)
+			SELECT typeId
+			FROM dbo.bettype b WITH (NOLOCK)
+			WHERE b.typeid <31 OR b.typeid BETWEEN 121 AND 999
+		END
+	IF 	@ProductCode='NG' 
+		BEGIN 
+			INSERT INTO #bettype (bettype)
+			SELECT typeId
+			FROM dbo.bettype b WITH (NOLOCK)
+			WHERE b.typeid BETWEEN 81 AND 120
+		END
+	IF 	@ProductCode='LC' 
+		BEGIN 
+			INSERT INTO #bettype (bettype)
+			SELECT typeId
+			FROM dbo.bettype b WITH (NOLOCK)
+			WHERE b.typeid BETWEEN 1101 AND 1199
+		END
+	IF 	@ProductCode='VS' 
+		BEGIN 
+			INSERT INTO #bettype (bettype)
+			SELECT typeId
+			FROM dbo.bettype b WITH (NOLOCK)
+			WHERE b.typeid BETWEEN 1201 AND 1299
+		END
+	IF 	@ProductCode='CS' 
+		BEGIN 
+			INSERT INTO #bettype (bettype)
+			SELECT typeId
+			FROM dbo.bettype b WITH (NOLOCK)
+			WHERE b.typeid =71
+		END
+	IF 	@ProductCode='RB' 
+		BEGIN 
+			INSERT INTO #bettype (bettype)
+			SELECT typeId
+			FROM dbo.bettype b WITH (NOLOCK)
+			WHERE b.typeid BETWEEN 31 AND 33
+		END
 	
+			
 	INSERT INTO #tmpLicensee (LicenseeID)   
 	SELECT l.LicenseeID
 	FROM bodb_Licensee.dbo.Licensees l (NOLOCK)
@@ -130,18 +175,12 @@ BEGIN
 					ELSE 1 END
 				)TurnOver
 		FROM 
-			bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK ) 
+			bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK,INDEX=CIX_rpt_Betting ) 
 			INNER JOIN #tmpLicensee ag ON ag.LicenseeID=b.SiteID
+			INNER JOIN #bettype be ON b.bettype=be.bettype
 		WHERE  
 			b.rptDate  BETWEEN @FromDate AND @ToDate 
 			AND b.status NOT IN (-1,103)
-			AND ( (@ProductCode='SB' AND (b.bettype <31 OR b.bettype BETWEEN 121 AND 999))
-				OR(@ProductCode='NG' AND b.bettype BETWEEN 81 AND 120)
-				OR(@ProductCode='LC' AND b.bettype BETWEEN 1101 AND 1199)
-				OR(@ProductCode='VS' AND b.bettype BETWEEN 1201 AND 1299)
-				OR(@ProductCode='CS' AND b.bettype =71)
-				OR(@ProductCode='RB' AND b.bettype BETWEEN 31 AND 33)
-				)	
 			AND (@Currency=0 OR (@Currency<>0 AND b.CurrencyID=@Currency))  
 			AND (@excludeTest=0 OR (@excludeTest=1 AND b.CurrencyID<>20)) 
 		GROUP BY b.siteID, b.rptDate,b.currencyID
@@ -209,6 +248,8 @@ BEGIN
 	DROP TABLE #Temp
 	DROP TABLE #tmpLicensee
 	DROP TABLE #MY
+	DROP TABLE #TempExchange
+	DROP TABLE #bettype
 END
 
 GO
