@@ -1,6 +1,5 @@
 USE [bodb02]
 GO
-
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -36,13 +35,13 @@ AS
 
 /*
 exec  OA_Rpt_LicPerformance_LicensingMargin
-		@Licensee='1,3,4,5,6,7,8,9,10,11,12,13,14,15,16',
+		@Licensee='1',
 		@Currency = 0,
-		@FromDate ='2013-04-01',
+		@FromDate ='2014-01-01',
 		@ToDate ='2014-04-30',
 		@ProductCode ='SB',
 		@drawfilter  = 1 ,
-		@excludeTest = 0
+		@excludeTest = 1
 */
 BEGIN  
 	SET NOCOUNT ON  
@@ -150,7 +149,16 @@ BEGIN
 			     b.rptDate
 
 	END	
+	
+	SELECT * INTO #TempExchange 
+	FROM Lrf_f_GetExchangeDaily(@FromDate,@ToDate)
+	WHERE exchangeid IN (SELECT DISTINCT CurrencyID FROM #Temp)
 
+	UPDATE  t
+	SET winloss=winloss*e.EUR
+		,TurnOver=TurnOver*e.EUR
+	FROM #Temp  t
+		INNER JOIN #TempExchange  e ON t.rptDate = e.ExchangeDate AND t.currencyid = e.ExchangeId
 	INSERT INTO #rptLicMargin(Licensee,rptDate,margin)
 	SELECT 
 		l.LicenseeName,
@@ -159,13 +167,6 @@ BEGIN
 			ELSE 
 				-SUM(Winloss)/SUM(Turnover) 
 			END Margin
-		/*				
-		SUM( CASE WHEN ISNULL(TurnOver,0)=0 THEN 0 
-				  ELSE 
-						-t.Winloss/TurnOver
-				   END
-			) margin
-			*/
 	FROM #Temp t
 		INNER JOIN bodb_licensee.dbo.Licensees l WITH (NOLOCK) ON t.LicenseeId=l.LicenseeId
 	GROUP BY 
