@@ -6,7 +6,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER  PROCEDURE [dbo].[OA_Rpt_LicPerformance_LicensingFee]  
+ALTER PROCEDURE [dbo].[OA_Rpt_LicPerformance_LicensingFee]  
 	@Licensee VARCHAR(1000)='',
 	@Currency INT = 0,
 	@FromDate SMALLDATETIME,
@@ -23,7 +23,7 @@ AS
     DB: DB052.bodb02  
    
     Revisions:  
-    
+		-20140528@jim: improve performance
 	Param's Explanation:  
 	  + @Licensee : a string of list LicenseeID, separated by ','
 	  + @Currency : 0-All Currencies
@@ -83,7 +83,8 @@ BEGIN
 		sDate DATETIME
 		)
 
-
+	CREATE TABLE #bettype (bettype INT)	
+	
 	DECLARE @cols AS NVARCHAR(MAX),
 			@query  AS NVARCHAR(MAX),
 			@sb_fee	AS SMALLMONEY,
@@ -110,13 +111,48 @@ BEGIN
 	FROM bodb_Licensee.dbo.Licensees l (NOLOCK)
 	WHERE l.LicenseeID IN (SELECT VAL FROM strSplit(@Licensee,','))  
 	
-	WHILE (@sdate<DATEADD(m,1,@ToDate) )	
+	WHILE ((month(@sdate)<=month(@ToDate) AND year(@sdate)=year(@ToDate)) OR ( year(@sdate)<year(@ToDate)))
 	BEGIN 
 		INSERT INTO #MY(sDate)
 		SELECT @sdate
 		SET @sdate=DATEADD(m,1,@sdate)
 	END
-
+	IF 	@ProductCode='SB' 
+		BEGIN 
+			INSERT INTO #bettype (bettype)
+			SELECT typeId
+			FROM dbo.bettype b WITH (NOLOCK)
+			WHERE b.typeid <31 OR b.typeid BETWEEN 121 AND 999
+		END
+	IF 	@ProductCode='NG' 
+		BEGIN 
+			INSERT INTO #bettype (bettype)
+			SELECT typeId
+			FROM dbo.bettype b WITH (NOLOCK)
+			WHERE b.typeid BETWEEN 81 AND 120
+		END
+	IF 	@ProductCode='LC' 
+		BEGIN 
+			INSERT INTO #bettype (bettype)
+			SELECT typeId
+			FROM dbo.bettype b WITH (NOLOCK)
+			WHERE b.typeid BETWEEN 1101 AND 1199
+		END
+	IF 	@ProductCode='VS' 
+		BEGIN 
+			INSERT INTO #bettype (bettype)
+			SELECT typeId
+			FROM dbo.bettype b WITH (NOLOCK)
+			WHERE b.typeid BETWEEN 1201 AND 1299
+		END
+	IF 	@ProductCode='CS' 
+		BEGIN 
+			INSERT INTO #bettype (bettype)
+			SELECT typeId
+			FROM dbo.bettype b WITH (NOLOCK)
+			WHERE b.typeid =71
+		END
+		
 	IF  @ProductCode IN ('SB','NG','LC','VS','CS')
 	BEGIN
 		INSERT INTO #Temp  (LicenseeID ,rptDate,CurrencyID,Winloss)
@@ -138,16 +174,10 @@ BEGIN
 		FROM 
 			bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK ) 
 			INNER JOIN #tmpLicensee ag ON ag.LicenseeID=b.SiteID
-			LEFT JOIN dbo.League l (NOLOCK) ON b.leagueid=l.leagueid
+			INNER JOIN #bettype be ON b.bettype=be.bettype
 		WHERE  
 			b.rptDate  BETWEEN @FromDate AND @ToDate 
 			AND b.status NOT IN (-1,103)
-			AND ( (@ProductCode='SB' AND (b.bettype <31 OR b.bettype BETWEEN 121 AND 999))
-				OR(@ProductCode='NG' AND b.bettype BETWEEN 81 AND 120)
-				OR(@ProductCode='LC' AND b.bettype BETWEEN 1101 AND 1199)
-				OR(@ProductCode='VS' AND b.bettype BETWEEN 1201 AND 1299)
-				OR(@ProductCode='CS' AND b.bettype =71)
-				)	
 			AND (@Currency=0 OR (@Currency<>0 AND b.CurrencyID=@Currency))  
 			AND (@excludeTest=0 OR (@excludeTest=1 AND b.CurrencyID<>20)) 
 		GROUP BY b.siteID, b.rptDate,b.currencyID
@@ -226,6 +256,7 @@ BEGIN
 	DROP TABLE #Temp
 	DROP TABLE #tmpLicensee
 	DROP TABLE #MY
+	DROP TABLE #bettype
 END
 GO
 GRANT EXECUTE ON [dbo].[OA_Rpt_LicPerformance_LicensingFee] TO [bodbAdminNet]
