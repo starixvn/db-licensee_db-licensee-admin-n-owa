@@ -1,13 +1,10 @@
 USE [bodb_licensee]
 GO
-
-/****** Object:  StoredProcedure [dbo].[KPI_GetReportData]    Script Date: 6/2/2014 16:11:38  ******/
+/****** Object:  StoredProcedure [dbo].[KPI_GetReportData]    Script Date: 6/9/2014 16:54:15  ******/
 SET ANSI_NULLS ON
 GO
-
 SET QUOTED_IDENTIFIER ON
 GO
-
 
 
 ALTER PROCEDURE [dbo].[KPI_GetReportData]   
@@ -562,7 +559,7 @@ BEGIN
 		--insert additional financials statistics		
 		insert INTO #TempResult (ReportDate,StatID,SectionID,GroupID,BranchID,Value)
 		SELECT t1.ReportDate,15 AS StatID,5,t1.GroupID,t1.BranchID,
-		(t1.Value * 0.15) AS SportRevenueGrossWin
+		(t1.Value * 0.1) AS SportRevenueGrossWin
 		FROM #TempResult (NOLOCK) t1 inner JOIN KPI_Groups g (NOLOCK)
 			ON t1.GroupID = g.GroupID inner JOIN bodb_licensee.dbo.Licensees (NOLOCK) l
 			ON g.SiteID = l.LicenseeID
@@ -733,9 +730,5 @@ END
 
 
 
-
-
-
-GO
 
 

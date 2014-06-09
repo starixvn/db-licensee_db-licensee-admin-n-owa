@@ -1,10 +1,8 @@
 USE [bodb_licensee]
 GO
-
-/****** Object:  StoredProcedure [dbo].[KPI_GetAllGroups]    Script Date: 6/2/2014 16:10:39  ******/
+/****** Object:  StoredProcedure [dbo].[KPI_GetAllGroups]    Script Date: 6/9/2014 16:55:07  ******/
 SET ANSI_NULLS ON
 GO
-
 SET QUOTED_IDENTIFIER ON
 GO
 
@@ -19,7 +17,7 @@ AS
  * Task  : Get all groups for KPI report(KPI structural re-arrangement task) 
  * DB   : DB052.bodb_Licensee  
  * Revisions :  
-   -20140529@Francis: Add BranchName (if exists) for each Group
+   -20140529@Francis: Add BrandName (if exists) for each Group
  * Param's Explanation:    
  * 
  */  
@@ -27,20 +25,26 @@ AS
 BEGIN
 	SET NOCOUNT ON  
 	
-	SELECT GroupID, 
-		   CASE WHEN BrandName IS NOT NULL AND BrandName <> '' AND BrandName <> ' '
-				THEN GroupName + ' (' + BrandName + ')'
+	SELECT g.GroupID, 
+		   CASE WHEN l.BrandName IS NOT NULL AND l.BrandName <> '' AND l.BrandName <> ' '
+				THEN g.GroupName + ' (' + l.BrandName + ')'
 		   ELSE
-				GroupName
+				g.GroupName
 		   END	
 		   AS GroupName, 
-		   GroupType, RelatedBranch, OrderNo
+		   g.GroupType, g.RelatedBranch, g.OrderNo
 	FROM KPI_Groups g (NOLOCK) 
 	     LEFT JOIN Licensees l (NOLOCK) ON g.SiteID = l.LicenseeID
-	WHERE ((@GroupID = 0) OR (@GroupID <> 0 AND GroupID = @GroupID))
-	AND ((@GroupType = -1) OR (@GroupType <> -1 AND GroupType = @GroupType))
-	AND IsActive = 1
+	WHERE ((@GroupID = 0) OR (@GroupID <> 0 AND g.GroupID = @GroupID))
+	AND ((@GroupType = -1) OR (@GroupType <> -1 AND g.GroupType = @GroupType))
+	AND g.IsActive = 1
+	OR (g.IsActive = 0 AND g.GroupID = 55)
 END
+
+
+
+
+
 
 
 
