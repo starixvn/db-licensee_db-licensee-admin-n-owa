@@ -1,6 +1,6 @@
 USE [bodb_licensee]
 GO
-/****** Object:  StoredProcedure [dbo].[KPI_GetAllGroups]    Script Date: 6/9/2014 16:55:07  ******/
+/****** Object:  StoredProcedure [dbo].[KPI_GetAllGroups]    Script Date: 6/23/2014 16:48:08  ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -38,12 +38,7 @@ BEGIN
 	WHERE ((@GroupID = 0) OR (@GroupID <> 0 AND g.GroupID = @GroupID))
 	AND ((@GroupType = -1) OR (@GroupType <> -1 AND g.GroupType = @GroupType))
 	AND g.IsActive = 1
-	OR (g.IsActive = 0 AND g.GroupID = 55)
 END
-
-
-
-
 
 
 

@@ -1,10 +1,11 @@
-USE [bodb_licensee]
+USE [bodb_Licensee]
 GO
-/****** Object:  StoredProcedure [dbo].[KPI_GetReportData]    Script Date: 6/9/2014 16:54:15  ******/
+/****** Object:  StoredProcedure [dbo].[KPI_GetReportData]    Script Date: 06/23/2014 05:53:36 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+/****** Object:  Stored Procedure dbo.KPI_GetReportData    Script Date: 6/18/2014 13:23:33  ******/
 
 
 ALTER PROCEDURE [dbo].[KPI_GetReportData]   
@@ -727,8 +728,3 @@ BEGIN
 	DROP TABLE #Result
 	
 END
-
-
-
-
-

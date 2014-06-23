@@ -1,17 +1,15 @@
-USE [bodb_Licensee]
+USE [bodb_licensee]
 GO
-/****** Object:  StoredProcedure [dbo].[KPI_AddNewGroup]    Script Date: 06/02/2014 05:15:25 ******/
+/****** Object:  StoredProcedure [dbo].[KPI_AddNewGroup]    Script Date: 6/23/2014 16:49:14  ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-/****** Object:  Stored Procedure dbo.KPI_AddNewGroup    Script Date: 3/3/2014 10:09:27  ******/
 
 ALTER PROCEDURE [dbo].[KPI_AddNewGroup]   
 	@GroupName varchar(50) = NULL,
 	@BranchID int = 0,
 	@GroupType int = 1,
-	@SiteID int = NULL,
 	@OrderNo int = 0,
 	@RelatedBranch varchar(50) = '',
 	@IsActive bit = 0,
@@ -24,11 +22,12 @@ AS
  * DB   : DB052.bodb_Licensee  
  * Revisions :  
    - 20140302@Francis: Fix not actived in SystemLicensee table bug
+   - 20140618@Francis: Automatically get SiteID (remove SiteID param)
  * Param's Explanation:    
  * - @SiteID: LicenseeID
  */  
 BEGIN
-declare @intCount int = 0
+declare @intCount int = 0, @SiteID int = NULL
 select @intCount = COUNT(1)
 from KPI_Branches with (NOLOCK)
 where BranchID = @BranchID
@@ -44,7 +43,11 @@ IF @GroupName IS NOT NULL AND @intCount > 0 AND @GroupName <> ''
 		
 		IF @TempID = 0--new group case
 		BEGIN
-		
+			
+			SELECT @SiteID = LicenseeID
+			FROM Licensees WITH (NOLOCK)
+			WHERE LicenseeName = @GroupName
+			
 			SET XACT_ABORT ON
 			BEGIN TRAN
 				INSERT INTO KPI_Groups (GroupName, GroupType, SiteID, OrderNo, RelatedBranch, IsActive)
@@ -55,6 +58,7 @@ IF @GroupName IS NOT NULL AND @intCount > 0 AND @GroupName <> ''
 				insert into KPI_BranchGroup (BranchID, GroupID, ProductID)
 				SELECT @BranchID, @TempID, @ProductID	
 			COMMIT
+
 		END
 		ELSE--existing group case
 		BEGIN
@@ -71,7 +75,8 @@ IF @GroupName IS NOT NULL AND @intCount > 0 AND @GroupName <> ''
 				select @BranchID, @TempID, @ProductID
 			END
 		END
-	
+		
+		--Set IsActive in SystemLicensee table
 		IF @SiteID IS NOT NULL
 		BEGIN
 			DECLARE @SystemID int
@@ -85,9 +90,11 @@ IF @GroupName IS NOT NULL AND @intCount > 0 AND @GroupName <> ''
 			AND LicenseeID = @SiteID
 			AND IsActive = 0
 		END
-	
 	END
 ELSE
 	PRINT 'Invalid GroupName or BranchID'
 
+SET XACT_ABORT OFF
 END
+
+
