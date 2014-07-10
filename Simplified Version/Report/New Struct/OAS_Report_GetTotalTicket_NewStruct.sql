@@ -1,10 +1,11 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[OAS_Report_GetTotalTicket_NewStruct]    Script Date: 02/04/2014 11:00:25 AM ******/
+/****** Object:  StoredProcedure [dbo].[OAS_Report_GetTotalTicket_NewStruct]    Script Date: 07/10/2014 00:32:17 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+/****** Object:  Stored Procedure dbo.OAS_Report_GetTotalTicket_NewStruct    Script Date: 4/18/2014 17:59:02  ******/
 
 ALTER PROCEDURE [dbo].[OAS_Report_GetTotalTicket_NewStruct]   
 	@NormalLicensee VARCHAR(1000),  
@@ -97,7 +98,8 @@ BEGIN
 	end
 	--end enhancement
 	
-		
+	IF LTRIM(RTRIM(ISNULL(@NormalLicensee,''))) <> ''
+	BEGIN	
 	insert into @tmpLicenseeReseller (FromPartyID, ToPartyID, FromDate, OldRefID)
 	select DISTINCT ci.FromParty, ci.ToParty, case WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END, p.OldRefID
 	from bodb_licensee.dbo.OAS_ChargeInfo ci (NOLOCK) inner JOIN bodb_Licensee.dbo.OAS_Party p (NOLOCK)
@@ -110,7 +112,10 @@ BEGIN
 		  and ci.ToParty IN (SELECT PartyID FROM bodb_Licensee.dbo.OAS_Party (NOLOCK) WHERE PartyName IN ('Oneworks','BCH','LDL'))
 		  --strSplit is a user-defined function
 		  and ci.FromParty IN (SELECT RTRIM(LTRIM(VAL)) FROM strSplit(@NormalLicensee,',')) 
+	end 
 		  
+	IF LTRIM(RTRIM(ISNULL(@Operator,''))) <> ''
+	BEGIN
 	insert into @tmpLicenseeReseller (FromPartyID, ToPartyID, FromDate, OldRefID)
 	select DISTINCT ci.FromParty, ci.ToParty, case WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END, p.OldRefID
 	from bodb_licensee.dbo.OAS_ChargeInfo ci (NOLOCK) inner JOIN bodb_Licensee.dbo.OAS_Party p (NOLOCK)
@@ -120,7 +125,7 @@ BEGIN
 		  AND ci.ChargeType = 2
 		  AND ci.ProductID = 0
 		  and ci.ToParty IN (SELECT RTRIM(LTRIM(VAL)) FROM strSplit(@Operator,','))
-	
+	END
 	--1. Exclude Licensees from Starlit and BA(FDL)
 	--For Deposit Licensees 
 	IF exists (SELECT 1 FROM @tmpLicenseeReseller tlr 

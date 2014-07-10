@@ -1,21 +1,22 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[OAS_Report_LicenseeWinloss_NewStruct]    Script Date: 01/04/2014 5:29:33 PM ******/
+/****** Object:  StoredProcedure [dbo].[OAS_Report_LicenseeWinloss_NewStruct]    Script Date: 07/10/2014 00:31:53 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+/****** Object:  Stored Procedure dbo.OAS_Report_LicenseeWinloss_NewStruct    Script Date: 4/18/2014 17:59:02  ******/
 
 
-ALTER PROC [dbo].[OAS_Report_LicenseeWinloss_NewStruct]    
+ALTER PROCEDURE [dbo].[OAS_Report_LicenseeWinloss_NewStruct]    
     @PartyID    INT,  
     @Currency  INT = 0,  
     @FromDate  SMALLDATETIME,    
     @ToDate   SMALLDATETIME,     
-    @ReportType  TINYINT = 1,    
+    @ReportType  TINYINT = 2,    
     @MoveBetsDay SMALLDATETIME,  
     @IsOld   BIT = 0,  
-    @drawfilter  SMALLINT = 1,  
+    @drawfilter  SMALLINT = 0,  
     @excludeTest BIT = 1
 AS    
   
@@ -24,7 +25,9 @@ AS
  * Task  : Get Winloss report for Sportbook (compatible with the new structure)
  * DB   : DB052.bodb02
  * Revisions :  
-	-20140327@florent: remove paging
+	-20140327@Florent: remove paging
+	-20140410@Francis: Fix showing data out of time-range bug
+	-20140410@Francis: Alter @drawfilter param's value to 0,1,2
  * 
  * Param's Explanation:    
  *  - @ID   : Party ID  (include: LicenseeID, ResellerID)
@@ -34,7 +37,7 @@ AS
  *  - @ReportType : 1-Daily; 2-Monthly;  
  *  - @MoveBetsDay : The day we move tickets to bettrans14   
  *  - @IsOld  : 0 - query in table rptLicWinloss, 1 - query in table rptLicWinloss_old.   
- *  - @drawfilter : 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)  
+ *  - @drawfilter : 'No Draw' filter is supportted (0:Normal 1:No Draw 2:No Draw for Turnover only)  
  *  - @excludeTest : remove currency UUS  
  */  
   
@@ -54,51 +57,42 @@ BEGIN
 		Playercomm    MONEY  
 	)    
   
-	DECLARE @tmpAg TABLE(custID INT PRIMARY KEY)    
+	DECLARE @tmpAg TABLE(custID INT PRIMARY KEY, FromDate SMALLDATETIME, ToDate SMALLDATETIME)    
 	DECLARE @VNDCurrencyName VARCHAR(20)  
   
 	SELECT @VNDCurrencyName = currency FROM exchange (NOLOCK) WHERE ExchangeId = 51 
-	
-	
 
-	--IF @Type = 1 --Normal Licensees
-	--	BEGIN 
-			INSERT INTO @tmpAg (custID)   
-        	SELECT DISTINCT lc.CustID
-			FROM
-				bodb_Licensee.dbo.LicenseeCust lc (NOLOCK) inner JOIN bodb_licensee.dbo.OAS_Party p (NOLOCK)
-				ON lc.LicenseeID = p.OldRefID AND p.PartyType = 1
-			where p.PartyID = @PartyID
-				and (@Currency = 0 OR lc.Currency = @Currency)	
-	--    END 
-	/*
-	ELSE IF @Type = 2  
-		BEGIN  
-			INSERT INTO @tmpAg (custID)   
-			SELECT DISTINCT lc.custID  
-			FROM bodb_Licensee.dbo.LicenseeCust lc WITH (NOLOCK)   
-				INNER JOIN bodb_Licensee.dbo.LicenseeReseller lr WITH (NOLOCK) ON lc.LicenseeID = lr.LicenseeID  
-				INNER JOIN bodb_Licensee.dbo.Resellers r WITH (NOLOCK) ON r.ResellerID = lr.ResellerID  
-				INNER JOIN bodb_licensee.dbo.Licensees l WITH (NOLOCK) ON lc.LicenseeID = l.LicenseeID
-				INNER JOIN bodb_Licensee.dbo.SystemLicensee sl (NOLOCK) ON l.LicenseeID=sl.LicenseeID 
-				INNER JOIN bodb_Licensee.dbo.Systems s (NOLOCK) ON sl.SystemID=s.ID
-			WHERE 
-				r.ResellerID = @ID AND r.ResellerType = 2 AND (@Currency = 0 OR lc.Currency = @Currency)  
-				AND sl.IsActive = 1 AND s.SystemName='OAS'
-    END  
-    */
-  
+	INSERT INTO @tmpAg (custID, FromDate, ToDate)   
+		SELECT DISTINCT lc.CustID,
+			   CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
+			   CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
+		FROM bodb_Licensee.dbo.LicenseeCust lc (NOLOCK) inner JOIN bodb_licensee.dbo.OAS_Party p (NOLOCK)
+			 ON lc.LicenseeID = p.OldRefID AND p.PartyType = 1 inner JOIN bodb_licensee.dbo.OAS_ChargeInfo ci (NOLOCK)
+			 ON ci.FromParty = p.PartyID
+		WHERE p.PartyID = @PartyID
+			  AND ci.ChargeType = 1
+			  AND ci.ProductID = 0	
+			  AND (@FromDate BETWEEN ci.FromDate AND ci.ToDate OR 
+				   @ToDate BETWEEN ci.FromDate AND ci.ToDate) 
+			  AND (@Currency = 0 OR lc.Currency = @Currency)	
+	  
 	DECLARE @TempFromDate DATETIME   
 	DECLARE @TempToDate DATETIME   
 	DECLARE @MaxOldDate DATETIME  
 	DECLARE @FDate SMALLDATETIME  
 	DECLARE @TDate SMALLDATETIME 
-    
+
+	IF(@FromDate <= (SELECT TOP 1 FromDate FROM @tmpAg))
+		SET @FromDate = (SELECT TOP 1 FromDate FROM @tmpAg)
+
+	IF(@ToDate >= (SELECT TOP 1 ToDate FROM @tmpAg))
+		SET @ToDate = (SELECT TOP 1 ToDate FROM @tmpAg)
+
+
 	--to Deal With Parameter Sniffing
 	SELECT @FDate=@FromDate,@TDate=@ToDate 
     
-    --@ToDate > @MoveBetsDay
-	IF @TDate > @MoveBetsDay  
+    IF @TDate > @MoveBetsDay  
 	BEGIN  
 		IF @FDate <= @MoveBetsDay   
 			SET @TempFromDate = DATEADD(DAY, 1, @MoveBetsDay)  
@@ -114,7 +108,7 @@ BEGIN
 			0 AS sporttype,  
 			SUM(stake *  
 			CASE   
-				WHEN @drawfilter IN (2, 3) THEN  
+				WHEN @drawfilter IN (1, 2) THEN  
 				CASE   
 					WHEN b.statusID = 111 THEN 0  
 					WHEN (b.statusID = 112 OR b.statusID = 113)   
@@ -129,7 +123,7 @@ BEGIN
 			- SUM(b.awinlost + b.winlost - b.actual_stake + b.comm) Company  , 
 			COUNT(b.transid) *   
 			CASE   
-			WHEN @drawfilter = 2 THEN  
+			WHEN @drawfilter = 1 THEN  
 				CASE   
 				WHEN b.statusID = 111 THEN 0  
 				ELSE 1   
@@ -151,7 +145,6 @@ BEGIN
 		b.winlostdate, b.srecommend, b.currency, b.bettype, b.statusID  
 	END    
   
-	--@FromDate <= MoveBetsDay
 	IF @FDate <= @MoveBetsDay   
 	BEGIN  
 	    IF @TDate >= @MoveBetsDay  
@@ -167,7 +160,7 @@ BEGIN
 			b.sporttype,      
 			SUM(b.turnover *  
 			CASE   
-				WHEN @drawfilter IN (2, 3) THEN  
+				WHEN @drawfilter IN (1, 2) THEN  
 				CASE   
 					WHEN b.statusID = 111 THEN 0  
 	                WHEN b.statusID IN (114, 115) THEN 0.5  
@@ -181,7 +174,7 @@ BEGIN
 			- SUM(b.awinlost + b.winlost + b.comm)  as Company   ,  
 			SUM(b.betcount) *   
 			CASE   
-	            WHEN @drawfilter = 2 THEN  
+	            WHEN @drawfilter = 1 THEN  
 		        CASE   
 			        WHEN b.statusID = 111 THEN 0  
 				    ELSE 1   
@@ -201,8 +194,7 @@ BEGIN
 		GROUP BY b.winlostdate, b.srecommend, b.currency, b.sporttype, b.statusID  
         
 	END
-	
-	  
+		  
 	IF @IsOld = 1       
 	BEGIN 
 	    SELECT @MaxOldDate = MAX(winlostdate) FROM bodb_Licensee.dbo.rptLicWinloss_old (NOLOCK)  
@@ -220,7 +212,7 @@ BEGIN
 	        SUM(  
 			b.turnover *  
 			CASE   
-	            WHEN @drawfilter IN (2, 3) THEN  
+	            WHEN @drawfilter IN (1, 2) THEN  
 				CASE   
 					WHEN b.statusID = 111  THEN 0  
 					WHEN b.statusID IN (114, 115) THEN 0.5  
@@ -234,7 +226,7 @@ BEGIN
 			- SUM(b.awinlost + b.winlost + b.comm) as Company   ,  
 			SUM(b.betcount) *   
 			CASE   
-	            WHEN @drawfilter = 2 THEN  
+	            WHEN @drawfilter = 1 THEN  
 				CASE   
 	                WHEN b.statusID = 111 THEN 0  
 		        ELSE 1   
@@ -262,7 +254,6 @@ BEGIN
 	END   
 
 	-- Exchange by Date
-
 	DECLARE @ExDate smalldatetime
 
 	SELECT @ExDate = CONVERT(VARCHAR(10), CASE 
@@ -270,8 +261,14 @@ BEGIN
 											ELSE DATEADD(day,-1,DATEADD(month,1,'01 '+SUBSTRING(CONVERT(VARCHAR(11),@TDate,106),4,8)))
 										  END,120)
 
-	SELECT * INTO #TempExchange 
-	FROM Lrf_f_GetExchangeDaily(@ExDate,@ExDate)
+	SELECT * 
+	INTO #Exchange1
+	FROM Lrf_f_GetExchangeDaily(@ExDate,@ExDate) -- get exchange rate in last day of month
+	WHERE exchangeid IN (SELECT DISTINCT Currency FROM #SAgWinLoss)
+
+	SELECT *
+	INTO #Exchange	
+	FROM Lrf_f_GetExchangeDaily(@FromDate,@ToDate)
 	WHERE exchangeid IN (SELECT DISTINCT Currency FROM #SAgWinLoss)
 
 	--return the result 	
@@ -283,12 +280,13 @@ BEGIN
 			END ReportType,    
 			Currency,     
 			CASE   
-			WHEN Currency = 51 THEN @VNDCurrencyName   
+				WHEN w.Currency = 51 THEN @VNDCurrencyName   
+				WHEN w.Currency=20 THEN 'UUS'
 			ELSE e.Code   
 			END currencyName, 
-			e.EUR AS EURExRate,
-			e.USD AS USDExRate,
-			e.MYR AS MYRExRate, 
+			ISNULL(e1.EUR,0) AS EURExRate,
+			ISNULL(e1.USD,0) AS USDExRate,
+			ISNULL(e1.MYR,0) AS MYRExRate, 
 			SUM(TurnOver) AS Turnover,     
 			SUM(Winlost) AS Winlost,    
 			SUM(LicenseeWL) AS LicenseeWL,  
@@ -318,8 +316,9 @@ BEGIN
 			sum(Playercomm * e.EUR) AS PlayercommEUR
 		FROM   
 			#SAgWinLoss w     
-			INNER JOIN #TempExchange e 
-			ON w.currency = e.ExchangeId  
+			INNER JOIN #Exchange e
+			ON w.currency = e.ExchangeId AND w.winlostdate =  e.ExchangeDate
+			LEFT JOIN #Exchange1 e1 ON w.currency = e1.ExchangeId
 		GROUP BY  
 			Currency,  
 			CASE   
@@ -328,20 +327,23 @@ BEGIN
 			ELSE '0'   
 			END,
 			CASE   
-			WHEN Currency = 51 THEN @VNDCurrencyName   
+				WHEN w.Currency = 51 THEN @VNDCurrencyName   
+				WHEN w.Currency = 20 THEN 'UUS'
 			ELSE e.Code   
 			END,
-			e.EUR,
-			e.USD,
-			e.MYR  
+			ISNULL(e1.EUR,0),
+			ISNULL(e1.USD,0),
+			ISNULL(e1.MYR,0)  
 		ORDER BY ReportType
 	END	
 	   
 	DROP TABLE #SAgWinLoss
-	DROP TABLE #TempExchange
+	DROP TABLE #Exchange
+	DROP TABLE #Exchange1
    
    
 END
+
 GO
 GRANT EXECUTE ON [dbo].[OAS_Report_LicenseeWinloss_NewStruct] TO [bodbLicenseeNet] 
 GRANT EXECUTE ON [dbo].[OAS_Report_LicenseeWinloss_NewStruct] TO bodbAdminNet 

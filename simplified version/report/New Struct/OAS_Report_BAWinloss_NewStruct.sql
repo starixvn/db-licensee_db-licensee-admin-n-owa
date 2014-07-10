@@ -1,10 +1,11 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[OAS_Report_BAWinloss_NewStruct]    Script Date: 4/2/2014 11:21:52  ******/
+/****** Object:  StoredProcedure [dbo].[OAS_Report_BAWinloss_NewStruct]    Script Date: 07/10/2014 00:32:05 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+/****** Object:  Stored Procedure dbo.OAS_Report_BAWinloss_NewStruct    Script Date: 4/18/2014 17:59:01  ******/
 
 
 
@@ -26,6 +27,7 @@ AS
  * DB: DB052.bodb02
  * Original: [OAS_Report_BAWinloss]
  * Revisions:
+   -20140410@Francis: Fix showing data out of time-range bug
  *
  * Params explanation:
  *	- @ReportBy: 0 - Daily, 1 - Monthly
@@ -50,17 +52,24 @@ BEGIN
 
 	
 
-	DECLARE @tempAg	TABLE( custID INT,currency INT)  
+	DECLARE @tempAg	TABLE(custID INT,currency INT, FromDate DATETIME, ToDate DATETIME)  
 	DECLARE @LicenseeName VARCHAR(50)
 
 	SELECT @LicenseeName = PartyName FROM bodb_Licensee.dbo.OAS_Party (NOLOCK) WHERE PartyID = @PartyID
 
-	INSERT INTO @tempAg (custID, currency) 
-		SELECT lc.custID, lc.currency 
+	INSERT INTO @tempAg (custID, currency, FromDate, ToDate) 
+		SELECT lc.custID, lc.currency,
+			   CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
+			   CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
 		FROM bodb_Licensee.dbo.LicenseeCust lc (NOLOCK) inner JOIN bodb_licensee.dbo.OAS_Party p (NOLOCK)
-			ON lc.LicenseeID = p.OldRefID AND p.PartyType = 1
+			ON lc.LicenseeID = p.OldRefID AND p.PartyType = 1 inner JOIN bodb_licensee.dbo.OAS_ChargeInfo ci (NOLOCK)
+			ON ci.FromParty = p.PartyID
 		WHERE 																
-			p.PartyID = @PartyID										
+			p.PartyID = @PartyID	
+			AND (@FromDate BETWEEN ci.FromDate AND ci.ToDate OR 
+			     @ToDate BETWEEN ci.FromDate AND ci.ToDate) 									
+			AND ci.ChargeType = 1
+		    AND ci.ProductID = 3
 			AND (@Currency = 0 OR (@Currency<> 0 AND Currency=@Currency))	
 			AND (Currency <> 20)
 
@@ -77,6 +86,13 @@ BEGIN
 	DECLARE @MaxOldDate DATETIME	   
 	DECLARE @FDate DATETIME 		   
 	DECLARE @TDate DATETIME 		   
+
+	IF(@FromDate <= (SELECT TOP 1 FromDate FROM @tempAg))
+		SET @FromDate = (SELECT TOP 1 FromDate FROM @tempAg)
+
+	IF(@ToDate >= (SELECT TOP 1 ToDate FROM @tempAg))
+		SET @ToDate = (SELECT TOP 1 ToDate FROM @tempAg)
+
 
 	SELECT @FDate=@fromDate, @TDate=@toDate 	
 	IF @TDate > @moveBetsDay  
@@ -181,7 +197,10 @@ BEGIN
 	IF (@ReportBy = 0) -- Daily report
 		BEGIN
 			SELECT CONVERT(VARCHAR(10),wl.WLDate,101) AS WLDate, wl.Currency, wl.TurnOver, wl.TotalTrans, wl.CustomerWL, wl.BAComm, wl.AmountBA,
-				   e.Code AS CurrencyName, 
+				   CASE WHEN wl.Currency = 20 THEN 'UUS'
+						WHEN wl.Currency = 51 THEN 'INH'
+						ELSE e.Code 
+				   END AS CurrencyName, 
 				   wl.TurnOver * e.ExRate AS TurnOverEx,
 				   wl.CustomerWL * e.ExRate AS CustomerWLEx,
 				   wl.BAComm * e.ExRate AS BACommEx,
@@ -199,14 +218,21 @@ BEGIN
 				   SUM(wl.CustomerWL) AS CustomerWL, 
 				   SUM(wl.BAComm) AS BAComm, 
 				   SUM(wl.AmountBA) AS AmountBA,
-				   e.Code AS CurrencyName, 
+				   CASE WHEN wl.Currency = 20 THEN 'UUS'
+						WHEN wl.Currency = 51 THEN 'INH'
+						ELSE e.Code 
+				   END AS CurrencyName, 
 				   SUM(wl.TurnOver * e.ExRate) AS TurnOverEx,
 				   SUM(wl.CustomerWL * e.ExRate) AS CustomerWLEx,
 				   SUM(wl.BAComm * e.ExRate) AS BACommEx,
 				   SUM(wl.AmountBA * e.ExRate) AS AmountBAEx
 			FROM #BAWinLoss wl
 				 INNER JOIN #tempExchange e ON wl.WLDate = e.ExchangeDate AND wl.currency = e.ExchangeId
-			GROUP BY SUBSTRING(CONVERT(VARCHAR(10),wl.WLDate,103),4,7), wl.Currency, e.Code
+			GROUP BY SUBSTRING(CONVERT(VARCHAR(10),wl.WLDate,103),4,7), wl.Currency, 
+			CASE WHEN wl.Currency = 20 THEN 'UUS'
+				 WHEN wl.Currency = 51 THEN 'INH'
+				 ELSE e.Code 
+			END 
 			ORDER BY SUBSTRING(CONVERT(VARCHAR(10),wl.WLDate,103),4,7), wl.Currency
 		END
 	
