@@ -7,7 +7,8 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_FunctionSelByGroup]
-	@GroupID	 INT
+	@GroupID	 INT,
+	@AdminID	 INT = 0
 AS
 
 /*  
@@ -16,8 +17,7 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:     
-	 Params :	 @getAll : 0 : get only Function active
-				    : 1 : get all function both active and not
+	 Params :	 @AdminID: ID of User log on
 */
 SET NOCOUNT ON
 
@@ -37,8 +37,22 @@ BEGIN
 		  ,FunctionKey	
     FROM dbo.LA_Function f WITH(NOLOCK) 
 		 INNER JOIN dbo.LA_GroupFunction gf WITH(NOLOCK) ON f.FunctionID = gf.FunctionID
+		 INNER JOIN dbo.LA_UserFunction uf WITH(NOLOCK) ON f.FunctionID = uf.FunctionID
     WHERE gf.GroupID = @GroupID AND f.StatusID != 0
+	     AND (@AdminID = 0 OR uf.UserID = @AdminID)
 		  --AND (@getAll = 1 or f.StatusID != @getAll)
+    GROUP BY f.FunctionID
+		  ,FunctionName
+		  ,FunctionDesc
+		  ,ParentID
+		  ,ParentName
+		  ,URL
+		  ,CreatedDate
+		  ,ModifiedDate
+		  ,DisplayOrder
+		  ,Creator
+		  ,f.StatusID
+		  ,FunctionKey	
 END
 
 GO

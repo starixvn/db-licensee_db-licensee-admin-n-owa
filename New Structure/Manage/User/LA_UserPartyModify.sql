@@ -30,7 +30,7 @@ DECLARE @startRun datetime
 	,@duration int
 	,@LogSPData varchar(5000)
 	,@LogSPData2 varchar(5000)
-	
+	,@strPermissionParty Varchar(5500) =''
 SET @startRun=GETDATE()	
 IF EXISTS (SELECT TOP 1 1 FROM dbo.LA_UserParty up WITH (NOLOCK) WHERE up.UserID = @UserID)
 BEGIN
@@ -38,8 +38,16 @@ BEGIN
     SELECT @PartyListOld = @PartyListOld + cast(PartyID as varchar(30)) + ',' 
 	   FROM dbo.LA_UserParty WITH (NOLOCK) 
 	   WHERE UserID = @UserID
+	   
+    SELECT @strPermissionParty = @strPermissionParty + CAST(PartyID AS VARCHAR(10)) +','
+	   FROM dbo.LA_UserParty WITH (NOLOCK) 
+	   WHERE UserID = @UserID 
+	   AND PartyID NOT IN (SELECT PartyID 
+						  FROM dbo.LA_UserParty WITH (NOLOCK) 
+						  WHERE UserID = @Creator)
+    SELECT @strPermissionParty = SUBSTRING(@strPermissionParty,0,LEN(@strPermissionParty))
 
-    SELECT @LogSPData2 ='<LA_UserPartyModify UserID="'+ coalesce(cast(@UserID as varchar(10)),space(1)) + '" ' +  
+    SELECT @LogSPData2 ='<LA_UserPartysModify UserID="'+ coalesce(cast(@UserID as varchar(10)),space(1)) + '" ' +  
 	'PartyID="'+ coalesce(@PartyListOld  ,space(1)) + '" ' +  
 	'ModifiedDate="'+ coalesce(cast(ModifyDate as varchar(20)),space(1)) + '" ' +
 	'Modifier="'+ coalesce(cast(modifier as varchar(20)),space(1)) + '" ' +
@@ -59,6 +67,14 @@ BEGIN
 	END
     
 END
+
+IF @strPermissionParty != '' 
+    BEGIN
+	  IF @PartyIDs != ''
+	   SELECT @PartyIDs = @PartyIDs + ',' + @strPermissionParty
+       ELSE
+	   SELECT @PartyIDs = @strPermissionParty
+    END
 
 INSERT INTO dbo.LA_UserParty (
 	UserID,
@@ -80,7 +96,7 @@ BEGIN
 	RETURN
 END
 
-SELECT @LogSPData ='<LA_UserPartyModify UserID="'+ coalesce(cast(@UserID as varchar(10)),space(1)) + '" ' +  
+SELECT @LogSPData ='<LA_UserPartysModify UserID="'+ coalesce(cast(@UserID as varchar(10)),space(1)) + '" ' +  
 	'PartyID="'+ coalesce(@PartyIDs  ,space(1)) + '" ' +  
 	'ModifiedDate="'+ coalesce(cast(getdate() as varchar(20)),space(1)) + '" ' +
 	'Modifier="'+ coalesce(cast(@Creator as varchar(20)),space(1)) + '" ' +

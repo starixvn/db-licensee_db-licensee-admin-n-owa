@@ -27,7 +27,7 @@ DECLARE @startRun datetime
 	,@duration int
 	,@LogSPData varchar(5000)
 	,@LogSPDataOld varchar(5000)
-	
+	,@strPermissionFunction Varchar(5500) =''
 SET @startRun=GETDATE()
 BEGIN
     IF EXISTS(SELECT TOP 1 1 FROM dbo.LA_UserFunction WITH(NOLOCK) WHERE UserID = @UserID)
@@ -37,7 +37,15 @@ BEGIN
 	   FROM dbo.LA_UserFunction WITH (NOLOCK) 
 	   WHERE UserID = @UserID
 
-	    SELECT @LogSPDataOld ='<LA_UserFunctionModify CustID="'+ coalesce(cast(@UserID as varchar(10)),space(1)) + '" ' +  	
+	   SELECT @strPermissionFunction = @strPermissionFunction + CAST(FunctionID AS VARCHAR(10)) +','
+	   FROM dbo.LA_UserFunction WITH (NOLOCK) 
+	   WHERE UserID = @UserID 
+	   AND FunctionID NOT IN (SELECT FunctionID 
+						  FROM dbo.LA_UserFunction WITH (NOLOCK) 
+						  WHERE UserID = @Creator)
+	   SELECT @strPermissionFunction = SUBSTRING(@strPermissionFunction,0,LEN(@strPermissionFunction))
+
+	   SELECT @LogSPDataOld ='<LA_UserFunctionModify CustID="'+ coalesce(cast(@UserID as varchar(10)),space(1)) + '" ' +  	
 		    'FunctionList="'+ coalesce(@FunctionListOld  ,space(1)) + '" ' +  
 		    'ModifiedDate="'+ coalesce(cast(ModifyDate as varchar(20)),space(1)) + '" ' +
 		    'Modifier="'+ coalesce(cast(modifier as varchar(20)),space(1)) + '" ' +    
@@ -56,6 +64,15 @@ BEGIN
 		    RETURN
 	    END
     END
+
+    IF @strPermissionFunction != '' 
+    BEGIN
+	  IF @FunctionIDs !=''
+	   SELECT @FunctionIDs = @FunctionIDs + ',' + @strPermissionFunction
+       ELSE
+	   SELECT @FunctionIDs = @strPermissionFunction
+    END
+
     --check case when user choice only 1 function, must be add parentID for him
     IF EXISTS( SELECT DISTINCT ParentID 
 				FROM LA_Function 
@@ -70,7 +87,7 @@ BEGIN
 				WHERE FunctionID IN( SELECT val FROM bodb02.dbo.strSplit (@FunctionIDs,','))
 				AND ParentID NOT IN (SELECT val FROM bodb02.dbo.strSplit (@FunctionIDs,','))
 		  ) A
-    END
+    END   
     
     INSERT INTO dbo.LA_UserFunction (
 	UserID,
