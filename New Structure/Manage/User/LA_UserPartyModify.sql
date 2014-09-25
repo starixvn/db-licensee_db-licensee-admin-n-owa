@@ -47,13 +47,13 @@ BEGIN
 						  WHERE UserID = @Creator)
     SELECT @strPermissionParty = SUBSTRING(@strPermissionParty,0,LEN(@strPermissionParty))
 
-    SELECT @LogSPData2 ='<LA_UserPartysModify UserID="'+ coalesce(cast(@UserID as varchar(10)),space(1)) + '" ' +  
-	'PartyID="'+ coalesce(@PartyListOld  ,space(1)) + '" ' +  
-	'ModifiedDate="'+ coalesce(cast(ModifyDate as varchar(20)),space(1)) + '" ' +
-	'Modifier="'+ coalesce(cast(modifier as varchar(20)),space(1)) + '" ' +
-	'Language="'+ coalesce(cast(@Language as varchar(20)),space(1)) + '" ' +  
-	'UserID="'+ coalesce(cast(@Creator as varchar(20)),space(1)) + '" ' +  
-	'IP="'+ coalesce(cast(@LoginIP as varchar(30)),space(1)) + '" />'
+    SELECT @LogSPData2 ='<LA_UserPartysModify UserID = "'+ coalesce(cast(@UserID as varchar(10)),space(1)) + '" ' +  
+	'PartyID = "'+ coalesce(@PartyListOld  ,space(1)) + '" ' +  
+	'ModifiedDate = "'+ coalesce(cast(ModifyDate as varchar(20)),space(1)) + '" ' +
+	'Modifier = "'+ coalesce(cast(modifier as varchar(20)),space(1)) + '" ' +
+	'Language = "'+ coalesce(cast(@Language as varchar(20)),space(1)) + '" ' +  
+	'CustID = "'+ coalesce(cast(@Creator as varchar(20)),space(1)) + '" ' +  
+	'IP = "'+ coalesce(cast(@LoginIP as varchar(30)),space(1)) + '" />'
 	 FROM dbo.LA_UserParty WITH (NOLOCK) 
 	   WHERE UserID = @UserID
 
@@ -96,12 +96,12 @@ BEGIN
 	RETURN
 END
 
-SELECT @LogSPData ='<LA_UserPartysModify UserID="'+ coalesce(cast(@UserID as varchar(10)),space(1)) + '" ' +  
-	'PartyID="'+ coalesce(@PartyIDs  ,space(1)) + '" ' +  
-	'ModifiedDate="'+ coalesce(cast(getdate() as varchar(20)),space(1)) + '" ' +
-	'Modifier="'+ coalesce(cast(@Creator as varchar(20)),space(1)) + '" ' +
-	'Language="'+ coalesce(cast(@Language as varchar(20)),space(1)) + '" ' +  
-	'UserID="'+ coalesce(cast(@Creator as varchar(20)),space(1)) + '" ' +  
+SELECT @LogSPData ='<LA_UserPartysModify UserID = "'+ coalesce(cast(@UserID as varchar(10)),space(1)) + '" ' +  
+	'PartyID = "'+ coalesce(@PartyIDs  ,space(1)) + '" ' +  
+	'ModifiedDate = "'+ coalesce(cast(getdate() as varchar(20)),space(1)) + '" ' +
+	'Modifier = "'+ coalesce(cast(@Creator as varchar(20)),space(1)) + '" ' +
+	'Language = "'+ coalesce(cast(@Language as varchar(20)),space(1)) + '" ' +  
+	'CustID = "'+ coalesce(cast(@Creator as varchar(20)),space(1)) + '" ' +  
 	'IP="'+ coalesce(cast(@LoginIP as varchar(30)),space(1)) + '" />'  
 
 SET @endRun = getdate()  
@@ -109,7 +109,7 @@ SET @duration  = datediff (millisecond,@startRun,@endRun)
 
 EXEC dbo.OA_WriteLog_UserLog_RunSP  
 	@UserID = @Creator,   
-	@CustID = 0,
+	@CustID = @UserID,
 	@SPName='LA_UserPartysModify',
 	--@ActionID = 0,  
 	@TrackingValue = @LogSPData,  
