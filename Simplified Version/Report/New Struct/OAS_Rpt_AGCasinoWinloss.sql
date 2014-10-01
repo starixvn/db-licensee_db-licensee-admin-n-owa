@@ -1,6 +1,6 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[OAS_Rpt_AGCasinoWinloss]    Script Date: 25/09/2014 15:09:37 PM ******/
+/****** Object:  StoredProcedure [dbo].[OAS_Rpt_AGCasinoWinloss]    Script Date: 01/10/2014 10:21:44 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -22,9 +22,10 @@ AS
 	Param's Explanation:  
 */
 /*
-OAS_Rpt_AGCasinoWinloss @PartyIDs = '15'
-	,@FromDate = '09-01-2014'
-	,@ToDate = '09-24-2014'
+OAS_Rpt_AGCasinoWinloss @PartyIDs = '15,16,17,18'
+	,@FromDate = '08-01-2014'
+	,@ToDate = '09-30-2014'
+	,@drawfilter = 3
 
 */
 SET NOCOUNT ON
@@ -79,7 +80,7 @@ BEGIN
 		,Todate
 		)
 	EXECUTE (@sql)
-
+	
 	--select @sql
 	INSERT INTO #tmpResult (
 		PartyID
@@ -96,19 +97,19 @@ BEGIN
 		,c.Winlostdate
 		,co.Currency
 		,SUM(c.TurnOver - CASE 
-				WHEN @drawfilter IN (2, 3)
+				WHEN @drawfilter IN (1, 2)
 					THEN c.DrawTO
 				ELSE 0
 				END) AS TurnOver
 		,SUM(c.BetCount - CASE 
-				WHEN @drawfilter = 2
+				WHEN @drawfilter = 1
 					THEN c.DrawBetCount
 				ELSE 0
 				END) AS TotalTrans
 		,SUM(c.Winlost) AS Winlost
 		,- SUM(c.Winlost) AS LicenseeWinlost
 	FROM bodb_report.dbo.rptDepWinlost_AGCasino c WITH (NOLOCK)
-	INNER JOIN dbo.Custinfo co WITH (NOLOCK) ON c.CustID = co.CustID
+	INNER JOIN dbo.Custinfo co WITH (NOLOCK) ON c.CustID = co.CustID 
 	INNER JOIN #tmpAg ag ON co.recommend = ag.CustID
 	WHERE c.Winlostdate BETWEEN ag.FromDate AND ag.Todate
 	GROUP BY c.Winlostdate
@@ -130,20 +131,21 @@ BEGIN
 			)
 
 	DECLARE @ParentID INT
-
+	SELECT ci.ChargeID,ci.Rate,ci.FromParty,ci.ToParty,ci.FromDate,ci.ToDate,ci.MinTrans,ci.MaxTrans
+	INTO #ChargeInfo
+	FROM DBLIC.bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) 
+	WHERE ProductID = 10 AND ChargeType = 1
 	--get AG revenue
 	SELECT @ParentID = OW.ChargeID
 	FROM (
-		SELECT sum(r.LicenseeWinlost * e.CNY) total
+		SELECT sum(Case WHEN r.LicenseeWinlost < 0 THEN 0 ELSE r.LicenseeWinlost END * e.CNY) total
 		FROM #tmpResult r
 		INNER JOIN #TempExchange e ON r.Winlostdate = e.ExchangeDate
 			AND r.currency = e.ExchangeId
 		) t1
-	LEFT JOIN DBLIC.bodb_licensee.dbo.OAS_ChargeInfo OW ON OW.FromParty = 1
-		AND OW.ProductID = 10
-		AND OW.ChargeType = 1
-		AND abs(t1.total) BETWEEN OW.MinTrans AND OW.MaxTrans
-
+	LEFT JOIN #ChargeInfo OW ON OW.FromParty = 1--OW
+		AND t1.total BETWEEN OW.MinTrans AND OW.MaxTrans
+     SELECT @ParentID = ISNULL (@ParentID,-1)
 	SELECT r.PartyID
 		,r.PartyName
 		,CONVERT(VARCHAR(6), winlostdate, 112) AS Winlostdate
@@ -158,26 +160,24 @@ BEGIN
 		,SUM(r.TotalTrans) AS BetCount
 		,SUM(r.TurnOver) AS TurnOver
 		,SUM(r.LicenseeWinlost) AS LicenseeWinlost
-		,SUM(r.LicenseeWinlost * DI.Rate) AS amtDueToOW
-		,SUM(r.LicenseeWinlost * OW.Rate) AS amtDueToAG
+		,SUM(r.LicenseeWinlost * ISNULL(DI.Rate,0)) AS amtDueToOW
+		,SUM(r.LicenseeWinlost * ISNULL(OW.Rate,0)) AS amtDueToAG
 		---USD
 		,SUM(r.TurnOver * e.USD) AS TurnOverUSD
 		,SUM(r.LicenseeWinlost * e.USD) AS LicenseeWinlostUSD
-		,SUM(r.LicenseeWinlost * DI.Rate * e.USD) AS amtDueToOWUSD
-		,SUM(r.LicenseeWinlost * OW.Rate * e.USD) AS amtDueToAGUSD
+		,SUM(r.LicenseeWinlost * ISNULL(DI.Rate,0) * e.USD) AS amtDueToOWUSD
+		,SUM(r.LicenseeWinlost * ISNULL(OW.Rate,0) * e.USD) AS amtDueToAGUSD
 		---EUR
 		,SUM(r.TurnOver * e.EUR) AS TurnOverEUR
 		,SUM(r.LicenseeWinlost * e.EUR) AS LicenseeWinlostEUR
-		,SUM(r.LicenseeWinlost * DI.Rate * e.EUR) AS amtDueToOWEUR
-		,SUM(r.LicenseeWinlost * OW.Rate * e.EUR) AS amtDueToAGEUR
+		,SUM(r.LicenseeWinlost * ISNULL(DI.Rate,0) * e.EUR) AS amtDueToOWEUR
+		,SUM(r.LicenseeWinlost * ISNULL(OW.Rate,0) * e.EUR) AS amtDueToAGEUR
 	FROM #tmpResult r
 	INNER JOIN #TempExchange e ON r.Winlostdate = e.ExchangeDate
 		AND r.currency = e.ExchangeId
-	LEFT JOIN DBLIC.bodb_licensee.dbo.OAS_ChargeInfo DI ON r.PartyID = DI.FromParty
-		AND DI.ProductID = 10
+	LEFT JOIN #ChargeInfo DI ON r.PartyID = DI.FromParty
 		AND r.winlostdate BETWEEN DI.FromDate AND DI.ToDate
-		AND DI.ChargeType = 1
-	LEFT JOIN DBLIC.bodb_licensee.dbo.OAS_ChargeInfo OW ON OW.ChargeID = @ParentID
+	LEFT JOIN #ChargeInfo OW ON OW.ChargeID = @ParentID
 	GROUP BY r.PartyID
 		,r.PartyName
 		,CONVERT(VARCHAR(6), winlostdate, 112)
@@ -193,7 +193,9 @@ BEGIN
 	DROP TABLE #tmpResult
 	DROP TABLE #tmpAg
 	DROP TABLE #TempExchange
+	DROP TABLE #ChargeInfo
 END
+
 GO
 GRANT EXECUTE ON [dbo].[OAS_Rpt_AGCasinoWinloss] TO [bodbLicenseeNet] 
 GRANT VIEW DEFINITION ON [dbo].[OAS_Rpt_AGCasinoWinloss] TO [vnteam] 
