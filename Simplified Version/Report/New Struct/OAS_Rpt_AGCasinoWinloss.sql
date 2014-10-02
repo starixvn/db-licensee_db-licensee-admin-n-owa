@@ -1,6 +1,6 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[OAS_Rpt_AGCasinoWinloss]    Script Date: 01/10/2014 10:21:44 AM ******/
+/****** Object:  StoredProcedure [dbo].[OAS_Rpt_AGCasinoWinloss]    Script Date: 02/10/2014 09:59:49 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -130,21 +130,25 @@ BEGIN
 			FROM #tmpResult
 			)
 
-	DECLARE @ParentID INT
+	DECLARE @ParentID INT, @Maxfee INT
 	SELECT ci.ChargeID,ci.Rate,ci.FromParty,ci.ToParty,ci.FromDate,ci.ToDate,ci.MinTrans,ci.MaxTrans
 	INTO #ChargeInfo
 	FROM DBLIC.bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) 
 	WHERE ProductID = 10 AND ChargeType = 1
 	--get AG revenue
+	SELECT @Maxfee = Max(MaxTrans) FROM #ChargeInfo WHERE FromParty = 1	
 	SELECT @ParentID = OW.ChargeID
 	FROM (
-		SELECT sum(Case WHEN r.LicenseeWinlost < 0 THEN 0 ELSE r.LicenseeWinlost END * e.CNY) total
+		SELECT Case WHEN sum(r.LicenseeWinlost * e.CNY) < 0 THEN 0
+				  ELSE sum(r.LicenseeWinlost * e.CNY) END AS total
 		FROM #tmpResult r
 		INNER JOIN #TempExchange e ON r.Winlostdate = e.ExchangeDate
 			AND r.currency = e.ExchangeId
 		) t1
 	LEFT JOIN #ChargeInfo OW ON OW.FromParty = 1--OW
-		AND t1.total BETWEEN OW.MinTrans AND OW.MaxTrans
+		AND CASE WHEN t1.total > @Maxfee THEN @Maxfee + 1 ELSE t1.total END
+			  BETWEEN ISNULL(OW.MinTrans,0) AND ISNULL(OW.MaxTrans,@Maxfee + 1)
+    
      SELECT @ParentID = ISNULL (@ParentID,-1)
 	SELECT r.PartyID
 		,r.PartyName
