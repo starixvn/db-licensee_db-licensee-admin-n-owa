@@ -1,6 +1,6 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_CurrencyWinloss]    Script Date: 9/8/2014 5:19:26 PM ******/
+/****** Object:  StoredProcedure [dbo].[LA_Rpt_CurrencyWinloss]    Script Date: 08/10/2014 11:20:32 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -181,7 +181,7 @@ AS
 	END
 
 	--exclude BA tickets
-	IF REPLACE(@ProductCodes, 'BA', '') != ''
+	IF (REPLACE(@ProductCodes, 'BA', '') != '' AND REPLACE(@ProductCodes, 'BA', '') != ',')
 	BEGIN
 		SELECT @sql = @sql + '--exclude BA rpt_Betting' + CHAR(13)
 
@@ -334,7 +334,9 @@ BEGIN
 END
 ELSE
 	EXEC (@sql + @output1 + @output2)
+
 GO
+
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_CurrencyWinloss] TO [vnteam] 
 GRANT EXECUTE ON [dbo].[LA_Rpt_CurrencyWinloss] TO bodbAdminNet 
 

@@ -202,3 +202,31 @@ GO
 GRANT SELECT ON dbo.LA_OnUser TO bodbLicenseeNet AS dbo
 GRANT VIEW DEFINITION ON dbo.LA_OnUser TO vnteam AS dbo
 GO
+
+
+--Rebate Table 
+GO
+CREATE TABLE LA_LicenseeFeeRebate
+(
+    LicenseeFeeID	INT NOT NULL IDENTITY(1,1) PRIMARY KEY,
+    LicenseeID		INT NOT NULL,
+    FromFee		INT,
+    ToFee			INT,
+    Rate			Money,
+    CurrencyRebate	INT NOT NULL,
+    FromDate		Datetime,
+    ToDate		Datetime
+)
+ON OWA_data
+GO
+
+GRANT SELECT ON dbo.LA_LicenseeFeeRebate TO bodbLicenseeNet AS dbo
+GRANT VIEW DEFINITION ON dbo.LA_LicenseeFeeRebate TO vnteam AS dbo
+GO
+--alter table ChargeIfno
+--add column WaiveFrom
+ALTER TABLE dbo.OAS_ChargeInfo
+ADD WaiveFrom DATETIME NULL
+--add column WaiveTo
+ALTER TABLE dbo.OAS_ChargeInfo
+ADD WaiveTo DATETIME NULL

@@ -1,21 +1,22 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_LicWinloss_Details]    Script Date: 9/8/2014 5:13:36 PM ******/
+/****** Object:  StoredProcedure [dbo].[LA_Rpt_LicWinloss_Details]    Script Date: 08/10/2014 11:23:06 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_Rpt_LicWinloss_Details] @PartyID INT
-	,@Currency INT = 0
-	,@FromDate SMALLDATETIME
-	,@ToDate SMALLDATETIME
-	,@ProductCode VARCHAR(10)
-	,@SportType INT = 0
-	,@Bettype INT = 0
-	,@ReportBy TINYINT = 1
-	,@DrawFilter SMALLINT = 1
-	,@ExcludeTest BIT = 0
+ALTER PROCEDURE [dbo].[LA_Rpt_LicWinloss_Details] 
+	 @PartyID		INT
+	,@Currency	INT			 = 0
+	,@FromDate	SMALLDATETIME
+	,@ToDate		SMALLDATETIME
+	,@ProductCodes VARCHAR(1000)
+	,@SportType	INT			 = 0
+	,@Bettype		INT			 = 0
+	,@ReportBy	TINYINT		 = 1
+	,@DrawFilter	SMALLINT		 = 1
+	,@ExcludeTest	BIT			 = 0
 AS
 /*   Created:  Florent.Nguyen
 	Date: 20140827
@@ -31,7 +32,7 @@ AS
 	  + @ReportBy: 1-Daily; 2-Monthly;  
 	  + @DrawFilter: 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
 	  + @excludeTest: add/remove currency UUS
-	  + @ProductCode	: Products code :
+	  + @ProductCodes	: Products code :
 				. SB _ SportBook
 				. NG _ Number Game
 				...
@@ -74,8 +75,8 @@ BEGIN
 		SELECT @Bettype
 	ELSE
 	BEGIN
-		IF @ProductCode = 'SB'
-			OR @ProductCode = 'BA'
+		IF CHARINDEX('SB', @ProductCodes) <> 0
+			OR CHARINDEX('BA', @ProductCodes) <> 0
 		BEGIN
 			INSERT INTO #Bettype
 			SELECT typeid
@@ -85,7 +86,7 @@ BEGIN
 				OR typeid BETWEEN 1301 AND 1399
 		END
 
-		IF @ProductCode = 'RB'
+		IF CHARINDEX('RB', @ProductCodes) <> 0
 		BEGIN
 			INSERT INTO #Bettype
 			SELECT typeid
@@ -93,7 +94,7 @@ BEGIN
 			WHERE typeid BETWEEN 31 AND 33
 		END
 
-		IF @ProductCode = 'NG'
+		IF CHARINDEX('NG', @ProductCodes) <> 0
 		BEGIN
 			INSERT INTO #Bettype
 			SELECT typeid
@@ -101,7 +102,7 @@ BEGIN
 			WHERE typeid BETWEEN 81 AND 120
 		END
 
-		IF @ProductCode = 'LC'
+		IF CHARINDEX('LC', @ProductCodes) <> 0
 		BEGIN
 			INSERT INTO #Bettype
 			SELECT typeid
@@ -109,7 +110,7 @@ BEGIN
 			WHERE typeid BETWEEN 1101 AND 1199
 		END
 
-		IF @ProductCode = 'VS'
+		IF CHARINDEX('VS', @ProductCodes) <> 0
 		BEGIN
 			INSERT INTO #Bettype
 			SELECT typeid
@@ -117,7 +118,7 @@ BEGIN
 			WHERE typeid BETWEEN 1201 AND 1299
 		END
 
-		IF @ProductCode = 'CS'
+		IF CHARINDEX('CS', @ProductCodes) <> 0
 		BEGIN
 			INSERT INTO #Bettype
 			SELECT typeid
@@ -153,14 +154,14 @@ BEGIN
 	WHERE p.PartyID = @PartyID
 		AND l.AffectedDate IS NOT NULL
 
-	DECLARE @_FromDate SMALLDATETIME
-		,@_ToDate SMALLDATETIME
-
-	IF (EXISTS (
-			SELECT TOP 1 1
-			FROM @tmpParty
-			WHERE AffectedDate > Fromdate
-			) AND @excludeTest = 1)
+	IF (
+			EXISTS (
+				SELECT TOP 1 1
+				FROM @tmpParty
+				WHERE AffectedDate > Fromdate
+				)
+			AND @excludeTest = 1
+			)
 	BEGIN
 		UPDATE @tmpParty
 		SET Fromdate = AffectedDate
@@ -168,7 +169,7 @@ BEGIN
 	END
 
 	BEGIN
-		IF @ProductCode = 'BA'
+		IF CHARINDEX('BA', @ProductCodes) <> 0
 		BEGIN
 			INSERT INTO #SAgWinLoss
 			SELECT b.rptDate
@@ -230,7 +231,8 @@ BEGIN
 				,b.currencyID
 				,b.STATUS
 		END
-		ELSE
+
+		IF (REPLACE(@ProductCodes, 'BA', '') != '' AND REPLACE(@ProductCodes, 'BA', '') != ',')
 		BEGIN
 			INSERT INTO #SAgWinLoss
 			SELECT b.rptDate

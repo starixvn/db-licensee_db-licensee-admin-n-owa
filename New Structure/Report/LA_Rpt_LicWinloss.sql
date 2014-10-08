@@ -1,21 +1,22 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_LicWinloss]    Script Date: 9/8/2014 5:13:10 PM ******/
+/****** Object:  StoredProcedure [dbo].[LA_Rpt_LicWinloss]    Script Date: 08/10/2014 11:22:41 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_Rpt_LicWinloss] @PartyIDs VARCHAR(1000) = ''
-	,@Currency INT = 0
-	,@FromDate SMALLDATETIME
-	,@ToDate SMALLDATETIME
-	,@ProductCode VARCHAR(10)
-	,@SportType INT = 0
-	,@Bettype INT = 0
-	,@ReportBy TINYINT = 1
-	,@DrawFilter SMALLINT = 1
-	,@excludeTest BIT = 0
+ALTER PROCEDURE [dbo].[LA_Rpt_LicWinloss] 
+      @PartyIDs	VARCHAR(1000)	 = ''
+	,@Currency	INT			 = 0
+	,@FromDate	SMALLDATETIME
+	,@ToDate		SMALLDATETIME
+	,@ProductCodes VARCHAR(1000)
+	,@SportType	INT			 = 0
+	,@Bettype		INT			 = 0
+	,@ReportBy	TINYINT		 = 1
+	,@DrawFilter	SMALLINT		 = 1
+	,@excludeTest	BIT			 = 0
 AS
 /*   Created:  Florent.Nguyen
 	Date: 20140827
@@ -31,7 +32,7 @@ AS
 	  + @ReportBy: 1-Daily; 2-Monthly;  
 	  + @DrawFilter: 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
 	  + @excludeTest: add/remove currency UUS
-	  + @ProductCode	: Products code :
+	  + @ProductCodes	: Products code :
 				. SB _ SportBook
 				. NG _ Number Game
 				...
@@ -115,8 +116,8 @@ BEGIN
 		SELECT @Bettype
 	ELSE
 	BEGIN
-		IF @ProductCode = 'SB'
-			OR @ProductCode = 'BA'
+		IF CHARINDEX('SB', @ProductCodes) <> 0
+			OR CHARINDEX('BA', @ProductCodes) <> 0
 		BEGIN
 			INSERT INTO #Bettype
 			SELECT typeid
@@ -126,7 +127,7 @@ BEGIN
 				OR typeid BETWEEN 1301 AND 1399
 		END
 
-		IF @ProductCode = 'RB'
+		IF CHARINDEX('RB', @ProductCodes) <> 0
 		BEGIN
 			INSERT INTO #Bettype
 			SELECT typeid
@@ -134,7 +135,7 @@ BEGIN
 			WHERE typeid BETWEEN 31 AND 33
 		END
 
-		IF @ProductCode = 'NG'
+		IF CHARINDEX('NG', @ProductCodes) <> 0
 		BEGIN
 			INSERT INTO #Bettype
 			SELECT typeid
@@ -142,7 +143,7 @@ BEGIN
 			WHERE typeid BETWEEN 81 AND 120
 		END
 
-		IF @ProductCode = 'LC'
+		IF CHARINDEX('LC', @ProductCodes) <> 0
 		BEGIN
 			INSERT INTO #Bettype
 			SELECT typeid
@@ -150,7 +151,7 @@ BEGIN
 			WHERE typeid BETWEEN 1101 AND 1199
 		END
 
-		IF @ProductCode = 'VS'
+		IF CHARINDEX('VS', @ProductCodes) <> 0
 		BEGIN
 			INSERT INTO #Bettype
 			SELECT typeid
@@ -158,7 +159,7 @@ BEGIN
 			WHERE typeid BETWEEN 1201 AND 1299
 		END
 
-		IF @ProductCode = 'CS'
+		IF CHARINDEX('CS', @ProductCodes) <> 0
 		BEGIN
 			INSERT INTO #Bettype
 			SELECT typeid
@@ -171,12 +172,13 @@ BEGIN
 		PartyID INT
 		,LicenseeID INT
 		,ParentID INT
-		,ParentName Varchar(100)
+		,ParentName VARCHAR(100)
 		,AffectedDate DATETIME
 		,Fromdate DATETIME
 		,Todate DATETIME
 		)
 
+	/*
     CREATE table #PartyList
     (
 	   PartyID INT,
@@ -185,53 +187,53 @@ BEGIN
     )
     INSERT INTO #PartyList
     EXEC bodb_licensee.dbo.LA_PartyListSel
-
+*/
 	INSERT INTO @tmpParty (
 		PartyID
-		,ParentID
-		,ParentName
 		,LicenseeID
 		,AffectedDate
 		,Fromdate
 		,Todate
 		)
 	SELECT p.PartyID
-		 ,pl.ParentID
-		 ,parent.PartyName
 		,l.LicenseeID
 		,l.AffectedDate
 		,@FromDate
 		,@ToDate
-	FROM #PartyList pl
-	INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON pl.PartyID=p.PartyID
+	FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)
 	INNER JOIN bodb_licensee.dbo.Licensees l(NOLOCK) ON p.OldRefID = l.LicenseeID
 		AND p.PartyType = 1
 	LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
-	LEFT JOIN (SELECT PartyID,PartyName FROM #PartyList WHERE ParentID = 0) parent ON pl.ParentID = parent.PartyID
 	WHERE p.PartyID IN (
 			SELECT VAL
 			FROM strSplit(@PartyIDs, ',')
 			)
-		AND (l.AffectedDate IS NOT NULL OR pd.IsDeposit = 0)
+		AND (
+			l.AffectedDate IS NOT NULL
+			OR pd.IsDeposit = 0
+			)
 
 	DECLARE @_FromDate SMALLDATETIME
 		,@_ToDate SMALLDATETIME
 
-	IF (EXISTS (
-			SELECT TOP 1 1
-			FROM @tmpParty
-			WHERE AffectedDate > Fromdate
-			) AND @excludeTest =1 )
+	IF (
+			EXISTS (
+				SELECT TOP 1 1
+				FROM @tmpParty
+				WHERE AffectedDate > Fromdate
+				)
+			AND @excludeTest = 1
+			)
 	BEGIN
 		UPDATE @tmpParty
 		SET Fromdate = AffectedDate
 		WHERE AffectedDate > Fromdate
 	END
-	
+
 	SELECT @_FromDate = @FromDate
 		,@_ToDate = @ToDate
 
-	CREATE TABLE #Exchange1 (
+	CREATE TABLE #Exchange (
 		ExchangeDate INT
 		,ExchangeId INT
 		,USD FLOAT
@@ -243,7 +245,7 @@ BEGIN
 			)
 		)
 
-	INSERT INTO #Exchange1 (
+	INSERT INTO #Exchange (
 		ExchangeDate
 		,ExchangeId
 		,USD
@@ -256,12 +258,12 @@ BEGIN
 		,EUR
 		,MYR
 	FROM Lrf_f_GetExchangeDaily(@_FromDate, @_ToDate)
-	--WHERE exchangeid IN (SELECT DISTINCT Currency FROM bodb_Licensee.dbo.LicenseeCust lc WITH (NOLOCK) WHERE 
-	--	lc.LicenseeID IN (SELECT LicenseeID FROM  @tmpParty))	
-	WHERE @Currency = 0
-		OR ExchangeId = @Currency
+	WHERE exchangeid IN (SELECT DISTINCT Currency FROM bodb_Licensee.dbo.LicenseeCust lc WITH (NOLOCK) WHERE 
+		lc.LicenseeID IN (SELECT LicenseeID FROM  @tmpParty))	
+	AND (@Currency = 0
+		OR ExchangeId = @Currency)
 
-	IF @ProductCode = 'BA'
+	IF CHARINDEX('BA', @ProductCodes) <> 0
 	BEGIN
 		INSERT INTO #Temp (
 			LicenseeID
@@ -340,7 +342,8 @@ BEGIN
 			,STATUS
 			,currencyID
 	END
-	ELSE
+
+	IF (REPLACE(@ProductCodes, 'BA', '') != '' AND REPLACE(@ProductCodes, 'BA', '') != ',')
 	BEGIN
 		INSERT INTO #Temp (
 			LicenseeID
@@ -412,7 +415,10 @@ BEGIN
 					THEN 0
 				ELSE 1
 				END BetCount
-		FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK,INDEX = IX_Sport )
+		FROM bodb_Licensee.dbo.rpt_Betting b WITH (
+				NOLOCK
+				,INDEX = IX_Sport
+				)
 		INNER JOIN @tmpParty p ON p.LicenseeID = b.SiteID
 		INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
 		LEFT JOIN dbo.League l(NOLOCK) ON b.leagueid = l.leagueid
@@ -491,14 +497,13 @@ BEGIN
 		,Company * e.EUR CompanyEUR
 		,Playercomm * e.EUR PlayercommEUR
 	FROM #Temp b
-	LEFT JOIN #Exchange1 e ON e.ExchangeDate = ReportType
+	LEFT JOIN #Exchange e ON e.ExchangeDate = ReportType
 		AND e.exchangeid = b.currency
 END
 
 SELECT --w.LicenseeID 
-      t.PartyID
+	t.PartyID
 	,l.LicenseeName AS PartyName
-	,t.ParentName
 	,w.ReportType
 	,SUM(TurnOver) AS Turnover
 	,SUM(Winlost) AS Winlost
@@ -549,20 +554,18 @@ SELECT --w.LicenseeID
 	,SUM(PlayercommEUR) AS PlayercommEUR
 FROM #WinLoss w
 INNER JOIN bodb_Licensee.dbo.Licensees l(NOLOCK) ON l.LicenseeID = w.LicenseeID
-LEFT JOIN @tmpParty t ON w.LicenseeID = t.LicenseeID 
+LEFT JOIN @tmpParty t ON w.LicenseeID = t.LicenseeID
 GROUP BY --w.LicenseeID
-      t.PartyID
+	t.PartyID
 	,l.LicenseeName
 	,w.ReportType
-	,t.ParentName
 ORDER BY l.LicenseeName
 	,ReportType
 
 DROP TABLE #WinLoss
-DROP TABLE #Exchange1
+DROP TABLE #Exchange
 DROP TABLE #Temp
 DROP TABLE #Bettype
-DROP TABLE #PartyList
 
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicWinloss] TO [vnteam] 
