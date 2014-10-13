@@ -37,7 +37,7 @@ SET @startRun=GETDATE()
 BEGIN
     IF EXISTS(SELECT TOP 1 1 FROM dbo.LA_User WITH(NOLOCK) WHERE UserID = @UserID)
     BEGIN
-	    SELECT @LogSPDataOld ='<LA_UserModify CustID="'+ coalesce(cast(@UserID as varchar(10)),space(1)) + '" ' +  	
+	    SELECT @LogSPDataOld ='<LA_UsersModify CustID="'+ coalesce(cast(@UserID as varchar(10)),space(1)) + '" ' +  	
 		    'UserName="'+ coalesce(cast(UserName as varchar(20)),space(1)) + '" ' +  
 		    'DisplayName="'+ coalesce(cast(DisplayName as varchar(20)),space(1)) + '" ' +  
 		    'StatusID="'+ coalesce(cast(StatusID as varchar(20)),space(1)) + '" ' +  
@@ -126,7 +126,7 @@ BEGIN
 	    END
     END
 
-    SELECT @LogSPData ='<LA_UserModify CustID="'+ coalesce(cast(@UserID as varchar(10)),space(1)) + '" ' +  	
+    SELECT @LogSPData ='<LA_UsersModify CustID="'+ coalesce(cast(@UserID as varchar(10)),space(1)) + '" ' +  	
 	    'UserName="'+ coalesce(cast(@UserName as varchar(20)),space(1)) + '" ' +  
 	    'DisplayName="'+ coalesce(cast(@DisplayName as varchar(20)),space(1)) + '" ' +  
 	    'StatusID="'+ coalesce(cast(@IsActive as varchar(20)),space(1)) + '" ' +  
@@ -137,16 +137,31 @@ BEGIN
 
     SET @endRun = getdate()  
     SET @duration  = datediff (millisecond,@startRun,@endRun)   
-
-    EXEC dbo.OA_WriteLog_UserLog_RunSP  
-	    @UserID = @Creator,   
-	    @CustID = @UserID,
-	    @SPName='LA_UserModify',
-	    --@ActionID = 0,  
-	    @TrackingValue = @LogSPData,  
-	    @TrackingValue2 = @LogSPDataOld,  
-	    @duration = @duration
+    IF LEN (ISNULL(@LogSPDataOld,'')) = 0
+    BEGIN
+	   SELECT @LogSPData = REPLACE(@LogSPData,'LA_UsersModify','LA_UsersModify_Create')
+	   EXEC dbo.OA_WriteLog_UserLog_RunSP  
+		   @UserID = @Creator,   
+		   @CustID = @UserID,
+		   @SPName='LA_UsersModify_Create',
+		   --@ActionID = 0,  
+		   @TrackingValue = @LogSPData,  
+		   @TrackingValue2 = @LogSPDataOld,  
+		   @duration = @duration
+    END
+    ELSE
+    BEGIN
+	   EXEC dbo.OA_WriteLog_UserLog_RunSP  
+		   @UserID = @Creator,   
+		   @CustID = @UserID,
+		   @SPName='LA_UsersModify',
+		   --@ActionID = 0,  
+		   @TrackingValue = @LogSPData,  
+		   @TrackingValue2 = @LogSPDataOld,  
+		   @duration = @duration
+    END
 END
+
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_UserModify] TO [vnteam] 
 GRANT EXECUTE ON [dbo].[LA_UserModify] TO bodbAdminNet 
