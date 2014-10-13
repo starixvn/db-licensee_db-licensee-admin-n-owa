@@ -206,16 +206,17 @@ GO
 
 --Rebate Table 
 GO
-CREATE TABLE LA_LicenseeFeeRebate
+CREATE TABLE LA_LicenseeProductRebate
 (
-    LicenseeFeeID	INT NOT NULL IDENTITY(1,1) PRIMARY KEY,
+    ID	INT NOT NULL IDENTITY(1,1) PRIMARY KEY,
     LicenseeID		INT NOT NULL,
-    FromFee		INT,
+	ProductID		INT NOT NULL,
+    FromFee			INT,
     ToFee			INT,
     Rate			Money,
-    CurrencyRebate	INT NOT NULL,
+    Currency		INT NOT NULL,
     FromDate		Datetime,
-    ToDate		Datetime
+    ToDate			Datetime
 )
 ON OWA_data
 GO
@@ -223,7 +224,7 @@ GO
 GRANT SELECT ON dbo.LA_LicenseeFeeRebate TO bodbLicenseeNet AS dbo
 GRANT VIEW DEFINITION ON dbo.LA_LicenseeFeeRebate TO vnteam AS dbo
 GO
---alter table ChargeIfno
+--alter table ChargeInfo
 --add column WaiveFrom
 ALTER TABLE dbo.OAS_ChargeInfo
 ADD WaiveFrom DATETIME NULL

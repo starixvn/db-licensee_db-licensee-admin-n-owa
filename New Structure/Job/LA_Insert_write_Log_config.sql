@@ -17,22 +17,26 @@ SELECT 603,6,'LA_UserFunctionModify',
 'Create/Update User Function','Create/Update User Function','Create/Update User Function','Create/Update User Function','Create/Update User Function','Create/Update User Function','Create/Update User Function'
 ,'',0
 UNION
-SELECT 604,6,'LA_UsersModify',
-'Create/Update User','Create/Update User','Create/Update User','Create/Update User','Create/Update User','Create/Update User','Create/Update User'
+SELECT 604,6,'LA_UsersModify_Create',
+'Create User','Create User','Create User','Create User','Create User','Create User','Create User'
 ,'',0
 UNION
-SELECT 605,6,'LA_UserPartysModify',
+SELECT 605,6,'LA_UsersModify',
+'Update User','Update User','Update User','Update User','Update User','Update User','Update User'
+,'',0
+UNION
+SELECT 606,6,'LA_UserPartysModify',
 'Create/Update User Party','Create/Update User Party','Create/Update User Party','Create/Update User Party','Create/Update User Party','Create/Update User Party','Create/Update User Party'
 ,'',0
 UNION
-SELECT 606,6,'LA_UserPasswordUpd',
+SELECT 607,6,'LA_UserPasswordUpd',
 'Update User Password','Update User Password','Update User Password','Update User Password','Update User Password','Update User Password','Update User Password'
 ,'',0
 UNION
-SELECT 607,6,'LA_UserPwdReset',
+SELECT 608,6,'LA_UserPwdReset',
 'Reset User Password','Reset User Password','Reset User Password','Reset User Password','Reset User Password','Reset User Password','Reset User Password'
 ,'',0
 UNION
-SELECT 608,6,'LA_UserUpdIsActive',
+SELECT 609,6,'LA_UserUpdIsActive',
 'Update User Status is Active/No-Active','Update User Status is Active/No-Active','Update User Status is Active/No-Active','Update User Status is Active/No-Active','Update User Status is Active/No-Active','Update User Status is Active/No-Active','Update User Status is Active/No-Active'
 ,'',0
