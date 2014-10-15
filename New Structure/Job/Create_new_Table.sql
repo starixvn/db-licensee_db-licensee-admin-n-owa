@@ -205,6 +205,7 @@ GO
 
 
 --Rebate Table 
+/*
 GO
 CREATE TABLE LA_LicenseeProductRebate
 (
@@ -231,3 +232,4 @@ ADD WaiveFrom DATETIME NULL
 --add column WaiveTo
 ALTER TABLE dbo.OAS_ChargeInfo
 ADD WaiveTo DATETIME NULL
+*/
