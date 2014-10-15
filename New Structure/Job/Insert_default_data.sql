@@ -10,13 +10,37 @@ SELECT 3,'User_Normal','2EFDBED0E7BA3D48A017087FEDD3A6C74D262920','User Normal',
 
 --Function
 TRUNCATE TABLE LA_Function
-INSERT INTO LA_Function (FunctionName,FunctionDesc,ParentID,ParentName,
-				    URL,CreatedDate,ModifiedDate,DisplayOrder,
-				    Creator,StatusID,FunctionKey)
-SELECT FunctionName,FunctionDesc,ParentID,ParentName,
-				    URL,CreatedDate,ModifiedDate,DisplayOrder,
-				    1,IsActive,FunctionKey
-FROM dbo.OA_Functions WITH (NOLOCK) 
+SET IDENTITY_INSERT [dbo].[LA_Function] ON 
+GO
+INSERT [dbo].[LA_Function] ([FunctionID], [FunctionName], [FunctionDesc], [ParentID], [ParentName], [URL], [CreatedDate], [ModifiedDate], [DisplayOrder], [Creator], [StatusID], [FunctionKey]) 
+VALUES (1, N'Administration', N'Administration', 0, N'None', N'', CAST(0x00009F7A01210128 AS DateTime), CAST(0x0000A38B00DA74B2 AS DateTime), 10, 1, 1, N'Administration'),
+(2, N'Manage Group', N'Manage Group', 1, N'Administration', N'/Group/ManageGroup', CAST(0x00009F5C00000000 AS DateTime), CAST(0x00009F5C00000000 AS DateTime), 10, 1, 0, N'ManageGroup'),
+(3, N'Manage User', N'Manage User', 1, N'Administration', N'/User/ManageUser', CAST(0x00009F5C00000000 AS DateTime), CAST(0x00009F5C00000000 AS DateTime), 20, 1, 1, N'ManageUser'),
+(4, N'Total Transaction', N'Total Transaction Report', 0, N'None', N'/TotalTrans/Main', CAST(0x00009F5C00000000 AS DateTime), CAST(0x0000A3C5000EFB9F AS DateTime), 20, 1, 1, N'TotalTransaction'),
+(5, N'Win Loss Report', N'Win Loss Report', 0, N'None', N'/Report/WinLoss', CAST(0x00009F5C00000000 AS DateTime), CAST(0x0000A00C00394FE0 AS DateTime), 30, 1, 1, N'WinLossReport'),
+(6, N'System Configuration', N'System Configuration', 0, N'None', N'/SystemSetting/Manage', CAST(0x00009F6C00000000 AS DateTime), CAST(0x0000A38D002D4075 AS DateTime), 100, 1, 1, N'SystemConfiguration'),
+(7, N'Racing', N'Racing', 0, N'None', N'/Racing/Main', CAST(0x00009F7B00AE6618 AS DateTime), CAST(0x0000A3C5000F7D40 AS DateTime), 40, 1, 1, N'Racing'),
+(8, N'Manage Configuration', N'Manage Configuration', 6, N'System Configuration', N'/SystemSetting/ManageConfiguration', CAST(0x00009F7F00000000 AS DateTime), CAST(0x00009F7F00000000 AS DateTime), 10, 1, 1, N'ManageConfiguration'),
+(9, N'Manage Function', N'Manage Function', 6, N'System Configuration', N'/SystemSetting/ManageFunction', CAST(0x00009F7B00000000 AS DateTime), CAST(0x00009FBA00000000 AS DateTime), 20, 1, 1, N'ManageFunction'),
+(11, N'Currency Win Loss Report', N'Currency Win Loss Report', 5, N'Win Loss Report', N'/CurrencyWinLoss/Main', CAST(0x00009FAD0036DCEC AS DateTime), CAST(0x0000A3C5000F14B4 AS DateTime), 7, 1, 1, N'CurrencyWinLossReport'),
+(12, N'Manage KPI Service', N'Manage KPI Service', 6, N'System Configuration', N'/KPIService/ManageTask', CAST(0x0000A04D00000000 AS DateTime), CAST(0x0000A04D00000000 AS DateTime), 40, 1, 1, N'ManageKPIService'),
+(13, N'OANDA Exchange Rate', N'OANDA Exchange Rate', 0, N'None', N'/ExchangeRate/Main', CAST(0x00009EED00000000 AS DateTime), CAST(0x0000A3C5000F8B92 AS DateTime), 50, 1, 1, N'ExchangeRate'),
+(14, N'Task Scheduler', N'Task Scheduler', 6, N'System Configuration', N'/TaskScheduler/Index', CAST(0x0000A08500000000 AS DateTime), CAST(0x0000A08500000000 AS DateTime), 50, 1, 1, N'TaskScheduler'),
+(15, N'Number Game Win Loss', N'Number Game Win Loss', 5, N'Win Loss Report', N'/NumberGame/Main', CAST(0x0000A0E500EDDAA0 AS DateTime), CAST(0x0000A3C5000F241B AS DateTime), 40, 1, 1, N'NumberGameReport'),
+(16, N'Virtual Sports', N'Virtual Sports', 5, N'Win Loss Report', N'/VirtualSports/Main', CAST(0x0000A0E800E78970 AS DateTime), CAST(0x0000A3C5000F333C AS DateTime), 40, 1, 1, N'VirtualSportsReport'),
+(17, N'Live Casino Win Loss', N'Live Casino Win Loss', 5, N'Win Loss Report', N'/LiveCasino/Main', CAST(0x0000A101009AE840 AS DateTime), CAST(0x0000A3C5000F4A58 AS DateTime), 40, 1, 1, N'LiveCasinoReport'),
+(18, N'Licensee Win Loss', N'Licensee Win Loss', 5, N'Win Loss Report', N'/LicenseeWinLoss/Main', CAST(0x0000A156009450C0 AS DateTime), CAST(0x0000A3C5000EBFEF AS DateTime), 6, 1, 1, N'LicenseeWinLoss'),
+(19, N'RNG Casino Win Loss', N'RNG Casino Win Loss', 5, N'Win Loss Report', N'/Report/RngWinLoss', CAST(0x0000A14E009450C0 AS DateTime), CAST(0x0000A14E009450C0 AS DateTime), 40, 1, 1, N'RngWinLossReport'),
+(20, N'SunSport Win Loss', N'SunSport Win Loss', 0, N'None', N'/SunSport/Main', CAST(0x0000A28A00000000 AS DateTime), CAST(0x0000A3C500103629 AS DateTime), 60, 1, 1, N'SunSportWinLoss'),
+(21, N'Performance', N'Performance', 0, N'None', N'/Report/LicenseePerformance', CAST(0x0000A2DC00000000 AS DateTime), CAST(0x0000A2DC00000000 AS DateTime), 45, 1, 1, N'Performance'),
+(22, N'Licensee Performance', N'Performance', 21, N'Performance', N'/Performance/LicenseePerformance', CAST(0x0000A2DC00000000 AS DateTime), CAST(0x0000A3C50018B811 AS DateTime), 11, 1, 1, N'LicenseePerformance'),
+(23, N'Performance by Turnover', N'Performance by Turnover', 21, N'Performance', N'/Performance/PerformanceByTurnover', CAST(0x0000A2DC00000000 AS DateTime), CAST(0x0000A3C50018DD35 AS DateTime), 12, 1, 1, N'LicenseePerformancebyTurnOver'),
+(24, N'Performance by Licensing Fee', N'Performance by Licensing Fee', 21, N'Performance', N'/Performance/PerformanceByFee', CAST(0x0000A2DC00000000 AS DateTime), CAST(0x0000A3C50018ED41 AS DateTime), 13, 1, 1, N'LicenseePerformancebyLicensingFee'),
+(25, N'Performance by Margin', N'Performance by Margin', 21, N'Performance', N'/Performance/PerformanceByMargin', CAST(0x0000A33200000000 AS DateTime), CAST(0x0000A3C50018F997 AS DateTime), 14, 1, 1, N'LicenseePerformancebyMargin'),
+(31, N'Licensee Performance in Details', N'Licensee Performance in Details', 21, N'Performance', N'/Performance/LicenseePerformanceDetail', CAST(0x0000A3C5000D89AA AS DateTime), CAST(0x0000A3C5000D89AA AS DateTime), 20, 1, 1, N'LicenseePerformanceDetail')
+
+
+SET IDENTITY_INSERT [dbo].[LA_Function] OFF
 --Group
 ---Insert data LA_Group
 TRUNCATE Table dbo.LA_Group
