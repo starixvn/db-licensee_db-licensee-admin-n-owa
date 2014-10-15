@@ -12,7 +12,7 @@ SELECT 3,'User_Normal','2EFDBED0E7BA3D48A017087FEDD3A6C74D262920','User Normal',
 TRUNCATE TABLE LA_Function
 SET IDENTITY_INSERT [dbo].[LA_Function] ON 
 GO
-INSERT [dbo].[LA_Function] ([FunctionID], [FunctionName], [FunctionDesc], [ParentID], [ParentName], [URL], [CreatedDate], [ModifiedDate], [DisplayOrder], [Creator], [StatusID], [FunctionKey]) 
+INSERT LA_Function (FunctionID, FunctionName, FunctionDesc, ParentID, ParentName, URL, CreatedDate, ModifiedDate, DisplayOrder, Creator, StatusID, FunctionKey) 
 VALUES (1, N'Administration', N'Administration', 0, N'None', N'', CAST(0x00009F7A01210128 AS DateTime), CAST(0x0000A38B00DA74B2 AS DateTime), 10, 1, 1, N'Administration'),
 (2, N'Manage Group', N'Manage Group', 1, N'Administration', N'/Group/ManageGroup', CAST(0x00009F5C00000000 AS DateTime), CAST(0x00009F5C00000000 AS DateTime), 10, 1, 0, N'ManageGroup'),
 (3, N'Manage User', N'Manage User', 1, N'Administration', N'/User/ManageUser', CAST(0x00009F5C00000000 AS DateTime), CAST(0x00009F5C00000000 AS DateTime), 20, 1, 1, N'ManageUser'),
@@ -94,7 +94,7 @@ WHERE FunctionName in (SELECT val FROM dbo.strSplit (@strPer,',')))
 
 --Insert to OA_UserParty
 DELETE LA_UserParty
-DECLARE @strPer Nvarchar(2000)='',@UserID INT
+SET @strPer =''
 --User_IT
 SELECT @UserID = UserID FROM LA_User where Username ='User_IT'
 INSERT INTO LA_UserParty( UserID,PartyID,Modifydate,Modifier,StatusID)
@@ -152,33 +152,3 @@ SELECT Functionid
   FROM Oa_Functionlicensees Fl INNER JOIN Oas_Party P ON Fl.Licenseeid = P.Oldrefid
                                                      AND P.Partytype = 1
 GROUP BY Functionid, P.Partyid
-/*
---Rebate
-DECLARE @HAIFA_ID INT
-SELECT @HAIFA_ID = LicenseeID FROM bodb_licensee.dbo.licensees WHERE LicenseeName = 'HAIFA'
-INSERT INTO dbo.LA_LicenseeFeeRebate(LicenseeID,FromFee,ToFee,Rate,CurrencyRebate,FromDate,ToDate)
-VALUES 
-(@HAIFA_ID,NULL,3000000,0,13,NULL,NULL),
-(@HAIFA_ID,3000001,5000000,0.05,13,NULL,NULL),
-(@HAIFA_ID,5000001,8000000,0.010,13,NULL,NULL),
-(@HAIFA_ID,8000001,10000000,0.14,13,NULL,NULL),
-(@HAIFA_ID,10000001,12000000,0.18,13,NULL,NULL),
-(@HAIFA_ID,12000001,14000000,0.22,13,NULL,NULL),
-(@HAIFA_ID,14000001,16000000,0.26,13,NULL,NULL),
-(@HAIFA_ID,16000001,18000000,0.30,13,NULL,NULL),
-(@HAIFA_ID,18000001,20000000,0.34,13,NULL,NULL),
-(@HAIFA_ID,20000001,NULL,0.40,13,NULL,NULL)
-
-INSERT INTO dbo.LA_LicenseeFeeRebate(LicenseeID,FromFee,ToFee,Rate,CurrencyRebate,FromDate,ToDate)
-VALUES 
-(0,NULL,350000,0,6,NULL,NULL),
-(0,350001,650000,0.05,6,NULL,NULL),
-(0,650001,950000,0.010,6,NULL,NULL),
-(0,950001,1250000,0.14,6,NULL,NULL),
-(0,1250001,1500000,0.18,6,NULL,NULL),
-(0,1500001,1750000,0.22,6,NULL,NULL),
-(0,1750001,2000000,0.26,6,NULL,NULL),
-(0,2000001,2250000,0.30,6,NULL,NULL),
-(0,2250001,2500000,0.34,6,NULL,NULL),
-(0,2500001,NULL,0.40,6,NULL,NULL)
-*/
