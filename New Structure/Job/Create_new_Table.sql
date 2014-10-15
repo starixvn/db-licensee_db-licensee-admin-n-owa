@@ -23,6 +23,7 @@ CREATE UNIQUE CLUSTERED Index CIX_LA_User ON LA_User
 
 GO 
 GRANT SELECT ON dbo.LA_User TO bodbLicenseeNet AS dbo
+GRANT SELECT ON dbo.LA_OnUser TO bodbAdminNet AS dbo
 GRANT VIEW DEFINITION ON dbo.LA_User TO vnteam AS dbo
 GO
 --2 LA_UserFunction
@@ -42,6 +43,7 @@ CREATE UNIQUE CLUSTERED Index CIX_LA_UserFunction ON LA_UserFunction
 (UserID,FunctionID);
 GO
 GRANT SELECT ON dbo.LA_UserFunction TO bodbLicenseeNet AS dbo
+GRANT SELECT ON dbo.LA_OnUser TO bodbAdminNet AS dbo
 GRANT VIEW DEFINITION ON dbo.LA_UserFunction TO vnteam AS dbo
 GO
 --3 LA_UserParty
@@ -62,6 +64,7 @@ CREATE UNIQUE CLUSTERED Index CIX_LA_UserParty ON LA_UserParty
 
 GO 
 GRANT SELECT ON dbo.LA_UserParty TO bodbLicenseeNet AS dbo
+GRANT SELECT ON dbo.LA_OnUser TO bodbAdminNet AS dbo
 GRANT VIEW DEFINITION ON dbo.LA_UserParty TO vnteam AS dbo
 GO
 /*
@@ -105,6 +108,7 @@ CREATE UNIQUE CLUSTERED Index CIX_LA_Group ON LA_Group
 (GroupID);
 GO
 GRANT SELECT ON dbo.LA_Group TO bodbLicenseeNet AS dbo
+GRANT SELECT ON dbo.LA_OnUser TO bodbAdminNet AS dbo
 GRANT VIEW DEFINITION ON dbo.LA_Group TO vnteam AS dbo
 GO
 
@@ -121,6 +125,7 @@ CREATE UNIQUE CLUSTERED Index CIX_LA_GroupFunction ON LA_GroupFunction
 (GroupID,FunctionID);
 GO
 GRANT SELECT ON dbo.LA_GroupFunction TO bodbLicenseeNet AS dbo
+GRANT SELECT ON dbo.LA_OnUser TO bodbAdminNet AS dbo
 GRANT VIEW DEFINITION ON dbo.LA_GroupFunction TO vnteam AS dbo
 GO
 /*
@@ -164,6 +169,7 @@ CREATE UNIQUE CLUSTERED Index CIX_LA_Function ON LA_Function
 (FunctionID);
 GO 
 GRANT SELECT ON dbo.LA_Function TO bodbLicenseeNet AS dbo
+GRANT SELECT ON dbo.LA_OnUser TO bodbAdminNet AS dbo
 GRANT VIEW DEFINITION ON dbo.LA_Function TO vnteam AS dbo
 GO
 
@@ -181,6 +187,7 @@ CREATE UNIQUE CLUSTERED Index CIX_LA_FunctionParty ON LA_FunctionParty
 (FunctionID,PartyID);
 GO 
 GRANT SELECT ON dbo.LA_FunctionParty TO bodbLicenseeNet AS dbo
+GRANT SELECT ON dbo.LA_OnUser TO bodbAdminNet AS dbo
 GRANT VIEW DEFINITION ON dbo.LA_FunctionParty TO vnteam AS dbo
 GO
 
@@ -200,6 +207,7 @@ ON OWA_data
 GO
 
 GRANT SELECT ON dbo.LA_OnUser TO bodbLicenseeNet AS dbo
+GRANT SELECT ON dbo.LA_OnUser TO bodbAdminNet AS dbo
 GRANT VIEW DEFINITION ON dbo.LA_OnUser TO vnteam AS dbo
 GO
 
