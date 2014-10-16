@@ -559,8 +559,7 @@ GROUP BY --w.LicenseeID
 	t.PartyID
 	,l.LicenseeName
 	,w.ReportType
-ORDER BY l.LicenseeName
-	,ReportType
+ORDER BY ReportType ASC,l.LicenseeName	
 
 DROP TABLE #WinLoss
 DROP TABLE #Exchange

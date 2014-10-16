@@ -219,7 +219,7 @@ GROUP BY
 		     ELSE p.PartyName 
 		END
 ORDER BY
-     CONVERT(Varchar(6),re.winlostdate,112) DESC,
+     CONVERT(Varchar(6),re.winlostdate,112) ASC,
 	CASE WHEN p.PartyName='IBC' THEN 'FDL'
 		     WHEN p.PartyName='18bb' THEN 'PIH'
 		     ELSE p.PartyName 

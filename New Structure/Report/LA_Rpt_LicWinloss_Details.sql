@@ -411,7 +411,7 @@ BEGIN
 				THEN @VNDCurrencyName
 			ELSE e.Code
 			END
-	ORDER BY ReportType
+	ORDER BY ReportType ASC
 
 	DROP TABLE #SAgWinLoss
 	DROP TABLE #TempExchange
