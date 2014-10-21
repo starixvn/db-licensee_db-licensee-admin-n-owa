@@ -19,7 +19,7 @@ AS
  * Task  : Get all licensees (compatible with the new structure) for Sportbook Winloss report 
  * DB   : DB052.bodb_Licensee  
  * Revisions :  
- 	
+ 	- 20141020@Florent: fix get only ONEWorks's Licensee and group all Boping's licensee to only row Boping
  * Param's Explanation:    
  * 
  */  
@@ -44,7 +44,7 @@ BEGIN
 	LEFT JOIN dbo.LicenseeReseller lr WITH (NOLOCK) ON p.OldRefID=lr.LicenseeID
 			LEFT JOIN dbo.Resellers r WITH (NOLOCK) ON lr.ResellerID=r.ResellerID
 	WHERE ci.ChargeType = 1
-		  AND ci.ProductID = 0 AND p.PartyType = 1
+		  AND ci.ProductID = 0 AND p.PartyType = 1AND p1.PartyName !='Boping'
 	ORDER BY CASE 
 			 WHEN p.PartyName='IBC' THEN r.ResellerName
 			 WHEN p.PartyName='18bb' THEN r.ResellerName
