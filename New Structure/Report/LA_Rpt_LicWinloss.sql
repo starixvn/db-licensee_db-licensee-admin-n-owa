@@ -25,7 +25,7 @@ AS
      DB: DB052.bodb02  
    
      Revisions:  
-	
+	   - 20141021@Florent: get data from credit's licensee
 	Param's Explanation:  
 	  + @PartyIDs	: a string of list PartyID, separate by ','
 	  + @Currency	:  0- All Currencies
@@ -47,7 +47,7 @@ BEGIN
 
 	----DECLARE  	
 	CREATE TABLE #WinLoss (
-		LicenseeID INT
+		PartyID INT
 		,ReportType VARCHAR(6)
 		,TurnOver MONEY
 		,Winlost MONEY
@@ -93,7 +93,7 @@ BEGIN
 		)
 
 	CREATE TABLE #Temp (
-		LicenseeID INT
+		PartyID INT
 		,ReportType INT
 		,Currency INT
 		,TurnOver MONEY
@@ -168,17 +168,16 @@ BEGIN
 		END
 	END
 
-	DECLARE @tmpParty TABLE (
-		PartyID INT
-		,LicenseeID INT
-		,ParentID INT
-		,ParentName VARCHAR(100)
+	CREATE TABLE #tmpParty (
+		PartyID	    INT
+		,LicenseeID   INT
+		,isDeposit    INT
 		,AffectedDate DATETIME
-		,Fromdate DATETIME
-		,Todate DATETIME
+		,Fromdate	    DATETIME
+		,Todate	    DATETIME
 		)
 
-	/*
+    /*
     CREATE table #PartyList
     (
 	   PartyID INT,
@@ -187,16 +186,18 @@ BEGIN
     )
     INSERT INTO #PartyList
     EXEC bodb_licensee.dbo.LA_PartyListSel
-*/
-	INSERT INTO @tmpParty (
+    */
+	INSERT INTO #tmpParty (
 		PartyID
 		,LicenseeID
+		,isDeposit
 		,AffectedDate
 		,Fromdate
 		,Todate
 		)
 	SELECT p.PartyID
-		,l.LicenseeID
+		,CASE WHEN ISNULL(pd.IsDeposit,0) = 1 THEN l.LicenseeID ELSE lb.LabelID END AS LicenseeID	
+		,pd.IsDeposit
 		,l.AffectedDate
 		,@FromDate
 		,@ToDate
@@ -204,6 +205,7 @@ BEGIN
 	INNER JOIN bodb_licensee.dbo.Licensees l(NOLOCK) ON p.OldRefID = l.LicenseeID
 		AND p.PartyType = 1
 	LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
+	LEFT JOIN bodb_Licensee.dbo.labels lb (NOLOCK) ON l.LicenseeID = lb.LicenseeID 
 	WHERE p.PartyID IN (
 			SELECT VAL
 			FROM strSplit(@PartyIDs, ',')
@@ -213,26 +215,21 @@ BEGIN
 			OR pd.IsDeposit = 0
 			)
 
-	DECLARE @_FromDate SMALLDATETIME
-		,@_ToDate SMALLDATETIME
 
 	IF (
-			EXISTS (
-				SELECT TOP 1 1
-				FROM @tmpParty
-				WHERE AffectedDate > Fromdate
-				)
-			AND @excludeTest = 1
-			)
+	   EXISTS (
+		  SELECT TOP 1 1
+		  FROM #tmpParty
+		  WHERE AffectedDate > Fromdate
+		  )
+	   AND @excludeTest = 1
+	   )
 	BEGIN
-		UPDATE @tmpParty
+		UPDATE #tmpParty
 		SET Fromdate = AffectedDate
 		WHERE AffectedDate > Fromdate
 	END
-
-	SELECT @_FromDate = @FromDate
-		,@_ToDate = @ToDate
-
+		
 	CREATE TABLE #Exchange (
 		ExchangeDate INT
 		,ExchangeId INT
@@ -257,16 +254,13 @@ BEGIN
 		,USD
 		,EUR
 		,MYR
-	FROM Lrf_f_GetExchangeDaily(@_FromDate, @_ToDate)
-	WHERE exchangeid IN (SELECT DISTINCT Currency FROM bodb_Licensee.dbo.LicenseeCust lc WITH (NOLOCK) WHERE 
-		lc.LicenseeID IN (SELECT LicenseeID FROM  @tmpParty))	
-	AND (@Currency = 0
-		OR ExchangeId = @Currency)
+	FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
 
+    
 	IF CHARINDEX('BA', @ProductCodes) <> 0
 	BEGIN
 		INSERT INTO #Temp (
-			LicenseeID
+			PartyID
 			,ReportType
 			,Currency
 			,TurnOver
@@ -281,7 +275,7 @@ BEGIN
 			,Playercomm
 			,Betcount
 			)
-		SELECT b.siteID
+		SELECT p.PartyID
 			,CONVERT(VARCHAR(6), b.rptDate, 112) ReportType
 			,b.currencyID
 			,SUM(b.turnover * CASE 
@@ -311,7 +305,7 @@ BEGIN
 				ELSE 1
 				END BetCount
 		FROM bodb_Licensee.dbo.rpt_Betting_BA b WITH (NOLOCK)
-		INNER JOIN @tmpParty p ON b.SiteID = p.LicenseeID
+		INNER JOIN #tmpParty p ON b.SiteID = p.LicenseeID
 		INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
 		LEFT JOIN dbo.League l(NOLOCK) ON b.leagueid = l.leagueid
 		WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate
@@ -337,7 +331,7 @@ BEGIN
 					AND b.CurrencyID <> 20
 					)
 				)
-		GROUP BY b.siteID
+		GROUP BY p.PartyID
 			,CONVERT(VARCHAR(6), b.rptDate, 112)
 			,STATUS
 			,currencyID
@@ -346,7 +340,7 @@ BEGIN
 	IF (REPLACE(@ProductCodes, 'BA', '') != '' AND REPLACE(@ProductCodes, 'BA', '') != ',')
 	BEGIN
 		INSERT INTO #Temp (
-			LicenseeID
+			PartyID
 			,ReportType
 			,Currency
 			,TurnOver
@@ -361,7 +355,7 @@ BEGIN
 			,Playercomm
 			,Betcount
 			)
-		SELECT b.siteID
+		SELECT p.PartyID
 			,CONVERT(VARCHAR(6), b.rptDate, 112) ReportType
 			,b.currencyID
 			,SUM(b.turnover * CASE 
@@ -415,11 +409,8 @@ BEGIN
 					THEN 0
 				ELSE 1
 				END BetCount
-		FROM bodb_Licensee.dbo.rpt_Betting b WITH (
-				NOLOCK
-				,INDEX = IX_Sport
-				)
-		INNER JOIN @tmpParty p ON p.LicenseeID = b.SiteID
+		FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK)
+		INNER JOIN #tmpParty p ON p.LicenseeID = b.SiteID
 		INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
 		LEFT JOIN dbo.League l(NOLOCK) ON b.leagueid = l.leagueid
 		WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate
@@ -446,14 +437,15 @@ BEGIN
 					AND b.CurrencyID <> 20
 					)
 				)
-		GROUP BY b.siteID
+			 AND b.customercategory NOT IN (27,28)
+		GROUP BY p.PartyID
 			,CONVERT(VARCHAR(6), b.rptDate, 112)
 			,b.STATUS
 			,b.currencyID
 	END
-
+	
 	INSERT INTO #WinLoss
-	SELECT LicenseeID
+	SELECT b.PartyID
 		,ReportType
 		,TurnOver
 		,Winlost
@@ -502,8 +494,12 @@ BEGIN
 END
 
 SELECT --w.LicenseeID 
-	t.PartyID
-	,l.LicenseeName AS PartyName
+	w.PartyID
+	,CASE p.PartyName
+	   WHEN '18bb' THEN 'PIH'
+	   WHEN 'IBC'	THEN 'FDL'
+	   ELSE p.PartyName
+	 END AS PartyName
 	,w.ReportType
 	,SUM(TurnOver) AS Turnover
 	,SUM(Winlost) AS Winlost
@@ -553,18 +549,18 @@ SELECT --w.LicenseeID
 	,SUM(CompanyEUR) AS CompanyEUR
 	,SUM(PlayercommEUR) AS PlayercommEUR
 FROM #WinLoss w
-INNER JOIN bodb_Licensee.dbo.Licensees l(NOLOCK) ON l.LicenseeID = w.LicenseeID
-LEFT JOIN @tmpParty t ON w.LicenseeID = t.LicenseeID
+INNER JOIN bodb_Licensee.dbo.OAS_Party p (NOLOCK) ON p.PartyID = w.PartyID
 GROUP BY --w.LicenseeID
-	t.PartyID
-	,l.LicenseeName
+	w.PartyID
+	,p.PartyName
 	,w.ReportType
-ORDER BY ReportType ASC,l.LicenseeName	
+ORDER BY ReportType ASC,p.PartyName
 
 DROP TABLE #WinLoss
 DROP TABLE #Exchange
 DROP TABLE #Temp
 DROP TABLE #Bettype
+DROP TABLE #tmpParty
 
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicWinloss] TO [vnteam] 
