@@ -7,11 +7,11 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[OAS_Rpt_AGCasinoWinloss] 
-	 @PartyIDs VARCHAR(1000)
-	,@Currency INT = 0
-	,@FromDate SMALLDATETIME
-	,@ToDate SMALLDATETIME
-	,@drawfilter SMALLINT = 1
+	 @PartyIDs 		VARCHAR(1000)
+	,@Currency 		INT 			= 0
+	,@FromDate 		SMALLDATETIME
+	,@ToDate 			SMALLDATETIME
+	,@drawfilter 		SMALLINT 		= 1
 AS
 /*  
     Created: Florent.Nguyen
@@ -19,7 +19,7 @@ AS
     Task : AG Win Loss report 
     DB: DBACC.bodb02  
     Revisions:  
-		
+		- 20141031@Florent: Apply new Structure Using SystemMapping
 	Param's Explanation:  
 */
 /*

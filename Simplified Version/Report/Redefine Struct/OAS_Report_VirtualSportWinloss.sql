@@ -1,6 +1,5 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[OAS_Report_VirtualSportWinloss_xtest]    Script Date: 07/11/2014 10:25:46 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -18,6 +17,7 @@ AS
 /*  
  * Created by : 20131219@Francis 
  * Task  : Get Winloss report for Virtual Sports (compatible with the new structure)
+ * Base : OAS_Report_VirtualSportWinloss_NewStruct
  * DB   : DB052.bodb02
  * Revisions :  
 	- 20140331@Florent: Aplly new report template

@@ -1,17 +1,16 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[OAS_Report_NumberGameWinloss_xtest]    Script Date: 07/11/2014 10:24:28 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[OAS_Report_NumberGameWinloss] 
-	 @PartyID INT
-	,@Currency INT = 0
-	,@drawfilter SMALLINT = 0
-	,@FromDate SMALLDATETIME
-	,@ToDate SMALLDATETIME
+	 @PartyID		INT
+	,@Currency	INT			 = 0
+	,@drawfilter	SMALLINT		 = 0
+	,@FromDate	SMALLDATETIME
+	,@ToDate		SMALLDATETIME
 AS
 /*  
  * Created by : 20131213@Francis 

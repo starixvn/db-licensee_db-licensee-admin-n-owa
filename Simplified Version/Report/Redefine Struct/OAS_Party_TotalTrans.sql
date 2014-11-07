@@ -8,9 +8,9 @@ GO
 
 /****** Object:  Stored Procedure dbo.OAS_Party_TotalTrans    Script Date: 12/31/2013 10:38:18  ******/
 ALTER PROCEDURE [dbo].[OAS_Party_TotalTrans] 
-	 @FromDate SMALLDATETIME
-	,@ToDate SMALLDATETIME
-	,@ExcludeTest BIT = 1
+	 @FromDate 	SMALLDATETIME
+	,@ToDate 		SMALLDATETIME
+	,@ExcludeTest 	BIT 			= 1
 AS
 /*  
  * Created by : 20131126@Francis 
@@ -32,7 +32,7 @@ BEGIN
 		,p.PartyName AS PartyName
 		,ci.ParentChargeID
 	FROM dbo.OAS_ChargeInfo ci WITH (NOLOCK)
-	     INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON ci.FromParty = p.PartyID
+	    INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON ci.FromParty = p.PartyID
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 4
 		LEFT JOIN dbo.LA_ChargeInfo_MinFee cm WITH (NOLOCK) ON ci.ChargeID = cm.ChargeID
 	WHERE (

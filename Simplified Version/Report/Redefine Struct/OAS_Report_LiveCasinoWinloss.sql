@@ -7,12 +7,12 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[OAS_Report_LiveCasinoWinloss] 
-      @Partyid INT
-	,@GameType INT = 0
-	,@Currency INT = 0
-	,@drawfilter SMALLINT = 0
-	,@FromDate SMALLDATETIME
-	,@ToDate SMALLDATETIME
+     @Partyid 		INT
+	,@GameType 	INT 			 = 0
+	,@Currency 	INT 			 = 0
+	,@drawfilter 	SMALLINT 		 = 0
+	,@FromDate	SMALLDATETIME
+	,@ToDate		SMALLDATETIME
 AS
 /*  
  * Created by : 20131219@Francis 

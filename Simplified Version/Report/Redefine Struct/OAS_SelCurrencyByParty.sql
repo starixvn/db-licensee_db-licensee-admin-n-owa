@@ -9,8 +9,8 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[OAS_SelCurrencyByParty] 
-	 @PartyID INT = 0
-	,@excludeTest BIT = 0
+	 @PartyID 	INT = 0
+	,@excludeTest 	BIT = 0
 AS
 /*
 Created: 20140328@Florent
@@ -58,7 +58,7 @@ BEGIN
 			ELSE e.Code
 			END AS CurrencyName
 	FROM @temp t
-	INNER JOIN exchange e WITH (NOLOCK) ON t.currency = e.exchangeid
+	INNER JOIN dbo.exchange e WITH (NOLOCK) ON t.currency = e.exchangeid
 	ORDER BY CASE 
 			WHEN t.currency = 20
 				THEN 'UUS'

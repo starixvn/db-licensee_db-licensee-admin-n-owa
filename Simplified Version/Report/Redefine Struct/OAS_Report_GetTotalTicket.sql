@@ -7,12 +7,12 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[OAS_Report_GetTotalTicket] 
-      @NormalLicensee VARCHAR(1000)
-	,@Operator VARCHAR(1000)
-	,@FromDate SMALLDATETIME
-	,@ToDate SMALLDATETIME
-	,@SportID INT = 0
-	,@GroupBy TINYINT = 2
+     @NormalLicensee 	VARCHAR(1000)
+	,@Operator 		VARCHAR(1000)
+	,@FromDate 		SMALLDATETIME
+	,@ToDate 			SMALLDATETIME
+	,@SportID 		INT 			= 0
+	,@GroupBy 		TINYINT 		= 2
 AS
 /*  
  * Created by : 20131203@Francis 

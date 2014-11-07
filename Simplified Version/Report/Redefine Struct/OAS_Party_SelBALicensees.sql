@@ -25,9 +25,9 @@ BEGIN
 
 	SELECT DISTINCT ci.FromParty AS PartyID
 	,p.PartyName AS PartyName
-    FROM dbo.OAS_ChargeInfo ci(NOLOCK)
-	   INNER JOIN dbo.OAS_Party p(NOLOCK) ON ci.FromParty = p.PartyID
-	   INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs(NOLOCK) ON ci.ChargeID = cs.ChargeID and cs.SystemID = 4
+    FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
+	   INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON ci.FromParty = p.PartyID
+	   INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH(NOLOCK) ON ci.ChargeID = cs.ChargeID and cs.SystemID = 4
     WHERE ci.ChargeType = 1
 	    AND ci.ProductID = 3
 	    AND (
@@ -45,10 +45,5 @@ BEGIN
 
 END
 GO
-GRANT VIEW DEFINITION
-	ON [dbo].[OAS_Party_SelBALicensees]
-	TO [vnteam]
-
-GRANT EXECUTE
-	ON [dbo].[OAS_Party_SelBALicensees]
-	TO bodbAdminNet
+GRANT VIEW DEFINITION ON [dbo].[OAS_Party_SelBALicensees]TO [vnteam]
+GRANT EXECUTE ON [dbo].[OAS_Party_SelBALicensees]TO bodbAdminNet

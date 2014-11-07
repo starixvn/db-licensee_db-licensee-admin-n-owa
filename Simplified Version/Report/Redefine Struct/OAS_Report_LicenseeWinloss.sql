@@ -7,15 +7,15 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROC [dbo].[OAS_Report_LicenseeWinloss] 
-	 @PartyID INT
-	,@Currency INT = 0
-	,@FromDate SMALLDATETIME
-	,@ToDate SMALLDATETIME
-	,@ReportType TINYINT = 2
-	,@MoveBetsDay SMALLDATETIME
-	,@IsOld BIT = 0
-	,@drawfilter SMALLINT = 0
-	,@excludeTest BIT = 1
+	 @PartyID 	INT
+	,@Currency 	INT 			= 0
+	,@FromDate 	SMALLDATETIME
+	,@ToDate 		SMALLDATETIME
+	,@ReportType 	TINYINT 		= 2
+	,@MoveBetsDay 	SMALLDATETIME
+	,@IsOld 		BIT 			= 0
+	,@drawfilter 	SMALLINT 		= 0
+	,@excludeTest 	BIT 			= 1
 AS
 /*  
  * Created by : 20131223@Francis 
