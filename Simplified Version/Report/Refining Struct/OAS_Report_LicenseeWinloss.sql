@@ -174,7 +174,7 @@ BEGIN
 				SELECT custid
 				FROM @tmpAg
 				)*/
-			AND (Bettype < 31  OR (Bettype BETWEEN 121 AND 999)) 
+			AND (Bettype < 31  OR (Bettype BETWEEN 121 AND 999) OR (Bettype BETWEEN 1301 AND 1399)) 
 			AND b.ruben = 1
 			AND b.statusID NOT IN (101, 102, 103)
 			AND tpositiontaking <> 0

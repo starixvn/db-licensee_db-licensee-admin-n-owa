@@ -89,6 +89,7 @@ BEGIN
 			AND (
 				b.bettype < 31
 				OR b.bettype BETWEEN 121 AND 999
+				OR b.bettype BETWEEN 1301 AND 1399
 				)
 			AND b.bettype NOT IN (9, 29)
 			AND l.Sporttype = convert(VARCHAR(10), @SportID)
@@ -132,6 +133,7 @@ BEGIN
 			AND (
 				b.bettype < 31
 				OR b.bettype BETWEEN 121 AND 999
+				OR b.bettype BETWEEN 1301 AND 1399
 				)
 		GROUP BY b.rptDate
 			,b.SiteID
