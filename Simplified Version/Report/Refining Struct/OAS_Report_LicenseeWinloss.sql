@@ -22,9 +22,10 @@ AS
  * Task  : Get Winloss report for Sportbook (compatible with the new structure)
  * DB   : DB052.bodb02
  * Revisions :  
-	-20140327@Florent: remove paging
-	-20140410@Francis: Fix showing data out of time-range bug
-	-20140410@Francis: Alter @drawfilter param's value to 0,1,2
+	- 20140327@Florent: remove paging
+	- 20140410@Francis: Fix showing data out of time-range bug
+	- 20140410@Francis: Alter @drawfilter param's value to 0,1,2
+	- 20141105@Florent: Apply new struct support multi-System
  * 
  * Param's Explanation:    
  *  - @ID   : Party ID  (include: LicenseeID, ResellerID)
@@ -173,8 +174,7 @@ BEGIN
 				SELECT custid
 				FROM @tmpAg
 				)*/
-			AND (Bettype < 31  OR (Bettype BETWEEN 121 AND 999)
-						    OR (Bettype BETWEEN 1301 AND 1399)) 
+			AND (Bettype < 31  OR (Bettype BETWEEN 121 AND 999)) 
 			AND b.ruben = 1
 			AND b.statusID NOT IN (101, 102, 103)
 			AND tpositiontaking <> 0
