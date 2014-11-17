@@ -1,18 +1,18 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[OAS_Report_LiveCasinoWinloss_xtest]    Script Date: 07/11/2014 10:26:54 AM ******/
+/****** Object:  StoredProcedure [dbo].[OAS_Report_LiveCasinoWinloss]    Script Date: 17/11/2014 11:21:21 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[OAS_Report_LiveCasinoWinloss] 
-     @Partyid 		INT
-	,@GameType 	INT 			 = 0
-	,@Currency 	INT 			 = 0
-	,@drawfilter 	SMALLINT 		 = 0
-	,@FromDate	SMALLDATETIME
-	,@ToDate		SMALLDATETIME
+      @Partyid INT
+	,@GameType INT = 0
+	,@Currency INT = 0
+	,@drawfilter SMALLINT = 0
+	,@FromDate SMALLDATETIME
+	,@ToDate SMALLDATETIME
 AS
 /*  
  * Created by : 20131219@Francis 
@@ -24,6 +24,7 @@ AS
 	- 20140416@Florent: Change condition of time range 
 	- 20140410@Francis: Alter @drawfilter param's value to 0,1,2
  	- 20141103@Florent: Fix formula for OW revenue, use new structure (#25393)
+	- 20141117@Florent: remove Comm
  * Param's Explanation:    
  *  
  *  
@@ -46,7 +47,6 @@ BEGIN
 		,ToPartyID	   INT
 		,TurnOver		   MONEY
 		,MemberWinloss	   MONEY
-		,Comm		   MONEY
 		,Betcount		   INT
 		)
 
@@ -107,7 +107,7 @@ BEGIN
 				ELSE @ToDate
 				END
 			,p.OldRefID
-		FROM bodb_licensee.dbo.OAS_ChargeInfo ci(NOLOCK)
+		FROM bodb_licensee.dbo.OAS_ChargeInfo_xtest ci(NOLOCK)
 		INNER JOIN bodb_Licensee.dbo.OAS_Party p(NOLOCK) ON ci.FromParty = p.PartyID
 		INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID 
 		WHERE (
@@ -141,7 +141,7 @@ BEGIN
 				ELSE @ToDate
 				END
 			,p.OldRefID
-		FROM bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK)
+		FROM bodb_licensee.dbo.OAS_ChargeInfo_xtest ci WITH (NOLOCK)
 		INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON ci.FromParty = p.PartyID
 		INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID 
 		WHERE (
@@ -175,7 +175,6 @@ BEGIN
 			,ToPartyID
 			,TurnOver
 			,MemberWinloss
-			,Comm
 			,Betcount
 			)
 		SELECT b.rptDate
@@ -197,7 +196,6 @@ BEGIN
 					ELSE 1
 					END)		 AS TurnOver
 			,SUM(b.Winloss)	 AS MemberWinloss
-			,SUM(b.CommissionA)	 AS Comm
 			,SUM(BetCount * CASE 
 					WHEN @drawfilter = 1
 						THEN CASE 
@@ -253,7 +251,6 @@ BEGIN
 			,ToPartyID
 			,TurnOver
 			,MemberWinloss
-			,Comm
 			,Betcount
 			)
 		SELECT b.rptDate
@@ -275,7 +272,6 @@ BEGIN
 					ELSE 1
 					END)		 AS TurnOver
 			,SUM(b.Winloss)	 AS MemberWinloss
-			,SUM(b.CommissionA)	 AS Comm
 			,SUM(BetCount * CASE 
 					WHEN @drawfilter = 1
 						THEN CASE 
@@ -405,21 +401,21 @@ BEGIN
 								AND OW.Rate IS NOT NULL
 								THEN isnull(DI.Rate, 0) * isnull(STAR.Rate, 0)
 							ELSE isnull(STAR.Rate, 0)
-							END + ISNULL(d.Comm,0) ), 0) AS MONEY) AS OneworksRevenue
+							END ), 0) AS MONEY) AS OneworksRevenue
 			,isnull(DI.Rate, 0) AS DistributorsChargeRate
 			,isnull(STAR.Rate, 0) AS StarExpressChargeRate
 			,isnull(OW.Rate, 0) AS OneworksChargeRate
 			,Currency
 			,winlostdate
 		FROM #Data d
-		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo DI ON d.ToPartyID = DI.ToParty
+		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo_xtest DI ON d.ToPartyID = DI.ToParty
 			AND d.FromPartyID = DI.FromParty
 			AND DI.ProductID = 4
 			AND d.winlostdate BETWEEN DI.FromDate AND DI.ToDate
 			AND DI.ChargeType = 1
 	     INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON DI.ChargeID = cs.ChargeID AND cs.SystemID = 4
-		LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo STAR ON DI.ParentChargeID = STAR.ChargeID
-		LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo OW ON STAR.ParentChargeID = OW.ChargeID
+		LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo_xtest STAR ON DI.ParentChargeID = STAR.ChargeID
+		LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo_xtest OW ON STAR.ParentChargeID = OW.ChargeID
 		GROUP BY d.ToPartyID
 			,d.FromPartyID
 			,DI.Rate
@@ -457,7 +453,7 @@ BEGIN
 			,
 			--Star Express' Revenue now equals 0
 			CAST(0 AS MONEY) AS StarExpressRevenue
-			,CAST(isnull(SUM(- 1 * d.MemberWinloss * isnull(OW.Rate, DI.Rate) + ISNULL(d.Comm,0)), 0) AS MONEY) AS OneworksRevenue
+			,CAST(isnull(SUM(- 1 * d.MemberWinloss * isnull(OW.Rate, DI.Rate) ), 0) AS MONEY) AS OneworksRevenue
 			,isnull(DI.Rate, 0) AS DistributorsChargeRate
 			,
 			--Star Express' ChargeRate now equals 0
@@ -466,13 +462,13 @@ BEGIN
 			,Currency
 			,winlostdate
 		FROM #Data d
-		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo DI ON d.ToPartyID = DI.ToParty
+		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo_xtest DI ON d.ToPartyID = DI.ToParty
 			AND d.FromPartyID = DI.FromParty
 			AND DI.ProductID = 4
 			AND d.winlostdate BETWEEN DI.FromDate AND DI.ToDate
 			AND DI.ChargeType = 1
 	     INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON DI.ChargeID = cs.ChargeID AND cs.SystemID = 4
-		LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo OW ON DI.ParentChargeID = OW.ChargeID
+		LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo_xtest OW ON DI.ParentChargeID = OW.ChargeID
 		GROUP BY d.ToPartyID
 			,d.FromPartyID
 			,DI.Rate
@@ -632,6 +628,7 @@ BEGIN
 	DROP TABLE #Exchange
 	DROP TABLE #Exchange1
 END
+
 GO
 GRANT VIEW DEFINITION ON [dbo].[OAS_Report_LiveCasinoWinloss] TO [vnteam] 
 GRANT EXECUTE ON [dbo].[OAS_Report_LiveCasinoWinloss] TO bodbAdminNet 

@@ -1,5 +1,6 @@
 USE [bodb02]
 GO
+/****** Object:  StoredProcedure [dbo].[OAS_Report_VirtualSportWinloss]    Script Date: 17/11/2014 11:22:30 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -17,13 +18,13 @@ AS
 /*  
  * Created by : 20131219@Francis 
  * Task  : Get Winloss report for Virtual Sports (compatible with the new structure)
- * Base : OAS_Report_VirtualSportWinloss_NewStruct
  * DB   : DB052.bodb02
  * Revisions :  
 	- 20140331@Florent: Aplly new report template
 	- 20140416@Florent: Change condition of time range 
 	- 20140410@Francis: Alter @drawfilter param's value to 0,1,2
  	- 20141103@Florent: Fix formula for OW revenue, use new structure (#25393)
+	- 20141117@Florent: remove comm
  * Param's Explanation:    
  *  
  *  
@@ -47,7 +48,6 @@ BEGIN
 		,ToPartyID	   INT
 		,TurnOver		   MONEY
 		,MemberWinloss	   MONEY
-		,Comm 		   MONEY
 		,Betcount		   INT
 		)
 
@@ -121,7 +121,7 @@ BEGIN
 				ELSE @ToDate
 				END
 			,p.OldRefID
-		FROM bodb_licensee.dbo.OAS_ChargeInfo ci(NOLOCK)
+		FROM bodb_licensee.dbo.OAS_ChargeInfo_xtest ci(NOLOCK)
 		INNER JOIN bodb_Licensee.dbo.OAS_Party p(NOLOCK) ON ci.FromParty = p.PartyID
 		INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID
 		WHERE (
@@ -155,7 +155,7 @@ BEGIN
 				ELSE @ToDate
 				END
 			,p.OldRefID
-		FROM bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK)
+		FROM bodb_licensee.dbo.OAS_ChargeInfo_xtest ci WITH (NOLOCK)
 		INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON ci.FromParty = p.PartyID
 		INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID
 		WHERE (
@@ -188,7 +188,6 @@ BEGIN
 			,ToPartyID
 			,TurnOver
 			,MemberWinloss
-			,Comm
 			,Betcount
 			)
 		SELECT b.rptDate
@@ -210,7 +209,6 @@ BEGIN
 					ELSE 1
 					END)		 AS TurnOver
 			,SUM(b.Winloss)	 AS MemberWinloss
-			,SUM(b.CommissionA)	 AS Comm
 			,SUM(BetCount * CASE 
 					WHEN @drawfilter = 1
 						THEN CASE 
@@ -265,7 +263,6 @@ BEGIN
 			,ToPartyID
 			,TurnOver
 			,MemberWinloss
-			,Comm
 			,Betcount
 			)
 		SELECT b.rptDate
@@ -287,7 +284,6 @@ BEGIN
 					ELSE 1
 					END)		 AS TurnOver
 			,SUM(b.Winloss)	 AS MemberWinloss
-			,SUM(b.CommissionA)	 AS Comm
 			,SUM(BetCount * CASE 
 					WHEN @drawfilter = 1
 						THEN CASE 
@@ -383,8 +379,8 @@ BEGIN
 		,CAST(CASE 
 				WHEN INS.Rate IS NOT NULL
 					THEN --normal Licensee
-						- 1 * isnull(SUM(d.MemberWinloss * isnull(OW.Rate, 0) + ISNULL(d.Comm,0)), 0)  --isnull(SUM(-1 * d.MemberWinloss ),0) < 0 THEN 0 
-				ELSE - 1 * isnull(SUM(d.MemberWinloss * isnull(DI.Rate, 0) + ISNULL(d.Comm,0)), 0)  --direct licensee
+						- 1 * isnull(SUM(d.MemberWinloss * isnull(OW.Rate, 0) ), 0)  --isnull(SUM(-1 * d.MemberWinloss ),0) < 0 THEN 0 
+				ELSE - 1 * isnull(SUM(d.MemberWinloss * isnull(DI.Rate, 0) ), 0)  --direct licensee
 				END AS MONEY) AS OneworksIncome
 		,CAST(CASE 
 				WHEN INS.Rate IS NOT NULL
@@ -398,14 +394,14 @@ BEGIN
 		,winlostdate
 		,Currency
 	FROM #Data d
-	INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo DI ON d.ToPartyID = DI.ToParty
+	INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo_xtest DI ON d.ToPartyID = DI.ToParty
 		AND d.FromPartyID = DI.FromParty
 		AND DI.ProductID = 5
 		AND d.winlostdate BETWEEN DI.FromDate AND DI.ToDate
 		AND DI.ChargeType = 1
      INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON cs.ChargeID = DI.ChargeID AND cs.SystemID = 4
-	LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo OW ON DI.ParentChargeID = OW.ChargeID
-	LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo INS ON OW.ParentChargeID = INS.ChargeID
+	LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo_xtest OW ON DI.ParentChargeID = OW.ChargeID
+	LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo_xtest INS ON OW.ParentChargeID = INS.ChargeID
 	GROUP BY d.ToPartyID
 		,d.FromPartyID
 		,DI.Rate
@@ -493,6 +489,7 @@ BEGIN
 	DROP TABLE #Exchange
 	DROP TABLE #Exchange1
 END
+
 GO
 GRANT VIEW DEFINITION ON [dbo].[OAS_Report_VirtualSportWinloss] TO [vnteam] 
 GRANT EXECUTE ON [dbo].[OAS_Report_VirtualSportWinloss] TO bodbAdminNet 
