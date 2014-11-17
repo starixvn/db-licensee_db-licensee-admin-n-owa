@@ -408,7 +408,7 @@ BEGIN
 			,winlostdate
 			,d.Currency
 		FROM #Data d
-		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo_xtest DI ON d.ToPartyID = DI.ToParty
+		LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo_xtest DI ON d.ToPartyID = DI.ToParty
 			AND d.FromPartyID = DI.FromParty
 			AND DI.ProductID = 2
 			AND d.winlostdate BETWEEN DI.FromDate AND DI.ToDate
@@ -462,7 +462,7 @@ BEGIN
 			,winlostdate
 			,d.Currency
 		FROM #Data d
-		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo_xtest DI ON d.ToPartyID = DI.ToParty
+		LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo_xtest DI ON d.ToPartyID = DI.ToParty
 			AND d.FromPartyID = DI.FromParty
 			AND DI.ProductID = 2
 			AND d.winlostdate BETWEEN DI.FromDate AND DI.ToDate
