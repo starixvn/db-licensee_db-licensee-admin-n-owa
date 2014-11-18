@@ -26,6 +26,7 @@ AS
    
      Revisions:  
 	   - 20141021@Florent: get data from credit's licensee
+	   - 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
 	Param's Explanation:  
 	  + @PartyIDs	: a string of list PartyID, separate by ','
 	  + @Currency	:  0- All Currencies
@@ -60,6 +61,22 @@ BEGIN
 		,Playercomm MONEY
 		)
 
+     CREATE TABLE #Data (
+		   rptDate	 Datetime
+		  ,SiteID		 INT
+		  ,PartyID	 INT
+		  ,ProductID	 INT
+		  ,Bettype	 INT
+		  ,Status		 SMALLINT
+		  ,Currency	 INT
+		  ,TurnOver	 MONEY
+		  ,Winloss	 MONEY
+		  ,AWinloss	 MONEY
+		  ,AComm		 MONEY
+		  ,PComm		 MONEY
+		  ,Betcount	 BIGINT
+		  )
+
 	DECLARE @VNDCurrencyName VARCHAR(20)
 	DECLARE @site VARCHAR(50)
 
@@ -67,111 +84,39 @@ BEGIN
 	FROM exchange(NOLOCK)
 	WHERE ExchangeId = 51
 
-	--Get Bettype
-	CREATE TABLE #Bettype (Bettype INT)
-
-	IF @Bettype != 0
-		INSERT INTO #Bettype
-		SELECT @Bettype
-	ELSE
-	BEGIN
-		IF CHARINDEX('SB', @ProductCodes) <> 0
-			OR CHARINDEX('BA', @ProductCodes) <> 0
-		BEGIN
-			INSERT INTO #Bettype
-			SELECT typeid
-			FROM dbo.bettype WITH (NOLOCK)
-			WHERE typeid < 31
-				OR typeid BETWEEN 121 AND 999
-				OR typeid BETWEEN 1301 AND 1399
-		END
-
-		IF CHARINDEX('RB', @ProductCodes) <> 0
-		BEGIN
-			INSERT INTO #Bettype
-			SELECT typeid
-			FROM dbo.bettype WITH (NOLOCK)
-			WHERE typeid BETWEEN 31 AND 33
-		END
-
-		IF CHARINDEX('NG', @ProductCodes) <> 0
-		BEGIN
-			INSERT INTO #Bettype
-			SELECT typeid
-			FROM dbo.bettype WITH (NOLOCK)
-			WHERE typeid BETWEEN 81 AND 120
-		END
-
-		IF CHARINDEX('LC', @ProductCodes) <> 0
-		BEGIN
-			INSERT INTO #Bettype
-			SELECT typeid
-			FROM dbo.bettype WITH (NOLOCK)
-			WHERE typeid BETWEEN 1101 AND 1199
-		END
-
-		IF CHARINDEX('VS', @ProductCodes) <> 0
-		BEGIN
-			INSERT INTO #Bettype
-			SELECT typeid
-			FROM dbo.bettype WITH (NOLOCK)
-			WHERE typeid BETWEEN 1201 AND 1299
-		END
-
-		IF CHARINDEX('CS', @ProductCodes) <> 0
-		BEGIN
-			INSERT INTO #Bettype
-			SELECT typeid
-			FROM dbo.bettype WITH (NOLOCK)
-			WHERE typeid = 71
-		END
-	END
+	--Get Bettype     
+	CREATE TABLE #Bettype (Bettype INT,ProductID INT)
+	
+     INSERT INTO #Bettype(Bettype,ProductID)
+	SELECT Bettype,ProductID
+	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(@Bettype,@ProductCodes)
 
 	--Get list of Party - Licensee
-	DECLARE @tmpParty TABLE (
+	CREATE TABLE #tmpParty (
 		PartyID	    INT
 		,LicenseeID   INT
 		,isDeposit    INT
-		,AffectedDate DATETIME
-		,Fromdate	    DATETIME
-		,Todate	    DATETIME
+		,AffectedDate SMALLDATETIME
+		,ProductID    INT 
+		,Rate	    Money
+		,Fromdate	    SMALLDATETIME
+		,Todate	    SMALLDATETIME
 		)
 
-	INSERT INTO @tmpParty (
-		PartyID
-		,LicenseeID
-		,isDeposit
-		,AffectedDate
-		,Fromdate
-		,Todate
-		)
-	SELECT p.PartyID
-		,CASE WHEN ISNULL(pd.IsDeposit,0) = 1 THEN l.LicenseeID ELSE lb.LabelID END AS LicenseeID
-		,pd.IsDeposit
-		,l.AffectedDate
-		,@FromDate
-		,@ToDate
-	FROM bodb_Licensee.dbo.OAS_Party p(NOLOCK)
-	INNER JOIN bodb_licensee.dbo.Licensees l(NOLOCK) ON p.OldRefID = l.LicenseeID
-		AND p.PartyType = 1
-     LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
-	LEFT JOIN bodb_Licensee.dbo.labels lb (NOLOCK) ON l.LicenseeID = lb.LicenseeID 
-	WHERE p.PartyID = @PartyID
-		AND (
-			l.AffectedDate IS NOT NULL
-			OR pd.IsDeposit = 0
-			)
+	INSERT INTO #tmpParty (PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Rate, Fromdate, Todate)
+	SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Rate, Fromdate, Todate
+	FROM bodb_licensee.dbo.LA_f_ChargeInfo (@PartyID,@FromDate,@ToDate,@ProductCodes,'OA')
 
 	IF (
 	   EXISTS (
 		  SELECT TOP 1 1
-		  FROM @tmpParty
+		  FROM #tmpParty
 		  WHERE AffectedDate > Fromdate
 		  )
 	   AND @excludeTest = 1
 	   )
 	BEGIN
-		UPDATE @tmpParty
+		UPDATE #tmpParty
 		SET Fromdate = AffectedDate
 		WHERE AffectedDate > Fromdate
 	END
@@ -195,7 +140,8 @@ BEGIN
 		  ,SUM(b.winloss) Winloss
 		  ,0 AS LicenseeWL
 		  ,0 AS WinlossRB
-		  ,- SUM(b.winloss + b.winlossA + b.CommissionA) AS AmountDueToBA
+		  --,- SUM(b.winloss + b.winlossA + b.CommissionA) AS AmountDueToBA
+		  ,- SUM((b.winloss * p.Rate )+ b.CommissionA) AS AmountDueToBA
 		  ,0 AS AmountDueToRB
 		  ,SUM(b.CommissionA) AS CommBA
 		  ,0 AS CommRB
@@ -209,7 +155,7 @@ BEGIN
 		  ,SUM(commissionP) AS Playercomm
 	   FROM bodb_Licensee.dbo.rpt_Betting_BA b WITH (NOLOCK)
 	   INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
-	   INNER JOIN @tmpParty p ON b.SiteID = p.LicenseeID
+	   INNER JOIN #tmpParty p ON b.SiteID = p.LicenseeID
 	   LEFT JOIN dbo.League l(NOLOCK) ON b.leagueid = l.leagueid
 	   WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate
 		  AND b.STATUS NOT IN (- 1, 103)
@@ -238,12 +184,62 @@ BEGIN
 		  ,b.currencyID
 		  ,b.STATUS
     END
-
+    --get data
+	INSERT INTO #Data
+	SELECT  b.rptDate	
+		  ,b.SiteID
+		  ,p.PartyID
+		  ,p.ProductID	
+		  ,b.Bettype
+		  ,b.Status		
+		  ,b.currencyID
+		  ,SUM(b.turnover)
+		  ,SUM(b.winloss)
+		  ,SUM(b.winlossA)
+		  ,SUM(b.CommissionA)
+		  ,SUM(b.commissionP)
+		  ,SUM(b.betcount)
+	   FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK)
+	   INNER JOIN #tmpParty p ON p.LicenseeID = b.SiteID AND p.ProductID NOT IN (3)
+	   INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND p.ProductID = bt.ProductID
+	   LEFT JOIN dbo.League l(NOLOCK) ON b.leagueid = l.leagueid
+	   WHERE b.rptDate BETWEEN @FromDate AND @ToDate
+		  AND b.STATUS NOT IN (- 1, 103)
+		  AND (
+			 @SportType = 0
+			 OR (
+				    @SportType <> 0
+				    AND b.bettype NOT BETWEEN 31 AND 120
+				    AND l.sporttype = @SportType
+				    )
+			 )
+		  AND (
+			 @Currency = 0
+			 OR (
+				    @Currency <> 0
+				    AND b.CurrencyID = @Currency
+				    )
+			 )
+		  AND (
+			 @excludeTest = 0
+			 OR (
+				    @excludeTest = 1
+				    AND b.CurrencyID <> 20
+				    )
+			 )
+		  AND b.customercategory NOT IN (27,28)
+	 GROUP BY  b.rptDate	
+		  ,b.SiteID 
+		  ,PartyID	 
+		  ,p.ProductID	 
+		  ,b.Bettype	 
+		  ,Status		 
+		  ,b.CurrencyID
 	   IF (REPLACE(@ProductCodes, 'BA', '') != '' AND REPLACE(@ProductCodes, 'BA', '') != ',')
 	   BEGIN
 		  INSERT INTO #SAgWinLoss
 		  SELECT b.rptDate
-			 ,b.CurrencyID
+			 ,b.Currency
 			 ,SUM(b.turnover * CASE 
 					   WHEN b.bettype = 33
 						  AND b.STATUS IN (114, 115)
@@ -268,24 +264,26 @@ BEGIN
 					   END) AS LicenseeWL
 			 ,SUM(CASE 
 					   WHEN b.bettype BETWEEN 31 AND 33
-						  THEN b.winlossA
+						  THEN b.AWinloss
 					   ELSE 0
 					   END) AS WinlossRB
 			 ,0 AS AmountDueToBA
 			 ,- SUM(CASE 
 					   WHEN b.bettype BETWEEN 31 AND 33
-						  THEN (b.winloss + b.winlossA + b.CommissionA)
+						  THEN (b.winloss + b.AWinloss + b.AComm)
+						  --THEN ((b.winloss * p.Rate)  + b.CommissionA)
 					   ELSE 0
 					   END) AS AmountDueToRB
 			 ,0 AS CommBA
 			 ,SUM(CASE 
 					   WHEN b.bettype BETWEEN 31 AND 33
-						  THEN b.CommissionA
+						  THEN b.AComm
 					   ELSE 0
 					   END) AS CommRB
 			 ,- SUM(CASE 
 					   WHEN b.bettype NOT BETWEEN 31 AND 33
-						  THEN (b.winloss + b.winlossA + b.CommissionA)
+						  --THEN (b.winloss + b.winlossA + b.CommissionA)
+						  THEN ((b.winloss * p.Rate) + b.AComm)
 					   ELSE 0
 					   END) AS Company
 			 ,SUM(b.betcount) * CASE 
@@ -297,38 +295,12 @@ BEGIN
 							 END
 				    ELSE 1
 				    END BetCount
-			 ,SUM(commissionP) AS Playercomm
-		  FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK)
-		  INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
-		  INNER JOIN @tmpParty p ON b.SiteID = p.LicenseeID
-		  LEFT JOIN dbo.League l(NOLOCK) ON b.leagueid = l.leagueid
-		  WHERE b.rptdate BETWEEN p.Fromdate AND p.Todate
-			 AND b.STATUS NOT IN (- 1, 103)
-			 AND (
-				    @SportType = 0
-				    OR (
-					   @SportType <> 0
-					   AND b.bettype NOT BETWEEN 31 AND 120
-					   AND l.sporttype = @SportType
-					   )
-				    )
-			 AND (
-				    @Currency = 0
-				    OR (
-					   @Currency <> 0
-					   AND b.CurrencyID = @Currency
-					   )
-				    )
-			 AND (
-				    @excludeTest = 0
-				    OR (
-					   @excludeTest = 1
-					   AND b.CurrencyID <> 20
-					   )
-				    )
-			  AND b.CustomerCategory NOT IN (27,28)
+			 ,SUM(b.PComm) AS Playercomm
+		  FROM #data b WITH (NOLOCK)
+		  INNER JOIN #tmpParty p ON b.SiteID = p.LicenseeID AND p.ProductID NOT IN (3) AND b.ProductID = p.ProductID		  
+		  WHERE b.rptdate BETWEEN p.Fromdate AND p.Todate			
 		  GROUP BY b.rptdate
-			 ,b.currencyID
+			 ,b.currency
 			 ,b.STATUS
 	   END
 
@@ -419,6 +391,8 @@ BEGIN
 	DROP TABLE #SAgWinLoss
 	DROP TABLE #TempExchange
 	DROP TABLE #Bettype
+	DROP TABLE #tmpParty
+	DROP TABLE #Data
 END
 
 GO
