@@ -1,4 +1,7 @@
-﻿ALTER PROCEDURE [dbo].[OA_FunctionLicenseesGetByFunctionID]
+﻿USE [bodb_licensee]
+GO
+ 
+ALTER PROCEDURE [dbo].[OA_FunctionLicenseesGetByFunctionID]
 	@FunctionID int
 AS
 /*  
@@ -9,6 +12,7 @@ AS
  * Revisions:     
  - 20120510@Henry: only get active Licensees
  - 20120704@Henry: Map Licensee with System
+ - 20140228@Jim: hard-code to hide Credit Licensee and test licensee in some report : Licensee Win Loss,Currency Win Loss Report,Racing 
 */
 SET NOCOUNT ON
 
@@ -27,12 +31,14 @@ FROM
 	INNER JOIN SystemLicensee sl (NOLOCK) ON l.LicenseeID=sl.LicenseeID 
 	INNER JOIN Systems s (NOLOCK) ON sl.SystemID=s.ID
 WHERE
-	gl.FunctionID = @FunctionID
+	(	
+		(r.ResellerID not in (4,8) and l.LicenseeID<> 5 and @FunctionID in (7,11,20,24,25,26) ) 
+		OR (FunctionID = @FunctionID and @FunctionID not in (7,11,20))
+	)
 	AND sl.IsActive = 1
 	AND s.SystemName='OA'
-	
 
 GO
 GRANT EXECUTE ON [dbo].[OA_FunctionLicenseesGetByFunctionID] TO [bodbAdminNet]
 GO
-GRANT VIEW DEFINITION ON [dbo].[OA_FunctionLicenseesGetByFunctionID] TO [vnteam]	
+GRANT VIEW DEFINITION ON [dbo].[OA_FunctionLicenseesGetByFunctionID] TO [vnteam]		
