@@ -1,3 +1,12 @@
+USE [bodb02]
+GO
+/****** Object:  StoredProcedure [dbo].[OA_Rpt_LicPerformance_Summary]    Script Date: 09/29/2014 06:17:31 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+/****** Object:  Stored Procedure dbo.OA_Rpt_LicPerformance_Summary    Script Date: 3/6/2014 5:23:51 PM ******/
+
 ALTER PROCEDURE [dbo].[OA_Rpt_LicPerformance_Summary]  
  @Licensee	VARCHAR(1000)='',
  @Currency		INT = 0,
@@ -15,7 +24,8 @@ AS
     DB: DB052.bodb02  
    
     Revisions:  
-    
+    - 20140306@Francis: Fix incorrect Total Racing/BA Comm, showing Racing/BA Comm instead of AmtDueTo Racing/BA
+	- 20140306@Francis: Negative value nolonger added to total Licensing Fee value
 	Param's Explanation:  
 	  + @Licensee : a string of list LicenseeID, separated by ','
 	  + @Currency : 0-All Currencies
@@ -96,31 +106,31 @@ where LicenseeName = '12Bet'
 
 CREATE TABLE #Result (  
 	LicenseeID int,
-	ReportType		VARCHAR(6),     
+	ReportType		VARCHAR(8),     
 	
 	TurnOver MONEY,   	
 	CustomerWinlost	MONEY,  
-	AmtDueToBA MONEY,   
-	AmtDueToRB MONEY,
+	CommBA MONEY,   
+	CommRB MONEY,
 	Betcount BIGINT,
 	LicensingFee MONEY,
 	
 	TurnOverMYR	MONEY,   	
 	CustomerWinlostMYR MONEY,  
-	AmtDueToBAMYR MONEY,   
-	AmtDueToRBMYR MONEY,
+	CommBAMYR MONEY,   
+	CommRBMYR MONEY,
 	LicensingFeeMYR MONEY,
 	
 	TurnOverUSD	MONEY,   	
 	CustomerWinlostUSD MONEY,  
-	AmtDueToBAUSD MONEY,   
-	AmtDueToRBUSD MONEY,
+	CommBAUSD MONEY,   
+	CommRBUSD MONEY,
 	LicensingFeeUSD MONEY,
 	
 	TurnOverEUR	MONEY,   	
 	CustomerWinlostEUR MONEY,  
-	AmtDueToBAEUR MONEY,   
-	AmtDueToRBEUR MONEY,
+	CommBAEUR MONEY,   
+	CommRBEUR MONEY,
 	LicensingFeeEUR MONEY
 )
 
@@ -130,48 +140,24 @@ CREATE TABLE #WinLoss (
 	
 	TurnOver		MONEY,   	
 	Winlost			MONEY,  
-	LicenseeWL		MONEY, 
-	WinlossRB		MONEY,
-	AmtDueToBA	MONEY,   
-	AmtDueToRB	MONEY,
 	CommBA			MONEY,   
 	CommRB		MONEY,   
-	Company		MONEY,
-	Playercomm	MONEY,
 	Betcount		BIGINT,
 	
 	TurnOverMYR		MONEY,   	
 	WinlostMYR			MONEY,  
-	LicenseeWLMYR		MONEY, 
-	WinlossRBMYR		MONEY,
-	AmtDueToBAMYR	MONEY,   
-	AmtDueToRBMYR	MONEY,
 	CommBAMYR			MONEY,   
 	CommRBMYR		MONEY,   
-	CompanyMYR		MONEY,
-	PlayercommMYR	MONEY,
 	
 	TurnOverUSD		MONEY,   	
 	WinlostUSD			MONEY,  
-	LicenseeWLUSD		MONEY, 
-	WinlossRBUSD		MONEY,
-	AmtDueToBAUSD	MONEY,   
-	AmtDueToRBUSD	MONEY,
 	CommBAUSD			MONEY,   
 	CommRBUSD		MONEY,   
-	CompanyUSD		MONEY,
-	PlayercommUSD	MONEY,
 	
 	TurnOverEUR		MONEY,   	
 	WinlostEUR			MONEY,  
-	LicenseeWLEUR		MONEY, 
-	WinlossRBEUR		MONEY,
-	AmtDueToBAEUR	MONEY,   
-	AmtDueToRBEUR	MONEY,
 	CommBAEUR			MONEY,   
-	CommRBEUR		MONEY,   
-	CompanyEUR		MONEY,
-	PlayercommEUR	MONEY
+	CommRBEUR		MONEY
 )
 
 CREATE TABLE #Temp (  
@@ -181,14 +167,8 @@ CREATE TABLE #Temp (
 	
 	TurnOver		MONEY,   	
 	Winlost			MONEY,  
-	LicenseeWL		MONEY, 
-	WinlossRB		MONEY,
-	AmtDueToBA	MONEY,   
-	AmtDueToRB	MONEY,
 	CommBA			MONEY,   
 	CommRB		MONEY,   
-	Company		MONEY,
-	Playercomm	MONEY,
 	Betcount		BIGINT
 )
 
@@ -226,7 +206,7 @@ BEGIN
 	--Case selected product is BA
 	IF @ShowBA=1 
 	BEGIN
-		INSERT INTO #Temp  (LicenseeID ,ReportType,Currency,TurnOver,Winlost,LicenseeWL,WinlossRB,AmtDueToBA,AmtDueToRB,CommBA,CommRB,Company,Playercomm,Betcount)
+		INSERT INTO #Temp  (LicenseeID ,ReportType,Currency,TurnOver,Winlost,CommBA,CommRB,Betcount)
 		SELECT 
 			b.siteID,
 			CONVERT(VARCHAR(6),b.rptDate,112) ReportType,  
@@ -240,14 +220,8 @@ BEGIN
 					ELSE 1 END
 				) TurnOver,
 			SUM(b.winloss) Winloss,
-			0 as LicenseeWL,
-			0 AS WinlossRB,
-			- SUM(b.winloss+b.winlossA+	b.CommissionA)as AmountDueToBA,
-			0 as AmountDueToRB,
 			SUM(b.CommissionA) as CommBA,
 			0 as CommRB,
-			0 as Company,
-			SUM(commissionP) AS Playercomm,
 			SUM(betcount)
 			* CASE WHEN @drawfilter = 2 AND b.status=111 THEN 0
 					ELSE 1 END BetCount
@@ -272,7 +246,7 @@ BEGIN
 	--exclude BA tickets
 	IF (@showSB = 1 or @ShowRB = 1 or @ShowNG = 1 or @ShowLC = 1 or @ShowVS = 1 or @ShowCS=1)
 	BEGIN
-		INSERT INTO #Temp  (LicenseeID ,ReportType,Currency,TurnOver,Winlost,LicenseeWL,WinlossRB,AmtDueToBA,AmtDueToRB,CommBA,CommRB,Company,Playercomm,Betcount)
+		INSERT INTO #Temp  (LicenseeID ,ReportType,Currency,TurnOver,Winlost,CommBA,CommRB,Betcount)
 		SELECT 
 			b.siteID,
 			CONVERT(VARCHAR(6),b.rptDate,112)  ReportType,  
@@ -288,15 +262,8 @@ BEGIN
 					ELSE 1 END
 				) TurnOver,
 			SUM(b.winloss) Winloss,	
-			-SUM(CASE WHEN (b.Bettype NOT BETWEEN 31 AND 33) THEN b.winloss ELSE 0 END) AS LicenseeWL,
-			SUM(CASE WHEN  b.bettype  BETWEEN 31 AND 33  THEN b.winlossA ELSE 0 END) AS WinlossRB,
-			0 as AmountDueToBA,
-			-SUM(CASE WHEN  b.bettype  BETWEEN 31 AND 33 THEN (b.winloss+b.winlossA+	b.CommissionA) ELSE 0 END ) AS AmountDueToRB,
 			0 as CommBA,
 			SUM(CASE WHEN  b.bettype  BETWEEN 31 AND 33   THEN b.CommissionA ELSE 0 END ) AS CommRB,
-			-SUM(CASE WHEN b.bettype  NOT BETWEEN 31 AND 33  THEN (b.winloss+b.winlossA+ b.CommissionA) ELSE 0 END ) AS Company,
-			
-			SUM(commissionP) AS Playercomm,
 			SUM(b.betcount)
 			* CASE WHEN @drawfilter = 2 AND b.status=111 THEN 0
 				  ELSE 1 END BetCount
@@ -324,41 +291,26 @@ BEGIN
 		GROUP BY b.siteID, CONVERT(VARCHAR(6),b.rptDate,112) , b.status,b.currencyID
 	END	
 	
-	INSERT INTO #WinLoss
+	INSERT INTO #WinLoss (LicenseeID,ReportType,TurnOver,Winlost,CommBA,CommRB,Betcount,
+						  TurnOverMYR,WinlostMYR,CommBAMYR,CommRBMYR,
+						  TurnOverUSD,WinlostUSD,CommBAUSD,CommRBUSD,
+						  TurnOverEUR,WinlostEUR,CommBAEUR,CommRBEUR)
 	SELECT
-		LicenseeID ,ReportType,TurnOver,Winlost,LicenseeWL,WinlossRB,AmtDueToBA,AmtDueToRB,CommBA,CommRB,Company,Playercomm,Betcount,
+		LicenseeID ,ReportType,TurnOver,Winlost,CommBA,CommRB,Betcount,
 		TurnOver * e.MYR TurnOverMYR,
 		Winlost * e.MYR WinlostMYR,
-		LicenseeWL * e.MYR LicenseeWLMYR,
-		WinlossRB * e.MYR WinlossRBMYR,
-		AmtDueToBA * e.MYR AmtDueToBAMYR,
-		AmtDueToRB * e.MYR AmtDueToRBMYR,
 		CommBA * e.MYR CommBAMYR,
 		CommRB * e.MYR CommRBMYR,
-		Company * e.MYR CompanyMYR,
-		Playercomm * e.MYR PlayercommMYR,
 		
 		TurnOver * e.USD TurnOverUSD,
 		Winlost * e.USD WinlostUSD,
-		LicenseeWL * e.USD LicenseeWLUSD,
-		WinlossRB * e.USD WinlossRBUSD,
-		AmtDueToBA * e.USD AmtDueToBAUSD,
-		AmtDueToRB * e.USD AmtDueToRBUSD,
 		CommBA * e.USD CommBAUSD,
 		CommRB * e.USD CommRBUSD,
-		Company * e.USD CompanyUSD,
-		Playercomm * e.USD PlayercommUSD,
 		
 		TurnOver * e.EUR TurnOverEUR,
 		Winlost * e.EUR WinlostEUR,
-		LicenseeWL * e.EUR LicenseeWLEUR,
-		WinlossRB * e.EUR WinlossRBEUR,
-		AmtDueToBA * e.EUR AmtDueToBAEUR,
-		AmtDueToRB * e.EUR AmtDueToRBEUR,
 		CommBA * e.EUR CommBAEUR,
-		CommRB * e.EUR CommRBEUR,
-		Company * e.EUR CompanyEUR,
-		Playercomm * e.EUR PlayercommEUR
+		CommRB * e.EUR CommRBEUR
 		
 	FROM 	#Temp b
 		LEFT JOIN #Exchange1 e  ON e.ExchangeDate = ReportType AND e.exchangeid = b.currency
@@ -380,7 +332,10 @@ BEGIN
 		
 	IF @ShowBA=1 
 	BEGIN
-		INSERT INTO #WinLoss  
+		INSERT INTO #WinLoss (LicenseeID,ReportType,TurnOver,Winlost,CommBA,CommRB,Betcount,
+						      TurnOverMYR,WinlostMYR,CommBAMYR,CommRBMYR,
+						      TurnOverUSD,WinlostUSD,CommBAUSD,CommRBUSD,
+						      TurnOverEUR,WinlostEUR,CommBAEUR,CommRBEUR)
 		SELECT 
 			b.siteID,
 			CONVERT(VARCHAR(6),b.rptDate,112) ReportType,  
@@ -393,14 +348,8 @@ BEGIN
 					ELSE 1 END
 				) TurnOver,
 			SUM(b.winloss) Winloss,
-			0 as LicenseeWL,
-			0 AS WinlossRB,
-			- SUM(b.winloss+b.winlossA+	b.CommissionA)as AmountDueToBA,
-			0 as AmountDueToRB,
 			SUM(b.CommissionA) as CommBA,
 			0 as CommRB,
-			0 as Company,
-			SUM(commissionP) AS Playercomm,
 			SUM(betcount)
 			* CASE WHEN @drawfilter = 2 AND b.status=111 THEN 0
 					ELSE 1 END BetCount,
@@ -416,15 +365,9 @@ BEGIN
 				* e.MYR
 				) TurnOverMYR,
 			SUM(b.winloss * e.MYR) WinlossMYR,
-			0 as LicenseeWLMYR,
-			0 AS WinlossRBMYR,
-			- SUM((b.winloss+b.winlossA+	b.CommissionA)*e.MYR ) as AmountDueToBAMYR,
-			0 as AmountDueToRBMYR,
 			SUM(b.CommissionA * e.MYR) as CommBAMYR,
 			0 as CommRBMYR,
-			0 as CompanyMYR,
-			SUM(commissionP * e.MYR) AS PlayercommMYR,		
-					
+								
 			--USD
 			SUM(b.turnover
 				*
@@ -436,15 +379,9 @@ BEGIN
 				* e.USD
 				) TurnOverUSD,
 			SUM(b.winloss * e.USD) WinlossUSD,
-			0 as LicenseeWLUSD,
-			0 AS WinlossRBUSD,
-			- SUM((b.winloss+b.winlossA+	b.CommissionA)*e.USD ) as AmountDueToBAUSD,
-			0 as AmountDueToRBUSD,
 			SUM(b.CommissionA * e.USD) as CommBAUSD,
 			0 as CommRBUSD,
-			0 as CompanyUSD,
-			SUM(commissionP * e.USD) AS PlayercommUSD,		
-			
+						
 			--EUR
 			SUM(b.turnover
 				*
@@ -456,15 +393,8 @@ BEGIN
 				* e.EUR
 				) TurnOverEUR,
 			SUM(b.winloss * e.EUR) WinlossEUR,
-			0 as LicenseeWLEUR,
-			0 AS WinlossRBEUR,
-			- SUM((b.winloss+b.winlossA+	b.CommissionA)*e.EUR ) as AmountDueToBAEUR,
-			0 as AmountDueToRBEUR,
 			SUM(b.CommissionA * e.EUR) as CommBAEUR,
-			0 as CommRBEUR,
-			0 as CompanyEUR,
-			SUM(commissionP * e.EUR) AS PlayercommEUR
-					
+			0 as CommRBEUR						
 		FROM 
 			bodb_Licensee.dbo.rpt_Betting_BA b WITH ( NOLOCK ) 
 			INNER JOIN @tmpLicensee ag ON ag.LicenseeID=b.SiteID
@@ -501,15 +431,8 @@ BEGIN
 					ELSE 1 END
 				) TurnOver,
 			SUM(b.winloss) Winloss,	
-			-SUM(CASE WHEN (b.Bettype NOT BETWEEN 31 AND 33) THEN b.winloss ELSE 0 END) AS LicenseeWL,
-			SUM(CASE WHEN  b.bettype  BETWEEN 31 AND 33  THEN b.winlossA ELSE 0 END) AS WinlossRB,
-			0 as AmountDueToBA,
-			-SUM(CASE WHEN  b.bettype  BETWEEN 31 AND 33 THEN (b.winloss+b.winlossA+	b.CommissionA) ELSE 0 END ) AS AmountDueToRB,
 			0 as CommBA,
 			SUM(CASE WHEN  b.bettype  BETWEEN 31 AND 33   THEN b.CommissionA ELSE 0 END ) AS CommRB,
-			-SUM(CASE WHEN b.bettype  NOT BETWEEN 31 AND 33  THEN (b.winloss+b.winlossA+ b.CommissionA) ELSE 0 END ) AS Company,
-			
-			SUM(commissionP) AS Playercomm,
 			SUM(b.betcount)
 			* CASE WHEN @drawfilter = 2 AND b.status=111 THEN 0
 				  ELSE 1 END BetCount,
@@ -527,15 +450,8 @@ BEGIN
 				* e.MYR	
 				) TurnOverMYR,
 			SUM(b.winloss * e.MYR) WinlossMYR,	
-			-SUM(CASE WHEN (b.Bettype NOT BETWEEN 31 AND 33) THEN b.winloss ELSE 0 END * e.MYR) AS LicenseeWLMYR,
-			SUM(CASE WHEN  b.bettype  BETWEEN 31 AND 33  THEN b.winlossA ELSE 0 END * e.MYR) AS WinlossRBMYR,
-			0 as AmountDueToBAMYR,
-			-SUM(CASE WHEN  b.bettype  BETWEEN 31 AND 33 THEN (b.winloss+b.winlossA+	b.CommissionA) ELSE 0 END * e.MYR) AS AmountDueToRBMYR,
 			0 as CommBAMYR,
 			SUM(CASE WHEN  b.bettype  BETWEEN 31 AND 33   THEN b.CommissionA ELSE 0 END * e.MYR) AS CommRBMYR,
-			-SUM(CASE WHEN b.bettype  NOT BETWEEN 31 AND 33  THEN (b.winloss+b.winlossA+ b.CommissionA) ELSE 0 END * e.MYR) AS CompanyMYR,
-			
-			SUM(commissionP * e.MYR) AS PlayercommMYR,	  
 			
 			--USD
 			SUM(b.turnover
@@ -550,16 +466,9 @@ BEGIN
 				* e.USD	
 				) TurnOverUSD,
 			SUM(b.winloss * e.USD) WinlossUSD,	
-			-SUM(CASE WHEN (b.Bettype NOT BETWEEN 31 AND 33) THEN b.winloss ELSE 0 END * e.USD) AS LicenseeWLUSD,
-			SUM(CASE WHEN  b.bettype  BETWEEN 31 AND 33  THEN b.winlossA ELSE 0 END * e.USD) AS WinlossRBUSD,
-			0 as AmountDueToBAUSD,
-			-SUM(CASE WHEN  b.bettype  BETWEEN 31 AND 33 THEN (b.winloss+b.winlossA+	b.CommissionA) ELSE 0 END * e.USD) AS AmountDueToRBUSD,
 			0 as CommBAUSD,
 			SUM(CASE WHEN  b.bettype  BETWEEN 31 AND 33   THEN b.CommissionA ELSE 0 END * e.USD) AS CommRBUSD,
-			-SUM(CASE WHEN b.bettype  NOT BETWEEN 31 AND 33  THEN (b.winloss+b.winlossA+ b.CommissionA) ELSE 0 END * e.USD) AS CompanyUSD,
-			
-			SUM(commissionP * e.USD) AS PlayercommUSD,	  
-			
+						
 			--EUR
 			SUM(b.turnover
 				*
@@ -573,16 +482,8 @@ BEGIN
 				* e.EUR	
 				) TurnOverEUR,
 			SUM(b.winloss * e.EUR) WinlossEUR,	
-			-SUM(CASE WHEN (b.Bettype NOT BETWEEN 31 AND 33) THEN b.winloss ELSE 0 END * e.EUR) AS LicenseeWLEUR,
-			SUM(CASE WHEN  b.bettype  BETWEEN 31 AND 33  THEN b.winlossA ELSE 0 END * e.EUR) AS WinlossRBEUR,
-			0 as AmountDueToBAEUR,
-			-SUM(CASE WHEN  b.bettype  BETWEEN 31 AND 33 THEN (b.winloss+b.winlossA+	b.CommissionA) ELSE 0 END * e.EUR) AS AmountDueToRBEUR,
 			0 as CommBAEUR,
-			SUM(CASE WHEN  b.bettype  BETWEEN 31 AND 33   THEN b.CommissionA ELSE 0 END * e.EUR) AS CommRBEUR,
-			-SUM(CASE WHEN b.bettype  NOT BETWEEN 31 AND 33  THEN (b.winloss+b.winlossA+ b.CommissionA) ELSE 0 END * e.EUR) AS CompanyEUR,
-			
-			SUM(commissionP * e.EUR) AS PlayercommEUR  
-				  
+			SUM(CASE WHEN  b.bettype  BETWEEN 31 AND 33   THEN b.CommissionA ELSE 0 END * e.EUR) AS CommRBEUR				  
 		FROM 
 			bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK ) 
 			INNER JOIN @tmpLicensee ag ON ag.LicenseeID=b.SiteID
@@ -615,43 +516,37 @@ insert INTO #Result
 		w.ReportType,  
 		SUM(TurnOver) AS Turnover,   
 		SUM(Winlost) AS CustomerWinlost,  
-		--SUM(LicenseeWL) AS LicenseeWL,
-		--SUM(WinlossRB)	AS WinlossRB,
-		--SUM(CommBA) AS CommBA,
-		--SUM(CommRB) AS CommRB,
-		SUM(AmtDuetoBA) AS AmtDuetoBA,
-		SUM(AmtDuetoRB) AS AmtDuetoRB,
-		--SUM(Company) AS Company,
+		SUM(CommBA) AS CommBA,
+		SUM(CommRB) AS CommRB,
 		SUM(Betcount) AS Betcount,
-		--SUM(Playercomm) AS Playercomm,
 		--Licensee Fee Hard-Code calculating
 		CASE 
-			WHEN @ShowSB = 1 THEN SUM(LicenseeWL) * @RateSB
-			WHEN @ShowVS = 1 THEN SUM(LicenseeWL) * @RateVS
-			WHEN @ShowLC = 1 THEN SUM(LicenseeWL) * @RateLC
-			WHEN @ShowCS = 1 THEN SUM(LicenseeWL) * @RateCS
-			WHEN @ShowNG = 1 THEN CASE WHEN w.LicenseeID = @HAIFAID THEN SUM(LicenseeWL) * @RateNGHAIFA
-								       WHEN w.LicenseeID = @12BetID AND cast(w.ReportType AS int) < @12BetDate THEN SUM(LicenseeWL) * @RateNG12Bet
-								       ELSE SUM(LicenseeWL) * @RateNG 
+			WHEN @ShowSB = 1 THEN -SUM(Winlost) * @RateSB
+			WHEN @ShowVS = 1 THEN -SUM(Winlost) * @RateVS
+			WHEN @ShowLC = 1 THEN -SUM(Winlost) * @RateLC
+			WHEN @ShowCS = 1 THEN -SUM(Winlost) * @RateCS
+			WHEN @ShowNG = 1 THEN CASE WHEN w.LicenseeID = @HAIFAID THEN -SUM(Winlost) * @RateNGHAIFA
+								       WHEN w.LicenseeID = @12BetID AND cast(w.ReportType AS int) < @12BetDate THEN -SUM(Winlost) * @RateNG12Bet
+								       ELSE -SUM(Winlost) * @RateNG 
 								       END
 			ELSE 0
 			END
 		 AS LicensingFee,
 
-	--BaseRM  
+	 --BaseRM  
 		SUM(TurnOverMYR)	AS TurnoverMYR,   
 		SUM(WinlostMYR)		AS CustomerWinlostMYR,  
-		SUM(AmtDuetoBAMYR) AS AmtDuetoBAMYR,
-		SUM(AmtDuetoRBMYR) AS AmtDuetoRBMYR,
+		SUM(CommBAMYR) AS CommBAMYR,
+		SUM(CommRBMYR) AS CommRBMYR,
 		--Licensee Fee Hard-Code calculating
 		CASE 
-			WHEN @ShowSB = 1 THEN SUM(LicenseeWLMYR) * @RateSB
-			WHEN @ShowVS = 1 THEN SUM(LicenseeWLMYR) * @RateVS
-			WHEN @ShowLC = 1 THEN SUM(LicenseeWLMYR) * @RateLC
-			WHEN @ShowCS = 1 THEN SUM(LicenseeWLMYR) * @RateCS
-			WHEN @ShowNG = 1 THEN CASE WHEN w.LicenseeID = @HAIFAID THEN SUM(LicenseeWLMYR) * @RateNGHAIFA
-								       WHEN w.LicenseeID = @12BetID AND cast(w.ReportType AS int) < @12BetDate THEN SUM(LicenseeWLMYR) * @RateNG12Bet
-								       ELSE SUM(LicenseeWLMYR) * @RateNG 
+			WHEN @ShowSB = 1 THEN -SUM(WinlostMYR) * @RateSB
+			WHEN @ShowVS = 1 THEN -SUM(WinlostMYR) * @RateVS
+			WHEN @ShowLC = 1 THEN -SUM(WinlostMYR) * @RateLC
+			WHEN @ShowCS = 1 THEN -SUM(WinlostMYR) * @RateCS
+			WHEN @ShowNG = 1 THEN CASE WHEN w.LicenseeID = @HAIFAID THEN -SUM(WinlostMYR) * @RateNGHAIFA
+								       WHEN w.LicenseeID = @12BetID AND cast(w.ReportType AS int) < @12BetDate THEN -SUM(WinlostMYR) * @RateNG12Bet
+								       ELSE -SUM(WinlostMYR) * @RateNG 
 								       END
 			ELSE 0
 			END
@@ -660,17 +555,17 @@ insert INTO #Result
 	--BaseUSD  
 		SUM(TurnOverUSD)	AS TurnoverUSD,   
 		SUM(WinlostUSD)		AS CustomerWinlostUSD,  
-		SUM(AmtDuetoBAUSD) AS AmtDuetoBAUSD,
-		SUM(AmtDuetoRBUSD) AS AmtDuetoRBUSD,
+		SUM(CommBAUSD) AS CommBAUSD,
+		SUM(CommRBUSD) AS CommRBUSD,
 		--Licensee Fee Hard-Code calculating
 		CASE 
-			WHEN @ShowSB = 1 THEN SUM(LicenseeWLUSD) * @RateSB
-			WHEN @ShowVS = 1 THEN SUM(LicenseeWLUSD) * @RateVS
-			WHEN @ShowLC = 1 THEN SUM(LicenseeWLUSD) * @RateLC
-			WHEN @ShowCS = 1 THEN SUM(LicenseeWLUSD) * @RateCS
-			WHEN @ShowNG = 1 THEN CASE WHEN w.LicenseeID = @HAIFAID THEN SUM(LicenseeWLUSD) * @RateNGHAIFA
-								       WHEN w.LicenseeID = @12BetID AND cast(w.ReportType AS int) < @12BetDate THEN SUM(LicenseeWLUSD) * @RateNG12Bet
-								       ELSE SUM(LicenseeWLUSD) * @RateNG 
+			WHEN @ShowSB = 1 THEN -SUM(WinlostUSD) * @RateSB
+			WHEN @ShowVS = 1 THEN -SUM(WinlostUSD) * @RateVS
+			WHEN @ShowLC = 1 THEN -SUM(WinlostUSD) * @RateLC
+			WHEN @ShowCS = 1 THEN -SUM(WinlostUSD) * @RateCS
+			WHEN @ShowNG = 1 THEN CASE WHEN w.LicenseeID = @HAIFAID THEN -SUM(WinlostUSD) * @RateNGHAIFA
+								       WHEN w.LicenseeID = @12BetID AND cast(w.ReportType AS int) < @12BetDate THEN -SUM(WinlostUSD) * @RateNG12Bet
+								       ELSE -SUM(WinlostUSD) * @RateNG 
 								       END
 			ELSE 0
 			END
@@ -679,17 +574,17 @@ insert INTO #Result
 	--BaseEUR  
 		SUM(TurnOverEUR)	AS TurnoverEUR,   
 		SUM(WinlostEUR)		AS CustomerWinlostEUR,  
-		SUM(AmtDuetoBAEUR) AS AmtDuetoBAEUR,
-		SUM(AmtDuetoRBEUR) AS AmtDuetoRBEUR,
+		SUM(CommBAEUR) AS CommBAEUR,
+		SUM(CommRBEUR) AS CommRBEUR,
 		--Licensee Fee Hard-Code calculating
 		CASE 
-			WHEN @ShowSB = 1 THEN SUM(LicenseeWLEUR) * @RateSB
-			WHEN @ShowVS = 1 THEN SUM(LicenseeWLEUR) * @RateVS
-			WHEN @ShowLC = 1 THEN SUM(LicenseeWLEUR) * @RateLC
-			WHEN @ShowCS = 1 THEN SUM(LicenseeWLEUR) * @RateCS
-			WHEN @ShowNG = 1 THEN CASE WHEN w.LicenseeID = @HAIFAID THEN SUM(LicenseeWLEUR) * @RateNGHAIFA
-								       WHEN w.LicenseeID = @12BetID AND cast(w.ReportType AS int) < @12BetDate THEN SUM(LicenseeWLEUR) * @RateNG12Bet
-								       ELSE SUM(LicenseeWLEUR) * @RateNG 
+			WHEN @ShowSB = 1 THEN -SUM(WinlostEUR) * @RateSB
+			WHEN @ShowVS = 1 THEN -SUM(WinlostEUR) * @RateVS
+			WHEN @ShowLC = 1 THEN -SUM(WinlostEUR) * @RateLC
+			WHEN @ShowCS = 1 THEN -SUM(WinlostEUR) * @RateCS
+			WHEN @ShowNG = 1 THEN CASE WHEN w.LicenseeID = @HAIFAID THEN -SUM(WinlostEUR) * @RateNGHAIFA
+								       WHEN w.LicenseeID = @12BetID AND cast(w.ReportType AS int) < @12BetDate THEN -SUM(WinlostEUR) * @RateNG12Bet
+								       ELSE -SUM(WinlostEUR) * @RateNG 
 								       END
 			ELSE 0
 			END
@@ -699,32 +594,47 @@ insert INTO #Result
 	GROUP BY w.ReportType, w.LicenseeID
 	ORDER BY w.ReportType, w.LicenseeID
 
+update #Result
+	SET LicensingFee = 0, LicensingFeeMYR = 0, LicensingFeeUSD = 0, LicensingFeeEUR = 0
+	WHERE LicensingFee < 0
 
-select ReportType,
+select CAST((ReportType + '01') AS date) AS [DateTime],
 	SUM(TurnOver) AS TurnOver,   	
 	SUM(CustomerWinlost) AS CustomerWinlost,  
-	SUM(AmtDueToBA) AS AmtDueToBA,   
-	SUM(AmtDueToRB) AS AmtDueToRB,
+	SUM(CommBA) AS AmtDueToBA,   
+	SUM(CommRB) AS AmtDueToRB,
 	SUM(Betcount)AS BetCount,
-	SUM(LicensingFee) AS LicensingFee,
+	CASE WHEN SUM(LicensingFee) < 0 THEN 0
+		 ELSE SUM(LicensingFee)
+		 END
+		 AS LicensingFee,
 	
 	SUM(TurnOverMYR) AS TurnOverMYR,   	
 	SUM(CustomerWinlostMYR) AS CustomerWinlostMYR,  
-	SUM(AmtDueToBAMYR) AS AmtDueToBAMYR,   
-	SUM(AmtDueToRBMYR) AS AmtDueToRBMYR,
-	SUM(LicensingFeeMYR) AS LicensingFeeMYR,
+	SUM(CommBAMYR) AS AmtDueToBAMYR,   
+	SUM(CommRBMYR) AS AmtDueToRBMYR,
+	CASE WHEN SUM(LicensingFeeMYR) < 0 THEN 0
+		 ELSE SUM(LicensingFeeMYR)
+		 END
+	AS LicensingFeeMYR,
 	
 	SUM(TurnOverUSD) AS TurnOverUSD,   	
 	SUM(CustomerWinlostUSD) AS CustomerWinlostUSD,  
-	SUM(AmtDueToBAUSD) AS AmtDueToBAUSD,   
-	SUM(AmtDueToRBUSD) AS AmtDueToRBUSD,
-	SUM(LicensingFeeUSD) AS LicensingFeeUSD,
+	SUM(CommBAUSD) AS AmtDueToBAUSD,   
+	SUM(CommRBUSD) AS AmtDueToRBUSD,
+	CASE WHEN SUM(LicensingFeeUSD) < 0 THEN 0
+		 ELSE SUM(LicensingFeeUSD)
+		 END
+	AS LicensingFeeUSD,
 	
 	SUM(TurnOverEUR) AS TurnOverEUR,   	
 	SUM(CustomerWinlostEUR) AS CustomerWinlostEUR,  
-	SUM(AmtDueToBAEUR) AS AmtDueToBAEUR,   
-	SUM(AmtDueToRBEUR) AS AmtDueToRBEUR,
-	SUM(LicensingFeeEUR) AS LicensingFeeEUR
+	SUM(CommBAEUR) AS AmtDueToBAEUR,   
+	SUM(CommRBEUR) AS AmtDueToRBEUR,
+	CASE WHEN SUM(LicensingFeeEUR) < 0 THEN 0
+		 ELSE SUM(LicensingFeeEUR)
+		 END
+	AS LicensingFeeEUR
 	   
 from #Result
 GROUP BY ReportType
@@ -738,8 +648,3 @@ DROP TABLE #Exchange2
 DROP TABLE #Temp
 
 END
-
-GO
-GRANT EXECUTE ON [dbo].[OA_Rpt_LicWinloss_Summary2] TO [bodbAdminNet]
-GO
-GRANT VIEW DEFINITION ON [dbo].[OA_Rpt_LicWinloss_Summary2]TO [vnteam]  
