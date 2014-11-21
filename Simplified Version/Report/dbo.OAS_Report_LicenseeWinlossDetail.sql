@@ -19,7 +19,7 @@ AS
    
     Revisions: 
 	  + 20131101@Victor: Add exchange rate to result table
-        
+      - 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust 
     Param's Explanation:  
       + @CustID: SuperID  
       + @BaseCurrency (input currencyID): 2-MYR ; 3-USD; 6-EUR
@@ -47,7 +47,7 @@ DECLARE @SAgWinLoss AS TABLE (
 )  
 
 
-DECLARE @tempAg    TABLE( custID INT PRIMARY KEY)  
+DECLARE @tempAg    TABLE( custID INT PRIMARY KEY,currency INT)  
 DECLARE @VNDCurrencyName VARCHAR(20)
 SELECT @VNDCurrencyName = currency FROM exchange (nolock) WHERE ExchangeId = 51
 
@@ -57,17 +57,18 @@ WHERE LicenseeID=@LicenseeID
 
 DECLARE @Super AS TABLE (custid int primary key, currency int)
 INSERT INTO @Super(custid,currency)  
-SELECT CustID,currency FROM Dep_CustSuper WITH (NOLOCK)  
-WHERE  site = @site
+SELECT DISTINCT CustID,currency FROM bodb_licensee.dbo.f_SelDepCustSuper(@site) --WITH (NOLOCK)  
+--WHERE  site = @site
 
 DECLARE @bettype AS TABLE (bettype INT PRIMARY KEY)
 DECLARE @sporttype TABLE(sporttype INT)
 
 -- get Licensee Cust with filter by @CustID, @Currency,@excludeTest
-INSERT INTO @tempAg (custID) 
-SELECT custID FROM bodb_Licensee.dbo.LicenseeCust (nolock) 
-WHERE (LicenseeID = @LicenseeID) 
-AND (@CustID=0 OR (@CustID<>0 AND CustID = @CustID)) 
+INSERT INTO @tempAg (custID,currency) 
+SELECT custID,currency FROM bodb_Licensee.dbo.f_SelLicenseeCust(@LicenseeID)-- (nolock) 
+WHERE --(LicenseeID = @LicenseeID) 
+--AND 
+(@CustID=0 OR (@CustID<>0 AND CustID = @CustID)) 
 AND (@Currency=0 OR (@Currency<>0 AND Currency=@Currency ))
 AND (@excludeTest=0 OR (@excludeTest=1 AND Currency<>20 ))
 
@@ -117,8 +118,8 @@ BEGIN
         sum(playercomm) AS Playercomm   
     FROM 
         dbo.bettrans b WITH ( NOLOCK,INDEX=IX_srecommend )  
-        INNER JOIN @Super s ON b.srecommend = s.custid
-        INNER JOIN @TempAg a ON b.recommend = a.custid
+        INNER JOIN @Super s ON b.srecommend = s.custid AND s.currency=b.currency
+        INNER JOIN @TempAg a ON b.recommend = a.custid AND b.currency=a.currency
         INNER JOIN @bettype bt ON b.bettype = bt.bettype
     WHERE 
         b.winlostdate BETWEEN @TempFromDate AND @ToDate AND  
@@ -160,7 +161,7 @@ BEGIN
             ELSE 1 END,
         sum(playercomm) AS Playercomm    
     FROM bodb_Licensee.dbo.rptLicWinloss2 b WITH ( NOLOCK )  
-        INNER JOIN @TempAg ag ON ag.custid = b.recommend
+        INNER JOIN @TempAg ag ON ag.custid = b.recommend AND ag.currency=b.Currency
         INNER JOIN @sporttype t ON b.sporttype = t.sporttype
     WHERE  
         b.Winlostdate BETWEEN @FromDate AND @TempToDate  
@@ -202,7 +203,7 @@ BEGIN
             ELSE 1 END,
         sum(playercomm) AS Playercomm        
     FROM bodb_Licensee.dbo.rptLicWinloss_old b WITH ( NOLOCK )  
-        INNER JOIN @TempAg ag ON ag.custid = b.recommend
+        INNER JOIN @TempAg ag ON ag.custid = b.recommend AND ag.currency=b.Currency
         INNER JOIN @sporttype t ON b.sporttype = t.sporttype
     WHERE  
         b.Winlostdate BETWEEN @FromDate AND @TempToDate  
