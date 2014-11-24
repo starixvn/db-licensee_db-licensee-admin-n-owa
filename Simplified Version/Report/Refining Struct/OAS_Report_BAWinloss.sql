@@ -101,7 +101,7 @@ BEGIN
 		AND (Currency <> 20)
 
 	DECLARE @Super AS TABLE (
-		custid INT PRIMARY KEY
+		custid INT --PRIMARY KEY
 		,currency INT
 		)
 
