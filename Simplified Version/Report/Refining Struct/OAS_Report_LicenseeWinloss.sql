@@ -57,7 +57,7 @@ BEGIN
 		)
 
 	DECLARE @tmpAg TABLE (
-		 custID INT PRIMARY KEY
+		 custID INT 
 		,currency INT
 		,Rate MONEY
 		,FromDate SMALLDATETIME
