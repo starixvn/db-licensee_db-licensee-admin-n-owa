@@ -1,24 +1,26 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[OA_Rpt_LicPerformance_TurnOver]    Script Date: 30/09/2014 09:56:37 AM ******/
+/****** Object:  StoredProcedure [dbo].[LA_Rpt_LicPerformance_TurnOver]    Script Date: 01/12/2014 14:39:52 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
 /****** Object:  Stored Procedure dbo.OA_Rpt_LicPerformance_TurnOver    Script Date: 3/4/2014 4:17:39 PM ******/
-ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_TurnOver]  
-	@PartyIDs		VARCHAR(1000)	 = '',
-	@Currency		INT			 = 0,
-	@FromDate		SMALLDATETIME,
-	@ToDate		SMALLDATETIME,
-	@ProductCode	VARCHAR(500),
-	@IsConvert	BIT			 = 0,
-	@BaseCurrency	INT			 = 0,
-	@drawfilter	SMALLINT		 = 1 ,
-	@excludeTest	BIT			 = 0
-AS  
+ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_TurnOver] 
+	 @PartyIDs	    VARCHAR(1000)	= ''
+	,@Currency	    INT			= 0
+	,@FromDate	    SMALLDATETIME
+	,@ToDate		    SMALLDATETIME
+	,@ProductCode	    VARCHAR(500)
+	,@IsConvert	    BIT			= 0
+	,@BaseCurrency	    INT			= 0
+	,@drawfilter	    SMALLINT		= 1
+	,@excludeTest	    BIT			= 0
+AS
+ 
 /*  Created by: 20140930@Florent
     Task : LicenseeAdmin - Get Licensee Perfomance TurnOver Report for each Licensee in one month
+    Original: OA_Rpt_LicPerformance_TurnOver
     DB: DB052.bodb02  
    
     Revisions:  
@@ -41,81 +43,89 @@ AS
 */  
 
 /*
-exec  OA_Rpt_LicPerformance_TurnOver
-	@Licensee='1,3,4,5,6,7,8,9,10,11,12,13,14,15,16',
-	@Currency = 0,
-	@FromDate ='2010-01-12',
-	@ToDate ='2014-02-28',
-	@ProductCode ='SB',
-	@IsConvert =1,
-	@BaseCurrency =-6,
-	@drawfilter  = 1 ,
-	@excludeTest = 0
+EXEC OA_Rpt_LicPerformance_TurnOver 
+	 @Licensee = '1,3,4,5,6,7,8,9,10,11,12,13,14,15,16'
+	,@Currency = 0
+	,@FromDate = '2014-01-12'
+	,@ToDate = '2014-10-28'
+	,@ProductCode = 'SB'
+	,@IsConvert = 1
+	,@BaseCurrency = - 6
+	,@drawfilter = 1
+	,@excludeTest = 0
+ 
+EXEC LA_Rpt_LicPerformance_TurnOver 
+      @PartyIDs = '14,16,17,18,19,20,21,22,23,24,25,26,27'
+	,@Currency = 0
+	,@FromDate = '2014-01-12'
+	,@ToDate = '2014-10-28'
+	,@ProductCode = 'SB'
+	,@IsConvert = 1
+	,@BaseCurrency = - 6
+	,@drawfilter = 1
+	,@excludeTest = 0
+
 */
 BEGIN  
 	SET NOCOUNT ON  
 
-	DECLARE @Licensee VARCHAR(1000) =''
+	CREATE TABLE #Bettype (Bettype INT, ProductID INT)
+     CREATE TABLE #tmpParty (
+		  PartyID		   INT
+		  ,LicenseeID	   INT
+		  ,isDeposit	   INT		  
+		  ,ProductID	   INT 		  		  
+		  )
 
-	SELECT @Licensee += CAST(l.LicenseeID AS VARCHAR) + ',' 
-	FROM bodb_licensee.dbo.Licensees l WITH (NOLOCK) 
-		INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON l.LicenseeID = p.OldRefID AND p. PartyType = 1
-     WHERE p.PartyID IN (SELECT val FROM dbo.strSplit(@PartyIDs,','))
-	
-	SELECT @Licensee = SUBSTRING(@Licensee,0,LEN(@Licensee))
+     INSERT INTO #Bettype
+     SELECT Bettype, ProductID FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, @ProductCode)
+
+     INSERT INTO #tmpParty
+     SELECT DISTINCT PartyID,LicenseeID,isDeposit,ProductID
+     FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA')
+
+
 	CREATE TABLE #rptTurnOver (  
-		Licensee 		VARCHAR(20),
+		PartyName 		VARCHAR(20),
 		rptDate		VARCHAR(50),	
-		TurnOver		MONEY	
-		
-	)
+		TurnOver		MONEY)
 	
 	CREATE TABLE #Temp (  
-		LicenseeID 		INT,	
+		PartyID	 	INT,	
 		rptDate 		DATETIME,
-		CurrencyID 		INT, 
-		TurnOver		MONEY
-	)
-	CREATE  TABLE #tmpLicensee(
-			LicenseeID INT
-	)  
+		CurrencyID 	INT, 
+		TurnOver		MONEY)	
 	
 	CREATE TABLE #Exchange (
-		ExchangeDate DATE,
-		ExchangeId INT,
-		Rate FLOAT,
-		PRIMARY KEY(ExchangeDate,ExchangeId)
-	)	
-	CREATE TABLE #MY(
-		sDate DATETIME
-		)
+		   ExchangeDate   DATE
+		   ,ExchangeId	   INT
+		   ,Rate		   FLOAT
+		   ,PRIMARY KEY (ExchangeDate,ExchangeId))
 
-	DECLARE @cols AS NVARCHAR(MAX),
-			@query  AS NVARCHAR(MAX),
-			@sdate  AS DATETIME 	
+	CREATE TABLE #MY(sDate DATETIME)
+
+	DECLARE  @cols AS NVARCHAR(MAX)
+		   ,@query AS NVARCHAR(MAX)
+		   ,@sdate AS DATETIME
+
 				
-	SELECT @cols=NULL,@query=NULL,@sdate=@FromDate
-
-	INSERT INTO #tmpLicensee (LicenseeID)   
-	SELECT l.LicenseeID
-	FROM bodb_Licensee.dbo.Licensees l (NOLOCK)
-	WHERE l.LicenseeID IN (SELECT VAL FROM strSplit(@Licensee,','))  
+	SELECT @cols = NULL,@query = NULL,@sdate = @FromDate
 	
-	WHILE (month(@sdate)<=month(@ToDate) OR year(@sdate)<year(@ToDate))	
+	WHILE (MONTH(@sdate) <= MONTH(@ToDate) OR YEAR(@sdate) < YEAR(@ToDate))	
 	BEGIN 
 		INSERT INTO #MY(sDate)
 		SELECT @sdate
-		SET @sdate=DATEADD(m,1,@sdate)
+		SET @sdate = DATEADD(m, 1, @sdate)
 	END
 		
-	IF @ProductCode='BA'
+	IF @ProductCode = 'BA'
 	BEGIN
-		INSERT INTO #Temp  (LicenseeID ,rptDate,CurrencyID,TurnOver)
+		INSERT INTO #Temp  (PartyID , rptDate, CurrencyID, TurnOver)
 		SELECT 
-			b.siteID,
-			rptDate,  
-			b.currencyID,
-			SUM(b.turnover
+			tp.PartyID
+			,rptDate
+			,b.currencyID
+			,SUM(b.turnover
 				*
 				CASE WHEN @drawfilter IN (2,3) THEN
 					CASE WHEN b.status = 111  THEN 0	
@@ -125,97 +135,87 @@ BEGIN
 				) TurnOver
 		FROM 
 			bodb_Licensee.dbo.rpt_Betting_BA b WITH ( NOLOCK ) 
-			INNER JOIN #tmpLicensee ag ON ag.LicenseeID=b.SiteID
+			INNER JOIN #tmpParty tp ON tp.LicenseeID = b.SiteID
 		WHERE  
-			b.rptDate  BETWEEN @FromDate AND @ToDate 
-			AND b.status NOT IN (-1,103)
-			AND (@Currency=0 OR (@Currency<>0 AND b.CurrencyID=@Currency))  
-			AND (@excludeTest=0 OR (@excludeTest=1 AND b.CurrencyID<>20)) 
-		GROUP BY b.siteID,rptDate , status, currencyID
-		ORDER BY b.siteID,
-		b.rptDate
+			b.rptDate BETWEEN @FromDate AND @ToDate 
+			AND b.status NOT IN (-1, 103)
+			AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
+			AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 
+		GROUP BY tp.PartyID, rptDate, status, currencyID
+		ORDER BY tp.PartyID, b.rptDate
 
 	END
 		
 		--exclude BA tickets
-	IF  @ProductCode IN ('SB','RB','NG','LC','VS','CS')
+	IF  @ProductCode IN ('SB', 'RB', 'NG', 'LC', 'VS', 'CS')
 	BEGIN
-		INSERT INTO #Temp  (LicenseeID ,rptDate,CurrencyID,TurnOver)
+		INSERT INTO #Temp(PartyID, rptDate, CurrencyID, TurnOver)
 		SELECT 
-			b.siteID,
-			b.rptDate,  
-			b.currencyID,
-			SUM(b.turnover
+			tp.PartyID
+			,b.rptDate
+			,b.currencyID
+			,SUM(b.turnover
 				*
-				CASE WHEN b.bettype=33 AND b.status IN (114,115) THEN 0.5 ELSE 1 END
+				CASE WHEN b.bettype = 33 AND b.status IN (114, 115) THEN 0.5 ELSE 1 END
 				*
-				CASE WHEN @drawfilter IN (2,3) THEN
+				CASE WHEN @drawfilter IN (2, 3) THEN
 					CASE WHEN b.status = 111  THEN 0	
-						 WHEN b.status IN (114,115) THEN 0.5
+						 WHEN b.status IN (114, 115) THEN 0.5
 						 ELSE 1 END 
 					ELSE 1 END
 				) TurnOver
 		FROM 
-			bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK ) 
-			INNER JOIN #tmpLicensee ag ON ag.LicenseeID=b.SiteID
-			LEFT JOIN dbo.League l (NOLOCK) ON b.leagueid=l.leagueid
+			bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK) 
+			INNER JOIN #tmpParty tp ON tp.LicenseeID = b.SiteID
+			INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
+			LEFT JOIN dbo.League l (NOLOCK) ON b.leagueid = l.leagueid
 		WHERE  
 			b.rptDate  BETWEEN @FromDate AND @ToDate 
-			AND b.status NOT IN (-1,103)
-			AND ( (@ProductCode='SB' AND (b.bettype <31 OR b.bettype BETWEEN 121 AND 999))
-				OR(@ProductCode='RB' AND b.bettype BETWEEN 31 AND 33)
-				OR(@ProductCode='NG' AND b.bettype BETWEEN 81 AND 120)
-				OR(@ProductCode='LC' AND b.bettype BETWEEN 1101 AND 1199)
-				OR(@ProductCode='VS' AND b.bettype BETWEEN 1201 AND 1299)
-				OR(@ProductCode='CS' AND b.bettype =71)
-				)	
-			AND (@Currency=0 OR (@Currency<>0 AND b.CurrencyID=@Currency))  
-			AND (@excludeTest=0 OR (@excludeTest=1 AND b.CurrencyID<>20)) 
-		GROUP BY b.siteID, b.rptDate,b.currencyID
-		ORDER BY 
-			b.rptDate ASC
+			AND b.status NOT IN (-1,103)			
+			AND (@Currency = 0 OR (@Currency<>0 AND b.CurrencyID = @Currency))  
+			AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 
+		GROUP BY tp.PartyID, b.rptDate, b.currencyID
+		ORDER BY tp.PartyID ASC
 
 	END	
 
-	INSERT INTO #Exchange (ExchangeDate,ExchangeId , Rate )
-	SELECT exchangedate
-			,exchangeid
-			,CASE @BaseCurrency WHEN -2 THEN MYR
-								WHEN -3 THEN USD
-								WHEN -6 THEN EUR
-								ELSE 1 END AS Rate
-	FROM Lrf_f_GetExchangeDaily (@fromdate,@todate)
-	WHERE exchangeid IN (
-						SELECT DISTINCT currencyID 
-						FROM #Temp
-						)
+	INSERT INTO #Exchange (ExchangeDate, ExchangeId, Rate )
+	SELECT ExchangeDate
+		  ,ExchangeId
+		  ,CASE @BaseCurrency WHEN -2 THEN MYR
+						  WHEN -3 THEN USD
+						  WHEN -6 THEN EUR
+						  ELSE 1 END AS Rate
+	FROM Lrf_f_GetExchangeDaily (@fromdate, @todate)
+	--WHERE exchangeid IN (
+	--				   SELECT DISTINCT currencyID 
+	--				   FROM #Temp
+	--				   )
 							
-	IF (@isconvert=0)
+	IF (@isconvert = 0)
 		BEGIN
 			UPDATE #Exchange
 			SET Rate=1
 		END
-	
-	INSERT INTO #rptTurnOver(Licensee,rptDate,TurnOver)
+
+	INSERT INTO #rptTurnOver(PartyName,rptDate,TurnOver)
 	--create table rptTurnOver (Licensee VARCHAR(20),rptDate VARCHAR(20),TurnOVer MONEY)
 	SELECT 
-		l.LicenseeName,
-		dbo.fnFormatDate(t.rptdate) rptDate,
-		SUM(ISNULL(t.TurnOver,0)*ee.Rate) TurnOver
-		
+		p.PartyName					   
+	    ,dbo.fnFormatDate(t.rptDate)		   AS rptDate
+	    ,SUM(ISNULL(t.TurnOver, 0) * ee.Rate)  AS TurnOver
 	FROM #Temp t
-		INNER JOIN bodb_licensee.dbo.Licensees l WITH (NOLOCK) ON t.LicenseeId=l.LicenseeId
-		INNER JOIN #Exchange  ee ON t.rptDate=ee.exchangedate AND t.CurrencyID=ee.ExchangeId
+		INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON t.PartyID = p.PartyID
+		INNER JOIN #Exchange ee ON t.rptDate = ee.ExchangeDate AND t.CurrencyID = ee.ExchangeId
 	GROUP BY 
-		l.LicenseeName,
-		dbo.fnFormatDate(t.rptdate)
+		p.PartyName, dbo.fnFormatDate(t.rptDate)
 	
 	
-	UPDATE 	#rptTurnOver
-	SET TurnOver=0
-	WHERE (ISNULL(TurnOver,0)=0 OR TurnOver<0)
+	UPDATE #rptTurnOver
+	SET TurnOver = 0
+	WHERE (ISNULL(TurnOver, 0) = 0 OR TurnOver < 0)
 	--------------------------------- view result  -------------------------------------------
-	SELECT @cols= STUFF((SELECT ',' + QUOTENAME(seq )
+	SELECT @cols = STUFF((SELECT ',' + QUOTENAME(seq )
                     FROM 
                     (
                       select dbo.fnFormatDate(sdate) seq
@@ -224,32 +224,32 @@ BEGIN
 					FOR XML PATH(''), TYPE
 					).value('.', 'NVARCHAR(MAX)') 
 				,1,1,'')
-	SET @query='select Licensee,' + @cols + ' 
-            from
+	SET @query='SELECT PartyName AS PartyName,' + @cols + ' 
+            FROM
             (
-              select s.Licensee, s.TurnOver,seq
-              from
+              SELECT s.PartyName, s.TurnOver, seq
+              FROM
               (
-                select Licensee,isnull(TurnOver,0) TurnOver
-                  , rptdate seq
-                from #rptTurnOver
+                SELECT PartyName, isnull(TurnOver, 0) TurnOver
+                  , rptDate seq
+                FROM #rptTurnOver
               ) s
               
             ) x
-            pivot 
+            PIVOT 
             (
-                max(TurnOver)
-                for seq in (' + CONVERT(VARCHAR(1000),@cols) + ')
+                MAX(TurnOver)
+                FOR seq IN (' + CONVERT(VARCHAR(1000), @cols) + ')
             ) p '
-			--print (@query)
+			print (@query)
 	EXECUTE sp_executesql @query;
 				
 	DROP TABLE #rptTurnOver
 	DROP TABLE #Exchange
 	DROP TABLE #Temp
-	DROP TABLE #tmpLicensee
+	DROP TABLE #tmpParty
+	DROP TABLE #Bettype
 	DROP TABLE #MY
-
 END
 
 GO

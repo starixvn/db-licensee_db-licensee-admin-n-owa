@@ -1,6 +1,6 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_CurrencyWinloss]    Script Date: 08/10/2014 11:20:32 AM ******/
+/****** Object:  StoredProcedure [dbo].[LA_Rpt_CurrencyWinloss]    Script Date: 01/12/2014 14:33:23 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -86,7 +86,7 @@ BEGIN
 							 ,Todate	    SMALLDATETIME
 							 )' + CHAR(13) + 
 				    'INSERT INTO #tmpParty (PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Rate, Fromdate, Todate)
-					   SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Rate, Fromdate, Todate
+					   SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, OW_Rate, Fromdate, Todate
 					   FROM bodb_licensee.dbo.LA_f_ChargeInfo (''' + @PartyIDs + ''',''' +CONVERT(VARCHAR(10), @FromDate, 120) + ''',''' + CONVERT(VARCHAR(10), @ToDate, 120) + ''',''' + @ProductCodes + ''',''OA'')' + CHAR(13) + 
 			 'IF ( EXISTS (
 				SELECT TOP 1 1
