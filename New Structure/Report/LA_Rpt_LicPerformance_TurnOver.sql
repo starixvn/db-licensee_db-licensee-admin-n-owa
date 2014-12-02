@@ -111,7 +111,7 @@ BEGIN
 				
 	SELECT @cols = NULL,@query = NULL,@sdate = @FromDate
 	
-	WHILE (MONTH(@sdate) <= MONTH(@ToDate) OR YEAR(@sdate) < YEAR(@ToDate))	
+	WHILE (@sdate < DATEADD(m, 1, @ToDate))	
 	BEGIN 
 		INSERT INTO #MY(sDate)
 		SELECT @sdate
