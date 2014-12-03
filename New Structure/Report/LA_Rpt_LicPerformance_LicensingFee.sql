@@ -76,7 +76,7 @@ BEGIN
      SELECT Bettype,ProductID FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,@ProductCode)
 
      INSERT INTO #tmpParty
-     SELECT PartyID,LicenseeID,isDeposit,AffectedDate,ProductID,OW_Rate,Fromdate,Todate
+     SELECT PartyID,LicenseeID,isDeposit,AffectedDate,ProductID,DI_Rate,Fromdate,Todate
      FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,@ProductCode,'OA')
 	
 	CREATE TABLE #rptLicFee (

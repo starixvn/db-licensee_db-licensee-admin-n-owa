@@ -104,7 +104,7 @@ BEGIN
 		)
 
 	INSERT INTO #tmpParty (PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Rate, Fromdate, Todate)
-	SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, OW_Rate, Fromdate, Todate
+	SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, Fromdate, Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo (@PartyID,@FromDate,@ToDate,@ProductCodes,'OA')
 
 	IF (

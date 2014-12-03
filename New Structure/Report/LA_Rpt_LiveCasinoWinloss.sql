@@ -51,7 +51,7 @@ BEGIN
 	   )
 
     INSERT INTO #tmpParty
-    SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, OW_Rate, Fromdate, Todate
+    SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, Fromdate, Todate
     FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,'LC','OA')
 	  -- filter with exclude test data before launch date
 	IF (EXISTS (

@@ -86,7 +86,7 @@ BEGIN
 							 ,Todate	    SMALLDATETIME
 							 )' + CHAR(13) + 
 				    'INSERT INTO #tmpParty (PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Rate, Fromdate, Todate)
-					   SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, OW_Rate, Fromdate, Todate
+					   SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, Fromdate, Todate
 					   FROM bodb_licensee.dbo.LA_f_ChargeInfo (''' + @PartyIDs + ''',''' +CONVERT(VARCHAR(10), @FromDate, 120) + ''',''' + CONVERT(VARCHAR(10), @ToDate, 120) + ''',''' + @ProductCodes + ''',''OA'')' + CHAR(13) + 
 			 'IF ( EXISTS (
 				SELECT TOP 1 1

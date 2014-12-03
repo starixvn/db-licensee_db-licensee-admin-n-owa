@@ -54,7 +54,7 @@ CREATE TABLE #tmpParty (
 	   )
 
     INSERT INTO #tmpParty
-    SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, OW_Rate, Fromdate, Todate
+    SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, Fromdate, Todate
     FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,'VS','OA')
 
 
