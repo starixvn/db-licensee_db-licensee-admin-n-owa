@@ -62,7 +62,7 @@ BEGIN
 		,pd.IsDeposit
 		,cte.AffectedDate
 		,DI.ProductID
-		,DI.Rate
+		,,CASE WHEN DI.Rate = 0 THEN OW.Rate ELSE DI.Rate END AS DI_Rate
 		,CASE 
 			WHEN DI.ProductID IN (0, 3) --SB and BA				
 				THEN DI.Rate
