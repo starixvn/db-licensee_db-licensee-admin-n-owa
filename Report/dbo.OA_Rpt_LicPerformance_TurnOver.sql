@@ -22,7 +22,7 @@ AS
 /*  Created by: 20140225@Jim
 	Task : LicenseeAdmin - Get Licensee Perfomance TurnOver Report for each Licensee in one month
     DB: DB052.bodb02  
-   
+		- 20141210@Florent: Fix While loop
     Revisions:  
     
 	Param's Explanation:  
@@ -59,15 +59,15 @@ BEGIN
 
 	CREATE TABLE #rptTurnOver (  
 		Licensee 		VARCHAR(20),
-		rptDate			VARCHAR(50),	
+		rptDate		VARCHAR(50),	
 		TurnOver		MONEY	
 		
 	)
 
 	CREATE TABLE #Temp (  
-		LicenseeID 		INT,	
+		LicenseeID 	INT,	
 		rptDate 		DATETIME,
-		CurrencyID 		INT, 
+		CurrencyID 	INT, 
 		TurnOver		MONEY
 	)
 	CREATE  TABLE #tmpLicensee(
@@ -88,18 +88,19 @@ BEGIN
 			@query  AS NVARCHAR(MAX),
 			@sdate  AS DATETIME 	
 				
-	SELECT @cols=NULL,@query=NULL,@sdate=@FromDate
+	SELECT @cols = NULL,@query = NULL,@sdate = @FromDate
 
 	INSERT INTO #tmpLicensee (LicenseeID)   
 	SELECT l.LicenseeID
 	FROM bodb_Licensee.dbo.Licensees l (NOLOCK)
 	WHERE l.LicenseeID IN (SELECT VAL FROM strSplit(@Licensee,','))  
 	
-	WHILE (@sdate<DATEADD(m,1,@ToDate) )	
+
+	WHILE (@sdate < @ToDate)	
 	BEGIN 
 		INSERT INTO #MY(sDate)
 		SELECT @sdate
-		SET @sdate=DATEADD(m,1,@sdate)
+		SET @sdate=DATEADD(m, 1, @sdate)
 	END
 		
 	IF @ProductCode='BA'
@@ -113,7 +114,7 @@ BEGIN
 				*
 				CASE WHEN @drawfilter IN (2,3) THEN
 					CASE WHEN b.status = 111  THEN 0	
-						 WHEN b.status IN (114,115) THEN 0.5
+						 WHEN b.status IN (114, 115) THEN 0.5
 						 ELSE 1 END 
 					ELSE 1 END
 				) TurnOver
@@ -123,8 +124,8 @@ BEGIN
 		WHERE  
 			b.rptDate  BETWEEN @FromDate AND @ToDate 
 			AND b.status NOT IN (-1,103)
-			AND (@Currency=0 OR (@Currency<>0 AND b.CurrencyID=@Currency))  
-			AND (@excludeTest=0 OR (@excludeTest=1 AND b.CurrencyID<>20)) 
+			AND (@Currency = 0 OR (@Currency<>0 AND b.CurrencyID = @Currency))  
+			AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 
 		GROUP BY b.siteID,rptDate , status, currencyID
 		ORDER BY b.siteID,
 		b.rptDate
@@ -156,15 +157,15 @@ BEGIN
 		WHERE  
 			b.rptDate  BETWEEN @FromDate AND @ToDate 
 			AND b.status NOT IN (-1,103)
-			AND ( (@ProductCode='SB' AND (b.bettype <31 OR b.bettype BETWEEN 121 AND 999))
-				OR(@ProductCode='RB' AND b.bettype BETWEEN 31 AND 33)
-				OR(@ProductCode='NG' AND b.bettype BETWEEN 81 AND 120)
-				OR(@ProductCode='LC' AND b.bettype BETWEEN 1101 AND 1199)
-				OR(@ProductCode='VS' AND b.bettype BETWEEN 1201 AND 1299)
-				OR(@ProductCode='CS' AND b.bettype =71)
+			AND ( (@ProductCode = 'SB' AND (b.bettype < 31 OR b.bettype BETWEEN 121 AND 999))
+				OR(@ProductCode = 'RB' AND b.bettype BETWEEN 31 AND 33)
+				OR(@ProductCode = 'NG' AND b.bettype BETWEEN 81 AND 120)
+				OR(@ProductCode = 'LC' AND b.bettype BETWEEN 1101 AND 1199)
+				OR(@ProductCode =' VS' AND b.bettype BETWEEN 1201 AND 1299)
+				OR(@ProductCode = 'CS' AND b.bettype = 71)
 				)	
-			AND (@Currency=0 OR (@Currency<>0 AND b.CurrencyID=@Currency))  
-			AND (@excludeTest=0 OR (@excludeTest=1 AND b.CurrencyID<>20)) 
+			AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
+			AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 
 		GROUP BY b.siteID, b.rptDate,b.currencyID
 		ORDER BY 
 			b.rptDate ASC
