@@ -96,7 +96,11 @@ BEGIN
 	WHERE l.LicenseeID IN (SELECT VAL FROM strSplit(@Licensee,','))  
 	
 
+<<<<<<< HEAD
 	WHILE (@sdate < @ToDate)	
+=======
+	WHILE (@sdate<DATEADD(m, 1, @ToDate) )	
+>>>>>>> d3905730f01168a5cd76879145c326d126bb0ebf
 	BEGIN 
 		INSERT INTO #MY(sDate)
 		SELECT @sdate
