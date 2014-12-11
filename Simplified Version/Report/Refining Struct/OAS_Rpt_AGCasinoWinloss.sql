@@ -20,6 +20,7 @@ AS
     DB: DBACC.bodb02  
     Revisions:  
 		- 20141031@Florent: Apply new Structure Using SystemMapping
+		- 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust
 	Param's Explanation:  
 */
 /*
@@ -64,7 +65,7 @@ BEGIN
 			 FROM OPENQUERY( DBLIC,''SELECT CustID,Currency,p.PartyID,p.PartyName,
 								CASE WHEN ''''' + CONVERT(VARCHAR(10), @Fromdate, 120) + ''''' <= ci.FromDate THEN ci.FromDate ELSE ''''' + CONVERT(VARCHAR(10), @Fromdate, 120) + ''''' END AS FromDate,
 								CASE WHEN ''''' + CONVERT(VARCHAR(10), @ToDate, 120) + '''''  >= ci.ToDate THEN ci.ToDate ELSE ''''' + CONVERT(VARCHAR(10), @ToDate, 120) + '''''  END AS ToDate
-								FROM bodb_Licensee.dbo.LicenseeCust lc WITH (NOLOCK)
+								FROM bodb_Licensee.dbo.f_SelLicenseeCust(0) lc
 								    INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON lc.LicenseeID = p.OldRefID AND p.PartyType = 1	
 								    INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON ci.FromParty = p.PartyID
 								    INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 4
@@ -113,7 +114,7 @@ BEGIN
 		,- SUM(c.Winlost) AS LicenseeWinlost
 	FROM bodb_report.dbo.rptDepWinlost_AGCasino c WITH (NOLOCK)
 	INNER JOIN dbo.Custinfo co WITH (NOLOCK) ON c.CustID = co.CustID
-	INNER JOIN #tmpAg ag ON co.recommend = ag.CustID
+	INNER JOIN #tmpAg ag ON co.recommend = ag.CustID AND co.currency=ag.Currency
 	WHERE c.Winlostdate BETWEEN ag.FromDate AND ag.Todate
 	GROUP BY c.Winlostdate
 		,co.Currency

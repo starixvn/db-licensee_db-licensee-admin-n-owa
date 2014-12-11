@@ -15,9 +15,8 @@ Created: 20140925@Florent
 Task : Get all the currency by multi party
 Base : Acc_SelCurrencyByLicensee
 DB: DB052.bodb02
-
-
 Revisions:
+   - 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust 
 Param's Explanation:
 */
 SET NOCOUNT ON
@@ -28,7 +27,7 @@ BEGIN
 	BEGIN
 		INSERT INTO @temp
 		SELECT DISTINCT Currency
-		FROM bodb_Licensee.dbo.LicenseeCust lc(NOLOCK)
+		FROM bodb_Licensee.dbo.f_SelLicenseeCust(0) lc--(NOLOCK)
 		INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON lc.LicenseeID = p.OldRefID
 		WHERE p.PartyID IN (
 				SELECT val
