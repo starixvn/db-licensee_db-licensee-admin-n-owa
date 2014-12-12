@@ -36,13 +36,21 @@ SELECT PartyID
 FROM dbo.OAS_Party WITH (NOLOCK)
 WHERE PartyName IN ('ONEWorks','Boping')
 
+--get list licensee with lastest config
 INSERT INTO @tmpLicensee (Fromdate, PartyID, PartyGroupID)
-SELECT MAX(FromDate), FromParty, ToParty
-FROM dbo.OAS_Party p WITH (NOLOCK)
-	INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
-     INNER JOIN @tmpCompany tc ON ci.ToParty = tc.PartyID
-WHERE ProductID = 0 AND ChargeType = 1
-GROUP BY FromParty,ToParty
+SELECT ci.FromDate, ci.FromParty, ci.ToParty
+FROM dbo.OAS_ChargeInfo ci WITH (NOLOCK) 
+INNER JOIN (
+	   SELECT MAX(FromDate) Fromdate, FromParty
+	   FROM dbo.OAS_Party p WITH (NOLOCK)
+		   INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty		   
+	   WHERE ProductID = 0 AND ChargeType = 1 
+	   GROUP BY FromParty) p ON ci.FromDate = p.Fromdate AND ci.FromParty = p.FromParty
+INNER JOIN @tmpCompany tc ON ci.ToParty = tc.PartyID
+INNER JOIN dbo.LA_ChargeInfo_SystemMapping cm WITH (NOLOCK) ON ci.ChargeID = cm.ChargeID
+WHERE ProductID = 0 
+    AND ChargeType = 1 
+    AND cm.SystemID = 2
 
 BEGIN
 	CREATE TABLE #Party (
