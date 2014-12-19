@@ -60,11 +60,11 @@ CREATE TABLE #tmpParty (
 	   )
 
 INSERT INTO #Bettype
-SELECT Bettype,ProductID FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,@ProductCode)
+SELECT Bettype,ProductID FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, @ProductCode)
 
 INSERT INTO #tmpParty
 SELECT PartyID,LicenseeID,isDeposit,AffectedDate,ProductID,DI_Rate,Fromdate,Todate
-FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,@ProductCode,'OA')
+FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA',@ExcludeTest)
 
 ----DECLARE  	
 
@@ -131,26 +131,13 @@ CREATE TABLE #Temp (
 	Betcount		BIGINT
 )
 
-IF (
-    EXISTS (
-	   SELECT TOP 1 1
-	   FROM #tmpParty
-	   WHERE AffectedDate > Fromdate
-	   )
-    AND @excludeTest = 1
-    )
-	BEGIN
-		UPDATE #tmpParty
-		SET Fromdate = AffectedDate
-		WHERE AffectedDate > Fromdate
-	END
 
-CREATE TABLE #Exchange (ExchangeDate SMALLDATETIME, ExchangeId INT, USD FLOAT, EUR FLOAT,MYR FLOAT, PRIMARY KEY(ExchangeDate,ExchangeId))	
+CREATE TABLE #Exchange (ExchangeDate SMALLDATETIME, ExchangeId INT, USD FLOAT, EUR FLOAT,MYR FLOAT)	
 
 BEGIN	
 	INSERT INTO #Exchange(ExchangeDate,ExchangeId,USD,EUR,MYR)
 	SELECT DISTINCT ExchangeDate, ExchangeId,USD,EUR,MYR 
-	FROM Lrf_f_GetExchangeDaily(@Fromdate,@ToDate)	
+	FROM Lrf_f_GetExchangeDaily(@Fromdate, @ToDate)	
 		
 	IF CHARINDEX('BA',@ProductCode) <> 0
 	BEGIN
@@ -172,15 +159,15 @@ BEGIN
 			,SUM(b.CommissionA) as CommBA
 			,0 as CommRB
 			,SUM(betcount)
-			* CASE WHEN @drawfilter = 2 AND b.status=111 THEN 0
+			* CASE WHEN @drawfilter = 2 AND b.status = 111 THEN 0
 					ELSE 1 END BetCount
 		FROM 
 			bodb_Licensee.dbo.rpt_Betting_BA b WITH ( NOLOCK ) 
-			INNER JOIN #tmpParty ag ON ag.LicenseeID = b.SiteID
-			INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
+			INNER JOIN #tmpParty ag ON ag.LicenseeID = b.SiteID AND ag.ProductID = 3
+			INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND ag.ProductID = bt.ProductID
 			LEFT JOIN dbo.League l (NOLOCK) ON b.leagueid = l.leagueid
 		WHERE  
-			b.rptDate BETWEEN @FromDate AND @ToDate 
+			b.rptDate BETWEEN ag.FromDate AND ag.ToDate 
 			AND b.status NOT IN (-1,103)
 			AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
 			AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 
@@ -212,7 +199,7 @@ BEGIN
 			,0 as CommBA
 			,SUM(CASE WHEN  b.bettype  BETWEEN 31 AND 33   THEN b.CommissionA ELSE 0 END ) AS CommRB
 			,SUM(b.betcount)
-			* CASE WHEN @drawfilter = 2 AND b.status=111 THEN 0
+			* CASE WHEN @drawfilter = 2 AND b.status = 111 THEN 0
 				  ELSE 1 END BetCount
 			
 		FROM 
@@ -221,10 +208,11 @@ BEGIN
 			INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
 			LEFT JOIN dbo.League l (NOLOCK) ON b.leagueid = l.leagueid
 		WHERE  
-			b.rptDate  BETWEEN @Fromdate AND @ToDate
-			AND b.status NOT IN (-1,103)
+			b.rptDate  BETWEEN ag.Fromdate AND ag.ToDate
+			AND b.status NOT IN (-1, 103)
 			AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
-			AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 			
+			AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 
+			--AND b.customercategory NOT IN (27,28)			
 		GROUP BY ag.PartyID, bt.ProductID, b.rptDate, b.status,b.currencyID
 	END		
 END
@@ -259,13 +247,13 @@ INSERT INTO #Result
 		-SUM(Winlost * e.EUR * tp.Rate)AS LicensingFeeEUR
 	FROM #Temp b
 	   LEFT JOIN #Exchange e  ON e.ExchangeDate = b.Rptdate AND e.exchangeid = b.currency
-	   LEFT JOIN #tmpParty tp ON b.PartyID = tp.PartyID AND b.Rptdate BETWEEN tp.Fromdate AND tp.Todate
-	GROUP BY CONVERT(VARCHAR(6),b.rptDate,112), b.PartyID
-	ORDER BY CONVERT(VARCHAR(6),b.rptDate,112), b.PartyID
+	   LEFT JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, Rate FROM #tmpParty) tp ON b.PartyID = tp.PartyID AND b.Rptdate BETWEEN tp.Fromdate AND tp.Todate
+	GROUP BY CONVERT(VARCHAR(6), b.rptDate, 112), b.PartyID
+	ORDER BY CONVERT(VARCHAR(6), b.rptDate, 112), b.PartyID
 
 UPDATE #Result
 	SET LicensingFee = 0, LicensingFeeMYR = 0, LicensingFeeUSD = 0, LicensingFeeEUR = 0
-	WHERE LicensingFee < 0
+	WHERE LicensingFeeMYR < 0
 
 select CAST((ReportType + '01') AS date) AS [DateTime],
 	SUM(TurnOver) AS TurnOver,   	

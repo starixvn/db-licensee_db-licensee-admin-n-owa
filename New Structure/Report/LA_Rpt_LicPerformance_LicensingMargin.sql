@@ -92,20 +92,7 @@ BEGIN
 
      INSERT INTO #tmpParty
      SELECT DISTINCT PartyID,LicenseeID,isDeposit,AffectedDate,ProductID,Fromdate,Todate
-     FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA')
-	IF (
-	    EXISTS (
-		  SELECT TOP 1 1
-		  FROM #tmpParty
-		  WHERE AffectedDate > Fromdate
-		  )
-	    AND @excludeTest = 1
-	    )
-	BEGIN
-		UPDATE #tmpParty
-		SET Fromdate = AffectedDate
-		WHERE AffectedDate > Fromdate
-	END
+     FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA',@ExcludeTest)
 
 	CREATE TABLE #MY(sDate DATETIME)
 	
@@ -165,7 +152,7 @@ BEGIN
 		FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK) 
 			INNER JOIN #tmpParty tp ON tp.LicenseeID = b.SiteID
 			INNER JOIN #bettype be ON b.bettype = be.bettype
-		WHERE b.rptDate BETWEEN @FromDate AND @Todate
+		WHERE b.rptDate BETWEEN tp.FromDate AND tp.Todate
 			 AND b.status NOT IN (-1, 103)
 			 AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
 			 AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 
@@ -189,7 +176,7 @@ BEGIN
 	
 	SELECT * INTO #TempExchange 
 	FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
-	--WHERE exchangeid IN (SELECT DISTINCT CurrencyID FROM #Temp)
+	
 
 	UPDATE  t
 	SET Winloss = t.Winloss * e.EUR

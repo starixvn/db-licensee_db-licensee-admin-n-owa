@@ -143,34 +143,24 @@ SET NOCOUNT ON
 
 	INSERT INTO #tmpParty
 	SELECT PartyID,LicenseeID,isDeposit,AffectedDate,ProductID,DI_Rate,Fromdate,Todate
-	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,@ProductCodes,'OA')
-	
-	IF ( EXISTS (
-		  SELECT TOP 1 1
-		  FROM #tmpParty
-		  WHERE AffectedDate > Fromdate
-		  ) AND @excludeTest = 1)
-	BEGIN
-		UPDATE #tmpParty
-		SET Fromdate = AffectedDate
-		WHERE AffectedDate > Fromdate
-	END
+	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,@ProductCodes,'OA',@excludeTest)
+		
 
-	SELECT p.PartyID, p.LicenseeID, p.ProductID, bt.Bettype 
+	SELECT DISTINCT p.PartyID, p.LicenseeID, p.ProductID, bt.Bettype 
      INTO #PartyBettype
      FROM #tmpParty p 
 	   INNER JOIN #Bettype bt ON p.ProductID = bt.ProductID
-		
+	GROUP BY p.PartyID, p.LicenseeID, p.ProductID, bt.Bettype 
 	CREATE TABLE #Exchange (
 		ExchangeDate  INT
 		,ExchangeId   INT
 		,USD		    FLOAT
 		,EUR		    FLOAT
 		,MYR		    FLOAT
-		,PRIMARY KEY (
-			ExchangeDate
-			,ExchangeId
-			)
+		--,PRIMARY KEY (
+		--	ExchangeDate
+		--	,ExchangeId
+		--	)
 		)
 
 	INSERT INTO #Exchange (ExchangeDate, ExchangeId, USD, EUR, MYR)
@@ -215,7 +205,7 @@ SET NOCOUNT ON
 				END BetCount
 		FROM bodb_Licensee.dbo.rpt_Betting_BA b WITH (NOLOCK)
 		INNER JOIN #tmpParty p ON b.SiteID = p.LicenseeID and p.ProductID = 3
-		INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
+		INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND p.ProductID = bt.ProductID
 		LEFT JOIN dbo.League l(NOLOCK) ON b.leagueid = l.leagueid
 		WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate
 			AND b.STATUS NOT IN (- 1, 103)
@@ -293,7 +283,7 @@ SET NOCOUNT ON
 					   AND b.CurrencyID <> 20
 					   )
 				)
-			 AND b.customercategory NOT IN (27,28)
+			 --AND b.customercategory NOT IN (27,28)
 		GROUP BY  b.rptDate	
 			 ,b.SiteID 
 			 ,PartyID	 
@@ -333,7 +323,7 @@ SET NOCOUNT ON
 					END) AS LicenseeWL
 			,SUM(CASE 
 					WHEN b.bettype BETWEEN 31 AND 33
-						THEN b.Winloss
+						THEN b.AWinloss
 					ELSE 0
 					END) AS WinlossRB
 			,0 AS AmountDueToBA
@@ -416,8 +406,7 @@ SET NOCOUNT ON
 		,Company * e.EUR	  AS CompanyEUR
 		,Playercomm * e.EUR	  AS PlayercommEUR
 	FROM #Temp b
-	LEFT JOIN #Exchange e ON e.ExchangeDate = ReportType
-		AND e.exchangeid = b.currency
+	LEFT JOIN #Exchange e ON e.ExchangeDate = ReportType AND e.ExchangeId = b.Currency
 END
 
 SELECT w.PartyID	

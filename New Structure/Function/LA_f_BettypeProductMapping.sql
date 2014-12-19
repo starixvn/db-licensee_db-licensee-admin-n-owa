@@ -22,11 +22,22 @@ AS
 */
 
 BEGIN
-	IF CHARINDEX('SB', @ProductCodes) <> 0
-	   OR CHARINDEX('BA', @ProductCodes) <> 0
+    IF CHARINDEX('SB', @ProductCodes) <> 0
+	   --OR CHARINDEX('BA', @ProductCodes) <> 0
     BEGIN
 	   INSERT INTO @tbBettypeProduct
-	   SELECT typeid,0
+	   SELECT typeid, 0
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE (typeid < 31
+		  OR typeid BETWEEN 121 AND 999
+		  OR typeid BETWEEN 1301 AND 1399)
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+    END
+
+    IF CHARINDEX('BA', @ProductCodes) <> 0
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 3
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE (typeid < 31
 		  OR typeid BETWEEN 121 AND 999
@@ -37,7 +48,7 @@ BEGIN
     IF CHARINDEX('RB', @ProductCodes) <> 0
     BEGIN
 	   INSERT INTO @tbBettypeProduct
-	   SELECT typeid,1
+	   SELECT typeid, 1
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 31 AND 33
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
@@ -46,7 +57,7 @@ BEGIN
     IF CHARINDEX('NG', @ProductCodes) <> 0
     BEGIN
 	   INSERT INTO @tbBettypeProduct
-	   SELECT typeid,2
+	   SELECT typeid, 2
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 81 AND 120
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
@@ -55,7 +66,7 @@ BEGIN
     IF CHARINDEX('LC', @ProductCodes) <> 0
     BEGIN
 	   INSERT INTO @tbBettypeProduct
-	   SELECT typeid,4
+	   SELECT typeid, 4
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 1101 AND 1199
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
@@ -64,7 +75,7 @@ BEGIN
     IF CHARINDEX('VS', @ProductCodes) <> 0
     BEGIN
 	   INSERT INTO @tbBettypeProduct
-	   SELECT typeid,5
+	   SELECT typeid, 5
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 1201 AND 1299
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
@@ -73,7 +84,7 @@ BEGIN
     IF CHARINDEX('CS', @ProductCodes) <> 0
     BEGIN
 	   INSERT INTO @tbBettypeProduct
-	   SELECT typeid,6
+	   SELECT typeid, 6
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid = 71
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))

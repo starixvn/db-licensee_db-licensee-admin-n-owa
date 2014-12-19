@@ -44,20 +44,8 @@ BEGIN
 
     INSERT INTO #tmpParty
     SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, Fromdate, Todate
-    FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,'NG','OA') 
+    FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'NG', 'OA', @ExcludeTest) 
 
-	-- filter with exclude test data before launch date
-	IF (EXISTS (
-			SELECT TOP 1 1
-			FROM #tmpParty
-			WHERE AffectedDate > Fromdate
-			) AND @excludeTest =1 )
-	BEGIN
-		UPDATE #tmpParty
-		SET Fromdate = AffectedDate
-		WHERE AffectedDate > Fromdate
-	END
-	
 	--Output table 
 	CREATE TABLE #Result (PartyID int,Currency int, TurnOver MONEY, MemberWinloss MONEY, GrossWinloss MONEY, Betcount INT, OneworksRevenue MONEY, winlostdate datetime)
 	
@@ -90,13 +78,13 @@ BEGIN
 			AND b.status NOT IN (-1,103)
 			AND (@excludeTest = 0 OR (@excludeTest = 1 AND CurrencyID <> 20))
 			AND bettype BETWEEN 81 AND 120			
-			AND b.customercategory NOT IN (27,28)
+			--AND b.customercategory NOT IN (27,28)
 		GROUP BY b.rptDate, b.CurrencyID, lr.PartyID
 	END	
 
 	CREATE NONCLUSTERED INDEX IDX_Currency ON #Data(Currency,winlostdate)
 	
-	SELECT *
+	SELECT DISTINCT ExchangeDate, ExchangeId, USD, EUR, MYR
 	INTO #Exchange	
 	FROM Lrf_f_GetExchangeDaily(@FromDate,@ToDate) 
 	WHERE exchangeid IN (SELECT DISTINCT Currency FROM #Data)
@@ -114,32 +102,15 @@ BEGIN
 			,winlostdate,d.Currency
 		FROM #Data d						
 			LEFT JOIN #tmpParty tp ON d.PartyID = tp.PartyID
+	     WHERE d.winlostdate BETWEEN tp.Fromdate AND tp.Todate
 		GROUP BY
 			 d.PartyID, d.Currency,winlostdate
 	END
-	/*
-	ELSE
-	BEGIN --time when Lupine has been terminated
-		INSERT INTO #Result(PartyID, TurnOver, MemberWinloss, GrossWinloss,  
-							Betcount, OneworksRevenue, winlostdate,Currency)
-		SELECT	
-			d.PartyID,
-			CAST(isnull(SUM(d.TurnOver ),0) AS MONEY) AS TurnOver,			
-			CAST(isnull(SUM(d.MemberWinloss ),0) AS MONEY) AS MemberWinloss,			
-			CAST(-1 * isnull(SUM(d.MemberWinloss ),0) AS money) AS GrossWinloss,			
-			ISNULL(SUM(d.betcount), 0) AS BetCount,
-			CAST( isnull(SUM(-1 * d.MemberWinloss  * isnull(tp.Rate,0)),0) AS money) AS OneworksRevenue			
-			,winlostdate,d.Currency
-		FROM #Data d
-			LEFT JOIN #tmpParty tp ON d.PartyID = tp.PartyID
-		GROUP BY
-			d.PartyID, winlostdate,d.Currency
-	END	
-	*/
+	
 		
 	SELECT	
-		CASE	WHEN p.PartyName='IBC' THEN 'FDL'
-		     WHEN p.PartyName='18bb' THEN 'PIH'
+		CASE	WHEN p.PartyName = 'IBC' THEN 'FDL'
+		     WHEN p.PartyName = '18bb' THEN 'PIH'
 		     ELSE p.PartyName 
 		END AS PartyName,
 		CONVERT(VARCHAR(6),winlostdate,112)   AS Winlostdate,
@@ -147,21 +118,28 @@ BEGIN
 
 		SUM(re.turnover * e.EUR) AS Turnover,
 		SUM(re.MemberWinloss * e.EUR) AS MemberWinloss,
-		SUM(re.GrossWinloss * e.EUR) AS LicenseeWinloss,
-		SUM(re.OneworksRevenue * e.EUR) AS OneworksRevenue
+		CASE WHEN SUM(re.GrossWinloss * e.EUR) <= 0
+			 THEN 0 
+			 ELSE SUM(re.GrossWinloss * e.EUR)
+		 END AS LicenseeWinloss,
+		CASE WHEN SUM(re.OneworksRevenue * e.EUR) <= 0
+			 THEN 0
+			ELSE SUM(re.OneworksRevenue * e.EUR)
+		END AS OneworksRevenue
 	FROM #Result re
-		INNER JOIN #Exchange e ON re.currency = e.ExchangeId AND re.winlostdate=e.ExchangeDate
+		INNER JOIN #Exchange e ON re.currency = e.ExchangeId AND re.winlostdate = e.ExchangeDate
 		LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON re.PartyID = p.PartyID		
 	GROUP BY
-		CONVERT(VARCHAR(6),winlostdate,112),CASE WHEN p.PartyName='IBC' THEN 'FDL'
-		     WHEN p.PartyName='18bb' THEN 'PIH'
+		CONVERT(VARCHAR(6),winlostdate,112),CASE WHEN p.PartyName = 'IBC' THEN 'FDL'
+		     WHEN p.PartyName = '18bb' THEN 'PIH'
 		     ELSE p.PartyName 
 		END
-     ORDER BY CONVERT(VARCHAR(6),winlostdate,112) ASC
+     ORDER BY CONVERT(VARCHAR(6), winlostdate, 112) ASC
 	
 	DROP TABLE	#Data
 	DROP TABLE	#Exchange
 	DROP TABLE	#Result
+	DROP TABLE	#tmpParty
 END    
 
 GO

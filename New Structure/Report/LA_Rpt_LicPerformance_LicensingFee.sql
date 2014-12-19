@@ -50,7 +50,7 @@ exec  OA_Rpt_LicPerformance_LicensingFee
 	@IsConvert =1,
 	@BaseCurrency =-6,
 	@drawfilter  = 1 ,
-	@excludeTest = 0
+	@ExcludeTest = 0
 */
 BEGIN  
 	SET NOCOUNT ON  
@@ -77,7 +77,7 @@ BEGIN
 
      INSERT INTO #tmpParty
      SELECT PartyID,LicenseeID,isDeposit,AffectedDate,ProductID,DI_Rate,Fromdate,Todate
-     FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,@ProductCode,'OA')
+     FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,@ProductCode,'OA',@ExcludeTest)
 	
 	CREATE TABLE #rptLicFee (
 		   Licensee VARCHAR(20)
@@ -91,10 +91,9 @@ BEGIN
 		   ,Winloss	   MONEY)
 	
 	CREATE TABLE #Exchange (
-		ExchangeDate  DATE
+		ExchangeDate   DATE
 		,ExchangeId    INT
-		,Rate		    FLOAT
-		,PRIMARY KEY(ExchangeDate,ExchangeId)
+		,Rate		FLOAT		
 	)	
 	CREATE TABLE #MY(sDate DATETIME)
 
@@ -119,7 +118,7 @@ BEGIN
 		FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK) 
 			INNER JOIN #tmpParty tp ON tp.LicenseeID = b.SiteID
 			INNER JOIN #bettype be ON b.bettype = be.bettype
-		WHERE b.rptDate BETWEEN @FromDate AND @Todate
+		WHERE b.rptDate BETWEEN tp.FromDate AND tp.Todate
 			 AND b.status NOT IN (-1, 103)
 			 AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
 			 AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 

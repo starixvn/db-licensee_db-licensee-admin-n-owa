@@ -16,6 +16,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_TurnOver]
 	,@BaseCurrency	    INT			= 0
 	,@drawfilter	    SMALLINT		= 1
 	,@excludeTest	    BIT			= 0
+WITH RECOMPILE
 AS
  
 /*  Created by: 20140930@Florent
@@ -74,15 +75,17 @@ BEGIN
 		  PartyID		   INT
 		  ,LicenseeID	   INT
 		  ,isDeposit	   INT		  
-		  ,ProductID	   INT 		  		  
+		  ,ProductID	   INT 		
+		  ,FromDate	   DATE  		  
+		  ,ToDate	   DATE
 		  )
 
      INSERT INTO #Bettype
      SELECT Bettype, ProductID FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, @ProductCode)
 
-     INSERT INTO #tmpParty
-     SELECT DISTINCT PartyID,LicenseeID,isDeposit,ProductID
-     FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA')
+     INSERT INTO #tmpParty (PartyID, LicenseeID, isDeposit, ProductID, FromDate, ToDate)
+     SELECT DISTINCT PartyID,LicenseeID,isDeposit,ProductID, FromDate, ToDate
+     FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA',@ExcludeTest)
 
 
 	CREATE TABLE #rptTurnOver (  
@@ -99,8 +102,7 @@ BEGIN
 	CREATE TABLE #Exchange (
 		   ExchangeDate   DATE
 		   ,ExchangeId	   INT
-		   ,Rate		   FLOAT
-		   ,PRIMARY KEY (ExchangeDate,ExchangeId))
+		   ,Rate		   FLOAT )
 
 	CREATE TABLE #MY(sDate DATETIME)
 
@@ -111,7 +113,7 @@ BEGIN
 				
 	SELECT @cols = NULL,@query = NULL,@sdate = @FromDate
 	
-	WHILE (@sdate < DATEADD(m, 1, @ToDate))	
+	WHILE (@sdate <= @ToDate)
 	BEGIN 
 		INSERT INTO #MY(sDate)
 		SELECT @sdate
@@ -137,7 +139,7 @@ BEGIN
 			bodb_Licensee.dbo.rpt_Betting_BA b WITH ( NOLOCK ) 
 			INNER JOIN #tmpParty tp ON tp.LicenseeID = b.SiteID
 		WHERE  
-			b.rptDate BETWEEN @FromDate AND @ToDate 
+			b.rptDate BETWEEN tp.FromDate AND tp.ToDate 
 			AND b.status NOT IN (-1, 103)
 			AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
 			AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 
@@ -170,7 +172,7 @@ BEGIN
 			INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
 			LEFT JOIN dbo.League l (NOLOCK) ON b.leagueid = l.leagueid
 		WHERE  
-			b.rptDate  BETWEEN @FromDate AND @ToDate 
+			b.rptDate  BETWEEN tp.FromDate AND tp.ToDate 
 			AND b.status NOT IN (-1,103)			
 			AND (@Currency = 0 OR (@Currency<>0 AND b.CurrencyID = @Currency))  
 			AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 
@@ -187,10 +189,6 @@ BEGIN
 						  WHEN -6 THEN EUR
 						  ELSE 1 END AS Rate
 	FROM Lrf_f_GetExchangeDaily (@fromdate, @todate)
-	--WHERE exchangeid IN (
-	--				   SELECT DISTINCT currencyID 
-	--				   FROM #Temp
-	--				   )
 							
 	IF (@isconvert = 0)
 		BEGIN
@@ -198,8 +196,7 @@ BEGIN
 			SET Rate=1
 		END
 
-	INSERT INTO #rptTurnOver(PartyName,rptDate,TurnOver)
-	--create table rptTurnOver (Licensee VARCHAR(20),rptDate VARCHAR(20),TurnOVer MONEY)
+	INSERT INTO #rptTurnOver(PartyName,rptDate,TurnOver)	
 	SELECT 
 		p.PartyName					   
 	    ,dbo.fnFormatDate(t.rptDate)		   AS rptDate
