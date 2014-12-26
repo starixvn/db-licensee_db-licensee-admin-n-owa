@@ -24,6 +24,7 @@ AS
     DB: DB052.bodb02  
    
     Revisions:  		
+	   - 20141226@Florent: enhance SP
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
 	  + @Currency : 0-All Currencies
@@ -39,70 +40,34 @@ AS
 					 -3: convert to USD
 		
 */  
-
-/*
-exec  OA_Rpt_LicPerformance_LicensingFee
-	@Licensee='1,3,4,5,6,7,8,9,10,11,12,13,14,15,16',
-	@Currency = 0,
-	@FromDate ='2010-01-12',
-	@ToDate ='2014-02-28',
-	@ProductCode ='SB',
-	@IsConvert =1,
-	@BaseCurrency =-6,
-	@drawfilter  = 1 ,
-	@ExcludeTest = 0
-*/
 BEGIN  
 	SET NOCOUNT ON  
 
-	CREATE TABLE #Bettype (Bettype INT,ProductID INT)
-     CREATE TABLE #tmpParty (
-		  PartyID	    INT
-		  ,LicenseeID   INT
-		  ,isDeposit    INT
-		  ,AffectedDate SMALLDATETIME
-		  ,ProductID    INT 
-		  ,Rate	    Money
-		  ,Fromdate	    SMALLDATETIME
-		  ,Todate	    SMALLDATETIME
-		  )
-     CREATE TABLE #Data (
-		   rptDate	   SMALLDATETIME
-		  ,currencyID	   INT 
-		  ,winloss	   MONEY 
-		  ,siteID		   INT)
+	CREATE TABLE #Bettype (Bettype INT, ProductID INT)
+     CREATE TABLE #tmpParty (PartyID INT, LicenseeID INT, ProductID INT, Rate MONEY, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
 
-     INSERT INTO #Bettype
-     SELECT Bettype,ProductID FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,@ProductCode)
+     INSERT INTO #Bettype( Bettype, ProductID)
+     SELECT Bettype,ProductID 
+	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,@ProductCode)
 
-     INSERT INTO #tmpParty
-     SELECT PartyID,LicenseeID,isDeposit,AffectedDate,ProductID,DI_Rate,Fromdate,Todate
-     FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,@ProductCode,'OA',@ExcludeTest)
+     INSERT INTO #tmpParty( PartyID, LicenseeID, ProductID, Rate, Fromdate, Todate)
+     SELECT PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
+     FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', @ExcludeTest)
 	
-	CREATE TABLE #rptLicFee (
-		   Licensee VARCHAR(20)
-		   ,rptDate VARCHAR(50)
-		   ,Fee MONEY)
+	CREATE TABLE #rptLicFee (Licensee VARCHAR(20), rptDate VARCHAR(50), Fee MONEY)
 
-	CREATE TABLE #Temp (
-		   PartyId	   INT
-		   ,rptDate	   DATETIME
-		   ,CurrencyID	   INT
-		   ,Winloss	   MONEY)
+	CREATE TABLE #Temp (PartyId INT, rptDate DATETIME, CurrencyID INT, Winloss MONEY)
 	
-	CREATE TABLE #Exchange (
-		ExchangeDate   DATE
-		,ExchangeId    INT
-		,Rate		FLOAT		
-	)	
+	CREATE TABLE #Exchange (ExchangeDate DATE, ExchangeId INT, Rate FLOAT)	
+
 	CREATE TABLE #MY(sDate DATETIME)
 
-	DECLARE @cols AS NVARCHAR(MAX),
-			@query  AS NVARCHAR(MAX),			
-			@sdate  AS DATETIME 
-	SELECT @cols=NULL,
-		   @query=NULL,		   
-		   @sdate=@FromDate
+	DECLARE @cols	    AS NVARCHAR(MAX),
+			@query   AS NVARCHAR(MAX),			
+			@sdate   AS DATETIME 
+	SELECT @cols = NULL,
+		  @query = NULL,		   
+		  @sdate = @FromDate
     
     	WHILE ((MONTH(@sdate) <= MONTH(@ToDate) AND YEAR(@sdate) = YEAR(@ToDate)) OR (YEAR(@sdate) < YEAR(@ToDate)))
 	BEGIN 
@@ -111,75 +76,68 @@ BEGIN
 		SET @sdate = DATEADD(m, 1, @sdate)
 	END	
 
-	IF  @ProductCode IN ('SB', 'NG', 'LC', 'VS', 'CS')
-	BEGIN
-		INSERT INTO #Data (rptDate, currencyID, winloss, siteID)
-		SELECT rptDate, currencyID, SUM(winloss), siteID
-		FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK) 
-			INNER JOIN #tmpParty tp ON tp.LicenseeID = b.SiteID
-			INNER JOIN #bettype be ON b.bettype = be.bettype
-		WHERE b.rptDate BETWEEN tp.FromDate AND tp.Todate
-			 AND b.status NOT IN (-1, 103)
-			 AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
-			 AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 
-	     GROUP BY rptDate, currencyID, siteID, b.bettype, status
-
-		INSERT INTO #Temp  (PartyId, rptDate, CurrencyID, Winloss)
-		SELECT 
-			tp.PartyID,
-			b.rptDate,  
-			b.currencyID,
-			-SUM(b.winloss	* ISNULL(tp.Rate,1)) Winloss
-		FROM #Data b WITH (NOLOCK)
-			INNER JOIN #tmpParty tp ON tp.LicenseeID = b.SiteID
-		WHERE b.rptDate  BETWEEN tp.Fromdate AND tp.Todate			
-		GROUP BY tp.PartyID, b.rptDate, b .currencyID
-		ORDER BY tp.PartyID, b.rptDate
-
+	IF @ProductCode IN ('SB', 'NG', 'LC', 'VS', 'CS')
+	BEGIN		
+		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, Winloss)
+		SELECT tp.PartyID, d.rptDate, d.CurrencyID, - SUM(d.Winloss * ISNULL(tp.Rate,0))
+		FROM (
+		    SELECT rptDate, currencyID, tp.PartyID, SUM(winloss) AS Winloss
+		    FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK) 
+			    INNER JOIN (SELECT DISTINCT PartyID, LicenseeID FROM #tmpParty) tp ON tp.LicenseeID = b.SiteID
+			    INNER JOIN #bettype be ON b.bettype = be.bettype 
+		    WHERE b.rptDate BETWEEN @FromDate AND @Todate
+				AND b.status NOT IN (-1, 103)
+				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
+				AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 
+				AND b.customercategory NOT IN (27, 28)
+		    GROUP BY rptDate, currencyID, tp.PartyID
+		    ) d 
+			 INNER JOIN (SELECT DISTINCT PartyID, Rate, Fromdate, Todate FROM #tmpParty) tp ON tp.PartyID = d.PartyID 
+		WHERE d.rptDate  BETWEEN tp.Fromdate AND tp.Todate			
+		GROUP BY tp.PartyID, d.rptDate, d.currencyID		
 	END	
 
-	INSERT INTO #Exchange (ExchangeDate, ExchangeId, Rate )
+	INSERT INTO #Exchange (ExchangeDate, ExchangeId, Rate)
 	SELECT ExchangeDate
 			,ExchangeId
 			,CASE @BaseCurrency WHEN -2 THEN MYR
 							 WHEN -3 THEN USD
 							 WHEN -6 THEN EUR
 							 ELSE 1 END AS Rate
-	FROM Lrf_f_GetExchangeDaily (@fromdate, @todate)
-	--WHERE exchangeid IN (
-	--					SELECT DISTINCT currencyID 
-	--					FROM #Temp
-	--					)
+	FROM dbo.Lrf_f_GetExchangeDaily (@fromdate, @todate)
 	IF (@isconvert = 0)
 		BEGIN
 			UPDATE #Exchange
 			SET Rate = 1
 		END
 	
-	INSERT INTO #rptLicFee(Licensee,rptDate,Fee)
+	INSERT INTO #rptLicFee(Licensee, rptDate, Fee)
 	SELECT 
-		p.PartyName,
-		dbo.fnFormatDate(t.rptdate) rptDate,
-		SUM(t.Winloss*ee.Rate) Fee
+		p.PartyName		
+		, DATENAME(YEAR, t.rptDate)  + '-' + DATENAME(MONTH, t.rptDate) AS rptDate
+		, SUM(t.Winloss*ee.Rate) Fee
 	FROM #Temp t
 		INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON t.PartyId = p.PartyID
-		INNER JOIN #Exchange  ee ON t.rptDate = ee.exchangedate AND t.CurrencyID = ee.ExchangeId
-	GROUP BY p.PartyName, dbo.fnFormatDate(t.rptdate)
-	ORDER BY  p.PartyName, dbo.fnFormatDate(t.rptdate)
+		INNER JOIN #Exchange ee ON t.rptDate = ee.exchangedate AND t.CurrencyID = ee.ExchangeId
+	GROUP BY p.PartyName, DATENAME(YEAR, t.rptDate)  + '-' + DATENAME(MONTH, t.rptDate)
+	
 	
 	UPDATE #rptLicFee
 	SET Fee = 0
 	WHERE Fee < 0	
 	--------------------------------- view result  -------------------------------------------
-	SELECT @cols = STUFF((SELECT ',' + QUOTENAME(seq )
-                    FROM 
-                    (
-                      SELECT dbo.fnFormatDate(sdate) seq
-                     FROM #MY
-                    )d
-					FOR XML PATH(''), TYPE
-					).value('.', 'NVARCHAR(MAX)') 
-				,1,1,'')
+	--SELECT @cols = STUFF((SELECT ',' + QUOTENAME(seq )
+ --                   FROM 
+ --                   (
+ --                     SELECT dbo.fnFormatDate(sdate) seq
+ --                    FROM #MY
+ --                   )d
+	--				FOR XML PATH(''), TYPE
+	--				).value('.', 'NVARCHAR(MAX)') 
+	--			, 1, 1, '')
+	SELECT @cols = COALESCE(@cols + ',' + QUOTENAME(DATENAME(YEAR, sdate)  + '-' + DATENAME(MONTH, sdate))
+									, QUOTENAME(DATENAME(YEAR, sdate)  + '-' + DATENAME(MONTH, sdate)))
+	FROM #MY
 	SET @query = 'SELECT Licensee AS PartyName,' + @cols + ' 
             FROM
             (
@@ -204,8 +162,7 @@ BEGIN
 	DROP TABLE #Temp
 	DROP TABLE #tmpParty
 	DROP TABLE #MY
-	DROP TABLE #bettype
-	DROP TABLE #Data
+	DROP TABLE #bettype	
 END
 
 GO

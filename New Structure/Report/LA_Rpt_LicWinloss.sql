@@ -27,6 +27,7 @@ AS
      Revisions:  
 	   - 20141021@Florent: get data from credit's licensee
 	   - 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
+	   - 20141226@Florent: Fix hafl-won, hafl-lose on Racing
 	Param's Explanation:  
 	  + @PartyIDs	: a string of list PartyID, separate by ','
 	  + @Currency	:  0- All Currencies
@@ -283,7 +284,7 @@ SET NOCOUNT ON
 					   AND b.CurrencyID <> 20
 					   )
 				)
-			 --AND b.customercategory NOT IN (27,28)
+			 AND b.customercategory NOT IN (27,28)
 		GROUP BY  b.rptDate	
 			 ,b.SiteID 
 			 ,PartyID	 
@@ -309,7 +310,7 @@ SET NOCOUNT ON
 						THEN CASE 
 								WHEN b.STATUS = 111
 									THEN 0
-								WHEN b.STATUS IN (114, 115)
+								WHEN b.STATUS IN (114, 115) AND b.Bettype != 33
 									THEN 0.5
 								ELSE 1
 								END

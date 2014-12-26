@@ -132,10 +132,10 @@ BEGIN
 			FROM (
 				SELECT SiteId, b.rptDate, b.CurrencyID, bt.ProductID
 					 , SUM(b.turnover 
-						* CASE WHEN b.bettype = 33 AND b.Status IN (114, 115) THEN 0.5 ELSE 1 END
+						* CASE WHEN b.bettype = 33 AND b.Status IN (114, 115) THEN 0.5 ELSE 1 END -- Haft-won, haft-lose for Racing
 						* CASE WHEN @DrawFilter IN (2, 3) 
 							THEN CASE WHEN b.Status = 111 THEN 0
-									WHEN b.Status IN (114, 115) THEN 0.5
+									WHEN b.Status IN (114, 115) AND b.Bettype != 33 THEN 0.5 -- Haft-won, haft-lose for not Racing
 									ELSE 1 END
 							ELSE 1 END
 						) AS TurnOver
@@ -166,7 +166,7 @@ BEGIN
 					LEFT JOIN dbo.League l(NOLOCK) ON b.leagueid = l.leagueid
 				WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 					AND b.[Status] NOT IN (- 1, 103)
-					--AND b.customercategory NOT IN (27,28)
+					AND b.customercategory NOT IN (27,28)
 					AND (@SportType = 0	OR (@SportType <> 0 AND b.bettype NOT BETWEEN 31 AND 120  AND l.sporttype = @SportType))
 					AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
 					AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
@@ -183,13 +183,37 @@ BEGIN
 	FROM Lrf_f_GetExchangeDaily(@FromDate, @Todate)
 	WHERE ExchangeId IN (SELECT Currency FROM #SAgWinLoss)
 
+	--=====Currency Name
+	DECLARE @temp AS TABLE (currency INT)
+	INSERT INTO @temp
+	SELECT DISTINCT Currency 
+	FROM #SAgWinLoss
+
+	DECLARE @temp1 AS TABLE (currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
+	INSERT INTO @temp1(currency, CurrencyName, CurrencyCode)
+	SELECT t.currency, e.currency, e.Code
+	FROM @temp t
+	INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON t.currency = e.exchangeid
+
+	UPDATE t1
+	SET CurrencyCode = t1.CurrencyCode + ' (' + CurrencyName + ')'
+	FROM @temp1 t1
+	INNER JOIN (
+	   SELECT CurrencyCode
+	    FROM @temp1
+	    GROUP BY CurrencyCode
+	    HAVING COUNT(1) > 1
+	) t2 ON t1.CurrencyCode = t2.CurrencyCode
+
 	--============================final select================================
 	SELECT CASE WHEN @ReportBy = 1 THEN CONVERT(VARCHAR(8), w.winlostdate, 112)
 			WHEN @ReportBy = 2 THEN CONVERT(VARCHAR(6), w.winlostdate, 112)
 			ELSE '0' END ReportType
 		, w.Currency
-		, CASE WHEN Currency = 51 THEN @VNDCurrencyName
-			ELSE e.Code END currencyName
+		, CASE WHEN w.Currency = 51 THEN @VNDCurrencyName			  
+			  WHEN w.Currency = 20 THEN e.Code
+			--ELSE e.Code END + CASE WHEN e.Code = ex.Code THEN '('+ CAST(ex.currency AS VARCHAR)+')'ELSE '' END AS currencyName
+			ELSE ISNULL(t.CurrencyCode,e.Code) END AS currencyName
 		, SUM(TurnOver) AS Turnover
 		, SUM(Winlost) AS Winlost
 		, SUM(LicenseeWL) AS LicenseeWL
@@ -236,12 +260,16 @@ BEGIN
 		, CAST(SUM(playercomm * e.EUR) AS MONEY) AS PlayercommEUR
 	FROM #SAgWinLoss w
 	INNER JOIN #TempExchange e ON w.winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
-	GROUP BY Currency
-		, CASE WHEN @ReportBy = 1 THEN CONVERT(VARCHAR(8), w.winlostdate, 112)
+	LEFT JOIN @temp1 t ON w.Currency = t.currency
+	GROUP BY w.Currency
+		, 
+		  CASE WHEN @ReportBy = 1 THEN CONVERT(VARCHAR(8), w.winlostdate, 112)
 			WHEN @ReportBy = 2 THEN CONVERT(VARCHAR(6), w.winlostdate, 112)
 			ELSE '0' END
-		, CASE WHEN Currency = 51 THEN @VNDCurrencyName
-			ELSE e.Code END
+		, CASE WHEN w.Currency = 51 THEN @VNDCurrencyName		
+			  WHEN w.Currency = 20 THEN e.Code	
+			--ELSE e.Code END + CASE WHEN e.Code = ex.Code THEN '('+ CAST(ex.currency AS VARCHAR)+')'ELSE '' END 
+			ELSE ISNULL(t.CurrencyCode,e.Code) END 
 	ORDER BY ReportType ASC
 
 	DROP TABLE #SAgWinLoss
