@@ -16,7 +16,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_LicensingFee]
 	,@BaseCurrency INT			 = 0
 	,@drawfilter	SMALLINT		 = 1
 	,@excludeTest	BIT			 = 0
-
+WITH RECOMPILE
 AS  
 /*  Created by: 20140930@Florent
     Task : LicenseeAdmin - Get Licensee Perfomance TurnOver Report for each Licensee in one month

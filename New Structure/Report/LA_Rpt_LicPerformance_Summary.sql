@@ -15,6 +15,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_Summary]
 	,@ReportType	TINYINT		 = 2	
 	,@drawfilter	SMALLINT		 = 1
 	,@excludeTest	BIT			 = 0
+	,@MoveBetsDay	SMALLDATETIME	 = ''
 WITH RECOMPILE
 AS  
 /*	Created by: 20140929@Florent
@@ -24,12 +25,13 @@ AS
    
     Revisions:  
 	   - 20141223@Florent: remove un-use code and enhance
+
 	Param's Explanation:  
 	  + @PartyIDs : a string of list PartyID, separated by ','
 	  + @Currency : 0-All Currencies
 	  + @ReportType: 1-Daily; 2-Monthly
 	  + @drawfilter: 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
-	  + @excludeTest: remove currency UUS	  
+	  + @excludeTest: remove currency UUS
 	  + @BettypeID : 0-selected all bettype	  
 */  
 BEGIN  
@@ -52,8 +54,7 @@ BEGIN
 	   , CustomerWinlostUSD MONEY, CommBAUSD MONEY, CommRBUSD MONEY, LicensingFeeUSD MONEY, TurnOverEUR MONEY, CustomerWinlostEUR MONEY
 	   , CommBAEUR MONEY, CommRBEUR MONEY, LicensingFeeEUR MONEY)
 
-    CREATE TABLE #Temp (PartyID INT	,Rptdate DATETIME, Currency INT, TurnOver MONEY, Winlost MONEY, LicenseeFee	MONEY
-	   , CommBA MONEY, CommRB MONEY, Betcount BIGINT)
+    CREATE TABLE #Temp (PartyID INT	,Rptdate DATETIME, Currency INT, TurnOver MONEY, Winlost MONEY, CommBA MONEY, CommRB MONEY, Betcount BIGINT)
 
     CREATE TABLE #Exchange (ExchangeDate SMALLDATETIME, ExchangeId INT, USD FLOAT, EUR FLOAT, MYR FLOAT)	
     INSERT INTO #Exchange(ExchangeDate, ExchangeId, USD, EUR, MYR)
@@ -62,7 +63,7 @@ BEGIN
 		
 	   IF CHARINDEX('BA',@ProductCode) <> 0
 	   BEGIN
-		  INSERT INTO #Temp (PartyID, Rptdate, Currency, TurnOver, Winlost, LicenseeFee, CommBA, CommRB, Betcount)
+		  INSERT INTO #Temp (PartyID, Rptdate, Currency, TurnOver, Winlost, CommBA, CommRB, Betcount)
 		  (
 			 SELECT PartyID, b.rptDate , b.currencyID
 				, SUM(b.turnover *
@@ -73,7 +74,7 @@ BEGIN
 						  ELSE 1 END
 				    ) TurnOver
 				, SUM(b.winloss) Winloss
-				, 0 AS LicenseeFee
+				--, 0 AS LicenseeFee
 				, SUM(b.CommissionA) AS CommBA				
 				, 0 AS CommRB
 				, SUM(betcount * 
@@ -96,7 +97,7 @@ BEGIN
 	   --exclude BA tickets
 	   IF CHARINDEX('BA',@ProductCode) = 0
 	   BEGIN
-		  INSERT INTO #Temp (PartyID, Rptdate, Currency, TurnOver, Winlost, LicenseeFee, CommBA, CommRB, Betcount)
+		  INSERT INTO #Temp (PartyID, Rptdate, Currency, TurnOver, Winlost, CommBA, CommRB, Betcount)
 		  (
 			 SELECT PartyID, b.rptDate, b.currencyID 
 				, SUM(b.turnover
@@ -108,7 +109,7 @@ BEGIN
 						  ELSE 1 END
 				    ) TurnOver
 				, SUM(b.winloss) AS Winlost
-				, 0 AS LicenseeFee	 
+				--, 0 AS LicenseeFee	 
 				, 0 AS CommBA
 				, SUM(CASE WHEN b.bettype BETWEEN 31 AND 33 THEN b.CommissionA ELSE 0 END ) AS CommRB
 				, SUM(b.betcount * 
@@ -137,25 +138,25 @@ BEGIN
 		  , SUM(CommBA) AS CommBA
 		  , SUM(CommRB) AS CommRB
 		  , SUM(Betcount) AS Betcount
-		  , -SUM(b.Winlost * ISNULL(p.Rate,0)) AS Winlost
+		  , - SUM(b.Winlost * ISNULL(p.Rate,0)) AS LicenseeFee
 		  --BaseRM  
 		  , SUM(TurnOver * e.MYR) AS TurnoverMYR
 		  , SUM(Winlost * e.MYR) AS CustomerWinlostMYR
 		  , SUM(CommBA * e.MYR) AS CommBAMYR
 		  , SUM(CommRB * e.MYR) AS CommRBMYR
-		  , -SUM(b.LicenseeFee * e.MYR * ISNULL(p.Rate,0)) AS LicensingFeeMYR
+		  , - SUM(b.Winlost * e.MYR * ISNULL(p.Rate,0)) AS LicensingFeeMYR
 		  --BaseUSD  
 		  , SUM(TurnOver * e.USD) AS TurnoverUSD
 		  , SUM(Winlost * e.USD) AS CustomerWinlostUSD
 		  , SUM(CommBA * e.USD) AS CommBAUSD
 		  , SUM(CommRB * e.USD) AS CommRBUSD
-		  , -SUM(b.LicenseeFee * e.USD * ISNULL(p.Rate,0)) AS LicensingFeeUSD
+		  , - SUM(b.Winlost * e.USD * ISNULL(p.Rate,0)) AS LicensingFeeUSD
 		  --BaseEUR 
 		  , SUM(TurnOver * e.EUR) AS TurnoverEUR
 		  , SUM(Winlost * e.EUR) AS CustomerWinlostEUR
 		  , SUM(CommBA * e.EUR) AS CommBAEUR
 		  , SUM(CommRB * e.EUR) AS CommRBEUR
-		  , -SUM(b.LicenseeFee * e.EUR * ISNULL(p.Rate,0)) AS LicensingFeeEUR
+		  , - SUM(b.Winlost * e.EUR * ISNULL(p.Rate,0)) AS LicensingFeeEUR
 	   FROM #Temp b
 	   INNER JOIN #Exchange e  ON e.ExchangeDate = b.Rptdate AND e.ExchangeId = b.Currency	   
 	   INNER JOIN  (

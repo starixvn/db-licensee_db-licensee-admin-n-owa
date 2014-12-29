@@ -16,6 +16,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_LicensingMargin]
 	,@BaseCurrency	    INT			= 0
 	,@drawfilter	    SMALLINT		= 1
 	,@excludeTest	    BIT			= 0
+WITH RECOMPILE
 AS
  
 /*  Created by: 20140930@Florent
