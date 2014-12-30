@@ -1,6 +1,6 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_LicWinloss]    Script Date: 08/10/2014 11:22:41 AM ******/
+/****** Object:  StoredProcedure [dbo].[LA_Rpt_LicWinloss]    Script Date: 01/12/2014 14:34:14 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -27,6 +27,7 @@ AS
      Revisions:  
 	   - 20141021@Florent: get data from credit's licensee
 	   - 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
+	   - 20141226@Florent: Fix hafl-won, hafl-lose on Racing
 	Param's Explanation:  
 	  + @PartyIDs	: a string of list PartyID, separate by ','
 	  + @Currency	:  0- All Currencies
@@ -48,69 +49,67 @@ SET NOCOUNT ON
 
 	----DECLARE  	
 	CREATE TABLE #WinLoss (
-		PartyID INT
-		,ProductID INT
-		,ReportType VARCHAR(6)
-		,TurnOver MONEY
-		,Winlost MONEY
-		,LicenseeWL MONEY
-		,WinlossRB MONEY
-		,AmtDueToBA MONEY
-		,AmtDueToRB MONEY
-		,CommBA MONEY
-		,CommRB MONEY
-		,Company MONEY
-		,Playercomm MONEY
-		,Betcount BIGINT
-		,TurnOverMYR MONEY
-		,WinlostMYR MONEY
-		,LicenseeWLMYR MONEY
-		,WinlossRBMYR MONEY
-		,AmtDueToBAMYR MONEY
-		,AmtDueToRBMYR MONEY
-		,CommBAMYR MONEY
-		,CommRBMYR MONEY
-		,CompanyMYR MONEY
-		,PlayercommMYR MONEY
-		,TurnOverUSD MONEY
-		,WinlostUSD MONEY
-		,LicenseeWLUSD MONEY
-		,WinlossRBUSD MONEY
-		,AmtDueToBAUSD MONEY
-		,AmtDueToRBUSD MONEY
-		,CommBAUSD MONEY
-		,CommRBUSD MONEY
-		,CompanyUSD MONEY
-		,PlayercommUSD MONEY
-		,TurnOverEUR MONEY
-		,WinlostEUR MONEY
-		,LicenseeWLEUR MONEY
-		,WinlossRBEUR MONEY
-		,AmtDueToBAEUR MONEY
-		,AmtDueToRBEUR MONEY
-		,CommBAEUR MONEY
-		,CommRBEUR MONEY
-		,CompanyEUR MONEY
-		,PlayercommEUR MONEY
+		PartyID		   INT
+		,ProductID	   INT
+		,ReportType	   VARCHAR(6)
+		,TurnOver		   MONEY
+		,Winlost		   MONEY
+		,LicenseeWL	   MONEY
+		,WinlossRB	   MONEY
+		,AmtDueToBA	   MONEY
+		,AmtDueToRB	   MONEY
+		,CommBA		   MONEY
+		,CommRB		   MONEY
+		,Company		   MONEY
+		,Playercomm	   MONEY
+		,Betcount		   BIGINT
+		,TurnOverMYR	   MONEY
+		,WinlostMYR	   MONEY
+		,LicenseeWLMYR	   MONEY
+		,WinlossRBMYR	   MONEY
+		,AmtDueToBAMYR	   MONEY
+		,AmtDueToRBMYR	   MONEY
+		,CommBAMYR	   MONEY
+		,CommRBMYR	   MONEY
+		,CompanyMYR	   MONEY
+		,PlayercommMYR	   MONEY
+		,TurnOverUSD	   MONEY
+		,WinlostUSD	   MONEY
+		,LicenseeWLUSD	   MONEY
+		,WinlossRBUSD	   MONEY
+		,AmtDueToBAUSD	   MONEY
+		,AmtDueToRBUSD	   MONEY
+		,CommBAUSD	   MONEY
+		,CommRBUSD	   MONEY
+		,CompanyUSD	   MONEY
+		,PlayercommUSD	   MONEY
+		,TurnOverEUR	   MONEY
+		,WinlostEUR	   MONEY
+		,LicenseeWLEUR	   MONEY
+		,WinlossRBEUR	   MONEY
+		,AmtDueToBAEUR	   MONEY
+		,AmtDueToRBEUR	   MONEY
+		,CommBAEUR	   MONEY
+		,CommRBEUR	   MONEY
+		,CompanyEUR	   MONEY
+		,PlayercommEUR	   MONEY
 		)
-
-	
-	CREATE TABLE #Temp (
-		PartyID INT
-		,ProductID INT
-		,ReportType INT
-		,Currency INT
-		,TurnOver MONEY
-		,Winlost MONEY
-		,LicenseeWL MONEY
-		,WinlossRB MONEY
-		,AmtDueToBA MONEY
-		,AmtDueToRB MONEY
-		,CommBA MONEY
-		,CommRB MONEY
-		,Company MONEY
-		,Playercomm MONEY
-		,Betcount BIGINT
+     CREATE TABLE #Temp (
+		PartyID	    INT
+		,ProductID    INT
+		,ReportType   INT
+		,Currency	    INT
+		,TurnOver	    MONEY
+		,Winlost	    MONEY
+		,LicenseeWL   MONEY
+		,WinlossRB    MONEY
+		,AmtDueToBA   MONEY
+		,AmtDueToRB   MONEY
+		,CommBA	    MONEY
+		,CommRB	    MONEY
+		,Company	    MONEY
+		,Playercomm   MONEY
+		,Betcount	    BIGINT
 		)
     CREATE TABLE #Data (
 		   rptDate	 Datetime
@@ -135,7 +134,7 @@ SET NOCOUNT ON
 		,isDeposit    INT
 		,AffectedDate SMALLDATETIME
 		,ProductID    INT 
-		,Rate	    Money
+		,Rate	    MONEY
 		,Fromdate	    SMALLDATETIME
 		,Todate	    SMALLDATETIME
 		)
@@ -144,30 +143,25 @@ SET NOCOUNT ON
 	SELECT Bettype,ProductID FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(@Bettype,@ProductCodes)
 
 	INSERT INTO #tmpParty
-	SELECT PartyID,LicenseeID,isDeposit,AffectedDate,ProductID,Rate,Fromdate,Todate
-	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,@ProductCodes,'OA')
-	
-	IF ( EXISTS (
-		  SELECT TOP 1 1
-		  FROM #tmpParty
-		  WHERE AffectedDate > Fromdate
-		  ) AND @excludeTest = 1)
-	BEGIN
-		UPDATE #tmpParty
-		SET Fromdate = AffectedDate
-		WHERE AffectedDate > Fromdate
-	END
+	SELECT PartyID,LicenseeID,isDeposit,AffectedDate,ProductID,DI_Rate,Fromdate,Todate
+	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,@ProductCodes,'OA',@excludeTest)
 		
+
+	SELECT DISTINCT p.PartyID, p.LicenseeID, p.ProductID, bt.Bettype 
+     INTO #PartyBettype
+     FROM #tmpParty p 
+	   INNER JOIN #Bettype bt ON p.ProductID = bt.ProductID
+	GROUP BY p.PartyID, p.LicenseeID, p.ProductID, bt.Bettype 
 	CREATE TABLE #Exchange (
-		ExchangeDate INT
-		,ExchangeId INT
-		,USD FLOAT
-		,EUR FLOAT
-		,MYR FLOAT
-		,PRIMARY KEY (
-			ExchangeDate
-			,ExchangeId
-			)
+		ExchangeDate  INT
+		,ExchangeId   INT
+		,USD		    FLOAT
+		,EUR		    FLOAT
+		,MYR		    FLOAT
+		--,PRIMARY KEY (
+		--	ExchangeDate
+		--	,ExchangeId
+		--	)
 		)
 
 	INSERT INTO #Exchange (ExchangeDate, ExchangeId, USD, EUR, MYR)
@@ -212,7 +206,7 @@ SET NOCOUNT ON
 				END BetCount
 		FROM bodb_Licensee.dbo.rpt_Betting_BA b WITH (NOLOCK)
 		INNER JOIN #tmpParty p ON b.SiteID = p.LicenseeID and p.ProductID = 3
-		INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
+		INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND p.ProductID = bt.ProductID
 		LEFT JOIN dbo.League l(NOLOCK) ON b.leagueid = l.leagueid
 		WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate
 			AND b.STATUS NOT IN (- 1, 103)
@@ -243,62 +237,63 @@ SET NOCOUNT ON
 			,STATUS
 			,currencyID
 	END
-
-	--get data
-	INSERT INTO #Data
-	SELECT  b.rptDate	
-		  ,b.SiteID
-		  ,p.PartyID
-		  ,p.ProductID	
-		  ,b.Bettype
-		  ,b.Status		
-		  ,b.currencyID
-		  ,SUM(b.turnover)
-		  ,SUM(b.winloss)
-		  ,SUM(b.winlossA)
-		  ,SUM(b.CommissionA)
-		  ,SUM(b.commissionP)
-		  ,SUM(b.betcount)
-	   FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK)
-	   INNER JOIN #tmpParty p ON p.LicenseeID = b.SiteID AND p.ProductID NOT IN (3)
-	   INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND p.ProductID = bt.ProductID
-	   LEFT JOIN dbo.League l(NOLOCK) ON b.leagueid = l.leagueid
-	   WHERE b.rptDate BETWEEN @FromDate AND @ToDate
-		  AND b.STATUS NOT IN (- 1, 103)
-		  AND (
-			 @SportType = 0
-			 OR (
-				    @SportType <> 0
-				    AND b.bettype NOT BETWEEN 31 AND 120
-				    AND l.sporttype = @SportType
-				    )
-			 )
-		  AND (
-			 @Currency = 0
-			 OR (
-				    @Currency <> 0
-				    AND b.CurrencyID = @Currency
-				    )
-			 )
-		  AND (
-			 @excludeTest = 0
-			 OR (
-				    @excludeTest = 1
-				    AND b.CurrencyID <> 20
-				    )
-			 )
-		  AND b.customercategory NOT IN (27,28)
-	 GROUP BY  b.rptDate	
-		  ,b.SiteID 
-		  ,PartyID	 
-		  ,p.ProductID	 
-		  ,b.Bettype	 
-		  ,Status		 
-		  ,b.CurrencyID
-     --CREATE INDEX CIX_Data ON #data (rptDate,ProductID,SiteID,Bettype,Currency)
+	
 	 --Filter again
 	IF (REPLACE(@ProductCodes, 'BA', '') != '' AND REPLACE(@ProductCodes, 'BA', '') != ',')
 	BEGIN
+		DELETE #PartyBettype WHERE ProductID = 3 --remove BA product
+		--get data
+	    INSERT INTO #Data
+	    SELECT  b.rptDate	
+			 ,b.SiteID
+			 ,p.PartyID
+			 ,p.ProductID	
+			 ,b.Bettype
+			 ,b.Status		
+			 ,b.currencyID
+			 ,SUM(b.turnover)
+			 ,SUM(b.winloss)
+			 ,SUM(b.winlossA)
+			 ,SUM(b.CommissionA)
+			 ,SUM(b.commissionP)
+			 ,SUM(b.betcount)
+		  FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK)
+		  INNER JOIN #PartyBettype p ON b.Bettype = p.Bettype AND b.SiteID = p.LicenseeID
+		  LEFT JOIN dbo.League l(NOLOCK) ON b.leagueid = l.leagueid
+		  WHERE b.rptDate BETWEEN @FromDate AND @ToDate
+			 AND b.STATUS NOT IN (- 1, 103)
+			 AND (
+				@SportType = 0
+				OR (
+					   @SportType <> 0
+					   AND b.bettype NOT BETWEEN 31 AND 120
+					   AND l.sporttype = @SportType
+					   )
+				)
+			 AND (
+				@Currency = 0
+				OR (
+					   @Currency <> 0
+					   AND b.CurrencyID = @Currency
+					   )
+				)
+			 AND (
+				@excludeTest = 0
+				OR (
+					   @excludeTest = 1
+					   AND b.CurrencyID <> 20
+					   )
+				)
+			 AND b.customercategory NOT IN (27,28)
+		GROUP BY  b.rptDate	
+			 ,b.SiteID 
+			 ,PartyID	 
+			 ,p.ProductID	 
+			 ,b.Bettype	 
+			 ,Status		 
+			 ,b.CurrencyID
+	    CREATE INDEX CIX_Data ON #data (rptDate,ProductID,SiteID,Bettype,Currency)
+
 		INSERT INTO #Temp (PartyID, ProductID, ReportType, Currency, TurnOver, Winlost, LicenseeWL, WinlossRB, AmtDueToBA
 			, AmtDueToRB, CommBA, CommRB, Company, Playercomm, Betcount)
 		SELECT p.PartyID
@@ -315,7 +310,7 @@ SET NOCOUNT ON
 						THEN CASE 
 								WHEN b.STATUS = 111
 									THEN 0
-								WHEN b.STATUS IN (114, 115)
+								WHEN b.STATUS IN (114, 115) AND b.Bettype != 33
 									THEN 0.5
 								ELSE 1
 								END
@@ -329,14 +324,13 @@ SET NOCOUNT ON
 					END) AS LicenseeWL
 			,SUM(CASE 
 					WHEN b.bettype BETWEEN 31 AND 33
-						THEN b.Winloss
+						THEN b.AWinloss
 					ELSE 0
 					END) AS WinlossRB
 			,0 AS AmountDueToBA
 			,- SUM(CASE 
 					WHEN b.bettype BETWEEN 31 AND 33
-						THEN (b.Winloss + b.AWinloss + b.AComm)
-						--THEN ((b.winloss * p.Rate)  + b.CommissionA)
+						THEN (b.Winloss + b.AWinloss + b.AComm)						
 					ELSE 0
 					END) AS AmountDueToRB
 			,0 AS CommBA
@@ -346,8 +340,7 @@ SET NOCOUNT ON
 					ELSE 0
 					END) AS CommRB
 			,- SUM(CASE 
-					WHEN b.bettype NOT BETWEEN 31 AND 33
-						--THEN (b.winloss + b.winlossA + b.CommissionA)
+					WHEN b.bettype NOT BETWEEN 31 AND 33						
 						THEN ((b.Winloss * p.Rate))
 					ELSE 0
 					END) AS Company
@@ -383,44 +376,41 @@ SET NOCOUNT ON
 		,Company
 		,Playercomm
 		,Betcount
-		,TurnOver * e.MYR TurnOverMYR
-		,Winlost * e.MYR WinlostMYR
-		,LicenseeWL * e.MYR LicenseeWLMYR
-		,WinlossRB * e.MYR WinlossRBMYR
-		,AmtDueToBA * e.MYR AmtDueToBAMYR
-		,AmtDueToRB * e.MYR AmtDueToRBMYR
-		,CommBA * e.MYR CommBAMYR
-		,CommRB * e.MYR CommRBMYR
-		,Company * e.MYR CompanyMYR
-		,Playercomm * e.MYR PlayercommMYR
-		,TurnOver * e.USD TurnOverUSD
-		,Winlost * e.USD WinlostUSD
-		,LicenseeWL * e.USD LicenseeWLUSD
-		,WinlossRB * e.USD WinlossRBUSD
-		,AmtDueToBA * e.USD AmtDueToBAUSD
-		,AmtDueToRB * e.USD AmtDueToRBUSD
-		,CommBA * e.USD CommBAUSD
-		,CommRB * e.USD CommRBUSD
-		,Company * e.USD CompanyUSD
-		,Playercomm * e.USD PlayercommUSD
-		,TurnOver * e.EUR TurnOverEUR
-		,Winlost * e.EUR WinlostEUR
-		,LicenseeWL * e.EUR LicenseeWLEUR
-		,WinlossRB * e.EUR WinlossRBEUR
-		,AmtDueToBA * e.EUR AmtDueToBAEUR
-		,AmtDueToRB * e.EUR AmtDueToRBEUR
-		,CommBA * e.EUR CommBAEUR
-		,CommRB * e.EUR CommRBEUR
-		,Company * e.EUR CompanyEUR
-		,Playercomm * e.EUR PlayercommEUR
+		,TurnOver * e.MYR	  AS TurnOverMYR
+		,Winlost * e.MYR 	  AS WinlostMYR
+		,LicenseeWL * e.MYR	  AS LicenseeWLMYR
+		,WinlossRB * e.MYR	  AS WinlossRBMYR
+		,AmtDueToBA * e.MYR	  AS AmtDueToBAMYR
+		,AmtDueToRB * e.MYR	  AS AmtDueToRBMYR
+		,CommBA * e.MYR	  AS CommBAMYR
+		,CommRB * e.MYR	  AS CommRBMYR
+		,Company * e.MYR	  AS CompanyMYR
+		,Playercomm * e.MYR	  AS PlayercommMYR
+		,TurnOver * e.USD	  AS TurnOverUSD
+		,Winlost * e.USD	  AS WinlostUSD
+		,LicenseeWL * e.USD	  AS LicenseeWLUSD
+		,WinlossRB * e.USD	  AS WinlossRBUSD
+		,AmtDueToBA * e.USD	  AS AmtDueToBAUSD
+		,AmtDueToRB * e.USD	  AS AmtDueToRBUSD
+		,CommBA * e.USD	  AS CommBAUSD
+		,CommRB * e.USD	  AS CommRBUSD
+		,Company * e.USD	  AS CompanyUSD
+		,Playercomm * e.USD	  AS PlayercommUSD
+		,TurnOver * e.EUR	  AS TurnOverEUR
+		,Winlost * e.EUR	  AS WinlostEUR
+		,LicenseeWL * e.EUR	  AS LicenseeWLEUR
+		,WinlossRB * e.EUR	  AS WinlossRBEUR
+		,AmtDueToBA * e.EUR	  AS AmtDueToBAEUR
+		,AmtDueToRB * e.EUR	  AS AmtDueToRBEUR
+		,CommBA * e.EUR	  AS CommBAEUR
+		,CommRB * e.EUR	  AS CommRBEUR
+		,Company * e.EUR	  AS CompanyEUR
+		,Playercomm * e.EUR	  AS PlayercommEUR
 	FROM #Temp b
-	LEFT JOIN #Exchange e ON e.ExchangeDate = ReportType
-		AND e.exchangeid = b.currency
+	LEFT JOIN #Exchange e ON e.ExchangeDate = ReportType AND e.ExchangeId = b.Currency
 END
 
-SELECT --w.LicenseeID 
-	w.PartyID
-	,w.ProductID
+SELECT w.PartyID	
 	,CASE p.PartyName
 	   WHEN '18bb' THEN 'PIH'
 	   WHEN 'IBC'	THEN 'FDL'
@@ -476,11 +466,9 @@ SELECT --w.LicenseeID
 	,SUM(PlayercommEUR) AS PlayercommEUR
 FROM #WinLoss w
 INNER JOIN bodb_Licensee.dbo.OAS_Party p (NOLOCK) ON p.PartyID = w.PartyID
-GROUP BY --w.LicenseeID
-	w.PartyID
-	,p.PartyName
-	,w.ReportType
-	,w.ProductID
+GROUP BY  w.PartyID
+	    ,p.PartyName
+	    ,w.ReportType	
 ORDER BY ReportType ASC,p.PartyName
 
 DROP TABLE #WinLoss
@@ -489,6 +477,7 @@ DROP TABLE #Temp
 DROP TABLE #Bettype
 DROP TABLE #tmpParty
 DROP TABLE #Data
+DROP TABLE #PartyBettype
 
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicWinloss] TO [vnteam] 

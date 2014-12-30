@@ -1,6 +1,6 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_CurrencyWinloss]    Script Date: 08/10/2014 11:20:32 AM ******/
+/****** Object:  StoredProcedure [dbo].[LA_Rpt_CurrencyWinloss]    Script Date: 01/12/2014 14:33:23 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -86,18 +86,8 @@ BEGIN
 							 ,Todate	    SMALLDATETIME
 							 )' + CHAR(13) + 
 				    'INSERT INTO #tmpParty (PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Rate, Fromdate, Todate)
-					   SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Rate, Fromdate, Todate
-					   FROM bodb_licensee.dbo.LA_f_ChargeInfo (''' + @PartyIDs + ''',''' +CONVERT(VARCHAR(10), @FromDate, 120) + ''',''' + CONVERT(VARCHAR(10), @ToDate, 120) + ''',''' + @ProductCodes + ''',''OA'')' + CHAR(13) + 
-			 'IF ( EXISTS (
-				SELECT TOP 1 1
-				FROM #tmpParty
-				WHERE AffectedDate > Fromdate
-				) and ' + CONVERT(VARCHAR(1), @excludeTest) + ' = 1 )
-			 BEGIN
-				UPDATE #tmpParty
-				SET Fromdate = AffectedDate
-				WHERE AffectedDate > Fromdate
-			 END' + CHAR(13) + 
+					   SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, Fromdate, Todate
+					   FROM bodb_licensee.dbo.LA_f_ChargeInfo (''' + @PartyIDs + ''',''' +CONVERT(VARCHAR(10), @FromDate, 120) + ''',''' + CONVERT(VARCHAR(10), @ToDate, 120) + ''',''' + @ProductCodes + ''',''OA'+''','''+ +CONVERT(VARCHAR(10), @ExcludeTest, 120) + ''')' + CHAR(13) + 			
 'CREATE TABLE #Bettype (Bettype INT,ProductID INT)' + CHAR(13)
 
 SELECT @sql = @sql + ' INSERT INTO #Bettype(Bettype,ProductID)
@@ -127,7 +117,7 @@ SELECT @sql = @sql + ' INSERT INTO #Bettype(Bettype,ProductID)
 			 END + ' Betcount' + CHAR(13) + ',SUM(b.CommissionP) as Playercomm' + CHAR(13) + 
 			 'FROM bodb_Licensee.dbo.rpt_Betting_BA b WITH ( NOLOCK )  ' + CHAR(13) + 
 			 'INNER JOIN #tmpParty tp ON b.siteid = tp.LicenseeID AND tp.ProductID = 3' + CHAR(13) + 
-			 'INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype' + CHAR(13) + 
+			 'INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND tp.ProductID = bt.ProductID ' + CHAR(13) + 
 			 'LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID' + CHAR(13) + 
 			 'WHERE b.rptDate BETWEEN tp.Fromdate and tp.ToDate' + CHAR(13) + 
 			 'AND b.status NOT IN (-1,103)' + CHAR(13) + 
@@ -154,13 +144,12 @@ SELECT @sql = @sql + ' INSERT INTO #Bettype(Bettype,ProductID)
 
     --exclude BA tickets
     IF (REPLACE(@ProductCodes, 'BA', '') != '' AND REPLACE(@ProductCodes, 'BA', '') != ',')
-    BEGIN
+    BEGIN 
 	   SELECT @sql = @sql + '--exclude BA rpt_Betting' + CHAR(13)
-	   SELECT @sql = @sql + 'SELECT p.PartyID,p.LicenseeID,p.ProductID,bt.Bettype 
+	   SELECT @sql = @sql + 'SELECT DISTINCT p.PartyID,p.LicenseeID,p.ProductID,bt.Bettype 
 						INTO #temp
 						FROM #tmpParty p 
-						   INNER JOIN #Bettype bt ON p.ProductID = bt.ProductID
-						WHERE p.ProductID NOT IN (3)' + CHAR(13)
+						   INNER JOIN #Bettype bt ON p.ProductID = bt.ProductID						WHERE p.ProductID NOT IN (3)' + CHAR(13)
 	   SELECT @sql = @sql + 'INSERT INTO #Data
 					    SELECT  b.rptDate	
 							 ,b.SiteID
@@ -199,7 +188,7 @@ SELECT @sql = @sql + ' INSERT INTO #Bettype(Bettype,ProductID)
 								    THEN 'AND b.IsLive=0 '
 							 ELSE ''
 							 END + CHAR(13) +
-							 'AND b.customercategory NOT IN (27,28)
+							 '--AND b.customercategory NOT IN (27,28)
 						GROUP BY  b.rptDate	
 							 ,b.SiteID 
 							 ,t.PartyID	 
@@ -219,9 +208,8 @@ SELECT @sql = @sql + ' INSERT INTO #Bettype(Bettype,ProductID)
 			 '0 as AmountDueToBA,' + CHAR(13) + 
 			 '- SUM ( CASE WHEN b.bettype BETWEEN 31 AND 33 THEN (b.winloss+b.winlossA+b.CommissionA) ELSE 0 END) as AmountDueToRB,' + CHAR(13) + 			 
 			 '0 as CommBA,' + CHAR(13) + 
-			 'SUM ( CASE WHEN b.bettype BETWEEN 31 AND 33 THEN CommissionA ELSE 0 END) as CommRB,' + CHAR(13) + 
-			 --'- SUM(CASE WHEN b.bettype NOT BETWEEN 31 AND 33 THEN b.winlossA + b.winloss + b.CommissionA ELSE 0 END)  as Company   ,' + CHAR(13) + 
-			 '- SUM(CASE WHEN b.bettype NOT BETWEEN 31 AND 33 THEN ((b.winloss * tp.Rate) + b.CommissionA) ELSE 0 END)  as Company   ,' + CHAR(13) + 
+			 'SUM ( CASE WHEN b.bettype BETWEEN 31 AND 33 THEN CommissionA ELSE 0 END) as CommRB,' + CHAR(13) + 			 
+			 '- SUM(CASE WHEN b.bettype NOT BETWEEN 31 AND 33 THEN ((b.winloss * tp.Rate)) ELSE 0 END)  as Company   ,' + CHAR(13) + 
 			 'SUM(b.betcount) * ' + CASE 
 			 WHEN @drawfilter = 2
 				    THEN 'CASE WHEN b.status = 111 THEN 0 ELSE 1 END'
@@ -237,7 +225,7 @@ END
 
 SELECT @sql = @sql + '--Output data from temp table' + CHAR(13)
 
-SELECT @sql = @sql + CHAR(13) + ' SELECT * 
+SELECT @sql = @sql + CHAR(13) + ' SELECT DISTINCT ExchangeDate, ExchangeId, Code, USD, EUR, MYR 
 						  INTO #TempExchange 
 						  FROM Lrf_f_GetExchangeDaily(''' + convert(VARCHAR(10), @FromDate, 120) + ''',''' + convert(VARCHAR(10), @ToDate, 120) + ''')' + CHAR(13)
 
