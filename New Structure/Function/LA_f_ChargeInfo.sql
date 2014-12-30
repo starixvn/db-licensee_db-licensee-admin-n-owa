@@ -1,6 +1,6 @@
 USE [bodb_licensee]
 GO
-/****** Object:  UserDefinedFunction [dbo].[LA_f_ChargeInfo]    Script Date: 18/11/2014 13:38:46 PM ******/
+/****** Object:  UserDefinedFunction [dbo].[LA_f_ChargeInfo]    Script Date: 01/12/2014 14:31:41 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -11,15 +11,19 @@ ALTER FUNCTION [dbo].[LA_f_ChargeInfo] (
 	,@FromDate	DATETIME
 	,@ToDate		DATETIME
 	,@ProductCodes VARCHAR(1000)
-	,@System		VARCHAR(10)
+	,@System		VARCHAR(10)	 = 'OA'
+	,@ExcludeTest	BIT	
 	)
 RETURNS @tbChargeInfo TABLE (
-	PartyID		INT
+	 ChargeID		INT
+	,PartyID		INT
 	,LicenseeID	INT
 	,isDeposit	INT
 	,AffectedDate	SMALLDATETIME
 	,ProductID	INT
-	,Rate		MONEY
+	,DI_Rate		MONEY
+	,OW_Rate		MONEY
+	,PNR_Rate		MONEY
 	,Fromdate		SMALLDATETIME
 	,Todate		SMALLDATETIME
 	)
@@ -35,74 +39,61 @@ BEGIN
      DECLARE @SystemID INT
 	SELECT @SystemID = id FROM dbo.Systems WITH (NOLOCK) WHERE SystemName = @System	
 	
-	;WITH Cte_AffectDate
-	AS (
-		SELECT MIN(FromDate) AS AffectedDate
-			,FromParty AS PartyID
-			,ci.ProductID
-		FROM dbo.OAS_Party p WITH (NOLOCK)
-		INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
-		WHERE ChargeType = 1
-			AND p.PartyID IN (
-				SELECT VAL
-				FROM strSplit(@PartyIDs, ',')
-				)
-		GROUP BY FromParty
-			,ci.ProductID
-		)
-     INSERT INTO @tbChargeInfo (PartyID,LicenseeID,isDeposit,AffectedDate,ProductID,Rate,Fromdate,Todate)
-	SELECT p.PartyID
-		,CASE 
-			WHEN ISNULL(pd.IsDeposit, 0) = 1
-				THEN l.LicenseeID
-			ELSE lb.LabelID
-			END AS LicenseeID
-		,pd.IsDeposit
-		,cte.AffectedDate
-		,DI.ProductID
-		,CASE 
-			WHEN DI.ProductID IN (0,3) --SB and BA				
-				THEN DI.Rate
-			WHEN DI.ProductID IN (5,4,2,6) -- VS NG,LC,CS
-				THEN
-				    CASE WHEN (PNR.rate IS NOT NULL AND PNR.ChargeType = 1)
-						  THEN (ISNULL(OW.Rate,0) - ISNULL(PNR.rate,0))
-					    WHEN (PNR.Rate IS NOT NULL AND PNR.ChargeType = 3 )
-						  THEN (CASE WHEN ISNULL(DI.Rate,0) = 0 THEN 1 ELSE ISNULL(DI.Rate,0) END * ISNULL(OW.Rate,0) * ISNULL(PNR.rate,0))					   
-					   ELSE CASE WHEN DI.Rate  = 0 THEN OW.Rate ELSE DI.Rate END
-				    END			
-			END OW_Rate
-		,CASE 
-			WHEN @FromDate <= DI.FromDate
-				THEN DI.FromDate
-			ELSE @FromDate
-			END
-		,CASE 
-			WHEN @ToDate >= DI.ToDate
+	DECLARE @Cte_AffectDate TABLE ( AffectedDate DATE, PartyID INT, ProductID INT) 
+
+	INSERT INTO @Cte_AffectDate (AffectedDate, PartyID, ProductID)
+	(
+	    SELECT MIN(FromDate) AS AffectedDate		  
+		  , FromParty AS PartyID
+		  , ci.ProductID
+	    FROM dbo.OAS_Party p WITH (NOLOCK)
+			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
+	    WHERE ChargeType = 1
+		  AND p.PartyID IN (SELECT VAL FROM strSplit(@PartyIDs, ','))		  
+	    GROUP BY FromParty, ci.ProductID
+	)
+			
+     INSERT INTO @tbChargeInfo (ChargeID , PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate)
+	SELECT DI.ChargeID 
+		, p.PartyID
+		, CASE 
+		 	WHEN ISNULL(pd.IsDeposit, 0) = 1
+		 		THEN p.OldRefID
+		 	ELSE lb.LabelID
+		 	END AS LicenseeID
+		, pd.IsDeposit
+		, cte.AffectedDate
+		, DI.ProductID
+		, CASE WHEN DI.Rate = 0 THEN ISNULL(OW.Rate,0) ELSE DI.Rate END AS DI_Rate	
+		, 0	 AS OW_Rate  -- not use now
+		, 0	 AS PNR_Rate -- not use now
+		, CASE 
+		 	WHEN @FromDate <= DI.FromDate 
+		 		THEN DI.FromDate
+		 	ELSE @FromDate
+		 	END
+		, CASE 
+			WHEN @ToDate >= DI.ToDate 
 				THEN DI.ToDate
 			ELSE @ToDate
 			END
-	FROM dbo.OAS_Party p WITH (NOLOCK)
-	INNER JOIN dbo.Licensees l WITH (NOLOCK) ON p.OldRefID = l.LicenseeID AND p.PartyType = 1
-	INNER JOIN dbo.OAS_ChargeInfo DI WITH (NOLOCK) ON DI.FromParty = p.PartyID	AND DI.ChargeType = 1
+	FROM dbo.OAS_Party p WITH (NOLOCK)	
+	INNER JOIN dbo.OAS_ChargeInfo DI WITH (NOLOCK) ON DI.FromParty = p.PartyID	AND DI.ChargeType = 1 AND p.PartyType = 1
 	INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON DI.ChargeID = cs.ChargeID AND cs.SystemID = @SystemID
 	LEFT JOIN dbo.OAS_ChargeInfo OW WITH (NOLOCK) ON DI.ParentChargeID = OW.ChargeID
-	LEFT JOIN dbo.OAS_ChargeInfo PNR WITH (NOLOCK) ON OW.ParentChargeID = PNR.ChargeID
 	LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
-	LEFT JOIN dbo.labels lb(NOLOCK) ON l.LicenseeID = lb.LicenseeID
-	LEFT JOIN Cte_AffectDate cte ON cte.PartyID = p.PartyID
+	LEFT JOIN dbo.labels lb(NOLOCK) ON p.OldRefID = lb.LicenseeID
+	LEFT JOIN @Cte_AffectDate cte ON cte.PartyID = p.PartyID
 		AND DI.ProductID = cte.ProductID
 	WHERE p.PartyID IN (
 			SELECT VAL
 			FROM strSplit(@PartyIDs, ',')
-			)
-		AND (
-			l.AffectedDate IS NOT NULL
-			OR pd.IsDeposit = 0
-			)
+			)		
 		AND (
 			@FromDate BETWEEN DI.FromDate AND DI.ToDate
 			OR @ToDate BETWEEN DI.FromDate AND DI.ToDate
+			OR DI.FromDate BETWEEN @FromDate AND @ToDate
+			OR DI.ToDate BETWEEN @FromDate AND @ToDate
 			)
 		AND DI.ProductID IN (
 			SELECT CASE 
@@ -116,11 +107,16 @@ BEGIN
 	ORDER BY p.PartyID
 		,Di.ProductID
 
+    --IF @ExcludeTest = 1
+    --DELETE @tbChargeInfo WHERE DI_Rate = 0
+
 
     --get more licensee for racing product
 	IF CHARINDEX('RB', @ProductCodes) <> 0
-     INSERT INTO @tbChargeInfo (PartyID,LicenseeID,isDeposit,AffectedDate,ProductID,Rate,Fromdate,Todate)
-	SELECT p.PartyID
+     INSERT INTO @tbChargeInfo (ChargeID, PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate)
+	SELECT
+		 0 AS ChargeID 
+		,p.PartyID
 		,CASE 
 			WHEN ISNULL(pd.IsDeposit, 0) = 1
 				THEN l.LicenseeID
@@ -129,6 +125,8 @@ BEGIN
 		,pd.IsDeposit
 		,NULL
 		,pr.Productid
+		,1
+		,1
 		,1
 		,@FromDate
 		,@ToDate		
@@ -153,9 +151,47 @@ BEGIN
 		AND (
 			l.AffectedDate IS NOT NULL
 			OR pd.IsDeposit = 0
-			)	
+			)
+
+    -- add more data incase trial
+    IF @ExcludeTest = 0
+    BEGIN
+	   INSERT INTO @tbChargeInfo (ChargeID, PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate)
+	   (
+		  SELECT 
+			 0 AS ChargeID
+		    , f1.Val PartyId
+		    , CASE WHEN ISNULL(pd.IsDeposit, 0) = 1
+			 THEN p.OldRefID ELSE lb.LabelID END AS LicenseeID
+		    , pd.IsDeposit
+		    , cte.AffectedDate
+		    , f2.Productid
+		    , 0 DI_Rate
+		    , 0 OW_Rate
+		    , 0 PNR_Rate
+		    , @FromDate
+		    , DATEADD(D, -1, cte.AffectedDate) 
+		  FROM strSplit(@PartyIDs, ',') f1
+			 INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON f1.Val = p.PartyID
+			 LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
+			 LEFT JOIN dbo.labels lb(NOLOCK) ON p.OldRefID = lb.LicenseeID
+			 LEFT JOIN @Cte_AffectDate cte ON p.PartyID = cte.PartyID 
+			 INNER JOIN (
+				SELECT CASE 
+						   WHEN s.val = 'SB'
+							   THEN 0
+						   ELSE p3.Productid
+						   END AS Productid
+				   FROM bodb02.dbo.strSplit(@ProductCodes, ',') s
+				   LEFT JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.val = p3.ProductPrefix
+			 ) f2 ON cte.ProductID = f2.Productid	 
+		  WHERE @FromDate <= cte.AffectedDate   
+	   )
+	END
+
 	RETURN
 END
+
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_f_ChargeInfo] TO [vnteam] 
 GRANT EXECUTE ON [dbo].[LA_f_ChargeInfo] TO bodbAdminNet 

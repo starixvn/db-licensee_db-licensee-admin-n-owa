@@ -10,6 +10,7 @@ DB: DB052.bodb02
 Revisions:
     - 20111028@Henry: Order by currency name
     - 20111111@Henry: allow to choose all currency
+	- 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust
 Param's Explanation:
 */
 
@@ -20,9 +21,9 @@ BEGIN
 	insert into @temp
 		SELECT 
 			distinct Currency 
-		FROM bodb_Licensee.dbo.LicenseeCust lc (nolock)
-		WHERE 
-			@LicenseeID = 0 OR LicenseeID = @LicenseeID
+		FROM bodb_Licensee.dbo.f_SelLicenseeCust(@LicenseeID) lc --(nolock)
+		--WHERE 
+		--	@LicenseeID = 0 OR LicenseeID = @LicenseeID
 
 	
 	SELECT 

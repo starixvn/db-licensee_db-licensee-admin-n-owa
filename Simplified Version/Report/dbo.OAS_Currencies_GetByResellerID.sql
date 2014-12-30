@@ -1,6 +1,6 @@
 ﻿   
   
-CREATE PROCEDURE [dbo].[OAS_Currencies_GetByResellerID]    
+ALTER PROCEDURE [dbo].[OAS_Currencies_GetByResellerID]    
  @ResellerID INT  
 AS    
   
@@ -9,6 +9,7 @@ AS
  * Task  : Get all currencies of all licensees of a reseller  
  * DB   : DB052.bodb_Licensee  
  * Revisions :  
+ - 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust
  *   
  * Param's Explanation:    
  *  - @ResellerID : Reseller ID  
@@ -21,7 +22,7 @@ DECLARE @temp AS TABLE (currency INT)
 INSERT INTO @temp  
 SELECT DISTINCT Currency   
 FROM   
-	 LicenseeCust lc (NOLOCK)  
+	 dbo.f_SelLicenseeCust(0) lc --(NOLOCK)  
 	 INNER JOIN  
 	 LicenseeReseller lr (NOLOCK)  
 	 ON lc.LicenseeID = lr.LicenseeID  

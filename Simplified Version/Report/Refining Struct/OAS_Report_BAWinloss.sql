@@ -23,6 +23,7 @@ AS
  * Revisions:
    - 20140410@Francis: Fix showing data out of time-range bug
    - 20141103@Florent: Fix formula for OW revenue, use new structure (#25393)
+   - 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust 
  *
  * Params explanation:
  *	- @ReportBy: 0 - Daily, 1 - Monthly
@@ -77,7 +78,7 @@ BEGIN
 				THEN ci.ToDate
 			ELSE @ToDate
 			END
-	FROM bodb_Licensee.dbo.LicenseeCust lc(NOLOCK)
+	FROM bodb_Licensee.dbo.f_SelLicenseeCust(0) lc--(NOLOCK)
 	INNER JOIN bodb_licensee.dbo.OAS_Party p(NOLOCK) ON lc.LicenseeID = p.OldRefID
 		AND p.PartyType = 1
 	INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci(NOLOCK) ON ci.FromParty = p.PartyID
@@ -100,7 +101,7 @@ BEGIN
 		AND (Currency <> 20)
 
 	DECLARE @Super AS TABLE (
-		custid INT PRIMARY KEY
+		custid INT --PRIMARY KEY
 		,currency INT
 		)
 
@@ -108,10 +109,10 @@ BEGIN
 		custid
 		,currency
 		)
-	SELECT CustID
+	SELECT DISTINCT CustID
 		,currency
-	FROM Dep_CustSuper(NOLOCK)
-	WHERE site = @licenseeName
+	FROM bodb_licensee.dbo.f_SelDepCustSuper(@licenseeName)--(NOLOCK)
+	--WHERE site = @licenseeName
 
 	DECLARE @moveBetsDay SMALLDATETIME
 
@@ -164,8 +165,8 @@ BEGIN
 			--,- SUM(b.winlost - b.actual_stake + awinlost + comm) AS AmountBA
 			,- SUM((b.winlost - b.actual_stake) * tma.Rate + comm) AS AmountBA
 		FROM dbo.bettrans b WITH (NOLOCK,INDEX = IX_srecommend)
-			INNER JOIN @Super s ON b.srecommend = s.custid
-			INNER JOIN @TempAg tma ON tma.CustID = b.recommend
+			INNER JOIN @Super s ON b.srecommend = s.custid AND b.currency=s.currency
+			INNER JOIN @TempAg tma ON tma.CustID = b.recommend AND tma.currency=b.currency
 			INNER JOIN bodb_Licensee.dbo.LicenseeBATransaction_active BA WITH (NOLOCK) ON s.custid = BA.srecommend AND b.transid = BA.transid
 		WHERE b.winlostdate BETWEEN @TempFromDate AND @TDate
 			AND b.statusID IN (111, 112, 113)
@@ -204,7 +205,7 @@ BEGIN
 			--,- SUM(b.winlost + b.awinlost + b.comm) AS AmountBA
 			,- SUM((b.winlost * ag.Rate) + b.comm) AS AmountBA
 		FROM bodb_Licensee.dbo.rptLicWinloss2 b(NOLOCK)
-		INNER JOIN @TempAg ag ON ag.custid = b.recommend
+		INNER JOIN @TempAg ag ON ag.custid = b.recommend AND ag.currency=b.Currency
 		WHERE b.Winlostdate BETWEEN @FDate AND @TempToDate
 			AND b.roleid = 2
 			AND b.statusID <> 101 --exclude REJECT bets

@@ -26,6 +26,7 @@ AS
 	- 20140410@Francis: Fix showing data out of time-range bug
 	- 20140410@Francis: Alter @drawfilter param's value to 0,1,2
 	- 20141105@Florent: Apply new struct support multi-System
+	- 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust
  * 
  * Param's Explanation:    
  *  - @ID   : Party ID  (include: LicenseeID, ResellerID)
@@ -56,7 +57,8 @@ BEGIN
 		)
 
 	DECLARE @tmpAg TABLE (
-		 custID INT PRIMARY KEY
+		 custID INT 
+		,currency INT
 		,Rate MONEY
 		,FromDate SMALLDATETIME
 		,ToDate SMALLDATETIME
@@ -69,11 +71,13 @@ BEGIN
 
 	INSERT INTO @tmpAg (
 		custID
+		,currency
 		,Rate
 		,FromDate
 		,ToDate
 		)
 	SELECT DISTINCT lc.CustID
+		,lc.currency
 		,ci.Rate
 		,CASE 
 			WHEN @FromDate <= ci.FromDate
@@ -85,7 +89,7 @@ BEGIN
 				THEN ci.ToDate
 			ELSE @ToDate
 			END
-	FROM bodb_Licensee.dbo.LicenseeCust lc(NOLOCK)
+	FROM bodb_Licensee.dbo.f_SelLicenseeCust(0) lc--(NOLOCK)
 	INNER JOIN bodb_licensee.dbo.OAS_Party p(NOLOCK) ON lc.LicenseeID = p.OldRefID
 		AND p.PartyType = 1
 	INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci(NOLOCK) ON ci.FromParty = p.PartyID
@@ -168,7 +172,7 @@ BEGIN
 				END BetCount
 			,SUM(playercomm) AS Playercomm
 		FROM dbo.bettrans b WITH (NOLOCK)
-			 INNER JOIN @tmpAg ag ON b.recommend = ag.CustID
+			 INNER JOIN @tmpAg ag ON b.recommend = ag.CustID AND b.currency=ag.currency
 		WHERE b.winlostdate BETWEEN @TempFromDate AND @TDate
 			/*AND Recommend IN (
 				SELECT custid
@@ -223,7 +227,7 @@ BEGIN
 				END
 			,SUM(playercomm) AS Playercomm
 		FROM bodb_Licensee.dbo.rptLicWinloss2 b WITH (NOLOCK)
-			INNER JOIN @tmpAg ag ON b.recommend = ag.CustID
+			INNER JOIN @tmpAg ag ON b.recommend = ag.CustID AND b.Currency=ag.currency
 		WHERE b.Winlostdate BETWEEN @FDate AND @TempToDate
 			AND b.sporttype = 0 --just only sportsbook
 			AND b.roleid = 2
@@ -282,7 +286,7 @@ BEGIN
 				END
 			,SUM(playercomm) AS Playercomm
 		FROM bodb_Licensee.dbo.rptLicWinloss_old b WITH (NOLOCK)
-			 INNER JOIN @tmpAg ag ON b.recommend = ag.CustID 
+			 INNER JOIN @tmpAg ag ON b.recommend = ag.CustID AND b.Currency=ag.currency
 		WHERE b.Winlostdate BETWEEN @FDate AND @TempToDate
 			AND b.sporttype = 0 --just only sportsbook
 			AND b.roleid = 2
