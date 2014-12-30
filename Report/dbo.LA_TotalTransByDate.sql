@@ -2,7 +2,7 @@ USE [bodb_licensee]
 GO
 /****** Object:  StoredProcedure [dbo].[LA_TotalTransByDate_xpre]    Script Date: 12/30/2014 4:00:33 PM ******/
 SET ANSI_NULLS ON
-GO
+GO 
 SET QUOTED_IDENTIFIER ON
 GO
 
