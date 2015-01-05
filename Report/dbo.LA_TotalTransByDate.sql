@@ -24,8 +24,8 @@ AS
 
 CREATE TABLE #tmpBetting (rptDate char(10),product varchar(10),siteID INT,betcount INT)
 --getting data
-INSERT INTO #tmpBetting
-SELECT month(b.rptDate), 		
+INSERT INTO #tmpBetting(rptDate,siteID,product,betcount)
+SELECT month(b.rptDate), 	b.SiteID,	
 CASE WHEN (b.bettype<31) OR (b.bettype>=121 and b.bettype<1000) OR b.Bettype BETWEEN 1301 and 1399 THEN 'SB'
 		WHEN bettype BETWEEN 81 AND 120 THEN 'NG'
 		WHEN bettype between 1101 and 1199 THEN 'LC'
@@ -35,9 +35,11 @@ CASE WHEN (b.bettype<31) OR (b.bettype>=121 and b.bettype<1000) OR b.Bettype BET
 		WHEN Bettype =71 THEN 'CS'		 
 		WHEN Bettype =73 THEN 'BG'	
 	END product,
-b.SiteID,SUM(b.betcount) betcount
+SUM(b.betcount) betcount
 FROM dbo.rpt_betting b WITH (NOLOCK)
-where b.rptDate between @Fromdate AND @Todate
+where 
+b.SiteID !=N'' AND
+b.rptDate BETWEEN @Fromdate AND @Todate 
 AND b.status NOT IN (-1,103)
 AND b.CurrencyID<>20
 AND ISNULL(b.CustomerCategory,0) not in (27,28)
@@ -75,6 +77,7 @@ INNER JOIN bodb02.dbo.customer ag (NOLOCK) ON  d.recommend = ag.custid AND ag.ro
 INNER JOIN bodb02.dbo.Site ibcsite (NOLOCK) ON ag.site=ibcsite.site
 INNER JOIN dbo.view_site_list [site] (NOLOCK) ON ibcsite.siteid=site.IbcSiteID	
 WHERE  c.[Winlostdate] between @Fromdate AND @Todate
+AND c.Currency<>20
 GROUP BY MONTH(c.[Winlostdate]), ISNULL(site.SiteID,-1) 
 ---------------------------------------------------------------------------------
 
@@ -187,4 +190,3 @@ FROM
 ---------------
 DROP TABLE #tmpBetting 
 DROP TABLE #data
-
