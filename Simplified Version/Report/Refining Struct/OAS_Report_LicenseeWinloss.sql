@@ -14,7 +14,6 @@ ALTER PROC [dbo].[OAS_Report_LicenseeWinloss]
 	, @MoveBetsDay 	SMALLDATETIME
 	, @IsOld 		BIT 			= 0
 	, @drawfilter 	SMALLINT 		= 0	
-WITH RECOMPILE
 AS
 /*  
  * Created by : 20131223@Francis 
@@ -43,21 +42,66 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	CREATE TABLE #SAgWinLoss (WinlostDate DATETIME, CustID INT, Currency INT, TurnOver MONEY, Winlost MONEY
-							,LicenseeWL MONEY, Company MONEY, PlayerComm MONEY, Betcount BIGINT)
+	CREATE TABLE #SAgWinLoss 
+		(
+			WinlostDate		DATETIME
+			,CustID			INT
+			,Currency		INT
+			,TurnOver		MONEY
+			,Winlost		MONEY
+			,LicenseeWL		MONEY
+			,Company		MONEY
+			,PlayerComm		MONEY
+			,Betcount		BIGINT
+		)
 	
-	CREATE TABLE #Exchange1(ExchangeDate DATE, ExchangeId INT, Code VARCHAR(10), EUR FLOAT, USD FLOAT, MYR FLOAT, GBP FLOAT)
-	CREATE TABLE #Exchange(ExchangeDate DATE, ExchangeId INT, Code VARCHAR(10), EUR FLOAT, USD FLOAT, MYR FLOAT, GBP FLOAT)
-	DECLARE @tmpAg TABLE (CustID INT , Currency INT, Rate MONEY, FromDate SMALLDATETIME, ToDate SMALLDATETIME)
-	DECLARE @VNDCurrencyName VARCHAR(20), @TempFromDate DATETIME, @TempToDate DATETIME
-		 , @MaxOldDate DATETIME, @FDate SMALLDATETIME, @TDate SMALLDATETIME
+	CREATE TABLE #Exchange1 
+		(
+			ExchangeDate	DATE
+			, ExchangeId	INT
+			, Code			VARCHAR(10)
+			, EUR			FLOAT
+			, USD			FLOAT
+			, MYR			FLOAT
+			, GBP			FLOAT
+		)
+
+	CREATE TABLE #Exchange 
+		(
+			ExchangeDate	DATE
+			, ExchangeId	INT
+			, Code			VARCHAR(10)
+			, EUR			FLOAT
+			, USD			FLOAT
+			, MYR			FLOAT
+			, GBP			FLOAT
+		)
+
+	DECLARE @tmpAg TABLE 
+		(
+			CustID			INT
+			, Currency		INT
+			, Rate			MONEY
+			, FromDate		SMALLDATETIME
+			, ToDate		SMALLDATETIME
+		)
+
+	DECLARE @VNDCurrencyName	VARCHAR(20)
+			, @TempFromDate		DATETIME
+			, @TempToDate		DATETIME
+			, @MaxOldDate		DATETIME
+			, @FDate			SMALLDATETIME
+			, @TDate			SMALLDATETIME
+
 
 	SELECT @VNDCurrencyName = currency
 	FROM Exchange WITH(NOLOCK)
 	WHERE ExchangeId = 51
 
 	INSERT INTO @tmpAg (CustID, Currency, Rate, FromDate, ToDate)
-	SELECT DISTINCT lc.CustID, lc.Currency, ci.Rate
+	SELECT DISTINCT lc.CustID
+		, lc.Currency
+		, ci.Rate
 		, CASE 
 			WHEN @FromDate <= ci.FromDate
 				THEN ci.FromDate
@@ -89,7 +133,8 @@ BEGIN
 		SET @ToDate = (SELECT TOP 1 ToDate FROM @tmpAg)
 
 	--to Deal With Parameter Sniffing
-	SELECT @FDate = @FromDate, @TDate = @ToDate
+	SELECT @FDate = @FromDate
+		, @TDate = @ToDate
 
 	IF @TDate > @MoveBetsDay
 	BEGIN
@@ -100,7 +145,9 @@ BEGIN
 
 		--SportBook   
 		INSERT INTO #SAgWinLoss(WinlostDate, CustID, Currency, TurnOver, Winlost, LicenseeWL, Company, PlayerComm, Betcount)
-		SELECT b.winlostdate, b.srecommend, b.currency			
+		SELECT b.winlostdate
+			, b.srecommend
+			, b.currency			
 			, SUM(stake * CASE 
 			 		WHEN @drawfilter IN (1, 2)
 			 			THEN CASE 
@@ -131,7 +178,9 @@ BEGIN
 			AND b.ruben = 1
 			AND b.statusID NOT IN (101, 102, 103)
 			AND tpositiontaking <> 0			
-		GROUP BY b.winlostdate, b.srecommend, b.currency
+		GROUP BY b.winlostdate
+				, b.srecommend
+				, b.currency
 	END
 
 	IF @FDate <= @MoveBetsDay
@@ -142,7 +191,9 @@ BEGIN
 			SET @TempToDate = @TDate
 
 		INSERT INTO #SAgWinLoss(WinlostDate, CustID, Currency, TurnOver, Winlost, LicenseeWL, Company, PlayerComm, Betcount)
-		SELECT b.winlostdate, b.srecommend, b.currency			
+		SELECT b.winlostdate
+			, b.srecommend
+			, b.currency			
 			, SUM(b.turnover * CASE 
 			 		WHEN @drawfilter IN (1, 2)
 			 			THEN CASE 
@@ -172,7 +223,9 @@ BEGIN
 			AND b.roleid = 2
 			AND b.statusID <> 101
 			AND ISNULL(b.isBA, 0) = 0
-		GROUP BY b.winlostdate, b.srecommend, b.currency
+		GROUP BY b.winlostdate
+				, b.srecommend
+				, b.currency
 	END
 
 	IF @IsOld = 1
@@ -186,7 +239,9 @@ BEGIN
 			SET @TempToDate = @TDate
 
 		INSERT INTO #SAgWinLoss(WinlostDate, CustID, Currency, TurnOver, Winlost, LicenseeWL, Company, PlayerComm, Betcount)
-		SELECT b.winlostdate, b.srecommend, b.currency
+		SELECT b.winlostdate
+			, b.srecommend
+			, b.currency
 			, SUM(b.turnover * CASE 
 			 		WHEN @drawfilter IN (1, 2)
 			 			THEN CASE 
@@ -230,12 +285,24 @@ BEGIN
 				END, 120)
 	-- get exchange rate in last day of month
 	INSERT INTO #Exchange1(ExchangeDate, ExchangeId, Code, EUR, USD, MYR, GBP)
-	SELECT ExchangeDate, ExchangeId, Code, EUR, USD, MYR, GBP	
+	SELECT ExchangeDate
+		, ExchangeId
+		, Code
+		, EUR
+		, USD
+		, MYR
+		, GBP	
 	FROM Lrf_f_GetExchangeDaily(@ExDate, @ExDate) 
 	WHERE exchangeid IN (SELECT DISTINCT Currency FROM #SAgWinLoss)
 
 	INSERT INTO #Exchange(ExchangeDate, ExchangeId, Code, EUR, USD, MYR, GBP)
-	SELECT ExchangeDate, ExchangeId, Code, EUR, USD, MYR, GBP		
+	SELECT ExchangeDate
+		, ExchangeId
+		, Code
+		, EUR
+		, USD
+		, MYR
+		, GBP		
 	FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
 	WHERE exchangeid IN (SELECT DISTINCT Currency FROM #SAgWinLoss)
 
@@ -296,7 +363,10 @@ BEGIN
 					THEN 'UUS'
 				ELSE e.Code
 				END
-			, ISNULL(e1.EUR, 0), ISNULL(e1.USD, 0), ISNULL(e1.MYR, 0), ISNULL(e1.GBP, 0)
+			, ISNULL(e1.EUR, 0)
+			, ISNULL(e1.USD, 0)
+			, ISNULL(e1.MYR, 0)
+			, ISNULL(e1.GBP, 0)
 		ORDER BY ReportType
 	END
 

@@ -35,17 +35,66 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @tmpLicenseeReseller AS TABLE (FromPartyID INT, ToPartyID INT, FromDate DATETIME, ToDate DATETIME, OldRefID INT)
-	CREATE TABLE #Data (WinlostDate DATETIME, Currency INT, FromPartyID INT, ToPartyID INT,TurnOver MONEY, MemberWinloss MONEY, Betcount INT)
-	CREATE TABLE #Exchange1(ExchangeDate DATE, ExchangeId INT, Code VARCHAR(10), EUR FLOAT, USD FLOAT, MYR FLOAT, GBP FLOAT)
-	CREATE TABLE #Exchange(ExchangeDate DATE, ExchangeId INT, Code VARCHAR(10), EUR FLOAT, USD FLOAT, MYR FLOAT, GBP FLOAT)
+	DECLARE @tmpLicenseeReseller AS TABLE 
+		(
+			FromPartyID		INT
+			, ToPartyID		INT
+			, FromDate		DATETIME
+			, ToDate		DATETIME
+			, OldRefID		INT
+		)
+
+	CREATE TABLE #Data 
+		(
+			WinlostDate		DATETIME
+			, Currency		INT
+			, FromPartyID	INT
+			, ToPartyID		INT
+			, TurnOver		MONEY
+			, MemberWinloss	MONEY
+			, Betcount		INT
+		)
+
+	CREATE TABLE #Exchange1 
+		(
+			ExchangeDate	DATE
+			, ExchangeId	INT
+			, Code			VARCHAR(10)
+			, EUR			FLOAT
+			, USD			FLOAT
+			, MYR			FLOAT
+			, GBP			FLOAT
+		)
+
+	CREATE TABLE #Exchange 
+		(
+			ExchangeDate	DATE
+			, ExchangeId	INT
+			, Code			VARCHAR(10)
+			, EUR			FLOAT
+			, USD			FLOAT
+			, MYR			FLOAT
+			, GBP			FLOAT
+		)
 
 	--Output table 
-	CREATE TABLE #Result (ResellerID INT, LicenseeID INT, TurnOver MONEY, MemberWinloss MONEY, GrossWinloss MONEY
-		, Betcount INT, OneworksRevenue MONEY, Currency INT, WinlostDate DATETIME)
+	CREATE TABLE #Result 
+		(
+			ResellerID			INT
+			, LicenseeID		INT
+			, TurnOver			MONEY
+			, MemberWinloss		MONEY
+			, GrossWinloss		MONEY
+			, Betcount			INT
+			, OneworksRevenue	MONEY
+			, Currency			INT
+			, WinlostDate		DATETIME
+		)
 
 	DECLARE @tmpTable AS TABLE (PartyID INT)
-	DECLARE @isDeposit INT = 0, @isBoping INT = 0
+	DECLARE @isDeposit INT = 0
+			, @isBoping INT = 0
+
 
 	INSERT INTO @tmpTable (PartyID)
 	SELECT PartyID
@@ -54,58 +103,60 @@ BEGIN
 
 	--Get normal licensee list	
 	IF NOT EXISTS (SELECT TOP 1 1 FROM bodb_licensee.dbo.OAS_Party WITH (NOLOCK) WHERE PartyName = 'Boping' AND PartyID = @Partyid)
-	BEGIN
-		INSERT INTO @tmpLicenseeReseller (FromPartyID, ToPartyID, FromDate, ToDate, OldRefID)
-		SELECT DISTINCT ci.FromParty, ci.ToParty
-			,CASE 
-				WHEN @FromDate <= ci.FromDate
-					THEN ci.FromDate
-				ELSE @FromDate
-				END
-			,CASE 
-				WHEN @ToDate >= ci.ToDate
-					THEN ci.ToDate
-				ELSE @ToDate
-				END
-			,p.OldRefID
-		FROM bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK)
-			INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON ci.FromParty = p.PartyID
-			INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 4 --OWS
-		WHERE (
-				@FromDate BETWEEN ci.FromDate AND ci.ToDate
-				OR @ToDate BETWEEN ci.FromDate AND ci.ToDate
-				)
-			AND ci.ChargeType = 1
-			AND ci.ProductID = 4			
-			AND ci.FromParty = @PartyID
-	END
+		BEGIN
+			INSERT INTO @tmpLicenseeReseller (FromPartyID, ToPartyID, FromDate, ToDate, OldRefID)
+			SELECT DISTINCT ci.FromParty
+				, ci.ToParty
+				,CASE 
+					WHEN @FromDate <= ci.FromDate
+						THEN ci.FromDate
+					ELSE @FromDate
+					END
+				,CASE 
+					WHEN @ToDate >= ci.ToDate
+						THEN ci.ToDate
+					ELSE @ToDate
+					END
+				,p.OldRefID
+			FROM bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK)
+				INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON ci.FromParty = p.PartyID
+				INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 4 --OWS
+			WHERE (
+					@FromDate BETWEEN ci.FromDate AND ci.ToDate
+					OR @ToDate BETWEEN ci.FromDate AND ci.ToDate
+					)
+				AND ci.ChargeType = 1
+				AND ci.ProductID = 4			
+				AND ci.FromParty = @PartyID
+		END
 	ELSE -- for boping's licensee
-	BEGIN
-		INSERT INTO @tmpLicenseeReseller (FromPartyID, ToPartyID, FromDate, ToDate, OldRefID)
-		SELECT DISTINCT ci.FromParty, ci.ToParty
-			, CASE 
-				WHEN @FromDate <= ci.FromDate
-					THEN ci.FromDate
-				ELSE @FromDate
-				END
-			, CASE 
-				WHEN @ToDate >= ci.ToDate
-					THEN ci.ToDate
-				ELSE @ToDate
-				END
-			,p.OldRefID
-		FROM bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK)
-			INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON ci.FromParty = p.PartyID
-			INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 4 --OWS
-		WHERE (
-				@FromDate BETWEEN ci.FromDate AND ci.ToDate
-				OR @ToDate BETWEEN ci.FromDate AND ci.ToDate
-				)
-			AND ci.ChargeType = 1
-			AND ci.ProductID = 4			
-			AND ci.ToParty = @PartyID
-		SET @isBoping = 1
-	END
+		BEGIN
+			INSERT INTO @tmpLicenseeReseller (FromPartyID, ToPartyID, FromDate, ToDate, OldRefID)
+			SELECT DISTINCT ci.FromParty
+				, ci.ToParty
+				, CASE 
+					WHEN @FromDate <= ci.FromDate
+						THEN ci.FromDate
+					ELSE @FromDate
+					END
+				, CASE 
+					WHEN @ToDate >= ci.ToDate
+						THEN ci.ToDate
+					ELSE @ToDate
+					END
+				,p.OldRefID
+			FROM bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK)
+				INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON ci.FromParty = p.PartyID
+				INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 4 --OWS
+			WHERE (
+					@FromDate BETWEEN ci.FromDate AND ci.ToDate
+					OR @ToDate BETWEEN ci.FromDate AND ci.ToDate
+					)
+				AND ci.ChargeType = 1
+				AND ci.ProductID = 4			
+				AND ci.ToParty = @PartyID
+			SET @isBoping = 1
+		END
 
 	--For Deposit Licensees
 	IF EXISTS (
@@ -117,7 +168,10 @@ BEGIN
 			)
 	BEGIN
 		INSERT INTO #Data (WinlostDate, Currency, FromPartyID, ToPartyID, TurnOver, MemberWinloss, Betcount)
-		SELECT b.rptDate, b.currencyID, lr.FromPartyID, lr.ToPartyID
+		SELECT b.rptDate
+			, b.currencyID
+			, lr.FromPartyID
+			, lr.ToPartyID
 			,SUM(Turnover * CASE 
 					WHEN @drawfilter IN (1, 2)
 						THEN CASE 
@@ -151,7 +205,10 @@ BEGIN
 			--Exclude Licensees from Starlit, BA(FDL)
 			AND lr.ToPartyID NOT IN (SELECT PartyID FROM @tmpTable)
 			AND ( @Currency <= 0 OR b.CurrencyID = @Currency)
-		GROUP BY b.rptDate, b.CurrencyID, lr.ToPartyID, lr.FromPartyID
+		GROUP BY b.rptDate
+			, b.CurrencyID
+			, lr.ToPartyID
+			, lr.FromPartyID
 		SET @isDeposit = 1
 	END
 
@@ -163,7 +220,10 @@ BEGIN
 				)
 	BEGIN
 		INSERT INTO #Data (WinlostDate, Currency, FromPartyID, ToPartyID, TurnOver, MemberWinloss, Betcount)
-		SELECT b.rptDate, b.currencyID, lr.FromPartyID, lr.ToPartyID
+		SELECT b.rptDate
+			, b.currencyID
+			, lr.FromPartyID
+			, lr.ToPartyID
 			,SUM(Turnover * CASE 
 					WHEN @drawfilter IN (1, 2)
 						THEN CASE 
@@ -197,7 +257,10 @@ BEGIN
 				)
 			AND b.customercategory NOT IN (27, 28)
 			AND (@Currency <= 0 OR b.CurrencyID = @Currency)
-		GROUP BY b.rptDate, b.CurrencyID, lr.ToPartyID, lr.FromPartyID
+		GROUP BY b.rptDate
+			, b.CurrencyID
+			, lr.ToPartyID
+			, lr.FromPartyID
 	END
 
 	CREATE NONCLUSTERED INDEX IDX_Currency ON #Data (Currency, winlostdate)
@@ -213,13 +276,15 @@ BEGIN
 	
 	 -- get exchange rate in last day of month
 	INSERT INTO #Exchange1(ExchangeDate, ExchangeId, Code, EUR, USD, MYR, GBP)
-	SELECT ExchangeDate, ExchangeId, Code, EUR, USD, MYR, GBP	
+	SELECT ExchangeDate, ExchangeId, Code
+		, EUR, USD, MYR, GBP	
 	FROM Lrf_f_GetExchangeDaily(@ExDate, @ExDate)
 	WHERE ExchangeId IN (SELECT DISTINCT Currency FROM #Data)
 		OR ExchangeId = 6 --EUR
 
 	INSERT INTO #Exchange(ExchangeDate, ExchangeId, Code, EUR, USD, MYR, GBP)
-	SELECT ExchangeDate, ExchangeId, Code, EUR, USD, MYR, GBP	
+	SELECT ExchangeDate, ExchangeId, Code
+		, EUR, USD, MYR, GBP	
 	FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
 	WHERE ExchangeId IN (SELECT DISTINCT Currency FROM #Data)
 
@@ -239,19 +304,15 @@ BEGIN
 				AND ActionID = 3
 				AND ObjectID = 5
 				AND ( @FromDate >= FromDate
-					AND (
-						ToDate IS NULL
-						OR @ToDate <= ToDate
-						)
-					)
-			)
+					AND (ToDate IS NULL OR @ToDate <= ToDate)))
 		SET @PartyTerminated = 1
 
 	--For Normal Licensees
 	IF @PartyTerminated = 0 --time when Star Express has not been terminated
 		BEGIN
 			INSERT INTO #Result (ResellerID, LicenseeID, TurnOver, MemberWinloss, GrossWinloss, Betcount, OneworksRevenue, Currency, WinlostDate)
-			SELECT d.ToPartyID, d.FromPartyID
+			SELECT d.ToPartyID
+				, d.FromPartyID
 				, CAST(isnull(SUM(d.TurnOver), 0) AS MONEY) AS TurnOver
 				, CAST(isnull(SUM(d.MemberWinloss), 0) AS MONEY) AS MemberWinloss
 				, CAST(- 1 * isnull(SUM(d.MemberWinloss), 0) AS MONEY) AS GrossWinloss			
@@ -277,7 +338,8 @@ BEGIN
 	ELSE
 		BEGIN --time when Star Express has been terminated	
 			INSERT INTO #Result (ResellerID, LicenseeID, TurnOver, MemberWinloss, GrossWinloss, Betcount, OneworksRevenue, Currency, WinlostDate)
-			SELECT d.ToPartyID, d.FromPartyID
+			SELECT d.ToPartyID
+				, d.FromPartyID
 				, CAST(isnull(SUM(d.TurnOver), 0) AS MONEY) AS TurnOver
 				, CAST(isnull(SUM(d.MemberWinloss), 0) AS MONEY) AS MemberWinloss
 				, CAST(- 1 * isnull(SUM(d.MemberWinloss), 0) AS MONEY) AS GrossWinloss			

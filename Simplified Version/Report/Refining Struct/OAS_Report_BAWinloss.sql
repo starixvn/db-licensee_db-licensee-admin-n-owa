@@ -37,17 +37,45 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	CREATE TABLE #BAWinLoss (WLDate DATETIME, Currency INT, TurnOver MONEY, TotalTrans INT, CustomerWL MONEY, BAComm MONEY, AmountBA MONEY)
-	CREATE TABLE #TempExchange (ExchangeDate DATE, ExchangeId INT, Code VARCHAR(10), ExRate FLOAT)
-	DECLARE @tempAg TABLE (CustID INT, Currency INT, Rate MONEY, FromDate DATETIME, ToDate DATETIME)
-	DECLARE @LicenseeName VARCHAR(50), @SQL NVARCHAR(500) = ''
+	CREATE TABLE #BAWinLoss 
+		(
+			WLDate			DATETIME
+			, Currency		INT
+			, TurnOver		MONEY
+			, TotalTrans	INT
+			, CustomerWL	MONEY
+			, BAComm		MONEY
+			, AmountBA		MONEY
+		)
+
+	CREATE TABLE #TempExchange 
+		(
+			ExchangeDate	DATE
+			, ExchangeId	INT
+			, Code			VARCHAR(10)
+			, ExRate		FLOAT
+		)
+
+	DECLARE @tempAg TABLE 
+	(
+		CustID		INT
+		, Currency	INT
+		, Rate		MONEY
+		, FromDate	DATETIME
+		, ToDate	DATETIME
+	)
+	DECLARE @LicenseeName VARCHAR(50)
+		, @SQL NVARCHAR(500) = ''
+
 
 	SELECT @LicenseeName = PartyName
 	FROM bodb_Licensee.dbo.OAS_Party WITH (NOLOCK)
 	WHERE PartyID = @PartyID
 
 	INSERT INTO @tempAg (CustID, Currency, Rate, FromDate, ToDate)
-	SELECT lc.CustID, lc.Currency, ci.Rate
+	SELECT lc.CustID
+		, lc.Currency
+		, ci.Rate
 		,CASE 
 			WHEN @FromDate <= ci.FromDate
 				THEN ci.FromDate
@@ -72,14 +100,23 @@ BEGIN
 		AND (@Currency <= 0 OR ( @Currency > 0 AND Currency = @Currency))
 		AND (Currency <> 20)
 
-	DECLARE @Super AS TABLE (Custid INT, Currency INT)
+	DECLARE @Super AS TABLE 
+		(
+			Custid INT
+			, Currency INT
+		)
 
 	INSERT INTO @Super (Custid, Currency)
-	SELECT DISTINCT CustID, Currency
+	SELECT DISTINCT CustID
+					, Currency
 	FROM bodb_licensee.dbo.f_SelDepCustSuper(@licenseeName)
 
 	DECLARE @MoveBetsDay SMALLDATETIME
-	DECLARE @MoveBets AS TABLE (BalanceUpDay DATETIME, MoveBetsDay DATETIME)
+	DECLARE @MoveBets AS TABLE 
+		(
+			BalanceUpDay DATETIME
+			, MoveBetsDay DATETIME
+		)
 
 	INSERT INTO @MoveBets
 	EXEC Lrf_SelBalanceUpDay
@@ -87,7 +124,11 @@ BEGIN
 	SELECT @MoveBetsDay = MoveBetsDay
 	FROM @MoveBets
 
-	DECLARE @TempFromDate DATETIME, @TempToDate DATETIME, @FDate DATETIME, @TDate DATETIME
+	DECLARE @TempFromDate	DATETIME
+			, @TempToDate	DATETIME
+			, @FDate		DATETIME
+			, @TDate		DATETIME
+
 
 	IF (@FromDate <= (SELECT TOP 1 FromDate FROM @tempAg))
 		SET @FromDate = (SELECT TOP 1 FromDate FROM @tempAg)
@@ -105,8 +146,9 @@ BEGIN
 		ELSE
 			SET @TempFromDate = @FDate
 
-		INSERT INTO #BAWinLoss
-		SELECT b.winlostdate, b.currency
+		INSERT INTO #BAWinLoss (WLDate, Currency, TurnOver, TotalTrans, CustomerWL, BAComm, AmountBA)
+		SELECT b.winlostdate
+			, b.currency
 			, SUM(b.stake * CASE 
 					WHEN @DrawFilter IN (1, 2)
 						THEN CASE 
@@ -133,7 +175,8 @@ BEGIN
 		WHERE b.winlostdate BETWEEN @TempFromDate AND @TDate
 			AND b.statusID IN (111, 112, 113)
 			AND (@DrawFilter <> 1 OR b.statusID != 111) -- NoDraw filter
-		GROUP BY b.winlostdate, b.currency
+		GROUP BY b.winlostdate
+				, b.currency
 	END
 
 	IF @FDate <= @MoveBetsDay
@@ -143,8 +186,9 @@ BEGIN
 		ELSE
 			SET @TempToDate = @TDate
 
-		INSERT INTO #BAWinLoss
-		SELECT b.winlostdate, b.currency
+		INSERT INTO #BAWinLoss (WLDate, Currency, TurnOver, TotalTrans, CustomerWL, BAComm, AmountBA)
+		SELECT b.winlostdate
+			, b.currency
 			, SUM(b.turnover * CASE 
 			 		WHEN @DrawFilter IN (1, 2)
 			 			THEN CASE 
@@ -171,7 +215,8 @@ BEGIN
 				@DrawFilter <> 1
 				OR b.statusID != 111
 				) -- NoDraw filter
-		GROUP BY b.winlostdate, b.currency
+		GROUP BY b.winlostdate
+				, b.currency
 	END
 
 	CREATE NONCLUSTERED INDEX IDX_Index_BA ON #BAWinLoss (Currency)
