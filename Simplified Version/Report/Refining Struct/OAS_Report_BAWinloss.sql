@@ -24,11 +24,15 @@ AS
    - 20141103@Florent: Fix formula for OW revenue, use new structure (#25393)
    - 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust 
    - 20150202@Florent: base currency GBP
+
  *
- * Params explanation: 
+ * Params explanation:
+ *	- @ReportBy: 0 - Daily, 1 - Monthly
 	- @Currency: 0 : All
 				-1: Base on EUR
 				-2: Base on GBP
+
+
  *	- @DrawFilter: 
  *		+ 0  Normal 
  *		+ 1  No draw (only win and loss tickets are calculated) 
@@ -37,45 +41,39 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	CREATE TABLE #BAWinLoss 
-		(
-			WLDate			DATETIME
-			, Currency		INT
-			, TurnOver		MONEY
-			, TotalTrans	INT
-			, CustomerWL	MONEY
-			, BAComm		MONEY
-			, AmountBA		MONEY
+	CREATE TABLE #BAWinLoss (
+		WLDate DATETIME
+		,Currency INT
+		,TurnOver MONEY
+		,TotalTrans INT
+		,CustomerWL MONEY
+		,BAComm MONEY
+		,AmountBA MONEY
 		)
 
-	CREATE TABLE #TempExchange 
-		(
-			ExchangeDate	DATE
-			, ExchangeId	INT
-			, Code			VARCHAR(10)
-			, ExRate		FLOAT
+	DECLARE @tempAg TABLE (
+		custID	INT
+		,currency INT
+		,Rate	MONEY
+		,FromDate DATETIME
+		,ToDate	DATETIME
 		)
-
-	DECLARE @tempAg TABLE 
-	(
-		CustID		INT
-		, Currency	INT
-		, Rate		MONEY
-		, FromDate	DATETIME
-		, ToDate	DATETIME
-	)
 	DECLARE @LicenseeName VARCHAR(50)
-		, @SQL NVARCHAR(500) = ''
-
 
 	SELECT @LicenseeName = PartyName
-	FROM bodb_Licensee.dbo.OAS_Party WITH (NOLOCK)
+	FROM bodb_Licensee.dbo.OAS_Party(NOLOCK)
 	WHERE PartyID = @PartyID
 
-	INSERT INTO @tempAg (CustID, Currency, Rate, FromDate, ToDate)
-	SELECT lc.CustID
-		, lc.Currency
-		, ci.Rate
+	INSERT INTO @tempAg (
+		custID
+		,currency
+		,Rate
+		,FromDate
+		,ToDate
+		)
+	SELECT lc.custID
+		,lc.currency
+		,ci.Rate
 		,CASE 
 			WHEN @FromDate <= ci.FromDate
 				THEN ci.FromDate
@@ -87,9 +85,11 @@ BEGIN
 			ELSE @ToDate
 			END
 	FROM bodb_Licensee.dbo.f_SelLicenseeCust(0) lc--(NOLOCK)
-		INNER JOIN bodb_licensee.dbo.OAS_Party p WITH(NOLOCK) ON lc.LicenseeID = p.OldRefID AND p.PartyType = 1
-		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci(NOLOCK) ON ci.FromParty = p.PartyID
-		INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs(NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 4
+	INNER JOIN bodb_licensee.dbo.OAS_Party p(NOLOCK) ON lc.LicenseeID = p.OldRefID
+		AND p.PartyType = 1
+	INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci(NOLOCK) ON ci.FromParty = p.PartyID
+	INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs(NOLOCK) ON ci.ChargeID = cs.ChargeID
+		AND cs.SystemID = 4
 	WHERE p.PartyID = @PartyID
 		AND (
 			@FromDate BETWEEN ci.FromDate AND ci.ToDate
@@ -97,38 +97,39 @@ BEGIN
 			)
 		AND ci.ChargeType = 1
 		AND ci.ProductID = 3
-		AND (@Currency <= 0 OR ( @Currency > 0 AND Currency = @Currency))
+		AND (
+			@Currency <= 0
+			OR (
+				@Currency > 0
+				AND Currency = @Currency
+				)
+			)
 		AND (Currency <> 20)
 
-	DECLARE @Super AS TABLE 
-		(
-			Custid INT
-			, Currency INT
+	DECLARE @Super AS TABLE (
+		custid INT --PRIMARY KEY
+		,currency INT
 		)
 
-	INSERT INTO @Super (Custid, Currency)
+	INSERT INTO @Super (
+		custid
+		,currency
+		)
 	SELECT DISTINCT CustID
-					, Currency
-	FROM bodb_licensee.dbo.f_SelDepCustSuper(@licenseeName)
+		,currency
+	FROM bodb_licensee.dbo.f_SelDepCustSuper(@licenseeName)--(NOLOCK)
+	--WHERE site = @licenseeName
 
-	DECLARE @MoveBetsDay SMALLDATETIME
-	DECLARE @MoveBets AS TABLE 
-		(
-			BalanceUpDay DATETIME
-			, MoveBetsDay DATETIME
-		)
+	DECLARE @moveBetsDay SMALLDATETIME
 
-	INSERT INTO @MoveBets
-	EXEC Lrf_SelBalanceUpDay
+	SELECT @moveBetsDay = MAX(m.eventdate)
+	FROM dbo.match14 m(NOLOCK)
 
-	SELECT @MoveBetsDay = MoveBetsDay
-	FROM @MoveBets
-
-	DECLARE @TempFromDate	DATETIME
-			, @TempToDate	DATETIME
-			, @FDate		DATETIME
-			, @TDate		DATETIME
-
+	DECLARE @TempFromDate DATETIME
+	DECLARE @TempToDate DATETIME
+	DECLARE @MaxOldDate DATETIME
+	DECLARE @FDate DATETIME
+	DECLARE @TDate DATETIME
 
 	IF (@FromDate <= (SELECT TOP 1 FromDate FROM @tempAg))
 		SET @FromDate = (SELECT TOP 1 FromDate FROM @tempAg)
@@ -136,20 +137,20 @@ BEGIN
 	IF (@ToDate >= (SELECT TOP 1 ToDate FROM @tempAg))
 		SET @ToDate = (SELECT TOP 1 ToDate FROM @tempAg)
 
-	SELECT @FDate = @FromDate
-		,@TDate = @ToDate
+	SELECT @FDate = @fromDate
+		,@TDate = @toDate
 
-	IF @TDate > @MoveBetsDay
+	IF @TDate > @moveBetsDay
 	BEGIN
-		IF @FDate <= @MoveBetsDay
-			SET @TempFromDate = DATEADD(DAY, 1, @MoveBetsDay)
+		IF @FDate <= @moveBetsDay
+			SET @TempFromDate = DATEADD(DAY, 1, @moveBetsDay)
 		ELSE
 			SET @TempFromDate = @FDate
 
-		INSERT INTO #BAWinLoss (WLDate, Currency, TurnOver, TotalTrans, CustomerWL, BAComm, AmountBA)
+		INSERT INTO #BAWinLoss
 		SELECT b.winlostdate
-			, b.currency
-			, SUM(b.stake * CASE 
+			,b.currency
+			,SUM(b.stake * CASE 
 					WHEN @DrawFilter IN (1, 2)
 						THEN CASE 
 								WHEN b.statusID = 111
@@ -164,48 +165,53 @@ BEGIN
 								END
 					ELSE 1
 					END) AS TurnOver
-			, COUNT(b.transid) AS TotalTrans
-			, SUM(b.winlost - b.actual_stake + b.playercomm) AS CustomerWL
-			, SUM(b.comm) AS BAComm			
-			, - SUM((b.winlost - b.actual_stake) * tma.Rate + comm) AS AmountBA
+			,COUNT(b.transid) AS TotalTrans
+			,SUM(b.winlost - b.actual_stake + PlayerComm) AS CustomerWL
+			,SUM(comm) AS BAComm
+			--,- SUM(b.winlost - b.actual_stake + awinlost + comm) AS AmountBA
+			,- SUM((b.winlost - b.actual_stake) * tma.Rate + comm) AS AmountBA
 		FROM dbo.bettrans b WITH (NOLOCK,INDEX = IX_srecommend)
-			INNER JOIN @Super s ON b.srecommend = s.custid AND b.currency = s.currency
-			INNER JOIN @TempAg tma ON tma.CustID = b.recommend AND tma.currency = b.currency
+			INNER JOIN @Super s ON b.srecommend = s.custid AND b.currency=s.currency
+			INNER JOIN @TempAg tma ON tma.CustID = b.recommend AND tma.currency=b.currency
 			INNER JOIN bodb_Licensee.dbo.LicenseeBATransaction_active BA WITH (NOLOCK) ON s.custid = BA.srecommend AND b.transid = BA.transid
 		WHERE b.winlostdate BETWEEN @TempFromDate AND @TDate
 			AND b.statusID IN (111, 112, 113)
-			AND (@DrawFilter <> 1 OR b.statusID != 111) -- NoDraw filter
+			AND (
+				@DrawFilter <> 1
+				OR b.statusID != 111
+				) -- NoDraw filter
 		GROUP BY b.winlostdate
-				, b.currency
+			,b.currency
 	END
 
-	IF @FDate <= @MoveBetsDay
+	IF @FDate <= @moveBetsDay
 	BEGIN
-		IF @TDate >= @MoveBetsDay
-			SET @TempToDate = @MoveBetsDay
+		IF @TDate >= @moveBetsDay
+			SET @TempToDate = @moveBetsDay
 		ELSE
 			SET @TempToDate = @TDate
 
-		INSERT INTO #BAWinLoss (WLDate, Currency, TurnOver, TotalTrans, CustomerWL, BAComm, AmountBA)
+		INSERT INTO #BAWinLoss
 		SELECT b.winlostdate
-			, b.currency
-			, SUM(b.turnover * CASE 
-			 		WHEN @DrawFilter IN (1, 2)
-			 			THEN CASE 
-			 					WHEN b.statusID = 111
-			 						THEN 0
-			 					WHEN b.statusID IN (114, 115)
-			 						THEN 0.5
-			 					ELSE 1
-			 					END
-			 		ELSE 1
-			 		END) AS TurnOver
-			, SUM(b.BetCount) AS TotalTrans
-			, SUM(b.winlost + b.playerComm) AS CustomerWL
-			, SUM(comm) AS BAComm			
-			, - SUM((b.winlost * ag.Rate) + b.comm) AS AmountBA
+			,b.currency
+			,SUM(b.turnover * CASE 
+					WHEN @DrawFilter IN (1, 2)
+						THEN CASE 
+								WHEN b.statusID = 111
+									THEN 0
+								WHEN b.statusID IN (114, 115)
+									THEN 0.5
+								ELSE 1
+								END
+					ELSE 1
+					END) AS TurnOver
+			,SUM(b.BetCount) AS TotalTrans
+			,SUM(b.winlost + b.playerComm) AS CustomerWL
+			,SUM(comm) AS BAComm
+			--,- SUM(b.winlost + b.awinlost + b.comm) AS AmountBA
+			,- SUM((b.winlost * ag.Rate) + b.comm) AS AmountBA
 		FROM bodb_Licensee.dbo.rptLicWinloss2 b(NOLOCK)
-		INNER JOIN @TempAg ag ON ag.custid = b.recommend AND ag.currency = b.Currency
+		INNER JOIN @TempAg ag ON ag.custid = b.recommend AND ag.currency=b.Currency
 		WHERE b.Winlostdate BETWEEN @FDate AND @TempToDate
 			AND b.roleid = 2
 			AND b.statusID <> 101 --exclude REJECT bets
@@ -216,7 +222,7 @@ BEGIN
 				OR b.statusID != 111
 				) -- NoDraw filter
 		GROUP BY b.winlostdate
-				, b.currency
+			,b.currency
 	END
 
 	CREATE NONCLUSTERED INDEX IDX_Index_BA ON #BAWinLoss (Currency)
@@ -225,7 +231,7 @@ BEGIN
 	DECLARE @AffectedDate DATETIME
 
 	SELECT @AffectedDate = FromDate
-	FROM bodb_licensee.dbo.OAS_ChargeInfo(NOLOCK)
+	FROM bodb_licensee.dbo.OAS_ChargeInfo (NOLOCK)
 	WHERE FromParty = @PartyID
 		AND (
 			@FromDate BETWEEN FromDate AND ToDate
@@ -238,37 +244,74 @@ BEGIN
 	FROM #BAWinLoss
 	WHERE WLDate < @AffectedDate
 
-	SELECT @SQL = @SQL + 'SELECT exchangedate, ExchangeId, Code' + CHAR(13)
-					   + ', '+UPPER(@ExchangeID) +' AS ExRate' +  CHAR(13)
-					   + 'FROM Lrf_f_GetExchangeDaily(''' + CONVERT(VARCHAR(8),@FromDate, 112) + ''', '''+ CONVERT(VARCHAR(8),@ToDate, 112)+''')' + CHAR(13)
-					   + 'WHERE exchangeid IN (SELECT DISTINCT Currency FROM #BAWinLoss)'		
-						
-	
-	INSERT INTO #TempExchange (ExchangeDate, ExchangeId, Code, ExRate)
-	EXECUTE sp_executesql @SQL
+	SELECT exchangedate
+		,ExchangeId
+		,Code
+		,CASE @ExchangeID
+			WHEN 'USD'
+				THEN USD
+			WHEN 'EUR'
+				THEN EUR
+			WHEN 'GBP'
+				THEN GBP
+			ELSE CNY
+			END AS ExRate
+	INTO #TempExchange
+	FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
+	WHERE exchangeid IN (
+			SELECT DISTINCT Currency
+			FROM #BAWinLoss
+			)
 
-	-- Monthly report
+	IF (@ReportBy = 0) -- Daily report
+	BEGIN
+		SELECT CONVERT(VARCHAR(10), wl.WLDate, 101) AS WLDate
+			,wl.Currency
+			,wl.TurnOver
+			,wl.TotalTrans
+			,wl.CustomerWL
+			,wl.BAComm
+			,wl.AmountBA
+			,CASE 
+				WHEN wl.Currency = 20
+					THEN 'UUS'
+				WHEN wl.Currency = 51
+					THEN 'INH'
+				ELSE e.Code
+				END AS CurrencyName
+			,wl.TurnOver * e.ExRate AS TurnOverEx
+			,wl.CustomerWL * e.ExRate AS CustomerWLEx
+			,wl.BAComm * e.ExRate AS BACommEx
+			,wl.AmountBA * e.ExRate AS AmountBAEx
+		FROM #BAWinLoss wl
+		INNER JOIN #tempExchange e ON wl.WLDate = e.ExchangeDate
+			AND wl.currency = e.ExchangeId
+		ORDER BY CONVERT(VARCHAR(10), wl.WLDate, 101)
+			,wl.Currency
+	END
+	ELSE -- Monthly report
 	BEGIN
 		SELECT SUBSTRING(CONVERT(VARCHAR(10), wl.WLDate, 103), 4, 7) AS WLDate
-			, wl.Currency
-			, SUM(wl.TurnOver) AS TurnOver
-			, SUM(wl.TotalTrans) AS TotalTrans
-			, SUM(wl.CustomerWL) AS CustomerWL
-			, SUM(wl.BAComm) AS BAComm
-			, SUM(wl.AmountBA) AS AmountBA
-			, CASE 
-			 	WHEN wl.Currency = 20
-			 		THEN 'UUS'
-			 	WHEN wl.Currency = 51
-			 		THEN 'INH'
-			 	ELSE e.Code
-			 	END AS CurrencyName
-			, SUM(wl.TurnOver * e.ExRate) AS TurnOverEx
-			, SUM(wl.CustomerWL * e.ExRate) AS CustomerWLEx
-			, SUM(wl.BAComm * e.ExRate) AS BACommEx
-			, SUM(wl.AmountBA * e.ExRate) AS AmountBAEx
+			,wl.Currency
+			,SUM(wl.TurnOver) AS TurnOver
+			,SUM(wl.TotalTrans) AS TotalTrans
+			,SUM(wl.CustomerWL) AS CustomerWL
+			,SUM(wl.BAComm) AS BAComm
+			,SUM(wl.AmountBA) AS AmountBA
+			,CASE 
+				WHEN wl.Currency = 20
+					THEN 'UUS'
+				WHEN wl.Currency = 51
+					THEN 'INH'
+				ELSE e.Code
+				END AS CurrencyName
+			,SUM(wl.TurnOver * e.ExRate) AS TurnOverEx
+			,SUM(wl.CustomerWL * e.ExRate) AS CustomerWLEx
+			,SUM(wl.BAComm * e.ExRate) AS BACommEx
+			,SUM(wl.AmountBA * e.ExRate) AS AmountBAEx
 		FROM #BAWinLoss wl
-			INNER JOIN #tempExchange e ON wl.WLDate = e.ExchangeDate AND wl.Currency = e.ExchangeId
+		INNER JOIN #tempExchange e ON wl.WLDate = e.ExchangeDate
+			AND wl.currency = e.ExchangeId
 		GROUP BY SUBSTRING(CONVERT(VARCHAR(10), wl.WLDate, 103), 4, 7)
 			,wl.Currency
 			,CASE 
