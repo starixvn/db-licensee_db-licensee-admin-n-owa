@@ -499,7 +499,7 @@ BEGIN
 				ELSE e.Code
 				END AS CurrencyName
 			,ISNULL(e1.EUR, 0) EUR
-			,ISNULL(e1.GBP, 0)
+			,ISNULL(e1.GBP, 0) GBP
 			,SUM(re.betcount) AS BetCount
 			,
 			--base
