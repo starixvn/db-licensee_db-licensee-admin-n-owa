@@ -7,12 +7,13 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[OAS_Report_BAWinloss] 
-	  @PartyID		INT
-	, @FromDate		DATETIME
-	, @ToDate		DATETIME
-	, @Currency		INT			= 0
-	, @ExchangeID	VARCHAR(5)  = 'EUR'	
-	, @DrawFilter	TINYINT		= 0
+	@PartyID		INT
+	,@FromDate	DATETIME
+	,@ToDate		DATETIME
+	,@Currency	INT		  = 0
+	,@ExchangeID	VARCHAR(5)  = 'EUR'
+	,@ReportBy	TINYINT	  = 1
+	,@DrawFilter	TINYINT	  = 0
 AS
 /*
  * Created by : 20131223@Francis
