@@ -16,6 +16,7 @@ AS
     DB  : DB052.bodb02    
      
     Revisions:
+	- 20150302@Florent: Fix bettype of VS same name.
 */  
 
 CREATE TABLE #Bettype (Bettype INT)
@@ -70,14 +71,18 @@ BEGIN
 			FROM dbo.bettype WITH (NOLOCK)
 			WHERE typeid = 71
 		END
-	END
+END
 
 BEGIN  
 	SET NOCOUNT ON   
 	SELECT 
 		typeid AS Bettype,
 		CASE WHEN typeid BETWEEN 81 AND 120 THEN 'NG - ' + typenamee 
-			 WHEN typeid BETWEEN 1201 AND 1299 THEN 'VS - '+typenamee
+			 WHEN typeid BETWEEN 1201 AND 1299 THEN 'VS - ' + typenamee +
+				CASE WHEN b.typeid = 1204 THEN ' (Soccer)'
+					 WHEN b.typeid = 1235 THEN ' (Tennis)'
+					 ELSE ''
+				END
 			 ELSE typenamee END AS BettypeName
 	FROM dbo.bettype b WITH (NOLOCK) 
 		INNER JOIN #Bettype bt ON b.typeid = bt.Bettype
