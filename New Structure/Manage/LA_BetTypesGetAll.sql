@@ -16,74 +16,29 @@ AS
     DB  : DB052.bodb02    
      
     Revisions:
-	- 20150302@Florent: Fix bettype of VS same name.
+	- 20150302@Florent: Fix bettype of VS same name and use function LA_f_BettypeProductMapping
 */  
 
 CREATE TABLE #Bettype (Bettype INT)
-BEGIN
-		IF @ProductCode = 'SB'
-			OR @ProductCode = 'BA'
-		BEGIN
-			INSERT INTO #Bettype
-			SELECT typeid
-			FROM dbo.bettype WITH (NOLOCK)
-			WHERE typeid < 31
-				OR typeid BETWEEN 121 AND 999
-				OR typeid BETWEEN 1301 AND 1399
-		END
-
-		IF @ProductCode = 'RB'
-		BEGIN
-			INSERT INTO #Bettype
-			SELECT typeid
-			FROM dbo.bettype WITH (NOLOCK)
-			WHERE typeid BETWEEN 31 AND 33
-		END
-
-		IF @ProductCode = 'NG'
-		BEGIN
-			INSERT INTO #Bettype
-			SELECT typeid
-			FROM dbo.bettype WITH (NOLOCK)
-			WHERE typeid BETWEEN 81 AND 120
-		END
-
-		IF @ProductCode = 'LC'
-		BEGIN
-			INSERT INTO #Bettype
-			SELECT typeid
-			FROM dbo.bettype WITH (NOLOCK)
-			WHERE typeid BETWEEN 1101 AND 1199
-		END
-
-		IF @ProductCode = 'VS'
-		BEGIN
-			INSERT INTO #Bettype
-			SELECT typeid
-			FROM dbo.bettype WITH (NOLOCK)
-			WHERE typeid BETWEEN 1201 AND 1299
-		END
-
-		IF @ProductCode = 'CS'
-		BEGIN
-			INSERT INTO #Bettype
-			SELECT typeid
-			FROM dbo.bettype WITH (NOLOCK)
-			WHERE typeid = 71
-		END
+BEGIN		
+	INSERT INTO #Bettype(Bettype)
+	(
+		SELECT Bettype 
+		FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, @ProductCode)
+	)
 END
 
 BEGIN  
 	SET NOCOUNT ON   
 	SELECT 
 		typeid AS Bettype,
-		CASE WHEN typeid BETWEEN 81 AND 120 THEN 'NG - ' + typenamee 
-			 WHEN typeid BETWEEN 1201 AND 1299 THEN 'VS - ' + typenamee +
+		CASE WHEN typeid BETWEEN 81 AND 120 THEN 'NG - ' + b.typenamee 
+			 WHEN typeid BETWEEN 1201 AND 1299 THEN 'VS - ' + b.typenamee +
 				CASE WHEN b.typeid = 1204 THEN ' (Soccer)'
 					 WHEN b.typeid = 1235 THEN ' (Tennis)'
 					 ELSE ''
 				END
-			 ELSE typenamee END AS BettypeName
+			 ELSE b.typenamee END AS BettypeName
 	FROM dbo.bettype b WITH (NOLOCK) 
 		INNER JOIN #Bettype bt ON b.typeid = bt.Bettype
 	WHERE 
