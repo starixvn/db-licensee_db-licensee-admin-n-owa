@@ -1,17 +1,23 @@
 USE [bodb02]
 GO
+/****** Object:  StoredProcedure [dbo].[LA_Rpt_KenoWinloss_xtest]    Script Date: 09/03/2015 10:09:14 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-CREATE PROCEDURE [dbo].[LA_Rpt_KenoWinloss] 
-	 @PartyIDs		VARCHAR(5500)
-	, @FromDate		SMALLDATETIME
-	, @ToDate		SMALLDATETIME	
-	, @Market		INT				= 0
-	, @Bettype		INT				= 0
-	, @drawfilter	SMALLINT		= 1
-	, @excludeTest	BIT				= 0
+
+/****** Object:  Stored Procedure dbo.LA_Rpt_KenoWinloss    Script Date: 06/03/2015 10:26:13 AM ******/
+
+
+ALTER PROCEDURE [dbo].[LA_Rpt_KenoWinloss] 
+	 @PartyIDs			VARCHAR(5500)
+	, @FromDate			SMALLDATETIME
+	, @ToDate			SMALLDATETIME	
+	, @Market			INT				= 0
+	, @Bettype			INT				= 0
+	, @Drawfilter		SMALLINT		= 1
+	, @ExcludeTest		BIT				= 0
+	, @BaseOnCurrency	VARCHAR(10)		= 'EUR'
 AS      
   
 /*  
@@ -67,6 +73,7 @@ BEGIN
 	CREATE TABLE #Bettype (
 		Bettype				INT
 		, ProductId			INT)
+	CREATE TABLE #Exchange( ExchangeDate VARCHAR(6), ExchangeID INT, Rate FLOAT)
 
 	INSERT INTO #tmpParty(PartyId, LicenseeId, Rate, Fromdate, Todate)
 	(
@@ -99,13 +106,14 @@ BEGIN
 			GROUP BY b.rptDate, b.CurrencyId, tp.PartyID, b.BetTypeId, b.KenoBetTypeId
 		)
 	END
-
-	SELECT DISTINCT CONVERT(VARCHAR(6), ExchangeDate, 112) AS ExchangeDate
-			, ExchangeId, USD, EUR, MYR 
-	INTO #TempExchange 
-	FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
-	WHERE ExchangeId IN (SELECT DISTINCT Currency FROM #Data)
-
+	DECLARE @sql VARCHAR(MAX) = ''
+	SET @sql = 'SELECT DISTINCT CONVERT(VARCHAR(6), ExchangeDate, 112) AS ExchangeDate
+				, ExchangeId, '+ @BaseOnCurrency + ' AS Rate
+				FROM Lrf_f_GetExchangeDaily('''+ CONVERT(VARCHAR(10),@FromDate, 120) +''', '''+ CONVERT(VARCHAR(10), @ToDate, 120) +''')
+				WHERE ExchangeId IN (SELECT DISTINCT Currency FROM #Data)'
+	INSERT INTO #Exchange(ExchangeDate, ExchangeID, Rate)
+	EXECUTE (@sql)
+	
 	INSERT INTO #Result (PartyID, TurnOver, BettypeId, KNBettypeId, MemberWinloss, LicWinloss, Betcount, AmtDueTo, WinlostDate, CurrencyId)
 	SELECT	d.PartyID
 			, CAST(ISNULL(SUM(d.TurnOver), 0) AS MONEY) AS TurnOver
@@ -131,11 +139,11 @@ BEGIN
 		, re.BettypeId 
 		, re.KNBettypeId 
 		, SUM(re.betcount) AS BetCount
-		, CAST(SUM(re.turnover * ex.EUR) AS MONEY) AS Turnover
-		, CAST(SUM(re.LicWinloss * ex.EUR) AS MONEY) AS Winlost
-		, CAST(SUM(re.AmtDueTo * ex.EUR) AS MONEY) AS AmtDueTo	
+		, CAST(SUM(re.turnover * ex.Rate) AS MONEY) AS Turnover
+		, CAST(SUM(re.LicWinloss * ex.Rate) AS MONEY) AS Winloss
+		, CAST(SUM(re.AmtDueTo * ex.Rate) AS MONEY) AS AmtDueTo	
 	FROM #Result re
-		INNER JOIN #TempExchange ex ON re.winlostdate = ex.exchangedate and re.CurrencyId = ex.ExchangeId    
+		INNER JOIN #Exchange ex ON re.winlostdate = ex.exchangedate and re.CurrencyId = ex.ExchangeId    
 		LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) on re.PartyID = p.PartyID    
 	GROUP BY re.BettypeId, re.KNBettypeId, CONVERT(VARCHAR(6), re.winlostdate, 112)
 			, CASE  WHEN p.PartyName = 'IBC' THEN 'FDL'
@@ -150,10 +158,11 @@ BEGIN
 			, re.BettypeId, re.KNBettypeId
 	DROP TABLE #Data
 	DROP TABLE #Result
-	DROP TABLE #TempExchange
+	DROP TABLE #Exchange
 	DROP TABLE #tmpParty
 	DROP TABLE #Bettype
 END
+
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_KenoWinloss] TO [vnteam] 
 GRANT EXECUTE ON [dbo].[LA_Rpt_KenoWinloss] TO bodbAdminNet
