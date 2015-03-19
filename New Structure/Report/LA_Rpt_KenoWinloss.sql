@@ -88,24 +88,27 @@ BEGIN
 	)
 
 	--collect data
-	BEGIN
-		INSERT INTO #Data (WinlostDate, Currency, PartyID, BettypeId, KNBettypeId, Turnover, MemberWinloss, Betcount)
-		(
-			SELECT  b.rptDate AS WinlostDate
-					, b.CurrencyId, tp.PartyID, b.BetTypeId, b.KenoBetTypeId
-					, SUM(Turnover) AS Turnover
-					, SUM(Winloss)  AS MemberWinloss
-					, SUM(BetCount) AS Betcount
-			FROM bodb_LicenseeReport.dbo.rptKenoWinloss b WITH ( NOLOCK) 
-				INNER JOIN #tmpParty tp ON tp.LicenseeID = b.SiteId
-				INNER JOIN #Bettype bt ON b.BetTypeId = bt.Bettype				
-			WHERE b.rptDate BETWEEN @Fromdate AND @Todate			
-				AND (@Bettype = 0 OR ( @Bettype <> 0 AND b.KenoBetTypeId = @Bettype)) 
-				AND (@excludeTest = 0 OR (@excludeTest = 1 AND CurrencyID <> 20))			
-				AND b.StatusID NOT IN (-1, 103)			
-			GROUP BY b.rptDate, b.CurrencyId, tp.PartyID, b.BetTypeId, b.KenoBetTypeId
-		)
-	END
+	INSERT INTO #Data (WinlostDate, Currency, PartyID, BettypeId, KNBettypeId, Turnover, MemberWinloss, Betcount)
+	(
+		SELECT  b.rptDate AS WinlostDate
+				, b.CurrencyId, tp.PartyID, b.BetTypeId, b.KenoBetTypeId
+				, SUM(Turnover *
+							CASE WHEN @drawfilter IN (2, 3) 
+									THEN CASE WHEN b.StatusId = 111 THEN 0								
+											ELSE 1
+									END
+							END) AS Turnover
+				, SUM(Winloss)  AS MemberWinloss
+				, SUM(BetCount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) AS Betcount
+		FROM bodb_LicenseeReport.dbo.rptKenoWinloss b WITH ( NOLOCK) 
+			INNER JOIN #tmpParty tp ON tp.LicenseeID = b.SiteId
+			INNER JOIN #Bettype bt ON b.BetTypeId = bt.Bettype				
+		WHERE b.rptDate BETWEEN @Fromdate AND @Todate
+			AND (@Bettype = 0 OR ( @Bettype <> 0 AND b.KenoBetTypeId = @Bettype)) 
+			AND (@excludeTest = 0 OR (@excludeTest = 1 AND CurrencyID <> 20))			
+			AND b.StatusID NOT IN (-1, 103)			
+		GROUP BY b.rptDate, b.CurrencyId, b.BetTypeId, b.KenoBetTypeId, tp.PartyID	
+	)
 	DECLARE @sql VARCHAR(MAX) = ''
 	SET @sql = 'SELECT DISTINCT CONVERT(VARCHAR(6), ExchangeDate, 112) AS ExchangeDate
 				, ExchangeId, '+ @BaseOnCurrency + ' AS Rate
