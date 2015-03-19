@@ -96,12 +96,8 @@ BEGIN
 							CASE WHEN @drawfilter IN (2, 3) 
 									THEN CASE WHEN b.StatusId = 111 THEN 0								
 											ELSE 1
-<<<<<<< HEAD
 										END
-								ELSE 1									
-=======
-									END
->>>>>>> 9766a19515b6c8878dbe92b2fd799b53eeb0c965
+								ELSE 1																		
 							END) AS Turnover
 				, SUM(Winloss)  AS MemberWinloss
 				, SUM(BetCount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) AS Betcount
