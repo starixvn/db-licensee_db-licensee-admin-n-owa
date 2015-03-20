@@ -26,7 +26,7 @@ AS
  * DB   : DB052.bodb02  
  
  * Revisions :  
-
+	- 20150320@Florent: enhance SP, using function LA_f_ExchangeDailySel
  * Param's Explanation:    
  *  - @FromDate		: From date   
  *  - @ToDate		: To date   
