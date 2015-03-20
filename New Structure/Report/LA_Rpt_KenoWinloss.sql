@@ -110,13 +110,10 @@ BEGIN
 			AND b.StatusID NOT IN (-1, 103)			
 		GROUP BY b.rptDate, b.CurrencyId, b.BetTypeId, b.KenoBetTypeId, tp.PartyID	
 	)
-	DECLARE @sql VARCHAR(MAX) = ''
-	SET @sql = 'SELECT DISTINCT CONVERT(VARCHAR(6), ExchangeDate, 112) AS ExchangeDate
-				, ExchangeId, '+ @BaseOnCurrency + ' AS Rate
-				FROM Lrf_f_GetExchangeDaily('''+ CONVERT(VARCHAR(10),@FromDate, 120) +''', '''+ CONVERT(VARCHAR(10), @ToDate, 120) +''')
-				WHERE ExchangeId IN (SELECT DISTINCT Currency FROM #Data)'
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, Rate)
-	EXECUTE (@sql)
+	SELECT DISTINCT CONVERT(VARCHAR(6), ExchangeDate, 112) AS ExchangeDate
+		, ExchangeID, BaseCurrencyRate
+	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseOnCurrency)
 	
 	INSERT INTO #Result (PartyID, TurnOver, BettypeId, KNBettypeId, MemberWinloss, LicWinloss, Betcount, AmtDueTo, WinlostDate, CurrencyId)
 	SELECT	d.PartyID
