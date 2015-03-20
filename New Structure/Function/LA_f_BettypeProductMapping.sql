@@ -16,7 +16,10 @@ RETURNS @tbBettypeProduct TABLE (
 AS
 /*  Created: 20141111@Florent  
     Task : Get bettype product mapping
-    DB: DB052/bodb_Licensee  
+    DB: DB052/bodb_Licensee
+	Revisions:
+		20150202@Patrick: Add more product: Bingo & Keno
+		
     Param's Explanation:   
 
 */
@@ -50,7 +53,7 @@ BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 1
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
-	   WHERE typeid BETWEEN 31 AND 33
+	   WHERE typeid IN (31, 32, 33, 41, 42, 43)
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
@@ -86,7 +89,25 @@ BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 6
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
-	   WHERE typeid = 71
+	   WHERE typeid IN (71, 72)
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+    END
+	
+	IF CHARINDEX('BG', @ProductCodes) <> 0
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 7
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid = 73
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+    END
+
+	IF CHARINDEX('KN', @ProductCodes) <> 0
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 8
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 1501 AND 1599
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
