@@ -107,7 +107,7 @@ BEGIN
 		WHERE b.rptDate BETWEEN @Fromdate AND @Todate
 			AND (@Bettype = 0 OR ( @Bettype <> 0 AND b.KenoBetTypeId = @Bettype)) 
 			AND (@excludeTest = 0 OR (@excludeTest = 1 AND CurrencyID <> 20))			
-			AND b.StatusID NOT IN (-1, 101, 102, 103)		
+			AND b.StatusID NOT IN (-1, 103)		
 		GROUP BY b.rptDate, b.CurrencyId, b.BetTypeId, b.KenoBetTypeId, tp.PartyID	
 	)
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, Rate)
