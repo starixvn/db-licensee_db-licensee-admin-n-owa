@@ -16,6 +16,7 @@ AS
 	 Task: Generate data for Keno Winlost
 	 DB: DBLIC/bodb_LicenseeReport
 	 Revisions: 
+		- 20150323@Florent: remove void, reject ticket
 	 Param's Explanation:
 */
 
@@ -53,7 +54,7 @@ BEGIN
 		CROSS APPLY bodb02.dbo.f_ParseTransDesc(b.transdesc, b.bettype) p
 		LEFT JOIN bodb02.dbo.View_KenoBettypeMapping v ON p.ChoiceId = v.ChoiceId
 	WHERE b.winlostdate = @Winlossdate	
-		AND b.statusID NOT IN (101, 102, 121)
+		AND b.statusID NOT IN (101, 102)
 	GROUP BY CAST(b.winlostdate AS DATE), ISNULL(site.SiteID,-1), b.bettype
 		, p.ChoiceId, ISNULL(v.BettypeID, -1),  b.currency, b.statusID
 	OPTION (MAXDOP 1)
