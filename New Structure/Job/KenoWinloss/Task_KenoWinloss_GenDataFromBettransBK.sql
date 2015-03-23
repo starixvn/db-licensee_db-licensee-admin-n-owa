@@ -18,6 +18,7 @@ AS
  Task: Gen history data from bettrans_bk
  DB: DBACC/bodb_LicenseeReport
  Revisions: 
+	- 20150323@Florent: remove void, reject ticket
  Param's Explanation:	
 */
 BEGIN
@@ -66,7 +67,8 @@ BEGIN
 			CROSS APPLY bodb02.dbo.f_ParseTransDesc(b.transdesc, b.bettype) p
 			LEFT JOIN @KenoBettypeMapping v ON p.ChoiceId = v.ChoiceId
 		WHERE b.winlostdate = @WinlostDate
-			AND b.bettype BETWEEN 1501 AND 1599			
+			AND b.bettype BETWEEN 1501 AND 1599	
+			AND b.statusID NOT IN (101, 102)			
 		GROUP BY CAST(b.winlostdate AS DATE), ISNULL(site.SiteID, -1), b.bettype
 			, p.ChoiceId, v.BettypeID,  b.currency, b.statusID
 		OPTION (MAXDOP 1)
