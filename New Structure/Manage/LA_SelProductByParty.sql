@@ -31,7 +31,8 @@ BEGIN
 			, CASE WHEN c.ProductID = 0 THEN 'Sportsbook'
 					 ELSE pr.ProductName
 				END AS ProductName
-		FROM dbo.OAS_ChargeInfo AS c
+		FROM dbo.OAS_ChargeInfo c WITH (NOLOCK) 
+			INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON c.ChargeID = cs.ChargeID AND cs.SystemID = 2
 			INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON c.FromParty = p.PartyID
 			LEFT JOIN dbo.Product3rd pr WITH (NOLOCK) ON c.ProductID = pr.Productid	
 		WHERE (@PartyID = 0 OR p.PartyID = @PartyID)
