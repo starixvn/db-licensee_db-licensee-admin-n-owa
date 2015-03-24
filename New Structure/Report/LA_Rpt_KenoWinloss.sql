@@ -126,7 +126,7 @@ BEGIN
 			, CONVERT(VARCHAR(6), d.WinlostDate, 112) AS WinlostDate
 			, d.Currency
 	FROM #Data d
-		LEFT JOIN #tmpParty tp ON d.PartyID = tp.PartyID
+		LEFT JOIN (SELECT DISTINCT PartyID, FromDate, ToDate, Rate FROM #tmpParty) tp ON d.PartyID = tp.PartyID
 	WHERE d.WinlostDate BETWEEN tp.FromDate AND tp.ToDate
 	GROUP BY d.PartyID, CONVERT(VARCHAR(6), d.WinlostDate, 112), d.Currency, d.BettypeId, d.KNBettypeId
 
