@@ -139,11 +139,7 @@ BEGIN
 	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
 	SELECT   														   
-		(
-			CASE WHEN GETDATE() < (DATEADD(s, -1, DATEADD(mm, DATEDIFF(m, 0, d.Winlostdate) + 1, 0))) 
-			THEN GETDATE() 
-			ELSE (DATEADD(s,-1, DATEADD(mm, DATEDIFF(m, 0, d.Winlostdate) + 1, 0))) END													   
-		)							AS WinLostDate
+		@ToDate						AS WinLostDate
 		, d.CurrencyId				AS CurrencyId
 		, e.CurrencyCode			AS CurrencyName
 		, SUM(Betcount)				AS Betcount
@@ -165,12 +161,7 @@ BEGIN
 		INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
 	GROUP BY   														   
 		d.CurrencyId	
-		, CurrencyCode												   
-		, (
-			CASE WHEN GETDATE() < (DATEADD(s, -1, DATEADD(mm, DATEDIFF(m, 0, d.Winlostdate) + 1, 0))) 
-			THEN GETDATE() 
-			ELSE (DATEADD(s,-1, DATEADD(mm, DATEDIFF(m, 0, d.Winlostdate) + 1, 0))) END													   
-			)
+		, CurrencyCode
 	ORDER BY WinLostDate  													   
 
 	DROP TABLE #Exchange												   
