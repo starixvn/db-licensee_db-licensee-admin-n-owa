@@ -57,6 +57,7 @@ BEGIN
 	(
 		SELECT PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyID, @FromDate, @ToDate, @ProductCode, 'OA', 1)
+		WHERE DI_Rate > 0
 	)
 
 	INSERT INTO @Bettype (Bettype)
