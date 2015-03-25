@@ -32,12 +32,10 @@ BEGIN
 	SELECT val
 	FROM strSPlit(@CurrencyIds, ',')
 	
-	DECLARE @sql VARCHAR(MAX) = ''
-	SET @sql = 'SELECT DISTINCT ExchangeDate, ExchangeId, Code, '+ @BaseCurrencyName + ' AS Rate
-				FROM bodb02.dbo.Lrf_f_GetExchangeDaily('''+ CONVERT(VARCHAR(10),@ExchangeDate, 120) +''', '''+ CONVERT(VARCHAR(10), @ExchangeDate, 120) +''')
-				WHERE ExchangeId IN (SELECT DISTINCT CurrencyID FROM #tmpCurrency)'
+	SELECT DISTINCT ExchangeDate, ExchangeId, Code, BaseCurrencyRate AS Rate
+	FROM bodb02.dbo.LA_f_ExchangeDailySel(@ExchangeDate, @ExchangeDate, @BaseCurrencyName)
+	WHERE ExchangeId IN (SELECT DISTINCT CurrencyID FROM #tmpCurrency)	
 	
-	EXECUTE (@sql)	
 	DROP TABLE #tmpCurrency
 END
 GO
