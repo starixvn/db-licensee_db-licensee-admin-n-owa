@@ -26,7 +26,7 @@ AS
  * DB   : DB052.bodb02  
  
  * Revisions :  
-
+	- 20150320@Florent: enhance SP, using function LA_f_ExchangeDailySel
  * Param's Explanation:    
  *  - @FromDate		: From date   
  *  - @ToDate		: To date   
@@ -107,16 +107,13 @@ BEGIN
 		WHERE b.rptDate BETWEEN @Fromdate AND @Todate
 			AND (@Bettype = 0 OR ( @Bettype <> 0 AND b.KenoBetTypeId = @Bettype)) 
 			AND (@excludeTest = 0 OR (@excludeTest = 1 AND CurrencyID <> 20))			
-			AND b.StatusID NOT IN (-1, 103)			
+			AND b.StatusID NOT IN (-1, 103)		
 		GROUP BY b.rptDate, b.CurrencyId, b.BetTypeId, b.KenoBetTypeId, tp.PartyID	
 	)
-	DECLARE @sql VARCHAR(MAX) = ''
-	SET @sql = 'SELECT DISTINCT CONVERT(VARCHAR(6), ExchangeDate, 112) AS ExchangeDate
-				, ExchangeId, '+ @BaseOnCurrency + ' AS Rate
-				FROM Lrf_f_GetExchangeDaily('''+ CONVERT(VARCHAR(10),@FromDate, 120) +''', '''+ CONVERT(VARCHAR(10), @ToDate, 120) +''')
-				WHERE ExchangeId IN (SELECT DISTINCT Currency FROM #Data)'
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, Rate)
-	EXECUTE (@sql)
+	SELECT DISTINCT CONVERT(VARCHAR(6), ExchangeDate, 112) AS ExchangeDate
+		, ExchangeID, BaseCurrencyRate
+	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseOnCurrency)
 	
 	INSERT INTO #Result (PartyID, TurnOver, BettypeId, KNBettypeId, MemberWinloss, LicWinloss, Betcount, AmtDueTo, WinlostDate, CurrencyId)
 	SELECT	d.PartyID
@@ -129,7 +126,7 @@ BEGIN
 			, CONVERT(VARCHAR(6), d.WinlostDate, 112) AS WinlostDate
 			, d.Currency
 	FROM #Data d
-		LEFT JOIN #tmpParty tp ON d.PartyID = tp.PartyID
+		LEFT JOIN (SELECT DISTINCT PartyID, FromDate, ToDate, Rate FROM #tmpParty) tp ON d.PartyID = tp.PartyID
 	WHERE d.WinlostDate BETWEEN tp.FromDate AND tp.ToDate
 	GROUP BY d.PartyID, CONVERT(VARCHAR(6), d.WinlostDate, 112), d.Currency, d.BettypeId, d.KNBettypeId
 

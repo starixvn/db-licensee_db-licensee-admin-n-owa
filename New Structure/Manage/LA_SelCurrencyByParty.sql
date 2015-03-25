@@ -6,9 +6,10 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 ALTER PROCEDURE  [dbo].[LA_SelCurrencyByParty]		
-	@PartyID int = 0,
-	@excludeTest BIT=0
-AS	
+	 @PartyID		INT				= 0
+	, @excludeTest	BIT				= 0
+	, @SystemMode	VARCHAR(10)		= 'LA'
+AS
 /*
 Created: 20140828@Florent
 Task : Get all the currency by a party
@@ -17,7 +18,7 @@ DB: DB052.bodb_licensee
 Revison:
     - 20141218@Florent: add more currency from credit licensee   
 	- 20150105@Florent: use f_SelLicenseeCust
-
+	- 20150312@Florent: add systemmode to use on report settlement
 Revisions:
 Param's Explanation:
 */
@@ -73,11 +74,13 @@ BEGIN
 	) t2 ON t1.CurrencyCode = t2.CurrencyCode
 
 	SELECT t.currency
-		,CASE 
-			WHEN t.currency = 20
+		,CASE t.currency
+			WHEN 20
 				THEN 'UUS'
-			WHEN t.currency = 51
-				THEN 'INH'
+			WHEN 51 
+				THEN CASE WHEN @SystemMode = 'LA' THEN 'INH'
+						  WHEN @SystemMode = 'INV' THEN 'VND'
+					 END
 			ELSE CurrencyCode
 			END AS CurrencyName
 	FROM @temp1 t
