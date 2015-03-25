@@ -68,7 +68,7 @@ BEGIN
 			LEFT JOIN @KenoBettypeMapping v ON p.ChoiceId = v.ChoiceId
 		WHERE b.winlostdate = @WinlostDate
 			AND b.bettype BETWEEN 1501 AND 1599	
-			AND b.statusID NOT IN (101, 102)			
+			AND b.statusID NOT IN (0, 1, 101, 102, 121)	
 		GROUP BY CAST(b.winlostdate AS DATE), ISNULL(site.SiteID, -1), b.bettype
 			, p.ChoiceId, v.BettypeID,  b.currency, b.statusID
 		OPTION (MAXDOP 1)
