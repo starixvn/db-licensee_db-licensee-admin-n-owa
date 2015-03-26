@@ -335,7 +335,7 @@ BEGIN
 				, SUM(b.PComm) AS Playercomm
 				, SUM(b.betcount) AS betcount
 			FROM #Data b WITH (NOLOCK)
-				INNER JOIN @tmpParty p ON p.PartyID = b.PartyID AND b.ProductID = p.ProductID				
+				INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate FROM @tmpParty) p ON p.PartyID = b.PartyID AND b.ProductID = p.ProductID				
 			WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate
 				AND p.ProductID <> 3
 			GROUP BY p.PartyID, b.rptDate, b.Currency

@@ -24,6 +24,7 @@ AS
  * Base on : [OA_Rpt_VirtualSportWinloss]
  * Revisions :  
 	   - 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
+	   - 20150326@Florent: fix filter drawfilter
  * Param's Explanation:    
  *  - @FromDate   : From date   
  *  - @ToDate   : To date  
@@ -61,9 +62,28 @@ CREATE TABLE #tmpParty (
 IF EXISTS(SELECT 1 FROM #tmpParty tp WHERE tp.IsDeposit = 1)
 BEGIN
 	INSERT INTO #Data
-	SELECT  b.rptDate,b.currencyID,tp.PartyID,l.sporttype, 
-		   b.bettype,SUM(Turnover) as Turnover, 
-		   SUM(Winloss) AS MemberWinloss,SUM(BetCount) AS betcount
+	SELECT  b.rptDate, b.currencyID, tp.PartyID, l.sporttype
+		   , b.bettype
+		   , SUM(Turnover * 
+							CASE   
+								WHEN @drawfilter IN (2,3) THEN  
+								CASE   
+									WHEN b.status = 111 THEN 0  
+									WHEN (b.status = 114 OR b.status = 115) THEN 0.5  
+								ELSE 1   
+								END  
+							ELSE 1   
+							END) AS Turnover
+		   , SUM(Winloss) AS MemberWinloss
+		   , SUM(BetCount * 
+							CASE   
+								WHEN @drawfilter = 2 THEN  
+									CASE   
+										WHEN b.status = 111 THEN 0  
+										ELSE 1   
+									END  
+								ELSE 1   
+							END ) AS betcount
 	FROM bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) 
 		INNER JOIN #tmpParty tp ON tp.LicenseeID = b.siteID
 		LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID				
@@ -82,7 +102,27 @@ END
 IF EXISTS (SELECT 1 FROM #tmpParty tp WHERE tp.IsDeposit = 0)
 BEGIN
 	INSERT INTO #Data
-	SELECT  b.rptDate,b.currencyID,lr.PartyID,l.sporttype, b.bettype,SUM(Turnover) as Turnover, SUM(Winloss) AS MemberWinloss,SUM(BetCount) AS betcount
+	SELECT  b.rptDate, b.currencyID, lr.PartyID, l.sporttype, b.bettype
+		, SUM(Turnover * 
+						CASE   
+							WHEN @drawfilter IN (2,3) THEN  
+							CASE   
+								WHEN b.status = 111 THEN 0  
+								WHEN (b.status = 114 OR b.status = 115) THEN 0.5  
+							ELSE 1   
+							END  
+						ELSE 1   
+						END) AS Turnover
+		, SUM(Winloss) AS MemberWinloss
+		, SUM(BetCount * 
+						CASE   
+							WHEN @drawfilter = 2 THEN  
+								CASE   
+									WHEN b.status = 111 THEN 0  
+									ELSE 1   
+								END  
+							ELSE 1   
+						END ) AS betcount
 	FROM #tmpParty lr		
 		INNER JOIN bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) ON b.siteID = lr.LicenseeID
 		LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID		
