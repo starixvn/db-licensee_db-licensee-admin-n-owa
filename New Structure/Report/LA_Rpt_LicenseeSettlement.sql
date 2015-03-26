@@ -15,19 +15,6 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeSettlement]
 	, @CurrencyId			INT				= 0
 	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
 WITH RECOMPILE
-AS
-	/*  Created: 20150313@Florent		
-		Task : Report - Licensee Settlement Report
-		Base on : IMS_Rpt_LicenseeSettlement
-		DB: DB052.bodb02
-		Revisions:  
-
-		Param's Explanation:  				
-			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
-								'NG' -> Number Game			'BA' -> BA
-								'LC' -> Live Casino			'VS' -> Virtual Sports
-								'CS' -> RNG Casino			'BG' -> Bingo			
-	*/  
 SET NOCOUNT ON
 BEGIN			
 	DECLARE @LicenseeID INT	
@@ -65,44 +52,104 @@ BEGIN
 		SELECT Bettype
 		FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, @ProductCode)
 	)
-
+	
 	SELECT @LicenseeID = LicenseeID 
 	FROM @tmpParty
+
 	-- Product <> BA
 	IF (REPLACE(@ProductCode, 'BA', '') != '' AND REPLACE(@ProductCode, 'BA', '') != ',')
 	BEGIN
-		INSERT INTO #Result( Winlostdate, CurrencyId, TurnOver, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
-			SELECT   			   
-				rptDate     
-				, CurrencyID		   
-				, SUM(Turnover) AS turnover
-				, SUM(WinLoss) AS Winlost
-				, SUM(PComm) AS PlayerComm
-				, - SUM(Winloss * ( 1 - p.Rate)) AS LicenseeWL				
-				, SUM(AComm - PComm) AS LicenseeComm
-				, - SUM(WinLoss * p.Rate + AComm) AS Company 
-				, SUM(BetCount) AS BetCount	  
-			FROM (
-				SELECT b.SiteId, b.rptDate, b.CurrencyID
-				, SUM(ISNULL(b.turnover, 0)) AS TurnOver
-				, SUM(ISNULL(b.winloss, 0)) Winloss					 			 					 				
-				, SUM(ISNULL(b.CommissionP, 0)) AS PComm
-				, SUM(ISNULL(b.CommissionA, 0)) AS AComm
-				, SUM(ISNULL(b.betcount, 0)) BetCount
-				FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK)
-					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype					
-				WHERE 
-					b.SiteID = @LicenseeID					
-					AND b.rptDate BETWEEN @FromDate AND @ToDate			
-					AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
-					AND (b.CurrencyID <> 20)
-					AND b.[Status] NOT IN (- 1, 103)
-					AND b.customercategory NOT IN (27, 28)					
-				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
-			) d 
-				INNER JOIN @tmpParty p ON d.SiteId = p.LicenseeID 
-			WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
-			GROUP BY rptDate, CurrencyID
+		IF CHARINDEX('AGC', @ProductCode) <> 0 -- AG Casino
+		BEGIN
+			DECLARE @Recommend VARCHAR(8000) = '', @SQL VARCHAR(8000) = ''
+			CREATE TABLE #DataWinloss3rd (Recommend	INT, Winlostdate DATETIME, SportType INT, Currency INT, TurnOver MONEY, TotalTrans INT, Winloss MONEY)
+			DECLARE @TempAG AS TABLE( LicenseeeID INT, CustId INT, CurrencyId INT)
+			--get licensee recommend			
+			INSERT INTO @TempAG(LicenseeeID, CustId, CurrencyId)
+			SELECT DISTINCT LicenseeID, CustID, Currency
+			FROM bodb_licensee.dbo.f_SelLicenseeCust(@LicenseeID)
+			WHERE (@CurrencyId = 0 OR (@CurrencyId <> 0 AND Currency = @CurrencyId))
+
+			SELECT @Recommend = @Recommend + CAST(CustID AS VARCHAR) + ',' 
+			FROM @TempAG 
+
+			--truncate last comma
+			SET @Recommend = SUBSTRING(@Recommend, 0, LEN(@Recommend))			
+			
+			SELECT @sql = 'SELECT Recommend, Winlostdate, SportType, Currency, TurnOver, TotalTrans, Winloss
+						  FROM OPENQUERY(DBACC,''EXEC bodb02.dbo.LA_Rpt_3rdProductWinloss
+												 @ProductCodes		= ''''@ProductCodes_''''
+												, @Recommend		= ''''@Recommend_''''
+												, @Currency 		= @Currency_
+												, @FromDate 		= ''''@FromDate_''''
+												, @ToDate 			= ''''@ToDate_''''
+												'')'
+			SET @SQL = REPLACE(@SQL, '@ProductCodes_', @ProductCode)
+			SET @SQL = REPLACE(@SQL, '@Recommend_', @Recommend)
+			SET @SQL = REPLACE(@SQL, '@Currency_', @CurrencyId)
+			SET @SQL = REPLACE(@SQL, '@FromDate_', CONVERT( VARCHAR(10),@FromDate, 120))
+			SET @SQL = REPLACE(@SQL, '@ToDate_', CONVERT( VARCHAR(10),@ToDate, 120))			
+			
+			INSERT INTO #DataWinloss3rd(Recommend, Winlostdate, SportType, Currency, TurnOver, TotalTrans, Winloss)
+			EXECUTE (@SQL)
+
+			INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
+			(
+				SELECT   			   
+					b.Winlostdate     
+					, CurrencyID		   
+					, SUM(Turnover) AS Turnover
+					, SUM(WinLoss) AS Winlost
+					, 0 AS PlayerComm
+					, - SUM(Winloss * ( 1 - p.Rate)) AS LicenseeWL				
+					, 0 AS LicenseeComm
+					, - SUM(WinLoss * p.Rate) AS Company 
+					, SUM(b.TotalTrans) AS BetCount	  
+				FROM #DataWinloss3rd b WITH (NOLOCK)	
+					INNER JOIN @TempAG ag ON b.Recommend = ag.CustId AND b.Currency = ag.CurrencyId								
+					INNER JOIN @tmpParty p ON ag.LicenseeeID = p.LicenseeId
+				WHERE b.Winlostdate BETWEEN p.Fromdate AND p.Todate
+				GROUP BY b.Winlostdate, CurrencyID 
+			)
+			DROP TABLE #DataWinloss3rd
+		END
+		ELSE
+		BEGIN
+			INSERT INTO #Result( Winlostdate, CurrencyId, TurnOver, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
+			(
+				SELECT   			   
+					rptDate     
+					, CurrencyID		   
+					, SUM(Turnover) AS turnover
+					, SUM(WinLoss) AS Winlost
+					, SUM(PComm) AS PlayerComm
+					, - SUM(Winloss * ( 1 - p.Rate)) AS LicenseeWL				
+					, SUM(AComm - PComm) AS LicenseeComm
+					, - SUM(WinLoss * p.Rate + AComm) AS Company 
+					, SUM(BetCount) AS BetCount	  
+				FROM (
+					SELECT b.SiteId, b.rptDate, b.CurrencyID
+					, SUM(ISNULL(b.turnover, 0)) AS TurnOver
+					, SUM(ISNULL(b.winloss, 0)) Winloss					 			 					 				
+					, SUM(ISNULL(b.CommissionP, 0)) AS PComm
+					, SUM(ISNULL(b.CommissionA, 0)) AS AComm
+					, SUM(ISNULL(b.betcount, 0)) BetCount
+					FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK)
+						INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype					
+					WHERE
+						b.SiteID = @LicenseeID
+						AND b.rptDate BETWEEN @FromDate AND @ToDate			
+						AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
+						AND (b.CurrencyID <> 20)
+						AND b.[Status] NOT IN (- 1, 103)
+						AND b.customercategory NOT IN (27, 28)					
+					GROUP BY b.rptdate, b.SiteId, b.CurrencyID
+				) d 
+					INNER JOIN @tmpParty p ON d.SiteId = p.LicenseeID 
+				WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
+				GROUP BY rptDate, CurrencyID
+			)
+		END
 	END	
 
 	-- Product = BA
@@ -134,9 +181,8 @@ BEGIN
 				b.rptDate, b.CurrencyID	
 		)
 	END	
-
-	INSERT INTO #Exchange(ExchangeDate, ExchangeID, Rate)
-	SELECT ExchangeDate, ExchangeID, BaseCurrencyRate
+	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
+	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
 	SELECT   														   
@@ -162,8 +208,8 @@ BEGIN
 		INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
 	GROUP BY   														   
 		d.CurrencyId	
-		, CurrencyCode
-	ORDER BY WinLostDate  													   
+		, CurrencyCode												   	
+	ORDER BY CurrencyId ASC
 
 	DROP TABLE #Exchange												   
 	DROP TABLE #Result	
