@@ -15,6 +15,19 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeSettlement]
 	, @CurrencyId			INT				= 0
 	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
 WITH RECOMPILE
+AS
+	/*  Created: 20150313@Florent		
+		Task : Report - Licensee Settlement Report
+		Base on : IMS_Rpt_LicenseeSettlement
+		DB: DB052.bodb02
+		Revisions:  
+
+		Param's Explanation:  				
+			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
+								'NG' -> Number Game			'BA' -> BA
+								'LC' -> Live Casino			'VS' -> Virtual Sports
+								'CS' -> RNG Casino			'BG' -> Bingo			
+	*/  
 SET NOCOUNT ON
 BEGIN			
 	DECLARE @LicenseeID INT	
