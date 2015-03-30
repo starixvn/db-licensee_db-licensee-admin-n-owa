@@ -69,6 +69,9 @@ BEGIN
 	SELECT @LicenseeID = LicenseeID 
 	FROM @tmpParty
 
+	IF @LicenseeID IS NULL
+		RETURN
+
 	-- Product <> BA
 	IF (REPLACE(@ProductCode, 'BA', '') != '' AND REPLACE(@ProductCode, 'BA', '') != ',')
 	BEGIN
@@ -82,6 +85,7 @@ BEGIN
 			SELECT DISTINCT LicenseeID, CustID, Currency
 			FROM bodb_licensee.dbo.f_SelLicenseeCust(@LicenseeID)
 			WHERE (@CurrencyId = 0 OR (@CurrencyId <> 0 AND Currency = @CurrencyId))
+				AND Currency <> 20
 
 			SELECT @Recommend = @Recommend + CAST(CustID AS VARCHAR) + ',' 
 			FROM @TempAG 
