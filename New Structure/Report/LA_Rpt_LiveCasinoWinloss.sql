@@ -86,7 +86,7 @@ BEGIN
 			AND (@excludeTest = 0 OR (@excludeTest = 1 AND CurrencyID<>20))
 			AND ((bettype BETWEEN 1101 AND 1199 AND @GameType = 0) OR (bettype = @GameType))			
 			AND (@Currency = 0 OR  b.CurrencyID = @Currency)
-			--AND b.customercategory NOT IN (27,28) 
+			AND b.customercategory NOT IN (27,28) 
 		GROUP BY b.rptDate, b.CurrencyID, tp.PartyID
 	END	
 
@@ -110,7 +110,7 @@ BEGIN
 			CAST( isnull(SUM(-1 * d.MemberWinloss  * isnull(tp.Rate, 0)),0)  AS money) AS OneworksRevenue,
 			Currency,winlostdate
 		FROM #Data d			
-			LEFT JOIN #tmpParty tp ON d.PartyID = tp.PartyID
+			LEFT JOIN (SELECT DISTINCT PartyID,Rate,Fromdate,Todate FROM #tmpParty) tp ON d.PartyID = tp.PartyID
 	     WHERE d.winlostdate BETWEEN tp.Fromdate AND tp.Todate
 		GROUP BY
 			d.PartyID, Currency,winlostdate

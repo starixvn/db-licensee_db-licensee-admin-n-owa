@@ -95,6 +95,7 @@ BEGIN
 		AND bettype BETWEEN 1201 AND 1299
 		AND (@Sporttype = 0 OR ( @Sporttype<>0 AND l.Sporttype = @Sporttype)) 
 		AND (@bettype = 0 OR (b.bettype = @bettype AND @bettype <> 0))
+		AND b.customercategory NOT IN (27,28) 
 	GROUP BY b.rptDate,b.currencyID,tp.PartyID,l.sporttype, b.bettype
 END
 
@@ -132,7 +133,7 @@ BEGIN
 		AND b.status NOT IN (-1,103)
 		AND (@excludeTest = 0 OR (@excludeTest = 1 AND CurrencyID <> 20))
 		AND bettype BETWEEN 1201 AND 1299
-		--AND b.customercategory NOT IN (27,28) 
+		AND b.customercategory NOT IN (27,28) 
 		AND (@Sporttype = 0 OR ( @Sporttype<>0 AND l.Sporttype = @Sporttype)) 
 		AND (@bettype = 0 OR (b.bettype = @bettype AND @bettype <> 0))
 	GROUP BY b.rptDate,b.currencyID, lr.PartyID,l.sporttype, b.bettype	
@@ -156,7 +157,7 @@ SELECT
 		CAST(-1 * isnull(SUM(d.MemberWinloss  * isnull(tp.Rate,0)),0) AS money) AS OneworksIncome
 		,winlostdate,Currency
 	FROM #Data d			
-		LEFT JOIN #tmpParty tp ON d.PartyID = tp.PartyID
+		LEFT JOIN (SELECT DISTINCT PartyID,Rate,Fromdate,Todate FROM #tmpParty) tp ON d.PartyID = tp.PartyID
      WHERE d.winlostdate BETWEEN tp.Fromdate AND tp.Todate
 	GROUP BY
 		d.PartyID, winlostdate,Currency,d.Sporttype,d.bettype
