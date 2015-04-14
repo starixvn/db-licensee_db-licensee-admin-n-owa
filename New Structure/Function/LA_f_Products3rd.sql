@@ -17,39 +17,35 @@ AS
 */
 
 BEGIN   
-	DECLARE @ProductsID AS TABLE (ProductID TINYINT, ProductPrefix VARCHAR(10), ProductName VARCHAR(50))
-	BEGIN  
-		INSERT INTO @ProductsID(ProductID, ProductPrefix, ProductName)  
-		SELECT ProductID, ProductPrefix, ProductName 
-		FROM dbo.Product3rd WITH (NOLOCK)
-		UNION
-		SELECT 0, 'SB', 'Sportbooks'			
-	END
-
 	IF ISNULL(@Products,'') = ''
 	BEGIN
 		INSERT INTO @tbProducts(ProductID, ProductPrefix, ProductName)
-			SELECT Productid, ProductPrefix, ProductName
-			FROM @ProductsID 
+		SELECT ProductID, ProductPrefix, ProductName 
+		FROM dbo.Product3rd WITH (NOLOCK)
+		
+		UNION
+		
+		SELECT 0, 'SB', 'Sportbooks'
+
 	END
 	ELSE
-	BEGIN		
+	BEGIN
 		IF CHARINDEX( 'SB', @Products) <> 0
 		BEGIN
 			INSERT INTO @tbProducts(ProductID, ProductPrefix, ProductName)
 			SELECT 0, 'SB', 'SportsBook'				
 		END
 
-		SELECT @Products = REPLACE(@Products, 'SB','')
-		BEGIN
-			INSERT INTO @tbProducts(ProductID, ProductPrefix, ProductName)
-			SELECT p.Productid, p.ProductPrefix, p.ProductName
-			FROM dbo.strSplit(@Products,',') s
-				INNER JOIN @ProductsID p ON s.val = p.ProductPrefix
-		END
+		INSERT INTO @tbProducts(ProductID, ProductPrefix, ProductName)
+		SELECT ProductID, ProductPrefix, ProductName 
+		FROM dbo.Product3rd WITH (NOLOCK)
+		WHERE ProductPrefix IN (SELECT val FROM dbo.strSplit(@Products,','))
+			AND ProductId <> 0
+			
 	END
-
+	
 	DELETE @tbProducts WHERE ProductID IS NULL
+
 	RETURN
 END
 GO

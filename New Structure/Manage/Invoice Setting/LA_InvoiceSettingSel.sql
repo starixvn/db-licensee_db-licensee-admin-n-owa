@@ -37,7 +37,7 @@ BEGIN
 		, STUFF((
 				SELECT ', ' + CAST(pp.ProductName AS VARCHAR)
 				FROM dbo.LA_InvoiceSetting ii WITH (NOLOCK)
-					LEFT JOIN dbo.[LA_f_Products3rd]('') pp ON ii.ProductId = pp.Productid
+					LEFT JOIN dbo.LA_f_Products3rd('') pp ON ii.ProductId = pp.Productid
 				WHERE i.FromPartyId = ii.FromPartyId AND i.ToPartyID = ii.ToPartyID
 				FOR XML PATH (''))
 			  , 1, 2, '') AS ProductList
