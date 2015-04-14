@@ -23,20 +23,20 @@ AS
 */
 SET NOCOUNT ON
 BEGIN
-	DECLARE @Products AS TABLE (ProductID TINYINT, ProductPrefix VARCHAR(10), ProductName VARCHAR(50))
-	INSERT INTO @Products(ProductID, ProductPrefix, ProductName)
-	SELECT ProductID, ProductPrefix, ProductName
-	FROM dbo.[LA_f_Products3rd]('') -- get all
 
-	BEGIN
-		SELECT c.ProductID, pd.ProductPrefix, pd.ProductName
-		FROM dbo.OAS_Party p WITH (NOLOCK)
-			INNER JOIN dbo.OAS_ChargeInfo c WITH (NOLOCK) ON p.PartyID = c.FromParty
-			INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON c.ChargeID = cs.ChargeID AND cs.SystemID = 2
-			LEFT JOIN @Products pd ON c.ProductID = pd.ProductID	
-		WHERE (@PayerId = 0 OR p.PartyID = @PayerId)
-		GROUP BY c.ProductID, pd.ProductPrefix, pd.ProductName
-	END
+	WITH cte_Product (ProductID, ProductPrefix, ProductName)
+	AS 
+	(
+		SELECT ProductID, ProductPrefix, ProductName
+		FROM dbo.[LA_f_Products3rd]('') -- get all
+	)
+	SELECT c.ProductID, pd.ProductPrefix, pd.ProductName
+	FROM dbo.OAS_Party p WITH (NOLOCK)
+		INNER JOIN dbo.OAS_ChargeInfo c WITH (NOLOCK) ON p.PartyID = c.FromParty
+		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON c.ChargeID = cs.ChargeID AND cs.SystemID = 2
+		LEFT JOIN cte_Product pd ON c.ProductID = pd.ProductID	
+	WHERE (@PayerId = 0 OR p.PartyID = @PayerId)
+	GROUP BY c.ProductID, pd.ProductPrefix, pd.ProductName	
 	
 END
 GO
