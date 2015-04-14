@@ -24,24 +24,20 @@ AS
 */
 SET NOCOUNT ON
 BEGIN
-	DECLARE @Products AS TABLE (ProductID TINYINT, ProductPrefix VARCHAR(10), ProductName VARCHAR(50))
-	INSERT INTO @Products(ProductID, ProductPrefix, ProductName)
-	SELECT ProductID, ProductPrefix, ProductName
-	FROM dbo.[LA_f_Products3rd]('') -- get all
 	
-	SELECT i.ToPartyID			AS BillerId
-		, b.BillerName			AS BillerName
-		, i.FromPartyId			AS PayerId
+	SELECT ToPartyID			AS BillerId
+		, BillerName			AS BillerName
+		, FromPartyId			AS PayerId
 		, p1.PartyName			AS PayerName
 		, i.InvTypeId			AS InvTypeId
-		, tp.InvTypeName		AS InvTypeName
+		, InvTypeName		AS InvTypeName
 		, i.InvTempId			AS InvTempId
-		, temp.InvTemplateName	AS InvTemplateName
+		, InvTemplateName	AS InvTemplateName
 		, COUNT(i.ProductId)	AS NumbOfProducts
-		,STUFF((
+		, STUFF((
 				SELECT ', ' + CAST(pp.ProductName AS VARCHAR)
 				FROM dbo.LA_InvoiceSetting ii WITH (NOLOCK)
-					LEFT JOIN @Products pp ON ii.ProductId = pp.Productid
+					LEFT JOIN dbo.[LA_f_Products3rd]('') pp ON ii.ProductId = pp.Productid
 				WHERE i.FromPartyId = ii.FromPartyId AND i.ToPartyID = ii.ToPartyID
 				FOR XML PATH (''))
 			  , 1, 2, '') AS ProductList
@@ -54,7 +50,8 @@ BEGIN
 	WHERE p.PartyType = 4 
 		AND (@BillerId = 0 OR i.ToPartyId = @BillerId)
 		AND (@PayerId = 0 OR i.FromPartyId = @PayerId)
-	GROUP BY i.ToPartyID, b.BillerName, i.FromPartyId, p1.PartyName, i.InvTypeId, tp.InvTypeName, i.InvTempId, temp.InvTemplateName
+	GROUP BY ToPartyID, BillerName, FromPartyId, p1.PartyName, i.InvTypeId, InvTypeName, i.InvTempId, InvTemplateName
+
 END			 	
 
 GO
