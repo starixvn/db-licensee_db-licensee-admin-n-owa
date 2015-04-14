@@ -92,7 +92,8 @@ BEGIN
 
 			-- Write log
 			SET @xml = (
-				SELECT	@BillerName						AS '@bn'
+				SELECT	SCOPE_IDENTITY()				AS '@b'
+						, @BillerName					AS '@bn'
 						, @BillerFullName				AS '@bfn'
 						, @StatusId						AS '@s'
 						, @CompanyName					AS '@c'
@@ -230,7 +231,7 @@ BEGIN
 	, @CurrencyID = 0
 	, @SPName = 'LA_BillerModify'
 	, @CustId = 0
-	, @ActionId = 12
+	, @ActionId = ActionID
 	, @Duration = @duration
 	, @Data = @logSPData
 	, @OldData = @logSPDataOld
