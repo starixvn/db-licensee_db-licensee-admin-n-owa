@@ -21,7 +21,7 @@ AS
 		Base on : IMS_Rpt_LicenseeSettlement
 		DB: DB052.bodb02
 		Revisions:  
-
+				- 20150407@Florent: add filter no draw for BA Settlement
 		Param's Explanation:  				
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
 								'NG' -> Number Game			'BA' -> BA
@@ -30,7 +30,8 @@ AS
 	*/  
 SET NOCOUNT ON
 BEGIN			
-	DECLARE @LicenseeID INT	
+	DECLARE @LicenseeID INT		
+		, @DrawFilter SMALLINT = 1
 	CREATE TABLE #Result (
 			Winlostdate		DATETIME
 			, CurrencyId	INT
@@ -172,18 +173,24 @@ BEGIN
 	-- Product = BA
 	IF CHARINDEX('BA', @ProductCode) <> 0
 	BEGIN
+		SET @DrawFilter = 2 -- set case No Darw
 		INSERT INTO #Result( Winlostdate, CurrencyId, TurnOver, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
 		(
 			SELECT   			   
 				b.rptDate     
 				, b.CurrencyID		   
-				, SUM(b.Turnover) AS turnover
+				, SUM(b.turnover * 
+						CASE WHEN @drawfilter IN (2, 3) 
+							THEN CASE WHEN b.STATUS = 111 THEN 0
+								WHEN b.STATUS IN (114, 115)	THEN 0.5 ELSE 1	END
+							ELSE 1
+						END) AS turnover
 				, SUM(b.WinLoss) AS Winlost
 				, 0 AS PlayerComm
 				, SUM(b.CommissionA) AS LicenseeWL				
 				, 0 AS LicenseeComm
 				, - SUM(b.WinLoss * p.Rate + b.CommissionA) AS Company 
-				, SUM(b.BetCount) AS BetCount	  
+				, SUM(betcount * CASE WHEN @drawfilter = 2 AND b.Status = 111 THEN 0 ELSE 1 END) AS BetCount	  
 			FROM 			
 				bodb_licensee.dbo.rpt_Betting_BA b WITH (NOLOCK)
 				INNER JOIN @tmpParty p ON b.SiteID = p.LicenseeId 				
