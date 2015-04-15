@@ -8,8 +8,8 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_BillerDel] 
 	@BillerID	INT	
-	, @UserID							INT
-	, @LoginIP							VARCHAR (50)	= ''
+	, @UserID	INT
+	, @LoginIP	VARCHAR (50)	= ''
 	, @ErrCode	INT				= 0		OUTPUT
 	, @ErrMsg	NVARCHAR(1000)	= ''	OUTPUT
 AS
@@ -20,9 +20,8 @@ AS
    
 	 Revisions:     
 */
-SET NOCOUNT ON
-
 BEGIN
+	SET NOCOUNT ON
 	--check exist
 	IF ISNULL(@BillerID, '') = ''
 		RETURN
@@ -82,6 +81,13 @@ BEGIN
 			DELETE dbo.LA_BillerInfo WITH (ROWLOCK, UPDLOCK)
 			WHERE PartyId = @BillerId
 					
+			IF @@ERROR <> 0 
+			BEGIN 
+				SELECT @ErrCode = 110
+					, @ErrMsg = 'Cannot delete the Biller, please try again!'
+			RETURN
+			END
+
 			SET @endRun = GETDATE()
 			SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
 			
@@ -103,19 +109,18 @@ BEGIN
 				, @Data = @logSPData
 				, @OldData = @logSPDataOld
 			BEGIN
-			SELECT @ErrCode = 101
+			SELECT @ErrCode = 111
 				,@ErrMsg = 'The Biller is deleted successfully'
 			RETURN
 		END
 		END
 	ELSE	
 		BEGIN
-			SELECT @ErrCode = 101
+			SELECT @ErrCode = 112
 			,@ErrMsg = 'The Biller cannot be deleted because it''s already responsible for billing!'
 			RETURN
 		END		
 END
-
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_BillerDel] TO [vnteam] 
 GRANT EXECUTE ON [dbo].[LA_BillerDel] TO bodbAdminNet 

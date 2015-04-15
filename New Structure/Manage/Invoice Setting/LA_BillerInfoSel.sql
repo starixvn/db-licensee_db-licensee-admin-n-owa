@@ -43,7 +43,7 @@ BEGIN
 	FROM dbo.OAS_Party p WITH (NOLOCK)
 	INNER JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON p.PartyID = b.PartyID
 	WHERE p.PartyType = 4
-		AND p.PartyID = @BillerId
+		AND (@BillerId = 0 OR p.PartyID = @BillerId)
 END
 
 GO
