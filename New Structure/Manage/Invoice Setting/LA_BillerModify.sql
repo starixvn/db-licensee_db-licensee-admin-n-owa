@@ -38,6 +38,7 @@ AS
    
 	 Revisions:     
 */
+BEGIN
 SET NOCOUNT ON
 -- For writing log
 	DECLARE 
@@ -50,7 +51,7 @@ SET NOCOUNT ON
 
 	-- Time start
 	SET @startRun = GETDATE()
-BEGIN
+
 	DECLARE @ConstantName VARCHAR(20) = 'Invoice System'
 	--check exist
 	IF ISNULL(@BillerName, '') = ''
@@ -59,6 +60,7 @@ BEGIN
 	IF NOT EXISTS (SELECT 1 FROM dbo.OAS_Party p WITH (NOLOCK) WHERE p.PartyID = @BillerID AND p.PartyType = 4)
 	--Insert New Biller
 	BEGIN
+		DECLARE @PartyId INT
 		IF NOT EXISTS (SELECT 1 FROM dbo.OAS_Party p WITH (NOLOCK) 
 						INNER JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON p.PartyId = b.PartyID 
 					 WHERE b.BillerName = @BillerName AND p.PartyType = 4)
@@ -66,10 +68,18 @@ BEGIN
 			INSERT INTO dbo.OAS_Party (PartyName, Description, PartyType, OldRefID)
 			SELECT @ConstantName, @ConstantName, 4, NULL
 
+			IF @@ERROR <> 0
+			BEGIN
+				--Rollback --delete
+				RETURN --error system
+			END
+
+			SELECT @PartyId = SCOPE_IDENTITY()
+
 			INSERT INTO dbo.LA_BillerInfo(PartyId, BillerName, BillerFullName, StatusId, CompanyName, Address1, Address2, LogoPath, [Description], AccountNumber, BankName, BankAddess
 			, IBAN, BeneficiaryName, SwiftCode, CorrespondentBank, CorrespondentAccountNumber, CorrespondentAddress, CorrespondentSwiftCode)
 			SELECT
-					SCOPE_IDENTITY()
+					@PartyId
 					, @BillerName
 					, @BillerFullName
 					, @StatusId
@@ -89,10 +99,19 @@ BEGIN
 					, @CorrespondentAddress
 					, @CorrespondentSwiftCode
 
-
+			IF @@ERROR <> 0 
+			BEGIN 
+				--rollback
+				DELETE dbo.OAS_Party WITH(ROWLOCK)
+				WHERE PartyID = @PartyId
+				SELECT @ErrCode = 100
+					, @ErrMsg = 'Cannot save the Biller, please try again!'
+				RETURN
+			END
 			-- Write log
 			SET @xml = (
-				SELECT	@BillerName						AS '@bn'
+				SELECT	@PartyId						AS '@b'
+						, @BillerName					AS '@bn'
 						, @BillerFullName				AS '@bfn'
 						, @StatusId						AS '@s'
 						, @CompanyName					AS '@c'
@@ -135,7 +154,8 @@ BEGIN
 			--write log old
 			-- Write log
 			SET @xml = (
-				SELECT	BillerName						AS '@bn'
+				SELECT	PartyId							AS '@b'
+						, BillerName					AS '@bn'
 						, BillerFullName				AS '@bfn'
 						, StatusId						AS '@s'
 						, CompanyName					AS '@c'
@@ -182,7 +202,8 @@ BEGIN
 			WHERE PartyId = @BillerID	
 
 			SET @xml = (
-			SELECT	@BillerName							AS '@bn'
+			SELECT		@BillerID						AS '@b'
+						, @BillerName					AS '@bn'
 						, @BillerFullName				AS '@bfn'
 						, @StatusId						AS '@s'
 						, @CompanyName					AS '@c'
@@ -223,17 +244,16 @@ BEGIN
 	FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
 	WHERE SPName = 'LA_BillerModify'
 
-	EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog 
-	@UserId = @UserID
-	, @IP = @LoginIP
-	, @LicenseeID = 0
-	, @CurrencyID = 0
-	, @SPName = 'LA_BillerModify'
-	, @CustId = 0
-	, @ActionId = 12
-	, @Duration = @duration
-	, @Data = @logSPData
-	, @OldData = @logSPDataOld
+	EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog @UserId = @UserID
+		, @IP = @LoginIP
+		, @LicenseeID = 0
+		, @CurrencyID = 0
+		, @SPName = 'LA_BillerModify'
+		, @CustId = 0
+		, @ActionId = @ActionID
+		, @Duration = @duration
+		, @Data = @logSPData
+		, @OldData = @logSPDataOld
 END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_BillerModify] TO [vnteam] 
