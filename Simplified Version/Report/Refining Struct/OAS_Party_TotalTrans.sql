@@ -19,6 +19,8 @@ AS
  * Revisions :  
  	- 20141031@Florent: Apply new Structure Using SystemMapping
 	- 20141105@Florent: fix get brand name of licensee
+	- 20150412@Patrick: Add filter by PartyType
+
  * Param's Explanation:    
  *  - @ExcludeTest: to exclude Spondemo (a test licensee)
  exec [OAS_Party_TotalTrans_xtest] '2014-09-01','2014-09-30'
@@ -49,7 +51,7 @@ BEGIN
 		AND ci.ToParty IN (
 			SELECT p1.PartyID
 			FROM OAS_Party p1(NOLOCK)
-			WHERE p1.PartyName IN ('Oneworks', 'BCH', 'LDL')
+			WHERE p1.PartyName IN ('Oneworks', 'BCH', 'LDL') AND p1.PartyType NOT IN (4)
 			)
 		AND (
 			(@ExcludeTest = 0)
@@ -58,7 +60,7 @@ BEGIN
 				AND ci.FromParty NOT IN (
 					SELECT p2.PartyID
 					FROM OAS_Party p2(NOLOCK)
-					WHERE p2.PartyName IN ('spondemo', 'Demo')
+					WHERE p2.PartyName IN ('spondemo', 'Demo') AND p2.PartyType NOT IN (4)
 					)
 				)
 			)

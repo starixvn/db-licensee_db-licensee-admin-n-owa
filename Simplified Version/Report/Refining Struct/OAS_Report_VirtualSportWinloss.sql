@@ -27,6 +27,8 @@ AS
  	- 20141103@Florent: Fix formula for OW revenue, use new structure (#25393)
 	- 20141117@Florent: remove comm
 	- 20150202@Florent: base currency GBP
+	- 20150412@Patrick: Add filter by PartyType
+
  * Param's Explanation:    
  *   @Currency: 0 : All
 				-1: Base on EUR
@@ -78,7 +80,7 @@ BEGIN
 	INSERT INTO @tmpTable (PartyID)
 	SELECT PartyID
 	FROM bodb_licensee.dbo.OAS_Party(NOLOCK)
-	WHERE PartyName IN ('Starlit', 'BA(FDL)')
+	WHERE PartyName IN ('Starlit', 'BA(FDL)') AND PartyType NOT IN (4)
 
 	IF (RTRIM(LTRIM(ISNULL(@SportList, '')))) = ''
 	BEGIN
@@ -100,7 +102,7 @@ BEGIN
 
 	SELECT @LicBoping = PartyID
 	FROM bodb_licensee.dbo.OAS_Party WITH (NOLOCK)
-	WHERE PartyName = 'Boping'
+	WHERE PartyName = 'Boping' AND PartyType NOT IN (4)
 
 	--Get normal licensee list	
 	IF (@LicBoping != @PartyID)

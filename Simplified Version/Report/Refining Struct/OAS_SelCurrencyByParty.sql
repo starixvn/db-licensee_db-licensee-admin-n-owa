@@ -18,10 +18,11 @@ Task : Get all the currency by a party
 Base : Acc_SelCurrencyByLicensee
 DB: DB052.bodb02
 
-
 Revisions:
 	- 20140415@Florent: exclude get currency from Boping
 	- 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust
+	- 20150412@Patrick: Add filter by PartyType
+
 Param's Explanation:
 */
 SET NOCOUNT ON
@@ -32,7 +33,7 @@ BEGIN
 
 	SELECT @LicBoping = PartyID
 	FROM bodb_licensee.dbo.OAS_Party
-	WHERE PartyName = 'Boping'
+	WHERE PartyName = 'Boping' AND PartyType NOT IN (4)
 
 	IF (@LicBoping != @PartyID)
 	BEGIN

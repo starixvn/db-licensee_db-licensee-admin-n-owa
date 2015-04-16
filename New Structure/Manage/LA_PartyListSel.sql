@@ -18,6 +18,8 @@ AS
 	 Revisions:     
 		  - 20141031@Florent: Apply new Structure Using SystemMapping
 		  - 20150312@Florent: add column brandname and fix case without SB
+		  - 20150412@Patrick: Add filter by PartyType
+
 	 Params:
 		+ UserID : 
 			- 0 get list Party of All user
@@ -34,12 +36,12 @@ DECLARE @CreditLicensee	AS TABLE (PartyID INT)
 INSERT INTO @CreditLicensee
 SELECT PartyID 
 FROM dbo.OAS_Party WITH (NOLOCK)
-WHERE PartyName IN ('IBC','18bb')
+WHERE PartyName IN ('IBC','18bb') AND PartyType NOT IN (4)
 
 INSERT INTO @tmpCompany
 SELECT PartyID 
 FROM dbo.OAS_Party WITH (NOLOCK)
-WHERE PartyName IN ('ONEWorks','Boping')
+WHERE PartyName IN ('ONEWorks','Boping') AND PartyType NOT IN (4)
 
 SELECT MAX(ci.FromDate) FromDate, ci.FromParty
 INTO #ListParty

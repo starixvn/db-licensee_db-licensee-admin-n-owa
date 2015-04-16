@@ -20,6 +20,8 @@ AS
  * DB   : DB052.bodb02
  * Revisions :  
  	- 20141103@Florent: use new structure (#25393)
+	- 20150412@Patrick: Add filter by PartyType
+
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
  *  - @Operator   : List of operator ID separated by ','  
@@ -56,6 +58,7 @@ BEGIN
 	SELECT PartyID
 	FROM bodb_licensee.dbo.OAS_Party(NOLOCK)
 	WHERE PartyName IN ('Starlit', 'BA(FDL)')
+		AND PartyType NOT IN (4)
 
 	--enhance performance
 	CREATE TABLE #tmpBetting (
@@ -185,7 +188,7 @@ BEGIN
 			AND ci.ToParty IN (
 				SELECT PartyID
 				FROM bodb_Licensee.dbo.OAS_Party(NOLOCK)
-				WHERE PartyName IN ('Oneworks', 'BCH', 'LDL')
+				WHERE PartyName IN ('Oneworks', 'BCH', 'LDL') AND PartyType NOT IN (4)
 				)
 			--strSplit is a user-defined function
 			AND ci.FromParty IN (
