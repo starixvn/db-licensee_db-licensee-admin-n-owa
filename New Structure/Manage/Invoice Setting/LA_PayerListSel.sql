@@ -21,9 +21,8 @@ AS
 	 Example:
 		EXEC dbo.LA_PayerListSel 0
 */
-SET NOCOUNT ON
 BEGIN	
-
+SET NOCOUNT ON
 	WITH cte_BillerPayer(FromPartyId, ToPartyID)
 	AS 
 	(
@@ -31,7 +30,15 @@ BEGIN
 		FROM dbo.LA_InvoiceSetting WITH (NOLOCK)
 		GROUP BY FromPartyId, ToPartyID 	
 	)
-	SELECT p.PartyID AS PayerID, p.PartyName AS PayerName, pd.BrandName, pd.CompanyName, COUNT(i.ToPartyId) AS NumberOfBillers	
+	SELECT p.PartyID		AS PayerID
+		, CASE 
+			WHEN ISNULL(pd.BrandName, '') != '' 
+				THEN pd.BrandName 
+			ELSE p.PartyName 
+		  END				AS PayerName
+		, pd.BrandName
+		, pd.CompanyName
+		, COUNT(i.ToPartyId) AS NumberOfBillers	
 		, STUFF((
 				SELECT ', ' + CAST(b.BillerName AS VARCHAR)
 				FROM cte_BillerPayer ii
@@ -39,7 +46,7 @@ BEGIN
 				WHERE b.PartyID = ii.ToPartyID		
 					AND ii.FromPartyId = p.PartyID			
 				FOR XML PATH (''))
-			  , 1, 2, '') AS PayerList		
+			  , 1, 2, '') AS BillerList		
 		, pd.StatusId 
 	FROM dbo.OAS_Party p WITH (NOLOCK)		
 		INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID

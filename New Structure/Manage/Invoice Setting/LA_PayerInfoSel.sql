@@ -19,10 +19,14 @@ AS
 	 Example:
 		EXEC dbo.LA_PayerInfoSel 14
 */
-SET NOCOUNT ON
 BEGIN
+SET NOCOUNT ON
 	SELECT p.PartyID	AS PayerID
-		, p.PartyName	AS PayerName
+		, CASE 
+			WHEN ISNULL(pd.BrandName, '') != '' 
+				THEN pd.BrandName 
+			ELSE p.PartyName 
+		  END	AS PayerName
 		, pd.StatusId
 		, pd.IsDeposit
 		, pd.BrandName

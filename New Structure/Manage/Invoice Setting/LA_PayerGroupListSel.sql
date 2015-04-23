@@ -26,9 +26,10 @@ SET NOCOUNT ON
 
 	SELECT pg.PartyGroupId AS PayerGroupID, pg.PartyGroupName AS PayerGroupName, COUNT(pga.PartyId) AS NumberOfPayers	
 		, STUFF((
-				SELECT ', ' + CAST(p1.PartyName AS VARCHAR)
+				SELECT ', ' + CAST(CASE WHEN ISNULL(pd.BrandName, '') != '' THEN pd.BrandName ELSE p1.PartyName END AS VARCHAR)
 				FROM LA_PartyGroupAssignment p
 					LEFT JOIN dbo.OAS_Party p1 ON p.PartyId = p1.PartyID
+					LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p1.PartyID = pd.PartyID
 				WHERE pg.PartyGroupId = p.PartyGroupId					
 				FOR XML PATH (''))
 			  , 1, 2, '') AS PayerList				

@@ -75,7 +75,11 @@ BEGIN
 	INSERT INTO @ChargeInfo(ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, Rate, FromDate, ToDate, FirstBilling, ExchangeID)
 	SELECT c.ChargeID		
 		, c.PartyID
-		, p.PartyName
+		, CASE 
+			WHEN ISNULL(pd.BrandName, '') != '' 
+				THEN pd.BrandName 
+			ELSE p.PartyName 
+		  END	AS PartyName
 		, pg.PartyGroupId
 		, pg.PartyGroupName
 		, c.ProductID
