@@ -8,6 +8,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_PayerGroupListSel]
 	 @PayerGroupId	INT	= 0	
+	 , @PayerID		INT = 0
 AS
 /*  
 	 Created: 20150422@Florent
@@ -19,7 +20,7 @@ AS
 		+ 0 get all payer
 		+ <> 0 specify a payer
 	 Example:
-		EXEC dbo.LA_PayerGroupListSel 1
+		EXEC dbo.LA_PayerGroupListSel @PayerGroupId = 1 ,@PayerID = 15
 */
 BEGIN	
 SET NOCOUNT ON
@@ -36,6 +37,7 @@ SET NOCOUNT ON
 	FROM dbo.LA_PartyGroup pg WITH (NOLOCK)		
 		LEFT JOIN dbo.LA_PartyGroupAssignment pga WITH (NOLOCK) ON pg.PartyGroupId = pga.PartyGroupId		
 	WHERE (@PayerGroupId = 0 OR pg.PartyGroupId = @PayerGroupId)
+		AND (@PayerID = 0 OR pga.PartyId = @PayerID)
 	GROUP BY pg.PartyGroupId, pg.PartyGroupName
 
 END

@@ -150,6 +150,10 @@ SET NOCOUNT ON
 			 	 VALUES (s.PayerGroupId, s.PartyID)
 		WHEN NOT MATCHED BY SOURCE AND PartyGroupId = @PayerGroupIdOut AND PartyId = t.PartyId
 			THEN DELETE;
+		
+		DELETE dbo.LA_PartyGroupAssignment WITH( ROWLOCK, UPDLOCK)
+		WHERE PartyId NOT IN (SELECT PartyID FROM dbo.OAS_Party WITH (NOLOCK) WHERE PartyType = 1)
+			AND PartyGroupId = @PayerGroupIdOut
 
 		IF @@ERROR <> 0
 		BEGIN

@@ -25,7 +25,7 @@ BEGIN
 		
 		UNION
 		
-		SELECT 0, 'SB', 'Sportbooks'
+		SELECT 0, 'SB', 'Sportsbook'
 
 	END
 	ELSE
@@ -33,7 +33,7 @@ BEGIN
 		IF CHARINDEX( 'SB', @Products) <> 0
 		BEGIN
 			INSERT INTO @tbProducts(ProductID, ProductPrefix, ProductName)
-			SELECT 0, 'SB', 'SportsBook'				
+			SELECT 0, 'SB', 'Sportsbook'				
 		END
 
 		INSERT INTO @tbProducts(ProductID, ProductPrefix, ProductName)
