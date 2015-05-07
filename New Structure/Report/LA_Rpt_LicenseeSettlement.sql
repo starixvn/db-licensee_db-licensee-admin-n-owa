@@ -27,7 +27,8 @@ AS
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
 								'NG' -> Number Game			'BA' -> BA
 								'LC' -> Live Casino			'VS' -> Virtual Sports
-								'CS' -> RNG Casino			'BG' -> Bingo			
+								'CS' -> RNG Casino			'BG' -> Bingo		
+								
 	*/  
 SET NOCOUNT ON
 BEGIN			
