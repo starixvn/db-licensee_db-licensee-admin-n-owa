@@ -95,8 +95,9 @@ SET NOCOUNT ON
 		SET @PayerGroupIdOut = SCOPE_IDENTITY()
 
 		INSERT INTO dbo.LA_PartyGroupAssignment(PartyGroupId, PartyId)
-		SELECT @PayerGroupIdOut, PartyID
-		FROM @PayerGroupList
+		SELECT @PayerGroupIdOut, l.PartyID
+		FROM @PayerGroupList l 
+			INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON l.PartyID = p.PartyID
 
 		IF @@ERROR <> 0 
 		BEGIN
