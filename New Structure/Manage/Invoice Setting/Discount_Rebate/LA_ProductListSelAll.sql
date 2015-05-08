@@ -15,3 +15,7 @@ BEGIN
 	SELECT ProductId, ProductName
 	FROM dbo.LA_f_Products3rd('')
 END
+GO
+GRANT VIEW DEFINITION ON dbo.LA_ProductListSelAll TO vnteam
+GRANT EXECUTE ON dbo.LA_ProductListSelAll TO bodbAdminNet
+GO

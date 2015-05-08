@@ -1,6 +1,6 @@
 USE bodb_licensee
 GO
-ALTER PROCEDURE dbo.LA_Discount_ValidatePayerAssignment @DiscountId INT
+ALTER PROCEDURE dbo.LA_Discount_ValidatePayerAssignment @DiscountGroupId INT
 	, @PayerIdList VARCHAR(4000) = ''
 	, @Mode VARCHAR(10) = 'R'
 
@@ -20,7 +20,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	RETURN --TODO: when implement Invoice page
-	IF ISNULL(@PayerIdList , '') = '' OR ISNULL(@DiscountId, 0) = 0
+	IF ISNULL(@PayerIdList , '') = '' OR ISNULL(@DiscountGroupId, 0) = 0
 		RETURN
 
 	DECLARE @PayerNameList VARCHAR(4000), @DiscountType TINYINT
@@ -28,7 +28,7 @@ BEGIN
 	--get discount group type
 	SELECT @DiscountType = DiscountGroupType
 	FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK)
-	WHERE DiscountGroupId = @DiscountId
+	WHERE DiscountGroupId = @DiscountGroupId
 
 	IF @Mode = 'R'
 	BEGIN
@@ -41,7 +41,7 @@ BEGIN
 			INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON a.PartyID = p.PartyID
 			INNER JOIN dbo.OAS_PartyDetail pp WITH(NOLOCK) ON a.PartyID = pp.PartyID
 			--INNER JOIN dbo.LA_InvoiceHeader inv WITH(NOLOCK) ON p.PartyId = inv.PartyId  --> todo
-		WHERE h.DiscountGroupId = @DiscountId
+		WHERE h.DiscountGroupId = @DiscountGroupId
 			AND a.PartyId IN (SELECT val FROM strSplit(@PayerIdList, ','))
 		IF ISNULL(@PayerNameList , '') = ''
 		BEGIN
@@ -55,4 +55,7 @@ If you want to stop the rebate program for the Payer, please set To date of the 
 	END
 	
 END
+GO
+GRANT VIEW DEFINITION ON dbo.LA_Discount_ValidatePayerAssignment TO vnteam
+GRANT EXECUTE ON dbo.LA_Discount_ValidatePayerAssignment TO bodbAdminNet
 GO

@@ -1,6 +1,6 @@
 USE bodb_licensee
 GO
-CREATE PROCEDURE dbo.LA_DiscountGroupListSel @DiscountType TINYINT
+ALTER PROCEDURE dbo.LA_DiscountGroupListSel @DiscountGroupType TINYINT
 AS
 /*  
 	 Created: 20150422@Patrick
@@ -14,5 +14,9 @@ BEGIN
 	SET NOCOUNT ON
 	SELECT DiscountGroupId, DiscountGroupName
 	FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK)
-	WHERE DiscountGroupType = @DiscountType
+	WHERE DiscountGroupType = @DiscountGroupType
 END
+GO
+GRANT VIEW DEFINITION ON dbo.LA_DiscountGroupListSel TO vnteam
+GRANT EXECUTE ON dbo.LA_DiscountGroupListSel TO bodbAdminNet
+GO

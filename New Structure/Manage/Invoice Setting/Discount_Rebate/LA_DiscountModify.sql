@@ -1,16 +1,16 @@
 USE bodb_licensee
 GO
 
-ALTER PROCEDURE dbo.LA_DiscountModify @GroupId SMALLINT = 0
+ALTER PROCEDURE dbo.LA_DiscountModify @DiscountGroupId SMALLINT = 0
 	, @GroupName VARCHAR(50)
-	, @GroupType TINYINT
+	, @DiscountGroupType TINYINT
 	, @CurrencyId TINYINT
 	, @FromDate DATE
 	, @ToDate DATE
 	, @IsEdit BIT
-	, @ProductXml VARCHAR(4000) = ''
-	, @AssignedPayersXml VARCHAR(MAX) = ''
-	, @RateSettingsXml VARCHAR(MAX) = ''
+	, @ProductIds VARCHAR(512) = ''
+	, @AssignedPartyIds VARCHAR(1204) = ''
+	, @RateSettingsData VARCHAR(MAX) = ''
 
 	, @UserId INT
 	, @LoginIp VARCHAR (50)	= ''
@@ -26,23 +26,7 @@ AS
    
 	 Revisions:
 	 Params:
-		@ProductXml = '<Root>
-							<AssignedProduct>
-								<ProductId>1</ProductId>
-							</AssignedProduct>
-							<AssignedProduct>
-								<ProductId>2</ProductId>
-							</AssignedProduct>
-						</Root>'
-		@AssignedPayersXml = '<Root>
-								<AssignedPayer>
-									<PayerId>1</PayerId>
-								</AssignedPayer>
-								<AssignedPayer>
-									<PayerId>2</PayerId>
-								</AssignedPayer>
-							</Root>'
-		@RateSettingsXml = '<Root>
+		@RateSettingsData = '<Root>
 								<RateSetting>
 									<SeqNo>1</SeqNo>
 									<FromAmount>1</FromAmount>
@@ -51,6 +35,7 @@ AS
 								</RateSetting>
 								<RateSetting>
 									<SeqNo>2</SeqNo>
+									<DiscountDetailId>1</DiscountDetailId>
 									<FromAmount>10001</FromAmount>
 									<ToAmount>20000</ToAmount>
 									<Rate>0.1</Rate>
@@ -71,7 +56,8 @@ BEGIN
 	END
 
 	--check exists
-	IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupName = @GroupName AND DiscountGroupType = @GroupType)
+	IF @IsEdit = 0
+		AND EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupName = @GroupName AND DiscountGroupType = @DiscountGroupType)
 	BEGIN
 		SELECT @ErrCode = 502, @ErrMsg = 'Group name exists. Please try again.'
 		RETURN
@@ -79,48 +65,40 @@ BEGIN
 
 	DECLARE @Products TABLE (ProductId TINYINT)
 	DECLARE @Payers TABLE (PayerId INT)
-	DECLARE @RateSettings TABLE (RowIndex TINYINT IDENTITY(1,1), SeqNo TINYINT, FromAmount MONEY, ToAmount MONEY, Rate MONEY)
-	DECLARE @RateSettingsTmp TABLE (SeqNo TINYINT, FromAmount MONEY, ToAmount MONEY, Rate MONEY)
+	DECLARE @RateSettings TABLE (RowIndex TINYINT IDENTITY(1,1), SeqNo TINYINT, DiscountDetailId SMALLINT, FromAmount MONEY, ToAmount MONEY, Rate MONEY)
+	DECLARE @RateSettingsTmp TABLE (SeqNo TINYINT, DiscountDetailId SMALLINT, FromAmount MONEY, ToAmount MONEY, Rate MONEY)
 	
 	DECLARE @docHandler INT
 	--parse product discount group
-	IF @ProductXml = ''
+	IF @ProductIds = ''
 	BEGIN
 		SELECT @ErrMsg = CASE WHEN @IsEdit = 0 THEN 'Insert failed. Please try again.' ELSE 'Update failed. Please try again.' END
 			, @ErrCode = CASE WHEN @IsEdit = 0 THEN 503	ELSE 504 END
 		RETURN	
 	END
 
-	EXEC sp_xml_preparedocument @docHandler OUTPUT, @ProductXml
 	INSERT INTO @Products(ProductId)
-	SELECT CAST(ProductId AS TINYINT)
-	FROM OPENXML(@docHandler, '/Root/AssignedProduct')
-	WITH (ProductId VARCHAR(10) 'ProductId')
-	
-	EXEC sp_xml_removedocument @docHandler
+	SELECT val FROM bodb02.dbo.Lrf_f_StringSplit(@ProductIds, ',')
 
 	--parse assigned payer to group
-	IF @AssignedPayersXml <> ''
+	IF @AssignedPartyIds <> ''
 	BEGIN
-		EXEC sp_xml_preparedocument @docHandler OUTPUT, @AssignedPayersXml
 		INSERT INTO @Payers(PayerId)
-		SELECT CAST(PayerId AS INT)
-		FROM OPENXML(@docHandler, '/Root/AssignedPayer')
-		WITH (PayerId VARCHAR(20) 'PayerId')
-	
-		EXEC sp_xml_removedocument @docHandler
+		SELECT val FROM bodb02.dbo.Lrf_f_StringSplit(@AssignedPartyIds, ',')
 	END
 	--parse setting rate
-	IF @RateSettingsXml <> ''
+	IF @RateSettingsData <> ''
 	BEGIN
-		EXEC sp_xml_preparedocument @docHandler OUTPUT, @RateSettingsXml
-		INSERT INTO @RateSettingsTmp(SeqNo, FromAmount, ToAmount, Rate)
+		EXEC sp_xml_preparedocument @docHandler OUTPUT, @RateSettingsData
+		INSERT INTO @RateSettingsTmp(SeqNo, DiscountDetailId, FromAmount, ToAmount, Rate)
 		SELECT CAST(SeqNo AS TINYINT)
+			, CAST(DiscountDetailId AS SMALLINT)
 			, CAST(FromAmount AS MONEY)
 			, CASE WHEN ToAmount = 'Unlimited' THEN @MaxAmountValue ELSE CAST(ToAmount AS MONEY) END
 			, CAST(Rate AS MONEY)
 		FROM OPENXML(@docHandler, 'Root/RateSetting')
 		WITH (SeqNo VARCHAR(20) 'SeqNo'
+			, DiscountDetailId VARCHAR(20) 'DiscountDetailId'
 			, FromAmount VARCHAR(50) 'FromAmount'
 			, ToAmount VARCHAR(50) 'ToAmount'
 			, Rate VARCHAR(50) 'Rate'
@@ -130,7 +108,10 @@ BEGIN
 	END
 	--check duplicated SeqNo
 	INSERT INTO @RateSettings(SeqNo, FromAmount, ToAmount, Rate)
-		SELECT SeqNo, FromAmount, ToAmount, Rate
+		SELECT SeqNo
+			, CASE WHEN @DiscountGroupType = 1 THEN FromAmount ELSE NULL END
+			, CASE WHEN @DiscountGroupType = 1 THEN ToAmount ELSE NULL END
+			, Rate
 		FROM @RateSettingsTmp
 		ORDER BY SeqNo ASC
 
@@ -141,8 +122,8 @@ BEGIN
 		RETURN
 	END
 
-	--check required field
-	IF @CurrencyId IS NULL OR @FromDate IS NULL OR @ToDate IS NULL
+	--check required fields
+	IF ISNULL(@CurrencyId, 0) = 0 OR @FromDate IS NULL OR @ToDate IS NULL
 		OR (NOT EXISTS (SELECT 1 FROM @Products))
 		--OR (NOT EXISTS (SELECT 1 FROM @RateSettings))
 	BEGIN
@@ -159,8 +140,10 @@ BEGIN
 					INNER JOIN dbo.LA_DiscountGroupProduct d WITH(NOLOCK) ON h.DiscountGroupId = d.DiscountGroupId
 					INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
 					INNER JOIN @Payers p ON a.PartyID = p.PayerId
-				WHERE (@FromDate BETWEEN FromDate AND ToDate)
-					OR (@ToDate BETWEEN FromDate AND ToDate))
+				WHERE h.DiscountGroupId <> @DiscountGroupId
+					AND ((@FromDate BETWEEN FromDate AND ToDate)
+						OR (@ToDate BETWEEN FromDate AND ToDate))
+				)
 	BEGIN
 		SET @PayerList = NULL
 		SELECT @PayerList = COALESCE(@PayerList + ',' + '''' + CASE WHEN ISNULL(dd.BrandName, '') = '' THEN ISNULL(pp.PartyName, '') ELSE ISNULL(dd.BrandName, '') END + ''''
@@ -171,17 +154,19 @@ BEGIN
 			INNER JOIN @Payers p ON a.PartyID = p.PayerId
 			INNER JOIN dbo.OAS_Party pp ON p.PayerId = pp.PartyID
 			INNER JOIN dbo.OAS_PartyDetail dd WITH(NOLOCK) ON pp.PartyID = dd.PartyID
-		WHERE (@FromDate BETWEEN FromDate AND ToDate)
-			OR (@ToDate BETWEEN FromDate AND ToDate)
+		WHERE h.DiscountGroupId <> @DiscountGroupId
+			AND ((@FromDate BETWEEN FromDate AND ToDate)
+				OR (@ToDate BETWEEN FromDate AND ToDate))
+		GROUP BY dd.BrandName, pp.PartyName
 		
-		SELECT @ErrMsg = CASE WHEN @GroupType = 1 THEN 'Payer ' + @PayerList + ' which being applied other discount at the time. Please check again.'
+		SELECT @ErrMsg = CASE WHEN @DiscountGroupType = 1 THEN 'Payer ' + @PayerList + ' which being applied other discount at the time. Please check again.'
 							ELSE 'Payer ' + @PayerList + ' which being applied other rebate at the time, please check again' END
 			, @ErrCode = 505
 		RETURN	
 	END
 	
 	--overlap rank discount
-	IF @GroupType = 1 --> discount
+	IF @DiscountGroupType = 1 --> discount
 	BEGIN
 		IF EXISTS (SELECT TOP 1 1 FROM @RateSettings)
 			AND EXISTS (SELECT TOP 1 1
@@ -196,8 +181,9 @@ BEGIN
 		END
 	END
 	
+	--Rate value less than zero
 	IF EXISTS (SELECT TOP 1 1 FROM @RateSettings)
-		AND EXISTS (SELECT 1 FROM @RateSettings WHERE Rate <= 0)
+		AND EXISTS (SELECT TOP 1 1 FROM @RateSettings WHERE Rate <= 0)
 	BEGIN
 		SELECT @ErrMsg = CASE WHEN @IsEdit = 0 THEN 'Insert failed. Please try again.' ELSE 'Update failed. Please try again.' END
 			, @ErrCode = CASE WHEN @IsEdit = 0 THEN 503	ELSE 504 END
@@ -216,12 +202,17 @@ BEGIN
 	BEGIN
 		--insert discount group header
 		INSERT INTO dbo.LA_DiscountGroupHeader(DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, Priority)
-		VALUES(@GroupName, @GroupType, @CurrencyId, @FromDate, @ToDate, CASE WHEN @GroupType = 1 THEN 1 ELSE 2 END)
+		VALUES(@GroupName, @DiscountGroupType, @CurrencyId, @FromDate, @ToDate, CASE WHEN @DiscountGroupType = 1 THEN 1 ELSE 2 END)
 
 		IF @@ERROR <> 0
+		BEGIN
+			SELECT @ErrMsg = CASE WHEN @IsEdit = 0 THEN 'Insert failed. Please try again.' ELSE 'Update failed. Please try again.' END
+				, @ErrCode = CASE WHEN @IsEdit = 0 THEN 503	ELSE 504 END
 			RETURN
+		END
+
 		SET @GroupIdOut = SCOPE_IDENTITY()
-		IF @GroupIdOut IS NULL OR @GroupIdOut = 0
+		IF ISNULL(@GroupIdOut, 0) = 0
 		BEGIN
 			SELECT @ErrMsg = CASE WHEN @IsEdit = 0 THEN 'Insert failed. Please try again.' ELSE 'Update failed. Please try again.' END
 				, @ErrCode = CASE WHEN @IsEdit = 0 THEN 503	ELSE 504 END
@@ -235,7 +226,7 @@ BEGIN
 
 		IF @@ERROR <> 0
 		BEGIN
-			DELETE dbo.LA_DiscountGroupHeader WHERE DiscountGroupId = @GroupIdOut
+			DELETE dbo.LA_DiscountGroupHeader WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
 			SELECT @ErrMsg = CASE WHEN @IsEdit = 0 THEN 'Insert failed. Please try again.' ELSE 'Update failed. Please try again.' END
 				, @ErrCode = CASE WHEN @IsEdit = 0 THEN 503	ELSE 504 END
 			RETURN
@@ -243,13 +234,13 @@ BEGIN
 
 		--insert discount group product
 		INSERT INTO dbo.LA_DiscountGroupProduct(DiscountGroupId, ProductId)
-		SELECT @GroupIdOut, ProductId
+		SELECT DISTINCT @GroupIdOut, ProductId
 		FROM @Products
 
 		IF @@ERROR <> 0
 		BEGIN
-			DELETE dbo.LA_DiscountGroupHeader WHERE DiscountGroupId = @GroupIdOut
-			DELETE dbo.LA_DiscountGroupDetail WHERE DiscountGroupId = @GroupIdOut
+			DELETE dbo.LA_DiscountGroupHeader WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
+			DELETE dbo.LA_DiscountGroupDetail WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
 			SELECT @ErrMsg = CASE WHEN @IsEdit = 0 THEN 'Insert failed. Please try again.' ELSE 'Update failed. Please try again.' END
 				, @ErrCode = CASE WHEN @IsEdit = 0 THEN 503	ELSE 504 END
 			RETURN
@@ -257,14 +248,14 @@ BEGIN
 
 		--insert discount group assignment
 		INSERT INTO dbo.LA_DiscountGroupAssignment(DiscountGroupId, PartyID)
-		SELECT @GroupIdOut, PayerId
+		SELECT DISTINCT @GroupIdOut, PayerId
 		FROM @Payers
 
 		IF @@ERROR <> 0
 		BEGIN
-			DELETE dbo.LA_DiscountGroupHeader WHERE DiscountGroupId = @GroupIdOut
-			DELETE dbo.LA_DiscountGroupDetail WHERE DiscountGroupId = @GroupIdOut
-			DELETE dbo.LA_DiscountGroupProduct WHERE DiscountGroupId = @GroupIdOut
+			DELETE dbo.LA_DiscountGroupHeader WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
+			DELETE dbo.LA_DiscountGroupDetail WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
+			DELETE dbo.LA_DiscountGroupProduct WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
 			SELECT @ErrMsg = CASE WHEN @IsEdit = 0 THEN 'Insert failed. Please try again.' ELSE 'Update failed. Please try again.' END
 				, @ErrCode = CASE WHEN @IsEdit = 0 THEN 503	ELSE 504 END
 			RETURN
@@ -273,7 +264,7 @@ BEGIN
 	END
 	ELSE --edit case
 	BEGIN
-		IF @GroupId = 0 OR @GroupId IS NULL
+		IF ISNULL(@DiscountGroupId, 0) = 0
 		BEGIN
 			SELECT @ErrMsg = CASE WHEN @IsEdit = 0 THEN 'Insert failed. Please try again.' ELSE 'Update failed. Please try again.' END
 				, @ErrCode = CASE WHEN @IsEdit = 0 THEN 503	ELSE 504 END
@@ -282,14 +273,14 @@ BEGIN
 
 		--validate list of Payers have applied to billing Invoice yet
 		DECLARE @PayerIdBeingRemoveList VARCHAR(4000)
-		SELECT COALESCE(@PayerIdBeingRemoveList + ',' + CAST(a.PartyId AS VARCHAR), CAST(a.PartyId AS VARCHAR))
+		SELECT @PayerIdBeingRemoveList = COALESCE(@PayerIdBeingRemoveList + ',' + CAST(a.PartyId AS VARCHAR), CAST(a.PartyId AS VARCHAR))
 		FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
-		WHERE DiscountGroupId = @GroupId
+		WHERE DiscountGroupId = @DiscountGroupId
 			AND PartyId NOT IN (SELECT PayerId FROM @Payers)
 
 		IF ISNULL(@PayerIdBeingRemoveList, '') <> ''
 		BEGIN
-			EXEC dbo.LA_Discount_ValidatePayerAssignment @DiscountId = @GroupId
+			EXEC dbo.LA_Discount_ValidatePayerAssignment @DiscountGroupId = @DiscountGroupId
 				, @PayerIdList  = @PayerIdBeingRemoveList
 				, @Mode = 'R'
 
@@ -322,7 +313,7 @@ BEGIN
 						, PartyID AS '@pa'
 					FROM dbo.LA_DiscountGroupAssignment
 					FOR XML PATH('z'), TYPE)
-				FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupId = @GroupId
+				FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupId = @DiscountGroupId
 				FOR XML PATH('r'), TYPE)
 
 		SET @logSPDataOld = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"')
@@ -330,11 +321,11 @@ BEGIN
 		--update discount group assingment
 		;MERGE dbo.LA_DiscountGroupAssignment WITH(ROWLOCK, UPDLOCK) AS t
 		USING @Payers AS s
-		ON (t.DiscountGroupId = @GroupId)
+		ON (t.DiscountGroupId = @DiscountGroupId AND t.PartyId = s.PayerId)
 		WHEN NOT MATCHED BY TARGET
 			THEN INSERT(DiscountGroupId, PartyId)
-				 VALUES(@GroupId, s.PayerId)
-		WHEN NOT MATCHED BY SOURCE AND t.DiscountGroupId = @GroupId
+				 VALUES(@DiscountGroupId, s.PayerId)
+		WHEN NOT MATCHED BY SOURCE AND t.DiscountGroupId = @DiscountGroupId
 			THEN DELETE;
 
 		IF @@ERROR <> 0
@@ -347,11 +338,11 @@ BEGIN
 		--update discount group product
 		;MERGE dbo.LA_DiscountGroupProduct WITH(ROWLOCK, UPDLOCK) AS t
 		USING @Products AS s
-		ON (t.DiscountGroupId = @GroupId)
+		ON (t.DiscountGroupId = @DiscountGroupId AND t.ProductId = s.ProductId)
 		WHEN NOT MATCHED BY TARGET
 			THEN INSERT(DiscountGroupId, ProductId)
-				 VALUES(@GroupId, s.ProductId)
-		WHEN NOT MATCHED BY SOURCE AND t.DiscountGroupId = @GroupId
+				 VALUES(@DiscountGroupId, s.ProductId)
+		WHEN NOT MATCHED BY SOURCE AND t.DiscountGroupId = @DiscountGroupId
 			THEN DELETE;
 
 		IF @@ERROR <> 0
@@ -364,13 +355,13 @@ BEGIN
 		--update discouunt group detail
 		;MERGE dbo.LA_DiscountGroupDetail WITH(ROWLOCK, UPDLOCK) AS t
 		USING @RateSettings AS s
-		ON (t.DiscountGroupId = @GroupId)
+		ON (t.DiscountGroupDetailId = s.DiscountDetailId AND t.DiscountGroupId = @DiscountGroupId)
 		WHEN NOT MATCHED BY TARGET
 			THEN INSERT(DiscountGroupId, FromAmount, ToAmount, Rate)
-				 VALUES(@GroupId, s.FromAmount, s.ToAmount, s.Rate)
+				 VALUES(@DiscountGroupId, s.FromAmount, s.ToAmount, s.Rate)
 		WHEN MATCHED
 			THEN UPDATE SET FromAmount = s.FromAmount, ToAmount = s.ToAmount, Rate = s.Rate
-		WHEN NOT MATCHED BY SOURCE AND t.DiscountGroupId = @GroupId
+		WHEN NOT MATCHED BY SOURCE AND t.DiscountGroupId = @DiscountGroupId
 			THEN DELETE;
 
 		IF @@ERROR <> 0
@@ -383,10 +374,10 @@ BEGIN
 		--update discount group header
 		UPDATE dbo.LA_DiscountGroupHeader WITH(ROWLOCK, UPDLOCK)
 		SET DiscountGroupName = @GroupName
-			, CurrencyId = CASE WHEN @GroupType = 1 THEN @CurrencyId ELSE 0 END
+			, CurrencyId = CASE WHEN @DiscountGroupType = 1 THEN @CurrencyId ELSE 0 END
 			, FromDate = @FromDate
 			, ToDate = @ToDate
-		WHERE DiscountGroupId = @GroupId
+		WHERE DiscountGroupId = @DiscountGroupId
 
 		IF @@ERROR <> 0
 		BEGIN
@@ -395,7 +386,7 @@ BEGIN
 			RETURN
 		END
 
-		SET @GroupIdOut = @GroupId
+		SET @GroupIdOut = @DiscountGroupId
 		
 	END
 	--write log
@@ -407,8 +398,8 @@ BEGIN
 				, @CurrencyId AS '@c'
 				, @FromDate AS '@fd'
 				, @ToDate AS '@td'
-				, @GroupType AS '@dt'
-				, CASE WHEN @GroupType = 1 THEN 1 ELSE 2 END AS '@pr'
+				, @DiscountGroupType AS '@dt'
+				, CASE WHEN @DiscountGroupType = 1 THEN 1 ELSE 2 END AS '@pr'
 				, (SELECT @GroupIdOut AS '@gd'
 					, FromAmount AS '@fam'
 					, ToAmount AS '@tam'
@@ -454,3 +445,7 @@ BEGIN
 			, @duration = @duration
 	END CATCH	
 END
+GO
+GRANT VIEW DEFINITION ON dbo.LA_DiscountModify TO vnteam
+GRANT EXECUTE ON dbo.LA_DiscountModify TO bodbAdminNet
+GO
