@@ -1,9 +1,6 @@
 USE [bodb02]
 GO
-<<<<<<< HEAD
-=======
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_ThirdPartyProductWinloss]    Script Date: 06/05/2015 13:06:42 PM ******/
->>>>>>> master
+
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
