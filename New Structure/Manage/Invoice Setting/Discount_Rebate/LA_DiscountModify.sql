@@ -123,7 +123,8 @@ BEGIN
 	END
 
 	--check required fields
-	IF ISNULL(@CurrencyId, 0) = 0 OR @FromDate IS NULL OR @ToDate IS NULL
+	IF @FromDate IS NULL OR @ToDate IS NULL
+		OR (@DiscountGroupType = 1 AND ISNULL(@CurrencyId, 0) = 0)
 		OR (NOT EXISTS (SELECT 1 FROM @Products))
 		--OR (NOT EXISTS (SELECT 1 FROM @RateSettings))
 	BEGIN
@@ -141,6 +142,7 @@ BEGIN
 					INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
 					INNER JOIN @Payers p ON a.PartyID = p.PayerId
 				WHERE h.DiscountGroupId <> @DiscountGroupId
+					AND h.DiscountGroupId = @DiscountGroupType
 					AND ((@FromDate BETWEEN FromDate AND ToDate)
 						OR (@ToDate BETWEEN FromDate AND ToDate))
 				)
@@ -155,6 +157,7 @@ BEGIN
 			INNER JOIN dbo.OAS_Party pp ON p.PayerId = pp.PartyID
 			INNER JOIN dbo.OAS_PartyDetail dd WITH(NOLOCK) ON pp.PartyID = dd.PartyID
 		WHERE h.DiscountGroupId <> @DiscountGroupId
+			AND h.DiscountGroupId = @DiscountGroupType
 			AND ((@FromDate BETWEEN FromDate AND ToDate)
 				OR (@ToDate BETWEEN FromDate AND ToDate))
 		GROUP BY dd.BrandName, pp.PartyName

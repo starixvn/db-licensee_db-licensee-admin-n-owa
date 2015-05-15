@@ -1,11 +1,11 @@
 USE bodb_licensee
 GO
-CREATE PROCEDURE dbo.LA_Discount_HasBilling @DiscountGroupId INT
+ALTER PROCEDURE dbo.LA_Discount_HasBilling @DiscountGroupId INT
 	, @HasBilling BIT = 0 OUTPUT
 AS
 /*  
 	 Created: 20150422@Patrick
-	 Task : Check this discount has belong to any a invoice yet
+	 Task : Check this discount has not belong to any a invoice yet
 	 DB: DB052.bodb_Licensee
 	 Revisions:     
 		
