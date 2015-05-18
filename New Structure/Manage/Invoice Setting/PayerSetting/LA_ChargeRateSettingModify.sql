@@ -66,7 +66,7 @@ BEGIN
 	EXEC sp_xml_preparedocument @idoc OUTPUT, @ChargeSettingXML
 
 	INSERT INTO @ChargeSetting(ChargeId, ProductId, FirstBilling, BasicBilling, Rate, ChargeType, FromDate, ToDate, IsEdit)
-	SELECT ChargeID, ProductId, FirstBilling, BasicBilling, Rate, ChargeType, FromDate, ToDate, IsEdit
+	SELECT ISNULL(ChargeID, 0), ProductId, FirstBilling, BasicBilling, Rate, ChargeType, FromDate, ToDate, IsEdit
 	FROM OPENXML(@idoc, 'ChargeSettings/ChargeSetting')
 	WITH (				
 		 ChargeId		INT				'ChargeId'

@@ -64,7 +64,7 @@ BEGIN
 	EXEC sp_xml_preparedocument @idoc OUTPUT, @MinFeeSettingXML
 
 	INSERT INTO @MinFeeSetting(MinFeeId, ProductId, FeeAmount, FeeTypeId, MinFeeTerm, Priority, FromDate, ToDate, IsEdit)
-	SELECT MinFeeId, ProductId, FeeAmount, FeeTypeId, MinFeeTerm, Priority, FromDate, ToDate, IsEdit
+	SELECT ISNULL(MinFeeId, 0), ProductId, FeeAmount, FeeTypeId, MinFeeTerm, Priority, FromDate, ToDate, IsEdit
 	FROM OPENXML(@idoc, 'MinFeeSettings/MinFeeSetting')
 	WITH (				
 		 MinFeeId		INT				'MinFeeId'
