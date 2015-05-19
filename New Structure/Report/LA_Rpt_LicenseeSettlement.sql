@@ -23,6 +23,7 @@ AS
 		Revisions:  
 			- 20150407@Florent: add filter no draw for BA Settlement
 			- 20150505@Florent: Integrate Gold Deluxe and Voidbridge
+			- 20150519@Florent: Change Product Prefix from VB to VG
 		Param's Explanation:  				
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
 								'NG' -> Number Game			'BA' -> BA
@@ -136,7 +137,7 @@ BEGIN
 				GROUP BY b.Winlostdate, CurrencyID 
 			)			
 		END
-		IF (CHARINDEX('GD', @ProductCode) <> 0 OR CHARINDEX('VB', @ProductCode) <> 0)-- GD, VB
+		IF (CHARINDEX('GD', @ProductCode) <> 0 OR CHARINDEX('VG', @ProductCode) <> 0)-- GD, VG
 		BEGIN
 			-- reset 
 			DELETE @TempAG		
