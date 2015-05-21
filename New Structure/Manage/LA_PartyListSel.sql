@@ -51,9 +51,11 @@ FROM OAS_ChargeInfo ci WITH (NOLOCK)
 		SELECT MIN(ci.ProductID) AS ProductID, FromParty
 		   FROM dbo.OAS_Party p WITH (NOLOCK)
 			   INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
+			   INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH(NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
 		   WHERE ChargeType = 1 AND p.PartyType = 1
 		   GROUP BY FromParty
 		) p ON ci.ProductID = p.ProductID AND ci.FromParty = p.FromParty
+	INNER JOIN dbo.LA_ChargeInfo_SystemMapping c WITH(NOLOCK) ON ci.ChargeID = c.ChargeID AND c.SystemID = 2
 WHERE ci.ChargeType = 1
 GROUP BY ci.FromParty
 
