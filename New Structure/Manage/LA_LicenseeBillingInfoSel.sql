@@ -13,24 +13,34 @@ AS
 	Base on : IMS_LicenseeBillingInfoSel
 	DB: DBLIC.bodb_Licensee
 	Revisions:  
+		- 201505628@Florent: implement code
 	Param's Explanation:  
 */  
-SET NOCOUNT ON
 BEGIN
-	SELECT 
-		/*
-		SELECT 
-			GETDATE() AS FirstBilling, 
-			'15% of Net Win' AS BasisOfBilling, 
-			'EUR15000 (minimum fees waived 3 months from date of launch)' AS MinimumFees,  
-			REPLACE(CONVERT(VARCHAR(11),GETDATE(),6), ' ', '-') AS HeadOfTerms
-		*/
-		'' AS FirstBilling, -- example 'Jan-01' 
-		'' AS BasisOfBilling, 
-		'' AS MinimumFees,  
-		'' AS HeadOfTerms
-END
+	SET NOCOUNT ON
+	DECLARE @FirstBilling VARCHAR(6)	
+		, @BasisOfBilling VARCHAR(50)	
+		, @MinimumFees VARCHAR(10)		
+	SELECT 	
+		@FirstBilling =  CONVERT(VARCHAR(3),DATENAME(MONTH, DATEADD(MONTH, MONTH(ci.FirstOfBilling), - 1))) + '-' + SUBSTRING(CAST(YEAR(ci.FirstOfBilling) AS VARCHAR),3,2)
+		, @BasisOfBilling = ISNULL(BasicOfBilling, '')
+		, @MinimumFees = ISNULL(m.MinFee, '')	
+	FROM dbo.OAS_ChargeInfo ci WITH (NOLOCK)
+		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2	
+		INNER JOIN (SELECT MAX(c.FromDate) FromDate, c.FromParty, c.ProductID FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
+								INNER JOIN dbo.LA_ChargeInfo_SystemMapping csm WITH (NOLOCK) ON c.ChargeID = csm.ChargeID AND csm.SystemID = 2
+								INNER JOIN (SELECT ProductPrefix, ProductID FROM dbo.LA_f_Products3rd(@ProductCode)) pp ON c.ProductID = pp.ProductID
+							WHERE c.FromParty = @PartyId
+								AND c.ChargeType = 1
+							GROUP BY c.FromParty, c.ProductID) t ON ci.FromDate = t.FromDate AND ci.FromParty = t.FromParty AND ci.ProductID = t.ProductID
+		LEFT JOIN dbo.LA_ChargeInfo_MinFee m WITH (NOLOCK) ON ci.ChargeID = m.ChargeID
+	WHERE ci.FromParty = @PartyId	
+		AND ci.ChargeType = 1
 
+	SELECT  ISNULL(@FirstBilling, '')		AS FirstBilling
+		   , ISNULL(@BasisOfBilling, '')	AS BasisOfBilling
+		   , ISNULL(@MinimumFees, '')		AS MinimumFees
+END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_LicenseeBillingInfoSel] TO [vnteam] 
 GRANT EXECUTE ON [dbo].[LA_LicenseeBillingInfoSel] TO bodbAdminNet
