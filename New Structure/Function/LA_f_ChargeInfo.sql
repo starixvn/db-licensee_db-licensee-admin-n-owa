@@ -107,8 +107,8 @@ BEGIN
 	ORDER BY p.PartyID
 		,Di.ProductID
 
-    --IF @ExcludeTest = 1
-    --DELETE @tbChargeInfo WHERE DI_Rate = 0
+    IF @ExcludeTest = 1
+    DELETE @tbChargeInfo WHERE DI_Rate = 0
 
 
     --get more licensee for racing product
@@ -170,7 +170,12 @@ BEGIN
 		    , 0 OW_Rate
 		    , 0 PNR_Rate
 		    , @FromDate
-		    , DATEADD(D, -1, cte.AffectedDate) 
+		    --, DATEADD(D, -1, cte.AffectedDate) 
+			, CASE 
+					WHEN @ToDate >= DATEADD(D, -1, cte.AffectedDate) 
+						THEN DATEADD(D, -1, cte.AffectedDate)
+					ELSE @ToDate
+				END
 		  FROM strSplit(@PartyIDs, ',') f1
 			 INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON f1.Val = p.PartyID
 			 LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID

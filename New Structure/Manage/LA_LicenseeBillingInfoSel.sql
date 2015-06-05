@@ -18,13 +18,13 @@ AS
 */  
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @FirstBilling VARCHAR(6)	
-		, @BasisOfBilling VARCHAR(50)	
-		, @MinimumFees VARCHAR(10)		
+	DECLARE @FirstBilling VARCHAR(6)
+		, @BasisOfBilling VARCHAR(50)
+		, @MinimumFees VARCHAR(10)
 	SELECT 	
 		@FirstBilling =  CONVERT(VARCHAR(3),DATENAME(MONTH, DATEADD(MONTH, MONTH(ci.FirstOfBilling), - 1))) + '-' + SUBSTRING(CAST(YEAR(ci.FirstOfBilling) AS VARCHAR),3,2)
 		, @BasisOfBilling = ISNULL(BasicOfBilling, '')
-		, @MinimumFees = ISNULL(m.MinFee, '')	
+		, @MinimumFees = ISNULL(m.MinFeeTerm, '')	
 	FROM dbo.OAS_ChargeInfo ci WITH (NOLOCK)
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2	
 		INNER JOIN (SELECT MAX(c.FromDate) FromDate, c.FromParty, c.ProductID FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
@@ -33,13 +33,16 @@ BEGIN
 							WHERE c.FromParty = @PartyId
 								AND c.ChargeType = 1
 							GROUP BY c.FromParty, c.ProductID) t ON ci.FromDate = t.FromDate AND ci.FromParty = t.FromParty AND ci.ProductID = t.ProductID
-		LEFT JOIN dbo.LA_ChargeInfo_MinFee m WITH (NOLOCK) ON ci.ChargeID = m.ChargeID
+		LEFT JOIN (SELECT FromDate, ToDate, PartyId, ProductId, MinFeeTerm
+					FROM dbo.LA_MinFee  WITH (NOLOCK) 
+					WHERE CONVERT(DATE, GETDATE()) BETWEEN FromDate AND ToDate
+					AND PartyId = @PartyId) m ON ci.FromParty = m.PartyId AND ci.ProductID = m.ProductId 
 	WHERE ci.FromParty = @PartyId	
 		AND ci.ChargeType = 1
-
+		
 	SELECT  ISNULL(@FirstBilling, '')		AS FirstBilling
-		   , ISNULL(@BasisOfBilling, '')	AS BasisOfBilling
-		   , ISNULL(@MinimumFees, '')		AS MinimumFees
+			, ISNULL(@BasisOfBilling, '')	AS BasisOfBilling
+			, ISNULL(@MinimumFees, '')		AS MinimumFees
 END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_LicenseeBillingInfoSel] TO [vnteam] 
