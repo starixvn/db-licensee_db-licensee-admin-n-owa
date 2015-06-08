@@ -22,8 +22,8 @@ AS
 	 Revisions:     
 	 Params:	
 */
-SET NOCOUNT ON
 BEGIN
+	SET NOCOUNT ON
 	IF ISNULL(@PayerID, '') = '' OR ISNULL(@BillerID, '') = ''
 		RETURN
 -- For writing log
@@ -47,7 +47,8 @@ BEGIN
 						, ToPartyId		AS '@t'
 						, ProductId		AS '@p'
 						, InvTypeId		AS '@itp'
-						, InvTempId		AS '@itm'					
+						, InvTempId		AS '@itm'		
+						, BankId		AS '@b'			
 				FROM dbo.LA_InvoiceSetting WITH (NOLOCK)
 				WHERE FromPartyId = @PayerID
 					AND ToPartyId = @BillerID
@@ -62,7 +63,7 @@ BEGIN
 
 		IF @@error <> 0
 		BEGIN
-			SELECT 	@ErrMsg = 'Delete failed. Please try again.', @ErrCode = 1	
+			SELECT 	@ErrMsg = 'Delete failed. Please try again.', @ErrCode = 140	
 			RETURN
 		END
 
@@ -72,21 +73,31 @@ BEGIN
 
 	--Write Log		
 	DECLARE @ActionID INT = 0
-	SELECT @ActionID = ActionId
+	SELECT ActionId
 	FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
 	WHERE SPName = 'LA_InvoiceSettingDel'
-
-	EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog 
-		@UserId = @UserID
-		, @IP = @LoginIP
-		, @LicenseeID = 0
-		, @CurrencyID = 0
-		, @SPName = 'LA_InvoiceSettingDel'
-		, @CustId = 0
-		, @ActionId = @ActionID
-		, @Duration = @duration
-		, @Data = @logSPData
-		, @OldData = @logSPDataOld
+	BEGIN TRY
+		EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog 
+			@UserId = @UserID
+			, @IP = @LoginIP
+			, @LicenseeID = 0
+			, @CurrencyID = 0
+			, @SPName = 'LA_InvoiceSettingDel'
+			, @CustId = 0
+			, @ActionId = @ActionID
+			, @Duration = @duration
+			, @Data = @logSPData
+			, @OldData = @logSPDataOld
+	END TRY
+	BEGIN CATCH
+		EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP 
+			@UserID = @UserID
+			, @CustID = 0
+			, @ActionID = @ActionID
+			, @TrackingValue = @LogSPData
+			, @TrackingValue2 = @logSPDataOld
+			, @duration = @duration
+	END CATCH	
 	
 END
 

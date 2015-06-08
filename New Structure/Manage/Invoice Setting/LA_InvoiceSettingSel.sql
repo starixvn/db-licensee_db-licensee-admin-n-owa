@@ -22,12 +22,12 @@ AS
 	 Example:
 		EXEC dbo.LA_InvoiceSettingSel 123, 14
 */
-SET NOCOUNT ON
 BEGIN
-	
+	SET NOCOUNT ON
 	SELECT ToPartyID			AS BillerId
 		, BillerName			AS BillerName
 		, FromPartyId			AS PayerId
+		, ISNULL(i.BankId, 0)	AS BankId
 		, CASE 
 			WHEN ISNULL(pd.BrandName, '') != '' 
 				THEN pd.BrandName 
@@ -60,13 +60,14 @@ BEGIN
 			WHEN ISNULL(pd.BrandName, '') != '' 
 				THEN pd.BrandName 
 			ELSE p1.PartyName 
-		  END, i.InvTypeId, InvTypeName, i.InvTempId, InvTemplateName
+		  END, i.InvTypeId, InvTypeName, i.InvTempId, InvTemplateName, ISNULL(i.BankId, 0)
 	ORDER BY BillerName , CASE 
 			WHEN ISNULL(pd.BrandName, '') != '' 
 				THEN pd.BrandName 
 			ELSE p1.PartyName 
 		  END	
 END			 	
+
 
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_InvoiceSettingSel] TO [vnteam] 
