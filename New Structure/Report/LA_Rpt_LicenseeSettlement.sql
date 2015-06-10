@@ -21,16 +21,20 @@ AS
 		Base on : IMS_Rpt_LicenseeSettlement
 		DB: DB052.bodb02
 		Revisions:  
-
+			- 20150407@Florent: add filter no draw for BA Settlement
+			- 20150505@Florent: Integrate Gold Deluxe and Voidbridge
+			- 20150519@Florent: Change Product Prefix from VB to VG
 		Param's Explanation:  				
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
 								'NG' -> Number Game			'BA' -> BA
 								'LC' -> Live Casino			'VS' -> Virtual Sports
-								'CS' -> RNG Casino			'BG' -> Bingo			
+								'CS' -> RNG Casino			'BG' -> Bingo		
+								
 	*/  
 SET NOCOUNT ON
 BEGIN			
 	DECLARE @LicenseeID INT	
+		, @DrawFilter SMALLINT = 1
 	CREATE TABLE #Result (
 			Winlostdate		DATETIME
 			, CurrencyId	INT
@@ -59,7 +63,7 @@ BEGIN
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyID, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE DI_Rate > 0
 	)
-
+	
 	INSERT INTO @Bettype (Bettype)
 	(
 		SELECT Bettype
@@ -68,19 +72,23 @@ BEGIN
 	
 	SELECT @LicenseeID = LicenseeID 
 	FROM @tmpParty
-
+	
 	IF @LicenseeID IS NULL
 		RETURN
 
+	DECLARE @Recommend VARCHAR(8000) = '', @SQL VARCHAR(8000) = ''
+	CREATE TABLE #DataWinloss3rd (Recommend	INT, Winlostdate DATETIME, SportType INT, Currency INT, TurnOver MONEY, TotalTrans INT, Winloss MONEY)
+	DECLARE @TempAG AS TABLE( LicenseeeID INT, CustId INT, CurrencyId INT)
+	
 	-- Product <> BA
 	IF (REPLACE(@ProductCode, 'BA', '') != '' AND REPLACE(@ProductCode, 'BA', '') != ',')
 	BEGIN
 		IF CHARINDEX('AGC', @ProductCode) <> 0 -- AG Casino
 		BEGIN
-			DECLARE @Recommend VARCHAR(8000) = '', @SQL VARCHAR(8000) = ''
-			CREATE TABLE #DataWinloss3rd (Recommend	INT, Winlostdate DATETIME, SportType INT, Currency INT, TurnOver MONEY, TotalTrans INT, Winloss MONEY)
-			DECLARE @TempAG AS TABLE( LicenseeeID INT, CustId INT, CurrencyId INT)
-			--get licensee recommend			
+			-- reset 
+			DELETE @TempAG		
+			SET @Recommend = ''
+			--get licensee recommend				
 			INSERT INTO @TempAG(LicenseeeID, CustId, CurrencyId)
 			SELECT DISTINCT LicenseeID, CustID, Currency
 			FROM bodb_licensee.dbo.f_SelLicenseeCust(@LicenseeID)
@@ -91,8 +99,8 @@ BEGIN
 			FROM @TempAG 
 
 			--truncate last comma
-			SET @Recommend = SUBSTRING(@Recommend, 0, LEN(@Recommend))			
-			
+			SET @Recommend = SUBSTRING(@Recommend, 0, LEN(@Recommend))	
+
 			SELECT @sql = 'SELECT Recommend, Winlostdate, SportType, Currency, TurnOver, TotalTrans, Winloss
 						  FROM OPENQUERY(DBACC,''EXEC bodb02.dbo.LA_Rpt_3rdProductWinloss
 												 @ProductCodes		= ''''@ProductCodes_''''
@@ -127,8 +135,54 @@ BEGIN
 					INNER JOIN @tmpParty p ON ag.LicenseeeID = p.LicenseeId
 				WHERE b.Winlostdate BETWEEN p.Fromdate AND p.Todate
 				GROUP BY b.Winlostdate, CurrencyID 
-			)
-			DROP TABLE #DataWinloss3rd
+			)			
+		END
+		IF (CHARINDEX('GD', @ProductCode) <> 0 OR CHARINDEX('VG', @ProductCode) <> 0)-- GD, VG
+		BEGIN
+			-- reset 
+			DELETE @TempAG		
+			SET @Recommend = ''
+
+			--get licensee recommend			
+			INSERT INTO @TempAG(LicenseeeID, CustId, CurrencyId)
+			SELECT DISTINCT LicenseeID, CustID, Currency
+			FROM bodb_licensee.dbo.f_SelLicenseeCust(@LicenseeID)
+			WHERE (@CurrencyId = 0 OR (@CurrencyId <> 0 AND Currency = @CurrencyId))
+				AND Currency <> 20
+
+			SELECT @Recommend = @Recommend + CAST(CustID AS VARCHAR) + ',' 
+			FROM @TempAG 
+
+			--truncate last comma
+			SET @Recommend = SUBSTRING(@Recommend, 0, LEN(@Recommend))	
+
+			INSERT INTO #DataWinloss3rd(Recommend, Winlostdate, Currency, TurnOver, TotalTrans, Winloss)
+			EXECUTE dbo.LA_Rpt_ThirdPartyProductWinloss
+					@ProductCodes	= @ProductCode
+					, @Recommend	= @Recommend
+					, @Currency 	= @CurrencyId
+					, @DrawFilter	= 1
+					, @FromDate 	= @FromDate
+					, @ToDate 		= @ToDate
+			
+			INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
+			(
+				SELECT   			   
+					b.Winlostdate     
+					, CurrencyID		   
+					, SUM(Turnover) AS Turnover
+					, SUM(WinLoss) AS Winlost
+					, 0 AS PlayerComm
+					, - SUM(Winloss * ( 1 - p.Rate)) AS LicenseeWL				
+					, 0 AS LicenseeComm
+					, - SUM(WinLoss * p.Rate) AS Company 
+					, SUM(b.TotalTrans) AS BetCount	  
+				FROM #DataWinloss3rd b WITH (NOLOCK)	
+					INNER JOIN @TempAG ag ON b.Recommend = ag.CustId AND b.Currency = ag.CurrencyId								
+					INNER JOIN @tmpParty p ON ag.LicenseeeID = p.LicenseeId
+				WHERE b.Winlostdate BETWEEN p.Fromdate AND p.Todate
+				GROUP BY b.Winlostdate, CurrencyID 
+			)			
 		END
 		ELSE
 		BEGIN
@@ -172,18 +226,24 @@ BEGIN
 	-- Product = BA
 	IF CHARINDEX('BA', @ProductCode) <> 0
 	BEGIN
+		SET @DrawFilter = 2 -- set case No Darw
 		INSERT INTO #Result( Winlostdate, CurrencyId, TurnOver, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
 		(
 			SELECT   			   
 				b.rptDate     
 				, b.CurrencyID		   
-				, SUM(b.Turnover) AS turnover
+				, SUM(b.turnover * 
+						CASE WHEN @drawfilter IN (2, 3) 
+							THEN CASE WHEN b.STATUS = 111 THEN 0
+								WHEN b.STATUS IN (114, 115)	THEN 0.5 ELSE 1	END
+							ELSE 1
+						END) AS turnover
 				, SUM(b.WinLoss) AS Winlost
 				, 0 AS PlayerComm
 				, SUM(b.CommissionA) AS LicenseeWL				
 				, 0 AS LicenseeComm
 				, - SUM(b.WinLoss * p.Rate + b.CommissionA) AS Company 
-				, SUM(b.BetCount) AS BetCount	  
+				, SUM(betcount * CASE WHEN @drawfilter = 2 AND b.Status = 111 THEN 0 ELSE 1 END) AS BetCount	  
 			FROM 			
 				bodb_licensee.dbo.rpt_Betting_BA b WITH (NOLOCK)
 				INNER JOIN @tmpParty p ON b.SiteID = p.LicenseeId 				
@@ -230,6 +290,7 @@ BEGIN
 
 	DROP TABLE #Exchange												   
 	DROP TABLE #Result	
+	DROP TABLE #DataWinloss3rd
 END
 
 GO
