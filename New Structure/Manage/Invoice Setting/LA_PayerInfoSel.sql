@@ -22,11 +22,7 @@ AS
 BEGIN
 SET NOCOUNT ON
 	SELECT p.PartyID	AS PayerID
-		, CASE 
-			WHEN ISNULL(pd.BrandName, '') != '' 
-				THEN pd.BrandName 
-			ELSE p.PartyName 
-		  END	AS PayerName
+		, p.PartyName 	AS PayerName
 		, pd.StatusId
 		, pd.IsDeposit
 		, pd.BrandName
