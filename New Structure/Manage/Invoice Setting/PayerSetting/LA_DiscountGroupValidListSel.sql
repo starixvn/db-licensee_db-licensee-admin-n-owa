@@ -21,7 +21,7 @@ BEGIN
 	SELECT DiscountGroupId, DiscountGroupName
 	FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK)
 	WHERE DiscountGroupType = @DiscountGroupType
-		AND GETDATE() BETWEEN FromDate AND ToDate
+		AND CONVERT(DATE,GETDATE()) BETWEEN FromDate AND ToDate
 END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_DiscountGroupValidListSel] TO [vnteam] 

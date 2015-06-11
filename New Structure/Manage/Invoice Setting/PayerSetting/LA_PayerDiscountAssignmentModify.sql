@@ -37,16 +37,14 @@ SET NOCOUNT ON
 		, @DiscountTypeId	INT
 	-- Time start
 	SET @startRun = GETDATE()
-	SET @todate = GETDATE()
+	SET @todate = CONVERT(DATE, GETDATE())
 
 	IF ISNULL(@DiscountGroupId, 0) = 0
 		RETURN
 	IF NOT EXISTS( SELECT 1 FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK) WHERE h.DiscountGroupId = @DiscountGroupId)
 		RETURN
 
-	SELECT @DiscountTypeId = h.DiscountGroupType FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK) WHERE h.DiscountGroupId = @DiscountGroupId
-	SELECT @DiscountTypeId AS DiscountTypeId
-	SELECT @DiscountGroupId DiscountGroupId
+	SELECT @DiscountTypeId = h.DiscountGroupType FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK) WHERE h.DiscountGroupId = @DiscountGroupId	
 	DECLARE @PayerDiscountList AS TABLE (DiscountGroupId INT, PartyID INT)		
 	INSERT INTO @PayerDiscountList(DiscountGroupId, PartyID)
 	SELECT @DiscountGroupId, val 
@@ -57,14 +55,22 @@ SET NOCOUNT ON
 						INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON  a.DiscountGroupId = h.DiscountGroupId
 				WHERE @todate BETWEEN h.FromDate AND h.ToDate
 					AND a.PartyID IN (SELECT PartyID FROM @PayerDiscountList)
-					AND h.DiscountGroupType = @DiscountTypeId)
+					AND h.DiscountGroupType = @DiscountTypeId
+					AND h.DiscountGroupId <> @DiscountGroupId)
+	BEGIN
+		SELECT 	@ErrMsg = 'Update failed. Please try again.', @ErrCode = 203	
 		RETURN
+	END
 	-- check valid discount
 	IF NOT EXISTS(SELECT 1 FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
 				WHERE @todate BETWEEN h.FromDate AND h.ToDate
 					AND h.DiscountGroupId = ISNULL(@DiscountGroupId, 0)
 					AND h.DiscountGroupType = @DiscountTypeId)
-		RETURN
+	BEGIN
+		SELECT 	@ErrMsg = 'Update failed. Please try again.', @ErrCode = 203	
+				RETURN
+	END
+		
 	--validate 
 	EXEC dbo.LA_Discount_ValidatePayerAssignment
 		@DiscountGroupId	= @DiscountGroupId
@@ -74,6 +80,13 @@ SET NOCOUNT ON
 		, @ErrMsg		= @ErrMsg	OUTPUT
 	IF @ErrCode <> 0
 		RETURN
+	-- check save exists group
+	IF EXISTS( SELECT 1 
+			FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) 
+				INNER JOIN @PayerDiscountList p ON a.PartyID = p.PartyID
+			WHERE a.DiscountGroupId = @DiscountGroupId)
+		RETURN
+
 	-- Case Add / modify
 	BEGIN	
 		;MERGE dbo.LA_DiscountGroupAssignment WITH( ROWLOCK, UPDLOCK) AS t
@@ -130,6 +143,7 @@ SET NOCOUNT ON
 			, @duration = @duration
 	END CATCH
 END
+
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_PayerDiscountAssignmentModify] TO [vnteam] 
 GRANT EXECUTE ON [dbo].[LA_PayerDiscountAssignmentModify] TO bodbAdminNet

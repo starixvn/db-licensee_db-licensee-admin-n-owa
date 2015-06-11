@@ -1,6 +1,6 @@
 USE bodb_licensee
 GO
-ALTER PROCEDURE dbo.LA_Discount_ValidatePayerAssignment @DiscountGroupId INT
+ALTER PROCEDURE [dbo].[LA_Discount_ValidatePayerAssignment] @DiscountGroupId INT
 	, @PayerIdList VARCHAR(4000) = ''
 	, @Mode VARCHAR(10) = 'R'
 
@@ -19,7 +19,7 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	RETURN --TODO: when implement Invoice page
+	--RETURN --TODO: when implement Invoice page
 	IF ISNULL(@PayerIdList , '') = '' OR ISNULL(@DiscountGroupId, 0) = 0
 		RETURN
 
@@ -29,10 +29,52 @@ BEGIN
 	SELECT @DiscountType = DiscountGroupType
 	FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK)
 	WHERE DiscountGroupId = @DiscountGroupId
+	IF @Mode = 'A'
+	BEGIN
+		IF EXISTS(SELECT 1 
+				FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
+					INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId					
+				WHERE h.DiscountGroupType = @DiscountType
+					AND a.PartyId IN (SELECT val FROM strSplit(@PayerIdList, ','))
+				 )				
+	BEGIN
+		DECLARE @tempDiscount AS TABLE (Indx INT IDENTITY(1,1),DiscountGroupId INT, DiscountType INT , FromDate DATE, ToDate DATE)
 
+		INSERT INTO @tempDiscount (DiscountGroupId, DiscountType, FromDate, ToDate)
+		SELECT h.DiscountGroupId, h.DiscountGroupType, FromDate, ToDate
+		FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
+			INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId			
+		WHERE h.DiscountGroupType = @DiscountType
+			AND a.PartyId IN (SELECT val FROM strSplit(@PayerIdList, ','))
+		UNION 
+		SELECT DiscountGroupId, DiscountGroupType, FromDate, ToDate
+		FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
+		WHERE h.DiscountGroupId = @DiscountGroupId
+		IF EXISTS (
+			SELECT TOP 1 1
+			FROM @tempDiscount a LEFT JOIN @tempDiscount b ON a.Indx != b.Indx  AND a.DiscountType = b.DiscountType
+			WHERE  (a.FromDate BETWEEN b.FromDate AND b.ToDate
+						OR a.ToDate BETWEEN b.FromDate AND b.ToDate
+						OR b.FromDate BETWEEN a.FromDate AND a.ToDate
+						OR b.ToDate BETWEEN a.FromDate AND a.ToDate
+					))
+		BEGIN			
+			DECLARE @PartyName VARCHAR(8000)
+			SELECT @PartyName = COALESCE(@PartyName + ',' + '''' + CASE WHEN ISNULL(pp.BrandName, '') = '' THEN ISNULL(p.PartyName, '') ELSE ISNULL(pp.BrandName, '') END + ''''
+						, '''' + CASE WHEN ISNULL(pp.BrandName, '') = '' THEN ISNULL(p.PartyName, '') ELSE ISNULL(pp.BrandName, '') END + '''')
+			FROM dbo.OAS_Party p WITH(NOLOCK) 
+				INNER JOIN dbo.OAS_PartyDetail pp WITH(NOLOCK) ON p.PartyID = pp.PartyID				
+			WHERE p.PartyId IN (SELECT val FROM strSplit(@PayerIdList, ','))
+			SELECT @ErrMsg = 'Payer ' + @PartyName + ' which being applied other discount at the time, please check again!'
+			, @ErrCode = 200
+			RETURN
+		END
+	END
+	END
 	IF @Mode = 'R'
 	BEGIN
-		SET @PayerNameList = NULL
+		RETURN
+		SET @PayerNameList = NULL		
 
 		SELECT COALESCE(@PayerNameList + ',' + '''' + CASE WHEN ISNULL(pp.BrandName, '') = '' THEN ISNULL(p.PartyName, '') ELSE ISNULL(pp.BrandName, '') END + ''''
 						, '''' + CASE WHEN ISNULL(pp.BrandName, '') = '' THEN ISNULL(p.PartyName, '') ELSE ISNULL(pp.BrandName, '') END + '''')

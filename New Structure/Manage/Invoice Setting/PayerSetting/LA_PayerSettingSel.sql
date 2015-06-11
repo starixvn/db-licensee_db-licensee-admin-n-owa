@@ -36,12 +36,14 @@ BEGIN
 		, @ListParty			VARCHAR(500) = ''
 		, @MinDate				DATE 
 		, @MaxDate				DATE
+		, @CurrentDate			DATE
+	SET @CurrentDate = CONVERT(DATE, GETDATE())
 	DECLARE @ChargeInfo AS TABLE (ChargeId INT, PartyId INT, PartyName VARCHAR(100),PartyGroupId INT, PartyGroupName VARCHAR(100), ProductId INT
 			, ProductName VARCHAR(100),Rate MONEY, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), ExchangeID INT, ExchangeName VARCHAR(50))
 	CREATE TABLE #Temp_ChargeInfo (ChargeId INT, PartyID INT, ProductID INT,Rate MONEY, Fromdate DATE, Todate DATE)
 
 	DECLARE @Minfee AS TABLE(PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, FromDate DATE, ToDate DATE)
-	DECLARE @Discount AS TABLE(PartyId INT, ProductId INT, FromDate DATE, ToDate DATE,DiscountGroupId INT, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
+	DECLARE @Discount AS TABLE(PartyId INT, ProductId INT, FromDate DATE, ToDate DATE,DiscountGroupId INT, FromAmount MONEY, ToAmount MONEY, Rate MONEY, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
 	DECLARE @ChargeDetail AS TABLE (ChargeID INT, PartyID INT, ProductID INT, DI_Rate MONEY, Fromdate DATE, Todate DATE)
 	
 	--Get list licensee, 
@@ -76,6 +78,7 @@ BEGIN
 	FROM (
 				SELECT c.PartyID, c.ProductID, MAX(c.Fromdate) AS Fromdate, MAX(c.Todate) AS Todate
 				FROM @ChargeDetail c
+				WHERE @CurrentDate BETWEEN c.Fromdate AND c.Todate
 				GROUP BY c.PartyID, c.ProductID
 		 ) a INNER JOIN @ChargeDetail b 
 				ON a.PartyID = b.PartyID AND a.ProductID = b.ProductID AND a.Fromdate = b.Fromdate AND a.Todate = b.Todate
@@ -106,23 +109,27 @@ BEGIN
 		INNER JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
 		INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 		LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON ci.BaseCurrencyId = e.exchangeid
+	WHERE @CurrentDate BETWEEN c.Fromdate AND c.Todate
 
 	INSERT INTO @Minfee(PartyId, ProductId, FeeTypeId, FeeAmount, FromDate, ToDate)
 	SELECT PartyId, ProductId, FeeTypeId, FeeAmount, FromDate, ToDate 
 	FROM dbo.LA_MinFee WITH (NOLOCK)
 	WHERE EXISTS (SELECT val FROM bodb02.dbo.strSplit(@ListParty, ',') WHERE PartyID = val)
+		AND @CurrentDate BETWEEN FromDate AND ToDate
 
-	INSERT INTO @Discount (PartyId, ProductId, FromDate, ToDate, DiscountGroupId, DiscountGroupName, DiscountGroupType)
-	SELECT a.PartyID, p.ProductId, h.FromDate, h.ToDate, d.DiscountGroupId, h.DiscountGroupName, h.DiscountGroupType
+	INSERT INTO @Discount (PartyId, ProductId, FromDate, ToDate, FromAmount, ToAmount, Rate, DiscountGroupId, DiscountGroupName, DiscountGroupType)
+	SELECT a.PartyID, p.ProductId, h.FromDate, h.ToDate, d.FromAmount, d.ToAmount, d.Rate, d.DiscountGroupId, h.DiscountGroupName, h.DiscountGroupType
 	FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
 		INNER JOIN dbo.LA_DiscountGroupDetail d WITH (NOLOCK) ON a.DiscountGroupId = d.DiscountGroupId 
 		INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON d.DiscountGroupId = h.DiscountGroupId 
 		INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
 	WHERE EXISTS (SELECT val FROM bodb02.dbo.strSplit(@ListParty, ',') WHERE a.PartyID = val)		
-	GROUP BY a.PartyID, p.ProductId, h.FromDate, h.ToDate, d.DiscountGroupId, h.DiscountGroupName, h.DiscountGroupType
+		AND @CurrentDate BETWEEN h.FromDate AND h.ToDate
+	GROUP BY a.PartyID, p.ProductId, h.FromDate, h.ToDate, d.DiscountGroupId, h.DiscountGroupName, h.DiscountGroupType, d.FromAmount, d.ToAmount, d.Rate	
 
 	--result
-	SELECT c.PartyId				AS PayerID
+	SELECT DISTINCT
+		 c.PartyId					AS PayerID
 		, PartyName					AS PayerName
 		, PartyGroupId			    AS PayerGroupID
 		, PartyGroupName		    AS PayerGroupName
@@ -131,9 +138,24 @@ BEGIN
 		, FirstBilling			    AS FirstBilling
 		, ISNULL(m.FeeAmount, 0)	AS MinFee
 		, w.FromDate				AS WaiveFrom	 
-		, w.ToDate					AS WaiveTo
-		, d.DiscountGroupName		AS DiscountGroupName
+		, w.ToDate					AS WaiveTo		
+		, d.DiscountGroupName		AS DiscountGroupName			
+		, STUFF((
+				SELECT ';' + ' Amount From: ' + CONVERT(VARCHAR(100), ii.FromAmount) + ' - ' 
+						   + 'Amount To: ' + CASE WHEN ii.ToAmount = 10000000000000 THEN 'Unlimited' ELSE CONVERT(VARCHAR(100), ii.ToAmount) END + ' - ' 
+						   + 'Rate: ' + CONVERT(VARCHAR(10), ii.Rate * 100) + '%'
+				FROM @Discount ii					
+				WHERE d.DiscountGroupId = ii.DiscountGroupId AND d.ProductId = ii.ProductId AND d.PartyId = ii.PartyId
+				FOR XML PATH (''))
+			  , 1, 2, '')			AS DiscountGroupValues
 		, r.DiscountGroupName		AS RebateGroupName
+		, STUFF((
+				SELECT ';' + ' Rate: ' + CONVERT(VARCHAR(10), ii.Rate * 100) + '%'
+				FROM @Discount ii					
+				WHERE r.DiscountGroupId = ii.DiscountGroupId AND r.ProductId = ii.ProductId AND r.PartyId = ii.PartyId
+				GROUP BY ii.DiscountGroupId, ii.Rate
+				FOR XML PATH (''))
+			  , 1, 2, '')			AS RebateGroupValues
 		, c.Rate					AS Rate
 		, c.ExchangeID				AS ExchangeID
 		, c.ExchangeName			AS ExchangeName

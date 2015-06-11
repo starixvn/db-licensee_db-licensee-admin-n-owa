@@ -28,11 +28,12 @@ SET NOCOUNT ON
 	SELECT pg.PartyGroupId AS PayerGroupID, pg.PartyGroupName AS PayerGroupName, COUNT(pga.PartyId) AS NumberOfPayers	
 		, STUFF((
 				SELECT ', ' + CAST(CASE WHEN ISNULL(pd.BrandName, '') != '' THEN pd.BrandName ELSE p1.PartyName END AS VARCHAR)
-				FROM LA_PartyGroupAssignment p
-					LEFT JOIN dbo.OAS_Party p1 ON p.PartyId = p1.PartyID
+				FROM dbo.LA_PartyGroupAssignment p WITH (NOLOCK)
+					LEFT JOIN dbo.OAS_Party p1 WITH (NOLOCK) ON p.PartyId = p1.PartyID
 					LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p1.PartyID = pd.PartyID
 				WHERE pg.PartyGroupId = p.PartyGroupId					
-				FOR XML PATH (''))
+				FOR XML PATH (''), ROOT('str'), TYPE 
+					).value('/str[1]','VARCHAR(MAX)') 
 			  , 1, 2, '') AS PayerList				
 	FROM dbo.LA_PartyGroup pg WITH (NOLOCK)		
 		LEFT JOIN dbo.LA_PartyGroupAssignment pga WITH (NOLOCK) ON pg.PartyGroupId = pga.PartyGroupId		

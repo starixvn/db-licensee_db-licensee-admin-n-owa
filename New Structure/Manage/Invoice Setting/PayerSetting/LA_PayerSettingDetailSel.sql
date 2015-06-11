@@ -31,8 +31,11 @@ BEGIN
 	DECLARE @ProductListAll		VARCHAR(100) = ''		
 		, @MinDate				DATE 
 		, @MaxDate				DATE
-	DECLARE @ChargeInfo AS TABLE (ChargeId INT, PartyId INT, ProductId INT, Rate MONEY, ChargeType SMALLINT, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), BasicOfBilling VARCHAR(100), ExchangeID INT)	
-	DECLARE @Minfee AS TABLE(PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY,MinFeeTerm VARCHAR(200), FromDate DATE, ToDate DATE)
+		, @CurrentDate			DATE
+
+	SET @CurrentDate = CONVERT(DATE, GETDATE())
+	DECLARE @ChargeInfo AS TABLE (ChargeId INT, PartyId INT, ProductId INT, Rate MONEY, ChargeType SMALLINT, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), BasicOfBilling VARCHAR(512), ExchangeID INT)	
+	DECLARE @Minfee AS TABLE(FeeId INT, PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, MinFeeTerm VARCHAR(200), FromDate DATE, ToDate DATE)
 	DECLARE @PayerSettingHeader AS TABLE(PartyId INT, PayerGroupID INT, PayerGroupName VARCHAR(100), ExchangeID INT, DiscountGroupID INT, DiscountGroupName VARCHAR(100), RebateGroupID INT, RebateGroupName VARCHAR(100))
 	DECLARE @Discount AS TABLE(PartyId INT, ProductId INT, FromDate DATE, ToDate DATE,DiscountGroupId INT, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
 
@@ -64,8 +67,8 @@ BEGIN
 		LEFT JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 	
 	--======Min fee Area ===---
-	INSERT INTO @Minfee(PartyId, ProductId, FeeTypeId, FeeAmount,MinFeeTerm, FromDate, ToDate)
-	SELECT PartyId, ProductId, FeeTypeId, FeeAmount, MinFeeTerm, FromDate, ToDate 
+	INSERT INTO @Minfee(FeeId, PartyId, ProductId, FeeTypeId, FeeAmount,MinFeeTerm, FromDate, ToDate)
+	SELECT MinFeeId , PartyId, ProductId, FeeTypeId, FeeAmount, MinFeeTerm, FromDate, ToDate 
 	FROM dbo.LA_MinFee WITH (NOLOCK)
 	WHERE PartyId = @PayerId
 
@@ -95,19 +98,20 @@ BEGIN
 				SELECT PartyId, DiscountGroupId, DiscountGroupName 
 				FROM @Discount 
 				WHERE DiscountGroupType = 1 
-					AND GETDATE() BETWEEN FromDate AND ToDate
+					AND @CurrentDate BETWEEN FromDate AND ToDate
 				) d1 ON c.PartyId = d1.PartyId --discount
 		LEFT JOIN (
 				SELECT PartyId, DiscountGroupId, DiscountGroupName 
 				FROM @Discount 
 				WHERE DiscountGroupType = 2
-					AND GETDATE() BETWEEN FromDate AND ToDate
+					AND @CurrentDate BETWEEN FromDate AND ToDate
 				) d2 ON c.PartyId = d2.PartyId --Rebate
 	GROUP BY c.PartyId, pg.PartyGroupId, pg.PartyGroupName, c.ExchangeID, d1.DiscountGroupId	
 		, d1.DiscountGroupName, d2.DiscountGroupId, d2.DiscountGroupName
 
 	--result
-	SELECT c.PartyId				AS PayerID				
+	SELECT c.ChargeId				AS ChargeId
+		, c.PartyId					AS PayerID				
 		, c.ProductId			    AS ProductId
 		, ProductName			    AS ProductName
 		, FirstBilling			    AS FirstBilling
@@ -119,9 +123,10 @@ BEGIN
 	FROM @ChargeInfo c
 		LEFT JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
 	--Minfee Setting
-	SELECT PartyId					AS PayerID
-		, m.ProductId				AS ProductId
-		, pr.ProductName			AS ProductName
+	SELECT  m.FeeId			AS MinFeeId
+		, PartyId			AS PayerID
+		, m.ProductId		AS ProductId
+		, pr.ProductName	AS ProductName
 		, FeeAmount
 		, MinFeeTerm
 		, FromDate
@@ -131,14 +136,15 @@ BEGIN
 	WHERE FeeTypeId = 1 -- Miniumfee
 
 	--Waive Setting
-	SELECT PartyId
-		, w.ProductId
-		, pr.ProductName
+	SELECT w.FeeId			AS WaiveId
+		, PartyId			AS PayerID
+		, w.ProductId		AS ProductId
+		, pr.ProductName	AS ProductName
 		, FromDate
 		, ToDate
 	FROM @Minfee w
 		LEFT JOIN dbo.LA_f_Products3rd('') pr ON w.ProductID = pr.ProductID
-	WHERE w.FeeTypeId = 2 -- waive
+	WHERE w.FeeTypeId = 2 -- waive	
 END			 	
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_PayerSettingDetailSel] TO [vnteam] 

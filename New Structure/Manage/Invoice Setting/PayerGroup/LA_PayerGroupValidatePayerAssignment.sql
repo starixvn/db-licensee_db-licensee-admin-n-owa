@@ -24,12 +24,30 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	RETURN --TODO: when implement Invoice page
+	
 	IF ISNULL(@PayerIdList , '') = '' OR ISNULL(@PayerGroupId, 0) = 0
 		RETURN
 
 	DECLARE @PayerNameList VARCHAR(4000), @DiscountType TINYINT
 	
+	IF @Mode = 'A'
+	BEGIN
+		-- check exists
+		IF EXISTS (SELECT 1 FROM dbo.LA_PartyGroupAssignment a WITH (NOLOCK) WHERE a.PartyId IN (SELECT val FROM strSplit(@PayerIdList, ',')))
+			BEGIN
+				SELECT @PayerNameList = COALESCE(@PayerNameList + ',' + '''' + CASE WHEN ISNULL(pp.BrandName, '') = '' THEN ISNULL(p.PartyName, '') ELSE ISNULL(pp.BrandName, '') END + ''''
+						, '''' + CASE WHEN ISNULL(pp.BrandName, '') = '' THEN ISNULL(p.PartyName, '') ELSE ISNULL(pp.BrandName, '') END + '''')
+				FROM dbo.LA_PartyGroupAssignment a WITH(NOLOCK)					
+					INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON a.PartyID = p.PartyID
+					INNER JOIN dbo.OAS_PartyDetail pp WITH(NOLOCK) ON a.PartyID = pp.PartyID
+					--INNER JOIN dbo.LA_InvoiceHeader inv WITH(NOLOCK) ON p.PartyId = inv.PartyId  --> todo
+				WHERE a.PartyId IN (SELECT val FROM strSplit(@PayerIdList, ','))
+
+				SELECT @ErrMsg = 'Payer ' + @PayerNameList + ' cannot be add to the payer group, it is being applied!' , @ErrCode = 205					
+				RETURN
+			END
+	END
+	RETURN --TODO: when implement Invoice page
 	IF @Mode = 'R'
 	BEGIN
 		SET @PayerNameList = NULL

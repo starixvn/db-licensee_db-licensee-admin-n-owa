@@ -62,9 +62,7 @@ BEGIN
 		RETURN
 	END
 	---check case Update , compare new data with old config 
-	IF NOT EXISTS (SELECT TOP 1 1
-					FROM @ChargeRate a 
-						INNER JOIN dbo.OAS_ChargeInfo c WITH (NOLOCK) ON a.ChargeID = c.ChargeID AND a.PartyId = @PayerID)
+	IF EXISTS (SELECT 1 FROM @ChargeRate)
 	BEGIN	
 		SET @xml = (
 				SELECT	ci.ChargeId				AS '@c'

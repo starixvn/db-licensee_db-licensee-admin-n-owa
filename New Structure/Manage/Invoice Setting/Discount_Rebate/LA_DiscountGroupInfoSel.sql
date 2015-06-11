@@ -45,7 +45,8 @@ BEGIN
 					LEFT JOIN dbo.OAS_Party pp WITH(NOLOCK) ON aa.PartyID = pp.PartyID
 					LEFT JOIN dbo.OAS_PartyDetail d ON aa.PartyID = d.PartyID
 				WHERE aa.DiscountGroupId = h.DiscountGroupId
-				FOR XML PATH (''))
+				FOR XML PATH (''), ROOT('str'), TYPE 
+					).value('/str[1]','VARCHAR(MAX)') 
 			  , 1, 2, '') AS PayerList
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
 		LEFT JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON h.DiscountGroupId = d.DiscountGroupId

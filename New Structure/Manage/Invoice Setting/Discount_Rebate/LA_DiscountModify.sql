@@ -1,7 +1,7 @@
 USE bodb_licensee
 GO
 
-ALTER PROCEDURE dbo.LA_DiscountModify @DiscountGroupId SMALLINT = 0
+ALTER PROCEDURE [dbo].[LA_DiscountModify] @DiscountGroupId SMALLINT = 0
 	, @GroupName VARCHAR(50)
 	, @DiscountGroupType TINYINT
 	, @CurrencyId TINYINT
@@ -132,34 +132,39 @@ BEGIN
 			, @ErrCode = CASE WHEN @IsEdit = 0 THEN 503	ELSE 504 END
 		RETURN
 	END
+	
 
-	--overlap range discount & product & payer
+	--overlap range discount & payer
 	DECLARE @PayerList VARCHAR(500)
 	IF EXISTS (SELECT TOP 1 1 FROM @Payers)
 		AND EXISTS (SELECT TOP 1 1
 				FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
-					INNER JOIN dbo.LA_DiscountGroupProduct d WITH(NOLOCK) ON h.DiscountGroupId = d.DiscountGroupId
 					INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
-					INNER JOIN @Payers p ON a.PartyID = p.PayerId
+					INNER JOIN @Payers p ON a.PartyID = p.PayerId					
 				WHERE h.DiscountGroupId <> @DiscountGroupId
-					AND h.DiscountGroupId = @DiscountGroupType
+					AND h.DiscountGroupType = @DiscountGroupType
 					AND ((@FromDate BETWEEN FromDate AND ToDate)
-						OR (@ToDate BETWEEN FromDate AND ToDate))
+						OR (@ToDate BETWEEN FromDate AND ToDate)
+						OR (h.FromDate BETWEEN @FromDate AND @ToDate)
+						OR (h.ToDate BETWEEN @FromDate AND @ToDate)
+						)
 				)
-	BEGIN
-		SET @PayerList = NULL
+	BEGIN				
 		SELECT @PayerList = COALESCE(@PayerList + ',' + '''' + CASE WHEN ISNULL(dd.BrandName, '') = '' THEN ISNULL(pp.PartyName, '') ELSE ISNULL(dd.BrandName, '') END + ''''
 									, '''' + CASE WHEN ISNULL(dd.BrandName, '') = '' THEN ISNULL(pp.PartyName, '') ELSE ISNULL(dd.BrandName, '') END + '''')
 		FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
-			INNER JOIN dbo.LA_DiscountGroupProduct d WITH(NOLOCK) ON h.DiscountGroupId = d.DiscountGroupId
+
 			INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
-			INNER JOIN @Payers p ON a.PartyID = p.PayerId
+			INNER JOIN @Payers p ON a.PartyID = p.PayerId			
 			INNER JOIN dbo.OAS_Party pp ON p.PayerId = pp.PartyID
 			INNER JOIN dbo.OAS_PartyDetail dd WITH(NOLOCK) ON pp.PartyID = dd.PartyID
 		WHERE h.DiscountGroupId <> @DiscountGroupId
-			AND h.DiscountGroupId = @DiscountGroupType
+			AND h.DiscountGroupType = @DiscountGroupType	
 			AND ((@FromDate BETWEEN FromDate AND ToDate)
-				OR (@ToDate BETWEEN FromDate AND ToDate))
+						OR (@ToDate BETWEEN FromDate AND ToDate)
+						OR (h.FromDate BETWEEN @FromDate AND @ToDate)
+						OR (h.ToDate BETWEEN @FromDate AND @ToDate)
+						)		
 		GROUP BY dd.BrandName, pp.PartyName
 		
 		SELECT @ErrMsg = CASE WHEN @DiscountGroupType = 1 THEN 'Payer ' + @PayerList + ' which being applied other discount at the time. Please check again.'
@@ -194,7 +199,7 @@ BEGIN
 	END
 
 	--incorrect params value from IU
-	IF @IsEdit = 0 AND EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupName = @GroupName)
+	IF @IsEdit = 0 AND EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupName = @GroupName AND DiscountGroupType = @DiscountGroupType)
 	BEGIN
 		SELECT @ErrMsg = CASE WHEN @IsEdit = 0 THEN 'Insert failed. Please try again.' ELSE 'Update failed. Please try again.' END
 			, @ErrCode = CASE WHEN @IsEdit = 0 THEN 503	ELSE 504 END
@@ -307,14 +312,17 @@ BEGIN
 						, ToAmount AS '@tam'
 						, Rate AS '@r'
 					FROM dbo.LA_DiscountGroupDetail WITH(NOLOCK)
+					WHERE DiscountGroupId = @DiscountGroupId
 					FOR XML PATH('x'), TYPE)
 					, (SELECT DiscountGroupId AS '@gd'
 						, ProductId AS '@p'
-					FROM dbo.LA_DiscountGroupProduct
+					FROM dbo.LA_DiscountGroupProduct WITH (NOLOCK)
+					WHERE DiscountGroupId = @DiscountGroupId
 					FOR XML PATH('y'), TYPE)
 					, (SELECT DiscountGroupId AS '@gd'
 						, PartyID AS '@pa'
-					FROM dbo.LA_DiscountGroupAssignment
+					FROM dbo.LA_DiscountGroupAssignment WITH (NOLOCK)
+					WHERE DiscountGroupId = @DiscountGroupId
 					FOR XML PATH('z'), TYPE)
 				FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupId = @DiscountGroupId
 				FOR XML PATH('r'), TYPE)

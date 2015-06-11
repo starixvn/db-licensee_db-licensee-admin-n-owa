@@ -9,7 +9,7 @@ GO
 ALTER PROCEDURE [dbo].[LA_PayerGroupModify]
 	@PayerGroupId			INT	= 0	
 	, @PayerGroupName		VARCHAR(100)
-	, @PayerList			VARCHAR(500)
+	, @PayerList			VARCHAR(500)	= ''
 	, @UserID				INT
 	, @LoginIP				VARCHAR (50)	= ''
 	, @ErrCode				INT				= 0		OUTPUT
@@ -45,8 +45,7 @@ SET NOCOUNT ON
 	-- check case edit
 	IF EXISTS ( SELECT 1 FROM dbo.LA_PartyGroup WITH (NOLOCK) WHERE PartyGroupId = @PayerGroupId)
 		SET @IsEdit = 1
-	IF ISNULL(@PayerList, '') = ''
-		RETURN
+	
 	INSERT INTO @PayerGroupList(PayerGroupId, PartyID)
 	SELECT @PayerGroupId, val 
 	FROM bodb02.dbo.strSplit(@PayerList, ',')

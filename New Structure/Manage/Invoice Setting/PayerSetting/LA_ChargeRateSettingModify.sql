@@ -8,7 +8,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_ChargeRateSettingModify] 	
 	@PayerID				INT	
-	, @ChargeSettingXML		VARCHAR (5000)
+	, @ChargeSettingXML		VARCHAR (MAX)
 	, @ExchangeID			INT
 	, @UserID				INT
 	, @LoginIP				VARCHAR (50)	= ''
@@ -58,33 +58,103 @@ BEGIN
 			, @MinDate			DATE 
 			, @MaxDate			DATE
 	SET @startRun = GETDATE()
-	
+	DECLARE @ActionID INT = 0
+	SELECT @ActionID = ActionId
+	FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
+	WHERE SPName = 'LA_ChargeRateSettingModify'
+
+	DECLARE @OldExchangeID INT
+
+	--backup old data, 	
+	SELECT @OldExchangeID = ISNULL(BaseCurrencyId, 0) FROM dbo.OAS_ChargeInfo WITH (NOLOCK) WHERE FromParty = @PayerID AND BaseCurrencyId IS NOT NULL
+
+	IF (ISNULL(@ExchangeID, 0)  <> ISNULL(@OldExchangeID, 0))
+	BEGIN
+		--build log string
+		SET @xml = (
+				SELECT @PayerID				AS '@fp'
+						, @OldExchangeID	AS '@e'				
+				FOR XML PATH('z'), ROOT('r')			
+				)
+		SET @logSPDataOld = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"');
+
+		UPDATE dbo.OAS_ChargeInfo WITH( ROWLOCK, UPDLOCK)
+		SET BaseCurrencyId = @ExchangeID
+		WHERE FromParty = @PayerID
+
+		SET @xml = (
+				SELECT @PayerID				AS '@fp'
+						, @ExchangeID		AS '@e'				
+				FOR XML PATH('z'), ROOT('r')			
+				)
+		SET @logSPData = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"');		
+		SET @endRun = GETDATE()
+		SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
+
+		--Write Log		
+		BEGIN TRY
+			EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog 
+				@UserId = @UserID
+				, @IP = @LoginIP
+				, @LicenseeID = 0
+				, @CurrencyID = 0
+				, @SPName = 'LA_ChargeRateSettingModify'
+				, @CustId = 0
+				, @ActionId = @ActionID
+				, @Duration = @duration
+				, @Data = @logSPData
+				, @OldData = @logSPDataOld
+		END TRY
+		BEGIN CATCH
+			EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP 
+				@UserID = @UserID
+				, @CustID = 0
+				, @ActionID = @ActionID
+				, @TrackingValue = @LogSPData
+				, @TrackingValue2 = @logSPDataOld
+				, @duration = @duration
+		END CATCH
+	END
+
+	IF ISNULL(@ChargeSettingXML, '') = ''
+		RETURN
 	-- parse XML
 	DECLARE @ChargeSetting AS TABLE (Idx INT IDENTITY(1,1), ChargeID INT,ProductId INT, FirstBilling DATE, BasicBilling VARCHAR(125), Rate MONEY, ChargeType INT, FromDate DATE, ToDate DATE, IsEdit BIT)
 	DECLARE @ChargeRate AS TABLE (ChargeID INT,ProductId INT, FromDate DATE, ToDate DATE)
 	DECLARE @idoc AS INT
 	EXEC sp_xml_preparedocument @idoc OUTPUT, @ChargeSettingXML
-
-	INSERT INTO @ChargeSetting(ChargeId, ProductId, FirstBilling, BasicBilling, Rate, ChargeType, FromDate, ToDate, IsEdit)
-	SELECT ISNULL(ChargeID, 0), ProductId, FirstBilling, BasicBilling, Rate, ChargeType, FromDate, ToDate, IsEdit
-	FROM OPENXML(@idoc, 'ChargeSettings/ChargeSetting')
-	WITH (				
-		 ChargeId		INT				'ChargeId'
-		, ProductId		INT				'ProductId'
-		, FirstBilling	DATE			'FirstBilling'
-		, BasicBilling	VARCHAR(125)	'BasicBilling'
-		, Rate			MONEY			'Rate'
-		, ChargeType	INT				'ChargeType'
-		, FromDate		DATE			'FromDate'
-		, ToDate		DATE			'ToDate'
-		, IsEdit		BIT				'IsEdit' 
-	)
+	BEGIN TRY
+		INSERT INTO @ChargeSetting(ChargeId, ProductId, FirstBilling, BasicBilling, Rate, ChargeType, FromDate, ToDate, IsEdit)
+		SELECT ISNULL(ChargeID, 0), ProductId, FirstBilling, BasicBilling, Rate, ChargeType, FromDate, ToDate, IsEdit
+		FROM OPENXML(@idoc, 'ChargeSettings/ChargeSetting')
+		WITH (				
+			 ChargeId		INT				'ChargeId'
+			, ProductId		INT				'ProductId'
+			, FirstBilling	DATE			'FirstBilling'
+			, BasicBilling	VARCHAR(125)	'BasicBilling'
+			, Rate			MONEY			'Rate'
+			, ChargeType	INT				'ChargeType'
+			, FromDate		DATE			'FromDate'
+			, ToDate		DATE			'ToDate'
+			, IsEdit		BIT				'IsEdit' 
+		)
+	END TRY
+	BEGIN CATCH 
+		SELECT 	@ErrMsg = 'Update failed. Please try again.', @ErrCode = 701	
+		RETURN
+	END CATCH
 	EXEC sp_xml_removedocument @idoc
+	-- check  0 < rate < 1
+	IF EXISTS (SELECT 1 FROM @ChargeSetting WHERE Rate < 0 OR Rate > 1)
+	BEGIN
+		SELECT 	@ErrMsg = 'Update failed. Please try again.', @ErrCode = 701	
+		RETURN
+	END
 	--get list Product
 	SELECT @ProductListAll = @ProductListAll + ProductPrefix + ','
 	FROM dbo.LA_f_Products3rd('')
 	SET @ProductListAll = REPLACE(SUBSTRING(@ProductListAll, 0, LEN(@ProductListAll)), 'RB', '')
-
+	
 	--get Minium date, maximum date
 	SELECT @MinDate = MIN(ci.FromDate)
 		, @MaxDate = MAX(ci.ToDate)
@@ -92,11 +162,12 @@ BEGIN
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
 
 	-- check overlap time charge
-	INSERT INTO @ChargeSetting(ChargeID, ProductId, FromDate, ToDate)
-	SELECT ChargeID, ProductId, FromDate, ToDate 
-	FROM dbo.LA_f_ChargeInfo(@PayerID, @MinDate, @MaxDate ,@ProductListAll, 'OA', 1)	
-	WHERE ChargeID NOT IN (SELECT ChargeID FROM @ChargeSetting)
-
+	INSERT INTO @ChargeSetting(ChargeId, ProductId, FirstBilling, BasicBilling, Rate, ChargeType, FromDate, ToDate)
+	SELECT a.ChargeId, a.ProductId, b.FirstOfBilling, b.BasicOfBilling, Rate, ChargeType, a.FromDate, a.ToDate
+	FROM dbo.LA_f_ChargeInfo(@PayerID, @MinDate, @MaxDate ,@ProductListAll, 'OA', 1) a	
+		INNER JOIN dbo.OAS_ChargeInfo b WITH (NOLOCK) ON a.ChargeID = b.ChargeID
+	WHERE a.ChargeID NOT IN (SELECT ChargeID FROM @ChargeSetting)	
+	
 	---check case Update , compare new data with old config 
 	IF NOT EXISTS (
 			SELECT TOP 1 1
@@ -115,15 +186,16 @@ BEGIN
 				SET @xml = (
 						SELECT	ci.ChargeId				AS '@c'
 								, ci.FromParty			AS '@fp'  
-								, cs.ProductId			AS '@tp'
+								, ci.ProductId			AS '@tp'
 								, ci.FirstOfBilling		AS '@fb'
 								, ci.BasicOfBilling		AS '@bb'
 								, ci.Rate				AS '@r'
 								, ci.ChargeType			AS '@ct'
 								, ci.FromDate			AS '@fd'
 								, ci.ToDate				AS '@td'
+								, ci.BaseCurrencyId		AS '@e'
 						FROM @ChargeSetting  cs
-							INNER JOIN OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID
+							INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID AND cs.IsEdit = 1
 						FOR XML PATH('z'), ROOT('r')			
 						)
 				SET @logSPDataOld = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"');
@@ -136,7 +208,8 @@ BEGIN
 								, t.BasicOfBilling = s.BasicBilling
 								, t.Rate = s.Rate
 								, t.FromDate = s.FromDate
-								, t.ToDate = s.ToDate;			
+								, t.ToDate = s.ToDate
+								, t.BaseCurrencyId = @ExchangeID;			
 				
 				IF @@ERROR <> 0
 				BEGIN
@@ -154,23 +227,58 @@ BEGIN
 								, cs.ChargeType			AS '@ct'
 								, cs.FromDate			AS '@fd'
 								, cs.ToDate				AS '@td'
+								, @ExchangeID			AS '@e'
 						FROM @ChargeSetting  cs
-							INNER JOIN OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID
+							INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID AND cs.IsEdit = 1
 						FOR XML PATH('z'), ROOT('r')			
 						)
 				SET @logSPData = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"');
 				SET @endRun = GETDATE()
 				SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
+
+				--Write Log		
+				BEGIN TRY
+					EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog 
+						@UserId = @UserID
+						, @IP = @LoginIP
+						, @LicenseeID = 0
+						, @CurrencyID = 0
+						, @SPName = 'LA_ChargeRateSettingModify'
+						, @CustId = 0
+						, @ActionId = @ActionID
+						, @Duration = @duration
+						, @Data = @logSPData
+						, @OldData = @logSPDataOld
+				END TRY
+				BEGIN CATCH
+					EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP 
+						@UserID = @UserID
+						, @CustID = 0
+						, @ActionID = @ActionID
+						, @TrackingValue = @LogSPData
+						, @TrackingValue2 = @logSPDataOld
+						, @duration = @duration
+				END CATCH
 			END
 			-- Case Insert			
-			ELSE
+			IF EXISTS (SELECT TOP 1 1 FROM @ChargeSetting cs WHERE IsEdit = 0)
 			BEGIN 
+
 				DECLARE @ToParty INT, @ParentChargeID INT, @Remark VARCHAR(200) = ''
+
 				SELECT @ToParty = c.ToParty
 					, @ParentChargeID = c.ParentChargeID
 				FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
-					INNER JOIN @ChargeSetting cs ON c.FromParty = @PayerID AND c.ChargeType = cs.ChargeType
-					WHERE FromParty = @PayerID	
+					INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON c.ChargeID = cs.ChargeID
+						AND cs.SystemID = 2
+				WHERE FromParty = @PayerID
+					AND c.FromDate = (
+						SELECT MAX(c.FromDate)
+						FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
+						INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON c.ChargeID = cs.ChargeID
+							AND cs.SystemID = 2
+						WHERE FromParty = @PayerID
+						)
 										
 				SET @Remark = @Remark + 'created date: ' + CONVERT(VARCHAR(20), GETDATE(), 101)
 				
@@ -190,9 +298,21 @@ BEGIN
 					RETURN
 				END
 							
-				INSERT INTO LA_ChargeInfo_SystemMapping (ChargeID, SystemID)
-				SELECT ChargeID, 2
-				FROM @ChargeID
+				IF ISNULL(@ParentChargeID, 0) = 1				
+				BEGIN
+					INSERT INTO LA_ChargeInfo_SystemMapping (ChargeID, SystemID)
+					SELECT ChargeID, 2
+					FROM @ChargeID
+					UNION 
+					SELECT ChargeID, 4
+					FROM @ChargeID
+				END
+				ELSE 
+				BEGIN 
+					INSERT INTO LA_ChargeInfo_SystemMapping (ChargeID, SystemID)
+					SELECT ChargeID, 2
+					FROM @ChargeID
+				END
 
 				IF @@ERROR <> 0
 				BEGIN
@@ -207,20 +327,45 @@ BEGIN
 				SET @xml = (
 						SELECT	ci.ChargeId				AS '@c'
 								, ci.FromParty			AS '@fp'  
-								, cs.ProductId			AS '@tp'
-								, cs.FirstBilling		AS '@fb'
-								, cs.BasicBilling		AS '@bb'
-								, cs.Rate				AS '@r'
-								, cs.ChargeType			AS '@ct'
-								, cs.FromDate			AS '@fd'
-								, cs.ToDate				AS '@td'
-						FROM @ChargeSetting  cs
-							INNER JOIN OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID
+								, ci.ProductId			AS '@tp'
+								, ci.FirstOfBilling		AS '@fb'
+								, ci.BasicOfBilling		AS '@bb'
+								, ci.Rate				AS '@r'
+								, ci.ChargeType			AS '@ct'
+								, ci.FromDate			AS '@fd'
+								, ci.ToDate				AS '@td'
+								, ci.BaseCurrencyId		As '@e'
+						FROM @ChargeID cs
+							INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID
 						FOR XML PATH('z'), ROOT('r')			
 						)
 				SET @logSPData = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"');
 				SET @endRun = GETDATE()
 				SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
+				SET @logSPDataOld = NULL
+				--Write Log		
+				BEGIN TRY
+					EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog 
+						@UserId = @UserID
+						, @IP = @LoginIP
+						, @LicenseeID = 0
+						, @CurrencyID = 0
+						, @SPName = 'LA_ChargeRateSettingModify'
+						, @CustId = 0
+						, @ActionId = @ActionID
+						, @Duration = @duration
+						, @Data = @logSPData
+						, @OldData = @logSPDataOld
+				END TRY
+				BEGIN CATCH
+					EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP 
+						@UserID = @UserID
+						, @CustID = 0
+						, @ActionID = @ActionID
+						, @TrackingValue = @LogSPData
+						, @TrackingValue2 = @logSPDataOld
+						, @duration = @duration
+				END CATCH
 			END
 	END
 	ELSE
@@ -237,34 +382,7 @@ BEGIN
 			, @ErrCode = 700
 		RETURN		
 	END
-	--Write Log		
-	DECLARE @ActionID INT = 0
-	SELECT @ActionID = ActionId
-	FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
-	WHERE SPName = 'LA_ChargeRateSettingModify'
 	
-	BEGIN TRY
-		EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog 
-			@UserId = @UserID
-			, @IP = @LoginIP
-			, @LicenseeID = 0
-			, @CurrencyID = 0
-			, @SPName = 'LA_ChargeRateSettingModify'
-			, @CustId = 0
-			, @ActionId = @ActionID
-			, @Duration = @duration
-			, @Data = @logSPData
-			, @OldData = @logSPDataOld
-	END TRY
-	BEGIN CATCH
-		EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP 
-			@UserID = @UserID
-			, @CustID = 0
-			, @ActionID = @ActionID
-			, @TrackingValue = @LogSPData
-			, @TrackingValue2 = @logSPDataOld
-			, @duration = @duration
-	END CATCH
 END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_ChargeRateSettingModify] TO [vnteam] 

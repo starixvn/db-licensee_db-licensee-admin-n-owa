@@ -49,7 +49,7 @@ BEGIN
 		RETURN
 	END
 	---check case Update , compare new data with old config 
-	IF NOT EXISTS (SELECT 1 FROM @Minfee)
+	IF EXISTS (SELECT 1 FROM @Minfee)
 	BEGIN	
 		SET @xml = (
 				SELECT	m.MinFeeId				AS '@m'

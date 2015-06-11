@@ -123,7 +123,7 @@ BEGIN
 	--Delete ChargeRate
 	--Delete mapping
 	DECLARE @i INT = 0
-	WHILE (@i < (SELECT MAX(Idx) FROM @ChargeDetail))
+	WHILE (@i <= (SELECT MAX(Idx) FROM @ChargeDetail))
 	BEGIN
 		DECLARE @TempChargeId INT
 		SELECT @TempChargeId = ChargeID FROM @ChargeDetail WHERE Idx = @i
@@ -144,7 +144,7 @@ BEGIN
 	--Delete Minfee
 	--Delete Waive
 	SET @i = 0
-	WHILE (@i < (SELECT MAX(Idx) FROM @Minfee))
+	WHILE (@i <= (SELECT MAX(Idx) FROM @Minfee))
 	BEGIN
 		DECLARE @TempMinfeeId INT
 		SELECT @TempMinfeeId = MinfeeId FROM @Minfee WHERE Idx = @i
@@ -166,7 +166,7 @@ BEGIN
 	--Delete Discount
 	--Delete Rebate
 	SET @i = 0
-	WHILE (@i < (SELECT MAX(Idx) FROM @Discount))
+	WHILE (@i <= (SELECT MAX(Idx) FROM @Discount))
 	BEGIN
 		DECLARE @TempDiscountGroupId INT
 		SELECT @TempDiscountGroupId = DiscountGroupId FROM @Discount WHERE Idx = @i

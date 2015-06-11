@@ -21,22 +21,16 @@ AS
 	 Example:
 		EXEC dbo.LA_ProductListByPayerSel 0
 */
-SET NOCOUNT ON
 BEGIN
-
-	WITH cte_Product (ProductID, ProductPrefix, ProductName)
-	AS 
-	(
-		SELECT ProductID, ProductPrefix, ProductName
-		FROM dbo.[LA_f_Products3rd]('') -- get all
-	)
+	SET NOCOUNT ON	
 	SELECT c.ProductID, pd.ProductPrefix, pd.ProductName
 	FROM dbo.OAS_Party p WITH (NOLOCK)
 		INNER JOIN dbo.OAS_ChargeInfo c WITH (NOLOCK) ON p.PartyID = c.FromParty
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON c.ChargeID = cs.ChargeID AND cs.SystemID = 2
-		LEFT JOIN cte_Product pd ON c.ProductID = pd.ProductID	
+		LEFT JOIN dbo.LA_f_Products3rd('') pd ON c.ProductID = pd.ProductID	
 	WHERE (@PayerId = 0 OR p.PartyID = @PayerId)
-	GROUP BY c.ProductID, pd.ProductPrefix, pd.ProductName	
+	GROUP BY c.ProductID, pd.ProductPrefix, pd.ProductName
+	
 	
 END
 GO

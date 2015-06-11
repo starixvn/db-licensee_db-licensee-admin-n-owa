@@ -22,8 +22,8 @@ AS
 		EXEC dbo.LA_PayerListSel 0
 */
 BEGIN	
-SET NOCOUNT ON
-	WITH cte_BillerPayer(FromPartyId, ToPartyID)
+	SET NOCOUNT ON
+	;WITH cte_BillerPayer(FromPartyId, ToPartyID)
 	AS 
 	(
 		SELECT FromPartyId, ToPartyID 
@@ -31,11 +31,7 @@ SET NOCOUNT ON
 		GROUP BY FromPartyId, ToPartyID 	
 	)
 	SELECT p.PartyID		AS PayerID
-		, CASE 
-			WHEN ISNULL(pd.BrandName, '') != '' 
-				THEN pd.BrandName 
-			ELSE p.PartyName 
-		  END				AS PayerName
+		, p.PartyName		AS PayerName
 		, pd.BrandName
 		, pd.CompanyName
 		, COUNT(i.ToPartyId) AS NumberOfBillers	

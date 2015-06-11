@@ -39,8 +39,9 @@ BEGIN
 			INNER JOIN dbo.LA_PartyGroup h WITH(NOLOCK) ON a.PartyGroupId = h.PartyGroupId		
 
 	--list of payers not in group
-	SELECT p.PartyId, PartyName, BrandName--, ParentId
+	SELECT p.PartyId, p.PartyName, p.BrandName--, ParentId
 	FROM @PartyList p
+		INNER JOIN dbo.OAS_Party pp WITH (NOLOCK) ON p.PartyId = pp.PartyID AND pp.PartyType IN (1)
 	WHERE p.ParentId NOT IN (999) 
 		AND p.PartyId NOT IN (999)
 		AND p.PartyId NOT IN (SELECT PartyId FROM @PartyIds)

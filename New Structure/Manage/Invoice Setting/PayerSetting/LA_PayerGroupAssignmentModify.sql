@@ -36,7 +36,8 @@ SET NOCOUNT ON
 		, @xml XML
 	-- Time start
 	SET @startRun = GETDATE()
-
+	IF ISNULL(@PayerGroupId, 0) = 0
+		RETURN
 	DECLARE @PayerGroupList AS TABLE (PayerGroupId INT, PartyID INT)		
 
 	INSERT INTO @PayerGroupList(PayerGroupId, PartyID)

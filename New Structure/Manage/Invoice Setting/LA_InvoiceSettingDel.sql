@@ -20,7 +20,28 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:     
-	 Params:	
+	 Params:
+		+ @InvoiceSettingXML: '<InvoiceSettings>
+									<InvoiceSetting>
+										<InvoiceTypeId>1</InvoiceTypeId>  
+										<InvoiceTemplateId>1</InvoiceTemplateId>
+										<ProductIds ProductId = "1"></ProductIds>
+										<ProductIds ProductId = "3"></ProductIds>
+										<ProductIds ProductId = "5"></ProductIds>
+									</InvoiceSetting>
+							
+									<InvoiceSetting>
+										<InvoiceTypeId>2</InvoiceTypeId>  
+										<InvoiceTemplateId>1</InvoiceTemplateId>
+										<ProductIds />
+									</InvoiceSetting>
+							
+									<InvoiceSetting>
+										<InvoiceTypeId>3</InvoiceTypeId>  
+										<InvoiceTemplateId>3</InvoiceTemplateId>
+										<ProductIds />
+									</InvoiceSetting>
+								</InvoiceSettings>'	
 */
 BEGIN
 	SET NOCOUNT ON

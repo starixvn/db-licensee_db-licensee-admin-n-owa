@@ -45,14 +45,14 @@ SET NOCOUNT ON
 	END
 	
 	-- TODO: check exists issue invoice
-	IF EXISTS (SELECT 1 
-				FROM dbo.LA_PartyGroupAssignment a WITH (NOLOCK) 
-				WHERE PartyGroupId = @PayerGroupId
-					--AND EXISTS (SELECT 1 FROM dbo.la_invHeader h WHERE a.PartyId = h.PartyID)
-				)
-	BEGIN
-		RETURN
-	END
+	--IF EXISTS (SELECT 1 
+	--			FROM dbo.LA_PartyGroupAssignment a WITH (NOLOCK) 
+	--			WHERE PartyGroupId = @PayerGroupId
+	--				--AND EXISTS (SELECT 1 FROM dbo.la_invHeader h WHERE a.PartyId = h.PartyID)
+	--			)
+	--BEGIN
+	--	RETURN
+	--END
 	
 	IF NOT EXISTS (SELECT 1 
 					FROM dbo.LA_PartyGroup pg WITH (NOLOCK) 
