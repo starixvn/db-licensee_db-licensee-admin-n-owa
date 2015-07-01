@@ -20,6 +20,7 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:     
+		- 20150618@Florent: add column Currency to LA_Minfee  
 	 Params:				
 */
 BEGIN
@@ -57,6 +58,7 @@ BEGIN
 						, m.FeeTypeId			AS '@ft'
 						, m.ProductId			AS '@pr'
 						, m.FeeAmount			AS '@fa'						
+						, m.CurrencyId			AS '@c'						
 						, m.FromDate			AS '@fd'
 						, m.ToDate				AS '@td'
 						, m.MinFeeTerm			AS '@mft'

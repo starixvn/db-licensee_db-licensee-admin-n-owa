@@ -14,7 +14,8 @@ AS
 	 Task : Get Payer setting
 	 DB: DB052.bodb_Licensee  
    
-	 Revisions:     		  
+	 Revisions:  
+		- 20150618@Florent: add column Currency to LA_Minfee   		  
 	 Params:
 		+ @PayerId :specify Party
 		+ @@PayerGroup :	0 get all Party
@@ -24,7 +25,7 @@ AS
 		+ @@RebateGroup :	0 get all Party
 							<> 0 specify Party
 	 Example:
-		exec [LA_PayerSettingDetailSel] 15
+				exec [LA_PayerSettingDetailSel_xtest] 15
 */
 BEGIN
 	SET NOCOUNT ON
@@ -35,7 +36,7 @@ BEGIN
 
 	SET @CurrentDate = CONVERT(DATE, GETDATE())
 	DECLARE @ChargeInfo AS TABLE (ChargeId INT, PartyId INT, ProductId INT, Rate MONEY, ChargeType SMALLINT, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), BasicOfBilling VARCHAR(512), ExchangeID INT)	
-	DECLARE @Minfee AS TABLE(FeeId INT, PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, MinFeeTerm VARCHAR(200), FromDate DATE, ToDate DATE)
+	DECLARE @Minfee AS TABLE(FeeId INT, PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, CurrencyId INT, MinFeeTerm VARCHAR(1000), FromDate DATE, ToDate DATE)
 	DECLARE @PayerSettingHeader AS TABLE(PartyId INT, PayerGroupID INT, PayerGroupName VARCHAR(100), ExchangeID INT, DiscountGroupID INT, DiscountGroupName VARCHAR(100), RebateGroupID INT, RebateGroupName VARCHAR(100))
 	DECLARE @Discount AS TABLE(PartyId INT, ProductId INT, FromDate DATE, ToDate DATE,DiscountGroupId INT, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
 
@@ -67,8 +68,8 @@ BEGIN
 		LEFT JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 	
 	--======Min fee Area ===---
-	INSERT INTO @Minfee(FeeId, PartyId, ProductId, FeeTypeId, FeeAmount,MinFeeTerm, FromDate, ToDate)
-	SELECT MinFeeId , PartyId, ProductId, FeeTypeId, FeeAmount, MinFeeTerm, FromDate, ToDate 
+	INSERT INTO @Minfee(FeeId, PartyId, ProductId, FeeTypeId, FeeAmount, CurrencyId, MinFeeTerm, FromDate, ToDate)
+	SELECT MinFeeId , PartyId, ProductId, FeeTypeId, FeeAmount, CurrencyId, MinFeeTerm, FromDate, ToDate 
 	FROM dbo.LA_MinFee WITH (NOLOCK)
 	WHERE PartyId = @PayerId
 
@@ -121,20 +122,23 @@ BEGIN
 		, c.FromDate
 		, c.ToDate
 	FROM @ChargeInfo c
-		LEFT JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
+		LEFT JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID		
 	--Minfee Setting
 	SELECT  m.FeeId			AS MinFeeId
 		, PartyId			AS PayerID
 		, m.ProductId		AS ProductId
 		, pr.ProductName	AS ProductName
 		, FeeAmount
+		, CurrencyId
+		, e.Code			AS CurrencyName
 		, MinFeeTerm
 		, FromDate
 		, ToDate
 	FROM @Minfee m
 		LEFT JOIN dbo.LA_f_Products3rd('') pr ON m.ProductID = pr.ProductID
+		LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON m.CurrencyId = e.exchangeid
 	WHERE FeeTypeId = 1 -- Miniumfee
-
+	 
 	--Waive Setting
 	SELECT w.FeeId			AS WaiveId
 		, PartyId			AS PayerID
@@ -145,7 +149,8 @@ BEGIN
 	FROM @Minfee w
 		LEFT JOIN dbo.LA_f_Products3rd('') pr ON w.ProductID = pr.ProductID
 	WHERE w.FeeTypeId = 2 -- waive	
-END			 	
+END
+			 	
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_PayerSettingDetailSel] TO [vnteam] 
 GRANT EXECUTE ON [dbo].[LA_PayerSettingDetailSel] TO bodbAdminNet
