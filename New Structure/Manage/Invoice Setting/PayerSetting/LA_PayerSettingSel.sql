@@ -18,6 +18,7 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:     		  
+		-20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
 	 Params:
 		+ @PayerId : 0 get all Party
 					<> 0 specify Party
@@ -99,7 +100,7 @@ BEGIN
 		, c.Fromdate
 		, c.Todate
 		, ci.FirstOfBilling
-		, ci.BaseCurrencyId
+		, pd.BaseCurrencyId
 		, ISNULL(e.Code, '') AS ExchangeName
 	FROM #Temp_ChargeInfo c
 		INNER JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID
@@ -108,7 +109,7 @@ BEGIN
 		LEFT JOIN dbo.LA_PartyGroup pg WITH (NOLOCK) ON pga.PartyGroupId = pg.PartyGroupId
 		INNER JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
 		INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
-		LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON ci.BaseCurrencyId = e.exchangeid
+		LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON pd.BaseCurrencyId = e.exchangeid
 	WHERE @CurrentDate BETWEEN c.Fromdate AND c.Todate
 
 	INSERT INTO @Minfee(PartyId, ProductId, FeeTypeId, FeeAmount, FromDate, ToDate)

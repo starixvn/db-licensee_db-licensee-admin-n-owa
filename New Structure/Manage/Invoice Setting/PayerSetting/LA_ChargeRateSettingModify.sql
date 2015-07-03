@@ -22,6 +22,7 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:     
+		-20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
 	 Params:		
 		+ @InvoiceSettingXML: '<ChargeSettings>
 								  <ChargeSetting>
@@ -66,7 +67,7 @@ BEGIN
 	DECLARE @OldExchangeID INT
 
 	--backup old data, 	
-	SELECT @OldExchangeID = ISNULL(BaseCurrencyId, 0) FROM dbo.OAS_ChargeInfo WITH (NOLOCK) WHERE FromParty = @PayerID AND BaseCurrencyId IS NOT NULL
+	SELECT @OldExchangeID = ISNULL(BaseCurrencyId, 0) FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE PartyID = @PayerID AND BaseCurrencyId IS NOT NULL
 
 	IF (ISNULL(@ExchangeID, 0)  <> ISNULL(@OldExchangeID, 0))
 	BEGIN
@@ -78,9 +79,9 @@ BEGIN
 				)
 		SET @logSPDataOld = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"');
 
-		UPDATE dbo.OAS_ChargeInfo WITH( ROWLOCK, UPDLOCK)
+		UPDATE dbo.OAS_PartyDetail WITH( ROWLOCK, UPDLOCK)
 		SET BaseCurrencyId = @ExchangeID
-		WHERE FromParty = @PayerID
+		WHERE PartyID = @PayerID
 
 		SET @xml = (
 				SELECT @PayerID				AS '@fp'
@@ -192,8 +193,7 @@ BEGIN
 								, ci.Rate				AS '@r'
 								, ci.ChargeType			AS '@ct'
 								, ci.FromDate			AS '@fd'
-								, ci.ToDate				AS '@td'
-								, ci.BaseCurrencyId		AS '@e'
+								, ci.ToDate				AS '@td'								
 						FROM @ChargeSetting  cs
 							INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID AND cs.IsEdit = 1
 						FOR XML PATH('z'), ROOT('r')			
@@ -208,8 +208,7 @@ BEGIN
 								, t.BasicOfBilling = s.BasicBilling
 								, t.Rate = s.Rate
 								, t.FromDate = s.FromDate
-								, t.ToDate = s.ToDate
-								, t.BaseCurrencyId = @ExchangeID;			
+								, t.ToDate = s.ToDate;										
 				
 				IF @@ERROR <> 0
 				BEGIN
@@ -284,10 +283,10 @@ BEGIN
 				
 				DECLARE @ChargeID AS TABLE (ChargeID INT)
 					
-				INSERT INTO dbo.OAS_ChargeInfo WITH (ROWLOCK, UPDLOCK)(ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasicOfBilling)
+				INSERT INTO dbo.OAS_ChargeInfo WITH (ROWLOCK, UPDLOCK)(ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, Remark, FirstOfBilling, BasicOfBilling)
 				OUTPUT INSERTED.ChargeID
 				INTO @ChargeID
-				SELECT ProductId, @PayerID, @ToParty, @ParentChargeID, Rate, ChargeType, FromDate, ToDate, @Remark, @ExchangeId, FirstBilling, BasicBilling
+				SELECT ProductId, @PayerID, @ToParty, @ParentChargeID, Rate, ChargeType, FromDate, ToDate, @Remark, FirstBilling, BasicBilling
 				FROM @ChargeSetting					
 				WHERE ChargeID = 0 
 					AND IsEdit = 0
@@ -334,7 +333,6 @@ BEGIN
 								, ci.ChargeType			AS '@ct'
 								, ci.FromDate			AS '@fd'
 								, ci.ToDate				AS '@td'
-								, ci.BaseCurrencyId		As '@e'
 						FROM @ChargeID cs
 							INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID
 						FOR XML PATH('z'), ROOT('r')			

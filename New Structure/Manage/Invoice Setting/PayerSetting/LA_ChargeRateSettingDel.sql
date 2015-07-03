@@ -21,6 +21,7 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:     
+		-20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
 	 Params:				
 */
 BEGIN
@@ -49,6 +50,7 @@ BEGIN
 	INSERT INTO @ChargeRate(ChargeID, PartyId, ProductId, FromDate, ToDate)
 	SELECT ChargeID, PartyId, ProductId, FromDate, ToDate 
 	FROM dbo.LA_f_ChargeInfo(@PayerID, @MinDate, @MaxDate ,@ProductListAll, 'OA', 1)		
+	WHERE ChargeID = @ChargeId
 
 	--check validate existing 
 	EXEC dbo.LA_ChargeRateValidate 
@@ -77,7 +79,6 @@ BEGIN
 						, ci.MinAmount			AS '@mi'
 						, ci.MaxAmount			AS '@ma'
 						, ci.Remark				AS '@re'
-						, ci.BaseCurrencyId		AS '@cu'			
 						, ci.FirstOfBilling		AS '@fb'
 						, ci.BasicOfBilling		AS '@bb'
 				FROM @ChargeRate cs
@@ -88,7 +89,7 @@ BEGIN
 		
 		DELETE dbo.OAS_ChargeInfo WITH (ROWLOCK, UPDLOCK)
 		WHERE ChargeID = @ChargeId AND FromParty = @PayerId
-
+		
 		IF @@ERROR <> 0
 		BEGIN
 			SELECT 	@ErrMsg = 'Delete failed. Please try again.', @ErrCode = 710	

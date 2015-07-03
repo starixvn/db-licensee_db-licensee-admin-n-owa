@@ -16,6 +16,7 @@ AS
    
 	 Revisions:  
 		- 20150618@Florent: add column Currency to LA_Minfee   		  
+		- 20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
 	 Params:
 		+ @PayerId :specify Party
 		+ @@PayerGroup :	0 get all Party
@@ -25,7 +26,7 @@ AS
 		+ @@RebateGroup :	0 get all Party
 							<> 0 specify Party
 	 Example:
-				exec [LA_PayerSettingDetailSel_xtest] 15
+				exec [LA_PayerSettingDetailSel] 15
 */
 BEGIN
 	SET NOCOUNT ON
@@ -61,7 +62,7 @@ BEGIN
 		, c.Todate
 		, ci.FirstOfBilling
 		, ci.BasicOfBilling
-		, ci.BaseCurrencyId
+		, pd.BaseCurrencyId
 	FROM dbo.LA_f_ChargeInfo(@PayerId, @MinDate, @MaxDate, @ProductListAll, 'OA', 1) c
 		LEFT JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID
 		LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID				
