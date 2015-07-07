@@ -7,15 +7,15 @@ SET QUOTED_IDENTIFIER ON
 GO
 /****** Object:  Stored Procedure dbo.OA_Rpt_LicPerformance_TurnOver    Script Date: 3/4/2014 4:17:39 PM ******/
 ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_TurnOver] 
-	 @PartyIDs	    VARCHAR(1000)	= ''
-	,@Currency	    INT			= 0
-	,@FromDate	    SMALLDATETIME
-	,@ToDate		    SMALLDATETIME
-	,@ProductCode	    VARCHAR(500)
-	,@IsConvert	    BIT			= 0
-	,@BaseCurrency	    INT			= 0
-	,@drawfilter	    SMALLINT		= 1
-	,@excludeTest	    BIT			= 0
+	 @PartyIDs				VARCHAR(1000)	= ''
+	,	@Currency			INT				= 0
+	,	@FromDate			SMALLDATETIME
+	,	@ToDate				SMALLDATETIME
+	,	@ProductCode		VARCHAR(500)
+	,	@IsConvert			BIT				= 0
+	,	@BaseCurrencyName	VARCHAR(3)		= 'GBP'
+	,	@drawfilter			SMALLINT		= 1
+	,	@excludeTest		BIT				= 0
 WITH RECOMPILE
 AS
  
@@ -26,6 +26,7 @@ AS
    
     Revisions: 
 		- 20141026@Patrick: Optimize code
+		- 20150703@Florent: add GBP
     
     Param's Explanation:  
 	   + @partyIDs : a string of list PartyID, separated by ','
@@ -36,9 +37,6 @@ AS
 	   + @IsConvert: =1 : convert figure to 
 					   =0 : no convert 
 					   (datatype:bit)
-	   + @BaseCurrency -6 : convert to EUR
-					   -2: convert to MYR
-					   -3: convert to USD
 		
 */  
 BEGIN  
@@ -70,18 +68,13 @@ BEGIN
     END
 
     INSERT INTO #Exchange (ExchangeDate, ExchangeId, Rate )
-    SELECT ExchangeDate
-	   , ExchangeId
-	   , CASE @BaseCurrency WHEN -2 THEN MYR
-					   WHEN -3 THEN USD
-					   WHEN -6 THEN EUR
-					   ELSE 1 END AS Rate
-    FROM dbo.Lrf_f_GetExchangeDaily (@fromdate, @todate)
+    SELECT ExchangeDate, ExchangeId, BaseCurrencyRate AS Rate	   
+    FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 							
     IF (@isconvert = 0)
     BEGIN
 	   UPDATE #Exchange
-	   SET Rate=1
+	   SET Rate = 1
     END
 		
     CREATE TABLE #Tmp(PartyId INT, rptDate DATE, CurrencyId INT, TurnOver MONEY)
@@ -145,7 +138,12 @@ BEGIN
     END	
 	
     INSERT INTO #rptTurnOver(PartyName, rptDate, TurnOver)
-    SELECT p.PartyName	   
+    SELECT --p.PartyName	   
+		  CASE p.PartyName
+			 WHEN '18bb' THEN 'PIH'
+			 WHEN 'IBC'  THEN 'FDL'
+		  ELSE p.PartyName
+		  END AS PartyName
 	   , DATENAME(YEAR, t.rptDate)  + '-' + DATENAME(MONTH, t.rptDate)
 	   , SUM(ISNULL(t.TurnOver, 0) * ee.Rate)
     FROM #Tmp t 
@@ -188,8 +186,6 @@ BEGIN
     DROP TABLE #rptTurnOver
     DROP TABLE #Exchange	    
 END
-
-
 GO
 GRANT EXECUTE ON [dbo].[LA_Rpt_LicPerformance_TurnOver] TO [bodbAdminNet]
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicPerformance_TurnOver] TO [vnteam]

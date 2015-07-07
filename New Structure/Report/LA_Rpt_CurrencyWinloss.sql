@@ -6,17 +6,19 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss]  
-	@PartyIDs		VARCHAR(5500)		= '',
-	@Currency		INT				= 0,
-	@FromDate		SMALLDATETIME,  
-	@ToDate		SMALLDATETIME,
-	@ProductCodes	VARCHAR(1000),
-	@SportType	INT				= 0,
-	@Bettype		INT				= 0,
-	@ReportBy		TINYINT			= 0,  
-	@drawfilter	SMALLINT			= 1,
-	@excludeTest	BIT				= 0,
-	@debug		BIT				= 0
+	@PartyIDs				VARCHAR(5500)		= ''
+	, @Currency				INT				= 0
+	, @FromDate				SMALLDATETIME 
+	, @ToDate				SMALLDATETIME
+	, @ProductCodes			VARCHAR(1000)
+	, @SportType			INT				= 0
+	, @Bettype				INT				= 0
+	, @ReportBy				TINYINT			= 0 
+	, @drawfilter			SMALLINT		= 1
+	, @excludeTest			BIT				= 0
+	, @debug				BIT				= 0
+	, @IsConvert			BIT				= 0
+	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
 
 AS  
 
@@ -29,6 +31,7 @@ AS
     Revisions:  
 	   - 20141021@Florent: show credit's licensee
 	   - 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
+	   - 20150703@Florent: add GBP
 	Param's Explanation:  
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;  
 	  +	@drawfilter: 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
@@ -188,7 +191,7 @@ SELECT @sql = @sql + ' INSERT INTO #Bettype(Bettype,ProductID)
 								    THEN 'AND b.IsLive=0 '
 							 ELSE ''
 							 END + CHAR(13) +
-							 '--AND b.customercategory NOT IN (27,28)
+							 'AND b.customercategory NOT IN (27,28)
 						GROUP BY  b.rptDate	
 							 ,b.SiteID 
 							 ,t.PartyID	 
@@ -225,116 +228,83 @@ END
 
 SELECT @sql = @sql + '--Output data from temp table' + CHAR(13)
 
-SELECT @sql = @sql + CHAR(13) + ' SELECT DISTINCT ExchangeDate, ExchangeId, Code, USD, EUR, MYR 
+SELECT @sql = @sql + CHAR(13) + ' SELECT DISTINCT ExchangeDate, ExchangeId, Code, BaseCurrencyRate AS Rate 
 						  INTO #TempExchange 
-						  FROM Lrf_f_GetExchangeDaily(''' + convert(VARCHAR(10), @FromDate, 120) + ''',''' + convert(VARCHAR(10), @ToDate, 120) + ''')' + CHAR(13)
-
+						  FROM dbo.LA_f_ExchangeDailySel(''' + convert(VARCHAR(10), @FromDate, 120) + ''',''' + convert(VARCHAR(10), @ToDate, 120) + ''','''+ CONVERT(VARCHAR(3),@BaseCurrencyName)+''')' + CHAR(13)
+IF @IsConvert = 0
+	BEGIN
+		SELECT @sql = @sql + CHAR(13) + 
+		' UPDATE #TempExchange
+		SET Rate = 1 '+ CHAR(13)
+	END
 SELECT @output1 = 'SELECT ' + CHAR(13) + 
 			 'w.PartyID,' + CHAR(13) + 
 			 'CASE WHEN p.PartyName =''18bb'' THEN ''PIH''
 				    WHEN p.PartyName =''IBC'' THEN ''FDL''
 				    ELSE p.PartyName
 				    END AS PartyName,'  + char(13) +
-			 'SUM(TurnOver) 	AS Turnover,' + CHAR(13) + 
-			 'SUM(Winlost) 		AS Winlost,' + CHAR(13) + 
-			 'SUM(LicenseeWL)  AS LicenseeWL,' + CHAR(13) + 
-			 'SUM(WinlossRB) 	AS WinlossRB,' + CHAR(13) + 
-			 'SUM(CommBA)  AS CommBA,' + CHAR(13) + 
-			 'SUM(CommRB)  AS CommRB,' + CHAR(13) + 
-			 'SUM(AmtDuetoBA)  AS AmtDuetoBA,' + CHAR(13) + 
-			 'SUM(AmtDuetoRB)  AS AmtDuetoRB,' + CHAR(13) + 
-			 'SUM(Company)  AS Company,' + CHAR(13) + 
+			 'SUM(TurnOver * e.Rate) 	AS Turnover,' + CHAR(13) + 
+			 'SUM(Winlost * e.Rate) 		AS Winlost,' + CHAR(13) + 
+			 'SUM(LicenseeWL * e.Rate)  AS LicenseeWL,' + CHAR(13) + 
+			 'SUM(WinlossRB * e.Rate) 	AS WinlossRB,' + CHAR(13) + 
+			 'SUM(CommBA * e.Rate)  AS CommBA,' + CHAR(13) + 
+			 'SUM(CommRB * e.Rate)  AS CommRB,' + CHAR(13) + 
+			 'SUM(AmtDuetoBA * e.Rate)  AS AmtDuetoBA,' + CHAR(13) + 
+			 'SUM(AmtDuetoRB * e.Rate)  AS AmtDuetoRB,' + CHAR(13) + 
+			 'SUM(Company * e.Rate)  AS Company,' + CHAR(13) + 
 			 'SUM(Betcount) 	AS Betcount,' + CHAR(13) + 
-			 'SUM(Playercomm) 	AS Playercomm,' + CHAR(13) + 
-			 'SUM(TurnOver*e.MYR) 	AS TurnoverMYR, ' + CHAR(13) + 
-			 'SUM(Winlost*e.MYR) 	AS WinlostMYR,' + CHAR(13) + 
-			 'SUM(LicenseeWL*e.MYR)  AS LicenseeWLMYR,' + CHAR(13) + 
-			 'SUM(WinlossRB*e.MYR) 	AS WinlossRBMYR,' + CHAR(13) + 
-			 'SUM(CommBA * e.MYR)  AS CommBAMYR,' + CHAR(13) + 
-			 'SUM(CommRB * e.MYR)  AS CommRBMYR,' + CHAR(13) + 
-			 'SUM(AmtDuetoBA*e.MYR)  AS AmtDuetoBAMYR,' + CHAR(13) + 
-			 'SUM(AmtDuetoRB*e.MYR)  AS AmtDuetoRBMYR,' + CHAR(13) + 
-			 'SUM(Company * e.MYR)  AS CompanyMYR,' + CHAR(13) + 
-			 'SUM(Playercomm * e.MYR) 	AS PlayercommMYR,' + CHAR(13) + 
-			 'SUM(TurnOver*e.USD) 	AS TurnoverUSD, ' + CHAR(13) + 
-			 'SUM(Winlost*e.USD) 	AS WinlostUSD,' + CHAR(13) + 
-			 'SUM(LicenseeWL*e.USD)  AS LicenseeWLUSD,' + CHAR(13) + 
-			 'SUM(WinlossRB*e.USD) 	AS WinlossRBUSD,' + CHAR(13) + 
-			 'SUM(CommBA * e.USD)  AS CommBAUSD,' + CHAR(13) + 
-			 'SUM(CommRB * e.USD)  AS CommRBUSD,' + CHAR(13) + 
-			 'SUM(AmtDuetoBA*e.USD)  AS AmtDuetoBAUSD,' + CHAR(13) + 
-			 'SUM(AmtDuetoRB*e.USD)  AS AmtDuetoRBUSD,' + CHAR(13) + 
-			 'SUM(Company * e.USD)  AS CompanyUSD,' + CHAR(13) + 
-			 'SUM(Playercomm * e.USD) 	AS PlayercommUSD,' + CHAR(13) + 
-			 'SUM(TurnOver*e.EUR) 	AS TurnoverEUR, ' + CHAR(13) + 
-			 'SUM(Winlost*e.EUR) 	AS WinlostEUR,' + CHAR(13) + 
-			 'SUM(LicenseeWL*e.EUR)  AS LicenseeWLEUR,' + CHAR(13) + 
-			 'SUM(WinlossRB*e.EUR) 	AS WinlossRBEUR,' + CHAR(13) + 
-			 'SUM(CommBA * e.EUR)  AS CommBAEUR,' + CHAR(13) + 
-			 'SUM(CommRB * e.EUR)  AS CommRBEUR,' + CHAR(13) + 
-			 'SUM(AmtDuetoBA*e.EUR)  AS AmtDuetoBAEUR,' + CHAR(13) + 
-			 'SUM(AmtDuetoRB*e.EUR)  AS AmtDuetoRBEUR,' + CHAR(13) + 
-			 'SUM(Company * e.EUR)  AS CompanyEUR,' + CHAR(13) + 
-			 'SUM(Playercomm * e.EUR) 	AS PlayercommEUR' + CHAR(13) + 
+			 'SUM(Playercomm * e.Rate) 	AS Playercomm' + CHAR(13) + 			 
     'FROM #tmpWinLoss w' + CHAR(13) + 		
     'INNER JOIN #TempExchange e' + CHAR(13) + 'ON w.winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId' + CHAR(13) + 
     'LEFT JOIN bodb_licensee.dbo.OAS_Party p ON w.PartyID = p.PartyID' + CHAR(13) + 
     'GROUP BY w.PartyID,p.PartyName' + CHAR(13) + 'ORDER BY w.PartyID,p.PartyName' + CHAR(13)
 
-SELECT @output2 = 
+SELECT @output2 = '--=====Currency Name
+				 DECLARE @temp AS TABLE (currency INT)
+				 INSERT INTO @temp
+				 SELECT DISTINCT Currency 
+				 FROM  #tmpWinLoss
+
+				 DECLARE @temp1 AS TABLE (currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
+				 INSERT INTO @temp1(currency, CurrencyName, CurrencyCode)
+				 SELECT t.currency, e.currency, e.Code
+				 FROM @temp t
+				 INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON t.currency = e.exchangeid
+
+				 UPDATE t1
+				 SET CurrencyCode = t1.CurrencyCode + ''('' + CurrencyName + '')''
+				 FROM @temp1 t1
+				 INNER JOIN (
+				    SELECT CurrencyCode
+					FROM @temp1
+					GROUP BY CurrencyCode
+					HAVING COUNT(1) > 1
+				 ) t2 ON t1.CurrencyCode = t2.CurrencyCode'+ char(13)
+
+SELECT @output2 = @output2 +
 		  'SELECT '  + char(13) +
-			 'CASE WHEN Currency = 51 THEN ''' + @VNDCurrencyName + ''' ELSE e.Code END currencyName,' + char(13) +
+			 --'CASE WHEN Currency = 51 THEN ''' + @VNDCurrencyName + ''' ELSE e.Code END currencyName,' + char(13) +
+			 'CASE WHEN w.Currency = 51 THEN ''' + @VNDCurrencyName + ''' WHEN w.Currency = 20 THEN e.Code ELSE t.CurrencyCode END currencyName,' + char(13) +
 			 'w.currency,'  + char(13) +
 				
-			 'SUM(TurnOver)	AS Turnover,'  + char(13) +
-			 'SUM(Winlost)		AS Winlost,'  + char(13) +
-			 'SUM(LicenseeWL)   AS LicenseeWL,'  + char(13) +
-			 'SUM(WinlossRB)	AS WinlossRB,'  + char(13) +
-			 'SUM(CommBA) AS CommBA,'  + char(13) +
-			 'SUM(CommRB) AS CommRB,'  + char(13) +
-			 'SUM(AmtDuetoBA) AS AmtDuetoBA,'  + char(13) +
-			 'SUM(AmtDuetoRB) AS AmtDuetoRB,'  + char(13) +
-			 'SUM(Company) AS Company,'  + char(13) +
+			 'SUM(TurnOver * e.Rate)	AS Turnover,'  + char(13) +
+			 'SUM(Winlost * e.Rate)		AS Winlost,'  + char(13) +
+			 'SUM(LicenseeWL * e.Rate)   AS LicenseeWL,'  + char(13) +
+			 'SUM(WinlossRB * e.Rate)	AS WinlossRB,'  + char(13) +
+			 'SUM(CommBA * e.Rate) AS CommBA,'  + char(13) +
+			 'SUM(CommRB * e.Rate) AS CommRB,'  + char(13) +
+			 'SUM(AmtDuetoBA * e.Rate) AS AmtDuetoBA,'  + char(13) +
+			 'SUM(AmtDuetoRB * e.Rate) AS AmtDuetoRB,'  + char(13) +
+			 'SUM(Company * e.Rate) AS Company,'  + char(13) +
 			 'SUM(Betcount)	AS Betcount,'  + char(13) +
-			 'SUM(Playercomm)	AS Playercomm,'  + char(13) +
-				
-			 'SUM(TurnOver*e.MYR)	AS TurnoverMYR, '  + char(13) +
-			 'SUM(Winlost*e.MYR)	AS WinlostMYR,'  + char(13) +
-			 'SUM(LicenseeWL*e.MYR) AS LicenseeWLMYR,'  + char(13) +
-			 'SUM(WinlossRB*e.MYR)	AS WinlossRBMYR,'  + char(13) +
-			 'SUM(CommBA * e.MYR) AS CommBAMYR,'  + char(13) +
-			 'SUM(CommRB * e.MYR) AS CommRBMYR,'  + char(13) +
-			 'SUM(AmtDuetoBA*e.MYR) AS AmtDuetoBAMYR,'  + char(13) +
-			 'SUM(AmtDuetoRB*e.MYR) AS AmtDuetoRBMYR,'  + char(13) +
-			 'SUM(Company * e.MYR) AS CompanyMYR,'  + char(13) +
-			 'SUM(Playercomm * e.MYR)	AS PlayercommMYR,'  + char(13) +
-				
-			 'SUM(TurnOver*e.USD)	AS TurnoverUSD, '  + char(13) +
-			 'SUM(Winlost*e.USD)	AS WinlostUSD,'  + char(13) +
-			 'SUM(LicenseeWL*e.USD) AS LicenseeWLUSD,'  + char(13) +
-			 'SUM(WinlossRB*e.USD)	AS WinlossRBUSD,'  + char(13) +
-			 'SUM(CommBA * e.USD) AS CommBAUSD,'  + char(13) +
-			 'SUM(CommRB * e.USD) AS CommRBUSD,'  + char(13) +
-			 'SUM(AmtDuetoBA*e.USD) AS AmtDuetoBAUSD,'  + char(13) +
-			 'SUM(AmtDuetoRB*e.USD) AS AmtDuetoRBUSD,'  + char(13) +
-			 'SUM(Company * e.USD) AS CompanyUSD,'  + char(13) +
-			 'SUM(Playercomm * e.USD)	AS PlayercommUSD,'  + char(13) +
-				
-			 'SUM(TurnOver*e.EUR)	AS TurnoverEUR, '  + char(13) +
-			 'SUM(Winlost*e.EUR)	    AS WinlostEUR,'  + char(13) +
-			 'SUM(LicenseeWL*e.EUR)   AS LicenseeWLEUR,'  + char(13) +
-			 'SUM(WinlossRB*e.EUR)	AS WinlossRBEUR,'  + char(13) +
-			 'SUM(CommBA * e.EUR) AS CommBAEUR,'  + char(13) +
-			 'SUM(CommRB * e.EUR) AS CommRBEUR,'  + char(13) +
-			 'SUM(AmtDuetoBA*e.EUR) AS AmtDuetoBAEUR,'  + char(13) +
-			 'SUM(AmtDuetoRB*e.EUR) AS AmtDuetoRBEUR,'  + char(13) +
-			 'SUM(Company * e.EUR) AS CompanyEUR,'  + char(13) +
-			 'SUM(Playercomm * e.EUR)	AS PlayercommEUR'  + char(13) +
+			 'SUM(Playercomm * e.Rate)	AS Playercomm'  + char(13) +				
 		  'FROM #tmpWinLoss w'  + char(13) +	
 			 'INNER JOIN #TempExchange e'+char(13)+
-			 'ON w.winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId'  + char(13) +				
-		  'GROUP BY CASE WHEN Currency = 51 THEN ''' + @VNDCurrencyName + ''' ELSE e.Code END ,w.currency '  + char(13) +
-		  'ORDER BY CASE WHEN Currency = 51 THEN ''' + @VNDCurrencyName + ''' ELSE e.Code END'  + char(13) +
+			 'ON w.winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId'  + char(13) +	
+		  'LEFT JOIN @temp1 t ON w.Currency = t.currency'+ char(13) +	
+		  --'GROUP BY CASE WHEN Currency = 51 THEN ''' + @VNDCurrencyName + ''' ELSE e.Code END ,w.currency '  + char(13) +
+		  'GROUP BY CASE WHEN w.Currency = 51 THEN ''' + @VNDCurrencyName + ''' WHEN w.Currency = 20 THEN e.Code ELSE t.CurrencyCode END ,w.currency '  + char(13) +
+		  'ORDER BY CASE WHEN w.Currency = 51 THEN ''' + @VNDCurrencyName + ''' WHEN w.Currency = 20 THEN e.Code ELSE t.CurrencyCode END'  + char(13) +
 		  'DROP TABLE #tmpWinLoss' + char(13) +
 		  'DROP TABLE #Bettype' + char(13) +
 		  'DROP TABLE #tmpParty' + char(13) +

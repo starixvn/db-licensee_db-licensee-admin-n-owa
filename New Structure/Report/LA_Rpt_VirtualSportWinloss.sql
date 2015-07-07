@@ -8,13 +8,15 @@ GO
 
 /****** Object:  Stored Procedure dbo.OA_Rpt_VirtualSportWinloss    Script Date: 9/10/2013 2:32:36 PM ******/
 ALTER PROCEDURE [dbo].[LA_Rpt_VirtualSportWinloss]      	
-	@PartyIDs		VARCHAR(5500),  
-	@FromDate		SMALLDATETIME,    
-	@ToDate		SMALLDATETIME,    
-	@SportType	INT=0,
-	@BetType		INT=0,
-	@drawfilter	SMALLINT= 1,
-	@excludeTest	BIT= 0	
+	@PartyIDs				VARCHAR(5500) 
+	, @FromDate				SMALLDATETIME    
+	, @ToDate				SMALLDATETIME    
+	, @SportType			INT				= 0
+	, @BetType				INT				= 0
+	, @drawfilter			SMALLINT		= 1
+	, @excludeTest			BIT				= 0
+	, @IsConvert			BIT				= 1
+	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'	
 AS      
   
 /*  
@@ -25,6 +27,7 @@ AS
  * Revisions :  
 	   - 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
 	   - 20150326@Florent: fix filter drawfilter
+	   - 20150703@Florent: add GBP
  * Param's Explanation:    
  *  - @FromDate   : From date   
  *  - @ToDate   : To date  
@@ -141,9 +144,16 @@ END
 
 CREATE NONCLUSTERED INDEX IDX_Currency ON #Data(Currency)
 
-SELECT DISTINCT ExchangeDate, ExchangeId, USD, EUR, MYR INTO #TempExchange 
-FROM Lrf_f_GetExchangeDaily(@FromDate,@ToDate)
+SELECT DISTINCT ExchangeDate, ExchangeId, BaseCurrencyRate AS Rate 
+INTO #TempExchange	
+FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName) 
 WHERE exchangeid IN (SELECT DISTINCT Currency FROM #Data)
+	
+IF @IsConvert = 0
+BEGIN
+	UPDATE #TempExchange
+	SET Rate = 1
+END
 
 INSERT INTO #Result (PartyID,TurnOver,SportType,BetType,MemberWinloss,GrossWinloss,Betcount,
 OneworksIncome,winlostdate,Currency)
@@ -172,9 +182,9 @@ SELECT
 	re.sporttype,
 	re.bettype,
 	ISNULL(SUM(re.betcount), 0) AS BetCount,
-	CAST(isnull(SUM(re.turnover * ex.EUR),0) AS MONEY) AS Turnover,	
-	CAST(isnull(SUM(re.GrossWinloss * ex.EUR),0) AS MONEY) AS GrossWinloss,	
-	CAST(isnull(SUM(re.OneworksIncome * ex.EUR),0) AS MONEY) AS OneworksIncome	
+	CAST(isnull(SUM(re.turnover * ex.Rate),0) AS MONEY) AS Turnover,	
+	CAST(isnull(SUM(re.GrossWinloss * ex.Rate),0) AS MONEY) AS GrossWinloss,	
+	CAST(isnull(SUM(re.OneworksIncome * ex.Rate),0) AS MONEY) AS OneworksIncome	
 FROM #Result re
     INNER JOIN #TempExchange ex ON re.winlostdate = ex.exchangedate and re.Currency = ex.ExchangeId    
     LEFT JOIN bodb_licensee.dbo.OAS_Party p on re.PartyID = p.PartyID    

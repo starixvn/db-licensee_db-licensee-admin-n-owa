@@ -6,12 +6,14 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 ALTER PROCEDURE [dbo].[LA_Rpt_NumberGameWinloss] 
-	 @PartyIDs	VARCHAR(5500)
-	,@FromDate	SMALLDATETIME
-	,@ToDate		SMALLDATETIME
-	,@Currency	INT			 = 0
-	,@drawfilter	SMALLINT		 = 0
-	,@excludeTest	BIT			 = 0
+	 @PartyIDs				VARCHAR(5500)
+	, @FromDate				SMALLDATETIME
+	, @ToDate				SMALLDATETIME
+	, @Currency				INT				= 0
+	, @drawfilter			SMALLINT		= 0
+	, @excludeTest			BIT				= 0
+	, @IsConvert			BIT				= 1
+	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
 
 AS      
   
@@ -21,6 +23,7 @@ AS
  * DB   : DB052.bodb02  
  * Revisions :  	
     - 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
+	- 20150703@Florent: add GBP
  * Param's Explanation:
  *  
  */  
@@ -84,11 +87,17 @@ BEGIN
 
 	CREATE NONCLUSTERED INDEX IDX_Currency ON #Data(Currency,winlostdate)
 	
-	SELECT DISTINCT ExchangeDate, ExchangeId, USD, EUR, MYR
+	SELECT DISTINCT ExchangeDate, ExchangeId, BaseCurrencyRate AS Rate 
 	INTO #Exchange	
-	FROM Lrf_f_GetExchangeDaily(@FromDate,@ToDate) 
+	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName) 
 	WHERE exchangeid IN (SELECT DISTINCT Currency FROM #Data)
 	
+	IF @IsConvert = 0
+	BEGIN
+		UPDATE #Exchange
+		SET Rate = 1
+	END
+
 	BEGIN
 		INSERT INTO #Result(PartyID, TurnOver, MemberWinloss, GrossWinloss,  
 							Betcount,  OneworksRevenue, winlostdate,Currency)
@@ -116,15 +125,15 @@ BEGIN
 		CONVERT(VARCHAR(6),winlostdate,112)   AS Winlostdate,
 		SUM(re.betcount) AS BetCount,
 
-		SUM(re.turnover * e.EUR) AS Turnover,
-		SUM(re.MemberWinloss * e.EUR) AS MemberWinloss,
-		CASE WHEN SUM(re.GrossWinloss * e.EUR) <= 0
+		SUM(re.turnover * e.Rate) AS Turnover,
+		SUM(re.MemberWinloss * e.Rate) AS MemberWinloss,
+		CASE WHEN SUM(re.GrossWinloss * e.Rate) <= 0
 			 THEN 0 
-			 ELSE SUM(re.GrossWinloss * e.EUR)
+			 ELSE SUM(re.GrossWinloss * e.Rate)
 		 END AS LicenseeWinloss,
-		CASE WHEN SUM(re.OneworksRevenue * e.EUR) <= 0
+		CASE WHEN SUM(re.OneworksRevenue * e.Rate) <= 0
 			 THEN 0
-			ELSE SUM(re.OneworksRevenue * e.EUR)
+			ELSE SUM(re.OneworksRevenue * e.Rate)
 		END AS OneworksRevenue
 	FROM #Result re
 		INNER JOIN #Exchange e ON re.currency = e.ExchangeId AND re.winlostdate = e.ExchangeDate
