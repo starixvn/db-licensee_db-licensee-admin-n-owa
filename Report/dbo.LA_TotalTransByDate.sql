@@ -17,6 +17,7 @@ AS
    
 	 Revisions:  
 	 --20141225@Winnie:  include AGCasino
+	 - 20150706@Florent: Add Vegas Games, Gold Deluxe
 	 Params:			   
 */
 --declare @Fromdate Datetime,@Todate Datetime
@@ -79,6 +80,16 @@ INNER JOIN dbo.view_site_list [site] (NOLOCK) ON ibcsite.siteid=site.IbcSiteID
 WHERE  c.[Winlostdate] between @Fromdate AND @Todate
 AND c.Currency<>20
 GROUP BY MONTH(c.[Winlostdate]), ISNULL(site.SiteID,-1) 
+--Vegas Game and Gold Deluxe
+INSERT INTO #tmpBetting(rptDate, product, siteID, betcount)
+SELECT MONTH(c.Winlostdate) AS rptDate, p.ProductPrefix AS product, lc.LicenseeID AS siteID, SUM(c.betcount) AS betcount
+FROM bodb_LicenseeReport.dbo.rptDepWinlost_ThirdParty c WITH (NOLOCK)
+	INNER JOIN bodb02.dbo.Custinfo co WITH (NOLOCK) ON c.CustID = co.CustID	
+	INNER JOIN dbo.f_SelLicenseeCust(0) lc ON co.recommend = lc.CustID
+	LEFT JOIN bodb_licensee.dbo.LRF_f_Products3rd('VG,GD') p ON c.ProductId = p.ProductID
+WHERE c.Winlostdate BETWEEN @FromDate AND @Todate
+	AND c.Currency <> 20
+GROUP BY MONTH(c.Winlostdate), p.ProductPrefix, lc.LicenseeID	
 ---------------------------------------------------------------------------------
 
 --DECLARE @product varchar(10)
@@ -110,7 +121,7 @@ FROM (
 				INNER JOIN dbo.Resellers r WITH (NOLOCK) ON lr.ResellerID=r.ResellerID
 				WHERE r.ResellerName ='Boping'
 				) LBP ON b.SiteID = lbp.LicenseeID 
-	WHERE b.product  in ('SB','RB','NG','VS','LC','BA','KN','AGC')
+	WHERE b.product  in ('SB','RB','NG','VS','LC','BA','KN','AGC', 'VG', 'GD')
 	GROUP BY b.rptDate,b.product,b.siteID,v.SiteName,CASE WHEN lb.LabelID is null then 'Deposit' else 'Credit' end,
 	CASE WHEN lb.LabelID is null and lbp.LicenseeID is not null then 'Boping'
 			WHEN lb.LabelID is null and lbp.LicenseeID is null THEN 'OW' 
