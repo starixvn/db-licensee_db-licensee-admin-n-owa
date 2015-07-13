@@ -10,14 +10,15 @@ GO
 
 
 ALTER PROCEDURE [dbo].[LA_Rpt_KenoWinloss] 
-	 @PartyIDs			VARCHAR(5500)
-	, @FromDate			SMALLDATETIME
-	, @ToDate			SMALLDATETIME	
-	, @Market			INT				= 0
-	, @Bettype			INT				= 0
-	, @Drawfilter		SMALLINT		= 1
-	, @ExcludeTest		BIT				= 0
-	, @BaseOnCurrency	VARCHAR(10)		= 'EUR'
+	 @PartyIDs				VARCHAR(5500)
+	, @FromDate				SMALLDATETIME
+	, @ToDate				SMALLDATETIME	
+	, @Market				INT				= 0
+	, @Bettype				INT				= 0
+	, @Drawfilter			SMALLINT		= 1
+	, @ExcludeTest			BIT				= 0
+	, @IsConvert			BIT				= 1
+	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
 AS      
   
 /*  
@@ -27,6 +28,8 @@ AS
  
  * Revisions :  
 	- 20150320@Florent: enhance SP, using function LA_f_ExchangeDailySel
+	- 20150705@Florent: add GBP
+
  * Param's Explanation:    
  *  - @FromDate		: From date   
  *  - @ToDate		: To date   
@@ -107,13 +110,19 @@ BEGIN
 		WHERE b.rptDate BETWEEN @Fromdate AND @Todate
 			AND (@Bettype = 0 OR ( @Bettype <> 0 AND b.KenoBetTypeId = @Bettype)) 
 			AND (@excludeTest = 0 OR (@excludeTest = 1 AND CurrencyID <> 20))			
-			AND b.StatusID NOT IN (-1, 103)		
+			AND b.StatusID NOT IN (-1, 101, 102, 103)			
 		GROUP BY b.rptDate, b.CurrencyId, b.BetTypeId, b.KenoBetTypeId, tp.PartyID	
 	)
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, Rate)
 	SELECT DISTINCT CONVERT(VARCHAR(6), ExchangeDate, 112) AS ExchangeDate
 		, ExchangeID, BaseCurrencyRate
-	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseOnCurrency)
+	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+
+	IF @IsConvert = 0
+	BEGIN
+		UPDATE #Exchange
+		SET Rate = 1
+	END 
 	
 	INSERT INTO #Result (PartyID, TurnOver, BettypeId, KNBettypeId, MemberWinloss, LicWinloss, Betcount, AmtDueTo, WinlostDate, CurrencyId)
 	SELECT	d.PartyID

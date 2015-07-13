@@ -7,15 +7,15 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_LicensingMargin] 
-      @PartyIDs	    VARCHAR(1000)	= ''
-	,@Currency	    INT			= 0
-	,@FromDate	    SMALLDATETIME
-	,@ToDate		    SMALLDATETIME
-	,@ProductCode	    VARCHAR(500)
-	,@IsConvert	    BIT			= 0
-	,@BaseCurrency	    INT			= 0
-	,@drawfilter	    SMALLINT		= 1
-	,@excludeTest	    BIT			= 0
+@PartyIDs				VARCHAR(1000)	= ''
+	, @Currency				INT				= 0
+	, @FromDate				SMALLDATETIME
+	, @ToDate				SMALLDATETIME
+	, @ProductCode			VARCHAR(500)	
+	, @drawfilter			SMALLINT		= 1
+	, @excludeTest			BIT				= 0
+	, @IsConvert			BIT				= 1
+	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
 WITH RECOMPILE
 AS
  
@@ -26,6 +26,7 @@ AS
    
     Revisions:  
 	   - 20141226@Florent: enhance SP
+	   - 20150705@Florent: add GBP
 	Param's Explanation:  
 	  + @PartyIDs : a string of list PartyID, separated by ','
 	  + @Currency : 0-All Currencies
@@ -52,7 +53,7 @@ BEGIN
 
 	DECLARE @MY TABLE (sDate DATETIME)
 
-	CREATE TABLE #Exchange (ExchangeDate DATE, ExchangeId INT, EUR FLOAT, USD FLOAT, MYR FLOAT)
+	CREATE TABLE #Exchange (ExchangeDate DATE, ExchangeId INT, Rate FLOAT)
 	
 	DECLARE	 @cols	   AS NVARCHAR(MAX)
 			, @query	   AS NVARCHAR(MAX)
@@ -69,9 +70,15 @@ BEGIN
 		SET @sdate = DATEADD(M, 1, @sdate)
 	END
 
-	INSERT INTO #Exchange (ExchangeDate, ExchangeId, EUR, USD, MYR)
-	SELECT ExchangeDate, ExchangeId, EUR, USD, MYR			
-	FROM dbo.Lrf_f_GetExchangeDaily (@fromdate, @todate)
+	INSERT INTO #Exchange (ExchangeDate, ExchangeId, Rate)
+	SELECT ExchangeDate, ExchangeId, BaseCurrencyRate			
+	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+
+	IF @IsConvert = 0
+	BEGIN
+		UPDATE #Exchange
+		SET Rate = 1
+	END
 
 	IF @ProductCode = 'BA'
 	BEGIN
@@ -122,11 +129,16 @@ BEGIN
 
 	INSERT INTO #rptLicMargin(Licensee, rptDate, Margin)
 	   SELECT 
-		  p.PartyName		  
+		  --p.PartyName		  
+		  CASE p.PartyName
+			 WHEN '18bb' THEN 'PIH'
+			 WHEN 'IBC'  THEN 'FDL'
+			 ELSE p.PartyName
+		    END AS PartyName
 		  , DATENAME(YEAR, d.rptDate)  + '-' + DATENAME(MONTH, d.rptDate) AS rptDate
-		  , CASE WHEN ISNULL(SUM(TurnOver * e.EUR), 0) = 0 THEN 0  
+		  , CASE WHEN ISNULL(SUM(TurnOver * e.Rate), 0) = 0 THEN 0  
 			 ELSE 
-				- SUM(Winloss * e.EUR) / SUM(Turnover * e.EUR) 
+				- SUM(Winloss * e.Rate) / SUM(Turnover * e.Rate) 
 			 END AS Margin
 	   FROM #Temp d
 		  INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON d.PartyID = p.PartyID		
