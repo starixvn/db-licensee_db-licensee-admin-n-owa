@@ -180,9 +180,9 @@ BEGIN
 		)
 	END
 
-	CREATE TABLE #TempExchange (ExchangeId INT, ExchangeDate DATE, Code VARCHAR(20), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT)
-	INSERT INTO #TempExchange(ExchangeDate, ExchangeId, Code, USD, EUR, MYR, GBP)
-	SELECT DISTINCT ExchangeDate, ExchangeId, Code, USD, EUR, MYR, GBP
+	CREATE TABLE #TempExchange (ExchangeId INT, ExchangeDate DATE, Code VARCHAR(20), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, CNY FLOAT)
+	INSERT INTO #TempExchange(ExchangeDate, ExchangeId, Code, USD, EUR, MYR, GBP, CNY)
+	SELECT DISTINCT ExchangeDate, ExchangeId, Code, USD, EUR, MYR, GBP, CNY
 	FROM dbo.Lrf_f_GetExchangeDaily(@FromDate, @Todate)
 	WHERE ExchangeId IN (SELECT Currency FROM #SAgWinLoss)
 
@@ -214,8 +214,7 @@ BEGIN
 			ELSE '0' END ReportType
 		, w.Currency
 		, CASE WHEN w.Currency = 51 THEN @VNDCurrencyName			  
-			  WHEN w.Currency = 20 THEN e.Code
-			--ELSE e.Code END + CASE WHEN e.Code = ex.Code THEN '('+ CAST(ex.currency AS VARCHAR)+')'ELSE '' END AS currencyName
+			  WHEN w.Currency = 20 THEN e.Code			
 			ELSE ISNULL(t.CurrencyCode,e.Code) END AS currencyName
 		, SUM(TurnOver) AS Turnover
 		, SUM(Winlost) AS Winlost
@@ -272,6 +271,17 @@ BEGIN
 		, CAST(SUM(AmtDuetoRB * e.GBP) AS MONEY) AS AmtDuetoRBGBP
 		, CAST(SUM(Company * e.GBP) AS MONEY) AS CompanyGBP
 		, CAST(SUM(playercomm * e.EUR) AS MONEY) AS PlayercommEUR
+		--BaseCNY 
+		, CAST(SUM(TurnOver * e.CNY) AS MONEY) AS TurnoverCNY
+		, CAST(SUM(Winlost * e.CNY) AS MONEY) AS WinlostCNY
+		, CAST(SUM(LicenseeWL * e.CNY) AS MONEY) AS LicenseeWLCNY
+		, CAST(SUM(WinlossRB * e.CNY) AS MONEY) AS WinlossRBCNY
+		, CAST(SUM(CommBA * e.CNY) AS MONEY) AS CommBACNY
+		, CAST(SUM(CommRB * e.CNY) AS MONEY) AS CommRBCNY
+		, CAST(SUM(AmtDuetoBA * e.CNY) AS MONEY) AS AmtDuetoBACNY
+		, CAST(SUM(AmtDuetoRB * e.CNY) AS MONEY) AS AmtDuetoRBCNY
+		, CAST(SUM(Company * e.CNY) AS MONEY) AS CompanyCNY
+		, CAST(SUM(playercomm * e.EUR) AS MONEY) AS PlayercommEUR
 	FROM #SAgWinLoss w
 		INNER JOIN #TempExchange e ON w.winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
 		LEFT JOIN @temp1 t ON w.Currency = t.currency
@@ -281,16 +291,14 @@ BEGIN
 			WHEN @ReportBy = 2 THEN CONVERT(VARCHAR(6), w.winlostdate, 112)
 			ELSE '0' END
 		, CASE WHEN w.Currency = 51 THEN @VNDCurrencyName		
-			  WHEN w.Currency = 20 THEN e.Code	
-			--ELSE e.Code END + CASE WHEN e.Code = ex.Code THEN '('+ CAST(ex.currency AS VARCHAR)+')'ELSE '' END 
+			  WHEN w.Currency = 20 THEN e.Code				
 			ELSE ISNULL(t.CurrencyCode,e.Code) END 
 	ORDER BY ReportType ASC
 
 	DROP TABLE #SAgWinLoss
 	DROP TABLE #TempExchange
 	DROP TABLE #Bettype
-	DROP TABLE #tmpParty
-	--DROP TABLE #Data
+	DROP TABLE #tmpParty	
 END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicWinloss_Details] TO [vnteam] 
