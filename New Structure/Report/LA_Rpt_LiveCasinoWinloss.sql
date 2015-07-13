@@ -156,6 +156,7 @@ BEGIN
 	DROP TABLE	#Data
 	DROP TABLE	#Result
 	DROP TABLE	#Exchange	
+	DROP TABLE	#tmpParty
 END
 
 GO
