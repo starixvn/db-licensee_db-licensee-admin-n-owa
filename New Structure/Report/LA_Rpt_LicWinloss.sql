@@ -369,7 +369,7 @@ BEGIN
 		, SUM(CommRB * e.Rate) AS CommRB
 		, SUM(Company * e.Rate) AS Company
 		, SUM(Playercomm * e.Rate) AS Playercomm
-		, SUM(Betcount * e.Rate) AS Betcount
+		, SUM(Betcount) AS Betcount
 	FROM #Temp b
 		INNER JOIN #Exchange e ON e.ExchangeDate = rptDate AND e.ExchangeId = b.Currency
 	GROUP BY PartyID, CONVERT(VARCHAR(6), b.rptDate, 112)
