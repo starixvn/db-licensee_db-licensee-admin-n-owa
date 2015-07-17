@@ -131,9 +131,13 @@ BEGIN
 				, - SUM(WinLoss * p.Rate3rd) AS Amtdueto 
 				, SUM(b.BetCount) AS BetCount	  
 			FROM bodb_licensee.dbo.rpt_Betting b WITH (NOLOCK)	
-				INNER JOIN @tmpParty p ON b.SiteID = p.LicenseeId
+				INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate FROM @tmpParty) p ON b.SiteID = p.LicenseeId
 				INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND p.ProductID = bt.ProductId				
-			WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate				
+			WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate		
+				AND b.Status NOT IN (- 1, 103)
+				AND b.customercategory NOT IN (27,28)
+				AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))			
+				AND (@ExcludeTest = 0 OR (@ExcludeTest <> 0 AND b.CurrencyID <> 20))					
 			GROUP BY b.rptDate, CurrencyID , p.PartyId, p.ParentId
 		)			
 	END		
