@@ -65,7 +65,7 @@ BEGIN
 	INSERT INTO #Bettype (Bettype, ProductID)
 	(
 		SELECT Bettype, ProductID 
-		FROM bodb_licensee.dbo.LA_f_BettypeProductMapping_xtest(0, 'GD')
+		FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, 'GD')
 	)
 	DECLARE @Recommend VARCHAR(MAX) = '', @SQL VARCHAR(8000) = ''
 	CREATE TABLE #DataWinloss3rd (Recommend	INT, Winlostdate DATETIME, SportType INT, Currency INT, TurnOver MONEY, TotalTrans INT, Winloss MONEY)
