@@ -8,27 +8,27 @@ GO
 
 CREATE PROCEDURE [dbo].[LA_Inv_InvoiceHeaderInsert] 
 	  @BillerId			INT
-	, @PartyId INT`
-	, @RefNo INT
-	, @CurrencyId INT
-	, @InvoiceKey VARCHAR(20)
-	, @InvoiceNo INT
-	, @InvoiceDate DATETIME
-	, @DueDate DATETIME
-	, @Amount MONEY
-	, @InvoiceType SMALLINT
-	, @StatusId SMALLINT
-	, @Note VARCHAR(200)
-	, @HasSent BIT
-	, @HasDeleted BIT
-	, @CreatedBy INT
-	, @CreatedDateTime DATETIME
-	, @UpdatedDateTime DATETIME
+	, @PartyId			INT
+	--, @RefNo			INT
+	, @CurrencyId		INT
+	, @InvoiceKey		VARCHAR(20)
+	, @InvoiceNo		INT
+	--, @InvoiceDate		DATETIME
+	, @DueDate			DATETIME
+	, @Amount			MONEY
+	, @InvoiceType		SMALLINT
+	, @StatusId			SMALLINT
+	, @Note				VARCHAR(200)
+	, @HasSent			BIT
+	, @HasDeleted		BIT
+	, @CreatedBy		INT
+	, @CreatedDateTime	DATETIME
+	, @UpdatedDateTime	DATETIME
 	, @InvoiceDetailXml VARCHAR(1000)
-	, @UserID				INT
-	, @LoginIP				VARCHAR (50)	= ''
-	, @ErrCode				INT				= 0		OUTPUT
-	, @ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
+	, @UserID			INT
+	, @LoginIP			VARCHAR (50)	= ''
+	, @ErrCode			INT				= 0		OUTPUT
+	, @ErrMsg			NVARCHAR(1000)	= ''	OUTPUT
 WITH RECOMPILE
 AS
 SET NOCOUNT ON
@@ -58,5 +58,19 @@ SET NOCOUNT ON
 								</InvoiceDetails>'
 */
 BEGIN	
+	IF	ISNULL(@BillerId, 0) <=0 
+		OR ISNULL(@PartyId,0) <=0 
+		OR ISNULL(@CurrencyId,0) <= 0 
+		OR ISNULL(@InvoiceKey,'') = '' 
+		OR ISNULL(@InvoiceNo, 0) <= 0
+		OR @DueDate IS NULL
+		OR ISNULL(@Amount, 0) <= 0
+		OR ISNULL(@InvoiceType, 0) <= 0
+		OR
+	BEGIN
+		SELECT @ErrCode = 1, @ErrMsg = 'Invalid Input.'
+		RETURN
+	END
 	
+	IF 
 END

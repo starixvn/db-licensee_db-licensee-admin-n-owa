@@ -20,9 +20,9 @@ BEGIN
 	INSERT INTO @PartyGroup(PartyId)
 	(
 	    SELECT PartyId 
-		FROM bodb_licensee.dbo.LA_PartyGroupAssignment
+		FROM bodb_licensee.dbo.LA_PartyGroupAssignment WITH(NOLOCK)
 		WHERE PartyGroupId IN (	SELECT PartyGroupId 
-								FROM bodb_licensee.dbo.LA_PartyGroupAssignment 
+								FROM bodb_licensee.dbo.LA_PartyGroupAssignment WITH(NOLOCK)
 								WHERE PartyId = @PartyId)
 	)
 	-- End region
@@ -52,14 +52,13 @@ BEGIN
 	DECLARE @BaseCurrencyId INT = 12
 	DECLARE @BaseCurrencyName VARCHAR(5) = 'GBP'
 	SET @BaseCurrencyId = ISNULL((	SELECT TOP 1 oci.BaseCurrencyId
-									FROM bodb_licensee.dbo.OAS_ChargeInfo oci 		
+									FROM bodb_licensee.dbo.OAS_ChargeInfo oci WITH(NOLOCK)	
 									WHERE oci.FromParty = @PartyId 
 										AND (@FromDate BETWEEN oci.FromDate AND oci.ToDate OR @ToDate BETWEEN oci.FromDate AND oci.ToDate)), 12)
 	
-	DECLARE @sqlString [varchar](100) = 'EXECUTE bodb_Licensee.dbo.LA_SelBaseCurrency'
-	DECLARE @BaseCurrencyTable AS TABLE(Id int, Name varchar(10))
+	DECLARE @BaseCurrencyTable AS TABLE(Id INT, Name VARCHAR(5))
 	INSERT INTO @BaseCurrencyTable(Id,Name)
-	EXECUTE(@sqlString)
+	EXECUTE bodb_Licensee.dbo.LA_SelBaseCurrency
 	
 	SELECT @BaseCurrencyName = Name
 	FROM @BaseCurrencyTable bct
@@ -253,9 +252,9 @@ BEGIN
 	INSERT INTO @DiscountGroupHeader(DiscountGroupId,DiscountGroupType,CurrencyId,FromDate,ToDate)
 	(
 		SELECT d.DiscountGroupId, t.DiscountGroupType,t.CurrencyId,d.FromDate,t.ToDate
-		FROM bodb_Licensee.dbo.LA_DiscountGroupHeader d INNER JOIN 
+		FROM bodb_Licensee.dbo.LA_DiscountGroupHeader d WITH(NOLOCK) INNER JOIN 
 			(SELECT DiscountGroupType, CurrencyId, Max(ToDate) AS ToDate
-			FROM bodb_Licensee.dbo.LA_DiscountGroupHeader dg 
+			FROM bodb_Licensee.dbo.LA_DiscountGroupHeader dg WITH(NOLOCK)
 			WHERE @FromDate<= ToDate AND FromDate<=@ToDate
 			GROUP BY DiscountGroupType, dg.CurrencyId) t ON d.ToDate = t.ToDate
 	)
@@ -271,9 +270,9 @@ BEGIN
 	(
 		SELECT dg.DiscountGroupId, dg.DiscountGroupType, dgd.FromAmount, dgd.ToAmount, dgd.Rate, dgp.ProductId
 		FROM @DiscountGroupHeader dg 
-			INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupDetail dgd ON dg.DiscountGroupId = dgd.DiscountGroupId
-			INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupProduct dgp ON dg.DiscountGroupId = dgp.DiscountGroupId
-			INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupAssignment dga ON dga.DiscountGroupId = dg.DiscountGroupId
+			INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupDetail dgd WITH(NOLOCK) ON dg.DiscountGroupId = dgd.DiscountGroupId
+			INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupProduct dgp WITH(NOLOCK) ON dg.DiscountGroupId = dgp.DiscountGroupId
+			INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupAssignment dga WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
 		WHERE	dga.PartyID = @PartyId
 				-- AND dg.CurrencyId = @BaseCurrencyId
 				AND dgp.ProductId IN ( SELECT ProductId FROM #InvoiceData)			

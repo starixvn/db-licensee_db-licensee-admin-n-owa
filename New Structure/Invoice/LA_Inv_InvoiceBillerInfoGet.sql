@@ -9,8 +9,6 @@ GO
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceBillerInfoGet] 
 	  @BillerId INT
 	, @PayerId INT
-	, @FromDate DATETIME
-	, @ToDate DATETIME
 WITH RECOMPILE
 AS
 SET NOCOUNT ON
@@ -23,10 +21,11 @@ BEGIN
 		InvoiceTempaltePath	VARCHAR(255))
 	INSERT INTO @InvoiceInfo(InvoiceTemplateId,InvoiceTemplateName,InvoiceTempaltePath)
 	(
-		SELECT itpl.InvTemplateId, itpl.InvTemplateName, itpl.TemplatePath
-		FROM dbo.LA_InvoiceSetting ivs INNER JOIN dbo.LA_InvoiceTemplate itpl ON ivs.InvTempId = itpl.InvTemplateId
+		SELECT ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath
+		FROM dbo.LA_InvoiceSetting ivs WITH(NOLOCK) INNER JOIN dbo.LA_InvoiceTemplate itpl WITH(NOLOCK) ON ivs.InvTempId = itpl.InvTemplateId
 		WHERE ivs.FromPartyId = @PayerId 
-			AND ivs.ToPartyId = @BillerId			
+			AND ivs.ToPartyId = @BillerId	
+		GROUP BY ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath
 	)
 	
 	DECLARE @InvoiceKey VARCHAR(20) = ''
@@ -44,6 +43,6 @@ BEGIN
 	SET InvoiceKey = @InvoiceKey,
 	    InvoiceNumber = @InvoiceNumber
 
-	SELECT ii.InvoiceKey, ii.InvoiceNumber, ii.InvoiceTemplateId, ii.InvoiceTemplateName, ii.InvoiceTempaltePath
+	SELECT TOP 1 ii.InvoiceKey, ii.InvoiceNumber, ii.InvoiceTemplateId, ii.InvoiceTemplateName, ii.InvoiceTempaltePath
 	FROM @InvoiceInfo ii
 END
