@@ -18,6 +18,8 @@ AS
 	 Revisions:     
 		  - 20141031@Florent: Apply new Structure Using SystemMapping
 		  - 20150312@Florent: add column brandname and fix case without SB
+		  - 20150412@Patrick: Add filter by PartyType
+
 	 Params:
 		+ UserID : 
 			- 0 get list Party of All user
@@ -34,12 +36,12 @@ DECLARE @CreditLicensee	AS TABLE (PartyID INT)
 INSERT INTO @CreditLicensee
 SELECT PartyID 
 FROM dbo.OAS_Party WITH (NOLOCK)
-WHERE PartyName IN ('IBC','18bb')
+WHERE PartyName IN ('IBC','18bb') AND PartyType NOT IN (4)
 
 INSERT INTO @tmpCompany
 SELECT PartyID 
 FROM dbo.OAS_Party WITH (NOLOCK)
-WHERE PartyName IN ('ONEWorks','Boping')
+WHERE PartyName IN ('ONEWorks','Boping') AND PartyType NOT IN (4)
 
 SELECT MAX(ci.FromDate) FromDate, ci.FromParty
 INTO #ListParty
@@ -49,9 +51,11 @@ FROM OAS_ChargeInfo ci WITH (NOLOCK)
 		SELECT MIN(ci.ProductID) AS ProductID, FromParty
 		   FROM dbo.OAS_Party p WITH (NOLOCK)
 			   INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
+			   INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH(NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
 		   WHERE ChargeType = 1 AND p.PartyType = 1
 		   GROUP BY FromParty
 		) p ON ci.ProductID = p.ProductID AND ci.FromParty = p.FromParty
+	INNER JOIN dbo.LA_ChargeInfo_SystemMapping c WITH(NOLOCK) ON ci.ChargeID = c.ChargeID AND c.SystemID = 2
 WHERE ci.ChargeType = 1
 GROUP BY ci.FromParty
 
