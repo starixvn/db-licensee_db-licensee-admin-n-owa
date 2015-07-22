@@ -26,7 +26,38 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert]
 WITH RECOMPILE
 AS
 SET NOCOUNT ON
-
+/*  
+	 Created: 20150721@Bravo
+	 Task : Create Invoice 
+	 DB: DB052.bodb_Licensee  
+   
+	 Revisions:     
+	 Params:		
+		+ @InvoiceDetailXml: 
+			<InvoiceDetails>
+				<InvoiceDetail>
+					<Description>Software & Data...</Description>
+					<Reference></Reference>
+					<ProductId>0</ProductId>
+					<InvoiceAmount>900.12</InvoiceAmount>
+					<AmountType>0</AmountType>
+				</InvoiceDetail>
+				<InvoiceDetail>
+					<Description>Less: Discount...</Description>
+					<Reference></Reference>
+					<ProductId>1</ProductId>
+					<InvoiceAmount>90.01</InvoiceAmount>
+					<AmountType>0</AmountType>
+				</InvoiceDetail>
+				<InvoiceDetail>
+					<Description>Less: Rebate...</Description>
+					<Reference></Reference>
+					<ProductId>2</ProductId>
+					<InvoiceAmount>81.1</InvoiceAmount>
+					<AmountType>2</AmountType>
+				</InvoiceDetail>
+			</InvoiceDetails>
+*/
 BEGIN	
 	IF	ISNULL(@BillerId, 0) > 0 
 		AND ISNULL(@PayerId,0) > 0 
@@ -109,7 +140,7 @@ BEGIN
 			DELETE FROM dbo.LA_InvoiceDetail WHERE InvoiceHeaderId = @CurrentInvoiceHeaderId
 			DELETE FROM dbo.LA_InvoiceHeader WHERE InvoiceHeaderId = @CurrentInvoiceHeaderId
 			
-			SELECT @ErrCode = 3, @ErrMsg = 'Insert invoice failed.'
+			SELECT @ErrCode = 3, @ErrMsg = 'Insert invoice failed.' -- System error
 		END		
 		ELSE
 		BEGIN
