@@ -13,7 +13,7 @@ AS
 SET NOCOUNT ON
 BEGIN
 	DECLARE @InvoiceInfo AS TABLE(		
-		InvoiceKey			VARCHAR(20), 
+		InvoiceSymbol			VARCHAR(20), 
 		InvoiceNumber		INT,
 		InvoiceTemplateId	SMALLINT,
 		InvoiceTemplateName	VARCHAR(50),
@@ -27,21 +27,21 @@ BEGIN
 		GROUP BY ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath
 	)
 	
-	DECLARE @InvoiceKey VARCHAR(20) = ''
+	DECLARE @InvoiceSymbol VARCHAR(20) = ''
 	DECLARE @InvoiceNumber INT = 1						
 	
-	SELECT @InvoiceKey = i.InvoiceKey 
+	SELECT @InvoiceSymbol = i.InvoiceSymbol 
 	FROM dbo.LA_InvoiceHeader i 
 	WHERE i.BillerId = @BillerId
 	
-	SELECT @InvoiceNumber = ISNULL(MAX(i.InvoiceNo), 0) + 1
+	SELECT @InvoiceNumber = ISNULL(MAX(i.InvoiceNumber), 0) + 1
 	FROM dbo.LA_InvoiceHeader i 
 	WHERE i.BillerId = @BillerId
 	
 	UPDATE @InvoiceInfo
-	SET InvoiceKey = @InvoiceKey,
+	SET InvoiceSymbol = @InvoiceSymbol,
 	    InvoiceNumber = @InvoiceNumber
 
-	SELECT TOP 1 ii.InvoiceKey, ii.InvoiceNumber, ii.InvoiceTemplateId, ii.InvoiceTemplateName, ii.InvoiceTempaltePath
+	SELECT TOP 1 ii.InvoiceSymbol, ii.InvoiceNumber, ii.InvoiceTemplateId, ii.InvoiceTemplateName, ii.InvoiceTempaltePath
 	FROM @InvoiceInfo ii
 END
