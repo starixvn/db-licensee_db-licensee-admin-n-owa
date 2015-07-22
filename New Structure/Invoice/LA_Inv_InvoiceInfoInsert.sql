@@ -23,7 +23,6 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert]
 	, @ErrCode			INT				= 0		OUTPUT
 	, @ErrMsg			NVARCHAR(1000)	= ''	OUTPUT
 	, @NewInvoiceNumber INT						OUTPUT
-WITH RECOMPILE
 AS
 SET NOCOUNT ON
 /*  

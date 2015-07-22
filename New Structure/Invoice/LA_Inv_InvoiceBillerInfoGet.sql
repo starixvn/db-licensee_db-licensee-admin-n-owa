@@ -9,7 +9,6 @@ GO
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceBillerInfoGet] 
 	  @BillerId INT
 	, @PayerId INT
-WITH RECOMPILE
 AS
 SET NOCOUNT ON
 BEGIN
