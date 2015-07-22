@@ -124,12 +124,18 @@ BEGIN
 				, p.ParentId 
 				, b.rptDate     
 				, b.CurrencyID		   
-				, SUM(b.Turnover) AS Turnover
+				, SUM(b.Turnover * 
+						CASE WHEN @DrawFilter IN (2, 3)	
+								THEN CASE WHEN b.STATUS = 111 THEN 0 
+										  WHEN b.STATUS IN (114, 115) AND b.Bettype != 33
+											THEN 0.5 ELSE 1
+								END	ELSE 1
+						END) AS Turnover
 				, SUM(b.WinLoss) AS Winlost		
 				, - SUM(b.WinLoss) AS LicenseeWL								
 				, - SUM(WinLoss * p.Rate) AS Company 
 				, - SUM(WinLoss * p.Rate3rd) AS Amtdueto 
-				, SUM(b.BetCount) AS BetCount	  
+				, SUM(b.BetCount * CASE WHEN @DrawFilter = 2 AND b.STATUS = 111 THEN 0 ELSE 1 END) AS BetCount	  
 			FROM bodb_licensee.dbo.rpt_Betting b WITH (NOLOCK)	
 				INNER JOIN @TempAG p ON b.SiteID = p.LicenseeId
 				INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND p.ProductID = bt.ProductId				
