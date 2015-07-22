@@ -22,8 +22,8 @@ BEGIN
 			WHEN ivs.ProductId = 0 THEN 'Sportbooks' 
 			ELSE p.ProductName
 			END AS ProductName
-	FROM dbo.LA_InvoiceSetting ivs INNER JOIN dbo.LA_InvoiceType it ON ivs.InvTypeId = it.InvTypeId 
-		LEFT JOIN bodb_licensee.dbo.Product3rd p ON ivs.ProductId = p.Productid
+	FROM dbo.LA_InvoiceSetting ivs WITH(NOLOCK) INNER JOIN dbo.LA_InvoiceType it WITH(NOLOCK) ON ivs.InvTypeId = it.InvTypeId 
+		LEFT JOIN bodb_licensee.dbo.Product3rd p WITH(NOLOCK) ON ivs.ProductId = p.Productid
 	WHERE	ivs.FromPartyId = @PayerId 
 			AND ivs.ToPartyId = @BillerId	
 END

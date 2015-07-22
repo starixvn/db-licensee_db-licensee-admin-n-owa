@@ -102,8 +102,7 @@ BEGIN
 		WHERE ((mf.FeeTypeId = 1 AND mf.CurrencyId = @BaseCurrencyId ) OR mf.FeeTypeId = 2)
 			AND mf.ProductId IN (SELECT ProductId FROM @PartyChargeInfo)
 			AND ((mf.FromDate BETWEEN @FirstDate AND @LastDate) OR (mf.ToDate BETWEEN @FirstDate AND @LastDate) OR (mf.FromDate<@FirstDate AND @LastDate < mf.ToDate))
-			AND (mf.PartyId = @PartyId OR mf.PartyId IN (SELECT PartyId FROM @PartyGroup))
-						
+			AND (mf.PartyId = @PartyId OR mf.PartyId IN (SELECT PartyId FROM @PartyGroup))						
 	)
 	
 	-- Calculate actual min fee via prorate.
