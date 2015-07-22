@@ -22,6 +22,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert]
 	, @LoginIP			VARCHAR (50)	= ''
 	, @ErrCode			INT				= 0		OUTPUT
 	, @ErrMsg			NVARCHAR(1000)	= ''	OUTPUT
+	, @NewInvoiceNumber INT						OUTPUT
 WITH RECOMPILE
 AS
 SET NOCOUNT ON
@@ -32,12 +33,13 @@ BEGIN
 		AND ISNULL(@CurrencyId,0) > 0 
 		AND ISNULL(@InvoiceSymbol,'') <> '' 
 		AND ISNULL(@InvoiceNumber, 0) > 0
-		AND @DueDate IS NOT NULL
+		AND ISNULL(@DueDate, '') <> ''
+		AND ISNULL(@InvoiceDetailXml, '') <> ''
 		AND ISNULL(@Amount, 0) > 0
 		AND ISNULL(@InvoiceType, 0) > 0
 		AND ISNULL(@UserID, 0) > 0
 	BEGIN
-		-- Region: Check business logic
+		-- Region: Check business logic: If invoice number exists, re-generate Invoice Number.
 		IF EXISTS (	SELECT 1 FROM dbo.LA_InvoiceHeader lih WITH(NOLOCK) WHERE lih.InvoiceSymbol = @InvoiceSymbol AND lih.InvoiceNumber = @InvoiceNumber)
 		BEGIN
 			SELECT @InvoiceNumber = (MAX(InvoiceNumber) + 1) FROM dbo.LA_InvoiceHeader lih WITH(NOLOCK) WHERE lih.BillerId = @BillerId
@@ -51,41 +53,67 @@ BEGIN
 		(
 			@BillerId, @PayerId, @CurrencyId, @InvoiceSymbol, @InvoiceNumber, @CurrentDateTime, @DueDate, @Amount, @InvoiceType, @StatusId, @Note, 0, 0, @UserID, @CurrentDateTime, @CurrentDateTime
 		)
-		DECLARE @CurrentInvoiceId BIGINT = @@IDENTITY
+		DECLARE @CurrentInvoiceHeaderId BIGINT = @@IDENTITY
 		-- End Region
 		
 		-- Region: Insert data to Invoice Detail
-		DECLARE @idoc AS INT
-		EXEC sp_xml_preparedocument @idoc OUTPUT, @InvoiceDetailXml
-		
-		INSERT INTO dbo.LA_InvoiceDetail(InvoiceHeaderId,ItemName,Reference,ProductId,Amount,FeeType)
-		SELECT @CurrentInvoiceId,
-			[Description],
-			Reference,
-			CAST(ProductId AS INT),
-			CAST(InvoiceAmount AS MONEY),
-			CAST(AmountType AS TINYINT)
-		FROM OPENXML(@idoc, 'InvoiceDetails/InvoiceDetail')
-		WITH (
-			[Description] VARCHAR(200) 'Description',
-			Reference VARCHAR(100) 'Reference',
-			ProductId VARCHAR(10) 'ProductId',
-			InvoiceAmount VARCHAR(20) 'InvoiceAmount',
-			AmountType VARCHAR(10) 'AmountType'
-		)
-		EXEC sp_xml_removedocument @idoc
-		
-		IF @@ERROR <> 0
-		BEGIN
-			-- Rollback manual: delete inserted record in LA_InvoiceHeader & LA_InvoiceDetail
-			DELETE FROM dbo.LA_InvoiceDetail WHERE InvoiceHeaderId = @CurrentInvoiceId
-			DELETE FROM dbo.LA_InvoiceHeader WHERE InvoiceHeaderId = @CurrentInvoiceId
+		BEGIN TRY
+			DECLARE @idoc AS INT
+			DECLARE @xmlText VARCHAR(1000) = REPLACE(@InvoiceDetailXml, '&', '&amp;')
+			DECLARE @Detail AS TABLE(
+				ItemName	VARCHAR(200),
+				Reference	VARCHAR(100),
+				ProductId	INT,
+				Amount		MONEY,
+				FeeType		TINYINT)
+						
+			EXEC sp_xml_preparedocument @idoc OUTPUT, @xmlText			
+			INSERT INTO @Detail(ItemName,Reference,ProductId,Amount,FeeType)
+			SELECT 
+				CAST([Description] AS VARCHAR(200)),
+				CAST(Reference AS VARCHAR(100)),
+				CAST(ProductId AS INT),
+				CAST(InvoiceAmount AS MONEY),
+				CAST(AmountType AS TINYINT)
+			FROM OPENXML(@idoc, 'InvoiceDetails/InvoiceDetail')
+			WITH (
+				[Description] VARCHAR(200) 'Description',
+				Reference VARCHAR(100) 'Reference',
+				ProductId VARCHAR(10) 'ProductId',
+				InvoiceAmount VARCHAR(20) 'InvoiceAmount',
+				AmountType VARCHAR(10) 'AmountType'
+			)
+			EXEC sp_xml_removedocument @idoc
 			
-			SELECT @ErrCode = 1001, @ErrMsg = 'Insert invoice failed.'
+			IF EXISTS (SELECT 1 FROM @Detail WHERE ProductId < 0 OR Amount <= 0 OR FeeType < 0)
+			BEGIN
+				SELECT @ErrCode = 2, @ErrMsg = 'Invalid invoice detail inputs.'
+        		RETURN
+			END
+			ELSE
+			BEGIN
+				INSERT INTO dbo.LA_InvoiceDetail(InvoiceHeaderId,ItemName,Reference,ProductId,Amount,FeeType)
+				SELECT @CurrentInvoiceHeaderId,ItemName,Reference,ProductId,Amount,FeeType
+				FROM @Detail
+			END
+        END TRY
+        BEGIN CATCH
+        	SELECT @ErrCode = 2, @ErrMsg = 'Invalid invoice detail inputs.'
+        	RETURN
+        END CATCH
+		-- End Region
+		
+		-- Region: Rollback manual: delete inserted record in LA_InvoiceHeader & LA_InvoiceDetail 		
+		IF @@ERROR <> 0
+		BEGIN			
+			DELETE FROM dbo.LA_InvoiceDetail WHERE InvoiceHeaderId = @CurrentInvoiceHeaderId
+			DELETE FROM dbo.LA_InvoiceHeader WHERE InvoiceHeaderId = @CurrentInvoiceHeaderId
+			
+			SELECT @ErrCode = 3, @ErrMsg = 'Insert invoice failed.'
 		END		
 		ELSE
 		BEGIN
-			SELECT @ErrCode = 0, @ErrMsg = 'Invoice saved successfully. Invoice Number = ' & @InvoiceNumber
+			SELECT @ErrCode = 0, @ErrMsg = 'Invoice saved successfully.', @NewInvoiceNumber = @InvoiceNumber
 		END
 		-- End Region
 		
@@ -95,7 +123,8 @@ BEGIN
 	END
 	ELSE
 	BEGIN
-		SELECT @ErrCode = 1, @ErrMsg = 'Invalid Inputs.'
+		SET @ErrCode = 1
+		SET @ErrMsg = 'Invalid invoice header inputs.'
 		RETURN
 	END
 END
