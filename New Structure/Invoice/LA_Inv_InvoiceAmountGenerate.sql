@@ -11,6 +11,8 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME
 	, @ProductCode			VARCHAR(100)	
+	, @ErrCode				INT				= 0		OUTPUT
+	, @ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
 WITH RECOMPILE
 AS
 SET NOCOUNT ON
@@ -25,6 +27,11 @@ BEGIN
 								FROM bodb_licensee.dbo.LA_PartyGroupAssignment WITH(NOLOCK)
 								WHERE PartyId = @PartyId)
 	)
+	
+	IF (SELECT COUNT(*) FROM @PartyGroup) = 0 -- Party dont have Party Group.
+	BEGIN 
+		INSERT INTO @PartyGroup(PartyId) VALUES(@PartyId)
+	END
 	-- End region
 	
 	-- Region: Get party charge rate info
@@ -46,6 +53,7 @@ BEGIN
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo_xtest(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE DI_Rate > 0 AND ProductId <> 1 --exclude RB
 	)	
+	--SELECT * FROM @PartyChargeInfo pci
 	-- End region
 	
 	-- Region: Get base Currency
@@ -53,8 +61,11 @@ BEGIN
 	DECLARE @BaseCurrencyName VARCHAR(5) = 'GBP'
 	SET @BaseCurrencyId = ISNULL((	SELECT TOP 1 oci.BaseCurrencyId
 									FROM bodb_licensee.dbo.OAS_ChargeInfo oci WITH(NOLOCK)	
-									WHERE oci.FromParty = @PartyId 
-										AND (@FromDate BETWEEN oci.FromDate AND oci.ToDate OR @ToDate BETWEEN oci.FromDate AND oci.ToDate)), 12)
+									WHERE	oci.FromParty = @PartyId 
+											AND(@FromDate BETWEEN oci.FromDate AND oci.ToDate 
+												OR @ToDate BETWEEN oci.FromDate AND oci.ToDate
+												OR (oci.FromDate < @FromDate AND @ToDate < oci.ToDate))
+								), 12)
 	
 	DECLARE @BaseCurrencyTable AS TABLE(Id INT, Name VARCHAR(5))
 	INSERT INTO @BaseCurrencyTable(Id,Name)
@@ -62,26 +73,28 @@ BEGIN
 	
 	SELECT @BaseCurrencyName = Name
 	FROM @BaseCurrencyTable bct
-	WHERE @BaseCurrencyId = bct.Id
+	WHERE @BaseCurrencyId = bct.Id	
 	-- End Region
 	
-	-- Region: Get exchange rate info
-	CREATE TABLE #Exchange ( 
-		ExchangeDate	DATE, 
-		ExchangeID		INT, 
-		CurrencyCode	VARCHAR(10), 
-		Rate			FLOAT)	
-	
-	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)	
-	-- End region
-	
-	-- Region: MinfeeGroup Date range
+	-- Region: Validate the same base currency in ChargeInfo,MinFee & Discount/Rebate
 	DECLARE @Month TINYINT = MONTH(@FromDate)
 	DECLARE @FirstDate DATETIME = DATEADD(mm, DATEDIFF(mm, 0, @FromDate), 0)
 	DECLARE @LastDate DATETIME = DATEADD (dd, -1, DATEADD(mm, DATEDIFF(mm, 0, @FromDate) + 1, 0))
 	DECLARE @DaysInMonth INT = DATEDIFF(day, @FirstDate, @LastDate) + 1
+	
+	IF (SELECT COUNT(mf.CurrencyId)
+		FROM bodb_licensee.dbo.LA_MinFee mf WITH(NOLOCK)
+		WHERE (mf.FeeTypeId = 1 AND mf.CurrencyId = @BaseCurrencyId )
+			AND mf.ProductId IN (SELECT ProductId FROM @PartyChargeInfo)
+			AND ((mf.FromDate BETWEEN @FirstDate AND @LastDate) OR (mf.ToDate BETWEEN @FirstDate AND @LastDate) OR (mf.FromDate<@FirstDate AND @LastDate < mf.ToDate))
+			AND (mf.PartyId = @PartyId OR mf.PartyId IN (SELECT PartyId FROM @PartyGroup))) = 0
+	BEGIN
+		SELECT @ErrCode=1, @ErrMsg='Wrong Base Currency'
+		RETURN
+	END		
+	-- End Region
+	
+	-- Region: MinfeeGroup Date range	
 
 	DECLARE @MinFeeGroup AS TABLE (
 		FeeType		TINYINT,	
@@ -92,7 +105,7 @@ BEGIN
 		FromDate	DATETIME,	
 		ToDate		DATETIME, 
 		ActualFee	MONEY)
-	DELETE FROM @MinFeeGroup
+	
 	INSERT INTO @MinFeeGroup(FeeType ,PartyId,ProductId, CurrencyId ,FeeAmount ,FromDate ,ToDate)
 	(
 		SELECT mf.FeeTypeId, mf.PartyId,mf.ProductId, mf.CurrencyId,mf.FeeAmount,
@@ -120,11 +133,23 @@ BEGIN
 	SET mf.ActualFee =  mf.FeeAmount 						
 	FROM @MinFeeGroup mf
 	WHERE mf.FeeType = 1 AND mf.ActualFee IS NULL	
+	SELECT * FROM @MinFeeGroup mfg
+	-- End region
+	
+	-- Region: Get exchange rate info
+	CREATE TABLE #Exchange ( 
+		ExchangeDate	DATE, 
+		ExchangeID		INT, 
+		CurrencyCode	VARCHAR(10), 
+		Rate			FLOAT)	
+	
+	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
+	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
+	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)	
 	-- End region
 	
 	-- Region: Get Amount by Product
 	DECLARE @DrawFilter SMALLINT = 1	
-	DECLARE @CurrencyId INT = 0
 		
 	CREATE TABLE #TempData (
 		LicenseeId		INT, 
@@ -143,9 +168,10 @@ BEGIN
 			, SUM(ISNULL(b.CommissionA, 0)) AS AComm
 			, p.ProductId
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN @PartyChargeInfo p ON b.ProductId = p.ProductID AND p.LicenseeId = b.SiteId
+			INNER JOIN @PartyChargeInfo p ON b.ProductId = p.ProductID 
+												AND p.LicenseeId = b.SiteId
+												AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate			
-			AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
 			AND (b.CurrencyID <> 20)
 			AND b.customercategory NOT IN (27, 28)					
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId
@@ -160,6 +186,8 @@ BEGIN
 							END
 	FROM #TempData td INNER JOIN @PartyChargeInfo p ON td.LicenseeId = p.LicenseeId AND td.ProductId = p.ProductID
 		INNER JOIN #Exchange e ON td.rptDate = e.ExchangeDate AND td.CurrencyId = e.ExchangeID
+	
+	--SELECT * FROM #TempData td
 	-- End region
 	
 	-- Region: Check min fee group	
@@ -170,7 +198,7 @@ BEGIN
 		AmountType		TINYINT,
 		IsApplyMinFee	BIT)
 	
-	DECLARE @MinFeeData AS TABLE (
+	DECLARE @AppliedMinFeeData AS TABLE (
 		PartyId				INT, 
 		ProductId			TINYINT, 
 		AmountToCompany		MONEY, 
@@ -186,25 +214,25 @@ BEGIN
 		GROUP BY td.PartyId, td.ProductId
 	)
 	
-	INSERT INTO @MinFeeData (PartyId,ProductId,AmountToCompany)
+	INSERT INTO @AppliedMinFeeData (PartyId,ProductId,AmountToCompany)
 	(
-	    SELECT mf.PartyId,mf.ProductId, cte.AmountToCompany					
-	    FROM @MinFeeGroup mf INNER JOIN SumAmout_Cte cte ON mf.PartyId = cte.PartyId AND mf.ProductId = cte.ProductId
+	    SELECT mf.PartyId,cte.ProductId, cte.AmountToCompany					
+	    FROM @MinFeeGroup mf INNER JOIN SumAmout_Cte cte ON mf.PartyId = cte.PartyId
 	    WHERE	mf.FeeType = 2 
 				AND mf.PartyId = @PartyId
 	)
 	
-	UPDATE @MinFeeData
-	SET AmountUnderWaive = (SELECT SUM(td.AmountToCompany)
-							FROM #TempData td
-							WHERE	mf.PartyId = td.PartyId 
-									AND mf.ProductId = td.ProductId
-									AND td.rptDate BETWEEN mf.FromDate AND mf.ToDate)
-	FROM @MinFeeData d INNER JOIN @MinFeeGroup mf ON mf.PartyId = d.PartyId AND mf.ProductId = d.ProductId
+	UPDATE @AppliedMinFeeData
+	SET AmountUnderWaive = ISNULL((	SELECT SUM(td.AmountToCompany)
+									FROM #TempData td
+									WHERE	mf.PartyId = td.PartyId 
+											AND mf.ProductId = td.ProductId
+											AND td.rptDate BETWEEN mf.FromDate AND mf.ToDate), 0)
+	FROM @AppliedMinFeeData d INNER JOIN @MinFeeGroup mf ON mf.PartyId = d.PartyId AND mf.ProductId = d.ProductId
 	WHERE	mf.FeeType = 2 
 			AND mf.PartyId = @PartyId		
-		
-	UPDATE @MinFeeData
+	
+	UPDATE @AppliedMinFeeData
 	SET AmountUnderWaive =	CASE 
 								WHEN AmountUnderWaive IS NULL OR AmountUnderWaive<0 THEN 0 
 								ELSE AmountUnderWaive 
@@ -214,14 +242,15 @@ BEGIN
 								ELSE ISNULL(AmountToCompany, 0) - ISNULL(AmountUnderWaive, 0) 
 							END
 	
-	UPDATE @MinFeeData
+	UPDATE @AppliedMinFeeData
 	SET d.TotalMinFeeAmount = ISNULL((	SELECT SUM(mf.ActualFee)
 										FROM @MinFeeGroup mf
 										WHERE	mf.FeeType = 1 
 												AND d.PartyId = mf.PartyId	
 												AND d.ProductId = mf.ProductId)
 										, 0)
-	FROM @MinFeeData d 
+	FROM @AppliedMinFeeData d 
+	--SELECT * FROM @AppliedMinFeeData mfd	
 	
 	INSERT INTO #InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType,IsApplyMinFee)
 	(
@@ -236,7 +265,7 @@ BEGIN
 				ELSE 0
 			END AS IsApplyMinFee
 				
-		FROM @MinFeeData d 
+		FROM @AppliedMinFeeData d 
 	)
 	-- End region
 	
