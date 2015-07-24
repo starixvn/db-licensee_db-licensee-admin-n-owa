@@ -45,7 +45,8 @@ BEGIN
 		, ProductID			INT
 		, Rate				MONEY
 		, FromDate			SMALLDATETIME
-		, ToDate			SMALLDATETIME)
+		, ToDate			SMALLDATETIME
+		, CurrencyId		INT)
 
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
 	(
@@ -64,7 +65,7 @@ BEGIN
 									WHERE	oci.FromParty = @PartyId 
 											AND(@FromDate BETWEEN oci.FromDate AND oci.ToDate 
 												OR @ToDate BETWEEN oci.FromDate AND oci.ToDate
-												OR (oci.FromDate < @FromDate AND @ToDate < oci.ToDate))
+												OR (@FromDate < oci.FromDate AND @ToDate > oci.ToDate))
 								), 12)
 	
 	DECLARE @BaseCurrencyTable AS TABLE(Id INT, Name VARCHAR(5))
@@ -74,28 +75,14 @@ BEGIN
 	SELECT @BaseCurrencyName = Name
 	FROM @BaseCurrencyTable bct
 	WHERE @BaseCurrencyId = bct.Id	
-	-- End Region
+	-- End Region	
 	
-	-- Region: Validate the same base currency in ChargeInfo,MinFee & Discount/Rebate
+	-- Region: MinfeeGroup Date range	
 	DECLARE @Month TINYINT = MONTH(@FromDate)
 	DECLARE @FirstDate DATETIME = DATEADD(mm, DATEDIFF(mm, 0, @FromDate), 0)
 	DECLARE @LastDate DATETIME = DATEADD (dd, -1, DATEADD(mm, DATEDIFF(mm, 0, @FromDate) + 1, 0))
 	DECLARE @DaysInMonth INT = DATEDIFF(day, @FirstDate, @LastDate) + 1
 	
-	IF (SELECT COUNT(mf.CurrencyId)
-		FROM bodb_licensee.dbo.LA_MinFee mf WITH(NOLOCK)
-		WHERE (mf.FeeTypeId = 1 AND mf.CurrencyId = @BaseCurrencyId )
-			AND mf.ProductId IN (SELECT ProductId FROM @PartyChargeInfo)
-			AND ((mf.FromDate BETWEEN @FirstDate AND @LastDate) OR (mf.ToDate BETWEEN @FirstDate AND @LastDate) OR (mf.FromDate<@FirstDate AND @LastDate < mf.ToDate))
-			AND (mf.PartyId = @PartyId OR mf.PartyId IN (SELECT PartyId FROM @PartyGroup))) = 0
-	BEGIN
-		SELECT @ErrCode=1, @ErrMsg='Wrong Base Currency'
-		RETURN
-	END		
-	-- End Region
-	
-	-- Region: MinfeeGroup Date range	
-
 	DECLARE @MinFeeGroup AS TABLE (
 		FeeType		TINYINT,	
 		PartyId		INT, 
@@ -112,7 +99,11 @@ BEGIN
 			CASE WHEN @FirstDate>= mf.FromDate THEN @FirstDate ELSE mf.FromDate END AS FromDate,
 			CASE WHEN @LastDate < mf.ToDate THEN @LastDate ELSE mf.ToDate END AS ToDate
 		FROM bodb_licensee.dbo.LA_MinFee mf WITH(NOLOCK)
-		WHERE ((mf.FeeTypeId = 1 AND mf.CurrencyId = @BaseCurrencyId ) OR mf.FeeTypeId = 2)
+		WHERE ((mf.FeeTypeId = 1 AND mf.CurrencyId = @BaseCurrencyId ) OR mf.FeeTypeId = 2 AND EXISTS ( SELECT PartyId 
+																										FROM bodb_licensee.dbo.LA_MinFee m WITH(NOLOCK)
+																										WHERE m.FeeTypeId = 1 
+																											AND m.PartyId = mf.PartyId
+																											AND m.CurrencyId = @BaseCurrencyId))					
 			AND mf.ProductId IN (SELECT ProductId FROM @PartyChargeInfo)
 			AND ((mf.FromDate BETWEEN @FirstDate AND @LastDate) OR (mf.ToDate BETWEEN @FirstDate AND @LastDate) OR (mf.FromDate<@FirstDate AND @LastDate < mf.ToDate))
 			AND (mf.PartyId = @PartyId OR mf.PartyId IN (SELECT PartyId FROM @PartyGroup))						
@@ -133,8 +124,44 @@ BEGIN
 	SET mf.ActualFee =  mf.FeeAmount 						
 	FROM @MinFeeGroup mf
 	WHERE mf.FeeType = 1 AND mf.ActualFee IS NULL	
-	SELECT * FROM @MinFeeGroup mfg
+	--SELECT * FROM @MinFeeGroup mfg
 	-- End region
+	
+	-- Region: Validate the same base currency in ChargeInfo,MinFee & Discount/Rebate
+	DECLARE @BaseCurrencyCheck TABLE(
+		Party INT, 
+		Product INT, 
+		FeeType INT, 
+		BaseCurrencyCount INT, 
+		NonBaseCurrencyCount INT)
+	
+	INSERT INTO @BaseCurrencyCheck
+	SELECT m.PartyId, m.ProductId, m.FeeTypeId,
+		 SUM(CASE WHEN m.CurrencyId = @BaseCurrencyID THEN 1 ELSE 0 END) BaseCurrencyCount
+		,SUM(CASE WHEN m.CurrencyId != @BaseCurrencyID THEN 1 ELSE 0 END) NonBaseCurrencyCount
+	FROM bodb_licensee.dbo.LA_MinFee m WITH(NOLOCK)
+	WHERE m.FeeTypeId = 1 AND m.PartyId IN (SELECT pg.PartyId FROM @PartyGroup pg)
+	GROUP BY m.PartyId, m.ProductId, m.FeeTypeId	
+	IF EXISTS(SELECT 1 FROM @BaseCurrencyCheck WHERE BaseCurrencyCount = 0 AND NonBaseCurrencyCount > 0)
+	BEGIN
+		SELECT @ErrCode = 1, @ErrMsg = 'Wrong currency setting on MinFee or Waive amount'
+		RETURN
+	END
+	
+	DELETE FROM @BaseCurrencyCheck
+	INSERT INTO @BaseCurrencyCheck
+	SELECT m.PartyId, m.ProductId, m.FeeType,
+		 SUM(CASE WHEN m.CurrencyId = @BaseCurrencyID THEN 1 ELSE 0 END) BaseCurrencyCount
+		,SUM(CASE WHEN m.CurrencyId != @BaseCurrencyID THEN 1 ELSE 0 END) NonBaseCurrencyCount
+	FROM @MinFeeGroup m
+	GROUP BY m.PartyId, m.ProductId, m.FeeType	
+	
+	IF EXISTS(SELECT 1 FROM @BaseCurrencyCheck WHERE BaseCurrencyCount = 0 AND NonBaseCurrencyCount > 0)
+	BEGIN
+		SELECT @ErrCode = 1, @ErrMsg = 'Wrong currency setting on MinFee or Waive amount'
+		RETURN
+	END
+	-- End Region
 	
 	-- Region: Get exchange rate info
 	CREATE TABLE #Exchange ( 
@@ -145,12 +172,10 @@ BEGIN
 	
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)	
+	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	-- End region
 	
 	-- Region: Get Amount by Product
-	DECLARE @DrawFilter SMALLINT = 1	
-		
 	CREATE TABLE #TempData (
 		LicenseeId		INT, 
 		PartyId			INT, 
@@ -177,7 +202,7 @@ BEGIN
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId
 	)
 	CREATE NONCLUSTERED INDEX Idx_InvoiceData ON #TempData (PartyId, ProductId)
-	
+
 	UPDATE #TempData
 	SET AmountToCompany =	CASE  
 								WHEN td.ProductId = 3 THEN (-td.WinLoss * p.Rate - td.AComm) * e.Rate									
@@ -186,8 +211,7 @@ BEGIN
 							END
 	FROM #TempData td INNER JOIN @PartyChargeInfo p ON td.LicenseeId = p.LicenseeId AND td.ProductId = p.ProductID
 		INNER JOIN #Exchange e ON td.rptDate = e.ExchangeDate AND td.CurrencyId = e.ExchangeID
-	
-	--SELECT * FROM #TempData td
+		
 	-- End region
 	
 	-- Region: Check min fee group	
@@ -287,13 +311,14 @@ BEGIN
 			GROUP BY DiscountGroupType, dg.CurrencyId) t ON d.ToDate = t.ToDate
 	)
 	
-	DECLARE @DiscountGroup AS TABLE(DiscountGroupId		SMALLINT,									
-									DiscountGroupType	TINYINT,																		
-									FromAmount			MONEY,
-									ToAmount			MONEY,
-									Rate				MONEY,
-									ProductId			TINYINT)
-		
+	DECLARE @DiscountGroup AS TABLE(
+		DiscountGroupId		SMALLINT,									
+		DiscountGroupType	TINYINT,																		
+		FromAmount			MONEY,
+		ToAmount			MONEY,
+		Rate				MONEY,
+		ProductId			TINYINT)
+
 	INSERT INTO @DiscountGroup (DiscountGroupId, DiscountGroupType, FromAmount, ToAmount, Rate, ProductId )	
 	(
 		SELECT dg.DiscountGroupId, dg.DiscountGroupType, dgd.FromAmount, dgd.ToAmount, dgd.Rate, dgp.ProductId
@@ -302,7 +327,7 @@ BEGIN
 			INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupProduct dgp WITH(NOLOCK) ON dg.DiscountGroupId = dgp.DiscountGroupId
 			INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupAssignment dga WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
 		WHERE	dga.PartyID = @PartyId
-				-- AND dg.CurrencyId = @BaseCurrencyId
+				AND dg.CurrencyId = @BaseCurrencyId
 				AND dgp.ProductId IN ( SELECT ProductId FROM #InvoiceData)			
 	)
 	-- End Region	
