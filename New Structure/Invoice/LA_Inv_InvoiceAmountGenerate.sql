@@ -141,7 +141,7 @@ BEGIN
 		,SUM(CASE WHEN m.CurrencyId != @BaseCurrencyID THEN 1 ELSE 0 END) NonBaseCurrencyCount
 	FROM bodb_licensee.dbo.LA_MinFee m WITH(NOLOCK)
 	WHERE m.FeeTypeId = 1 AND m.PartyId IN (SELECT pg.PartyId FROM @PartyGroup pg)
-		AND ((mf.FromDate BETWEEN @FirstDate AND @LastDate) OR (mf.ToDate BETWEEN @FirstDate AND @LastDate) OR (mf.FromDate<@FirstDate AND @LastDate < mf.ToDate))
+		AND ((m.FromDate BETWEEN @FirstDate AND @LastDate) OR (m.ToDate BETWEEN @FirstDate AND @LastDate) OR (m.FromDate<@FirstDate AND @LastDate < m.ToDate))
 	GROUP BY m.PartyId, m.ProductId, m.FeeTypeId	
 	IF EXISTS(SELECT 1 FROM @BaseCurrencyCheck WHERE BaseCurrencyCount = 0 AND NonBaseCurrencyCount > 0)
 	BEGIN
