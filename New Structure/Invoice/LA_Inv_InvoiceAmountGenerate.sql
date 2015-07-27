@@ -210,7 +210,8 @@ BEGIN
 								WHEN td.ProductId <> 3 THEN (-td.WinLoss * p.Rate) * e.Rate
 								ELSE 0 
 							END
-	FROM #TempData td INNER JOIN @PartyChargeInfo p ON td.LicenseeId = p.LicenseeId AND td.ProductId = p.ProductID
+	FROM #TempData td 
+		INNER JOIN @PartyChargeInfo p ON td.LicenseeId = p.LicenseeId AND td.ProductId = p.ProductID
 		INNER JOIN #Exchange e ON td.rptDate = e.ExchangeDate AND td.CurrencyId = e.ExchangeID
 		
 	-- End region
@@ -242,7 +243,8 @@ BEGIN
 	INSERT INTO @AppliedMinFeeData (PartyId,ProductId,AmountToCompany)
 	(
 	    SELECT mf.PartyId,cte.ProductId, cte.AmountToCompany					
-	    FROM @MinFeeGroup mf INNER JOIN SumAmout_Cte cte ON mf.PartyId = cte.PartyId
+	    FROM @MinFeeGroup mf 
+			INNER JOIN SumAmout_Cte cte ON mf.PartyId = cte.PartyId
 	    WHERE	mf.FeeType = 2 
 				AND mf.PartyId = @PartyId
 	)
@@ -305,11 +307,11 @@ BEGIN
 	INSERT INTO @DiscountGroupHeader(DiscountGroupId,DiscountGroupType,CurrencyId,FromDate,ToDate)
 	(
 		SELECT d.DiscountGroupId, t.DiscountGroupType,t.CurrencyId,d.FromDate,t.ToDate
-		FROM bodb_Licensee.dbo.LA_DiscountGroupHeader d WITH(NOLOCK) INNER JOIN 
-			(SELECT DiscountGroupType, CurrencyId, Max(ToDate) AS ToDate
-			FROM bodb_Licensee.dbo.LA_DiscountGroupHeader dg WITH(NOLOCK)
-			WHERE @FromDate<= ToDate AND FromDate<=@ToDate
-			GROUP BY DiscountGroupType, dg.CurrencyId) t ON d.ToDate = t.ToDate
+		FROM bodb_Licensee.dbo.LA_DiscountGroupHeader d WITH(NOLOCK) 
+			INNER JOIN (SELECT DiscountGroupType, CurrencyId, Max(ToDate) AS ToDate
+						FROM bodb_Licensee.dbo.LA_DiscountGroupHeader dg WITH(NOLOCK)
+						WHERE @FromDate<= ToDate AND FromDate<=@ToDate
+						GROUP BY DiscountGroupType, dg.CurrencyId) t ON d.ToDate = t.ToDate
 	)
 	
 	DECLARE @DiscountGroup AS TABLE(
@@ -337,7 +339,8 @@ BEGIN
 	INSERT INTO #InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType)
 	(
 	    SELECT iv.PartyId, iv.ProductId, iv.InvoiceAmount * dg.Rate AS InvoiceAmount, dg.DiscountGroupType AS AmountType
-	    FROM #InvoiceData iv INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
+	    FROM #InvoiceData iv 
+			INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
 	    WHERE ROUND(iv.InvoiceAmount - 0.5, 0) BETWEEN dg.FromAmount AND dg.ToAmount
 			AND iv.IsApplyMinFee = 0
 			AND dg.DiscountGroupType = 1
@@ -349,7 +352,8 @@ BEGIN
 	INSERT INTO #InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType)
 	(
 	    SELECT iv.PartyId, iv.ProductId, iv.InvoiceAmount * dg.Rate AS InvoiceAmount, dg.DiscountGroupType AS AmountType
-	    FROM #InvoiceData iv INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
+	    FROM #InvoiceData iv 
+			INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
 	    WHERE ROUND(iv.InvoiceAmount - ISNULL((SELECT SUM(id.InvoiceAmount)
 										FROM #InvoiceData id
 										WHERE iv.PartyId = id.PartyId 
@@ -373,7 +377,8 @@ BEGIN
 			END AS ProductName,
 		id.InvoiceAmount,
 		id.AmountType
-	FROM #InvoiceData id  LEFT JOIN bodb_licensee.dbo.Product3rd p ON id.ProductId = p.Productid
+	FROM #InvoiceData id  
+		LEFT JOIN bodb_licensee.dbo.Product3rd p ON id.ProductId = p.Productid
 	-- End Region
 	
 	DROP TABLE #Exchange
