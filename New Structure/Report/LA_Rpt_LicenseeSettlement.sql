@@ -21,9 +21,13 @@ AS
 		Base on : IMS_Rpt_LicenseeSettlement
 		DB: DB052.bodb02
 		Revisions:  
+<<<<<<< HEAD
 			- 20150407@Florent: add filter no draw for BA Settlement
 			- 20150505@Florent: Integrate Gold Deluxe and Voidbridge
 			- 20150519@Florent: Change Product Prefix from VB to VG
+=======
+				- 20150407@Florent: add filter no draw for BA Settlement
+>>>>>>> 26618_SettlementPage
 		Param's Explanation:  				
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
 								'NG' -> Number Game			'BA' -> BA
@@ -33,7 +37,11 @@ AS
 	*/  
 SET NOCOUNT ON
 BEGIN			
+<<<<<<< HEAD
 	DECLARE @LicenseeID INT	
+=======
+	DECLARE @LicenseeID INT		
+>>>>>>> 26618_SettlementPage
 		, @DrawFilter SMALLINT = 1
 	CREATE TABLE #Result (
 			Winlostdate		DATETIME
