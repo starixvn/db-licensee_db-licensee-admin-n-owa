@@ -30,13 +30,13 @@ BEGIN
 	DECLARE @InvoiceSymbol VARCHAR(20) = ''
 	DECLARE @InvoiceNumber INT = 1						
 	
-	SELECT @InvoiceSymbol = i.InvoiceSymbol 
+	SELECT TOP 1 @InvoiceSymbol = i.InvoiceSymbol 
 	FROM dbo.LA_InvoiceHeader i WITH(NOLOCK)
 	WHERE i.BillerId = @BillerId
 	ORDER BY i.InvoiceDate DESC
 	
 	SELECT @InvoiceNumber = ISNULL(MAX(i.InvoiceNumber), 0) + 1
-	FROM dbo.LA_InvoiceHeader i 
+	FROM dbo.LA_InvoiceHeader i WITH(NOLOCK)
 	WHERE i.BillerId = @BillerId
 	
 	UPDATE @InvoiceInfo

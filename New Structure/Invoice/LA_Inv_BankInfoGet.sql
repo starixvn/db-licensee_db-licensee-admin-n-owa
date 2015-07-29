@@ -13,7 +13,7 @@ AS
 SET NOCOUNT ON
 BEGIN		
 	SELECT TOP 1 b.BankId,b.AccountNumber,b.BankName,b.BankAddress,b.IBAN,b.BeneficiaryName,b.SwiftCode,b.CorrespondentBank,b.CorrespondentAccountNumber,b.CorrespondentAddress,b.CorrespondentSwiftCode
-	FROM dbo.LA_InvoiceSetting s INNER JOIN dbo.LA_BankInfo b ON s.FromPartyId = b.PartyId AND s.BankId = b.BankId
+	FROM dbo.LA_InvoiceSetting s WITH(NOLOCK) INNER JOIN dbo.LA_BankInfo b WITH(NOLOCK) ON s.FromPartyId = b.PartyId AND s.BankId = b.BankId
 	WHERE s.ToPartyId = @BillerId 
 		AND s.FromPartyId = @PayerId
 END
