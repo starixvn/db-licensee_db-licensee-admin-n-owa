@@ -24,7 +24,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert]
 	, @ErrMsg			NVARCHAR(1000)	= ''	OUTPUT
 	, @NewInvoiceNumber INT						OUTPUT
 AS
-SET NOCOUNT ON
+
 /*  
 	 Created: 20150721@Bravo
 	 Task : Create Invoice 
@@ -57,7 +57,9 @@ SET NOCOUNT ON
 				</InvoiceDetail>
 			</InvoiceDetails>
 */
-BEGIN	
+BEGIN
+	SET NOCOUNT ON
+		
 	IF	ISNULL(@BillerId, 0) > 0 
 		AND ISNULL(@PayerId,0) > 0 
 		AND ISNULL(@CurrencyId,0) > 0 

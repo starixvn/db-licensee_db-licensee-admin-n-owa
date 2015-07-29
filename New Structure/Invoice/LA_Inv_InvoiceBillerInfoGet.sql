@@ -10,8 +10,9 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceBillerInfoGet]
 	  @BillerId INT
 	, @PayerId INT
 AS
-SET NOCOUNT ON
 BEGIN
+	SET NOCOUNT ON
+	
 	DECLARE @InvoiceInfo AS TABLE(		
 		InvoiceSymbol		VARCHAR(20), 
 		InvoiceNumber		INT,

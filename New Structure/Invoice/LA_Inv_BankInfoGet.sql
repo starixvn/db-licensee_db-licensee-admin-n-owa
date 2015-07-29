@@ -10,9 +10,20 @@ ALTER PROCEDURE [dbo].[LA_Inv_BankInfoGet]
 	  @BillerId INT
 	, @PayerId INT	
 AS
-SET NOCOUNT ON
 BEGIN		
-	SELECT TOP 1 b.BankId,b.AccountNumber,b.BankName,b.BankAddress,b.IBAN,b.BeneficiaryName,b.SwiftCode,b.CorrespondentBank,b.CorrespondentAccountNumber,b.CorrespondentAddress,b.CorrespondentSwiftCode
+	SET NOCOUNT ON
+	
+	SELECT TOP 1 b.BankId,
+		b.AccountNumber,
+		b.BankName,
+		b.BankAddress,
+		b.IBAN,
+		b.BeneficiaryName,
+		b.SwiftCode,
+		b.CorrespondentBank,
+		b.CorrespondentAccountNumber,
+		b.CorrespondentAddress,
+		b.CorrespondentSwiftCode
 	FROM dbo.LA_InvoiceSetting s WITH(NOLOCK) INNER JOIN dbo.LA_BankInfo b WITH(NOLOCK) ON s.ToPartyId = b.PartyId AND s.BankId = b.BankId
 	WHERE s.ToPartyId = @BillerId 
 		AND s.FromPartyId = @PayerId

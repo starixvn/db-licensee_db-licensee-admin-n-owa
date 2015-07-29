@@ -10,8 +10,9 @@ CREATE PROCEDURE [dbo].[LA_Inv_InvoiceTypeInfoGet]
 	  @BillerId INT
 	, @PayerId INT	
 AS
-SET NOCOUNT ON
 BEGIN
+	SET NOCOUNT ON
+	
 	SELECT it.InvTypeId AS InvoiceTypeId, it.InvTypeName AS InvoiceTypeName, 
 		CASE 
 			WHEN ivs.ProductId = 0 THEN 'SB' 

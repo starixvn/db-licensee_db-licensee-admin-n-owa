@@ -15,8 +15,9 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
 	, @ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
 WITH RECOMPILE
 AS
-SET NOCOUNT ON
 BEGIN
+	SET NOCOUNT ON
+	
 	-- Region Party Group Assignment
 	DECLARE @PartyGroup AS TABLE (PartyId INT)
 	INSERT INTO @PartyGroup(PartyId)
