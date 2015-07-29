@@ -18,8 +18,8 @@ BEGIN
 		InvoiceNumber		INT,
 		InvoiceTemplateId	SMALLINT,
 		InvoiceTemplateName	VARCHAR(50),
-		InvoiceTempaltePath	VARCHAR(255))
-	INSERT INTO @InvoiceInfo(InvoiceTemplateId,InvoiceTemplateName,InvoiceTempaltePath)
+		InvoiceTemplatePath	VARCHAR(255))
+	INSERT INTO @InvoiceInfo(InvoiceTemplateId,InvoiceTemplateName,InvoiceTemplatePath)
 	(
 		SELECT ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath
 		FROM dbo.LA_InvoiceSetting ivs WITH(NOLOCK) INNER JOIN dbo.LA_InvoiceTemplate itpl WITH(NOLOCK) ON ivs.InvTempId = itpl.InvTemplateId
@@ -44,6 +44,6 @@ BEGIN
 	SET InvoiceSymbol = @InvoiceSymbol,
 	    InvoiceNumber = @InvoiceNumber
 
-	SELECT TOP 1 ii.InvoiceSymbol, ii.InvoiceNumber, ii.InvoiceTemplateId, ii.InvoiceTemplateName, ii.InvoiceTempaltePath
+	SELECT TOP 1 ii.InvoiceSymbol, ii.InvoiceNumber, ii.InvoiceTemplateId, ii.InvoiceTemplateName, ii.InvoiceTemplatePath
 	FROM @InvoiceInfo ii
 END
