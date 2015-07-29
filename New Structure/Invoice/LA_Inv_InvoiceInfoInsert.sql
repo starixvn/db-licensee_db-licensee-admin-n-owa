@@ -86,6 +86,7 @@ BEGIN
 		IF(@@ERROR <> 0)
 		BEGIN
 			SELECT @ErrCode = 3, @ErrMsg = 'Insert invoice failed.' -- System error
+			RETURN
 		END
 				
 		DECLARE @CurrentInvoiceHeaderId BIGINT = SCOPE_IDENTITY()
