@@ -65,7 +65,7 @@ BEGIN
 		AND ISNULL(@InvoiceNumber, 0) > 0
 		AND ISNULL(@DueDate, '') <> ''
 		AND ISNULL(@InvoiceDetailXml, '') <> ''
-		AND ISNULL(@Amount, 0) > 0
+		AND @Amount IS NOT NULL
 		AND ISNULL(@InvoiceType, 0) > 0
 		AND ISNULL(@UserID, 0) > 0
 	BEGIN
@@ -83,6 +83,11 @@ BEGIN
 		(
 			@BillerId, @PayerId, @CurrencyId, @InvoiceSymbol, @InvoiceNumber, @CurrentDateTime, @DueDate, @Amount, @InvoiceType, @StatusId, @Note, 0, 0, @UserID, @CurrentDateTime, @CurrentDateTime
 		)
+		IF(@@ERROR <> 0)
+		BEGIN
+			SELECT @ErrCode = 3, @ErrMsg = 'Insert invoice failed.' -- System error
+		END
+				
 		DECLARE @CurrentInvoiceHeaderId BIGINT = SCOPE_IDENTITY()
 		-- End Region
 		
@@ -115,7 +120,7 @@ BEGIN
 			)
 			EXEC sp_xml_removedocument @idoc
 			
-			IF EXISTS (SELECT 1 FROM @Detail WHERE ProductId < 0 OR Amount <= 0 OR FeeType < 0)
+			IF EXISTS (SELECT 1 FROM @Detail WHERE ProductId < 0 OR FeeType < 0)
 			BEGIN
 				SELECT @ErrCode = 2, @ErrMsg = 'Invalid invoice detail inputs.'
         		RETURN
