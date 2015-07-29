@@ -45,8 +45,7 @@ BEGIN
 		, ProductID			INT
 		, Rate				MONEY
 		, FromDate			SMALLDATETIME
-		, ToDate			SMALLDATETIME
-		, CurrencyId		INT)
+		, ToDate			SMALLDATETIME)
 
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
 	(
@@ -124,7 +123,7 @@ BEGIN
 	SET mf.ActualFee =  mf.FeeAmount 						
 	FROM @MinFeeGroup mf
 	WHERE mf.FeeType = 1 AND mf.ActualFee IS NULL	
-	--SELECT * FROM @MinFeeGroup mfg
+	SELECT * FROM @MinFeeGroup mfg
 	-- End region
 	
 	-- Region: Validate the same base currency in ChargeInfo,MinFee & Discount/Rebate

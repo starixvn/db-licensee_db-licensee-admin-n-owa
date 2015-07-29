@@ -83,7 +83,7 @@ BEGIN
 		(
 			@BillerId, @PayerId, @CurrencyId, @InvoiceSymbol, @InvoiceNumber, @CurrentDateTime, @DueDate, @Amount, @InvoiceType, @StatusId, @Note, 0, 0, @UserID, @CurrentDateTime, @CurrentDateTime
 		)
-		DECLARE @CurrentInvoiceHeaderId BIGINT = @@IDENTITY
+		DECLARE @CurrentInvoiceHeaderId BIGINT = SCOPE_IDENTITY()
 		-- End Region
 		
 		-- Region: Insert data to Invoice Detail
