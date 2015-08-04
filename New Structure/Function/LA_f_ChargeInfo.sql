@@ -236,7 +236,7 @@ BEGIN
     BEGIN
 	   INSERT INTO @tbChargeInfo (ChargeID, PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Bettype, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate)
 	   (
-			SELECT 0 AS ChargeID
+			SELECT DISTINCT 0 AS ChargeID
 				, f1.Val PartyId
 				, CASE 
 					WHEN ISNULL(pd.IsDeposit, 0) = 1
@@ -280,7 +280,7 @@ BEGIN
 
 			UNION ALL
 
-			SELECT 0 AS ChargeID
+			SELECT DISTINCT 0 AS ChargeID
 				, f1.Val PartyId
 				, CASE 
 					WHEN ISNULL(pd.IsDeposit, 0) = 1
