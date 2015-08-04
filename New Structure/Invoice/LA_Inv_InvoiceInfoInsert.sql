@@ -8,16 +8,16 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert] 
 	  @BillerId			INT
-	, @PayerId			INT	
-	, @CurrencyId		INT
+	, @PayerId			INT		
 	, @InvoiceSymbol	VARCHAR(20)
 	, @InvoiceNumber	INT	
+	, @FromDate			DATETIME
+	, @ToDate			DATETIME
 	, @DueDate			DATETIME
 	, @Amount			MONEY
 	, @InvoiceType		SMALLINT
-	, @StatusId			SMALLINT
 	, @Note				VARCHAR(200)	
-	, @InvoiceDetailXml VARCHAR(1000)
+	, @InvoiceDetailXml VARCHAR(MAX)
 	, @UserID			INT
 	, @LoginIP			VARCHAR (50)	= ''
 	, @ErrCode			INT				= 0		OUTPUT
@@ -59,10 +59,10 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
+	
 		
 	IF	ISNULL(@BillerId, 0) > 0 
-		AND ISNULL(@PayerId,0) > 0 
-		AND ISNULL(@CurrencyId,0) > 0 
+		AND ISNULL(@PayerId,0) > 0 		
 		AND ISNULL(@InvoiceSymbol,'') <> '' 
 		AND ISNULL(@InvoiceNumber, 0) > 0
 		AND ISNULL(@DueDate, '') <> ''
@@ -79,11 +79,20 @@ BEGIN
 		-- End Region
 		
 		-- Region: Insert data to Invoice Header
+		DECLARE @CurrencyId INT = 12	
+		SET @CurrencyId = ISNULL((	SELECT TOP 1 oci.BaseCurrencyId
+										FROM bodb_licensee.dbo.OAS_ChargeInfo oci WITH(NOLOCK)	
+										WHERE	oci.FromParty = @PayerId 
+												AND(@FromDate BETWEEN oci.FromDate AND oci.ToDate 
+													OR @ToDate BETWEEN oci.FromDate AND oci.ToDate
+													OR (@FromDate < oci.FromDate AND @ToDate > oci.ToDate))
+									), 12)
+									
 		DECLARE @CurrentDateTime DATETIME = GETDATE()
 		INSERT INTO dbo.LA_InvoiceHeader (BillerId,PartyId,CurrencyId,InvoiceSymbol,InvoiceNumber,InvoiceDate,DueDate,Amount,InvoiceType,StatusId,Note,HasSent,HasDeleted,CreatedBy,CreatedDateTime,UpdatedDateTime)
 		VALUES
 		(
-			@BillerId, @PayerId, @CurrencyId, @InvoiceSymbol, @InvoiceNumber, @CurrentDateTime, @DueDate, @Amount, @InvoiceType, @StatusId, @Note, 0, 0, @UserID, @CurrentDateTime, @CurrentDateTime
+			@BillerId, @PayerId, @CurrencyId, @InvoiceSymbol, @InvoiceNumber, @CurrentDateTime, @DueDate, @Amount, @InvoiceType, 0, @Note, 0, 0, @UserID, @CurrentDateTime, @CurrentDateTime
 		)
 		IF(@@ERROR <> 0)
 		BEGIN
