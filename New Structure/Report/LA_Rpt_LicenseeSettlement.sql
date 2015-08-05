@@ -224,7 +224,7 @@ BEGIN
 					, SUM(ISNULL(b.CommissionA, 0)) AS AComm
 					, SUM(ISNULL(b.betcount, 0)) BetCount
 					FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK)
-						INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.Bettype = p.Bettype					
+						INNER JOIN (SELECT DISTINCT LicenseeId, Bettype FROM @tmpParty) p ON b.SiteId = p.LicenseeID AND b.Bettype = p.Bettype					
 					WHERE
 						b.SiteID = @LicenseeID
 						AND b.rptDate BETWEEN @FromDate AND @ToDate			
