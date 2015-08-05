@@ -28,7 +28,7 @@ AS
 /*  
 	 Created: 20150721@Bravo
 	 Task : Create Invoice 
-	 DB: DB052.bodb_Licensee  
+	 DB: DB052.bodb_Licensee
    
 	 Revisions:     
 	 Params:		
@@ -106,7 +106,7 @@ BEGIN
 		-- Region: Insert data to Invoice Detail
 		BEGIN TRY
 			DECLARE @idoc AS INT
-			DECLARE @xmlText VARCHAR(1000) = REPLACE(@InvoiceDetailXml, '&', '&amp;')
+			DECLARE @xmlText VARCHAR(MAX) = REPLACE(@InvoiceDetailXml, '&', '&amp;')
 			DECLARE @Detail AS TABLE(
 				ItemName	VARCHAR(200),
 				Reference	VARCHAR(100),
@@ -131,20 +131,13 @@ BEGIN
 				AmountType VARCHAR(10) 'AmountType'
 			)
 			EXEC sp_xml_removedocument @idoc
+						
+			INSERT INTO dbo.LA_InvoiceDetail(InvoiceHeaderId,ItemName,Reference,ProductId,Amount,FeeType)
+			SELECT @CurrentInvoiceHeaderId,ItemName,Reference,ProductId,Amount,FeeType
+			FROM @Detail
 			
-			IF EXISTS (SELECT 1 FROM @Detail WHERE ProductId < 0 OR FeeType < 0)
-			BEGIN
-				SELECT @ErrCode = 2, @ErrMsg = 'Invalid invoice detail inputs.'
-        		RETURN
-			END
-			ELSE
-			BEGIN
-				INSERT INTO dbo.LA_InvoiceDetail(InvoiceHeaderId,ItemName,Reference,ProductId,Amount,FeeType)
-				SELECT @CurrentInvoiceHeaderId,ItemName,Reference,ProductId,Amount,FeeType
-				FROM @Detail
-			END
         END TRY
-        BEGIN CATCH
+        BEGIN CATCH        	
         	SELECT @ErrCode = 2, @ErrMsg = 'Invalid invoice detail inputs.'
         	RETURN
         END CATCH
