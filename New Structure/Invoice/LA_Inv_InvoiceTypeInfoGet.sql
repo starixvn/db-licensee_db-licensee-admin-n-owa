@@ -42,6 +42,6 @@ BEGIN
 			LEFT JOIN bodb_licensee.dbo.Product3rd p WITH(NOLOCK) ON ivs.ProductId = p.Productid
 	WHERE	ivs.FromPartyId = @PayerId 
 			AND ivs.ToPartyId = @BillerId	
-			
-	GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceTypeInfoGet] TO bodbAdminNet
-END
+	
+END		
+GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceTypeInfoGet] TO bodbAdminNet

@@ -43,5 +43,6 @@ BEGIN
 	WHERE	s.ToPartyId = @BillerId 
 			AND s.FromPartyId = @PayerId
 		
-	GRANT EXECUTE ON [dbo].[LA_Inv_BankInfoGet] TO bodbAdminNet
 END
+
+GRANT EXECUTE ON [dbo].[LA_Inv_BankInfoGet] TO bodbAdminNet

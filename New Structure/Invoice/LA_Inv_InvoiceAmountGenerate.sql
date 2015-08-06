@@ -462,6 +462,6 @@ BEGIN
 	DROP TABLE #TempData
 	DROP TABLE #AppliedMinFee
 	DROP TABLE #InvoiceData
-	
-	GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceAmountGenerate] TO bodbAdminNet
 END
+
+GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceAmountGenerate] TO bodbAdminNet

@@ -185,5 +185,5 @@ BEGIN
 		RETURN
 	END
 	
-	GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceInfoInsert] TO bodbAdminNet
 END
+GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceInfoInsert] TO bodbAdminNet
