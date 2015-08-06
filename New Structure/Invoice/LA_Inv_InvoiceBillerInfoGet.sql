@@ -5,7 +5,21 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-
+/*	Header:
+	Created: 2015.08.06 - Bravo.Tran
+	Task : Create Invoice 
+	DB: DB052.bodb_Licensee
+   
+	Revisions: 
+		+ 2015.08.06: Invoice Biller Info - Get
+*/
+/*	Example:
+	USE bodb_licensee
+	DECLARE @BillerId INT = 98
+	DECLARE @PartyId INT = 14
+	
+	EXEC LA_Inv_InvoiceBillerInfoGet @BillerId, @PartyId
+*/
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceBillerInfoGet] 
 	  @BillerId INT
 	, @PayerId INT
@@ -46,4 +60,7 @@ BEGIN
 
 	SELECT TOP 1 ii.InvoiceSymbol, ii.InvoiceNumber, ii.InvoiceTemplateId, ii.InvoiceTemplateName, ii.InvoiceTemplatePath
 	FROM @InvoiceInfo ii
+	
+	GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceBillerInfoGet] TO bodbAdminNet
+
 END

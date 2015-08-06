@@ -25,13 +25,14 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert]
 	, @NewInvoiceNumber INT						OUTPUT
 AS
 
-/*  
-	 Created: 20150721@Bravo
-	 Task : Create Invoice 
-	 DB: DB052.bodb_Licensee
-   
-	 Revisions:     
-	 Params:		
+/*  Header:
+	Created: 2015.08.06 - Bravo.Tran
+	Task : Create Invoice 
+	DB: DB052.bodb_Licensee
+
+	Revisions:   
+		+ 2015.08.06: Save invoice.   
+	Params:		
 		+ @InvoiceDetailXml: 
 			<InvoiceDetails>
 				<InvoiceDetail>
@@ -57,13 +58,24 @@ AS
 				</InvoiceDetail>
 			</InvoiceDetails>
 */
+/*	Example:
+	USE bodb_licensee
+	declare @p2 nvarchar(1000)
+	declare @p9 int
+	set @p9=2
+	declare @p11 int
+	set @p11=0
+	exec LA_Inv_InvoiceInfoInsert @InvoiceNumber=9,@ErrMsg=@p2 output,@DueDate='2015-09-30 00:00:00',@Note='',@UserID=4,@InvoiceDetailXml='<InvoiceDetails><InvoiceDetail><Description>Software & Data Licensing & Data transmission fees for Jul 2015 
+	(Sportsbook)</Description><Reference></Reference><ProductId>0</ProductId><InvoiceAmount>483.87</InvoiceAmount><AmountType>0</AmountType></InvoiceDetail><InvoiceDetail><Description>1</Description><Reference></Reference><ProductId>0</ProductId><InvoiceAmount>21.19</InvoiceAmount><AmountType>1</AmountType></InvoiceDetail><InvoiceDetail><Description>1</Description><Reference></Reference><ProductId>0</ProductId><InvoiceAmount>21.19</InvoiceAmount><AmountType>1</AmountType></InvoiceDetail><InvoiceDetail><Description>Software & Data Licensing & Data transmission fees for Jul 2015 (Number Game)</Description><Reference></Reference><ProductId>2</ProductId><InvoiceAmount>109.12</InvoiceAmount><AmountType>0</AmountType></InvoiceDetail><InvoiceDetail><Description>Software & Data Licensing & Data transmission fees for Jul 2015 (BA)</Description><Reference></Reference><ProductId>3</ProductId><InvoiceAmount>17.34</InvoiceAmount><AmountType>0</AmountType></InvoiceDetail><InvoiceDetail><Description>Software & Data Licensing & Data transmission fees for Jul 2015 (Virtual Sports)</Description><Reference></Reference><ProductId>5</ProductId><InvoiceAmount>1</InvoiceAmount><AmountType>0</AmountType></InvoiceDetail><InvoiceDetail><Description>1</Description><Reference></Reference><ProductId>-1</ProductId><InvoiceAmount>1</InvoiceAmount><AmountType>0</AmountType></InvoiceDetail><InvoiceDetail><Description>1</Description><Reference></Reference><ProductId>-1</ProductId><InvoiceAmount>1</InvoiceAmount><AmountType>1</AmountType></InvoiceDetail></InvoiceDetails>',@BillerId=115,@Amount=568.9500,@ErrCode=@p9 output,@FromDate='2015-07-01 00:00:00',@NewInvoiceNumber=@p11 output,@InvoiceSymbol='BHC',@ToDate='2015-07-31 00:00:00',@PayerId=24,@LoginIP='10.19.10.68',@InvoiceType=1
+	select @p2, @p9, @p11
+*/
 BEGIN
 	SET NOCOUNT ON
 	
 		
 	IF	ISNULL(@BillerId, 0) > 0 
 		AND ISNULL(@PayerId,0) > 0 		
-		AND ISNULL(@InvoiceSymbol,'') <> '' 
+		AND @InvoiceSymbol IS NOT NULL
 		AND ISNULL(@InvoiceNumber, 0) > 0
 		AND ISNULL(@DueDate, '') <> ''
 		AND ISNULL(@InvoiceDetailXml, '') <> ''
@@ -72,21 +84,26 @@ BEGIN
 		AND ISNULL(@UserID, 0) > 0
 	BEGIN
 		-- Region: Check business logic: If invoice number exists, re-generate Invoice Number.
-		IF EXISTS (	SELECT 1 FROM dbo.LA_InvoiceHeader lih WITH(NOLOCK) WHERE lih.InvoiceSymbol = @InvoiceSymbol AND lih.InvoiceNumber = @InvoiceNumber)
+		IF EXISTS (	SELECT 1 
+					FROM dbo.LA_InvoiceHeader lih WITH(NOLOCK) 
+					WHERE lih.InvoiceSymbol = @InvoiceSymbol 
+						AND lih.InvoiceNumber = @InvoiceNumber)
 		BEGIN
-			SELECT @InvoiceNumber = (MAX(InvoiceNumber) + 1) FROM dbo.LA_InvoiceHeader lih WITH(NOLOCK) WHERE lih.BillerId = @BillerId
+			SELECT @InvoiceNumber = (MAX(InvoiceNumber) + 1) 
+			FROM dbo.LA_InvoiceHeader lih WITH(NOLOCK) 
+			WHERE lih.BillerId = @BillerId
 		END		
 		-- End Region
 		
 		-- Region: Insert data to Invoice Header
 		DECLARE @CurrencyId INT = 12	
 		SET @CurrencyId = ISNULL((	SELECT TOP 1 oci.BaseCurrencyId
-										FROM bodb_licensee.dbo.OAS_ChargeInfo oci WITH(NOLOCK)	
-										WHERE	oci.FromParty = @PayerId 
-												AND(@FromDate BETWEEN oci.FromDate AND oci.ToDate 
-													OR @ToDate BETWEEN oci.FromDate AND oci.ToDate
-													OR (@FromDate < oci.FromDate AND @ToDate > oci.ToDate))
-									), 12)
+									FROM bodb_licensee.dbo.OAS_ChargeInfo oci WITH(NOLOCK)	
+									WHERE	oci.FromParty = @PayerId 
+											AND(@FromDate BETWEEN oci.FromDate AND oci.ToDate 
+												OR @ToDate BETWEEN oci.FromDate AND oci.ToDate
+												OR (@FromDate < oci.FromDate AND @ToDate > oci.ToDate))
+								), 12)
 									
 		DECLARE @CurrentDateTime DATETIME = GETDATE()
 		INSERT INTO dbo.LA_InvoiceHeader (BillerId,PartyId,CurrencyId,InvoiceSymbol,InvoiceNumber,InvoiceDate,DueDate,Amount,InvoiceType,StatusId,Note,HasSent,HasDeleted,CreatedBy,CreatedDateTime,UpdatedDateTime)
@@ -167,4 +184,6 @@ BEGIN
 		SET @ErrMsg = 'Invalid invoice header inputs.'
 		RETURN
 	END
+	
+	GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceInfoInsert] TO bodbAdminNet
 END

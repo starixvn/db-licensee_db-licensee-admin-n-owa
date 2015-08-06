@@ -5,7 +5,31 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-
+/*	Header:
+	Created: 2015.08.06 - Bravo.Tran
+	Task : Create Invoice 
+	DB: DB052.bodb_Licensee
+   
+	Revisions: 
+		+ 2015.08.06: Invoice Amount - Generate
+*/
+/*	Example:
+	USE bodb02
+	DECLARE @FromDate DATETIME,
+		@ToDate DATETIME,
+		@PartyId INT,
+		@ProductCode VARCHAR(100),
+		@ErrCode INT,
+		@ErrMsg NVARCHAR(1000),
+		@BaseCurrency NVARCHAR(20)
+	SET @FromDate = '2015-07-1'
+	SET @ToDate = '2015-07-31'
+	SET @PartyId=17
+	SET @ProductCode='SB,BA,RB,NG,LC,VS,CS,BG,KN,PTCS,AGC,GD,VG,BT,MGC'	
+	
+	EXEC [LA_Inv_InvoiceAmountGenerate] @PartyId, @FromDate, @ToDate, @ProductCode, @ErrCode OUT, @ErrMsg OUT, @BaseCurrency OUT
+	SELECT @ErrCode, @ErrMsg, @BaseCurrency
+*/
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate] 
 	  @PartyId				INT
 	, @FromDate				DATETIME
@@ -22,11 +46,11 @@ BEGIN
 	DECLARE @PartyGroup AS TABLE (PartyId INT)
 	INSERT INTO @PartyGroup(PartyId)
 	(
-	    SELECT PartyId 
-		FROM bodb_licensee.dbo.LA_PartyGroupAssignment WITH(NOLOCK)
-		WHERE PartyGroupId IN (	SELECT PartyGroupId 
-								FROM bodb_licensee.dbo.LA_PartyGroupAssignment WITH(NOLOCK)
-								WHERE PartyId = @PartyId)
+	    SELECT	PartyId 
+		FROM	bodb_licensee.dbo.LA_PartyGroupAssignment WITH(NOLOCK)
+		WHERE	PartyGroupId IN (	SELECT	PartyGroupId 
+									FROM	bodb_licensee.dbo.LA_PartyGroupAssignment WITH(NOLOCK)
+									WHERE	PartyId = @PartyId)
 	)
 	
 	IF (SELECT COUNT(*) FROM @PartyGroup) = 0 -- Party dont have Party Group.
@@ -36,9 +60,9 @@ BEGIN
 	-- End region
 	
 	-- Region: Get party charge rate info
-	DECLARE @PartyIdString VARCHAR(100)
-	SELECT @PartyIdString = COALESCE(@PartyIdString + ', ', '') + CONVERT(VARCHAR(10), PartyId)
-	FROM @PartyGroup 
+	DECLARE	@PartyIdString VARCHAR(100)
+	SELECT	@PartyIdString = COALESCE(@PartyIdString + ', ', '') + CONVERT(VARCHAR(10), PartyId)
+	FROM	@PartyGroup 
 	
 	DECLARE @PartyChargeInfo AS TABLE (
 		PartyId				INT
@@ -50,9 +74,9 @@ BEGIN
 
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
 	(
-		SELECT PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
-		FROM bodb_licensee.dbo.LA_f_ChargeInfo_xtest(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
-		WHERE DI_Rate > 0 AND ProductId <> 1 --exclude RB
+		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
+		FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
+		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
 	)	
 	--SELECT * FROM @PartyChargeInfo pci
 	-- End region
@@ -74,7 +98,9 @@ BEGIN
 	
 	SELECT @BaseCurrencyName = Name
 	FROM @BaseCurrencyTable bct
-	WHERE @BaseCurrencyId = bct.Id	
+	WHERE @BaseCurrencyId = bct.Id
+	
+	SELECT @BaseCurrency = @BaseCurrencyName	
 	-- End Region	
 	
 	-- Region: MinfeeGroup Date range	
@@ -92,40 +118,29 @@ BEGIN
 		CurrencyId	INT,	
 		FeeAmount	MONEY, 
 		FromDate	DATETIME,	
-		ToDate		DATETIME, 
-		ActualFee	MONEY)
+		ToDate		DATETIME)
 	
 	INSERT INTO @MinFeeGroup(FeeType ,PartyId,ProductId, CurrencyId ,FeeAmount ,FromDate ,ToDate)
 	(
-		SELECT mf.FeeTypeId, mf.PartyId,mf.ProductId, mf.CurrencyId,mf.FeeAmount,
-			CASE WHEN @FirstDate>= mf.FromDate THEN @FirstDate ELSE mf.FromDate END AS FromDate,
-			CASE WHEN @LastDate < mf.ToDate THEN @LastDate ELSE mf.ToDate END AS ToDate
-		FROM bodb_licensee.dbo.LA_MinFee mf WITH(NOLOCK)
-		WHERE ((mf.FeeTypeId = 1 AND mf.CurrencyId = @BaseCurrencyId ) OR mf.FeeTypeId = 2 AND EXISTS ( SELECT PartyId 
-																										FROM bodb_licensee.dbo.LA_MinFee m WITH(NOLOCK)
-																										WHERE m.FeeTypeId = 1 
-																											AND m.PartyId = mf.PartyId
-																											AND m.CurrencyId = @BaseCurrencyId))					
-			AND mf.ProductId IN (SELECT ProductId FROM @PartyChargeInfo)
-			AND ((mf.FromDate BETWEEN @FirstDate AND @LastDate) OR (mf.ToDate BETWEEN @FirstDate AND @LastDate) OR (mf.FromDate<@FirstDate AND @LastDate < mf.ToDate))
-			AND (mf.PartyId = @PartyId OR mf.PartyId IN (SELECT PartyId FROM @PartyGroup))						
+		SELECT	mf.FeeTypeId, 
+				mf.PartyId,
+				mf.ProductId, 
+				mf.CurrencyId,
+				mf.FeeAmount,
+				CASE WHEN @FirstDate>= mf.FromDate THEN @FirstDate ELSE mf.FromDate END AS FromDate,
+				CASE WHEN @LastDate < mf.ToDate THEN @LastDate ELSE mf.ToDate END AS ToDate
+		FROM	bodb_licensee.dbo.LA_MinFee mf WITH(NOLOCK)
+		WHERE	((mf.FeeTypeId = 1 AND mf.CurrencyId = @BaseCurrencyId ) 
+				OR mf.FeeTypeId = 2 AND EXISTS (SELECT PartyId 
+												FROM bodb_licensee.dbo.LA_MinFee m WITH(NOLOCK)
+												WHERE m.FeeTypeId = 1 
+													AND m.PartyId = mf.PartyId
+													AND m.CurrencyId = @BaseCurrencyId))					
+				AND mf.ProductId IN (SELECT ProductId FROM @PartyChargeInfo)
+				AND ((mf.FromDate BETWEEN @FirstDate AND @LastDate) OR (mf.ToDate BETWEEN @FirstDate AND @LastDate) OR (mf.FromDate<@FirstDate AND @LastDate < mf.ToDate))
+				AND (mf.PartyId = @PartyId OR mf.PartyId IN (SELECT PartyId FROM @PartyGroup))						
 	)
-	
-	-- Calculate actual min fee via prorate.
-	UPDATE @MinFeeGroup
-	SET mf.ActualFee =  mf.FeeAmount 
-						* (@DaysInMonth - (	SELECT SUM(DATEDIFF(d, w.FromDate, w.ToDate) + 1)
-											FROM @MinFeeGroup w
-											WHERE FeeType = 2 AND mf.PartyId = w.PartyId AND mf.ProductId = w.ProductId))
-						/ @DaysInMonth						
-						
-	FROM @MinFeeGroup mf
-	WHERE mf.FeeType = 1
-	
-	UPDATE @MinFeeGroup
-	SET mf.ActualFee =  mf.FeeAmount 						
-	FROM @MinFeeGroup mf
-	WHERE mf.FeeType = 1 AND mf.ActualFee IS NULL	
+			
 	--SELECT * FROM @MinFeeGroup mfg
 	-- End region
 	
@@ -447,4 +462,6 @@ BEGIN
 	DROP TABLE #TempData
 	DROP TABLE #AppliedMinFee
 	DROP TABLE #InvoiceData
+	
+	GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceAmountGenerate] TO bodbAdminNet
 END
