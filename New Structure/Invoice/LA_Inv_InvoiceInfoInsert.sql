@@ -84,29 +84,60 @@ BEGIN
 		AND ISNULL(@UserID, 0) > 0
 	BEGIN
 		-- Region: Check business logic: If invoice number exists, re-generate Invoice Number.
-		IF EXISTS (	SELECT 1 
-					FROM dbo.LA_InvoiceHeader lih WITH(NOLOCK) 
-					WHERE lih.InvoiceSymbol = @InvoiceSymbol 
-						AND lih.InvoiceNumber = @InvoiceNumber)
+		IF EXISTS (	SELECT	1 
+					FROM	dbo.LA_InvoiceHeader lih WITH(NOLOCK) 
+					WHERE	lih.InvoiceSymbol = @InvoiceSymbol 
+							AND lih.InvoiceNumber = @InvoiceNumber)
 		BEGIN
-			SELECT @InvoiceNumber = (MAX(InvoiceNumber) + 1) 
-			FROM dbo.LA_InvoiceHeader lih WITH(NOLOCK) 
-			WHERE lih.BillerId = @BillerId
+			SELECT	@InvoiceNumber = (MAX(InvoiceNumber) + 1) 
+			FROM	dbo.LA_InvoiceHeader lih WITH(NOLOCK) 
+			WHERE	lih.BillerId = @BillerId
 		END		
 		-- End Region
 		
 		-- Region: Insert data to Invoice Header
 		DECLARE @CurrencyId INT = 12	
-		SET @CurrencyId = ISNULL((	SELECT TOP 1 opd.CurrencyId
-									FROM bodb_licensee.dbo.OAS_PartyDetail opd WITH(NOLOCK)	
+		SET @CurrencyId = ISNULL((	SELECT	TOP 1 opd.CurrencyId
+									FROM	bodb_licensee.dbo.OAS_PartyDetail opd WITH(NOLOCK)	
 									WHERE	opd.PartyID = @PayerId
 								), 12)
 									
 		DECLARE @CurrentDateTime DATETIME = GETDATE()
-		INSERT INTO dbo.LA_InvoiceHeader (BillerId,PartyId,CurrencyId,InvoiceSymbol,InvoiceNumber,InvoiceDate,DueDate,Amount,InvoiceType,StatusId,Note,HasSent,HasDeleted,CreatedBy,CreatedDateTime,UpdatedDateTime)
+		INSERT	INTO dbo.LA_InvoiceHeader (
+				BillerId,
+				PartyId,
+				CurrencyId,
+				InvoiceSymbol,				
+				InvoiceNumber,
+				InvoiceDate,
+				DueDate,
+				Amount,
+				InvoiceType,
+				StatusId,
+				Note,
+				HasSent,
+				HasDeleted,
+				CreatedBy,
+				CreatedDateTime,
+				UpdatedDateTime)
 		VALUES
 		(
-			@BillerId, @PayerId, @CurrencyId, @InvoiceSymbol, @InvoiceNumber, @CurrentDateTime, @DueDate, @Amount, @InvoiceType, 0, @Note, 0, 0, @UserID, @CurrentDateTime, @CurrentDateTime
+				@BillerId, 
+				@PayerId, 
+				@CurrencyId, 
+				@InvoiceSymbol, 
+				@InvoiceNumber, 
+				@CurrentDateTime, 
+				@DueDate, 				
+				@Amount, 
+				@InvoiceType, 
+				0, 
+				@Note, 
+				0, 
+				0, 
+				@UserID, 
+				@CurrentDateTime, 
+				@CurrentDateTime
 		)
 		IF(@@ERROR <> 0)
 		BEGIN
@@ -122,37 +153,37 @@ BEGIN
 			DECLARE @idoc AS INT
 			DECLARE @xmlText VARCHAR(MAX) = REPLACE(@InvoiceDetailXml, '&', '&amp;')
 			DECLARE @Detail AS TABLE(
-				ItemName	VARCHAR(200),
-				Reference	VARCHAR(100),
-				ProductId	INT,
-				Amount		MONEY,
-				FeeType		TINYINT)
+					ItemName	VARCHAR(200),
+					Reference	VARCHAR(100),
+					ProductId	INT,
+					Amount		MONEY,
+					FeeType		TINYINT)
 						
-			EXEC sp_xml_preparedocument @idoc OUTPUT, @xmlText			
-			INSERT INTO @Detail(ItemName,Reference,ProductId,Amount,FeeType)
+			EXEC	sp_xml_preparedocument @idoc OUTPUT, @xmlText			
+			INSERT	INTO @Detail(ItemName,Reference,ProductId,Amount,FeeType)
 			SELECT 
-				CAST([Description] AS VARCHAR(200)),
-				CAST(Reference AS VARCHAR(100)),
-				CAST(ProductId AS INT),
-				CAST(InvoiceAmount AS MONEY),
-				CAST(AmountType AS TINYINT)
-			FROM OPENXML(@idoc, 'InvoiceDetails/InvoiceDetail')
+					CAST([Description] AS VARCHAR(200)),
+					CAST(Reference AS VARCHAR(100)),
+					CAST(ProductId AS INT),
+					CAST(InvoiceAmount AS MONEY),
+					CAST(AmountType AS TINYINT)
+			FROM	OPENXML(@idoc, 'InvoiceDetails/InvoiceDetail')
 			WITH (
-				[Description] VARCHAR(200) 'Description',
-				Reference VARCHAR(100) 'Reference',
-				ProductId VARCHAR(10) 'ProductId',
-				InvoiceAmount VARCHAR(20) 'InvoiceAmount',
-				AmountType VARCHAR(10) 'AmountType'
+					[Description] VARCHAR(200) 'Description',
+					Reference VARCHAR(100) 'Reference',
+					ProductId VARCHAR(10) 'ProductId',
+					InvoiceAmount VARCHAR(20) 'InvoiceAmount',
+					AmountType VARCHAR(10) 'AmountType'
 			)
 			EXEC sp_xml_removedocument @idoc
 						
-			INSERT INTO dbo.LA_InvoiceDetail(InvoiceHeaderId,ItemName,Reference,ProductId,Amount,FeeType)
-			SELECT @CurrentInvoiceHeaderId,ItemName,Reference,ProductId,Amount,FeeType
-			FROM @Detail
+			INSERT	INTO dbo.LA_InvoiceDetail(InvoiceHeaderId,ItemName,Reference,ProductId,Amount,FeeType)
+			SELECT	@CurrentInvoiceHeaderId,ItemName,Reference,ProductId,Amount,FeeType
+			FROM	@Detail
 			
         END TRY
         BEGIN CATCH        	
-        	SELECT @ErrCode = 2, @ErrMsg = 'Invalid invoice detail inputs.'
+        	SELECT	@ErrCode = 2, @ErrMsg = 'Invalid invoice detail inputs.'
         	RETURN
         END CATCH
 		-- End Region
