@@ -28,38 +28,39 @@ BEGIN
 	SET NOCOUNT ON
 	
 	DECLARE @InvoiceInfo AS TABLE(		
-		InvoiceSymbol		VARCHAR(20), 
-		InvoiceNumber		INT,
-		InvoiceTemplateId	SMALLINT,
-		InvoiceTemplateName	VARCHAR(50),
-		InvoiceTemplatePath	VARCHAR(255))
-	INSERT INTO @InvoiceInfo(InvoiceTemplateId,InvoiceTemplateName,InvoiceTemplatePath)
+			InvoiceSymbol		VARCHAR(20), 
+			InvoiceNumber		INT,
+			InvoiceTemplateId	SMALLINT,
+			InvoiceTemplateName	VARCHAR(50),
+			InvoiceTemplatePath	VARCHAR(255))
+	INSERT	INTO @InvoiceInfo(InvoiceTemplateId,InvoiceTemplateName,InvoiceTemplatePath)
 	(
-		SELECT ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath
-		FROM dbo.LA_InvoiceSetting ivs WITH(NOLOCK) INNER JOIN dbo.LA_InvoiceTemplate itpl WITH(NOLOCK) ON ivs.InvTempId = itpl.InvTemplateId
-		WHERE ivs.FromPartyId = @PayerId 
-			AND ivs.ToPartyId = @BillerId	
-		GROUP BY ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath
+		SELECT	ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath
+		FROM	dbo.LA_InvoiceSetting ivs WITH(NOLOCK) 
+				INNER JOIN dbo.LA_InvoiceTemplate itpl WITH(NOLOCK) ON ivs.InvTempId = itpl.InvTemplateId
+		WHERE	ivs.FromPartyId = @PayerId 
+				AND ivs.ToPartyId = @BillerId	
+		GROUP	BY ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath
 	)
 	
 	DECLARE @InvoiceSymbol VARCHAR(20) = ''
 	DECLARE @InvoiceNumber INT = 1						
 	
-	SELECT TOP 1 @InvoiceSymbol = i.InvoiceSymbol 
-	FROM dbo.LA_InvoiceHeader i WITH(NOLOCK)
-	WHERE i.BillerId = @BillerId
-	ORDER BY i.InvoiceDate DESC
+	SELECT	TOP 1 @InvoiceSymbol = i.InvoiceSymbol 
+	FROM	dbo.LA_InvoiceHeader i WITH(NOLOCK)
+	WHERE	i.BillerId = @BillerId
+	ORDER	BY i.InvoiceDate DESC
 	
-	SELECT @InvoiceNumber = ISNULL(MAX(i.InvoiceNumber), 0) + 1
-	FROM dbo.LA_InvoiceHeader i WITH(NOLOCK)
-	WHERE i.BillerId = @BillerId
+	SELECT	@InvoiceNumber = ISNULL(MAX(i.InvoiceNumber), 0) + 1
+	FROM	dbo.LA_InvoiceHeader i WITH(NOLOCK)
+	WHERE	i.BillerId = @BillerId
 	
-	UPDATE @InvoiceInfo
-	SET InvoiceSymbol = @InvoiceSymbol,
-	    InvoiceNumber = @InvoiceNumber
+	UPDATE	@InvoiceInfo
+	SET		InvoiceSymbol = @InvoiceSymbol,
+			InvoiceNumber = @InvoiceNumber
 
-	SELECT TOP 1 ii.InvoiceSymbol, ii.InvoiceNumber, ii.InvoiceTemplateId, ii.InvoiceTemplateName, ii.InvoiceTemplatePath
-	FROM @InvoiceInfo ii
+	SELECT	TOP 1 ii.InvoiceSymbol, ii.InvoiceNumber, ii.InvoiceTemplateId, ii.InvoiceTemplateName, ii.InvoiceTemplatePath
+	FROM	@InvoiceInfo ii
 
 END
 
