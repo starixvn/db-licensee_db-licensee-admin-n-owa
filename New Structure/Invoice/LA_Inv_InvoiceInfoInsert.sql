@@ -97,12 +97,9 @@ BEGIN
 		
 		-- Region: Insert data to Invoice Header
 		DECLARE @CurrencyId INT = 12	
-		SET @CurrencyId = ISNULL((	SELECT TOP 1 oci.BaseCurrencyId
-									FROM bodb_licensee.dbo.OAS_ChargeInfo oci WITH(NOLOCK)	
-									WHERE	oci.FromParty = @PayerId 
-											AND(@FromDate BETWEEN oci.FromDate AND oci.ToDate 
-												OR @ToDate BETWEEN oci.FromDate AND oci.ToDate
-												OR (@FromDate < oci.FromDate AND @ToDate > oci.ToDate))
+		SET @CurrencyId = ISNULL((	SELECT TOP 1 opd.CurrencyId
+									FROM bodb_licensee.dbo.OAS_PartyDetail opd WITH(NOLOCK)	
+									WHERE	opd.PartyID = @PayerId
 								), 12)
 									
 		DECLARE @CurrentDateTime DATETIME = GETDATE()
