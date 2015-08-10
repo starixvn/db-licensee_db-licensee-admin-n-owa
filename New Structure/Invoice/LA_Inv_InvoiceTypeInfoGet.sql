@@ -41,7 +41,7 @@ BEGIN
 			INNER JOIN dbo.LA_InvoiceType it WITH(NOLOCK) ON ivs.InvTypeId = it.InvTypeId 
 			LEFT JOIN bodb_licensee.dbo.Product3rd p WITH(NOLOCK) ON ivs.ProductId = p.Productid
 	WHERE	ivs.FromPartyId = @PayerId 
-			AND ivs.ToPartyId = @BillerId	
+			AND ivs.ToPartyId = @BillerId
 	
 END		
 GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceTypeInfoGet] TO bodbAdminNet

@@ -9,7 +9,7 @@ GO
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert] 
 	  @BillerId			INT
 	, @PayerId			INT		
-	, @InvoiceSymbol	VARCHAR(20)
+	, @InvoiceSymbol	VARCHAR(20)		= ''
 	, @InvoiceNumber	INT	
 	, @FromDate			DATETIME
 	, @ToDate			DATETIME
@@ -18,6 +18,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert]
 	, @InvoiceType		SMALLINT
 	, @Note				VARCHAR(200)	
 	, @InvoiceDetailXml VARCHAR(MAX)
+	, @IsSeparateProduct BIT			= 0
 	, @UserID			INT
 	, @LoginIP			VARCHAR (50)	= ''
 	, @ErrCode			INT				= 0		OUTPUT
@@ -119,7 +120,8 @@ BEGIN
 				HasDeleted,
 				CreatedBy,
 				CreatedDateTime,
-				UpdatedDateTime)
+				UpdatedDateTime,
+				IsSeparateProduct)
 		VALUES
 		(
 				@BillerId, 
@@ -137,7 +139,8 @@ BEGIN
 				0, 
 				@UserID, 
 				@CurrentDateTime, 
-				@CurrentDateTime
+				@CurrentDateTime,
+				@IsSeparateProduct
 		)
 		IF(@@ERROR <> 0)
 		BEGIN

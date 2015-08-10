@@ -35,13 +35,18 @@ BEGIN
 			i.DueDate,
 			i.Amount,
 			i.InvoiceType,
+			lis.InvTempId AS InvoiceTemplateId,
+			lit.InvTemplateName AS InvoiceTemplateName,
 			i.StatusId,
 			i.Note,
 			i.HasSent,
 			i.CreatedBy,
 			i.CreatedDateTime,
-			i.UpdatedDateTime
-	FROM	dbo.LA_InvoiceHeader i
+			i.UpdatedDateTime,
+			i.IsSeparateProduct
+	FROM	dbo.LA_InvoiceHeader i WITH(NOLOCK)
+			INNER JOIN dbo.LA_InvoiceSetting lis ON i.BillerId = lis.ToPartyId AND i.PartyId = lis.FromPartyId
+			INNER JOIN dbo.LA_InvoiceTemplate lit ON lis.InvTempId = lit.InvTemplateId
 	WHERE	i.InvoiceHeaderId = @InvoiceHeaderId
 			AND i.HasDeleted = 0
 	
@@ -51,7 +56,7 @@ BEGIN
 			i.ProductId,
 			i.FeeType,
 			i.Amount
-	FROM	dbo.LA_InvoiceDetail i
+	FROM	dbo.LA_InvoiceDetail i WITH (NOLOCK)
 	WHERE	i.InvoiceHeaderId = @InvoiceHeaderId
 END		
 GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceInfoGet] TO bodbAdminNet
