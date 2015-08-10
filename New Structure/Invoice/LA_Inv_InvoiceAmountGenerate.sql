@@ -132,9 +132,9 @@ BEGIN
 														AND m.PartyId = mf.PartyId
 														AND m.ProductId = mf.ProductId
 														AND m.CurrencyId = @BaseCurrencyId
-														AND ((mf.FromDate BETWEEN @FirstDate AND @LastDate) 
-															OR (mf.ToDate BETWEEN @FirstDate AND @LastDate) 
-															OR (mf.FromDate<@FirstDate AND @LastDate < mf.ToDate)
+														AND ((m.FromDate BETWEEN @FirstDate AND @LastDate) 
+															OR (m.ToDate BETWEEN @FirstDate AND @LastDate) 
+															OR (m.FromDate<@FirstDate AND @LastDate < m.ToDate)
 														)
 													)
 				)					
@@ -201,7 +201,10 @@ BEGIN
 	-- Region: Validate the same base currency in ChargeInfo,MinFee & Discount/Rebate
 	DECLARE @EmptyTable AS TABLE(
 			ProductId	INT,
-			ProductCode VARCHAR(10)
+			ProductCode	VARCHAR(20),
+			Productname	VARCHAR(200),
+			InvoiceAmount MONEY,
+			AmountType	TINYINT
 	)
 	DECLARE @BaseCurrencyCheck TABLE(
 			Party INT, 
@@ -227,7 +230,7 @@ BEGIN
 	IF EXISTS(SELECT 1 FROM @BaseCurrencyCheck WHERE BaseCurrencyCount = 0 AND NonBaseCurrencyCount > 0)
 	BEGIN
 		SELECT @ErrCode = 1, @ErrMsg = 'Wrong currency setting on MinFee or Waive amount'
-		SELECT ProductId, ProductCode FROM @EmptyTable
+		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
 		RETURN
 	END
 	
@@ -243,7 +246,7 @@ BEGIN
 	IF EXISTS(SELECT 1 FROM @BaseCurrencyCheck WHERE BaseCurrencyCount = 0 AND NonBaseCurrencyCount > 0)
 	BEGIN
 		SELECT @ErrCode = 2, @ErrMsg = 'Wrong currency setting on Discount amount'
-		SELECT ProductId, ProductCode FROM @EmptyTable
+		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
 		RETURN
 	END
 	
