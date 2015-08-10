@@ -4,6 +4,10 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+
+ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoGet] 
+	  @InvoiceHeaderId INT	
+AS
 /*	Header:
 	Created: 2015.08.07 - Bravo.Tran
 	Task : Create Invoice 
@@ -18,9 +22,6 @@ GO
 	
 	EXEC LA_Inv_InvoiceInfoGet @InvoiceHeaderId
 */
-ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoGet] 
-	  @InvoiceHeaderId INT	
-AS
 BEGIN
 	SET NOCOUNT ON
 	

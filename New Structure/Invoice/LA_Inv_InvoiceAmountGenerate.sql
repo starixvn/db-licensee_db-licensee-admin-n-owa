@@ -5,6 +5,17 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+
+ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
+	  @PartyId				INT
+	, @FromDate				DATETIME
+	, @ToDate				DATETIME
+	, @ProductCode			VARCHAR(100)	
+	, @ErrCode				INT				= 0		OUTPUT
+	, @ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
+	, @BaseCurrency			NVARCHAR(20)	= 'GBP'	OUTPUT
+WITH RECOMPILE
+AS
 /*	Header:
 	Created: 2015.08.06 - Bravo.Tran
 	Task : Create Invoice 
@@ -30,18 +41,8 @@ GO
 	EXEC [LA_Inv_InvoiceAmountGenerate] @PartyId, @FromDate, @ToDate, @ProductCode, @ErrCode OUT, @ErrMsg OUT, @BaseCurrency OUT
 	SELECT @ErrCode, @ErrMsg, @BaseCurrency
 */
-ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
-	  @PartyId				INT
-	, @FromDate				DATETIME
-	, @ToDate				DATETIME
-	, @ProductCode			VARCHAR(100)	
-	, @ErrCode				INT				= 0		OUTPUT
-	, @ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
-	, @BaseCurrency			NVARCHAR(20)	= 'GBP'	OUTPUT
-WITH RECOMPILE
-AS
-SET NOCOUNT ON
 BEGIN
+	SET NOCOUNT ON
 	-- Region Party Group Assignment
 	DECLARE @PartyGroup AS TABLE (PartyId INT)
 	INSERT INTO @PartyGroup(PartyId)
@@ -83,7 +84,7 @@ BEGIN
 	-- Region: Get base Currency
 	DECLARE @BaseCurrencyId INT = 12
 	DECLARE @BaseCurrencyName VARCHAR(5) = 'GBP'
-	SET @BaseCurrencyId = ISNULL((	SELECT TOP 1 opd.CurrencyId
+	SET @BaseCurrencyId = ISNULL((	SELECT TOP 1 opd.BaseCurrencyId
 									FROM bodb_licensee.dbo.OAS_PartyDetail opd WITH(NOLOCK)	
 									WHERE	opd.PartyID = @PartyId
 								), 12)
