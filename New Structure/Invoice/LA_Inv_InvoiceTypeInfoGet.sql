@@ -45,4 +45,6 @@ BEGIN
 			AND ivs.ToPartyId = @BillerId
 	
 END		
+
+GO
 GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceTypeInfoGet] TO bodbAdminNet

@@ -483,4 +483,5 @@ BEGIN
 	DROP TABLE #InvoiceData
 END
 
+GO
 GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceAmountGenerate] TO bodbAdminNet

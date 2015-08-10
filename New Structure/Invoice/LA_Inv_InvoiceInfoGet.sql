@@ -60,4 +60,6 @@ BEGIN
 	FROM	dbo.LA_InvoiceDetail i WITH (NOLOCK)
 	WHERE	i.InvoiceHeaderId = @InvoiceHeaderId
 END		
+
+GO
 GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceInfoGet] TO bodbAdminNet

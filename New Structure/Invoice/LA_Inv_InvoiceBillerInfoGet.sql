@@ -65,4 +65,5 @@ BEGIN
 
 END
 
+GO
 GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceBillerInfoGet] TO bodbAdminNet

@@ -217,4 +217,6 @@ BEGIN
 	END
 	
 END
+
+GO
 GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceInfoInsert] TO bodbAdminNet

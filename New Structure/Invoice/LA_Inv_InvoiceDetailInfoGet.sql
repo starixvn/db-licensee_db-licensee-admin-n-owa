@@ -108,4 +108,6 @@ BEGIN
 	
 	DROP TABLE #tmpResult
 END		
+
+GO
 GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceDetailInfoGet] TO bodbAdminNet
