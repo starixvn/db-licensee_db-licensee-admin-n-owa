@@ -25,7 +25,7 @@ AS
 		+ 2015.08.06: Invoice Amount - Generate
 */
 /*	Example:
-	USE bodb02
+	USE bodb_Licensee
 	DECLARE @FromDate DATETIME,
 		@ToDate DATETIME,
 		@PartyId INT,
@@ -143,10 +143,9 @@ BEGIN
 					OR (mf.ToDate BETWEEN @FirstDate AND @LastDate) 
 					OR (mf.FromDate<@FirstDate AND @LastDate < mf.ToDate)
 				)
-				AND (mf.PartyId = @PartyId OR mf.PartyId IN (SELECT PartyId FROM @PartyGroup))						
+				AND (mf.PartyId = @PartyId OR mf.PartyId IN (SELECT PartyId FROM @PartyGroup))
 	)
 			
-	--SELECT * FROM @MinFeeGroup mfg
 	-- End region
 	
 	-- Region: Get discount group info
@@ -200,6 +199,10 @@ BEGIN
 	-- End Region	
 	
 	-- Region: Validate the same base currency in ChargeInfo,MinFee & Discount/Rebate
+	DECLARE @EmptyTable AS TABLE(
+			ProductId	INT,
+			ProductCode VARCHAR(10)
+	)
 	DECLARE @BaseCurrencyCheck TABLE(
 			Party INT, 
 			Product INT, 
@@ -224,6 +227,7 @@ BEGIN
 	IF EXISTS(SELECT 1 FROM @BaseCurrencyCheck WHERE BaseCurrencyCount = 0 AND NonBaseCurrencyCount > 0)
 	BEGIN
 		SELECT @ErrCode = 1, @ErrMsg = 'Wrong currency setting on MinFee or Waive amount'
+		SELECT ProductId, ProductCode FROM @EmptyTable
 		RETURN
 	END
 	
@@ -238,7 +242,8 @@ BEGIN
 	
 	IF EXISTS(SELECT 1 FROM @BaseCurrencyCheck WHERE BaseCurrencyCount = 0 AND NonBaseCurrencyCount > 0)
 	BEGIN
-		SELECT @ErrCode = 1, @ErrMsg = 'Wrong currency setting on Discount amount'
+		SELECT @ErrCode = 2, @ErrMsg = 'Wrong currency setting on Discount amount'
+		SELECT ProductId, ProductCode FROM @EmptyTable
 		RETURN
 	END
 	
