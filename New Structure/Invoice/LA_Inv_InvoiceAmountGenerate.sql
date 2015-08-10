@@ -1,4 +1,4 @@
-USE [bodb02]
+USE [bodb_Licensee]
 GO
 /****** Object:  StoredProcedure [dbo].[LA_Inv_InvoiceAmountGenerate]   Script Date: 07/20/2015 09:12:41 ******/
 SET ANSI_NULLS ON
@@ -48,9 +48,9 @@ BEGIN
 	INSERT INTO @PartyGroup(PartyId)
 	(
 	    SELECT	PartyId 
-		FROM	bodb_licensee.dbo.LA_PartyGroupAssignment WITH(NOLOCK)
+		FROM	dbo.LA_PartyGroupAssignment WITH(NOLOCK)
 		WHERE	PartyGroupId IN (	SELECT	PartyGroupId 
-									FROM	bodb_licensee.dbo.LA_PartyGroupAssignment WITH(NOLOCK)
+									FROM	dbo.LA_PartyGroupAssignment WITH(NOLOCK)
 									WHERE	PartyId = @PartyId)
 	)
 	
@@ -76,7 +76,7 @@ BEGIN
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
 	(
 		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
-		FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
+		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
 	)	
 	-- End region
@@ -85,7 +85,7 @@ BEGIN
 	DECLARE @BaseCurrencyId INT = 12
 	DECLARE @BaseCurrencyName VARCHAR(5) = 'GBP'
 	SET @BaseCurrencyId = ISNULL((	SELECT TOP 1 opd.BaseCurrencyId
-									FROM bodb_licensee.dbo.OAS_PartyDetail opd WITH(NOLOCK)	
+									FROM dbo.OAS_PartyDetail opd WITH(NOLOCK)	
 									WHERE	opd.PartyID = @PartyId
 								), 12)
 	
@@ -124,10 +124,10 @@ BEGIN
 				mf.FeeAmount,
 				CASE WHEN @FirstDate>= mf.FromDate THEN @FirstDate ELSE mf.FromDate END AS FromDate,
 				CASE WHEN @LastDate < mf.ToDate THEN @LastDate ELSE mf.ToDate END AS ToDate
-		FROM	bodb_licensee.dbo.LA_MinFee mf WITH(NOLOCK)
+		FROM	dbo.LA_MinFee mf WITH(NOLOCK)
 		WHERE   ((mf.FeeTypeId = 1 AND mf.CurrencyId = @BaseCurrencyId ) 
 					OR mf.FeeTypeId = 2 AND EXISTS (SELECT PartyId 
-													FROM bodb_licensee.dbo.LA_MinFee m WITH(NOLOCK)
+													FROM dbo.LA_MinFee m WITH(NOLOCK)
 													WHERE m.FeeTypeId = 1 
 														AND m.PartyId = mf.PartyId
 														AND m.ProductId = mf.ProductId
@@ -213,7 +213,7 @@ BEGIN
 			m.FeeTypeId,
 			SUM(CASE WHEN m.CurrencyId = @BaseCurrencyID THEN 1 ELSE 0 END) BaseCurrencyCount,
 			SUM(CASE WHEN m.CurrencyId != @BaseCurrencyID THEN 1 ELSE 0 END) NonBaseCurrencyCount
-	FROM	bodb_licensee.dbo.LA_MinFee m WITH(NOLOCK)
+	FROM	dbo.LA_MinFee m WITH(NOLOCK)
 	WHERE	m.FeeTypeId = 1 AND m.PartyId IN (SELECT pg.PartyId FROM @PartyGroup pg)
 			AND ((m.FromDate BETWEEN @FirstDate AND @LastDate) 
 				OR (m.ToDate BETWEEN @FirstDate AND @LastDate) 
@@ -256,7 +256,7 @@ BEGIN
 	
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	-- End region
 	
 	-- Region: Get Amount by Product
@@ -472,7 +472,7 @@ BEGIN
 			id.InvoiceAmount,
 			id.AmountType
 	FROM	#InvoiceData id  
-		LEFT JOIN bodb_licensee.dbo.Product3rd p ON id.ProductId = p.Productid
+		LEFT JOIN dbo.Product3rd p ON id.ProductId = p.Productid
 	
 	SELECT @ErrCode = 0, @ErrMsg = ''
 	-- End Region	
