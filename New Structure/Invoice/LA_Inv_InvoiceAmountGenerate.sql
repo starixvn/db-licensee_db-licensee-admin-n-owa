@@ -165,7 +165,7 @@ BEGIN
 							FROM bodb_Licensee.dbo.LA_DiscountGroupHeader dg WITH(NOLOCK)
 								INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupAssignment dga WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
 							WHERE @FromDate<= ToDate AND FromDate<=@ToDate
-								AND dga.PartyID = @PartyId OR dga.PartyId IN (SELECT PartyID FROM @PartyGroup pg)
+								AND dga.PartyID = @PartyId
 							GROUP BY dg.DiscountGroupId, dg.DiscountGroupType, dg.CurrencyId, dga.PartyId) t ON d.DiscountGroupId = t.DiscountGroupId
 	)
 	
@@ -195,7 +195,6 @@ BEGIN
 				
 		WHERE	dgp.ProductId IN ( SELECT DISTINCT ProductId FROM @PartyChargeInfo)			
 	)
-	
 	-- End Region	
 	
 	-- Region: Validate the same base currency in ChargeInfo,MinFee & Discount/Rebate
@@ -229,7 +228,7 @@ BEGIN
 	
 	IF EXISTS(SELECT 1 FROM @BaseCurrencyCheck WHERE BaseCurrencyCount = 0 AND NonBaseCurrencyCount > 0)
 	BEGIN
-		SELECT @ErrCode = 1, @ErrMsg = 'Wrong currency setting on MinFee or Waive amount'
+		SELECT @ErrCode = 1, @ErrMsg = 'Please check the Exchange settings of Payer&rsquo;s minfee or minfee group. Exchange of minfee or minfees in group should be the same with Payer&rsquo;s exchange.'
 		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
 		RETURN
 	END
@@ -245,7 +244,7 @@ BEGIN
 	
 	IF EXISTS(SELECT 1 FROM @BaseCurrencyCheck WHERE BaseCurrencyCount = 0 AND NonBaseCurrencyCount > 0)
 	BEGIN
-		SELECT @ErrCode = 2, @ErrMsg = 'Wrong currency setting on Discount amount'
+		SELECT @ErrCode = 2, @ErrMsg = 'Please check the Exchange settings of Payer&rsquo;s discount. Exchange of discount must be the same with Payer&rsquo;s exchange.'
 		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
 		RETURN
 	END
@@ -420,9 +419,10 @@ BEGIN
 	
 	CREATE	TABLE #InvoiceData (
 			PartyId			INT,
-			ProductId		TINYINT, 
+			ProductId		INT, 
 			InvoiceAmount	MONEY, 
 			AmountType		TINYINT,
+			Rate			MONEY,
 			IsApplyMinFee	BIT)
 	
 	INSERT INTO #InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType,IsApplyMinFee)
@@ -442,9 +442,9 @@ BEGIN
 	-- End region
 	
 	-- Region: Apply Discount
-	INSERT INTO #InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType)
+	INSERT INTO #InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
 	(
-	    SELECT	iv.PartyId, iv.ProductId, iv.InvoiceAmount * dg.Rate AS InvoiceAmount, dg.DiscountGroupType AS AmountType
+	    SELECT	iv.PartyId, iv.ProductId, iv.InvoiceAmount * dg.Rate AS InvoiceAmount, dg.DiscountGroupType AS AmountType, dg.Rate
 	    FROM	#InvoiceData iv 
 				INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
 	    WHERE	ROUND(iv.InvoiceAmount - 0.5, 0) BETWEEN dg.FromAmount AND dg.ToAmount
@@ -455,9 +455,9 @@ BEGIN
 	-- End Region
 	
 	-- Region: Apply Rebate
-	INSERT INTO #InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType)
+	INSERT INTO #InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
 	(
-	    SELECT	iv.PartyId, iv.ProductId, iv.InvoiceAmount * dg.Rate AS InvoiceAmount, dg.DiscountGroupType AS AmountType
+	    SELECT	iv.PartyId, iv.ProductId, iv.InvoiceAmount * dg.Rate AS InvoiceAmount, dg.DiscountGroupType AS AmountType, dg.Rate
 	    FROM	#InvoiceData iv 
 				INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
 	    WHERE	iv.IsApplyMinFee = 0
@@ -478,7 +478,8 @@ BEGIN
 				ELSE p.ProductName
 				END AS ProductName,
 			id.InvoiceAmount,
-			id.AmountType
+			id.AmountType,
+			id.Rate
 	FROM	#InvoiceData id  
 		LEFT JOIN dbo.Product3rd p ON id.ProductId = p.Productid
 	
