@@ -1,4 +1,4 @@
-USE bodb02
+USE bodb_licensee
 GO
 SET ANSI_NULLS ON
 GO
@@ -14,16 +14,24 @@ AS
 /*	Header:
 	Created: 2015.08.07 - Bravo.Tran
 	Task : Create Invoice 
-	DB: DB052.bodb02
+	DB: DB052.bodb_licensee
    
 	Revisions: 
 		+ 2015.08.07: Invoice Detail Info - Get
 */
 /*	Example:
 	USE bodb_licensee
-	DECLARE @InvoiceHeaderId INT = 8
+	DECLARE @FromDate DATETIME,
+		@ToDate DATETIME,
+		@PartyId INT,
+		@ProductCode VARCHAR(100)
+		
+	SET @FromDate = '2015-07-1'
+	SET @ToDate = '2015-07-31'
+	SET @PartyId=17
+	SET @ProductCode='SB,BA,RB,NG,LC,VS,CS,BG,KN,PTCS,AGC,GD,VG'	
 	
-	EXEC LA_Inv_InvoiceDetailInfoGet @InvoiceHeaderId
+	EXEC [LA_Inv_InvoiceDetailInfoGet] @PartyId, @FromDate, @ToDate, @ProductCode
 */
 BEGIN
 	SET NOCOUNT ON
@@ -31,14 +39,14 @@ BEGIN
 	-- Region: Get base Currency
 	DECLARE @BaseCurrencyId INT = 12
 	DECLARE @BaseCurrencyName VARCHAR(5) = 'GBP'
-	SET @BaseCurrencyId = ISNULL((	SELECT TOP 1 opd.CurrencyId
+	SET @BaseCurrencyId = ISNULL((	SELECT TOP 1 opd.BaseCurrencyId
 									FROM bodb_licensee.dbo.OAS_PartyDetail opd WITH(NOLOCK)	
 									WHERE	opd.PartyID = @PartyId
 								), 12)
 	
 	DECLARE @BaseCurrencyTable AS TABLE(Id INT, Name VARCHAR(5))
 	INSERT	INTO @BaseCurrencyTable(Id,Name)
-	EXECUTE bodb_Licensee.dbo.LA_SelBaseCurrency
+	EXECUTE dbo.LA_SelBaseCurrency
 	
 	SELECT	@BaseCurrencyName = Name
 	FROM	@BaseCurrencyTable bct
@@ -48,39 +56,42 @@ BEGIN
 	
 	-- Region: Get party charge rate info	
 	DECLARE @PartyChargeInfo AS TABLE (
-		PartyId				INT
-		, LicenseeId		INT
-		, ProductID			INT
-		, Rate				MONEY
-		, FromDate			SMALLDATETIME
-		, ToDate			SMALLDATETIME)
+		PartyId		INT,
+		LicenseeId	INT,
+		ProductID	INT,
+		Rate		MONEY,
+		FromDate	SMALLDATETIME,
+		ToDate		SMALLDATETIME,
+		RowNumber	INT)
 
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
+	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, RowNumber)
 	(
-		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
-		FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, @ProductCode, 'OA', 1)
+		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate, ROW_NUMBER() OVER (ORDER BY ProductId)
+		FROM	dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
-	)
-		
-	UPDATE @PartyChargeInfo
-	SET    ToDate = '2015-07-15 00:00:00' -- SMALLDATETIME
-	WHERE ProductID=0
+	)		
 	
-	INSERT INTO @PartyChargeInfo(PartyId,LicenseeId,ProductID,Rate,FromDate,ToDate)
-	VALUES
-	(
-	    14, -- PartyId - INT
-	    4, -- LicenseeId - INT
-	    0, -- ProductID - INT
-	    0.2, -- Rate - MONEY
-	    '2015-07-16 00:00', -- FromDate - SMALLDATETIME
-	    '2015-07-31 00:00' -- ToDate - SMALLDATETIME
+	-- End Region
+	
+	-- Region: Product Code
+	DECLARE @Products AS TABLE(
+			ProductId	INT,
+			ProductCode VARCHAR(10)
 	)
-	SELECT * FROM @PartyChargeInfo pci
+	INSERT INTO @Products(ProductId,ProductCode)
+	SELECT DISTINCT
+			i.ProductId,
+			CASE 
+				WHEN i.ProductId = 0 THEN 'SB' 
+				ELSE p.ProductPrefix
+				END AS ProductCode			
+	FROM	@PartyChargeInfo i  
+			LEFT JOIN dbo.Product3rd p ON i.ProductId = p.Productid	
 	-- End Region
 	
 	-- Region: Call data from sp Settlement.
 	CREATE	TABLE #tmpResult(
+			GroupId				INT,
 			Game				VARCHAR(100),
 			WinLostDate			DATETIME,
 			CurrencyId			INT,
@@ -98,12 +109,41 @@ BEGIN
 			CompanyBase			MONEY
 	)
 	
-	--WHILE (SELECT COUNT(1) FROM @PartyChargeInfo pci
+	DECLARE @Index INT = 1
+	WHILE (SELECT COUNT(1) FROM @PartyChargeInfo pci WHERE pci.RowNumber = @Index) > 0
+	BEGIN
+		DECLARE @TempProductCode VARCHAR(10), @TempFromDate DATETIME, @TempToDate DATETIME
+		SELECT	TOP 1 @TempProductCode = p.ProductCode, @TempFromDate = pci.FromDate, @TempToDate = pci.ToDate
+		FROM	@PartyChargeInfo pci INNER JOIN @Products p ON pci.ProductID = p.ProductId
+		WHERE	pci.RowNumber = @Index
+		
+		INSERT INTO #tmpResult(Game,WinLostDate,CurrencyId,CurrencyName,Betcount,Turnover,MemberWinLoss,MemberComm,LicenseeWL,LicenseeComm,Company,TurnoverBase,MemberWinLossBase,LicenseeWLBase,CompanyBase)
+		EXECUTE bodb02.dbo.LA_Rpt_LicenseeSettlement @PartyId, @TempFromDate, @TempToDate, @TempProductCode, 0, @BaseCurrencyName	
+		
+		UPDATE #tmpResult
+		SET GroupId = @Index
+		WHERE GroupId IS NULL    
+				
+		SET @Index = @Index + 1
+	END	
 	
-	INSERT INTO #tmpResult(Game,WinLostDate,CurrencyId,CurrencyName,Betcount,Turnover,MemberWinLoss,MemberComm,LicenseeWL,LicenseeComm,Company,TurnoverBase,MemberWinLossBase,LicenseeWLBase,CompanyBase)
-	EXECUTE [dbo].[LA_Rpt_LicenseeSettlement] @PartyId, @FromDate, @ToDate, @ProductCode, @BaseCurrencyId, @BaseCurrencyName	
-	
-	SELECT * FROM #tmpResult r
+	SELECT	r.GroupId, 
+			r.Game, 
+			r.WinLostDate, 
+			r.CurrencyId, 
+			r.CurrencyName, 
+			r.Betcount, 
+			r.Turnover,
+			r.MemberWinLoss,
+			r.MemberComm,
+			r.LicenseeWL,
+			r.LicenseeComm,
+			r.Company,
+			r.TurnoverBase,
+			r.MemberWinLossBase,
+			r.LicenseeWLBase,
+			r.CompanyBase
+	FROM	#tmpResult r
 	-- End region
 	
 	DROP TABLE #tmpResult
