@@ -159,14 +159,12 @@ BEGIN
 		
 	INSERT INTO @DiscountGroupHeader(DiscountGroupId,DiscountGroupType,PartyId,CurrencyId,FromDate,ToDate)
 	(
-		SELECT	d.DiscountGroupId, t.DiscountGroupType,t.PartyId,t.CurrencyId,d.FromDate,t.ToDate
-		FROM	bodb_Licensee.dbo.LA_DiscountGroupHeader d WITH(NOLOCK) 
-				INNER JOIN (SELECT dg.DiscountGroupId,dg.DiscountGroupType,dga.PartyId, dg.CurrencyId, MAX(dg.ToDate) AS ToDate
-							FROM bodb_Licensee.dbo.LA_DiscountGroupHeader dg WITH(NOLOCK)
-								INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupAssignment dga WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
-							WHERE @FromDate<= ToDate AND FromDate<=@ToDate
-								AND dga.PartyID = @PartyId
-							GROUP BY dg.DiscountGroupId, dg.DiscountGroupType, dg.CurrencyId, dga.PartyId) t ON d.DiscountGroupId = t.DiscountGroupId
+		SELECT	dg.DiscountGroupId,dg.DiscountGroupType,dga.PartyId, dg.CurrencyId, dg.FromDate, MAX(dg.ToDate) AS ToDate
+		FROM	bodb_Licensee.dbo.LA_DiscountGroupHeader dg WITH(NOLOCK)
+				INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupAssignment dga WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
+		WHERE	@FromDate<= ToDate AND FromDate<=@ToDate
+				AND dga.PartyID = @PartyId
+		GROUP BY dg.DiscountGroupId, dg.DiscountGroupType, dg.CurrencyId, dg.FromDate, dga.PartyId
 	)
 	
 	DECLARE @DiscountGroup AS TABLE(
@@ -250,7 +248,7 @@ BEGIN
 	END
 	
 	DELETE FROM @DiscountGroup
-	WHERE (BaseCurrency != @BaseCurrencyId AND DiscountGroupType = 1)OR PartyId != @PartyId
+	WHERE (BaseCurrency != @BaseCurrencyId AND DiscountGroupType = 1)
 	
 	-- End Region
 	

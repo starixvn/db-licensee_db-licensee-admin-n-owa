@@ -6,10 +6,12 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceDetailInfoGet] 
-	 @PartyId		INT,  
-	 @FromDate		DATETIME,
-	 @ToDate		DATETIME,  
-	 @ProductCode	VARCHAR(6)
+	 @PartyId			INT,  
+	 @FromDate			DATETIME,
+	 @ToDate			DATETIME,  
+	 @ProductCode		VARCHAR(6),
+	 @CurrencyId		INT			= 0	,
+	 @BaseCurrencyName VARCHAR(20)	= 'GBP'
 AS
 /*	Header:
 	Created: 2015.08.07 - Bravo.Tran
@@ -35,24 +37,6 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	
-	-- Region: Get base Currency
-	DECLARE @BaseCurrencyId INT = 12
-	DECLARE @BaseCurrencyName VARCHAR(5) = 'GBP'
-	SET @BaseCurrencyId = ISNULL((	SELECT TOP 1 opd.BaseCurrencyId
-									FROM bodb_licensee.dbo.OAS_PartyDetail opd WITH(NOLOCK)	
-									WHERE	opd.PartyID = @PartyId
-								), 12)
-	
-	DECLARE @BaseCurrencyTable AS TABLE(Id INT, Name VARCHAR(5))
-	INSERT	INTO @BaseCurrencyTable(Id,Name)
-	EXECUTE dbo.LA_SelBaseCurrency
-	
-	SELECT	@BaseCurrencyName = Name
-	FROM	@BaseCurrencyTable bct
-	WHERE	@BaseCurrencyId = bct.Id
-
-	-- End Region	
 	
 	-- Region: Get party charge rate info	
 	DECLARE @PartyChargeInfo AS TABLE (
