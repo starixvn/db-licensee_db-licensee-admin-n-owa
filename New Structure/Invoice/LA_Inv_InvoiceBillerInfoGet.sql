@@ -20,8 +20,8 @@ AS
 */
 /*	Example:
 	USE bodb_licensee
-	DECLARE @BillerId INT = 98
-	DECLARE @PartyId INT = 14
+	DECLARE @BillerId INT = 115
+	DECLARE @PartyId INT = 17
 	
 	EXEC LA_Inv_InvoiceBillerInfoGet @BillerId, @PartyId
 */
@@ -33,7 +33,8 @@ BEGIN
 			InvoiceNumber		INT,
 			InvoiceTemplateId	SMALLINT,
 			InvoiceTemplateName	VARCHAR(50),
-			InvoiceTemplatePath	VARCHAR(255))
+			InvoiceTemplatePath	VARCHAR(255),
+			IsSeparateProduct	BIT)
 	INSERT	INTO @InvoiceInfo(InvoiceTemplateId,InvoiceTemplateName,InvoiceTemplatePath)
 	(
 		SELECT	ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath
@@ -59,8 +60,13 @@ BEGIN
 	UPDATE	@InvoiceInfo
 	SET		InvoiceSymbol = @InvoiceSymbol,
 			InvoiceNumber = @InvoiceNumber
-
-	SELECT	TOP 1 ii.InvoiceSymbol, ii.InvoiceNumber, ii.InvoiceTemplateId, ii.InvoiceTemplateName, ii.InvoiceTemplatePath
+	UPDATE	@InvoiceInfo
+	SET		IsSeparateProduct = (SELECT TOP 1 i.IsSeparateProduct
+								FROM LA_InvoiceHeader i
+								WHERE i.BillerId = @BillerId AND i.PartyId = @PayerId
+								ORDER BY i.InvoiceNumber DESC)
+	
+	SELECT	TOP 1 ii.InvoiceSymbol, ii.InvoiceNumber, ii.InvoiceTemplateId, ii.InvoiceTemplateName, ii.InvoiceTemplatePath, ii.IsSeparateProduct
 	FROM	@InvoiceInfo ii
 
 END

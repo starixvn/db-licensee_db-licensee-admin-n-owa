@@ -24,6 +24,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert]
 	, @ErrCode			INT				= 0		OUTPUT
 	, @ErrMsg			NVARCHAR(1000)	= ''	OUTPUT
 	, @NewInvoiceNumber INT						OUTPUT
+	, @NewInvoiceId		INT						OUTPUT
 AS
 
 /*  Header:
@@ -201,7 +202,7 @@ BEGIN
 		END		
 		ELSE
 		BEGIN
-			SELECT @ErrCode = 0, @ErrMsg = 'Invoice saved successfully.', @NewInvoiceNumber = @InvoiceNumber
+			SELECT @ErrCode = 0, @ErrMsg = 'Invoice saved successfully.', @NewInvoiceNumber = @InvoiceNumber, @NewInvoiceId = @CurrentInvoiceHeaderId
 		END
 		-- End Region
 		
