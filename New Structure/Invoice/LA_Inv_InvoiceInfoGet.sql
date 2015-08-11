@@ -32,6 +32,8 @@ BEGIN
 			i.CurrencyId,
 			i.InvoiceSymbol,
 			i.InvoiceNumber,
+			i.FromDate,
+			i.ToDate,
 			i.InvoiceDate,
 			i.DueDate,
 			i.Amount,

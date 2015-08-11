@@ -291,6 +291,7 @@ BEGIN
 			AND b.customercategory NOT IN (27, 28)					
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId
 	)
+	
 	CREATE NONCLUSTERED INDEX Idx_InvoiceData ON #TempData (PartyId, ProductId)
 
 	UPDATE #TempData
@@ -325,6 +326,23 @@ BEGIN
 			GROUP BY m.ToDate,m.ProductId,m.FeeType
 		) a		
 	)	
+		
+	--INSERT INTO @DateList (ProductId,DateVal)
+	--(
+	--    SELECT a.ProductId, a.DateVal AS DateVal
+	--    FROM (
+	--		SELECT m.ProductId, 
+	--			m.FromDate AS DateVal
+	--		FROM @PartyChargeInfo m
+	--		WHERE m.ProductID NOT IN (SELECT dl.ProductId FROM @DateList dl)
+			
+	--		UNION 
+	--		SELECT m.ProductId, 
+	--			ToDate AS DateVal
+	--		FROM @PartyChargeInfo m
+	--		WHERE m.ProductID NOT IN (SELECT dl.ProductId FROM @DateList dl)
+	--	) a		
+	--)	
 	
 	DECLARE @MaxDate DATETIME
 	SELECT @MaxDate = MAX(DateVal) FROM @DateList dl
@@ -354,7 +372,7 @@ BEGIN
 	    WHERE dl.DateVal < @MaxDate	    
 	    GROUP BY dl.DateVal, dl.ProductId
 	)
-		    
+	
 	CREATE TABLE #AppliedMinFee
 	(
 		PartyId			INT,
@@ -389,7 +407,7 @@ BEGIN
 	UPDATE	#AppliedMinFee
 	SET		MinFeeProrate = (FeeAmount / @DaysInMonth) * (DATEDIFF(DAY, FromDate, ToDate) + 1)	
 	WHERE	ISNULL(IsWaived, 0) = 0
-	
+		
 	UPDATE	#AppliedMinFee
 	SET		AmountToCompany = ISNULL((	SELECT SUM(td.AmountToCompany)							
 										FROM #TempData td 
@@ -423,7 +441,7 @@ BEGIN
 			InvoiceAmount	MONEY, 
 			AmountType		TINYINT,
 			Rate			MONEY,
-			IsApplyMinFee	BIT)
+			IsApplyMinFee	INT)
 	
 	INSERT INTO #InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType,IsApplyMinFee)
 	(
@@ -439,6 +457,19 @@ BEGIN
 		WHERE	amf.PartyId = @PartyId
 		GROUP	BY amf.PartyId, amf.ProductId		
 	)
+	
+	INSERT INTO #InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType,IsApplyMinFee)
+	(
+		SELECT	td.PartyId, 
+				td.ProductId, 
+				SUM(td.AmountToCompany), 
+				0 AS AmountType, 
+				0 AS IsApplyMinFee
+		FROM	#TempData td INNER JOIN @PartyChargeInfo p ON td.PartyId = p.PartyId AND td.ProductId = p.ProductId
+		WHERE	p.ProductId NOT IN (SELECT td2.ProductId FROM #AppliedMinFee td2)
+		GROUP	BY td.PartyId, td.ProductId		
+	)
+	
 	-- End region
 	
 	-- Region: Apply Discount
