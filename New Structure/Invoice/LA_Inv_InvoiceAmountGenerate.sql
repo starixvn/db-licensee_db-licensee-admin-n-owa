@@ -380,11 +380,15 @@ BEGIN
 	
 	UPDATE	#AppliedMinFee
 	SET		IsWaived =  CASE 
-						WHEN am.FromDate >= mf.FromDate AND am.ToDate <= mf.ToDate THEN 1
-						ELSE 0 
-					END
-	FROM	@MinFeeGroup mf INNER JOIN #AppliedMinFee am ON mf.PartyId = am.PartyId AND mf.ProductId = am.ProductId
-	WHERE	mf.FeeType = 2
+							WHEN EXISTS (	SELECT	1 
+											FROM	@MinFeeGroup mf
+											WHERE	am.FromDate >= mf.FromDate AND am.ToDate <= mf.ToDate
+													AND mf.PartyId = am.PartyId AND mf.ProductId = am.ProductId
+													AND mf.FeeType = 2) 
+							THEN 1
+							ELSE 0 
+						END
+	FROM	#AppliedMinFee am	
 	
 	UPDATE	#AppliedMinFee
 	SET		MinFeeProrate = (FeeAmount / @DaysInMonth) * (DATEDIFF(DAY, FromDate, ToDate) + 1)	
@@ -412,6 +416,7 @@ BEGIN
 												AND a2.ToDate = amf.ToDate)	
 									AND amf.AmountToCompany < amf.MinFeeProrate
 								THEN amf.MinFeeProrate
+								WHEN amf.AmountToCompany < 0 THEN 0
 								ELSE amf.AmountToCompany
 							END
 	FROM	#AppliedMinFee amf
@@ -505,6 +510,7 @@ BEGIN
 				id.Rate
 		FROM	#InvoiceData id  
 				LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON id.ProductId = p.Productid		
+		WHERE	id.InvoiceAmount > 0
 	)
 	
 	INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate)
