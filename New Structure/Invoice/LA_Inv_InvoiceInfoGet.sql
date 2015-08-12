@@ -54,7 +54,7 @@ BEGIN
 			i.UpdatedDateTime,
 			i.IsSeparateProduct
 	FROM	dbo.LA_InvoiceHeader i WITH(NOLOCK)
-			INNER JOIN dbo.LA_InvoiceSetting lis ON i.BillerId = lis.ToPartyId AND i.PartyId = lis.FromPartyId
+			INNER JOIN dbo.LA_InvoiceSetting lis ON i.BillerId = lis.ToPartyId AND i.PartyId = lis.FromPartyId AND i.InvoiceType = lis.InvTypeId
 			INNER JOIN dbo.LA_InvoiceTemplate lit ON lis.InvTempId = lit.InvTemplateId
 			INNER JOIN @BaseCurrencyTable bct ON i.CurrencyId = bct.CurrencyId
 	WHERE	i.InvoiceHeaderId = @InvoiceHeaderId
@@ -64,8 +64,7 @@ BEGIN
 			i.ItemName,
 			i.Reference,
 			i.ProductId,
-			CASE 
-				
+			CASE				
 				WHEN i.ProductId = 0 THEN 'SB' 
 				ELSE p.ProductPrefix
 			END AS ProductCode,
