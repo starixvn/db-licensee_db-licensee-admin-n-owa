@@ -25,7 +25,8 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	
-	SELECT	i.InvoiceHeaderId,
+	SELECT TOP 1	
+			i.InvoiceHeaderId,
 			i.BillerId,
 			i.PartyId,
 			i.RefNo,
