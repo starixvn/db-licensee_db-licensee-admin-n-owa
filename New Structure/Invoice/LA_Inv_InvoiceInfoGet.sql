@@ -18,7 +18,7 @@ AS
 */
 /*	Example:
 	USE bodb_licensee
-	DECLARE @InvoiceHeaderId INT = 8
+	DECLARE @InvoiceHeaderId INT = 117
 	
 	EXEC LA_Inv_InvoiceInfoGet @InvoiceHeaderId
 */
@@ -58,9 +58,15 @@ BEGIN
 			i.ItemName,
 			i.Reference,
 			i.ProductId,
+			CASE 
+				
+				WHEN i.ProductId = 0 THEN 'SB' 
+				ELSE p.ProductPrefix
+			END AS ProductCode,
 			i.FeeType,
 			i.Amount
 	FROM	dbo.LA_InvoiceDetail i WITH (NOLOCK)
+			LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON i.ProductId = p.Productid	
 	WHERE	i.InvoiceHeaderId = @InvoiceHeaderId
 END		
 
