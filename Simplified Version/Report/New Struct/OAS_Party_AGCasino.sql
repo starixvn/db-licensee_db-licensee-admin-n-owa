@@ -1,0 +1,193 @@
+USE [bodb_licensee]
+GO
+/****** Object:  StoredProcedure [dbo].[OAS_Party_AGCasino]    Script Date: 25/09/2014 15:06:25 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[OAS_Party_AGCasino]
+AS  
+  
+/*  
+ * Created by : 20140925@Florent 
+ * Task  : Get all licensees (compatible with the new structure) for AGCasino Winloss report 
+ * DB   : DB052.bodb_Licensee  
+ * Revisions :  
+ 	
+ * Param's Explanation:    
+ * 
+ */  
+ 
+SET NOCOUNT ON
+BEGIN
+	CREATE TABLE #tmpResult (
+		PartyID INT
+		,PartyName NVARCHAR(100)
+		,Winlostdate DATETIME
+		,Currency INT
+		,TurnOver MONEY
+		,TotalTrans INT
+		,Winlost MONEY
+		,LicenseeWinlost MONEY
+		)
+
+
+	CREATE TABLE #tmpAg (
+		CustId INT
+		,Currency INT
+		,PartyID INT
+		,PartyName NVARCHAR(100)
+		,FromDate DATETIME
+		,Todate DATETIME
+		)
+
+	DECLARE @VNDCurrencyName VARCHAR(20)
+
+	SELECT @VNDCurrencyName = currency
+	FROM dbo.Exchange WITH (NOLOCK)
+	WHERE ExchangeId = 51
+
+	DECLARE @sql NVARCHAR(1000)
+
+	SET @sql = 'SELECT CustID,Currency,PartyID,PartyName,FromDate,ToDate
+			 FROM OPENQUERY( DBLIC,''SELECT CustID,Currency,p.PartyID,p.PartyName,
+								CASE WHEN ''''' + CONVERT(VARCHAR(10), @Fromdate, 120) + ''''' <= ci.FromDate THEN ci.FromDate ELSE ''''' + CONVERT(VARCHAR(10), @Fromdate, 120) + ''''' END AS FromDate,
+								CASE WHEN ''''' + CONVERT(VARCHAR(10), @ToDate, 120) + '''''  >= ci.ToDate THEN ci.ToDate ELSE ''''' + CONVERT(VARCHAR(10), @ToDate, 120) + '''''  END AS ToDate
+								FROM bodb_Licensee.dbo.LicenseeCust lc WITH (NOLOCK)
+								    INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON lc.LicenseeID = p.OldRefID AND p.PartyType = 1	
+								    INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON ci.FromParty = p.PartyID
+				    WHERE Currency <> 20 AND p.PartyID IN (' + @PartyIDs + ') AND ci.ChargeType = 1 AND ci.ProductID = 10
+						AND ( ''''' + CONVERT(VARCHAR(10), @Fromdate, 120) + ''''' BETWEEN ci.FromDate AND ci.ToDate OR ''''' + CONVERT(VARCHAR(10), @ToDate, 120) + ''''' BETWEEN ci.FromDate AND ci.ToDate)
+						AND (' + CAST(@Currency AS VARCHAR) + ' = 0 OR lc.Currency = ' + CAST(@Currency AS VARCHAR) + ')''
+				    )'
+
+	INSERT INTO #tmpAg (
+		CustID
+		,Currency
+		,PartyID
+		,PartyName
+		,FromDate
+		,Todate
+		)
+	EXECUTE (@sql)
+	
+	--select @sql
+	INSERT INTO #tmpResult (
+		PartyID
+		,PartyName
+		,Winlostdate
+		,Currency
+		,TurnOver
+		,TotalTrans
+		,Winlost
+		,LicenseeWinlost
+		)
+	SELECT ag.PartyID
+		,ag.PartyName
+		,c.Winlostdate
+		,co.Currency
+		,SUM(c.TurnOver - CASE 
+				WHEN @drawfilter IN (2, 3)
+					THEN c.DrawTO
+				ELSE 0
+				END) AS TurnOver
+		,SUM(c.BetCount - CASE 
+				WHEN @drawfilter = 2
+					THEN c.DrawBetCount
+				ELSE 0
+				END) AS TotalTrans
+		,SUM(c.Winlost) AS Winlost
+		,- SUM(c.Winlost) AS LicenseeWinlost
+	FROM bodb_report.dbo.rptDepWinlost_AGCasino c WITH (NOLOCK)
+	INNER JOIN dbo.Custinfo co WITH (NOLOCK) ON c.CustID = co.CustID 
+	INNER JOIN #tmpAg ag ON co.recommend = ag.CustID
+	WHERE c.Winlostdate BETWEEN ag.FromDate AND ag.Todate
+	GROUP BY c.Winlostdate
+		,co.Currency
+		,ag.PartyID
+		,ag.PartyName
+
+	SELECT ExchangeDate
+		,ExchangeId
+		,Code
+		,USD
+		,EUR
+		,CNY
+	INTO #TempExchange
+	FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
+	WHERE exchangeid IN (
+			SELECT DISTINCT Currency
+			FROM #tmpResult
+			)
+
+	DECLARE @ParentID INT
+	SELECT ci.ChargeID,ci.Rate,ci.FromParty,ci.ToParty,ci.FromDate,ci.ToDate,ci.MinTrans,ci.MaxTrans
+	INTO #ChargeInfo
+	FROM DBLIC.bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) 
+	WHERE ProductID = 10 AND ChargeType = 1
+	--get AG revenue
+	SELECT @ParentID = OW.ChargeID
+	FROM (
+		SELECT sum(r.LicenseeWinlost * e.CNY) total
+		FROM #tmpResult r
+		INNER JOIN #TempExchange e ON r.Winlostdate = e.ExchangeDate
+			AND r.currency = e.ExchangeId
+		) t1
+	LEFT JOIN #ChargeInfo OW ON OW.FromParty = 1--OW
+		AND abs(t1.total) BETWEEN OW.MinTrans AND OW.MaxTrans
+     SELECT @ParentID = ISNULL (@ParentID,-1)
+	SELECT r.PartyID
+		,r.PartyName
+		,CONVERT(VARCHAR(6), winlostdate, 112) AS Winlostdate
+		,r.Currency
+		,e.EUR AS EUR
+		--,@AGRevenue AS amtDueToAG
+		,CASE 
+			WHEN Currency = 51
+				THEN @VNDCurrencyName
+			ELSE e.Code
+			END CurrencyName
+		,SUM(r.TotalTrans) AS BetCount
+		,SUM(r.TurnOver) AS TurnOver
+		,SUM(r.LicenseeWinlost) AS LicenseeWinlost
+		,SUM(r.LicenseeWinlost * ISNULL(DI.Rate,0)) AS amtDueToOW
+		,SUM(r.LicenseeWinlost * ISNULL(OW.Rate,0)) AS amtDueToAG
+		---USD
+		,SUM(r.TurnOver * e.USD) AS TurnOverUSD
+		,SUM(r.LicenseeWinlost * e.USD) AS LicenseeWinlostUSD
+		,SUM(r.LicenseeWinlost * ISNULL(DI.Rate,0) * e.USD) AS amtDueToOWUSD
+		,SUM(r.LicenseeWinlost * ISNULL(OW.Rate,0) * e.USD) AS amtDueToAGUSD
+		---EUR
+		,SUM(r.TurnOver * e.EUR) AS TurnOverEUR
+		,SUM(r.LicenseeWinlost * e.EUR) AS LicenseeWinlostEUR
+		,SUM(r.LicenseeWinlost * ISNULL(DI.Rate,0) * e.EUR) AS amtDueToOWEUR
+		,SUM(r.LicenseeWinlost * ISNULL(OW.Rate,0) * e.EUR) AS amtDueToAGEUR
+	FROM #tmpResult r
+	INNER JOIN #TempExchange e ON r.Winlostdate = e.ExchangeDate
+		AND r.currency = e.ExchangeId
+	LEFT JOIN #ChargeInfo DI ON r.PartyID = DI.FromParty
+		AND r.winlostdate BETWEEN DI.FromDate AND DI.ToDate
+	LEFT JOIN #ChargeInfo OW ON OW.ChargeID = @ParentID
+	GROUP BY r.PartyID
+		,r.PartyName
+		,CONVERT(VARCHAR(6), winlostdate, 112)
+		,r.Currency
+		,e.EUR
+		,CASE 
+			WHEN Currency = 51
+				THEN @VNDCurrencyName
+			ELSE e.Code
+			END
+
+	---------
+	DROP TABLE #tmpResult
+	DROP TABLE #tmpAg
+	DROP TABLE #TempExchange
+	DROP TABLE #ChargeInfo
+END
+
+GO
+GRANT EXECUTE ON [dbo].[OAS_Party_AGCasino] TO [bodbLicenseeNet] 
+GRANT VIEW DEFINITION ON [dbo].[OAS_Party_AGCasino] TO [vnteam] 
+GRANT EXECUTE ON [dbo].[OAS_Party_AGCasino] TO bodbAdminNet 
