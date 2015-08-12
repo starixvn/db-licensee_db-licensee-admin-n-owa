@@ -325,23 +325,6 @@ BEGIN
 			GROUP BY m.ToDate,m.ProductId,m.FeeType
 		) a		
 	)	
-		
-	--INSERT INTO @DateList (ProductId,DateVal)
-	--(
-	--    SELECT a.ProductId, a.DateVal AS DateVal
-	--    FROM (
-	--		SELECT m.ProductId, 
-	--			m.FromDate AS DateVal
-	--		FROM @PartyChargeInfo m
-	--		WHERE m.ProductID NOT IN (SELECT dl.ProductId FROM @DateList dl)
-			
-	--		UNION 
-	--		SELECT m.ProductId, 
-	--			ToDate AS DateVal
-	--		FROM @PartyChargeInfo m
-	--		WHERE m.ProductID NOT IN (SELECT dl.ProductId FROM @DateList dl)
-	--	) a		
-	--)	
 	
 	DECLARE @MaxDate DATETIME
 	SELECT @MaxDate = MAX(DateVal) FROM @DateList dl
@@ -500,8 +483,8 @@ BEGIN
 	-- Region: Select data	
 	DECLARE	@FinalResult TABLE(
 			ProductId		INT,
-			ProductCode		VARCHAR(10),
-			ProductName		VARCHAR(200),
+			ProductCode		VARCHAR(100),
+			ProductName		VARCHAR(500),
 			InvoiceAmount	MONEY,
 			AmountType		TINYINT,
 			Rate			MONEY)
@@ -521,22 +504,31 @@ BEGIN
 				id.AmountType,
 				id.Rate
 		FROM	#InvoiceData id  
-				LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON id.ProductId = p.Productid
-		WHERE	id.AmountType = 0
+				LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON id.ProductId = p.Productid		
 	)
 	
 	INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate)
 	(
 	    SELECT	-1,
-				'',
-				'',
+				(	SELECT	f.ProductCode + ',' 
+					FROM	@FinalResult f 
+					WHERE f.AmountType = id.AmountType FOR XML PATH('')) 
+				AS ProductCode,
+				(	SELECT	f.ProductName + ',' 
+					FROM	@FinalResult f 
+					WHERE f.AmountType = id.AmountType FOR XML PATH('')) 
+				AS ProductName,
 				SUM(id.InvoiceAmount),
 				id.AmountType,
 				id.Rate
-		FROM	#InvoiceData id  				
+		FROM	@FinalResult id  				
 		WHERE	id.AmountType > 0
 		GROUP BY id.AmountType, id.Rate
 	)	
+	UPDATE	@FinalResult
+	SET		ProductCode = LEFT(ProductCode, LEN(ProductCode) - 1),
+			ProductName = LEFT(ProductName, LEN(ProductName) - 1)
+	WHERE	ProductId = -1
 	
 	SELECT	f.ProductId,
 			f.ProductCode,
@@ -545,6 +537,8 @@ BEGIN
 			f.AmountType,
 			f.Rate
 	FROM	@FinalResult f
+	WHERE	f.AmountType = 0 
+			OR f.ProductId = -1
 	ORDER BY f.AmountType, f.ProductId
 	
 	SELECT @ErrCode = 0, @ErrMsg = ''

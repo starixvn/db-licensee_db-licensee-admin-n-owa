@@ -9,7 +9,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceDetailInfoGet]
 	 @PartyId			INT,  
 	 @FromDate			DATETIME,
 	 @ToDate			DATETIME,  
-	 @ProductCode		VARCHAR(6),
+	 @ProductCode		VARCHAR(200),
 	 @CurrencyId		INT			= 0	,
 	 @BaseCurrencyName VARCHAR(20)	= 'GBP'
 AS
@@ -85,7 +85,7 @@ BEGIN
 			ProductName			VARCHAR(200),
 			Game				VARCHAR(100),
 			WinLostDate			DATETIME,
-			CurrencyId			INT,
+			Currency			INT,
 			CurrencyName		NVARCHAR(20),
 			Betcount			INT,
 			Turnover			MONEY,
@@ -97,7 +97,7 @@ BEGIN
 			TurnoverBase		MONEY,	
 			MemberWinLossBase	MONEY,
 			LicenseeWLBase		MONEY,
-			CompanyBase			MONEY
+			CompanyBaseCurrency	MONEY
 	)
 	
 	DECLARE @Index INT = 1
@@ -108,7 +108,7 @@ BEGIN
 		FROM	@PartyChargeInfo pci INNER JOIN @Products p ON pci.ProductID = p.ProductId
 		WHERE	pci.RowNumber = @Index
 		
-		INSERT INTO #tmpResult(Game,WinLostDate,CurrencyId,CurrencyName,Betcount,Turnover,MemberWinLoss,MemberComm,LicenseeWL,LicenseeComm,Company,TurnoverBase,MemberWinLossBase,LicenseeWLBase,CompanyBase)
+		INSERT INTO #tmpResult(Game,WinLostDate,Currency,CurrencyName,Betcount,Turnover,MemberWinLoss,MemberComm,LicenseeWL,LicenseeComm,Company,TurnoverBase,MemberWinLossBase,LicenseeWLBase,CompanyBaseCurrency)
 		EXECUTE bodb02.dbo.LA_Rpt_LicenseeSettlement @PartyId, @TempFromDate, @TempToDate, @TempProductCode, 0, @BaseCurrencyName	
 		
 		UPDATE	#tmpResult
@@ -125,7 +125,7 @@ BEGIN
 			r.ProductName,
 			r.Game, 
 			r.WinLostDate, 
-			r.CurrencyId, 
+			r.Currency, 
 			r.CurrencyName, 
 			r.Betcount, 
 			r.Turnover,
@@ -137,7 +137,7 @@ BEGIN
 			r.TurnoverBase,
 			r.MemberWinLossBase,
 			r.LicenseeWLBase,
-			r.CompanyBase
+			r.CompanyBaseCurrency
 	FROM	#tmpResult r
 	-- End region
 	
