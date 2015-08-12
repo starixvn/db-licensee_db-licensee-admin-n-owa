@@ -453,12 +453,12 @@ BEGIN
 				0 AS AmountType, 
 				0 AS IsApplyMinFee
 		FROM	#TempData td INNER JOIN @PartyChargeInfo p ON td.PartyId = p.PartyId AND td.ProductId = p.ProductId
-		WHERE	p.ProductId NOT IN (SELECT td2.ProductId FROM #AppliedMinFee td2)
+		WHERE	td.PartyId = @PartyId AND p.ProductId NOT IN (SELECT td2.ProductId FROM #AppliedMinFee td2)
 		GROUP	BY td.PartyId, td.ProductId		
 	)
 	
 	-- End region
-	
+
 	-- Region: Apply Discount
 	INSERT INTO #InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
 	(
