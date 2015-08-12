@@ -76,6 +76,7 @@ BEGIN
 	-- Region: Call data from sp Settlement.
 	CREATE	TABLE #tmpResult(
 			GroupId				INT,
+			ProductCode			VARCHAR(10),
 			Game				VARCHAR(100),
 			WinLostDate			DATETIME,
 			CurrencyId			INT,
@@ -104,14 +105,16 @@ BEGIN
 		INSERT INTO #tmpResult(Game,WinLostDate,CurrencyId,CurrencyName,Betcount,Turnover,MemberWinLoss,MemberComm,LicenseeWL,LicenseeComm,Company,TurnoverBase,MemberWinLossBase,LicenseeWLBase,CompanyBase)
 		EXECUTE bodb02.dbo.LA_Rpt_LicenseeSettlement @PartyId, @TempFromDate, @TempToDate, @TempProductCode, 0, @BaseCurrencyName	
 		
-		UPDATE #tmpResult
-		SET GroupId = @Index
-		WHERE GroupId IS NULL    
+		UPDATE	#tmpResult
+		SET		GroupId = @Index,
+				ProductCode = @TempProductCode
+		WHERE	GroupId IS NULL    
 				
 		SET @Index = @Index + 1
 	END	
 	
 	SELECT	r.GroupId, 
+			r.ProductCode,
 			r.Game, 
 			r.WinLostDate, 
 			r.CurrencyId, 
