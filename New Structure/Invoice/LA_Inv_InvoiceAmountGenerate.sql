@@ -416,7 +416,7 @@ BEGIN
 												AND a2.ToDate = amf.ToDate)	
 									AND amf.AmountToCompany < amf.MinFeeProrate
 								THEN amf.MinFeeProrate
-								WHEN amf.AmountToCompany < 0 THEN 0
+								WHEN amf.AmountToCompany < 0 AND amf.ProductId != 3 THEN 0
 								ELSE amf.AmountToCompany
 							END
 	FROM	#AppliedMinFee amf

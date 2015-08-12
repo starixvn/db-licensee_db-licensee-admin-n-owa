@@ -25,12 +25,17 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	
+	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(5))
+	INSERT	INTO @BaseCurrencyTable(CurrencyId,CurrencyName)
+	EXECUTE bodb_Licensee.dbo.LA_SelBaseCurrency
+	
 	SELECT TOP 1	
 			i.InvoiceHeaderId,
 			i.BillerId,
 			i.PartyId,
 			i.RefNo,
 			i.CurrencyId,
+			bct.CurrencyName,
 			i.InvoiceSymbol,
 			i.InvoiceNumber,
 			i.FromDate,
@@ -51,6 +56,7 @@ BEGIN
 	FROM	dbo.LA_InvoiceHeader i WITH(NOLOCK)
 			INNER JOIN dbo.LA_InvoiceSetting lis ON i.BillerId = lis.ToPartyId AND i.PartyId = lis.FromPartyId
 			INNER JOIN dbo.LA_InvoiceTemplate lit ON lis.InvTempId = lit.InvTemplateId
+			INNER JOIN @BaseCurrencyTable bct ON i.CurrencyId = bct.CurrencyId
 	WHERE	i.InvoiceHeaderId = @InvoiceHeaderId
 			AND i.HasDeleted = 0
 	
