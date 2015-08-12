@@ -28,9 +28,7 @@ BEGIN
 	DECLARE @LicenseeID INT			
 	CREATE TABLE #Result (
 			PartyID			INT
-			, ParentId		INT
-			, Winlostdate	DATETIME
-			, CurrencyId	INT
+			, ParentId		INT			
 			, BettypeRef	INT
 			, Game			VARCHAR(20)
 			, TurnOver		MONEY
@@ -86,26 +84,21 @@ BEGIN
 		WHERE BettypeRef = 2005
 
 		-- product 3rd sub name
-		INSERT INTO #Result( Winlostdate, CurrencyId, ParentId, PartyID, BettypeRef, Game, Turnover, Winlost, LicenseeWL, Company, Betcount)
+		INSERT INTO #Result(ParentId, PartyID, BettypeRef, Game, Turnover, Winlost, LicenseeWL, Company, Betcount)
 		(
-			SELECT   			   
-				d.RptDate     
-				, d.CurrencyId	
-				, p.ParentId AS ParentId
+			SELECT p.ParentId AS ParentId
 				, p.PartyId
 				, ps.BettypeRef
 				, ps.ProductName AS Game
 				, SUM(Turnover * e.Rate) AS Turnover
 				, SUM(WinLoss * e.Rate) AS Winlost				
 				, - SUM(Winloss * e.Rate) AS LicenseeWL								
-				, - SUM((WinLoss * p.Rate + AComm) * e.Rate) AS Company 
+				, - SUM((WinLoss * p.Rate) * e.Rate) AS Company 
 				, SUM(BetCount) AS BetCount	  
 			FROM (
 				SELECT b.SiteId, b.RptDate, b.CurrencyId, b.BetTypeId
 				, SUM(ISNULL(b.Turnover, 0)) AS TurnOver
-				, SUM(ISNULL(b.Winloss, 0)) Winloss					 			 					 				
-				, SUM(ISNULL(b.PComm, 0)) AS PComm
-				, SUM(ISNULL(b.AComm, 0)) AS AComm
+				, SUM(ISNULL(b.Winloss, 0)) Winloss					 			 					 								
 				, SUM(ISNULL(b.BetCount, 0)) BetCount
 				FROM bodb_LicenseeReport.dbo.rpt_ThirPartyWL_ExtraGMT b WITH (NOLOCK)
 					INNER JOIN (SELECT DISTINCT LicenseeId, Bettype FROM @tmpParty) p ON b.SiteId = p.LicenseeID AND b.BetTypeId = p.Bettype					
@@ -119,7 +112,7 @@ BEGIN
 				INNER JOIN #Exchange e ON d.CurrencyId = e.ExchangeID AND d.RptDate = e.ExchangeDate
 				LEFT JOIN #Product3rdSubName ps ON d.BetTypeId = ps.Bettype
 			WHERE d.RptDate BETWEEN p.Fromdate AND p.Todate
-			GROUP BY d.RptDate, d.CurrencyId , ps.ProductName, ps.BettypeRef, p.ParentId, p.PartyId
+			GROUP BY ps.ProductName, ps.BettypeRef, p.ParentId, p.PartyId
 		)
 			
 		DROP TABLE #Product3rdSubName				
