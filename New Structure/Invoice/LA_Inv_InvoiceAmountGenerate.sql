@@ -498,20 +498,54 @@ BEGIN
 	-- End Region
 	
 	-- Region: Select data	
-	SELECT	id.ProductId,
-			CASE 
-				WHEN id.ProductId = 0 THEN 'SB' 
-				ELSE p.ProductPrefix
-				END AS ProductCode,
-			CASE 
-				WHEN id.ProductId = 0 THEN 'Sportbooks' 
-				ELSE p.ProductName
-				END AS ProductName,
-			id.InvoiceAmount,
-			id.AmountType,
-			id.Rate
-	FROM	#InvoiceData id  
-		LEFT JOIN dbo.Product3rd p ON id.ProductId = p.Productid
+	DECLARE	@FinalResult TABLE(
+			ProductId		INT,
+			ProductCode		VARCHAR(10),
+			ProductName		VARCHAR(200),
+			InvoiceAmount	MONEY,
+			AmountType		TINYINT,
+			Rate			MONEY)
+	
+	INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate)
+	(
+	    SELECT	id.ProductId,
+				CASE 
+					WHEN id.ProductId = 0 THEN 'SB' 
+					ELSE p.ProductPrefix
+					END AS ProductCode,
+				CASE 
+					WHEN id.ProductId = 0 THEN 'Sportbooks' 
+					ELSE p.ProductName
+					END AS ProductName,
+				id.InvoiceAmount,
+				id.AmountType,
+				id.Rate
+		FROM	#InvoiceData id  
+				LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON id.ProductId = p.Productid
+		WHERE	id.AmountType = 0
+	)
+	
+	INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate)
+	(
+	    SELECT	-1,
+				'',
+				'',
+				SUM(id.InvoiceAmount),
+				id.AmountType,
+				id.Rate
+		FROM	#InvoiceData id  				
+		WHERE	id.AmountType > 0
+		GROUP BY id.AmountType, id.Rate
+	)	
+	
+	SELECT	f.ProductId,
+			f.ProductCode,
+			f.ProductName,
+			f.InvoiceAmount,
+			f.AmountType,
+			f.Rate
+	FROM	@FinalResult f
+	ORDER BY f.AmountType, f.ProductId
 	
 	SELECT @ErrCode = 0, @ErrMsg = ''
 	-- End Region	
