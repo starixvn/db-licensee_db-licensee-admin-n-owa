@@ -230,7 +230,7 @@ BEGIN
 		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
 		RETURN
 	END
-	
+		
 	DELETE FROM @BaseCurrencyCheck	
 	INSERT INTO @BaseCurrencyCheck(Party, Product, BaseCurrencyCount, NonBaseCurrencyCount)
 	SELECT	d.PartyId, 
@@ -238,6 +238,7 @@ BEGIN
 			SUM(CASE WHEN d.BaseCurrency = @BaseCurrencyID THEN 1 ELSE 0 END) BaseCurrencyCount,
 			SUM(CASE WHEN d.BaseCurrency != @BaseCurrencyID THEN 1 ELSE 0 END) NonBaseCurrencyCount
 	FROM	@DiscountGroup d
+	WHERE	d.DiscountGroupType = 1
 	GROUP BY d.PartyId, d.ProductId
 	
 	IF EXISTS(SELECT 1 FROM @BaseCurrencyCheck WHERE BaseCurrencyCount = 0 AND NonBaseCurrencyCount > 0)
