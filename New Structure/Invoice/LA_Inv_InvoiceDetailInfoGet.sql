@@ -60,15 +60,20 @@ BEGIN
 	-- Region: Product Code
 	DECLARE @Products AS TABLE(
 			ProductId	INT,
-			ProductCode VARCHAR(10)
+			ProductCode VARCHAR(10),
+			ProductName VARCHAR(200)
 	)
-	INSERT INTO @Products(ProductId,ProductCode)
+	INSERT INTO @Products(ProductId,ProductCode, ProductName)
 	SELECT DISTINCT
 			i.ProductId,
 			CASE 
 				WHEN i.ProductId = 0 THEN 'SB' 
 				ELSE p.ProductPrefix
-				END AS ProductCode			
+			END AS ProductCode,
+			CASE 
+				WHEN i.ProductId = 0 THEN 'Sportbooks' 
+				ELSE p.ProductName
+			END AS ProductName			
 	FROM	@PartyChargeInfo i  
 			LEFT JOIN dbo.Product3rd p ON i.ProductId = p.Productid	
 	-- End Region
@@ -77,6 +82,7 @@ BEGIN
 	CREATE	TABLE #tmpResult(
 			GroupId				INT,
 			ProductCode			VARCHAR(10),
+			ProductName			VARCHAR(200),
 			Game				VARCHAR(100),
 			WinLostDate			DATETIME,
 			CurrencyId			INT,
@@ -97,8 +103,8 @@ BEGIN
 	DECLARE @Index INT = 1
 	WHILE (SELECT COUNT(1) FROM @PartyChargeInfo pci WHERE pci.RowNumber = @Index) > 0
 	BEGIN
-		DECLARE @TempProductCode VARCHAR(10), @TempFromDate DATETIME, @TempToDate DATETIME
-		SELECT	TOP 1 @TempProductCode = p.ProductCode, @TempFromDate = pci.FromDate, @TempToDate = pci.ToDate
+		DECLARE @TempProductCode VARCHAR(10), @ProductName VARCHAR(200), @TempFromDate DATETIME, @TempToDate DATETIME
+		SELECT	TOP 1 @TempProductCode = p.ProductCode, @ProductName = p.ProductName, @TempFromDate = pci.FromDate, @TempToDate = pci.ToDate
 		FROM	@PartyChargeInfo pci INNER JOIN @Products p ON pci.ProductID = p.ProductId
 		WHERE	pci.RowNumber = @Index
 		
@@ -107,7 +113,8 @@ BEGIN
 		
 		UPDATE	#tmpResult
 		SET		GroupId = @Index,
-				ProductCode = @TempProductCode
+				ProductCode = @TempProductCode,
+				ProductName = @ProductName
 		WHERE	GroupId IS NULL    
 				
 		SET @Index = @Index + 1
@@ -115,6 +122,7 @@ BEGIN
 	
 	SELECT	r.GroupId, 
 			r.ProductCode,
+			r.ProductName,
 			r.Game, 
 			r.WinLostDate, 
 			r.CurrencyId, 
