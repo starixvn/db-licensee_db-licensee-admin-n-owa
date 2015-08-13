@@ -69,7 +69,7 @@ BEGIN
 				ELSE p.ProductPrefix
 			END AS ProductCode,
 			i.AmountType,
-			i.Amount
+			i.InvoiceAmount
 	FROM	dbo.LA_InvoiceDetail i WITH (NOLOCK)
 			LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON i.ProductId = p.Productid	
 	WHERE	i.InvoiceHeaderId = @InvoiceHeaderId

@@ -185,7 +185,7 @@ BEGIN
 			)
 			EXEC sp_xml_removedocument @idoc
 						
-			INSERT	INTO dbo.LA_InvoiceDetail(InvoiceHeaderId,[Description],Reference,ProductId,Amount,AmountType)
+			INSERT	INTO dbo.LA_InvoiceDetail(InvoiceHeaderId,[Description],Reference,ProductId,InvoiceAmount,AmountType)
 			SELECT	@CurrentInvoiceHeaderId,[Description],Reference,ProductId,Amount,AmountType
 			FROM	@Detail
 			
