@@ -78,7 +78,8 @@ BEGIN
 		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
 		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
-	)	
+	)
+	
 	-- End region
 	
 	-- Region: Get base Currency
@@ -151,7 +152,6 @@ BEGIN
 				)
 				AND (mf.PartyId = @PartyId OR mf.PartyId IN (SELECT PartyId FROM @PartyGroup))
 	)
-	
 	-- End region
 	
 	-- Region: Get discount group info
@@ -398,6 +398,7 @@ BEGIN
 				amf.IsMinFee
 		FROM	@MinFeeGroup amf
 		WHERE	amf.PartyId = @PartyId
+				AND amf.FeeType = 1
 		GROUP	BY amf.PartyId, amf.ProductId,amf.IsMinFee
 	)
 	
@@ -408,11 +409,10 @@ BEGIN
 				SUM(td.AmountToCompany), 
 				0 AS AmountType, 
 				0 AS IsApplyMinFee
-		FROM	#TempData td INNER JOIN @PartyChargeInfo p ON td.PartyId = p.PartyId AND td.ProductId = p.ProductId
-		WHERE	td.PartyId = @PartyId AND p.ProductId NOT IN (SELECT td2.ProductId FROM @MinFeeGroup td2)
+		FROM	#TempData td 
+		WHERE	td.PartyId = @PartyId AND td.ProductId NOT IN (SELECT td2.ProductId FROM @MinFeeGroup td2)
 		GROUP	BY td.PartyId, td.ProductId		
 	)
-	
 	-- End region
 
 	-- Region: Apply Discount
@@ -461,12 +461,14 @@ BEGIN
 					WHEN id.ProductId = 0 THEN 'Sportbooks' 
 					ELSE p.ProductName
 					END AS ProductName,
-				id.InvoiceAmount,
+				CASE
+					WHEN id.InvoiceAmount > 0 THEN id.InvoiceAmount
+					ELSE 0
+				END AS InvoiceAmount,
 				id.AmountType,
 				id.Rate
 		FROM	@InvoiceData id  
-				LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON id.ProductId = p.Productid		
-		WHERE	id.InvoiceAmount > 0
+				LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON id.ProductId = p.Productid				
 	)
 	
 	INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate)
