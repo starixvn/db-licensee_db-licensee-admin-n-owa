@@ -63,7 +63,7 @@ BEGIN
 	UPDATE	@InvoiceInfo
 	SET		IsSeparateProduct = (SELECT TOP 1 i.IsSeparateProduct
 								FROM LA_InvoiceHeader i
-								WHERE i.BillerId = @BillerId AND i.PartyId = @PayerId
+								WHERE i.BillerId = @BillerId
 								ORDER BY i.InvoiceNumber DESC)
 	
 	SELECT	TOP 1 ii.InvoiceSymbol, ii.InvoiceNumber, ii.InvoiceTemplateId, ii.InvoiceTemplateName, ii.InvoiceTemplatePath, ii.IsSeparateProduct
