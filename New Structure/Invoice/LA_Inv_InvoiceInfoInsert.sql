@@ -64,16 +64,16 @@ AS
 	USE bodb_licensee
 	declare @p2 nvarchar(1000)
 	declare @p9 int
+	declare @p4 int
 	set @p9=2
 	declare @p11 int
 	set @p11=0
-	exec LA_Inv_InvoiceInfoInsert @InvoiceNumber=9,@ErrMsg=@p2 output,@DueDate='2015-09-30 00:00:00',@Note='',@UserID=4,@InvoiceDetailXml='<InvoiceDetails><InvoiceDetail><Description>Software & Data Licensing & Data transmission fees for Jul 2015 
+	exec LA_Inv_InvoiceInfoInsert @NewInvoiceId = @p4 output, @InvoiceNumber=9,@ErrMsg=@p2 output,@DueDate='2015-09-30 00:00:00',@Note='',@UserID=4,@InvoiceDetailXml='<InvoiceDetails><InvoiceDetail><Description>Software & Data Licensing & Data transmission fees for Jul 2015 
 	(Sportsbook)</Description><Reference></Reference><ProductId>0</ProductId><InvoiceAmount>483.87</InvoiceAmount><AmountType>0</AmountType></InvoiceDetail><InvoiceDetail><Description>1</Description><Reference></Reference><ProductId>0</ProductId><InvoiceAmount>21.19</InvoiceAmount><AmountType>1</AmountType></InvoiceDetail><InvoiceDetail><Description>1</Description><Reference></Reference><ProductId>0</ProductId><InvoiceAmount>21.19</InvoiceAmount><AmountType>1</AmountType></InvoiceDetail><InvoiceDetail><Description>Software & Data Licensing & Data transmission fees for Jul 2015 (Number Game)</Description><Reference></Reference><ProductId>2</ProductId><InvoiceAmount>109.12</InvoiceAmount><AmountType>0</AmountType></InvoiceDetail><InvoiceDetail><Description>Software & Data Licensing & Data transmission fees for Jul 2015 (BA)</Description><Reference></Reference><ProductId>3</ProductId><InvoiceAmount>17.34</InvoiceAmount><AmountType>0</AmountType></InvoiceDetail><InvoiceDetail><Description>Software & Data Licensing & Data transmission fees for Jul 2015 (Virtual Sports)</Description><Reference></Reference><ProductId>5</ProductId><InvoiceAmount>1</InvoiceAmount><AmountType>0</AmountType></InvoiceDetail><InvoiceDetail><Description>1</Description><Reference></Reference><ProductId>-1</ProductId><InvoiceAmount>1</InvoiceAmount><AmountType>0</AmountType></InvoiceDetail><InvoiceDetail><Description>1</Description><Reference></Reference><ProductId>-1</ProductId><InvoiceAmount>1</InvoiceAmount><AmountType>1</AmountType></InvoiceDetail></InvoiceDetails>',@BillerId=115,@Amount=568.9500,@ErrCode=@p9 output,@FromDate='2015-07-01 00:00:00',@NewInvoiceNumber=@p11 output,@InvoiceSymbol='BHC',@ToDate='2015-07-31 00:00:00',@PayerId=24,@LoginIP='10.19.10.68',@InvoiceType=1
-	select @p2, @p9, @p11
+	select @p2, @p9, @p11, @p4
 */
 BEGIN
-	SET NOCOUNT ON
-	
+	SET NOCOUNT ON	
 		
 	IF	ISNULL(@BillerId, 0) > 0 
 		AND ISNULL(@PayerId,0) > 0 		
@@ -161,14 +161,14 @@ BEGIN
 			DECLARE @idoc AS INT
 			DECLARE @xmlText VARCHAR(MAX) = REPLACE(@InvoiceDetailXml, '&', '&amp;')
 			DECLARE @Detail AS TABLE(
-					ItemName	VARCHAR(200),
+					[Description]	VARCHAR(200),
 					Reference	VARCHAR(100),
 					ProductId	INT,
 					Amount		MONEY,
-					FeeType		TINYINT)
+					AmountType	TINYINT)
 						
 			EXEC	sp_xml_preparedocument @idoc OUTPUT, @xmlText			
-			INSERT	INTO @Detail(ItemName,Reference,ProductId,Amount,FeeType)
+			INSERT	INTO @Detail([Description],Reference,ProductId,Amount,AmountType)
 			SELECT 
 					CAST([Description] AS VARCHAR(200)),
 					CAST(Reference AS VARCHAR(100)),
@@ -185,8 +185,8 @@ BEGIN
 			)
 			EXEC sp_xml_removedocument @idoc
 						
-			INSERT	INTO dbo.LA_InvoiceDetail(InvoiceHeaderId,ItemName,Reference,ProductId,Amount,FeeType)
-			SELECT	@CurrentInvoiceHeaderId,ItemName,Reference,ProductId,Amount,FeeType
+			INSERT	INTO dbo.LA_InvoiceDetail(InvoiceHeaderId,[Description],Reference,ProductId,Amount,AmountType)
+			SELECT	@CurrentInvoiceHeaderId,[Description],Reference,ProductId,Amount,AmountType
 			FROM	@Detail
 			
         END TRY

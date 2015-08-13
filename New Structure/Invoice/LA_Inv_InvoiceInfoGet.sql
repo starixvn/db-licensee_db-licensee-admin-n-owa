@@ -61,14 +61,14 @@ BEGIN
 			AND i.HasDeleted = 0
 	
 	SELECT	i.InvoiceHeaderId,
-			i.ItemName,
+			i.[Description],
 			i.Reference,
 			i.ProductId,
 			CASE				
 				WHEN i.ProductId = 0 THEN 'SB' 
 				ELSE p.ProductPrefix
 			END AS ProductCode,
-			i.FeeType,
+			i.AmountType,
 			i.Amount
 	FROM	dbo.LA_InvoiceDetail i WITH (NOLOCK)
 			LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON i.ProductId = p.Productid	
