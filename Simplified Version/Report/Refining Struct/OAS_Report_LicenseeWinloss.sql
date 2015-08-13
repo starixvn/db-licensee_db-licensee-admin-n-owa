@@ -182,6 +182,7 @@ BEGIN
 				FROM @tmpAg
 				)*/
 			AND (Bettype < 31  OR (Bettype BETWEEN 121 AND 999) OR (Bettype BETWEEN 1301 AND 1399)) 
+			AND (Bettype NOT IN (901, 902, 903))--remove Bettrade ticket
 			AND b.ruben = 1
 			AND b.statusID NOT IN (101, 102, 103)
 			AND tpositiontaking <> 0
@@ -233,6 +234,7 @@ BEGIN
 			INNER JOIN @tmpAg ag ON b.recommend = ag.CustID AND b.Currency=ag.currency
 		WHERE b.Winlostdate BETWEEN @FDate AND @TempToDate
 			AND b.sporttype = 0 --just only sportsbook
+			AND Bettype NOT IN (901, 902, 903) -- remove Bettrade ticket
 			AND b.roleid = 2
 			/*AND b.Recommend IN (
 				SELECT custid
