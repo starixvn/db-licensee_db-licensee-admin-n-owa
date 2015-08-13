@@ -381,7 +381,7 @@ BEGIN
 	FROM	@MinFeeGroup amf
 	WHERE	amf.FeeType = 1
 	
-	CREATE	TABLE #InvoiceData (
+	DECLARE @InvoiceData	TABLE(
 			PartyId			INT,
 			ProductId		INT, 
 			InvoiceAmount	MONEY, 
@@ -389,7 +389,7 @@ BEGIN
 			Rate			MONEY,
 			IsApplyMinFee	INT)
 	
-	INSERT INTO #InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType,IsApplyMinFee)
+	INSERT INTO @InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType,IsApplyMinFee)
 	(
 		SELECT	amf.PartyId, 
 				amf.ProductId, 
@@ -401,7 +401,7 @@ BEGIN
 		GROUP	BY amf.PartyId, amf.ProductId,amf.IsMinFee
 	)
 	
-	INSERT INTO #InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType,IsApplyMinFee)
+	INSERT INTO @InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType,IsApplyMinFee)
 	(
 		SELECT	td.PartyId, 
 				td.ProductId, 
@@ -416,10 +416,10 @@ BEGIN
 	-- End region
 
 	-- Region: Apply Discount
-	INSERT INTO #InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
+	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
 	(
 	    SELECT	iv.PartyId, iv.ProductId, iv.InvoiceAmount * dg.Rate AS InvoiceAmount, dg.DiscountGroupType AS AmountType, dg.Rate
-	    FROM	#InvoiceData iv 
+	    FROM	@InvoiceData iv 
 				INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
 	    WHERE	ROUND(iv.InvoiceAmount - 0.5, 0) BETWEEN dg.FromAmount AND dg.ToAmount
 				AND iv.IsApplyMinFee = 0
@@ -429,10 +429,10 @@ BEGIN
 	-- End Region
 	
 	-- Region: Apply Rebate
-	INSERT INTO #InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
+	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
 	(
 	    SELECT	iv.PartyId, iv.ProductId, iv.InvoiceAmount * dg.Rate AS InvoiceAmount, dg.DiscountGroupType AS AmountType, dg.Rate
-	    FROM	#InvoiceData iv 
+	    FROM	@InvoiceData iv 
 				INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
 	    WHERE	iv.IsApplyMinFee = 0
 				AND dg.DiscountGroupType = 2
@@ -464,7 +464,7 @@ BEGIN
 				id.InvoiceAmount,
 				id.AmountType,
 				id.Rate
-		FROM	#InvoiceData id  
+		FROM	@InvoiceData id  
 				LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON id.ProductId = p.Productid		
 		WHERE	id.InvoiceAmount > 0
 	)
@@ -508,7 +508,6 @@ BEGIN
 	
 	DROP TABLE #Exchange
 	DROP TABLE #TempData
-	DROP TABLE #InvoiceData
 END
 
 GO
