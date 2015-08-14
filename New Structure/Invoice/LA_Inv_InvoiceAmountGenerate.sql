@@ -309,7 +309,7 @@ BEGIN
 									ELSE 0 
 								END
 	FROM	#TempData td 
-			INNER JOIN @PartyChargeInfo p ON td.LicenseeId = p.LicenseeId AND td.ProductId = p.ProductID
+			INNER JOIN @PartyChargeInfo p ON td.LicenseeId = p.LicenseeId AND td.ProductId = p.ProductID AND td.rptDate BETWEEN p.FromDate AND p.ToDate
 			INNER JOIN #Exchange e ON td.rptDate = e.ExchangeDate AND td.CurrencyId = e.ExchangeID	
 	-- End region
 	
@@ -348,7 +348,7 @@ BEGIN
 										WHERE	f.FeeType = 2
 												AND amf.PartyId = f.PartyId
 												AND amf.ProductId = f.ProductId), 0),
-			amf.TotalAmount = ISNULL((	SELECT	SUM(td.AmountToCompany)							
+			amf.TotalAmount  =  ISNULL((SELECT	SUM(td.AmountToCompany)							
 										FROM	#TempData td 
 										WHERE	amf.PartyId = td.PartyId
 												AND amf.ProductId = td.ProductId), 0)
@@ -380,7 +380,7 @@ BEGIN
 									END
 	FROM	@MinFeeGroup amf
 	WHERE	amf.FeeType = 1
-	
+		
 	DECLARE @InvoiceData	TABLE(
 			PartyId			INT,
 			ProductId		INT, 
@@ -462,7 +462,7 @@ BEGIN
 					ELSE p.ProductName
 					END AS ProductName,
 				CASE
-					WHEN id.InvoiceAmount > 0 THEN id.InvoiceAmount
+					WHEN id.InvoiceAmount > 0 OR id.ProductId = 3 THEN id.InvoiceAmount
 					ELSE 0
 				END AS InvoiceAmount,
 				id.AmountType,
