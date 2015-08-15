@@ -361,11 +361,14 @@ BEGIN
 	FROM	@MinFeeGroup amf
 	WHERE	amf.FeeType = 1
 	
-	DECLARE @TotalMinFee	   MONEY = (SELECT SUM(MinFeeProrate)
-										FROM @MinFeeGroup)
-	DECLARE @TotalMinFeeAmount MONEY = (SELECT SUM(MinFeeAmount)
+	DECLARE @TotalMinFee	   MONEY = (SELECT	SUM(MinFeeProrate)
 										FROM	@MinFeeGroup
-										WHERE	MinFeeAmount > 0)
+										WHERE	FeeType = 1)
+	DECLARE @TotalMinFeeAmount MONEY = (SELECT	SUM(MinFeeAmount)
+										FROM	@MinFeeGroup
+										WHERE	MinFeeAmount > 0
+												AND FeeType = 1)
+	
 	--- calculate amount to company
 	UPDATE	amf
 	SET		amf.AmountToCompany =	CASE 
@@ -380,7 +383,7 @@ BEGIN
 									END
 	FROM	@MinFeeGroup amf
 	WHERE	amf.FeeType = 1
-			
+				
 	DECLARE @InvoiceData	TABLE(
 			PartyId			INT,
 			ProductId		INT, 
