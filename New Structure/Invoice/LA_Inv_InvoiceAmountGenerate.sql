@@ -129,8 +129,8 @@ BEGIN
 				mf.ProductId, 
 				mf.CurrencyId,
 				mf.FeeAmount,
-				CASE WHEN @FirstDate>= mf.FromDate THEN @FirstDate ELSE mf.FromDate END AS FromDate,
-				CASE WHEN @LastDate < mf.ToDate THEN @LastDate ELSE mf.ToDate END AS ToDate
+				CASE WHEN @FromDate >= mf.FromDate THEN @FromDate ELSE mf.FromDate END AS FromDate,
+				CASE WHEN @ToDate < mf.ToDate THEN @ToDate ELSE mf.ToDate END AS ToDate
 		FROM	dbo.LA_MinFee mf WITH(NOLOCK)
 		WHERE   ((mf.FeeTypeId = 1 AND mf.CurrencyId = @BaseCurrencyId ) 
 					OR mf.FeeTypeId = 2 AND EXISTS (SELECT	PartyId 
@@ -337,12 +337,12 @@ BEGIN
 	
 	--- calculate min fee prorate (fee amount in month - waived amount (*)
 	UPDATE	amf
-	SET		amf.MinFeeProrate = amf.FeeAmount - 
-								ISNULL((SELECT	SUM(f.MinFeeProrate)							
-										FROM	@MinFeeGroup f
-										WHERE	f.FeeType = 2
-												AND amf.PartyId = f.PartyId
-												AND amf.ProductId = f.ProductId), 0),
+	SET		amf.MinFeeProrate = ROUND((	amf.FeeAmount / @DaysInMonth) * (DATEDIFF(DAY, FromDate, ToDate) + 1) - 
+										ISNULL((SELECT	SUM(f.MinFeeProrate)							
+												FROM	@MinFeeGroup f
+												WHERE	f.FeeType = 2
+														AND amf.PartyId = f.PartyId
+														AND amf.ProductId = f.ProductId), 0), 2),
 			amf.WaivedAmount =  ISNULL((SELECT	SUM(f.WaivedAmount)							
 										FROM	@MinFeeGroup f
 										WHERE	f.FeeType = 2
@@ -380,7 +380,7 @@ BEGIN
 									END
 	FROM	@MinFeeGroup amf
 	WHERE	amf.FeeType = 1
-		
+			
 	DECLARE @InvoiceData	TABLE(
 			PartyId			INT,
 			ProductId		INT, 
