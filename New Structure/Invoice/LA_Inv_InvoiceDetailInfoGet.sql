@@ -108,8 +108,12 @@ BEGIN
 		FROM	@PartyChargeInfo pci INNER JOIN @Products p ON pci.ProductID = p.ProductId
 		WHERE	pci.RowNumber = @Index
 		
+		BEGIN TRY
 		INSERT INTO #tmpResult(Game,WinLostDate,Currency,CurrencyName,Betcount,Turnover,MemberWinLoss,MemberComm,LicenseeWL,LicenseeComm,Company,TurnoverBase,MemberWinLossBase,LicenseeWLBase,CompanyBaseCurrency)
 		EXECUTE bodb02.dbo.LA_Rpt_LicenseeSettlement @PartyId, @TempFromDate, @TempToDate, @TempProductCode, 0, @BaseCurrencyName	
+		END TRY
+		BEGIN CATCH
+		END CATCH
 		
 		UPDATE	#tmpResult
 		SET		GroupId = @Index,
