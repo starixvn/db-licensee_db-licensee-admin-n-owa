@@ -154,7 +154,7 @@ BEGIN
 	)
 	
 	DELETE	FROM @MinFeeGroup
-	WHERE	ProductID NOT IN (SELECT ProductId FROM @MinFeeGroup WHERE [@MinFeeGroup].PartyId = @PartyId)
+	WHERE	ProductID NOT IN (SELECT ProductId FROM @MinFeeGroup WHERE [@MinFeeGroup].PartyId = @PartyId)	
 	-- End region
 	
 	-- Region: Get discount group info
@@ -364,27 +364,39 @@ BEGIN
 	FROM	@MinFeeGroup amf
 	WHERE	amf.FeeType = 1
 	
-	DECLARE @TotalMinFee	   MONEY = (SELECT	SUM(MinFeeProrate)
-										FROM	@MinFeeGroup
-										WHERE	FeeType = 1)
-	DECLARE @TotalMinFeeAmount MONEY = (SELECT	SUM(MinFeeAmount)
-										FROM	@MinFeeGroup
-										WHERE	MinFeeAmount > 0
-												AND FeeType = 1)
+	DECLARE @TotalMinFees TABLE(
+		ProductId			INT,
+		TotalMinFee			MONEY,
+		TotalMinFeeAmount	MONEY
+	)
+	INSERT	INTO @TotalMinFees(ProductId, TotalMinFee)
+	SELECT	mf.ProductId,
+			SUM(MinFeeProrate)
+	FROM	@MinFeeGroup mf
+	WHERE	mf.FeeType = 1
+	GROUP BY mf.ProductId
+	
+	UPDATE	t
+	SET		TotalMinFeeAmount = (	SELECT	SUM(mf.MinFeeAmount)
+									FROM	@MinFeeGroup mf
+									WHERE	mf.MinFeeAmount > 0
+											AND FeeType = 1
+											AND mf.ProductId = t.ProductId)
+	FROM	@TotalMinFees t
 	
 	--- calculate amount to company
 	UPDATE	amf
 	SET		amf.AmountToCompany =	CASE 
-										WHEN @TotalMinFeeAmount < @TotalMinFee AND amf.MinFeeAmount < amf.MinFeeProrate 
+										WHEN t.TotalMinFeeAmount < t.TotalMinFee AND amf.MinFeeAmount < amf.MinFeeProrate 
 											THEN amf.MinFeeProrate + amf.WaivedAmount
 										ELSE amf.TotalAmount
 									END,
 			amf.IsMinFee		=	CASE 
-										WHEN @TotalMinFeeAmount < @TotalMinFee AND amf.MinFeeAmount < amf.MinFeeProrate 
+										WHEN t.TotalMinFeeAmount < t.TotalMinFee AND amf.MinFeeAmount < amf.MinFeeProrate 
 											THEN 1
 										ELSE 0
 									END
-	FROM	@MinFeeGroup amf
+	FROM	@MinFeeGroup amf INNER JOIN @TotalMinFees t ON amf.ProductId = t.ProductId
 	WHERE	amf.FeeType = 1
 				
 	DECLARE @InvoiceData	TABLE(
@@ -420,18 +432,23 @@ BEGIN
 		GROUP	BY td.PartyId, td.ProductId		
 	)
 	-- End region
-
+	
 	-- Region: Apply Discount
+	DECLARE @TotalAmountDiscount MONEY = (	SELECT SUM(i.InvoiceAmount) 
+											FROM @InvoiceData i 
+											WHERE i.ProductId IN (SELECT ProductId FROM @DiscountGroup))
+	DELETE	FROM @DiscountGroup
+	WHERE	@TotalAmountDiscount NOT BETWEEN [@DiscountGroup].FromAmount AND [@DiscountGroup].ToAmount
+			AND [@DiscountGroup].DiscountGroupType = 1
+		
+	
 	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
 	(
 	    SELECT	iv.PartyId, iv.ProductId, iv.InvoiceAmount * dg.Rate AS InvoiceAmount, dg.DiscountGroupType AS AmountType, dg.Rate
-	    FROM	@InvoiceData iv 
-				INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
-	    WHERE	ROUND(iv.InvoiceAmount - 0.5, 0) BETWEEN dg.FromAmount AND dg.ToAmount
-				AND iv.IsApplyMinFee = 0
+	    FROM	@InvoiceData iv INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
+	    WHERE	iv.IsApplyMinFee = 0
 				AND dg.DiscountGroupType = 1
-	)
-	
+	)	
 	-- End Region
 	
 	-- Region: Apply Rebate
