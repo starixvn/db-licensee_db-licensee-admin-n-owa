@@ -93,7 +93,7 @@ BEGIN
 		BEGIN
 			SELECT	@InvoiceNumber = (MAX(InvoiceNumber) + 1) 
 			FROM	dbo.LA_InvoiceHeader lih WITH(NOLOCK) 
-			WHERE	lih.BillerId = @BillerId
+			WHERE	lih.InvoiceSymbol = @InvoiceSymbol AND lih.BillerId = @BillerId
 		END		
 		-- End Region
 		
@@ -103,56 +103,59 @@ BEGIN
 									FROM	bodb_licensee.dbo.OAS_PartyDetail opd WITH(NOLOCK)	
 									WHERE	opd.PartyID = @PayerId
 								), 12)
-									
-		DECLARE @CurrentDateTime DATETIME = GETDATE()
-		INSERT	INTO dbo.LA_InvoiceHeader (
-				BillerId,
-				PartyId,
-				CurrencyId,
-				InvoiceSymbol,				
-				InvoiceNumber,
-				FromDate,
-				ToDate,
-				InvoiceDate,				
-				DueDate,
-				Amount,
-				InvoiceType,
-				StatusId,
-				Note,
-				HasSent,
-				HasDeleted,
-				CreatedBy,
-				CreatedDateTime,
-				UpdatedDateTime,
-				IsSeparateProduct)
-		VALUES
-		(
-				@BillerId, 
-				@PayerId, 
-				@CurrencyId, 
-				@InvoiceSymbol, 
-				@InvoiceNumber,
-				@FromDate,
-				@ToDate, 
-				@CurrentDateTime, 
-				@DueDate, 				
-				@Amount, 
-				@InvoiceType, 
-				0, 
-				@Note, 
-				0, 
-				0, 
-				@UserID, 
-				@CurrentDateTime, 
-				@CurrentDateTime,
-				@IsSeparateProduct
-		)
-		IF(@@ERROR <> 0)
-		BEGIN
-			SELECT @ErrCode = 3, @ErrMsg = 'Insert invoice failed.' -- System error
-			RETURN
-		END
-				
+		
+		BEGIN TRY							
+			DECLARE @CurrentDateTime DATETIME = GETDATE()
+			INSERT	INTO dbo.LA_InvoiceHeader (
+					BillerId,
+					PartyId,
+					CurrencyId,
+					InvoiceSymbol,				
+					InvoiceNumber,
+					FromDate,
+					ToDate,
+					InvoiceDate,				
+					DueDate,
+					Amount,
+					InvoiceType,
+					StatusId,
+					Note,
+					HasSent,
+					HasDeleted,
+					CreatedBy,
+					CreatedDateTime,
+					UpdatedDateTime,
+					IsSeparateProduct)
+			VALUES
+			(
+					@BillerId, 
+					@PayerId, 
+					@CurrencyId, 
+					@InvoiceSymbol, 
+					@InvoiceNumber,
+					@FromDate,
+					@ToDate, 
+					@CurrentDateTime, 
+					@DueDate, 				
+					@Amount, 
+					@InvoiceType, 
+					0, 
+					@Note, 
+					0, 
+					0, 
+					@UserID, 
+					@CurrentDateTime, 
+					@CurrentDateTime,
+					@IsSeparateProduct
+			)
+		END TRY
+		BEGIN CATCH
+			IF(@@ERROR <> 0)
+			BEGIN
+				SELECT @ErrCode = 3, @ErrMsg = 'Insert invoice failed.' -- System error
+				RETURN
+			END
+		END CATCH	
 		DECLARE @CurrentInvoiceHeaderId BIGINT = SCOPE_IDENTITY()
 		-- End Region
 		

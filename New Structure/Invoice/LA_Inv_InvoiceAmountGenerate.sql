@@ -79,7 +79,7 @@ BEGIN
 		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
 	)
-	
+		
 	-- End region
 	
 	-- Region: Get base Currency
@@ -152,6 +152,9 @@ BEGIN
 				)
 				AND (mf.PartyId = @PartyId OR mf.PartyId IN (SELECT PartyId FROM @PartyGroup))
 	)
+	
+	DELETE	FROM @MinFeeGroup
+	WHERE	ProductID NOT IN (SELECT ProductId FROM @MinFeeGroup WHERE [@MinFeeGroup].PartyId = @PartyId)
 	-- End region
 	
 	-- Region: Get discount group info
