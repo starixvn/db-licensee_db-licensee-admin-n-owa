@@ -35,7 +35,7 @@ BEGIN
 				ELSE p.ProductPrefix
 			END AS ProductCode,
 			CASE 
-				WHEN ivs.ProductId = 0 THEN 'Sportbooks' 
+				WHEN ivs.ProductId = 0 THEN 'Sportsbook' 
 				ELSE p.ProductName
 			END AS ProductName
 	FROM	dbo.LA_InvoiceSetting ivs WITH(NOLOCK) 

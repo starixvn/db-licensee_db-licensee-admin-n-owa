@@ -71,7 +71,7 @@ BEGIN
 				ELSE p.ProductPrefix
 			END AS ProductCode,
 			CASE 
-				WHEN i.ProductId = 0 THEN 'Sportbooks' 
+				WHEN i.ProductId = 0 THEN 'Sportsbook' 
 				ELSE p.ProductName
 			END AS ProductName			
 	FROM	@PartyChargeInfo i  
@@ -81,6 +81,8 @@ BEGIN
 	-- Region: Call data from sp Settlement.
 	CREATE	TABLE #tmpResult(
 			GroupId				INT,
+			FromDate			DATETIME,
+			ToDate				DATETIME,
 			ProductCode			VARCHAR(10),
 			ProductName			VARCHAR(200),
 			Game				VARCHAR(100),
@@ -116,7 +118,9 @@ BEGIN
 		END CATCH
 		
 		UPDATE	#tmpResult
-		SET		GroupId = @Index,
+		SET		GroupId		= @Index,
+				FromDate	= @TempFromDate,
+				ToDate		= @TempToDate,
 				ProductCode = @TempProductCode,
 				ProductName = @ProductName
 		WHERE	GroupId IS NULL    
@@ -125,6 +129,8 @@ BEGIN
 	END	
 	
 	SELECT	r.GroupId, 
+			r.FromDate,
+			r.ToDate,
 			r.ProductCode,
 			r.ProductName,
 			r.Game, 
