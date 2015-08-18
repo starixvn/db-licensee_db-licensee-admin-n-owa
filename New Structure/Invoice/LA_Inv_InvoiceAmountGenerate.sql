@@ -454,7 +454,15 @@ BEGIN
 	-- Region: Apply Rebate
 	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
 	(
-	    SELECT	iv.PartyId, iv.ProductId, iv.InvoiceAmount * dg.Rate AS InvoiceAmount, dg.DiscountGroupType AS AmountType, dg.Rate
+	    SELECT	iv.PartyId, 
+				iv.ProductId, 
+				(iv.InvoiceAmount - ISNULL((	SELECT	SUM(i.InvoiceAmount)
+											FROM	@InvoiceData i
+											WHERE	i.AmountType = 1
+													AND i.ProductId = iv.ProductId), 0))
+					* dg.Rate AS InvoiceAmount, 
+				dg.DiscountGroupType AS AmountType, 
+				dg.Rate
 	    FROM	@InvoiceData iv 
 				INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
 	    WHERE	iv.IsApplyMinFee = 0
