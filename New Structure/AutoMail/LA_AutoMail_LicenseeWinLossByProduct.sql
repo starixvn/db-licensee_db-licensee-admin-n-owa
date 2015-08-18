@@ -9,9 +9,10 @@ GO
 ALTER PROCEDURE [dbo].[LA_AutoMail_LicenseeWinLossByProduct]	  
 	@FromDate		DATETIME,
 	@ToDate			DATETIME,	
+	@CurrencyName	VARCHAR(10),	
 	@ErrCode		INT				= 0		OUTPUT,
-	@ErrMsg			NVARCHAR(1000)	= ''	OUTPUT,
-	@BaseCurrency	INT				=		OUTPUT
+	@ErrMsg			NVARCHAR(1000)	= ''	OUTPUT
+	
 WITH RECOMPILE
 AS
 /*	Header:
@@ -24,28 +25,24 @@ AS
 */
 /*	Example:
 	USE bodb_Licensee
-	DECLARE @FromDate DATETIME,
-		@ToDate DATETIME,
-		@PartyId INT,
-		@ProductCode VARCHAR(100),
-		@ErrCode INT,
-		@ErrMsg NVARCHAR(1000),
-		@BaseCurrency NVARCHAR(20)
-	SET @FromDate = '2015-07-1'
-	SET @ToDate = '2015-07-31'
-	SET @PartyId=17
-	SET @ProductCode='SB,BA,RB,NG,LC,VS,CS,BG,KN,PTCS,AGC,GD,VG,BT,MGC'	
-	
-	EXEC [LA_Inv_InvoiceAmountGenerate] @PartyId, @FromDate, @ToDate, @ProductCode, @ErrCode OUT, @ErrMsg OUT, @BaseCurrency OUT
-	SELECT @ErrCode, @ErrMsg, @BaseCurrency
+	DECLARE @FromDate		DATETIME		= '2015-7-1'
+	DECLARE @ToDate			DATETIME		= '2015-7-31'
+	DECLARe @CurrencyName	VARCHAR(10)		= 'GBP'
+	DECLARE @ErrCode		INT				
+	DECLARE @ErrMsg			NVARCHAR(1000)
+		
+	EXEC [LA_AutoMail_LicenseeWinLossByProduct] @FromDate, @ToDate, @CurrencyName, @ErrCode OUT, @ErrMsg OUT
+	SELECT @ErrCode, @ErrMsg
 */
 BEGIN
 	SET NOCOUNT ON
 	
 	-- Region: Get party charge rate info
-	DECLARE	@PartyIdString VARCHAR(100)
-	SELECT	@PartyIdString = COALESCE(@PartyIdString + ', ', '') + CONVERT(VARCHAR(10), PartyId)
-	FROM	@PartyGroup 
+	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG'
+	DECLARE @PartyIdString VARCHAR(2000)
+	SELECT @PartyIdString = COALESCE(@PartyIdString + ', ', '') + CONVERT(VARCHAR(10), PartyId)
+	FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)
+	WHERE PartyType = 1
 	
 	DECLARE @PartyChargeInfo AS TABLE (
 			PartyId		INT,
@@ -61,9 +58,53 @@ BEGIN
 		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
 	)
-		
 	-- End region
 	
+	-- Region: Get exchange rate info
+	CREATE	TABLE #Exchange ( 
+			ExchangeDate	DATE, 
+			ExchangeID		INT, 
+			CurrencyCode	VARCHAR(10), 
+			Rate			FLOAT)	
+	
+	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
+	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
+	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CurrencyName)
+	-- End region
+	
+	-- Region: Generate licensee name & group
+	DECLARE @TempPartyList AS TABLE(
+		PartyId		INT,
+		PartyName	VARCHAR(200),
+		BranchName	VARCHAR(200),
+		ParentId	INT		
+	)
+	INSERT INTO @TempPartyList
+	EXECUTE dbo.LA_PartyListSel
+	
+	CREATE TABLE #LicenseeAmount(		
+		GroupName	VARCHAR(200),		
+		PartyName	VARCHAR(200),
+		BranchName	VARCHAR(200),		
+		SB			MONEY,
+		RB			MONEY,
+		NG			MONEY,		
+		BA			MONEY,
+		LC			MONEY,
+		VS			MONEY,
+		CS			MONEY,
+		KN			MONEY,
+		AGC			MONEY,
+		GD			MONEY,
+		VG			MONEY
+	)
+	INSERT INTO #LicenseeAmount(GroupName,PartyName,BranchName)
+	SELECT	p.PartyName, t.PartyName, t.BranchName
+	FROM	@TempPartyList t INNER JOIN @TempPartyList p ON t.ParentId = p.PartyId
+	WHERE	t.ParentId != 0
+	
+	SELECT * FROM #LicenseeAmount
+	-- EndRegion
 END
 
 GO
