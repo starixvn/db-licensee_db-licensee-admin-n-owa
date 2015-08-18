@@ -23,10 +23,6 @@ BEGIN
 	SELECT Bettype, ProductId 
 	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB,NG,VS,RB,LC,CS,KN,BG,MGC')
 
-	UPDATE @BettypeProductMapping
-	SET ProductID = 13 
-	WHERE Bettype IN (901, 902, 903)
-
 	-- Import data from rpt_Betting / rpt_Betting_BA
 	INSERT INTO [dbo].[rpt_BettingByProduct]
 			([rptDate]
