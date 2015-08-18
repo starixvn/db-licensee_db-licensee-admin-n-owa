@@ -117,7 +117,6 @@ BEGIN
 			FeeAmount		MONEY,		
 			FromDate		DATETIME,
 			ToDate			DATETIME,
-			IsMinFee		TINYINT,
 			MinFeeProrate	MONEY,
 			WaivedAmount	MONEY,
 			TotalAmount		MONEY,		
@@ -392,11 +391,6 @@ BEGIN
 										WHEN t.TotalMinFeeAmount < t.TotalMinFee AND amf.MinFeeAmount < amf.MinFeeProrate 
 											THEN amf.MinFeeProrate + amf.WaivedAmount
 										ELSE amf.TotalAmount
-									END,
-			amf.IsMinFee		=	CASE 
-										WHEN t.TotalMinFeeAmount < t.TotalMinFee AND amf.MinFeeAmount < amf.MinFeeProrate 
-											THEN 1
-										ELSE 0
 									END
 	FROM	@MinFeeGroup amf INNER JOIN @TotalMinFees t ON amf.ProductId = t.ProductId
 	WHERE	amf.FeeType = 1
@@ -406,29 +400,26 @@ BEGIN
 			ProductId		INT, 
 			InvoiceAmount	MONEY, 
 			AmountType		TINYINT,
-			Rate			MONEY,
-			IsApplyMinFee	INT)
+			Rate			MONEY)
 	
-	INSERT INTO @InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType,IsApplyMinFee)
+	INSERT INTO @InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType)
 	(
 		SELECT	amf.PartyId, 
 				amf.ProductId, 
 				SUM(amf.AmountToCompany), 
-				0 AS AmountType, 
-				amf.IsMinFee
+				0 AS AmountType
 		FROM	@MinFeeGroup amf
 		WHERE	amf.PartyId = @PartyId
 				AND amf.FeeType = 1
-		GROUP	BY amf.PartyId, amf.ProductId,amf.IsMinFee
+		GROUP	BY amf.PartyId, amf.ProductId
 	)
 	
-	INSERT INTO @InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType,IsApplyMinFee)
+	INSERT INTO @InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType)
 	(
 		SELECT	td.PartyId, 
 				td.ProductId, 
 				SUM(td.AmountToCompany), 
-				0 AS AmountType, 
-				0 AS IsApplyMinFee
+				0 AS AmountType
 		FROM	#TempData td 
 		WHERE	td.PartyId = @PartyId AND td.ProductId NOT IN (SELECT td2.ProductId FROM @MinFeeGroup td2)
 		GROUP	BY td.PartyId, td.ProductId		
@@ -448,8 +439,7 @@ BEGIN
 	(
 	    SELECT	iv.PartyId, iv.ProductId, iv.InvoiceAmount * dg.Rate AS InvoiceAmount, dg.DiscountGroupType AS AmountType, dg.Rate
 	    FROM	@InvoiceData iv INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
-	    WHERE	iv.IsApplyMinFee = 0
-				AND dg.DiscountGroupType = 1
+	    WHERE	dg.DiscountGroupType = 1
 	)	
 	-- End Region
 	
@@ -467,8 +457,7 @@ BEGIN
 				dg.Rate
 	    FROM	@InvoiceData iv 
 				INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
-	    WHERE	iv.IsApplyMinFee = 0
-				AND dg.DiscountGroupType = 2
+	    WHERE	dg.DiscountGroupType = 2
 				AND iv.AmountType = 0
 	)
 	
@@ -535,7 +524,7 @@ BEGIN
 			f.Rate
 	FROM	@FinalResult f
 	WHERE	f.AmountType = 0 
-			OR f.ProductId = -1
+			OR (f.ProductId = -1 AND f.InvoiceAmount > 0)
 	ORDER BY f.AmountType, f.ProductId
 	
 	SELECT @ErrCode = 0, @ErrMsg = ''
