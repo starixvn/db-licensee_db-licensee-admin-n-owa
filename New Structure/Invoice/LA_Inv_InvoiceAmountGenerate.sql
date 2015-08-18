@@ -9,7 +9,7 @@ GO
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
 	@PartyId			INT,
 	@BillerId			INT,
-	@InvoiceTypeId		INT,
+	@InvoiceType		INT,
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
 	@ProductCode		VARCHAR(100),	
@@ -33,14 +33,14 @@ AS
 	DECLARE @ToDate DATETIME  = '2015-07-31'
 	DECLARE @PartyId INT = 17
 	DECLARE @BillerId INT = 150
-	DECLARE @InvoiceTypeId INT = 1
+	DECLARE @InvoiceType INT = 1
 	DECLARE @ProductCode VARCHAR(100)='SB,BA,RB,NG,LC,VS,CS,BG,KN,PTCS,AGC,GD,VG,BT,MGC'
 	DECLARE	@ErrCode INT
 	DECLARE	@ErrMsg NVARCHAR(1000)
 	DECLARE	@BaseCurrency NVARCHAR(20)
 	DECLARE @InvoiceTemplateId INT
 	
-	EXEC [LA_Inv_InvoiceAmountGenerate] @PartyId,@BillerId,@InvoiceTypeId, @FromDate, @ToDate, @ProductCode, @ErrCode OUT, @ErrMsg OUT, @BaseCurrency OUT, @InvoiceTemplateId OUT
+	EXEC [LA_Inv_InvoiceAmountGenerate] @PartyId,@BillerId,@InvoiceType, @FromDate, @ToDate, @ProductCode, @ErrCode OUT, @ErrMsg OUT, @BaseCurrency OUT, @InvoiceTemplateId OUT
 	SELECT @ErrCode, @ErrMsg, @BaseCurrency, @InvoiceTemplateId
 */
 BEGIN
@@ -543,7 +543,7 @@ BEGIN
 								FROM	dbo.LA_InvoiceSetting i
 								WHERE	i.FromPartyId = @PartyId
 										AND i.ToPartyId = @BillerId
-										AND i.InvTypeId = @InvoiceTypeId)
+										AND i.InvTypeId = @InvoiceType)
 	-- End Region	
 	
 	DROP TABLE #Exchange
