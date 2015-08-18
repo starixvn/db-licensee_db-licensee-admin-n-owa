@@ -7,13 +7,16 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
-	  @PartyId				INT
-	, @FromDate				DATETIME
-	, @ToDate				DATETIME
-	, @ProductCode			VARCHAR(100)	
-	, @ErrCode				INT				= 0		OUTPUT
-	, @ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
-	, @BaseCurrency			NVARCHAR(20)	= 'GBP'	OUTPUT
+	@PartyId			INT,
+	@BillerId			INT,
+	@InvoiceTypeId		INT,
+	@FromDate			DATETIME,
+	@ToDate				DATETIME,
+	@ProductCode		VARCHAR(100),	
+	@ErrCode			INT				= 0		OUTPUT,
+	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT,
+	@BaseCurrency		NVARCHAR(20)	= 'GBP'	OUTPUT,
+	@InvoiceTemplateId	INT				= 0		OUTPUT
 WITH RECOMPILE
 AS
 /*	Header:
@@ -26,20 +29,19 @@ AS
 */
 /*	Example:
 	USE bodb_Licensee
-	DECLARE @FromDate DATETIME,
-		@ToDate DATETIME,
-		@PartyId INT,
-		@ProductCode VARCHAR(100),
-		@ErrCode INT,
-		@ErrMsg NVARCHAR(1000),
-		@BaseCurrency NVARCHAR(20)
-	SET @FromDate = '2015-07-1'
-	SET @ToDate = '2015-07-31'
-	SET @PartyId=17
-	SET @ProductCode='SB,BA,RB,NG,LC,VS,CS,BG,KN,PTCS,AGC,GD,VG,BT,MGC'	
+	DECLARE @FromDate DATETIME = '2015-07-1'
+	DECLARE @ToDate DATETIME  = '2015-07-31'
+	DECLARE @PartyId INT = 17
+	DECLARE @BillerId INT = 150
+	DECLARE @InvoiceTypeId INT = 1
+	DECLARE @ProductCode VARCHAR(100)='SB,BA,RB,NG,LC,VS,CS,BG,KN,PTCS,AGC,GD,VG,BT,MGC'
+	DECLARE	@ErrCode INT
+	DECLARE	@ErrMsg NVARCHAR(1000)
+	DECLARE	@BaseCurrency NVARCHAR(20)
+	DECLARE @InvoiceTemplateId INT
 	
-	EXEC [LA_Inv_InvoiceAmountGenerate] @PartyId, @FromDate, @ToDate, @ProductCode, @ErrCode OUT, @ErrMsg OUT, @BaseCurrency OUT
-	SELECT @ErrCode, @ErrMsg, @BaseCurrency
+	EXEC [LA_Inv_InvoiceAmountGenerate] @PartyId,@BillerId,@InvoiceTypeId, @FromDate, @ToDate, @ProductCode, @ErrCode OUT, @ErrMsg OUT, @BaseCurrency OUT, @InvoiceTemplateId OUT
+	SELECT @ErrCode, @ErrMsg, @BaseCurrency, @InvoiceTemplateId
 */
 BEGIN
 	SET NOCOUNT ON
@@ -537,6 +539,11 @@ BEGIN
 	ORDER BY f.AmountType, f.ProductId
 	
 	SELECT @ErrCode = 0, @ErrMsg = ''
+	SELECT @InvoiceTemplateId = (SELECT	TOP 1 i.InvTempId
+								FROM	dbo.LA_InvoiceSetting i
+								WHERE	i.FromPartyId = @PartyId
+										AND i.ToPartyId = @BillerId
+										AND i.InvTypeId = @InvoiceTypeId)
 	-- End Region	
 	
 	DROP TABLE #Exchange
