@@ -9,9 +9,7 @@ GO
 ALTER PROCEDURE [dbo].[LA_AutoMail_LicenseeWinLossByProduct]	  
 	@FromDate		DATETIME,
 	@ToDate			DATETIME,	
-	@CurrencyName	VARCHAR(10),	
-	@ErrCode		INT				= 0		OUTPUT,
-	@ErrMsg			NVARCHAR(1000)	= ''	OUTPUT
+	@CurrencyName	VARCHAR(10)
 	
 WITH RECOMPILE
 AS
@@ -28,11 +26,9 @@ AS
 	DECLARE @FromDate		DATETIME		= '2015-7-1'
 	DECLARE @ToDate			DATETIME		= '2015-7-31'
 	DECLARe @CurrencyName	VARCHAR(10)		= 'GBP'
-	DECLARE @ErrCode		INT				
-	DECLARE @ErrMsg			NVARCHAR(1000)
-		
-	EXEC [LA_AutoMail_LicenseeWinLossByProduct] @FromDate, @ToDate, @CurrencyName, @ErrCode OUT, @ErrMsg OUT
-	SELECT @ErrCode, @ErrMsg
+			
+	EXEC [LA_AutoMail_LicenseeWinLossByProduct] @FromDate, @ToDate, @CurrencyName
+	
 */
 BEGIN
 	SET NOCOUNT ON
@@ -72,6 +68,37 @@ BEGIN
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CurrencyName)
 	-- End region
 	
+	-- Region: Get Winloss data
+	CREATE	TABLE #TempData (
+			LicenseeId	INT, 
+			PartyId		INT, 
+			rptDate		DATETIME, 
+			CurrencyId	INT, 
+			MemberWL	MONEY,
+			AWinLoss	MONEY, 
+			AComm		MONEY, 
+			ProductId	TINYINT)
+	
+	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,MemberWL,AWinLoss,AComm,ProductId)
+	(
+	    SELECT	b.SiteID,
+				p.PartyId, 
+				b.rptDate, 
+				b.CurrencyID, 
+				SUM(ISNULL(b.MemberWL, 0)) Winloss,
+				SUM(ISNULL(b.GrossWL, 0)) AS AWinLoss,
+				SUM(ISNULL(b.CommissionA, 0)) AS AComm, 
+				b.ProductId
+		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+				INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON b.SiteID = p.OldRefID AND p.PartyType = 1													
+		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate			
+				AND (b.CurrencyID <> 20)
+				AND b.customercategory NOT IN (27, 28)					
+		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, b.ProductId
+	)	
+	
+	-- EndRegion
+	
 	-- Region: Generate licensee name & group
 	DECLARE @TempPartyList AS TABLE(
 		PartyId		INT,
@@ -83,27 +110,112 @@ BEGIN
 	EXECUTE dbo.LA_PartyListSel
 	
 	CREATE TABLE #LicenseeAmount(		
-		GroupName	VARCHAR(200),		
-		PartyName	VARCHAR(200),
-		BranchName	VARCHAR(200),		
-		SB			MONEY,
-		RB			MONEY,
-		NG			MONEY,		
-		BA			MONEY,
-		LC			MONEY,
-		VS			MONEY,
-		CS			MONEY,
-		KN			MONEY,
-		AGC			MONEY,
-		GD			MONEY,
-		VG			MONEY
+		GroupName	VARCHAR(200),
+		LicenseeId	INT,		
+		PartyId		INT,		
+		PartyName	VARCHAR(200),			
+		SB			MONEY, --SB
+		RB			MONEY, -- RB
+		NG			MONEY, -- NG	
+		BA			MONEY, -- BA
+		LC			MONEY, -- LC
+		VS			MONEY, -- VS
+		CS			MONEY, -- CS
+		KN			MONEY, -- KN
+		AGC			MONEY, -- AGC
+		GD			MONEY, -- GD
+		VG			MONEY  -- VG
 	)
-	INSERT INTO #LicenseeAmount(GroupName,PartyName,BranchName)
-	SELECT	p.PartyName, t.PartyName, t.BranchName
+	INSERT INTO #LicenseeAmount(GroupName, LicenseeId, PartyId,PartyName)
+	SELECT	CASE
+				WHEN p.PartyId = 1 THEN 'ONEWorks'
+				WHEN p.PartyId = 11 THEN 'Boping'
+				WHEN p.PartyId = 98 THEN 'Zelianta'
+				ELSE 'Credit' 
+			END	AS PartyName,			
+			op.OldRefID,
+			t.PartyId, 
+			t.PartyName
 	FROM	@TempPartyList t INNER JOIN @TempPartyList p ON t.ParentId = p.PartyId
-	WHERE	t.ParentId != 0
+			INNER JOIN dbo.OAS_Party op WITH (NOLOCK) ON op.PartyID = t.PartyId
+	WHERE	t.ParentId != 0 AND p.PartyId != 98
 	
-	SELECT * FROM #LicenseeAmount
+	-- BA	
+	;WITH AmountDueBA AS
+	(
+		SELECT	d.LicenseeId,
+				SUM(-(MemberWL + AComm)) Amount
+		FROM	#TempData d
+		WHERE	d.ProductId = 3
+		GROUP	BY d.LicenseeId
+	)
+	
+	UPDATE	d
+	SET		BA = a.Amount
+	FROM	#LicenseeAmount d INNER JOIN AmountDueBA a ON a.LicenseeId = d.LicenseeId
+	
+	-- RB
+	;WITH AmountDueRacing AS
+	(
+		SELECT	d.LicenseeId,
+				SUM(-(MemberWL + AWinloss + AComm)) Amount
+		FROM	#TempData d
+		WHERE	d.ProductId = 1 --RB
+		GROUP	BY d.LicenseeId
+	)
+	UPDATE	d
+	SET		RB = a.Amount
+	FROM	#LicenseeAmount d INNER JOIN AmountDueRacing a ON a.LicenseeId = d.LicenseeId
+		
+	;WITH AmountDueByProduct AS
+	(
+		SELECT	d.PartyId,
+				d.LicenseeId,
+				ISNULL(SUM(CASE WHEN d.ProductId = 0 THEN -(MemberWL + AWinloss + AComm) ELSE 0 END),0) AS SB,
+				ISNULL(SUM(CASE WHEN d.ProductId = 2 THEN -(MemberWL + AWinloss + AComm) ELSE 0 END),0) AS NG,
+				ISNULL(SUM(CASE WHEN d.ProductId = 4 THEN -(MemberWL + AWinloss + AComm) ELSE 0 END),0) AS LC,
+				ISNULL(SUM(CASE WHEN d.ProductId = 5 THEN -(MemberWL + AWinloss + AComm) ELSE 0 END),0) AS VS,
+				ISNULL(SUM(CASE WHEN d.ProductId = 6 THEN -(MemberWL + AWinloss + AComm) ELSE 0 END),0) AS CS,
+				ISNULL(SUM(CASE WHEN d.ProductId = 8 THEN -(MemberWL + AWinloss + AComm) ELSE 0 END),0) AS KN,
+				ISNULL(SUM(CASE WHEN d.ProductId = 10 THEN -MemberWL * ci.Rate ELSE 0 END),0) AS AGC,
+				ISNULL(SUM(CASE WHEN d.ProductId = 11 THEN -MemberWL * ci.Rate ELSE 0 END),0) AS GD,
+				ISNULL(SUM(CASE WHEN d.ProductId = 12 THEN -MemberWL * ci.Rate ELSE 0 END),0) AS VG
+		FROM	#TempData d
+				INNER JOIN @PartyChargeInfo ci ON	d.PartyId = ci.PartyId 
+													AND ci.ProductId = d.ProductId 
+													AND d.rptDate BETWEEN ci.FromDate AND ci.ToDate
+		GROUP BY d.PartyId,
+				 d.LicenseeId
+	)
+	UPDATE	l
+	SET		SB = a.SB,
+			NG = a.NG,
+			LC = a.LC,
+			VS = a.VS,
+			CS = a.CS,
+			KN = a.KN,
+			AGC = a.AGC,
+			GD = a.GD,
+			VG = a.VG
+	FROM	#LicenseeAmount l
+			INNER JOIN AmountDueByProduct a ON a.LicenseeId = l.LicenseeId AND a.PartyId = l.PartyId
+	
+	DELETE	FROM #LicenseeAmount
+	WHERE	SB IS NULL
+			AND RB IS NULL
+			AND NG IS NULL
+			AND BA IS NULL
+			AND LC IS NULL
+			AND VS IS NULL
+			AND CS IS NULL
+			AND KN IS NULL
+			AND AGC IS NULL
+			AND GD IS NULL
+			AND VG IS NULL
+	
+	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG
+	FROM	#LicenseeAmount l
+	
 	-- EndRegion
 END
 
