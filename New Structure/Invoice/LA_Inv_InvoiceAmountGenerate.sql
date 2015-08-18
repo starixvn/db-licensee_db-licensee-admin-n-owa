@@ -6,7 +6,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
+ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate_xtest]
 	@PartyId			INT,
 	@BillerId			INT,
 	@InvoiceType		INT,
@@ -169,13 +169,23 @@ BEGIN
 		
 	INSERT INTO @DiscountGroupHeader(DiscountGroupId,DiscountGroupType,PartyId,CurrencyId,FromDate,ToDate)
 	(
-		SELECT	dg.DiscountGroupId,dg.DiscountGroupType,dga.PartyId, dg.CurrencyId, dg.FromDate, MAX(dg.ToDate) AS ToDate
+		SELECT	dg.DiscountGroupId,dg.DiscountGroupType,dga.PartyId, dg.CurrencyId, dg.FromDate, dg.ToDate
 		FROM	bodb_Licensee.dbo.LA_DiscountGroupHeader dg WITH(NOLOCK)
 				INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupAssignment dga WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
 		WHERE	@FromDate<= ToDate AND FromDate<=@ToDate
-				AND dga.PartyID = @PartyId
-		GROUP BY dg.DiscountGroupId, dg.DiscountGroupType, dg.CurrencyId, dg.FromDate, dga.PartyId
+				AND dga.PartyID = @PartyId		
 	)
+	
+	DELETE	FROM @DiscountGroupHeader
+	WHERE	ToDate < (SELECT	MAX(ToDate)
+					FROM	@DiscountGroupHeader
+					WHERE	DiscountGroupType = 1)
+			AND DiscountGroupType = 1
+	DELETE	FROM @DiscountGroupHeader
+	WHERE	ToDate < (SELECT	MAX(ToDate)
+					FROM	@DiscountGroupHeader
+					WHERE	DiscountGroupType = 2)
+			AND DiscountGroupType = 2
 	
 	DECLARE @DiscountGroup AS TABLE(
 			DiscountGroupId		SMALLINT,									
