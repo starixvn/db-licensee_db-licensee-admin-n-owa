@@ -300,7 +300,8 @@ BEGIN
 													AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate			
 				AND (b.CurrencyID <> 20)
-				AND b.customercategory NOT IN (27, 28)					
+				AND b.customercategory NOT IN (27, 28)
+				AND b.Bettype NOT IN (901,902,903)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId
 	)
 	
