@@ -326,7 +326,7 @@ BEGIN
 	FROM	#TempData td 
 			INNER JOIN @PartyChargeInfo p ON td.LicenseeId = p.LicenseeId AND td.ProductId = p.ProductID AND td.rptDate BETWEEN p.FromDate AND p.ToDate
 			INNER JOIN #Exchange e ON td.rptDate = e.ExchangeDate AND td.CurrencyId = e.ExchangeID	
-	-- End region
+	-- End region	
 	
 	-- Region: Check min fee group			
 	--- calculate waived prorate (*)
@@ -389,11 +389,11 @@ BEGIN
 	GROUP BY mf.ProductId
 	
 	UPDATE	t
-	SET		TotalMinFeeAmount = (	SELECT	SUM(mf.MinFeeAmount)
-									FROM	@MinFeeGroup mf
-									WHERE	mf.MinFeeAmount > 0
-											AND FeeType = 1
-											AND mf.ProductId = t.ProductId)
+	SET		TotalMinFeeAmount = ISNULL((	SELECT	SUM(mf.MinFeeAmount)
+											FROM	@MinFeeGroup mf
+											WHERE	mf.MinFeeAmount > 0
+													AND FeeType = 1
+													AND mf.ProductId = t.ProductId), 0)
 	FROM	@TotalMinFees t
 	
 	--- calculate amount to company
@@ -405,7 +405,7 @@ BEGIN
 									END
 	FROM	@MinFeeGroup amf INNER JOIN @TotalMinFees t ON amf.ProductId = t.ProductId
 	WHERE	amf.FeeType = 1
-				
+	
 	DECLARE @InvoiceData	TABLE(
 			PartyId			INT,
 			ProductId		INT, 
