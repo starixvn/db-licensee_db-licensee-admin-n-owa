@@ -50,7 +50,7 @@ BEGIN
 
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, RowNumber)
 	(
-		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate, ROW_NUMBER() OVER (ORDER BY ProductId)
+		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate, ROW_NUMBER() OVER (ORDER BY ProductId, Todate)
 		FROM	dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
 	)		
@@ -111,8 +111,8 @@ BEGIN
 		WHERE	pci.RowNumber = @Index
 		
 		BEGIN TRY
-		INSERT INTO #tmpResult(Game,WinLostDate,Currency,CurrencyName,Betcount,Turnover,MemberWinLoss,MemberComm,LicenseeWL,LicenseeComm,Company,TurnoverBase,MemberWinLossBase,LicenseeWLBase,CompanyBaseCurrency)
-		EXECUTE bodb02.dbo.LA_Rpt_LicenseeSettlement @PartyId, @TempFromDate, @TempToDate, @TempProductCode, 0, @BaseCurrencyName	
+			INSERT INTO #tmpResult(Game,WinLostDate,Currency,CurrencyName,Betcount,Turnover,MemberWinLoss,MemberComm,LicenseeWL,LicenseeComm,Company,TurnoverBase,MemberWinLossBase,LicenseeWLBase,CompanyBaseCurrency)
+			EXECUTE bodb02.dbo.LA_Rpt_LicenseeSettlement @PartyId, @TempFromDate, @TempToDate, @TempProductCode, 0, @BaseCurrencyName	
 		END TRY
 		BEGIN CATCH
 		END CATCH
@@ -149,6 +149,7 @@ BEGIN
 			r.LicenseeWLBase,
 			r.CompanyBaseCurrency
 	FROM	#tmpResult r
+	
 	-- End region
 	
 	DROP TABLE #tmpResult
