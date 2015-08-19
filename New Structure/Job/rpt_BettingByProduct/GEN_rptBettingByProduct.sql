@@ -43,7 +43,7 @@ BEGIN
 		[rptDate]
 		,[SiteID]
 		, bt.ProductID
-		,CASE WHEN bt.ProductID IN (13,14) THEN b.[Bettype] ELSE -1 END [Bettype]
+		,CASE WHEN bt.ProductID IN (13,14) OR b.Bettype IN (901, 902, 903) THEN b.[Bettype] ELSE -1 END [Bettype]
 		,[CurrencyId]
 		,Status [StatusId]
 		,ISNULL([CustomerCategory],-1)
@@ -62,7 +62,7 @@ BEGIN
 	GROUP BY [rptDate]
 			,[SiteID]
 			, bt.ProductID
-			,CASE WHEN bt.ProductID IN (13,14) THEN b.[Bettype] ELSE -1 END 
+			,CASE WHEN bt.ProductID IN (13,14) OR b.Bettype IN (901, 902, 903) THEN b.[Bettype] ELSE -1 END 
 			,[CurrencyId]
 			,Status
 			,ISNULL([CustomerCategory],-1)
@@ -71,7 +71,7 @@ BEGIN
 		[rptDate]
 		,[SiteID]
 		, 3
-		,CASE WHEN bt.ProductID IN (13,14) THEN b.[Bettype] ELSE -1 END [Bettype]
+		,CASE WHEN bt.ProductID IN (13,14) OR b.Bettype IN (901, 902, 903) THEN b.[Bettype] ELSE -1 END [Bettype]
 		,[CurrencyId]
 		,Status [StatusId]
 		,ISNULL([CustomerCategory],-1)
@@ -90,7 +90,7 @@ BEGIN
 	GROUP BY [rptDate]
 			,[SiteID]
 			, bt.ProductID
-			,CASE WHEN bt.ProductID IN (13,14) THEN b.[Bettype] ELSE -1 END 
+			,CASE WHEN bt.ProductID IN (13,14) OR b.Bettype IN (901, 902, 903) THEN b.[Bettype] ELSE -1 END 
 			,[CurrencyId]
 			,Status
 			,ISNULL([CustomerCategory],-1)
