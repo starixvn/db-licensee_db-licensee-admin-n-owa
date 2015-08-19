@@ -6,7 +6,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate_xtest]
+ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
 	@PartyId			INT,
 	@BillerId			INT,
 	@InvoiceType		INT,
