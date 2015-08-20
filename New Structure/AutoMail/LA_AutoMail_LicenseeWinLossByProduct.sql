@@ -172,19 +172,20 @@ BEGIN
 	(
 		SELECT	d.PartyId,
 				d.LicenseeId,
-				ISNULL(SUM(CASE WHEN d.ProductId = 0 THEN -(MemberWL + AWinloss + AComm) ELSE 0 END),0) AS SB,
-				ISNULL(SUM(CASE WHEN d.ProductId = 2 THEN -(MemberWL + AWinloss + AComm) ELSE 0 END),0) AS NG,
-				ISNULL(SUM(CASE WHEN d.ProductId = 4 THEN -(MemberWL + AWinloss + AComm) ELSE 0 END),0) AS LC,
-				ISNULL(SUM(CASE WHEN d.ProductId = 5 THEN -(MemberWL + AWinloss + AComm) ELSE 0 END),0) AS VS,
-				ISNULL(SUM(CASE WHEN d.ProductId = 6 THEN -(MemberWL + AWinloss + AComm) ELSE 0 END),0) AS CS,
-				ISNULL(SUM(CASE WHEN d.ProductId = 8 THEN -(MemberWL + AWinloss + AComm) ELSE 0 END),0) AS KN,
-				ISNULL(SUM(CASE WHEN d.ProductId = 10 THEN -MemberWL * ci.Rate ELSE 0 END),0) AS AGC,
-				ISNULL(SUM(CASE WHEN d.ProductId = 11 THEN -MemberWL * ci.Rate ELSE 0 END),0) AS GD,
-				ISNULL(SUM(CASE WHEN d.ProductId = 12 THEN -MemberWL * ci.Rate ELSE 0 END),0) AS VG
+				ISNULL(SUM(CASE WHEN d.ProductId = 0  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS SB,
+				ISNULL(SUM(CASE WHEN d.ProductId = 2  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS NG,
+				ISNULL(SUM(CASE WHEN d.ProductId = 4  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS LC,
+				ISNULL(SUM(CASE WHEN d.ProductId = 5  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS VS,
+				ISNULL(SUM(CASE WHEN d.ProductId = 6  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS CS,
+				ISNULL(SUM(CASE WHEN d.ProductId = 8  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS KN,
+				ISNULL(SUM(CASE WHEN d.ProductId = 10 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS AGC,
+				ISNULL(SUM(CASE WHEN d.ProductId = 11 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS GD,
+				ISNULL(SUM(CASE WHEN d.ProductId = 12 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS VG
 		FROM	#TempData d
 				INNER JOIN @PartyChargeInfo ci ON	d.PartyId = ci.PartyId 
 													AND ci.ProductId = d.ProductId 
 													AND d.rptDate BETWEEN ci.FromDate AND ci.ToDate
+				INNER JOIN #Exchange e ON d.rptDate = e.ExchangeDate AND d.CurrencyId = e.ExchangeID	
 		GROUP BY d.PartyId,
 				 d.LicenseeId
 	)
