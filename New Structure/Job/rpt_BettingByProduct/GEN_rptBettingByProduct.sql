@@ -21,7 +21,7 @@ BEGIN
 	
 	INSERT INTO @BettypeProductMapping (Bettype, ProductID)
 	SELECT Bettype, ProductId 
-	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB,NG,VS,RB,LC,CS,KN,BG,MGC')
+	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB,NG,VS,RB,LC,CS,KN,BG,MGC,BT')
 
 	-- Import data from rpt_Betting / rpt_Betting_BA
 	INSERT INTO [dbo].[rpt_BettingByProduct]
@@ -42,8 +42,8 @@ BEGIN
 	SELECT
 		[rptDate]
 		,[SiteID]
-		, bt.ProductID
-		,CASE WHEN bt.ProductID IN (13,14) OR b.Bettype IN (901, 902, 903) THEN b.[Bettype] ELSE -1 END [Bettype]
+		,CASE WHEN bt.ProductID = 13 THEN 0 ELSE bt.ProductID END AS ProductID
+		,CASE WHEN bt.ProductID IN (13,14) THEN b.[Bettype] ELSE -1 END [Bettype]
 		,[CurrencyId]
 		,Status [StatusId]
 		,ISNULL([CustomerCategory],-1)
@@ -62,7 +62,7 @@ BEGIN
 	GROUP BY [rptDate]
 			,[SiteID]
 			, bt.ProductID
-			,CASE WHEN bt.ProductID IN (13,14) OR b.Bettype IN (901, 902, 903) THEN b.[Bettype] ELSE -1 END 
+			,CASE WHEN bt.ProductID IN (13,14) THEN b.[Bettype] ELSE -1 END 
 			,[CurrencyId]
 			,Status
 			,ISNULL([CustomerCategory],-1)
@@ -71,7 +71,7 @@ BEGIN
 		[rptDate]
 		,[SiteID]
 		, 3
-		,CASE WHEN bt.ProductID IN (13,14) OR b.Bettype IN (901, 902, 903) THEN b.[Bettype] ELSE -1 END [Bettype]
+		,CASE WHEN bt.ProductID IN (13,14) THEN b.[Bettype] ELSE -1 END [Bettype]
 		,[CurrencyId]
 		,Status [StatusId]
 		,ISNULL([CustomerCategory],-1)
@@ -90,7 +90,7 @@ BEGIN
 	GROUP BY [rptDate]
 			,[SiteID]
 			, bt.ProductID
-			,CASE WHEN bt.ProductID IN (13,14) OR b.Bettype IN (901, 902, 903) THEN b.[Bettype] ELSE -1 END 
+			,CASE WHEN bt.ProductID IN (13,14) THEN b.[Bettype] ELSE -1 END 
 			,[CurrencyId]
 			,Status
 			,ISNULL([CustomerCategory],-1)
