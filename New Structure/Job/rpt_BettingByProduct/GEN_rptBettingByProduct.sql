@@ -114,11 +114,13 @@ BEGIN
 	GROUP BY Winlostdate, Custid, Currency
 
 	-- PTCS
+	/*	
 	INSERT INTO #tmpData (rptDate, CustID, ProductID, CurrencyId, Winlost, Turnover, BetCount, PlayerComm)
 	SELECT Winlostdate, Custid, 9 AS ProductId, Currency, Winlost, Turnover, BetCount, PlayerComm
 	FROM DBRPT.bodb_report.dbo.rptDepWinlost_PlaytechCS WITH (NOLOCK)
 	WHERE Winlostdate >= @date AND Winlostdate < @date2
 		AND [Currency] <> 20
+	*/
 
 	INSERT INTO [dbo].[rpt_BettingByProduct]
 			([rptDate]
