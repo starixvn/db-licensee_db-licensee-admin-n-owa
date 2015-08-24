@@ -21,6 +21,7 @@ AS
 		- 20150202@Patrick: Add more product: Bingo & Keno
 		- 20150414@Jim: add MicroGaming
 		- 20150714@Florent: Add product Gold Deluxe
+		- 20150820@Florent: Add Bettrade and remove bettypes 901, 902, 903 in SB, BA
     Param's Explanation:   
 
 */
@@ -35,6 +36,7 @@ BEGIN
 	   WHERE (typeid < 31
 		  OR typeid BETWEEN 121 AND 999
 		  OR typeid BETWEEN 1301 AND 1399)
+		  AND typeid NOT IN (901, 902, 903) -- Bettrade bettypes
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
@@ -46,6 +48,7 @@ BEGIN
 	   WHERE (typeid < 31
 		  OR typeid BETWEEN 121 AND 999
 		  OR typeid BETWEEN 1301 AND 1399)
+		  AND typeid NOT IN (901, 902, 903) -- Bettrade bettypes
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
@@ -126,6 +129,15 @@ BEGIN
 	   SELECT typeid, 11
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 1701 AND 1799
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+    END
+
+	IF CHARINDEX('BT', @ProductCodes) <> 0
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 13
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 901 AND 903
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
     
