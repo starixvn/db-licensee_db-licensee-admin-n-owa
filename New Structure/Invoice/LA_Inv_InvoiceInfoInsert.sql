@@ -98,6 +98,11 @@ BEGIN
 			FROM	dbo.LA_InvoiceHeader lih WITH(NOLOCK) 
 			WHERE	lih.InvoiceSymbol = @InvoiceSymbol AND lih.BillerId = @BillerId
 		END		
+		
+		IF(@InvoiceNumber IS NULL)
+		BEGIN
+			SET @InvoiceNumber = 1
+		END
 		-- End Region
 		
 		-- Region: Insert data to Invoice Header
