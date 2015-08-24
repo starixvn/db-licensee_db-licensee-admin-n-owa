@@ -16,7 +16,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
 	@ErrCode			INT				= 0		OUTPUT,
 	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT,
 	@BaseCurrency		NVARCHAR(20)	= 'GBP'	OUTPUT,
-	@InvoiceTemplateId	INT				= 0		OUTPUT
+	@InvoiceTemplateName VARCHAR(200)	= 0		OUTPUT
 WITH RECOMPILE
 AS
 /*	Header:
@@ -38,7 +38,7 @@ AS
 	DECLARE	@ErrCode INT
 	DECLARE	@ErrMsg NVARCHAR(1000)
 	DECLARE	@BaseCurrency NVARCHAR(20)
-	DECLARE @InvoiceTemplateId INT
+	DECLARE @InvoiceTemplateId VARCHAR(200)
 	
 	EXEC [LA_Inv_InvoiceAmountGenerate] @PartyId,@BillerId,@InvoiceType, @FromDate, @ToDate, @ProductCode, @ErrCode OUT, @ErrMsg OUT, @BaseCurrency OUT, @InvoiceTemplateId OUT
 	SELECT @ErrCode, @ErrMsg, @BaseCurrency, @InvoiceTemplateId
@@ -539,11 +539,12 @@ BEGIN
 	ORDER BY f.AmountType, f.ProductId
 	
 	SELECT @ErrCode = 0, @ErrMsg = ''
-	SELECT @InvoiceTemplateId = (SELECT	TOP 1 i.InvTempId
-								FROM	dbo.LA_InvoiceSetting i
-								WHERE	i.FromPartyId = @PartyId
-										AND i.ToPartyId = @BillerId
-										AND i.InvTypeId = @InvoiceType)
+	SELECT @InvoiceTemplateName = ( SELECT	TOP 1 t.InvTemplateName
+									FROM	dbo.LA_InvoiceSetting i 
+											INNER JOIN dbo.LA_InvoiceTemplate t ON i.InvTempId = t.InvTemplateId
+									WHERE	i.FromPartyId = @PartyId
+											AND i.ToPartyId = @BillerId
+											AND i.InvTypeId = @InvoiceType)
 	-- End Region	
 	
 	DROP TABLE #Exchange

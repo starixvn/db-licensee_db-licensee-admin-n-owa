@@ -112,9 +112,11 @@ BEGIN
 		
 		BEGIN TRY
 			INSERT INTO #tmpResult(Game,WinLostDate,Currency,CurrencyName,Betcount,Turnover,MemberWinLoss,MemberComm,LicenseeWL,LicenseeComm,Company,TurnoverBase,MemberWinLossBase,LicenseeWLBase,CompanyBaseCurrency)
-			EXECUTE bodb02.dbo.LA_Rpt_LicenseeSettlement @PartyId, @TempFromDate, @TempToDate, @TempProductCode, 0, @BaseCurrencyName	
+			EXECUTE DBEXT.bodb02.dbo.LA_Rpt_LicenseeSettlement @PartyId, @TempFromDate, @TempToDate, @TempProductCode, 0, @BaseCurrencyName	
+			 
 		END TRY
 		BEGIN CATCH
+			SELECT ERROR_MESSAGE()
 		END CATCH
 		
 		UPDATE	#tmpResult
