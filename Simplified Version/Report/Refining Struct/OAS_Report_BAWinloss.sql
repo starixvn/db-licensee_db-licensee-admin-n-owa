@@ -19,12 +19,13 @@ AS
  * Created by : 20131223@Francis
  * Task : Get Winloss report for Sportbook (compatible with the new structure)
  * DB: DB052.bodb02
- * Original: [OAS_Report_BAWinloss_xtest]
+ * Original: [OAS_Report_BAWinloss]
  * Revisions:
    - 20140410@Francis: Fix showing data out of time-range bug
    - 20141103@Florent: Fix formula for OW revenue, use new structure (#25393)
    - 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust 
    - 20150202@Florent: base currency GBP
+   - 20150824@Florent: remove bettrade ticket
 
  *
  * Params explanation:
@@ -181,6 +182,7 @@ BEGIN
 				@DrawFilter <> 1
 				OR b.statusID != 111
 				) -- NoDraw filter
+			AND b.bettype NOT IN( 901, 902, 903)
 		GROUP BY b.winlostdate
 			,b.currency
 	END
@@ -222,6 +224,7 @@ BEGIN
 				@DrawFilter <> 1
 				OR b.statusID != 111
 				) -- NoDraw filter
+			AND b.bettype NOT IN( 901, 902, 903)
 		GROUP BY b.winlostdate
 			,b.currency
 	END

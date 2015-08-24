@@ -28,6 +28,7 @@ AS
 	- 20141105@Florent: Apply new struct support multi-System
 	- 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust
 	- 20150202@Florent: base currency GBP
+	- 20150824@Florent: remove Bettrade bettypes
  * 
  * Param's Explanation:    
  *  - @ID   : Party ID  (include: LicenseeID, ResellerID)
@@ -41,7 +42,7 @@ AS
  *  - @IsOld  : 0 - query in table rptLicWinloss, 1 - query in table rptLicWinloss_old.   
  *  - @drawfilter : 'No Draw' filter is supportted (0:Normal 1:No Draw 2:No Draw for Turnover only)  
  *  - @excludeTest : remove currency UUS  
-        exec OAS_Report_LicenseeWinloss_xtest 14,0,'2014-09-01','2014-09-30',2,'2014-09-20',0,0,0
+                exec OAS_Report_LicenseeWinloss 14,0,'2014-09-01','2014-09-30',2,'2014-09-20',0,0,0
  */
 BEGIN
 	SET NOCOUNT ON
@@ -181,8 +182,8 @@ BEGIN
 				SELECT custid
 				FROM @tmpAg
 				)*/
-			AND (Bettype < 31  OR (Bettype BETWEEN 121 AND 999) OR (Bettype BETWEEN 1301 AND 1399)) 
-			AND (Bettype NOT IN (901, 902, 903))--remove Bettrade ticket
+			AND (Bettype < 31  OR (Bettype BETWEEN 121 AND 999) OR (Bettype BETWEEN 1301 AND 1399))
+			AND b.bettype NOT IN (901, 902, 903) -- bettrade bettypes
 			AND b.ruben = 1
 			AND b.statusID NOT IN (101, 102, 103)
 			AND tpositiontaking <> 0
@@ -234,13 +235,13 @@ BEGIN
 			INNER JOIN @tmpAg ag ON b.recommend = ag.CustID AND b.Currency=ag.currency
 		WHERE b.Winlostdate BETWEEN @FDate AND @TempToDate
 			AND b.sporttype = 0 --just only sportsbook
-			AND Bettype NOT IN (901, 902, 903) -- remove Bettrade ticket
 			AND b.roleid = 2
 			/*AND b.Recommend IN (
 				SELECT custid
 				FROM @tmpAg
 				)
 			 */
+			AND b.bettype NOT IN (903, 902, 903)-- bettrade bettypes
 			AND b.statusID <> 101
 			AND ISNULL(b.isBA, 0) = 0
 		GROUP BY b.winlostdate
