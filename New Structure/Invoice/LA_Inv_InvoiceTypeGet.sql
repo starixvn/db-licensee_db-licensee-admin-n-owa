@@ -23,7 +23,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	
-	SELECT i.InvTypeId AS InvoiceTypeId, i.InvTypeName AS InvoiceTypeName
+	SELECT i.InvTypeId, i.InvTypeName
 	FROM dbo.LA_InvoiceType i
 	
 END		
