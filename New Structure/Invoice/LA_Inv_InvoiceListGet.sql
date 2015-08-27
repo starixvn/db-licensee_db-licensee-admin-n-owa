@@ -8,8 +8,8 @@ GO
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceListGet] 
 	@InvoiceNo		VARCHAR(50) = '',
 	@InvoiceTypes	VARCHAR(100)= '',
-	@BillerId		INT			= 0,
-	@PayerId		INT			= 0,
+	@BillerIds		VARCHAR(500)= '',
+	@PayerIds		VARCHAR(500)= '',
 	@IssueFromDate	DATETIME,
 	@IssueToDate	DATETIME
 	  
@@ -26,12 +26,12 @@ AS
 	USE bodb_licensee
 	DECLARE @InvoiceNo		VARCHAR(50)	= ''
 	DECLARE @InvoiceTypes	VARCHAR(100)= '1,2,3'
-	DECLARE @BillerId		INT			= 0
-	DECLARE @PayerId		INT			= 0
+	DECLARE @BillerIds		VARCHAR(100)= '119,122'
+	DECLARE @PayerIds		VARCHAR(100)= '14,24'
 	DECLARE @IssueFromDate	DATETIME	= '2015-7-1'
 	DECLARE @IssueToDate	DATETIME	= '2015-7-31'
 	
-	EXEC [LA_Inv_InvoiceListGet] @InvoiceNo,@InvoiceTypes,@BillerId,@PayerId,@IssueFromDate,@IssueToDate
+	EXEC [LA_Inv_InvoiceListGet] @InvoiceNo,@InvoiceTypes,@BillerIds,@PayerIds,@IssueFromDate,@IssueToDate
 */
 BEGIN
 	SET NOCOUNT ON
@@ -39,7 +39,7 @@ BEGIN
 	DECLARE @InvoiceTypeTable TABLE (Id INT NOT NULL)	
 	DECLARE @Delimiter CHAR(1)=','
 
-	;WITH SEPARATEDTABLE (STARTVAL, STOPVAL) 
+	;WITH SeparatedTable (STARTVAL, STOPVAL) 
 	AS 
 	(
 		SELECT
@@ -48,7 +48,7 @@ BEGIN
 		UNION ALL SELECT
 			STARTVAL = STOPVAL + 1,
 			STOPVAL = CHARINDEX(@Delimiter, @InvoiceTypes + @Delimiter, STOPVAL + 1)
-		FROM SEPARATEDTABLE
+		FROM SeparatedTable
 		WHERE STOPVAL > 0
 	)
 	INSERT @InvoiceTypeTable (Id)
@@ -56,7 +56,57 @@ BEGIN
 																WHEN STOPVAL > 0 THEN STOPVAL - STARTVAL
 																ELSE 0
 															END)))
-	FROM SEPARATEDTABLE
+	FROM SeparatedTable
+	WHERE STOPVAL > 0
+	OPTION (MAXRECURSION 0)
+	-- End Region
+	
+	-- Region: Get Biller ID
+	DECLARE @BillerTable TABLE (Id INT NOT NULL)		
+
+	;WITH SeparatedTable (STARTVAL, STOPVAL) 
+	AS 
+	(
+		SELECT
+			STARTVAL = CAST(1 AS INT),
+			STOPVAL = CHARINDEX(@Delimiter, @BillerIds + @Delimiter) 
+		UNION ALL SELECT
+			STARTVAL = STOPVAL + 1,
+			STOPVAL = CHARINDEX(@Delimiter, @BillerIds + @Delimiter, STOPVAL + 1)
+		FROM SeparatedTable
+		WHERE STOPVAL > 0
+	)
+	INSERT @BillerTable (Id)
+	SELECT LTRIM(RTRIM(SUBSTRING(@BillerIds, STARTVAL,	CASE
+															WHEN STOPVAL > 0 THEN STOPVAL - STARTVAL
+															ELSE 0
+														END)))
+	FROM SeparatedTable
+	WHERE STOPVAL > 0
+	OPTION (MAXRECURSION 0)
+	-- End Region
+	
+	-- Region: Get Payers ID
+	DECLARE @PayerTable TABLE (Id INT NOT NULL)	
+	
+	;WITH SeparatedTable (STARTVAL, STOPVAL) 
+	AS 
+	(
+		SELECT
+			STARTVAL = CAST(1 AS INT),
+			STOPVAL = CHARINDEX(@Delimiter, @PayerIds + @Delimiter) 
+		UNION ALL SELECT
+			STARTVAL = STOPVAL + 1,
+			STOPVAL = CHARINDEX(@Delimiter, @PayerIds + @Delimiter, STOPVAL + 1)
+		FROM SeparatedTable
+		WHERE STOPVAL > 0
+	)
+	INSERT @PayerTable (Id)
+	SELECT LTRIM(RTRIM(SUBSTRING(@PayerIds, STARTVAL,	CASE
+															WHEN STOPVAL > 0 THEN STOPVAL - STARTVAL
+															ELSE 0
+														END)))
+	FROM SeparatedTable
 	WHERE STOPVAL > 0
 	OPTION (MAXRECURSION 0)
 	-- End Region
@@ -85,8 +135,8 @@ BEGIN
 			INNER JOIN dbo.LA_InvoiceType it ON i.InvoiceType = it.InvTypeId
 			INNER JOIN @BaseCurrencyTable bct ON i.CurrencyId = bct.CurrencyId
 	WHERE	(i.InvoiceSymbol + CONVERT(VARCHAR(20), i.InvoiceNumber) = @InvoiceNo OR @InvoiceNo = '')
-			AND (i.BillerId = @BillerId OR @BillerId = 0)
-			AND (i.PartyId = @PayerId OR @PayerId = 0)
+			AND i.BillerId IN (SELECT Id FROM @BillerTable)
+			AND i.PartyId IN (SELECT Id FROM @PayerTable)
 			AND i.InvoiceType IN (SELECT Id FROM @InvoiceTypeTable)
 			AND i.ToDate BETWEEN @IssueFromDate AND @IssueToDate
 	
