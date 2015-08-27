@@ -105,7 +105,7 @@ BEGIN
 												END) AS TurnOver
 				, SUM(ISNULL(b.Winloss, 0)) Winloss					 			 					 								
 				, SUM(ISNULL(b.BetCount, 0) * CASE WHEN @DrawFilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) BetCount
-				FROM bodb_LicenseeReport.dbo.rpt_ThirPartyWL_ExtraGMT b WITH (NOLOCK)
+				FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
 					INNER JOIN (SELECT DISTINCT LicenseeId, Bettype FROM @tmpParty) p ON b.SiteId = p.LicenseeID AND b.BetTypeId = p.Bettype					
 				WHERE b.RptDate BETWEEN @FromDate AND @ToDate			
 					AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
