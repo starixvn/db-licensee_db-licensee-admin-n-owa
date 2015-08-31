@@ -23,6 +23,7 @@ AS
    
 	 Revisions:			
 		- 20150618@Florent: add column Currency to LA_Minfee   	
+		- 20150831@Bravo: fix bug - Min fee term & Basis of billing max length.
 	 Params:		
 		+ @InvoiceSettingXML: '<MinFeeSettings>
 								<MinFeeSetting>

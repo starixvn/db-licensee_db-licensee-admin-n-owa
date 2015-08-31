@@ -22,7 +22,8 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:     
-		-20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
+		- 20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
+		- 20150831@Bravo: fix bug - Min fee term & Basis of billing max length.
 	 Params:		
 		+ @InvoiceSettingXML: '<ChargeSettings>
 								  <ChargeSetting>

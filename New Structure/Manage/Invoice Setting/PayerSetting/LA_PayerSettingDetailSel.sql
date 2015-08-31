@@ -17,6 +17,7 @@ AS
 	 Revisions:  
 		- 20150618@Florent: add column Currency to LA_Minfee   		  
 		- 20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
+		- 20150831@Bravo: fix bug - Min fee term & Basis of billing max length.
 	 Params:
 		+ @PayerId :specify Party
 		+ @@PayerGroup :	0 get all Party
