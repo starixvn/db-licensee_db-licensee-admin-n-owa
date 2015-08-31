@@ -10,13 +10,14 @@ ALTER PROCEDURE [dbo].[LA_SelBaseCurrency]
 	@BaseCurrencyDefault	VARCHAR(3) = 'GBP'
 AS
 /*
-Created: 20150312@Florent
-Task : Get all BaseCurrency
-DB: DB052.bodb_licensee
-Revison:
+	Created: 20150312@Florent
+	Task : Get all BaseCurrency
+	DB: DB052.bodb_licensee
+	Revison:
+		- 20150703@Florent: add currency MYR
 
-Revisions:
-Param's Explanation:
+	Revisions:
+	Param's Explanation:
 */
 SET NOCOUNT ON
 
@@ -33,11 +34,13 @@ BEGIN
 								  'CNY' -- ExchangeID = 13
 								, 'EUR' -- ExchangeID = 6		
 								, 'GBP' -- ExchangeID = 12
-								, 'USD' -- ExchangeID = 3		
+								, 'USD' -- ExchangeID = 3	
+								, 'MYR'	-- ExchangeID = 2	
 							)
 								AND e.exchangeid IN
 							(
-								  3
+								  2
+								, 3
 								, 6
 								, 12
 								, 13

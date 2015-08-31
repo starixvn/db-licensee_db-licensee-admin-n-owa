@@ -7,15 +7,15 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_LicensingFee]
-      @PartyIDs	VARCHAR(1000)	 = ''
-	,@Currency	INT			 = 0
-	,@FromDate	SMALLDATETIME
-	,@ToDate		SMALLDATETIME
-	,@ProductCode	VARCHAR(500)
-	,@IsConvert	BIT			 = 0
-	,@BaseCurrency INT			 = 0
-	,@drawfilter	SMALLINT		 = 1
-	,@excludeTest	BIT			 = 0
+	   @PartyIDs			VARCHAR(1000)	= ''
+	   , @Currency			INT				= 0
+	   , @FromDate			SMALLDATETIME
+	   , @ToDate			SMALLDATETIME
+	   , @ProductCode		VARCHAR(500)
+	   , @IsConvert			BIT				= 0
+	   , @BaseCurrencyName	VARCHAR(3)		= 'GBP'
+	   , @drawfilter		SMALLINT		= 1
+	   , @excludeTest		BIT				= 0
 WITH RECOMPILE
 AS  
 /*  Created by: 20140930@Florent
@@ -25,6 +25,7 @@ AS
    
     Revisions:  		
 	   - 20141226@Florent: enhance SP
+	   - 20150703@Florent: add GBP
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
 	  + @Currency : 0-All Currencies
@@ -35,9 +36,6 @@ AS
 	  + @IsConvert: =1 : convert figure to 
 					=0 : no convert 
 					(datatype:bit)
-	  +@BaseCurrency -6 : convert to EUR
-					 -2: convert to MYR
-					 -3: convert to USD
 		
 */  
 BEGIN  
@@ -98,13 +96,9 @@ BEGIN
 	END	
 
 	INSERT INTO #Exchange (ExchangeDate, ExchangeId, Rate)
-	SELECT ExchangeDate
-			,ExchangeId
-			,CASE @BaseCurrency WHEN -2 THEN MYR
-							 WHEN -3 THEN USD
-							 WHEN -6 THEN EUR
-							 ELSE 1 END AS Rate
-	FROM dbo.Lrf_f_GetExchangeDaily (@fromdate, @todate)
+	SELECT ExchangeDate, ExchangeId, BaseCurrencyRate AS Rate
+	FROM dbo.LA_f_ExchangeDailySel(@fromdate, @todate, @BaseCurrencyName)
+
 	IF (@isconvert = 0)
 		BEGIN
 			UPDATE #Exchange
@@ -113,9 +107,13 @@ BEGIN
 	
 	INSERT INTO #rptLicFee(Licensee, rptDate, Fee)
 	SELECT 
-		p.PartyName		
+		CASE p.PartyName
+			 WHEN '18bb' THEN 'PIH'
+			 WHEN 'IBC'  THEN 'FDL'
+			 ELSE p.PartyName
+		    END AS PartyName
 		, DATENAME(YEAR, t.rptDate)  + '-' + DATENAME(MONTH, t.rptDate) AS rptDate
-		, SUM(t.Winloss*ee.Rate) Fee
+		, SUM(t.Winloss * ee.Rate) Fee
 	FROM #Temp t
 		INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON t.PartyId = p.PartyID
 		INNER JOIN #Exchange ee ON t.rptDate = ee.exchangedate AND t.CurrencyID = ee.ExchangeId

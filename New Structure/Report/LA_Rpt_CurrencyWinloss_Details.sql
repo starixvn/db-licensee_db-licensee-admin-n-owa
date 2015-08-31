@@ -8,17 +8,17 @@ GO
 
 /****** Object:  Stored Procedure dbo.OA_Rpt_LicenseeCurrencyWinloss_xtest    Script Date: 2013-06-05 4:42:57 PM ******/
 ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss_Details] 
-      @PartyIDs	VARCHAR(5500)	 = ''
-	,@Currency	INT			 = 0
-	,@FromDate	SMALLDATETIME
-	,@ToDate		SMALLDATETIME
-	,@ProductCodes VARCHAR(1000)	 = 'SB'
-	,@SportType	INT			 = 0
-	,@Bettype		INT			 = 0
-	,@ReportBy	TINYINT		 = 0
-	,@drawfilter	SMALLINT		 = 1
-	,@excludeTest	BIT			 = 0
-	,@Debug		BIT			 = 0
+     @PartyIDs				VARCHAR(5500)	= ''
+	, @Currency				INT				= 0
+	, @FromDate				SMALLDATETIME
+	, @ToDate				SMALLDATETIME
+	, @ProductCodes			VARCHAR(1000)	= 'SB'
+	, @SportType			INT				= 0
+	, @Bettype				INT				= 0
+	, @ReportBy				TINYINT			= 0
+	, @drawfilter			SMALLINT		= 1
+	, @excludeTest			BIT				= 0
+	, @Debug				BIT				= 0
 AS
 /*  Created: Florent.Nguyen  
 	Date: 2014-09-04
@@ -28,6 +28,7 @@ AS
     Revisions:  	
 	   - 20141021@Florent: show credit's licensee
 	   - 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
+	   - 20150703@Florent: add GBP
 	Param's Explanation:  
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;  
 	  +	@drawfilter: 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
@@ -181,7 +182,7 @@ BEGIN
 								    THEN 'AND b.IsLive=0 '
 							 ELSE ''
 							 END + CHAR(13) +
-							 '--AND b.customercategory NOT IN (27,28)
+							 'AND b.customercategory NOT IN (27,28)
 						GROUP BY  b.rptDate	
 							 ,b.SiteID 
 							 ,t.PartyID	 
@@ -217,7 +218,7 @@ END
 
 SELECT @sql = @sql + '--Output data from temp table' + CHAR(13)
 
-SELECT @sql = @sql + CHAR(13) + ' SELECT DISTINCT ExchangeDate, ExchangeId, Code, USD, EUR, MYR INTO #TempExchange FROM Lrf_f_GetExchangeDaily(''' + convert(VARCHAR(10), @FromDate, 120) + ''',''' + convert(VARCHAR(10), @ToDate, 120) + ''')' + CHAR(13)
+SELECT @sql = @sql + CHAR(13) + ' SELECT DISTINCT ExchangeDate, ExchangeId, Code, USD, EUR, MYR, GBP INTO #TempExchange FROM Lrf_f_GetExchangeDaily(''' + convert(VARCHAR(10), @FromDate, 120) + ''',''' + convert(VARCHAR(10), @ToDate, 120) + ''')' + CHAR(13)
 
 SELECT @output = 'SELECT ' + CHAR(13) + 
 			  'w.PartyID,' + CHAR(13) + 
@@ -266,7 +267,18 @@ SELECT @output = 'SELECT ' + CHAR(13) +
 			  'SUM(AmtDuetoBA*e.EUR)  AS AmtDuetoBAEUR,' + CHAR(13) + 
 			  'SUM(AmtDuetoRB*e.EUR)  AS AmtDuetoRBEUR,' + CHAR(13) + 
 			  'SUM(Company * e.EUR)  AS CompanyEUR,' + CHAR(13) + 
-			  'SUM(Playercomm * e.EUR) 	AS PlayercommEUR' + CHAR(13) + 
+			  'SUM(Playercomm * e.EUR) 	AS PlayercommEUR,' + CHAR(13) + 
+			  --GBP
+			  'SUM(TurnOver*e.GBP) 	AS TurnoverGBP, ' + CHAR(13) + 
+			  'SUM(Winlost*e.GBP) 	AS WinlostGBP,' + CHAR(13) + 
+			  'SUM(LicenseeWL*e.GBP)  AS LicenseeWLGBP,' + CHAR(13) + 
+			  'SUM(WinlossRB*e.GBP) 	AS WinlossRBGBP,' + CHAR(13) + 
+			  'SUM(CommBA * e.GBP)  AS CommBAGBP,' + CHAR(13) + 
+			  'SUM(CommRB * e.GBP)  AS CommRBGBP,' + CHAR(13) + 
+			  'SUM(AmtDuetoBA*e.GBP)  AS AmtDuetoBAGBP,' + CHAR(13) + 
+			  'SUM(AmtDuetoRB*e.GBP)  AS AmtDuetoRBGBP,' + CHAR(13) + 
+			  'SUM(Company * e.GBP)  AS CompanyGBP,' + CHAR(13) + 
+			  'SUM(Playercomm * e.GBP) 	AS PlayercommGBP' + CHAR(13) + 
 			  'FROM #tmpWinLoss w' + CHAR(13) + 
 				 'INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = w.PartyID' + CHAR(13) + 				 
 				 'INNER JOIN #TempExchange e' + CHAR(13) + 

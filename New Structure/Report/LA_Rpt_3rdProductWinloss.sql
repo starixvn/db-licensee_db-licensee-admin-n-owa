@@ -7,10 +7,11 @@ SET QUOTED_IDENTIFIER ON
 GO
 ALTER PROCEDURE [dbo].[LA_Rpt_3rdProductWinloss] 
 	@ProductCodes		VARCHAR(100)	
-	, @Recommend		VARCHAR(8000)	= ''
+	, @Recommend		VARCHAR(MAX)	= ''
 	, @Currency 		INT 			= 0
 	, @FromDate 		SMALLDATETIME
 	, @ToDate 			SMALLDATETIME	
+	, @DrawFilter		SMALLINT		= 1
 WITH RECOMPILE
 AS
 /*  
@@ -19,7 +20,7 @@ AS
     Task : AG Win Loss report 
     DB: DBACC.bodb02  
     Revisions:  		
-
+		- 20150518@Florent: Add param @DrawFilter
 	Param's Explanation:  
 */
 SET NOCOUNT ON
@@ -43,8 +44,8 @@ BEGIN
 			, c.Winlostdate
 			, c.Sporttype
 			, c.Currency
-			, SUM(c.TurnOver) AS TurnOver
-			, SUM(c.BetCount) AS TotalTrans
+			, SUM(c.TurnOver - CASE WHEN @DrawFilter IN (2, 3) THEN c.DrawTO ELSE 0 END) AS TurnOver
+			, SUM(c.BetCount - CASE WHEN @DrawFilter IN (2) THEN c.DrawBetCount ELSE 0 END) AS TotalTrans
 			, SUM(c.Winlost) AS Winloss
 		FROM bodb_report.dbo.rptDepWinlost_AGCasino c WITH (NOLOCK)
 			INNER JOIN dbo.Custinfo co WITH (NOLOCK) ON c.CustID = co.CustID	

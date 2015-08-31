@@ -8,15 +8,15 @@ GO
 
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LiveCasinoWinloss]
-	 @Partyids	VARCHAR(5500)
-	,@GameType	INT			 = 0
-	,@Currency	INT			 = 0
-	,@drawfilter	SMALLINT		 = 0
-	,@FromDate	SMALLDATETIME
-	,@ToDate		SMALLDATETIME
-	,@excludeTest	BIT			 = 0
-
-	
+	 @Partyids				VARCHAR(5500)
+	, @GameType				INT				= 0
+	, @Currency				INT				= 0
+	, @drawfilter			SMALLINT		= 0
+	, @FromDate				SMALLDATETIME
+	, @ToDate				SMALLDATETIME
+	, @excludeTest			BIT				= 0
+	, @IsConvert			BIT				= 1
+	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
 AS      
   
 /*  
@@ -26,6 +26,7 @@ AS
  * Base on : OA_Rpt_LiveCasinoWinloss
  * Revisions :  
     - 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
+	- 20150703@Florent: add GBP
  * Param's Explanation:    
  
  *  
@@ -93,10 +94,16 @@ BEGIN
 	CREATE NONCLUSTERED INDEX IDX_Currency ON #Data(Currency,winlostdate)
 		
 	--get specified exchange value in time range		
-	SELECT DISTINCT ExchangeDate, ExchangeId, USD, EUR, MYR
+	SELECT DISTINCT ExchangeDate, ExchangeId, BaseCurrencyRate AS Rate 
 	INTO #Exchange	
-	FROM Lrf_f_GetExchangeDaily(@FromDate,@ToDate) -- get exchange rate in last day of month
-	WHERE ExchangeId IN (SELECT DISTINCT Currency FROM #Data)
+	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName) 
+	WHERE exchangeid IN (SELECT DISTINCT Currency FROM #Data)
+	
+	IF @IsConvert = 0
+	BEGIN
+		UPDATE #Exchange
+		SET Rate = 1
+	END
 	
 	BEGIN --time when Star Express has been terminated	
 		INSERT INTO #Result(PartyID, TurnOver, MemberWinloss, GrossWinloss, 
@@ -125,15 +132,15 @@ BEGIN
 		END AS PartyName,				
 		SUM(re.betcount) AS BetCount,
 		--EUR
-		SUM(re.turnover * e.EUR) AS Turnover,
-		SUM(re.MemberWinloss * e.EUR) AS MemberWinloss,
-		CASE WHEN SUM(re.GrossWinloss * e.EUR) <= 0
+		SUM(re.turnover * e.Rate) AS Turnover,
+		SUM(re.MemberWinloss * e.Rate) AS MemberWinloss,
+		CASE WHEN SUM(re.GrossWinloss * e.Rate) <= 0
 			 THEN 0
-		  ELSE SUM(re.GrossWinloss * e.EUR)
+		  ELSE SUM(re.GrossWinloss * e.Rate)
 	     END AS LicenseeWinloss,		
-		CASE WHEN SUM(re.OneworksRevenue * e.EUR) <= 0
+		CASE WHEN SUM(re.OneworksRevenue * e.Rate) <= 0
 			 THEN 0
-		  ELSE SUM(re.OneworksRevenue * e.EUR)
+		  ELSE SUM(re.OneworksRevenue * e.Rate)
 		END AS OneworksRevenue
 	FROM #Result re
 		INNER JOIN #Exchange e ON re.Currency = e.ExchangeId AND re.winlostdate = e.ExchangeDate
@@ -149,6 +156,7 @@ BEGIN
 	DROP TABLE	#Data
 	DROP TABLE	#Result
 	DROP TABLE	#Exchange	
+	DROP TABLE	#tmpParty
 END
 
 GO

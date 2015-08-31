@@ -18,8 +18,9 @@ AS
     Task : Get bettype product mapping
     DB: DB052/bodb_Licensee
 	Revisions:
-		20150202@Patrick: Add more product: Bingo & Keno
-		
+		- 20150202@Patrick: Add more product: Bingo & Keno
+		- 20150414@Jim: add MicroGaming
+		- 20150714@Florent: Add product Gold Deluxe
     Param's Explanation:   
 
 */
@@ -110,6 +111,23 @@ BEGIN
 	   WHERE typeid BETWEEN 1501 AND 1599
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
-
+	
+	IF CHARINDEX('MGC', @ProductCodes) <> 0
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 14
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 2001 AND 2009
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+    END
+	IF CHARINDEX('GD', @ProductCodes) <> 0
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 11
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 1701 AND 1799
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+    END
+    
 	RETURN
 END
