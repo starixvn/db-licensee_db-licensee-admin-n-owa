@@ -14,12 +14,13 @@ AS
 	DB: DBLIC.bodb_Licensee
 	Revisions:  
 		- 201505628@Florent: implement code
+		- 20150831@Bravo: fix bug - Min fee term & Basis of billing max length.
 	Param's Explanation:  
 */  
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @FirstBilling VARCHAR(6)
-		, @BasisOfBilling VARCHAR(50)
+	DECLARE @FirstBilling VARCHAR(100)
+		, @BasisOfBilling VARCHAR(MAX)
 		, @MinimumFees VARCHAR(10)
 	SELECT 	
 		@FirstBilling =  CONVERT(VARCHAR(3),DATENAME(MONTH, DATEADD(MONTH, MONTH(ci.FirstOfBilling), - 1))) + '-' + SUBSTRING(CAST(YEAR(ci.FirstOfBilling) AS VARCHAR),3,2)

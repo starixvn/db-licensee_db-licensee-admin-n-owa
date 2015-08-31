@@ -37,7 +37,7 @@ BEGIN
 		, @CurrentDate			DATE
 
 	SET @CurrentDate = CONVERT(DATE, GETDATE())
-	DECLARE @ChargeInfo AS TABLE (ChargeId INT, PartyId INT, ProductId INT, Rate MONEY, ChargeType SMALLINT, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(MAX), BasicOfBilling VARCHAR(512), ExchangeID INT)	
+	DECLARE @ChargeInfo AS TABLE (ChargeId INT, PartyId INT, ProductId INT, Rate MONEY, ChargeType SMALLINT, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), BasicOfBilling VARCHAR(MAX), ExchangeID INT)	
 	DECLARE @Minfee AS TABLE(FeeId INT, PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, CurrencyId INT, MinFeeTerm VARCHAR(MAX), FromDate DATE, ToDate DATE)
 	DECLARE @PayerSettingHeader AS TABLE(PartyId INT, PayerGroupID INT, PayerGroupName VARCHAR(100), ExchangeID INT, DiscountGroupID INT, DiscountGroupName VARCHAR(100), RebateGroupID INT, RebateGroupName VARCHAR(100))
 	DECLARE @Discount AS TABLE(PartyId INT, ProductId INT, FromDate DATE, ToDate DATE,DiscountGroupId INT, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
