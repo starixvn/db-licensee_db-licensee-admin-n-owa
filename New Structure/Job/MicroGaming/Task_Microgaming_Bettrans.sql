@@ -32,7 +32,6 @@ BEGIN
 	FROM bodb_licensee.dbo.Sport_Bettype_Reference WITH (NOLOCK)
 	WHERE Sporttype = 203 
 
-	--For Keno
 	INSERT INTO dbo. rpt_ThirPartyWL_ExtraGMT(RptDate, RptDate3rd, SiteId, BetTypeId, CurrencyId, StatusId, BetCount, Turnover, Winloss, AComm, PComm)
 	SELECT CAST(b.winlostdate AS DATE)	AS Rptdate
 		, CAST(b.checktime AS DATE)	AS RptDate3rd
