@@ -23,6 +23,7 @@ AS
    
 	 Revisions:			
 		- 20150618@Florent: add column Currency to LA_Minfee   	
+		- 20150831@Bravo: fix bug - Min fee term & Basis of billing max length.
 	 Params:		
 		+ @InvoiceSettingXML: '<MinFeeSettings>
 								<MinFeeSetting>
@@ -59,7 +60,7 @@ BEGIN
 	IF ISNULL(@MinFeeSettingXML, '') = ''
 		RETURN
 	-- parse XML
-	DECLARE @MinFeeSetting AS TABLE (Idx INT IDENTITY(1,1), MinFeeId INT,ProductId INT, FeeAmount MONEY, CurrencyId INT, FeeTypeId INT, MinFeeTerm VARCHAR(100), Priority SMALLINT, FromDate DATE, ToDate DATE, IsEdit BIT)	
+	DECLARE @MinFeeSetting AS TABLE (Idx INT IDENTITY(1,1), MinFeeId INT,ProductId INT, FeeAmount MONEY, CurrencyId INT, FeeTypeId INT, MinFeeTerm VARCHAR(MAX), Priority SMALLINT, FromDate DATE, ToDate DATE, IsEdit BIT)	
 	DECLARE @idoc AS INT
 	EXEC sp_xml_preparedocument @idoc OUTPUT, @MinFeeSettingXML
 	
@@ -85,7 +86,7 @@ BEGIN
 			, FeeAmount		MONEY			'FeeAmount'
 			, CurrencyId	INT				'CurrencyId'
 			, FeeTypeId		INT				'FeeTypeId'
-			, MinFeeTerm	VARCHAR(100)	'MinFeeTerm'		
+			, MinFeeTerm	VARCHAR(MAX)	'MinFeeTerm'		
 			, FromDate		DATE			'FromDate'
 			, ToDate		DATE			'ToDate'
 			, IsEdit		BIT				'IsEdit' 

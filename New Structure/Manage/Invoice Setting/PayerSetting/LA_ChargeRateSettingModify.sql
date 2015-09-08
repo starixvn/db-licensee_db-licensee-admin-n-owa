@@ -22,7 +22,8 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:     
-		-20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
+		- 20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
+		- 20150831@Bravo: fix bug - Min fee term & Basis of billing max length.
 	 Params:		
 		+ @InvoiceSettingXML: '<ChargeSettings>
 								  <ChargeSetting>
@@ -120,7 +121,7 @@ BEGIN
 	IF ISNULL(@ChargeSettingXML, '') = ''
 		RETURN
 	-- parse XML
-	DECLARE @ChargeSetting AS TABLE (Idx INT IDENTITY(1,1), ChargeID INT,ProductId INT, FirstBilling DATE, BasicBilling VARCHAR(125), Rate MONEY, ChargeType INT, FromDate DATE, ToDate DATE, IsEdit BIT)
+	DECLARE @ChargeSetting AS TABLE (Idx INT IDENTITY(1,1), ChargeID INT,ProductId INT, FirstBilling DATE, BasicBilling VARCHAR(MAX), Rate MONEY, ChargeType INT, FromDate DATE, ToDate DATE, IsEdit BIT)
 	DECLARE @ChargeRate AS TABLE (ChargeID INT,ProductId INT, FromDate DATE, ToDate DATE)
 	DECLARE @idoc AS INT
 	EXEC sp_xml_preparedocument @idoc OUTPUT, @ChargeSettingXML
@@ -132,7 +133,7 @@ BEGIN
 			 ChargeId		INT				'ChargeId'
 			, ProductId		INT				'ProductId'
 			, FirstBilling	DATE			'FirstBilling'
-			, BasicBilling	VARCHAR(125)	'BasicBilling'
+			, BasicBilling	VARCHAR(MAX)	'BasicBilling'
 			, Rate			MONEY			'Rate'
 			, ChargeType	INT				'ChargeType'
 			, FromDate		DATE			'FromDate'
