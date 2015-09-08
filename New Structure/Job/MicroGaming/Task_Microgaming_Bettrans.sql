@@ -1,12 +1,8 @@
-USE [bodb_LicenseeReport]
+SET QUOTED_IDENTIFIER ON 
 GO
-
-SET ANSI_NULLS ON
+SET ANSI_NULLS ON 
 GO
-SET QUOTED_IDENTIFIER ON
-GO
-
-ALTER PROCEDURE [dbo].[Task_Microgaming_Bettrans] @Winlossdate DATE
+CREATE PROCEDURE [dbo].[Task_Microgaming_Bettrans] @Winlossdate DATE
 AS
 /*
 	 Creator: 20150731@Florent
@@ -22,7 +18,7 @@ BEGIN
 		RETURN
 	IF NOT EXISTS(SELECT TOP 1 1 FROM bodb02.dbo.bettrans WITH (NOLOCK) WHERE winlostdate = @Winlossdate)
 		RETURN
-	DELETE dbo. rpt_ThirPartyWL_ExtraGMT WITH(ROWLOCK, UPDLOCK)
+	DELETE dbo.rpt_ThirdPartyWL_ExtraGMT WITH(ROWLOCK, UPDLOCK)
 	WHERE RptDate = @Winlossdate
 
 	--bettype mapping
@@ -32,7 +28,7 @@ BEGIN
 	FROM bodb_licensee.dbo.Sport_Bettype_Reference WITH (NOLOCK)
 	WHERE Sporttype = 203 
 
-	INSERT INTO dbo. rpt_ThirPartyWL_ExtraGMT(RptDate, RptDate3rd, SiteId, BetTypeId, CurrencyId, StatusId, BetCount, Turnover, Winloss, AComm, PComm)
+	INSERT INTO dbo.rpt_ThirdPartyWL_ExtraGMT(RptDate, RptDate3rd, SiteId, BetTypeId, CurrencyId, StatusId, BetCount, Turnover, Winloss, AComm, PComm)
 	SELECT CAST(b.winlostdate AS DATE)	AS Rptdate
 		, CAST(b.checktime AS DATE)	AS RptDate3rd
 		, ISNULL(site.SiteID, -1) AS siteid
@@ -56,3 +52,13 @@ BEGIN
 	OPTION (MAXDOP 1)
 END
 
+
+GO
+
+SET QUOTED_IDENTIFIER OFF 
+GO
+SET ANSI_NULLS ON 
+GO
+
+
+GO 

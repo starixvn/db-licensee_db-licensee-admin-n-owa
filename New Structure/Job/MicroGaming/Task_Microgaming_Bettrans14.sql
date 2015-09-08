@@ -1,11 +1,9 @@
-USE [bodb_LicenseeReport]
-GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
 
-ALTER PROCEDURE [dbo].[Task_Microgaming_Bettrans14] 
+SET QUOTED_IDENTIFIER ON 
+GO
+SET ANSI_NULLS ON 
+GO
+CREATE PROCEDURE [dbo].[Task_Microgaming_Bettrans14] 
 	@Fromdate	DATE
 	, @Todate	DATE 
 AS
@@ -37,12 +35,12 @@ BEGIN
 	
 	WHILE (@Winlostdate <= @Todate)
 	BEGIN
-		IF EXISTS (SELECT TOP 1 1 FROM dbo.rpt_ThirPartyWL_ExtraGMT WITH (NOLOCK) WHERE RptDate = @Winlostdate)
+		IF EXISTS (SELECT TOP 1 1 FROM dbo.rpt_ThirdPartyWL_ExtraGMT WITH (NOLOCK) WHERE RptDate = @Winlostdate)
 		BEGIN
-			DELETE dbo.rpt_ThirPartyWL_ExtraGMT WITH (ROWLOCK, UPDLOCK) WHERE RptDate = @Winlostdate
+			DELETE dbo.rpt_ThirdPartyWL_ExtraGMT WITH (ROWLOCK, UPDLOCK) WHERE RptDate = @Winlostdate
 		END
 
-		INSERT INTO dbo.rpt_ThirPartyWL_ExtraGMT(RptDate, RptDate3rd, SiteId, BetTypeId, CurrencyId, StatusId, BetCount, Turnover, Winloss, AComm, PComm)
+		INSERT INTO dbo.rpt_ThirdPartyWL_ExtraGMT(RptDate, RptDate3rd, SiteId, BetTypeId, CurrencyId, StatusId, BetCount, Turnover, Winloss, AComm, PComm)
 		SELECT CAST(b.winlostdate AS DATE)	AS Rptdate
 			, CAST(b.checktime AS DATE)	AS RptDate3rd
 			, ISNULL(site.SiteID, -1) AS siteid
@@ -69,3 +67,13 @@ BEGIN
 	END
 END
 
+
+GO
+
+SET QUOTED_IDENTIFIER OFF 
+GO
+SET ANSI_NULLS ON 
+GO
+
+
+GO 
