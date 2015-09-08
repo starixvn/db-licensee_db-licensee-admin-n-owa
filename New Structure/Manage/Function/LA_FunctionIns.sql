@@ -78,6 +78,7 @@ BEGIN
 			 , @ErrMsg = 'Failed to insert Function ' + convert(VARCHAR(10), @FunctionID) + ' to Group '+ convert(VARCHAR(10), @GroupIDs)
 			  DELETE dbo.LA_Function WITH(ROWLOCK) WHERE FunctionID=@FunctionID
 			  DELETE dbo.LA_GroupFunction WITH(ROWLOCK) WHERE FunctionID=@FunctionID
+			  DELETE dbo.LA_UserFunction WITH(ROWLOCK) WHERE FunctionID=@FunctionID
 			  RETURN
 		END 
 	END	
