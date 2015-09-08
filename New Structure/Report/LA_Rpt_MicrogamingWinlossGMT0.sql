@@ -59,7 +59,7 @@ BEGIN
 	INSERT INTO @tmpParty(ChargeId, PartyId, ParentId, LicenseeId, ProductID, Bettype, Rate, Fromdate, Todate)
 	(
 		SELECT DISTINCT a.ChargeID, a.PartyID, p.ParentId, LicenseeID, a.ProductID, a.Bettype, DI_Rate, a.Fromdate, a.Todate
-		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyID, @FromDate, @ToDate, @ProductCode, 'OA', @ExcludeTest) a
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', @ExcludeTest) a
 			LEFT JOIN #PartyList p ON a.PartyID = p.PartyId		
 	)
 	
@@ -195,5 +195,15 @@ BEGIN
 END
 
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_MicrogamingWinlossGMT0] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_Rpt_MicrogamingWinlossGMT0] TO bodbAdminNet
+
+SET QUOTED_IDENTIFIER OFF 
+GO
+SET ANSI_NULLS ON 
+GO
+
+
+GO 
+ GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_MicrogamingWinlossGMT0] TO [vnteam]
+GO 
+ GRANT EXECUTE ON [dbo].[LA_Rpt_MicrogamingWinlossGMT0] TO [bodbAdminNet]
+GO 

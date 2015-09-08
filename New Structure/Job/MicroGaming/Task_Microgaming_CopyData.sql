@@ -5,7 +5,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[Task_Microgaming_CopyData]
+CREATE PROCEDURE [dbo].[Task_Microgaming_CopyData]
 	@Fromdate	DATE
 	, @Todate	DATE
 AS
@@ -29,7 +29,7 @@ BEGIN
 	INSERT INTO @IndexTable(rptDate)
 	SELECT rptDate
 	FROM OPENQUERY(DBARC, 'SELECT rptDate 
-						FROM bodb_report.dbo.rpt_ThirPartyWL_ExtraGMTTemp WITH (NOLOCK)						
+						FROM bodb_report.dbo.rpt_ThirdPartyWL_ExtraGMTTemp WITH (NOLOCK)						
 						GROUP BY rptDate OPTION (MAXDOP 1)')
 	WHERE rptDate BETWEEN @Fromdate AND @Todate
 
@@ -47,22 +47,35 @@ BEGIN
 
 		SELECT @sql = 'SELECT RptDate, RptDate3rd, SiteId, BetTypeId, CurrencyId, StatusId, BetCount, Turnover, Winloss, AComm, PComm
 						FROM OPENQUERY(DBRPT, ''SELECT RptDate, RptDate3rd, SiteId, BetTypeId, CurrencyId, StatusId, BetCount, Turnover, Winloss, AComm, PComm
-												FROM bodb_report.dbo.rpt_ThirPartyWL_ExtraGMTTemp WITH (NOLOCK) 
+												FROM bodb_report.dbo.rpt_ThirdPartyWL_ExtraGMTTemp WITH (NOLOCK) 
 												WHERE rptDate = ''''' + CAST(@rptDate AS VARCHAR(20)) + '''''
 						OPTION (MAXDOP 1)'')'
 		--SELECT @TransDate AS '@TransDate', @sql AS '@sql'
 		
-		IF EXISTS ( SELECT TOP 1 1 FROM dbo.rpt_ThirPartyWL_ExtraGMT WITH (NOLOCK) WHERE RptDate = @rptDate)
+		IF EXISTS ( SELECT TOP 1 1 FROM dbo.rpt_ThirdPartyWL_ExtraGMT WITH (NOLOCK) WHERE RptDate = @rptDate)
 		BEGIN
-			DELETE dbo.rpt_ThirPartyWL_ExtraGMT WITH (ROWLOCK, UPDLOCK)
+			DELETE dbo.rpt_ThirdPartyWL_ExtraGMT WITH (ROWLOCK, UPDLOCK)
 			WHERE RptDate = @rptDate
 		END
 		
-		INSERT INTO dbo.rpt_ThirPartyWL_ExtraGMT(RptDate, RptDate3rd, SiteId, BetTypeId, CurrencyId, StatusId, BetCount, Turnover, Winloss, AComm, PComm)
+		INSERT INTO dbo.rpt_ThirdPartyWL_ExtraGMT(RptDate, RptDate3rd, SiteId, BetTypeId, CurrencyId, StatusId, BetCount, Turnover, Winloss, AComm, PComm)
 		EXECUTE (@sql)
 		
 		WAITFOR DELAY '00:00:00.280'
 	END	
 END
+
+
+
+GO
+
+SET QUOTED_IDENTIFIER OFF 
+GO
+SET ANSI_NULLS ON 
+GO
+
+
+GO 
+
 
 

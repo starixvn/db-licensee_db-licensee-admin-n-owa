@@ -7,7 +7,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-CREATE TABLE [dbo].[rpt_ThirPartyWL_ExtraGMTTemp](
+CREATE TABLE [dbo].[rpt_ThirdPartyWL_ExtraGMTTemp](
 	[RptDate] [date] NOT NULL,
 	[RptDate3rd] [date] NOT NULL,
 	[SiteId] [int] NOT NULL,
