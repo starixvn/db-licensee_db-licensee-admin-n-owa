@@ -62,19 +62,24 @@ BEGIN
 			  DELETE dbo.LA_Function WITH(ROWLOCK) WHERE FunctionID=@FunctionID
 			  RETURN
 		  END 
-
-	   --Add to Group Function
-	   INSERT INTO dbo.LA_GroupFunction WITH (ROWLOCK) (GroupID,FunctionID)
-	   SELECT val,@FunctionID
-	   FROM bodb02.dbo.strSplit(@GroupIDs,',')
-	   IF @@ERROR <> 0 --rollback
-		  BEGIN
+		
+		--Add to Group Function
+		INSERT INTO dbo.LA_GroupFunction WITH (ROWLOCK) (GroupID,FunctionID)
+		SELECT val,@FunctionID
+		FROM bodb02.dbo.strSplit(@GroupIDs,',')
+		
+		-- Add to User Function
+		INSERT INTO dbo.LA_UserFunction
+		VALUES(@Creator, @FunctionID, GETDATE(), @Creator, 1)
+		
+		IF @@ERROR <> 0 --rollback
+		BEGIN
 			 SELECT @ErrCode = 101
 			 , @ErrMsg = 'Failed to insert Function ' + convert(VARCHAR(10), @FunctionID) + ' to Group '+ convert(VARCHAR(10), @GroupIDs)
 			  DELETE dbo.LA_Function WITH(ROWLOCK) WHERE FunctionID=@FunctionID
 			  DELETE dbo.LA_GroupFunction WITH(ROWLOCK) WHERE FunctionID=@FunctionID
 			  RETURN
-		  END 
+		END 
 	END	
 	SELECT @FunctionID	
 	--Write Log	
