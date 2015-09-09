@@ -28,7 +28,7 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:
-		+ Bravo.Tran@2015.09.04: update function key
+		+ 20150904@Bravo: update function key
 */
 SET NOCOUNT ON
 DECLARE

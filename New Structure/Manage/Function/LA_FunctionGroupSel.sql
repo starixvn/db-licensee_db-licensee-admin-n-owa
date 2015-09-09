@@ -14,7 +14,7 @@ AS
 	DB:		DB052.bodb_Licensee
    
 	Revisions: 
-		+ Bravo.Tran@2015.09.04: get function groups
+		+ 20150904@Bravo: get function groups
 */
 /*	Example:
 	USE bodb_licensee
