@@ -27,7 +27,8 @@ AS
 	 Task : Modify Function
 	 DB: DB052.bodb_Licensee  
    
-	 Revisions:     
+	 Revisions:
+		+ Bravo.Tran@2015.09.04: update function key
 */
 SET NOCOUNT ON
 DECLARE

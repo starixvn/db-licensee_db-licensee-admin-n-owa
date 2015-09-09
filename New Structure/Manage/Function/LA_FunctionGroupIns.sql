@@ -19,7 +19,7 @@ AS
 	DB:		DB052.bodb_Licensee
    
 	Revisions: 
-		+ 2015.09.04: add function group
+		+ Bravo.Tran@2015.09.04: add function group
 */
 /*	Example:
 	USE bodb_licensee

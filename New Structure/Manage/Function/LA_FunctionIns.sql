@@ -29,6 +29,7 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:     
+		+ Bravo.Tran@2015.09.04: add default function permission
 */
 SET NOCOUNT ON
 DECLARE
