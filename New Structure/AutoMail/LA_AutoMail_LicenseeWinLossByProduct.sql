@@ -222,4 +222,4 @@ BEGIN
 END
 
 GO
-GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceAmountGenerate] TO bodbAdminNet
+GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceAmountGenerate] TO bodbLicenseeNet
