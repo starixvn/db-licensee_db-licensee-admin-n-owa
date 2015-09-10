@@ -34,7 +34,8 @@ AS
     DB: DB052/bodb_Licensee  
     Param's Explanation:   
 		- 20150710@Florent: support product MicroGaming with multi charge rate
-    select * FROM [LA_f_ChargeInfo]('14,15,16,17,18,25','2013-08-01','2013-08-30','NG','OA')
+		- 20150825@Florent: change fiter ChargeType = 1 to ChargeType != 2 (support new ChargeType 5)
+    select * FROM [LA_f_ChargeInfo_xtest]('14,15,16,17,18,25','2013-08-01','2013-08-30','NG','OA')
 */
 
 BEGIN     
@@ -50,7 +51,7 @@ BEGIN
 		  , ci.ProductID
 	    FROM dbo.OAS_Party p WITH (NOLOCK)
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
-	    WHERE ChargeType = 1
+	    WHERE ChargeType != 2
 		  AND p.PartyID IN (SELECT VAL FROM strSplit(@PartyIDs, ','))		  
 		  AND NOT EXISTS (SELECT Productid FROM dbo.LA_Product3rdSub WITH (NOLOCK) WHERE ci.ProductID = Productid)
 	    GROUP BY FromParty, ci.ProductID
@@ -68,7 +69,7 @@ BEGIN
 		, cte.AffectedDate
 		, DI.ProductID
 		, CASE WHEN DI.Rate = 0 THEN ISNULL(OW.Rate,0) ELSE DI.Rate END AS DI_Rate	
-		, 0	 AS OW_Rate  -- not use now
+		, ow.Rate	 AS OW_Rate  -- not use now
 		, 0	 AS PNR_Rate -- not use now
 		, CASE 
 		 	WHEN @FromDate <= DI.FromDate 
@@ -81,7 +82,7 @@ BEGIN
 			ELSE @ToDate
 			END
 	FROM dbo.OAS_Party p WITH (NOLOCK)	
-		INNER JOIN dbo.OAS_ChargeInfo DI WITH (NOLOCK) ON DI.FromParty = p.PartyID	AND DI.ChargeType = 1 AND p.PartyType = 1
+		INNER JOIN dbo.OAS_ChargeInfo DI WITH (NOLOCK) ON DI.FromParty = p.PartyID	AND DI.ChargeType != 2 AND p.PartyType = 1
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON DI.ChargeID = cs.ChargeID AND cs.SystemID = @SystemID
 		LEFT JOIN dbo.OAS_ChargeInfo OW WITH (NOLOCK) ON DI.ParentChargeID = OW.ChargeID	
 		LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
@@ -121,7 +122,7 @@ BEGIN
 	    FROM dbo.OAS_Party p WITH (NOLOCK)
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
 			INNER JOIN dbo.OAS_ChargeInfoSub s WITH (NOLOCK) ON s.ChargeIDRef = ci.ChargeID
-	    WHERE ci.ChargeType = 1
+	    WHERE ci.ChargeType != 2
 		  AND p.PartyID IN (SELECT VAL FROM strSplit(@PartyIDs, ','))		  
 	    GROUP BY ci.FromParty, ci.ProductID
 	)
@@ -152,7 +153,7 @@ BEGIN
 			ELSE @ToDate
 			END
 	FROM dbo.OAS_Party p WITH (NOLOCK)	
-		INNER JOIN dbo.OAS_ChargeInfo DI WITH (NOLOCK) ON DI.FromParty = p.PartyID	AND DI.ChargeType = 1 AND p.PartyType = 1
+		INNER JOIN dbo.OAS_ChargeInfo DI WITH (NOLOCK) ON DI.FromParty = p.PartyID AND DI.ChargeType != 2 AND p.PartyType = 1
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON DI.ChargeID = cs.ChargeID AND cs.SystemID = @SystemID
 		INNER JOIN dbo.OAS_ChargeInfoSub sub WITH (NOLOCK) ON DI.ChargeID = sub.ChargeIDref
 		INNER JOIN dbo.Sport_Bettype_Reference sbr WITH (NOLOCK) ON sbr.BettypeRef = sub.BettypeRef
