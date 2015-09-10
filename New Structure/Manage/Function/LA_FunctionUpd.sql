@@ -27,7 +27,8 @@ AS
 	 Task : Modify Function
 	 DB: DB052.bodb_Licensee  
    
-	 Revisions:     
+	 Revisions:
+		+ 20150904@Bravo: update function key
 */
 SET NOCOUNT ON
 DECLARE
@@ -43,7 +44,7 @@ BEGIN
 	--check exist
 	IF EXISTS (SELECT TOP 1 1 
 				FROM dbo.LA_Function f WITH (NOLOCK) 
-			  WHERE f.FunctionKey = @FunctionKey AND FunctionID = @FunctionID
+			  WHERE FunctionID = @FunctionID
 			 )
      BEGIN	    
 	   
@@ -73,6 +74,7 @@ BEGIN
 		   FunctionDesc = @FunctionDesc,
 		   ParentID = @ParentID,
 		   ParentName = @ParentName,
+		   FunctionKey = @FunctionKey,
 		   URL = @URL,
 		   ModifiedDate = GETDATE(),
 		   DisplayOrder = @DisplayOrder,
