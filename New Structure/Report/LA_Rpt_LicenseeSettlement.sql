@@ -336,8 +336,10 @@ BEGIN
 		
 		--Base on currency
 		, SUM(TurnOver * e.Rate)	AS TurnoverBase
-		, SUM(Winlost * e.Rate)		AS MemberWinLossBase	
-		, SUM(LicenseeWL * e.Rate)	AS LicenseeWLBase		
+		, SUM(Winlost * e.Rate)		AS MemberWinLossBase
+		, SUM(PlayerComm * e.Rate)	AS MemberCommBase	
+		, SUM(LicenseeWL * e.Rate)	AS LicenseeWLBase
+		, SUM(LicenseeComm * e.Rate)AS LicenseeCommBase			
 		, SUM(Company* e.Rate)		AS CompanyBase		
 	FROM													  
 		#Result d  									  
