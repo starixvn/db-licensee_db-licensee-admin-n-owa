@@ -25,6 +25,7 @@ AS
 			- 20150505@Florent: Integrate Gold Deluxe and Voidbridge
 			- 20150519@Florent: Change Product Prefix from VB to VG
 			- 20150722@Florent: Implement Microgaming Casino (MGC)
+			- 20150914@Bravo: Add 2 Column for Grand Total Row.
 		Param's Explanation:  				
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
 								'NG' -> Number Game			'BA' -> BA
