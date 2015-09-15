@@ -6,9 +6,10 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_AutoMail_LicenseeWinLossByProduct]	  
+	@PartyIdString  VARCHAR(500),
 	@FromDate		DATETIME,
 	@ToDate			DATETIME,	
-	@CurrencyName	VARCHAR(10)
+	@BaseCurrencyName	VARCHAR(10)
 	
 WITH RECOMPILE
 AS
@@ -19,14 +20,16 @@ AS
    
 	Revisions: 
 		+ 2015.08.06: Invoice Amount - Generate
+		+ 2015.09.15: Get Amount by PartyId List.
 */
 /*	Example:
 	USE bodb_Licensee
-	DECLARE @FromDate		DATETIME		= '2015-7-1'
-	DECLARE @ToDate			DATETIME		= '2015-7-31'
-	DECLARe @CurrencyName	VARCHAR(10)		= 'GBP'
+	DECLARe @PartyIdString	VARCHAR(500)	= '14,15,29,25,30'
+	DECLARE @FromDate		DATETIME		= '2015-8-1'
+	DECLARE @ToDate			DATETIME		= '2015-8-31'
+	DECLARe @BaseCurrencyName	VARCHAR(10)		= 'GBP'
 			
-	EXEC [LA_AutoMail_LicenseeWinLossByProduct] @FromDate, @ToDate, @CurrencyName
+	EXEC [LA_AutoMail_LicenseeWinLossByProduct] @PartyIdString, @FromDate, @ToDate, @BaseCurrencyName
 	
 */
 BEGIN
@@ -34,10 +37,32 @@ BEGIN
 	
 	-- Region: Get party charge rate info
 	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG'
-	DECLARE @PartyIdString VARCHAR(2000)
-	SELECT @PartyIdString = COALESCE(@PartyIdString + ', ', '') + CONVERT(VARCHAR(10), PartyId)
-	FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)
-	WHERE PartyType = 1
+	
+	-- Region: Get Party ID
+	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)	
+	DECLARE @Delimiter CHAR(1)=','
+
+	;WITH SeparatedTable (STARTVAL, STOPVAL) 
+	AS 
+	(
+		SELECT
+			STARTVAL = CAST(1 AS INT),
+			STOPVAL = CHARINDEX(@Delimiter, @PartyIdString + @Delimiter) 
+		UNION ALL SELECT
+			STARTVAL = STOPVAL + 1,
+			STOPVAL = CHARINDEX(@Delimiter, @PartyIdString + @Delimiter, STOPVAL + 1)
+		FROM SeparatedTable
+		WHERE STOPVAL > 0
+	)
+	INSERT @PartyIdTable (Id)
+	SELECT LTRIM(RTRIM(SUBSTRING(@PartyIdString, STARTVAL,	CASE
+																WHEN STOPVAL > 0 THEN STOPVAL - STARTVAL
+																ELSE 0
+															END)))
+	FROM SeparatedTable
+	WHERE STOPVAL > 0
+	OPTION (MAXRECURSION 0)
+	-- End Region
 	
 	DECLARE @PartyChargeInfo AS TABLE (
 			PartyId		INT,
@@ -64,7 +89,7 @@ BEGIN
 	
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CurrencyName)
+	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	-- End region
 	
 	-- Region: Get Winloss data
@@ -139,6 +164,7 @@ BEGIN
 	FROM	@TempPartyList t INNER JOIN @TempPartyList p ON t.ParentId = p.PartyId
 			INNER JOIN dbo.OAS_Party op WITH (NOLOCK) ON op.PartyID = t.PartyId
 	WHERE	t.ParentId != 0 AND p.PartyId != 98
+			AND t.PartyId IN (SELECT Id FROM @PartyIdTable)
 	
 	-- BA	
 	;WITH AmountDueBA AS
