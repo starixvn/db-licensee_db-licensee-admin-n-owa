@@ -77,7 +77,7 @@ BEGIN
 				, SUM (d.BTWinLoss * e.Rate) AS BettradeWinloss				
 				, SUM (d.LicWinLoss * e.Rate) AS LicenseeWL								
 				, SUM (d.BettradeComm * e.Rate) AS BettradeComm 
-				, SUM ((d.LicWinLoss + d.BettradeComm + d.Actual_stake - d.BuyBackAmount) * e.Rate) AS Total
+				, SUM ((d.LicWinLoss + d.BettradeComm + (d.Actual_stake - d.BuyBackAmount)) * e.Rate) AS Total
 				, SUM (BetCount) AS BetCount	  
 			FROM (
 				SELECT p.PartyId, p.ParentId, b.RptDate, b.CurrencyId
