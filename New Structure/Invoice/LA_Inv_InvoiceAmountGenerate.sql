@@ -45,6 +45,44 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
+	-- Region: Check Invoice Type is Rebate
+	DECLARE @EmptyTable AS TABLE(
+			ProductId	INT,
+			ProductCode	VARCHAR(20),
+			Productname	VARCHAR(200),
+			InvoiceAmount MONEY,
+			AmountType	TINYINT
+	)
+	IF @InvoiceType = 3 -- rebate
+	BEGIN
+		DECLARE @ProductCodeString VARCHAR(100) = ''
+		SELECT  @ProductCodeString = @ProductCodeString + p.ProductCode + ','
+		FROM(
+				SELECT	CASE 
+							WHEN dp.ProductId = 0 THEN 'SB'
+							ELSE p.ProductPrefix 
+						END AS ProductCode
+				FROM	dbo.LA_DiscountGroupProduct dp WITH(NOLOCK)
+						LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON dp.ProductId = p.Productid
+						INNER JOIN dbo.LA_DiscountGroupHeader dh WITH(NOLOCK) ON dp.DiscountGroupId = dh.DiscountGroupId
+						INNER JOIN dbo.LA_DiscountGroupAssignment da WITH(NOLOCK) ON dh.DiscountGroupId = da.DiscountGroupId
+				WHERE	da.PartyID = @PartyId
+						AND dh.DiscountGroupType = 2
+			) p
+				
+		IF @ProductCodeString = '' OR @ProductCodeString = ','
+		BEGIN
+			SELECT @ErrCode = 1, @ErrMsg = 'No rebate'
+			SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
+			RETURN
+		END
+		ELSE
+		BEGIN
+			SET @ProductCode = SUBSTRING(@ProductCodeString, 1, LEN(@ProductCodeString) - 1)
+		END
+	END	
+	-- EndRegion
+	
 	-- Region Party Group Assignment
 	DECLARE @PartyGroup AS TABLE (PartyId INT)
 	INSERT	INTO @PartyGroup(PartyId)
@@ -215,14 +253,7 @@ BEGIN
 	)
 	-- End Region	
 	
-	-- Region: Validate the same base currency in ChargeInfo,MinFee & Discount/Rebate
-	DECLARE @EmptyTable AS TABLE(
-			ProductId	INT,
-			ProductCode	VARCHAR(20),
-			Productname	VARCHAR(200),
-			InvoiceAmount MONEY,
-			AmountType	TINYINT
-	)
+	-- Region: Validate the same base currency in ChargeInfo,MinFee & Discount/Rebate	
 	DECLARE @BaseCurrencyCheck TABLE(
 			Party INT, 
 			Product INT, 
@@ -459,7 +490,7 @@ BEGIN
 	(
 	    SELECT	iv.PartyId, 
 				iv.ProductId, 
-				(iv.InvoiceAmount - ISNULL((	SELECT	SUM(i.InvoiceAmount)
+				(iv.InvoiceAmount - ISNULL((SELECT	SUM(i.InvoiceAmount)
 											FROM	@InvoiceData i
 											WHERE	i.AmountType = 1
 													AND i.ProductId = iv.ProductId), 0))
@@ -526,7 +557,7 @@ BEGIN
 	SET		ProductCode = LEFT(ProductCode, LEN(ProductCode) - 1),
 			ProductName = LEFT(ProductName, LEN(ProductName) - 1)
 	WHERE	ProductId = -1
-	
+		
 	SELECT	f.ProductId,
 			f.ProductCode,
 			f.ProductName,
@@ -534,8 +565,8 @@ BEGIN
 			f.AmountType,
 			f.Rate
 	FROM	@FinalResult f
-	WHERE	f.AmountType = 0 
-			OR (f.ProductId = -1 AND f.InvoiceAmount > 0)
+	WHERE	(@InvoiceType != 3 AND (f.AmountType = 0 OR (f.ProductId = -1 AND f.AmountType = 1)))
+			OR (@InvoiceType = 3 AND f.ProductId = -1 AND f.AmountType = 2)
 	ORDER BY f.AmountType, f.ProductId
 	
 	SELECT @ErrCode = 0, @ErrMsg = ''
