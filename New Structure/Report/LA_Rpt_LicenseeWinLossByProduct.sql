@@ -5,7 +5,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_AutoMail_LicenseeWinLossByProduct]	  
+ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinLossByProduct]	  
 	@PartyIdString  VARCHAR(500),
 	@FromDate		DATETIME,
 	@ToDate			DATETIME,	
@@ -29,7 +29,7 @@ AS
 	DECLARE @ToDate			DATETIME		= '2015-8-31'
 	DECLARe @BaseCurrencyName	VARCHAR(10)		= 'GBP'
 			
-	EXEC [LA_AutoMail_LicenseeWinLossByProduct] @PartyIdString, @FromDate, @ToDate, @BaseCurrencyName
+	EXEC [LA_Rpt_LicenseeWinLossByProduct] @PartyIdString, @FromDate, @ToDate, @BaseCurrencyName
 	
 */
 BEGIN
@@ -247,4 +247,4 @@ BEGIN
 END
 
 GO
-GRANT EXECUTE ON [dbo].[LA_AutoMail_LicenseeWinLossByProduct] TO bodbLicenseeNet
+GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeWinLossByProduct] TO bodbLicenseeNet
