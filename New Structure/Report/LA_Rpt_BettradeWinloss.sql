@@ -92,7 +92,7 @@ BEGIN
 					, SUM(CASE WHEN bt.ProductID = 0 THEN b.WinLoss ELSE 0 END)	AS BTWinLoss
 					, - SUM(CASE WHEN bt.ProductID = 0 THEN b.WinLoss ELSE 0 END) AS LicWinLoss			 
 					, SUM (CASE WHEN b.Bettype = 901 THEN b.BuyBackAmount * p.Rate ELSE 0 END) AS BettradeComm			 					 								
-					, SUM(CASE WHEN b.Bettype = 901 THEN ISNULL(b.BetCount, 0) * CASE WHEN @DrawFilter = 2 AND b.Status = 111 THEN 0 ELSE 1 END 
+					, SUM(CASE WHEN bt.ProductID = 0 THEN ISNULL(b.BetCount, 0) * CASE WHEN @DrawFilter = 2 AND b.Status = 111 THEN 0 ELSE 1 END 
 						ELSE 0 END) BetCount
 				FROM bodb_licensee.dbo.rpt_Betting b WITH (NOLOCK)
 					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID 
@@ -105,24 +105,17 @@ BEGIN
 				GROUP BY p.PartyId, b.RptDate, b.CurrencyId, p.ParentId
 
 				UNION ALL 
-
+				-- rpt_betting_BA only contain original ticket, SOLD BOUGHT COMM ticket will be in rpt_betting
 				SELECT p.PartyId, p.ParentId, b.RptDate, b.CurrencyId
-					, SUM(CASE WHEN b.Bettype = 901 THEN ((b.BuyBackAmount - b.WinLoss) * CASE WHEN @DrawFilter IN (1, 2)
-															THEN CASE WHEN b.Status = 111 THEN 0
-															ELSE 1
-															END 
-														ELSE 1 END)
-							ELSE 0
-							END) AS Actual_stake
-					, SUM(CASE WHEN b.Bettype = 901 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmount
-					, SUM(CASE WHEN bt.ProductID = 0 THEN b.WinLoss ELSE 0 END)	AS BTWinLoss
-					, - SUM(CASE WHEN bt.ProductID = 13 THEN b.WinLoss ELSE 0 END) AS LicWinLoss				 
-					, SUM (CASE WHEN b.Bettype = 901 THEN b.BuyBackAmount * p.Rate ELSE 0 END) AS BettradeComm		 					 								
-					, SUM(CASE WHEN b.Bettype = 901 THEN ISNULL(b.BetCount, 0) * CASE WHEN @DrawFilter = 2 AND b.Status = 111 THEN 0 ELSE 1 END 
-						ELSE 0 END) BetCount
+					, 0 AS Actual_stake
+					, 0 AS BuyBackAmount
+					, SUM(b.WinLoss)	AS BTWinLoss
+					, - SUM(b.WinLoss) AS LicWinLoss				 
+					, 0 AS BettradeComm		 					 								
+					, SUM(ISNULL(b.BetCount, 0) * CASE WHEN @DrawFilter = 2 AND b.Status = 111 THEN 0 ELSE 1 END) BetCount
 				FROM bodb_licensee.dbo.rpt_Betting_BA b WITH (NOLOCK)
 					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID 					
-					INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN(3, 13)
+					INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN(3)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
 					AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))					
 					AND (@ExcludeTest = 0 OR (@ExcludeTest <> 0 AND b.CurrencyID <> 20))

@@ -25,6 +25,7 @@ AS
 			- 20150505@Florent: Integrate Gold Deluxe and Voidbridge
 			- 20150519@Florent: Change Product Prefix from VB to VG
 			- 20150722@Florent: Implement Microgaming Casino (MGC)
+			- 20150910@Florent: Implement Bettrade
 			- 20150914@Bravo: Add 2 Column for Grand Total Row.
 		Param's Explanation:  				
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
@@ -42,10 +43,13 @@ BEGIN
 			, CurrencyId	INT
 			, Game			VARCHAR(100)
 			, TurnOver		MONEY
+			, ActualStake	MONEY
+			, BuyBackAmount	MONEY
 			, Winlost		MONEY
 			, PlayerComm	MONEY
 			, LicenseeWL	MONEY
 			, LicenseeComm	MONEY
+			, BettradeComm	MONEY
 			, Company		MONEY
 			, Betcount		BIGINT)
 	DECLARE @tmpParty AS TABLE (
@@ -68,9 +72,9 @@ BEGIN
 		WHERE DI_Rate > 0
 	)
 	
-	INSERT INTO @Bettype (Bettype)
+	INSERT INTO @Bettype (Bettype, ProductId)
 	(
-		SELECT Bettype
+		SELECT Bettype, ProductID
 		FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, @ProductCode)
 	)
 	
@@ -243,6 +247,70 @@ BEGIN
 			
 			DROP TABLE #Product3rdSubName			
 		END
+		IF (CHARINDEX('BT', @ProductCode) <> 0 )-- Bettrade
+		BEGIN					
+			-- add more bettype for SB, BA
+			INSERT INTO @Bettype (Bettype, ProductId)
+			(
+				SELECT Bettype, ProductID
+				FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, 'SB,BA')
+			)
+			
+			INSERT INTO #Result( Winlostdate, CurrencyId, ActualStake, BuyBackAmount, LicenseeWL, Winlost, BettradeComm, Company, Betcount)
+			(
+				SELECT
+					d.RptDate					AS  Winlostdate
+					, d.CurrencyID					
+					, SUM (d.Actual_stake)		AS ActualStake
+					, SUM (d.BuyBackAmount )	AS BuyBackAmount
+					, SUM (d.BTWinLoss)			AS Winlost				
+					, SUM (d.LicWinLoss )		AS LicenseeWL								
+					, SUM (d.BettradeComm)		AS BettradeComm 
+					, SUM ((d.LicWinLoss + d.BettradeComm + d.Actual_stake - d.BuyBackAmount)) AS Company
+					, SUM (BetCount) AS BetCount	  
+				FROM (
+					SELECT b.RptDate, b.CurrencyId
+						, SUM(CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount - b.WinLoss)
+								ELSE 0
+								END) AS Actual_stake
+						, SUM(CASE WHEN b.Bettype = 901 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmount
+						, SUM(CASE WHEN bt.ProductID = 0 THEN b.WinLoss ELSE 0 END)	AS BTWinLoss
+						, - SUM(CASE WHEN bt.ProductID = 0 THEN b.WinLoss ELSE 0 END) AS LicWinLoss			 
+						, SUM (CASE WHEN b.Bettype = 901 THEN b.BuyBackAmount * p.Rate ELSE 0 END) AS BettradeComm			 					 								
+						, SUM(CASE WHEN bt.ProductId = 0 THEN ISNULL(b.BetCount, 0) ELSE 0 END) BetCount
+					FROM bodb_licensee.dbo.rpt_Betting b WITH (NOLOCK)
+						INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID 
+						INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN (0, 13)
+					WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
+						AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))					
+						AND b.CurrencyID <> 20
+						AND b.Status NOT IN (- 1, 103)	
+						AND b.CustomerCategory = 1001				
+					GROUP BY b.RptDate, b.CurrencyId
+
+					UNION ALL 
+					-- rpt_betting_BA only contain original ticket, SOLD BOUGHT COMM ticket will be in rpt_betting
+					SELECT b.RptDate, b.CurrencyId
+						, 0 AS Actual_stake
+						, 0 AS BuyBackAmount
+						, SUM(b.WinLoss)	AS BTWinLoss
+						, - SUM(b.WinLoss) AS LicWinLoss				 
+						, 0 AS BettradeComm		 					 								
+						, SUM(ISNULL(b.BetCount, 0)) BetCount
+					FROM bodb_licensee.dbo.rpt_Betting_BA b WITH (NOLOCK)
+						INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID 					
+						INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (3)
+					WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
+						AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))					
+						AND b.CurrencyID <> 20
+						AND b.Status NOT IN (- 1, 103)	
+						AND b.CustomerCategory = 1001									
+					GROUP BY b.RptDate, b.CurrencyId
+
+				) d 				
+				GROUP BY d.RptDate, d.CurrencyID		
+			)
+		END
 		ELSE
 		BEGIN
 			INSERT INTO #Result( Winlostdate, CurrencyId, TurnOver, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
@@ -322,21 +390,27 @@ BEGIN
 	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
 	SELECT   					
-		d.Game						AS Game									   
+		ISNULL(d.Game, '')			AS Game									   
 		, @ToDate					AS WinLostDate
 		, d.CurrencyId				AS CurrencyId
 		, e.CurrencyCode			AS CurrencyName
 		, SUM(Betcount)				AS Betcount
 		--orginal
-		, SUM(TurnOver)				AS Turnover
-		, SUM(Winlost)				AS MemberWinLoss		
-		, SUM(PlayerComm)			AS MemberComm		
-		, SUM(LicenseeWL)			AS LicenseeWL		
-		, SUM(LicenseeComm)			AS LicenseeComm		
-		, SUM(Company)				AS Company
+		, SUM(ISNULL(TurnOver, 0))				AS Turnover
+		, SUM(ISNULL(d.ActualStake, 0))			AS ActualStake
+		, SUM(ISNULL(d.BuyBackAmount, 0))		AS BuyBackAmount
+		, SUM(ISNULL(Winlost, 0))				AS MemberWinLoss		
+		, SUM(ISNULL(PlayerComm, 0))			AS MemberComm
+		, SUM(ISNULL(d.BettradeComm, 0))		AS BettradeComm
+		, SUM(ISNULL(LicenseeWL, 0))			AS LicenseeWL		
+		, SUM(ISNULL(LicenseeComm, 0))			AS LicenseeComm		
+		, SUM(ISNULL(Company, 0))				AS Company
 		
 		--Base on currency
 		, SUM(TurnOver * e.Rate)	AS TurnoverBase
+		, SUM(ISNULL(d.ActualStake * e.Rate, 0))		AS ActualStakeBase
+		, SUM(ISNULL(d.BuyBackAmount * e.Rate, 0))		AS BuyBackAmountBase
+		, SUM(ISNULL(d.BettradeComm * e.Rate, 0))		AS BettradeCommBase
 		, SUM(Winlost * e.Rate)		AS MemberWinLossBase
 		, SUM(PlayerComm * e.Rate)	AS MemberCommBase	
 		, SUM(LicenseeWL * e.Rate)	AS LicenseeWLBase
