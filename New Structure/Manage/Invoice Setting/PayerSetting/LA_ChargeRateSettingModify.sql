@@ -8,7 +8,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_ChargeRateSettingModify] 	
 	@PayerID				INT	
-	, @ChargeSettingXML		VARCHAR (MAX)
+	, @ChargeSettingXML		NVARCHAR (MAX)
 	, @ExchangeID			INT
 	, @UserID				INT
 	, @LoginIP				VARCHAR (50)	= ''
@@ -24,6 +24,7 @@ AS
 	 Revisions:     
 		- 20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
 		- 20150831@Bravo: fix bug - Min fee term & Basis of billing max length.
+		- 20150917@Victor: Support Chinese on Settings
 	 Params:		
 		+ @InvoiceSettingXML: '<ChargeSettings>
 								  <ChargeSetting>
@@ -121,7 +122,7 @@ BEGIN
 	IF ISNULL(@ChargeSettingXML, '') = ''
 		RETURN
 	-- parse XML
-	DECLARE @ChargeSetting AS TABLE (Idx INT IDENTITY(1,1), ChargeID INT,ProductId INT, FirstBilling DATE, BasicBilling VARCHAR(MAX), Rate MONEY, ChargeType INT, FromDate DATE, ToDate DATE, IsEdit BIT)
+	DECLARE @ChargeSetting AS TABLE (Idx INT IDENTITY(1,1), ChargeID INT,ProductId INT, FirstBilling DATE, BasicBilling NVARCHAR(MAX), Rate MONEY, ChargeType INT, FromDate DATE, ToDate DATE, IsEdit BIT)
 	DECLARE @ChargeRate AS TABLE (ChargeID INT,ProductId INT, FromDate DATE, ToDate DATE)
 	DECLARE @idoc AS INT
 	EXEC sp_xml_preparedocument @idoc OUTPUT, @ChargeSettingXML
@@ -133,7 +134,7 @@ BEGIN
 			 ChargeId		INT				'ChargeId'
 			, ProductId		INT				'ProductId'
 			, FirstBilling	DATE			'FirstBilling'
-			, BasicBilling	VARCHAR(MAX)	'BasicBilling'
+			, BasicBilling	NVARCHAR(MAX)	'BasicBilling'
 			, Rate			MONEY			'Rate'
 			, ChargeType	INT				'ChargeType'
 			, FromDate		DATE			'FromDate'
@@ -165,7 +166,7 @@ BEGIN
 
 	-- check overlap time charge
 	INSERT INTO @ChargeSetting(ChargeId, ProductId, FirstBilling, BasicBilling, Rate, ChargeType, FromDate, ToDate)
-	SELECT a.ChargeId, a.ProductId, b.FirstOfBilling, b.BasicOfBilling, Rate, ChargeType, a.FromDate, a.ToDate
+	SELECT a.ChargeId, a.ProductId, b.FirstOfBilling, b.BasisOfBilling, Rate, ChargeType, a.FromDate, a.ToDate
 	FROM dbo.LA_f_ChargeInfo(@PayerID, @MinDate, @MaxDate ,@ProductListAll, 'OA', 1) a	
 		INNER JOIN dbo.OAS_ChargeInfo b WITH (NOLOCK) ON a.ChargeID = b.ChargeID
 	WHERE a.ChargeID NOT IN (SELECT ChargeID FROM @ChargeSetting)	
@@ -190,7 +191,7 @@ BEGIN
 								, ci.FromParty			AS '@fp'  
 								, ci.ProductId			AS '@tp'
 								, ci.FirstOfBilling		AS '@fb'
-								, ci.BasicOfBilling		AS '@bb'
+								, ci.BasisOfBilling		AS '@bb'
 								, ci.Rate				AS '@r'
 								, ci.ChargeType			AS '@ct'
 								, ci.FromDate			AS '@fd'
@@ -206,7 +207,7 @@ BEGIN
 				ON (t.ChargeID = s.ChargeID)
 				WHEN MATCHED
 					THEN UPDATE SET t.FirstOfBilling = s.FirstBilling
-								, t.BasicOfBilling = s.BasicBilling
+								, t.BasisOfBilling = s.BasicBilling
 								, t.Rate = s.Rate
 								, t.FromDate = s.FromDate
 								, t.ToDate = s.ToDate;										
@@ -284,7 +285,7 @@ BEGIN
 				
 				DECLARE @ChargeID AS TABLE (ChargeID INT)
 					
-				INSERT INTO dbo.OAS_ChargeInfo WITH (ROWLOCK, UPDLOCK)(ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, Remark, FirstOfBilling, BasicOfBilling)
+				INSERT INTO dbo.OAS_ChargeInfo WITH (ROWLOCK, UPDLOCK)(ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, Remark, FirstOfBilling, BasisOfBilling)
 				OUTPUT INSERTED.ChargeID
 				INTO @ChargeID
 				SELECT ProductId, @PayerID, @ToParty, @ParentChargeID, Rate, ChargeType, FromDate, ToDate, @Remark, FirstBilling, BasicBilling
@@ -329,7 +330,7 @@ BEGIN
 								, ci.FromParty			AS '@fp'  
 								, ci.ProductId			AS '@tp'
 								, ci.FirstOfBilling		AS '@fb'
-								, ci.BasicOfBilling		AS '@bb'
+								, ci.BasisOfBilling		AS '@bb'
 								, ci.Rate				AS '@r'
 								, ci.ChargeType			AS '@ct'
 								, ci.FromDate			AS '@fd'

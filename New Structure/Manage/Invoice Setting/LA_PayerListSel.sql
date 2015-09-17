@@ -15,6 +15,7 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:     		  
+		- 20150917@Victor: support Chinese on settings
 	 Params:
 		+ 0 get all payer
 		+ <> 0 specify a payer
@@ -36,7 +37,7 @@ BEGIN
 		, pd.CompanyName
 		, COUNT(i.ToPartyId) AS NumberOfBillers	
 		, STUFF((
-				SELECT ', ' + CAST(b.BillerName AS VARCHAR)
+				SELECT ', ' + CAST(b.BillerName AS NVARCHAR)
 				FROM cte_BillerPayer ii
 					LEFT JOIN dbo.LA_BillerInfo b ON ii.ToPartyId = b.PartyId
 				WHERE b.PartyID = ii.ToPartyID		

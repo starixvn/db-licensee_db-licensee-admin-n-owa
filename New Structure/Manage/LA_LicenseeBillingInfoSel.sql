@@ -14,16 +14,17 @@ AS
 	DB: DBLIC.bodb_Licensee
 	Revisions:  
 		- 201505628@Florent: implement code
+		- 20150917@Victor: Support Chinese on Settings
 	Param's Explanation:  
 */  
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @FirstBilling VARCHAR(6)
-		, @BasisOfBilling VARCHAR(MAX)
-		, @MinimumFees VARCHAR(MAX)
+		, @BasisOfBilling NVARCHAR(MAX)
+		, @MinimumFees NVARCHAR(MAX)
 	SELECT 	
 		@FirstBilling =  CONVERT(VARCHAR(3),DATENAME(MONTH, DATEADD(MONTH, MONTH(ci.FirstOfBilling), - 1))) + '-' + SUBSTRING(CAST(YEAR(ci.FirstOfBilling) AS VARCHAR),3,2)
-		, @BasisOfBilling = ISNULL(BasicOfBilling, '')
+		, @BasisOfBilling = ISNULL(BasisOfBilling, '')
 		, @MinimumFees = ISNULL(m.MinFeeTerm, '')	
 	FROM dbo.OAS_ChargeInfo ci WITH (NOLOCK)
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2	

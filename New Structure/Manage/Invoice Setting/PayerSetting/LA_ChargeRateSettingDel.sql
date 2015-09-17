@@ -22,6 +22,7 @@ AS
    
 	 Revisions:     
 		-20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
+		-20150917@Victor: Support Chinese on Settings
 	 Params:				
 */
 BEGIN
@@ -80,7 +81,7 @@ BEGIN
 						, ci.MaxAmount			AS '@ma'
 						, ci.Remark				AS '@re'
 						, ci.FirstOfBilling		AS '@fb'
-						, ci.BasicOfBilling		AS '@bb'
+						, ci.BasisOfBilling		AS '@bb'
 				FROM @ChargeRate cs
 					INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID
 				FOR XML PATH('z'), ROOT('r')			
