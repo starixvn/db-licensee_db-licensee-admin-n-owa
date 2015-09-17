@@ -170,8 +170,9 @@ BEGIN
 	;WITH AmountDueBA AS
 	(
 		SELECT	d.LicenseeId,
-				SUM(-(MemberWL + AComm)) Amount
+				SUM(-(MemberWL + AComm) * e.Rate) Amount
 		FROM	#TempData d
+				INNER JOIN #Exchange e ON d.rptDate = e.ExchangeDate AND d.CurrencyId = e.ExchangeID
 		WHERE	d.ProductId = 3
 		GROUP	BY d.LicenseeId
 	)
@@ -184,8 +185,9 @@ BEGIN
 	;WITH AmountDueRacing AS
 	(
 		SELECT	d.LicenseeId,
-				SUM(-(MemberWL + AWinloss + AComm)) Amount
+				SUM(-(MemberWL + AWinloss + AComm) * e.Rate) Amount
 		FROM	#TempData d
+				INNER JOIN #Exchange e ON d.rptDate = e.ExchangeDate AND d.CurrencyId = e.ExchangeID
 		WHERE	d.ProductId = 1 --RB
 		GROUP	BY d.LicenseeId
 	)
