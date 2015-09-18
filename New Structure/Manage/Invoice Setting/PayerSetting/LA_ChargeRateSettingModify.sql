@@ -56,7 +56,7 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData VARCHAR(5000), @logSPDataOld VARCHAR(5000),	@xml XML
+	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX),	@xml XML
 	DECLARE @ProductListAll		VARCHAR(100) = ''
 			, @MinDate			DATE 
 			, @MaxDate			DATE
@@ -79,7 +79,7 @@ BEGIN
 						, @OldExchangeID	AS '@e'				
 				FOR XML PATH('z'), ROOT('r')			
 				)
-		SET @logSPDataOld = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"');
+		SET @logSPDataOld = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"');
 
 		UPDATE dbo.OAS_PartyDetail WITH( ROWLOCK, UPDLOCK)
 		SET BaseCurrencyId = @ExchangeID
@@ -90,7 +90,7 @@ BEGIN
 						, @ExchangeID		AS '@e'				
 				FOR XML PATH('z'), ROOT('r')			
 				)
-		SET @logSPData = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"');		
+		SET @logSPData = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"');		
 		SET @endRun = GETDATE()
 		SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
 
@@ -200,7 +200,7 @@ BEGIN
 							INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID AND cs.IsEdit = 1
 						FOR XML PATH('z'), ROOT('r')			
 						)
-				SET @logSPDataOld = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"');
+				SET @logSPDataOld = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"');
 
 				;MERGE dbo.OAS_ChargeInfo WITH (ROWLOCK, UPDLOCK) AS t
 				USING (SELECT ChargeID, FirstBilling, BasisBilling, Rate, FromDate, ToDate FROM @ChargeSetting WHERE IsEdit = 1) AS s
@@ -233,7 +233,7 @@ BEGIN
 							INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID AND cs.IsEdit = 1
 						FOR XML PATH('z'), ROOT('r')			
 						)
-				SET @logSPData = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"');
+				SET @logSPData = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"');
 				SET @endRun = GETDATE()
 				SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
 
@@ -339,7 +339,7 @@ BEGIN
 							INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID
 						FOR XML PATH('z'), ROOT('r')			
 						)
-				SET @logSPData = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"');
+				SET @logSPData = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"');
 				SET @endRun = GETDATE()
 				SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
 				SET @logSPDataOld = NULL

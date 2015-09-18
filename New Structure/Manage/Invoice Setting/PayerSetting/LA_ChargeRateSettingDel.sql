@@ -27,7 +27,7 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData VARCHAR(5000), @logSPDataOld VARCHAR(5000),	@xml XML
+	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX),	@xml XML
 	DECLARE @ProductListAll		VARCHAR(100) = ''
 			, @MinDate			DATE 
 			, @MaxDate			DATE
@@ -86,7 +86,7 @@ BEGIN
 					INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID
 				FOR XML PATH('z'), ROOT('r')			
 				)
-		SET @logSPDataOld = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"')	
+		SET @logSPDataOld = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"')	
 		
 		DELETE dbo.OAS_ChargeInfo WITH (ROWLOCK, UPDLOCK)
 		WHERE ChargeID = @ChargeId AND FromParty = @PayerId

@@ -31,11 +31,9 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData VARCHAR(5000), @logSPDataOld VARCHAR(5000),	@xml XML
 	DECLARE @ProductListAll		VARCHAR(100) = ''
 			, @MinDate			DATE 
 			, @MaxDate			DATE
-	SET @startRun = GETDATE()
 	
 	DECLARE @OldPayerGroupId INT, @MinFeeInsertedList VARCHAR(100), @WaiveInsertedList VARCHAR(100)
 

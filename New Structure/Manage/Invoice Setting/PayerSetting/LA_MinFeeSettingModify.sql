@@ -53,7 +53,7 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData VARCHAR(5000), @logSPDataOld VARCHAR(5000),	@xml XML
+	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX),	@xml XML
 	DECLARE @ProductListAll		VARCHAR(100) = ''
 			, @MinDate			DATE 
 			, @MaxDate			DATE
@@ -147,7 +147,7 @@ BEGIN
 							INNER JOIN dbo.LA_MinFee mf WITH (NOLOCK) ON cs.FeeTypeId = mf.FeeTypeId AND cs.MinFeeId = mf.MinFeeId AND mf.PartyId = @PayerID AND cs.IsEdit = 1
 						FOR XML PATH('z'), ROOT('r')			
 						)
-				SET @logSPDataOld = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"');
+				SET @logSPDataOld = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"');
 				
 				;MERGE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) AS t
 				USING (SELECT MinFeeId, FeeTypeId, ProductId, FeeAmount, CurrencyId, FromDate, ToDate, MinFeeTerm, Priority FROM @MinFeeSetting WHERE IsEdit = 1) AS s
@@ -180,7 +180,7 @@ BEGIN
 							INNER JOIN dbo.LA_MinFee mf WITH (NOLOCK) ON cs.FeeTypeId = mf.FeeTypeId AND cs.MinFeeId = mf.MinFeeId AND mf.PartyId = @PayerID AND cs.IsEdit = 1
 						FOR XML PATH('z'), ROOT('r')			
 						)
-				SET @logSPData = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"');
+				SET @logSPData = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"');
 				SET @endRun = GETDATE()
 				SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
 
@@ -242,7 +242,7 @@ BEGIN
 						INNER JOIN dbo.LA_MinFee m WITH (NOLOCK) ON cs.MinFeeID = m.MinFeeId						
 					FOR XML PATH('z'), ROOT('r')			
 					)
-			SET @logSPData = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"');
+			SET @logSPData = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"');
 			SET @endRun = GETDATE()
 			SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
 			SET @logSPDataOld = NULL
