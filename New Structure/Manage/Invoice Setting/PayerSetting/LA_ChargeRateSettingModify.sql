@@ -32,7 +32,7 @@ AS
 									<ChargeId>1</ChargeId>
 									<ProductId>1</ProductId>
 									<FirstBilling>1</FirstBilling>
-									<BasicBilling>1</BasicBilling>
+									<BasisBilling>1</BasisBilling>
 									<Rate>1</Rate>
 									<ChargeType>1</ChargeType>
 									<FromDate>1</FromDate>
@@ -45,7 +45,7 @@ AS
 									<ChargeId>1</ChargeId>
 									<ProductId>1</ProductId>
 									<FirstBilling>1</FirstBilling>
-									<BasicBilling>1</BasicBilling>
+									<BasisBilling>1</BasisBilling>
 									<Rate>1</Rate>
 									<ChargeType>1</ChargeType>
 									<FromDate>1</FromDate>
@@ -122,19 +122,19 @@ BEGIN
 	IF ISNULL(@ChargeSettingXML, '') = ''
 		RETURN
 	-- parse XML
-	DECLARE @ChargeSetting AS TABLE (Idx INT IDENTITY(1,1), ChargeID INT,ProductId INT, FirstBilling DATE, BasicBilling NVARCHAR(MAX), Rate MONEY, ChargeType INT, FromDate DATE, ToDate DATE, IsEdit BIT)
+	DECLARE @ChargeSetting AS TABLE (Idx INT IDENTITY(1,1), ChargeID INT,ProductId INT, FirstBilling DATE, BasisBilling NVARCHAR(MAX), Rate MONEY, ChargeType INT, FromDate DATE, ToDate DATE, IsEdit BIT)
 	DECLARE @ChargeRate AS TABLE (ChargeID INT,ProductId INT, FromDate DATE, ToDate DATE)
 	DECLARE @idoc AS INT
 	EXEC sp_xml_preparedocument @idoc OUTPUT, @ChargeSettingXML
 	BEGIN TRY
-		INSERT INTO @ChargeSetting(ChargeId, ProductId, FirstBilling, BasicBilling, Rate, ChargeType, FromDate, ToDate, IsEdit)
-		SELECT ISNULL(ChargeID, 0), ProductId, FirstBilling, BasicBilling, Rate, ChargeType, FromDate, ToDate, IsEdit
+		INSERT INTO @ChargeSetting(ChargeId, ProductId, FirstBilling, BasisBilling, Rate, ChargeType, FromDate, ToDate, IsEdit)
+		SELECT ISNULL(ChargeID, 0), ProductId, FirstBilling, BasisBilling, Rate, ChargeType, FromDate, ToDate, IsEdit
 		FROM OPENXML(@idoc, 'ChargeSettings/ChargeSetting')
 		WITH (				
 			 ChargeId		INT				'ChargeId'
 			, ProductId		INT				'ProductId'
 			, FirstBilling	DATE			'FirstBilling'
-			, BasicBilling	NVARCHAR(MAX)	'BasicBilling'
+			, BasisBilling	NVARCHAR(MAX)	'BasisBilling'
 			, Rate			MONEY			'Rate'
 			, ChargeType	INT				'ChargeType'
 			, FromDate		DATE			'FromDate'
@@ -165,7 +165,7 @@ BEGIN
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
 
 	-- check overlap time charge
-	INSERT INTO @ChargeSetting(ChargeId, ProductId, FirstBilling, BasicBilling, Rate, ChargeType, FromDate, ToDate)
+	INSERT INTO @ChargeSetting(ChargeId, ProductId, FirstBilling, BasisBilling, Rate, ChargeType, FromDate, ToDate)
 	SELECT a.ChargeId, a.ProductId, b.FirstOfBilling, b.BasisOfBilling, Rate, ChargeType, a.FromDate, a.ToDate
 	FROM dbo.LA_f_ChargeInfo(@PayerID, @MinDate, @MaxDate ,@ProductListAll, 'OA', 1) a	
 		INNER JOIN dbo.OAS_ChargeInfo b WITH (NOLOCK) ON a.ChargeID = b.ChargeID
@@ -203,11 +203,11 @@ BEGIN
 				SET @logSPDataOld = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"');
 
 				;MERGE dbo.OAS_ChargeInfo WITH (ROWLOCK, UPDLOCK) AS t
-				USING (SELECT ChargeID, FirstBilling, BasicBilling, Rate, FromDate, ToDate FROM @ChargeSetting WHERE IsEdit = 1) AS s
+				USING (SELECT ChargeID, FirstBilling, BasisBilling, Rate, FromDate, ToDate FROM @ChargeSetting WHERE IsEdit = 1) AS s
 				ON (t.ChargeID = s.ChargeID)
 				WHEN MATCHED
 					THEN UPDATE SET t.FirstOfBilling = s.FirstBilling
-								, t.BasisOfBilling = s.BasicBilling
+								, t.BasisOfBilling = s.BasisBilling
 								, t.Rate = s.Rate
 								, t.FromDate = s.FromDate
 								, t.ToDate = s.ToDate;										
@@ -223,7 +223,7 @@ BEGIN
 								, ci.FromParty			AS '@fp'  
 								, cs.ProductId			AS '@tp'
 								, cs.FirstBilling		AS '@fb'
-								, cs.BasicBilling		AS '@bb'
+								, cs.BasisBilling		AS '@bb'
 								, cs.Rate				AS '@r'
 								, cs.ChargeType			AS '@ct'
 								, cs.FromDate			AS '@fd'
@@ -288,7 +288,7 @@ BEGIN
 				INSERT INTO dbo.OAS_ChargeInfo WITH (ROWLOCK, UPDLOCK)(ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, Remark, FirstOfBilling, BasisOfBilling)
 				OUTPUT INSERTED.ChargeID
 				INTO @ChargeID
-				SELECT ProductId, @PayerID, @ToParty, @ParentChargeID, Rate, ChargeType, FromDate, ToDate, @Remark, FirstBilling, BasicBilling
+				SELECT ProductId, @PayerID, @ToParty, @ParentChargeID, Rate, ChargeType, FromDate, ToDate, @Remark, FirstBilling, BasisBilling
 				FROM @ChargeSetting					
 				WHERE ChargeID = 0 
 					AND IsEdit = 0

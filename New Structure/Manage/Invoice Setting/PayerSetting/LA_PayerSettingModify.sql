@@ -11,9 +11,9 @@ ALTER PROCEDURE [dbo].[LA_PayerSettingModify]
 	, @PayerGroupId			INT				= 0
 	, @DiscountGroupId		INT				= 0
 	, @RebateGroupId		INT				= 0
-	, @ChargeSettingXML		VARCHAR (MAX)
-	, @MinFeeSettingXML		VARCHAR (MAX)
-	, @WaiveSettingXML		VARCHAR (MAX)
+	, @ChargeSettingXML		NVARCHAR (MAX)
+	, @MinFeeSettingXML		NVARCHAR (MAX)
+	, @WaiveSettingXML		NVARCHAR (MAX)
 	, @ExchangeID			INT
 	, @UserID				INT
 	, @LoginIP				VARCHAR (50)	= ''
@@ -26,6 +26,7 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:     
+		- 20150918@Victor: Support Chinese on Settings
 	 Params:				
 */
 BEGIN

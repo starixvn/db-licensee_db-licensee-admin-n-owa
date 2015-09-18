@@ -8,7 +8,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_MinFeeSettingModify] 	
 	@PayerID				INT	
-	, @MinFeeSettingXML		VARCHAR (5000)
+	, @MinFeeSettingXML		NVARCHAR (MAX)
 	, @ExchangeID			INT
 	, @UserID				INT
 	, @LoginIP				VARCHAR (50)	= ''
