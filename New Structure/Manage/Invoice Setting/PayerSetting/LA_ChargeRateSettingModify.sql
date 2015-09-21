@@ -122,6 +122,8 @@ BEGIN
 	IF ISNULL(@ChargeSettingXML, '') = ''
 		RETURN
 	-- parse XML
+	SELECT @ChargeSettingXML = REPLACE(@ChargeSettingXML,N'&',N'&amp;')
+
 	DECLARE @ChargeSetting AS TABLE (Idx INT IDENTITY(1,1), ChargeID INT,ProductId INT, FirstBilling DATE, BasisBilling NVARCHAR(MAX), Rate MONEY, ChargeType INT, FromDate DATE, ToDate DATE, IsEdit BIT)
 	DECLARE @ChargeRate AS TABLE (ChargeID INT,ProductId INT, FromDate DATE, ToDate DATE)
 	DECLARE @idoc AS INT

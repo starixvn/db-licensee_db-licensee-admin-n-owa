@@ -61,6 +61,8 @@ BEGIN
 	IF ISNULL(@MinFeeSettingXML, '') = ''
 		RETURN
 	-- parse XML
+	SELECT @MinFeeSettingXML = REPLACE(@MinFeeSettingXML,N'&',N'&amp;')
+	
 	DECLARE @MinFeeSetting AS TABLE (Idx INT IDENTITY(1,1), MinFeeId INT,ProductId INT, FeeAmount MONEY, CurrencyId INT, FeeTypeId INT, MinFeeTerm NVARCHAR(MAX), Priority SMALLINT, FromDate DATE, ToDate DATE, IsEdit BIT)	
 	DECLARE @idoc AS INT
 	EXEC sp_xml_preparedocument @idoc OUTPUT, @MinFeeSettingXML
