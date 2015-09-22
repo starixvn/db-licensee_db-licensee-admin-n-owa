@@ -471,7 +471,7 @@ BEGIN
 	-- Region: Apply Discount
 	DECLARE @TotalAmountDiscount MONEY = (	SELECT SUM(i.InvoiceAmount) 
 											FROM @InvoiceData i 
-											WHERE i.ProductId IN (SELECT ProductId FROM @DiscountGroup))
+											WHERE i.ProductId IN (SELECT ProductId FROM @DiscountGroup d WHERE d.DiscountGroupType = 1))
 	DELETE	FROM @DiscountGroup
 	WHERE	@TotalAmountDiscount NOT BETWEEN [@DiscountGroup].FromAmount AND [@DiscountGroup].ToAmount
 			AND [@DiscountGroup].DiscountGroupType = 1
