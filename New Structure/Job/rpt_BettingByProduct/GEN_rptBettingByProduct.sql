@@ -7,7 +7,8 @@ AS
     Task : Generate data for rpt_BettingByProduct
     DB: DBLIC/bodb_LicenseeReport  
     Param's Explanation:   
-    
+	Revisions:
+		- 20150923@Victor: Fix third party data summary issues (AGCS, VG, GD)
 */
 
 BEGIN  
@@ -47,13 +48,13 @@ BEGIN
 		,[CurrencyId]
 		,Status [StatusId]
 		,ISNULL([CustomerCategory],-1)
-		,ISNULL(SUM(WinLossA),0) [GrossWL]
-		,ISNULL(SUM(WinLoss),0) [MemberWL]
-		,ISNULL(SUM([Turnover]),0) [Turnover]
-		,ISNULL(SUM([BetCount]),0) [BetCount]
-		,ISNULL(SUM([CommissionA]),0) [CommissionA]
-		,ISNULL(SUM([CommissionP]),0) [CommissionP]
-		,ISNULL(SUM([BuyBackAmount]),0) [BuyBackAmount]
+		,SUM(ISNULL(WinLossA,0)) [GrossWL]
+		,SUM(ISNULL(WinLoss,0)) [MemberWL]
+		,SUM(ISNULL([Turnover],0)) [Turnover]
+		,SUM(ISNULL([BetCount],0)) [BetCount]
+		,SUM(ISNULL([CommissionA],0)) [CommissionA]
+		,SUM(ISNULL([CommissionP],0)) [CommissionP]
+		,SUM(ISNULL([BuyBackAmount],0)) [BuyBackAmount]
 	FROM bodb_licensee.dbo.rpt_Betting b WITH (NOLOCK)
 		INNER JOIN @BettypeProductMapping bt ON b.Bettype = bt.Bettype
 	WHERE rptDate >= @date AND rptDate < @date2
@@ -75,13 +76,13 @@ BEGIN
 		,[CurrencyId]
 		,Status [StatusId]
 		,ISNULL([CustomerCategory],-1)
-		,ISNULL(SUM(WinLossA),0) [GrossWL]
-		,ISNULL(SUM(WinLoss),0) [MemberWL]
-		,ISNULL(SUM([Turnover]),0) [Turnover]
-		,ISNULL(SUM([BetCount]),0) [BetCount]
-		,ISNULL(SUM([CommissionA]),0) [CommissionA]
-		,ISNULL(SUM([CommissionP]),0) [CommissionP]
-		,ISNULL(SUM([BuyBackAmount]),0) [BuyBackAmount]
+		,SUM(ISNULL(WinLossA,0)) [GrossWL]
+		,SUM(ISNULL(WinLoss,0)) [MemberWL]
+		,SUM(ISNULL([Turnover],0)) [Turnover]
+		,SUM(ISNULL([BetCount],0)) [BetCount]
+		,SUM(ISNULL([CommissionA],0)) [CommissionA]
+		,SUM(ISNULL([CommissionP],0)) [CommissionP]
+		,SUM(ISNULL([BuyBackAmount],0)) [BuyBackAmount]
 	FROM bodb_licensee.dbo.rpt_Betting_BA b WITH (NOLOCK)
 		INNER JOIN @BettypeProductMapping bt ON b.Bettype = bt.Bettype
 	WHERE rptDate >= @date AND rptDate < @date2
@@ -149,17 +150,26 @@ BEGIN
 		  END AS StatusId
 		, -1 AS CustomerCategory
 		, 0 AS GrossWL
-		, td.Winlost
-		, td.Turnover
-		, td.BetCount
+		, SUM(ISNULL(td.Winlost,0)) AS MemberWL
+		, SUM(ISNULL(td.Turnover,0)) AS Turnover
+		, SUM(ISNULL(td.BetCount,0)) AS BetCount
 		, 0 AS CommissionA
-		, PlayerComm AS CommissionP
+		, SUM(ISNULL(PlayerComm,0)) AS CommissionP
 		, 0 AS BuyBackAmount
 	FROM #tmpData td WITH (NOLOCK)
 		LEFT JOIN bodb02.dbo.Customer c WITH (NOLOCK) ON c.Custid = td.CustID AND c.roleid = 1
 		LEFT JOIN bodb02.dbo.customer ag WITH (NOLOCK) ON c.recommend = ag.custid AND ag.roleid = 2
 	    LEFT JOIN bodb02.dbo.Site ibcsite WITH (NOLOCK) ON ag.site=ibcsite.site
 	    LEFT JOIN bodb_licensee.dbo.view_site_list [site] WITH (NOLOCK) ON ibcsite.siteid=site.IbcSiteID
+	GROUP BY rptDate
+		, ISNULL(site.SiteID,-1)
+		, td.productId
+		, td.CurrencyId
+		, CASE 
+			WHEN td.Winlost > 0 THEN 112
+			WHEN td.Winlost < 0 THEN 113
+			ELSE 111
+		  END
 
 	DROP TABLE #tmpData
 END
