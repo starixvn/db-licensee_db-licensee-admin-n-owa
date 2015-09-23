@@ -73,7 +73,7 @@ BEGIN
 				
 		IF @ProductCodeString = '' OR @ProductCodeString = ','
 		BEGIN
-			SELECT @ErrCode = 1, @ErrMsg = 'No rebate'
+			SELECT @ErrCode = 1, @ErrMsg = 'There is no setting for Rebate in the Rebate Group. Please set it before proceeding further.'
 			SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
 			RETURN
 		END
