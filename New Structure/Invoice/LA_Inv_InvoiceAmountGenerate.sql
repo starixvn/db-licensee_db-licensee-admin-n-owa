@@ -25,8 +25,8 @@ AS
 	DB: DB052.bodb_Licensee
    
 	Revisions: 
-		+ 2015.08.06: Invoice Amount - Generate
-		+ 2015.09.22: Invoice Amount - Fix bug wrong Total amount under Discount.
+		+ 2015.08.06 @Bravo.Tran: Invoice Amount - Generate
+		+ 2015.09.22 @Bravo.Tran: Invoice Amount - Fix bug wrong Total amount under Discount.
 */
 /*	Example:
 	USE bodb_Licensee
