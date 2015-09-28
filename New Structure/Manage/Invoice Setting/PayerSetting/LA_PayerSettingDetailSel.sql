@@ -18,6 +18,7 @@ AS
 		- 20150618@Florent: add column Currency to LA_Minfee   		  
 		- 20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
 		- 20150831@Bravo: fix bug - Min fee term & Basis of billing max length.
+		- 20150917@Victor: Support Chinese on Settings
 	 Params:
 		+ @PayerId :specify Party
 		+ @@PayerGroup :	0 get all Party
@@ -37,8 +38,8 @@ BEGIN
 		, @CurrentDate			DATE
 
 	SET @CurrentDate = CONVERT(DATE, GETDATE())
-	DECLARE @ChargeInfo AS TABLE (ChargeId INT, PartyId INT, ProductId INT, Rate MONEY, ChargeType SMALLINT, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), BasicOfBilling VARCHAR(MAX), ExchangeID INT)	
-	DECLARE @Minfee AS TABLE(FeeId INT, PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, CurrencyId INT, MinFeeTerm VARCHAR(MAX), FromDate DATE, ToDate DATE)
+	DECLARE @ChargeInfo AS TABLE (ChargeId INT, PartyId INT, ProductId INT, Rate MONEY, ChargeType SMALLINT, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), BasisOfBilling NVARCHAR(MAX), ExchangeID INT)	
+	DECLARE @Minfee AS TABLE(FeeId INT, PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, CurrencyId INT, MinFeeTerm NVARCHAR(MAX), FromDate DATE, ToDate DATE)
 	DECLARE @PayerSettingHeader AS TABLE(PartyId INT, PayerGroupID INT, PayerGroupName VARCHAR(100), ExchangeID INT, DiscountGroupID INT, DiscountGroupName VARCHAR(100), RebateGroupID INT, RebateGroupName VARCHAR(100))
 	DECLARE @Discount AS TABLE(PartyId INT, ProductId INT, FromDate DATE, ToDate DATE,DiscountGroupId INT, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
 
@@ -53,7 +54,7 @@ BEGIN
 	FROM dbo.OAS_ChargeInfo ci WITH (NOLOCK)
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2	
 	
-	INSERT INTO @ChargeInfo(ChargeId, PartyId, ProductId, Rate, ChargeType, FromDate, ToDate, FirstBilling, BasicOfBilling, ExchangeID)
+	INSERT INTO @ChargeInfo(ChargeId, PartyId, ProductId, Rate, ChargeType, FromDate, ToDate, FirstBilling, BasisOfBilling, ExchangeID)
 	SELECT c.ChargeID		
 		, c.PartyID
 		, c.ProductID		
@@ -62,7 +63,7 @@ BEGIN
 		, c.Fromdate
 		, c.Todate
 		, ci.FirstOfBilling
-		, ci.BasicOfBilling
+		, ci.BasisOfBilling
 		, pd.BaseCurrencyId
 	FROM dbo.LA_f_ChargeInfo(@PayerId, @MinDate, @MaxDate, @ProductListAll, 'OA', 1) c
 		LEFT JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID
@@ -118,7 +119,7 @@ BEGIN
 		, c.ProductId			    AS ProductId
 		, ProductName			    AS ProductName
 		, FirstBilling			    AS FirstBilling
-		, c.BasicOfBilling
+		, c.BasisOfBilling
 		, c.Rate					AS Rate
 		, c.ChargeType
 		, c.FromDate

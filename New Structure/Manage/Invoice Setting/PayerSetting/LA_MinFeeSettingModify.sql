@@ -8,7 +8,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_MinFeeSettingModify] 	
 	@PayerID				INT	
-	, @MinFeeSettingXML		VARCHAR (5000)
+	, @MinFeeSettingXML		NVARCHAR (MAX)
 	, @ExchangeID			INT
 	, @UserID				INT
 	, @LoginIP				VARCHAR (50)	= ''
@@ -24,6 +24,7 @@ AS
 	 Revisions:			
 		- 20150618@Florent: add column Currency to LA_Minfee   	
 		- 20150831@Bravo: fix bug - Min fee term & Basis of billing max length.
+		- 20150917@Victor: Support Chinese on Settings
 	 Params:		
 		+ @InvoiceSettingXML: '<MinFeeSettings>
 								<MinFeeSetting>
@@ -52,7 +53,7 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData VARCHAR(5000), @logSPDataOld VARCHAR(5000),	@xml XML
+	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX),	@xml XML
 	DECLARE @ProductListAll		VARCHAR(100) = ''
 			, @MinDate			DATE 
 			, @MaxDate			DATE
@@ -60,7 +61,9 @@ BEGIN
 	IF ISNULL(@MinFeeSettingXML, '') = ''
 		RETURN
 	-- parse XML
-	DECLARE @MinFeeSetting AS TABLE (Idx INT IDENTITY(1,1), MinFeeId INT,ProductId INT, FeeAmount MONEY, CurrencyId INT, FeeTypeId INT, MinFeeTerm VARCHAR(MAX), Priority SMALLINT, FromDate DATE, ToDate DATE, IsEdit BIT)	
+	SELECT @MinFeeSettingXML = REPLACE(@MinFeeSettingXML,N'&',N'&amp;')
+	
+	DECLARE @MinFeeSetting AS TABLE (Idx INT IDENTITY(1,1), MinFeeId INT,ProductId INT, FeeAmount MONEY, CurrencyId INT, FeeTypeId INT, MinFeeTerm NVARCHAR(MAX), Priority SMALLINT, FromDate DATE, ToDate DATE, IsEdit BIT)	
 	DECLARE @idoc AS INT
 	EXEC sp_xml_preparedocument @idoc OUTPUT, @MinFeeSettingXML
 	
@@ -86,7 +89,7 @@ BEGIN
 			, FeeAmount		MONEY			'FeeAmount'
 			, CurrencyId	INT				'CurrencyId'
 			, FeeTypeId		INT				'FeeTypeId'
-			, MinFeeTerm	VARCHAR(MAX)	'MinFeeTerm'		
+			, MinFeeTerm	NVARCHAR(MAX)	'MinFeeTerm'		
 			, FromDate		DATE			'FromDate'
 			, ToDate		DATE			'ToDate'
 			, IsEdit		BIT				'IsEdit' 
@@ -146,7 +149,7 @@ BEGIN
 							INNER JOIN dbo.LA_MinFee mf WITH (NOLOCK) ON cs.FeeTypeId = mf.FeeTypeId AND cs.MinFeeId = mf.MinFeeId AND mf.PartyId = @PayerID AND cs.IsEdit = 1
 						FOR XML PATH('z'), ROOT('r')			
 						)
-				SET @logSPDataOld = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"');
+				SET @logSPDataOld = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"');
 				
 				;MERGE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) AS t
 				USING (SELECT MinFeeId, FeeTypeId, ProductId, FeeAmount, CurrencyId, FromDate, ToDate, MinFeeTerm, Priority FROM @MinFeeSetting WHERE IsEdit = 1) AS s
@@ -179,7 +182,7 @@ BEGIN
 							INNER JOIN dbo.LA_MinFee mf WITH (NOLOCK) ON cs.FeeTypeId = mf.FeeTypeId AND cs.MinFeeId = mf.MinFeeId AND mf.PartyId = @PayerID AND cs.IsEdit = 1
 						FOR XML PATH('z'), ROOT('r')			
 						)
-				SET @logSPData = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"');
+				SET @logSPData = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"');
 				SET @endRun = GETDATE()
 				SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
 
@@ -241,7 +244,7 @@ BEGIN
 						INNER JOIN dbo.LA_MinFee m WITH (NOLOCK) ON cs.MinFeeID = m.MinFeeId						
 					FOR XML PATH('z'), ROOT('r')			
 					)
-			SET @logSPData = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"');
+			SET @logSPData = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"');
 			SET @endRun = GETDATE()
 			SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
 			SET @logSPDataOld = NULL

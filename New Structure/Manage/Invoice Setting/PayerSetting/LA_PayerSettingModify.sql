@@ -11,9 +11,9 @@ ALTER PROCEDURE [dbo].[LA_PayerSettingModify]
 	, @PayerGroupId			INT				= 0
 	, @DiscountGroupId		INT				= 0
 	, @RebateGroupId		INT				= 0
-	, @ChargeSettingXML		VARCHAR (MAX)
-	, @MinFeeSettingXML		VARCHAR (MAX)
-	, @WaiveSettingXML		VARCHAR (MAX)
+	, @ChargeSettingXML		NVARCHAR (MAX)
+	, @MinFeeSettingXML		NVARCHAR (MAX)
+	, @WaiveSettingXML		NVARCHAR (MAX)
 	, @ExchangeID			INT
 	, @UserID				INT
 	, @LoginIP				VARCHAR (50)	= ''
@@ -26,15 +26,14 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:     
+		- 20150918@Victor: Support Chinese on Settings
 	 Params:				
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData VARCHAR(5000), @logSPDataOld VARCHAR(5000),	@xml XML
 	DECLARE @ProductListAll		VARCHAR(100) = ''
 			, @MinDate			DATE 
 			, @MaxDate			DATE
-	SET @startRun = GETDATE()
 	
 	DECLARE @OldPayerGroupId INT, @MinFeeInsertedList VARCHAR(100), @WaiveInsertedList VARCHAR(100)
 
