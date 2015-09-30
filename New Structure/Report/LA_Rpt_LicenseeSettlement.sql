@@ -263,10 +263,10 @@ BEGIN
 					, d.CurrencyID					
 					, SUM (d.Actual_stake)		AS ActualStake
 					, SUM (d.BuyBackAmount )	AS BuyBackAmount
-					, SUM (d.BTWinLoss)			AS Winlost				
-					, SUM (d.LicWinLoss )		AS LicenseeWL								
+					, SUM (d.LicWinLoss )		AS LicenseeWL
+					, SUM (d.BTWinLoss)			AS Winlost
 					, SUM (d.BettradeComm)		AS BettradeComm 
-					, SUM ((d.LicWinLoss + d.BettradeComm + d.Actual_stake - d.BuyBackAmount)) AS Company
+					, SUM ((d.BTWinLoss + d.BettradeComm + d.Actual_stake - d.BuyBackAmount)) AS Company
 					, SUM (BetCount) AS BetCount	  
 				FROM (
 					SELECT b.RptDate, b.CurrencyId
@@ -276,7 +276,7 @@ BEGIN
 						, SUM(CASE WHEN b.Bettype = 901 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmount
 						, SUM(CASE WHEN bt.ProductID = 0 THEN b.WinLoss ELSE 0 END)	AS BTWinLoss
 						, - SUM(CASE WHEN bt.ProductID = 0 THEN b.WinLoss ELSE 0 END) AS LicWinLoss			 
-						, SUM (CASE WHEN b.Bettype = 901 THEN b.BuyBackAmount * p.Rate ELSE 0 END) AS BettradeComm			 					 								
+						, SUM (CASE WHEN b.Bettype = 901 THEN - b.BuyBackAmount * p.Rate ELSE 0 END) AS BettradeComm			 					 								
 						, SUM(CASE WHEN bt.ProductId = 0 THEN ISNULL(b.BetCount, 0) ELSE 0 END) BetCount
 					FROM bodb_licensee.dbo.rpt_Betting b WITH (NOLOCK)
 						INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID 
