@@ -9,6 +9,7 @@ AS
     Param's Explanation:   
 	Revisions:
 		- 20150923@Victor: Fix third party data summary issues (AGCS, VG, GD)
+		- 20151002@Victor: Move all Bettrade detail tickets (901,902,903) to product BT
 */
 
 BEGIN  
@@ -43,7 +44,7 @@ BEGIN
 	SELECT
 		[rptDate]
 		,[SiteID]
-		,CASE WHEN bt.ProductID = 13 THEN 0 ELSE bt.ProductID END AS ProductID
+		,bt.ProductID
 		,CASE WHEN bt.ProductID IN (13,14) THEN b.[Bettype] ELSE -1 END [Bettype]
 		,[CurrencyId]
 		,Status [StatusId]
@@ -71,7 +72,7 @@ BEGIN
 	SELECT
 		[rptDate]
 		,[SiteID]
-		, 3
+		, bt.ProductID
 		,CASE WHEN bt.ProductID IN (13,14) THEN b.[Bettype] ELSE -1 END [Bettype]
 		,[CurrencyId]
 		,Status [StatusId]
@@ -84,7 +85,8 @@ BEGIN
 		,SUM(ISNULL([CommissionP],0)) [CommissionP]
 		,SUM(ISNULL([BuyBackAmount],0)) [BuyBackAmount]
 	FROM bodb_licensee.dbo.rpt_Betting_BA b WITH (NOLOCK)
-		INNER JOIN @BettypeProductMapping bt ON b.Bettype = bt.Bettype
+		INNER JOIN (SELECT Bettype, ProductId 
+					FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'BA')) bt ON b.Bettype = bt.Bettype
 	WHERE rptDate >= @date AND rptDate < @date2
 		AND b.Status IN (111,112,113,114,115)
 		AND [CurrencyID] <> 20    
