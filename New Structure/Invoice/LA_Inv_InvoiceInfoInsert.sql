@@ -96,7 +96,7 @@ BEGIN
 		BEGIN
 			SELECT	@InvoiceNumber = (MAX(InvoiceNumber) + 1) 
 			FROM	dbo.LA_InvoiceHeader lih WITH(NOLOCK) 
-			WHERE	lih.InvoiceSymbol = @InvoiceSymbol AND lih.BillerId = @BillerId
+			WHERE	lih.InvoiceSymbol = @InvoiceSymbol AND lih.BillerId = @BillerId AND lih.InvoiceType = @InvoiceType
 		END		
 		
 		IF(@InvoiceNumber IS NULL)
