@@ -9,6 +9,7 @@ GO
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceBillerInfoGet] 
 	  @BillerId INT
 	, @PayerId INT
+	, @InvoiceType INT
 AS
 /*	Header:
 	Created: 2015.08.06 - Bravo.Tran
@@ -22,8 +23,8 @@ AS
 	USE bodb_licensee
 	DECLARE @BillerId INT = 115
 	DECLARE @PartyId INT = 17
-	
-	EXEC LA_Inv_InvoiceBillerInfoGet @BillerId, @PartyId
+	DECLARE @InvoiceType INT = 1
+	EXEC LA_Inv_InvoiceBillerInfoGet @BillerId, @PartyId, @InvoiceType
 */
 BEGIN
 	SET NOCOUNT ON
@@ -50,12 +51,14 @@ BEGIN
 	
 	SELECT	TOP 1 @InvoiceSymbol = i.InvoiceSymbol 
 	FROM	dbo.LA_InvoiceHeader i WITH(NOLOCK)
-	WHERE	i.BillerId = @BillerId
+	WHERE	i.BillerId = @BillerId AND
+			i.InvoiceType = @InvoiceType
 	ORDER	BY i.InvoiceDate DESC
 	
 	SELECT	@InvoiceNumber = ISNULL(MAX(i.InvoiceNumber), 0) + 1
 	FROM	dbo.LA_InvoiceHeader i WITH(NOLOCK)
-	WHERE	i.BillerId = @BillerId
+	WHERE	i.BillerId = @BillerId AND
+			i.InvoiceType = @InvoiceType
 	
 	UPDATE	@InvoiceInfo
 	SET		InvoiceSymbol = @InvoiceSymbol,
