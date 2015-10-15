@@ -198,15 +198,15 @@ BEGIN
 		 	END AS PartyName
 		, w.ReportDate
 		, SUM(TurnOver) AS Turnover
-		, SUM(Winlost) AS Winlost
-		, SUM(LicenseeWL) AS LicenseeWL
-		, SUM(WinlossRB) AS WinlossRB
-		, SUM(CommBA) AS CommBA
-		, SUM(CommRB) AS CommRB
-		, SUM(AmtDuetoBA) AS AmtDuetoBA
-		, SUM(AmtDuetoRB) AS AmtDuetoRB
-		, SUM(Company) AS Company
-		, SUM(Betcount) AS Betcount
+		, SUM(Winlost) AS CustWinLoss
+		, SUM(LicenseeWL) AS LicenseeWinLoss
+		, SUM(WinlossRB) AS RacingWinLoss
+		, SUM(CommBA) AS BACommission
+		, SUM(CommRB) AS RacingCommission
+		, SUM(AmtDuetoBA) AS AmountDueToBA
+		, SUM(AmtDuetoRB) AS AmountDueToRacing
+		, SUM(Company) AS AmountCompany
+		, SUM(Betcount) AS TotalTransaction
 	FROM #WinLoss w
 		INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON p.PartyID = w.PartyID
 	GROUP BY w.PartyID, p.PartyName, w.ReportDate	
