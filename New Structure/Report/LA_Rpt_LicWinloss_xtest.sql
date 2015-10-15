@@ -1,20 +1,17 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_LicWinloss_xtest]    Script Date: 01/12/2014 14:34:14 PM ******/
+/****** Object:  StoredProcedure [dbo].[LA_Rpt_LicenseeWinloss]    Script Date: 01/12/2014 14:34:14 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_Rpt_LicWinloss_xtest] 
+ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss] 
 	  @PartyIDs				VARCHAR(1000)	= ''
 	, @Currency				INT				= 0
 	, @FromDate				SMALLDATETIME
 	, @ToDate				SMALLDATETIME
 	, @ProductCodes			VARCHAR(1000)
-	, @SportType			INT				= 0
-	, @Bettype				INT				= 0
-	, @ReportBy				TINYINT			= 1
 	, @DrawFilter			SMALLINT		= 1
 	, @excludeTest			BIT				= 0
 	, @IsConvert			BIT				= 0
@@ -38,22 +35,15 @@ AS
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
 		+ @Currency	:  0- All Currencies
-		+ @ReportBy: 1-Daily; 2-Monthly;  
 		+ @DrawFilter: 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
 		+ @excludeTest: add/remove currency UUS
 		+ @ProductCodes	: Products code :
 				. SB _ SportBook
 				. NG _ Number Game
 				...
-		+@SportType	:
-				0  : selected all sporttype 
-		+@Bettype : 
-			0: selected all bettype
 */
 BEGIN
 	SET NOCOUNT ON
-	SET @ReportBy = 2 -- only allow monthly
-	
 	CREATE TABLE #Temp (PartyID INT, ProductID INT, ReportDate DATE, CurrencyID INT, TurnOver MONEY, Winlost MONEY, LicenseeWL MONEY, WinlossRB MONEY, 
 						AmtDueToBA MONEY, AmtDueToRB MONEY, CommBA MONEY, CommRB MONEY, Company MONEY, Betcount BIGINT)
 						
@@ -99,7 +89,7 @@ BEGIN
 				INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID
 			WHERE b.rptDate BETWEEN @Fromdate AND @Todate
 				AND b.ProductID = 3
-				AND b.StatusId NOT IN (- 1, 103)
+				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
 				AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
 			GROUP BY ci.PartyID, b.rptDate, b.ProductID, currencyID
@@ -147,7 +137,7 @@ BEGIN
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN (SELECT DISTINCT PartyId, LicenseeId, ProductID FROM @ChargeInfo WHERE ProductID <> 3) ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
-				AND b.StatusId NOT IN (- 1, 103)
+				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
 				AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
 				AND b.customercategory NOT IN (27,28)
@@ -218,5 +208,5 @@ BEGIN
 	DELETE #WinLoss
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicWinloss_xtest] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_Rpt_LicWinloss_xtest] TO bodbAdminNet 
+GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicenseeWinloss] TO [vnteam] 
+GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeWinloss] TO bodbAdminNet 
