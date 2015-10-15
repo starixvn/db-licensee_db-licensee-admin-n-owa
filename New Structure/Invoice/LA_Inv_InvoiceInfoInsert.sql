@@ -80,7 +80,7 @@ BEGIN
 		
 	IF	ISNULL(@BillerId, 0) > 0 
 		AND ISNULL(@PayerId,0) > 0 		
-		AND @InvoiceSymbol IS NOT NULL
+		AND ISNULL(@InvoiceSymbol, '') <> ''
 		AND ISNULL(@InvoiceNumber, 0) > 0
 		AND ISNULL(@DueDate, '') <> ''
 		AND ISNULL(@InvoiceDetailXml, '') <> ''
@@ -96,7 +96,7 @@ BEGIN
 		BEGIN
 			SELECT	@InvoiceNumber = (MAX(InvoiceNumber) + 1) 
 			FROM	dbo.LA_InvoiceHeader lih WITH(NOLOCK) 
-			WHERE	lih.InvoiceSymbol = @InvoiceSymbol AND lih.BillerId = @BillerId
+			WHERE	lih.InvoiceSymbol = @InvoiceSymbol
 		END		
 		
 		IF(@InvoiceNumber IS NULL)

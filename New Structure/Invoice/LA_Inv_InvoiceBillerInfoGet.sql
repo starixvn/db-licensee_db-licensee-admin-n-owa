@@ -9,6 +9,7 @@ GO
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceBillerInfoGet] 
 	  @BillerId INT
 	, @PayerId INT
+	, @InvoiceType INT
 AS
 /*	Header:
 	Created: 2015.08.06 - Bravo.Tran
@@ -22,8 +23,8 @@ AS
 	USE bodb_licensee
 	DECLARE @BillerId INT = 115
 	DECLARE @PartyId INT = 17
-	
-	EXEC LA_Inv_InvoiceBillerInfoGet @BillerId, @PartyId
+	DECLARE @InvoiceType INT = 1
+	EXEC LA_Inv_InvoiceBillerInfoGet @BillerId, @PartyId, @InvoiceType
 */
 BEGIN
 	SET NOCOUNT ON
@@ -45,17 +46,32 @@ BEGIN
 		GROUP	BY ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath
 	)
 	
+	DECLARE @InvoiceTmp TABLE(
+			BillerId		INT,
+			InvoiceType		INT,
+			InvoiceSymbol	VARCHAR(50),
+			InvoiceNumber	INT)
+	INSERT	INTO @InvoiceTmp
+	SELECT	i.BillerId,
+			i.InvoiceType,
+			i.InvoiceSymbol,
+			MAX(i.InvoiceNumber)
+	FROM	LA_InvoiceHeader i
+	WHERE	i.BillerId = @BillerId
+	GROUP BY i.BillerId,i.InvoiceType,i.InvoiceSymbol,i.InvoiceDate
+	ORDER BY i.InvoiceDate DESC
+		
 	DECLARE @InvoiceSymbol VARCHAR(20) = ''
 	DECLARE @InvoiceNumber INT = 1						
 	
 	SELECT	TOP 1 @InvoiceSymbol = i.InvoiceSymbol 
-	FROM	dbo.LA_InvoiceHeader i WITH(NOLOCK)
-	WHERE	i.BillerId = @BillerId
-	ORDER	BY i.InvoiceDate DESC
+	FROM	@InvoiceTmp i	
+	WHERE	i.InvoiceType = @InvoiceType	
 	
 	SELECT	@InvoiceNumber = ISNULL(MAX(i.InvoiceNumber), 0) + 1
-	FROM	dbo.LA_InvoiceHeader i WITH(NOLOCK)
-	WHERE	i.BillerId = @BillerId
+	FROM	@InvoiceTmp i
+			INNER JOIN @InvoiceTmp rf ON i.InvoiceSymbol = rf.InvoiceSymbol	
+	WHERE	i.InvoiceSymbol = @InvoiceSymbol
 	
 	UPDATE	@InvoiceInfo
 	SET		InvoiceSymbol = @InvoiceSymbol,
