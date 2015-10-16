@@ -32,7 +32,8 @@ BEGIN
 			, ParentId			INT
 			, Actual_stake		MONEY
 			, BuyBackAmount		MONEY
-			, BettradeWinloss	MONEY			
+			, BettradeWinloss	MONEY		
+			, WLonBBA			MONEY -- Winloss on Buy back Amount	
 			, LicenseeWL		MONEY
 			, BettradeComm		MONEY						
 			, Total				MONEY
@@ -66,7 +67,7 @@ BEGIN
 	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	
 	BEGIN			
-		INSERT INTO #Result(WinlostDate, PartyID, ParentId, Actual_stake, BuyBackAmount, BettradeWinloss, LicenseeWL, BettradeComm, Total, Betcount)
+		INSERT INTO #Result(WinlostDate, PartyID, ParentId, Actual_stake, BuyBackAmount, BettradeWinloss, WLonBBA, LicenseeWL, BettradeComm, Total, Betcount)
 		(
 			SELECT
 				CONVERT(VARCHAR(6), d.RptDate, 112) AS  WinlostDate
@@ -74,14 +75,11 @@ BEGIN
 				, d.ParentId
 				, SUM (d.Actual_stake * e.Rate) AS Actual_stake
 				, SUM (d.BuyBackAmount * e.Rate) AS BuyBackAmount
-				, SUM (d.BTWinLoss * e.Rate) AS BettradeWinloss				
+				, SUM (d.BTWinLoss * e.Rate) AS BettradeWinloss	
+				, SUM ((d.Actual_stake - d.BuyBackAmount) * e.Rate) AS WLonBBA
 				, SUM (d.LicWinLoss * e.Rate) AS LicenseeWL								
 				, SUM (d.BettradeComm * e.Rate) AS BettradeComm 
-<<<<<<< origin/#42706_BTWinloss_BTSettlement
-				, SUM ((d.LicWinLoss + d.BettradeComm - (d.Actual_stake - d.BuyBackAmount)) * e.Rate) AS Total
-=======
-				, SUM ((d.LicWinLoss + d.BettradeComm + (d.Actual_stake - d.BuyBackAmount)) * e.Rate) AS Total
->>>>>>> local
+				, SUM ((d.BTWinLoss + d.BettradeComm + (d.Actual_stake - d.BuyBackAmount)) * e.Rate) AS Total
 				, SUM (BetCount) AS BetCount	  
 			FROM (
 				SELECT p.PartyId, p.ParentId, b.RptDate, b.CurrencyId
@@ -95,7 +93,7 @@ BEGIN
 					, SUM(CASE WHEN b.Bettype = 901 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmount
 					, SUM(CASE WHEN bt.ProductID = 0 THEN b.WinLoss ELSE 0 END)	AS BTWinLoss
 					, - SUM(CASE WHEN bt.ProductID = 0 THEN b.WinLoss ELSE 0 END) AS LicWinLoss			 
-					, SUM (CASE WHEN b.Bettype = 901 THEN b.BuyBackAmount * p.Rate ELSE 0 END) AS BettradeComm			 					 								
+					, - SUM (CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount * p.Rate) ELSE 0 END) AS BettradeComm	-- negative amount (meaning that house charges BetTrade this amount).		 					 								
 					, SUM(CASE WHEN bt.ProductID = 0 THEN ISNULL(b.BetCount, 0) * CASE WHEN @DrawFilter = 2 AND b.Status = 111 THEN 0 ELSE 1 END 
 						ELSE 0 END) BetCount
 				FROM bodb_licensee.dbo.rpt_Betting b WITH (NOLOCK)
@@ -144,9 +142,10 @@ BEGIN
 		, SUM(d.Actual_stake)		AS ActualStake
 		, SUM(d.BuyBackAmount)		AS BuyBackAmount
 		, SUM(d.BettradeWinloss)	AS BetTradeWinLoss
-		, SUM(d.LicenseeWL)			AS LicenseeWinLoss
+		, SUM(d.WLonBBA)			AS BuyBackWinLoss
+		--, SUM(d.LicenseeWL)			AS LicenseeWinLoss
 		, SUM(d.BettradeComm)		AS BetTradeComm				
-		, SUM(d.Total)				AS Total			
+		, SUM(d.Total)				AS AmountDueTo			
 	FROM													  
 		#Result d  									  		
 		LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON d.PartyID = p.PartyID		
