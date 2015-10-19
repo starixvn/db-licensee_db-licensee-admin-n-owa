@@ -6,7 +6,7 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceListGet] 
-	@InvoiceNo		VARCHAR(50) = '',
+	@InvoiceNo		NVARCHAR(50) = '',
 	@InvoiceTypes	VARCHAR(100)= '',
 	@BillerIds		VARCHAR(500)= '',
 	@PayerIds		VARCHAR(500)= '',
@@ -17,14 +17,15 @@ AS
 /*	Header:
 	Created:2015.08.21 - Bravo.Tran
 	Task :	Create Invoice 
-	DB:		DB052.bodb_Licensee
+	DB:		DBLIC/bodb_Licensee
    
 	Revisions: 
-		+ 2015.08.07: Invoice Info List - Get
+		+ 20150807@Bravo: Invoice Info List - Get
+		+ 20151019@Victor: Support Chinese on Invoice's text fields
 */
 /*	Example:
 	USE bodb_licensee
-	DECLARE @InvoiceNo		VARCHAR(50)	= ''
+	DECLARE @InvoiceNo		NVARCHAR(50)	= ''
 	DECLARE @InvoiceTypes	VARCHAR(100)= '1,2,3'
 	DECLARE @BillerIds		VARCHAR(100)= '119,122'
 	DECLARE @PayerIds		VARCHAR(100)= '14,24'
@@ -134,7 +135,7 @@ BEGIN
 			INNER JOIN dbo.OAS_Party p ON i.PartyId = p.PartyID
 			INNER JOIN dbo.LA_InvoiceType it ON i.InvoiceType = it.InvTypeId
 			INNER JOIN @BaseCurrencyTable bct ON i.CurrencyId = bct.CurrencyId
-	WHERE	(i.InvoiceSymbol + CONVERT(VARCHAR(20), i.InvoiceNumber) = @InvoiceNo OR @InvoiceNo = '')
+	WHERE	(i.InvoiceSymbol + CONVERT(NVARCHAR(20), i.InvoiceNumber) = @InvoiceNo OR @InvoiceNo = '')
 			AND i.BillerId IN (SELECT Id FROM @BillerTable)
 			AND i.PartyId IN (SELECT Id FROM @PayerTable)
 			AND i.InvoiceType IN (SELECT Id FROM @InvoiceTypeTable)

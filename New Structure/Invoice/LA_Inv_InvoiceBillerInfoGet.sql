@@ -1,6 +1,6 @@
 USE [bodb_licensee]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Inv_InvoiceBillerInfoGet]   Script Date: 07/21/2015 09:12:41 ******/
+
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -14,10 +14,11 @@ AS
 /*	Header:
 	Created: 2015.08.06 - Bravo.Tran
 	Task : Create Invoice 
-	DB: DB052.bodb_Licensee
+	DB: DBLIC/bodb_Licensee
    
 	Revisions: 
-		+ 2015.08.06: Invoice Biller Info - Get
+		+ 20150806@Bravo: Invoice Biller Info - Get
+		+ 20151019@Victor: Support Chinese on Invoice's text fields
 */
 /*	Example:
 	USE bodb_licensee
@@ -30,7 +31,7 @@ BEGIN
 	SET NOCOUNT ON
 	
 	DECLARE @InvoiceInfo AS TABLE(		
-			InvoiceSymbol		VARCHAR(20), 
+			InvoiceSymbol		NVARCHAR(20), 
 			InvoiceNumber		INT,
 			InvoiceTemplateId	SMALLINT,
 			InvoiceTemplateName	VARCHAR(50),
@@ -49,7 +50,7 @@ BEGIN
 	DECLARE @InvoiceTmp TABLE(
 			BillerId		INT,
 			InvoiceType		INT,
-			InvoiceSymbol	VARCHAR(50),
+			InvoiceSymbol	NVARCHAR(20),
 			InvoiceNumber	INT)
 	INSERT	INTO @InvoiceTmp
 	SELECT	i.BillerId,
@@ -61,7 +62,7 @@ BEGIN
 	GROUP BY i.BillerId,i.InvoiceType,i.InvoiceSymbol,i.InvoiceDate
 	ORDER BY i.InvoiceDate DESC
 		
-	DECLARE @InvoiceSymbol VARCHAR(20) = ''
+	DECLARE @InvoiceSymbol NVARCHAR(20) = ''
 	DECLARE @InvoiceNumber INT = 1						
 	
 	SELECT	TOP 1 @InvoiceSymbol = i.InvoiceSymbol 

@@ -9,7 +9,7 @@ GO
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert] 
 	  @BillerId			INT
 	, @PayerId			INT		
-	, @InvoiceSymbol	VARCHAR(20)		= ''
+	, @InvoiceSymbol	NVARCHAR(20)		= ''
 	, @InvoiceNumber	INT	
 	, @FromDate			DATETIME
 	, @ToDate			DATETIME
