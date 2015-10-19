@@ -49,12 +49,12 @@ BEGIN
 						
 	CREATE TABLE #Exchange(ExchangeId INT, ExchangeDate DATE, Code VARCHAR(20), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, CNY FLOAT, Base FLOAT)
 	
-	DECLARE @ChargeInfo TABLE(PartyID INT, LicenseeID INT, ProductID INT, Rate MONEY, Fromdate DATE, Todate DATE)
+	DECLARE @ChargeInfo TABLE(PartyID INT, LicenseeID INT, ProductID INT,BetTypeId INT ,Rate MONEY, Fromdate DATE, Todate DATE)
 	
-	CREATE TABLE #Data (rptDate DATE, PartyID INT, ProductID INT, Currency INT, Turnover MONEY, Winloss MONEY, AWinloss MONEY, AComm MONEY, Betcount BIGINT)
+	CREATE TABLE #Data (rptDate DATE, PartyID INT, ProductID INT, Currency INT,BetTypeId INT, Turnover MONEY, Winloss MONEY, AWinloss MONEY, AComm MONEY, Betcount BIGINT)
 	
-	INSERT INTO @ChargeInfo(PartyID, LicenseeID, ProductID, Rate, Fromdate, Todate)
-	SELECT DISTINCT PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
+	INSERT INTO @ChargeInfo(PartyID, LicenseeID, ProductID, BetTypeId, Rate, Fromdate, Todate)
+	SELECT DISTINCT PartyID, LicenseeID, ProductID, Bettype, DI_Rate, Fromdate, Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', @excludeTest)
 
 	IF CHARINDEX('BA', @ProductCodes) <> 0
@@ -96,14 +96,61 @@ BEGIN
 				, 0 AS Company
 				, SUM(betcount) BetCount
 			FROM #Data b
-				INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate FROM @ChargeInfo) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
+				INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate FROM @ChargeInfo WHERE ProductID = 3) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
 			WHERE b.rptDate BETWEEN ci.Fromdate AND ci.Todate
-				AND ci.ProductID = 3
 			GROUP BY ci.PartyID, b.rptDate, b.Currency
 		)
 	END
 	
-	IF (REPLACE(@ProductCodes, 'BA', '') != '' AND REPLACE(@ProductCodes, 'BA', '') != ',')
+	IF CHARINDEX('MGC', @ProductCodes) <> 0
+	BEGIN
+		DELETE #Data
+		
+		INSERT INTO #Data(rptDate, PartyID, ProductID, Currency, BetTypeId, Turnover, Winloss, AWinloss, AComm, Betcount)
+		(
+			SELECT b.rptDate, ci.PartyID, b.ProductID, b.currencyID, ci.BetTypeId
+				, SUM(b.turnover * 
+					CASE WHEN @drawfilter IN (2, 3) 
+						THEN CASE WHEN b.StatusId = 111 THEN 0
+							WHEN b.StatusId IN (114, 115)	THEN 0.5 ELSE 1	END
+						ELSE 1
+					END) Turnover
+				, SUM(b.MemberWL) Winloss
+				, 0 AS AWinloss
+				, SUM(b.CommissionA) CommBA
+				, SUM(b.BetCount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) BetCount
+			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+				INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND ci.BetTypeId = b.Bettype
+			WHERE b.rptDate BETWEEN @Fromdate AND @Todate
+				AND b.ProductID = 14
+				AND b.StatusId NOT IN (- 1, 101, 102, 103)
+				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
+				AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
+			GROUP BY ci.PartyID, b.rptDate, b.ProductID, currencyID, ci.BetTypeId
+		)
+		
+		INSERT INTO #Report (PartyID, ReportDate, CurrencyID, Turnover, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Company, Betcount)
+		(
+			SELECT ci.PartyID, b.rptDate, b.currency
+				, SUM(b.turnover) Turnover
+				, SUM(b.winloss) Winloss
+				, 0 AS LicenseeWL
+				, 0 AS WinlossRB
+				, -SUM((b.winloss * ci.Rate ) + b.AComm) AS AmountDueToBA
+				, 0 AS AmountDueToRB
+				, SUM(b.AComm) AS CommBA
+				, 0 AS CommRB
+				, 0 AS Company
+				, SUM(betcount) BetCount
+			FROM #Data b
+				INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, BetTypeId, Rate FROM @ChargeInfo WHERE ProductID = 14) ci 
+				ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID AND ci.BetTypeId = b.BetTypeId			
+			WHERE b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+			GROUP BY ci.PartyID, b.rptDate, b.Currency
+		)
+	END
+	
+	IF (REPLACE(@ProductCodes, 'BA', '') != '' AND REPLACE(@ProductCodes, 'BA', '') != ',' AND REPLACE(@ProductCodes, 'MGC', '') != '' AND REPLACE(@ProductCodes, 'MGC', '') != ',')
 	BEGIN
 		DELETE #Data
 		
@@ -122,7 +169,7 @@ BEGIN
 				, SUM(b.CommissionA)
 				, SUM(b.betcount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) BetCount
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN (SELECT DISTINCT PartyId, LicenseeId, ProductID FROM @ChargeInfo WHERE ProductID <> 3) ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
+				INNER JOIN (SELECT DISTINCT PartyId, LicenseeId, ProductID FROM @ChargeInfo WHERE ProductID NOT IN (3,14)) ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
@@ -144,9 +191,8 @@ BEGIN
 			, -SUM(CASE WHEN b.ProductID <> 1 THEN ((b.Winloss * ci.Rate))ELSE 0 END) AS Company
 			, SUM(b.betcount) AS betcount
 		FROM #Data b WITH (NOLOCK)
-			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate FROM @ChargeInfo) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
+			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate FROM @ChargeInfo WHERE ProductID NOT IN (3,14)) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
 		WHERE b.rptDate BETWEEN ci.Fromdate AND ci.Todate
-			AND ci.ProductID <> 3
 		GROUP BY ci.PartyID, b.rptDate, b.Currency
 	END
 	
@@ -176,7 +222,7 @@ BEGIN
 	SELECT b.PartyID
 		, p.PartyName
 		, CONVERT(VARCHAR(6), b.ReportDate, 112) AS ReportDate
-		, SUM(Betcount * e.Base) AS TotalTransaction
+		, SUM(Betcount) AS TotalTransaction
 		, CAST(SUM(Turnover * e.Base) AS MONEY) AS Turnover
 		, CAST(SUM(Winlost * e.Base) AS MONEY) AS CustomerWinLoss
 		, CAST(SUM(LicenseeWL * e.Base) AS MONEY) AS LicenseeWinLoss
@@ -242,9 +288,9 @@ BEGIN
 	GROUP BY b.PartyID, p.PartyName ,CONVERT(VARCHAR(6), b.ReportDate, 112)
 	ORDER BY ReportDate ASC, CASE p.PartyName WHEN '18bb' THEN 'PIH' WHEN 'IBC' THEN 'FDL' ELSE p.PartyName END
 	
-	DELETE #Exchange
-	DELETE #Report
-	DELETE #Data
+	DROP TABLE #Exchange
+	DROP TABLE #Report
+	DROP TABLE #Data
 END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicenseeWinloss] TO [vnteam] 
