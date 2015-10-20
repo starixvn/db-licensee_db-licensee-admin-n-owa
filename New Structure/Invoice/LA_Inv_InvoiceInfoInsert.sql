@@ -1,6 +1,6 @@
 USE [bodb_licensee]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Inv_InvoiceInfoInsert]   Script Date: 07/21/2015 09:12:41 ******/
+
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -9,15 +9,15 @@ GO
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert] 
 	  @BillerId			INT
 	, @PayerId			INT		
-	, @InvoiceSymbol	VARCHAR(20)		= ''
+	, @InvoiceSymbol	NVARCHAR(20)		= ''
 	, @InvoiceNumber	INT	
 	, @FromDate			DATETIME
 	, @ToDate			DATETIME
 	, @DueDate			DATETIME
 	, @Amount			MONEY
 	, @InvoiceType		SMALLINT
-	, @Note				VARCHAR(200)	
-	, @InvoiceDetailXml VARCHAR(MAX)
+	, @Note				NVARCHAR(200)	
+	, @InvoiceDetailXml NVARCHAR(MAX)
 	, @IsSeparateProduct BIT			= 0
 	, @UserID			INT
 	, @LoginIP			VARCHAR (50)	= ''
@@ -33,7 +33,8 @@ AS
 	DB: DB052.bodb_Licensee
 
 	Revisions:   
-		+ 2015.08.06: Save invoice.   
+		+ 20150806@Bravo: Save invoice
+		+ 20151019@Victor: Support Chinese on Invoice's text fields
 	Params:		
 		+ @InvoiceDetailXml: 
 			<InvoiceDetails>
@@ -75,7 +76,7 @@ AS
 BEGIN
 	SET NOCOUNT ON	
 
-	DECLARE @startRun DATETIME, @endRun DATETIME, @duration INT, @logSPData VARCHAR(MAX), @logSPDataOld	VARCHAR(MAX), @xml XML
+	DECLARE @startRun DATETIME, @endRun DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld	NVARCHAR(MAX), @xml XML
 	SET @startRun = GETDATE()
 		
 	IF	ISNULL(@BillerId, 0) > 0 
@@ -170,10 +171,10 @@ BEGIN
 		-- Region: Insert data to Invoice Detail
 		BEGIN TRY
 			DECLARE @idoc AS INT
-			DECLARE @xmlText VARCHAR(MAX) = REPLACE(@InvoiceDetailXml, '&', '&amp;')
+			DECLARE @xmlText NVARCHAR(MAX) = REPLACE(@InvoiceDetailXml, '&', '&amp;')
 			DECLARE @Detail AS TABLE(
-					[Description]	VARCHAR(200),
-					Reference	VARCHAR(100),
+					[Description]	NVARCHAR(200),
+					Reference	NVARCHAR(100),
 					ProductId	INT,
 					Amount		MONEY,
 					AmountType	TINYINT)
@@ -181,15 +182,15 @@ BEGIN
 			EXEC	sp_xml_preparedocument @idoc OUTPUT, @xmlText			
 			INSERT	INTO @Detail([Description],Reference,ProductId,Amount,AmountType)
 			SELECT 
-					CAST([Description] AS VARCHAR(200)),
-					CAST(Reference AS VARCHAR(100)),
+					CAST([Description] AS NVARCHAR(200)),
+					CAST(Reference AS NVARCHAR(100)),
 					CAST(ProductId AS INT),
 					CAST(InvoiceAmount AS MONEY),
 					CAST(AmountType AS TINYINT)
 			FROM	OPENXML(@idoc, 'InvoiceDetails/InvoiceDetail')
 			WITH (
-					[Description] VARCHAR(200) 'Description',
-					Reference VARCHAR(100) 'Reference',
+					[Description] NVARCHAR(200) 'Description',
+					Reference NVARCHAR(100) 'Reference',
 					ProductId VARCHAR(10) 'ProductId',
 					InvoiceAmount VARCHAR(20) 'InvoiceAmount',
 					AmountType VARCHAR(10) 'AmountType'
@@ -253,7 +254,7 @@ BEGIN
 					FOR XML PATH('d'), TYPE)					
 				FOR XML PATH('h'), TYPE)
 
-		SET @logSpData = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"')
+		SET @logSpData = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"')
 
 		--get log action
 		DECLARE @ActionID INT = 0
