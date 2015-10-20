@@ -163,7 +163,7 @@ BEGIN
 			t.PartyName
 	FROM	@TempPartyList t INNER JOIN @TempPartyList p ON t.ParentId = p.PartyId
 			INNER JOIN dbo.OAS_Party op WITH (NOLOCK) ON op.PartyID = t.PartyId
-	WHERE	t.ParentId != 0 AND p.PartyId != 98
+	WHERE	t.ParentId != 0
 			AND t.PartyId IN (SELECT Id FROM @PartyIdTable)
 	
 	-- BA	
