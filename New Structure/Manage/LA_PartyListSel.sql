@@ -36,12 +36,12 @@ DECLARE @CreditLicensee	AS TABLE (PartyID INT)
 INSERT INTO @CreditLicensee
 SELECT PartyID 
 FROM dbo.OAS_Party WITH (NOLOCK)
-WHERE PartyName IN ('IBC','18bb') AND PartyType NOT IN (4)
+WHERE PartyName IN ('IBC','18bb')
 
 INSERT INTO @tmpCompany
 SELECT PartyID 
 FROM dbo.OAS_Party WITH (NOLOCK)
-WHERE PartyName IN ('ONEWorks','Boping') AND PartyType NOT IN (4)
+WHERE PartyName IN ('ONEWorks','Boping', 'Zelianta')
 
 SELECT MAX(ci.FromDate) FromDate, ci.FromParty
 INTO #ListParty
