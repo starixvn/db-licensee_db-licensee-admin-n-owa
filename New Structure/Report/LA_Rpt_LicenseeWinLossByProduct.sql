@@ -21,6 +21,7 @@ AS
 	Revisions: 
 		+ 2015.08.06: Invoice Amount - Generate
 		+ 2015.09.15: Get Amount by PartyId List.
+		+ 2015.10.20@Bravo: Add Zelianta
 */
 /*	Example:
 	USE bodb_Licensee
@@ -163,7 +164,7 @@ BEGIN
 			t.PartyName
 	FROM	@TempPartyList t INNER JOIN @TempPartyList p ON t.ParentId = p.PartyId
 			INNER JOIN dbo.OAS_Party op WITH (NOLOCK) ON op.PartyID = t.PartyId
-	WHERE	t.ParentId != 0 AND p.PartyId != 98
+	WHERE	t.ParentId != 0
 			AND t.PartyId IN (SELECT Id FROM @PartyIdTable)
 	
 	-- BA	
