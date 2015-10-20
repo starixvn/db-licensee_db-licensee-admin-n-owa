@@ -21,6 +21,7 @@ AS
 	Revisions: 
 		+ 2015.08.06: Invoice Amount - Generate
 		+ 2015.09.15: Get Amount by PartyId List.
+		+ 2015.10.20@Bravo: Add Zelianta
 */
 /*	Example:
 	USE bodb_Licensee
