@@ -10,6 +10,7 @@ AS
 	Revisions:
 		- 20150923@Victor: Fix third party data summary issues (AGCS, VG, GD)
 		- 20151002@Victor: Move all Bettrade detail tickets (901,902,903) to product BT
+		- 20151021@Victor: Support AG Casino Single Wallet and include Void, Reject, Refund tickets
 */
 
 BEGIN  
@@ -23,7 +24,7 @@ BEGIN
 	
 	INSERT INTO @BettypeProductMapping (Bettype, ProductID)
 	SELECT Bettype, ProductId 
-	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB,NG,VS,RB,LC,CS,KN,BG,MGC,BT')
+	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB,NG,VS,RB,LC,CS,KN,BG,AGC,MGC,BT')
 
 	-- Import data from rpt_Betting / rpt_Betting_BA
 	INSERT INTO [dbo].[rpt_BettingByProduct]
@@ -59,7 +60,7 @@ BEGIN
 	FROM bodb_licensee.dbo.rpt_Betting b WITH (NOLOCK)
 		INNER JOIN @BettypeProductMapping bt ON b.Bettype = bt.Bettype
 	WHERE rptDate >= @date AND rptDate < @date2
-		AND b.Status IN (111,112,113,114,115)
+		AND b.Status IN (111,112,113,114,115,101,102,103)
 		AND [CurrencyID] <> 20    
 	GROUP BY [rptDate]
 			,[SiteID]
@@ -88,7 +89,7 @@ BEGIN
 		INNER JOIN (SELECT Bettype, ProductId 
 					FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'BA')) bt ON b.Bettype = bt.Bettype
 	WHERE rptDate >= @date AND rptDate < @date2
-		AND b.Status IN (111,112,113,114,115)
+		AND b.Status IN (111,112,113,114,115,101,102,103)
 		AND [CurrencyID] <> 20    
 	GROUP BY [rptDate]
 			,[SiteID]
@@ -108,7 +109,7 @@ BEGIN
 	WHERE Winlostdate >= @date AND Winlostdate < @date2
 		AND [Currency] <> 20
 
-	-- AGCS
+	-- AGCS (separate wallet)
 	INSERT INTO #tmpData (rptDate, CustID, ProductID, CurrencyId, Winlost, Turnover, BetCount, PlayerComm)
 	SELECT Winlostdate, Custid, 10 AS ProductId, Currency, SUM(Winlost), SUM(Turnover), SUM(BetCount), SUM(PlayerComm)
 	FROM DBRPT.bodb_report.dbo.rptDepWinlost_AGCasino WITH (NOLOCK)
