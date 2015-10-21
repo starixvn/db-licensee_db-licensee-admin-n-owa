@@ -20,11 +20,16 @@ BEGIN
 	DELETE FROM dbo.rpt_BettingByProduct
 	WHERE rptDate>=@date AND rptDate<@date2
 
-	DECLARE @BettypeProductMapping TABLE (Bettype INT, ProductID INT)
+	CREATE TABLE #BettypeProductMapping (Bettype INT, ProductID INT)
+	CREATE TABLE #BettypeProductMappingBA (Bettype INT, ProductID INT)
 	
-	INSERT INTO @BettypeProductMapping (Bettype, ProductID)
+	INSERT INTO #BettypeProductMapping (Bettype, ProductID)
 	SELECT Bettype, ProductId 
 	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB,NG,VS,RB,LC,CS,KN,BG,AGC,MGC,BT')
+
+	INSERT INTO #BettypeProductMappingBA (Bettype, ProductID)
+	SELECT Bettype, ProductId 
+	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'BA')
 
 	-- Import data from rpt_Betting / rpt_Betting_BA
 	INSERT INTO [dbo].[rpt_BettingByProduct]
@@ -58,7 +63,7 @@ BEGIN
 		,SUM(ISNULL([CommissionP],0)) [CommissionP]
 		,SUM(ISNULL([BuyBackAmount],0)) [BuyBackAmount]
 	FROM bodb_licensee.dbo.rpt_Betting b WITH (NOLOCK)
-		INNER JOIN @BettypeProductMapping bt ON b.Bettype = bt.Bettype
+		INNER JOIN #BettypeProductMapping bt ON b.Bettype = bt.Bettype
 	WHERE rptDate >= @date AND rptDate < @date2
 		AND b.Status IN (111,112,113,114,115,101,102,103)
 		AND [CurrencyID] <> 20    
@@ -86,8 +91,7 @@ BEGIN
 		,SUM(ISNULL([CommissionP],0)) [CommissionP]
 		,SUM(ISNULL([BuyBackAmount],0)) [BuyBackAmount]
 	FROM bodb_licensee.dbo.rpt_Betting_BA b WITH (NOLOCK)
-		INNER JOIN (SELECT Bettype, ProductId 
-					FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'BA')) bt ON b.Bettype = bt.Bettype
+		INNER JOIN #BettypeProductMappingBA bt ON b.Bettype = bt.Bettype
 	WHERE rptDate >= @date AND rptDate < @date2
 		AND b.Status IN (111,112,113,114,115,101,102,103)
 		AND [CurrencyID] <> 20    
@@ -175,6 +179,8 @@ BEGIN
 		  END
 
 	DROP TABLE #tmpData
+	DROP TABLE #BettypeProductMapping
+	DROP TABLE #BettypeProductMappingBA
 END
 
 GO
