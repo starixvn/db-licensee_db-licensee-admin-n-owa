@@ -1,6 +1,6 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_LicenseeWinloss_Details]    Script Date: 01/12/2014 14:34:39 PM ******/
+/****** Object:  StoredProcedure [dbo].[LA_Rpt_LicenseeWinloss_Details]    Script Date: 20/10/2015 13:00:00 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -19,27 +19,24 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss_Details]
 	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
 
 AS
-/*   Created:  Florent.Nguyen
-	Date: 20140827
-     Original: OA_Rpt_LicWinloss2
-	Task : LA Get Party Winloss Details
-     DB: DB052.bodb02  
-   
-     Revisions:  
-	   - 20141021@Florent: get data from credit's licensee
-	   - 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
-	   - 20150703@Florent: add GBP
-	   - 20151019@Forrest: Add Microgaming and Update new Data Flow
+/*  Created:  Forrest.Nguyen
+	Date: 20151020
+    Original: LA_Rpt_LicenseeWinloss_Details
+	Feature: 44873
+    DB: DB052.bodb02  
+    Revisions:  
 	Param's Explanation:  
-	  + @PartyIDs	: a string of list PartyID, separate by ','
-	  + @Currency	:  0- All Currencies
-	  + @ReportBy: 1-Daily; 2-Monthly;  
-	  + @DrawFilter: 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
-	  + @excludeTest: add/remove currency UUS
-	  + @ProductCodes	: Products code :
+		+ @PartyIDs	: a string of list PartyID, separate by ','
+		+ @Currency	:  0- All Currencies
+		+ @ReportBy: 1-Daily; 2-Monthly;  
+		+ @DrawFilter: 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
+		+ @excludeTest: add/remove currency UUS
+		+ @ProductCodes	: Products code :
 				. SB _ SportBook
 				. NG _ Number Game
 				...
+		+ @IsConvert: 0-No Convert, 1-Convert
+		+ @BaseCurrencyName: GBP, CNY, USD, EUR, MYR
 */
 BEGIN
 	SET NOCOUNT ON

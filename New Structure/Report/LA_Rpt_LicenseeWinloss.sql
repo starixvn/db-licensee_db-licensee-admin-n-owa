@@ -1,6 +1,6 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_LicenseeWinloss]    Script Date: 01/12/2014 14:34:14 PM ******/
+/****** Object:  StoredProcedure [dbo].[LA_Rpt_LicenseeWinloss]    Script Date: 20/10/2015 13:00:00 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -19,19 +19,12 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss]
 
 WITH RECOMPILE
 AS
-/*   Created:  Florent.Nguyen
-	Date: 20140827
-		Original: OA_Rpt_LicWinloss_Summary
-	Task : LA Get Party Winloss
-		DB: DB052.bodb02  
-   
-		Revisions:  
-		- 20141021@Florent: get data from credit's licensee
-		- 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
-		- 20141226@Florent: Fix hafl-won, hafl-lose on Racing
-		- 20150330@Florent: Fix case FDL licensee duplicate data
-		- 20150703@Florent: add GBP
-		- 20151013@Forrest: Up to date new flow
+/*  Created:  Forrest.Nguyen
+	Date: 20151020
+	Original: LA_Rpt_LicenseeWinloss
+	Feature: 44873
+	DB: DB052.bodb02  
+	Revisions:  
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
 		+ @Currency	:  0- All Currencies
@@ -41,6 +34,8 @@ AS
 				. SB _ SportBook
 				. NG _ Number Game
 				...
+		+ @IsConvert: 0-No Convert, 1-Convert
+		+ @BaseCurrencyName: GBP, CNY, USD, EUR, MYR
 */
 BEGIN
 	SET NOCOUNT ON
