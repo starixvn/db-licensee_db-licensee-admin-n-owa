@@ -1,6 +1,6 @@
 USE [bodb_licensee]
 GO
-/****** Object:  UserDefinedFunction [dbo].[LA_f_BettypeProductMapping]    Script Date: 01/12/2014 14:32:00 PM ******/
+
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -22,12 +22,18 @@ AS
 		- 20150414@Jim: add MicroGaming
 		- 20150714@Florent: Add product Gold Deluxe
 		- 20150820@Florent: Add Bettrade and remove bettypes 901, 902, 903 in SB, BA
+		- 20151012@Victor: Add product AG Casino Single Wallet
     Param's Explanation:   
 
 */
 
 BEGIN
-    IF CHARINDEX('SB', @ProductCodes) <> 0
+	DECLARE @ProductList TABLE (ProductCode VARCHAR(10))
+
+	INSERT INTO @ProductList (ProductCode)
+	SELECT val FROM bodb02.dbo.Lrf_f_StringSplit(@ProductCodes, ',')
+
+    IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'SB')
 	   --OR CHARINDEX('BA', @ProductCodes) <> 0
     BEGIN
 	   INSERT INTO @tbBettypeProduct
@@ -40,7 +46,7 @@ BEGIN
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
-    IF CHARINDEX('BA', @ProductCodes) <> 0
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'BA')
     BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 3
@@ -52,7 +58,7 @@ BEGIN
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
-    IF CHARINDEX('RB', @ProductCodes) <> 0
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'RB')
     BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 1
@@ -61,7 +67,7 @@ BEGIN
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
-    IF CHARINDEX('NG', @ProductCodes) <> 0
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'NG')
     BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 2
@@ -70,7 +76,7 @@ BEGIN
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
-    IF CHARINDEX('LC', @ProductCodes) <> 0
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'LC')
     BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 4
@@ -79,7 +85,7 @@ BEGIN
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
-    IF CHARINDEX('VS', @ProductCodes) <> 0
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'VS')
     BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 5
@@ -88,7 +94,7 @@ BEGIN
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
-    IF CHARINDEX('CS', @ProductCodes) <> 0
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'CS')
     BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 6
@@ -97,7 +103,7 @@ BEGIN
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 	
-	IF CHARINDEX('BG', @ProductCodes) <> 0
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'BG')
     BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 7
@@ -106,7 +112,7 @@ BEGIN
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
-	IF CHARINDEX('KN', @ProductCodes) <> 0
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'KN')
     BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 8
@@ -115,7 +121,7 @@ BEGIN
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 	
-	IF CHARINDEX('MGC', @ProductCodes) <> 0
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'MGC')
     BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 14
@@ -123,7 +129,8 @@ BEGIN
 	   WHERE typeid BETWEEN 2001 AND 2009
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
-	IF CHARINDEX('GD', @ProductCodes) <> 0
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'GD')
     BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 11
@@ -132,12 +139,21 @@ BEGIN
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
-	IF CHARINDEX('BT', @ProductCodes) <> 0
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'BT')
     BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 13
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 901 AND 903
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+    END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'AGC')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 10
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 1801 AND 1899
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
     
