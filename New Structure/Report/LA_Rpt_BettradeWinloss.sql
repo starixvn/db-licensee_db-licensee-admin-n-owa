@@ -103,7 +103,7 @@ BEGIN
 					AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))					
 					AND (@ExcludeTest = 0 OR (@ExcludeTest <> 0 AND b.CurrencyID <> 20))
 					AND b.Status NOT IN (- 1, 103)	
-					AND b.CustomerCategory = 1001				
+					AND b.CustomerCategory IN( 1001, 1002)
 				GROUP BY p.PartyId, b.RptDate, b.CurrencyId, p.ParentId
 
 				UNION ALL 
@@ -122,7 +122,7 @@ BEGIN
 					AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))					
 					AND (@ExcludeTest = 0 OR (@ExcludeTest <> 0 AND b.CurrencyID <> 20))
 					AND b.Status NOT IN (- 1, 103)	
-					AND b.CustomerCategory = 1001									
+					AND b.CustomerCategory IN( 1001, 1002)									
 				GROUP BY p.PartyId, b.RptDate, b.CurrencyId, p.ParentId
 
 			) d 
