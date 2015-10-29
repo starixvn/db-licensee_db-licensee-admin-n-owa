@@ -110,10 +110,10 @@ BEGIN
 							WHEN b.StatusId IN (114, 115)	THEN 0.5 ELSE 1	END
 						ELSE 1
 					END) Turnover
-				, SUM(b.MemberWL) Winloss
-				, 0 AS AWinloss
-				, SUM(b.CommissionA) CommBA
-				, SUM(b.BetCount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) BetCount
+				, SUM(b.MemberWL)
+				, SUM(b.GrossWL)
+				, SUM(b.CommissionA)
+				, SUM(b.betcount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) BetCount
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND ci.BetTypeId = b.Bettype
 			WHERE b.rptDate BETWEEN @Fromdate AND @Todate
@@ -128,15 +128,15 @@ BEGIN
 		(
 			SELECT ci.PartyID, b.rptDate, b.currency
 				, SUM(b.turnover) Turnover
-				, SUM(b.winloss) Winloss
-				, 0 AS LicenseeWL
+				, SUM(b.Winloss) Winloss
+				, -SUM(b.Winloss) AS LicenseeWL
 				, 0 AS WinlossRB
-				, -SUM((b.winloss * ci.Rate ) + b.AComm) AS AmountDueToBA
+				, 0 AS AmountDueToBA
 				, 0 AS AmountDueToRB
-				, SUM(b.AComm) AS CommBA
+				, 0 AS CommBA
 				, 0 AS CommRB
-				, 0 AS Company
-				, SUM(betcount) BetCount
+				, -SUM(b.Winloss * ci.Rate) AS Company
+				, SUM(b.betcount) AS betcount
 			FROM #Data b
 				INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, BetTypeId, Rate FROM @ChargeInfo WHERE ProductID = 14) ci 
 				ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID AND ci.BetTypeId = b.BetTypeId			
