@@ -141,7 +141,7 @@ BEGIN
 			SELECT b.rptDate, b.currency, b.ProductID
 				, SUM(b.turnover) Turnover
 				, SUM(b.winloss) Winloss
-				, 0 AS LicenseeWL
+				, -SUM(b.Winloss) AS LicenseeWL
 				, 0 AS WinlossRB
 				, 0 AS AmountDueToBA
 				, 0 AS AmountDueToRB
