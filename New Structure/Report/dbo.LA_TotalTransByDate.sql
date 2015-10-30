@@ -45,7 +45,7 @@ BEGIN
 		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB	
 	)
-	
+		
 	DECLARE @TempPartyList TABLE (PartyId INT, PartyName VARCHAR(200), BrandName VARCHAR(200), ParentId INT)
 	INSERT INTO @TempPartyList
 	EXEC dbo.LA_PartyListSel
@@ -141,7 +141,7 @@ BEGIN
 			AND c.Currency <> 20
 	GROUP BY MONTH(c.Winlostdate), p.ProductPrefix, lc.LicenseeID, ci.ToParty, ci.PartyId
 	---------------------------------------------------------------------------------
-	
+
 	SELECT	CASE a.product 
 				WHEN 'SB' THEN 'Sportsbook' 
 				ELSE p.ProductName 
@@ -160,7 +160,8 @@ BEGIN
 					CASE WHEN b.FromParty = 25 THEN 'FDL' 
 						 WHEN b.FromParty = 30 THEN 'PIH' 
 						 WHEN b.ToParty = 11 then 'Boping'
-						 WHEN b.ToParty = 1 THEN 'OW'						 
+						 WHEN b.ToParty = 1 THEN 'OW'
+						 WHEN b.ToParty = 98 THEN 'Zelianta'						 
 						 ELSE '' END				
 					resellerName
 		
@@ -176,7 +177,8 @@ BEGIN
 					CASE WHEN b.FromParty = 25 THEN 'FDL' 
 						 WHEN b.FromParty = 30 THEN 'PIH' 
 						 WHEN b.ToParty = 11 then 'Boping'
-						 WHEN b.ToParty = 1 THEN 'OW'						 
+						 WHEN b.ToParty = 1 THEN 'OW'	
+						 WHEN b.ToParty = 98 THEN 'Zelianta'					 
 						 ELSE '' END
 		) A LEFT JOIN dbo.Product3rd p on a.product=p.ProductPrefix
 		
@@ -241,6 +243,26 @@ BEGIN
 		FROM (
 			SELECT *
 			FROM #data where resellerName IN ('PIH','FDL')
+		) as s
+		PIVOT
+		(
+			sum(betcount)
+			FOR rptdate IN ([1], [2], [3], [4], 
+			[5], [6], [7], [8], [9], [10], [11], [12])
+		) as pivt
+		) A	
+	UNION ALL
+	SELECT  product,'Zelianta',sitename,
+		ISNULL(a.[1],0) AS 'Jan', ISNULL(a.[2],0) AS 'Feb', ISNULL(a.[3],0) AS 'Mar', 
+		ISNULL(a.[4],0) AS 'Apr', ISNULL(a.[5],0) AS 'May', ISNULL(a.[6],0) AS 'Jun', 
+		ISNULL(a.[7],0) AS 'Jul', ISNULL(a.[8],0) AS 'Aug', ISNULL(a.[9],0) AS 'Sep', 
+		ISNULL(a.[10],0) AS 'Oct', ISNULL(a.[11],0) AS 'Nov', ISNULL(a.[12],0) AS 'Dec'
+	FROM
+		(
+		SELECT *
+		FROM (
+			SELECT *
+			FROM #data where resellerName IN ('Zelianta')
 		) as s
 		PIVOT
 		(
