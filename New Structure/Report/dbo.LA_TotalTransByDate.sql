@@ -1,6 +1,5 @@
 USE [bodb_licensee]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_TotalTransByDate_xpre]    Script Date: 12/30/2014 4:00:33 PM ******/
 SET ANSI_NULLS ON
 GO 
 SET QUOTED_IDENTIFIER ON
@@ -22,7 +21,7 @@ AS
 	 Params:			   
 */
 BEGIN
-
+ 
 	DECLARE @PartyIdString VARCHAR(500) 
 	SELECT	@PartyIdString = COALESCE(@PartyIdString + ',', '') + CAST(PartyId AS VARCHAR(5))
 	FROM	OAS_Party
@@ -35,6 +34,7 @@ BEGIN
 			ToParty		INT,
 			LicenseeId	INT,
 			ProductID	INT,
+			ProductCode VARCHAR(10),
 			Rate		MONEY,
 			FromDate	SMALLDATETIME,
 			ToDate		SMALLDATETIME)
@@ -45,6 +45,9 @@ BEGIN
 		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB	
 	)
+	UPDATE	c
+	SET		ProductCode = CASE WHEN c.ProductID = 0 THEN 'SB' ELSE p.ProductPrefix END
+	FROM	@PartyChargeInfo c LEFT JOIN Product3rd p ON c.ProductID = p.Productid
 		
 	DECLARE @TempPartyList TABLE (PartyId INT, PartyName VARCHAR(200), BrandName VARCHAR(200), ParentId INT)
 	INSERT INTO @TempPartyList
@@ -59,11 +62,11 @@ BEGIN
 			AND c.ToDate BETWEEN ci.FromDate AND ci.ToDate
 	WHERE	ci.ChargeType != 2
 	
-	CREATE TABLE #tmpBetting (rptDate char(10),product varchar(10),siteID INT,betcount INT, FromParty INT, ToParty INT)
+	CREATE TABLE #tmpBetting (rptDate char(10),rptDateFull DATETIME, product varchar(10),siteID INT,betcount INT, FromParty INT, ToParty INT)
 	
-	INSERT	INTO #tmpBetting(rptDate,siteID,product,betcount, FromParty, ToParty)
-	SELECT	month(b.rptDate), 	b.SiteID,	
-	CASE	WHEN (b.bettype<31) OR (b.bettype>=121 and b.bettype<1000) OR b.Bettype BETWEEN 1301 and 1399 THEN 'SB'
+	INSERT	INTO #tmpBetting(rptDate,rptDateFull,siteID,product,betcount)
+	SELECT	month(b.rptDate), b.rptDate, b.SiteID,	
+	CASE	WHEN (b.bettype<31) OR (b.bettype>=121 and b.bettype<1000 AND b.Bettype NOT IN (901,902,903)) OR b.Bettype BETWEEN 1301 and 1399 THEN 'SB'
 			WHEN bettype BETWEEN 81 AND 120 THEN 'NG'
 			WHEN bettype between 1101 and 1199 THEN 'LC'
 			WHEN bettype BETWEEN 31 AND 43 THEN 'RB'
@@ -72,18 +75,16 @@ BEGIN
 			WHEN Bettype =71 THEN 'CS'		 
 			WHEN Bettype =73 THEN 'BG'	
 			END product,
-			SUM(b.betcount) betcount,
-			c.PartyId,
-			c.ToParty
-	FROM	dbo.rpt_betting b WITH (NOLOCK) INNER JOIN @PartyChargeInfo c on b.SiteID = c.LicenseeId AND b.rptDate BETWEEN c.FromDate AND c.ToDate
+			SUM(b.betcount) betcount
+	FROM	dbo.rpt_betting b WITH (NOLOCK)
 	where 	b.SiteID !=N'' AND
 			b.rptDate BETWEEN @Fromdate AND @Todate 
 			AND b.status NOT IN (-1,103)
 			AND b.CurrencyID<>20
 			AND ISNULL(b.CustomerCategory,0) not in (27,28)
-	GROUP BY month(b.rptDate), 
-			b.SiteID, c.ToParty, c.PartyId,
-			CASE WHEN (b.bettype<31) OR (b.bettype>=121 and b.bettype<1000) OR b.Bettype BETWEEN 1301 and 1399 THEN 'SB'
+	GROUP BY month(b.rptDate),b.rptDate, 
+			b.SiteID, 
+			CASE WHEN (b.bettype<31) OR (b.Bettype>=121 AND b.Bettype<1000 AND b.Bettype NOT IN (901,902,903)) OR b.Bettype BETWEEN 1301 AND 1399 THEN 'SB'
 				WHEN bettype BETWEEN 81 AND 120 THEN 'NG'
 				WHEN bettype between 1101 and 1199 THEN 'LC'
 				WHEN bettype BETWEEN 31 AND 43 THEN 'RB'
@@ -94,8 +95,8 @@ BEGIN
 			END
 
 	--BA
-	INSERT	INTO #tmpBetting(rptDate,product,siteID,betcount, FromParty, ToParty)
-	SELECT	month(b.rptDate), 
+	INSERT	INTO #tmpBetting(rptDate,rptDateFull,product,siteID,betcount, FromParty, ToParty)
+	SELECT	month(b.rptDate), b.rptDate,
 			'BA' AS product,
 			b.SiteID,SUM(b.betcount) betcount,
 			c.PartyId,
@@ -104,42 +105,45 @@ BEGIN
 	where	b.rptDate between @Fromdate AND @Todate
 			AND b.status NOT IN (-1,103)
 			AND b.CurrencyID<>20
-	GROUP BY month(b.rptDate), b.SiteID, c.ToParty, c.PartyId
+	GROUP BY month(b.rptDate),b.rptDate, b.SiteID, c.ToParty, c.PartyId
 
 	-- AG Casino
-	INSERT	INTO #tmpBetting(rptDate, product, siteID, betcount,  FromParty, ToParty)
-	SELECT	MONTH(c.[Winlostdate]),
+	INSERT	INTO #tmpBetting(rptDate, rptDateFull,product, siteID, betcount)
+	SELECT	MONTH(c.[Winlostdate]),c.[Winlostdate],
 			'AGC' AS product,
 			ISNULL(site.SiteID,-1) siteid,
-			SUM([BetCount])  betcount,
-			ci.PartyId,
-			ci.ToParty
+			SUM([BetCount])  betcount
 	FROM	DBRPT.bodb_report.dbo.rptDepWinlost_AGCasino c WITH (NOLOCK)
 			INNER JOIN  bodb02.dbo.custInfo (NOLOCK) d ON c.custid=d.custid
 			INNER JOIN bodb02.dbo.customer ag (NOLOCK) ON  d.recommend = ag.custid AND ag.roleid = 2
 			INNER JOIN bodb02.dbo.Site ibcsite (NOLOCK) ON ag.site=ibcsite.site
-			INNER JOIN dbo.view_site_list [site] (NOLOCK) ON ibcsite.siteid=site.IbcSiteID
-			INNER JOIN @PartyChargeInfo ci on [site].SiteID = ci.LicenseeId	AND c.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
+			INNER JOIN dbo.view_site_list [site] (NOLOCK) ON ibcsite.siteid=site.IbcSiteID			
 	WHERE	c.[Winlostdate] between @Fromdate AND @Todate
 			AND c.Currency<>20
-	GROUP BY MONTH(c.[Winlostdate]), ISNULL(site.SiteID,-1), ci.ToParty, ci.PartyId
+	GROUP BY MONTH(c.[Winlostdate]), c.[Winlostdate], ISNULL(site.SiteID,-1)
 
 	--Vegas Game and Gold Deluxe
-	INSERT	INTO #tmpBetting(rptDate, product, siteID, betcount, FromParty,  ToParty)
-	SELECT	MONTH(c.Winlostdate) AS rptDate, 
+	INSERT	INTO #tmpBetting(rptDate,rptDateFull, product, siteID, betcount)
+	SELECT	MONTH(c.Winlostdate) AS rptDate, c.Winlostdate,
 			p.ProductPrefix AS product, 
 			lc.LicenseeID AS siteID, 
-			SUM(c.betcount) AS betcount, 
-			ci.PartyId,
-			ci.ToParty
+			SUM(c.betcount) AS betcount
 	FROM	bodb_LicenseeReport.dbo.rptDepWinlost_ThirdParty c WITH (NOLOCK)
 			INNER JOIN bodb02.dbo.Custinfo co WITH (NOLOCK) ON c.CustID = co.CustID	
 			INNER JOIN dbo.f_SelLicenseeCust(0) lc ON co.recommend = lc.CustID
-			LEFT JOIN bodb_licensee.dbo.LRF_f_Products3rd('VG,GD') p ON c.ProductId = p.ProductID	
-			INNER JOIN @PartyChargeInfo ci on lc.LicenseeID = ci.LicenseeId	AND c.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
+			LEFT JOIN bodb_licensee.dbo.LRF_f_Products3rd('VG,GD') p ON c.ProductId = p.ProductID				
 	WHERE	c.Winlostdate BETWEEN @FromDate AND @Todate
 			AND c.Currency <> 20
-	GROUP BY MONTH(c.Winlostdate), p.ProductPrefix, lc.LicenseeID, ci.ToParty, ci.PartyId
+	GROUP BY MONTH(c.Winlostdate), c.Winlostdate, p.ProductPrefix, lc.LicenseeID
+	---------------------------------------------------------------------------------	
+
+	UPDATE	t
+	SET		t.FromParty = c.PartyId,
+			t.ToParty = c.ToParty
+	FROM	#tmpBetting t INNER JOIN @PartyChargeInfo c ON
+			t.rptDateFull BETWEEN c.FromDate AND c.ToDate AND
+			t.product = c.ProductCode AND
+			t.siteID = c.LicenseeId	
 	---------------------------------------------------------------------------------
 
 	SELECT	CASE a.product 
