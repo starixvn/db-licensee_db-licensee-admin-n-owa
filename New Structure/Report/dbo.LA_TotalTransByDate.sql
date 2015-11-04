@@ -5,7 +5,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_TotalTransByDate]          
+ALTER PROCEDURE [dbo].[LA_TotalTransByDate_xtest]          
 	@FromDate DATETIME,
 	@ToDate DATETIME	
 AS
@@ -27,7 +27,7 @@ BEGIN
 	FROM	OAS_Party
 	WHERE	PartyType=1
 	
-	DECLARE @ProductCode VARCHAR(200) = 'SB,RB,NG,LC,VS,KN,VG,BG,BA,AGC,GD'
+	DECLARE @ProductCode VARCHAR(200) = 'SB,RB,NG,LC,VS,KN,BG,BA,AGC,VG,GD'
 	
 	DECLARE @PartyChargeInfo AS TABLE (
 			PartyId		INT,
@@ -144,6 +144,8 @@ BEGIN
 			t.rptDateFull BETWEEN c.FromDate AND c.ToDate AND
 			t.product = c.ProductCode AND
 			t.siteID = c.LicenseeId	
+	SELECT * FROM @PartyChargeInfo
+	SELECT * FROM #tmpBetting
 	---------------------------------------------------------------------------------
 
 	SELECT	CASE a.product 
@@ -175,7 +177,9 @@ BEGIN
 								INNER JOIN dbo.Resellers r WITH (NOLOCK) ON lr.ResellerID=r.ResellerID
 								WHERE r.ResellerName ='Boping'
 								) LBP ON b.SiteID = lbp.LicenseeID 
-			WHERE	b.product  in ('SB','RB','NG','VS','LC','BA','KN','AGC', 'VG', 'GD')
+			WHERE	b.product  in ('SB','RB','NG','VS','LC','BA','KN','AGC', 'VG', 'GD') AND
+					b.FromParty != NULL AND
+					b.ToParty != NULL
 			GROUP BY b.rptDate,b.product,b.siteID,v.SiteName,b.ToParty,b.FromParty,
 					CASE WHEN b.FromParty IN (25,30) THEN 'Credit' ELSE 'Deposit' END,
 					CASE WHEN b.FromParty = 25 THEN 'FDL' 
