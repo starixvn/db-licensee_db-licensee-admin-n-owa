@@ -5,7 +5,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_TotalTransByDate_xtest]          
+ALTER PROCEDURE [dbo].[LA_TotalTransByDate]          
 	@FromDate DATETIME,
 	@ToDate DATETIME	
 AS
