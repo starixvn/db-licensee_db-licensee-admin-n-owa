@@ -11,6 +11,7 @@ AS
 		- 20150923@Victor: Fix third party data summary issues (AGCS, VG, GD)
 		- 20151002@Victor: Move all Bettrade detail tickets (901,902,903) to product BT
 		- 20151021@Victor: Support AG Casino Single Wallet and include Void, Reject, Refund tickets
+		- 20151105@Victor: Summary data for Racing by bettype [Redmine: #44873]
 */
 
 BEGIN  
@@ -51,7 +52,7 @@ BEGIN
 		[rptDate]
 		,[SiteID]
 		,bt.ProductID
-		,CASE WHEN bt.ProductID IN (13,14) THEN b.[Bettype] ELSE -1 END [Bettype]
+		,CASE WHEN bt.ProductID IN (1,13,14) THEN b.[Bettype] ELSE -1 END [Bettype]
 		,[CurrencyId]
 		,Status [StatusId]
 		,ISNULL([CustomerCategory],-1)
@@ -70,7 +71,7 @@ BEGIN
 	GROUP BY [rptDate]
 			,[SiteID]
 			, bt.ProductID
-			,CASE WHEN bt.ProductID IN (13,14) THEN b.[Bettype] ELSE -1 END 
+			,CASE WHEN bt.ProductID IN (1,13,14) THEN b.[Bettype] ELSE -1 END 
 			,[CurrencyId]
 			,Status
 			,ISNULL([CustomerCategory],-1)
@@ -79,7 +80,7 @@ BEGIN
 		[rptDate]
 		,[SiteID]
 		, bt.ProductID
-		,CASE WHEN bt.ProductID IN (13,14) THEN b.[Bettype] ELSE -1 END [Bettype]
+		,CASE WHEN bt.ProductID IN (1,13,14) THEN b.[Bettype] ELSE -1 END [Bettype]
 		,[CurrencyId]
 		,Status [StatusId]
 		,ISNULL([CustomerCategory],-1)
@@ -98,7 +99,7 @@ BEGIN
 	GROUP BY [rptDate]
 			,[SiteID]
 			, bt.ProductID
-			,CASE WHEN bt.ProductID IN (13,14) THEN b.[Bettype] ELSE -1 END 
+			,CASE WHEN bt.ProductID IN (1,13,14) THEN b.[Bettype] ELSE -1 END 
 			,[CurrencyId]
 			,Status
 			,ISNULL([CustomerCategory],-1)
