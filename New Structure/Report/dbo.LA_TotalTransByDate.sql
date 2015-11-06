@@ -27,7 +27,7 @@ BEGIN
 	FROM	OAS_Party
 	WHERE	PartyType=1
 	
-	DECLARE @ProductCode VARCHAR(200) = 'SB,RB,NG,LC,VS,KN,BG,BA,AGC,VG,GD'
+	DECLARE @ProductCode VARCHAR(200) = 'SB,RB,NG,LC,VS,KN,VG,BG,BA,AGC,GD'
 	
 	DECLARE @PartyChargeInfo AS TABLE (
 			PartyId		INT,
@@ -95,17 +95,15 @@ BEGIN
 			END
 
 	--BA
-	INSERT	INTO #tmpBetting(rptDate,rptDateFull,product,siteID,betcount, FromParty, ToParty)
+	INSERT	INTO #tmpBetting(rptDate,rptDateFull,product,siteID,betcount)
 	SELECT	month(b.rptDate), b.rptDate,
 			'BA' AS product,
-			b.SiteID,SUM(b.betcount) betcount,
-			c.PartyId,
-			c.ToParty
-	FROM	dbo.rpt_Betting_BA b WITH (NOLOCK) INNER JOIN @PartyChargeInfo c on b.SiteID = c.LicenseeId AND b.rptDate BETWEEN c.FromDate AND c.ToDate
+			b.SiteID,SUM(b.betcount) betcount
+	FROM	dbo.rpt_Betting_BA b WITH (NOLOCK) 
 	where	b.rptDate between @Fromdate AND @Todate
 			AND b.status NOT IN (-1,103)
 			AND b.CurrencyID<>20
-	GROUP BY month(b.rptDate),b.rptDate, b.SiteID, c.ToParty, c.PartyId
+	GROUP BY month(b.rptDate),b.rptDate, b.SiteID
 
 	-- AG Casino
 	INSERT	INTO #tmpBetting(rptDate, rptDateFull,product, siteID, betcount)
@@ -144,8 +142,6 @@ BEGIN
 			t.rptDateFull BETWEEN c.FromDate AND c.ToDate AND
 			t.product = c.ProductCode AND
 			t.siteID = c.LicenseeId	
-	SELECT * FROM @PartyChargeInfo
-	SELECT * FROM #tmpBetting
 	---------------------------------------------------------------------------------
 
 	SELECT	CASE a.product 
@@ -177,9 +173,7 @@ BEGIN
 								INNER JOIN dbo.Resellers r WITH (NOLOCK) ON lr.ResellerID=r.ResellerID
 								WHERE r.ResellerName ='Boping'
 								) LBP ON b.SiteID = lbp.LicenseeID 
-			WHERE	b.product  in ('SB','RB','NG','VS','LC','BA','KN','AGC', 'VG', 'GD') AND
-					b.FromParty != NULL AND
-					b.ToParty != NULL
+			WHERE	b.product  in ('SB','RB','NG','VS','LC','BA','KN','AGC', 'VG', 'GD')
 			GROUP BY b.rptDate,b.product,b.siteID,v.SiteName,b.ToParty,b.FromParty,
 					CASE WHEN b.FromParty IN (25,30) THEN 'Credit' ELSE 'Deposit' END,
 					CASE WHEN b.FromParty = 25 THEN 'FDL' 
