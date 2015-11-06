@@ -45,10 +45,10 @@ BEGIN
 						AmtDueToBA MONEY, AmtDueToRB MONEY, CommBA MONEY, CommRB MONEY, Company MONEY, Betcount BIGINT)							
 	CREATE TABLE #Exchange (ExchangeId INT, ExchangeDate DATE, Code VARCHAR(20), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, CNY FLOAT, Base FLOAT)
 	CREATE TABLE #Data (rptDate DATE, PartyID INT, ProductID INT, Currency INT,BetTypeId INT, Turnover MONEY, Winloss MONEY, AWinloss MONEY, AComm MONEY, Betcount BIGINT)
-	CREATE TABLE #Products(ProductID INT, ProductName VARCHAR(20))
+	CREATE TABLE #Products(ProductID INT, ProductName VARCHAR(50))
 	CREATE TABLE #ChargeInfo (PartyID INT, LicenseeID INT, ProductID INT, BetTypeID INT, Rate MONEY, Fromdate DATE , Todate DATE)
 	
-	DECLARE @VNDCurrencyName VARCHAR(20), @site VARCHAR(50)
+	DECLARE @VNDCurrencyName VARCHAR(20)
 
 	SELECT @VNDCurrencyName = currency
 	FROM dbo.Exchange (NOLOCK)
