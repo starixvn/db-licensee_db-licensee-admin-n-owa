@@ -151,9 +151,9 @@ BEGIN
 	BEGIN
 		DELETE #Data
 		
-		INSERT INTO #Data(rptDate, PartyID, ProductID, Currency, BetTypeId, Turnover, Winloss, AWinloss, AComm, Betcount)
+		INSERT INTO #Data(rptDate, PartyID, ProductID, Currency, Turnover, Winloss, AWinloss, AComm, Betcount)
 		(
-			SELECT b.rptDate, ci.PartyID, b.ProductID, b.currencyID, ci.BetTypeId
+			SELECT b.rptDate, ci.PartyID, b.ProductID, b.currencyID
 				, SUM(b.turnover * 
 					CASE WHEN b.bettype = 33 AND b.StatusId IN (114, 115) THEN 0.5 ELSE 1 END * 
 					CASE WHEN @drawfilter IN (2, 3)	
@@ -166,13 +166,13 @@ BEGIN
 				, SUM(b.CommissionA)
 				, SUM(b.betcount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) BetCount
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND ci.BetTypeId = b.Bettype AND b.ProductID = ci.ProductID
+				INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
 			WHERE b.rptDate BETWEEN @Fromdate AND @Todate
 				AND b.ProductID = 1
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
 				AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
-			GROUP BY ci.PartyID, b.rptDate, b.ProductID, currencyID, ci.BetTypeId
+			GROUP BY ci.PartyID, b.rptDate, b.ProductID, currencyID
 		)
 		
 		INSERT INTO #Report (PartyID, ReportDate, CurrencyID, Turnover, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Company, Betcount)
@@ -190,7 +190,7 @@ BEGIN
 				, SUM(b.betcount) AS betcount
 			FROM #Data b
 				INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, BetTypeId, Rate FROM @ChargeInfo WHERE ProductID = 1) ci 
-				ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID AND ci.BetTypeId = b.BetTypeId			
+				ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID		
 			WHERE b.rptDate BETWEEN ci.Fromdate AND ci.Todate
 			GROUP BY ci.PartyID, b.rptDate, b.Currency
 		)
