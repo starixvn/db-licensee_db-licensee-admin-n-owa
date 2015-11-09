@@ -584,4 +584,4 @@ BEGIN
 END
 
 GO
-GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceAmountGenerate_xtest] TO bodbAdminNet
+GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceAmountGenerate] TO bodbAdminNet
