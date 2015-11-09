@@ -1,6 +1,6 @@
 USE [bodb_Licensee]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Inv_InvoiceAmountGenerate]   Script Date: 07/20/2015 09:12:41 ******/
+
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -27,6 +27,7 @@ AS
 	Revisions: 
 		+ 2015.08.06 @Bravo.Tran: Invoice Amount - Generate
 		+ 2015.09.22 @Bravo.Tran: Invoice Amount - Fix bug wrong Total amount under Discount.
+		+ 2015.11.09 @Bravo.Tran: Invoice Amount - Enhance prorate min fee.
 */
 /*	Example:
 	USE bodb_Licensee
