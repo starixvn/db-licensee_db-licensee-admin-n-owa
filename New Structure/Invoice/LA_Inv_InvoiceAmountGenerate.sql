@@ -1,6 +1,5 @@
 USE [bodb_Licensee]
 GO
-
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -391,7 +390,7 @@ BEGIN
 												WHERE	f.FeeType = 2
 														AND amf.PartyId = f.PartyId
 														AND amf.ProductId = f.ProductId), 0), 2),
-			amf.WaivedAmount =  ISNULL((SELECT	SUM(f.WaivedAmount)							
+			amf.WaivedAmount =  ISNULL((SELECT	CASE WHEN SUM(f.WaivedAmount) < 0 THEN 0 ELSE SUM(f.WaivedAmount) END
 										FROM	@MinFeeGroup f
 										WHERE	f.FeeType = 2
 												AND amf.PartyId = f.PartyId
@@ -585,4 +584,4 @@ BEGIN
 END
 
 GO
-GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceAmountGenerate] TO bodbAdminNet
+GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceAmountGenerate_xtest] TO bodbAdminNet
