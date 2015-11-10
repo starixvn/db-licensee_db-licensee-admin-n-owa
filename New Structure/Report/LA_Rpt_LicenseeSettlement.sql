@@ -1,11 +1,10 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_LicenseeSettlement]    Script Date: 23/03/2015 10:41:55 AM ******/
+
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-/****** Object:  Stored Procedure dbo.LA_Rpt_LicenseeSettlement    Script Date: 19/03/2015 14:00:56 PM ******/
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeSettlement] 
 	  @PartyId				INT
@@ -82,7 +81,37 @@ BEGIN
 	FROM @tmpParty
 	
 	IF @LicenseeID IS NULL
+	BEGIN
+		SELECT TOP 0  					
+		''							AS Game									   
+		, @ToDate					AS WinLostDate
+		, 0							AS CurrencyId
+		, ''						AS CurrencyName
+		, CAST(0 AS MONEY)			AS Betcount
+		--orginal
+		, CAST(0 AS MONEY)			AS Turnover
+		, CAST(0 AS MONEY)			AS ActualStake
+		, CAST(0 AS MONEY)			AS BuyBackAmount
+		, CAST(0 AS MONEY)			AS MemberWinLoss		
+		, CAST(0 AS MONEY)			AS MemberComm
+		, CAST(0 AS MONEY)			AS BettradeComm
+		, CAST(0 AS MONEY)			AS LicenseeWL		
+		, CAST(0 AS MONEY)			AS LicenseeComm		
+		, CAST(0 AS MONEY)			AS Company
+		
+		--Base on currency
+		, CAST(0 AS MONEY)			AS TurnoverBase
+		, CAST(0 AS MONEY)			AS ActualStakeBase
+		, CAST(0 AS MONEY)			AS BuyBackAmountBase
+		, CAST(0 AS MONEY)			AS BettradeCommBase
+		, CAST(0 AS MONEY)			AS MemberWinLossBase
+		, CAST(0 AS MONEY)			AS MemberCommBase	
+		, CAST(0 AS MONEY)			AS LicenseeWLBase
+		, CAST(0 AS MONEY)			AS LicenseeCommBase			
+		, CAST(0 AS MONEY)			AS CompanyBase
+
 		RETURN
+	END
 
 	DECLARE @Recommend VARCHAR(8000) = '', @SQL VARCHAR(8000) = ''
 	CREATE TABLE #DataWinloss3rd (Recommend	INT, Winlostdate DATETIME, SportType INT, Currency INT, TurnOver MONEY, TotalTrans INT, Winloss MONEY)
