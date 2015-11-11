@@ -14,7 +14,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_BettradeWinloss]
 	, @CurrencyId			INT				= 0
 	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
 	, @DrawFilter			SMALLINT		= 1
-	, @ExcludeTest			BIT				= 0
+	, @ExcludeTest			BIT				= 1
 WITH RECOMPILE
 AS
 /*  Created: 20150825@Florent		
