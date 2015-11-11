@@ -1,12 +1,12 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_BettradeWinloss]    Script Date: 10/09/2015 16:06:32 PM ******/
+
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-CREATE PROCEDURE [dbo].[LA_Rpt_BettradeWinloss] 
+ALTER PROCEDURE [dbo].[LA_Rpt_BettradeWinloss] 
 	  @PartyIds				VARCHAR(1000)
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME	
@@ -19,7 +19,7 @@ WITH RECOMPILE
 AS
 /*  Created: 20150825@Florent		
 	Task : Report - Bettrade Winloss
-	DB: DB052.bodb02
+	DB: DBEXT/bodb02
 	Revisions:  			
 	Param's Explanation:  						
 */  
@@ -52,10 +52,15 @@ BEGIN
 
 	INSERT INTO @tmpParty(PartyId, ParentId, LicenseeId, ProductID, Rate, Fromdate, Todate)
 	(
-		SELECT DISTINCT PartyID, ci.FromParty, LicenseeID, a.ProductID, ci.Rate, a.Fromdate, a.Todate
+		SELECT DISTINCT PartyID, ci.FromParty, LicenseeID, a.ProductID, ci.Rate, 
+			CASE WHEN a.FromDate >= ci.FromDate THEN a.FromDate ELSE ci.FromDate END AS FromDate,
+			CASE WHEN a.ToDate < ci.ToDate THEN a.ToDate ELSE ci.ToDate END AS ToDate
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo_xtest(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', @ExcludeTest) a
 			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo c WITH (NOLOCK) ON a.ChargeID = c.ChargeID
-			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ToParty = ci.FromParty AND a.ProductID = ci.ProductID
+			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) 
+				ON c.ToParty = ci.FromParty AND a.ProductID = ci.ProductID
+					AND ((ci.FromDate BETWEEN a.FromDate AND a.ToDate) OR (ci.ToDate BETWEEN a.FromDate AND a.ToDate) OR (ci.FromDate<a.FromDate AND a.ToDate < ci.ToDate))
+				
 	)
 	--hardcode get bettype of SB, BA
 	INSERT INTO #Bettype(Bettype, ProductID)
