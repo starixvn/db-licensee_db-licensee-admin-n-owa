@@ -1,13 +1,13 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_3rdPartyProductWinloss]    Script Date: 05/06/2015 09:50:08 AM ******/
+
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_3rdPartyProductWinloss] 
-	  @PartyId				VARCHAR(500)
+	  @PartyId				VARCHAR(1000)
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME
 	, @ProductCode			VARCHAR(6)
@@ -22,6 +22,7 @@ AS
 	DB: DB052.bodb02
 	Revisions:  			
 		- 20150714@Florent: support credit licensee
+		- 20150722@Florent: fix bug NoDraw filter
 	Param's Explanation:  				
 		+ @ProductCode:	+ 'GD'	Gold Deluxe
 */  
