@@ -18,6 +18,7 @@ AS
 	 - 20141225@Winnie:  include AGCasino
 	 - 20150706@Florent: Add Vegas Games, Gold Deluxe
 	 - 20151028@Bravo:	 Exclude trial data
+	 - 20151112@Bravo:	 Fix bug missing BA data.
 	 Params:			   
 */
 BEGIN
@@ -48,10 +49,6 @@ BEGIN
 	UPDATE	c
 	SET		ProductCode = CASE WHEN c.ProductID = 0 THEN 'SB' ELSE p.ProductPrefix END
 	FROM	@PartyChargeInfo c LEFT JOIN Product3rd p ON c.ProductID = p.Productid
-		
-	DECLARE @TempPartyList TABLE (PartyId INT, PartyName VARCHAR(200), BrandName VARCHAR(200), ParentId INT)
-	INSERT INTO @TempPartyList
-	EXEC dbo.LA_PartyListSel
 	
 	UPDATE  c
 	SET		c.ToParty = ci.ToParty
@@ -162,7 +159,7 @@ BEGIN
 					CASE WHEN b.FromParty = 25 THEN 'FDL' 
 						 WHEN b.FromParty = 30 THEN 'PIH' 
 						 WHEN b.ToParty = 11 then 'Boping'
-						 WHEN b.ToParty = 1 THEN 'OW'
+						 WHEN b.ToParty IN (1,13) THEN 'OW'
 						 WHEN b.ToParty = 98 THEN 'Zelianta'						 
 						 ELSE '' END				
 					resellerName
@@ -179,7 +176,7 @@ BEGIN
 					CASE WHEN b.FromParty = 25 THEN 'FDL' 
 						 WHEN b.FromParty = 30 THEN 'PIH' 
 						 WHEN b.ToParty = 11 then 'Boping'
-						 WHEN b.ToParty = 1 THEN 'OW'	
+						 WHEN b.ToParty IN (1,13) THEN 'OW'	
 						 WHEN b.ToParty = 98 THEN 'Zelianta'					 
 						 ELSE '' END
 		) A LEFT JOIN dbo.Product3rd p on a.product=p.ProductPrefix
