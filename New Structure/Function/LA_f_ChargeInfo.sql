@@ -1,6 +1,6 @@
 USE [bodb_licensee]
 GO
-/****** Object:  UserDefinedFunction [dbo].[LA_f_ChargeInfo]    Script Date: 01/12/2014 14:31:41 PM ******/
+
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -31,7 +31,7 @@ RETURNS @tbChargeInfo TABLE (
 AS
 /*  Created: 20141111@Florent  
     Task : Get Charge Information
-    DB: DB052/bodb_Licensee  
+    DB: DBLIC/bodb_Licensee  
     Param's Explanation:   
 		- 20150710@Florent: support product MicroGaming with multi charge rate
 		- 20150825@Florent: change fiter ChargeType = 1 to ChargeType != 2 (support new ChargeType 5)
@@ -69,7 +69,7 @@ BEGIN
 		, cte.AffectedDate
 		, DI.ProductID
 		, CASE WHEN DI.Rate = 0 THEN ISNULL(OW.Rate,0) ELSE DI.Rate END AS DI_Rate	
-		, ow.Rate	 AS OW_Rate  -- not use now
+		, ISNULL(ow.Rate, 0)	 AS OW_Rate  -- not use now
 		, 0	 AS PNR_Rate -- not use now
 		, CASE 
 		 	WHEN @FromDate <= DI.FromDate 
