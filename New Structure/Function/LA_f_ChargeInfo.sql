@@ -328,4 +328,5 @@ END
 
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_f_ChargeInfo] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_f_ChargeInfo] TO bodbAdminNet 
+GO
+GRANT SELECT ON [dbo].[LA_f_ChargeInfo] TO bodbAdminNet 
