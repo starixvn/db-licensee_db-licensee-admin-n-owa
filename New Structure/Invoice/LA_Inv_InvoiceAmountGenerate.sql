@@ -394,17 +394,18 @@ BEGIN
 										FROM	@MinFeeGroup f
 										WHERE	f.FeeType = 2
 												AND amf.PartyId = f.PartyId
-												AND amf.ProductId = f.ProductId), 0),
-			amf.TotalAmount  =  ISNULL((SELECT	SUM(td.AmountToCompany)							
+												AND amf.ProductId = f.ProductId), 0),			
+			amf.MinFeeAmount =  ISNULL((SELECT	SUM(td.AmountToCompany)							
 										FROM	#TempData td 
 										WHERE	amf.PartyId = td.PartyId
-												AND amf.ProductId = td.ProductId), 0)
+												AND td.rptDate BETWEEN amf.FromDate AND amf.ToDate
+												AND amf.ProductId = td.ProductId), 0)												
 	FROM	@MinFeeGroup amf
 	WHERE	amf.FeeType = 1
 	
 	--- sum min fee amount
 	UPDATE	amf
-	SET		amf.MinFeeAmount =  amf.TotalAmount - amf.WaivedAmount
+	SET		amf.TotalAmount =  amf.MinFeeAmount + amf.WaivedAmount
 	FROM	@MinFeeGroup amf
 	WHERE	amf.FeeType = 1
 	
@@ -427,7 +428,7 @@ BEGIN
 													AND FeeType = 1
 													AND mf.ProductId = t.ProductId), 0)
 	FROM	@TotalMinFees t
-	
+			
 	--- calculate amount to company
 	UPDATE	amf
 	SET		amf.AmountToCompany =	CASE 
