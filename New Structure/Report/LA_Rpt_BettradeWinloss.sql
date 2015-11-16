@@ -55,7 +55,7 @@ BEGIN
 		SELECT DISTINCT PartyID, ci.FromParty, LicenseeID, a.ProductID, ci.Rate, 
 			CASE WHEN a.FromDate >= ci.FromDate THEN a.FromDate ELSE ci.FromDate END AS FromDate,
 			CASE WHEN a.ToDate < ci.ToDate THEN a.ToDate ELSE ci.ToDate END AS ToDate
-		FROM bodb_licensee.dbo.LA_f_ChargeInfo_xtest(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', @ExcludeTest) a
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', @ExcludeTest) a
 			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo c WITH (NOLOCK) ON a.ChargeID = c.ChargeID
 			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) 
 				ON c.ToParty = ci.FromParty AND a.ProductID = ci.ProductID
