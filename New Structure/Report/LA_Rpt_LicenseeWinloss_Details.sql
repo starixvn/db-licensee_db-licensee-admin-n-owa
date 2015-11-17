@@ -271,7 +271,7 @@ BEGIN
 						ELSE 1 
 					 END)
 	END
-	ELSE IF @IsConvert = 0 AND @Currency <> 0
+	ELSE IF @IsConvert = 0
 	BEGIN
 		UPDATE #Exchange
 		SET Base = 1
