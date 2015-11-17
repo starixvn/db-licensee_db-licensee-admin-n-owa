@@ -11,10 +11,11 @@ AS
 /*  Created: 20150318@Florent	
 	Task : Report - Licensee Settlement Report
 	Base on : IMS_LicenseeBillingInfoSel
-	DB: DBLIC.bodb_Licensee
+	DB: DBLIC/bodb_Licensee
 	Revisions:  
 		- 201505628@Florent: implement code
 		- 20150917@Victor: Support Chinese on Settings
+		- 20151109@Victor: Support Billing information of all Charge Types [Redmine: #41032]
 	Param's Explanation:  
 */  
 BEGIN
@@ -32,7 +33,6 @@ BEGIN
 								INNER JOIN dbo.LA_ChargeInfo_SystemMapping csm WITH (NOLOCK) ON c.ChargeID = csm.ChargeID AND csm.SystemID = 2
 								INNER JOIN (SELECT ProductPrefix, ProductID FROM dbo.LA_f_Products3rd(@ProductCode)) pp ON c.ProductID = pp.ProductID
 							WHERE c.FromParty = @PartyId
-								AND c.ChargeType = 1
 							GROUP BY c.FromParty, c.ProductID) t ON ci.FromDate = t.FromDate AND ci.FromParty = t.FromParty AND ci.ProductID = t.ProductID
 		LEFT JOIN (SELECT FromDate, ToDate, PartyId, ProductId, MinFeeTerm
 					FROM dbo.LA_MinFee  WITH (NOLOCK) 
@@ -41,7 +41,6 @@ BEGIN
 					AND FeeTypeId = 1
 					AND PartyId = @PartyId) m ON ci.FromParty = m.PartyId AND ci.ProductID = m.ProductId 
 	WHERE ci.FromParty = @PartyId	
-		AND ci.ChargeType = 1		
 
 	SELECT  ISNULL(@FirstBilling, '')		AS FirstBilling
 			, ISNULL(@BasisOfBilling, '')	AS BasisOfBilling
