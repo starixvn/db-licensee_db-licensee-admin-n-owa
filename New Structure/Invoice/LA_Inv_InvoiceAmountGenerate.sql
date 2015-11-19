@@ -195,6 +195,7 @@ BEGIN
 	
 	DELETE	FROM @MinFeeGroup
 	WHERE	ProductID NOT IN (SELECT ProductId FROM @MinFeeGroup WHERE [@MinFeeGroup].PartyId = @PartyId)	
+			OR (FeeType = 2 AND (FromDate > ToDate))
 	-- End region
 	
 	-- Region: Get discount group info
@@ -326,7 +327,8 @@ BEGIN
 			WinLoss			MONEY, 
 			AComm			MONEY, 
 			ProductId		TINYINT, 
-			AmountToCompany MONEY)
+			AmountToCompany MONEY,
+			IsApplyMinFee	BIT)
 	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,WinLoss,AComm,ProductId)
 	(
 	    SELECT	b.SiteID,
@@ -358,6 +360,14 @@ BEGIN
 	FROM	#TempData td 
 			INNER JOIN @PartyChargeInfo p ON td.LicenseeId = p.LicenseeId AND td.ProductId = p.ProductID AND td.rptDate BETWEEN p.FromDate AND p.ToDate
 			INNER JOIN #Exchange e ON td.rptDate = e.ExchangeDate AND td.CurrencyId = e.ExchangeID	
+	
+	
+	UPDATE  t
+	SET		t.IsApplyMinFee = 0
+	FROM	#TempData t INNER JOIN @MinFeeGroup m ON t.rptDate BETWEEN m.FromDate AND m.ToDate
+			AND t.ProductId = m.ProductId
+			AND t.PartyId = m.PartyId
+	WHERE	m.FeeType=2
 	-- End region	
 	
 	-- Region: Check min fee group			
@@ -373,7 +383,7 @@ BEGIN
 	WHERE	FeeType = 2
 	
 	--- sum amount under waived	
-	UPDATE	amf
+	UPDATE	amf	
 	SET		amf.WaivedAmount = ISNULL((	SELECT	SUM(td.AmountToCompany)							
 										FROM	#TempData td 
 										WHERE	amf.PartyId = td.PartyId
@@ -381,7 +391,7 @@ BEGIN
 												AND td.rptDate BETWEEN amf.FromDate AND amf.ToDate), 0)
 	FROM	@MinFeeGroup amf
 	WHERE	amf.FeeType = 2
-	
+			
 	--- calculate min fee prorate (fee amount in month - waived amount (*)
 	UPDATE	amf
 	SET		amf.MinFeeProrate = ROUND((	amf.FeeAmount / @DaysInMonth) * (DATEDIFF(DAY, FromDate, ToDate) + 1) - 
@@ -394,15 +404,15 @@ BEGIN
 										FROM	@MinFeeGroup f
 										WHERE	f.FeeType = 2
 												AND amf.PartyId = f.PartyId
-												AND amf.ProductId = f.ProductId), 0),			
+												AND amf.ProductId = f.ProductId), 0),	
 			amf.MinFeeAmount =  ISNULL((SELECT	SUM(td.AmountToCompany)							
 										FROM	#TempData td 
 										WHERE	amf.PartyId = td.PartyId
 												AND td.rptDate BETWEEN amf.FromDate AND amf.ToDate
-												AND amf.ProductId = td.ProductId), 0)												
+												AND td.IsApplyMinFee IS NULL
+												AND amf.ProductId = td.ProductId), 0)
 	FROM	@MinFeeGroup amf
 	WHERE	amf.FeeType = 1
-	
 	--- sum min fee amount
 	UPDATE	amf
 	SET		amf.TotalAmount =  amf.MinFeeAmount + amf.WaivedAmount
