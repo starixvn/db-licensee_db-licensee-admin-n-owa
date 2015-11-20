@@ -10,7 +10,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_MicrogamingWinloss]
 	  @PartyId				VARCHAR(1000)
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME	
-	, @ProductCode			VARCHAR(6)		= 'MGC'
+	, @ProductCode			VARCHAR(6)		= 'MGCLC'
 	, @CurrencyId			INT				= 0
 	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
 	, @DrawFilter			SMALLINT		= 1
