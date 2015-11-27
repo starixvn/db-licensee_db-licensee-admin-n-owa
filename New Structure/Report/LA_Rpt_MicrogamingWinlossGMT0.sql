@@ -174,7 +174,7 @@ BEGIN
 	UPDATE r SET r.AmountDueToProduct = g.AmountDueTo FROM #Result r
 	LEFT JOIN #AmountDueToMicrogaming g ON r.ParentId = g.ParentID AND r.BettypeRef = g.BettypeRef
 	
-	SELECT re.BettypeRef AS GameTypeId, re.GameTypeName, re.PartyId, re.PartyName, re.ProductId, pr.ProductName, re.CurrencyId, ex.Code,
+	SELECT re.BettypeRef AS GameTypeId, re.GameTypeName, re.PartyId, re.PartyName, re.ProductId, pr.ProductName, re.CurrencyId, ex.Code AS CurrencyName,
 		SUM(re.TotalTrans) AS TotalTrans,
 		SUM(re.Turnover) AS Turnover,
 		SUM(re.CustomerWinLoss) AS CustomerWinLoss,
