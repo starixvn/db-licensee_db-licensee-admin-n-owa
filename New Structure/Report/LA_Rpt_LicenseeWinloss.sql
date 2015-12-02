@@ -52,9 +52,8 @@ BEGIN
 	SELECT DISTINCT PartyID, LicenseeID, ProductID, Bettype, DI_Rate, Fromdate, Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', @excludeTest)
 	
-	DECLARE @ChargeRateCount INT = (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID NOT IN (1, 3, 14))
-
-	IF CHARINDEX('BA', @ProductCodes) <> 0
+	/* BA Product Id = 3 */
+	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = 3) > 0
 	BEGIN
 		INSERT INTO #Data(rptDate, PartyID, ProductID, Currency, Turnover, Winloss, AWinloss, AComm, Betcount)
 		(
@@ -99,7 +98,8 @@ BEGIN
 		)
 	END
 	
-	IF CHARINDEX('MGC', @ProductCodes) <> 0
+	/* Microgaming Live Casino Product Id = 14 */
+	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = 14) > 0
 	BEGIN
 		DELETE #Data
 		
@@ -147,7 +147,8 @@ BEGIN
 		)
 	END
 	
-	IF CHARINDEX('RB', @ProductCodes) <> 0
+	/* Racing Product Id = 1 */
+	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = 1) > 0
 	BEGIN
 		DELETE #Data
 		
@@ -196,7 +197,7 @@ BEGIN
 		)
 	END
 
-	IF @ChargeRateCount > 0
+	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID NOT IN (1, 3, 14)) > 0
 	BEGIN
 		DELETE #Data
 		

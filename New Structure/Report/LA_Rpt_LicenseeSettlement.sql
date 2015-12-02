@@ -35,6 +35,10 @@ AS
 	*/  
 SET NOCOUNT ON
 BEGIN			
+	DECLARE @ProductPrefix TABLE (ProductCode VARCHAR(20))
+	INSERT INTO @ProductPrefix
+	SELECT val FROM bodb02.dbo.Lrf_f_StringSplit(@ProductCode, ',')
+	
 	DECLARE @LicenseeID INT	
 		, @DrawFilter SMALLINT = 1
 	CREATE TABLE #Result (
@@ -120,7 +124,7 @@ BEGIN
 	-- Product <> BA
 	IF (REPLACE(@ProductCode, 'BA', '') != '' AND REPLACE(@ProductCode, 'BA', '') != ',')
 	BEGIN
-		IF CHARINDEX('AGC', @ProductCode) <> 0 -- AG Casino
+		IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode = 'AGC') -- AG Casino
 		BEGIN
 			-- reset 
 			DELETE @TempAG		
@@ -174,7 +178,7 @@ BEGIN
 				GROUP BY b.Winlostdate, CurrencyID 
 			)			
 		END
-		IF (CHARINDEX('GD', @ProductCode) <> 0 OR CHARINDEX('VG', @ProductCode) <> 0)-- GD, VG
+		IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode IN ('GD','VG')) -- GD, VG
 		BEGIN
 			-- reset 
 			DELETE @TempAG		
@@ -221,7 +225,7 @@ BEGIN
 				GROUP BY b.Winlostdate, CurrencyID 
 			)			
 		END
-		IF (CHARINDEX('MGC', @ProductCode) <> 0 )-- MGC
+		IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode = 'MGCLC') 
 		BEGIN
 			-- product 3rd sub name
 			CREATE TABLE #Product3rdSubName (Bettype INT, BettypeRef INT, ProductName VARCHAR(100))
@@ -276,7 +280,7 @@ BEGIN
 			
 			DROP TABLE #Product3rdSubName			
 		END
-		IF (CHARINDEX('BT', @ProductCode) <> 0 )-- Bettrade
+		IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode = 'BT')--BetTrade
 		BEGIN					
 			-- add more bettype for SB, BA
 			INSERT INTO @Bettype (Bettype, ProductId)
@@ -380,7 +384,7 @@ BEGIN
 	END	
 
 	-- Product = BA
-	IF CHARINDEX('BA', @ProductCode) <> 0
+	IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode = 'BA')
 	BEGIN
 		SET @DrawFilter = 2 -- set case No Darw
 		INSERT INTO #Result( Winlostdate, CurrencyId, TurnOver, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)

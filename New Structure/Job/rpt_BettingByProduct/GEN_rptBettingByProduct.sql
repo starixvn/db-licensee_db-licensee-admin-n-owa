@@ -1,3 +1,5 @@
+use bodb_LicenseeReport
+go
 ALTER PROCEDURE [dbo].[GEN_rptBettingByProduct] (
 	@date DATE,
 	@date2 DATE = NULL
@@ -12,6 +14,7 @@ AS
 		- 20151002@Victor: Move all Bettrade detail tickets (901,902,903) to product BT
 		- 20151021@Victor: Support AG Casino Single Wallet and include Void, Reject, Refund tickets
 		- 20151105@Victor: Summary data for Racing by bettype [Redmine: #44873]
+		- 20151201@Bravo: Change Product code: MGC -> MGCLC
 */
 
 BEGIN  
@@ -26,7 +29,7 @@ BEGIN
 	
 	INSERT INTO #BettypeProductMapping (Bettype, ProductID)
 	SELECT Bettype, ProductId 
-	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB,NG,VS,RB,LC,CS,KN,BG,AGC,MGC,BT')
+	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB,NG,VS,RB,LC,CS,KN,BG,AGC,MGCLC,BT')
 
 	INSERT INTO #BettypeProductMappingBA (Bettype, ProductID)
 	SELECT Bettype, ProductId 

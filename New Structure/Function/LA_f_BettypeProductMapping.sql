@@ -23,6 +23,7 @@ AS
 		- 20150714@Florent: Add product Gold Deluxe
 		- 20150820@Florent: Add Bettrade and remove bettypes 901, 902, 903 in SB, BA
 		- 20151012@Victor: Add product AG Casino Single Wallet
+		- 20151201@Bravo: Change Product code: MGC -> MGCLC
     Param's Explanation:   
 
 */
@@ -121,12 +122,12 @@ BEGIN
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 	
-	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'MGC')
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'MGCLC')
     BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 14
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
-	   WHERE typeid BETWEEN 2001 AND 2009
+	   WHERE typeid BETWEEN 2001 AND 2007
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
