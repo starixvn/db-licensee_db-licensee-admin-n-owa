@@ -1,3 +1,5 @@
+use bodb_LicenseeReport
+go
 ALTER PROCEDURE [dbo].[GEN_rptBettingByProduct] (
 	@date DATE,
 	@date2 DATE = NULL

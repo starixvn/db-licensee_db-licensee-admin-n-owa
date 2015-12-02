@@ -6,7 +6,7 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_MicrogamingWinlossGMT0] 
-	  @PartyId				VARCHAR(1000)
+	  @PartyIds				VARCHAR(1000)
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME	
 	, @ProductCode			VARCHAR(6)		= 'MGCLC'
