@@ -178,7 +178,7 @@ BEGIN
 				GROUP BY b.Winlostdate, CurrencyID 
 			)			
 		END
-		IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode IN ('GD','VG')) -- GD, VG
+		ELSE IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode IN ('GD','VG')) -- GD, VG
 		BEGIN
 			-- reset 
 			DELETE @TempAG		
@@ -225,7 +225,7 @@ BEGIN
 				GROUP BY b.Winlostdate, CurrencyID 
 			)			
 		END
-		IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode = 'MGCLC') 
+		ELSE IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode IN ('MGCLC','MGCRNG')) 
 		BEGIN
 			-- product 3rd sub name
 			CREATE TABLE #Product3rdSubName (Bettype INT, BettypeRef INT, ProductName VARCHAR(100))
@@ -233,20 +233,39 @@ BEGIN
 			SELECT s.Bettype, p.BettypeRef, p.ProductName 			
 			FROM bodb_licensee.dbo.Sport_Bettype_Reference s WITH (NOLOCK)
 					LEFT JOIN bodb_licensee.dbo.LA_Product3rdSub p WITH (NOLOCK) ON s.BettypeRef = p.BettypeRef
-
-			UPDATE #Product3rdSubName
-			SET ProductName = 'Generic Games'
-			WHERE BettypeRef = 2001
-			UPDATE #Product3rdSubName
-			SET ProductName = 'Branded Games'
-			WHERE BettypeRef = 2005
+						
+			IF @ProductCode = 'MGCLC'
+			BEGIN
+				DELETE FROM #Product3rdSubName WHERE Bettype IN (2008,2009)
+				DELETE FROM @tmpParty WHERE Bettype IN (2008,2009)
+				
+				UPDATE #Product3rdSubName
+				SET ProductName = 'Live Casino - Generic Games'
+				WHERE BettypeRef = 2001
+				UPDATE #Product3rdSubName
+				SET ProductName = 'Live Casino - Branded Games'
+				WHERE BettypeRef = 2005
+			END
+			ELSE
+			BEGIN
+				DELETE FROM #Product3rdSubName WHERE Bettype NOT IN (2008,2009)
+				DELETE FROM @tmpParty WHERE Bettype NOT IN (2008,2009)
+				
+				UPDATE #Product3rdSubName
+				SET ProductName = 'RNG Casino - Generic Games'
+				WHERE BettypeRef = 2001
+				UPDATE #Product3rdSubName
+				SET ProductName = 'RNG Casino - Branded Games'
+				WHERE BettypeRef = 2005
+			END			
+						
 			-- product 3rd sub name
 			INSERT INTO #Result( Winlostdate, CurrencyId, Game, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
 			(
 				SELECT   			   
 					rptDate     
 					, CurrencyID	
-					, ps.ProductName AS Game
+					, ps.ProductName AS Game					
 					, SUM(Turnover) AS turnover
 					, SUM(WinLoss) AS Winlost
 					, SUM(PComm) AS PlayerComm
@@ -275,12 +294,12 @@ BEGIN
 					INNER JOIN @tmpParty p ON d.SiteId = p.LicenseeID AND d.Bettype = p.Bettype					
 					LEFT JOIN #Product3rdSubName ps ON d.Bettype = ps.Bettype
 				WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
-				GROUP BY rptDate, CurrencyID , ps.ProductName
+				GROUP BY rptDate, CurrencyID , ps.ProductName, d.Bettype
 			)
 			
 			DROP TABLE #Product3rdSubName			
 		END
-		IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode = 'BT')--BetTrade
+		ELSE IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode = 'BT')--BetTrade
 		BEGIN					
 			-- add more bettype for SB, BA
 			INSERT INTO @Bettype (Bettype, ProductId)
