@@ -31,6 +31,15 @@ BEGIN
 	
 	DECLARE @ProductCode VARCHAR(200) = 'SB,RB,NG,LC,VS,KN,VG,BG,BA,AGC,GD'
 	
+	DECLARE @PartyParent TABLE (
+			PartyId		INT,
+			PartyName	VARCHAR(100),
+			BrandName	VARCHAR(100),
+			ParentId	INT)
+	
+	INSERT	INTO @PartyParent
+	EXEC	dbo.LA_PartyListSel
+	
 	DECLARE @PartyChargeInfo AS TABLE (
 			PartyId		INT,
 			ToParty		INT,
@@ -59,6 +68,11 @@ BEGIN
 			AND c.FromDate BETWEEN ci.FromDate AND ci.ToDate
 			AND c.ToDate BETWEEN ci.FromDate AND ci.ToDate
 	WHERE	ci.ChargeType != 2
+	
+	UPDATE	c
+	SET		c.ToParty = p.ParentId
+	FROM	@PartyChargeInfo c INNER JOIN @PartyParent p ON c.PartyId = p.PartyId
+	WHERE	c.ProductID=1
 	
 	CREATE TABLE #tmpBetting (rptDate char(10),rptDateFull DATETIME, product varchar(10),siteID INT,betcount INT, FromParty INT, ToParty INT)
 	
@@ -140,6 +154,7 @@ BEGIN
 			t.rptDateFull BETWEEN c.FromDate AND c.ToDate AND
 			t.product = c.ProductCode AND
 			t.siteID = c.LicenseeId	
+
 	---------------------------------------------------------------------------------
 
 	SELECT	CASE a.product 
