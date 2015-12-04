@@ -19,6 +19,7 @@ AS
 	 - 20150706@Florent: Add Vegas Games, Gold Deluxe
 	 - 20151028@Bravo:	 Exclude trial data
 	 - 20151112@Bravo:	 Fix bug missing BA data.
+	 - 20151204@Bravo:	 #48740-HotFix-TotalTrans-AutoMail.
 	 Params:			   
 */
 BEGIN
@@ -44,7 +45,7 @@ BEGIN
 	(
 		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
 		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
-		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB	
+		WHERE	DI_Rate > 0
 	)
 	UPDATE	c
 	SET		ProductCode = CASE WHEN c.ProductID = 0 THEN 'SB' ELSE p.ProductPrefix END
