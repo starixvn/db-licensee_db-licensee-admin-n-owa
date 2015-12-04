@@ -42,6 +42,27 @@ BEGIN
 	DECLARE @SystemID INT
 	SELECT @SystemID = id FROM dbo.Systems WITH (NOLOCK) WHERE SystemName = @System	
 	
+	DECLARE @ProductTable TABLE (ProductID smallint, ProductPrefix varchar(20))
+	DECLARE @Bettype TABLE (BetTypeRef smallint, BetType smallint)
+	--DECLARE @ProductCodes varchar(20) = 'MGCLC'
+		
+	INSERT INTO @ProductTable (ProductID, ProductPrefix)
+	SELECT CASE 
+			WHEN s.val = 'SB'
+				THEN 0
+			ELSE p3.Productid
+			END
+			, p3.ProductPrefix
+			FROM bodb02.dbo.strSplit(@ProductCodes, ',') s
+			INNER JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.val = p3.ProductPrefix
+	
+	INSERT INTO @Bettype(BetTypeRef, Bettype)
+	SELECT sbr.BettypeRef, sbm.BetType
+	FROM @ProductTable pt 
+		 INNER JOIN bodb02.dbo.Products p ON pt.ProductPrefix = p.ProductPrefix
+		 INNER JOIN bodb02.dbo.SportBettypeMatrix sbm ON p.ProductID = sbm.ProductID
+		 INNER JOIN dbo.Sport_Bettype_Reference sbr ON sbm.BetType = sbr.Bettype
+		
 	DECLARE @Cte_AffectDate TABLE (AffectedDate DATE, PartyID INT, ProductID INT) 
 
 	INSERT INTO @Cte_AffectDate (AffectedDate, PartyID, ProductID)
@@ -100,13 +121,7 @@ BEGIN
 			OR DI.ToDate BETWEEN @FromDate AND @ToDate
 			)
 		AND DI.ProductID IN (
-			SELECT CASE 
-					WHEN s.val = 'SB'
-						THEN 0
-					ELSE p3.Productid
-					END
-			FROM bodb02.dbo.strSplit(@ProductCodes, ',') s
-			LEFT JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.val = p3.ProductPrefix
+			SELECT ProductID FROM @ProductTable
 			)
 		AND NOT EXISTS (SELECT 1 FROM dbo.OAS_ChargeInfoSub WITH (NOLOCK) WHERE DI.ChargeID = ChargeIDRef)
 	ORDER BY p.PartyID
@@ -156,7 +171,7 @@ BEGIN
 		INNER JOIN dbo.OAS_ChargeInfo DI WITH (NOLOCK) ON DI.FromParty = p.PartyID AND DI.ChargeType != 2 AND p.PartyType = 1
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON DI.ChargeID = cs.ChargeID AND cs.SystemID = @SystemID
 		INNER JOIN dbo.OAS_ChargeInfoSub sub WITH (NOLOCK) ON DI.ChargeID = sub.ChargeIDref
-		INNER JOIN dbo.Sport_Bettype_Reference sbr WITH (NOLOCK) ON sbr.BettypeRef = sub.BettypeRef
+		INNER JOIN @Bettype sbr ON sbr.BetTypeRef = sub.BettypeRef
 		LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
 		LEFT JOIN dbo.labels lb(NOLOCK) ON p.OldRefID = lb.LicenseeID
 		LEFT JOIN @Cte_AffectDate cte ON cte.PartyID = p.PartyID
@@ -172,13 +187,7 @@ BEGIN
 			OR sub.ToDate BETWEEN @FromDate AND @ToDate
 			)
 		AND DI.ProductID IN (
-			SELECT CASE 
-					WHEN s.val = 'SB'
-						THEN 0
-					ELSE p3.Productid
-					END
-			FROM bodb02.dbo.strSplit(@ProductCodes, ',') s
-			LEFT JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.val = p3.ProductPrefix
+			SELECT ProductID FROM @ProductTable
 			)		
 	ORDER BY p.PartyID
 		,Di.ProductID
@@ -263,15 +272,7 @@ BEGIN
 				LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
 				LEFT JOIN dbo.labels lb(NOLOCK) ON p.OldRefID = lb.LicenseeID
 				LEFT JOIN @Cte_AffectDate cte ON p.PartyID = cte.PartyID
-				INNER JOIN (
-					SELECT CASE 
-							WHEN s.val = 'SB'
-								THEN 0
-							ELSE p3.Productid
-							END AS Productid
-					FROM bodb02.dbo.strSplit(@ProductCodes, ',') s
-					LEFT JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.val = p3.ProductPrefix
-					) f2 ON cte.ProductID = f2.Productid
+				INNER JOIN @ProductTable f2 ON cte.ProductID = f2.Productid
 			WHERE @FromDate <= cte.AffectedDate
 				AND NOT EXISTS (
 					SELECT Productid
@@ -307,17 +308,9 @@ BEGIN
 				LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
 				LEFT JOIN dbo.labels lb(NOLOCK) ON p.OldRefID = lb.LicenseeID
 				LEFT JOIN @Cte_AffectDate cte ON p.PartyID = cte.PartyID
-				INNER JOIN (
-					SELECT CASE 
-							WHEN s.val = 'SB'
-								THEN 0
-							ELSE p3.Productid
-							END AS Productid
-					FROM bodb02.dbo.strSplit(@ProductCodes, ',') s
-					LEFT JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.val = p3.ProductPrefix
-					) f2 ON cte.ProductID = f2.Productid
+				INNER JOIN @ProductTable f2 ON cte.ProductID = f2.Productid
 				INNER JOIN dbo.OAS_ChargeInfoSub sub WITH (NOLOCK) ON sub.ProductID = cte.ProductID
-				INNER JOIN dbo.Sport_Bettype_Reference sbr WITH (NOLOCK) ON sbr.BettypeRef = sub.BettypeRef
+				INNER JOIN @Bettype sbr ON sbr.BetTypeRef = sub.BettypeRef
 			WHERE @FromDate <= cte.AffectedDate
 				AND EXISTS (SELECT Productid FROM dbo.LA_Product3rdSub WITH (NOLOCK)WHERE cte.ProductID = Productid)
 	   )
