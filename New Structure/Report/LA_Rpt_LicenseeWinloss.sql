@@ -50,7 +50,7 @@ BEGIN
 	
 	INSERT INTO @ChargeInfo(PartyID, LicenseeID, ProductID, BetTypeId, Rate, Fromdate, Todate)
 	SELECT DISTINCT PartyID, LicenseeID, ProductID, Bettype, DI_Rate, Fromdate, Todate
-	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', @excludeTest)
+	FROM bodb_licensee.dbo.LA_f_ChargeInfo_xtest(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', @excludeTest)
 	
 	/* BA Product Id = 3 */
 	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = 3) > 0
@@ -98,10 +98,22 @@ BEGIN
 		)
 	END
 	
-	/* Microgaming Live Casino Product Id = 14 */
-	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = 14) > 0
+	/* Microgaming Live Casino Product Id = 14, Microgaming RNG Casino Product Id = 17 */
+	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID IN (14, 17)) > 0
 	BEGIN
 		DELETE #Data
+		
+		CREATE TABLE #MicrogamingProducts (ProductId INT)
+		
+		IF EXISTS (SELECT * FROM @ChargeInfo WHERE ProductID = 14)
+		BEGIN
+			INSERT INTO #MicrogamingProducts VALUES(14)
+		END
+		
+		IF EXISTS (SELECT * FROM @ChargeInfo WHERE ProductID = 17)
+		BEGIN
+			INSERT INTO #MicrogamingProducts VALUES(17)
+		END
 		
 		INSERT INTO #Data(rptDate, PartyID, ProductID, Currency, BetTypeId, Turnover, Winloss, AWinloss, AComm, Betcount)
 		(
@@ -119,7 +131,7 @@ BEGIN
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND ci.BetTypeId = b.Bettype AND b.ProductID = ci.ProductID
 			WHERE b.rptDate BETWEEN @Fromdate AND @Todate
-				AND b.ProductID = 14
+				AND b.ProductID IN (SELECT ProductId FROM #MicrogamingProducts)
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
 				AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
@@ -140,11 +152,13 @@ BEGIN
 				, -SUM(b.Winloss * ci.Rate) AS Company
 				, SUM(b.betcount) AS betcount
 			FROM #Data b
-				INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, BetTypeId, Rate FROM @ChargeInfo WHERE ProductID = 14) ci 
+				INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, BetTypeId, Rate FROM @ChargeInfo WHERE ProductID IN(SELECT ProductId FROM #MicrogamingProducts)) ci 
 				ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID AND ci.BetTypeId = b.BetTypeId			
 			WHERE b.rptDate BETWEEN ci.Fromdate AND ci.Todate
 			GROUP BY ci.PartyID, b.rptDate, b.Currency
 		)
+		
+		DROP TABLE #MicrogamingProducts
 	END
 	
 	/* Racing Product Id = 1 */
@@ -197,7 +211,7 @@ BEGIN
 		)
 	END
 
-	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID NOT IN (1, 3, 14)) > 0
+	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID NOT IN (1, 3, 14, 17)) > 0
 	BEGIN
 		DELETE #Data
 		
@@ -215,7 +229,7 @@ BEGIN
 				, 0
 				, SUM(b.betcount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) BetCount
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN (SELECT DISTINCT PartyId, LicenseeId, ProductID FROM @ChargeInfo WHERE ProductID NOT IN (1, 3, 14)) ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
+				INNER JOIN (SELECT DISTINCT PartyId, LicenseeId, ProductID FROM @ChargeInfo WHERE ProductID NOT IN (1, 3, 14, 17)) ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
