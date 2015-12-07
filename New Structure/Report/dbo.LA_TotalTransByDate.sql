@@ -20,6 +20,7 @@ AS
 	 - 20151028@Bravo:	 Exclude trial data
 	 - 20151112@Bravo:	 Fix bug missing BA data.
 	 - 20151204@Bravo:	 #48740-HotFix-TotalTrans-AutoMail.
+	 - 20151204@Bravo:	 #48864-HotFix-Missing Credit data.
 	 Params:			   
 */
 BEGIN
@@ -56,6 +57,7 @@ BEGIN
 		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE	DI_Rate > 0
 	)
+	
 	UPDATE	c
 	SET		ProductCode = CASE WHEN c.ProductID = 0 THEN 'SB' ELSE p.ProductPrefix END
 	FROM	@PartyChargeInfo c LEFT JOIN Product3rd p ON c.ProductID = p.Productid
@@ -72,7 +74,7 @@ BEGIN
 	UPDATE	c
 	SET		c.ToParty = p.ParentId
 	FROM	@PartyChargeInfo c INNER JOIN @PartyParent p ON c.PartyId = p.PartyId
-	WHERE	c.ProductID=1
+	WHERE	c.ProductID=1 OR c.PartyId IN (25,30)
 	
 	CREATE TABLE #tmpBetting (rptDate char(10),rptDateFull DATETIME, product varchar(10),siteID INT,betcount INT, FromParty INT, ToParty INT)
 	
