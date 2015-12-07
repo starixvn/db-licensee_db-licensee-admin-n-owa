@@ -32,7 +32,7 @@ BEGIN
 		INNER JOIN (SELECT MAX(c.FromDate) FromDate, c.FromParty, c.ProductID FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
 								INNER JOIN dbo.LA_ChargeInfo_SystemMapping csm WITH (NOLOCK) ON c.ChargeID = csm.ChargeID AND csm.SystemID = 2
 								INNER JOIN (SELECT ProductPrefix, ProductID FROM dbo.LA_f_Products3rd(@ProductCode)) pp ON c.ProductID = pp.ProductID
-							WHERE c.FromParty = @PartyId
+							WHERE c.FromParty = @PartyId AND c.ChargeType != 2
 							GROUP BY c.FromParty, c.ProductID) t ON ci.FromDate = t.FromDate AND ci.FromParty = t.FromParty AND ci.ProductID = t.ProductID
 		LEFT JOIN (SELECT FromDate, ToDate, PartyId, ProductId, MinFeeTerm
 					FROM dbo.LA_MinFee  WITH (NOLOCK) 
@@ -40,7 +40,7 @@ BEGIN
 					) BETWEEN FromDate AND ToDate
 					AND FeeTypeId = 1
 					AND PartyId = @PartyId) m ON ci.FromParty = m.PartyId AND ci.ProductID = m.ProductId 
-	WHERE ci.FromParty = @PartyId	
+	WHERE ci.FromParty = @PartyId AND ci.ChargeType != 2
 
 	SELECT  ISNULL(@FirstBilling, '')		AS FirstBilling
 			, ISNULL(@BasisOfBilling, '')	AS BasisOfBilling

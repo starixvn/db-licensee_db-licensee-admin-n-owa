@@ -19,6 +19,7 @@ AS
 	 - 20150706@Florent: Add Vegas Games, Gold Deluxe
 	 - 20151028@Bravo:	 Exclude trial data
 	 - 20151112@Bravo:	 Fix bug missing BA data.
+	 - 20151204@Bravo:	 #48740-HotFix-TotalTrans-AutoMail.
 	 Params:			   
 */
 BEGIN
@@ -29,6 +30,15 @@ BEGIN
 	WHERE	PartyType=1
 	
 	DECLARE @ProductCode VARCHAR(200) = 'SB,RB,NG,LC,VS,KN,VG,BG,BA,AGC,GD'
+	
+	DECLARE @PartyParent TABLE (
+			PartyId		INT,
+			PartyName	VARCHAR(100),
+			BrandName	VARCHAR(100),
+			ParentId	INT)
+	
+	INSERT	INTO @PartyParent
+	EXEC	dbo.LA_PartyListSel
 	
 	DECLARE @PartyChargeInfo AS TABLE (
 			PartyId		INT,
@@ -44,7 +54,7 @@ BEGIN
 	(
 		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
 		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
-		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB	
+		WHERE	DI_Rate > 0
 	)
 	UPDATE	c
 	SET		ProductCode = CASE WHEN c.ProductID = 0 THEN 'SB' ELSE p.ProductPrefix END
@@ -58,6 +68,11 @@ BEGIN
 			AND c.FromDate BETWEEN ci.FromDate AND ci.ToDate
 			AND c.ToDate BETWEEN ci.FromDate AND ci.ToDate
 	WHERE	ci.ChargeType != 2
+	
+	UPDATE	c
+	SET		c.ToParty = p.ParentId
+	FROM	@PartyChargeInfo c INNER JOIN @PartyParent p ON c.PartyId = p.PartyId
+	WHERE	c.ProductID=1
 	
 	CREATE TABLE #tmpBetting (rptDate char(10),rptDateFull DATETIME, product varchar(10),siteID INT,betcount INT, FromParty INT, ToParty INT)
 	
@@ -139,6 +154,7 @@ BEGIN
 			t.rptDateFull BETWEEN c.FromDate AND c.ToDate AND
 			t.product = c.ProductCode AND
 			t.siteID = c.LicenseeId	
+
 	---------------------------------------------------------------------------------
 
 	SELECT	CASE a.product 
