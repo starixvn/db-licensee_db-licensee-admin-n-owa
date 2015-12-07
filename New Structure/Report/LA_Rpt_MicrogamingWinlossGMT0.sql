@@ -52,8 +52,29 @@ BEGIN
 		LicenseeWinLoss		MONEY,
 		AmountDueToCompany	MONEY,
 		AmountDueToProduct	MONEY)
+		
+	CREATE TABLE #SumData(
+	RptDate				DATE,
+	SiteId				INT,
+	BetTypeId			INT,
+	CurrencyId			INT,
+	StatusId			INT,
+	BetCount			BIGINT,
+	Turnover			MONEY,
+	Winloss				MONEY,
+	AComm				MONEY,
+	PComm				MONEY)
+		
+	INSERT INTO #SumData (RptDate, SiteId, BetTypeId, CurrencyId, StatusId, BetCount, Turnover, Winloss, AComm, PComm)	
+	SELECT RptDate3rd, SiteId, BetTypeId, CurrencyId, StatusId, SUM(BetCount), SUM(Turnover), SUM(Winloss), SUM(AComm), SUM(PComm)
+	FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT
+	WHERE RptDate3rd BETWEEN @FromDate AND @ToDate
+		  AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND CurrencyID = @CurrencyId))
+		  AND (@ExcludeTest = 0 OR (@ExcludeTest = 1 AND CurrencyID <> 20))
+		  AND StatusId NOT IN (-1, 101, 102, 103)
+	GROUP BY RptDate3rd, SiteId, BetTypeId, CurrencyId, StatusId
 
-	CREATE TABLE #AmountDueToMicrogaming (ParentId INT, BettypeRef INT, AmountDueTo MONEY)
+	CREATE TABLE #AmountDueToMicrogaming (BettypeRef INT, AmountDueTo MONEY)
 
 	CREATE TABLE #ExchangeRate(ExchangeDate DATE, ExchangeId INT, Rate FLOAT)
 
@@ -111,13 +132,13 @@ BEGIN
 	SELECT DISTINCT ci.ChargeID, ci.PartyID, p.PartyName, p.ParentId, LicenseeID, ci.ProductID, ci.Bettype, DI_Rate, ci.Fromdate, ci.Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo_xtest(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', @ExcludeTest) ci LEFT JOIN #Parties p ON ci.PartyID = p.PartyId
 
-	CREATE TABLE #ProductChargeInfo (ParentId INT, BettypeRef INT, ChargeType INT, Rate MONEY, MinAmount MONEY, MaxAmount MONEY)
+	CREATE TABLE #ProductChargeInfo (ParentId INT, ProductId INT, BettypeRef INT, ChargeType INT, Rate MONEY, MinAmount MONEY, MaxAmount MONEY)
 	
-	INSERT INTO #ProductChargeInfo (ParentId, BettypeRef, ChargeType, Rate, MinAmount, MaxAmount)
-	SELECT DISTINCT a.FromParty, a.BettypeRef, a.ChargeType, a.Rate,
+	INSERT INTO #ProductChargeInfo (ParentId, ProductId, BettypeRef, ChargeType, Rate, MinAmount, MaxAmount)
+	SELECT DISTINCT a.FromParty, a.ProductId, a.BettypeRef, a.ChargeType, a.Rate,
 		CASE WHEN a.ChargeType = 4 THEN a.MinAmount * er.Rate ELSE 0 END MinAmount,
 		CASE WHEN a.ChargeType = 4 THEN a.MaxAmount * er.Rate ELSE 0 END MaxAmount
-	FROM (SELECT DISTINCT ci2.ChargeID, cis.FromParty, cis.BettypeRef, cis.ChargeType, cis.Rate, cis.MinAmount, cis.MaxAmount, cis.BaseCurrencyId
+	FROM (SELECT DISTINCT tp.ProductId, ci2.ChargeID, cis.FromParty, cis.BettypeRef, cis.ChargeType, cis.Rate, cis.MinAmount, cis.MaxAmount, cis.BaseCurrencyId
 	FROM #PartyChargeInfo tp
 		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON tp.ChargeId = ci.ChargeID
 		LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo ci2 WITH (NOLOCK) ON ci.ToParty = ci2.FromParty AND ci2.ProductID = tp.ProductID
@@ -131,24 +152,20 @@ BEGIN
 		-SUM(CustomerWinLoss * er.Rate) AS LicenseeWinLoss,
 		-SUM((CustomerWinLoss * pci.Rate) * er.Rate) AS AmountDueToCompany,
 		SUM(TotalTrans) AS TotalTrans
-	FROM (SELECT rd.SiteId, rd.RptDate3rd, rd.CurrencyId, rd.BetTypeId, pci.PartyId, pci.ProductId,
+	FROM (SELECT rd.SiteId, rd.RptDate, rd.CurrencyId, rd.BetTypeId, pci.PartyId, pci.ProductId,
 				SUM(ISNULL(rd.Turnover, 0) * CASE WHEN @DrawFilter IN (2, 3) THEN CASE
 												  WHEN rd.StatusId = 111 THEN 0
 												  WHEN rd.StatusId IN (114, 115) THEN 0.5 ELSE 1
 												  END ELSE 1 END) AS Turnover,
 				SUM(ISNULL(rd.Winloss, 0)) CustomerWinLoss,
 				SUM(ISNULL(rd.BetCount, 0) * CASE WHEN @DrawFilter = 2 AND rd.StatusId = 111 THEN 0 ELSE 1 END) AS TotalTrans
-			FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT rd WITH (NOLOCK)
+			FROM #SumData rd WITH (NOLOCK)
 				INNER JOIN (SELECT DISTINCT LicenseeId, BettypeId, PartyId, PartyName, ProductId FROM #PartyChargeInfo) pci ON rd.SiteId = pci.LicenseeID AND rd.BetTypeId = pci.BettypeId
-			WHERE rd.RptDate3rd BETWEEN @FromDate AND @ToDate
-				AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND rd.CurrencyID = @CurrencyId))
-				AND (@ExcludeTest = 0 OR (@ExcludeTest = 1 AND rd.CurrencyID <> 20))
-				AND rd.StatusId NOT IN (-1, 101, 102, 103)
-			GROUP BY	rd.RptDate3rd, rd.SiteId, rd.CurrencyID, rd.BetTypeId, pci.PartyId, pci.PartyName, pci.ProductId) d
+			GROUP BY	rd.RptDate, rd.SiteId, rd.CurrencyID, rd.BetTypeId, pci.PartyId, pci.PartyName, pci.ProductId) d
 		INNER JOIN #PartyChargeInfo pci ON d.SiteId = pci.LicenseeID AND d.BetTypeId = pci.BettypeId
-		INNER JOIN #ExchangeRate er ON d.CurrencyId = er.ExchangeID AND d.RptDate3rd = er.ExchangeDate
+		INNER JOIN #ExchangeRate er ON d.CurrencyId = er.ExchangeID AND d.RptDate = er.ExchangeDate
 		LEFT JOIN #GameTypes gt ON d.BetTypeId = gt.BettypeId
-	WHERE d.RptDate3rd BETWEEN pci.Fromdate AND pci.Todate
+	WHERE d.RptDate BETWEEN pci.Fromdate AND pci.Todate
 	GROUP BY gt.GameTypeName, gt.BettypeRef, pci.ParentId, pci.PartyId, pci.PartyName, d.ProductId, d.CurrencyId
 	
 	DROP TABLE #GameTypes
@@ -156,23 +173,22 @@ BEGIN
 	DROP TABLE #ExchangeRate
 	DROP TABLE #Parties
 	
-	INSERT INTO #AmountDueToMicrogaming ([@GroupWinloss].BettypeRef, ParentID, AmountDueTo)
-	SELECT BettypeRef, ParentId, SUM(CASE WHEN oa.kq > 0 THEN oa.kq ELSE 0 END) AS AmtDueto
-	FROM (SELECT BettypeRef, ParentId, SUM(LicenseeWinLoss) AS GroupWinloss
+	INSERT INTO #AmountDueToMicrogaming ([@GroupWinloss].BettypeRef, AmountDueTo)
+	SELECT BettypeRef, SUM(CASE WHEN oa.kq > 0 THEN oa.kq ELSE 0 END) AS AmtDueto
+	FROM (SELECT ProductId, BettypeRef, ParentId, SUM(LicenseeWinLoss) AS GroupWinloss
 		  FROM #Result
-		  GROUP BY BettypeRef, ParentId) d
+		  GROUP BY ProductId, BettypeRef, ParentId) d
 	OUTER APPLY (
 		SELECT
 		CASE WHEN (ChargeType = 4 AND GroupWinloss BETWEEN MinAmount AND ISNULL(MaxAmount, 100000000000)) THEN (GroupWinloss - MinAmount) * Rate ELSE 0 END +
 		CASE WHEN (ChargeType = 4 AND GroupWinloss > MaxAmount) THEN (MaxAmount - MinAmount) * Rate ELSE 0 END +
 		CASE WHEN (ChargeType = 1) THEN GroupWinloss * Rate ELSE 0 END AS kq
 		FROM #ProductChargeInfo
-		WHERE ParentId = d.ParentId AND BettypeRef = d.BettypeRef) oa
-	GROUP BY	BettypeRef, ParentId
-	ORDER BY BettypeRef, ParentId
+		WHERE ParentId = d.ParentId AND BettypeRef = d.BettypeRef AND ProductId = d.ProductId) oa
+	GROUP BY BettypeRef
 	
 	UPDATE r SET r.AmountDueToProduct = g.AmountDueTo FROM #Result r
-	LEFT JOIN #AmountDueToMicrogaming g ON r.ParentId = g.ParentID AND r.BettypeRef = g.BettypeRef
+	LEFT JOIN #AmountDueToMicrogaming g ON r.BettypeRef = g.BettypeRef
 	
 	SELECT re.BettypeRef AS GameTypeId, re.GameTypeName, re.PartyId, re.PartyName, re.ProductId, pr.ProductName, re.CurrencyId, ex.Code AS CurrencyName,
 		SUM(re.TotalTrans) AS TotalTrans,
