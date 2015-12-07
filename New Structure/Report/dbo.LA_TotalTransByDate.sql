@@ -20,7 +20,7 @@ AS
 	 - 20151028@Bravo:	 Exclude trial data
 	 - 20151112@Bravo:	 Fix bug missing BA data.
 	 - 20151204@Bravo:	 #48740-HotFix-TotalTrans-AutoMail.
-	 - 20151204@Bravo:	 #48864-HotFix-Missing Credit data.
+	 - 20151207@Bravo:	 #48864-HotFix-Missing Credit data.
 	 Params:			   
 */
 BEGIN
@@ -28,7 +28,7 @@ BEGIN
 	DECLARE @PartyIdString VARCHAR(500) 
 	SELECT	@PartyIdString = COALESCE(@PartyIdString + ',', '') + CAST(PartyId AS VARCHAR(5))
 	FROM	OAS_Party
-	WHERE	PartyType=1
+	WHERE	PartyType=1 AND PartyID NOT IN (25,30)
 	
 	DECLARE @ProductCode VARCHAR(200) = 'SB,RB,NG,LC,VS,KN,VG,BG,BA,AGC,GD'
 	
@@ -54,8 +54,13 @@ BEGIN
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
 	(
 		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
-		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
-		WHERE	DI_Rate > 0
+		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)		
+	)
+	
+	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
+	(
+		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
+		FROM	dbo.LA_f_ChargeInfo('25,30', @FromDate, @ToDate, @ProductCode, 'OA', 0)		
 	)
 	
 	UPDATE	c
