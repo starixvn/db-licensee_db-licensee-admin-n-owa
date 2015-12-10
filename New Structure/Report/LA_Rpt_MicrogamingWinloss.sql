@@ -58,21 +58,28 @@ BEGIN
 		SiteId				INT,
 		BetTypeId			INT,
 		CurrencyId			INT,
-		StatusId			INT,
 		BetCount			BIGINT,
 		Turnover			MONEY,
-		Winloss				MONEY,
-		AComm				MONEY,
-		PComm				MONEY)
+		Winloss				MONEY)
 		
-	INSERT INTO #SumData (RptDate, SiteId, BetTypeId, CurrencyId, StatusId, BetCount, Turnover, Winloss, AComm, PComm)	
-	SELECT RptDate, SiteId, BetTypeId, CurrencyId, StatusId, SUM(BetCount), SUM(Turnover), SUM(Winloss), SUM(AComm), SUM(PComm)
-	FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT
-	WHERE RptDate BETWEEN @FromDate AND @ToDate
-		  AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND CurrencyID = @CurrencyId))
-		  AND (@ExcludeTest = 0 OR (@ExcludeTest = 1 AND CurrencyID <> 20))
-		  AND StatusId NOT IN (-1, 101, 102, 103)
-	GROUP BY RptDate, SiteId, BetTypeId, CurrencyId, StatusId
+	INSERT INTO #SumData (RptDate, SiteId, BetTypeId, CurrencyId, BetCount, Turnover, Winloss)
+	SELECT RptDate, SiteId, BetTypeId, CurrencyId, SUM(st.BetCount), SUM(st.Turnover), SUM(st.Winloss)
+	FROM (	
+		SELECT RptDate, SiteId, BetTypeId, CurrencyId, StatusId, 
+			SUM(ISNULL(BetCount, 0) * CASE WHEN @DrawFilter = 2 AND StatusId = 111 THEN 0 ELSE 1 END) AS BetCount, 
+			SUM(ISNULL(Turnover, 0) * CASE WHEN @DrawFilter IN (2, 3) THEN CASE
+													  WHEN StatusId = 111 THEN 0
+													  WHEN StatusId IN (114, 115) THEN 0.5 ELSE 1
+													  END ELSE 1 END) AS Turnover
+			, SUM(ISNULL(Winloss, 0)) AS Winloss
+		FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT
+		WHERE RptDate BETWEEN @FromDate AND @ToDate
+			  AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND CurrencyID = @CurrencyId))
+			  AND (@ExcludeTest = 0 OR (@ExcludeTest = 1 AND CurrencyID <> 20))
+			  AND StatusId NOT IN (-1, 101, 102, 103)
+		GROUP BY RptDate, SiteId, BetTypeId, CurrencyId, StatusId
+		) st
+	GROUP BY RptDate, SiteId, BetTypeId, CurrencyId
 	
 	CREATE TABLE #AmountDueToMicrogaming (BettypeRef INT, AmountDueTo MONEY)
 
@@ -87,12 +94,14 @@ BEGIN
 	INSERT INTO #Parties (PartyId, PartyName, BrandName, ParentId)
 	EXEC bodb_licensee.dbo.LA_PartyListSel
 
-	CREATE TABLE #GameTypes (BettypeRef INT, BettypeId INT, GameTypeName VARCHAR(100))
+	CREATE TABLE #GameTypes (ProductId INT, BettypeRef INT, BettypeId INT, GameTypeName VARCHAR(100))
 
-	INSERT INTO #GameTypes (BettypeId, BettypeRef, GameTypeName)
-	SELECT sp.Bettype, pr.BettypeRef, pr.ProductName
+	INSERT INTO #GameTypes (ProductId, BettypeId, BettypeRef)
+	SELECT CASE WHEN sp.SporttypeRef = 203 THEN 14
+				WHEN sp.SporttypeRef = 205 THEN 17 ELSE 0 END AS ProductId, sp.Bettype, pr.BettypeRef
 	FROM bodb_licensee.dbo.Sport_Bettype_Reference sp WITH (NOLOCK)
 		LEFT JOIN bodb_licensee.dbo.LA_Product3rdSub pr WITH (NOLOCK) ON sp.BettypeRef = pr.BettypeRef
+	GROUP BY sp.SporttypeRef, sp.Bettype, pr.BettypeRef
 
 	UPDATE #GameTypes
 	SET GameTypeName = 'Generic'
@@ -152,19 +161,13 @@ BEGIN
 		-SUM(CustomerWinLoss * er.Rate) AS LicenseeWinLoss,
 		-SUM((CustomerWinLoss * pci.Rate) * er.Rate) AS AmountDueToCompany,
 		SUM(TotalTrans) AS TotalTrans
-	FROM (SELECT rd.SiteId, rd.RptDate, rd.CurrencyId, rd.BetTypeId, pci.PartyId, pci.ProductId,
-				SUM(ISNULL(rd.Turnover, 0) * CASE WHEN @DrawFilter IN (2, 3) THEN CASE
-												  WHEN rd.StatusId = 111 THEN 0
-												  WHEN rd.StatusId IN (114, 115) THEN 0.5 ELSE 1
-												  END ELSE 1 END) AS Turnover,
-				SUM(ISNULL(rd.Winloss, 0)) CustomerWinLoss,
-				SUM(ISNULL(rd.BetCount, 0) * CASE WHEN @DrawFilter = 2 AND rd.StatusId = 111 THEN 0 ELSE 1 END) AS TotalTrans
+	FROM (SELECT rd.SiteId, rd.RptDate, rd.CurrencyId, rd.BetTypeId, pci.PartyId, pci.ProductId, SUM(rd.Winloss) AS CustomerWinLoss, SUM(rd.Turnover) as Turnover, SUM(rd.BetCount) AS TotalTrans
 			FROM #SumData rd
-				INNER JOIN (SELECT DISTINCT LicenseeId, BettypeId, PartyId, PartyName, ProductId FROM #PartyChargeInfo) pci ON rd.SiteId = pci.LicenseeID AND rd.BetTypeId = pci.BettypeId
-			GROUP BY	rd.RptDate, rd.SiteId, rd.CurrencyID, rd.BetTypeId, pci.PartyId, pci.PartyName, pci.ProductId) d
+				INNER JOIN (SELECT DISTINCT LicenseeId, BettypeId, PartyId, ProductId FROM #PartyChargeInfo) pci ON rd.SiteId = pci.LicenseeID AND rd.BetTypeId = pci.BettypeId
+			GROUP BY	rd.RptDate, rd.SiteId, rd.CurrencyID, rd.BetTypeId, pci.PartyId, pci.ProductId) d
 		INNER JOIN #PartyChargeInfo pci ON d.SiteId = pci.LicenseeID AND d.BetTypeId = pci.BettypeId
 		INNER JOIN #ExchangeRate er ON d.CurrencyId = er.ExchangeID AND d.RptDate = er.ExchangeDate
-		LEFT JOIN #GameTypes gt ON d.BetTypeId = gt.BettypeId
+		LEFT JOIN #GameTypes gt ON d.BetTypeId = gt.BettypeId AND gt.ProductId = d.ProductId
 	WHERE d.RptDate BETWEEN pci.Fromdate AND pci.Todate
 	GROUP BY gt.GameTypeName, gt.BettypeRef, pci.ParentId, pci.PartyId, pci.PartyName, d.ProductId, d.CurrencyId
 	
