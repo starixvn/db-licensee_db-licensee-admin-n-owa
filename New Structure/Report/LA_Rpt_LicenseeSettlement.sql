@@ -71,7 +71,7 @@ BEGIN
 	INSERT INTO @tmpParty(PartyId, LicenseeId, ProductID, Bettype, Rate, Fromdate, Todate)
 	(
 		SELECT DISTINCT PartyID, LicenseeID, ProductID, Bettype, DI_Rate, Fromdate, Todate
-		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyID, @FromDate, @ToDate, @ProductCode, 'OA', 1)
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo_xtest(@PartyID, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE DI_Rate > 0
 	)
 	
