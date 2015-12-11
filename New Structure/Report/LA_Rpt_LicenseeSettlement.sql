@@ -229,10 +229,11 @@ BEGIN
 		BEGIN
 			-- product 3rd sub name
 			CREATE TABLE #Product3rdSubName (Bettype INT, BettypeRef INT, ProductName VARCHAR(100))
-			INSERT INTO #Product3rdSubName( Bettype, BettypeRef, ProductName)
-			SELECT s.Bettype, p.BettypeRef, p.ProductName 			
+			INSERT INTO #Product3rdSubName( Bettype, BettypeRef)
+			SELECT s.Bettype, p.BettypeRef 			
 			FROM bodb_licensee.dbo.Sport_Bettype_Reference s WITH (NOLOCK)
 					LEFT JOIN bodb_licensee.dbo.LA_Product3rdSub p WITH (NOLOCK) ON s.BettypeRef = p.BettypeRef
+			GROUP BY s.Bettype, p.BettypeRef
 						
 			IF @ProductCode = 'MGCLC'
 			BEGIN
