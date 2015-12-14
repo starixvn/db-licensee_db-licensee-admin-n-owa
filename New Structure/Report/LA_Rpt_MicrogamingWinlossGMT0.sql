@@ -11,10 +11,9 @@ ALTER PROCEDURE [dbo].[LA_Rpt_MicrogamingWinlossGMT0]
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME	
 	, @ProductCodes			VARCHAR(50)
-	, @CurrencyId			INT				= 0
-	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
-	, @DrawFilter			SMALLINT		= 1
-	, @ExcludeTest			BIT				= 1
+	, @CurrencyId			INT
+	, @BaseCurrencyName		VARCHAR(3)
+	, @ExcludeTest			BIT
 WITH RECOMPILE
 AS
 /*  Created: 20150804@Florent		
@@ -26,7 +25,6 @@ AS
 	Param's Explanation:
 		+ @PartyIDs	: a string of list PartyID, separate by ','
 		+ @Currency	:  0 - All Currencies
-		+ @DrawFilter: 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
 		+ @excludeTest: add/remove currency UUS
 		+ @ProductCodes	: Products code :
 				. MGCLC - Microgaming Live Casino
@@ -66,11 +64,8 @@ BEGIN
 	SELECT RptDate3rd, SiteId, BetTypeId, CurrencyId, SUM(st.BetCount), SUM(st.Turnover), SUM(st.Winloss)
 	FROM (	
 		SELECT RptDate3rd, SiteId, BetTypeId, CurrencyId, StatusId, 
-			SUM(ISNULL(BetCount, 0) * CASE WHEN @DrawFilter = 2 AND StatusId = 111 THEN 0 ELSE 1 END) AS BetCount, 
-			SUM(ISNULL(Turnover, 0) * CASE WHEN @DrawFilter IN (2, 3) THEN CASE
-													  WHEN StatusId = 111 THEN 0
-													  WHEN StatusId IN (114, 115) THEN 0.5 ELSE 1
-													  END ELSE 1 END) AS Turnover
+			SUM(ISNULL(BetCount, 0)) AS BetCount, 
+			SUM(ISNULL(Turnover, 0)) AS Turnover
 			, SUM(ISNULL(Winloss, 0)) AS Winloss
 		FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT
 		WHERE RptDate3rd BETWEEN @FromDate AND @ToDate
