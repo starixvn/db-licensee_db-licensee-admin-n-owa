@@ -11,7 +11,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_MicrogamingWinlossGMT0]
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME	
 	, @ProductCodes			VARCHAR(50)
-	, @CurrencyId			INT
+	, @CurrencyId			INT				= 0
 	, @BaseCurrencyName		VARCHAR(3)
 	, @ExcludeTest			BIT
 WITH RECOMPILE
