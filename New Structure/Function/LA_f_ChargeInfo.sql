@@ -292,7 +292,7 @@ BEGIN
 				, pd.IsDeposit
 				, cte.AffectedDate
 				, f2.Productid
-				, sbr.Bettype AS Bettype
+				, sbr.BetTypeRef AS BetTypeRef
 				, 0 DI_Rate
 				, 0 OW_Rate
 				, 0 PNR_Rate
