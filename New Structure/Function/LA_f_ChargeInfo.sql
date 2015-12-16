@@ -21,7 +21,7 @@ RETURNS @tbChargeInfo TABLE (
 	, isDeposit			INT
 	, AffectedDate		SMALLDATETIME
 	, ProductID			INT
-	, Bettype			INT				DEFAULT -1
+	, BettypeRef		INT				DEFAULT -1
 	, DI_Rate			MONEY
 	, OW_Rate			MONEY
 	, PNR_Rate			MONEY
@@ -43,7 +43,7 @@ BEGIN
 	SELECT @SystemID = id FROM dbo.Systems WITH (NOLOCK) WHERE SystemName = @System	
 	
 	DECLARE @ProductTable TABLE (ProductID smallint, ProductPrefix varchar(20))
-	DECLARE @Bettype TABLE (BetTypeRef smallint, BetType smallint)
+	DECLARE @Bettype TABLE (ProductId smallint, BetTypeRef smallint, BetType smallint)
 	--DECLARE @ProductCodes varchar(20) = 'MGCLC'
 		
 	INSERT INTO @ProductTable (ProductID, ProductPrefix)
@@ -56,12 +56,12 @@ BEGIN
 			FROM bodb02.dbo.strSplit(@ProductCodes, ',') s
 			INNER JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.val = p3.ProductPrefix
 	
-	INSERT INTO @Bettype(BetTypeRef, Bettype)
-	SELECT sbr.BettypeRef, sbm.BetType
+	INSERT INTO @Bettype(ProductId, BetTypeRef, Bettype)
+	SELECT pt.ProductID, sbr.BettypeRef, sbm.BetType
 	FROM @ProductTable pt 
-		 INNER JOIN bodb02.dbo.Products p ON pt.ProductPrefix = p.ProductPrefix
-		 INNER JOIN bodb02.dbo.SportBettypeMatrix sbm ON p.ProductID = sbm.ProductID
-		 INNER JOIN dbo.Sport_Bettype_Reference sbr ON sbm.BetType = sbr.Bettype
+	 INNER JOIN bodb02.dbo.Products p ON pt.ProductPrefix = p.ProductPrefix
+	 INNER JOIN bodb02.dbo.SportBettypeMatrix sbm ON p.ProductID = sbm.ProductID
+	 INNER JOIN dbo.Sport_Bettype_Reference sbr ON sbm.BetType = sbr.Bettype
 		
 	DECLARE @Cte_AffectDate TABLE (AffectedDate DATE, PartyID INT, ProductID INT) 
 
@@ -142,7 +142,7 @@ BEGIN
 	    GROUP BY ci.FromParty, ci.ProductID
 	)
 	
-	INSERT INTO @tbChargeInfo (ChargeID , PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Bettype, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate)
+	INSERT INTO @tbChargeInfo (ChargeID , PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, BettypeRef, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate)
 	SELECT DISTINCT DI.ChargeID 
 		, p.PartyID
 		, CASE 
@@ -153,7 +153,7 @@ BEGIN
 		, pd.IsDeposit
 		, cte.AffectedDate
 		, DI.ProductID
-		, sbr.Bettype
+		, sbr.BetTypeRef
 		, sub.Rate DI_Rate	
 		, 0	 AS OW_Rate  -- not use now
 		, 0	 AS PNR_Rate -- not use now
@@ -199,7 +199,7 @@ BEGIN
     --get more licensee for racing product
 	IF CHARINDEX('RB', @ProductCodes) <> 0
 	BEGIN
-		INSERT INTO @tbChargeInfo (ChargeID, PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Bettype, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate)
+		INSERT INTO @tbChargeInfo (ChargeID, PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, BettypeRef, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate)
 		SELECT
 			 0 AS ChargeID 
 			, p.PartyID
@@ -211,7 +211,7 @@ BEGIN
 			, pd.IsDeposit
 			, NULL
 			, pr.Productid
-			, -1 AS Bettype
+			, -1 AS BettypeRef
 			, 1
 			, 1
 			, 1
@@ -244,7 +244,7 @@ BEGIN
     -- add more data incase trial
     IF @ExcludeTest = 0
     BEGIN
-	   INSERT INTO @tbChargeInfo (ChargeID, PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Bettype, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate)
+	   INSERT INTO @tbChargeInfo (ChargeID, PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, BettypeRef, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate)
 	   (
 			SELECT DISTINCT 0 AS ChargeID
 				, f1.Val PartyId
@@ -256,7 +256,7 @@ BEGIN
 				, pd.IsDeposit
 				, cte.AffectedDate
 				, f2.Productid
-				, - 1 AS Bettype
+				, - 1 AS BettypeRef
 				, 0 DI_Rate
 				, 0 OW_Rate
 				, 0 PNR_Rate
