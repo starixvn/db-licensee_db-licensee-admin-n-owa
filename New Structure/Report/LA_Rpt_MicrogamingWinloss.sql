@@ -178,7 +178,7 @@ BEGIN
 
 	INSERT INTO #AmountDueToMicrogaming ([@GroupWinloss].BettypeRef, AmountDueTo)
 	SELECT BettypeRef, SUM(CASE WHEN oa.kq > 0 THEN oa.kq ELSE 0 END) AS AmtDueto
-	FROM (SELECT ProductId, BettypeRef, ParentId, SUM(AmountDueToCompany) AS GroupWinloss
+	FROM (SELECT ProductId, BettypeRef, ParentId, SUM(AmountDueToProduct) AS GroupWinloss
 		  FROM #Result
 		  GROUP BY ProductId, BettypeRef, ParentId) d
 	OUTER APPLY (
