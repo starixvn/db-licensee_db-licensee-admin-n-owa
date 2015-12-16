@@ -117,7 +117,7 @@ BEGIN
 		ToDate				DATETIME)
 
 	INSERT INTO #PartyChargeInfo (ChargeId, PartyId, PartyName, ParentId, LicenseeId, ProductID, BettypeRef, Rate, Fromdate, Todate)
-	SELECT DISTINCT ci.ChargeID, ci.PartyID, p.PartyName, p.ParentId, LicenseeID, ci.ProductID, ci.BettypeRef, DI_Rate, ci.Fromdate, ci.Todate
+	SELECT DISTINCT ci.ChargeID, ci.PartyID, p.PartyName, p.ParentId, LicenseeID, ci.ProductID, ci.Bettype, DI_Rate, ci.Fromdate, ci.Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo_xtest(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', @ExcludeTest) ci LEFT JOIN #Parties p ON ci.PartyID = p.PartyId
 	
 	INSERT INTO #SumData (RptDate, SiteId, ProductId, BetTypeRef, CurrencyId, BetCount, Turnover, Winloss)
