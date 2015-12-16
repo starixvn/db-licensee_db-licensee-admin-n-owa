@@ -6,7 +6,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER FUNCTION [dbo].[LA_f_ChargeInfo] (
+ALTER FUNCTION [dbo].[LA_f_ChargeInfo_xtest] (
 	@PartyIDs			VARCHAR(1000)
 	, @FromDate			DATETIME
 	, @ToDate			DATETIME
@@ -320,6 +320,6 @@ BEGIN
 END
 
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_f_ChargeInfo] TO [vnteam] 
+GRANT VIEW DEFINITION ON [dbo].[LA_f_ChargeInfo_xtest] TO [vnteam] 
 GO
-GRANT SELECT ON [dbo].[LA_f_ChargeInfo] TO bodbAdminNet 
+GRANT SELECT ON [dbo].[LA_f_ChargeInfo_xtest] TO bodbAdminNet 
