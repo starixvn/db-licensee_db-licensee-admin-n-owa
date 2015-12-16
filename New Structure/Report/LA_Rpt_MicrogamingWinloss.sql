@@ -177,28 +177,28 @@ BEGIN
 
 	INSERT INTO #AmountDueToMicrogaming ([@GroupWinloss].BettypeRef, AmountDueTo)
 	SELECT BettypeRef, SUM(CASE WHEN oa.kq > 0 THEN oa.kq ELSE 0 END) AS AmtDueto
-	FROM (SELECT ProductId, BettypeRef, ParentId, SUM(LicenseeWinLoss) AS GroupWinloss
+	FROM (SELECT ProductId, BettypeRef, ParentId, SUM(LicenseeWinLoss) AS GroupWinloss, SUM(AmountDueToCompany) AS AmountDueToCompany
 		  FROM #Result
 		  GROUP BY ProductId, BettypeRef, ParentId) d
 	OUTER APPLY (
 		SELECT
-		CASE WHEN (ChargeType = 4 AND GroupWinloss BETWEEN MinAmount AND ISNULL(MaxAmount, 100000000000)) THEN (GroupWinloss - MinAmount) * Rate ELSE 0 END +
-		CASE WHEN (ChargeType = 4 AND GroupWinloss > MaxAmount) THEN (MaxAmount - MinAmount) * Rate ELSE 0 END +
-		CASE WHEN (ChargeType = 1) THEN GroupWinloss * Rate ELSE 0 END AS kq
+		CASE WHEN (AmountDueToCompany > 0 AND ChargeType = 4 AND GroupWinloss BETWEEN MinAmount AND ISNULL(MaxAmount, 100000000000)) THEN (GroupWinloss - MinAmount) * Rate ELSE 0 END +
+		CASE WHEN (AmountDueToCompany > 0 AND ChargeType = 4 AND GroupWinloss > MaxAmount) THEN (MaxAmount - MinAmount) * Rate ELSE 0 END +
+		CASE WHEN (AmountDueToCompany > 0 AND ChargeType = 1) THEN GroupWinloss * Rate ELSE 0 END AS kq
 		FROM #ProductChargeInfo
 		WHERE ParentId = d.ParentId AND BettypeRef = d.BettypeRef AND ProductId = d.ProductId) oa
 	GROUP BY BettypeRef
 		
 	UPDATE r SET r.AmountDueToProduct = g.AmountDueTo FROM #Result r
 	LEFT JOIN #AmountDueToMicrogaming g ON r.BettypeRef = g.BettypeRef
-
+	
 	SELECT re.BettypeRef AS GameTypeId, re.GameTypeName, re.PartyId, re.PartyName, re.ProductId, pr.ProductName, re.CurrencyId, ex.Code AS CurrencyName,
 		SUM(re.TotalTrans) AS TotalTrans,
 		SUM(re.Turnover) AS Turnover,
 		SUM(re.CustomerWinLoss) AS CustomerWinLoss,
 		SUM(re.LicenseeWinLoss) AS LicenseeWinLoss,
 		SUM(re.AmountDueToCompany) AS AmountCompany,
-		re.AmountDueToProduct AS AmountProduct
+		ISNULL(re.AmountDueToProduct, 0) AS AmountProduct
 	FROM #Result re
 	LEFT JOIN dbo.Exchange ex WITH (NOLOCK) ON re.CurrencyId = ex.exchangeid
 	LEFT JOIN #Products pr WITH (NOLOCK) ON re.ProductId = pr.ProductId
