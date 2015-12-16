@@ -5,23 +5,24 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinLossByProduct]	  
-	@PartyIdString  VARCHAR(500),
-	@FromDate		DATETIME,
-	@ToDate			DATETIME,	
+ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinLossByProduct]
+	@PartyIdString		VARCHAR(500),
+	@FromDate			DATETIME,
+	@ToDate				DATETIME,
 	@BaseCurrencyName	VARCHAR(10)
-	
+
 WITH RECOMPILE
 AS
 /*	Header:
 	Created: 2015.08.06 - Bravo.Tran
 	Task : Create Invoice 
 	DB: DB052.bodb_Licensee
-   
-	Revisions: 
+
+	Revisions:
 		+ 2015.08.06: Invoice Amount - Generate
 		+ 2015.09.15: Get Amount by PartyId List.
 		+ 2015.10.20@Bravo: Add Zelianta
+		+ 2015.12.15@Bruce: Add MGCLC and MGCRNG
 */
 /*	Example:
 	USE bodb_Licensee
@@ -37,18 +38,18 @@ BEGIN
 	SET NOCOUNT ON
 	
 	-- Region: Get party charge rate info
-	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG'
+	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG'
 	
 	-- Region: Get Party ID
-	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)	
+	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)
 	DECLARE @Delimiter CHAR(1)=','
 
-	;WITH SeparatedTable (STARTVAL, STOPVAL) 
+	;WITH SeparatedTable (STARTVAL, STOPVAL)
 	AS 
 	(
 		SELECT
 			STARTVAL = CAST(1 AS INT),
-			STOPVAL = CHARINDEX(@Delimiter, @PartyIdString + @Delimiter) 
+			STOPVAL = CHARINDEX(@Delimiter, @PartyIdString + @Delimiter)
 		UNION ALL SELECT
 			STARTVAL = STOPVAL + 1,
 			STOPVAL = CHARINDEX(@Delimiter, @PartyIdString + @Delimiter, STOPVAL + 1)
@@ -69,24 +70,25 @@ BEGIN
 			PartyId		INT,
 			LicenseeId	INT,
 			ProductID	INT,
+			BettypeRef	INT,
 			Rate		MONEY,
 			FromDate	SMALLDATETIME,
 			ToDate		SMALLDATETIME)
 
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
+	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, BettypeRef)
 	(
-		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
-		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
+		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate, BettypeRef
+		FROM	dbo.LA_f_ChargeInfo_xtest(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
 	)
 	-- End region
 	
 	-- Region: Get exchange rate info
-	CREATE	TABLE #Exchange ( 
-			ExchangeDate	DATE, 
-			ExchangeID		INT, 
-			CurrencyCode	VARCHAR(10), 
-			Rate			FLOAT)	
+	CREATE	TABLE #Exchange (
+			ExchangeDate	DATE,
+			ExchangeID		INT,
+			CurrencyCode	VARCHAR(10),
+			Rate			FLOAT)
 	
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
@@ -95,51 +97,54 @@ BEGIN
 	
 	-- Region: Get Winloss data
 	CREATE	TABLE #TempData (
-			LicenseeId	INT, 
-			PartyId		INT, 
-			rptDate		DATETIME, 
-			CurrencyId	INT, 
+			LicenseeId	INT,
+			PartyId		INT,
+			rptDate		DATETIME,
+			CurrencyId	INT,
 			MemberWL	MONEY,
-			AWinLoss	MONEY, 
-			AComm		MONEY, 
-			ProductId	TINYINT)
+			AWinLoss	MONEY,
+			AComm		MONEY,
+			ProductId	TINYINT,
+			BettypeRef	INT)
 	
-	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,MemberWL,AWinLoss,AComm,ProductId)
+	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,MemberWL,AWinLoss,AComm,ProductId,BettypeRef)
 	(
-	    SELECT	b.SiteID,
-				p.PartyId, 
-				b.rptDate, 
-				b.CurrencyID, 
+		SELECT	b.SiteID,
+				p.PartyId,
+				b.rptDate,
+				b.CurrencyID,
 				SUM(ISNULL(b.MemberWL, 0)) Winloss,
 				SUM(ISNULL(b.GrossWL, 0)) AS AWinLoss,
-				SUM(ISNULL(b.CommissionA, 0)) AS AComm, 
-				b.ProductId
+				SUM(ISNULL(b.CommissionA, 0)) AS AComm,
+				b.ProductId,
+				ISNULL(sbr.BettypeRef, -1)
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON b.SiteID = p.OldRefID AND p.PartyType = 1													
-		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate			
+				INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON b.SiteID = p.OldRefID AND p.PartyType = 1
+				LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.Bettype = b.Bettype
+		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.Bettype NOT IN (901,902,903)
-		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, b.ProductId
-	)	
-	
+		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, b.ProductId, ISNULL(sbr.BettypeRef, -1)
+	)
+
 	-- EndRegion
-	
+
 	-- Region: Generate licensee name & group
 	DECLARE @TempPartyList AS TABLE(
 		PartyId		INT,
 		PartyName	VARCHAR(200),
 		BranchName	VARCHAR(200),
-		ParentId	INT		
+		ParentId	INT
 	)
 	INSERT INTO @TempPartyList
 	EXECUTE dbo.LA_PartyListSel
 	
-	CREATE TABLE #LicenseeAmount(		
+	CREATE TABLE #LicenseeAmount(
 		GroupName	VARCHAR(200),
-		LicenseeId	INT,		
-		PartyId		INT,		
-		PartyName	VARCHAR(200),			
+		LicenseeId	INT,
+		PartyId		INT,
+		PartyName	VARCHAR(200),
 		SB			MONEY, --SB
 		RB			MONEY, -- RB
 		NG			MONEY, -- NG	
@@ -150,15 +155,17 @@ BEGIN
 		KN			MONEY, -- KN
 		AGC			MONEY, -- AGC
 		GD			MONEY, -- GD
-		VG			MONEY  -- VG
+		VG			MONEY, -- VG
+		MGCLC		MONEY, -- Microgaming - Live Casino
+		MGCRNG		MONEY  -- Microgaming - RNG Casino
 	)
 	INSERT INTO #LicenseeAmount(GroupName, LicenseeId, PartyId,PartyName)
 	SELECT	CASE
 				WHEN p.PartyId = 1 THEN 'ONEWorks'
 				WHEN p.PartyId = 11 THEN 'Boping'
 				WHEN p.PartyId = 98 THEN 'Zelianta'
-				ELSE 'Credit' 
-			END	AS PartyName,			
+				ELSE 'Credit'
+			END	AS PartyName,
 			op.OldRefID,
 			t.PartyId, 
 			t.PartyName
@@ -166,8 +173,8 @@ BEGIN
 			INNER JOIN dbo.OAS_Party op WITH (NOLOCK) ON op.PartyID = t.PartyId
 	WHERE	t.ParentId != 0
 			AND t.PartyId IN (SELECT Id FROM @PartyIdTable)
-	
-	-- BA	
+
+	-- BA
 	;WITH AmountDueBA AS
 	(
 		SELECT	d.LicenseeId,
@@ -177,7 +184,6 @@ BEGIN
 		WHERE	d.ProductId = 3
 		GROUP	BY d.LicenseeId
 	)
-	
 	UPDATE	d
 	SET		BA = a.Amount
 	FROM	#LicenseeAmount d INNER JOIN AmountDueBA a ON a.LicenseeId = d.LicenseeId
@@ -195,7 +201,7 @@ BEGIN
 	UPDATE	d
 	SET		RB = a.Amount
 	FROM	#LicenseeAmount d INNER JOIN AmountDueRacing a ON a.LicenseeId = d.LicenseeId
-		
+
 	;WITH AmountDueByProduct AS
 	(
 		SELECT	d.PartyId,
@@ -208,12 +214,15 @@ BEGIN
 				ISNULL(SUM(CASE WHEN d.ProductId = 8  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS KN,
 				ISNULL(SUM(CASE WHEN d.ProductId = 10 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS AGC,
 				ISNULL(SUM(CASE WHEN d.ProductId = 11 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS GD,
-				ISNULL(SUM(CASE WHEN d.ProductId = 12 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS VG
+				ISNULL(SUM(CASE WHEN d.ProductId = 12 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS VG,
+				ISNULL(SUM(CASE WHEN d.ProductId = 14 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS MGCLC,
+				ISNULL(SUM(CASE WHEN d.ProductId = 17 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS MGCRNG
 		FROM	#TempData d
 				INNER JOIN @PartyChargeInfo ci ON	d.PartyId = ci.PartyId 
 													AND ci.ProductId = d.ProductId 
 													AND d.rptDate BETWEEN ci.FromDate AND ci.ToDate
-				INNER JOIN #Exchange e ON d.rptDate = e.ExchangeDate AND d.CurrencyId = e.ExchangeID	
+													AND d.BettypeRef = ci.BettypeRef
+				INNER JOIN #Exchange e ON d.rptDate = e.ExchangeDate AND d.CurrencyId = e.ExchangeID
 		GROUP BY d.PartyId,
 				 d.LicenseeId
 	)
@@ -226,7 +235,9 @@ BEGIN
 			KN = a.KN,
 			AGC = a.AGC,
 			GD = a.GD,
-			VG = a.VG
+			VG = a.VG,
+			MGCLC = a.MGCLC,
+			MGCRNG = a.MGCRNG
 	FROM	#LicenseeAmount l
 			INNER JOIN AmountDueByProduct a ON a.LicenseeId = l.LicenseeId AND a.PartyId = l.PartyId
 	
@@ -242,11 +253,17 @@ BEGIN
 			AND AGC IS NULL
 			AND GD IS NULL
 			AND VG IS NULL
+			AND MGCLC IS NULL
+			AND MGCRNG IS NULL
 	
-	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG
+	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG
 	FROM	#LicenseeAmount l
 	
 	-- EndRegion
+
+	DROP TABLE #Exchange
+	DROP TABLE #TempData
+	DROP TABLE #LicenseeAmount
 END
 
 GO
