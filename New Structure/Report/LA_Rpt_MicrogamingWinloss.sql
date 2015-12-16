@@ -151,13 +151,14 @@ BEGIN
 		LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfoSub cis WITH (NOLOCK) ON ci2.ChargeID = cis.ChargeIdRef) a
 		LEFT JOIN #ExchangeRate er ON a.BaseCurrencyId = er.ExchangeID
 		
-	INSERT INTO #Result (ParentId, PartyID, PartyName, BettypeRef, GameTypeName, ProductId, CurrencyId, Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueToCompany, TotalTrans)
+	INSERT INTO #Result (ParentId, PartyID, PartyName, BettypeRef, GameTypeName, ProductId, CurrencyId, Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueToCompany, TotalTrans, AmountDueToProduct)
 	SELECT pci.ParentId, pci.PartyId, pci.PartyName, gt.BettypeRef, gt.GameTypeName, d.ProductId, d.CurrencyId,
 		SUM(Turnover * er.Rate) AS Turnover,
 		SUM(CustomerWinLoss * er.Rate) AS CustomerWinLoss,
 		-SUM(CustomerWinLoss * er.Rate) AS LicenseeWinLoss,
 		-SUM((CustomerWinLoss * pci.Rate) * er.Rate) AS AmountDueToCompany,
-		SUM(TotalTrans) AS TotalTrans
+		SUM(TotalTrans) AS TotalTrans,
+		SUM(CASE WHEN pci.ChargeId <> 0 AND d.RptDate BETWEEN pci.FromDate AND pci.ToDate THEN -(d.CustomerWinLoss * er.Rate) ELSE 0 END) AS AmountDueToProduct
 	FROM (SELECT rd.SiteId, rd.RptDate, rd.CurrencyId, rd.BetTypeRef, pci.PartyId, pci.ProductId, SUM(rd.Winloss) AS CustomerWinLoss, SUM(rd.Turnover) as Turnover, SUM(rd.BetCount) AS TotalTrans
 			FROM #SumData rd
 				INNER JOIN (SELECT DISTINCT LicenseeId, BettypeRef, PartyId, ProductId FROM #PartyChargeInfo) pci 
@@ -177,14 +178,14 @@ BEGIN
 
 	INSERT INTO #AmountDueToMicrogaming ([@GroupWinloss].BettypeRef, AmountDueTo)
 	SELECT BettypeRef, SUM(CASE WHEN oa.kq > 0 THEN oa.kq ELSE 0 END) AS AmtDueto
-	FROM (SELECT ProductId, BettypeRef, ParentId, SUM(LicenseeWinLoss) AS GroupWinloss, SUM(AmountDueToCompany) AS AmountDueToCompany
+	FROM (SELECT ProductId, BettypeRef, ParentId, SUM(AmountDueToCompany) AS GroupWinloss
 		  FROM #Result
 		  GROUP BY ProductId, BettypeRef, ParentId) d
 	OUTER APPLY (
 		SELECT
-		CASE WHEN (AmountDueToCompany > 0 AND ChargeType = 4 AND GroupWinloss BETWEEN MinAmount AND ISNULL(MaxAmount, 100000000000)) THEN (GroupWinloss - MinAmount) * Rate ELSE 0 END +
-		CASE WHEN (AmountDueToCompany > 0 AND ChargeType = 4 AND GroupWinloss > MaxAmount) THEN (MaxAmount - MinAmount) * Rate ELSE 0 END +
-		CASE WHEN (AmountDueToCompany > 0 AND ChargeType = 1) THEN GroupWinloss * Rate ELSE 0 END AS kq
+		CASE WHEN (ChargeType = 4 AND GroupWinloss BETWEEN MinAmount AND ISNULL(MaxAmount, 100000000000)) THEN (GroupWinloss - MinAmount) * Rate ELSE 0 END +
+		CASE WHEN (ChargeType = 4 AND GroupWinloss > MaxAmount) THEN (MaxAmount - MinAmount) * Rate ELSE 0 END +
+		CASE WHEN (ChargeType = 1) THEN GroupWinloss * Rate ELSE 0 END AS kq
 		FROM #ProductChargeInfo
 		WHERE ParentId = d.ParentId AND BettypeRef = d.BettypeRef AND ProductId = d.ProductId) oa
 	GROUP BY BettypeRef
