@@ -167,7 +167,7 @@ BEGIN
 		INNER JOIN #PartyChargeInfo pci ON d.SiteId = pci.LicenseeID AND d.BettypeRef = pci.BettypeRef AND pci.ProductId = d.ProductId
 		INNER JOIN #ExchangeRate er ON d.CurrencyId = er.ExchangeID AND d.RptDate = er.ExchangeDate
 		LEFT JOIN (SELECT DISTINCT BettypeRef, GameTypeName, ProductId FROM #GameTypes) gt ON d.BettypeRef = gt.BettypeRef AND gt.ProductId = d.ProductId
-	WHERE d.RptDate BETWEEN pci.Fromdate AND pci.Todate
+	WHERE d.RptDate BETWEEN pci.Fromdate AND pci.Todate OR @ExcludeTest = 0
 	GROUP BY gt.GameTypeName, gt.BettypeRef, pci.ParentId, pci.PartyId, pci.PartyName, d.ProductId, d.CurrencyId
 
 	DROP TABLE #GameTypes
