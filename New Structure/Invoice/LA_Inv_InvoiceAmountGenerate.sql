@@ -110,14 +110,15 @@ BEGIN
 			PartyId		INT,
 			LicenseeId	INT,
 			ProductID	INT,
+			BettypeRef  INT,
 			Rate		MONEY,
 			FromDate	SMALLDATETIME,
 			ToDate		SMALLDATETIME)
 
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
+	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, BettypeRef, Rate, Fromdate, Todate)
 	(
-		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
-		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
+		SELECT	PartyID, LicenseeID, ProductID, Bettype, DI_Rate, Fromdate, Todate
+		FROM	dbo.LA_f_ChargeInfo_xtest(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
 	)
 		
@@ -326,10 +327,11 @@ BEGIN
 			CurrencyId		INT, 
 			WinLoss			MONEY, 
 			AComm			MONEY, 
-			ProductId		TINYINT, 
+			ProductId		TINYINT,
+			BettypeRef		INT, 
 			AmountToCompany MONEY,
 			IsApplyMinFee	BIT)
-	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,WinLoss,AComm,ProductId)
+	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,WinLoss,AComm,ProductId,BettypeRef)
 	(
 	    SELECT	b.SiteID,
 				p.PartyId, 
@@ -337,8 +339,10 @@ BEGIN
 				b.CurrencyID, 
 				SUM(ISNULL(b.MemberWL, 0)) Winloss, 
 				SUM(ISNULL(b.CommissionA, 0)) AS AComm, 
-				p.ProductId
+				p.ProductId,
+				r.BettypeRef
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+				INNER JOIN dbo.Sport_Bettype_Reference r ON b.Bettype = r.Bettype
 				INNER JOIN @PartyChargeInfo p ON	b.ProductId = p.ProductID 
 													AND p.LicenseeId = b.SiteId
 													AND b.rptDate BETWEEN p.FromDate AND p.ToDate
@@ -346,7 +350,7 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.Bettype NOT IN (901,902,903)
-		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId
+		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, r.BettypeRef
 	)
 	
 	CREATE NONCLUSTERED INDEX Idx_InvoiceData ON #TempData (PartyId, ProductId)
@@ -358,7 +362,12 @@ BEGIN
 									ELSE 0 
 								END
 	FROM	#TempData td 
-			INNER JOIN @PartyChargeInfo p ON td.LicenseeId = p.LicenseeId AND td.ProductId = p.ProductID AND td.rptDate BETWEEN p.FromDate AND p.ToDate
+			INNER JOIN @PartyChargeInfo p 
+				ON td.LicenseeId = p.LicenseeId 
+				AND ((td.ProductId = p.ProductID AND td.ProductId NOT IN (SELECT DISTINCT Productid FROM dbo.LA_Product3rdSub))
+						OR 
+					(td.ProductId = p.ProductID AND td.BettypeRef = p.BettypeRef AND td.ProductId IN (SELECT DISTINCT Productid FROM dbo.LA_Product3rdSub)))
+				AND td.rptDate BETWEEN p.FromDate AND p.ToDate
 			INNER JOIN #Exchange e ON td.rptDate = e.ExchangeDate AND td.CurrencyId = e.ExchangeID	
 	
 	
