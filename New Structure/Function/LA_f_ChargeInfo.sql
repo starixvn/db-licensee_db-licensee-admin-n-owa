@@ -311,7 +311,7 @@ BEGIN
 				INNER JOIN @ProductTable f2 ON cte.ProductID = f2.Productid
 				INNER JOIN dbo.OAS_ChargeInfoSub sub WITH (NOLOCK) ON sub.ProductID = cte.ProductID
 				INNER JOIN @Bettype sbr ON sbr.BetTypeRef = sub.BettypeRef
-			WHERE (@FromDate <= cte.AffectedDate OR @ExcludeTest = 0)
+			WHERE @FromDate <= cte.AffectedDate
 				AND EXISTS (SELECT Productid FROM dbo.LA_Product3rdSub WITH (NOLOCK)WHERE cte.ProductID = Productid)
 	   )
 	END
