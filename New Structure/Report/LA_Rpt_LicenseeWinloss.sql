@@ -135,16 +135,11 @@ BEGIN
 		INSERT INTO #Data(rptDate, PartyID, ProductID, Currency, BetTypeId, Turnover, Winloss, AWinloss, AComm, Betcount)
 		(
 			SELECT b.rptDate, ci.PartyID, b.ProductID, b.currencyID, ci.BetTypeId
-				, SUM(b.turnover * 
-					CASE WHEN @drawfilter IN (2, 3) 
-						THEN CASE WHEN b.StatusId = 111 THEN 0
-							WHEN b.StatusId IN (114, 115)	THEN 0.5 ELSE 1	END
-						ELSE 1
-					END) Turnover
+				, SUM(b.turnover) Turnover
 				, SUM(b.MemberWL)
 				, 0
 				, 0
-				, SUM(b.betcount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) BetCount
+				, SUM(b.betcount) BetCount
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN #MicrogamingChargeInfo ci ON b.SiteID = ci.LicenseeID AND ci.BetTypeId = b.Bettype AND b.ProductID = ci.ProductID
 			WHERE b.rptDate BETWEEN @Fromdate AND @Todate
