@@ -153,7 +153,7 @@ BEGIN
 				, 0
 				, SUM(b.betcount) BetCount
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN #MicrogamingChargeInfo ci ON b.SiteID = ci.LicenseeID AND ci.BetTypeId = b.Bettype AND b.ProductID = ci.ProductID
+				INNER JOIN (SELECT DISTINCT PartyID, LicenseeID, ProductID, BetTypeId FROM #MicrogamingChargeInfo) ci ON b.SiteID = ci.LicenseeID AND ci.BetTypeId = b.Bettype AND b.ProductID = ci.ProductID
 			WHERE b.rptDate BETWEEN @Fromdate AND @Todate
 				AND b.ProductID IN (SELECT ProductId FROM #MicrogamingProducts)
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
