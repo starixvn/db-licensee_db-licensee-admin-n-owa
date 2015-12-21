@@ -45,7 +45,7 @@ BEGIN
 			Winlostdate		DATETIME
 			, CurrencyId	INT
 			, Game			VARCHAR(100)
-			, TurnOver		MONEY
+			, Turnover		MONEY
 			, ActualStake	MONEY
 			, BuyBackAmount	MONEY
 			, Winlost		MONEY
@@ -66,7 +66,7 @@ BEGIN
 	DECLARE @Bettype AS TABLE (
 		Bettype				INT
 		, ProductId			INT)
-	CREATE TABLE #Exchange( ExchangeDate DATE, ExchangeID INT, CurrencyCode VARCHAR(10), Rate FLOAT)
+	CREATE TABLE #Exchange( ExchangeDate DATE, ExchangeID INT, CurrencyCode VARCHAR(10), Rate MONEY)
 	
 	INSERT INTO @tmpParty(PartyId, LicenseeId, ProductID, Bettype, Rate, Fromdate, Todate)
 	(
@@ -118,7 +118,7 @@ BEGIN
 	END
 
 	DECLARE @Recommend VARCHAR(8000) = '', @SQL VARCHAR(8000) = ''
-	CREATE TABLE #DataWinloss3rd (Recommend	INT, Winlostdate DATETIME, SportType INT, Currency INT, TurnOver MONEY, TotalTrans INT, Winloss MONEY)
+	CREATE TABLE #DataWinloss3rd (Recommend	INT, Winlostdate DATETIME, SportType INT, Currency INT, Turnover MONEY, TotalTrans INT, Winloss MONEY)
 	DECLARE @TempAG AS TABLE( LicenseeeID INT, CustId INT, CurrencyId INT)
 	
 	-- Product <> BA
@@ -142,7 +142,7 @@ BEGIN
 			--truncate last comma
 			SET @Recommend = SUBSTRING(@Recommend, 0, LEN(@Recommend))	
 
-			SELECT @sql = 'SELECT Recommend, Winlostdate, SportType, Currency, TurnOver, TotalTrans, Winloss
+			SELECT @sql = 'SELECT Recommend, Winlostdate, SportType, Currency, Turnover, TotalTrans, Winloss
 						  FROM OPENQUERY(DBACC,''EXEC bodb02.dbo.LA_Rpt_3rdProductWinloss
 												 @ProductCodes		= ''''@ProductCodes_''''
 												, @Recommend		= ''''@Recommend_''''
@@ -156,7 +156,7 @@ BEGIN
 			SET @SQL = REPLACE(@SQL, '@FromDate_', CONVERT( VARCHAR(10),@FromDate, 120))
 			SET @SQL = REPLACE(@SQL, '@ToDate_', CONVERT( VARCHAR(10),@ToDate, 120))			
 			
-			INSERT INTO #DataWinloss3rd(Recommend, Winlostdate, SportType, Currency, TurnOver, TotalTrans, Winloss)
+			INSERT INTO #DataWinloss3rd(Recommend, Winlostdate, SportType, Currency, Turnover, TotalTrans, Winloss)
 			EXECUTE (@SQL)
 
 			INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
@@ -197,7 +197,7 @@ BEGIN
 			--truncate last comma
 			SET @Recommend = SUBSTRING(@Recommend, 0, LEN(@Recommend))	
 
-			INSERT INTO #DataWinloss3rd(Recommend, Winlostdate, Currency, TurnOver, TotalTrans, Winloss)
+			INSERT INTO #DataWinloss3rd(Recommend, Winlostdate, Currency, Turnover, TotalTrans, Winloss)
 			EXECUTE dbo.LA_Rpt_ThirdPartyProductWinloss
 					@ProductCodes	= @ProductCode
 					, @Recommend	= @Recommend
@@ -266,7 +266,7 @@ BEGIN
 					rptDate     
 					, CurrencyID	
 					, ps.ProductName AS Game					
-					, SUM(Turnover) AS turnover
+					, SUM(Turnover) AS Turnover
 					, SUM(WinLoss) AS Winlost
 					, SUM(PComm) AS PlayerComm
 					, - SUM(Winloss * ( 1 - p.Rate)) AS LicenseeWL				
@@ -275,7 +275,7 @@ BEGIN
 					, SUM(BetCount) AS BetCount	  
 				FROM (
 					SELECT b.SiteId, b.rptDate, b.CurrencyID, b.Bettype
-					, SUM(ISNULL(b.turnover, 0)) AS TurnOver
+					, SUM(ISNULL(b.Turnover, 0)) AS Turnover
 					, SUM(ISNULL(b.winloss, 0)) Winloss					 			 					 				
 					, SUM(ISNULL(b.CommissionP, 0)) AS PComm
 					, SUM(ISNULL(b.CommissionA, 0)) AS AComm
@@ -367,7 +367,7 @@ BEGIN
 		END
 		ELSE
 		BEGIN
-			INSERT INTO #Result( Winlostdate, CurrencyId, TurnOver, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
+			INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
 			(
 				SELECT   			   
 					rptDate     
@@ -381,7 +381,7 @@ BEGIN
 					, SUM(BetCount) AS BetCount	  
 				FROM (
 					SELECT b.SiteId, b.rptDate, b.CurrencyID
-					, SUM(ISNULL(b.turnover, 0)) AS TurnOver
+					, SUM(ISNULL(b.turnover, 0)) AS Turnover
 					, SUM(ISNULL(b.winloss, 0)) Winloss					 			 					 				
 					, SUM(ISNULL(b.CommissionP, 0)) AS PComm
 					, SUM(ISNULL(b.CommissionA, 0)) AS AComm
@@ -408,7 +408,7 @@ BEGIN
 	IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode = 'BA')
 	BEGIN
 		SET @DrawFilter = 2 -- set case No Darw
-		INSERT INTO #Result( Winlostdate, CurrencyId, TurnOver, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
+		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
 		(
 			SELECT   			   
 				b.rptDate     
@@ -450,7 +450,7 @@ BEGIN
 		, e.CurrencyCode			AS CurrencyName
 		, SUM(Betcount)				AS Betcount
 		--orginal
-		, SUM(ISNULL(TurnOver, 0))				AS Turnover
+		, SUM(ISNULL(Turnover, 0))				AS Turnover
 		, SUM(ISNULL(d.ActualStake, 0))			AS ActualStake
 		, SUM(ISNULL(d.BuyBackAmount, 0))		AS BuyBackAmount
 		, SUM(ISNULL(Winlost, 0))				AS MemberWinLoss		
@@ -461,7 +461,7 @@ BEGIN
 		, SUM(ISNULL(Company, 0))				AS Company
 		
 		--Base on currency
-		, SUM(TurnOver * e.Rate)	AS TurnoverBase
+		, SUM(Turnover * e.Rate)	AS TurnoverBase
 		, SUM(ISNULL(d.ActualStake * e.Rate, 0))		AS ActualStakeBase
 		, SUM(ISNULL(d.BuyBackAmount * e.Rate, 0))		AS BuyBackAmountBase
 		, SUM(ISNULL(d.BettradeComm * e.Rate, 0))		AS BettradeCommBase
