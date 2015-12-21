@@ -227,6 +227,7 @@ BEGIN
 		END
 		ELSE IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode IN ('MGCLC','MGCRNG')) 
 		BEGIN
+		
 			-- product 3rd sub name
 			CREATE TABLE #Product3rdSubName (Bettype INT, BettypeRef INT, ProductName VARCHAR(100))
 			INSERT INTO #Product3rdSubName( Bettype, BettypeRef)
@@ -238,7 +239,6 @@ BEGIN
 			IF @ProductCode = 'MGCLC'
 			BEGIN
 				DELETE FROM #Product3rdSubName WHERE Bettype IN (2008,2009)
-				DELETE FROM @tmpParty WHERE Bettype IN (2008,2009)
 				
 				UPDATE #Product3rdSubName
 				SET ProductName = 'Live Casino - Generic Games'
@@ -250,7 +250,6 @@ BEGIN
 			ELSE
 			BEGIN
 				DELETE FROM #Product3rdSubName WHERE Bettype NOT IN (2008,2009)
-				DELETE FROM @tmpParty WHERE Bettype NOT IN (2008,2009)
 				
 				UPDATE #Product3rdSubName
 				SET ProductName = 'RNG Casino - Generic Games'
@@ -258,8 +257,8 @@ BEGIN
 				UPDATE #Product3rdSubName
 				SET ProductName = 'RNG Casino - Branded Games'
 				WHERE BettypeRef = 2005
-			END			
-						
+			END		
+				
 			-- product 3rd sub name
 			INSERT INTO #Result( Winlostdate, CurrencyId, Game, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
 			(
@@ -282,7 +281,9 @@ BEGIN
 					, SUM(ISNULL(b.CommissionA, 0)) AS AComm
 					, SUM(ISNULL(b.betcount, 0)) BetCount
 					FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK)
-						INNER JOIN (SELECT DISTINCT LicenseeId, Bettype FROM @tmpParty) p ON b.SiteId = p.LicenseeID AND b.Bettype = p.Bettype					
+						INNER JOIN #Product3rdSubName s ON s.Bettype = b.Bettype
+						INNER JOIN (SELECT DISTINCT LicenseeId, Bettype FROM @tmpParty) p ON b.SiteId = p.LicenseeID AND p.Bettype=s.BettypeRef
+							
 					WHERE
 						b.SiteID = @LicenseeID
 						AND b.rptDate BETWEEN @FromDate AND @ToDate			
@@ -292,12 +293,12 @@ BEGIN
 						AND b.customercategory NOT IN (27, 28)					
 					GROUP BY b.rptdate, b.SiteId, b.CurrencyID, b.Bettype
 				) d 
-					INNER JOIN @tmpParty p ON d.SiteId = p.LicenseeID AND d.Bettype = p.Bettype					
-					LEFT JOIN #Product3rdSubName ps ON d.Bettype = ps.Bettype
+					INNER JOIN #Product3rdSubName ps ON d.Bettype = ps.Bettype
+					INNER JOIN @tmpParty p ON d.SiteId = p.LicenseeID AND p.Bettype = ps.BettypeRef					
+					
 				WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
 				GROUP BY rptDate, CurrencyID , ps.ProductName, d.Bettype
 			)
-			
 			DROP TABLE #Product3rdSubName			
 		END
 		ELSE IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode = 'BT')--BetTrade
