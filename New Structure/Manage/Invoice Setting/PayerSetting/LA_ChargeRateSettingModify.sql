@@ -338,13 +338,13 @@ BEGIN
 				WHERE ChargeID = 0 
 					AND IsEdit = 0
 					AND BettypeRef != 0
-				
+								
 				INSERT INTO dbo.OAS_ChargeInfoSub WITH (ROWLOCK, UPDLOCK)(ProductID, FromParty, ToParty, ParentChargeID, BettypeRef, Rate, ChargeType, FromDate, ToDate, FirstOfBilling, BasisOfBilling, ChargeIdRef)
 				SELECT c.ProductId, @PayerID, @ToParty, @ParentChargeID, c.BettypeRef, c.Rate, c.ChargeType, c.FromDate, c.ToDate, c.FirstBilling, c.BasisBilling, i.ChargeID
 				FROM @ChargeSetting	c INNER JOIN @ChargeID i ON c.ProductId = i.ProductId				
 				WHERE c.ChargeID = 0 
 					AND IsEdit = 0
-					AND BettypeRef = 0
+					AND BettypeRef != 0
 											
 				IF @@ERROR <> 0
 				BEGIN
