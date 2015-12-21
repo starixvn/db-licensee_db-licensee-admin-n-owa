@@ -98,7 +98,7 @@ BEGIN
 		END
 		
 		DELETE dbo.OAS_ChargeInfoSub WITH (ROWLOCK, UPDLOCK)
-		WHERE ChargeID = @ChargeId AND FromParty = @PayerId
+		WHERE ChargeIdRef = @ChargeId AND FromParty = @PayerId
 		
 		IF @@ERROR <> 0
 		BEGIN
