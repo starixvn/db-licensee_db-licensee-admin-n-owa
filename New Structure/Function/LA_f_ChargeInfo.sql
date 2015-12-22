@@ -74,10 +74,10 @@ BEGIN
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
 	    WHERE ChargeType != 2
 		  AND p.PartyID IN (SELECT VAL FROM strSplit(@PartyIDs, ','))		  
-		  AND NOT EXISTS (SELECT Productid FROM dbo.LA_Product3rdSub WITH (NOLOCK) WHERE ci.ProductID = Productid)
+		  AND ci.ProductID NOT IN (SELECT Productid FROM dbo.LA_Product3rdSub WITH (NOLOCK))
 	    GROUP BY FromParty, ci.ProductID
 	)
-			
+
     INSERT INTO @tbChargeInfo (ChargeID , PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate)
 	SELECT DI.ChargeID 
 		, p.PartyID
@@ -136,12 +136,13 @@ BEGIN
 		  , ci.ProductID
 	    FROM dbo.OAS_Party p WITH (NOLOCK)
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
-			INNER JOIN dbo.OAS_ChargeInfoSub s WITH (NOLOCK) ON s.ChargeIDRef = ci.ChargeID
+			INNER JOIN dbo.OAS_ChargeInfoSub s WITH (NOLOCK) ON s.ChargeIDRef = ci.ChargeID AND s.FromParty = ci.FromParty
 	    WHERE ci.ChargeType != 2
-		  AND p.PartyID IN (SELECT VAL FROM strSplit(@PartyIDs, ','))		  
+		  AND p.PartyID IN (SELECT VAL FROM strSplit(@PartyIDs, ','))		
+		  AND ci.ProductID IN (SELECT Productid FROM dbo.LA_Product3rdSub WITH (NOLOCK))	  
 	    GROUP BY ci.FromParty, ci.ProductID
 	)
-	
+
 	INSERT INTO @tbChargeInfo (ChargeID , PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Bettype, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate)
 	SELECT DISTINCT DI.ChargeID 
 		, p.PartyID
