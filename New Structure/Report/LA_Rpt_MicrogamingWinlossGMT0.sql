@@ -150,7 +150,8 @@ BEGIN
 	FROM #PartyChargeInfo tp
 		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON tp.ChargeId = ci.ChargeID
 		LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo ci2 WITH (NOLOCK) ON ci.ToParty = ci2.FromParty AND ci2.ProductID = tp.ProductID
-		LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfoSub cis WITH (NOLOCK) ON ci2.ChargeID = cis.ChargeIdRef) a
+		LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfoSub cis WITH (NOLOCK) ON ci2.ChargeID = cis.ChargeIdRef
+		WHERE tp.ChargeId > 0) a
 		LEFT JOIN #ExchangeRate er ON a.BaseCurrencyId = er.ExchangeID
 		
 	INSERT INTO #Result (ParentId, PartyID, PartyName, BettypeRef, GameTypeName, ProductId, CurrencyId, Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueToCompany, TotalTrans, AmountDueToProduct)
@@ -169,7 +170,7 @@ BEGIN
 		INNER JOIN #PartyChargeInfo pci ON d.SiteId = pci.LicenseeID AND d.BettypeRef = pci.BettypeRef AND pci.ProductId = d.ProductId
 		INNER JOIN #ExchangeRate er ON d.CurrencyId = er.ExchangeID AND d.RptDate = er.ExchangeDate
 		LEFT JOIN (SELECT DISTINCT BettypeRef, GameTypeName, ProductId FROM #GameTypes) gt ON d.BettypeRef = gt.BettypeRef AND gt.ProductId = d.ProductId
-	WHERE d.RptDate BETWEEN pci.Fromdate AND pci.Todate OR @ExcludeTest = 0
+	WHERE d.RptDate BETWEEN pci.Fromdate AND pci.Todate
 	GROUP BY gt.GameTypeName, gt.BettypeRef, pci.ParentId, pci.PartyId, pci.PartyName, d.ProductId, d.CurrencyId
 
 	DROP TABLE #GameTypes
@@ -183,7 +184,7 @@ BEGIN
 		(SELECT BettypeRef , PartyId, SUM(AmountDueToCompany) AS AmountCompany 
 		FROM #Result 
 		GROUP BY BettypeRef, PartyId) rs
-		INNER JOIN (SELECT BettypeRef, PartyId, MAX(Rate) AS Rate FROM #PartyChargeInfo GROUP BY BettypeRef, PartyId) pci ON rs.BettypeRef = pci.BettypeRef AND pci.PartyId = rs.PartyId
+		INNER JOIN (SELECT BettypeRef, PartyId, MAX(Rate) AS Rate FROM #PartyChargeInfo WHERE ChargeId > 0 GROUP BY BettypeRef, PartyId) pci ON rs.BettypeRef = pci.BettypeRef AND pci.PartyId = rs.PartyId
 	GROUP BY pci.BettypeRef, pci.PartyId
 	
 	UPDATE rs SET rs.AmountDueToCompany = adt.AmountDueTo FROM #Result rs
