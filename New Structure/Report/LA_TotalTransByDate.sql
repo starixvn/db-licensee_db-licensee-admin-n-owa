@@ -1,7 +1,8 @@
-USE [bodb_licensee]
+USE [bodb_Licensee]
 GO
+/****** Object:  StoredProcedure [dbo].[LA_TotalTransByDate]    Script Date: 12/21/2015 06:47:11 ******/
 SET ANSI_NULLS ON
-GO 
+GO
 SET QUOTED_IDENTIFIER ON
 GO
 
@@ -20,7 +21,7 @@ AS
 	 - 20151028@Bravo:	 Exclude trial data
 	 - 20151112@Bravo:	 Fix bug missing BA data.
 	 - 20151204@Bravo:	 #48740-HotFix-TotalTrans-AutoMail.
-	 - 20151207@Bravo:	 #48864-HotFix-Missing Credit data.
+	 - 20151222@Francis: #48864-HotFix-Missing Credit data for GD
 	 Params:			   
 */
 BEGIN
@@ -139,7 +140,7 @@ BEGIN
 			AND c.Currency<>20
 	GROUP BY MONTH(c.[Winlostdate]), c.[Winlostdate], ISNULL(site.SiteID,-1)
 
-	--Vegas Game and Gold Deluxe
+	--Vegas Game
 	INSERT	INTO #tmpBetting(rptDate,rptDateFull, product, siteID, betcount)
 	SELECT	MONTH(c.Winlostdate) AS rptDate, c.Winlostdate,
 			p.ProductPrefix AS product, 
@@ -148,10 +149,23 @@ BEGIN
 	FROM	bodb_LicenseeReport.dbo.rptDepWinlost_ThirdParty c WITH (NOLOCK)
 			INNER JOIN bodb02.dbo.Custinfo co WITH (NOLOCK) ON c.CustID = co.CustID	
 			INNER JOIN dbo.f_SelLicenseeCust(0) lc ON co.recommend = lc.CustID
-			LEFT JOIN bodb_licensee.dbo.LRF_f_Products3rd('VG,GD') p ON c.ProductId = p.ProductID				
+			LEFT JOIN bodb_licensee.dbo.LRF_f_Products3rd('VG') p ON c.ProductId = p.ProductID				
 	WHERE	c.Winlostdate BETWEEN @FromDate AND @Todate
 			AND c.Currency <> 20
 	GROUP BY MONTH(c.Winlostdate), c.Winlostdate, p.ProductPrefix, lc.LicenseeID
+	
+	--Gold Deluxe for both (single and seperate wallet)
+	INSERT	INTO #tmpBetting(rptDate,rptDateFull,product,siteID,betcount)
+	SELECT	month(b.rptDate), b.rptDate,
+			p.ProductPrefix AS product,
+			b.SiteID, 
+			SUM(b.betcount) AS betcount
+	FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK) 
+			LEFT JOIN bodb_licensee.dbo.LRF_f_Products3rd('GD') p ON b.ProductId = p.ProductID				
+	where	b.rptDate between @Fromdate AND @Todate
+			AND b.StatusId NOT IN (-1,103)
+			AND b.CurrencyID <> 20
+	GROUP BY month(b.rptDate),b.rptDate, p.ProductPrefix, b.SiteID
 	---------------------------------------------------------------------------------	
 
 	UPDATE	t
@@ -297,3 +311,8 @@ BEGIN
 	DROP TABLE #tmpBetting 
 	DROP TABLE #data
 END
+
+GO
+GRANT EXECUTE ON [dbo].[LA_TotalTransByDate] TO [bodbLicenseeNet] AS [dbo]
+GO
+GRANT VIEW DEFINITION ON [dbo].[LA_TotalTransByDate] TO [vnteam] AS [dbo]
