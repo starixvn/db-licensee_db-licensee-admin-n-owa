@@ -1,5 +1,11 @@
-use bodb_LicenseeReport
-go
+USE [bodb_LicenseeReport]
+GO
+/****** Object:  StoredProcedure [dbo].[GEN_rptBettingByProduct]    Script Date: 12/22/2015 02:27:15 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+/****** Object:  Stored Procedure dbo.GEN_rptBettingByProduct    Script Date: 12/2/2015 14:38:34 ******/
 ALTER PROCEDURE [dbo].[GEN_rptBettingByProduct] (
 	@date DATE,
 	@date2 DATE = NULL
@@ -15,6 +21,7 @@ AS
 		- 20151021@Victor: Support AG Casino Single Wallet and include Void, Reject, Refund tickets
 		- 20151105@Victor: Summary data for Racing by bettype [Redmine: #44873]
 		- 20151201@Bravo: Change Product code: MGC -> MGCLC
+		- 20151222@Francis: Add GD Single Wallet data for Credit
 */
 
 BEGIN  
@@ -29,7 +36,7 @@ BEGIN
 	
 	INSERT INTO #BettypeProductMapping (Bettype, ProductID)
 	SELECT Bettype, ProductId 
-	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB,NG,VS,RB,LC,CS,KN,BG,AGC,MGCLC,BT')
+	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB,NG,VS,RB,LC,CS,KN,BG,AGC,MGCLC,BT,GD')
 
 	INSERT INTO #BettypeProductMappingBA (Bettype, ProductID)
 	SELECT Bettype, ProductId 
@@ -186,5 +193,3 @@ BEGIN
 	DROP TABLE #BettypeProductMapping
 	DROP TABLE #BettypeProductMappingBA
 END
-
-GO
