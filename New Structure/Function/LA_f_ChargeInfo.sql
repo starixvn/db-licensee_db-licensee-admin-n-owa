@@ -52,9 +52,9 @@ BEGIN
 				THEN 0
 			ELSE p3.Productid
 			END
-			, p3.ProductPrefix
+			, s.val
 			FROM bodb02.dbo.strSplit(@ProductCodes, ',') s
-			INNER JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.val = p3.ProductPrefix
+			LEFT JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.val = p3.ProductPrefix
 	
 	INSERT INTO @Bettype(ProductId, BetTypeRef, Bettype)
 	SELECT pt.ProductID, sbr.BettypeRef, sbm.BetType
