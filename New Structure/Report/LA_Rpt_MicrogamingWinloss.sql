@@ -61,8 +61,6 @@ BEGIN
 		Winloss				MONEY)
 	
 	CREATE TABLE #AmountDueToMicrogaming (BettypeRef INT, AmountDueTo MONEY)
-	
-	CREATE TABLE #AmountDueToCompany (BettypeRef INT, PartyId INT, AmountDueTo MONEY)
 
 	CREATE TABLE #ExchangeRate(ExchangeDate DATE, ExchangeId INT, Rate FLOAT)
 
@@ -159,9 +157,9 @@ BEGIN
 		SUM(Turnover * er.Rate) AS Turnover,
 		SUM(CustomerWinLoss * er.Rate) AS CustomerWinLoss,
 		-SUM(CustomerWinLoss * er.Rate) AS LicenseeWinLoss,
-		-SUM((CustomerWinLoss) * er.Rate) AS AmountDueToCompany,
+		-SUM(CustomerWinLoss * er.Rate * pci.Rate) AS AmountDueToCompany,
 		SUM(TotalTrans) AS TotalTrans,
-		-SUM((CustomerWinLoss) * er.Rate) AS AmountDueToProduct
+		-SUM(CustomerWinLoss * er.Rate) AS AmountDueToProduct
 	FROM (SELECT rd.SiteId, rd.RptDate, rd.CurrencyId, rd.BetTypeRef, pci.PartyId, pci.ProductId, SUM(rd.Winloss) AS CustomerWinLoss, SUM(rd.Turnover) as Turnover, SUM(rd.BetCount) AS TotalTrans
 			FROM #SumData rd
 				INNER JOIN (SELECT DISTINCT LicenseeId, BettypeRef, PartyId, ProductId FROM #PartyChargeInfo) pci 
@@ -177,18 +175,7 @@ BEGIN
 	DROP TABLE #ExchangeRate
 	DROP TABLE #Parties
 	DROP TABLE #SumData
-	
-	INSERT INTO #AmountDueToCompany(BettypeRef, PartyId, AmountDueTo)
-	SELECT pci.BettypeRef, pci.PartyId, SUM(CASE WHEN rs.AmountCompany > 0 THEN rs.AmountCompany * pci.Rate ELSE 0 END) AS AmountDueTo
-	FROM
-		(SELECT BettypeRef , PartyId, SUM(AmountDueToCompany) AS AmountCompany 
-		FROM #Result 
-		GROUP BY BettypeRef, PartyId) rs
-		INNER JOIN (SELECT BettypeRef, PartyId, MAX(Rate) AS Rate FROM #PartyChargeInfo WHERE ChargeId > 0 GROUP BY BettypeRef, PartyId) pci ON rs.BettypeRef = pci.BettypeRef AND pci.PartyId = rs.PartyId
-	GROUP BY pci.BettypeRef, pci.PartyId
-	
-	UPDATE rs SET rs.AmountDueToCompany = adt.AmountDueTo FROM #Result rs
-	LEFT JOIN #AmountDueToCompany adt ON rs.BettypeRef = adt.BettypeRef AND rs.PartyId = adt.PartyId
+	DROP TABLE #PartyChargeInfo
 
 	INSERT INTO #AmountDueToMicrogaming ([@GroupWinloss].BettypeRef, AmountDueTo)
 	SELECT BettypeRef, SUM(CASE WHEN oa.kq > 0 THEN oa.kq ELSE 0 END) AS AmtDueto
@@ -199,6 +186,7 @@ BEGIN
 		SELECT
 		CASE WHEN (ChargeType = 4 AND GroupWinloss BETWEEN MinAmount AND ISNULL(MaxAmount, 100000000000)) THEN (GroupWinloss - MinAmount) * Rate ELSE 0 END +
 		CASE WHEN (ChargeType = 4 AND GroupWinloss > MaxAmount) THEN (MaxAmount - MinAmount) * Rate ELSE 0 END +
+		CASE WHEN (ChargeType = 4 AND GroupWinloss < ISNULL(MinAmount, 0) AND GroupWinloss < ISNULL(MaxAmount, 0)) THEN GroupWinloss * Rate ELSE 0 END +
 		CASE WHEN (ChargeType = 1) THEN GroupWinloss * Rate ELSE 0 END AS kq
 		FROM (SELECT BettypeRef, ChargeType, Rate, MinAmount, MaxAmount FROM #ProductChargeInfo GROUP BY BettypeRef, ChargeType, Rate, MinAmount, MaxAmount) pci
 		WHERE BettypeRef = d.BettypeRef) oa
@@ -223,9 +211,7 @@ BEGIN
 	DROP TABLE #Result
 	DROP TABLE #ProductChargeInfo
 	DROP TABLE #AmountDueToMicrogaming
-	DROP TABLE #AmountDueToCompany
 	DROP TABLE #Products
-	DROP TABLE #PartyChargeInfo
 END
 
 GO
