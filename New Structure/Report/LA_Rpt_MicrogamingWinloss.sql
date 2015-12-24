@@ -178,15 +178,15 @@ BEGIN
 	DROP TABLE #PartyChargeInfo
 
 	INSERT INTO #AmountDueToMicrogaming ([@GroupWinloss].BettypeRef, AmountDueTo)
-	SELECT BettypeRef, SUM(CASE WHEN oa.kq > 0 THEN oa.kq ELSE 0 END) AS AmtDueto
+	SELECT BettypeRef, SUM(oa.kq) AS AmtDueto
 	FROM (SELECT BettypeRef, SUM(AmountDueToProduct) AS GroupWinloss
 		  FROM #Result
 		  GROUP BY BettypeRef) d
 	OUTER APPLY (
 		SELECT
+		CASE WHEN (ChargeType = 4 AND GroupWinloss < 0 AND ISNULL(MaxAmount, 0) = 0 AND ISNULL(MinAmount, 0) = 0) THEN GroupWinloss * Rate ELSE 0 END +
 		CASE WHEN (ChargeType = 4 AND GroupWinloss BETWEEN MinAmount AND ISNULL(MaxAmount, 100000000000)) THEN (GroupWinloss - MinAmount) * Rate ELSE 0 END +
 		CASE WHEN (ChargeType = 4 AND GroupWinloss > MaxAmount) THEN (MaxAmount - MinAmount) * Rate ELSE 0 END +
-		CASE WHEN (ChargeType = 4 AND GroupWinloss < 0 AND ISNULL(MaxAmount, 0) = 0 AND ISNULL(MinAmount, 0) = 0) THEN GroupWinloss * Rate ELSE 0 END +
 		CASE WHEN (ChargeType = 1) THEN GroupWinloss * Rate ELSE 0 END AS kq
 		FROM (SELECT BettypeRef, ChargeType, Rate, MinAmount, MaxAmount FROM #ProductChargeInfo GROUP BY BettypeRef, ChargeType, Rate, MinAmount, MaxAmount) pci
 		WHERE BettypeRef = d.BettypeRef) oa
