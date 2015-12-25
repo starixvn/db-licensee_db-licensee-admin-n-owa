@@ -159,7 +159,7 @@ BEGIN
 		-SUM(CustomerWinLoss * er.Rate) AS LicenseeWinLoss,
 		-SUM(CustomerWinLoss * er.Rate * pci.Rate) AS AmountDueToCompany,
 		SUM(TotalTrans) AS TotalTrans,
-		-SUM(CustomerWinLoss * er.Rate) AS AmountDueToProduct
+		-SUM(CASE WHEN d.RptDate BETWEEN pci.FromDate AND pci.ToDate AND pci.ChargeId > 0 THEN CustomerWinLoss * er.Rate ELSE 0 END) AS AmountDueToProduct
 	FROM (SELECT rd.SiteId, rd.RptDate, rd.CurrencyId, rd.BetTypeRef, pci.PartyId, pci.ProductId, SUM(rd.Winloss) AS CustomerWinLoss, SUM(rd.Turnover) as Turnover, SUM(rd.BetCount) AS TotalTrans
 			FROM #SumData rd
 				INNER JOIN (SELECT DISTINCT LicenseeId, BettypeRef, PartyId, ProductId FROM #PartyChargeInfo) pci 
