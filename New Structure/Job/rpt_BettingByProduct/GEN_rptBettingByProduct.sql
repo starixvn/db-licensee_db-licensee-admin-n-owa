@@ -36,11 +36,11 @@ BEGIN
 	
 	INSERT INTO #BettypeProductMapping (Bettype, ProductID)
 	SELECT Bettype, ProductId 
-	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB,NG,VS,RB,LC,CS,KN,BG,AGC,MGCLC,MGCRNG,BT,GD')
+	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping_xtest(0,'SB,NG,VS,RB,LC,CS,KN,BG,AGC,MGCLC,MGCRNG,BT,GD')
 
 	INSERT INTO #BettypeProductMappingBA (Bettype, ProductID)
 	SELECT Bettype, ProductId 
-	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'BA')
+	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping_xtest(0,'BA')
 
 	-- Import data from rpt_Betting / rpt_Betting_BA
 	INSERT INTO [dbo].[rpt_BettingByProduct]
