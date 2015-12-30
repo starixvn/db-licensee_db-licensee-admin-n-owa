@@ -135,7 +135,7 @@ BEGIN
 			RETURN
 		END
 	--Modify Chargerate Setting
-	EXEC dbo.LA_ChargeRateSettingModify
+	EXEC dbo.LA_ChargeRateSettingModify_xtest
 		@PayerID				= @PayerID
 		, @ChargeSettingXML		= @ChargeSettingXML
 		, @ExchangeID			= @ExchangeID
