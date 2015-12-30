@@ -20,8 +20,9 @@ AS
 	Task : Report - Microgaming Casino GMT - 4
 	DB: DB052.bodb02
 	Modified:
-	- Feature 44698: Add Microgaming RNG and change data flow.
-	Revisions:  			
+	- Feature 44698
+	Revisions: 
+	- 20151201@Forrest: Add Microgaming RNG and change data flow	
 	Param's Explanation:
 		+ @PartyIDs	: a string of list PartyID, separate by ','
 		+ @Currency	:  0 - All Currencies
