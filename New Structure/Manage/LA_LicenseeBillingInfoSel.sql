@@ -16,6 +16,7 @@ AS
 		- 201505628@Florent: implement code
 		- 20150917@Victor: Support Chinese on Settings
 		- 20151109@Victor: Support Billing information of all Charge Types [Redmine: #41032]
+		- 20151230@Bravo: Add MGCRNG
 	Param's Explanation:  
 */  
 BEGIN

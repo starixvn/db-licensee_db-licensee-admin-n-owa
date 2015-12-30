@@ -35,6 +35,7 @@ AS
     Param's Explanation:   
 		- 20150710@Florent: support product MicroGaming with multi charge rate
 		- 20150825@Florent: change fiter ChargeType = 1 to ChargeType != 2 (support new ChargeType 5)
+		- 20151230@Bravo: Add MGCRNG charge info.
     select * FROM [LA_f_ChargeInfo_xtest]('14,15,16,17,18,25','2013-08-01','2013-08-30','NG','OA')
 */
 
