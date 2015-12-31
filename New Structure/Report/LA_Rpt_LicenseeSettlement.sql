@@ -66,7 +66,7 @@ BEGIN
 	DECLARE @Bettype AS TABLE (
 		Bettype				INT
 		, ProductId			INT)
-	CREATE TABLE #Exchange( ExchangeDate DATE, ExchangeID INT, CurrencyCode VARCHAR(10), Rate MONEY)
+	CREATE TABLE #Exchange( ExchangeDate DATE, ExchangeID INT, CurrencyCode VARCHAR(10), Rate FLOAT)
 	
 	INSERT INTO @tmpParty(PartyId, LicenseeId, ProductID, Bettype, Rate, Fromdate, Todate)
 	(
@@ -450,26 +450,26 @@ BEGIN
 		, e.CurrencyCode			AS CurrencyName
 		, SUM(Betcount)				AS Betcount
 		--orginal
-		, SUM(ISNULL(Turnover, 0))				AS Turnover
+		, SUM(ISNULL(d.Turnover, 0))			AS Turnover
 		, SUM(ISNULL(d.ActualStake, 0))			AS ActualStake
 		, SUM(ISNULL(d.BuyBackAmount, 0))		AS BuyBackAmount
-		, SUM(ISNULL(Winlost, 0))				AS MemberWinLoss		
-		, SUM(ISNULL(PlayerComm, 0))			AS MemberComm
+		, SUM(ISNULL(d.Winlost, 0))				AS MemberWinLoss		
+		, SUM(ISNULL(d.PlayerComm, 0))			AS MemberComm
 		, SUM(ISNULL(d.BettradeComm, 0))		AS BettradeComm
-		, SUM(ISNULL(LicenseeWL, 0))			AS LicenseeWL		
-		, SUM(ISNULL(LicenseeComm, 0))			AS LicenseeComm		
-		, SUM(ISNULL(Company, 0))				AS Company
+		, SUM(ISNULL(d.LicenseeWL, 0))			AS LicenseeWL		
+		, SUM(ISNULL(d.LicenseeComm, 0))		AS LicenseeComm		
+		, SUM(ISNULL(d.Company, 0))				AS Company
 		
 		--Base on currency
-		, SUM(Turnover * e.Rate)	AS TurnoverBase
-		, SUM(ISNULL(d.ActualStake * e.Rate, 0))		AS ActualStakeBase
-		, SUM(ISNULL(d.BuyBackAmount * e.Rate, 0))		AS BuyBackAmountBase
-		, SUM(ISNULL(d.BettradeComm * e.Rate, 0))		AS BettradeCommBase
-		, SUM(Winlost * e.Rate)		AS MemberWinLossBase
-		, SUM(PlayerComm * e.Rate)	AS MemberCommBase	
-		, SUM(LicenseeWL * e.Rate)	AS LicenseeWLBase
-		, SUM(LicenseeComm * e.Rate)AS LicenseeCommBase			
-		, SUM(Company* e.Rate)		AS CompanyBase		
+		, CONVERT(MONEY, SUM(ISNULL(d.Turnover * e.Rate, 0)))		AS TurnoverBase
+		, CONVERT(MONEY, SUM(ISNULL(d.ActualStake * e.Rate, 0)))	AS ActualStakeBase
+		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmount * e.Rate, 0)))	AS BuyBackAmountBase
+		, CONVERT(MONEY, SUM(ISNULL(d.BettradeComm * e.Rate, 0)))	AS BettradeCommBase
+		, CONVERT(MONEY, SUM(d.Winlost * e.Rate))					AS MemberWinLossBase
+		, CONVERT(MONEY, SUM(d.PlayerComm * e.Rate))				AS MemberCommBase	
+		, CONVERT(MONEY, SUM(d.LicenseeWL * e.Rate))				AS LicenseeWLBase
+		, CONVERT(MONEY, SUM(d.LicenseeComm * e.Rate))				AS LicenseeCommBase			
+		, CONVERT(MONEY, SUM(d.Company* e.Rate))					AS CompanyBase		
 	FROM													  
 		#Result d  									  
 		INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
