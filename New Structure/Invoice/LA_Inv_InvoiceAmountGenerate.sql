@@ -342,10 +342,10 @@ BEGIN
 				p.ProductId,
 				r.BettypeRef
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN dbo.Sport_Bettype_Reference r ON b.Bettype = r.Bettype
+				LEFT JOIN dbo.Sport_Bettype_Reference r ON b.Bettype = r.Bettype
 				INNER JOIN @PartyChargeInfo p ON	b.ProductId = p.ProductID 
 													AND p.LicenseeId = b.SiteId
-													AND (b.Bettype=-1 OR r.BettypeRef = p.BettypeRef)
+													AND (b.Bettype = -1 OR r.BettypeRef = p.BettypeRef)
 													AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate			
 				AND (b.CurrencyID <> 20)
