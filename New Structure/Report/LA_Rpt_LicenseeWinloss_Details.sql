@@ -56,7 +56,7 @@ BEGIN
 
 	INSERT INTO #ChargeInfo (PartyID, LicenseeID, ProductID, BetTypeID, Rate, Fromdate, Todate)
 	SELECT DISTINCT PartyID, LicenseeID, ProductID, Bettype, DI_Rate, Fromdate, Todate
-	FROM bodb_licensee.dbo.LA_f_ChargeInfo_xtest (@PartyID, @FromDate, @ToDate, @ProductCodes, 'OA', @excludeTest)
+	FROM bodb_licensee.dbo.LA_f_ChargeInfo (@PartyID, @FromDate, @ToDate, @ProductCodes, 'OA', @excludeTest)
 	
 	INSERT INTO #Products(ProductID,ProductName)
 	SELECT DISTINCT Productid,ProductName
