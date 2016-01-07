@@ -130,6 +130,15 @@ BEGIN
 	   WHERE typeid BETWEEN 2001 AND 2007
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
+    
+    IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'MGCRNG')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 17
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 2008 AND 2009
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+    END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'GD')
     BEGIN

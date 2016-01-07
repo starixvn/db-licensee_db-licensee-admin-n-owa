@@ -45,7 +45,7 @@ BEGIN
 			Winlostdate		DATETIME
 			, CurrencyId	INT
 			, Game			VARCHAR(100)
-			, TurnOver		MONEY
+			, Turnover		MONEY
 			, ActualStake	MONEY
 			, BuyBackAmount	MONEY
 			, Winlost		MONEY
@@ -118,7 +118,7 @@ BEGIN
 	END
 
 	DECLARE @Recommend VARCHAR(8000) = '', @SQL VARCHAR(8000) = ''
-	CREATE TABLE #DataWinloss3rd (Recommend	INT, Winlostdate DATETIME, SportType INT, Currency INT, TurnOver MONEY, TotalTrans INT, Winloss MONEY)
+	CREATE TABLE #DataWinloss3rd (Recommend	INT, Winlostdate DATETIME, SportType INT, Currency INT, Turnover MONEY, TotalTrans INT, Winloss MONEY)
 	DECLARE @TempAG AS TABLE( LicenseeeID INT, CustId INT, CurrencyId INT)
 	
 	-- Product <> BA
@@ -142,7 +142,7 @@ BEGIN
 			--truncate last comma
 			SET @Recommend = SUBSTRING(@Recommend, 0, LEN(@Recommend))	
 
-			SELECT @sql = 'SELECT Recommend, Winlostdate, SportType, Currency, TurnOver, TotalTrans, Winloss
+			SELECT @sql = 'SELECT Recommend, Winlostdate, SportType, Currency, Turnover, TotalTrans, Winloss
 						  FROM OPENQUERY(DBACC,''EXEC bodb02.dbo.LA_Rpt_3rdProductWinloss
 												 @ProductCodes		= ''''@ProductCodes_''''
 												, @Recommend		= ''''@Recommend_''''
@@ -156,7 +156,7 @@ BEGIN
 			SET @SQL = REPLACE(@SQL, '@FromDate_', CONVERT( VARCHAR(10),@FromDate, 120))
 			SET @SQL = REPLACE(@SQL, '@ToDate_', CONVERT( VARCHAR(10),@ToDate, 120))			
 			
-			INSERT INTO #DataWinloss3rd(Recommend, Winlostdate, SportType, Currency, TurnOver, TotalTrans, Winloss)
+			INSERT INTO #DataWinloss3rd(Recommend, Winlostdate, SportType, Currency, Turnover, TotalTrans, Winloss)
 			EXECUTE (@SQL)
 
 			INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
@@ -178,7 +178,7 @@ BEGIN
 				GROUP BY b.Winlostdate, CurrencyID 
 			)			
 		END
-		IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode IN ('GD','VG')) -- GD, VG
+		ELSE IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode IN ('GD','VG')) -- GD, VG
 		BEGIN
 			-- reset 
 			DELETE @TempAG		
@@ -197,7 +197,7 @@ BEGIN
 			--truncate last comma
 			SET @Recommend = SUBSTRING(@Recommend, 0, LEN(@Recommend))	
 
-			INSERT INTO #DataWinloss3rd(Recommend, Winlostdate, Currency, TurnOver, TotalTrans, Winloss)
+			INSERT INTO #DataWinloss3rd(Recommend, Winlostdate, Currency, Turnover, TotalTrans, Winloss)
 			EXECUTE dbo.LA_Rpt_ThirdPartyProductWinloss
 					@ProductCodes	= @ProductCode
 					, @Recommend	= @Recommend
@@ -225,29 +225,48 @@ BEGIN
 				GROUP BY b.Winlostdate, CurrencyID 
 			)			
 		END
-		IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode = 'MGCLC') 
+		ELSE IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode IN ('MGCLC','MGCRNG')) 
 		BEGIN
+		
 			-- product 3rd sub name
 			CREATE TABLE #Product3rdSubName (Bettype INT, BettypeRef INT, ProductName VARCHAR(100))
-			INSERT INTO #Product3rdSubName( Bettype, BettypeRef, ProductName)
-			SELECT s.Bettype, p.BettypeRef, p.ProductName 			
+			INSERT INTO #Product3rdSubName( Bettype, BettypeRef)
+			SELECT s.Bettype, p.BettypeRef 			
 			FROM bodb_licensee.dbo.Sport_Bettype_Reference s WITH (NOLOCK)
 					LEFT JOIN bodb_licensee.dbo.LA_Product3rdSub p WITH (NOLOCK) ON s.BettypeRef = p.BettypeRef
-
-			UPDATE #Product3rdSubName
-			SET ProductName = 'Generic Games'
-			WHERE BettypeRef = 2001
-			UPDATE #Product3rdSubName
-			SET ProductName = 'Branded Games'
-			WHERE BettypeRef = 2005
+			GROUP BY s.Bettype, p.BettypeRef
+						
+			IF @ProductCode = 'MGCLC'
+			BEGIN
+				DELETE FROM #Product3rdSubName WHERE Bettype IN (2008,2009)
+				
+				UPDATE #Product3rdSubName
+				SET ProductName = 'Live Casino - Generic Games'
+				WHERE BettypeRef = 2001
+				UPDATE #Product3rdSubName
+				SET ProductName = 'Live Casino - Branded Games'
+				WHERE BettypeRef = 2005
+			END
+			ELSE
+			BEGIN
+				DELETE FROM #Product3rdSubName WHERE Bettype NOT IN (2008,2009)
+				
+				UPDATE #Product3rdSubName
+				SET ProductName = 'RNG Casino - Generic Games'
+				WHERE BettypeRef = 2001
+				UPDATE #Product3rdSubName
+				SET ProductName = 'RNG Casino - Branded Games'
+				WHERE BettypeRef = 2005
+			END		
+				
 			-- product 3rd sub name
 			INSERT INTO #Result( Winlostdate, CurrencyId, Game, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
 			(
 				SELECT   			   
 					rptDate     
 					, CurrencyID	
-					, ps.ProductName AS Game
-					, SUM(Turnover) AS turnover
+					, ps.ProductName AS Game					
+					, SUM(Turnover) AS Turnover
 					, SUM(WinLoss) AS Winlost
 					, SUM(PComm) AS PlayerComm
 					, - SUM(Winloss * ( 1 - p.Rate)) AS LicenseeWL				
@@ -256,13 +275,15 @@ BEGIN
 					, SUM(BetCount) AS BetCount	  
 				FROM (
 					SELECT b.SiteId, b.rptDate, b.CurrencyID, b.Bettype
-					, SUM(ISNULL(b.turnover, 0)) AS TurnOver
+					, SUM(ISNULL(b.Turnover, 0)) AS Turnover
 					, SUM(ISNULL(b.winloss, 0)) Winloss					 			 					 				
 					, SUM(ISNULL(b.CommissionP, 0)) AS PComm
 					, SUM(ISNULL(b.CommissionA, 0)) AS AComm
 					, SUM(ISNULL(b.betcount, 0)) BetCount
 					FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK)
-						INNER JOIN (SELECT DISTINCT LicenseeId, Bettype FROM @tmpParty) p ON b.SiteId = p.LicenseeID AND b.Bettype = p.Bettype					
+						INNER JOIN #Product3rdSubName s ON s.Bettype = b.Bettype
+						INNER JOIN (SELECT DISTINCT LicenseeId, Bettype FROM @tmpParty) p ON b.SiteId = p.LicenseeID AND p.Bettype=s.BettypeRef
+							
 					WHERE
 						b.SiteID = @LicenseeID
 						AND b.rptDate BETWEEN @FromDate AND @ToDate			
@@ -272,15 +293,15 @@ BEGIN
 						AND b.customercategory NOT IN (27, 28)					
 					GROUP BY b.rptdate, b.SiteId, b.CurrencyID, b.Bettype
 				) d 
-					INNER JOIN @tmpParty p ON d.SiteId = p.LicenseeID AND d.Bettype = p.Bettype					
-					LEFT JOIN #Product3rdSubName ps ON d.Bettype = ps.Bettype
+					INNER JOIN #Product3rdSubName ps ON d.Bettype = ps.Bettype
+					INNER JOIN @tmpParty p ON d.SiteId = p.LicenseeID AND p.Bettype = ps.BettypeRef					
+					
 				WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
-				GROUP BY rptDate, CurrencyID , ps.ProductName
+				GROUP BY rptDate, CurrencyID , ps.ProductName, d.Bettype
 			)
-			
 			DROP TABLE #Product3rdSubName			
 		END
-		IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode = 'BT')--BetTrade
+		ELSE IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode = 'BT')--BetTrade
 		BEGIN					
 			-- add more bettype for SB, BA
 			INSERT INTO @Bettype (Bettype, ProductId)
@@ -346,7 +367,7 @@ BEGIN
 		END
 		ELSE
 		BEGIN
-			INSERT INTO #Result( Winlostdate, CurrencyId, TurnOver, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
+			INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
 			(
 				SELECT   			   
 					rptDate     
@@ -360,7 +381,7 @@ BEGIN
 					, SUM(BetCount) AS BetCount	  
 				FROM (
 					SELECT b.SiteId, b.rptDate, b.CurrencyID
-					, SUM(ISNULL(b.turnover, 0)) AS TurnOver
+					, SUM(ISNULL(b.turnover, 0)) AS Turnover
 					, SUM(ISNULL(b.winloss, 0)) Winloss					 			 					 				
 					, SUM(ISNULL(b.CommissionP, 0)) AS PComm
 					, SUM(ISNULL(b.CommissionA, 0)) AS AComm
@@ -387,7 +408,7 @@ BEGIN
 	IF EXISTS (SELECT * FROM @ProductPrefix WHERE ProductCode = 'BA')
 	BEGIN
 		SET @DrawFilter = 2 -- set case No Darw
-		INSERT INTO #Result( Winlostdate, CurrencyId, TurnOver, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
+		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
 		(
 			SELECT   			   
 				b.rptDate     
@@ -429,26 +450,26 @@ BEGIN
 		, e.CurrencyCode			AS CurrencyName
 		, SUM(Betcount)				AS Betcount
 		--orginal
-		, SUM(ISNULL(TurnOver, 0))				AS Turnover
+		, SUM(ISNULL(d.Turnover, 0))			AS Turnover
 		, SUM(ISNULL(d.ActualStake, 0))			AS ActualStake
 		, SUM(ISNULL(d.BuyBackAmount, 0))		AS BuyBackAmount
-		, SUM(ISNULL(Winlost, 0))				AS MemberWinLoss		
-		, SUM(ISNULL(PlayerComm, 0))			AS MemberComm
+		, SUM(ISNULL(d.Winlost, 0))				AS MemberWinLoss		
+		, SUM(ISNULL(d.PlayerComm, 0))			AS MemberComm
 		, SUM(ISNULL(d.BettradeComm, 0))		AS BettradeComm
-		, SUM(ISNULL(LicenseeWL, 0))			AS LicenseeWL		
-		, SUM(ISNULL(LicenseeComm, 0))			AS LicenseeComm		
-		, SUM(ISNULL(Company, 0))				AS Company
+		, SUM(ISNULL(d.LicenseeWL, 0))			AS LicenseeWL		
+		, SUM(ISNULL(d.LicenseeComm, 0))		AS LicenseeComm		
+		, SUM(ISNULL(d.Company, 0))				AS Company
 		
 		--Base on currency
-		, SUM(TurnOver * e.Rate)	AS TurnoverBase
-		, SUM(ISNULL(d.ActualStake * e.Rate, 0))		AS ActualStakeBase
-		, SUM(ISNULL(d.BuyBackAmount * e.Rate, 0))		AS BuyBackAmountBase
-		, SUM(ISNULL(d.BettradeComm * e.Rate, 0))		AS BettradeCommBase
-		, SUM(Winlost * e.Rate)		AS MemberWinLossBase
-		, SUM(PlayerComm * e.Rate)	AS MemberCommBase	
-		, SUM(LicenseeWL * e.Rate)	AS LicenseeWLBase
-		, SUM(LicenseeComm * e.Rate)AS LicenseeCommBase			
-		, SUM(Company* e.Rate)		AS CompanyBase		
+		, CONVERT(MONEY, SUM(ISNULL(d.Turnover * e.Rate, 0)))		AS TurnoverBase
+		, CONVERT(MONEY, SUM(ISNULL(d.ActualStake * e.Rate, 0)))	AS ActualStakeBase
+		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmount * e.Rate, 0)))	AS BuyBackAmountBase
+		, CONVERT(MONEY, SUM(ISNULL(d.BettradeComm * e.Rate, 0)))	AS BettradeCommBase
+		, CONVERT(MONEY, SUM(d.Winlost * e.Rate))					AS MemberWinLossBase
+		, CONVERT(MONEY, SUM(d.PlayerComm * e.Rate))				AS MemberCommBase	
+		, CONVERT(MONEY, SUM(d.LicenseeWL * e.Rate))				AS LicenseeWLBase
+		, CONVERT(MONEY, SUM(d.LicenseeComm * e.Rate))				AS LicenseeCommBase			
+		, CONVERT(MONEY, SUM(d.Company* e.Rate))					AS CompanyBase		
 	FROM													  
 		#Result d  									  
 		INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
