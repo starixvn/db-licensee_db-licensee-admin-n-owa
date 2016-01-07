@@ -140,7 +140,7 @@ BEGIN
 			LEFT JOIN dbo.LA_PartyGroup pg WITH (NOLOCK) ON pga.PartyGroupId = pg.PartyGroupId
 			INNER JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
-			INNER JOIN dbo.OAS_ChargeInfoSub s WITH(NOLOCK) ON ci.ChargeID = s.ChargeIdRef
+			LEFT JOIN dbo.OAS_ChargeInfoSub s WITH(NOLOCK) ON ci.ChargeID = s.ChargeIdRef
 			LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON pd.BaseCurrencyId = e.exchangeid
 		WHERE @CurrentDate BETWEEN c.Fromdate AND c.Todate
 
