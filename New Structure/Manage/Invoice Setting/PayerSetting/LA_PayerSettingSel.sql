@@ -39,56 +39,13 @@ BEGIN
 			@MaxDate DATE, 
 			@CurrentDate DATE
 	SET @CurrentDate = CONVERT(DATE, GETDATE())
-	DECLARE @ChargeInfo AS TABLE(
-			ChargeId INT, 
-			PartyId INT, 
-			PartyName VARCHAR(100), 
-			PartyGroupId INT, 
-			PartyGroupName VARCHAR(100), 
-			ProductId INT, 
-			ProductName VARCHAR(100), 
-			BettypeRef INT,
-			Rate MONEY, 
-			FromDate DATE, 
-			ToDate DATE, 
-			FirstBilling VARCHAR(100), 
-			ExchangeID INT, 
-			ExchangeName VARCHAR(50))
-	CREATE TABLE #Temp_ChargeInfo(
-			ChargeId INT, 
-			PartyID INT, 
-			ProductID INT, 
-			BettypeRef INT,
-			Rate MONEY, 
-			Fromdate DATE, 
-			Todate DATE)
+	DECLARE @ChargeInfo AS TABLE(ChargeId INT, PartyId INT, PartyName VARCHAR(100), PartyGroupId INT, PartyGroupName VARCHAR(100), ProductId INT, ProductName VARCHAR(100), 
+			BettypeRef INT,Rate MONEY, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), ExchangeID INT, ExchangeName VARCHAR(50))
+	CREATE TABLE #Temp_ChargeInfo(ChargeId INT, PartyID INT, ProductID INT, BettypeRef INT,Rate MONEY, Fromdate DATE, Todate DATE)
 
-	DECLARE @Minfee AS TABLE(
-			PartyId INT, 
-			ProductId INT, 
-			FeeTypeId TINYINT, 
-			FeeAmount MONEY, 
-			FromDate DATE, 
-			ToDate DATE)
-	DECLARE @Discount AS TABLE(
-			PartyId INT, 
-			ProductId INT, 
-			FromDate DATE, 
-			ToDate DATE, 
-			DiscountGroupId INT, 
-			FromAmount MONEY, 
-			ToAmount MONEY, 
-			Rate MONEY, 
-			DiscountGroupName VARCHAR(100), 
-			DiscountGroupType TINYINT)
-	DECLARE @ChargeDetail AS TABLE(
-			ChargeID INT, 
-			PartyID INT, 
-			ProductID INT, 
-			BettypeRef INT,
-			DI_Rate MONEY, 
-			Fromdate DATE, 
-			Todate DATE)
+	DECLARE @Minfee AS TABLE(PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, FromDate DATE, ToDate DATE)
+	DECLARE @Discount AS TABLE(PartyId INT, ProductId INT, FromDate DATE, ToDate DATE, DiscountGroupId INT, FromAmount MONEY, ToAmount MONEY, Rate MONEY, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
+	DECLARE @ChargeDetail AS TABLE(ChargeID INT, PartyID INT, ProductID INT, BettypeRef INT,DI_Rate MONEY, Fromdate DATE, Todate DATE)
 
 	--Get list licensee,     
 	SELECT	@ListParty = @ListParty + CAST(p.PartyID AS VARCHAR) + ','
@@ -173,24 +130,18 @@ BEGIN
 			c.Rate,
 			c.Fromdate,
 			c.Todate,
-			ci.FirstOfBilling,
+			CASE WHEN c.ProductID IN (14,17) THEN s.FirstOfBilling ELSE ci.FirstOfBilling END,
 			pd.BaseCurrencyId,
 			ISNULL(e.Code, '') AS ExchangeName
 		FROM #Temp_ChargeInfo c
-			INNER JOIN OAS_Party p WITH (NOLOCK)
-				ON c.PartyID = p.PartyID
-			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK)
-				ON p.PartyID = pd.PartyID
-			LEFT JOIN dbo.LA_PartyGroupAssignment pga WITH (NOLOCK)
-				ON c.PartyID = pga.PartyId
-			LEFT JOIN dbo.LA_PartyGroup pg WITH (NOLOCK)
-				ON pga.PartyGroupId = pg.PartyGroupId
-			INNER JOIN dbo.LA_f_Products3rd('') pr
-				ON c.ProductID = pr.ProductID
-			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK)
-				ON c.ChargeID = ci.ChargeID
-			LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK)
-				ON pd.BaseCurrencyId = e.exchangeid
+			INNER JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID
+			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
+			LEFT JOIN dbo.LA_PartyGroupAssignment pga WITH (NOLOCK) ON c.PartyID = pga.PartyId
+			LEFT JOIN dbo.LA_PartyGroup pg WITH (NOLOCK) ON pga.PartyGroupId = pg.PartyGroupId
+			INNER JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
+			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
+			INNER JOIN dbo.OAS_ChargeInfoSub s WITH(NOLOCK) ON ci.ChargeID = s.ChargeIdRef
+			LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON pd.BaseCurrencyId = e.exchangeid
 		WHERE @CurrentDate BETWEEN c.Fromdate AND c.Todate
 
 	INSERT INTO @Minfee (PartyId, ProductId, FeeTypeId, FeeAmount, FromDate, ToDate)
