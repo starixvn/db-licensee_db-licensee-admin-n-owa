@@ -121,7 +121,7 @@ BEGIN
 		FROM	dbo.LA_f_ChargeInfo_xtest(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
 	)
-		
+
 	-- End region
 	
 	-- Region: Get base Currency
@@ -457,7 +457,7 @@ BEGIN
 									END
 	FROM	@MinFeeGroup amf INNER JOIN @TotalMinFees t ON amf.ProductId = t.ProductId
 	WHERE	amf.FeeType = 1
-	
+
 	DECLARE @InvoiceData	TABLE(
 			PartyId			INT,
 			ProductId		INT, 
@@ -490,13 +490,12 @@ BEGIN
 	-- End region
 	
 	-- Region: Apply Discount
-	DECLARE @TotalAmountDiscount MONEY = (	SELECT SUM(i.InvoiceAmount) 
+	DECLARE @TotalAmountDiscount MONEY = (	SELECT SUM(CASE WHEN i.InvoiceAmount < 0 THEN 0 ELSE i.InvoiceAmount END) 
 											FROM @InvoiceData i 
 											WHERE i.ProductId IN (SELECT ProductId FROM @DiscountGroup d WHERE d.DiscountGroupType = 1))
 	DELETE	FROM @DiscountGroup
 	WHERE	@TotalAmountDiscount NOT BETWEEN [@DiscountGroup].FromAmount AND [@DiscountGroup].ToAmount
 			AND [@DiscountGroup].DiscountGroupType = 1
-		
 	
 	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
 	(
@@ -505,7 +504,7 @@ BEGIN
 	    WHERE	dg.DiscountGroupType = 1
 	)	
 	-- End Region
-	
+		
 	-- Region: Apply Rebate
 	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
 	(

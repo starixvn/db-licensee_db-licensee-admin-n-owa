@@ -330,10 +330,10 @@ BEGIN
 					AND IsEdit = 0
 					AND BettypeRef = 0
 				
-				INSERT INTO dbo.OAS_ChargeInfo WITH (ROWLOCK, UPDLOCK)(ProductID, FromParty, ToParty, ParentChargeID)
+				INSERT INTO dbo.OAS_ChargeInfo WITH (ROWLOCK, UPDLOCK)(ProductID, FromParty, ToParty, ParentChargeID, ChargeType)
 				OUTPUT INSERTED.ChargeID, INSERTED.ProductID
 				INTO @ChargeID
-				SELECT DISTINCT ProductId, @PayerID, @ToParty, @ParentChargeID
+				SELECT DISTINCT ProductId, @PayerID, @ToParty, @ParentChargeID, ChargeType
 				FROM @ChargeSetting					
 				WHERE ChargeID = 0 
 					AND IsEdit = 0
