@@ -27,6 +27,7 @@ AS
 			- 20150910@Florent: Implement Bettrade
 			- 20150914@Bravo: Add 2 Column for Grand Total Row.
 			- 20160107@Bruce: Split BuyBackAmount into BuyBackAmountSB & BuyBackAmountBA
+			- 20160112@Bruce: Bettrade: LicenseeWL = 0 for BA tickets
 		Param's Explanation:
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
 								'NG' -> Number Game			'BA' -> BA
@@ -334,7 +335,7 @@ BEGIN
 						, SUM(CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount - b.WinLoss) ELSE 0 END) AS Actual_stake
 						, SUM(CASE WHEN b.Bettype = 901 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountTotal
 						, SUM(CASE WHEN bt.ProductID = 0 THEN b.WinLoss ELSE 0 END) AS BTWinLoss
-						, - SUM(CASE WHEN bt.ProductID = 0 THEN b.WinLoss ELSE 0 END) AS LicWinLoss
+						, - SUM(CASE WHEN bt.ProductID = 0 AND b.CustomerCategory <> 1002 THEN b.WinLoss ELSE 0 END) AS LicWinLoss -- LicenseeWL on bought BA(1002) = 0
 						, SUM (CASE WHEN b.Bettype = 901 AND b.CustomerCategory = 1001 THEN - b.BuyBackAmount * p.Rate ELSE 0 END) AS BettradeComm
 						, SUM(CASE WHEN bt.ProductId = 0 THEN ISNULL(b.BetCount, 0) ELSE 0 END) BetCount
 						, SUM(CASE WHEN b.bettype = 901 AND b.CustomerCategory = 1001 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountSB -- 1001 : SB
@@ -354,7 +355,7 @@ BEGIN
 						, 0 AS Actual_stake
 						, 0 AS BuyBackAmountTotal
 						, SUM(b.WinLoss) AS BTWinLoss
-						, - SUM(b.WinLoss) AS LicWinLoss
+						, 0 AS LicWinLoss -- LicenseeWL on bought BA = 0
 						, 0 AS BettradeComm
 						, SUM(ISNULL(b.BetCount, 0)) BetCount
 						, 0 AS BuyBackAmountSB
