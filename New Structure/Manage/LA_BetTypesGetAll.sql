@@ -6,7 +6,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 ALTER PROCEDURE [dbo].[LA_BetTypesGetAll]
-	@ProductCode VARCHAR(10) = 'SB'
+	@ProductCode VARCHAR(200) = 'SB'
 AS
 /*    
  Created : FLorent	    
