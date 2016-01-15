@@ -96,6 +96,15 @@ BEGIN
 			SELECT 	@ErrMsg = 'Delete failed. Please try again.', @ErrCode = 710	
 			RETURN
 		END
+		
+		DELETE dbo.OAS_ChargeInfoSub WITH (ROWLOCK, UPDLOCK)
+		WHERE ChargeIdRef = @ChargeId AND FromParty = @PayerId
+		
+		IF @@ERROR <> 0
+		BEGIN
+			SELECT 	@ErrMsg = 'Delete failed. Please try again.', @ErrCode = 710	
+			RETURN
+		END
 
 		DELETE dbo.LA_ChargeInfo_SystemMapping WITH (ROWLOCK, UPDLOCK)
 		WHERE ChargeID = @ChargeId

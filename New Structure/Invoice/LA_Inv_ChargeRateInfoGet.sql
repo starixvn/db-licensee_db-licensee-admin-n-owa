@@ -50,9 +50,10 @@ BEGIN
 
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, RowNumber)
 	(
-		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate, ROW_NUMBER() OVER (ORDER BY ProductId, Todate)
+		SELECT	PartyID, LicenseeID, ProductID, MAX(DI_Rate), Fromdate, Todate, ROW_NUMBER() OVER (ORDER BY ProductId, Todate)
 		FROM	dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
+		GROUP BY PartyID,LicenseeID,ProductID,Fromdate,Todate
 	)		
 	
 	-- End Region

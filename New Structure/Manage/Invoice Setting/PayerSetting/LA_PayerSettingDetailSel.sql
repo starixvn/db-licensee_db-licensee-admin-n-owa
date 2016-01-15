@@ -38,7 +38,7 @@ BEGIN
 		, @CurrentDate			DATE
 
 	SET @CurrentDate = CONVERT(DATE, GETDATE())
-	DECLARE @ChargeInfo AS TABLE (ChargeId INT, PartyId INT, ProductId INT, Rate MONEY, ChargeType SMALLINT, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), BasisOfBilling NVARCHAR(MAX), ExchangeID INT)	
+	DECLARE @ChargeInfo AS TABLE (ChargeId INT, PartyId INT, ProductId INT, BettypeRef INT, Rate MONEY, ChargeType SMALLINT, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), BasisOfBilling NVARCHAR(MAX), ExchangeID INT)	
 	DECLARE @Minfee AS TABLE(FeeId INT, PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, CurrencyId INT, MinFeeTerm NVARCHAR(MAX), FromDate DATE, ToDate DATE)
 	DECLARE @PayerSettingHeader AS TABLE(PartyId INT, PayerGroupID INT, PayerGroupName VARCHAR(100), ExchangeID INT, DiscountGroupID INT, DiscountGroupName VARCHAR(100), RebateGroupID INT, RebateGroupName VARCHAR(100))
 	DECLARE @Discount AS TABLE(PartyId INT, ProductId INT, FromDate DATE, ToDate DATE,DiscountGroupId INT, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
@@ -54,21 +54,26 @@ BEGIN
 	FROM dbo.OAS_ChargeInfo ci WITH (NOLOCK)
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2	
 	
-	INSERT INTO @ChargeInfo(ChargeId, PartyId, ProductId, Rate, ChargeType, FromDate, ToDate, FirstBilling, BasisOfBilling, ExchangeID)
+	INSERT INTO @ChargeInfo(ChargeId, PartyId, ProductId, BettypeRef, Rate, ChargeType, FromDate, ToDate, FirstBilling, BasisOfBilling, ExchangeID)
 	SELECT c.ChargeID		
 		, c.PartyID
 		, c.ProductID		
+		, CASE WHEN c.ProductID IN (14,17) THEN 
+					c.Bettype
+				 ELSE 0 END
+		  AS BettypeRef
 		, c.DI_Rate
 		, ci.ChargeType
 		, c.Fromdate
 		, c.Todate
-		, ci.FirstOfBilling
-		, ci.BasisOfBilling
+		, CASE WHEN c.ProductID IN (14,17) THEN cs.FirstOfBilling ELSE ci.FirstOfBilling END AS FirstOfBilling
+		, CASE WHEN c.ProductID IN (14,17) THEN cs.BasisOfBilling ELSE ci.BasisOfBilling END AS BasisOfBilling
 		, pd.BaseCurrencyId
-	FROM dbo.LA_f_ChargeInfo(@PayerId, @MinDate, @MaxDate, @ProductListAll, 'OA', 1) c
+	FROM dbo.LA_f_ChargeInfo_xtest(@PayerId, @MinDate, @MaxDate, @ProductListAll, 'OA', 1) c
 		LEFT JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID
 		LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID				
 		LEFT JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
+		LEFT JOIN dbo.OAS_ChargeInfoSub cs WITH(NOLOCK) ON ci.ChargeID = cs.ChargeIdRef AND c.Bettype = cs.BettypeRef
 	
 	--======Min fee Area ===---
 	INSERT INTO @Minfee(FeeId, PartyId, ProductId, FeeTypeId, FeeAmount, CurrencyId, MinFeeTerm, FromDate, ToDate)
@@ -120,6 +125,7 @@ BEGIN
 		, ProductName			    AS ProductName
 		, FirstBilling			    AS FirstBilling
 		, c.BasisOfBilling
+		, c.BettypeRef
 		, c.Rate					AS Rate
 		, c.ChargeType
 		, c.FromDate
