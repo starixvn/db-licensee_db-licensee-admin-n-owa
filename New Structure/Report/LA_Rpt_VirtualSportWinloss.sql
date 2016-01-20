@@ -1,12 +1,12 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_VirtualSportWinloss_xtest]    Script Date: 01/12/2014 14:37:01 PM ******/
+
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-/****** Object:  Stored Procedure dbo.OA_Rpt_VirtualSportWinloss    Script Date: 9/10/2013 2:32:36 PM ******/
+
 ALTER PROCEDURE [dbo].[LA_Rpt_VirtualSportWinloss]      	
 	@PartyIDs				VARCHAR(5500) 
 	, @FromDate				SMALLDATETIME    
@@ -28,6 +28,7 @@ AS
 	   - 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
 	   - 20150326@Florent: fix filter drawfilter
 	   - 20150703@Florent: add GBP
+	   - 20160115@Victor: Show data of credit licensees regardless Charge Rate = 0 [Redmine: #50829]
  * Param's Explanation:    
  *  - @FromDate   : From date   
  *  - @ToDate   : To date  
@@ -57,9 +58,26 @@ CREATE TABLE #tmpParty (
 	   ,Todate	    SMALLDATETIME
 	   )
 
-    INSERT INTO #tmpParty
-    SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, Fromdate, Todate
-    FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,'VS','OA',@ExcludeTest)
+DECLARE @PartyIDs_NoCredit	VARCHAR(5500)
+DECLARE @PartyIDs_Credit	VARCHAR(5500)
+
+SELECT	@PartyIDs_NoCredit = COALESCE(@PartyIDs_NoCredit + ', ', '') + CONVERT(VARCHAR(10), val)
+FROM	Lrf_f_StringSplit(@PartyIDs,',') s
+	INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON p.PartyID = s.val AND p.PartyType = 1
+	INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID AND pd.IsDeposit = 1
+
+SELECT	@PartyIDs_Credit = COALESCE(@PartyIDs_Credit + ', ', '') + CONVERT(VARCHAR(10), val)
+FROM	Lrf_f_StringSplit(@PartyIDs,',') s
+	INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON p.PartyID = s.val AND p.PartyType = 1
+	INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID AND pd.IsDeposit = 0
+	
+INSERT INTO #tmpParty
+SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, Fromdate, Todate
+FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs_NoCredit,@FromDate,@ToDate,'VS','OA',@ExcludeTest)
+
+INSERT INTO #tmpParty
+SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, Fromdate, Todate
+FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs_Credit,@FromDate,@ToDate,'VS','OA',0)
  
 -- normal Licensee
 IF EXISTS(SELECT 1 FROM #tmpParty tp WHERE tp.IsDeposit = 1)
