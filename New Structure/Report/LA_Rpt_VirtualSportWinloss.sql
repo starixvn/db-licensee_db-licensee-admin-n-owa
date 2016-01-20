@@ -64,12 +64,12 @@ DECLARE @PartyIDs_Credit	VARCHAR(5500)
 SELECT	@PartyIDs_NoCredit = COALESCE(@PartyIDs_NoCredit + ', ', '') + CONVERT(VARCHAR(10), val)
 FROM	Lrf_f_StringSplit(@PartyIDs,',') s
 	INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON p.PartyID = s.val AND p.PartyType = 1
-	INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID AND pd.IsDeposit = 0
+	INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID AND pd.IsDeposit = 1
 
 SELECT	@PartyIDs_Credit = COALESCE(@PartyIDs_Credit + ', ', '') + CONVERT(VARCHAR(10), val)
 FROM	Lrf_f_StringSplit(@PartyIDs,',') s
 	INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON p.PartyID = s.val AND p.PartyType = 1
-	INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID AND pd.IsDeposit = 1
+	INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID AND pd.IsDeposit = 0
 	
 INSERT INTO #tmpParty
 SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, Fromdate, Todate
