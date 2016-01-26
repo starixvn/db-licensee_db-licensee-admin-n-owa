@@ -24,6 +24,7 @@ AS
 		- 20150820@Florent: Add Bettrade and remove bettypes 901, 902, 903 in SB, BA
 		- 20151012@Victor: Add product AG Casino Single Wallet
 		- 20151201@Bravo: Change Product code: MGC -> MGCLC
+		- 20160113@Bruce: Include new bettypes 2101-2399 for CS (OW RNG)
     Param's Explanation:   
 
 */
@@ -100,7 +101,7 @@ BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 6
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
-	   WHERE typeid IN (71, 72)
+	   WHERE (typeid IN (71, 72) OR typeid BETWEEN 2101 AND 2399)
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 	
