@@ -153,133 +153,135 @@ BEGIN
 	--	  AND b.winlostdate BETWEEN @FromDate AND @ToDate
 	--GROUP BY sl.siteid, b.currency, b.winlostdate
 	
-	INSERT INTO @Exchange(ExchangeId, ExchangeDate, Code, MYR, USD, EUR, CNY, GBP)
-	SELECT ExchangeId, ExchangeDate, Code, MYR, USD, EUR, CNY, GBP
-	FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
-	WHERE ExchangeId IN (SELECT DISTINCT CurrencyId FROM @Data)
+	IF((SELECT COUNT(*) FROM @Data) > 0)
+	BEGIN
 	
-	UPDATE @Exchange
-	SET Base = (CASE @BaseCurrencyName
-					WHEN 'MYR' THEN MYR
-					WHEN 'USD' THEN USD
-					WHEN 'EUR' THEN EUR
-					WHEN 'GBP' THEN GBP
-					WHEN 'CNY' THEN CNY
-					ELSE 1 
-					END)
-	
-	-- Update Result
-	
-	INSERT INTO @Result(PartyId, PartyName, CurrencyId, WinLossDate, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, ShareComm, AmountDueTo)
-	SELECT  p.PartyID, p.PartyName, d.CurrencyId, d.WinLossDate,
-			SUM(d.TotalTrans),
-			SUM(d.Turnover * e.Base),
-			SUM(d.CustomerWinLoss * e.Base),
-			SUM(d.WinLossShare * e.Base),
-			SUM(d.LicenseeComm * e.Base),
-			SUM(d.ShareComm * e.Base),
-			SUM((d.WinLossShare - d.ShareComm) * e.Base)
-	FROM @Data d
-	INNER JOIN (SELECT ExchangeId, ExchangeDate, Base FROM @Exchange) e ON d.CurrencyId = e.ExchangeId AND d.WinLossDate = e.ExchangeDate
-	INNER JOIN @SelectedParty sp ON sp.LicenseeId = d.SiteId
-	INNER JOIN (SELECT * FROM bodb_licensee..OAS_Party WHERE PartyType = 1) p ON sp.PartyId = p.PartyID  
-	GROUP BY p.PartyID, p.PartyName, d.CurrencyId, d.WinLossDate
-	
-	INSERT INTO @CurrencyTable(CurrencyId, CurrencyName, CurrencyCode)
-	SELECT t.CurrencyID, e.currency, e.Code
-	FROM (SELECT DISTINCT CurrencyID FROM @Data) t
-	INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON t.CurrencyID = e.exchangeid
-	
-	UPDATE t1
-	SET CurrencyCode = t1.CurrencyCode + ' (' + CurrencyName + ')'
-	FROM @CurrencyTable t1
-	INNER JOIN (
-	   SELECT CurrencyCode
-	    FROM @CurrencyTable
-	    GROUP BY CurrencyCode
-	    HAVING COUNT(1) > 1
-	) t2 ON t1.CurrencyCode = t2.CurrencyCode
-	
-	UPDATE @Result SET CurrencyName = CASE
-											WHEN r.CurrencyId = 51 THEN @VNDCurrencyName
-											WHEN r.CurrencyId = 20 THEN cr.CurrencyName
-											ELSE cr.CurrencyCode
-									  END
-											
-	FROM @Result r
-	INNER JOIN @CurrencyTable cr ON r.CurrencyId = cr.CurrencyId
-	
-	Update @Result SET ParentId = p.ParentId, ParentName = p.ParentName
-	FROM @Result r
-	INNER JOIN (	
-				SELECT ap1.PartyId,ap1.ParentId,ap2.PartyName AS ParentName
-				FROM @AllParty ap1
-				INNER JOIN @AllParty ap2 ON ap1.ParentId = ap2.PartyId) p ON r.PartyId = p.PartyId
+		INSERT INTO @Exchange(ExchangeId, ExchangeDate, Code, MYR, USD, EUR, CNY, GBP)
+		SELECT ExchangeId, ExchangeDate, Code, MYR, USD, EUR, CNY, GBP
+		FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
+		WHERE ExchangeId IN (SELECT DISTINCT CurrencyId FROM @Data)
+		
+		UPDATE @Exchange
+		SET Base = (CASE @BaseCurrencyName
+						WHEN 'MYR' THEN MYR
+						WHEN 'USD' THEN USD
+						WHEN 'EUR' THEN EUR
+						WHEN 'GBP' THEN GBP
+						WHEN 'CNY' THEN CNY
+						ELSE 1 
+						END)
+		
+		-- Update Result
+		
+		INSERT INTO @Result(PartyId, PartyName, CurrencyId, WinLossDate, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, ShareComm, AmountDueTo)
+		SELECT  p.PartyID, p.PartyName, d.CurrencyId, d.WinLossDate,
+				SUM(d.TotalTrans),
+				SUM(d.Turnover * e.Base),
+				SUM(d.CustomerWinLoss * e.Base),
+				SUM(d.WinLossShare * e.Base),
+				SUM(d.LicenseeComm * e.Base),
+				SUM(d.ShareComm * e.Base),
+				SUM((d.WinLossShare - d.ShareComm) * e.Base)
+		FROM @Data d
+		INNER JOIN (SELECT ExchangeId, ExchangeDate, Base FROM @Exchange) e ON d.CurrencyId = e.ExchangeId AND d.WinLossDate = e.ExchangeDate
+		INNER JOIN @SelectedParty sp ON sp.LicenseeId = d.SiteId
+		INNER JOIN (SELECT * FROM bodb_licensee..OAS_Party WHERE PartyType = 1) p ON sp.PartyId = p.PartyID  
+		GROUP BY p.PartyID, p.PartyName, d.CurrencyId, d.WinLossDate
+		
+		INSERT INTO @CurrencyTable(CurrencyId, CurrencyName, CurrencyCode)
+		SELECT t.CurrencyID, e.currency, e.Code
+		FROM (SELECT DISTINCT CurrencyID FROM @Data) t
+		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON t.CurrencyID = e.exchangeid
+		
+		UPDATE t1
+		SET CurrencyCode = t1.CurrencyCode + ' (' + CurrencyName + ')'
+		FROM @CurrencyTable t1
+		INNER JOIN (
+		   SELECT CurrencyCode
+			FROM @CurrencyTable
+			GROUP BY CurrencyCode
+			HAVING COUNT(1) > 1
+		) t2 ON t1.CurrencyCode = t2.CurrencyCode
+		
+		UPDATE @Result SET CurrencyName = CASE
+												WHEN r.CurrencyId = 51 THEN @VNDCurrencyName
+												WHEN r.CurrencyId = 20 THEN cr.CurrencyName
+												ELSE cr.CurrencyCode
+										  END
+												
+		FROM @Result r
+		INNER JOIN @CurrencyTable cr ON r.CurrencyId = cr.CurrencyId
+		
+		Update @Result SET ParentId = p.ParentId, ParentName = p.ParentName
+		FROM @Result r
+		INNER JOIN (	
+					SELECT ap1.PartyId,ap1.ParentId,ap2.PartyName AS ParentName
+					FROM @AllParty ap1
+					INNER JOIN @AllParty ap2 ON ap1.ParentId = ap2.PartyId) p ON r.PartyId = p.PartyId
+				
+		-- Calculate Grand Total
+		INSERT INTO @GrandTotal(CurrencyName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, ShareComm, AmountDueTo)
+		SELECT 'MYR', 
+				SUM(d.TotalTrans), 
+				SUM(d.Turnover * e.MYR), 
+				SUM(d.CustomerWinLoss * e.MYR), 
+				SUM(d.WinLossShare * e.MYR), 
+				SUM(d.LicenseeComm * e.MYR), 
+				SUM(d.ShareComm * e.MYR), 
+				SUM((d.WinLossShare - d.ShareComm) * e.MYR)
+		FROM @Data d
+		INNER JOIN (SELECT ExchangeId, ExchangeDate, MYR FROM @Exchange) e ON d.CurrencyId = e.ExchangeId AND d.WinLossDate = e.ExchangeDate
+		
+		INSERT INTO @GrandTotal(CurrencyName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, ShareComm, AmountDueTo)
+		SELECT 'USD', 
+				SUM(d.TotalTrans), 
+				SUM(d.Turnover * e.USD), 
+				SUM(d.CustomerWinLoss * e.USD), 
+				SUM(d.WinLossShare * e.USD), 
+				SUM(d.LicenseeComm * e.USD), 
+				SUM(d.ShareComm * e.USD), 
+				SUM((d.WinLossShare - d.ShareComm) * e.USD)
+		FROM @Data d
+		INNER JOIN (SELECT ExchangeId, ExchangeDate, USD FROM @Exchange) e ON d.CurrencyId = e.ExchangeId AND d.WinLossDate = e.ExchangeDate
+		
+		INSERT INTO @GrandTotal(CurrencyName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, ShareComm, AmountDueTo)
+		SELECT 'EUR', 
+				SUM(d.TotalTrans), 
+				SUM(d.Turnover * e.EUR), 
+				SUM(d.CustomerWinLoss * e.EUR), 
+				SUM(d.WinLossShare * e.EUR), 
+				SUM(d.LicenseeComm * e.EUR), 
+				SUM(d.ShareComm * e.EUR), 
+				SUM((d.WinLossShare - d.ShareComm) * e.EUR)
+		FROM @Data d
+		INNER JOIN (SELECT ExchangeId, ExchangeDate, EUR FROM @Exchange) e ON d.CurrencyId = e.ExchangeId AND d.WinLossDate = e.ExchangeDate
+		
+		INSERT INTO @GrandTotal(CurrencyName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, ShareComm, AmountDueTo)
+		SELECT 'GBP', 
+				SUM(d.TotalTrans), 
+				SUM(d.Turnover * e.GBP), 
+				SUM(d.CustomerWinLoss * e.GBP), 
+				SUM(d.WinLossShare * e.GBP), 
+				SUM(d.LicenseeComm * e.GBP), 
+				SUM(d.ShareComm * e.GBP), 
+				SUM((d.WinLossShare - d.ShareComm) * e.GBP)
+		FROM @Data d
+		INNER JOIN (SELECT ExchangeId, ExchangeDate, GBP FROM @Exchange) e ON d.CurrencyId = e.ExchangeId AND d.WinLossDate = e.ExchangeDate
+		
+		INSERT INTO @GrandTotal(CurrencyName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, ShareComm, AmountDueTo)
+		SELECT 'CNY', 
+				SUM(d.TotalTrans), 
+				SUM(d.Turnover * e.CNY), 
+				SUM(d.CustomerWinLoss * e.CNY), 
+				SUM(d.WinLossShare * e.CNY), 
+				SUM(d.LicenseeComm * e.CNY), 
+				SUM(d.ShareComm * e.CNY), 
+				SUM((d.WinLossShare - d.ShareComm) * e.CNY)
+		FROM @Data d
+		INNER JOIN (SELECT ExchangeId, ExchangeDate, CNY FROM @Exchange) e ON d.CurrencyId = e.ExchangeId AND d.WinLossDate = e.ExchangeDate
+	END
 	
 	SELECT * FROM @Result
-	
-	-- Calculate Grand Total
-	
-	INSERT INTO @GrandTotal(CurrencyName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, ShareComm, AmountDueTo)
-	SELECT 'MYR', 
-			SUM(d.TotalTrans), 
-			SUM(d.Turnover * e.MYR), 
-			SUM(d.CustomerWinLoss * e.MYR), 
-			SUM(d.WinLossShare * e.MYR), 
-			SUM(d.LicenseeComm * e.MYR), 
-			SUM(d.ShareComm * e.MYR), 
-			SUM((d.WinLossShare - d.ShareComm) * e.MYR)
-	FROM @Data d
-	INNER JOIN (SELECT ExchangeId, ExchangeDate, MYR FROM @Exchange) e ON d.CurrencyId = e.ExchangeId AND d.WinLossDate = e.ExchangeDate
-	
-	INSERT INTO @GrandTotal(CurrencyName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, ShareComm, AmountDueTo)
-	SELECT 'USD', 
-			SUM(d.TotalTrans), 
-			SUM(d.Turnover * e.USD), 
-			SUM(d.CustomerWinLoss * e.USD), 
-			SUM(d.WinLossShare * e.USD), 
-			SUM(d.LicenseeComm * e.USD), 
-			SUM(d.ShareComm * e.USD), 
-			SUM((d.WinLossShare - d.ShareComm) * e.USD)
-	FROM @Data d
-	INNER JOIN (SELECT ExchangeId, ExchangeDate, USD FROM @Exchange) e ON d.CurrencyId = e.ExchangeId AND d.WinLossDate = e.ExchangeDate
-	
-	INSERT INTO @GrandTotal(CurrencyName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, ShareComm, AmountDueTo)
-	SELECT 'EUR', 
-			SUM(d.TotalTrans), 
-			SUM(d.Turnover * e.EUR), 
-			SUM(d.CustomerWinLoss * e.EUR), 
-			SUM(d.WinLossShare * e.EUR), 
-			SUM(d.LicenseeComm * e.EUR), 
-			SUM(d.ShareComm * e.EUR), 
-			SUM((d.WinLossShare - d.ShareComm) * e.EUR)
-	FROM @Data d
-	INNER JOIN (SELECT ExchangeId, ExchangeDate, EUR FROM @Exchange) e ON d.CurrencyId = e.ExchangeId AND d.WinLossDate = e.ExchangeDate
-	
-	INSERT INTO @GrandTotal(CurrencyName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, ShareComm, AmountDueTo)
-	SELECT 'GBP', 
-			SUM(d.TotalTrans), 
-			SUM(d.Turnover * e.GBP), 
-			SUM(d.CustomerWinLoss * e.GBP), 
-			SUM(d.WinLossShare * e.GBP), 
-			SUM(d.LicenseeComm * e.GBP), 
-			SUM(d.ShareComm * e.GBP), 
-			SUM((d.WinLossShare - d.ShareComm) * e.GBP)
-	FROM @Data d
-	INNER JOIN (SELECT ExchangeId, ExchangeDate, GBP FROM @Exchange) e ON d.CurrencyId = e.ExchangeId AND d.WinLossDate = e.ExchangeDate
-	
-	INSERT INTO @GrandTotal(CurrencyName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, ShareComm, AmountDueTo)
-	SELECT 'CNY', 
-			SUM(d.TotalTrans), 
-			SUM(d.Turnover * e.CNY), 
-			SUM(d.CustomerWinLoss * e.CNY), 
-			SUM(d.WinLossShare * e.CNY), 
-			SUM(d.LicenseeComm * e.CNY), 
-			SUM(d.ShareComm * e.CNY), 
-			SUM((d.WinLossShare - d.ShareComm) * e.CNY)
-	FROM @Data d
-	INNER JOIN (SELECT ExchangeId, ExchangeDate, CNY FROM @Exchange) e ON d.CurrencyId = e.ExchangeId AND d.WinLossDate = e.ExchangeDate
-	
 	SELECT * FROM @GrandTotal
 END
 GO
