@@ -1,13 +1,5 @@
-USE [bodb_Licensee]
+USE [bodb_licensee]
 GO
-/****** Object:  StoredProcedure [dbo].[KPI_GetReportData]    Script Date: 06/23/2014 05:53:36 ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-/****** Object:  Stored Procedure dbo.KPI_GetReportData    Script Date: 6/18/2014 13:23:33  ******/
-
-
 ALTER PROCEDURE [dbo].[KPI_GetReportData]   
 	@ReportType int = 0,
 	@ReportDate datetime = NULL
@@ -20,9 +12,13 @@ AS
  * Revisions :  
  		-20140213@Francis: Set N/A StatID in Credit Branch to value 0 in sportbook report
 		-20140530@Francis: Support Keno product
+		-20160116@Francis: Change to use KPI_Statistics table instead of view_kpi_statistics
+		-20160116@Francis: Support BetTrade
  			
  * Param's Explanation:    
- * 
+ * -@ReportType: 
+	+0: Sportbook
+	+1: Non-sport
  */  
  
 BEGIN
@@ -72,8 +68,8 @@ BEGIN
 	--For SportBook	
 	IF @ReportType = 0
 	BEGIN
-		delete FROM #Temp
-		delete FROM #Result
+		TRUNCATE TABLE #Temp
+		TRUNCATE TABLE #Result
 		delete from @Sites
 		
 		insert into @Sites(LicenseeID,SiteID,SiteName,DateStarted)
@@ -98,16 +94,18 @@ BEGIN
 	            case 
 		            when mtd.StatID in (14,16) then 0 
 					else mtd.MonthToDate 
-				end * case when stat.IsCurrency = 1 then EUR else 1 end),0) AS [Value]
+				end * case when stat.StatisticType = 4 then EUR else 1 end),0) AS [Value]
 		from dbo.rptKPI_MTD_Cross mtd (nolock)
 			inner join @Sites sites on mtd.siteid = sites.SiteID
 			inner join dbo.KPI_Groups g (NOLOCK) on sites.LicenseeID = g.SiteID
 			inner join dbo.KPI_SectionStatistic ss (NOLOCK) ON mtd.StatID = ss.StatID
 			inner join dbo.KPI_BranchGroup bg (NOLOCK) ON g.GroupID = bg.GroupID AND bg.ProductID = 0 
-			left join dbo.view_kpi_statistics stat on mtd.StatID = stat.StatID
+			left join dbo.KPI_Statistics stat on mtd.StatID = stat.StatID
 			left join bodb02.dbo.Lrf_f_GetExchangeDaily(@FromDate,@ToDate) oanda on mtd.rptdate = oanda.exchangedate and mtd.currencyid = oanda.exchangeid
 		where rptDate between @FromDate and @ToDate
 			and (sites.DateStarted is null or rptDate >= sites.DateStarted)
+			--exclude BetTrade StatID
+			and mtd.StatID not between 30 and 34
 		group by 
 			mtd.rptDate,
 			mtd.StatID,
@@ -177,17 +175,58 @@ BEGIN
 		WHERE t1.StatID = 1100
 
 	--Set N/A StatID in Credit Branch to value 0 in sportbook report
-	
 	UPDATE #Result WITH (UPDLOCK, ROWLOCK)
 		SET Value = 0
 		WHERE StatID NOT IN (7,17)
 		AND BranchID = 4	
-	end
+		
 	
+	--For BetTrade
+	TRUNCATE TABLE #Temp
 	
+	insert INTO #Temp (ReportDate,StatID,SectionID,GroupID,BranchID,Value)
+		select 
+		mtd.rptDate AS [ReportDate],
+		mtd.StatID,
+		ss.SectionID,
+		g.GroupID,
+		bg.BranchID,
+		isnull(
+			sum(mtd.MonthToDate * case when stat.StatisticType = 4 then EUR else 1 end),0) AS [Value]
+		from dbo.rptKPI_MTD_Cross mtd (nolock)
+			inner join @Sites sites on mtd.siteid = sites.SiteID
+			inner join dbo.KPI_Groups g (NOLOCK) on sites.LicenseeID = g.SiteID
+			inner join dbo.KPI_SectionStatistic ss (NOLOCK) ON mtd.StatID = ss.StatID
+			inner join dbo.KPI_BranchGroup bg (NOLOCK) ON g.GroupID = bg.GroupID AND bg.ProductID = 13 --BetTrade
+			left join dbo.KPI_Statistics stat on mtd.StatID = stat.StatID
+			left join bodb02.dbo.Lrf_f_GetExchangeDaily(@FromDate,@ToDate) oanda on mtd.rptdate = oanda.exchangedate and mtd.currencyid = oanda.exchangeid
+		where rptDate between @FromDate and @ToDate
+			and (sites.DateStarted is null or rptDate >= sites.DateStarted)
+			--include only BetTrade StatID
+			and mtd.StatID BETWEEN 30 and 34
+		group by 
+			mtd.rptDate,
+			mtd.StatID,
+			ss.SectionID,
+			g.GroupID,
+			bg.BranchID
+		order by bg.BranchID, g.GroupID
+	
+	insert INTO #Result (ReportDate,StatID,SectionID,GroupID,BranchID,Value)
+		SELECT ReportDate,StatID,SectionID,GroupID,BranchID,Value
+		FROM #Temp (NOLOCK)
+		
+	--insert additional financials statistics
+	insert INTO #Result (ReportDate,StatID,SectionID,GroupID,BranchID,Value)
+		SELECT t1.ReportDate,34 AS StatID,t1.SectionID,t1.GroupID,t1.BranchID,(t1.Value * oanda.MYR) AS TotalCommissionInMYR
+		FROM #Result (NOLOCK) t1
+		left join bodb02.dbo.Lrf_f_GetExchangeDaily(@FromDate,@ToDate) oanda on t1.ReportDate = oanda.exchangedate and oanda.exchangeid = 6
+		WHERE t1.StatID = 33
+		
+	END
+		
 	--For Non-Sportbook
 	IF @ReportType = 1
-	
 	BEGIN
 		
 	--For NG
@@ -201,9 +240,9 @@ BEGIN
 			Value float
 		)
 	
-		delete FROM #Temp
-		delete FROM #TempResult
-		delete FROM #Result
+		TRUNCATE TABLE #Temp
+		TRUNCATE TABLE #TempResult
+		TRUNCATE TABLE #Result
 		delete from @Sites
 		
 		insert into @Sites (LicenseeID,SiteID,SiteName,DateStarted)
@@ -237,13 +276,13 @@ BEGIN
 	            case 
 		            when mtd.StatID in (14,16) then 0 
 					else mtd.MonthToDate 
-				end * case when stat.IsCurrency = 1 then EUR else 1 end),0) AS [Value] 
+				end * case when stat.StatisticType = 4 then EUR else 1 end),0) AS [Value] 
 		from dbo.rptKPI_MTD_3rdProducts mtd (nolock)
 			inner join @Sites sites on mtd.siteid = sites.SiteID
 			inner join dbo.KPI_Groups g (NOLOCK) on sites.LicenseeID = g.SiteID
 			inner join dbo.KPI_SectionStatistic ss (NOLOCK) ON mtd.StatID = ss.StatID
 			inner join dbo.KPI_BranchGroup bg (NOLOCK) ON g.GroupID = bg.GroupID AND bg.ProductID = 2 
-			left join dbo.view_kpi_statistics stat on mtd.StatID = stat.StatID
+			left join dbo.KPI_Statistics stat on mtd.StatID = stat.StatID
 			left join bodb02.dbo.Lrf_f_GetExchangeDaily(@FromDate,@ToDate) oanda on mtd.rptdate = oanda.exchangedate and mtd.currencyid = oanda.exchangeid
 		where rptDate between @FromDate and @ToDate
 			and (sites.DateStarted is null or rptDate >= sites.DateStarted)
@@ -372,13 +411,13 @@ BEGIN
 	            case 
 		            when mtd.StatID in (14,16) then 0 
 					else mtd.MonthToDate 
-				end * case when stat.IsCurrency = 1 then EUR else 1 end),0) AS [Value] 
+				end * case when stat.StatisticType = 4 then EUR else 1 end),0) AS [Value] 
 		from dbo.rptKPI_MTD_3rdProducts mtd (nolock)
 			inner join @Sites sites on mtd.siteid = sites.SiteID
 			inner join dbo.KPI_Groups g (NOLOCK) on sites.LicenseeID = g.SiteID
 			inner join dbo.KPI_SectionStatistic ss (NOLOCK) ON mtd.StatID = ss.StatID
 			inner join dbo.KPI_BranchGroup bg (NOLOCK) ON g.GroupID = bg.GroupID AND bg.ProductID = 4 
-			left join dbo.view_kpi_statistics stat on mtd.StatID = stat.StatID
+			left join dbo.KPI_Statistics stat on mtd.StatID = stat.StatID
 			left join bodb02.dbo.Lrf_f_GetExchangeDaily(@FromDate,@ToDate) oanda on mtd.rptdate = oanda.exchangedate and mtd.currencyid = oanda.exchangeid
 		where rptDate between @FromDate and @ToDate
 			and (sites.DateStarted is null or rptDate >= sites.DateStarted)
@@ -495,13 +534,13 @@ BEGIN
 	            case 
 		            when mtd.StatID in (14,16) then 0 
 					else mtd.MonthToDate 
-				end * case when stat.IsCurrency = 1 then EUR else 1 end),0) AS [Value] 
+				end * case when stat.StatisticType = 4 then EUR else 1 end),0) AS [Value] 
 		from dbo.rptKPI_MTD_3rdProducts mtd (nolock)
 			inner join @Sites sites on mtd.siteid = sites.SiteID
 			inner join dbo.KPI_Groups g (NOLOCK) on sites.LicenseeID = g.SiteID
 			inner join dbo.KPI_SectionStatistic ss (NOLOCK) ON mtd.StatID = ss.StatID
 			inner join dbo.KPI_BranchGroup bg (NOLOCK) ON g.GroupID = bg.GroupID AND bg.ProductID = 8 
-			left join dbo.view_kpi_statistics stat on mtd.StatID = stat.StatID
+			left join dbo.KPI_Statistics stat on mtd.StatID = stat.StatID
 			left join bodb02.dbo.Lrf_f_GetExchangeDaily(@FromDate,@ToDate) oanda on mtd.rptdate = oanda.exchangedate and mtd.currencyid = oanda.exchangeid
 		where rptDate between @FromDate and @ToDate
 			and (sites.DateStarted is null or rptDate >= sites.DateStarted)
@@ -620,13 +659,13 @@ BEGIN
 	            case 
 		            when mtd.StatID in (14,16) then 0 
 					else mtd.MonthToDate 
-				end * case when stat.IsCurrency = 1 then EUR else 1 end),0) AS [Value] 
+				end * case when stat.StatisticType = 4 then EUR else 1 end),0) AS [Value] 
 		from dbo.rptKPI_MTD_3rdProducts mtd (nolock)
 			inner join @Sites sites on mtd.siteid = sites.SiteID
 			inner join dbo.KPI_Groups g (NOLOCK) on sites.LicenseeID = g.SiteID
 			inner join dbo.KPI_SectionStatistic ss (NOLOCK) ON mtd.StatID = ss.StatID
 			inner join dbo.KPI_BranchGroup bg (NOLOCK) ON g.GroupID = bg.GroupID AND bg.ProductID = 5 
-			left join dbo.view_kpi_statistics stat on mtd.StatID = stat.StatID
+			left join dbo.KPI_Statistics stat on mtd.StatID = stat.StatID
 			left join bodb02.dbo.Lrf_f_GetExchangeDaily(@FromDate,@ToDate) oanda on mtd.rptdate = oanda.exchangedate and mtd.currencyid = oanda.exchangeid
 		where rptDate between @FromDate and @ToDate
 			and (sites.DateStarted is null or rptDate >= sites.DateStarted)
@@ -728,3 +767,10 @@ BEGIN
 	DROP TABLE #Result
 	
 END
+
+GO
+GRANT EXECUTE ON [dbo].[KPI_GetReportData] TO [bodbAdminNet] AS [dbo]
+GO
+GRANT EXECUTE ON [dbo].[KPI_GetReportData] TO [bodbLicenseeNet] AS [dbo]
+GO
+GRANT VIEW DEFINITION ON [dbo].[KPI_GetReportData] TO [vnteam] AS [dbo]
