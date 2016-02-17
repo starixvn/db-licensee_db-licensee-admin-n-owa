@@ -1,11 +1,3 @@
-USE [bodb02]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-
 ALTER PROCEDURE [dbo].[OAS_Report_LicenseeWinloss] 
 	 @PartyID 	INT
 	,@Currency 	INT 			= 0
@@ -42,7 +34,7 @@ AS
  *  - @IsOld  : 0 - query in table rptLicWinloss, 1 - query in table rptLicWinloss_old.   
  *  - @drawfilter : 'No Draw' filter is supportted (0:Normal 1:No Draw 2:No Draw for Turnover only)  
  *  - @excludeTest : remove currency UUS  
-                exec OAS_Report_LicenseeWinloss 14,0,'2014-09-01','2014-09-30',2,'2014-09-20',0,0,0
+                                                                exec OAS_Report_LicenseeWinloss 14,0,'2014-09-01','2014-09-30',2,'2014-09-20',0,0,0
  */
 BEGIN
 	SET NOCOUNT ON
@@ -241,7 +233,7 @@ BEGIN
 				FROM @tmpAg
 				)
 			 */
-			AND b.bettype NOT IN (903, 902, 903)-- bettrade bettypes
+			AND b.bettype NOT IN (901, 902, 903)-- bettrade bettypes
 			AND b.statusID <> 101
 			AND ISNULL(b.isBA, 0) = 0
 		GROUP BY b.winlostdate
@@ -432,5 +424,6 @@ BEGIN
 	DROP TABLE #Exchange1
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_Report_LicenseeWinloss] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[OAS_Report_LicenseeWinloss] TO bodbAdminNet 
+GRANT EXECUTE ON [dbo].[OAS_Report_LicenseeWinloss] TO [bodbAdminNet] AS [dbo]
+GO
+GRANT VIEW DEFINITION ON [dbo].[OAS_Report_LicenseeWinloss] TO [vnteam] AS [dbo]
