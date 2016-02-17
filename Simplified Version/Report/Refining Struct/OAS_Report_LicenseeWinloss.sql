@@ -21,6 +21,7 @@ AS
 	- 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust
 	- 20150202@Florent: base currency GBP
 	- 20150824@Florent: remove Bettrade bettypes
+	- 20160217@Victor: hotfix - remove bettrade bettypes [Redmine: 52120]
  * 
  * Param's Explanation:    
  *  - @ID   : Party ID  (include: LicenseeID, ResellerID)
