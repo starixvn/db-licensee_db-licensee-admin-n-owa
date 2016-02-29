@@ -20,6 +20,7 @@ AS
  * Task  : Get all data for BA (branch) KPI report
  * DB   : DB052.bodb_Licensee  
  * Revisions :  
+   -20160116@Francis: Change to use KPI_Statistics table instead of view_kpi_statistics
  	
  * Param's Explanation:    
  * 
@@ -96,13 +97,13 @@ BEGIN
 		            case 
 			            when mtd.StatID in (15,16) then 0 
 						else mtd.MonthToDate 
-					end * case when stat.IsCurrency = 1 then EUR else 1 end),0) AS [Value]
+					end * case when stat.StatisticType = 4 then EUR else 1 end),0) AS [Value]
 		from dbo.rptKPI_MTD_BA_Cross mtd (nolock)
 			inner join @Sites sites on mtd.siteid = sites.SiteID
 			inner join dbo.KPI_Groups g (NOLOCK) on sites.LicenseeID = g.SiteID
 			inner join dbo.KPI_SectionStatistic ss (NOLOCK) ON mtd.StatID = ss.StatID
 			inner join dbo.KPI_BranchGroup bg (NOLOCK) ON g.GroupID = bg.GroupID AND bg.BranchID = @TempID 
-			left join dbo.view_kpi_statistics stat on mtd.StatID = stat.StatID
+			left join dbo.KPI_Statistics stat on mtd.StatID = stat.StatID
 			left join bodb02.dbo.Lrf_f_GetExchangeDaily(@FromDate,@ToDate) oanda on mtd.rptdate = oanda.exchangedate and mtd.currencyid = oanda.exchangeid
 		where rptDate between @FromDate and @ToDate
 			and (sites.DateStarted is null or rptDate >= sites.DateStarted)
