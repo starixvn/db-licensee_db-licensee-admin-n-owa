@@ -97,7 +97,7 @@ BEGIN
 				AND b.Bettype NOT IN (901,902,903)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId, b.CurrencyID, b.ProductId
 	)
-
+	
 	-- EndRegion
 	
 	CREATE TABLE #Result (
@@ -114,18 +114,12 @@ BEGIN
 		AmountDueTo		MONEY
 	)
 
---SELECT * FROM @PartyChargeInfo
---SELECT * from @PartyList 
---SELECT * FROM #Exchange WHERE CurrencyCode = @BaseCurrencyName
---SELECT * FROM #TempData td
-
-
 	IF @BaseCurrencyName = ''
 	BEGIN 
 		INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueTo)
-		SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode, td.TotalTrans, td.Turnover, td.MemberWL, td.LicWL, td.AmountDue
+		SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, 'e.CurrencyCode', td.TotalTrans, td.Turnover, td.MemberWL, td.LicWL, td.AmountDue
 		FROM #TempData td 
-			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
+			--INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
 			INNER JOIN @PartyList p ON td.PartyId = p.PartyID
 			INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId
 		
@@ -151,7 +145,7 @@ BEGIN
 
 	CREATE TABLE #GrandTotal (		
 		CurrencyName	VARCHAR(20),
-		Exchange		MONEY,
+		TotalTrans		INT,
 		Turnover		MONEY,
 		CustomerWinLoss	MONEY,		
 		LicenseeWinLoss	MONEY,
@@ -167,16 +161,15 @@ BEGIN
 		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency)
 
-		INSERT INTO #GrandTotal (CurrencyName,Exchange,Turnover,CustomerWinLoss,LicenseeWinLoss,AmountDueTo)
+		INSERT INTO #GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,AmountDueTo)
 		SELECT	@tempCurrency, 
-				e.Rate,
+				SUM(td.TotalTrans),
 				SUM(td.Turnover*e.Rate), 
 				SUM(td.MemberWL*e.Rate), 
 				SUM(td.LicWL*e.Rate), 
 				SUM(td.AmountDue*e.Rate)
 		FROM #TempData td 
-			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate		
-		GROUP BY td.PartyId, td.rptDate, e.CurrencyCode, e.Rate
+			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate				
 
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 	END
