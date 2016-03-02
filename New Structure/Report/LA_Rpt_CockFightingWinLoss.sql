@@ -117,9 +117,9 @@ BEGIN
 	IF @BaseCurrencyName = ''
 	BEGIN 
 		INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueTo)
-		SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, 'e.CurrencyCode', td.TotalTrans, td.Turnover, td.MemberWL, td.LicWL, td.AmountDue
+		SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode, td.TotalTrans, td.Turnover, td.MemberWL, td.LicWL, td.AmountDue
 		FROM #TempData td 
-			--INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
+			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
 			INNER JOIN @PartyList p ON td.PartyId = p.PartyID
 			INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId
 		
