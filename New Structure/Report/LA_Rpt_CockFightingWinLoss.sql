@@ -22,6 +22,7 @@ AS
 	 Params:			   
 */
 BEGIN	
+	-- Region: Charge Info
 	DECLARE @PartyChargeInfo AS TABLE (
 		PartyId		INT,
 		LicenseeId	INT,
