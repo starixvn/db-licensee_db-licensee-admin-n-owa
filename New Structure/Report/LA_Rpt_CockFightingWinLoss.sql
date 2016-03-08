@@ -88,7 +88,7 @@ BEGIN
 				SUM(ISNULL(b.BetCount, 0)) TotalTrans,
 				SUM(ISNULL(b.Turnover, 0)) Turnover,
 				SUM(ISNULL(b.MemberWL, 0)) MemberWL,
-				SUM(ISNULL(b.GrossWL, 0)) LicWL,
+				SUM(ISNULL(-b.MemberWL, 0)) LicWL,
 				SUM(ISNULL(-b.MemberWL * p.Rate, 0)) AmountDue
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN @PartyChargeInfo p ON b.ProductID = p.ProductID AND b.SiteID = p.LicenseeId
