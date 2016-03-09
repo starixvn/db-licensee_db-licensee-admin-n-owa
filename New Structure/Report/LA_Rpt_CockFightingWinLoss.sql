@@ -91,7 +91,9 @@ BEGIN
 				SUM(ISNULL(-b.MemberWL, 0)) LicWL,
 				SUM(ISNULL(-b.MemberWL * p.Rate, 0)) AmountDue
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN @PartyChargeInfo p ON b.ProductID = p.ProductID AND b.SiteID = p.LicenseeId
+				INNER JOIN @PartyChargeInfo p ON b.ProductID = p.ProductID 
+												AND b.SiteID = p.LicenseeId
+												AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
