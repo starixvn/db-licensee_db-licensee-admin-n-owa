@@ -10,7 +10,7 @@ declare--ALTER PROCEDURE [dbo].[LA_Rpt_ColossusBetWinloss]
 	  @PartyIds				VARCHAR(1000)
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME
-	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
+	, @BaseCurrencyName		VARCHAR(3)		= 'CNY'
 select @partyids='30',@FromDate='20150101',@ToDate='20150131',@BaseCurrencyName='' --WITH RECOMPILE
 --AS
 /*  Created: 20160310@Bruce
@@ -22,6 +22,13 @@ select @partyids='30',@FromDate='20150101',@ToDate='20150131',@BaseCurrencyName=
 */
 --BEGIN
 --	SET NOCOUNT ON
+
+	CREATE TABLE #Exchange (
+		ExchangeDate	DATE,
+		ExchangeID		INT,
+		CurrencyCode	VARCHAR(10),
+		Rate			FLOAT
+	)
 
 	-- Region: Charge Info
 	CREATE TABLE #PartyChargeInfo (
@@ -80,19 +87,6 @@ select @partyids='30',@FromDate='20150101',@ToDate='20150131',@BaseCurrencyName=
 	EXEC LA_PartyListSel
 	---- Endregion
 
-	-- Region: Get exchange rate info
-	CREATE TABLE #Exchange (
-		ExchangeDate	DATE,
-		ExchangeID		INT,
-		CurrencyCode	VARCHAR(10),
-		Rate			FLOAT
-	)
-	
-	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
-	-- End region
-
 	-- Region: Get Winloss data
 	CREATE	TABLE #TempData (
 		LicenseeId		INT,
@@ -147,21 +141,20 @@ select @partyids='30',@FromDate='20150101',@ToDate='20150131',@BaseCurrencyName=
 		(
 			SELECT p.PartyId, p.PartyName, g.PartyId, g.PartyName, td.rptDate, e.Code, td.TotalTrans, td.Turnover, td.Prize, td.CashOut, td.CashInAmount
 			FROM #TempData td 
-				INNER JOIN (SELECT DISTINCT ExchangeID, Code FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)) e ON td.CurrencyId = e.ExchangeID
+				INNER JOIN bodb02.dbo.Exchange e ON td.CurrencyId = e.ExchangeID
 				INNER JOIN @PartyList p ON td.PartyId = p.PartyID
 				INNER JOIN @PartyList g ON p.ParentId = g.PartyId
 		)
 	END
-	--ELSE
-	--BEGIN
-	
-	--	INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, CommissionShare, AmountDueLicensee)
-	--	SELECT p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode, td.TotalTrans, td.Turnover*e.Rate, td.MemberWL*e.Rate, td.WLShare*e.Rate, td.LicComm*e.Rate, td.CommShare*e.Rate, td.AmtLicensee*e.Rate
-	--	FROM #TempData td 
-	--		INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
-	--		INNER JOIN @PartyList p ON td.PartyId = p.PartyID
-	--		INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId	
-	--END
+	ELSE
+	BEGIN	
+		INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, Prize, CashOut, CashInAmount)
+		SELECT p.PartyId, p.PartyName, g.PartyId, g.PartyName, td.rptDate, e.Code, td.TotalTrans, td.Turnover * e.BaseCurrencyRate, td.Prize * e.BaseCurrencyRate, td.CashOut * e.BaseCurrencyRate, td.CashInAmount * e.BaseCurrencyRate
+		FROM #TempData td
+			INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName) e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
+			INNER JOIN @PartyList p ON td.PartyId = p.PartyID
+			INNER JOIN @PartyList g ON p.ParentId = g.PartyId
+	END
 
 	-- Region: Grand total data
 	DECLARE @tempCurrency VARCHAR(20)
@@ -188,8 +181,7 @@ select @partyids='30',@FromDate='20150101',@ToDate='20150131',@BaseCurrencyName=
 	WHILE EXISTS (SELECT TOP 1 * FROM @BaseCurrencies WHERE IsApply IS NULL)
 	BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)
-		
-		DELETE FROM #Exchange
+
 		INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency)
@@ -204,28 +196,32 @@ select @partyids='30',@FromDate='20150101',@ToDate='20150131',@BaseCurrencyName=
 		FROM #TempData td
 		INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
 
+		-- convert min/max amount to current currency
 		UPDATE p SET
 			MinAmountEx = MinAmount * e.Rate,
 			MaxAmountEx = MaxAmount * e.Rate
 		FROM #PartyChargeInfo p
-		INNER JOIN #Exchange e ON p.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @FromDate
+		INNER JOIN #Exchange e ON p.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
 
-		SELECT *
+		-- calculate commission/cashinshare
+		UPDATE g SET 
+			Commission = g.Turnover * cm.Rate,
+			CashInShare = g.CashInAmount * cs.Rate
 		FROM @GrandTotal g
-		INNER JOIN #PartyChargeInfo p ON p.ChargeType = 6
+		INNER JOIN #PartyChargeInfo cm ON cm.ChargeType = 6 AND g.Turnover >= cm.MinAmountEx AND g.Turnover < cm.MaxAmountEx			-- Commission share
+		INNER JOIN #PartyChargeInfo cs ON cs.ChargeType = 7 AND g.CashInAmount >= cs.MinAmountEx AND g.CashInAmount < cs.MaxAmountEx	-- Cash in share
+		WHERE g.CurrencyName = @tempCurrency
 		
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
+		DELETE FROM #Exchange
 	END
 
-	--UPDATE #GrandTotal
-	--SET AmountDueMuayThai = WinLossShare + CommissionShare
-
-	--UPDATE #GrandTotal
-	--SET AmountDueCompany = AmountDueLicensee - AmountDueMuayThai
+	UPDATE @GrandTotal
+	SET AmountDueToColossusBet = Turnover - Prize - CashOut - Commission - CashInShare
 	----EndRegion
 	
-	--SELECT * FROM #Result
-	--SELECT * FROM #GrandTotal
+	SELECT * FROM #Result
+	SELECT * FROM @GrandTotal
 	
 	DROP TABLE #TempData
 	DROP TABLE #Result
