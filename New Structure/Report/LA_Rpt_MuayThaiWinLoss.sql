@@ -177,8 +177,7 @@ BEGIN
 	
 	WHILE EXISTS (SELECT * FROM @BaseCurrencies WHERE IsApply IS NULL)
 	BEGIN
-		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)
-		PRINT @tempCurrency
+		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)		
 		DELETE FROM #Exchange
 		INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
