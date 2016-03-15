@@ -1,6 +1,6 @@
 USE [bodb_licensee]
 GO
-/****** Object:  StoredProcedure [dbo].[OAS_ChargeInfoIns]    Script Date: 4/13/2015 3:37:01 PM ******/
+
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -40,6 +40,7 @@ AS
 		- 20150616@Florent: rename param @MinfeeCurrencyId to @BaseCurrencyId
 							- add data to LA_Minfee for minfee and waive time
 		- 20150813@Florent: support multicharge rate - Microgaming
+		- 20160315@Victor: support Microgaming - RNG product
 
 	Param's Explanation:
 */
@@ -129,7 +130,7 @@ BEGIN
 					)
 			)
 	BEGIN
-		IF @ProductId = 14 -- case Microgaming
+		IF @ProductId IN (14, 17) -- case Microgaming
 			BEGIN
 				INSERT INTO dbo.OAS_ChargeInfo (ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, MinAmount, MaxAmount, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling)
 				SELECT @ProductID, @FromPartyId, @ToPartyId, @ParentChargeId, NULL, @ChargeType, @FromDate, @ToDate, @MinAmount, @MaxAmount, @Remark, @BaseCurrencyId, @FromDate, ''
