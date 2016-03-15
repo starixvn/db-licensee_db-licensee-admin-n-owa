@@ -44,7 +44,7 @@ BEGIN
 
 		INSERT INTO @CBShare(Rate, MinAmount, MaxAmount, BaseCurrencyId, TypeId)
 		SELECT ci.Rate, MinAmount, MaxAmount, BaseCurrencyId, ChargeType
-		FROM OAS_ChargeInfo ci WITH(NOLOCK)
+		FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
 		WHERE FromParty = 1 AND ProductID = 15 AND ChargeType IN (6,7) AND (
 			@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
 			@ToDate BETWEEN ci.FromDate AND ci.ToDate OR
@@ -53,21 +53,6 @@ BEGIN
 		)
 		-- Product - 15: Colossus bet
 		-- ChargeType: 6,7 are turnover and commission
-	END
-
-	-- Charge Info
-	BEGIN
-		DECLARE @PartyChargeInfo AS TABLE (
-			PartyId			INT,
-			LicenseeId		INT,
-			ProductID		INT,
-			FromDate		SMALLDATETIME,
-			ToDate			SMALLDATETIME
-		)
-
-		INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Fromdate, Todate)
-		SELECT	PartyId,LicenseeID, ProductID, Fromdate, Todate
-		FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate,'CB','OA',1) ci
 	END
 
 	-- Party List
@@ -102,14 +87,20 @@ BEGIN
 				p.PartyId,
 				b.rptDate,
 				b.CurrencyID,
-				SUM(ISNULL(b.BetCount, 0)) TotalTrans,
-				SUM(ISNULL(b.Turnover, 0)) Turnover,
-				SUM(CASE WHEN b.StatusId = 113 OR b.Bettype = 18002 THEN 0 ELSE b.MemberWL END) Prize, -- exclude lose & cash out
-				SUM(CASE WHEN b.Bettype = 18002 THEN b.MemberWL ELSE 0 END) CashOut,
-				SUM(CASE WHEN b.Bettype = 18002 THEN b.BuyBackAmount ELSE 0 END) CashInAmount
-		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-		INNER JOIN @PartyChargeInfo p ON b.ProductID = p.ProductID AND b.SiteID = p.LicenseeId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
-		WHERE	b.CurrencyID <> 20 AND b.customercategory NOT IN (27, 28)
+				SUM(b.BetCount) TotalTrans,
+				SUM(b.Turnover) Turnover,
+				SUM(b.MemberWL) Prize,
+				SUM(b.GrossWL) CashOut,
+				SUM(b.BuyBackAmount) CashInAmount
+		FROM dbo.OAS_Party p WITH(NOLOCK)
+		INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
+		LEFT JOIN dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
+		INNER JOIN bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			ON	b.ProductID = 15 AND
+				b.SiteID = (CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END) AND
+				b.rptDate BETWEEN @FromDate AND @ToDate
+		WHERE	b.CurrencyID <> 20 AND b.customercategory NOT IN (27, 28) AND
+				p.PartyID IN (SELECT val FROM dbo.strSplit(@PartyIds, ','))
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, p.PartyId
 	END
 
@@ -216,7 +207,16 @@ BEGIN
 	--EndRegion Grand total data
 	
 	SELECT * FROM #Result
-	SELECT * FROM @GrandTotal
+	SELECT	CurrencyName,
+			ISNULL(AmountDueToColossusBet,0) AmountDueToColossusBet,
+			ISNULL(TotalTrans,0) TotalTrans,
+			ISNULL(Turnover,0) Turnover,
+			ISNULL(Prize,0) Prize,
+			ISNULL(CashOut,0) CashOut,
+			ISNULL(Commission,0) Commission,
+			ISNULL(CashInShare,0) CashInShare,
+			ISNULL(CashInAmount,0) CashInAmount
+	FROM @GrandTotal
 	
 	DROP TABLE #TempData
 	DROP TABLE #Result
