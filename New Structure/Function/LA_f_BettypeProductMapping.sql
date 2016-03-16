@@ -25,6 +25,7 @@ AS
 		- 20151012@Victor: Add product AG Casino Single Wallet
 		- 20151201@Bravo: Change Product code: MGC -> MGCLC
 		- 20160113@Bruce: Include new bettypes 2101-2399 for CS (OW RNG)
+		- 20160224@Victor: Add product Cock Fighting [Redmine: 52452]
     Param's Explanation:   
 
 */
@@ -165,6 +166,15 @@ BEGIN
 	   SELECT typeid, 10
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 1801 AND 1899
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+    END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'CF')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 19
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid = 1003
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
     
