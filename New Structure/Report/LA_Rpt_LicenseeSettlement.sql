@@ -28,6 +28,7 @@ AS
 			- 20150914@Bravo: Add 2 Column for Grand Total Row.
 			- 20160107@Bruce: Split BuyBackAmount into BuyBackAmountSB & BuyBackAmountBA
 			- 20160112@Bruce: Bettrade: LicenseeWL = 0 for BA tickets
+			- 20160316@Bruce: Bettrade: added BuyBackAmountSportsbookBase and BuyBackAmountBABase
 		Param's Explanation:
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
 								'NG' -> Number Game			'BA' -> BA
