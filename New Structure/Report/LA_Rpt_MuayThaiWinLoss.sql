@@ -26,20 +26,21 @@ BEGIN
 	DECLARE @PartyChargeInfo AS TABLE (
 		PartyId		INT,
 		LicenseeId	INT,
+		IsDeposit   BIT,
 		ProductID	INT,
 		Rate		MONEY,
 		FromDate	SMALLDATETIME,
 		ToDate		SMALLDATETIME
 	)
 
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
+	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, IsDeposit, ProductID, Rate, Fromdate, Todate)
 	(
-		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
-		FROM	dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'SB', 'OA', 1)
-		WHERE	DI_Rate > 0
+		SELECT	PartyID, LicenseeID, isDeposit, ProductID, DI_Rate, Fromdate, Todate
+		FROM	dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'SB', 'OA', 0)
+		--WHERE	DI_Rate > 0
 	)
 	-- End region
-	
+
 	-- Region: Party List
 	DECLARE @PartyList AS TABLE (
 		PartyId		INT,
@@ -93,7 +94,10 @@ BEGIN
 				SUM(ISNULL(b.WLShare, 0)) WLShare,
 				SUM(ISNULL(b.CommissionS, 0)) LicComm,
 				SUM(ISNULL(b.CommShare, 0)) CommShare,
-				SUM(ISNULL(-b.CustomerWL, 0) * p.Rate) AmtLicensee
+				SUM(CASE WHEN p.IsDeposit = 0 
+						THEN ISNULL(b.LicenseeWL, 0) 
+						ELSE ISNULL(-b.CustomerWL, 0) * p.Rate 
+					END) AmtLicensee
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingBySport b WITH (NOLOCK)
 				INNER JOIN @PartyChargeInfo p ON b.ProductID = p.ProductID 
 												AND b.SiteID = p.LicenseeId
@@ -208,6 +212,7 @@ BEGIN
 	SELECT * FROM #Result
 	SELECT * FROM #GrandTotal
 	
+	DROP TABLE #TempData
 	DROP TABLE #Exchange
 	DROP TABLE #Result
 	DROP TABLE #GrandTotal
