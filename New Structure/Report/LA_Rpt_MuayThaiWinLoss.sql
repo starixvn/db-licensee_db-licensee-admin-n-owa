@@ -104,6 +104,7 @@ BEGIN
 												AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate
 				AND (b.CurrencyID <> 20)
+				AND b.StatusId BETWEEN 111 AND 113
 				AND b.customercategory NOT IN (27, 28)
 				AND b.SportType = 44 -- Muay Thai
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, p.PartyId

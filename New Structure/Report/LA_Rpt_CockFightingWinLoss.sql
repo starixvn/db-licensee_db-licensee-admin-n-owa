@@ -178,9 +178,9 @@ BEGIN
 	END
 	
 	SELECT * FROM #Result
-
 	SELECT * FROM #GrandTotal
 	
+	DROP TABLE #TempData
 	DROP TABLE #Exchange
 	DROP TABLE #Result
 	DROP TABLE #GrandTotal
