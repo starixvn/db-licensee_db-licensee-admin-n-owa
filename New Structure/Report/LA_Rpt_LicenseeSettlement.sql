@@ -28,6 +28,7 @@ AS
 			- 20150914@Bravo: Add 2 Column for Grand Total Row.
 			- 20160107@Bruce: Split BuyBackAmount into BuyBackAmountSB & BuyBackAmountBA
 			- 20160112@Bruce: Bettrade: LicenseeWL = 0 for BA tickets
+			- 20160316@Bruce: Bettrade: added BuyBackAmountSportsbookBase and BuyBackAmountBABase
 		Param's Explanation:
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
 								'NG' -> Number Game			'BA' -> BA
@@ -472,15 +473,17 @@ BEGIN
 		, SUM(ISNULL(d.Company, 0))				AS Company
 
 		--Base on currency
-		, CONVERT(MONEY, SUM(ISNULL(d.Turnover * e.Rate, 0)))		AS TurnoverBase
-		, CONVERT(MONEY, SUM(ISNULL(d.ActualStake * e.Rate, 0)))	AS ActualStakeBase
-		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmount * e.Rate, 0)))	AS BuyBackAmountBase
-		, CONVERT(MONEY, SUM(ISNULL(d.BettradeComm * e.Rate, 0)))	AS BettradeCommBase
-		, CONVERT(MONEY, SUM(d.Winlost * e.Rate))					AS MemberWinLossBase
-		, CONVERT(MONEY, SUM(d.PlayerComm * e.Rate))				AS MemberCommBase
-		, CONVERT(MONEY, SUM(d.LicenseeWL * e.Rate))				AS LicenseeWLBase
-		, CONVERT(MONEY, SUM(d.LicenseeComm * e.Rate))				AS LicenseeCommBase
-		, CONVERT(MONEY, SUM(d.Company* e.Rate))					AS CompanyBase
+		, CONVERT(MONEY, SUM(ISNULL(d.Turnover * e.Rate, 0)))			AS TurnoverBase
+		, CONVERT(MONEY, SUM(ISNULL(d.ActualStake * e.Rate, 0)))		AS ActualStakeBase
+		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmount * e.Rate, 0)))		AS BuyBackAmountBase
+		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountSB * e.Rate, 0)))	AS BuyBackAmountSportsbookBase
+		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountBA * e.Rate, 0)))	AS BuyBackAmountBABase
+		, CONVERT(MONEY, SUM(ISNULL(d.BettradeComm * e.Rate, 0)))		AS BettradeCommBase
+		, CONVERT(MONEY, SUM(d.Winlost * e.Rate))						AS MemberWinLossBase
+		, CONVERT(MONEY, SUM(d.PlayerComm * e.Rate))					AS MemberCommBase
+		, CONVERT(MONEY, SUM(d.LicenseeWL * e.Rate))					AS LicenseeWLBase
+		, CONVERT(MONEY, SUM(d.LicenseeComm * e.Rate))					AS LicenseeCommBase
+		, CONVERT(MONEY, SUM(d.Company* e.Rate))						AS CompanyBase
 	FROM
 		#Result d
 		INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
