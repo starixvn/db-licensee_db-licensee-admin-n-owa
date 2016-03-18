@@ -89,9 +89,9 @@ BEGIN
 				b.CurrencyID,
 				SUM(b.BetCount) TotalTrans,
 				SUM(b.Turnover) Turnover,
-				SUM(b.MemberWL) Prize,
-				SUM(b.GrossWL) CashOut,
-				SUM(b.BuyBackAmount) CashInAmount
+				SUM(ISNULL(b.WinPrizeAmount,0)) Prize,
+				SUM(ISNULL(b.CashOutAmount,0)) CashOut,
+				SUM(ISNULL(b.BuyBackAmount,0)) CashInAmount
 		FROM dbo.OAS_Party p WITH(NOLOCK)
 		INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 		LEFT JOIN dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
