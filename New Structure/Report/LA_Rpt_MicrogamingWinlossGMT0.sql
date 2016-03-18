@@ -21,8 +21,10 @@ AS
 	DB: DB052.bodb02
 	Modified:
 	- Feature 44698.
+	- Feature 54152.
 	Revisions:
-	- 20151201@Forrest: Add Microgaming RNG and change data flow.	  			
+	- 20151201@Forrest: Add Microgaming RNG and change data flow.
+	- 20160316@Forrest: Change SporttypeRef to Sporttype.	  			
 	Param's Explanation:
 		+ @PartyIDs	: a string of list PartyID, separate by ','
 		+ @Currency	:  0 - All Currencies
@@ -77,11 +79,11 @@ BEGIN
 	CREATE TABLE #GameTypes (ProductId INT, BettypeRef INT, BettypeId INT, GameTypeName VARCHAR(100))
 
 	INSERT INTO #GameTypes (ProductId, BettypeId, BettypeRef)
-	SELECT CASE WHEN sp.SporttypeRef = 203 THEN 14
-				WHEN sp.SporttypeRef = 205 THEN 17 ELSE 0 END AS ProductId, sp.Bettype, pr.BettypeRef
+	SELECT CASE WHEN sp.Sporttype = 203 THEN 14
+				WHEN sp.Sporttype = 205 THEN 17 ELSE 0 END AS ProductId, sp.Bettype, pr.BettypeRef
 	FROM bodb_licensee.dbo.Sport_Bettype_Reference sp WITH (NOLOCK)
 		LEFT JOIN bodb_licensee.dbo.LA_Product3rdSub pr WITH (NOLOCK) ON sp.BettypeRef = pr.BettypeRef
-	GROUP BY sp.SporttypeRef, sp.Bettype, pr.BettypeRef
+	GROUP BY sp.Sporttype, sp.Bettype, pr.BettypeRef
 
 	UPDATE #GameTypes
 	SET GameTypeName = 'Generic'

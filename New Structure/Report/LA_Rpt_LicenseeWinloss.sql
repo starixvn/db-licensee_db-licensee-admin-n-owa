@@ -24,7 +24,8 @@ AS
 	Original: LA_Rpt_LicenseeWinloss
 	Feature: 44873
 	DB: DB052.bodb02  
-	Revisions:  
+	Revisions:
+	- 20160316: @Forrest - Change SporttypeRef to Sporttype for Microgaming  
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
 		+ @Currency	:  0- All Currencies
@@ -107,11 +108,11 @@ BEGIN
 		CREATE TABLE #MicrogamingChargeInfo(PartyID INT, LicenseeID INT, ProductID INT,BetTypeId INT ,Rate MONEY, Fromdate DATE, Todate DATE)
 
 		INSERT INTO #GameTypes (ProductId, BettypeId, BettypeRef)
-		SELECT CASE WHEN sp.SporttypeRef = 203 THEN 14
-					WHEN sp.SporttypeRef = 205 THEN 17 ELSE 0 END AS ProductId, sp.Bettype, pr.BettypeRef
+		SELECT CASE WHEN sp.Sporttype = 203 THEN 14
+					WHEN sp.Sporttype = 205 THEN 17 ELSE 0 END AS ProductId, sp.Bettype, pr.BettypeRef
 		FROM bodb_licensee.dbo.Sport_Bettype_Reference sp WITH (NOLOCK)
 			LEFT JOIN bodb_licensee.dbo.LA_Product3rdSub pr WITH (NOLOCK) ON sp.BettypeRef = pr.BettypeRef
-		GROUP BY sp.SporttypeRef, sp.Bettype, pr.BettypeRef
+		GROUP BY sp.Sporttype, sp.Bettype, pr.BettypeRef
 		
 		INSERT INTO #MicrogamingChargeInfo(PartyID, LicenseeID, ProductID, BetTypeId, Rate, Fromdate, Todate)
 		SELECT PartyID, LicenseeID, ci.ProductID, gt.BetTypeId, Rate, Fromdate, Todate 
