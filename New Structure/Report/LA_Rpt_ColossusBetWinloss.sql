@@ -223,5 +223,5 @@ BEGIN
 	DROP TABLE #Exchange
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_MuayThaiWinLoss] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_Rpt_MuayThaiWinLoss] TO bodbAdminNet
+GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_ColossusBetWinloss] TO [vnteam]
+GRANT EXECUTE ON [dbo].[LA_Rpt_ColossusBetWinloss] TO bodbAdminNet
