@@ -17,7 +17,8 @@ AS
 	Task : Report - Muay Thai Win Loss
 	DB: DBEXT/bodb02
 	Revisions: 
-		- 20160302@Bravo: create sp on table sum 			
+		- 20160302@Bravo: create sp on table sum 		
+		- 20160322@Bravo: fix bug currency name VND => INH	
 	Param's Explanation:  						
 */
 SET NOCOUNT ON
@@ -63,8 +64,12 @@ BEGIN
 	)
 	
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
+	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate	
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+
+	UPDATE #Exchange 
+	SET CurrencyCode = 'INH'
+	WHERE ExchangeID = 51
 	-- End region
 	
 	-- Region: Get Winloss data
