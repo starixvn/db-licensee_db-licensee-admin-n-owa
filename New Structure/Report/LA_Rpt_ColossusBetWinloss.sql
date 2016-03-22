@@ -39,11 +39,15 @@ BEGIN
 			MinAmountEx		MONEY,
 			MaxAmountEx		MONEY,
 			BaseCurrencyId	SMALLINT,
-			TypeId			SMALLINT
+			TypeId			SMALLINT,
+			FromDate		DATETIME,
+			ToDate			DATETIME
 		)
 
-		INSERT INTO @CBShare(Rate, MinAmount, MaxAmount, BaseCurrencyId, TypeId)
-		SELECT ci.Rate, MinAmount, MaxAmount, BaseCurrencyId, ChargeType
+		INSERT INTO @CBShare(Rate, MinAmount, MaxAmount, BaseCurrencyId, TypeId, FromDate, ToDate)
+		SELECT	ci.Rate, MinAmount, MaxAmount, BaseCurrencyId, ChargeType,
+				CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
+				CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
 		FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
 		WHERE FromParty = 1 AND ProductID = 15 AND ChargeType IN (6,7) AND (
 			@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
@@ -54,6 +58,9 @@ BEGIN
 		-- Product - 15: Colossus bet
 		-- ChargeType: 6,7 are turnover and commission
 	END
+
+	SET @FromDate = (SELECT MIN(FromDate) FROM @CBShare)
+	SET @ToDate = (SELECT MAX(ToDate) FROM @CBShare)
 
 	-- Party List
 	BEGIN
