@@ -65,18 +65,18 @@ SET NOCOUNT ON
 	
 	-- Region: Get exchange rate info
 	
-	DECLARE @Exchange TABLE(
+	CREATE TABLE #Exchange(
 		ExchangeDate	DATE,
 		ExchangeID		INT,
 		CurrencyCode	VARCHAR(10),
 		Rate			FLOAT
 	)
 	
-	INSERT INTO @Exchange
+	INSERT INTO #Exchange
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	
-	UPDATE @Exchange 
+	UPDATE #Exchange 
 	SET CurrencyCode = 'INH'
 	WHERE ExchangeID = 51
 	
@@ -84,7 +84,7 @@ SET NOCOUNT ON
 	
 	-- Region: Get Winloss data
 	
-	DECLARE @TempData TABLE(
+	CREATE TABLE #TempData(
 		LicenseeId	INT,
 		PartyId		INT,
 		RptDate		DATETIME,
@@ -95,7 +95,7 @@ SET NOCOUNT ON
 		AmtLicensee MONEY
 	)
 	
-	INSERT INTO @TempData (LicenseeId, PartyId, RptDate, CurrencyId, TotalTrans, Turnover, MemberWL, AmtLicensee)
+	INSERT INTO #TempData (LicenseeId, PartyId, RptDate, CurrencyId, TotalTrans, Turnover, MemberWL, AmtLicensee)
 	(
 		SELECT	b.SiteID,
 				p.PartyId,
@@ -141,8 +141,8 @@ SET NOCOUNT ON
 	BEGIN 
 		INSERT INTO @Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueLicensee)
 		SELECT p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode, td.TotalTrans, td.Turnover, td.MemberWL, -td.MemberWL, td.AmtLicensee
-		FROM @TempData td 
-			INNER JOIN @Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
+		FROM #TempData td 
+			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
 			INNER JOIN @PartyList p ON td.PartyId = p.PartyID
 			INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId
 		
@@ -151,8 +151,8 @@ SET NOCOUNT ON
 	BEGIN
 		INSERT INTO @Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueLicensee)
 		SELECT p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode, td.TotalTrans, td.Turnover*e.Rate, td.MemberWL*e.Rate, -td.MemberWL*e.Rate, td.AmtLicensee*e.Rate
-		FROM @TempData td 
-			INNER JOIN @Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
+		FROM #TempData td 
+			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
 			INNER JOIN @PartyList p ON td.PartyId = p.PartyID
 			INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId	
 	END
@@ -196,8 +196,8 @@ SET NOCOUNT ON
 	WHILE EXISTS (SELECT * FROM @BaseCurrencies WHERE IsApply IS NULL)
 	BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)		
-		DELETE FROM @Exchange
-		INSERT INTO @Exchange
+		DELETE FROM #Exchange
+		INSERT INTO #Exchange
 		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency)
 		
@@ -208,8 +208,8 @@ SET NOCOUNT ON
 				SUM(td.MemberWL * e.Rate), 
 				SUM(-td.MemberWL * e.Rate), 
 				SUM(td.AmtLicensee * e.Rate)
-		FROM @TempData td 
-		INNER JOIN @Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
+		FROM #TempData td 
+		INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
 		
 		DELETE FROM @ProductChargeInfo
 		
@@ -221,7 +221,7 @@ SET NOCOUNT ON
 				ci.MaxAmount * ex.Rate,
 				@tempCurrency
 		FROM OAS_ChargeInfo ci
-		INNER JOIN @Exchange ex ON ci.BaseCurrencyId = ex.ExchangeID AND ex.ExchangeDate = @ToDate
+		INNER JOIN #Exchange ex ON ci.BaseCurrencyId = ex.ExchangeID AND ex.ExchangeDate = @ToDate
 		WHERE ci.ProductID = 0 AND ci.FromParty = 1 AND ci.ChargeType = 4 -- Get Charge Rate to Billing for Metric Gaming
 		
 		SELECT @AmountDueSuperlive = ISNULL(SUM(pci.AmountDueSuperlive),0) FROM @GrandTotal gt OUTER APPLY (
@@ -245,6 +245,9 @@ SET NOCOUNT ON
 	
 	SELECT * FROM @Result
 	SELECT * FROM @GrandTotal
+	
+	DROP TABLE #Exchange
+	DROP TABLE #TempData
 END
 
 GO
