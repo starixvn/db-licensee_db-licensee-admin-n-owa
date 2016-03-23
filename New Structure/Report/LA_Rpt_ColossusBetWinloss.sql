@@ -168,7 +168,8 @@ BEGIN
 		CashInAmount			MONEY,
 		Commission				MONEY,
 		CashInShare				MONEY,
-		AmountDueToColossusBet	MONEY
+		AmountDueToColossusBet	MONEY,
+		ChargeDate				DATETIME
 	)
 	
 	WHILE EXISTS (SELECT TOP 1 * FROM @BaseCurrencies WHERE IsApply IS NULL)
@@ -179,40 +180,53 @@ BEGIN
 		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency)
 
-		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,Prize,CashOut,CashInAmount)
+		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,Prize,CashOut,CashInAmount, ChargeDate)
 		SELECT	@tempCurrency,
 				SUM(td.TotalTrans),
 				SUM(td.Turnover*e.Rate),
 				SUM(td.Prize*e.Rate),
 				SUM(td.CashOut*e.Rate),
-				SUM(td.CashInAmount*e.Rate)
+				SUM(td.CashInAmount*e.Rate),
+				s.ToDate
 		FROM #TempData td
 		INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
+		INNER JOIN (SELECT DISTINCT FromDate, ToDate FROM @CBShare) s ON td.rptDate BETWEEN s.FromDate AND s.ToDate
+		GROUP BY s.ToDate
 
 		-- convert min/max amount to current currency
 		UPDATE s SET
 			MinAmountEx = MinAmount * e.Rate,
 			MaxAmountEx = MaxAmount * e.Rate
 		FROM @CBShare s
-		INNER JOIN #Exchange e ON s.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
+		INNER JOIN #Exchange e ON s.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = s.ToDate
 
 		-- calculate commission/ cash in share
 		UPDATE g SET 
 			Commission = g.Turnover * cm.Rate,
 			CashInShare = g.CashInAmount * cs.Rate
 		FROM @GrandTotal g
-		INNER JOIN @CBShare cm ON cm.TypeId = 6 AND g.Turnover >= cm.MinAmountEx AND g.Turnover < cm.MaxAmountEx		 -- Commission share
-		INNER JOIN @CBShare cs ON cs.TypeId = 7 AND g.CashInAmount >= cs.MinAmountEx AND g.CashInAmount < cs.MaxAmountEx -- Cash in share
+		INNER JOIN @CBShare cm ON cm.ToDate = g.ChargeDate AND cm.TypeId = 6 AND g.Turnover >= cm.MinAmountEx AND g.Turnover < cm.MaxAmountEx		 -- Commission share
+		INNER JOIN @CBShare cs ON cs.ToDate = g.ChargeDate AND cs.TypeId = 7 AND g.CashInAmount >= cs.MinAmountEx AND g.CashInAmount < cs.MaxAmountEx -- Cash in share
 		WHERE g.CurrencyName = @tempCurrency
-		
+
+		INSERT INTO @GrandTotal (CurrencyName,AmountDueToColossusBet,TotalTrans,Turnover,Prize,CashOut,Commission,CashInShare,CashInAmount)
+		SELECT	@tempCurrency,
+				SUM(ISNULL(Turnover - Prize - CashOut - Commission - CashInShare,0)),
+				SUM(ISNULL(TotalTrans,0)),
+				SUM(ISNULL(Turnover,0)),
+				SUM(ISNULL(Prize,0)),
+				SUM(ISNULL(CashOut,0)),
+				SUM(ISNULL(Commission,0)),
+				SUM(ISNULL(CashInShare,0)),
+				SUM(ISNULL(CashInAmount,0))
+		FROM @GrandTotal
+		WHERE CurrencyName = @tempCurrency
+
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 		DELETE FROM #Exchange
 	END
-
-	UPDATE @GrandTotal
-	SET AmountDueToColossusBet = Turnover - Prize - CashOut - Commission - CashInShare
 	--EndRegion Grand total data
-	
+
 	SELECT	PartyId,
 			PartyName,
 			ParentId,
@@ -236,7 +250,8 @@ BEGIN
 			ISNULL(CashInShare,0) CashInShare,
 			ISNULL(CashInAmount,0) CashInAmount
 	FROM @GrandTotal
-	
+	WHERE ChargeDate IS NULL
+
 	DROP TABLE #TempData
 	DROP TABLE #Result
 	DROP TABLE #Exchange
