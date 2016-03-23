@@ -64,6 +64,10 @@ BEGIN
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+
+	UPDATE #Exchange 
+	SET CurrencyCode = 'INH'
+	WHERE ExchangeID = 51
 	-- End region
 	
 	-- Region: Get Winloss data
