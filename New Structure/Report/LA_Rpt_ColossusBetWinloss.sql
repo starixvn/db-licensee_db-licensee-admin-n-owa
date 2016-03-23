@@ -213,7 +213,19 @@ BEGIN
 	SET AmountDueToColossusBet = Turnover - Prize - CashOut - Commission - CashInShare
 	--EndRegion Grand total data
 	
-	SELECT * FROM #Result
+	SELECT	PartyId,
+			PartyName,
+			ParentId,
+			ParentName,
+			WinLossDate,
+			CASE WHEN CurrencyName='VND' THEN 'INH' ELSE CurrencyName END CurrencyName,
+			TotalTrans,
+			Turnover,
+			Prize,
+			CashOut,
+			CashInAmount	
+	FROM #Result
+
 	SELECT	CurrencyName,
 			ISNULL(AmountDueToColossusBet,0) AmountDueToColossusBet,
 			ISNULL(TotalTrans,0) TotalTrans,
