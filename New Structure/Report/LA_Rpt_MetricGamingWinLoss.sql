@@ -115,7 +115,7 @@ SET NOCOUNT ON
 				AND (b.CurrencyID <> 20)
 				AND b.[Status] BETWEEN 111 AND 113
 				AND b.customercategory NOT IN (27, 28)
-				AND b.Bettype BETWEEN 801 AND 806 -- Metric Gaming Bettype In Sportsbook
+				AND b.Bettype BETWEEN 800 AND 899 -- Metric Gaming Bettype In Sportsbook
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, p.PartyId
 	)
 	
@@ -228,9 +228,7 @@ SET NOCOUNT ON
 		SELECT 
 		CASE WHEN (gt.AmountDueLicensee BETWEEN MinAmount AND MaxAmount) AND MinAmount = 0 THEN (gt.AmountDueLicensee - MinAmount) * Rate 
 			 WHEN (gt.AmountDueLicensee BETWEEN MinAmount AND MaxAmount) AND MinAmount > 0 THEN (gt.AmountDueLicensee - MinAmount) * Rate 
-			 WHEN (gt.AmountDueLicensee > MaxAmount) THEN CASE  WHEN MinAmount = 0 THEN (MaxAmount - 0) * Rate
-																WHEN MinAmount > 0 THEN (MaxAmount - MinAmount) * Rate 
-																ELSE 0 END
+			 WHEN (gt.AmountDueLicensee > MaxAmount) THEN (MaxAmount - MinAmount) * Rate 
 			 ELSE 0 END AS AmountDueSuperlive, pci.MinAmount, pci.MaxAmount
 		FROM @ProductChargeInfo pci 
 		WHERE gt.CurrencyName = pci.BaseCurrenyCode) pci
