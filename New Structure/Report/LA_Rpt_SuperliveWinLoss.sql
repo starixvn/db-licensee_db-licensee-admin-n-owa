@@ -1,12 +1,12 @@
 USE [bodb_Licensee]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_MetricGamingWinLoss]    Script Date: 03/22/2016 10:30:00 ******/
+/****** Object:  StoredProcedure [dbo].[LA_Rpt_SuperliveWinLoss]    Script Date: 03/22/2016 10:30:00 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_Rpt_MetricGamingWinLoss]          
+ALTER PROCEDURE [dbo].[LA_Rpt_SuperliveWinLoss]          
 				@PartyIds			VARCHAR(1000),
 				@FromDate			DATETIME,
 				@ToDate				DATETIME,
@@ -249,7 +249,7 @@ SET NOCOUNT ON
 END
 
 GO
-GRANT EXECUTE ON [dbo].[LA_Rpt_MetricGamingWinLoss] TO [bodbLicenseeNet] AS [dbo]
-GRANT EXECUTE ON [dbo].[LA_Rpt_MetricGamingWinLoss] TO [bodbAdminNet] AS [dbo]
+GRANT EXECUTE ON [dbo].[LA_Rpt_SuperliveWinLoss] TO [bodbLicenseeNet] AS [dbo]
+GRANT EXECUTE ON [dbo].[LA_Rpt_SuperliveWinLoss] TO [bodbAdminNet] AS [dbo]
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_MetricGamingWinLoss] TO [vnteam] AS [dbo]
+GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_SuperliveWinLoss] TO [vnteam] AS [dbo]
