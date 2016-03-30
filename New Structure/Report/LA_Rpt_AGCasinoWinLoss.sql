@@ -6,7 +6,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_Rpt_MuayThaiWinLoss]
+ALTER PROCEDURE [dbo].[LA_Rpt_AGCasinoWinLoss]
 	  @PartyIds				VARCHAR(1000)
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME	
@@ -224,5 +224,5 @@ BEGIN
 	DROP TABLE #GrandTotal
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_MuayThaiWinLoss] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_Rpt_MuayThaiWinLoss] TO bodbAdminNet 
+GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_AGCasinoWinLoss] TO [vnteam] 
+GRANT EXECUTE ON [dbo].[LA_Rpt_AGCasinoWinLoss] TO bodbAdminNet 
