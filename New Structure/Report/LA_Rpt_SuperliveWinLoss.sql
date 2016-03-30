@@ -15,11 +15,11 @@ AS
 
 /*  
 	 Created: 20160322@Forrest
-	 Task : Metric Gaming Win Loss Report
+	 Task : Superlive Win Loss Report
 	 DB: DB052.bodb_licensee
    
 	 Revisions:  
-	 - 20160322@Forrest: Get Metric Gaming Report Data.
+	 - 20160322@Forrest: Get Superlive Report Data.
 	 Params:
 	 - PartyIds: List Party Id.
 	 - FromDate: From Date.
