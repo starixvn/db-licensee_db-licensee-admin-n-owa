@@ -23,6 +23,12 @@ AS
 */
 BEGIN	
 	-- Region: Charge Info
+	DECLARE @tempBaseCurrency VARCHAR(10) = @BaseCurrencyName
+	IF @tempBaseCurrency = ''
+	BEGIN
+		SET @tempBaseCurrency = 'GBP'
+	END
+
 	DECLARE @PartyChargeInfo AS TABLE (
 		PartyId		INT,
 		LicenseeId	INT,
@@ -63,7 +69,7 @@ BEGIN
 	
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempBaseCurrency)
 
 	UPDATE #Exchange 
 	SET CurrencyCode = 'INH'
@@ -241,7 +247,7 @@ BEGIN
 		INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency)
-		--SELECT * from #Exchange WHERE CurrencyCode IN (@BaseCurrencyName,@tempCurrency)
+		
 		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
 		SELECT	@tempCurrency, 
 				SUM(td.TotalTrans),
@@ -252,16 +258,20 @@ BEGIN
 				SUM(td.PayToSupplier * e.Rate),
 				SUM(td.CompanyIncome * e.Rate)
 		FROM @Total td 
-			INNER JOIN #Exchange e ON e.CurrencyCode = @BaseCurrencyName AND e.ExchangeDate = (SELECT MAX(ex.ExchangeDate)
+			INNER JOIN #Exchange e ON e.CurrencyCode = @tempBaseCurrency AND e.ExchangeDate = (SELECT MAX(ex.ExchangeDate)
 																								FROM #Exchange ex
-																								WHERE @BaseCurrencyName = ex.CurrencyCode)
+																								WHERE @tempBaseCurrency = ex.CurrencyCode)
 
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 	END
 	
 	SELECT * FROM #Result
 	SELECT * FROM @GrandTotal
-	SELECT * FROM @Total
+	
+	IF @BaseCurrencyName <> ''
+	BEGIN
+		SELECT * FROM @Total
+	END
 	
 	DROP TABLE #TempData
 	DROP TABLE #TempAgent
