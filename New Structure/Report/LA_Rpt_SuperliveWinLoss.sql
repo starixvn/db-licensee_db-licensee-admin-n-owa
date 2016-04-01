@@ -105,7 +105,10 @@ SET NOCOUNT ON
 				SUM(ISNULL(b.BetCount, 0)) TotalTrans,
 				SUM(ISNULL(b.Turnover, 0)) Turnover,
 				SUM(ISNULL(b.WinLoss, 0)) CustomerWL,
-				SUM(-b.WinLoss - b.WinLossA - b.WinLossS - b.WinLossM - b.CommissionS) LicenseeWL,
+				SUM(CASE WHEN p.IsDeposit = 0 
+						 THEN (-b.WinLoss - b.WinLossA - b.WinLossS - b.WinLossM - b.CommissionS)
+						 ELSE -b.WinLoss
+					END) LicenseeWL,
 				SUM(CASE WHEN p.IsDeposit = 0 
 						 THEN (-b.WinLoss - b.WinLossA - b.WinLossS - b.WinLossM - b.CommissionS) * p.Rate
 						 ELSE -b.WinLoss * p.Rate 
