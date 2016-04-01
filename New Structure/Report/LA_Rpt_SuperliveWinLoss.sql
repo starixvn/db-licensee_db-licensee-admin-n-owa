@@ -91,11 +91,12 @@ SET NOCOUNT ON
 		CurrencyId	INT,
 		TotalTrans	INT,
 		Turnover	MONEY,
-		MemberWL	MONEY,
+		CustomerWL	MONEY,
+		LicenseeWL	MONEY,
 		AmtLicensee MONEY
 	)
 	
-	INSERT INTO #TempData (LicenseeId, PartyId, RptDate, CurrencyId, TotalTrans, Turnover, MemberWL, AmtLicensee)
+	INSERT INTO #TempData (LicenseeId, PartyId, RptDate, CurrencyId, TotalTrans, Turnover, CustomerWL, LicenseeWL, AmtLicensee)
 	(
 		SELECT	b.SiteID,
 				p.PartyId,
@@ -103,10 +104,11 @@ SET NOCOUNT ON
 				b.CurrencyID,
 				SUM(ISNULL(b.BetCount, 0)) TotalTrans,
 				SUM(ISNULL(b.Turnover, 0)) Turnover,
-				SUM(ISNULL(b.WinLoss, 0)) MemberWL,
+				SUM(ISNULL(b.WinLoss, 0)) CustomerWL,
+				SUM(-b.WinLoss - b.WinLossA - b.WinLossS - b.WinLossM - b.CommissionS) LicenseeWL,
 				SUM(CASE WHEN p.IsDeposit = 0 
-						THEN (-b.WinLoss - b.WinLossA - b.WinLossS - b.WinLossM - b.CommissionS) * p.Rate
-						ELSE -b.WinLoss * p.Rate 
+						 THEN (-b.WinLoss - b.WinLossA - b.WinLossS - b.WinLossM - b.CommissionS) * p.Rate
+						 ELSE -b.WinLoss * p.Rate 
 					END) AmtLicensee
 		FROM	rpt_Betting b WITH (NOLOCK)
 				INNER JOIN @PartyChargeInfo p ON b.SiteID = p.LicenseeId 
@@ -140,7 +142,7 @@ SET NOCOUNT ON
 	IF @BaseCurrencyName = ''
 	BEGIN 
 		INSERT INTO @Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueLicensee)
-		SELECT p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode, td.TotalTrans, td.Turnover, td.MemberWL, -td.MemberWL, td.AmtLicensee
+		SELECT p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode, td.TotalTrans, td.Turnover, td.CustomerWL, td.LicenseeWL, td.AmtLicensee
 		FROM #TempData td 
 			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
 			INNER JOIN @PartyList p ON td.PartyId = p.PartyID
@@ -150,7 +152,7 @@ SET NOCOUNT ON
 	ELSE 
 	BEGIN
 		INSERT INTO @Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueLicensee)
-		SELECT p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode, td.TotalTrans, td.Turnover*e.Rate, td.MemberWL*e.Rate, -td.MemberWL*e.Rate, td.AmtLicensee*e.Rate
+		SELECT p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode, td.TotalTrans, td.Turnover*e.Rate, td.CustomerWL*e.Rate, td.LicenseeWL*e.Rate, td.AmtLicensee*e.Rate
 		FROM #TempData td 
 			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
 			INNER JOIN @PartyList p ON td.PartyId = p.PartyID
@@ -193,52 +195,54 @@ SET NOCOUNT ON
 	
 	DECLARE @AmountDueSuperlive MONEY
 	
-	WHILE EXISTS (SELECT * FROM @BaseCurrencies WHERE IsApply IS NULL)
+	IF(SELECT COUNT(*) FROM @Result) > 0
 	BEGIN
-		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)		
-		DELETE FROM #Exchange
-		INSERT INTO #Exchange
-		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency)
-		
-		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,AmountDueLicensee)
-		SELECT	@tempCurrency, 
-				SUM(td.TotalTrans),
-				SUM(td.Turnover * e.Rate), 
-				SUM(td.MemberWL * e.Rate), 
-				SUM(-td.MemberWL * e.Rate), 
-				SUM(td.AmtLicensee * e.Rate)
-		FROM #TempData td 
-		INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
-		
-		DELETE FROM @ProductChargeInfo
-		
-		INSERT INTO @ProductChargeInfo(Rate, FromDate, ToDate, MinAmount, MaxAmount, BaseCurrenyCode)
-		SELECT	ci.Rate,
-				ci.FromDate,
-				ci.ToDate,
-				ci.MinAmount * ex.Rate,
-				ci.MaxAmount * ex.Rate,
-				@tempCurrency
-		FROM OAS_ChargeInfo ci
-		INNER JOIN #Exchange ex ON ci.BaseCurrencyId = ex.ExchangeID AND ex.ExchangeDate = @ToDate
-		WHERE ci.ProductID = 0 AND ci.FromParty = 1 AND ci.ChargeType = 4 -- Get Charge Rate to Billing for Metric Gaming
-		
-		SELECT @AmountDueSuperlive = ISNULL(SUM(pci.AmountDueSuperlive),0) FROM @GrandTotal gt OUTER APPLY (
-		SELECT 
-		CASE WHEN (gt.AmountDueLicensee BETWEEN MinAmount AND MaxAmount) AND MinAmount = 0 THEN (gt.AmountDueLicensee - MinAmount) * Rate 
-			 WHEN (gt.AmountDueLicensee BETWEEN MinAmount AND MaxAmount) AND MinAmount > 0 THEN (gt.AmountDueLicensee - MinAmount) * Rate 
-			 WHEN (gt.AmountDueLicensee > MaxAmount) THEN (MaxAmount - MinAmount) * Rate 
-			 ELSE 0 END AS AmountDueSuperlive, pci.MinAmount, pci.MaxAmount
-		FROM @ProductChargeInfo pci 
-		WHERE gt.CurrencyName = pci.BaseCurrenyCode) pci
-		WHERE gt.CurrencyName = @tempCurrency
-		GROUP BY gt.CurrencyName					
-		
-		UPDATE @GrandTotal SET AmountDueSuperlive = @AmountDueSuperlive, AmountDueCompany = AmountDueLicensee - @AmountDueSuperlive WHERE CurrencyName = @tempCurrency
-		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency 
+		WHILE EXISTS (SELECT * FROM @BaseCurrencies WHERE IsApply IS NULL)
+		BEGIN
+			SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)		
+			DELETE FROM #Exchange
+			INSERT INTO #Exchange
+			SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
+			FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency)
+			
+			INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,AmountDueLicensee)
+			SELECT	@tempCurrency, 
+					SUM(td.TotalTrans),
+					SUM(td.Turnover * e.Rate), 
+					SUM(td.CustomerWL * e.Rate), 
+					SUM(td.LicenseeWL * e.Rate), 
+					SUM(td.AmtLicensee * e.Rate)
+			FROM #TempData td 
+			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
+			
+			DELETE FROM @ProductChargeInfo
+			
+			INSERT INTO @ProductChargeInfo(Rate, FromDate, ToDate, MinAmount, MaxAmount, BaseCurrenyCode)
+			SELECT	ci.Rate,
+					ci.FromDate,
+					ci.ToDate,
+					ci.MinAmount * ex.Rate,
+					ci.MaxAmount * ex.Rate,
+					@tempCurrency
+			FROM OAS_ChargeInfo ci
+			INNER JOIN #Exchange ex ON ci.BaseCurrencyId = ex.ExchangeID AND ex.ExchangeDate = @ToDate
+			WHERE ci.ProductID = 0 AND ci.FromParty = 1 AND ci.ChargeType = 4 -- Get Charge Rate to Billing for Metric Gaming
+			
+			SELECT @AmountDueSuperlive = ISNULL(SUM(pci.AmountDueSuperlive),0) FROM @GrandTotal gt OUTER APPLY (
+			SELECT 
+			CASE WHEN (gt.AmountDueLicensee BETWEEN MinAmount AND MaxAmount) AND MinAmount = 0 THEN (gt.AmountDueLicensee - MinAmount) * Rate 
+				 WHEN (gt.AmountDueLicensee BETWEEN MinAmount AND MaxAmount) AND MinAmount > 0 THEN (gt.AmountDueLicensee - MinAmount) * Rate 
+				 WHEN (gt.AmountDueLicensee > MaxAmount) THEN (MaxAmount - MinAmount) * Rate 
+				 ELSE 0 END AS AmountDueSuperlive, pci.MinAmount, pci.MaxAmount
+			FROM @ProductChargeInfo pci 
+			WHERE gt.CurrencyName = pci.BaseCurrenyCode) pci
+			WHERE gt.CurrencyName = @tempCurrency
+			GROUP BY gt.CurrencyName					
+			
+			UPDATE @GrandTotal SET AmountDueSuperlive = @AmountDueSuperlive, AmountDueCompany = AmountDueLicensee - @AmountDueSuperlive WHERE CurrencyName = @tempCurrency
+			UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency 
+		END
 	END
-	
 	-- End region
 	
 	SELECT * FROM @Result
