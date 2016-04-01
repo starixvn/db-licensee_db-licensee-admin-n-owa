@@ -14,9 +14,9 @@ RETURNS @tbBettypeProduct TABLE (
 	Bettype INT,ProductID INT
 	)
 AS
-/*  Created: 20141111@Florent  
-    Task : Get bettype product mapping
-    DB: DB052/bodb_Licensee
+/*	Created: 20141111@Florent
+	Task : Get bettype product mapping
+	DB: DB052/bodb_Licensee
 	Revisions:
 		- 20150202@Patrick: Add more product: Bingo & Keno
 		- 20150414@Jim: add MicroGaming
@@ -26,7 +26,8 @@ AS
 		- 20151201@Bravo: Change Product code: MGC -> MGCLC
 		- 20160113@Bruce: Include new bettypes 2101-2399 for CS (OW RNG)
 		- 20160224@Victor: Add product Cock Fighting [Redmine: 52452]
-    Param's Explanation:   
+		- 20160318@Bruce: Add product Colossus bet
+	Param's Explanation:
 
 */
 
@@ -177,6 +178,15 @@ BEGIN
 	   WHERE typeid = 1003
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
-    
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'CB')
+	BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 15
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 18000 AND 18006
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+	END
+
 	RETURN
 END
