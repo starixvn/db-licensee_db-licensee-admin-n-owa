@@ -118,7 +118,7 @@ BEGIN
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, BettypeRef, Rate, Fromdate, Todate)
 	(
 		SELECT	PartyID, LicenseeID, ProductID, Bettype, DI_Rate, Fromdate, Todate
-		FROM	dbo.LA_f_ChargeInfo_xtest(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
+		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
 	)
 
