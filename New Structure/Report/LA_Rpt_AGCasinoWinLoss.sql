@@ -1,47 +1,45 @@
-USE [bodb_licensee]
+USE [bodb_Licensee]
 GO
-
+/****** Object:  StoredProcedure [dbo].[LA_Rpt_AGCasinoWinLoss]    Script Date: 12/21/2015 06:47:11 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_Rpt_AGCasinoWinLoss]
-	  @PartyIds				VARCHAR(1000)
-	, @FromDate				DATETIME
-	, @ToDate				DATETIME	
-	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
-WITH RECOMPILE
+ALTER PROCEDURE [dbo].[LA_Rpt_AGCasinoWinLoss]          
+	@PartyIds			VARCHAR(500),
+	@FromDate			DATETIME,
+	@ToDate				DATETIME,
+	@BaseCurrencyName	VARCHAR(20)
 AS
-/*  Created: 20160302@Bravo
-	Task : Report - Muay Thai Win Loss
-	DB: DBEXT/bodb02
-	Revisions: 
-		- 20160302@Bravo: create sp on table sum 		
-		- 20160322@Bravo: fix bug currency name VND => INH	
-	Param's Explanation:  						
+/*  
+	 Created: 20160225@Bravo
+	 Task : Get report Cock Fighting Win Loss
+	 DB: DB052.bodb_licensee
+   
+	 Revisions:  
+	 - 20160225@Bravo: Get CF win loss data.
+	 Params:			   
 */
-SET NOCOUNT ON
 BEGIN	
 	-- Region: Charge Info
 	DECLARE @PartyChargeInfo AS TABLE (
 		PartyId		INT,
 		LicenseeId	INT,
-		IsDeposit   BIT,
 		ProductID	INT,
 		Rate		MONEY,
 		FromDate	SMALLDATETIME,
 		ToDate		SMALLDATETIME
 	)
 
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, IsDeposit, ProductID, Rate, Fromdate, Todate)
+	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
 	(
-		SELECT	PartyID, LicenseeID, isDeposit, ProductID, DI_Rate, Fromdate, Todate
-		FROM	dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'SB', 'OA', 0)
-		--WHERE	DI_Rate > 0
+		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
+		FROM	dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'AGC', 'OA', 1)
+		WHERE	DI_Rate > 0
 	)
 	-- End region
-
+	
 	-- Region: Party List
 	DECLARE @PartyList AS TABLE (
 		PartyId		INT,
@@ -64,7 +62,7 @@ BEGIN
 	)
 	
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate	
+	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
 	UPDATE #Exchange 
@@ -73,96 +71,148 @@ BEGIN
 	-- End region
 	
 	-- Region: Get Winloss data
-	CREATE	TABLE #TempData (
-		LicenseeId	INT,
-		PartyId		INT,
-		rptDate		DATETIME,
-		CurrencyId	INT,
-		TotalTrans	INT,
-		Turnover	MONEY,
-		MemberWL	MONEY,
-		WLShare		MONEY,
-		LicComm		MONEY,
-		CommShare	MONEY,
-		AmtLicensee MONEY
-	)
+	CREATE TABLE #TempAgent (
+		CustId INT
+		,Currency INT
+		,PartyID INT
+		,PartyName NVARCHAR(100)
+		,FromDate DATETIME
+		,Todate DATETIME)
+	CREATE TABLE #TempData (
+		PartyID INT
+		,PartyName NVARCHAR(100)
+		,Winlostdate DATETIME
+		,CurrencyId INT
+		,TurnOver MONEY
+		,TotalTrans INT
+		,Winlost MONEY
+		,LicenseeWinlost MONEY
+		,LicensingFee MONEY)
+
+	INSERT INTO #TempAgent (CustID,Currency,PartyID,PartyName,FromDate,Todate)
+	SELECT	CustID,
+		Currency,
+		p.PartyID,
+		p.PartyName,
+		CASE WHEN @FromDate < ci.FromDate THEN ci.FromDate ELSE @FromDate END AS FromDate,
+		CASE WHEN @ToDate > ci.ToDate THEN ci.ToDate ELSE @ToDate END AS ToDate
+	FROM bodb_Licensee.dbo.f_SelLicenseeCust(0) lc
+		INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON lc.LicenseeID = p.OldRefID AND p.PartyType = 1	
+		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON ci.FromParty = p.PartyID
+		INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
+	WHERE lc.Currency <> 20 
+		AND p.PartyID IN (SELECT val FROM bodb02.dbo.Lrf_f_StringSplit(@PartyIDs, ','))
+		AND ci.ChargeType = 1
+		AND ci.ProductID = 10
+		AND (@FromDate BETWEEN ci.FromDate AND ci.ToDate OR @ToDate BETWEEN ci.FromDate AND ci.ToDate)
 	
-	INSERT INTO #TempData (LicenseeId, PartyId, rptDate, CurrencyId, TotalTrans, Turnover, MemberWL, WLShare, LicComm, CommShare, AmtLicensee)
-	(
-		SELECT	b.SiteID,
-				p.PartyId,
-				b.rptDate,
-				b.CurrencyID,
-				SUM(ISNULL(b.BetCount, 0)) TotalTrans,
-				SUM(ISNULL(b.Turnover, 0)) Turnover,
-				SUM(ISNULL(b.CustomerWL, 0)) MemberWL,
-				SUM(ISNULL(b.WLShare, 0)) WLShare,
-				SUM(ISNULL(b.CommissionS, 0)) LicComm,
-				SUM(ISNULL(b.CommShare, 0)) CommShare,
-				SUM(CASE WHEN p.IsDeposit = 0 
-						THEN ISNULL(b.LicenseeWL, 0) 
-						ELSE ISNULL(-b.CustomerWL, 0) * p.Rate 
-					END) AmtLicensee
-		FROM	bodb_LicenseeReport.dbo.rpt_BettingBySport b WITH (NOLOCK)
-				INNER JOIN @PartyChargeInfo p ON b.ProductID = p.ProductID 
-												AND b.SiteID = p.LicenseeId
-												AND b.rptDate BETWEEN p.FromDate AND p.ToDate
-		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate
-				AND (b.CurrencyID <> 20)
-				AND b.StatusId BETWEEN 111 AND 113
-				AND b.customercategory NOT IN (27, 28)
-				AND b.SportType = 44 -- Muay Thai
-		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, p.PartyId
-	)	
+	INSERT INTO #TempData (PartyID,PartyName,Winlostdate,CurrencyId,TurnOver,TotalTrans,Winlost,LicenseeWinlost,LicensingFee)
+	SELECT ag.PartyID
+		,ag.PartyName
+		,c.Winlostdate
+		,co.Currency
+		,SUM(c.TurnOver) AS TurnOver
+		,SUM(c.BetCount) AS TotalTrans
+		,SUM(c.Winlost) AS Winlost
+		,- SUM(c.Winlost) AS LicenseeWinlost
+		,SUM(-c.Winlost * pc.Rate) AS LicensingFee
+	FROM DBACC.bodb_report.dbo.rptDepWinlost_AGCasino c WITH (NOLOCK)
+		INNER JOIN DBACC.bodb02.dbo.Custinfo co WITH (NOLOCK) ON c.CustID = co.CustID
+		INNER JOIN #TempAgent ag ON co.recommend = ag.CustID AND co.currency=ag.Currency
+		INNER JOIN @PartyChargeInfo pc ON pc.PartyId = ag.PartyID
+	WHERE c.Winlostdate BETWEEN ag.FromDate AND ag.Todate --AND c.Winlost<0
+	GROUP BY c.Winlostdate
+		,co.Currency
+		,ag.PartyID
+		,ag.PartyName
+
 	-- EndRegion
 	
-	-- Region: Result data
 	CREATE TABLE #Result (
-		PartyId				INT,
-		PartyName			VARCHAR(100),
-		ParentId			INT,
-		ParentName			VARCHAR(100),
-		WinLossDate			DATETIME,
-		CurrencyName		VARCHAR(20),
-		TotalTrans			INT,
-		Turnover			MONEY,
-		CustomerWinLoss		MONEY,		
-		WinLossShare		MONEY,
-		LicenseeComm		MONEY,
-		CommissionShare		MONEY,
-		AmountDueLicensee	MONEY,
-		AmountDueMuayThai	MONEY,
-		AmountDueCompany	MONEY
+		PartyId			INT,
+		PartyName		VARCHAR(100),
+		ParentId		INT,
+		ParentName		VARCHAR(100),
+		WinLossDate		DATETIME,
+		CurrencyName	VARCHAR(20),
+		TotalTrans		INT,
+		Turnover		MONEY,
+		CustomerWinLoss	MONEY,		
+		LicenseeWinLoss	MONEY,
+		LicensingFee	MONEY
 	)
 
 	IF @BaseCurrencyName = ''
 	BEGIN 
-		INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, CommissionShare, AmountDueLicensee)
-		SELECT p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode, td.TotalTrans, td.Turnover, td.MemberWL, td.WLShare, td.LicComm, td.CommShare, td.AmtLicensee
+		INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee)
+		SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.Winlostdate, e.CurrencyCode, td.TotalTrans, td.Turnover, td.Winlost, td.LicenseeWinlost, td.LicensingFee
 		FROM #TempData td 
-			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
+			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.Winlostdate
 			INNER JOIN @PartyList p ON td.PartyId = p.PartyID
 			INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId
+			
 		
 	END 
 	ELSE 
 	BEGIN
-		INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, CommissionShare, AmountDueLicensee)
-		SELECT p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode, td.TotalTrans, td.Turnover*e.Rate, td.MemberWL*e.Rate, td.WLShare*e.Rate, td.LicComm*e.Rate, td.CommShare*e.Rate, td.AmtLicensee*e.Rate
+		INSERT INTO #Result (PartyId,PartyName,ParentId,ParentName,WinLossDate,CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee)
+		SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.Winlostdate, e.CurrencyCode, td.TotalTrans, td.Turnover*e.Rate, td.Winlost*e.Rate, td.LicenseeWinlost*e.Rate, td.LicensingFee * e.Rate
 		FROM #TempData td 
-			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
+			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.Winlostdate
 			INNER JOIN @PartyList p ON td.PartyId = p.PartyID
-			INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId	
+			INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId		
+			
 	END
 	
-	UPDATE #Result
-	SET AmountDueMuayThai = WinLossShare + CommissionShare
+	DECLARE @Total TABLE (	
+		GroupId			INT,
+		TotalTrans		INT,
+		Turnover		MONEY,
+		CustomerWinLoss	MONEY,		
+		LicenseeWinLoss	MONEY,
+		LicensingFee	MONEY,
+		PayToSupplier	MONEY,
+		CompanyIncome	MONEY
+	)
+	
+	DECLARE @MYR MONEY
+	DECLARE @USD MONEY
+	SELECT @MYR = (SELECT TOP 1 15000000 * e.Rate
+					FROM #Exchange e
+					WHERE e.CurrencyCode = 'MYR'
+					ORDER BY e.ExchangeDate DESC)	
+	SELECT @USD = (SELECT TOP 1 2500000 * e.Rate
+					FROM #Exchange e
+					WHERE e.CurrencyCode = 'USD'
+					ORDER BY e.ExchangeDate DESC)	
 
-	UPDATE #Result
-	SET AmountDueCompany = AmountDueLicensee - AmountDueMuayThai
-	-- EndRegion
+	DECLARE @3rdRate TABLE(
+		GroupId  INT,
+		MinValue MONEY,
+		MaxValue MONEY,
+		Rate	 MONEY)
+	
+	INSERT INTO @3rdRate(GroupId,  MinValue, MaxValue, Rate)
+	VALUES (1,  0, @MYR, 0.08) , 
+		(1,  @MYR, 1000000000000, 0.07) , 
+		(11,  0, @USD, 0.08) , 
+		(11,  @USD, 1000000000000, 0.07)
 
-	-- Region: Grand total data
+	INSERT INTO @Total (GroupID, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee)
+	SELECT d.ParentId,
+		SUM(d.TotalTrans),
+		SUM(d.Turnover),
+		SUM(d.CustomerWinLoss),
+		SUM(d.LicenseeWinLoss),
+		SUM(d.LicensingFee)
+	FROM #Result d
+	GROUP BY d.ParentId
+
+	UPDATE t
+	SET t.PayToSupplier = -t.CustomerWinLoss * r.Rate
+	FROM @Total t INNER JOIN @3rdRate r ON t.GroupId = r.GroupId AND -t.CustomerWinLoss BETWEEN r.MinValue AND r.MaxValue
+	UPDATE @Total SET CompanyIncome = LicensingFee - ISNULL(PayToSupplier, 0)
+
 	DECLARE @tempCurrency VARCHAR(20)
 	DECLARE @BaseCurrencies TABLE(
 		Id INT,
@@ -172,57 +222,55 @@ BEGIN
 	INSERT INTO @BaseCurrencies(Id, Name)
 	EXEC LA_SelBaseCurrency
 
-	CREATE TABLE #GrandTotal (		
+	DECLARE @GrandTotal TABLE (		
 		CurrencyName	VARCHAR(20),
 		TotalTrans		INT,
 		Turnover		MONEY,
-		CustomerWinLoss		MONEY,		
-		WinLossShare		MONEY,
-		LicenseeComm		MONEY,
-		CommissionShare		MONEY,
-		AmountDueLicensee	MONEY,
-		AmountDueMuayThai	MONEY,
-		AmountDueCompany	MONEY
+		CustomerWinLoss	MONEY,		
+		LicenseeWinLoss	MONEY,
+		LicensingFee	MONEY,
+		PayToSupplier	MONEY,
+		CompanyIncome	MONEY
 	)
 	
 	WHILE EXISTS (SELECT * FROM @BaseCurrencies WHERE IsApply IS NULL)
 	BEGIN
-		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)		
+		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)
+		PRINT @tempCurrency
 		DELETE FROM #Exchange
 		INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency)
-
-		INSERT INTO #GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,WinLossShare,LicenseeComm,CommissionShare,AmountDueLicensee)
+		--SELECT * from #Exchange WHERE CurrencyCode IN (@BaseCurrencyName,@tempCurrency)
+		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
 		SELECT	@tempCurrency, 
 				SUM(td.TotalTrans),
 				SUM(td.Turnover*e.Rate), 
-				SUM(td.MemberWL*e.Rate), 
-				SUM(td.WLShare*e.Rate), 
-				SUM(td.LicComm*e.Rate),
-				SUM(td.CommShare*e.Rate),
-				SUM(td.AmtLicensee*e.Rate)
-		FROM #TempData td 
-			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate				
+				SUM(td.CustomerWinLoss*e.Rate), 
+				SUM(td.LicenseeWinLoss*e.Rate), 
+				SUM(td.LicensingFee *e.Rate),
+				SUM(td.PayToSupplier * e.Rate),
+				SUM(td.CompanyIncome * e.Rate)
+		FROM @Total td 
+			INNER JOIN #Exchange e ON e.CurrencyCode = @BaseCurrencyName AND e.ExchangeDate = (SELECT MAX(ex.ExchangeDate)
+																								FROM #Exchange ex
+																								WHERE @BaseCurrencyName = ex.CurrencyCode)
 
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 	END
-
-	UPDATE #GrandTotal
-	SET AmountDueMuayThai = WinLossShare + CommissionShare
-
-	UPDATE #GrandTotal
-	SET AmountDueCompany = AmountDueLicensee - AmountDueMuayThai
-	--EndRegion
 	
 	SELECT * FROM #Result
-	SELECT * FROM #GrandTotal
+	SELECT * FROM @GrandTotal
+	SELECT * FROM @Total
 	
 	DROP TABLE #TempData
+	DROP TABLE #TempAgent
 	DROP TABLE #Exchange
 	DROP TABLE #Result
-	DROP TABLE #GrandTotal
 END
+
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_AGCasinoWinLoss] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_Rpt_AGCasinoWinLoss] TO bodbAdminNet 
+GRANT EXECUTE ON [dbo].[LA_Rpt_AGCasinoWinLoss] TO [bodbLicenseeNet] AS [dbo]
+GRANT EXECUTE ON [dbo].[LA_Rpt_AGCasinoWinLoss] TO [bodbAdminNet] AS [dbo]
+GO
+GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_AGCasinoWinLoss] TO [vnteam] AS [dbo]
