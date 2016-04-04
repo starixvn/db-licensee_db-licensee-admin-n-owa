@@ -171,7 +171,7 @@ BEGIN
 
 	-- Calculate Total by group
 	DECLARE @TotalByGroups AS TABLE(
-		GroupId			INT,
+		ParentId			INT,
 		TotalTrans		INT,
 		Turnover		MONEY,
 		CustomerWL		MONEY,
@@ -221,7 +221,7 @@ BEGIN
 				INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @TempCurrency) e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.WinLossDate
 				GROUP BY td.ParentId,td.PartyId
 			)
-			INSERT INTO @TotalByGroups(GroupId,TotalTrans,Turnover,CustomerWL,LicenseeWL,LicensingFee,PayToSupplier, CurrencyName)
+			INSERT INTO @TotalByGroups(ParentId,TotalTrans,Turnover,CustomerWL,LicenseeWL,LicensingFee,PayToSupplier, CurrencyName)
 			SELECT	ParentId,
 					SUM(TotalTrans),
 					SUM(Turnover),
@@ -251,17 +251,6 @@ BEGIN
 	END
 
 	SELECT * FROM #Result
-	
-	SELECT	GroupId,
-			TotalTrans,
-			Turnover,
-			CustomerWL,
-			LicenseeWL,
-			LicensingFee,
-			PayToSupplier,
-			(LicensingFee - PayToSupplier) CompanyIncome
-	FROM @TotalByGroups
-	WHERE CurrencyName = @BaseCurrencyName
 
 	SELECT	CurrencyName,
 			TotalTrans,
@@ -274,6 +263,17 @@ BEGIN
 	FROM @GrandTotal g
 	INNER JOIN @BaseCurrencies b ON g.CurrencyName = b.Name
 	ORDER BY b.RowIndex
+
+	SELECT	ParentId,
+			TotalTrans,
+			Turnover,
+			CustomerWL,
+			LicenseeWL,
+			LicensingFee,
+			PayToSupplier,
+			(LicensingFee - PayToSupplier) CompanyIncome
+	FROM @TotalByGroups
+	WHERE CurrencyName = @BaseCurrencyName
 
 	DROP TABLE #Result
 	DROP TABLE #TempData
