@@ -36,7 +36,7 @@ BEGIN
 
 		INSERT INTO @PartyChargeInfo(PartyId, LicenseeId,ProductID, Rate, Fromdate, Todate)
 		SELECT PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
-		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'KN', 'OA', 1)
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'KN', 'OA', 0)
 	END
 
 	-- Party List
@@ -51,13 +51,20 @@ BEGIN
 		INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
 		EXEC bodb_licensee.dbo.LA_PartyListSel
 
-		UPDATE @PartyList SET PartyName = RTRIM(REPLACE(PartyName,'Licensees',''))
+		-- This report has 3 group:
+		--		- 12Bet: 12Bet
+		--		- Credit: Credit licensees
+		--		- ONEWorks: ONEWorks & Boping
+		DECLARE	@12BetGroupId INT = -1,
+				@OneWorksGroupId INT = 1,
+				@CreditGroupId INT = 999
 
-		-- Create 12bet group
-		UPDATE @PartyList SET ParentId = -1 WHERE PartyId = 14 -- 12bet
+		UPDATE @PartyList SET PartyName = RTRIM(REPLACE(PartyName,'Licensees','')) WHERE ParentId = 0
+		UPDATE @PartyList SET ParentId = @OneWorksGroupId WHERE ParentId IN (11,98)
+		UPDATE @PartyList SET ParentId = @12BetGroupId WHERE PartyId = 14 -- 12bet
 
 		INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
-		SELECT -1, PartyName, BranchName, 0 FROM @PartyList WHERE PartyId = 14 -- 12bet
+		SELECT @12BetGroupId, PartyName, BranchName, 0 FROM @PartyList WHERE PartyId = 14
 	END
 
 	-- Get Winloss data
@@ -71,8 +78,8 @@ BEGIN
 			CurrencyId		INT,
 			TotalTrans		INT,
 			Turnover		MONEY,
-			CustomerWL		MONEY,
-			LicenseeWL		MONEY,
+			CustomerWinLoss	MONEY,
+			LicenseeWinLoss	MONEY,
 			LicensingFee	MONEY,
 			PayToSupplier	MONEY
 		)
@@ -94,7 +101,7 @@ BEGIN
 					(b.customercategory NOT IN (27, 28))
 			GROUP BY b.rptdate, b.SiteId, p.PartyId, b.CurrencyID
 		)
-		INSERT INTO #TempData (PartyId,PartyName,ParentId,ParentName,WinLossDate,CurrencyId,TotalTrans,Turnover,CustomerWL,LicenseeWL,LicensingFee,PayToSupplier)
+		INSERT INTO #TempData (PartyId,PartyName,ParentId,ParentName,WinLossDate,CurrencyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
 		SELECT	p.PartyId,
 				p.PartyName,
 				g.PartyId,
@@ -125,15 +132,16 @@ BEGIN
 			CurrencyName	VARCHAR(10),
 			TotalTrans		INT,
 			Turnover		MONEY,
-			CustomerWL		MONEY,
-			LicenseeWL		MONEY,
+			CustomerWinLoss	MONEY,
+			LicenseeWinLoss	MONEY,
 			LicensingFee	MONEY,
-			PayToSupplier	MONEY
+			PayToSupplier	MONEY,
+			CompanyIncome	MONEY
 		)
 
 		IF(ISNULL(@BaseCurrencyName,'') = '')
 		BEGIN
-			INSERT INTO #Result (PartyId,PartyName,ParentId,ParentName,WinLossDate,CurrencyName,TotalTrans,Turnover,CustomerWL,LicenseeWL,LicensingFee,PayToSupplier)
+			INSERT INTO #Result (PartyId,PartyName,ParentId,ParentName,WinLossDate,CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,CompanyIncome)
 			SELECT	td.PartyId,
 					td.PartyName,
 					td.ParentId,
@@ -142,16 +150,17 @@ BEGIN
 					CASE WHEN e.Code = 'VND' THEN 'INH' ELSE e.Code END AS CurrencyName,
 					td.TotalTrans,
 					td.Turnover,
-					td.CustomerWL,
-					td.LicenseeWL,
+					td.CustomerWinLoss,
+					td.LicenseeWinLoss,
 					td.LicensingFee,
-					td.PayToSupplier
+					td.PayToSupplier,
+					td.LicensingFee - td.PayToSupplier
 			FROM #TempData td
 			INNER JOIN bodb02.dbo.Exchange e ON td.CurrencyId = e.ExchangeID
 		END
 		ELSE
 		BEGIN
-			INSERT INTO #Result (PartyId,PartyName,ParentId,ParentName,WinLossDate,CurrencyName,TotalTrans,Turnover,CustomerWL,LicenseeWL,LicensingFee,PayToSupplier)
+			INSERT INTO #Result (PartyId,PartyName,ParentId,ParentName,WinLossDate,CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,CompanyIncome)
 			SELECT	td.PartyId,
 					td.PartyName,
 					td.ParentId,
@@ -159,11 +168,12 @@ BEGIN
 					td.WinLossDate,
 					CASE WHEN e.Code = 'VND' THEN 'INH' ELSE e.Code END AS CurrencyName,
 					td.TotalTrans,
-					td.Turnover			* e.BaseCurrencyRate,
-					td.CustomerWL		* e.BaseCurrencyRate,
-					td.LicenseeWL		* e.BaseCurrencyRate,
-					td.LicensingFee		* e.BaseCurrencyRate,
-					td.PayToSupplier	* e.BaseCurrencyRate
+					td.Turnover * e.BaseCurrencyRate,
+					td.CustomerWinLoss * e.BaseCurrencyRate,
+					td.LicenseeWinLoss * e.BaseCurrencyRate,
+					td.LicensingFee * e.BaseCurrencyRate,
+					td.PayToSupplier * e.BaseCurrencyRate,
+					(td.LicensingFee - td.PayToSupplier) * e.BaseCurrencyRate
 			FROM #TempData td
 			INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName) e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.WinLossDate
 		END
@@ -174,8 +184,8 @@ BEGIN
 		ParentId			INT,
 		TotalTrans		INT,
 		Turnover		MONEY,
-		CustomerWL		MONEY,
-		LicenseeWL		MONEY,
+		CustomerWinLoss	MONEY,
+		LicenseeWinLoss	MONEY,
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY,
 		CurrencyName	VARCHAR(3)
@@ -185,8 +195,8 @@ BEGIN
 		CurrencyName	VARCHAR(3),
 		TotalTrans		INT,
 		Turnover		MONEY,
-		CustomerWL		MONEY,
-		LicenseeWL		MONEY,
+		CustomerWinLoss	MONEY,
+		LicenseeWinLoss	MONEY,
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY
 	)
@@ -213,20 +223,20 @@ BEGIN
 						td.ParentId,
 						SUM(td.TotalTrans) TotalTrans,
 						SUM(td.Turnover			* e.BaseCurrencyRate) Turnover,
-						SUM(td.CustomerWL		* e.BaseCurrencyRate) CustomerWL,
-						SUM(td.LicenseeWL		* e.BaseCurrencyRate) LicenseeWL,
+						SUM(td.CustomerWinLoss	* e.BaseCurrencyRate) CustomerWinLoss,
+						SUM(td.LicenseeWinLoss	* e.BaseCurrencyRate) LicenseeWinLoss,
 						SUM(td.LicensingFee		* e.BaseCurrencyRate) LicensingFee,
 						SUM(td.PayToSupplier	* e.BaseCurrencyRate) PayToSupplier
 				FROM #TempData td
 				INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @TempCurrency) e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.WinLossDate
 				GROUP BY td.ParentId,td.PartyId
 			)
-			INSERT INTO @TotalByGroups(ParentId,TotalTrans,Turnover,CustomerWL,LicenseeWL,LicensingFee,PayToSupplier, CurrencyName)
+			INSERT INTO @TotalByGroups(ParentId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier, CurrencyName)
 			SELECT	ParentId,
 					SUM(TotalTrans),
 					SUM(Turnover),
-					SUM(CustomerWL),
-					SUM(LicenseeWL),
+					SUM(CustomerWinLoss),
+					SUM(LicenseeWinLoss),
 					SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
 					SUM(PayToSupplier),
 					@TempCurrency
@@ -238,12 +248,12 @@ BEGIN
 
 		UPDATE @TotalByGroups SET PayToSupplier = CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END
 
-		INSERT INTO @GrandTotal(CurrencyName,TotalTrans,Turnover,CustomerWL,LicenseeWL,LicensingFee,PayToSupplier)
+		INSERT INTO @GrandTotal(CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
 		SELECT	CurrencyName,
 				SUM(TotalTrans),
 				SUM(Turnover),
-				SUM(CustomerWL),
-				SUM(LicenseeWL),
+				SUM(CustomerWinLoss),
+				SUM(LicenseeWinLoss),
 				SUM(LicensingFee),
 				SUM(PayToSupplier)
 		FROM @TotalByGroups
@@ -255,8 +265,8 @@ BEGIN
 	SELECT	CurrencyName,
 			TotalTrans,
 			Turnover,
-			CustomerWL,
-			LicenseeWL,
+			CustomerWinLoss,
+			LicenseeWinLoss,
 			LicensingFee,
 			PayToSupplier,
 			(LicensingFee - PayToSupplier) CompanyIncome
@@ -267,8 +277,8 @@ BEGIN
 	SELECT	ParentId,
 			TotalTrans,
 			Turnover,
-			CustomerWL,
-			LicenseeWL,
+			CustomerWinLoss,
+			LicenseeWinLoss,
 			LicensingFee,
 			PayToSupplier,
 			(LicensingFee - PayToSupplier) CompanyIncome
