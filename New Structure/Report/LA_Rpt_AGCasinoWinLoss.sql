@@ -145,7 +145,9 @@ BEGIN
 		Turnover		MONEY,
 		CustomerWinLoss	MONEY,		
 		LicenseeWinLoss	MONEY,
-		LicensingFee	MONEY
+		LicensingFee	MONEY,		
+		PayToSupplier	MONEY,
+		CompanyIncome	MONEY
 	)
 
 	IF @BaseCurrencyName = ''
@@ -171,7 +173,7 @@ BEGIN
 	END
 	
 	DECLARE @Total TABLE (	
-		GroupId			INT,
+		PartyId			INT,
 		TotalTrans		INT,
 		Turnover		MONEY,
 		CustomerWinLoss	MONEY,		
@@ -196,7 +198,8 @@ BEGIN
 		GroupId  INT,
 		MinValue MONEY,
 		MaxValue MONEY,
-		Rate	 MONEY)
+		Rate	 MONEY,
+		IsApply  BIT)
 	
 	INSERT INTO @3rdRate(GroupId,  MinValue, MaxValue, Rate)
 	VALUES (1,  0, @MYR, 0.08) , 
@@ -204,20 +207,28 @@ BEGIN
 		(11,  0, @USD, 0.08) , 
 		(11,  @USD, 1000000000000, 0.07)
 
-	INSERT INTO @Total (GroupID, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee)
+	INSERT INTO @Total (PartyId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee)
 	SELECT d.ParentId,
 		SUM(d.TotalTrans),
 		SUM(d.Turnover),
 		SUM(d.CustomerWinLoss),
 		SUM(d.LicenseeWinLoss),
-		SUM(d.LicensingFee)
+		CASE WHEN SUM(d.LicensingFee) < 0 THEN 0 ELSE SUM(d.LicensingFee) END LicensingFee
 	FROM #Result d
 	GROUP BY d.ParentId
-
+	
 	UPDATE t
-	SET t.PayToSupplier = -t.CustomerWinLoss * r.Rate
-	FROM @Total t INNER JOIN @3rdRate r ON t.GroupId = r.GroupId AND -t.CustomerWinLoss BETWEEN r.MinValue AND r.MaxValue
-	UPDATE @Total SET CompanyIncome = LicensingFee - ISNULL(PayToSupplier, 0)
+	SET t.PayToSupplier = t.LicensingFee * r.Rate
+	FROM @Total t INNER JOIN @3rdRate r ON t.PartyId = r.GroupId AND CASE WHEN -t.CustomerWinLoss < 0 THEN 0 ELSE -t.CustomerWinLoss END BETWEEN r.MinValue AND r.MaxValue
+	UPDATE @Total SET PayToSupplier = ISNULL(PayToSupplier, 0), CompanyIncome = LicensingFee - ISNULL(PayToSupplier, 0)
+
+	UPDATE r
+	SET r.IsApply = 1
+	FROM @Total t INNER JOIN @3rdRate r ON t.PartyId = r.GroupId AND CASE WHEN -t.CustomerWinLoss < 0 THEN 0 ELSE -t.CustomerWinLoss END BETWEEN r.MinValue AND r.MaxValue
+
+	UPDATE r 
+	SET r.PayToSupplier = r.LicensingFee * rd.Rate, r.CompanyIncome = r.LicensingFee - r.LicensingFee * rd.Rate
+	FROM #Result r INNER JOIN @3rdRate rd ON r.ParentId = rd.GroupId AND rd.IsApply = 1
 
 	DECLARE @tempCurrency VARCHAR(20)
 	DECLARE @BaseCurrencies TABLE(
