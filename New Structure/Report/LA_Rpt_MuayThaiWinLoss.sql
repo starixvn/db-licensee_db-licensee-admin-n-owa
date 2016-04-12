@@ -19,6 +19,7 @@ AS
 	Revisions: 
 		- 20160302@Bravo: create sp on table sum 		
 		- 20160322@Bravo: fix bug currency name VND => INH	
+		- 20160412@Bruce: Add grand total in THB
 	Param's Explanation:  						
 */
 SET NOCOUNT ON
