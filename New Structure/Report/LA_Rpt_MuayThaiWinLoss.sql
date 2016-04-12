@@ -172,6 +172,9 @@ BEGIN
 	INSERT INTO @BaseCurrencies(Id, Name)
 	EXEC LA_SelBaseCurrency
 
+	-- support THB
+	INSERT INTO @BaseCurrencies(Id, Name)VALUES(4,'THB')
+
 	CREATE TABLE #GrandTotal (		
 		CurrencyName	VARCHAR(20),
 		TotalTrans		INT,
