@@ -150,8 +150,23 @@ BEGIN
 		CompanyIncome	MONEY
 	)
 
-	IF @BaseCurrencyName = ''
-	BEGIN 
+	CREATE TABLE #ResultBase (
+		PartyId			INT,
+		PartyName		VARCHAR(100),
+		ParentId		INT,
+		ParentName		VARCHAR(100),
+		WinLossDate		DATETIME,
+		CurrencyName	VARCHAR(20),
+		TotalTrans		INT,
+		Turnover		MONEY,
+		CustomerWinLoss	MONEY,		
+		LicenseeWinLoss	MONEY,
+		LicensingFee	MONEY,		
+		PayToSupplier	MONEY,
+		CompanyIncome	MONEY
+	)
+
+	
 		INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee)
 		SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.Winlostdate, e.CurrencyCode, td.TotalTrans, td.Turnover, td.Winlost, td.LicenseeWinlost, td.LicensingFee
 		FROM #TempData td 
@@ -160,17 +175,14 @@ BEGIN
 			INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId
 			
 		
-	END 
-	ELSE 
-	BEGIN
-		INSERT INTO #Result (PartyId,PartyName,ParentId,ParentName,WinLossDate,CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee)
+	
+		INSERT INTO #ResultBase (PartyId,PartyName,ParentId,ParentName,WinLossDate,CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee)
 		SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.Winlostdate, e.CurrencyCode, td.TotalTrans, td.Turnover*e.Rate, td.Winlost*e.Rate, td.LicenseeWinlost*e.Rate, td.LicensingFee * e.Rate
 		FROM #TempData td 
 			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.Winlostdate
 			INNER JOIN @PartyList p ON td.PartyId = p.PartyID
 			INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId		
 			
-	END
 	
 	DECLARE @Total TABLE (	
 		PartyId			INT,
@@ -222,7 +234,7 @@ BEGIN
 			SUM(r.CustomerWinLoss) CustomerWinLoss,
 			SUM(r.LicenseeWinLoss) LicenseeWinLoss,
 			CASE WHEN SUM(r.LicensingFee) < 0 THEN 0 ELSE SUM(r.LicensingFee) END LicensingFee
-		FROM #Result r
+		FROM #ResultBase r
 		GROUP BY r.PartyId, r.ParentId
 	) d
 	GROUP BY d.ParentId
@@ -235,10 +247,14 @@ BEGIN
 	UPDATE r
 	SET r.IsApply = 1
 	FROM @Total t INNER JOIN @3rdRate r ON t.PartyId = r.GroupId AND CASE WHEN -t.CustomerWinLoss < 0 THEN 0 ELSE -t.CustomerWinLoss END BETWEEN r.MinValue AND r.MaxValue
-
+	
 	UPDATE r 
 	SET r.PayToSupplier = r.LicensingFee * rd.Rate, r.CompanyIncome = r.LicensingFee - r.LicensingFee * rd.Rate
 	FROM #Result r INNER JOIN @3rdRate rd ON r.ParentId = rd.GroupId AND rd.IsApply = 1
+
+	UPDATE r 
+	SET r.PayToSupplier = r.LicensingFee * rd.Rate, r.CompanyIncome = r.LicensingFee - r.LicensingFee * rd.Rate
+	FROM #ResultBase r INNER JOIN @3rdRate rd ON r.ParentId = rd.GroupId AND rd.IsApply = 1
 
 	DECLARE @tempCurrency VARCHAR(20)
 	DECLARE @BaseCurrencies TABLE(
@@ -286,18 +302,23 @@ BEGIN
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 	END
 	
-	SELECT * FROM #Result
-	SELECT * FROM @GrandTotal
-	
 	IF @BaseCurrencyName <> ''
 	BEGIN
+		SELECT * FROM #ResultBase
+		SELECT * FROM @GrandTotal
 		SELECT * FROM @Total
 	END
-	
+	ELSE
+	BEGIN
+		SELECT * FROM #Result
+		SELECT * FROM @GrandTotal
+	END
+		
 	DROP TABLE #TempData
 	DROP TABLE #TempAgent
 	DROP TABLE #Exchange
 	DROP TABLE #Result
+	DROP TABLE #ResultBase
 END
 
 GO
