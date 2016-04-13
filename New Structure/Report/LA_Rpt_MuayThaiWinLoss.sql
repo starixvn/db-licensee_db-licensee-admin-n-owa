@@ -6,7 +6,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_Rpt_MuayThaiWinLoss_xtest]
+ALTER PROCEDURE [dbo].[LA_Rpt_MuayThaiWinLoss]
 	  @PartyIds				VARCHAR(1000)
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME	

@@ -1,12 +1,13 @@
 USE [bodb02]
 GO
-/****** Object:  UserDefinedFunction [dbo].[LA_f_ExchangeDailySel_xtest]    Script Date: 4/13/2016 15:39:21 ******/
+
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel_xtest] (@fromdate DATETIME
+ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
+	@fromdate DATETIME
 	, @todate DATETIME
 	, @BaseCurrency VARCHAR(10)
 )
