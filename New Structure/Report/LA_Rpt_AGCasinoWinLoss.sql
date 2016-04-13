@@ -14,11 +14,11 @@ ALTER PROCEDURE [dbo].[LA_Rpt_AGCasinoWinLoss]
 AS
 /*  
 	 Created: 20160225@Bravo
-	 Task : Get report Cock Fighting Win Loss
+	 Task : Get report AG Casino Win Loss
 	 DB: DB052.bodb_licensee
    
 	 Revisions:  
-	 - 20160225@Bravo: Get CF win loss data.
+	 - 20160225@Bravo: Get AG Casino win loss data.
 	 Params:			   
 */
 BEGIN	
