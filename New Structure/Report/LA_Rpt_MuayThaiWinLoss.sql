@@ -6,7 +6,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_Rpt_MuayThaiWinLoss]
+ALTER PROCEDURE [dbo].[LA_Rpt_MuayThaiWinLoss_xtest]
 	  @PartyIds				VARCHAR(1000)
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME	
@@ -66,7 +66,7 @@ BEGIN
 	
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate	
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+	FROM bodb02.dbo.LA_f_ExchangeDailySel_xtest(@FromDate, @ToDate, @BaseCurrencyName)
 
 	UPDATE #Exchange 
 	SET CurrencyCode = 'INH'
@@ -195,7 +195,7 @@ BEGIN
 		DELETE FROM #Exchange
 		INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency)
+		FROM bodb02.dbo.LA_f_ExchangeDailySel_xtest(@FromDate, @ToDate, @tempCurrency)
 
 		INSERT INTO #GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,WinLossShare,LicenseeComm,CommissionShare,AmountDueLicensee)
 		SELECT	@tempCurrency, 
