@@ -1,15 +1,14 @@
 USE [bodb02]
 GO
-/****** Object:  UserDefinedFunction [dbo].[LA_f_ExchangeDailySel]    Script Date: 20/03/2015 16:06:20 PM ******/
+/****** Object:  UserDefinedFunction [dbo].[LA_f_ExchangeDailySel_xtest]    Script Date: 4/13/2016 15:39:21 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
-	@fromdate 			DATETIME
-	, @todate 			DATETIME
-	, @BaseCurrency 	VARCHAR(10)
+ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel_xtest] (@fromdate DATETIME
+	, @todate DATETIME
+	, @BaseCurrency VARCHAR(10)
 )
 	
 /*  
@@ -20,6 +19,7 @@ ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
 	Revisions:  
 
 	Param's Explanation:  			
+	- 20160413@Francis: Support THB Base Currency
 */
 RETURNS @tempDate TABLE (exchangedate DATETIME, ExchangeId INT, Code VARCHAR(5)
 		, BaseCurrencyRate FLOAT
@@ -58,6 +58,7 @@ BEGIN
 					WHEN @BaseCurrency = 'EUR' THEN EUR
 					WHEN @BaseCurrency = 'CNY' THEN CNY
 					WHEN @BaseCurrency = 'GBP' THEN GBP
+					WHEN @BaseCurrency = 'THB' THEN THB
 					ELSE 1 END BaseCurrencyRate
 				--, MYR, USD, EUR, CNY, GBP, actualrate
 			FROM dbo.ExchangeDailyOanda WITH (NOLOCK)
