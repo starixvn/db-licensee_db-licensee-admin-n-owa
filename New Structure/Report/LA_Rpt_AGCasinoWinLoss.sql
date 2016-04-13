@@ -183,11 +183,11 @@ BEGIN
 		CompanyIncome	MONEY
 	)
 	
-	DECLARE @MYR MONEY
+	DECLARE @CNY MONEY
 	DECLARE @USD MONEY
-	SELECT @MYR = (SELECT TOP 1 15000000 * e.Rate
+	SELECT @CNY = (SELECT TOP 1 15000000 * e.Rate
 					FROM #Exchange e
-					WHERE e.CurrencyCode = 'MYR'
+					WHERE e.CurrencyCode = 'CNY'
 					ORDER BY e.ExchangeDate DESC)	
 	SELECT @USD = (SELECT TOP 1 2500000 * e.Rate
 					FROM #Exchange e
@@ -202,8 +202,8 @@ BEGIN
 		IsApply  BIT)
 	
 	INSERT INTO @3rdRate(GroupId,  MinValue, MaxValue, Rate)
-	VALUES (1,  0, @MYR, 0.08) , 
-		(1,  @MYR, 1000000000000, 0.07) , 
+	VALUES (1,  0, @CNY, 0.08) , 
+		(1,  @CNY, 1000000000000, 0.07) , 
 		(11,  0, @USD, 0.08) , 
 		(11,  @USD, 1000000000000, 0.07)
 
