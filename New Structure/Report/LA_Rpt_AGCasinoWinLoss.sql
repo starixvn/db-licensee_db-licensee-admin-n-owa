@@ -213,8 +213,18 @@ BEGIN
 		SUM(d.Turnover),
 		SUM(d.CustomerWinLoss),
 		SUM(d.LicenseeWinLoss),
-		CASE WHEN SUM(d.LicensingFee) < 0 THEN 0 ELSE SUM(d.LicensingFee) END LicensingFee
-	FROM #Result d
+		SUM(d.LicensingFee)
+	FROM
+	(
+		SELECT r.ParentId,
+			SUM(r.TotalTrans) TotalTrans,
+			SUM(r.Turnover) Turnover,
+			SUM(r.CustomerWinLoss) CustomerWinLoss,
+			SUM(r.LicenseeWinLoss) LicenseeWinLoss,
+			CASE WHEN SUM(r.LicensingFee) < 0 THEN 0 ELSE SUM(r.LicensingFee) END LicensingFee
+		FROM #Result r
+		GROUP BY r.PartyId, r.ParentId
+	) d
 	GROUP BY d.ParentId
 	
 	UPDATE t
