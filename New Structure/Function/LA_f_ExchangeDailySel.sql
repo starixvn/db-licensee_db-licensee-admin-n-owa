@@ -75,4 +75,4 @@ RETURN
 END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_f_ExchangeDailySel] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_f_ExchangeDailySel] TO bodbAdminNet 
+GRANT SELECT ON [dbo].[LA_f_ExchangeDailySel] TO bodbAdminNet 
