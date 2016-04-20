@@ -177,9 +177,25 @@ BEGIN
 	UPDATE r
 	SET r.PayToSupplier = a.ApplyRate * r.LicensingFee, r.CompanyIncome = r.LicensingFee - a.ApplyRate * r.LicensingFee
 	FROM #Result r INNER JOIN @ApplyRange a ON r.ParentId = a.ParentId
+	-- End Region
+
+	-- Calculate Total
+	DECLARE @LicensingFee TABLE (
+		PartyId		INT,
+		LicenseeWL	MONEY,
+		IsApply		BIT)
+	
+	INSERT INTO @LicensingFee(PartyId, LicenseeWL)
+	SELECT r.PartyId,SUM(r.LicenseeWinLoss)
+	FROM #Result r
+	GROUP BY r.PartyId
+	
+	UPDATE @LicensingFee
+	SET IsApply = CASE WHEN LicenseeWL < 0 THEN 0 ELSE 1 END
 	
 	DECLARE @Total TABLE (	
 		PartyId			INT,
+		ParentId		INT,
 		CurrencyId		INT,
 		WinLossDate		DATETIME,
 		TotalTrans		INT,
@@ -190,26 +206,26 @@ BEGIN
 		PayToSupplier	MONEY,
 		CompanyIncome	MONEY
 	)
-	-- End Region
 
-	-- Calculate Total
-	INSERT INTO @Total (PartyId, CurrencyId, WinLossDate, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee)
-	SELECT r.ParentId,
+	INSERT INTO @Total (PartyId, ParentId, CurrencyId, WinLossDate, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee)
+	SELECT 
+		r.PartyId,
+		r.ParentId,
 		r.CurrencyId,
 		r.WinLossDate,
 		SUM(r.TotalTrans),
 		SUM(r.Turnover),
 		SUM(r.CustomerWinLoss),
 		SUM(r.LicenseeWinLoss),
-		SUM(CASE WHEN r.LicensingFee < 0 THEN 0 ELSE r.LicensingFee END)
-	FROM #Result r
+		SUM(CASE WHEN l.IsApply = 1 THEN r.LicensingFee ELSE 0 END)
+	FROM #Result r INNER JOIN @LicensingFee l ON r.PartyId = l.PartyId
 	GROUP BY r.PartyId, r.ParentId, r.CurrencyId, r.WinLossDate
 	
 	UPDATE t
 	SET t.PayToSupplier = a.ApplyRate * t.LicensingFee, t.CompanyIncome = t.LicensingFee - a.ApplyRate * t.LicensingFee
-	FROM @Total t INNER JOIN @ApplyRange a ON t.PartyId = a.ParentId
+	FROM @Total t INNER JOIN @ApplyRange a ON t.ParentId = a.ParentId
 	-- End Region
-		
+	
 	-- Region: Calculate Grand Total
 	DECLARE @tempCurrency VARCHAR(20)
 	DECLARE @BaseCurrencies TABLE(
@@ -317,7 +333,7 @@ BEGIN
 		SELECT * FROM @GrandTotal
 
 		-- Total
-		SELECT PartyId,
+		SELECT t.ParentId AS PartyId,
 			SUM(TotalTrans) TotalTrans,
 			SUM(Turnover * e.Rate) Turnover,
 			SUM(CustomerWinLoss * e.Rate) CustomerWinLoss,		
@@ -327,7 +343,7 @@ BEGIN
 			SUM(CompanyIncome * e.Rate) CompanyIncome
 		FROM @Total t
 			INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeID AND e.ExchangeDate = t.WinLossDate
-		GROUP BY PartyId
+		GROUP BY ParentId
 	END
 	-- End Region
 
