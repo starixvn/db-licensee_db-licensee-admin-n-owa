@@ -272,7 +272,7 @@ BEGIN
 	SET CurrencyCode = 'INH'
 	WHERE ExchangeID = 51
 	
-	IF @BaseCurrencyName <> ''
+	IF @BaseCurrencyName = ''
 	BEGIN		
 		--Result 
 		SELECT r.PartyId,
