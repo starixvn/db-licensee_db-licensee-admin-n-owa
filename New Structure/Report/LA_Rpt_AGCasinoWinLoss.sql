@@ -180,6 +180,21 @@ BEGIN
 	-- End Region
 
 	-- Calculate Total
+	CREATE TABLE #Exchange (
+		ExchangeDate	DATE,
+		ExchangeID		INT,
+		CurrencyCode	VARCHAR(10),
+		Rate			MONEY
+	)	
+	
+	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
+	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
+	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+		
+	UPDATE #Exchange 
+	SET CurrencyCode = 'INH'
+	WHERE ExchangeID = 51
+
 	DECLARE @LicensingFee TABLE (
 		PartyId		INT,
 		LicenseeWL	MONEY,
@@ -187,7 +202,7 @@ BEGIN
 	
 	INSERT INTO @LicensingFee(PartyId, LicenseeWL)
 	SELECT r.PartyId,SUM(r.LicenseeWinLoss)
-	FROM #Result r
+	FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.WinLossDate = e.ExchangeDate
 	GROUP BY r.PartyId
 	
 	UPDATE @LicensingFee
@@ -247,19 +262,19 @@ BEGIN
 		CompanyIncome	MONEY
 	)
 	
-	CREATE TABLE #Exchange (
+	CREATE TABLE #ExchangeBase (
 		ExchangeDate	DATE,
 		ExchangeID		INT,
 		CurrencyCode	VARCHAR(10),
 		Rate			MONEY
 	)	
-
+	
 	WHILE EXISTS (SELECT * FROM @BaseCurrencies WHERE IsApply IS NULL)
 	BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)
 		PRINT @tempCurrency
-		DELETE FROM #Exchange
-		INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
+		DELETE FROM #ExchangeBase
+		INSERT INTO #ExchangeBase(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency)
 		
@@ -272,22 +287,13 @@ BEGIN
 				SUM(td.LicensingFee *e.Rate),
 				SUM(td.PayToSupplier * e.Rate),
 				SUM(td.CompanyIncome * e.Rate)
-		FROM @Total td INNER JOIN #Exchange e ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
+		FROM @Total td INNER JOIN #ExchangeBase e ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
 
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 	END
 	-- End Region
 
-	-- Region: Select Data
-	DELETE FROM #Exchange
-	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
-
-	UPDATE #Exchange 
-	SET CurrencyCode = 'INH'
-	WHERE ExchangeID = 51
-	
+	-- Region: Select Data	
 	IF @BaseCurrencyName = ''
 	BEGIN		
 		--Result 
@@ -352,6 +358,7 @@ BEGIN
 	DROP TABLE #Exchange
 	DROP TABLE #ExchangeCNY
 	DROP TABLE #ExchangeUSD
+	DROP TABLE #ExchangeBase
 	DROP TABLE #Result
 END
 
