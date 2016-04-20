@@ -1,6 +1,5 @@
 USE [bodb_Licensee]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_AGCasinoWinLoss]    Script Date: 12/21/2015 06:47:11 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -13,12 +12,12 @@ ALTER PROCEDURE [dbo].[LA_Rpt_AGCasinoWinLoss]
 	@BaseCurrencyName	VARCHAR(20)
 AS
 /*  
-	 Created: 20160225@Bravo
+	 Created: 20160420@Bravo
 	 Task : Get report AG Casino Win Loss
 	 DB: DB052.bodb_licensee
    
 	 Revisions:  
-	 - 20160225@Bravo: Get AG Casino win loss data.
+	 - 20160420@Bravo: Get AG Casino win loss data.
 	 Params:			   
 */
 BEGIN	
@@ -49,11 +48,10 @@ BEGIN
 	)
 
 	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
-	EXEC LA_PartyListSel
-		
+	EXEC LA_PartyListSel		
 	-- Endregion
 
-	-- Region: Get exchange rate info	
+	-- Region: Get base exchange rate info	
 	CREATE TABLE #ExchangeUSD (
 		ExchangeDate	DATE,
 		ExchangeID		INT,
@@ -74,8 +72,7 @@ BEGIN
 	
 	INSERT INTO #ExchangeCNY(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, 'CNY')
-		
+	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, 'CNY')		
 	-- End region
 	
 	-- Region: Get Winloss data
@@ -133,9 +130,9 @@ BEGIN
 		,co.Currency
 		,ag.PartyID
 		,ag.PartyName
-
 	-- EndRegion
 	
+	-- Region: Calculate result
 	CREATE TABLE #Result (
 		PartyId			INT,
 		PartyName		VARCHAR(100),
@@ -193,7 +190,9 @@ BEGIN
 		PayToSupplier	MONEY,
 		CompanyIncome	MONEY
 	)
-		
+	-- End Region
+
+	-- Calculate Total
 	INSERT INTO @Total (PartyId, CurrencyId, WinLossDate, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee)
 	SELECT r.ParentId,
 		r.CurrencyId,
@@ -209,7 +208,9 @@ BEGIN
 	UPDATE t
 	SET t.PayToSupplier = a.ApplyRate * t.LicensingFee, t.CompanyIncome = t.LicensingFee - a.ApplyRate * t.LicensingFee
 	FROM @Total t INNER JOIN @ApplyRange a ON t.PartyId = a.ParentId
+	-- End Region
 		
+	-- Region: Calculate Grand Total
 	DECLARE @tempCurrency VARCHAR(20)
 	DECLARE @BaseCurrencies TABLE(
 		Id INT,
@@ -260,7 +261,9 @@ BEGIN
 
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 	END
-	
+	-- End Region
+
+	-- Region: Select Data
 	DELETE FROM #Exchange
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
@@ -327,7 +330,8 @@ BEGIN
 		-- Grand Total
 		SELECT * FROM @GrandTotal
 	END
-		
+	-- End Region
+
 	DROP TABLE #TempData
 	DROP TABLE #TempAgent
 	DROP TABLE #Exchange
