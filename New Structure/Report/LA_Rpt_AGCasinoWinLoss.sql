@@ -122,7 +122,7 @@ BEGIN
 		,- SUM(c.WinLost) AS LicenseeWinloss
 		,SUM(-c.WinLost * pc.Rate) AS LicensingFee
 	FROM DBACC.bodb_report.dbo.rptDepWinlost_AGCasino c WITH (NOLOCK)
-		INNER JOIN DBACC.bodb02.dbo.Custinfo co WITH (NOLOCK) ON c.CustID = co.CustID
+		INNER JOIN DBACC.bodb02.dbo.Custinfo co WITH (NOLOCK) ON c.Custid = co.CustID
 		INNER JOIN #TempAgent ag ON co.recommend = ag.CustID AND co.currency=ag.Currency
 		INNER JOIN @PartyChargeInfo pc ON pc.PartyId = ag.PartyID
 	WHERE c.Winlostdate BETWEEN ag.FromDate AND ag.Todate --AND c.CustomerWinLoss<0
@@ -256,8 +256,7 @@ BEGIN
 				SUM(td.LicensingFee *e.Rate),
 				SUM(td.PayToSupplier * e.Rate),
 				SUM(td.CompanyIncome * e.Rate)
-		FROM @Total td 
-			INNER JOIN #Exchange e ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
+		FROM @Total td INNER JOIN #Exchange e ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
 
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 	END
@@ -295,7 +294,7 @@ BEGIN
 		-- Grand Total
 		SELECT * FROM @GrandTotal
 
-		 Total
+		-- Total
 		SELECT PartyId,
 			SUM(TotalTrans) TotalTrans,
 			SUM(Turnover * e.Rate) Turnover,
