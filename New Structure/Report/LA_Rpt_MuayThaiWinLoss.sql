@@ -19,6 +19,7 @@ AS
 	Revisions: 
 		- 20160302@Bravo: create sp on table sum 		
 		- 20160322@Bravo: fix bug currency name VND => INH	
+		- 20160412@Bruce: Add grand total in THB
 	Param's Explanation:  						
 */
 SET NOCOUNT ON
@@ -65,7 +66,7 @@ BEGIN
 	
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate	
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+	FROM bodb02.dbo.LA_f_ExchangeDailySel_xtest(@FromDate, @ToDate, @BaseCurrencyName)
 
 	UPDATE #Exchange 
 	SET CurrencyCode = 'INH'
@@ -172,6 +173,9 @@ BEGIN
 	INSERT INTO @BaseCurrencies(Id, Name)
 	EXEC LA_SelBaseCurrency
 
+	-- support THB
+	INSERT INTO @BaseCurrencies(Id, Name)VALUES(4,'THB')
+
 	CREATE TABLE #GrandTotal (		
 		CurrencyName	VARCHAR(20),
 		TotalTrans		INT,
@@ -191,7 +195,7 @@ BEGIN
 		DELETE FROM #Exchange
 		INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency)
+		FROM bodb02.dbo.LA_f_ExchangeDailySel_xtest(@FromDate, @ToDate, @tempCurrency)
 
 		INSERT INTO #GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,WinLossShare,LicenseeComm,CommissionShare,AmountDueLicensee)
 		SELECT	@tempCurrency, 
