@@ -201,7 +201,7 @@ BEGIN
 		IsApply		BIT)
 	
 	INSERT INTO @LicensingFee(PartyId, LicenseeWL)
-	SELECT r.PartyId,SUM(r.LicenseeWinLoss)
+	SELECT r.PartyId,SUM(r.LicenseeWinLoss * e.Rate)
 	FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.WinLossDate = e.ExchangeDate
 	GROUP BY r.PartyId
 	
