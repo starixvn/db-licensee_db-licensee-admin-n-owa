@@ -292,20 +292,7 @@ BEGIN
 		FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
 
 		-- Grand Total
-		SELECT * FROM @GrandTotal
-
-		-- Total
-		SELECT PartyId,
-			SUM(TotalTrans) TotalTrans,
-			SUM(Turnover * e.Rate) Turnover,
-			SUM(CustomerWinLoss * e.Rate) CustomerWinLoss,		
-			SUM(LicenseeWinLoss * e.Rate) LicenseeWinLoss,
-			SUM(LicensingFee * e.Rate) LicensingFee,
-			SUM(PayToSupplier * e.Rate) PayToSupplier,
-			SUM(CompanyIncome * e.Rate) CompanyIncome
-		FROM @Total t
-			INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeID AND e.ExchangeDate = t.WinLossDate
-		GROUP BY PartyId
+		SELECT * FROM @GrandTotal		
 	END	
 	ELSE 
 	BEGIN
@@ -328,6 +315,19 @@ BEGIN
 
 		-- Grand Total
 		SELECT * FROM @GrandTotal
+
+		-- Total
+		SELECT PartyId,
+			SUM(TotalTrans) TotalTrans,
+			SUM(Turnover * e.Rate) Turnover,
+			SUM(CustomerWinLoss * e.Rate) CustomerWinLoss,		
+			SUM(LicenseeWinLoss * e.Rate) LicenseeWinLoss,
+			SUM(LicensingFee * e.Rate) LicensingFee,
+			SUM(PayToSupplier * e.Rate) PayToSupplier,
+			SUM(CompanyIncome * e.Rate) CompanyIncome
+		FROM @Total t
+			INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeID AND e.ExchangeDate = t.WinLossDate
+		GROUP BY PartyId
 	END
 	-- End Region
 
