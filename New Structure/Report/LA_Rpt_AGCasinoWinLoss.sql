@@ -124,8 +124,8 @@ BEGIN
 	FROM DBACC.bodb_report.dbo.rptDepWinlost_AGCasino c WITH (NOLOCK)
 		INNER JOIN DBACC.bodb02.dbo.Custinfo co WITH (NOLOCK) ON c.Custid = co.CustID
 		INNER JOIN #TempAgent ag ON co.recommend = ag.CustID AND co.currency=ag.Currency
-		INNER JOIN @PartyChargeInfo pc ON pc.PartyId = ag.PartyID
-	WHERE c.Winlostdate BETWEEN ag.FromDate AND ag.Todate --AND c.CustomerWinLoss<0
+		INNER JOIN @PartyChargeInfo pc ON pc.PartyId = ag.PartyID AND c.Winlostdate BETWEEN pc.FromDate AND pc.ToDate
+	WHERE c.Winlostdate BETWEEN ag.FromDate AND ag.Todate
 	GROUP BY c.Winlostdate
 		,co.Currency
 		,ag.PartyID
