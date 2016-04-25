@@ -98,7 +98,8 @@ BEGIN
 											 (b.rptDate BETWEEN p.FromDate AND p.ToDate)
 			WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate) AND
 					(b.CurrencyID <> 20) AND
-					(b.customercategory NOT IN (27, 28))
+					(b.customercategory NOT IN (27, 28)) AND
+					 b.StatusId NOT IN (-1, 101, 102, 103)
 			GROUP BY b.rptdate, b.SiteId, p.PartyId, b.CurrencyID
 		)
 		INSERT INTO #TempData (PartyId,PartyName,ParentId,ParentName,WinLossDate,CurrencyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
