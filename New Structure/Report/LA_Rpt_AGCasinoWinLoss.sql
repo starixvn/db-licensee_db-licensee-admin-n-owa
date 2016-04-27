@@ -18,7 +18,7 @@ AS
    
 	 Revisions:  
 	 - 20160420@Bravo: Get AG Casino win loss data.
-	 Params:			   
+	 Params:
 */
 BEGIN	
 	-- Region: Charge Info	
@@ -56,7 +56,7 @@ BEGIN
 		ExchangeDate	DATE,
 		ExchangeID		INT,
 		CurrencyCode	VARCHAR(10),
-		Rate			MONEY
+		Rate			FLOAT
 	)
 	
 	INSERT INTO #ExchangeUSD(ExchangeDate, ExchangeID, CurrencyCode, Rate)
@@ -67,7 +67,7 @@ BEGIN
 		ExchangeDate	DATE,
 		ExchangeID		INT,
 		CurrencyCode	VARCHAR(10),
-		Rate			MONEY
+		Rate			FLOAT
 	)
 	
 	INSERT INTO #ExchangeCNY(ExchangeDate, ExchangeID, CurrencyCode, Rate)
@@ -184,7 +184,7 @@ BEGIN
 		ExchangeDate	DATE,
 		ExchangeID		INT,
 		CurrencyCode	VARCHAR(10),
-		Rate			MONEY
+		Rate			FLOAT
 	)	
 	
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
@@ -266,7 +266,7 @@ BEGIN
 		ExchangeDate	DATE,
 		ExchangeID		INT,
 		CurrencyCode	VARCHAR(10),
-		Rate			MONEY
+		Rate			FLOAT
 	)	
 	
 	WHILE EXISTS (SELECT * FROM @BaseCurrencies WHERE IsApply IS NULL)
@@ -327,12 +327,12 @@ BEGIN
 			r.CurrencyId,			 
 			e.CurrencyCode AS CurrencyName,
 			r.TotalTrans,
-			r.Turnover * e.Rate AS Turnover,
-			r.CustomerWinLoss * e.Rate AS CustomerWinLoss,
-			r.LicenseeWinLoss * e.Rate AS LicenseeWinLoss,
-			r.LicensingFee * e.Rate AS LicensingFee,
-			r.PayToSupplier * e.Rate AS PayToSupplier,
-			r.CompanyIncome * e.Rate AS CompanyIncome
+			CAST(r.Turnover * e.Rate AS MONEY) AS Turnover,
+			CAST(r.CustomerWinLoss * e.Rate AS MONEY) AS CustomerWinLoss,
+			CAST(r.LicenseeWinLoss * e.Rate AS MONEY) AS LicenseeWinLoss,
+			CAST(r.LicensingFee * e.Rate AS MONEY) AS LicensingFee,
+			CAST(r.PayToSupplier * e.Rate AS MONEY) AS PayToSupplier,
+			CAST(r.CompanyIncome * e.Rate AS MONEY) AS CompanyIncome
 		FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
 
 		-- Grand Total
@@ -341,12 +341,12 @@ BEGIN
 		-- Total
 		SELECT t.ParentId AS PartyId,
 			SUM(TotalTrans) TotalTrans,
-			SUM(Turnover * e.Rate) Turnover,
-			SUM(CustomerWinLoss * e.Rate) CustomerWinLoss,		
-			SUM(LicenseeWinLoss * e.Rate) LicenseeWinLoss,
-			SUM(LicensingFee * e.Rate) LicensingFee,
-			SUM(PayToSupplier * e.Rate) PayToSupplier,
-			SUM(CompanyIncome * e.Rate) CompanyIncome
+			CAST(SUM(Turnover * e.Rate) AS MONEY) Turnover,
+			CAST(SUM(CustomerWinLoss * e.Rate) AS MONEY) CustomerWinLoss,		
+			CAST(SUM(LicenseeWinLoss * e.Rate) AS MONEY) LicenseeWinLoss,
+			CAST(SUM(LicensingFee * e.Rate) AS MONEY) LicensingFee,
+			CAST(SUM(PayToSupplier * e.Rate) AS MONEY) PayToSupplier,
+			CAST(SUM(CompanyIncome * e.Rate) AS MONEY) CompanyIncome
 		FROM @Total t
 			INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeID AND e.ExchangeDate = t.WinLossDate
 		GROUP BY ParentId
