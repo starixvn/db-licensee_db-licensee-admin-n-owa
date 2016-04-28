@@ -11,9 +11,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_MicrogamingWinloss]
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME	
 	, @ProductCodes			VARCHAR(50)
-	, @CurrencyId			INT				= 0
-	, @BaseCurrencyName		VARCHAR(3)
-	, @ExcludeTest			BIT
+	, @BaseCurrencyName		VARCHAR(3)			= 'GBP'
 WITH RECOMPILE
 AS
 /*  Created: 20150804@Florent		
@@ -24,7 +22,8 @@ AS
 	- Feature 54152.
 	Revisions:
 	- 20151201@Forrest: Add Microgaming RNG and change data flow.
-	- 20160316@Forrest: Change SporttypeRef to Sporttype.	
+	- 20160316@Forrest: Change SporttypeRef to Sporttype.
+	- 20160428@Forrest: Update Entire Report	
 	Param's Explanation:
 		+ @PartyIDs	: a string of list PartyID, separate by ','
 		+ @Currency	:  0 - All Currencies
@@ -36,78 +35,38 @@ AS
 */
 SET NOCOUNT ON
 BEGIN		
-	CREATE TABLE #Result (
-	BettypeRef			INT, 
-	GameTypeName		VARCHAR(20),
-	PartyId				INT, 
-	PartyName			VARCHAR(20), 
-	CurrencyId			INT, 
-	CurrencyName		VARCHAR(20),
-	ProductId			INT,
-	ProductName			VARCHAR(20),
-	ParentId			INT, 
-	TotalTrans			INT,
-	Turnover			MONEY,
-	CustomerWinLoss		MONEY,
-	LicenseeWinLoss		MONEY,
-	AmountDueToCompany	MONEY,
-	AmountDueToProduct	MONEY)
-	
-	CREATE TABLE #SumData(
-		RptDate				DATE,
-		SiteId				INT,
-		ProductId			INT,
-		BetTypeRef			INT,
-		CurrencyId			INT,
-		BetCount			BIGINT,
-		Turnover			MONEY,
-		Winloss				MONEY)
-	
-	CREATE TABLE #AmountDueToMicrogaming (BettypeRef INT, AmountDueTo MONEY)
+	--Region Parties
 
-	CREATE TABLE #ExchangeRate(ExchangeDate DATE, ExchangeId INT, Rate FLOAT)
+	DECLARE @Parties AS TABLE  (PartyId INT, PartyName VARCHAR(100), BrandName VARCHAR(100), ParentId INT)
 
-	INSERT INTO #ExchangeRate (ExchangeDate, ExchangeID, Rate)
-	SELECT ExchangeDate, ExchangeID, BaseCurrencyRate
-	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
-
-	CREATE TABLE #Parties (PartyId INT, PartyName VARCHAR(100), BrandName VARCHAR(100), ParentId INT)
-
-	INSERT INTO #Parties (PartyId, PartyName, BrandName, ParentId)
+	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
 	EXEC bodb_licensee.dbo.LA_PartyListSel
 
-	CREATE TABLE #GameTypes (ProductId INT, BettypeRef INT, BettypeId INT, GameTypeName VARCHAR(100))
+	--Endregion
+	
+	--Region Game Type
 
-	INSERT INTO #GameTypes (ProductId, BettypeId, BettypeRef)
+	DECLARE @GameTypes AS TABLE (ProductId INT, BettypeRef INT, BettypeId INT, GameTypeName VARCHAR(100))
+
+	INSERT INTO @GameTypes (ProductId, BettypeId, BettypeRef)
 	SELECT CASE WHEN sp.Sporttype = 203 THEN 14
 				WHEN sp.Sporttype = 205 THEN 17 ELSE 0 END AS ProductId, sp.Bettype, pr.BettypeRef
 	FROM bodb_licensee.dbo.Sport_Bettype_Reference sp WITH (NOLOCK)
-		LEFT JOIN bodb_licensee.dbo.LA_Product3rdSub pr WITH (NOLOCK) ON sp.BettypeRef = pr.BettypeRef
+		INNER JOIN bodb_licensee.dbo.LA_Product3rdSub pr WITH (NOLOCK) ON sp.BettypeRef = pr.BettypeRef
 	GROUP BY sp.Sporttype, sp.Bettype, pr.BettypeRef
 
-	UPDATE #GameTypes
+	UPDATE @GameTypes
 	SET GameTypeName = 'Generic'
 	WHERE BettypeRef = 2001
-	UPDATE #GameTypes
+	UPDATE @GameTypes
 	SET GameTypeName = 'Branded'
 	WHERE BettypeRef = 2005
 
-	CREATE TABLE #Products(ProductId INT,ProductName VARCHAR(50))
+	--Endregion
+	
+	--Region Charge Info
 
-	INSERT INTO #Products (ProductId, ProductName)
-	SELECT ProductId, ProductName
-	FROM bodb_licensee.dbo.Product3rd
-	WHERE Productid IN (14, 17) -- 14 = MGC Live Casino, 17 = MGC RNG Casino --
-
-	UPDATE #Products
-	SET ProductName = 'Live Casino'
-	WHERE ProductId = 14
-
-	UPDATE #Products
-	SET ProductName = 'RNG Casino'
-	WHERE ProductId = 17
-
-	CREATE TABLE #PartyChargeInfo (
+	DECLARE @PartyChargeInfo AS TABLE (
 		ChargeId			INT,
 		PartyId				INT,
 		PartyName			VARCHAR(100),
@@ -119,105 +78,255 @@ BEGIN
 		FromDate			DATETIME,
 		ToDate				DATETIME)
 
-	INSERT INTO #PartyChargeInfo (ChargeId, PartyId, PartyName, ParentId, LicenseeId, ProductID, BettypeRef, Rate, Fromdate, Todate)
+	INSERT INTO @PartyChargeInfo (ChargeId, PartyId, PartyName, ParentId, LicenseeId, ProductID, BettypeRef, Rate, Fromdate, Todate)
 	SELECT DISTINCT ci.ChargeID, ci.PartyID, p.PartyName, p.ParentId, LicenseeID, ci.ProductID, ci.Bettype, DI_Rate, ci.Fromdate, ci.Todate
-	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', @ExcludeTest) ci LEFT JOIN #Parties p ON ci.PartyID = p.PartyId
+	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci LEFT JOIN @Parties p ON ci.PartyID = p.PartyId
+
+	--Endregion
 	
-	INSERT INTO #SumData (RptDate, SiteId, ProductId, BetTypeRef, CurrencyId, BetCount, Turnover, Winloss)
-	SELECT st.RptDate, SiteId, st.ProductId, st.BettypeRef, CurrencyId, SUM(st.BetCount), SUM(st.Turnover), SUM(st.Winloss)
-	FROM (	
-		SELECT rpt.RptDate, SiteId, gt.ProductId, gt.BettypeRef, CurrencyId, StatusId, 
-			SUM(ISNULL(BetCount, 0)) AS BetCount, 
-			SUM(ISNULL(Turnover, 0)) AS Turnover
-			, SUM(ISNULL(Winloss, 0)) AS Winloss
-		FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT rpt
-			INNER JOIN #GameTypes gt ON rpt.BetTypeId = gt.BettypeId
-		WHERE rpt.RptDate BETWEEN @FromDate AND @ToDate
-			  AND rpt.SiteId IN (SELECT DISTINCT LicenseeId FROM #PartyChargeInfo)
-			  AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND CurrencyID = @CurrencyId))
-			  AND (@ExcludeTest = 0 OR (@ExcludeTest = 1 AND CurrencyID <> 20))
-			  AND StatusId NOT IN (-1, 101, 102, 103)
-		GROUP BY rpt.RptDate, SiteId, gt.ProductId, gt.BettypeRef, CurrencyId, StatusId
-		) st
-	GROUP BY st.RptDate, SiteId, st.ProductId, st.BettypeRef, CurrencyId
+	--Region Base Currency Data
+	DECLARE @tempCurrencyId INT
+	DECLARE @tempCurrencyCode VARCHAR(3)
+	DECLARE @BaseCurrencies TABLE(
+		Id INT,
+		Name VARCHAR(20),
+		IsApply BIT
+	)
 
-	CREATE TABLE #ProductChargeInfo (ParentId INT, ProductId INT, BettypeRef INT, ChargeType INT, Rate MONEY, MinAmount MONEY, MaxAmount MONEY)
+	INSERT INTO @BaseCurrencies(Id, Name)
+	EXEC bodb_licensee..LA_SelBaseCurrency
 
-	INSERT INTO #ProductChargeInfo (ParentId, ProductId, BettypeRef, ChargeType, Rate, MinAmount, MaxAmount)
-	SELECT DISTINCT a.FromParty, a.ProductId, a.BettypeRef, a.ChargeType, a.Rate,
-		CASE WHEN a.ChargeType = 4 THEN a.MinAmount * er.Rate ELSE 0 END MinAmount,
-		CASE WHEN a.ChargeType = 4 THEN a.MaxAmount * er.Rate ELSE 0 END MaxAmount
-	FROM (SELECT DISTINCT tp.ProductId, ci2.ChargeID, cis.FromParty, cis.BettypeRef, cis.ChargeType, cis.Rate, cis.MinAmount, cis.MaxAmount, cis.BaseCurrencyId
-	FROM #PartyChargeInfo tp
-		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON tp.ChargeId = ci.ChargeID
-		LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo ci2 WITH (NOLOCK) ON ci.ToParty = ci2.FromParty AND ci2.ProductID = tp.ProductID
-		LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfoSub cis WITH (NOLOCK) ON ci2.ChargeID = cis.ChargeIdRef
-		WHERE tp.ChargeId > 0) a
-		LEFT JOIN #ExchangeRate er ON a.BaseCurrencyId = er.ExchangeID
+	--Endregion
+	
+	--Region Product Charge Info
+
+	DECLARE @ProductChargeInfo AS TABLE (
+			ParentId		INT, 
+			ProductId		INT, 
+			BettypeRef		INT, 
+			ChargeType		INT, 
+			Rate			MONEY, 
+			MinAmount		MONEY, 
+			MaxAmount		MONEY, 
+			CurrencyId		INT, 
+			CurrencyCode	VARCHAR(3))
+
+	--Endregion
+	
+	-- Region: Exchange
+
+	CREATE TABLE #Exchange (ExchangeDate DATE, ExchangeID INT, CurrencyCode	VARCHAR(10), Rate FLOAT)
+	
+	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
+	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate	
+	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+
+	UPDATE #Exchange 
+	SET CurrencyCode = 'INH'
+	WHERE ExchangeID = 51
+
+	--Endregion
+	
+	--Region Sum Data
+
+	CREATE TABLE #SumData(
+		RptDate				DATE,
+		BettypeRef			INT, 
+		GameTypeName		VARCHAR(20),
+		PartyId				INT, 
+		PartyName			VARCHAR(20), 
+		CurrencyId			INT, 
+		ProductId			INT,
+		ParentId			INT, 
+		TotalTrans			INT,
+		Turnover			MONEY,
+		LicenseeWinLoss		MONEY,
+		LicenseeNetWin		MONEY,
+		ProgresCont			MONEY,
+		ProgresPayout		MONEY,
+		LicensingFee		MONEY)
 		
-	INSERT INTO #Result (ParentId, PartyID, PartyName, BettypeRef, GameTypeName, ProductId, CurrencyId, Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueToCompany, TotalTrans, AmountDueToProduct)
-	SELECT pci.ParentId, pci.PartyId, pci.PartyName, gt.BettypeRef, gt.GameTypeName, d.ProductId, d.CurrencyId,
-		SUM(Turnover * er.Rate) AS Turnover,
-		SUM(CustomerWinLoss * er.Rate) AS CustomerWinLoss,
-		-SUM(CustomerWinLoss * er.Rate) AS LicenseeWinLoss,
-		-SUM(CustomerWinLoss * er.Rate * pci.Rate) AS AmountDueToCompany,
+	INSERT INTO #SumData (RptDate, BettypeRef, GameTypeName, PartyId, PartyName, CurrencyId, ProductId,
+							 ParentId, TotalTrans, Turnover, LicenseeWinLoss, LicenseeNetWin, ProgresCont, ProgresPayout, LicensingFee)
+	SELECT d.RptDate, gt.BetTypeRef, gt.GameTypeName, pci.PartyId, pci.PartyName, d.CurrencyId, d.ProductId, pci.ParentId,
 		SUM(TotalTrans) AS TotalTrans,
-		-SUM(CASE WHEN d.RptDate BETWEEN pci.FromDate AND pci.ToDate AND pci.ChargeId > 0 THEN CustomerWinLoss * er.Rate ELSE 0 END) AS AmountDueToProduct
-	FROM (SELECT rd.SiteId, rd.RptDate, rd.CurrencyId, rd.BetTypeRef, pci.PartyId, pci.ProductId, SUM(rd.Winloss) AS CustomerWinLoss, SUM(rd.Turnover) as Turnover, SUM(rd.BetCount) AS TotalTrans
-			FROM #SumData rd
-				INNER JOIN (SELECT DISTINCT LicenseeId, BettypeRef, PartyId, ProductId FROM #PartyChargeInfo) pci 
-				ON rd.SiteId = pci.LicenseeID AND rd.BetTypeRef = pci.BettypeRef AND rd.ProductId = pci.ProductId
-			GROUP BY	rd.RptDate, rd.SiteId, rd.CurrencyID, rd.BettypeRef, pci.PartyId, pci.ProductId) d
-		INNER JOIN #PartyChargeInfo pci ON d.SiteId = pci.LicenseeID AND d.BettypeRef = pci.BettypeRef AND pci.ProductId = d.ProductId
-		INNER JOIN #ExchangeRate er ON d.CurrencyId = er.ExchangeID AND d.RptDate = er.ExchangeDate
-		LEFT JOIN (SELECT DISTINCT BettypeRef, GameTypeName, ProductId FROM #GameTypes) gt ON d.BettypeRef = gt.BettypeRef AND gt.ProductId = d.ProductId
-	WHERE d.RptDate BETWEEN pci.Fromdate AND pci.Todate
-	GROUP BY gt.GameTypeName, gt.BettypeRef, pci.ParentId, pci.PartyId, pci.PartyName, d.ProductId, d.CurrencyId
+		SUM(Turnover) AS Turnover,
+		SUM(LicenseeWinLoss) AS LicenseeWinLoss,
+		SUM(LicenseeWinLoss - ProgresCont) AS LicenseeNetWin,
+		SUM(ProgresCont) AS ProgresCont,
+		SUM(ProgresPayout) AS ProgresPayout,
+		SUM((LicenseeWinLoss - ProgresCont) * pci.Rate) AS LicensingFee
+	FROM (SELECT rpt.RptDate, SiteId, gt.ProductId, gt.BettypeRef, CurrencyId, 
+				SUM(ISNULL(BetCount, 0)) AS TotalTrans , 
+				SUM(ISNULL(Turnover, 0)) AS Turnover, 
+				-SUM(ISNULL(Winloss, 0)) AS LicenseeWinLoss,
+				SUM(ISNULL(ProgressiveContribution, 0)) AS ProgresCont,
+				SUM(ISNULL(ProgressivePayout, 0)) AS ProgresPayout
+			FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT rpt
+				INNER JOIN @GameTypes gt ON rpt.BetTypeId = gt.BettypeId
+			WHERE rpt.RptDate BETWEEN @FromDate AND @ToDate
+				  AND rpt.SiteId IN (SELECT DISTINCT LicenseeId FROM @PartyChargeInfo)
+				  AND CurrencyID <> 20
+				  AND StatusId NOT IN (-1, 101, 102, 103)
+				  AND gt.BettypeRef = 2001 --Get Generic Game Only
+			GROUP BY rpt.RptDate, SiteId, gt.ProductId, gt.BettypeRef, CurrencyId) d
+		INNER JOIN @PartyChargeInfo pci ON d.SiteId = pci.LicenseeID AND d.BettypeRef = pci.BettypeRef AND pci.ProductId = d.ProductId
+		LEFT JOIN (SELECT DISTINCT BettypeRef, GameTypeName, ProductId FROM @GameTypes) gt ON d.BettypeRef = gt.BettypeRef AND gt.ProductId = d.ProductId
+	WHERE d.RptDate BETWEEN pci.Fromdate AND pci.ToDate
+	GROUP BY d.RptDate, gt.GameTypeName, gt.BettypeRef, pci.ParentId, pci.PartyId, pci.PartyName, d.ProductId, d.CurrencyId
 
-	DROP TABLE #GameTypes
-	DROP TABLE #ExchangeRate
-	DROP TABLE #Parties
-	DROP TABLE #SumData
-	DROP TABLE #PartyChargeInfo
+	--Endregion
 
-	INSERT INTO #AmountDueToMicrogaming ([@GroupWinloss].BettypeRef, AmountDueTo)
-	SELECT BettypeRef, SUM(oa.kq) AS AmtDueto
-	FROM (SELECT BettypeRef, SUM(AmountDueToProduct) AS GroupWinloss
-		  FROM #Result
-		  GROUP BY BettypeRef) d
-	OUTER APPLY (
-		SELECT
-		CASE WHEN (ChargeType = 4 AND GroupWinloss BETWEEN MinAmount AND MaxAmount) THEN CASE WHEN MinAmount < 0 THEN (GroupWinloss - 0) * Rate 
-																							  WHEN MinAmount >=0 THEN (GroupWinloss - MinAmount) * Rate ELSE 0 END
-																					ELSE 0 END +
-		CASE WHEN (ChargeType = 4 AND GroupWinloss > MaxAmount) THEN CASE WHEN MinAmount < 0 THEN (MaxAmount - 0) * Rate
-																		  WHEN MinAmount >= 0 THEN (MaxAmount - MinAmount) * Rate ELSE 0 END
-																ELSE 0 END +
-		CASE WHEN (ChargeType = 1) THEN GroupWinloss * Rate ELSE 0 END AS kq
-		FROM (SELECT BettypeRef, ChargeType, Rate, MinAmount, MaxAmount FROM #ProductChargeInfo GROUP BY BettypeRef, ChargeType, Rate, MinAmount, MaxAmount) pci
-		WHERE BettypeRef = d.BettypeRef) oa
-	GROUP BY BettypeRef
-		
-	UPDATE r SET r.AmountDueToProduct = g.AmountDueTo FROM #Result r
-	LEFT JOIN #AmountDueToMicrogaming g ON r.BettypeRef = g.BettypeRef
+	--Region Result
+
+	DECLARE @Result AS TABLE (
+		WinLossDate						DATE,
+		GameTypeId						INT,
+		GameTypeName					VARCHAR(20),
+		PartyId							INT, 
+		PartyName						VARCHAR(20), 
+		CurrencyName					VARCHAR(20),
+		TotalTrans						INT,
+		Turnover						MONEY,
+		LicenseeWinLoss					MONEY,
+		ProgressiveContribution			MONEY,
+		ProgressivePayout				MONEY,
+		LicensingFee					MONEY,
+		ProgressiveFee					MONEY,
+		LicenseeNetWin					MONEY)
+
+	IF @BaseCurrencyName = ''
+		BEGIN 
+			INSERT INTO @Result(WinLossDate, GameTypeId, GameTypeName, PartyId, PartyName, CurrencyName,
+								TotalTrans, Turnover, LicenseeWinLoss, ProgressiveContribution, ProgressivePayout, LicensingFee, ProgressiveFee, LicenseeNetWin)
+			SELECT sd.RptDate, sd.BettypeRef AS GameTypeId, sd.GameTypeName, sd.PartyId, sd.PartyName, ex.CurrencyCode,
+				SUM(TotalTrans), SUM(Turnover), SUM(LicenseeWinLoss), 
+				SUM(ProgresCont), SUM(ProgresPayout), SUM(LicensingFee), SUM(ProgresCont - ProgresPayout), SUM(LicenseeNetWin)
+			FROM #SumData sd
+				INNER JOIN #Exchange ex ON ex.ExchangeDate = sd.RptDate AND ex.ExchangeID = sd.CurrencyId
+			GROUP BY sd.RptDate, sd.BettypeRef, sd.GameTypeName, sd.PartyId, sd.PartyName, ex.CurrencyCode
+			
+		END 
+	ELSE 
+		BEGIN
+			INSERT INTO @Result(WinLossDate, GameTypeId, GameTypeName, PartyId, PartyName, CurrencyName,
+								TotalTrans, Turnover, LicenseeWinLoss, ProgressiveContribution, ProgressivePayout, LicensingFee, ProgressiveFee, LicenseeNetWin)
+			SELECT sd.RptDate, sd.BettypeRef AS GameTypeId, sd.GameTypeName, sd.PartyId, sd.PartyName, ex.CurrencyCode,
+				SUM(TotalTrans), SUM(Turnover * ex.Rate), SUM(LicenseeWinLoss * ex.Rate), 
+				SUM(ProgresCont * ex.Rate), SUM(ProgresPayout * ex.Rate), SUM(LicensingFee * ex.Rate), SUM((ProgresCont - ProgresPayout) * ex.Rate),
+				SUM(LicenseeNetWin * ex.Rate)
+			FROM #SumData sd
+				INNER JOIN #Exchange ex ON ex.ExchangeDate = sd.RptDate AND ex.ExchangeID = sd.CurrencyId
+			GROUP BY sd.RptDate, sd.BettypeRef, sd.GameTypeName, sd.PartyId, sd.PartyName, ex.CurrencyCode
+		END
+
+	--Endregion
 	
-	SELECT re.BettypeRef AS GameTypeId, re.GameTypeName, re.PartyId, re.PartyName, re.ProductId, pr.ProductName, re.CurrencyId, ex.Code AS CurrencyName,
-		SUM(re.TotalTrans) AS TotalTrans,
-		SUM(re.Turnover) AS Turnover,
-		SUM(re.CustomerWinLoss) AS CustomerWinLoss,
-		SUM(re.LicenseeWinLoss) AS LicenseeWinLoss,
-		ISNULL(re.AmountDueToCompany, 0) AS AmountCompany,
-		ISNULL(re.AmountDueToProduct, 0) AS AmountProduct
-	FROM #Result re
-	LEFT JOIN dbo.Exchange ex WITH (NOLOCK) ON re.CurrencyId = ex.exchangeid
-	LEFT JOIN #Products pr WITH (NOLOCK) ON re.ProductId = pr.ProductId
-	GROUP BY	re.BettypeRef, re.GameTypeName, re.PartyId, re.PartyName, re.ProductId, pr.ProductName, re.CurrencyId, ex.Code, re.AmountDueToCompany, re.AmountDueToProduct
-	ORDER BY re.BettypeRef
+	-- Region Grand Total
 
-	DROP TABLE #Result
-	DROP TABLE #ProductChargeInfo
-	DROP TABLE #AmountDueToMicrogaming
-	DROP TABLE #Products
+	DECLARE @GrandTotal AS TABLE (
+		CurrencyName					VARCHAR(20),
+		TotalTrans						INT,
+		Turnover						MONEY,
+		LicenseeWinLoss					MONEY,
+		LicenseeNetWin					MONEY,
+		ProgressiveContribution			MONEY,
+		ProgressivePayout				MONEY,
+		LicensingFee					MONEY,
+		PayTosupplier					MONEY,
+		ProgressiveFee					MONEY,
+		NetIncome						MONEY)
+
+	DECLARE @TempGrandTotal AS TABLE (
+		BettypeRef						INT,
+		TotalTrans						INT,
+		Turnover						MONEY,
+		LicenseeWinLoss					MONEY,
+		LicenseeNetWin					MONEY,
+		ProgressiveContribution			MONEY,
+		ProgressivePayout				MONEY,
+		LicensingFee					MONEY,
+		PayToSupplier					MONEY)
+
+	DECLARE @PayToSupplier MONEY
+
+	WHILE EXISTS (SELECT * FROM @BaseCurrencies WHERE IsApply IS NULL)
+	BEGIN
+		SET @tempCurrencyId = (SELECT TOP 1 Id FROM @BaseCurrencies WHERE IsApply IS NULL)
+		SET @tempCurrencyCode = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)
+		DELETE FROM #Exchange
+		
+		INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
+		SELECT ExchangeDate, ExchangeId, Code, BaseCurrencyRate	
+		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrencyCode)
+		
+		DELETE FROM @ProductChargeInfo
+		DELETE FROM @TempGrandTotal
+		
+		INSERT INTO @ProductChargeInfo (ParentId, ProductId, BettypeRef, ChargeType, Rate, MinAmount, MaxAmount, CurrencyId, CurrencyCode)
+		SELECT DISTINCT a.FromParty, a.ProductId, a.BettypeRef, a.ChargeType, a.Rate, 
+						CASE WHEN a.ChargeType = 4 THEN a.MinAmount * er.Rate ELSE 0 END MinAmount,
+						CASE WHEN a.ChargeType = 4 THEN a.MaxAmount * er.Rate ELSE 0 END MaxAmount,
+						@tempCurrencyId, @tempCurrencyCode
+		FROM (SELECT DISTINCT tp.ProductId, ci2.ChargeID, cis.FromParty, cis.BettypeRef, cis.ChargeType, cis.Rate, cis.MinAmount, cis.MaxAmount, cis.BaseCurrencyId
+				FROM @PartyChargeInfo tp
+					INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON tp.ChargeId = ci.ChargeID
+					LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo ci2 WITH (NOLOCK) ON ci.ToParty = ci2.FromParty AND ci2.ProductID = tp.ProductID
+					LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfoSub cis WITH (NOLOCK) ON ci2.ChargeID = cis.ChargeIdRef
+				WHERE tp.ChargeId > 0) a
+			LEFT JOIN #Exchange er ON a.BaseCurrencyId = er.ExchangeID
+		
+		INSERT INTO @TempGrandTotal(BettypeRef, TotalTrans, Turnover, LicenseeWinLoss, LicenseeNetWin, ProgressiveContribution, ProgressivePayout, LicensingFee)
+			SELECT sd.BettypeRef, SUM(TotalTrans), SUM(Turnover * ex.Rate), SUM(LicenseeWinLoss * ex.Rate), SUM(LicenseeNetWin * ex.Rate),
+				SUM(ProgresCont * ex.Rate), SUM(ProgresPayout * ex.Rate), SUM(LicensingFee * ex.Rate)
+			FROM #SumData sd
+				INNER JOIN #Exchange ex ON ex.ExchangeDate = sd.RptDate AND ex.ExchangeID = sd.CurrencyId
+			GROUP BY sd.BettypeRef
+		
+		UPDATE g SET g.PayToSupplier = t.PayToSupplier
+		FROM @TempGrandTotal g
+		INNER JOIN 	(SELECT BettypeRef, SUM(rs.PayToSupplier) AS PayToSupplier
+					 FROM (SELECT BettypeRef, SUM(LicenseeNetWin) AS LicenseeNetWin
+						  FROM @TempGrandTotal
+						  GROUP BY BettypeRef) d
+						  OUTER APPLY	(
+							SELECT
+							CASE WHEN (ChargeType = 4 AND LicenseeNetWin BETWEEN MinAmount AND MaxAmount) THEN CASE WHEN MinAmount < 0 THEN (LicenseeNetWin - 0) * Rate 
+																												  WHEN MinAmount >=0 THEN (LicenseeNetWin - MinAmount) * Rate ELSE 0 END
+																										ELSE 0 END +
+							CASE WHEN (ChargeType = 4 AND LicenseeNetWin > MaxAmount) THEN CASE WHEN MinAmount < 0 THEN (MaxAmount - 0) * Rate
+																							  WHEN MinAmount >= 0 THEN (MaxAmount - MinAmount) * Rate ELSE 0 END
+																					ELSE 0 END +
+							CASE WHEN (ChargeType = 1) THEN LicenseeNetWin * Rate ELSE 0 END AS PayToSupplier
+							FROM (SELECT BettypeRef, ChargeType, Rate, MinAmount, MaxAmount FROM @ProductChargeInfo GROUP BY BettypeRef, ChargeType, Rate, MinAmount, MaxAmount) pci
+							WHERE BettypeRef = d.BettypeRef) rs
+					GROUP BY BettypeRef) t
+		ON t.BettypeRef = g.BettypeRef
+		
+		INSERT INTO @GrandTotal(CurrencyName, TotalTrans, Turnover, LicenseeWinLoss, LicenseeNetWin, ProgressiveContribution, ProgressivePayout, 
+								LicensingFee, PayTosupplier, ProgressiveFee, NetIncome)
+		SELECT @tempCurrencyCode, SUM(t.TotalTrans), SUM(t.Turnover), SUM(t.LicenseeWinLoss), SUM(t.LicenseeNetWin), SUM(t.ProgressiveContribution), SUM(t.ProgressivePayout), 
+		CASE WHEN(SUM(t.LicensingFee) > 0) THEN SUM(t.LicensingFee) ELSE 0 END,
+		CASE WHEN(SUM(t.PayTosupplier) > 0) THEN SUM(t.PayTosupplier) ELSE 0 END,
+		SUM(ProgressiveContribution - ProgressivePayout),
+		CASE WHEN(SUM(t.LicensingFee - t.PayTosupplier) > 0) THEN SUM(t.LicensingFee - t.PayTosupplier) ELSE 0 END
+		FROM @TempGrandTotal t
+		
+		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Id = @tempCurrencyId	
+	END
+
+	--Endregion
+
+	--Region Return Main Data
+
+	SELECT * FROM @Result
+
+	SELECT * FROM @GrandTotal
+
+	--Endregion
+
+	DROP TABLE #Exchange
+	DROP TABLE #SumData
 END
 
 GO
