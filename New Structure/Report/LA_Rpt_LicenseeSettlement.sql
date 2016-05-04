@@ -293,7 +293,7 @@ BEGIN
 		END
 
 		;WITH d AS (
-			SELECT b.SiteId, b.rptDate, b.CurrencyID, p.Bettype
+			SELECT b.SiteId, b.rptDate, b.CurrencyID, s.Bettype
 				, SUM(ISNULL(b.Turnover, 0)) AS Turnover
 				, SUM(ISNULL(b.winloss, 0)) AS Winloss
 				, SUM(ISNULL(b.PComm, 0)) AS PComm
@@ -309,7 +309,7 @@ BEGIN
 				AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
 				AND (b.CurrencyID <> 20)
 				AND b.StatusId NOT IN (- 1, 103)
-			GROUP BY b.rptDate, b.SiteId, b.CurrencyID, p.Bettype
+			GROUP BY b.rptDate, b.SiteId, b.CurrencyID, s.Bettype
 		)
 		INSERT INTO #Result( Winlostdate, CurrencyId, Game, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount,ProgressiveContribution,ProgressivePayout,ProgressiveFee)
 		SELECT	 d.rptDate
