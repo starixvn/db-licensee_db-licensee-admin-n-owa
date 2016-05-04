@@ -318,7 +318,7 @@ BEGIN
 				,SUM(d.Turnover)
 				,SUM(d.WinLoss)
 				,SUM(d.PComm)
-				,SUM(-d.Winloss - d.ProgressiveContribution * ( 1 - p.Rate))
+				,SUM((-d.Winloss - d.ProgressiveContribution) * ( 1 - p.Rate))
 				,SUM(d.AComm - d.PComm)
 				,SUM((-d.WinLoss - d.ProgressiveContribution) * p.Rate - d.AComm)
 				,SUM(d.BetCount)
