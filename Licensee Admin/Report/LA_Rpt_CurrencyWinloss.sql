@@ -66,7 +66,7 @@ BEGIN
 	CREATE INDEX IX_tmpWinloss ON #tmpWinLoss(PartyID, winlostdate, Currency)
 
 	CREATE TABLE #Data (
-		rptDate			Datetime
+		rptDate			DATETIME
 		,SiteID			INT
 		,PartyID		INT
 		,ProductID		INT
@@ -87,7 +87,7 @@ BEGIN
 		,isDeposit		INT
 		,AffectedDate	SMALLDATETIME
 		,ProductID		INT
-		,Rate			Money
+		,Rate			MONEY
 		,Fromdate		SMALLDATETIME
 		,Todate			SMALLDATETIME
 	)
@@ -145,7 +145,7 @@ BEGIN
 	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode <> 'BA')
 	BEGIN
 		--exclude BA rpt_Betting
-		SELECT DISTINCT p.PartyID,p.LicenseeID,p.ProductID,bt.Bettype
+		SELECT DISTINCT p.PartyID, p.LicenseeID, p.ProductID, bt.Bettype
 		INTO #PartyBettypeMapping
 		FROM #tmpParty p
 		INNER JOIN #Bettype bt ON p.ProductID = bt.ProductID
@@ -168,7 +168,7 @@ BEGIN
 					,SUM(b.BetCount)
 			FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK)
 			INNER JOIN #PartyBettypeMapping t ON b.Bettype = t.Bettype AND b.SiteID = t.LicenseeID
-			LEFT JOIN dbo.League l(NOLOCK) ON b.leagueid = l.leagueid
+			LEFT JOIN dbo.League l WITH(NOLOCK) ON b.leagueid = l.leagueid
 			WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate) AND
 					 b.[Status] NOT IN (- 1, 103) AND
 					(@Currency = 0 OR @Currency = b.CurrencyID) AND
