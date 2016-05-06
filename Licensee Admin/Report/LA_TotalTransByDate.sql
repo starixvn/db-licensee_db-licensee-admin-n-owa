@@ -22,6 +22,7 @@ AS
 	 - 20151112@Bravo:	 Fix bug missing BA data.
 	 - 20151204@Bravo:	 #48740-HotFix-TotalTrans-AutoMail.
 	 - 20151222@Francis: #48864-HotFix-Missing Credit data for GD
+	 - 20160504@Bravo:	 Add VB Data
 	 Params:			   
 */
 BEGIN

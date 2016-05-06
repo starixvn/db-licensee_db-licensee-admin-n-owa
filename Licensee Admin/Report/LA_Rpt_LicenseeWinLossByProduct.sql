@@ -23,6 +23,7 @@ AS
 		+ 2015.09.15: Get Amount by PartyId List.
 		+ 2015.10.20@Bravo: Add Zelianta
 		+ 2015.12.15@Bruce: Add MGCLC and MGCRNG
+		+ 2016.05.05@Bravo: Add VB Data
 */
 /*	Example:
 	USE bodb_Licensee
