@@ -38,7 +38,7 @@ BEGIN
 	SET NOCOUNT ON
 	
 	-- Region: Get party charge rate info
-	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG'
+	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB'
 	
 	-- Region: Get Party ID
 	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)
@@ -127,7 +127,7 @@ BEGIN
 				AND b.Bettype NOT IN (901,902,903)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, b.ProductId, ISNULL(sbr.BettypeRef, -1)
 	)
-
+	
 	-- EndRegion
 
 	-- Region: Generate licensee name & group
@@ -157,7 +157,8 @@ BEGIN
 		GD			MONEY, -- GD
 		VG			MONEY, -- VG
 		MGCLC		MONEY, -- Microgaming - Live Casino
-		MGCRNG		MONEY  -- Microgaming - RNG Casino
+		MGCRNG		MONEY,  -- Microgaming - RNG Casino
+		VB			MONEY  -- VB
 	)
 	INSERT INTO #LicenseeAmount(GroupName, LicenseeId, PartyId,PartyName)
 	SELECT	CASE
@@ -216,7 +217,8 @@ BEGIN
 				ISNULL(SUM(CASE WHEN d.ProductId = 11 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS GD,
 				ISNULL(SUM(CASE WHEN d.ProductId = 12 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS VG,
 				ISNULL(SUM(CASE WHEN d.ProductId = 14 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS MGCLC,
-				ISNULL(SUM(CASE WHEN d.ProductId = 17 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS MGCRNG
+				ISNULL(SUM(CASE WHEN d.ProductId = 17 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS MGCRNG,
+				ISNULL(SUM(CASE WHEN d.ProductId = 22 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS VB
 		FROM	#TempData d
 				INNER JOIN @PartyChargeInfo ci ON	d.PartyId = ci.PartyId 
 													AND ci.ProductId = d.ProductId 
@@ -237,7 +239,8 @@ BEGIN
 			GD = a.GD,
 			VG = a.VG,
 			MGCLC = a.MGCLC,
-			MGCRNG = a.MGCRNG
+			MGCRNG = a.MGCRNG,
+			VB = a.VB
 	FROM	#LicenseeAmount l
 			INNER JOIN AmountDueByProduct a ON a.LicenseeId = l.LicenseeId AND a.PartyId = l.PartyId
 	
@@ -255,8 +258,9 @@ BEGIN
 			AND VG IS NULL
 			AND MGCLC IS NULL
 			AND MGCRNG IS NULL
+			AND VB IS NULL
 	
-	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG
+	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB
 	FROM	#LicenseeAmount l
 	
 	-- EndRegion
