@@ -283,7 +283,7 @@ BEGIN
 				INNER JOIN #Exchange ex ON ex.ExchangeDate = sd.RptDate AND ex.ExchangeID = sd.CurrencyId
 			GROUP BY sd.BettypeRef
 		
-		UPDATE g SET g.PayToSupplier = t.PayToSupplier
+		UPDATE g SET g.PayToSupplier = t.PayToSupplier * pci.Rate
 		FROM @TempGrandTotal g
 		INNER JOIN 	(SELECT BettypeRef, SUM(rs.PayToSupplier) AS PayToSupplier
 					 FROM (SELECT BettypeRef, SUM(LicenseeNetWin) AS LicenseeNetWin
@@ -301,6 +301,7 @@ BEGIN
 							FROM (SELECT BettypeRef, ChargeType, Rate, MinAmount, MaxAmount FROM @ProductChargeInfo GROUP BY BettypeRef, ChargeType, Rate, MinAmount, MaxAmount) pci
 							WHERE BettypeRef = d.BettypeRef) rs
 					GROUP BY BettypeRef) t
+		INNER JOIN (SELECT BettypeRef, Rate FROM @PartyChargeInfo GROUP BY BettypeRef, Rate) pci ON pci.BettypeRef = t.BettypeRef
 		ON t.BettypeRef = g.BettypeRef
 		
 		INSERT INTO @GrandTotal(CurrencyName, TotalTrans, Turnover, LicenseeWinLoss, LicenseeNetWin, ProgressiveContribution, ProgressivePayout, 
