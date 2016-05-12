@@ -1,11 +1,10 @@
 USE [bodb_licensee]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_UpdateUser]    Script Date: 9/8/2014 4:57:19 PM ******/
+
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-/****** Object:  Stored Procedure dbo.OA_FunctionLicenseesModify    Script Date: 12/2/2011 10:33:03 AM ******/
 
 ALTER PROCEDURE [dbo].[LA_UpdateUser]
 	 @UserID		INT 

@@ -1,11 +1,11 @@
 USE [bodb_licensee]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_UserSelByUserID]    Script Date: 9/8/2014 5:02:56 PM ******/
+
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-/****** Object:  Stored Procedure dbo.OA_UsersGetAll    Script Date: 10/21/2011 7:48:20 PM ******/
+
 ALTER PROCEDURE [dbo].[LA_UserSelByUserID]
 	@UserID	 int,
 	@GroupID	 int = 0
