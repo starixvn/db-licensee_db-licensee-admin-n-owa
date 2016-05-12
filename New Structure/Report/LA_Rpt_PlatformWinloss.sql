@@ -81,8 +81,7 @@ BEGIN
 		SELECT	PartyID, LicenseeID
 		FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'SB', 'OA', 1)
 	)
-	--SELECT * from @LicenseeInfo
-	
+		
 	SELECT @FDate=@FromDate,@TDate=@ToDate 
 	
 	WHILE EXISTS (SELECT * FROM @LicenseeInfo WHERE IsSelectCust IS NULL)
@@ -96,26 +95,9 @@ BEGIN
 		UPDATE @LicenseeInfo SET IsSelectCust = 1 WHERE LicenseeId = @licenseeID
 	END		
 	
-	--SELECT * FROM #tempAg
-
-	--SELECT TOP 10 betfrom,bettype,tpositiontaking,statusID, recommend, * from bettrans WHERE custid in (SELECT custID FROM #tempAg) AND betfrom IS not NULL
-	--SELECT @TempFromDate,@TDate
-	--select top 100 *
-	--FROM dbo.bettrans b WITH (NOLOCK)
-	--	--INNER JOIN #tempAg tma ON tma.CustID=b.recommend  AND b.currency = tma.currency
-	--WHERE
-	--	b.statusID  IN (111, 112, 113)
-	--	--AND b.winlostdate BETWEEN @TempFromDate AND @TDate
-	--	AND (b.bettype<31 OR (b.bettype BETWEEN 121 AND 999)
-	--						OR (b.Bettype BETWEEN 1301 and 1399) --new tennis's bettypes
-	--	) 
-	--	AND b.bettype NOT IN (901,902,903)
-	--	AND b.tpositiontaking <>0
-
-
 	INSERT  INTO #sporttype(sporttype, ProductPrefix) VALUES  (0, 'SB')	
 
-	-- Region: Get exchange rate info
+	-- Get exchange rate info
 	CREATE TABLE #Exchange (
 		ExchangeDate	DATE,
 		ExchangeID		INT,
@@ -127,6 +109,7 @@ BEGIN
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrency)
 
+	-- Get data.
 	IF @TDate>@MoveBetsDay
 	BEGIN
 		IF @FDate <= @MoveBetsDay 
