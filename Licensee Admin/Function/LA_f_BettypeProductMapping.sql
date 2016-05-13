@@ -27,6 +27,7 @@ AS
 		- 20160113@Bruce: Include new bettypes 2101-2399 for CS (OW RNG)
 		- 20160224@Victor: Add product Cock Fighting [Redmine: 52452]
 		- 20160318@Bruce: Add product Colossus bet
+		- 20160422@Victor: Add product Voidbridge [Redmine: #55057]
 	Param's Explanation:
 
 */
@@ -185,6 +186,15 @@ BEGIN
 	   SELECT typeid, 15
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 18000 AND 18006
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+	END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'VB')
+	BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 22
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 4001 AND 7999
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
 	END
 
