@@ -9,8 +9,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_PlatformWinloss]
 	 @PartyIds		VARCHAR(500),
 	 @FromDate		SMALLDATETIME,  
 	 @ToDate		SMALLDATETIME,	 
-	 @BaseCurrency  VARCHAR(20),
-	 @excludeTest	BIT = 0
+	 @BaseCurrency  VARCHAR(20)
 AS
 /*  Created: 20160512@Bravo
     Task : Platform WinLoss Report 
