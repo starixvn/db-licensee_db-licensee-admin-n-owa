@@ -66,8 +66,8 @@ BEGIN
 
 	INSERT INTO @tempDate
 	EXEC Lrf_SelBalanceUpDay 
-
-	SET @MoveBetsDay = (SELECT 1 MoveBetsDay FROM @tempDate)
+	
+	SELECT @MoveBetsDay = (SELECT MoveBetsDay FROM @tempDate)
 
 	--  Charge Info
 	DECLARE @LicenseeInfo AS TABLE (
@@ -281,9 +281,10 @@ BEGIN
 		GROUP BY	
 			b.winlostdate,
 			b.currency,
-			ag.LicenseeID
-	END			
-
+			ag.LicenseeID,
+			ag.Currency
+	END
+	
 	SELECT 
 		p.PartyName,
 		w.LicenseeID,
