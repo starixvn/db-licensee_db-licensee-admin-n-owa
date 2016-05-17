@@ -124,31 +124,31 @@ BEGIN
 			tma.currency,				
 			SUM(
 				CASE
-					WHEN b.betfrom = 'd' THEN CASE WHEN b.bettype in (33,34) AND b.liveawayscore=0 THEN b.stake/2 ELSE b.stake END
+					WHEN b.betfrom = 'd' THEN CASE WHEN b.bettype in (33,43) AND b.liveawayscore=0 THEN b.stake/2 ELSE b.stake END
 					ELSE 0 
 				END
 			) TurnoverAsia,
 			SUM(
 				CASE
-					WHEN b.betfrom = 'a' THEN CASE WHEN b.bettype in (33,34) AND b.liveawayscore=0 THEN b.stake/2 ELSE b.stake END
+					WHEN b.betfrom = 'a' THEN CASE WHEN b.bettype in (33,43) AND b.liveawayscore=0 THEN b.stake/2 ELSE b.stake END
 					ELSE 0 
 				END
 			) TurnoverChina,
 			SUM(
 				CASE
-					WHEN b.betfrom IN ('e', 'u') THEN CASE WHEN b.bettype in (33,34) AND b.liveawayscore=0 THEN b.stake/2 ELSE b.stake END
+					WHEN b.betfrom IN ('e', 'u') THEN CASE WHEN b.bettype in (33,43) AND b.liveawayscore=0 THEN b.stake/2 ELSE b.stake END
 					ELSE 0 
 				END
 			) TurnoverEuro,
 			SUM(
 				CASE
-					WHEN b.betfrom = 'm' THEN CASE WHEN b.bettype in (33,34) AND b.liveawayscore=0 THEN b.stake/2 ELSE b.stake END
+					WHEN b.betfrom = 'm' THEN CASE WHEN b.bettype in (33,43) AND b.liveawayscore=0 THEN b.stake/2 ELSE b.stake END
 					ELSE 0 
 				END
 			) TurnoverWap,
 			SUM(
 				CASE
-					WHEN b.betfrom IN ('s','l') THEN CASE WHEN b.bettype in (33,34) AND b.liveawayscore=0 THEN b.stake/2 ELSE b.stake END
+					WHEN b.betfrom IN ('s','l') THEN CASE WHEN b.bettype in (33,43) AND b.liveawayscore=0 THEN b.stake/2 ELSE b.stake END
 					ELSE 0 
 				END
 			) TurnoverSmart,
