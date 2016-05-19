@@ -303,7 +303,7 @@ BEGIN
 		INNER JOIN @LicenseeInfo l ON w.LicenseeID = l.LicenseeId
 		INNER JOIN bodb_licensee..OAS_Party p ON l.PartyId = p.PartyID
 	GROUP BY w.LicenseeID, w.Winlostdate,p.PartyName
-	ORDER BY w.LicenseeID
+	ORDER BY w.LicenseeID, w.Winlostdate
 
 	DROP TABLE #sporttype
 	DROP TABLE #bettype
