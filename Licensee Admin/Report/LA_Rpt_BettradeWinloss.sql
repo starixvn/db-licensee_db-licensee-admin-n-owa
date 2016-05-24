@@ -9,9 +9,7 @@ GO
 ALTER PROCEDURE [dbo].[LA_Rpt_BettradeWinloss] 
 	  @PartyIds				VARCHAR(1000)
 	, @FromDate				DATETIME
-	, @ToDate				DATETIME	
-	, @ProductCode			VARCHAR(6)		= 'BT'
-	, @CurrencyId			INT				= 0
+	, @ToDate				DATETIME		
 	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
 WITH RECOMPILE
 AS
@@ -20,23 +18,27 @@ AS
 	DB: DBEXT/bodb02
 	Revisions: 
 		-20160317@Bravo: Remove unused param: fix bug wrong actual stake in BTWinLoss report.
+		-20160523@Bravo: https://nexdev.net/projects/owa/wiki/CR_20160519_UpdateBetTradeCommercialTerm
 	Param's Explanation:  						
 */  
 SET NOCOUNT ON
 BEGIN			
-	DECLARE @LicenseeID INT			
+	DECLARE @LicenseeID INT		
+	DECLARE @ProductCode VARCHAR(6)	= 'BT'	
 	CREATE TABLE #Result (
-			 WinlostDate		VARCHAR(6)
+			 WinlossDate		DATETIME
+			, CurrencyId		INT
+			, CurrencyName		VARCHAR(10)
 			, PartyID			INT
 			, ParentId			INT
-			, Actual_stake		MONEY
+			, ActualStake		MONEY
 			, BuyBackAmount		MONEY
-			, BettradeWinloss	MONEY		
-			, WLonBBA			MONEY -- Winloss on Buy back Amount	
-			, LicenseeWL		MONEY
-			, BettradeComm		MONEY						
-			, Total				MONEY
-			, Betcount			BIGINT)	
+			, WinLossOnBoughtTickets MONEY		
+			, WinLossOnBuyBackAmount MONEY -- Winloss on Buy back Amount	
+			, BettradeComm		MONEY		
+			, ProfitSharing		MONEY				
+			, AmountDueTo		MONEY
+			, TotalTransaction	BIGINT)	
 	DECLARE @tmpParty AS TABLE (
 		 PartyId			INT
 		, ParentId			INT
@@ -71,33 +73,32 @@ BEGIN
 	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	
 	BEGIN			
-		INSERT INTO #Result(WinlostDate, PartyID, ParentId, Actual_stake, BuyBackAmount, BettradeWinloss, WLonBBA, LicenseeWL, BettradeComm, Total, Betcount)
+		INSERT INTO #Result(WinlossDate, PartyID, ParentId, CurrencyId, CurrencyName, ActualStake, BuyBackAmount, WinLossOnBoughtTickets, WinLossOnBuyBackAmount, BettradeComm, ProfitSharing, TotalTransaction)
 		(
 			SELECT
-				CONVERT(VARCHAR(6), d.RptDate, 112) AS  WinlostDate
+				d.RptDate
 				, d.PartyId
 				, d.ParentId
+				, d.CurrencyID
+				, e.CurrencyCode
 				, SUM (d.Actual_stake * e.Rate) AS Actual_stake
 				, SUM (d.BuyBackAmount * e.Rate) AS BuyBackAmount
-				, SUM (d.BTWinLoss * e.Rate) AS BettradeWinloss	
-				, SUM ((d.Actual_stake - d.BuyBackAmount) * e.Rate) AS WLonBBA
-				, SUM (d.LicWinLoss * e.Rate) AS LicenseeWL								
+				, SUM (d.WinLossOnBoughtTickets * e.Rate) AS WinLossOnBoughtTickets	
+				, SUM ((d.Actual_stake - d.BuyBackAmount) * e.Rate) AS WinLossOnBuyBackAmount	
 				, SUM (d.BettradeComm * e.Rate) AS BettradeComm 
-				, SUM ((d.BTWinLoss + d.BettradeComm + (d.Actual_stake - d.BuyBackAmount)) * e.Rate) AS Total
-				, SUM (BetCount) AS BetCount	  
+				, SUM ((d.BuyBackAmount + d.WinLossOnBoughtTickets - d.BettradeComm) * e.Rate) * c.Rate AS ProfitSharing
+				, SUM (TotalTrans) AS TotalTrans	  
 			FROM (
 				SELECT p.PartyId, p.ParentId, b.RptDate, b.CurrencyId
 					, SUM(CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount - b.WinLoss) ELSE 0 END) AS Actual_stake
 					, SUM(CASE WHEN b.Bettype = 901 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmount
-					, SUM(CASE WHEN bt.ProductID = 0 THEN b.WinLoss ELSE 0 END)	AS BTWinLoss
-					, - SUM(CASE WHEN bt.ProductID = 0 THEN b.WinLoss ELSE 0 END) AS LicWinLoss			 
-					, - SUM (CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount * p.Rate) ELSE 0 END) AS BettradeComm	-- negative amount (meaning that house charges BetTrade this amount).		 					 								
-					, SUM(CASE WHEN bt.ProductID = 0 THEN ISNULL(b.BetCount, 0) ELSE 0 END) BetCount
+					, -SUM(b.WinLoss)	AS WinLossOnBoughtTickets
+					, SUM (CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount * p.Rate) ELSE 0 END) AS BettradeComm	-- negative amount (meaning that house charges BetTrade this amount).							 					 								
+					, SUM(CASE WHEN bt.ProductID = 0 THEN ISNULL(b.BetCount, 0) ELSE 0 END) TotalTrans
 				FROM bodb_licensee.dbo.rpt_Betting b WITH (NOLOCK)
 					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID 
 					INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (0, 13)
-				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
-					AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))					
+				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate									
 					AND b.CurrencyID <> 20
 					AND b.Status NOT IN (- 1, 103)	
 					AND b.CustomerCategory IN( 1001, 1002)
@@ -108,51 +109,113 @@ BEGIN
 				SELECT p.PartyId, p.ParentId, b.RptDate, b.CurrencyId
 					, 0 AS Actual_stake
 					, 0 AS BuyBackAmount
-					, SUM(b.WinLoss)	AS BTWinLoss
-					, - SUM(b.WinLoss) AS LicWinLoss				 
+					, -SUM(b.WinLoss) AS WinLossOnBoughtTickets 
 					, 0 AS BettradeComm		 					 								
-					, SUM(ISNULL(b.BetCount, 0)) BetCount
+					, SUM(ISNULL(b.BetCount, 0)) TotalTrans
 				FROM bodb_licensee.dbo.rpt_Betting_BA b WITH (NOLOCK)
 					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID 					
 					INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN(3)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
-					AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))					
 					AND b.CurrencyID <> 20
 					AND b.Status NOT IN (- 1, 103)	
 					AND b.CustomerCategory IN( 1001, 1002)
 				GROUP BY p.PartyId, b.RptDate, b.CurrencyId, p.ParentId
 
 			) d 
-				INNER JOIN #Exchange e ON d.CurrencyId = e.ExchangeID AND d.RptDate = e.ExchangeDate							
-			GROUP BY d.PartyId, d.ParentId, CONVERT(VARCHAR(6), d.RptDate, 112)
+				INNER JOIN #Exchange e ON d.CurrencyId = e.ExchangeID AND d.RptDate = e.ExchangeDate
+				INNER JOIN bodb_licensee..OAS_ChargeInfo c ON d.PartyId = c.FromParty AND d.rptDate BETWEEN c.FromDate AND c.ToDate
+			WHERE c.ProductID = 13 AND c.ChargeType = 8
+			GROUP BY d.PartyId, d.ParentId,d.RptDate, d.CurrencyID, e.CurrencyCode, c.Rate
 		)	
 	END		
 
+	UPDATE #Result
+	SET AmountDueTo = WinLossOnBuyBackAmount + WinLossOnBoughtTickets - BettradeComm - ProfitSharing
+
 	SELECT
-		d.ParentId					AS GroupId
+		d.WinlossDate
+		, d.ParentId					AS GroupId
 		, CASE WHEN d.ParentId = 999 
 				THEN 'Credit' 
 			ELSE pp.PartyName END	AS GroupName
 		, d.PartyID					AS PartyID
 		, p.PartyName				AS PartyName		
-		, SUM(Betcount)				AS TotalTransaction		
-		, SUM(d.Actual_stake)		AS ActualStake
+		, d.CurrencyId			
+		, d.CurrencyName
+		, SUM(TotalTransaction)		AS TotalTransaction		
+		, SUM(d.ActualStake)		AS ActualStake
 		, SUM(d.BuyBackAmount)		AS BuyBackAmount
-		, SUM(d.BettradeWinloss)	AS BetTradeWinLoss
-		, SUM(d.WLonBBA)			AS BuyBackWinLoss
-		--, SUM(d.LicenseeWL)			AS LicenseeWinLoss
-		, SUM(d.BettradeComm)		AS BetTradeComm				
-		, SUM(d.Total)				AS AmountDueTo			
+		, SUM(d.WinLossOnBoughtTickets)	AS WinLossOnBoughtTickets
+		, SUM(d.WinLossOnBuyBackAmount)	AS WinLossOnBuyBackAmount
+		, SUM(d.BettradeComm)		AS BetTradeComm			
+		, SUM(d.ProfitSharing)		AS ProfitSharing
+		, SUM(d.AmountDueTo)		AS AmountDueTo			
 	FROM													  
 		#Result d  									  		
 		LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON d.PartyID = p.PartyID		
 		LEFT JOIN bodb_licensee.dbo.OAS_Party pp WITH (NOLOCK) ON d.ParentId = pp.PartyID
 	GROUP BY d.ParentId, CASE WHEN d.ParentId = 999 
 				THEN 'Credit' 
-			ELSE pp.PartyName END, d.PartyID, p.PartyName		
+			ELSE pp.PartyName END, d.PartyID, p.PartyName, d.CurrencyId, d.CurrencyName, d.WinlossDate
 	ORDER BY ParentId ASC, p.PartyName ASC
 
+	-- Region: Grand Total
+	DECLARE @tempCurrency VARCHAR(20)
+	DECLARE @BaseCurrencies TABLE(
+		Id INT,
+		Name VARCHAR(20),
+		IsApply BIT
+	)
+	INSERT INTO @BaseCurrencies(Id, Name)
+	EXEC bodb_licensee..LA_SelBaseCurrency
+
+	CREATE TABLE #ExchangeBase (
+		ExchangeDate	DATE,
+		ExchangeID		INT,
+		CurrencyCode	VARCHAR(10),
+		Rate			FLOAT
+	)	
+
+	DECLARE @GrandTotal AS TABLE(
+		CurrencyName		VARCHAR(10)
+		, TotalTransaction	BIGINT
+		, ActualStake		MONEY
+		, BuyBackAmount		MONEY
+		, WinLossOnBoughtTickets MONEY		
+		, WinLossOnBuyBackAmount MONEY
+		, BettradeComm		MONEY		
+		, ProfitSharing		MONEY				
+		, AmountDueTo		MONEY)	
+	
+	WHILE EXISTS (SELECT * FROM @BaseCurrencies WHERE IsApply IS NULL)
+	BEGIN
+		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)
+		PRINT @tempCurrency
+		DELETE FROM #ExchangeBase
+		INSERT INTO #ExchangeBase(ExchangeDate, ExchangeID, CurrencyCode, Rate)
+		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
+		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency)
+		
+		INSERT INTO @GrandTotal (CurrencyName,TotalTransaction, ActualStake, BuyBackAmount, WinLossOnBoughtTickets, WinLossOnBuyBackAmount, BettradeComm, ProfitSharing, AmountDueTo)
+		SELECT	@tempCurrency, 
+				SUM(td.TotalTransaction),
+				SUM(td.ActualStake * e.Rate), 
+				SUM(td.BuyBackAmount * e.Rate), 
+				SUM(td.WinLossOnBoughtTickets * e.Rate), 
+				SUM(td.WinLossOnBuyBackAmount * e.Rate),
+				SUM(td.BettradeComm * e.Rate),
+				SUM(td.ProfitSharing * e.Rate),
+				SUM(td.AmountDueTo * e.Rate)
+		FROM #Result td INNER JOIN #ExchangeBase e ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinlossDate
+
+		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
+	END
+	
+	SELECT * FROM @GrandTotal
+	-- End Region
+	
 	DROP TABLE #Exchange												   
+	DROP TABLE #ExchangeBase
 	DROP TABLE #Result	
 	DROP TABLE #Bettype
 END
