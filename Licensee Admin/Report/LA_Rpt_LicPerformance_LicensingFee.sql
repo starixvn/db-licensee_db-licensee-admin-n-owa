@@ -26,6 +26,7 @@ AS
     Revisions:  		
 	   - 20141226@Florent: enhance SP
 	   - 20150703@Florent: add GBP
+	   - 20160506@Bravo: Add VB data.
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
 	  + @Currency : 0-All Currencies
@@ -74,7 +75,7 @@ BEGIN
 		SET @sdate = DATEADD(m, 1, @sdate)
 	END	
 
-	IF @ProductCode IN ('SB', 'NG', 'LC', 'VS', 'CS')
+	IF @ProductCode IN ('SB', 'NG', 'LC', 'VS', 'CS', 'VB')
 	BEGIN		
 		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, Winloss)
 		SELECT tp.PartyID, d.rptDate, d.CurrencyID, - SUM(d.Winloss * ISNULL(tp.Rate,0))

@@ -27,6 +27,7 @@ AS
     Revisions: 
 		- 20141026@Patrick: Optimize code
 		- 20150703@Florent: add GBP
+		- 20160506@Bravo: Add VB data.
     
     Param's Explanation:  
 	   + @partyIDs : a string of list PartyID, separated by ','
@@ -107,7 +108,7 @@ BEGIN
     END
 
     --exclude BA tickets
-    IF @ProductCode IN ('SB', 'RB', 'NG', 'LC', 'VS', 'CS')
+    IF @ProductCode IN ('SB', 'RB', 'NG', 'LC', 'VS', 'CS', 'VB')
     BEGIN		
 	   INSERT INTO #Tmp(PartyId, rptDate, CurrencyId, TurnOver)
 	   (
