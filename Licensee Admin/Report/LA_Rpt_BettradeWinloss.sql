@@ -123,7 +123,7 @@ BEGIN
 
 			) d 
 				INNER JOIN #Exchange e ON d.CurrencyId = e.ExchangeID AND d.RptDate = e.ExchangeDate
-				INNER JOIN bodb_licensee..OAS_ChargeInfo c ON d.PartyId = c.FromParty AND d.rptDate BETWEEN c.FromDate AND c.ToDate
+				INNER JOIN bodb_licensee..OAS_ChargeInfo c ON d.ParentId = c.FromParty AND d.rptDate BETWEEN c.FromDate AND c.ToDate
 			WHERE c.ProductID = 13 AND c.ChargeType = 8
 			GROUP BY d.PartyId, d.ParentId,d.RptDate, d.CurrencyID, e.CurrencyCode, c.Rate
 		)	
