@@ -61,6 +61,7 @@ BEGIN
 			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) 
 				ON c.ToParty = ci.FromParty AND a.ProductID = ci.ProductID
 					AND ((ci.FromDate BETWEEN a.FromDate AND a.ToDate) OR (ci.ToDate BETWEEN a.FromDate AND a.ToDate) OR (ci.FromDate<a.FromDate AND a.ToDate < ci.ToDate))
+		WHERE ci.ChargeType != 8
 				
 	)
 	--hardcode get bettype of SB, BA
