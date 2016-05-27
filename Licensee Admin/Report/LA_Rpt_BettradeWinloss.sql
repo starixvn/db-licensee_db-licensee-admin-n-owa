@@ -73,6 +73,19 @@ BEGIN
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	
+	DECLARE @SharingCharge TABLE (
+		PartyId INT,
+		FromDate DATE,
+		ToDate DATE,
+		Rate MONEY)
+	INSERT INTO @SharingCharge(PartyId, FromDate, ToDate, Rate)
+	SELECT c.FromParty, 
+		CASE WHEN c.FromDate > @ToDate THEN @FromDate ELSE c.FromDate END, 
+		CASE WHEN c.FromDate > @ToDate THEN @ToDate ELSE c.ToDate END, 
+		CASE WHEN c.FromDate > @ToDate THEN 0 ELSE c.Rate END
+	FROM bodb_licensee..OAS_ChargeInfo c
+	WHERE c.ProductID = 13 AND c.ChargeType = 8
+		
 	BEGIN			
 		INSERT INTO #Result(WinlossDate, PartyID, ParentId, CurrencyId, CurrencyName, ActualStake, BuyBackAmount, WinLossOnBoughtTickets, WinLossOnBuyBackAmount, BettradeComm, ProfitSharing, TotalTransaction)
 		(
@@ -93,7 +106,7 @@ BEGIN
 				SELECT p.PartyId, p.ParentId, b.RptDate, b.CurrencyId
 					, SUM(CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount - b.WinLoss) ELSE 0 END) AS Actual_stake
 					, SUM(CASE WHEN b.Bettype = 901 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmount
-					, -SUM(CASE WHEN b.Bettype IN (901, 902, 903) THEN 0 ELSE b.WinLoss END)	AS WinLossOnBoughtTickets
+					, SUM(CASE WHEN b.Bettype IN (901, 902, 903) THEN 0 ELSE b.WinLoss END)	AS WinLossOnBoughtTickets
 					, SUM (CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount * p.Rate) ELSE 0 END) AS BettradeComm	-- negative amount (meaning that house charges BetTrade this amount).							 					 								
 					, SUM(CASE WHEN bt.ProductID = 0 THEN ISNULL(b.BetCount, 0) ELSE 0 END) TotalTrans
 				FROM bodb_licensee.dbo.rpt_Betting b WITH (NOLOCK)
@@ -110,7 +123,7 @@ BEGIN
 				SELECT p.PartyId, p.ParentId, b.RptDate, b.CurrencyId
 					, 0 AS Actual_stake
 					, 0 AS BuyBackAmount
-					, -SUM(b.WinLoss) AS WinLossOnBoughtTickets 
+					, SUM(b.WinLoss) AS WinLossOnBoughtTickets 
 					, 0 AS BettradeComm		 					 								
 					, SUM(ISNULL(b.BetCount, 0)) TotalTrans
 				FROM bodb_licensee.dbo.rpt_Betting_BA b WITH (NOLOCK)
@@ -124,8 +137,7 @@ BEGIN
 
 			) d 
 				INNER JOIN #Exchange e ON d.CurrencyId = e.ExchangeID AND d.RptDate = e.ExchangeDate
-				INNER JOIN bodb_licensee..OAS_ChargeInfo c ON d.ParentId = c.FromParty AND d.rptDate BETWEEN c.FromDate AND c.ToDate
-			WHERE c.ProductID = 13 AND c.ChargeType = 8
+				INNER JOIN @SharingCharge c ON d.ParentId = c.PartyId AND d.rptDate BETWEEN c.FromDate AND c.ToDate
 			GROUP BY d.PartyId, d.ParentId,d.RptDate, d.CurrencyID, e.CurrencyCode, c.Rate
 		)	
 	END
@@ -135,7 +147,7 @@ BEGIN
 
 	SELECT
 		d.WinlossDate
-		, d.ParentId					AS GroupId
+		, d.ParentId				AS GroupId
 		, CASE WHEN d.ParentId = 999 
 				THEN 'Credit' 
 			ELSE pp.PartyName END	AS GroupName
