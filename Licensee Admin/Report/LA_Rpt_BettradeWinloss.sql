@@ -100,7 +100,7 @@ BEGIN
 				, SUM (d.WinLossOnBoughtTickets * e.Rate) AS WinLossOnBoughtTickets	
 				, SUM ((d.Actual_stake - d.BuyBackAmount) * e.Rate) AS WinLossOnBuyBackAmount	
 				, SUM (d.BettradeComm * e.Rate) AS BettradeComm 
-				, SUM ((d.BuyBackAmount + d.WinLossOnBoughtTickets - d.BettradeComm) * e.Rate) * c.Rate AS ProfitSharing
+				, SUM (((d.Actual_stake - d.BuyBackAmount) + d.WinLossOnBoughtTickets - d.BettradeComm) * e.Rate) * c.Rate AS ProfitSharing
 				, SUM (TotalTrans) AS TotalTrans	  
 			FROM (
 				SELECT p.PartyId, p.ParentId, b.RptDate, b.CurrencyId
