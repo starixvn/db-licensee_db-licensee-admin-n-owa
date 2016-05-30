@@ -142,6 +142,24 @@ BEGIN
 	UPDATE #Result
 	SET AmountDueTo = WinLossOnBuyBackAmount + WinLossOnBoughtTickets - BettradeComm - ProfitSharing
 
+	CREATE TABLE #FinalResult (
+			 WinlossDate		DATETIME
+			, GroupId			INT
+			, GroupName			VARCHAR(100)
+			, PartyId			INT
+			, PartyName			VARCHAR(100)
+			, CurrencyId		INT
+			, CurrencyName		VARCHAR(20)
+			, TotalTransaction	BIGINT
+			, ActualStake		MONEY
+			, BuyBackAmount		MONEY
+			, WinLossOnBoughtTickets MONEY		
+			, WinLossOnBuyBackAmount MONEY -- Winloss on Buy back Amount	
+			, BettradeComm		MONEY		
+			, ProfitSharing		MONEY				
+			, AmountDueTo		MONEY)	
+
+	INSERT INTO #FinalResult
 	SELECT
 		d.WinlossDate
 		, d.ParentId				AS GroupId
@@ -169,6 +187,8 @@ BEGIN
 				THEN 'Credit' 
 			ELSE pp.PartyName END, d.PartyID, p.PartyName, d.CurrencyId, e.CurrencyCode, d.WinlossDate
 	ORDER BY ParentId ASC, p.PartyName ASC
+
+	SELECT * FROM #FinalResult
 
 	-- Region: Grand Total
 	DECLARE @tempCurrency VARCHAR(20)
@@ -228,6 +248,7 @@ BEGIN
 	DROP TABLE #Exchange												   
 	DROP TABLE #ExchangeBase
 	DROP TABLE #Result	
+	DROP TABLE #FinalResult
 	DROP TABLE #Bettype
 END
 GO
