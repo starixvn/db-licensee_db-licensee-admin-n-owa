@@ -87,7 +87,7 @@ BEGIN
 			DI_Rate,
 			Fromdate,
 			Todate
-		FROM dbo.LA_f_ChargeInfo_xtest(@ListParty, @MinDate, @MaxDate, @ProductListAll, 'OA', 1)
+		FROM dbo.LA_f_ChargeInfo(@ListParty, @MinDate, @MaxDate, @ProductListAll, 'OA', 1)
 
 	INSERT INTO #Temp_ChargeInfo (ChargeID, PartyID, ProductID, BettypeRef, Rate, Fromdate, Todate)
 		SELECT

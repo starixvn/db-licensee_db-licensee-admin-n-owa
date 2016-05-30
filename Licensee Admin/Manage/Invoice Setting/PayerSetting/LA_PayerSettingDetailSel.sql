@@ -69,7 +69,7 @@ BEGIN
 		, CASE WHEN c.ProductID IN (14,17) THEN cs.FirstOfBilling ELSE ci.FirstOfBilling END AS FirstOfBilling
 		, CASE WHEN c.ProductID IN (14,17) THEN cs.BasisOfBilling ELSE ci.BasisOfBilling END AS BasisOfBilling
 		, pd.BaseCurrencyId
-	FROM dbo.LA_f_ChargeInfo_xtest(@PayerId, @MinDate, @MaxDate, @ProductListAll, 'OA', 1) c
+	FROM dbo.LA_f_ChargeInfo(@PayerId, @MinDate, @MaxDate, @ProductListAll, 'OA', 1) c
 		LEFT JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID
 		LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID				
 		LEFT JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID

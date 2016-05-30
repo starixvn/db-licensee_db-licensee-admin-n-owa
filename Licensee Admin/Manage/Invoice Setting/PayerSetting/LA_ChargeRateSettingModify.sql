@@ -191,7 +191,7 @@ BEGIN
 	-- check overlap time charge
 	INSERT INTO @ChargeSetting(ChargeId, ProductId, FirstBilling, BasisBilling, BettypeRef, Rate, ChargeType, FromDate, ToDate)
 	SELECT a.ChargeId, a.ProductId, b.FirstOfBilling, b.BasisOfBilling, a.Bettype, Rate, ChargeType, a.FromDate, a.ToDate
-	FROM dbo.LA_f_ChargeInfo_xtest(@PayerID, @MinDate, @MaxDate ,@ProductListAll, 'OA', 1) a	
+	FROM dbo.LA_f_ChargeInfo(@PayerID, @MinDate, @MaxDate ,@ProductListAll, 'OA', 1) a	
 		INNER JOIN dbo.OAS_ChargeInfo b WITH (NOLOCK) ON a.ChargeID = b.ChargeID
 	WHERE a.ChargeID NOT IN (SELECT ChargeID FROM @ChargeSetting)	
 
