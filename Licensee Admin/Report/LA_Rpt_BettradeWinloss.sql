@@ -28,7 +28,6 @@ BEGIN
 	CREATE TABLE #Result (
 			 WinlossDate		DATETIME
 			, CurrencyId		INT
-			, CurrencyName		VARCHAR(10)
 			, PartyID			INT
 			, ParentId			INT
 			, ActualStake		MONEY
@@ -87,20 +86,19 @@ BEGIN
 	WHERE c.ProductID = 13 AND c.ChargeType = 8
 		
 	BEGIN			
-		INSERT INTO #Result(WinlossDate, PartyID, ParentId, CurrencyId, CurrencyName, ActualStake, BuyBackAmount, WinLossOnBoughtTickets, WinLossOnBuyBackAmount, BettradeComm, ProfitSharing, TotalTransaction)
+		INSERT INTO #Result(WinlossDate, PartyID, ParentId, CurrencyId, ActualStake, BuyBackAmount, WinLossOnBoughtTickets, WinLossOnBuyBackAmount, BettradeComm, ProfitSharing, TotalTransaction)
 		(
 			SELECT
 				d.RptDate
 				, d.PartyId
 				, d.ParentId
 				, d.CurrencyID
-				, e.CurrencyCode
-				, SUM (d.Actual_stake * e.Rate) AS Actual_stake
-				, SUM (d.BuyBackAmount * e.Rate) AS BuyBackAmount
-				, SUM (d.WinLossOnBoughtTickets * e.Rate) AS WinLossOnBoughtTickets	
-				, SUM ((d.Actual_stake - d.BuyBackAmount) * e.Rate) AS WinLossOnBuyBackAmount	
-				, SUM (d.BettradeComm * e.Rate) AS BettradeComm 
-				, SUM (((d.Actual_stake - d.BuyBackAmount) + d.WinLossOnBoughtTickets - d.BettradeComm) * e.Rate) * c.Rate AS ProfitSharing
+				, SUM (d.Actual_stake) AS Actual_stake
+				, SUM (d.BuyBackAmount) AS BuyBackAmount
+				, SUM (d.WinLossOnBoughtTickets) AS WinLossOnBoughtTickets	
+				, SUM (d.Actual_stake - d.BuyBackAmount) AS WinLossOnBuyBackAmount	
+				, SUM (d.BettradeComm) AS BettradeComm 
+				, SUM ((d.Actual_stake - d.BuyBackAmount) + d.WinLossOnBoughtTickets - d.BettradeComm) * c.Rate AS ProfitSharing
 				, SUM (TotalTrans) AS TotalTrans	  
 			FROM (
 				SELECT p.PartyId, p.ParentId, b.RptDate, b.CurrencyId
@@ -135,10 +133,9 @@ BEGIN
 					AND b.CustomerCategory IN( 1001, 1002)
 				GROUP BY p.PartyId, b.RptDate, b.CurrencyId, p.ParentId
 
-			) d 
-				INNER JOIN #Exchange e ON d.CurrencyId = e.ExchangeID AND d.RptDate = e.ExchangeDate
+			) d 				
 				INNER JOIN @SharingCharge c ON d.ParentId = c.PartyId AND d.rptDate BETWEEN c.FromDate AND c.ToDate
-			GROUP BY d.PartyId, d.ParentId,d.RptDate, d.CurrencyID, e.CurrencyCode, c.Rate
+			GROUP BY d.PartyId, d.ParentId,d.RptDate, d.CurrencyID, c.Rate
 		)	
 	END
 
@@ -154,22 +151,23 @@ BEGIN
 		, d.PartyID					AS PartyID
 		, p.PartyName				AS PartyName		
 		, d.CurrencyId			
-		, d.CurrencyName
+		, e.CurrencyCode			AS CurrencyName
 		, SUM(TotalTransaction)		AS TotalTransaction		
-		, SUM(d.ActualStake)		AS ActualStake
-		, SUM(d.BuyBackAmount)		AS BuyBackAmount
-		, SUM(d.WinLossOnBoughtTickets)	AS WinLossOnBoughtTickets
-		, SUM(d.WinLossOnBuyBackAmount)	AS WinLossOnBuyBackAmount
-		, SUM(d.BettradeComm)		AS BetTradeComm			
-		, SUM(d.ProfitSharing)		AS ProfitSharing
-		, SUM(d.AmountDueTo)		AS AmountDueTo			
+		, SUM(d.ActualStake * e.Rate)		AS ActualStake
+		, SUM(d.BuyBackAmount * e.Rate)		AS BuyBackAmount
+		, SUM(d.WinLossOnBoughtTickets * e.Rate)	AS WinLossOnBoughtTickets
+		, SUM(d.WinLossOnBuyBackAmount * e.Rate)	AS WinLossOnBuyBackAmount
+		, SUM(d.BettradeComm * e.Rate)		AS BetTradeComm			
+		, SUM(d.ProfitSharing * e.Rate)		AS ProfitSharing
+		, SUM(d.AmountDueTo * e.Rate)		AS AmountDueTo			
 	FROM													  
-		#Result d  									  		
+		#Result d  		
+		INNER JOIN #Exchange e ON d.CurrencyId = e.ExchangeID AND d.WinlossDate = e.ExchangeDate							  		
 		LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON d.PartyID = p.PartyID		
 		LEFT JOIN bodb_licensee.dbo.OAS_Party pp WITH (NOLOCK) ON d.ParentId = pp.PartyID
 	GROUP BY d.ParentId, CASE WHEN d.ParentId = 999 
 				THEN 'Credit' 
-			ELSE pp.PartyName END, d.PartyID, p.PartyName, d.CurrencyId, d.CurrencyName, d.WinlossDate
+			ELSE pp.PartyName END, d.PartyID, p.PartyName, d.CurrencyId, e.CurrencyCode, d.WinlossDate
 	ORDER BY ParentId ASC, p.PartyName ASC
 
 	-- Region: Grand Total
