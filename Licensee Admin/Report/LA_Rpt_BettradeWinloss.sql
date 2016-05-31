@@ -31,7 +31,8 @@ BEGIN
 			, PartyID			INT
 			, ParentId			INT
 			, ActualStake		MONEY
-			, BuyBackAmount		MONEY
+			, BuyBackAmountSB		MONEY
+			, BuyBackAmountBA		MONEY
 			, WinLossOnBoughtTickets MONEY		
 			, WinLossOnBuyBackAmount MONEY -- Winloss on Buy back Amount	
 			, BettradeComm		MONEY		
@@ -63,6 +64,7 @@ BEGIN
 		WHERE ci.ChargeType != 8
 				
 	)
+	
 	--hardcode get bettype of SB, BA
 	INSERT INTO #Bettype(Bettype, ProductID)
 	SELECT Bettype,ProductID 
@@ -86,7 +88,7 @@ BEGIN
 	WHERE c.ProductID = 13 AND c.ChargeType = 8
 		
 	BEGIN			
-		INSERT INTO #Result(WinlossDate, PartyID, ParentId, CurrencyId, ActualStake, BuyBackAmount, WinLossOnBoughtTickets, WinLossOnBuyBackAmount, BettradeComm, ProfitSharing, TotalTransaction)
+		INSERT INTO #Result(WinlossDate, PartyID, ParentId, CurrencyId, ActualStake, BuyBackAmountSB, BuyBackAmountBA, WinLossOnBoughtTickets, WinLossOnBuyBackAmount, BettradeComm, ProfitSharing, TotalTransaction)
 		(
 			SELECT
 				d.RptDate
@@ -94,19 +96,21 @@ BEGIN
 				, d.ParentId
 				, d.CurrencyID
 				, SUM (d.Actual_stake) AS Actual_stake
-				, SUM (d.BuyBackAmount) AS BuyBackAmount
+				, SUM (d.BuyBackAmountSB) AS BuyBackAmountSB
+				, SUM (d.BuyBackAmountBA) AS BuyBackAmountBA
 				, SUM (d.WinLossOnBoughtTickets) AS WinLossOnBoughtTickets	
-				, SUM (d.Actual_stake - d.BuyBackAmount) AS WinLossOnBuyBackAmount	
+				, SUM (d.Actual_stake - (d.BuyBackAmountSB + d.BuyBackAmountBA)) AS WinLossOnBuyBackAmount	
 				, SUM (d.BettradeComm) AS BettradeComm 
-				, SUM ((d.Actual_stake - d.BuyBackAmount) + d.WinLossOnBoughtTickets - d.BettradeComm) * c.Rate AS ProfitSharing
+				, SUM ((d.Actual_stake - (d.BuyBackAmountSB + d.BuyBackAmountBA)) + d.WinLossOnBoughtTickets - d.BettradeComm) * c.Rate AS ProfitSharing
 				, SUM (TotalTrans) AS TotalTrans	  
 			FROM (
 				SELECT p.PartyId, p.ParentId, b.RptDate, b.CurrencyId
 					, SUM(CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount - b.WinLoss) ELSE 0 END) AS Actual_stake
-					, SUM(CASE WHEN b.Bettype = 901 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmount
+					, SUM(CASE WHEN b.Bettype = 901 AND b.CustomerCategory = 1001 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountSB
+					, SUM(CASE WHEN b.Bettype = 901 AND b.CustomerCategory = 1002 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountBA
 					, SUM(CASE WHEN b.Bettype IN (901, 902, 903) THEN 0 ELSE b.WinLoss END)	AS WinLossOnBoughtTickets
-					, SUM (CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount * p.Rate) ELSE 0 END) AS BettradeComm	-- negative amount (meaning that house charges BetTrade this amount).							 					 								
-					, SUM(CASE WHEN bt.ProductID = 0 THEN ISNULL(b.BetCount, 0) ELSE 0 END) TotalTrans
+					, SUM(CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount * p.Rate) ELSE 0 END) AS BettradeComm	-- negative amount (meaning that house charges BetTrade this amount).							 					 								
+					, SUM(CASE WHEN b.Bettype = 901 THEN b.BetCount ELSE 0 END) TotalTrans
 				FROM bodb_licensee.dbo.rpt_Betting b WITH (NOLOCK)
 					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID 
 					INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (0, 13)
@@ -120,7 +124,8 @@ BEGIN
 				-- rpt_betting_BA only contain original ticket, SOLD BOUGHT COMM ticket will be in rpt_betting
 				SELECT p.PartyId, p.ParentId, b.RptDate, b.CurrencyId
 					, 0 AS Actual_stake
-					, 0 AS BuyBackAmount
+					, 0 AS BuyBackAmountSB
+					, 0 AS BuyBackAmountBA
 					, SUM(b.WinLoss) AS WinLossOnBoughtTickets 
 					, 0 AS BettradeComm		 					 								
 					, SUM(ISNULL(b.BetCount, 0)) TotalTrans
@@ -152,7 +157,8 @@ BEGIN
 			, CurrencyName		VARCHAR(20)
 			, TotalTransaction	BIGINT
 			, ActualStake		MONEY
-			, BuyBackAmount		MONEY
+			, BuyBackAmountSB	MONEY
+			, BuyBackAmountBA	MONEY
 			, WinLossOnBoughtTickets MONEY		
 			, WinLossOnBuyBackAmount MONEY -- Winloss on Buy back Amount	
 			, BettradeComm		MONEY		
@@ -172,7 +178,8 @@ BEGIN
 		, e.CurrencyCode			AS CurrencyName
 		, SUM(TotalTransaction)		AS TotalTransaction		
 		, SUM(d.ActualStake * e.Rate)		AS ActualStake
-		, SUM(d.BuyBackAmount * e.Rate)		AS BuyBackAmount
+		, SUM(d.BuyBackAmountSB * e.Rate)		AS BuyBackAmountSB
+		, SUM(d.BuyBackAmountBA * e.Rate)		AS BuyBackAmountBA
 		, SUM(d.WinLossOnBoughtTickets * e.Rate)	AS WinLossOnBoughtTickets
 		, SUM(d.WinLossOnBuyBackAmount * e.Rate)	AS WinLossOnBuyBackAmount
 		, SUM(d.BettradeComm * e.Rate)		AS BetTradeComm			
@@ -211,7 +218,8 @@ BEGIN
 		CurrencyName		VARCHAR(10)
 		, TotalTransaction	BIGINT
 		, ActualStake		MONEY
-		, BuyBackAmount		MONEY
+		, BuyBackAmountSB	MONEY
+		, BuyBackAmountBA	MONEY
 		, WinLossOnBoughtTickets MONEY		
 		, WinLossOnBuyBackAmount MONEY
 		, BettradeComm		MONEY		
@@ -227,11 +235,12 @@ BEGIN
 		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency)
 		
-		INSERT INTO @GrandTotal (CurrencyName,TotalTransaction, ActualStake, BuyBackAmount, WinLossOnBoughtTickets, WinLossOnBuyBackAmount, BettradeComm, ProfitSharing, AmountDueTo)
+		INSERT INTO @GrandTotal (CurrencyName,TotalTransaction, ActualStake, BuyBackAmountSB, BuyBackAmountBA, WinLossOnBoughtTickets, WinLossOnBuyBackAmount, BettradeComm, ProfitSharing, AmountDueTo)
 		SELECT	@tempCurrency, 
 				SUM(td.TotalTransaction),
 				SUM(td.ActualStake * e.Rate), 
-				SUM(td.BuyBackAmount * e.Rate), 
+				SUM(td.BuyBackAmountSB * e.Rate), 
+				SUM(td.BuyBackAmountBA * e.Rate), 
 				SUM(td.WinLossOnBoughtTickets * e.Rate), 
 				SUM(td.WinLossOnBuyBackAmount * e.Rate),
 				SUM(td.BettradeComm * e.Rate),
