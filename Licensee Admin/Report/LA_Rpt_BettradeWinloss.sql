@@ -11,7 +11,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_BettradeWinloss]
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME		
 	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
-WITH RECOMPILE
+
 AS
 /*  Created: 20150825@Florent		
 	Task : Report - Bettrade Winloss
