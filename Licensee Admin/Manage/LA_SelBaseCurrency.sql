@@ -7,7 +7,7 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_SelBaseCurrency]	
-	@BaseCurrencyDefault	VARCHAR(3) = 'GBP'
+	@BaseCurrencyDefault	VARCHAR(3) = 'EUR'
 AS
 /*
 	Created: 20150312@Florent
