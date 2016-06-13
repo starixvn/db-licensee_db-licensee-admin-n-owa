@@ -46,6 +46,7 @@ BEGIN
 					AND ii.InvTypeId = i.InvTypeId
 				FOR XML PATH (''))
 			  , 1, 2, '') AS ProductList
+		, i.ActiveAddress
 	FROM dbo.OAS_Party p WITH (NOLOCK)
 		INNER JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON p.PartyID = b.PartyID		
 		INNER JOIN dbo.LA_InvoiceSetting i WITH (NOLOCK) ON i.ToPartyId = p.PartyID
@@ -60,7 +61,7 @@ BEGIN
 			WHEN ISNULL(pd.BrandName, '') != '' 
 				THEN pd.BrandName 
 			ELSE p1.PartyName 
-		  END, i.InvTypeId, InvTypeName, i.InvTempId, InvTemplateName, ISNULL(i.BankId, 0)
+		  END, i.InvTypeId, InvTypeName, i.InvTempId, InvTemplateName, ISNULL(i.BankId, 0), i.ActiveAddress
 	ORDER BY BillerName , CASE 
 			WHEN ISNULL(pd.BrandName, '') != '' 
 				THEN pd.BrandName 
