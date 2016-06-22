@@ -26,9 +26,11 @@ BEGIN
 		Id INT, Name VARCHAR(10)
 	)
 
+	DECLARE @FirstDate DATETIME = DATEADD(mm, DATEDIFF(mm, 0, GETDATE()), 0)
+
 	INSERT INTO @Currency
 	SELECT ExchangeID, Code
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(GETDATE(), GETDATE(), 'EUR')
+	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FirstDate, @FirstDate, 'EUR')
 
 	SELECT	f.HostingFeesId, 
 			f.HostingFeesName, 
