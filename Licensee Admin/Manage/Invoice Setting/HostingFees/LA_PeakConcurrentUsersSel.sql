@@ -22,6 +22,14 @@ BEGIN
 		WHERE p.PartyID = @PartyId
 		FOR XML PATH('')), 1, 1, '')
 	)
+	
+	IF(ISNULL(@ServerIds,'') = '')
+	BEGIN
+		SELECT TOP 0 
+			CAST(0 AS INT) AS TotalUser,
+			CAST(NULL AS DATETIME) AS LogDate
+		RETURN
+	END
 
 	DECLARE @OpenQuery VARCHAR(2000) = '
 		DECLARE @FromDate DATETIME = ''''' + CONVERT(VARCHAR(50), @FromDate, 120) +''''',
