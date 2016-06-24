@@ -17,13 +17,14 @@ ALTER PROCEDURE [dbo].[LA_HostingFeesIns]
 	@ErrCode			INT				= 0		OUTPUT,
 	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
 AS
-/*  
-	 Created: 20160615@Bravo
-	 Task : Insert hosting fees settings
-	 DB: DB052.bodb_Licensee  
-   
-	 Revisions:
-	 Params:
+/*
+	Created: 20160615@Bravo
+	Task : Insert hosting fees settings
+	DB: DB052.bodb_Licensee
+
+	Revisions:
+		20160624@Bruce: Check duplicate charge rage name
+	Params:
 		+ @InvoiceSettingXML: '<HostingFees>
 								  <HostingFee>
 									<BaseCurrencyId>1</BaseCurrencyId>
@@ -39,40 +40,45 @@ AS
 									<Amount>1</Amount>
 								  </HostingFee>
 								</HostingFees>'
-	 Example:
+	Example:
 		EXEC dbo.LA_HostingFeesSel 0
 */
 BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @HostingFeeId INT
+
 	-- Region: Insert hosting fees
-	INSERT INTO dbo.LA_HostingFees(HostingFeesName, HostingFeesTypeId, BaseCurrencyId, Description)
+	IF EXISTS (SELECT 1 FROM dbo.LA_HostingFees WHERE HostingFeesName = @HostingFeesName)
+	BEGIN
+		SELECT @ErrCode = 1, @ErrMsg = 'Charge Rate Name exists please try again!'
+		RETURN
+	END
+
+	INSERT INTO dbo.LA_HostingFees(HostingFeesName, HostingFeesTypeId, BaseCurrencyId, [Description])
 	VALUES (@HostingFeesName, @HostingFeesTypeId, @BaseCurrencyId, @Description)
 
-	SET @HostingFeeId = @@identity
+	SET @HostingFeeId = SCOPE_IDENTITY()
 	-- EndRegion
 
 	-- Region: Insert hosting fees details
-	SELECT @XmlDetails = REPLACE(@XmlDetails,N'&',N'&amp;')
-
 	DECLARE @FeesDetails AS TABLE (
-		BaseCurrencyId	INT	,
-		VCMFrom	INT	,
-		VCMTo	INT	,
-		Amount	MONEY)
-		
+		BaseCurrencyId	INT,
+		VCMFrom			INT,
+		VCMTo			INT,
+		Amount			MONEY)
+
 	DECLARE @idoc AS INT
 	EXEC sp_xml_preparedocument @idoc OUTPUT, @XmlDetails
 	BEGIN TRY
 		INSERT INTO @FeesDetails(BaseCurrencyId, VCMFrom, VCMTo, Amount)
 		SELECT BaseCurrencyId, VCMFrom, VCMTo, Amount
 		FROM OPENXML(@idoc, 'HostingFees/HostingFee')
-		WITH (	
-			BaseCurrencyId	INT	'BaseCurrencyId',
-			VCMFrom	INT	'VCMFrom',
-			VCMTo	INT	'VCMTo',
-			Amount	MONEY 'Amount'
+		WITH (
+			BaseCurrencyId	INT		'BaseCurrencyId',
+			VCMFrom			INT		'VCMFrom',
+			VCMTo			INT		'VCMTo',
+			Amount			MONEY	'Amount'
 		)
 
 		INSERT INTO dbo.LA_HostingFeesDetail(HostingFeesId, BaseCurrencyId, VCMFrom, VCMTo, Amount)
@@ -80,18 +86,18 @@ BEGIN
 		FROM @FeesDetails f
 
 	END TRY
-	BEGIN CATCH 
+	BEGIN CATCH
 		-- Rollback
 		DELETE FROM dbo.LA_HostingFees WHERE HostingFeesId = @HostingFeeId
 		DELETE FROM dbo.LA_HostingFeesDetail WHERE HostingFeesId = @HostingFeeId
 
-		SELECT 	@ErrMsg = 'Update failed. Please try again.', @ErrCode = 1	
+		SELECT @ErrMsg = 'Insert failed. Please try again.', @ErrCode = 3
 		RETURN
 	END CATCH
-	EXEC sp_xml_removedocument @idoc	
+	EXEC sp_xml_removedocument @idoc
 
 	-- EndRegion
-	
+
 	-- Region: Write Log
 
 	-- EndRegion
