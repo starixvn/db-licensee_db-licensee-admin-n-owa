@@ -40,8 +40,6 @@ AS
 									<Amount>1</Amount>
 								  </HostingFee>
 								</HostingFees>'
-	Example:
-		EXEC dbo.LA_HostingFeesSel 0
 */
 BEGIN
 	SET NOCOUNT ON
