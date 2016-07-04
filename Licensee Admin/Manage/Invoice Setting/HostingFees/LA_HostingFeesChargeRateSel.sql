@@ -34,8 +34,12 @@ BEGIN
 	SELECT ExchangeID, Code
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FirstDate, @LastDate, 'EUR')
 
-	SELECT s.FromParty AS PayerId,
-		p.PartyName AS PayerName,
+	SELECT s.ChargeId,
+		s.FromParty AS PayerId,
+		CASE
+			WHEN ISNULL(pd.BrandName, '') != '' THEN pd.BrandName
+			ELSE p.PartyName
+		END AS PayerName,
 		s.FirstBilling,
 		s.FromDate,
 		s.ToDate,		
@@ -46,6 +50,7 @@ BEGIN
 		c.Name AS Exchange
 	FROM dbo.LA_HostingFeesSetting s 
 		INNER JOIN dbo.OAS_Party p ON s.FromParty = p.PartyID
+		INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 		INNER JOIN dbo.LA_HostingFees f ON s.HostingFeesId = f.HostingFeesId
 		INNER JOIN dbo.LA_HostingFeesTypes t ON f.HostingFeesTypeId = t.HostingFeesTypeId
 		INNER JOIN @Currency c ON s.BaseCurrencyId = c.Id
