@@ -45,16 +45,16 @@ BEGIN
 					ToDate,
 					ProductName,
 					BasedMinimunFees,
+					HostingFeesId,
 					ROW_NUMBER() OVER (PARTITION BY FromParty ORDER BY FromDate DESC) RowNumber
 			FROM dbo.LA_HostingFeesSetting WITH(NOLOCK)
 			WHERE SettingType = 2
 				AND ProductName = @ProductName
-				AND (@PayerId = 0 OR @PayerId = FromParty) 
-				AND (@HostingFeesId = 0 OR HostingFeesId = @HostingFeesId)
+				AND (@PayerId = 0 OR @PayerId = FromParty)
 		)
 		INSERT INTO @WaiveSettings
 		SELECT PartyId, FromDate, ToDate, ProductName, BasedMinimunFees
-		FROM ws WHERE RowNumber = 1
+		FROM ws WHERE RowNumber = 1 AND (@HostingFeesId = 0 OR HostingFeesId = @HostingFeesId)
 	END
 
 	-- Hosting fees Settings
@@ -69,8 +69,7 @@ BEGIN
 		FROM dbo.LA_HostingFeesSetting WITH(NOLOCK)
 		WHERE SettingType = 1
 			AND ProductName = @ProductName
-			AND (@PayerId = 0 OR @PayerId = FromParty) 
-			AND (@HostingFeesId = 0 OR HostingFeesId = @HostingFeesId)
+			AND (@PayerId = 0 OR @PayerId = FromParty)
 	)
 	SELECT
 		hs.FromParty AS PayerId,
@@ -84,7 +83,8 @@ BEGIN
 		pr.ProductName AS BasedMinimunFeesName,
 		f.HostingFeesName,
 		t.HostingFeesTypeName,
-		c.Code AS Exchange
+		c.Code AS Exchange,
+		hs.ProductName
 	FROM hs
 		LEFT JOIN @WaiveSettings ws ON hs.FromParty = ws.FromParty
 		LEFT JOIN dbo.LA_f_Products3rd('') pr ON ws.BasedMinimunFees = pr.ProductID
@@ -93,9 +93,9 @@ BEGIN
 		INNER JOIN dbo.LA_HostingFees f ON hs.HostingFeesId = f.HostingFeesId
 		INNER JOIN dbo.LA_HostingFeesTypes t ON f.HostingFeesTypeId = t.HostingFeesTypeId
 		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FirstDate, @LastDate, 'EUR') c ON hs.BaseCurrencyId = c.ExchangeID
-	WHERE hs.RowNumber = 1
+	WHERE hs.RowNumber = 1 AND (@HostingFeesId = 0 OR hs.HostingFeesId = @HostingFeesId)
 END
 GO
 
-GRANT VIEW DEFINITION ON [dbo].[LA_HostingFeesChargeRateSel] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_HostingFeesChargeRateSel] TO bodbAdminNet 
+GRANT VIEW DEFINITION ON [dbo].[LA_HostingFeesChargeRateSel] TO [vnteam]
+GRANT EXECUTE ON [dbo].[LA_HostingFeesChargeRateSel] TO bodbAdminNet
