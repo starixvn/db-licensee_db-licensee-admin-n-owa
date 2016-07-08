@@ -7,8 +7,8 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_HostingFeesChargeRateIns]
-	@PayerId			INT,	
-	@BaseCurrencyId		INT	,	
+	@PayerId			INT,
+	@BaseCurrencyId		INT,
 	@XmlChargeRates		NVARCHAR(MAX),
 	@XmlWaives			NVARCHAR(MAX),
 	@UserID				INT,
@@ -63,32 +63,31 @@ BEGIN
 	SET NOCOUNT ON
 
 	-- Region: Insert hosting fees details
-	SELECT @XmlChargeRates = REPLACE(@XmlChargeRates,N'&',N'&amp;')
-	SELECT @XmlWaives = REPLACE(@XmlWaives,N'&',N'&amp;')
-
 	DECLARE @ChargeRates AS TABLE (
 		ChargeId		INT	,
 		FromDate		DATETIME,
 		ToDate			DATETIME,
 		FirstBilling	DATETIME,
 		BasisOfBilling	NVARCHAR(200),
-		HostingFeesId	INT)
+		HostingFeesId	INT,
+		RowId			SMALLINT IDENTITY)
 	DECLARE @Waives AS TABLE (
 		ChargeId		INT	,
 		FromDate		DATETIME,
 		ToDate			DATETIME,
-		BasedMinimunFees INT)
+		BasedMinimunFees INT,
+		RowId			SMALLINT IDENTITY)
 			
-	DECLARE @idoc AS INT
-	EXEC sp_xml_preparedocument @idoc OUTPUT, @XmlChargeRates
-
 	DECLARE @idoc1 AS INT
-	EXEC sp_xml_preparedocument @idoc1 OUTPUT, @XmlWaives
+	EXEC sp_xml_preparedocument @idoc1 OUTPUT, @XmlChargeRates
+
+	DECLARE @idoc2 AS INT
+	EXEC sp_xml_preparedocument @idoc2 OUTPUT, @XmlWaives
 
 	BEGIN TRY
 		INSERT INTO @ChargeRates(ChargeId, FromDate, ToDate, FirstBilling, BasisOfBilling, HostingFeesId)
 		SELECT ChargeId, FromDate, ToDate, FirstBilling, BasisOfBilling, HostingFeesId
-		FROM OPENXML(@idoc, 'ChargeRates/ChargeRate')
+		FROM OPENXML(@idoc1, 'ChargeRates/ChargeRate')
 		WITH (
 			ChargeId		INT				'ChargeId',
 			FromDate		DATETIME		'FromDate',	
@@ -100,7 +99,7 @@ BEGIN
 
 		INSERT INTO @Waives(ChargeId, FromDate, ToDate, BasedMinimunFees)
 		SELECT ChargeId, FromDate, ToDate, BasedMinimunFees
-		FROM OPENXML(@idoc1, 'Waives/Waive')
+		FROM OPENXML(@idoc2, 'Waives/Waive')
 		WITH (
 			ChargeId		INT				'ChargeId',
 			FromDate		DATETIME		'FromDate',	
@@ -108,100 +107,106 @@ BEGIN
 			BasedMinimunFees INT			'BasedMinimunFees'
 		)
 
-		-- Update charge rate
-		IF EXISTS (	SELECT 1 
-					FROM @ChargeRates c1 INNER JOIN @ChargeRates c2 
-						ON c1.ChargeId > 0 
-						AND c2.ChargeId > 0 
-						AND c1.ChargeId != c2.ChargeId 
-						AND ((c1.FromDate BETWEEN c2.FromDate AND c2.ToDate) OR (c1.ToDate BETWEEN c2.FromDate AND c2.ToDate)) )
-			OR EXISTS ( SELECT 1 
-					FROM @ChargeRates c1 INNER JOIN dbo.LA_HostingFeesSetting c2
-						ON ((c1.FromDate BETWEEN c2.FromDate AND c2.ToDate) OR (c1.ToDate BETWEEN c2.FromDate AND c2.ToDate))
-					WHERE c2.FromParty = @PayerId AND c2.SettingType = 1 AND c1.ChargeId != 0 AND c2.ChargeId NOT IN (SELECT ChargeId FROM @ChargeRates WHERE c1.ChargeId != 0)
-			)			
-		BEGIN
-			SELECT 	@ErrMsg = 'Invalid date range of charge rate. Please try again.', @ErrCode = 11
-			RETURN
-		END
-		ELSE
-		BEGIN 
-			UPDATE h
-			SET h.FromDate = c.FromDate, h.ToDate = c.ToDate, h.FirstBilling = c.FirstBilling, h.BasisOfBilling = c.BasisOfBilling, h.HostingFeesId = c.HostingFeesId
-			FROM dbo.LA_HostingFeesSetting h INNER JOIN @ChargeRates c ON h.ChargeId = c.ChargeId
-			WHERE h.SettingType = 1 -- charge rate
-				AND c.ChargeId > 0
-		END
+		DECLARE @LatestChargeId INT = (
+			SELECT TOP 1 ChargeId FROM dbo.LA_HostingFeesSetting WITH(NOLOCK)
+			WHERE FromParty = @PayerId AND SettingType = 1
+			ORDER BY FromDate DESC
+		)
 
-		-- Insert new charge rate
-		IF EXISTS ( SELECT 1 
-					FROM @ChargeRates c1 INNER JOIN dbo.LA_HostingFeesSetting c2
-						ON ((c1.FromDate BETWEEN c2.FromDate AND c2.ToDate) OR (c1.ToDate BETWEEN c2.FromDate AND c2.ToDate))
-					WHERE c2.FromParty = @PayerId AND c2.SettingType = 1 AND c1.ChargeId = 0
+		-- only allow update latest charge rate
+		IF @LatestChargeId IS NULL OR (@LatestChargeId = ISNULL((SELECT TOP 1 ChargeId FROM @ChargeRates WHERE ChargeId > 0), @LatestChargeId))
+		BEGIN
+			-- validate charge rate settings
+			IF EXISTS (
+				SELECT 1 FROM @ChargeRates c1 INNER JOIN @ChargeRates c2 ON (
+					(c1.FromDate BETWEEN c2.FromDate AND c2.ToDate) OR
+					(c1.ToDate BETWEEN c2.FromDate AND c2.ToDate)
+				) WHERE c1.RowId != c2.RowId)
+			OR EXISTS (
+				SELECT 1 FROM @ChargeRates c1 INNER JOIN dbo.LA_HostingFeesSetting c2 WITH(NOLOCK) ON (
+					(c1.FromDate BETWEEN c2.FromDate AND c2.ToDate) OR
+					(c1.ToDate BETWEEN c2.FromDate AND c2.ToDate)
+				) WHERE c2.ChargeId != @LatestChargeId AND c2.SettingType = 1 AND c2.FromParty = @PayerId
 			)
-		BEGIN
-			SELECT 	@ErrMsg = 'Invalid date range of charge rate. Please try again.', @ErrCode = 12
-			RETURN
+			BEGIN
+				SELECT @ErrMsg = 'Invalid date range of charge rate. Please try again.', @ErrCode = 10
+				RETURN
+			END;
+
+			-- Update charge rate settings
+			MERGE dbo.LA_HostingFeesSetting h
+			USING @ChargeRates c ON h.ChargeId = c.ChargeId AND h.ChargeId = @LatestChargeId
+			WHEN MATCHED THEN
+				UPDATE SET
+					h.FromDate = c.FromDate,
+					h.ToDate = c.ToDate,
+					h.FirstBilling = c.FirstBilling,
+					h.BasisOfBilling = c.BasisOfBilling,
+					h.HostingFeesId = c.HostingFeesId
+			WHEN NOT MATCHED BY TARGET THEN
+				INSERT (SettingType,ParentId,FromParty,ToParty,FromDate,ToDate,ProductName,FirstBilling,BasisOfBilling,BaseCurrencyId,HostingFeesId,Remark)
+				VALUES (1, 0, @PayerId, 1, c.FromDate, c.ToDate, 'Hosting', c.FirstBilling, c.BasisOfBilling, @BaseCurrencyId, c.HostingFeesId, 'Insert new hosting fees charge rate.');
+
 		END
 		ELSE
-		BEGIN 
-			INSERT INTO LA_HostingFeesSetting(SettingType,ParentId,FromParty,ToParty,FromDate,ToDate,ProductName,FirstBilling,BasisOfBilling,BaseCurrencyId,HostingFeesId,Remark)
-			SELECT 1, 0, @PayerId, 1, c.FromDate, c.ToDate, 'Hosting', c.FirstBilling, c.BasisOfBilling, @BaseCurrencyId, c.HostingFeesId, 'Insert new hosting fees charge rate.'
-			FROM @ChargeRates c
-			WHERE c.ChargeId = 0
-		END
-
-		-- Update waive
-		IF EXISTS (	SELECT 1 
-					FROM @Waives c1 INNER JOIN @Waives c2 
-						ON c1.ChargeId > 0 
-						AND c2.ChargeId > 0 
-						AND c1.ChargeId != c2.ChargeId 
-						AND ((c1.FromDate BETWEEN c2.FromDate AND c2.ToDate) OR (c1.ToDate BETWEEN c2.FromDate AND c2.ToDate)) )
-			OR EXISTS ( SELECT 1 
-					FROM @Waives c1 INNER JOIN dbo.LA_HostingFeesSetting c2
-						ON ((c1.FromDate BETWEEN c2.FromDate AND c2.ToDate) OR (c1.ToDate BETWEEN c2.FromDate AND c2.ToDate))
-					WHERE c2.FromParty = @PayerId AND c2.SettingType = 2 AND c1.ChargeId != 0 AND c2.ChargeId NOT IN (SELECT ChargeId FROM @Waives WHERE c1.ChargeId != 0)
-			)				
 		BEGIN
-			SELECT 	@ErrMsg = 'Invalid date range of waive. Please try again.', @ErrCode = 13
+			SELECT @ErrMsg = 'Update failed, allow update latest charge rate setting only.', @ErrCode = 11
 			RETURN
 		END
-		ELSE
-		BEGIN			
-			UPDATE h
-			SET h.FromDate = c.FromDate, h.ToDate = c.ToDate, h.BasedMinimunFees = c.BasedMinimunFees
-			FROM dbo.LA_HostingFeesSetting h INNER JOIN @Waives c ON h.ChargeId = c.ChargeId
-			WHERE h.SettingType = 2 -- waive
-				AND c.ChargeId > 0
-		END
 
-		-- Insert new waive
-		IF EXISTS ( SELECT 1 
-					FROM @Waives c1 INNER JOIN dbo.LA_HostingFeesSetting c2
-						ON ((c1.FromDate BETWEEN c2.FromDate AND c2.ToDate) OR (c1.ToDate BETWEEN c2.FromDate AND c2.ToDate))
-					WHERE c2.FromParty = @PayerId AND c2.SettingType = 2 AND c1.ChargeId = 0
+		-- only allow update latest waive
+		SET @LatestChargeId = (
+			SELECT TOP 1 ChargeId FROM dbo.LA_HostingFeesSetting WITH(NOLOCK)
+			WHERE FromParty = @PayerId AND SettingType = 2
+			ORDER BY FromDate DESC
+		)
+
+		IF @LatestChargeId IS NULL OR (@LatestChargeId = ISNULL((SELECT TOP 1 ChargeId FROM @Waives WHERE ChargeId > 0), @LatestChargeId))
+		BEGIN
+			-- validate waive settings
+			IF EXISTS (
+				SELECT 1 FROM @Waives c1 INNER JOIN @Waives c2 ON (
+					(c1.FromDate BETWEEN c2.FromDate AND c2.ToDate) OR
+					(c1.ToDate BETWEEN c2.FromDate AND c2.ToDate)
+				) WHERE c1.RowId != c2.RowId)
+			OR EXISTS (
+				SELECT 1 FROM @Waives c1 INNER JOIN dbo.LA_HostingFeesSetting c2 WITH(NOLOCK) ON (
+					(c1.FromDate BETWEEN c2.FromDate AND c2.ToDate) OR
+					(c1.ToDate BETWEEN c2.FromDate AND c2.ToDate)
+				) WHERE c2.ChargeId != @LatestChargeId AND c2.SettingType = 2 AND c2.FromParty = @PayerId
 			)
-		BEGIN
-			SELECT 	@ErrMsg = 'Invalid date range of waive. Please try again.', @ErrCode = 14
-			RETURN
+			BEGIN
+				SELECT @ErrMsg = 'Invalid date range of waive. Please try again.', @ErrCode = 12
+				RETURN
+			END;
+
+			-- Update waive settings
+			MERGE dbo.LA_HostingFeesSetting h
+			USING @Waives c ON h.ChargeId = c.ChargeId
+			WHEN MATCHED THEN
+				UPDATE SET
+					h.FromDate = c.FromDate,
+					h.ToDate = c.ToDate,
+					h.BasedMinimunFees = c.BasedMinimunFees
+			WHEN NOT MATCHED BY TARGET THEN
+				INSERT (SettingType,ParentId,FromParty,ToParty,FromDate,ToDate,ProductName,BaseCurrencyId,Remark)
+				VALUES (2, 0, @PayerId, 1, c.FromDate, c.ToDate, 'Hosting', @BaseCurrencyId, 'Insert new hosting fees waive.');
+
 		END
 		ELSE
 		BEGIN
-			INSERT INTO LA_HostingFeesSetting(SettingType,ParentId,FromParty,ToParty,FromDate,ToDate,ProductName,BaseCurrencyId,Remark)
-			SELECT 2, 0, @PayerId, 1, c.FromDate, c.ToDate, 'Hosting', @BaseCurrencyId, 'Insert new hosting fees waive.'
-			FROM @Waives c
-			WHERE c.ChargeId = 0
-		END		
+			SELECT @ErrMsg = 'Update failed, allow update latest waive setting only.', @ErrCode = 13
+			RETURN
+		END
 
 	END TRY
-	BEGIN CATCH 
-		-- Rollback
-		
-		SELECT 	@ErrMsg = 'Update failed. Please try again.', @ErrCode = 1	
+	BEGIN CATCH
+		SELECT 	@ErrMsg = 'Update failed. Please try again.', @ErrCode = 1
 		RETURN
 	END CATCH
-	EXEC sp_xml_removedocument @idoc	
+
+	EXEC sp_xml_removedocument @idoc1
+	EXEC sp_xml_removedocument @idoc2
 
 	-- EndRegion
 	
@@ -210,6 +215,6 @@ BEGIN
 	-- EndRegion
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_HostingFeesChargeRateIns] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_HostingFeesChargeRateIns] TO bodbAdminNet 
 
+GRANT VIEW DEFINITION ON [dbo].[LA_HostingFeesChargeRateIns] TO [vnteam]
+GRANT EXECUTE ON [dbo].[LA_HostingFeesChargeRateIns] TO bodbAdminNet
