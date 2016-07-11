@@ -189,8 +189,8 @@ BEGIN
 					h.ToDate = c.ToDate,
 					h.BasedMinimunFees = c.BasedMinimunFees
 			WHEN NOT MATCHED BY TARGET THEN
-				INSERT (SettingType,ParentId,FromParty,ToParty,FromDate,ToDate,ProductName,BaseCurrencyId,Remark)
-				VALUES (2, 0, @PayerId, 1, c.FromDate, c.ToDate, 'Hosting', @BaseCurrencyId, 'Insert new hosting fees waive.');
+				INSERT (SettingType,ParentId,FromParty,ToParty,FromDate,ToDate,ProductName,BasedMinimunFees,Remark)
+				VALUES (2, 0, @PayerId, 1, c.FromDate, c.ToDate, 'Hosting', c.BasedMinimunFees,'Insert new hosting fees waive.');
 
 		END
 		ELSE
