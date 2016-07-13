@@ -15,7 +15,8 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
 	@ErrCode			INT				= 0		OUTPUT,
 	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT,
 	@BaseCurrency		NVARCHAR(20)	= 'GBP'	OUTPUT,
-	@InvoiceTemplateName VARCHAR(200)	= 0		OUTPUT
+	@InvoiceTemplateName VARCHAR(200)	= 0		OUTPUT,
+	@ExchangeRate		MONEY			= 1		OUTPUT
 WITH RECOMPILE
 AS
 /*	Header:
@@ -83,6 +84,15 @@ BEGIN
 	
 	SELECT @BaseCurrency = @BaseCurrencyName	
 	-- End Region	
+
+	-- Region: Get template
+	SELECT @InvoiceTemplateName = ( SELECT	TOP 1 t.InvTemplateName
+									FROM	dbo.LA_InvoiceSetting i 
+											INNER JOIN dbo.LA_InvoiceTemplate t ON i.InvTempId = t.InvTemplateId
+									WHERE	i.FromPartyId = @PartyId
+											AND i.ToPartyId = @BillerId
+											AND i.InvTypeId = @InvoiceType)
+	-- End Region
 
 	-- Region: Get exchange rate info
 	CREATE	TABLE #Exchange ( 
@@ -172,6 +182,13 @@ BEGIN
 					SET @ErrMsg = 'There is no Peak Concurrent Users data!'
 				END
 			END
+
+			-- get exchange
+			SET @ExchangeRate = (	SELECT e.Rate
+									FROM @Settings s
+										INNER JOIN dbo.LA_HostingFeesDetail d ON s.FeesId = d.HostingFeesId
+										INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
+									WHERE s.SettingType = 1)
 		END
 		
 		DECLARE @BaseProduct INT = (SELECT BaseProduct FROM @Settings WHERE SettingType = 1)
@@ -711,13 +728,7 @@ BEGIN
 			OR (@InvoiceType = 3 AND f.ProductId = -1 AND f.AmountType = 2)
 	ORDER BY f.AmountType, f.ProductId
 	
-	SELECT @ErrCode = 0, @ErrMsg = ''
-	SELECT @InvoiceTemplateName = ( SELECT	TOP 1 t.InvTemplateName
-									FROM	dbo.LA_InvoiceSetting i 
-											INNER JOIN dbo.LA_InvoiceTemplate t ON i.InvTempId = t.InvTemplateId
-									WHERE	i.FromPartyId = @PartyId
-											AND i.ToPartyId = @BillerId
-											AND i.InvTypeId = @InvoiceType)
+	SELECT @ErrCode = 0, @ErrMsg = ''	
 	-- End Region	
 	
 	DROP TABLE #Exchange
