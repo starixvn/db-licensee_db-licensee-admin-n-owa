@@ -52,10 +52,10 @@ BEGIN
 		s.BasedMinimunFees AS BasedMinimunFeesId,
 		pr.ProductName AS BasedMinimunFeesName,
 		s.SettingType
-	FROM dbo.LA_HostingFeesSetting s
+	FROM dbo.LA_HostingFeesSetting s WITH (NOLOCK)
 		LEFT JOIN dbo.LA_f_Products3rd('') pr ON s.BasedMinimunFees = pr.ProductID
-		LEFT JOIN dbo.LA_HostingFees f ON s.HostingFeesId = f.HostingFeesId
-		LEFT JOIN dbo.LA_HostingFeesTypes t ON f.HostingFeesTypeId = t.HostingFeesTypeId
+		LEFT JOIN dbo.LA_HostingFees f WITH (NOLOCK) ON s.HostingFeesId = f.HostingFeesId
+		LEFT JOIN dbo.LA_HostingFeesTypes t WITH (NOLOCK) ON f.HostingFeesTypeId = t.HostingFeesTypeId
 	WHERE s.FromParty = @PayerId
 	ORDER BY s.SettingType, s.FromDate
 END
