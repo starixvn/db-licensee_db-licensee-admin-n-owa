@@ -61,5 +61,5 @@ BEGIN
 END
 GO
 
-GRANT VIEW DEFINITION ON [dbo].[LA_HostingFeesChargeRateSel] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_HostingFeesChargeRateSel] TO bodbAdminNet
+GRANT VIEW DEFINITION ON [dbo].[LA_HostingFeesPayerSettingsSel] TO [vnteam]
+GRANT EXECUTE ON [dbo].[LA_HostingFeesPayerSettingsSel] TO bodbAdminNet
