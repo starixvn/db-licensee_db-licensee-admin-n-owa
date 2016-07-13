@@ -120,7 +120,8 @@ BEGIN
 				
 		INSERT INTO @Settings(ChargeId, SettingType, FromParty, FromDate, ToDate, InputFromDate, InputToDate, DaysInMonth, ProductName, FeesId, FeesType, BaseProduct)
 		SELECT s.ChargeId, s.SettingType, s.FromParty, s.FromDate, s.ToDate, @FromDate, @ToDate, @DaysInMonth, s.ProductName, f.HostingFeesId, f.HostingFeesTypeId, s.BasedMinimunFees
-		FROM dbo.LA_HostingFeesSetting s 
+		FROM dbo.LA_HostingFeesSetting s
+			--INNER JOIN dbo.LA_InvoiceSetting i ON s.FromParty = i.FromPartyId AND i.ProductId = s.
 			INNER JOIN dbo.LA_HostingFees f ON s.HostingFeesId = f.HostingFeesId
 		WHERE s.FromParty = @PartyId
 			AND (@FromDate BETWEEN s.FromDate AND s.ToDate OR @ToDate BETWEEN s.FromDate AND s.ToDate)

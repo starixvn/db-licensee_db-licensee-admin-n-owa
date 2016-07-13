@@ -6,7 +6,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-CREATE PROCEDURE [dbo].[LA_HostingFeesDel]
+ALTER PROCEDURE [dbo].[LA_HostingFeesDel]
 	@HostingFeesId	INT,
 	@UserID			INT,
 	@LoginIP		VARCHAR (50)	= '',
