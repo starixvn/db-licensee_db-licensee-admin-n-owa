@@ -130,7 +130,7 @@ BEGIN
 				h.HostingFeesId = c.HostingFeesId
 		WHEN NOT MATCHED BY TARGET THEN
 			INSERT (SettingType,ParentId,FromParty,ToParty,FromDate,ToDate,ProductName,FirstBilling,BasisOfBilling,BaseCurrencyId,HostingFeesId,Remark)
-			VALUES (1, 0, @PayerId, NULL, c.FromDate, c.ToDate, 'Hosting', c.FirstBilling, c.BasisOfBilling, @BaseCurrencyId, c.HostingFeesId, 'Insert new hosting fees charge rate.')
+			VALUES (1, 0, @PayerId, 0, c.FromDate, c.ToDate, 'Hosting', c.FirstBilling, c.BasisOfBilling, @BaseCurrencyId, c.HostingFeesId, 'Insert new hosting fees charge rate.')
 		WHEN NOT MATCHED BY SOURCE AND h.SettingType=1 AND h.FromParty=@PayerId THEN DELETE;
 
 		-- validate waive settings
@@ -154,7 +154,7 @@ BEGIN
 				h.BasedMinimunFees = c.BasedMinimunFees
 		WHEN NOT MATCHED BY TARGET THEN
 			INSERT (SettingType,ParentId,FromParty,ToParty,FromDate,ToDate,ProductName,BasedMinimunFees,Remark)
-			VALUES (2, 0, @PayerId, NULL, c.FromDate, c.ToDate, 'Hosting', c.BasedMinimunFees,'Insert new hosting fees waive.')
+			VALUES (2, 0, @PayerId, 0, c.FromDate, c.ToDate, 'Hosting', c.BasedMinimunFees,'Insert new hosting fees waive.')
 		WHEN NOT MATCHED BY SOURCE AND h.SettingType=2 AND h.FromParty=@PayerId THEN DELETE;
 
 	END TRY
