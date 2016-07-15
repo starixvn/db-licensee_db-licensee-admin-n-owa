@@ -16,7 +16,9 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
 	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT,
 	@BaseCurrency		NVARCHAR(20)	= 'GBP'	OUTPUT,
 	@InvoiceTemplateName VARCHAR(200)	= 0		OUTPUT,
-	@ExchangeRate		MONEY			= 1		OUTPUT
+	@HostingFeesExchangeName VARCHAR(20)= 0		OUTPUT,
+	@HostingFeesExchangeRate MONEY		= 0		OUTPUT,
+	@HostingFeesAmount MONEY			= 0		OUTPUT
 WITH RECOMPILE
 AS
 /*	Header:
@@ -131,7 +133,6 @@ BEGIN
 		INSERT INTO @Settings(ChargeId, SettingType, FromParty, FromDate, ToDate, InputFromDate, InputToDate, DaysInMonth, ProductName, FeesId, FeesType, BaseProduct)
 		SELECT s.ChargeId, s.SettingType, s.FromParty, s.FromDate, s.ToDate, @FromDate, @ToDate, @DaysInMonth, s.ProductName, f.HostingFeesId, f.HostingFeesTypeId, s.BasedMinimunFees
 		FROM dbo.LA_HostingFeesSetting s
-			--INNER JOIN dbo.LA_InvoiceSetting i ON s.FromParty = i.FromPartyId AND i.ProductId = s.
 			INNER JOIN dbo.LA_HostingFees f ON s.HostingFeesId = f.HostingFeesId
 		WHERE s.FromParty = @PartyId
 			AND (@FromDate BETWEEN s.FromDate AND s.ToDate OR @ToDate BETWEEN s.FromDate AND s.ToDate)
@@ -183,12 +184,14 @@ BEGIN
 				END
 			END
 
-			-- get exchange
-			SET @ExchangeRate = (	SELECT e.Rate
-									FROM @Settings s
-										INNER JOIN dbo.LA_HostingFeesDetail d ON s.FeesId = d.HostingFeesId
-										INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
-									WHERE s.SettingType = 1)
+			SELECT TOP 1	@HostingFeesAmount = d.Amount,
+							@HostingFeesExchangeName = e.CurrencyCode,
+							@HostingFeesExchangeRate = e.Rate
+			FROM @Settings s
+				INNER JOIN dbo.LA_HostingFeesDetail d WITH(NOLOCK) ON s.FeesId = d.HostingFeesId
+				INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
+			WHERE s.SettingType = 1
+			
 		END
 		
 		DECLARE @BaseProduct INT = (SELECT BaseProduct FROM @Settings WHERE SettingType = 1)
@@ -598,142 +601,141 @@ BEGIN
 			UPDATE @EmptyTable
 			SET InvoiceAmount = InvoiceAmount * ( SELECT (NumOfApplyDate / DaysInMonth) FROM @Settings WHERE SettingType = 1)		
 			
-			SELECT * FROM @EmptyTable			
+			SELECT * FROM @EmptyTable
 		END
-
-		RETURN
+	END
+	ELSE
+	BEGIN
+		INSERT INTO @InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType)
+		(
+			SELECT	amf.PartyId, 
+					amf.ProductId, 
+					SUM(amf.AmountToCompany), 
+					0 AS AmountType
+			FROM	@MinFeeGroup amf
+			WHERE	amf.PartyId = @PartyId
+					AND amf.FeeType = 1
+			GROUP	BY amf.PartyId, amf.ProductId
+		)
+	
+		INSERT INTO @InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType)
+		(
+			SELECT	td.PartyId, 
+					td.ProductId, 
+					SUM(td.AmountToCompany), 
+					0 AS AmountType
+			FROM	#TempData td 
+			WHERE	td.PartyId = @PartyId AND td.ProductId NOT IN (SELECT td2.ProductId FROM @MinFeeGroup td2)
+			GROUP	BY td.PartyId, td.ProductId		
+		)
+		-- End region
+	
+		-- Region: Apply Discount
+		DECLARE @TotalAmountDiscount MONEY = (	SELECT SUM(CASE WHEN i.InvoiceAmount < 0 THEN 0 ELSE i.InvoiceAmount END) 
+												FROM @InvoiceData i 
+												WHERE i.ProductId IN (SELECT ProductId FROM @DiscountGroup d WHERE d.DiscountGroupType = 1))
+		DELETE	FROM @DiscountGroup
+		WHERE	@TotalAmountDiscount NOT BETWEEN [@DiscountGroup].FromAmount AND [@DiscountGroup].ToAmount
+				AND [@DiscountGroup].DiscountGroupType = 1
+	
+		INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
+		(
+			SELECT	iv.PartyId, iv.ProductId, iv.InvoiceAmount * dg.Rate AS InvoiceAmount, dg.DiscountGroupType AS AmountType, dg.Rate
+			FROM	@InvoiceData iv INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
+			WHERE	dg.DiscountGroupType = 1
+		)	
+		-- End Region
+		
+		-- Region: Apply Rebate
+		INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
+		(
+			SELECT	iv.PartyId, 
+					iv.ProductId, 
+					(iv.InvoiceAmount - ISNULL((SELECT	SUM(i.InvoiceAmount)
+												FROM	@InvoiceData i
+												WHERE	i.AmountType = 1
+														AND i.ProductId = iv.ProductId), 0))
+						* dg.Rate AS InvoiceAmount, 
+					dg.DiscountGroupType AS AmountType, 
+					dg.Rate
+			FROM	@InvoiceData iv 
+					INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
+			WHERE	dg.DiscountGroupType = 2
+					AND iv.AmountType = 0
+		)
+	
+		-- End Region
+	
+		-- Region: Select data	
+		DECLARE	@FinalResult TABLE(
+				ProductId		INT,
+				ProductCode		VARCHAR(100),
+				ProductName		VARCHAR(500),
+				InvoiceAmount	MONEY,
+				AmountType		TINYINT,
+				Rate			MONEY)
+	
+		INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate)
+		(
+			SELECT	id.ProductId,
+					CASE 
+						WHEN id.ProductId = 0 THEN 'SB' 
+						ELSE p.ProductPrefix
+						END AS ProductCode,
+					CASE 
+						WHEN id.ProductId = 0 THEN 'Sportsbook' 
+						ELSE p.ProductName
+						END AS ProductName,
+					CASE
+						WHEN id.InvoiceAmount > 0 OR id.ProductId = 3 THEN id.InvoiceAmount
+						ELSE 0
+					END AS InvoiceAmount,
+					id.AmountType,
+					id.Rate
+			FROM	@InvoiceData id  
+					LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON id.ProductId = p.Productid				
+		)
+	
+		INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate)
+		(
+			SELECT	-1,
+					(	SELECT	f.ProductCode + ',' 
+						FROM	@FinalResult f 
+						WHERE f.AmountType = id.AmountType FOR XML PATH('')) 
+					AS ProductCode,
+					(	SELECT	f.ProductName + ',' 
+						FROM	@FinalResult f 
+						WHERE f.AmountType = id.AmountType FOR XML PATH('')) 
+					AS ProductName,
+					SUM(id.InvoiceAmount),
+					id.AmountType,
+					id.Rate
+			FROM	@FinalResult id  				
+			WHERE	id.AmountType > 0
+			GROUP BY id.AmountType, id.Rate
+		)	
+		UPDATE	@FinalResult
+		SET		ProductCode = LEFT(ProductCode, LEN(ProductCode) - 1),
+				ProductName = LEFT(ProductName, LEN(ProductName) - 1)
+		WHERE	ProductId = -1
+		
+		SELECT	f.ProductId,
+				f.ProductCode,
+				f.ProductName,
+				f.InvoiceAmount,
+				f.AmountType,
+				f.Rate
+		FROM	@FinalResult f
+		WHERE	(@InvoiceType != 3 AND (f.AmountType = 0 OR (f.ProductId = -1 AND f.AmountType = 1)))
+				OR (@InvoiceType = 3 AND f.ProductId = -1 AND f.AmountType = 2)
+		ORDER BY f.AmountType, f.ProductId
 	END
 
-	INSERT INTO @InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType)
-	(
-		SELECT	amf.PartyId, 
-				amf.ProductId, 
-				SUM(amf.AmountToCompany), 
-				0 AS AmountType
-		FROM	@MinFeeGroup amf
-		WHERE	amf.PartyId = @PartyId
-				AND amf.FeeType = 1
-		GROUP	BY amf.PartyId, amf.ProductId
-	)
-	
-	INSERT INTO @InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType)
-	(
-		SELECT	td.PartyId, 
-				td.ProductId, 
-				SUM(td.AmountToCompany), 
-				0 AS AmountType
-		FROM	#TempData td 
-		WHERE	td.PartyId = @PartyId AND td.ProductId NOT IN (SELECT td2.ProductId FROM @MinFeeGroup td2)
-		GROUP	BY td.PartyId, td.ProductId		
-	)
-	-- End region
-	
-	-- Region: Apply Discount
-	DECLARE @TotalAmountDiscount MONEY = (	SELECT SUM(CASE WHEN i.InvoiceAmount < 0 THEN 0 ELSE i.InvoiceAmount END) 
-											FROM @InvoiceData i 
-											WHERE i.ProductId IN (SELECT ProductId FROM @DiscountGroup d WHERE d.DiscountGroupType = 1))
-	DELETE	FROM @DiscountGroup
-	WHERE	@TotalAmountDiscount NOT BETWEEN [@DiscountGroup].FromAmount AND [@DiscountGroup].ToAmount
-			AND [@DiscountGroup].DiscountGroupType = 1
-	
-	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
-	(
-		SELECT	iv.PartyId, iv.ProductId, iv.InvoiceAmount * dg.Rate AS InvoiceAmount, dg.DiscountGroupType AS AmountType, dg.Rate
-		FROM	@InvoiceData iv INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
-		WHERE	dg.DiscountGroupType = 1
-	)	
-	-- End Region
-		
-	-- Region: Apply Rebate
-	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
-	(
-		SELECT	iv.PartyId, 
-				iv.ProductId, 
-				(iv.InvoiceAmount - ISNULL((SELECT	SUM(i.InvoiceAmount)
-											FROM	@InvoiceData i
-											WHERE	i.AmountType = 1
-													AND i.ProductId = iv.ProductId), 0))
-					* dg.Rate AS InvoiceAmount, 
-				dg.DiscountGroupType AS AmountType, 
-				dg.Rate
-		FROM	@InvoiceData iv 
-				INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
-		WHERE	dg.DiscountGroupType = 2
-				AND iv.AmountType = 0
-	)
-	
-	-- End Region
-	
-	-- Region: Select data	
-	DECLARE	@FinalResult TABLE(
-			ProductId		INT,
-			ProductCode		VARCHAR(100),
-			ProductName		VARCHAR(500),
-			InvoiceAmount	MONEY,
-			AmountType		TINYINT,
-			Rate			MONEY)
-	
-	INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate)
-	(
-		SELECT	id.ProductId,
-				CASE 
-					WHEN id.ProductId = 0 THEN 'SB' 
-					ELSE p.ProductPrefix
-					END AS ProductCode,
-				CASE 
-					WHEN id.ProductId = 0 THEN 'Sportsbook' 
-					ELSE p.ProductName
-					END AS ProductName,
-				CASE
-					WHEN id.InvoiceAmount > 0 OR id.ProductId = 3 THEN id.InvoiceAmount
-					ELSE 0
-				END AS InvoiceAmount,
-				id.AmountType,
-				id.Rate
-		FROM	@InvoiceData id  
-				LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON id.ProductId = p.Productid				
-	)
-	
-	INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate)
-	(
-		SELECT	-1,
-				(	SELECT	f.ProductCode + ',' 
-					FROM	@FinalResult f 
-					WHERE f.AmountType = id.AmountType FOR XML PATH('')) 
-				AS ProductCode,
-				(	SELECT	f.ProductName + ',' 
-					FROM	@FinalResult f 
-					WHERE f.AmountType = id.AmountType FOR XML PATH('')) 
-				AS ProductName,
-				SUM(id.InvoiceAmount),
-				id.AmountType,
-				id.Rate
-		FROM	@FinalResult id  				
-		WHERE	id.AmountType > 0
-		GROUP BY id.AmountType, id.Rate
-	)	
-	UPDATE	@FinalResult
-	SET		ProductCode = LEFT(ProductCode, LEN(ProductCode) - 1),
-			ProductName = LEFT(ProductName, LEN(ProductName) - 1)
-	WHERE	ProductId = -1
-		
-	SELECT	f.ProductId,
-			f.ProductCode,
-			f.ProductName,
-			f.InvoiceAmount,
-			f.AmountType,
-			f.Rate
-	FROM	@FinalResult f
-	WHERE	(@InvoiceType != 3 AND (f.AmountType = 0 OR (f.ProductId = -1 AND f.AmountType = 1)))
-			OR (@InvoiceType = 3 AND f.ProductId = -1 AND f.AmountType = 2)
-	ORDER BY f.AmountType, f.ProductId
-	
-	SELECT @ErrCode = 0, @ErrMsg = ''	
-	-- End Region	
-	
+	SELECT @ErrCode = 0, @ErrMsg = ''
+
 	DROP TABLE #Exchange
 	DROP TABLE #TempData
-	
+
 END
 GO
 GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceAmountGenerate] TO bodbAdminNet
