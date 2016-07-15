@@ -56,6 +56,7 @@ BEGIN
 
 	EXEC('SELECT * FROM OPENQUERY(DBONUSER, ''' + @OpenQuery + ''')')
 END
+GO
 
 GRANT VIEW DEFINITION ON [dbo].LA_PeakConcurrentUsersSel TO [vnteam] 
 GRANT EXECUTE ON [dbo].LA_PeakConcurrentUsersSel TO bodbAdminNet 
