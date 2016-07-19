@@ -52,7 +52,10 @@ BEGIN
 			i.CreatedBy,
 			i.CreatedDateTime,
 			i.UpdatedDateTime,
-			i.IsSeparateProduct
+			i.IsSeparateProduct,
+			i.MaxPCU,
+			i.RateAmount,
+			i.IsWaived
 	FROM	dbo.LA_InvoiceHeader i WITH(NOLOCK)
 			INNER JOIN dbo.LA_InvoiceSetting lis ON i.BillerId = lis.ToPartyId AND i.PartyId = lis.FromPartyId AND i.InvoiceType = lis.InvTypeId
 			INNER JOIN dbo.LA_InvoiceTemplate lit ON lis.InvTempId = lit.InvTemplateId
