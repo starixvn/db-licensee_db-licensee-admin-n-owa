@@ -19,6 +19,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
 	@HostingFeesExchangeName VARCHAR(20)= 0		OUTPUT,
 	@HostingFeesExchangeRate MONEY		= 0		OUTPUT,
 	@HostingFeesAmount MONEY			= 0		OUTPUT,
+	@HostingFeesMaxPCU INT				= 0		OUTPUT,
 	@IsWaived BIT						= 0		OUTPUT
 WITH RECOMPILE
 AS
@@ -32,6 +33,7 @@ AS
 		+ 2015.09.22 @Bravo.Tran: Invoice Amount - Fix bug wrong Total amount under Discount.
 		+ 2015.11.09 @Bravo.Tran: Invoice Amount - Enhance prorate min fee.
 		+ 2016.06.27 @Bravo.Tran: Invoice Amount - Hosting Fess amount.
+		+ 2016.07.19 @Bruce.Bui: Adding hosting fees extra info.
 */
 /*	Example:
 	USE bodb_Licensee
@@ -173,13 +175,13 @@ BEGIN
 				INSERT INTO @CurrentUser
 				EXEC LA_PeakConcurrentUsersSel @PartyId, @FromDate, @ToDate
 
-				DECLARE @MaxCurrentUser INT = (SELECT MAX(TotalUser) FROM @CurrentUser)
-				IF(ISNULL(@MaxCurrentUser, 0) > 0)
+				SET @HostingFeesMaxPCU = (SELECT MAX(TotalUser) FROM @CurrentUser)
+				IF(ISNULL(@HostingFeesMaxPCU, 0) > 0)
 				BEGIN
 					INSERT INTO @EmptyTable
 					SELECT p.Productid, p.ProductPrefix, s.ProductName, s.NumOfApplyDate/s.DaysInMonth * d.Amount * e.Rate, d.Amount * e.Rate, 0
 					FROM @Settings s INNER JOIN dbo.Product3rd p ON s.ProductName = p.ProductName
-						INNER JOIN dbo.LA_HostingFeesDetail d ON s.FeesId = d.HostingFeesId AND @MaxCurrentUser BETWEEN d.VCMFrom AND d.VCMTo
+						INNER JOIN dbo.LA_HostingFeesDetail d ON s.FeesId = d.HostingFeesId AND @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
 						INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
 					WHERE s.SettingType = 1
 				END
@@ -202,7 +204,7 @@ BEGIN
 				INNER JOIN dbo.LA_HostingFeesDetail d WITH(NOLOCK) ON s.FeesId = d.HostingFeesId
 				INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
 			WHERE s.SettingType = 1 AND (
-				d.VCMFrom IS NULL OR @MaxCurrentUser BETWEEN d.VCMFrom AND d.VCMTo
+				d.VCMFrom IS NULL OR @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
 			)
 
 			SELECT * FROM @EmptyTable
