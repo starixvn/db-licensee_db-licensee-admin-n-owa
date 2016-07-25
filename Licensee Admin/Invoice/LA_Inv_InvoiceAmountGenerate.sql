@@ -131,82 +131,93 @@ BEGIN
 			ProductName VARCHAR(50),
 			FeesId		INT,
 			FeesType	TINYINT,
-			BaseProduct INT
+			BaseProduct INT,
+			IsSameExchange BIT
 		)
-				
-		INSERT INTO @Settings(ChargeId, SettingType, FromParty, FromDate, ToDate, InputFromDate, InputToDate, DaysInMonth, ProductName, FeesId, FeesType, BaseProduct)
-		SELECT s.ChargeId, s.SettingType, s.FromParty, s.FromDate, s.ToDate, @FromDate, @ToDate, @DaysInMonth, s.ProductName, f.HostingFeesId, f.HostingFeesTypeId, s.BasedMinimunFees
+
+		INSERT INTO @Settings(ChargeId, SettingType, FromParty, FromDate, ToDate, InputFromDate, InputToDate, DaysInMonth, ProductName, FeesId, FeesType, BaseProduct, IsSameExchange)
+		SELECT s.ChargeId, s.SettingType, s.FromParty, s.FromDate, s.ToDate, @FromDate, @ToDate, @DaysInMonth, s.ProductName, f.HostingFeesId, f.HostingFeesTypeId, s.BasedMinimunFees,
+			CASE WHEN s.BaseCurrencyId = f.BaseCurrencyId AND s.BaseCurrencyId = @BaseCurrencyId THEN 1 ELSE 0 END
 		FROM dbo.LA_HostingFeesSetting s
 			LEFT JOIN dbo.LA_HostingFees f ON s.HostingFeesId = f.HostingFeesId
 		WHERE s.FromParty = @PartyId
 			AND (@FromDate BETWEEN s.FromDate AND s.ToDate OR @ToDate BETWEEN s.FromDate AND s.ToDate)
-		
-		UPDATE @Settings
-		SET NumOfApplyDate = CONVERT(MONEY, CASE WHEN InputToDate < ToDate THEN InputToDate ELSE ToDate END - CASE WHEN InputFromDate > FromDate THEN InputFromDate ELSE FromDate END) + 1
 
-		-- check waived status
-		DECLARE @NumOfWaivedDays INT = ISNULL((SELECT NumOfApplyDate FROM @Settings WHERE SettingType = 2), 0)
-		SET @IsWaived = (CASE WHEN @NumOfWaivedDays > 0 THEN 1 ELSE 0 END)
-
-		UPDATE @Settings 
-		SET NumOfApplyDate = NumOfApplyDate - @NumOfWaivedDays
-		WHERE SettingType = 1
-
-		IF (SELECT COUNT(*) from @Settings WHERE SettingType = 1) = 0
-		BEGIN 
-			SET @ErrCode = 81
-			SET @ErrMsg = 'There is no hosting fees charge rate settings!'
+		SET @ErrCode = 0
+		IF EXISTS (SELECT 1 FROM @Settings WHERE IsSameExchange = 0 AND SettingType = 1)
+		BEGIN
+			SET @ErrCode = 80
+			SET @ErrMsg = 'Please check the Exchange settings of Hosting Charge Rate. Exchange of the setting must be the same with Payer'' exchange'
 		END
 		ELSE
 		BEGIN
-			DECLARE @FeesType TINYINT = (SELECT FeesType FROM @Settings WHERE SettingType = 1)
-			IF @FeesType = 1 -- Fixed
-			BEGIN
-				INSERT INTO @EmptyTable
-				SELECT p.Productid, p.ProductPrefix, s.ProductName, s.NumOfApplyDate/s.DaysInMonth * d.Amount * e.Rate, d.Amount * e.Rate, 0
-				FROM @Settings s INNER JOIN dbo.Product3rd p ON s.ProductName = p.ProductName
-					INNER JOIN dbo.LA_HostingFeesDetail d ON s.FeesId = d.HostingFeesId
-					INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
-				WHERE s.SettingType = 1
-			END
-			ELSE -- VCM
-			BEGIN 
-				DECLARE @CurrentUser TABLE (TotalUser INT, LogDate DATETIME)
-				INSERT INTO @CurrentUser
-				EXEC LA_PeakConcurrentUsersSel @PartyId, @FromDate, @ToDate
+			UPDATE @Settings
+			SET NumOfApplyDate = CONVERT(MONEY, CASE WHEN InputToDate < ToDate THEN InputToDate ELSE ToDate END - CASE WHEN InputFromDate > FromDate THEN InputFromDate ELSE FromDate END) + 1
 
-				SET @HostingFeesMaxPCU = (SELECT MAX(TotalUser) FROM @CurrentUser)
-				IF(ISNULL(@HostingFeesMaxPCU, 0) > 0)
+			-- check waived status
+			DECLARE @NumOfWaivedDays INT = ISNULL((SELECT NumOfApplyDate FROM @Settings WHERE SettingType = 2), 0)
+			SET @IsWaived = (CASE WHEN @NumOfWaivedDays > 0 THEN 1 ELSE 0 END)
+
+			UPDATE @Settings 
+			SET NumOfApplyDate = NumOfApplyDate - @NumOfWaivedDays
+			WHERE SettingType = 1
+
+			IF (SELECT COUNT(*) from @Settings WHERE SettingType = 1) = 0
+			BEGIN 
+				SET @ErrCode = 81
+				SET @ErrMsg = 'There is no hosting fees charge rate settings!'
+			END
+			ELSE
+			BEGIN
+				DECLARE @FeesType TINYINT = (SELECT FeesType FROM @Settings WHERE SettingType = 1)
+				IF @FeesType = 1 -- Fixed
 				BEGIN
 					INSERT INTO @EmptyTable
 					SELECT p.Productid, p.ProductPrefix, s.ProductName, s.NumOfApplyDate/s.DaysInMonth * d.Amount * e.Rate, d.Amount * e.Rate, 0
 					FROM @Settings s INNER JOIN dbo.Product3rd p ON s.ProductName = p.ProductName
-						INNER JOIN dbo.LA_HostingFeesDetail d ON s.FeesId = d.HostingFeesId AND @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
+						INNER JOIN dbo.LA_HostingFeesDetail d ON s.FeesId = d.HostingFeesId
 						INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
 					WHERE s.SettingType = 1
 				END
-				ELSE
+				ELSE -- VCM
 				BEGIN 
-					SET @ErrCode = 82
-					SET @ErrMsg = 'There is no Peak Concurrent Users data!'
+					DECLARE @CurrentUser TABLE (TotalUser INT, LogDate DATETIME)
+					INSERT INTO @CurrentUser
+					EXEC LA_PeakConcurrentUsersSel @PartyId, @FromDate, @ToDate
+
+					SET @HostingFeesMaxPCU = (SELECT MAX(TotalUser) FROM @CurrentUser)
+					IF(ISNULL(@HostingFeesMaxPCU, 0) > 0)
+					BEGIN
+						INSERT INTO @EmptyTable
+						SELECT p.Productid, p.ProductPrefix, s.ProductName, s.NumOfApplyDate/s.DaysInMonth * d.Amount * e.Rate, d.Amount * e.Rate, 0
+						FROM @Settings s INNER JOIN dbo.Product3rd p ON s.ProductName = p.ProductName
+							INNER JOIN dbo.LA_HostingFeesDetail d ON s.FeesId = d.HostingFeesId AND @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
+							INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
+						WHERE s.SettingType = 1
+					END
+					ELSE
+					BEGIN 
+						SET @ErrCode = 82
+						SET @ErrMsg = 'There is no Peak Concurrent Users data!'
+					END
 				END
+
+				SELECT TOP 1	@HostingFeesAmount = d.Amount,
+								@HostingFeesExchangeName = e.CurrencyCode,
+								@HostingFeesExchangeRate = e.Rate
+				FROM @Settings s
+					INNER JOIN dbo.LA_HostingFeesDetail d WITH(NOLOCK) ON s.FeesId = d.HostingFeesId
+					INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
+				WHERE s.SettingType = 1 AND (
+					d.VCMFrom IS NULL OR @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
+				)
 			END
 		END
 		
 		DECLARE @BaseProduct INT = (SELECT BaseProduct FROM @Settings WHERE SettingType = 1)
 		
-		IF (@BaseProduct IS NULL)
+		IF (@ErrCode != 0 OR @BaseProduct IS NULL)
 		BEGIN
-			SELECT TOP 1	@HostingFeesAmount = d.Amount,
-							@HostingFeesExchangeName = e.CurrencyCode,
-							@HostingFeesExchangeRate = e.Rate
-			FROM @Settings s
-				INNER JOIN dbo.LA_HostingFeesDetail d WITH(NOLOCK) ON s.FeesId = d.HostingFeesId
-				INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
-			WHERE s.SettingType = 1 AND (
-				d.VCMFrom IS NULL OR @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
-			)
-
 			SELECT * FROM @EmptyTable
 			DROP TABLE #Exchange
 			RETURN
