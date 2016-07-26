@@ -81,12 +81,10 @@ BEGIN
 
 	DECLARE @startRun DATETIME, @endRun DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld	NVARCHAR(MAX), @xml XML
 	SET @startRun = GETDATE()
-
-	DECLARE @IsHostingFees BIT = ISNULL((SELECT 1 FROM dbo.LA_InvoiceType WITH(NOLOCK) WHERE InvTypeId = @InvoiceType AND InvTypeName = 'Hosting Fees'),0)
 		
 	IF	ISNULL(@BillerId, 0) > 0 
 		AND ISNULL(@PayerId,0) > 0 		
-		AND (@IsHostingFees = 1 OR ISNULL(@InvoiceSymbol, '') <> '')
+		AND ISNULL(@InvoiceSymbol, '') <> ''
 		AND ISNULL(@InvoiceNumber, 0) > 0
 		AND ISNULL(@DueDate, '') <> ''
 		AND ISNULL(@InvoiceDetailXml, '') <> ''
