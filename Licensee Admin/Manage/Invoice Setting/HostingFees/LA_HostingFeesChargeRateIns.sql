@@ -107,6 +107,12 @@ BEGIN
 			BasedMinimunFees INT			'BasedMinimunFees'
 		)
 
+		IF NOT EXISTS (SELECT TOP 1 * FROM @ChargeRates)
+		BEGIN
+			SELECT @ErrMsg = 'Hosting fees charge rate is required.', @ErrCode = 13
+			RETURN
+		END
+
 		-- validate charge rate settings
 		IF EXISTS (
 			SELECT 1 FROM @ChargeRates c1 INNER JOIN @ChargeRates c2 ON (
