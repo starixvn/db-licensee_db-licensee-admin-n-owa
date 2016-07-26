@@ -108,7 +108,7 @@ BEGIN
 					, SUM(CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount - b.WinLoss) ELSE 0 END) AS Actual_stake
 					, SUM(CASE WHEN b.Bettype = 901 AND b.CustomerCategory = 1001 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountSB
 					, SUM(CASE WHEN b.Bettype = 901 AND b.CustomerCategory = 1002 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountBA
-					, SUM(CASE WHEN b.Bettype IN (901, 902, 903) THEN 0 ELSE b.WinLoss END)	AS WinLossOnBoughtTickets
+					, SUM(CASE WHEN b.Bettype IN (901, 902, 903, 904) THEN 0 ELSE b.WinLoss END)	AS WinLossOnBoughtTickets
 					, SUM(CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount * p.Rate) ELSE 0 END) AS BettradeComm	-- negative amount (meaning that house charges BetTrade this amount).							 					 								
 					, SUM(CASE WHEN bt.ProductID = 0 THEN ISNULL(b.BetCount, 0) ELSE 0 END) TotalTrans
 				FROM bodb_licensee.dbo.rpt_Betting b WITH (NOLOCK)
