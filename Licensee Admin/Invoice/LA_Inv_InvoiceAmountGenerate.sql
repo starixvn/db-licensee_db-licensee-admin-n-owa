@@ -143,6 +143,9 @@ BEGIN
 		WHERE s.FromParty = @PartyId
 			AND (@FromDate BETWEEN s.FromDate AND s.ToDate OR @ToDate BETWEEN s.FromDate AND s.ToDate)
 
+		-- if there is multiple setting, use the latest
+		DELETE @Settings WHERE SettingType = 1 AND FromDate < (SELECT MAX(s.FromDate) FROM @Settings s WHERE s.SettingType=1)
+
 		SET @ErrCode = 0
 		IF EXISTS (SELECT 1 FROM @Settings WHERE IsSameExchange = 0 AND SettingType = 1)
 		BEGIN
@@ -155,7 +158,7 @@ BEGIN
 			SET NumOfApplyDate = CONVERT(MONEY, CASE WHEN InputToDate < ToDate THEN InputToDate ELSE ToDate END - CASE WHEN InputFromDate > FromDate THEN InputFromDate ELSE FromDate END) + 1
 
 			-- check waived status
-			DECLARE @NumOfWaivedDays INT = ISNULL((SELECT NumOfApplyDate FROM @Settings WHERE SettingType = 2), 0)
+			DECLARE @NumOfWaivedDays INT = ISNULL((SELECT SUM(NumOfApplyDate) FROM @Settings WHERE SettingType = 2), 0)
 			SET @IsWaived = (CASE WHEN @NumOfWaivedDays > 0 THEN 1 ELSE 0 END)
 
 			UPDATE @Settings 
