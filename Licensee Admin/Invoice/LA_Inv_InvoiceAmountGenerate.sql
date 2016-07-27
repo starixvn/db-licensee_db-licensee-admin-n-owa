@@ -188,21 +188,17 @@ BEGIN
 					INSERT INTO @CurrentUser
 					EXEC LA_PeakConcurrentUsersSel @PartyId, @FromDate, @ToDate
 
-					SET @HostingFeesMaxPCU = (SELECT MAX(TotalUser) FROM @CurrentUser)
-					IF(ISNULL(@HostingFeesMaxPCU, 0) > 0)
-					BEGIN
-						INSERT INTO @EmptyTable
-						SELECT p.Productid, p.ProductPrefix, s.ProductName, s.NumOfApplyDate/s.DaysInMonth * d.Amount * e.Rate, d.Amount * e.Rate, 0
-						FROM @Settings s INNER JOIN dbo.Product3rd p ON s.ProductName = p.ProductName
-							INNER JOIN dbo.LA_HostingFeesDetail d ON s.FeesId = d.HostingFeesId AND @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
-							INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
-						WHERE s.SettingType = 1
-					END
-					ELSE
-					BEGIN 
-						SET @ErrCode = 82
-						SET @ErrMsg = 'There is no Peak Concurrent Users data!'
-					END
+					-- If waive is applied then get max pcu out of waive range
+					SET @HostingFeesMaxPCU = ISNULL((SELECT MAX(c.TotalUser) FROM @CurrentUser c WHERE c.TotalUser NOT IN (
+						SELECT TotalUser FROM @CurrentUser c2 INNER JOIN @Settings s ON c2.LogDate BETWEEN s.FromDate AND s.ToDate WHERE s.SettingType = 2
+					)),0)
+					
+					INSERT INTO @EmptyTable
+					SELECT p.Productid, p.ProductPrefix, s.ProductName, s.NumOfApplyDate/s.DaysInMonth * d.Amount * e.Rate, d.Amount * e.Rate, 0
+					FROM @Settings s INNER JOIN dbo.Product3rd p ON s.ProductName = p.ProductName
+						INNER JOIN dbo.LA_HostingFeesDetail d ON s.FeesId = d.HostingFeesId AND @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
+						INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
+					WHERE s.SettingType = 1
 				END
 
 				SELECT TOP 1	@HostingFeesAmount = d.Amount,
