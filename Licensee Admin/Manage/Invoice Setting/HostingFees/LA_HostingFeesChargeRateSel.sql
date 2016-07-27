@@ -128,6 +128,7 @@ BEGIN
 		INNER JOIN dbo.LA_HostingFeesTypes t ON f.HostingFeesTypeId = t.HostingFeesTypeId
 		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FirstDate, @LastDate, 'EUR') c ON hs.BaseCurrencyId = c.ExchangeID
 		INNER JOIN @ChargeRateInfo r ON hs.HostingFeesId = r.HostingFeesId
+	ORDER BY hs.FromParty
 
 END
 GO
