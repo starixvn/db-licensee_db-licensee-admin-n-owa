@@ -217,7 +217,11 @@ BEGIN
 			END
 		END
 		
-		DECLARE @BaseProduct INT = (SELECT BaseProduct FROM @Settings WHERE SettingType = 1)
+		DECLARE @BaseProduct INT = (SELECT BaseProduct FROM @Settings WHERE SettingType = 2)
+		SET @ProductCode = CASE 
+			WHEN @BaseProduct = 0 THEN 'SB'
+			ELSE (SELECT ProductPrefix FROM dbo.Product3rd WITH(NOLOCK) WHERE Productid = @BaseProduct)
+		END
 		
 		IF (@ErrCode != 0 OR @BaseProduct IS NULL)
 		BEGIN
@@ -611,7 +615,7 @@ BEGIN
 		
 	IF @InvoiceType = @InvoiceTypeHostingFeesId
 	BEGIN 
-		DECLARE @IsApplyMinFee BIT = (SELECT IsApplyMinFee FROM @MinFeeGroup WHERE PartyId = @PartyId)
+		DECLARE @IsApplyMinFee BIT = ISNULL((SELECT IsApplyMinFee FROM @MinFeeGroup WHERE PartyId = @PartyId),0)
 
 		-- Apply Min fee => Not waived
 		-- No Min fee => waived
