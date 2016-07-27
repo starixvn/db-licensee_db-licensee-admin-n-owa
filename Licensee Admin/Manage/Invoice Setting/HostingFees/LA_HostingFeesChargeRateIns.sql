@@ -120,7 +120,7 @@ BEGIN
 				(c1.ToDate BETWEEN c2.FromDate AND c2.ToDate)
 			) WHERE c1.RowId != c2.RowId)
 		BEGIN
-			SELECT @ErrMsg = 'Invalid date range of charge rate. Please try again.', @ErrCode = 10
+			SELECT @ErrMsg = 'Cannot save the setting, please check From date/To date.', @ErrCode = 10
 			RETURN
 		END;
 
@@ -146,7 +146,7 @@ BEGIN
 				(c1.ToDate BETWEEN c2.FromDate AND c2.ToDate)
 			) WHERE c1.RowId != c2.RowId)
 		BEGIN
-			SELECT @ErrMsg = 'Invalid date range of waive. Please try again.', @ErrCode = 12
+			SELECT @ErrMsg = 'Cannot save waive setting, please check From date/To date.', @ErrCode = 12
 			RETURN
 		END;
 
