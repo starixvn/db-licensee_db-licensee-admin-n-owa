@@ -15,8 +15,8 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
 	@ErrCode			INT				= 0		OUTPUT,
 	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT,
 	@BaseCurrency		NVARCHAR(20)	= 'GBP'	OUTPUT,
-	@InvoiceTemplateName VARCHAR(200)	= 0		OUTPUT,
-	@HostingFeesExchangeName VARCHAR(20)= 0		OUTPUT,
+	@InvoiceTemplateName VARCHAR(200)	= ''	OUTPUT,
+	@HostingFeesExchangeName VARCHAR(20)= ''	OUTPUT,
 	@HostingFeesExchangeRate MONEY		= 0		OUTPUT,
 	@HostingFeesAmount MONEY			= 0		OUTPUT,
 	@HostingFeesMaxPCU INT				= 0		OUTPUT,
@@ -611,7 +611,7 @@ BEGIN
 		
 	IF @InvoiceType = @InvoiceTypeHostingFeesId
 	BEGIN 
-		DECLARE @IsApplyMinFee BIT = ISNULL((SELECT IsApplyMinFee FROM @MinFeeGroup WHERE PartyId = @PartyId),0)
+		DECLARE @IsApplyMinFee BIT = ISNULL((SELECT TOP 1 IsApplyMinFee FROM @MinFeeGroup WHERE PartyId = @PartyId AND FeeType=1),0)
 
 		-- Apply Min fee => Not waived
 		-- No Min fee => waived
