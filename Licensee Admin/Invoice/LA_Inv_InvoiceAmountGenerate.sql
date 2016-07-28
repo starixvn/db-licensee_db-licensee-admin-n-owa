@@ -617,6 +617,28 @@ BEGIN
 		-- No Min fee => waived
 		SET @IsWaived = (CASE WHEN @IsApplyMinFee = 1 THEN 0 ELSE 1 END)
 
+		IF @IsWaived = 0 AND @FeesType = 2 -- VCM and not waive then re-calculate max PCU
+		BEGIN
+			SET @HostingFeesMaxPCU =ISNULL((SELECT MAX(TotalUser) FROM @CurrentUser),0)
+			
+			DELETE @EmptyTable
+
+			INSERT INTO @EmptyTable
+			SELECT p.Productid, p.ProductPrefix, s.ProductName, 0, d.Amount * e.Rate, 0
+			FROM @Settings s INNER JOIN dbo.Product3rd p ON s.ProductName = p.ProductName
+				INNER JOIN dbo.LA_HostingFeesDetail d ON s.FeesId = d.HostingFeesId AND @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
+				INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
+			WHERE s.SettingType = 1
+
+			SELECT TOP 1	@HostingFeesAmount = d.Amount,
+							@HostingFeesExchangeName = e.CurrencyCode,
+							@HostingFeesExchangeRate = e.Rate
+			FROM @Settings s
+				INNER JOIN dbo.LA_HostingFeesDetail d WITH(NOLOCK) ON s.FeesId = d.HostingFeesId
+				INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
+			WHERE s.SettingType = 1 AND (@HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo)
+		END
+
 		SELECT ProductId,
 			ProductCode,
 			Productname,
