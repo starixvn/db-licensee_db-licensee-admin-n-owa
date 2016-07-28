@@ -44,6 +44,13 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
+	-- For writing log
+	DECLARE 
+		@startRun	DATETIME = GETDATE(),
+		@endRun		DATETIME,
+		@duration	INT,
+		@logData	NVARCHAR(4000)
+
 	DECLARE @HostingFeeId INT
 
 	-- Region: Insert hosting fees
@@ -52,6 +59,15 @@ BEGIN
 		SELECT @ErrCode = 1, @ErrMsg = 'Charge Rate Name exists please try again!'
 		RETURN
 	END
+
+	SET @logData = CAST((SELECT
+			@BaseCurrencyId		AS '@bc',
+			@Description		AS '@ds',
+			@HostingFeesName	AS '@hn',
+			@HostingFeesTypeId	AS '@ht',
+			CAST(@XmlDetails AS VARCHAR(2000)) AS '@dt'
+		FOR XML PATH('z'), ROOT('r')
+	) AS NVARCHAR(4000))
 
 	INSERT INTO dbo.LA_HostingFees(HostingFeesName, HostingFeesTypeId, BaseCurrencyId, [Description])
 	VALUES (@HostingFeesName, @HostingFeesTypeId, @BaseCurrencyId, @Description)
@@ -97,7 +113,38 @@ BEGIN
 	-- EndRegion
 
 	-- Region: Write Log
+	SET @endRun = GETDATE()
+	SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
 
+	DECLARE @SpName VARCHAR(100) = 'LA_HostingFeesIns'
+	DECLARE @ActionID INT = ISNULL((
+		SELECT ActionId
+		FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
+		WHERE SPName = @SpName
+	),0)
+
+	BEGIN TRY
+		EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog
+			@UserId = @UserID
+			, @IP = @LoginIP
+			, @LicenseeID = 0
+			, @CurrencyID = 0
+			, @SPName = @SpName
+			, @CustId = 0
+			, @ActionId = @ActionID
+			, @Duration = @duration
+			, @Data = @logData
+			, @OldData = ''
+	END TRY
+	BEGIN CATCH
+		EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP
+			@UserID = @UserID
+			, @CustID = 0
+			, @ActionID = @ActionID
+			, @TrackingValue = @logData
+			, @TrackingValue2 = ''
+			, @duration = @duration
+	END CATCH
 	-- EndRegion
 END
 GO

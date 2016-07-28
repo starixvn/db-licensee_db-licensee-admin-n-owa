@@ -45,11 +45,44 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
+	-- For writing log
+	DECLARE 
+		@startRun	DATETIME = GETDATE(),
+		@endRun		DATETIME,
+		@duration	INT,
+		@logData	NVARCHAR(4000),
+		@logDataOld	NVARCHAR(4000)
+
 	IF EXISTS (SELECT 1 FROM dbo.LA_HostingFees WHERE HostingFeesName = @HostingFeesName AND HostingFeesId != @HostingFeesId)
 	BEGIN
 		SELECT @ErrCode = 1, @ErrMsg = 'Charge Rate Name exists please try again!'
 		RETURN
 	END
+
+	SET @logDataOld = CAST((SELECT
+			c.BaseCurrencyId	AS '@bc',
+			c.[Description]		AS '@ds',
+			c.HostingFeesId		AS '@hi',
+			c.HostingFeesName	AS '@hn',
+			c.HostingFeesTypeId	AS '@ht',
+			(
+				SELECT dt.* FROM dbo.LA_HostingFeesDetail dt WITH(NOLOCK)
+				WHERE dt.HostingFeesId = @HostingFeesId
+				FOR XML PATH('item')
+			) AS '@dt'
+		FROM dbo.LA_HostingFees c WHERE c.HostingFeesId = @HostingFeesId
+		FOR XML PATH('z'), ROOT('r')
+	) AS NVARCHAR(4000))
+
+	SET @logData = CAST((SELECT
+			@BaseCurrencyId		AS '@bc',
+			@Description		AS '@ds',
+			@HostingFeesName	AS '@hn',
+			@HostingFeesTypeId	AS '@ht',
+			@HostingFeesId		AS '@hi',
+			CAST(@XmlDetails AS VARCHAR(2000)) AS '@dt'
+		FOR XML PATH('z'), ROOT('r')
+	) AS NVARCHAR(4000))
 
 	-- Region: Backup
 	DECLARE @BackupHostingFees TABLE(
@@ -111,6 +144,40 @@ BEGIN
 		INSERT INTO dbo.LA_HostingFeesDetail(HostingFeesId, BaseCurrencyId, VCMFrom, VCMTo, Amount)
 		SELECT @HostingFeesId, f.BaseCurrencyId, f.VCMFrom, f.VCMTo, f.Amount
 		FROM @FeesDetails f
+
+		-- write log
+		SET @endRun = GETDATE()
+		SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
+
+		DECLARE @SpName VARCHAR(100) = 'LA_HostingFeesUpd'
+		DECLARE @ActionID INT = ISNULL((
+			SELECT ActionId
+			FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
+			WHERE SPName = @SpName
+		),0)
+
+		BEGIN TRY
+			EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog
+				@UserId = @UserID
+				, @IP = @LoginIP
+				, @LicenseeID = 0
+				, @CurrencyID = 0
+				, @SPName = @SpName
+				, @CustId = 0
+				, @ActionId = @ActionID
+				, @Duration = @duration
+				, @Data = @logData
+				, @OldData = @logDataOld
+		END TRY
+		BEGIN CATCH
+			EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP
+				@UserID = @UserID
+				, @CustID = 0
+				, @ActionID = @ActionID
+				, @TrackingValue = @logData
+				, @TrackingValue2 = @logDataOld
+				, @duration = @duration
+		END CATCH
 	END TRY
 	BEGIN CATCH 
 		-- Rollback
