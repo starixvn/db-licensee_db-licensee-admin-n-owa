@@ -62,6 +62,14 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
+	-- For writing log
+	DECLARE 
+		@startRun	DATETIME = GETDATE(),
+		@endRun		DATETIME,
+		@duration	INT,
+		@logData	NVARCHAR(4000),
+		@logDataOld	NVARCHAR(4000)
+
 	-- Region: Insert hosting fees details
 	DECLARE @ChargeRates AS TABLE (
 		ChargeId		INT	,
@@ -77,7 +85,7 @@ BEGIN
 		ToDate			DATETIME,
 		BasedMinimunFees INT,
 		RowId			SMALLINT IDENTITY)
-			
+
 	DECLARE @idoc1 AS INT
 	EXEC sp_xml_preparedocument @idoc1 OUTPUT, @XmlChargeRates
 
@@ -106,6 +114,71 @@ BEGIN
 			ToDate			DATETIME		'ToDate',
 			BasedMinimunFees INT			'BasedMinimunFees'
 		)
+
+		SET @logDataOld = CAST((SELECT
+				c.ChargeId			AS '@ci',
+				c.SettingType 		AS '@st',
+				c.ParentId 			AS '@pi',
+				c.FromParty 		AS '@fp',
+				c.ToParty 			AS '@tp',
+				c.FromDate 			AS '@fd',
+				c.ToDate 			AS '@td',
+				c.ProductName 		AS '@pn',
+				c.FirstBilling 		AS '@fb',
+				c.BasisOfBilling 	AS '@bb',
+				c.BaseCurrencyId 	AS '@bc',
+				c.HostingFeesId 	AS '@hi',
+				c.BasedMinimunFees 	AS '@bf',
+				c.Remark 			AS '@rm'
+			FROM dbo.LA_HostingFeesSetting c WHERE FromParty = @PayerId
+			FOR XML PATH('z'), ROOT('r')
+		) AS NVARCHAR(4000))
+
+		SET @logData = CAST((SELECT
+				c.ChargeId			AS '@ci',
+				c.SettingType 		AS '@st',
+				c.ParentId 			AS '@pi',
+				c.FromParty 		AS '@fp',
+				c.ToParty 			AS '@tp',
+				c.FromDate 			AS '@fd',
+				c.ToDate 			AS '@td',
+				c.ProductName 		AS '@pn',
+				c.FirstBilling 		AS '@fb',
+				c.BasisOfBilling 	AS '@bb',
+				c.BaseCurrencyId 	AS '@bc',
+				c.HostingFeesId 	AS '@hi',
+				c.BasedMinimunFees 	AS '@bf',
+				c.Remark 			AS '@rm'
+			FROM ( SELECT ChargeId,
+					1 SettingType,
+					0 ParentId,
+					@PayerId FromParty,
+					0 ToParty,
+					FromDate,
+					ToDate,
+					'Hosting' ProductName,
+					FirstBilling,
+					BasisOfBilling,
+					@BaseCurrencyId BaseCurrencyId,
+					HostingFeesId,
+					NULL BasedMinimunFees,
+					'' Remark FROM @ChargeRates
+				UNION ALL SELECT ChargeId,
+					2 SettingType,
+					0 ParentId,
+					@PayerId FromParty,
+					0 ToParty,
+					FromDate,
+					ToDate,
+					'Hosting' ProductName,
+					NULL FirstBilling,
+					NULL BasisOfBilling,
+					@BaseCurrencyId BaseCurrencyId,
+					NULL HostingFeesId,
+					BasedMinimunFees,
+					'' Remark FROM @Waives
+			) c FOR XML PATH('z'), ROOT('r')
+		) AS NVARCHAR(4000))
 
 		IF NOT EXISTS (SELECT TOP 1 * FROM @ChargeRates)
 		BEGIN
@@ -174,7 +247,39 @@ BEGIN
 
 	-- EndRegion
 	
-	-- Region: Write Log
+	-- write log
+	SET @endRun = GETDATE()
+	SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
+
+	DECLARE @SpName VARCHAR(100) = 'LA_HostingFeesChargeRateIns'
+	DECLARE @ActionID INT = ISNULL((
+		SELECT ActionId
+		FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
+		WHERE SPName = @SpName
+	),0)
+
+	BEGIN TRY
+		EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog
+			@UserId = @UserID
+			, @IP = @LoginIP
+			, @LicenseeID = 0
+			, @CurrencyID = 0
+			, @SPName = @SpName
+			, @CustId = 0
+			, @ActionId = @ActionID
+			, @Duration = @duration
+			, @Data = @logData
+			, @OldData = @logDataOld
+	END TRY
+	BEGIN CATCH
+		EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP
+			@UserID = @UserID
+			, @CustID = 0
+			, @ActionID = @ActionID
+			, @TrackingValue = @logData
+			, @TrackingValue2 = @logDataOld
+			, @duration = @duration
+	END CATCH
 
 	-- EndRegion
 END
