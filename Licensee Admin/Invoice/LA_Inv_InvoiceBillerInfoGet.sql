@@ -19,6 +19,7 @@ AS
 	Revisions: 
 		+ 20150806@Bravo: Invoice Biller Info - Get
 		+ 20151019@Victor: Support Chinese on Invoice's text fields
+		+ 20160728@Bruce: Software data fee & hosting fee have a same invoice no
 */
 /*	Example:
 	USE bodb_licensee
@@ -46,7 +47,9 @@ BEGIN
 				AND ivs.ToPartyId = @BillerId	
 		GROUP	BY ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath
 	)
-	
+
+	DECLARE @HostingFeeInvoiceType INT = (SELECT InvTypeId FROM LA_InvoiceType WHERE InvTypeName = 'Hosting Fees')
+
 	DECLARE @InvoiceTmp TABLE(
 			BillerId		INT,
 			InvoiceType		INT,
@@ -63,12 +66,21 @@ BEGIN
 	ORDER BY i.InvoiceDate DESC
 		
 	DECLARE @InvoiceSymbol NVARCHAR(20) = ''
-	DECLARE @InvoiceNumber INT = 1						
-	
-	SELECT	TOP 1 @InvoiceSymbol = i.InvoiceSymbol 
-	FROM	@InvoiceTmp i	
-	WHERE	i.InvoiceType = @InvoiceType	
-	
+	DECLARE @InvoiceNumber INT = 1
+
+	IF @InvoiceType IN (1, @HostingFeeInvoiceType)
+	BEGIN
+		SELECT	TOP 1 @InvoiceSymbol = i.InvoiceSymbol
+		FROM	@InvoiceTmp i
+		WHERE	i.InvoiceType IN (1, @HostingFeeInvoiceType)
+	END
+	ELSE
+	BEGIN
+		SELECT	TOP 1 @InvoiceSymbol = i.InvoiceSymbol 
+		FROM	@InvoiceTmp i
+		WHERE	i.InvoiceType = @InvoiceType
+	END
+
 	SELECT	@InvoiceNumber = ISNULL(MAX(i.InvoiceNumber), 0) + 1
 	FROM	@InvoiceTmp i
 			INNER JOIN @InvoiceTmp rf ON i.InvoiceSymbol = rf.InvoiceSymbol	
