@@ -176,7 +176,7 @@ BEGIN
 				FROM @tmpAg
 				)*/
 			AND (Bettype < 31  OR (Bettype BETWEEN 121 AND 999) OR (Bettype BETWEEN 1301 AND 1399))
-			AND b.bettype NOT IN (901, 902, 903) -- bettrade bettypes
+			AND b.bettype NOT IN (901, 902, 903, 904) -- bettrade bettypes
 			AND b.ruben = 1
 			AND b.statusID NOT IN (101, 102, 103)
 			AND tpositiontaking <> 0
@@ -234,7 +234,7 @@ BEGIN
 				FROM @tmpAg
 				)
 			 */
-			AND b.bettype NOT IN (901, 902, 903)-- bettrade bettypes
+			AND b.bettype NOT IN (901, 902, 903, 904)-- bettrade bettypes
 			AND b.statusID <> 101
 			AND ISNULL(b.isBA, 0) = 0
 		GROUP BY b.winlostdate

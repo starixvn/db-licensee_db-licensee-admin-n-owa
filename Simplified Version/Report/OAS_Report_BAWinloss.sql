@@ -182,7 +182,7 @@ BEGIN
 				@DrawFilter <> 1
 				OR b.statusID != 111
 				) -- NoDraw filter
-			AND b.bettype NOT IN( 901, 902, 903)
+			AND b.bettype NOT IN( 901, 902, 903, 904)
 		GROUP BY b.winlostdate
 			,b.currency
 	END
@@ -224,7 +224,7 @@ BEGIN
 				@DrawFilter <> 1
 				OR b.statusID != 111
 				) -- NoDraw filter
-			AND b.bettype NOT IN( 901, 902, 903)
+			AND b.bettype NOT IN( 901, 902, 903, 904)
 		GROUP BY b.winlostdate
 			,b.currency
 	END
