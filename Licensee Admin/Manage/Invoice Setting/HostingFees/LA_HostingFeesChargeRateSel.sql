@@ -95,11 +95,17 @@ BEGIN
 
 		INSERT INTO @ChargeRateInfo
 		SELECT DISTINCT d1.HostingFeesId, STUFF((
-					SELECT ',', CAST(CONVERT(DOUBLE PRECISION,Amount) AS VARCHAR(10))
-					FROM dbo.LA_HostingFeesDetail AS d2 WITH (NOLOCK)
-					WHERE d2.HostingFeesId = d1.HostingFeesId
-					FOR XML PATH(''))
-				, 1, 1, '')
+				SELECT ',', (CASE 
+					WHEN ISNULL(d2.VCMTo,0) = 0 THEN REPLACE(CAST(Amount AS VARCHAR(20)),'.00','')
+					ELSE 'VCM From: ' + CAST(VCMFrom AS VARCHAR(20)) + ' - VCM To: ' + (CASE
+							WHEN VCMTo = 1000000000 THEN 'Unlimited'
+							ELSE CAST(VCMTo AS VARCHAR(20))
+						END) + ' - Amount: ' + REPLACE(CAST(Amount AS VARCHAR(20)),'.00','')
+					END)
+				FROM dbo.LA_HostingFeesDetail AS d2 WITH (NOLOCK)
+				WHERE d2.HostingFeesId = d1.HostingFeesId
+				FOR XML PATH(''))
+			, 1, 1, '')
 		FROM LA_HostingFeesDetail AS d1 WITH (NOLOCK)
 		WHERE d1.HostingFeesId IN (SELECT HostingFeesId FROM @HostingSettings)
 	END
