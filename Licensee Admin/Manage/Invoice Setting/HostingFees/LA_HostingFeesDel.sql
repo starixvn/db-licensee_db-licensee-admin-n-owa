@@ -34,7 +34,7 @@ BEGIN
 		@duration	INT,
 		@logData	NVARCHAR(4000)
 
-	IF EXISTS (SELECT 1 FROM dbo.LA_HostingFeesSetting WHERE HostingFeesId = @HostingFeesId)
+	IF EXISTS (SELECT 1 FROM dbo.LA_HostingFeesSetting WITH(NOLOCK) WHERE HostingFeesId = @HostingFeesId)
 	BEGIN
 		SELECT 	@ErrMsg = 'This setting is being used.', @ErrCode = 2	
 		RETURN

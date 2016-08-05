@@ -57,8 +57,8 @@ BEGIN
 			i.RateAmount,
 			i.IsWaived
 	FROM	dbo.LA_InvoiceHeader i WITH(NOLOCK)
-			INNER JOIN dbo.LA_InvoiceSetting lis ON i.BillerId = lis.ToPartyId AND i.PartyId = lis.FromPartyId AND i.InvoiceType = lis.InvTypeId
-			INNER JOIN dbo.LA_InvoiceTemplate lit ON lis.InvTempId = lit.InvTemplateId
+			INNER JOIN dbo.LA_InvoiceSetting lis WITH(NOLOCK) ON i.BillerId = lis.ToPartyId AND i.PartyId = lis.FromPartyId AND i.InvoiceType = lis.InvTypeId
+			INNER JOIN dbo.LA_InvoiceTemplate lit WITH(NOLOCK) ON lis.InvTempId = lit.InvTemplateId
 			INNER JOIN @BaseCurrencyTable bct ON i.CurrencyId = bct.CurrencyId
 	WHERE	i.InvoiceHeaderId = @InvoiceHeaderId
 			AND i.HasDeleted = 0

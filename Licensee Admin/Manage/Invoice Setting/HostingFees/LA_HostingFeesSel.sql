@@ -43,9 +43,9 @@ BEGIN
 			d.Amount,
 			d.BaseCurrencyId AS RateCurrencyId,
 			c1.Name AS RateCurrencyName
-	FROM dbo.LA_HostingFees f
-			INNER JOIN dbo.LA_HostingFeesDetail d ON f.HostingFeesId = d.HostingFeesId
-			INNER JOIN dbo.LA_HostingFeesTypes t ON f.HostingFeesTypeId = t.HostingFeesTypeId
+	FROM dbo.LA_HostingFees f WITH(NOLOCK)
+			INNER JOIN dbo.LA_HostingFeesDetail d WITH(NOLOCK) ON f.HostingFeesId = d.HostingFeesId
+			INNER JOIN dbo.LA_HostingFeesTypes t WITH(NOLOCK) ON f.HostingFeesTypeId = t.HostingFeesTypeId
 			INNER JOIN @Currency c ON f.BaseCurrencyId = c.Id
 			INNER JOIN @Currency c1 ON d.BaseCurrencyId = c1.Id
 	WHERE f.HostingFeesId = @HostingFeesId OR @HostingFeesId = 0

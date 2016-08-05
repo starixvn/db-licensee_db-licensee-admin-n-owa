@@ -50,7 +50,7 @@ BEGIN
 			c.HostingFeesId 	AS '@hi',
 			c.BasedMinimunFees 	AS '@bf',
 			c.Remark 			AS '@rm'
-		FROM dbo.LA_HostingFeesSetting c WHERE FromParty = @PayerId
+		FROM dbo.LA_HostingFeesSetting c WITH(NOLOCK) WHERE FromParty = @PayerId
 		FOR XML PATH('z'), ROOT('r')
 	) AS NVARCHAR(4000))
 

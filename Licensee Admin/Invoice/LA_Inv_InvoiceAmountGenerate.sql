@@ -93,8 +93,8 @@ BEGIN
 
 	-- Region: Get template
 	SELECT @InvoiceTemplateName = ( SELECT	TOP 1 t.InvTemplateName
-									FROM	dbo.LA_InvoiceSetting i 
-											INNER JOIN dbo.LA_InvoiceTemplate t ON i.InvTempId = t.InvTemplateId
+									FROM	dbo.LA_InvoiceSetting i WITH(NOLOCK)
+											INNER JOIN dbo.LA_InvoiceTemplate t WITH(NOLOCK) ON i.InvTempId = t.InvTemplateId
 									WHERE	i.FromPartyId = @PartyId
 											AND i.ToPartyId = @BillerId
 											AND i.InvTypeId = @InvoiceType)
@@ -113,7 +113,7 @@ BEGIN
 	
 	-- End region
 	
-	DECLARE @InvoiceTypeHostingFeesId INT = (SELECT InvTypeId FROM dbo.LA_InvoiceType WHERE InvTypeName LIKE 'Hosting Fees')
+	DECLARE @InvoiceTypeHostingFeesId INT = (SELECT InvTypeId FROM dbo.LA_InvoiceType WITH(NOLOCK) WHERE InvTypeName LIKE 'Hosting Fees')
 	
 	IF @InvoiceType = @InvoiceTypeHostingFeesId
 	BEGIN
@@ -138,8 +138,8 @@ BEGIN
 		INSERT INTO @Settings(ChargeId, SettingType, FromParty, FromDate, ToDate, InputFromDate, InputToDate, DaysInMonth, ProductName, FeesId, FeesType, BaseProduct, IsSameExchange)
 		SELECT s.ChargeId, s.SettingType, s.FromParty, s.FromDate, s.ToDate, @FromDate, @ToDate, @DaysInMonth, s.ProductName, f.HostingFeesId, f.HostingFeesTypeId, s.BasedMinimunFees,
 			CASE WHEN s.BaseCurrencyId = f.BaseCurrencyId AND s.BaseCurrencyId = @BaseCurrencyId THEN 1 ELSE 0 END
-		FROM dbo.LA_HostingFeesSetting s
-			LEFT JOIN dbo.LA_HostingFees f ON s.HostingFeesId = f.HostingFeesId
+		FROM dbo.LA_HostingFeesSetting s WITH(NOLOCK)
+			LEFT JOIN dbo.LA_HostingFees f WITH(NOLOCK) ON s.HostingFeesId = f.HostingFeesId
 		WHERE s.FromParty = @PartyId
 			AND (@FromDate BETWEEN s.FromDate AND s.ToDate OR @ToDate BETWEEN s.FromDate AND s.ToDate)
 
@@ -166,7 +166,7 @@ BEGIN
 			SET NumOfApplyDate = @NumOfApplyDate - @NumOfWaivedDays
 			WHERE SettingType = 1
 
-			IF (SELECT COUNT(*) from @Settings WHERE SettingType = 1) = 0
+			IF (SELECT COUNT(*) FROM @Settings WHERE SettingType = 1) = 0
 			BEGIN 
 				SET @ErrCode = 81
 				SET @ErrMsg = 'There is no hosting fees charge rate settings!'
@@ -178,8 +178,8 @@ BEGIN
 				BEGIN
 					INSERT INTO @EmptyTable
 					SELECT p.Productid, p.ProductPrefix, s.ProductName, s.NumOfApplyDate/s.DaysInMonth * d.Amount * e.Rate, d.Amount * e.Rate, 0
-					FROM @Settings s INNER JOIN dbo.Product3rd p ON s.ProductName = p.ProductName
-						INNER JOIN dbo.LA_HostingFeesDetail d ON s.FeesId = d.HostingFeesId
+					FROM @Settings s INNER JOIN dbo.Product3rd p WITH(NOLOCK) ON s.ProductName = p.ProductName
+						INNER JOIN dbo.LA_HostingFeesDetail d WITH(NOLOCK) ON s.FeesId = d.HostingFeesId
 						INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
 					WHERE s.SettingType = 1
 				END
@@ -196,8 +196,8 @@ BEGIN
 					
 					INSERT INTO @EmptyTable
 					SELECT p.Productid, p.ProductPrefix, s.ProductName, s.NumOfApplyDate/s.DaysInMonth * d.Amount * e.Rate, d.Amount * e.Rate, 0
-					FROM @Settings s INNER JOIN dbo.Product3rd p ON s.ProductName = p.ProductName
-						INNER JOIN dbo.LA_HostingFeesDetail d ON s.FeesId = d.HostingFeesId AND @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
+					FROM @Settings s INNER JOIN dbo.Product3rd p WITH(NOLOCK) ON s.ProductName = p.ProductName
+						INNER JOIN dbo.LA_HostingFeesDetail d WITH(NOLOCK) ON s.FeesId = d.HostingFeesId AND @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
 						INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
 					WHERE s.SettingType = 1
 				END
@@ -505,9 +505,9 @@ BEGIN
 	FROM	#TempData td 
 			INNER JOIN @PartyChargeInfo p 
 				ON td.LicenseeId = p.LicenseeId 
-				AND ((td.ProductId = p.ProductID AND td.ProductId NOT IN (SELECT DISTINCT Productid FROM dbo.LA_Product3rdSub))
+				AND ((td.ProductId = p.ProductID AND td.ProductId NOT IN (SELECT DISTINCT Productid FROM dbo.LA_Product3rdSub WITH(NOLOCK)))
 						OR 
-					(td.ProductId = p.ProductID AND td.BettypeRef = p.BettypeRef AND td.ProductId IN (SELECT DISTINCT Productid FROM dbo.LA_Product3rdSub)))
+					(td.ProductId = p.ProductID AND td.BettypeRef = p.BettypeRef AND td.ProductId IN (SELECT DISTINCT Productid FROM dbo.LA_Product3rdSub WITH(NOLOCK))))
 				AND td.rptDate BETWEEN p.FromDate AND p.ToDate
 			INNER JOIN #Exchange e ON td.rptDate = e.ExchangeDate AND td.CurrencyId = e.ExchangeID	
 		

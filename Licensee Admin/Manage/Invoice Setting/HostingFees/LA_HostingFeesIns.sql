@@ -54,7 +54,7 @@ BEGIN
 	DECLARE @HostingFeeId INT
 
 	-- Region: Insert hosting fees
-	IF EXISTS (SELECT 1 FROM dbo.LA_HostingFees WHERE HostingFeesName = @HostingFeesName)
+	IF EXISTS (SELECT 1 FROM dbo.LA_HostingFees WITH(NOLOCK) WHERE HostingFeesName = @HostingFeesName)
 	BEGIN
 		SELECT @ErrCode = 1, @ErrMsg = 'Charge Rate Name exists please try again!'
 		RETURN

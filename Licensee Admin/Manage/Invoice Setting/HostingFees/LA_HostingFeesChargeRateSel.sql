@@ -130,8 +130,8 @@ BEGIN
 		LEFT JOIN dbo.LA_f_Products3rd('') pr ON ws.BasedMinimunFees = pr.ProductID
 		INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON hs.FromParty = p.PartyID
 		INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
-		INNER JOIN dbo.LA_HostingFees f ON hs.HostingFeesId = f.HostingFeesId
-		INNER JOIN dbo.LA_HostingFeesTypes t ON f.HostingFeesTypeId = t.HostingFeesTypeId
+		INNER JOIN dbo.LA_HostingFees f WITH(NOLOCK) ON hs.HostingFeesId = f.HostingFeesId
+		INNER JOIN dbo.LA_HostingFeesTypes t WITH(NOLOCK) ON f.HostingFeesTypeId = t.HostingFeesTypeId
 		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FirstDate, @LastDate, 'EUR') c ON hs.BaseCurrencyId = c.ExchangeID
 		INNER JOIN @ChargeRateInfo r ON hs.HostingFeesId = r.HostingFeesId
 	ORDER BY hs.FromParty

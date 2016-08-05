@@ -48,7 +48,7 @@ BEGIN
 		GROUP	BY ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath
 	)
 
-	DECLARE @HostingFeeInvoiceType INT = (SELECT InvTypeId FROM LA_InvoiceType WHERE InvTypeName = 'Hosting Fees')
+	DECLARE @HostingFeeInvoiceType INT = (SELECT InvTypeId FROM LA_InvoiceType WITH(NOLOCK) WHERE InvTypeName = 'Hosting Fees')
 
 	DECLARE @InvoiceTmp TABLE(
 			BillerId		INT,
@@ -60,7 +60,7 @@ BEGIN
 			i.InvoiceType,
 			i.InvoiceSymbol,
 			MAX(i.InvoiceNumber)
-	FROM	LA_InvoiceHeader i
+	FROM	LA_InvoiceHeader i WITH(NOLOCK)
 	WHERE	i.BillerId = @BillerId
 	GROUP BY i.BillerId,i.InvoiceType,i.InvoiceSymbol,i.InvoiceDate
 	ORDER BY i.InvoiceDate DESC
@@ -91,7 +91,7 @@ BEGIN
 			InvoiceNumber = @InvoiceNumber
 	UPDATE	@InvoiceInfo
 	SET		IsSeparateProduct = (SELECT TOP 1 i.IsSeparateProduct
-								FROM LA_InvoiceHeader i
+								FROM LA_InvoiceHeader i WITH(NOLOCK)
 								WHERE i.BillerId = @BillerId
 								ORDER BY i.InvoiceNumber DESC)
 	

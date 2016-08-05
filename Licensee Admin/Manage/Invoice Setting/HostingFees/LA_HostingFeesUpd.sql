@@ -53,7 +53,7 @@ BEGIN
 		@logData	NVARCHAR(4000),
 		@logDataOld	NVARCHAR(4000)
 
-	IF EXISTS (SELECT 1 FROM dbo.LA_HostingFees WHERE HostingFeesName = @HostingFeesName AND HostingFeesId != @HostingFeesId)
+	IF EXISTS (SELECT 1 FROM dbo.LA_HostingFees WITH(NOLOCK) WHERE HostingFeesName = @HostingFeesName AND HostingFeesId != @HostingFeesId)
 	BEGIN
 		SELECT @ErrCode = 1, @ErrMsg = 'Charge Rate Name exists please try again!'
 		RETURN
@@ -70,7 +70,7 @@ BEGIN
 				WHERE dt.HostingFeesId = @HostingFeesId
 				FOR XML PATH('item')
 			) AS '@dt'
-		FROM dbo.LA_HostingFees c WHERE c.HostingFeesId = @HostingFeesId
+		FROM dbo.LA_HostingFees c WITH(NOLOCK) WHERE c.HostingFeesId = @HostingFeesId
 		FOR XML PATH('z'), ROOT('r')
 	) AS NVARCHAR(4000))
 
@@ -95,7 +95,7 @@ BEGIN
 
 	INSERT INTO @BackupHostingFees(HostingFeesId, HostingFeesName, HostingFeesTypeId, BaseCurrencyId, [Description])
 	SELECT f.HostingFeesId, f.HostingFeesName, f.HostingFeesTypeId, f.BaseCurrencyId, f.[Description]
-	FROM dbo.LA_HostingFees f
+	FROM dbo.LA_HostingFees f WITH(NOLOCK)
 	WHERE f.HostingFeesId = @HostingFeesId
 
 	-- Region: update hosting fees
@@ -116,7 +116,7 @@ BEGIN
 
 	INSERT INTO @BackupFeesDetails (HostingFeesId, BaseCurrencyId, VCMFrom, VCMTo, Amount)
 	SELECT d.HostingFeesId, d.BaseCurrencyId, d.VCMFrom, d.VCMTo, d.Amount
-	FROM dbo.LA_HostingFeesDetail d
+	FROM dbo.LA_HostingFeesDetail d WITH(NOLOCK)
 	WHERE d.HostingFeesId = @HostingFeesId
 	-- EndRegion
 
