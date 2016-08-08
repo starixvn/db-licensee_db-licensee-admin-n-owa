@@ -86,7 +86,7 @@ BEGIN
 		CASE WHEN c.FromDate > @ToDate THEN 0 ELSE c.Rate END
 	FROM bodb_licensee..OAS_ChargeInfo c
 	WHERE c.ProductID = 13 AND c.ChargeType = 8
-		
+
 	BEGIN			
 		INSERT INTO #Result(WinlossDate, PartyID, ParentId, CurrencyId, ActualStake, BuyBackAmountSB, BuyBackAmountBA, WinLossOnBoughtTickets, WinLossOnBuyBackAmount, BettradeComm, ProfitSharing, TotalTransaction)
 		(
@@ -112,7 +112,7 @@ BEGIN
 					, SUM(CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount * p.Rate) ELSE 0 END) AS BettradeComm	-- negative amount (meaning that house charges BetTrade this amount).							 					 								
 					, SUM(CASE WHEN bt.ProductID = 0 THEN ISNULL(b.BetCount, 0) ELSE 0 END) TotalTrans
 				FROM bodb_licensee.dbo.rpt_Betting b WITH (NOLOCK)
-					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID 
+					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 					INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (0, 13)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate									
 					AND b.CurrencyID <> 20
@@ -130,7 +130,7 @@ BEGIN
 					, 0 AS BettradeComm		 					 								
 					, SUM(ISNULL(b.BetCount, 0)) TotalTrans
 				FROM bodb_licensee.dbo.rpt_Betting_BA b WITH (NOLOCK)
-					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID 					
+					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate				
 					INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN(3)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
 					AND b.CurrencyID <> 20
@@ -139,7 +139,7 @@ BEGIN
 				GROUP BY p.PartyId, b.RptDate, b.CurrencyId, p.ParentId
 
 			) d 				
-				INNER JOIN @SharingCharge c ON d.ParentId = c.PartyId AND d.rptDate BETWEEN c.FromDate AND c.ToDate
+				LEFT JOIN @SharingCharge c ON d.ParentId = c.PartyId AND d.rptDate BETWEEN c.FromDate AND c.ToDate
 			GROUP BY d.PartyId, d.ParentId,d.RptDate, d.CurrencyID, c.Rate
 		)	
 	END

@@ -1,3 +1,11 @@
+USE [bodb02]
+GO
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
 ALTER PROCEDURE [dbo].[OAS_Report_LicenseeWinloss] 
 	 @PartyID 	INT
 	,@Currency 	INT 			= 0
