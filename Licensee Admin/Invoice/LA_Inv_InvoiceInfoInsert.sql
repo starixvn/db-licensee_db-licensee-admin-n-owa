@@ -38,6 +38,7 @@ AS
 	Revisions:   
 		+ 20150806@Bravo: Save invoice
 		+ 20151019@Victor: Support Chinese on Invoice's text fields
+        + 20160718@Bruce: Hosting fees - Insert hosting fees info
 	Params:		
 		+ @InvoiceDetailXml: 
 			<InvoiceDetails>

@@ -15,6 +15,7 @@ AS
    
 	Revisions: 
 		+ 2015.08.07: Invoice Info - Get
+        + 20160805@Bruce: Include hosting fee info
 */
 /*	Example:
 	USE bodb_licensee
