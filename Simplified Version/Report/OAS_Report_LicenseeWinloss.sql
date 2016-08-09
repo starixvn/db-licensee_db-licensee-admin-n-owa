@@ -30,6 +30,7 @@ AS
 	- 20150202@Florent: base currency GBP
 	- 20150824@Florent: remove Bettrade bettypes
 	- 20160217@Victor: hotfix - remove bettrade bettypes [Redmine: 52120]
+	- 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
  * 
  * Param's Explanation:    
  *  - @ID   : Party ID  (include: LicenseeID, ResellerID)

@@ -19,6 +19,7 @@ AS
 	Revisions: 
 		-20160317@Bravo: Remove unused param: fix bug wrong actual stake in BTWinLoss report.
 		-20160523@Bravo: https://nexdev.net/projects/owa/wiki/CR_20160519_UpdateBetTradeCommercialTerm
+		- 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
 	Param's Explanation:  						
 */  
 SET NOCOUNT ON

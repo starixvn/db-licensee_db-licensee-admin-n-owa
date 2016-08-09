@@ -26,6 +26,7 @@ AS
    - 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust 
    - 20150202@Florent: base currency GBP
    - 20150824@Florent: remove bettrade ticket
+   - 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
 
  *
  * Params explanation:

@@ -28,6 +28,7 @@ AS
 		- 20160224@Victor: Add product Cock Fighting [Redmine: 52452]
 		- 20160318@Bruce: Add product Colossus bet
 		- 20160422@Victor: Add product Voidbridge [Redmine: #55057]
+		- 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
 	Param's Explanation:
 
 */
