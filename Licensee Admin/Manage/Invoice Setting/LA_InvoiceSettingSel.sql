@@ -15,7 +15,8 @@ AS
 	 Task : Get Inoive setting
 	 DB: DB052.bodb_Licensee  
    
-	 Revisions:     		  
+	 Revisions:
+		+ @Bravo-2016.08.08: Hosting fees     		  
 	 Params:
 		+ 0 get all biller
 		+ <> 0 specify a biller 

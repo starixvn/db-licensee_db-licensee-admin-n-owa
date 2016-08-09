@@ -16,7 +16,8 @@ AS
 	 Task : get Payer Information by Id
 	 DB: DB052.bodb_Licensee  
    
-	 Revisions:     		  
+	 Revisions:     	
+		+ @Bravo-2016.08.08: Hosting fees	  
 	 Params:
 	 Example:
 		EXEC dbo.LA_PayerInfoSel 14
