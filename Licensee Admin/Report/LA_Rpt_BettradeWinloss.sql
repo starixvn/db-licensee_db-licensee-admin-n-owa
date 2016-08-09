@@ -145,7 +145,7 @@ BEGIN
 	END
 
 	UPDATE #Result
-	SET AmountDueTo = WinLossOnBuyBackAmount + WinLossOnBoughtTickets - BettradeComm - ProfitSharing
+	SET AmountDueTo = WinLossOnBuyBackAmount + WinLossOnBoughtTickets - BettradeComm - ISNULL(ProfitSharing, 0)
 
 	CREATE TABLE #FinalResult (
 			 WinlossDate		DATETIME
