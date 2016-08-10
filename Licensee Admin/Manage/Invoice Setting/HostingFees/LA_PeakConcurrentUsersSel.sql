@@ -38,14 +38,14 @@ BEGIN
 		;WITH OU AS (
 			SELECT SUM(Users) Users, LogDate
 			FROM ON_USER.dbo.TotalOnline WITH (NOLOCK)
-			WHERE LEFT(ServerID,3) IN (' + @ServerIds +') AND LogDate BETWEEN @FromDate and @ToDate
+			WHERE LEFT(ServerID,3) IN (' + @ServerIds +') AND DATEADD(d, DATEDIFF(DAY, 0, LogDate), 0) BETWEEN @FromDate and @ToDate
 			GROUP BY LogDate
 
 			UNION ALL
 
 			SELECT SUM(Users) Users, LogDate
 			FROM ON_USER.dbo.TotalOnline_BK WITH (NOLOCK)
-			WHERE LEFT(ServerID,3) IN (' + @ServerIds +') AND LogDate BETWEEN @FromDate and @ToDate
+			WHERE LEFT(ServerID,3) IN (' + @ServerIds +') AND DATEADD(d, DATEDIFF(DAY, 0, LogDate), 0) BETWEEN @FromDate and @ToDate
 			GROUP BY LogDate
 		)
 		SELECT MAX(Users) AS TotalUser, DATEADD(d, DATEDIFF(DAY, 0, LogDate), 0) AS LogDate
