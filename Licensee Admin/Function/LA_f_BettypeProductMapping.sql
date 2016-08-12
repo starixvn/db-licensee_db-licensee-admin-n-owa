@@ -28,6 +28,7 @@ AS
 		- 20160224@Victor: Add product Cock Fighting [Redmine: 52452]
 		- 20160318@Bruce: Add product Colossus bet
 		- 20160422@Victor: Add product Voidbridge [Redmine: #55057]
+		- 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
 	Param's Explanation:
 
 */
@@ -47,7 +48,7 @@ BEGIN
 	   WHERE (typeid < 31
 		  OR typeid BETWEEN 121 AND 999
 		  OR typeid BETWEEN 1301 AND 1399)
-		  AND typeid NOT IN (901, 902, 903) -- Bettrade bettypes
+		  AND typeid NOT IN (901, 902, 903, 904) -- Bettrade bettypes
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
@@ -59,7 +60,7 @@ BEGIN
 	   WHERE (typeid < 31
 		  OR typeid BETWEEN 121 AND 999
 		  OR typeid BETWEEN 1301 AND 1399)
-		  AND typeid NOT IN (901, 902, 903) -- Bettrade bettypes
+		  AND typeid NOT IN (901, 902, 903, 904) -- Bettrade bettypes
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
@@ -158,7 +159,7 @@ BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 13
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
-	   WHERE typeid BETWEEN 901 AND 903
+	   WHERE typeid BETWEEN 901 AND 904
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 

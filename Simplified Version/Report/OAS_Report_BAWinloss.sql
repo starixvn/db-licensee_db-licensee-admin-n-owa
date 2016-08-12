@@ -26,6 +26,7 @@ AS
    - 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust 
    - 20150202@Florent: base currency GBP
    - 20150824@Florent: remove bettrade ticket
+   - 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
 
  *
  * Params explanation:
@@ -182,7 +183,7 @@ BEGIN
 				@DrawFilter <> 1
 				OR b.statusID != 111
 				) -- NoDraw filter
-			AND b.bettype NOT IN( 901, 902, 903)
+			AND b.bettype NOT IN( 901, 902, 903, 904)
 		GROUP BY b.winlostdate
 			,b.currency
 	END
@@ -224,7 +225,7 @@ BEGIN
 				@DrawFilter <> 1
 				OR b.statusID != 111
 				) -- NoDraw filter
-			AND b.bettype NOT IN( 901, 902, 903)
+			AND b.bettype NOT IN( 901, 902, 903, 904)
 		GROUP BY b.winlostdate
 			,b.currency
 	END

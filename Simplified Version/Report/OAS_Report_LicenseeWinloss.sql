@@ -1,3 +1,11 @@
+USE [bodb02]
+GO
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
 ALTER PROCEDURE [dbo].[OAS_Report_LicenseeWinloss] 
 	 @PartyID 	INT
 	,@Currency 	INT 			= 0
@@ -22,6 +30,7 @@ AS
 	- 20150202@Florent: base currency GBP
 	- 20150824@Florent: remove Bettrade bettypes
 	- 20160217@Victor: hotfix - remove bettrade bettypes [Redmine: 52120]
+	- 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
  * 
  * Param's Explanation:    
  *  - @ID   : Party ID  (include: LicenseeID, ResellerID)
@@ -176,7 +185,7 @@ BEGIN
 				FROM @tmpAg
 				)*/
 			AND (Bettype < 31  OR (Bettype BETWEEN 121 AND 999) OR (Bettype BETWEEN 1301 AND 1399))
-			AND b.bettype NOT IN (901, 902, 903) -- bettrade bettypes
+			AND b.bettype NOT IN (901, 902, 903, 904) -- bettrade bettypes
 			AND b.ruben = 1
 			AND b.statusID NOT IN (101, 102, 103)
 			AND tpositiontaking <> 0
@@ -234,7 +243,7 @@ BEGIN
 				FROM @tmpAg
 				)
 			 */
-			AND b.bettype NOT IN (901, 902, 903)-- bettrade bettypes
+			AND b.bettype NOT IN (901, 902, 903, 904)-- bettrade bettypes
 			AND b.statusID <> 101
 			AND ISNULL(b.isBA, 0) = 0
 		GROUP BY b.winlostdate
