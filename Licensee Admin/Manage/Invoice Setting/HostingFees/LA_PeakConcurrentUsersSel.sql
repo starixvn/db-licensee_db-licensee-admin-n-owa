@@ -54,7 +54,7 @@ BEGIN
 		ORDER BY LogDate
 	'
 
-	EXEC('SELECT * FROM OPENQUERY(DB05, ''' + @OpenQuery + ''')')
+	EXEC('SELECT * FROM OPENQUERY(DBONUSER, ''' + @OpenQuery + ''')')
 END
 GO
 
