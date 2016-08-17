@@ -21,6 +21,9 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert]
 	, @IsSeparateProduct BIT			= 0
 	, @UserID			INT
 	, @LoginIP			VARCHAR (50)	= ''
+	, @HostingFeeMaxPCU		INT = 0
+	, @HostingFeeRateAmount	MONEY = 0
+	, @HostingFeeIsWaived	BIT = 0
 	, @ErrCode			INT				= 0		OUTPUT
 	, @ErrMsg			NVARCHAR(1000)	= ''	OUTPUT
 	, @NewInvoiceNumber INT						OUTPUT
@@ -35,6 +38,7 @@ AS
 	Revisions:   
 		+ 20150806@Bravo: Save invoice
 		+ 20151019@Victor: Support Chinese on Invoice's text fields
+        + 20160718@Bruce: Hosting fees - Insert hosting fees info
 	Params:		
 		+ @InvoiceDetailXml: 
 			<InvoiceDetails>
@@ -119,11 +123,11 @@ BEGIN
 					BillerId,
 					PartyId,
 					CurrencyId,
-					InvoiceSymbol,				
+					InvoiceSymbol,
 					InvoiceNumber,
 					FromDate,
 					ToDate,
-					InvoiceDate,				
+					InvoiceDate,
 					DueDate,
 					Amount,
 					InvoiceType,
@@ -134,7 +138,10 @@ BEGIN
 					CreatedBy,
 					CreatedDateTime,
 					UpdatedDateTime,
-					IsSeparateProduct)
+					IsSeparateProduct,
+					MaxPCU,
+					RateAmount,
+					IsWaived)
 			VALUES
 			(
 					@BillerId, 
@@ -155,7 +162,10 @@ BEGIN
 					@UserID, 
 					@CurrentDateTime, 
 					@CurrentDateTime,
-					@IsSeparateProduct
+					@IsSeparateProduct,
+					@HostingFeeMaxPCU,
+					@HostingFeeRateAmount,
+					@HostingFeeIsWaived
 			)
 		END TRY
 		BEGIN CATCH
