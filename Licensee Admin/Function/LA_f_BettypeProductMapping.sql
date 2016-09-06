@@ -28,7 +28,9 @@ AS
 		- 20160224@Victor: Add product Cock Fighting [Redmine: 52452]
 		- 20160318@Bruce: Add product Colossus bet
 		- 20160422@Victor: Add product Voidbridge [Redmine: #55057]
+		- 20160727@Jim:  LRF - Commercial terms changed for Bet Trade [Redmine: #61342]
 		- 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
+		- 20160808@Jim:  LRF - Integrate Allbet [Redmine: #61066]
 	Param's Explanation:
 
 */
@@ -48,7 +50,8 @@ BEGIN
 	   WHERE (typeid < 31
 		  OR typeid BETWEEN 121 AND 999
 		  OR typeid BETWEEN 1301 AND 1399)
-		  AND typeid NOT IN (901, 902, 903, 904) -- Bettrade bettypes
+		  AND typeid NOT IN (901, 902, 903,904) -- Bettrade bettypes
+ 
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
@@ -60,7 +63,7 @@ BEGIN
 	   WHERE (typeid < 31
 		  OR typeid BETWEEN 121 AND 999
 		  OR typeid BETWEEN 1301 AND 1399)
-		  AND typeid NOT IN (901, 902, 903, 904) -- Bettrade bettypes
+		  AND typeid NOT IN (901, 902, 903,904) -- Bettrade bettypes
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
@@ -198,6 +201,17 @@ BEGIN
 	   WHERE typeid BETWEEN 4001 AND 7999
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
 	END
-
+	
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'AB')
+	BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 21
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 2401 AND 2499
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+	END
+	
+	 
+	
 	RETURN
 END
