@@ -1,0 +1,303 @@
+USE bodb_licensee
+GO
+
+ALTER PROCEDURE [dbo].[LA_Rpt_AllBetWinloss]
+	 @PartyIDs			VARCHAR(5500)
+	,@FromDate			SMALLDATETIME
+	,@ToDate			SMALLDATETIME
+	,@BaseCurrencyName	VARCHAR(3) = 'GBP'
+	,@IsGroupByLicensee BIT = 0
+AS
+/*
+ Created by	: [20160907@Bruce]
+ Task		: Get Allbet Winloss
+ DB			: DB052.bodb_licensee
+
+ Revisions:
+
+ Param's Explanation:
+	- @FromDate			: From date
+	- @ToDate			: To date
+	- @BaseCurrencyName	: base currency
+	- @IsGroupByLicensee: if group by curreny then all curreny will be converted to base currency
+*/
+
+BEGIN
+	SET NOCOUNT ON
+
+	DECLARE @ProductId INT = (SELECT TOP 1 ProductId FROM dbo.Product3rd WITH(NOLOCK) WHERE ProductPrefix='AB')
+
+	-- ChargeRate
+	DECLARE	@ServiceChargeCredit	MONEY = (SELECT TOP 1 Rate FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE ProductID=@ProductId AND FromParty=1 AND ChargeType=9)
+	DECLARE	@ServiceChargeDeposit	MONEY = (SELECT TOP 1 Rate FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE ProductID=@ProductId AND FromParty=1 AND ChargeType=10)
+	DECLARE	@RebateCommissionCredit	MONEY = (SELECT TOP 1 Rate FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE ProductID=@ProductId AND FromParty=1 AND ChargeType=11)
+	set @ProductId=1
+	-- Party list
+	BEGIN
+		DECLARE @PartyList AS TABLE (PartyId INT, LicenseeId INT, IsDeposit BIT)
+
+		INSERT INTO @PartyList
+		SELECT p.PartyID, CASE WHEN ISNULL(d.IsDeposit,0) = 1 THEN p.OldRefID ELSE l.LabelID END, ISNULL(d.IsDeposit,0)
+		FROM dbo.OAS_Party p WITH(NOLOCK)
+		INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
+		LEFT JOIN dbo.Labels l WITH(NOLOCK) ON l.LicenseeID = p.OldRefID
+		WHERE p.PartyID IN (SELECT val FROM dbo.strSplit(@PartyIDs, ','))
+	END
+
+	-- Party group List
+	BEGIN
+		DECLARE @PartyGroupList AS TABLE (
+			PartyId		INT,
+			PartyName	VARCHAR(100),
+			BranchName	VARCHAR(100),
+			ParentId	INT
+		)
+
+		INSERT INTO @PartyGroupList (PartyId, PartyName, BranchName, ParentId)
+		EXEC dbo.LA_PartyListSel
+
+		UPDATE @PartyGroupList SET PartyName=REPLACE(PartyName,' Licensees','') WHERE ParentId=0
+	END
+
+	-- Play currency settings
+	BEGIN
+		DECLARE @PlayCurrencySettings TABLE(
+			SiteId			INT,
+			MemberCurrency	INT,
+			PlayCurrency	INT,
+			FromDate		DATETIME,
+			ToDate			DATETIME
+		)
+		INSERT INTO @PlayCurrencySettings
+		SELECT SiteId, MemberCurrency,PlayCurrency,FromDate,ToDate
+		FROM OPENQUERY(DB06,'SELECT SiteId, MemberCurrency,PlayCurrency,FromDate,ToDate FROM bodb02.dbo.PlayCurrencySetting WITH(NOLOCK)')
+	END
+
+	-- Base currencies
+	BEGIN	
+		DECLARE @BaseCurrencies TABLE(
+			CurrencyId	INT,
+			Code		VARCHAR(10),
+			IsApply		BIT
+		)
+		INSERT INTO @BaseCurrencies(CurrencyId, Code)
+		EXEC bodb_Licensee.dbo.LA_SelBaseCurrency
+	END
+
+	-- Exchange
+	CREATE TABLE #Exchange(
+		ExchangeDate	DATETIME,
+		ExchangeId		INT,
+		Code			VARCHAR(10),
+		Rate			FLOAT
+	)
+
+	-- Get Winloss data to #TempData
+	;WITH SumByDate AS (
+		SELECT	p.PartyId,
+				p.IsDeposit,
+				b.rptDate,
+				b.CurrencyID,
+				ISNULL(pc.PlayCurrency, b.CurrencyID) PlayCurrency,
+				SUM(ISNULL(b.BetCount, 0)) TotalTrans,
+				SUM(ISNULL(b.Turnover, 0)) Turnover,
+				SUM(ISNULL(b.MemberWL, 0)) CustomerWinLoss,
+				SUM(ISNULL(b.MemberWL, 0)) ValidBetAmount
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			INNER JOIN @PartyList p ON b.ProductID = @ProductId AND b.SiteID = p.LicenseeId
+			INNER JOIN dbo.view_site_list s WITH(NOLOCK) ON b.SiteId = s.SiteID
+			LEFT JOIN @PlayCurrencySettings pc ON
+			(
+				s.IbcSiteID = pc.SiteId AND
+				b.CurrencyId = pc.MemberCurrency AND
+				b.rptDate BETWEEN pc.FromDate AND pc.ToDate
+			)
+		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate) AND
+				(b.CurrencyID <> 20) AND
+				(b.customercategory NOT IN (27, 28)) AND
+				(b.StatusId NOT IN (-1, 101, 102, 103))
+		GROUP BY b.rptdate, p.PartyId, b.CurrencyID, ISNULL(pc.PlayCurrency, b.CurrencyID), p.IsDeposit
+	)
+	SELECT	PartyId,
+			rptDate,
+			CurrencyID,
+			PlayCurrency,
+			TotalTrans,
+			Turnover,
+			CustomerWinLoss,
+			(-CustomerWinLoss * (CASE WHEN IsDeposit = 0 THEN @ServiceChargeCredit ELSE @ServiceChargeDeposit END)) ServiceChargeOriginal,
+			--IF group = CREDIT THEN
+			--  serviceCharge = - customerWL * 5%
+			--ELSE
+			--  serviceCharge = - customerWL * 4%
+			ValidBetAmount,
+			(CASE WHEN IsDeposit = 0 THEN ValidBetAmount * @RebateCommissionCredit * @ServiceChargeCredit ELSE 0 END) RebateCommissionOriginal
+			--IF group = CREDIT THEN
+			--  rebateAmount = validBetAmount * 1% * 5%
+			--ELSE
+			--  rebate Amount = 0
+	INTO #TempData
+	FROM SumByDate
+
+	-- Report result
+	CREATE TABLE #Result(
+		PartyId						INT,
+		ReportDate					DATETIME,
+		OriginalCurrency			VARCHAR(10),
+		RegisteredCurrency			VARCHAR(10),
+		TotalTrans					INT,
+		Turnover					MONEY,
+		TurnoverBased				MONEY,
+		ValidBetAmount				MONEY,
+		ValidBetAmountBased			MONEY,
+		CustomerWinLoss				MONEY,
+		CustomerWinLossBased		MONEY,
+		ServiceChargeOriginal		MONEY,
+		ServiceChargeBased			MONEY,
+		ServiceChargeRegistered		MONEY,
+		ServiceChargeVariance		MONEY,
+		RebateCommissionOriginal	MONEY,
+		RebateCommissionBased		MONEY,
+		RebateCommissionRegistered	MONEY,
+		RebateCommissionVariance	MONEY,
+		PayToSupplierOriginal		MONEY,
+		PayToSupplierBase			MONEY,
+		PayToSupplierRegistered		MONEY,
+		PayToSupplierVariance		MONEY
+	)
+	
+	DECLARE @GrandTotals AS TABLE(
+		RegisteredCurrency			VARCHAR(10),
+		TotalTrans					INT,
+		Turnover					MONEY,
+		ValidBetAmount				MONEY,
+		CustomerWinLoss				MONEY,
+		ServiceChargeBased			MONEY,
+		ServiceChargeRegistered		MONEY,
+		ServiceChargeVariance		MONEY,
+		RebateCommissionBased		MONEY,
+		RebateCommissionRegistered	MONEY,
+		RebateCommissionVariance	MONEY,
+		PayToSupplierBase			MONEY,
+		PayToSupplierRegistered		MONEY,
+		PayToSupplierVariance		MONEY
+	)
+
+	DECLARE @TempCurrency VARCHAR(10)
+	WHILE EXISTS (SELECT * FROM @BaseCurrencies WHERE IsApply IS NULL)
+	BEGIN
+		SET @TempCurrency = (SELECT TOP 1 Code FROM @BaseCurrencies WHERE IsApply IS NULL)
+		
+		INSERT INTO #Exchange(ExchangeDate, ExchangeId,Code,Rate)
+		SELECT exchangedate, ExchangeId,Code, BaseCurrencyRate
+		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @TempCurrency)
+
+		;WITH StagingData AS (
+			SELECT	t.PartyId,
+					t.rptDate,
+					oe.Code AS OriginalCurrency,
+					re.Code AS RegisteredCurrency,
+					t.TotalTrans,
+					t.Turnover,
+					t.Turnover * oe.Rate AS TurnoverBased,
+					t.ValidBetAmount,
+					t.ValidBetAmount * oe.Rate AS ValidBetAmountBased,
+					t.CustomerWinLoss,
+					t.CustomerWinLoss * oe.Rate AS CustomerWinLossBased,
+					t.ServiceChargeOriginal,
+					t.ServiceChargeOriginal * oe.Rate AS ServiceChargeBased,
+					t.ServiceChargeOriginal * re.Rate AS ServiceChargeRegistered,
+					t.RebateCommissionOriginal ,
+					t.RebateCommissionOriginal * oe.Rate AS RebateCommissionBased,
+					t.RebateCommissionOriginal * re.Rate AS RebateCommissionRegistered
+			FROM #TempData t
+			INNER JOIN #Exchange oe ON oe.exchangedate=t.rptDate AND oe.ExchangeId=t.CurrencyId
+			INNER JOIN #Exchange re ON re.exchangedate=t.rptDate AND re.ExchangeId=t.PlayCurrency
+		)
+		INSERT INTO #Result
+		SELECT	PartyId,
+				rptDate,
+				OriginalCurrency,
+				RegisteredCurrency,
+				TotalTrans,
+				Turnover,
+				TurnoverBased,
+				ValidBetAmount,
+				ValidBetAmountBased,
+				CustomerWinLoss,
+				CustomerWinLossBased,
+				ServiceChargeOriginal,
+				ServiceChargeBased,
+				ServiceChargeRegistered,
+				ServiceChargeBased - ServiceChargeRegistered,
+				RebateCommissionOriginal,
+				RebateCommissionBased,
+				RebateCommissionRegistered,
+				RebateCommissionBased - RebateCommissionRegistered,
+				ServiceChargeOriginal - RebateCommissionOriginal,
+				ServiceChargeBased - RebateCommissionBased,
+				ServiceChargeRegistered - RebateCommissionRegistered,
+				ServiceChargeBased - RebateCommissionBased - ServiceChargeRegistered - RebateCommissionRegistered
+		FROM StagingData
+
+		IF @BaseCurrencyName=@TempCurrency
+		BEGIN
+			SELECT	g.PartyName AS GroupName,
+					p.PartyName,
+					r.PartyId,
+					r.ReportDate,
+					r.OriginalCurrency,
+					r.RegisteredCurrency,
+					r.TotalTrans,
+					CASE WHEN @IsGroupByLicensee=1 THEN TurnoverBased ELSE Turnover END Turnover,
+					CASE WHEN @IsGroupByLicensee=1 THEN ValidBetAmountBased ELSE ValidBetAmount END ValidBetAmount,
+					CASE WHEN @IsGroupByLicensee=1 THEN CustomerWinLossBased ELSE CustomerWinLoss END CustomerWinLoss,
+					r.ServiceChargeOriginal,
+					r.ServiceChargeBased,
+					r.ServiceChargeRegistered,
+					r.ServiceChargeVariance,
+					r.RebateCommissionOriginal,
+					r.RebateCommissionBased,
+					r.RebateCommissionRegistered,
+					r.RebateCommissionVariance,
+					r.PayToSupplierOriginal,
+					r.PayToSupplierBase,
+					r.PayToSupplierRegistered,
+					r.PayToSupplierVariance
+			FROM #Result r
+			INNER JOIN @PartyGroupList p ON r.PartyId = p.PartyId AND p.ParentId > 0
+			INNER JOIN @PartyGroupList g ON p.ParentId= g.PartyId AND g.ParentId = 0
+		END
+
+		INSERT INTO @GrandTotals
+		SELECT	@TempCurrency,
+				SUM(TotalTrans),
+				SUM(TurnoverBased),
+				SUM(ValidBetAmountBased),
+				SUM(CustomerWinLossBased),
+				SUM(ServiceChargeBased),
+				SUM(ServiceChargeRegistered),
+				SUM(ServiceChargeVariance),
+				SUM(RebateCommissionBased),
+				SUM(RebateCommissionBased),
+				SUM(RebateCommissionVariance),
+				SUM(PayToSupplierBase),
+				SUM(PayToSupplierRegistered),
+				SUM(PayToSupplierVariance)
+		FROM #Result
+
+		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Code = @TempCurrency
+		DELETE #Exchange
+		DELETE #Result
+	END
+
+	SELECT * FROM @GrandTotals
+
+	DROP TABLE #Result
+	DROP TABLE #TempData
+	DROP TABLE #Exchange
+END
+
+GO
+GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_AllBetWinloss] TO [vnteam]
+GRANT EXECUTE ON [dbo].[LA_Rpt_AllBetWinloss] TO bodbAdminNet
