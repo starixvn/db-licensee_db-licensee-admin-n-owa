@@ -14,6 +14,7 @@ AS
 		-20140530@Francis: Support Keno product
 		-20160116@Francis: Change to use KPI_Statistics table instead of view_kpi_statistics
 		-20160116@Francis: Support BetTrade
+ 		-20160810@Francis: BetTrade commercial terms changed [Redmine: #62111]
  			
  * Param's Explanation:    
  * -@ReportType: 
@@ -105,7 +106,7 @@ BEGIN
 		where rptDate between @FromDate and @ToDate
 			and (sites.DateStarted is null or rptDate >= sites.DateStarted)
 			--exclude BetTrade StatID
-			and mtd.StatID not between 30 and 34
+			and mtd.StatID not between 30 and 40
 		group by 
 			mtd.rptDate,
 			mtd.StatID,
@@ -203,7 +204,7 @@ BEGIN
 		where rptDate between @FromDate and @ToDate
 			and (sites.DateStarted is null or rptDate >= sites.DateStarted)
 			--include only BetTrade StatID
-			and mtd.StatID BETWEEN 30 and 34
+			and mtd.StatID BETWEEN 30 and 40
 		group by 
 			mtd.rptDate,
 			mtd.StatID,
@@ -222,6 +223,13 @@ BEGIN
 		FROM #Result (NOLOCK) t1
 		left join bodb02.dbo.Lrf_f_GetExchangeDaily(@FromDate,@ToDate) oanda on t1.ReportDate = oanda.exchangedate and oanda.exchangeid = 6
 		WHERE t1.StatID = 33
+		
+		--insert additional financials statistics
+	insert INTO #Result (ReportDate,StatID,SectionID,GroupID,BranchID,Value)
+		SELECT t1.ReportDate,40 AS StatID,t1.SectionID,t1.GroupID,t1.BranchID,(t1.Value * oanda.MYR) AS ProfitSharingInMYR
+		FROM #Result (NOLOCK) t1
+		left join bodb02.dbo.Lrf_f_GetExchangeDaily(@FromDate,@ToDate) oanda on t1.ReportDate = oanda.exchangedate and oanda.exchangeid = 6
+		WHERE t1.StatID = 39
 		
 	END
 		
