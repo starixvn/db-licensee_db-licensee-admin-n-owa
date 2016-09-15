@@ -31,7 +31,7 @@ BEGIN
 	DECLARE	@ServiceChargeCredit	MONEY = (SELECT TOP 1 Rate FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE ProductID=@ProductId AND FromParty=1 AND ChargeType=9)
 	DECLARE	@ServiceChargeDeposit	MONEY = (SELECT TOP 1 Rate FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE ProductID=@ProductId AND FromParty=1 AND ChargeType=10)
 	DECLARE	@RebateCommissionCredit	MONEY = (SELECT TOP 1 Rate FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE ProductID=@ProductId AND FromParty=1 AND ChargeType=11)
-	set @ProductId=1
+
 	-- Party list
 	BEGIN
 		DECLARE @PartyList AS TABLE (PartyId INT, LicenseeId INT, IsDeposit BIT)
@@ -70,7 +70,7 @@ BEGIN
 		)
 		INSERT INTO @PlayCurrencySettings
 		SELECT SiteId, MemberCurrency,PlayCurrency,FromDate,ToDate
-		FROM OPENQUERY(DB06,'SELECT SiteId, MemberCurrency,PlayCurrency,FromDate,ToDate FROM bodb02.dbo.PlayCurrencySetting WITH(NOLOCK)')
+		FROM OPENQUERY(DB06,'SELECT SiteId, MemberCurrency,PlayCurrency,FromDate,ToDate FROM bodb02.dbo.PlayCurrencySetting WITH(NOLOCK) WHERE SportType=211')
 	END
 
 	-- Base currencies
@@ -96,15 +96,15 @@ BEGIN
 	;WITH SumByDate AS (
 		SELECT	p.PartyId,
 				p.IsDeposit,
-				b.rptDate,
+				b.RptDate3rd AS rptDate,
 				b.CurrencyID,
-				ISNULL(pc.PlayCurrency, b.CurrencyID) PlayCurrency,
-				SUM(ISNULL(b.BetCount, 0)) TotalTrans,
-				SUM(ISNULL(b.Turnover, 0)) Turnover,
-				SUM(ISNULL(b.MemberWL, 0)) CustomerWinLoss,
-				SUM(ISNULL(b.MemberWL, 0)) ValidBetAmount
-		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN @PartyList p ON b.ProductID = @ProductId AND b.SiteID = p.LicenseeId
+				ISNULL(pc.PlayCurrency, b.CurrencyID) AS PlayCurrency,
+				SUM(ISNULL(b.BetCount, 0)) AS TotalTrans,
+				SUM(ISNULL(b.Turnover, 0)) AS Turnover,
+				SUM(ISNULL(b.Winloss, 0)) AS CustomerWinLoss,
+				SUM(ISNULL(b.ValidBetAmount, 0)) AS ValidBetAmount
+		FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
+			INNER JOIN @PartyList p ON b.SiteID = p.LicenseeId
 			INNER JOIN dbo.view_site_list s WITH(NOLOCK) ON b.SiteId = s.SiteID
 			LEFT JOIN @PlayCurrencySettings pc ON
 			(
@@ -112,11 +112,11 @@ BEGIN
 				b.CurrencyId = pc.MemberCurrency AND
 				b.rptDate BETWEEN pc.FromDate AND pc.ToDate
 			)
-		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate) AND
+		WHERE	(b.RptDate3rd BETWEEN @FromDate AND @ToDate) AND
 				(b.CurrencyID <> 20) AND
-				(b.customercategory NOT IN (27, 28)) AND
+				(b.BetTypeId BETWEEN 2401 AND 2499) AND
 				(b.StatusId NOT IN (-1, 101, 102, 103))
-		GROUP BY b.rptdate, p.PartyId, b.CurrencyID, ISNULL(pc.PlayCurrency, b.CurrencyID), p.IsDeposit
+		GROUP BY b.RptDate3rd, p.PartyId, b.CurrencyID, ISNULL(pc.PlayCurrency, b.CurrencyID), p.IsDeposit
 	)
 	SELECT	PartyId,
 			rptDate,
