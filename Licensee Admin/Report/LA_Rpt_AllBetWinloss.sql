@@ -291,7 +291,21 @@ BEGIN
 		DELETE #Result
 	END
 
-	SELECT * FROM @GrandTotals
+	SELECT RegisteredCurrency,
+		ISNULL(TotalTrans,0)					AS TotalTrans,
+		ISNULL(Turnover,0)						AS Turnover,
+		ISNULL(ValidBetAmount,0)				AS ValidBetAmount,
+		ISNULL(CustomerWinLoss,0)				AS CustomerWinLoss,
+		ISNULL(ServiceChargeBased,0)			AS ServiceChargeBased,
+		ISNULL(ServiceChargeRegistered,0)		AS ServiceChargeRegistered,
+		ISNULL(ServiceChargeVariance,0)			AS ServiceChargeVariance,
+		ISNULL(RebateCommissionBased,0)			AS RebateCommissionBased,
+		ISNULL(RebateCommissionRegistered,0)	AS RebateCommissionRegistered,
+		ISNULL(RebateCommissionVariance,0)		AS RebateCommissionVariance,
+		ISNULL(PayToSupplierBase,0)				AS PayToSupplierBase,
+		ISNULL(PayToSupplierRegistered,0)		AS PayToSupplierRegistered,
+		ISNULL(PayToSupplierVariance,0)			AS PayToSupplierVariance
+	FROM @GrandTotals
 
 	DROP TABLE #Result
 	DROP TABLE #TempData
