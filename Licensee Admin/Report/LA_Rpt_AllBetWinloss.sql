@@ -237,7 +237,7 @@ BEGIN
 				ServiceChargeOriginal - RebateCommissionOriginal,
 				ServiceChargeBased - RebateCommissionBased,
 				ServiceChargeRegistered - RebateCommissionRegistered,
-				ServiceChargeBased - RebateCommissionBased - ServiceChargeRegistered - RebateCommissionRegistered
+				(ServiceChargeBased - RebateCommissionBased) - (ServiceChargeRegistered - RebateCommissionRegistered)
 		FROM StagingData
 
 		IF @BaseCurrencyName=@TempCurrency
