@@ -66,7 +66,7 @@ BEGIN
 	
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate	
-	FROM bodb02.dbo.LA_f_ExchangeDailySel_xtest(@FromDate, @ToDate, @BaseCurrencyName)
+	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
 	UPDATE #Exchange 
 	SET CurrencyCode = 'INH'
@@ -195,7 +195,7 @@ BEGIN
 		DELETE FROM #Exchange
 		INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-		FROM bodb02.dbo.LA_f_ExchangeDailySel_xtest(@FromDate, @ToDate, @tempCurrency)
+		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency)
 
 		INSERT INTO #GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,WinLossShare,LicenseeComm,CommissionShare,AmountDueLicensee)
 		SELECT	@tempCurrency, 
