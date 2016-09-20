@@ -28,9 +28,20 @@ BEGIN
 	DECLARE @ProductId INT = (SELECT TOP 1 ProductId FROM dbo.Product3rd WITH(NOLOCK) WHERE ProductPrefix='AB')
 
 	-- ChargeRate
-	DECLARE	@ServiceChargeCredit	MONEY = (SELECT TOP 1 Rate FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE ProductID=@ProductId AND FromParty=1 AND ChargeType=9)
-	DECLARE	@ServiceChargeDeposit	MONEY = (SELECT TOP 1 Rate FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE ProductID=@ProductId AND FromParty=1 AND ChargeType=10)
-	DECLARE	@RebateCommissionCredit	MONEY = (SELECT TOP 1 Rate FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE ProductID=@ProductId AND FromParty=1 AND ChargeType=11)
+	DECLARE @ChargeRate TABLE(Rate MONEY, ChargeType TINYINT, FromDate DATETIME, ToDate DATETIME)
+	INSERT INTO @ChargeRate (Rate, ChargeType, FromDate, ToDate)
+	(
+		SELECT Rate, ChargeType,
+			CASE WHEN @FromDate <= FromDate THEN FromDate ELSE @FromDate END,
+			CASE WHEN @ToDate >= ToDate THEN ToDate ELSE @ToDate END
+		FROM dbo.OAS_ChargeInfo WITH(NOLOCK) 
+		WHERE ProductID=@ProductId AND FromParty=1 AND ChargeType IN (9,10,11) AND (
+			@FromDate BETWEEN FromDate AND ToDate OR
+			@ToDate BETWEEN FromDate AND ToDate OR
+			FromDate BETWEEN @FromDate AND @ToDate OR
+			ToDate BETWEEN @FromDate AND @ToDate
+		)
+	)
 
 	-- Party list
 	BEGIN
@@ -121,26 +132,34 @@ BEGIN
 				(b.StatusId NOT IN (-1, 101, 102, 103))
 		GROUP BY b.RptDate3rd, p.PartyId, b.CurrencyID, ISNULL(pc.PlayCurrency, b.CurrencyID), p.IsDeposit
 	)
-	SELECT	PartyId,
-			rptDate,
-			CurrencyID,
-			PlayCurrency,
-			TotalTrans,
-			Turnover,
-			CustomerWinLoss,
-			(-CustomerWinLoss * (CASE WHEN IsDeposit = 0 THEN @ServiceChargeCredit ELSE @ServiceChargeDeposit END)) ServiceChargeOriginal,
-			--IF group = CREDIT THEN
-			--  serviceCharge = - customerWL * 5%
-			--ELSE
-			--  serviceCharge = - customerWL * 4%
-			ValidBetAmount,
-			(CASE WHEN IsDeposit = 0 THEN ValidBetAmount * @RebateCommissionCredit * @ServiceChargeCredit ELSE 0 END) RebateCommissionOriginal
-			--IF group = CREDIT THEN
-			--  rebateAmount = validBetAmount * 1% * 5%
-			--ELSE
-			--  rebate Amount = 0
+	SELECT	*,
+			CAST(NULL AS MONEY) AS ServiceChargeOriginal,
+			CAST(NULL AS MONEY) AS RebateCommissionOriginal
 	INTO #TempData
-	FROM SumByDate
+	FROM SumByDate s
+
+	-- service charge credit
+	UPDATE t SET 
+		ServiceChargeOriginal = -CustomerWinLoss * scc.Rate,
+		RebateCommissionOriginal = ValidBetAmount * scc.Rate
+	FROM #TempData t
+	INNER JOIN @ChargeRate scc ON t.IsDeposit = 0 AND scc.ChargeType = 9  AND t.rptDate BETWEEN scc.FromDate AND scc.ToDate
+
+	-- service charge deposit
+	UPDATE t SET 
+		ServiceChargeOriginal = -CustomerWinLoss * scd.Rate,
+		RebateCommissionOriginal = 0
+	FROM #TempData t
+	INNER JOIN @ChargeRate scd ON t.IsDeposit = 1 AND scd.ChargeType = 10 AND t.rptDate BETWEEN scd.FromDate AND scd.ToDate
+
+	-- rebate commission
+	UPDATE t SET 
+		RebateCommissionOriginal = RebateCommissionOriginal * rbc.Rate
+	FROM #TempData t
+	INNER JOIN @ChargeRate rbc ON t.IsDeposit = 0 AND rbc.ChargeType = 11 AND t.rptDate BETWEEN rbc.FromDate AND rbc.ToDate
+
+	-- remove data out of date range
+	DELETE #TempData WHERE ServiceChargeOriginal IS NULL OR RebateCommissionOriginal IS NULL
 
 	-- Report result
 	CREATE TABLE #Result(
