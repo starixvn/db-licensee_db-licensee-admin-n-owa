@@ -60,6 +60,7 @@ BEGIN
 					WHEN @BaseCurrency = 'CNY' THEN CNY
 					WHEN @BaseCurrency = 'GBP' THEN GBP
 					WHEN @BaseCurrency = 'THB' THEN THB
+					WHEN @BaseCurrency = 'HKD' THEN HKD
 					ELSE 1 END BaseCurrencyRate
 				--, MYR, USD, EUR, CNY, GBP, actualrate
 			FROM dbo.ExchangeDailyOanda WITH (NOLOCK)
