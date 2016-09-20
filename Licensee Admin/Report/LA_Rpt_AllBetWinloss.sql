@@ -279,7 +279,7 @@ BEGIN
 				SUM(ServiceChargeRegistered),
 				SUM(ServiceChargeVariance),
 				SUM(RebateCommissionBased),
-				SUM(RebateCommissionBased),
+				SUM(RebateCommissionRegistered),
 				SUM(RebateCommissionVariance),
 				SUM(PayToSupplierBase),
 				SUM(PayToSupplierRegistered),
