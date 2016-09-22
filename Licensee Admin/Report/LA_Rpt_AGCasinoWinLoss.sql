@@ -18,6 +18,7 @@ AS
    
 	 Revisions:  
 	 - 20160420@Bravo: Get AG Casino win loss data.
+         - 20160920@Bruce: #64425-Update AG Casino PayToSupplier = winloss * rate
 	 Params:
 */
 BEGIN	
@@ -175,7 +176,7 @@ BEGIN
 						END
 	
 	UPDATE r
-	SET r.PayToSupplier = a.ApplyRate * r.LicensingFee, r.CompanyIncome = r.LicensingFee - a.ApplyRate * r.LicensingFee
+	SET r.PayToSupplier = a.ApplyRate * r.LicenseeWinLoss, r.CompanyIncome = r.LicensingFee - (a.ApplyRate * r.LicenseeWinLoss)
 	FROM #Result r INNER JOIN @ApplyRange a ON r.ParentId = a.ParentId
 	-- End Region
 
@@ -237,7 +238,7 @@ BEGIN
 	GROUP BY r.PartyId, r.ParentId, r.CurrencyId, r.WinLossDate
 	
 	UPDATE t
-	SET t.PayToSupplier = a.ApplyRate * t.LicensingFee, t.CompanyIncome = t.LicensingFee - a.ApplyRate * t.LicensingFee
+	SET t.PayToSupplier = a.ApplyRate * t.LicenseeWinLoss, t.CompanyIncome = t.LicensingFee - (a.ApplyRate * t.LicenseeWinLoss)
 	FROM @Total t INNER JOIN @ApplyRange a ON t.ParentId = a.ParentId
 	-- End Region
 	
