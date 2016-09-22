@@ -264,31 +264,60 @@ BEGIN
 
 		IF @BaseCurrencyName=@TempCurrency
 		BEGIN
-			SELECT	g.PartyName AS GroupName,
-					p.PartyName,
-					r.PartyId,
-					r.ReportDate,
-					r.OriginalCurrency,
-					r.RegisteredCurrency,
-					r.TotalTrans,
-					CASE WHEN @IsGroupByLicensee=1 THEN TurnoverBased ELSE Turnover END Turnover,
-					CASE WHEN @IsGroupByLicensee=1 THEN ValidBetAmountBased ELSE ValidBetAmount END ValidBetAmount,
-					CASE WHEN @IsGroupByLicensee=1 THEN CustomerWinLossBased ELSE CustomerWinLoss END CustomerWinLoss,
-					r.ServiceChargeOriginal,
-					r.ServiceChargeBased,
-					r.ServiceChargeRegistered,
-					r.ServiceChargeVariance,
-					r.RebateCommissionOriginal,
-					r.RebateCommissionBased,
-					r.RebateCommissionRegistered,
-					r.RebateCommissionVariance,
-					r.PayToSupplierOriginal,
-					r.PayToSupplierBase,
-					r.PayToSupplierRegistered,
-					r.PayToSupplierVariance
-			FROM #Result r
-			INNER JOIN @PartyGroupList p ON r.PartyId = p.PartyId AND p.ParentId > 0
-			INNER JOIN @PartyGroupList g ON p.ParentId= g.PartyId AND g.ParentId = 0
+			IF @IsGroupByLicensee=1 BEGIN
+				SELECT	g.PartyName AS GroupName,
+						p.PartyName,
+						r.PartyId,
+						r.ReportDate,
+						r.OriginalCurrency,
+						r.RegisteredCurrency,
+						r.TotalTrans,
+						r.TurnoverBased AS Turnover,
+						r.ValidBetAmountBased AS ValidBetAmount,
+						r.CustomerWinLossBased AS CustomerWinLoss,
+						r.ServiceChargeOriginal,
+						r.ServiceChargeBased,
+						r.ServiceChargeRegistered,
+						r.ServiceChargeVariance,
+						r.RebateCommissionOriginal,
+						r.RebateCommissionBased,
+						r.RebateCommissionRegistered,
+						r.RebateCommissionVariance,
+						r.PayToSupplierOriginal,
+						r.PayToSupplierBase,
+						r.PayToSupplierRegistered,
+						r.PayToSupplierVariance
+				FROM #Result r
+				INNER JOIN @PartyGroupList p ON r.PartyId = p.PartyId AND p.ParentId > 0
+				INNER JOIN @PartyGroupList g ON p.ParentId= g.PartyId AND g.ParentId = 0
+			END ELSE BEGIN
+				SELECT	'' AS GroupName,
+						'' AS PartyName,
+						0 AS PartyId,
+						r.ReportDate,
+						r.OriginalCurrency,
+						r.RegisteredCurrency,
+						SUM(r.TotalTrans) AS TotalTrans,
+						SUM(r.Turnover) AS Turnover,
+						SUM(r.ValidBetAmount) AS ValidBetAmount,
+						SUM(r.CustomerWinLoss) AS CustomerWinLoss,
+						SUM(r.ServiceChargeOriginal) AS ServiceChargeOriginal,
+						SUM(r.ServiceChargeBased) AS ServiceChargeBased,
+						SUM(r.ServiceChargeRegistered) AS ServiceChargeRegistered,
+						SUM(r.ServiceChargeVariance) AS ServiceChargeVariance,
+						SUM(r.RebateCommissionOriginal) AS RebateCommissionOriginal,
+						SUM(r.RebateCommissionBased) AS RebateCommissionBased,
+						SUM(r.RebateCommissionRegistered) AS RebateCommissionRegistered,
+						SUM(r.RebateCommissionVariance) AS RebateCommissionVariance,
+						SUM(r.PayToSupplierOriginal) AS PayToSupplierOriginal,
+						SUM(r.PayToSupplierBase) AS PayToSupplierBase,
+						SUM(r.PayToSupplierRegistered) AS PayToSupplierRegistered,
+						SUM(r.PayToSupplierVariance) AS PayToSupplierVariance
+				FROM #Result r
+				INNER JOIN @PartyGroupList p ON r.PartyId = p.PartyId AND p.ParentId > 0
+				INNER JOIN @PartyGroupList g ON p.ParentId= g.PartyId AND g.ParentId = 0
+				GROUP BY r.ReportDate, r.OriginalCurrency, r.RegisteredCurrency
+			END
 		END
 
 		INSERT INTO @GrandTotals
