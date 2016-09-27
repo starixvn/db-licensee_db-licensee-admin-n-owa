@@ -21,7 +21,7 @@ AS
  * Revisions :  
  	- 20141103@Florent: use new structure (#25393)
 	- 20150412@Patrick: Add filter by PartyType
-
+	- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
  *  - @Operator   : List of operator ID separated by ','  
@@ -83,7 +83,7 @@ BEGIN
 		SELECT b.rptDate
 			,b.SiteID
 			,SUM(b.betcount)
-		FROM bodb_licensee.dbo.rpt_betting b WITH (NOLOCK)
+		FROM bodb_licenseereport.dbo.rpt_betting b WITH (NOLOCK)
 		LEFT JOIN bodb02.dbo.League l WITH (NOLOCK) ON b.leagueid = l.leagueid
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.STATUS NOT IN (- 1, 103)
@@ -107,7 +107,7 @@ BEGIN
 		SELECT b.rptDate
 			,b.SiteID
 			,SUM(b.betcount)
-		FROM bodb_licensee.dbo.rpt_betting_BA b WITH (NOLOCK)
+		FROM bodb_licenseereport.dbo.rpt_betting_BA b WITH (NOLOCK)
 		LEFT JOIN bodb02.dbo.League l WITH (NOLOCK) ON b.leagueid = l.leagueid
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.STATUS NOT IN (- 1, 103)
@@ -127,7 +127,7 @@ BEGIN
 		SELECT b.rptDate
 			,b.SiteID
 			,SUM(b.betcount)
-		FROM bodb_licensee.dbo.rpt_betting b WITH (NOLOCK)
+		FROM bodb_licenseereport.dbo.rpt_betting b WITH (NOLOCK)
 		LEFT JOIN bodb02.dbo.League l WITH (NOLOCK) ON b.leagueid = l.leagueid
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.STATUS NOT IN (- 1, 103)
@@ -149,7 +149,7 @@ BEGIN
 		SELECT b.rptDate
 			,b.SiteID
 			,SUM(b.betcount)
-		FROM bodb_licensee.dbo.rpt_betting_BA b WITH (NOLOCK)
+		FROM bodb_licenseereport.dbo.rpt_betting_BA b WITH (NOLOCK)
 		LEFT JOIN bodb02.dbo.League l WITH (NOLOCK) ON b.leagueid = l.leagueid
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.STATUS NOT IN (- 1, 103)

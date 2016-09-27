@@ -28,6 +28,7 @@ AS
 	- 20141117@Florent: remove comm
 	- 20150202@Florent: base currency GBP
 	- 20150412@Patrick: Add filter by PartyType
+	- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 
  * Param's Explanation:    
  *   @Currency: 0 : All
@@ -224,7 +225,7 @@ BEGIN
 								END
 					ELSE 1
 					END) AS BetCount
-		FROM bodb_Licensee.dbo.rpt_Betting b(NOLOCK)
+		FROM bodb_licenseereport.dbo.rpt_Betting b(NOLOCK)
 		INNER JOIN @tmpLicenseeReseller lr ON b.SiteID = lr.OldRefID
 		INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd(NOLOCK) ON lr.FromPartyID = pd.PartyID
 		INNER JOIN bodb02.dbo.league l(NOLOCK) ON l.leagueid = b.LeagueID
@@ -302,7 +303,7 @@ BEGIN
 		FROM @tmpLicenseeReseller lr
 		INNER JOIN bodb_Licensee.dbo.OAS_PartyDetail pd(NOLOCK) ON lr.FromPartyID = pd.PartyID
 		INNER JOIN bodb_Licensee.dbo.labels lb(NOLOCK) ON lr.OldRefID = lb.LicenseeID
-		INNER JOIN bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK) ON b.siteID = lb.LabelID
+		INNER JOIN bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK) ON b.siteID = lb.LabelID
 		INNER JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
 		WHERE pd.IsDeposit = 0
 			AND b.rptDate BETWEEN lr.FromDate AND lr.ToDate
