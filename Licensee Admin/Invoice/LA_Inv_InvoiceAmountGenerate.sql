@@ -34,6 +34,7 @@ AS
 		+ 2015.11.09 @Bravo.Tran: Invoice Amount - Enhance prorate min fee.
 		+ 2016.06.27 @Bravo.Tran: Invoice Amount - Hosting Fess amount.
 		+ 2016.07.19 @Bruce.Bui: Adding hosting fees extra info.
+        + 2016.09.27 @Bruce.Bui: Get MaxPCU case full month waive
 */
 /*	Example:
 	USE bodb_Licensee
