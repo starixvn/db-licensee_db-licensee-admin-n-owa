@@ -28,7 +28,7 @@ AS
     Revisions:  
 	   - 20141223@Florent: remove un-use code and enhance
 	   - 20150703@Florent: add GBP
-
+	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]	
 	Param's Explanation:  
 	  + @PartyIDs : a string of list PartyID, separated by ','
 	  + @Currency : 0-All Currencies
@@ -87,7 +87,7 @@ BEGIN
 			, SUM(betcount * 
 					CASE WHEN @drawfilter = 2 AND b.status = 111 THEN 0
 						ELSE 1 END) AS BetCount
-			FROM bodb_Licensee.dbo.rpt_Betting_BA b WITH (NOLOCK) 			
+			FROM bodb_LicenseeReport.dbo.rpt_Betting_BA b WITH (NOLOCK) 			
 			INNER JOIN(
 					SELECT DISTINCT PartyID, LicenseeID
 					FROM @tmpParty
@@ -122,7 +122,7 @@ BEGIN
 			, SUM(b.betcount * 
 					CASE WHEN @drawfilter = 2 AND b.Status = 111 THEN 0
 					ELSE 1 END) AS BetCount			
-			FROM bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK ) 
+			FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH ( NOLOCK ) 
 			INNER JOIN(
 					SELECT DISTINCT PartyID, LicenseeID--, Bettype
 					FROM @tmpParty

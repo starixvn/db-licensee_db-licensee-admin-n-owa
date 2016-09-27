@@ -29,6 +29,7 @@ AS
 	   - 20150326@Florent: fix filter drawfilter
 	   - 20150703@Florent: add GBP
 	   - 20160115@Victor: Show data of credit licensees regardless Charge Rate = 0 [Redmine: #50829]
+	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
  * Param's Explanation:    
  *  - @FromDate   : From date   
  *  - @ToDate   : To date  
@@ -105,7 +106,7 @@ BEGIN
 									END  
 								ELSE 1   
 							END ) AS betcount
-	FROM bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) 
+	FROM bodb_licenseereport.dbo.rpt_Betting b WITH ( NOLOCK) 
 		INNER JOIN #tmpParty tp ON tp.LicenseeID = b.siteID
 		LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID				
 	WHERE
@@ -146,7 +147,7 @@ BEGIN
 							ELSE 1   
 						END ) AS betcount
 	FROM #tmpParty lr		
-		INNER JOIN bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) ON b.siteID = lr.LicenseeID
+		INNER JOIN bodb_licenseereport.dbo.rpt_Betting b WITH ( NOLOCK) ON b.siteID = lr.LicenseeID
 		LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID		
 	WHERE
 		lr.IsDeposit = 0 AND

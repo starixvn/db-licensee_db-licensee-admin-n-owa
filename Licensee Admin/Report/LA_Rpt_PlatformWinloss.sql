@@ -16,7 +16,7 @@ AS
     DB: DBEXT/bodb02    
 
     Revisions:  
-
+		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	Explanation:  
 	  + @PlatformType: 0: All  
 					   1: Asia (d)  
@@ -268,7 +268,7 @@ BEGIN
 					ELSE 0 
 				END
 			) WinlossSmart	
-		FROM bodb_Licensee.dbo.rptLicWinloss2 b WITH ( NOLOCK )
+		FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH ( NOLOCK )
 			INNER JOIN #tempAg ag ON b.recommend = ag.CustId AND b.Currency = ag.Currency
 			INNER JOIN #sporttype t ON b.sporttype = t.sporttype
 		WHERE 		

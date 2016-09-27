@@ -24,6 +24,7 @@ AS
  * Revisions :  	
     - 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
 	- 20150703@Florent: add GBP
+	- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
  * Param's Explanation:
  *  
  */  
@@ -75,7 +76,7 @@ BEGIN
 							END  
 						ELSE 1   
 						END  ) AS BetCount
-		FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK) 
+		FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK) 
 			INNER JOIN #tmpParty lr ON b.SiteID = lr.LicenseeID 			
 		WHERE b.rptDate BETWEEN lr.FromDate AND lr.ToDate
 			AND b.status NOT IN (-1,103)

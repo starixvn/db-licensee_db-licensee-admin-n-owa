@@ -25,7 +25,7 @@ AS
     Base on :[OA_Rpt_GetTotalTicket]
      
     Revisions:    
-    
+		 - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	Param's Explanation:    
 	+ @ReportBy 1-Live; 2-Non-Live; 0: All;  
 	+ @GroupBy 1-Daily; 2-Monthly
@@ -154,7 +154,7 @@ BEGIN
 		'SELECT  b.rptDate,lr.ResellerID,lr.licenseeid, SUM(BetCount) AS betcount' + CHAR(13) + 
 		'FROM #tmpLicenseeReseller lr' + CHAR(13) + 
 		'INNER JOIN bodb_licensee.dbo.licensees lic WITH ( NOLOCK) ON lic.licenseeid=lr.licenseeid' + CHAR(13) + 
-		'INNER JOIN bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) ON lr.LicenseeID = b.siteID' + CHAR(13) + 
+		'INNER JOIN bodb_licenseereport.dbo.rpt_Betting b WITH ( NOLOCK) ON lr.LicenseeID = b.siteID' + CHAR(13) + 
 		'INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype' + CHAR(13) + 
 		'LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID' + CHAR(13) + 
 		'WHERE ' + CHAR(13) + 
@@ -207,7 +207,7 @@ BEGIN
 		'SELECT b.rptDate,lr.ResellerID,lr.LicenseeID ,SUM(BetCount) AS betcount' + CHAR(13) + 
 		'FROM #tmpLicenseeReseller lr ' + CHAR(13) + 
 		'INNER JOIN bodb_Licensee.dbo.labels lb WITH (NOLOCK) ON lr.LicenseeID=lb.LicenseeID' + CHAR(13) + 
-		'INNER JOIN bodb_Licensee.dbo.rpt_Betting b WITH ( NOLOCK) ON b.siteID=lb.LabelID' + CHAR(13) + 
+		'INNER JOIN bodb_licenseereport.dbo.rpt_Betting b WITH ( NOLOCK) ON b.siteID=lb.LabelID' + CHAR(13) + 
 		'INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype' + CHAR(13) + 
 		'LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID' + CHAR(13) + 'WHERE ' + CHAR(13) + 
 		'b.rptDate BETWEEN lr.AffectedDate AND ''' + convert(VARCHAR(10), @ToDate, 120) + '''' + CHAR(13) + 

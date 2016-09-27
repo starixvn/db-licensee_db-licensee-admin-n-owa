@@ -27,6 +27,7 @@ AS
 	   - 20141226@Florent: enhance SP
 	   - 20150703@Florent: add GBP
 	   - 20160506@Bravo: Add VB data.
+	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
 	  + @Currency : 0-All Currencies
@@ -81,7 +82,7 @@ BEGIN
 		SELECT tp.PartyID, d.rptDate, d.CurrencyID, - SUM(d.Winloss * ISNULL(tp.Rate,0))
 		FROM (
 		    SELECT rptDate, currencyID, tp.PartyID, SUM(winloss) AS Winloss
-		    FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK) 
+		    FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK) 
 			    INNER JOIN (SELECT DISTINCT PartyID, LicenseeID FROM #tmpParty) tp ON tp.LicenseeID = b.SiteID
 			    INNER JOIN #bettype be ON b.bettype = be.bettype 
 		    WHERE b.rptDate BETWEEN @FromDate AND @Todate
