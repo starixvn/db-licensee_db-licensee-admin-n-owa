@@ -1,15 +1,5 @@
 USE [bodb_licensee]
 GO
-
-/****** Object:  StoredProcedure [dbo].[KPI_GetReportData_BA]    Script Date: 6/2/2014 16:11:53  ******/
-SET ANSI_NULLS ON
-GO
-
-SET QUOTED_IDENTIFIER ON
-GO
-
-
-
 ALTER PROCEDURE [dbo].[KPI_GetReportData_BA]   
 	@ReportType int = 0,
 	@ReportDate datetime = NULL
@@ -21,7 +11,7 @@ AS
  * DB   : DB052.bodb_Licensee  
  * Revisions :  
    -20160116@Francis: Change to use KPI_Statistics table instead of view_kpi_statistics
- 	
+   -20160726@Francis: Move SP to bodb_LicenseeReport - [Redmine: #60449]
  * Param's Explanation:    
  * 
  */  
@@ -98,7 +88,7 @@ BEGIN
 			            when mtd.StatID in (15,16) then 0 
 						else mtd.MonthToDate 
 					end * case when stat.StatisticType = 4 then EUR else 1 end),0) AS [Value]
-		from dbo.rptKPI_MTD_BA_Cross mtd (nolock)
+		from bodb_LicenseeReport.dbo.rptKPI_MTD_BA_Cross mtd (nolock)
 			inner join @Sites sites on mtd.siteid = sites.SiteID
 			inner join dbo.KPI_Groups g (NOLOCK) on sites.LicenseeID = g.SiteID
 			inner join dbo.KPI_SectionStatistic ss (NOLOCK) ON mtd.StatID = ss.StatID
@@ -191,4 +181,9 @@ BEGIN
 END
 
 
-
+GO
+GRANT EXECUTE ON [dbo].[KPI_GetReportData_BA] TO [bodbAdminNet] AS [dbo]
+GO
+GRANT EXECUTE ON [dbo].[KPI_GetReportData_BA] TO [bodbLicenseeNet] AS [dbo]
+GO
+GRANT VIEW DEFINITION ON [dbo].[KPI_GetReportData_BA] TO [vnteam] AS [dbo]
