@@ -30,6 +30,7 @@ AS
 			- 20160112@Bruce: Bettrade: LicenseeWL = 0 for BA tickets
 			- 20160316@Bruce: Bettrade: added BuyBackAmountSportsbookBase and BuyBackAmountBABase
 			- 20160428@Bruce: MGCRNG: Support Microgaming - Progressive Contribution
+			- 20160929@Scofield: Update for Colossus Bet
 		Param's Explanation:
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
 								'NG' -> Number Game			'BA' -> BA
@@ -55,10 +56,13 @@ BEGIN
 		BuyBackAmountSB				MONEY,
 		BuyBackAmountBA				MONEY,
 		Winlost						MONEY,
+		WinningPrize				MONEY,
+		Cashout						MONEY,
 		PlayerComm					MONEY,
 		LicenseeWL					MONEY,
 		LicenseeComm				MONEY,
 		BettradeComm				MONEY,
+		CashInShare					MONEY,
 		Company						MONEY,
 		ProgressiveContribution		MONEY,
 		ProgressivePayout			MONEY,
@@ -432,6 +436,158 @@ BEGIN
 				b.rptDate, b.CurrencyID	
 		)
 	END
+	ELSE IF (@ProductCode = 'CB')
+	BEGIN
+		-- Region: Local variables
+		DECLARE @ProductId INT = (SELECT TOP 1 ProductId FROM bodb_licensee.dbo.Product3rd WITH(NOLOCK) WHERE ProductPrefix='CB')
+		DECLARE @CommChargeType INT = 6
+		DECLARE @CashInShareChargeType INT = 7		
+
+		-- Region: Commision and Cash in share Rates
+		DECLARE @CBShare AS TABLE (
+			PartyId			INT,
+			LicenseeId		INT,
+			Rate			MONEY,
+			MinAmount		MONEY,
+			MaxAmount		MONEY,
+			MinAmountEx		MONEY,
+			MaxAmountEx		MONEY,
+			BaseCurrencyId	SMALLINT,
+			TypeId			SMALLINT,
+			FromDate		DATETIME,
+			ToDate			DATETIME
+		)
+
+		INSERT INTO @CBShare(PartyId, LicenseeId, Rate, MinAmount, MaxAmount, BaseCurrencyId, TypeId, FromDate, ToDate)
+		SELECT	ci.FromParty,
+			CASE
+				WHEN ISNULL(pd.IsDeposit, 0) = 1
+					THEN p.OldRefID
+				ELSE lb.LabelID
+				END AS LicenseeId,
+			ci.Rate, ci.MinAmount, ci.MaxAmount, ci.BaseCurrencyId, ci.ChargeType,
+				CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
+				CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
+		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
+			LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
+			LEFT JOIN bodb_licensee.dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
+		WHERE FromParty = @PartyId AND ProductID = @ProductId AND ChargeType IN (@CommChargeType,@CashInShareChargeType) AND (
+			@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
+			@ToDate BETWEEN ci.FromDate AND ci.ToDate OR
+			ci.FromDate BETWEEN @FromDate AND @ToDate OR
+			ci.ToDate BETWEEN @FromDate AND @ToDate
+		)
+		-- End Region: Commision and Cash in share Rates
+
+		-- Region: Get Winloss Data
+		CREATE TABLE #TempData (
+			LicenseeId						INT,
+			PartyId							INT,
+			rptDate							DATETIME,
+			CurrencyId						INT,
+			TotalTrans						INT,
+			Turnover						MONEY,
+			TurnoverExchanged				MONEY,
+			WinningPrize					MONEY,
+			CashOut							MONEY,
+			CommisionShare					MONEY,
+			CashInShare						MONEY,
+			CashInAmount					MONEY,
+			CashInAmountExchanged			MONEY
+		)
+		
+		INSERT INTO #TempData (LicenseeId, PartyId, rptDate, CurrencyId, TotalTrans, Turnover, WinningPrize, CashOut, CashInAmount)
+		SELECT	b.SiteID,
+				p.PartyId,
+				b.rptDate,
+				b.CurrencyID,
+				SUM(b.BetCount) TotalTrans,
+				SUM(b.Turnover) Turnover,
+				SUM(ISNULL(b.WinPrizeAmount,0)) WinningPrize,
+				SUM(ISNULL(b.CashOutAmount,0)) CashOut,
+				SUM(ISNULL(b.BuyBackAmount,0)) CashInAmount
+		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+		INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
+		LEFT JOIN bodb_licensee.dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
+		INNER JOIN bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			ON	b.ProductID = @ProductId AND
+				b.SiteID = (CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END) AND
+				b.rptDate BETWEEN @FromDate AND @ToDate
+		WHERE	b.CurrencyID <> 20 AND b.customercategory NOT IN (27, 28) AND p.PartyID = @PartyId
+			AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
+		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, p.PartyId		
+		-- End Region: Get Winloss Data
+		
+		-- Region: Exchange Turnover, CashInAmount to CBShare Currency
+		DECLARE @CBShare_BaseCurrencyCode VARCHAR(10) = (SELECT Code FROM dbo.Exchange WHERE exchangeid = (SELECT TOP 1 BaseCurrencyId From @CBShare))
+		DECLARE @CBShare_Exchange AS TABLE(
+			ExchangeDate	DATE,
+			ExchangeID		INT,
+			CurrencyCode	VARCHAR(10),
+			Rate			FLOAT
+		)
+
+		INSERT INTO @CBShare_Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
+		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
+		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CBShare_BaseCurrencyCode)
+		
+		UPDATE #TempData
+		SET TurnoverExchanged = td.Turnover * ex.Rate, CashInAmountExchanged = td.CashInAmount * ex.Rate
+		FROM #TempData td
+		INNER JOIN @CBShare_Exchange ex ON td.CurrencyId = ex.ExchangeID AND td.rptDate = ex.ExchangeDate
+		-- End Region: Exchange Turnover, CashInAmount to CBShare Currency
+		
+		-- Region: Calculate Commision, Cash In Share
+		DECLARE @SeperateDate DATE = (SELECT MIN(ToDate) FROM @CBShare)
+		DECLARE @CBShare_Rates AS TABLE(
+			SeparateDate				Date,
+			TotalTurnover				MONEY,
+			CommRateBasic				FLOAT,
+			CommRateAmountBased			FLOAT,
+			TotalCashInAmount			MONEY,
+			CashInShareRateBasic		FLOAT,
+			CashInShareRateAmountBased	FLOAT
+		)
+
+		INSERT INTO @CBShare_Rates(SeparateDate, TotalTurnover, TotalCashInAmount)
+		SELECT @SeperateDate, SUM(TurnoverExchanged), SUM(CashInAmountExchanged)
+		FROM #TempData
+		WHERE rptDate > @SeperateDate -- over 12 months
+
+		UPDATE @CBShare_Rates
+		SET CommRateBasic = cmb.Rate, CommRateAmountBased = cm.Rate, 
+			CashInShareRateBasic = csb.Rate, CashInShareRateAmountBased = cs.Rate
+		FROM @CBShare_Rates cbr
+		LEFT JOIN @CBShare cmb ON cmb.TypeId = @CommChargeType AND cbr.SeparateDate = cmb.ToDate
+		LEFT JOIN @CBShare cm ON cm.TypeId = @CommChargeType AND cbr.SeparateDate < cm.ToDate AND cbr.TotalTurnover >= cm.MinAmount AND cbr.TotalTurnover < cm.MaxAmount
+		LEFT JOIN @CBShare csb ON csb.TypeId = @CashInShareChargeType AND cbr.SeparateDate = csb.ToDate
+		LEFT JOIN @CBShare cs ON cs.TypeId = @CashInShareChargeType AND  cbr.SeparateDate < cs.ToDate AND cbr.TotalCashInAmount >= cs.MinAmount AND cbr.TotalCashInAmount < cs.MaxAmount
+
+		DECLARE @CommRateBasic FLOAT = (SELECT TOP 1 CommRateBasic FROM @CBShare_Rates)
+		DECLARE @CommRateAmountBased FLOAT = (SELECT TOP 1 CommRateAmountBased FROM @CBShare_Rates)
+		DECLARE @CashInShareRateBasic FLOAT = (SELECT TOP 1 CashInShareRateBasic FROM @CBShare_Rates)
+		DECLARE @CashInShareRateAmountBased FLOAT = (SELECT TOP 1 CashInShareRateAmountBased FROM @CBShare_Rates)
+
+		UPDATE #TempData
+		SET CommisionShare = td.Turnover * (CASE WHEN td.rptDate <= @SeperateDate THEN @CommRateBasic ELSE  @CommRateAmountBased END ),
+			CashInShare = td.CashInAmount * (CASE WHEN td.rptDate <= @SeperateDate THEN @CashInShareRateBasic ELSE @CashInShareRateAmountBased END)
+		FROM #TempData td		
+		-- End Region: Calculate Commision, Cash In Share
+		
+		-- Region: Group by Currency
+		INSERT INTO #Result(Winlostdate, CurrencyId, Turnover, Betcount, WinningPrize, Cashout, LicenseeComm, CashInShare)
+		SELECT @ToDate, CurrencyId, SUM(td.Turnover), SUM(td.TotalTrans), SUM(td.WinningPrize), SUM(td.CashOut), SUM(td.CommisionShare), SUM(td.CashInShare)
+		FROM #TempData td
+		GROUP BY td.CurrencyId
+
+		UPDATE #Result
+		SET Company = Turnover - WinningPrize - Cashout - LicenseeComm - CashInShare
+		-- End Region: Group by Currency				
+
+		-- Drop temp tables
+		DROP TABLE #TempData
+	END
 	ELSE
 	BEGIN
 		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
@@ -487,10 +643,13 @@ BEGIN
 		, SUM(ISNULL(d.BuyBackAmountSB, 0))				AS BuyBackAmountSportsbook
 		, SUM(ISNULL(d.BuyBackAmountBA, 0))				AS BuyBackAmountBA
 		, SUM(ISNULL(d.Winlost, 0))						AS MemberWinLoss
+		, SUM(ISNULL(d.WinningPrize, 0))				AS WinningPrize
+		, SUM(ISNULL(d.Cashout, 0))						AS Cashout
 		, SUM(ISNULL(d.PlayerComm, 0))					AS MemberComm
 		, SUM(ISNULL(d.BettradeComm, 0))				AS BettradeComm
 		, SUM(ISNULL(d.LicenseeWL, 0))					AS LicenseeWL
 		, SUM(ISNULL(d.LicenseeComm, 0))				AS LicenseeComm
+		, SUM(ISNULL(d.CashInShare, 0))					AS CashInShare
 		, SUM(ISNULL(d.Company, 0))						AS Company
 		, SUM(ISNULL(d.ProgressiveContribution, 0))		AS ProgressiveContribution
 		, SUM(ISNULL(d.ProgressivePayout, 0))			AS ProgressivePayout
@@ -503,11 +662,14 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountSB * e.Rate, 0)))			AS BuyBackAmountSportsbookBase
 		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountBA * e.Rate, 0)))			AS BuyBackAmountBABase
 		, CONVERT(MONEY, SUM(ISNULL(d.BettradeComm * e.Rate, 0)))				AS BettradeCommBase
-		, CONVERT(MONEY, SUM(d.Winlost * e.Rate))								AS MemberWinLossBase
-		, CONVERT(MONEY, SUM(d.PlayerComm * e.Rate))							AS MemberCommBase
-		, CONVERT(MONEY, SUM(d.LicenseeWL * e.Rate))							AS LicenseeWLBase
-		, CONVERT(MONEY, SUM(d.LicenseeComm * e.Rate))							AS LicenseeCommBase
-		, CONVERT(MONEY, SUM(d.Company* e.Rate))								AS CompanyBase
+		, CONVERT(MONEY, SUM(ISNULL(d.Winlost * e.Rate, 0)))					AS MemberWinLossBase
+		, CONVERT(MONEY, SUM(ISNULL(d.WinningPrize * e.Rate, 0)))				AS WinningPrizeBase
+		, CONVERT(MONEY, SUM(ISNULL(d.Cashout * e.Rate, 0)))					AS CashoutBase
+		, CONVERT(MONEY, SUM(ISNULL(d.PlayerComm * e.Rate, 0)))					AS MemberCommBase
+		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeWL * e.Rate, 0)))					AS LicenseeWLBase
+		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeComm * e.Rate, 0)))				AS LicenseeCommBase
+		, CONVERT(MONEY, SUM(ISNULL(d.CashInShare * e.Rate, 0)))				AS CashInShareBase
+		, CONVERT(MONEY, SUM(ISNULL(d.Company* e.Rate, 0)))						AS CompanyBase
 		, CONVERT(MONEY, SUM(ISNULL(d.ProgressiveContribution * e.Rate, 0)))	AS ProgressiveContributionBase
 		, CONVERT(MONEY, SUM(ISNULL(d.ProgressiveFee * e.Rate, 0)))				AS ProgressiveFeeBase
 		, CONVERT(MONEY, SUM(ISNULL(d.ProgressivePayout * e.Rate, 0)))			AS ProgressivePayoutBase
