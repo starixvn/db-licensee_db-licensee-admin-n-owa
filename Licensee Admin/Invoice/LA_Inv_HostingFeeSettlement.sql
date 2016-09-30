@@ -23,9 +23,9 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	
-	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(5))
+	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(20))
 	INSERT	INTO @BaseCurrencyTable(CurrencyId,CurrencyName)
-	EXEC dbo.LA_SelCurrencyByParty @Partyid = @PayerId, @SystemMode='INV'
+	EXEC dbo.LA_SelCurrencyByParty @Partyid = 0, @SystemMode='INV'
 	
 	DECLARE @ChargeRates TABLE (
 		PartyName		NVARCHAR(100),
