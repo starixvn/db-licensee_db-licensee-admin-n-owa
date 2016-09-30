@@ -25,7 +25,7 @@ BEGIN
 	
 	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(5))
 	INSERT	INTO @BaseCurrencyTable(CurrencyId,CurrencyName)
-	EXECUTE bodb_Licensee.dbo.LA_SelBaseCurrency
+	EXEC dbo.LA_SelCurrencyByParty @Partyid = @PayerId, @SystemMode='INV'
 	
 	DECLARE @ChargeRates TABLE (
 		PartyName		NVARCHAR(100),
