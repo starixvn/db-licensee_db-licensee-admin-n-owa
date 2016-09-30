@@ -37,6 +37,7 @@ AS
 								'LC' -> Live Casino			'VS' -> Virtual Sports
 								'CS' -> RNG Casino			'BG' -> Bingo
 								'MGC'->Microgaming Casino	'BT' -> Bettrade
+								'CB' -> Colossus Bets
 	*/
 SET NOCOUNT ON
 BEGIN
@@ -460,11 +461,7 @@ BEGIN
 
 		INSERT INTO @CBShare(PartyId, LicenseeId, Rate, MinAmount, MaxAmount, BaseCurrencyId, TypeId, FromDate, ToDate)
 		SELECT	ci.FromParty,
-			CASE
-				WHEN ISNULL(pd.IsDeposit, 0) = 1
-					THEN p.OldRefID
-				ELSE lb.LabelID
-				END AS LicenseeId,
+			CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END AS LicenseeId,
 			ci.Rate, ci.MinAmount, ci.MaxAmount, ci.BaseCurrencyId, ci.ChargeType,
 				CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
 				CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
@@ -476,14 +473,12 @@ BEGIN
 			@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
 			@ToDate BETWEEN ci.FromDate AND ci.ToDate OR
 			ci.FromDate BETWEEN @FromDate AND @ToDate OR
-			ci.ToDate BETWEEN @FromDate AND @ToDate
-		)
+			ci.ToDate BETWEEN @FromDate AND @ToDate)
 		-- End Region: Commision and Cash in share Rates
 
 		-- Region: Get Winloss Data
 		CREATE TABLE #TempData (
 			LicenseeId						INT,
-			PartyId							INT,
 			rptDate							DATETIME,
 			CurrencyId						INT,
 			TotalTrans						INT,
@@ -496,46 +491,29 @@ BEGIN
 			CashInAmount					MONEY,
 			CashInAmountExchanged			MONEY
 		)
+		DECLARE @SiteId INT = (SELECT TOP 1 LicenseeId FROM @CBShare)
 		
-		INSERT INTO #TempData (LicenseeId, PartyId, rptDate, CurrencyId, TotalTrans, Turnover, WinningPrize, CashOut, CashInAmount)
-		SELECT	b.SiteID,
-				p.PartyId,
-				b.rptDate,
-				b.CurrencyID,
-				SUM(b.BetCount) TotalTrans,
-				SUM(b.Turnover) Turnover,
-				SUM(ISNULL(b.WinPrizeAmount,0)) WinningPrize,
-				SUM(ISNULL(b.CashOutAmount,0)) CashOut,
-				SUM(ISNULL(b.BuyBackAmount,0)) CashInAmount
-		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
-		INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
-		LEFT JOIN bodb_licensee.dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
-		INNER JOIN bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			ON	b.ProductID = @ProductId AND
-				b.SiteID = (CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END) AND
-				b.rptDate BETWEEN @FromDate AND @ToDate
-		WHERE	b.CurrencyID <> 20 AND b.customercategory NOT IN (27, 28) AND p.PartyID = @PartyId
-			AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
-		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, p.PartyId		
+		INSERT INTO #TempData (LicenseeId, rptDate, CurrencyId, TotalTrans, Turnover, WinningPrize, CashOut, CashInAmount)
+		SELECT	SiteID, rptDate, CurrencyId, SUM(BetCount) TotalTrans, SUM(Turnover) Turnover, SUM(ISNULL(WinPrizeAmount,0)) WinningPrize,
+				SUM(ISNULL(CashOutAmount,0)) CashOut, SUM(ISNULL(BuyBackAmount,0)) CashInAmount
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct WITH (NOLOCK)
+		WHERE ProductID = @ProductId AND SiteID = @SiteId AND (rptDate BETWEEN @FromDate AND @ToDate) AND CustomerCategory NOT IN (27, 28) 
+			AND CurrencyId <> 20 AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND CurrencyId = @CurrencyId))
+		GROUP BY rptdate, SiteId, CurrencyId
 		-- End Region: Get Winloss Data
 		
 		-- Region: Exchange Turnover, CashInAmount to CBShare Currency
 		DECLARE @CBShare_BaseCurrencyCode VARCHAR(10) = (SELECT Code FROM dbo.Exchange WHERE exchangeid = (SELECT TOP 1 BaseCurrencyId From @CBShare))
-		DECLARE @CBShare_Exchange AS TABLE(
-			ExchangeDate	DATE,
-			ExchangeID		INT,
-			CurrencyCode	VARCHAR(10),
-			Rate			FLOAT
-		)
-
-		INSERT INTO @CBShare_Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
+		
+		DELETE FROM #Exchange
+		INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CBShare_BaseCurrencyCode)
 		
 		UPDATE #TempData
 		SET TurnoverExchanged = td.Turnover * ex.Rate, CashInAmountExchanged = td.CashInAmount * ex.Rate
 		FROM #TempData td
-		INNER JOIN @CBShare_Exchange ex ON td.CurrencyId = ex.ExchangeID AND td.rptDate = ex.ExchangeDate
+		INNER JOIN #Exchange ex ON td.CurrencyId = ex.ExchangeID AND td.rptDate = ex.ExchangeDate
 		-- End Region: Exchange Turnover, CashInAmount to CBShare Currency
 		
 		-- Region: Calculate Commision, Cash In Share
@@ -552,12 +530,10 @@ BEGIN
 
 		INSERT INTO @CBShare_Rates(SeparateDate, TotalTurnover, TotalCashInAmount)
 		SELECT @SeperateDate, SUM(TurnoverExchanged), SUM(CashInAmountExchanged)
-		FROM #TempData
-		WHERE rptDate > @SeperateDate -- over 12 months
+		FROM #TempData WHERE rptDate > @SeperateDate -- over 12 months
 
 		UPDATE @CBShare_Rates
-		SET CommRateBasic = cmb.Rate, CommRateAmountBased = cm.Rate, 
-			CashInShareRateBasic = csb.Rate, CashInShareRateAmountBased = cs.Rate
+		SET CommRateBasic = cmb.Rate, CommRateAmountBased = cm.Rate, CashInShareRateBasic = csb.Rate, CashInShareRateAmountBased = cs.Rate
 		FROM @CBShare_Rates cbr
 		LEFT JOIN @CBShare cmb ON cmb.TypeId = @CommChargeType AND cbr.SeparateDate = cmb.ToDate
 		LEFT JOIN @CBShare cm ON cm.TypeId = @CommChargeType AND cbr.SeparateDate < cm.ToDate AND cbr.TotalTurnover >= cm.MinAmount AND cbr.TotalTurnover < cm.MaxAmount
@@ -581,11 +557,11 @@ BEGIN
 		FROM #TempData td
 		GROUP BY td.CurrencyId
 
-		UPDATE #Result
-		SET Company = Turnover - WinningPrize - Cashout - LicenseeComm - CashInShare
+		UPDATE #Result SET Company = Turnover - WinningPrize - Cashout - LicenseeComm - CashInShare
 		-- End Region: Group by Currency				
 
 		-- Drop temp tables
+		DELETE FROM #Exchange
 		DROP TABLE #TempData
 	END
 	ELSE
