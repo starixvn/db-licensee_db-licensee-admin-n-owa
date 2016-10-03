@@ -24,6 +24,7 @@ AS
 	Revisions:  			
 		- 20150714@Florent: support credit licensee
 		- 20150722@Florent: fix bug NoDraw filter
+		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	Param's Explanation:  				
 		+ @ProductCode:	+ 'GD'	Gold Deluxe
 */  
