@@ -1,11 +1,17 @@
-ALTER  PROCEDURE [dbo].[LA_Rpt_3rdPartyProductWinloss] 
+USE [bodb02]
+GO
+
+/****** Object:  StoredProcedure [dbo].[LA_Rpt_3rdPartyProductWinloss]    Script Date: 10/02/2016 22:50:32 ******/
 SET ANSI_NULLS ON
 GO
+
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_Rpt_3rdPartyProductWinloss] 
-	  @PartyId				VARCHAR(1000)
+/****** Object:  Stored Procedure dbo.LA_Rpt_3rdPartyProductWinloss    Script Date: 6/7/2016 1:36:01 PM ******/
+
+CREATE PROCEDURE [dbo].[LA_Rpt_3rdPartyProductWinloss] 
+	  @PartyIds				VARCHAR(1000)
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME
 	, @ProductCode			VARCHAR(6)
@@ -21,7 +27,6 @@ AS
 	Revisions:  			
 		- 20150714@Florent: support credit licensee
 		- 20150722@Florent: fix bug NoDraw filter
-		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	Param's Explanation:  				
 		+ @ProductCode:	+ 'GD'	Gold Deluxe
 */  
@@ -58,7 +63,7 @@ BEGIN
 	INSERT INTO @tmpParty(PartyId, ParentId, LicenseeId, IsDeposit, ProductID, Rate, Rate3rd, Fromdate, Todate)
 	(
 		SELECT a.PartyID, p.ParentId, LicenseeID, a.isDeposit, a.ProductID, DI_Rate, CASE WHEN a.isDeposit = 0 THEN a.DI_Rate ELSE b.Rate END AS Rate3rd, a.Fromdate, a.Todate
-		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyID, @FromDate, @ToDate, @ProductCode, 'OA', @ExcludeTest) a
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', @ExcludeTest) a
 			LEFT JOIN #PartyList p ON a.PartyID = p.PartyId
 			LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo b WITH (NOLOCK) ON p.ParentId = b.FromParty AND a.ProductID = b.ProductID AND (a.Fromdate BETWEEN b.FromDate AND b.ToDate OR a.Todate BETWEEN b.FromDate AND b.ToDate )		
 	)	
@@ -195,8 +200,12 @@ BEGIN
 	DROP TABLE #PartyList
 	DROP TABLE #Bettype
 END
+GO
 
+GRANT EXECUTE ON [dbo].[LA_Rpt_3rdPartyProductWinloss] TO [bodbAdminNet] AS [dbo]
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_3rdPartyProductWinloss] TO [vnteam] 
+
+GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_3rdPartyProductWinloss] TO [vnteam] AS [dbo]
 GO
-GRANT EXECUTE ON [dbo].[LA_Rpt_3rdPartyProductWinloss] TO bodbAdminNet
+
+
