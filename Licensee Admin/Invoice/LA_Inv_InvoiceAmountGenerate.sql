@@ -34,6 +34,7 @@ AS
 		+ 2015.11.09 @Bravo.Tran: Invoice Amount - Enhance prorate min fee.
 		+ 2016.06.27 @Bravo.Tran: Invoice Amount - Hosting Fess amount.
 		+ 2016.07.19 @Bruce.Bui: Adding hosting fees extra info.
+        + 2016.09.27 @Bruce.Bui: Get MaxPCU case full month waive
 */
 /*	Example:
 	USE bodb_Licensee
@@ -193,6 +194,9 @@ BEGIN
 					SET @HostingFeesMaxPCU = ISNULL((SELECT MAX(c.TotalUser) FROM @CurrentUser c WHERE c.TotalUser NOT IN (
 						SELECT TotalUser FROM @CurrentUser c2 INNER JOIN @Settings s ON c2.LogDate BETWEEN s.FromDate AND s.ToDate WHERE s.SettingType = 2
 					)),0)
+
+					-- if maxpcu = 0 it means this is full range waive then get maxpcu for reference
+					IF @HostingFeesMaxPCU = 0 SET @HostingFeesMaxPCU = (SELECT MAX(TotalUser) FROM @CurrentUser)
 					
 					INSERT INTO @EmptyTable
 					SELECT p.Productid, p.ProductPrefix, s.ProductName, s.NumOfApplyDate/s.DaysInMonth * d.Amount * e.Rate, d.Amount * e.Rate, 0
