@@ -492,12 +492,13 @@ BEGIN
 			CashInAmountExchanged			MONEY
 		)
 		DECLARE @SiteId INT = (SELECT TOP 1 LicenseeId FROM @CBShare)
+		DECLARE @LaunchDate DATETIME = (SELECT MIN(FromDate) FROM @CBShare)
 		
 		INSERT INTO #TempData (LicenseeId, rptDate, CurrencyId, TotalTrans, Turnover, WinningPrize, CashOut, CashInAmount)
 		SELECT	SiteID, rptDate, CurrencyId, SUM(BetCount) TotalTrans, SUM(Turnover) Turnover, SUM(ISNULL(WinPrizeAmount,0)) WinningPrize,
 				SUM(ISNULL(CashOutAmount,0)) CashOut, SUM(ISNULL(BuyBackAmount,0)) CashInAmount
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct WITH (NOLOCK)
-		WHERE ProductID = @ProductId AND SiteID = @SiteId AND (rptDate BETWEEN @FromDate AND @ToDate) AND CustomerCategory NOT IN (27, 28) 
+		WHERE ProductID = @ProductId AND SiteID = @SiteId AND (rptDate >= @LaunchDate) AND (rptDate BETWEEN @FromDate AND @ToDate) AND CustomerCategory NOT IN (27, 28) 
 			AND CurrencyId <> 20 AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND CurrencyId = @CurrencyId))
 		GROUP BY rptdate, SiteId, CurrencyId
 		-- End Region: Get Winloss Data
