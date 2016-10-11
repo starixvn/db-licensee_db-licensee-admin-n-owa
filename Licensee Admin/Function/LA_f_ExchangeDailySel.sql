@@ -21,6 +21,7 @@ ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
 
 	Param's Explanation:  			
 	- 20160413@Francis: Support THB Base Currency
+	- 20160920@Harper : Suppoer HKD Base Currency
 */
 RETURNS @tempDate TABLE (exchangedate DATETIME, ExchangeId INT, Code VARCHAR(5)
 		, BaseCurrencyRate FLOAT
