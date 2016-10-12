@@ -519,7 +519,7 @@ BEGIN
 		-- End Region: Exchange Turnover, CashInAmount to CBShare Currency
 		
 		-- Region: Calculate Commision, Cash In Share
-		DECLARE @SeperateDate DATE = (SELECT MIN(ToDate) FROM @CBShare)
+		DECLARE @SeperateDate DATE = (SELECT MIN(ToDate) FROM bodb_licensee.dbo.OAS_ChargeInfo WHERE FromParty = @PartyId AND ProductID = @ProductId)
 		DECLARE @CBShare_Rates AS TABLE(
 			SeparateDate				Date,
 			TotalTurnover				MONEY,
