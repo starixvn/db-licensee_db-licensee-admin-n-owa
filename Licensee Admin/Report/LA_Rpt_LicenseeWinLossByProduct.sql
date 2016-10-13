@@ -10,8 +10,6 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinLossByProduct]
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
 	@BaseCurrencyName	VARCHAR(10)
-
-WITH RECOMPILE
 AS
 /*	Header:
 	Created: 2015.08.06 - Bravo.Tran
@@ -24,6 +22,7 @@ AS
 		+ 2015.10.20@Bravo: Add Zelianta
 		+ 2015.12.15@Bruce: Add MGCLC and MGCRNG
 		+ 2016.05.05@Bravo: Add VB Data
+		+ 2016.10.12@Bruce: Order result by group
 */
 /*	Example:
 	USE bodb_Licensee
@@ -143,6 +142,7 @@ BEGIN
 	
 	CREATE TABLE #LicenseeAmount(
 		GroupName	VARCHAR(200),
+		GroupId		INT,
 		LicenseeId	INT,
 		PartyId		INT,
 		PartyName	VARCHAR(200),
@@ -161,13 +161,14 @@ BEGIN
 		MGCRNG		MONEY,  -- Microgaming - RNG Casino
 		VB			MONEY  -- VB
 	)
-	INSERT INTO #LicenseeAmount(GroupName, LicenseeId, PartyId,PartyName)
+	INSERT INTO #LicenseeAmount(GroupName, GroupId, LicenseeId, PartyId,PartyName)
 	SELECT	CASE
 				WHEN p.PartyId = 1 THEN 'ONEWorks'
 				WHEN p.PartyId = 11 THEN 'Boping'
 				WHEN p.PartyId = 98 THEN 'Zelianta'
 				ELSE 'Credit'
 			END	AS PartyName,
+			p.PartyId,
 			op.OldRefID,
 			t.PartyId, 
 			t.PartyName
@@ -263,6 +264,7 @@ BEGIN
 	
 	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB
 	FROM	#LicenseeAmount l
+	ORDER BY l.GroupId, l.PartyId
 	
 	-- EndRegion
 
