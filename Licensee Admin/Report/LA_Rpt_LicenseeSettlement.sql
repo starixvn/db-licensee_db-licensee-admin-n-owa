@@ -537,9 +537,9 @@ BEGIN
 		UPDATE @CBShare_Rates
 		SET CommRateBasic = cmb.Rate, CommRateAmountBased = cm.Rate, CashInShareRateBasic = csb.Rate, CashInShareRateAmountBased = cs.Rate
 		FROM @CBShare_Rates cbr
-		LEFT JOIN @CBShare cmb ON cmb.TypeId = @CommChargeType AND cbr.SeparateDate = cmb.ToDate
+		LEFT JOIN @CBShare cmb ON cmb.TypeId = @CommChargeType AND cmb.ToDate <= cbr.SeparateDate
 		LEFT JOIN @CBShare cm ON cm.TypeId = @CommChargeType AND cbr.SeparateDate < cm.ToDate AND cbr.TotalTurnover >= cm.MinAmount AND cbr.TotalTurnover < cm.MaxAmount
-		LEFT JOIN @CBShare csb ON csb.TypeId = @CashInShareChargeType AND cbr.SeparateDate = csb.ToDate
+		LEFT JOIN @CBShare csb ON csb.TypeId = @CashInShareChargeType AND csb.ToDate <= cbr.SeparateDate
 		LEFT JOIN @CBShare cs ON cs.TypeId = @CashInShareChargeType AND  cbr.SeparateDate < cs.ToDate AND cbr.TotalCashInAmount >= cs.MinAmount AND cbr.TotalCashInAmount < cs.MaxAmount
 
 		DECLARE @CommRateBasic FLOAT = (SELECT TOP 1 CommRateBasic FROM @CBShare_Rates)
