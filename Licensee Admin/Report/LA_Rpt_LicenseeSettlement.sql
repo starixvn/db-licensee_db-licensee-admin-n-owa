@@ -442,27 +442,23 @@ BEGIN
 		-- Region: Local variables
 		DECLARE @ProductId INT = (SELECT TOP 1 ProductId FROM bodb_licensee.dbo.Product3rd WITH(NOLOCK) WHERE ProductPrefix='CB')
 		DECLARE @CommChargeType INT = 6
-		DECLARE @CashInShareChargeType INT = 7		
+		DECLARE @CashInShareChargeType INT = 7
 
 		-- Region: Commision and Cash in share Rates
 		DECLARE @CBShare AS TABLE (
 			PartyId			INT,
 			LicenseeId		INT,
 			Rate			MONEY,
-			MinAmount		MONEY,
-			MaxAmount		MONEY,
-			MinAmountEx		MONEY,
-			MaxAmountEx		MONEY,
-			BaseCurrencyId	SMALLINT,
 			TypeId			SMALLINT,
 			FromDate		DATETIME,
 			ToDate			DATETIME
 		)
 
-		INSERT INTO @CBShare(PartyId, LicenseeId, Rate, MinAmount, MaxAmount, BaseCurrencyId, TypeId, FromDate, ToDate)
+		INSERT INTO @CBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
 		SELECT	ci.FromParty,
-			CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END AS LicenseeId,
-			ci.Rate, ci.MinAmount, ci.MaxAmount, ci.BaseCurrencyId, ci.ChargeType,
+				CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END AS LicenseeId,
+				ci.Rate,
+				ci.ChargeType,
 				CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
 				CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
 		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
@@ -473,12 +469,12 @@ BEGIN
 			@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
 			@ToDate BETWEEN ci.FromDate AND ci.ToDate OR
 			ci.FromDate BETWEEN @FromDate AND @ToDate OR
-			ci.ToDate BETWEEN @FromDate AND @ToDate)
+			ci.ToDate BETWEEN @FromDate AND @ToDate
+		)
 		-- End Region: Commision and Cash in share Rates
 
 		-- Region: Get Winloss Data
 		CREATE TABLE #TempData (
-			LicenseeId						INT,
 			rptDate							DATETIME,
 			CurrencyId						INT,
 			TotalTrans						INT,
@@ -488,69 +484,33 @@ BEGIN
 			CashOut							MONEY,
 			CommisionShare					MONEY,
 			CashInShare						MONEY,
-			CashInAmount					MONEY,
-			CashInAmountExchanged			MONEY
+			CashInAmount					MONEY
 		)
-		DECLARE @SiteId INT = (SELECT TOP 1 LicenseeId FROM @CBShare)
-		DECLARE @MinDate DATETIME = (SELECT MIN(FromDate) FROM @CBShare)
-		DECLARE @MaxDate DATETIME = (SELECT MAX(ToDate) FROM @CBShare)
-		
-		INSERT INTO #TempData (LicenseeId, rptDate, CurrencyId, TotalTrans, Turnover, WinningPrize, CashOut, CashInAmount)
-		SELECT	SiteID, rptDate, CurrencyId, SUM(BetCount) TotalTrans, SUM(Turnover) Turnover, SUM(ISNULL(WinPrizeAmount,0)) WinningPrize,
-				SUM(ISNULL(CashOutAmount,0)) CashOut, SUM(ISNULL(BuyBackAmount,0)) CashInAmount
-		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct WITH (NOLOCK)
-		WHERE ProductID = @ProductId AND SiteID = @SiteId AND (rptDate BETWEEN @MinDate AND @MaxDate) AND CustomerCategory NOT IN (27, 28) 
-			AND CurrencyId <> 20 AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND CurrencyId = @CurrencyId))
-		GROUP BY rptdate, SiteId, CurrencyId
+
+		INSERT INTO #TempData (rptDate, CurrencyId, TotalTrans, Turnover, WinningPrize, CashOut, CashInAmount)
+		SELECT	rptDate,
+				CurrencyId,
+				SUM(BetCount) TotalTrans,
+				SUM(Turnover) Turnover,
+				SUM(ISNULL(WinPrizeAmount,0)) WinningPrize,
+				SUM(ISNULL(CashOutAmount,0)) CashOut,
+				SUM(ISNULL(BuyBackAmount,0)) CashInAmount
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+		JOIN @CBShare cb ON b.SiteID = cb.LicenseeId AND b.rptDate BETWEEN cb.FromDate AND cb.ToDate
+		WHERE	ProductID = @ProductId AND
+				CustomerCategory NOT IN (27, 28) AND
+				CurrencyId <> 20 AND
+				(@CurrencyId = 0 OR (@CurrencyId <> 0 AND CurrencyId = @CurrencyId)) AND
+				cb.TypeId = @CommChargeType -- to remove duplicate we use one of (6,7)
+		GROUP BY rptdate, CurrencyId
 		-- End Region: Get Winloss Data
-		
-		-- Region: Exchange Turnover, CashInAmount to CBShare Currency
-		DECLARE @CBShare_BaseCurrencyCode VARCHAR(10) = (SELECT Code FROM dbo.Exchange WHERE exchangeid = (SELECT TOP 1 BaseCurrencyId From @CBShare))
-		
-		DELETE FROM #Exchange
-		INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CBShare_BaseCurrencyCode)
-		
+
 		UPDATE #TempData
-		SET TurnoverExchanged = td.Turnover * ex.Rate, CashInAmountExchanged = td.CashInAmount * ex.Rate
+		SET CommisionShare = td.Turnover * cm.Rate,
+			CashInShare = td.CashInAmount * ci.Rate
 		FROM #TempData td
-		INNER JOIN #Exchange ex ON td.CurrencyId = ex.ExchangeID AND td.rptDate = ex.ExchangeDate
-		-- End Region: Exchange Turnover, CashInAmount to CBShare Currency
-		
-		-- Region: Calculate Commision, Cash In Share
-		DECLARE @SeperateDate DATE = (SELECT MIN(ToDate) FROM bodb_licensee.dbo.OAS_ChargeInfo WHERE FromParty = @PartyId AND ProductID = @ProductId)
-		DECLARE @CBShare_Rates AS TABLE(
-			SeparateDate				Date,
-			TotalTurnover				MONEY,
-			CommRateBasic				FLOAT,
-			CommRateAmountBased			FLOAT,
-			TotalCashInAmount			MONEY,
-			CashInShareRateBasic		FLOAT,
-			CashInShareRateAmountBased	FLOAT
-		)
-
-		INSERT INTO @CBShare_Rates(SeparateDate, TotalTurnover, TotalCashInAmount)
-		SELECT @SeperateDate, SUM(TurnoverExchanged), SUM(CashInAmountExchanged)
-		FROM #TempData WHERE rptDate > @SeperateDate -- over 12 months
-
-		UPDATE @CBShare_Rates
-		SET CommRateBasic = cmb.Rate, CommRateAmountBased = cm.Rate, CashInShareRateBasic = csb.Rate, CashInShareRateAmountBased = cs.Rate
-		FROM @CBShare_Rates cbr
-		LEFT JOIN @CBShare cmb ON cmb.TypeId = @CommChargeType AND cmb.ToDate <= cbr.SeparateDate
-		LEFT JOIN @CBShare cm ON cm.TypeId = @CommChargeType AND cbr.SeparateDate < cm.ToDate AND cbr.TotalTurnover >= cm.MinAmount AND cbr.TotalTurnover < cm.MaxAmount
-		LEFT JOIN @CBShare csb ON csb.TypeId = @CashInShareChargeType AND csb.ToDate <= cbr.SeparateDate
-		LEFT JOIN @CBShare cs ON cs.TypeId = @CashInShareChargeType AND  cbr.SeparateDate < cs.ToDate AND cbr.TotalCashInAmount >= cs.MinAmount AND cbr.TotalCashInAmount < cs.MaxAmount
-
-		DECLARE @CommRateBasic FLOAT = (SELECT TOP 1 CommRateBasic FROM @CBShare_Rates)
-		DECLARE @CommRateAmountBased FLOAT = (SELECT TOP 1 CommRateAmountBased FROM @CBShare_Rates)
-		DECLARE @CashInShareRateBasic FLOAT = (SELECT TOP 1 CashInShareRateBasic FROM @CBShare_Rates)
-		DECLARE @CashInShareRateAmountBased FLOAT = (SELECT TOP 1 CashInShareRateAmountBased FROM @CBShare_Rates)
-
-		UPDATE #TempData
-		SET CommisionShare = td.Turnover * (CASE WHEN td.rptDate <= @SeperateDate THEN @CommRateBasic ELSE  @CommRateAmountBased END ),
-			CashInShare = td.CashInAmount * (CASE WHEN td.rptDate <= @SeperateDate THEN @CashInShareRateBasic ELSE @CashInShareRateAmountBased END)
-		FROM #TempData td		
+		JOIN @CBShare AS cm ON cm.TypeId = @CommChargeType AND (td.rptDate BETWEEN cm.FromDate AND cm.ToDate)
+		JOIN @CBShare AS ci ON ci.TypeId = @CashInShareChargeType AND (td.rptDate BETWEEN ci.FromDate AND ci.ToDate)
 		-- End Region: Calculate Commision, Cash In Share
 		
 		-- Region: Group by Currency
@@ -560,10 +520,9 @@ BEGIN
 		GROUP BY td.CurrencyId
 
 		UPDATE #Result SET Company = Turnover - WinningPrize - Cashout - LicenseeComm - CashInShare
-		-- End Region: Group by Currency				
+		-- End Region: Group by Currency
 
 		-- Drop temp tables
-		DELETE FROM #Exchange
 		DROP TABLE #TempData
 	END
 	ELSE
