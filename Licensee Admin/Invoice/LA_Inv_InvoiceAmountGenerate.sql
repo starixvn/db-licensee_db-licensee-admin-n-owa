@@ -474,7 +474,8 @@ BEGIN
 			ProductId		TINYINT,
 			BettypeRef		INT, 
 			AmountToCompany MONEY,
-			IsApplyMinFee	BIT)
+			IsApplyMinFee	BIT,
+			LicenseeWinLossBase MONEY)
 	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,WinLoss,AComm,ProductId,BettypeRef)
 	(
 		SELECT	b.SiteID,
@@ -505,7 +506,8 @@ BEGIN
 									WHEN td.ProductId = 3 THEN (-td.WinLoss * p.Rate - td.AComm) * e.Rate									
 									WHEN td.ProductId <> 3 THEN (-td.WinLoss * p.Rate) * e.Rate
 									ELSE 0 
-								END
+								END,
+			LicenseeWinLossBase = -td.WinLoss * e.Rate
 	FROM	#TempData td 
 			INNER JOIN @PartyChargeInfo p 
 				ON td.LicenseeId = p.LicenseeId 
@@ -695,7 +697,17 @@ BEGIN
 			WHERE	dg.DiscountGroupType = 1
 		)	
 		-- End Region
-		
+
+		-- discount by winloss
+		INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
+		(
+			SELECT t.PartyId, t.ProductId, SUM(t.LicenseeWinLossBase * d.Rate), 1, d.Rate
+			FROM #TempData t
+			INNER JOIN @DiscountGroup d ON d.ProductId = t.ProductId  AND d.DiscountGroupType = 3
+			GROUP BY t.PartyId, t.ProductId, d.Rate
+		)
+		--end discount by winloss
+
 		-- Region: Apply Rebate
 		INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
 		(
@@ -751,11 +763,11 @@ BEGIN
 			SELECT	-1,
 					(	SELECT	f.ProductCode + ',' 
 						FROM	@FinalResult f 
-						WHERE f.AmountType = id.AmountType FOR XML PATH('')) 
+						WHERE f.AmountType = id.AmountType AND f.Rate=id.Rate  FOR XML PATH('')) 
 					AS ProductCode,
 					(	SELECT	f.ProductName + ',' 
 						FROM	@FinalResult f 
-						WHERE f.AmountType = id.AmountType FOR XML PATH('')) 
+						WHERE f.AmountType = id.AmountType AND f.Rate=id.Rate  FOR XML PATH('')) 
 					AS ProductName,
 					SUM(id.InvoiceAmount),
 					id.AmountType,
