@@ -448,7 +448,7 @@ BEGIN
 		DECLARE @CBShare AS TABLE (
 			PartyId			INT,
 			LicenseeId		INT,
-			Rate			MONEY,
+			Rate			DECIMAL(9,8),
 			TypeId			SMALLINT,
 			FromDate		DATETIME,
 			ToDate			DATETIME
