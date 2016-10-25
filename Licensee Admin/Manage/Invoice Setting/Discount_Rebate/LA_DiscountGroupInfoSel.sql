@@ -29,8 +29,8 @@ BEGIN
 	END
 	
 	SELECT h.DiscountGroupId, h.DiscountGroupName, ISNULL(ex.Code, '') AS CurrencyName , h.FromDate, h.ToDate
-		, CASE WHEN DiscountGroupType = 1 THEN ISNULL(d.FromAmount, 0) ELSE 0 END AS FromAmount
-		, CASE WHEN DiscountGroupType = 1 THEN ISNULL(d.ToAmount, 0) ELSE 0 END AS ToAmount
+		, CASE WHEN DiscountGroupType IN (1,3) THEN ISNULL(d.FromAmount, 0) ELSE 0 END AS FromAmount
+		, CASE WHEN DiscountGroupType IN (1,3) THEN ISNULL(d.ToAmount, 0) ELSE 0 END AS ToAmount
 		, d.Rate
 		, COUNT(DISTINCT p.ProductId) AS NumberOfProduct
 		, COUNT(DISTINCT a.PartyID) AS NumberOfPayer
@@ -62,8 +62,8 @@ BEGIN
 			(@DiscountGroupType <> 1 AND DiscountGroupType = @DiscountGroupType)
 		)
 	GROUP BY h.DiscountGroupId, h.DiscountGroupName, ISNULL(ex.Code, ''), h.FromDate, h.ToDate
-		, CASE WHEN DiscountGroupType = 1 THEN ISNULL(d.FromAmount, 0) ELSE 0 END
-		, CASE WHEN DiscountGroupType = 1 THEN ISNULL(d.ToAmount, 0) ELSE 0 END
+		, CASE WHEN DiscountGroupType IN (1,3) THEN ISNULL(d.FromAmount, 0) ELSE 0 END
+		, CASE WHEN DiscountGroupType IN (1,3) THEN ISNULL(d.ToAmount, 0) ELSE 0 END
 		, d.Rate
 		, DiscountGroupType
 END
