@@ -19,6 +19,7 @@ AS
        
   Revisions:             
   -20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail    
+  - 20161025@Scofield: exclude Colossus Bet from ChargeInfo
   Params:    
   + @PayerId : 0 get all Party    
      <> 0 specify Party    
@@ -142,7 +143,7 @@ BEGIN
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 			LEFT JOIN dbo.OAS_ChargeInfoSub s WITH(NOLOCK) ON ci.ChargeID = s.ChargeIdRef
 			LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON pd.BaseCurrencyId = e.exchangeid
-		WHERE @CurrentDate BETWEEN c.Fromdate AND c.Todate
+		WHERE @CurrentDate BETWEEN c.Fromdate AND c.Todate AND ci.ProductID <> 15
 
 	INSERT INTO @Minfee (PartyId, ProductId, FeeTypeId, FeeAmount, FromDate, ToDate)
 		SELECT

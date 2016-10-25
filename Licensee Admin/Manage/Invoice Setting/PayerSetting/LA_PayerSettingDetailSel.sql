@@ -19,6 +19,7 @@ AS
 		- 20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
 		- 20150831@Bravo: fix bug - Min fee term & Basis of billing max length.
 		- 20150917@Victor: Support Chinese on Settings
+		- 20161025@Scofield: exclude Colossus Bet from ChargeInfo
 	 Params:
 		+ @PayerId :specify Party
 		+ @@PayerGroup :	0 get all Party
@@ -74,6 +75,7 @@ BEGIN
 		LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID				
 		LEFT JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 		LEFT JOIN dbo.OAS_ChargeInfoSub cs WITH(NOLOCK) ON ci.ChargeID = cs.ChargeIdRef AND c.Bettype = cs.BettypeRef
+	WHERE c.ProductID <> 15 -- exclude Colossus Bet
 	
 	--======Min fee Area ===---
 	INSERT INTO @Minfee(FeeId, PartyId, ProductId, FeeTypeId, FeeAmount, CurrencyId, MinFeeTerm, FromDate, ToDate)
