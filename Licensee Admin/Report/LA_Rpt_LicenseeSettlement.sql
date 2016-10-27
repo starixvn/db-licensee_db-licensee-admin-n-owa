@@ -30,12 +30,14 @@ AS
 			- 20160112@Bruce: Bettrade: LicenseeWL = 0 for BA tickets
 			- 20160316@Bruce: Bettrade: added BuyBackAmountSportsbookBase and BuyBackAmountBABase
 			- 20160428@Bruce: MGCRNG: Support Microgaming - Progressive Contribution
+			- 20160929@Scofield: Update for Colossus Bet
 		Param's Explanation:
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
 								'NG' -> Number Game			'BA' -> BA
 								'LC' -> Live Casino			'VS' -> Virtual Sports
 								'CS' -> RNG Casino			'BG' -> Bingo
 								'MGC'->Microgaming Casino	'BT' -> Bettrade
+								'CB' -> Colossus Bets
 	*/
 SET NOCOUNT ON
 BEGIN
@@ -55,10 +57,13 @@ BEGIN
 		BuyBackAmountSB				MONEY,
 		BuyBackAmountBA				MONEY,
 		Winlost						MONEY,
+		WinningPrize				MONEY,
+		Cashout						MONEY,
 		PlayerComm					MONEY,
 		LicenseeWL					MONEY,
 		LicenseeComm				MONEY,
 		BettradeComm				MONEY,
+		CashInShare					MONEY,
 		Company						MONEY,
 		ProgressiveContribution		MONEY,
 		ProgressivePayout			MONEY,
@@ -432,6 +437,94 @@ BEGIN
 				b.rptDate, b.CurrencyID	
 		)
 	END
+	ELSE IF (@ProductCode = 'CB')
+	BEGIN
+		-- Region: Local variables
+		DECLARE @ProductId INT = (SELECT TOP 1 ProductId FROM bodb_licensee.dbo.Product3rd WITH(NOLOCK) WHERE ProductPrefix='CB')
+		DECLARE @CommChargeType INT = 6
+		DECLARE @CashInShareChargeType INT = 7
+
+		-- Region: Commision and Cash in share Rates
+		DECLARE @CBShare AS TABLE (
+			PartyId			INT,
+			LicenseeId		INT,
+			Rate			MONEY,
+			TypeId			SMALLINT,
+			FromDate		DATETIME,
+			ToDate			DATETIME
+		)
+
+		INSERT INTO @CBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
+		SELECT	ci.FromParty,
+				CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END AS LicenseeId,
+				ci.Rate,
+				ci.ChargeType,
+				CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
+				CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
+		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
+			LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
+			LEFT JOIN bodb_licensee.dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
+		WHERE FromParty = @PartyId AND ProductID = @ProductId AND ChargeType IN (@CommChargeType,@CashInShareChargeType) AND (
+			@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
+			@ToDate BETWEEN ci.FromDate AND ci.ToDate OR
+			ci.FromDate BETWEEN @FromDate AND @ToDate OR
+			ci.ToDate BETWEEN @FromDate AND @ToDate
+		)
+		-- End Region: Commision and Cash in share Rates
+
+		-- Region: Get Winloss Data
+		CREATE TABLE #TempData (
+			rptDate							DATETIME,
+			CurrencyId						INT,
+			TotalTrans						INT,
+			Turnover						MONEY,
+			TurnoverExchanged				MONEY,
+			WinningPrize					MONEY,
+			CashOut							MONEY,
+			CommisionShare					MONEY,
+			CashInShare						MONEY,
+			CashInAmount					MONEY
+		)
+
+		INSERT INTO #TempData (rptDate, CurrencyId, TotalTrans, Turnover, WinningPrize, CashOut, CashInAmount)
+		SELECT	rptDate,
+				CurrencyId,
+				SUM(BetCount) TotalTrans,
+				SUM(Turnover) Turnover,
+				SUM(ISNULL(WinPrizeAmount,0)) WinningPrize,
+				SUM(ISNULL(CashOutAmount,0)) CashOut,
+				SUM(ISNULL(BuyBackAmount,0)) CashInAmount
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+		JOIN @CBShare cb ON b.SiteID = cb.LicenseeId AND b.rptDate BETWEEN cb.FromDate AND cb.ToDate
+		WHERE	ProductID = @ProductId AND
+				CustomerCategory NOT IN (27, 28) AND
+				CurrencyId <> 20 AND
+				(@CurrencyId = 0 OR (@CurrencyId <> 0 AND CurrencyId = @CurrencyId)) AND
+				cb.TypeId = @CommChargeType -- to remove duplicate we use one of (6,7)
+		GROUP BY rptdate, CurrencyId
+		-- End Region: Get Winloss Data
+
+		UPDATE #TempData
+		SET CommisionShare = td.Turnover * cm.Rate,
+			CashInShare = td.CashInAmount * ci.Rate
+		FROM #TempData td
+		JOIN @CBShare AS cm ON cm.TypeId = @CommChargeType AND (td.rptDate BETWEEN cm.FromDate AND cm.ToDate)
+		JOIN @CBShare AS ci ON ci.TypeId = @CashInShareChargeType AND (td.rptDate BETWEEN ci.FromDate AND ci.ToDate)
+		-- End Region: Calculate Commision, Cash In Share
+		
+		-- Region: Group by Currency
+		INSERT INTO #Result(Winlostdate, CurrencyId, Turnover, Betcount, WinningPrize, Cashout, LicenseeComm, CashInShare)
+		SELECT @ToDate, CurrencyId, SUM(td.Turnover), SUM(td.TotalTrans), SUM(td.WinningPrize), SUM(td.CashOut), SUM(td.CommisionShare), SUM(td.CashInShare)
+		FROM #TempData td
+		GROUP BY td.CurrencyId
+
+		UPDATE #Result SET Company = Turnover - WinningPrize - Cashout - LicenseeComm - CashInShare
+		-- End Region: Group by Currency
+
+		-- Drop temp tables
+		DROP TABLE #TempData
+	END
 	ELSE
 	BEGIN
 		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
@@ -487,10 +580,13 @@ BEGIN
 		, SUM(ISNULL(d.BuyBackAmountSB, 0))				AS BuyBackAmountSportsbook
 		, SUM(ISNULL(d.BuyBackAmountBA, 0))				AS BuyBackAmountBA
 		, SUM(ISNULL(d.Winlost, 0))						AS MemberWinLoss
+		, SUM(ISNULL(d.WinningPrize, 0))				AS WinningPrize
+		, SUM(ISNULL(d.Cashout, 0))						AS Cashout
 		, SUM(ISNULL(d.PlayerComm, 0))					AS MemberComm
 		, SUM(ISNULL(d.BettradeComm, 0))				AS BettradeComm
 		, SUM(ISNULL(d.LicenseeWL, 0))					AS LicenseeWL
 		, SUM(ISNULL(d.LicenseeComm, 0))				AS LicenseeComm
+		, SUM(ISNULL(d.CashInShare, 0))					AS CashInShare
 		, SUM(ISNULL(d.Company, 0))						AS Company
 		, SUM(ISNULL(d.ProgressiveContribution, 0))		AS ProgressiveContribution
 		, SUM(ISNULL(d.ProgressivePayout, 0))			AS ProgressivePayout
@@ -503,11 +599,14 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountSB * e.Rate, 0)))			AS BuyBackAmountSportsbookBase
 		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountBA * e.Rate, 0)))			AS BuyBackAmountBABase
 		, CONVERT(MONEY, SUM(ISNULL(d.BettradeComm * e.Rate, 0)))				AS BettradeCommBase
-		, CONVERT(MONEY, SUM(d.Winlost * e.Rate))								AS MemberWinLossBase
-		, CONVERT(MONEY, SUM(d.PlayerComm * e.Rate))							AS MemberCommBase
-		, CONVERT(MONEY, SUM(d.LicenseeWL * e.Rate))							AS LicenseeWLBase
-		, CONVERT(MONEY, SUM(d.LicenseeComm * e.Rate))							AS LicenseeCommBase
-		, CONVERT(MONEY, SUM(d.Company* e.Rate))								AS CompanyBase
+		, CONVERT(MONEY, SUM(ISNULL(d.Winlost * e.Rate, 0)))					AS MemberWinLossBase
+		, CONVERT(MONEY, SUM(ISNULL(d.WinningPrize * e.Rate, 0)))				AS WinningPrizeBase
+		, CONVERT(MONEY, SUM(ISNULL(d.Cashout * e.Rate, 0)))					AS CashoutBase
+		, CONVERT(MONEY, SUM(ISNULL(d.PlayerComm * e.Rate, 0)))					AS MemberCommBase
+		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeWL * e.Rate, 0)))					AS LicenseeWLBase
+		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeComm * e.Rate, 0)))				AS LicenseeCommBase
+		, CONVERT(MONEY, SUM(ISNULL(d.CashInShare * e.Rate, 0)))				AS CashInShareBase
+		, CONVERT(MONEY, SUM(ISNULL(d.Company* e.Rate, 0)))						AS CompanyBase
 		, CONVERT(MONEY, SUM(ISNULL(d.ProgressiveContribution * e.Rate, 0)))	AS ProgressiveContributionBase
 		, CONVERT(MONEY, SUM(ISNULL(d.ProgressiveFee * e.Rate, 0)))				AS ProgressiveFeeBase
 		, CONVERT(MONEY, SUM(ISNULL(d.ProgressivePayout * e.Rate, 0)))			AS ProgressivePayoutBase
