@@ -6,8 +6,8 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_PayerSettingDetailSel]	 
-	@PayerId			INT	
+ALTER PROCEDURE [dbo].[LA_PayerSettingDetailSel]
+	@PayerId			INT
 AS
 /*  
 	 Created: 20150420@Florent
@@ -20,6 +20,7 @@ AS
 		- 20150831@Bravo: fix bug - Min fee term & Basis of billing max length.
 		- 20150917@Victor: Support Chinese on Settings
 		- 20161025@Scofield: exclude Colossus Bet from ChargeInfo
+		- 20161031@bruce.bui: show CB and charge type
 	 Params:
 		+ @PayerId :specify Party
 		+ @@PayerGroup :	0 get all Party
@@ -75,8 +76,7 @@ BEGIN
 		LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID				
 		LEFT JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 		LEFT JOIN dbo.OAS_ChargeInfoSub cs WITH(NOLOCK) ON ci.ChargeID = cs.ChargeIdRef AND c.Bettype = cs.BettypeRef
-	WHERE c.ProductID <> 15 -- exclude Colossus Bet
-	
+
 	--======Min fee Area ===---
 	INSERT INTO @Minfee(FeeId, PartyId, ProductId, FeeTypeId, FeeAmount, CurrencyId, MinFeeTerm, FromDate, ToDate)
 	SELECT MinFeeId , PartyId, ProductId, FeeTypeId, FeeAmount, CurrencyId, MinFeeTerm, FromDate, ToDate 
@@ -121,19 +121,21 @@ BEGIN
 		, d1.DiscountGroupName, d2.DiscountGroupId, d2.DiscountGroupName
 
 	--result
-	SELECT c.ChargeId				AS ChargeId
-		, c.PartyId					AS PayerID				
-		, c.ProductId			    AS ProductId
-		, ProductName			    AS ProductName
-		, FirstBilling			    AS FirstBilling
+	SELECT c.ChargeId		AS ChargeId
+		, c.PartyId			AS PayerID
+		, c.ProductId		AS ProductId
+		, ProductName		AS ProductName
+		, FirstBilling		AS FirstBilling
 		, c.BasisOfBilling
 		, c.BettypeRef
-		, c.Rate					AS Rate
+		, c.Rate			AS Rate
 		, c.ChargeType
 		, c.FromDate
 		, c.ToDate
 	FROM @ChargeInfo c
-		LEFT JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID		
+	LEFT JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
+	ORDER BY c.ProductId, c.FromDate
+
 	--Minfee Setting
 	SELECT  m.FeeId			AS MinFeeId
 		, PartyId			AS PayerID
