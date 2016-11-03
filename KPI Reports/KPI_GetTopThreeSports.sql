@@ -1,15 +1,5 @@
 USE [bodb_licensee]
 GO
-
-/****** Object:  StoredProcedure [dbo].[KPI_GetTopThreeSports]    Script Date: 6/2/2014 16:12:30  ******/
-SET ANSI_NULLS ON
-GO
-
-SET QUOTED_IDENTIFIER ON
-GO
-
-
-
 ALTER PROCEDURE [dbo].[KPI_GetTopThreeSports]   
 	@ReportDate datetime = NULL,
 	@BranchID int,
@@ -21,7 +11,7 @@ AS
  * Task  : Get all data for sportbook TOP 3 Sports KPI report(exclude SUNCITY) 
  * DB   : DB052.bodb_Licensee  
  * Revisions :  
- 	
+   -20160726@Francis: Move SP to bodb_LicenseeReport - [Redmine: #60449]
  * Param's Explanation:    
  * 
  */  
@@ -178,7 +168,7 @@ BEGIN
 			--Get data from bodb_licensee.dbo.rpt_Betting just one time by longest range time
 			INSERT INTO #MTD_TopThreeSports(rptDate,CurrencyID,SportID,Turnover)
 				SELECT rptDate,b.CurrencyID,l.sporttype,SUM(Turnover) Turnover  
-				FROM bodb_licensee.dbo.rpt_Betting b (NOLOCK) 
+				FROM bodb_LicenseeReport.dbo.rpt_Betting b (NOLOCK) 
 					INNER JOIN bodb02.dbo.League l (NOLOCK) ON b.leagueid=l.leagueid 
 			        INNER JOIN @Labels lbl ON b.SiteID=lbl.LabelID AND (lbl.DateStarted is null OR b.rptDate>=lbl.DateStarted)
 				WHERE rptDate>=@Date_FirstDayOfYear AND rptDate<@Date_MTDCurrentMonth
@@ -399,7 +389,7 @@ BEGIN
 				SELECT rptDate,b.CurrencyID,l.sporttype,SUM(Turnover) Turnover  
 				FROM (
 						SELECT rptDate,LeagueID,SiteID,CurrencyID,Turnover
-						FROM bodb_Licensee.dbo.rpt_Betting (NOLOCK) 
+						FROM bodb_LicenseeReport.dbo.rpt_Betting (NOLOCK) 
 						WHERE rptDate>=@Date_FirstDayOfYear AND rptDate<@Date_MTDCurrentMonth
 							AND status NOT IN (-1,103) 
 							AND currencyID<>20 
@@ -407,7 +397,7 @@ BEGIN
 							AND ISNULL(customercategory,-1) NOT IN (27,28)-- 8RM&BARM 
 						UNION ALL
 						SELECT rptDate,LeagueID,SiteID,CurrencyID,Turnover
-						FROM bodb_Licensee.dbo.rpt_Betting_BA (NOLOCK) 
+						FROM bodb_LicenseeReport.dbo.rpt_Betting_BA (NOLOCK) 
 						WHERE rptDate>=@Date_FirstDayOfYear AND rptDate<@Date_MTDCurrentMonth
 							AND status NOT IN (-1,103) 
 							AND currencyID<>20 
@@ -630,7 +620,7 @@ BEGIN
 			--Get data from bodb_licensee.dbo.rpt_Betting just one time by longest range time
 			INSERT INTO #MTD_TopThreeSports(rptDate,CurrencyID,SportID,Turnover)
 				SELECT rptDate,b.CurrencyID,l.sporttype,SUM(Turnover) Turnover  
-				FROM bodb_licensee.dbo.rpt_Betting_BA b (NOLOCK) 
+				FROM bodb_LicenseeReport.dbo.rpt_Betting_BA b (NOLOCK) 
 					INNER JOIN bodb02.dbo.League l (NOLOCK) ON b.leagueid=l.leagueid 
 			        INNER JOIN @Labels lbl ON b.SiteID=lbl.LabelID AND (lbl.DateStarted is null OR b.rptDate>=lbl.DateStarted)
 				WHERE rptDate>=@Date_FirstDayOfYear AND rptDate<@Date_MTDCurrentMonth
@@ -877,4 +867,9 @@ BEGIN
 END
 
 
-
+GO
+GRANT EXECUTE ON [dbo].[KPI_GetTopThreeSports] TO [bodbAdminNet] AS [dbo]
+GO
+GRANT EXECUTE ON [dbo].[KPI_GetTopThreeSports] TO [bodbLicenseeNet] AS [dbo]
+GO
+GRANT VIEW DEFINITION ON [dbo].[KPI_GetTopThreeSports] TO [vnteam] AS [dbo]

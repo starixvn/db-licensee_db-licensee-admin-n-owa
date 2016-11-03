@@ -27,6 +27,7 @@ AS
    - 20150202@Florent: base currency GBP
    - 20150824@Florent: remove bettrade ticket
    - 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
+   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 
  *
  * Params explanation:
@@ -214,7 +215,7 @@ BEGIN
 			,SUM(comm) AS BAComm
 			--,- SUM(b.winlost + b.awinlost + b.comm) AS AmountBA
 			,- SUM((b.winlost * ag.Rate) + b.comm) AS AmountBA
-		FROM bodb_Licensee.dbo.rptLicWinloss2 b(NOLOCK)
+		FROM bodb_licenseereport.dbo.rptLicWinloss2 b(NOLOCK)
 		INNER JOIN @TempAg ag ON ag.custid = b.recommend AND ag.currency=b.Currency
 		WHERE b.Winlostdate BETWEEN @FDate AND @TempToDate
 			AND b.roleid = 2

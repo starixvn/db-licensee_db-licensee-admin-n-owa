@@ -27,6 +27,7 @@ AS
     Revisions:  
 	   - 20141226@Florent: enhance SP
 	   - 20150705@Florent: add GBP
+	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	Param's Explanation:  
 	  + @PartyIDs : a string of list PartyID, separated by ','
 	  + @Currency : 0-All Currencies
@@ -93,7 +94,7 @@ BEGIN
 				    ELSE 1 END
 			 ) AS TurnOver
 		  , SUM(b.winloss) AS Winloss
-	   FROM bodb_Licensee.dbo.rpt_Betting_BA b WITH ( NOLOCK ) 
+	   FROM bodb_LicenseeReport.dbo.rpt_Betting_BA b WITH ( NOLOCK ) 
 		  INNER JOIN (SELECT DISTINCT PartyID, LicenseeID FROM @tmpParty) tp ON tp.LicenseeID = b.SiteID
 	   WHERE b.rptDate BETWEEN @Fromdate AND @Todate
 		  AND b.Status NOT IN (-1, 103)
@@ -115,7 +116,7 @@ BEGIN
 					   ELSE 1 END
 				) AS TurnOver
 		  , SUM(winloss) AS Winloss
-	   FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK) 			
+	   FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK) 			
 		  INNER JOIN (SELECT DISTINCT PartyID, LicenseeID FROM @tmpParty) tp ON tp.LicenseeID = b.SiteID
 		  --INNER JOIN @bettype be ON b.bettype = be.bettype
 	   WHERE b.rptDate BETWEEN @FromDate AND @Todate

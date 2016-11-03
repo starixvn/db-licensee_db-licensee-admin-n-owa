@@ -28,7 +28,7 @@ AS
 		- 20141026@Patrick: Optimize code
 		- 20150703@Florent: add GBP
 		- 20160506@Bravo: Add VB data.
-    
+		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
     Param's Explanation:  
 	   + @partyIDs : a string of list PartyID, separated by ','
 	   + @Currency : 0-All Currencies
@@ -93,7 +93,7 @@ BEGIN
 						  ELSE 1 END 
 					   ELSE 1 END
 				) TurnOver
-		  FROM bodb_Licensee.dbo.rpt_Betting_BA b WITH ( NOLOCK ) 
+		  FROM bodb_licenseereport.dbo.rpt_Betting_BA b WITH ( NOLOCK ) 
 			 INNER JOIN(
 				    SELECT DISTINCT PartyID, LicenseeID
 				    FROM @tmpParty
@@ -123,7 +123,7 @@ BEGIN
 						   ELSE 1 END 
 					   ELSE 1 END
 				) TurnOver
-		  FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK) 
+		  FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK) 
 			 INNER JOIN (
 				    SELECT DISTINCT PartyID, LicenseeID
 				    FROM @tmpParty

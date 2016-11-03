@@ -16,10 +16,11 @@ AS
 /*  
 	 Created: 20160322@Forrest
 	 Task : Superlive Win Loss Report
-	 DB: DB052.bodb_licensee
+	 DB: DBLIC.bodb_licensee
    
 	 Revisions:  
 	 - 20160322@Forrest: Get Superlive Report Data.
+	 - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	 Params:
 	 - PartyIds: List Party Id.
 	 - FromDate: From Date.
@@ -113,7 +114,7 @@ SET NOCOUNT ON
 						 THEN (-b.WinLoss - b.WinLossA - b.WinLossS - b.WinLossM - b.CommissionS) * p.Rate
 						 ELSE -b.WinLoss * p.Rate 
 					END) AmtLicensee
-		FROM	rpt_Betting b WITH (NOLOCK)
+		FROM	bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
 				INNER JOIN @PartyChargeInfo p ON b.SiteID = p.LicenseeId 
 				AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate

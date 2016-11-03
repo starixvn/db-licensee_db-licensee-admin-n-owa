@@ -14,8 +14,8 @@ AS
 		-20140530@Francis: Support Keno product
 		-20160116@Francis: Change to use KPI_Statistics table instead of view_kpi_statistics
 		-20160116@Francis: Support BetTrade
+		-20160726@Francis: Move SP to bodb_LicenseeReport - [Redmine: #60449]
  		-20160810@Francis: BetTrade commercial terms changed [Redmine: #62111]
- 			
  * Param's Explanation:    
  * -@ReportType: 
 	+0: Sportbook
@@ -96,7 +96,7 @@ BEGIN
 		            when mtd.StatID in (14,16) then 0 
 					else mtd.MonthToDate 
 				end * case when stat.StatisticType = 4 then EUR else 1 end),0) AS [Value]
-		from dbo.rptKPI_MTD_Cross mtd (nolock)
+		from bodb_LicenseeReport.dbo.rptKPI_MTD_Cross mtd (nolock)
 			inner join @Sites sites on mtd.siteid = sites.SiteID
 			inner join dbo.KPI_Groups g (NOLOCK) on sites.LicenseeID = g.SiteID
 			inner join dbo.KPI_SectionStatistic ss (NOLOCK) ON mtd.StatID = ss.StatID
@@ -194,7 +194,7 @@ BEGIN
 		bg.BranchID,
 		isnull(
 			sum(mtd.MonthToDate * case when stat.StatisticType = 4 then EUR else 1 end),0) AS [Value]
-		from dbo.rptKPI_MTD_Cross mtd (nolock)
+		from bodb_LicenseeReport.dbo.rptKPI_MTD_Cross mtd (nolock)
 			inner join @Sites sites on mtd.siteid = sites.SiteID
 			inner join dbo.KPI_Groups g (NOLOCK) on sites.LicenseeID = g.SiteID
 			inner join dbo.KPI_SectionStatistic ss (NOLOCK) ON mtd.StatID = ss.StatID
@@ -285,7 +285,7 @@ BEGIN
 		            when mtd.StatID in (14,16) then 0 
 					else mtd.MonthToDate 
 				end * case when stat.StatisticType = 4 then EUR else 1 end),0) AS [Value] 
-		from dbo.rptKPI_MTD_3rdProducts mtd (nolock)
+		from bodb_LicenseeReport.dbo.rptKPI_MTD_3rdProducts mtd (nolock)
 			inner join @Sites sites on mtd.siteid = sites.SiteID
 			inner join dbo.KPI_Groups g (NOLOCK) on sites.LicenseeID = g.SiteID
 			inner join dbo.KPI_SectionStatistic ss (NOLOCK) ON mtd.StatID = ss.StatID
@@ -420,7 +420,7 @@ BEGIN
 		            when mtd.StatID in (14,16) then 0 
 					else mtd.MonthToDate 
 				end * case when stat.StatisticType = 4 then EUR else 1 end),0) AS [Value] 
-		from dbo.rptKPI_MTD_3rdProducts mtd (nolock)
+		from bodb_LicenseeReport.dbo.rptKPI_MTD_3rdProducts mtd (nolock)
 			inner join @Sites sites on mtd.siteid = sites.SiteID
 			inner join dbo.KPI_Groups g (NOLOCK) on sites.LicenseeID = g.SiteID
 			inner join dbo.KPI_SectionStatistic ss (NOLOCK) ON mtd.StatID = ss.StatID
@@ -543,7 +543,7 @@ BEGIN
 		            when mtd.StatID in (14,16) then 0 
 					else mtd.MonthToDate 
 				end * case when stat.StatisticType = 4 then EUR else 1 end),0) AS [Value] 
-		from dbo.rptKPI_MTD_3rdProducts mtd (nolock)
+		from bodb_LicenseeReport.dbo.rptKPI_MTD_3rdProducts mtd (nolock)
 			inner join @Sites sites on mtd.siteid = sites.SiteID
 			inner join dbo.KPI_Groups g (NOLOCK) on sites.LicenseeID = g.SiteID
 			inner join dbo.KPI_SectionStatistic ss (NOLOCK) ON mtd.StatID = ss.StatID
@@ -668,7 +668,7 @@ BEGIN
 		            when mtd.StatID in (14,16) then 0 
 					else mtd.MonthToDate 
 				end * case when stat.StatisticType = 4 then EUR else 1 end),0) AS [Value] 
-		from dbo.rptKPI_MTD_3rdProducts mtd (nolock)
+		from bodb_LicenseeReport.dbo.rptKPI_MTD_3rdProducts mtd (nolock)
 			inner join @Sites sites on mtd.siteid = sites.SiteID
 			inner join dbo.KPI_Groups g (NOLOCK) on sites.LicenseeID = g.SiteID
 			inner join dbo.KPI_SectionStatistic ss (NOLOCK) ON mtd.StatID = ss.StatID
@@ -775,6 +775,7 @@ BEGIN
 	DROP TABLE #Result
 	
 END
+
 
 GO
 GRANT EXECUTE ON [dbo].[KPI_GetReportData] TO [bodbAdminNet] AS [dbo]

@@ -27,6 +27,7 @@ AS
 	   - 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
 	   - 20150703@Florent: add GBP
 	   - 20160505@Bruce: Remove dynamic sql
+	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -121,7 +122,7 @@ BEGIN
 					0 as Company,
 					SUM(b.BetCount) * (CASE	WHEN @drawfilter = 2 AND b.[Status] = 111 THEN 0 ELSE 1 END),
 					SUM(b.CommissionP)
-			FROM bodb_Licensee.dbo.rpt_Betting_BA b WITH ( NOLOCK )
+			FROM bodb_licenseereport.dbo.rpt_Betting_BA b WITH ( NOLOCK )
 				INNER JOIN #tmpParty tp ON b.siteid = tp.LicenseeID AND tp.ProductID = 3
 				INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND tp.ProductID = bt.ProductID
 				LEFT JOIN League l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
@@ -161,7 +162,7 @@ BEGIN
 					,SUM(b.CommissionA)
 					,SUM(b.CommissionP)
 					,SUM(b.BetCount)
-			FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK)
+			FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
 			INNER JOIN #PartyBettypeMapping t ON b.Bettype = t.Bettype AND b.SiteID = t.LicenseeID
 			LEFT JOIN dbo.League l WITH(NOLOCK) ON b.LeagueID = l.leagueid
 			WHERE	(b.rptDate BETWEEN @Fromdate AND @ToDate) AND

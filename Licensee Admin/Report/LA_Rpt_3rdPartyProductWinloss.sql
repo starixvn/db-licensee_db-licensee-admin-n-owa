@@ -24,6 +24,7 @@ AS
 	Revisions:  			
 		- 20150714@Florent: support credit licensee
 		- 20150722@Florent: fix bug NoDraw filter
+		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	Param's Explanation:  				
 		+ @ProductCode:	+ 'GD'	Gold Deluxe
 */  
@@ -138,7 +139,7 @@ BEGIN
 				, - SUM(WinLoss * p.Rate) AS Company 
 				, - SUM(WinLoss * p.Rate3rd) AS Amtdueto 
 				, SUM(b.BetCount * CASE WHEN @DrawFilter = 2 AND b.STATUS = 111 THEN 0 ELSE 1 END) AS BetCount	  
-			FROM bodb_licensee.dbo.rpt_Betting b WITH (NOLOCK)	
+			FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)	
 				INNER JOIN @tmpParty p ON b.SiteID = p.LicenseeId
 				INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND p.ProductID = bt.ProductId				
 			WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate		

@@ -20,6 +20,7 @@ AS
 		-20160317@Bravo: Remove unused param: fix bug wrong actual stake in BTWinLoss report.
 		-20160523@Bravo: https://nexdev.net/projects/owa/wiki/CR_20160519_UpdateBetTradeCommercialTerm
 		- 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
+		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	Param's Explanation:  						
 */  
 SET NOCOUNT ON
@@ -112,7 +113,7 @@ BEGIN
 					, SUM(CASE WHEN b.Bettype IN (901, 902, 903, 904) THEN 0 ELSE b.WinLoss END)	AS WinLossOnBoughtTickets
 					, SUM(CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount * p.Rate) ELSE 0 END) AS BettradeComm	-- negative amount (meaning that house charges BetTrade this amount).							 					 								
 					, SUM(CASE WHEN bt.ProductID = 0 THEN ISNULL(b.BetCount, 0) ELSE 0 END) TotalTrans
-				FROM bodb_licensee.dbo.rpt_Betting b WITH (NOLOCK)
+				FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
 					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 					INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (0, 13)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate									
@@ -130,7 +131,7 @@ BEGIN
 					, SUM(b.WinLoss) AS WinLossOnBoughtTickets 
 					, 0 AS BettradeComm		 					 								
 					, SUM(ISNULL(b.BetCount, 0)) TotalTrans
-				FROM bodb_licensee.dbo.rpt_Betting_BA b WITH (NOLOCK)
+				FROM bodb_licenseereport.dbo.rpt_Betting_BA b WITH (NOLOCK)
 					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate				
 					INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN(3)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate

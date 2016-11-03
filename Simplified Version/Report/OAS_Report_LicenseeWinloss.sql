@@ -31,6 +31,7 @@ AS
 	- 20150824@Florent: remove Bettrade bettypes
 	- 20160217@Victor: hotfix - remove bettrade bettypes [Redmine: 52120]
 	- 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
+	- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
  * 
  * Param's Explanation:    
  *  - @ID   : Party ID  (include: LicenseeID, ResellerID)
@@ -233,7 +234,7 @@ BEGIN
 				ELSE 1
 				END
 			,SUM(playercomm) AS Playercomm
-		FROM bodb_Licensee.dbo.rptLicWinloss2 b WITH (NOLOCK)
+		FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH (NOLOCK)
 			INNER JOIN @tmpAg ag ON b.recommend = ag.CustID AND b.Currency=ag.currency
 		WHERE b.Winlostdate BETWEEN @FDate AND @TempToDate
 			AND b.sporttype = 0 --just only sportsbook
@@ -256,7 +257,7 @@ BEGIN
 	IF @IsOld = 1
 	BEGIN
 		SELECT @MaxOldDate = MAX(winlostdate)
-		FROM bodb_Licensee.dbo.rptLicWinloss_old(NOLOCK)
+		FROM bodb_licenseereport.dbo.rptLicWinloss_old(NOLOCK)
 
 		IF @TDate >= @MaxOldDate
 			SET @TempToDate = @MaxOldDate
@@ -293,7 +294,7 @@ BEGIN
 				ELSE 1
 				END
 			,SUM(playercomm) AS Playercomm
-		FROM bodb_Licensee.dbo.rptLicWinloss_old b WITH (NOLOCK)
+		FROM bodb_licenseereport.dbo.rptLicWinloss_old b WITH (NOLOCK)
 			 INNER JOIN @tmpAg ag ON b.recommend = ag.CustID AND b.Currency=ag.currency
 		WHERE b.Winlostdate BETWEEN @FDate AND @TempToDate
 			AND b.sporttype = 0 --just only sportsbook

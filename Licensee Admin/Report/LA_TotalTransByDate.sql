@@ -23,6 +23,7 @@ AS
 	 - 20151204@Bravo:	 #48740-HotFix-TotalTrans-AutoMail.
 	 - 20151222@Francis: #48864-HotFix-Missing Credit data for GD
 	 - 20160504@Bravo:	 Add VB Data
+	 - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	 Params:			   
 */
 BEGIN
@@ -98,7 +99,7 @@ BEGIN
 			WHEN b.Bettype BETWEEN 4001 AND 7999 THEN 'VB'
 			END product,
 			SUM(b.betcount) betcount
-	FROM	dbo.rpt_betting b WITH (NOLOCK)
+	FROM	bodb_licenseereport.dbo.rpt_betting b WITH (NOLOCK)
 	where 	b.SiteID !=N'' AND
 			b.rptDate BETWEEN @Fromdate AND @Todate 
 			AND b.status NOT IN (-1,103)
@@ -122,7 +123,7 @@ BEGIN
 	SELECT	month(b.rptDate), b.rptDate,
 			'BA' AS product,
 			b.SiteID,SUM(b.betcount) betcount
-	FROM	dbo.rpt_Betting_BA b WITH (NOLOCK) 
+	FROM	bodb_licenseereport.dbo.rpt_Betting_BA b WITH (NOLOCK) 
 	where	b.rptDate between @Fromdate AND @Todate
 			AND b.status NOT IN (-1,103)
 			AND b.CurrencyID<>20

@@ -31,6 +31,7 @@ AS
 			- 20160316@Bruce: Bettrade: added BuyBackAmountSportsbookBase and BuyBackAmountBABase
 			- 20160428@Bruce: MGCRNG: Support Microgaming - Progressive Contribution
 			- 20160929@Scofield: Update for Colossus Bet
+			- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 		Param's Explanation:
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
 								'NG' -> Number Game			'BA' -> BA
@@ -369,7 +370,7 @@ BEGIN
 					, SUM(CASE WHEN bt.ProductId = 0 THEN ISNULL(b.BetCount, 0) ELSE 0 END) BetCount
 					, SUM(CASE WHEN b.bettype = 901 AND b.CustomerCategory = 1001 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountSB -- 1001 : SB
 					, SUM(CASE WHEN b.bettype = 901 AND b.CustomerCategory = 1002 THEN b.BuyBackAmount ELSE 0 END) AS BuyBachAmountBA -- 1002 : BA
-				FROM bodb_licensee.dbo.rpt_Betting b WITH (NOLOCK)
+				FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
 					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID 
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN (0, 13)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
@@ -389,7 +390,7 @@ BEGIN
 					, SUM(ISNULL(b.BetCount, 0)) BetCount
 					, 0 AS BuyBackAmountSB
 					, 0 AS BuyBackAmountBA
-				FROM bodb_licensee.dbo.rpt_Betting_BA b WITH (NOLOCK)
+				FROM bodb_licenseereport.dbo.rpt_Betting_BA b WITH (NOLOCK)
 					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (3)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
@@ -424,7 +425,7 @@ BEGIN
 				, - SUM(b.WinLoss * p.Rate + b.CommissionA) AS Company
 				, SUM(betcount * CASE WHEN @drawfilter = 2 AND b.Status = 111 THEN 0 ELSE 1 END) AS BetCount
 			FROM
-				bodb_licensee.dbo.rpt_Betting_BA b WITH (NOLOCK)
+				bodb_licenseereport.dbo.rpt_Betting_BA b WITH (NOLOCK)
 				INNER JOIN @tmpParty p ON b.SiteID = p.LicenseeId
 			WHERE
 				b.rptDate BETWEEN p.FromDate AND p.ToDate
@@ -546,7 +547,7 @@ BEGIN
 				, SUM(ISNULL(b.CommissionP, 0)) AS PComm
 				, SUM(ISNULL(b.CommissionA, 0)) AS AComm
 				, SUM(ISNULL(b.betcount, 0)) BetCount
-				FROM bodb_Licensee.dbo.rpt_Betting b WITH (NOLOCK)
+				FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype
 				WHERE
 					b.SiteID = @LicenseeID
