@@ -1,6 +1,8 @@
 USE bodb_licensee
 GO
-ALTER PROCEDURE dbo.LA_DiscountGroupInfoSel @DiscountGroupType TINYINT
+
+ALTER PROCEDURE dbo.LA_DiscountGroupInfoSel
+	@DiscountGroupType TINYINT
 	, @DiscountGroupId SMALLINT = 0
 	, @GroupName VARCHAR(100) = ''
 AS
@@ -9,7 +11,7 @@ AS
 	 Task : Get discount group info
 	 DB: DB052.bodb_Licensee
 	 Revisions:     
-		
+		- 2016.10.24@Bruce: display discount type 3
 	 Params:
 */
 BEGIN
@@ -27,8 +29,8 @@ BEGIN
 	END
 	
 	SELECT h.DiscountGroupId, h.DiscountGroupName, ISNULL(ex.Code, '') AS CurrencyName , h.FromDate, h.ToDate
-		, CASE WHEN DiscountGroupType = 1 THEN ISNULL(d.FromAmount, 0) ELSE 0 END AS FromAmount
-		, CASE WHEN DiscountGroupType = 1 THEN ISNULL(d.ToAmount, 0) ELSE 0 END AS ToAmount
+		, CASE WHEN DiscountGroupType IN (1,3) THEN ISNULL(d.FromAmount, 0) ELSE 0 END AS FromAmount
+		, CASE WHEN DiscountGroupType IN (1,3) THEN ISNULL(d.ToAmount, 0) ELSE 0 END AS ToAmount
 		, d.Rate
 		, COUNT(DISTINCT p.ProductId) AS NumberOfProduct
 		, COUNT(DISTINCT a.PartyID) AS NumberOfPayer
@@ -47,18 +49,23 @@ BEGIN
 				WHERE aa.DiscountGroupId = h.DiscountGroupId
 				FOR XML PATH (''), ROOT('str'), TYPE 
 					).value('/str[1]','VARCHAR(MAX)') 
-			  , 1, 2, '') AS PayerList
+			  , 1, 2, '') AS PayerList,
+		DiscountGroupType
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
 		LEFT JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON h.DiscountGroupId = d.DiscountGroupId
 		LEFT JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON h.DiscountGroupId = p.DiscountGroupId
 		LEFT JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
 		LEFT JOIN bodb02.dbo.Exchange ex WITH(NOLOCK) ON h.CurrencyId = ex.ExchangeId
 	WHERE (@DiscountGroupId IS NULL OR (@DiscountGroupId IS NOT NULL AND h.DiscountGroupId = @DiscountGroupId))
-		AND DiscountGroupType = @DiscountGroupType
+		AND (
+			(@DiscountGroupType = 1 AND DiscountGroupType IN (1,3)) OR
+			(@DiscountGroupType <> 1 AND DiscountGroupType = @DiscountGroupType)
+		)
 	GROUP BY h.DiscountGroupId, h.DiscountGroupName, ISNULL(ex.Code, ''), h.FromDate, h.ToDate
-		, CASE WHEN DiscountGroupType = 1 THEN ISNULL(d.FromAmount, 0) ELSE 0 END
-		, CASE WHEN DiscountGroupType = 1 THEN ISNULL(d.ToAmount, 0) ELSE 0 END
+		, CASE WHEN DiscountGroupType IN (1,3) THEN ISNULL(d.FromAmount, 0) ELSE 0 END
+		, CASE WHEN DiscountGroupType IN (1,3) THEN ISNULL(d.ToAmount, 0) ELSE 0 END
 		, d.Rate
+		, DiscountGroupType
 END
 GO
 GRANT VIEW DEFINITION ON dbo.LA_DiscountGroupInfoSel TO vnteam

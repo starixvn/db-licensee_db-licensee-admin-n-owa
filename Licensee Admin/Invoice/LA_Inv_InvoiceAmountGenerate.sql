@@ -34,9 +34,10 @@ AS
 		+ 2015.11.09 @Bravo.Tran: Invoice Amount - Enhance prorate min fee.
 		+ 2016.06.27 @Bravo.Tran: Invoice Amount - Hosting Fess amount.
 		+ 2016.07.19 @Bruce.Bui: Adding hosting fees extra info.
-        + 2016.09.27 @Bruce.Bui: Get MaxPCU case full month waive
-*/
-/*	Example:
+		+ 2016.09.27 @Bruce.Bui: Get MaxPCU case full month waive
+		+ 2016.10.24 @Bruce.Bui: Add new discount type = 3
+
+Example:
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
 	DECLARE @ToDate DATETIME  = '2016-06-30'
@@ -474,7 +475,8 @@ BEGIN
 			ProductId		TINYINT,
 			BettypeRef		INT, 
 			AmountToCompany MONEY,
-			IsApplyMinFee	BIT)
+			IsApplyMinFee	BIT,
+			LicenseeWinLossBase MONEY)
 	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,WinLoss,AComm,ProductId,BettypeRef)
 	(
 		SELECT	b.SiteID,
@@ -505,7 +507,8 @@ BEGIN
 									WHEN td.ProductId = 3 THEN (-td.WinLoss * p.Rate - td.AComm) * e.Rate									
 									WHEN td.ProductId <> 3 THEN (-td.WinLoss * p.Rate) * e.Rate
 									ELSE 0 
-								END
+								END,
+			LicenseeWinLossBase = -td.WinLoss * e.Rate
 	FROM	#TempData td 
 			INNER JOIN @PartyChargeInfo p 
 				ON td.LicenseeId = p.LicenseeId 
@@ -695,7 +698,17 @@ BEGIN
 			WHERE	dg.DiscountGroupType = 1
 		)	
 		-- End Region
-		
+
+		-- discount by winloss
+		INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
+		(
+			SELECT t.PartyId, t.ProductId, SUM(t.LicenseeWinLossBase * d.Rate), 1, d.Rate
+			FROM #TempData t
+			INNER JOIN @DiscountGroup d ON d.ProductId = t.ProductId  AND d.DiscountGroupType = 3
+			GROUP BY t.PartyId, t.ProductId, d.Rate
+		)
+		--end discount by winloss
+
 		-- Region: Apply Rebate
 		INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
 		(
@@ -715,7 +728,7 @@ BEGIN
 		)
 	
 		-- End Region
-	
+
 		-- Region: Select data	
 		DECLARE	@FinalResult TABLE(
 				ProductId		INT,
@@ -724,7 +737,7 @@ BEGIN
 				InvoiceAmount	MONEY,
 				AmountType		TINYINT,
 				Rate			MONEY)
-	
+
 		INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate)
 		(
 			SELECT	id.ProductId,
@@ -743,24 +756,24 @@ BEGIN
 					id.AmountType,
 					id.Rate
 			FROM	@InvoiceData id  
-					LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON id.ProductId = p.Productid				
+					LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON id.ProductId = p.Productid
 		)
-	
+
 		INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate)
 		(
 			SELECT	-1,
 					(	SELECT	f.ProductCode + ',' 
 						FROM	@FinalResult f 
-						WHERE f.AmountType = id.AmountType FOR XML PATH('')) 
+						WHERE f.AmountType = id.AmountType AND f.Rate=id.Rate FOR XML PATH('')) 
 					AS ProductCode,
 					(	SELECT	f.ProductName + ',' 
 						FROM	@FinalResult f 
-						WHERE f.AmountType = id.AmountType FOR XML PATH('')) 
+						WHERE f.AmountType = id.AmountType AND f.Rate=id.Rate FOR XML PATH('')) 
 					AS ProductName,
 					SUM(id.InvoiceAmount),
 					id.AmountType,
 					id.Rate
-			FROM	@FinalResult id  				
+			FROM	@FinalResult id
 			WHERE	id.AmountType > 0
 			GROUP BY id.AmountType, id.Rate
 		)	
@@ -768,7 +781,7 @@ BEGIN
 		SET		ProductCode = LEFT(ProductCode, LEN(ProductCode) - 1),
 				ProductName = LEFT(ProductName, LEN(ProductName) - 1)
 		WHERE	ProductId = -1
-		
+
 		SELECT	f.ProductId,
 				f.ProductCode,
 				f.ProductName,

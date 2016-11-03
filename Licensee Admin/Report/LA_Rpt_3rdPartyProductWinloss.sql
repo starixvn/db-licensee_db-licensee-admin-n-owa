@@ -1,16 +1,13 @@
 USE [bodb02]
 GO
 
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_3rdPartyProductWinloss]    Script Date: 10/02/2016 22:50:32 ******/
 SET ANSI_NULLS ON
 GO
 
 SET QUOTED_IDENTIFIER ON
 GO
 
-/****** Object:  Stored Procedure dbo.LA_Rpt_3rdPartyProductWinloss    Script Date: 6/7/2016 1:36:01 PM ******/
-
-CREATE PROCEDURE [dbo].[LA_Rpt_3rdPartyProductWinloss] 
+ALTER PROCEDURE [dbo].[LA_Rpt_3rdPartyProductWinloss] 
 	  @PartyIds				VARCHAR(1000)
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME
