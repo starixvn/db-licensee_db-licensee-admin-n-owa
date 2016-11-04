@@ -291,6 +291,7 @@ BEGIN
 			ProductID	INT,
 			BettypeRef  INT,
 			Rate		MONEY,
+			TypeId		SMALLINT,
 			FromDate	SMALLDATETIME,
 			ToDate		SMALLDATETIME)
 
@@ -298,9 +299,34 @@ BEGIN
 	(
 		SELECT	PartyID, LicenseeID, ProductID, Bettype, DI_Rate, Fromdate, Todate
 		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
-		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
+		WHERE	DI_Rate > 0 AND ProductId NOT IN (1, 15) --exclude RB, CB
 	)
-
+	
+	-- Get ChargeInfo for CB
+	DECLARE @CommChargeType INT = 6
+	DECLARE @CashInShareChargeType INT = 7
+	DECLARE @CBProductId INT = 15
+	
+	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, TypeId, FromDate, ToDate)
+	SELECT	ci.FromParty,
+			CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END AS LicenseeId,
+			@CBProductId,
+			ci.Rate,
+			ci.ChargeType,
+			CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
+			CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
+	FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
+		LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
+		LEFT JOIN bodb_licensee.dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
+	WHERE FromParty = @PartyId AND ProductID = @CBProductId AND ChargeType IN (@CommChargeType,@CashInShareChargeType) AND (
+		@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
+		@ToDate BETWEEN ci.FromDate AND ci.ToDate OR
+		ci.FromDate BETWEEN @FromDate AND @ToDate OR
+		ci.ToDate BETWEEN @FromDate AND @ToDate
+	)	
+	-- End Get ChargeInfo for CB
+	
 	-- End region
 	
 	-- Region: MinfeeGroup Date range	
@@ -497,6 +523,7 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.Bettype NOT IN (901,902,903)
+				AND b.ProductId <> @CBProductId
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, r.BettypeRef
 	)
 	
@@ -525,6 +552,48 @@ BEGIN
 			AND t.PartyId = m.PartyId
 	WHERE	m.FeeType=2
 	-- End region	
+	
+	-- Region: Get Amount By Product CB
+	CREATE TABLE #TempDataCB (
+		rptDate				DATETIME,
+		LicenseeId			INT,
+		PartyId				INT,
+		ProductId			INT,
+		CurrencyId			INT,
+		Turnover			MONEY,
+		TurnoverExchanged	MONEY,
+		WinningPrize		MONEY,
+		CashOut				MONEY,
+		CommisionShare		MONEY,
+		CashInShare			MONEY,
+		CashInAmount		MONEY
+	)
+		
+	INSERT INTO #TempDataCB (rptDate, LicenseeId, PartyId, ProductId, CurrencyId, Turnover, WinningPrize, CashOut, CashInAmount)
+	SELECT	rptDate,
+			b.SiteID,
+			cb.PartyId,
+			b.ProductId,
+			CurrencyId,
+			SUM(Turnover) Turnover,
+			SUM(ISNULL(WinPrizeAmount,0)) WinningPrize,
+			SUM(ISNULL(CashOutAmount,0)) CashOut,
+			SUM(ISNULL(BuyBackAmount,0)) CashInAmount
+	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+	JOIN @PartyChargeInfo cb ON b.SiteID = cb.LicenseeId AND b.ProductId = cb.ProductID AND b.rptDate BETWEEN cb.FromDate AND cb.ToDate
+	WHERE	b.ProductId = @CBProductId AND CustomerCategory NOT IN (27, 28) AND CurrencyId <> 20 AND cb.TypeId = @CommChargeType -- to remove duplicate we use one of (6,7)
+	GROUP BY rptdate, CurrencyId, b.SiteID, cb.PartyId, b.ProductId
+	
+	UPDATE #TempDataCB
+	SET CommisionShare = td.Turnover * cm.Rate, CashInShare = td.CashInAmount * ci.Rate
+	FROM #TempDataCB td
+	JOIN @PartyChargeInfo AS cm ON cm.ProductID = @CBProductId AND cm.TypeId = @CommChargeType AND (td.rptDate BETWEEN cm.FromDate AND cm.ToDate)
+	JOIN @PartyChargeInfo AS ci ON cm.ProductID = @CBProductId AND ci.TypeId = @CashInShareChargeType AND (td.rptDate BETWEEN ci.FromDate AND ci.ToDate)
+	
+	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,ProductId, AmountToCompany)
+	SELECT LicenseeId, PartyId, rptDate, CurrencyId, ProductId, Turnover - WinningPrize - Cashout - CommisionShare - CashInShare
+	FROM #TempDataCB
+	-- End region: Get Amount By Product CB
 	
 	-- Region: Check min fee group			
 	--- calculate waived prorate (*)
