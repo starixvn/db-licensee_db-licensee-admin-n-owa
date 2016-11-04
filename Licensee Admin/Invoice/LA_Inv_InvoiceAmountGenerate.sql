@@ -36,8 +36,9 @@ AS
 		+ 2016.07.19 @Bruce.Bui: Adding hosting fees extra info.
 		+ 2016.09.27 @Bruce.Bui: Get MaxPCU case full month waive
 		+ 2016.10.24 @Bruce.Bui: Add new discount type = 3
+        + 2016.09.27 @Bruce.Bui: Get MaxPCU case full month waive
+		+ 2016.11.04 @Scofield.Huynh: Update for CB
 
-Example:
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
 	DECLARE @ToDate DATETIME  = '2016-06-30'
@@ -591,8 +592,9 @@ BEGIN
 	JOIN @PartyChargeInfo AS ci ON cm.ProductID = @CBProductId AND ci.TypeId = @CashInShareChargeType AND (td.rptDate BETWEEN ci.FromDate AND ci.ToDate)
 	
 	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,ProductId, AmountToCompany)
-	SELECT LicenseeId, PartyId, rptDate, CurrencyId, ProductId, Turnover - WinningPrize - Cashout - CommisionShare - CashInShare
-	FROM #TempDataCB
+	SELECT LicenseeId, PartyId, rptDate, CurrencyId, ProductId, (Turnover - WinningPrize - Cashout - CommisionShare - CashInShare) * e.Rate
+	FROM #TempDataCB tcb
+	INNER JOIN #Exchange e ON tcb.rptDate = e.ExchangeDate AND tcb.CurrencyId = e.ExchangeID	
 	-- End region: Get Amount By Product CB
 	
 	-- Region: Check min fee group			
@@ -867,6 +869,7 @@ BEGIN
 
 	DROP TABLE #Exchange
 	DROP TABLE #TempData
+	DROP TABLE #TempDataCB
 
 END
 GO
