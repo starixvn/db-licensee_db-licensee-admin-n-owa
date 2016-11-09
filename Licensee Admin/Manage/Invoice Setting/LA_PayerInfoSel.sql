@@ -19,13 +19,16 @@ AS
 	 Revisions:
 		+ @Bravo-2016.08.08: Hosting fees
 		+ @Bruce-2016-09-05: Default active address is 1
+		+ @Bruce-2016-11-09: Include non-official payers
+			1: official payer
+			5: non-official payer
 	 Params:
 	 Example:
 		EXEC dbo.LA_PayerInfoSel 14
 */
 BEGIN
 SET NOCOUNT ON
-	SELECT p.PartyID AS PayerID
+	SELECT TOP 1 p.PartyID AS PayerID
 		, p.PartyName AS PayerName
 		, pd.StatusId
 		, pd.IsDeposit
@@ -36,6 +39,9 @@ SET NOCOUNT ON
 		, pd.Address1
 		, pd.Address2
 		, ISNULL(i.ActiveAddress, 1) AS ActiveAddress
+		, p.PartyType
+		, ISNULL(p.SetupName, '') AS SetupName
+		, ISNULL(pd.BaseCurrencyId, 0) BaseCurrencyId
 	FROM dbo.OAS_Party p WITH (NOLOCK)
 		LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 		LEFT JOIN (
@@ -45,7 +51,7 @@ SET NOCOUNT ON
 			GROUP BY i.FromPartyId, i.ToPartyId, i.InvTypeId, i.ActiveAddress
 		) i ON p.PartyID = i.FromPartyId
 	WHERE (@PayerId = 0 OR p.PartyID = @PayerId)
-		AND p.PartyType = 1
+		AND p.PartyType IN (1,5)
 END
 GO
 
