@@ -17,18 +17,19 @@ AS
 		- 20150917@Victor: Support Chinese on Settings
 		- 20151109@Victor: Support Billing information of all Charge Types [Redmine: #41032]
 		- 20151230@Bravo: Add MGCRNG
+		- 20161110@Bruce.bui: check first billing date
 	Param's Explanation:  
 */  
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @FirstBilling VARCHAR(6)
+	DECLARE @FirstBilling DATE
 		, @BasisOfBilling NVARCHAR(MAX)
 		, @MinimumFees NVARCHAR(MAX)
 	
 	IF(@ProductCode='MGCRNG' OR @ProductCode='MGCLC')
 	BEGIN
-		SELECT 	
-			@FirstBilling =  CONVERT(VARCHAR(3),DATENAME(MONTH, DATEADD(MONTH, MONTH(ci.FirstOfBilling), - 1))) + '-' + SUBSTRING(CAST(YEAR(ci.FirstOfBilling) AS VARCHAR),3,2)
+		SELECT
+			@FirstBilling = ci.FirstOfBilling
 			, @BasisOfBilling = ISNULL(BasisOfBilling, '')
 			, @MinimumFees = ISNULL(m.MinFeeTerm, '')	
 		FROM dbo.OAS_ChargeInfoSub ci WITH (NOLOCK)
@@ -48,8 +49,8 @@ BEGIN
 	END
 	ELSE
 	BEGIN
-		SELECT 	
-			@FirstBilling =  CONVERT(VARCHAR(3),DATENAME(MONTH, DATEADD(MONTH, MONTH(ci.FirstOfBilling), - 1))) + '-' + SUBSTRING(CAST(YEAR(ci.FirstOfBilling) AS VARCHAR),3,2)
+		SELECT
+			@FirstBilling = ci.FirstOfBilling
 			, @BasisOfBilling = ISNULL(BasisOfBilling, '')
 			, @MinimumFees = ISNULL(m.MinFeeTerm, '')	
 		FROM dbo.OAS_ChargeInfo ci WITH (NOLOCK)
@@ -68,9 +69,12 @@ BEGIN
 		WHERE ci.FromParty = @PartyId AND ci.ChargeType != 2
 	END
 	
-	SELECT  ISNULL(@FirstBilling, '')		AS FirstBilling
-			, ISNULL(@BasisOfBilling, '')	AS BasisOfBilling
-			, ISNULL(@MinimumFees, '')		AS MinimumFees
+	SELECT CASE
+			WHEN @FirstBilling IS NULL OR CAST(@FirstBilling AS DATE) <= CAST('19000101' AS DATE) THEN ''
+			ELSE CONVERT(VARCHAR(3),DATENAME(MONTH, DATEADD(MONTH, MONTH(@FirstBilling), - 1))) + '-' + SUBSTRING(CAST(YEAR(@FirstBilling) AS VARCHAR),3,2)
+		END AS FirstBilling
+		, ISNULL(@BasisOfBilling, '')	AS BasisOfBilling
+		, ISNULL(@MinimumFees, '')		AS MinimumFees
 END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_LicenseeBillingInfoSel] TO [vnteam] 
