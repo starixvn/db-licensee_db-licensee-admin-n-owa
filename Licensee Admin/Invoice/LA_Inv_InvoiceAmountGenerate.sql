@@ -320,7 +320,8 @@ BEGIN
 		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
 		LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
 		LEFT JOIN bodb_licensee.dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
-	WHERE FromParty = @PartyId AND ProductID = @CBProductId AND ChargeType IN (@CommChargeType,@CashInShareChargeType) AND (
+	WHERE EXISTS(SELECT val FROM bodb02.dbo.strSplit(@ProductCode, ',') WHERE val = 'CB') AND
+		FromParty = @PartyId AND ProductID = @CBProductId AND ChargeType IN (@CommChargeType,@CashInShareChargeType) AND (
 		@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
 		@ToDate BETWEEN ci.FromDate AND ci.ToDate OR
 		ci.FromDate BETWEEN @FromDate AND @ToDate OR
