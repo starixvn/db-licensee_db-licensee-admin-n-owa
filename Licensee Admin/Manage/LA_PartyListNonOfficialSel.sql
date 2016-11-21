@@ -1,7 +1,7 @@
 USE [bodb_licensee]
 GO
 
-CREATE PROCEDURE [dbo].[LA_PartyListNonOfficialSel]
+ALTER PROCEDURE [dbo].[LA_PartyListNonOfficialSel]
 AS
 /*
 	Created: 20161109@bruce.bui
@@ -31,6 +31,10 @@ BEGIN
 	FROM dbo.OAS_Party p WITH(NOLOCK)
 	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID = d.PartyID
 	WHERE p.PartyType = 5 -- 5: non-official licensee
+	
+	UNION ALL
+
+	SELECT 1000, 'Non-Official Licensees', '', 0
 END
 GO
 
