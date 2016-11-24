@@ -18,8 +18,9 @@ AS
   DB: DB052.bodb_Licensee      
        
   Revisions:             
-  -20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail    
+  - 20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail    
   - 20161025@Scofield: exclude Colossus Bet from ChargeInfo
+  - 20161031@bruce.bui: include CB, charge type
   Params:    
   + @PayerId : 0 get all Party    
      <> 0 specify Party    
@@ -41,7 +42,7 @@ BEGIN
 			@CurrentDate DATE
 	SET @CurrentDate = CONVERT(DATE, GETDATE())
 	DECLARE @ChargeInfo AS TABLE(ChargeId INT, PartyId INT, PartyName VARCHAR(100), PartyGroupId INT, PartyGroupName VARCHAR(100), ProductId INT, ProductName VARCHAR(100), 
-			BettypeRef INT,Rate MONEY, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), ExchangeID INT, ExchangeName VARCHAR(50))
+			BettypeRef INT,Rate MONEY, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), ExchangeID INT, ExchangeName VARCHAR(50), ChargeType TINYINT)
 	CREATE TABLE #Temp_ChargeInfo(ChargeId INT, PartyID INT, ProductID INT, BettypeRef INT,Rate MONEY, Fromdate DATE, Todate DATE)
 
 	DECLARE @Minfee AS TABLE(PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, FromDate DATE, ToDate DATE)
@@ -114,8 +115,7 @@ BEGIN
 			AND a.Fromdate = b.Fromdate
 			AND a.Todate = b.Todate
 
-
-	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName)
+	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)
 		SELECT
 			c.ChargeID,
 			c.PartyID,
@@ -133,7 +133,8 @@ BEGIN
 			c.Todate,
 			CASE WHEN c.ProductID IN (14,17) THEN s.FirstOfBilling ELSE ci.FirstOfBilling END,
 			pd.BaseCurrencyId,
-			ISNULL(e.Code, '') AS ExchangeName
+			ISNULL(e.Code, '') AS ExchangeName,
+			ci.ChargeType
 		FROM #Temp_ChargeInfo c
 			INNER JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID
 			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
@@ -143,7 +144,7 @@ BEGIN
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 			LEFT JOIN dbo.OAS_ChargeInfoSub s WITH(NOLOCK) ON ci.ChargeID = s.ChargeIdRef
 			LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON pd.BaseCurrencyId = e.exchangeid
-		WHERE @CurrentDate BETWEEN c.Fromdate AND c.Todate AND ci.ProductID <> 15
+		WHERE @CurrentDate BETWEEN c.Fromdate AND c.Todate
 
 	INSERT INTO @Minfee (PartyId, ProductId, FeeTypeId, FeeAmount, FromDate, ToDate)
 		SELECT
@@ -232,7 +233,8 @@ BEGIN
 		c.BettypeRef,
 		c.Rate AS Rate,
 		c.ExchangeID AS ExchangeID,
-		c.ExchangeName AS ExchangeName
+		c.ExchangeName AS ExchangeName,
+		c.ChargeType
 	FROM @ChargeInfo c
 		LEFT JOIN @Minfee m
 			ON c.PartyId = m.PartyId
@@ -278,6 +280,7 @@ BEGIN
 		OR (@RebateGroup <> 0
 		AND r.DiscountGroupId = @RebateGroup
 		AND r.DiscountGroupType = 2))
+	ORDER BY c.PartyId, c.ProductId
 END
 DROP TABLE #Temp_ChargeInfo
 

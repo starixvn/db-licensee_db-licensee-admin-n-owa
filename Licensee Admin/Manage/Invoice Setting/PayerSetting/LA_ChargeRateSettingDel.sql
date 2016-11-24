@@ -7,7 +7,7 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_ChargeRateSettingDel] 	
-	@ChargeId				INT	
+	@ChargeIds				VARCHAR(100)
 	, @PayerId				INT
 	, @UserID				INT
 	, @LoginIP				VARCHAR (50)	= ''
@@ -23,6 +23,7 @@ AS
 	 Revisions:     
 		-20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
 		-20150917@Victor: Support Chinese on Settings
+		-20161101@bruce.bui: support delete multiple rate
 	 Params:				
 */
 BEGIN
@@ -33,7 +34,7 @@ BEGIN
 			, @MaxDate			DATE
 	SET @startRun = GETDATE()
 	
-	IF ISNULL(@ChargeId, 0 ) = 0 OR ISNULL(@PayerId, 0) = 0
+	IF ISNULL(@ChargeIds, '' ) = '' OR ISNULL(@PayerId, 0) = 0
 		RETURN
 	
 	DECLARE @ChargeRate AS TABLE (ChargeID INT, PartyId INT, ProductId INT, FromDate DATE, ToDate DATE)	
@@ -50,19 +51,24 @@ BEGIN
 
 	INSERT INTO @ChargeRate(ChargeID, PartyId, ProductId, FromDate, ToDate)
 	SELECT ChargeID, PartyId, ProductId, FromDate, ToDate 
-	FROM dbo.LA_f_ChargeInfo(@PayerID, @MinDate, @MaxDate ,@ProductListAll, 'OA', 1)		
-	WHERE ChargeID = @ChargeId
+	FROM dbo.LA_f_ChargeInfo(@PayerID, @MinDate, @MaxDate ,@ProductListAll, 'OA', 1)
+	WHERE ChargeID IN (SELECT CAST(val AS INT) FROM dbo.strSplit( @ChargeIds, ','))
 
 	--check validate existing 
-	EXEC dbo.LA_ChargeRateValidate 
-		@ChargeId = @ChargeId
-		, @PayerIdList = @PayerID
-		, @Mode = 'R'
-		, @ErrCode = @ErrCode OUTPUT
-		, @ErrMsg = @ErrMsg OUTPUT
-	IF @ErrCode <> 0 
+	DECLARE @i INT = 0
+	WHILE(@i IS NOT NULL)
 	BEGIN
-		RETURN
+		SET @i = (SELECT TOP 1 ChargeID FROM @ChargeRate WHERE ChargeID > @i ORDER BY ChargeID)
+		EXEC dbo.LA_ChargeRateValidate 
+			@ChargeId = @i
+			, @PayerIdList = @PayerID
+			, @Mode = 'R'
+			, @ErrCode = @ErrCode OUTPUT
+			, @ErrMsg = @ErrMsg OUTPUT
+		IF @ErrCode <> 0 
+		BEGIN
+			RETURN
+		END
 	END
 	---check case Update , compare new data with old config 
 	IF EXISTS (SELECT 1 FROM @ChargeRate)
@@ -89,7 +95,7 @@ BEGIN
 		SET @logSPDataOld = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"')	
 		
 		DELETE dbo.OAS_ChargeInfo WITH (ROWLOCK, UPDLOCK)
-		WHERE ChargeID = @ChargeId AND FromParty = @PayerId
+		WHERE ChargeID IN (SELECT ChargeID FROM @ChargeRate)
 		
 		IF @@ERROR <> 0
 		BEGIN
@@ -98,7 +104,7 @@ BEGIN
 		END
 		
 		DELETE dbo.OAS_ChargeInfoSub WITH (ROWLOCK, UPDLOCK)
-		WHERE ChargeIdRef = @ChargeId AND FromParty = @PayerId
+		WHERE ChargeIdRef IN (SELECT ChargeID FROM @ChargeRate) AND FromParty = @PayerId
 		
 		IF @@ERROR <> 0
 		BEGIN
@@ -107,7 +113,7 @@ BEGIN
 		END
 
 		DELETE dbo.LA_ChargeInfo_SystemMapping WITH (ROWLOCK, UPDLOCK)
-		WHERE ChargeID = @ChargeId
+		WHERE ChargeID IN (SELECT ChargeID FROM @ChargeRate)
 			AND SystemID = 2
 											
 		IF @@ERROR <> 0
