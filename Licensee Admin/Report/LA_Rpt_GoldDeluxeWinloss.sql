@@ -44,9 +44,10 @@ BEGIN
 	)
 
 	-- get licenseeFee's charge rate
+	-- credit licensee display licensee fee as 0 -> set rate to 0
 	INSERT INTO #ChargeInfo(PartyId, LicenseeId, ProductId, Rate, IsDeposit, Fromdate, Todate, IsPayToSupplier, ChargeType)
 	(
-		SELECT PartyID, LicenseeId, ProductId, DI_Rate, IsDeposit, Fromdate, Todate, 0, 1
+		SELECT PartyID, LicenseeId, ProductId, CASE WHEN IsDeposit=1 THEN DI_Rate ELSE 0 END, IsDeposit, Fromdate, Todate, 0, 1
 		FROM dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'GD', 'OA', 1)
 	)
 	
@@ -168,17 +169,63 @@ BEGIN
 	WHERE d.BaseCurrency = @BaseCurrencyName
 	ORDER BY p2.PartyId, p1.PartyId
 
-	SELECT d.BaseCurrency AS CurrencyName,
-		SUM(d.Totaltrans) AS Totaltrans,
-		SUM(d.Turnover) AS Turnover,
-		SUM(d.CustomerWL) AS CustomerWinLoss,
-		SUM(-d.CustomerWL) AS LicenseeWinLoss,
-		SUM(d.LicenseeFee) AS LicenseeFee,
-		SUM(d.PaytoSupplier) AS PaytoSupplier,
-		SUM(d.LicenseeFee - d.PaytoSupplier) AS CompanyInCome
+	DECLARE @GrandTotals TABLE (
+		CurrencyName	VARCHAR(10),
+		PartyId			INT,
+		ParentId		INT,
+		Totaltrans		INT,
+		Turnover		MONEY,
+		CustomerWinLoss	MONEY,
+		LicenseeFee		MONEY,
+		PaytoSupplier	MONEY,
+		Step			TINYINT
+	)
+
+	INSERT INTO @GrandTotals
+	SELECT d.BaseCurrency, d.PartyId, p.ParentId,
+		SUM(d.Totaltrans),
+		SUM(d.Turnover),
+		SUM(d.CustomerWL),
+		SUM(d.LicenseeFee),
+		SUM(d.PaytoSupplier),
+		1 -- step 1
 	FROM #Data d
+	INNER JOIN #PartyList p ON d.PartyId = p.PartyId
 	WHERE d.BaseCurrency IS NOT NULL AND d.BaseCurrency <> '-'
-	GROUP BY d.BaseCurrency
+	GROUP BY d.BaseCurrency, d.PartyId, p.ParentId
+
+	INSERT INTO @GrandTotals
+	SELECT CurrencyName, 0, ParentId,
+		SUM(Totaltrans),
+		SUM(Turnover),
+		SUM(CustomerWinLoss),
+		SUM(CASE WHEN LicenseeFee < 0 THEN 0 ELSE LicenseeFee END), -- negative amount = 0
+		SUM(PaytoSupplier),
+		2 -- step 2
+	FROM @GrandTotals
+	WHERE Step = 1
+	GROUP BY CurrencyName, ParentId
+
+	;WITH GT AS (
+		SELECT CurrencyName,
+			SUM(Totaltrans) AS Totaltrans,
+			SUM(Turnover) AS Turnover,
+			SUM(CustomerWinLoss) AS CustomerWinLoss,
+			SUM(LicenseeFee) AS LicenseeFee,
+			SUM(CASE WHEN PaytoSupplier < 0 THEN 0 ELSE PaytoSupplier END) AS PaytoSupplier -- negative amount = 0
+		FROM @GrandTotals
+		WHERE Step = 2
+		GROUP BY CurrencyName
+	)
+	SELECT CurrencyName,
+		Totaltrans,
+		Turnover,
+		CustomerWinLoss,
+		-CustomerWinLoss AS LicenseeWinLoss,
+		LicenseeFee,
+		PaytoSupplier,
+		(LicenseeFee - PaytoSupplier) AS CompanyInCome
+	FROM GT
 
 	DROP TABLE #PartyList
 	DROP TABLE #ChargeInfo
