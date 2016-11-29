@@ -1,13 +1,8 @@
 USE [bodb_licensee]
 GO
 
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-
 ALTER PROCEDURE [dbo].[LA_InvoiceSettingSel]
-	 @BillerId	INT	= 0		 
+	 @BillerId	INT = 0
 	 , @PayerId	INT = 0
 AS
 /*  
@@ -16,7 +11,8 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:
-		+ @Bravo-2016.08.08: Hosting fees     		  
+		+ @Bravo-2016.08.08: Hosting fees
+		+ @Bruce-2016.11.29: Select active payers only
 	 Params:
 		+ 0 get all biller
 		+ <> 0 specify a biller 
