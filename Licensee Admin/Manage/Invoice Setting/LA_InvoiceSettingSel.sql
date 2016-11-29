@@ -12,7 +12,7 @@ AS
    
 	 Revisions:
 		+ @Bravo-2016.08.08: Hosting fees
-		+ @Bruce-2016.11.29: Select active payers only
+		+ @Bruce-2016.11.29: Add isactive status
 	 Params:
 		+ 0 get all biller
 		+ <> 0 specify a biller 
@@ -44,6 +44,7 @@ BEGIN
 				FOR XML PATH (''))
 			  , 1, 2, '') AS ProductList
 		, i.ActiveAddress
+		, CASE WHEN pd.StatusId=1 THEN 1 ELSE 0 END AS IsActive
 	FROM dbo.OAS_Party p WITH (NOLOCK)
 		INNER JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON p.PartyID = b.PartyID		
 		INNER JOIN dbo.LA_InvoiceSetting i WITH (NOLOCK) ON i.ToPartyId = p.PartyID
@@ -58,7 +59,7 @@ BEGIN
 			WHEN ISNULL(pd.BrandName, '') != '' 
 				THEN pd.BrandName 
 			ELSE p1.PartyName 
-		  END, i.InvTypeId, InvTypeName, i.InvTempId, InvTemplateName, ISNULL(i.BankId, 0), i.ActiveAddress
+		  END, i.InvTypeId, InvTypeName, i.InvTempId, InvTemplateName, ISNULL(i.BankId, 0), i.ActiveAddress, pd.StatusId
 	ORDER BY BillerName , CASE 
 			WHEN ISNULL(pd.BrandName, '') != '' 
 				THEN pd.BrandName 
