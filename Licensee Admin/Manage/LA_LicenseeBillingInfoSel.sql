@@ -1,81 +1,85 @@
 USE [bodb_licensee]
 GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
+
 ALTER PROCEDURE [dbo].[LA_LicenseeBillingInfoSel]
-	@PartyId			TINYINT
-	, @ProductCode		VARCHAR(6)
+	@PartyId		INT
+	, @ProductCode	VARCHAR(10)
 AS
-/*  Created: 20150318@Florent	
+/*  Created: 20150318@Florent
 	Task : Report - Licensee Settlement Report
 	Base on : IMS_LicenseeBillingInfoSel
 	DB: DBLIC/bodb_Licensee
-	Revisions:  
+
+	Revisions:
 		- 201505628@Florent: implement code
 		- 20150917@Victor: Support Chinese on Settings
 		- 20151109@Victor: Support Billing information of all Charge Types [Redmine: #41032]
 		- 20151230@Bravo: Add MGCRNG
 		- 20161110@Bruce.bui: check first billing date
-	Param's Explanation:  
-*/  
+		- 20161130@Bruce.bui: 
+			+ Update partyId from TINYINT to INT
+			+ Re-structure SP
+	Param's Explanation:
+
+*/
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @FirstBilling DATE
-		, @BasisOfBilling NVARCHAR(MAX)
-		, @MinimumFees NVARCHAR(MAX)
-	
+
+	DECLARE
+		@FirstBilling DATE,
+		@BasisOfBilling NVARCHAR(4000),
+		@MinimumFees NVARCHAR(4000),
+		@ProductId INT = (SELECT TOP 1 ProductId FROM dbo.LA_f_Products3rd(@ProductCode))
+
+	DECLARE @ChargeInfo TABLE (
+		ProductID		INT,
+		FromParty		INT,
+		ChargeType		TINYINT,
+		FirstOfBilling	DATE,
+		FromDate		DATE,
+		BasisOfBilling	NVARCHAR(4000),
+		ChargeID		INT,
+		OriginalId		INT
+	)
+
 	IF(@ProductCode='MGCRNG' OR @ProductCode='MGCLC')
 	BEGIN
-		SELECT
-			@FirstBilling = ci.FirstOfBilling
-			, @BasisOfBilling = ISNULL(BasisOfBilling, '')
-			, @MinimumFees = ISNULL(m.MinFeeTerm, '')	
-		FROM dbo.OAS_ChargeInfoSub ci WITH (NOLOCK)
-			INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeIdRef = cs.ChargeID AND cs.SystemID = 2	
-			INNER JOIN (SELECT MAX(c.FromDate) FromDate, c.FromParty, c.ProductID FROM dbo.OAS_ChargeInfoSub c WITH (NOLOCK)
-									INNER JOIN dbo.LA_ChargeInfo_SystemMapping csm WITH (NOLOCK) ON c.ChargeIdRef = csm.ChargeID AND csm.SystemID = 2
-									INNER JOIN (SELECT ProductPrefix, ProductID FROM dbo.LA_f_Products3rd(@ProductCode)) pp ON c.ProductID = pp.ProductID
-								WHERE c.FromParty = @PartyId AND c.ChargeType != 2
-								GROUP BY c.FromParty, c.ProductID) t ON ci.FromDate = t.FromDate AND ci.FromParty = t.FromParty AND ci.ProductID = t.ProductID
-			LEFT JOIN (SELECT FromDate, ToDate, PartyId, ProductId, MinFeeTerm
-						FROM dbo.LA_MinFee  WITH (NOLOCK) 
-						WHERE CONVERT(DATE, GETDATE()
-						) BETWEEN FromDate AND ToDate
-						AND FeeTypeId = 1
-						AND PartyId = @PartyId) m ON ci.FromParty = m.PartyId AND ci.ProductID = m.ProductId 
-		WHERE ci.FromParty = @PartyId
+		INSERT INTO @ChargeInfo
+		SELECT ProductID,FromParty,ChargeType,FirstOfBilling,FromDate,BasisOfBilling,ChargeIdRef,ChargeId
+		FROM dbo.OAS_ChargeInfoSub WITH (NOLOCK)
+		WHERE FromParty = @PartyId AND ChargeType != 2
 	END
 	ELSE
 	BEGIN
-		SELECT
-			@FirstBilling = ci.FirstOfBilling
-			, @BasisOfBilling = ISNULL(BasisOfBilling, '')
-			, @MinimumFees = ISNULL(m.MinFeeTerm, '')	
+		INSERT INTO @ChargeInfo
+		SELECT ProductID,FromParty,ChargeType,FirstOfBilling,FromDate,BasisOfBilling,ChargeID,ChargeId
 		FROM dbo.OAS_ChargeInfo ci WITH (NOLOCK)
-			INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2	
-			INNER JOIN (SELECT MAX(c.FromDate) FromDate, c.FromParty, c.ProductID FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
-									INNER JOIN dbo.LA_ChargeInfo_SystemMapping csm WITH (NOLOCK) ON c.ChargeID = csm.ChargeID AND csm.SystemID = 2
-									INNER JOIN (SELECT ProductPrefix, ProductID FROM dbo.LA_f_Products3rd(@ProductCode)) pp ON c.ProductID = pp.ProductID
-								WHERE c.FromParty = @PartyId AND c.ChargeType != 2
-								GROUP BY c.FromParty, c.ProductID) t ON ci.FromDate = t.FromDate AND ci.FromParty = t.FromParty AND ci.ProductID = t.ProductID
-			LEFT JOIN (SELECT FromDate, ToDate, PartyId, ProductId, MinFeeTerm
-						FROM dbo.LA_MinFee  WITH (NOLOCK) 
-						WHERE CONVERT(DATE, GETDATE()
-						) BETWEEN FromDate AND ToDate
-						AND FeeTypeId = 1
-						AND PartyId = @PartyId) m ON ci.FromParty = m.PartyId AND ci.ProductID = m.ProductId 
-		WHERE ci.FromParty = @PartyId AND ci.ChargeType != 2
+		WHERE FromParty = @PartyId AND ChargeType != 2
 	END
+
+	SELECT TOP 1
+		@FirstBilling = ci.FirstOfBilling,
+		@BasisOfBilling = ci.BasisOfBilling
+	FROM @ChargeInfo ci
+	INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeId = cs.ChargeID AND cs.SystemID = 2
+	WHERE ci.FromParty = @PartyId AND ci.ProductID = @ProductId
+	ORDER BY ci.FromDate DESC
+
+	SELECT TOP 1
+		@MinimumFees = m.MinFeeTerm
+	FROM dbo.LA_MinFee m WITH (NOLOCK)
+	WHERE CONVERT(DATE, GETDATE()) BETWEEN m.FromDate AND m.ToDate
+		AND m.FeeTypeId = 1
+		AND m.PartyId = @PartyId
+		AND m.ProductId = @ProductId
 	
 	SELECT CASE
 			WHEN @FirstBilling IS NULL OR CAST(@FirstBilling AS DATE) <= CAST('19000101' AS DATE) THEN ''
 			ELSE CONVERT(VARCHAR(3),DATENAME(MONTH, DATEADD(MONTH, MONTH(@FirstBilling), - 1))) + '-' + SUBSTRING(CAST(YEAR(@FirstBilling) AS VARCHAR),3,2)
 		END AS FirstBilling
-		, ISNULL(@BasisOfBilling, '')	AS BasisOfBilling
-		, ISNULL(@MinimumFees, '')		AS MinimumFees
+		, ISNULL(@BasisOfBilling, '') AS BasisOfBilling
+		, ISNULL(@MinimumFees, '') AS MinimumFees
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_LicenseeBillingInfoSel] TO [vnteam] 
+GRANT VIEW DEFINITION ON [dbo].[LA_LicenseeBillingInfoSel] TO [vnteam]
 GRANT EXECUTE ON [dbo].[LA_LicenseeBillingInfoSel] TO bodbAdminNet
