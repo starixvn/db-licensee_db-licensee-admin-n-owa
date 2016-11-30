@@ -18,8 +18,9 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @3rdPartyId INT = (SELECT PartyId FROM dbo.OAS_Party WHERE PartyName = 'GD' AND PartyType = 3)
-	DECLARE @RollingCommissionType INT = 12 -- charge type
+	DECLARE @RollingCommissionType INT = 11 -- charge type
 	DECLARE @GrossWin INT = 1 -- charge type
+	DECLARE @NoExchange VARCHAR(3) = '---'
 
 	-- get partylist and parent group
 	CREATE TABLE #PartyList(
@@ -30,6 +31,7 @@ BEGIN
 	)
 	INSERT INTO #PartyList EXEC dbo.LA_PartyListSel
 	UPDATE #PartyList SET PartyName = REPLACE(PartyName,' Licensees', '') WHERE ParentId = 0
+	UPDATE #PartyList SET PartyName = 'Boping + Zelianta' WHERE ParentId = 0 AND PartyId IN (11,98)
 
 	CREATE TABLE #ChargeInfo(
 		PartyId					INT
@@ -81,38 +83,42 @@ BEGIN
 		CurrencyName	VARCHAR(10),
 		Totaltrans		INT,
 		Turnover		MONEY,
+		ValidBetAmount	MONEY,
 		CustomerWL		MONEY,
 		LicenseeFee		MONEY,
-		PaytoSupplier	MONEY,
+		ServiceCharge	MONEY,
+		Rebate			MONEY,
 		BaseCurrency	VARCHAR(10)
 	)
 
-	INSERT INTO #Data(PartyId, ReportDate, CurrencyId, IsDeposit, Totaltrans, Turnover, CustomerWL, LicenseeFee, PaytoSupplier)
+	INSERT INTO #Data(PartyId, ReportDate, CurrencyId, IsDeposit, Totaltrans, Turnover, ValidBetAmount, CustomerWL, LicenseeFee, ServiceCharge, Rebate)
 	(
 		SELECT  ci.PartyID, b.rptDate, b.currencyID, ci.IsDeposit
 			, SUM(b.betcount) AS Totaltrans
 			, SUM(b.turnover) AS Turnover
+			, SUM(ISNULL(b.ValidBetAmount,0)) AS ValidBetAmount
 			, SUM(b.MemberWL) AS CustomerWL
 			, SUM(-b.MemberWL * ci.Rate) AS LicenseeFee
-			, SUM((-b.MemberWL - (b.Turnover * ISNULL(r.Rate,0))) * p.Rate) AS PaytoSupplier
+			, SUM(-b.MemberWL *  ISNULL(s.Rate, 0)) AS ServiceCharge
+			, SUM(b.Turnover * ISNULL(r.Rate, 0) * ISNULL(s.Rate, 0)) AS Rebate
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN #ChargeInfo ci ON (
+			INNER JOIN #ChargeInfo ci ON ( -- licensee charge rate
 				b.SiteID = ci.LicenseeID AND
 				b.ProductID = ci.ProductId AND
 				b.rptDate BETWEEN ci.FromDate AND ci.ToDate AND
 				ci.IsPayToSupplier = 0)
-			LEFT JOIN #ChargeInfo r ON (
+			LEFT JOIN #ChargeInfo r ON ( -- rolling commission rate
 				b.SiteID = r.LicenseeID AND
 				b.ProductID = r.ProductId AND
 				b.rptDate BETWEEN r.FromDate AND r.ToDate AND
 				r.IsPayToSupplier = 1 AND
 				r.ChargeType = @RollingCommissionType)
-			LEFT JOIN #ChargeInfo p ON (
-				b.SiteID = p.LicenseeID AND
-				b.ProductID = p.ProductId AND
-				b.rptDate BETWEEN p.FromDate AND p.ToDate AND
-				p.IsPayToSupplier = 1 AND
-				p.ChargeType = @GrossWin)
+			LEFT JOIN #ChargeInfo s ON ( -- service charge rate
+				b.SiteID = s.LicenseeID AND
+				b.ProductID = s.ProductId AND
+				b.rptDate BETWEEN s.FromDate AND s.ToDate AND
+				s.IsPayToSupplier = 1 AND
+				s.ChargeType = @GrossWin)
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 			  b.StatusId NOT IN (- 1, 101, 102, 103) AND
 			  b.CurrencyId <> 20 AND
@@ -130,7 +136,7 @@ BEGIN
 
 	IF ISNULL(@BaseCurrencyName,'')=''
 	BEGIN
-		SET @BaseCurrencyName = '-'
+		SET @BaseCurrencyName = @NoExchange
 		INSERT INTO @BaseCurrencies(CurrencyId, Code) VALUES (0, @BaseCurrencyName)
 	END
 
@@ -138,12 +144,14 @@ BEGIN
 	BEGIN
 		DECLARE @Currency VARCHAR(10) = (SELECT TOP 1 Code FROM @BaseCurrencies WHERE IsApplied IS NULL)
 
-		INSERT INTO #Data(PartyId, IsDeposit, ReportDate, CurrencyName, Totaltrans, BaseCurrency, Turnover, CustomerWL, LicenseeFee, PaytoSupplier)
+		INSERT INTO #Data(PartyId, IsDeposit, ReportDate, CurrencyName, Totaltrans, BaseCurrency, Turnover, CustomerWL, LicenseeFee, ServiceCharge, Rebate, ValidBetAmount)
 		SELECT d.PartyId, d.IsDeposit, d.ReportDate, e.Code, d.Totaltrans, @Currency,
 			d.Turnover * e.BaseCurrencyRate,
 			d.CustomerWL * e.BaseCurrencyRate,
 			d.LicenseeFee * e.BaseCurrencyRate,
-			d.PaytoSupplier * e.BaseCurrencyRate
+			d.ServiceCharge * e.BaseCurrencyRate,
+			d.Rebate * e.BaseCurrencyRate,
+			d.ValidBetAmount * e.BaseCurrencyRate
 		FROM #Data d
 		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @Currency) e ON e.ExchangeId = d.CurrencyId AND e.exchangedate = d.ReportDate
 
@@ -159,73 +167,72 @@ BEGIN
 		d.Totaltrans,
 		d.Turnover,
 		d.CustomerWL AS CustomerWinLoss,
-		-d.CustomerWL AS LicenseeWinLoss,
+		d.ValidBetAmount,
 		d.LicenseeFee,
-		d.PaytoSupplier,
-		(d.LicenseeFee - d.PaytoSupplier) AS CompanyInCome
+		d.ServiceCharge,
+		d.Rebate,
+		(d.ServiceCharge - d.Rebate) AS PayToSupplier
 	FROM #Data d
 	INNER JOIN #PartyList p1 ON d.PartyId = p1.PartyId
 	INNER JOIN #PartyList p2 ON p1.ParentId = p2.PartyId
 	WHERE d.BaseCurrency = @BaseCurrencyName
-	ORDER BY p2.PartyId, p1.PartyId
 
 	DECLARE @GrandTotals TABLE (
 		CurrencyName	VARCHAR(10),
 		PartyId			INT,
-		ParentId		INT,
+		GroupName		VARCHAR(100),
 		Totaltrans		INT,
 		Turnover		MONEY,
 		CustomerWinLoss	MONEY,
 		LicenseeFee		MONEY,
-		PaytoSupplier	MONEY,
+		ServiceCharge	MONEY,
+		Rebate			MONEY,
+		ValidBetAmount	MONEY,
 		Step			TINYINT
 	)
 
 	INSERT INTO @GrandTotals
-	SELECT d.BaseCurrency, d.PartyId, p.ParentId,
+	SELECT d.BaseCurrency, d.PartyId, p2.PartyName,
 		SUM(d.Totaltrans),
 		SUM(d.Turnover),
 		SUM(d.CustomerWL),
 		SUM(d.LicenseeFee),
-		SUM(d.PaytoSupplier),
+		SUM(d.ServiceCharge),
+		SUM(d.Rebate),
+		SUM(d.ValidBetAmount),
 		1 -- step 1
 	FROM #Data d
-	INNER JOIN #PartyList p ON d.PartyId = p.PartyId
-	WHERE d.BaseCurrency IS NOT NULL AND d.BaseCurrency <> '-'
-	GROUP BY d.BaseCurrency, d.PartyId, p.ParentId
+	INNER JOIN #PartyList p1 ON d.PartyId = p1.PartyId
+	INNER JOIN #PartyList p2 ON p2.PartyId = p1.ParentId
+	WHERE d.BaseCurrency IS NOT NULL AND d.BaseCurrency <> @NoExchange
+	GROUP BY d.BaseCurrency, d.PartyId, p2.PartyName
 
 	INSERT INTO @GrandTotals
-	SELECT CurrencyName, 0, ParentId,
+	SELECT CurrencyName, 0, GroupName,
 		SUM(Totaltrans),
 		SUM(Turnover),
 		SUM(CustomerWinLoss),
 		SUM(CASE WHEN LicenseeFee < 0 THEN 0 ELSE LicenseeFee END), -- negative amount = 0
-		SUM(PaytoSupplier),
+		SUM(ServiceCharge),
+		SUM(Rebate),
+		SUM(ValidBetAmount),
 		2 -- step 2
 	FROM @GrandTotals
 	WHERE Step = 1
-	GROUP BY CurrencyName, ParentId
+	GROUP BY CurrencyName, GroupName
 
-	;WITH GT AS (
-		SELECT CurrencyName,
-			SUM(Totaltrans) AS Totaltrans,
-			SUM(Turnover) AS Turnover,
-			SUM(CustomerWinLoss) AS CustomerWinLoss,
-			SUM(LicenseeFee) AS LicenseeFee,
-			SUM(CASE WHEN PaytoSupplier < 0 THEN 0 ELSE PaytoSupplier END) AS PaytoSupplier -- negative amount = 0
-		FROM @GrandTotals
-		WHERE Step = 2
-		GROUP BY CurrencyName
-	)
 	SELECT CurrencyName,
-		Totaltrans,
-		Turnover,
-		CustomerWinLoss,
-		-CustomerWinLoss AS LicenseeWinLoss,
-		LicenseeFee,
-		PaytoSupplier,
-		(LicenseeFee - PaytoSupplier) AS CompanyInCome
-	FROM GT
+		SUM(Totaltrans) AS Totaltrans,
+		SUM(Turnover) AS Turnover,
+		SUM(ValidBetAmount) AS ValidBetAmount,
+		SUM(CustomerWinLoss) AS CustomerWinLoss,
+		SUM(LicenseeFee) AS LicenseeFee,
+		SUM(ServiceCharge) AS ServiceCharge,
+		SUM(Rebate) AS Rebate,
+		SUM(CASE WHEN (ServiceCharge - Rebate) < 0 THEN 0 ELSE (ServiceCharge - Rebate) END) AS PaytoSupplier -- negative amount = 0
+	FROM @GrandTotals
+	WHERE Step = 2
+	GROUP BY CurrencyName
 
 	DROP TABLE #PartyList
 	DROP TABLE #ChargeInfo
