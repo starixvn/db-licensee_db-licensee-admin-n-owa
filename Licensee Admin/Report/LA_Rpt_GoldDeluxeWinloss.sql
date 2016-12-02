@@ -17,10 +17,14 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @3rdPartyId INT = (SELECT PartyId FROM dbo.OAS_Party WHERE PartyName = 'GD' AND PartyType = 3)
-	DECLARE @RollingCommissionType INT = 11 -- charge type
-	DECLARE @GrossWin INT = 1 -- charge type
+	DECLARE @3rdPartyId INT = (SELECT PartyId FROM dbo.OAS_Party WHERE PartyName = 'GD' AND PartyType = 3)	
 	DECLARE @NoExchange VARCHAR(3) = '---'
+
+	-- charge type
+	DECLARE @RollingCommissionType	INT = 11
+	DECLARE @CreditServiceCharge	INT = 10
+	DECLARE @DepositServiceCharge	INT = 9
+	DECLARE @GrossWin				INT = 1
 
 	-- get partylist and parent group
 	CREATE TABLE #PartyList(
@@ -100,7 +104,7 @@ BEGIN
 			, SUM(b.MemberWL) AS CustomerWL
 			, SUM(-b.MemberWL * ci.Rate) AS LicenseeFee
 			, SUM(-b.MemberWL *  ISNULL(s.Rate, 0)) AS ServiceCharge
-			, SUM(b.Turnover * ISNULL(r.Rate, 0) * ISNULL(s.Rate, 0)) AS Rebate
+			, SUM(ISNULL(b.ValidBetAmount,0) * ISNULL(r.Rate, 0) * ISNULL(s.Rate, 0)) AS Rebate
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #ChargeInfo ci ON ( -- licensee charge rate
 				b.SiteID = ci.LicenseeID AND
@@ -118,7 +122,7 @@ BEGIN
 				b.ProductID = s.ProductId AND
 				b.rptDate BETWEEN s.FromDate AND s.ToDate AND
 				s.IsPayToSupplier = 1 AND
-				s.ChargeType = @GrossWin)
+				s.ChargeType IN (@GrossWin, @CreditServiceCharge, @DepositServiceCharge))
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 			  b.StatusId NOT IN (- 1, 101, 102, 103) AND
 			  b.CurrencyId <> 20 AND
