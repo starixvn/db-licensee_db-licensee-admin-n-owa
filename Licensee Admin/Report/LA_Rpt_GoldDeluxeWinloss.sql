@@ -35,7 +35,6 @@ BEGIN
 	)
 	INSERT INTO #PartyList EXEC dbo.LA_PartyListSel
 	UPDATE #PartyList SET PartyName = REPLACE(PartyName,' Licensees', '') WHERE ParentId = 0
-	UPDATE #PartyList SET PartyName = 'Boping + Zelianta' WHERE ParentId = 0 AND PartyId IN (11,98)
 
 	CREATE TABLE #ChargeInfo(
 		PartyId					INT
