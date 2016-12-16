@@ -138,7 +138,7 @@ BEGIN
 			p.PartyName,
 			g.PartyName,
 			t.RptDate,
-			e.Code,
+			CASE WHEN e.Code='VND' THEN 'INH' ELSE e.Code END,
 			t.TotalTrans,
 			t.Turnover * e.BaseCurrencyRate,
 			t.CustomerWinLoss * e.BaseCurrencyRate,
@@ -161,7 +161,8 @@ BEGIN
 			SUM(LicensingFee),
 			SUM(PayToSupplier),
 			SUM(CompanyIncome)
-		FROM #TempResult WHERE BaseCurrency = @TempCurrency
+		FROM #TempResult
+		WHERE BaseCurrency = @TempCurrency
 
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Code = @TempCurrency
 	END
