@@ -36,6 +36,7 @@ AS
 		- 20150710@Florent: support product MicroGaming with multi charge rate
 		- 20150825@Florent: change fiter ChargeType = 1 to ChargeType != 2 (support new ChargeType 5)
 		- 20151230@Bravo: Add MGCRNG charge info.
+		- 20161216@Bruce: remove rolling comission row ( type = 11)
     select * FROM [LA_f_ChargeInfo_xtest]('14,15,16,17,18,25','2013-08-01','2013-08-30','NG','OA')
 */
 
@@ -80,7 +81,7 @@ BEGIN
 	)
 
     INSERT INTO @tbChargeInfo (ChargeID , PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate)
-	SELECT DI.ChargeID 
+	SELECT DISTINCT DI.ChargeID 
 		, p.PartyID
 		, CASE 
 		 	WHEN ISNULL(pd.IsDeposit, 0) = 1
@@ -125,6 +126,7 @@ BEGIN
 			SELECT ProductID FROM @ProductTable
 			)
 		AND NOT EXISTS (SELECT 1 FROM dbo.OAS_ChargeInfoSub WITH (NOLOCK) WHERE DI.ChargeID = ChargeIDRef)
+		AND DI.ChargeType != 11 -- rolling commission
 	ORDER BY p.PartyID
 		,Di.ProductID
 
@@ -190,7 +192,8 @@ BEGIN
 			)
 		AND DI.ProductID IN (
 			SELECT ProductID FROM @ProductTable
-			)		
+			)
+		AND DI.ChargeType != 11 -- rolling commission
 	ORDER BY p.PartyID
 		,Di.ProductID
 
