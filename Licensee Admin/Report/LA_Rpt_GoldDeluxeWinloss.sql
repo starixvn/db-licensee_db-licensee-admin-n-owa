@@ -166,7 +166,7 @@ BEGIN
 		p1.PartyName,
 		d.IsDeposit,
 		d.ReportDate,
-		d.CurrencyName,
+		CASE WHEN d.CurrencyName='VND' THEN 'INH' ELSE d.CurrencyName END CurrencyName,
 		d.Totaltrans,
 		d.Turnover,
 		d.CustomerWL AS CustomerWinLoss,
