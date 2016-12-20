@@ -97,7 +97,7 @@ BEGIN
 			AND b.rptDate BETWEEN @FromDate AND @ToDate
 	)
 	INSERT INTO #TempData (PartyId, RptDate, CurrencyId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, PayToSupplier, CompanyIncome)
-	SELECT PartyId,rptDate, CurrencyID, BetCount, Turnover, WinLoss, LicenseeWl , 0, LicenseeWl * Rate3rd, LicenseeWl * Rate3rd
+	SELECT PartyId,rptDate, CurrencyID, BetCount, Turnover, WinLoss, LicenseeWl , 0, LicenseeWl * Rate3rd, LicenseeWl - (LicenseeWl * Rate3rd)
 	FROM CalculateLicenseeWinLoss
 
 	-- Calculate result
