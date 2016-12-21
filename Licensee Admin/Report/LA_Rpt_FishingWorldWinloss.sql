@@ -91,9 +91,8 @@ BEGIN
 		(-b.MemberWL) * r.Rate3rd, 
 		((-b.MemberWL) * r.Rate) - ((-b.MemberWL) * r.Rate3rd)
 	FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK) 
-	INNER JOIN @ChargeRate r ON b.SiteID = r.LicenseeId AND b.rptDate BETWEEN r.FromDate AND r.ToDate
+	INNER JOIN @ChargeRate r ON b.SiteID = r.LicenseeId AND b.ProductId = r.ProductID AND b.rptDate BETWEEN r.FromDate AND r.ToDate
 	WHERE b.StatusId NOT IN (-1, 101, 102, 103)
-		AND b.Bettype BETWEEN 1011 AND 1020
 		AND b.CustomerCategory NOT IN (27, 28)
 		AND b.CurrencyId <> 20
 		AND b.rptDate BETWEEN @FromDate AND @ToDate
@@ -122,8 +121,7 @@ BEGIN
 		 CustomerWinLoss	MONEY,
 		 LicenseeWinLoss	MONEY,
 		 LicensingFee		MONEY,
-		 PayToSupplier		MONEY,
-		 CompanyIncome		MONEY)
+		 PayToSupplier		MONEY)
 
 	DECLARE @TempCurrency VARCHAR(10)
 
@@ -149,17 +147,16 @@ BEGIN
 		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @TempCurrency) e ON e.ExchangeDate = t.RptDate AND e.ExchangeId = t.CurrencyId		
 
 		;WITH TempResultGroupByParty AS(
-			SELECT t.PartyId,
+			SELECT t.PartyId,t.GroupName,
 				SUM(TotalTrans) AS TotalTrans,
 				SUM(Turnover) AS Turnover,
 				SUM(CustomerWinLoss) AS CustomerWinLoss,
 				SUM(LicenseeWinLoss) AS LicenseeWinLoss,
 				SUM(LicensingFee) AS LicensingFee,
-				SUM(PayToSupplier) AS PayToSupplier,
-				SUM(CompanyIncome) AS CompanyIncome
+				SUM(PayToSupplier) AS PayToSupplier
 			FROM #TempResult t
 			WHERE BaseCurrency = @TempCurrency
-			GROUP BY t.PartyId 
+			GROUP BY t.PartyId, t.GroupName
 		)
 		INSERT INTO #GrandTotals (CurrencyName, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, PayToSupplier)
 		SELECT @TempCurrency,
@@ -168,17 +165,39 @@ BEGIN
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
-			SUM(CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END)
-		FROM TempResultGroupByParty		
+			SUM(PayToSupplier)
+		FROM TempResultGroupByParty
+		GROUP BY GroupName
 		
-		UPDATE #GrandTotals SET CompanyIncome = LicensingFee - PayToSupplier
-		WHERE CurrencyName = @TempCurrency
+		--UPDATE #GrandTotals SET CompanyIncome = LicensingFee - PayToSupplier
+		--WHERE CurrencyName = @TempCurrency
 
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Code = @TempCurrency
 	END
 
 	SELECT * from #TempResult WHERE BaseCurrency = @BaseCurrencyName
-	SELECT * FROM #GrandTotals WHERE CurrencyName <> @NoBaseCurrency
+
+	;WITH TempGrandTotals AS(
+		SELECT CurrencyName,
+			SUM(TotalTrans) AS TotalTrans,
+			SUM(Turnover) AS Turnover,
+			SUM(CustomerWinLoss) AS CustomerWinLoss,
+			SUM(LicenseeWinLoss) AS LicenseeWinLoss,
+			SUM(LicensingFee) AS LicensingFee,
+			SUM(CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END) AS PayToSupplier
+		FROM #GrandTotals
+		WHERE CurrencyName <> @NoBaseCurrency
+		GROUP BY CurrencyName
+	)
+	SELECT CurrencyName,
+		TotalTrans,
+		Turnover,
+		CustomerWinLoss,
+		LicenseeWinLoss,
+		LicensingFee,
+		PayToSupplier,
+		(LicensingFee-PayToSupplier) AS CompanyIncome
+	FROM TempGrandTotals
 	
 	-- Drop temp tables
 	DROP TABLE #TempResult
