@@ -41,6 +41,7 @@ AS
 							- add data to LA_Minfee for minfee and waive time
 		- 20150813@Florent: support multicharge rate - Microgaming
 		- 20160315@Victor: support Microgaming - RNG product
+		- 20161214@Jim:Invoice - Setup fees [RedmineID : #65260 ]
 
 	Param's Explanation:
 */
@@ -78,14 +79,29 @@ BEGIN
 
 	IF @FromPartyId IS NULL
 	BEGIN
+		SELECT @FromPartyId = PartyID
+		FROM dbo.OAS_Party WITH (NOLOCK)
+		WHERE  [PartyName] = @FromPartyName AND PartyType = 5
+		
+		IF ISNULL(@FromPartyId,0)= 0
+			BEGIN
+				INSERT INTO dbo.OAS_Party (PartyName, [Description], PartyType, OldRefID)
+				SELECT LicenseeName, [Description], 1, LicenseeID
+				FROM dbo.licensees WITH (NOLOCK)
+				WHERE LicenseeName = @FromPartyName
 
-		INSERT INTO dbo.OAS_Party (PartyName, [Description], PartyType, OldRefID)
-		SELECT LicenseeName, [Description], 1, LicenseeID
-		FROM dbo.licensees WITH (NOLOCK)
-		WHERE LicenseeName = @FromPartyName
-
-		SET @FromPartyId = SCOPE_IDENTITY()
-
+				SET @FromPartyId = SCOPE_IDENTITY()
+			END
+		ELSE 
+			BEGIN
+				UPDATE dbo.OAS_Party  
+				SET [OldRefID]   = @OldRefId
+					,[SetupName] = [PartyName]
+					,[PartyType] = 1
+					,[PartyName] = @FromPartyName
+				WHERE 	
+					[PartyID] = @FromPartyId
+			END	
 		--insert party detail if doesn't exists
 		IF NOT EXISTS (SELECT TOP 1 1
 			FROM dbo.OAS_PartyDetail WITH (NOLOCK)
