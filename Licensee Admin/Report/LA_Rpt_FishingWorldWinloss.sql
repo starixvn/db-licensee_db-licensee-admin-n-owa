@@ -86,16 +86,16 @@ BEGIN
 		CompanyIncome	MONEY)
 		
 	INSERT INTO #TempData (PartyId, PartyName, GroupName, RptDate, CurrencyId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, PayToSupplier, CompanyIncome)
-	SELECT r.PartyId, r.PartyName, r.GroupName, b.rptDate, b.CurrencyId, b.BetCount, b.Turnover, b.MemberWL, -b.MemberWL, 
-		(-b.MemberWL) * r.Rate, 
-		(-b.MemberWL) * r.Rate3rd, 
-		((-b.MemberWL) * r.Rate) - ((-b.MemberWL) * r.Rate3rd)
-	FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK) 
-	INNER JOIN @ChargeRate r ON b.SiteID = r.LicenseeId AND b.ProductId = r.ProductID AND b.rptDate BETWEEN r.FromDate AND r.ToDate
+	SELECT r.PartyId, r.PartyName, r.GroupName, b.RptDate3rd, b.CurrencyId, b.BetCount, b.Turnover, b.Winloss, -b.Winloss, 
+		(-b.Winloss) * r.Rate, 
+		(-b.Winloss) * r.Rate3rd, 
+		((-b.Winloss) * r.Rate) - ((-b.Winloss) * r.Rate3rd)
+	FROM bodb_licenseereport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK) 
+	INNER JOIN @ChargeRate r ON b.SiteID = r.LicenseeId AND b.RptDate3rd BETWEEN r.FromDate AND r.ToDate
 	WHERE b.StatusId NOT IN (-1, 101, 102, 103)
-		AND b.CustomerCategory NOT IN (27, 28)
+		AND b.Bettypeid BETWEEN  1011 AND 1020
 		AND b.CurrencyId <> 20
-		AND b.rptDate BETWEEN @FromDate AND @ToDate
+		AND b.RptDate3rd BETWEEN @FromDate AND @ToDate
 		
 	-- Calculate result
 	CREATE TABLE #TempResult (
