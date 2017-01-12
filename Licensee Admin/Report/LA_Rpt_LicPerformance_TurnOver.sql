@@ -102,7 +102,7 @@ BEGIN
 			 AND b.Bettype IN (SELECT Bettype FROM @Bettype)
 			 AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
 			 AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 
-			 AND b.status NOT IN (-1, 103)
+			 AND b.status NOT IN (-1, 101, 102, 103)
 		  GROUP BY tp.PartyID, rptDate, currencyID
 		  ) 
     END
@@ -130,7 +130,7 @@ BEGIN
 			 ) tp ON b.SiteID = tp.LicenseeID
 		  WHERE b.rptDate  BETWEEN @FromDate AND @ToDate 
 			 AND b.Bettype IN (SELECT Bettype FROM @Bettype)
-			 AND b.Status NOT IN (-1, 103)
+			 AND b.Status NOT IN (-1, 101, 102, 103)
 			 AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
 			 AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 
 			 AND b.customercategory NOT IN (27,28)

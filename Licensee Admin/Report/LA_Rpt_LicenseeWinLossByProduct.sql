@@ -122,6 +122,7 @@ BEGIN
 				INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON b.SiteID = p.OldRefID AND p.PartyType = 1
 				LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.Bettype = b.Bettype
 		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate
+				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.Bettype NOT IN (901,902,903)

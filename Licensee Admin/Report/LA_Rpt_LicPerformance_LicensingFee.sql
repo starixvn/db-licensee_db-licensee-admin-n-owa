@@ -86,7 +86,7 @@ BEGIN
 			    INNER JOIN (SELECT DISTINCT PartyID, LicenseeID FROM #tmpParty) tp ON tp.LicenseeID = b.SiteID
 			    INNER JOIN #bettype be ON b.bettype = be.bettype 
 		    WHERE b.rptDate BETWEEN @FromDate AND @Todate
-				AND b.status NOT IN (-1, 103)
+				AND b.status NOT IN (-1, 101, 102, 103)
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
 				AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 
 				AND b.customercategory NOT IN (27, 28)

@@ -97,7 +97,7 @@ BEGIN
 	   FROM bodb_LicenseeReport.dbo.rpt_Betting_BA b WITH ( NOLOCK ) 
 		  INNER JOIN (SELECT DISTINCT PartyID, LicenseeID FROM @tmpParty) tp ON tp.LicenseeID = b.SiteID
 	   WHERE b.rptDate BETWEEN @Fromdate AND @Todate
-		  AND b.Status NOT IN (-1, 103)
+		  AND b.Status NOT IN (-1, 101, 102, 103)
 		  AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
 		  AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 
 	   GROUP BY tp.PartyID, b.rptDate, b.currencyID			
@@ -123,7 +123,7 @@ BEGIN
 		  AND b.Bettype IN (SELECT Bettype FROM @Bettype)		  
 		  AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
 		  AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 
-		  AND b.status NOT IN (-1, 103)
+		  AND b.status NOT IN (-1, 101, 102, 103)
 		  AND b.customercategory NOT IN (27, 28)
 	   GROUP BY tp.PartyID, rptDate, currencyID
 	END		
