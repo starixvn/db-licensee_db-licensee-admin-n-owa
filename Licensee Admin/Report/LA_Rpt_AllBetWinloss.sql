@@ -269,8 +269,8 @@ BEGIN
 						p.PartyName,
 						r.PartyId,
 						@FromDate AS ReportDate, -- dummy data,
-						r.OriginalCurrency,
-						r.RegisteredCurrency,
+						CASE WHEN r.OriginalCurrency='VND' THEN 'INH' ELSE r.OriginalCurrency END OriginalCurrency,
+						CASE WHEN r.RegisteredCurrency='VND' THEN 'INH' ELSE r.RegisteredCurrency END RegisteredCurrency,
 						SUM(r.TotalTrans) AS TotalTrans,
 						SUM(r.TurnoverBased) AS Turnover,
 						SUM(r.ValidBetAmountBased) AS ValidBetAmount,
@@ -296,8 +296,8 @@ BEGIN
 						'' AS PartyName,	-- dummy data
 						0 AS PartyId,		-- dummy data
 						r.ReportDate,
-						r.OriginalCurrency,
-						r.RegisteredCurrency,
+						CASE WHEN r.OriginalCurrency='VND' THEN 'INH' ELSE r.OriginalCurrency END OriginalCurrency,
+						CASE WHEN r.RegisteredCurrency='VND' THEN 'INH' ELSE r.RegisteredCurrency END RegisteredCurrency,
 						SUM(r.TotalTrans) AS TotalTrans,
 						SUM(r.Turnover) AS Turnover,
 						SUM(r.ValidBetAmount) AS ValidBetAmount,
