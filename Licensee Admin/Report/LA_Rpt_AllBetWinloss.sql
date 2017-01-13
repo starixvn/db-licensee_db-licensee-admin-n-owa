@@ -14,7 +14,7 @@ AS
  DB			: DB052.bodb_licensee
 
  Revisions:
-
+	- 20170113@bruce: checking launchDate to exclude trial data
  Param's Explanation:
 	- @FromDate			: From date
 	- @ToDate			: To date
@@ -45,16 +45,16 @@ BEGIN
 
 	-- Party list
 	BEGIN
-		DECLARE @PartyList AS TABLE (PartyId INT, LicenseeId INT, IsDeposit BIT)
+		DECLARE @PartyList AS TABLE (PartyId INT, LicenseeId INT, IsDeposit BIT, FromDate DATE, ToDate DATE)
 
 		INSERT INTO @PartyList
-		SELECT p.PartyID, CASE WHEN ISNULL(d.IsDeposit,0) = 1 THEN p.OldRefID ELSE l.LabelID END, ISNULL(d.IsDeposit,0)
+		SELECT p.PartyID, ISNULL(ci.LicenseeID, l.LabelId), ISNULL(ci.IsDeposit,0), ISNULL(ci.Fromdate, @FromDate), ISNULL(ci.Todate,@ToDate)
 		FROM dbo.OAS_Party p WITH(NOLOCK)
-		INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
-		LEFT JOIN dbo.Labels l WITH(NOLOCK) ON l.LicenseeID = p.OldRefID
+		LEFT JOIN dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'AB', 'OA', 1) ci ON ci.PartyID = p.PartyID
+		LEFT JOIN dbo.Labels l WITH(NOLOCK) ON l.LicenseeID = p.OldRefID AND ci.isDeposit IS NULL
 		WHERE p.PartyID IN (SELECT val FROM dbo.strSplit(@PartyIDs, ','))
 	END
-
+	
 	-- Party group List
 	BEGIN
 		DECLARE @PartyGroupList AS TABLE (
@@ -118,7 +118,7 @@ BEGIN
 				SUM(ISNULL(b.Winloss, 0)) AS CustomerWinLoss,
 				SUM(ISNULL(b.ValidBetAmount, 0)) AS ValidBetAmount
 		FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
-			INNER JOIN @PartyList p ON b.SiteID = p.LicenseeId
+			INNER JOIN @PartyList p ON b.SiteID = p.LicenseeId AND b.RptDate3rd BETWEEN p.FromDate AND p.ToDate
 			INNER JOIN dbo.view_site_list s WITH(NOLOCK) ON b.SiteId = s.SiteID
 			LEFT JOIN @PlayCurrencySettings pc ON
 			(
