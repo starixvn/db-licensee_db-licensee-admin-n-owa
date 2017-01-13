@@ -59,6 +59,20 @@ BEGIN
 		-- ChargeType: 6,7 are turnover and commission
 	END
 
+	BEGIN
+		DECLARE @LaunchDateFilter AS TABLE (			
+			PartyId			INT,
+			FromDate		DATETIME,
+			ToDate			DATETIME
+		)
+
+		INSERT INTO @LaunchDateFilter(PartyId, FromDate, ToDate)
+		SELECT ci.partyid, ci.Fromdate,ci.Todate			
+		FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'CB', 'OA', 1) ci 
+		INNER JOIN dbo.OAS_ChargeInfo t WITH(NOLOCK) ON ci.ChargeID=t.ChargeID
+		WHERE t.ChargeType = 6
+	END
+
 	SET @FromDate = (SELECT MIN(FromDate) FROM @CBShare)
 	SET @ToDate = (SELECT MAX(ToDate) FROM @CBShare)
 
@@ -107,6 +121,9 @@ BEGIN
 				b.StatusId NOT IN (-1, 101, 102, 103) AND
 				b.SiteID = (CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END) AND
 				b.rptDate BETWEEN @FromDate AND @ToDate
+		INNER JOIN @LaunchDateFilter ld 
+			ON  ld.PartyId = p.PartyID
+				AND b.rptDate BETWEEN ld.FromDate AND ld.ToDate
 		WHERE	b.CurrencyID <> 20 AND b.customercategory NOT IN (27, 28) AND
 				p.PartyID IN (SELECT val FROM dbo.strSplit(@PartyIds, ','))
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, p.PartyId
