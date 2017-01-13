@@ -67,10 +67,8 @@ BEGIN
 		)
 
 		INSERT INTO @LaunchDateFilter(PartyId, FromDate, ToDate)
-		SELECT ci.partyid, ci.Fromdate,ci.Todate			
-		FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'CB', 'OA', 1) ci 
-		INNER JOIN dbo.OAS_ChargeInfo t WITH(NOLOCK) ON ci.ChargeID=t.ChargeID
-		WHERE t.ChargeType = 6
+		SELECT DISTINCT ci.partyid, ci.Fromdate,ci.Todate			
+		FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'CB', 'OA', 1) ci 		
 	END
 
 	SET @FromDate = (SELECT MIN(FromDate) FROM @CBShare)
