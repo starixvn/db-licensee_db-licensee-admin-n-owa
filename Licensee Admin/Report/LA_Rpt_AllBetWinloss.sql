@@ -26,35 +26,28 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @ProductId INT = (SELECT TOP 1 ProductId FROM dbo.Product3rd WITH(NOLOCK) WHERE ProductPrefix='AB')
+	DECLARE @RebateCommissionType INT = 11
 
 	-- ChargeRate
-	DECLARE @ChargeRate TABLE(Rate MONEY, ChargeType TINYINT, FromDate DATETIME, ToDate DATETIME)
-	INSERT INTO @ChargeRate (Rate, ChargeType, FromDate, ToDate)
-	(
-		SELECT Rate, ChargeType,
-			CASE WHEN @FromDate <= FromDate THEN FromDate ELSE @FromDate END,
-			CASE WHEN @ToDate >= ToDate THEN ToDate ELSE @ToDate END
-		FROM dbo.OAS_ChargeInfo WITH(NOLOCK) 
-		WHERE ProductID=@ProductId AND FromParty=1 AND ChargeType IN (9,10,11) AND (
-			@FromDate BETWEEN FromDate AND ToDate OR
-			@ToDate BETWEEN FromDate AND ToDate OR
-			FromDate BETWEEN @FromDate AND @ToDate OR
-			ToDate BETWEEN @FromDate AND @ToDate
-		)
+	DECLARE @ChargeRate TABLE(
+		PartyId				INT,
+		LicenseeId			INT,
+		Rate				DECIMAL(10,8),
+		RebateCommission	DECIMAL(10,8),
+		FromDate			DATETIME,
+		ToDate				DATETIME
 	)
 
-	-- Party list
-	BEGIN
-		DECLARE @PartyList AS TABLE (PartyId INT, LicenseeId INT, IsDeposit BIT, FromDate DATE, ToDate DATE)
+	INSERT INTO @ChargeRate
+	SELECT ci.PartyId, ci.LicenseeID, ci.DI_Rate, ISNULL(ci.DI_Rate * c.Rate, 0), ci.FromDate, ci.ToDate
+	FROM dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate,@ToDate,'AB','OA',1) ci
+	LEFT JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON
+		c.FromParty = ci.PartyID AND
+		c.ProductID = ci.ProductID AND
+		ci.FromDate <= c.ToDate AND
+		c.FromDate <= ci.Todate AND
+		c.ChargeType = @RebateCommissionType
 
-		INSERT INTO @PartyList
-		SELECT p.PartyID, ISNULL(ci.LicenseeID, l.LabelId), ISNULL(ci.IsDeposit,0), ISNULL(ci.Fromdate, @FromDate), ISNULL(ci.Todate,@ToDate)
-		FROM dbo.OAS_Party p WITH(NOLOCK)
-		LEFT JOIN dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'AB', 'OA', 1) ci ON ci.PartyID = p.PartyID
-		LEFT JOIN dbo.Labels l WITH(NOLOCK) ON l.LicenseeID = p.OldRefID AND ci.isDeposit IS NULL
-		WHERE p.PartyID IN (SELECT val FROM dbo.strSplit(@PartyIDs, ','))
-	END
-	
 	-- Party group List
 	BEGIN
 		DECLARE @PartyGroupList AS TABLE (
@@ -107,59 +100,31 @@ BEGIN
 	)
 
 	-- Get Winloss data to #TempData
-	;WITH SumByDate AS (
-		SELECT	p.PartyId,
-				p.IsDeposit,
-				b.RptDate3rd AS rptDate,
-				b.CurrencyID,
-				ISNULL(pc.PlayCurrency, b.CurrencyID) AS PlayCurrency,
-				SUM(ISNULL(b.BetCount, 0)) AS TotalTrans,
-				SUM(ISNULL(b.Turnover, 0)) AS Turnover,
-				SUM(ISNULL(b.Winloss, 0)) AS CustomerWinLoss,
-				SUM(ISNULL(b.ValidBetAmount, 0)) AS ValidBetAmount
-		FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
-			INNER JOIN @PartyList p ON b.SiteID = p.LicenseeId AND b.RptDate3rd BETWEEN p.FromDate AND p.ToDate
-			INNER JOIN dbo.view_site_list s WITH(NOLOCK) ON b.SiteId = s.SiteID
-			LEFT JOIN @PlayCurrencySettings pc ON
-			(
-				s.IbcSiteID = pc.SiteId AND
-				b.CurrencyId = pc.MemberCurrency AND
-				b.rptDate BETWEEN pc.FromDate AND pc.ToDate
-			)
-		WHERE	(b.RptDate3rd BETWEEN @FromDate AND @ToDate) AND
-				(b.CurrencyID <> 20) AND
-				(b.BetTypeId BETWEEN 2401 AND 2499) AND
-				(b.StatusId NOT IN (-1, 101, 102, 103))
-		GROUP BY b.RptDate3rd, p.PartyId, b.CurrencyID, ISNULL(pc.PlayCurrency, b.CurrencyID), p.IsDeposit
-	)
-	SELECT	*,
-			CAST(NULL AS MONEY) AS ServiceChargeOriginal,
-			CAST(NULL AS MONEY) AS RebateCommissionOriginal
+	SELECT	ci.PartyId,
+			b.RptDate3rd AS rptDate,
+			b.CurrencyID,
+			ISNULL(pc.PlayCurrency, b.CurrencyID) AS PlayCurrency,
+			SUM(ISNULL(b.BetCount, 0)) AS TotalTrans,
+			SUM(ISNULL(b.Turnover, 0)) AS Turnover,
+			SUM(ISNULL(b.Winloss, 0)) AS CustomerWinLoss,
+			SUM(ISNULL(b.ValidBetAmount, 0)) AS ValidBetAmount,
+			SUM(ISNULL(-b.Winloss, 0) * ci.Rate) AS ServiceChargeOriginal,
+			SUM(ISNULL(b.ValidBetAmount, 0) * ci.RebateCommission) AS RebateCommissionOriginal
 	INTO #TempData
-	FROM SumByDate s
-
-	-- service charge credit
-	UPDATE t SET 
-		ServiceChargeOriginal = -CustomerWinLoss * scc.Rate,
-		RebateCommissionOriginal = ValidBetAmount * scc.Rate
-	FROM #TempData t
-	INNER JOIN @ChargeRate scc ON t.IsDeposit = 0 AND scc.ChargeType = 9  AND t.rptDate BETWEEN scc.FromDate AND scc.ToDate
-
-	-- service charge deposit
-	UPDATE t SET 
-		ServiceChargeOriginal = -CustomerWinLoss * scd.Rate,
-		RebateCommissionOriginal = 0
-	FROM #TempData t
-	INNER JOIN @ChargeRate scd ON t.IsDeposit = 1 AND scd.ChargeType = 10 AND t.rptDate BETWEEN scd.FromDate AND scd.ToDate
-
-	-- rebate commission
-	UPDATE t SET 
-		RebateCommissionOriginal = RebateCommissionOriginal * rbc.Rate
-	FROM #TempData t
-	INNER JOIN @ChargeRate rbc ON t.IsDeposit = 0 AND rbc.ChargeType = 11 AND t.rptDate BETWEEN rbc.FromDate AND rbc.ToDate
-
-	-- remove data out of date range
-	DELETE #TempData WHERE ServiceChargeOriginal IS NULL OR RebateCommissionOriginal IS NULL
+	FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
+		INNER JOIN @ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
+		INNER JOIN dbo.view_site_list s WITH(NOLOCK) ON b.SiteId = s.SiteID
+		LEFT JOIN @PlayCurrencySettings pc ON
+		(
+			s.IbcSiteID = pc.SiteId AND
+			b.CurrencyId = pc.MemberCurrency AND
+			b.rptDate BETWEEN pc.FromDate AND pc.ToDate
+		)
+	WHERE	(b.RptDate3rd BETWEEN @FromDate AND @ToDate) AND
+			(b.CurrencyID <> 20) AND
+			(b.BetTypeId BETWEEN 2401 AND 2499) AND
+			(b.StatusId NOT IN (-1, 101, 102, 103))
+	GROUP BY b.RptDate3rd, ci.PartyId, b.CurrencyID, ISNULL(pc.PlayCurrency, b.CurrencyID)
 
 	-- Report result
 	CREATE TABLE #Result(
