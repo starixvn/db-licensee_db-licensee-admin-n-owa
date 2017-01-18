@@ -25,8 +25,9 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @ProductId INT = (SELECT TOP 1 ProductId FROM dbo.Product3rd WITH(NOLOCK) WHERE ProductPrefix='AB')
+	DECLARE @Allbet INT = (SELECT PartyID FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyName='Allbet' AND PartyType=3)
 	DECLARE @RebateCommissionType INT = 11
+	DECLARE @DepositServiceCharge INT = 10
 
 	-- ChargeRate
 	DECLARE @ChargeRate TABLE(
@@ -38,15 +39,30 @@ BEGIN
 		ToDate				DATETIME
 	)
 
-	INSERT INTO @ChargeRate
-	SELECT ci.PartyId, ci.LicenseeID, ci.DI_Rate, ISNULL(ci.DI_Rate * c.Rate, 0), ci.FromDate, ci.ToDate
+	INSERT INTO @ChargeRate(PartyId, LicenseeId, FromDate,ToDate, Rate, RebateCommission)
+	SELECT ci.PartyId, ci.LicenseeID,
+		CASE WHEN ci.isDeposit=1 AND ci.FromDate <= dc.FromDate THEN dc.FromDate
+			 WHEN ci.isDeposit=0 AND ci.FromDate <= cc.FromDate THEN cc.FromDate
+			 ELSE ci.FromDate END,
+		CASE WHEN ci.isDeposit=1 AND ci.Todate >= dc.ToDate THEN dc.ToDate
+			 WHEN ci.isDeposit=0 AND ci.Todate >= cc.ToDate THEN cc.ToDate
+			 ELSE ci.ToDate END,
+		ISNULL(CASE WHEN ci.isDeposit=1 THEN dc.Rate ELSE ci.DI_Rate END,0),
+		ISNULL(ci.DI_Rate * cc.Rate, 0)
 	FROM dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate,@ToDate,'AB','OA',1) ci
-	LEFT JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON
-		c.FromParty = ci.PartyID AND
-		c.ProductID = ci.ProductID AND
-		ci.FromDate <= c.ToDate AND
-		c.FromDate <= ci.Todate AND
-		c.ChargeType = @RebateCommissionType
+	LEFT JOIN dbo.OAS_ChargeInfo dc WITH(NOLOCK) ON
+		dc.FromParty = 1 AND
+		dc.ToParty = @Allbet AND
+		dc.ProductID = ci.ProductID AND
+		dc.ToDate >= ci.FromDate AND
+		dc.FromDate <= ci.Todate AND
+		dc.ChargeType = @DepositServiceCharge
+	LEFT JOIN dbo.OAS_ChargeInfo cc WITH(NOLOCK) ON
+		cc.FromParty = ci.PartyID AND
+		cc.ProductID = ci.ProductID AND
+		cc.ToDate >= ci.FromDate AND
+		cc.FromDate <= ci.Todate AND
+		cc.ChargeType = 11
 
 	-- Party group List
 	BEGIN
