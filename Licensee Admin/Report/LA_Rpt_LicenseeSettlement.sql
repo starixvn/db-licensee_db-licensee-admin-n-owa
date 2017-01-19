@@ -314,7 +314,7 @@ BEGIN
 				AND b.rptDate BETWEEN @FromDate AND @ToDate
 				AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
 				AND (b.CurrencyID <> 20)
-				AND b.StatusId NOT IN (- 1, 103)
+				AND b.StatusId NOT IN (-1, 101, 102, 103)
 			GROUP BY b.rptDate, b.SiteId, b.CurrencyID, s.Bettype
 		)
 		INSERT INTO #Result( Winlostdate, CurrencyId, Game, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount,ProgressiveContribution,ProgressivePayout,ProgressiveFee)
@@ -376,7 +376,7 @@ BEGIN
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
 					AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
 					AND b.CurrencyID <> 20
-					AND b.Status NOT IN (- 1, 103)
+					AND b.Status NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory IN (1001, 1002)
 				GROUP BY b.RptDate, b.CurrencyId
 				UNION ALL 
@@ -396,7 +396,7 @@ BEGIN
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
 					AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
 					AND b.CurrencyID <> 20
-					AND b.Status NOT IN (- 1, 103)
+					AND b.Status NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory = 1002 -- for BT BA
 				GROUP BY b.RptDate, b.CurrencyId
 
@@ -431,7 +431,7 @@ BEGIN
 				b.rptDate BETWEEN p.FromDate AND p.ToDate
 				AND b.SiteID = @LicenseeID
 				AND b.Bettype IN (SELECT Bettype FROM @Bettype)
-				AND b.Status NOT IN (- 1, 103)
+				AND b.Status NOT IN (-1, 101, 102, 103)
 				AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
 				AND b.CurrencyID <> 20
 			GROUP BY
@@ -500,6 +500,7 @@ BEGIN
 		JOIN @CBShare cb ON b.SiteID = cb.LicenseeId AND b.rptDate BETWEEN cb.FromDate AND cb.ToDate
 		WHERE	ProductID = @ProductId AND
 				CustomerCategory NOT IN (27, 28) AND
+				b.StatusId NOT IN (-1, 101, 102, 103) AND
 				CurrencyId <> 20 AND
 				(@CurrencyId = 0 OR (@CurrencyId <> 0 AND CurrencyId = @CurrencyId)) AND
 				cb.TypeId = @CommChargeType -- to remove duplicate we use one of (6,7)
@@ -554,7 +555,7 @@ BEGIN
 					AND b.rptDate BETWEEN @FromDate AND @ToDate
 					AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
 					AND (b.CurrencyID <> 20)
-					AND b.[Status] NOT IN (- 1, 103)
+					AND b.[Status] NOT IN (-1, 101, 102, 103)
 					AND b.customercategory NOT IN (27, 28)
 				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 			) d

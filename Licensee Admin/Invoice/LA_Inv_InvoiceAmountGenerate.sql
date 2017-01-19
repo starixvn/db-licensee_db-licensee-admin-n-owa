@@ -522,6 +522,7 @@ BEGIN
 													AND (b.Bettype = -1 OR r.BettypeRef = p.BettypeRef)
 													AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate			
+				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.Bettype NOT IN (901,902,903)
@@ -583,7 +584,11 @@ BEGIN
 			SUM(ISNULL(BuyBackAmount,0)) CashInAmount
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 	JOIN @PartyChargeInfo cb ON b.SiteID = cb.LicenseeId AND b.ProductId = cb.ProductID AND b.rptDate BETWEEN cb.FromDate AND cb.ToDate
-	WHERE	b.ProductId = @CBProductId AND CustomerCategory NOT IN (27, 28) AND CurrencyId <> 20 AND cb.TypeId = @CommChargeType -- to remove duplicate we use one of (6,7)
+	WHERE	b.ProductId = @CBProductId AND 
+		b.StatusId NOT IN (-1, 101, 102, 103) AND
+		CustomerCategory NOT IN (27, 28) AND 
+		CurrencyId <> 20 AND 
+		cb.TypeId = @CommChargeType -- to remove duplicate we use one of (6,7)
 	GROUP BY rptdate, CurrencyId, b.SiteID, cb.PartyId, b.ProductId
 	
 	UPDATE #TempDataCB

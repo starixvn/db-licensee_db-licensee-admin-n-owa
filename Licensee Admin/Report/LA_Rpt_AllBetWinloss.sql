@@ -14,7 +14,7 @@ AS
  DB			: DB052.bodb_licensee
 
  Revisions:
-
+	- 20170113@bruce: checking launchDate to exclude trial data
  Param's Explanation:
 	- @FromDate			: From date
 	- @ToDate			: To date
@@ -25,35 +25,44 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @ProductId INT = (SELECT TOP 1 ProductId FROM dbo.Product3rd WITH(NOLOCK) WHERE ProductPrefix='AB')
+	DECLARE @Allbet INT = (SELECT PartyID FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyName='Allbet' AND PartyType=3)
+	DECLARE @RebateCommissionType INT = 11
+	DECLARE @DepositServiceCharge INT = 10
 
 	-- ChargeRate
-	DECLARE @ChargeRate TABLE(Rate MONEY, ChargeType TINYINT, FromDate DATETIME, ToDate DATETIME)
-	INSERT INTO @ChargeRate (Rate, ChargeType, FromDate, ToDate)
-	(
-		SELECT Rate, ChargeType,
-			CASE WHEN @FromDate <= FromDate THEN FromDate ELSE @FromDate END,
-			CASE WHEN @ToDate >= ToDate THEN ToDate ELSE @ToDate END
-		FROM dbo.OAS_ChargeInfo WITH(NOLOCK) 
-		WHERE ProductID=@ProductId AND FromParty=1 AND ChargeType IN (9,10,11) AND (
-			@FromDate BETWEEN FromDate AND ToDate OR
-			@ToDate BETWEEN FromDate AND ToDate OR
-			FromDate BETWEEN @FromDate AND @ToDate OR
-			ToDate BETWEEN @FromDate AND @ToDate
-		)
+	DECLARE @ChargeRate TABLE(
+		PartyId				INT,
+		LicenseeId			INT,
+		Rate				DECIMAL(10,8),
+		RebateCommission	DECIMAL(10,8),
+		FromDate			DATETIME,
+		ToDate				DATETIME
 	)
 
-	-- Party list
-	BEGIN
-		DECLARE @PartyList AS TABLE (PartyId INT, LicenseeId INT, IsDeposit BIT)
-
-		INSERT INTO @PartyList
-		SELECT p.PartyID, CASE WHEN ISNULL(d.IsDeposit,0) = 1 THEN p.OldRefID ELSE l.LabelID END, ISNULL(d.IsDeposit,0)
-		FROM dbo.OAS_Party p WITH(NOLOCK)
-		INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
-		LEFT JOIN dbo.Labels l WITH(NOLOCK) ON l.LicenseeID = p.OldRefID
-		WHERE p.PartyID IN (SELECT val FROM dbo.strSplit(@PartyIDs, ','))
-	END
+	INSERT INTO @ChargeRate(PartyId, LicenseeId, FromDate,ToDate, Rate, RebateCommission)
+	SELECT ci.PartyId, ci.LicenseeID,
+		CASE WHEN ci.isDeposit=1 AND ci.FromDate <= dc.FromDate THEN dc.FromDate
+			 WHEN ci.isDeposit=0 AND ci.FromDate <= cc.FromDate THEN cc.FromDate
+			 ELSE ci.FromDate END,
+		CASE WHEN ci.isDeposit=1 AND ci.Todate >= dc.ToDate THEN dc.ToDate
+			 WHEN ci.isDeposit=0 AND ci.Todate >= cc.ToDate THEN cc.ToDate
+			 ELSE ci.ToDate END,
+		ISNULL(CASE WHEN ci.isDeposit=1 THEN dc.Rate ELSE ci.DI_Rate END,0),
+		ISNULL(ci.DI_Rate * cc.Rate, 0)
+	FROM dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate,@ToDate,'AB','OA',1) ci
+	LEFT JOIN dbo.OAS_ChargeInfo dc WITH(NOLOCK) ON
+		dc.FromParty = 1 AND
+		dc.ToParty = @Allbet AND
+		dc.ProductID = ci.ProductID AND
+		dc.ToDate >= ci.FromDate AND
+		dc.FromDate <= ci.Todate AND
+		dc.ChargeType = @DepositServiceCharge
+	LEFT JOIN dbo.OAS_ChargeInfo cc WITH(NOLOCK) ON
+		cc.FromParty = ci.PartyID AND
+		cc.ProductID = ci.ProductID AND
+		cc.ToDate >= ci.FromDate AND
+		cc.FromDate <= ci.Todate AND
+		cc.ChargeType = 11
 
 	-- Party group List
 	BEGIN
@@ -107,59 +116,31 @@ BEGIN
 	)
 
 	-- Get Winloss data to #TempData
-	;WITH SumByDate AS (
-		SELECT	p.PartyId,
-				p.IsDeposit,
-				b.RptDate3rd AS rptDate,
-				b.CurrencyID,
-				ISNULL(pc.PlayCurrency, b.CurrencyID) AS PlayCurrency,
-				SUM(ISNULL(b.BetCount, 0)) AS TotalTrans,
-				SUM(ISNULL(b.Turnover, 0)) AS Turnover,
-				SUM(ISNULL(b.Winloss, 0)) AS CustomerWinLoss,
-				SUM(ISNULL(b.ValidBetAmount, 0)) AS ValidBetAmount
-		FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
-			INNER JOIN @PartyList p ON b.SiteID = p.LicenseeId
-			INNER JOIN dbo.view_site_list s WITH(NOLOCK) ON b.SiteId = s.SiteID
-			LEFT JOIN @PlayCurrencySettings pc ON
-			(
-				s.IbcSiteID = pc.SiteId AND
-				b.CurrencyId = pc.MemberCurrency AND
-				b.rptDate BETWEEN pc.FromDate AND pc.ToDate
-			)
-		WHERE	(b.RptDate3rd BETWEEN @FromDate AND @ToDate) AND
-				(b.CurrencyID <> 20) AND
-				(b.BetTypeId BETWEEN 2401 AND 2499) AND
-				(b.StatusId NOT IN (-1, 101, 102, 103))
-		GROUP BY b.RptDate3rd, p.PartyId, b.CurrencyID, ISNULL(pc.PlayCurrency, b.CurrencyID), p.IsDeposit
-	)
-	SELECT	*,
-			CAST(NULL AS MONEY) AS ServiceChargeOriginal,
-			CAST(NULL AS MONEY) AS RebateCommissionOriginal
+	SELECT	ci.PartyId,
+			b.RptDate3rd AS rptDate,
+			b.CurrencyID,
+			ISNULL(pc.PlayCurrency, b.CurrencyID) AS PlayCurrency,
+			SUM(ISNULL(b.BetCount, 0)) AS TotalTrans,
+			SUM(ISNULL(b.Turnover, 0)) AS Turnover,
+			SUM(ISNULL(b.Winloss, 0)) AS CustomerWinLoss,
+			SUM(ISNULL(b.ValidBetAmount, 0)) AS ValidBetAmount,
+			SUM(ISNULL(-b.Winloss, 0) * ci.Rate) AS ServiceChargeOriginal,
+			SUM(ISNULL(b.ValidBetAmount, 0) * ci.RebateCommission) AS RebateCommissionOriginal
 	INTO #TempData
-	FROM SumByDate s
-
-	-- service charge credit
-	UPDATE t SET 
-		ServiceChargeOriginal = -CustomerWinLoss * scc.Rate,
-		RebateCommissionOriginal = ValidBetAmount * scc.Rate
-	FROM #TempData t
-	INNER JOIN @ChargeRate scc ON t.IsDeposit = 0 AND scc.ChargeType = 9  AND t.rptDate BETWEEN scc.FromDate AND scc.ToDate
-
-	-- service charge deposit
-	UPDATE t SET 
-		ServiceChargeOriginal = -CustomerWinLoss * scd.Rate,
-		RebateCommissionOriginal = 0
-	FROM #TempData t
-	INNER JOIN @ChargeRate scd ON t.IsDeposit = 1 AND scd.ChargeType = 10 AND t.rptDate BETWEEN scd.FromDate AND scd.ToDate
-
-	-- rebate commission
-	UPDATE t SET 
-		RebateCommissionOriginal = RebateCommissionOriginal * rbc.Rate
-	FROM #TempData t
-	INNER JOIN @ChargeRate rbc ON t.IsDeposit = 0 AND rbc.ChargeType = 11 AND t.rptDate BETWEEN rbc.FromDate AND rbc.ToDate
-
-	-- remove data out of date range
-	DELETE #TempData WHERE ServiceChargeOriginal IS NULL OR RebateCommissionOriginal IS NULL
+	FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
+		INNER JOIN @ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
+		INNER JOIN dbo.view_site_list s WITH(NOLOCK) ON b.SiteId = s.SiteID
+		LEFT JOIN @PlayCurrencySettings pc ON
+		(
+			s.IbcSiteID = pc.SiteId AND
+			b.CurrencyId = pc.MemberCurrency AND
+			b.rptDate BETWEEN pc.FromDate AND pc.ToDate
+		)
+	WHERE	(b.RptDate3rd BETWEEN @FromDate AND @ToDate) AND
+			(b.CurrencyID <> 20) AND
+			(b.BetTypeId BETWEEN 2401 AND 2499) AND
+			(b.StatusId NOT IN (-1, 101, 102, 103))
+	GROUP BY b.RptDate3rd, ci.PartyId, b.CurrencyID, ISNULL(pc.PlayCurrency, b.CurrencyID)
 
 	-- Report result
 	CREATE TABLE #Result(
@@ -269,8 +250,8 @@ BEGIN
 						p.PartyName,
 						r.PartyId,
 						@FromDate AS ReportDate, -- dummy data,
-						r.OriginalCurrency,
-						r.RegisteredCurrency,
+						CASE WHEN r.OriginalCurrency='VND' THEN 'INH' ELSE r.OriginalCurrency END OriginalCurrency,
+						CASE WHEN r.RegisteredCurrency='VND' THEN 'INH' ELSE r.RegisteredCurrency END RegisteredCurrency,
 						SUM(r.TotalTrans) AS TotalTrans,
 						SUM(r.TurnoverBased) AS Turnover,
 						SUM(r.ValidBetAmountBased) AS ValidBetAmount,
@@ -296,8 +277,8 @@ BEGIN
 						'' AS PartyName,	-- dummy data
 						0 AS PartyId,		-- dummy data
 						r.ReportDate,
-						r.OriginalCurrency,
-						r.RegisteredCurrency,
+						CASE WHEN r.OriginalCurrency='VND' THEN 'INH' ELSE r.OriginalCurrency END OriginalCurrency,
+						CASE WHEN r.RegisteredCurrency='VND' THEN 'INH' ELSE r.RegisteredCurrency END RegisteredCurrency,
 						SUM(r.TotalTrans) AS TotalTrans,
 						SUM(r.Turnover) AS Turnover,
 						SUM(r.ValidBetAmount) AS ValidBetAmount,

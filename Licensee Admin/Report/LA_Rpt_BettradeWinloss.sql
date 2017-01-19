@@ -118,7 +118,7 @@ BEGIN
 					INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (0, 13)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate									
 					AND b.CurrencyID <> 20
-					AND b.Status NOT IN (- 1, 103)	
+					AND b.Status NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory IN( 1001, 1002)
 				GROUP BY p.PartyId, b.RptDate, b.CurrencyId, p.ParentId
 
@@ -136,7 +136,7 @@ BEGIN
 					INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN(3)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
 					AND b.CurrencyID <> 20
-					AND b.Status NOT IN (- 1, 103)	
+					AND b.Status NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory IN( 1001, 1002)
 				GROUP BY p.PartyId, b.RptDate, b.CurrencyId, p.ParentId
 

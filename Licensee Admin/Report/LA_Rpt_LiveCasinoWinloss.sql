@@ -84,7 +84,7 @@ BEGIN
 		FROM bodb_licenseereport.dbo.rpt_Betting b (NOLOCK) 
 			INNER JOIN #tmpParty tp ON b.SiteID = tp.LicenseeID 			
 		WHERE b.rptDate BETWEEN tp.FromDate AND tp.ToDate
-			AND b.status NOT IN (-1,103)
+			AND b.status NOT IN (-1, 101, 102, 103)
 			AND (@excludeTest = 0 OR (@excludeTest = 1 AND CurrencyID<>20))
 			AND ((bettype BETWEEN 1101 AND 1199 AND @GameType = 0) OR (bettype = @GameType))			
 			AND (@Currency = 0 OR  b.CurrencyID = @Currency)

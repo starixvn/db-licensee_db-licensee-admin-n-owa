@@ -132,7 +132,7 @@ BEGIN
 				INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND tp.ProductID = bt.ProductID
 				LEFT JOIN League l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
 			WHERE	(b.rptDate BETWEEN tp.Fromdate AND tp.ToDate) AND
-					 b.[Status] NOT IN (-1,103) AND
+					 b.[Status] NOT IN (-1, 101, 102, 103) AND
 					(@Currency = 0 OR @Currency = b.CurrencyID) AND
 					(@excludeTest = 0 OR b.CurrencyID<>20) AND
 					(@SportType = 0 OR (b.bettype NOT IN (9,29) AND l.Sporttype = @SportType)) AND
@@ -171,7 +171,7 @@ BEGIN
 			INNER JOIN #PartyBettypeMapping t ON b.Bettype = t.Bettype AND b.SiteID = t.LicenseeID
 			LEFT JOIN dbo.League l WITH(NOLOCK) ON b.leagueid = l.leagueid
 			WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate) AND
-					 b.[Status] NOT IN (- 1, 103) AND
+					 b.[Status] NOT IN (-1, 101, 102, 103) AND
 					(@Currency = 0 OR @Currency = b.CurrencyID) AND
 					(@excludeTest = 0 OR b.CurrencyID<>20) AND
 					(@SportType = 0 OR (b.bettype NOT IN (9,29) AND (b.bettype NOT BETWEEN 31 AND 120) AND l.Sporttype = @Sporttype)) AND

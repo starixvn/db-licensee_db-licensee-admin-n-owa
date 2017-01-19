@@ -112,7 +112,7 @@ BEGIN
 	WHERE
 		tp.IsDeposit = 1 AND
 		b.rptDate BETWEEN tp.Fromdate AND tp.Todate
-		AND b.status NOT IN (-1, 103)
+		AND b.status NOT IN (-1, 101, 102, 103)
 		AND (@excludeTest = 0 OR (@excludeTest = 1 AND CurrencyID <> 20))
 		AND bettype BETWEEN 1201 AND 1299
 		AND (@Sporttype = 0 OR ( @Sporttype<>0 AND l.Sporttype = @Sporttype)) 
@@ -152,7 +152,7 @@ BEGIN
 	WHERE
 		lr.IsDeposit = 0 AND
 		b.rptDate BETWEEN lr.Fromdate AND lr.Todate
-		AND b.status NOT IN (-1,103)
+		AND b.status NOT IN (-1, 101, 102, 103)
 		AND (@excludeTest = 0 OR (@excludeTest = 1 AND CurrencyID <> 20))
 		AND bettype BETWEEN 1201 AND 1299
 		AND b.customercategory NOT IN (27,28) 
