@@ -5,10 +5,10 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_Rpt_PlatformWinloss]   
+ALTER PROCEDURE [dbo].[LA_Rpt_PlatformWinloss]
 	 @PartyIds		VARCHAR(500),
-	 @FromDate		SMALLDATETIME,  
-	 @ToDate		SMALLDATETIME,	 
+	 @FromDate		SMALLDATETIME,
+	 @ToDate		SMALLDATETIME,
 	 @BaseCurrency  VARCHAR(20)
 AS
 /*  Created: 20160512@Bravo
@@ -17,7 +17,8 @@ AS
 
     Revisions:  
 		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
-		- 20170207@Bruce: exclude ticket 904, refund tickets
+		- 20170207@Bruce:	exclude ticket 904, refund tickets
+							exclude trial data and terminated
 
 	Explanation:  
 	  + @PlatformType: 0: All  
@@ -74,15 +75,17 @@ BEGIN
 	DECLARE @LicenseeInfo AS TABLE (
 		PartyId		INT,
 		LicenseeId	INT,
-		IsSelectCust BIT
+		IsSelectCust BIT,
+		Fromdate DATETIME,
+		Todate DATETIME
 	)
 
-	INSERT INTO @LicenseeInfo(PartyId, LicenseeId)
+	INSERT INTO @LicenseeInfo(PartyId, LicenseeId, Fromdate, Todate)
 	(
-		SELECT	PartyID, LicenseeID
+		SELECT	PartyID, LicenseeID, Fromdate, Todate
 		FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'SB', 'OA', 1)
 	)
-		
+
 	SELECT @FDate=@FromDate,@TDate=@ToDate 
 	
 	WHILE EXISTS (SELECT * FROM @LicenseeInfo WHERE IsSelectCust IS NULL)
@@ -186,7 +189,8 @@ BEGIN
 			) WinlossSmart				
 			FROM dbo.bettrans b WITH (NOLOCK)
 				INNER JOIN #tempAg tma ON tma.CustID=b.recommend  AND b.currency = tma.currency
-				LEFT JOIN bodb_licensee.dbo.LicenseeBATransaction ba ON b.transid = ba.transid AND ba.transdate BETWEEN @TempFromDate AND @TDate
+				INNER JOIN @LicenseeInfo li ON li.LicenseeId = tma.LicenseeId AND b.winlostdate BETWEEN li.Fromdate AND li.Todate
+				LEFT JOIN bodb_licensee.dbo.LicenseeBATransaction ba WITH(NOLOCK) ON b.transid = ba.transid AND ba.transdate BETWEEN @TempFromDate AND @TDate
 			WHERE
 				b.statusID  IN (111, 112, 113)
 				AND b.winlostdate BETWEEN @TempFromDate AND @TDate
@@ -273,6 +277,7 @@ BEGIN
 			) WinlossSmart	
 		FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH ( NOLOCK )
 			INNER JOIN #tempAg ag ON b.recommend = ag.CustId AND b.Currency = ag.Currency
+			INNER JOIN @LicenseeInfo li ON li.LicenseeId = ag.LicenseeId AND b.winlostdate BETWEEN li.Fromdate AND li.Todate
 			INNER JOIN #sporttype t ON b.sporttype = t.sporttype
 		WHERE 		
 			b.Winlostdate BETWEEN @FDate AND @TempToDate  
