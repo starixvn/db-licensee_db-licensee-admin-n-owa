@@ -17,6 +17,8 @@ AS
 
     Revisions:  
 		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+		- 20170207@Bruce: exclude ticket 904, refund tickets
+
 	Explanation:  
 	  + @PlatformType: 0: All  
 					   1: Asia (d)  
@@ -190,7 +192,7 @@ BEGIN
 				AND (b.bettype<31 OR (b.bettype BETWEEN 121 AND 999)
 								  OR (b.Bettype BETWEEN 1301 and 1399) --new tennis's bettypes
 				) 
-				AND b.bettype NOT IN (901,902,903)
+				AND b.bettype NOT IN (901,902,903,904)
 				AND b.tpositiontaking <>0
 			GROUP BY  b.winlostdate, tma.currency, tma.LicenseeID
 	END				
@@ -274,8 +276,8 @@ BEGIN
 		WHERE 		
 			b.Winlostdate BETWEEN @FDate AND @TempToDate  
 			AND b.roleid = 1   
-			AND b.statusID <> 101 --exclude REJECT bets
-			AND b.bettype NOT IN (901,902,903)
+			AND b.statusID  NOT IN (-1, 101, 102, 103)
+			AND b.bettype NOT IN (901,902,903,904)
 			AND ISNULL(b.isBA,0) = 0	
 		GROUP BY	
 			b.winlostdate,
