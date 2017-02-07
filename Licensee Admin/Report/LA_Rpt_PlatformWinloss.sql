@@ -186,14 +186,15 @@ BEGIN
 			) WinlossSmart				
 			FROM dbo.bettrans b WITH (NOLOCK)
 				INNER JOIN #tempAg tma ON tma.CustID=b.recommend  AND b.currency = tma.currency
+				LEFT JOIN bodb_licensee.dbo.LicenseeBATransaction ba ON b.transid = ba.transid AND ba.transdate BETWEEN @TempFromDate AND @TDate
 			WHERE
 				b.statusID  IN (111, 112, 113)
 				AND b.winlostdate BETWEEN @TempFromDate AND @TDate
 				AND (b.bettype<31 OR (b.bettype BETWEEN 121 AND 999)
 								  OR (b.Bettype BETWEEN 1301 and 1399) --new tennis's bettypes
 				) 
-				AND b.bettype NOT IN (901,902,903,904)
-				AND b.tpositiontaking <>0
+				AND b.bettype NOT IN (901,902,903,904/*bettrade*/,911,912,913,914/*cashout*/)
+				AND ba.TransID IS NULL -- not BA
 			GROUP BY  b.winlostdate, tma.currency, tma.LicenseeID
 	END				
 
@@ -277,7 +278,7 @@ BEGIN
 			b.Winlostdate BETWEEN @FDate AND @TempToDate  
 			AND b.roleid = 1   
 			AND b.statusID  NOT IN (-1, 101, 102, 103)
-			AND b.bettype NOT IN (901,902,903,904)
+			AND b.bettype NOT IN (901,902,903,904/*bettrade*/,911,912,913,914/*cashout*/)
 			AND ISNULL(b.isBA,0) = 0	
 		GROUP BY	
 			b.winlostdate,
