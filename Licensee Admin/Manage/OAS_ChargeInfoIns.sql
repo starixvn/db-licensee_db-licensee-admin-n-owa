@@ -214,8 +214,8 @@ BEGIN
 					INSERT INTO dbo.LA_ChargeInfo_MinFee (ChargeID, MinFee, MinFeeCurrencyID, WaiveFrom, WaiveTo)
 					SELECT @ChargeID, @MinFee, @BaseCurrencyId, @FromDate, DATEADD(DAY, - 1, DATEADD(MONTH, @WaiveMonth, @FromDate))
 
-					INSERT INTO dbo.LA_MinFee(PartyId, FeeTypeId, ProductId, FeeAmount, FromDate, ToDate, MinFeeTerm, Priority)
-					SELECT c.FromParty, 1, c.ProductID, @MinFee, c.FromDate, c.ToDate , '', 1
+					INSERT INTO dbo.LA_MinFee(PartyId, FeeTypeId, ProductId, FeeAmount, CurrencyId, FromDate, ToDate, MinFeeTerm, Priority)
+					SELECT c.FromParty, 1, c.ProductID, @MinFee, @BaseCurrencyId, c.FromDate, c.ToDate , '', 1
 					FROM dbo.OAS_ChargeInfo c WITH (NOLOCK) 
 					WHERE c.ChargeID = @ChargeId
 
