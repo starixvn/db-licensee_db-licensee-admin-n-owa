@@ -190,7 +190,7 @@ BEGIN
 			FROM dbo.bettrans b WITH (NOLOCK)
 				INNER JOIN #tempAg tma ON tma.CustID=b.recommend  AND b.currency = tma.currency
 				INNER JOIN @LicenseeInfo li ON li.LicenseeId = tma.LicenseeId AND b.winlostdate BETWEEN li.Fromdate AND li.Todate
-				LEFT JOIN bodb_licensee.dbo.LicenseeBATransaction ba WITH(NOLOCK) ON b.transid = ba.transid AND ba.transdate BETWEEN @TempFromDate AND @TDate
+				LEFT JOIN bodb_licensee.dbo.LicenseeBATransaction ba WITH(NOLOCK) ON b.transid = ba.transid
 			WHERE
 				b.statusID  IN (111, 112, 113)
 				AND b.winlostdate BETWEEN @TempFromDate AND @TDate
@@ -276,12 +276,12 @@ BEGIN
 				END
 			) WinlossSmart	
 		FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH ( NOLOCK )
-			INNER JOIN #tempAg ag ON b.recommend = ag.CustId AND b.Currency = ag.Currency
+			INNER JOIN #tempAg ag ON b.CustId = ag.CustId AND b.Currency = ag.Currency
 			INNER JOIN @LicenseeInfo li ON li.LicenseeId = ag.LicenseeId AND b.winlostdate BETWEEN li.Fromdate AND li.Todate
 			INNER JOIN #sporttype t ON b.sporttype = t.sporttype
 		WHERE 		
 			b.Winlostdate BETWEEN @FDate AND @TempToDate  
-			AND b.roleid = 1   
+			AND b.roleid = 2   
 			AND b.statusID  NOT IN (-1, 101, 102, 103)
 			AND b.bettype NOT IN (901,902,903,904/*bettrade*/,911,912,913,914/*cashout*/)
 			AND ISNULL(b.isBA,0) = 0	
