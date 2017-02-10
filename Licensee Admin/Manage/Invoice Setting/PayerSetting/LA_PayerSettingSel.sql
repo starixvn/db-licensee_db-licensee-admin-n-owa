@@ -192,6 +192,31 @@ BEGIN
 					d.ToAmount,
 					d.Rate
 
+	-- get terminated
+	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)
+	SELECT DISTINCT -1,
+		d.PartyID,
+		CASE
+			WHEN ISNULL(pd.BrandName, '') != '' THEN pd.BrandName
+			ELSE p.PartyName
+		END AS PartyName,
+		NULL,
+		NULL,
+		0,
+		'Terminated',
+		0,
+		0,
+		@MinDate,
+		@MinDate,
+		NULL,
+		0,
+		'',
+		1
+	FROM @ChargeDetail d
+		INNER JOIN OAS_Party p WITH (NOLOCK) ON d.PartyID = p.PartyID
+		INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
+	WHERE d.PartyID NOT IN (SELECT c.PartyId FROM @ChargeInfo c)
+
 	--result
 	SELECT DISTINCT
 		c.PartyId		AS PayerID,
