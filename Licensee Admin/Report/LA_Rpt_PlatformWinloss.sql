@@ -61,7 +61,7 @@ BEGIN
 	DECLARE @FDate SMALLDATETIME
 	DECLARE @TDate SMALLDATETIME
 
-	CREATE TABLE #tempAg	(LicenseeID INT, custID INT, Currency INT)
+	CREATE TABLE #tempAg	(LicenseeID INT, custID INT, Currency INT, FromDate SMALLDATETIME, ToDate SMALLDATETIME)
 	DECLARE @tempDate TABLE (BalanceUpDay DATETIME, MoveBetsDay DATETIME)
 
 	INSERT INTO @tempDate
@@ -85,8 +85,8 @@ BEGIN
 
 	SELECT @FDate=@FromDate,@TDate=@ToDate 
 
-	INSERT INTO #tempAg (LicenseeID, custID,currency) 
-	SELECT li.licenseeID, custID,currency 
+	INSERT INTO #tempAg (LicenseeID, custID,currency, FromDate, ToDate) 
+	SELECT li.licenseeID, custID,currency, li.Fromdate, li.Todate 
 	FROM  @LicenseeInfo li
 		CROSS APPLY bodb_Licensee.dbo.f_SelLicenseeCust(li.licenseeID) lc
 
@@ -178,6 +178,7 @@ BEGIN
 			) WinlossSmart				
 			FROM dbo.bettrans b WITH (NOLOCK)
 				INNER JOIN #tempAg tma ON tma.CustID=b.recommend  AND b.currency = tma.currency
+											AND b.winlostdate BETWEEN tma.FromDate AND tma.ToDate
 			WHERE
 				b.statusID  IN (111, 112, 113)
 				AND b.winlostdate BETWEEN @TempFromDate AND @TDate
@@ -263,7 +264,7 @@ BEGIN
 				END
 			) WinlossSmart	
 		FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH ( NOLOCK )
-			INNER JOIN #tempAg ag ON b.CustId = ag.CustId AND b.Currency = ag.Currency
+			INNER JOIN #tempAg ag ON b.CustId = ag.CustId AND b.Currency = ag.Currency AND b.winlostdate BETWEEN ag.FromDate AND ag.ToDate
 		WHERE 		
 			b.Winlostdate BETWEEN @FDate AND @TempToDate  
 			AND b.roleid = 2   
