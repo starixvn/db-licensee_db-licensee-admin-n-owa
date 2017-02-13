@@ -39,7 +39,7 @@ BEGIN
 			@CurrentDate DATE
 	SET @CurrentDate = CONVERT(DATE, GETDATE())
 	DECLARE @ChargeInfo AS TABLE(ChargeId INT, PartyId INT, PartyName VARCHAR(100), PartyGroupId INT, PartyGroupName VARCHAR(100), ProductId INT, ProductName VARCHAR(100),
-			BettypeRef INT,Rate MONEY, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), ExchangeID INT, ExchangeName VARCHAR(50), ChargeType TINYINT)
+			BettypeRef INT,Rate MONEY, FromDate DATE, ToDate DATE, FirstBilling DATE, ExchangeID INT, ExchangeName VARCHAR(50), ChargeType TINYINT)
 	CREATE TABLE #Temp_ChargeInfo(ChargeId INT, PartyID INT, ProductID INT, BettypeRef INT,Rate MONEY, Fromdate DATE, Todate DATE)
 
 	DECLARE @Minfee AS TABLE(PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, FromDate DATE, ToDate DATE)
