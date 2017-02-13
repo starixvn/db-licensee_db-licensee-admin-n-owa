@@ -54,15 +54,13 @@ BEGIN
 		WinlossSmart	MONEY
 	)
 		
-	DECLARE @MoveBetsDay DATETIME 
-	DECLARE @TempFromDate DATETIME 
-	DECLARE @TempToDate DATETIME 
-	DECLARE @MaxOldDate DATETIME
-	DECLARE @FDate DATETIME
-	DECLARE @TDate DATETIME
+	DECLARE @MoveBetsDay SMALLDATETIME 
+	DECLARE @TempFromDate SMALLDATETIME 
+	DECLARE @TempToDate SMALLDATETIME 
+	DECLARE @MaxOldDate SMALLDATETIME
+	DECLARE @FDate SMALLDATETIME
+	DECLARE @TDate SMALLDATETIME
 
-	CREATE TABLE #sporttype (sporttype INT, ProductPrefix VARCHAR(10))
-	CREATE TABLE #bettype	(bettype INT PRIMARY KEY, ProductPrefix VARCHAR(10))
 	CREATE TABLE #tempAg	(LicenseeID INT, custID INT, Currency INT)
 	DECLARE @tempDate TABLE (BalanceUpDay DATETIME, MoveBetsDay DATETIME)
 
@@ -75,7 +73,6 @@ BEGIN
 	DECLARE @LicenseeInfo AS TABLE (
 		PartyId		INT,
 		LicenseeId	INT,
-		IsSelectCust BIT,
 		Fromdate DATETIME,
 		Todate DATETIME
 	)
@@ -87,23 +84,15 @@ BEGIN
 	)
 
 	SELECT @FDate=@FromDate,@TDate=@ToDate 
-	
-	WHILE EXISTS (SELECT * FROM @LicenseeInfo WHERE IsSelectCust IS NULL)
-	BEGIN
-		DECLARE @licenseeID INT = (SELECT TOP 1 LicenseeId FROM @LicenseeInfo WHERE IsSelectCust IS NULL)
 
-		INSERT INTO #tempAg (LicenseeID, custID,currency) 
-		SELECT @licenseeID, custID,currency 
-		FROM  bodb_Licensee.dbo.f_SelLicenseeCust(@licenseeID) lc
-
-		UPDATE @LicenseeInfo SET IsSelectCust = 1 WHERE LicenseeId = @licenseeID
-	END		
-	
-	INSERT  INTO #sporttype(sporttype, ProductPrefix) VALUES  (0, 'SB')	
+	INSERT INTO #tempAg (LicenseeID, custID,currency) 
+	SELECT li.licenseeID, custID,currency 
+	FROM  @LicenseeInfo li
+		CROSS APPLY bodb_Licensee.dbo.f_SelLicenseeCust(li.licenseeID) lc
 
 	-- Get exchange rate info
 	CREATE TABLE #Exchange (
-		ExchangeDate	DATE,
+		ExchangeDate	DATETIME,
 		ExchangeID		INT,
 		CurrencyCode	VARCHAR(10),
 		Rate			FLOAT
@@ -189,8 +178,6 @@ BEGIN
 			) WinlossSmart				
 			FROM dbo.bettrans b WITH (NOLOCK)
 				INNER JOIN #tempAg tma ON tma.CustID=b.recommend  AND b.currency = tma.currency
-				INNER JOIN @LicenseeInfo li ON li.LicenseeId = tma.LicenseeId AND b.winlostdate BETWEEN li.Fromdate AND li.Todate
-				LEFT JOIN bodb_licensee.dbo.LicenseeBATransaction ba WITH(NOLOCK) ON b.transid = ba.transid
 			WHERE
 				b.statusID  IN (111, 112, 113)
 				AND b.winlostdate BETWEEN @TempFromDate AND @TDate
@@ -198,7 +185,7 @@ BEGIN
 								  OR (b.Bettype BETWEEN 1301 and 1399) --new tennis's bettypes
 				) 
 				AND b.bettype NOT IN (901,902,903,904/*bettrade*/,911,912,913,914/*cashout*/)
-				AND ba.TransID IS NULL -- not BA
+				AND NOT EXISTS (SELECT 1 FROM bodb_licensee.dbo.LicenseeBATransaction ba WITH(NOLOCK) WHERE b.transid = ba.transid)
 			GROUP BY  b.winlostdate, tma.currency, tma.LicenseeID
 	END				
 
@@ -277,14 +264,13 @@ BEGIN
 			) WinlossSmart	
 		FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH ( NOLOCK )
 			INNER JOIN #tempAg ag ON b.CustId = ag.CustId AND b.Currency = ag.Currency
-			INNER JOIN @LicenseeInfo li ON li.LicenseeId = ag.LicenseeId AND b.winlostdate BETWEEN li.Fromdate AND li.Todate
-			INNER JOIN #sporttype t ON b.sporttype = t.sporttype
 		WHERE 		
 			b.Winlostdate BETWEEN @FDate AND @TempToDate  
 			AND b.roleid = 2   
 			AND b.statusID  NOT IN (-1, 101, 102, 103)
 			AND b.bettype NOT IN (901,902,903,904/*bettrade*/,911,912,913,914/*cashout*/)
-			AND ISNULL(b.isBA,0) = 0	
+			AND ISNULL(b.isBA,0) = 0
+			AND b.sporttype = 0	
 		GROUP BY	
 			b.winlostdate,
 			b.currency,
@@ -313,8 +299,6 @@ BEGIN
 	GROUP BY w.LicenseeID, w.Winlostdate,p.PartyName
 	ORDER BY w.LicenseeID, w.Winlostdate
 
-	DROP TABLE #sporttype
-	DROP TABLE #bettype
 	DROP TABLE #Exchange
 	DROP TABLE #WinLoss
 	DROP TABLE #tempAg
