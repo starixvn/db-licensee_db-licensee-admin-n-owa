@@ -17,7 +17,7 @@ AS
 
     Revisions:  
 		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
-		- 20170207@Bruce:	exclude ticket 904, refund tickets
+		- 20170207@Bruce:	exclude ticket 904, refund tickets [RedmindID:	#60707]
 							exclude trial data and terminated
 
 	Explanation:  
