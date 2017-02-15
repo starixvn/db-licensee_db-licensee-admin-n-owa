@@ -26,6 +26,7 @@ AS
 		- 20150831@Bravo: fix bug - Min fee term & Basis of billing max length.
 		- 20150917@Victor: Support Chinese on Settings.
 		- 20151216@Bravo: Add MGC charge rate (Generic & Branded game).
+		- 20170215@Scofield: Update check overlap and update system mapping
 	 Params:		
 		+ @InvoiceSettingXML: '<ChargeSettings>
 								  <ChargeSetting>
@@ -179,8 +180,7 @@ BEGIN
 	END
 	--get list Product
 	SELECT @ProductListAll = @ProductListAll + ProductPrefix + ','
-	FROM dbo.LA_f_Products3rd('')
-	SET @ProductListAll = REPLACE(SUBSTRING(@ProductListAll, 0, LEN(@ProductListAll)), 'RB', '')
+	FROM dbo.LA_f_Products3rd('')	
 	
 	--get Minium date, maximum date
 	SELECT @MinDate = MIN(ci.FromDate)
@@ -189,16 +189,17 @@ BEGIN
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
 
 	-- check overlap time charge
-	INSERT INTO @ChargeSetting(ChargeId, ProductId, FirstBilling, BasisBilling, BettypeRef, Rate, ChargeType, FromDate, ToDate)
-	SELECT a.ChargeId, a.ProductId, b.FirstOfBilling, b.BasisOfBilling, a.Bettype, Rate, ChargeType, a.FromDate, a.ToDate
+	INSERT INTO @ChargeSetting(ChargeId, ProductId,  BettypeRef, ChargeType, FromDate, ToDate)
+	SELECT a.ChargeId, a.ProductId, a.Bettype, ChargeType, a.FromDate, a.ToDate
 	FROM dbo.LA_f_ChargeInfo(@PayerID, @MinDate, @MaxDate ,@ProductListAll, 'OA', 1) a	
 		INNER JOIN dbo.OAS_ChargeInfo b WITH (NOLOCK) ON a.ChargeID = b.ChargeID
 	WHERE a.ChargeID NOT IN (SELECT ChargeID FROM @ChargeSetting)	
+		AND a.ProductId IN (SELECT ProductId FROM @ChargeSetting)
 
 	---check case Update , compare new data with old config 
 	IF NOT EXISTS (
 			SELECT TOP 1 1
-			FROM @ChargeSetting a LEFT JOIN @ChargeSetting b ON a.Idx != b.Idx AND a.ProductId = b.ProductId AND (a.ProductId IN (14,17) AND a.BettypeRef = b.BettypeRef)
+			FROM @ChargeSetting a LEFT JOIN @ChargeSetting b ON a.Idx != b.Idx AND a.ChargeType = b.ChargeType AND (a.ProductId = b.ProductId OR (a.ProductId IN (14,17) AND a.BettypeRef = b.BettypeRef))
 			WHERE  (a.FromDate BETWEEN b.FromDate AND b.ToDate
 						OR a.ToDate BETWEEN b.FromDate AND b.ToDate
 						OR b.FromDate BETWEEN a.FromDate AND a.ToDate
@@ -352,21 +353,22 @@ BEGIN
 					RETURN
 				END
 							
-				IF ISNULL(@ParentChargeID, 0) = 1				
+				-- update system mapping
+				INSERT INTO LA_ChargeInfo_SystemMapping (ChargeID, SystemID)
+				SELECT ChargeID, 2
+				FROM @ChargeID					
+							
+				IF @ToParty = 1 -- ONEWorks
 				BEGIN
 					INSERT INTO LA_ChargeInfo_SystemMapping (ChargeID, SystemID)
-					SELECT ChargeID, 2
-					FROM @ChargeID
-					UNION 
 					SELECT ChargeID, 4
-					FROM @ChargeID
-				END
-				ELSE 
-				BEGIN 
-					INSERT INTO LA_ChargeInfo_SystemMapping (ChargeID, SystemID)
-					SELECT ChargeID, 2
-					FROM @ChargeID
-				END
+					FROM @ChargeID		
+					WHERE ProductId IN (
+						SELECT 0 -- SB
+						UNION
+						SELECT Productid  FROM dbo.Product3rd
+						WHERE ProductPrefix IN ('NG', 'VS', 'LC', 'BA', 'AGC', 'GD', 'VG'))
+				END				
 
 				IF @@ERROR <> 0
 				BEGIN
