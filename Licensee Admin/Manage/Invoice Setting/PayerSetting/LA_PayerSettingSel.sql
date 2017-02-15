@@ -131,7 +131,7 @@ BEGIN
 			CASE WHEN c.ProductID IN (14,17) THEN s.FirstOfBilling ELSE ci.FirstOfBilling END,
 			pd.BaseCurrencyId,
 			ISNULL(e.Code, '') AS ExchangeName,
-			ci.ChargeType
+			CASE WHEN c.ProductID IN (14,17) THEN s.ChargeType ELSE ci.ChargeType END
 		FROM #Temp_ChargeInfo c
 			INNER JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID
 			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
