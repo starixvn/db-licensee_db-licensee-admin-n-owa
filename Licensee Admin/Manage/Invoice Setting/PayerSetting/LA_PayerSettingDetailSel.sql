@@ -21,6 +21,7 @@ AS
 		- 20150917@Victor: Support Chinese on Settings
 		- 20161025@Scofield: exclude Colossus Bet from ChargeInfo
 		- 20161031@bruce.bui: show CB and charge type
+		- 20170216@bruce.bui: sort product, include payername
 	 Params:
 		+ @PayerId :specify Party
 		+ @@PayerGroup :	0 get all Party
@@ -48,13 +49,14 @@ BEGIN
 	--get list Product
 	SELECT @ProductListAll = @ProductListAll + ProductPrefix + ','
 	FROM dbo.LA_f_Products3rd('')
-	SET @ProductListAll = REPLACE(SUBSTRING(@ProductListAll, 0, LEN(@ProductListAll)), 'RB', '')
+	SET @ProductListAll = REPLACE(SUBSTRING(@ProductListAll, 0, LEN(@ProductListAll)), 'RB', '') -- dont support RB
 
 	--get Minium date, maximum date
 	SELECT @MinDate = MIN(ci.FromDate)
 		, @MaxDate = MAX(ci.ToDate)
 	FROM dbo.OAS_ChargeInfo ci WITH (NOLOCK)
-		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2	
+		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
+	WHERE ci.FromParty = @PayerId
 	
 	INSERT INTO @ChargeInfo(ChargeId, PartyId, ProductId, BettypeRef, Rate, ChargeType, FromDate, ToDate, FirstBilling, BasisOfBilling, ExchangeID)
 	SELECT c.ChargeID		
@@ -93,16 +95,28 @@ BEGIN
 	WHERE a.PartyID = @PayerId
 	GROUP BY a.PartyID, p.ProductId, h.FromDate, h.ToDate, d.DiscountGroupId, h.DiscountGroupName, h.DiscountGroupType
 
-	--
-	SELECT c.PartyId			AS PayerID	
+	-- product order
+	DECLARE @ProductOrder TABLE(ProductId INT, OrderNumber SMALLMONEY)
+	INSERT INTO @ProductOrder
+	SELECT ProductId, CASE ProductId 
+			WHEN 15/*CB*/ THEN 13.5 -- , make CB after BT and before MGCLC
+			ELSE ProductId -- keep as it is
+		END
+	FROM dbo.LA_f_Products3rd('')
+
+	-- payer setting
+	SELECT TOP 1 c.PartyId			AS PayerID	
 		, pg.PartyGroupId		AS PayerGroupId
 		, pg.PartyGroupName		AS PayerGroupName
-		, c.ExchangeID			
+		, c.ExchangeID
 		, d1.DiscountGroupId	AS DiscountGroupID
 		, d1.DiscountGroupName	AS DiscountGroupName
 		, d2.DiscountGroupId	AS RebateGroupID
 		, d2.DiscountGroupName	AS RebateGroupName
+		, CASE WHEN ISNULL(pd.BrandName,'')<>'' THEN pd.BrandName + ' (' +p.PartyName+')' ELSE p.PartyName END PayerName
 	FROM @ChargeInfo c
+		INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID=c.PartyId
+		INNER JOIN dbo.OAS_PartyDetail pd ON pd.PartyId=c.PartyId
 		LEFT JOIN dbo.LA_PartyGroupAssignment pga WITH (NOLOCK) ON  c.PartyId = pga.PartyId
 		LEFT JOIN dbo.LA_PartyGroup pg WITH (NOLOCK) ON  pga.PartyGroupId = pg.PartyGroupId
 		LEFT JOIN (
@@ -117,10 +131,10 @@ BEGIN
 				WHERE DiscountGroupType = 2
 					AND @CurrentDate BETWEEN FromDate AND ToDate
 				) d2 ON c.PartyId = d2.PartyId --Rebate
-	GROUP BY c.PartyId, pg.PartyGroupId, pg.PartyGroupName, c.ExchangeID, d1.DiscountGroupId	
-		, d1.DiscountGroupName, d2.DiscountGroupId, d2.DiscountGroupName
+	--GROUP BY c.PartyId, pg.PartyGroupId, pg.PartyGroupName, c.ExchangeID, d1.DiscountGroupId	
+	--	, d1.DiscountGroupName, d2.DiscountGroupId, d2.DiscountGroupName
 
-	--result
+	-- charge rate setting
 	SELECT c.ChargeId		AS ChargeId
 		, c.PartyId			AS PayerID
 		, c.ProductId		AS ProductId
@@ -133,8 +147,9 @@ BEGIN
 		, c.FromDate
 		, c.ToDate
 	FROM @ChargeInfo c
-	LEFT JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
-	ORDER BY c.ProductId, c.FromDate
+	INNER JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
+	INNER JOIN @ProductOrder po ON pr.ProductID = po.ProductId
+	ORDER BY po.OrderNumber, c.FromDate
 
 	--Minfee Setting
 	SELECT  m.FeeId			AS MinFeeId
@@ -148,9 +163,11 @@ BEGIN
 		, FromDate
 		, ToDate
 	FROM @Minfee m
-		LEFT JOIN dbo.LA_f_Products3rd('') pr ON m.ProductID = pr.ProductID
-		LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON m.CurrencyId = e.exchangeid
+		INNER JOIN dbo.LA_f_Products3rd('') pr ON m.ProductID = pr.ProductID
+		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON m.CurrencyId = e.exchangeid
+		INNER JOIN @ProductOrder po ON pr.ProductID = po.ProductId
 	WHERE FeeTypeId = 1 -- Miniumfee
+	ORDER BY po.OrderNumber, m.FromDate
 	 
 	--Waive Setting
 	SELECT w.FeeId			AS WaiveId
@@ -160,8 +177,10 @@ BEGIN
 		, FromDate
 		, ToDate
 	FROM @Minfee w
-		LEFT JOIN dbo.LA_f_Products3rd('') pr ON w.ProductID = pr.ProductID
+		INNER JOIN dbo.LA_f_Products3rd('') pr ON w.ProductID = pr.ProductID
+		INNER JOIN @ProductOrder po ON pr.ProductID = po.ProductId
 	WHERE w.FeeTypeId = 2 -- waive	
+	ORDER BY po.OrderNumber, w.FromDate
 END
 			 	
 GO
