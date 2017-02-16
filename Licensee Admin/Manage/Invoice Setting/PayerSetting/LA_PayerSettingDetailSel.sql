@@ -98,7 +98,7 @@ BEGIN
 	GROUP BY a.PartyID, p.ProductId, h.FromDate, h.ToDate, d.DiscountGroupId, h.DiscountGroupName, h.DiscountGroupType
 
 	-- product order
-	DECLARE @ProductOrder TABLE(ProductId INT, OrderNumber SMALLMONEY)
+	DECLARE @ProductOrder TABLE(ProductId INT, ProductOrder SMALLMONEY)
 	INSERT INTO @ProductOrder
 	SELECT ProductId, CASE ProductId 
 			WHEN 15/*CB*/ THEN 13.5 -- , make CB after BT and before MGCLC
@@ -135,32 +135,27 @@ BEGIN
 				) d2 ON c.PartyId = d2.PartyId --Rebate
 
 	-- charge rate setting
-	SELECT c.ChargeId		AS ChargeId
-		, c.PartyId			AS PayerID
-		, c.ProductId		AS ProductId
-		, ProductName		AS ProductName
-		, FirstBilling		AS FirstBilling
-		, c.BasisOfBilling
-		, c.BettypeRef
-		, c.Rate			AS Rate
-		, c.ChargeType
-		, c.FromDate
-		, c.ToDate
-		, ROW_NUMBER() OVER (PARTITION BY c.ProductId ORDER BY c.FromDate) RowNumber
-	INTO #ChargeRateSettings
-	FROM @ChargeInfo c
-	INNER JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
-
 	;WITH Rate AS(
-		SELECT c.*,po.OrderNumber, CASE WHEN RowNumber > 1 THEN 1 ELSE 0 END IsExpired
-		FROM #ChargeRateSettings c
+		SELECT c.ChargeId		AS ChargeId
+			, c.PartyId			AS PayerID
+			, c.ProductId		AS ProductId
+			, ProductName		AS ProductName
+			, FirstBilling		AS FirstBilling
+			, c.BasisOfBilling
+			, c.BettypeRef
+			, c.Rate			AS Rate
+			, c.ChargeType
+			, c.FromDate
+			, c.ToDate
+			, CASE WHEN @CurrentDate > c.ToDate THEN 1 ELSE 0 END IsExpired
+			, po.ProductOrder
+		FROM @ChargeInfo c
+		INNER JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
 		INNER JOIN @ProductOrder po ON c.ProductID = po.ProductId
 	)
 	SELECT *
 	FROM Rate
-	ORDER BY IsExpired, OrderNumber
-
-	DROP TABLE #ChargeRateSettings
+	ORDER BY IsExpired, ProductOrder, FromDate
 
 	--Minfee Setting
 	SELECT  m.FeeId			AS MinFeeId
@@ -178,7 +173,7 @@ BEGIN
 		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON m.CurrencyId = e.exchangeid
 		INNER JOIN @ProductOrder po ON pr.ProductID = po.ProductId
 	WHERE FeeTypeId = 1 -- Miniumfee
-	ORDER BY po.OrderNumber, m.FromDate
+	ORDER BY po.ProductOrder, m.FromDate
 	 
 	--Waive Setting
 	SELECT w.FeeId			AS WaiveId
@@ -190,10 +185,9 @@ BEGIN
 	FROM @Minfee w
 		INNER JOIN dbo.LA_f_Products3rd('') pr ON w.ProductID = pr.ProductID
 		INNER JOIN @ProductOrder po ON pr.ProductID = po.ProductId
-	WHERE w.FeeTypeId = 2 -- waive	
-	ORDER BY po.OrderNumber, w.FromDate
+	WHERE w.FeeTypeId = 2 -- waive
+	ORDER BY po.ProductOrder, w.FromDate
 END
-			 	
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_PayerSettingDetailSel] TO [vnteam] 
 GRANT EXECUTE ON [dbo].[LA_PayerSettingDetailSel] TO bodbAdminNet
