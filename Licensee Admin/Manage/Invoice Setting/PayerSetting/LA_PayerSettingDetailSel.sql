@@ -21,7 +21,9 @@ AS
 		- 20150917@Victor: Support Chinese on Settings
 		- 20161025@Scofield: exclude Colossus Bet from ChargeInfo
 		- 20161031@bruce.bui: show CB and charge type
-		- 20170216@bruce.bui: sort product, include payername
+		- 20170216@bruce.bui:
+				+ sort product, include payername,
+				+ sort charge rate by expired
 	 Params:
 		+ @PayerId :specify Party
 		+ @@PayerGroup :	0 get all Party
@@ -131,8 +133,6 @@ BEGIN
 				WHERE DiscountGroupType = 2
 					AND @CurrentDate BETWEEN FromDate AND ToDate
 				) d2 ON c.PartyId = d2.PartyId --Rebate
-	--GROUP BY c.PartyId, pg.PartyGroupId, pg.PartyGroupName, c.ExchangeID, d1.DiscountGroupId	
-	--	, d1.DiscountGroupName, d2.DiscountGroupId, d2.DiscountGroupName
 
 	-- charge rate setting
 	SELECT c.ChargeId		AS ChargeId
@@ -146,10 +146,21 @@ BEGIN
 		, c.ChargeType
 		, c.FromDate
 		, c.ToDate
+		, ROW_NUMBER() OVER (PARTITION BY c.ProductId ORDER BY c.FromDate) RowNumber
+	INTO #ChargeRateSettings
 	FROM @ChargeInfo c
 	INNER JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
-	INNER JOIN @ProductOrder po ON pr.ProductID = po.ProductId
-	ORDER BY po.OrderNumber, c.FromDate
+
+	;WITH Rate AS(
+		SELECT c.*,po.OrderNumber, CASE WHEN RowNumber > 1 THEN 1 ELSE 0 END IsExpired
+		FROM #ChargeRateSettings c
+		INNER JOIN @ProductOrder po ON c.ProductID = po.ProductId
+	)
+	SELECT *
+	FROM Rate
+	ORDER BY IsExpired, OrderNumber
+
+	DROP TABLE #ChargeRateSettings
 
 	--Minfee Setting
 	SELECT  m.FeeId			AS MinFeeId
