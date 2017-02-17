@@ -27,7 +27,7 @@ BEGIN
 
 	DECLARE @Allbet INT = (SELECT PartyID FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyName='Allbet' AND PartyType=3)
 	DECLARE @RebateCommissionType INT = 11
-	DECLARE @DepositServiceCharge INT = 10
+	DECLARE @DepositServiceCharge INT = 9
 
 	-- ChargeRate
 	DECLARE @ChargeRate TABLE(
