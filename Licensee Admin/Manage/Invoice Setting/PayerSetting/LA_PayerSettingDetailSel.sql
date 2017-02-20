@@ -141,7 +141,7 @@ BEGIN
 			, c.ProductId		AS ProductId
 			, ProductName		AS ProductName
 			, FirstBilling		AS FirstBilling
-			, c.BasisOfBilling
+			, REPLACE(c.BasisOfBilling,'&amp;','&') BasisOfBilling
 			, c.BettypeRef
 			, c.Rate			AS Rate
 			, c.ChargeType
@@ -165,7 +165,7 @@ BEGIN
 		, FeeAmount
 		, CurrencyId
 		, e.Code			AS CurrencyName
-		, MinFeeTerm
+		, REPLACE(MinFeeTerm,'&amp;','&') MinFeeTerm
 		, FromDate
 		, ToDate
 	FROM @Minfee m
