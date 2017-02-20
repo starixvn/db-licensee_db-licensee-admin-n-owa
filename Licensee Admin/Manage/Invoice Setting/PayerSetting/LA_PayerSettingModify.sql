@@ -6,7 +6,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_PayerSettingModify] 	
+ALTER PROCEDURE [dbo].[LA_PayerSettingModify]
 	@PayerID				INT	
 	, @PayerGroupId			INT				= 0
 	, @DiscountGroupId		INT				= 0
@@ -27,6 +27,7 @@ AS
    
 	 Revisions:     
 		- 20150918@Victor: Support Chinese on Settings
+		- 20170220@bruce: update payer settings [#70050]
 	 Params:				
 */
 BEGIN
@@ -93,7 +94,6 @@ BEGIN
 	EXEC dbo.LA_MinFeeSettingModify
 		@PayerID				= @PayerID
 		, @MinFeeSettingXML		= @MinFeeSettingXML
-		, @ExchangeID			= @ExchangeID
 		, @UserID				= @UserID
 		, @LoginIP				= @LoginIP
 		, @ErrCode				= @ErrCode		OUTPUT
@@ -138,7 +138,6 @@ BEGIN
 	EXEC dbo.LA_ChargeRateSettingModify
 		@PayerID				= @PayerID
 		, @ChargeSettingXML		= @ChargeSettingXML
-		, @ExchangeID			= @ExchangeID
 		, @UserID				= @UserID
 		, @LoginIP				= @LoginIP
 		, @ErrCode				= @ErrCode		OUTPUT
@@ -163,5 +162,7 @@ BEGIN
 		END
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_PayerSettingModify] TO [vnteam] 
+
+GRANT VIEW DEFINITION ON [dbo].[LA_PayerSettingModify] TO [vnteam]
 GRANT EXECUTE ON [dbo].[LA_PayerSettingModify] TO bodbAdminNet
+GO
