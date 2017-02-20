@@ -70,59 +70,6 @@ BEGIN
 	FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
 	WHERE SPName = 'LA_ChargeRateSettingModify'
 
-	DECLARE @OldExchangeID INT
-
-	--backup old data, 	
-	SELECT @OldExchangeID = ISNULL(BaseCurrencyId, 0) FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE PartyID = @PayerID AND BaseCurrencyId IS NOT NULL
-
-	IF (ISNULL(@ExchangeID, 0)  <> ISNULL(@OldExchangeID, 0))
-	BEGIN
-		--build log string
-		SET @xml = (
-				SELECT @PayerID				AS '@fp'
-						, @OldExchangeID	AS '@e'				
-				FOR XML PATH('z'), ROOT('r')			
-				)
-		SET @logSPDataOld = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"');
-
-		UPDATE dbo.OAS_PartyDetail WITH( ROWLOCK, UPDLOCK)
-		SET BaseCurrencyId = @ExchangeID
-		WHERE PartyID = @PayerID
-
-		SET @xml = (
-				SELECT @PayerID				AS '@fp'
-						, @ExchangeID		AS '@e'				
-				FOR XML PATH('z'), ROOT('r')			
-				)
-		SET @logSPData = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"');		
-		SET @endRun = GETDATE()
-		SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
-
-		--Write Log		
-		BEGIN TRY
-			EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog 
-				@UserId = @UserID
-				, @IP = @LoginIP
-				, @LicenseeID = 0
-				, @CurrencyID = 0
-				, @SPName = 'LA_ChargeRateSettingModify'
-				, @CustId = 0
-				, @ActionId = @ActionID
-				, @Duration = @duration
-				, @Data = @logSPData
-				, @OldData = @logSPDataOld
-		END TRY
-		BEGIN CATCH
-			EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP 
-				@UserID = @UserID
-				, @CustID = 0
-				, @ActionID = @ActionID
-				, @TrackingValue = @LogSPData
-				, @TrackingValue2 = @logSPDataOld
-				, @duration = @duration
-		END CATCH
-	END
-
 	IF ISNULL(@ChargeSettingXML, '') = ''
 		RETURN
 	-- parse XML

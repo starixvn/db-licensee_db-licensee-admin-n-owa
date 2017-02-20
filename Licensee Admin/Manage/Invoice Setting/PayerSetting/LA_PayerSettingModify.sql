@@ -38,6 +38,8 @@ BEGIN
 	
 	DECLARE @OldPayerGroupId INT, @MinFeeInsertedList VARCHAR(100), @WaiveInsertedList VARCHAR(100)
 
+	IF (@ExchangeID IS NULL) SET @ExchangeID = (SELECT ISNULL(BaseCurrencyId, 0) FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE PartyID = @PayerID)
+
 	--backup old data
 	SELECT @OldPayerGroupId = ISNULL(a.PartyGroupId, 0) FROM dbo.LA_PartyGroupAssignment a WITH (NOLOCK) WHERE a.PartyId = @PayerID	
 	-- Payer Group Assignment
@@ -160,6 +162,60 @@ BEGIN
 				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM bodb02.dbo.strSplit(@WaiveInsertedList, ','))
 			RETURN
 		END
+
+	-- update payer setting
+	DECLARE @startRun DATETIME = GETDATE()
+	DECLARE @OldExchangeID INT = (SELECT ISNULL(BaseCurrencyId, 0) FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE PartyID = @PayerID)
+	IF (@ExchangeID <> ISNULL(@OldExchangeID, 0))
+	BEGIN
+		--build log string
+		DECLARE @logSPDataOld VARCHAR(200) = (
+			SELECT @PayerID			AS '@fp'
+				, @OldExchangeID	AS '@e'
+			FOR XML PATH('z'), ROOT('r')
+		)
+
+		UPDATE dbo.OAS_PartyDetail WITH(ROWLOCK, UPDLOCK)
+		SET BaseCurrencyId = @ExchangeID
+		WHERE PartyID = @PayerID
+
+		DECLARE @logSPData VARCHAR(200) = (
+			SELECT @PayerID		AS '@fp'
+				, @ExchangeID	AS '@e'
+			FOR XML PATH('z'), ROOT('r')
+		)
+		DECLARE @endRun DATETIME = GETDATE()
+		DECLARE @duration INT = DATEDIFF(MILLISECOND, @startRun, @endRun) 
+		DECLARE @ActionID INT = 0
+
+		SELECT @ActionID = ActionId
+		FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
+		WHERE SPName = 'LA_PayerSettingModify'
+
+		--Write Log
+		BEGIN TRY
+			EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog 
+				@UserId = @UserID
+				, @IP = @LoginIP
+				, @LicenseeID = 0
+				, @CurrencyID = 0
+				, @SPName = 'LA_PayerSettingModify'
+				, @CustId = 0
+				, @ActionId = @ActionID
+				, @Duration = @duration
+				, @Data = @logSPData
+				, @OldData = @logSPDataOld
+		END TRY
+		BEGIN CATCH
+			EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP
+				@UserID = @UserID
+				, @CustID = 0
+				, @ActionID = @ActionID
+				, @TrackingValue = @LogSPData
+				, @TrackingValue2 = @logSPDataOld
+				, @duration = @duration
+		END CATCH
+	END
 END
 GO
 
