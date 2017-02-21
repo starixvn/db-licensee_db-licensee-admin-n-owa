@@ -75,19 +75,20 @@ BEGIN
 		ChargeType		INT,
 		FromDate		DATE,
 		ToDate			DATE,
-		IsEdit			BIT)
+		StatusId		TINYINT)
 
 	DECLARE @ChargeRate AS TABLE (
 		ChargeID	INT,
 		ProductId	INT,
+		BettypeRef	INT,
 		FromDate	DATE,
 		ToDate		DATE)
 
 	DECLARE @idoc AS INT
 	EXEC sp_xml_preparedocument @idoc OUTPUT, @ChargeSettingXML
 	BEGIN TRY
-		INSERT INTO @ChargeSetting(ChargeId, ProductId, FirstBilling, BasisBilling, BettypeRef, Rate, ChargeType, FromDate, ToDate, IsEdit)
-		SELECT ISNULL(ChargeID, 0), ProductId, CASE WHEN FirstBilling='1900-01-01' THEN NULL ELSE FirstBilling END, BasisBilling, BettypeRef, Rate, ChargeType, FromDate, ToDate, 1
+		INSERT INTO @ChargeSetting(ChargeId, ProductId, FirstBilling, BasisBilling, BettypeRef, Rate, ChargeType, FromDate, ToDate, StatusId)
+		SELECT ISNULL(ChargeID, 0), ProductId, CASE WHEN FirstBilling='1900-01-01' THEN NULL ELSE FirstBilling END, BasisBilling, BettypeRef, Rate, ChargeType, FromDate, ToDate, 1/*new settings*/
 		FROM OPENXML(@idoc, 'ChargeSettings/ChargeSetting')
 		WITH (
 			 ChargeId		INT				'ChargeId'
@@ -133,27 +134,37 @@ BEGIN
 	WHERE ci.FromParty = @PayerID
 	
 	-- check overlap time charge
-	INSERT INTO @ChargeSetting(ChargeId, ProductId,  BettypeRef, ChargeType, FromDate, ToDate, IsEdit)
-	SELECT a.ChargeId, a.ProductId, a.Bettype, b.ChargeType, a.FromDate, a.ToDate, 0
-	FROM dbo.LA_f_ChargeInfo(@PayerID, @MinDate, @MaxDate ,@ProductListAll, 'OA', 1) a
+	INSERT INTO @ChargeRate(ChargeId, ProductId,  BettypeRef, FromDate, ToDate)
+	SELECT ChargeId,ProductId, Bettype, FromDate, ToDate
+	FROM dbo.LA_f_ChargeInfo(@PayerID, @MinDate, @MaxDate ,@ProductListAll, 'OA', 1)
+
+	INSERT INTO @ChargeSetting(ChargeId, ProductId,  BettypeRef, ChargeType, FromDate, ToDate, StatusId)
+	SELECT a.ChargeId, a.ProductId, a.BettypeRef, b.ChargeType, a.FromDate, a.ToDate, 0/*original settings*/
+	FROM @ChargeRate a
 		INNER JOIN dbo.OAS_ChargeInfo b WITH (NOLOCK) ON a.ChargeID = b.ChargeID
 	WHERE a.ChargeID NOT IN (SELECT ChargeID FROM @ChargeSetting)
 		AND a.ProductId IN (SELECT ProductId FROM @ChargeSetting)
 
 	---check case Update , compare new data with old config
 	IF NOT EXISTS (
-			SELECT TOP 1 1
-			FROM @ChargeSetting a LEFT JOIN @ChargeSetting b ON a.Idx != b.Idx AND a.ChargeType = b.ChargeType AND a.ProductId = b.ProductId AND (
-				a.ProductId NOT IN (14,17) OR
-				a.BettypeRef = b.BettypeRef
-			)
-			WHERE  (a.FromDate BETWEEN b.FromDate AND b.ToDate
-						OR a.ToDate BETWEEN b.FromDate AND b.ToDate
-						OR b.FromDate BETWEEN a.FromDate AND a.ToDate
-						OR b.ToDate BETWEEN a.FromDate AND a.ToDate
-					))
+		SELECT TOP 1 1
+		FROM @ChargeSetting a LEFT JOIN @ChargeSetting b ON a.Idx != b.Idx AND a.ChargeType = b.ChargeType AND a.ProductId = b.ProductId AND (
+			a.ProductId NOT IN (14,17) OR
+			a.BettypeRef = b.BettypeRef
+		)
+		WHERE  (a.FromDate BETWEEN b.FromDate AND b.ToDate
+					OR a.ToDate BETWEEN b.FromDate AND b.ToDate
+					OR b.FromDate BETWEEN a.FromDate AND a.ToDate
+					OR b.ToDate BETWEEN a.FromDate AND a.ToDate
+				))
 	BEGIN
-		DELETE @ChargeSetting WHERE IsEdit = 0
+		-- remove original settings
+		DELETE @ChargeSetting WHERE StatusId = 0
+
+		-- new product
+		UPDATE s SET s.StatusId = 2 /*new product*/
+		FROM @ChargeSetting s
+		WHERE s.ProductID NOT IN (SELECT ProductId FROM @ChargeRate)
 
 		-- write log
 		-- build log string
@@ -233,6 +244,14 @@ BEGIN
 			FROM @MergeResult m
 			WHERE m.ProductId IN (SELECT p.ProductId FROM dbo.LRF_f_Products3rd('SB,NG,VS,LC,BA,AGC,GD,VG') p)
 				AND m.[$action] = 'INSERT'
+		END
+
+		-- add licensee/function permission
+		WHILE EXISTS (SELECT TOP 1 1 FROM @ChargeSetting WHERE StatusId = 2)
+		BEGIN
+			DECLARE @ProductId INT = (SELECT TOP 1 ProductId FROM @ChargeSetting WHERE StatusId = 2)
+			EXEC dbo.LA_FunctionPartiesPermission @PartyId=@PayerID, @ProductId=@ProductId
+			UPDATE  @ChargeSetting SET StatusId = 1 WHERE StatusId = 2 AND ProductId = @ProductId
 		END
 
 		IF @@ERROR <> 0
