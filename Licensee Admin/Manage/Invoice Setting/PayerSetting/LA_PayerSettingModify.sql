@@ -116,7 +116,6 @@ BEGIN
 	EXEC dbo.LA_MinFeeSettingModify
 		@PayerID				= @PayerID
 		, @MinFeeSettingXML		= @WaiveSettingXML
-		, @ExchangeID			= @ExchangeID
 		, @UserID				= @UserID
 		, @LoginIP				= @LoginIP
 		, @ErrCode				= @ErrCode		OUTPUT
