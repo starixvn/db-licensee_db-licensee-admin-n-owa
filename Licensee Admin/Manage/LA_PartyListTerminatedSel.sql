@@ -1,7 +1,8 @@
 USE [bodb_licensee]
 GO
 
-CREATE PROCEDURE [dbo].[LA_PartyListTerminatedSel]
+ALTER PROCEDURE [dbo].[LA_PartyListTerminatedSel]
+	@UserID		INT	   = 0
 AS
 /*
 	Created: 20170223@scofield.huynh
@@ -31,13 +32,14 @@ BEGIN
 	SELECT p.PartyID, p.PartyName, d.BrandName, 1001 AS ParentID
 	FROM dbo.OAS_Party p WITH(NOLOCK)
 	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID = d.PartyID
+	INNER JOIN dbo.LA_UserParty up WITH (NOLOCK) ON p.PartyID = up.PartyID
 	WHERE p.PartyID IN (
 		SELECT FromParty 
 		FROM (SELECT FromParty AS FromParty, MAX(ToDate) AS ToDate 
 			  FROM OAS_ChargeInfo
 			  GROUP BY FromParty) candidateParties
 		WHERE ToDate < CONVERT(DATE, GETDATE())
-	) AND p.PartyType = 1 AND d.IsDeposit = 1 AND d.StatusId = 1
+	) AND p.PartyType = 1 AND d.IsDeposit = 1 AND d.StatusId = 1 AND up.UserID = @UserID
 
 	UNION ALL
 
