@@ -14,7 +14,8 @@ AS
 	 Task : get All Launched Products
 	 DB: DB052.bodb_Licensee  
    
-	 Revisions:     		  
+	 Revisions:     	
+		- 20170301@Scofield: Update to exclude 'RB', 'BG', 'PTCS', 'HF' and inclucde 'SB'
 	 Example:
 		EXEC dbo.LA_ProductListLauchedSel
 */
@@ -35,7 +36,14 @@ BEGIN
 		LEFT JOIN OAS_PartyDetail pd ON p.PartyID = pd.PartyID
 		LEFT JOIN dbo.labels lb(NOLOCK) ON p.OldRefID = lb.LicenseeID
 		WHERE p.PartyID = @PayerId
-	)
+	) AND p.ProductPrefix NOT IN ('RB', 'BG', 'PTCS', 'HF')
+	
+	UNION
+	
+	SELECT p.ProductID, p.ProductPrefix, p.ProductName
+	FROM dbo.LA_f_Products3rd('') p
+	WHERE p.ProductPrefix = 'SB'
+	
 END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_ProductListLauchedSel] TO [vnteam] 
