@@ -23,6 +23,7 @@ AS
 		- 20170215@Scofield: Update check overlap and update system mapping
 		- 20170220@bruce:	- remove update payer's base curency
 							- refactor sp
+		- 20170301@Scofield: update effective date for LicenseeProduct3rd
 
 	 Params:
 		+ @InvoiceSettingXML: '<ChargeSettings>
@@ -213,6 +214,34 @@ BEGIN
 		INNER JOIN @MergeResult m ON m.ChargeId = ci.ChargeID
 		INNER JOIN @ChargeSetting c ON ci.ProductID = c.ProductId AND c.FromDate = ci.FromDate
 		WHERE m.[$action]='INSERT'
+		
+		-- update effective date for LicenseeProduct3rd
+		DECLARE @EffectiveDates TABLE (LicenseeId INT, ProductId INT, EffectiveDate SMALLDATETIME)
+		
+		INSERT INTO @EffectiveDates (LicenseeId, ProductId, EffectiveDate)
+		SELECT tmpLicensees.LicenseeID, tmpDates.ProductId, MIN(tmpDates.FromDate)
+		FROM 		
+			(SELECT @PayerID AS PayerId, c.ProductId, c.FromDate
+			FROM @MergeResult m
+			INNER JOIN @ChargeSetting c ON m.ChargeId = c.ChargeID
+			WHERE m.[$action]='INSERT') tmpDates
+		INNER JOIN
+			(SELECT
+				@PayerId AS PayerId,
+				CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID
+				ELSE lb.LabelID END AS LicenseeID
+			FROM OAS_Party p
+			LEFT JOIN OAS_PartyDetail pd ON p.PartyID = pd.PartyID
+			LEFT JOIN dbo.labels lb(NOLOCK) ON p.OldRefID = lb.LicenseeID
+			WHERE p.PartyID = @PayerId) tmpLicensees
+		ON tmpDates.PayerId = tmpLicensees.PayerId
+		GROUP BY tmpLicensees.LicenseeID, tmpDates.ProductId
+		
+		UPDATE lp
+		SET lp.EffectiveDate = ed.EffectiveDate
+		FROM dbo.LicenseeProduct3rd lp
+		INNER JOIN @EffectiveDates ed ON lp.LicenseeID = ed.LicenseeId AND lp.ProductID = ed.ProductId
+		WHERE lp.EffectiveDate IS NULL		
 
 		-- update charege info & charge info sub (MGC)
 		;MERGE dbo.OAS_ChargeInfoSub WITH (ROWLOCK, UPDLOCK) AS t
