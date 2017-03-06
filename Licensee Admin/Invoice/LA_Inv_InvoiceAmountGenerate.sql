@@ -860,10 +860,12 @@ BEGIN
 				ProductName = LEFT(ProductName, LEN(ProductName) - 1)
 		WHERE	ProductId = -1
 
-		-- include BA amount = 0
-		IF	EXISTS(SELECT 1 FROM @PartyChargeInfo WHERE ProductID = 3/*BA*/ AND PartyId=@PartyId) AND
-			NOT EXISTS (SELECT 1 FROM @FinalResult WHERE ProductId = 3/*BA*/) AND
-			@InvoiceType = 1/*Software*/
+		-- Include BA amount = 0
+		-- ProductID BA: 3
+		-- InvoiceType Software: 1
+		IF	EXISTS(SELECT 1 FROM @PartyChargeInfo WHERE ProductID = 3 AND PartyId=@PartyId) AND
+			NOT EXISTS (SELECT 1 FROM @FinalResult WHERE ProductId = 3) AND
+			@InvoiceType = 1
 		BEGIN
 			INSERT INTO @FinalResult VALUES (3, 'BA', 'BA', 0, 0, NULL)
 		END
