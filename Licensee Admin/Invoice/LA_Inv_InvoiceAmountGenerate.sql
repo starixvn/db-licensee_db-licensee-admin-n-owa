@@ -36,8 +36,9 @@ AS
 		+ 2016.07.19 @Bruce.Bui: Adding hosting fees extra info.
 		+ 2016.09.27 @Bruce.Bui: Get MaxPCU case full month waive
 		+ 2016.10.24 @Bruce.Bui: Add new discount type = 3
-        + 2016.09.27 @Bruce.Bui: Get MaxPCU case full month waive
+		+ 2016.09.27 @Bruce.Bui: Get MaxPCU case full month waive
 		+ 2016.11.04 @Scofield.Huynh: Update for CB
+		+ 2017.03.06 @bruce: include BA amount =0
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -858,6 +859,16 @@ BEGIN
 		SET		ProductCode = LEFT(ProductCode, LEN(ProductCode) - 1),
 				ProductName = LEFT(ProductName, LEN(ProductName) - 1)
 		WHERE	ProductId = -1
+
+		-- Include BA amount = 0
+		-- ProductID BA: 3
+		-- InvoiceType Software: 1
+		IF	EXISTS(SELECT 1 FROM @PartyChargeInfo WHERE ProductID = 3 AND PartyId=@PartyId) AND
+			NOT EXISTS (SELECT 1 FROM @FinalResult WHERE ProductId = 3) AND
+			@InvoiceType = 1
+		BEGIN
+			INSERT INTO @FinalResult VALUES (3, 'BA', 'BA', 0, 0, NULL)
+		END
 
 		SELECT	f.ProductId,
 				f.ProductCode,
