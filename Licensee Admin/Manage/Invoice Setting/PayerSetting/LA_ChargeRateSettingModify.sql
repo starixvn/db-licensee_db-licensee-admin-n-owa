@@ -24,6 +24,7 @@ AS
 		- 20170220@bruce:	- remove update payer's base curency
 							- refactor sp
 		- 20170301@Scofield: update effective date for LicenseeProduct3rd
+		- 20170307@Scofield: update to not save rate, basic billing, first billing for MGC
 
 	 Params:
 		+ @InvoiceSettingXML: '<ChargeSettings>
@@ -205,8 +206,11 @@ BEGIN
 			, t.FromDate = s.FromDate
 			, t.ToDate = s.ToDate
 		WHEN NOT MATCHED BY TARGET AND (s.ProductId NOT IN (14,17) OR s.BettypeRef = 2001)
-			THEN INSERT(ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, Remark, FirstOfBilling, BasisOfBilling)
-			VALUES(s.ProductId, @PayerID, @ToParty, @ParentChargeID, s.Rate, s.ChargeType, s.FromDate, s.ToDate, @Remark, s.FirstBilling, s.BasisBilling)
+			THEN INSERT(ProductID, FromParty, ToParty, ParentChargeID, ChargeType, FromDate, ToDate, Remark, Rate, FirstOfBilling, BasisOfBilling)
+			VALUES(s.ProductId, @PayerID, @ToParty, @ParentChargeID, s.ChargeType, s.FromDate, s.ToDate, @Remark, 
+				CASE WHEN (s.BettypeRef = 2001) THEN NULL ELSE s.Rate END, 
+				CASE WHEN (s.BettypeRef = 2001) THEN NULL ELSE s.FirstBilling END, 
+				CASE WHEN (s.BettypeRef = 2001) THEN NULL ELSE s.BasisBilling END)
 		OUTPUT INSERTED.ChargeID, INSERTED.ProductId, $action INTO @MergeResult;
 
 		-- update new charge id to @ChargeSetting
