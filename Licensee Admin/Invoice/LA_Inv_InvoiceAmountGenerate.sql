@@ -39,6 +39,7 @@ AS
 		+ 2016.09.27 @Bruce.Bui: Get MaxPCU case full month waive
 		+ 2016.11.04 @Scofield.Huynh: Update for CB
 		+ 2017.03.06 @bruce: include BA amount =0
+		+ 2017.03.07 @Scofield: include amount = 0 for all products
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -860,14 +861,18 @@ BEGIN
 				ProductName = LEFT(ProductName, LEN(ProductName) - 1)
 		WHERE	ProductId = -1
 
-		-- Include BA amount = 0
-		-- ProductID BA: 3
 		-- InvoiceType Software: 1
-		IF	EXISTS(SELECT 1 FROM @PartyChargeInfo WHERE ProductID = 3 AND PartyId=@PartyId) AND
-			NOT EXISTS (SELECT 1 FROM @FinalResult WHERE ProductId = 3) AND
-			@InvoiceType = 1
+		IF @InvoiceType = 1			
 		BEGIN
-			INSERT INTO @FinalResult VALUES (3, 'BA', 'BA', 0, 0, NULL)
+			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, AmountType)
+			SELECT pd.ProductID, pd.ProductPrefix, pd.ProductPrefix, 0, 0
+			FROM
+				(SELECT DISTINCT pci.ProductID 
+				FROM @PartyChargeInfo pci
+				LEFT JOIN @FinalResult r ON pci.ProductID = r.ProductId
+				WHERE r.ProductId IS NULL) p
+				JOIN
+				dbo.LA_f_Products3rd('') pd ON p.ProductID = pd.ProductID	
 		END
 
 		SELECT	f.ProductId,
