@@ -198,12 +198,13 @@ BEGIN
 		-- update charege info (product without bettype ref)
 		;MERGE dbo.OAS_ChargeInfo WITH (ROWLOCK, UPDLOCK) AS t
 		USING @ChargeSetting s ON t.ChargeID = s.ChargeID
-		WHEN MATCHED THEN UPDATE SET t.FirstOfBilling = s.FirstBilling
+		WHEN MATCHED AND (s.ProductId NOT IN (14,17) OR s.BettypeRef = 2001)
+			THEN UPDATE SET t.FirstOfBilling = s.FirstBilling
 			, t.BasisOfBilling = s.BasisBilling
 			, t.Rate = s.Rate
 			, t.FromDate = s.FromDate
 			, t.ToDate = s.ToDate
-		WHEN NOT MATCHED BY TARGET AND (ISNULL(s.BettypeRef, 0) = 0 OR (s.BettypeRef = 2001 AND s.ProductId IN(14,17))/*insert a reference charge rate setting for 14,17*/)
+		WHEN NOT MATCHED BY TARGET AND (s.ProductId NOT IN (14,17) OR s.BettypeRef = 2001)
 			THEN INSERT(ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, Remark, FirstOfBilling, BasisOfBilling)
 			VALUES(s.ProductId, @PayerID, @ToParty, @ParentChargeID, s.Rate, s.ChargeType, s.FromDate, s.ToDate, @Remark, s.FirstBilling, s.BasisBilling)
 		OUTPUT INSERTED.ChargeID, INSERTED.ProductId, $action INTO @MergeResult;
