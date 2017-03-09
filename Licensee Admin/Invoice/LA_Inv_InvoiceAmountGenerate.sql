@@ -38,8 +38,8 @@ AS
 		+ 2016.10.24 @Bruce.Bui: Add new discount type = 3
 		+ 2016.09.27 @Bruce.Bui: Get MaxPCU case full month waive
 		+ 2016.11.04 @Scofield.Huynh: Update for CB
-		+ 2017.03.06 @bruce: include BA amount =0
-		+ 2017.03.07 @Scofield: include amount = 0 for all products
+		+ 2017.03.06 @bruce: include BA amount =0 [RedmindID: #72806]
+		+ 2017.03.07 @Scofield: include amount = 0 for all products [RedmindID: #72806]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
