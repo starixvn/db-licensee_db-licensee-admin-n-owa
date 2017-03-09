@@ -42,6 +42,7 @@ AS
 		- 20150813@Florent: support multicharge rate - Microgaming
 		- 20160315@Victor: support Microgaming - RNG product
 		- 20161214@Jim:Invoice - Setup fees [RedmineID : #65260 ]
+		- 20170309@Harper: Add BaseCurrencyID For MinFee and PartyDetail
 
 	Param's Explanation:
 */
@@ -107,8 +108,8 @@ BEGIN
 			FROM dbo.OAS_PartyDetail WITH (NOLOCK)
 			WHERE PartyID = @FromPartyId)
 		BEGIN
-			INSERT INTO dbo.OAS_PartyDetail (PartyID, IsDeposit, BrandName, CompanyName, IsAllowedMemberComm)
-			SELECT @FromPartyId, IsDeposit, BrandName, CompanyName, IsAllowedMemberComm
+			INSERT INTO dbo.OAS_PartyDetail (PartyID, IsDeposit, BrandName, CompanyName, IsAllowedMemberComm, BaseCurrencyId)
+			SELECT @FromPartyId, IsDeposit, BrandName, CompanyName, IsAllowedMemberComm, @BaseCurrencyId
 			FROM dbo.licensees WITH (NOLOCK)
 			WHERE LicenseeName = @FromPartyName
 		END
