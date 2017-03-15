@@ -7,7 +7,7 @@ ALTER PROCEDURE [dbo].[LA_FunctionPartiesPermission]
 AS
 /*	Header:
 	Created: 20170221@Bruce
-	Task : Add function permission for licensee
+	Task : #70050: Add function permission for licensee
 	DB: DB052.bodb_Licensee
 */
 BEGIN

@@ -15,7 +15,7 @@ AS
 
  Revisions:
 	- 20170113@bruce: checking launchDate to exclude trial data
-	- 20170217@bruce: change deposit service charge to 9
+	- 20170217@bruce: change deposit service charge to 9 [#70050]
 
  Param's Explanation:
 	- @FromDate			: From date

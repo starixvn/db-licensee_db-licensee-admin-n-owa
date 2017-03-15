@@ -19,7 +19,7 @@ AS
   - 20170208@bruce.bui: include terminated licensees
   - 20170214@bruce.bui: show sub charge type
   - 20170215@bruce.bui: sort product
-  - 20170315@Scofield: hard code for Bettrade BA
+  - 20170315@Scofield: hard code for Bettrade BA [#70050]
 
   Params:
   + @PayerId : 0 get all Party

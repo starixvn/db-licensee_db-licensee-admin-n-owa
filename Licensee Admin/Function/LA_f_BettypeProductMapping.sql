@@ -32,7 +32,7 @@ AS
 		- 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
 		- 20160808@Jim:  LRF - Integrate Allbet [Redmine: #61066]
 		- 20161115@Jim: LRF - Integrate new product Fishing World [RedmineID : #66737]
-		- 20170221@bruce: support NG2
+		- 20170221@bruce: support NG2 [#70050]
 
 	Param's Explanation:
 

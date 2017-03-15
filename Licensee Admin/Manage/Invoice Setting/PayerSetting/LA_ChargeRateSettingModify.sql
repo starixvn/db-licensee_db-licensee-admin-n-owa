@@ -24,7 +24,7 @@ AS
 		- 20170220@bruce:	- remove update payer's base curency
 							- refactor sp
 		- 20170301@Scofield: update effective date for LicenseeProduct3rd
-		- 20170307@Scofield: update to not save rate, basic billing, first billing for MGC
+		- 20170307@Scofield: update to not save rate, basic billing, first billing for MGC[#70050]
 
 	 Params:
 		+ @InvoiceSettingXML: '<ChargeSettings>

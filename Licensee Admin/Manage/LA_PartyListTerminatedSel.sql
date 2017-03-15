@@ -6,7 +6,7 @@ ALTER PROCEDURE [dbo].[LA_PartyListTerminatedSel]
 AS
 /*
 	Created: 20170223@scofield.huynh
-	Task : Get list of terminated payers
+	Task : Get list of terminated payers [#70050]
 	DB: DB052.bodb_Licensee
 
 	Revisions:

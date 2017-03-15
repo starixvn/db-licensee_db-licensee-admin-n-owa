@@ -15,7 +15,7 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:     	
-		- 20170301@Scofield: Update to exclude 'RB', 'BG', 'PTCS', 'HF' and inclucde 'SB'
+		- 20170301@Scofield: Update to exclude 'RB', 'BG', 'PTCS', 'HF' and inclucde 'SB' [#70050]
 	 Example:
 		EXEC dbo.LA_ProductListLauchedSel
 */

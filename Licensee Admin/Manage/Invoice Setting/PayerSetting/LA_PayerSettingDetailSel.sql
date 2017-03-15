@@ -21,7 +21,7 @@ AS
 		- 20150917@Victor: Support Chinese on Settings
 		- 20161025@Scofield: exclude Colossus Bet from ChargeInfo
 		- 20161031@bruce.bui: show CB and charge type
-		- 20170216@bruce.bui:
+		- 20170216@bruce.bui: [#70050]
 				+ sort product, include payername,
 				+ sort charge rate by expired
 	 Params:
