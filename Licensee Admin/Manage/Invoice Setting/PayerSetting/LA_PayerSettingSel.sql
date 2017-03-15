@@ -19,6 +19,7 @@ AS
   - 20170208@bruce.bui: include terminated licensees
   - 20170214@bruce.bui: show sub charge type
   - 20170215@bruce.bui: sort product
+  - 20170315@Scofield: hard code for Bettrade BA
 
   Params:
   + @PayerId : 0 get all Party
@@ -144,6 +145,12 @@ BEGIN
 			LEFT JOIN dbo.OAS_ChargeInfoSub s WITH(NOLOCK) ON ci.ChargeID = s.ChargeIdRef
 			LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON pd.BaseCurrencyId = e.exchangeid
 		WHERE @CurrentDate BETWEEN c.Fromdate AND c.Todate
+
+	-- Hard code for Bettrade BA
+	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)
+	SELECT ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, 0, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, 12
+	FROM @ChargeInfo
+	WHERE ProductId = 13
 
 	INSERT INTO @Minfee (PartyId, ProductId, FeeTypeId, FeeAmount, FromDate, ToDate)
 		SELECT
