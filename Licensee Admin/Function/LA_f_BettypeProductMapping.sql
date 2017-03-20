@@ -32,6 +32,8 @@ AS
 		- 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
 		- 20160808@Jim:  LRF - Integrate Allbet [Redmine: #61066]
 		- 20161115@Jim: LRF - Integrate new product Fishing World [RedmineID : #66737]
+		- 20170221@bruce: support NG2 [#70050]
+
 	Param's Explanation:
 
 */
@@ -212,12 +214,21 @@ BEGIN
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
 	END
 	
-	 IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'FW')
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'FW')
 	BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 24
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid  BETWEEN 1011 AND 1020
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+	END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'NG2')
+	BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 23
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid  BETWEEN 2501 AND 2699
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
 	END
 	

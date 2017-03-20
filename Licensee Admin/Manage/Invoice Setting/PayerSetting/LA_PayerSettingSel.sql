@@ -1,55 +1,55 @@
 USE [bodb_licensee]
 GO
 
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
+ALTER PROCEDURE [dbo].[LA_PayerSettingSel]
+  @PayerId			INT = 0
+ ,@PayerGroup		INT = 0
+ ,@DiscountGroup	INT = 0
+ ,@RebateGroup		INT = 0
+AS
+/*
+  Created: 20150420@Florent
+  Task : Get Payer setting
+  DB: DB052.bodb_Licensee
 
-ALTER PROCEDURE [dbo].[LA_PayerSettingSel]      
- @PayerId   INT = 0    
- , @PayerGroup  INT = 0    
- , @DiscountGroup INT = 0    
- , @RebateGroup  INT = 0    
-AS    
-/*      
-  Created: 20150420@Florent    
-  Task : Get Payer setting    
-  DB: DB052.bodb_Licensee      
-       
-  Revisions:             
-  - 20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail    
+  Revisions:
+  - 20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
   - 20161025@Scofield: exclude Colossus Bet from ChargeInfo
   - 20161031@bruce.bui: include CB, charge type
-  Params:    
-  + @PayerId : 0 get all Party    
-     <> 0 specify Party    
-  + @@PayerGroup : 0 get all Party    
-       <> 0 specify Party    
-  + @@DiscountGroup : 0 get all Party    
-       <> 0 specify Party    
-  + @@RebateGroup : 0 get all Party    
-       <> 0 specify Party    
-  Example:    
-      
-*/    
+  - 20170208@bruce.bui: include terminated licensees
+  - 20170214@bruce.bui: show sub charge type
+  - 20170215@bruce.bui: sort product
+  - 20170315@Scofield: hard code for Bettrade BA [#70050]
+
+  Params:
+  + @PayerId : 0 get all Party
+     <> 0 specify Party
+  + @@PayerGroup : 0 get all Party
+       <> 0 specify Party
+  + @@DiscountGroup : 0 get all Party
+       <> 0 specify Party
+  + @@RebateGroup : 0 get all Party
+       <> 0 specify Party
+  Example:
+
+*/
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @ProductListAll VARCHAR(100) = '',
-			@ListParty VARCHAR(500) = '', 
-			@MinDate DATE, 
-			@MaxDate DATE, 
+			@ListParty VARCHAR(500) = '',
+			@MinDate DATE,
+			@MaxDate DATE,
 			@CurrentDate DATE
 	SET @CurrentDate = CONVERT(DATE, GETDATE())
-	DECLARE @ChargeInfo AS TABLE(ChargeId INT, PartyId INT, PartyName VARCHAR(100), PartyGroupId INT, PartyGroupName VARCHAR(100), ProductId INT, ProductName VARCHAR(100), 
-			BettypeRef INT,Rate MONEY, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), ExchangeID INT, ExchangeName VARCHAR(50), ChargeType TINYINT)
+	DECLARE @ChargeInfo AS TABLE(ChargeId INT, PartyId INT, PartyName VARCHAR(100), PartyGroupId INT, PartyGroupName VARCHAR(100), ProductId INT, ProductName VARCHAR(100),
+			BettypeRef INT,Rate MONEY, FromDate DATE, ToDate DATE, FirstBilling DATE, ExchangeID INT, ExchangeName VARCHAR(50), ChargeType TINYINT)
 	CREATE TABLE #Temp_ChargeInfo(ChargeId INT, PartyID INT, ProductID INT, BettypeRef INT,Rate MONEY, Fromdate DATE, Todate DATE)
 
 	DECLARE @Minfee AS TABLE(PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, FromDate DATE, ToDate DATE)
 	DECLARE @Discount AS TABLE(PartyId INT, ProductId INT, FromDate DATE, ToDate DATE, DiscountGroupId INT, FromAmount MONEY, ToAmount MONEY, Rate MONEY, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
 	DECLARE @ChargeDetail AS TABLE(ChargeID INT, PartyID INT, ProductID INT, BettypeRef INT,DI_Rate MONEY, Fromdate DATE, Todate DATE)
 
-	--Get list licensee,     
+	--Get list licensee,
 	SELECT	@ListParty = @ListParty + CAST(p.PartyID AS VARCHAR) + ','
 	FROM	dbo.OAS_Party p WITH (NOLOCK)
 			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK)
@@ -64,12 +64,12 @@ BEGIN
 			OR pga.PartyGroupId = @PayerGroup)
 
 	SET @ListParty = SUBSTRING(@ListParty, 0, LEN(@ListParty))
-	--get list Product    
+	--get list Product
 	SELECT	@ProductListAll = @ProductListAll + ProductPrefix + ','
 	FROM	dbo.LA_f_Products3rd('')
 	SET @ProductListAll = REPLACE(SUBSTRING(@ProductListAll, 0, LEN(@ProductListAll)), 'RB', '')
 
-	--get Minium date, maximum date    
+	--get Minium date, maximum date
 	SELECT	@MinDate = MIN(ci.FromDate),
 			@MaxDate = MAX(ci.ToDate)
 	FROM	dbo.OAS_ChargeInfo ci WITH (NOLOCK)
@@ -82,10 +82,10 @@ BEGIN
 			ChargeID,
 			PartyID,
 			ProductID,
-			CASE WHEN ProductID IN (14,17) THEN 
+			CASE WHEN ProductID IN (14,17) THEN
 					Bettype
 				 ELSE 0 END
-			AS BettypeRef, 
+			AS BettypeRef,
 			DI_Rate,
 			Fromdate,
 			Todate
@@ -134,7 +134,7 @@ BEGIN
 			CASE WHEN c.ProductID IN (14,17) THEN s.FirstOfBilling ELSE ci.FirstOfBilling END,
 			pd.BaseCurrencyId,
 			ISNULL(e.Code, '') AS ExchangeName,
-			ci.ChargeType
+			CASE WHEN c.ProductID IN (14,17) THEN s.ChargeType ELSE ci.ChargeType END
 		FROM #Temp_ChargeInfo c
 			INNER JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID
 			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
@@ -145,6 +145,12 @@ BEGIN
 			LEFT JOIN dbo.OAS_ChargeInfoSub s WITH(NOLOCK) ON ci.ChargeID = s.ChargeIdRef
 			LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON pd.BaseCurrencyId = e.exchangeid
 		WHERE @CurrentDate BETWEEN c.Fromdate AND c.Todate
+
+	-- Hard code for Bettrade BA
+	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)
+	SELECT ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, 0, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, 12
+	FROM @ChargeInfo
+	WHERE ProductId = 13
 
 	INSERT INTO @Minfee (PartyId, ProductId, FeeTypeId, FeeAmount, FromDate, ToDate)
 		SELECT
@@ -195,96 +201,134 @@ BEGIN
 					d.ToAmount,
 					d.Rate
 
-	--result    
-	SELECT DISTINCT
-		c.PartyId		AS PayerID,
-		PartyName		AS PayerName,
-		PartyGroupId	AS PayerGroupID,
-		PartyGroupName	AS PayerGroupName,
-		c.ProductId		AS ProductId,
-		ProductName		AS ProductName,
-		FirstBilling	AS FirstBilling,
-		ISNULL(m.FeeAmount, 0) AS MinFee,
-		w.FromDate		AS WaiveFrom,
-		w.ToDate		AS WaiveTo,
-		d.DiscountGroupName AS DiscountGroupName,
-		STUFF((SELECT
-				';' + ' Amount From: ' + CONVERT(VARCHAR(100), ii.FromAmount) + ' - '
-				+ 'Amount To: ' + CASE
-					WHEN ii.ToAmount = 10000000000000 THEN 'Unlimited'
-					ELSE CONVERT(VARCHAR(100), ii.ToAmount)
-				END + ' - '
-				+ 'Rate: ' + CONVERT(VARCHAR(10), ii.Rate * 100) + '%'
-			FROM @Discount ii
-			WHERE d.DiscountGroupId = ii.DiscountGroupId
-				AND d.ProductId = ii.ProductId
-				AND d.PartyId = ii.PartyId
-				FOR XML PATH ('')), 1, 2, '') AS DiscountGroupValues,
-			r.DiscountGroupName AS RebateGroupName,
-		STUFF((SELECT
-				';' + ' Rate: ' + CONVERT(VARCHAR(10), ii.Rate * 100) + '%'
-			FROM @Discount ii
-			WHERE r.DiscountGroupId = ii.DiscountGroupId
-			AND r.ProductId = ii.ProductId
-			AND r.PartyId = ii.PartyId
-			GROUP BY	ii.DiscountGroupId,
-						ii.Rate
-			FOR XML PATH ('')), 1, 2, '') AS RebateGroupValues,
-		c.BettypeRef,
-		c.Rate AS Rate,
-		c.ExchangeID AS ExchangeID,
-		c.ExchangeName AS ExchangeName,
-		c.ChargeType
-	FROM @ChargeInfo c
-		LEFT JOIN @Minfee m
-			ON c.PartyId = m.PartyId
-			AND c.ProductId = m.ProductId
-			AND (c.FromDate BETWEEN m.FromDate AND m.ToDate
-			OR c.ToDate BETWEEN m.FromDate AND m.ToDate
-			OR m.FromDate BETWEEN c.FromDate AND c.ToDate
-			OR m.ToDate BETWEEN c.FromDate AND c.ToDate
-			)
-			AND m.FeeTypeId = 1 -- Miniumfee    
-		LEFT JOIN @Minfee w
-			ON c.PartyId = w.PartyId
-			AND c.ProductId = w.ProductId
-			AND (c.FromDate BETWEEN w.FromDate AND w.ToDate
-			OR c.ToDate BETWEEN w.FromDate AND w.ToDate
-			OR w.FromDate BETWEEN c.FromDate AND c.ToDate
-			OR w.ToDate BETWEEN c.FromDate AND c.ToDate
-			)
-			AND w.FeeTypeId = 2 -- waive    
-		LEFT JOIN @Discount d
-			ON d.PartyId = c.PartyId
-			AND d.ProductId = c.ProductId
-			AND (c.FromDate BETWEEN d.FromDate AND d.ToDate
-			OR c.ToDate BETWEEN d.FromDate AND d.ToDate
-			OR d.FromDate BETWEEN c.FromDate AND c.ToDate
-			OR d.ToDate BETWEEN c.FromDate AND c.ToDate
-			)
-			AND d.DiscountGroupType = 1 -- discount    
-		LEFT JOIN @Discount r
-			ON r.PartyId = c.PartyId
-			AND r.ProductId = c.ProductId
-			AND (c.FromDate BETWEEN r.FromDate AND r.ToDate
-			OR c.ToDate BETWEEN r.FromDate AND r.ToDate
-			OR r.FromDate BETWEEN c.FromDate AND c.ToDate
-			OR r.ToDate BETWEEN c.FromDate AND c.ToDate
-			)
-			AND r.DiscountGroupType = 2 -- rebate    
-	WHERE ((@DiscountGroup = 0)
-		OR (@DiscountGroup <> 0
-		AND d.DiscountGroupId = @DiscountGroup
-		AND d.DiscountGroupType = 1))
-		AND ((@RebateGroup = 0)
-		OR (@RebateGroup <> 0
-		AND r.DiscountGroupId = @RebateGroup
-		AND r.DiscountGroupType = 2))
-	ORDER BY c.PartyId, c.ProductId
+	-- get terminated
+	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)
+	SELECT DISTINCT -1,
+		d.PartyID,
+		CASE
+			WHEN ISNULL(pd.BrandName, '') != '' THEN pd.BrandName
+			ELSE p.PartyName
+		END AS PartyName,
+		NULL,
+		NULL,
+		0,
+		'Terminated',
+		0,
+		0,
+		@MinDate,
+		@MinDate,
+		NULL,
+		0,
+		'',
+		1
+	FROM @ChargeDetail d
+		INNER JOIN OAS_Party p WITH (NOLOCK) ON d.PartyID = p.PartyID
+		INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
+	WHERE d.PartyID NOT IN (SELECT c.PartyId FROM @ChargeInfo c)
+
+	-- product order
+	DECLARE @ProductOrder TABLE(ProductId INT, OrderNumber SMALLMONEY)
+	INSERT INTO @ProductOrder
+	SELECT ProductId, CASE ProductId 
+			WHEN 15/*CB*/ THEN 13.5 -- , make CB after BT and before MGCLC
+			ELSE ProductId -- keep as it is
+		END
+	FROM dbo.LA_f_Products3rd('')
+
+	--result
+	;WITH Result AS (
+		SELECT DISTINCT
+			c.PartyId		AS PayerID,
+			PartyName		AS PayerName,
+			PartyGroupId	AS PayerGroupID,
+			PartyGroupName	AS PayerGroupName,
+			c.ProductId		AS ProductId,
+			ProductName		AS ProductName,
+			FirstBilling	AS FirstBilling,
+			ISNULL(m.FeeAmount, 0) AS MinFee,
+			w.FromDate		AS WaiveFrom,
+			w.ToDate		AS WaiveTo,
+			d.DiscountGroupName AS DiscountGroupName,
+			STUFF((SELECT
+					';' + ' Amount From: ' + CONVERT(VARCHAR(100), ii.FromAmount) + ' - '
+					+ 'Amount To: ' + CASE
+						WHEN ii.ToAmount = 10000000000000 THEN 'Unlimited'
+						ELSE CONVERT(VARCHAR(100), ii.ToAmount)
+					END + ' - '
+					+ 'Rate: ' + CONVERT(VARCHAR(10), ii.Rate * 100) + '%'
+				FROM @Discount ii
+				WHERE d.DiscountGroupId = ii.DiscountGroupId
+					AND d.ProductId = ii.ProductId
+					AND d.PartyId = ii.PartyId
+					FOR XML PATH ('')), 1, 2, '') AS DiscountGroupValues,
+				r.DiscountGroupName AS RebateGroupName,
+			STUFF((SELECT
+					';' + ' Rate: ' + CONVERT(VARCHAR(10), ii.Rate * 100) + '%'
+				FROM @Discount ii
+				WHERE r.DiscountGroupId = ii.DiscountGroupId
+				AND r.ProductId = ii.ProductId
+				AND r.PartyId = ii.PartyId
+				GROUP BY	ii.DiscountGroupId,
+							ii.Rate
+				FOR XML PATH ('')), 1, 2, '') AS RebateGroupValues,
+			c.BettypeRef,
+			c.Rate AS Rate,
+			c.ExchangeID AS ExchangeID,
+			c.ExchangeName AS ExchangeName,
+			c.ChargeType
+		FROM @ChargeInfo c
+			LEFT JOIN @Minfee m
+				ON c.PartyId = m.PartyId
+				AND c.ProductId = m.ProductId
+				AND (c.FromDate BETWEEN m.FromDate AND m.ToDate
+				OR c.ToDate BETWEEN m.FromDate AND m.ToDate
+				OR m.FromDate BETWEEN c.FromDate AND c.ToDate
+				OR m.ToDate BETWEEN c.FromDate AND c.ToDate
+				)
+				AND m.FeeTypeId = 1 -- Miniumfee
+			LEFT JOIN @Minfee w
+				ON c.PartyId = w.PartyId
+				AND c.ProductId = w.ProductId
+				AND (c.FromDate BETWEEN w.FromDate AND w.ToDate
+				OR c.ToDate BETWEEN w.FromDate AND w.ToDate
+				OR w.FromDate BETWEEN c.FromDate AND c.ToDate
+				OR w.ToDate BETWEEN c.FromDate AND c.ToDate
+				)
+				AND w.FeeTypeId = 2 -- waive
+			LEFT JOIN @Discount d
+				ON d.PartyId = c.PartyId
+				AND d.ProductId = c.ProductId
+				AND (c.FromDate BETWEEN d.FromDate AND d.ToDate
+				OR c.ToDate BETWEEN d.FromDate AND d.ToDate
+				OR d.FromDate BETWEEN c.FromDate AND c.ToDate
+				OR d.ToDate BETWEEN c.FromDate AND c.ToDate
+				)
+				AND d.DiscountGroupType = 1 -- discount
+			LEFT JOIN @Discount r
+				ON r.PartyId = c.PartyId
+				AND r.ProductId = c.ProductId
+				AND (c.FromDate BETWEEN r.FromDate AND r.ToDate
+				OR c.ToDate BETWEEN r.FromDate AND r.ToDate
+				OR r.FromDate BETWEEN c.FromDate AND c.ToDate
+				OR r.ToDate BETWEEN c.FromDate AND c.ToDate
+				)
+				AND r.DiscountGroupType = 2 -- rebate
+		WHERE ((@DiscountGroup = 0)
+			OR (@DiscountGroup <> 0
+			AND d.DiscountGroupId = @DiscountGroup
+			AND d.DiscountGroupType = 1))
+			AND ((@RebateGroup = 0)
+			OR (@RebateGroup <> 0
+			AND r.DiscountGroupId = @RebateGroup
+			AND r.DiscountGroupType = 2))
+	)
+	SELECT Result.*
+	FROM Result
+	INNER JOIN @ProductOrder po ON po.ProductId = Result.ProductId
+	ORDER BY Result.PayerID, po.OrderNumber
 END
 DROP TABLE #Temp_ChargeInfo
 
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_PayerSettingSel] TO [vnteam]
- 
 GRANT EXECUTE ON [dbo].[LA_PayerSettingSel] TO bodbAdminNet

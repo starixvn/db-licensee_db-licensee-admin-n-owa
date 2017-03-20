@@ -15,6 +15,8 @@ AS
 
  Revisions:
 	- 20170113@bruce: checking launchDate to exclude trial data
+	- 20170217@bruce: change deposit service charge to 9 [#70050]
+
  Param's Explanation:
 	- @FromDate			: From date
 	- @ToDate			: To date
@@ -27,7 +29,7 @@ BEGIN
 
 	DECLARE @Allbet INT = (SELECT PartyID FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyName='Allbet' AND PartyType=3)
 	DECLARE @RebateCommissionType INT = 11
-	DECLARE @DepositServiceCharge INT = 10
+	DECLARE @DepositServiceCharge INT = 9
 
 	-- ChargeRate
 	DECLARE @ChargeRate TABLE(
