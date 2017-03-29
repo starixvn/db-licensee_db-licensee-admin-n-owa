@@ -32,13 +32,14 @@ AS
 			- 20160428@Bruce: MGCRNG: Support Microgaming - Progressive Contribution
 			- 20160929@Scofield: Update for Colossus Bet
 			- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+			- 20170329@Scofield: support Cashout [RedmineID :#73310]
 		Param's Explanation:
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
 								'NG' -> Number Game			'BA' -> BA
 								'LC' -> Live Casino			'VS' -> Virtual Sports
 								'CS' -> RNG Casino			'BG' -> Bingo
 								'MGC'->Microgaming Casino	'BT' -> Bettrade
-								'CB' -> Colossus Bets
+								'CB' -> Colossus Bets		'CO' -> Cash Out
 	*/
 SET NOCOUNT ON
 BEGIN
@@ -69,7 +70,13 @@ BEGIN
 		ProgressiveContribution		MONEY,
 		ProgressivePayout			MONEY,
 		ProgressiveFee				MONEY,
-		Betcount					BIGINT
+		Betcount					BIGINT,
+		CashOutTimes				MONEY,
+		CashOutTickets				MONEY,
+		CashOutValue				MONEY,
+		TicketsPayout				MONEY,
+		CashoutCommission			MONEY,
+		BuyBackAmountAndComm		MONEY
 	)
 
 	CREATE TABLE #Exchange
@@ -527,6 +534,74 @@ BEGIN
 		-- Drop temp tables
 		DROP TABLE #TempData
 	END
+	ELSE IF (@ProductCode = 'CO')
+	BEGIN
+		DECLARE @SBProductId INT = 0
+		DECLARE @BAProductId INT = 3
+		DECLARE @COProductId INT = (SELECT Productid FROM bodb_licensee.dbo.Product3rd WHERE ProductPrefix = 'CO') 
+		-- add more bettype for SB, BA
+		INSERT INTO @Bettype (Bettype, ProductId)
+		(
+			SELECT Bettype, ProductID
+			FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, 'SB,BA,CO')
+		)
+
+		INSERT INTO #Result( Winlostdate, CurrencyId, CashoutTimes, CashoutTickets, CashoutValue, BuyBackAmountSB, BuyBackAmountBA, BuyBackAmount, TicketsPayout, CashoutCommission, BuyBackAmountAndComm, Company)
+		(
+			SELECT
+				d.RptDate,
+				d.CurrencyID,
+				SUM(CashoutTimes) AS CashoutTimes,
+				SUM(CashoutTickets) AS CashoutTickets,
+				SUM(CashoutValue) AS CashoutValue,					
+				SUM(BuyBackAmountSB) AS BuyBackAmountSB,
+				SUM(BuyBackAmountBA) AS BuyBackAmountBA,
+				SUM(BuyBackAmountSB + BuyBackAmountBA) AS BuyBackAmount,
+				SUM(TicketsPayout) AS TicketsPayout,					
+				SUM(CashoutCommission) AS CashoutCommission,
+				SUM(BuyBackAmountSB + BuyBackAmountBA + CashoutCommission) AS BuyBackAmountAndComm,
+				SUM(TicketsPayout - BuyBackAmountSB - BuyBackAmountBA - CashoutCommission) AS Company
+			FROM (
+				SELECT b.RptDate, b.CurrencyId,
+					SUM(CASE WHEN bt.ProductId = @SBProductId AND b.Bettype = 911 THEN ISNULL(b.BetCount, 0) ELSE 0 END) AS CashoutTimes,
+					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.CashoutTicket, 0) ELSE 0 END) AS CashoutTickets,
+					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.CashOutAmount, 0) ELSE 0 END) AS CashoutValue,					
+					SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1003 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountSB,
+					SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1004 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountBA,
+					SUM(ISNULL(b.TicketPayout, 0)) AS TicketsPayout,				
+					SUM(CASE WHEN b.Bettype = 911 THEN (b.BuyBackAmount * p.Rate) ELSE 0 END) AS CashoutCommission
+				FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
+					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
+					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN (@SBProductId, @COProductId)
+				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate									
+					AND b.CurrencyID <> 20
+					AND b.Status NOT IN (-1, 101, 102, 103)
+					AND b.CustomerCategory IN( 1003, 1004)
+				GROUP BY p.PartyId, b.RptDate, b.CurrencyId
+
+				UNION ALL 
+				
+				-- rpt_betting_BA only contain original ticket, SOLD BOUGHT COMM ticket will be in rpt_betting
+				SELECT b.RptDate, b.CurrencyId,
+					SUM(ISNULL(b.BetCount, 0)) AS CashoutTimes,
+					0 AS CashoutTickets,
+					0 AS CashoutValue,					
+					0 AS BuyBackAmountSB,
+					0 AS BuyBackAmountBA,
+					SUM(ISNULL(b.TicketPayout, 0)) AS TicketsPayout,					
+					0 AS CashoutCommission
+				FROM bodb_licenseereport.dbo.rpt_Betting_BA b WITH (NOLOCK)
+					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate				
+					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN(@BAProductId)
+				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
+					AND b.CurrencyID <> 20
+					AND b.Status NOT IN (-1, 101, 102, 103)
+					AND b.CustomerCategory IN( 1003, 1004)
+				GROUP BY p.PartyId, b.RptDate, b.CurrencyId
+			) d
+			GROUP BY d.RptDate, d.CurrencyID
+		)
+	END
 	ELSE
 	BEGIN
 		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
@@ -593,6 +668,12 @@ BEGIN
 		, SUM(ISNULL(d.ProgressiveContribution, 0))		AS ProgressiveContribution
 		, SUM(ISNULL(d.ProgressivePayout, 0))			AS ProgressivePayout
 		, SUM(ISNULL(d.ProgressiveFee, 0))				AS ProgressiveFee
+		, SUM(ISNULL(d.CashoutTimes, 0))				AS CashoutTimes
+		, SUM(ISNULL(d.CashoutTickets, 0))				AS CashoutTickets
+		, SUM(ISNULL(d.CashoutValue, 0))				AS CashoutValue
+		, SUM(ISNULL(d.TicketsPayout, 0))				AS TicketsPayout
+		, SUM(ISNULL(d.CashoutCommission, 0))			AS CashoutCommission
+		, SUM(ISNULL(d.BuyBackAmountAndComm, 0))		AS BuyBackAmountAndComm		
 
 		--Base on currency
 		, CONVERT(MONEY, SUM(ISNULL(d.Turnover * e.Rate, 0)))					AS TurnoverBase
@@ -611,7 +692,13 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.Company* e.Rate, 0)))						AS CompanyBase
 		, CONVERT(MONEY, SUM(ISNULL(d.ProgressiveContribution * e.Rate, 0)))	AS ProgressiveContributionBase
 		, CONVERT(MONEY, SUM(ISNULL(d.ProgressiveFee * e.Rate, 0)))				AS ProgressiveFeeBase
-		, CONVERT(MONEY, SUM(ISNULL(d.ProgressivePayout * e.Rate, 0)))			AS ProgressivePayoutBase
+		, CONVERT(MONEY, SUM(ISNULL(d.ProgressivePayout * e.Rate, 0)))			AS ProgressivePayoutBase		
+		, CONVERT(MONEY, SUM(ISNULL(d.CashoutTimes * e.Rate, 0)))				AS CashoutTimesBase
+		, CONVERT(MONEY, SUM(ISNULL(d.CashoutTickets * e.Rate, 0)))				AS CashoutTicketsBase
+		, CONVERT(MONEY, SUM(ISNULL(d.CashoutValue * e.Rate, 0)))				AS CashoutValueBase
+		, CONVERT(MONEY, SUM(ISNULL(d.TicketsPayout * e.Rate, 0)))				AS TicketsPayoutBase
+		, CONVERT(MONEY, SUM(ISNULL(d.CashoutCommission * e.Rate, 0)))			AS CashoutCommissionBase
+		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountAndComm * e.Rate, 0)))		AS BuyBackAmountAndCommBase
 	FROM
 		#Result d
 		INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
