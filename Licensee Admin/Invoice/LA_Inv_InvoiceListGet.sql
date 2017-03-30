@@ -22,6 +22,7 @@ AS
 	Revisions: 
 		+ 20150807@Bravo: Invoice Info List - Get
 		+ 20151019@Victor: Support Chinese on Invoice's text fields
+		+ 20170330@Bruce: only show invoice has invoice path
 */
 /*	Example:
 	USE bodb_licensee
@@ -140,6 +141,7 @@ BEGIN
 			AND i.PartyId IN (SELECT Id FROM @PayerTable)
 			AND i.InvoiceType IN (SELECT Id FROM @InvoiceTypeTable)
 			AND i.ToDate BETWEEN @IssueFromDate AND @IssueToDate
+			AND InvoicePath IS NOT NULL
 	
 	-- End Region
 	

@@ -6,10 +6,12 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-CREATE PROCEDURE [dbo].[LA_Inv_InvoiceMetadataUpd]
+ALTER PROCEDURE [dbo].[LA_Inv_InvoiceMetadataUpd]
 	  @InvoiceId	INT
 	, @InvoiceData	NVARCHAR(MAX)
 	, @InvoicePath	NVARCHAR(255)
+	, @ErrCode	INT OUTPUT
+	, @ErrMsg	VARCHAR(50) OUTPUT
 AS
 
 /*  Header:
