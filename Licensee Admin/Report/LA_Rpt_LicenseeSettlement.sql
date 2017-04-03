@@ -540,11 +540,7 @@ BEGIN
 		DECLARE @BAProductId INT = 3
 		DECLARE @COProductId INT = (SELECT Productid FROM bodb_licensee.dbo.Product3rd WHERE ProductPrefix = 'CO') 
 		-- add more bettype for SB, BA
-		INSERT INTO @Bettype (Bettype, ProductId)
-		(
-			SELECT Bettype, ProductID
-			FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, 'SB,BA,CO')
-		)
+		
 
 		INSERT INTO #Result( Winlostdate, CurrencyId, CashoutTimes, CashoutTickets, CashoutValue, BuyBackAmountSB, BuyBackAmountBA, BuyBackAmount, TicketsPayout, CashoutCommission, BuyBackAmountAndComm, Company)
 		(
@@ -572,7 +568,7 @@ BEGIN
 					SUM(CASE WHEN b.Bettype = 911 THEN (b.BuyBackAmount * p.Rate) ELSE 0 END) AS CashoutCommission
 				FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
-					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN (@SBProductId, @COProductId)
+					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN (@COProductId)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate									
 					AND b.CurrencyID <> 20
 					AND b.StatusID NOT IN (-1, 101, 102, 103)
@@ -580,7 +576,7 @@ BEGIN
 				GROUP BY p.PartyId, b.RptDate, b.CurrencyId				
 			) d
 			GROUP BY d.RptDate, d.CurrencyID
-		)
+		)		
 	END
 	ELSE
 	BEGIN
