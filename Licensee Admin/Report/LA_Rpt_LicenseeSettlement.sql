@@ -570,34 +570,14 @@ BEGIN
 					SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1004 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountBA,
 					SUM(ISNULL(b.TicketPayout, 0)) AS TicketsPayout,				
 					SUM(CASE WHEN b.Bettype = 911 THEN (b.BuyBackAmount * p.Rate) ELSE 0 END) AS CashoutCommission
-				FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
+				FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN (@SBProductId, @COProductId)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate									
 					AND b.CurrencyID <> 20
-					AND b.Status NOT IN (-1, 101, 102, 103)
+					AND b.StatusID NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory IN( 1003, 1004)
-				GROUP BY p.PartyId, b.RptDate, b.CurrencyId
-
-				UNION ALL 
-				
-				-- rpt_betting_BA only contain original ticket, SOLD BOUGHT COMM ticket will be in rpt_betting
-				SELECT b.RptDate, b.CurrencyId,
-					0 AS CashoutTimes,
-					0 AS CashoutTickets,
-					0 AS CashoutValue,					
-					0 AS BuyBackAmountSB,
-					0 AS BuyBackAmountBA,
-					SUM(ISNULL(b.TicketPayout, 0)) AS TicketsPayout,					
-					0 AS CashoutCommission
-				FROM bodb_licenseereport.dbo.rpt_Betting_BA b WITH (NOLOCK)
-					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate				
-					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN(@BAProductId)
-				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
-					AND b.CurrencyID <> 20
-					AND b.Status NOT IN (-1, 101, 102, 103)
-					AND b.CustomerCategory IN( 1003, 1004)
-				GROUP BY p.PartyId, b.RptDate, b.CurrencyId
+				GROUP BY p.PartyId, b.RptDate, b.CurrencyId				
 			) d
 			GROUP BY d.RptDate, d.CurrencyID
 		)
