@@ -583,7 +583,7 @@ BEGIN
 				
 				-- rpt_betting_BA only contain original ticket, SOLD BOUGHT COMM ticket will be in rpt_betting
 				SELECT b.RptDate, b.CurrencyId,
-					SUM(ISNULL(b.BetCount, 0)) AS CashoutTimes,
+					0 AS CashoutTimes,
 					0 AS CashoutTickets,
 					0 AS CashoutValue,					
 					0 AS BuyBackAmountSB,
@@ -715,4 +715,6 @@ END
 
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicenseeSettlement] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeSettlement] TO bodbAdminNet
+GO
+GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeSettlement] TO [bodbAdminNet]
+GO
