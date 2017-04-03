@@ -40,6 +40,7 @@ AS
 		+ 2016.11.04 @Scofield.Huynh: Update for CB
 		+ 2017.03.06 @bruce: include BA amount =0 [RedmindID: #72806]
 		+ 2017.03.07 @Scofield: include amount = 0 for all products [RedmindID: #72806]
+		+ 2017.04.03 @Scofield: update for Cashout [RedmindID: #73310]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -309,6 +310,7 @@ BEGIN
 	DECLARE @CommChargeType INT = 6
 	DECLARE @CashInShareChargeType INT = 7
 	DECLARE @CBProductId INT = 15
+	DECLARE @COProductId INT = 25
 	
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, TypeId, FromDate, ToDate)
 	SELECT	ci.FromParty,
@@ -528,7 +530,7 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.Bettype NOT IN (901,902,903)
-				AND b.ProductId <> @CBProductId
+				AND b.ProductId NOT IN (@CBProductId, @COProductId)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, r.BettypeRef
 	)
 	
@@ -604,6 +606,41 @@ BEGIN
 	FROM #TempDataCB tcb
 	INNER JOIN #Exchange e ON tcb.rptDate = e.ExchangeDate AND tcb.CurrencyId = e.ExchangeID	
 	-- End region: Get Amount By Product CB
+	
+	-- Region: Get Amount By Product CO
+	DECLARE @Bettype AS TABLE (Bettype INT, ProductID INT)		
+	INSERT INTO @Bettype(Bettype, ProductID)
+	SELECT Bettype,ProductID 
+	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, 'SB,BA,CO')
+	
+	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,ProductId, AmountToCompany, LicenseeWinLossBase)
+	(
+		SELECT
+			d.LicenseeId,			
+			d.PartyId,
+			d.RptDate,
+			d.CurrencyID,
+			@COProductId,
+			(TicketsPayout - BuyBackAmountSB - BuyBackAmountBA - CashoutCommission) * e.Rate AS AmountToCompany,
+			0				
+		FROM (
+			SELECT p.LicenseeId, p.PartyId, b.RptDate, b.CurrencyId,
+				SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1003 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountSB,
+				SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1004 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountBA,
+				SUM(ISNULL(b.TicketPayout, 0)) AS TicketsPayout,					
+				SUM(CASE WHEN b.Bettype = 911 THEN (b.BuyBackAmount * p.Rate) ELSE 0 END) AS CashoutCommission	
+			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+				INNER JOIN @PartyChargeInfo p ON b.SiteId = p.LicenseeId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
+				INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (@COProductId)
+			WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate									
+				AND b.CurrencyID <> 20
+				AND b.StatusID NOT IN (-1, 101, 102, 103)
+				AND b.CustomerCategory IN( 1003, 1004)
+			GROUP BY p.LicenseeId, p.PartyId, b.RptDate, b.CurrencyId
+		) d
+		INNER JOIN #Exchange e ON d.rptDate = e.ExchangeDate AND d.CurrencyId = e.ExchangeID	
+	)
+	-- End region: Get Amount By Product CO
 	
 	-- Region: Check min fee group			
 	--- calculate waived prorate (*)
