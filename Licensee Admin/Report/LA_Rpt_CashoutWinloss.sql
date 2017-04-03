@@ -29,31 +29,34 @@ BEGIN
 	DECLARE @SBProductId INT = 0
 	DECLARE @BAProductId INT = 3
 	CREATE TABLE #Result (
-		WinlossDate				DATETIME,
-		CurrencyId				INT,
-		PartyID					INT,
-		ParentId				INT,
-		CashoutTimes			MONEY,
-		CashoutTickets			MONEY,
-		CashoutValue			MONEY,
-		BuyBackAmountSB			MONEY,
-		BuyBackAmountBA			MONEY,
-		BuyBackAmountTotal		MONEY,
-		TicketsPayout			MONEY,
-		CashoutCommission		MONEY,
-		IncomeOnBB				MONEY,
-		IncomeOnProfitSharing 	MONEY,
-		AmtDueToOnBB			MONEY,
-		AmtDueToOnProfitSharing	MONEY)	
+					WinlossDate				DATETIME,
+					CurrencyId				INT,
+					PartyID					INT,
+					ParentId				INT,
+					CashoutTimes			MONEY,
+					CashoutTickets			MONEY,
+					CashoutValue			MONEY,
+					BuyBackAmountSB			MONEY,
+					BuyBackAmountBA			MONEY,
+					BuyBackAmountTotal		MONEY,
+					TicketsPayout			MONEY,
+					CashoutCommission		MONEY,
+					IncomeOnBB				MONEY,
+					IncomeOnProfitSharing 	MONEY,
+					AmtDueToOnBB			MONEY,
+					AmtDueToOnProfitSharing	MONEY
+				)	
+
 	DECLARE @tmpParty AS TABLE (
-		PartyId			INT,
-		ParentId		INT,
-		LicenseeId		INT,
-		ProductID		INT,
-		DI_Rate			MONEY,
-		Rate			MONEY,
-		FromDate		SMALLDATETIME,
-		ToDate			SMALLDATETIME)
+					PartyId			INT,
+					ParentId		INT,
+					LicenseeId		INT,
+					ProductID		INT,
+					DI_Rate			MONEY,
+					Rate			MONEY,
+					FromDate		SMALLDATETIME,
+					ToDate			SMALLDATETIME
+				)
 	
 	CREATE TABLE #Exchange(ExchangeDate DATE, ExchangeID INT, CurrencyCode VARCHAR(10), Rate FLOAT)		
 	CREATE TABLE #Bettype (Bettype INT, ProductID INT)
@@ -134,7 +137,7 @@ BEGIN
 				
 				-- rpt_betting_BA only contain original ticket, SOLD BOUGHT COMM ticket will be in rpt_betting
 				SELECT p.PartyId, p.ParentId, b.RptDate, b.CurrencyId,
-					SUM(ISNULL(b.BetCount, 0)) AS CashoutTimes,
+					0 AS CashoutTimes,
 					0 AS CashoutTickets,
 					0 AS CashoutValue,					
 					0 AS BuyBackAmountSB,
@@ -166,7 +169,7 @@ BEGIN
 		d.WinlossDate,
 		d.ParentId				AS GroupId,
 		CASE WHEN d.ParentId = 999 THEN 'Credit' ELSE pp.PartyName END AS GroupName,
-		d.PartyID					AS PartyID,
+		d.PartyID				AS PartyID,
 		p.PartyName				AS PartyName,		
 		d.CurrencyId,			
 		e.CurrencyCode			AS CurrencyName,
@@ -185,8 +188,8 @@ BEGIN
 	FROM													  
 		#Result d  		
 		INNER JOIN #Exchange e ON d.CurrencyId = e.ExchangeID AND d.WinlossDate = e.ExchangeDate							  		
-		LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON d.PartyID = p.PartyID		
-		LEFT JOIN bodb_licensee.dbo.OAS_Party pp WITH (NOLOCK) ON d.ParentId = pp.PartyID
+		INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON d.PartyID = p.PartyID		
+		INNER JOIN bodb_licensee.dbo.OAS_Party pp WITH (NOLOCK) ON d.ParentId = pp.PartyID
 	GROUP BY d.ParentId, CASE WHEN d.ParentId = 999 THEN 'Credit' ELSE pp.PartyName END, 
 		d.PartyID, p.PartyName, d.CurrencyId, e.CurrencyCode, d.WinlossDate
 	ORDER BY ParentId ASC, p.PartyName ASC
@@ -261,5 +264,9 @@ BEGIN
 	DROP TABLE #Bettype
 END
 GO
+
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_CashoutWinloss] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_Rpt_CashoutWinloss] TO bodbAdminNet 
+GO
+
+GRANT EXECUTE ON [dbo].[LA_Rpt_CashoutWinloss] TO [bodbAdminNet] 
+GO
