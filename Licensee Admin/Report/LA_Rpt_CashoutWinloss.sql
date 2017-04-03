@@ -116,7 +116,7 @@ BEGIN
 				SUM(IncomeOnBB) AS IncomeOnBB						
 			FROM (
 				SELECT p.PartyId, p.ParentId, b.RptDate, b.CurrencyId,
-					SUM(CASE WHEN bt.ProductID = @SBProductId AND b.Bettype = 911 THEN ISNULL(b.BetCount, 0) ELSE 0 END) AS CashoutTimes,
+					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.BetCount, 0) ELSE 0 END) AS CashoutTimes,
 					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.CashoutTicket, 0) ELSE 0 END) AS CashoutTickets,
 					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.CashOutAmount, 0) ELSE 0 END) AS CashoutValue,					
 					SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1003 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountSB,
@@ -126,7 +126,7 @@ BEGIN
 					SUM(CASE WHEN b.Bettype = 911 THEN (b.BuyBackAmount * p.Rate) ELSE 0 END) AS IncomeOnBB						
 				FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
 					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
-					INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (@SBProductId, @ProductId)
+					INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (@ProductId)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate									
 					AND b.CurrencyID <> 20
 					AND b.Status NOT IN (-1, 101, 102, 103)
