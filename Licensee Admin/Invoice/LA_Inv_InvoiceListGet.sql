@@ -22,7 +22,7 @@ AS
 	Revisions:
 		+ 20150807@Bravo: Invoice Info List - Get
 		+ 20151019@Victor: Support Chinese on Invoice's text fields
-		+ 20170330@Bruce: include invoice path
+		+ 20170330@Bruce: include invoice path [RedmineID: #74096]
 */
 /*	Example:
 	USE bodb_licensee
@@ -130,7 +130,8 @@ BEGIN
 			i.ToDate,
 			bct.CurrencyName,
 			i.Amount,
-			i.InvoicePath
+			i.InvoicePath,
+			i.Environment
 	FROM	dbo.LA_InvoiceHeader i WITH(NOLOCK)
 			INNER JOIN dbo.LA_BillerInfo b ON i.BillerId = b.PartyId
 			INNER JOIN dbo.OAS_Party p ON i.PartyId = p.PartyID

@@ -10,6 +10,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceMetadataUpd]
 	  @InvoiceId	INT
 	, @InvoiceData	NVARCHAR(MAX)
 	, @InvoicePath	NVARCHAR(255)
+	, @Environment	VARCHAR(50)
 	, @ErrCode	INT OUTPUT
 	, @ErrMsg	VARCHAR(50) OUTPUT
 AS
@@ -24,7 +25,8 @@ BEGIN
 
 	UPDATE dbo.LA_InvoiceHeader WITH(ROWLOCK, UPDLOCK) SET
 		InvoiceData = @InvoiceData,
-		InvoicePath = @InvoicePath
+		InvoicePath = @InvoicePath,
+		Environment = @Environment
 	WHERE InvoiceHeaderId = @InvoiceId
 END
 GO

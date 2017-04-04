@@ -38,7 +38,7 @@ AS
 		+ 20150806@Bravo: Save invoice
 		+ 20151019@Victor: Support Chinese on Invoice's text fields
 		+ 20160718@Bruce: Hosting fees - Insert hosting fees info
-		+ 20170330@Bruce: Don't save details
+		+ 20170330@Bruce: Don't save details [RedmineID: #74096]
 */
 /*	Example:
 	USE bodb_licensee
