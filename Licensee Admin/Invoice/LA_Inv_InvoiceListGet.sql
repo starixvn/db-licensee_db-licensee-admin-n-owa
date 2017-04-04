@@ -146,5 +146,8 @@ BEGIN
 END
 
 GO
-GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceListGet] TO bodbAdminNet
 
+GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceListGet] TO bodbAdminNet
+GO
+GRANT VIEW DEFINITION ON [dbo].[LA_Inv_InvoiceListGet] TO vnteam
+GO

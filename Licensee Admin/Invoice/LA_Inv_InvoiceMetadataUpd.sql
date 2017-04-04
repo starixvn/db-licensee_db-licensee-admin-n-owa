@@ -14,9 +14,9 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceMetadataUpd]
 	, @ErrMsg	VARCHAR(50) OUTPUT
 AS
 
-/*  Header:
+/*  
 	Created: 20170330@Bruce
-	Task : Update invoice metadata
+	Task : Update invoice metadata [#74096]
 	DB: DB052.bodb_Licensee
 */
 BEGIN
@@ -30,4 +30,6 @@ END
 GO
 
 GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceMetadataUpd] TO bodbAdminNet
+GO
+GRANT VIEW DEFINITION ON [dbo].[LA_Inv_InvoiceMetadataUpd] TO vnteam
 GO

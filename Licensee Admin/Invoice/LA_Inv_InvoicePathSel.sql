@@ -5,12 +5,12 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-CREATE PROCEDURE [dbo].[LA_Inv_InvoicePathSel]
+ALTER PROCEDURE [dbo].[LA_Inv_InvoicePathSel]
 	@InvoiceId INT
 AS
-/*	Header:
+/*	
 	Created: 20170330@Bruce
-	Task :	Get invoice metadata
+	Task :	Get invoice metadata [#74096]
 	DB:		DBLIC/bodb_Licensee
 */
 BEGIN
@@ -21,4 +21,6 @@ END
 
 GO
 GRANT EXECUTE ON [dbo].[LA_Inv_InvoicePathSel] TO bodbAdminNet
-
+GO
+GRANT VIEW DEFINITION ON [dbo].[LA_Inv_InvoicePathSel] TO vnteam
+GO
