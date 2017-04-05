@@ -5,23 +5,24 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[LA_Inv_InvoiceListGet] 
+ALTER PROCEDURE [dbo].[LA_Inv_InvoiceListGet]
 	@InvoiceNo		NVARCHAR(50) = '',
 	@InvoiceTypes	VARCHAR(100)= '',
 	@BillerIds		VARCHAR(500)= '',
 	@PayerIds		VARCHAR(500)= '',
 	@IssueFromDate	DATETIME,
 	@IssueToDate	DATETIME
-	  
+
 AS
 /*	Header:
 	Created:2015.08.21 - Bravo.Tran
-	Task :	Create Invoice 
+	Task :	Create Invoice
 	DB:		DBLIC/bodb_Licensee
-   
-	Revisions: 
+
+	Revisions:
 		+ 20150807@Bravo: Invoice Info List - Get
 		+ 20151019@Victor: Support Chinese on Invoice's text fields
+		+ 20170330@Bruce: include invoice path [RedmineID: #74096]
 */
 /*	Example:
 	USE bodb_licensee
@@ -31,21 +32,21 @@ AS
 	DECLARE @PayerIds		VARCHAR(100)= '14,24'
 	DECLARE @IssueFromDate	DATETIME	= '2015-7-1'
 	DECLARE @IssueToDate	DATETIME	= '2015-7-31'
-	
+
 	EXEC [LA_Inv_InvoiceListGet] @InvoiceNo,@InvoiceTypes,@BillerIds,@PayerIds,@IssueFromDate,@IssueToDate
 */
 BEGIN
 	SET NOCOUNT ON
 	-- Region: Get Invoice Type ID
-	DECLARE @InvoiceTypeTable TABLE (Id INT NOT NULL)	
+	DECLARE @InvoiceTypeTable TABLE (Id INT NOT NULL)
 	DECLARE @Delimiter CHAR(1)=','
 
-	;WITH SeparatedTable (STARTVAL, STOPVAL) 
-	AS 
+	;WITH SeparatedTable (STARTVAL, STOPVAL)
+	AS
 	(
 		SELECT
 			STARTVAL = CAST(1 AS INT),
-			STOPVAL = CHARINDEX(@Delimiter, @InvoiceTypes + @Delimiter) 
+			STOPVAL = CHARINDEX(@Delimiter, @InvoiceTypes + @Delimiter)
 		UNION ALL SELECT
 			STARTVAL = STOPVAL + 1,
 			STOPVAL = CHARINDEX(@Delimiter, @InvoiceTypes + @Delimiter, STOPVAL + 1)
@@ -61,16 +62,16 @@ BEGIN
 	WHERE STOPVAL > 0
 	OPTION (MAXRECURSION 0)
 	-- End Region
-	
-	-- Region: Get Biller ID
-	DECLARE @BillerTable TABLE (Id INT NOT NULL)		
 
-	;WITH SeparatedTable (STARTVAL, STOPVAL) 
-	AS 
+	-- Region: Get Biller ID
+	DECLARE @BillerTable TABLE (Id INT NOT NULL)
+
+	;WITH SeparatedTable (STARTVAL, STOPVAL)
+	AS
 	(
 		SELECT
 			STARTVAL = CAST(1 AS INT),
-			STOPVAL = CHARINDEX(@Delimiter, @BillerIds + @Delimiter) 
+			STOPVAL = CHARINDEX(@Delimiter, @BillerIds + @Delimiter)
 		UNION ALL SELECT
 			STARTVAL = STOPVAL + 1,
 			STOPVAL = CHARINDEX(@Delimiter, @BillerIds + @Delimiter, STOPVAL + 1)
@@ -86,16 +87,16 @@ BEGIN
 	WHERE STOPVAL > 0
 	OPTION (MAXRECURSION 0)
 	-- End Region
-	
+
 	-- Region: Get Payers ID
-	DECLARE @PayerTable TABLE (Id INT NOT NULL)	
-	
-	;WITH SeparatedTable (STARTVAL, STOPVAL) 
-	AS 
+	DECLARE @PayerTable TABLE (Id INT NOT NULL)
+
+	;WITH SeparatedTable (STARTVAL, STOPVAL)
+	AS
 	(
 		SELECT
 			STARTVAL = CAST(1 AS INT),
-			STOPVAL = CHARINDEX(@Delimiter, @PayerIds + @Delimiter) 
+			STOPVAL = CHARINDEX(@Delimiter, @PayerIds + @Delimiter)
 		UNION ALL SELECT
 			STARTVAL = STOPVAL + 1,
 			STOPVAL = CHARINDEX(@Delimiter, @PayerIds + @Delimiter, STOPVAL + 1)
@@ -111,25 +112,26 @@ BEGIN
 	WHERE STOPVAL > 0
 	OPTION (MAXRECURSION 0)
 	-- End Region
-	
+
 	-- Region: Base currency
 	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(5))
 	INSERT	INTO @BaseCurrencyTable(CurrencyId,CurrencyName)
 	EXECUTE bodb_Licensee.dbo.LA_SelBaseCurrency
 	-- End Region
-	
+
 	-- Region: Get data
-	SELECT  i.InvoiceHeaderId,						
+	SELECT  i.InvoiceHeaderId,
 			i.InvoiceSymbol,
-			i.InvoiceNumber,			
+			i.InvoiceNumber,
 			b.BillerName,
-			p.PartyName AS PayerName,						
+			p.PartyName AS PayerName,
 			it.InvTypeName AS InvoiceTypeName,
 			i.DueDate,
 			i.ToDate,
 			bct.CurrencyName,
-			i.Amount
-			
+			i.Amount,
+			i.InvoicePath,
+			i.Environment
 	FROM	dbo.LA_InvoiceHeader i WITH(NOLOCK)
 			INNER JOIN dbo.LA_BillerInfo b ON i.BillerId = b.PartyId
 			INNER JOIN dbo.OAS_Party p ON i.PartyId = p.PartyID
@@ -140,11 +142,13 @@ BEGIN
 			AND i.PartyId IN (SELECT Id FROM @PayerTable)
 			AND i.InvoiceType IN (SELECT Id FROM @InvoiceTypeTable)
 			AND i.ToDate BETWEEN @IssueFromDate AND @IssueToDate
-	
 	-- End Region
-	
-END		
+
+END
 
 GO
-GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceListGet] TO bodbAdminNet
 
+GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceListGet] TO bodbAdminNet
+GO
+GRANT VIEW DEFINITION ON [dbo].[LA_Inv_InvoiceListGet] TO vnteam
+GO
