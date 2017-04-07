@@ -25,6 +25,7 @@ AS
 							- refactor sp
 		- 20170301@Scofield: update effective date for LicenseeProduct3rd
 		- 20170307@Scofield: update to not save rate, basic billing, first billing for MGC[#70050]
+		- 20170407@Scofield: log dataold [#73310]
 
 	 Params:
 		+ @InvoiceSettingXML: '<ChargeSettings>
@@ -184,6 +185,7 @@ BEGIN
 				INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID
 			FOR XML PATH('z'), ROOT('r')
 		)
+		SET @logSPDataOld = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"');
 
 		DECLARE @MergeResult TABLE(ChargeId INT, ProductId INT, [$action] VARCHAR(20))
 		DECLARE @ToParty INT, @ParentChargeID INT, @Remark VARCHAR(200) = ''
