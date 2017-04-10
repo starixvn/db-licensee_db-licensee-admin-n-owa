@@ -24,6 +24,7 @@ AS
 		+ 2016.05.05@Bravo: Add VB Data
 		+ 2016.10.12@Bruce: Order result by group
 		+ 2017.04.10@Scofield: Support AB and FW [#74738]
+*/
 		
 /*	Example:
 	USE bodb_Licensee
