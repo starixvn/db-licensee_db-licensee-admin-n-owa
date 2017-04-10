@@ -560,7 +560,7 @@ BEGIN
 			FROM (
 				SELECT b.RptDate, b.CurrencyId,
 					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.BetCount, 0) ELSE 0 END) AS CashoutTimes,
-					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.CashoutTicket, 0) ELSE 0 END) AS CashoutTickets,
+					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.COTicketCount, 0) ELSE 0 END) AS CashoutTickets,
 					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.CashOutAmount, 0) ELSE 0 END) AS CashoutValue,					
 					SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1003 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountSB,
 					SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1004 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountBA,
