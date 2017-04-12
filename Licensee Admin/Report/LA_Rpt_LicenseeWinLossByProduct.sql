@@ -23,6 +23,7 @@ AS
 		+ 2015.12.15@Bruce: Add MGCLC and MGCRNG
 		+ 2016.05.05@Bravo: Add VB Data
 		+ 2016.10.12@Bruce: Order result by group
+		+ 20170412: @Scofield - Removing Trading Bet Types [#73310]
 */
 /*	Example:
 	USE bodb_Licensee
@@ -125,7 +126,7 @@ BEGIN
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
-				AND b.Bettype NOT IN (901,902,903)
+				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, b.ProductId, ISNULL(sbr.BettypeRef, -1)
 	)
 	

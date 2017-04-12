@@ -28,6 +28,7 @@ AS
 	   - 20141226@Florent: enhance SP
 	   - 20150705@Florent: add GBP
 	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+	   - 20170412: @Scofield - Removing Trading Bet Types [#73310]
 	Param's Explanation:  
 	  + @PartyIDs : a string of list PartyID, separated by ','
 	  + @Currency : 0-All Currencies
@@ -125,6 +126,7 @@ BEGIN
 		  AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 
 		  AND b.status NOT IN (-1, 101, 102, 103)
 		  AND b.customercategory NOT IN (27, 28)
+		  AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
 	   GROUP BY tp.PartyID, rptDate, currencyID
 	END		
 
