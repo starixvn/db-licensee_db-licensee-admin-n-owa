@@ -564,7 +564,7 @@ BEGIN
 					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.CashOutAmount, 0) ELSE 0 END) AS CashoutValue,					
 					SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1003 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountSB,
 					SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1004 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountBA,
-					SUM(ISNULL(b.TicketPayout, 0)) AS TicketsPayout,				
+					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.TicketPayout, 0)ELSE 0 END) AS TicketsPayout,				
 					SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1003 THEN (b.BuyBackAmount * p.Rate) ELSE 0 END) AS CashoutCommission
 				FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
