@@ -571,6 +571,7 @@ BEGIN
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN (@COProductId)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate									
 					AND b.CurrencyID <> 20
+					AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
 					AND b.StatusID NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory IN( 1003, 1004)
 				GROUP BY p.PartyId, b.RptDate, b.CurrencyId				
