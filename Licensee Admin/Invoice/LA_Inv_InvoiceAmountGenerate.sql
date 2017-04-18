@@ -866,7 +866,7 @@ BEGIN
 						ELSE p.ProductName
 						END AS ProductName,
 					CASE
-						WHEN id.InvoiceAmount > 0 OR id.ProductId = 3 OR id.ProductId = @CBProductId THEN id.InvoiceAmount
+						WHEN id.InvoiceAmount > 0 OR id.ProductId = 3 OR id.ProductId = @CBProductId OR id.ProductId = @COProductId THEN id.InvoiceAmount
 						ELSE 0
 					END AS InvoiceAmount,
 					id.AmountType,
