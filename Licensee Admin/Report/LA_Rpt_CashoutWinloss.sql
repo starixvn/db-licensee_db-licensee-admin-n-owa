@@ -96,15 +96,16 @@ BEGIN
 	FROM bodb_licensee..OAS_ChargeInfo c
 	WHERE c.ProductID = @ProductId AND c.ChargeType = @ProfitSharingChargeType
 
-	BEGIN			
+	BEGIN
+							
 		INSERT INTO #Result(WinlossDate, PartyID, ParentId, CurrencyId, CashoutTimes, CashoutTickets, CashoutValue, 
 			BuyBackAmountSB, BuyBackAmountBA, BuyBackAmountTotal, TicketsPayout, CashoutCommission, IncomeOnBB)
 		(
 			SELECT
-				d.RptDate,
+				d.Winlostdate,
 				d.PartyId,
 				d.ParentId,
-				d.CurrencyID,
+				d.Currency,
 				SUM(CashoutTimes) AS CashoutTimes,
 				SUM(CashoutTickets) AS CashoutTickets,
 				SUM(CashoutValue) AS CashoutValue,					
@@ -115,25 +116,23 @@ BEGIN
 				SUM(CashoutCommission) AS CashoutCommission,
 				SUM(IncomeOnBB) AS IncomeOnBB						
 			FROM (
-				SELECT p.PartyId, p.ParentId, b.RptDate, b.CurrencyId,
-					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.BetCount, 0) ELSE 0 END) AS CashoutTimes,
-					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.COTicketCount, 0) ELSE 0 END) AS CashoutTickets,
-					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.CashOutAmount, 0) ELSE 0 END) AS CashoutValue,					
-					SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1003 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountSB,
-					SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1004 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountBA,
-					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.TicketPayout, 0) ELSE 0 END) AS TicketsPayout,					
-					SUM(CASE WHEN b.Bettype = 911 THEN (b.BuyBackAmount * p.DI_Rate) ELSE 0 END) AS CashoutCommission,	
-					SUM(CASE WHEN b.Bettype = 911 THEN (b.BuyBackAmount * p.Rate) ELSE 0 END) AS IncomeOnBB						
-				FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
-					INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (@ProductId)
-				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate									
-					AND b.CurrencyID <> 20
-					AND b.StatusID NOT IN (-1, 101, 102, 103)
-					AND b.CustomerCategory IN( 1003, 1004)
-				GROUP BY p.PartyId, b.RptDate, b.CurrencyId, p.ParentId				
+					SELECT p.PartyId, p.ParentId, b.Winlostdate, b.Currency,
+						SUM(b.NumOfCashoutTrans) AS CashoutTimes,
+						SUM(b.NumOfCashoutTicket) AS CashoutTickets,
+						SUM(b.CashoutAmount) AS CashoutValue,					
+						SUM(b.BuyBackAmt) AS BuyBackAmountSB,
+						SUM(b.BABuyBackAmt) AS BuyBackAmountBA,
+						SUM(b.TicketPayout) AS TicketsPayout,					
+						SUM(b.BuyBackAmt * p.DI_Rate) AS CashoutCommission,	
+						SUM(b.BABuyBackAmt * p.Rate) AS IncomeOnBB						
+					FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
+						INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate					
+					WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate									
+						AND b.Currency <> 20
+						AND b.ProductID = 25
+					GROUP BY p.PartyId, b.Winlostdate, b.Currency, p.ParentId				
 			) d
-			GROUP BY d.PartyId, d.ParentId,d.RptDate, d.CurrencyID
+			GROUP BY d.PartyId, d.ParentId,d.Winlostdate, d.Currency
 		)	
 	END
 

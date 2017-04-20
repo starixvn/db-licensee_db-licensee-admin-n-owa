@@ -539,16 +539,15 @@ BEGIN
 		DECLARE @SBProductId INT = 0
 		DECLARE @BAProductId INT = 3
 		DECLARE @COProductId INT = (SELECT Productid FROM bodb_licensee.dbo.Product3rd WHERE ProductPrefix = 'CO') 
-		-- add more bettype for SB, BA
-		
+		-- add more bettype for SB, BA		
 
 		INSERT INTO #Result( Winlostdate, CurrencyId, CashoutTimes, CashoutTickets, CashoutValue, BuyBackAmountSB, BuyBackAmountBA, BuyBackAmount, TicketsPayout, CashoutCommission, BuyBackAmountAndComm, Company)
 		(
 			SELECT
-				d.RptDate,
-				d.CurrencyID,
+				d.Winlostdate,
+				d.Currency,
 				SUM(CashoutTimes) AS CashoutTimes,
-				SUM(CashoutTickets) AS CashoutTickets,
+				SUM(ISNULL(CashoutTickets, 0)) AS CashoutTickets,
 				SUM(CashoutValue) AS CashoutValue,					
 				SUM(BuyBackAmountSB) AS BuyBackAmountSB,
 				SUM(BuyBackAmountBA) AS BuyBackAmountBA,
@@ -558,25 +557,22 @@ BEGIN
 				SUM(BuyBackAmountSB + BuyBackAmountBA + CashoutCommission) AS BuyBackAmountAndComm,
 				SUM(TicketsPayout - BuyBackAmountSB - BuyBackAmountBA - CashoutCommission) AS Company
 			FROM (
-				SELECT b.RptDate, b.CurrencyId,
-					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.BetCount, 0) ELSE 0 END) AS CashoutTimes,
-					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.COTicketCount, 0) ELSE 0 END) AS CashoutTickets,
-					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.CashOutAmount, 0) ELSE 0 END) AS CashoutValue,					
-					SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1003 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountSB,
-					SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1004 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountBA,
-					SUM(CASE WHEN b.Bettype = 911 THEN ISNULL(b.TicketPayout, 0)ELSE 0 END) AS TicketsPayout,				
-					SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1003 THEN (b.BuyBackAmount * p.Rate) ELSE 0 END) AS CashoutCommission
-				FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
-					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN (@COProductId)
-				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate									
-					AND b.CurrencyID <> 20
-					AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
-					AND b.StatusID NOT IN (-1, 101, 102, 103)
-					AND b.CustomerCategory IN( 1003, 1004)
-				GROUP BY p.PartyId, b.RptDate, b.CurrencyId				
+					SELECT p.PartyId, b.Winlostdate, b.Currency,
+							SUM(b.NumOfCashoutTrans) AS CashoutTimes,
+							SUM(b.NumOfCashoutTicket) AS CashoutTickets,
+							SUM(b.CashoutAmount) AS CashoutValue,					
+							SUM(b.BuyBackAmt) AS BuyBackAmountSB,
+							SUM(b.BABuyBackAmt) AS BuyBackAmountBA,
+							SUM(b.TicketPayout) AS TicketsPayout,					
+							SUM(b.BuyBackAmt * p.Rate) AS CashoutCommission	
+					FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
+						INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate					
+					WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate									
+						AND b.Currency <> 20
+						AND b.ProductID = 25
+					GROUP BY p.PartyId, b.Winlostdate, b.Currency			
 			) d
-			GROUP BY d.RptDate, d.CurrencyID
+			GROUP BY d.Winlostdate, d.Currency
 		)		
 	END
 	ELSE
