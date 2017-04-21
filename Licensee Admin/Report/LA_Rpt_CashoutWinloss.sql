@@ -130,6 +130,7 @@ BEGIN
 					WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate									
 						AND b.Currency <> 20
 						AND b.ProductID = 25
+						AND b.RoleID = 1
 					GROUP BY p.PartyId, b.Winlostdate, b.Currency, p.ParentId				
 			) d
 			GROUP BY d.PartyId, d.ParentId,d.Winlostdate, d.Currency
