@@ -628,7 +628,9 @@ BEGIN
 			FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
 				INNER JOIN @PartyChargeInfo p ON b.SiteId = p.LicenseeId AND b.ProductId = p.ProductID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate
 			WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate									
-				AND b.ProductID = 25				
+				AND b.ProductID = 25	
+				AND b.Currency <> 20
+				AND b.RoleID = 1 -- Member Level			
 			GROUP BY p.LicenseeId, p.PartyId, b.Winlostdate, b.Currency
 		) d
 		INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.Currency = e.ExchangeID	
