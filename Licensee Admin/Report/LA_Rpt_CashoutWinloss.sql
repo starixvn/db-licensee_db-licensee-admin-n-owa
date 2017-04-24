@@ -123,8 +123,8 @@ BEGIN
 						SUM(b.BuyBackAmt) AS BuyBackAmountSB,
 						SUM(b.BABuyBackAmt) AS BuyBackAmountBA,
 						SUM(b.TicketPayout) AS TicketsPayout,					
-						SUM(b.BuyBackAmt * p.DI_Rate) AS CashoutCommission,	
-						SUM(b.BABuyBackAmt * p.Rate) AS IncomeOnBB						
+						SUM((b.BuyBackAmt + b.BABuyBackAmt) * p.DI_Rate) AS CashoutCommission,	
+						SUM((b.BuyBackAmt + b.BABuyBackAmt) * p.Rate) AS IncomeOnBB						
 					FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
 						INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate					
 					WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate									

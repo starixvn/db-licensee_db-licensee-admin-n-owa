@@ -607,38 +607,31 @@ BEGIN
 	INNER JOIN #Exchange e ON tcb.rptDate = e.ExchangeDate AND tcb.CurrencyId = e.ExchangeID	
 	-- End region: Get Amount By Product CB
 	
-	-- Region: Get Amount By Product CO
-	DECLARE @Bettype AS TABLE (Bettype INT, ProductID INT)		
-	INSERT INTO @Bettype(Bettype, ProductID)
-	SELECT Bettype,ProductID 
-	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, 'SB,BA,CO')
+	-- Region: Get Amount By Product CO	
 	
 	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,ProductId, AmountToCompany, LicenseeWinLossBase)
 	(
 		SELECT
 			d.LicenseeId,			
 			d.PartyId,
-			d.RptDate,
-			d.CurrencyID,
+			d.Winlostdate,
+			d.Currency,
 			@COProductId,
 			(TicketsPayout - BuyBackAmountSB - BuyBackAmountBA - CashoutCommission) * e.Rate AS AmountToCompany,
 			0				
 		FROM (
-			SELECT p.LicenseeId, p.PartyId, b.RptDate, b.CurrencyId,
-				SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1003 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountSB,
-				SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1004 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountBA,
-				SUM(ISNULL(b.TicketPayout, 0)) AS TicketsPayout,					
-				SUM(CASE WHEN b.Bettype = 911 AND b.CustomerCategory = 1003 THEN (b.BuyBackAmount * p.Rate) ELSE 0 END) AS CashoutCommission	
-			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN @PartyChargeInfo p ON b.SiteId = p.LicenseeId AND b.ProductId = p.ProductID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
-				INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (@COProductId)
-			WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate									
-				AND b.CurrencyID <> 20
-				AND b.StatusID NOT IN (-1, 101, 102, 103)
-				AND b.CustomerCategory IN( 1003, 1004)
-			GROUP BY p.LicenseeId, p.PartyId, b.RptDate, b.CurrencyId
+			SELECT p.LicenseeId, p.PartyId, b.Winlostdate, b.Currency,
+				SUM(b.BuyBackAmt) AS BuyBackAmountSB,
+				SUM(b.BABuyBackAmt) AS BuyBackAmountBA,
+				SUM(b.TicketPayout) AS TicketsPayout,					
+				SUM((b.BuyBackAmt + b.BABuyBackAmt) * p.Rate) AS CashoutCommission	
+			FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
+				INNER JOIN @PartyChargeInfo p ON b.SiteId = p.LicenseeId AND b.ProductId = p.ProductID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate
+			WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate									
+				AND b.ProductID = 25				
+			GROUP BY p.LicenseeId, p.PartyId, b.Winlostdate, b.Currency
 		) d
-		INNER JOIN #Exchange e ON d.rptDate = e.ExchangeDate AND d.CurrencyId = e.ExchangeID	
+		INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.Currency = e.ExchangeID	
 	)
 	-- End region: Get Amount By Product CO
 	
