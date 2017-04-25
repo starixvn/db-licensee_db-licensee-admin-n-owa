@@ -1,7 +1,7 @@
 USE [bodb_Licensee]
 GO
 
-ALTER PROCEDURE [dbo].LA_Rpt_LicenseeWinLossByProductAll
+ALTER PROCEDURE [dbo].LA_Rpt_LicenseeWinLossByDynamicProduct
 	@ProductIdString	VARCHAR(200),
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
@@ -122,5 +122,5 @@ BEGIN
 END
 GO
 
-GRANT EXECUTE ON [dbo].LA_Rpt_LicenseeWinLossByProductAll TO bodbAdminNet
+GRANT EXECUTE ON [dbo].LA_Rpt_LicenseeWinLossByDynamicProduct TO bodbAdminNet
 GO
