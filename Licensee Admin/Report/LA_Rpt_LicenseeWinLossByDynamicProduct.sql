@@ -85,7 +85,7 @@ BEGIN
 		FROM @Parties p2
 		GROUP BY p2.LicenseeId HAVING COUNT(p2.LicenseeId)>1
 	)
-	DELETE @Parties WHERE LicenseeId IN (SELECT p.LicenseeId FROM @Parties p WHERE p.PartyId = 0) AND PartyId > 0
+	DELETE @Parties WHERE LicenseeId IN (SELECT p.LicenseeId FROM @Parties p WHERE p.PartyId = -1) AND PartyId > 0
 
 	-- parties: charge rates
 	SELECT c.ProductId				AS ProductId,
