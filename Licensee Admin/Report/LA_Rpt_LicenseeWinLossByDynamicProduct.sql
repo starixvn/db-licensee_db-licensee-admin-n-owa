@@ -50,7 +50,7 @@ BEGIN
 	SELECT b.rptDate										AS WinLossDate,
 		b.SiteId											AS LicenseeId,
 		b.ProductId											AS ProductId,
-		b.BetType											AS Bettype,
+		ISNULL(sbr.BettypeRef, -1)							AS Bettype,
 		b.CurrencyId										AS CurrencyId,
 		SUM(ISNULL(b.MemberWL * e.BaseCurrencyRate, 0))		AS Winloss,
 		SUM(ISNULL(b.GrossWL * e.BaseCurrencyRate, 0))		AS GrossWinLoss,
@@ -59,7 +59,8 @@ BEGIN
 		SUM(b.BetCount)										AS BetCount
 	INTO #Data
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
-	INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName) e ON e.ExchangeId = b.CurrencyId
+	INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName) e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
+	LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.Bettype = b.Bettype
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 		AND b.StatusId NOT IN (-1, 101, 102, 103)
 		AND b.CurrencyID <> 20
@@ -67,7 +68,7 @@ BEGIN
 		AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
 		AND b.SiteID NOT IN (SELECT LabelID FROM CreditLicensees)
 		AND b.ProductID IN (SELECT p.ProductId FROM @Products p)
-	GROUP BY b.rptdate, b.SiteId, b.CurrencyID, b.ProductId, b.BetType
+	GROUP BY b.rptdate, b.SiteId, b.CurrencyID, b.ProductId, ISNULL(sbr.BettypeRef, -1)
 
 	-- get unkown parties
 	INSERT INTO @Parties
@@ -77,7 +78,7 @@ BEGIN
 
 	-- remove duplicate
 	INSERT @Parties
-	SELECT DISTINCT 0, STUFF((SELECT '-' + p3.PartyName FROM @Parties p3 WHERE p3.LicenseeId=p1.LicenseeId FOR XML PATH('')), 1, 1, '') AS PartyName, p1.LicenseeId
+	SELECT DISTINCT -1, STUFF((SELECT '-' + p3.PartyName FROM @Parties p3 WHERE p3.LicenseeId=p1.LicenseeId FOR XML PATH('')), 1, 1, '') AS PartyName, p1.LicenseeId
 	FROM @Parties p1
 	WHERE p1.LicenseeId IN (
 		SELECT p2.LicenseeId 
