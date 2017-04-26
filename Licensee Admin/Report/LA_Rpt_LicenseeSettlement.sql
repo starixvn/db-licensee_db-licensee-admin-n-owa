@@ -32,7 +32,8 @@ AS
 			- 20160428@Bruce: MGCRNG: Support Microgaming - Progressive Contribution
 			- 20160929@Scofield: Update for Colossus Bet
 			- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
-			- 20170329@Scofield: support Cashout [RedmineID :#73310]			
+			- 20170329@Scofield: support Cashout [RedmineID :#73310]		
+			- 20170404@Harper: using new sum table for Cashout Product [RedmineID: #73310]	
 		Param's Explanation:
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
 								'NG' -> Number Game			'BA' -> BA

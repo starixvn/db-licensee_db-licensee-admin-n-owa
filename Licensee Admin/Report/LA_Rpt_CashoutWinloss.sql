@@ -17,7 +17,7 @@ AS
 	Task : Report - Cashout Winloss
 	DB: DBEXT/bodb02
 	Revisions: 		
-		- 20170328@scofield.huynh: #73310 - Support new Keno report
+		- 20170401@Harper: #73310_Change sum table for CashOut Product
 	Param's Explanation:  						
 */  
 SET NOCOUNT ON

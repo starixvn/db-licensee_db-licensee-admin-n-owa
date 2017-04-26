@@ -41,7 +41,7 @@ AS
 		+ 2017.03.06 @bruce: include BA amount =0 [RedmindID: #72806]
 		+ 2017.03.07 @Scofield: include amount = 0 for all products [RedmindID: #72806]
 		+ 2017.04.03 @Scofield: update for Cashout [RedmindID: #73310]
-
+		+ 2017.04.04 @Harper: using new sum table for Cashout Product [RedmindID: #73310]
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
 	DECLARE @ToDate DATETIME  = '2016-06-30'
