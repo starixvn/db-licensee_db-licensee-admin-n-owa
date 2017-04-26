@@ -9,7 +9,7 @@ ALTER PROCEDURE [dbo].LA_Rpt_LicenseeWinLossByDynamicProduct
 AS
 /*	Header:
 	Created: 2017.04.21 - Bruce
-	Task : Get winloss report by all product
+	Task : Get winloss report by dynamic product
 	DB: DB052.bodb_Licensee
 */
 BEGIN
@@ -51,12 +51,9 @@ BEGIN
 		b.SiteId											AS LicenseeId,
 		b.ProductId											AS ProductId,
 		ISNULL(sbr.BettypeRef, -1)							AS Bettype,
-		b.CurrencyId										AS CurrencyId,
 		SUM(ISNULL(b.MemberWL * e.BaseCurrencyRate, 0))		AS Winloss,
 		SUM(ISNULL(b.GrossWL * e.BaseCurrencyRate, 0))		AS GrossWinLoss,
-		SUM(ISNULL(b.CommissionA * e.BaseCurrencyRate, 0))	AS Commission,
-		SUM(b.Turnover)										AS Turnover,
-		SUM(b.BetCount)										AS BetCount
+		SUM(ISNULL(b.CommissionA * e.BaseCurrencyRate, 0))	AS Commission
 	INTO #Data
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 	INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName) e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
@@ -68,7 +65,7 @@ BEGIN
 		AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
 		AND b.SiteID NOT IN (SELECT LabelID FROM CreditLicensees)
 		AND b.ProductID IN (SELECT p.ProductId FROM @Products p)
-	GROUP BY b.rptdate, b.SiteId, b.CurrencyID, b.ProductId, ISNULL(sbr.BettypeRef, -1)
+	GROUP BY b.rptdate, b.SiteId, b.ProductId, ISNULL(sbr.BettypeRef, -1)
 
 	-- get unkown parties
 	INSERT INTO @Parties
@@ -93,25 +90,10 @@ BEGIN
 		ISNULL(b.Bettype, -1)	AS Bettype,
 		c.DI_Rate				AS Rate,
 		c.FromDate				AS FromDate,
-		c.ToDate				AS ToDate,
-		CAST(1 AS BIT)			AS IsOriginal
+		c.ToDate				AS ToDate
 	INTO #ChargeRates
 	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) c
 	LEFT JOIN dbo.Sport_Bettype_Reference b WITH(NOLOCK) ON b.BettypeRef = c.Bettype AND IsActive = 1
-
-	INSERT INTO #ChargeRates
-	SELECT pp.ProductId			AS ProductId,
-		p.LicenseeId			AS LicenseeId,
-		ISNULL(b.Bettype, -1)	AS Bettype,
-		CAST(1 AS DECIMAL)		AS Rate,
-		@FromDate				AS FromDate,
-		@ToDate					AS ToDate,
-		0						AS IsOriginal
-	FROM @Parties p
-	INNER JOIN @Products pp ON 1=1
-	LEFT JOIN dbo.LA_Product3rdSub ps WITH(NOLOCK) ON ps.Productid = pp.ProductId
-	LEFT JOIN dbo.Sport_Bettype_Reference b WITH(NOLOCK) ON b.BettypeRef = ISNULL(ps.BettypeRef, -1) AND b.IsActive = 1
-	WHERE p.LicenseeId IN (SELECT d.LicenseeId FROM #Data d)
 
 	SELECT * FROM @Products
 	SELECT * FROM @Parties
