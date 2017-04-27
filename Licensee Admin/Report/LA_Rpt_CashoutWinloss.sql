@@ -151,7 +151,7 @@ BEGIN
 		d.PartyID				AS PartyID,
 		p.PartyName				AS PartyName,		
 		d.CurrencyId,			
-		e.CurrencyCode			AS CurrencyName,
+		CASE WHEN e.CurrencyCode='VND' THEN 'INH' ELSE e.CurrencyCode END AS CurrencyName,
 		SUM(CashoutTimes) AS CashoutTimes,
 		SUM(CashoutTickets) AS CashoutTickets,
 		SUM(CashoutValue * e.Rate) AS CashoutValue,
