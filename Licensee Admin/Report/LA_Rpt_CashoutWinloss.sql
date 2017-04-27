@@ -15,7 +15,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_CashoutWinloss]
 AS
 /*  Created: 20170328@scofield.huynh
 	Task : Report - Cashout Winloss
-	DB: DBEXT/bodb02
+	DB: DBLIC.bodb_licensee
 	Revisions: 		
 		- 20170401@Harper: #73310_Change sum table for CashOut Product
 	Param's Explanation:  						
@@ -59,7 +59,6 @@ BEGIN
 				)
 	
 	CREATE TABLE #Exchange(ExchangeDate DATE, ExchangeID INT, CurrencyCode VARCHAR(10), Rate FLOAT)		
-	CREATE TABLE #Bettype (Bettype INT, ProductID INT)
 
 	INSERT INTO @tmpParty(PartyId, ParentId, LicenseeId, ProductID, DI_Rate, Rate, Fromdate, Todate)
 	(
@@ -74,11 +73,6 @@ BEGIN
 		WHERE ci.ChargeType != @ProfitSharingChargeType				
 	)
 	
-	-- Get bettype of SB, BA
-	INSERT INTO #Bettype(Bettype, ProductID)
-	SELECT Bettype,ProductID 
-	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, 'SB,BA,CO')
-
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
@@ -240,7 +234,6 @@ BEGIN
 	DROP TABLE #Exchange												   
 	DROP TABLE #ExchangeBase
 	DROP TABLE #Result	
-	DROP TABLE #Bettype
 END
 GO
 
