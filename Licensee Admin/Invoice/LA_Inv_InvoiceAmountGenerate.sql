@@ -40,7 +40,8 @@ AS
 		+ 2016.11.04 @Scofield.Huynh: Update for CB
 		+ 2017.03.06 @bruce: include BA amount =0 [RedmindID: #72806]
 		+ 2017.03.07 @Scofield: include amount = 0 for all products [RedmindID: #72806]
-
+		+ 2017.04.03 @Scofield: update for Cashout [RedmindID: #73310]
+		+ 2017.04.04 @Harper: using new sum table for Cashout Product [RedmindID: #73310]
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
 	DECLARE @ToDate DATETIME  = '2016-06-30'
@@ -309,6 +310,7 @@ BEGIN
 	DECLARE @CommChargeType INT = 6
 	DECLARE @CashInShareChargeType INT = 7
 	DECLARE @CBProductId INT = 15
+	DECLARE @COProductId INT = 25
 	
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, TypeId, FromDate, ToDate)
 	SELECT	ci.FromParty,
@@ -528,7 +530,7 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.Bettype NOT IN (901,902,903)
-				AND b.ProductId <> @CBProductId
+				AND b.ProductId NOT IN (@CBProductId, @COProductId)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, r.BettypeRef
 	)
 	
@@ -604,6 +606,36 @@ BEGIN
 	FROM #TempDataCB tcb
 	INNER JOIN #Exchange e ON tcb.rptDate = e.ExchangeDate AND tcb.CurrencyId = e.ExchangeID	
 	-- End region: Get Amount By Product CB
+	
+	-- Region: Get Amount By Product CO	
+	
+	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,ProductId, AmountToCompany, LicenseeWinLossBase)
+	(
+		SELECT
+			d.LicenseeId,			
+			d.PartyId,
+			d.Winlostdate,
+			d.Currency,
+			@COProductId,
+			(TicketsPayout - BuyBackAmountSB - BuyBackAmountBA - CashoutCommission) * e.Rate AS AmountToCompany,
+			0				
+		FROM (
+			SELECT p.LicenseeId, p.PartyId, b.Winlostdate, b.Currency,
+				SUM(b.BuyBackAmt) AS BuyBackAmountSB,
+				SUM(b.BABuyBackAmt) AS BuyBackAmountBA,
+				SUM(b.TicketPayout) AS TicketsPayout,					
+				SUM(b.BuyBackAmt  * p.Rate) AS CashoutCommission	
+			FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
+				INNER JOIN @PartyChargeInfo p ON b.SiteId = p.LicenseeId AND b.ProductId = p.ProductID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate
+			WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate									
+				AND b.ProductID = 25	
+				AND b.Currency <> 20
+				AND b.RoleID = 1 -- Member Level			
+			GROUP BY p.LicenseeId, p.PartyId, b.Winlostdate, b.Currency
+		) d
+		INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.Currency = e.ExchangeID	
+	)
+	-- End region: Get Amount By Product CO
 	
 	-- Region: Check min fee group			
 	--- calculate waived prorate (*)
@@ -829,7 +861,7 @@ BEGIN
 						ELSE p.ProductName
 						END AS ProductName,
 					CASE
-						WHEN id.InvoiceAmount > 0 OR id.ProductId = 3 OR id.ProductId = @CBProductId THEN id.InvoiceAmount
+						WHEN id.InvoiceAmount > 0 OR id.ProductId = 3 OR id.ProductId = @CBProductId OR id.ProductId = @COProductId THEN id.InvoiceAmount
 						ELSE 0
 					END AS InvoiceAmount,
 					id.AmountType,

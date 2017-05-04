@@ -32,13 +32,15 @@ AS
 			- 20160428@Bruce: MGCRNG: Support Microgaming - Progressive Contribution
 			- 20160929@Scofield: Update for Colossus Bet
 			- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+			- 20170329@Scofield: support Cashout [RedmineID :#73310]		
+			- 20170404@Harper: using new sum table for Cashout Product [RedmineID: #73310]	
 		Param's Explanation:
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
 								'NG' -> Number Game			'BA' -> BA
 								'LC' -> Live Casino			'VS' -> Virtual Sports
 								'CS' -> RNG Casino			'BG' -> Bingo
 								'MGC'->Microgaming Casino	'BT' -> Bettrade
-								'CB' -> Colossus Bets
+								'CB' -> Colossus Bets		'CO' -> Cash Out
 	*/
 SET NOCOUNT ON
 BEGIN
@@ -69,7 +71,13 @@ BEGIN
 		ProgressiveContribution		MONEY,
 		ProgressivePayout			MONEY,
 		ProgressiveFee				MONEY,
-		Betcount					BIGINT
+		Betcount					BIGINT,
+		CashOutTimes				MONEY,
+		CashOutTickets				MONEY,
+		CashOutValue				MONEY,
+		TicketsPayout				MONEY,
+		CashoutCommission			MONEY,
+		BuyBackAmountAndComm		MONEY
 	)
 
 	CREATE TABLE #Exchange
@@ -527,6 +535,48 @@ BEGIN
 		-- Drop temp tables
 		DROP TABLE #TempData
 	END
+	ELSE IF (@ProductCode = 'CO')
+	BEGIN
+		DECLARE @SBProductId INT = 0
+		DECLARE @BAProductId INT = 3
+		DECLARE @COProductId INT = (SELECT Productid FROM bodb_licensee.dbo.Product3rd WHERE ProductPrefix = 'CO') 
+		-- add more bettype for SB, BA		
+
+		INSERT INTO #Result( Winlostdate, CurrencyId, CashoutTimes, CashoutTickets, CashoutValue, BuyBackAmountSB, BuyBackAmountBA, BuyBackAmount, TicketsPayout, CashoutCommission, BuyBackAmountAndComm, Company)
+		(
+			SELECT
+				d.Winlostdate,
+				d.Currency,
+				SUM(CashoutTimes) AS CashoutTimes,
+				SUM(ISNULL(CashoutTickets, 0)) AS CashoutTickets,
+				SUM(CashoutValue) AS CashoutValue,					
+				SUM(BuyBackAmountSB) AS BuyBackAmountSB,
+				SUM(BuyBackAmountBA) AS BuyBackAmountBA,
+				SUM(BuyBackAmountSB + BuyBackAmountBA) AS BuyBackAmount,
+				SUM(TicketsPayout) AS TicketsPayout,					
+				SUM(CashoutCommission) AS CashoutCommission,
+				SUM(BuyBackAmountSB + BuyBackAmountBA + CashoutCommission) AS BuyBackAmountAndComm,
+				SUM(TicketsPayout - BuyBackAmountSB - BuyBackAmountBA - CashoutCommission) AS Company
+			FROM (
+					SELECT p.PartyId, b.Winlostdate, b.Currency,
+							SUM(b.NumOfCashoutTrans) AS CashoutTimes,
+							SUM(b.NumOfCashoutTicket) AS CashoutTickets,
+							SUM(b.CashoutAmount) AS CashoutValue,					
+							SUM(b.BuyBackAmt) AS BuyBackAmountSB,
+							SUM(b.BABuyBackAmt) AS BuyBackAmountBA,
+							SUM(b.TicketPayout) AS TicketsPayout,					
+							SUM(b.BuyBackAmt * p.Rate) AS CashoutCommission	
+					FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
+						INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate					
+					WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate									
+						AND b.Currency <> 20
+						AND b.ProductID = 25
+						AND b.RoleID = 1 -- Member
+					GROUP BY p.PartyId, b.Winlostdate, b.Currency			
+			) d
+			GROUP BY d.Winlostdate, d.Currency
+		)		
+	END
 	ELSE
 	BEGIN
 		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
@@ -593,6 +643,12 @@ BEGIN
 		, SUM(ISNULL(d.ProgressiveContribution, 0))		AS ProgressiveContribution
 		, SUM(ISNULL(d.ProgressivePayout, 0))			AS ProgressivePayout
 		, SUM(ISNULL(d.ProgressiveFee, 0))				AS ProgressiveFee
+		, SUM(ISNULL(d.CashoutTimes, 0))				AS CashoutTimes
+		, SUM(ISNULL(d.CashoutTickets, 0))				AS CashoutTickets
+		, SUM(ISNULL(d.CashoutValue, 0))				AS CashoutValue
+		, SUM(ISNULL(d.TicketsPayout, 0))				AS TicketsPayout
+		, SUM(ISNULL(d.CashoutCommission, 0))			AS CashoutCommission
+		, SUM(ISNULL(d.BuyBackAmountAndComm, 0))		AS BuyBackAmountAndComm		
 
 		--Base on currency
 		, CONVERT(MONEY, SUM(ISNULL(d.Turnover * e.Rate, 0)))					AS TurnoverBase
@@ -611,7 +667,13 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.Company* e.Rate, 0)))						AS CompanyBase
 		, CONVERT(MONEY, SUM(ISNULL(d.ProgressiveContribution * e.Rate, 0)))	AS ProgressiveContributionBase
 		, CONVERT(MONEY, SUM(ISNULL(d.ProgressiveFee * e.Rate, 0)))				AS ProgressiveFeeBase
-		, CONVERT(MONEY, SUM(ISNULL(d.ProgressivePayout * e.Rate, 0)))			AS ProgressivePayoutBase
+		, CONVERT(MONEY, SUM(ISNULL(d.ProgressivePayout * e.Rate, 0)))			AS ProgressivePayoutBase		
+		, CONVERT(MONEY, SUM(ISNULL(d.CashoutTimes * e.Rate, 0)))				AS CashoutTimesBase
+		, CONVERT(MONEY, SUM(ISNULL(d.CashoutTickets * e.Rate, 0)))				AS CashoutTicketsBase
+		, CONVERT(MONEY, SUM(ISNULL(d.CashoutValue * e.Rate, 0)))				AS CashoutValueBase
+		, CONVERT(MONEY, SUM(ISNULL(d.TicketsPayout * e.Rate, 0)))				AS TicketsPayoutBase
+		, CONVERT(MONEY, SUM(ISNULL(d.CashoutCommission * e.Rate, 0)))			AS CashoutCommissionBase
+		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountAndComm * e.Rate, 0)))		AS BuyBackAmountAndCommBase
 	FROM
 		#Result d
 		INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
@@ -628,4 +690,6 @@ END
 
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicenseeSettlement] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeSettlement] TO bodbAdminNet
+GO
+GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeSettlement] TO [bodbAdminNet]
+GO

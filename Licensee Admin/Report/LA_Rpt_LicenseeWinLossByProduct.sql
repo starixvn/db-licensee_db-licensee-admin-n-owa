@@ -23,7 +23,10 @@ AS
 		+ 2015.12.15@Bruce: Add MGCLC and MGCRNG
 		+ 2016.05.05@Bravo: Add VB Data
 		+ 2016.10.12@Bruce: Order result by group
+		+ 2017.04.10@Scofield: Support AB and FW [#74738]
+		+ 20170412: @Scofield - Removing Trading Bet Types [#73310]
 */
+		
 /*	Example:
 	USE bodb_Licensee
 	DECLARe @PartyIdString	VARCHAR(500)	= '14,15,29,25,30'
@@ -38,7 +41,7 @@ BEGIN
 	SET NOCOUNT ON
 	
 	-- Region: Get party charge rate info
-	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB'
+	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW'
 	
 	-- Region: Get Party ID
 	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)
@@ -125,7 +128,7 @@ BEGIN
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
-				AND b.Bettype NOT IN (901,902,903)
+				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, b.ProductId, ISNULL(sbr.BettypeRef, -1)
 	)
 	
@@ -160,7 +163,9 @@ BEGIN
 		VG			MONEY, -- VG
 		MGCLC		MONEY, -- Microgaming - Live Casino
 		MGCRNG		MONEY,  -- Microgaming - RNG Casino
-		VB			MONEY  -- VB
+		VB			MONEY,  -- VB
+		AB			MONEY,	-- AB
+		FW			MONEY	-- FW	
 	)
 	INSERT INTO #LicenseeAmount(GroupName, GroupId, LicenseeId, PartyId,PartyName)
 	SELECT	CASE
@@ -221,7 +226,9 @@ BEGIN
 				ISNULL(SUM(CASE WHEN d.ProductId = 12 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS VG,
 				ISNULL(SUM(CASE WHEN d.ProductId = 14 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS MGCLC,
 				ISNULL(SUM(CASE WHEN d.ProductId = 17 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS MGCRNG,
-				ISNULL(SUM(CASE WHEN d.ProductId = 22 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS VB
+				ISNULL(SUM(CASE WHEN d.ProductId = 22 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS VB,
+				ISNULL(SUM(CASE WHEN d.ProductId = 21 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS AB,
+				ISNULL(SUM(CASE WHEN d.ProductId = 24 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS FW
 		FROM	#TempData d
 				INNER JOIN @PartyChargeInfo ci ON	d.PartyId = ci.PartyId 
 													AND ci.ProductId = d.ProductId 
@@ -243,7 +250,9 @@ BEGIN
 			VG = a.VG,
 			MGCLC = a.MGCLC,
 			MGCRNG = a.MGCRNG,
-			VB = a.VB
+			VB = a.VB,
+			AB = a.AB,
+			FW = a.FW
 	FROM	#LicenseeAmount l
 			INNER JOIN AmountDueByProduct a ON a.LicenseeId = l.LicenseeId AND a.PartyId = l.PartyId
 	
@@ -262,8 +271,9 @@ BEGIN
 			AND MGCLC IS NULL
 			AND MGCRNG IS NULL
 			AND VB IS NULL
-	
-	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB
+			AND AB IS NULL
+			AND FW IS NULL
+	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW
 	FROM	#LicenseeAmount l
 	ORDER BY l.GroupId, l.PartyId
 	

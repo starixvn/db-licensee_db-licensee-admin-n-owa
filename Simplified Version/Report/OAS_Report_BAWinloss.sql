@@ -28,6 +28,7 @@ AS
    - 20150824@Florent: remove bettrade ticket
    - 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
    - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+   - 20170405@Harper: #73310 - Remove Cashout Bettype
 
  *
  * Params explanation:
@@ -184,7 +185,7 @@ BEGIN
 				@DrawFilter <> 1
 				OR b.statusID != 111
 				) -- NoDraw filter
-			AND b.bettype NOT IN( 901, 902, 903, 904)
+			AND b.bettype NOT IN( 901, 902, 903, 904, 911, 912, 913, 914)
 		GROUP BY b.winlostdate
 			,b.currency
 	END
@@ -226,7 +227,7 @@ BEGIN
 				@DrawFilter <> 1
 				OR b.statusID != 111
 				) -- NoDraw filter
-			AND b.bettype NOT IN( 901, 902, 903, 904)
+			AND b.bettype NOT IN( 901, 902, 903, 904, 911, 912, 913, 914)
 		GROUP BY b.winlostdate
 			,b.currency
 	END
@@ -336,6 +337,9 @@ BEGIN
 END
 
 GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_Report_BAWinloss] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[OAS_Report_BAWinloss] TO bodbAdminNet 
 
+GRANT VIEW DEFINITION ON [dbo].[OAS_Report_BAWinloss] TO [vnteam] 
+GO
+
+GRANT EXECUTE ON [dbo].[OAS_Report_BAWinloss] TO bodbAdminNet 
+GO

@@ -26,6 +26,7 @@ AS
 	DB: DB052.bodb02  
 	Revisions:
 	- 20160316: @Forrest - Change SporttypeRef to Sporttype for Microgaming  
+	- 20170412: @Scofield - Removing Trading Bet Types [#73310]
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
 		+ @Currency	:  0- All Currencies
@@ -76,6 +77,7 @@ BEGIN
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
 				AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
+				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
 			GROUP BY ci.PartyID, b.rptDate, b.ProductID, currencyID
 		)
 		
@@ -249,6 +251,7 @@ BEGIN
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
 				AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
 				AND b.customercategory NOT IN (27,28)
+				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
 			GROUP BY b.rptDate, ci.PartyID, b.ProductID, b.CurrencyID
 		)
 

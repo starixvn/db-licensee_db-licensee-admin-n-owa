@@ -32,6 +32,7 @@ AS
 	- 20160217@Victor: hotfix - remove bettrade bettypes [Redmine: 52120]
 	- 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
 	- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+	- 20170405@Harper: #73310 - Remove Cashout Bettype
  * 
  * Param's Explanation:    
  *  - @ID   : Party ID  (include: LicenseeID, ResellerID)
@@ -186,7 +187,7 @@ BEGIN
 				FROM @tmpAg
 				)*/
 			AND (Bettype < 31  OR (Bettype BETWEEN 121 AND 999) OR (Bettype BETWEEN 1301 AND 1399))
-			AND b.bettype NOT IN (901, 902, 903, 904) -- bettrade bettypes
+			AND b.bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914) -- bettrade- Cashout bettypes
 			AND b.ruben = 1
 			AND b.statusID NOT IN (101, 102, 103)
 			AND tpositiontaking <> 0
@@ -244,7 +245,7 @@ BEGIN
 				FROM @tmpAg
 				)
 			 */
-			AND b.bettype NOT IN (901, 902, 903, 904)-- bettrade bettypes
+			AND b.bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914)-- bettrade - Cashout bettypes
 			AND b.statusID <> 101
 			AND ISNULL(b.isBA, 0) = 0
 		GROUP BY b.winlostdate

@@ -33,6 +33,7 @@ AS
 		- 20160808@Jim:  LRF - Integrate Allbet [Redmine: #61066]
 		- 20161115@Jim: LRF - Integrate new product Fishing World [RedmineID : #66737]
 		- 20170221@bruce: support NG2 [#70050]
+		- 20170327@Harper: #73110 - Integrate new product Cashout
 
 	Param's Explanation:
 
@@ -53,7 +54,7 @@ BEGIN
 	   WHERE (typeid < 31
 		  OR typeid BETWEEN 121 AND 999
 		  OR typeid BETWEEN 1301 AND 1399)
-		  AND typeid NOT IN (901, 902, 903,904) -- Bettrade bettypes
+		  AND typeid NOT IN (901, 902, 903,904, 911, 912, 913, 914) -- Bettrade bettypes
  
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
@@ -66,7 +67,7 @@ BEGIN
 	   WHERE (typeid < 31
 		  OR typeid BETWEEN 121 AND 999
 		  OR typeid BETWEEN 1301 AND 1399)
-		  AND typeid NOT IN (901, 902, 903,904) -- Bettrade bettypes
+		  AND typeid NOT IN (901, 902, 903,904, 911, 912, 913, 914) -- Bettrade bettypes
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
@@ -231,6 +232,16 @@ BEGIN
 	   WHERE typeid  BETWEEN 2501 AND 2699
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
 	END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'CO')
+	BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 25
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 911 AND 914
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+	END
 	
 	RETURN
 END
+

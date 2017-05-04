@@ -7,19 +7,21 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceBillerInfoGet] 
-	  @BillerId INT
-	, @PayerId INT
-	, @InvoiceType INT
+	  @BillerId		INT
+	, @PayerId		INT
+	, @InvoiceType	INT
+	, @Environment	VARCHAR(20)
 AS
 /*	Header:
 	Created: 2015.08.06 - Bravo.Tran
 	Task : Create Invoice 
 	DB: DBLIC/bodb_Licensee
-   
+
 	Revisions: 
 		+ 20150806@Bravo: Invoice Biller Info - Get
 		+ 20151019@Victor: Support Chinese on Invoice's text fields
 		+ 20160728@Bruce: Software data fee & hosting fee have a same invoice no
+		+ 20170421@Bruce: Add environment filter
 */
 /*	Example:
 	USE bodb_licensee
@@ -30,21 +32,22 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	
-	DECLARE @InvoiceInfo AS TABLE(		
-			InvoiceSymbol		NVARCHAR(20), 
-			InvoiceNumber		INT,
-			InvoiceTemplateId	SMALLINT,
-			InvoiceTemplateName	VARCHAR(50),
-			InvoiceTemplatePath	VARCHAR(255),
-			IsSeparateProduct	BIT)
-	INSERT	INTO @InvoiceInfo(InvoiceTemplateId,InvoiceTemplateName,InvoiceTemplatePath)
+
+	DECLARE @InvoiceInfo AS TABLE(
+		InvoiceSymbol		NVARCHAR(20),
+		InvoiceNumber		INT,
+		InvoiceTemplateId	SMALLINT,
+		InvoiceTemplateName	VARCHAR(50),
+		InvoiceTemplatePath	VARCHAR(255),
+		IsSeparateProduct	BIT
+	)
+	INSERT INTO @InvoiceInfo(InvoiceTemplateId,InvoiceTemplateName,InvoiceTemplatePath)
 	(
 		SELECT	ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath
 		FROM	dbo.LA_InvoiceSetting ivs WITH(NOLOCK) 
 				INNER JOIN dbo.LA_InvoiceTemplate itpl WITH(NOLOCK) ON ivs.InvTempId = itpl.InvTemplateId
-		WHERE	ivs.FromPartyId = @PayerId 
-				AND ivs.ToPartyId = @BillerId	
+		WHERE	ivs.FromPartyId = @PayerId
+				AND ivs.ToPartyId = @BillerId
 		GROUP	BY ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath
 	)
 
@@ -61,7 +64,7 @@ BEGIN
 			i.InvoiceSymbol,
 			MAX(i.InvoiceNumber)
 	FROM	LA_InvoiceHeader i WITH(NOLOCK)
-	WHERE	i.BillerId = @BillerId
+	WHERE	i.BillerId = @BillerId AND (i.Environment IS NULL OR i.Environment = @Environment)
 	GROUP BY i.BillerId,i.InvoiceType,i.InvoiceSymbol,i.InvoiceDate
 	ORDER BY i.InvoiceDate DESC
 		

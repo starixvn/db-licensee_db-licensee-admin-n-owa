@@ -23,6 +23,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert]
 	, @HostingFeeMaxPCU		INT = 0
 	, @HostingFeeRateAmount	MONEY = 0
 	, @HostingFeeIsWaived	BIT = 0
+	, @Environment			VARCHAR(20)
 	, @ErrCode				INT				= 0		OUTPUT
 	, @ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
 	, @NewInvoiceNumber		INT						OUTPUT
@@ -39,6 +40,7 @@ AS
 		+ 20151019@Victor: Support Chinese on Invoice's text fields
 		+ 20160718@Bruce: Hosting fees - Insert hosting fees info
 		+ 20170330@Bruce: Don't save details [RedmineID: #74096]
+		+ 20170421@Bruce: Add environment filter
 */
 /*	Example:
 	USE bodb_licensee
@@ -85,11 +87,13 @@ BEGIN
 		IF EXISTS (	SELECT	1
 					FROM	dbo.LA_InvoiceHeader lih WITH(NOLOCK)
 					WHERE	lih.InvoiceSymbol = @InvoiceSymbol
-							AND lih.InvoiceNumber = @InvoiceNumber)
+							AND lih.InvoiceNumber = @InvoiceNumber
+							AND lih.Environment = @Environment
+		)
 		BEGIN
 			SELECT	@InvoiceNumber = (MAX(InvoiceNumber) + 1)
 			FROM	dbo.LA_InvoiceHeader lih WITH(NOLOCK)
-			WHERE	lih.InvoiceSymbol = @InvoiceSymbol
+			WHERE	lih.InvoiceSymbol = @InvoiceSymbol AND lih.Environment = @Environment
 		END
 
 		IF(@InvoiceNumber IS NULL)
