@@ -250,7 +250,7 @@ BEGIN
 													AND mf.ProductId = t.ProductId), 0)
 	FROM	@TotalMinFees t
 	-- End region
-			
+
 	-- Region: Calculate IsApplyMinFee
 	UPDATE	amf
 	SET		amf.IsApplyMinFee	=	CASE 
@@ -274,12 +274,12 @@ BEGIN
 		DaysInMonth			INT,
 		IsWaived			BIT DEFAULT 0)
 
-	IF ((SELECT COUNT(*) FROM @MinFeeGroup WHERE FeeType = 1 AND PartyId = @PartyId AND IsApplyMinFee = 1) > 0) AND
+	IF ((SELECT COUNT(*) FROM @MinFeeGroup WHERE FeeType = 1 AND PartyId = @PartyId) > 0) AND
 		((SELECT COUNT(*) FROM @MinFeeGroup WHERE FeeType = 2 AND PartyId = @PartyId) > 0)
 	BEGIN
 		INSERT INTO @Result(FromDate, ToDate, IsWaived)
 		SELECT FromDate, ToDate, 1
-		FROM @MinFeeGroup WHERE FeeType = 2 AND PartyId = @PartyId		
+		FROM @MinFeeGroup WHERE FeeType = 2 AND PartyId = @PartyId
 
 		IF (SELECT MIN(FromDate) FROM @Result ) > @FromDate
 		INSERT INTO @Result (FromDate, ToDate) VALUES(@FromDate, DATEADD(DAY,-1,(SELECT MIN(FromDate) FROM @Result )))
@@ -287,22 +287,24 @@ BEGIN
 		IF (SELECT MAX(ToDate) FROM @Result ) < @ToDate
 		INSERT INTO @Result (FromDate, ToDate) VALUES(DATEADD(DAY,1,(SELECT MAX(ToDate) FROM @Result )), @ToDate)
 
-		;WITH a AS (SELECT *, ROW_NUMBER() over(ORDER BY FromDate) period FROM @Result)
+		;WITH a AS (
+			SELECT *, ROW_NUMBER() OVER(ORDER BY FromDate) period FROM @Result
+		)
 		INSERT INTO @Result(FromDate, ToDate)
 		SELECT DATEADD(DAY,1,a.ToDate), DATEADD(DAY,-1,(SELECT b.FromDate FROM a b WHERE b.period=(a.period+1)))
 		FROM a
-		WHERE DATEADD(DAY,1,a.ToDate) < (SELECT b.FromDate FROM a b WHERE b.period=(a.period+1))	
+		WHERE DATEADD(DAY,1,a.ToDate) < (SELECT b.FromDate FROM a b WHERE b.period=(a.period+1))
 
 		UPDATE @Result
 		SET CurrencyName = @BaseCurrencyName, 
 			MinFeeAmount = (SELECT TOP 1 FeeAmount FROM @MinFeeGroup WHERE FeeType = 1 AND PartyId = @PartyId),
-			MinFeeProrateTotal = (SELECT TOP 1 MinFeeProrate FROM @MinFeeGroup WHERE FeeType = 1 AND PartyId = @PartyId),
+			MinFeeProrateTotal = (SELECT TOP 1 MinFeeProrate FROM @MinFeeGroup WHERE FeeType = 1 AND PartyId = @PartyId AND IsApplyMinFee = 1),
 			NumberOfDays = (DATEDIFF(DAY, FromDate, ToDate) + 1),
 			DaysInMonth = @DaysInMonth
 		WHERE IsWaived = 0
 
 		UPDATE @Result
-		SET MinFeeProrate = MinFeeProrateTotal * (NumberOfDays/(SELECT SUM(NumberOfDays) FROM @Result))
+		SET MinFeeProrate = ISNULL(MinFeeProrateTotal,0) * (NumberOfDays/(SELECT SUM(NumberOfDays) FROM @Result))
 	END		
 	-- End region
 
@@ -310,6 +312,9 @@ BEGIN
 	SELECT FromDate, ToDate, CurrencyName, MinFeeAmount, MinFeeProrate, NumberOfDays, DaysInMonth, IsWaived
 	FROM @Result ORDER BY FromDate
 	-- End region
+
+	DROP TABLE #Exchange
+	DROP TABLE #TempData
 END		
 
 GO
