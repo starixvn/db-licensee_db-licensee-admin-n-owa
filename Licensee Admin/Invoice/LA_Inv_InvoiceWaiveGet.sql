@@ -312,7 +312,9 @@ BEGIN
 
 	-- Region: Get result
 	SELECT FromDate, ToDate, CurrencyName, MinFeeAmount, MinFeeProrate, NumberOfDays, DaysInMonth, IsWaived
-	FROM @Result ORDER BY FromDate
+	FROM @Result
+	WHERE NumberOfDays < DaysInMonth
+	ORDER BY FromDate
 	-- End region
 
 	DROP TABLE #Exchange
