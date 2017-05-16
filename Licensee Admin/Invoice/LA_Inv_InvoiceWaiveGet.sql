@@ -7,8 +7,8 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceWaiveGet] 
-	@FromDate		Date,
-	@ToDate			Date,
+	@FromDate		DATE,
+	@ToDate			DATE,
 	@PartyId		INT,
 	@ProductCode	VARCHAR(100) = 'SB'	  /* Default is Sportbook and currently we use this SP for SB only */
 AS
@@ -84,7 +84,7 @@ BEGIN
 		WHERE	DI_Rate > 0 AND ProductId NOT IN (1, 15) --exclude RB, CB
 	)
 	-- End region
-	
+
 	-- Region: Get exchange rate info
 	CREATE	TABLE #Exchange ( 
 			ExchangeDate	DATE, 
@@ -144,7 +144,7 @@ BEGIN
 	DELETE	FROM @MinFeeGroup
 	WHERE	ProductID NOT IN (SELECT ProductId FROM @MinFeeGroup WHERE [@MinFeeGroup].PartyId = @PartyId)	
 			OR (FeeType = 2 AND (FromDate > ToDate))
-	
+
 	-- Region: Get Amount by Product
 	CREATE	TABLE #TempData (
 			LicenseeId		INT, 
@@ -191,7 +191,7 @@ BEGIN
 					(td.ProductId = p.ProductID AND td.BettypeRef = p.BettypeRef AND td.ProductId IN (SELECT DISTINCT Productid FROM dbo.LA_Product3rdSub WITH(NOLOCK))))
 				AND td.rptDate BETWEEN p.FromDate AND p.ToDate
 			INNER JOIN #Exchange e ON td.rptDate = e.ExchangeDate AND td.CurrencyId = e.ExchangeID	
-		
+
 	UPDATE  t
 	SET		t.IsApplyMinFee = 0
 	FROM	#TempData t INNER JOIN @MinFeeGroup m ON t.rptDate BETWEEN m.FromDate AND m.ToDate
@@ -227,7 +227,7 @@ BEGIN
 	FROM	@MinFeeGroup amf
 	WHERE	amf.FeeType = 1
 	-- End region
-	
+
 	-- Region: Sum min fee amount
 	DECLARE @TotalMinFees TABLE(
 		ProductId			INT,
@@ -253,11 +253,7 @@ BEGIN
 
 	-- Region: Calculate IsApplyMinFee
 	UPDATE	amf
-	SET		amf.IsApplyMinFee	=	CASE 
-										WHEN t.TotalMinFeeAmount < t.TotalMinFee AND amf.MinFeeAmount < amf.MinFeeProrate 
-											THEN 1
-										ELSE 0
-									END
+	SET		amf.IsApplyMinFee = CASE WHEN (t.TotalMinFeeAmount < t.TotalMinFee) AND (amf.MinFeeAmount < amf.MinFeeProrate) THEN 1 ELSE 0 END
 	FROM	@MinFeeGroup amf INNER JOIN @TotalMinFees t ON amf.ProductId = t.ProductId
 	WHERE	amf.FeeType = 1	
 	-- End region
@@ -273,9 +269,9 @@ BEGIN
 		NumberOfDays		FLOAT,
 		DaysInMonth			INT,
 		IsWaived			BIT DEFAULT 0)
-
-	IF ((SELECT COUNT(*) FROM @MinFeeGroup WHERE FeeType = 1 AND PartyId = @PartyId) > 0) AND
-		((SELECT COUNT(*) FROM @MinFeeGroup WHERE FeeType = 2 AND PartyId = @PartyId) > 0)
+	
+	-- Split waive range and non-waive range
+	IF ((SELECT COUNT(*) FROM @MinFeeGroup WHERE FeeType = 2 AND PartyId = @PartyId) > 0)
 	BEGIN
 		INSERT INTO @Result(FromDate, ToDate, IsWaived)
 		SELECT FromDate, ToDate, 1
@@ -286,26 +282,32 @@ BEGIN
 
 		IF (SELECT MAX(ToDate) FROM @Result ) < @ToDate
 		INSERT INTO @Result (FromDate, ToDate) VALUES(DATEADD(DAY,1,(SELECT MAX(ToDate) FROM @Result )), @ToDate)
-
-		;WITH a AS (
+		
+		;WITH OrderedPeriods AS (
 			SELECT *, ROW_NUMBER() OVER(ORDER BY FromDate) period FROM @Result
 		)
 		INSERT INTO @Result(FromDate, ToDate)
-		SELECT DATEADD(DAY,1,a.ToDate), DATEADD(DAY,-1,(SELECT b.FromDate FROM a b WHERE b.period=(a.period+1)))
-		FROM a
-		WHERE DATEADD(DAY,1,a.ToDate) < (SELECT b.FromDate FROM a b WHERE b.period=(a.period+1))
+		SELECT DATEADD(DAY,1,a.ToDate), DATEADD(DAY,-1,(SELECT b.FromDate FROM OrderedPeriods b WHERE b.period=(a.period+1)))
+		FROM OrderedPeriods a
+		WHERE DATEADD(DAY,1,a.ToDate) < (SELECT b.FromDate FROM OrderedPeriods b WHERE b.period=(a.period+1))
+	END
+	ELSE IF ((SELECT COUNT(*) FROM @MinFeeGroup WHERE PartyId = @PartyId AND IsApplyMinFee = 1) > 0)
+	BEGIN
+		INSERT INTO @Result(FromDate, ToDate, IsWaived)
+		SELECT FromDate, ToDate, 0
+		FROM @MinFeeGroup WHERE PartyId = @PartyId AND IsApplyMinFee = 1
+	END
 
-		UPDATE @Result
-		SET CurrencyName = @BaseCurrencyName, 
-			MinFeeAmount = (SELECT TOP 1 FeeAmount FROM @MinFeeGroup WHERE FeeType = 1 AND PartyId = @PartyId),
-			MinFeeProrateTotal = (SELECT TOP 1 MinFeeProrate FROM @MinFeeGroup WHERE FeeType = 1 AND PartyId = @PartyId AND IsApplyMinFee = 1),
-			NumberOfDays = (DATEDIFF(DAY, FromDate, ToDate) + 1),
-			DaysInMonth = @DaysInMonth
-		WHERE IsWaived = 0
+	UPDATE @Result
+	SET CurrencyName = @BaseCurrencyName, 
+		MinFeeAmount = (SELECT TOP 1 FeeAmount FROM @MinFeeGroup WHERE FeeType = 1 AND PartyId = @PartyId),
+		MinFeeProrateTotal = (SELECT TOP 1 MinFeeProrate FROM @MinFeeGroup WHERE FeeType = 1 AND PartyId = @PartyId AND IsApplyMinFee = 1),
+		NumberOfDays = (DATEDIFF(DAY, FromDate, ToDate) + 1),
+		DaysInMonth = @DaysInMonth
+	WHERE IsWaived = 0
 
-		UPDATE @Result
-		SET MinFeeProrate = ISNULL(MinFeeProrateTotal,0) * (NumberOfDays/(SELECT SUM(NumberOfDays) FROM @Result))
-	END		
+	UPDATE @Result
+	SET MinFeeProrate = ISNULL(MinFeeProrateTotal,0) * (NumberOfDays/(SELECT SUM(NumberOfDays) FROM @Result))
 	-- End region
 
 	-- Region: Get result
