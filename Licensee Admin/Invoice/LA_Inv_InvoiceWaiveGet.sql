@@ -29,11 +29,9 @@ BEGIN
 	-- End region
 
 	-- Region: Get Base Currency for Party
-	DECLARE @BaseCurrencyId INT = 12
-	SET		@BaseCurrencyId = ISNULL((	SELECT TOP 1 opd.BaseCurrencyId
-										FROM dbo.OAS_PartyDetail opd WITH(NOLOCK)	
-										WHERE	opd.PartyID = @PartyId
-									), 12)
+	DECLARE @BaseCurrencyId INT = ISNULL((
+		SELECT TOP 1 opd.BaseCurrencyId FROM dbo.OAS_PartyDetail opd WITH(NOLOCK) WHERE opd.PartyID = @PartyId
+	), 6) -- default is EUR
 
 	DECLARE @BaseCurrencyTable AS TABLE(Id INT, Name VARCHAR(5))
 	INSERT	INTO @BaseCurrencyTable(Id,Name)
@@ -269,7 +267,7 @@ BEGIN
 		NumberOfDays		FLOAT,
 		DaysInMonth			INT,
 		IsWaived			BIT DEFAULT 0)
-	
+
 	-- Split waive range and non-waive range
 	IF ((SELECT COUNT(*) FROM @MinFeeGroup WHERE FeeType = 2 AND PartyId = @PartyId) > 0)
 	BEGIN
@@ -313,7 +311,7 @@ BEGIN
 	-- Region: Get result
 	SELECT FromDate, ToDate, CurrencyName, MinFeeAmount, MinFeeProrate, NumberOfDays, DaysInMonth, IsWaived
 	FROM @Result
-	WHERE NumberOfDays < DaysInMonth
+	WHERE IsWaived = 1 OR NumberOfDays < DaysInMonth
 	ORDER BY FromDate
 	-- End region
 
