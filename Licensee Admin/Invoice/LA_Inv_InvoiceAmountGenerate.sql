@@ -530,7 +530,7 @@ BEGIN
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
-				AND b.Bettype NOT IN (901,902,903)
+				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
 				AND b.ProductId NOT IN (@CBProductId, @COProductId)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, r.BettypeRef
 	)
@@ -539,7 +539,7 @@ BEGIN
 
 	UPDATE	#TempData
 	SET		AmountToCompany =	CASE  
-									WHEN td.ProductId = 3 THEN (-td.WinLoss * p.Rate - td.AComm) * e.Rate									
+									WHEN td.ProductId = 3 THEN (-td.WinLoss * p.Rate - td.AComm) * e.Rate
 									WHEN td.ProductId <> 3 THEN (-td.WinLoss * p.Rate) * e.Rate
 									ELSE 0 
 								END,
