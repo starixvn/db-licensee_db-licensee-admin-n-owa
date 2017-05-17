@@ -169,11 +169,11 @@ BEGIN
 													AND p.LicenseeId = b.SiteId
 													AND (b.Bettype = -1 OR r.BettypeRef = p.BettypeRef)
 													AND b.rptDate BETWEEN p.FromDate AND p.ToDate
-		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate			
+		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
-				AND b.Bettype NOT IN (901,902,903,911,912,913)
+				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914) -- exclude BT and CO
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, r.BettypeRef
 	)
 	
