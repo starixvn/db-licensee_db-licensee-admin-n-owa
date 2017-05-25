@@ -42,6 +42,7 @@ AS
 		+ 2017.03.07 @Scofield: include amount = 0 for all products [RedmindID: #72806]
 		+ 2017.04.03 @Scofield: update for Cashout [RedmindID: #73310]
 		+ 2017.04.04 @Harper: using new sum table for Cashout Product [RedmindID: #73310]
+		+ 2017.05.05 @Bruce: Correct Product name in Description [RedmindID: #75950]
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
 	DECLARE @ToDate DATETIME  = '2016-06-30'
@@ -529,7 +530,7 @@ BEGIN
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
-				AND b.Bettype NOT IN (901,902,903)
+				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
 				AND b.ProductId NOT IN (@CBProductId, @COProductId)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, r.BettypeRef
 	)
@@ -538,7 +539,7 @@ BEGIN
 
 	UPDATE	#TempData
 	SET		AmountToCompany =	CASE  
-									WHEN td.ProductId = 3 THEN (-td.WinLoss * p.Rate - td.AComm) * e.Rate									
+									WHEN td.ProductId = 3 THEN (-td.WinLoss * p.Rate - td.AComm) * e.Rate
 									WHEN td.ProductId <> 3 THEN (-td.WinLoss * p.Rate) * e.Rate
 									ELSE 0 
 								END,
@@ -897,7 +898,7 @@ BEGIN
 		IF @InvoiceType = 1			
 		BEGIN
 			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, AmountType)
-			SELECT pd.ProductID, pd.ProductPrefix, pd.ProductPrefix, 0, 0
+			SELECT pd.ProductID, pd.ProductPrefix, pd.ProductName, 0, 0
 			FROM
 				(SELECT DISTINCT pci.ProductID 
 				FROM @PartyChargeInfo pci

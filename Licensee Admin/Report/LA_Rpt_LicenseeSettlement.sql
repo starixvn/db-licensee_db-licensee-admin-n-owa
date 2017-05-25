@@ -34,6 +34,7 @@ AS
 			- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 			- 20170329@Scofield: support Cashout [RedmineID :#73310]		
 			- 20170404@Harper: using new sum table for Cashout Product [RedmineID: #73310]	
+			- 20170511@bruce: include exchange rate [RedmineID: #76132]
 		Param's Explanation:
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
 								'NG' -> Number Game			'BA' -> BA
@@ -85,7 +86,7 @@ BEGIN
 		ExchangeDate	DATE,
 		ExchangeID		INT,
 		CurrencyCode	VARCHAR(10),
-		Rate			FLOAT
+		Rate			DECIMAL(6,5)
 	)
 
 	DECLARE @tmpParty AS TABLE
@@ -624,6 +625,7 @@ BEGIN
 		, @ToDate					AS WinLostDate
 		, d.CurrencyId				AS CurrencyId
 		, e.CurrencyCode			AS CurrencyName
+		, e.Rate					AS ExchangeRate
 		, SUM(Betcount)				AS Betcount
 		--orginal
 		, SUM(ISNULL(d.Turnover, 0))					AS Turnover
@@ -648,7 +650,7 @@ BEGIN
 		, SUM(ISNULL(d.CashoutValue, 0))				AS CashoutValue
 		, SUM(ISNULL(d.TicketsPayout, 0))				AS TicketsPayout
 		, SUM(ISNULL(d.CashoutCommission, 0))			AS CashoutCommission
-		, SUM(ISNULL(d.BuyBackAmountAndComm, 0))		AS BuyBackAmountAndComm		
+		, SUM(ISNULL(d.BuyBackAmountAndComm, 0))		AS BuyBackAmountAndComm
 
 		--Base on currency
 		, CONVERT(MONEY, SUM(ISNULL(d.Turnover * e.Rate, 0)))					AS TurnoverBase
@@ -679,7 +681,8 @@ BEGIN
 		INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
 	GROUP BY
 		d.CurrencyId
-		, CurrencyCode
+		, e.CurrencyCode
+		, e.Rate
 		, d.Game
 	ORDER BY CurrencyId ASC
 
