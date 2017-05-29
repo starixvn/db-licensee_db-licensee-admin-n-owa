@@ -13,7 +13,7 @@ ALTER PROCEDURE [dbo].[LA_DiscountModify]
 	, @AssignedPartyIds VARCHAR(1204) = ''
 	, @RateSettingsData VARCHAR(MAX) = ''
 	, @UserId INT
-	, @Remark NVARCHAR(1000)
+	, @Remark NVARCHAR(4000)
 	, @LoginIp VARCHAR (50)	= ''
 	, @ErrCode INT = 0 OUTPUT
 	, @ErrMsg VARCHAR(4000)= '' OUTPUT
@@ -45,8 +45,8 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @startRun DATETIME, @endRun DATETIME, @duration INT, @logSPData VARCHAR(MAX)
-		, @logSPDataOld	VARCHAR(MAX), @xml XML, @MaxAmountValue MONEY = 10000000000000--922,337,203,685,477.5807
+	DECLARE @startRun DATETIME, @endRun DATETIME, @duration INT, @logSPData NVARCHAR(MAX)
+		, @logSPDataOld	NVARCHAR(MAX), @xml XML, @MaxAmountValue MONEY = 10000000000000--922,337,203,685,477.5807
 	SET @startRun = GETDATE()
 	
 	--check empty
@@ -329,7 +329,7 @@ BEGIN
 				FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupId = @DiscountGroupId
 				FOR XML PATH('r'), TYPE)
 
-		SET @logSPDataOld = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"')
+		SET @logSPDataOld = CONVERT(NVARCHAR(MAX), @xml)
 
 		--update discount group assingment
 		;MERGE dbo.LA_DiscountGroupAssignment WITH(ROWLOCK, UPDLOCK) AS t
@@ -430,7 +430,7 @@ BEGIN
 				FOR XML PATH('z'), TYPE)
 			FOR XML PATH('r'), TYPE)
 
-		SET @logSpData = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"')
+		SET @logSpData = CONVERT(NVARCHAR(MAX), @xml)
 
 	--get log action
 	DECLARE @ActionID INT = 0
