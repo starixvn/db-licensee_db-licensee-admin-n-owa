@@ -25,6 +25,7 @@ AS
 		+ 2016.10.12@Bruce: Order result by group
 		+ 2017.04.10@Scofield: Support AB and FW [#74738]
 		+ 20170412: @Scofield - Removing Trading Bet Types [#73310]
+		+ 20170605@Bruce: - Include Bettrade [#76131]
 */
 		
 /*	Example:
@@ -41,7 +42,7 @@ BEGIN
 	SET NOCOUNT ON
 	
 	-- Region: Get party charge rate info
-	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW'
+	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT'
 	
 	-- Region: Get Party ID
 	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)
@@ -150,23 +151,24 @@ BEGIN
 		LicenseeId	INT,
 		PartyId		INT,
 		PartyName	VARCHAR(200),
-		SB			MONEY, --SB
-		RB			MONEY, -- RB
-		NG			MONEY, -- NG	
+		SB			MONEY, -- Sportsbook
+		RB			MONEY, -- Racing
+		NG			MONEY, -- Number Game	
 		BA			MONEY, -- BA
-		LC			MONEY, -- LC
-		VS			MONEY, -- VS
-		CS			MONEY, -- CS
-		KN			MONEY, -- KN
-		AGC			MONEY, -- AGC
-		GD			MONEY, -- GD
-		VG			MONEY, -- VG
+		LC			MONEY, -- Live Casino
+		VS			MONEY, -- Virtual Sports
+		CS			MONEY, -- RNG Casino
+		KN			MONEY, -- Keno
+		AGC			MONEY, -- AG Casino
+		GD			MONEY, -- Gold Deluxe
+		VG			MONEY, -- Vegas games
 		MGCLC		MONEY, -- Microgaming - Live Casino
-		MGCRNG		MONEY,  -- Microgaming - RNG Casino
-		VB			MONEY,  -- VB
-		AB			MONEY,	-- AB
-		FW			MONEY	-- FW	
-	)
+		MGCRNG		MONEY, -- Microgaming - RNG Casino
+		VB			MONEY, -- Macau Games
+		AB			MONEY, -- Allbet
+		FW			MONEY, -- Fishing World
+		BT			MONEY  -- BetTrade
+	)						  
 	INSERT INTO #LicenseeAmount(GroupName, GroupId, LicenseeId, PartyId,PartyName)
 	SELECT	CASE
 				WHEN p.PartyId = 1 THEN 'ONEWorks'
@@ -196,7 +198,8 @@ BEGIN
 	UPDATE	d
 	SET		BA = a.Amount
 	FROM	#LicenseeAmount d INNER JOIN AmountDueBA a ON a.LicenseeId = d.LicenseeId
-	
+	-- End BA
+
 	-- RB
 	;WITH AmountDueRacing AS
 	(
@@ -210,7 +213,36 @@ BEGIN
 	UPDATE	d
 	SET		RB = a.Amount
 	FROM	#LicenseeAmount d INNER JOIN AmountDueRacing a ON a.LicenseeId = d.LicenseeId
+	-- End RB
 
+	-- BT
+	DECLARE @BTWinLoss AS TABLE (LicenseeId INT, Amount MONEY)
+	;WITH t AS (
+		SELECT b.RptDate, b.SiteId, b.CurrencyId
+			, SUM(CASE WHEN b.ProductId IN (0,13) AND b.Bettype = 901 THEN (b.BuyBackAmount - b.MemberWL) ELSE 0 END) AS ActualStake
+			, SUM(CASE WHEN b.ProductId IN (0,13) AND b.Bettype = 901 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountTotal
+			, SUM(CASE WHEN b.ProductId IN (0,13) AND b.Bettype = 901 AND b.CustomerCategory = 1001 THEN -b.BuyBackAmount * p.Rate ELSE 0 END) AS BettradeComm
+			, SUM(CASE WHEN b.ProductID <> 13 THEN b.MemberWL ELSE 0 END) AS BettradeWinLoss
+		FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			INNER JOIN @PartyChargeInfo p ON b.SiteId = p.LicenseeID AND p.ProductID = 13
+		WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
+			AND b.CurrencyID <> 20
+			AND b.StatusId NOT IN (-1, 101, 102, 103)
+			AND b.CustomerCategory IN (1001, 1002)
+			AND b.ProductID IN (0, 3, 13) -- include original and Bettrade tickets
+		GROUP BY b.RptDate, b.SiteId, b.CurrencyId
+	)
+	INSERT INTO @BTWinLoss
+	SELECT t.SiteId, SUM ((t.BettradeWinLoss + t.BettradeComm + t.ActualStake - t.BuyBackAmountTotal) * e.Rate)
+	FROM t INNER JOIN #Exchange e ON t.RptDate = e.ExchangeDate AND t.CurrencyId = e.ExchangeId
+	GROUP BY t.SiteID
+
+	UPDATE	d
+	SET		BT = a.Amount
+	FROM	#LicenseeAmount d INNER JOIN @BTWinLoss a ON a.LicenseeId = d.LicenseeId 
+	-- End BT
+
+	-- Others
 	;WITH AmountDueByProduct AS
 	(
 		SELECT	d.PartyId,
@@ -273,10 +305,10 @@ BEGIN
 			AND VB IS NULL
 			AND AB IS NULL
 			AND FW IS NULL
-	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW
+			AND BT IS NULL
+	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, L.BT
 	FROM	#LicenseeAmount l
-	ORDER BY l.GroupId, l.PartyId
-	
+	ORDER BY l.GroupId, l.PartyId	
 	-- EndRegion
 
 	DROP TABLE #Exchange
