@@ -26,6 +26,7 @@ AS
 		+ 2017.04.10@Scofield: Support AB and FW [#74738]
 		+ 20170412: @Scofield - Removing Trading Bet Types [#73310]
 		+ 20170605@Bruce: - Include Bettrade [#76131]
+						  - Include Colossus bet [#76131]
 */
 		
 /*	Example:
@@ -42,7 +43,7 @@ BEGIN
 	SET NOCOUNT ON
 	
 	-- Region: Get party charge rate info
-	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT'
+	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB'
 	
 	-- Region: Get Party ID
 	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)
@@ -130,6 +131,7 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
+				AND b.ProductID NOT IN (3,1,13,15)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, b.ProductId, ISNULL(sbr.BettypeRef, -1)
 	)
 	
@@ -167,7 +169,8 @@ BEGIN
 		VB			MONEY, -- Macau Games
 		AB			MONEY, -- Allbet
 		FW			MONEY, -- Fishing World
-		BT			MONEY  -- BetTrade
+		BT			MONEY, -- BetTrade
+		CB			MONEY  -- Colossus bet
 	)						  
 	INSERT INTO #LicenseeAmount(GroupName, GroupId, LicenseeId, PartyId,PartyName)
 	SELECT	CASE
@@ -242,6 +245,68 @@ BEGIN
 	FROM	#LicenseeAmount d INNER JOIN @BTWinLoss a ON a.LicenseeId = d.LicenseeId 
 	-- End BT
 
+	-- CB
+	DECLARE @CommChargeType INT = 6
+	DECLARE @CashInShareChargeType INT = 7
+
+	DECLARE @CBChargeRates AS TABLE (
+		PartyId			INT,
+		LicenseeId		INT,
+		Rate			MONEY,
+		TypeId			SMALLINT,
+		FromDate		DATETIME,
+		ToDate			DATETIME
+	)
+
+	INSERT INTO @CBChargeRates(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
+	SELECT	p.PartyID,
+			CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END,
+			ci.Rate,
+			ci.ChargeType,
+			CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
+			CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
+	FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
+		LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
+		LEFT JOIN bodb_licensee.dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
+	WHERE p.PartyID IN (SELECT pc.PartyId FROM @PartyChargeInfo pc) 
+		AND ci.ProductID = 15
+		AND ci.ChargeType IN (@CommChargeType,@CashInShareChargeType) AND (
+			@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
+			@ToDate BETWEEN ci.FromDate AND ci.ToDate OR
+			ci.FromDate BETWEEN @FromDate AND @ToDate OR
+			ci.ToDate BETWEEN @FromDate AND @ToDate
+		)
+
+	DECLARE @CBWinLoss AS TABLE (LicenseeId INT, Amount MONEY)
+	;WITH t AS (
+		SELECT b.SiteId, b.rptDate,
+			SUM(Turnover * e.Rate) Turnover,
+			SUM(ISNULL(WinPrizeAmount * e.Rate,0)) WinningPrize,
+			SUM(ISNULL(CashOutAmount * e.Rate,0)) CashOut,
+			SUM(ISNULL(BuyBackAmount * e.Rate,0)) CashInAmount
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+		INNER JOIN @CBChargeRates cb ON b.SiteID = cb.LicenseeId AND b.rptDate BETWEEN cb.FromDate AND cb.ToDate
+		INNER JOIN #Exchange e ON e.ExchangeID=b.CurrencyId AND e.ExchangeDate = b.rptDate
+		WHERE b.ProductID = 15
+			AND b.CustomerCategory NOT IN (27, 28)
+			AND b.StatusId NOT IN (-1, 101, 102, 103)
+			AND b.CurrencyId <> 20
+			AND cb.TypeId = @CommChargeType -- to remove duplicate we use one of (6,7)
+		GROUP BY b.rptDate, b.SiteId
+	)
+	INSERT INTO @CBWinLoss
+	SELECT t.SiteId, SUM(t.Turnover) - SUM(t.WinningPrize) - SUM(t.CashOut) - SUM(t.Turnover * cm.Rate) - SUM(t.CashInAmount * ci.Rate)
+	FROM t
+	INNER JOIN @CBChargeRates AS cm ON cm.TypeId = @CommChargeType AND (t.rptDate BETWEEN cm.FromDate AND cm.ToDate) AND cm.LicenseeId=t.SiteID
+	INNER JOIN @CBChargeRates AS ci ON ci.TypeId = @CashInShareChargeType AND (t.rptDate BETWEEN ci.FromDate AND ci.ToDate) AND ci.LicenseeId=t.SiteID
+	GROUP BY t.SiteId
+
+	UPDATE	d
+	SET		CB = a.Amount
+	FROM	#LicenseeAmount d INNER JOIN @CBWinLoss a ON a.LicenseeId = d.LicenseeId
+	-- End CB
+
 	-- Others
 	;WITH AmountDueByProduct AS
 	(
@@ -306,7 +371,8 @@ BEGIN
 			AND AB IS NULL
 			AND FW IS NULL
 			AND BT IS NULL
-	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, L.BT
+			AND CB IS NULL
+	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB
 	FROM	#LicenseeAmount l
 	ORDER BY l.GroupId, l.PartyId	
 	-- EndRegion
