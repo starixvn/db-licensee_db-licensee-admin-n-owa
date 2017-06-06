@@ -27,6 +27,7 @@ AS
 		+ 20170412: @Scofield - Removing Trading Bet Types [#73310]
 		+ 20170605@Bruce: - Include Bettrade [#76131]
 						  - Include Colossus bet [#76131]
+						  - Include CashOut [#76131]
 */
 		
 /*	Example:
@@ -43,7 +44,7 @@ BEGIN
 	SET NOCOUNT ON
 	
 	-- Region: Get party charge rate info
-	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB'
+	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO'
 	
 	-- Region: Get Party ID
 	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)
@@ -131,7 +132,7 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
-				AND b.ProductID NOT IN (3,1,13,15)
+				AND b.ProductID NOT IN (3,1,13,15,25)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, b.ProductId, ISNULL(sbr.BettypeRef, -1)
 	)
 	
@@ -170,7 +171,8 @@ BEGIN
 		AB			MONEY, -- Allbet
 		FW			MONEY, -- Fishing World
 		BT			MONEY, -- BetTrade
-		CB			MONEY  -- Colossus bet
+		CB			MONEY, -- Colossus bet
+		CO			MONEY  -- CashOut
 	)						  
 	INSERT INTO #LicenseeAmount(GroupName, GroupId, LicenseeId, PartyId,PartyName)
 	SELECT	CASE
@@ -307,6 +309,32 @@ BEGIN
 	FROM	#LicenseeAmount d INNER JOIN @CBWinLoss a ON a.LicenseeId = d.LicenseeId
 	-- End CB
 
+	-- CO
+	DECLARE @COWinLoss AS TABLE (LicenseeId INT, Amount MONEY)
+	;WITH t AS (
+		SELECT b.SiteId,
+			SUM(b.BuyBackAmt * e.Rate) AS BuyBackAmountSB,
+			SUM(b.BABuyBackAmt * e.Rate) AS BuyBackAmountBA,
+			SUM(b.TicketPayout * e.Rate) AS TicketsPayout,					
+			SUM(b.BuyBackAmt * p.Rate * e.Rate) AS CashoutCommission	
+		FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
+			INNER JOIN @PartyChargeInfo p ON b.SiteId = p.LicenseeID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate AND p.ProductID = b.ProductID
+			INNER JOIN #Exchange e ON e.ExchangeID=b.Currency AND e.ExchangeDate = b.Winlostdate
+		WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate									
+			AND b.Currency <> 20
+			AND b.RoleID = 1 -- Member
+		GROUP BY b.SiteId
+	)
+	INSERT INTO @COWinLoss
+	SELECT SiteId, SUM(TicketsPayout - BuyBackAmountSB - BuyBackAmountBA - CashoutCommission)
+	FROM t
+	GROUP BY t.SiteId
+
+	UPDATE	d
+	SET		CO = a.Amount
+	FROM	#LicenseeAmount d INNER JOIN @COWinLoss a ON a.LicenseeId = d.LicenseeId
+	-- End CO
+
 	-- Others
 	;WITH AmountDueByProduct AS
 	(
@@ -372,7 +400,7 @@ BEGIN
 			AND FW IS NULL
 			AND BT IS NULL
 			AND CB IS NULL
-	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB
+	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO
 	FROM	#LicenseeAmount l
 	ORDER BY l.GroupId, l.PartyId	
 	-- EndRegion
