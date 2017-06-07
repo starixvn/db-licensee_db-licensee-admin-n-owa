@@ -23,6 +23,7 @@ AS
 		+ 20150807@Bravo: Invoice Info List - Get
 		+ 20151019@Victor: Support Chinese on Invoice's text fields
 		+ 20170330@Bruce: include invoice path [RedmineID: #74096]
+		+ 20170606@Bruce: include invoice status, invoiceno [RedmineID: #76411]
 */
 /*	Example:
 	USE bodb_licensee
@@ -120,7 +121,8 @@ BEGIN
 	-- End Region
 
 	-- Region: Get data
-	SELECT  i.InvoiceHeaderId,
+	;WITH a AS (
+		SELECT i.InvoiceHeaderId,			
 			i.InvoiceSymbol,
 			i.InvoiceNumber,
 			b.BillerName,
@@ -131,17 +133,25 @@ BEGIN
 			bct.CurrencyName,
 			i.Amount,
 			i.InvoicePath,
-			i.Environment
-	FROM	dbo.LA_InvoiceHeader i WITH(NOLOCK)
-			INNER JOIN dbo.LA_BillerInfo b ON i.BillerId = b.PartyId
-			INNER JOIN dbo.OAS_Party p ON i.PartyId = p.PartyID
-			INNER JOIN dbo.LA_InvoiceType it ON i.InvoiceType = it.InvTypeId
+			i.Environment,
+			i.StatusId,
+			i.UpdatedDateTime AS UpdatedTime,
+			ISNULL(u.Username, '') AS UpdatedBy,
+			i.InvoiceSymbol + CASE WHEN i.InvoiceNumber < 100 
+				THEN RIGHT('000' + CONVERT(VARCHAR(5), i.InvoiceNumber), 3) 
+				ELSE CONVERT(VARCHAR(20), i.InvoiceNumber) END AS InvoiceNo
+		FROM dbo.LA_InvoiceHeader i WITH(NOLOCK)
+			INNER JOIN dbo.LA_BillerInfo b WITH(NOLOCK) ON i.BillerId = b.PartyId
+			INNER JOIN dbo.OAS_Party p  WITH(NOLOCK) ON i.PartyId = p.PartyID
+			INNER JOIN dbo.LA_InvoiceType it WITH(NOLOCK) ON i.InvoiceType = it.InvTypeId
 			INNER JOIN @BaseCurrencyTable bct ON i.CurrencyId = bct.CurrencyId
-	WHERE	(i.InvoiceSymbol + CONVERT(NVARCHAR(20), i.InvoiceNumber) = @InvoiceNo OR @InvoiceNo = '')
-			AND i.BillerId IN (SELECT Id FROM @BillerTable)
+			LEFT JOIN dbo.LA_User u WITH(NOLOCK) ON u.UserID = i.UpdatedBy
+		WHERE i.BillerId IN (SELECT Id FROM @BillerTable)	--(i.InvoiceSymbol + CASE WHEN i.InvoiceNumber < 1000 THEN  RIGHT('000' + CONVERT(VARCHAR(20), i.InvoiceNumber), ) = @InvoiceNo OR @InvoiceNo = '')
 			AND i.PartyId IN (SELECT Id FROM @PayerTable)
 			AND i.InvoiceType IN (SELECT Id FROM @InvoiceTypeTable)
 			AND i.ToDate BETWEEN @IssueFromDate AND @IssueToDate
+	)
+	SELECT * FROM a WHERE ISNULL(@InvoiceNo, '') = '' OR InvoiceNo LIKE @InvoiceNo ESCAPE '\' 
 	-- End Region
 
 END
