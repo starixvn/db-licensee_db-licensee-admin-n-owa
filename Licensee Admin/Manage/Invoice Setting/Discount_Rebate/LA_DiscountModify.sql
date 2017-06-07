@@ -1,7 +1,8 @@
 USE bodb_licensee
 GO
 
-ALTER PROCEDURE [dbo].[LA_DiscountModify] @DiscountGroupId SMALLINT = 0
+ALTER PROCEDURE [dbo].[LA_DiscountModify]
+	  @DiscountGroupId SMALLINT = 0
 	, @GroupName VARCHAR(50)
 	, @DiscountGroupType TINYINT
 	, @CurrencyId TINYINT
@@ -11,10 +12,9 @@ ALTER PROCEDURE [dbo].[LA_DiscountModify] @DiscountGroupId SMALLINT = 0
 	, @ProductIds VARCHAR(512) = ''
 	, @AssignedPartyIds VARCHAR(1204) = ''
 	, @RateSettingsData VARCHAR(MAX) = ''
-
 	, @UserId INT
+	, @Remark NVARCHAR(4000)
 	, @LoginIp VARCHAR (50)	= ''
-
 	, @ErrCode INT = 0 OUTPUT
 	, @ErrMsg VARCHAR(4000)= '' OUTPUT
 	, @GroupIdOut SMALLINT = 0 OUTPUT
@@ -25,6 +25,7 @@ AS
 	 DB: DB052.bodb_Licensee
    
 	 Revisions:
+		+ 20170518@Bruce: include remark [#76133]
 	 Params:
 		@RateSettingsData = '<Root>
 								<RateSetting>
@@ -44,8 +45,8 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @startRun DATETIME, @endRun DATETIME, @duration INT, @logSPData VARCHAR(MAX)
-		, @logSPDataOld	VARCHAR(MAX), @xml XML, @MaxAmountValue MONEY = 10000000000000--922,337,203,685,477.5807
+	DECLARE @startRun DATETIME, @endRun DATETIME, @duration INT, @logSPData NVARCHAR(MAX)
+		, @logSPDataOld	NVARCHAR(MAX), @xml XML, @MaxAmountValue MONEY = 10000000000000--922,337,203,685,477.5807
 	SET @startRun = GETDATE()
 	
 	--check empty
@@ -209,8 +210,8 @@ BEGIN
 	IF @IsEdit = 0
 	BEGIN
 		--insert discount group header
-		INSERT INTO dbo.LA_DiscountGroupHeader(DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, Priority)
-		VALUES(@GroupName, @DiscountGroupType, @CurrencyId, @FromDate, @ToDate, CASE WHEN @DiscountGroupType = 1 THEN 1 ELSE 2 END)
+		INSERT INTO dbo.LA_DiscountGroupHeader(DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, [Priority], Remark)
+		VALUES(@GroupName, @DiscountGroupType, @CurrencyId, @FromDate, @ToDate, CASE WHEN @DiscountGroupType = 1 THEN 1 ELSE 2 END, @Remark)
 
 		IF @@ERROR <> 0
 		BEGIN
@@ -306,7 +307,8 @@ BEGIN
 					, FromDate AS '@fd'
 					, ToDate AS '@td'
 					, DiscountGroupType AS '@dt'
-					, Priority AS '@pr'
+					, [Priority] AS '@pr'
+					, Remark AS '@rm'
 					, (SELECT DiscountGroupId AS '@dg'
 						, FromAmount AS '@fam'
 						, ToAmount AS '@tam'
@@ -327,7 +329,7 @@ BEGIN
 				FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupId = @DiscountGroupId
 				FOR XML PATH('r'), TYPE)
 
-		SET @logSPDataOld = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"')
+		SET @logSPDataOld = CONVERT(NVARCHAR(MAX), @xml)
 
 		--update discount group assingment
 		;MERGE dbo.LA_DiscountGroupAssignment WITH(ROWLOCK, UPDLOCK) AS t
@@ -388,6 +390,7 @@ BEGIN
 			, CurrencyId = CASE WHEN @DiscountGroupType = 1 THEN @CurrencyId ELSE 0 END
 			, FromDate = @FromDate
 			, ToDate = @ToDate
+			, Remark = @Remark
 		WHERE DiscountGroupId = @DiscountGroupId
 
 		IF @@ERROR <> 0
@@ -427,7 +430,7 @@ BEGIN
 				FOR XML PATH('z'), TYPE)
 			FOR XML PATH('r'), TYPE)
 
-		SET @logSpData = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"')
+		SET @logSpData = CONVERT(NVARCHAR(MAX), @xml)
 
 	--get log action
 	DECLARE @ActionID INT = 0
