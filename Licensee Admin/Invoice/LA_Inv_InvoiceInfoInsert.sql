@@ -104,7 +104,24 @@ BEGIN
 
 	BEGIN TRY
 		DECLARE @CurrentDateTime DATETIME = GETDATE()
-		INSERT	INTO dbo.LA_InvoiceHeader (BillerId, PartyId, CurrencyId, InvoiceSymbol, InvoiceNumber, FromDate, ToDate, InvoiceDate, DueDate, Amount, InvoiceType, StatusId, Note, HasSent, HasDeleted, CreatedBy, CreatedDateTime, IsSeparateProduct, MaxPCU, RateAmount, IsWaived)
+		DECLARE @InvoiceNo VARCHAR(50) =  CAST(@InvoiceNumber AS VARCHAR(10))
+		SET @InvoiceNo = @InvoiceSymbol + (CASE WHEN @InvoiceNumber < 100 THEN RIGHT('000' + @InvoiceNo,3) ELSE @InvoiceNo END)
+
+		DECLARE @InvoiceTypeList TABLE(InvoiceTypeId TINYINT, InvoiceTypeName VARCHAR(10))
+		INSERT INTO @InvoiceTypeList VALUES (1,'SW'),(2,'BA'),(3,'RB'),(4,'CN'),(5,'DN'),(6,'HF'),(7,'SF')
+
+		DECLARE @InvoiceNoCount INT = (
+			SELECT COUNT(1) 
+			FROM dbo.LA_InvoiceHeader WITH(NOLOCK) 
+			WHERE InvoiceNumber = @InvoiceNumber AND InvoiceSymbol = @InvoiceSymbol AND Environment = @Environment
+		)
+		--{environment}-{invoice-type}-{invoice-number}-{create-date}-{gen-number}.pdf
+		DECLARE @InvoiceFileName VARCHAR(255) = (
+			SELECT @Environment + '-' + InvoiceTypeName + '-' + @InvoiceNo + '-' + CONVERT(varchar(50),@CurrentDateTime, 112) + '-' + CAST((@InvoiceNoCount + 1) AS VARCHAR(10)) + '.pdf'
+			FROM @InvoiceTypeList WHERE InvoiceTypeId = @InvoiceType
+		)
+
+		INSERT	INTO dbo.LA_InvoiceHeader (BillerId, PartyId, CurrencyId, InvoiceSymbol, InvoiceNumber, FromDate, ToDate, InvoiceDate, DueDate, Amount, InvoiceType, StatusId, Note, HasSent, HasDeleted, CreatedBy, CreatedDateTime, IsSeparateProduct, MaxPCU, RateAmount, IsWaived, InvoicePath, Environment)
 		VALUES
 		(
 				@BillerId,
@@ -127,7 +144,9 @@ BEGIN
 				@IsSeparateProduct,
 				@HostingFeeMaxPCU,
 				@HostingFeeRateAmount,
-				@HostingFeeIsWaived
+				@HostingFeeIsWaived,
+				@InvoiceFileName,
+				@Environment
 		)
 	END TRY
 	BEGIN CATCH
@@ -166,7 +185,7 @@ BEGIN
 			InvoiceAmount	VARCHAR(20) 'InvoiceAmount',
 			AmountType		VARCHAR(10) 'AmountType'
 		)
-		EXEC sp_xml_removedocument @idoc
+		EXEC sp_xml_removedocument @idoc		
 						
 		INSERT	INTO dbo.LA_InvoiceDetail(InvoiceHeaderId,[Description],Reference,ProductId,InvoiceAmount,AmountType)
 		SELECT	@CurrentInvoiceHeaderId,[Description],Reference,ProductId,Amount,AmountType
