@@ -6,7 +6,7 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceListGet]
-	@InvoiceNo		NVARCHAR(50) = '',
+	@InvoiceNo		NVARCHAR(50)= '',
 	@InvoiceTypes	VARCHAR(100)= '',
 	@BillerIds		VARCHAR(500)= '',
 	@PayerIds		VARCHAR(500)= '',
@@ -146,7 +146,7 @@ BEGIN
 			INNER JOIN dbo.LA_InvoiceType it WITH(NOLOCK) ON i.InvoiceType = it.InvTypeId
 			INNER JOIN @BaseCurrencyTable bct ON i.CurrencyId = bct.CurrencyId
 			LEFT JOIN dbo.LA_User u WITH(NOLOCK) ON u.UserID = i.UpdatedBy
-		WHERE i.BillerId IN (SELECT Id FROM @BillerTable)	--(i.InvoiceSymbol + CASE WHEN i.InvoiceNumber < 1000 THEN  RIGHT('000' + CONVERT(VARCHAR(20), i.InvoiceNumber), ) = @InvoiceNo OR @InvoiceNo = '')
+		WHERE i.BillerId IN (SELECT Id FROM @BillerTable)
 			AND i.PartyId IN (SELECT Id FROM @PayerTable)
 			AND i.InvoiceType IN (SELECT Id FROM @InvoiceTypeTable)
 			AND i.ToDate BETWEEN @IssueFromDate AND @IssueToDate
