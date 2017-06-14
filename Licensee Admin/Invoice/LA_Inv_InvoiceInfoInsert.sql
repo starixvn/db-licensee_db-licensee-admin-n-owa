@@ -53,9 +53,7 @@ BEGIN
 		@startRun		DATETIME, 
 		@endRun			DATETIME, 
 		@duration		INT, 
-		@logSPData		NVARCHAR(MAX), 
-		@logSPDataOld	NVARCHAR(MAX), 
-		@xml			XML
+		@logSPData		NVARCHAR(MAX) 
 
 	SET @startRun = GETDATE()
 
@@ -202,34 +200,35 @@ BEGIN
 	-- Region: Write Log
 	SET @endRun = GETDATE()
 	SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun)
-	SET @xml = (
-			SELECT @CurrentInvoiceHeaderId AS '@hid'
-				, @BillerId			AS '@b'
-				, @PayerId			AS '@p'
-				, @CurrencyId		AS '@c'
-				, @InvoiceSymbol	AS '@is'
-				, @InvoiceNumber	AS '@in'
-				, @CurrentDateTime	AS '@ivd'
-				, @DueDate			AS '@dd'
-				, @Amount			AS '@amt'
-				, @InvoiceType		AS '@ivt'
-				, 0					AS '@stt'
-				, @Note				AS '@n'
-				, 0					AS '@hs'
-				, 0					AS '@hd'
-				, @UserID			AS '@cb'
-				, @CurrentDateTime	AS '@crd'
-				, @CurrentDateTime	AS '@upd'
-				, (SELECT 
-					@CurrentInvoiceHeaderId AS '@hid'
-					, [Description]			AS '@d'
-					, Reference				AS '@r'
-					, ProductId				AS '@pr'
-					, Amount				AS '@amt'
-					, AmountType			AS '@at'
-				FROM @Detail
-				FOR XML PATH('d'), TYPE)
-			FOR XML PATH('h'), TYPE)
+	DECLARE @xml XML = (
+		SELECT @CurrentInvoiceHeaderId AS '@hid'
+			, @BillerId			AS '@b'
+			, @PayerId			AS '@p'
+			, @CurrencyId		AS '@c'
+			, @InvoiceSymbol	AS '@is'
+			, @InvoiceNumber	AS '@in'
+			, @CurrentDateTime	AS '@ivd'
+			, @DueDate			AS '@dd'
+			, @Amount			AS '@amt'
+			, @InvoiceType		AS '@ivt'
+			, 0					AS '@stt'
+			, @Note				AS '@n'
+			, 0					AS '@hs'
+			, 0					AS '@hd'
+			, @UserID			AS '@cb'
+			, @CurrentDateTime	AS '@crd'
+			, @CurrentDateTime	AS '@upd'
+			, (SELECT 
+				@CurrentInvoiceHeaderId AS '@hid'
+				, [Description]			AS '@d'
+				, Reference				AS '@r'
+				, ProductId				AS '@pr'
+				, Amount				AS '@amt'
+				, AmountType			AS '@at'
+			FROM @Detail
+			FOR XML PATH('d'), TYPE)
+		FOR XML PATH('h'), TYPE)
+	SET @logSPData = CAST(@xml AS NVARCHAR(MAX))
 
 	--get log action
 	DECLARE @ActionID INT = 0
@@ -247,14 +246,14 @@ BEGIN
 			, @ActionId = @ActionID
 			, @Duration = @duration
 			, @Data = @logSPData
-			, @OldData = @logSPDataOld
+			, @OldData = ''
 	END TRY
 	BEGIN CATCH
 		EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP @UserID = @UserID
 			, @CustID = 0
 			, @ActionID = @ActionID
 			, @TrackingValue = @LogSPData
-			, @TrackingValue2 = @logSPDataOld
+			, @TrackingValue2 = ''
 			, @duration = @duration
 	END CATCH
 	-- End Region
