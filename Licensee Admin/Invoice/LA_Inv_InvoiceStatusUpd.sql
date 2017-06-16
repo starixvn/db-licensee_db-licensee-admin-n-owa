@@ -20,6 +20,7 @@ AS
 	DB:		DBLIC/bodb_Licensee
 
 	Revisions:
+		20170607@Bruce: Create new SP for void invoice [RedmineID: #76411]
 */
 BEGIN
 	SET NOCOUNT ON
