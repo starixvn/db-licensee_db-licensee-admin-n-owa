@@ -400,6 +400,7 @@ BEGIN
 			AND FW IS NULL
 			AND BT IS NULL
 			AND CB IS NULL
+			AND CO IS NULL
 	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO
 	FROM	#LicenseeAmount l
 	ORDER BY l.GroupId, l.PartyId	
