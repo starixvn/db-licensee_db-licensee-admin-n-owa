@@ -132,7 +132,7 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
-				AND b.ProductID NOT IN (3,1,13,15,25)
+				AND b.ProductID NOT IN (13,15,25)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, b.ProductId, ISNULL(sbr.BettypeRef, -1)
 	)
 	
