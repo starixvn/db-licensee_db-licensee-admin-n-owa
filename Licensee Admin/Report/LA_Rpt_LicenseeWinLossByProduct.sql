@@ -224,9 +224,9 @@ BEGIN
 	DECLARE @BTWinLoss AS TABLE (LicenseeId INT, Amount MONEY)
 	;WITH t AS (
 		SELECT b.RptDate, b.SiteId, b.CurrencyId
-			, SUM(CASE WHEN b.ProductId IN (0,13) AND b.Bettype = 901 THEN (b.BuyBackAmount - b.MemberWL) ELSE 0 END) AS ActualStake
-			, SUM(CASE WHEN b.ProductId IN (0,13) AND b.Bettype = 901 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountTotal
-			, SUM(CASE WHEN b.ProductId IN (0,13) AND b.Bettype = 901 AND b.CustomerCategory = 1001 THEN -b.BuyBackAmount * p.Rate ELSE 0 END) AS BettradeComm
+			, SUM(CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount - b.MemberWL) ELSE 0 END) AS ActualStake
+			, SUM(CASE WHEN b.Bettype = 901 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountTotal
+			, SUM(CASE WHEN b.Bettype = 901 AND b.CustomerCategory = 1001 THEN -b.BuyBackAmount * p.Rate ELSE 0 END) AS BettradeComm
 			, SUM(CASE WHEN b.ProductID <> 13 THEN b.MemberWL ELSE 0 END) AS BettradeWinLoss
 		FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN @PartyChargeInfo p ON b.SiteId = p.LicenseeID AND p.ProductID = 13
