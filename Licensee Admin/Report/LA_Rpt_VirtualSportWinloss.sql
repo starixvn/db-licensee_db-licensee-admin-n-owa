@@ -64,11 +64,11 @@ CREATE TABLE #ChargeInfo (
 )
 
 INSERT INTO #ChargeInfo
-SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, pc.Rate, c.Fromdate, c.Todate
+SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, ISNULL(pc.Rate,0), c.Fromdate, c.Todate
 FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,'VS','OA',@ExcludeTest) c
 INNER JOIN #Party p ON c.PartyID=p.PartyId
-INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo pc WITH(NOLOCK) ON pc.FromParty = CASE WHEN c.isDeposit=1 THEN p.ParentId ELSE p.PartyId END
-WHERE pc.ProductID = @VirtualSportsProductId AND pc.ToParty = @VirtualSports3rdId
+LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo pc WITH(NOLOCK)
+	ON pc.ProductID = @VirtualSportsProductId AND pc.ToParty = @VirtualSports3rdId AND pc.FromParty = CASE WHEN c.isDeposit=1 THEN p.ParentId ELSE p.PartyId END
 
 SELECT DISTINCT ExchangeDate, ExchangeId, BaseCurrencyRate AS Rate
 INTO #TempExchange
