@@ -29,6 +29,7 @@ AS
  * Revisions :  
 	- 20150320@Florent: enhance SP, using function LA_f_ExchangeDailySel
 	- 20150705@Florent: add GBP
+	- 20170622@Scofield: get PayToSupplier [#78398]
 
  * Param's Explanation:    
  *  - @FromDate		: From date   
@@ -65,12 +66,14 @@ BEGIN
 		, LicWinloss		MONEY
 		, Betcount			INT
 		, AmtDueTo			MONEY
+		, PayToSupplier		MONEY
 		, WinlostDate		VARCHAR(6)
 		, CurrencyId		INT)
 	CREATE TABLE #tmpParty (
 		PartyId				INT
 		, LicenseeId		INT
 		, Rate				MONEY
+		, Rate3rd			MONEY
 		, FromDate			SMALLDATETIME
 		, ToDate			SMALLDATETIME)
 	CREATE TABLE #Bettype (
@@ -78,10 +81,21 @@ BEGIN
 		, ProductId			INT)
 	CREATE TABLE #Exchange( ExchangeDate VARCHAR(6), ExchangeID INT, Rate FLOAT)
 
-	INSERT INTO #tmpParty(PartyId, LicenseeId, Rate, Fromdate, Todate)
+	DECLARE	@Keno3rdId		INT = (SELECT partyid FROM bodb_licensee.dbo.OAS_Party WHERE PartyType = 3 AND PartyName = 'KN'),
+		@KenoProductId INT = 8,
+		@12BetPartyId INT = 14
+
+	CREATE TABLE #Party (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
+	INSERT INTO #Party EXEC bodb_licensee.dbo.LA_PartyListSel
+
+	INSERT INTO #tmpParty(PartyId, LicenseeId, Rate, Rate3rd, Fromdate, Todate)
 	(
-		SELECT PartyID, LicenseeID, DI_Rate, Fromdate, Todate
-		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'KN', 'OA', @ExcludeTest)
+		SELECT c.PartyID, c.LicenseeID, c.DI_Rate, pc.Rate, c.Fromdate, c.Todate
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'KN', 'OA', @ExcludeTest) c
+		INNER JOIN #Party p ON c.PartyID=p.PartyId
+		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo pc WITH(NOLOCK) 
+			ON pc.FromParty = CASE WHEN c.isDeposit=1 AND c.PartyID != @12BetPartyId THEN p.ParentId ELSE p.PartyId END
+		WHERE pc.ProductID = @KenoProductId AND pc.ToParty = @Keno3rdId
 	)
 
 	INSERT INTO #Bettype (Bettype, ProductID)
@@ -124,7 +138,7 @@ BEGIN
 		SET Rate = 1
 	END 
 	
-	INSERT INTO #Result (PartyID, TurnOver, BettypeId, KNBettypeId, MemberWinloss, LicWinloss, Betcount, AmtDueTo, WinlostDate, CurrencyId)
+	INSERT INTO #Result (PartyID, TurnOver, BettypeId, KNBettypeId, MemberWinloss, LicWinloss, Betcount, AmtDueTo, PayToSupplier, WinlostDate, CurrencyId)
 	SELECT	d.PartyID
 			, CAST(ISNULL(SUM(d.TurnOver), 0) AS MONEY) AS TurnOver
 			, d.BettypeId, d.KNBettypeId
@@ -132,10 +146,11 @@ BEGIN
 			, CAST(- 1 * ISNULL(SUM(d.MemberWinloss), 0) AS MONEY) AS LicWinloss
 			, ISNULL(SUM(d.Betcount), 0) AS BetCount
 			, CAST(- 1 * ISNULL(SUM(d.MemberWinloss * ISNULL(tp.Rate, 0)), 0) AS MONEY) AS AmtDueTo
+			, CAST(- 1 * ISNULL(SUM(d.MemberWinloss * ISNULL(tp.Rate3rd, 0)), 0) AS MONEY) AS PayToSupplier
 			, CONVERT(VARCHAR(6), d.WinlostDate, 112) AS WinlostDate
 			, d.Currency
 	FROM #Data d
-		LEFT JOIN (SELECT DISTINCT PartyID, FromDate, ToDate, Rate FROM #tmpParty) tp ON d.PartyID = tp.PartyID
+		LEFT JOIN (SELECT DISTINCT PartyID, FromDate, ToDate, Rate, Rate3rd FROM #tmpParty) tp ON d.PartyID = tp.PartyID
 	WHERE d.WinlostDate BETWEEN tp.FromDate AND tp.ToDate
 	GROUP BY d.PartyID, CONVERT(VARCHAR(6), d.WinlostDate, 112), d.Currency, d.BettypeId, d.KNBettypeId
 
@@ -152,6 +167,7 @@ BEGIN
 		, CAST(SUM(re.turnover * ex.Rate) AS MONEY) AS Turnover
 		, CAST(SUM(re.LicWinloss * ex.Rate) AS MONEY) AS Winloss
 		, CAST(SUM(re.AmtDueTo * ex.Rate) AS MONEY) AS AmtDueTo	
+		, CAST(SUM(re.PayToSupplier * ex.Rate) AS MONEY) AS PayToSupplier	
 	FROM #Result re
 		INNER JOIN #Exchange ex ON re.winlostdate = ex.exchangedate and re.CurrencyId = ex.ExchangeId    
 		LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) on re.PartyID = p.PartyID    
