@@ -25,6 +25,9 @@ AS
 		+ 2016.10.12@Bruce: Order result by group
 		+ 2017.04.10@Scofield: Support AB and FW [#74738]
 		+ 20170412: @Scofield - Removing Trading Bet Types [#73310]
+		+ 20170605@Bruce: - Include Bettrade [#76131]
+						  - Include Colossus bet [#76131]
+						  - Include CashOut [#76131]
 */
 		
 /*	Example:
@@ -41,7 +44,7 @@ BEGIN
 	SET NOCOUNT ON
 	
 	-- Region: Get party charge rate info
-	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW'
+	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO'
 	
 	-- Region: Get Party ID
 	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)
@@ -129,6 +132,7 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
+				AND b.ProductID NOT IN (13,15,25)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, b.ProductId, ISNULL(sbr.BettypeRef, -1)
 	)
 	
@@ -150,23 +154,26 @@ BEGIN
 		LicenseeId	INT,
 		PartyId		INT,
 		PartyName	VARCHAR(200),
-		SB			MONEY, --SB
-		RB			MONEY, -- RB
-		NG			MONEY, -- NG	
+		SB			MONEY, -- Sportsbook
+		RB			MONEY, -- Racing
+		NG			MONEY, -- Number Game	
 		BA			MONEY, -- BA
-		LC			MONEY, -- LC
-		VS			MONEY, -- VS
-		CS			MONEY, -- CS
-		KN			MONEY, -- KN
-		AGC			MONEY, -- AGC
-		GD			MONEY, -- GD
-		VG			MONEY, -- VG
+		LC			MONEY, -- Live Casino
+		VS			MONEY, -- Virtual Sports
+		CS			MONEY, -- RNG Casino
+		KN			MONEY, -- Keno
+		AGC			MONEY, -- AG Casino
+		GD			MONEY, -- Gold Deluxe
+		VG			MONEY, -- Vegas games
 		MGCLC		MONEY, -- Microgaming - Live Casino
-		MGCRNG		MONEY,  -- Microgaming - RNG Casino
-		VB			MONEY,  -- VB
-		AB			MONEY,	-- AB
-		FW			MONEY	-- FW	
-	)
+		MGCRNG		MONEY, -- Microgaming - RNG Casino
+		VB			MONEY, -- Macau Games
+		AB			MONEY, -- Allbet
+		FW			MONEY, -- Fishing World
+		BT			MONEY, -- BetTrade
+		CB			MONEY, -- Colossus bet
+		CO			MONEY  -- CashOut
+	)						  
 	INSERT INTO #LicenseeAmount(GroupName, GroupId, LicenseeId, PartyId,PartyName)
 	SELECT	CASE
 				WHEN p.PartyId = 1 THEN 'ONEWorks'
@@ -196,7 +203,8 @@ BEGIN
 	UPDATE	d
 	SET		BA = a.Amount
 	FROM	#LicenseeAmount d INNER JOIN AmountDueBA a ON a.LicenseeId = d.LicenseeId
-	
+	-- End BA
+
 	-- RB
 	;WITH AmountDueRacing AS
 	(
@@ -210,7 +218,124 @@ BEGIN
 	UPDATE	d
 	SET		RB = a.Amount
 	FROM	#LicenseeAmount d INNER JOIN AmountDueRacing a ON a.LicenseeId = d.LicenseeId
+	-- End RB
 
+	-- BT
+	DECLARE @BTWinLoss AS TABLE (LicenseeId INT, Amount MONEY)
+	;WITH t AS (
+		SELECT b.RptDate, b.SiteId, b.CurrencyId
+			, SUM(CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount - b.MemberWL) ELSE 0 END) AS ActualStake
+			, SUM(CASE WHEN b.Bettype = 901 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountTotal
+			, SUM(CASE WHEN b.Bettype = 901 AND b.CustomerCategory = 1001 THEN -b.BuyBackAmount * p.Rate ELSE 0 END) AS BettradeComm
+			, SUM(CASE WHEN b.ProductID <> 13 THEN b.MemberWL ELSE 0 END) AS BettradeWinLoss
+		FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			INNER JOIN @PartyChargeInfo p ON b.SiteId = p.LicenseeID AND p.ProductID = 13
+		WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
+			AND b.CurrencyID <> 20
+			AND b.StatusId NOT IN (-1, 101, 102, 103)
+			AND b.CustomerCategory IN (1001, 1002)
+			AND b.ProductID IN (0, 3, 13) -- include original and Bettrade tickets
+		GROUP BY b.RptDate, b.SiteId, b.CurrencyId
+	)
+	INSERT INTO @BTWinLoss
+	SELECT t.SiteId, SUM ((t.BettradeWinLoss + t.BettradeComm + t.ActualStake - t.BuyBackAmountTotal) * e.Rate)
+	FROM t INNER JOIN #Exchange e ON t.RptDate = e.ExchangeDate AND t.CurrencyId = e.ExchangeId
+	GROUP BY t.SiteID
+
+	UPDATE	d
+	SET		BT = a.Amount
+	FROM	#LicenseeAmount d INNER JOIN @BTWinLoss a ON a.LicenseeId = d.LicenseeId 
+	-- End BT
+
+	-- CB
+	DECLARE @CommChargeType INT = 6
+	DECLARE @CashInShareChargeType INT = 7
+
+	DECLARE @CBChargeRates AS TABLE (
+		PartyId			INT,
+		LicenseeId		INT,
+		Rate			MONEY,
+		TypeId			SMALLINT,
+		FromDate		DATETIME,
+		ToDate			DATETIME
+	)
+
+	INSERT INTO @CBChargeRates(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
+	SELECT	p.PartyID,
+			CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END,
+			ci.Rate,
+			ci.ChargeType,
+			CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
+			CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
+	FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
+		LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
+		LEFT JOIN bodb_licensee.dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
+	WHERE p.PartyID IN (SELECT pc.PartyId FROM @PartyChargeInfo pc) 
+		AND ci.ProductID = 15
+		AND ci.ChargeType IN (@CommChargeType,@CashInShareChargeType) AND (
+			@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
+			@ToDate BETWEEN ci.FromDate AND ci.ToDate OR
+			ci.FromDate BETWEEN @FromDate AND @ToDate OR
+			ci.ToDate BETWEEN @FromDate AND @ToDate
+		)
+
+	DECLARE @CBWinLoss AS TABLE (LicenseeId INT, Amount MONEY)
+	;WITH t AS (
+		SELECT b.SiteId, b.rptDate,
+			SUM(Turnover * e.Rate) Turnover,
+			SUM(ISNULL(WinPrizeAmount * e.Rate,0)) WinningPrize,
+			SUM(ISNULL(CashOutAmount * e.Rate,0)) CashOut,
+			SUM(ISNULL(BuyBackAmount * e.Rate,0)) CashInAmount
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+		INNER JOIN @CBChargeRates cb ON b.SiteID = cb.LicenseeId AND b.rptDate BETWEEN cb.FromDate AND cb.ToDate
+		INNER JOIN #Exchange e ON e.ExchangeID=b.CurrencyId AND e.ExchangeDate = b.rptDate
+		WHERE b.ProductID = 15
+			AND b.CustomerCategory NOT IN (27, 28)
+			AND b.StatusId NOT IN (-1, 101, 102, 103)
+			AND b.CurrencyId <> 20
+			AND cb.TypeId = @CommChargeType -- to remove duplicate we use one of (6,7)
+		GROUP BY b.rptDate, b.SiteId
+	)
+	INSERT INTO @CBWinLoss
+	SELECT t.SiteId, SUM(t.Turnover) - SUM(t.WinningPrize) - SUM(t.CashOut) - SUM(t.Turnover * cm.Rate) - SUM(t.CashInAmount * ci.Rate)
+	FROM t
+	INNER JOIN @CBChargeRates AS cm ON cm.TypeId = @CommChargeType AND (t.rptDate BETWEEN cm.FromDate AND cm.ToDate) AND cm.LicenseeId=t.SiteID
+	INNER JOIN @CBChargeRates AS ci ON ci.TypeId = @CashInShareChargeType AND (t.rptDate BETWEEN ci.FromDate AND ci.ToDate) AND ci.LicenseeId=t.SiteID
+	GROUP BY t.SiteId
+
+	UPDATE	d
+	SET		CB = a.Amount
+	FROM	#LicenseeAmount d INNER JOIN @CBWinLoss a ON a.LicenseeId = d.LicenseeId
+	-- End CB
+
+	-- CO
+	DECLARE @COWinLoss AS TABLE (LicenseeId INT, Amount MONEY)
+	;WITH t AS (
+		SELECT b.SiteId,
+			SUM(b.BuyBackAmt * e.Rate) AS BuyBackAmountSB,
+			SUM(b.BABuyBackAmt * e.Rate) AS BuyBackAmountBA,
+			SUM(b.TicketPayout * e.Rate) AS TicketsPayout,					
+			SUM(b.BuyBackAmt * p.Rate * e.Rate) AS CashoutCommission	
+		FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
+			INNER JOIN @PartyChargeInfo p ON b.SiteId = p.LicenseeID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate AND p.ProductID = b.ProductID
+			INNER JOIN #Exchange e ON e.ExchangeID=b.Currency AND e.ExchangeDate = b.Winlostdate
+		WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate									
+			AND b.Currency <> 20
+			AND b.RoleID = 1 -- Member
+		GROUP BY b.SiteId
+	)
+	INSERT INTO @COWinLoss
+	SELECT SiteId, SUM(TicketsPayout - BuyBackAmountSB - BuyBackAmountBA - CashoutCommission)
+	FROM t
+	GROUP BY t.SiteId
+
+	UPDATE	d
+	SET		CO = a.Amount
+	FROM	#LicenseeAmount d INNER JOIN @COWinLoss a ON a.LicenseeId = d.LicenseeId
+	-- End CO
+
+	-- Others
 	;WITH AmountDueByProduct AS
 	(
 		SELECT	d.PartyId,
@@ -273,10 +398,12 @@ BEGIN
 			AND VB IS NULL
 			AND AB IS NULL
 			AND FW IS NULL
-	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW
+			AND BT IS NULL
+			AND CB IS NULL
+			AND CO IS NULL
+	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO
 	FROM	#LicenseeAmount l
-	ORDER BY l.GroupId, l.PartyId
-	
+	ORDER BY l.GroupId, l.PartyId	
 	-- EndRegion
 
 	DROP TABLE #Exchange
