@@ -11,7 +11,7 @@ AS
 	Task : Report - Gold Deluxe win loss
 	DB: DB052.bodb_licensee
 	Revisions:
-
+		- 20170622@bruce: show original value [#78398]
 	Param's Explanation:
 */
 BEGIN
@@ -91,10 +91,11 @@ BEGIN
 		LicenseeFee		MONEY,
 		ServiceCharge	MONEY,
 		Rebate			MONEY,
-		BaseCurrency	VARCHAR(10)
+		BaseCurrency	VARCHAR(10),
+		RowId			UNIQUEIDENTIFIER
 	)
 
-	INSERT INTO #Data(PartyId, ReportDate, CurrencyId, IsDeposit, Totaltrans, Turnover, ValidBetAmount, CustomerWL, LicenseeFee, ServiceCharge, Rebate)
+	INSERT INTO #Data(PartyId, ReportDate, CurrencyId, IsDeposit, Totaltrans, Turnover, ValidBetAmount, CustomerWL, LicenseeFee, ServiceCharge, Rebate, RowId)
 	(
 		SELECT  ci.PartyID, b.rptDate, b.currencyID, ci.IsDeposit
 			, SUM(b.betcount) AS Totaltrans
@@ -104,6 +105,7 @@ BEGIN
 			, SUM(-b.MemberWL * ci.Rate) AS LicenseeFee
 			, SUM(-b.MemberWL *  ISNULL(s.Rate, 0)) AS ServiceCharge
 			, SUM(ISNULL(b.ValidBetAmount,0) * ISNULL(r.Rate, 0) * ISNULL(s.Rate, 0)) AS Rebate
+			, NEWID()
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #ChargeInfo ci ON ( -- licensee charge rate
 				b.SiteID = ci.LicenseeID AND
@@ -147,14 +149,15 @@ BEGIN
 	BEGIN
 		DECLARE @Currency VARCHAR(10) = (SELECT TOP 1 Code FROM @BaseCurrencies WHERE IsApplied IS NULL)
 
-		INSERT INTO #Data(PartyId, IsDeposit, ReportDate, CurrencyName, Totaltrans, BaseCurrency, Turnover, CustomerWL, LicenseeFee, ServiceCharge, Rebate, ValidBetAmount)
+		INSERT INTO #Data(PartyId, IsDeposit, ReportDate, CurrencyName, Totaltrans, BaseCurrency, Turnover, CustomerWL, LicenseeFee, ServiceCharge, Rebate, ValidBetAmount, RowId)
 		SELECT d.PartyId, d.IsDeposit, d.ReportDate, e.Code, d.Totaltrans, @Currency,
 			d.Turnover * e.BaseCurrencyRate,
 			d.CustomerWL * e.BaseCurrencyRate,
 			d.LicenseeFee * e.BaseCurrencyRate,
 			d.ServiceCharge * e.BaseCurrencyRate,
 			d.Rebate * e.BaseCurrencyRate,
-			d.ValidBetAmount * e.BaseCurrencyRate
+			d.ValidBetAmount * e.BaseCurrencyRate,
+			d.RowId
 		FROM #Data d
 		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @Currency) e ON e.ExchangeId = d.CurrencyId AND e.exchangedate = d.ReportDate
 
@@ -169,13 +172,21 @@ BEGIN
 		CASE WHEN d.CurrencyName='VND' THEN 'INH' ELSE d.CurrencyName END CurrencyName,
 		d.Totaltrans,
 		d.Turnover,
-		d.CustomerWL AS CustomerWinLoss,
+		o.Turnover			AS TurnoverOriginal,
+		d.CustomerWL		AS CustomerWinLoss,
+		o.CustomerWL		AS CustomerWinLossOriginal,
 		d.ValidBetAmount,
+		o.ValidBetAmount	AS ValidBetAmountOriginal,
 		d.LicenseeFee,
+		o.LicenseeFee		AS LicenseeFeeOriginal,
 		d.ServiceCharge,
+		o.ServiceCharge		AS ServiceChargeOriginal,
 		d.Rebate,
-		(d.ServiceCharge - d.Rebate) AS PayToSupplier
+		o.Rebate			AS RebateOriginal,
+		(d.ServiceCharge - d.Rebate) AS PayToSupplier,
+		(o.ServiceCharge - o.Rebate) AS PayToSupplierOriginal
 	FROM #Data d
+	INNER JOIN #Data o ON o.RowId = d.RowId AND o.BaseCurrency IS NULL
 	INNER JOIN #PartyList p1 ON d.PartyId = p1.PartyId
 	INNER JOIN #PartyList p2 ON p1.ParentId = p2.PartyId
 	WHERE d.BaseCurrency = @BaseCurrencyName
