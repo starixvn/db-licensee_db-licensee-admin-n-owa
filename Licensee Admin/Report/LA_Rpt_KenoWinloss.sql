@@ -43,7 +43,7 @@ AS
  *  - @excludeTest:  0 Get all currency in date range from - to
 				 1 get only real currency from licensee_launch_date/from_date to to_date
  */  
-    
+	
 BEGIN      
 
 	SET NOCOUNT ON
@@ -67,7 +67,7 @@ BEGIN
 		, Betcount			INT
 		, AmtDueTo			MONEY
 		, PayToSupplier		MONEY
-		, WinlostDate		VARCHAR(6)
+		, WinlostDate		DATE
 		, CurrencyId		INT)
 	CREATE TABLE #tmpParty (
 		PartyId				INT
@@ -79,7 +79,6 @@ BEGIN
 	CREATE TABLE #Bettype (
 		Bettype				INT
 		, ProductId			INT)
-	CREATE TABLE #Exchange( ExchangeDate VARCHAR(6), ExchangeID INT, Rate FLOAT)
 
 	DECLARE	@Keno3rdId		INT = (SELECT partyid FROM bodb_licensee.dbo.OAS_Party WHERE PartyType = 3 AND PartyName = 'KN'),
 		@KenoProductId INT = 8,
@@ -127,9 +126,10 @@ BEGIN
 			AND b.StatusID NOT IN (-1, 101, 102, 103)			
 		GROUP BY b.rptDate, b.CurrencyId, b.BetTypeId, b.KenoBetTypeId, tp.PartyID	
 	)
+	
+	CREATE TABLE #Exchange( ExchangeDate DATE, ExchangeID INT, Rate FLOAT)
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, Rate)
-	SELECT DISTINCT CONVERT(VARCHAR(6), ExchangeDate, 112) AS ExchangeDate
-		, ExchangeID, BaseCurrencyRate
+	SELECT ExchangeDate,  ExchangeID, BaseCurrencyRate
 	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
 	IF @IsConvert = 0
@@ -147,12 +147,12 @@ BEGIN
 			, ISNULL(SUM(d.Betcount), 0) AS BetCount
 			, CAST(- 1 * ISNULL(SUM(d.MemberWinloss * ISNULL(tp.Rate, 0)), 0) AS MONEY) AS AmtDueTo
 			, CAST(- 1 * ISNULL(SUM(d.MemberWinloss * ISNULL(tp.Rate3rd, 0)), 0) AS MONEY) AS PayToSupplier
-			, CONVERT(VARCHAR(6), d.WinlostDate, 112) AS WinlostDate
+			, DATEADD(MONTH, DATEDIFF(MONTH, 0,d.WinlostDate),0)
 			, d.Currency
 	FROM #Data d
 		LEFT JOIN (SELECT DISTINCT PartyID, FromDate, ToDate, Rate, Rate3rd FROM #tmpParty) tp ON d.PartyID = tp.PartyID
 	WHERE d.WinlostDate BETWEEN tp.FromDate AND tp.ToDate
-	GROUP BY d.PartyID, CONVERT(VARCHAR(6), d.WinlostDate, 112), d.Currency, d.BettypeId, d.KNBettypeId
+	GROUP BY d.PartyID, DATEADD(MONTH, DATEDIFF(MONTH, 0,d.WinlostDate),0), d.Currency, d.BettypeId, d.KNBettypeId
 
 	--return the result
 	SELECT	
@@ -162,7 +162,7 @@ BEGIN
 		END AS PartyName
 		, re.WinlostDate
 		, re.BettypeId 
-		, re.KNBettypeId 
+		, re.KNBettypeId AS KenoBettypeId
 		, SUM(re.betcount) AS BetCount
 		, CAST(SUM(re.turnover * ex.Rate) AS MONEY) AS Turnover
 		, CAST(SUM(re.LicWinloss * ex.Rate) AS MONEY) AS Winloss
@@ -171,7 +171,7 @@ BEGIN
 	FROM #Result re
 		INNER JOIN #Exchange ex ON re.winlostdate = ex.exchangedate and re.CurrencyId = ex.ExchangeId    
 		LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) on re.PartyID = p.PartyID    
-	GROUP BY re.BettypeId, re.KNBettypeId, CONVERT(VARCHAR(6), re.winlostdate, 112)
+	GROUP BY re.BettypeId, re.KNBettypeId, re.WinlostDate
 			, CASE  WHEN p.PartyName = 'IBC' THEN 'FDL'
 					WHEN p.PartyName = '18bb' THEN 'PIH'
 					ELSE p.PartyName 
