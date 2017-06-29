@@ -124,8 +124,7 @@ BEGIN
 		LicenseeWinLoss	MONEY,
 		ApplyValue		MONEY,
 		LicensingFee	MONEY,		
-		PayToSupplier	MONEY,
-		CompanyIncome	MONEY
+		PayToSupplier	MONEY
 	)
 		
 	INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, ApplyValue)
@@ -156,7 +155,7 @@ BEGIN
 						END
 	
 	UPDATE r
-	SET r.PayToSupplier = a.ApplyRate * r.LicenseeWinLoss, r.CompanyIncome = r.LicensingFee - (a.ApplyRate * r.LicenseeWinLoss)
+	SET r.PayToSupplier = a.ApplyRate * r.LicenseeWinLoss
 	FROM #Result r INNER JOIN @ApplyRange a ON r.ParentId = a.ParentId
 	-- End Region
 
@@ -174,42 +173,19 @@ BEGIN
 		
 	UPDATE #Exchange SET CurrencyCode = 'INH' WHERE ExchangeID = 51
 	-- End
-
-	-- Calculate Total
-	DECLARE @Total TABLE (	
+	
+	DECLARE @Total TABLE (
 		PartyId			INT,
-		ParentId		INT,
-		CurrencyId		INT,
-		WinLossDate		DATETIME,
 		TotalTrans		INT,
 		Turnover		MONEY,
-		CustomerWinLoss	MONEY,		
+		CustomerWinLoss	MONEY,
 		LicenseeWinLoss	MONEY,
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY,
-		CompanyIncome	MONEY
+		CompanyIncome	MONEY,
+		Currency		VARCHAR(20)
 	)
 
-	;WITH PartyWinLoss AS(
-		SELECT r.PartyId,SUM(r.LicenseeWinLoss) AS LicenseeWL FROM #Result r GROUP BY r.PartyId
-	)
-	INSERT INTO @Total (PartyId, ParentId, CurrencyId, WinLossDate, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee,PayToSupplier,CompanyIncome)
-	SELECT 
-		r.PartyId,
-		r.ParentId,
-		r.CurrencyId,
-		r.WinLossDate,
-		SUM(r.TotalTrans),
-		SUM(r.Turnover),
-		SUM(r.CustomerWinLoss),
-		SUM(r.LicenseeWinLoss),
-		SUM(CASE WHEN l.LicenseeWL < 0 THEN 0 ELSE r.LicensingFee END),
-		SUM(r.PayToSupplier),
-		SUM(r.CompanyIncome)
-	FROM #Result r INNER JOIN PartyWinLoss l ON r.PartyId = l.PartyId
-	GROUP BY r.PartyId, r.ParentId, r.CurrencyId, r.WinLossDate
-	-- End Region
-	
 	-- Region: Calculate Grand Total
 	DECLARE @tempCurrency VARCHAR(20)
 	DECLARE @BaseCurrencies TABLE(
@@ -235,20 +211,44 @@ BEGIN
 	BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)
 		
+		;WITH TotalByParty AS(
+			SELECT td.ParentId,
+				SUM(td.TotalTrans) TotalTrans,
+				SUM(td.Turnover * e.BaseCurrencyRate) Turnover, 
+				SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss, 
+				SUM(td.LicenseeWinLoss * e.BaseCurrencyRate) LicenseeWinLoss, 
+				SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
+				SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
+			FROM #Result td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e 
+			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
+			GROUP BY td.ParentId, td.PartyId
+		)
+		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier)
+		SELECT @tempCurrency,ParentId,
+			SUM(TotalTrans),
+			SUM(Turnover),
+			SUM(CustomerWinLoss),
+			SUM(LicenseeWinLoss),
+			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
+			SUM(CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END)
+		FROM TotalByParty
+		GROUP BY ParentId
+
 		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
-		SELECT	@tempCurrency, 
-				SUM(td.TotalTrans),
-				SUM(td.Turnover * e.BaseCurrencyRate), 
-				SUM(td.CustomerWinLoss * e.BaseCurrencyRate), 
-				SUM(td.LicenseeWinLoss * e.BaseCurrencyRate), 
-				SUM(td.LicensingFee * e.BaseCurrencyRate),
-				SUM(td.PayToSupplier * e.BaseCurrencyRate),
-				SUM(td.CompanyIncome * e.BaseCurrencyRate)
-		FROM @Total td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e 
-		ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
+		SELECT Currency,
+			SUM(TotalTrans),
+			SUM(Turnover),
+			SUM(CustomerWinLoss),
+			SUM(LicenseeWinLoss),
+			SUM(LicensingFee),
+			SUM(PayToSupplier),
+			SUM(LicensingFee - PayToSupplier)
+		FROM @Total
+		WHERE Currency = @tempCurrency
+		GROUP BY Currency
 
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
-	END
+	END	
 	-- End Region
 
 	-- Region: Select Data	
@@ -268,7 +268,7 @@ BEGIN
 			r.LicenseeWinLoss,
 			r.LicensingFee,
 			r.PayToSupplier,
-			r.CompanyIncome
+			(r.LicensingFee - r.PayToSupplier) AS CompanyIncome
 		FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
 
 		-- Grand Total
@@ -291,31 +291,30 @@ BEGIN
 			CAST(r.LicenseeWinLoss * e.Rate AS MONEY) AS LicenseeWinLoss,
 			CAST(r.LicensingFee * e.Rate AS MONEY) AS LicensingFee,
 			CAST(r.PayToSupplier * e.Rate AS MONEY) AS PayToSupplier,
-			CAST(r.CompanyIncome * e.Rate AS MONEY) AS CompanyIncome,
+			CAST((r.LicensingFee - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome,
 			-- original
 			r.Turnover AS TurnoverOriginal,
 			r.CustomerWinLoss AS CustomerWinLossOriginal,
 			r.LicenseeWinLoss AS LicenseeWinLossOriginal,
 			r.LicensingFee AS LicensingFeeOriginal,
 			r.PayToSupplier AS PayToSupplierOriginal,
-			r.CompanyIncome AS CompanyIncomeOriginal
+			(r.LicensingFee - r.PayToSupplier) AS CompanyIncomeOriginal
 		FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
 
 		-- Grand Total
 		SELECT * FROM @GrandTotal
-
+		
 		-- Total
-		SELECT t.ParentId AS PartyId,
-			SUM(TotalTrans) TotalTrans,
-			CAST(SUM(Turnover * e.Rate) AS MONEY) Turnover,
-			CAST(SUM(CustomerWinLoss * e.Rate) AS MONEY) CustomerWinLoss,		
-			CAST(SUM(LicenseeWinLoss * e.Rate) AS MONEY) LicenseeWinLoss,
-			CAST(SUM(LicensingFee * e.Rate) AS MONEY) LicensingFee,
-			CAST(SUM(PayToSupplier * e.Rate) AS MONEY) PayToSupplier,
-			CAST(SUM(CompanyIncome * e.Rate) AS MONEY) CompanyIncome
+		SELECT PartyId,
+			TotalTrans,
+			Turnover,
+			CustomerWinLoss,		
+			LicenseeWinLoss,
+			LicensingFee,
+			PayToSupplier,
+			(LicensingFee - PayToSupplier) CompanyIncome
 		FROM @Total t
-			INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeID AND e.ExchangeDate = t.WinLossDate
-		GROUP BY ParentId
+		WHERE Currency = @BaseCurrencyName
 	END
 	-- End Region
 
