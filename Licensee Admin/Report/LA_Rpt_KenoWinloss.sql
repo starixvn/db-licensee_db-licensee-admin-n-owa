@@ -9,7 +9,7 @@ GO
 /****** Object:  Stored Procedure dbo.LA_Rpt_KenoWinloss    Script Date: 06/03/2015 10:26:13 AM ******/
 
 
-ALTER PROCEDURE [dbo].[LA_Rpt_KenoWinloss] 
+ALTER PROCEDURE [dbo].[LA_Rpt_KenoWinloss_xtest] 
 	 @PartyIDs				VARCHAR(5500)
 	, @FromDate				SMALLDATETIME
 	, @ToDate				SMALLDATETIME	
@@ -85,10 +85,14 @@ BEGIN
 
 	INSERT INTO #tmpParty(PartyId, LicenseeId, Rate, Rate3rd, Fromdate, Todate)
 	(
-		SELECT c.PartyID, c.LicenseeID, c.DI_Rate,
-			CASE WHEN c.PartyId = 14 OR ISNULL(c.IsDeposit,0)=0 THEN 0.03 ELSE 0.05 END
-			, c.Fromdate, c.Todate
+		SELECT c.PartyID, c.LicenseeID, c.DI_Rate, 
+			CASE
+				WHEN c.DI_Rate<=0 THEN 0 
+				WHEN c.PartyId = 14 OR ISNULL(c.IsDeposit,0)=0 THEN 0.03 
+				ELSE 0.05 
+			END, c.Fromdate, c.Todate
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'KN', 'OA', @ExcludeTest) c
+		WHERE c.Fromdate <= c.Todate
 	)
 
 	INSERT INTO #Bettype (Bettype, ProductID)
@@ -112,7 +116,7 @@ BEGIN
 				, SUM(Winloss)  AS MemberWinloss
 				, SUM(BetCount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) AS Betcount
 		FROM bodb_LicenseeReport.dbo.rptKenoWinloss b WITH ( NOLOCK) 
-			INNER JOIN #tmpParty tp ON tp.LicenseeID = b.SiteId
+			INNER JOIN #tmpParty tp ON tp.LicenseeID = b.SiteId AND b.RptDate BETWEEN tp.FromDate AND tp.ToDate
 			INNER JOIN #Bettype bt ON b.BetTypeId = bt.Bettype				
 		WHERE b.rptDate BETWEEN @Fromdate AND @Todate
 			AND (@Bettype = 0 OR ( @Bettype <> 0 AND b.KenoBetTypeId = @Bettype)) 
