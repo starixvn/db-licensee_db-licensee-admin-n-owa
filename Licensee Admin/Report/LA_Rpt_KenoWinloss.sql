@@ -9,7 +9,7 @@ GO
 /****** Object:  Stored Procedure dbo.LA_Rpt_KenoWinloss    Script Date: 06/03/2015 10:26:13 AM ******/
 
 
-ALTER PROCEDURE [dbo].[LA_Rpt_KenoWinloss_xtest] 
+ALTER PROCEDURE [dbo].[LA_Rpt_KenoWinloss] 
 	 @PartyIDs				VARCHAR(5500)
 	, @FromDate				SMALLDATETIME
 	, @ToDate				SMALLDATETIME	
