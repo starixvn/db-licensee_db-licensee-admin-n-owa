@@ -1,4 +1,4 @@
-USE [bodb02]
+﻿USE [bodb02]
 GO
 /****** Object:  StoredProcedure [dbo].[LA_Rpt_NumberGameWinloss]    Script Date: 01/12/2014 14:36:23 PM ******/
 SET ANSI_NULLS ON
@@ -32,9 +32,6 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE	@NumberGame3rdId		INT = (SELECT partyid FROM bodb_licensee.dbo.OAS_Party WHERE PartyType = 3 AND PartyName = 'NG'),
-			@NumberGameProductId	INT = 2
-
 	CREATE TABLE #Party (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
 	INSERT INTO #Party EXEC bodb_licensee.dbo.LA_PartyListSel
 
@@ -48,12 +45,10 @@ BEGIN
 		,Fromdate		SMALLDATETIME
 		,Todate			SMALLDATETIME
 	)
+	-- ​Pay to Supplier: equals 40% of [Licensing Fee]
 	INSERT INTO #ChargeRate
-	SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate,ISNULL(pc.Rate,0), c.Fromdate, c.Todate
+	SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, 0.4, c.Fromdate, c.Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'NG', 'OA', @ExcludeTest) c
-	INNER JOIN #Party p ON c.PartyID=p.PartyId
-	LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo pc WITH(NOLOCK) 
-		ON pc.ToParty = @NumberGame3rdId AND pc.ProductID = @NumberGameProductId AND pc.FromParty = CASE WHEN c.isDeposit=1 THEN p.ParentId ELSE p.PartyId END
 
 	SELECT DISTINCT ExchangeDate, ExchangeId, BaseCurrencyRate AS Rate
 	INTO #Exchange

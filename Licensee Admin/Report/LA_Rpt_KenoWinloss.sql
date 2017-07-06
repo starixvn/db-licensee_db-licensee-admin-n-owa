@@ -80,21 +80,15 @@ BEGIN
 		Bettype				INT
 		, ProductId			INT)
 
-	DECLARE	@Keno3rdId		INT = (SELECT partyid FROM bodb_licensee.dbo.OAS_Party WHERE PartyType = 3 AND PartyName = 'KN'),
-		@KenoProductId INT = 8,
-		@12BetPartyId INT = 14
-
 	CREATE TABLE #Party (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
 	INSERT INTO #Party EXEC bodb_licensee.dbo.LA_PartyListSel
 
 	INSERT INTO #tmpParty(PartyId, LicenseeId, Rate, Rate3rd, Fromdate, Todate)
 	(
-		SELECT c.PartyID, c.LicenseeID, c.DI_Rate, pc.Rate, c.Fromdate, c.Todate
+		SELECT c.PartyID, c.LicenseeID, c.DI_Rate,
+			CASE WHEN c.PartyId = 14 OR ISNULL(c.IsDeposit,0)=0 THEN 0.03 ELSE 0.05 END
+			, c.Fromdate, c.Todate
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'KN', 'OA', @ExcludeTest) c
-		INNER JOIN #Party p ON c.PartyID=p.PartyId
-		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo pc WITH(NOLOCK) 
-			ON pc.FromParty = CASE WHEN c.isDeposit=1 AND c.PartyID != @12BetPartyId THEN p.ParentId ELSE p.PartyId END
-		WHERE pc.ProductID = @KenoProductId AND pc.ToParty = @Keno3rdId
 	)
 
 	INSERT INTO #Bettype (Bettype, ProductID)
