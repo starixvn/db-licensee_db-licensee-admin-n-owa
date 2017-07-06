@@ -40,9 +40,9 @@ BEGIN
 		@KenoLotteryProductId INT = 28,
 		@12BetPartyId INT = 14
 
-	INSERT INTO @ChargeInfos(PartyId, LicenseeId, Rate, Rate3rd, Fromdate, Todate)
+	INSERT INTO @ChargeInfos(PartyId, ProductID, LicenseeId, Rate, Rate3rd, Fromdate, Todate)
 	(
-		SELECT c.PartyID, c.LicenseeID, c.DI_Rate, pc.Rate, c.Fromdate, c.Todate
+		SELECT c.PartyID, c.ProductID, c.LicenseeID, c.DI_Rate, pc.Rate, c.Fromdate, c.Todate
 		FROM
 		(SELECT ci.* 
 			FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'LO', 'OA', 1) ci
@@ -54,7 +54,7 @@ BEGIN
 		WHERE pc.ProductID = @KenoLotteryProductId AND pc.ToParty = @KenoLottery3rdId
 	)		
 	-- End region
-
+	
 	-- Region: TempData
 	CREATE TABLE #TempData (
 		PartyID INT,
