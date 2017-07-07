@@ -45,6 +45,24 @@ BEGIN
 
 SET NOCOUNT ON
 
+DECLARE @CreditLicenses TABLE(PartyId INT)
+INSERT INTO @CreditLicenses
+SELECT p.PartyID
+FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+INNER JOIN bodb_licensee.dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
+WHERE p.PartyType=1 AND ISNULL(d.IsDeposit,0)=0
+
+DECLARE @PartyIDs_Deposit	VARCHAR(4000)
+DECLARE @PartyIDs_Credit	VARCHAR(4000)
+
+SELECT	@PartyIDs_Deposit = COALESCE(@PartyIDs_Deposit + ', ', '') + CONVERT(VARCHAR(10), val)
+FROM	dbo.strSplit(@PartyIDs,',') s
+WHERE	CAST(s.val AS INT) NOT IN (SELECT l.PartyId FROM @CreditLicenses l)
+
+SELECT	@PartyIDs_Credit = COALESCE(@PartyIDs_Credit + ', ', '') + CONVERT(VARCHAR(10), val)
+FROM	dbo.strSplit(@PartyIDs,',') s
+WHERE	CAST(s.val AS INT) IN (SELECT l.PartyId FROM @CreditLicenses l)
+
 CREATE TABLE #Party (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
 INSERT INTO #Party EXEC bodb_licensee.dbo.LA_PartyListSel
 
@@ -62,10 +80,11 @@ CREATE TABLE #ChargeInfo (
 --   Credit: 1% of of Licensee Winloss
 --   Deposit: 7.5% of Licensee Winloss
 INSERT INTO #ChargeInfo
-SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, 
-	CASE WHEN ISNULL(c.isDeposit,0)=1 THEN 0.075 ELSE 0.01 END
-, c.Fromdate, c.Todate
-FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,'VS','OA',@ExcludeTest) c
+SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate,0.075, c.Fromdate, c.Todate
+FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs_Deposit,@FromDate,@ToDate,'VS','OA',@ExcludeTest) c
+UNION ALL
+SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate,0.01, c.Fromdate, c.Todate
+FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs_Credit,@FromDate,@ToDate,'VS','OA',0) c
 
 SELECT DISTINCT ExchangeDate, ExchangeId, BaseCurrencyRate AS Rate
 INTO #TempExchange
