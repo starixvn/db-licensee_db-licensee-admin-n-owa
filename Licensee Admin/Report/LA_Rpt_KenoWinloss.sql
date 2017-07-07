@@ -1,15 +1,7 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_KenoWinloss_xtest]    Script Date: 09/03/2015 10:09:14 AM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
 
-/****** Object:  Stored Procedure dbo.LA_Rpt_KenoWinloss    Script Date: 06/03/2015 10:26:13 AM ******/
-
-
-ALTER PROCEDURE [dbo].[LA_Rpt_KenoWinloss] 
+ALTER PROCEDURE [dbo].LA_Rpt_KenoWinloss
 	 @PartyIDs				VARCHAR(5500)
 	, @FromDate				SMALLDATETIME
 	, @ToDate				SMALLDATETIME	
@@ -101,30 +93,6 @@ BEGIN
 		FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(@Market, 'KN')
 	)
 
-	--collect data
-	INSERT INTO #Data (WinlostDate, Currency, PartyID, BettypeId, KNBettypeId, Turnover, MemberWinloss, Betcount)
-	(
-		SELECT  b.rptDate AS WinlostDate
-				, b.CurrencyId, tp.PartyID, b.BetTypeId, b.KenoBetTypeId
-				, SUM(Turnover *
-							CASE WHEN @drawfilter IN (2, 3) 
-									THEN CASE WHEN b.StatusId = 111 THEN 0								
-											ELSE 1
-										END
-								ELSE 1																		
-							END) AS Turnover
-				, SUM(Winloss)  AS MemberWinloss
-				, SUM(BetCount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) AS Betcount
-		FROM bodb_LicenseeReport.dbo.rptKenoWinloss b WITH ( NOLOCK) 
-			INNER JOIN #tmpParty tp ON tp.LicenseeID = b.SiteId AND b.RptDate BETWEEN tp.FromDate AND tp.ToDate
-			INNER JOIN #Bettype bt ON b.BetTypeId = bt.Bettype				
-		WHERE b.rptDate BETWEEN @Fromdate AND @Todate
-			AND (@Bettype = 0 OR ( @Bettype <> 0 AND b.KenoBetTypeId = @Bettype)) 
-			AND (@excludeTest = 0 OR (@excludeTest = 1 AND CurrencyID <> 20))			
-			AND b.StatusID NOT IN (-1, 101, 102, 103)			
-		GROUP BY b.rptDate, b.CurrencyId, b.BetTypeId, b.KenoBetTypeId, tp.PartyID	
-	)
-	
 	CREATE TABLE #Exchange( ExchangeDate DATE, ExchangeID INT, Rate FLOAT)
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, Rate)
 	SELECT ExchangeDate,  ExchangeID, BaseCurrencyRate
@@ -135,6 +103,25 @@ BEGIN
 		UPDATE #Exchange
 		SET Rate = 1
 	END 
+
+	--collect data
+	INSERT INTO #Data (WinlostDate, Currency, PartyID, BettypeId, KNBettypeId, Turnover, MemberWinloss, Betcount)
+	(
+		SELECT  b.rptDate AS WinlostDate
+				, b.CurrencyId, tp.PartyID, b.BetTypeId, b.KenoBetTypeId
+				, SUM(CASE WHEN @drawfilter IN (2, 3) AND b.StatusId = 111 THEN 0 ELSE Turnover * ex.Rate END) AS Turnover
+				, SUM(Winloss * ex.Rate)  AS MemberWinloss
+				, SUM(BetCount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) AS Betcount
+		FROM bodb_LicenseeReport.dbo.rptKenoWinloss b WITH ( NOLOCK) 
+			INNER JOIN #tmpParty tp ON tp.LicenseeID = b.SiteId AND b.RptDate BETWEEN tp.FromDate AND tp.ToDate
+			INNER JOIN #Bettype bt ON b.BetTypeId = bt.Bettype			
+			INNER JOIN #Exchange ex ON b.rptDate = ex.exchangedate and b.CurrencyId = ex.ExchangeId   	
+		WHERE b.rptDate BETWEEN @Fromdate AND @Todate
+			AND (@Bettype = 0 OR ( @Bettype <> 0 AND b.KenoBetTypeId = @Bettype)) 
+			AND (@excludeTest = 0 OR (@excludeTest = 1 AND CurrencyID <> 20))			
+			AND b.StatusID NOT IN (-1, 101, 102, 103)			
+		GROUP BY b.rptDate, b.CurrencyId, b.BetTypeId, b.KenoBetTypeId, tp.PartyID	
+	)
 	
 	INSERT INTO #Result (PartyID, TurnOver, BettypeId, KNBettypeId, MemberWinloss, LicWinloss, Betcount, AmtDueTo, PayToSupplier, WinlostDate, CurrencyId)
 	SELECT	d.PartyID
@@ -162,12 +149,11 @@ BEGIN
 		, re.BettypeId 
 		, re.KNBettypeId AS KenoBettypeId
 		, SUM(re.betcount) AS BetCount
-		, CAST(SUM(re.turnover * ex.Rate) AS MONEY) AS Turnover
-		, CAST(SUM(re.LicWinloss * ex.Rate) AS MONEY) AS Winloss
-		, CAST(SUM(re.AmtDueTo * ex.Rate) AS MONEY) AS AmtDueTo	
-		, CAST(SUM(re.PayToSupplier * ex.Rate) AS MONEY) AS PayToSupplier	
+		, CAST(SUM(re.turnover) AS MONEY)		AS Turnover
+		, CAST(SUM(re.LicWinloss) AS MONEY)		AS Winloss
+		, CAST(SUM(re.AmtDueTo) AS MONEY)		AS AmtDueTo	
+		, CAST(SUM(re.PayToSupplier) AS MONEY)	AS PayToSupplier	
 	FROM #Result re
-		INNER JOIN #Exchange ex ON re.winlostdate = ex.exchangedate and re.CurrencyId = ex.ExchangeId    
 		LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) on re.PartyID = p.PartyID    
 	GROUP BY re.BettypeId, re.KNBettypeId, re.WinlostDate
 			, CASE  WHEN p.PartyName = 'IBC' THEN 'FDL'
