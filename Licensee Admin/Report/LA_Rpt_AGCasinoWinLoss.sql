@@ -230,25 +230,25 @@ BEGIN
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
-			SUM(CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END)
+			SUM(PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
 
-		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
+		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier)
 		SELECT Currency,
 			SUM(TotalTrans),
 			SUM(Turnover),
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(LicensingFee),
-			SUM(PayToSupplier),
-			SUM(LicensingFee - PayToSupplier)
+			SUM(CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END)
 		FROM @Total
 		WHERE Currency = @tempCurrency
 		GROUP BY Currency
 
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 	END	
+	UPDATE @GrandTotal SET CompanyIncome = LicensingFee - PayToSupplier
 	-- End Region
 
 	-- Region: Select Data	
@@ -260,7 +260,7 @@ BEGIN
 			r.ParentId,
 			r.ParentName,
 			r.WinLossDate,
-			r.CurrencyId,			 
+			r.CurrencyId,
 			e.CurrencyCode AS CurrencyName,
 			r.TotalTrans,
 			r.Turnover,
@@ -272,7 +272,7 @@ BEGIN
 		FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
 
 		-- Grand Total
-		SELECT * FROM @GrandTotal		
+		SELECT * FROM @GrandTotal
 	END	
 	ELSE 
 	BEGIN
@@ -282,7 +282,7 @@ BEGIN
 			r.ParentId,
 			r.ParentName,
 			r.WinLossDate,
-			r.CurrencyId,			 
+			r.CurrencyId,
 			e.CurrencyCode AS CurrencyName,
 			r.TotalTrans,
 			-- base
@@ -308,11 +308,11 @@ BEGIN
 		SELECT PartyId,
 			TotalTrans,
 			Turnover,
-			CustomerWinLoss,		
+			CustomerWinLoss,
 			LicenseeWinLoss,
 			LicensingFee,
-			PayToSupplier,
-			(LicensingFee - PayToSupplier) CompanyIncome
+			CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END PayToSupplier,
+			(LicensingFee - (CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END)) CompanyIncome
 		FROM @Total t
 		WHERE Currency = @BaseCurrencyName
 	END
