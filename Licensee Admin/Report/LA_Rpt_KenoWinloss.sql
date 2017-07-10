@@ -79,9 +79,8 @@ BEGIN
 	(
 		SELECT c.PartyID, c.LicenseeID, c.DI_Rate, 
 			CASE
-				WHEN c.DI_Rate<=0 THEN 0 
-				WHEN c.PartyId = 14 OR ISNULL(c.IsDeposit,0)=0 THEN 0.03 
-				ELSE 0.05 
+				WHEN c.PartyId = 14 OR ISNULL(c.IsDeposit,0)=0 THEN 0.03
+				ELSE 0.05
 			END, c.Fromdate, c.Todate
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'KN', 'OA', @ExcludeTest) c
 		WHERE c.Fromdate <= c.Todate
