@@ -36,22 +36,12 @@ BEGIN
 		FromDate	SMALLDATETIME,
 		ToDate		SMALLDATETIME)	
 	
-	DECLARE	@KenoLottery3rdId INT = (SELECT partyid FROM bodb_licensee.dbo.OAS_Party WHERE PartyType = 3 AND PartyName = 'LO'),
-		@KenoLotteryProductId INT = 28,
-		@12BetPartyId INT = 14
-
 	INSERT INTO @ChargeInfos(PartyId, ProductID, LicenseeId, Rate, Rate3rd, Fromdate, Todate)
 	(
-		SELECT c.PartyID, c.ProductID, c.LicenseeID, c.DI_Rate, pc.Rate, c.Fromdate, c.Todate
-		FROM
-		(SELECT ci.* 
-			FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'LO', 'OA', 1) ci
-			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo pci  ON ci.ChargeID = pci.ChargeID
-			WHERE pci.ToParty != @KenoLottery3rdId) c
-		INNER JOIN @PartyList p ON c.PartyID=p.PartyId
-		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo pc WITH(NOLOCK) 
-			ON pc.FromParty = CASE WHEN c.isDeposit=1 AND c.PartyID != @12BetPartyId THEN p.ParentId ELSE p.PartyId END
-		WHERE pc.ProductID = @KenoLotteryProductId AND pc.ToParty = @KenoLottery3rdId
+		SELECT c.PartyID, c.ProductID, c.LicenseeID, c.DI_Rate, 
+			CASE WHEN c.PartyId = 14 OR ISNULL(c.IsDeposit,0)=0 THEN 0.03 ELSE 0.05 END,
+			c.Fromdate, c.Todate
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'LO', 'OA', 1) c				
 	)		
 	-- End region
 	
