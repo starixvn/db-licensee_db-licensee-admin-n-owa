@@ -21,7 +21,8 @@ ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
 
 	Param's Explanation:  			
 	- 20160413@Francis: Support THB Base Currency
-	- 20160920@Harper : Suppoer HKD Base Currency
+	- 20160920@Harper : Support HKD Base Currency
+	- 20170712@Harper: Support IDR Base Currency [RedmineID: #79309]
 */
 RETURNS @tempDate TABLE (exchangedate DATETIME, ExchangeId INT, Code VARCHAR(5)
 		, BaseCurrencyRate FLOAT
@@ -62,6 +63,7 @@ BEGIN
 					WHEN @BaseCurrency = 'GBP' THEN GBP
 					WHEN @BaseCurrency = 'THB' THEN THB
 					WHEN @BaseCurrency = 'HKD' THEN HKD
+					WHEN @BaseCurrency = 'IDR' THEN IDR
 					ELSE 1 END BaseCurrencyRate
 				--, MYR, USD, EUR, CNY, GBP, actualrate
 			FROM dbo.ExchangeDailyOanda WITH (NOLOCK)
