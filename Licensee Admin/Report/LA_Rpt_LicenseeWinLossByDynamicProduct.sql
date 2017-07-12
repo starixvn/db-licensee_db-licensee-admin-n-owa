@@ -13,7 +13,7 @@ AS
 	DB: DB052.bodb_Licensee
 
 	Revisions:
-		+ 20170630@Bruce: include BT/CO/CB, remove LC, VG
+		+ 20170630@Bruce: include BT/CO/CB, remove LC, VG [RedmineID: #79309]
 */
 BEGIN
 	SET NOCOUNT ON
