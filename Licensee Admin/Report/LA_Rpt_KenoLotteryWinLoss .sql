@@ -41,7 +41,7 @@ BEGIN
 		SELECT c.PartyID, c.ProductID, c.LicenseeID, c.DI_Rate, 
 			CASE WHEN c.PartyId = 14 OR ISNULL(c.IsDeposit,0)=0 THEN 0.03 ELSE 0.05 END,
 			c.Fromdate, c.Todate
-		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'LO', 'OA', 1) c				
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'LT', 'OA', 1) c				
 	)		
 	-- End region
 	
@@ -169,7 +169,7 @@ BEGIN
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
-			SUM(CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END)
+			SUM(PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
 
