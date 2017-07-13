@@ -36,26 +36,15 @@ BEGIN
 		FromDate	SMALLDATETIME,
 		ToDate		SMALLDATETIME)	
 	
-	DECLARE	@BetRadarVS3rdId INT = (SELECT partyid FROM bodb_licensee.dbo.OAS_Party WHERE PartyType = 3 AND PartyName = 'BRVS'),
-		@BetRadarVSProductId INT = 27
-
 	INSERT INTO @ChargeInfos(PartyId, ProductID, LicenseeId, Rate, Rate3rd, Fromdate, Todate)
 	(
-		SELECT c.PartyID, c.ProductID, c.LicenseeID, c.DI_Rate, pc.Rate, c.Fromdate, c.Todate
-		FROM
-		(SELECT ci.* 
-			FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'BRVS', 'OA', 1) ci
-			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo pci  ON ci.ChargeID = pci.ChargeID
-			WHERE pci.ToParty != @BetRadarVS3rdId) c
-		INNER JOIN @PartyList p ON c.PartyID=p.PartyId
-		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo pc WITH(NOLOCK) 
-			ON pc.FromParty = CASE WHEN c.isDeposit=1 THEN p.ParentId ELSE p.PartyId END
-		WHERE pc.ProductID = @BetRadarVSProductId AND pc.ToParty = @BetRadarVS3rdId
+		SELECT c.PartyID, c.ProductID, c.LicenseeID, c.DI_Rate,
+			CASE WHEN ISNULL(c.IsDeposit,0)=0 THEN 0.01 ELSE 0.065 END,
+			c.Fromdate, c.Todate
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'BRVS', 'OA', 1) c		
 	)		
 	-- End region
 
-	select * from @ChargeInfos
-	
 	-- Region: TempData
 	CREATE TABLE #TempData (
 		PartyID INT,
