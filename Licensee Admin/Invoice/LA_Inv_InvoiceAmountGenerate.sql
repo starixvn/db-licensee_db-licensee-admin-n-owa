@@ -1,14 +1,10 @@
 USE [bodb_Licensee]
 GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
 	@PartyId			INT,
 	@BillerId			INT,
-	@InvoiceType		INT,
+	@InvoiceTypeId		INT,
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
 	@ProductCode		VARCHAR(100),	
@@ -43,6 +39,7 @@ AS
 		+ 2017.04.03 @Scofield: update for Cashout [RedmindID: #73310]
 		+ 2017.04.04 @Harper: using new sum table for Cashout Product [RedmindID: #73310]
 		+ 2017.05.05 @Bruce: Correct Product name in Description [RedmindID: #75950]
+		+ 2017.07.18 @Bruce: restructure invoice db [RedmindID: #79905]
 		+ 2017.07.21 @Scofield: Update Amount Type [##79905]
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -53,14 +50,14 @@ AS
 	--DECLARE @ToDate DATETIME  = '2013-11-30'
 	DECLARE @PartyId INT = 14
 	DECLARE @BillerId INT = 150
-	DECLARE @InvoiceType INT = 8
+	DECLARE @InvoiceTypeId INT = 8
 	DECLARE @ProductCode VARCHAR(100)='SB,BA,RB,NG,LC,VS,CS,BG,KN,PTCS,AGC,GD,VG,BT,MGC'
 	DECLARE	@ErrCode INT
 	DECLARE	@ErrMsg NVARCHAR(1000)
 	DECLARE	@BaseCurrency NVARCHAR(20)
 	DECLARE @InvoiceTemplateId VARCHAR(200)
 	
-	EXEC [LA_Inv_InvoiceAmountGenerate] @PartyId,@BillerId,@InvoiceType, @FromDate, @ToDate, @ProductCode, @ErrCode OUT, @ErrMsg OUT, @BaseCurrency OUT, @InvoiceTemplateId OUT
+	EXEC [LA_Inv_InvoiceAmountGenerate] @PartyId,@BillerId,@InvoiceTypeId, @FromDate, @ToDate, @ProductCode, @ErrCode OUT, @ErrMsg OUT, @BaseCurrency OUT, @InvoiceTemplateId OUT
 	SELECT @ErrCode, @ErrMsg, @BaseCurrency, @InvoiceTemplateId
 */
 BEGIN
@@ -105,7 +102,7 @@ BEGIN
 											INNER JOIN dbo.LA_InvoiceTemplate t WITH(NOLOCK) ON i.InvTempId = t.InvTemplateId
 									WHERE	i.FromPartyId = @PartyId
 											AND i.ToPartyId = @BillerId
-											AND i.InvTypeId = @InvoiceType)
+											AND i.InvTypeId = @InvoiceTypeId)
 	-- End Region
 
 	-- Region: Get exchange rate info
@@ -128,8 +125,8 @@ BEGIN
 		@AmountTypeRebate INT = 6,
 		@AmountTypeRackHostingFee INT = 8,
 		@AmountTypeMonthlyHostingFee INT = 9
-	
-	IF @InvoiceType = @InvoiceTypeHostingFeesId
+
+	IF @InvoiceTypeId = @InvoiceTypeHostingFeesId
 	BEGIN
 		-- Get charge rate settings
 		DECLARE @Settings TABLE(
@@ -245,7 +242,7 @@ BEGIN
 		END
 	END
 		
-	IF @InvoiceType = 3 -- rebate
+	IF @InvoiceTypeId = 3 -- rebate
 	BEGIN
 		DECLARE @ProductCodeString VARCHAR(100) = ''
 		SELECT  @ProductCodeString = @ProductCodeString + p.ProductCode + ','
@@ -736,7 +733,7 @@ BEGIN
 			AmountType		TINYINT,
 			Rate			MONEY)
 		
-	IF @InvoiceType = @InvoiceTypeHostingFeesId
+	IF @InvoiceTypeId = @InvoiceTypeHostingFeesId
 	BEGIN 
 		DECLARE @IsApplyMinFee BIT = ISNULL((SELECT TOP 1 IsApplyMinFee FROM @MinFeeGroup WHERE PartyId = @PartyId AND FeeType=1),0)
 
@@ -902,7 +899,7 @@ BEGIN
 		WHERE	ProductId = -1
 
 		-- InvoiceType Software: 1
-		IF @InvoiceType = 1			
+		IF @InvoiceTypeId = 1			
 		BEGIN
 			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, AmountType)
 			SELECT pd.ProductID, pd.ProductPrefix, pd.ProductName, 0, @AmountTypeSoftwareFee
@@ -922,8 +919,8 @@ BEGIN
 				f.AmountType,
 				f.Rate
 		FROM	@FinalResult f
-		WHERE	(@InvoiceType != 3 AND (f.AmountType = @AmountTypeSoftwareFee OR (f.ProductId = -1 AND f.AmountType = @AmountTypeDiscount)))
-				OR (@InvoiceType = 3 AND f.ProductId = -1 AND f.AmountType = @AmountTypeRebate)
+		WHERE	(@InvoiceTypeId != 3 AND (f.AmountType = @AmountTypeSoftwareFee OR (f.ProductId = -1 AND f.AmountType = @AmountTypeDiscount)))
+				OR (@InvoiceTypeId = 3 AND f.ProductId = -1 AND f.AmountType = @AmountTypeRebate)
 		ORDER BY f.AmountType, f.ProductId
 	END
 
