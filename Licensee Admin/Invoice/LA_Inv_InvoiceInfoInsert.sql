@@ -43,7 +43,7 @@ AS
 		+ 20160718@Bruce: Hosting fees - Insert hosting fees info
 		+ 20170421@Bruce: Add environment filter
 		+ 20170608@Bruce: Save details, reuse invoice no of voided invoice [#76411]
-
+		+ 20170721@Scofield: Update to save data to InvoiceStatement [#79905]
 */
 
 BEGIN
@@ -160,34 +160,41 @@ BEGIN
 	-- Region: Insert data to Invoice Detail
 	DECLARE @Detail AS TABLE(
 		[Description]	NVARCHAR(200),
-		Reference		NVARCHAR(100),
-		ProductId		INT,
 		Amount			MONEY,
-		AmountType		TINYINT
+		AmountType		TINYINT,
+		RefNo			NVARCHAR(100)
 	)
 	BEGIN TRY
 		DECLARE @idoc AS INT						
 		EXEC	sp_xml_preparedocument @idoc OUTPUT, @InvoiceDetailXml			
-		INSERT INTO @Detail([Description],Reference,ProductId,Amount,AmountType)
+		INSERT INTO @Detail([Description],Amount,AmountType, RefNo)
 		SELECT 
 			CAST([Description]	AS NVARCHAR(200)),
-			CAST(Reference		AS NVARCHAR(100)),
-			CAST(ProductId		AS INT),
 			CAST(InvoiceAmount	AS MONEY),
-			CAST(AmountType		AS TINYINT)
+			CAST(AmountType		AS TINYINT),
+			CAST(RefNo			AS NVARCHAR(100))
 		FROM OPENXML(@idoc, 'InvoiceDetails/InvoiceDetail')
 		WITH (
 			[Description]	NVARCHAR(200) 'Description',
-			Reference		NVARCHAR(100) 'Reference',
-			ProductId		VARCHAR(10) 'ProductId',
 			InvoiceAmount	VARCHAR(20) 'InvoiceAmount',
-			AmountType		VARCHAR(10) 'AmountType'
+			AmountType		VARCHAR(10) 'AmountType',
+			RefNo			VARCHAR(100) 'RefNo'
 		)
 		EXEC sp_xml_removedocument @idoc		
 						
-		INSERT	INTO dbo.LA_InvoiceDetail(InvoiceHeaderId,[Description],Reference,ProductId,InvoiceAmount,AmountType)
-		SELECT	@CurrentInvoiceHeaderId,[Description],Reference,ProductId,Amount,AmountType
-		FROM	@Detail			
+		INSERT INTO dbo.LA_InvoiceStatement(InvoiceHeaderId, InvItemTypeId, Description, RefNo, Income, Expense)
+		SELECT @CurrentInvoiceHeaderId, AmountType, [Description], RefNo, 
+			CASE WHEN it.GroupDB = 'Income' THEN d.Amount * it.SignDB ELSE NULL END AS Income,
+			CASE WHEN it.GroupDB = 'Expense' THEN d.Amount * it.SignDB ELSE NULL END AS Expense
+		FROM @Detail d
+		INNER JOIN LA_InvoiceItemType it ON d.AmountType = it.InvItemTypeId				
+		
+		UPDATE dbo.LA_InvoiceHeader 
+		SET Amount = (SELECT (SUM(Income)- SUM(Expense)) 
+						FROM  dbo.LA_InvoiceStatement
+						WHERE InvoiceHeaderId = @CurrentInvoiceHeaderId)
+		WHERE InvoiceHeaderId = @CurrentInvoiceHeaderId
+		
 	END TRY
 	BEGIN CATCH        	
 		SELECT	@ErrCode = 2, @ErrMsg = 'Invalid invoice detail inputs.'
@@ -221,10 +228,9 @@ BEGIN
 			, (SELECT 
 				@CurrentInvoiceHeaderId AS '@hid'
 				, [Description]			AS '@d'
-				, Reference				AS '@r'
-				, ProductId				AS '@pr'
 				, Amount				AS '@amt'
 				, AmountType			AS '@at'
+				, RefNo					AS '@rn'
 			FROM @Detail
 			FOR XML PATH('d'), TYPE)
 		FOR XML PATH('h'), TYPE)
