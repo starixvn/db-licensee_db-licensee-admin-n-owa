@@ -23,7 +23,13 @@ BEGIN
 	DECLARE @PartyList AS TABLE (PartyId INT, PartyName	VARCHAR(100), BranchName VARCHAR(100), ParentId	INT)
 
 	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
-	EXEC LA_PartyListSel		
+	EXEC LA_PartyListSel	
+	
+	DECLARE	@12BetGroupId INT = -1		
+	UPDATE @PartyList SET ParentId = @12BetGroupId WHERE PartyId = 14 -- 12bet
+
+	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
+	SELECT @12BetGroupId, PartyName, BranchName, 0 FROM @PartyList WHERE PartyId = 14
 	-- Endregion	
 
 	-- Region: Charge Info	
