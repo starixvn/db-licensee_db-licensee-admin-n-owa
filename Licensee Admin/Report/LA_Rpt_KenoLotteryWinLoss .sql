@@ -25,7 +25,9 @@ BEGIN
 	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC LA_PartyListSel	
 	
-	DECLARE	@12BetGroupId INT = -1		
+	DECLARE	@12BetGroupId INT = -1,
+		@OneWorksGroupId INT = 1
+	UPDATE @PartyList SET ParentId = @OneWorksGroupId WHERE ParentId IN (11,98)
 	UPDATE @PartyList SET ParentId = @12BetGroupId WHERE PartyId = 14 -- 12bet
 
 	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
