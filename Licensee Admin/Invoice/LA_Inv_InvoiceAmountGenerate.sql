@@ -832,7 +832,7 @@ BEGIN
 					iv.ProductId, 
 					(iv.InvoiceAmount - ISNULL((SELECT	SUM(i.InvoiceAmount)
 												FROM	@InvoiceData i
-												WHERE	i.AmountType = 1
+												WHERE	i.AmountType = @AmountTypeDiscount
 														AND i.ProductId = iv.ProductId), 0))
 						* dg.Rate AS InvoiceAmount, 
 					@AmountTypeRebate, 
@@ -840,7 +840,7 @@ BEGIN
 			FROM	@InvoiceData iv 
 					INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
 			WHERE	dg.DiscountGroupType = 2
-					AND iv.AmountType = 0
+					AND iv.AmountType = @AmountTypeSoftwareFee
 		)
 	
 		-- End Region
@@ -890,7 +890,7 @@ BEGIN
 					id.AmountType,
 					id.Rate
 			FROM	@FinalResult id
-			WHERE	id.AmountType > 0
+			WHERE	id.AmountType > @AmountTypeSoftwareFee
 			GROUP BY id.AmountType, id.Rate
 		)	
 		UPDATE	@FinalResult
