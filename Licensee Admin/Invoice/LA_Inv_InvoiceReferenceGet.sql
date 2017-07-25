@@ -3,20 +3,21 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceReferenceGet]
 	@BillerId		INT,
-	@PayerId 		INT,
-	@InvoiceType	INT = 0
+	@PayerId 		INT
 AS
 /*	
 	Created: 2017.07.19 - Scofield.Huynh [#79905]		
 	DB:		DBLIC/bodb_Licensee	
 */
 BEGIN
-	SELECT OfficialInvoiceNo InvoiceNo, InvoiceType
+	SELECT OfficialInvoiceNo	AS InvoiceNo,
+		InvoiceHeaderId			AS InvoiceId,
+		InvoiceType
 	FROM LA_InvoiceHeader WITH(NOLOCK)
-	WHERE BillerId = @BillerId 
+	WHERE InvoiceType IN (1, 3) -- Software Fee, Rebate
 		AND StatusId = 0 -- normal
 		AND PartyId = @PayerId 
-		AND ((@InvoiceType = 0 AND InvoiceType IN (1, 3)) OR @InvoiceType = InvoiceType) -- Software Fee, Rebate
+		AND BillerId = @BillerId
 	ORDER BY CreatedDateTime
 END
 GO
