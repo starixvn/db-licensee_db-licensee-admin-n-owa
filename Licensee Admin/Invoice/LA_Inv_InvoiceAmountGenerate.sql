@@ -820,7 +820,7 @@ BEGIN
 		(
 			SELECT t.PartyId, t.ProductId, SUM(t.LicenseeWinLossBase * d.Rate), @AmountTypeDiscount, d.Rate
 			FROM #TempData t
-			INNER JOIN @DiscountGroup d ON d.ProductId = t.ProductId  AND d.DiscountGroupType = 3
+			INNER JOIN @DiscountGroup d ON d.ProductId = t.ProductId  AND d.DiscountGroupType = 3 AND t.PartyId=d.PartyId
 			GROUP BY t.PartyId, t.ProductId, d.Rate
 		)
 		--end discount by winloss
