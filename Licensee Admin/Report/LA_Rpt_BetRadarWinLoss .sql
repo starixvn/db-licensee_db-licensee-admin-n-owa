@@ -121,7 +121,6 @@ BEGIN
 		LicenseeWinLoss	MONEY,
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY,
-		OriginalPayToSupplier	MONEY,
 		CompanyIncome	MONEY,
 		Currency		VARCHAR(20)
 	)
@@ -163,17 +162,20 @@ BEGIN
 			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
 			GROUP BY td.ParentId, td.PartyId
 		)
-		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, OriginalPayToSupplier)
+		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier)
 		SELECT @tempCurrency,ParentId,
 			SUM(TotalTrans),
 			SUM(Turnover),
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
-			SUM(CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END),
 			SUM(PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
+		
+		UPDATE @Total
+		SET PayToSupplier = 0
+		WHERE PayToSupplier < 0
 
 		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
 		SELECT Currency,
@@ -252,8 +254,8 @@ BEGIN
 			CustomerWinLoss,		
 			LicenseeWinLoss,
 			LicensingFee,
-			OriginalPayToSupplier as PayToSupplier,
-			(LicensingFee - PayToSupplier) CompanyIncome
+			PayToSupplier,
+			(LicensingFee - PayToSupplier) AS CompanyIncome
 		FROM @Total t
 		WHERE Currency = @BaseCurrencyName
 	END
