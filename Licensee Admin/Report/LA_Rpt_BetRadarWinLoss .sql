@@ -27,6 +27,7 @@ BEGIN
 	-- Endregion	
 
 	-- Region: Charge Info	
+	DECLARE @BRVSProductID INT = (SELECT ProductID FROM bodb_licensee.dbo.Product3rd WHERE ProductPrefix = 'BRVS')
 	DECLARE @ChargeInfos AS TABLE (
 		PartyId		INT,
 		LicenseeId	INT,
@@ -42,6 +43,27 @@ BEGIN
 			CASE WHEN ISNULL(c.IsDeposit,0)=0 THEN 0.01 ELSE 0.065 END,
 			c.Fromdate, c.Todate
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'BRVS', 'OA', 1) c		
+		
+		UNION
+		
+		-- get Credit settings with rate = 0
+		SELECT p.PartyID, ci.ProductId, lb.LabelID AS LicenseeID, ci.Rate, 0.01 AS Rate3rd,	
+			CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate
+				ELSE @FromDate END,
+			CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate 
+				ELSE @ToDate END
+		FROM OAS_ChargeInfo ci
+		INNER JOIN dbo.OAS_Party p ON ci.FromParty = p.PartyID	AND ci.ChargeType != 2 AND p.PartyType = 1
+		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
+		INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
+		LEFT JOIN dbo.labels lb(NOLOCK) ON p.OldRefID = lb.LicenseeID 
+		WHERE ci.Productid = @BRVSProductID and ci.Rate = 0 AND ISNULL(pd.IsDeposit, 0) = 0 AND
+			p.PartyID IN (	SELECT VAL
+							FROM strSplit(@PartyIDs, ','))	AND
+			(	@FromDate BETWEEN ci.FromDate AND ci.ToDate
+				OR @ToDate BETWEEN ci.FromDate AND ci.ToDate
+				OR ci.FromDate BETWEEN @FromDate AND @ToDate
+				OR ci.ToDate BETWEEN @FromDate AND @ToDate)
 	)		
 	-- End region
 
