@@ -7,7 +7,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
 	@InvoiceTypeId		INT,
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
-	@ProductCode		VARCHAR(100),	
+	@ProductCodes		VARCHAR(100),	
 	@ErrCode			INT				= 0		OUTPUT,
 	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT,
 	@BaseCurrency		NVARCHAR(20)	= 'GBP'	OUTPUT,
@@ -51,13 +51,13 @@ AS
 	DECLARE @PartyId INT = 14
 	DECLARE @BillerId INT = 150
 	DECLARE @InvoiceTypeId INT = 8
-	DECLARE @ProductCode VARCHAR(100)='SB,BA,RB,NG,LC,VS,CS,BG,KN,PTCS,AGC,GD,VG,BT,MGC'
+	DECLARE @ProductCodes VARCHAR(100)='SB,BA,RB,NG,LC,VS,CS,BG,KN,PTCS,AGC,GD,VG,BT,MGC'
 	DECLARE	@ErrCode INT
 	DECLARE	@ErrMsg NVARCHAR(1000)
 	DECLARE	@BaseCurrency NVARCHAR(20)
 	DECLARE @InvoiceTemplateId VARCHAR(200)
 	
-	EXEC [LA_Inv_InvoiceAmountGenerate] @PartyId,@BillerId,@InvoiceTypeId, @FromDate, @ToDate, @ProductCode, @ErrCode OUT, @ErrMsg OUT, @BaseCurrency OUT, @InvoiceTemplateId OUT
+	EXEC [LA_Inv_InvoiceAmountGenerate] @PartyId,@BillerId,@InvoiceTypeId, @FromDate, @ToDate, @ProductCodes, @ErrCode OUT, @ErrMsg OUT, @BaseCurrency OUT, @InvoiceTemplateId OUT
 	SELECT @ErrCode, @ErrMsg, @BaseCurrency, @InvoiceTemplateId
 */
 BEGIN
@@ -229,7 +229,7 @@ BEGIN
 		END
 		
 		DECLARE @BaseProduct INT = (SELECT BaseProduct FROM @Settings WHERE SettingType = 2)
-		SET @ProductCode = CASE 
+		SET @ProductCodes = CASE 
 			WHEN @BaseProduct = 0 THEN 'SB'
 			ELSE (SELECT ProductPrefix FROM dbo.Product3rd WITH(NOLOCK) WHERE Productid = @BaseProduct)
 		END
@@ -267,7 +267,7 @@ BEGIN
 		END
 		ELSE
 		BEGIN
-			SET @ProductCode = SUBSTRING(@ProductCodeString, 1, LEN(@ProductCodeString) - 1)
+			SET @ProductCodes = SUBSTRING(@ProductCodeString, 1, LEN(@ProductCodeString) - 1)
 		END
 	END	
 	-- EndRegion
@@ -307,7 +307,7 @@ BEGIN
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, BettypeRef, Rate, Fromdate, Todate)
 	(
 		SELECT	PartyID, LicenseeID, ProductID, Bettype, DI_Rate, Fromdate, Todate
-		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
+		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId NOT IN (1, 15) --exclude RB, CB
 	)
 	
@@ -329,7 +329,7 @@ BEGIN
 		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
 		LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
 		LEFT JOIN bodb_licensee.dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
-	WHERE EXISTS(SELECT val FROM bodb02.dbo.strSplit(@ProductCode, ',') WHERE val = 'CB') AND
+	WHERE EXISTS(SELECT val FROM bodb02.dbo.strSplit(@ProductCodes, ',') WHERE val = 'CB') AND
 		FromParty = @PartyId AND ProductID = @CBProductId AND ChargeType IN (@CommChargeType,@CashInShareChargeType) AND (
 		@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
 		@ToDate BETWEEN ci.FromDate AND ci.ToDate OR

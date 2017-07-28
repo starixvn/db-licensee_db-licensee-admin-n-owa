@@ -9,7 +9,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_ChargeRateInfoGet]
 	 @PartyId			INT,  
 	 @FromDate			DATETIME,
 	 @ToDate			DATETIME,  
-	 @ProductCode		VARCHAR(200),
+	 @ProductCodes		VARCHAR(200),
 	 @CurrencyId		INT			= 0	,
 	 @BaseCurrencyName VARCHAR(20)	= 'GBP'
 AS
@@ -26,14 +26,14 @@ AS
 	DECLARE @FromDate DATETIME,
 		@ToDate DATETIME,
 		@PartyId INT,
-		@ProductCode VARCHAR(100)
+		@ProductCodes VARCHAR(100)
 		
 	SET @FromDate = '2015-07-1'
 	SET @ToDate = '2015-07-31'
 	SET @PartyId=17
-	SET @ProductCode='SB,BA,RB,NG,LC,VS,CS,BG,KN,PTCS,AGC,GD,VG'	
+	SET @ProductCodes='SB,BA,RB,NG,LC,VS,CS,BG,KN,PTCS,AGC,GD,VG'	
 	
-	EXEC [LA_Inv_ChargeRateInfoGet] @PartyId, @FromDate, @ToDate, @ProductCode
+	EXEC [LA_Inv_ChargeRateInfoGet] @PartyId, @FromDate, @ToDate, @ProductCodes
 */
 BEGIN
 	SET NOCOUNT ON
@@ -51,7 +51,7 @@ BEGIN
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, RowNumber)
 	(
 		SELECT	PartyID, LicenseeID, ProductID, MAX(DI_Rate), Fromdate, Todate, ROW_NUMBER() OVER (ORDER BY ProductId, Todate)
-		FROM	dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, @ProductCode, 'OA', 1)
+		FROM	dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
 		GROUP BY PartyID,LicenseeID,ProductID,Fromdate,Todate
 	)		
