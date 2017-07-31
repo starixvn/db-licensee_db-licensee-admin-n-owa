@@ -1,24 +1,19 @@
 USE [bodb_licensee]
 GO
 
-SET ANSI_NULLS ON
-GO
-
-SET QUOTED_IDENTIFIER ON
-GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert]
 	  @BillerId				INT
-	, @PayerId				INT
-	, @InvoiceSymbol		NVARCHAR(20) = ''
+	, @PartyId				INT
+	, @InvoiceSymbol		NVARCHAR(20)
 	, @InvoiceNumber		INT
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME
 	, @DueDate				DATETIME
 	, @Amount				MONEY
-	, @InvoiceType			SMALLINT
-	, @Note					NVARCHAR(200)
-	, @InvoiceDetailXml		NVARCHAR(MAX)
+	, @InvoiceTypeId		SMALLINT
+	, @Note					NVARCHAR(200) = ''
+	, @StatementXml			NVARCHAR(MAX)
 	, @IsSeparateProduct	BIT = 0
 	, @UserID				INT
 	, @LoginIP				VARCHAR (50) = ''
@@ -30,6 +25,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert]
 	, @ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
 	, @NewInvoiceNumber		INT						OUTPUT
 	, @NewInvoiceId			INT						OUTPUT
+	, @InvoiceFileName		NVARCHAR(200)	= ''	OUTPUT
 AS
 
 /*  Header:
@@ -58,13 +54,13 @@ BEGIN
 	SET @startRun = GETDATE()
 
 	IF ISNULL(@BillerId, 0) = 0
-		OR ISNULL(@PayerId,0) = 0
+		OR ISNULL(@PartyId,0) = 0
 		OR ISNULL(@InvoiceSymbol, '') = ''
 		OR ISNULL(@InvoiceNumber, 0) <= 0
 		OR ISNULL(@DueDate, '') = ''
-		OR ISNULL(@InvoiceDetailXml, '') = ''
+		OR ISNULL(@StatementXml, '') = ''
 		OR @Amount IS NULL
-		OR ISNULL(@InvoiceType, 0) <= 0
+		OR ISNULL(@InvoiceTypeId, 0) <= 0
 		OR ISNULL(@UserID, 0) = 0
 		OR ISNULL(@Environment,'') = ''
 	BEGIN
@@ -98,32 +94,35 @@ BEGIN
 	DECLARE @CurrencyId INT = ISNULL((
 		SELECT TOP 1 BaseCurrencyId
 		FROM dbo.OAS_PartyDetail WITH(NOLOCK)
-		WHERE PartyID = @PayerId), 6) -- default EUR
+		WHERE PartyID = @PartyId), 6) -- default EUR
 
 	BEGIN TRY
 		DECLARE @CurrentDateTime DATETIME = GETDATE()
+
+		-- generate Invoice No.
 		DECLARE @InvoiceNo VARCHAR(50) =  CAST(@InvoiceNumber AS VARCHAR(10))
 		SET @InvoiceNo = @InvoiceSymbol + (CASE WHEN @InvoiceNumber < 100 THEN RIGHT('000' + @InvoiceNo,3) ELSE @InvoiceNo END)
 
 		DECLARE @InvoiceTypeList TABLE(InvoiceTypeId TINYINT, InvoiceTypeName VARCHAR(10))
 		INSERT INTO @InvoiceTypeList VALUES (1,'SW'),(2,'BA'),(3,'RB'),(4,'CN'),(5,'DN'),(6,'HF'),(7,'SF')
 
+		-- generate filename
 		DECLARE @InvoiceNoCount INT = (
 			SELECT COUNT(1) 
 			FROM dbo.LA_InvoiceHeader WITH(NOLOCK) 
 			WHERE InvoiceNumber = @InvoiceNumber AND InvoiceSymbol = @InvoiceSymbol AND Environment = @Environment
 		)
 		--{environment}-{invoice-type}-{invoice-number}-{create-date}-{gen-number}.pdf
-		DECLARE @InvoiceFileName VARCHAR(255) = (
+		SET @InvoiceFileName = (
 			SELECT @Environment + '-' + InvoiceTypeName + '-' + @InvoiceNo + '-' + CONVERT(varchar(50),@CurrentDateTime, 112) + '-' + CAST((@InvoiceNoCount + 1) AS VARCHAR(10)) + '.pdf'
-			FROM @InvoiceTypeList WHERE InvoiceTypeId = @InvoiceType
+			FROM @InvoiceTypeList WHERE InvoiceTypeId = @InvoiceTypeId
 		)
 
-		INSERT	INTO dbo.LA_InvoiceHeader (BillerId, PartyId, CurrencyId, InvoiceSymbol, InvoiceNumber, FromDate, ToDate, InvoiceDate, DueDate, Amount, InvoiceType, StatusId, Note, HasSent, HasDeleted, CreatedBy, CreatedDateTime, IsSeparateProduct, MaxPCU, RateAmount, IsWaived, InvoicePath, Environment)
+		INSERT	INTO dbo.LA_InvoiceHeader (BillerId, PartyId, CurrencyId, InvoiceSymbol, InvoiceNumber, FromDate, ToDate, InvoiceDate, DueDate, Amount, InvoiceType, StatusId, Note, HasSent, HasDeleted, CreatedBy, CreatedDateTime, IsSeparateProduct, MaxPCU, RateAmount, IsWaived, InvoicePath, Environment, OfficialInvoiceNo)
 		VALUES
 		(
 				@BillerId,
-				@PayerId,
+				@PartyId,
 				@CurrencyId,
 				@InvoiceSymbol,
 				@InvoiceNumber,
@@ -132,7 +131,7 @@ BEGIN
 				@CurrentDateTime,
 				@DueDate,
 				@Amount,
-				@InvoiceType,
+				@InvoiceTypeId,
 				0,
 				@Note,
 				0,
@@ -144,7 +143,8 @@ BEGIN
 				@HostingFeeRateAmount,
 				@HostingFeeIsWaived,
 				@InvoiceFileName,
-				@Environment
+				@Environment,
+				@InvoiceNo
 		)
 	END TRY
 	BEGIN CATCH
@@ -158,36 +158,36 @@ BEGIN
 	-- End Region
 
 	-- Region: Insert data to Invoice Detail
-	DECLARE @Detail AS TABLE(
+	DECLARE @Settlements AS TABLE(
 		[Description]	NVARCHAR(200),
 		Amount			MONEY,
-		AmountType		TINYINT,
-		RefNo			NVARCHAR(100)
+		ItemType		TINYINT,
+		Reference		NVARCHAR(100)
 	)
 	BEGIN TRY
 		DECLARE @idoc AS INT						
-		EXEC	sp_xml_preparedocument @idoc OUTPUT, @InvoiceDetailXml			
-		INSERT INTO @Detail([Description],Amount,AmountType, RefNo)
+		EXEC	sp_xml_preparedocument @idoc OUTPUT, @StatementXml			
+		INSERT INTO @Settlements([Description],Amount,ItemType,Reference)
 		SELECT 
-			CAST([Description]	AS NVARCHAR(200)),
-			CAST(InvoiceAmount	AS MONEY),
-			CAST(AmountType		AS TINYINT),
-			CAST(RefNo			AS NVARCHAR(100))
-		FROM OPENXML(@idoc, 'InvoiceDetails/InvoiceDetail')
+			[Description],
+			CAST(Amount		AS MONEY),
+			CAST(ItemType	AS TINYINT),
+			Reference
+		FROM OPENXML(@idoc, 'Statements/Statement')
 		WITH (
 			[Description]	NVARCHAR(200) 'Description',
-			InvoiceAmount	VARCHAR(20) 'InvoiceAmount',
-			AmountType		VARCHAR(10) 'AmountType',
-			RefNo			VARCHAR(100) 'RefNo'
+			Amount			VARCHAR(20) 'Amount',
+			ItemType		VARCHAR(10) 'ItemType',
+			Reference		VARCHAR(100) 'Reference'
 		)
 		EXEC sp_xml_removedocument @idoc		
 						
-		INSERT INTO dbo.LA_InvoiceStatement(InvoiceHeaderId, InvItemTypeId, Description, RefNo, Income, Expense)
-		SELECT @CurrentInvoiceHeaderId, AmountType, [Description], RefNo, 
+		INSERT INTO dbo.LA_InvoiceStatement(InvoiceHeaderId, InvItemTypeId, [Description], RefNo, Income, Expense)
+		SELECT @CurrentInvoiceHeaderId, d.ItemType, d.[Description], d.Reference, 
 			CASE WHEN it.GroupDB = 'Income' THEN d.Amount * it.SignDB ELSE NULL END AS Income,
 			CASE WHEN it.GroupDB = 'Expense' THEN d.Amount * it.SignDB ELSE NULL END AS Expense
-		FROM @Detail d
-		INNER JOIN LA_InvoiceItemType it ON d.AmountType = it.InvItemTypeId				
+		FROM @Settlements d
+		INNER JOIN LA_InvoiceItemType it ON d.ItemType = it.InvItemTypeId				
 		
 		UPDATE dbo.LA_InvoiceHeader 
 		SET Amount = (SELECT (SUM(Income)- SUM(Expense)) 
@@ -210,14 +210,14 @@ BEGIN
 	DECLARE @xml XML = (
 		SELECT @CurrentInvoiceHeaderId AS '@hid'
 			, @BillerId			AS '@b'
-			, @PayerId			AS '@p'
+			, @PartyId			AS '@p'
 			, @CurrencyId		AS '@c'
 			, @InvoiceSymbol	AS '@is'
 			, @InvoiceNumber	AS '@in'
 			, @CurrentDateTime	AS '@ivd'
 			, @DueDate			AS '@dd'
 			, @Amount			AS '@amt'
-			, @InvoiceType		AS '@ivt'
+			, @InvoiceTypeId	AS '@ivt'
 			, 0					AS '@stt'
 			, @Note				AS '@n'
 			, 0					AS '@hs'
@@ -225,13 +225,18 @@ BEGIN
 			, @UserID			AS '@cb'
 			, @CurrentDateTime	AS '@crd'
 			, @CurrentDateTime	AS '@upd'
+			, @InvoiceFileName	AS '@fn'
+			, @IsSeparateProduct	AS '@sp'
+			, @HostingFeeIsWaived	AS '@hfw'
+			, @HostingFeeMaxPCU		AS '@hfpcu'
+			, @HostingFeeRateAmount	AS '@hfam'
 			, (SELECT 
 				@CurrentInvoiceHeaderId AS '@hid'
 				, [Description]			AS '@d'
 				, Amount				AS '@amt'
-				, AmountType			AS '@at'
-				, RefNo					AS '@rn'
-			FROM @Detail
+				, ItemType				AS '@at'
+				, Reference				AS '@rn'
+			FROM @Settlements
 			FOR XML PATH('d'), TYPE)
 		FOR XML PATH('h'), TYPE)
 	SET @logSPData = CAST(@xml AS NVARCHAR(MAX))
