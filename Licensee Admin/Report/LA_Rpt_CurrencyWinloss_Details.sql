@@ -212,6 +212,8 @@ BEGIN
 		INNER JOIN #Bettype bt ON p.ProductID = bt.ProductID
 		WHERE p.ProductID NOT IN (3,14,17)
 		
+		DELETE #Data
+		
 		INSERT INTO #Data(rptDate, SiteID, PartyID, ProductID, Bettype, [Status], CurrencyID, TurnOver, Winloss, WinlossA, CommissionA, CommissionP, Betcount)
 		(
 			SELECT	b.rptDate
