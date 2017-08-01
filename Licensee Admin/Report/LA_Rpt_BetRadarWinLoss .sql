@@ -27,7 +27,7 @@ BEGIN
 	-- Endregion	
 
 	-- Region: Charge Info	
-	DECLARE @BRVSProductID INT = (SELECT ProductID FROM bodb_licensee.dbo.Product3rd WHERE ProductPrefix = 'BRVS')
+	DECLARE @BRVSProductID INT = (SELECT ProductID FROM bodb_licensee.dbo.Product3rd WHERE ProductPrefix = 'VS2')
 	DECLARE @ChargeInfos AS TABLE (
 		PartyId		INT,
 		LicenseeId	INT,
@@ -42,7 +42,7 @@ BEGIN
 		SELECT c.PartyID, c.ProductID, c.LicenseeID, c.DI_Rate,
 			CASE WHEN ISNULL(c.IsDeposit,0)=0 THEN 0.01 ELSE 0.065 END,
 			c.Fromdate, c.Todate
-		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'BRVS', 'OA', 1) c		
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'VS2', 'OA', 1) c		
 		
 		UNION
 		
