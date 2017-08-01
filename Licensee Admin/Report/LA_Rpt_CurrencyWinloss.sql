@@ -31,6 +31,7 @@ AS
 	   - 20150703@Florent: add GBP
 	   - 20160504@Bruce: Remove dynamic sql
 	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+	   - 20170801@Kenny: Filter data for Microgaming
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -91,11 +92,12 @@ BEGIN
 		,Rate			MONEY
 		,Fromdate		SMALLDATETIME
 		,Todate			SMALLDATETIME
+		,Bettype		INT
 	)
 
-	INSERT INTO #tmpParty (PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Rate, Fromdate, Todate)
+	INSERT INTO #tmpParty (PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Rate, Fromdate, Todate, Bettype)
 	(
-		SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, Fromdate, Todate
+		SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, Fromdate, Todate, Bettype
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo (@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', @excludeTest)
 	)
 
@@ -143,14 +145,80 @@ BEGIN
 		)
 	END
 
-	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode <> 'BA')
+	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode IN ('MGCLC','MGCRNG'))
 	BEGIN
+		CREATE TABLE #GameTypes (ProductId INT, BettypeRef INT, BettypeId INT)
+		CREATE TABLE #MicrogamingChargeInfo(PartyID INT, LicenseeID INT, ProductID INT,BetTypeId INT ,Rate MONEY, Fromdate DATE, Todate DATE)
+
+		INSERT INTO #GameTypes (ProductId, BettypeId, BettypeRef)
+		SELECT CASE WHEN sp.Sporttype = 203 THEN 14
+					WHEN sp.Sporttype = 205 THEN 17 ELSE 0 END AS ProductId, sp.Bettype, pr.BettypeRef
+		FROM bodb_licensee.dbo.Sport_Bettype_Reference sp WITH (NOLOCK)
+			LEFT JOIN bodb_licensee.dbo.LA_Product3rdSub pr WITH (NOLOCK) ON sp.BettypeRef = pr.BettypeRef
+		GROUP BY sp.Sporttype, sp.Bettype, pr.BettypeRef
+		
+		INSERT INTO #MicrogamingChargeInfo(PartyID, LicenseeID, ProductID, BetTypeId, Rate, Fromdate, Todate)
+		SELECT PartyID, LicenseeID, ci.ProductID, gt.BetTypeId, Rate, Fromdate, Todate 
+		FROM #tmpParty ci
+		INNER JOIN #GameTypes gt ON ci.ProductID = gt.ProductId AND ci.Bettype = gt.BettypeRef
+		
+		DROP TABLE #GameTypes
+
+		DELETE #Data
+
+		INSERT INTO #Data(rptDate, SiteID, PartyID, ProductID, Bettype, [Status], CurrencyID, Turnover, Winloss, WinlossA, CommissionA, CommissionP, Betcount)
+		(
+			SELECT b.rptDate,b.SiteID, ci.PartyID, b.ProductID, ci.BetTypeId, b.StatusId,  b.currencyID
+				, SUM(b.turnover) Turnover
+				, SUM(b.MemberWL)
+				, 0
+				, 0
+				, 0
+				, SUM(b.betcount) BetCount
+			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+				INNER JOIN (SELECT DISTINCT PartyID, LicenseeID, ProductID, BetTypeId FROM #MicrogamingChargeInfo) ci ON b.SiteID = ci.LicenseeID AND ci.BetTypeId = b.Bettype AND b.ProductID = ci.ProductID
+			WHERE b.rptDate BETWEEN @Fromdate AND @Todate
+				AND b.ProductID IN (14,17)
+				AND b.StatusId NOT IN (- 1, 101, 102, 103)
+				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
+				AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
+			GROUP BY ci.PartyID, b.SiteID, b.rptDate, b.ProductID, currencyID, ci.BetTypeId, b.StatusId
+		)
+
+		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, ProductID, Currency, TurnOver, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Company, Betcount, Playercomm)
+		(
+			SELECT b.rptDate, ci.PartyID, b.ProductID, b.CurrencyID
+				, SUM(b.turnover) Turnover
+				, SUM(b.Winloss) Winlost
+				, -SUM(b.Winloss) AS LicenseeWL
+				, 0 AS WinlossRB
+				, 0 AS AmtDueToBA
+				, 0 AS AmtDueToRB
+				, 0 AS CommBA
+				, 0 AS CommRB
+				, -SUM(b.Winloss * ci.Rate) AS Company
+				, SUM(b.betcount) AS betcount
+				, 0 as Playercomm
+			FROM #Data b
+				INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, BetTypeId, Rate FROM #MicrogamingChargeInfo WHERE ProductID IN(14,17)) ci 
+				ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID AND ci.BetTypeId = b.Bettype			
+			WHERE b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+			GROUP BY ci.PartyID, b.rptDate, b.CurrencyID,  b.ProductID
+		)
+
+	END
+
+	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode NOT IN ('BA','MGCLC','MGCRNG'))
+	BEGIN
+		
 		--exclude BA rpt_Betting
 		SELECT DISTINCT p.PartyID, p.LicenseeID, p.ProductID, bt.Bettype
 		INTO #PartyBettypeMapping
 		FROM #tmpParty p
 		INNER JOIN #Bettype bt ON p.ProductID = bt.ProductID
-		WHERE p.ProductID <> 3
+		WHERE p.ProductID NOT IN (3,14,17)
+
+		DELETE #Data
 
 		INSERT INTO #Data(rptDate, SiteID, PartyID, ProductID, Bettype, [Status], CurrencyID, TurnOver, Winloss, WinlossA, CommissionA, CommissionP, Betcount)
 		(
@@ -210,7 +278,7 @@ BEGIN
 					SUM(b.Betcount) * (CASE WHEN @drawfilter = 2 AND b.[Status] = 111 THEN 0 ELSE 1 END),
 					SUM(b.CommissionP)
 			FROM #Data b WITH (NOLOCK)
-			INNER JOIN #tmpParty tp ON b.SiteID = tp.LicenseeID AND tp.ProductID <> 3 AND b.ProductID = tp.ProductID
+			INNER JOIN #tmpParty tp ON b.SiteID = tp.LicenseeID AND tp.ProductID NOT IN (3,14,17) AND b.ProductID = tp.ProductID
 			WHERE b.rptDate BETWEEN tp.FromDate AND tp.Todate
 			GROUP BY  b.rptDate, tp.ProductID, tp.PartyID, b.currencyID, b.[Status]
 		)
