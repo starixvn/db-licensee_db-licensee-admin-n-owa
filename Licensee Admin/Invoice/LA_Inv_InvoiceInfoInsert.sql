@@ -190,7 +190,7 @@ BEGIN
 		INNER JOIN LA_InvoiceItemType it ON d.ItemType = it.InvItemTypeId				
 		
 		UPDATE dbo.LA_InvoiceHeader 
-		SET Amount = (SELECT (SUM(Income)- SUM(Expense)) 
+		SET Amount = (SELECT (SUM(ISNULL(Income, 0))- SUM(ISNULL(Expense, 0))) 
 						FROM  dbo.LA_InvoiceStatement
 						WHERE InvoiceHeaderId = @CurrentInvoiceHeaderId)
 		WHERE InvoiceHeaderId = @CurrentInvoiceHeaderId
