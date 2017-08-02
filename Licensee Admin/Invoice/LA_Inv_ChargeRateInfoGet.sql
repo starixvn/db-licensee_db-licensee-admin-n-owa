@@ -19,7 +19,8 @@ AS
 	DB: DB052.bodb_licensee
    
 	Revisions: 
-		+ 2015.08.07: Charge rate Info - Get
+		+ 20150807@Bravo: Charge rate Info - Get
+		+ 20170802@Bruce: @ProductCode => @ProductCodes [#79905]
 */
 /*	Example:
 	USE bodb_licensee
