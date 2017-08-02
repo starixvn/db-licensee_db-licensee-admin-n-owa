@@ -16,6 +16,7 @@ AS
 	 Task : Get report Bet Radar Virtual Sport Win Loss
 	 DB: DB052.bodb_licensee   
 	 Revisions:  
+		- 20170707@Scofield: Get report Bet Radar Virtual Sport Win Loss [#79310]
 	 Params:
 */
 BEGIN	
