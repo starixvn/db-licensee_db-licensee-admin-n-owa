@@ -170,7 +170,7 @@ BEGIN
 			FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
 			INNER JOIN #tmpParty p ON p.LicenseeId=b.SiteId AND p.Bettype=b.Bettype AND b.RptDate BETWEEN p.FromDate AND p.ToDate
 			WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
-				AND (b.CurrencyID <> 20)
+				AND (@excludeTest = 0 OR b.CurrencyID<>20)
 				AND b.Status NOT IN (-1, 101, 102, 103)
 			GROUP BY p.LicenseeId, p.PartyId, b.rptDate, b.CurrencyID, p.ProductID
 		)
