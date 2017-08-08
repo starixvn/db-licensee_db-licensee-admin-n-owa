@@ -43,6 +43,7 @@ AS
 		- 20160315@Victor: support Microgaming - RNG product
 		- 20161214@Jim:Invoice - Setup fees [RedmineID : #65260 ]
 		- 20170309@Harper: Add BaseCurrencyID For MinFee and PartyDetail
+		- 20170808@Harper: Fix case MinFee = 0
 
 	Param's Explanation:
 */
@@ -215,10 +216,13 @@ BEGIN
 					INSERT INTO dbo.LA_ChargeInfo_MinFee (ChargeID, MinFee, MinFeeCurrencyID, WaiveFrom, WaiveTo)
 					SELECT @ChargeID, @MinFee, @BaseCurrencyId, @FromDate, DATEADD(DAY, - 1, DATEADD(MONTH, @WaiveMonth, @FromDate))
 
-					INSERT INTO dbo.LA_MinFee(PartyId, FeeTypeId, ProductId, FeeAmount, CurrencyId, FromDate, ToDate, MinFeeTerm, Priority)
-					SELECT c.FromParty, 1, c.ProductID, @MinFee, @BaseCurrencyId, c.FromDate, c.ToDate , '', 1
-					FROM dbo.OAS_ChargeInfo c WITH (NOLOCK) 
-					WHERE c.ChargeID = @ChargeId
+					IF (@Minfee <> 0)
+					BEGIN
+						INSERT INTO dbo.LA_MinFee(PartyId, FeeTypeId, ProductId, FeeAmount, CurrencyId, FromDate, ToDate, MinFeeTerm, Priority)
+						SELECT c.FromParty, 1, c.ProductID, @MinFee, @BaseCurrencyId, c.FromDate, c.ToDate , '', 1
+						FROM dbo.OAS_ChargeInfo c WITH (NOLOCK) 
+						WHERE c.ChargeID = @ChargeId
+					END
 
 					IF (ISNULL(@WaiveMonth, '') <> '' AND @WaiveMonth <> 0) 
 					BEGIN
