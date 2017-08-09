@@ -1,8 +1,7 @@
 USE [bodb_licensee]
 GO
 
-
-ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert]
+ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert_xtest]
 	  @BillerId				INT
 	, @PartyId				INT
 	, @InvoiceSymbol		NVARCHAR(20)
@@ -180,7 +179,45 @@ BEGIN
 			ItemType		VARCHAR(10) 'ItemType',
 			Reference		VARCHAR(100) 'Reference'
 		)
-		EXEC sp_xml_removedocument @idoc		
+		EXEC sp_xml_removedocument @idoc
+		
+		-- verify statements
+		SELECT s.*, h.InvoiceType INTO #StatementsHeader
+		FROM @Settlements s
+		LEFT JOIN dbo.LA_InvoiceHeader h on s.Reference = h.OfficialInvoiceNo
+
+		-- wrong invoice no
+		DECLARE @WrongInvoiceNo NVARCHAR(200) = STUFF((
+			SELECT ',', '''' + s.Reference + ''''
+			FROM #StatementsHeader s WHERE s.InvoiceType IS NULL
+			FOR XML PATH('')
+		),1,1,'')
+
+		IF @WrongInvoiceNo IS NOT NULL
+		BEGIN
+			SELECT	@ErrCode = 4, @ErrMsg = 'Unknown Invoice No. ' + @WrongInvoiceNo
+			RETURN
+		END
+
+		-- wrong item type
+		-- item type:    data fee: 11,12  -  rebate: 13,14
+		-- invoice type: data fee: 1      -  rebate: 3
+		--
+		SET @WrongInvoiceNo = STUFF((
+			SELECT ',', '''' + s.Reference + ''''
+			FROM #StatementsHeader s WHERE
+				(s.ItemType IN (11,12) AND s.InvoiceType <> 1) OR
+				(s.ItemType IN (13,14) AND s.InvoiceType <> 3)
+			FOR XML PATH('')
+		),1,1,'')
+
+		IF @WrongInvoiceNo IS NOT NULL
+		BEGIN
+			SELECT	@ErrCode = 5, @ErrMsg = 'Wrong Invoice No. ' + @WrongInvoiceNo + ' for this item type.'
+			RETURN
+		END
+
+		DROP TABLE #StatementsHeader
 						
 		INSERT INTO dbo.LA_InvoiceStatement(InvoiceHeaderId, InvItemTypeId, [Description], RefNo, Income, Expense)
 		SELECT @CurrentInvoiceHeaderId, d.ItemType, d.[Description], d.Reference, 
