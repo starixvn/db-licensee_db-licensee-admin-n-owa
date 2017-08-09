@@ -34,6 +34,7 @@ AS
 		- 20161115@Jim: LRF - Integrate new product Fishing World [RedmineID : #66737]
 		- 20170221@bruce: support NG2 [#70050]
 		- 20170327@Harper: #73110 - Integrate new product Cashout
+		- 20170712@Harper: #79310 - Integrate new product Betradar Virtual Sport
 
 	Param's Explanation:
 
@@ -241,7 +242,24 @@ BEGIN
 	   WHERE typeid BETWEEN 911 AND 914
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
 	END
-	
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'VS2')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 27
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 2701 AND 2799
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+    END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'LT')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 28
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 1021 AND 1038
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+    END
 	RETURN
 END
 

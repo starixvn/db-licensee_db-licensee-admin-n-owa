@@ -1,11 +1,6 @@
 USE [bodb02]
 GO
 
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeSettlement]
 	  @PartyId				INT
 	, @FromDate				DATETIME
@@ -35,6 +30,8 @@ AS
 			- 20170329@Scofield: support Cashout [RedmineID :#73310]		
 			- 20170404@Harper: using new sum table for Cashout Product [RedmineID: #73310]	
 			- 20170511@bruce: include exchange rate [RedmineID: #76132]
+			- 20170712@bruce: include BRVS, LO [RedmineID: #79310]
+
 		Param's Explanation:
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
 								'NG' -> Number Game			'BA' -> BA
@@ -42,6 +39,7 @@ AS
 								'CS' -> RNG Casino			'BG' -> Bingo
 								'MGC'->Microgaming Casino	'BT' -> Bettrade
 								'CB' -> Colossus Bets		'CO' -> Cash Out
+								'BRVS' -> Betradar Virtual Sports		'LO' -> Lottery
 	*/
 SET NOCOUNT ON
 BEGIN
@@ -620,11 +618,15 @@ BEGIN
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
+	;WITH sortedExchange AS (
+		SELECT ExchangeID, CurrencyCode, ROW_NUMBER() OVER (PARTITION BY CurrencyCode ORDER BY ExchangeId) RowNumber
+		FROM #Exchange
+	)
 	SELECT
 		ISNULL(d.Game, '')			AS Game
 		, @ToDate					AS WinLostDate
-		, d.CurrencyId				AS CurrencyId
-		, e.CurrencyCode			AS CurrencyName
+		, se.ExchangeID				AS CurrencyId
+		, se.CurrencyCode			AS CurrencyName
 		, e.Rate					AS ExchangeRate
 		, SUM(Betcount)				AS Betcount
 		--orginal
@@ -676,15 +678,12 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.TicketsPayout * e.Rate, 0)))				AS TicketsPayoutBase
 		, CONVERT(MONEY, SUM(ISNULL(d.CashoutCommission * e.Rate, 0)))			AS CashoutCommissionBase
 		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountAndComm * e.Rate, 0)))		AS BuyBackAmountAndCommBase
-	FROM
-		#Result d
-		INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
-	GROUP BY
-		d.CurrencyId
-		, e.CurrencyCode
-		, e.Rate
-		, d.Game
-	ORDER BY CurrencyId ASC
+	FROM #Result d
+	INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
+	INNER JOIN sortedExchange se ON se.CurrencyCode = e.CurrencyCode
+	WHERE se.RowNumber = 1 -- remove duplicate currency codes have different id
+	GROUP BY se.ExchangeID,se.CurrencyCode, e.Rate, d.Game
+	ORDER BY se.ExchangeID
 
 	DROP TABLE #Exchange
 	DROP TABLE #Result
