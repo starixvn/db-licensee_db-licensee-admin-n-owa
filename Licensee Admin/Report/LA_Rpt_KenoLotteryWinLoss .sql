@@ -15,7 +15,8 @@ AS
 	 Created: 20170705@Scofield [#79310]
 	 Task : Get report Keno Lottery Win Loss
 	 DB: DB052.bodb_licensee   
-	 Revisions:  
+	 Revisions: 
+		- 20170705@Scofield: Create Keno Lottery Winloss [#79310] 
 	 Params:
 */
 BEGIN	

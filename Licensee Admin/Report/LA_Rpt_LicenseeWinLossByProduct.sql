@@ -28,6 +28,7 @@ AS
 		+ 20170605@Bruce: - Include Bettrade [#76131]
 						  - Include Colossus bet [#76131]
 						  - Include CashOut [#76131]
+		- 20170704@Scofield: Add VS2 and LT into report [RedmineID: #79310]
 */
 		
 /*	Example:
