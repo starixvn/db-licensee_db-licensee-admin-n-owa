@@ -43,7 +43,7 @@ AS
 		- 20160315@Victor: support Microgaming - RNG product
 		- 20161214@Jim:Invoice - Setup fees [RedmineID : #65260 ]
 		- 20170309@Harper: Add BaseCurrencyID For MinFee and PartyDetail
-		- 20170808@Harper: Fix case MinFee = 0
+		- 20170808@Harper: Fix case MinFee = 0 [RedmineID: #81327]
 
 	Param's Explanation:
 */
