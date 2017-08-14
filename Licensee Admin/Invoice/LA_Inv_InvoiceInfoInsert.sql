@@ -224,8 +224,8 @@ BEGIN
 			DROP TABLE #StatementsHeader
 		END
 						
-		INSERT INTO dbo.LA_InvoiceStatement(InvoiceHeaderId, InvItemTypeId, [Description], RefNo, Income, Expense)
-		SELECT @CurrentInvoiceHeaderId, d.ItemType, d.[Description], d.Reference, 
+		INSERT INTO dbo.LA_InvoiceStatement(InvoiceHeaderId, InvItemTypeId, [Description], RefNo, RefPartyId, Income, Expense)
+		SELECT @CurrentInvoiceHeaderId, d.ItemType, d.[Description], d.Reference, @PartyId,
 			CASE WHEN it.GroupDB = 'Income' THEN d.Amount * it.SignDB ELSE NULL END AS Income,
 			CASE WHEN it.GroupDB = 'Expense' THEN d.Amount * it.SignDB ELSE NULL END AS Expense
 		FROM @Settlements d
