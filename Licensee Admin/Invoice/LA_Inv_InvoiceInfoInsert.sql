@@ -188,7 +188,7 @@ BEGIN
 			-- verify statements
 			SELECT s.*, h.InvoiceType INTO #StatementsHeader
 			FROM @Settlements s
-			LEFT JOIN dbo.LA_InvoiceHeader h on s.Reference = h.OfficialInvoiceNo
+			LEFT JOIN dbo.LA_InvoiceHeader h on s.Reference = h.OfficialInvoiceNo AND h.StatusId = 0 -- normal invoice
 
 			-- wrong invoice no
 			DECLARE @WrongInvoiceNo NVARCHAR(200) = STUFF((
