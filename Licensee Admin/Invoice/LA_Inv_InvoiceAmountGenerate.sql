@@ -40,7 +40,8 @@ AS
 		+ 2017.04.04 @Harper: using new sum table for Cashout Product [RedmindID: #73310]
 		+ 2017.05.05 @Bruce: Correct Product name in Description [RedmindID: #75950]
 		+ 2017.07.18 @Bruce: restructure invoice db [RedmindID: #79905]
-		+ 2017.07.21 @Scofield: Update Amount Type [##79905]
+		+ 2017.07.21 @Scofield: Update Amount Type [#79905]
+		+ 2017.07.21 @Bruce: Calculate AMF amount [#76410]
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
 	DECLARE @ToDate DATETIME  = '2016-06-30'
@@ -851,7 +852,9 @@ BEGIN
 				ProductName		VARCHAR(500),
 				InvoiceAmount	MONEY,
 				AmountType		TINYINT,
-				Rate			MONEY)
+				Rate			MONEY,
+				AmfAmount		MONEY,
+				RemainingAmf	MONEY)
 
 		INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate)
 		(
@@ -900,15 +903,40 @@ BEGIN
 		-- InvoiceType Software: 1
 		IF @InvoiceTypeId = 1			
 		BEGIN
+			-- insert zero amount
 			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, AmountType)
 			SELECT pd.ProductID, pd.ProductPrefix, pd.ProductName, 0, @AmountTypeSoftwareFee
-			FROM
-				(SELECT DISTINCT pci.ProductID 
+			FROM (SELECT DISTINCT pci.ProductID 
 				FROM @PartyChargeInfo pci
 				LEFT JOIN @FinalResult r ON pci.ProductID = r.ProductId
 				WHERE r.ProductId IS NULL) p
-				JOIN
-				dbo.LA_f_Products3rd('') pd ON p.ProductID = pd.ProductID	
+			JOIN dbo.LA_f_Products3rd('') pd ON p.ProductID = pd.ProductID	
+
+			-- insert amf
+			DECLARE @RemainingAmf MONEY = ISNULL((
+				SELECT SUM(Income) - SUM(Expense)
+				FROM dbo.LA_InvoiceStatement WITH(NOLOCK)
+				WHERE InvItemTypeId IN (3,5,7) AND RefPartyId = @PartyId AND ISNULL(StatusID, 0) <> -1 -- void
+			),0)
+
+			IF @RemainingAmf > 0 
+			BEGIN
+				DECLARE @ProgratedMinfee MONEY = ISNULL((
+					SELECT TOP 1 MinFeeProrate
+					FROM @MinFeeGroup
+					WHERE PartyId = @PartyId AND FeeType = 1 AND ProductId = 0
+				),0)
+				DECLARE @SBAfterDiscount MONEY = ISNULL((
+					SELECT SUM(CASE WHEN AmountType = 1 THEN InvoiceAmount ELSE -InvoiceAmount END)
+					FROM @FinalResult
+					WHERE ProductId = 0 AND AmountType IN (1,4) -- 1: Software fee, 4: discount
+				),0)
+				DECLARE @AmfAmount MONEY = (CASE WHEN @RemainingAmf < @ProgratedMinfee THEN @RemainingAmf ELSE @ProgratedMinfee END)
+				SET @AmfAmount = (CASE WHEN @AmfAmount < @SBAfterDiscount THEN @AmfAmount ELSE @SBAfterDiscount END)
+
+				UPDATE @FinalResult SET AmfAmount = @AmfAmount, RemainingAmf = @RemainingAmf - @AmfAmount
+				WHERE AmountType = 1 AND ProductId = 0 -- SB
+			END
 		END
 
 		SELECT	f.ProductId,
@@ -916,7 +944,9 @@ BEGIN
 				f.ProductName,
 				f.InvoiceAmount,
 				f.AmountType,
-				f.Rate
+				f.Rate,
+				f.AmfAmount,
+				f.RemainingAmf
 		FROM	@FinalResult f
 		WHERE	(@InvoiceTypeId != 3 AND (f.AmountType = @AmountTypeSoftwareFee OR (f.ProductId = -1 AND f.AmountType = @AmountTypeDiscount)))
 				OR (@InvoiceTypeId = 3 AND f.ProductId = -1 AND f.AmountType = @AmountTypeRebate)
