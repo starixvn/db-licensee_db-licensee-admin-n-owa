@@ -231,7 +231,7 @@ BEGIN
 		FROM @Settlements d
 		INNER JOIN LA_InvoiceItemType it ON d.ItemType = it.InvItemTypeId				
 		
-		UPDATE dbo.LA_InvoiceHeader 
+		UPDATE dbo.LA_InvoiceHeader WITH(ROWLOCK,UPDLOCK)
 		SET Amount = (SELECT (SUM(ISNULL(Income, 0))- SUM(ISNULL(Expense, 0))) 
 						FROM  dbo.LA_InvoiceStatement
 						WHERE InvoiceHeaderId = @CurrentInvoiceHeaderId)
