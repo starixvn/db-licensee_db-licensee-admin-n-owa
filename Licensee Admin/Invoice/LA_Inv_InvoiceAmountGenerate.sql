@@ -118,9 +118,8 @@ BEGIN
 	
 	-- End region
 	
-	DECLARE @InvoiceTypeHostingFeesId INT = (SELECT InvTypeId FROM dbo.LA_InvoiceType WITH(NOLOCK) WHERE InvTypeName LIKE 'Hosting Fees')
-	
-	DECLARE @AmountTypeSoftwareFee INT = 1,
+	DECLARE @InvoiceTypeHostingFeesId INT = 6,
+		@AmountTypeSoftwareFee INT = 1,
 		@AmountTypeDiscount INT = 4,
 		@AmountTypeRebate INT = 6,
 		@AmountTypeRackHostingFee INT = 8,

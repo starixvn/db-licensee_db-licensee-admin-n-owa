@@ -199,6 +199,7 @@ BEGIN
 
 			IF @WrongInvoiceNo IS NOT NULL
 			BEGIN
+				DELETE dbo.LA_InvoiceHeader WHERE InvoiceHeaderId=@CurrentInvoiceHeaderId
 				SELECT	@ErrCode = 4, @ErrMsg = 'Unknown Invoice No. ' + @WrongInvoiceNo
 				RETURN
 			END
@@ -217,6 +218,7 @@ BEGIN
 
 			IF @WrongInvoiceNo IS NOT NULL
 			BEGIN
+				DELETE dbo.LA_InvoiceHeader WHERE InvoiceHeaderId=@CurrentInvoiceHeaderId
 				SELECT	@ErrCode = 5, @ErrMsg = 'Wrong Invoice No. ' + @WrongInvoiceNo + ' for this item type.'
 				RETURN
 			END
@@ -238,7 +240,8 @@ BEGIN
 		WHERE InvoiceHeaderId = @CurrentInvoiceHeaderId
 		
 	END TRY
-	BEGIN CATCH        	
+	BEGIN CATCH
+		DELETE dbo.LA_InvoiceHeader WHERE InvoiceHeaderId=@CurrentInvoiceHeaderId
 		SELECT	@ErrCode = 2, @ErrMsg = 'Invalid invoice detail inputs.'
 		RETURN
 	END CATCH
