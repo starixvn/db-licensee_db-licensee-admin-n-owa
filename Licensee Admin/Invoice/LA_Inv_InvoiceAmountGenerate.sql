@@ -914,9 +914,13 @@ BEGIN
 
 			-- insert amf
 			DECLARE @RemainingAmf MONEY = ISNULL((
-				SELECT SUM(Income) - SUM(Expense)
-				FROM dbo.LA_InvoiceStatement WITH(NOLOCK)
-				WHERE InvItemTypeId IN (3,5,7) AND RefPartyId = @PartyId AND ISNULL(StatusID, 0) <> -1 -- void
+				SELECT SUM(ISNULL(Income,0)) - SUM(ISNULL(Expense,0))
+				FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
+				INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
+				WHERE s.InvItemTypeId IN (3,5,7) 
+					AND h.PartyId = @PartyId
+					AND h.BillerId = @BillerId
+					AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
 			),0)
 
 			IF @RemainingAmf > 0 
@@ -933,6 +937,7 @@ BEGIN
 				),0)
 				DECLARE @AmfAmount MONEY = (CASE WHEN @RemainingAmf < @ProgratedMinfee THEN @RemainingAmf ELSE @ProgratedMinfee END)
 				SET @AmfAmount = (CASE WHEN @AmfAmount < @SBAfterDiscount THEN @AmfAmount ELSE @SBAfterDiscount END)
+				SET @AmfAmount = (CASE WHEN @AmfAmount < 0 THEN 0 ELSE @AmfAmount END)
 
 				UPDATE @FinalResult SET AmfAmount = @AmfAmount, RemainingAmf = @RemainingAmf - @AmfAmount
 				WHERE AmountType = 1 AND ProductId = 0 -- SB
