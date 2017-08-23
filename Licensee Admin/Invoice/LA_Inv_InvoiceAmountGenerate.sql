@@ -269,7 +269,7 @@ BEGIN
 		BEGIN
 			SET @ProductCodes = SUBSTRING(@ProductCodeString, 1, LEN(@ProductCodeString) - 1)
 		END
-	END	
+	END
 	-- EndRegion
 	
 	-- Region Party Group Assignment
@@ -900,6 +900,16 @@ BEGIN
 				ProductName = LEFT(ProductName, LEN(ProductName) - 1)
 		WHERE	ProductId = -1
 
+		DECLARE @RemainingAmf MONEY = ISNULL((
+			SELECT SUM(ISNULL(Income,0)) - SUM(ISNULL(Expense,0))
+			FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
+			INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
+			WHERE s.InvItemTypeId IN (3,5,7) 
+				AND h.PartyId = @PartyId
+				AND h.BillerId = @BillerId
+				AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
+		),0)
+
 		-- InvoiceType Software: 1
 		IF @InvoiceTypeId = 1			
 		BEGIN
@@ -910,19 +920,9 @@ BEGIN
 				FROM @PartyChargeInfo pci
 				LEFT JOIN @FinalResult r ON pci.ProductID = r.ProductId
 				WHERE r.ProductId IS NULL) p
-			JOIN dbo.LA_f_Products3rd('') pd ON p.ProductID = pd.ProductID	
+			JOIN dbo.LA_f_Products3rd('') pd ON p.ProductID = pd.ProductID
 
 			-- insert amf
-			DECLARE @RemainingAmf MONEY = ISNULL((
-				SELECT SUM(ISNULL(Income,0)) - SUM(ISNULL(Expense,0))
-				FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
-				INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
-				WHERE s.InvItemTypeId IN (3,5,7) 
-					AND h.PartyId = @PartyId
-					AND h.BillerId = @BillerId
-					AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
-			),0)
-
 			IF @RemainingAmf > 0 
 			BEGIN
 				DECLARE @ProgratedMinfee MONEY = ISNULL((
@@ -942,6 +942,13 @@ BEGIN
 				UPDATE @FinalResult SET AmfAmount = @AmfAmount, RemainingAmf = @RemainingAmf - @AmfAmount
 				WHERE AmountType = 1 AND ProductId = 0 -- SB
 			END
+		END
+
+		-- 10: debit note for return amf
+		IF @InvoiceTypeId = 10
+		BEGIN
+			DELETE @FinalResult
+			INSERT INTO @FinalResult(AmountType, RemainingAmf) VALUES (1, @RemainingAmf)
 		END
 
 		SELECT	f.ProductId,
