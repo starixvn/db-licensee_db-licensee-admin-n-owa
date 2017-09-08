@@ -26,7 +26,6 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert]
 	, @NewInvoiceId			INT						OUTPUT
 	, @InvoiceFileName		NVARCHAR(200)	= ''	OUTPUT
 AS
-
 /*  Header:
 	Created: 2015.08.06 - Bravo.Tran
 	Task : Create Invoice
@@ -161,9 +160,11 @@ BEGIN
 		[Description]	NVARCHAR(200),
 		Amount			MONEY,
 		ItemType		TINYINT,
-		Reference		NVARCHAR(100)
+		Reference		NVARCHAR(100),
+		Id				INT IDENTITY(1,1) NOT NULL
 	)
 	BEGIN TRY
+		DECLARE @WrongInvoiceNo NVARCHAR(200) 
 		DECLARE @idoc AS INT						
 		EXEC	sp_xml_preparedocument @idoc OUTPUT, @StatementXml			
 		INSERT INTO @Settlements([Description],Amount,ItemType,Reference)
@@ -194,7 +195,7 @@ BEGIN
 				AND h.BillerId = @BillerId
 
 			-- wrong invoice no
-			DECLARE @WrongInvoiceNo NVARCHAR(200) = STUFF((
+			SET @WrongInvoiceNo = STUFF((
 				SELECT ',', '''' + s.Reference + ''''
 				FROM #StatementsHeader s WHERE s.InvoiceType IS NULL
 				FOR XML PATH('')
@@ -207,28 +208,39 @@ BEGIN
 				RETURN
 			END
 
-			-- wrong item type
-			-- item type:    data fee: 11,12  -  rebate: 13,14
+			-- update itemtype
 			-- invoice type: data fee: 1      -  rebate: 3
+			-- item type:    data fee: debit(11),credit(12)  -  rebate: debit(13),credit(14)
 			--
-			SET @WrongInvoiceNo = STUFF((
-				SELECT ',', '''' + s.Reference + ''''
-				FROM #StatementsHeader s WHERE
-					(s.ItemType IN (11,12) AND s.InvoiceType <> 1) OR
-					(s.ItemType IN (13,14) AND s.InvoiceType <> 3)
-				FOR XML PATH('')
-			),1,1,'')
-
-			IF @WrongInvoiceNo IS NOT NULL
-			BEGIN
-				DELETE dbo.LA_InvoiceHeader WHERE InvoiceHeaderId=@CurrentInvoiceHeaderId
-				SELECT	@ErrCode = 5, @ErrMsg = 'Wrong Invoice No. ' + @WrongInvoiceNo + ' for this item type.'
-				RETURN
-			END
+			UPDATE s SET s.ItemType = (CASE WHEN sh.InvoiceType = 1 THEN
+						CASE WHEN @InvoiceTypeId = 4 THEN 12 ELSE 11 END
+					WHEN sh.InvoiceType = 3 THEN
+						CASE WHEN @InvoiceTypeId = 4 THEN 14 ELSE 13 END
+					ELSE -1
+				END)
+			FROM #StatementsHeader sh
+			INNER JOIN @Settlements s ON s.Id = sh.Id
 
 			DROP TABLE #StatementsHeader
 		END
-						
+
+		-- wrong item type
+		--
+		SET @WrongInvoiceNo = STUFF((
+			SELECT ',', '''' + s.Reference + ''''
+			FROM @Settlements s
+			LEFT JOIN dbo.LA_InvoiceTypeMapping m WITH(NOLOCK) ON m.InvItemTypeId = s.ItemType AND m.InvTypeId = @InvoiceTypeId
+			WHERE m.InvItemTypeId IS NULL
+			FOR XML PATH('')
+		),1,1,'')
+
+		IF @WrongInvoiceNo IS NOT NULL
+		BEGIN
+			DELETE dbo.LA_InvoiceHeader WHERE InvoiceHeaderId=@CurrentInvoiceHeaderId
+			SELECT	@ErrCode = 5, @ErrMsg = 'Wrong Invoice No. ' + @WrongInvoiceNo + ' for this item type.'
+			RETURN
+		END
+					
 		INSERT INTO dbo.LA_InvoiceStatement(InvoiceHeaderId, InvItemTypeId, [Description], RefNo, RefPartyId, Income, Expense)
 		SELECT @CurrentInvoiceHeaderId, d.ItemType, d.[Description], d.Reference, @PartyId,
 			CASE WHEN it.GroupDB = 'Income' THEN d.Amount * it.SignDB ELSE NULL END AS Income,
