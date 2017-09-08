@@ -3,7 +3,8 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceReferenceGet]
 	@BillerId		INT,
-	@PayerId 		INT
+	@PayerId 		INT,
+	@Environment		VARCHAR(10)
 AS
 /*	
 	Created: 2017.07.19 - Scofield.Huynh [#79905]		
@@ -18,6 +19,7 @@ BEGIN
 		AND StatusId = 0 -- normal
 		AND PartyId = @PayerId 
 		AND BillerId = @BillerId
+		AND Environment = @Environment
 	ORDER BY CreatedDateTime
 END
 GO
