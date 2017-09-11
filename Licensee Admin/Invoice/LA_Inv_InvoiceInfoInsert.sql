@@ -221,24 +221,24 @@ BEGIN
 			FROM #StatementsHeader sh
 			INNER JOIN @Settlements s ON s.Id = sh.Id
 
+			-- wrong item type
+			--
+			SET @WrongInvoiceNo = STUFF((
+				SELECT ',', '''' + s.Reference + ''''
+				FROM @Settlements s
+				LEFT JOIN dbo.LA_InvoiceTypeMapping m WITH(NOLOCK) ON m.InvItemTypeId = s.ItemType AND m.InvTypeId = @InvoiceTypeId
+				WHERE m.InvItemTypeId IS NULL
+				FOR XML PATH('')
+			),1,1,'')
+
+			IF @WrongInvoiceNo IS NOT NULL
+			BEGIN
+				DELETE dbo.LA_InvoiceHeader WHERE InvoiceHeaderId=@CurrentInvoiceHeaderId
+				SELECT	@ErrCode = 5, @ErrMsg = 'Wrong Invoice No. ' + @WrongInvoiceNo + ' for this item type.'
+				RETURN
+			END
+
 			DROP TABLE #StatementsHeader
-		END
-
-		-- wrong item type
-		--
-		SET @WrongInvoiceNo = STUFF((
-			SELECT ',', '''' + s.Reference + ''''
-			FROM @Settlements s
-			LEFT JOIN dbo.LA_InvoiceTypeMapping m WITH(NOLOCK) ON m.InvItemTypeId = s.ItemType AND m.InvTypeId = @InvoiceTypeId
-			WHERE m.InvItemTypeId IS NULL
-			FOR XML PATH('')
-		),1,1,'')
-
-		IF @WrongInvoiceNo IS NOT NULL
-		BEGIN
-			DELETE dbo.LA_InvoiceHeader WHERE InvoiceHeaderId=@CurrentInvoiceHeaderId
-			SELECT	@ErrCode = 5, @ErrMsg = 'Wrong Invoice No. ' + @WrongInvoiceNo + ' for this item type.'
-			RETURN
 		END
 					
 		INSERT INTO dbo.LA_InvoiceStatement(InvoiceHeaderId, InvItemTypeId, [Description], RefNo, RefPartyId, Income, Expense)
