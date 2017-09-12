@@ -52,7 +52,6 @@ BEGIN
 		GROUP	BY ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath
 	)
 
-	DECLARE @HostingFeeInvoiceType INT = 6
 	DECLARE @InvoiceTmp TABLE(
 			BillerId		INT,
 			InvoiceType		INT,
