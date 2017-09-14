@@ -185,7 +185,8 @@ BEGIN
 		
 		-- credit note = 4
 		-- debit note  = 5
-		IF @InvoiceTypeId = 4 OR @InvoiceTypeId = 5
+		-- debit note for return AMF = 10
+		IF @InvoiceTypeId IN (4,5,10)
 		BEGIN
 			-- verify statements
 			SELECT s.*, h.InvoiceType INTO #StatementsHeader
@@ -221,6 +222,7 @@ BEGIN
 				END)
 			FROM #StatementsHeader sh
 			INNER JOIN @Settlements s ON s.Id = sh.Id
+			WHERE @InvoiceTypeId <> 10
 
 			-- wrong item type
 			--
