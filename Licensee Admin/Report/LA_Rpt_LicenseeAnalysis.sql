@@ -2,12 +2,15 @@ USE bodb_licensee
 go
 
 declare
-	@PartyIDs		VARCHAR(1000)='14,19,20,22,23,24,26,27,33,39,40,42,43,44,45,46,47,48,49,54,55,56,87,89,92,93,100,101,120,15,29,31,34,35,36,37,38,41,53,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,88,90,91,95,97,125,224,16,17,52,99',
-	@ProductCodes	VARCHAR(1000)='SB,BA,AB',
-	@FromDate		SMALLDATETIME='20160101',
-	@ToDate			SMALLDATETIME='20160131',
-	@BaseCurrency	VARCHAR(20) = 'EUR'
-
+	@PartyIDs		VARCHAR(1000)	= '14,19,20,22,23,24,26,27,33,39,40,42,43,44,45,46,47,48,49,54,55,56,87,89,92,93,100,101,120,15,29,31,34,35,36,37,38,41,53,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,88,90,91,95,97,125,224,16,17,52,99',
+	@ProductCodes	VARCHAR(1000)	= 'SB,BA,AB',
+	@FromDate		SMALLDATETIME	= '20160101',
+	@ToDate			SMALLDATETIME	= '20160131',
+	@BaseCurrency	VARCHAR(20)		= 'EUR',
+	@IsSkinView		BIT				= 0
+/*
+	Notes: @FromDate, @ToDate should be a full month range
+*/
 BEGIN
 	SET NOCOUNT ON
 	
@@ -33,6 +36,7 @@ BEGIN
 		WHERE	PartyGroupId IN (	SELECT	p1.PartyGroupId
 									FROM	bodb_licensee.dbo.LA_PartyGroupAssignment p1 WITH(NOLOCK)
 									WHERE	p1.PartyId IN (SELECT p2.PartyId FROM @PartyIdTable p2))
+			AND @IsSkinView = 0
 	)
 
 	INSERT INTO @PartyIdTable
@@ -108,7 +112,7 @@ BEGIN
 			CASE WHEN @FromDate >= mf.FromDate THEN @FromDate ELSE mf.FromDate END AS FromDate,
 			CASE WHEN @ToDate < mf.ToDate THEN @ToDate ELSE mf.ToDate END AS ToDate
 		FROM dbo.LA_MinFee mf WITH(NOLOCK)
-		WHERE mf.FeeTypeId = 1
+		WHERE @IsSkinView = 0 AND (mf.FeeTypeId = 1
 			OR (mf.FeeTypeId = 2 AND EXISTS (
 				SELECT PartyId FROM dbo.LA_MinFee m WITH(NOLOCK)
 				WHERE m.FeeTypeId = 1
@@ -124,7 +128,7 @@ BEGIN
 			AND ((mf.FromDate BETWEEN @FirstDate AND @LastDate) 
 				OR (mf.ToDate BETWEEN @FirstDate AND @LastDate) 
 				OR (mf.FromDate<@FirstDate AND @LastDate < mf.ToDate)
-			)
+			))
 	)
 
 	UPDATE m SET m.FeeAmount = m.FeeAmount * e.Rate
@@ -133,7 +137,6 @@ BEGIN
 	-- End region
 
 	-- 5. get licensee/customer and currency info
-	--
 	-- Licensee customer info
 	CREATE TABLE #LicenseeCustInfo(PartyId INT,LicenseeId INT, CustId INT, CurrencyId INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
 
@@ -161,15 +164,12 @@ BEGIN
 	-- end region
 
 	-- 6. get move bet info
-	--
 	DECLARE @BalanceUpDay TABLE (BalanceUpDay DATETIME, MoveBetsDay DATETIME)
-	INSERT INTO @BalanceUpDay EXEC bodb02.dbo.Lrf_SelBalanceUpDay
-	
+	INSERT INTO @BalanceUpDay EXEC bodb02.dbo.Lrf_SelBalanceUpDay	
 	DECLARE @MoveBetsDay DATETIME = (SELECT TOP 1 MoveBetsDay FROM @BalanceUpDay)
 	-- end region
 
-	-- 7. if data from moveBetsDay: get data from bettrans
-	-- else get data from rptWinLoss2
+	-- 7. if data from moveBetsDay: get data from bettrans else get data from rptWinLoss2
 	CREATE TABLE #Data (
 		PartyId				INT,
 		ReportDate			DATETIME,
@@ -188,7 +188,7 @@ BEGIN
 	IF @ToDate > @MoveBetsDay
 	BEGIN
 		DECLARE @TempFromDate SMALLDATETIME = CASE WHEN @FromDate <= @MoveBetsDay THEN DATEADD(DAY,1,@MoveBetsDay) ELSE @FromDate END
-		INSERT INTO #Data(ReportDate, CurrencyId, BetFrom, Turnover, LicenseeWinLoss, ProductId,PartyId)
+		INSERT INTO #Data(ReportDate, CurrencyId, BetFrom, Turnover, LicenseeWinLoss, ProductId, PartyId)
 		(
 			SELECT
 				b.winlostdate,
@@ -339,11 +339,121 @@ BEGIN
 									END
 	FROM	@MinFeeGroup amf
 	WHERE	amf.FeeType = 1 AND amf.AmountToCompany IS NULL
-
 	-- end region
+
+	-- 12. Get discount group info
+	DECLARE @DiscountGroupHeader AS TABLE (
+		DiscountGroupId		INT,
+		DiscountGroupType	TINYINT,
+		PartyId				INT,
+		CurrencyId			INT,
+		FromDate			DATETIME,
+		ToDate				DATETIME
+	)
+
+	INSERT INTO @DiscountGroupHeader(DiscountGroupId,DiscountGroupType,PartyId,CurrencyId,FromDate,ToDate)
+	(
+		SELECT dg.DiscountGroupId,dg.DiscountGroupType,dga.PartyId, dg.CurrencyId, dg.FromDate, dg.ToDate
+		FROM dbo.LA_DiscountGroupHeader dg WITH(NOLOCK)
+			INNER JOIN dbo.LA_DiscountGroupAssignment dga WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
+		WHERE @FromDate<= ToDate AND FromDate<=@ToDate
+	)
+	
+	DELETE FROM @DiscountGroupHeader
+	WHERE ToDate < (SELECT MAX(ToDate) FROM @DiscountGroupHeader WHERE DiscountGroupType = 1) AND DiscountGroupType = 1
+
+	DELETE FROM @DiscountGroupHeader 
+	WHERE ToDate < (SELECT MAX(ToDate) FROM @DiscountGroupHeader WHERE DiscountGroupType = 2) AND DiscountGroupType = 2
+	
+	DECLARE @DiscountGroup AS TABLE(
+		DiscountGroupId		SMALLINT,
+		DiscountGroupType	TINYINT,
+		FromAmount			MONEY,
+		ToAmount			MONEY,
+		Rate				MONEY,
+		PartyId				INT,
+		ProductId			TINYINT,
+		BaseCurrency		INT
+	)
+
+	INSERT INTO @DiscountGroup (DiscountGroupId, DiscountGroupType, FromAmount, ToAmount, Rate, PartyId, ProductId , BaseCurrency)	
+	(
+		SELECT dg.DiscountGroupId,
+			dg.DiscountGroupType,
+			dgd.FromAmount,
+			dgd.ToAmount,
+			dgd.Rate,
+			dg.PartyID,
+			dgp.ProductId,
+			dg.CurrencyId
+		FROM @DiscountGroupHeader dg 
+			INNER JOIN dbo.LA_DiscountGroupDetail dgd WITH(NOLOCK) ON dg.DiscountGroupId = dgd.DiscountGroupId
+			INNER JOIN dbo.LA_DiscountGroupProduct dgp WITH(NOLOCK) ON dg.DiscountGroupId = dgp.DiscountGroupId
+		WHERE dgp.ProductId IN (SELECT DISTINCT ProductId FROM @PartyChargeInfo)
+	)
+
+	UPDATE d SET
+		d.FromAmount = d.FromAmount * e.Rate,
+		d.ToAmount = d.ToAmount * e.Rate
+	FROM @DiscountGroup d
+	INNER JOIN #Exchange e ON e.ExchangeDate = @ToDate AND d.BaseCurrency = e.ExchangeID AND d.DiscountGroupType = 1
+	-- End Region
+
+	-- 13. sum by licensee
+	;WITH a AS (
+		SELECT d.PartyId, d.ProductId,
+			SUM(d.Turnover)			Turnover,
+			SUM(d.LicenseeWinLoss)	LicenseeWinLoss,
+			SUM(d.LicensingFee)		LicensingFee,
+			CAST(0 AS MONEY)		Discount,
+			CAST(0 AS MONEY)		Rebate
+		FROM #Data d
+		GROUP BY d.PartyId, d.ProductId
+	)
+	SELECT a.LicenseeWinLoss,a.PartyId,a.ProductId,a.Turnover,a.Discount,a.Rebate, ISNULL(amf.AmountToCompany, a.LicensingFee) LicensingFee
+	INTO #SumByLicensee FROM a
+	LEFT JOIN @MinFeeGroup amf ON amf.PartyId=a.PartyId AND amf.FeeType=1 AND amf.ProductId=a.ProductId
+
+	-- insert data for party-product which has min fee but doesn't has bet ticket
+	INSERT INTO #SumByLicensee(PartyId, ProductId, LicensingFee,LicenseeWinLoss,Turnover,Discount,Rebate)
+	SELECT m.PartyId, m.ProductId, m.AmountToCompany, 0, 0, 0, 0
+	FROM @MinFeeGroup m
+	LEFT JOIN #SumByLicensee s ON m.PartyId = s.PartyId AND m.ProductId = s.ProductId
+	WHERE m.FeeType = 1 AND s.PartyId IS NULL	
+	-- end region
+
+	-- 14. Apply Discount/rebate
+	;WITH t AS(
+		SELECT SUM(s.LicensingFee) Total, s.PartyId, d.DiscountGroupId
+		FROM #SumByLicensee s
+		INNER JOIN (SELECT DISTINCT DiscountGroupId,PartyId,ProductId FROM @DiscountGroup WHERE DiscountGroupType = 1) AS d
+			ON s.PartyId=d.PartyId AND s.ProductId=d.ProductId
+		GROUP BY s.PartyId, d.DiscountGroupId
+	)
+	DELETE d
+	FROM @DiscountGroup d
+	INNER JOIN t ON t.DiscountGroupId = d.DiscountGroupId AND t.PartyId = d.PartyId
+	WHERE d.DiscountGroupType = 1 AND t.Total NOT BETWEEN d.FromAmount AND d.ToAmount
+	
+	-- discount
+	UPDATE s SET Discount =	(CASE WHEN -s.LicenseeWinLoss < 0 THEN 0 ELSE -s.LicenseeWinLoss * ISNULL(d3.Rate, 0) END) + 
+							(CASE WHEN s.LicensingFee < 0 THEN 0 ELSE s.LicensingFee * ISNULL(d1.Rate, 0) END)
+	FROM #SumByLicensee s
+		LEFT JOIN @DiscountGroup d1 ON s.PartyId = d1.PartyId AND d1.ProductId = s.ProductId AND d1.DiscountGroupType = 1 -- discount by fee
+		LEFT JOIN @DiscountGroup d3 ON s.PartyId = d3.PartyId AND d3.ProductId = s.ProductId AND d3.DiscountGroupType = 3 -- discount by winloss
+
+	-- rebate
+	UPDATE s SET Rebate = CASE WHEN (s.LicensingFee - s.Discount) < 0 THEN 0 ELSE (s.LicensingFee - s.Discount) * ISNULL(r.Rate, 0) END			
+	FROM #SumByLicensee s
+	LEFT JOIN @DiscountGroup r ON s.PartyId = r.PartyId AND r.ProductId = s.ProductId AND r.DiscountGroupType = 2 -- rebate = 2
+	-- End Region
+
+
+	
 
 	DROP TABLE #Exchange
 	DROP TABLE #LicenseeCustInfo
 	DROP TABLE #Data
+	DROP TABLE #SumByLicensee
 END
 
