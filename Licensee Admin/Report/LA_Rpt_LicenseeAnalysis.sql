@@ -1,13 +1,15 @@
 USE bodb_licensee
-go
+GO
 
-declare
-	@PartyIDs		VARCHAR(1000)	= '14,19,20,22,23,24,26,27,33,39,40,42,43,44,45,46,47,48,49,54,55,56,87,89,92,93,100,101,120,15,29,31,34,35,36,37,38,41,53,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,88,90,91,95,97,125,224,16,17,52,99',
-	@ProductCodes	VARCHAR(1000)	= 'SB,BA,AB',
-	@FromDate		SMALLDATETIME	= '20160101',
-	@ToDate			SMALLDATETIME	= '20160131',
+ALTER PROC dbo.[LA_Rpt_LicenseeAnalysis] (
+	@PartyIDs		VARCHAR(1000),
+	@ProductCodes	VARCHAR(1000),
+	@FromDate		SMALLDATETIME,
+	@ToDate			SMALLDATETIME,
 	@BaseCurrency	VARCHAR(20)		= 'EUR',
 	@IsSkinView		BIT				= 0
+)
+AS
 /*
 	Notes: @FromDate, @ToDate should be a full month range
 */
@@ -15,18 +17,20 @@ BEGIN
 	SET NOCOUNT ON
 	
 	-- remove un-support products
-	SET @ProductCodes = STUFF((
-		SELECT ',' + ProductPrefix
-		FROM dbo.strSplit(@ProductCodes,',') p1
-		INNER JOIN dbo.LA_f_Products3rd('') p2 ON p1.val=p2.ProductPrefix
-		WHERE p2.ProductID NOT IN (1,3,7,9,13,14,15,16,17,19,25)
-		FOR XML PATH('')
-	),1,1,'')	
+	DECLARE @Products AS TABLE (ProductId INT,ProductCode VARCHAR(10))
+
+	INSERT INTO @Products(ProductCode,ProductId)
+	SELECT DISTINCT p2.ProductPrefix,p2.ProductID
+	FROM dbo.strSplit(@ProductCodes,',') p1
+	INNER JOIN dbo.LA_f_Products3rd('') p2 ON p1.val=p2.ProductPrefix
+	WHERE p2.ProductID NOT IN (1,3,7,9,13,14,15,16,17,19,25)
+
+	SET @ProductCodes = STUFF((SELECT ',' + ProductCode FROM @Products FOR XML PATH('')),1,1,'')	
 
 	-- 1. Party groups
 	-- select all parties in the same group
 	DECLARE @PartyIdTable TABLE (PartyId INT, IsSelected BIT)
-	INSERT INTO @PartyIdTable SELECT val, 1 FROM dbo.strSplit(@PartyIDs, ',')
+	INSERT INTO @PartyIdTable SELECT DISTINCT val, 1 FROM dbo.strSplit(@PartyIDs, ',')
 
 	DECLARE @PartyGroup AS TABLE (PartyGroupId INT, PartyId INT)
 	INSERT	INTO @PartyGroup(PartyGroupId, PartyId)
@@ -40,41 +44,26 @@ BEGIN
 	)
 
 	INSERT INTO @PartyIdTable
-	SELECT PartyId, 0 FROM @PartyGroup WHERE PartyId NOT IN (SELECT p2.PartyId FROM @PartyIdTable p2)
+	SELECT DISTINCT PartyId, 0 FROM @PartyGroup WHERE PartyId NOT IN (SELECT p2.PartyId FROM @PartyIdTable p2)
 
 	SET @PartyIds = STUFF((SELECT CAST(PartyId AS VARCHAR(10)) + ',' FROM @PartyIdTable FOR XML PATH('')),1,1,'')
 	-- End region
 
 	-- 2. Region: Party charge info
 	DECLARE @PartyChargeInfo AS TABLE(
-		PartyName	VARCHAR(100),
-		GroupName	VARCHAR(100),
 		PartyId		INT,
 		LicenseeId	INT,
 		ProductID	INT,
 		Rate		DECIMAL(9,8),
 		FromDate	SMALLDATETIME,
-		ToDate		SMALLDATETIME,
-		ProductCode	VARCHAR(10)
+		ToDate		SMALLDATETIME
 	)
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate,ProductCode)
+	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
 	(
-		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, ci.DI_Rate, ci.Fromdate, ci.ToDate,p.ProductPrefix
+		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, ci.DI_Rate, ci.Fromdate, ci.ToDate
 		FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
-		INNER JOIN dbo.LA_f_Products3rd('') p ON p.ProductID=ci.ProductID
 		WHERE	DI_Rate > 0
 	)
-
-	DECLARE @PartyList AS TABLE (PartyId INT, PartyName VARCHAR(100), BrandName VARCHAR(100), ParentID INT)
-	INSERT INTO @PartyList
-	EXEC dbo.LA_PartyListSel
-
-	UPDATE p SET
-		PartyName = pl.PartyName,
-		GroupName = CASE WHEN pl.ParentID = 1 THEN 'OW' ELSE 'Boping' END
-	FROM @PartyChargeInfo p
-	INNER JOIN @PartyList pl ON p.PartyId = pl.PartyId
-	WHERE pl.ParentID IN (1,11,98)
 	-- End region
 	
 	-- 3. Region: Get exchange rate info
@@ -123,7 +112,7 @@ BEGIN
 						OR (m.FromDate<@FirstDate AND @LastDate < m.ToDate)
 					)
 			))
-			AND mf.ProductId IN (SELECT ProductId FROM @PartyChargeInfo)
+			AND mf.ProductId IN (SELECT ProductId FROM @Products)
 			AND mf.PartyId IN (SELECT p.PartyId FROM @PartyIdTable p)
 			AND ((mf.FromDate BETWEEN @FirstDate AND @LastDate) 
 				OR (mf.ToDate BETWEEN @FirstDate AND @LastDate) 
@@ -131,6 +120,7 @@ BEGIN
 			))
 	)
 
+	DELETE @MinFeeGroup WHERE ToDate < FromDate
 	UPDATE m SET m.FeeAmount = m.FeeAmount * e.Rate
 	FROM @MinFeeGroup m
 	INNER JOIN #Exchange e ON m.ToDate = e.ExchangeDate AND m.CurrencyId = e.ExchangeID
@@ -201,7 +191,7 @@ BEGIN
 			FROM bodb02.dbo.bettrans b WITH (NOLOCK)
 				INNER JOIN #LicenseeCustInfo l ON l.CustId=b.recommend AND b.currency=l.CurrencyId AND b.winlostdate BETWEEN l.Fromdate AND l.Todate
 				INNER JOIN dbo.LA_f_BettypeProductMapping(0,@ProductCodes) bt ON bt.Bettype=b.bettype
-				INNER JOIN dbo.LA_f_Products3rd('') p ON p.ProductID = bt.ProductID
+				INNER JOIN @Products p ON p.ProductID = bt.ProductID
 				INNER JOIN #Exchange e ON l.CurrencyId = e.ExchangeID AND b.winlostdate = e.ExchangeDate
 			WHERE b.statusID IN (111, 112, 113) 
 				AND b.winlostdate BETWEEN @TempFromDate AND @ToDate
@@ -230,7 +220,7 @@ BEGIN
 			INNER JOIN #LicenseeCustInfo l ON b.CustId = l.CustId AND b.Currency = l.CurrencyId AND b.winlostdate BETWEEN l.Fromdate AND l.Todate
 			INNER JOIN bodb02.dbo.f_LicWinLoss_ProductSportType_Sel(@ProductCodes) ps ON ps.SportType = b.sporttype
 			INNER JOIN #Exchange e ON l.CurrencyId = e.ExchangeID AND b.winlostdate = e.ExchangeDate
-			INNER JOIN dbo.LA_f_Products3rd('') p ON p.ProductPrefix=ps.ProductCode
+			INNER JOIN @Products p ON p.ProductCode=ps.ProductCode
 			WHERE b.Winlostdate BETWEEN @FromDate AND @TempToDate
 				AND b.roleid = 2 -- Sum on agent for better performance
 				AND b.statusID NOT IN (-1, 101, 102, 103)
@@ -240,9 +230,9 @@ BEGIN
 		)
 	END
 	-- end region
-
+	
 	-- 10. calculate licensing fee(amount to company)
-	UPDATE d SET LicensingFee = SUM(d.LicenseeWinLoss * p.Rate), FeeAfterDiscount=0,FeeAfterRebate=0
+	UPDATE d SET LicensingFee = (d.LicenseeWinLoss * p.Rate), FeeAfterDiscount=0,FeeAfterRebate=0
 	FROM #Data d
 	INNER JOIN @PartyChargeInfo p ON p.PartyId = d.PartyId AND p.ProductId=d.ProductId AND d.ReportDate BETWEEN p.FromDate AND p.ToDate
 	-- end region
@@ -389,7 +379,7 @@ BEGIN
 		FROM @DiscountGroupHeader dg 
 			INNER JOIN dbo.LA_DiscountGroupDetail dgd WITH(NOLOCK) ON dg.DiscountGroupId = dgd.DiscountGroupId
 			INNER JOIN dbo.LA_DiscountGroupProduct dgp WITH(NOLOCK) ON dg.DiscountGroupId = dgp.DiscountGroupId
-		WHERE dgp.ProductId IN (SELECT DISTINCT ProductId FROM @PartyChargeInfo)
+		WHERE dgp.ProductId IN (SELECT DISTINCT ProductId FROM @Products)
 	)
 
 	UPDATE d SET
@@ -408,18 +398,22 @@ BEGIN
 			CAST(0 AS MONEY)		Discount,
 			CAST(0 AS MONEY)		Rebate
 		FROM #Data d
+		INNER JOIN @PartyIdTable p ON d.PartyId=p.PartyId
+		WHERE p.IsSelected = 1
 		GROUP BY d.PartyId, d.ProductId
 	)
-	SELECT a.LicenseeWinLoss,a.PartyId,a.ProductId,a.Turnover,a.Discount,a.Rebate, ISNULL(amf.AmountToCompany, a.LicensingFee) LicensingFee
+	SELECT a.LicenseeWinLoss,a.PartyId,a.ProductId,a.Turnover,a.Discount,a.Rebate,
+		CASE WHEN ISNULL(amf.AmountToCompany, a.LicensingFee) < 0 THEN CAST(0 AS MONEY)
+		ELSE ISNULL(amf.AmountToCompany, a.LicensingFee) END AS LicensingFee
 	INTO #SumByLicensee FROM a
 	LEFT JOIN @MinFeeGroup amf ON amf.PartyId=a.PartyId AND amf.FeeType=1 AND amf.ProductId=a.ProductId
-
+	
 	-- insert data for party-product which has min fee but doesn't has bet ticket
 	INSERT INTO #SumByLicensee(PartyId, ProductId, LicensingFee,LicenseeWinLoss,Turnover,Discount,Rebate)
 	SELECT m.PartyId, m.ProductId, m.AmountToCompany, 0, 0, 0, 0
 	FROM @MinFeeGroup m
 	LEFT JOIN #SumByLicensee s ON m.PartyId = s.PartyId AND m.ProductId = s.ProductId
-	WHERE m.FeeType = 1 AND s.PartyId IS NULL	
+	WHERE m.FeeType = 1 AND s.PartyId IS NULL
 	-- end region
 
 	-- 14. Apply Discount/rebate
@@ -446,14 +440,92 @@ BEGIN
 	UPDATE s SET Rebate = CASE WHEN (s.LicensingFee - s.Discount) < 0 THEN 0 ELSE (s.LicensingFee - s.Discount) * ISNULL(r.Rate, 0) END			
 	FROM #SumByLicensee s
 	LEFT JOIN @DiscountGroup r ON s.PartyId = r.PartyId AND r.ProductId = s.ProductId AND r.DiscountGroupType = 2 -- rebate = 2
-	-- End Region
+	-- End Region	
 
+	-- 15. licensee group
+	DECLARE @PartyList AS TABLE (PartyId INT, PartyName VARCHAR(100), BrandName VARCHAR(100), ParentID INT)
+	INSERT INTO @PartyList
+	EXEC dbo.LA_PartyListSel
+	-- end region
 
-	
+	IF @IsSkinView = 0
+	BEGIN
+		SELECT CASE WHEN p.ParentID = 1 THEN 'OW' ELSE 'Boping' END AS GroupName
+			,p.PartyName AS [Name]
+			,s.LicenseeWinLoss
+			,s.Turnover
+			,s.LicensingFee
+			,s.Discount
+			,s.Rebate
+			,@FirstDate AS [Date]
+			,pp.ProductCode
+		FROM #SumByLicensee s
+		INNER JOIN @PartyList p ON p.PartyId=s.PartyId
+		INNER JOIN @Products pp ON s.ProductId=pp.ProductID
+		WHERE p.ParentID IN (1,11,98)
+	END
+	ELSE
+	BEGIN
+		-- group by skin
+		-- exclude minfee
+		-- discount of each skin = total discount * (licensing fee/ total licensing fee)
+		SELECT p.ParentID,d.BetFrom, d.ProductId,
+			SUM(d.Turnover)			Turnover,
+			SUM(d.LicenseeWinLoss)	LicenseeWinLoss,
+			SUM(d.LicensingFee)		LicensingFee,
+			CAST(0 AS MONEY)		Discount,
+			CAST(0 AS MONEY)		Rebate
+		INTO #SumBySkin
+		FROM #Data d
+		INNER JOIN @PartyList p ON p.PartyId=d.PartyId
+		INNER JOIN @PartyIdTable pt ON pt.PartyId=p.PartyId
+		WHERE p.ParentID IN (1,11,98) AND pt.IsSelected = 1
+		GROUP BY p.ParentID,d.BetFrom, d.ProductId
+
+		-- total discount by product
+		;WITH t AS (
+			SELECT p.ParentID,s.ProductId
+				,SUM(s.LicensingFee)	AS TotalFee
+				,SUM(s.Discount)		AS TotalDiscount
+				,SUM(s.Rebate)			AS TotalRebate
+			FROM #SumByLicensee s
+			INNER JOIN @PartyList p ON p.PartyId=s.PartyId
+			WHERE p.ParentID IN (1,11,98)
+			GROUP BY p.ParentID,s.ProductId
+		)
+		UPDATE s SET 
+			s.Discount = t.TotalDiscount * (s.LicensingFee / t.TotalFee),
+			s.Rebate = t.TotalRebate * (s.LicensingFee / t.TotalFee)
+		FROM #SumBySkin s
+		INNER JOIN t ON t.ParentID=s.ParentID AND t.ProductId=s.ProductId
+
+		SELECT CASE WHEN s.ParentID = 1 THEN 'OW' ELSE 'Boping' END AS GroupName
+			,CASE	WHEN s.BetFrom = 'd' THEN 'Asia'
+					WHEN s.BetFrom = 'a' THEN 'China'
+					WHEN s.BetFrom = 'm' THEN 'WAP'
+					WHEN s.BetFrom = 'e' OR s.BetFrom = 'u' THEN 'Euro'
+					WHEN s.BetFrom = 's' OR s.BetFrom = 'l' THEN 'Smart'
+				ELSE 'Other' END AS [Name]
+			,s.LicenseeWinLoss
+			,s.Turnover
+			,s.LicensingFee
+			,s.Discount
+			,s.Rebate
+			,@FirstDate AS [Date]
+			,pp.ProductCode
+		FROM #SumBySkin s
+		INNER JOIN @Products pp ON s.ProductId=pp.ProductID
+
+		DROP TABLE #SumBySkin
+	END	
 
 	DROP TABLE #Exchange
 	DROP TABLE #LicenseeCustInfo
 	DROP TABLE #Data
 	DROP TABLE #SumByLicensee
 END
+GO
 
+GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeAnalysis] TO [bodbLicenseeNet] AS [dbo]
+GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeAnalysis] TO [bodbAdminNet] AS [dbo]
+GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicenseeAnalysis] TO [vnteam] AS [dbo]
