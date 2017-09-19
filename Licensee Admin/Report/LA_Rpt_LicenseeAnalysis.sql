@@ -11,6 +11,14 @@ ALTER PROC dbo.[LA_Rpt_LicenseeAnalysis] (
 )
 AS
 /*
+	Created: BRUCE
+	Date: 20170919
+	Task: Licensee Analysis (support raw data) #redmind: https://nexdev.net/issues/78294
+	DB: bodb_licensee
+
+	Revisions:
+		- 20170919@Bravo: create SP
+
 	Notes: @FromDate, @ToDate should be a full month range
 */
 BEGIN
