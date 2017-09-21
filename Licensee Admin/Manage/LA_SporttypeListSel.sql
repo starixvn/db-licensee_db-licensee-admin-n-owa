@@ -1,23 +1,27 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
 
-CREATE PROCEDURE [dbo].[LA_SporttypeListSel](
+ALTER PROCEDURE [dbo].[LA_SporttypeListSel](
 	@ProductCodes VARCHAR(200)
 )
 AS
+
 /*
-	Created : Bruce.Bui
-	Date : 2016-01-13
-		Task	: Get sport types by given products
-		DB		: DB052.bodb02
+	Created: Bruce.Bui
+	Date: 2016-01-13
+	Task: Get sport types by given products
+	DB: DBEXT.bodb02
+	
 	Revisions:
+		- 20170816@Percy: Change data type of Sporttype [RedmineID: #73545]
 */
 
 BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @Products TABLE(Code VARCHAR(10))
-	DECLARE @Sporttypes TABLE(Sporttype TINYINT, SportName NVARCHAR(50), ProductCode VARCHAR(10))
+	DECLARE @Sporttypes TABLE(Sporttype SMALLINT, SportName NVARCHAR(50), ProductCode VARCHAR(10))
 
 	INSERT INTO @Products(Code)
 	(
@@ -57,5 +61,3 @@ BEGIN
 	SELECT Sporttype,SportName, ProductCode FROM @Sporttypes
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_SporttypeListSel] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_SporttypeListSel] TO bodbAdminNet
