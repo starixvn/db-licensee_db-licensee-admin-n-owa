@@ -406,8 +406,6 @@ BEGIN
 			CAST(0 AS MONEY)		Discount,
 			CAST(0 AS MONEY)		Rebate
 		FROM #Data d
-		INNER JOIN @PartyIdTable p ON d.PartyId=p.PartyId
-		WHERE p.IsSelected = 1
 		GROUP BY d.PartyId, d.ProductId
 	)
 	SELECT a.LicenseeWinLoss,a.PartyId,a.ProductId,a.Turnover,a.Discount,a.Rebate,
@@ -442,12 +440,7 @@ BEGIN
 							(CASE WHEN s.LicensingFee < 0 THEN 0 ELSE s.LicensingFee * ISNULL(d1.Rate, 0) END)
 	FROM #SumByLicensee s
 		LEFT JOIN @DiscountGroup d1 ON s.PartyId = d1.PartyId AND d1.ProductId = s.ProductId AND d1.DiscountGroupType = 1 -- discount by fee
-		LEFT JOIN @DiscountGroup d3 ON s.PartyId = d3.PartyId AND d3.ProductId = s.ProductId AND d3.DiscountGroupType = 3 -- discount by winloss
-
-	-- rebate
-	UPDATE s SET Rebate = CASE WHEN (s.LicensingFee - s.Discount) < 0 THEN 0 ELSE (s.LicensingFee - s.Discount) * ISNULL(r.Rate, 0) END			
-	FROM #SumByLicensee s
-	LEFT JOIN @DiscountGroup r ON s.PartyId = r.PartyId AND r.ProductId = s.ProductId AND r.DiscountGroupType = 2 -- rebate = 2
+		LEFT JOIN @DiscountGroup d3 ON s.PartyId = d3.PartyId AND d3.ProductId = s.ProductId AND d3.DiscountGroupType = 3 -- discount by winloss	
 	-- End Region	
 
 	-- 15. licensee group
@@ -458,26 +451,34 @@ BEGIN
 
 	IF @IsSkinView = 0
 	BEGIN
+		-- rebate
+		UPDATE s SET Rebate = CASE WHEN (s.LicensingFee - s.Discount) < 0 THEN 0 ELSE (s.LicensingFee - s.Discount) * ISNULL(r.Rate, 0) END			
+		FROM #SumByLicensee s
+		LEFT JOIN @DiscountGroup r ON s.PartyId = r.PartyId AND r.ProductId = s.ProductId AND r.DiscountGroupType = 2 -- rebate = 2
+
 		SELECT CASE WHEN p.ParentID = 1 THEN 'OW' ELSE 'Boping' END AS GroupName
-			,p.PartyName AS [Name]
-			,s.LicenseeWinLoss
+			,p.PartyName 		AS ViewName
+			,s.LicenseeWinLoss	AS WinLoss
 			,s.Turnover
 			,s.LicensingFee
-			,s.Discount
-			,s.Rebate
+			,s.Rebate			AS Discount
 			,@FirstDate AS [Date]
 			,pp.ProductCode
 		FROM #SumByLicensee s
 		INNER JOIN @PartyList p ON p.PartyId=s.PartyId
 		INNER JOIN @Products pp ON s.ProductId=pp.ProductID
-		WHERE p.ParentID IN (1,11,98)
+		INNER JOIN @PartyIdTable pt ON pt.PartyId=s.PartyId
+		WHERE p.ParentID IN (1,11,98) AND pt.IsSelected=1
 	END
 	ELSE
 	BEGIN
+		DECLARE @Skin AS TABLE(BetFrom CHAR(1), Skin VARCHAR(10))
+		INSERT INTO @Skin VALUES ('d','Asia'),('a','China'),('m','WAP'),('e','Euro'),('u','Euro'),('s','Smart'),('l','Smart'),('*','Other')
+
 		-- group by skin
 		-- exclude minfee
 		-- discount of each skin = total discount * (licensing fee/ total licensing fee)
-		SELECT p.ParentID,d.BetFrom, d.ProductId,
+		SELECT p.ParentID,s.Skin, d.ProductId,
 			SUM(d.Turnover)			Turnover,
 			SUM(d.LicenseeWinLoss)	LicenseeWinLoss,
 			SUM(d.LicensingFee)		LicensingFee,
@@ -487,8 +488,9 @@ BEGIN
 		FROM #Data d
 		INNER JOIN @PartyList p ON p.PartyId=d.PartyId
 		INNER JOIN @PartyIdTable pt ON pt.PartyId=p.PartyId
+		INNER JOIN @Skin s ON s.BetFrom=d.BetFrom
 		WHERE p.ParentID IN (1,11,98) AND pt.IsSelected = 1
-		GROUP BY p.ParentID,d.BetFrom, d.ProductId
+		GROUP BY p.ParentID,s.Skin, d.ProductId
 
 		-- total discount by product
 		;WITH t AS (
@@ -502,23 +504,17 @@ BEGIN
 			GROUP BY p.ParentID,s.ProductId
 		)
 		UPDATE s SET 
-			s.Discount = t.TotalDiscount * (s.LicensingFee / t.TotalFee),
-			s.Rebate = t.TotalRebate * (s.LicensingFee / t.TotalFee)
+			s.Discount = CASE WHEN t.TotalFee=0 THEN 0 ELSE t.TotalDiscount * (s.LicensingFee / t.TotalFee) END,
+			s.Rebate = CASE WHEN t.TotalFee=0 THEN 0 ELSE t.TotalRebate * (s.LicensingFee / t.TotalFee) END
 		FROM #SumBySkin s
 		INNER JOIN t ON t.ParentID=s.ParentID AND t.ProductId=s.ProductId
-
+		
 		SELECT CASE WHEN s.ParentID = 1 THEN 'OW' ELSE 'Boping' END AS GroupName
-			,CASE	WHEN s.BetFrom = 'd' THEN 'Asia'
-					WHEN s.BetFrom = 'a' THEN 'China'
-					WHEN s.BetFrom = 'm' THEN 'WAP'
-					WHEN s.BetFrom = 'e' OR s.BetFrom = 'u' THEN 'Euro'
-					WHEN s.BetFrom = 's' OR s.BetFrom = 'l' THEN 'Smart'
-				ELSE 'Other' END AS [Name]
-			,s.LicenseeWinLoss
+			,s.Skin				AS ViewName
+			,s.LicenseeWinLoss	AS Winloss
 			,s.Turnover
 			,s.LicensingFee
 			,s.Discount
-			,s.Rebate
 			,@FirstDate AS [Date]
 			,pp.ProductCode
 		FROM #SumBySkin s
