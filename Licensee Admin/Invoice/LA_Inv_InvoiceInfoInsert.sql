@@ -218,7 +218,7 @@ BEGIN
 						CASE WHEN @InvoiceTypeId = 4 THEN 12 ELSE 11 END
 					WHEN sh.InvoiceType = 3 THEN
 						CASE WHEN @InvoiceTypeId = 4 THEN 14 ELSE 13 END
-					ELSE -1
+					ELSE NULL
 				END)
 			FROM #StatementsHeader sh
 			INNER JOIN @Settlements s ON s.Id = sh.Id
@@ -230,7 +230,7 @@ BEGIN
 				SELECT ',', '''' + s.Reference + ''''
 				FROM @Settlements s
 				LEFT JOIN dbo.LA_InvoiceTypeMapping m WITH(NOLOCK) ON m.InvItemTypeId = s.ItemType AND m.InvTypeId = @InvoiceTypeId
-				WHERE m.InvItemTypeId IS NULL
+				WHERE m.InvItemTypeId IS NULL OR s.ItemType IS NULL
 				FOR XML PATH('')
 			),1,1,'')
 
