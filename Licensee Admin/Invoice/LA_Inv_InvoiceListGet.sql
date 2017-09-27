@@ -9,7 +9,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceListGet]
 	@InvoiceNo		NVARCHAR(50)= '',
 	@InvoiceTypes	VARCHAR(100)= '',
 	@BillerIds		VARCHAR(500)= '',
-	@PayerIds		VARCHAR(500)= '',
+	@PayerIds		VARCHAR(4000)= '',
 	@IssueFromDate	DATETIME,
 	@IssueToDate	DATETIME
 
@@ -24,6 +24,7 @@ AS
 		+ 20151019@Victor: Support Chinese on Invoice's text fields
 		+ 20170330@Bruce: include invoice path [RedmineID: #74096]
 		+ 20170606@Bruce: include invoice status, invoiceno [RedmineID: #76411]
+		+ 20170927@Bruce: increase PayerIds size to 4000 [#79905]
 */
 /*	Example:
 	USE bodb_licensee
