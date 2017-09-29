@@ -11,6 +11,7 @@ AS
 	DB: DB052.bodb_Licensee
 
 	Revisions:
+		20170824@Bruce: Create New SP to delete Invoice [RedmineID: #76410]
 */
 
 BEGIN
