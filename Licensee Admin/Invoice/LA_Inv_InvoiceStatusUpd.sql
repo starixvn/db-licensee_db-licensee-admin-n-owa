@@ -35,6 +35,10 @@ BEGIN
 	SET StatusId = @StatusId, UpdatedBy = @UserId, UpdatedDateTime=@VoidTime
 	WHERE InvoiceHeaderId = @InvoiceId
 
+	UPDATE dbo.LA_InvoiceStatement WITH(ROWLOCK, UPDLOCK)
+	SET StatusID = @StatusId
+	WHERE InvoiceHeaderId = @InvoiceId
+
 	SELECT @ErrCode = 0, @ErrMsg = ''
 END
 
@@ -42,5 +46,6 @@ GO
 
 GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceStatusUpd] TO bodbAdminNet
 GO
+
 GRANT VIEW DEFINITION ON [dbo].[LA_Inv_InvoiceStatusUpd] TO vnteam
 GO

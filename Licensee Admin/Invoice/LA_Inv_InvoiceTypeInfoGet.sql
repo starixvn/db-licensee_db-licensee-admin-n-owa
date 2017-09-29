@@ -1,10 +1,5 @@
 USE [bodb_licensee]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Inv_InvoiceTypeInfoGet]   Script Date: 07/21/2015 09:12:41 ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceTypeInfoGet] 
 	  @BillerId INT
@@ -16,7 +11,8 @@ AS
 	DB: DB052.bodb_Licensee
    
 	Revisions: 
-		+ 2015.08.06: Invoice Type Info - Get
+		+ 20150806@Bravo: Invoice Type Info - Get
+		+ 20170717@Bruce: show product for type = 1 only [#79905]
 */
 /*	Example:
 	USE bodb_licensee
@@ -28,21 +24,14 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	
-	SELECT	it.InvTypeId AS InvoiceTypeId, 
-			it.InvTypeName AS InvoiceTypeName, 
-			CASE 
-				WHEN ivs.ProductId = 0 THEN 'SB' 
-				ELSE p.ProductPrefix
-			END AS ProductCode,
-			CASE 
-				WHEN ivs.ProductId = 0 THEN 'Sportsbook' 
-				ELSE p.ProductName
-			END AS ProductName
+	SELECT	it.InvTypeId		AS InvoiceTypeId, 
+			it.InvTypeName		AS InvoiceTypeName, 
+			p.ProductPrefix		AS ProductCode,
+			p.ProductName		AS ProductName
 	FROM	dbo.LA_InvoiceSetting ivs WITH(NOLOCK) 
 			INNER JOIN dbo.LA_InvoiceType it WITH(NOLOCK) ON ivs.InvTypeId = it.InvTypeId 
-			LEFT JOIN bodb_licensee.dbo.Product3rd p WITH(NOLOCK) ON ivs.ProductId = p.Productid
-	WHERE	ivs.FromPartyId = @PayerId 
-			AND ivs.ToPartyId = @BillerId
+			LEFT JOIN dbo.LA_f_Products3rd('') p ON ivs.ProductId = p.Productid AND it.InvTypeId = 1 -- software & data fee
+	WHERE	ivs.FromPartyId = @PayerId AND ivs.ToPartyId = @BillerId
 	
 END		
 

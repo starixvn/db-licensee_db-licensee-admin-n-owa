@@ -1,17 +1,13 @@
 USE [bodb_Licensee]
 GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
 	@PartyId			INT,
 	@BillerId			INT,
-	@InvoiceType		INT,
+	@InvoiceTypeId		INT,
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
-	@ProductCode		VARCHAR(100),	
+	@ProductCodes		VARCHAR(100),	
 	@ErrCode			INT				= 0		OUTPUT,
 	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT,
 	@BaseCurrency		NVARCHAR(20)	= 'GBP'	OUTPUT,
@@ -43,6 +39,9 @@ AS
 		+ 2017.04.03 @Scofield: update for Cashout [RedmindID: #73310]
 		+ 2017.04.04 @Harper: using new sum table for Cashout Product [RedmindID: #73310]
 		+ 2017.05.05 @Bruce: Correct Product name in Description [RedmindID: #75950]
+		+ 2017.07.18 @Bruce: restructure invoice db [RedmindID: #79905]
+		+ 2017.07.21 @Scofield: Update Amount Type [#79905]
+		+ 2017.07.21 @Bruce: Calculate AMF amount [#76410]
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
 	DECLARE @ToDate DATETIME  = '2016-06-30'
@@ -52,14 +51,14 @@ AS
 	--DECLARE @ToDate DATETIME  = '2013-11-30'
 	DECLARE @PartyId INT = 14
 	DECLARE @BillerId INT = 150
-	DECLARE @InvoiceType INT = 8
-	DECLARE @ProductCode VARCHAR(100)='SB,BA,RB,NG,LC,VS,CS,BG,KN,PTCS,AGC,GD,VG,BT,MGC'
+	DECLARE @InvoiceTypeId INT = 8
+	DECLARE @ProductCodes VARCHAR(100)='SB,BA,RB,NG,LC,VS,CS,BG,KN,PTCS,AGC,GD,VG,BT,MGC'
 	DECLARE	@ErrCode INT
 	DECLARE	@ErrMsg NVARCHAR(1000)
 	DECLARE	@BaseCurrency NVARCHAR(20)
 	DECLARE @InvoiceTemplateId VARCHAR(200)
 	
-	EXEC [LA_Inv_InvoiceAmountGenerate] @PartyId,@BillerId,@InvoiceType, @FromDate, @ToDate, @ProductCode, @ErrCode OUT, @ErrMsg OUT, @BaseCurrency OUT, @InvoiceTemplateId OUT
+	EXEC [LA_Inv_InvoiceAmountGenerate] @PartyId,@BillerId,@InvoiceTypeId, @FromDate, @ToDate, @ProductCodes, @ErrCode OUT, @ErrMsg OUT, @BaseCurrency OUT, @InvoiceTemplateId OUT
 	SELECT @ErrCode, @ErrMsg, @BaseCurrency, @InvoiceTemplateId
 */
 BEGIN
@@ -104,7 +103,7 @@ BEGIN
 											INNER JOIN dbo.LA_InvoiceTemplate t WITH(NOLOCK) ON i.InvTempId = t.InvTemplateId
 									WHERE	i.FromPartyId = @PartyId
 											AND i.ToPartyId = @BillerId
-											AND i.InvTypeId = @InvoiceType)
+											AND i.InvTypeId = @InvoiceTypeId)
 	-- End Region
 
 	-- Region: Get exchange rate info
@@ -120,9 +119,14 @@ BEGIN
 	
 	-- End region
 	
-	DECLARE @InvoiceTypeHostingFeesId INT = (SELECT InvTypeId FROM dbo.LA_InvoiceType WITH(NOLOCK) WHERE InvTypeName LIKE 'Hosting Fees')
-	
-	IF @InvoiceType = @InvoiceTypeHostingFeesId
+	DECLARE @InvoiceTypeHostingFeesId INT = 6,
+		@AmountTypeSoftwareFee INT = 1,
+		@AmountTypeDiscount INT = 4,
+		@AmountTypeRebate INT = 6,
+		@AmountTypeRackHostingFee INT = 8,
+		@AmountTypeMonthlyHostingFee INT = 9
+
+	IF @InvoiceTypeId = @InvoiceTypeHostingFeesId
 	BEGIN
 		-- Get charge rate settings
 		DECLARE @Settings TABLE(
@@ -184,7 +188,7 @@ BEGIN
 				IF @FeesType = 1 -- Fixed
 				BEGIN
 					INSERT INTO @EmptyTable
-					SELECT p.Productid, p.ProductPrefix, s.ProductName, s.NumOfApplyDate/s.DaysInMonth * d.Amount * e.Rate, d.Amount * e.Rate, 0
+					SELECT p.Productid, p.ProductPrefix, s.ProductName, s.NumOfApplyDate/s.DaysInMonth * d.Amount * e.Rate, d.Amount * e.Rate, @AmountTypeRackHostingFee
 					FROM @Settings s INNER JOIN dbo.Product3rd p WITH(NOLOCK) ON s.ProductName = p.ProductName
 						INNER JOIN dbo.LA_HostingFeesDetail d WITH(NOLOCK) ON s.FeesId = d.HostingFeesId
 						INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
@@ -205,7 +209,7 @@ BEGIN
 					IF @HostingFeesMaxPCU = 0 SET @HostingFeesMaxPCU = (SELECT MAX(TotalUser) FROM @CurrentUser)
 					
 					INSERT INTO @EmptyTable
-					SELECT p.Productid, p.ProductPrefix, s.ProductName, s.NumOfApplyDate/s.DaysInMonth * d.Amount * e.Rate, d.Amount * e.Rate, 0
+					SELECT p.Productid, p.ProductPrefix, s.ProductName, s.NumOfApplyDate/s.DaysInMonth * d.Amount * e.Rate, d.Amount * e.Rate, @AmountTypeMonthlyHostingFee
 					FROM @Settings s INNER JOIN dbo.Product3rd p WITH(NOLOCK) ON s.ProductName = p.ProductName
 						INNER JOIN dbo.LA_HostingFeesDetail d WITH(NOLOCK) ON s.FeesId = d.HostingFeesId AND @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
 						INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
@@ -225,7 +229,7 @@ BEGIN
 		END
 		
 		DECLARE @BaseProduct INT = (SELECT BaseProduct FROM @Settings WHERE SettingType = 2)
-		SET @ProductCode = CASE 
+		SET @ProductCodes = CASE 
 			WHEN @BaseProduct = 0 THEN 'SB'
 			ELSE (SELECT ProductPrefix FROM dbo.Product3rd WITH(NOLOCK) WHERE Productid = @BaseProduct)
 		END
@@ -238,7 +242,7 @@ BEGIN
 		END
 	END
 		
-	IF @InvoiceType = 3 -- rebate
+	IF @InvoiceTypeId = 3 -- rebate
 	BEGIN
 		DECLARE @ProductCodeString VARCHAR(100) = ''
 		SELECT  @ProductCodeString = @ProductCodeString + p.ProductCode + ','
@@ -263,9 +267,9 @@ BEGIN
 		END
 		ELSE
 		BEGIN
-			SET @ProductCode = SUBSTRING(@ProductCodeString, 1, LEN(@ProductCodeString) - 1)
+			SET @ProductCodes = SUBSTRING(@ProductCodeString, 1, LEN(@ProductCodeString) - 1)
 		END
-	END	
+	END
 	-- EndRegion
 	
 	-- Region Party Group Assignment
@@ -303,7 +307,7 @@ BEGIN
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, BettypeRef, Rate, Fromdate, Todate)
 	(
 		SELECT	PartyID, LicenseeID, ProductID, Bettype, DI_Rate, Fromdate, Todate
-		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
+		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId NOT IN (1, 15) --exclude RB, CB
 	)
 	
@@ -325,7 +329,7 @@ BEGIN
 		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
 		LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
 		LEFT JOIN bodb_licensee.dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
-	WHERE EXISTS(SELECT val FROM bodb02.dbo.strSplit(@ProductCode, ',') WHERE val = 'CB') AND
+	WHERE EXISTS(SELECT val FROM bodb02.dbo.strSplit(@ProductCodes, ',') WHERE val = 'CB') AND
 		FromParty = @PartyId AND ProductID = @CBProductId AND ChargeType IN (@CommChargeType,@CashInShareChargeType) AND (
 		@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
 		@ToDate BETWEEN ci.FromDate AND ci.ToDate OR
@@ -729,7 +733,7 @@ BEGIN
 			AmountType		TINYINT,
 			Rate			MONEY)
 		
-	IF @InvoiceType = @InvoiceTypeHostingFeesId
+	IF @InvoiceTypeId = @InvoiceTypeHostingFeesId
 	BEGIN 
 		DECLARE @IsApplyMinFee BIT = ISNULL((SELECT TOP 1 IsApplyMinFee FROM @MinFeeGroup WHERE PartyId = @PartyId AND FeeType=1),0)
 
@@ -744,7 +748,7 @@ BEGIN
 			DELETE @EmptyTable
 
 			INSERT INTO @EmptyTable
-			SELECT p.Productid, p.ProductPrefix, s.ProductName, 0, d.Amount * e.Rate, 0
+			SELECT p.Productid, p.ProductPrefix, s.ProductName, 0, d.Amount * e.Rate, @AmountTypeMonthlyHostingFee
 			FROM @Settings s INNER JOIN dbo.Product3rd p ON s.ProductName = p.ProductName
 				INNER JOIN dbo.LA_HostingFeesDetail d ON s.FeesId = d.HostingFeesId AND @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
 				INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
@@ -776,7 +780,7 @@ BEGIN
 			SELECT	amf.PartyId, 
 					amf.ProductId, 
 					SUM(amf.AmountToCompany), 
-					0 AS AmountType
+					@AmountTypeSoftwareFee
 			FROM	@MinFeeGroup amf
 			WHERE	amf.PartyId = @PartyId
 					AND amf.FeeType = 1
@@ -788,7 +792,7 @@ BEGIN
 			SELECT	td.PartyId, 
 					td.ProductId, 
 					SUM(td.AmountToCompany), 
-					0 AS AmountType
+					@AmountTypeSoftwareFee
 			FROM	#TempData td 
 			WHERE	td.PartyId = @PartyId AND td.ProductId NOT IN (SELECT td2.ProductId FROM @MinFeeGroup td2)
 			GROUP	BY td.PartyId, td.ProductId		
@@ -805,7 +809,7 @@ BEGIN
 	
 		INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
 		(
-			SELECT	iv.PartyId, iv.ProductId, iv.InvoiceAmount * dg.Rate AS InvoiceAmount, dg.DiscountGroupType AS AmountType, dg.Rate
+			SELECT	iv.PartyId, iv.ProductId, iv.InvoiceAmount * dg.Rate AS InvoiceAmount, @AmountTypeDiscount, dg.Rate
 			FROM	@InvoiceData iv INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
 			WHERE	dg.DiscountGroupType = 1
 		)	
@@ -814,9 +818,9 @@ BEGIN
 		-- discount by winloss
 		INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
 		(
-			SELECT t.PartyId, t.ProductId, SUM(t.LicenseeWinLossBase * d.Rate), 1, d.Rate
+			SELECT t.PartyId, t.ProductId, SUM(t.LicenseeWinLossBase * d.Rate), @AmountTypeDiscount, d.Rate
 			FROM #TempData t
-			INNER JOIN @DiscountGroup d ON d.ProductId = t.ProductId  AND d.DiscountGroupType = 3
+			INNER JOIN @DiscountGroup d ON d.ProductId = t.ProductId  AND d.DiscountGroupType = 3 AND t.PartyId=d.PartyId
 			GROUP BY t.PartyId, t.ProductId, d.Rate
 		)
 		--end discount by winloss
@@ -828,15 +832,15 @@ BEGIN
 					iv.ProductId, 
 					(iv.InvoiceAmount - ISNULL((SELECT	SUM(i.InvoiceAmount)
 												FROM	@InvoiceData i
-												WHERE	i.AmountType = 1
+												WHERE	i.AmountType = @AmountTypeDiscount
 														AND i.ProductId = iv.ProductId), 0))
 						* dg.Rate AS InvoiceAmount, 
-					dg.DiscountGroupType AS AmountType, 
+					@AmountTypeRebate, 
 					dg.Rate
 			FROM	@InvoiceData iv 
 					INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
 			WHERE	dg.DiscountGroupType = 2
-					AND iv.AmountType = 0
+					AND iv.AmountType = @AmountTypeSoftwareFee
 		)
 	
 		-- End Region
@@ -848,7 +852,9 @@ BEGIN
 				ProductName		VARCHAR(500),
 				InvoiceAmount	MONEY,
 				AmountType		TINYINT,
-				Rate			MONEY)
+				Rate			MONEY,
+				AmfAmount		MONEY,
+				RemainingAmf	MONEY)
 
 		INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate)
 		(
@@ -886,7 +892,7 @@ BEGIN
 					id.AmountType,
 					id.Rate
 			FROM	@FinalResult id
-			WHERE	id.AmountType > 0
+			WHERE	id.AmountType > @AmountTypeSoftwareFee
 			GROUP BY id.AmountType, id.Rate
 		)	
 		UPDATE	@FinalResult
@@ -894,18 +900,55 @@ BEGIN
 				ProductName = LEFT(ProductName, LEN(ProductName) - 1)
 		WHERE	ProductId = -1
 
+		DECLARE @RemainingAmf MONEY = ISNULL((
+			SELECT SUM(ISNULL(Income,0)) - SUM(ISNULL(Expense,0))
+			FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
+			INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
+			WHERE s.InvItemTypeId IN (3,5,7) 
+				AND h.PartyId = @PartyId
+				AND h.BillerId = @BillerId
+				AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
+		),0)
+
 		-- InvoiceType Software: 1
-		IF @InvoiceType = 1			
+		IF @InvoiceTypeId = 1			
 		BEGIN
+			-- insert zero amount
 			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, AmountType)
-			SELECT pd.ProductID, pd.ProductPrefix, pd.ProductName, 0, 0
-			FROM
-				(SELECT DISTINCT pci.ProductID 
+			SELECT pd.ProductID, pd.ProductPrefix, pd.ProductName, 0, @AmountTypeSoftwareFee
+			FROM (SELECT DISTINCT pci.ProductID 
 				FROM @PartyChargeInfo pci
 				LEFT JOIN @FinalResult r ON pci.ProductID = r.ProductId
 				WHERE r.ProductId IS NULL) p
-				JOIN
-				dbo.LA_f_Products3rd('') pd ON p.ProductID = pd.ProductID	
+			JOIN dbo.LA_f_Products3rd('') pd ON p.ProductID = pd.ProductID
+
+			-- insert amf
+			IF @RemainingAmf > 0 
+			BEGIN
+				DECLARE @ProgratedMinfee MONEY = ISNULL((
+					SELECT TOP 1 MinFeeProrate
+					FROM @MinFeeGroup
+					WHERE PartyId = @PartyId AND FeeType = 1 AND ProductId = 0
+				),0)
+				DECLARE @SBAfterDiscount MONEY = ISNULL((
+					SELECT SUM(CASE WHEN AmountType = 1 THEN InvoiceAmount ELSE -InvoiceAmount END)
+					FROM @FinalResult
+					WHERE ProductId = 0 AND AmountType IN (1,4) -- 1: Software fee, 4: discount
+				),0)
+				DECLARE @AmfAmount MONEY = (CASE WHEN @RemainingAmf < @ProgratedMinfee THEN @RemainingAmf ELSE @ProgratedMinfee END)
+				SET @AmfAmount = (CASE WHEN @AmfAmount < @SBAfterDiscount THEN @AmfAmount ELSE @SBAfterDiscount END)
+				SET @AmfAmount = (CASE WHEN @AmfAmount < 0 THEN 0 ELSE @AmfAmount END)
+
+				UPDATE @FinalResult SET AmfAmount = @AmfAmount, RemainingAmf = @RemainingAmf - @AmfAmount
+				WHERE AmountType = 1 AND ProductId = 0 -- SB
+			END
+		END
+
+		-- 10: debit note for return amf
+		IF @InvoiceTypeId = 10
+		BEGIN
+			DELETE @FinalResult
+			INSERT INTO @FinalResult(AmountType, RemainingAmf) VALUES (1, @RemainingAmf)
 		END
 
 		SELECT	f.ProductId,
@@ -913,10 +956,12 @@ BEGIN
 				f.ProductName,
 				f.InvoiceAmount,
 				f.AmountType,
-				f.Rate
+				f.Rate,
+				f.AmfAmount,
+				f.RemainingAmf
 		FROM	@FinalResult f
-		WHERE	(@InvoiceType != 3 AND (f.AmountType = 0 OR (f.ProductId = -1 AND f.AmountType = 1)))
-				OR (@InvoiceType = 3 AND f.ProductId = -1 AND f.AmountType = 2)
+		WHERE	(@InvoiceTypeId != 3 AND (f.AmountType = @AmountTypeSoftwareFee OR (f.ProductId = -1 AND f.AmountType = @AmountTypeDiscount)))
+				OR (@InvoiceTypeId = 3 AND f.ProductId = -1 AND f.AmountType = @AmountTypeRebate)
 		ORDER BY f.AmountType, f.ProductId
 	END
 

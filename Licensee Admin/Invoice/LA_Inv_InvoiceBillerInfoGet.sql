@@ -22,6 +22,7 @@ AS
 		+ 20151019@Victor: Support Chinese on Invoice's text fields
 		+ 20160728@Bruce: Software data fee & hosting fee have a same invoice no
 		+ 20170421@Bruce: Add environment filter
+		+ 20170824@Bruce: use same invoice no for debit note and debit note for return amf [#76410]
 */
 /*	Example:
 	USE bodb_licensee
@@ -51,8 +52,6 @@ BEGIN
 		GROUP	BY ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath
 	)
 
-	DECLARE @HostingFeeInvoiceType INT = (SELECT InvTypeId FROM LA_InvoiceType WITH(NOLOCK) WHERE InvTypeName = 'Hosting Fees')
-
 	DECLARE @InvoiceTmp TABLE(
 			BillerId		INT,
 			InvoiceType		INT,
@@ -70,19 +69,18 @@ BEGIN
 		
 	DECLARE @InvoiceSymbol NVARCHAR(20) = ''
 	DECLARE @InvoiceNumber INT = 1
+	DECLARE @SameInvoiceNoList TABLE (InvoiceType INT)
 
-	IF @InvoiceType IN (1, @HostingFeeInvoiceType)
-	BEGIN
-		SELECT	TOP 1 @InvoiceSymbol = i.InvoiceSymbol
-		FROM	@InvoiceTmp i
-		WHERE	i.InvoiceType IN (1, @HostingFeeInvoiceType)
-	END
-	ELSE
-	BEGIN
-		SELECT	TOP 1 @InvoiceSymbol = i.InvoiceSymbol 
-		FROM	@InvoiceTmp i
-		WHERE	i.InvoiceType = @InvoiceType
-	END
+	-- 1: software fee, 6: hosting fee
+	IF @InvoiceType IN (1,6) INSERT INTO @SameInvoiceNoList VALUES(1),(6)
+	-- 5: debit note, 10: debit note for return AMF
+	ELSE IF @InvoiceType IN (5,10) INSERT INTO @SameInvoiceNoList VALUES(5),(10)
+	-- others
+	ELSE INSERT INTO @SameInvoiceNoList VALUES(@InvoiceType)
+
+	SELECT	TOP 1 @InvoiceSymbol = i.InvoiceSymbol
+	FROM	@InvoiceTmp i
+	WHERE	i.InvoiceType IN (SELECT * FROM @SameInvoiceNoList)
 
 	SELECT	@InvoiceNumber = ISNULL(MAX(i.InvoiceNumber), 0) + 1
 	FROM	@InvoiceTmp i
