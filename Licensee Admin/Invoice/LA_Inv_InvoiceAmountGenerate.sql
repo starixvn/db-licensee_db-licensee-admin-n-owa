@@ -7,7 +7,8 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
 	@InvoiceTypeId		INT,
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
-	@ProductCodes		VARCHAR(100),	
+	@ProductCodes		VARCHAR(100),
+	@Environment		VARCHAR(50),
 	@ErrCode			INT				= 0		OUTPUT,
 	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT,
 	@BaseCurrency		NVARCHAR(20)	= 'GBP'	OUTPUT,
@@ -42,6 +43,7 @@ AS
 		+ 2017.07.18 @Bruce: restructure invoice db [RedmindID: #79905]
 		+ 2017.07.21 @Scofield: Update Amount Type [#79905]
 		+ 2017.07.21 @Bruce: Calculate AMF amount [#76410]
+		+ 2017.10.02 @Bruce: add environment to parameter list [#84038]
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
 	DECLARE @ToDate DATETIME  = '2016-06-30'
@@ -908,6 +910,7 @@ BEGIN
 				AND h.PartyId = @PartyId
 				AND h.BillerId = @BillerId
 				AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
+				AND h.Environment = @Environment
 		),0)
 
 		-- InvoiceType Software: 1
