@@ -132,7 +132,7 @@ BEGIN
 			FROM bodb_licenseereport.dbo.rpt_Betting_BA b WITH ( NOLOCK )
 				INNER JOIN #tmpParty tp ON b.siteid = tp.LicenseeID AND tp.ProductID = 3
 				INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype AND tp.ProductID = bt.ProductID
-				LEFT JOIN League l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
+				LEFT JOIN dbo.League l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
 			WHERE	(b.rptDate BETWEEN tp.Fromdate AND tp.ToDate) AND
 					 b.[Status] NOT IN (-1, 101, 102, 103) AND
 					(@Currency = 0 OR @Currency = b.CurrencyID) AND
@@ -165,10 +165,13 @@ BEGIN
 				, 0 as Playercomm
 			FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
 			INNER JOIN #tmpParty p ON p.LicenseeId=b.SiteId AND p.Bettype=b.Bettype AND b.RptDate BETWEEN p.FromDate AND p.ToDate
+			LEFT JOIN dbo.League l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
 			WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
 				AND (@excludeTest = 0 OR b.CurrencyID<>20)
 				AND b.Status NOT IN (-1, 101, 102, 103)
 				AND (@Currency = 0 OR @Currency = b.CurrencyID)
+				AND (@SportType = 0 OR l.Sporttype = @SportType)
+				AND (@Bettype = 0 OR b.bettype = @Bettype)
 			GROUP BY p.PartyId, b.rptDate, b.CurrencyID, p.ProductID,b.[Status]
 		)
 	END
