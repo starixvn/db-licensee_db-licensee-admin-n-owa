@@ -156,7 +156,9 @@ BEGIN
 		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, ProductID, Currency, TurnOver, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Company, Betcount, Playercomm)
 		(
 			SELECT b.RptDate, p.PartyId, p.ProductID, b.CurrencyID
-				, SUM(b.Turnover) Turnover
+				, SUM(b.Turnover) * (CASE	WHEN @drawfilter IN (2, 3) AND b.[Status] = 111			THEN 0
+											WHEN @drawfilter IN (2, 3) AND b.[Status] IN (114,115)	THEN 0.5
+											ELSE 1 END)
 				, SUM(b.WinLoss) Winloss
 				, -SUM(b.WinLoss) AS LicenseeWL
 				, 0 AS WinlossRB
@@ -165,7 +167,7 @@ BEGIN
 				, 0 AS CommBA
 				, 0 AS CommRB
 				, -SUM(b.WinLoss* p.Rate) AS Company
-				, SUM(b.betcount) AS Betcount
+				, SUM(b.BetCount) * (CASE WHEN @drawfilter = 2 AND b.[Status] = 111 THEN 0 ELSE 1 END)
 				, 0 as Playercomm
 			FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
 			INNER JOIN #tmpParty p ON p.LicenseeId=b.SiteId AND p.Bettype=b.Bettype AND b.RptDate BETWEEN p.FromDate AND p.ToDate
@@ -173,7 +175,7 @@ BEGIN
 				AND (@excludeTest = 0 OR b.CurrencyID<>20)
 				AND b.Status NOT IN (-1, 101, 102, 103)
 				AND (@Currency = 0 OR @Currency = b.CurrencyID)
-			GROUP BY p.LicenseeId, p.PartyId, b.rptDate, b.CurrencyID, p.ProductID
+			GROUP BY p.PartyId, b.rptDate, b.CurrencyID, p.ProductID,b.[Status]
 		)
 	END
 
