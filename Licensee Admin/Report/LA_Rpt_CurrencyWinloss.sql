@@ -172,6 +172,7 @@ BEGIN
 			WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
 				AND (@excludeTest = 0 OR b.CurrencyID<>20)
 				AND b.Status NOT IN (-1, 101, 102, 103)
+				AND (@Currency = 0 OR @Currency = b.CurrencyID)
 			GROUP BY p.LicenseeId, p.PartyId, b.rptDate, b.CurrencyID, p.ProductID
 		)
 	END
