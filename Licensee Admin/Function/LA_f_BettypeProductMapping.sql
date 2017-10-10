@@ -265,7 +265,7 @@ BEGIN
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'VG')
     BEGIN
 	   INSERT INTO @tbBettypeProduct
-	   SELECT typeid, 14
+	   SELECT typeid, 12
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid = 1900
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
