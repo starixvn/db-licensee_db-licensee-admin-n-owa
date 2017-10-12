@@ -1,16 +1,12 @@
 USE [bodb_licensee]
 GO
 
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_MuayThaiWinLoss]
 	  @PartyIds				VARCHAR(1000)
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME	
 	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
+	, @TicketType			TINYINT
 WITH RECOMPILE
 AS
 /*  Created: 20160302@Bravo
@@ -20,7 +16,10 @@ AS
 		- 20160302@Bravo: create sp on table sum 		
 		- 20160322@Bravo: fix bug currency name VND => INH	
 		- 20160412@Bruce: Add grand total in THB
-	Param's Explanation:  						
+		- 20171009@Harper: Get more info for MuayThai Parlay [Redmine: #82827]
+
+	Param's Explanation:  
+		- @TicketType: 1 - Single; 2 - Parlay; 3 - All		
 */
 SET NOCOUNT ON
 BEGIN	
@@ -34,12 +33,12 @@ BEGIN
 		FromDate	SMALLDATETIME,
 		ToDate		SMALLDATETIME
 	)
+	DECLARE @ShareRate MONEY = 0.03
 
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, IsDeposit, ProductID, Rate, Fromdate, Todate)
 	(
 		SELECT	PartyID, LicenseeID, isDeposit, ProductID, DI_Rate, Fromdate, Todate
-		FROM	dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'SB', 'OA', 0)
-		--WHERE	DI_Rate > 0
+		FROM	dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'SB', 'OA', 0)		
 	)
 	-- End region
 
@@ -96,13 +95,13 @@ BEGIN
 				b.CurrencyID,
 				SUM(ISNULL(b.BetCount, 0)) TotalTrans,
 				SUM(ISNULL(b.Turnover, 0)) Turnover,
-				SUM(ISNULL(b.CustomerWL, 0)) MemberWL,
-				SUM(ISNULL(b.WLShare, 0)) WLShare,
-				SUM(ISNULL(b.CommissionS, 0)) LicComm,
-				SUM(ISNULL(b.CommShare, 0)) CommShare,
+				SUM(ISNULL(b.CustomerWLOfParlay, 0)) MemberWL,
+				SUM(ISNULL(b.CustomerWLOfParlay, 0) * - @ShareRate) WLShare,
+				SUM(ISNULL(b.CommissionSOfParlay, 0)) LicComm,
+				SUM(ISNULL(b.CommShareOfParlay, 0) * @ShareRate) CommShare,
 				SUM(CASE WHEN p.IsDeposit = 0 
-						THEN ISNULL(b.LicenseeWL, 0) 
-						ELSE ISNULL(-b.CustomerWL, 0) * p.Rate 
+						THEN ISNULL(b.LicenseeWLOfParlay, 0) 
+						ELSE ISNULL(-b.CustomerWLOfParlay, 0) * p.Rate 
 					END) AmtLicensee
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingBySport b WITH (NOLOCK)
 				INNER JOIN @PartyChargeInfo p ON b.ProductID = p.ProductID 
@@ -112,7 +111,11 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.StatusId BETWEEN 111 AND 113
 				AND b.customercategory NOT IN (27, 28)
-				AND b.SportType = 44 -- Muay Thai
+				AND b.SportType = 44 -- MuayThai
+				AND ( @TicketType = 3
+					OR (@TicketType = 1 AND b.IsParlay = 0)
+					OR (@TicketType = 2 AND b.IsParlay = 1)
+					)
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, p.PartyId
 	)	
 	-- EndRegion
@@ -228,5 +231,9 @@ BEGIN
 	DROP TABLE #GrandTotal
 END
 GO
+
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_MuayThaiWinLoss] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_Rpt_MuayThaiWinLoss] TO bodbAdminNet 
+GO
+
+GRANT EXECUTE ON [dbo].[LA_Rpt_MuayThaiWinLoss] TO [bodbAdminNet]
+GO
