@@ -5,7 +5,7 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss_Details_xtest]
+ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss_Details]
 	@PartyIDs			VARCHAR(5500)	= ''
 	, @Currency			INT				= 0
 	, @FromDate			SMALLDATETIME
@@ -28,7 +28,7 @@ AS
 	   - 20150703@Florent: add GBP
 	   - 20160505@Bruce: Remove dynamic sql
 	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
-	   - 20170801@Kenny: Filter data for Microgaming
+	   - 20170801@Kenny: Filter data for Microgaming [RedmineID: #79311]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -211,6 +211,7 @@ BEGIN
 				AND (@Currency = 0 OR @Currency = b.CurrencyID)
 				AND (@SportType = 0 OR l.Sporttype = @SportType)
 				AND (@Bettype = 0 OR b.bettype = @Bettype)
+				AND p.ProductId IN (14,17)
 			GROUP BY p.PartyId, b.rptDate, b.CurrencyID, p.ProductID,b.[Status]
 		)
 	END
@@ -284,7 +285,7 @@ BEGIN
 					SUM(b.Betcount) * (CASE WHEN @drawfilter = 2 AND b.[Status] = 111 THEN 0 ELSE 1 END),
 					SUM(b.CommissionP)
 			FROM #Data b WITH (NOLOCK)
-			INNER JOIN #tmpParty tp ON b.SiteID = tp.LicenseeID AND tp.ProductID NOT IN (3,14,17) AND b.ProductID = tp.ProductID
+			INNER JOIN #tmpParty tp ON b.SiteID = tp.LicenseeID AND tp.ProductID NOT IN (3,14,17,10,11,12) AND b.ProductID = tp.ProductID
 			WHERE b.rptDate BETWEEN tp.FromDate AND tp.Todate
 			GROUP BY  b.rptDate, tp.ProductID, tp.PartyID, b.currencyID, b.[Status]
 		)
