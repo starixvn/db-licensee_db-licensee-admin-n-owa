@@ -5,7 +5,7 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss_Details]
+ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss_Details_xtest]
 	@PartyIDs			VARCHAR(5500)	= ''
 	, @Currency			INT				= 0
 	, @FromDate			SMALLDATETIME
@@ -145,6 +145,45 @@ BEGIN
 		)
 	END
 
+	IF EXISTS (SELECT 1 FROM @ProductList WHERE ProductCode IN ('AGC','GD','VG'))
+	BEGIN
+		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, ProductID, Currency, TurnOver, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Company, Betcount, Playercomm)
+		(
+			SELECT b.rptDate,p.PartyID,p.ProductID,b.CurrencyId
+					,SUM(b.Turnover * 
+						(CASE WHEN b.Bettype=33 AND b.[StatusId] IN (114,115) THEN 0.5 ELSE 1 END) *
+						(CASE WHEN @drawfilter IN (2, 3) AND b.[StatusId] = 111  THEN 0
+							  WHEN @drawfilter IN (2, 3) AND b.[StatusId] IN (114,115) THEN 0.5
+							  ELSE 1 END))
+					,SUM(b.MemberWL)
+					,SUM(-b.MemberWL)
+					,0 AS WinlossRB
+					,0 AS AmtDueToBA
+					,0 AS AmtDueToRB
+					,0 AS CommBA
+					,0 AS CommRB
+					,SUM(-b.MemberWL * p.Rate) AS Company
+					,SUM(b.Betcount) * (CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END)
+					,SUM(b.commissionP)
+			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			INNER JOIN #tmpParty p ON b.SiteID = p.LicenseeID AND p.ProductID=b.ProductID AND b.rptDate BETWEEN p.Fromdate AND p.Todate
+			WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate) AND
+					 b.StatusId NOT IN (-1, 101, 102, 103) AND
+					(@Currency = 0 OR @Currency = b.CurrencyID) AND
+					(@excludeTest = 0 OR b.CurrencyID<>20) AND
+					@SportType = 0 AND
+					@ReportBy = 0 AND
+					@Bettype = 0 AND
+					b.CustomerCategory NOT IN (27,28) AND
+					p.ProductID IN (10,11,12)
+			GROUP BY b.rptDate
+					,p.PartyID
+					,p.ProductID
+					,b.[StatusId]
+					,b.CurrencyID
+		)
+	END
+
 	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode IN ('MGCLC','MGCRNG'))
 	BEGIN
 		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, ProductID, Currency, TurnOver, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Company, Betcount, Playercomm)
@@ -176,14 +215,14 @@ BEGIN
 		)
 	END
 
-	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode NOT IN ('BA','MGCLC','MGCRNG'))
+	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode NOT IN ('BA','MGCLC','MGCRNG','AGC','GD','VG'))
 	BEGIN
 		--exclude BA rpt_Betting
 		SELECT DISTINCT p.PartyID, p.LicenseeID, p.ProductID, bt.Bettype
 		INTO #PartyBettypeMapping
 		FROM #tmpParty p
 		INNER JOIN #Bettype bt ON p.ProductID = bt.ProductID
-		WHERE p.ProductID NOT IN (3,14,17)
+		WHERE p.ProductID NOT IN (3,14,17,10,11,12)
 		
 		DELETE #Data
 		
