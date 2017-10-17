@@ -35,6 +35,7 @@ AS
 		- 20170221@bruce: support NG2 [#70050]
 		- 20170327@Harper: #73110 - Integrate new product Cashout
 		- 20170712@Harper: #79310 - Integrate new product Betradar Virtual Sport
+		- 20171006@Harper: #79311 - Support Macau products
 
 	Param's Explanation:
 
@@ -260,6 +261,14 @@ BEGIN
 	   WHERE typeid BETWEEN 1021 AND 1038
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'VG')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 12
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid = 1900
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+    END
 	RETURN
 END
-
