@@ -86,38 +86,82 @@ BEGIN
 		CommShare	MONEY,
 		AmtLicensee MONEY
 	)
+
+	-- Cut of date is 2017-10-01 - Just support single ticket
+	DECLARE @CutOfDate		SMALLDATETIME,
+			@TmpFromDate	SMALLDATETIME,
+			@TmpToDate		SMALLDATETIME 
+
+	SELECT @CutOfDate = '2017-09-30'
+	SELECT @TmpFromDate = CASE WHEN @FromDate <= @CutOfDate THEN DATEADD(DAY,1,@CutOfDate) ELSE @FromDate END
+	SELECT @TmpToDate = CASE WHEN @ToDate >= @CutOfDate THEN @CutOfDate ELSE @ToDate END
+
+	IF @ToDate > @CutOfDate -- New Data
+	BEGIN
+		INSERT INTO #TempData (LicenseeId, PartyId, rptDate, CurrencyId, TotalTrans, Turnover, MemberWL, WLShare, LicComm, CommShare, AmtLicensee)
+		(
+			SELECT	b.SiteID,
+					p.PartyId,
+					b.rptDate,
+					b.CurrencyID,
+					SUM(ISNULL(b.BetCount, 0)) TotalTrans,
+					SUM(ISNULL(b.Turnover, 0)) Turnover,
+					SUM(ISNULL(b.AdjustedCustomerWL, 0)) MemberWL,
+					SUM(ISNULL(b.AdjustedCustomerWL, 0) * - @ShareRate) WLShare,
+					SUM(ISNULL(b.AdjustedCommissionS, 0)) LicComm,
+					SUM(ISNULL(b.AdjustedCommShare, 0) * @ShareRate) CommShare,
+					SUM(CASE WHEN p.IsDeposit = 0 
+							THEN ISNULL(b.AdjustedLicenseeWL, 0) 
+							ELSE ISNULL(-b.AdjustedCustomerWL, 0) * p.Rate 
+						END) AmtLicensee
+			FROM	bodb_LicenseeReport.dbo.rpt_BettingBySport b WITH (NOLOCK)
+					INNER JOIN @PartyChargeInfo p ON b.ProductID = p.ProductID 
+													AND b.SiteID = p.LicenseeId
+													AND b.rptDate BETWEEN p.FromDate AND p.ToDate
+			WHERE	b.rptDate BETWEEN @TmpFromDate AND @ToDate
+					AND (b.CurrencyID <> 20)
+					AND b.StatusId BETWEEN 111 AND 113
+					AND b.customercategory NOT IN (27, 28)
+					AND b.SportType = 44 -- MuayThai
+					AND ( @TicketType = 3
+						OR (@TicketType = 1 AND ISNULL(b.IsParlay, 0) = 0)
+						OR (@TicketType = 2 AND ISNULL(b.IsParlay, 0) = 1)
+						)
+			GROUP BY b.rptdate, b.SiteId, b.CurrencyID, p.PartyId
+		)	
+	END
+
+	IF @FromDate <= @CutOfDate AND @TicketType IN (1, 3)-- Old data
+	BEGIN
+		INSERT INTO #TempData (LicenseeId, PartyId, rptDate, CurrencyId, TotalTrans, Turnover, MemberWL, WLShare, LicComm, CommShare, AmtLicensee)
+		(
+			SELECT	b.SiteID,
+					p.PartyId,
+					b.rptDate,
+					b.CurrencyID,
+					SUM(ISNULL(b.BetCount, 0)) TotalTrans,
+					SUM(ISNULL(b.Turnover, 0)) Turnover,
+					SUM(ISNULL(b.CustomerWL, 0)) MemberWL,
+					SUM(ISNULL(b.WLShare, 0)) WLShare,
+					SUM(ISNULL(b.CommissionS, 0)) LicComm,
+					SUM(ISNULL(b.CommShare, 0)) CommShare,
+					SUM(CASE WHEN p.IsDeposit = 0 
+							THEN ISNULL(b.LicenseeWL, 0) 
+							ELSE ISNULL(-b.CustomerWL, 0) * p.Rate 
+						END) AmtLicensee
+			FROM	bodb_LicenseeReport.dbo.rpt_BettingBySport b WITH (NOLOCK)
+					INNER JOIN @PartyChargeInfo p ON b.ProductID = p.ProductID 
+													AND b.SiteID = p.LicenseeId
+													AND b.rptDate BETWEEN p.FromDate AND p.ToDate
+			WHERE	b.rptDate BETWEEN @FromDate AND @TmpToDate
+					AND (b.CurrencyID <> 20)
+					AND b.StatusId BETWEEN 111 AND 113
+					AND b.customercategory NOT IN (27, 28)
+					AND b.SportType = 44 -- Muay Thai
+			GROUP BY b.rptdate, b.SiteId, b.CurrencyID, p.PartyId
+		)
+	END
 	
-	INSERT INTO #TempData (LicenseeId, PartyId, rptDate, CurrencyId, TotalTrans, Turnover, MemberWL, WLShare, LicComm, CommShare, AmtLicensee)
-	(
-		SELECT	b.SiteID,
-				p.PartyId,
-				b.rptDate,
-				b.CurrencyID,
-				SUM(ISNULL(b.BetCount, 0)) TotalTrans,
-				SUM(ISNULL(b.Turnover, 0)) Turnover,
-				SUM(ISNULL(b.CustomerWLOfParlay, 0)) MemberWL,
-				SUM(ISNULL(b.CustomerWLOfParlay, 0) * - @ShareRate) WLShare,
-				SUM(ISNULL(b.CommissionSOfParlay, 0)) LicComm,
-				SUM(ISNULL(b.CommShareOfParlay, 0) * @ShareRate) CommShare,
-				SUM(CASE WHEN p.IsDeposit = 0 
-						THEN ISNULL(b.LicenseeWLOfParlay, 0) 
-						ELSE ISNULL(-b.CustomerWLOfParlay, 0) * p.Rate 
-					END) AmtLicensee
-		FROM	bodb_LicenseeReport.dbo.rpt_BettingBySport b WITH (NOLOCK)
-				INNER JOIN @PartyChargeInfo p ON b.ProductID = p.ProductID 
-												AND b.SiteID = p.LicenseeId
-												AND b.rptDate BETWEEN p.FromDate AND p.ToDate
-		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate
-				AND (b.CurrencyID <> 20)
-				AND b.StatusId BETWEEN 111 AND 113
-				AND b.customercategory NOT IN (27, 28)
-				AND b.SportType = 44 -- MuayThai
-				AND ( @TicketType = 3
-					OR (@TicketType = 1 AND b.IsParlay = 0)
-					OR (@TicketType = 2 AND b.IsParlay = 1)
-					)
-		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, p.PartyId
-	)	
 	-- EndRegion
 	
 	-- Region: Result data
@@ -142,21 +186,36 @@ BEGIN
 	IF @BaseCurrencyName = ''
 	BEGIN 
 		INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, CommissionShare, AmountDueLicensee)
-		SELECT p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode, td.TotalTrans, td.Turnover, td.MemberWL, td.WLShare, td.LicComm, td.CommShare, td.AmtLicensee
+		SELECT p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode
+			, SUM(td.TotalTrans)
+			, SUM(td.Turnover)
+			, SUM(td.MemberWL)
+			, SUM(td.WLShare)
+			, SUM(td.LicComm)
+			, SUM(td.CommShare)
+			, SUM(td.AmtLicensee)
 		FROM #TempData td 
 			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
 			INNER JOIN @PartyList p ON td.PartyId = p.PartyID
 			INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId
-		
+		GROUP BY p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode
 	END 
 	ELSE 
 	BEGIN
 		INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, CommissionShare, AmountDueLicensee)
-		SELECT p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode, td.TotalTrans, td.Turnover*e.Rate, td.MemberWL*e.Rate, td.WLShare*e.Rate, td.LicComm*e.Rate, td.CommShare*e.Rate, td.AmtLicensee*e.Rate
+		SELECT p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode
+			, SUM(td.TotalTrans)
+			, SUM(td.Turnover*e.Rate)
+			, SUM(td.MemberWL*e.Rate)
+			, SUM(td.WLShare*e.Rate)
+			, SUM(td.LicComm*e.Rate)
+			, SUM(td.CommShare*e.Rate)
+			, SUM(td.AmtLicensee*e.Rate)
 		FROM #TempData td 
 			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
 			INNER JOIN @PartyList p ON td.PartyId = p.PartyID
 			INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId	
+		GROUP BY p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode
 	END
 	
 	UPDATE #Result
