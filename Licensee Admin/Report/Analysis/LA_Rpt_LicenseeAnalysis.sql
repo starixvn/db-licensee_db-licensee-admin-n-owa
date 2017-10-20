@@ -456,19 +456,17 @@ BEGIN
 		FROM #SumByLicensee s
 		LEFT JOIN @DiscountGroup r ON s.PartyId = r.PartyId AND r.ProductId = s.ProductId AND r.DiscountGroupType = 2 -- rebate = 2
 
-		SELECT CASE WHEN p.ParentID = 1 THEN 'OW' ELSE 'Boping' END AS GroupName
-			,p.PartyName 		AS ViewName
-			,s.LicenseeWinLoss	AS WinLoss
-			,s.Turnover
-			,s.LicensingFee
-			,s.Rebate			AS Discount
-			,@FirstDate AS [Date]
-			,pp.ProductCode
-		FROM #SumByLicensee s
-		INNER JOIN @PartyList p ON p.PartyId=s.PartyId
-		INNER JOIN @Products pp ON s.ProductId=pp.ProductID
-		INNER JOIN @PartyIdTable pt ON pt.PartyId=s.PartyId
-		WHERE p.ParentID IN (1,11,98) AND pt.IsSelected=1
+		SELECT p.PartyName 						AS ViewName
+			,SUM(ISNULL(s.LicenseeWinLoss,0))	AS WinLoss
+			,SUM(ISNULL(s.Turnover,0))			AS Turnover
+			,SUM(ISNULL(s.LicensingFee,0))		AS LicensingFee
+			,SUM(ISNULL(s.Rebate,0))			AS Discount
+			,@FirstDate							AS [Date]
+		FROM @PartyIdTable pt
+		LEFT JOIN @PartyList p ON p.PartyId=pt.PartyId
+		LEFT JOIN #SumByLicensee s ON pt.PartyId=s.PartyId
+		WHERE pt.IsSelected = 1
+		GROUP BY p.PartyName
 	END
 	ELSE
 	BEGIN
@@ -478,7 +476,7 @@ BEGIN
 		-- group by skin
 		-- exclude minfee
 		-- discount of each skin = total discount * (licensing fee/ total licensing fee)
-		SELECT p.ParentID,s.Skin, d.ProductId,
+		SELECT s.Skin, d.ProductId,
 			SUM(d.Turnover)			Turnover,
 			SUM(d.LicenseeWinLoss)	LicenseeWinLoss,
 			SUM(d.LicensingFee)		LicensingFee,
@@ -486,39 +484,35 @@ BEGIN
 			CAST(0 AS MONEY)		Rebate
 		INTO #SumBySkin
 		FROM #Data d
-		INNER JOIN @PartyList p ON p.PartyId=d.PartyId
-		INNER JOIN @PartyIdTable pt ON pt.PartyId=p.PartyId
+		INNER JOIN @PartyIdTable pt ON pt.PartyId=d.PartyId
 		INNER JOIN @Skin s ON s.BetFrom=d.BetFrom
-		WHERE p.ParentID IN (1,11,98) AND pt.IsSelected = 1
-		GROUP BY p.ParentID,s.Skin, d.ProductId
+		WHERE pt.IsSelected = 1
+		GROUP BY s.Skin, d.ProductId
 
 		-- total discount by product
 		;WITH t AS (
-			SELECT p.ParentID,s.ProductId
+			SELECT s.ProductId
 				,SUM(s.LicensingFee)	AS TotalFee
 				,SUM(s.Discount)		AS TotalDiscount
 				,SUM(s.Rebate)			AS TotalRebate
 			FROM #SumByLicensee s
-			INNER JOIN @PartyList p ON p.PartyId=s.PartyId
-			WHERE p.ParentID IN (1,11,98)
-			GROUP BY p.ParentID,s.ProductId
+			GROUP BY s.ProductId
 		)
 		UPDATE s SET 
 			s.Discount = CASE WHEN t.TotalFee=0 THEN 0 ELSE t.TotalDiscount * (s.LicensingFee / t.TotalFee) END,
 			s.Rebate = CASE WHEN t.TotalFee=0 THEN 0 ELSE t.TotalRebate * (s.LicensingFee / t.TotalFee) END
 		FROM #SumBySkin s
-		INNER JOIN t ON t.ParentID=s.ParentID AND t.ProductId=s.ProductId
+		INNER JOIN t ON t.ProductId=s.ProductId
 		
-		SELECT CASE WHEN s.ParentID = 1 THEN 'OW' ELSE 'Boping' END AS GroupName
-			,s.Skin				AS ViewName
-			,s.LicenseeWinLoss	AS Winloss
-			,s.Turnover
-			,s.LicensingFee
-			,s.Discount
-			,@FirstDate AS [Date]
-			,pp.ProductCode
-		FROM #SumBySkin s
-		INNER JOIN @Products pp ON s.ProductId=pp.ProductID
+		SELECT s.Skin							AS ViewName
+			,SUM(ISNULL(s.LicenseeWinLoss,0))	AS WinLoss
+			,SUM(ISNULL(s.Turnover,0))			AS Turnover
+			,SUM(ISNULL(s.LicensingFee,0))		AS LicensingFee
+			,SUM(ISNULL(s.Discount,0))			AS Discount
+			,@FirstDate							AS [Date]
+		FROM @Skin bs
+		LEFT JOIN #SumBySkin s ON s.Skin = bs.Skin
+		GROUP BY s.Skin
 
 		DROP TABLE #SumBySkin
 	END	
