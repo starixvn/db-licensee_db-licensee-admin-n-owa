@@ -2,6 +2,8 @@ USE bodb_licensee
 GO
 
 CREATE PROC dbo.[LA_AnalysisFileUpd]
+	@FileName	VARCHAR(200),
+	@Status		TINYINT
 AS
 /*
 	Created: BRUCE
@@ -14,6 +16,10 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
+
+	UPDATE dbo.LA_AnalysisFile WITH(ROWLOCK, UPDLOCK)
+	SET [Status] = @Status
+	WHERE [Filename] = @FileName
 END
 GO
 

@@ -1,7 +1,8 @@
 USE bodb_licensee
 GO
 
-CREATE PROC dbo.LA_AnalysisFileIns
+ALTER PROC dbo.LA_AnalysisFileIns
+	@Files AS XML
 AS
 /*
 	Created: BRUCE
@@ -14,6 +15,18 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
+
+	INSERT INTO dbo.LA_AnalysisFile(Filename, PartyIds, ProductCodes,FromDate,ToDate,IsSkinView, [Status])
+	SELECT 
+		t.c.value('@name',		'varchar(200)'), 
+		t.c.value('@partyids',	'varchar(4000)'),
+		t.c.value('@codes',		'varchar(200)'),
+		t.c.value('@from',		'datetime'),
+		t.c.value('@to',		'datetime'),
+		t.c.value('@skin',		'bit'),
+		0
+	FROM @files.nodes('files/file') t(c)
+
 END
 GO
 
