@@ -185,8 +185,10 @@ BEGIN
 
 	IF @BaseCurrencyName = ''
 	BEGIN 
-		INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, CommissionShare, AmountDueLicensee)
-		SELECT p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode
+		INSERT INTO #Result (PartyId, PartyName, WinLossDate, CurrencyName, ParentId, ParentName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, CommissionShare, AmountDueLicensee)
+		SELECT p.PartyId, p.PartyName, td.rptDate, e.CurrencyCode
+			, CASE WHEN pa.PartyId = 999 THEN pa.PartyId ELSE 0 END
+			, CASE WHEN pa.PartyId = 999 THEN 'Credit' ELSE 'Deposit' END
 			, SUM(td.TotalTrans)
 			, SUM(td.Turnover)
 			, SUM(td.MemberWL)
@@ -198,12 +200,16 @@ BEGIN
 			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
 			INNER JOIN @PartyList p ON td.PartyId = p.PartyID
 			INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId
-		GROUP BY p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode
+		GROUP BY p.PartyId, p.PartyName, td.rptDate, e.CurrencyCode,
+			CASE WHEN pa.PartyId = 999 THEN pa.PartyId ELSE 0 END,
+			CASE WHEN pa.PartyId = 999 THEN 'Credit' ELSE 'Deposit' END			
 	END 
 	ELSE 
 	BEGIN
-		INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, CommissionShare, AmountDueLicensee)
-		SELECT p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode
+		INSERT INTO #Result (PartyId, PartyName, WinLossDate, CurrencyName, ParentId, ParentName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, CommissionShare, AmountDueLicensee)
+		SELECT p.PartyId, p.PartyName, td.rptDate, e.CurrencyCode
+			, CASE WHEN pa.PartyId = 999 THEN pa.PartyId ELSE 0 END
+			, CASE WHEN pa.PartyId = 999 THEN 'Credit' ELSE 'Deposit' END
 			, SUM(td.TotalTrans)
 			, SUM(td.Turnover*e.Rate)
 			, SUM(td.MemberWL*e.Rate)
@@ -215,7 +221,9 @@ BEGIN
 			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
 			INNER JOIN @PartyList p ON td.PartyId = p.PartyID
 			INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId	
-		GROUP BY p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode
+		GROUP BY p.PartyId, p.PartyName, td.rptDate, e.CurrencyCode,
+			CASE WHEN pa.PartyId = 999 THEN pa.PartyId ELSE 0 END,
+			CASE WHEN pa.PartyId = 999 THEN 'Credit' ELSE 'Deposit' END
 	END
 	
 	UPDATE #Result
