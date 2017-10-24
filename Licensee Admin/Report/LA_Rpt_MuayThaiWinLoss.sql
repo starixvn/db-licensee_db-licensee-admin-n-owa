@@ -76,6 +76,7 @@ BEGIN
 	CREATE	TABLE #TempData (
 		LicenseeId	INT,
 		PartyId		INT,
+		IsDeposit	BIT,
 		rptDate		DATETIME,
 		CurrencyId	INT,
 		TotalTrans	INT,
@@ -98,10 +99,11 @@ BEGIN
 
 	IF @ToDate > @CutOfDate -- New Data
 	BEGIN
-		INSERT INTO #TempData (LicenseeId, PartyId, rptDate, CurrencyId, TotalTrans, Turnover, MemberWL, WLShare, LicComm, CommShare, AmtLicensee)
+		INSERT INTO #TempData (LicenseeId, PartyId, IsDeposit, rptDate, CurrencyId, TotalTrans, Turnover, MemberWL, WLShare, LicComm, CommShare, AmtLicensee)
 		(
 			SELECT	b.SiteID,
 					p.PartyId,
+					p.IsDeposit,
 					b.rptDate,
 					b.CurrencyID,
 					SUM(ISNULL(b.BetCount, 0)) TotalTrans,
@@ -127,16 +129,17 @@ BEGIN
 						OR (@TicketType = 1 AND ISNULL(b.IsParlay, 0) = 0)
 						OR (@TicketType = 2 AND ISNULL(b.IsParlay, 0) = 1)
 						)
-			GROUP BY b.rptdate, b.SiteId, b.CurrencyID, p.PartyId
+			GROUP BY b.rptdate, b.SiteId, b.CurrencyID, p.PartyId, p.IsDeposit
 		)	
 	END
 
 	IF @FromDate <= @CutOfDate AND @TicketType IN (1, 3)-- Old data
 	BEGIN
-		INSERT INTO #TempData (LicenseeId, PartyId, rptDate, CurrencyId, TotalTrans, Turnover, MemberWL, WLShare, LicComm, CommShare, AmtLicensee)
+		INSERT INTO #TempData (LicenseeId, PartyId, IsDeposit, rptDate, CurrencyId, TotalTrans, Turnover, MemberWL, WLShare, LicComm, CommShare, AmtLicensee)
 		(
 			SELECT	b.SiteID,
 					p.PartyId,
+					p.IsDeposit,
 					b.rptDate,
 					b.CurrencyID,
 					SUM(ISNULL(b.BetCount, 0)) TotalTrans,
@@ -158,7 +161,7 @@ BEGIN
 					AND b.StatusId BETWEEN 111 AND 113
 					AND b.customercategory NOT IN (27, 28)
 					AND b.SportType = 44 -- Muay Thai
-			GROUP BY b.rptdate, b.SiteId, b.CurrencyID, p.PartyId
+			GROUP BY b.rptdate, b.SiteId, b.CurrencyID, p.PartyId, p.IsDeposit
 		)
 	END
 	
@@ -167,7 +170,7 @@ BEGIN
 	-- Region: Result data
 	CREATE TABLE #Result (
 		PartyId				INT,
-		PartyName			VARCHAR(100),
+		PartyName			VARCHAR(100),		
 		ParentId			INT,
 		ParentName			VARCHAR(100),
 		WinLossDate			DATETIME,
@@ -187,8 +190,8 @@ BEGIN
 	BEGIN 
 		INSERT INTO #Result (PartyId, PartyName, WinLossDate, CurrencyName, ParentId, ParentName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, CommissionShare, AmountDueLicensee)
 		SELECT p.PartyId, p.PartyName, td.rptDate, e.CurrencyCode
-			, CASE WHEN pa.PartyId = 999 THEN pa.PartyId ELSE 0 END
-			, CASE WHEN pa.PartyId = 999 THEN 'Credit' ELSE 'Deposit' END
+			, td.IsDeposit
+			, CASE WHEN td.IsDeposit = 1 THEN 'Deposit' ELSE 'Credit' END
 			, SUM(td.TotalTrans)
 			, SUM(td.Turnover)
 			, SUM(td.MemberWL)
@@ -198,18 +201,17 @@ BEGIN
 			, SUM(td.AmtLicensee)
 		FROM #TempData td 
 			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
-			INNER JOIN @PartyList p ON td.PartyId = p.PartyID
-			INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId
-		GROUP BY p.PartyId, p.PartyName, td.rptDate, e.CurrencyCode,
-			CASE WHEN pa.PartyId = 999 THEN pa.PartyId ELSE 0 END,
-			CASE WHEN pa.PartyId = 999 THEN 'Credit' ELSE 'Deposit' END			
+			INNER JOIN @PartyList p ON td.PartyId = p.PartyID			
+		GROUP BY p.PartyId, p.PartyName, td.rptDate, e.CurrencyCode
+			, td.IsDeposit
+			, CASE WHEN td.IsDeposit = 1 THEN 'Deposit' ELSE 'Credit' END	
 	END 
 	ELSE 
 	BEGIN
 		INSERT INTO #Result (PartyId, PartyName, WinLossDate, CurrencyName, ParentId, ParentName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, CommissionShare, AmountDueLicensee)
 		SELECT p.PartyId, p.PartyName, td.rptDate, e.CurrencyCode
-			, CASE WHEN pa.PartyId = 999 THEN pa.PartyId ELSE 0 END
-			, CASE WHEN pa.PartyId = 999 THEN 'Credit' ELSE 'Deposit' END
+			, td.IsDeposit
+			, CASE WHEN td.IsDeposit = 1 THEN 'Deposit' ELSE 'Credit' END			
 			, SUM(td.TotalTrans)
 			, SUM(td.Turnover*e.Rate)
 			, SUM(td.MemberWL*e.Rate)
@@ -219,13 +221,12 @@ BEGIN
 			, SUM(td.AmtLicensee*e.Rate)
 		FROM #TempData td 
 			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
-			INNER JOIN @PartyList p ON td.PartyId = p.PartyID
-			INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId	
-		GROUP BY p.PartyId, p.PartyName, td.rptDate, e.CurrencyCode,
-			CASE WHEN pa.PartyId = 999 THEN pa.PartyId ELSE 0 END,
-			CASE WHEN pa.PartyId = 999 THEN 'Credit' ELSE 'Deposit' END
+			INNER JOIN @PartyList p ON td.PartyId = p.PartyID			
+		GROUP BY p.PartyId, p.PartyName, td.rptDate, e.CurrencyCode
+			, td.IsDeposit
+			, CASE WHEN td.IsDeposit = 1 THEN 'Deposit' ELSE 'Credit' END
 	END
-	
+
 	UPDATE #Result
 	SET AmountDueMuayThai = WinLossShare + CommissionShare
 
