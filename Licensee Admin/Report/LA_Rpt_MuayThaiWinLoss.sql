@@ -32,7 +32,8 @@ BEGIN
 		Rate		MONEY,
 		FromDate	SMALLDATETIME,
 		ToDate		SMALLDATETIME
-	)
+	)	
+
 	DECLARE @ShareRate MONEY = 0.03
 
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, IsDeposit, ProductID, Rate, Fromdate, Todate)
@@ -109,9 +110,9 @@ BEGIN
 					SUM(ISNULL(b.BetCount, 0)) TotalTrans,
 					SUM(ISNULL(b.Turnover, 0)) Turnover,
 					SUM(ISNULL(b.AdjustedCustomerWL, 0)) MemberWL,
-					SUM(ISNULL(b.AdjustedCustomerWL, 0) * - @ShareRate) WLShare,
+					SUM(ISNULL(b.AdjustedCustomerWL, 0) * (- @ShareRate)) WLShare,
 					SUM(ISNULL(b.AdjustedCommissionS, 0)) LicComm,
-					SUM(ISNULL(b.AdjustedCommShare, 0) * @ShareRate) CommShare,
+					SUM(ISNULL(b.AdjustedCommShare, 0)) CommShare,
 					SUM(CASE WHEN p.IsDeposit = 0 
 							THEN ISNULL(b.AdjustedLicenseeWL, 0) 
 							ELSE ISNULL(-b.AdjustedCustomerWL, 0) * p.Rate 
