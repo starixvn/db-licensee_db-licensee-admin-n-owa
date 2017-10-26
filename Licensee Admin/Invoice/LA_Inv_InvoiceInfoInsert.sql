@@ -9,6 +9,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert]
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME
 	, @DueDate				DATETIME
+	, @InvoiceDate			DATETIME
 	, @Amount				MONEY
 	, @InvoiceTypeId		SMALLINT
 	, @Note					NVARCHAR(200) = ''
@@ -39,6 +40,9 @@ AS
 		+ 20170608@Bruce: Save details, reuse invoice no of voided invoice [#76411]
 		+ 20170721@Scofield: Update to save data to InvoiceStatement [#79905]
 		+ 20170824@Bruce: Support debit note for return AMF [#76410]
+		+ 20171026@Bruce: redmine id [#85256]
+				- add invoice date
+				- insert product id to statement
 */
 
 BEGIN
@@ -128,7 +132,7 @@ BEGIN
 				@InvoiceNumber,
 				@FromDate,
 				@ToDate,
-				@CurrentDateTime,
+				@InvoiceDate,
 				@DueDate,
 				@Amount,
 				@InvoiceTypeId,
@@ -163,24 +167,28 @@ BEGIN
 		Amount			MONEY,
 		ItemType		TINYINT,
 		Reference		NVARCHAR(100),
+		ProductId		INT,
 		Id				INT IDENTITY(1,1) NOT NULL
 	)
 	BEGIN TRY
 		DECLARE @idoc AS INT						
 		EXEC	sp_xml_preparedocument @idoc OUTPUT, @StatementXml			
-		INSERT INTO @Settlements([Description],Amount,ItemType,Reference)
+		INSERT INTO @Settlements([Description],Amount,ItemType,Reference,ProductId)
 		SELECT 
 			[Description],
 			CAST(Amount		AS MONEY),
 			CAST(ItemType	AS TINYINT),
-			Reference
+			Reference,
+			ISNULL(p.ProductID, -1)
 		FROM OPENXML(@idoc, 'Statements/Statement')
 		WITH (
-			[Description]	NVARCHAR(200) 'Description',
-			Amount			VARCHAR(20) 'Amount',
-			ItemType		VARCHAR(10) 'ItemType',
-			Reference		VARCHAR(100) 'Reference'
-		)
+			[Description]	NVARCHAR(200)	'Description',
+			Amount			VARCHAR(20)		'Amount',
+			ItemType		VARCHAR(10)		'ItemType',
+			Reference		VARCHAR(100)	'Reference',
+			ProductCode		VARCHAR(10)		'ProductCode'
+		) s
+		LEFT JOIN dbo.LA_f_Products3rd('') p ON s.ProductCode = p.ProductPrefix
 		EXEC sp_xml_removedocument @idoc
 		
 		-- credit note = 4
@@ -244,8 +252,9 @@ BEGIN
 			DROP TABLE #StatementsHeader
 		END
 					
-		INSERT INTO dbo.LA_InvoiceStatement(InvoiceHeaderId, InvItemTypeId, [Description], RefNo, RefPartyId, Income, Expense)
+		INSERT INTO dbo.LA_InvoiceStatement(InvoiceHeaderId, InvItemTypeId, [Description], RefNo, RefPartyId, ProductId, Income, Expense)
 		SELECT @CurrentInvoiceHeaderId, d.ItemType, d.[Description], d.Reference, @PartyId,
+			ISNULL(ProductId, -1),
 			CASE WHEN it.GroupDB = 'Income' THEN d.Amount * it.SignDB ELSE NULL END AS Income,
 			CASE WHEN it.GroupDB = 'Expense' THEN d.Amount * it.SignDB ELSE NULL END AS Expense
 		FROM @Settlements d
@@ -278,7 +287,7 @@ BEGIN
 			, @CurrencyId		AS '@c'
 			, @InvoiceSymbol	AS '@is'
 			, @InvoiceNumber	AS '@in'
-			, @CurrentDateTime	AS '@ivd'
+			, @InvoiceDate		AS '@ivd'
 			, @DueDate			AS '@dd'
 			, @Amount			AS '@amt'
 			, @InvoiceTypeId	AS '@ivt'
