@@ -974,6 +974,7 @@ BEGIN
 			OR (@InvoiceTypeId = 3 -- rebate
 				AND f.ProductId = -1 AND f.AmountType = @AmountTypeRebate -- summarized rebate row
 			)
+			OR @InvoiceTypeId = 10
 		ORDER BY f.AmountType, f.ProductId
 	END
 
