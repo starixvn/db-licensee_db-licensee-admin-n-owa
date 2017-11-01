@@ -10,8 +10,8 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceListGet]
 	@InvoiceTypes	VARCHAR(100)= '',
 	@BillerIds		VARCHAR(500)= '',
 	@PayerIds		VARCHAR(4000)= '',
-	@IssueFromDate	DATETIME,
-	@IssueToDate	DATETIME
+	@IssueFromDate	DATE,
+	@IssueToDate	DATE
 
 AS
 /*	Header:
@@ -151,7 +151,7 @@ BEGIN
 		WHERE i.BillerId IN (SELECT Id FROM @BillerTable)
 			AND i.PartyId IN (SELECT Id FROM @PayerTable)
 			AND i.InvoiceType IN (SELECT Id FROM @InvoiceTypeTable)
-			AND i.InvoiceDate BETWEEN @IssueFromDate AND @IssueToDate
+			AND CONVERT(DATE,i.InvoiceDate,101) BETWEEN @IssueFromDate AND @IssueToDate
 	)
 	SELECT * FROM a WHERE ISNULL(@InvoiceNo, '') = '' OR InvoiceNo LIKE @InvoiceNo ESCAPE '\' 
 	-- End Region
