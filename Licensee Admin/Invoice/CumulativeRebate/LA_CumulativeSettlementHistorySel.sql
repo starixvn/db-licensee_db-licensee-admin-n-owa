@@ -1,3 +1,6 @@
+USE bodb_licensee
+GO
+
 CREATE PROCEDURE [dbo].[LA_CumulativeSettlementHistorySel]
 	@FromDate	DATE,
 	@ToDate		DATE
