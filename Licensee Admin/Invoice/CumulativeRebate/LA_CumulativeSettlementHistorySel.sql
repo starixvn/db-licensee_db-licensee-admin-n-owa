@@ -1,7 +1,7 @@
 USE bodb_licensee
 GO
 
-CREATE PROCEDURE [dbo].[LA_CumulativeSettlementHistorySel]
+ALTER PROCEDURE [dbo].[LA_CumulativeSettlementHistorySel]
 	@FromDate	DATE,
 	@ToDate		DATE
 AS  
@@ -19,9 +19,8 @@ Example:
 BEGIN  
 	SET NOCOUNT ON  
    
-	SELECT s.SettlementId, s.SettlementDate, p.PartyName
-	FROM dbo.LA_CummulativeSettlement s WITH(NOLOCK)
-	INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID=s.PartyId
+	SELECT s.SettlementId, s.SettlementDate, '' PartyName
+	FROM dbo.LA_SettlementHistory s WITH(NOLOCK)
 	WHERE s.SettlementDate BETWEEN @FromDate AND @ToDate
 	ORDER BY s.CreatedDate DESC
 END

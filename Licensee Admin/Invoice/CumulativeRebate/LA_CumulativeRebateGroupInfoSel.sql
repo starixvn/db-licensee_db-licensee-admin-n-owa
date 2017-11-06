@@ -20,24 +20,24 @@ BEGIN
 	DECLARE @RebateGroup TABLE(Id INT, [Name] NVARCHAR(200), ParentId INT)
 	INSERT INTO @RebateGroup(Id, [Name], ParentId)
 	(
-		SELECT DISTINCT h.RebateGroupHeaderId, h.GroupName, 0
-		FROM dbo.LA_RebateGroupHeader h WITH(NOLOCK)
-		INNER JOIN dbo.LA_RebateGroupAssignment a WITH(NOLOCK) ON a.RebateGroupHeaderId=h.RebateGroupHeaderId
+		SELECT DISTINCT h.SettingGroupHeaderId, h.GroupName, 0
+		FROM dbo.LA_SettingGroupHeader h WITH(NOLOCK)
+		INNER JOIN dbo.LA_SettingGroupAssignment a WITH(NOLOCK) ON a.SettingGroupHeaderId=h.SettingGroupHeaderId
 		INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON a.PartyId=p.PartyID -- remove empty group
-		WHERE h.RebateGroupHeaderId IN (
-			SELECT DISTINCT RebateGroupHeaderId
-			FROM dbo.LA_RebateGroupDetail d WITH(NOLOCK)
+		WHERE h.SettingGroupHeaderId IN (
+			SELECT DISTINCT SettingGroupHeaderId
+			FROM dbo.LA_SettingGroupDetail d WITH(NOLOCK)
 			WHERE d.[Status] = 'Active'
 		)
 	)
 
 	INSERT INTO @RebateGroup(Id, [Name], ParentId)
 	(
-		SELECT a.RebateGroupAssignmentId + 10000, p.PartyName, a.RebateGroupHeaderId
-		FROM dbo.LA_RebateGroupAssignment a WITH(NOLOCK)
+		SELECT a.SettingGroupAssignmentId + 10000, p.PartyName, a.SettingGroupHeaderId
+		FROM dbo.LA_SettingGroupAssignment a WITH(NOLOCK)
 		INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON a.PartyId=p.PartyID
 		WHERE a.[Status] = 'Active' 
-			AND a.RebateGroupHeaderId IN (SELECT Id FROM @RebateGroup)
+			AND a.SettingGroupHeaderId IN (SELECT Id FROM @RebateGroup)
 	)
 
 	;WITH Single AS (
