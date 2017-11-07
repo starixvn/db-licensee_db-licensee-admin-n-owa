@@ -243,6 +243,10 @@ BEGIN
 	UPDATE d SET LicensingFee = (d.LicenseeWinLoss * p.Rate), FeeAfterDiscount=0,FeeAfterRebate=0
 	FROM #Data d
 	INNER JOIN @PartyChargeInfo p ON p.PartyId = d.PartyId AND p.ProductId=d.ProductId AND d.ReportDate BETWEEN p.FromDate AND p.ToDate
+
+	UPDATE d SET LicensingFee = 0, FeeAfterDiscount=0,FeeAfterRebate=0
+	FROM #Data d
+	WHERE LicensingFee IS NULL
 	-- end region
 
 	-- 11. calculate min fee
@@ -470,8 +474,8 @@ BEGIN
 	END
 	ELSE
 	BEGIN
-		DECLARE @Skin AS TABLE(BetFrom CHAR(1), Skin VARCHAR(10))
-		INSERT INTO @Skin VALUES ('d','Asia'),('a','China'),('m','WAP'),('e','Euro'),('u','Euro'),('s','Smart'),('l','Smart'),('*','Other')
+		DECLARE @Skin AS TABLE(BetFrom CHAR(1), Skin VARCHAR(10), [Order] TINYINT)
+		INSERT INTO @Skin VALUES ('d','Asia',1),('a','China',2),('e','Euro',3),('u','Euro',3),('m','WAP',4),('s','Smart',5),('l','Smart',5),('*','Other',6)
 
 		-- group by skin
 		-- exclude minfee
@@ -503,8 +507,8 @@ BEGIN
 			s.Rebate = CASE WHEN t.TotalFee=0 THEN 0 ELSE t.TotalRebate * (s.LicensingFee / t.TotalFee) END
 		FROM #SumBySkin s
 		INNER JOIN t ON t.ProductId=s.ProductId
-		
-		SELECT s.Skin							AS ViewName
+
+		SELECT bs.Skin							AS ViewName
 			,SUM(ISNULL(s.LicenseeWinLoss,0))	AS WinLoss
 			,SUM(ISNULL(s.Turnover,0))			AS Turnover
 			,SUM(ISNULL(s.LicensingFee,0))		AS LicensingFee
@@ -512,7 +516,8 @@ BEGIN
 			,@FirstDate							AS [Date]
 		FROM @Skin bs
 		LEFT JOIN #SumBySkin s ON s.Skin = bs.Skin
-		GROUP BY s.Skin
+		GROUP BY bs.Skin, bs.[Order]
+		ORDER BY bs.[Order]
 
 		DROP TABLE #SumBySkin
 	END	
