@@ -2,7 +2,7 @@ USE bodb_licensee
 GO
 
 ALTER PROC dbo.LA_AnalysisFileSel (
-	@FileNames VARCHAR(4000) = '',
+	@FileName VARCHAR(200) = '',
 	@Fromdate DATETIME = NULL,  
 	@ToDate DATETIME = NULL
 )
@@ -21,13 +21,11 @@ BEGIN
 
 	IF @Fromdate IS NULL SET @Fromdate = '20000101'
 	IF @ToDate IS NULL SET @ToDate = '20500101'
-	IF @FileNames IS NULL SET @FileNames = ''
 
 	SELECT *
 	FROM dbo.LA_AnalysisFile f WITH(NOLOCK)
 	WHERE f.FromDate >= @Fromdate AND f.ToDate <= @ToDate AND (
-		ISNULL(@FileNames,'') = '' OR
-		f.[Filename] IN (SELECT s.val FROM dbo.strSplit(@FileNames,',') s)
+		ISNULL(@FileName,'') = '' OR f.[Filename] LIKE @FileName ESCAPE '\'
 	)
 
 END
