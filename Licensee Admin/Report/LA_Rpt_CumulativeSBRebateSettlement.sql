@@ -32,7 +32,7 @@ BEGIN
 
 	CREATE TABLE #tmpDetail			( InvoiceHeaderId INT, FromDate SMALLDATETIME, InvoiceNumber NVARCHAR(50), PartyId INT, Amount MONEY, Balance MONEY)	
 	CREATE TABLE #tmpAssignment		( PartyID INT, FromDate	SMALLDATETIME, ToDate SMALLDATETIME	)	
-	CREATE TABLE #Exchange			( ExchangeDate DATE, ExchangeID INT, Rate FLOAT )
+	CREATE TABLE #Exchange			( FirstExchangeDateByMonth SMALLDATETIME, LastExchangeDateByMonth SMALLDATETIME, ExchangeID INT, Rate FLOAT )
 	CREATE TABLE #tmpDiscountDetail ( SettingGroupHeaderID INT, TargetAmount MONEY, TargetAmountExchange MONEY, CurrencyId INT, CurrencyName VARCHAR(3), [Period] INT, Rate MONEY, FromDate SMALLDATETIME, ToDate SMALLDATETIME)
 
 	DECLARE @TotalValue MONEY, @Rate FLOAT
@@ -90,9 +90,9 @@ BEGIN
 
 	-- #Region: Get Exchange Rate
 
-	INSERT INTO #Exchange(ExchangeDate, ExchangeID, Rate)
-	SELECT ExchangeDate, ExchangeID, BaseCurrencyRate
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(@CutOffDate, @FirstDayCurrMonth, @BaseCurrencyName)
+	INSERT INTO #Exchange(FirstExchangeDateByMonth, LastExchangeDateByMonth, ExchangeID, Rate)
+	SELECT FirstExchangeDateByMonth, LastExchangeDateByMonth, ExchangeID, BaseCurrencyRate
+	FROM bodb02.dbo.LA_f_SubExchangedailySel(@CutOffDate, @FirstDayCurrMonth, @BaseCurrencyName)
 
 	-- #EndRegion: Get Exchange Rate
 
@@ -103,7 +103,7 @@ BEGIN
 	FROM dbo.LA_InvoiceStatement s WITH (NOLOCK)
 		INNER JOIN dbo.LA_InvoiceHeader h WITH (NOLOCK) ON s.InvoiceHeaderId = h.InvoiceHeaderId
 		INNER JOIN #tmpAssignment a ON h.PartyId = a.PartyID AND h.FromDate BETWEEN a.FromDate AND a.ToDate
-		INNER JOIN #Exchange e ON h.CurrencyId = e.ExchangeID AND h.FromDate = e.ExchangeDate
+		INNER JOIN #Exchange e ON h.CurrencyId = e.ExchangeID AND h.FromDate BETWEEN e.FirstExchangeDateByMonth AND e.LastExchangeDateByMonth
 	WHERE s.InvItemTypeId IN (1, 4) AND s.ProductId = 0		
 	GROUP BY h.InvoiceHeaderId, h.FromDate, h.OfficialInvoiceNo, h.PartyId
 
@@ -131,7 +131,7 @@ BEGIN
 	UPDATE #tmpDiscountDetail
 	SET TargetAmountExchange = TargetAmount * e.Rate
 	FROM #tmpDiscountDetail d
-		INNER JOIN #Exchange e ON d.CurrencyId = e.ExchangeID AND d.FromDate = e.ExchangeDate
+		INNER JOIN #Exchange e ON d.CurrencyId = e.ExchangeID AND d.FromDate BETWEEN FirstExchangeDateByMonth AND LastExchangeDateByMonth
 	
 	INSERT INTO #Result
 	        ( CreatedDate ,
@@ -189,6 +189,11 @@ BEGIN
 
 	-- #EndRegion
 
+	DROP TABLE #Exchange
+	DROP TABLE #Result
+	DROP TABLE #tmpAssignment
+	DROP TABLE #tmpDetail
+	DROP TABLE #tmpDiscountDetail
 END
 GO
 
