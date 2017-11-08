@@ -24,7 +24,7 @@ BEGIN
 		t.c.value('@from',		'datetime')			AS FromDate,
 		t.c.value('@to',		'datetime')			AS ToDate,
 		t.c.value('@skin',		'bit')				AS IsSkinView,
-		CAST(0 AS TINYINT) [Status]
+		CAST(1 AS TINYINT) [Status] -- pending
 	INTO #Files
 	FROM @files.nodes('files/file') t(c)
 
@@ -36,7 +36,7 @@ BEGIN
 		AND f.ProductCodes = fs.ProductCodes
 		AND f.ToDate = fs.ToDate
 
-	UPDATE fs SET [Status] = 255
+	UPDATE fs SET [Status] = 0 -- existed
 	FROM dbo.LA_AnalysisFile f WITH(NOLOCK)
 	INNER JOIN #Files fs ON f.[Filename] = fs.[Filename]
 

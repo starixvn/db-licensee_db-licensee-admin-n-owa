@@ -2,8 +2,8 @@ USE bodb_licensee
 GO
 
 ALTER PROC dbo.[LA_Rpt_LicenseeAnalysis] (
-	@PartyIDs		VARCHAR(1000),
-	@ProductCodes	VARCHAR(1000),
+	@PartyIDs		VARCHAR(4000),
+	@ProductCodes	VARCHAR(200),
 	@FromDate		SMALLDATETIME,
 	@ToDate			SMALLDATETIME,
 	@BaseCurrency	VARCHAR(20)		= 'EUR',

@@ -24,7 +24,7 @@ BEGIN
 		t.c.value('@from',		'datetime'),
 		t.c.value('@to',		'datetime'),
 		t.c.value('@skin',		'bit'),
-		0
+		1 -- pending
 	FROM @files.nodes('files/file') t(c)
 
 END
