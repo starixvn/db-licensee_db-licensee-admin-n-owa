@@ -44,6 +44,8 @@ AS
 		+ 2017.07.21 @Scofield: Update Amount Type [#79905]
 		+ 2017.07.21 @Bruce: Calculate AMF amount [#76410]
 		+ 2017.10.02 @Bruce: add environment to parameter list [#84038]
+		+ 2017.10.27 @Bruce: show individual discount by product [#85256]
+
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
 	DECLARE @ToDate DATETIME  = '2016-06-30'
@@ -963,8 +965,16 @@ BEGIN
 				f.AmfAmount,
 				f.RemainingAmf
 		FROM	@FinalResult f
-		WHERE	(@InvoiceTypeId != 3 AND (f.AmountType = @AmountTypeSoftwareFee OR (f.ProductId = -1 AND f.AmountType = @AmountTypeDiscount)))
-				OR (@InvoiceTypeId = 3 AND f.ProductId = -1 AND f.AmountType = @AmountTypeRebate)
+		WHERE (@InvoiceTypeId != 3		--not rebate
+				AND f.ProductId != -1	-- not summarized row
+				AND (
+						f.AmountType = @AmountTypeSoftwareFee OR	-- software data fee rows
+						f.AmountType = @AmountTypeDiscount			-- discount rows
+					))
+			OR (@InvoiceTypeId = 3 -- rebate
+				AND f.ProductId = -1 AND f.AmountType = @AmountTypeRebate -- summarized rebate row
+			)
+			OR @InvoiceTypeId = 10
 		ORDER BY f.AmountType, f.ProductId
 	END
 

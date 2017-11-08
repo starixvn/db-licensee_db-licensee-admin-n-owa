@@ -10,8 +10,8 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceListGet]
 	@InvoiceTypes	VARCHAR(100)= '',
 	@BillerIds		VARCHAR(500)= '',
 	@PayerIds		VARCHAR(4000)= '',
-	@IssueFromDate	DATETIME,
-	@IssueToDate	DATETIME
+	@IssueFromDate	DATE,
+	@IssueToDate	DATE
 
 AS
 /*	Header:
@@ -25,6 +25,7 @@ AS
 		+ 20170330@Bruce: include invoice path [RedmineID: #74096]
 		+ 20170606@Bruce: include invoice status, invoiceno [RedmineID: #76411]
 		+ 20170927@Bruce: increase PayerIds size to 4000 [#79905]
+		+ 20171030@Bruce: filter invoice date [#85256]
 */
 /*	Example:
 	USE bodb_licensee
@@ -130,7 +131,7 @@ BEGIN
 			p.PartyName AS PayerName,
 			it.InvTypeName AS InvoiceTypeName,
 			i.DueDate,
-			i.ToDate,
+			i.InvoiceDate,
 			bct.CurrencyName,
 			i.Amount,
 			i.InvoicePath,
@@ -150,7 +151,7 @@ BEGIN
 		WHERE i.BillerId IN (SELECT Id FROM @BillerTable)
 			AND i.PartyId IN (SELECT Id FROM @PayerTable)
 			AND i.InvoiceType IN (SELECT Id FROM @InvoiceTypeTable)
-			AND i.ToDate BETWEEN @IssueFromDate AND @IssueToDate
+			AND CONVERT(DATE,i.InvoiceDate,101) BETWEEN @IssueFromDate AND @IssueToDate
 	)
 	SELECT * FROM a WHERE ISNULL(@InvoiceNo, '') = '' OR InvoiceNo LIKE @InvoiceNo ESCAPE '\' 
 	-- End Region
