@@ -1,7 +1,7 @@
 USE bodb_licensee
 GO
 
-ALTER PROCEDURE [dbo].[LA_CumulativeRebateGroupInfoSel]    
+create PROCEDURE [dbo].[LA_CumulativeRebateGroupInfoSel]    
 AS  
 /*
 Header:  
@@ -33,7 +33,7 @@ BEGIN
 
 	INSERT INTO @RebateGroup(Id, [Name], ParentId)
 	(
-		SELECT a.SettingGroupAssignmentId + 10000, p.PartyName, a.SettingGroupHeaderId
+		SELECT p.PartyName, a.SettingGroupHeaderId, a.SettingGroupAssignmentId + 10000 -- dummy id
 		FROM dbo.LA_SettingGroupAssignment a WITH(NOLOCK)
 		INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON a.PartyId=p.PartyID
 		WHERE a.[Status] = 'Active' 
