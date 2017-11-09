@@ -31,17 +31,18 @@ BEGIN
 						)
 
 	CREATE TABLE #tmpDetail			( InvoiceHeaderId INT, FromDate SMALLDATETIME, InvoiceNumber NVARCHAR(50), PartyId INT, Amount MONEY, Balance MONEY)	
-	CREATE TABLE #tmpAssignment		( PartyID INT, FromDate	SMALLDATETIME, ToDate SMALLDATETIME	)	
+	CREATE TABLE #tmpAssignment		( PartyID INT, FromDateOfParty	SMALLDATETIME, ToDateOfParty SMALLDATETIME	)	
 	CREATE TABLE #Exchange			( FirstExchangeDateByMonth SMALLDATETIME, LastExchangeDateByMonth SMALLDATETIME, ExchangeID INT, Rate FLOAT )
 	CREATE TABLE #tmpDiscountDetail ( SettingGroupHeaderID INT, TargetAmount MONEY, TargetAmountExchange MONEY, CurrencyId INT, CurrencyName VARCHAR(3), [Period] INT, Rate MONEY, FromDate SMALLDATETIME, ToDate SMALLDATETIME)
 
-	DECLARE @TotalValue MONEY, @Rate FLOAT
-			, @CumulativeInvDate SMALLDATETIME, @CutOffDate SMALLDATETIME, @FirstDayCurrMonth SMALLDATETIME, @FromDate SMALLDATETIME
+	DECLARE @TotalValue MONEY, @Rate FLOAT, @MaxDate SMALLDATETIME
+			, @CumulativeInvDate SMALLDATETIME, @CutOffDate SMALLDATETIME, @FirstDayCurrMonth SMALLDATETIME, @FromDateOfGroupSetting SMALLDATETIME
 
 	-- #Region: Get Cumulative Discount Group Setting
 
 	INSERT INTO #tmpDiscountDetail( SettingGroupHeaderID, TargetAmount ,CurrencyId, CurrencyName ,Period ,Rate, FromDate, ToDate )	
-	SELECT d.SettingGroupHeaderId, d.TargetAmount, d.CurrencyId, e.Code, d.[Period], d.Rate, d.FromDate, d.ToDate
+	SELECT d.SettingGroupHeaderId, d.TargetAmount, 
+			d.CurrencyId, e.Code, d.[Period], d.Rate, d.FromDate, d.ToDate
 	FROM dbo.LA_SettingGroupDetail d WITH (NOLOCK)
 		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON d.CurrencyId = e.exchangeid
 	WHERE d.SettingGroupHeaderId = @SettingGroupID AND d.[Status] = 'Active'
@@ -49,7 +50,7 @@ BEGIN
 	IF (SELECT ToDate FROM #tmpDiscountDetail) < GETDATE()
 		RETURN
 
-	INSERT INTO #tmpAssignment( PartyID, FromDate, ToDate )	
+	INSERT INTO #tmpAssignment( PartyID, FromDateOfParty, ToDateOfParty )	
 	SELECT a.PartyId, a.FromDate, a.ToDate		
 	FROM dbo.LA_SettingGroupAssignment a WITH (NOLOCK)
 	WHERE a.SettingGroupHeaderId = @SettingGroupID
@@ -59,40 +60,34 @@ BEGIN
 	-- #Region: Get Lasted Cumulative Invoice From Date
 
 	SELECT @FirstDayCurrMonth = DATEADD(MONTH, DATEDIFF(MONTH, 0, GETDATE()), 0)
-	SELECT @FromDate = FromDate FROM #tmpDiscountDetail
 
-	SELECT @CumulativeInvDate = MAX(a.FromDate)
+	SELECT @FromDateOfGroupSetting = FromDate FROM #tmpDiscountDetail
+
+	SELECT @CumulativeInvDate = ISNULL(MAX(CONVERT(SMALLDATETIME, h.FromDate)), '1900-01-01')
 	FROM dbo.LA_InvoiceHeader h WITH (NOLOCK)
 		INNER JOIN #tmpAssignment a ON h.PartyId = a.PartyID
-	WHERE h.InvoiceType = 11
+	WHERE h.InvoiceType = 11	
 
-	SELECT @CumulativeInvDate = CASE WHEN @CumulativeInvDate IS NULL 
-									THEN DATEADD(MONTH, - (SELECT [Period] FROM #tmpDiscountDetail), @FirstDayCurrMonth)
-									ELSE @CumulativeInvDate 
-								END
-
-	SELECT @CutOffDate = CASE WHEN @CumulativeInvDate <= @FromDate 
-							THEN @FromDate
-							ELSE @CumulativeInvDate
-						END	
-
-	SELECT @CutOffDate = CASE WHEN @CutOffDate <= '2017-10-01' 
-							THEN '2017-10-01' 
-							ELSE @CutOffDate 
-						END
+	SELECT @CutOffDate = DATEADD(MONTH, - (SELECT [Period] FROM #tmpDiscountDetail), @FirstDayCurrMonth)
+	
+	SELECT @MaxDate = MAX(fromdate)
+	FROM 
+	(
+		VALUES(@CumulativeInvDate),(@FromDateOfGroupSetting), (@CutOffDate)--, ('2017-10-01') --comment for local testing
+	) AS VALUE(fromdate)
 
 	UPDATE t
-	SET FromDate = CASE WHEN FromDate <= @CutOffDate THEN @CutOffDate ELSE FromDate END,
-		ToDate = CASE WHEN ToDate > @FirstDayCurrMonth THEN @FirstDayCurrMonth ELSE ToDate END
+	SET t.FromDateOfParty = CASE WHEN t.FromDateOfParty <= @MaxDate THEN @MaxDate ELSE t.FromDateOfParty END,
+		t.ToDateOfParty = CASE WHEN t.ToDateOfParty > @FirstDayCurrMonth THEN @FirstDayCurrMonth ELSE t.ToDateOfParty END
 	FROM #tmpAssignment t
 
 	-- #EndRegion: Get Lasted Cumulative Invoice From Date  
 
 	-- #Region: Get Exchange Rate
-
+	
 	INSERT INTO #Exchange(FirstExchangeDateByMonth, LastExchangeDateByMonth, ExchangeID, Rate)
 	SELECT FirstExchangeDateByMonth, LastExchangeDateByMonth, ExchangeID, BaseCurrencyRate
-	FROM bodb02.dbo.LA_f_SubExchangedailySel(@CutOffDate, @FirstDayCurrMonth, @BaseCurrencyName)
+	FROM bodb02.dbo.LA_f_SubExchangedailySel(@MaxDate, @FirstDayCurrMonth, @BaseCurrencyName)
 
 	-- #EndRegion: Get Exchange Rate
 
@@ -102,8 +97,10 @@ BEGIN
 		, SUM(ISNULL(s.Income, 0) * e.Rate - ISNULL(s.Expense, 0) * e.Rate) AS Amount
 	FROM dbo.LA_InvoiceStatement s WITH (NOLOCK)
 		INNER JOIN dbo.LA_InvoiceHeader h WITH (NOLOCK) ON s.InvoiceHeaderId = h.InvoiceHeaderId
-		INNER JOIN #tmpAssignment a ON h.PartyId = a.PartyID AND h.FromDate BETWEEN a.FromDate AND a.ToDate
-		INNER JOIN #Exchange e ON h.CurrencyId = e.ExchangeID AND h.FromDate BETWEEN e.FirstExchangeDateByMonth AND e.LastExchangeDateByMonth
+		INNER JOIN #tmpAssignment a ON h.PartyId = a.PartyID 
+									AND h.FromDate BETWEEN a.FromDateOfParty AND a.ToDateOfParty
+		INNER JOIN #Exchange e ON h.CurrencyId = e.ExchangeID 
+		AND h.FromDate BETWEEN e.FirstExchangeDateByMonth AND e.LastExchangeDateByMonth
 	WHERE s.InvItemTypeId IN (1, 4) AND s.ProductId = 0		
 	GROUP BY h.InvoiceHeaderId, h.FromDate, h.OfficialInvoiceNo, h.PartyId
 
@@ -132,7 +129,7 @@ BEGIN
 	SET TargetAmountExchange = TargetAmount * e.Rate
 	FROM #tmpDiscountDetail d
 		INNER JOIN #Exchange e ON d.CurrencyId = e.ExchangeID AND d.FromDate BETWEEN FirstExchangeDateByMonth AND LastExchangeDateByMonth
-	
+
 	INSERT INTO #Result
 	        ( CreatedDate ,
 	          InvoiceType ,
