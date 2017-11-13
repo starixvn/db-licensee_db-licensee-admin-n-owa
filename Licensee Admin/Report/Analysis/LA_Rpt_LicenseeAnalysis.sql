@@ -469,7 +469,7 @@ BEGIN
 		FROM @PartyIdTable pt
 		LEFT JOIN @PartyList p ON p.PartyId=pt.PartyId
 		LEFT JOIN #SumByLicensee s ON pt.PartyId=s.PartyId
-		WHERE pt.IsSelected = 1
+		WHERE pt.IsSelected = 1 AND p.ParentId > 0
 		GROUP BY p.PartyName
 	END
 	ELSE
