@@ -478,7 +478,7 @@ BEGIN
 	
 	IF EXISTS(SELECT 1 FROM @BaseCurrencyCheck WHERE BaseCurrencyCount = 0 AND NonBaseCurrencyCount > 0)
 	BEGIN
-		SELECT @ErrCode = 1, @ErrMsg = 'Please check the Exchange settings of Payer&rsquo;s minfee or minfee group. Exchange of minfee or minfees in group should be the same with Payer&rsquo;s exchange.'
+		SELECT @ErrCode = 1, @ErrMsg = 'Please check the Exchange settings of Payer''s minfee or minfee group. Exchange of minfee or minfees in group should be the same with Payer''s exchange.'
 		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
 		RETURN
 	END
@@ -495,7 +495,7 @@ BEGIN
 	
 	IF EXISTS(SELECT 1 FROM @BaseCurrencyCheck WHERE BaseCurrencyCount = 0 AND NonBaseCurrencyCount > 0)
 	BEGIN
-		SELECT @ErrCode = 2, @ErrMsg = 'Please check the Exchange settings of Payer&rsquo;s discount. Exchange of discount must be the same with Payer&rsquo;s exchange.'
+		SELECT @ErrCode = 2, @ErrMsg = 'Please check the Exchange settings of Payer''s discount. Exchange of discount must be the same with Payer''s exchange.'
 		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
 		RETURN
 	END
