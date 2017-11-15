@@ -1,1 +1,1 @@
-Licensee Admin\Invoice\CumulativeRebate\LA_CumulativeSettlementHistorySel.sql
+Licensee Admin/Invoice/CumulativeRebate/LA_CumulativeSettlementHistorySel.sql

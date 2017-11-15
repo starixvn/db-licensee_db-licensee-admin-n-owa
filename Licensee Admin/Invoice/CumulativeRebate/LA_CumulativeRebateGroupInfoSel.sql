@@ -6,12 +6,13 @@ GO
 ALTER PROCEDURE [dbo].[LA_CumulativeRebateGroupInfoSel]
 AS  
 /*
-Header:  
 	Created: 2017.11.02 - Bruce.bui
 	Task : Select rebate group info
 	DB: DB052.bodb_Licensee  
 
 Revisions:
+	- 20171102@Bruce: Create New SP [RedmineID: #84163]
+	
 Example:
 	USE bodb_licensee
 	EXEC [LA_CumulativeRebateGroupInfoSel]

@@ -46,7 +46,8 @@ AS
 		+ 2017.07.21 @Scofield: Update Amount Type [#79905]
 		+ 2017.07.21 @Bruce: Calculate AMF amount [#76410]
 		+ 2017.10.02 @Bruce: add environment to parameter list [#84038]
-		+ 2017.10.27 @Bruce: show individual discount by product [#85256]
+		+ 2017.10.27 @Bruce: show individual discount by product [#85256]		
+		- 20171113@Bruce: Modified error message [RedmineID: #84163]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -988,4 +989,6 @@ BEGIN
 
 END
 GO
+
 GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceAmountGenerate] TO bodbAdminNet
+GO
