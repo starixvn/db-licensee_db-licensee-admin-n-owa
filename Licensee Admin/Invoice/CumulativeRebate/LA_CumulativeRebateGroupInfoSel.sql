@@ -1,26 +1,26 @@
 USE bodb_licensee
 GO
 
-create PROCEDURE [dbo].[LA_CumulativeRebateGroupInfoSel]    
+ALTER PROCEDURE [dbo].[LA_CumulativeRebateGroupInfoSel]
 AS  
 /*
 Header:  
 	Created: 2017.11.02 - Bruce.bui
 	Task : Select rebate group info
 	DB: DB052.bodb_Licensee  
-     
-Revisions:   
-Example:  
-	USE bodb_licensee   
-	EXEC [LA_CumulativeRebateGroupInfoSel]   
-*/  
-BEGIN  
-	SET NOCOUNT ON  
-   
-	DECLARE @RebateGroup TABLE(Id INT, [Name] NVARCHAR(200), ParentId INT)
-	INSERT INTO @RebateGroup(Id, [Name], ParentId)
+
+Revisions:
+Example:
+	USE bodb_licensee
+	EXEC [LA_CumulativeRebateGroupInfoSel]
+*/
+BEGIN
+	SET NOCOUNT ON
+
+	DECLARE @RebateGroup TABLE(Id INT, [Name] NVARCHAR(200))
+	INSERT INTO @RebateGroup(Id, [Name])
 	(
-		SELECT DISTINCT h.SettingGroupHeaderId, h.GroupName, 0
+		SELECT DISTINCT h.SettingGroupHeaderId, h.GroupName
 		FROM dbo.LA_SettingGroupHeader h WITH(NOLOCK)
 		INNER JOIN dbo.LA_SettingGroupAssignment a WITH(NOLOCK) ON a.SettingGroupHeaderId=h.SettingGroupHeaderId
 		INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON a.PartyId=p.PartyID -- remove empty group
@@ -30,28 +30,6 @@ BEGIN
 			WHERE d.[Status] = 'Active'
 		)
 	)
-
-	INSERT INTO @RebateGroup(Id, [Name], ParentId)
-	(
-		SELECT p.PartyName, a.SettingGroupHeaderId, a.SettingGroupAssignmentId + 10000 -- dummy id
-		FROM dbo.LA_SettingGroupAssignment a WITH(NOLOCK)
-		INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON a.PartyId=p.PartyID
-		WHERE a.[Status] = 'Active' 
-			AND a.SettingGroupHeaderId IN (SELECT Id FROM @RebateGroup)
-	)
-
-	;WITH Single AS (
-		SELECT g1.Id, g1.ParentId, g2.[Name] + '('+g1.[Name]+')' AS GroupName -- group has 1 party then concat payername and group name
-		FROM @RebateGroup g1
-		INNER JOIN @RebateGroup g2 ON g1.ParentId = g2.Id
-		WHERE g2.ParentId = 0 AND g2.Id IN (
-			SELECT ParentId FROM @RebateGroup g WHERE g.ParentId > 0
-			GROUP BY ParentId HAVING COUNT(ParentId) = 1
-		)) 
-	MERGE @RebateGroup rg
-	USING Single s ON s.ParentId = rg.Id OR s.Id = rg.Id
-	WHEN MATCHED AND rg.ParentId = 0 THEN UPDATE SET rg.[Name] = s.GroupName
-	WHEN MATCHED AND rg.ParentId > 0 THEN DELETE;
 
 	SELECT * FROM @RebateGroup WHERE Id > 0
 
