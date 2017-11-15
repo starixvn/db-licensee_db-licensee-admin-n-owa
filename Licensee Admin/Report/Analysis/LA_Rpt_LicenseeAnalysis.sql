@@ -1,7 +1,7 @@
 USE bodb_licensee
 GO
 
-ALTER PROC dbo.[LA_Rpt_LicenseeAnalysis] (
+ALTER PROCEDURE dbo.[LA_Rpt_LicenseeAnalysis] (
 	@PartyIDs		VARCHAR(4000),
 	@ProductCodes	VARCHAR(200),
 	@FromDate		SMALLDATETIME,
@@ -28,10 +28,9 @@ BEGIN
 	DECLARE @Products AS TABLE (ProductId INT,ProductCode VARCHAR(10))
 
 	INSERT INTO @Products(ProductCode,ProductId)
-	SELECT DISTINCT p2.ProductPrefix,p2.ProductID
-	FROM dbo.strSplit(@ProductCodes,',') p1
-	INNER JOIN dbo.LA_f_Products3rd('') p2 ON p1.val=p2.ProductPrefix
-	WHERE p2.ProductID NOT IN (1,3,7,9,13,14,15,16,17,19,25)
+	SELECT ProductPrefix,ProductID
+	FROM dbo.LA_f_Products3rd(@ProductCodes)
+	WHERE ProductID NOT IN (1,3,7,9,13,14,15,16,17,19,25)
 
 	SET @ProductCodes = STUFF((SELECT ',' + ProductCode FROM @Products FOR XML PATH('')),1,1,'')	
 
@@ -41,20 +40,23 @@ BEGIN
 	INSERT INTO @PartyIdTable SELECT DISTINCT val, 1 FROM dbo.strSplit(@PartyIDs, ',')
 
 	DECLARE @PartyGroup AS TABLE (PartyGroupId INT, PartyId INT)
-	INSERT	INTO @PartyGroup(PartyGroupId, PartyId)
-	(
-		SELECT	PartyGroupId, PartyId
-		FROM	bodb_licensee.dbo.LA_PartyGroupAssignment WITH(NOLOCK)
-		WHERE	PartyGroupId IN (	SELECT	p1.PartyGroupId
-									FROM	bodb_licensee.dbo.LA_PartyGroupAssignment p1 WITH(NOLOCK)
-									WHERE	p1.PartyId IN (SELECT p2.PartyId FROM @PartyIdTable p2))
-			AND @IsSkinView = 0
-	)
+	
+	IF @IsSkinView = 0
+	BEGIN
+		INSERT	INTO @PartyGroup(PartyGroupId, PartyId)
+		(
+			SELECT	PartyGroupId, PartyId
+			FROM	dbo.LA_PartyGroupAssignment WITH(NOLOCK)
+			WHERE	PartyGroupId IN (	SELECT	p1.PartyGroupId
+										FROM	dbo.LA_PartyGroupAssignment p1 WITH(NOLOCK)
+										WHERE	p1.PartyId IN (SELECT p2.PartyId FROM @PartyIdTable p2))
+		)
+	END
 
 	INSERT INTO @PartyIdTable
 	SELECT DISTINCT PartyId, 0 FROM @PartyGroup WHERE PartyId NOT IN (SELECT p2.PartyId FROM @PartyIdTable p2)
 
-	SET @PartyIds = STUFF((SELECT CAST(PartyId AS VARCHAR(10)) + ',' FROM @PartyIdTable FOR XML PATH('')),1,1,'')
+	SET @PartyIds = STUFF((SELECT CAST(PartyId AS VARCHAR(10)) + ',' FROM @PartyIdTable FOR XML PATH('')),1,1,'')	
 	-- End region
 
 	-- 2. Region: Party charge info
@@ -194,18 +196,17 @@ BEGIN
 				CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END,
 				SUM(b.stake * e.Rate),
 				SUM(-(b.winlost - b.actual_stake) * e.Rate),
-				p.ProductID,
+				bt.ProductID,
 				l.PartyId
 			FROM bodb02.dbo.bettrans b WITH (NOLOCK)
 				INNER JOIN #LicenseeCustInfo l ON l.CustId=b.recommend AND b.currency=l.CurrencyId AND b.winlostdate BETWEEN l.Fromdate AND l.Todate
 				INNER JOIN dbo.LA_f_BettypeProductMapping(0,@ProductCodes) bt ON bt.Bettype=b.bettype
-				INNER JOIN @Products p ON p.ProductID = bt.ProductID
 				INNER JOIN #Exchange e ON l.CurrencyId = e.ExchangeID AND b.winlostdate = e.ExchangeDate
 			WHERE b.statusID IN (111, 112, 113) 
 				AND b.winlostdate BETWEEN @TempFromDate AND @ToDate
 				AND NOT EXISTS (SELECT 1 FROM dbo.LicenseeBATransaction ba WITH(NOLOCK) WHERE b.transid = ba.transid)
 				AND b.bettype NOT IN (901,902,903,904,911,912,913,914)
-			GROUP BY b.winlostdate, l.CurrencyId, CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END, p.ProductID,l.PartyId
+			GROUP BY b.winlostdate, l.CurrencyId, CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END, bt.ProductID,l.PartyId
 		)
 	END
 	
@@ -228,7 +229,7 @@ BEGIN
 			INNER JOIN #LicenseeCustInfo l ON b.CustId = l.CustId AND b.Currency = l.CurrencyId AND b.winlostdate BETWEEN l.Fromdate AND l.Todate
 			INNER JOIN bodb02.dbo.f_LicWinLoss_ProductSportType_Sel(@ProductCodes) ps ON ps.SportType = b.sporttype
 			INNER JOIN #Exchange e ON l.CurrencyId = e.ExchangeID AND b.winlostdate = e.ExchangeDate
-			INNER JOIN @Products p ON p.ProductCode=ps.ProductCode
+			INNER JOIN @Products p ON p.ProductCode=ps.ProductCode -- ps.ProductId <> p.ProductId
 			WHERE b.Winlostdate BETWEEN @FromDate AND @TempToDate
 				AND b.roleid = 2 -- Sum on agent for better performance
 				AND b.statusID NOT IN (-1, 101, 102, 103)
