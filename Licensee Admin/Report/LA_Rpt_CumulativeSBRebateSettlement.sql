@@ -1,9 +1,10 @@
 USE bodb_licensee
 GO
 
-ALTER PROCEDURE dbo.LA_Rpt_CumulativeSBRebateSettlement
+ALTER PROCEDURE dbo.LA_Rpt_CumulativeSBRebateSettlement_xtest
 	@SettingGroupID		INT,
-	@BaseCurrencyName	VARCHAR(10)
+	@BaseCurrencyName	VARCHAR(10),
+	@Environment		VARCHAR(20)
 AS
 
 /*
@@ -14,7 +15,7 @@ AS
 	Revisions: 
 		- 20171030@Harper: Create new SP Cumulative SB Rebate Settlement Report [#RedmineID: 84163]
 
-	EXEC LA_Rpt_CumulativeSBRebateSettlement @SettingGroupID = 1, @BaseCurrencyName = 'EUR'
+	EXEC LA_Rpt_CumulativeSBRebateSettlement @SettingGroupID = 1, @BaseCurrencyName = 'EUR', @Environment = 'LOCAL'
 */
 
 BEGIN
@@ -31,11 +32,11 @@ BEGIN
 						)
 
 	CREATE TABLE #tmpInvoiceList 	( InvoiceHeaderId INT, FromDate SMALLDATETIME, InvoiceDate SMALLDATETIME, InvoiceNumber NVARCHAR(50), PartyId INT, Amount MONEY, Balance MONEY)	
-	CREATE TABLE #tmpAssignment		( PartyID INT, FromDateOfParty	SMALLDATETIME, ToDateOfParty SMALLDATETIME	)	
+	CREATE TABLE #tmpAssignment		( SettingGroupHeaderID INT, PartyID INT, FromDateOfParty SMALLDATETIME, ToDateOfParty SMALLDATETIME	)	
 	CREATE TABLE #Exchange			( FirstExchangeDateByMonth SMALLDATETIME, LastExchangeDateByMonth SMALLDATETIME, ExchangeID INT, Rate FLOAT )
 	DECLARE @tmpDiscountDetail TABLE ( SettingGroupHeaderID INT, TargetAmount MONEY, TargetAmountExchange MONEY, CurrencyId INT, CurrencyName VARCHAR(3), [Period] INT, Rate MONEY, FromDate SMALLDATETIME, ToDate SMALLDATETIME)
 
-	DECLARE @TotalValue MONEY, @Rate FLOAT, @MaxDate SMALLDATETIME
+	DECLARE @TotalValue MONEY, @Rate MONEY, @MaxDate SMALLDATETIME
 			, @CumulativeInvDate SMALLDATETIME, @CutOffDate SMALLDATETIME, @FirstDayCurrMonth SMALLDATETIME, @FromDateOfGroupSetting SMALLDATETIME
 
 	-- #Region: Get Cumulative Discount Group Setting
@@ -50,8 +51,8 @@ BEGIN
 	IF (SELECT ToDate FROM @tmpDiscountDetail) < GETDATE()
 		RETURN
 
-	INSERT INTO #tmpAssignment( PartyID, FromDateOfParty, ToDateOfParty )	
-	SELECT a.PartyId, a.FromDate, a.ToDate		
+	INSERT INTO #tmpAssignment( SettingGroupHeaderID, PartyID, FromDateOfParty, ToDateOfParty )	
+	SELECT a.SettingGroupHeaderId, a.PartyId, a.FromDate, a.ToDate		
 	FROM dbo.LA_SettingGroupAssignment a WITH (NOLOCK)
 	WHERE a.SettingGroupHeaderId = @SettingGroupID
 
@@ -67,6 +68,9 @@ BEGIN
 	FROM dbo.LA_InvoiceHeader h WITH (NOLOCK)
 		INNER JOIN #tmpAssignment a ON h.PartyId = a.PartyID
 	WHERE h.InvoiceType = 11 AND h.StatusId = 0 -- Active invoice	
+		AND h.Environment = @Environment
+
+	SELECT @CumulativeInvDate = CASE WHEN @CumulativeInvDate <> '1900-01-01' THEN DATEADD(MONTH, DATEDIFF(MONTH, 0, DATEADD(MONTH, 1, @CumulativeInvDate)), 0) ELSE @CumulativeInvDate END
 
 	SELECT @CutOffDate = DATEADD(MONTH, - (SELECT [Period] FROM @tmpDiscountDetail), @FirstDayCurrMonth)
 	
@@ -80,17 +84,14 @@ BEGIN
 	SET t.FromDateOfParty = CASE WHEN t.FromDateOfParty <= @MaxDate THEN @MaxDate ELSE t.FromDateOfParty END,
 		t.ToDateOfParty = CASE WHEN t.ToDateOfParty > @FirstDayCurrMonth THEN @FirstDayCurrMonth ELSE t.ToDateOfParty END
 	FROM #tmpAssignment t
-
 	-- #EndRegion: Get Lasted Cumulative Invoice From Date  
 
-	-- #Region: Get Exchange Rate
-	
+	-- #Region: Get Exchange Rate	
 	INSERT INTO #Exchange(FirstExchangeDateByMonth, LastExchangeDateByMonth, ExchangeID, Rate)
 	SELECT FirstExchangeDateByMonth, LastExchangeDateByMonth, ExchangeID, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_SubExchangedailySel(@FromDateOfGroupSetting, @FirstDayCurrMonth, @BaseCurrencyName)
-
 	-- #EndRegion: Get Exchange Rate
-
+	
 	-- #Region: Get SB Invoice Data
 	INSERT INTO #tmpInvoiceList( InvoiceHeaderId ,FromDate, InvoiceDate ,InvoiceNumber ,PartyId ,Amount )	
 	SELECT h.InvoiceHeaderId, h.FromDate, h.InvoiceDate, h.OfficialInvoiceNo, h.PartyId
@@ -100,6 +101,8 @@ BEGIN
 		INNER JOIN #tmpAssignment a ON h.PartyId = a.PartyID AND h.FromDate BETWEEN a.FromDateOfParty AND a.ToDateOfParty
 		INNER JOIN #Exchange e ON h.CurrencyId = e.ExchangeID AND h.FromDate BETWEEN e.FirstExchangeDateByMonth AND e.LastExchangeDateByMonth
 	WHERE s.InvItemTypeId IN (1, 4) AND s.ProductId = 0	AND h.StatusId = 0 -- active invoice
+		AND h.Environment = @Environment
+
 	GROUP BY h.InvoiceHeaderId, h.FromDate, h.InvoiceDate, h.OfficialInvoiceNo, h.PartyId
 
 	; WITH balance AS (
@@ -126,8 +129,8 @@ BEGIN
 	UPDATE @tmpDiscountDetail
 	SET TargetAmountExchange = TargetAmount * e.Rate
 	FROM @tmpDiscountDetail d
-		INNER JOIN #Exchange e ON d.CurrencyId = e.ExchangeID AND d.FromDate BETWEEN FirstExchangeDateByMonth AND LastExchangeDateByMonth
-	
+		INNER JOIN #Exchange e ON d.CurrencyId = e.ExchangeID AND (DATEADD(DAY, -1, @FirstDayCurrMonth)) BETWEEN FirstExchangeDateByMonth AND LastExchangeDateByMonth	
+
 	INSERT INTO #Result
 	        ( CreatedDate ,
 	          InvoiceType ,
@@ -160,7 +163,7 @@ BEGIN
 		          'Rebate' , -- InvoiceType - varchar(20)
 		          N'' , -- InvoiceNo - nvarchar(50)
 		          '' , -- LicenseeName - varchar(100)
-		          'Rebates on Sportsbook (' + CONVERT(VARCHAR(3), @Rate * 100) + '%) ' 
+		          'Rebates on Sportsbook (' + CONVERT(VARCHAR(10), @Rate * 100) + '%) ' 
 					+ CONVERT(NVARCHAR(3), DATENAME(MONTH, @CutOffDate)) + ' ' + CAST(YEAR(@CutOffDate) AS CHAR(4)) 
 					+ ' - ' + CONVERT(NVARCHAR(3), DATENAME(MONTH, DATEADD(DAY, -1, @FirstDayCurrMonth))) + ' ' + CAST(YEAR(DATEADD(DAY, -1, @FirstDayCurrMonth)) AS CHAR(4)),		         
 		          @TotalValue * @Rate  -- Rebate - money		         
@@ -169,18 +172,29 @@ BEGIN
 	-- #EndRegion: Get SB Invoice Data
 
 	-- #Region: Return result
-	
+	;WITH licName AS (
+						SELECT SS.SettingGroupHeaderID,
+						STUFF(( SELECT '; ' + US.PartyName 
+								FROM OAS_Party US
+									INNER JOIN #tmpAssignment a ON us.PartyID = a.PartyID
+								WHERE a.SettingGroupHeaderID = SS.SettingGroupHeaderID
+								ORDER BY PartyName
+								FOR XML PATH('')), 1, 1, '') [Licensees]
+						FROM #tmpAssignment SS		
+						GROUP BY SS.SettingGroupHeaderID						
+					)
+
 	SELECT DATEADD(DAY, -1, @FirstDayCurrMonth) AS SettlementDate
-		, h.GroupName AS LicenseeName
-		, d.CurrencyName
+		, l.Licensees AS LicenseeName
+		, d.CurrencyName AS CurrencyName
 		, d.Rate
 		, d.Period
 		, d.TargetAmount
-	FROM dbo.LA_SettingGroupHeader h WITH (NOLOCK)
-		INNER JOIN @tmpDiscountDetail d ON h.SettingGroupHeaderId = d.SettingGroupHeaderID	
-
+	FROM @tmpDiscountDetail d
+		INNER JOIN licName l ON l.SettingGroupHeaderID = d.SettingGroupHeaderID
+	
 	SELECT CreatedDate, InvoiceType, InvoiceNo, LicenseeName, [Description], Amount, Rebate, Balance
-	FROM #Result
+	FROM #Result	
 
 	-- #EndRegion
 
