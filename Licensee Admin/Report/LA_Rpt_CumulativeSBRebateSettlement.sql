@@ -1,7 +1,9 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+
 USE bodb_licensee
 GO
 
-ALTER PROCEDURE dbo.LA_Rpt_CumulativeSBRebateSettlement_xtest
+ALTER PROCEDURE dbo.LA_Rpt_CumulativeSBRebateSettlement--_xtest
 	@SettingGroupID		INT,
 	@BaseCurrencyName	VARCHAR(10),
 	@Environment		VARCHAR(20)
@@ -70,7 +72,7 @@ BEGIN
 	WHERE h.InvoiceType = 11 AND h.StatusId = 0 -- Active invoice	
 		AND h.Environment = @Environment
 
-	SELECT @CumulativeInvDate = CASE WHEN @CumulativeInvDate <> '1900-01-01' THEN DATEADD(MONTH, DATEDIFF(MONTH, 0, DATEADD(MONTH, 1, @CumulativeInvDate)), 0) ELSE @CumulativeInvDate END
+	SELECT @CumulativeInvDate = CASE WHEN @CumulativeInvDate >= @FromDateOfGroupSetting THEN DATEADD(MONTH, DATEDIFF(MONTH, 0, DATEADD(MONTH, 1, @CumulativeInvDate)), 0) ELSE @FromDateOfGroupSetting END
 
 	SELECT @CutOffDate = DATEADD(MONTH, - (SELECT [Period] FROM @tmpDiscountDetail), @FirstDayCurrMonth)
 	
@@ -164,7 +166,7 @@ BEGIN
 		          N'' , -- InvoiceNo - nvarchar(50)
 		          '' , -- LicenseeName - varchar(100)
 		          'Rebates on Sportsbook (' + CONVERT(VARCHAR(10), @Rate * 100) + '%) ' 
-					+ CONVERT(NVARCHAR(3), DATENAME(MONTH, @CutOffDate)) + ' ' + CAST(YEAR(@CutOffDate) AS CHAR(4)) 
+					+ CONVERT(NVARCHAR(3), DATENAME(MONTH, @MaxDate)) + ' ' + CAST(YEAR(@MaxDate) AS CHAR(4)) 
 					+ ' - ' + CONVERT(NVARCHAR(3), DATENAME(MONTH, DATEADD(DAY, -1, @FirstDayCurrMonth))) + ' ' + CAST(YEAR(DATEADD(DAY, -1, @FirstDayCurrMonth)) AS CHAR(4)),		         
 		          @TotalValue * @Rate  -- Rebate - money		         
 		        )
@@ -174,7 +176,7 @@ BEGIN
 	-- #Region: Return result
 	;WITH licName AS (
 						SELECT SS.SettingGroupHeaderID,
-						STUFF(( SELECT '; ' + US.PartyName 
+						STUFF(( SELECT ', ' + US.PartyName 
 								FROM OAS_Party US
 									INNER JOIN #tmpAssignment a ON us.PartyID = a.PartyID
 								WHERE a.SettingGroupHeaderID = SS.SettingGroupHeaderID
