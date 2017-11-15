@@ -3,7 +3,7 @@
 USE bodb_licensee
 GO
 
-ALTER PROCEDURE dbo.LA_Rpt_CumulativeSBRebateSettlement--_xtest
+ALTER PROCEDURE dbo.LA_Rpt_CumulativeSBRebateSettlement
 	@SettingGroupID		INT,
 	@BaseCurrencyName	VARCHAR(10),
 	@Environment		VARCHAR(20)
