@@ -17,7 +17,7 @@ AS
 	Revisions: 
 		- 20171030@Harper: Create new SP Cumulative SB Rebate Settlement Report [#RedmineID: 84163]
 
-	EXEC LA_Rpt_CumulativeSBRebateSettlement @SettingGroupID = 1, @BaseCurrencyName = 'EUR', @Environment = 'LOCAL'
+	EXEC LA_Rpt_CumulativeSBRebateSettlement @SettingGroupID = 11, @BaseCurrencyName = 'EUR', @Environment = 'LOCAL'
 */
 
 BEGIN
@@ -36,16 +36,19 @@ BEGIN
 	CREATE TABLE #tmpInvoiceList 	( InvoiceHeaderId INT, FromDate SMALLDATETIME, InvoiceDate SMALLDATETIME, InvoiceNumber NVARCHAR(50), PartyId INT, Amount MONEY, Balance MONEY)	
 	CREATE TABLE #tmpAssignment		( SettingGroupHeaderID INT, PartyID INT, FromDateOfParty SMALLDATETIME, ToDateOfParty SMALLDATETIME	)	
 	CREATE TABLE #Exchange			( FirstExchangeDateByMonth SMALLDATETIME, LastExchangeDateByMonth SMALLDATETIME, ExchangeID INT, Rate FLOAT )
-	DECLARE @tmpDiscountDetail TABLE ( SettingGroupHeaderID INT, TargetAmount MONEY, TargetAmountExchange MONEY, CurrencyId INT, CurrencyName VARCHAR(3), [Period] INT, Rate MONEY, FromDate SMALLDATETIME, ToDate SMALLDATETIME)
+	
+	DECLARE @tmpDiscountDetail TABLE ( SettingGroupHeaderID INT, TargetAmount MONEY, TargetAmountExchange MONEY, CurrencyId INT
+										, CurrencyName VARCHAR(3), [Period] INT, Rate MONEY
+										, FromDate SMALLDATETIME, ToDate SMALLDATETIME, RestartDate SMALLDATETIME)
 
 	DECLARE @TotalValue MONEY, @Rate MONEY, @MaxDate SMALLDATETIME
 			, @CumulativeInvDate SMALLDATETIME, @CutOffDate SMALLDATETIME, @FirstDayCurrMonth SMALLDATETIME, @FromDateOfGroupSetting SMALLDATETIME
 
 	-- #Region: Get Cumulative Discount Group Setting
 
-	INSERT INTO @tmpDiscountDetail( SettingGroupHeaderID, TargetAmount ,CurrencyId, CurrencyName ,Period ,Rate, FromDate, ToDate )	
+	INSERT INTO @tmpDiscountDetail( SettingGroupHeaderID, TargetAmount ,CurrencyId, CurrencyName ,Period ,Rate, FromDate, ToDate, RestartDate )	
 	SELECT d.SettingGroupHeaderId, d.TargetAmount, 
-			d.CurrencyId, e.Code, d.[Period], d.Rate, d.FromDate, d.ToDate
+			d.CurrencyId, e.Code, d.[Period], d.Rate, d.FromDate, d.ToDate, d.RestartDate
 	FROM dbo.LA_SettingGroupDetail d WITH (NOLOCK)
 		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON d.CurrencyId = e.exchangeid
 	WHERE d.SettingGroupHeaderId = @SettingGroupID AND d.[Status] = 'Active'
@@ -66,13 +69,13 @@ BEGIN
 
 	SELECT @FromDateOfGroupSetting = FromDate FROM @tmpDiscountDetail
 
-	SELECT @CumulativeInvDate = ISNULL(MAX(h.FromDate), '1900-01-01')
-	FROM dbo.LA_InvoiceHeader h WITH (NOLOCK)
-		INNER JOIN #tmpAssignment a ON h.PartyId = a.PartyID
-	WHERE h.InvoiceType = 11 AND h.StatusId = 0 -- Active invoice	
-		AND h.Environment = @Environment
+	SELECT @CumulativeInvDate = ISNULL(MAX(d.RestartDate), '1900-01-01')
+	FROM @tmpDiscountDetail d	
 
-	SELECT @CumulativeInvDate = CASE WHEN @CumulativeInvDate >= @FromDateOfGroupSetting THEN DATEADD(MONTH, DATEDIFF(MONTH, 0, DATEADD(MONTH, 1, @CumulativeInvDate)), 0) ELSE @FromDateOfGroupSetting END
+	SELECT @CumulativeInvDate = CASE WHEN @CumulativeInvDate >= @FromDateOfGroupSetting 
+									THEN @CumulativeInvDate 
+									ELSE @FromDateOfGroupSetting 
+								END
 
 	SELECT @CutOffDate = DATEADD(MONTH, - (SELECT [Period] FROM @tmpDiscountDetail), @FirstDayCurrMonth)
 	
@@ -87,7 +90,7 @@ BEGIN
 		t.ToDateOfParty = CASE WHEN t.ToDateOfParty > @FirstDayCurrMonth THEN @FirstDayCurrMonth ELSE t.ToDateOfParty END
 	FROM #tmpAssignment t
 	-- #EndRegion: Get Lasted Cumulative Invoice From Date  
-
+	
 	-- #Region: Get Exchange Rate	
 	INSERT INTO #Exchange(FirstExchangeDateByMonth, LastExchangeDateByMonth, ExchangeID, Rate)
 	SELECT FirstExchangeDateByMonth, LastExchangeDateByMonth, ExchangeID, BaseCurrencyRate
@@ -104,6 +107,7 @@ BEGIN
 		INNER JOIN #Exchange e ON h.CurrencyId = e.ExchangeID AND h.FromDate BETWEEN e.FirstExchangeDateByMonth AND e.LastExchangeDateByMonth
 	WHERE s.InvItemTypeId IN (1, 4) AND s.ProductId = 0	AND h.StatusId = 0 -- active invoice
 		AND h.Environment = @Environment
+		AND h.BillerId <> 221 -- Testing Biller
 
 	GROUP BY h.InvoiceHeaderId, h.FromDate, h.InvoiceDate, h.OfficialInvoiceNo, h.PartyId
 
@@ -179,10 +183,11 @@ BEGIN
 						STUFF(( SELECT ', ' + US.PartyName 
 								FROM OAS_Party US
 									INNER JOIN #tmpAssignment a ON us.PartyID = a.PartyID
-								WHERE a.SettingGroupHeaderID = SS.SettingGroupHeaderID
+								WHERE EXISTS (SELECT 1 FROM #tmpInvoiceList i WHERE a.PartyID = i.PartyId) 
+									AND a.SettingGroupHeaderID = SS.SettingGroupHeaderID
 								ORDER BY PartyName
 								FOR XML PATH('')), 1, 1, '') [Licensees]
-						FROM #tmpAssignment SS		
+						FROM #tmpAssignment SS
 						GROUP BY SS.SettingGroupHeaderID						
 					)
 
