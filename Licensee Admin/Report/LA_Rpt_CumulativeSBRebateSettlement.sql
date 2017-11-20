@@ -107,9 +107,13 @@ BEGIN
 		INNER JOIN #Exchange e ON h.CurrencyId = e.ExchangeID AND h.FromDate BETWEEN e.FirstExchangeDateByMonth AND e.LastExchangeDateByMonth
 	WHERE s.InvItemTypeId IN (1, 4) AND s.ProductId = 0	AND h.StatusId = 0 -- active invoice
 		AND (
-				h.Environment = @Environment
-				OR (@Environment = 'PRO' AND h.Environment = @Environment AND h.BillerId <> 221 -- Exclude Testing Biller for PRO
-					)
+				(
+					( @Environment <> 'PRO' AND h.Environment = @Environment
+						)
+					OR 
+					( @Environment = 'PRO' AND h.Environment = @Environment AND h.BillerId <> 221 -- Exclude Testing Biller for PRO
+						)
+				)
 			)
 
 			  
@@ -174,7 +178,7 @@ BEGIN
 		          'Rebate' , -- InvoiceType - varchar(20)
 		          N'' , -- InvoiceNo - nvarchar(50)
 		          '' , -- LicenseeName - varchar(100)
-		          'Rebates on Sportsbook (' + CONVERT(VARCHAR(10), @Rate * 100) + '%) ' 
+		          'Rebates on Sportsbook (' + CONVERT(VARCHAR(10), @Rate * 100) + '%) for ' 
 					+ CONVERT(NVARCHAR(3), DATENAME(MONTH, @MaxDate)) + ' ' + CAST(YEAR(@MaxDate) AS CHAR(4)) 
 					+ ' - ' + CONVERT(NVARCHAR(3), DATENAME(MONTH, DATEADD(DAY, -1, @FirstDayCurrMonth))) + ' ' + CAST(YEAR(DATEADD(DAY, -1, @FirstDayCurrMonth)) AS CHAR(4)),		         
 		          @TotalValue * @Rate  -- Rebate - money		         
