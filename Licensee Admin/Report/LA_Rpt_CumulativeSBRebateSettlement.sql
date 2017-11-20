@@ -106,8 +106,13 @@ BEGIN
 		INNER JOIN #tmpAssignment a ON h.PartyId = a.PartyID AND h.FromDate BETWEEN a.FromDateOfParty AND a.ToDateOfParty
 		INNER JOIN #Exchange e ON h.CurrencyId = e.ExchangeID AND h.FromDate BETWEEN e.FirstExchangeDateByMonth AND e.LastExchangeDateByMonth
 	WHERE s.InvItemTypeId IN (1, 4) AND s.ProductId = 0	AND h.StatusId = 0 -- active invoice
-		AND h.Environment = @Environment
-		AND h.BillerId <> 221 -- Testing Biller
+		AND (
+				h.Environment = @Environment
+				OR (@Environment = 'PRO' AND h.Environment = @Environment AND h.BillerId <> 221 -- Exclude Testing Biller for PRO
+					)
+			)
+
+			  
 
 	GROUP BY h.InvoiceHeaderId, h.FromDate, h.InvoiceDate, h.OfficialInvoiceNo, h.PartyId
 
