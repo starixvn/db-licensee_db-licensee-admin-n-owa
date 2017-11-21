@@ -1,7 +1,7 @@
 USE bodb_licensee
 GO
 
-ALTER PROC dbo.LA_AnalysisFileSel (
+ALTER PROCEDURE dbo.[LA_AnalysisFileSel] (
 	@FileName VARCHAR(200) = '',
 	@Fromdate DATETIME = NULL,  
 	@ToDate DATETIME = NULL
@@ -22,7 +22,7 @@ BEGIN
 	IF @Fromdate IS NULL SET @Fromdate = '20000101'
 	IF @ToDate IS NULL SET @ToDate = '20500101'
 
-	SELECT *
+	SELECT FileId, PartyIds, ProductCodes, Filename, FromDate, ToDate, Status IsSkinView
 	FROM dbo.LA_AnalysisFile f WITH(NOLOCK)
 	WHERE f.FromDate >= @Fromdate AND f.ToDate <= @ToDate AND (
 		ISNULL(@FileName,'') = '' OR f.[Filename] LIKE @FileName ESCAPE '\'
@@ -31,11 +31,11 @@ BEGIN
 END
 GO
 
-GRANT EXECUTE ON [dbo].LA_AnalysisFileSel TO [bodbLicenseeNet] AS [dbo]
+GRANT EXECUTE ON [dbo].[LA_AnalysisFileSel] TO [bodbLicenseeNet] AS [dbo]
 go
 
-GRANT EXECUTE ON [dbo].LA_AnalysisFileSel TO [bodbAdminNet] AS [dbo]
+GRANT EXECUTE ON [dbo].[LA_AnalysisFileSel] TO [bodbAdminNet] AS [dbo]
 go
 
-GRANT VIEW DEFINITION ON [dbo].LA_AnalysisFileSel TO [vnteam] AS [dbo]
+GRANT VIEW DEFINITION ON [dbo].[LA_AnalysisFileSel] TO [vnteam] AS [dbo]
 go

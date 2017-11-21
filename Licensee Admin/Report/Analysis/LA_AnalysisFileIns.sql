@@ -1,7 +1,7 @@
 USE bodb_licensee
 GO
 
-ALTER PROC dbo.LA_AnalysisFileIns
+ALTER PROCEDURE [dbo].[LA_AnalysisFileIns]
 	@Files AS XML
 AS
 /*
@@ -30,11 +30,11 @@ BEGIN
 END
 GO
 
-GRANT EXECUTE ON [dbo].LA_AnalysisFileIns TO [bodbLicenseeNet] AS [dbo]
+GRANT EXECUTE ON [dbo].[LA_AnalysisFileIns] TO [bodbLicenseeNet] AS [dbo]
 go
 
-GRANT EXECUTE ON [dbo].LA_AnalysisFileIns TO [bodbAdminNet] AS [dbo]
+GRANT EXECUTE ON [dbo].[LA_AnalysisFileIns] TO [bodbAdminNet] AS [dbo]
 go
 
-GRANT VIEW DEFINITION ON [dbo].LA_AnalysisFileIns TO [vnteam] AS [dbo]
+GRANT VIEW DEFINITION ON [dbo].[LA_AnalysisFileIns] TO [vnteam] AS [dbo]
 go

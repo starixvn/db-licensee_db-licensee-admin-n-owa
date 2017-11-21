@@ -1,7 +1,7 @@
 USE bodb_licensee
 GO
 
-CREATE PROC dbo.[LA_AnalysisFileUpd]
+CREATE PROCEDURE dbo.[LA_AnalysisFileUpd]
 	@FileName	VARCHAR(200),
 	@Status		TINYINT
 AS
@@ -23,11 +23,11 @@ BEGIN
 END
 GO
 
-GRANT EXECUTE ON [dbo].LA_AnalysisFileUpd TO [bodbLicenseeNet] AS [dbo]
+GRANT EXECUTE ON [dbo].[LA_AnalysisFileUpd] TO [bodbLicenseeNet] AS [dbo]
 go
 
-GRANT EXECUTE ON [dbo].LA_AnalysisFileUpd TO [bodbAdminNet] AS [dbo]
+GRANT EXECUTE ON [dbo].[LA_AnalysisFileUpd] TO [bodbAdminNet] AS [dbo]
 go
 
-GRANT VIEW DEFINITION ON [dbo].LA_AnalysisFileUpd TO [vnteam] AS [dbo]
+GRANT VIEW DEFINITION ON [dbo].[LA_AnalysisFileUpd] TO [vnteam] AS [dbo]
 go

@@ -1,7 +1,7 @@
 USE bodb_licensee
 GO
 
-ALTER PROCEDURE dbo.[LA_Rpt_LicenseeAnalysis] (
+ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeAnalysis] (
 	@PartyIDs		VARCHAR(4000),
 	@ProductCodes	VARCHAR(200),
 	@FromDate		SMALLDATETIME,
@@ -17,7 +17,7 @@ AS
 	DB: bodb_licensee
 
 	Revisions:
-		- 20170919@Bravo: create SP
+		- 20170919@Bruce: create SP
 
 	Notes: @FromDate, @ToDate should be a full month range
 */
@@ -531,5 +531,8 @@ END
 GO
 
 GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeAnalysis] TO [bodbLicenseeNet] AS [dbo]
+GO
 GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeAnalysis] TO [bodbAdminNet] AS [dbo]
+GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicenseeAnalysis] TO [vnteam] AS [dbo]
+GO

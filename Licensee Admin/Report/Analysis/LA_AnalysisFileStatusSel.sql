@@ -1,7 +1,7 @@
 USE bodb_licensee
 GO
 
-ALTER PROC dbo.LA_AnalysisFileStatusSel (
+ALTER PROCEDURE [dbo].[LA_AnalysisFileStatusSel] (
 	@Files AS XML
 )
 AS
@@ -46,11 +46,11 @@ BEGIN
 END
 GO
 
-GRANT EXECUTE ON [dbo].LA_AnalysisFileStatusSel TO [bodbLicenseeNet] AS [dbo]
+GRANT EXECUTE ON [dbo].[LA_AnalysisFileStatusSel] TO [bodbLicenseeNet] AS [dbo]
 go
 
-GRANT EXECUTE ON [dbo].LA_AnalysisFileStatusSel TO [bodbAdminNet] AS [dbo]
+GRANT EXECUTE ON [dbo].[LA_AnalysisFileStatusSel] TO [bodbAdminNet] AS [dbo]
 go
 
-GRANT VIEW DEFINITION ON [dbo].LA_AnalysisFileStatusSel TO [vnteam] AS [dbo]
+GRANT VIEW DEFINITION ON [dbo].[LA_AnalysisFileStatusSel] TO [vnteam] AS [dbo]
 go
