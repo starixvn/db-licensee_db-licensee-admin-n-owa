@@ -99,7 +99,7 @@ BEGIN
 	
 	-- #Region: Get SB Invoice Data
 	INSERT INTO #tmpInvoiceList( InvoiceHeaderId ,FromDate, InvoiceDate ,InvoiceNumber ,PartyId ,Amount )	
-	SELECT h.InvoiceHeaderId, h.FromDate, h.InvoiceDate, h.OfficialInvoiceNo, h.PartyId
+	SELECT h.InvoiceHeaderId, h.FromDate, h.InvoiceDate, h.InvoiceNumber, h.PartyId
 		, SUM(ISNULL(s.Income, 0) * e.Rate - ISNULL(s.Expense, 0) * e.Rate) AS Amount
 	FROM dbo.LA_InvoiceStatement s WITH (NOLOCK)
 		INNER JOIN dbo.LA_InvoiceHeader h WITH (NOLOCK) ON s.InvoiceHeaderId = h.InvoiceHeaderId
@@ -118,7 +118,7 @@ BEGIN
 
 			  
 
-	GROUP BY h.InvoiceHeaderId, h.FromDate, h.InvoiceDate, h.OfficialInvoiceNo, h.PartyId
+	GROUP BY h.InvoiceHeaderId, h.FromDate, h.InvoiceDate, h.InvoiceNumber, h.PartyId
 
 	; WITH balance AS (
 						SELECT curr.Amount + COALESCE(SUM(prev.Amount),0) AS Balance, curr.InvoiceHeaderId
