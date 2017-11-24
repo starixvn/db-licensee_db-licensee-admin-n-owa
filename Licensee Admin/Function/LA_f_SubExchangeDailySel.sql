@@ -1,6 +1,6 @@
 /*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="1" isNested="0"></info>*/
 
-ALTER FUNCTION [dbo].[LA_f_SubExchangeDailySel] (
+ALTER FUNCTION [dbo].[LA_f_SubExchangeDailySel_dontest] (
 	@FromDate					SMALLDATETIME
 	, @ToDate					SMALLDATETIME
 	, @BaseCurrency				VARCHAR(10)
@@ -25,15 +25,14 @@ RETURNS @tempDate TABLE
 	)
 AS 
 BEGIN
-	DECLARE @tblDate AS TABLE(number INT PRIMARY KEY, firstday SMALLDATETIME, lastday SMALLDATETIME)
+	DECLARE @tblDate AS TABLE(number INT PRIMARY KEY, firstday SMALLDATETIME, lastday SMALLDATETIME, lastexchangeday SMALLDATETIME)
 
-	DECLARE @MaxExchangeDate SMALLDATETIME
 	DECLARE @MonthDist INT
 
-	SELECT @MaxExchangeDate = MAX(ExchangeDate) 
-	FROM dbo.ExchangeDailyOanda WITH(NOLOCK)
+	IF (@FromDate > @ToDate)
+		RETURN
 
-	SET @MonthDist = DATEDIFF(MONTH, @FromDate, @ToDate)
+	SELECT @MonthDist = DATEDIFF(MONTH, @FromDate, @ToDate)
 
 	WHILE (@MonthDist >= 0)
 	BEGIN
@@ -48,7 +47,18 @@ BEGIN
 		firstday = CONVERT(VARCHAR(25), DATEADD(dd, -(DAY(DATEADD(MONTH, number, @FromDate))-1), DATEADD(MONTH, number, @FromDate)), 101),
 		lastday = CONVERT(VARCHAR(25), DATEADD(dd, -(DAY(DATEADD(MONTH, 1, DATEADD(MONTH, number, @FromDate)))), DATEADD(MONTH, 1, DATEADD(MONTH, number, @FromDate))), 101)
 
-	;WITH cte AS (
+	UPDATE dt
+	SET
+		lastexchangeday = tmp.exchangedate
+	FROM @tblDate dt
+		CROSS APPLY (
+			SELECT TOP 1 ExchangeDate 
+			FROM dbo.ExchangeDailyOanda ex WITH(NOLOCK) 
+			WHERE ex.ExchangeDate BETWEEN CONVERT(SMALLDATETIME, DATEADD(DAY, -7, dt.firstday)) AND dt.lastday 
+			ORDER BY ExchangeDate DESC
+		) tmp
+
+	;WITH cteNumber AS (
 		SELECT TOP 1 number FROM @tblDate ORDER BY number ASC
 		UNION ALL
 		SELECT TOP 1 number FROM @tblDate ORDER BY number DESC
@@ -58,7 +68,7 @@ BEGIN
 		firstday = CASE WHEN firstday < @FromDate THEN @FromDate ELSE firstday END,
 		lastday = CASE WHEN lastday > @ToDate THEN @ToDate ELSE lastday END
 	FROM @tblDate dt 
-		INNER JOIN cte ON dt.number = cte.number
+		INNER JOIN cteNumber ON dt.number = cteNumber.number
 	
 	INSERT INTO @tempDate(FirstExchangeDateByMonth, LastExchangeDateByMonth, ExchangeId, Code, BaseCurrencyRate)
 		SELECT dt.firstday, dt.lastday, ex.ExchangeId, ex.Code, 
@@ -74,8 +84,8 @@ BEGIN
 				ELSE 1 
 			END BaseCurrencyRate
 		FROM dbo.ExchangeDailyOanda ex WITH(NOLOCK)
-			INNER JOIN @tblDate dt ON ex.ExchangeDate = dt.lastday
+			INNER JOIN @tblDate dt ON ex.ExchangeDate = dt.lastexchangeday
 
-	RETURN 
+	RETURN
 END
 GO
