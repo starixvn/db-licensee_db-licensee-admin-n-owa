@@ -18,8 +18,12 @@ AS
 
 	Revisions:
 		- 20170919@Bruce: create SP
+		- 20171123@Sophia: Revise the performance
 
 	Notes: @FromDate, @ToDate should be a full month range
+	Example :  EXEC LA_Rpt_LicenseeAnalysis_xtest  @PartyIDs = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,29,30,31,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88', 
+			@ProductCodes = 'RB,NG,BA,LC,VS,CS,BG,KN,PTCS,AGC,GD,VG,BT,MGCLC,HF,MGCRNG,AB,VB,NG2,FW,CO,VS2,LT',
+			@FromDate =  '2017-01-01',  @ToDate = '2017-10-31' , @IsSkinView = 0
 */
 BEGIN
 	SET NOCOUNT ON
@@ -33,7 +37,7 @@ BEGIN
 	WHERE ProductID NOT IN (1,3,7,9,13,14,15,16,17,19,25)
 
 	SET @ProductCodes = STUFF((SELECT ',' + ProductCode FROM @Products FOR XML PATH('')),1,1,'')	
-
+			 
 	-- 1. Party groups
 	-- select all parties in the same group
 	DECLARE @PartyIdTable TABLE (PartyId INT, IsSelected BIT)
@@ -77,10 +81,10 @@ BEGIN
 	-- End region
 	
 	-- 3. Region: Get exchange rate info
-	CREATE	TABLE #Exchange (ExchangeDate DATE, ExchangeID INT, CurrencyCode VARCHAR(10), Rate DECIMAL(9,8))
-	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrency)
+	CREATE	TABLE #Exchange (FirstExchangeDateByMonth DATE, LastExchangeDateByMonth DATE, ExchangeID INT, CurrencyCode VARCHAR(10), Rate DECIMAL(9,8))
+	INSERT INTO #Exchange(FirstExchangeDateByMonth, LastExchangeDateByMonth, ExchangeID,  CurrencyCode, Rate)
+	SELECT FirstExchangeDateByMonth, LastExchangeDateByMonth, ExchangeId,  Code, BaseCurrencyRate
+	FROM bodb02.dbo.LA_f_SubExchangeDailySel(@FromDate, @ToDate, @BaseCurrency)
 	-- End region
 
 	-- 4. Region: Minfee configs
@@ -133,12 +137,12 @@ BEGIN
 	DELETE @MinFeeGroup WHERE ToDate < FromDate
 	UPDATE m SET m.FeeAmount = m.FeeAmount * e.Rate
 	FROM @MinFeeGroup m
-	INNER JOIN #Exchange e ON m.ToDate = e.ExchangeDate AND m.CurrencyId = e.ExchangeID
+	INNER JOIN #Exchange e ON m.ToDate BETWEEN e.FirstExchangeDateByMonth AND e.LastExchangeDateByMonth AND m.CurrencyId = e.ExchangeID
 	-- End region
 
 	-- 5. get licensee/customer and currency info
 	-- Licensee customer info
-	CREATE TABLE #LicenseeCustInfo(PartyId INT,LicenseeId INT, CustId INT, CurrencyId INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
+	CREATE TABLE #LicenseeCustInfo(PartyId INT,LicenseeId INT, CustId INT, CurrencyId INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME, mrecommend INT, srecommend INT, )
 
 	-- KeenOcean has different currency
 	DECLARE @KeenOceanID INT = (SELECT LicenseeID FROM dbo.Licensees WITH (NOLOCK) WHERE LicenseeName LIKE 'KeenOcean')
@@ -156,11 +160,14 @@ BEGIN
 			INNER JOIN @PartyChargeInfo p ON p.LicenseeId=c.LicenseeID
 		WHERE p.LicenseeID = @KeenOceanID AND Currency = @YUN
 	)
-	INSERT INTO #LicenseeCustInfo (LicenseeId, CustId, CurrencyId, Fromdate, Todate,PartyId)
-	SELECT DISTINCT LicenseeId, CustId, Currency, Fromdate, Todate,PartyId
-	FROM Cust
+	INSERT INTO #LicenseeCustInfo (LicenseeId, CustId, CurrencyId, Fromdate, Todate,PartyId, mrecommend, srecommend)
+	SELECT DISTINCT c.LicenseeId, c.CustId, c.Currency, c.Fromdate, c.Todate, c.PartyId, I.mrecommend, I.srecommend
+	FROM Cust c
+	INNER JOIN bodb02.dbo.CustInfo I
+		ON I.CustID = C.CustID 
+			AND I.RoleID = 2 			
 
-	CREATE CLUSTERED INDEX ix_LicenseeCustInfo_cl ON #LicenseeCustInfo(CustId, CurrencyId)
+	CREATE CLUSTERED INDEX ix_LicenseeCustInfo_cl ON #LicenseeCustInfo(srecommend, mrecommend, CustId, CurrencyId)
 	-- end region
 
 	-- 6. get move bet info
@@ -170,7 +177,7 @@ BEGIN
 	-- end region
 
 	-- 7. if data from moveBetsDay: get data from bettrans else get data from rptWinLoss2
-	CREATE TABLE #Data (
+	CREATE TABLE #Result (
 		PartyId				INT,
 		ReportDate			DATETIME,
 		CurrencyId			INT,
@@ -187,8 +194,14 @@ BEGIN
 	 -- 7.1. get data from bettrans
 	IF @ToDate > @MoveBetsDay
 	BEGIN
+	
+		CREATE TABLE #BettypeList  (Bettype SMALLINT, ProductId INT ) 
+		INSERT INTO #BettypeList (Bettype, ProductID)
+		SELECT bettype, ProductID FROM LA_f_BettypeProductMapping(0,@ProductCodes)   
+
+		
 		DECLARE @TempFromDate SMALLDATETIME = CASE WHEN @FromDate <= @MoveBetsDay THEN DATEADD(DAY,1,@MoveBetsDay) ELSE @FromDate END
-		INSERT INTO #Data(ReportDate, CurrencyId, BetFrom, Turnover, LicenseeWinLoss, ProductId, PartyId)
+		INSERT INTO #Result(ReportDate, CurrencyId, BetFrom, Turnover, LicenseeWinLoss, ProductId, PartyId)
 		(
 			SELECT
 				b.winlostdate,
@@ -199,9 +212,15 @@ BEGIN
 				bt.ProductID,
 				l.PartyId
 			FROM bodb02.dbo.bettrans b WITH (NOLOCK)
-				INNER JOIN #LicenseeCustInfo l ON l.CustId=b.recommend AND b.currency=l.CurrencyId AND b.winlostdate BETWEEN l.Fromdate AND l.Todate
-				INNER JOIN dbo.LA_f_BettypeProductMapping(0,@ProductCodes) bt ON bt.Bettype=b.bettype
-				INNER JOIN #Exchange e ON l.CurrencyId = e.ExchangeID AND b.winlostdate = e.ExchangeDate
+				INNER JOIN #LicenseeCustInfo l 
+					ON l.CustId = b.recommend 					
+						---AND b.currency=l.CurrencyId 
+						AND b.winlostdate BETWEEN l.Fromdate AND l.Todate
+				INNER JOIN #BettypeList bt 
+					ON bt.Bettype=b.bettype
+				INNER JOIN #Exchange e 
+					ON b.Currency = e.ExchangeID 
+						AND b.winlostdate BETWEEN e.FirstExchangeDateByMonth AND e.LastExchangeDateByMonth
 			WHERE b.statusID IN (111, 112, 113) 
 				AND b.winlostdate BETWEEN @TempFromDate AND @ToDate
 				AND NOT EXISTS (SELECT 1 FROM dbo.LicenseeBATransaction ba WITH(NOLOCK) WHERE b.transid = ba.transid)
@@ -214,8 +233,17 @@ BEGIN
 	-- notes: ps.ProductId <> p.ProductId
 	IF @FromDate <= @MoveBetsDay
 	BEGIN
+	
+		DECLARE @SportypeList AS TABLE (SportType SMALLINT, ProductCode Varchar(10), ProductId INT) 
+		INSERT INTO @SportypeList (SportType, ProductCode, ProductId)
+		SELECT s.SportType, s.ProductCode , p.ProductId
+		FROM f_LicWinLoss_ProductSportType_Sel(@ProductCodes)  s
+		INNER JOIN @Products p 
+			ON p.ProductCode=s.ProductCode 
+		
+		
 		DECLARE @TempToDate SMALLDATETIME = CASE WHEN @ToDate >= @MoveBetsDay THEN @MoveBetsDay ELSE @ToDate END
-		INSERT INTO #Data(ReportDate, CurrencyId, BetFrom, Turnover, LicenseeWinLoss, ProductID,PartyId)
+		INSERT INTO #Result(ReportDate, CurrencyId, BetFrom, Turnover, LicenseeWinLoss, ProductID,PartyId)
 		(
 			SELECT
 				b.winlostdate,
@@ -223,36 +251,42 @@ BEGIN
 				CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END,
 				SUM(b.turnover * e.Rate),
 				SUM(-b.winlost * e.Rate),
-				p.ProductID,
+				ps.ProductID,
 				l.PartyId
 			FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH ( NOLOCK )
-			INNER JOIN #LicenseeCustInfo l ON b.CustId = l.CustId AND b.Currency = l.CurrencyId AND b.winlostdate BETWEEN l.Fromdate AND l.Todate
-			INNER JOIN bodb02.dbo.f_LicWinLoss_ProductSportType_Sel(@ProductCodes) ps ON ps.SportType = b.sporttype
-			INNER JOIN #Exchange e ON l.CurrencyId = e.ExchangeID AND b.winlostdate = e.ExchangeDate
-			INNER JOIN @Products p ON p.ProductCode=ps.ProductCode -- ps.ProductId <> p.ProductId
+			INNER JOIN #LicenseeCustInfo l 
+				ON  b.winlostdate BETWEEN l.Fromdate AND l.Todate
+					AND b.srecommend = l.srecommend
+					AND b.mrecommend = l.mrecommend
+					AND b.recommend = l.CustId
+					AND b.roleid = 2  		
+			INNER JOIN @SportypeList ps ON ps.SportType = b.sporttype					
+			INNER JOIN #Exchange e 
+				ON b.Currency = e.ExchangeID 
+					AND b.winlostdate BETWEEN e.FirstExchangeDateByMonth AND e.LastExchangeDateByMonth	
 			WHERE b.Winlostdate BETWEEN @FromDate AND @TempToDate
-				AND b.roleid = 2 -- Sum on agent for better performance
+				---AND b.roleid = 2 -- Sum on agent for better performance
 				AND b.statusID NOT IN (-1, 101, 102, 103)
 				AND b.bettype NOT IN (901,902,903,904,911,912,913,914)
 				AND ISNULL(b.isBA,0) = 0
-			GROUP BY b.winlostdate, l.CurrencyId, CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END,l.PartyId,p.ProductID
+			GROUP BY b.winlostdate, l.CurrencyId, CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END,l.PartyId,ps.ProductID
 		)
 	END
 	-- end region
 	
 	-- 10. calculate licensing fee(amount to company)
 	UPDATE d SET LicensingFee = (d.LicenseeWinLoss * p.Rate), FeeAfterDiscount=0,FeeAfterRebate=0
-	FROM #Data d
+	FROM #Result d
 	INNER JOIN @PartyChargeInfo p ON p.PartyId = d.PartyId AND p.ProductId=d.ProductId AND d.ReportDate BETWEEN p.FromDate AND p.ToDate
 
 	UPDATE d SET LicensingFee = 0, FeeAfterDiscount=0,FeeAfterRebate=0
-	FROM #Data d
+	FROM #Result d
 	WHERE LicensingFee IS NULL
 	-- end region
 
 	-- 11. calculate min fee
 	UPDATE t SET t.IsApplyMinFee = 0
-	FROM #Data t
+	FROM #Result t
 	INNER JOIN @MinFeeGroup m ON t.ProductId = m.ProductId
 		AND (t.PartyId = m.PartyId )
 		AND (t.ReportDate BETWEEN m.FromDate AND m.ToDate)
@@ -271,7 +305,7 @@ BEGIN
 	-- 11.2 calculate amount to company under waived time
 	UPDATE amf SET amf.WaivedAmount = ISNULL((
 			SELECT SUM(td.LicensingFee)
-			FROM #Data td 
+			FROM #Result td 
 			WHERE	amf.PartyId = td.PartyId AND
 					amf.ProductId = td.ProductId AND
 					td.ReportDate BETWEEN amf.FromDate AND amf.ToDate
@@ -292,7 +326,7 @@ BEGIN
 									FROM	@MinFeeGroup f
 									WHERE	f.FeeType = 2 AND amf.PartyId = f.PartyId AND amf.ProductId = f.ProductId), 0),
 		amf.MinFeeAmount =  ISNULL((SELECT	SUM(td.LicensingFee)
-									FROM	#Data td
+									FROM	#Result td
 									WHERE	amf.PartyId = td.PartyId
 											AND td.ReportDate BETWEEN amf.FromDate AND amf.ToDate
 											AND td.IsApplyMinFee IS NULL
@@ -399,7 +433,7 @@ BEGIN
 		d.FromAmount = d.FromAmount * e.Rate,
 		d.ToAmount = d.ToAmount * e.Rate
 	FROM @DiscountGroup d
-	INNER JOIN #Exchange e ON e.ExchangeDate = @ToDate AND d.BaseCurrency = e.ExchangeID AND d.DiscountGroupType = 1
+	INNER JOIN #Exchange e ON @ToDate BETWEEN e.FirstExchangeDateByMonth AND e.LastExchangeDateByMonth  AND d.BaseCurrency = e.ExchangeID AND d.DiscountGroupType = 1
 	-- End Region
 
 	-- 13. sum by licensee
@@ -410,7 +444,7 @@ BEGIN
 			SUM(d.LicensingFee)		LicensingFee,
 			CAST(0 AS MONEY)		Discount,
 			CAST(0 AS MONEY)		Rebate
-		FROM #Data d
+		FROM #Result d
 		GROUP BY d.PartyId, d.ProductId
 	)
 	SELECT a.LicenseeWinLoss,a.PartyId,a.ProductId,a.Turnover,a.Discount,a.Rebate,
@@ -450,7 +484,7 @@ BEGIN
 
 	-- 15. licensee group
 	DECLARE @PartyList AS TABLE (PartyId INT, PartyName VARCHAR(100), BrandName VARCHAR(100), ParentID INT)
-	INSERT INTO @PartyList
+	INSERT INTO @PartyList (PartyId, PartyName, BrandName, ParentID)
 	EXEC dbo.LA_PartyListSel
 	-- end region
 
@@ -488,7 +522,7 @@ BEGIN
 			CAST(0 AS MONEY)		Discount,
 			CAST(0 AS MONEY)		Rebate
 		INTO #SumBySkin
-		FROM #Data d
+		FROM #Result d
 		INNER JOIN @PartyIdTable pt ON pt.PartyId=d.PartyId
 		INNER JOIN @Skin s ON s.BetFrom=d.BetFrom
 		WHERE pt.IsSelected = 1
@@ -525,7 +559,7 @@ BEGIN
 
 	DROP TABLE #Exchange
 	DROP TABLE #LicenseeCustInfo
-	DROP TABLE #Data
+	DROP TABLE #Result
 	DROP TABLE #SumByLicensee
 END
 GO
