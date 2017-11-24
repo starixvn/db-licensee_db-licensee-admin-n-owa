@@ -1,6 +1,6 @@
 /*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="1" isNested="0"></info>*/
 
-ALTER FUNCTION [dbo].[LA_f_SubExchangeDailySel_dontest] (
+ALTER FUNCTION [dbo].[LA_f_SubExchangeDailySel] (
 	@FromDate					SMALLDATETIME
 	, @ToDate					SMALLDATETIME
 	, @BaseCurrency				VARCHAR(10)
