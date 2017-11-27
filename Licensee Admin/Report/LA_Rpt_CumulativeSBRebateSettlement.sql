@@ -187,13 +187,13 @@ BEGIN
 	-- #Region: Return result
 	;WITH licName AS (
 						SELECT SS.SettingGroupHeaderID,
-						STUFF(( SELECT ',' + US.PartyName 
+						STUFF(( SELECT ', ' + US.PartyName 
 								FROM OAS_Party US
 									INNER JOIN #tmpAssignment a ON us.PartyID = a.PartyID
 								WHERE EXISTS (SELECT 1 FROM #tmpInvoiceList i WHERE a.PartyID = i.PartyId) 
 									AND a.SettingGroupHeaderID = SS.SettingGroupHeaderID
 								ORDER BY PartyName
-								FOR XML PATH('')), 1, 1, '') [Licensees]
+								FOR XML PATH('')), 1, 2, '') [Licensees]
 						FROM #tmpAssignment SS
 						GROUP BY SS.SettingGroupHeaderID						
 					)
