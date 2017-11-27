@@ -36,6 +36,7 @@ AS
 		- 20170327@Harper: #73110 - Integrate new product Cashout
 		- 20170712@Harper: #79310 - Integrate new product Betradar Virtual Sport
 		- 20171006@Harper: #79311 - Support Macau products
+		- 20171127@Sophia: #87257 - Support New range bettype for RNG casino
 
 	Param's Explanation:
 
@@ -114,7 +115,10 @@ BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 6
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
-	   WHERE (typeid IN (71, 72) OR typeid BETWEEN 2101 AND 2399)
+	   WHERE (typeid IN (71, 72) 
+			  OR typeid BETWEEN 2101 AND 2399
+			  OR typeid BETWEEN 2901 AND 2999
+			  )
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 	
