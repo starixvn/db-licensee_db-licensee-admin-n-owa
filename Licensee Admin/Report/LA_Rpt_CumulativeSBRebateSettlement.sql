@@ -17,7 +17,7 @@ AS
 	Revisions: 
 		- 20171030@Harper: Create new SP Cumulative SB Rebate Settlement Report [#RedmineID: 84163]
 
-	EXEC LA_Rpt_CumulativeSBRebateSettlement @SettingGroupID = 11, @BaseCurrencyName = 'EUR', @Environment = 'LOCAL'
+	EXEC LA_Rpt_CumulativeSBRebateSettlement @SettingGroupID = 8, @BaseCurrencyName = 'EUR', @Environment = 'LOCAL'
 */
 
 BEGIN
@@ -144,7 +144,7 @@ BEGIN
 	SET TargetAmountExchange = TargetAmount * e.Rate
 	FROM @tmpDiscountDetail d
 		INNER JOIN #Exchange e ON d.CurrencyId = e.ExchangeID AND (DATEADD(DAY, -1, @FirstDayCurrMonth)) BETWEEN FirstExchangeDateByMonth AND LastExchangeDateByMonth	
-
+	
 	INSERT INTO #Result
 	        ( CreatedDate ,
 	          InvoiceType ,
@@ -159,8 +159,8 @@ BEGIN
 			, d.Amount, d.Balance
 	FROM #tmpInvoiceList d
 		INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON d.PartyId = p.PartyID
-
-	SET @TotalValue = (SELECT TOP 1 Balance FROM #tmpInvoiceList ORDER BY InvoiceHeaderId DESC)
+	
+	SET @TotalValue = (SELECT TOP 1 Balance FROM #tmpInvoiceList ORDER BY InvoiceNumber DESC)
 	SELECT @Rate = Rate FROM @tmpDiscountDetail
 	
 	IF (@TotalValue >= (SELECT TargetAmountExchange FROM @tmpDiscountDetail))
