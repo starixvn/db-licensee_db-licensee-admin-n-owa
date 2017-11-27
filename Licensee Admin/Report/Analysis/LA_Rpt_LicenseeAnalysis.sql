@@ -1,6 +1,8 @@
 USE bodb_licensee
 GO
 
+
+
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeAnalysis] (
 	@PartyIDs		VARCHAR(4000),
 	@ProductCodes	VARCHAR(200),
@@ -142,8 +144,7 @@ BEGIN
 
 	-- 5. get licensee/customer and currency info
 	-- Licensee customer info
-	--CREATE TABLE #LicenseeCustInfo(PartyId INT,LicenseeId INT, CustId INT, CurrencyId INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME, mrecommend INT, srecommend INT)
-	DECLARE @LicenseeCustInfo AS TABLE (PartyId INT,LicenseeId INT, CustId INT, CurrencyId INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
+	CREATE TABLE #LicenseeCustInfo(PartyId INT,LicenseeId INT, CustId INT, CurrencyId INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME, mrecommend INT, srecommend INT, )
 
 	-- KeenOcean has different currency
 	DECLARE @KeenOceanID INT = (SELECT LicenseeID FROM dbo.Licensees WITH (NOLOCK) WHERE LicenseeName LIKE 'KeenOcean')
@@ -161,10 +162,14 @@ BEGIN
 			INNER JOIN @PartyChargeInfo p ON p.LicenseeId=c.LicenseeID
 		WHERE p.LicenseeID = @KeenOceanID AND Currency = @YUN
 	)
-	INSERT INTO @LicenseeCustInfo (LicenseeId, CustId, CurrencyId, Fromdate, Todate,PartyId )
-	SELECT DISTINCT c.LicenseeId, c.CustId, c.Currency, c.Fromdate, c.Todate, c.PartyId
-	FROM Cust c 		
-	 
+	INSERT INTO #LicenseeCustInfo (LicenseeId, CustId, CurrencyId, Fromdate, Todate,PartyId, mrecommend, srecommend)
+	SELECT DISTINCT c.LicenseeId, c.CustId, c.Currency, c.Fromdate, c.Todate, c.PartyId, I.mrecommend, I.srecommend
+	FROM Cust c
+	INNER JOIN bodb02.dbo.CustInfo I
+		ON I.CustID = C.CustID 
+			AND I.RoleID = 2 			
+
+	CREATE CLUSTERED INDEX ix_LicenseeCustInfo_cl ON #LicenseeCustInfo(srecommend, mrecommend, CustId, CurrencyId)
 	-- end region
 
 	-- 6. get move bet info
@@ -209,7 +214,7 @@ BEGIN
 				bt.ProductID,
 				l.PartyId
 			FROM bodb02.dbo.bettrans b WITH (NOLOCK)
-				INNER JOIN @LicenseeCustInfo l 
+				INNER JOIN #LicenseeCustInfo l 
 					ON l.CustId = b.recommend 					
 						---AND b.currency=l.CurrencyId 
 						AND b.winlostdate BETWEEN l.Fromdate AND l.Todate
@@ -231,11 +236,10 @@ BEGIN
 	IF @FromDate <= @MoveBetsDay
 	BEGIN
 	
-		--DECLARE @SportypeList AS TABLE (SportType SMALLINT, ProductCode Varchar(10), ProductId INT) 
-		CREATE TABLE #SportypeList  (SportType SMALLINT, ProductCode Varchar(10), ProductId INT) 
-		INSERT INTO #SportypeList (SportType, ProductCode, ProductId)
+		DECLARE @SportypeList AS TABLE (SportType SMALLINT, ProductCode Varchar(10), ProductId INT) 
+		INSERT INTO @SportypeList (SportType, ProductCode, ProductId)
 		SELECT s.SportType, s.ProductCode , p.ProductId
-		FROM f_LicWinLoss_ProductSportType_Sel(@ProductCodes)  s
+		FROM bodb02.dbo.f_LicWinLoss_ProductSportType_Sel(@ProductCodes)  s
 		INNER JOIN @Products p 
 			ON p.ProductCode=s.ProductCode 
 		
@@ -252,11 +256,13 @@ BEGIN
 				ps.ProductID,
 				l.PartyId
 			FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH ( NOLOCK )
-			INNER JOIN @LicenseeCustInfo l 
-				ON  b.winlostdate BETWEEN l.Fromdate AND l.Todate					
+			INNER JOIN #LicenseeCustInfo l 
+				ON  b.winlostdate BETWEEN l.Fromdate AND l.Todate
+					AND b.srecommend = l.srecommend
+					AND b.mrecommend = l.mrecommend
 					AND b.recommend = l.CustId
 					AND b.roleid = 2  		
-			INNER JOIN #SportypeList ps ON ps.SportType = b.sporttype					
+			INNER JOIN @SportypeList ps ON ps.SportType = b.sporttype					
 			INNER JOIN #Exchange e 
 				ON b.Currency = e.ExchangeID 
 					AND b.winlostdate BETWEEN e.FirstExchangeDateByMonth AND e.LastExchangeDateByMonth	
@@ -554,15 +560,15 @@ BEGIN
 	END	
 
 	DROP TABLE #Exchange
-	--DROP TABLE #LicenseeCustInfo
+	DROP TABLE #LicenseeCustInfo
 	DROP TABLE #Result
 	DROP TABLE #SumByLicensee
 END
-GO
 
-GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeAnalysis] TO [bodbLicenseeNet] AS [dbo]
-GO
-GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeAnalysis] TO [bodbAdminNet] AS [dbo]
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicenseeAnalysis] TO [vnteam] AS [dbo]
-GO
+GO 
+ GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicenseeAnalysis] TO [vnteam]
+GO 
+ GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeAnalysis] TO [bodbLicenseeNet]
+GO 
+ GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeAnalysis] TO [bodbAdminNet]
+GO 
