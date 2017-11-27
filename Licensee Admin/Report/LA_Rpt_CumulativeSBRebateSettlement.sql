@@ -117,27 +117,28 @@ BEGIN
 			)			  
 
 	GROUP BY h.InvoiceHeaderId, h.FromDate, h.InvoiceDate, h.InvoiceNumber, h.PartyId
+	ORDER BY h.InvoiceNumber
 
 	; WITH balance AS (
-						SELECT curr.Amount + COALESCE(SUM(prev.Amount),0) AS Balance, curr.InvoiceHeaderId
+						SELECT curr.Amount + COALESCE(SUM(prev.Amount),0) AS Balance, curr.InvoiceNumber
 						FROM
 						(
-							SELECT SUM(Amount) Amount, InvoiceHeaderId
+							SELECT SUM(Amount) Amount, InvoiceNumber
 							FROM #tmpInvoiceList
-							GROUP BY InvoiceHeaderId
+							GROUP BY InvoiceNumber
 						) curr
 						LEFT OUTER JOIN
 						(
-							SELECT SUM(Amount) Amount, InvoiceHeaderId
+							SELECT SUM(Amount) Amount, InvoiceNumber
 							FROM #tmpInvoiceList
-							GROUP BY InvoiceHeaderId
-						) prev ON prev.InvoiceHeaderId < curr.InvoiceHeaderId
-						GROUP BY curr.InvoiceHeaderId, curr.Amount
+							GROUP BY InvoiceNumber
+						) prev ON prev.InvoiceNumber < curr.InvoiceNumber
+						GROUP BY curr.InvoiceNumber, curr.Amount
 				)
 	UPDATE d
 	SET d.Balance = ISNULL(b.Balance , 0)
 	FROM #tmpInvoiceList d
-		INNER JOIN balance b ON d.InvoiceHeaderId = b.InvoiceHeaderId
+		INNER JOIN balance b ON d.InvoiceNumber = b.InvoiceNumber
 
 	UPDATE @tmpDiscountDetail
 	SET TargetAmountExchange = TargetAmount * e.Rate
@@ -209,7 +210,7 @@ BEGIN
 	
 	SELECT CreatedDate, InvoiceType, InvoiceNo, LicenseeName, [Description], Amount, Rebate, Balance
 	FROM #Result	
-
+	
 	-- #EndRegion
 
 	DROP TABLE #Exchange
