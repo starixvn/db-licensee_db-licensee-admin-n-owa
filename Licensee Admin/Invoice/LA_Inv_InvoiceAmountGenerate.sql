@@ -1,3 +1,5 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+
 USE [bodb_Licensee]
 GO
 
@@ -44,7 +46,8 @@ AS
 		+ 2017.07.21 @Scofield: Update Amount Type [#79905]
 		+ 2017.07.21 @Bruce: Calculate AMF amount [#76410]
 		+ 2017.10.02 @Bruce: add environment to parameter list [#84038]
-		+ 2017.10.27 @Bruce: show individual discount by product [#85256]
+		+ 2017.10.27 @Bruce: show individual discount by product [#85256]		
+		- 20171113@Bruce: Modified error message [RedmineID: #84163]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -478,7 +481,7 @@ BEGIN
 	
 	IF EXISTS(SELECT 1 FROM @BaseCurrencyCheck WHERE BaseCurrencyCount = 0 AND NonBaseCurrencyCount > 0)
 	BEGIN
-		SELECT @ErrCode = 1, @ErrMsg = 'Please check the Exchange settings of Payer&rsquo;s minfee or minfee group. Exchange of minfee or minfees in group should be the same with Payer&rsquo;s exchange.'
+		SELECT @ErrCode = 1, @ErrMsg = 'Please check the Exchange settings of Payer''s minfee or minfee group. Exchange of minfee or minfees in group should be the same with Payer''s exchange.'
 		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
 		RETURN
 	END
@@ -495,7 +498,7 @@ BEGIN
 	
 	IF EXISTS(SELECT 1 FROM @BaseCurrencyCheck WHERE BaseCurrencyCount = 0 AND NonBaseCurrencyCount > 0)
 	BEGIN
-		SELECT @ErrCode = 2, @ErrMsg = 'Please check the Exchange settings of Payer&rsquo;s discount. Exchange of discount must be the same with Payer&rsquo;s exchange.'
+		SELECT @ErrCode = 2, @ErrMsg = 'Please check the Exchange settings of Payer''s discount. Exchange of discount must be the same with Payer''s exchange.'
 		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
 		RETURN
 	END
@@ -986,4 +989,6 @@ BEGIN
 
 END
 GO
+
 GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceAmountGenerate] TO bodbAdminNet
+GO
