@@ -8,11 +8,11 @@ ALTER FUNCTION [dbo].[LA_f_SubExchangeDailySel] (
 /*  
 	Created: 20171107@Don
 	Task : Get sub exchange daily
-	DB: DB052.bodb02
+	DB: DBEXT.bodb02
 	Revisions:  
 
 	Param's Explanation:  			
-	- 20171107@Don: Initial version
+	- 20171107@Don: Initial version [RedmineID: #84163]
 
 */
 RETURNS @tempDate TABLE 
