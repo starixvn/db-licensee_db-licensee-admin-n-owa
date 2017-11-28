@@ -1,8 +1,5 @@
 USE bodb_licensee
 GO
-
-
-
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeAnalysis] (
 	@PartyIDs		VARCHAR(4000),
 	@ProductCodes	VARCHAR(200),
@@ -23,7 +20,9 @@ AS
 		- 20171123@Sophia: Revise SP
 
 	Notes: @FromDate, @ToDate should be a full month range
-	Example :  EXEC LA_Rpt_LicenseeAnalysis_xtest  @PartyIDs = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,29,30,31,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88', 
+	Example :  EXEC LA_Rpt_LicenseeAnalysis_xtest  @PartyIDs = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,29,30,31,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72
+
+,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88', 
 			@ProductCodes = 'RB,NG,BA,LC,VS,CS,BG,KN,PTCS,AGC,GD,VG,BT,MGCLC,HF,MGCRNG,AB,VB,NG2,FW,CO,VS2,LT',
 			@FromDate =  '2017-01-01',  @ToDate = '2017-10-31' , @IsSkinView = 0
 */
@@ -144,7 +143,7 @@ BEGIN
 
 	-- 5. get licensee/customer and currency info
 	-- Licensee customer info
-	CREATE TABLE #LicenseeCustInfo(PartyId INT,LicenseeId INT, CustId INT, CurrencyId INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME, mrecommend INT, srecommend INT, )
+	CREATE TABLE #LicenseeCustInfo(PartyId INT,LicenseeId INT, CustId INT, CurrencyId INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME) 
 
 	-- KeenOcean has different currency
 	DECLARE @KeenOceanID INT = (SELECT LicenseeID FROM dbo.Licensees WITH (NOLOCK) WHERE LicenseeName LIKE 'KeenOcean')
@@ -162,14 +161,11 @@ BEGIN
 			INNER JOIN @PartyChargeInfo p ON p.LicenseeId=c.LicenseeID
 		WHERE p.LicenseeID = @KeenOceanID AND Currency = @YUN
 	)
-	INSERT INTO #LicenseeCustInfo (LicenseeId, CustId, CurrencyId, Fromdate, Todate,PartyId, mrecommend, srecommend)
-	SELECT DISTINCT c.LicenseeId, c.CustId, c.Currency, c.Fromdate, c.Todate, c.PartyId, I.mrecommend, I.srecommend
-	FROM Cust c
-	INNER JOIN bodb02.dbo.CustInfo I
-		ON I.CustID = C.CustID 
-			AND I.RoleID = 2 			
-
-	CREATE CLUSTERED INDEX ix_LicenseeCustInfo_cl ON #LicenseeCustInfo(srecommend, mrecommend, CustId, CurrencyId)
+	INSERT INTO #LicenseeCustInfo (LicenseeId, CustId, CurrencyId, Fromdate, Todate,PartyId) 
+	SELECT DISTINCT c.LicenseeId, c.CustId, c.Currency, c.Fromdate, c.Todate, c.PartyId 
+	FROM Cust c	
+ 
+	CREATE CLUSTERED INDEX ix_LicenseeCustInfo_cl ON #LicenseeCustInfo(CustId, CurrencyId)
 	-- end region
 
 	-- 6. get move bet info
@@ -216,7 +212,7 @@ BEGIN
 			FROM bodb02.dbo.bettrans b WITH (NOLOCK)
 				INNER JOIN #LicenseeCustInfo l 
 					ON l.CustId = b.recommend 					
-						---AND b.currency=l.CurrencyId 
+						AND b.currency=l.CurrencyId 
 						AND b.winlostdate BETWEEN l.Fromdate AND l.Todate
 				INNER JOIN #BettypeList bt 
 					ON bt.Bettype=b.bettype
@@ -236,8 +232,8 @@ BEGIN
 	IF @FromDate <= @MoveBetsDay
 	BEGIN
 	
-		DECLARE @SportypeList AS TABLE (SportType SMALLINT, ProductCode Varchar(10), ProductId INT) 
-		INSERT INTO @SportypeList (SportType, ProductCode, ProductId)
+		CREATE TABLE #SportypeList  (SportType SMALLINT, ProductCode Varchar(10), ProductId INT) 
+		INSERT INTO #SportypeList (SportType, ProductCode, ProductId)
 		SELECT s.SportType, s.ProductCode , p.ProductId
 		FROM bodb02.dbo.f_LicWinLoss_ProductSportType_Sel(@ProductCodes)  s
 		INNER JOIN @Products p 
@@ -249,29 +245,33 @@ BEGIN
 		(
 			SELECT
 				b.winlostdate,
-				l.CurrencyId,
+				b.Currency,
 				CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END,
 				SUM(b.turnover * e.Rate),
 				SUM(-b.winlost * e.Rate),
 				ps.ProductID,
 				l.PartyId
 			FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH ( NOLOCK )
-			INNER JOIN #LicenseeCustInfo l 
-				ON  b.winlostdate BETWEEN l.Fromdate AND l.Todate
-					AND b.srecommend = l.srecommend
-					AND b.mrecommend = l.mrecommend
-					AND b.recommend = l.CustId
-					AND b.roleid = 2  		
-			INNER JOIN @SportypeList ps ON ps.SportType = b.sporttype					
+			CROSS APPLY (SELECT l.PartyId 
+						FROM #LicenseeCustInfo l 
+						WHERE 
+						    b.winlostdate >= l.Fromdate AND b.winlostdate <= l.Todate
+							AND b.Currency = l.CurrencyId
+							--AND b.srecommend = l.srecommend
+							--AND b.mrecommend = l.mrecommend
+							AND b.recommend = l.CustId
+							AND b.roleid = 2  
+							) l		
+			INNER JOIN #SportypeList ps ON ps.SportType = b.sporttype					
 			INNER JOIN #Exchange e 
 				ON b.Currency = e.ExchangeID 
 					AND b.winlostdate BETWEEN e.FirstExchangeDateByMonth AND e.LastExchangeDateByMonth	
 			WHERE b.Winlostdate BETWEEN @FromDate AND @TempToDate
-				---AND b.roleid = 2 -- Sum on agent for better performance
+				AND b.roleid = 2 -- Sum on agent for better performance
 				AND b.statusID NOT IN (-1, 101, 102, 103)
 				AND b.bettype NOT IN (901,902,903,904,911,912,913,914)
 				AND ISNULL(b.isBA,0) = 0
-			GROUP BY b.winlostdate, l.CurrencyId, CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END,l.PartyId,ps.ProductID
+			GROUP BY b.winlostdate, b.Currency, CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END,l.PartyId,ps.ProductID
 		)
 	END
 	-- end region
@@ -563,8 +563,8 @@ BEGIN
 	DROP TABLE #LicenseeCustInfo
 	DROP TABLE #Result
 	DROP TABLE #SumByLicensee
+	DROP TABLE #SportypeList 
 END
-
 GO 
  GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicenseeAnalysis] TO [vnteam]
 GO 
