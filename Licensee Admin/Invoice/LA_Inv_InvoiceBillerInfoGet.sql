@@ -23,7 +23,7 @@ AS
 		+ 20160728@Bruce: Software data fee & hosting fee have a same invoice no
 		+ 20170421@Bruce: Add environment filter
 		+ 20170824@Bruce: use same invoice no for debit note and debit note for return amf [#76410]
-		+ 20171128@Bruce: use created date time instead of invoice date [#76410]
+		+ 20171128@Bruce: use created date time instead of invoice date [#86399]
 */
 /*	Example:
 	USE bodb_licensee
