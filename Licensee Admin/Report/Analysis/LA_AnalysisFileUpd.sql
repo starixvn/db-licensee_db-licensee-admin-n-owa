@@ -1,7 +1,7 @@
 USE bodb_licensee
 GO
 
-CREATE PROCEDURE dbo.[LA_AnalysisFileUpd]
+ALTER PROCEDURE dbo.[LA_AnalysisFileUpd]
 	@FileName	VARCHAR(200),
 	@Status		TINYINT
 AS

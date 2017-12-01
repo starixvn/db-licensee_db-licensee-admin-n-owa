@@ -22,7 +22,7 @@ BEGIN
 	IF @Fromdate IS NULL SET @Fromdate = '20000101'
 	IF @ToDate IS NULL SET @ToDate = '20500101'
 
-	SELECT FileId, PartyIds, ProductCodes, Filename, FromDate, ToDate, Status IsSkinView
+	SELECT FileId, PartyIds, ProductCodes, Filename, FromDate, ToDate, [Status], IsSkinView
 	FROM dbo.LA_AnalysisFile f WITH(NOLOCK)
 	WHERE f.FromDate >= @Fromdate AND f.ToDate <= @ToDate AND (
 		ISNULL(@FileName,'') = '' OR f.[Filename] LIKE @FileName ESCAPE '\'
