@@ -1,5 +1,4 @@
-USE bodb_licensee
-GO
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 
 ALTER PROCEDURE [dbo].[LA_AnalysisFileIns]
 	@Files AS XML

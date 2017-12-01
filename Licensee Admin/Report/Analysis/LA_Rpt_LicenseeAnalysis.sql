@@ -1,5 +1,5 @@
-USE bodb_licensee
-GO
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeAnalysis] (
 	@PartyIDs		VARCHAR(4000),
 	@ProductCodes	VARCHAR(200),
@@ -20,7 +20,7 @@ AS
 		- 20171123@Sophia: Revise SP
 
 	Notes: @FromDate, @ToDate should be a full month range
-	Example :  EXEC LA_Rpt_LicenseeAnalysis_xtest  @PartyIDs = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,29,30,31,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72
+	Example :  EXEC LA_Rpt_LicenseeAnalysis  @PartyIDs = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,29,30,31,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72
 
 ,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88', 
 			@ProductCodes = 'RB,NG,BA,LC,VS,CS,BG,KN,PTCS,AGC,GD,VG,BT,MGCLC,HF,MGCRNG,AB,VB,NG2,FW,CO,VS2,LT',
