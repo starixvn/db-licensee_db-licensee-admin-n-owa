@@ -23,6 +23,7 @@ AS
 		+ 20160728@Bruce: Software data fee & hosting fee have a same invoice no
 		+ 20170421@Bruce: Add environment filter
 		+ 20170824@Bruce: use same invoice no for debit note and debit note for return amf [#76410]
+		+ 20171128@Bruce: use created date time instead of invoice date [#86399]
 */
 /*	Example:
 	USE bodb_licensee
@@ -64,9 +65,9 @@ BEGIN
 			MAX(i.InvoiceNumber)
 	FROM	LA_InvoiceHeader i WITH(NOLOCK)
 	WHERE	i.BillerId = @BillerId AND (i.Environment IS NULL OR i.Environment = @Environment)
-	GROUP BY i.BillerId,i.InvoiceType,i.InvoiceSymbol,i.InvoiceDate
-	ORDER BY i.InvoiceDate DESC
-		
+	GROUP BY i.BillerId,i.InvoiceType,i.InvoiceSymbol,i.CreatedDateTime
+	ORDER BY i.CreatedDateTime DESC
+
 	DECLARE @InvoiceSymbol NVARCHAR(20) = ''
 	DECLARE @InvoiceNumber INT = 1
 	DECLARE @SameInvoiceNoList TABLE (InvoiceType INT)
