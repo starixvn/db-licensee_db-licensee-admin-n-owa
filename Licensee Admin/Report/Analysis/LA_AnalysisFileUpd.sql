@@ -11,7 +11,7 @@ AS
 	DB: bodb_licensee
 
 	Revisions:
-		- 20170919@Bruce: create SP
+		- 20170919@Bruce: create SP [RedmineID: #78294]
 */
 BEGIN
 	SET NOCOUNT ON

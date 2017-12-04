@@ -1,4 +1,6 @@
 /*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
+GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeAnalysis] (
 	@PartyIDs		VARCHAR(4000),
@@ -16,8 +18,8 @@ AS
 	DB: bodb_licensee
 
 	Revisions:
-		- 20170919@Bruce: create SP
-		- 20171123@Sophia: Revise SP
+		- 20170919@Bruce: create SP [RedmineID: #78294]
+		- 20171123@Sophia: Revise SP [RedmineID: #78294]
 
 	Notes: @FromDate, @ToDate should be a full month range
 	Example :  EXEC LA_Rpt_LicenseeAnalysis  @PartyIDs = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,29,30,31,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72
@@ -61,7 +63,7 @@ BEGIN
 	INSERT INTO @PartyIdTable
 	SELECT DISTINCT PartyId, 0 FROM @PartyGroup WHERE PartyId NOT IN (SELECT p2.PartyId FROM @PartyIdTable p2)
 
-	SET @PartyIds = STUFF((SELECT CAST(PartyId AS VARCHAR(10)) + ',' FROM @PartyIdTable FOR XML PATH('')),1,1,'')	
+	SET @PartyIds = STUFF((SELECT ',' + CAST(PartyId AS VARCHAR(10)) FROM @PartyIdTable FOR XML PATH('')),1,1,'')
 	-- End region
 
 	-- 2. Region: Party charge info
@@ -80,7 +82,7 @@ BEGIN
 		WHERE	DI_Rate > 0
 	)
 	-- End region
-	
+
 	-- 3. Region: Get exchange rate info
 	CREATE	TABLE #Exchange (FirstExchangeDateByMonth DATE, LastExchangeDateByMonth DATE, ExchangeID INT, CurrencyCode VARCHAR(10), Rate DECIMAL(9,8))
 	INSERT INTO #Exchange(FirstExchangeDateByMonth, LastExchangeDateByMonth, ExchangeID,  CurrencyCode, Rate)
@@ -116,23 +118,24 @@ BEGIN
 			CASE WHEN @FromDate >= mf.FromDate THEN @FromDate ELSE mf.FromDate END AS FromDate,
 			CASE WHEN @ToDate < mf.ToDate THEN @ToDate ELSE mf.ToDate END AS ToDate
 		FROM dbo.LA_MinFee mf WITH(NOLOCK)
-		WHERE @IsSkinView = 0 AND (mf.FeeTypeId = 1
-			OR (mf.FeeTypeId = 2 AND EXISTS (
-				SELECT PartyId FROM dbo.LA_MinFee m WITH(NOLOCK)
-				WHERE m.FeeTypeId = 1
-					AND m.PartyId = mf.PartyId
-					AND m.ProductId = mf.ProductId
-					AND ((m.FromDate BETWEEN @FirstDate AND @LastDate)
-						OR (m.ToDate BETWEEN @FirstDate AND @LastDate)
-						OR (m.FromDate<@FirstDate AND @LastDate < m.ToDate)
-					)
+		WHERE @IsSkinView = 0 
+			AND (mf.FeeTypeId = 1 OR (mf.FeeTypeId = 2 
+				AND EXISTS (SELECT PartyId FROM dbo.LA_MinFee m WITH(NOLOCK)
+					WHERE m.FeeTypeId = 1
+						AND m.PartyId = mf.PartyId
+						AND m.ProductId = mf.ProductId
+						AND ((m.FromDate BETWEEN @FirstDate AND @LastDate)
+							OR (m.ToDate BETWEEN @FirstDate AND @LastDate)
+							OR (m.FromDate<@FirstDate AND @LastDate < m.ToDate)
+						)
+				)
 			))
 			AND mf.ProductId IN (SELECT ProductId FROM @Products)
 			AND mf.PartyId IN (SELECT p.PartyId FROM @PartyIdTable p)
 			AND ((mf.FromDate BETWEEN @FirstDate AND @LastDate) 
 				OR (mf.ToDate BETWEEN @FirstDate AND @LastDate) 
 				OR (mf.FromDate<@FirstDate AND @LastDate < mf.ToDate)
-			))
+			)
 	)
 
 	DELETE @MinFeeGroup WHERE ToDate < FromDate
@@ -195,8 +198,7 @@ BEGIN
 	
 		CREATE TABLE #BettypeList  (Bettype SMALLINT, ProductId INT ) 
 		INSERT INTO #BettypeList (Bettype, ProductID)
-		SELECT bettype, ProductID FROM LA_f_BettypeProductMapping(0,@ProductCodes)   
-
+		SELECT bettype, ProductID FROM LA_f_BettypeProductMapping(0,@ProductCodes) 
 		
 		DECLARE @TempFromDate SMALLDATETIME = CASE WHEN @FromDate <= @MoveBetsDay THEN DATEADD(DAY,1,@MoveBetsDay) ELSE @FromDate END
 		INSERT INTO #Result(ReportDate, CurrencyId, BetFrom, Turnover, LicenseeWinLoss, ProductId, PartyId)
@@ -230,15 +232,12 @@ BEGIN
 	-- 7.2. get data from rptWinLoss2
 	-- notes: ps.ProductId <> p.ProductId
 	IF @FromDate <= @MoveBetsDay
-	BEGIN
-	
+	BEGIN	
 		CREATE TABLE #SportypeList  (SportType SMALLINT, ProductCode Varchar(10), ProductId INT) 
 		INSERT INTO #SportypeList (SportType, ProductCode, ProductId)
 		SELECT s.SportType, s.ProductCode , p.ProductId
 		FROM bodb02.dbo.f_LicWinLoss_ProductSportType_Sel(@ProductCodes)  s
-		INNER JOIN @Products p 
-			ON p.ProductCode=s.ProductCode 
-		
+		INNER JOIN @Products p ON p.ProductCode=s.ProductCode		
 		
 		DECLARE @TempToDate SMALLDATETIME = CASE WHEN @ToDate >= @MoveBetsDay THEN @MoveBetsDay ELSE @ToDate END
 		INSERT INTO #Result(ReportDate, CurrencyId, BetFrom, Turnover, LicenseeWinLoss, ProductID,PartyId)
@@ -257,8 +256,6 @@ BEGIN
 						WHERE 
 						    b.winlostdate >= l.Fromdate AND b.winlostdate <= l.Todate
 							AND b.Currency = l.CurrencyId
-							--AND b.srecommend = l.srecommend
-							--AND b.mrecommend = l.mrecommend
 							AND b.recommend = l.CustId
 							AND b.roleid = 2  
 							) l		
@@ -275,7 +272,7 @@ BEGIN
 		)
 	END
 	-- end region
-	
+
 	-- 10. calculate licensing fee(amount to company)
 	UPDATE d SET LicensingFee = (d.LicenseeWinLoss * p.Rate), FeeAfterDiscount=0,FeeAfterRebate=0
 	FROM #Result d
@@ -395,7 +392,7 @@ BEGIN
 		SELECT dg.DiscountGroupId,dg.DiscountGroupType,dga.PartyId, dg.CurrencyId, dg.FromDate, dg.ToDate
 		FROM dbo.LA_DiscountGroupHeader dg WITH(NOLOCK)
 			INNER JOIN dbo.LA_DiscountGroupAssignment dga WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
-		WHERE @FromDate<= ToDate AND FromDate<=@ToDate
+		WHERE @FromDate<= ToDate AND FromDate<=@ToDate AND dga.PartyID IN (SELECT p.PartyId FROM @PartyIdTable p)
 	)
 	
 	DELETE FROM @DiscountGroupHeader
@@ -475,9 +472,9 @@ BEGIN
 	FROM @DiscountGroup d
 	INNER JOIN t ON t.DiscountGroupId = d.DiscountGroupId AND t.PartyId = d.PartyId
 	WHERE d.DiscountGroupType = 1 AND t.Total NOT BETWEEN d.FromAmount AND d.ToAmount
-	
+
 	-- discount
-	UPDATE s SET Discount =	(CASE WHEN -s.LicenseeWinLoss < 0 THEN 0 ELSE -s.LicenseeWinLoss * ISNULL(d3.Rate, 0) END) + 
+	UPDATE s SET Discount =	(CASE WHEN s.LicenseeWinLoss < 0 THEN 0 ELSE s.LicenseeWinLoss * ISNULL(d3.Rate, 0) END) + 
 							(CASE WHEN s.LicensingFee < 0 THEN 0 ELSE s.LicensingFee * ISNULL(d1.Rate, 0) END)
 	FROM #SumByLicensee s
 		LEFT JOIN @DiscountGroup d1 ON s.PartyId = d1.PartyId AND d1.ProductId = s.ProductId AND d1.DiscountGroupType = 1 -- discount by fee
@@ -501,7 +498,7 @@ BEGIN
 			,SUM(ISNULL(s.LicenseeWinLoss,0))	AS WinLoss
 			,SUM(ISNULL(s.Turnover,0))			AS Turnover
 			,SUM(ISNULL(s.LicensingFee,0))		AS LicensingFee
-			,SUM(ISNULL(s.Rebate,0))			AS Discount
+			,SUM(ISNULL(s.LicensingFee,0) - ISNULL(s.Discount,0) - ISNULL(s.Rebate,0)) AS Discount
 			,@FirstDate							AS [Date]
 		FROM @PartyIdTable pt
 		LEFT JOIN @PartyList p ON p.PartyId=pt.PartyId
@@ -549,7 +546,7 @@ BEGIN
 			,SUM(ISNULL(s.LicenseeWinLoss,0))	AS WinLoss
 			,SUM(ISNULL(s.Turnover,0))			AS Turnover
 			,SUM(ISNULL(s.LicensingFee,0))		AS LicensingFee
-			,SUM(ISNULL(s.Discount,0))			AS Discount
+			,SUM(ISNULL(s.LicensingFee,0)-ISNULL(s.Discount,0))	AS Discount
 			,@FirstDate							AS [Date]
 		FROM @Skin bs
 		LEFT JOIN #SumBySkin s ON s.Skin = bs.Skin
