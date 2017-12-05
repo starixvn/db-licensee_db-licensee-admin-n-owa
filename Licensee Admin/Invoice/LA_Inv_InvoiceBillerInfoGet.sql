@@ -24,6 +24,7 @@ AS
 		+ 20170421@Bruce: Add environment filter
 		+ 20170824@Bruce: use same invoice no for debit note and debit note for return amf [#76410]
 		+ 20171128@Bruce: use created date time instead of invoice date [#86399]
+		+ 20171205@Bruce: exclude void invoice [#87723]
 */
 /*	Example:
 	USE bodb_licensee
@@ -64,7 +65,7 @@ BEGIN
 			i.InvoiceSymbol,
 			MAX(i.InvoiceNumber)
 	FROM	LA_InvoiceHeader i WITH(NOLOCK)
-	WHERE	i.BillerId = @BillerId AND (i.Environment IS NULL OR i.Environment = @Environment)
+	WHERE	i.BillerId = @BillerId AND (i.Environment IS NULL OR i.Environment = @Environment) AND ISNULL(StatusId,0) <> -1
 	GROUP BY i.BillerId,i.InvoiceType,i.InvoiceSymbol,i.CreatedDateTime
 	ORDER BY i.CreatedDateTime DESC
 
