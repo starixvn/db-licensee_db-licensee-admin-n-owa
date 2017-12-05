@@ -7,17 +7,17 @@ SET QUOTED_IDENTIFIER ON
 GO
 /****** Object:  Stored Procedure dbo.OA_Rpt_LicPerformance_Summary    Script Date: 3/6/2014 5:23:51 PM ******/
 ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_Summary] 
-	 @PartyIDs			VARCHAR(1000)	= ''
+	 @PartyIDs			VARCHAR(4000)	= ''
 	, @Currency			INT				= 0
 	, @FromDate			SMALLDATETIME
 	, @ToDate			SMALLDATETIME
-	, @ProductCode		VARCHAR(6)
+	, @ProductCode		VARCHAR(10)
 	, @ReportType		TINYINT			= 2	
 	, @drawfilter		SMALLINT		= 1
 	, @excludeTest		BIT				= 0
 	, @MoveBetsDay		SMALLDATETIME	= ''
 	, @IsConvert		BIT				= 0
-	, @BaseCurrencyName	VARCHAR(3)		= 'GBP'
+	, @BaseCurrencyName	VARCHAR(10)		= 'GBP'
 WITH RECOMPILE
 AS  
 /*	Created by: 20140929@Florent

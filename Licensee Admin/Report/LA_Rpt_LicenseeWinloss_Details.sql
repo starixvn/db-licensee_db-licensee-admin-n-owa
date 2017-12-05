@@ -16,7 +16,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss_Details]
 	, @DrawFilter			SMALLINT		= 1
 	, @ExcludeTest			BIT				= 0
 	, @IsConvert			BIT				= 0
-	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
+	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
 
 AS
 /*  Created:  Forrest.Nguyen

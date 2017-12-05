@@ -7,13 +7,13 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_LicensingFee]
-	   @PartyIDs			VARCHAR(1000)	= ''
+	   @PartyIDs			VARCHAR(4000)	= ''
 	   , @Currency			INT				= 0
 	   , @FromDate			SMALLDATETIME
 	   , @ToDate			SMALLDATETIME
 	   , @ProductCode		VARCHAR(500)
 	   , @IsConvert			BIT				= 0
-	   , @BaseCurrencyName	VARCHAR(3)		= 'GBP'
+	   , @BaseCurrencyName	VARCHAR(10)		= 'GBP'
 	   , @drawfilter		SMALLINT		= 1
 	   , @excludeTest		BIT				= 0
 WITH RECOMPILE
