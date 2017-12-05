@@ -14,6 +14,7 @@ AS
 
 	Revisions:
 		+ 20170630@Bruce: include BT/CO/CB, remove LC, VG [RedmineID: #79309]
+		- 20171205@Bruce: fix partyid length [#87723]
 */
 BEGIN
 	SET NOCOUNT ON

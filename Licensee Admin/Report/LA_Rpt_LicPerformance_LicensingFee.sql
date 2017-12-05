@@ -28,6 +28,7 @@ AS
 	   - 20150703@Florent: add GBP
 	   - 20160506@Bravo: Add VB data.
 	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+	   - 20171205@Bruce: fix partyid length [#87723]
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
 	  + @Currency : 0-All Currencies

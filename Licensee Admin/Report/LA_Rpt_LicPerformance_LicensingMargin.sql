@@ -28,6 +28,7 @@ AS
 	   - 20141226@Florent: enhance SP
 	   - 20150705@Florent: add GBP
 	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+	   - 20171205@Bruce: fix partyid length [#87723]
 	Param's Explanation:  
 	  + @PartyIDs : a string of list PartyID, separated by ','
 	  + @Currency : 0-All Currencies
