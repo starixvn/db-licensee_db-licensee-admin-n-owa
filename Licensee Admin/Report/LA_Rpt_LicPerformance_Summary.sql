@@ -7,17 +7,17 @@ SET QUOTED_IDENTIFIER ON
 GO
 /****** Object:  Stored Procedure dbo.OA_Rpt_LicPerformance_Summary    Script Date: 3/6/2014 5:23:51 PM ******/
 ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_Summary] 
-	 @PartyIDs			VARCHAR(1000)	= ''
+	 @PartyIDs			VARCHAR(4000)	= ''
 	, @Currency			INT				= 0
 	, @FromDate			SMALLDATETIME
 	, @ToDate			SMALLDATETIME
-	, @ProductCode		VARCHAR(6)
+	, @ProductCode		VARCHAR(10)
 	, @ReportType		TINYINT			= 2	
 	, @drawfilter		SMALLINT		= 1
 	, @excludeTest		BIT				= 0
 	, @MoveBetsDay		SMALLDATETIME	= ''
 	, @IsConvert		BIT				= 0
-	, @BaseCurrencyName	VARCHAR(3)		= 'GBP'
+	, @BaseCurrencyName	VARCHAR(10)		= 'GBP'
 WITH RECOMPILE
 AS  
 /*	Created by: 20140929@Florent
@@ -29,6 +29,7 @@ AS
 	   - 20141223@Florent: remove un-use code and enhance
 	   - 20150703@Florent: add GBP
 	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]	
+	   - 20171205@Bruce: fix partyid length [#87723]
 	Param's Explanation:  
 	  + @PartyIDs : a string of list PartyID, separated by ','
 	  + @Currency : 0-All Currencies

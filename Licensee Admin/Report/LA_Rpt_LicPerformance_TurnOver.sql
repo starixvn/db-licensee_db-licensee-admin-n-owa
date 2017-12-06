@@ -7,13 +7,13 @@ SET QUOTED_IDENTIFIER ON
 GO
 /****** Object:  Stored Procedure dbo.OA_Rpt_LicPerformance_TurnOver    Script Date: 3/4/2014 4:17:39 PM ******/
 ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_TurnOver] 
-	 @PartyIDs				VARCHAR(1000)	= ''
+	 @PartyIDs				VARCHAR(4000)	= ''
 	,	@Currency			INT				= 0
 	,	@FromDate			SMALLDATETIME
 	,	@ToDate				SMALLDATETIME
 	,	@ProductCode		VARCHAR(500)
 	,	@IsConvert			BIT				= 0
-	,	@BaseCurrencyName	VARCHAR(3)		= 'GBP'
+	,	@BaseCurrencyName	VARCHAR(10)		= 'GBP'
 	,	@drawfilter			SMALLINT		= 1
 	,	@excludeTest		BIT				= 0
 WITH RECOMPILE
@@ -29,6 +29,7 @@ AS
 		- 20150703@Florent: add GBP
 		- 20160506@Bravo: Add VB data.
 		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+		- 20171205@Bruce: fix partyid length [#87723]
     Param's Explanation:  
 	   + @partyIDs : a string of list PartyID, separated by ','
 	   + @Currency : 0-All Currencies

@@ -6,7 +6,7 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinLossByProduct]
-	@PartyIdString		VARCHAR(500),
+	@PartyIdString		VARCHAR(4000),
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
 	@BaseCurrencyName	VARCHAR(10)
@@ -29,6 +29,7 @@ AS
 						  - Include Colossus bet [#76131]
 						  - Include CashOut [#76131]
 		- 20170704@Scofield: Add VS2 and LT into report [RedmineID: #79310]
+		- 20171205@Bruce: fix partyid length [#87723]
 */
 		
 /*	Example:

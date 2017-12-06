@@ -7,7 +7,7 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss] 
-	  @PartyIDs				VARCHAR(1000)	= ''
+	  @PartyIDs				VARCHAR(4000)	= ''
 	, @Currency				INT				= 0
 	, @FromDate				SMALLDATETIME
 	, @ToDate				SMALLDATETIME
@@ -15,7 +15,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss]
 	, @DrawFilter			SMALLINT		= 1
 	, @excludeTest			BIT				= 0
 	, @IsConvert			BIT				= 0
-	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
+	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
 
 WITH RECOMPILE
 AS
@@ -27,6 +27,7 @@ AS
 	Revisions:
 	- 20160316: @Forrest - Change SporttypeRef to Sporttype for Microgaming  
 	- 20170412: @Scofield - Removing Trading Bet Types [#73310]
+	- 20171205@Bruce: fix partyid length [#87723]
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
 		+ @Currency	:  0- All Currencies
