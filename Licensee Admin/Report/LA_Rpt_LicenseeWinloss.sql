@@ -27,6 +27,7 @@ AS
 	Revisions:
 	- 20160316: @Forrest - Change SporttypeRef to Sporttype for Microgaming  
 	- 20170412: @Scofield - Removing Trading Bet Types [#73310]
+	- 20171205@Bruce: fix partyid length [#87723]
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
 		+ @Currency	:  0- All Currencies
