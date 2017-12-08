@@ -1,9 +1,4 @@
-USE [bodb_Licensee]
-GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 
 ALTER PROCEDURE [dbo].[LA_Rpt_MacauGamesWinLoss]          
 	@PartyIds			VARCHAR(500),
@@ -15,22 +10,17 @@ AS
 	 Created: 20171201@Scofield [#86573]
 	 Task : Get report Macau Games Win Loss
 	 DB: DB052.bodb_licensee   
+
 	 Revisions:  
 		- 20171201@Scofield: Create Macau Games Win Loss [#86573]
 	 Params:
 */
-BEGIN	
-	-- Region: Party List
-	DECLARE @PartyList AS TABLE (PartyId INT, PartyName	VARCHAR(100), BranchName VARCHAR(100), ParentId	INT)
-
-	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
-	EXEC LA_PartyListSel		
-	-- Endregion	
+BEGIN		
 
 	-- Region: Charge Info	
-	DECLARE @MacauGamesProductID INT = (SELECT ProductID FROM bodb_licensee.dbo.Product3rd WHERE ProductPrefix = 'VB')
 	DECLARE @ChargeInfos AS TABLE (
 		PartyId		INT,
+		ParentId	INT,		
 		LicenseeId	INT,
 		ProductID	INT,
 		Rate		MONEY,
@@ -47,6 +37,22 @@ BEGIN
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'VB', 'OA', 1) c		
 	)		
 	-- End region
+
+	-- Region: Party List
+	DECLARE @PartyList AS TABLE (PartyId INT, PartyName	VARCHAR(100), BranchName VARCHAR(100), ParentId	INT, ParentName VARCHAR(100))
+
+	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
+	EXEC LA_PartyListSel
+
+	UPDATE p
+	SET p.ParentName = pa.PartyName
+	FROM @PartyList p
+		INNER JOIN @PartyList pa ON pa.ParentId = 0 AND p.ParentId = pa.PartyId
+	
+	DELETE p
+	FROM @PartyList p
+	WHERE NOT EXISTS (SELECT 1 FROM @ChargeInfos ci WHERE ci.PartyId = p.PartyId)
+	-- Endregion	
 
 	-- Region: TempData
 	CREATE TABLE #TempData (
@@ -95,10 +101,9 @@ BEGIN
 	)
 		
 	INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, PayToSupplier)
-	SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.Winlostdate, td.CurrencyId, td.TotalTrans, td.Turnover, td.CustomerWinLoss, td.LicenseeWinloss, td.LicensingFee, td.PayToSupplier
+	SELECT td.PartyId, p.PartyName, p.ParentId, p.ParentName, td.Winlostdate, td.CurrencyId, td.TotalTrans, td.Turnover, td.CustomerWinLoss, td.LicenseeWinloss, td.LicensingFee, td.PayToSupplier
 	FROM #TempData td 	
 		INNER JOIN @PartyList p ON td.PartyId = p.PartyID
-		INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId		
 	-- End Region
 
 	-- Region: Exchange
@@ -268,9 +273,4 @@ BEGIN
 	DROP TABLE #Exchange
 	DROP TABLE #Result
 END
-
 GO
-GRANT EXECUTE ON [dbo].[LA_Rpt_MacauGamesWinLoss] TO [bodbLicenseeNet] AS [dbo]
-GRANT EXECUTE ON [dbo].[LA_Rpt_MacauGamesWinLoss] TO [bodbAdminNet] AS [dbo]
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_MacauGamesWinLoss] TO [vnteam] AS [dbo]
