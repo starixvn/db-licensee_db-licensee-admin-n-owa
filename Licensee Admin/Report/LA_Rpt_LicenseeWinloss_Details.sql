@@ -28,6 +28,7 @@ AS
     - 20160316: @Forrest - Change SporttypeRef to Sporttype for Microgaming
 	- 20170412: @Scofield - Removing Trading Bet Types [#73310]
 	- 20171205@Bruce: fix partyid length [#87723]
+	- 20171211: @Scofield - Support Colossus Bet [#87038]
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
 		+ @Currency	:  0- All Currencies
@@ -240,7 +241,95 @@ BEGIN
 		)
 	END
 	
-	IF (SELECT COUNT(*) FROM #ChargeInfo WHERE ProductID NOT IN (1, 3, 14, 17)) > 0
+	IF (SELECT COUNT(*) FROM #ChargeInfo WHERE ProductID = 15) > 0
+	BEGIN
+		-- Region: Local variables
+		DECLARE @ProductId INT = 15
+		DECLARE @CommChargeType INT = 6
+		DECLARE @CashInShareChargeType INT = 7
+
+		-- Region: Commision and Cash in share Rates
+		DECLARE @CBShare AS TABLE (
+			PartyId			INT,
+			LicenseeId		INT,
+			Rate			MONEY,
+			TypeId			SMALLINT,
+			FromDate		DATETIME,
+			ToDate			DATETIME
+		)
+
+		INSERT INTO @CBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
+		SELECT	ci.FromParty,
+				CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END AS LicenseeId,
+				ci.Rate,
+				ci.ChargeType,
+				CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
+				CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
+		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
+			LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
+			LEFT JOIN bodb_licensee.dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
+		WHERE FromParty = @PartyID AND ProductID = @ProductId AND ChargeType IN (@CommChargeType,@CashInShareChargeType) AND (
+			@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
+			@ToDate BETWEEN ci.FromDate AND ci.ToDate OR
+			ci.FromDate BETWEEN @FromDate AND @ToDate OR
+			ci.ToDate BETWEEN @FromDate AND @ToDate
+		)
+		-- End Region: Commision and Cash in share Rates
+
+		-- Region: Get Winloss Data
+		CREATE TABLE #TempData (
+			PartyId							INT,
+			rptDate							DATETIME,
+			CurrencyId						INT,
+			TotalTrans						INT,
+			Turnover						MONEY,
+			TurnoverExchanged				MONEY,
+			WinningPrize					MONEY,
+			CashOut							MONEY,
+			CommisionShare					MONEY,
+			CashInShare						MONEY,
+			CashInAmount					MONEY
+		)
+
+		INSERT INTO #TempData (PartyId, rptDate, CurrencyId, TotalTrans, Turnover, WinningPrize, CashOut, CashInAmount)
+		SELECT	cb.PartyId,
+				rptDate,
+				CurrencyId,
+				SUM(BetCount) TotalTrans,
+				SUM(Turnover) Turnover,
+				SUM(ISNULL(WinPrizeAmount,0)) WinningPrize,
+				SUM(ISNULL(CashOutAmount,0)) CashOut,
+				SUM(ISNULL(BuyBackAmount,0)) CashInAmount
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+		JOIN @CBShare cb ON b.SiteID = cb.LicenseeId AND b.rptDate BETWEEN cb.FromDate AND cb.ToDate
+		WHERE	ProductID = @ProductId AND
+				CustomerCategory NOT IN (27, 28) AND
+				b.StatusId NOT IN (-1, 101, 102, 103) AND
+				CurrencyId <> 20 AND
+				(@Currency = 0 OR (@Currency <> 0 AND CurrencyId = @Currency)) AND
+				cb.TypeId = @CommChargeType -- to remove duplicate we use one of (6,7)
+		GROUP BY cb.PartyId, rptdate, CurrencyId
+		-- End Region: Get Winloss Data
+
+		UPDATE #TempData
+		SET CommisionShare = td.Turnover * cm.Rate,
+			CashInShare = td.CashInAmount * ci.Rate
+		FROM #TempData td
+		JOIN @CBShare AS cm ON cm.TypeId = @CommChargeType AND (td.rptDate BETWEEN cm.FromDate AND cm.ToDate)
+		JOIN @CBShare AS ci ON ci.TypeId = @CashInShareChargeType AND (td.rptDate BETWEEN ci.FromDate AND ci.ToDate)
+		-- End Region: Calculate Commision, Cash In Share		
+		
+		INSERT INTO #Report (ReportDate, CurrencyID, ProductID, Company, Turnover, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Betcount)
+		SELECT td.rptDate, td.CurrencyId, @ProductId,
+			Turnover - WinningPrize - Cashout - CommisionShare - CashInShare,
+			0, 0, 0, 0, 0, 0, 0, 0, 0
+		FROM #TempData td	
+		
+		DROP TABLE #TempData
+	END
+	
+	IF (SELECT COUNT(*) FROM #ChargeInfo WHERE ProductID NOT IN (1, 3, 14, 17, 15)) > 0
 	BEGIN
 		DELETE #Data
 		
@@ -259,7 +348,7 @@ BEGIN
 				, 0
 				, SUM(b.betcount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) BetCount
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN (SELECT DISTINCT PartyId, LicenseeId, ProductID FROM #ChargeInfo WHERE ProductID NOT IN (1, 3, 14, 17)) ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
+				INNER JOIN (SELECT DISTINCT PartyId, LicenseeId, ProductID FROM #ChargeInfo WHERE ProductID NOT IN (1, 3, 14, 17, 15)) ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
@@ -282,7 +371,7 @@ BEGIN
 			, -SUM(b.Winloss * ci.Rate) AS Company
 			, SUM(b.betcount) AS betcount
 		FROM #Data b WITH (NOLOCK)
-			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate FROM #ChargeInfo WHERE ProductID NOT IN (1, 3, 14, 17)) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
+			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate FROM #ChargeInfo WHERE ProductID NOT IN (1, 3, 14, 17, 15)) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
 		WHERE b.rptDate BETWEEN ci.Fromdate AND ci.Todate
 		GROUP BY b.rptDate, b.Currency, b.ProductID
 	END
