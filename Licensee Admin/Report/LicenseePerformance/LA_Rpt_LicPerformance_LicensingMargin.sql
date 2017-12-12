@@ -1,13 +1,8 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_LicPerformance_LicensingMargin]    Script Date: 01/12/2014 14:41:09 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_LicensingMargin] 
-@PartyIDs				VARCHAR(4000)	= ''
+	@PartyIDs				VARCHAR(4000)	= ''
 	, @Currency				INT				= 0
 	, @FromDate				SMALLDATETIME
 	, @ToDate				SMALLDATETIME
@@ -21,14 +16,15 @@ AS
  
 /*  Created by: 20140930@Florent
 	Task : LicenseeAdmin - Get Licensee Perfomance TurnOver Report for each Licensee in one month
-    DB: DB052.bodb02  
-    Base on: [OA_Rpt_LicPerformance_LicensingMargin]
+	DB: DB052.bodb02  
+	Base on: [OA_Rpt_LicPerformance_LicensingMargin]
    
-    Revisions:  
+	Revisions:  
 	   - 20141226@Florent: enhance SP
 	   - 20150705@Florent: add GBP
 	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	   - 20171205@Bruce: fix partyid length [#87723]
+	   - 20171212@Bruce: Add Average Margin [#87843]
 	Param's Explanation:  
 	  + @PartyIDs : a string of list PartyID, separated by ','
 	  + @Currency : 0-All Currencies
@@ -40,46 +36,27 @@ AS
 BEGIN  
 	SET NOCOUNT ON  
 	
-	CREATE TABLE #rptLicMargin (Licensee VARCHAR(20), rptDate VARCHAR(50), Margin MONEY)
-	CREATE TABLE #Temp (PartyID INT, rptDate DATETIME, CurrencyID INT, Winloss MONEY, TurnOver MONEY)
+	CREATE TABLE #rptLicMargin (PartyName NVARCHAR(200), ReportDate SMALLDATETIME, Margin MONEY)
+	CREATE TABLE #Temp (PartyID INT, rptDate DATETIME, CurrencyID INT, Winloss DECIMAL(18,5), TurnOver DECIMAL(18,5))
 	DECLARE @Bettype TABLE (Bettype INT, ProductID INT)
-     DECLARE @tmpParty TABLE (PartyID INT, LicenseeID INT, ProductID INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME)     
+	DECLARE @tmpParty TABLE (PartyID INT, LicenseeID INT, ProductID INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME)     
 
-     INSERT INTO @Bettype( Bettype, ProductID)
-     SELECT Bettype,ProductID 
+	INSERT INTO @Bettype( Bettype, ProductID)
+	SELECT Bettype,ProductID
 	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, @ProductCode)
 
-     INSERT INTO @tmpParty( PartyID, LicenseeID,ProductID, Fromdate, Todate)
-     SELECT DISTINCT PartyID, LicenseeID, ProductID, Fromdate, Todate
-     FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', @ExcludeTest)
+	INSERT INTO @tmpParty( PartyID, LicenseeID,ProductID, Fromdate, Todate)
+	SELECT DISTINCT PartyID, LicenseeID, ProductID, Fromdate, Todate
+	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', @ExcludeTest)
 
-	DECLARE @MY TABLE (sDate DATETIME)
-
-	CREATE TABLE #Exchange (ExchangeDate DATE, ExchangeId INT, Rate FLOAT)
-	
-	DECLARE	 @cols	   AS NVARCHAR(MAX)
-			, @query	   AS NVARCHAR(MAX)
-			, @sdate	   AS DATETIME 
-	SELECT   @cols	 = NULL
-		    , @query = NULL
-		    , @sdate = @FromDate	
-
-	--WHILE ((MONTH(@sdate) <= MONTH(@ToDate) AND YEAR(@sdate) = YEAR(@ToDate)) OR (YEAR(@sdate) < YEAR(@ToDate)))
-	WHILE (@sdate <= @ToDate)
-	BEGIN 
-		INSERT INTO @MY(sDate)
-		SELECT @sdate
-		SET @sdate = DATEADD(M, 1, @sdate)
-	END
-
+	CREATE TABLE #Exchange (ExchangeDate DATE, ExchangeId INT, Rate DECIMAL(18,5))
 	INSERT INTO #Exchange (ExchangeDate, ExchangeId, Rate)
 	SELECT ExchangeDate, ExchangeId, BaseCurrencyRate			
 	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
 	IF @IsConvert = 0
 	BEGIN
-		UPDATE #Exchange
-		SET Rate = 1
+		UPDATE #Exchange SET Rate = 1
 	END
 
 	IF @ProductCode = 'BA'
@@ -89,10 +66,10 @@ BEGIN
 		  tp.PartyID, b.rptDate, b.currencyID		  
 		  , SUM(b.turnover *
 			 CASE WHEN @drawfilter IN (2, 3)	  THEN
-				    CASE WHEN b.Status = 111	  THEN 0	
-					    WHEN b.Status IN (114, 115) THEN 0.5
-					    ELSE 1 END 
-				    ELSE 1 END
+					CASE WHEN b.Status = 111	  THEN 0	
+						WHEN b.Status IN (114, 115) THEN 0.5
+						ELSE 1 END 
+					ELSE 1 END
 			 ) AS TurnOver
 		  , SUM(b.winloss) AS Winloss
 	   FROM bodb_LicenseeReport.dbo.rpt_Betting_BA b WITH ( NOLOCK ) 
@@ -119,7 +96,6 @@ BEGIN
 		  , SUM(winloss) AS Winloss
 	   FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK) 			
 		  INNER JOIN (SELECT DISTINCT PartyID, LicenseeID FROM @tmpParty) tp ON tp.LicenseeID = b.SiteID
-		  --INNER JOIN @bettype be ON b.bettype = be.bettype
 	   WHERE b.rptDate BETWEEN @FromDate AND @Todate
 		  AND b.Bettype IN (SELECT Bettype FROM @Bettype)		  
 		  AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
@@ -129,54 +105,73 @@ BEGIN
 	   GROUP BY tp.PartyID, rptDate, currencyID
 	END		
 
-	INSERT INTO #rptLicMargin(Licensee, rptDate, Margin)
-	   SELECT 
-		  --p.PartyName		  
-		  CASE p.PartyName
-			 WHEN '18bb' THEN 'PIH'
-			 WHEN 'IBC'  THEN 'FDL'
-			 ELSE p.PartyName
-		    END AS PartyName
-		  , DATENAME(YEAR, d.rptDate)  + '-' + DATENAME(MONTH, d.rptDate) AS rptDate
-		  , CASE WHEN ISNULL(SUM(TurnOver * e.Rate), 0) = 0 THEN 0  
-			 ELSE 
-				- SUM(Winloss * e.Rate) / SUM(Turnover * e.Rate) 
-			 END AS Margin
-	   FROM #Temp d
-		  INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON d.PartyID = p.PartyID		
-		  INNER JOIN #Exchange e ON d.rptDate = e.ExchangeDate AND d.CurrencyID = e.ExchangeId
-		  INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate FROM @tmpParty) tp ON tp.PartyID = d.PartyID
-	   WHERE  d.rptDate BETWEEN tp.Fromdate AND tp.Todate	   
-	   GROUP BY p.PartyName, DATENAME(YEAR, d.rptDate)  + '-' + DATENAME(MONTH, d.rptDate)
+	INSERT INTO #Temp(PartyID, rptDate, TurnOver, Winloss)
+	(
+		SELECT d.PartyID, DATEADD(MONTH, DATEDIFF(MONTH, 0, d.rptDate), 0)
+			, SUM(d.TurnOver * e.Rate)
+			, SUM(d.Winloss * e.Rate)
+		FROM #Temp d
+			INNER JOIN #Exchange e ON d.rptDate = e.ExchangeDate AND d.CurrencyID = e.ExchangeId
+			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate FROM @tmpParty) tp ON tp.PartyID = d.PartyID
+		WHERE  d.rptDate BETWEEN tp.Fromdate AND tp.Todate
+		GROUP BY d.PartyID, DATEADD(MONTH, DATEDIFF(MONTH, 0, d.rptDate), 0)
+	)
 
-	--------------------------------- view result  -------------------------------------------
-	SELECT @cols = COALESCE(@cols + ',' + QUOTENAME(DATENAME(YEAR, sdate)  + '-' + DATENAME(MONTH, sdate))
-									, QUOTENAME(DATENAME(YEAR, sdate)  + '-' + DATENAME(MONTH, sdate)))
-	FROM @MY
-	SET @query='SELECT Licensee AS PartyName,' + @cols + ' 
-            FROM
-            (
-              SELECT s.Licensee,s.margin,s.seq
-              FROM
-              (
-                SELECT Licensee,margin
-                  , rptdate seq
-                FROM #rptLicMargin
-              ) s
-              
-            ) x
-            PIVOT
-            (
-                MAX(margin)
-                FOR seq IN (' + convert(varchar(1000),@cols) + ')
-            ) p '			
-	EXECUTE sp_executesql @query;
-				
+	INSERT INTO #rptLicMargin(PartyName, ReportDate, Margin)
+	(
+		SELECT 
+			CASE p.PartyName
+				WHEN '18bb' THEN 'PIH'
+				WHEN 'IBC'  THEN 'FDL'
+				ELSE p.PartyName
+			END AS PartyName
+			, d.rptDate
+			, CASE WHEN d.TurnOver = 0 THEN 0 ELSE -d.Winloss/d.TurnOver END AS Margin
+		FROM #Temp d
+			INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON d.PartyID = p.PartyID		
+		WHERE d.CurrencyID IS NULL
+	)
+
+	-- Average Margin
+	INSERT INTO #rptLicMargin(PartyName, ReportDate, Margin)
+	(
+		SELECT 'Average Margin'
+			, d.rptDate
+			, CASE WHEN SUM(d.TurnOver) = 0 THEN 0 ELSE SUM(-d.Winloss)/SUM(d.TurnOver)	END AS Margin
+		FROM #Temp d
+			INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON d.PartyID = p.PartyID		
+		WHERE d.CurrencyID IS NULL
+		GROUP BY d.rptDate
+	)
+
+	-- insert missing month
+	DECLARE @Date SMALLDATETIME = DATEADD(MONTH, DATEDIFF(MONTH, 0, @FromDate), 0)
+	DECLARE @MonthList TABLE(DateValue SMALLDATETIME)
+
+	WHILE(@Date <= @ToDate)
+	BEGIN
+		INSERT INTO @MonthList(DateValue) VALUES(@Date)
+		SET @Date = DATEADD(MONTH,1,@Date)
+	END
+
+	INSERT INTO #rptLicMargin(PartyName, ReportDate, Margin)
+	(
+		SELECT y.PartyName,m.DateValue,0
+		FROM @MonthList m
+			INNER JOIN (SELECT DISTINCT x.PartyName FROM #rptLicMargin x) y ON 1=1
+			LEFT JOIN #rptLicMargin r ON r.PartyName = y.PartyName AND r.ReportDate = m.DateValue
+		WHERE r.ReportDate IS NULL
+	)	
+
+	SELECT PartyName, ReportDate, Margin
+	FROM #rptLicMargin
+
 	DROP TABLE #rptLicMargin
 	DROP TABLE #Temp	
 	DROP TABLE #Exchange	
 END
-
 GO
+
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicPerformance_LicensingMargin] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_Rpt_LicPerformance_LicensingMargin] TO bodbAdminNet 
+GRANT EXECUTE ON [dbo].[LA_Rpt_LicPerformance_LicensingMargin] TO bodbAdminNet
+GO
