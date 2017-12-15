@@ -28,7 +28,7 @@ AS
     - 20160316: @Forrest - Change SporttypeRef to Sporttype for Microgaming
 	- 20170412: @Scofield - Removing Trading Bet Types [#73310]
 	- 20171205@Bruce: fix partyid length [#87723]
-	- 20171211: @Scofield - Support Colossus Bet [#87038]
+	- 20171211: @Scofield - Support Colossus Bet, Cashout, Bet Trade [#87038]
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
 		+ @Currency	:  0- All Currencies
@@ -282,9 +282,7 @@ BEGIN
 			PartyId							INT,
 			rptDate							DATETIME,
 			CurrencyId						INT,
-			TotalTrans						INT,
 			Turnover						MONEY,
-			TurnoverExchanged				MONEY,
 			WinningPrize					MONEY,
 			CashOut							MONEY,
 			CommisionShare					MONEY,
@@ -292,16 +290,15 @@ BEGIN
 			CashInAmount					MONEY
 		)
 
-		INSERT INTO #TempData (rptDate, CurrencyId, TotalTrans, Turnover, WinningPrize, CashOut, CashInAmount)
+		INSERT INTO #TempData (rptDate, CurrencyId, Turnover, WinningPrize, CashOut, CashInAmount)
 		SELECT	rptDate,
 				CurrencyId,
-				SUM(BetCount) TotalTrans,
 				SUM(Turnover) Turnover,
 				SUM(ISNULL(WinPrizeAmount,0)) WinningPrize,
 				SUM(ISNULL(CashOutAmount,0)) CashOut,
 				SUM(ISNULL(BuyBackAmount,0)) CashInAmount
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-		JOIN @CBShare cb ON b.SiteID = cb.LicenseeId AND b.rptDate BETWEEN cb.FromDate AND cb.ToDate
+		INNER JOIN @CBShare cb ON b.SiteID = cb.LicenseeId AND b.rptDate BETWEEN cb.FromDate AND cb.ToDate
 		WHERE	ProductID = @ProductId AND
 				CustomerCategory NOT IN (27, 28) AND
 				b.StatusId NOT IN (-1, 101, 102, 103) AND
@@ -315,8 +312,8 @@ BEGIN
 		SET CommisionShare = td.Turnover * cm.Rate,
 			CashInShare = td.CashInAmount * ci.Rate
 		FROM #TempData td
-		JOIN @CBShare AS cm ON cm.TypeId = @CommChargeType AND (td.rptDate BETWEEN cm.FromDate AND cm.ToDate)
-		JOIN @CBShare AS ci ON ci.TypeId = @CashInShareChargeType AND (td.rptDate BETWEEN ci.FromDate AND ci.ToDate)
+		INNER JOIN @CBShare AS cm ON cm.TypeId = @CommChargeType AND (td.rptDate BETWEEN cm.FromDate AND cm.ToDate)
+		INNER JOIN @CBShare AS ci ON ci.TypeId = @CashInShareChargeType AND (td.rptDate BETWEEN ci.FromDate AND ci.ToDate)
 		-- End Region: Calculate Commision, Cash In Share		
 		
 		INSERT INTO #Report (ReportDate, CurrencyID, ProductID, Company, Turnover, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Betcount)
@@ -330,8 +327,6 @@ BEGIN
 	
 	IF (SELECT COUNT(*) FROM #ChargeInfo WHERE ProductID = 25) > 0
 	BEGIN
-		DECLARE @SBProductId INT = 0
-		DECLARE @BAProductId INT = 3
 		DECLARE @COProductId INT = 25
 
 		INSERT INTO #Report (ReportDate, CurrencyID, ProductID, Company, Turnover, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Betcount)
@@ -344,9 +339,6 @@ BEGIN
 				0, 0, 0, 0, 0, 0, 0, 0, 0
 			FROM (
 					SELECT b.Winlostdate, b.Currency,
-							SUM(b.NumOfCashoutTrans) AS CashoutTimes,
-							SUM(b.NumOfCashoutTicket) AS CashoutTickets,
-							SUM(b.CashoutAmount) AS CashoutValue,					
 							SUM(b.BuyBackAmt) AS BuyBackAmountSB,
 							SUM(b.BABuyBackAmt) AS BuyBackAmountBA,
 							SUM(b.TicketPayout) AS TicketsPayout,					
@@ -366,12 +358,11 @@ BEGIN
 	IF (SELECT COUNT(*) FROM #ChargeInfo WHERE ProductID = 13) > 0
 	BEGIN
 		DECLARE @BTProductId INT = 13
-		DECLARE @Bettype AS TABLE(
-			Bettype	   INT,
-			ProductId	   INT)
+		DECLARE @Bettype AS TABLE(Bettype INT, ProductId INT)
+		
 		INSERT INTO @Bettype (Bettype, ProductId)		
-	     SELECT Bettype, ProductID
-	     FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, 'BT,SB,BA')		
+	    SELECT Bettype, ProductID
+	    FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, 'BT,SB,BA')		
 
 		INSERT INTO #Report (ReportDate, CurrencyID, ProductId, Company, Turnover, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Betcount)
 		(
@@ -386,11 +377,7 @@ BEGIN
 					, SUM(CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount - b.WinLoss) ELSE 0 END) AS Actual_stake
 					, SUM(CASE WHEN b.Bettype = 901 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountTotal
 					, SUM(CASE WHEN bt.ProductID = 0 THEN b.WinLoss ELSE 0 END) AS BTWinLoss
-					, - SUM(CASE WHEN bt.ProductID = 0 AND b.CustomerCategory <> 1002 THEN b.WinLoss ELSE 0 END) AS LicWinLoss -- LicenseeWL on bought BA(1002) = 0
 					, SUM (CASE WHEN b.Bettype = 901 AND b.CustomerCategory = 1001 THEN - b.BuyBackAmount * ci.Rate ELSE 0 END) AS BettradeComm
-					, SUM(CASE WHEN bt.ProductId = 0 THEN ISNULL(b.BetCount, 0) ELSE 0 END) BetCount
-					, SUM(CASE WHEN b.bettype = 901 AND b.CustomerCategory = 1001 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountSB -- 1001 : SB
-					, SUM(CASE WHEN b.bettype = 901 AND b.CustomerCategory = 1002 THEN b.BuyBackAmount ELSE 0 END) AS BuyBachAmountBA -- 1002 : BA
 				FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
 					INNER JOIN #ChargeInfo ci ON b.SiteId = ci.LicenseeID 
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN (0, 13)
@@ -400,17 +387,15 @@ BEGIN
 					AND b.Status NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory IN (1001, 1002)
 				GROUP BY b.RptDate, b.CurrencyId
+				
 				UNION ALL 
+				
 				-- rpt_betting_BA only contain original ticket, SOLD BOUGHT COMM ticket will be in rpt_betting
 				SELECT b.RptDate, b.CurrencyId
 					, 0 AS Actual_stake
 					, 0 AS BuyBackAmountTotal
 					, SUM(b.WinLoss) AS BTWinLoss
-					, 0 AS LicWinLoss -- LicenseeWL on bought BA = 0
 					, 0 AS BettradeComm
-					, SUM(ISNULL(b.BetCount, 0)) BetCount
-					, 0 AS BuyBackAmountSB
-					, 0 AS BuyBackAmountBA
 				FROM bodb_licenseereport.dbo.rpt_Betting_BA b WITH (NOLOCK)
 					INNER JOIN #ChargeInfo ci ON b.SiteId = ci.LicenseeID
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (3)
