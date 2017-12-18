@@ -1,10 +1,4 @@
-USE [bodb02]
-GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_LicenseeWinloss_Details]    Script Date: 20/10/2015 13:00:00 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss_Details] 
 	  @PartyID				INT
@@ -589,5 +583,3 @@ BEGIN
 	DROP TABLE #Products
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicenseeWinloss_Details] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeWinloss_Details] TO bodbAdminNet 
