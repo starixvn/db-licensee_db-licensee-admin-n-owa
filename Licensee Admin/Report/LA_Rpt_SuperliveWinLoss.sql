@@ -1,31 +1,27 @@
 USE [bodb_Licensee]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_SuperliveWinLoss]    Script Date: 03/22/2016 10:30:00 ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
 
-ALTER PROCEDURE [dbo].[LA_Rpt_SuperliveWinLoss]          
-				@PartyIds			VARCHAR(1000),
-				@FromDate			DATETIME,
-				@ToDate				DATETIME,
-				@BaseCurrencyName	VARCHAR(3)		= 'GBP'
+ALTER PROCEDURE [dbo].[LA_Rpt_SuperliveWinLoss]
+	@PartyIds			VARCHAR(4000),
+	@FromDate			DATETIME,
+	@ToDate				DATETIME,
+	@BaseCurrencyName	VARCHAR(10)		= 'GBP'
 AS
 
-/*  
+/*
 	 Created: 20160322@Forrest
 	 Task : Superlive Win Loss Report
 	 DB: DBLIC.bodb_licensee
-   
-	 Revisions:  
+
+	 Revisions:
 	 - 20160322@Forrest: Get Superlive Report Data.
 	 - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+	 - 20171219@Bruce: increase length for variables [#88197]
 	 Params:
 	 - PartyIds: List Party Id.
 	 - FromDate: From Date.
 	 - ToDate: To Date.
-	 - BaseCurrencyName: Base Currency needs to be converted to.			   
+	 - BaseCurrencyName: Base Currency needs to be converted to.
 */
 
 BEGIN
@@ -47,44 +43,44 @@ SET NOCOUNT ON
 	SELECT	PartyID, LicenseeID, isDeposit, ProductID, DI_Rate, Fromdate, Todate
 	FROM	dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'SB', 'OA', 0)
 	WHERE	DI_Rate > 0
-	
+
 	-- End region
-	
+
 	-- Region: Party List
-	
+
 	DECLARE @PartyList AS TABLE (
 		PartyId		INT,
 		PartyName	VARCHAR(100),
-		BranchName	VARCHAR(100), 
+		BranchName	VARCHAR(100),
 		ParentId	INT
 	)
 
 	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC LA_PartyListSel
-	
+
 	-- End region
-	
+
 	-- Region: Get exchange rate info
-	
+
 	CREATE TABLE #Exchange(
 		ExchangeDate	DATE,
 		ExchangeID		INT,
 		CurrencyCode	VARCHAR(10),
 		Rate			FLOAT
 	)
-	
+
 	INSERT INTO #Exchange
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
-	
-	UPDATE #Exchange 
+
+	UPDATE #Exchange
 	SET CurrencyCode = 'INH'
 	WHERE ExchangeID = 51
-	
+
 	-- End region
-	
+
 	-- Region: Get Winloss data
-	
+
 	CREATE TABLE #TempData(
 		LicenseeId	INT,
 		PartyId		INT,
@@ -96,7 +92,7 @@ SET NOCOUNT ON
 		LicenseeWL	MONEY,
 		AmtLicensee MONEY
 	)
-	
+
 	INSERT INTO #TempData (LicenseeId, PartyId, RptDate, CurrencyId, TotalTrans, Turnover, CustomerWL, LicenseeWL, AmtLicensee)
 	(
 		SELECT	b.SiteID,
@@ -106,16 +102,16 @@ SET NOCOUNT ON
 				SUM(ISNULL(b.BetCount, 0)) TotalTrans,
 				SUM(ISNULL(b.Turnover, 0)) Turnover,
 				SUM(ISNULL(b.WinLoss, 0)) CustomerWL,
-				SUM(CASE WHEN p.IsDeposit = 0 
+				SUM(CASE WHEN p.IsDeposit = 0
 						 THEN (-b.WinLoss - b.WinLossA - b.WinLossS - b.WinLossM - b.CommissionS)
 						 ELSE -b.WinLoss
 					END) LicenseeWL,
-				SUM(CASE WHEN p.IsDeposit = 0 
+				SUM(CASE WHEN p.IsDeposit = 0
 						 THEN (-b.WinLoss - b.WinLossA - b.WinLossS - b.WinLossM - b.CommissionS) * p.Rate
-						 ELSE -b.WinLoss * p.Rate 
+						 ELSE -b.WinLoss * p.Rate
 					END) AmtLicensee
 		FROM	bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
-				INNER JOIN @PartyChargeInfo p ON b.SiteID = p.LicenseeId 
+				INNER JOIN @PartyChargeInfo p ON b.SiteID = p.LicenseeId
 				AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate
 				AND (b.CurrencyID <> 20)
@@ -124,11 +120,11 @@ SET NOCOUNT ON
 				AND b.Bettype BETWEEN 800 AND 899 -- Metric Gaming Bettype In Sportsbook
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, p.PartyId
 	)
-	
+
 	-- End region
-	
+
 	-- Region: Result data
-	
+
 	DECLARE @Result TABLE (
 		PartyId				INT,
 		PartyName			VARCHAR(100),
@@ -138,42 +134,42 @@ SET NOCOUNT ON
 		CurrencyName		VARCHAR(20),
 		TotalTrans			INT,
 		Turnover			MONEY,
-		CustomerWinLoss		MONEY,		
+		CustomerWinLoss		MONEY,
 		LicenseeWinLoss		MONEY,
 		AmountDueLicensee	MONEY
 	)
-	
+
 	IF @BaseCurrencyName = ''
-	BEGIN 
+	BEGIN
 		INSERT INTO @Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueLicensee)
 		SELECT p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode, td.TotalTrans, td.Turnover, td.CustomerWL, td.LicenseeWL, td.AmtLicensee
-		FROM #TempData td 
+		FROM #TempData td
 			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
 			INNER JOIN @PartyList p ON td.PartyId = p.PartyID
 			INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId
-		
-	END 
-	ELSE 
+
+	END
+	ELSE
 	BEGIN
 		INSERT INTO @Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueLicensee)
 		SELECT p.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.rptDate, e.CurrencyCode, td.TotalTrans, td.Turnover*e.Rate, td.CustomerWL*e.Rate, td.LicenseeWL*e.Rate, td.AmtLicensee*e.Rate
-		FROM #TempData td 
+		FROM #TempData td
 			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
 			INNER JOIN @PartyList p ON td.PartyId = p.PartyID
-			INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId	
+			INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId
 	END
-	
+
 	-- End region
-	
+
 	-- Region: Grand total data
-	
+
 	DECLARE @tempCurrency VARCHAR(20)
 	DECLARE @BaseCurrencies TABLE(
 		Id INT,
 		Name VARCHAR(20),
 		IsApply BIT
 	)
-	
+
 	DECLARE @ProductChargeInfo TABLE (
 		Rate FLOAT,
 		FromDate SMALLDATETIME,
@@ -182,45 +178,45 @@ SET NOCOUNT ON
 		MaxAmount MONEY,
 		BaseCurrenyCode VARCHAR(20)
 	)
-	
+
 	DECLARE @GrandTotal TABLE (
 		CurrencyName	VARCHAR(20),
 		TotalTrans		INT,
 		Turnover		MONEY,
-		CustomerWinLoss		MONEY,		
+		CustomerWinLoss		MONEY,
 		LicenseeWinLoss		MONEY,
 		AmountDueLicensee	MONEY,
 		AmountDueSuperlive	MONEY,
 		AmountDueCompany	MONEY
 	)
-	
+
 	INSERT INTO @BaseCurrencies(Id, Name)
 	EXEC LA_SelBaseCurrency
-	
+
 	DECLARE @AmountDueSuperlive MONEY
-	
+
 	IF(SELECT COUNT(*) FROM @Result) > 0
 	BEGIN
 		WHILE EXISTS (SELECT * FROM @BaseCurrencies WHERE IsApply IS NULL)
 		BEGIN
-			SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)		
+			SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)
 			DELETE FROM #Exchange
 			INSERT INTO #Exchange
 			SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 			FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency)
-			
+
 			INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,AmountDueLicensee)
-			SELECT	@tempCurrency, 
+			SELECT	@tempCurrency,
 					SUM(td.TotalTrans),
-					SUM(td.Turnover * e.Rate), 
-					SUM(td.CustomerWL * e.Rate), 
-					SUM(td.LicenseeWL * e.Rate), 
+					SUM(td.Turnover * e.Rate),
+					SUM(td.CustomerWL * e.Rate),
+					SUM(td.LicenseeWL * e.Rate),
 					SUM(td.AmtLicensee * e.Rate)
-			FROM #TempData td 
+			FROM #TempData td
 			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
-			
+
 			DELETE FROM @ProductChargeInfo
-			
+
 			INSERT INTO @ProductChargeInfo(Rate, FromDate, ToDate, MinAmount, MaxAmount, BaseCurrenyCode)
 			SELECT	ci.Rate,
 					ci.FromDate,
@@ -231,27 +227,27 @@ SET NOCOUNT ON
 			FROM OAS_ChargeInfo ci
 			INNER JOIN #Exchange ex ON ci.BaseCurrencyId = ex.ExchangeID AND ex.ExchangeDate = @ToDate
 			WHERE ci.ProductID = 0 AND ci.FromParty = 1 AND ci.ChargeType = 4 -- Get Charge Rate to Billing for Metric Gaming
-			
+
 			SELECT @AmountDueSuperlive = ISNULL(SUM(pci.AmountDueSuperlive),0) FROM @GrandTotal gt OUTER APPLY (
-			SELECT 
-			CASE WHEN (gt.AmountDueLicensee BETWEEN MinAmount AND MaxAmount) AND MinAmount = 0 THEN (gt.AmountDueLicensee - MinAmount) * Rate 
-				 WHEN (gt.AmountDueLicensee BETWEEN MinAmount AND MaxAmount) AND MinAmount > 0 THEN (gt.AmountDueLicensee - MinAmount) * Rate 
-				 WHEN (gt.AmountDueLicensee > MaxAmount) THEN (MaxAmount - MinAmount) * Rate 
+			SELECT
+			CASE WHEN (gt.AmountDueLicensee BETWEEN MinAmount AND MaxAmount) AND MinAmount = 0 THEN (gt.AmountDueLicensee - MinAmount) * Rate
+				 WHEN (gt.AmountDueLicensee BETWEEN MinAmount AND MaxAmount) AND MinAmount > 0 THEN (gt.AmountDueLicensee - MinAmount) * Rate
+				 WHEN (gt.AmountDueLicensee > MaxAmount) THEN (MaxAmount - MinAmount) * Rate
 				 ELSE 0 END AS AmountDueSuperlive, pci.MinAmount, pci.MaxAmount
-			FROM @ProductChargeInfo pci 
+			FROM @ProductChargeInfo pci
 			WHERE gt.CurrencyName = pci.BaseCurrenyCode) pci
 			WHERE gt.CurrencyName = @tempCurrency
-			GROUP BY gt.CurrencyName					
-			
+			GROUP BY gt.CurrencyName
+
 			UPDATE @GrandTotal SET AmountDueSuperlive = @AmountDueSuperlive, AmountDueCompany = AmountDueLicensee - @AmountDueSuperlive WHERE CurrencyName = @tempCurrency
-			UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency 
+			UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 		END
 	END
 	-- End region
-	
+
 	SELECT * FROM @Result
 	SELECT * FROM @GrandTotal
-	
+
 	DROP TABLE #Exchange
 	DROP TABLE #TempData
 END

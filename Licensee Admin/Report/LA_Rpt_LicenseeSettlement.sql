@@ -5,9 +5,9 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeSettlement]
 	  @PartyId				INT
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME
-	, @ProductCode			VARCHAR(6)
+	, @ProductCode			VARCHAR(50)
 	, @CurrencyId			INT				= 0
-	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
+	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
 WITH RECOMPILE
 AS
 	/*  Created: 20150313@Florent
@@ -27,10 +27,11 @@ AS
 			- 20160428@Bruce: MGCRNG: Support Microgaming - Progressive Contribution
 			- 20160929@Scofield: Update for Colossus Bet
 			- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
-			- 20170329@Scofield: support Cashout [RedmineID :#73310]		
-			- 20170404@Harper: using new sum table for Cashout Product [RedmineID: #73310]	
+			- 20170329@Scofield: support Cashout [RedmineID :#73310]
+			- 20170404@Harper: using new sum table for Cashout Product [RedmineID: #73310]
 			- 20170511@bruce: include exchange rate [RedmineID: #76132]
 			- 20170712@bruce: include BRVS, LO [RedmineID: #79310]
+			- 20171219@Bruce: increase length for variables [#88197]
 
 		Param's Explanation:
 			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
@@ -138,7 +139,7 @@ BEGIN
 		,CAST(0 AS MONEY)	AS BuyBackAmountBase
 		,CAST(0 AS MONEY)	AS BettradeCommBase
 		,CAST(0 AS MONEY)	AS MemberWinLossBase
-		,CAST(0 AS MONEY)	AS MemberCommBase	
+		,CAST(0 AS MONEY)	AS MemberCommBase
 		,CAST(0 AS MONEY)	AS LicenseeWLBase
 		,CAST(0 AS MONEY)	AS LicenseeCommBase
 		,CAST(0 AS MONEY)	AS CompanyBase
@@ -154,7 +155,7 @@ BEGIN
 	END
 
 	DECLARE @Recommend VARCHAR(8000) = '', @SQL VARCHAR(8000) = ''
-	
+
 	CREATE TABLE #DataWinloss3rd
 	(
 		Recommend		INT,
@@ -182,11 +183,11 @@ BEGIN
 		WHERE (@CurrencyId = 0 OR (@CurrencyId <> 0 AND Currency = @CurrencyId))
 			AND Currency <> 20
 
-		SELECT @Recommend = @Recommend + CAST(CustID AS VARCHAR) + ',' 
-		FROM @TempAG 
+		SELECT @Recommend = @Recommend + CAST(CustID AS VARCHAR) + ','
+		FROM @TempAG
 
 		--truncate last comma
-		SET @Recommend = SUBSTRING(@Recommend, 0, LEN(@Recommend))	
+		SET @Recommend = SUBSTRING(@Recommend, 0, LEN(@Recommend))
 
 		SELECT @sql = 'SELECT Recommend, Winlostdate, SportType, Currency, Turnover, TotalTrans, Winloss
 						FROM OPENQUERY(DBACC,''EXEC bodb02.dbo.LA_Rpt_3rdProductWinloss
@@ -221,7 +222,7 @@ BEGIN
 				INNER JOIN @TempAG ag ON b.Recommend = ag.CustId AND b.Currency = ag.CurrencyId
 				INNER JOIN @tmpParty p ON ag.LicenseeeID = p.LicenseeId
 			WHERE b.Winlostdate BETWEEN p.Fromdate AND p.Todate
-			GROUP BY b.Winlostdate, CurrencyID 
+			GROUP BY b.Winlostdate, CurrencyID
 		)
 	END
 	ELSE IF (@ProductCode = 'GD' OR @ProductCode = 'VG') -- GD, VG
@@ -234,10 +235,10 @@ BEGIN
 			AND Currency <> 20
 
 		SELECT @Recommend = @Recommend + CAST(CustID AS VARCHAR) + ','
-		FROM @TempAG 
+		FROM @TempAG
 
 		--truncate last comma
-		SET @Recommend = SUBSTRING(@Recommend, 0, LEN(@Recommend))	
+		SET @Recommend = SUBSTRING(@Recommend, 0, LEN(@Recommend))
 
 		INSERT INTO #DataWinloss3rd(Recommend, Winlostdate, Currency, Turnover, TotalTrans, Winloss)
 		EXECUTE dbo.LA_Rpt_ThirdPartyProductWinloss
@@ -264,7 +265,7 @@ BEGIN
 				INNER JOIN @TempAG ag ON b.Recommend = ag.CustId AND b.Currency = ag.CurrencyId
 				INNER JOIN @tmpParty p ON ag.LicenseeeID = p.LicenseeId
 			WHERE b.Winlostdate BETWEEN p.Fromdate AND p.Todate
-			GROUP BY b.Winlostdate, CurrencyID 
+			GROUP BY b.Winlostdate, CurrencyID
 		)
 	END
 	ELSE IF (@ProductCode = 'MGCLC' OR @ProductCode = 'MGCRNG')
@@ -362,7 +363,7 @@ BEGIN
 				, SUM (d.BuyBackAmountTotal)	AS BuyBackAmount
 				, SUM (d.LicWinLoss )		AS LicenseeWL
 				, SUM (d.BTWinLoss)			AS Winlost
-				, SUM (d.BettradeComm)		AS BettradeComm 
+				, SUM (d.BettradeComm)		AS BettradeComm
 				, SUM ((d.BTWinLoss + d.BettradeComm + d.Actual_stake - d.BuyBackAmountTotal)) AS Company
 				, SUM (BetCount) AS BetCount
 				, SUM (BuyBackAmountSB)
@@ -378,7 +379,7 @@ BEGIN
 					, SUM(CASE WHEN b.bettype = 901 AND b.CustomerCategory = 1001 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountSB -- 1001 : SB
 					, SUM(CASE WHEN b.bettype = 901 AND b.CustomerCategory = 1002 THEN b.BuyBackAmount ELSE 0 END) AS BuyBachAmountBA -- 1002 : BA
 				FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
-					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID 
+					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN (0, 13)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
 					AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
@@ -386,7 +387,7 @@ BEGIN
 					AND b.Status NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory IN (1001, 1002)
 				GROUP BY b.RptDate, b.CurrencyId
-				UNION ALL 
+				UNION ALL
 				-- rpt_betting_BA only contain original ticket, SOLD BOUGHT COMM ticket will be in rpt_betting
 				SELECT b.RptDate, b.CurrencyId
 					, 0 AS Actual_stake
@@ -420,7 +421,7 @@ BEGIN
 				b.rptDate
 				, b.CurrencyID
 				, SUM(b.turnover *
-						CASE WHEN @drawfilter IN (2, 3) 
+						CASE WHEN @drawfilter IN (2, 3)
 							THEN CASE WHEN b.STATUS = 111 THEN 0
 								WHEN b.STATUS IN (114, 115)	THEN 0.5 ELSE 1	END
 							ELSE 1
@@ -442,7 +443,7 @@ BEGIN
 				AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
 				AND b.CurrencyID <> 20
 			GROUP BY
-				b.rptDate, b.CurrencyID	
+				b.rptDate, b.CurrencyID
 		)
 	END
 	ELSE IF (@ProductCode = 'CB')
@@ -521,7 +522,7 @@ BEGIN
 		JOIN @CBShare AS cm ON cm.TypeId = @CommChargeType AND (td.rptDate BETWEEN cm.FromDate AND cm.ToDate)
 		JOIN @CBShare AS ci ON ci.TypeId = @CashInShareChargeType AND (td.rptDate BETWEEN ci.FromDate AND ci.ToDate)
 		-- End Region: Calculate Commision, Cash In Share
-		
+
 		-- Region: Group by Currency
 		INSERT INTO #Result(Winlostdate, CurrencyId, Turnover, Betcount, WinningPrize, Cashout, LicenseeComm, CashInShare)
 		SELECT @ToDate, CurrencyId, SUM(td.Turnover), SUM(td.TotalTrans), SUM(td.WinningPrize), SUM(td.CashOut), SUM(td.CommisionShare), SUM(td.CashInShare)
@@ -538,8 +539,8 @@ BEGIN
 	BEGIN
 		DECLARE @SBProductId INT = 0
 		DECLARE @BAProductId INT = 3
-		DECLARE @COProductId INT = (SELECT Productid FROM bodb_licensee.dbo.Product3rd WHERE ProductPrefix = 'CO') 
-		-- add more bettype for SB, BA		
+		DECLARE @COProductId INT = (SELECT Productid FROM bodb_licensee.dbo.Product3rd WHERE ProductPrefix = 'CO')
+		-- add more bettype for SB, BA
 
 		INSERT INTO #Result( Winlostdate, CurrencyId, CashoutTimes, CashoutTickets, CashoutValue, BuyBackAmountSB, BuyBackAmountBA, BuyBackAmount, TicketsPayout, CashoutCommission, BuyBackAmountAndComm, Company)
 		(
@@ -548,11 +549,11 @@ BEGIN
 				d.Currency,
 				SUM(CashoutTimes) AS CashoutTimes,
 				SUM(ISNULL(CashoutTickets, 0)) AS CashoutTickets,
-				SUM(CashoutValue) AS CashoutValue,					
+				SUM(CashoutValue) AS CashoutValue,
 				SUM(BuyBackAmountSB) AS BuyBackAmountSB,
 				SUM(BuyBackAmountBA) AS BuyBackAmountBA,
 				SUM(BuyBackAmountSB + BuyBackAmountBA) AS BuyBackAmount,
-				SUM(TicketsPayout) AS TicketsPayout,					
+				SUM(TicketsPayout) AS TicketsPayout,
 				SUM(CashoutCommission) AS CashoutCommission,
 				SUM(BuyBackAmountSB + BuyBackAmountBA + CashoutCommission) AS BuyBackAmountAndComm,
 				SUM(TicketsPayout - BuyBackAmountSB - BuyBackAmountBA - CashoutCommission) AS Company
@@ -560,21 +561,21 @@ BEGIN
 					SELECT p.PartyId, b.Winlostdate, b.Currency,
 							SUM(b.NumOfCashoutTrans) AS CashoutTimes,
 							SUM(b.NumOfCashoutTicket) AS CashoutTickets,
-							SUM(b.CashoutAmount) AS CashoutValue,					
+							SUM(b.CashoutAmount) AS CashoutValue,
 							SUM(b.BuyBackAmt) AS BuyBackAmountSB,
 							SUM(b.BABuyBackAmt) AS BuyBackAmountBA,
-							SUM(b.TicketPayout) AS TicketsPayout,					
-							SUM(b.BuyBackAmt * p.Rate) AS CashoutCommission	
+							SUM(b.TicketPayout) AS TicketsPayout,
+							SUM(b.BuyBackAmt * p.Rate) AS CashoutCommission
 					FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
-						INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate					
-					WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate									
+						INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate
+					WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate
 						AND b.Currency <> 20
 						AND b.ProductID = 25
 						AND b.RoleID = 1 -- Member
-					GROUP BY p.PartyId, b.Winlostdate, b.Currency			
+					GROUP BY p.PartyId, b.Winlostdate, b.Currency
 			) d
 			GROUP BY d.Winlostdate, d.Currency
-		)		
+		)
 	END
 	ELSE
 	BEGIN
@@ -671,7 +672,7 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.Company* e.Rate, 0)))						AS CompanyBase
 		, CONVERT(MONEY, SUM(ISNULL(d.ProgressiveContribution * e.Rate, 0)))	AS ProgressiveContributionBase
 		, CONVERT(MONEY, SUM(ISNULL(d.ProgressiveFee * e.Rate, 0)))				AS ProgressiveFeeBase
-		, CONVERT(MONEY, SUM(ISNULL(d.ProgressivePayout * e.Rate, 0)))			AS ProgressivePayoutBase		
+		, CONVERT(MONEY, SUM(ISNULL(d.ProgressivePayout * e.Rate, 0)))			AS ProgressivePayoutBase
 		, CONVERT(MONEY, SUM(ISNULL(d.CashoutTimes * e.Rate, 0)))				AS CashoutTimesBase
 		, CONVERT(MONEY, SUM(ISNULL(d.CashoutTickets * e.Rate, 0)))				AS CashoutTicketsBase
 		, CONVERT(MONEY, SUM(ISNULL(d.CashoutValue * e.Rate, 0)))				AS CashoutValueBase

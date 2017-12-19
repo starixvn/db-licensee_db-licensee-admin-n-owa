@@ -1,8 +1,8 @@
 USE [bodb_licensee]
 GO
 
-ALTER PROCEDURE [dbo].[LA_Rpt_GoldDeluxeWinloss] 
-	  @PartyIds			VARCHAR(1000)
+ALTER PROCEDURE [dbo].[LA_Rpt_GoldDeluxeWinloss]
+	  @PartyIds			VARCHAR(4000)
 	, @FromDate			DATETIME
 	, @ToDate			DATETIME
 	, @BaseCurrencyName	VARCHAR(3) = 'EUR'
@@ -12,12 +12,13 @@ AS
 	DB: DB052.bodb_licensee
 	Revisions:
 		- 20170622@bruce: show original value [#78398]
+		- 20171219@Bruce: increase length for variables [#88197]
 	Param's Explanation:
 */
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @3rdPartyId INT = (SELECT PartyId FROM dbo.OAS_Party WHERE PartyName = 'GD' AND PartyType = 3)	
+	DECLARE @3rdPartyId INT = (SELECT PartyId FROM dbo.OAS_Party WHERE PartyName = 'GD' AND PartyType = 3)
 	DECLARE @NoExchange VARCHAR(3) = '---'
 
 	-- charge type
@@ -55,7 +56,7 @@ BEGIN
 		SELECT DISTINCT PartyID, LicenseeId, ProductId, CASE WHEN IsDeposit=1 THEN DI_Rate ELSE 0 END, IsDeposit, Fromdate, Todate, 0, 1
 		FROM dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'GD', 'OA', 1)
 	)
-	
+
 	-- get payToSupplier's charge rate
 	;WITH CI AS (
 		SELECT ci.PartyId, ci.LicenseeId, ci.ProductId, ci.IsDeposit,

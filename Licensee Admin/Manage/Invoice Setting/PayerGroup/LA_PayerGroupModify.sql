@@ -1,19 +1,14 @@
 USE [bodb_licensee]
 GO
 
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-
 ALTER PROCEDURE [dbo].[LA_PayerGroupModify]
-	@PayerGroupId			INT	= 0	
+	@PayerGroupId			INT	= 0
 	, @PayerGroupName		VARCHAR(100)
-	, @PayerList			VARCHAR(500)	= ''
+	, @PayerList			VARCHAR(4000)	= ''
 	, @UserID				INT
 	, @LoginIP				VARCHAR (50)	= ''
-	, @ErrCode				INT				= 0		OUTPUT
-	, @ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
+	, @ErrCode				INT				= 0  OUTPUT
+	, @ErrMsg				NVARCHAR(1000)	= '' OUTPUT
 	, @PayerGroupIdOut		INT	= 0	OUTPUT
 AS
 /*  
@@ -21,7 +16,8 @@ AS
 	 Task : add/modify payer Group setting
 	 DB: DB052.bodb_Licensee  
    
-	 Revisions:     		  
+	 Revisions:
+	 	- 20171219@Bruce: increase length for variables [#88197]
 	 Params:		
 	 Example:
 	

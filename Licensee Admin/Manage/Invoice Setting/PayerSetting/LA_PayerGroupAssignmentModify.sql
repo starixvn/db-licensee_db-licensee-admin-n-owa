@@ -1,27 +1,23 @@
 USE [bodb_licensee]
 GO
 
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-
 ALTER PROCEDURE [dbo].[LA_PayerGroupAssignmentModify]
-	@PayerList				VARCHAR(500)
-	, @PayerGroupId			INT				
+	@PayerList				VARCHAR(4000)
+	, @PayerGroupId			INT
 	, @UserID				INT
 	, @Mode					VARCHAR(10)		= ''
 	, @LoginIP				VARCHAR (50)	= ''
 	, @ErrCode				INT				= 0		OUTPUT
-	, @ErrMsg				NVARCHAR(1000)	= ''	OUTPUT	
+	, @ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
 AS
 /*  
 	 Created: 20150422@Florent
 	 Task : add/modify Payer Group Assignment setting
-	 DB: DB052.bodb_Licensee  
-   
-	 Revisions:     		  
-	 Params:		
+	 DB: DB052.bodb_Licensee
+
+	 Revisions:
+	 	- 20171219@Bruce: increase length for variables [#88197]
+	 Params:
 	 Example:
 	
 */
@@ -38,7 +34,7 @@ SET NOCOUNT ON
 	SET @startRun = GETDATE()
 	IF ISNULL(@PayerGroupId, 0) = 0
 		RETURN
-	DECLARE @PayerGroupList AS TABLE (PayerGroupId INT, PartyID INT)		
+	DECLARE @PayerGroupList AS TABLE (PayerGroupId INT, PartyID INT)
 
 	INSERT INTO @PayerGroupList(PayerGroupId, PartyID)
 	SELECT @PayerGroupId, val 

@@ -1,13 +1,8 @@
 USE [bodb_licensee]
 GO
 
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_MacauWinloss]
-	  @PartyIds				VARCHAR(1000)
+	  @PartyIds				VARCHAR(4000)
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME
 	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
@@ -18,6 +13,7 @@ AS
 	DB: DBEXT/bodb02
 	Revisions:
 		- 20160329@Bruce: Create SP
+		- 20171219@Bruce: increase length for variables [#88197]
 	Param's Explanation:
 */
 BEGIN
@@ -150,7 +146,7 @@ BEGIN
 					CustomerWL,
 					LicensingFee,
 					PayToSupplier)
-			SELECT	p.PartyId, 
+			SELECT	p.PartyId,
 					p.PartyName,
 					g.PartyId,
 					g.PartyName,
@@ -205,7 +201,7 @@ BEGIN
 		Name VARCHAR(20),
 		IsApply BIT
 	)
-	
+
 	INSERT INTO @BaseCurrencies(Id, Name)
 	EXEC LA_SelBaseCurrency
 
@@ -217,7 +213,7 @@ BEGIN
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY
 	)
-	
+
 	WHILE EXISTS (SELECT TOP 1 * FROM @BaseCurrencies WHERE IsApply IS NULL)
 	BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)

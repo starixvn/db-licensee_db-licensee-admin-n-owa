@@ -1,13 +1,8 @@
 USE [bodb02]
 GO
 
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_BettradeWinloss]
-	  @PartyIds				VARCHAR(1000)
+	  @PartyIds				VARCHAR(4000)
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME
 	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
@@ -22,6 +17,7 @@ AS
 		- 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
 		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 		- 20170505@Bruce: show INH [RedmineId: #75954]
+		- 20171219@Bruce: increase length for variables [#88197]
 	Param's Explanation:
 */
 SET NOCOUNT ON
@@ -173,7 +169,7 @@ BEGIN
 		,d.ParentId									AS GroupId
 		,CASE
 			WHEN d.ParentId = 999 THEN 'Credit'
-			ELSE pp.PartyName 
+			ELSE pp.PartyName
 		 END										AS GroupName
 		,d.PartyID									AS PartyID
 		,p.PartyName								AS PartyName

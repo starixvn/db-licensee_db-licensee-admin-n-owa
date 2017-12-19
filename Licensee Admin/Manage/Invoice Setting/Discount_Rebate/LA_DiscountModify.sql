@@ -10,7 +10,7 @@ ALTER PROCEDURE [dbo].[LA_DiscountModify]
 	, @ToDate DATE
 	, @IsEdit BIT
 	, @ProductIds VARCHAR(512) = ''
-	, @AssignedPartyIds VARCHAR(1204) = ''
+	, @AssignedPartyIds VARCHAR(4000) = ''
 	, @RateSettingsData VARCHAR(MAX) = ''
 	, @UserId INT
 	, @Remark NVARCHAR(4000)
@@ -26,6 +26,7 @@ AS
    
 	 Revisions:
 		+ 20170518@Bruce: include remark [#76133]
+		+ 20171219@Bruce: increase length for variables [#88197]
 	 Params:
 		@RateSettingsData = '<Root>
 								<RateSetting>

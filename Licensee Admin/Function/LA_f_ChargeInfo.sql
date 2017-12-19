@@ -1,18 +1,13 @@
 USE [bodb_licensee]
 GO
 
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-
 ALTER FUNCTION [dbo].[LA_f_ChargeInfo] (
-	@PartyIDs			VARCHAR(1000)
+	@PartyIDs			VARCHAR(4000)
 	, @FromDate			DATETIME
 	, @ToDate			DATETIME
 	, @ProductCodes		VARCHAR(1000)
 	, @System			VARCHAR(10)		= 'OA'
-	, @ExcludeTest		BIT	
+	, @ExcludeTest		BIT
 	)
 RETURNS @tbChargeInfo TABLE (
 	 ChargeID			INT
@@ -21,7 +16,7 @@ RETURNS @tbChargeInfo TABLE (
 	, isDeposit			INT
 	, AffectedDate		SMALLDATETIME
 	, ProductID			INT
-	, Bettype			INT				DEFAULT -1
+	, Bettype			INT DEFAULT -1
 	, DI_Rate			MONEY
 	, OW_Rate			MONEY
 	, PNR_Rate			MONEY
@@ -29,27 +24,28 @@ RETURNS @tbChargeInfo TABLE (
 	, Todate			SMALLDATETIME
 	)
 AS
-/*  Created: 20141111@Florent  
+/*  Created: 20141111@Florent
     Task : Get Charge Information
-    DB: DBLIC/bodb_Licensee  
-    Param's Explanation:   
+    DB: DBLIC/bodb_Licensee
+    Param's Explanation:
 		- 20150710@Florent: support product MicroGaming with multi charge rate
 		- 20150825@Florent: change fiter ChargeType = 1 to ChargeType != 2 (support new ChargeType 5)
 		- 20151230@Bravo: Add MGCRNG charge info.
 		- 20161216@Bruce: remove rolling comission row ( type = 11)
+		- 20171219@Bruce: increase length for variables [#88197]
     select * FROM [LA_f_ChargeInfo_xtest]('14,15,16,17,18,25','2013-08-01','2013-08-30','NG','OA')
 */
 
-BEGIN     
+BEGIN
 	DECLARE @SystemID INT
-	SELECT @SystemID = id FROM dbo.Systems WITH (NOLOCK) WHERE SystemName = @System	
-	
+	SELECT @SystemID = id FROM dbo.Systems WITH (NOLOCK) WHERE SystemName = @System
+
 	DECLARE @ProductTable TABLE (ProductID smallint, ProductPrefix varchar(20))
 	DECLARE @Bettype TABLE (ProductId smallint, BetTypeRef smallint, BetType smallint)
 	--DECLARE @ProductCodes varchar(20) = 'MGCLC'
 		
 	INSERT INTO @ProductTable (ProductID, ProductPrefix)
-	SELECT CASE 
+	SELECT CASE
 			WHEN s.val = 'SB'
 				THEN 0
 			ELSE p3.Productid
@@ -60,7 +56,7 @@ BEGIN
 	
 	INSERT INTO @Bettype(ProductId, BetTypeRef, Bettype)
 	SELECT pt.ProductID, sbr.BettypeRef, sbm.BetType
-	FROM @ProductTable pt 
+	FROM @ProductTable pt
 	 INNER JOIN bodb02.dbo.Products p ON pt.ProductPrefix = p.ProductPrefix
 	 INNER JOIN bodb02.dbo.SportBettypeMatrix sbm ON p.ProductID = sbm.ProductID
 	 INNER JOIN dbo.Sport_Bettype_Reference sbr ON sbm.BetType = sbr.Bettype
@@ -69,13 +65,13 @@ BEGIN
 
 	INSERT INTO @Cte_AffectDate (AffectedDate, PartyID, ProductID)
 	(
-	    SELECT MIN(FromDate) AS AffectedDate		  
+	    SELECT MIN(FromDate) AS AffectedDate
 		  , FromParty AS PartyID
 		  , ci.ProductID
 	    FROM dbo.OAS_Party p WITH (NOLOCK)
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
 	    WHERE ChargeType != 2
-		  AND p.PartyID IN (SELECT VAL FROM strSplit(@PartyIDs, ','))		  
+		  AND p.PartyID IN (SELECT VAL FROM strSplit(@PartyIDs, ','))
 		  AND ci.ProductID NOT IN (SELECT Productid FROM dbo.LA_Product3rdSub WITH (NOLOCK))
 	    GROUP BY FromParty, ci.ProductID
 	)
@@ -134,7 +130,7 @@ BEGIN
 	--case multi chargerate
 	INSERT INTO @Cte_AffectDate (AffectedDate, PartyID, ProductID)
 	(
-	    SELECT MIN(s.FromDate) AS AffectedDate		  
+	    SELECT MIN(s.FromDate) AS AffectedDate
 		  , ci.FromParty AS PartyID
 		  , ci.ProductID
 	    FROM dbo.OAS_Party p WITH (NOLOCK)
@@ -325,6 +321,7 @@ BEGIN
 END
 
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_f_ChargeInfo] TO [vnteam] 
+GRANT VIEW DEFINITION ON [dbo].[LA_f_ChargeInfo] TO [vnteam]
+
 GO
 GRANT SELECT ON [dbo].[LA_f_ChargeInfo] TO bodbAdminNet 
