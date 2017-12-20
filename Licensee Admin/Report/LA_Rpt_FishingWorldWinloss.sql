@@ -5,18 +5,21 @@ ALTER PROCEDURE [dbo].[LA_Rpt_FishingWorldWinloss]
 	@PartyIDs			VARCHAR(5500),
 	@FromDate			SMALLDATETIME,
 	@ToDate				SMALLDATETIME,
-	@BaseCurrencyName	VARCHAR(3) = 'EUR'
+	@BaseCurrencyName	VARCHAR(10) = 'EUR'
 AS
 
 /*
  * Created by : [20161220@Scofield.Huynh]
  * Task  : Get Fishing World Winloss
  * DB   : DB052.bodb_licensee
+ *
+ * Revisions:
+ *	- 20171220@Parsons: increase length for variables [#88197]
  */
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @NoBaseCurrency VARCHAR(3) = '---'
+	DECLARE @NoBaseCurrency VARCHAR(10) = '---'
 
 	-- Party List
 	CREATE TABLE #PartyList(

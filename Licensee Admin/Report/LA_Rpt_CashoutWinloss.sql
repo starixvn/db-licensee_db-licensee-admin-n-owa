@@ -5,7 +5,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_CashoutWinloss]
 	  @PartyIds				VARCHAR(4000),
 	  @FromDate				DATETIME,
 	  @ToDate				DATETIME,
-	  @BaseCurrencyName		VARCHAR(3)		= 'GBP'
+	  @BaseCurrencyName		VARCHAR(10)		= 'GBP'
 
 AS
 /*  Created: 20170328@scofield.huynh

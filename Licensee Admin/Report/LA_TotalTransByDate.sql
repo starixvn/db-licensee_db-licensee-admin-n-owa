@@ -24,11 +24,12 @@ AS
 	 - 20151222@Francis: #48864-HotFix-Missing Credit data for GD
 	 - 20160504@Bravo:	 Add VB Data
 	 - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+	 - 20171220@Parsons: increase length for variables [#88197]
 	 Params:			   
 */
 BEGIN
  
-	DECLARE @PartyIdString VARCHAR(500) 
+	DECLARE @PartyIdString VARCHAR(4000) 
 	SELECT	@PartyIdString = COALESCE(@PartyIdString + ',', '') + CAST(PartyId AS VARCHAR(5))
 	FROM	OAS_Party
 	WHERE	PartyType=1 AND PartyID NOT IN (25,30)

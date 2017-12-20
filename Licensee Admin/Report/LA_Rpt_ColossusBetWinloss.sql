@@ -1,11 +1,6 @@
 USE [bodb_licensee]
 GO
 
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_ColossusBetWinloss]
 	  @PartyIds				VARCHAR(4000)
 	, @FromDate				DATETIME
@@ -61,15 +56,15 @@ BEGIN
 	END
 
 	BEGIN
-		DECLARE @LaunchDateFilter AS TABLE (
+		DECLARE @LaunchDateFilter AS TABLE (			
 			PartyId			INT,
 			FromDate		DATETIME,
 			ToDate			DATETIME
 		)
 
 		INSERT INTO @LaunchDateFilter(PartyId, FromDate, ToDate)
-		SELECT DISTINCT ci.partyid, ci.Fromdate,ci.Todate
-		FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'CB', 'OA', 1) ci
+		SELECT DISTINCT ci.partyid, ci.Fromdate,ci.Todate			
+		FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'CB', 'OA', 1) ci 		
 	END
 
 	SET @FromDate = (SELECT MIN(FromDate) FROM @CBShare)
@@ -120,7 +115,7 @@ BEGIN
 				b.StatusId NOT IN (-1, 101, 102, 103) AND
 				b.SiteID = (CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END) AND
 				b.rptDate BETWEEN @FromDate AND @ToDate
-		INNER JOIN @LaunchDateFilter ld
+		INNER JOIN @LaunchDateFilter ld 
 			ON  ld.PartyId = p.PartyID
 				AND b.rptDate BETWEEN ld.FromDate AND ld.ToDate
 		WHERE	b.CurrencyID <> 20 AND b.customercategory NOT IN (27, 28) AND
@@ -149,7 +144,7 @@ BEGIN
 		BEGIN
 			INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, TotalTrans, Turnover, Prize, CashOut, CashInAmount)
 			SELECT p.PartyId, p.PartyName, g.PartyId, g.PartyName, td.rptDate, e.Code, td.TotalTrans, td.Turnover, td.Prize, td.CashOut, td.CashInAmount
-			FROM #TempData td
+			FROM #TempData td 
 				INNER JOIN bodb02.dbo.Exchange e ON td.CurrencyId = e.ExchangeID
 				INNER JOIN @PartyList p ON td.PartyId = p.PartyID
 				INNER JOIN @PartyList g ON p.ParentId = g.PartyId
@@ -172,12 +167,12 @@ BEGIN
 		Name VARCHAR(20),
 		IsApply BIT
 	)
-
+	
 	INSERT INTO @BaseCurrencies(Id, Name)
 	EXEC LA_SelBaseCurrency
 
 	DECLARE @GrandTotal AS TABLE(
-		CurrencyName			VARCHAR(3),
+		CurrencyName			VARCHAR(10),
 		TotalTrans				INT,
 		Turnover				MONEY,
 		Prize					MONEY,
@@ -188,7 +183,7 @@ BEGIN
 		AmountDueToColossusBet	MONEY,
 		ChargeDate				DATETIME
 	)
-
+	
 	WHILE EXISTS (SELECT TOP 1 * FROM @BaseCurrencies WHERE IsApply IS NULL)
 	BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)
@@ -218,7 +213,7 @@ BEGIN
 		INNER JOIN #Exchange e ON s.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = s.ToDate
 
 		-- calculate commission/ cash in share
-		UPDATE g SET
+		UPDATE g SET 
 			Commission = g.Turnover * cm.Rate,
 			CashInShare = g.CashInAmount * cs.Rate
 		FROM @GrandTotal g
@@ -254,7 +249,7 @@ BEGIN
 			Turnover,
 			Prize,
 			CashOut,
-			CashInAmount
+			CashInAmount	
 	FROM #Result
 
 	SELECT	CurrencyName,
@@ -274,5 +269,9 @@ BEGIN
 	DROP TABLE #Exchange
 END
 GO
+
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_ColossusBetWinloss] TO [vnteam]
+GO
+
 GRANT EXECUTE ON [dbo].[LA_Rpt_ColossusBetWinloss] TO bodbAdminNet
+GO

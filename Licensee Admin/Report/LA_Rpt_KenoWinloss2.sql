@@ -190,11 +190,11 @@ BEGIN
 		LicenseeWinLoss	MONEY,
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY,
-		CurrencyName	VARCHAR(3)
+		CurrencyName	VARCHAR(10)
 	)
 
 	DECLARE @GrandTotal AS TABLE(
-		CurrencyName	VARCHAR(3),
+		CurrencyName	VARCHAR(10),
 		TotalTrans		INT,
 		Turnover		MONEY,
 		CustomerWinLoss	MONEY,

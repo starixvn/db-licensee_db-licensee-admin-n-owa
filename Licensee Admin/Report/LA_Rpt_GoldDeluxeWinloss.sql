@@ -5,7 +5,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_GoldDeluxeWinloss]
 	  @PartyIds			VARCHAR(4000)
 	, @FromDate			DATETIME
 	, @ToDate			DATETIME
-	, @BaseCurrencyName	VARCHAR(3) = 'EUR'
+	, @BaseCurrencyName	VARCHAR(10) = 'EUR'
 AS
 /*  Created: 20161118@bruce.bui
 	Task : Report - Gold Deluxe win loss

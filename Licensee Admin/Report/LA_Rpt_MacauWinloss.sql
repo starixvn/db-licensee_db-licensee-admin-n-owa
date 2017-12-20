@@ -5,7 +5,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_MacauWinloss]
 	  @PartyIds				VARCHAR(4000)
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME
-	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
+	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
 WITH RECOMPILE
 AS
 /*  Created: 20160329@Bruce
@@ -206,7 +206,7 @@ BEGIN
 	EXEC LA_SelBaseCurrency
 
 	DECLARE @GrandTotal AS TABLE(
-		CurrencyName	VARCHAR(3),
+		CurrencyName	VARCHAR(10),
 		TotalTrans		INT,
 		Turnover		MONEY,
 		CustomerWL		MONEY,

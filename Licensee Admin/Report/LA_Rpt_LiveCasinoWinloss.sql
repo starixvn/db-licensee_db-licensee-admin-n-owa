@@ -16,7 +16,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LiveCasinoWinloss]
 	, @ToDate				SMALLDATETIME
 	, @excludeTest			BIT				= 0
 	, @IsConvert			BIT				= 1
-	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
+	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
 AS      
   
 /*  
@@ -28,6 +28,7 @@ AS
     - 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
 	- 20150703@Florent: add GBP
 	- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+	- 20171220@Parsons: increase length for variables [#88197]
  * Param's Explanation:    
  
  *  

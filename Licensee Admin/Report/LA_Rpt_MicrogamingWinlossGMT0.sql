@@ -94,7 +94,7 @@ BEGIN
 
 	-- Region Base Currency Data
 	DECLARE @tempCurrencyId INT
-	DECLARE @tempCurrencyCode VARCHAR(3)
+	DECLARE @tempCurrencyCode VARCHAR(10)
 	DECLARE @BaseCurrencies TABLE(
 		Id INT,
 		Name VARCHAR(20),
@@ -117,7 +117,7 @@ BEGIN
 			MinAmount		MONEY,
 			MaxAmount		MONEY,
 			CurrencyId		INT,
-			CurrencyCode	VARCHAR(3))
+			CurrencyCode	VARCHAR(10))
 
 	-- Endregion
 

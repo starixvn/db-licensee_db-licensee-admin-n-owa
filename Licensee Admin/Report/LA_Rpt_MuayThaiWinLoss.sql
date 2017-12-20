@@ -5,7 +5,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_MuayThaiWinLoss]
 	  @PartyIds				VARCHAR(4000)
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME
-	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
+	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
 	, @TicketType			TINYINT
 WITH RECOMPILE
 AS

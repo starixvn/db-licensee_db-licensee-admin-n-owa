@@ -10,7 +10,7 @@ ALTER PROCEDURE [dbo].LA_Rpt_KenoWinloss
 	, @Drawfilter			SMALLINT		= 1
 	, @ExcludeTest			BIT				= 0
 	, @IsConvert			BIT				= 1
-	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
+	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
 AS      
   
 /*  
@@ -22,6 +22,7 @@ AS
 	- 20150320@Florent: enhance SP, using function LA_f_ExchangeDailySel
 	- 20150705@Florent: add GBP
 	- 20170622@Scofield: get PayToSupplier [#78398]
+	- 20171220@Parsons: increase length for variables [#88197]
 
  * Param's Explanation:    
  *  - @FromDate		: From date   

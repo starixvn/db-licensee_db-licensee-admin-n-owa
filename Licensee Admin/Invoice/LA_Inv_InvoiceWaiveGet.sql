@@ -17,6 +17,7 @@ AS
 	DB: DB052.bodb_Licensee   
 	Revisions: 
 		+ 2017-05-09 @Scofield.Huynh: Create [#76132]
+		- 20171220@Parsons: increase length for variables [#88197]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -33,7 +34,7 @@ BEGIN
 		SELECT TOP 1 opd.BaseCurrencyId FROM dbo.OAS_PartyDetail opd WITH(NOLOCK) WHERE opd.PartyID = @PartyId
 	), 6) -- default is EUR
 
-	DECLARE @BaseCurrencyTable AS TABLE(Id INT, Name VARCHAR(5))
+	DECLARE @BaseCurrencyTable AS TABLE(Id INT, Name VARCHAR(10))
 	INSERT	INTO @BaseCurrencyTable(Id,Name)
 	EXECUTE bodb_Licensee.dbo.LA_SelBaseCurrency
 	
@@ -61,7 +62,7 @@ BEGIN
 	-- End region
 
 	-- Region: Get party charge rate info
-	DECLARE	@PartyIdString VARCHAR(100)
+	DECLARE	@PartyIdString VARCHAR(4000)
 	SELECT	@PartyIdString = COALESCE(@PartyIdString + ', ', '') + CONVERT(VARCHAR(10), PartyId)
 	FROM	@PartyGroup 
 	

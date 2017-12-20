@@ -118,7 +118,7 @@ BEGIN
 			MinAmount		MONEY,
 			MaxAmount		MONEY,
 			CurrencyId		INT,
-			CurrencyCode	VARCHAR(3))
+			CurrencyCode	VARCHAR(10))
 
 	-- Endregion
 

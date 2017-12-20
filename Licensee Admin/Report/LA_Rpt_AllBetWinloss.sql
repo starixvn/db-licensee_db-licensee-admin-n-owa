@@ -5,7 +5,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_AllBetWinloss]
 	 @PartyIDs			VARCHAR(5500)
 	,@FromDate			SMALLDATETIME
 	,@ToDate			SMALLDATETIME
-	,@BaseCurrencyName	VARCHAR(3) = 'GBP'
+	,@BaseCurrencyName	VARCHAR(10) = 'GBP'
 	,@IsGroupByLicensee BIT = 0
 AS
 /*
@@ -16,6 +16,7 @@ AS
  Revisions:
 	- 20170113@bruce: checking launchDate to exclude trial data
 	- 20170217@bruce: change deposit service charge to 9 [#70050]
+	- 20171220@Parsons: increase length for variables [#88197]
 
  Param's Explanation:
 	- @FromDate			: From date

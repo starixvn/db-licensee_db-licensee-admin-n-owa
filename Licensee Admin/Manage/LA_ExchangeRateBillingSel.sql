@@ -4,7 +4,7 @@ GO
 ALTER PROCEDURE [dbo].[LA_ExchangeRateBillingSel]
 	@CurrencyIds			VARCHAR(4000)	= ''
 	, @ExchangeDate			DATETIME
-	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
+	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
 
 AS
 /*  Created: 20150318@Florent
