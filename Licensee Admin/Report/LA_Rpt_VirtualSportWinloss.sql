@@ -77,7 +77,7 @@ CREATE TABLE #ChargeInfo (
 	,Fromdate		SMALLDATETIME
 	,Todate			SMALLDATETIME
 )
--- ​Pay to Supplier:
+-- Pay to Supplier:
 --   Credit: 1% of of Licensee Winloss
 --   Deposit: 7.5% of Licensee Winloss
 INSERT INTO #ChargeInfo
