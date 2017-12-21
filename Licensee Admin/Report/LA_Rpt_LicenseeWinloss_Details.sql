@@ -338,7 +338,7 @@ BEGIN
 							SUM(b.TicketPayout) AS TicketsPayout,					
 							SUM(b.BuyBackAmt * ci.Rate) AS CashoutCommission	
 					FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
-						INNER JOIN #ChargeInfo ci ON b.SiteId = ci.LicenseeID AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate					
+						INNER JOIN #ChargeInfo ci ON b.SiteId = ci.LicenseeID AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate AND b.ProductID = ci.ProductId					
 					WHERE b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate									
 						AND b.Currency <> 20
 						AND b.ProductID = @COProductId
