@@ -570,6 +570,7 @@ BEGIN
 						INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate
 					WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate
 						AND b.Currency <> 20
+						AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.Currency = @CurrencyId))
 						AND b.ProductID = 25
 						AND b.RoleID = 1 -- Member
 					GROUP BY p.PartyId, b.Winlostdate, b.Currency

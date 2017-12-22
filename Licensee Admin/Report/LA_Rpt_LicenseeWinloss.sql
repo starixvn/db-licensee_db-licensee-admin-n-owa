@@ -330,6 +330,7 @@ BEGIN
 						INNER JOIN @ChargeInfo ci ON b.SiteId = ci.LicenseeID AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate AND b.ProductID = ci.ProductId					
 					WHERE b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate									
 						AND b.Currency <> 20
+						AND(@Currency = 0 OR (@Currency <> 0 AND b.Currency = @Currency))
 						AND b.ProductID = @COProductId
 						AND b.RoleID = 1 -- Member
 					GROUP BY ci.PartyId, b.Winlostdate, b.Currency			
@@ -340,6 +341,8 @@ BEGIN
 	
 	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = 13) > 0
 	BEGIN
+		DECLARE @BTProductId INT = 13
+	
 		DECLARE @Bettype AS TABLE( Bettype INT, ProductId INT)
 		INSERT INTO @Bettype (Bettype, ProductId)		
 	    SELECT Bettype, ProductID
@@ -360,8 +363,8 @@ BEGIN
 					, SUM(CASE WHEN bt.ProductID = 0 THEN b.WinLoss ELSE 0 END) AS BTWinLoss
 					, SUM (CASE WHEN b.Bettype = 901 AND b.CustomerCategory = 1001 THEN - b.BuyBackAmount * ci.Rate ELSE 0 END) AS BettradeComm
 				FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
-					INNER JOIN @ChargeInfo ci ON b.SiteId = ci.LicenseeID 
-					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN (0, 13)
+					INNER JOIN @ChargeInfo ci ON b.SiteId = ci.LicenseeID AND ci.ProductId = @BTProductId
+					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN (0, @BTProductId)
 				WHERE b.RptDate BETWEEN ci.FromDate AND ci.ToDate
 					AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
 					AND b.CurrencyID <> 20
@@ -378,7 +381,7 @@ BEGIN
 					, SUM(b.WinLoss) AS BTWinLoss
 					, 0 AS BettradeComm
 				FROM bodb_licenseereport.dbo.rpt_Betting_BA b WITH (NOLOCK)
-					INNER JOIN @ChargeInfo ci ON b.SiteId = ci.LicenseeID
+					INNER JOIN @ChargeInfo ci ON b.SiteId = ci.LicenseeID AND ci.ProductId = @BTProductId
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (3)
 				WHERE b.RptDate BETWEEN ci.FromDate AND ci.ToDate
 					AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
