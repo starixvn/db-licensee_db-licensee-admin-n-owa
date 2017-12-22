@@ -1,5 +1,4 @@
-USE [bodb02]
-GO
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeSettlement]
 	  @PartyId				INT
@@ -691,9 +690,4 @@ BEGIN
 	DROP TABLE #Result
 	DROP TABLE #DataWinloss3rd
 END
-
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicenseeSettlement] TO [vnteam]
-GO
-GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeSettlement] TO [bodbAdminNet]
 GO
