@@ -5,7 +5,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_KenoWinloss2]
 	 @PartyIDs			VARCHAR(5500)
 	,@FromDate			SMALLDATETIME
 	,@ToDate			SMALLDATETIME
-	,@BaseCurrencyName	VARCHAR(3) = 'GBP'
+	,@BaseCurrencyName	VARCHAR(10) = 'GBP'
 AS
 /*
  Created by	: [20160331@Bruce]
@@ -14,6 +14,7 @@ AS
 
  Revisions:
 	- 20160331@Bruce: #55003 - Support new Keno report
+	- 20171219@Bruce: increase length for variables [#88197]
 
  Param's Explanation:
 	- @FromDate		: From date
@@ -189,11 +190,11 @@ BEGIN
 		LicenseeWinLoss	MONEY,
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY,
-		CurrencyName	VARCHAR(3)
+		CurrencyName	VARCHAR(10)
 	)
 
 	DECLARE @GrandTotal AS TABLE(
-		CurrencyName	VARCHAR(3),
+		CurrencyName	VARCHAR(10),
 		TotalTrans		INT,
 		Turnover		MONEY,
 		CustomerWinLoss	MONEY,

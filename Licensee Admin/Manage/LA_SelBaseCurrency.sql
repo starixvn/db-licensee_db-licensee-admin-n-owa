@@ -7,7 +7,7 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_SelBaseCurrency]	
-	@BaseCurrencyDefault	VARCHAR(3) = 'EUR'
+	@BaseCurrencyDefault	VARCHAR(10) = 'EUR'
 AS
 /*
 	Created: 20150312@Florent
@@ -15,6 +15,7 @@ AS
 	DB: DB052.bodb_licensee
 	Revison:
 		- 20150703@Florent: add currency MYR
+		- 20171220@Parsons: increase length for variables [#88197]
 
 	Revisions:
 	Param's Explanation:

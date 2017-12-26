@@ -13,7 +13,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_NumberGameWinloss]
 	, @drawfilter			SMALLINT		= 0
 	, @excludeTest			BIT				= 0
 	, @IsConvert			BIT				= 1
-	, @BaseCurrencyName		VARCHAR(3)		= 'EUR'
+	, @BaseCurrencyName		VARCHAR(10)		= 'EUR'
 AS
 
 /*
@@ -25,6 +25,7 @@ AS
 	- 20150703@Florent: add GBP
 	- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	- 20170621@Bruce: include paytosupplier & netincome [#78398]
+	- 20171220@Parsons: increase length for variables [#88197]
  * Param's Explanation:
  *
  */

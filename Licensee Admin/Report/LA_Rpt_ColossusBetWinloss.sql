@@ -1,16 +1,11 @@
 USE [bodb_licensee]
 GO
 
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_ColossusBetWinloss]
-	  @PartyIds				VARCHAR(1000)
+	  @PartyIds				VARCHAR(4000)
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME
-	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
+	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
 WITH RECOMPILE
 AS
 /*  Created: 20160310@Bruce
@@ -18,6 +13,7 @@ AS
 	DB: DBEXT/bodb02
 	Revisions:
 		- 20160310@Bruce: Create SP
+		- 20171219@Bruce: increase length for variables [#88197]
 	Param's Explanation:
 */
 BEGIN
@@ -176,7 +172,7 @@ BEGIN
 	EXEC LA_SelBaseCurrency
 
 	DECLARE @GrandTotal AS TABLE(
-		CurrencyName			VARCHAR(3),
+		CurrencyName			VARCHAR(10),
 		TotalTrans				INT,
 		Turnover				MONEY,
 		Prize					MONEY,
@@ -273,5 +269,9 @@ BEGIN
 	DROP TABLE #Exchange
 END
 GO
+
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_ColossusBetWinloss] TO [vnteam]
+GO
+
 GRANT EXECUTE ON [dbo].[LA_Rpt_ColossusBetWinloss] TO bodbAdminNet
+GO

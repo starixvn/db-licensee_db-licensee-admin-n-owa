@@ -1,4 +1,4 @@
-﻿USE [bodb02]
+USE [bodb02]
 GO
 
 SET ANSI_NULLS ON
@@ -15,7 +15,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_VirtualSportWinloss]
 	, @drawfilter			SMALLINT	= 1
 	, @excludeTest			BIT			= 0
 	, @IsConvert			BIT			= 1
-	, @BaseCurrencyName		VARCHAR(3)	= 'EUR'
+	, @BaseCurrencyName		VARCHAR(10)	= 'EUR'
 AS
 
 /*
@@ -30,6 +30,7 @@ AS
 		- 20160115@Victor: Show data of credit licensees regardless Charge Rate = 0 [Redmine: #50829]
 		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 		- 20170620@Bruce: add paytosupplier and netincome [#78398]
+		- 20171220@Parsons: increase length for variables [#88197]
  * Param's Explanation:
  *  - @FromDate   : From date
  *  - @ToDate   : To date
@@ -76,7 +77,7 @@ CREATE TABLE #ChargeInfo (
 	,Fromdate		SMALLDATETIME
 	,Todate			SMALLDATETIME
 )
--- ​Pay to Supplier:
+-- Pay to Supplier:
 --   Credit: 1% of of Licensee Winloss
 --   Deposit: 7.5% of Licensee Winloss
 INSERT INTO #ChargeInfo

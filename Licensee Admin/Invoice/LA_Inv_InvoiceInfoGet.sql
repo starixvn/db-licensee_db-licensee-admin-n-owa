@@ -16,6 +16,7 @@ AS
 	Revisions: 
 		+ 2015.08.07: Invoice Info - Get
         + 20160805@Bruce: Include hosting fee info
+        - 20171220@Parsons: increase length for variables [#88197]
 */
 /*	Example:
 	USE bodb_licensee
@@ -26,7 +27,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	
-	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(5))
+	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(10))
 	INSERT	INTO @BaseCurrencyTable(CurrencyId,CurrencyName)
 	EXECUTE bodb_Licensee.dbo.LA_SelBaseCurrency
 	

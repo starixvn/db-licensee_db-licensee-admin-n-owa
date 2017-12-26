@@ -48,6 +48,7 @@ AS
 		+ 2017.10.02 @Bruce: add environment to parameter list [#84038]
 		+ 2017.10.27 @Bruce: show individual discount by product [#85256]		
 		- 20171113@Bruce: Modified error message [RedmineID: #84163]
+		- 20171220@Parsons: increase length for variables [#88197]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -87,13 +88,13 @@ BEGIN
 
 	-- Region: Get base Currency
 	DECLARE @BaseCurrencyId INT = 12
-	DECLARE @BaseCurrencyName VARCHAR(5) = 'GBP'
+	DECLARE @BaseCurrencyName VARCHAR(10) = 'GBP'
 	SET		@BaseCurrencyId = ISNULL((	SELECT TOP 1 opd.BaseCurrencyId
 										FROM dbo.OAS_PartyDetail opd WITH(NOLOCK)	
 										WHERE	opd.PartyID = @PartyId
 									), 12)
 	
-	DECLARE @BaseCurrencyTable AS TABLE(Id INT, Name VARCHAR(5))
+	DECLARE @BaseCurrencyTable AS TABLE(Id INT, Name VARCHAR(10))
 	INSERT	INTO @BaseCurrencyTable(Id,Name)
 	EXECUTE bodb_Licensee.dbo.LA_SelBaseCurrency
 	
@@ -297,7 +298,7 @@ BEGIN
 	-- End region
 	
 	-- Region: Get party charge rate info
-	DECLARE	@PartyIdString VARCHAR(100)
+	DECLARE	@PartyIdString VARCHAR(4000)
 	SELECT	@PartyIdString = COALESCE(@PartyIdString + ', ', '') + CONVERT(VARCHAR(10), PartyId)
 	FROM	@PartyGroup 
 	

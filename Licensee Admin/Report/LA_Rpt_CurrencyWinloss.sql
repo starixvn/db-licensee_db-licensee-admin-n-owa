@@ -17,7 +17,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss]
 	, @drawfilter			SMALLINT		= 1
 	, @excludeTest			BIT				= 0
 	, @IsConvert			BIT				= 0
-	, @BaseCurrencyName		VARCHAR(3)		= 'GBP'
+	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
 AS
 /*  Created: Florent.Nguyen
 	Date: 2014-09-03
@@ -32,6 +32,7 @@ AS
 	   - 20160504@Bruce: Remove dynamic sql
 	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	   - 20170801@Kenny: Filter data for Microgaming [RedmineID: #79311]
+	   - 20171220@Parsons: increase length for variables [#88197]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;

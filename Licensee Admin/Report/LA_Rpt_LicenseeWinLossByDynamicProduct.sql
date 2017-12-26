@@ -15,6 +15,7 @@ AS
 	Revisions:
 		+ 20170630@Bruce: include BT/CO/CB, remove LC, VG [RedmineID: #79309]
 		- 20171205@Bruce: fix partyid length [#87723]
+		- 20171220@Parsons: increase length for variables [#88197]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -44,7 +45,7 @@ BEGIN
 		WHERE d.IsDeposit = 1 AND p.PartyType = 1 AND p.OldRefID IS NOT NULL
 	)
 
-	DECLARE @PartyIds VARCHAR(2000) = (SELECT CAST(PartyId AS VARCHAR(10)) + ',' FROM #Parties FOR XML PATH (''))
+	DECLARE @PartyIds VARCHAR(4000) = (SELECT CAST(PartyId AS VARCHAR(10)) + ',' FROM #Parties FOR XML PATH (''))
 	
 	DECLARE @CreditLicenee TABLE(LicenseeId INT)
 	INSERT INTO @CreditLicenee(LicenseeId)

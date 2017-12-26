@@ -26,6 +26,7 @@ AS
 		+ 20170606@Bruce: include invoice status, invoiceno [RedmineID: #76411]
 		+ 20170927@Bruce: increase PayerIds size to 4000 [#79905]
 		+ 20171030@Bruce: filter invoice date [#85256]
+		- 20171220@Parsons: increase length for variables [#88197]
 */
 /*	Example:
 	USE bodb_licensee
@@ -117,7 +118,7 @@ BEGIN
 	-- End Region
 
 	-- Region: Base currency
-	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(5))
+	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(10))
 	INSERT	INTO @BaseCurrencyTable(CurrencyId,CurrencyName)
 	EXECUTE bodb_Licensee.dbo.LA_SelBaseCurrency
 	-- End Region
