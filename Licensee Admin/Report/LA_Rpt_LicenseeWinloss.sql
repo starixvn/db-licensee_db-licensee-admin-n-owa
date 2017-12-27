@@ -1,6 +1,6 @@
 /*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 
-ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss_xtest] 
+ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss] 
 	  @PartyIDs				VARCHAR(4000)	= ''
 	, @Currency				INT				= 0
 	, @FromDate				SMALLDATETIME
