@@ -1,6 +1,6 @@
 /*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 
-ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss] 
+ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss_xtest] 
 	  @PartyIDs				VARCHAR(4000)	= ''
 	, @Currency				INT				= 0
 	, @FromDate				SMALLDATETIME
@@ -387,7 +387,7 @@ BEGIN
 	    SELECT Bettype, ProductID
 	    FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, 'BT,SB,BA')		
 
-		CREATE NONCLUSTERED INDEX IDX_Index_Bettype ON #Bettype(ProductId)
+		CREATE NONCLUSTERED INDEX IDX_Index_Bettype ON #Bettype(Bettype)
 		
 		CREATE TABLE #BTChargeInfo (PartyID INT, LicenseeID INT, FromDate DATE, ToDate DATE, Rate MONEY)
 		INSERT INTO #BTChargeInfo
