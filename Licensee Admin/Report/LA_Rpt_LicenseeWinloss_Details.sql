@@ -339,7 +339,7 @@ BEGIN
 		WHERE	ProductID = @CBProductId AND
 				CustomerCategory NOT IN (27, 28) AND
 				b.StatusId NOT IN (-1, 101, 102, 103) AND
-				(@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) AND
+				(@ExcludeTest = 0 OR (@ExcludeTest = 1 AND b.CurrencyID <> 20)) AND
 				(@Currency = 0 OR (@Currency <> 0 AND CurrencyId = @Currency)) AND
 				cb.TypeId = @CommChargeType -- to remove duplicate we use one of (6,7)
 		GROUP BY rptdate, CurrencyId
@@ -383,7 +383,7 @@ BEGIN
 					FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
 						INNER JOIN #ChargeInfo ci ON b.SiteId = ci.LicenseeID AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate AND b.ProductID = ci.ProductId					
 					WHERE b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate									
-						AND b.Currency <> 20
+						AND (@ExcludeTest = 0 OR (@ExcludeTest = 1 AND b.Currency <> 20))
 						AND(@Currency = 0 OR (@Currency <> 0 AND b.Currency = @Currency))
 						AND b.ProductID = @COProductId
 						AND b.RoleID = 1 -- Member
@@ -421,7 +421,7 @@ BEGIN
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN (0, @BTProductId)
 				WHERE b.RptDate BETWEEN ci.FromDate AND ci.ToDate
 					AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
-					AND b.CurrencyID <> 20
+					AND (@ExcludeTest = 0 OR (@ExcludeTest = 1 AND b.CurrencyID <> 20))
 					AND b.Status NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory IN (1001, 1002)
 				GROUP BY b.RptDate, b.CurrencyId
@@ -439,7 +439,7 @@ BEGIN
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (3)
 				WHERE b.RptDate BETWEEN ci.FromDate AND ci.ToDate
 					AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
-					AND b.CurrencyID <> 20
+					AND (@ExcludeTest = 0 OR (@ExcludeTest = 1 AND b.CurrencyID <> 20))
 					AND b.Status NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory = 1002 -- for BT BA
 				GROUP BY b.RptDate, b.CurrencyId
