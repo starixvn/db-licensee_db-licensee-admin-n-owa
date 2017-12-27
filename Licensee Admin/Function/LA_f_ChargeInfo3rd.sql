@@ -1,0 +1,124 @@
+USE bodb_licensee
+GO
+
+CREATE FUNCTION [dbo].[LA_f_ChargeInfo3rd]
+    (
+      @FromDate DATETIME ,
+      @ToDate DATETIME ,
+      @ProductCodes VARCHAR(1000) ,
+      @System VARCHAR(10) = 'OA'   
+    )
+RETURNS @tbChargeInfo TABLE
+    (
+      ChargeID INT ,
+      PartyID INT ,      
+      ProductID INT ,
+      DI_Rate MONEY ,
+      ChargeType INT ,
+	  IsDeposit INT,
+      Fromdate SMALLDATETIME ,
+      Todate SMALLDATETIME
+    )
+AS 
+
+/*  
+	Created: 20170310@Harper  
+    Task :  Get Charge Information of Product 3rd  
+    DB:   DBLIC/bodb_Licensee    
+  
+    Param's Explanation:     
+   
+ SELECT * FROM LA_f_ChargeInfo3rd ('2016-11-29', '2016-12-01', 'GD', 'OA')  
+*/  
+
+BEGIN       
+    DECLARE @SystemID INT
+	DECLARE @tmpCompany	AS TABLE (PartyID INT)
+
+    SELECT  @SystemID = id
+    FROM    dbo.Systems WITH ( NOLOCK )
+    WHERE   SystemName = @System
+   
+    DECLARE @ProductTable TABLE (ProductID SMALLINT, ProductPrefix VARCHAR(20))  
+     
+    INSERT  INTO @ProductTable( ProductID, ProductPrefix)
+            SELECT  CASE 
+						WHEN s.val = 'SB' THEN 0
+                        ELSE p3.Productid
+                    END ,
+                    s.val
+            FROM    bodb02.dbo.strSplit(@ProductCodes, ',') s
+                    LEFT JOIN dbo.Product3rd p3 WITH ( NOLOCK ) ON s.val = p3.ProductPrefix	
+
+    INSERT  INTO @tbChargeInfo
+            ( ChargeID ,
+                PartyID ,
+                ProductID ,
+                DI_Rate ,
+                ChargeType ,
+				IsDeposit,
+                Fromdate ,
+                Todate
+            )
+            SELECT  DI.ChargeID ,
+                    CASE WHEN Di.FromParty IN (1, 11, 98) THEN DI.FromParty ELSE 999 END,
+                    DI.ProductID ,
+                    DI.Rate ,
+                    DI.ChargeType ,
+					CASE WHEN Di.FromParty IN (1, 11, 98) THEN 1 ELSE 0 END,
+                    CASE WHEN @FromDate <= DI.FromDate 
+							THEN DI.FromDate
+                            ELSE @FromDate
+                    END ,
+                    CASE WHEN @ToDate >= DI.ToDate 
+							THEN DI.ToDate
+                            ELSE @ToDate
+                    END
+            FROM    dbo.OAS_ChargeInfo DI (NOLOCK)
+                    INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs (NOLOCK) ON DI.ChargeID = cs.ChargeID
+                                                            AND cs.SystemID = @SystemID
+                    INNER JOIN dbo.OAS_Party t (NOLOCK) ON DI.ToParty = t.PartyID
+                                                            AND t.PartyType = 3
+                                                            AND t.OldRefID IS NULL
+            WHERE   ( @FromDate BETWEEN DI.FromDate AND DI.ToDate
+                        OR @ToDate BETWEEN DI.FromDate AND DI.ToDate
+                        OR DI.FromDate BETWEEN @FromDate AND @ToDate
+                        OR DI.ToDate BETWEEN @FromDate AND @ToDate
+                    )
+                    AND DI.ProductID IN ( SELECT ProductID FROM @ProductTable )
+                    AND NOT EXISTS ( SELECT 1 FROM dbo.OAS_ChargeInfoSub (NOLOCK) WHERE DI.ChargeID = ChargeIdRef )   
+
+
+	DECLARE @PartyID INT, @n INT, @m INT
+
+	INSERT INTO @tmpCompany (PartyID)
+	SELECT PartyID
+	FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)
+	WHERE PartyName IN ('ONEWorks','Boping', 'Zelianta')
+		AND NOT EXISTS (SELECT 1 FROM @tbChargeInfo WHERE PartyID = p.PartyID)
+
+	SELECT @n = 1
+		  ,@m = MAX(PartyID) FROM @tmpCompany
+	WHILE (@n <= @m)	  
+	BEGIN
+		SELECT @PartyID = PartyID FROM @tmpCompany WHERE PartyID = @n
+		INSERT INTO @tbChargeInfo
+		        ( ChargeID ,
+		          PartyID ,
+		          ProductID ,
+		          DI_Rate ,
+		          ChargeType ,
+		          IsDeposit ,
+		          Fromdate ,
+		          Todate
+		        )
+		SELECT ChargeID, @PartyID, ProductID, DI_Rate, ChargeType, IsDeposit, Fromdate, Todate
+		FROM @tbChargeInfo
+		WHERE PartyID = 1
+		
+		SET @n = @n + 1 	
+	END
+
+   RETURN;  
+END;
+
