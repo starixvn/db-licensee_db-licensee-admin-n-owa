@@ -226,19 +226,13 @@ BEGIN
 	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = 15) > 0
 	BEGIN
 		-- Region: Local variables
-		DECLARE @ProductId INT = 15
+		DECLARE @CBProductId INT = 15
 		DECLARE @CommChargeType INT = 6
-		DECLARE @CashInShareChargeType INT = 7
+		DECLARE @CashInShareChargeType INT = 7		
+		DECLARE @Cte_AffectDate TABLE (PartyID INT, AffectedDate DATE) 		
 
 		-- Region: Commision and Cash in share Rates
-		DECLARE @CBShare AS TABLE (
-			PartyId			INT,
-			LicenseeId		INT,
-			Rate			MONEY,
-			TypeId			SMALLINT,
-			FromDate		DATETIME,
-			ToDate			DATETIME
-		)
+		DECLARE @CBShare AS TABLE(PartyId INT, LicenseeId INT, Rate MONEY, TypeId SMALLINT, FromDate DATETIME, ToDate DATETIME)	
 
 		INSERT INTO @CBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
 		SELECT	ci.FromParty,
@@ -251,12 +245,57 @@ BEGIN
 			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
 			LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
 			LEFT JOIN bodb_licensee.dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
-		WHERE FromParty IN (SELECT VAL FROM strSplit(@PartyIDs, ',')) AND ProductID = @ProductId AND ChargeType IN (@CommChargeType,@CashInShareChargeType) AND (
+		WHERE FromParty IN (SELECT VAL FROM strSplit(@PartyIDs, ',')) AND ProductID = @CBProductId AND ChargeType IN (@CommChargeType,@CashInShareChargeType) AND (
 			@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
 			@ToDate BETWEEN ci.FromDate AND ci.ToDate OR
 			ci.FromDate BETWEEN @FromDate AND @ToDate OR
 			ci.ToDate BETWEEN @FromDate AND @ToDate
 		)
+		
+		-- Test Data
+		IF @excludeTest = 0
+		BEGIN	
+			DECLARE @TempCBShare AS TABLE (PartyId INT, LicenseeId INT, Rate MONEY, TypeId SMALLINT, FromDate DATETIME, ToDate DATETIME)	
+
+			INSERT INTO @Cte_AffectDate (PartyID, AffectedDate)
+			(
+				SELECT FromParty AS PartyID, MIN(FromDate) AS AffectedDate		  			  
+				FROM bodb_licensee..OAS_Party p WITH (NOLOCK)
+					INNER JOIN bodb_licensee..OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
+				WHERE ChargeType != 2
+				  AND p.PartyID IN (SELECT VAL FROM strSplit(@PartyIDs, ','))		  
+				  AND ci.ProductID = @CBProductId
+				GROUP BY FromParty
+			)
+			
+			INSERT INTO @TempCBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
+			SELECT DISTINCT 
+				f1.Val PartyId,
+				CASE 
+					WHEN ISNULL(pd.IsDeposit, 0) = 1
+						THEN p.OldRefID
+					ELSE lb.LabelID END AS LicenseeID,				
+				0 DI_Rate,
+				@CommChargeType,
+				@FromDate,
+				CASE WHEN @ToDate >= DATEADD(D, - 1, cte.AffectedDate)
+						THEN DATEADD(D, - 1, cte.AffectedDate)
+					ELSE @ToDate END
+			FROM strSplit(@PartyIDs, ',') f1
+				INNER JOIN bodb_licensee..OAS_Party p WITH (NOLOCK) ON f1.Val = p.PartyID
+				LEFT JOIN bodb_licensee..OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
+				LEFT JOIN bodb_licensee..labels lb(NOLOCK) ON p.OldRefID = lb.LicenseeID
+				LEFT JOIN @Cte_AffectDate cte ON p.PartyID = cte.PartyID
+			WHERE @FromDate <= cte.AffectedDate
+
+			INSERT INTO @TempCBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
+			SELECT PartyId, LicenseeId, Rate, @CashInShareChargeType, FromDate, ToDate
+			FROM @TempCBShare
+
+			INSERT @CBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
+			SELECT PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate
+			FROM @TempCBShare
+		END				
 		-- End Region: Commision and Cash in share Rates
 
 		-- Region: Get Winloss Data
@@ -282,10 +321,10 @@ BEGIN
 				SUM(ISNULL(BuyBackAmount,0)) CashInAmount
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		INNER JOIN @CBShare cb ON b.SiteID = cb.LicenseeId AND b.rptDate BETWEEN cb.FromDate AND cb.ToDate
-		WHERE	ProductID = @ProductId AND
+		WHERE	ProductID = @CBProductId AND
 				CustomerCategory NOT IN (27, 28) AND
 				b.StatusId NOT IN (-1, 101, 102, 103) AND
-				CurrencyId <> 20 AND
+				(@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) AND
 				(@Currency = 0 OR (@Currency <> 0 AND CurrencyId = @Currency)) AND
 				cb.TypeId = @CommChargeType -- to remove duplicate we use one of (6,7)
 		GROUP BY cb.PartyId, rptdate, CurrencyId
@@ -298,7 +337,7 @@ BEGIN
 		INNER JOIN @CBShare AS cm ON cm.TypeId = @CommChargeType AND (td.rptDate BETWEEN cm.FromDate AND cm.ToDate) AND cm.PartyId = td.PartyId
 		INNER JOIN @CBShare AS ci ON ci.TypeId = @CashInShareChargeType AND (td.rptDate BETWEEN ci.FromDate AND ci.ToDate) AND ci.PartyId = td.PartyId
 		-- End Region: Calculate Commision, Cash In Share		
-		
+
 		INSERT INTO #Report (PartyID, ReportDate, CurrencyID, Company, Turnover, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Betcount)
 		SELECT td.PartyId, td.rptDate, td.CurrencyId, 
 			Turnover - WinningPrize - Cashout - CommisionShare - CashInShare,
@@ -329,7 +368,7 @@ BEGIN
 					FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
 						INNER JOIN @ChargeInfo ci ON b.SiteId = ci.LicenseeID AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate AND b.ProductID = ci.ProductId					
 					WHERE b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate									
-						AND b.Currency <> 20
+						AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.Currency <> 20))
 						AND(@Currency = 0 OR (@Currency <> 0 AND b.Currency = @Currency))
 						AND b.ProductID = @COProductId
 						AND b.RoleID = 1 -- Member
@@ -367,7 +406,7 @@ BEGIN
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN (0, @BTProductId)
 				WHERE b.RptDate BETWEEN ci.FromDate AND ci.ToDate
 					AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
-					AND b.CurrencyID <> 20
+					AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
 					AND b.Status NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory IN (1001, 1002)
 				GROUP BY b.RptDate, b.CurrencyId, ci.PartyId
@@ -385,7 +424,7 @@ BEGIN
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (3)
 				WHERE b.RptDate BETWEEN ci.FromDate AND ci.ToDate
 					AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
-					AND b.CurrencyID <> 20
+					AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
 					AND b.Status NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory = 1002 -- for BT BA
 				GROUP BY b.RptDate, b.CurrencyId, ci.PartyId
