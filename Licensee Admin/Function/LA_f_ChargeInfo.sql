@@ -29,6 +29,7 @@ AS
     Task : Get Charge Information
     DB: DBLIC/bodb_Licensee
     Param's Explanation:
+	Revisions:
 		- 20150710@Florent: support product MicroGaming with multi charge rate
 		- 20150825@Florent: change fiter ChargeType = 1 to ChargeType != 2 (support new ChargeType 5)
 		- 20151230@Bravo: Add MGCRNG charge info.
