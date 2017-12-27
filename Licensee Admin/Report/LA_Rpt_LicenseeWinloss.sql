@@ -413,7 +413,7 @@ BEGIN
 				SELECT ci.PartyId, b.RptDate, b.CurrencyId
 					, SUM(CASE WHEN b.Bettype = 901 THEN (b.BuyBackAmount - b.WinLoss) ELSE 0 END) AS Actual_stake
 					, SUM(CASE WHEN b.Bettype = 901 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountTotal
-					, SUM(CASE WHEN b.Bettype NOT IN (901, 902, 903, 904) THEN b.WinLoss ELSE 0 END) AS BTWinLoss
+					, SUM(CASE WHEN bt.ProductId = 0 THEN b.WinLoss ELSE 0 END) AS BTWinLoss
 					, SUM (CASE WHEN b.Bettype = 901 AND b.CustomerCategory = 1001 THEN - b.BuyBackAmount * ci.Rate ELSE 0 END) AS BettradeComm
 				FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
 					INNER JOIN #BTChargeInfo ci ON b.SiteId = ci.LicenseeID
@@ -436,12 +436,13 @@ BEGIN
 					, 0 AS BettradeComm
 				FROM bodb_licenseereport.dbo.rpt_Betting_BA b WITH (NOLOCK)		
 					INNER JOIN #BTChargeInfo ci ON b.SiteId = ci.LicenseeID 
-				WHERE b.RptDate BETWEEN ci.FromDate AND ci.ToDate 
-					AND b.Bettype IN (901, 902, 903, 904)
+					INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
+				WHERE b.RptDate BETWEEN ci.FromDate AND ci.ToDate 					
 					AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
 					AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
 					AND b.Status NOT IN (-1, 101, 102, 103)
-					AND b.CustomerCategory = 1002 -- for BT BA					
+					AND b.CustomerCategory = 1002 -- for BT BA	
+					AND bt.ProductId = 3				
 				GROUP BY b.RptDate, b.CurrencyId, ci.PartyId
 			) d
 			GROUP BY d.RptDate, d.CurrencyID, d.PartyId
