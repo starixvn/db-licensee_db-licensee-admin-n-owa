@@ -238,7 +238,7 @@ BEGIN
 	IF (SELECT COUNT(*) FROM #ChargeInfo WHERE ProductID = 15) > 0
 	BEGIN
 		-- Region: Local variables
-		DECLARE @ProductId INT = 15
+		DECLARE @CBProductId INT = 15
 		DECLARE @CommChargeType INT = 6
 		DECLARE @CashInShareChargeType INT = 7
 
@@ -263,12 +263,55 @@ BEGIN
 			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
 			LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
 			LEFT JOIN bodb_licensee.dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
-		WHERE FromParty = @PartyID AND ProductID = @ProductId AND ChargeType IN (@CommChargeType,@CashInShareChargeType) AND (
+		WHERE FromParty = @PartyID AND ProductID = @CBProductId AND ChargeType IN (@CommChargeType,@CashInShareChargeType) AND (
 			@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
 			@ToDate BETWEEN ci.FromDate AND ci.ToDate OR
 			ci.FromDate BETWEEN @FromDate AND @ToDate OR
 			ci.ToDate BETWEEN @FromDate AND @ToDate
 		)
+		
+		-- Test Data
+		IF @ExcludeTest = 0
+		BEGIN	
+			DECLARE @TempCBShare AS TABLE (PartyId INT, LicenseeId INT, Rate MONEY, TypeId SMALLINT, FromDate DATETIME, ToDate DATETIME)	
+			DECLARE @Cte_AffectDate TABLE (PartyID INT, AffectedDate DATE) 		
+
+			INSERT INTO @Cte_AffectDate (PartyID, AffectedDate)
+			(
+				SELECT FromParty AS PartyID, MIN(FromDate) AS AffectedDate		  			  
+				FROM bodb_licensee..OAS_Party p WITH (NOLOCK)
+					INNER JOIN bodb_licensee..OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
+				WHERE ChargeType != 2
+				  AND p.PartyID = @PartyID
+				  AND ci.ProductID = @CBProductId
+				GROUP BY FromParty
+			)
+			
+			INSERT INTO @TempCBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
+			SELECT DISTINCT 
+				@PartyID,
+				CASE 
+					WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID
+					ELSE lb.LabelID END AS LicenseeID,				
+				0 DI_Rate,
+				@CommChargeType,
+				@FromDate,
+				CASE WHEN @ToDate >= DATEADD(D, - 1, cte.AffectedDate) THEN DATEADD(D, - 1, cte.AffectedDate)
+					ELSE @ToDate END
+			FROM bodb_licensee..OAS_Party p WITH (NOLOCK) 
+				LEFT JOIN bodb_licensee..OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
+				LEFT JOIN bodb_licensee..labels lb(NOLOCK) ON p.OldRefID = lb.LicenseeID
+				LEFT JOIN @Cte_AffectDate cte ON p.PartyID = cte.PartyID
+			WHERE @FromDate <= cte.AffectedDate AND p.PartyID = @PartyID
+
+			INSERT INTO @TempCBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
+			SELECT PartyId, LicenseeId, Rate, @CashInShareChargeType, FromDate, ToDate
+			FROM @TempCBShare
+
+			INSERT @CBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
+			SELECT PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate
+			FROM @TempCBShare
+		END		
 		-- End Region: Commision and Cash in share Rates
 
 		-- Region: Get Winloss Data
@@ -293,10 +336,10 @@ BEGIN
 				SUM(ISNULL(BuyBackAmount,0)) CashInAmount
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		INNER JOIN @CBShare cb ON b.SiteID = cb.LicenseeId AND b.rptDate BETWEEN cb.FromDate AND cb.ToDate
-		WHERE	ProductID = @ProductId AND
+		WHERE	ProductID = @CBProductId AND
 				CustomerCategory NOT IN (27, 28) AND
 				b.StatusId NOT IN (-1, 101, 102, 103) AND
-				CurrencyId <> 20 AND
+				(@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) AND
 				(@Currency = 0 OR (@Currency <> 0 AND CurrencyId = @Currency)) AND
 				cb.TypeId = @CommChargeType -- to remove duplicate we use one of (6,7)
 		GROUP BY rptdate, CurrencyId
@@ -311,7 +354,7 @@ BEGIN
 		-- End Region: Calculate Commision, Cash In Share		
 		
 		INSERT INTO #Report (ReportDate, CurrencyID, ProductID, Company, Turnover, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Betcount)
-		SELECT td.rptDate, td.CurrencyId, @ProductId,
+		SELECT td.rptDate, td.CurrencyId, @CBProductId,
 			Turnover - WinningPrize - Cashout - CommisionShare - CashInShare,
 			0, 0, 0, 0, 0, 0, 0, 0, 0
 		FROM #TempData td	
