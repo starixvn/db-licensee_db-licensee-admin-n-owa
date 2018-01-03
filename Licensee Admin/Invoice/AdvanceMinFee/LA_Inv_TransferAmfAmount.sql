@@ -3,11 +3,11 @@
 USE [bodb_Licensee]
 GO
 
-CREATE PROCEDURE [dbo].[LA_Inv_TransferAmfAmount]
+ALTER PROCEDURE [dbo].[LA_Inv_TransferAmfAmount]
 	@FromPartyId		INT,
 	@ToPartyId			INT,
 	@Amount				MONEY,
-	@ItemTypeId			SMALLINT,
+	@Option				SMALLINT,
 	@Environment		VARCHAR(50),
 	@UserId				INT,
 	@LoginIp			VARCHAR(50),
@@ -21,9 +21,20 @@ AS
 
 	Revisions:
 		- 20171226: create SP
+	Explanation:
+		@Option: 0-Write off, 1-deduct as AMF, 2-deduct against invoice
 */
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @Description VARCHAR(100)
+	DECLARE @BillerId INT = 0
+	DECLARE @InvoiceTypeId INT = 1000
+
+	SET @FromPartyId = ISNULL(@FromPartyId,0)
+	SET @ToPartyId = ISNULL(@ToPartyId,0)
+	SET @Amount = ISNULL(@Amount,0)
+
 	DECLARE
 		@startRun		DATETIME,
 		@endRun			DATETIME,
@@ -43,22 +54,39 @@ BEGIN
 		WHERE p.PartyType=1 AND d.PartyID IN(@FromPartyId, @ToPartyId)
 			AND ISNULL(d.StatusId,0) = 1
 			AND ISNULL(d.IsDeposit,0) = 1
+		UNION ALL SELECT 0, 'OW'
 	)
 
-	IF ISNULL(@FromPartyId,0) > 0 AND NOT EXISTS (SELECT * FROM @ExistingParties WHERE PartyId=@FromPartyId)
+	IF @FromPartyId > 0 AND NOT EXISTS (SELECT * FROM @ExistingParties WHERE PartyId=@FromPartyId)
 	BEGIN
 		SELECT @ErrorCode = 100, @ErrorMsg = 'From Licensee is not found.'
 		RETURN
 	END
-	IF ISNULL(@ToPartyId,0) > 0 AND NOT EXISTS (SELECT * FROM @ExistingParties WHERE PartyId=@ToPartyId)
+	IF @ToPartyId > 0 AND NOT EXISTS (SELECT * FROM @ExistingParties WHERE PartyId=@ToPartyId)
 	BEGIN
 		SELECT @ErrorCode = 100, @ErrorMsg = 'To Licensee is not found.'
 		RETURN
 	END
 
-	DECLARE @RemainingAmf TABLE (Amount MONEY) 
-	INSERT INTO @RemainingAmf
-	EXEC dbo.LA_Inv_RemainingAmfGet @PartyId = @FromPartyId, @Environment=@Environment
+	-- get remaining amf, prepayment
+	DECLARE @RemainingAMF MONEY = ISNULL((SELECT SUM(ISNULL(Income,0)) - SUM(ISNULL(Expense,0))
+		FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
+		INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
+		WHERE h.Environment = @Environment
+			AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
+			AND @FromPartyId > 0
+			AND s.RefPartyId = @FromPartyId
+			AND s.InvItemTypeId IN (3,5,7,21)
+	),0)
+	DECLARE @RemainingPP MONEY = ISNULL((SELECT SUM(ISNULL(Income,0)) - SUM(ISNULL(Expense,0))
+		FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
+		INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
+		WHERE h.Environment = @Environment
+			AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
+			AND @FromPartyId > 0
+			AND s.RefPartyId = @FromPartyId
+			AND s.InvItemTypeId IN (22,23,24)
+	),0)
 
 	DECLARE @Transfer TABLE(
 		ItemTypeId		SMALLINT,
@@ -68,57 +96,81 @@ BEGIN
 	)
 
 	-- write off
-	IF @ItemTypeId = 1
+	-- 21-amf, 23-prepayment
+	IF @Option = 0
 	BEGIN
-		IF ISNULL(@FromPartyId,0) = 0
+		IF @FromPartyId = 0
 		BEGIN
 			SELECT @ErrorCode = 101, @ErrorMsg = 'From Licensee is required.'
 			RETURN
 		END
 
-		INSERT INTO @Transfer(ItemTypeId, RefPartyId, Amount, [Description])
-		SELECT TOP 1 @ItemTypeId, @FromPartyId, ISNULL(r.Amount,0),'Write off' + CHAR(13) + 'Amount: ' + CONVERT(VARCHAR, r.Amount, 1)
-		FROM @RemainingAmf r
+		SET @Description = 'Write off' + CHAR(13) + 'Amount: ' + CONVERT(VARCHAR, @Amount, 1)
+		
+		IF @RemainingAMF > 0 BEGIN
+			INSERT INTO @Transfer(ItemTypeId, RefPartyId, Amount, [Description])
+			VALUES (21, @FromPartyId, CASE WHEN @Amount<@RemainingAMF THEN @Amount ELSE @RemainingAMF END,@Description)
+		END
+
+		IF @RemainingPP > 0 AND (@Amount-@RemainingAMF)>0 BEGIN
+			INSERT INTO @Transfer(ItemTypeId, RefPartyId, Amount, [Description])
+			VALUES (23, @FromPartyId, @Amount-@RemainingAMF,@Description)
+		END
 	END
 	ELSE
 	BEGIN
 		-- deduct as AMF
 		-- deduct against monthly billing
-		IF ISNULL(@ToPartyId,0) = 0
+		IF @ToPartyId = 0
 		BEGIN
 			SELECT @ErrorCode = 101, @ErrorMsg = 'To Licensee is required.'
 			RETURN
 		END
-		IF ISNULL(@Amount,0) = 0
+		IF @Amount = 0
 		BEGIN
 			SELECT @ErrorCode = 102, @ErrorMsg = 'The transfer amount is required.'
 			RETURN
 		END
-		IF ISNULL(@FromPartyId,0) > 0 AND EXISTS (SELECT * FROM @RemainingAmf WHERE ISNULL(Amount,0) < @Amount)
+		IF @FromPartyId > 0 AND @Amount > (@RemainingAMF+@RemainingPP)
 		BEGIN
 			SELECT @ErrorCode = 103, @ErrorMsg = 'The transfer amount must be equals to or less than remaining AMF.'
 			RETURN
 		END
 
-		DECLARE @Description VARCHAR(100)
-		DECLARE @DeductText VARCHAR(100) = (CASE WHEN @ItemTypeId = 2 THEN 'Deduct as AMF' ELSE 'Deduct against invoice' END)
+		DECLARE @DeductText VARCHAR(100) = (CASE WHEN @Option=1 THEN 'Deduct as AMF' ELSE 'Deduct against invoice' END)
 		DECLARE @FromPartyName VARCHAR(50) = (SELECT PartyName FROM @ExistingParties WHERE PartyId = @FromPartyId)
 		DECLARE @ToPartyName VARCHAR(50) = (SELECT PartyName FROM @ExistingParties WHERE PartyId = @ToPartyId)
 
 		-- transfer to
-		IF ISNULL(@FromPartyId,0) > 0
+		IF @FromPartyId > 0
 		BEGIN
 			SET @Description = 'Transfer to ' + @ToPartyName + CHAR(13) + @DeductText + CHAR(13) + 'Amount: ' + CONVERT(VARCHAR, @Amount, 1)
-			INSERT INTO @Transfer(ItemTypeId, RefPartyId, Amount, [Description]) VALUES(@ItemTypeId, @FromPartyId, -@Amount, @Description)
+
+			IF @RemainingAMF > 0 BEGIN
+				INSERT INTO @Transfer(ItemTypeId, RefPartyId, Amount, [Description])
+				VALUES (21, @FromPartyId, CASE WHEN @Amount<@RemainingAMF THEN @Amount ELSE @RemainingAMF END,@Description)
+			END
+
+			IF @RemainingPP > 0 AND (@Amount-@RemainingAMF)>0 BEGIN
+				INSERT INTO @Transfer(ItemTypeId, RefPartyId, Amount, [Description])
+				VALUES (23, @FromPartyId, @Amount-@RemainingAMF,@Description)
+			END
 		END
 
 		-- transfer from
-		SET @Description = 'Transfer' + ISNULL((' from ' + @FromPartyName), '') + CHAR(13) + @DeductText + CHAR(13) + 'Amount: ' + CONVERT(VARCHAR, @Amount, 1)
-		INSERT INTO @Transfer(ItemTypeId, RefPartyId, Amount, [Description]) VALUES(@ItemTypeId, @ToPartyId, @Amount, @Description)
+		-- 3-initialize AMF
+		--22-initialize prepayment
+		SET @Description = 'Transfer from ' + @FromPartyName + CHAR(13) + @DeductText + CHAR(13) + 'Amount: ' + CONVERT(VARCHAR, @Amount, 1)
+		INSERT INTO @Transfer(ItemTypeId, RefPartyId, Amount, [Description]) VALUES(CASE WHEN @Option=1 THEN 3 ELSE 22 END, @ToPartyId, @Amount, @Description)
 	END
 
+	INSERT INTO dbo.LA_InvoiceHeader (BillerId,PartyId,CurrencyId,InvoiceSymbol,InvoiceNumber,InvoiceDate,Amount,InvoiceType,StatusId,Note,Environment)
+		VALUES(@BillerId, @ToPartyId, 0, '', 1, GETDATE(), @Amount, @InvoiceTypeId, 0, '', @Environment)
+
+	DECLARE @HeaderId INT = SCOPE_IDENTITY()
+
 	INSERT INTO dbo.LA_InvoiceStatement(InvoiceHeaderId, InvItemTypeId, RefPartyId, [Description], Income, Expense)
-	SELECT 0, f.ItemTypeId, f.RefPartyId, f.[Description]
+	SELECT @HeaderId, f.ItemTypeId, f.RefPartyId, f.[Description]
 		, CASE WHEN it.GroupDB = 'Income' THEN f.Amount * it.SignDB ELSE NULL END
 		, CASE WHEN it.GroupDB = 'Expense' THEN f.Amount * it.SignDB ELSE NULL END
 	FROM @Transfer f
@@ -131,6 +183,7 @@ BEGIN
 			, f.RefPartyId		AS '@pid'
 			, f.Amount			AS '@a'
 			, f.[Description]	AS '@d'
+			, @Environment		AS '@env'
 		FROM @Transfer f
 		FOR XML PATH('h'), TYPE)
 	SET @logSPData = CAST(@xml AS NVARCHAR(MAX))
