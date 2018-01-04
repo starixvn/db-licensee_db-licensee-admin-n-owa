@@ -49,8 +49,8 @@ BEGIN
 	INSERT INTO @ExistingParties(PartyId,PartyName)
 	(
 		SELECT p.PartyId, p.PartyName
-		FROM dbo.OAS_Party p
-		INNER JOIN dbo.OAS_PartyDetail d ON p.PartyID=d.PartyID
+		FROM dbo.OAS_Party p WITH(NOLOCK)
+		INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
 		WHERE p.PartyType=1 AND d.PartyID IN(@FromPartyId, @ToPartyId)
 			AND ISNULL(d.StatusId,0) = 1
 			AND ISNULL(d.IsDeposit,0) = 1

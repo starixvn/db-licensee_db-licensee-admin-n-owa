@@ -25,8 +25,8 @@ BEGIN
 	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionId=@FunctionId
 
 	UPDATE p SET HasAmf = 1
-	FROM dbo.LA_InvoiceStatement s
-	INNER JOIN dbo.LA_InvoiceHeader h on h.InvoiceHeaderId=s.InvoiceHeaderId
+	FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
+	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON h.InvoiceHeaderId=s.InvoiceHeaderId
 	INNER JOIN @Parties p ON p.PartyId = s.RefPartyId
 	WHERE s.InvItemTypeId = 3 AND p.ParentId > 0
 		AND h.StatusId = 0 -- 0: normal invoice
