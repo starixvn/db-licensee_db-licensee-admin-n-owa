@@ -25,8 +25,7 @@ SET NOCOUNT ON
 BEGIN
 	SELECT InvTypeId, InvTypeName
 	FROM dbo.LA_InvoiceType WITH (NOLOCK)
-	WHERE (@InvoiceTypeId = 0 OR InvTypeId = @InvoiceTypeId)
-		
+	WHERE (@InvoiceTypeId = 0 OR InvTypeId = @InvoiceTypeId) AND IsVisible=1
 END
 
 GO
