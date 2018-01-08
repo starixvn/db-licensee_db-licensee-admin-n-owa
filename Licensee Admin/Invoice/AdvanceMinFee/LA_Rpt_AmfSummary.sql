@@ -109,6 +109,18 @@ BEGIN
 	FROM @AmfParties p
 	LEFT JOIN wp ON wp.PartyId=p.PartyId
 
+	-- month of deduction
+	-- 1 minfee
+	;WITH md AS (
+		SELECT m.PartyId, m.MonthOfDeduction, ROW_NUMBER() OVER (PARTITION BY m.PartyId ORDER BY m.ToDate DESC) AS RowNum
+		FROM dbo.LA_MinFee m WITH(NOLOCK)
+		INNER JOIN @AmfParties p ON p.PartyId = m.PartyId
+		WHERE m.FeeTypeId=1
+	)
+	UPDATE p SET p.MonthCount = md.MonthOfDeduction
+	FROM @AmfParties p
+	INNER JOIN md ON p.PartyId=md.PartyId AND md.RowNum=1
+
 	SELECT REPLACE(pp.PartyName, ' Licensees', '') AS GroupName
 		, p.PartyId
 		, p.PartyName
