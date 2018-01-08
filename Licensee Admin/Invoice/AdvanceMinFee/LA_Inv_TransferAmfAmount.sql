@@ -29,7 +29,7 @@ BEGIN
 
 	DECLARE @Description VARCHAR(100)
 	DECLARE @BillerId INT = 0
-	DECLARE @InvoiceTypeId INT = 1000
+	DECLARE @InvoiceTypeId INT = 12
 
 	SET @FromPartyId = ISNULL(@FromPartyId,0)
 	SET @ToPartyId = ISNULL(@ToPartyId,0)
