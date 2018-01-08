@@ -30,7 +30,7 @@ BEGIN
 	-- licensees have amf/prepayment
 	-- 3-amf
 	-- 22-prepayment
-	DECLARE @AmfParties TABLE(PartyId INT, Balance MONEY, WaiverPeriod INT, MonthCount INT, Prepayment MONEY)
+	DECLARE @AmfParties TABLE(PartyId INT, Balance MONEY, WaiverPeriod INT, MonthCount INT, Prepayment MONEY, Remark VARCHAR(100))
 	INSERT INTO @AmfParties(PartyId, Prepayment)
 	(
 		SELECT p.PartyId, SUM(s.Income)
@@ -59,6 +59,20 @@ BEGIN
 	UPDATE af SET Balance = b.AdvanceMinFee+b.Prepayment
 	FROM @AmfParties af
 	INNER JOIN b ON b.PartyId = af.PartyId
+
+	-- remark
+	;WITH r AS (
+		SELECT p.PartyId, s.[Description], ROW_NUMBER() OVER (PARTITION BY p.PartyId ORDER BY h.CreatedDateTime DESC) AS RowNum
+		FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
+		INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
+		INNER JOIN @Parties p ON p.PartyId = s.RefPartyId
+		WHERE h.Environment = @Environment
+			AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
+			AND s.InvItemTypeId IN (3,5,21,22,23,24)-- exclude return amf-7
+	)
+	UPDATE af SET Remark = r.[Description]
+	FROM @AmfParties af
+	INNER JOIN r ON r.PartyId = af.PartyId AND r.RowNum = 1
 
 	-- launching date
 	-- 1-party
@@ -103,7 +117,7 @@ BEGIN
 		, af.WaiverPeriod
 		, ISNULL(af.MonthCount,0) AS MonthCount
 		, af.Balance
-		, '' AS Remark
+		, ISNULL(af.Remark,'') AS Remark
 		, l.PartyType
 	FROM @AmfParties af
 	INNER JOIN @Parties p ON af.PartyId=p.PartyId AND p.ParentId>0
