@@ -67,6 +67,11 @@ BEGIN
 		SELECT @ErrorCode = 100, @ErrorMsg = 'To Licensee is not found.'
 		RETURN
 	END
+	IF @ToPartyId = @FromPartyId
+	BEGIN
+		SELECT @ErrorCode = 104, @ErrorMsg = 'Cannot transfer to same licensee.'
+		RETURN
+	END
 
 	-- get remaining amf, prepayment
 	DECLARE @RemainingAMF MONEY = ISNULL((SELECT SUM(ISNULL(Income,0)) - SUM(ISNULL(Expense,0))
