@@ -15,6 +15,7 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:     		  
+		+ 20180109@bruce: filter invoice type by IsVisible=1 [#87039]
 	 Params:
 		+ 0 get all Invoice type
 		+ <> 0 specify a Invoice type
