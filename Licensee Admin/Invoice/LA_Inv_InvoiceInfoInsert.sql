@@ -43,8 +43,9 @@ AS
 		+ 20171026@Bruce: redmine id [#85256]
 				- add invoice date
 				- insert product id to statement
-		+ 20170112@Bruce: increase description length [#89417]
+		+ 20180112@Bruce: increase description length [#89417]
 		+ 20180131@Bruce: support credit note for setup fee [#90274]
+		+ 20180109@Bruce: month of deduction [#87039]
 */
 
 BEGIN
@@ -254,7 +255,7 @@ BEGIN
 
 			DROP TABLE #StatementsHeader
 		END
-					
+
 		INSERT INTO dbo.LA_InvoiceStatement(InvoiceHeaderId, InvItemTypeId, [Description], RefNo, RefPartyId, ProductId, Income, Expense)
 		SELECT @CurrentInvoiceHeaderId, d.ItemType, d.[Description], d.Reference, @PartyId,
 			ISNULL(ProductId, -1),
@@ -268,7 +269,22 @@ BEGIN
 						FROM  dbo.LA_InvoiceStatement s WITH(NOLOCK)
 						WHERE s.InvoiceHeaderId = @CurrentInvoiceHeaderId)
 		WHERE InvoiceHeaderId = @CurrentInvoiceHeaderId
-		
+
+		-- month of deduction
+		-- setup fee=7
+		-- amf = 3
+		DECLARE @AMF MONEY = (SELECT Amount FROM @Settlements WHERE ItemType=3)
+		IF @InvoiceTypeId=7 AND ISNULL(@AMF,0)>0
+		BEGIN
+			-- find active minfee
+			-- minfee=1
+			UPDATE m SET MonthOfDeduction = CEILING(@AMF / m.FeeAmount)
+			FROM dbo.LA_MinFee m WITH(NOLOCK)
+			WHERE m.FeeTypeId=1
+				AND m.PartyId = @PartyId
+				AND m.CurrencyId = @CurrencyId
+				AND @InvoiceDate BETWEEN m.FromDate AND m.ToDate
+		END
 	END TRY
 	BEGIN CATCH
 		DELETE dbo.LA_InvoiceHeader WHERE InvoiceHeaderId = @CurrentInvoiceHeaderId
