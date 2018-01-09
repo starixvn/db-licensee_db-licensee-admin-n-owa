@@ -114,12 +114,12 @@ BEGIN
 		
 		IF @RemainingAMF > 0 BEGIN
 			INSERT INTO @Transfer(ItemTypeId, RefPartyId, Amount, [Description])
-			VALUES (21, @FromPartyId, CASE WHEN @Amount<@RemainingAMF THEN @Amount ELSE @RemainingAMF END,@Description)
+			VALUES (21, @FromPartyId, -(CASE WHEN @Amount<@RemainingAMF THEN @Amount ELSE @RemainingAMF END),@Description)
 		END
 
 		IF @RemainingPP > 0 AND (@Amount-@RemainingAMF)>0 BEGIN
 			INSERT INTO @Transfer(ItemTypeId, RefPartyId, Amount, [Description])
-			VALUES (23, @FromPartyId, @Amount-@RemainingAMF,@Description)
+			VALUES (23, @FromPartyId, @RemainingAMF-@Amount,@Description)
 		END
 	END
 	ELSE
@@ -169,8 +169,8 @@ BEGIN
 		INSERT INTO @Transfer(ItemTypeId, RefPartyId, Amount, [Description]) VALUES(CASE WHEN @Option=1 THEN 3 ELSE 22 END, @ToPartyId, @Amount, @Description)
 	END
 
-	INSERT INTO dbo.LA_InvoiceHeader (BillerId,PartyId,CurrencyId,InvoiceSymbol,InvoiceNumber,InvoiceDate,Amount,InvoiceType,StatusId,Note,Environment)
-		VALUES(@BillerId, @ToPartyId, 0, '', 1, GETDATE(), @Amount, @InvoiceTypeId, 0, '', @Environment)
+	INSERT INTO dbo.LA_InvoiceHeader (BillerId,PartyId,CurrencyId,InvoiceSymbol,InvoiceNumber,InvoiceDate,Amount,InvoiceType,StatusId,Note,Environment,FromDate,ToDate,DueDate,HasDeleted,HasSent,CreatedBy,CreatedDateTime)
+		VALUES(@BillerId, @ToPartyId, 0, '', 1, GETDATE(), @Amount, @InvoiceTypeId, 0, '', @Environment,GETDATE(),GETDATE(),GETDATE(),0,0,@UserId,GETDATE())
 
 	DECLARE @HeaderId INT = SCOPE_IDENTITY()
 
