@@ -125,7 +125,7 @@ BEGIN
 		UNION ALL
 		SELECT d.rptDate,'Average Margin'
 			, CASE WHEN SUM(d.TurnOver) = 0 THEN 0 ELSE SUM(-d.Winloss)/SUM(d.TurnOver) END AS Margin
-		FROM d INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON d.PartyID = p.PartyID
+		FROM d
 		GROUP BY d.rptDate
 	)
 
@@ -157,6 +157,6 @@ BEGIN
 END
 GO
 
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicPerformance_LicensingMargin] TO [vnteam] 
+GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicPerformance_LicensingMargin] TO [vnteam]
 GRANT EXECUTE ON [dbo].[LA_Rpt_LicPerformance_LicensingMargin] TO bodbAdminNet
 GO
