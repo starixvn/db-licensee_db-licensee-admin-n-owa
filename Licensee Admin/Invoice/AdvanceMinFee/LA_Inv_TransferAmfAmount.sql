@@ -181,6 +181,19 @@ BEGIN
 	FROM @Transfer f
 	INNER JOIN dbo.LA_InvoiceItemType it ON f.ItemTypeId = it.InvItemTypeId
 
+	-- month of deduction
+	-- deduct as AMF = 1
+	IF @Option = 1
+	BEGIN
+		DECLARE @CurrencyId INT = (SELECT BaseCurrencyId FROM dbo.OAS_PartyDetail WHERE PartyID=@ToPartyId)
+		UPDATE m SET MonthOfDeduction = CEILING(@Amount / m.FeeAmount)
+		FROM dbo.LA_MinFee m WITH(NOLOCK)
+		WHERE m.FeeTypeId=1
+			AND m.PartyId = @ToPartyId
+			AND m.CurrencyId = @CurrencyId
+			AND GETDATE() BETWEEN m.FromDate AND m.ToDate
+	END
+
 	SET @endRun = GETDATE()
 	SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun)
 	DECLARE @xml XML = (
