@@ -49,6 +49,7 @@ AS
 		+ 2017.10.27 @Bruce: show individual discount by product [#85256]		
 		- 20171113@Bruce: Modified error message [RedmineID: #84163]
 		- 20171220@Parsons: increase length for variables [#88197]
+		- 20180110@Bruce: deduct against invoice [#87039]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -912,9 +913,8 @@ BEGIN
 			SELECT SUM(ISNULL(Income,0)) - SUM(ISNULL(Expense,0))
 			FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
 			INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
-			WHERE s.InvItemTypeId IN (3,5,7) 
+			WHERE s.InvItemTypeId IN (3,5,7,21) 
 				AND h.PartyId = @PartyId
-				AND h.BillerId = @BillerId
 				AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
 				AND h.Environment = @Environment
 		),0)
@@ -951,6 +951,28 @@ BEGIN
 				UPDATE @FinalResult SET AmfAmount = @AmfAmount, RemainingAmf = @RemainingAmf - @AmfAmount
 				WHERE AmountType = 1 AND ProductId = 0 -- SB
 			END
+
+			-- deduct against invoice
+			DECLARE @Prepayment MONEY = ISNULL((
+				SELECT SUM(ISNULL(Income,0)) - SUM(ISNULL(Expense,0))
+				FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
+				INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
+				WHERE s.InvItemTypeId IN (22,23,24) 
+					AND h.PartyId = @PartyId
+					AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
+					AND h.Environment = @Environment
+			),0)
+
+			DECLARE @TotalAmount MONEY = (
+				SELECT SUM(InvoiceAmount - ISNULL(AmfAmount,0))
+				FROM @FinalResult
+				WHERE ProductId != -1	-- not summarized row
+					AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount)
+			)
+
+			IF @Prepayment>0 AND @TotalAmount>0
+			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, AmountType)
+			VALUES(0,'','',CASE WHEN @Prepayment-@TotalAmount >=0 THEN -@TotalAmount ELSE -@Prepayment END, 24)-- 24=deduct against invoice
 		END
 
 		-- 10: debit note for return amf
