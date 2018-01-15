@@ -74,7 +74,7 @@ BEGIN
 	-- launching date
 	-- 1-party
 	-- 5-un-official party
-	DECLARE @LaunchingDate TABLE(LaunchindDate DATE, PartyId INT, PartyType INT)
+	DECLARE @LaunchingDate TABLE(LaunchingDate DATE, PartyId INT, PartyType INT)
 	;WITH P AS (
 		SELECT ci.FromDate, p.PartyID, p.PartyType
 		FROM dbo.OAS_Party p WITH (NOLOCK)
@@ -91,7 +91,7 @@ BEGIN
 		INNER JOIN dbo.OAS_ChargeInfoSub s WITH (NOLOCK) ON s.ChargeIDRef = ci.ChargeID AND s.FromParty = ci.FromParty
 		WHERE p.PartyType IN (1,5)
 	)
-	INSERT INTO @LaunchingDate(LaunchindDate, PartyId, PartyType)
+	INSERT INTO @LaunchingDate(LaunchingDate, PartyId, PartyType)
 	SELECT MIN(FromDate), PartyID, PartyType FROM P GROUP BY PartyID, PartyType
 
 	-- waiver period
@@ -125,7 +125,7 @@ BEGIN
 		, af.PartyId
 		, af.PartyName
 		, af.Prepayment
-		, l.LaunchindDate
+		, l.LaunchingDate
 		, af.WaiverPeriod
 		, ISNULL(af.MonthCount,0) AS MonthCount
 		, af.Balance
