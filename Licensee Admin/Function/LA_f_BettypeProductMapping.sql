@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="1" isNested="0"></info>*/
 ALTER FUNCTION [dbo].[LA_f_BettypeProductMapping] (
 	 @Bettype	 	INT = 0
 	,@ProductCodes VARCHAR(1000)	
