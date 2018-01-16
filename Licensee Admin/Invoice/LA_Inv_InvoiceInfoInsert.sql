@@ -43,6 +43,7 @@ AS
 		+ 20171026@Bruce: redmine id [#85256]
 				- add invoice date
 				- insert product id to statement
+		+ 20170112@Bruce: increase description length [#89417]
 */
 
 BEGIN
@@ -163,7 +164,7 @@ BEGIN
 
 	-- Region: Insert data to Invoice Detail
 	DECLARE @Settlements AS TABLE(
-		[Description]	NVARCHAR(200),
+		[Description]	NVARCHAR(500),
 		Amount			MONEY,
 		ItemType		TINYINT,
 		Reference		NVARCHAR(100),
@@ -182,7 +183,7 @@ BEGIN
 			ISNULL(p.ProductID, -1)
 		FROM OPENXML(@idoc, 'Statements/Statement')
 		WITH (
-			[Description]	NVARCHAR(200)	'Description',
+			[Description]	NVARCHAR(500)	'Description',
 			Amount			VARCHAR(20)		'Amount',
 			ItemType		VARCHAR(10)		'ItemType',
 			Reference		VARCHAR(100)	'Reference',
@@ -270,7 +271,7 @@ BEGIN
 	BEGIN CATCH
 		DELETE dbo.LA_InvoiceHeader WHERE InvoiceHeaderId = @CurrentInvoiceHeaderId
 		DELETE dbo.LA_InvoiceStatement WHERE InvoiceHeaderId = @CurrentInvoiceHeaderId
-		SELECT	@ErrCode = 2, @ErrMsg = 'Invalid invoice detail inputs.'
+		SELECT	@ErrCode = 2, @ErrMsg = 'Invalid invoice detail inputs: ' + ERROR_MESSAGE()
 		RETURN
 	END CATCH
 	-- End Region
