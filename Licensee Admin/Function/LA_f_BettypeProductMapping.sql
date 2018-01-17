@@ -273,7 +273,7 @@ BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 31
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
-	   WHERE typeid = 8000
+	   WHERE typeid BETWEEN 8000 AND 8099
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 	
