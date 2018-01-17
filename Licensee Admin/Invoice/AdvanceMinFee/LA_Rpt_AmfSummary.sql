@@ -40,7 +40,7 @@ BEGIN
 	)
 
 	-- statement
-	SELECT s.[Description],s.Expense,s.Income,s.InvItemTypeId,s.RefNo,s.RefPartyId, h.CreatedDateTime, h.OfficialInvoiceNo
+	SELECT s.[Description],s.Expense,s.Income,s.InvItemTypeId,s.RefNo,s.RefPartyId, h.CreatedDateTime, h.OfficialInvoiceNo, h.InvoiceType
 	INTO #Statement
 	FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
 	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
@@ -62,10 +62,14 @@ BEGIN
 	INNER JOIN b ON b.RefPartyId = af.PartyId
 
 	-- remark
+	-- invoice type: 7-setupfee
+	-- item type: 7 - return amf
 	;WITH r AS (
-		SELECT RefPartyId, [Description], ROW_NUMBER() OVER (PARTITION BY RefPartyId ORDER BY CreatedDateTime DESC) AS RowNum
-		FROM #Statement
-		WHERE InvItemTypeId <> 7-- exclude return amf-7
+		SELECT RefPartyId
+			, CASE WHEN s.InvoiceType=7 THEN '' ELSE [Description] END AS [Description]
+			, ROW_NUMBER() OVER (PARTITION BY RefPartyId ORDER BY CreatedDateTime DESC) AS RowNum
+		FROM #Statement s
+		WHERE InvItemTypeId <> 7
 	)
 	UPDATE af SET Remark = r.[Description]
 	FROM @AmfParties af
