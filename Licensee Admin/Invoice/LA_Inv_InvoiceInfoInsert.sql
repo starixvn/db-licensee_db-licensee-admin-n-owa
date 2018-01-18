@@ -273,7 +273,7 @@ BEGIN
 		-- month of deduction
 		-- setup fee=7
 		-- amf = 3
-		DECLARE @AMF MONEY = (SELECT Amount FROM @Settlements WHERE ItemType=3)
+		DECLARE @AMF MONEY = (SELECT SUM(Amount) FROM @Settlements WHERE ItemType=3)
 		IF @InvoiceTypeId=7 AND ISNULL(@AMF,0)>0
 		BEGIN
 			-- find active minfee
