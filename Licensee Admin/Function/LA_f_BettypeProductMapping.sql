@@ -1,11 +1,4 @@
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="1" isNested="0"></info>*/
 ALTER FUNCTION [dbo].[LA_f_BettypeProductMapping] (
 	 @Bettype	 	INT = 0
 	,@ProductCodes VARCHAR(1000)	
@@ -37,7 +30,7 @@ AS
 		- 20170712@Harper: #79310 - Integrate new product Betradar Virtual Sport
 		- 20171006@Harper: #79311 - Support Macau products
 		- 20171127@Sophia: #87257 - Support New range bettype for RNG casino
-
+		- 20171214@Sophia: #86640 - Add Exchange Citi Product
 	Param's Explanation:
 
 */
@@ -274,5 +267,16 @@ BEGIN
 	   WHERE typeid = 1900
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
+	
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'BX')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 31
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 8000 AND 8099
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+    END
+	
 	RETURN
 END
+

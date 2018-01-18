@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="1" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -22,17 +23,21 @@ RETURNS @tbChargeInfo TABLE (
 	, PNR_Rate			MONEY
 	, Fromdate			SMALLDATETIME
 	, Todate			SMALLDATETIME
+	, ChargeType		TINYINT
 	)
 AS
 /*  Created: 20141111@Florent
     Task : Get Charge Information
     DB: DBLIC/bodb_Licensee
     Param's Explanation:
+	Revisions:
 		- 20150710@Florent: support product MicroGaming with multi charge rate
 		- 20150825@Florent: change fiter ChargeType = 1 to ChargeType != 2 (support new ChargeType 5)
 		- 20151230@Bravo: Add MGCRNG charge info.
 		- 20161216@Bruce: remove rolling comission row ( type = 11)
 		- 20171219@Bruce: increase length for variables [#88197]
+		- 20171227@Sophia: output column ChargeType [Redmine: #82408]
+		
     select * FROM [LA_f_ChargeInfo_xtest]('14,15,16,17,18,25','2013-08-01','2013-08-30','NG','OA')
 */
 
@@ -76,7 +81,7 @@ BEGIN
 	    GROUP BY FromParty, ci.ProductID
 	)
 
-    INSERT INTO @tbChargeInfo (ChargeID , PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate)
+    INSERT INTO @tbChargeInfo (ChargeID , PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate, ChargeType)
 	SELECT DISTINCT DI.ChargeID 
 		, p.PartyID
 		, CASE 
@@ -100,6 +105,7 @@ BEGIN
 				THEN DI.ToDate
 			ELSE @ToDate
 			END
+		, DI.ChargeType
 	FROM dbo.OAS_Party p WITH (NOLOCK)	
 		INNER JOIN dbo.OAS_ChargeInfo DI WITH (NOLOCK) ON DI.FromParty = p.PartyID	AND DI.ChargeType != 2 AND p.PartyType = 1
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON DI.ChargeID = cs.ChargeID AND cs.SystemID = @SystemID
@@ -142,7 +148,7 @@ BEGIN
 	    GROUP BY ci.FromParty, ci.ProductID
 	)
 
-	INSERT INTO @tbChargeInfo (ChargeID , PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Bettype, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate)
+	INSERT INTO @tbChargeInfo (ChargeID , PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Bettype, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate, ChargeType)
 	SELECT DISTINCT DI.ChargeID 
 		, p.PartyID
 		, CASE 
@@ -167,6 +173,7 @@ BEGIN
 				THEN sub.ToDate
 			ELSE @ToDate
 			END
+		, DI.ChargeType
 	FROM dbo.OAS_Party p WITH (NOLOCK)	
 		INNER JOIN dbo.OAS_ChargeInfo DI WITH (NOLOCK) ON DI.FromParty = p.PartyID AND DI.ChargeType != 2 AND p.PartyType = 1
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON DI.ChargeID = cs.ChargeID AND cs.SystemID = @SystemID
@@ -200,7 +207,7 @@ BEGIN
     --get more licensee for racing product
 	IF CHARINDEX('RB', @ProductCodes) <> 0
 	BEGIN
-		INSERT INTO @tbChargeInfo (ChargeID, PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Bettype, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate)
+		INSERT INTO @tbChargeInfo (ChargeID, PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Bettype, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate, ChargeType)
 		SELECT
 			 0 AS ChargeID 
 			, p.PartyID
@@ -217,7 +224,8 @@ BEGIN
 			, 1
 			, 1
 			, @FromDate
-			, @ToDate		
+			, @ToDate
+			, 1 AS ChargeType
 		FROM dbo.OAS_Party p WITH (NOLOCK)
 			INNER JOIN dbo.Licensees l(NOLOCK) ON p.OldRefID = l.LicenseeID AND p.PartyType = 1	
 			INNER JOIN (
@@ -245,7 +253,7 @@ BEGIN
     -- add more data incase trial
     IF @ExcludeTest = 0
     BEGIN
-	   INSERT INTO @tbChargeInfo (ChargeID, PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Bettype, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate)
+	   INSERT INTO @tbChargeInfo (ChargeID, PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Bettype, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate, ChargeType)
 	   (
 			SELECT DISTINCT 0 AS ChargeID
 				, f1.Val PartyId
@@ -268,6 +276,7 @@ BEGIN
 						THEN DATEADD(D, - 1, cte.AffectedDate)
 					ELSE @ToDate
 					END
+				, 1 AS ChargeType
 			FROM strSplit(@PartyIDs, ',') f1
 				INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON f1.Val = p.PartyID
 				LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
@@ -304,6 +313,7 @@ BEGIN
 						THEN DATEADD(D, - 1, cte.AffectedDate)
 					ELSE @ToDate
 					END
+				, 1 AS ChargeType
 			FROM strSplit(@PartyIDs, ',') f1
 				INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON f1.Val = p.PartyID
 				LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
