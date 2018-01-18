@@ -30,6 +30,7 @@ AS
 		- 20160506@Bravo: Add VB data.
 		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 		- 20171205@Bruce: fix partyid length [#87723]
+		- 20180118@Parsons: Data is incorrect when chosing cross month [#89351]
     Param's Explanation:  
 	   + @partyIDs : a string of list PartyID, separated by ','
 	   + @Currency : 0-All Currencies
@@ -60,7 +61,7 @@ BEGIN
     DECLARE @MY TABLE(sDate DATETIME)
 
     DECLARE @cols AS NVARCHAR(MAX), @query AS NVARCHAR(MAX), @sdate AS DATETIME
-    SELECT @cols = NULL,@query = NULL,@sdate = @FromDate
+    SELECT @cols = NULL,@query = NULL,@sdate = DATEADD(MONTH,DATEDIFF(MONTH, 0, @FromDate),0)
 	
     WHILE (@sdate <= @ToDate)
     BEGIN 
@@ -161,6 +162,7 @@ BEGIN
     UPDATE #rptTurnOver
     SET TurnOver = 0
     WHERE (ISNULL(TurnOver, 0) = 0 OR TurnOver < 0)
+	
     --------------------------------- view result  -------------------------------------------
     SELECT @cols = COALESCE(@cols + ',' + QUOTENAME(DATENAME(YEAR, sdate)  + '-' + DATENAME(MONTH, sdate))
 								    , QUOTENAME(DATENAME(YEAR, sdate)  + '-' + DATENAME(MONTH, sdate)))
