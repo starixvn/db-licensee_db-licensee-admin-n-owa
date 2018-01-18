@@ -22,6 +22,9 @@ BEGIN
 	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT)
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionId=@FunctionId
+	
+	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
+	EXEC dbo.LA_PartyListNonOfficialSel
 
 	-- licensees have amf/prepayment
 	-- 3-amf
@@ -134,9 +137,9 @@ BEGIN
 		, ISNULL(af.MonthCount,0) AS MonthCount
 		, af.Balance
 		, ISNULL(af.Remark,'') AS Remark
-		, l.PartyType
+		, ISNULL(l.PartyType,5) AS PartyType-- un-official party
 	FROM @AmfParties af
-	INNER JOIN @LaunchingDate l ON l.PartyId=af.PartyId
+	LEFT JOIN @LaunchingDate l ON l.PartyId=af.PartyId
 	INNER JOIN @Parties pp ON pp.PartyId=af.ParentId AND pp.ParentId=0
 
 	-- get deduct amount detail
