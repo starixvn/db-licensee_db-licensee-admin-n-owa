@@ -24,6 +24,9 @@ BEGIN
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionId=@FunctionId
 
+	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
+	EXEC dbo.LA_PartyListNonOfficialSel
+
 	UPDATE p SET HasAmf = 1
 	FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
 	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON h.InvoiceHeaderId=s.InvoiceHeaderId
