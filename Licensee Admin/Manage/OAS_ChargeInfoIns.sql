@@ -1,10 +1,4 @@
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 
 ALTER PROCEDURE [dbo].[OAS_ChargeInfoIns] 
 	@ProductName			NVARCHAR(10)
@@ -22,6 +16,7 @@ ALTER PROCEDURE [dbo].[OAS_ChargeInfoIns]
 	, @WaiveMonth			INT				= 0
 	, @System				NVARCHAR(10)	= 'OA'
 	, @Remark				NVARCHAR(200)	= NULL
+	, @BasicOfBilling		NVARCHAR(4000)  = NULL
 	, @IsDebug				BIT				= 1
 	, @ChargeId				INT OUTPUT
 AS
@@ -44,6 +39,9 @@ AS
 		- 20161214@Jim:Invoice - Setup fees [RedmineID : #65260 ]
 		- 20170309@Harper: Add BaseCurrencyID For MinFee and PartyDetail
 		- 20170808@Harper: Fix case MinFee = 0 [RedmineID: #81327]
+		- 20170912@Harper: Clear code [RedmineID: #82673] 
+		- 20171012@Harper: Add more Basic Of Billing Info [#84772]
+		
 
 	Param's Explanation:
 */
@@ -74,7 +72,7 @@ BEGIN
 	IF (@ProductName = 'SB'	OR @ProductName = 'TT')
 		SET @ProductID = 0
 
-	--insert OAS_Party if doesn't exists
+	-------------------------------------------* OAS_PARTY *-------------------------------------
 	SELECT @FromPartyId = PartyID
 	FROM dbo.OAS_Party WITH (NOLOCK)
 	WHERE OldRefID = @OldRefId AND PartyType = 1
@@ -83,31 +81,32 @@ BEGIN
 	BEGIN
 		SELECT @FromPartyId = PartyID
 		FROM dbo.OAS_Party WITH (NOLOCK)
-		WHERE  [PartyName] = @FromPartyName AND PartyType = 5
+		WHERE PartyName = @FromPartyName AND PartyType = 5
 		
-		IF ISNULL(@FromPartyId,0)= 0
-			BEGIN
-				INSERT INTO dbo.OAS_Party (PartyName, [Description], PartyType, OldRefID)
-				SELECT LicenseeName, [Description], 1, LicenseeID
-				FROM dbo.licensees WITH (NOLOCK)
-				WHERE LicenseeName = @FromPartyName
+		IF ISNULL(@FromPartyId, 0)= 0
+		BEGIN
+			INSERT INTO dbo.OAS_Party (PartyName, [Description], PartyType, OldRefID)
+			SELECT LicenseeName, [Description], 1, LicenseeID
+			FROM dbo.licensees WITH (NOLOCK)
+			WHERE LicenseeName = @FromPartyName
 
-				SET @FromPartyId = SCOPE_IDENTITY()
-			END
+			SET @FromPartyId = SCOPE_IDENTITY()
+		END
 		ELSE 
-			BEGIN
-				UPDATE dbo.OAS_Party  
-				SET [OldRefID]   = @OldRefId
-					,[SetupName] = [PartyName]
-					,[PartyType] = 1
-					,[PartyName] = @FromPartyName
-				WHERE 	
-					[PartyID] = @FromPartyId
-			END	
-		--insert party detail if doesn't exists
-		IF NOT EXISTS (SELECT TOP 1 1
-			FROM dbo.OAS_PartyDetail WITH (NOLOCK)
-			WHERE PartyID = @FromPartyId)
+		BEGIN
+			UPDATE dbo.OAS_Party  
+			SET OldRefID   = @OldRefId
+				,SetupName = PartyName
+				,PartyType = 1
+				,PartyName = @FromPartyName
+			WHERE PartyID = @FromPartyId
+		END	
+
+		-------------------------------------------* OAS_PARTY DETAIL *-------------------------------------
+		IF NOT EXISTS ( SELECT TOP 1 1
+						FROM dbo.OAS_PartyDetail WITH (NOLOCK)
+						WHERE PartyID = @FromPartyId
+						)
 		BEGIN
 			INSERT INTO dbo.OAS_PartyDetail (PartyID, IsDeposit, BrandName, CompanyName, IsAllowedMemberComm, BaseCurrencyId)
 			SELECT @FromPartyId, IsDeposit, BrandName, CompanyName, IsAllowedMemberComm, @BaseCurrencyId
@@ -116,7 +115,8 @@ BEGIN
 		END
 	END
 	
-	--param anlysiz
+	-------------------------------------------* OAS_CHARGEINFO *-------------------------------------
+	
 	IF (@ProductID = 0 AND @ChargeType = 1) --charge in winloss
 	BEGIN
 		SELECT @MinAmount = NULL, @MaxAmount = NULL
@@ -135,104 +135,102 @@ BEGIN
 		SET @ParentChargeId = 0
 
 	--insert chargeinfo if doesn't exists or overlap data
-	IF NOT EXISTS (SELECT TOP 1 1
-			FROM dbo.OAS_ChargeInfo WITH (NOLOCK)
-			WHERE ProductID = @ProductID
-				AND FromParty = @FromPartyID
-				AND ToParty = @ToPartyID
-				AND ChargeType = @ChargeType
-				AND ((@FromDate BETWEEN FromDate AND ToDate
-						OR @Todate BETWEEN FromDate	AND ToDate)
-					OR (FromDate BETWEEN @FromDate AND @ToDate
-						AND ToDate BETWEEN @Fromdate AND @Todate)
-					)
-			)
+	IF NOT EXISTS ( SELECT TOP 1 1
+					FROM dbo.OAS_ChargeInfo WITH (NOLOCK)
+					WHERE ProductID = @ProductID
+						AND FromParty = @FromPartyID
+						AND ToParty = @ToPartyID
+						AND ChargeType = @ChargeType
+						AND ((@FromDate BETWEEN FromDate AND ToDate	OR @Todate BETWEEN FromDate	AND ToDate)
+							OR (FromDate BETWEEN @FromDate AND @ToDate AND ToDate BETWEEN @Fromdate AND @Todate))
+				)
 	BEGIN
 		IF @ProductId IN (14, 17) -- case Microgaming
+		BEGIN
+			INSERT INTO dbo.OAS_ChargeInfo (ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, MinAmount, MaxAmount, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling)
+			SELECT @ProductID, @FromPartyId, @ToPartyId, @ParentChargeId, NULL, @ChargeType, @FromDate, @ToDate, @MinAmount, @MaxAmount, @Remark, @BaseCurrencyId, @FromDate, @BasicOfBilling
+
+			SELECT @ChargeId = SCOPE_IDENTITY()
+			-- parse XML
+			DECLARE @ChargeInfoSub AS TABLE (ProductId INT, BettypeRef INT,	FromParty INT, ToParty INT, ParentChargeID INT, Rate MONEY, ChargeType INT, FromDate DATE, ToDate DATE, MinAmount MONEY, MaxAmount MONEY, BaseCurrencyId INT, FirstOfBilling DATE, BasicOfBilling VARCHAR (100),ChargeIdRef INT) 	
+			DECLARE @ChargeIdInserted AS TABLE (ChargeID INT)
+			DECLARE @idoc AS INT
+			EXEC sp_xml_preparedocument @idoc OUTPUT, @RateSettingXML
+
+			INSERT INTO @ChargeInfoSub(ProductId, BettypeRef, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, MinAmount, MaxAmount, BaseCurrencyId, FirstOfBilling, BasicOfBilling, ChargeIdRef)
+			SELECT @ProductID, BettypeRef, @FromPartyId, @ToPartyId, ParentChargeID, Rate, @ChargeType, FromDate, ToDate, @MinAmount, @MaxAmount, BaseCurrencyId, @FromDate, @BasicOfBilling, @ChargeId
+			FROM OPENXML(@idoc, 'ChargeInfoSub/Sub') 
+			WITH (
+				BettypeRef			INT		'BettypeRef'
+				, ParentChargeID	INT		'ParentChargeID'
+				, Rate				MONEY	'Rate'
+				, FromDate			DATE	'FromDate'
+				, ToDate			DATE	'ToDate'
+				, BaseCurrencyId	INT		'BaseCurrencyId'					
+			) 
+			EXEC sp_xml_removedocument @idoc
+
+			IF @@ERROR <> 0
 			BEGIN
-				INSERT INTO dbo.OAS_ChargeInfo (ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, MinAmount, MaxAmount, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling)
-				SELECT @ProductID, @FromPartyId, @ToPartyId, @ParentChargeId, NULL, @ChargeType, @FromDate, @ToDate, @MinAmount, @MaxAmount, @Remark, @BaseCurrencyId, @FromDate, ''
+				DELETE dbo.OAS_ChargeInfo WITH (ROWLOCK, UPDLOCK) WHERE ChargeID = @ChargeId
+				SELECT 'Error!!! Please check again', @ProductID AS '@ProductId', @FromPartyID AS '@FromPartyId', @ToPartyId AS '@ToPartyId'
+						, @ChargeType AS '@ChargeType', @FromDate AS '@FromDate', @ToDate AS '@ToDate', @ParentChargeId AS '@ParentChargeId'
+						, @RateSettingXML AS '@RateSettingXML'
+				RETURN
+			END
 
-				SELECT @ChargeId = SCOPE_IDENTITY()
-				-- parse XML
-				DECLARE @ChargeInfoSub AS TABLE (ProductId INT, BettypeRef INT,	FromParty INT, ToParty INT, ParentChargeID INT, Rate MONEY, ChargeType INT, FromDate DATE, ToDate DATE, MinAmount MONEY, MaxAmount MONEY, BaseCurrencyId INT, FirstOfBilling DATE, BasicOfBilling VARCHAR (100),ChargeIdRef INT) 	
-				DECLARE @ChargeIdInserted AS TABLE (ChargeID INT)
-				DECLARE @idoc AS INT
-				EXEC sp_xml_preparedocument @idoc OUTPUT, @RateSettingXML
-
-				INSERT INTO @ChargeInfoSub(ProductId, BettypeRef, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, MinAmount, MaxAmount, BaseCurrencyId, FirstOfBilling, BasicOfBilling, ChargeIdRef)
-				SELECT @ProductID, BettypeRef, @FromPartyId, @ToPartyId, ParentChargeID, Rate, @ChargeType, FromDate, ToDate, @MinAmount, @MaxAmount, BaseCurrencyId, @FromDate, '', @ChargeId
-				FROM OPENXML(@idoc, 'ChargeInfoSub/Sub') 
-				WITH (
-					BettypeRef			INT		'BettypeRef'
-					, ParentChargeID	INT		'ParentChargeID'
-					, Rate				MONEY	'Rate'
-					, FromDate			DATE	'FromDate'
-					, ToDate			DATE	'ToDate'
-					, BaseCurrencyId	INT		'BaseCurrencyId'					
-				) 
-				EXEC sp_xml_removedocument @idoc
-
-				IF @@ERROR <> 0
-				BEGIN
-					DELETE dbo.OAS_ChargeInfo WITH (ROWLOCK, UPDLOCK) WHERE ChargeID = @ChargeId
-					SELECT 'Error!!! Please check again', @ProductID AS '@ProductId', @FromPartyID AS '@FromPartyId', @ToPartyId AS '@ToPartyId'
-							, @ChargeType AS '@ChargeType', @FromDate AS '@FromDate', @ToDate AS '@ToDate', @ParentChargeId AS '@ParentChargeId'
-							, @RateSettingXML AS '@RateSettingXML'
-					RETURN
-				END
-
-				INSERT INTO dbo.OAS_ChargeInfoSub(ProductId, BettypeRef, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, MinAmount, MaxAmount, BaseCurrencyId, FirstOfBilling, BasisOfBilling, ChargeIdRef)
-				OUTPUT INSERTED.ChargeID
-				INTO @ChargeIdInserted
-				SELECT ProductId, BettypeRef, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, MinAmount, MaxAmount, BaseCurrencyId, FirstOfBilling, BasicOfBilling, ChargeIdRef				
-				FROM @ChargeInfoSub
+			INSERT INTO dbo.OAS_ChargeInfoSub(ProductId, BettypeRef, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, MinAmount, MaxAmount, BaseCurrencyId, FirstOfBilling, BasisOfBilling, ChargeIdRef)
+			OUTPUT INSERTED.ChargeID
+			INTO @ChargeIdInserted
+			SELECT ProductId, BettypeRef, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, MinAmount, MaxAmount, BaseCurrencyId, FirstOfBilling, BasicOfBilling, ChargeIdRef				
+			FROM @ChargeInfoSub
 				
-				IF @@ERROR <> 0
-				BEGIN
-					DELETE dbo.OAS_ChargeInfo WITH (ROWLOCK, UPDLOCK) WHERE ChargeID = @ChargeId
-					SELECT 'Error!!! Please check again', @ProductID AS '@ProductId', @FromPartyID AS '@FromPartyId', @ToPartyId AS '@ToPartyId'
-							, @ChargeType AS '@ChargeType', @FromDate AS '@FromDate', @ToDate AS '@ToDate', @ParentChargeId AS '@ParentChargeId'
-							, @RateSettingXML AS '@RateSettingXML'
-					RETURN
-				END
-			END
-		ELSE
+			IF @@ERROR <> 0
 			BEGIN
-				INSERT INTO dbo.OAS_ChargeInfo (ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, MinAmount, MaxAmount, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling)
-				SELECT @ProductID, @FromPartyId, @ToPartyId, @ParentChargeId, @Rate, @ChargeType, @FromDate, @ToDate, @MinAmount, @MaxAmount, @Remark, @BaseCurrencyId, @FromDate, ''
+				DELETE dbo.OAS_ChargeInfo WITH (ROWLOCK, UPDLOCK) WHERE ChargeID = @ChargeId
+				SELECT 'Error!!! Please check again', @ProductID AS '@ProductId', @FromPartyID AS '@FromPartyId', @ToPartyId AS '@ToPartyId'
+						, @ChargeType AS '@ChargeType', @FromDate AS '@FromDate', @ToDate AS '@ToDate', @ParentChargeId AS '@ParentChargeId'
+						, @RateSettingXML AS '@RateSettingXML'
+				RETURN
+			END
+		END
+		ELSE
+		BEGIN
+			INSERT INTO dbo.OAS_ChargeInfo (ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, MinAmount, MaxAmount, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling)
+			SELECT @ProductID, @FromPartyId, @ToPartyId, @ParentChargeId, @Rate, @ChargeType, @FromDate, @ToDate, @MinAmount, @MaxAmount, @Remark, @BaseCurrencyId, @FromDate, @BasicOfBilling
 
-				SELECT @ChargeId = SCOPE_IDENTITY()
+			SELECT @ChargeId = SCOPE_IDENTITY()
 
-				--reset waivemonth
-				IF (ISNULL(@WaiveMonth, '') = '' OR @WaiveMonth = 0)
+			--reset waivemonth
+			IF (ISNULL(@WaiveMonth, '') = '' OR @WaiveMonth = 0)
+			BEGIN
+				SET @FromDate = NULL
+			END
+
+			--insert minfee
+			IF (@ProductID = 0 AND @ChargeType = 1)
+			BEGIN
+				INSERT INTO dbo.LA_ChargeInfo_MinFee (ChargeID, MinFee, MinFeeCurrencyID, WaiveFrom, WaiveTo)
+				SELECT @ChargeID, @MinFee, @BaseCurrencyId, @FromDate, DATEADD(DAY, - 1, DATEADD(MONTH, @WaiveMonth, @FromDate))
+
+				IF (@Minfee <> 0)
 				BEGIN
-					SET @FromDate = NULL
+					INSERT INTO dbo.LA_MinFee(PartyId, FeeTypeId, ProductId, FeeAmount, CurrencyId, FromDate, ToDate, MinFeeTerm, Priority)
+					SELECT c.FromParty, 1, c.ProductID, @MinFee, @BaseCurrencyId, c.FromDate, c.ToDate , '', 1
+					FROM dbo.OAS_ChargeInfo c WITH (NOLOCK) 
+					WHERE c.ChargeID = @ChargeId
 				END
 
-				--insert minfee
-				IF (@ProductID = 0 AND @ChargeType = 1)
+				IF (ISNULL(@WaiveMonth, '') <> '' AND @WaiveMonth <> 0) 
 				BEGIN
-					INSERT INTO dbo.LA_ChargeInfo_MinFee (ChargeID, MinFee, MinFeeCurrencyID, WaiveFrom, WaiveTo)
-					SELECT @ChargeID, @MinFee, @BaseCurrencyId, @FromDate, DATEADD(DAY, - 1, DATEADD(MONTH, @WaiveMonth, @FromDate))
-
-					IF (@Minfee <> 0)
-					BEGIN
-						INSERT INTO dbo.LA_MinFee(PartyId, FeeTypeId, ProductId, FeeAmount, CurrencyId, FromDate, ToDate, MinFeeTerm, Priority)
-						SELECT c.FromParty, 1, c.ProductID, @MinFee, @BaseCurrencyId, c.FromDate, c.ToDate , '', 1
-						FROM dbo.OAS_ChargeInfo c WITH (NOLOCK) 
-						WHERE c.ChargeID = @ChargeId
-					END
-
-					IF (ISNULL(@WaiveMonth, '') <> '' AND @WaiveMonth <> 0) 
-					BEGIN
-						INSERT INTO dbo.LA_MinFee(PartyId, FeeTypeId, ProductId, FeeAmount, FromDate, ToDate, MinFeeTerm, Priority)
-						SELECT c.FromParty, 2, c.ProductID, NULL, @FromDate, DATEADD(DAY, - 1, DATEADD(MONTH, @WaiveMonth, @FromDate)), NULL, 2
-						FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
-						WHERE c.ChargeID = @ChargeId
-					END
+					INSERT INTO dbo.LA_MinFee(PartyId, FeeTypeId, ProductId, FeeAmount, FromDate, ToDate, MinFeeTerm, Priority)
+					SELECT c.FromParty, 2, c.ProductID, NULL, @FromDate, DATEADD(DAY, - 1, DATEADD(MONTH, @WaiveMonth, @FromDate)), NULL, 2
+					FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
+					WHERE c.ChargeID = @ChargeId
 				END
 			END
+		END
+
 		--add system mapping
 		INSERT INTO dbo.LA_ChargeInfo_SystemMapping (ChargeID, SystemID)
 		SELECT @ChargeId, s.id
@@ -249,3 +247,4 @@ BEGIN
 		END
 	END
 END
+GO
