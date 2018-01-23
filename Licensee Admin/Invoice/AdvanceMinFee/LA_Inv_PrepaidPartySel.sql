@@ -23,6 +23,9 @@ BEGIN
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionId=@FunctionId
 
+	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
+	EXEC dbo.LA_PartyListNonOfficialSel
+
 	;WITH a AS (
 		SELECT p.PartyId, p.PartyName, p.BrandName, p.ParentId
 			, SUM(CASE WHEN s.InvItemTypeId IN (3,5,7,21) THEN ISNULL(Income,0)-ISNULL(s.Expense,0) ELSE 0 END) AS AdvanceMinFee
