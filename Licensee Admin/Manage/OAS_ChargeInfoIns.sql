@@ -41,7 +41,7 @@ AS
 		- 20170808@Harper: Fix case MinFee = 0 [RedmineID: #81327]
 		- 20170912@Harper: Clear code [RedmineID: #82673] 
 		- 20171012@Harper: Add more Basic Of Billing Info [#84772]
-		
+		- 20180122@Harper: Add code for insert Month of deduction for LA_MinFee [RedmineID: #87039]
 
 	Param's Explanation:
 */
@@ -215,10 +215,29 @@ BEGIN
 
 				IF (@Minfee <> 0)
 				BEGIN
+					DECLARE @MinFeeID INT, @AMF MONEY
+
 					INSERT INTO dbo.LA_MinFee(PartyId, FeeTypeId, ProductId, FeeAmount, CurrencyId, FromDate, ToDate, MinFeeTerm, Priority)
 					SELECT c.FromParty, 1, c.ProductID, @MinFee, @BaseCurrencyId, c.FromDate, c.ToDate , '', 1
 					FROM dbo.OAS_ChargeInfo c WITH (NOLOCK) 
 					WHERE c.ChargeID = @ChargeId
+
+					SELECT @MinFeeID = SCOPE_IDENTITY()
+
+					-- Caculate Month of Deduction
+					SELECT @AMF = d.Income
+					FROM dbo.LA_InvoiceHeader h WITH (NOLOCK)
+						INNER JOIN dbo.LA_InvoiceStatement d WITH (NOLOCK) ON h.InvoiceHeaderId = d.InvoiceHeaderId
+					 WHERE h.InvoiceType = 7 AND d.InvItemTypeId = 3 AND h.StatusId = 0 --AND h.Environment = 'PRO'					
+						AND h.PartyId = @FromPartyId
+						AND h.CurrencyId = @BaseCurrencyId
+
+					IF ISNULL(@AMF, 0) <> 0
+					BEGIN
+						UPDATE dbo.LA_MinFee
+						SET MonthOfDeduction = CEILING(@AMF / @Minfee)
+						WHERE MinFeeId = @MinFeeID
+					END
 				END
 
 				IF (ISNULL(@WaiveMonth, '') <> '' AND @WaiveMonth <> 0) 
