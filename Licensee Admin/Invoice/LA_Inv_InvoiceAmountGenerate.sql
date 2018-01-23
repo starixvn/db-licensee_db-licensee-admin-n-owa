@@ -133,7 +133,8 @@ BEGIN
 		@AmountTypeDiscount INT = 4,
 		@AmountTypeRebate INT = 6,
 		@AmountTypeRackHostingFee INT = 8,
-		@AmountTypeMonthlyHostingFee INT = 9
+		@AmountTypeMonthlyHostingFee INT = 9,
+		@DeductAgainstInvoice INT = 24
 
 	IF @InvoiceTypeId = @InvoiceTypeHostingFeesId
 	BEGIN
@@ -972,7 +973,7 @@ BEGIN
 
 			IF @Prepayment>0 AND @TotalAmount>0
 			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, AmountType)
-			VALUES(0,'','',CASE WHEN @Prepayment-@TotalAmount >=0 THEN -@TotalAmount ELSE -@Prepayment END, 24)-- 24=deduct against invoice
+			VALUES(0,'','',CASE WHEN @Prepayment-@TotalAmount >=0 THEN -@TotalAmount ELSE -@Prepayment END, @DeductAgainstInvoice)-- 24=deduct against invoice
 		END
 
 		-- 10: debit note for return amf
@@ -996,7 +997,7 @@ BEGIN
 				AND (
 						f.AmountType = @AmountTypeSoftwareFee OR	-- software data fee rows
 						f.AmountType = @AmountTypeDiscount OR		-- discount rows
-						f.AmountType = 24			-- deduct agains invoice
+						f.AmountType = @DeductAgainstInvoice		-- deduct against invoice
 					))
 			OR (@InvoiceTypeId = 3 -- rebate
 				AND f.ProductId = -1 AND f.AmountType = @AmountTypeRebate -- summarized rebate row
