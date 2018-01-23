@@ -11,8 +11,8 @@ ALTER PROCEDURE [dbo].[LA_Inv_TransferAmfAmount]
 	@Environment		VARCHAR(50),
 	@UserId				INT,
 	@LoginIp			VARCHAR(50),
-	@ErrorCode			INT				OUTPUT,
-	@ErrorMsg			VARCHAR(4000)	OUTPUT
+	@ErrCode			INT				OUTPUT,
+	@ErrMsg				VARCHAR(4000)	OUTPUT
 AS
 /*	Header:
 	Created: 20171226 - Bruce.Bui
@@ -43,15 +43,17 @@ BEGIN
 
 	SET @startRun = GETDATE()
 
-	SELECT @ErrorCode = 0, @ErrorMsg = ''
+	SELECT @ErrCode = 0, @ErrMsg = ''
 
+	-- 1 official party
+	-- 5 un-official party
 	DECLARE @ExistingParties TABLE(PartyId INT, PartyName VARCHAR(50))
 	INSERT INTO @ExistingParties(PartyId,PartyName)
 	(
 		SELECT p.PartyId, p.PartyName
 		FROM dbo.OAS_Party p WITH(NOLOCK)
 		INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
-		WHERE p.PartyType=1 AND d.PartyID IN(@FromPartyId, @ToPartyId)
+		WHERE p.PartyType IN (1,5) AND d.PartyID IN(@FromPartyId, @ToPartyId)
 			AND ISNULL(d.StatusId,0) = 1
 			AND ISNULL(d.IsDeposit,0) = 1
 		UNION ALL SELECT 0, 'OW'
@@ -59,17 +61,17 @@ BEGIN
 
 	IF @FromPartyId > 0 AND NOT EXISTS (SELECT * FROM @ExistingParties WHERE PartyId=@FromPartyId)
 	BEGIN
-		SELECT @ErrorCode = 100, @ErrorMsg = 'From Licensee is not found.'
+		SELECT @ErrCode = 100, @ErrMsg = 'From Licensee is not found.'
 		RETURN
 	END
 	IF @ToPartyId > 0 AND NOT EXISTS (SELECT * FROM @ExistingParties WHERE PartyId=@ToPartyId)
 	BEGIN
-		SELECT @ErrorCode = 100, @ErrorMsg = 'To Licensee is not found.'
+		SELECT @ErrCode = 100, @ErrMsg = 'To Licensee is not found.'
 		RETURN
 	END
 	IF @ToPartyId = @FromPartyId
 	BEGIN
-		SELECT @ErrorCode = 104, @ErrorMsg = 'Cannot transfer to same licensee.'
+		SELECT @ErrCode = 104, @ErrMsg = 'Cannot transfer to same licensee.'
 		RETURN
 	END
 
@@ -106,7 +108,7 @@ BEGIN
 	BEGIN
 		IF @FromPartyId = 0
 		BEGIN
-			SELECT @ErrorCode = 101, @ErrorMsg = 'From Licensee is required.'
+			SELECT @ErrCode = 101, @ErrMsg = 'From Licensee is required.'
 			RETURN
 		END
 
@@ -128,17 +130,17 @@ BEGIN
 		-- deduct against monthly billing
 		IF @ToPartyId = 0
 		BEGIN
-			SELECT @ErrorCode = 101, @ErrorMsg = 'To Licensee is required.'
+			SELECT @ErrCode = 101, @ErrMsg = 'To Licensee is required.'
 			RETURN
 		END
 		IF @Amount = 0
 		BEGIN
-			SELECT @ErrorCode = 102, @ErrorMsg = 'The transfer amount is required.'
+			SELECT @ErrCode = 102, @ErrMsg = 'The transfer amount is required.'
 			RETURN
 		END
 		IF @FromPartyId > 0 AND @Amount > (@RemainingAMF+@RemainingPP)
 		BEGIN
-			SELECT @ErrorCode = 103, @ErrorMsg = 'The transfer amount must be equals to or less than remaining AMF.'
+			SELECT @ErrCode = 103, @ErrMsg = 'The transfer amount must be equals to or less than remaining AMF.'
 			RETURN
 		END
 
