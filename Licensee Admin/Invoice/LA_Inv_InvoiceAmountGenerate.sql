@@ -995,7 +995,8 @@ BEGIN
 				AND f.ProductId != -1	-- not summarized row
 				AND (
 						f.AmountType = @AmountTypeSoftwareFee OR	-- software data fee rows
-						f.AmountType = @AmountTypeDiscount			-- discount rows
+						f.AmountType = @AmountTypeDiscount OR		-- discount rows
+						f.AmountType = 24			-- deduct agains invoice
 					))
 			OR (@InvoiceTypeId = 3 -- rebate
 				AND f.ProductId = -1 AND f.AmountType = @AmountTypeRebate -- summarized rebate row
