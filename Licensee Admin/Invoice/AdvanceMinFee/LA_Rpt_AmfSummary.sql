@@ -18,6 +18,8 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
+	DECLARE @AMF INT = 3
+	DECLARE @PREPAYMENT INT = 22
 
 	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT)
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
@@ -29,54 +31,65 @@ BEGIN
 	-- licensees have amf/prepayment
 	-- 3-amf
 	-- 22-prepayment
-	DECLARE @AmfParties TABLE(PartyId INT, Balance MONEY, WaiverPeriod INT, MonthCount INT, Prepayment MONEY, Remark VARCHAR(100), PartyName VARCHAR(50), ParentId INT)
-	INSERT INTO @AmfParties(PartyId, Prepayment, PartyName, ParentId)
+	DECLARE @AmfParties TABLE(
+		PartyId INT,
+		Balance MONEY,
+		WaiverPeriod INT,
+		MonthCount INT,
+		InitialAmount MONEY,
+		Remark VARCHAR(100),
+		PartyName VARCHAR(50),
+		ParentId INT,
+		RowType INT
+	)
+	INSERT INTO @AmfParties(PartyId, InitialAmount, PartyName, ParentId, RowType)
 	(
-		SELECT p.PartyId, SUM(s.Income), p.PartyName, p.ParentId
+		SELECT p.PartyId, SUM(s.Income), p.PartyName, p.ParentId,s.InvItemTypeId
 		FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
 		INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) on h.InvoiceHeaderId=s.InvoiceHeaderId
 		INNER JOIN @Parties p ON p.PartyId = s.RefPartyId
-		WHERE s.InvItemTypeId IN(3,22) AND p.ParentId > 0
+		WHERE s.InvItemTypeId IN(@AMF,@PREPAYMENT) AND p.ParentId > 0
 			AND h.StatusId = 0 -- 0: normal invoice
 			AND h.Environment=@Environment
-		GROUP BY p.PartyId, p.PartyName, p.ParentId
+		GROUP BY p.PartyId, p.PartyName, p.ParentId,s.InvItemTypeId
 	)
 
 	-- statement
-	SELECT s.[Description],s.Expense,s.Income,s.InvItemTypeId,s.RefNo,s.RefPartyId, h.CreatedDateTime, h.OfficialInvoiceNo, h.InvoiceType
+	-- 3,5,7,21: amf
+	-- 22: prepayment
+	SELECT s.[Description],s.Expense,s.Income,s.InvItemTypeId,s.RefNo,s.RefPartyId, h.CreatedDateTime, h.OfficialInvoiceNo, h.InvoiceType,
+		CASE WHEN s.InvItemTypeId IN (3,5,7,21) THEN @AMF ELSE @PREPAYMENT END RowType
 	INTO #Statement
 	FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
 	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
-	INNER JOIN @AmfParties p ON p.PartyId = s.RefPartyId
 	WHERE h.Environment = @Environment
 		AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
 		AND s.InvItemTypeId IN (3,5,7,21,22,23,24)
+		AND s.RefPartyId IN (SELECT a.PartyId FROM @AmfParties a)
 
 	-- get balance
 	;WITH b AS (
-		SELECT RefPartyId
-			, SUM(CASE WHEN InvItemTypeId IN (3,5,7,21) THEN ISNULL(Income,0)-ISNULL(Expense,0) ELSE 0 END) AS AdvanceMinFee
-			, SUM(CASE WHEN InvItemTypeId IN (22,23,24) THEN ISNULL(Income,0)-ISNULL(Expense,0) ELSE 0 END) AS Prepayment
+		SELECT RefPartyId, RowType, SUM(ISNULL(Income,0)-ISNULL(Expense,0)) AS Balance
 		FROM #Statement
-		GROUP BY RefPartyId
+		GROUP BY RefPartyId, RowType
 	)
-	UPDATE af SET Balance = b.AdvanceMinFee+b.Prepayment
+	UPDATE af SET Balance = b.Balance
 	FROM @AmfParties af
-	INNER JOIN b ON b.RefPartyId = af.PartyId
+	INNER JOIN b ON b.RefPartyId = af.PartyId AND b.RowType=af.RowType
 
 	-- remark
 	-- invoice type: 7-setupfee
-	-- item type: 7 - return amf
+	-- item type: 7 - return amf(exclude)
 	;WITH r AS (
-		SELECT RefPartyId
+		SELECT RefPartyId, RowType
 			, CASE WHEN s.InvoiceType=7 THEN '' ELSE [Description] END AS [Description]
-			, ROW_NUMBER() OVER (PARTITION BY RefPartyId ORDER BY CreatedDateTime DESC) AS RowNum
+			, ROW_NUMBER() OVER (PARTITION BY RefPartyId,RowType ORDER BY CreatedDateTime DESC) AS RowNum
 		FROM #Statement s
-		WHERE InvItemTypeId <> 7
+		WHERE InvItemTypeId <> 7-- exclude return amf
 	)
 	UPDATE af SET Remark = r.[Description]
 	FROM @AmfParties af
-	INNER JOIN r ON r.RefPartyId = af.PartyId AND r.RowNum = 1
+	INNER JOIN r ON r.RefPartyId = af.PartyId AND r.RowType=af.RowType AND r.RowNum = 1
 
 	-- launching date
 	-- 1-party
@@ -104,40 +117,44 @@ BEGIN
 	-- waiver period
 	-- 1 minfee
 	-- 2 waive
+	-- 3 amf
 	;WITH wp AS (
 		SELECT w.PartyId, SUM(DATEDIFF(MONTH,w.FromDate,w.ToDate )+1) WaiverPeriod
 		FROM dbo.LA_MinFee w WITH(NOLOCK)
 		INNER JOIN dbo.LA_MinFee m WITH(NOLOCK) ON m.PartyId=w.PartyId AND m.ProductId=w.ProductId
-		INNER JOIN @AmfParties af ON af.PartyId=w.PartyId
+		INNER JOIN @AmfParties af ON af.PartyId=w.PartyId AND af.RowType=@AMF
 		WHERE w.FeeTypeId = 2 AND m.FeeTypeId=1 AND w.FromDate >= m.FromDate AND w.ToDate<=m.ToDate
 		GROUP BY w.PartyId
 	)
 	UPDATE p SET p.WaiverPeriod = ISNULL(wp.WaiverPeriod, 0)
 	FROM @AmfParties p
 	LEFT JOIN wp ON wp.PartyId=p.PartyId
+	WHERE p.RowType=@AMF
 
 	-- month of deduction
 	-- 1 minfee
 	;WITH md AS (
 		SELECT m.PartyId, m.MonthOfDeduction, ROW_NUMBER() OVER (PARTITION BY m.PartyId ORDER BY m.ToDate DESC) AS RowNum
 		FROM dbo.LA_MinFee m WITH(NOLOCK)
-		INNER JOIN @AmfParties p ON p.PartyId = m.PartyId
+		INNER JOIN @AmfParties p ON p.PartyId = m.PartyId AND p.RowType=@AMF
 		WHERE m.FeeTypeId=1
 	)
 	UPDATE p SET p.MonthCount = md.MonthOfDeduction
 	FROM @AmfParties p
 	INNER JOIN md ON p.PartyId=md.PartyId AND md.RowNum=1
+	WHERE p.RowType=@AMF
 
 	SELECT REPLACE(pp.PartyName, ' Licensees', '') AS GroupName
 		, af.PartyId
 		, af.PartyName
-		, af.Prepayment
+		, af.InitialAmount				AS Prepayment
 		, l.LaunchingDate
-		, af.WaiverPeriod
-		, ISNULL(af.MonthCount,0) AS MonthCount
+		, ISNULL(af.WaiverPeriod,0)		AS WaiverPeriod
+		, ISNULL(af.MonthCount,0)		AS MonthCount
 		, af.Balance
-		, ISNULL(af.Remark,'') AS Remark
-		, ISNULL(l.PartyType,5) AS PartyType-- un-official party
+		, ISNULL(af.Remark,'')			AS Remark
+		, ISNULL(l.PartyType,5)			AS PartyType-- un-official party
+		, af.RowType
 	FROM @AmfParties af
 	LEFT JOIN @LaunchingDate l ON l.PartyId=af.PartyId
 	INNER JOIN @Parties pp ON pp.PartyId=af.ParentId AND pp.ParentId=0
@@ -145,13 +162,13 @@ BEGIN
 	-- get deduct amount detail
 	-- 5-deduct AMF
 	-- 24-deduct against invoice
-	DECLARE @Deduct TABLE(PartyId INT, InvoiceNo VARCHAR(50), Amount MONEY)
-	INSERT INTO @Deduct(PartyId, InvoiceNo, Amount)
+	DECLARE @Deduct TABLE(PartyId INT, InvoiceNo VARCHAR(50), Amount MONEY, RowType INT)
+	INSERT INTO @Deduct(PartyId, InvoiceNo, Amount, RowType)
 	(
-		SELECT RefPartyId, OfficialInvoiceNo, SUM(Expense) AS Amount
+		SELECT RefPartyId, OfficialInvoiceNo, SUM(Expense) AS Amount,InvItemTypeId
 		FROM #Statement
 		WHERE InvItemTypeId IN(5,24)
-		GROUP BY RefPartyId, OfficialInvoiceNo
+		GROUP BY RefPartyId, OfficialInvoiceNo,InvItemTypeId
 	)
 
 	;WITH r AS (
@@ -160,7 +177,9 @@ BEGIN
 		WHERE InvItemTypeId = 7-- 7-return amf
 		GROUP BY RefPartyId,RefNo
 	)
-	SELECT d.PartyId, d.InvoiceNo, d.Amount - ISNULL(r.Amount,0) AS Amount
+	SELECT d.PartyId, d.InvoiceNo
+		, d.Amount - ISNULL(r.Amount,0) AS Amount
+		, CASE WHEN d.RowType=5 THEN @AMF ELSE @PREPAYMENT END AS RowType
 	FROM @Deduct d
 	LEFT JOIN r ON d.InvoiceNo = r.RefNo
 	ORDER BY d.PartyId, d.InvoiceNo
