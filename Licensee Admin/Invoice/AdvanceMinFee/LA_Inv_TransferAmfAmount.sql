@@ -112,16 +112,18 @@ BEGIN
 			RETURN
 		END
 
-		SET @Description = 'Write off' + CHAR(13) + 'Amount: ' + CONVERT(VARCHAR, @Amount, 1)
+		SET @Description = 'Write off' + CHAR(13) + 'Amount: '
+		DECLARE @WriteOffAmount MONEY = CASE WHEN @Amount<@RemainingAMF THEN @Amount ELSE @RemainingAMF END
 		
 		IF @RemainingAMF > 0 BEGIN
 			INSERT INTO @Transfer(ItemTypeId, RefPartyId, Amount, [Description])
-			VALUES (21, @FromPartyId, -(CASE WHEN @Amount<@RemainingAMF THEN @Amount ELSE @RemainingAMF END),@Description)
+			VALUES (21, @FromPartyId, -@WriteOffAmount, @Description + CONVERT(VARCHAR, @WriteOffAmount, 1))
 		END
-
-		IF @RemainingPP > 0 AND (@Amount-@RemainingAMF)>0 BEGIN
+		
+		SET @WriteOffAmount = @Amount-@RemainingAMF
+		IF @RemainingPP > 0 AND @WriteOffAmount > 0 BEGIN
 			INSERT INTO @Transfer(ItemTypeId, RefPartyId, Amount, [Description])
-			VALUES (23, @FromPartyId, @RemainingAMF-@Amount,@Description)
+			VALUES (23, @FromPartyId,-@WriteOffAmount, @Description + CONVERT(VARCHAR, @WriteOffAmount, 1))
 		END
 	END
 	ELSE
