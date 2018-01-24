@@ -915,7 +915,7 @@ BEGIN
 			FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
 			INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
 			WHERE s.InvItemTypeId IN (3,5,7,21) 
-				AND h.PartyId = @PartyId
+				AND s.RefPartyId = @PartyId
 				AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
 				AND h.Environment = @Environment
 		),0)
@@ -958,8 +958,8 @@ BEGIN
 				SELECT SUM(ISNULL(Income,0)) - SUM(ISNULL(Expense,0))
 				FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
 				INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
-				WHERE s.InvItemTypeId IN (22,23,24) 
-					AND h.PartyId = @PartyId
+				WHERE s.InvItemTypeId IN (22,23,24)
+					AND s.RefPartyId = @PartyId
 					AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
 					AND h.Environment = @Environment
 			),0)
