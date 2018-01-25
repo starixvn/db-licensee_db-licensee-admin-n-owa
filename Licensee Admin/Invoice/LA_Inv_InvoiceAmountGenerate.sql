@@ -965,7 +965,7 @@ BEGIN
 			),0)
 
 			DECLARE @TotalAmount MONEY = (
-				SELECT SUM(InvoiceAmount - ISNULL(AmfAmount,0))
+				SELECT SUM((CASE WHEN AmountType=@AmountTypeDiscount THEN -InvoiceAmount ELSE InvoiceAmount END) - ISNULL(AmfAmount,0))
 				FROM @FinalResult
 				WHERE ProductId != -1	-- not summarized row
 					AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount)
