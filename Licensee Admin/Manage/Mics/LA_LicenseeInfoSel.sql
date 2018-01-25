@@ -16,6 +16,7 @@ AS
 
 	Revisions:
 	- 20151007@Bruce: Get Licensee information
+	- 20180125@Bruce: include branch name [#90029]
 */
 BEGIN
 SET NOCOUNT ON
@@ -57,6 +58,7 @@ SELECT	 CASE pd.IsDeposit	WHEN 0 THEN 'Credit' ELSE g.PartyName							END AS Gro
 		,ci.ProductId
 		,pd.IsDeposit
 		,ci.BettypeRef
+		,pd.BrandName
 FROM ChargeInfo AS ci
 	INNER JOIN dbo.OAS_Party AS p WITH (NOLOCK) ON p.PartyID = ci.FromParty			-- Licensee
 	INNER JOIN @Groups AS g ON ci.ToParty = g.PartyID								-- Group
@@ -66,7 +68,7 @@ FROM ChargeInfo AS ci
 WHERE p.PartyType = 1 AND ci.ChargeID IN (	SELECT ChargeID 
 											FROM dbo.LA_ChargeInfo_SystemMapping WITH (NOLOCK)
 											WHERE SystemID = 2)
-ORDER BY p.PartyName, ci.FromDate
+ORDER BY p.PartyName,pd.BrandName, ci.FromDate
 
 END
 GO
