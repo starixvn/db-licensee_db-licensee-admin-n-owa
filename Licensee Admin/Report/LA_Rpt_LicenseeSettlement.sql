@@ -31,15 +31,17 @@ AS
 			- 20170511@bruce: include exchange rate [RedmineID: #76132]
 			- 20170712@bruce: include BRVS, LO [RedmineID: #79310]
 			- 20171219@Bruce: increase length for variables [#88197]
+			- 20180126@Bruce: include Exchange-BX [#87754]
 
 		Param's Explanation:
-			+ @@ProductCode:	'SB' -> Sportsbook			'RB' -> Racing
-								'NG' -> Number Game			'BA' -> BA
-								'LC' -> Live Casino			'VS' -> Virtual Sports
-								'CS' -> RNG Casino			'BG' -> Bingo
-								'MGC'->Microgaming Casino	'BT' -> Bettrade
-								'CB' -> Colossus Bets		'CO' -> Cash Out
-								'BRVS' -> Betradar Virtual Sports		'LO' -> Lottery
+			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
+								'NG' -> Number Game				'BA' -> BA
+								'LC' -> Live Casino				'VS' -> Virtual Sports
+								'CS' -> RNG Casino				'BG' -> Bingo
+								'BT' -> Bettrade				'MGCLC'->Microgaming Live Casino
+								'BX' -> Exchange				'MGCRNG'->Microgaming RNG Casino
+								'CB' -> Colossus Bets			'CO' -> Cash Out
+								'LO' -> Lottery					'BRVS' -> Betradar Virtual Sports
 	*/
 SET NOCOUNT ON
 BEGIN
@@ -575,6 +577,31 @@ BEGIN
 					GROUP BY p.PartyId, b.Winlostdate, b.Currency
 			) d
 			GROUP BY d.Winlostdate, d.Currency
+		)
+	END
+	ELSE IF (@ProductCode = 'BX')
+	BEGIN
+		DECLARE @ExchangeProductId INT = (SELECT Productid FROM bodb_licensee.dbo.Product3rd WHERE ProductPrefix = 'BX')
+
+		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
+		(
+			SELECT b.rptDate
+				, b.CurrencyId
+				, SUM(b.turnover)
+				, SUM(b.MemberWL) winloss
+				, SUM(b.CommissionP)
+				, SUM(-b.MemberWL * (1 - p.Rate))
+				, SUM(b.CommissionP + b.CommissionA)
+				, SUM(-b.MemberWL * p.Rate + b.CommissionA)
+				, SUM(b.BetCount)
+			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+				INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
+			WHERE b.CurrencyId <> 20
+				AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
+				AND b.ProductID = @ExchangeProductId
+				AND b.StatusId NOT IN (-1, 101, 102, 103)
+				AND b.customercategory NOT IN (27, 28)
+			GROUP BY b.rptDate, b.CurrencyId
 		)
 	END
 	ELSE
