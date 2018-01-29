@@ -153,16 +153,18 @@ BEGIN
 		-- transfer to
 		IF @FromPartyId > 0
 		BEGIN
-			SET @Description = 'Transfer to ' + @ToPartyName + CHAR(13) + @DeductText + CHAR(13) + 'Amount: ' + CONVERT(VARCHAR, @Amount, 1)
+			SET @Description = 'Transfer to ' + @ToPartyName + CHAR(13) + @DeductText + CHAR(13) + 'Amount: '
+			DECLARE @TransferAmount MONEY = CASE WHEN @Amount<@RemainingAMF THEN @Amount ELSE @RemainingAMF END
 
 			IF @RemainingAMF > 0 BEGIN
 				INSERT INTO @Transfer(ItemTypeId, RefPartyId, Amount, [Description])
-				VALUES (21, @FromPartyId, -(CASE WHEN @Amount<@RemainingAMF THEN @Amount ELSE @RemainingAMF END),@Description)
+				VALUES (21, @FromPartyId, -@TransferAmount,@Description + CONVERT(VARCHAR, @TransferAmount, 1))
 			END
 
-			IF @RemainingPP > 0 AND (@Amount-@RemainingAMF)>0 BEGIN
+			SET @TransferAmount = @Amount-@RemainingAMF
+			IF @RemainingPP > 0 AND @TransferAmount > 0 BEGIN
 				INSERT INTO @Transfer(ItemTypeId, RefPartyId, Amount, [Description])
-				VALUES (23, @FromPartyId, @RemainingAMF-@Amount,@Description)
+				VALUES (23, @FromPartyId, -@TransferAmount,@Description + CONVERT(VARCHAR, @TransferAmount, 1))
 			END
 		END
 
