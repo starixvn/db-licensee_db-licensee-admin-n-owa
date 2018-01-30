@@ -23,6 +23,7 @@ AS
 	- 20170412: @Scofield - Removing Trading Bet Types [#73310]
 	- 20171205@Bruce: fix partyid length [#87723]
 	- 20171211: @Scofield - Support Colossus Bet, Cashout, Bet Trade [#87038]
+	- 20180130@Bruce: integrate Exchange product [#87754]
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
 		+ @Currency	:  0- All Currencies
@@ -42,7 +43,7 @@ BEGIN
 	CREATE TABLE #Report (ReportDate DATE, CurrencyID INT, ProductID INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY, WinlossRB MONEY, 
 						AmtDueToBA MONEY, AmtDueToRB MONEY, CommBA MONEY, CommRB MONEY, Company MONEY, Betcount BIGINT)							
 	CREATE TABLE #Exchange (ExchangeId INT, ExchangeDate DATE, Code VARCHAR(20), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, CNY FLOAT, Base FLOAT)
-	CREATE TABLE #Data (rptDate DATE, PartyID INT, ProductID INT, Currency INT,BetTypeId INT, Turnover MONEY, Winloss MONEY, AWinloss MONEY, AComm MONEY, Betcount BIGINT)
+	CREATE TABLE #Data (rptDate DATE, PartyID INT, ProductID INT, Currency INT,BetTypeId INT, Turnover MONEY, Winloss MONEY, AWinloss MONEY, AComm MONEY, PComm MONEY, Betcount BIGINT)
 	CREATE TABLE #Products(ProductID INT, ProductName VARCHAR(50))
 	CREATE TABLE #ChargeInfo (PartyID INT, LicenseeID INT, ProductID INT, BetTypeID INT, Rate MONEY, Fromdate DATE , Todate DATE)
 	
@@ -456,7 +457,7 @@ BEGIN
 	BEGIN
 		DELETE #Data
 		
-		INSERT INTO #Data(rptDate, PartyID, ProductID, Currency, Turnover, Winloss, AWinloss, AComm, Betcount)
+		INSERT INTO #Data(rptDate, PartyID, ProductID, Currency, Turnover, Winloss, AWinloss, PComm, AComm, Betcount)
 		(
 			SELECT  b.rptDate, ci.PartyID, b.ProductID, b.currencyID
 				, SUM(b.turnover * 
@@ -468,7 +469,8 @@ BEGIN
 					END) Turnover
 				, SUM(b.MemberWL)
 				, 0
-				, 0
+				, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END)
+				, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionA ELSE 0 END)
 				, SUM(b.betcount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) BetCount
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN (SELECT DISTINCT PartyId, LicenseeId, ProductID FROM #ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
@@ -484,14 +486,14 @@ BEGIN
 		INSERT INTO #Report (ReportDate, CurrencyID, ProductID, Turnover, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Company, Betcount)
 		SELECT rptDate, b.Currency, b.ProductID
 			, SUM(b.turnover) Turnover
-			, SUM(b.Winloss) Winloss
-			, -SUM(b.Winloss) AS LicenseeWL
+			, SUM(b.Winloss + CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS Winloss
+			, - SUM(b.Winloss + CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS LicenseeWL
 			, 0 AS WinlossRB
 			, 0 AS AmountDueToBA
 			, 0 AS AmountDueToRB
 			, 0 AS CommBA
 			, 0 AS CommRB
-			, -SUM(b.Winloss * ci.Rate) AS Company
+			, SUM(-b.Winloss * ci.Rate + CASE WHEN b.ProductID=31 THEN b.AComm ELSE 0 END) AS Company
 			, SUM(b.betcount) AS betcount
 		FROM #Data b WITH (NOLOCK)
 			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate FROM #ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
