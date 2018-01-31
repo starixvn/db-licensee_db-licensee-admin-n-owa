@@ -30,6 +30,7 @@ AS
 						  - Include CashOut [#76131]
 		- 20170704@Scofield: Add VS2 and LT into report [RedmineID: #79310]
 		- 20171205@Bruce: fix partyid length [#87723]
+		- 20180131@Scofield: Add BX [#87754]
 */
 		
 /*	Example:
@@ -46,7 +47,7 @@ BEGIN
 	SET NOCOUNT ON
 	
 	-- Region: Get party charge rate info
-	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT'
+	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX'
 	
 	-- Region: Get Party ID
 	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)
@@ -176,7 +177,8 @@ BEGIN
 		CB			MONEY, -- Colossus bet
 		CO			MONEY, -- CashOut
 		BRVS		MONEY, -- Bet Radar
-		LT			MONEY  -- Lottery
+		LT			MONEY,  -- Lottery
+		BX			MONEY  -- Exchange
 	)						  
 	INSERT INTO #LicenseeAmount(GroupName, GroupId, LicenseeId, PartyId,PartyName)
 	SELECT	CASE
@@ -338,7 +340,7 @@ BEGIN
 	SET		CO = a.Amount
 	FROM	#LicenseeAmount d INNER JOIN @COWinLoss a ON a.LicenseeId = d.LicenseeId
 	-- End CO
-
+	
 	-- Others
 	;WITH AmountDueByProduct AS
 	(
@@ -359,7 +361,8 @@ BEGIN
 				ISNULL(SUM(CASE WHEN d.ProductId = 21 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS AB,
 				ISNULL(SUM(CASE WHEN d.ProductId = 24 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS FW,
 				ISNULL(SUM(CASE WHEN d.ProductId = 27 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS BRVS,
-				ISNULL(SUM(CASE WHEN d.ProductId = 28 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS LT
+				ISNULL(SUM(CASE WHEN d.ProductId = 28 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS LT,
+				ISNULL(SUM(CASE WHEN d.ProductId = 31 THEN (-MemberWL * ci.Rate + AComm) * e.Rate ELSE 0 END),0) AS BX
 		FROM	#TempData d
 				INNER JOIN @PartyChargeInfo ci ON	d.PartyId = ci.PartyId 
 													AND ci.ProductId = d.ProductId 
@@ -385,7 +388,8 @@ BEGIN
 			AB = a.AB,
 			FW = a.FW,
 			BRVS = a.BRVS,
-			LT = a.LT
+			LT = a.LT,
+			BX = a.BX
 	FROM	#LicenseeAmount l
 			INNER JOIN AmountDueByProduct a ON a.LicenseeId = l.LicenseeId AND a.PartyId = l.PartyId
 	
@@ -411,7 +415,8 @@ BEGIN
 			AND CO IS NULL
 			AND BRVS IS NULL
 			AND LT IS NULL
-	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT
+			AND BX IS NULL
+	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX
 	FROM	#LicenseeAmount l
 	ORDER BY l.GroupId, l.PartyId	
 	-- EndRegion
