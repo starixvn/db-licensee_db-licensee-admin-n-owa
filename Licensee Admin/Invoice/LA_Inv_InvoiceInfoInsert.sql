@@ -44,6 +44,7 @@ AS
 				- add invoice date
 				- insert product id to statement
 		+ 20170112@Bruce: increase description length [#89417]
+		+ 20180131@Bruce: support credit note for setup fee [#90274]
 */
 
 BEGIN

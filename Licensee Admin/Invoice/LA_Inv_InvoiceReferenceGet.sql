@@ -11,7 +11,7 @@ AS
 	DB:		DBLIC/bodb_Licensee	
 
 	Revision:
-		20180131@Bruce: include setupfee
+		20180131@Bruce: support credit note for setup fee [#90274]
 */
 BEGIN
 	SELECT OfficialInvoiceNo	AS InvoiceNo,
