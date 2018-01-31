@@ -220,13 +220,14 @@ BEGIN
 			END
 
 			-- update itemtype
-			-- invoice type: data fee: 1      -  rebate: 3
+			-- invoice type: data fee: 1      -  rebate: 3   - Setupfee: 7       - creditnote: 4
 			-- item type:    data fee: debit(11),credit(12)  -  rebate: debit(13),credit(14)
 			--
 			UPDATE s SET s.ItemType = (CASE WHEN sh.InvoiceType = 1 THEN
 						CASE WHEN @InvoiceTypeId = 4 THEN 12 ELSE 11 END
 					WHEN sh.InvoiceType = 3 THEN
 						CASE WHEN @InvoiceTypeId = 4 THEN 14 ELSE 13 END
+					WHEN sh.InvoiceType = 7 AND @InvoiceTypeId = 4 THEN 12 -- credit note for setup fee
 					ELSE NULL
 				END)
 			FROM #StatementsHeader sh
