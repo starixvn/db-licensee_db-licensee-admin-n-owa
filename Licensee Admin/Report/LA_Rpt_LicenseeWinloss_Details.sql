@@ -15,11 +15,11 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss_Details]
 AS
 /*  Created:  Forrest.Nguyen
 	Date: 20151020
-    Original: LA_Rpt_LicenseeWinloss_Details
+	Original: LA_Rpt_LicenseeWinloss_Details
 	Feature: 44873
-    DB: DB052.bodb02  
-    Revisions:  
-    - 20160316: @Forrest - Change SporttypeRef to Sporttype for Microgaming
+	DB: DB052.bodb02  
+	Revisions:  
+	- 20160316: @Forrest - Change SporttypeRef to Sporttype for Microgaming
 	- 20170412: @Scofield - Removing Trading Bet Types [#73310]
 	- 20171205@Bruce: fix partyid length [#87723]
 	- 20171211: @Scofield - Support Colossus Bet, Cashout, Bet Trade [#87038]
@@ -400,8 +400,8 @@ BEGIN
 		DECLARE @Bettype AS TABLE(Bettype INT, ProductId INT)
 		
 		INSERT INTO @Bettype (Bettype, ProductId)		
-	    SELECT Bettype, ProductID
-	    FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, 'BT,SB,BA')		
+		SELECT Bettype, ProductID
+		FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, 'BT,SB,BA')		
 
 		INSERT INTO #Report (ReportDate, CurrencyID, ProductId, Company, Turnover, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Betcount)
 		(
@@ -493,7 +493,7 @@ BEGIN
 			, 0 AS AmountDueToRB
 			, 0 AS CommBA
 			, 0 AS CommRB
-			, SUM(-b.Winloss * ci.Rate + CASE WHEN b.ProductID=31 THEN b.AComm ELSE 0 END) AS Company
+			, SUM(-b.Winloss * ci.Rate + CASE WHEN b.ProductID=31 THEN (b.AComm + b.PComm) ELSE 0 END) AS Company
 			, SUM(b.betcount) AS betcount
 		FROM #Data b WITH (NOLOCK)
 			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate FROM #ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
@@ -536,9 +536,9 @@ BEGIN
 	FROM @CurrencyTable t1
 	INNER JOIN (
 	   SELECT CurrencyCode
-	    FROM @CurrencyTable
-	    GROUP BY CurrencyCode
-	    HAVING COUNT(1) > 1
+		FROM @CurrencyTable
+		GROUP BY CurrencyCode
+		HAVING COUNT(1) > 1
 	) t2 ON t1.CurrencyCode = t2.CurrencyCode
 	
 	SELECT p.ProductID, p.ProductName

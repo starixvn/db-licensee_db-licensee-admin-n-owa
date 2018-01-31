@@ -165,7 +165,7 @@ BEGIN
 					,0 AS AmtDueToRB
 					,0 AS CommBA
 					,0 AS CommRB
-					,SUM(-b.MemberWL * p.Rate + CASE WHEN b.ProductID=31 THEN b.CommissionA ELSE 0 END) AS Company
+					,SUM(-b.MemberWL * p.Rate + CASE WHEN b.ProductID=31 THEN (b.CommissionA + b.CommissionP) ELSE 0 END) AS Company
 					,SUM(b.Betcount) * (CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END)
 					,SUM(b.commissionP)
 			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
