@@ -113,10 +113,11 @@ BEGIN
 			MemberWL	MONEY,
 			AWinLoss	MONEY,
 			AComm		MONEY,
+			PComm		MONEY,
 			ProductId	TINYINT,
 			BettypeRef	INT)
 	
-	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,MemberWL,AWinLoss,AComm,ProductId,BettypeRef)
+	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,MemberWL,AWinLoss,AComm,PComm,ProductId,BettypeRef)
 	(
 		SELECT	b.SiteID,
 				p.PartyId,
@@ -125,6 +126,7 @@ BEGIN
 				SUM(ISNULL(b.MemberWL, 0)) Winloss,
 				SUM(ISNULL(b.GrossWL, 0)) AS AWinLoss,
 				SUM(ISNULL(b.CommissionA, 0)) AS AComm,
+				SUM(ISNULL(b.CommissionP, 0)) AS PComm,
 				b.ProductId,
 				ISNULL(sbr.BettypeRef, -1)
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
@@ -362,7 +364,7 @@ BEGIN
 				ISNULL(SUM(CASE WHEN d.ProductId = 24 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS FW,
 				ISNULL(SUM(CASE WHEN d.ProductId = 27 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS BRVS,
 				ISNULL(SUM(CASE WHEN d.ProductId = 28 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS LT,
-				ISNULL(SUM(CASE WHEN d.ProductId = 31 THEN (-MemberWL * ci.Rate + AComm) * e.Rate ELSE 0 END),0) AS BX
+				ISNULL(SUM(CASE WHEN d.ProductId = 31 THEN (-MemberWL * ci.Rate - (AComm + PComm)) * e.Rate ELSE 0 END),0) AS BX
 		FROM	#TempData d
 				INNER JOIN @PartyChargeInfo ci ON	d.PartyId = ci.PartyId 
 													AND ci.ProductId = d.ProductId 

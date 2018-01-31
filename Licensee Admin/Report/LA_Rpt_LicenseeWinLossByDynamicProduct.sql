@@ -65,6 +65,7 @@ BEGIN
 		CAST(SUM(ISNULL(b.MemberWL * e.BaseCurrencyRate, 0)) AS MONEY)		AS Winloss,
 		CAST(SUM(ISNULL(b.GrossWL * e.BaseCurrencyRate, 0)) AS MONEY)		AS GrossWinLoss,
 		CAST(SUM(ISNULL(b.CommissionA * e.BaseCurrencyRate, 0)) AS MONEY)	AS Commission,
+		CAST(SUM(ISNULL(b.CommissionP * e.BaseCurrencyRate, 0)) AS MONEY)	AS CommissionP,
 		CAST(0 AS MONEY)	AS ActualStake,
 		CAST(0 AS MONEY)	AS BuyBackAmount,
 		CAST(0 AS MONEY)	AS Turnover,
