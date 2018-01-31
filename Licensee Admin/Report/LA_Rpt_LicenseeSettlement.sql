@@ -592,7 +592,7 @@ BEGIN
 				, SUM(b.CommissionP)
 				, SUM(-b.MemberWL * (1 - p.Rate))
 				, SUM(b.CommissionA)
-				, SUM(-b.MemberWL * p.Rate + (b.CommissionA + b.CommissionP))
+				, SUM(-b.MemberWL * p.Rate - (b.CommissionA + b.CommissionP))
 				, SUM(b.BetCount)
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
