@@ -588,8 +588,8 @@ BEGIN
 			SELECT b.rptDate
 				, b.CurrencyId
 				, SUM(b.turnover)
-				, SUM(b.MemberWL) winloss
-				, SUM(b.CommissionP)
+				, SUM(b.MemberWL + b.CommissionP) winloss
+				, 0
 				, SUM(-b.MemberWL * (1 - p.Rate) + b.CommissionA)
 				, 0
 				, SUM(-b.MemberWL * p.Rate - (b.CommissionA + b.CommissionP))
