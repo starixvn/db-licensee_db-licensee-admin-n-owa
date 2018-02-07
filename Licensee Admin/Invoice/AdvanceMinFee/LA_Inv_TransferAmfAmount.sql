@@ -112,6 +112,7 @@ BEGIN
 			RETURN
 		END
 
+		SET @Amount = @RemainingAMF + @RemainingPP
 		SET @Description = 'Write off' + CHAR(13) + 'Amount: '
 		DECLARE @WriteOffAmount MONEY = CASE WHEN @Amount<@RemainingAMF THEN @Amount ELSE @RemainingAMF END
 		
