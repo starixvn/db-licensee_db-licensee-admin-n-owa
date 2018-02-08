@@ -181,7 +181,8 @@ BEGIN
 		, d.Amount - ISNULL(r.Amount,0) AS Amount
 		, CASE WHEN d.RowType=5 THEN @AMF ELSE @PREPAYMENT END AS RowType
 	FROM @Deduct d
-	LEFT JOIN r ON d.InvoiceNo = r.RefNo
+	LEFT JOIN r ON d.InvoiceNo = r.RefNo AND d.RowType = 5 --deduct AMF
+	WHERE d.Amount - ISNULL(r.Amount,0) <> 0
 	ORDER BY d.PartyId, d.InvoiceNo
 
 	DROP TABLE #Statement
