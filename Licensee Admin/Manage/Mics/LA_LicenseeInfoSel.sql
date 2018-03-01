@@ -17,6 +17,7 @@ AS
 	Revisions:
 	- 20151007@Bruce: Get Licensee information
 	- 20180125@Bruce: include branch name [#90029]
+	- 20180301@Parson: inlclude CO to Licensee List [#90721]
 */
 BEGIN
 SET NOCOUNT ON
@@ -42,7 +43,7 @@ WHERE PartyName IN ('ONEWorks','Boping', 'Zelianta', 'Price Feed')
 ;WITH ChargeInfo AS(
 	SELECT ci.ProductId, ci.FromParty, ci.ToParty, ci.Rate, ci.FromDate, ci.ToDate, ci.ChargeID, 0 as BettypeRef
 	FROM dbo.OAS_ChargeInfo AS ci WITH (NOLOCK)
-	WHERE ProductId NOT IN (14, 17) AND ChargeType = 1
+	WHERE ProductId NOT IN (14, 17)
 	UNION ALL
 	SELECT s.ProductId, s.FromParty, s.ToParty, s.Rate, s.FromDate, s.ToDate, s.ChargeIdRef, s.BettypeRef
 	FROM dbo.OAS_ChargeInfoSub AS s WITH (NOLOCK)
