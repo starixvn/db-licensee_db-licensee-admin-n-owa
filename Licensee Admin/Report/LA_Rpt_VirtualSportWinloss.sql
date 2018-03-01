@@ -31,6 +31,8 @@ AS
 		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 		- 20170620@Bruce: add paytosupplier and netincome [#78398]
 		- 20171220@Parsons: increase length for variables [#88197]
+		- 20180301@Harper: Virtual Sports - Change of commercial terms between company and provider [RedmineID: #91225]
+
  * Param's Explanation:
  *  - @FromDate   : From date
  *  - @ToDate   : To date
@@ -81,7 +83,7 @@ CREATE TABLE #ChargeInfo (
 --   Credit: 1% of of Licensee Winloss
 --   Deposit: 7.5% of Licensee Winloss
 INSERT INTO #ChargeInfo
-SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate,0.075, c.Fromdate, c.Todate
+SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, 0.065, c.Fromdate, c.Todate
 FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs_Deposit,@FromDate,@ToDate,'VS','OA',@ExcludeTest) c
 UNION ALL
 SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate,0.01, c.Fromdate, c.Todate
