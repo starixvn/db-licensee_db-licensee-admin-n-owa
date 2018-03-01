@@ -1,7 +1,7 @@
 USE bodb_licensee
 GO
 
-CREATE FUNCTION [dbo].[LA_f_ChargeInfo3rd]
+ALTER FUNCTION [dbo].[LA_f_ChargeInfo3rd]
     (
       @FromDate DATETIME ,
       @ToDate DATETIME ,
@@ -25,7 +25,10 @@ AS
 	Created: 20170310@Harper  
     Task :  Get Charge Information of Product 3rd  
     DB:   DBLIC/bodb_Licensee    
-  
+	
+	Revisions:  
+		- 20180122@Harper: Fix return data rows [RedmineID: #89006]
+
     Param's Explanation:     
    
  SELECT * FROM LA_f_ChargeInfo3rd ('2016-11-29', '2016-12-01', 'GD', 'OA')  
@@ -33,7 +36,7 @@ AS
 
 BEGIN       
     DECLARE @SystemID INT
-	DECLARE @tmpCompany	AS TABLE (PartyID INT)
+	DECLARE @tmpCompany	AS TABLE (ID INT IDENTITY, PartyID INT)
 
     SELECT  @SystemID = id
     FROM    dbo.Systems WITH ( NOLOCK )
@@ -98,10 +101,11 @@ BEGIN
 		AND NOT EXISTS (SELECT 1 FROM @tbChargeInfo WHERE PartyID = p.PartyID)
 
 	SELECT @n = 1
-		  ,@m = MAX(PartyID) FROM @tmpCompany
+		  ,@m = MAX(ID) FROM @tmpCompany
+	
 	WHILE (@n <= @m)	  
 	BEGIN
-		SELECT @PartyID = PartyID FROM @tmpCompany WHERE PartyID = @n
+		SELECT @PartyID = PartyID FROM @tmpCompany WHERE ID = @n
 		INSERT INTO @tbChargeInfo
 		        ( ChargeID ,
 		          PartyID ,
