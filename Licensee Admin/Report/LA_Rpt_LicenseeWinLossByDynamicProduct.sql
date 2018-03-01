@@ -16,6 +16,7 @@ AS
 		+ 20170630@Bruce: include BT/CO/CB, remove LC, VG [RedmineID: #79309]
 		- 20171205@Bruce: fix partyid length [#87723]
 		- 20171220@Parsons: increase length for variables [#88197]
+		- 20180131@Scofield: Add BX [#87754]
 */
 BEGIN
 	SET NOCOUNT ON
