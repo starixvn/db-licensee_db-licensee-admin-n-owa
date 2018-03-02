@@ -18,11 +18,12 @@ ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
 	DB: DB052.bodb02
 	Original: Lrf_f_GetExchangeDaily
 	Revisions:  
+		- 20160413@Francis: Support THB Base Currency
+		- 20160920@Harper : Support HKD Base Currency
+		- 20170712@Harper: Support IDR Base Currency [RedmineID: #79309]
+		- 20180301@Harper: Support SGD as base currency [RedmineID: #91339]  
 
-	Param's Explanation:  			
-	- 20160413@Francis: Support THB Base Currency
-	- 20160920@Harper : Support HKD Base Currency
-	- 20170712@Harper: Support IDR Base Currency [RedmineID: #79309]
+	Param's Explanation:  				
 */
 RETURNS @tempDate TABLE (exchangedate DATETIME, ExchangeId INT, Code VARCHAR(5)
 		, BaseCurrencyRate FLOAT
@@ -64,6 +65,7 @@ BEGIN
 					WHEN @BaseCurrency = 'THB' THEN THB
 					WHEN @BaseCurrency = 'HKD' THEN HKD
 					WHEN @BaseCurrency = 'IDR' THEN IDR
+					WHEN @BaseCurrency = 'SGD' THEN SGD  
 					ELSE 1 END BaseCurrencyRate
 				--, MYR, USD, EUR, CNY, GBP, actualrate
 			FROM dbo.ExchangeDailyOanda WITH (NOLOCK)
