@@ -1,7 +1,7 @@
 USE [bodb_Licensee]
 GO
 
-ALTER PROCEDURE [dbo].LA_Rpt_AGCasinoWinLoss_xtest
+ALTER PROCEDURE [dbo].LA_Rpt_AGCasinoWinLoss
 	@PartyIds			VARCHAR(4000),
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
