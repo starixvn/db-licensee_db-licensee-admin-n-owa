@@ -28,8 +28,10 @@ AS
 	
 	Revisions:  
 		- 20180122@Harper: Fix return data rows [RedmineID: #89006]
+		- 20180302@Harper: Inspired , Lupine, Star Express, AG is 3rd Licensee [#RedmineID: #91255]
 
-    Param's Explanation:     
+    Param's Explanation:  
+	
    
  SELECT * FROM LA_f_ChargeInfo3rd ('2016-11-29', '2016-12-01', 'GD', 'OA')  
 */  
@@ -82,7 +84,7 @@ BEGIN
                                                             AND cs.SystemID = @SystemID
                     INNER JOIN dbo.OAS_Party t (NOLOCK) ON DI.ToParty = t.PartyID
                                                             AND t.PartyType = 3
-                                                            AND t.OldRefID IS NULL
+                                                            AND (t.OldRefID IS NULL OR t.OldRefID IN (2, 3, 5, 6))
             WHERE   ( @FromDate BETWEEN DI.FromDate AND DI.ToDate
                         OR @ToDate BETWEEN DI.FromDate AND DI.ToDate
                         OR DI.FromDate BETWEEN @FromDate AND @ToDate

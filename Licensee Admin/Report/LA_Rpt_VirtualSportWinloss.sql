@@ -31,7 +31,7 @@ AS
 		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 		- 20170620@Bruce: add paytosupplier and netincome [#78398]
 		- 20171220@Parsons: increase length for variables [#88197]
-		- 20180301@Harper: Virtual Sports - Change of commercial terms between company and provider [RedmineID: #91225]
+		- 20180301@Harper: Virtual Sports - Change of commercial terms between company and provider [RedmineID: #91255]
 
  * Param's Explanation:
  *  - @FromDate   : From date
@@ -46,97 +46,119 @@ AS
 
 BEGIN
 
-SET NOCOUNT ON
+SET NOCOUNT ON	
+	
+	DECLARE @ChargeInfos AS TABLE (
+		PartyID			INT
+		,PartyName		VARCHAR(50)
+		,ParentID		INT		
+		,LicenseeID		INT
+		,IsDeposit		INT
+		,ProductID		INT
+		,Rate			MONEY		
+		,Fromdate		SMALLDATETIME
+		,Todate			SMALLDATETIME
+		)
+		
+	DECLARE @Charge3rdInfos AS TABLE (
+		PartyID			INT	
+		,IsDeposit		INT
+		,ProductID		INT
+		,Rate			MONEY		
+		,Fromdate		SMALLDATETIME
+		,Todate			SMALLDATETIME
+		)	
 
-DECLARE @CreditLicenses TABLE(PartyId INT)
-INSERT INTO @CreditLicenses
-SELECT p.PartyID
-FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
-INNER JOIN bodb_licensee.dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
-WHERE p.PartyType=1 AND ISNULL(d.IsDeposit,0)=0
+	-- Region: Charge Info	
+	INSERT INTO @ChargeInfos(PartyId, ProductID, LicenseeId, IsDeposit, Rate, Fromdate, Todate)
+	(
+		SELECT c.PartyID, c.ProductID, c.LicenseeID, c.isDeposit,c.DI_Rate, c.Fromdate, c.Todate
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'VS', 'OA', 0) c 
+	)
+	
+	IF @excludeTest = 1
+	BEGIN
+		DELETE @ChargeInfos
+		WHERE IsDeposit = 1 AND Rate = 0
+	END	
+	
+	DECLARE @PartyList AS TABLE (PartyId INT, PartyName	VARCHAR(100), BranchName VARCHAR(100), ParentId	INT, ParentName VARCHAR(100))
 
-DECLARE @PartyIDs_Deposit	VARCHAR(4000)
-DECLARE @PartyIDs_Credit	VARCHAR(4000)
+	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
+	EXEC bodb_licensee.dbo.LA_PartyListSel
+		
+	DELETE p
+	FROM @PartyList p
+	WHERE NOT EXISTS (SELECT 1 FROM @ChargeInfos ci WHERE ci.PartyId = p.PartyId)
+			
+	UPDATE ci
+	SET ci.PartyName = p.PartyName,
+		ci.ParentID = p.ParentId
+	FROM @ChargeInfos ci
+	INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
+	
+	-- End region
 
-SELECT	@PartyIDs_Deposit = COALESCE(@PartyIDs_Deposit + ', ', '') + CONVERT(VARCHAR(10), val)
-FROM	dbo.strSplit(@PartyIDs,',') s
-WHERE	CAST(s.val AS INT) NOT IN (SELECT l.PartyId FROM @CreditLicenses l)
+	-- Region: Charge 3rd
+	INSERT INTO @Charge3rdInfos ( PartyID ,IsDeposit ,ProductID ,Rate ,Fromdate ,Todate )	
+	(
+		SELECT c.PartyID, c.isDeposit, c.ProductID, c.DI_Rate, c.Fromdate, c.Todate
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'VS', 'OA') c 
+		UNION ALL
+		SELECT 999, 0, 5, 0.01, @FromDate, @ToDate
+	)	
+	-- End Region: Charge 3rd
 
-SELECT	@PartyIDs_Credit = COALESCE(@PartyIDs_Credit + ', ', '') + CONVERT(VARCHAR(10), val)
-FROM	dbo.strSplit(@PartyIDs,',') s
-WHERE	CAST(s.val AS INT) IN (SELECT l.PartyId FROM @CreditLicenses l)
+	-- Region: Get Echange Rate
+	SELECT DISTINCT ExchangeDate, ExchangeId, BaseCurrencyRate AS Rate
+	INTO #TempExchange
+	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+	
+	IF @IsConvert = 0 UPDATE #TempExchange SET Rate = 1
+	-- End region: Get Exchange Rate
 
-CREATE TABLE #Party (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
-INSERT INTO #Party EXEC bodb_licensee.dbo.LA_PartyListSel
+	-- Region: Return Result
+	;WITH d AS (
+		SELECT b.rptDate, b.currencyID, c.PartyID, c.PartyName, l.sporttype, b.bettype
+			, SUM(CASE
+					WHEN @drawfilter IN (2,3) AND b.status = 111 THEN 0.0
+					WHEN @drawfilter IN (2,3) AND (b.status = 114 OR b.status = 115) THEN b.Turnover * 0.5
+				ELSE b.Turnover END) AS Turnover
+			, SUM(-b.Winloss) AS GrossWinloss
+			, SUM(-b.Winloss * c3.Rate) AS PayToSupplier
+			, SUM(-b.Winloss * c.Rate) AS OneworksIncome
+			, SUM(CASE WHEN @drawfilter = 2 AND b.status = 111 THEN 0 ELSE BetCount END) AS BetCount
+		FROM bodb_licenseereport.dbo.rpt_Betting b WITH ( NOLOCK)
+			INNER JOIN @ChargeInfos c ON c.LicenseeID = b.siteID AND b.rptDate BETWEEN c.Fromdate AND c.Todate
+			INNER JOIN @Charge3rdInfos c3 ON c3.PartyID = c.ParentID AND b.rptDate BETWEEN c3.Fromdate AND c3.Todate
+			LEFT JOIN dbo.League l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
+		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
+			AND b.status NOT IN (-1, 101, 102, 103)
+			AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
+			AND b.bettype BETWEEN 1201 AND 1299
+			AND (@Sporttype = 0 OR ( @Sporttype<>0 AND l.Sporttype = @Sporttype))
+			AND (@bettype = 0 OR (b.bettype = @bettype AND @bettype <> 0))
+			AND b.customercategory NOT IN (27,28)
+		GROUP BY b.rptDate,b.currencyID,c.PartyID,c.PartyName,l.sporttype, b.bettype
+	)
+	SELECT
+		d.PartyName,
+		d.rptDate AS WinlostDate,
+		d.SportType,
+		d.BetType,
+		ISNULL(SUM(d.betcount), 0) AS BetCount,
+		CAST(ISNULL(SUM(d.turnover * ex.Rate),0) AS MONEY) AS Turnover,
+		CAST(ISNULL(SUM(d.GrossWinloss * ex.Rate),0) AS MONEY) AS GrossWinloss,
+		CAST(ISNULL(SUM(d.PayToSupplier * ex.Rate),0) AS MONEY) AS PayToSupplier,
+		CAST(ISNULL(SUM(d.OneworksIncome * ex.Rate),0) AS MONEY) AS OneworksIncome,
+		CAST(ISNULL(SUM((d.OneworksIncome - d.PayToSupplier) * ex.Rate),0) AS MONEY) AS NetIncome
+	FROM d
+		INNER JOIN #TempExchange ex ON d.rptDate = ex.exchangedate and d.currencyID = ex.ExchangeId		
+	GROUP BY d.sporttype, d.bettype, d.rptDate, d.PartyName
+	ORDER BY d.rptDate ASC, d.PartyName, d.sporttype, d.bettype
+	-- End Region: Return Result
 
-CREATE TABLE #ChargeInfo (
-	 PartyID		INT
-	,LicenseeID		INT
-	,isDeposit		INT
-	,ProductID		INT
-	,Rate			MONEY
-	,Rate3rd		MONEY
-	,Fromdate		SMALLDATETIME
-	,Todate			SMALLDATETIME
-)
--- Pay to Supplier:
---   Credit: 1% of of Licensee Winloss
---   Deposit: 7.5% of Licensee Winloss
-INSERT INTO #ChargeInfo
-SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, 0.065, c.Fromdate, c.Todate
-FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs_Deposit,@FromDate,@ToDate,'VS','OA',@ExcludeTest) c
-UNION ALL
-SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate,0.01, c.Fromdate, c.Todate
-FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs_Credit,@FromDate,@ToDate,'VS','OA',0) c
-
-SELECT DISTINCT ExchangeDate, ExchangeId, BaseCurrencyRate AS Rate
-INTO #TempExchange
-FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
-
-IF @IsConvert = 0 UPDATE #TempExchange SET Rate = 1
-
-;WITH d AS (
-	SELECT b.rptDate, b.currencyID, c.PartyID, l.sporttype, b.bettype
-		, SUM(CASE
-				WHEN @drawfilter IN (2,3) AND b.status = 111 THEN 0.0
-				WHEN @drawfilter IN (2,3) AND (b.status = 114 OR b.status = 115) THEN b.Turnover * 0.5
-			ELSE b.Turnover END) AS Turnover
-		, SUM(-b.Winloss) AS GrossWinloss
-		, SUM(-b.Winloss * c.Rate3rd) AS PayToSupplier
-		, SUM(-b.Winloss * c.Rate) AS OneworksIncome
-		, SUM(CASE WHEN @drawfilter = 2 AND b.status = 111 THEN 0 ELSE BetCount END) AS BetCount
-	FROM bodb_licenseereport.dbo.rpt_Betting b WITH ( NOLOCK)
-		INNER JOIN #ChargeInfo c ON c.LicenseeID = b.siteID AND b.rptDate BETWEEN c.Fromdate AND c.Todate
-		LEFT JOIN dbo.League l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
-	WHERE b.rptDate BETWEEN c.Fromdate AND c.Todate
-		AND b.status NOT IN (-1, 101, 102, 103)
-		AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
-		AND b.bettype BETWEEN 1201 AND 1299
-		AND (@Sporttype = 0 OR ( @Sporttype<>0 AND l.Sporttype = @Sporttype))
-		AND (@bettype = 0 OR (b.bettype = @bettype AND @bettype <> 0))
-		AND b.customercategory NOT IN (27,28)
-	GROUP BY b.rptDate,b.currencyID,c.PartyID,l.sporttype, b.bettype
-)
-SELECT
-	p.PartyName,
-	d.rptDate AS WinlostDate,
-	d.SportType,
-	d.BetType,
-	ISNULL(SUM(d.betcount), 0) AS BetCount,
-	CAST(ISNULL(SUM(d.turnover * ex.Rate),0) AS MONEY) AS Turnover,
-	CAST(ISNULL(SUM(d.GrossWinloss * ex.Rate),0) AS MONEY) AS GrossWinloss,
-	CAST(ISNULL(SUM(d.PayToSupplier * ex.Rate),0) AS MONEY) AS PayToSupplier,
-	CAST(ISNULL(SUM(d.OneworksIncome * ex.Rate),0) AS MONEY) AS OneworksIncome,
-	CAST(ISNULL(SUM((d.OneworksIncome - d.PayToSupplier) * ex.Rate),0) AS MONEY) AS NetIncome
-FROM d
-	INNER JOIN #TempExchange ex ON d.rptDate = ex.exchangedate and d.currencyID = ex.ExchangeId
-	INNER JOIN #Party p ON p.PartyId = d.PartyID
-GROUP BY d.sporttype, d.bettype, d.rptDate, p.PartyName
-ORDER BY d.rptDate ASC, p.PartyName, d.sporttype, d.bettype
-
-DROP TABLE  #TempExchange
-DROP TABLE  #Party
-DROP TABLE  #ChargeInfo
+	DROP TABLE  #TempExchange	
 END
 
 GO
