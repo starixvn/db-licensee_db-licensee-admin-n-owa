@@ -82,7 +82,7 @@ SET NOCOUNT ON
 		WHERE IsDeposit = 1 AND Rate = 0
 	END	
 	
-	DECLARE @PartyList AS TABLE (PartyId INT, PartyName	VARCHAR(100), BranchName VARCHAR(100), ParentId	INT, ParentName VARCHAR(100))
+	DECLARE @PartyList AS TABLE (PartyId INT, PartyName	VARCHAR(100), BranchName VARCHAR(100), ParentId	INT)
 
 	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC bodb_licensee.dbo.LA_PartyListSel
