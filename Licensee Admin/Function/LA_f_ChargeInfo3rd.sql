@@ -28,8 +28,10 @@ AS
 	
 	Revisions:  
 		- 20180122@Harper: Fix return data rows [RedmineID: #89006]
+		- 20180302@Harper: Inspired , Lupine, Star Express, AG is 3rd Licensee [#RedmineID: #91255]
 
-    Param's Explanation:     
+    Param's Explanation:  
+	
    
  SELECT * FROM LA_f_ChargeInfo3rd ('2016-11-29', '2016-12-01', 'GD', 'OA')  
 */  
@@ -45,51 +47,51 @@ BEGIN
     DECLARE @ProductTable TABLE (ProductID SMALLINT, ProductPrefix VARCHAR(20))  
      
     INSERT  INTO @ProductTable( ProductID, ProductPrefix)
-            SELECT  CASE 
-						WHEN s.val = 'SB' THEN 0
-                        ELSE p3.Productid
-                    END ,
-                    s.val
-            FROM    bodb02.dbo.strSplit(@ProductCodes, ',') s
-                    LEFT JOIN dbo.Product3rd p3 WITH ( NOLOCK ) ON s.val = p3.ProductPrefix	
+    SELECT  CASE 
+				WHEN s.val = 'SB' THEN 0
+                ELSE p3.Productid
+            END ,
+            s.val
+    FROM    bodb02.dbo.strSplit(@ProductCodes, ',') s
+            LEFT JOIN dbo.Product3rd p3 WITH ( NOLOCK ) ON s.val = p3.ProductPrefix	
 
     INSERT  INTO @tbChargeInfo
-            ( ChargeID ,
-                PartyID ,
-                ProductID ,
-                DI_Rate ,
-                ChargeType ,
-				IsDeposit,
-                Fromdate ,
-                Todate
+								( ChargeID ,
+									PartyID ,
+									ProductID ,
+									DI_Rate ,
+									ChargeType ,
+									IsDeposit,
+									Fromdate ,
+									Todate
+								)
+    SELECT  DI.ChargeID ,
+            CASE WHEN Di.FromParty IN (1, 11, 98) THEN DI.FromParty ELSE 999 END,
+            DI.ProductID ,
+            DI.Rate ,
+            DI.ChargeType ,
+			CASE WHEN Di.FromParty IN (1, 11, 98) THEN 1 ELSE 0 END,
+            CASE WHEN @FromDate <= DI.FromDate 
+					THEN DI.FromDate
+                    ELSE @FromDate
+            END ,
+            CASE WHEN @ToDate >= DI.ToDate 
+					THEN DI.ToDate
+                    ELSE @ToDate
+            END
+    FROM    dbo.OAS_ChargeInfo DI (NOLOCK)
+            INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs (NOLOCK) ON DI.ChargeID = cs.ChargeID
+                                                    AND cs.SystemID = @SystemID
+            INNER JOIN dbo.OAS_Party t (NOLOCK) ON DI.ToParty = t.PartyID
+                                                    AND t.PartyType = 3
+                                                    AND (t.OldRefID IS NULL OR t.OldRefID IN (2, 3, 5, 6))
+    WHERE   ( @FromDate BETWEEN DI.FromDate AND DI.ToDate
+                OR @ToDate BETWEEN DI.FromDate AND DI.ToDate
+                OR DI.FromDate BETWEEN @FromDate AND @ToDate
+                OR DI.ToDate BETWEEN @FromDate AND @ToDate
             )
-            SELECT  DI.ChargeID ,
-                    CASE WHEN Di.FromParty IN (1, 11, 98) THEN DI.FromParty ELSE 999 END,
-                    DI.ProductID ,
-                    DI.Rate ,
-                    DI.ChargeType ,
-					CASE WHEN Di.FromParty IN (1, 11, 98) THEN 1 ELSE 0 END,
-                    CASE WHEN @FromDate <= DI.FromDate 
-							THEN DI.FromDate
-                            ELSE @FromDate
-                    END ,
-                    CASE WHEN @ToDate >= DI.ToDate 
-							THEN DI.ToDate
-                            ELSE @ToDate
-                    END
-            FROM    dbo.OAS_ChargeInfo DI (NOLOCK)
-                    INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs (NOLOCK) ON DI.ChargeID = cs.ChargeID
-                                                            AND cs.SystemID = @SystemID
-                    INNER JOIN dbo.OAS_Party t (NOLOCK) ON DI.ToParty = t.PartyID
-                                                            AND t.PartyType = 3
-                                                            AND t.OldRefID IS NULL
-            WHERE   ( @FromDate BETWEEN DI.FromDate AND DI.ToDate
-                        OR @ToDate BETWEEN DI.FromDate AND DI.ToDate
-                        OR DI.FromDate BETWEEN @FromDate AND @ToDate
-                        OR DI.ToDate BETWEEN @FromDate AND @ToDate
-                    )
-                    AND DI.ProductID IN ( SELECT ProductID FROM @ProductTable )
-                    AND NOT EXISTS ( SELECT 1 FROM dbo.OAS_ChargeInfoSub (NOLOCK) WHERE DI.ChargeID = ChargeIdRef )   
+            AND DI.ProductID IN ( SELECT ProductID FROM @ProductTable )
+            AND NOT EXISTS ( SELECT 1 FROM dbo.OAS_ChargeInfoSub (NOLOCK) WHERE DI.ChargeID = ChargeIdRef )   
 
 
 	DECLARE @PartyID INT, @n INT, @m INT
