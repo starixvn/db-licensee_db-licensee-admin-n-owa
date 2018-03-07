@@ -972,8 +972,13 @@ BEGIN
 			)
 
 			IF @Prepayment>0 AND @TotalAmount>0
-			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, AmountType)
-			VALUES(0,'','',CASE WHEN @Prepayment-@TotalAmount >=0 THEN -@TotalAmount ELSE -@Prepayment END, @DeductAgainstInvoice)-- 24=deduct against invoice
+			BEGIN
+				DECLARE @RemainingPrepayment MONEY = @Prepayment - @TotalAmount
+				INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmf)
+				VALUES(0,'','',@DeductAgainstInvoice,
+					CASE WHEN @RemainingPrepayment >=0 THEN -@TotalAmount ELSE -@Prepayment END,
+					CASE WHEN @RemainingPrepayment >=0 THEN @RemainingPrepayment ELSE 0 END)
+			END
 		END
 
 		-- 10: debit note for return amf
