@@ -909,16 +909,20 @@ BEGIN
 		SET		ProductCode = LEFT(ProductCode, LEN(ProductCode) - 1),
 				ProductName = LEFT(ProductName, LEN(ProductName) - 1)
 		WHERE	ProductId = -1
+		
+		-- get AMF and prepayment
+		SELECT SUM(ISNULL(Income,0) - ISNULL(Expense,0)) Amount, s.InvItemTypeId
+		INTO #credit
+		FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
+		INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
+		WHERE s.InvItemTypeId IN (3,5,7,21,22,23,24) 
+			AND s.RefPartyId = @PartyId
+			AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
+			AND h.Environment = @Environment
+		GROUP BY s.InvItemTypeId
 
-		DECLARE @RemainingAmf MONEY = ISNULL((
-			SELECT SUM(ISNULL(Income,0)) - SUM(ISNULL(Expense,0))
-			FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
-			INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
-			WHERE s.InvItemTypeId IN (3,5,7,21) 
-				AND s.RefPartyId = @PartyId
-				AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
-				AND h.Environment = @Environment
-		),0)
+		DECLARE @RemainingAmf MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeId IN (3,5,7,21)),0)
+		DECLARE @Prepayment MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeId IN (22,23,24)),0)
 
 		-- InvoiceType Software: 1
 		IF @InvoiceTypeId = 1			
@@ -953,17 +957,6 @@ BEGIN
 				WHERE AmountType = 1 AND ProductId = 0 -- SB
 			END
 
-			-- deduct against invoice
-			DECLARE @Prepayment MONEY = ISNULL((
-				SELECT SUM(ISNULL(Income,0)) - SUM(ISNULL(Expense,0))
-				FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
-				INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
-				WHERE s.InvItemTypeId IN (22,23,24)
-					AND s.RefPartyId = @PartyId
-					AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
-					AND h.Environment = @Environment
-			),0)
-
 			DECLARE @TotalAmount MONEY = (
 				SELECT SUM((CASE WHEN AmountType=@AmountTypeDiscount THEN -InvoiceAmount ELSE InvoiceAmount END) - ISNULL(AmfAmount,0))
 				FROM @FinalResult
@@ -985,7 +978,7 @@ BEGIN
 		IF @InvoiceTypeId = 10
 		BEGIN
 			DELETE @FinalResult
-			INSERT INTO @FinalResult(AmountType, RemainingAmf) VALUES (1, @RemainingAmf)
+			INSERT INTO @FinalResult(AmountType, RemainingAmf, InvoiceAmount) VALUES (1, @RemainingAmf, @Prepayment)
 		END
 
 		SELECT	f.ProductId,
