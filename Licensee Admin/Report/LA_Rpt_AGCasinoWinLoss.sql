@@ -17,6 +17,7 @@ AS
 	 - 20160920@Bruce: #64425-Update AG Casino PayToSupplier = winloss * rate
 	 - 20170623@Bruce: include original currency [#78398]
 	 - 20171219@Bruce: increase length for variables [#88197]
+	 - 20180302@Harper: Support SGD as base currency for AG WL report [RedmineID: #91339]
 	 Params:
 */
 BEGIN
@@ -192,6 +193,8 @@ BEGIN
 	)
 	INSERT INTO @BaseCurrencies(Id, Name)
 	EXEC LA_SelBaseCurrency
+
+	INSERT INTO @BaseCurrencies(Id, Name) VALUES (1, 'SGD') -- Include SGD to report
 
 	DECLARE @GrandTotal TABLE (
 		CurrencyName	VARCHAR(20),
