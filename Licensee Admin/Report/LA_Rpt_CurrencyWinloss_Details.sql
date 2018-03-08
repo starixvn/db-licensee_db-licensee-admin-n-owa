@@ -1,10 +1,6 @@
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_CurrencyWinloss_Details]    Script Date: 01/12/2014 14:33:41 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
+
 ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss_Details]
 	@PartyIDs			VARCHAR(5500)	= ''
 	, @Currency			INT				= 0
@@ -29,6 +25,7 @@ AS
 	   - 20160505@Bruce: Remove dynamic sql
 	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	   - 20170801@Kenny: Filter data for Microgaming [RedmineID: #79311]
+	   - 20180130@Bruce: integrate Exchange product [#87754]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -145,7 +142,7 @@ BEGIN
 		)
 	END
 
-	IF EXISTS (SELECT 1 FROM @ProductList WHERE ProductCode IN ('AGC','GD','VG'))
+	IF EXISTS (SELECT 1 FROM @ProductList WHERE ProductCode IN ('AGC','GD','VG','BX'))
 	BEGIN
 		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, ProductID, Currency, TurnOver, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Company, Betcount, Playercomm)
 		(
@@ -155,14 +152,14 @@ BEGIN
 						(CASE WHEN @drawfilter IN (2, 3) AND b.[StatusId] = 111  THEN 0
 							  WHEN @drawfilter IN (2, 3) AND b.[StatusId] IN (114,115) THEN 0.5
 							  ELSE 1 END))
-					,SUM(b.MemberWL)
-					,SUM(-b.MemberWL)
+					,SUM(b.MemberWL + CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END)
+					,SUM(-b.MemberWL - CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END)
 					,0 AS WinlossRB
 					,0 AS AmtDueToBA
 					,0 AS AmtDueToRB
 					,0 AS CommBA
 					,0 AS CommRB
-					,SUM(-b.MemberWL * p.Rate) AS Company
+					,SUM(-b.MemberWL * p.Rate - CASE WHEN b.ProductID=31 THEN (b.CommissionA + b.CommissionP) ELSE 0 END) AS Company
 					,SUM(b.Betcount) * (CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END)
 					,SUM(b.commissionP)
 			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
@@ -175,7 +172,7 @@ BEGIN
 					@ReportBy = 0 AND
 					@Bettype = 0 AND
 					b.CustomerCategory NOT IN (27,28) AND
-					p.ProductID IN (10,11,12)
+					p.ProductID IN (10,11,12,31)
 			GROUP BY b.rptDate
 					,p.PartyID
 					,p.ProductID
@@ -216,14 +213,14 @@ BEGIN
 		)
 	END
 
-	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode NOT IN ('BA','MGCLC','MGCRNG','AGC','GD','VG'))
+	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode NOT IN ('BA','MGCLC','MGCRNG','AGC','GD','VG','BX'))
 	BEGIN
 		--exclude BA rpt_Betting
 		SELECT DISTINCT p.PartyID, p.LicenseeID, p.ProductID, bt.Bettype
 		INTO #PartyBettypeMapping
 		FROM #tmpParty p
 		INNER JOIN #Bettype bt ON p.ProductID = bt.ProductID
-		WHERE p.ProductID NOT IN (3,14,17,10,11,12)
+		WHERE p.ProductID NOT IN (3,14,17,10,11,12,31)
 		
 		DELETE #Data
 		
@@ -289,6 +286,8 @@ BEGIN
 			WHERE b.rptDate BETWEEN tp.FromDate AND tp.Todate
 			GROUP BY  b.rptDate, tp.ProductID, tp.PartyID, b.currencyID, b.[Status]
 		)
+
+		DROP TABLE #PartyBettypeMapping
 	END
 
 	SELECT DISTINCT ExchangeDate, ExchangeId, Code, USD, EUR, MYR, GBP
@@ -362,7 +361,6 @@ BEGIN
 	DROP TABLE #Bettype
 	DROP TABLE #tmpParty
 	DROP TABLE #Data
-	DROP TABLE #PartyBettypeMapping
 	DROP TABLE #TempExchange
 END
 GO

@@ -11,8 +11,9 @@ AS
 	DB: bodb_licensee
 
 	Revision:
-	  + 20170710@bruce: include CO, CB, BA [#79741]
+	  - 20170710@bruce: include CO, CB, BA [#79741]
 	  - 20171220@Parsons: increase length for variables [#88197]
+	  - 20180126@Bruce: Exclude Exchange-BX [#87754]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -45,7 +46,7 @@ BEGIN
 	SELECT DISTINCT p.ProductID, p.ProductPrefix
 	FROM LA_f_Products3rd('') p
 	INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON c.ProductID = p.ProductID
-	WHERE c.FromParty = @PartyId AND c.ProductId NOT IN (1,23,13,14,17 ) --exclude RB,bettrade,NG2, MGCLC,MGCRNG
+	WHERE c.FromParty = @PartyId AND c.ProductId NOT IN (1,23,13,14,17,31 ) --exclude RB,bettrade,NG2, MGCLC,MGCRNG,BX
 
 	-- Region: Party charge info
 	DECLARE @CB INT = 15, @CO INT = 25
