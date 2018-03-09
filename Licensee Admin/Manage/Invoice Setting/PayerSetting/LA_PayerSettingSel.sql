@@ -20,6 +20,7 @@ AS
   - 20170214@bruce.bui: show sub charge type
   - 20170215@bruce.bui: sort product
   - 20170315@Scofield: hard code for Bettrade BA [#70050]
+  - 20180309@Bruce: Param @ListParty should increase length in SP LA_PayerSettingSel [#91814]
 
   Params:
   + @PayerId : 0 get all Party
@@ -35,8 +36,8 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @ProductListAll VARCHAR(100) = '',
-			@ListParty VARCHAR(500) = '',
+	DECLARE @ProductListAll VARCHAR(500) = '',
+			@ListParty VARCHAR(8000) = '',
 			@MinDate DATE,
 			@MaxDate DATE,
 			@CurrentDate DATE
