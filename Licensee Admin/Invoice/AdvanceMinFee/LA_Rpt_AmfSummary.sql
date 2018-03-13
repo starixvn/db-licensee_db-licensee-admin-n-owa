@@ -167,25 +167,35 @@ BEGIN
 	(
 		SELECT RefPartyId, OfficialInvoiceNo, SUM(Expense) AS Amount,InvItemTypeId
 		FROM #Statement
-		WHERE InvItemTypeId IN(5,24)
+		WHERE InvItemTypeId IN(5,24) AND InvoiceType <> 10  --Debit Note (for return AMF)
 		GROUP BY RefPartyId, OfficialInvoiceNo,InvItemTypeId
 	)
 
+	--10   Debit Note (for return AMF)
+	--7    Return amf
+	--24   Deduct against invoice
 	;WITH r AS (
-		SELECT RefPartyId,RefNo,SUM(Income) AS Amount
+		SELECT RefPartyId,RefNo,
+			SUM(ISNULL(Income,0)) AS ReturnAmf,
+			SUM(ISNULL(Expense,0)) AS DeductAmount
 		FROM #Statement
-		WHERE InvItemTypeId = 7-- 7-return amf
+		WHERE InvoiceType = 10 AND InvItemTypeId IN (7,24)
 		GROUP BY RefPartyId,RefNo
 	)
 	SELECT d.PartyId, d.InvoiceNo
-		, d.Amount - ISNULL(r.Amount,0) AS Amount
+		, (d.Amount - ISNULL(CASE WHEN d.RowType=5 THEN r.ReturnAmf ELSE -r.DeductAmount END,0)) AS Amount
 		, CASE WHEN d.RowType=5 THEN @AMF ELSE @PREPAYMENT END AS RowType
+	INTO #Invoices
 	FROM @Deduct d
-	LEFT JOIN r ON d.InvoiceNo = r.RefNo AND d.RowType = 5 --deduct AMF
-	WHERE d.Amount - ISNULL(r.Amount,0) <> 0
-	ORDER BY d.PartyId, d.InvoiceNo
+	LEFT JOIN r ON d.InvoiceNo = r.RefNo
+
+	SELECT PartyId, InvoiceNo, Amount, RowType
+	FROM #Invoices
+	WHERE Amount>0
+	ORDER BY PartyId, InvoiceNo
 
 	DROP TABLE #Statement
+	DROP TABLE #Invoices
 END
 GO
 
