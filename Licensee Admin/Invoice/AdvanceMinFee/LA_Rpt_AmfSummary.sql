@@ -164,39 +164,34 @@ BEGIN
 	-- 5-deduct AMF
 	-- 24-deduct against invoice
 	DECLARE @Deduct TABLE(PartyId INT, InvoiceNo VARCHAR(50), Amount MONEY, RowType INT)
-	INSERT INTO @Deduct(PartyId, InvoiceNo, Amount, RowType)
+	INSERT INTO @Deduct(PartyId, RowType, Amount, InvoiceNo)
 	(
-		SELECT RefPartyId, OfficialInvoiceNo, SUM(Expense) AS Amount,InvItemTypeId
+		SELECT RefPartyId, InvItemTypeId,
+			SUM(ISNULL(Expense,0)) AS Amount,
+			CASE WHEN InvoiceType = 10 THEN RefNo ELSE OfficialInvoiceNo END
 		FROM #Statement
-		WHERE InvItemTypeId IN(5,24) AND InvoiceType <> 10  --Debit Note (for return AMF)
-		GROUP BY RefPartyId, OfficialInvoiceNo,InvItemTypeId
+		WHERE InvItemTypeId IN (5,24) --Debit Note (for return AMF)
+		GROUP BY RefPartyId,InvItemTypeId, CASE WHEN InvoiceType = 10 THEN RefNo ELSE OfficialInvoiceNo END
 	)
 
 	--10   Debit Note (for return AMF)
 	--7    Return amf
 	--24   Deduct against invoice
 	;WITH r AS (
-		SELECT RefPartyId,RefNo,
-			SUM(ISNULL(Income,0)) AS ReturnAmf,
-			SUM(ISNULL(Expense,0)) AS DeductAmount
+		SELECT RefPartyId,RefNo, SUM(ISNULL(Income,0)) AS Amount
 		FROM #Statement
-		WHERE InvoiceType = 10 AND InvItemTypeId IN (7,24)
+		WHERE InvItemTypeId = 7
 		GROUP BY RefPartyId,RefNo
 	)
 	SELECT d.PartyId, d.InvoiceNo
-		, (d.Amount - ISNULL(CASE WHEN d.RowType=5 THEN r.ReturnAmf ELSE -r.DeductAmount END,0)) AS Amount
+		, (d.Amount - ISNULL(r.Amount,0)) AS Amount
 		, CASE WHEN d.RowType=5 THEN @AMF ELSE @PREPAYMENT END AS RowType
-	INTO #Invoices
 	FROM @Deduct d
-	LEFT JOIN r ON d.InvoiceNo = r.RefNo
-
-	SELECT PartyId, InvoiceNo, Amount, RowType
-	FROM #Invoices
-	WHERE Amount>0
-	ORDER BY PartyId, InvoiceNo
+	LEFT JOIN r ON d.InvoiceNo = r.RefNo AND d.RowType = 5 --deduct AMF
+	WHERE (d.Amount - ISNULL(r.Amount,0)) <> 0
+	ORDER BY d.PartyId, d.InvoiceNo
 
 	DROP TABLE #Statement
-	DROP TABLE #Invoices
 END
 GO
 
