@@ -79,14 +79,14 @@ BEGIN
 
 	-- remark
 	-- invoice type: 7-setupfee
-	-- item type: 7 - return amf(exclude)
+	-- item type: 3,21,22,23
 	;WITH r AS (
 		SELECT s1.RefPartyId, s1.RowType
 			, CASE WHEN s1.InvoiceType=7 THEN '' ELSE s1.[Description] END AS [Description]
 			, ROW_NUMBER() OVER (PARTITION BY s1.RefPartyId,s1.RowType ORDER BY s1.CreatedDateTime DESC) AS RowNum
 		FROM #Statement s1
 		LEFT JOIN #Statement s2 ON s1.OfficialInvoiceNo=s2.RefNo AND s2.InvItemTypeId = 7
-		WHERE s1.InvItemTypeId <> 7 AND s2.RefNo IS NULL
+		WHERE s1.InvItemTypeId IN(3,21,22,23) AND s2.RefNo IS NULL
 	)
 	UPDATE af SET Remark = r.[Description]
 	FROM @AmfParties af
