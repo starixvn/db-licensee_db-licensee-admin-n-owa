@@ -964,8 +964,9 @@ BEGIN
 					AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount)
 			)
 
-			IF @Prepayment>0 AND @TotalAmount>0
+			IF @Prepayment>0
 			BEGIN
+				SET @TotalAmount = CASE WHEN @TotalAmount<0 THEN 0 ELSE @TotalAmount END
 				DECLARE @RemainingPrepayment MONEY = @Prepayment - @TotalAmount
 				INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmf)
 				VALUES(0,'','',@DeductAgainstInvoice,
