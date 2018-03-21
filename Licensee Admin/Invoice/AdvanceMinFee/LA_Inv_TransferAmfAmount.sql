@@ -190,7 +190,7 @@ BEGIN
 
 	-- month of deduction
 	-- deduct as AMF = 1
-	IF @Option = 1
+	IF @Option = 1 AND @Environment = 'PRO'
 	BEGIN
 		DECLARE @CurrencyId INT = (SELECT BaseCurrencyId FROM dbo.OAS_PartyDetail WHERE PartyID=@ToPartyId)
 		UPDATE m SET MonthOfDeduction = CEILING(@Amount / m.FeeAmount)

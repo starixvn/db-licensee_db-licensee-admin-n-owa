@@ -274,7 +274,7 @@ BEGIN
 		-- setup fee=7
 		-- amf = 3
 		DECLARE @AMF MONEY = (SELECT SUM(Amount) FROM @Settlements WHERE ItemType=3)
-		IF @InvoiceTypeId=7 AND ISNULL(@AMF,0)>0
+		IF @InvoiceTypeId=7 AND ISNULL(@AMF,0)>0 AND @Environment = 'PRO'
 		BEGIN
 			-- find active minfee
 			-- minfee=1
