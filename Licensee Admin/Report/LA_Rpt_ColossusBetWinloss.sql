@@ -6,6 +6,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_ColossusBetWinloss]
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME
 	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
+	, @TicketType			VARCHAR(50) 	
 WITH RECOMPILE
 AS
 /*  Created: 20160310@Bruce
@@ -97,7 +98,7 @@ BEGIN
 				b.rptDate,
 				b.CurrencyID,
 				SUM(b.BetCount) TotalTrans,
-				SUM(b.Turnover) Turnover,
+				SUM(CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN b.Turnover ELSE b.ExtraAmount END) Turnover,
 				SUM(ISNULL(b.WinPrizeAmount,0)) Prize,
 				SUM(ISNULL(b.CashOutAmount,0)) CashOut,
 				SUM(ISNULL(b.BuyBackAmount,0)) CashInAmount
@@ -112,8 +113,9 @@ BEGIN
 		INNER JOIN @LaunchDateFilter ld 
 			ON  ld.PartyId = p.PartyID
 				AND b.rptDate BETWEEN ld.FromDate AND ld.ToDate
-		WHERE	b.CurrencyID <> 20 AND b.customercategory NOT IN (27, 28) AND
-				p.PartyID IN (SELECT val FROM dbo.strSplit(@PartyIds, ','))
+		WHERE	b.CurrencyID <> 20 AND b.customercategory NOT IN (27, 28)
+				AND p.PartyID IN (SELECT val FROM dbo.strSplit(@PartyIds, ','))
+				AND ISNULL(b.TicketType, 0) IN (SELECT val FROM dbo.strSplit(@TicketType, ','))				
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, p.PartyId
 	END
 
