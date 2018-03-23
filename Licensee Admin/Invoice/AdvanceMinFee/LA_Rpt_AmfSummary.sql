@@ -120,7 +120,7 @@ BEGIN
 	-- 2 waive
 	-- 3 amf
 	;WITH wp AS (
-		SELECT w.PartyId, SUM(DATEDIFF(MONTH,w.FromDate,w.ToDate )+1) WaiverPeriod
+		SELECT w.PartyId, SUM(DATEDIFF(MONTH,w.FromDate, DATEADD(DAY, 1, w.ToDate))) WaiverPeriod
 		FROM dbo.LA_MinFee w WITH(NOLOCK)
 		INNER JOIN dbo.LA_MinFee m WITH(NOLOCK) ON m.PartyId=w.PartyId AND m.ProductId=w.ProductId
 		INNER JOIN @AmfParties af ON af.PartyId=w.PartyId AND af.RowType=@AMF
