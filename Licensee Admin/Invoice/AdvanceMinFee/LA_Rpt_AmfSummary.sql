@@ -15,6 +15,7 @@ AS
 
 	Revisions:
 		- 20171226: create SP
+		- 20180326@Harper: Change the way to get Waive month
 */
 BEGIN
 	SET NOCOUNT ON
@@ -120,16 +121,25 @@ BEGIN
 	-- 2 waive
 	-- 3 amf
 	;WITH wp AS (
-		SELECT w.PartyId, SUM(DATEDIFF(MONTH,w.FromDate, DATEADD(DAY, 1, w.ToDate))) WaiverPeriod
+		SELECT w.PartyId, w.FromDate, DATEADD(DAY, 1, w.ToDate) AS ToDate
 		FROM dbo.LA_MinFee w WITH(NOLOCK)
 		INNER JOIN dbo.LA_MinFee m WITH(NOLOCK) ON m.PartyId=w.PartyId AND m.ProductId=w.ProductId
 		INNER JOIN @AmfParties af ON af.PartyId=w.PartyId AND af.RowType=@AMF
-		WHERE w.FeeTypeId = 2 AND m.FeeTypeId=1 AND w.FromDate >= m.FromDate AND w.ToDate<=m.ToDate
-		GROUP BY w.PartyId
+		WHERE w.FeeTypeId = 2 AND m.FeeTypeId=1 AND w.FromDate >= m.FromDate AND w.ToDate<=m.ToDate		
 	)
-	UPDATE p SET p.WaiverPeriod = ISNULL(wp.WaiverPeriod, 0)
+	, waive AS (
+		SELECT wp.PartyId,
+				SUM(    CASE
+						WHEN DATEADD(Month, DATEDIFF(Month, wp.FromDate, wp.ToDate) +1, wp.FromDate) <= wp.ToDate Then DATEDIFF(Month, wp.FromDate, wp.ToDate) +1
+						WHEN DATEADD(Month, DATEDIFF(Month, wp.FromDate, wp.ToDate) , wp.FromDate) <= wp.ToDate Then DATEDIFF(Month, wp.FromDate, wp.ToDate) 
+						WHEN DATEADD(Month, DATEDIFF(Month, wp.FromDate, wp.ToDate) -1, wp.FromDate) <= wp.ToDate Then DATEDIFF(Month, wp.FromDate, wp.ToDate) -1
+						END ) WaiverPeriod
+		FROM wp
+		GROUP BY wp.PartyId
+	)
+	UPDATE p SET p.WaiverPeriod = ISNULL(waive.WaiverPeriod, 0)
 	FROM @AmfParties p
-	LEFT JOIN wp ON wp.PartyId=p.PartyId
+	LEFT JOIN waive ON waive.PartyId=p.PartyId
 	WHERE p.RowType=@AMF
 
 	-- month of deduction
