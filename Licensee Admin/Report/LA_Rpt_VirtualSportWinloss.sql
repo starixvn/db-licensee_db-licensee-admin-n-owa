@@ -32,6 +32,7 @@ AS
 		- 20170620@Bruce: add paytosupplier and netincome [#78398]
 		- 20171220@Parsons: increase length for variables [#88197]
 		- 20180301@Harper: Virtual Sports - Change of commercial terms between company and provider [RedmineID: #91255]
+		- 20180327@Harper: Add more Cozni as Parent Licensee [RedmineID: #85681]
 
  * Param's Explanation:
  *  - @FromDate   : From date
@@ -107,6 +108,36 @@ SET NOCOUNT ON
 		UNION ALL
 		SELECT 999, 0, 5, 0.01, @FromDate, @ToDate
 	)	
+
+	IF @ExcludeTest = 0
+	BEGIN
+		;WITH affectedDate AS 
+		(
+			SELECT i.PartyID, i.ProductID, MIN (i.Fromdate) AS AffectedDate
+			FROM @Charge3rdInfos i
+			GROUP BY i.PartyID, i.ProductID						
+		)
+		INSERT INTO @Charge3rdInfos
+		        ( PartyID ,
+		          IsDeposit ,
+		          ProductID ,
+		          Rate ,
+		          Fromdate ,
+		          Todate
+		        )	
+		SELECT DISTINCT CASE WHEN c.PartyID IN (1, 11, 98, 9) THEN c.PartyID ELSE 999 END					
+					, CASE WHEN c.PartyID IN (1, 11, 98, 9) THEN 1 ELSE 0 END
+					, c.ProductID
+					, 0
+					, @FromDate
+					, CASE WHEN @ToDate >= DATEADD(D, - 1, ci.AffectedDate)
+							THEN DATEADD(D, - 1, ci.AffectedDate)
+					ELSE @ToDate END  
+		FROM @Charge3rdInfos c
+			LEFT JOIN affectedDate ci ON ci.PartyID = c.PartyID			
+		WHERE @FromDate < ci.AffectedDate
+	END
+
 	-- End Region: Charge 3rd
 
 	-- Region: Get Echange Rate
