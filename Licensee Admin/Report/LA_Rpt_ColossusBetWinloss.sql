@@ -87,18 +87,20 @@ BEGIN
 			CurrencyId		INT,
 			TotalTrans		INT,
 			Turnover		MONEY,
+			TurnoverForCommision MONEY,
 			Prize			MONEY,
 			CashOut			MONEY,
 			CashInAmount	MONEY
 		)
 
-		INSERT INTO #TempData (LicenseeId, PartyId, rptDate, CurrencyId, TotalTrans, Turnover, Prize, CashOut, CashInAmount)
+		INSERT INTO #TempData (LicenseeId, PartyId, rptDate, CurrencyId, TotalTrans, Turnover, TurnoverForCommision, Prize, CashOut, CashInAmount)
 		SELECT	b.SiteID,
 				p.PartyId,
 				b.rptDate,
 				b.CurrencyID,
 				SUM(b.BetCount) TotalTrans,
-				SUM(CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN b.Turnover ELSE b.ExtraAmount END) Turnover,
+				SUM(ISNULL(b.Turnover,0)) Turnover,
+				SUM(CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN b.Turnover ELSE b.ExtraAmount END) TurnoverForCommision,
 				SUM(ISNULL(b.WinPrizeAmount,0)) Prize,
 				SUM(ISNULL(b.CashOutAmount,0)) CashOut,
 				SUM(ISNULL(b.BuyBackAmount,0)) CashInAmount
@@ -131,6 +133,7 @@ BEGIN
 			CurrencyId		INT,
 			TotalTrans		INT,
 			Turnover		MONEY,
+			TurnoverForCommision MONEY,
 			Prize			MONEY,
 			CashOut			MONEY,
 			CashInAmount	MONEY,
@@ -146,7 +149,7 @@ BEGIN
 			AmountDueToColossusBetBase	MONEY
 		)
 		
-		INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, CurrencyName, TotalTrans, Turnover, Prize, CashOut, CashInAmount)
+		INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, CurrencyName, TotalTrans, Turnover, TurnoverForCommision, Prize, CashOut, CashInAmount)
 			SELECT 
 				p.PartyId, 
 				p.PartyName, 
@@ -155,8 +158,9 @@ BEGIN
 				td.rptDate, 
 				td.CurrencyId, 
 				e.Code, 				
-				td.TotalTrans, 
+				td.TotalTrans, 			
 				td.Turnover, 
+				td.TurnoverForCommision,
 				td.Prize, 
 				td.CashOut, 
 				td.CashInAmount
@@ -200,17 +204,17 @@ BEGIN
 	DECLARE @TotalByPeriod AS TABLE (
 		FromDate		DATETIME,
 		ToDate			DATETIME,
-		Turnover		MONEY,
+		TurnoverForCommision		MONEY,
 		CashInAmount	MONEY		
 	)
 	
 	SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)
 	
-	INSERT INTO @TotalByPeriod(FromDate, Todate, Turnover, CashInAmount)
+	INSERT INTO @TotalByPeriod(FromDate, Todate, TurnoverForCommision, CashInAmount)
 	SELECT 
 		s.FromDate, 
 		s.ToDate, 
-		SUM(td.Turnover*e.BaseCurrencyRate),
+		SUM(td.TurnoverForCommision*e.BaseCurrencyRate),
 		SUM(td.CashInAmount*e.BaseCurrencyRate)
 	FROM #TempData td
 	INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
@@ -233,8 +237,8 @@ BEGIN
 	LEFT JOIN @CBShare cm ON cm.TypeId = 6  -- Commission share
 		AND cm.FromDate = t.FromDate 
 		AND cm.ToDate = t.ToDate
-		AND t.Turnover >= cm.MinAmountEx 
-		AND t.Turnover < cm.MaxAmountEx		 
+		AND t.TurnoverForCommision >= cm.MinAmountEx 
+		AND t.TurnoverForCommision < cm.MaxAmountEx		 
 	LEFT JOIN @CBShare cs ON cs.TypeId = 7 -- Cash in share
 		AND cs.FromDate = t.FromDate
 		AND cs.ToDate = t.ToDate
@@ -246,9 +250,9 @@ BEGIN
 	-- Update Commission, CashInShare, AmountDueToColossusBet for #Result
 	UPDATE r
 	SET
-		Commission = r.Turnover * rbp.CommissionRate,
+		Commission = r.TurnoverForCommision * rbp.CommissionRate,
 		CashInShare = r.CashInAmount * rbp.CashInShareRate,
-		AmountDueToColossusBet = Turnover - Prize - CashOut - r.Turnover * rbp.CommissionRate - r.CashInAmount * rbp.CashInShareRate		
+		AmountDueToColossusBet = Turnover - Prize - CashOut - r.TurnoverForCommision * rbp.CommissionRate - r.CashInAmount * rbp.CashInShareRate		
 	FROM #Result r
 	INNER JOIN @RateByPeriod rbp ON r.WinLossDate BETWEEN rbp.FromDate AND rbp.ToDate	
 	-- End Update Commission, CashInShare, AmountDueToColossusBet for #Result
