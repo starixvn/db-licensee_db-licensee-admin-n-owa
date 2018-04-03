@@ -19,6 +19,7 @@ AS
 		  - 20141031@Florent: Apply new Structure Using SystemMapping
 		  - 20150312@Florent: add column brandname and fix case without SB
 		  - 20150412@Patrick: Add filter by PartyType
+		  - 20180403@Harper: Add more Cozni as parent license [RedmineID: #85681]
 
 	 Params:
 		+ UserID : 
@@ -41,7 +42,7 @@ WHERE PartyName IN ('IBC','18bb')
 INSERT INTO @tmpCompany
 SELECT PartyID 
 FROM dbo.OAS_Party WITH (NOLOCK)
-WHERE PartyName IN ('ONEWorks','Boping', 'Zelianta')
+WHERE PartyName IN ('ONEWorks','Boping', 'Zelianta', 'Cozni')
 
 SELECT MAX(ci.FromDate) FromDate, ci.FromParty
 INTO #ListParty
