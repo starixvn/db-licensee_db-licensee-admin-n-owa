@@ -14,8 +14,8 @@ AS
 	DB: DB052.bodb_Licensee
 
 	Revisions:
-		- 20171226: create SP
-		- 20180326@Harper: Change the way to get Waive month
+		- 20171226@Bruce: create SP report for AMF Summary [RedmineID: #87039]
+		- 20180326@Harper: Change the way to get Waive month [RedmineID: #87039]
 */
 BEGIN
 	SET NOCOUNT ON
