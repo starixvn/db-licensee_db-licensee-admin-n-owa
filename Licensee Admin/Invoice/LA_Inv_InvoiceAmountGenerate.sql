@@ -49,6 +49,7 @@ AS
 		+ 2017.10.27 @Bruce: show individual discount by product [#85256]		
 		- 20171113@Bruce: Modified error message [RedmineID: #84163]
 		- 20171220@Parsons: increase length for variables [#88197]
+		- 20180110@Bruce: deduct against invoice [#87039]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -132,7 +133,8 @@ BEGIN
 		@AmountTypeDiscount INT = 4,
 		@AmountTypeRebate INT = 6,
 		@AmountTypeRackHostingFee INT = 8,
-		@AmountTypeMonthlyHostingFee INT = 9
+		@AmountTypeMonthlyHostingFee INT = 9,
+		@DeductAgainstInvoice INT = 24
 
 	IF @InvoiceTypeId = @InvoiceTypeHostingFeesId
 	BEGIN
@@ -907,17 +909,20 @@ BEGIN
 		SET		ProductCode = LEFT(ProductCode, LEN(ProductCode) - 1),
 				ProductName = LEFT(ProductName, LEN(ProductName) - 1)
 		WHERE	ProductId = -1
+		
+		-- get AMF and prepayment
+		SELECT SUM(ISNULL(Income,0) - ISNULL(Expense,0)) Amount, s.InvItemTypeId
+		INTO #credit
+		FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
+		INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
+		WHERE s.InvItemTypeId IN (3,5,7,21,22,23,24) 
+			AND s.RefPartyId = @PartyId
+			AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
+			AND h.Environment = @Environment
+		GROUP BY s.InvItemTypeId
 
-		DECLARE @RemainingAmf MONEY = ISNULL((
-			SELECT SUM(ISNULL(Income,0)) - SUM(ISNULL(Expense,0))
-			FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
-			INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
-			WHERE s.InvItemTypeId IN (3,5,7) 
-				AND h.PartyId = @PartyId
-				AND h.BillerId = @BillerId
-				AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
-				AND h.Environment = @Environment
-		),0)
+		DECLARE @RemainingAmf MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeId IN (3,5,7,21)),0)
+		DECLARE @Prepayment MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeId IN (22,23,24)),0)
 
 		-- InvoiceType Software: 1
 		IF @InvoiceTypeId = 1			
@@ -951,13 +956,30 @@ BEGIN
 				UPDATE @FinalResult SET AmfAmount = @AmfAmount, RemainingAmf = @RemainingAmf - @AmfAmount
 				WHERE AmountType = 1 AND ProductId = 0 -- SB
 			END
+
+			DECLARE @TotalAmount MONEY = (
+				SELECT SUM((CASE WHEN AmountType=@AmountTypeDiscount THEN -InvoiceAmount ELSE InvoiceAmount END) - ISNULL(AmfAmount,0))
+				FROM @FinalResult
+				WHERE ProductId != -1	-- not summarized row
+					AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount)
+			)
+
+			IF @Prepayment>0
+			BEGIN
+				SET @TotalAmount = CASE WHEN @TotalAmount<0 THEN 0 ELSE @TotalAmount END
+				DECLARE @RemainingPrepayment MONEY = @Prepayment - @TotalAmount
+				INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmf)
+				VALUES(0,'','',@DeductAgainstInvoice,
+					CASE WHEN @RemainingPrepayment >=0 THEN -@TotalAmount ELSE -@Prepayment END,
+					CASE WHEN @RemainingPrepayment >=0 THEN @RemainingPrepayment ELSE 0 END)
+			END
 		END
 
 		-- 10: debit note for return amf
 		IF @InvoiceTypeId = 10
 		BEGIN
 			DELETE @FinalResult
-			INSERT INTO @FinalResult(AmountType, RemainingAmf) VALUES (1, @RemainingAmf)
+			INSERT INTO @FinalResult(AmountType, RemainingAmf, InvoiceAmount) VALUES (1, @RemainingAmf, @Prepayment)
 		END
 
 		SELECT	f.ProductId,
@@ -973,7 +995,8 @@ BEGIN
 				AND f.ProductId != -1	-- not summarized row
 				AND (
 						f.AmountType = @AmountTypeSoftwareFee OR	-- software data fee rows
-						f.AmountType = @AmountTypeDiscount			-- discount rows
+						f.AmountType = @AmountTypeDiscount OR		-- discount rows
+						f.AmountType = @DeductAgainstInvoice		-- deduct against invoice
 					))
 			OR (@InvoiceTypeId = 3 -- rebate
 				AND f.ProductId = -1 AND f.AmountType = @AmountTypeRebate -- summarized rebate row

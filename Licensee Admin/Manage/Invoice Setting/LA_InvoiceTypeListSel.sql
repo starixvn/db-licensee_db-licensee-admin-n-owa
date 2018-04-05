@@ -15,6 +15,7 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:     		  
+		+ 20180109@bruce: filter invoice type by IsVisible=1 [#87039]
 	 Params:
 		+ 0 get all Invoice type
 		+ <> 0 specify a Invoice type
@@ -25,8 +26,7 @@ SET NOCOUNT ON
 BEGIN
 	SELECT InvTypeId, InvTypeName
 	FROM dbo.LA_InvoiceType WITH (NOLOCK)
-	WHERE (@InvoiceTypeId = 0 OR InvTypeId = @InvoiceTypeId)
-		
+	WHERE (@InvoiceTypeId = 0 OR InvTypeId = @InvoiceTypeId) AND IsVisible=1
 END
 
 GO
