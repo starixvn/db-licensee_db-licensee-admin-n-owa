@@ -12,7 +12,7 @@ WITH RECOMPILE
 AS
 /*  Created: 20160310@Bruce
 	Task : Support settlement for Colossus Bets
-	DB: DBEXT/bodb02
+	DB: DBLIC/bodb_licensee
 	Revisions:
 		- 20160310@Bruce: Create SP
 		- 20171219@Bruce: increase length for variables [#88197]
