@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
 GO
 SET ANSI_NULLS ON
@@ -31,6 +32,7 @@ AS
 		- 20170704@Scofield: Add VS2 and LT into report [RedmineID: #79310]
 		- 20171205@Bruce: fix partyid length [#87723]
 		- 20180131@Scofield: Add BX [#87754]
+		- 20180315@Bruce:Support Cozni licensees [#85681]
 */
 		
 /*	Example:
@@ -183,12 +185,7 @@ BEGIN
 		BX			MONEY  -- Exchange
 	)						  
 	INSERT INTO #LicenseeAmount(GroupName, GroupId, LicenseeId, PartyId,PartyName)
-	SELECT	CASE
-				WHEN p.PartyId = 1 THEN 'ONEWorks'
-				WHEN p.PartyId = 11 THEN 'Boping'
-				WHEN p.PartyId = 98 THEN 'Zelianta'
-				ELSE 'Credit'
-			END	AS PartyName,
+	SELECT	REPLACE(p.PartyName,' Licensees','') AS PartyName,
 			p.PartyId,
 			op.OldRefID,
 			t.PartyId, 
