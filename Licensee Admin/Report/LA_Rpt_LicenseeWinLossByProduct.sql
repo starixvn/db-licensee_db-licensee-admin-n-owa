@@ -256,7 +256,7 @@ BEGIN
 	DECLARE @CBWinLoss AS TABLE (LicenseeId INT, Amount MONEY)
 	;WITH t AS (
 		SELECT b.SiteId, b.rptDate,
-			SUM(Turnover) Turnover,
+			SUM(Turnover* e.Rate) Turnover,
 			SUM(CASE WHEN TicketType=0 THEN Turnover ELSE ISNULL(ExtraAmount,0) END * e.Rate) TurnoverForCommission,
 			SUM(ISNULL(WinPrizeAmount * e.Rate,0)) WinningPrize,
 			SUM(ISNULL(CashOutAmount * e.Rate,0)) CashOut,
