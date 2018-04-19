@@ -256,7 +256,8 @@ BEGIN
 	DECLARE @CBWinLoss AS TABLE (LicenseeId INT, Amount MONEY)
 	;WITH t AS (
 		SELECT b.SiteId, b.rptDate,
-			SUM(CASE WHEN TicketType=0 THEN Turnover ELSE ISNULL(ExtraAmount,0) END * e.Rate) Turnover,
+			SUM(Turnover) Turnover,
+			SUM(CASE WHEN TicketType=0 THEN Turnover ELSE ISNULL(ExtraAmount,0) END * e.Rate) TurnoverForCommission,
 			SUM(ISNULL(WinPrizeAmount * e.Rate,0)) WinningPrize,
 			SUM(ISNULL(CashOutAmount * e.Rate,0)) CashOut,
 			SUM(ISNULL(BuyBackAmount * e.Rate,0)) CashInAmount
@@ -271,7 +272,7 @@ BEGIN
 		GROUP BY b.rptDate, b.SiteId
 	)
 	INSERT INTO @CBWinLoss
-	SELECT t.SiteId, SUM(t.Turnover) - SUM(t.WinningPrize) - SUM(t.CashOut) - SUM(t.Turnover * cm.Rate) - SUM(t.CashInAmount * ci.Rate)
+	SELECT t.SiteId, SUM(t.Turnover) - SUM(t.WinningPrize) - SUM(t.CashOut) - SUM(t.TurnoverForCommission * cm.Rate) - SUM(t.CashInAmount * ci.Rate)
 	FROM t
 	INNER JOIN @CBChargeRates AS cm ON cm.TypeId = @CommChargeType AND (t.rptDate BETWEEN cm.FromDate AND cm.ToDate) AND cm.LicenseeId=t.SiteID
 	INNER JOIN @CBChargeRates AS ci ON ci.TypeId = @CashInShareChargeType AND (t.rptDate BETWEEN ci.FromDate AND ci.ToDate) AND ci.LicenseeId=t.SiteID

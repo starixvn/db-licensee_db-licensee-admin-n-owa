@@ -268,6 +268,7 @@ BEGIN
 			rptDate							DATETIME,
 			CurrencyId						INT,
 			Turnover						MONEY,
+			TurnoverForCommission			MONEY,
 			WinningPrize					MONEY,
 			CashOut							MONEY,
 			CommisionShare					MONEY,
@@ -275,10 +276,11 @@ BEGIN
 			CashInAmount					MONEY
 		)
 
-		INSERT INTO #TempData (rptDate, CurrencyId, Turnover, WinningPrize, CashOut, CashInAmount)
+		INSERT INTO #TempData (rptDate, CurrencyId, Turnover, TurnoverForCommission, WinningPrize, CashOut, CashInAmount)
 		SELECT	rptDate,
 				CurrencyId,
-				SUM(CASE WHEN TicketType=0 THEN Turnover ELSE ISNULL(ExtraAmount,0) END) Turnover,
+				SUM(Turnover) Turnover,
+				SUM(CASE WHEN TicketType=0 THEN Turnover ELSE ISNULL(ExtraAmount,0) END) TurnoverForCommission,
 				SUM(ISNULL(WinPrizeAmount,0)) WinningPrize,
 				SUM(ISNULL(CashOutAmount,0)) CashOut,
 				SUM(ISNULL(BuyBackAmount,0)) CashInAmount
@@ -294,7 +296,7 @@ BEGIN
 		-- End Region: Get Winloss Data
 
 		UPDATE #TempData
-		SET CommisionShare = td.Turnover * cm.Rate,
+		SET CommisionShare = td.TurnoverForCommission * cm.Rate,
 			CashInShare = td.CashInAmount * ci.Rate
 		FROM #TempData td
 		INNER JOIN @CBShare AS cm ON cm.TypeId = @CommChargeType AND (td.rptDate BETWEEN cm.FromDate AND cm.ToDate)
