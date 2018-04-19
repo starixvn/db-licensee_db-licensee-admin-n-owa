@@ -1,5 +1,4 @@
-USE bodb_licensee
-GO
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 
 ALTER PROCEDURE dbo.LA_Inv_RebateWorksheetSel
 	@PartyId		INT
@@ -437,7 +436,4 @@ BEGIN
 	DROP TABLE #TempDataCB
 	-- End region
 END
-GO
-
-GRANT EXECUTE ON [dbo].LA_Inv_RebateWorksheetSel TO [bodbAdminNet]
 GO
