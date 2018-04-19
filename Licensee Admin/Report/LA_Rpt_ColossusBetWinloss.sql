@@ -18,6 +18,7 @@ AS
 		- 20171219@Bruce: increase length for variables [#88197]
 		- 20180321@Scofield: Implement Colossus Bets Freeplay [#89768]
 		- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
+
 	Param's Explanation:
 */
 BEGIN

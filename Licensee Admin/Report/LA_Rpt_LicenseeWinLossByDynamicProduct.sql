@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
 GO
 
@@ -13,10 +14,11 @@ AS
 	DB: DB052.bodb_Licensee
 
 	Revisions:
-		+ 20170630@Bruce: include BT/CO/CB, remove LC, VG [RedmineID: #79309]
+		- 20170630@Bruce: include BT/CO/CB, remove LC, VG [RedmineID: #79309]
 		- 20171205@Bruce: fix partyid length [#87723]
 		- 20171220@Parsons: increase length for variables [#88197]
 		- 20180131@Scofield: Add BX [#87754]
+		- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
 */
 BEGIN
 	SET NOCOUNT ON
