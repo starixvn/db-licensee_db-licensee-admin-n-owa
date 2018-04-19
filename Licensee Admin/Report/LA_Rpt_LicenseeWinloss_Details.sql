@@ -24,6 +24,8 @@ AS
 	- 20171205@Bruce: fix partyid length [#87723]
 	- 20171211: @Scofield - Support Colossus Bet, Cashout, Bet Trade [#87038]
 	- 20180130@Bruce: integrate Exchange product [#87754]
+	- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
+
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
 		+ @Currency	:  0- All Currencies
@@ -244,75 +246,20 @@ BEGIN
 		DECLARE @CashInShareChargeType INT = 7
 
 		-- Region: Commision and Cash in share Rates
-		DECLARE @CBShare AS TABLE (
-			PartyId			INT,
-			LicenseeId		INT,
-			Rate			MONEY,
-			TypeId			SMALLINT,
-			FromDate		DATETIME,
-			ToDate			DATETIME
-		)
+		DECLARE @CBShare AS TABLE(PartyId INT, LicenseeId INT, Rate MONEY, TypeId SMALLINT, FromDate DATETIME, ToDate DATETIME)
 
 		INSERT INTO @CBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
-		SELECT	ci.FromParty,
-				CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END AS LicenseeId,
-				ci.Rate,
-				ci.ChargeType,
-				CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
-				CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
-		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
-			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
-			LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
-			LEFT JOIN bodb_licensee.dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
-		WHERE FromParty = @PartyID AND ProductID = @CBProductId AND ChargeType IN (@CommChargeType,@CashInShareChargeType) AND (
-			@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
-			@ToDate BETWEEN ci.FromDate AND ci.ToDate OR
-			ci.FromDate BETWEEN @FromDate AND @ToDate OR
-			ci.ToDate BETWEEN @FromDate AND @ToDate
-		)
-		
+		SELECT PartyID,LicenseeID,DI_Rate,ChargeType,Fromdate,Todate
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyID,@FromDate,@ToDate,'CB','OA',@excludeTest)
+
 		-- Test Data
-		IF @ExcludeTest = 0
+		IF @excludeTest = 0
 		BEGIN	
-			DECLARE @TempCBShare AS TABLE (PartyId INT, LicenseeId INT, Rate MONEY, TypeId SMALLINT, FromDate DATETIME, ToDate DATETIME)	
-			DECLARE @Cte_AffectDate TABLE (PartyID INT, AffectedDate DATE) 		
-
-			INSERT INTO @Cte_AffectDate (PartyID, AffectedDate)
-			(
-				SELECT FromParty AS PartyID, MIN(FromDate) AS AffectedDate		  			  
-				FROM bodb_licensee..OAS_Party p WITH (NOLOCK)
-					INNER JOIN bodb_licensee..OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
-				WHERE ChargeType != 2
-				  AND p.PartyID = @PartyID
-				  AND ci.ProductID = @CBProductId
-				GROUP BY FromParty
-			)
-			
-			INSERT INTO @TempCBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
-			SELECT DISTINCT 
-				@PartyID,
-				CASE 
-					WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID
-					ELSE lb.LabelID END AS LicenseeID,				
-				0 DI_Rate,
-				@CommChargeType,
-				@FromDate,
-				CASE WHEN @ToDate >= DATEADD(D, - 1, cte.AffectedDate) THEN DATEADD(D, - 1, cte.AffectedDate)
-					ELSE @ToDate END
-			FROM bodb_licensee..OAS_Party p WITH (NOLOCK) 
-				LEFT JOIN bodb_licensee..OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
-				LEFT JOIN bodb_licensee..labels lb(NOLOCK) ON p.OldRefID = lb.LicenseeID
-				LEFT JOIN @Cte_AffectDate cte ON p.PartyID = cte.PartyID
-			WHERE @FromDate <= cte.AffectedDate AND p.PartyID = @PartyID
-
-			INSERT INTO @TempCBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
+			UPDATE @CBShare SET TypeId = @CommChargeType WHERE Rate = 0 AND TypeId=1
+			INSERT INTO @CBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
 			SELECT PartyId, LicenseeId, Rate, @CashInShareChargeType, FromDate, ToDate
-			FROM @TempCBShare
-
-			INSERT @CBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
-			SELECT PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate
-			FROM @TempCBShare
-		END		
+			FROM @CBShare WHERE Rate=0 AND TypeId=@CommChargeType
+		END
 		-- End Region: Commision and Cash in share Rates
 
 		-- Region: Get Winloss Data
@@ -331,7 +278,7 @@ BEGIN
 		INSERT INTO #TempData (rptDate, CurrencyId, Turnover, WinningPrize, CashOut, CashInAmount)
 		SELECT	rptDate,
 				CurrencyId,
-				SUM(Turnover) Turnover,
+				SUM(CASE WHEN TicketType=0 THEN Turnover ELSE ISNULL(ExtraAmount,0) END) Turnover,
 				SUM(ISNULL(WinPrizeAmount,0)) WinningPrize,
 				SUM(ISNULL(CashOutAmount,0)) CashOut,
 				SUM(ISNULL(BuyBackAmount,0)) CashInAmount
