@@ -32,6 +32,7 @@ AS
 			- 20170712@bruce: include BRVS, LO [RedmineID: #79310]
 			- 20171219@Bruce: increase length for variables [#88197]
 			- 20180126@Bruce: include Exchange-BX [#87754]
+			- 20180419@Scofield: update CB for FreePlay [#93907]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -489,6 +490,7 @@ BEGIN
 			CurrencyId						INT,
 			TotalTrans						INT,
 			Turnover						MONEY,
+			TurnoverForCommision			MONEY,
 			TurnoverExchanged				MONEY,
 			WinningPrize					MONEY,
 			CashOut							MONEY,
@@ -497,11 +499,12 @@ BEGIN
 			CashInAmount					MONEY
 		)
 
-		INSERT INTO #TempData (rptDate, CurrencyId, TotalTrans, Turnover, WinningPrize, CashOut, CashInAmount)
+		INSERT INTO #TempData (rptDate, CurrencyId, TotalTrans, Turnover, TurnoverForCommision, WinningPrize, CashOut, CashInAmount)
 		SELECT	rptDate,
 				CurrencyId,
 				SUM(BetCount) TotalTrans,
 				SUM(Turnover) Turnover,
+				SUM(CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN b.Turnover ELSE b.ExtraAmount END) TurnoverForCommision,
 				SUM(ISNULL(WinPrizeAmount,0)) WinningPrize,
 				SUM(ISNULL(CashOutAmount,0)) CashOut,
 				SUM(ISNULL(BuyBackAmount,0)) CashInAmount
@@ -517,7 +520,7 @@ BEGIN
 		-- End Region: Get Winloss Data
 
 		UPDATE #TempData
-		SET CommisionShare = td.Turnover * cm.Rate,
+		SET CommisionShare = td.TurnoverForCommision * cm.Rate,
 			CashInShare = td.CashInAmount * ci.Rate
 		FROM #TempData td
 		JOIN @CBShare AS cm ON cm.TypeId = @CommChargeType AND (td.rptDate BETWEEN cm.FromDate AND cm.ToDate)
