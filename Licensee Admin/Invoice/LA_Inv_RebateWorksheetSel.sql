@@ -14,6 +14,7 @@ AS
 	  - 20170710@bruce: include CO, CB, BA [#79741]
 	  - 20171220@Parsons: increase length for variables [#88197]
 	  - 20180126@Bruce: Exclude Exchange-BX [#87754]
+	  - 20180419@Scofield: update CB for FreePlay [#93907]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -221,6 +222,7 @@ BEGIN
 			b.ProductId,
 			CurrencyId,
 			SUM(Turnover) Turnover,
+			SUM(CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN b.Turnover ELSE b.ExtraAmount END) TurnoverForCommision,
 			SUM(ISNULL(WinPrizeAmount,0)) WinningPrize,
 			SUM(ISNULL(CashOutAmount,0)) CashOut,
 			SUM(ISNULL(BuyBackAmount,0)) CashInAmount,
@@ -237,7 +239,7 @@ BEGIN
 	GROUP BY rptdate, CurrencyId, b.SiteID, cb.PartyId, b.ProductId
 	
 	UPDATE #TempDataCB SET
-		CommisionShare = td.Turnover * cm.Rate,
+		CommisionShare = td.TurnoverForCommision * cm.Rate,
 		CashInShare = td.CashInAmount * ci.Rate
 	FROM #TempDataCB td
 	JOIN @PartyChargeInfo AS cm ON cm.ProductID = @CB AND cm.TypeId = @CommChargeType AND (td.rptDate BETWEEN cm.FromDate AND cm.ToDate)
