@@ -32,6 +32,8 @@ AS
 		- 20171127@Sophia: #87257 - Support New range bettype for RNG casino
 		- 20171214@Sophia: #86640 - Add Exchange Citi Product
 		- 20180604@Bruce: #96383 - New Bettype range for VS2
+		- 20180420@Bruce: LA - Implement sum job for Pragmatic [RedmineId #93958]
+
 	Param's Explanation:
 
 */
@@ -202,7 +204,16 @@ BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 22
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
-	   WHERE typeid BETWEEN 4001 AND 7999
+	   WHERE typeid BETWEEN 4001 AND 4100
+		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+	END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'PP')
+	BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 32
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 4101 AND 4300
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
 	END
 	
