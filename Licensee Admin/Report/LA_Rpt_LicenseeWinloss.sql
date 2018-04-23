@@ -268,7 +268,7 @@ BEGIN
 				rptDate,
 				CurrencyId,
 				SUM(Turnover) Turnover,
-				SUM(CASE WHEN TicketType=0 THEN Turnover ELSE ISNULL(ExtraAmount,0) END) TurnoverForCommission,
+				SUM(CASE WHEN ISNULL(TicketType,0)=0 THEN Turnover ELSE ISNULL(ExtraAmount,0) END) TurnoverForCommission,
 				SUM(ISNULL(WinPrizeAmount,0)) WinningPrize,
 				SUM(ISNULL(CashOutAmount,0)) CashOut,
 				SUM(ISNULL(BuyBackAmount,0)) CashInAmount

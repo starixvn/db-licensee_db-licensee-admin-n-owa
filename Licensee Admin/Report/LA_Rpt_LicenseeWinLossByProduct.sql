@@ -257,7 +257,7 @@ BEGIN
 	;WITH t AS (
 		SELECT b.SiteId, b.rptDate,
 			SUM(Turnover* e.Rate) Turnover,
-			SUM(CASE WHEN TicketType=0 THEN Turnover ELSE ISNULL(ExtraAmount,0) END * e.Rate) TurnoverForCommission,
+			SUM(CASE WHEN ISNULL(TicketType,0)=0 THEN Turnover ELSE ISNULL(ExtraAmount,0) END * e.Rate) TurnoverForCommission,
 			SUM(ISNULL(WinPrizeAmount * e.Rate,0)) WinningPrize,
 			SUM(ISNULL(CashOutAmount * e.Rate,0)) CashOut,
 			SUM(ISNULL(BuyBackAmount * e.Rate,0)) CashInAmount

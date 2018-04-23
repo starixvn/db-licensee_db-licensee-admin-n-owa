@@ -116,7 +116,7 @@ BEGIN
 		INSERT INTO #Data(WinLossDate,LicenseeId,ProductId,Bettype,Turnover,ActualStake,WinningPrize,CashOut,BuyBackAmount)
 		SELECT b.rptDate,b.SiteId,15,-1,
 			SUM(Turnover * e.BaseCurrencyRate),
-			SUM(CASE WHEN TicketType=0 THEN Turnover ELSE ISNULL(ExtraAmount,0) END * e.BaseCurrencyRate),
+			SUM(CASE WHEN ISNULL(TicketType,0)=0 THEN Turnover ELSE ISNULL(ExtraAmount,0) END * e.BaseCurrencyRate),
 			SUM(ISNULL(WinPrizeAmount * e.BaseCurrencyRate,0)) ,
 			SUM(ISNULL(CashOutAmount * e.BaseCurrencyRate,0)),
 			SUM(ISNULL(BuyBackAmount * e.BaseCurrencyRate,0))
