@@ -50,6 +50,7 @@ AS
 		- 20171113@Bruce: Modified error message [RedmineID: #84163]
 		- 20171220@Parsons: increase length for variables [#88197]
 		- 20180110@Bruce: deduct against invoice [#87039]
+		- 20180419@Scofield: update CB for FreePlay [#93907]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -583,6 +584,7 @@ BEGIN
 		ProductId			INT,
 		CurrencyId			INT,
 		Turnover			MONEY,
+		TurnoverForCommision MONEY,
 		TurnoverExchanged	MONEY,
 		WinningPrize		MONEY,
 		CashOut				MONEY,
@@ -591,13 +593,14 @@ BEGIN
 		CashInAmount		MONEY
 	)
 		
-	INSERT INTO #TempDataCB (rptDate, LicenseeId, PartyId, ProductId, CurrencyId, Turnover, WinningPrize, CashOut, CashInAmount)
+	INSERT INTO #TempDataCB (rptDate, LicenseeId, PartyId, ProductId, CurrencyId, Turnover, TurnoverForCommision, WinningPrize, CashOut, CashInAmount)
 	SELECT	rptDate,
 			b.SiteID,
 			cb.PartyId,
 			b.ProductId,
 			CurrencyId,
 			SUM(Turnover) Turnover,
+			SUM(CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN b.Turnover ELSE b.ExtraAmount END) TurnoverForCommision,
 			SUM(ISNULL(WinPrizeAmount,0)) WinningPrize,
 			SUM(ISNULL(CashOutAmount,0)) CashOut,
 			SUM(ISNULL(BuyBackAmount,0)) CashInAmount
@@ -611,7 +614,7 @@ BEGIN
 	GROUP BY rptdate, CurrencyId, b.SiteID, cb.PartyId, b.ProductId
 	
 	UPDATE #TempDataCB
-	SET CommisionShare = td.Turnover * cm.Rate, CashInShare = td.CashInAmount * ci.Rate
+	SET CommisionShare = td.TurnoverForCommision * cm.Rate, CashInShare = td.CashInAmount * ci.Rate
 	FROM #TempDataCB td
 	JOIN @PartyChargeInfo AS cm ON cm.ProductID = @CBProductId AND cm.TypeId = @CommChargeType AND (td.rptDate BETWEEN cm.FromDate AND cm.ToDate)
 	JOIN @PartyChargeInfo AS ci ON cm.ProductID = @CBProductId AND ci.TypeId = @CashInShareChargeType AND (td.rptDate BETWEEN ci.FromDate AND ci.ToDate)

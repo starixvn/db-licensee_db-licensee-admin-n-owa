@@ -33,6 +33,7 @@ AS
 		- 20171205@Bruce: fix partyid length [#87723]
 		- 20180131@Scofield: Add BX [#87754]
 		- 20180315@Bruce:Support Cozni licensees [#85681]
+		- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
 */
 		
 /*	Example:
@@ -55,26 +56,9 @@ BEGIN
 	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)
 	DECLARE @Delimiter CHAR(1)=','
 
-	;WITH SeparatedTable (STARTVAL, STOPVAL)
-	AS 
-	(
-		SELECT
-			STARTVAL = CAST(1 AS INT),
-			STOPVAL = CHARINDEX(@Delimiter, @PartyIdString + @Delimiter)
-		UNION ALL SELECT
-			STARTVAL = STOPVAL + 1,
-			STOPVAL = CHARINDEX(@Delimiter, @PartyIdString + @Delimiter, STOPVAL + 1)
-		FROM SeparatedTable
-		WHERE STOPVAL > 0
-	)
 	INSERT @PartyIdTable (Id)
-	SELECT LTRIM(RTRIM(SUBSTRING(@PartyIdString, STARTVAL,	CASE
-																WHEN STOPVAL > 0 THEN STOPVAL - STARTVAL
-																ELSE 0
-															END)))
-	FROM SeparatedTable
-	WHERE STOPVAL > 0
-	OPTION (MAXRECURSION 0)
+	SELECT val
+	FROM dbo.strSplit(@PartyIdString, @Delimiter)
 	-- End Region
 	
 	DECLARE @PartyChargeInfo AS TABLE (
@@ -266,29 +250,14 @@ BEGIN
 	)
 
 	INSERT INTO @CBChargeRates(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
-	SELECT	p.PartyID,
-			CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END,
-			ci.Rate,
-			ci.ChargeType,
-			CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
-			CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
-	FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
-		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
-		LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
-		LEFT JOIN bodb_licensee.dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
-	WHERE p.PartyID IN (SELECT pc.PartyId FROM @PartyChargeInfo pc) 
-		AND ci.ProductID = 15
-		AND ci.ChargeType IN (@CommChargeType,@CashInShareChargeType) AND (
-			@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
-			@ToDate BETWEEN ci.FromDate AND ci.ToDate OR
-			ci.FromDate BETWEEN @FromDate AND @ToDate OR
-			ci.ToDate BETWEEN @FromDate AND @ToDate
-		)
+	SELECT PartyID,LicenseeID,DI_Rate,ChargeType,Fromdate,Todate
+	FROM dbo.LA_f_ChargeInfo(@PartyIdString,@FromDate,@ToDate,'CB','OA',1)
 
 	DECLARE @CBWinLoss AS TABLE (LicenseeId INT, Amount MONEY)
 	;WITH t AS (
 		SELECT b.SiteId, b.rptDate,
-			SUM(Turnover * e.Rate) Turnover,
+			SUM(Turnover* e.Rate) Turnover,
+			SUM(CASE WHEN ISNULL(TicketType,0)=0 THEN Turnover ELSE ISNULL(ExtraAmount,0) END * e.Rate) TurnoverForCommission,
 			SUM(ISNULL(WinPrizeAmount * e.Rate,0)) WinningPrize,
 			SUM(ISNULL(CashOutAmount * e.Rate,0)) CashOut,
 			SUM(ISNULL(BuyBackAmount * e.Rate,0)) CashInAmount
@@ -303,7 +272,7 @@ BEGIN
 		GROUP BY b.rptDate, b.SiteId
 	)
 	INSERT INTO @CBWinLoss
-	SELECT t.SiteId, SUM(t.Turnover) - SUM(t.WinningPrize) - SUM(t.CashOut) - SUM(t.Turnover * cm.Rate) - SUM(t.CashInAmount * ci.Rate)
+	SELECT t.SiteId, SUM(t.Turnover) - SUM(t.WinningPrize) - SUM(t.CashOut) - SUM(t.TurnoverForCommission * cm.Rate) - SUM(t.CashInAmount * ci.Rate)
 	FROM t
 	INNER JOIN @CBChargeRates AS cm ON cm.TypeId = @CommChargeType AND (t.rptDate BETWEEN cm.FromDate AND cm.ToDate) AND cm.LicenseeId=t.SiteID
 	INNER JOIN @CBChargeRates AS ci ON ci.TypeId = @CashInShareChargeType AND (t.rptDate BETWEEN ci.FromDate AND ci.ToDate) AND ci.LicenseeId=t.SiteID

@@ -16,7 +16,9 @@ AS
 	Revisions:
 		- 20160310@Bruce: Create SP
 		- 20171219@Bruce: increase length for variables [#88197]
-		- 20190321@Scofield: Implement Colossus Bets Freeplay [#89768]
+		- 20180321@Scofield: Implement Colossus Bets Freeplay [#89768]
+		- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
+
 	Param's Explanation:
 */
 BEGIN
@@ -28,8 +30,6 @@ BEGIN
 			Rate			MONEY,
 			MinAmount		MONEY,
 			MaxAmount		MONEY,
-			MinAmountEx		MONEY,
-			MaxAmountEx		MONEY,
 			BaseCurrencyId	SMALLINT,
 			TypeId			SMALLINT,
 			FromDate		DATETIME,
@@ -140,14 +140,7 @@ BEGIN
 			CashInAmount	MONEY,
 			Commission				MONEY,
 			CashInShare				MONEY,
-			AmountDueToColossusBet	MONEY,
-			TurnoverBase		MONEY,
-			PrizeBase			MONEY,
-			CashOutBase			MONEY,
-			CashInAmountBase	MONEY,
-			CommissionBase				MONEY,
-			CashInShareBase				MONEY,
-			AmountDueToColossusBetBase	MONEY
+			AmountDueToColossusBet	MONEY
 		)
 		
 		INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, CurrencyName, TotalTrans, Turnover, TurnoverForCommision, Prize, CashOut, CashInAmount)
@@ -209,7 +202,7 @@ BEGIN
 		CashInAmount	MONEY		
 	)
 	
-	SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)
+	DECLARE @CBBaseCurrency VARCHAR(10) = (SELECT TOP 1 Name FROM @BaseCurrencies b INNER JOIN @CBShare c ON c.BaseCurrencyId=b.Id)
 	
 	INSERT INTO @TotalByPeriod(FromDate, Todate, TurnoverForCommision, CashInAmount)
 	SELECT 
@@ -218,33 +211,23 @@ BEGIN
 		SUM(td.TurnoverForCommision*e.BaseCurrencyRate),
 		SUM(td.CashInAmount*e.BaseCurrencyRate)
 	FROM #TempData td
-	INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
+	INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CBBaseCurrency) e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
 	INNER JOIN (SELECT DISTINCT FromDate, ToDate FROM @CBShare) s ON td.rptDate BETWEEN s.FromDate AND s.ToDate
 	GROUP BY s.FromDate, s.ToDate
 		
-	UPDATE s SET
-		MinAmountEx = MinAmount * e.BaseCurrencyRate,
-		MaxAmountEx = MaxAmount * e.BaseCurrencyRate
-	FROM @CBShare s
-	INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e ON s.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = s.ToDate
-	
 	INSERT INTO @RateByPeriod(FromDate, ToDate, CommissionRate, CashInShareRate)
-	SELECT 
-		t.FromDate,
-		t.ToDate,
-		cm.Rate, -- can be null
-		cs.Rate
+	SELECT t.FromDate,t.ToDate,cm.Rate,cs.Rate
 	FROM @TotalByPeriod t
 	LEFT JOIN @CBShare cm ON cm.TypeId = 6  -- Commission share
 		AND cm.FromDate = t.FromDate 
 		AND cm.ToDate = t.ToDate
-		AND t.TurnoverForCommision >= cm.MinAmountEx 
-		AND t.TurnoverForCommision < cm.MaxAmountEx		 
+		AND t.TurnoverForCommision > cm.MinAmount
+		AND t.TurnoverForCommision <= cm.MaxAmount 
 	LEFT JOIN @CBShare cs ON cs.TypeId = 7 -- Cash in share
 		AND cs.FromDate = t.FromDate
 		AND cs.ToDate = t.ToDate
-		AND t.CashInAmount >= cs.MinAmountEx 
-		AND t.CashInAmount < cs.MaxAmountEx 
+		AND t.CashInAmount > cs.MinAmount
+		AND t.CashInAmount <= cs.MaxAmount
 	
 	-- end get commissionRate, cashinshareRate for every Period in @CBShare		
 	
@@ -253,7 +236,7 @@ BEGIN
 	SET
 		Commission = r.TurnoverForCommision * rbp.CommissionRate,
 		CashInShare = r.CashInAmount * rbp.CashInShareRate,
-		AmountDueToColossusBet = Turnover - Prize - CashOut - r.TurnoverForCommision * rbp.CommissionRate - r.CashInAmount * rbp.CashInShareRate		
+		AmountDueToColossusBet = Turnover - Prize - CashOut - (r.TurnoverForCommision * rbp.CommissionRate) - (r.CashInAmount * rbp.CashInShareRate)
 	FROM #Result r
 	INNER JOIN @RateByPeriod rbp ON r.WinLossDate BETWEEN rbp.FromDate AND rbp.ToDate	
 	-- End Update Commission, CashInShare, AmountDueToColossusBet for #Result

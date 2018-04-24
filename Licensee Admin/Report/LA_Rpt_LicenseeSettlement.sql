@@ -32,6 +32,7 @@ AS
 			- 20170712@bruce: include BRVS, LO [RedmineID: #79310]
 			- 20171219@Bruce: increase length for variables [#88197]
 			- 20180126@Bruce: include Exchange-BX [#87754]
+			- 20180419@Scofield: update CB for FreePlay [#93907]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -464,23 +465,9 @@ BEGIN
 			ToDate			DATETIME
 		)
 
-		INSERT INTO @CBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
-		SELECT	ci.FromParty,
-				CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END AS LicenseeId,
-				ci.Rate,
-				ci.ChargeType,
-				CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
-				CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
-		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
-			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
-			LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
-			LEFT JOIN bodb_licensee.dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
-		WHERE FromParty = @PartyId AND ProductID = @ProductId AND ChargeType IN (@CommChargeType,@CashInShareChargeType) AND (
-			@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
-			@ToDate BETWEEN ci.FromDate AND ci.ToDate OR
-			ci.FromDate BETWEEN @FromDate AND @ToDate OR
-			ci.ToDate BETWEEN @FromDate AND @ToDate
-		)
+		INSERT INTO @CBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)		
+		SELECT PartyID,LicenseeID,DI_Rate,ChargeType,Fromdate,Todate
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo(CAST(@PartyId as varchar(20)),@FromDate,@ToDate,'CB','OA',1)
 		-- End Region: Commision and Cash in share Rates
 
 		-- Region: Get Winloss Data
@@ -489,6 +476,7 @@ BEGIN
 			CurrencyId						INT,
 			TotalTrans						INT,
 			Turnover						MONEY,
+			TurnoverForCommision			MONEY,
 			TurnoverExchanged				MONEY,
 			WinningPrize					MONEY,
 			CashOut							MONEY,
@@ -497,11 +485,12 @@ BEGIN
 			CashInAmount					MONEY
 		)
 
-		INSERT INTO #TempData (rptDate, CurrencyId, TotalTrans, Turnover, WinningPrize, CashOut, CashInAmount)
+		INSERT INTO #TempData (rptDate, CurrencyId, TotalTrans, Turnover, TurnoverForCommision, WinningPrize, CashOut, CashInAmount)
 		SELECT	rptDate,
 				CurrencyId,
 				SUM(BetCount) TotalTrans,
 				SUM(Turnover) Turnover,
+				SUM(CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN b.Turnover ELSE b.ExtraAmount END) TurnoverForCommision,
 				SUM(ISNULL(WinPrizeAmount,0)) WinningPrize,
 				SUM(ISNULL(CashOutAmount,0)) CashOut,
 				SUM(ISNULL(BuyBackAmount,0)) CashInAmount
@@ -517,7 +506,7 @@ BEGIN
 		-- End Region: Get Winloss Data
 
 		UPDATE #TempData
-		SET CommisionShare = td.Turnover * cm.Rate,
+		SET CommisionShare = td.TurnoverForCommision * cm.Rate,
 			CashInShare = td.CashInAmount * ci.Rate
 		FROM #TempData td
 		JOIN @CBShare AS cm ON cm.TypeId = @CommChargeType AND (td.rptDate BETWEEN cm.FromDate AND cm.ToDate)

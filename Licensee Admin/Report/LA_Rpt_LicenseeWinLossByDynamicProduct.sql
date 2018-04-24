@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
 GO
 
@@ -13,10 +14,11 @@ AS
 	DB: DB052.bodb_Licensee
 
 	Revisions:
-		+ 20170630@Bruce: include BT/CO/CB, remove LC, VG [RedmineID: #79309]
+		- 20170630@Bruce: include BT/CO/CB, remove LC, VG [RedmineID: #79309]
 		- 20171205@Bruce: fix partyid length [#87723]
 		- 20171220@Parsons: increase length for variables [#88197]
 		- 20180131@Scofield: Add BX [#87754]
+		- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -111,9 +113,10 @@ BEGIN
 	-- CB
 	IF EXISTS (SELECT 1 FROM @Products WHERE ProductId=15)
 	BEGIN
-		INSERT INTO #Data(WinLossDate,LicenseeId,ProductId,Bettype,Turnover,WinningPrize,CashOut,BuyBackAmount)
+		INSERT INTO #Data(WinLossDate,LicenseeId,ProductId,Bettype,Turnover,ActualStake,WinningPrize,CashOut,BuyBackAmount)
 		SELECT b.rptDate,b.SiteId,15,-1,
 			SUM(Turnover * e.BaseCurrencyRate),
+			SUM(CASE WHEN ISNULL(TicketType,0)=0 THEN Turnover ELSE ISNULL(ExtraAmount,0) END * e.BaseCurrencyRate),
 			SUM(ISNULL(WinPrizeAmount * e.BaseCurrencyRate,0)) ,
 			SUM(ISNULL(CashOutAmount * e.BaseCurrencyRate,0)),
 			SUM(ISNULL(BuyBackAmount * e.BaseCurrencyRate,0))
@@ -162,43 +165,18 @@ BEGIN
 	DELETE #Parties WHERE LicenseeId IN (SELECT p.LicenseeId FROM #Parties p WHERE p.PartyId = -1) AND PartyId > 0
 
 	-- parties: charge rates
-	DECLARE @ProductCodes VARCHAR(500) = (
-		SELECT ProductCode + ',' FROM @Products 
-		WHERE ProductId NOT IN (15) FOR XML PATH ('')
-	)
+	DECLARE @ProductCodes VARCHAR(500) = (SELECT ProductCode + ',' FROM @Products FOR XML PATH (''))
 	SELECT c.ProductId			AS ProductId,
 		c.LicenseeId			AS LicenseeId,
 		ISNULL(b.Bettype, -1)	AS Bettype,
 		c.DI_Rate				AS Rate,
 		c.FromDate				AS FromDate,
 		c.ToDate				AS ToDate,
-		CAST(1 AS INT)			AS ChargeType
+		CASE WHEN c.ProductID=15 THEN ChargeType ELSE 1 END AS ChargeType
 	INTO #ChargeRates
 	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) c
 	LEFT JOIN dbo.Sport_Bettype_Reference b WITH(NOLOCK) ON b.BettypeRef = c.Bettype AND IsActive = 1
 	WHERE c.DI_Rate > 0
-
-	-- include CB charge rates
-	IF EXISTS (SELECT 1 FROM @Products WHERE ProductId=15)
-	BEGIN
-		INSERT INTO #ChargeRates
-		SELECT 15,p.OldRefID,-1,ci.Rate,
-			CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
-			CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END,
-			ci.ChargeType
-		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
-			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
-			LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
-		WHERE p.PartyType = 1
-			AND ISNULL(pd.IsDeposit, 0) = 1
-			AND ci.ProductID = 15
-			AND ci.ChargeType IN (6,7) AND (
-				@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
-				@ToDate BETWEEN ci.FromDate AND ci.ToDate OR
-				ci.FromDate BETWEEN @FromDate AND @ToDate OR
-				ci.ToDate BETWEEN @FromDate AND @ToDate
-			)
-	END
 
 	SELECT * FROM @Products
 	SELECT * FROM #Parties
