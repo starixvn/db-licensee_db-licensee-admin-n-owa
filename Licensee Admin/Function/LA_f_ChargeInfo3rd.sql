@@ -18,7 +18,8 @@ RETURNS @tbChargeInfo TABLE
       ChargeType INT ,
 	  IsDeposit INT,
       Fromdate SMALLDATETIME ,
-      Todate SMALLDATETIME
+      Todate SMALLDATETIME,
+	  IsParent BIT
     )
 AS 
 
@@ -31,11 +32,12 @@ AS
 		- 20180122@Harper: Fix return data rows [RedmineID: #89006]
 		- 20180302@Harper: Inspired , Lupine, Star Express, AG is 3rd Licensee [#RedmineID: #91255]
 		- 20180327@Harper: Add more Cozni as Parent Licensee [RedmineID: #85681]
+		- 20180508@Harper: Change PayToSupplier term of Exchange product [RedmineID: #94281]
 
     Param's Explanation:  
 	
    
- SELECT * FROM LA_f_ChargeInfo3rd ('2016-11-29', '2016-12-01', 'GD', 'OA')  
+ SELECT * FROM LA_f_ChargeInfo3rd ('2018-04-01', '2016-05-0', 'GD', 'OA')  
 */  
 
 BEGIN       
@@ -65,14 +67,17 @@ BEGIN
 									ChargeType ,
 									IsDeposit,
 									Fromdate ,
-									Todate
+									Todate,
+									IsParent
 								)
     SELECT  DI.ChargeID ,
-            CASE WHEN Di.FromParty IN (1, 11, 98, 9) THEN DI.FromParty ELSE 999 END,
+            CASE WHEN Di.FromParty IN (1, 11, 98, 9) THEN DI.FromParty 
+				 WHEN Di.FromParty IN (25, 30) THEN 999 
+				 ELSE Di. FromParty END,
             DI.ProductID ,
             DI.Rate ,
             DI.ChargeType ,
-			CASE WHEN Di.FromParty IN (1, 11, 98, 9) THEN 1 ELSE 0 END,
+			CASE WHEN Di.FromParty IN (25, 30) THEN 0 ELSE 1 END,
             CASE WHEN @FromDate <= DI.FromDate 
 					THEN DI.FromDate
                     ELSE @FromDate
@@ -80,7 +85,8 @@ BEGIN
             CASE WHEN @ToDate >= DI.ToDate 
 					THEN DI.ToDate
                     ELSE @ToDate
-            END
+            END,
+			CASE WHEN DI.FromParty IN (1, 11, 98, 9, 25, 30) THEN 1 ELSE 0 END
     FROM    dbo.OAS_ChargeInfo DI (NOLOCK)
             INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs (NOLOCK) ON DI.ChargeID = cs.ChargeID
                                                     AND cs.SystemID = @SystemID
@@ -118,9 +124,10 @@ BEGIN
 		          ChargeType ,
 		          IsDeposit ,
 		          Fromdate ,
-		          Todate
+		          Todate,
+				  IsParent
 		        )
-		SELECT ChargeID, @PartyID, ProductID, DI_Rate, ChargeType, IsDeposit, Fromdate, Todate
+		SELECT ChargeID, @PartyID, ProductID, DI_Rate, ChargeType, IsDeposit, Fromdate, Todate, IsParent
 		FROM @tbChargeInfo
 		WHERE PartyID = 1
 		
