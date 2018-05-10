@@ -27,8 +27,9 @@ AS
 		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 		- 20171205@Bruce: fix partyid length [#87723]
 		- 20180118@Parsons: Data is incorrect when chosing cross month [#89351]
-		- 20180716@bruce: add new group TEST for credit [#98126]
-		
+		- 20180716@bruce: add new group TEST for credit [#98126]		
+		- 20180510@Bruce: Integrate Pragmatic [#94108]
+
     Param's Explanation:  
 	   + @partyIDs : a string of list PartyID, separated by ','
 	   + @Currency : 0-All Currencies
@@ -108,7 +109,7 @@ BEGIN
     END
 
     --exclude BA tickets
-    IF @ProductCode IN ('SB', 'RB', 'NG', 'LC', 'VS', 'CS', 'VB')
+    IF @ProductCode IN ('SB', 'RB', 'NG', 'LC', 'VS', 'CS', 'VB', 'PP')
     BEGIN		
 	   INSERT INTO #Tmp(PartyId, rptDate, CurrencyId, TurnOver)
 	   (
