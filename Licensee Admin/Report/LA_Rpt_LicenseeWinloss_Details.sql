@@ -25,6 +25,7 @@ AS
 	- 20171211: @Scofield - Support Colossus Bet, Cashout, Bet Trade [#87038]
 	- 20180130@Bruce: integrate Exchange product [#87754]
 	- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
+	- 20180515@Scofield: Incorporate 9wickets data [#94950]
 
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -476,9 +477,8 @@ BEGIN
 	--Update Currency Name
 	DECLARE @CurrencyTable AS TABLE (currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
 	INSERT INTO @CurrencyTable(currency, CurrencyName, CurrencyCode)
-	SELECT t.CurrencyID, e.currency, e.Code
-	FROM (SELECT DISTINCT CurrencyID FROM #Report) t
-	INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON t.CurrencyID = e.exchangeid
+	SELECT exchangeid, currency, Code
+	FROM bodb02.dbo.Exchange WITH (NOLOCK)	
 
 	UPDATE t1
 	SET CurrencyCode = t1.CurrencyCode + ' (' + CurrencyName + ')'
