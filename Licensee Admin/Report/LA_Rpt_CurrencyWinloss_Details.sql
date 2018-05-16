@@ -26,6 +26,7 @@ AS
 	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	   - 20170801@Kenny: Filter data for Microgaming [RedmineID: #79311]
 	   - 20180130@Bruce: integrate Exchange product [#87754]
+	   - 20180515@Scofield: Incorporate 9wickets data [#94950]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -293,13 +294,25 @@ BEGIN
 	SELECT DISTINCT ExchangeDate, ExchangeId, Code, USD, EUR, MYR, GBP
 	INTO #TempExchange
 	FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
+	
+	DECLARE @ExchangeInfo AS TABLE (CurrencyId INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
 
+	INSERT INTO @ExchangeInfo(CurrencyId, CurrencyName, CurrencyCode)
+	SELECT e.exchangeid, e.currency, e.Code
+	FROM bodb02.dbo.Exchange e WITH (NOLOCK)
+
+	UPDATE e
+	SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'
+	FROM @ExchangeInfo e
+	WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @ExchangeInfo GROUP BY CurrencyCode HAVING COUNT(1) > 1)
+	
 	SELECT	w.PartyID,
 			CASE WHEN p.PartyName ='18bb' THEN 'PIH'
 				WHEN p.PartyName ='IBC' THEN 'FDL'
 				ELSE p.PartyName
 			END AS PartyName,
-			CASE WHEN Currency = 51 THEN 'INH' ELSE e.Code END currencyName,
+			CASE WHEN Currency = 51 THEN 'INH' 
+				ELSE ISNULL(ei.CurrencyCode, e.Code) END CurrencyName,				
 			SUM(TurnOver) AS Turnover,
 			SUM(Winlost) AS Winlost,
 			SUM(LicenseeWL) AS LicenseeWL,
@@ -354,7 +367,8 @@ BEGIN
 	FROM #tmpWinLoss w
 		INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = w.PartyID
 		INNER JOIN #TempExchange e ON w.Winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
-	GROUP BY w.PartyID, p.PartyName, CASE WHEN Currency = 51 THEN 'INH' ELSE e.Code END
+		LEFT JOIN @ExchangeInfo ei ON w.currency  = ei.CurrencyId
+	GROUP BY w.PartyID, p.PartyName, w.Currency, ISNULL(ei.CurrencyCode, e.Code)
 	ORDER BY w.PartyID, p.PartyName
 
 	DROP TABLE #tmpWinLoss

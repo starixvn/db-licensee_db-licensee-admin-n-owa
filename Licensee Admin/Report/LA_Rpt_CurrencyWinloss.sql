@@ -30,6 +30,7 @@ AS
 	   - 20170801@Kenny: Filter data for Microgaming [RedmineID: #79311]
 	   - 20171220@Parsons: increase length for variables [#88197]
 	   - 20180130@Bruce: integrate Exchange product [#87754]
+	   - 20180515@Scofield: Incorporate 9wickets data [#94950]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -335,7 +336,6 @@ BEGIN
 	INSERT INTO @Exchange(Currency, CurrencyName, CurrencyCode)
 	SELECT e.exchangeid, e.currency, e.Code
 	FROM bodb02.dbo.Exchange e WITH (NOLOCK)
-	WHERE e.exchangeid IN (SELECT DISTINCT Currency FROM #tmpWinLoss)
 
 	UPDATE e
 	SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'
