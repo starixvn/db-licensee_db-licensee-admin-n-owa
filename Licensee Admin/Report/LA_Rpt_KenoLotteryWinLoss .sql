@@ -14,6 +14,7 @@ AS
 	 Revisions:
 		- 20170705@Scofield: Create Keno Lottery Winloss [#79310]
 		- 20171219@Bruce: increase length for variables [#88197]
+		- 20180515@Scofield: Incorporate 9wickets data [#94950]
 	 Params:
 */
 BEGIN
@@ -117,7 +118,7 @@ BEGIN
 		LicenseeWinLoss	MONEY,
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY
-	)
+	)	
 
 	INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, PayToSupplier)
 	SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.Winlostdate, td.CurrencyId, td.TotalTrans, td.Turnover, td.CustomerWinLoss, td.LicenseeWinloss, td.LicensingFee, td.PayToSupplier
@@ -221,6 +222,17 @@ BEGIN
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 	END
 	-- End Region
+	
+	DECLARE @ExchangeInfo AS TABLE (CurrencyId INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
+
+	INSERT INTO @ExchangeInfo(CurrencyId, CurrencyName, CurrencyCode)
+	SELECT e.exchangeid, e.currency, e.Code
+	FROM bodb02.dbo.Exchange e WITH (NOLOCK)
+
+	UPDATE e
+	SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'
+	FROM @ExchangeInfo e
+	WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @ExchangeInfo GROUP BY CurrencyCode HAVING COUNT(1) > 1)
 
 	-- Region: Select Data
 	IF @BaseCurrencyName = ''
@@ -232,7 +244,8 @@ BEGIN
 			r.ParentName,
 			r.WinLossDate,
 			r.CurrencyId,
-			e.CurrencyCode AS CurrencyName,
+			CASE WHEN e.CurrencyCode = 'VND' THEN 'INH' 
+				ELSE ISNULL(ei.CurrencyCode, e.CurrencyCode) END AS CurrencyName,
 			r.TotalTrans,
 			r.Turnover,
 			r.CustomerWinLoss,
@@ -240,7 +253,9 @@ BEGIN
 			r.LicensingFee,
 			r.PayToSupplier,
 			(r.LicensingFee - r.PayToSupplier) AS CompanyIncome
-		FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
+		FROM #Result r 
+			INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
+			LEFT JOIN @ExchangeInfo ei ON r.CurrencyId  = ei.CurrencyId
 
 		-- Grand Total
 		SELECT * FROM @GrandTotal
@@ -254,7 +269,8 @@ BEGIN
 			r.ParentName,
 			r.WinLossDate,
 			r.CurrencyId,
-			e.CurrencyCode AS CurrencyName,
+			CASE WHEN e.CurrencyCode = 'VND' THEN 'INH' 
+				ELSE ISNULL(ei.CurrencyCode, e.CurrencyCode) END AS CurrencyName,
 			r.TotalTrans,
 			-- base
 			CAST(r.Turnover * e.Rate AS MONEY) AS Turnover,
@@ -270,7 +286,9 @@ BEGIN
 			r.LicensingFee AS LicensingFeeOriginal,
 			r.PayToSupplier AS PayToSupplierOriginal,
 			(r.LicensingFee - r.PayToSupplier) AS CompanyIncomeOriginal
-		FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
+		FROM #Result r 
+			INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
+			LEFT JOIN @ExchangeInfo ei ON r.CurrencyId  = ei.CurrencyId
 
 		-- Grand Total
 		SELECT * FROM @GrandTotal
