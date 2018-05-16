@@ -1,5 +1,4 @@
-USE bodb_licensee
-GO
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 
 ALTER PROCEDURE [dbo].[LA_Rpt_KenoWinloss2]
 	 @PartyIDs			VARCHAR(5500)
@@ -306,7 +305,4 @@ BEGIN
 	DROP TABLE #Result
 	DROP TABLE #TempData
 END
-
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_KenoWinloss2] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_Rpt_KenoWinloss2] TO bodbAdminNet

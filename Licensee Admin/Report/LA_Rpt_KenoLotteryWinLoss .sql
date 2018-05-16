@@ -1,5 +1,4 @@
-USE [bodb_Licensee]
-GO
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 
 ALTER PROCEDURE [dbo].[LA_Rpt_KenoLotteryWinLoss]
 	@PartyIds			VARCHAR(4000),
@@ -311,9 +310,5 @@ BEGIN
 	DROP TABLE #Exchange
 	DROP TABLE #Result
 END
+GO
 
-GO
-GRANT EXECUTE ON [dbo].[LA_Rpt_KenoLotteryWinLoss] TO [bodbLicenseeNet] AS [dbo]
-GRANT EXECUTE ON [dbo].[LA_Rpt_KenoLotteryWinLoss] TO [bodbAdminNet] AS [dbo]
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_KenoLotteryWinLoss] TO [vnteam] AS [dbo]

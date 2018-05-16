@@ -1,5 +1,4 @@
-USE [bodb02]
-GO
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 
 ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss_Details]
 	@PartyIDs			VARCHAR(5500)	= ''
@@ -378,7 +377,4 @@ BEGIN
 	DROP TABLE #TempExchange
 END
 GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_CurrencyWinloss_Details] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_Rpt_CurrencyWinloss_Details] TO bodbAdminNet
 
