@@ -37,7 +37,8 @@ AS
 		- 20161216@Bruce: remove rolling comission row ( type = 11)
 		- 20171219@Bruce: increase length for variables [#88197]
 		- 20171227@Sophia: output column ChargeType [Redmine: #82408]
-		
+		- 20180508@Harper: Change PayToSupplier term of Exchange product [RedmineID: #94281]
+
     select * FROM [LA_f_ChargeInfo_xtest]('14,15,16,17,18,25','2013-08-01','2013-08-30','NG','OA')
 */
 
@@ -56,8 +57,8 @@ BEGIN
 			ELSE p3.Productid
 			END
 			, s.val
-			FROM bodb02.dbo.strSplit(@ProductCodes, ',') s
-			LEFT JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.val = p3.ProductPrefix
+	FROM bodb02.dbo.strSplit(@ProductCodes, ',') s
+		LEFT JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.val = p3.ProductPrefix
 	
 	INSERT INTO @Bettype(ProductId, BetTypeRef, Bettype)
 	SELECT pt.ProductID, sbr.BettypeRef, sbm.BetType
@@ -77,10 +78,10 @@ BEGIN
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
 	    WHERE ChargeType != 2
 		  AND p.PartyID IN (SELECT VAL FROM strSplit(@PartyIDs, ','))
-		  AND ci.ProductID NOT IN (SELECT Productid FROM dbo.LA_Product3rdSub WITH (NOLOCK))
+		  AND ci.ProductID NOT IN (SELECT Productid FROM dbo.LA_Product3rdSub WITH (NOLOCK))		  
 	    GROUP BY FromParty, ci.ProductID
 	)
-
+	
     INSERT INTO @tbChargeInfo (ChargeID , PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate, ChargeType)
 	SELECT DISTINCT DI.ChargeID 
 		, p.PartyID
@@ -129,10 +130,10 @@ BEGIN
 			)
 		AND NOT EXISTS (SELECT 1 FROM dbo.OAS_ChargeInfoSub WITH (NOLOCK) WHERE DI.ChargeID = ChargeIDRef)
 		AND DI.ChargeType != 11 -- rolling commission
+		AND NOT EXISTS (SELECT 1 FROM dbo.OAS_Party t WITH (NOLOCK) WHERE DI.FromParty NOT IN (25, 30) AND DI.ToParty = t.PartyID AND t.PartyType = 3 AND (t.OldRefID IS NULL OR t.OldRefID IN (2, 3, 5, 6)))
 	ORDER BY p.PartyID
 		,Di.ProductID
-
-
+		
 	--case multi chargerate
 	INSERT INTO @Cte_AffectDate (AffectedDate, PartyID, ProductID)
 	(
