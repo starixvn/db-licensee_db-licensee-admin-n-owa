@@ -33,6 +33,7 @@ AS
 			- 20171219@Bruce: increase length for variables [#88197]
 			- 20180126@Bruce: include Exchange-BX [#87754]
 			- 20180419@Scofield: update CB for FreePlay [#93907]
+			- 20180515@Scofield: Incorporate 9wickets data [#94950]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -634,6 +635,17 @@ BEGIN
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+	
+	DECLARE @ExchangeInfo AS TABLE (CurrencyId INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
+
+	INSERT INTO @ExchangeInfo(CurrencyId, CurrencyName, CurrencyCode)
+	SELECT e.exchangeid, e.currency, e.Code
+	FROM bodb02.dbo.Exchange e WITH (NOLOCK)
+
+	UPDATE e
+	SET CurrencyCode = CurrencyName
+	FROM @ExchangeInfo e
+	WHERE e.CurrencyCode = 'INR'
 
 	;WITH sortedExchange AS (
 		SELECT ExchangeID, CurrencyCode, ROW_NUMBER() OVER (PARTITION BY CurrencyCode ORDER BY ExchangeId) RowNumber
@@ -643,7 +655,7 @@ BEGIN
 		ISNULL(d.Game, '')			AS Game
 		, @ToDate					AS WinLostDate
 		, se.ExchangeID				AS CurrencyId
-		, se.CurrencyCode			AS CurrencyName
+		, ISNULL(ei.CurrencyCode, se.CurrencyCode) CurrencyName
 		, e.Rate					AS ExchangeRate
 		, SUM(Betcount)				AS Betcount
 		--orginal
@@ -698,8 +710,9 @@ BEGIN
 	FROM #Result d
 	INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
 	INNER JOIN sortedExchange se ON se.CurrencyCode = e.CurrencyCode
+	LEFT JOIN @ExchangeInfo ei ON d.CurrencyId  = ei.CurrencyId
 	WHERE se.RowNumber = 1 -- remove duplicate currency codes have different id
-	GROUP BY se.ExchangeID,se.CurrencyCode, e.Rate, d.Game
+	GROUP BY se.ExchangeID, ISNULL(ei.CurrencyCode, se.CurrencyCode), e.Rate, d.Game
 	ORDER BY se.ExchangeID
 
 	DROP TABLE #Exchange
