@@ -294,24 +294,16 @@ BEGIN
 	INTO #TempExchange
 	FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
 	
-	DECLARE @ExchangeInfo AS TABLE (CurrencyId INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
-
-	INSERT INTO @ExchangeInfo(CurrencyId, CurrencyName, CurrencyCode)
-	SELECT e.exchangeid, e.currency, e.Code
-	FROM bodb02.dbo.Exchange e WITH (NOLOCK)
-
-	UPDATE e
-	SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'
-	FROM @ExchangeInfo e
-	WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @ExchangeInfo GROUP BY CurrencyCode HAVING COUNT(1) > 1)
-	
 	SELECT	w.PartyID,
 			CASE WHEN p.PartyName ='18bb' THEN 'PIH'
 				WHEN p.PartyName ='IBC' THEN 'FDL'
 				ELSE p.PartyName
 			END AS PartyName,
 			CASE WHEN Currency = 51 THEN 'INH' 
-				ELSE ISNULL(ei.CurrencyCode, e.Code) END CurrencyName,				
+				WHEN Currency = 75 THEN 'PTU'
+				WHEN Currency = 76 THEN 'PS'
+				WHEN Currency = 77 THEN 'PTH'
+				ELSE e.Code END currencyName
 			SUM(TurnOver) AS Turnover,
 			SUM(Winlost) AS Winlost,
 			SUM(LicenseeWL) AS LicenseeWL,
@@ -366,8 +358,12 @@ BEGIN
 	FROM #tmpWinLoss w
 		INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = w.PartyID
 		INNER JOIN #TempExchange e ON w.Winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
-		LEFT JOIN @ExchangeInfo ei ON w.currency  = ei.CurrencyId
-	GROUP BY w.PartyID, p.PartyName, w.Currency, ISNULL(ei.CurrencyCode, e.Code)
+	GROUP BY w.PartyID, p.PartyName, 
+		CASE WHEN Currency = 51 THEN 'INH' 
+			WHEN Currency = 75 THEN 'PTU'
+			WHEN Currency = 76 THEN 'PS'
+			WHEN Currency = 77 THEN 'PTH'
+			ELSE e.Code END
 	ORDER BY w.PartyID, p.PartyName
 
 	DROP TABLE #tmpWinLoss

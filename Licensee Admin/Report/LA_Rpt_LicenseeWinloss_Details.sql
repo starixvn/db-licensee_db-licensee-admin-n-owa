@@ -477,8 +477,9 @@ BEGIN
 	--Update Currency Name
 	DECLARE @CurrencyTable AS TABLE (currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
 	INSERT INTO @CurrencyTable(currency, CurrencyName, CurrencyCode)
-	SELECT exchangeid, currency, Code
-	FROM bodb02.dbo.Exchange WITH (NOLOCK)	
+	SELECT t.CurrencyID, e.currency, e.Code
+	FROM (SELECT DISTINCT CurrencyID FROM #Report) t
+	INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON t.CurrencyID = e.exchangeid
 
 	UPDATE t1
 	SET CurrencyCode = t1.CurrencyCode + ' (' + CurrencyName + ')'
@@ -496,6 +497,9 @@ BEGIN
 			 ELSE '0' END ReportDate
 		, b.CurrencyID
 		, CASE WHEN b.CurrencyID = 51 THEN @VNDCurrencyName			  
+			 WHEN b.CurrencyID = 75 THEN 'PTU'
+			 WHEN b.CurrencyID = 76 THEN 'PS'
+			 WHEN b.CurrencyID = 77 THEN 'PTH'
 			 WHEN b.CurrencyID = 20 THEN e.Code			
 			 ELSE ISNULL(t.CurrencyCode,e.Code) END AS CurrencyName
 		, SUM(Betcount) AS TotalTransaction
@@ -567,6 +571,9 @@ BEGIN
 				 WHEN @ReportBy = 2 THEN CONVERT(VARCHAR(6), b.ReportDate, 112)
 				 ELSE '0' END, 
 			CASE WHEN b.CurrencyID = 51 THEN @VNDCurrencyName		
+				 WHEN b.CurrencyID = 75 THEN 'PTU'
+				 WHEN b.CurrencyID = 76 THEN 'PS'
+				 WHEN b.CurrencyID = 77 THEN 'PTH'
 				 WHEN b.CurrencyID = 20 THEN e.Code				
 				 ELSE ISNULL(t.CurrencyCode, e.Code) END 
 	ORDER BY ReportDate ASC

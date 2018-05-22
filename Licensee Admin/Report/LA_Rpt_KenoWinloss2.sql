@@ -140,17 +140,6 @@ BEGIN
 			PayToSupplier	MONEY,
 			CompanyIncome	MONEY
 		)
-		
-		DECLARE @ExchangeInfo AS TABLE (CurrencyId INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
-
-		INSERT INTO @ExchangeInfo(CurrencyId, CurrencyName, CurrencyCode)
-		SELECT e.exchangeid, e.currency, e.Code
-		FROM bodb02.dbo.Exchange e WITH (NOLOCK)
-
-		UPDATE e
-		SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'
-		FROM @ExchangeInfo e
-		WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @ExchangeInfo GROUP BY CurrencyCode HAVING COUNT(1) > 1)
 
 		IF(ISNULL(@BaseCurrencyName,'') = '')
 		BEGIN
@@ -161,7 +150,10 @@ BEGIN
 					td.ParentName,
 					td.WinLossDate,
 					CASE WHEN e.Code = 'VND' THEN 'INH' 
-						ELSE ISNULL(ei.CurrencyCode, e.Code) END AS CurrencyName,
+						WHEN e.ExchangeID = 75 THEN 'PTU'
+						WHEN e.ExchangeID = 76 THEN 'PS'
+						WHEN e.ExchangeID = 77 THEN 'PTH'
+						ELSE e.Code END AS CurrencyName,
 					td.TotalTrans,
 					td.Turnover,
 					td.CustomerWinLoss,
@@ -171,7 +163,6 @@ BEGIN
 					td.LicensingFee - td.PayToSupplier
 			FROM #TempData td
 			INNER JOIN bodb02.dbo.Exchange e ON td.CurrencyId = e.ExchangeID
-			LEFT JOIN @ExchangeInfo ei ON td.CurrencyId  = ei.CurrencyId
 		END
 		ELSE
 		BEGIN
@@ -182,7 +173,10 @@ BEGIN
 					td.ParentName,
 					td.WinLossDate,
 					CASE WHEN e.Code = 'VND' THEN 'INH' 
-						ELSE ISNULL(ei.CurrencyCode, e.Code) END AS CurrencyName,
+						WHEN e.ExchangeID = 75 THEN 'PTU'
+						WHEN e.ExchangeID = 76 THEN 'PS'
+						WHEN e.ExchangeID = 77 THEN 'PTH'
+						ELSE e.Code END AS CurrencyName,
 					td.TotalTrans,
 					td.Turnover * e.BaseCurrencyRate,
 					td.CustomerWinLoss * e.BaseCurrencyRate,
@@ -192,7 +186,6 @@ BEGIN
 					(td.LicensingFee - td.PayToSupplier) * e.BaseCurrencyRate
 			FROM #TempData td
 			INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName) e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.WinLossDate
-			LEFT JOIN @ExchangeInfo ei ON td.CurrencyId  = ei.CurrencyId
 		END
 	END
 

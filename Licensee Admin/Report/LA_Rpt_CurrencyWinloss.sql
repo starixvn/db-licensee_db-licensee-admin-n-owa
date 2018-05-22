@@ -335,6 +335,7 @@ BEGIN
 	INSERT INTO @Exchange(Currency, CurrencyName, CurrencyCode)
 	SELECT e.exchangeid, e.currency, e.Code
 	FROM bodb02.dbo.Exchange e WITH (NOLOCK)
+	WHERE e.exchangeid IN (SELECT DISTINCT Currency FROM #tmpWinLoss)
 
 	UPDATE e
 	SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'
@@ -342,6 +343,9 @@ BEGIN
 	WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1)
 
 	SELECT	CASE WHEN w.Currency = 51 THEN 'INH'
+				WHEN w.Currency = 75 THEN 'PTU'
+				WHEN w.Currency = 76 THEN 'PS'
+				WHEN w.Currency = 77 THEN 'PTH'
 				WHEN w.Currency = 20 THEN e.Code
 				ELSE t.CurrencyCode END AS currencyName,
 			w.currency,
@@ -359,7 +363,13 @@ BEGIN
 	FROM #tmpWinLoss w	
 	INNER JOIN #DailyExchange e ON w.Winlostdate = e.ExchangeDate AND w.Currency = e.ExchangeId
 	LEFT JOIN @Exchange t ON w.Currency = t.Currency
-	GROUP BY CASE WHEN w.Currency = 51 THEN 'INH' WHEN w.Currency = 20 THEN e.Code ELSE t.CurrencyCode END, w.currency
+	GROUP BY CASE WHEN w.Currency = 51 THEN 'INH' 
+				WHEN w.Currency = 75 THEN 'PTU'
+				WHEN w.Currency = 76 THEN 'PS'
+				WHEN w.Currency = 77 THEN 'PTH'
+				WHEN w.Currency = 20 THEN e.Code 
+				ELSE t.CurrencyCode END, 
+		w.currency
 	ORDER BY CASE WHEN w.Currency = 51 THEN 'INH' WHEN w.Currency = 20 THEN e.Code ELSE t.CurrencyCode END
 
 	DROP TABLE #tmpWinLoss

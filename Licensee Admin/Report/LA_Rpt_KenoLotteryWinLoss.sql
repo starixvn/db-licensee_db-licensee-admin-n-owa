@@ -222,17 +222,6 @@ BEGIN
 	END
 	-- End Region
 	
-	DECLARE @ExchangeInfo AS TABLE (CurrencyId INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
-
-	INSERT INTO @ExchangeInfo(CurrencyId, CurrencyName, CurrencyCode)
-	SELECT e.exchangeid, e.currency, e.Code
-	FROM bodb02.dbo.Exchange e WITH (NOLOCK)
-
-	UPDATE e
-	SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'
-	FROM @ExchangeInfo e
-	WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @ExchangeInfo GROUP BY CurrencyCode HAVING COUNT(1) > 1)
-
 	-- Region: Select Data
 	IF @BaseCurrencyName = ''
 	BEGIN
@@ -243,8 +232,10 @@ BEGIN
 			r.ParentName,
 			r.WinLossDate,
 			r.CurrencyId,
-			CASE WHEN e.CurrencyCode = 'VND' THEN 'INH' 
-				ELSE ISNULL(ei.CurrencyCode, e.CurrencyCode) END AS CurrencyName,
+			CASE WHEN e.ExchangeID = 75 THEN 'PTU'
+					WHEN e.ExchangeID = 76 THEN 'PS'
+					WHEN e.ExchangeID = 77 THEN 'PTH'
+					ELSE e.CurrencyCode END AS CurrencyName,
 			r.TotalTrans,
 			r.Turnover,
 			r.CustomerWinLoss,
@@ -252,9 +243,7 @@ BEGIN
 			r.LicensingFee,
 			r.PayToSupplier,
 			(r.LicensingFee - r.PayToSupplier) AS CompanyIncome
-		FROM #Result r 
-			INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
-			LEFT JOIN @ExchangeInfo ei ON r.CurrencyId  = ei.CurrencyId
+		FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
 
 		-- Grand Total
 		SELECT * FROM @GrandTotal
@@ -268,8 +257,10 @@ BEGIN
 			r.ParentName,
 			r.WinLossDate,
 			r.CurrencyId,
-			CASE WHEN e.CurrencyCode = 'VND' THEN 'INH' 
-				ELSE ISNULL(ei.CurrencyCode, e.CurrencyCode) END AS CurrencyName,
+			CASE WHEN e.ExchangeID = 75 THEN 'PTU'
+					WHEN e.ExchangeID = 76 THEN 'PS'
+					WHEN e.ExchangeID = 77 THEN 'PTH'
+					ELSE e.CurrencyCode END AS CurrencyName,
 			r.TotalTrans,
 			-- base
 			CAST(r.Turnover * e.Rate AS MONEY) AS Turnover,
@@ -285,9 +276,7 @@ BEGIN
 			r.LicensingFee AS LicensingFeeOriginal,
 			r.PayToSupplier AS PayToSupplierOriginal,
 			(r.LicensingFee - r.PayToSupplier) AS CompanyIncomeOriginal
-		FROM #Result r 
-			INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
-			LEFT JOIN @ExchangeInfo ei ON r.CurrencyId  = ei.CurrencyId
+		FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
 
 		-- Grand Total
 		SELECT * FROM @GrandTotal
