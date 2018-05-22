@@ -303,7 +303,7 @@ BEGIN
 				WHEN Currency = 75 THEN 'PTU'
 				WHEN Currency = 76 THEN 'PS'
 				WHEN Currency = 77 THEN 'PTH'
-				ELSE e.Code END currencyName
+				ELSE e.Code END currencyName,
 			SUM(TurnOver) AS Turnover,
 			SUM(Winlost) AS Winlost,
 			SUM(LicenseeWL) AS LicenseeWL,
