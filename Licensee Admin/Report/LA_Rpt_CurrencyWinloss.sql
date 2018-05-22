@@ -370,7 +370,12 @@ BEGIN
 				WHEN w.Currency = 20 THEN e.Code 
 				ELSE t.CurrencyCode END, 
 		w.currency
-	ORDER BY CASE WHEN w.Currency = 51 THEN 'INH' WHEN w.Currency = 20 THEN e.Code ELSE t.CurrencyCode END
+	ORDER BY CASE WHEN w.Currency = 51 THEN 'INH' 
+				WHEN w.Currency = 75 THEN 'PTU'
+				WHEN w.Currency = 76 THEN 'PS'
+				WHEN w.Currency = 77 THEN 'PTH'
+				WHEN w.Currency = 20 THEN e.Code 
+				ELSE t.CurrencyCode END
 
 	DROP TABLE #tmpWinLoss
 	DROP TABLE #Bettype
