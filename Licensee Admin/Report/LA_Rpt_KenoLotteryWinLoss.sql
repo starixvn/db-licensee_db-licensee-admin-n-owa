@@ -137,8 +137,17 @@ BEGIN
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+	
+	UPDATE #Exchange
+	SET CurrencyCode = (CASE ExchangeId
+					WHEN 51 THEN 'INH'
+					WHEN 75 THEN 'PTU'
+					WHEN 76 THEN 'PS'
+					WHEN 77 THEN 'PTH'
+					ELSE CurrencyCode
+				END)
+	WHERE ExchangeId IN (51, 75, 76, 77)
 
-	UPDATE #Exchange SET CurrencyCode = 'INH' WHERE ExchangeID = 51
 	-- End Region
 
 	DECLARE @Total TABLE (
@@ -232,10 +241,7 @@ BEGIN
 			r.ParentName,
 			r.WinLossDate,
 			r.CurrencyId,
-			CASE WHEN e.ExchangeID = 75 THEN 'PTU'
-					WHEN e.ExchangeID = 76 THEN 'PS'
-					WHEN e.ExchangeID = 77 THEN 'PTH'
-					ELSE e.CurrencyCode END AS CurrencyName,
+			e.CurrencyCode AS CurrencyName,
 			r.TotalTrans,
 			r.Turnover,
 			r.CustomerWinLoss,
@@ -257,10 +263,7 @@ BEGIN
 			r.ParentName,
 			r.WinLossDate,
 			r.CurrencyId,
-			CASE WHEN e.ExchangeID = 75 THEN 'PTU'
-					WHEN e.ExchangeID = 76 THEN 'PS'
-					WHEN e.ExchangeID = 77 THEN 'PTH'
-					ELSE e.CurrencyCode END AS CurrencyName,
+			e.CurrencyCode AS CurrencyName,
 			r.TotalTrans,
 			-- base
 			CAST(r.Turnover * e.Rate AS MONEY) AS Turnover,

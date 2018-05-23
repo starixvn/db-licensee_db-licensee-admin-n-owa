@@ -88,8 +88,7 @@ BEGIN
 		ExchangeDate			DATE,
 		ExchangeID				INT,
 		CurrencyCode			VARCHAR(10),
-		Rate					DECIMAL(6,5),
-		SelectedExchangeID		INT
+		Rate					DECIMAL(6,5)
 	)
 
 	DECLARE @tmpParty AS TABLE
@@ -631,42 +630,30 @@ BEGIN
 			WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
 			GROUP BY rptDate, CurrencyID
 		)
-	END
-
-	CREATE TABLE #SortedExchange
-	(
-		ExchangeID		INT,
-		CurrencyCode	VARCHAR(10),
-		RowNumber		INT
-	)
+	END	
 	
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)	
+							
+	UPDATE #Exchange
+	SET CurrencyCode = (CASE ExchangeId
+							WHEN 75 THEN 'PTU'
+							WHEN 76 THEN 'PS'
+							WHEN 77 THEN 'PTH' 
+							ELSE CurrencyCode
+						END)
+	WHERE ExchangeId IN (75, 76, 77)	
 	
-	INSERT INTO #SortedExchange(ExchangeID, CurrencyCode, RowNumber)
-	SELECT ExchangeID, CurrencyCode, ROW_NUMBER() OVER (PARTITION BY CurrencyCode ORDER BY ExchangeId) RowNumber
-	FROM #Exchange	
-	
-	UPDATE ex
-	SET ex.SelectedExchangeID = sex.ExchangeID
-	FROM #Exchange ex
-	INNER JOIN #SortedExchange sex 
-	   ON ex.CurrencyCode = sex.CurrencyCode
-		  AND sex.RowNumber = 1
-
-    UPDATE #Exchange
-    SET  SelectedExchangeID = ExchangeID
-    WHERE ExchangeID IN (75, 76, 77)		
-	
+	;WITH sortedExchange AS (
+		SELECT ExchangeID, CurrencyCode, ROW_NUMBER() OVER (PARTITION BY CurrencyCode ORDER BY ExchangeId) RowNumber
+		FROM #Exchange
+	)
 	SELECT
 		ISNULL(d.Game, '')			AS Game
 		, @ToDate					AS WinLostDate
 		, e.SelectedExchangeID		AS CurrencyId
-		, CASE WHEN e.SelectedExchangeID = 75 THEN 'PTU'
-				WHEN e.SelectedExchangeID = 76 THEN 'PS'
-				WHEN e.SelectedExchangeID = 77 THEN 'PTH'
-				ELSE e.CurrencyCode END AS CurrencyName
+		, se.CurrencyCode			AS CurrencyName
 		, e.Rate					AS ExchangeRate
 		, SUM(Betcount)				AS Betcount
 		--orginal
@@ -720,8 +707,10 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountAndComm * e.Rate, 0)))		AS BuyBackAmountAndCommBase
 	FROM #Result d
 	INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
-	GROUP BY e.CurrencyCode, e.SelectedExchangeID, e.Rate, d.Game
-	ORDER BY e.SelectedExchangeID
+	INNER JOIN sortedExchange se ON se.CurrencyCode = e.CurrencyCode
+	WHERE se.RowNumber = 1 -- remove duplicate currency codes have different id
+	GROUP BY se.ExchangeID,se.CurrencyCode, e.Rate, d.Game
+	ORDER BY se.ExchangeID	
 
 	DROP TABLE #Exchange
 	DROP TABLE #Result

@@ -336,17 +336,23 @@ BEGIN
 	SELECT e.exchangeid, e.currency, e.Code
 	FROM bodb02.dbo.Exchange e WITH (NOLOCK)
 	WHERE e.exchangeid IN (SELECT DISTINCT Currency FROM #tmpWinLoss)
+	
+	UPDATE @Exchange
+	SET CurrencyCode = (CASE Currency
+					WHEN 51 THEN 'INH'
+					WHEN 75 THEN 'PTU'
+					WHEN 76 THEN 'PS'
+					WHEN 77 THEN 'PTH' 
+					ELSE CurrencyCode
+				END)
+	WHERE Currency IN (51, 75, 76, 77)
 
 	UPDATE e
 	SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'
 	FROM @Exchange e
 	WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1)
 
-	SELECT	CASE WHEN w.Currency = 51 THEN 'INH'
-				WHEN w.Currency = 75 THEN 'PTU'
-				WHEN w.Currency = 76 THEN 'PS'
-				WHEN w.Currency = 77 THEN 'PTH'
-				WHEN w.Currency = 20 THEN e.Code
+	SELECT	CASE WHEN w.Currency = 20 THEN e.Code
 				ELSE t.CurrencyCode END AS currencyName,
 			w.currency,
 			SUM(TurnOver * e.Rate) AS Turnover,
@@ -363,19 +369,8 @@ BEGIN
 	FROM #tmpWinLoss w	
 	INNER JOIN #DailyExchange e ON w.Winlostdate = e.ExchangeDate AND w.Currency = e.ExchangeId
 	LEFT JOIN @Exchange t ON w.Currency = t.Currency
-	GROUP BY CASE WHEN w.Currency = 51 THEN 'INH' 
-				WHEN w.Currency = 75 THEN 'PTU'
-				WHEN w.Currency = 76 THEN 'PS'
-				WHEN w.Currency = 77 THEN 'PTH'
-				WHEN w.Currency = 20 THEN e.Code 
-				ELSE t.CurrencyCode END, 
-		w.currency
-	ORDER BY CASE WHEN w.Currency = 51 THEN 'INH' 
-				WHEN w.Currency = 75 THEN 'PTU'
-				WHEN w.Currency = 76 THEN 'PS'
-				WHEN w.Currency = 77 THEN 'PTH'
-				WHEN w.Currency = 20 THEN e.Code 
-				ELSE t.CurrencyCode END
+	GROUP BY CASE WHEN w.Currency = 20 THEN e.Code ELSE t.CurrencyCode END, w.currency
+	ORDER BY CASE WHEN w.Currency = 20 THEN e.Code ELSE t.CurrencyCode END
 
 	DROP TABLE #tmpWinLoss
 	DROP TABLE #Bettype

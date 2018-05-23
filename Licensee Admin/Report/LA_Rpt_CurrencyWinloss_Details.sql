@@ -294,16 +294,22 @@ BEGIN
 	INTO #TempExchange
 	FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
 	
+	UPDATE #TempExchange
+	SET Code = (CASE ExchangeId
+					WHEN 51 THEN 'INH'
+					WHEN 75 THEN 'PTU'
+					WHEN 76 THEN 'PS'
+					WHEN 77 THEN 'PTH' 
+					ELSE Code
+				END)
+	WHERE ExchangeId IN (51, 75, 76, 77)
+	
 	SELECT	w.PartyID,
 			CASE WHEN p.PartyName ='18bb' THEN 'PIH'
 				WHEN p.PartyName ='IBC' THEN 'FDL'
 				ELSE p.PartyName
 			END AS PartyName,
-			CASE WHEN Currency = 51 THEN 'INH' 
-				WHEN Currency = 75 THEN 'PTU'
-				WHEN Currency = 76 THEN 'PS'
-				WHEN Currency = 77 THEN 'PTH'
-				ELSE e.Code END currencyName,
+			e.Code AS currencyName,
 			SUM(TurnOver) AS Turnover,
 			SUM(Winlost) AS Winlost,
 			SUM(LicenseeWL) AS LicenseeWL,
@@ -358,12 +364,7 @@ BEGIN
 	FROM #tmpWinLoss w
 		INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = w.PartyID
 		INNER JOIN #TempExchange e ON w.Winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
-	GROUP BY w.PartyID, p.PartyName, 
-		CASE WHEN Currency = 51 THEN 'INH' 
-			WHEN Currency = 75 THEN 'PTU'
-			WHEN Currency = 76 THEN 'PS'
-			WHEN Currency = 77 THEN 'PTH'
-			ELSE e.Code END
+	GROUP BY w.PartyID, p.PartyName, e.Code
 	ORDER BY w.PartyID, p.PartyName
 
 	DROP TABLE #tmpWinLoss
