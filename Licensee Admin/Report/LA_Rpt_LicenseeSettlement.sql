@@ -652,7 +652,7 @@ BEGIN
 	SELECT
 		ISNULL(d.Game, '')			AS Game
 		, @ToDate					AS WinLostDate
-		, e.SelectedExchangeID		AS CurrencyId
+		, se.ExchangeID		AS CurrencyId
 		, se.CurrencyCode			AS CurrencyName
 		, e.Rate					AS ExchangeRate
 		, SUM(Betcount)				AS Betcount
