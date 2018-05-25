@@ -1,9 +1,4 @@
-USE [bodb_licensee]
-GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 
 ALTER PROCEDURE [dbo].[LA_Inv_HostingFeeSettlement]
 	@PayerId	INT,
@@ -15,6 +10,7 @@ AS
 
 	Revisions:
 		+ 20160718@Bruce: Create
+		+ 20180525@Scofield: Update Currency Length 
 
 	Example:
 		USE bodb_licensee
@@ -34,7 +30,7 @@ BEGIN
 		VCMFrom			INT,
 		VCMTo			INT,
 		Amount			MONEY,
-		CurrencyName	VARCHAR(5)
+		CurrencyName	VARCHAR(20)
 	)
 
 	INSERT INTO @ChargeRates
@@ -84,6 +80,4 @@ BEGIN
 
 	SELECT * FROM @ChargeRates
 END
-
 GO
-GRANT EXECUTE ON [dbo].[LA_Inv_HostingFeeSettlement] TO bodbAdminNet
