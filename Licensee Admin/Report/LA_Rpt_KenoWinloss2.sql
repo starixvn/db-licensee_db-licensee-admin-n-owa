@@ -36,8 +36,29 @@ BEGIN
 		)
 
 		INSERT INTO @PartyChargeInfo(PartyId, LicenseeId,ProductID, Rate, Fromdate, Todate)
-		SELECT PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
-		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'KN', 'OA', 0)
+		(
+			SELECT PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
+			FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'KN', 'OA', 1)
+			
+			UNION
+			
+			-- get Credit settings with rate = 0
+			SELECT p.PartyID, lb.LabelID AS LicenseeID, ci.ProductId, ci.Rate, 
+				CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
+				CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
+			FROM OAS_ChargeInfo ci
+			INNER JOIN dbo.OAS_Party p ON ci.FromParty = p.PartyID	AND ci.ChargeType != 2 AND p.PartyType = 1
+			INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
+			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
+			LEFT JOIN dbo.labels lb(NOLOCK) ON p.OldRefID = lb.LicenseeID
+			WHERE ci.Productid = 8 and ci.Rate = 0 AND ISNULL(pd.IsDeposit, 0) = 0 AND
+				p.PartyID IN (SELECT VAL FROM strSplit(@PartyIDs, ','))	AND
+				(	@FromDate BETWEEN ci.FromDate AND ci.ToDate
+					OR @ToDate BETWEEN ci.FromDate AND ci.ToDate
+					OR ci.FromDate BETWEEN @FromDate AND @ToDate
+					OR ci.ToDate BETWEEN @FromDate AND @ToDate)
+		)
+		
 	END
 
 	-- Party List
