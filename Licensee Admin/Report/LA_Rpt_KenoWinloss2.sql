@@ -1,5 +1,4 @@
-USE bodb_licensee
-GO
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 
 ALTER PROCEDURE [dbo].[LA_Rpt_KenoWinloss2]
 	 @PartyIDs			VARCHAR(5500)
@@ -15,6 +14,7 @@ AS
  Revisions:
 	- 20160331@Bruce: #55003 - Support new Keno report
 	- 20171219@Bruce: increase length for variables [#88197]
+	- 20180515@Scofield: Incorporate 9wickets data [#94950]
 
  Param's Explanation:
 	- @FromDate		: From date
@@ -36,8 +36,29 @@ BEGIN
 		)
 
 		INSERT INTO @PartyChargeInfo(PartyId, LicenseeId,ProductID, Rate, Fromdate, Todate)
-		SELECT PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
-		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'KN', 'OA', 0)
+		(
+			SELECT PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
+			FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'KN', 'OA', 1)
+			
+			UNION
+			
+			-- get Credit settings with rate = 0
+			SELECT p.PartyID, lb.LabelID AS LicenseeID, ci.ProductId, ci.Rate, 
+				CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
+				CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
+			FROM OAS_ChargeInfo ci
+			INNER JOIN dbo.OAS_Party p ON ci.FromParty = p.PartyID	AND ci.ChargeType != 2 AND p.PartyType = 1
+			INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
+			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
+			LEFT JOIN dbo.labels lb(NOLOCK) ON p.OldRefID = lb.LicenseeID
+			WHERE ci.Productid = 8 and ci.Rate = 0 AND ISNULL(pd.IsDeposit, 0) = 0 AND
+				p.PartyID IN (SELECT VAL FROM strSplit(@PartyIDs, ','))	AND
+				(	@FromDate BETWEEN ci.FromDate AND ci.ToDate
+					OR @ToDate BETWEEN ci.FromDate AND ci.ToDate
+					OR ci.FromDate BETWEEN @FromDate AND @ToDate
+					OR ci.ToDate BETWEEN @FromDate AND @ToDate)
+		)
+		
 	END
 
 	-- Party List
@@ -149,7 +170,11 @@ BEGIN
 					td.ParentId,
 					td.ParentName,
 					td.WinLossDate,
-					CASE WHEN e.Code = 'VND' THEN 'INH' ELSE e.Code END AS CurrencyName,
+					CASE WHEN e.Code = 'VND' THEN 'INH' 
+						WHEN e.ExchangeID = 75 THEN 'PTU'
+						WHEN e.ExchangeID = 76 THEN 'PS'
+						WHEN e.ExchangeID = 77 THEN 'PTH'
+						ELSE e.Code END AS CurrencyName,
 					td.TotalTrans,
 					td.Turnover,
 					td.CustomerWinLoss,
@@ -168,7 +193,11 @@ BEGIN
 					td.ParentId,
 					td.ParentName,
 					td.WinLossDate,
-					CASE WHEN e.Code = 'VND' THEN 'INH' ELSE e.Code END AS CurrencyName,
+					CASE WHEN e.Code = 'VND' THEN 'INH' 
+						WHEN e.ExchangeID = 75 THEN 'PTU'
+						WHEN e.ExchangeID = 76 THEN 'PS'
+						WHEN e.ExchangeID = 77 THEN 'PTH'
+						ELSE e.Code END AS CurrencyName,
 					td.TotalTrans,
 					td.Turnover * e.BaseCurrencyRate,
 					td.CustomerWinLoss * e.BaseCurrencyRate,
@@ -290,7 +319,4 @@ BEGIN
 	DROP TABLE #Result
 	DROP TABLE #TempData
 END
-
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_KenoWinloss2] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_Rpt_KenoWinloss2] TO bodbAdminNet

@@ -47,10 +47,11 @@ AS
 		+ 2017.07.21 @Bruce: Calculate AMF amount [#76410]
 		+ 2017.10.02 @Bruce: add environment to parameter list [#84038]
 		+ 2017.10.27 @Bruce: show individual discount by product [#85256]		
-		- 20171113@Bruce: Modified error message [RedmineID: #84163]
-		- 20171220@Parsons: increase length for variables [#88197]
-		- 20180110@Bruce: deduct against invoice [#87039]
-		- 20180419@Scofield: update CB for FreePlay [#93907]
+		+ 20171113@Bruce: Modified error message [RedmineID: #84163]
+		+ 20171220@Parsons: increase length for variables [#88197]
+		+ 20180110@Bruce: deduct against invoice [#87039]
+		+ 20180419@Scofield: update CB for FreePlay [#93907]
+		+ 20180525@Scofield: Incorporate 9wickets' data [#94950]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -228,7 +229,12 @@ BEGIN
 				END
 
 				SELECT TOP 1	@HostingFeesAmount = d.Amount,
-								@HostingFeesExchangeName = e.CurrencyCode,
+								@HostingFeesExchangeName = CASE e.ExchangeID
+																WHEN 75 THEN 'PTU'
+																WHEN 76 THEN 'PS'
+																WHEN 77 THEN 'PTH'
+																ELSE e.CurrencyCode
+															END,
 								@HostingFeesExchangeRate = e.Rate
 				FROM @Settings s
 					INNER JOIN dbo.LA_HostingFeesDetail d WITH(NOLOCK) ON s.FeesId = d.HostingFeesId

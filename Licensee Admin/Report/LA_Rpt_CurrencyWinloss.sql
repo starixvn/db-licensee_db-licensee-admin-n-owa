@@ -1,5 +1,4 @@
-USE [bodb02]
-GO
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 
 ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss]
 	@PartyIDs				VARCHAR(5500)	= ''
@@ -30,6 +29,7 @@ AS
 	   - 20170801@Kenny: Filter data for Microgaming [RedmineID: #79311]
 	   - 20171220@Parsons: increase length for variables [#88197]
 	   - 20180130@Bruce: integrate Exchange product [#87754]
+	   - 20180515@Scofield: Incorporate 9wickets data [#94950]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -336,14 +336,23 @@ BEGIN
 	SELECT e.exchangeid, e.currency, e.Code
 	FROM bodb02.dbo.Exchange e WITH (NOLOCK)
 	WHERE e.exchangeid IN (SELECT DISTINCT Currency FROM #tmpWinLoss)
+	
+	UPDATE @Exchange
+	SET CurrencyCode = (CASE Currency
+					WHEN 51 THEN 'INH'
+					WHEN 75 THEN 'PTU'
+					WHEN 76 THEN 'PS'
+					WHEN 77 THEN 'PTH' 
+					ELSE CurrencyCode
+				END)
+	WHERE Currency IN (51, 75, 76, 77)
 
 	UPDATE e
 	SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'
 	FROM @Exchange e
 	WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1)
 
-	SELECT	CASE WHEN w.Currency = 51 THEN 'INH'
-				WHEN w.Currency = 20 THEN e.Code
+	SELECT	CASE WHEN w.Currency = 20 THEN e.Code
 				ELSE t.CurrencyCode END AS currencyName,
 			w.currency,
 			SUM(TurnOver * e.Rate) AS Turnover,
@@ -360,8 +369,8 @@ BEGIN
 	FROM #tmpWinLoss w	
 	INNER JOIN #DailyExchange e ON w.Winlostdate = e.ExchangeDate AND w.Currency = e.ExchangeId
 	LEFT JOIN @Exchange t ON w.Currency = t.Currency
-	GROUP BY CASE WHEN w.Currency = 51 THEN 'INH' WHEN w.Currency = 20 THEN e.Code ELSE t.CurrencyCode END, w.currency
-	ORDER BY CASE WHEN w.Currency = 51 THEN 'INH' WHEN w.Currency = 20 THEN e.Code ELSE t.CurrencyCode END
+	GROUP BY CASE WHEN w.Currency = 20 THEN e.Code ELSE t.CurrencyCode END, w.currency
+	ORDER BY CASE WHEN w.Currency = 20 THEN e.Code ELSE t.CurrencyCode END
 
 	DROP TABLE #tmpWinLoss
 	DROP TABLE #Bettype
@@ -370,6 +379,3 @@ BEGIN
 	DROP TABLE #DailyExchange
 END
 GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_CurrencyWinloss] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_Rpt_CurrencyWinloss] TO bodbAdminNet

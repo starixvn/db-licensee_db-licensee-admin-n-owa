@@ -1,5 +1,4 @@
-USE [bodb_Licensee]
-GO
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 
 ALTER PROCEDURE [dbo].[LA_Rpt_KenoLotteryWinLoss]
 	@PartyIds			VARCHAR(4000),
@@ -14,6 +13,7 @@ AS
 	 Revisions:
 		- 20170705@Scofield: Create Keno Lottery Winloss [#79310]
 		- 20171219@Bruce: increase length for variables [#88197]
+		- 20180515@Scofield: Incorporate 9wickets data [#94950]
 	 Params:
 */
 BEGIN
@@ -117,7 +117,7 @@ BEGIN
 		LicenseeWinLoss	MONEY,
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY
-	)
+	)	
 
 	INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, PayToSupplier)
 	SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.Winlostdate, td.CurrencyId, td.TotalTrans, td.Turnover, td.CustomerWinLoss, td.LicenseeWinloss, td.LicensingFee, td.PayToSupplier
@@ -137,8 +137,17 @@ BEGIN
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+	
+	UPDATE #Exchange
+	SET CurrencyCode = (CASE ExchangeId
+					WHEN 51 THEN 'INH'
+					WHEN 75 THEN 'PTU'
+					WHEN 76 THEN 'PS'
+					WHEN 77 THEN 'PTH'
+					ELSE CurrencyCode
+				END)
+	WHERE ExchangeId IN (51, 75, 76, 77)
 
-	UPDATE #Exchange SET CurrencyCode = 'INH' WHERE ExchangeID = 51
 	-- End Region
 
 	DECLARE @Total TABLE (
@@ -221,7 +230,7 @@ BEGIN
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 	END
 	-- End Region
-
+	
 	-- Region: Select Data
 	IF @BaseCurrencyName = ''
 	BEGIN
@@ -293,9 +302,5 @@ BEGIN
 	DROP TABLE #Exchange
 	DROP TABLE #Result
 END
+GO
 
-GO
-GRANT EXECUTE ON [dbo].[LA_Rpt_KenoLotteryWinLoss] TO [bodbLicenseeNet] AS [dbo]
-GRANT EXECUTE ON [dbo].[LA_Rpt_KenoLotteryWinLoss] TO [bodbAdminNet] AS [dbo]
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_KenoLotteryWinLoss] TO [vnteam] AS [dbo]

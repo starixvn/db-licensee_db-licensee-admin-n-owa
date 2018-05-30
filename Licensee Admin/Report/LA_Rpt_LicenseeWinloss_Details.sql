@@ -25,6 +25,7 @@ AS
 	- 20171211: @Scofield - Support Colossus Bet, Cashout, Bet Trade [#87038]
 	- 20180130@Bruce: integrate Exchange product [#87754]
 	- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
+	- 20180515@Scofield: Incorporate 9wickets data [#94950]
 
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -479,6 +480,16 @@ BEGIN
 	SELECT t.CurrencyID, e.currency, e.Code
 	FROM (SELECT DISTINCT CurrencyID FROM #Report) t
 	INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON t.CurrencyID = e.exchangeid
+	
+	UPDATE @CurrencyTable
+	SET CurrencyCode = (CASE currency
+					WHEN 51 THEN 'INH'
+					WHEN 75 THEN 'PTU'
+					WHEN 76 THEN 'PS'
+					WHEN 77 THEN 'PTH' 
+					ELSE CurrencyCode
+				END)
+	WHERE currency IN (51, 75, 76, 77)	
 
 	UPDATE t1
 	SET CurrencyCode = t1.CurrencyCode + ' (' + CurrencyName + ')'
@@ -495,8 +506,7 @@ BEGIN
 			 WHEN @ReportBy = 2 THEN CONVERT(VARCHAR(6), b.ReportDate, 112)
 			 ELSE '0' END ReportDate
 		, b.CurrencyID
-		, CASE WHEN b.CurrencyID = 51 THEN @VNDCurrencyName			  
-			 WHEN b.CurrencyID = 20 THEN e.Code			
+		, CASE WHEN b.CurrencyID = 20 THEN e.Code			
 			 ELSE ISNULL(t.CurrencyCode,e.Code) END AS CurrencyName
 		, SUM(Betcount) AS TotalTransaction
 		, CAST(SUM(Turnover * e.Base) AS MONEY) AS Turnover
@@ -566,8 +576,7 @@ BEGIN
 			CASE WHEN @ReportBy = 1 THEN CONVERT(VARCHAR(8), b.ReportDate, 112)
 				 WHEN @ReportBy = 2 THEN CONVERT(VARCHAR(6), b.ReportDate, 112)
 				 ELSE '0' END, 
-			CASE WHEN b.CurrencyID = 51 THEN @VNDCurrencyName		
-				 WHEN b.CurrencyID = 20 THEN e.Code				
+			CASE WHEN b.CurrencyID = 20 THEN e.Code				
 				 ELSE ISNULL(t.CurrencyCode, e.Code) END 
 	ORDER BY ReportDate ASC
 

@@ -1,5 +1,4 @@
-USE [bodb02]
-GO
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 
 ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss_Details]
 	@PartyIDs			VARCHAR(5500)	= ''
@@ -26,6 +25,7 @@ AS
 	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	   - 20170801@Kenny: Filter data for Microgaming [RedmineID: #79311]
 	   - 20180130@Bruce: integrate Exchange product [#87754]
+	   - 20180515@Scofield: Incorporate 9wickets data [#94950]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -293,13 +293,23 @@ BEGIN
 	SELECT DISTINCT ExchangeDate, ExchangeId, Code, USD, EUR, MYR, GBP
 	INTO #TempExchange
 	FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
-
+	
+	UPDATE #TempExchange
+	SET Code = (CASE ExchangeId
+					WHEN 51 THEN 'INH'
+					WHEN 75 THEN 'PTU'
+					WHEN 76 THEN 'PS'
+					WHEN 77 THEN 'PTH' 
+					ELSE Code
+				END)
+	WHERE ExchangeId IN (51, 75, 76, 77)
+	
 	SELECT	w.PartyID,
 			CASE WHEN p.PartyName ='18bb' THEN 'PIH'
 				WHEN p.PartyName ='IBC' THEN 'FDL'
 				ELSE p.PartyName
 			END AS PartyName,
-			CASE WHEN Currency = 51 THEN 'INH' ELSE e.Code END currencyName,
+			e.Code AS currencyName,
 			SUM(TurnOver) AS Turnover,
 			SUM(Winlost) AS Winlost,
 			SUM(LicenseeWL) AS LicenseeWL,
@@ -354,7 +364,7 @@ BEGIN
 	FROM #tmpWinLoss w
 		INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = w.PartyID
 		INNER JOIN #TempExchange e ON w.Winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
-	GROUP BY w.PartyID, p.PartyName, CASE WHEN Currency = 51 THEN 'INH' ELSE e.Code END
+	GROUP BY w.PartyID, p.PartyName, e.Code
 	ORDER BY w.PartyID, p.PartyName
 
 	DROP TABLE #tmpWinLoss
@@ -364,7 +374,4 @@ BEGIN
 	DROP TABLE #TempExchange
 END
 GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_CurrencyWinloss_Details] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_Rpt_CurrencyWinloss_Details] TO bodbAdminNet
 
