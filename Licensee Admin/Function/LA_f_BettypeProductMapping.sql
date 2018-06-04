@@ -247,7 +247,7 @@ BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 27
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
-	   WHERE typeid BETWEEN 2700 AND 2899
+	   WHERE typeid BETWEEN 2700 AND 2829
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
