@@ -31,6 +31,7 @@ AS
 		- 20171006@Harper: #79311 - Support Macau products
 		- 20171127@Sophia: #87257 - Support New range bettype for RNG casino
 		- 20171214@Sophia: #86640 - Add Exchange Citi Product
+		- 20180604@Bruce: #96383 - New Bettype range for VS2
 	Param's Explanation:
 
 */
@@ -246,7 +247,7 @@ BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 27
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
-	   WHERE typeid BETWEEN 2701 AND 2799
+	   WHERE typeid BETWEEN 2700 AND 2899
 		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
     END
 
