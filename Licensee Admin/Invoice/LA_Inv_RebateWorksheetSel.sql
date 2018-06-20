@@ -17,6 +17,7 @@ AS
 	  - 20180126@Bruce: Exclude Exchange-BX [#87754]
 	  - 20180419@Scofield: update CB for FreePlay [#93907]
 	  - 20180716@bruce: add new group TEST for credit [#98126]
+	  - 20180620@Bruce: discount then rebate [#97153]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -185,10 +186,10 @@ BEGIN
 		PartyId			INT,
 		rptDate			DATETIME,
 		CurrencyId		INT,
-		WinLoss			MONEY,
+		WinLoss			DECIMAL(20,5),
 		AComm			MONEY,
 		ProductId		TINYINT,
-		AmountToCompany	MONEY,
+		AmountToCompany	DECIMAL(20,5),
 		IsApplyMinFee	BIT
 	)
 	CREATE NONCLUSTERED INDEX Idx_InvoiceData ON #TempData (PartyId, ProductId)
@@ -379,9 +380,11 @@ BEGIN
 	INNER JOIN @TotalMinFees t ON amf.ProductId = t.ProductId
 	WHERE amf.FeeType = 1
 
-	-- Rebate
-	SELECT h.ToDate,p.ProductId, d.Rate, h.Remark
-	INTO #Rebate
+	-- get discount settings
+	DECLARE @RebateType INT = 2, @DiscountByFee INT = 1, @DiscountByWinloss INT = 3
+
+	SELECT h.ToDate,p.ProductId, d.Rate, h.Remark,h.CurrencyId,h.FromDate,d.FromAmount,d.ToAmount, h.DiscountGroupType
+	INTO #DiscountRebate
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
 	INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
 	INNER JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON p.DiscountGroupId = h.DiscountGroupId
@@ -389,53 +392,85 @@ BEGIN
 	WHERE	a.PartyID = @PartyId AND
 			@FromDate<= h.ToDate AND
 			h.FromDate<=@ToDate AND
-			h.DiscountGroupType = 2 AND
 			p.ProductId <> 1 --exclude RB
 
-	DELETE  #Rebate WHERE ToDate < (SELECT	MAX(ToDate) FROM #Rebate)
-	-- end rebate
+	-- only one discount/rebate for a product at time
+	DELETE d
+	FROM #DiscountRebate d
+	INNER JOIN (SELECT dr.ProductId, dr.DiscountGroupType, MAX(dr.ToDate) ToDate
+		FROM #DiscountRebate dr
+		GROUP BY dr.ProductId,dr.DiscountGroupType
+	) t ON t.ProductId = d.ProductId AND t.DiscountGroupType = d.DiscountGroupType
+	WHERE d.ToDate < t.ToDate
 
-	DECLARE @Result TABLE(ProductId INT, AmountToCompany MONEY)
+	-- discount currency must the same with party's base currency
+	DELETE #DiscountRebate WHERE CurrencyId <> @BaseCurrencyId AND DiscountGroupType <> @RebateType
+	-- end
+
+	DECLARE @Result TABLE(ProductId INT, AmountToCompany MONEY, Discount MONEY)
 	
 	-- products have minfee
-	INSERT INTO @Result
+	INSERT INTO @Result(ProductId, AmountToCompany)
 	SELECT ProductId, SUM(AmountToCompany)
 	FROM @MinFeeGroup
 	WHERE PartyId = @PartyId AND FeeType = 1
 	GROUP BY ProductId
 
 	-- products don't have minfee
-	INSERT INTO @Result
+	INSERT INTO @Result(ProductId, AmountToCompany)
 	SELECT td.ProductId, SUM(td.AmountToCompany)
 	FROM #TempData td
 	WHERE td.PartyId = @PartyId AND td.ProductId NOT IN (SELECT td2.ProductId FROM @MinFeeGroup td2 WHERE td2.PartyId = @PartyId)
 	GROUP BY td.ProductId
 
 	-- include no ticket product
-	INSERT INTO @Result
+	INSERT INTO @Result(ProductId, AmountToCompany)
 	SELECT p.ProductId, 0 FROM @Products p
 	WHERE p.ProductId NOT IN (SELECT r.ProductId FROM @Result r)
 
+	-- calculate discount by winloss
+	;WITH wl AS (SELECT - SUM(WinLoss) Amount, ProductId FROM #TempData WHERE PartyId = @PartyId GROUP BY ProductId)
+	UPDATE r SET Discount = (CASE WHEN wl.Amount<0 THEN 0 ELSE wl.Amount * dr.Rate END)
+	FROM @Result r
+	INNER JOIN #DiscountRebate dr ON r.ProductId = dr.ProductId AND dr.DiscountGroupType = @DiscountByWinloss
+	INNER JOIN wl ON wl.ProductId = dr.ProductId AND wl.Amount > dr.FromAmount AND wl.Amount <= dr.ToAmount
+
+	-- calculate discount by fee
+	UPDATE r SET Discount = (CASE WHEN AmountToCompany<0 THEN 0 ELSE AmountToCompany * dr.Rate END) + ISNULL(Discount,0)
+	FROM @Result r
+	INNER JOIN #DiscountRebate dr ON r.ProductId = dr.ProductId 
+			AND dr.DiscountGroupType = @DiscountByFee 
+			AND r.AmountToCompany > dr.FromAmount
+			AND r.AmountToCompany <= dr.ToAmount
+	 
+	 UPDATE @Result SET AmountToCompany = CASE 
+			WHEN AmountToCompany < 0 THEN AmountToCompany
+			WHEN AmountToCompany > ISNULL(Discount,0) THEN AmountToCompany - ISNULL(Discount,0)
+			ELSE 0
+		END
+	-- end
+
+	-- calculate rebate
 	;WITH RebateCalculation AS(
 		SELECT
 			ISNULL(CASE WHEN rs.AmountToCompany < 0 THEN 0 ELSE rs.AmountToCompany END * rb.Rate, 0) Rebate,
-			ISNULL(CASE WHEN rs.AmountToCompany < 0 AND rs.ProductId NOT IN (3,15,25) THEN 0 ELSE rs.AmountToCompany END, 0) Amount
+			ISNULL(CASE WHEN rs.AmountToCompany < 0 AND rs.ProductId NOT IN (3,15,25,6) THEN 0 ELSE rs.AmountToCompany END, 0) Amount
 		FROM @Result rs
-		LEFT JOIN #Rebate rb ON rb.ProductId = rs.ProductId
+		LEFT JOIN #DiscountRebate rb ON rb.ProductId = rs.ProductId AND rb.DiscountGroupType=@RebateType
 	)
-	SELECT (SELECT TOP 1 Remark FROM #Rebate) Remark,
+	SELECT (SELECT TOP 1 Remark FROM #DiscountRebate WHERE DiscountGroupType = @RebateType) Remark,
 		@ToDate			AS ReportDate,
 		@BaseCurrency	AS CurrencyName,
 		SUM(Rebate)		AS TotalRebate,
 		SUM(Amount)		AS TotalAmount
 	FROM RebateCalculation
 
-	SELECT * FROM @Result
+	SELECT ProductId, AmountToCompany FROM @Result
 
 	-- Region: Drop tmp table
 	DROP TABLE #Exchange
 	DROP TABLE #TempData
-	DROP TABLE #Rebate
+	DROP TABLE #DiscountRebate
 	DROP TABLE #TempDataCB
 	-- End region
 END
