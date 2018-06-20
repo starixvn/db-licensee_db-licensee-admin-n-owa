@@ -25,13 +25,13 @@ BEGIN
 	DECLARE @PartyIdTable TABLE (PartyId INT)
 	INSERT INTO @PartyIdTable VALUES (@PartyId)
 
-	DECLARE @BaseCurrency VARCHAR(10) = ISNULL((
-			SELECT TOP 1 Code 
-			FROM bodb02.dbo.Exchange e WITH(NOLOCK)
-			INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON e.exchangeid = d.BaseCurrencyId
-			WHERE d.PartyID = @PartyId
-		),6) -- default is EUR
+	DECLARE @BaseCurrency VARCHAR(10) = 'EUR'
+	DECLARE @BaseCurrencyId INT = 6
 
+	SELECT TOP 1 @BaseCurrency=Code ,@BaseCurrencyId=e.exchangeid
+	FROM bodb02.dbo.Exchange e WITH(NOLOCK)
+	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON e.exchangeid = d.BaseCurrencyId
+	WHERE d.PartyID = @PartyId
 	-- Party groups
 	-- select all parties in the same group
 	INSERT INTO @PartyIdTable
