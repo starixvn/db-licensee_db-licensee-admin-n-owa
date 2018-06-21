@@ -40,7 +40,7 @@ BEGIN
 	--check empty
 	IF ISNULL(@GroupName, '') = ''
 	BEGIN
-		SELECT @ErrCode = 501, @ErrMsg = 'Group name required.'
+		SELECT @ErrCode = 501, @ErrMsg = 'Group name required. '
 		RETURN
 	END
 
