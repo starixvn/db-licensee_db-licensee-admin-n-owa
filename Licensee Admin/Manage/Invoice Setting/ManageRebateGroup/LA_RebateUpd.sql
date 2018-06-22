@@ -40,7 +40,7 @@ BEGIN
 	--check empty
 	IF ISNULL(@GroupName, '') = ''
 	BEGIN
-		SELECT @ErrCode = 501, @ErrMsg = 'Group name required. '
+		SELECT @ErrCode = 501, @ErrMsg = 'Please fill out group name.'
 		RETURN
 	END
 
@@ -57,7 +57,7 @@ BEGIN
 	--parse product rebate group
 	IF @ProductIds = ''
 	BEGIN
-		SELECT @ErrMsg = 'Update failed. Please try again.', @ErrCode = 503
+		SELECT @ErrMsg = 'Please select at least 1 product!', @ErrCode = 503
 		RETURN	
 	END
 
@@ -76,7 +76,7 @@ BEGIN
 		OR (NOT EXISTS (SELECT 1 FROM @Products))
 		OR @Rate < 0
 	BEGIN
-		SELECT @ErrMsg = 'Update failed. Please try again.', @ErrCode = 504
+		SELECT @ErrMsg = 'Please fill all required field.', @ErrCode = 503
 		RETURN
 	END
 
@@ -162,19 +162,19 @@ BEGIN
 		RETURN
 	END
 
-		--update rebate group header
-		UPDATE dbo.LA_DiscountGroupHeader WITH(ROWLOCK, UPDLOCK)
-		SET DiscountGroupName = @GroupName
-			, FromDate = @FromDate
-			, ToDate = @ToDate
-			, Remark = @Remark
-		WHERE DiscountGroupId = @GroupId
+	--update rebate group header
+	UPDATE dbo.LA_DiscountGroupHeader WITH(ROWLOCK, UPDLOCK)
+	SET DiscountGroupName = @GroupName
+		, FromDate = @FromDate
+		, ToDate = @ToDate
+		, Remark = @Remark
+	WHERE DiscountGroupId = @GroupId
 
-		IF @@ERROR <> 0
-		BEGIN
-			SELECT @ErrMsg = 'Update failed. Please try again.', @ErrCode = 504
-			RETURN
-		END
+	IF @@ERROR <> 0
+	BEGIN
+		SELECT @ErrMsg = 'Update failed. Please try again.', @ErrCode = 504
+		RETURN
+	END
 
 	-- #Endregion Update 
 
