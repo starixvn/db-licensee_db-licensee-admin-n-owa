@@ -5,9 +5,7 @@ GO
 ALTER PROCEDURE [dbo].[LA_Rebate_PartyListSel]
 	@GroupId	SMALLINT = 0,
 	@FromDate	DATE = NULL, 
-	@ToDate		DATE = NULL, 
-	@UserId		INT = 0, 
-	@FunctionId INT = 0
+	@ToDate		DATE = NULL
 AS
 /*  
 	 Created: 20180529@Parsons [#94282]
@@ -31,7 +29,7 @@ BEGIN
 	DECLARE	@RebateGroupType INT = 2
 	
 	INSERT INTO @PartyList(PartyId, PartyName, BrandName, ParentId)
-	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionId = @FunctionId
+	EXEC dbo.LA_PartyListSel
 
 	DECLARE @PartiesInAnyGroup TABLE (PartyId INT, DiscountId SMALLINT)
 	INSERT INTO @PartiesInAnyGroup(PartyId, DiscountId)
