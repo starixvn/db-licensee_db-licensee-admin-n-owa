@@ -8,7 +8,7 @@ ALTER PROCEDURE [dbo].[LA_RebateUpd]
 	@FromDate	DATE, 
 	@ToDate		DATE, 
 	@ProductIds VARCHAR(512) = '', 
-	@AssignedPartyIds VARCHAR(4000) = '', 
+	@PartyIds VARCHAR(4000) = '', 
 	@Rate		DECIMAL(9, 8), 
 	@UserId		INT, 
 	@Remark		NVARCHAR(4000), 
@@ -65,10 +65,10 @@ BEGIN
 	SELECT val FROM bodb02.dbo.Lrf_f_StringSplit(@ProductIds, ',')
 
 	--parse assigned payer to group
-	IF @AssignedPartyIds <> ''
+	IF @PartyIds <> ''
 	BEGIN
 		INSERT INTO @Payers(PayerId)
-		SELECT val FROM bodb02.dbo.Lrf_f_StringSplit(@AssignedPartyIds, ',')
+		SELECT val FROM bodb02.dbo.Lrf_f_StringSplit(@PartyIds, ',')
 	END
 	
 	--check required fields

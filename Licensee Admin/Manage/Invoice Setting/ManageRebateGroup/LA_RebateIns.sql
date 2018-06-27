@@ -7,14 +7,14 @@ ALTER PROCEDURE [dbo].[LA_RebateIns]
 	@FromDate	DATE, 
 	@ToDate		DATE, 
 	@ProductIds VARCHAR(512) = '', 
-	@AssignedPartyIds VARCHAR(4000) = '', 
+	@PartyIds VARCHAR(4000) = '', 
 	@Rate		DECIMAL(9, 8), 
 	@UserId		INT, 
 	@Remark		NVARCHAR(4000), 
 	@LoginIp	VARCHAR (50)	= '', 
 	@ErrCode	INT = 0 OUTPUT, 
 	@ErrMsg		VARCHAR(4000)= '' OUTPUT, 
-	@GroupIdOut SMALLINT = 0 OUTPUT
+	@GroupIdOut INT = 0 OUTPUT
 AS
 /*  
 	 Created: 20180528@Parsons [#94282]
@@ -65,10 +65,10 @@ BEGIN
 	SELECT val FROM bodb02.dbo.Lrf_f_StringSplit(@ProductIds, ',')
 
 	--parse assigned payer to group
-	IF @AssignedPartyIds <> ''
+	IF @PartyIds <> ''
 	BEGIN
 		INSERT INTO @Payers(PayerId)
-		SELECT val FROM bodb02.dbo.Lrf_f_StringSplit(@AssignedPartyIds, ',')
+		SELECT val FROM bodb02.dbo.Lrf_f_StringSplit(@PartyIds, ',')
 	END
 	
 	--check required fields
@@ -98,7 +98,6 @@ BEGIN
 		SELECT @ErrMsg = 'Insert failed. Please try again.', @ErrCode = 503
 		RETURN
 	END
-	SELECT @GroupIdOut
 
 	--insert rebate group detail
 	INSERT INTO dbo.LA_DiscountGroupDetail(DiscountGroupId, FromAmount, ToAmount, Rate)
