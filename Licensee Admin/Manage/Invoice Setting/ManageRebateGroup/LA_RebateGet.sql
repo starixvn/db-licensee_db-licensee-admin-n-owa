@@ -43,7 +43,7 @@ BEGIN
 			ToDate, 
 			Remark, 
 			@ProductIds AS ProductIds,
-			@PartyIds	AS PayerList,
+			@PartyIds	AS PartyIds,
 			@Rate AS Rate
 	FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK)
 	WHERE DiscountGroupId = @GroupId
