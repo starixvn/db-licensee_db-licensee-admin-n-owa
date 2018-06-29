@@ -15,6 +15,7 @@ AS
 		- 20170622@bruce: show original value [#78398]
 		- 20171219@Bruce: increase length for variables [#88197]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20180628@Scofield: Update calculation formula for AG& GD report [#94283]
 		
 	Param's Explanation:
 */
@@ -93,13 +94,14 @@ BEGIN
 		ValidBetAmount	MONEY,
 		CustomerWL		MONEY,
 		LicenseeFee		MONEY,
-		ServiceCharge	MONEY,
-		Rebate			MONEY,
+		Commission		MONEY,
+		NetWinLoss		MONEY,		
+		PayToSupplier	MONEY,
 		BaseCurrency	VARCHAR(10),
 		RowId			UNIQUEIDENTIFIER
 	)
 
-	INSERT INTO #Data(PartyId, ReportDate, CurrencyId, IsDeposit, Totaltrans, Turnover, ValidBetAmount, CustomerWL, LicenseeFee, ServiceCharge, Rebate, RowId)
+	INSERT INTO #Data(PartyId, ReportDate, CurrencyId, IsDeposit, Totaltrans, Turnover, ValidBetAmount, CustomerWL, LicenseeFee, Commission, NetWinLoss, PayToSupplier, RowId)
 	(
 		SELECT  ci.PartyID, b.rptDate, b.currencyID, ci.IsDeposit
 			, SUM(b.betcount) AS Totaltrans
@@ -107,8 +109,9 @@ BEGIN
 			, SUM(ISNULL(b.ValidBetAmount,0)) AS ValidBetAmount
 			, SUM(b.MemberWL) AS CustomerWL
 			, SUM(-b.MemberWL * ci.Rate) AS LicenseeFee
-			, SUM(-b.MemberWL *  ISNULL(s.Rate, 0)) AS ServiceCharge
-			, SUM(ISNULL(b.ValidBetAmount,0) * ISNULL(r.Rate, 0) * ISNULL(s.Rate, 0)) AS Rebate
+			, SUM(ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS Commission
+			, SUM(-b.MemberWL - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS NetWinLoss
+			, SUM((-b.MemberWL - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) * ISNULL(s.Rate, 0)) AS PayToSupplier
 			, NEWID()
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #ChargeInfo ci ON ( -- licensee charge rate
@@ -127,7 +130,7 @@ BEGIN
 				b.ProductID = s.ProductId AND
 				b.rptDate BETWEEN s.FromDate AND s.ToDate AND
 				s.IsPayToSupplier = 1 AND
-				s.ChargeType IN (@GrossWin, @CreditServiceCharge, @DepositServiceCharge))
+				s.ChargeType IN (@GrossWin, @CreditServiceCharge, @DepositServiceCharge)) -- @GrossWin for old setting 
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 			  b.StatusId NOT IN (- 1, 101, 102, 103) AND
 			  b.CurrencyId <> 20 AND
@@ -153,13 +156,14 @@ BEGIN
 	BEGIN
 		DECLARE @Currency VARCHAR(10) = (SELECT TOP 1 Code FROM @BaseCurrencies WHERE IsApplied IS NULL)
 
-		INSERT INTO #Data(PartyId, IsDeposit, ReportDate, CurrencyName, Totaltrans, BaseCurrency, Turnover, CustomerWL, LicenseeFee, ServiceCharge, Rebate, ValidBetAmount, RowId)
+		INSERT INTO #Data(PartyId, IsDeposit, ReportDate, CurrencyName, Totaltrans, BaseCurrency, Turnover, CustomerWL, LicenseeFee, Commission, NetWinLoss, PayToSupplier, ValidBetAmount, RowId)
 		SELECT d.PartyId, d.IsDeposit, d.ReportDate, e.Code, d.Totaltrans, @Currency,
 			d.Turnover * e.BaseCurrencyRate,
 			d.CustomerWL * e.BaseCurrencyRate,
 			d.LicenseeFee * e.BaseCurrencyRate,
-			d.ServiceCharge * e.BaseCurrencyRate,
-			d.Rebate * e.BaseCurrencyRate,
+			d.Commission * e.BaseCurrencyRate,
+			d.NetWinLoss * e.BaseCurrencyRate,
+			d.PayToSupplier * e.BaseCurrencyRate,
 			d.ValidBetAmount * e.BaseCurrencyRate,
 			d.RowId
 		FROM #Data d
@@ -183,12 +187,12 @@ BEGIN
 		o.ValidBetAmount	AS ValidBetAmountOriginal,
 		d.LicenseeFee,
 		o.LicenseeFee		AS LicenseeFeeOriginal,
-		d.ServiceCharge,
-		o.ServiceCharge		AS ServiceChargeOriginal,
-		d.Rebate,
-		o.Rebate			AS RebateOriginal,
-		(d.ServiceCharge - d.Rebate) AS PayToSupplier,
-		(o.ServiceCharge - o.Rebate) AS PayToSupplierOriginal
+		d.Commission,
+		o.Commission			AS ComissionOriginal,
+		d.NetWinLoss,
+		o.NetWinLoss		AS NetWinLossOriginal,
+		d.PayToSupplier,
+		o.PayToSupplier		AS PayToSupplierOriginal
 	FROM #Data d
 	INNER JOIN #Data o ON o.RowId = d.RowId AND o.BaseCurrency IS NULL
 	INNER JOIN #PartyList p1 ON d.PartyId = p1.PartyId
@@ -202,9 +206,10 @@ BEGIN
 		Totaltrans		INT,
 		Turnover		MONEY,
 		CustomerWinLoss	MONEY,
-		LicenseeFee		MONEY,
-		ServiceCharge	MONEY,
-		Rebate			MONEY,
+		LicenseeFee		MONEY,		
+		Commission		MONEY,
+		NetWinLoss		MONEY,
+		PayToSupplier	MONEY,
 		ValidBetAmount	MONEY,
 		Step			TINYINT
 	)
@@ -215,8 +220,9 @@ BEGIN
 		SUM(d.Turnover),
 		SUM(d.CustomerWL),
 		SUM(d.LicenseeFee),
-		SUM(d.ServiceCharge),
-		SUM(d.Rebate),
+		SUM(d.Commission),
+		SUM(d.NetWinLoss),
+		SUM(d.PayToSupplier),
 		SUM(d.ValidBetAmount),
 		1 -- step 1
 	FROM #Data d
@@ -230,9 +236,10 @@ BEGIN
 		SUM(Totaltrans),
 		SUM(Turnover),
 		SUM(CustomerWinLoss),
-		SUM(CASE WHEN LicenseeFee < 0 THEN 0 ELSE LicenseeFee END), -- negative amount = 0
-		SUM(ServiceCharge),
-		SUM(Rebate),
+		SUM(CASE WHEN LicenseeFee < 0 THEN 0 ELSE LicenseeFee END), -- negative amount = 0		
+		SUM(Commission),
+		SUM(NetWinLoss),
+		SUM(CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END), -- negative amount = 0		
 		SUM(ValidBetAmount),
 		2 -- step 2
 	FROM @GrandTotals
@@ -245,9 +252,9 @@ BEGIN
 		SUM(ValidBetAmount) AS ValidBetAmount,
 		SUM(CustomerWinLoss) AS CustomerWinLoss,
 		SUM(LicenseeFee) AS LicenseeFee,
-		SUM(ServiceCharge) AS ServiceCharge,
-		SUM(Rebate) AS Rebate,
-		SUM(CASE WHEN (ServiceCharge - Rebate) < 0 THEN 0 ELSE (ServiceCharge - Rebate) END) AS PaytoSupplier -- negative amount = 0
+		SUM(Commission) AS Commission,
+		SUM(NetWinLoss) AS NetWinLoss,
+		SUM(PayToSupplier) AS PaytoSupplier 
 	FROM @GrandTotals
 	WHERE Step = 2
 	GROUP BY CurrencyName
