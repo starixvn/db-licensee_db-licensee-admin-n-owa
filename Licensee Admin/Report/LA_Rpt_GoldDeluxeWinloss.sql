@@ -188,7 +188,7 @@ BEGIN
 		d.LicenseeFee,
 		o.LicenseeFee		AS LicenseeFeeOriginal,
 		d.Commission,
-		o.Commission			AS ComissionOriginal,
+		o.Commission			AS CommissionOriginal,
 		d.NetWinLoss,
 		o.NetWinLoss		AS NetWinLossOriginal,
 		d.PayToSupplier,
