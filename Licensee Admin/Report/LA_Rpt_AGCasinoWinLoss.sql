@@ -244,7 +244,7 @@ BEGIN
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(LicensingFee),
-			SUM(CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END)
+			SUM(PayToSupplier)
 		FROM @Total
 		WHERE Currency = @tempCurrency
 		GROUP BY Currency
@@ -314,8 +314,8 @@ BEGIN
 			CustomerWinLoss,
 			LicenseeWinLoss,
 			LicensingFee,
-			CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END PayToSupplier,
-			(LicensingFee - (CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END)) CompanyIncome
+			PayToSupplier,
+			(LicensingFee - PayToSupplier) CompanyIncome
 		FROM @Total t
 		WHERE Currency = @BaseCurrencyName
 	END
@@ -328,6 +328,7 @@ BEGIN
 END
 
 GO
+
 GRANT EXECUTE ON [dbo].[LA_Rpt_AGCasinoWinLoss] TO [bodbLicenseeNet] AS [dbo]
 GRANT EXECUTE ON [dbo].[LA_Rpt_AGCasinoWinLoss] TO [bodbAdminNet] AS [dbo]
 GO
