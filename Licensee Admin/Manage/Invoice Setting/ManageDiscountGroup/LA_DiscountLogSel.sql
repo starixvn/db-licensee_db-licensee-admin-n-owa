@@ -21,12 +21,16 @@ AS
 
 BEGIN
 	SET NOCOUNT ON
+	-- discount log actionid
+	-- DiscountIns = 5516
+	-- DiscountUpd = 5517
+	-- DiscountDel = 5518
 
 	SELECT l.LogId, l.LogDate, u.Username, l.ActionId, l.Doing AS [Data]
 	FROM bodb_CustomerLog.dbo.UserLog_UserControl l WITH(NOLOCK)
 	INNER JOIN dbo.LA_User u WITH(NOLOCK) ON l.UserID = u.UserID
 	WHERE (@GroupId=0 OR l.CustID = @GroupId)
-		AND (@ActionId=0 OR l.ActionID = @ActionId)
+		AND ((@ActionId=0 AND l.ActionID IN (5516,5517,5518)) OR l.ActionID = @ActionId)
 		AND l.LogDate BETWEEN @FromDate AND @ToDate
 END
 GO
