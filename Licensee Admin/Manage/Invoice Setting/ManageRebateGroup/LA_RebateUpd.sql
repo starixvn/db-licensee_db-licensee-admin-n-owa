@@ -11,7 +11,7 @@ ALTER PROCEDURE [dbo].[LA_RebateUpd]
 	@PartyIds VARCHAR(4000) = '', 
 	@Rate		DECIMAL(9, 8), 
 	@UserId		INT, 
-	@Remark		NVARCHAR(4000), 
+	@Remark		NVARCHAR(4000) = '', 
 	@LoginIp	VARCHAR (50)	= '', 
 	@ErrCode	INT = 0 OUTPUT, 
 	@ErrMsg		VARCHAR(4000)= '' OUTPUT
@@ -124,8 +124,8 @@ BEGIN
 	USING @Payers AS s
 	ON (t.DiscountGroupId = @GroupId AND t.PartyId = s.PayerId)
 	WHEN NOT MATCHED BY TARGET
-		THEN INSERT(DiscountGroupId, PartyId)
-				VALUES(@GroupId, s.PayerId)
+		THEN INSERT(DiscountGroupId, PartyId, IsApplyDiscount)
+				VALUES(@GroupId, s.PayerId, 1)
 	WHEN NOT MATCHED BY SOURCE AND t.DiscountGroupId = @GroupId
 		THEN DELETE;
 
@@ -140,8 +140,8 @@ BEGIN
 	USING @Products AS s
 	ON (t.DiscountGroupId = @GroupId AND t.ProductId = s.ProductId)
 	WHEN NOT MATCHED BY TARGET
-		THEN INSERT(DiscountGroupId, ProductId)
-				VALUES(@GroupId, s.ProductId)
+		THEN INSERT(DiscountGroupId, ProductId, IsDiscountProduct)
+				VALUES(@GroupId, s.ProductId, 0)
 	WHEN NOT MATCHED BY SOURCE AND t.DiscountGroupId = @GroupId
 		THEN DELETE;
 

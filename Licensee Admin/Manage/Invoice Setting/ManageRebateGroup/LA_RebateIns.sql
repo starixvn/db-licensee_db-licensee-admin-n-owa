@@ -10,7 +10,7 @@ ALTER PROCEDURE [dbo].[LA_RebateIns]
 	@PartyIds VARCHAR(4000) = '', 
 	@Rate		DECIMAL(9, 8), 
 	@UserId		INT, 
-	@Remark		NVARCHAR(4000), 
+	@Remark		NVARCHAR(4000) = '', 
 	@LoginIp	VARCHAR (50)	= '', 
 	@ErrCode	INT = 0 OUTPUT, 
 	@ErrMsg		VARCHAR(4000)= '' OUTPUT, 
@@ -83,8 +83,8 @@ BEGIN
 	-- #Region Insert 
 
 	--insert rebate group header
-	INSERT INTO dbo.LA_DiscountGroupHeader(DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, [Priority], Remark)
-	VALUES(@GroupName, @RebateGroupType, 0, @FromDate, @ToDate, 2, @Remark)
+	INSERT INTO dbo.LA_DiscountGroupHeader(DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, Remark, [Priority], CalculationType)
+	VALUES(@GroupName, @RebateGroupType, 0, @FromDate, @ToDate, @Remark, 2, 0)
 
 	IF @@ERROR <> 0
 	BEGIN
@@ -111,8 +111,8 @@ BEGIN
 	END
 
 	--insert rebate group product
-	INSERT INTO dbo.LA_DiscountGroupProduct(DiscountGroupId, ProductId)
-	SELECT DISTINCT @GroupIdOut, ProductId
+	INSERT INTO dbo.LA_DiscountGroupProduct(DiscountGroupId, ProductId, IsDiscountProduct)
+	SELECT DISTINCT @GroupIdOut, ProductId, 0
 	FROM @Products
 
 	IF @@ERROR <> 0
@@ -124,8 +124,8 @@ BEGIN
 	END
 
 	--insert rebate group assignment
-	INSERT INTO dbo.LA_DiscountGroupAssignment(DiscountGroupId, PartyID)
-	SELECT DISTINCT @GroupIdOut, PayerId
+	INSERT INTO dbo.LA_DiscountGroupAssignment(DiscountGroupId, PartyID, IsApplyDiscount)
+	SELECT DISTINCT @GroupIdOut, PayerId, 1
 	FROM @Payers
 
 	IF @@ERROR <> 0
