@@ -264,9 +264,3 @@ BEGIN
 	DROP TABLE #Data
 END
 GO
-
-GRANT EXECUTE ON [dbo].[LA_Rpt_GoldDeluxeWinloss] TO [bodbAdminNet] AS [dbo]
-GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_GoldDeluxeWinloss] TO [vnteam] AS [dbo]
-GO
