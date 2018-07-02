@@ -383,7 +383,7 @@ BEGIN
 	-- get discount settings
 	DECLARE @RebateType INT = 2, @DiscountByFee INT = 1, @DiscountByWinloss INT = 3
 
-	SELECT h.ToDate,p.ProductId, d.Rate, h.Remark,h.CurrencyId,h.FromDate,d.FromAmount,d.ToAmount, h.DiscountGroupType
+	SELECT h.ToDate,p.ProductId, d.Rate, h.Remark,h.CurrencyId,h.FromDate,d.FromAmount,d.ToAmount, h.DiscountGroupType, h.DiscountGroupId
 	INTO #DiscountRebate
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
 	INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
@@ -436,12 +436,19 @@ BEGIN
 	INNER JOIN wl ON wl.ProductId = dr.ProductId AND wl.Amount > dr.FromAmount AND wl.Amount <= dr.ToAmount
 
 	-- calculate discount by fee
-	UPDATE r SET Discount = (CASE WHEN AmountToCompany<0 THEN 0 ELSE AmountToCompany * dr.Rate END) + ISNULL(Discount,0)
+	;WITH f AS (
+		SELECT dr.DiscountGroupId, SUM(CASE WHEN r.AmountToCompany<0 THEN 0 ELSE r.AmountToCompany END) AS Amount
+		FROM @Result r
+		INNER JOIN #DiscountRebate dr ON r.ProductId = dr.ProductId
+		WHERE dr.DiscountGroupType = @DiscountByFee
+		GROUP BY dr.DiscountGroupId
+	)
+	UPDATE r SET Discount = (CASE WHEN r.AmountToCompany<0 THEN 0 ELSE r.AmountToCompany * dr.Rate END) + ISNULL(Discount,0)
 	FROM @Result r
-	INNER JOIN #DiscountRebate dr ON r.ProductId = dr.ProductId 
-			AND dr.DiscountGroupType = @DiscountByFee 
-			AND r.AmountToCompany > dr.FromAmount
-			AND r.AmountToCompany <= dr.ToAmount
+	INNER JOIN #DiscountRebate dr ON r.ProductId = dr.ProductId
+	INNER JOIN f ON f.DiscountGroupId = dr.DiscountGroupId
+			AND f.Amount > dr.FromAmount
+			AND f.Amount <= dr.ToAmount
 	 
 	 UPDATE @Result SET AmountToCompany = CASE 
 			WHEN AmountToCompany < 0 THEN AmountToCompany
