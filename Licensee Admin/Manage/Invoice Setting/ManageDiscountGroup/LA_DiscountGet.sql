@@ -21,37 +21,49 @@ BEGIN
 	SET NOCOUNT ON
 
 	--get products which has assigned to group
-	DECLARE @CalculationProductIds VARCHAR(200), @DiscountProductIds VARCHAR(200)
+	DECLARE 
+		@CalculationProductIds VARCHAR(1000), 
+		@DiscountProductIds VARCHAR(1000),
+		@CalculationProductList VARCHAR(4000), 
+		@DiscountProductList VARCHAR(4000)
 
-	SELECT @CalculationProductIds = COALESCE(@CalculationProductIds + ',' + CAST(ProductId AS VARCHAR), CAST(ProductId AS VARCHAR))
-	FROM dbo.LA_DiscountGroupProduct WITH(NOLOCK)
-	WHERE DiscountGroupId = @GroupId
+	SELECT @CalculationProductIds = COALESCE(@CalculationProductIds + ',' + CAST(p.ProductId AS VARCHAR), CAST(p.ProductId AS VARCHAR))
+		 ,@CalculationProductList = COALESCE(@CalculationProductList + ',' + p.ProductName, p.ProductName)
+	FROM dbo.LA_DiscountGroupProduct d WITH(NOLOCK)
+	INNER JOIN LA_f_Products3rd('') p ON p.ProductID = d.ProductId
+	WHERE d.DiscountGroupId = @GroupId AND d.IsCalculationProduct = 1
 
-	SELECT @DiscountProductIds = COALESCE(@DiscountProductIds + ',' + CAST(ProductId AS VARCHAR), CAST(ProductId AS VARCHAR))
-	FROM dbo.LA_DiscountGroupProduct WITH(NOLOCK)
-	WHERE DiscountGroupId = @GroupId AND IsDiscountProduct = 1
+	SELECT @DiscountProductIds = COALESCE(@DiscountProductIds + ',' + CAST(p.ProductId AS VARCHAR), CAST(p.ProductId AS VARCHAR))
+		 ,@DiscountProductList = COALESCE(@DiscountProductList + ',' + p.ProductName, p.ProductName)
+	FROM dbo.LA_DiscountGroupProduct d WITH(NOLOCK)
+	INNER JOIN LA_f_Products3rd('') p ON p.ProductID = d.ProductId
+	WHERE d.DiscountGroupId = @GroupId AND d.IsDiscountProduct = 1
 
 	--get discount header
-	SELECT DiscountGroupId
-		, DiscountGroupType
-		, DiscountGroupName
-		, CurrencyId
-		, FromDate
-		, ToDate
-		, Remark
+	SELECT h.DiscountGroupId
+		, h.DiscountGroupType
+		, h.DiscountGroupName
+		, c.CurrencyId
+		, c.CurrencyName
+		, h.FromDate
+		, h.ToDate
 		, @CalculationProductIds	AS CalculationProductIds
 		, @DiscountProductIds		AS DiscountProductIds
-		, CalculationType
-	FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK)
+		, @CalculationProductList	AS CalculationProductList
+		, @DiscountProductList		AS DiscountProductList
+		, h.CalculationType
+	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
+	INNER JOIN LA_f_BaseCurrency() c ON c.CurrencyId = h.CurrencyId
 	WHERE DiscountGroupId = @GroupId
 
-	
 	--get list of licensees
 	SELECT DiscountGroupId,
-			PartyID,
+			p.PartyId,
+			p.PartyName,
 			IsApplyDiscount,
 			Remark 
-	FROM dbo.LA_DiscountGroupAssignment WITH(NOLOCK)
+	FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
+	INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = a.PartyID
 	WHERE DiscountGroupId = @GroupId
 
 	--get discount setting rates
