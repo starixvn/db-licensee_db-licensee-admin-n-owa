@@ -26,17 +26,28 @@ BEGIN
 	INSERT INTO @PartyList(PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel
 
-	DECLARE @PartiesInAnyGroup TABLE (PartyId INT, DiscountId SMALLINT)
-	INSERT INTO @PartiesInAnyGroup(PartyId, DiscountId)
-	SELECT DISTINCT a.PartyId, a.DiscountGroupId
+	-- Get Parties in any group
+	DECLARE @PartiesInAnyGroup TABLE (PartyId INT, DiscountGroupId SMALLINT)
+	INSERT INTO @PartiesInAnyGroup(PartyId, DiscountGroupId)
+	SELECT a.PartyId, a.DiscountGroupId
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
 		INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
-		INNER JOIN dbo.LA_DiscountGroupProduct dp WITH(NOLOCK) ON dp.DiscountGroupId = h.DiscountGroupId
 	WHERE h.DiscountGroupType IN (1, 3)
 		AND (@FromDate IS NULL OR @FromDate <= h.ToDate)
 		AND (@ToDate IS NULL OR @ToDate >= h.FromDate)
-		AND dp.ProductId NOT IN (SELECT p.val FROM bodb02.dbo.strSplit(@ProductIds, ',') p)
-		
+
+	--Get parties have at least one product in ProductIds
+	;WITH cte_PartyHaveProductInProductIds AS (
+		SELECT DISTINCT a.PartyID
+		FROM @PartiesInAnyGroup h
+			INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
+			INNER JOIN dbo.LA_DiscountGroupProduct dp WITH(NOLOCK) ON dp.DiscountGroupId = h.DiscountGroupId
+			INNER JOIN bodb02.dbo.strSplit(@ProductIds, ',') p ON p.val = dp.ProductId
+	)
+	-- Exclude parties not in cte_PartyHaveProductInProductIds
+	DELETE @PartiesInAnyGroup
+	WHERE PartyId NOT IN (SELECT PartyID FROM cte_PartyHaveProductInProductIds)
+
 	--list of payer not in group
 	SELECT p.PartyId, PartyName, BrandName
 	FROM @PartyList p
