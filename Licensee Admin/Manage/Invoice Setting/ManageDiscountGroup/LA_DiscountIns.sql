@@ -81,10 +81,10 @@ BEGIN
 	END
 
 	INSERT INTO @CalculationProducts(ProductId)
-	SELECT val FROM bodb02.dbo.Lrf_f_StringSplit(@CalculationProductIds, ',')
+	SELECT val FROM bodb02.dbo.strSplit(@CalculationProductIds, ',')
 
 	INSERT INTO @DiscountProducts(ProductId)
-	SELECT val FROM bodb02.dbo.Lrf_f_StringSplit(@DiscountProductIds, ',')
+	SELECT val FROM bodb02.dbo.strSplit(@DiscountProductIds, ',')
 
 	--parse assigned payer to group
 	IF @PartySettingsData <> ''
@@ -93,9 +93,9 @@ BEGIN
 		INSERT INTO @PartySettings(PartyId, Remark, IsApplyDiscount)
 		SELECT PartyId, Remark,  IsApplyDiscount
 		FROM OPENXML(@docHandler, 'Root/PartySetting')
-		WITH (PartyId VARCHAR(4) 'PartyId', 
-				Remark NVARCHAR(500) 'Remark', 
-				IsApplyDiscount VARCHAR(1) 'IsApplyDiscount' )
+		WITH (PartyId	INT 'PartyId', 
+				Remark	NVARCHAR(4000) 'Remark', 
+				IsApplyDiscount BIT 'IsApplyDiscount')
 	
 		EXEC sp_xml_removedocument @docHandler
 	END
@@ -104,13 +104,13 @@ BEGIN
 	BEGIN
 		EXEC sp_xml_preparedocument @docHandler OUTPUT, @RateSettingsData
 		INSERT INTO @RateSettings(FromAmount, ToAmount, Rate)
-		SELECT CAST(FromAmount AS MONEY), 
+		SELECT FromAmount, 
 				CASE WHEN ToAmount = 'Unlimited' THEN @MaxAmountValue ELSE CAST(ToAmount AS MONEY) END, 
 				CAST(Rate AS MONEY)
 		FROM OPENXML(@docHandler, 'Root/RateSetting')
-		WITH (FromAmount VARCHAR(50) 'FromAmount', 
+		WITH (FromAmount MONEY 'FromAmount', 
 				ToAmount VARCHAR(50) 'ToAmount', 
-				Rate VARCHAR(50) 'Rate' )
+				Rate DECIMAL(9, 8) 'Rate' )
 	
 		EXEC sp_xml_removedocument @docHandler
 	END
@@ -119,7 +119,6 @@ BEGIN
 	IF @FromDate IS NULL 
 		OR @ToDate IS NULL
 		OR ISNULL(@CurrencyId, 0) = 0
-		OR (NOT EXISTS (SELECT 1 FROM @PartySettings))
 		OR (NOT EXISTS (SELECT 1 FROM @RateSettings))
 	BEGIN
 		SELECT @ErrMsg = 'Please fill all required field.', @ErrCode = 503
