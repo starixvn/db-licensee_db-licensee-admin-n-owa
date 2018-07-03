@@ -22,7 +22,10 @@ AS
 */
 
 BEGIN
-	-- party list
+/*--------------------------------------------------------------------------------------------------------------------------------
+ * Prepare settings
+ *-------------------------------------------------------------------------------------------------------------------------------*/
+	-- 1. party list
 	DECLARE @PartyList TABLE(PartyId INT, PartyName VARCHAR(500), BrandName VARCHAR(500), ParentId INT, IsSelected BIT)
 	INSERT INTO @PartyList(PartyId,PartyName,BrandName,ParentId)
 	EXEC dbo.LA_PartyListSel
@@ -45,117 +48,52 @@ BEGIN
 	WHERE p2.PartyId NOT IN (SELECT p3.PartyId FROM @PartyList p3)
 	-- End region
 
-	-- product list
+	-- 2. product list
 	-- exclude some unsupported products
 	DECLARE @ProductList TABLE(ProductId INT, ProductCode VARCHAR(10))
 	INSERT INTO @ProductList(ProductId, ProductCode)
 	SELECT ProductID, ProductPrefix
 	FROM dbo.LA_f_Products3rd(ISNULL(@ProductCodes,''))
-	WHERE ProductID NOT IN (1,3,23,13,14,17,31) -- exclude RB,BA,bettrade,NG2, MGCLC,MGCRNG,BX
+	WHERE ProductID NOT IN (1,3,23,13,14,17,31) -- exclude RB,BA,NG2,bettrade,MGCLC,MGCRNG,BX
 
-	-- exchange
-	SELECT ExchangeDate, ExchangeId, BaseCurrencyRate
+	-- 3. charge info
+	SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, ci.DI_Rate AS Rate, ci.Fromdate, ci.ToDate,
+			CASE WHEN ci.ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END Bettype,
+			1 AS TypeId
+	INTO #ChargeInfo
+	FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
+	LEFT JOIN bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype AND (
+			(ci.ProductId NOT IN (14,17)) OR 
+			(ci.ProductID = 14 AND sbr.Bettype BETWEEN 2001 AND 2007) OR
+			(ci.ProductID = 17 AND sbr.Bettype BETWEEN 2008 AND 2009)
+		)			
+	WHERE	DI_Rate > 0 AND ci.ProductID <> 15 -- exclude CB
+	
+	-- include CB charge info
+	IF EXISTS(SELECT TOP 1 1 FROM @ProductList WHERE ProductId=15) -- colossus bet
+	BEGIN
+		INSERT INTO #ChargeInfo(PartyId, LicenseeId, ProductID, Rate, TypeId, FromDate, ToDate)
+		SELECT	ci.FromParty,p.OldRefID,15,ci.Rate,ci.ChargeType,
+				CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
+				CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
+		FROM dbo.OAS_Party p WITH(NOLOCK)
+			INNER JOIN @PartyList pl ON p.PartyID=pl.PartyId
+			INNER JOIN dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
+			LEFT JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
+		WHERE ci.ProductID = 15 -- colossus bet
+			AND pd.IsDeposit = 1
+			AND ChargeType IN (6,7) -- 6 comm, 7 cashin
+			AND @FromDate <= ci.ToDate
+			AND ci.FromDate <= @ToDate
+	END
+
+	-- 4. exchange
+	SELECT ExchangeDate, ExchangeId, BaseCurrencyRate AS Rate
 	INTO #Exchange
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrency)
 	WHERE ExchangeDate BETWEEN @FromDate AND @ToDate
 
-
-
-	DROP TABLE #Exchange
-END
-GO
-
-/*
-SET NOCOUNT ON
-
-	DECLARE @LicenseeID INT
-	DECLARE @PartyIdTable TABLE (PartyId INT)
-	INSERT INTO @PartyIdTable VALUES (@PartyId)
-
-	DECLARE @BaseCurrencyId INT = (SELECT TOP 1 BaseCurrencyId FROM dbo.OAS_PartyDetail WITH(NOLOCK) WHERE PartyID = @PartyId)
-	DECLARE @BaseCurrency VARCHAR(10) = (SELECT TOP 1 Code FROM bodb02.dbo.Exchange e WITH(NOLOCK) WHERE e.exchangeid = @BaseCurrencyId)
-
-	-- Party groups
-	-- select all parties in the same group
-	INSERT INTO @PartyIdTable
-	SELECT	PartyId
-	FROM	bodb_licensee.dbo.LA_PartyGroupAssignment WITH(NOLOCK)
-	WHERE	PartyId <> @PartyId AND PartyGroupId IN (
-		SELECT	p1.PartyGroupId
-		FROM	bodb_licensee.dbo.LA_PartyGroupAssignment p1 WITH(NOLOCK)
-		WHERE	p1.PartyId = @PartyId
-	)
-	-- End region
-
-	-- products
-	DECLARE @Products TABLE (ProductId INT, ProductCode VARCHAR(20))
-	INSERT INTO @Products
-	SELECT DISTINCT p.ProductID, p.ProductPrefix
-	FROM LA_f_Products3rd('') p
-	INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON c.ProductID = p.ProductID
-	WHERE c.FromParty = @PartyId AND c.ProductId NOT IN (1,23,13,14,17,31 ) --exclude RB,bettrade,NG2, MGCLC,MGCRNG,BX
-
-	-- Region: Party charge info
-	DECLARE @CB INT = 15, @CO INT = 25, @CSProductId INT = 6
-	DECLARE @PartyIds VARCHAR(4000) = (SELECT CAST(PartyId AS VARCHAR(10)) + ',' FROM @PartyIdTable FOR XML PATH(''))
-	DECLARE @ProductCodes VARCHAR(2000) = (SELECT ProductCode + ',' FROM @Products FOR XML PATH(''))
-	DECLARE @PartyChargeInfo AS TABLE (
-		PartyId		INT,
-		LicenseeId	INT,
-		ProductID	INT,
-		Rate		DECIMAL(9,8),
-		FromDate	SMALLDATETIME,
-		ToDate		SMALLDATETIME,
-		Bettype		INT,
-		TypeId		SMALLINT
-	)
-
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
-	(
-		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, ci.DI_Rate, ci.Fromdate, ci.ToDate,
-				CASE WHEN ci.ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
-		FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
-		LEFT JOIN bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype AND (
-				(ci.ProductId NOT IN (14,17)) OR 
-				(ci.ProductID = 14 AND sbr.Bettype BETWEEN 2001 AND 2007) OR
-				(ci.ProductID = 17 AND sbr.Bettype BETWEEN 2008 AND 2009)
-			)			
-		WHERE	DI_Rate > 0 AND ci.ProductID <> @CB -- exclude CB
-	)
-
-	-- include CB	
-	DECLARE @CommChargeType INT = 6
-	DECLARE @CashInShareChargeType INT = 7
-
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, TypeId, FromDate, ToDate)
-	SELECT	ci.FromParty,
-			p.OldRefID,
-			@CB,
-			ci.Rate,
-			ci.ChargeType,
-			CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
-			CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
-	FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
-		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
-		LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
-	WHERE EXISTS(SELECT TOP 1 1 FROM @Products WHERE ProductId=@CB)
-		AND FromParty = @PartyId
-		AND ProductID = @CB
-		AND pd.IsDeposit = 1
-		AND ChargeType IN (@CommChargeType,@CashInShareChargeType) AND (
-			@FromDate BETWEEN ci.FromDate AND ci.ToDate OR
-			@ToDate BETWEEN ci.FromDate AND ci.ToDate OR
-			ci.FromDate BETWEEN @FromDate AND @ToDate OR
-			ci.ToDate BETWEEN @FromDate AND @ToDate
-		)
-	
-	SELECT TOP 1 @LicenseeID =  LicenseeID FROM @PartyChargeInfo
-	-- End region
-
-	-- keep active products
-	DELETE @Products WHERE ProductId NOT IN (SELECT p.ProductId FROM @PartyChargeInfo p WHERE p.PartyId = @PartyId)
-
-	-- Region: MinfeeGroup Date range
+	-- 5. minfee settings
 	DECLARE @Month TINYINT = MONTH(@FromDate)
 	DECLARE @FirstDate DATETIME = DATEADD(mm, DATEDIFF(mm, 0, @FromDate), 0)
 	DECLARE @LastDate DATETIME = DATEADD (dd, -1, DATEADD(mm, DATEDIFF(mm, 0, @FromDate) + 1, 0))
@@ -174,7 +112,7 @@ SET NOCOUNT ON
 		TotalAmount		MONEY,
 		MinFeeAmount	MONEY,
 		AmountToCompany	MONEY,
-		DaysOutOfWaiveTime  INT
+		DaysOutOfWaiveTime	INT
 	)
 
 	INSERT INTO @MinFeeGroup(FeeType ,PartyId,ProductId, CurrencyId ,FeeAmount ,FromDate ,ToDate)
@@ -199,34 +137,23 @@ SET NOCOUNT ON
 															)
 													)
 				)
-				AND mf.ProductId IN (SELECT ProductId FROM @PartyChargeInfo)
-				AND mf.PartyId IN (SELECT p.PartyId FROM @PartyIdTable p)
+				AND mf.ProductId IN (SELECT ProductId FROM @ProductList)
+				AND mf.PartyId IN (SELECT p.PartyId FROM @PartyList p)
 				AND ((mf.FromDate BETWEEN @FirstDate AND @LastDate) 
 					OR (mf.ToDate BETWEEN @FirstDate AND @LastDate) 
 					OR (mf.FromDate<@FirstDate AND @LastDate < mf.ToDate)
 				)
 	)
-	-- End region
-
-	-- Region: Get exchange rate info
-	CREATE	TABLE #Exchange (
-		ExchangeDate	DATE,
-		ExchangeID		INT,
-		CurrencyCode	VARCHAR(10),
-		Rate			DECIMAL(9,8)
-	)
-
-	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrency)
-	-- End region
 
 	UPDATE m SET m.FeeAmount = m.FeeAmount * e.Rate
 	FROM @MinFeeGroup m
 	INNER JOIN #Exchange e ON m.ToDate = e.ExchangeDate AND m.CurrencyId = e.ExchangeID
 
-	-- Region: Get Amount by Product
-	CREATE	TABLE #TempData (
+/*--------------------------------------------------------------------------------------------------------------------------------
+ * winloss data
+ *-------------------------------------------------------------------------------------------------------------------------------*/
+	-- 6. temp data
+	CREATE TABLE #TempData (
 		LicenseeId		INT,
 		PartyId			INT,
 		rptDate			DATETIME,
@@ -238,6 +165,7 @@ SET NOCOUNT ON
 		IsApplyMinFee	BIT
 	)
 	CREATE NONCLUSTERED INDEX Idx_InvoiceData ON #TempData (PartyId, ProductId)
+
 	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,ProductId,WinLoss,AComm,AmountToCompany)
 	(
 		SELECT	b.SiteID,
@@ -248,12 +176,12 @@ SET NOCOUNT ON
 				SUM(ISNULL(b.MemberWL, 0)) * e.Rate,
 				SUM(ISNULL(b.CommissionA, 0)) * e.Rate,
 				SUM((-ISNULL(b.MemberWL, 0) * p.Rate) - (CASE WHEN b.ProductId = 3 THEN ISNULL(b.CommissionA, 0) ELSE 0 END)) * e.Rate
-		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-				INNER JOIN @PartyChargeInfo p ON	b.ProductId = p.ProductID 
-													AND p.LicenseeId = b.SiteId
-													AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
-													AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
+			INNER JOIN #ChargeInfo p ON b.ProductId = p.ProductID 
+					AND p.LicenseeId = b.SiteId
+					AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
+					AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
 		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
@@ -262,6 +190,33 @@ SET NOCOUNT ON
 				AND b.ProductId NOT IN (15,25,14,17, 6) -- exclude CO, CB, MGCLC, MGCRNG, CS
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, e.Rate
 	)
+/*--------------------------------------------------------------------------------------------------------------------------------
+ * minfee settings
+ *-------------------------------------------------------------------------------------------------------------------------------*/
+
+	DROP TABLE #Exchange
+	DROP TABLE #ChargeInfo
+END
+GO
+
+/*
+SET NOCOUNT ON
+
+	DECLARE @LicenseeID INT
+	DECLARE @PartyIdTable TABLE (PartyId INT)
+	INSERT INTO @PartyIdTable VALUES (@PartyId)
+
+	DECLARE @BaseCurrencyId INT = (SELECT TOP 1 BaseCurrencyId FROM dbo.OAS_PartyDetail WITH(NOLOCK) WHERE PartyID = @PartyId)
+	DECLARE @BaseCurrency VARCHAR(10) = (SELECT TOP 1 Code FROM bodb02.dbo.Exchange e WITH(NOLOCK) WHERE e.exchangeid = @BaseCurrencyId)
+
+
+	-- Region: MinfeeGroup Date range
+	
+	-- End region
+
+
+
+	
 
 	-- Region: include CB
 	SELECT	rptDate,
@@ -515,8 +470,9 @@ SET NOCOUNT ON
 	;WITH f AS (
 		SELECT dr.DiscountGroupId, SUM(CASE WHEN r.AmountToCompany<0 THEN 0 ELSE r.AmountToCompany END) AS Amount
 		FROM @Result r
-		INNER JOIN #DiscountRebate dr ON r.ProductId = dr.ProductId
-		WHERE dr.DiscountGroupType = @DiscountByFee
+		INNER JOIN (SELECT DISTINCT DiscountGroupId,ProductId 
+			FROM #DiscountRebate d 
+			WHERE d.DiscountGroupType = @DiscountByFee) dr ON r.ProductId = dr.ProductId
 		GROUP BY dr.DiscountGroupId
 	)
 	UPDATE r SET Discount = (CASE WHEN r.AmountToCompany<0 THEN 0 ELSE r.AmountToCompany * dr.Rate END) + ISNULL(Discount,0)
