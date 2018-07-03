@@ -29,6 +29,7 @@ AS
 	- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
 	- 20180515@Scofield: Incorporate 9wickets data [#94950]
 	- 20180716@bruce: add new group TEST for credit [#98126]
+	- 20180703@Parsons: Integrate Pragmatic Win Loss [#94108]
 
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -60,7 +61,9 @@ BEGIN
 	WHERE ExchangeId = 51
 
 	INSERT INTO #ChargeInfo (PartyID, LicenseeID, ProductID, BetTypeID, Rate, Fromdate, Todate)
-	SELECT DISTINCT PartyID, LicenseeID, ProductID, Bettype, DI_Rate, Fromdate, Todate
+	SELECT DISTINCT PartyID, LicenseeID, ProductID, Bettype, 
+			CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END,
+			Fromdate, Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo (@PartyID, @FromDate, @ToDate, @ProductCodes, 'OA', @excludeTest)
 	
 	INSERT INTO #Products(ProductID,ProductName)
