@@ -66,8 +66,7 @@ BEGIN
 		RETURN
 	END
 
-	DECLARE @CalculationProducts TABLE (ProductId TINYINT)
-	DECLARE @DiscountProducts TABLE (ProductId TINYINT)
+	DECLARE @Products TABLE (ProductId TINYINT, IsDiscount BIT, IsCalculation BIT)
 	DECLARE @PartySettings	TABLE (PartyId SMALLINT, Remark NVARCHAR(500), IsApplyDiscount BIT)
 	DECLARE @RateSettings	TABLE (FromAmount MONEY, ToAmount MONEY, Rate MONEY, RowIndex INT)
 	
@@ -80,11 +79,13 @@ BEGIN
 		RETURN	
 	END
 
-	INSERT INTO @CalculationProducts(ProductId)
-	SELECT val FROM bodb02.dbo.strSplit(@CalculationProductIds, ',')
-
-	INSERT INTO @DiscountProducts(ProductId)
-	SELECT val FROM bodb02.dbo.strSplit(@DiscountProductIds, ',')
+	INSERT INTO @Products(ProductId, IsDiscount, IsCalculation)
+	SELECT val, 0, 1 FROM bodb02.dbo.strSplit(@CalculationProductIds, ',')
+	
+	;MERGE @Products AS t 
+	USING bodb02.dbo.strSplit(@DiscountProductIds, ',') AS s ON t.ProductId = s.val
+		WHEN MATCHED THEN UPDATE SET IsDiscount = 1
+		WHEN NOT MATCHED THEN INSERT (ProductId, IsDiscount, IsCalculation) VALUES(s.val, 1, 0);
 
 	--parse assigned payer to group
 	IF @PartySettingsData <> ''
@@ -189,11 +190,9 @@ BEGIN
 	END
 
 	--insert discount group product
-	INSERT INTO dbo.LA_DiscountGroupProduct(DiscountGroupId, ProductId, IsDiscountProduct)
-	SELECT DISTINCT @GroupIdOut, c.ProductId,
-			CASE WHEN d.ProductId IS NOT NULL THEN 1 ELSE 0 END
-	FROM @CalculationProducts AS c
-			LEFT JOIN @DiscountProducts AS d ON c.ProductId = d.ProductId 
+	INSERT INTO dbo.LA_DiscountGroupProduct(DiscountGroupId, ProductId, IsDiscountProduct, IsCalculationProduct)
+	SELECT @GroupIdOut, ProductId, IsDiscount, IsCalculation
+	FROM @Products
 
 	IF @@ERROR <> 0
 	BEGIN
