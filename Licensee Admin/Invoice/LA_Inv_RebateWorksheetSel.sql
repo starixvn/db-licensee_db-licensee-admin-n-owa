@@ -439,8 +439,9 @@ BEGIN
 	;WITH f AS (
 		SELECT dr.DiscountGroupId, SUM(CASE WHEN r.AmountToCompany<0 THEN 0 ELSE r.AmountToCompany END) AS Amount
 		FROM @Result r
-		INNER JOIN #DiscountRebate dr ON r.ProductId = dr.ProductId
-		WHERE dr.DiscountGroupType = @DiscountByFee
+		INNER JOIN (SELECT DISTINCT DiscountGroupId,ProductId 
+			FROM #DiscountRebate d 
+			WHERE d.DiscountGroupType = @DiscountByFee) dr ON r.ProductId = dr.ProductId
 		GROUP BY dr.DiscountGroupId
 	)
 	UPDATE r SET Discount = (CASE WHEN r.AmountToCompany<0 THEN 0 ELSE r.AmountToCompany * dr.Rate END) + ISNULL(Discount,0)
