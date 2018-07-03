@@ -56,6 +56,15 @@ BEGIN
 	INNER JOIN LA_f_BaseCurrency() c ON c.CurrencyId = h.CurrencyId
 	WHERE DiscountGroupId = @GroupId
 
+	--get discount setting rates
+	SELECT DiscountGroupDetailId AS DiscountDetailId
+		, FromAmount
+		, ToAmount
+		, Rate
+	FROM dbo.LA_DiscountGroupDetail WITH(NOLOCK)
+	WHERE DiscountGroupId = @GroupId
+	ORDER BY FromAmount
+
 	--get list of licensees
 	SELECT DiscountGroupId,
 			p.PartyId,
@@ -65,14 +74,5 @@ BEGIN
 	FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
 	INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = a.PartyID
 	WHERE DiscountGroupId = @GroupId
-
-	--get discount setting rates
-	SELECT DiscountGroupDetailId 
-		, FromAmount
-		, ToAmount
-		, Rate
-	FROM dbo.LA_DiscountGroupDetail WITH(NOLOCK)
-	WHERE DiscountGroupId = @GroupId
-	ORDER BY FromAmount
 END
 GO
