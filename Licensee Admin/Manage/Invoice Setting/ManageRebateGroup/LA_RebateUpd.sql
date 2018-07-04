@@ -140,8 +140,8 @@ BEGIN
 	USING @Products AS s
 	ON (t.DiscountGroupId = @GroupId AND t.ProductId = s.ProductId)
 	WHEN NOT MATCHED BY TARGET
-		THEN INSERT(DiscountGroupId, ProductId, IsDiscountProduct)
-				VALUES(@GroupId, s.ProductId, 0)
+		THEN INSERT(DiscountGroupId, ProductId, IsDiscountProduct, IsCalculationProduct)
+				VALUES(@GroupId, s.ProductId, 0, 1)
 	WHEN NOT MATCHED BY SOURCE AND t.DiscountGroupId = @GroupId
 		THEN DELETE;
 

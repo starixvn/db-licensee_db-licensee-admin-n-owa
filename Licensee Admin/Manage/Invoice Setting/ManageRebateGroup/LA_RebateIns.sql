@@ -111,8 +111,8 @@ BEGIN
 	END
 
 	--insert rebate group product
-	INSERT INTO dbo.LA_DiscountGroupProduct(DiscountGroupId, ProductId, IsDiscountProduct)
-	SELECT DISTINCT @GroupIdOut, ProductId, 0
+	INSERT INTO dbo.LA_DiscountGroupProduct(DiscountGroupId, ProductId, IsDiscountProductm, IsCalculationProduct)
+	SELECT DISTINCT @GroupIdOut, ProductId, 0, 1
 	FROM @Products
 
 	IF @@ERROR <> 0
