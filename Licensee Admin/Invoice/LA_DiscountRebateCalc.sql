@@ -166,6 +166,7 @@ BEGIN
 	)
 	CREATE NONCLUSTERED INDEX Idx_InvoiceData ON #TempData (PartyId, ProductId)
 
+	-- general products
 	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,ProductId,WinLoss,AComm,AmountToCompany)
 	(
 		SELECT	b.SiteID,
@@ -185,17 +186,104 @@ BEGIN
 		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
-				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
+				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914) -- exclude CO, BT
 				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
-				AND b.ProductId NOT IN (15,25,14,17, 6) -- exclude CO, CB, MGCLC, MGCRNG, CS
+				AND b.ProductId NOT IN (15,25,14,17,6) -- exclude CO, CB, MGCLC, MGCRNG, CS
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, e.Rate
 	)
+	-- include CB winloss
+	SELECT	rptDate,
+			b.SiteID,
+			cb.PartyId,
+			b.ProductId,
+			CurrencyId,
+			SUM(Turnover) Turnover,
+			SUM(CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN b.Turnover ELSE b.ExtraAmount END) TurnoverForCommision,
+			SUM(ISNULL(WinPrizeAmount,0)) WinningPrize,
+			SUM(ISNULL(CashOutAmount,0)) CashOut,
+			SUM(ISNULL(BuyBackAmount,0)) CashInAmount,
+			CAST(0 AS MONEY) CommisionShare,
+			CAST(0 AS MONEY) CashInShare
+	INTO #TempDataCB
+	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+	JOIN #ChargeInfo cb ON b.SiteID = cb.LicenseeId AND b.ProductId = cb.ProductID AND b.rptDate BETWEEN cb.FromDate AND cb.ToDate
+	WHERE b.ProductId = 15 -- colossus bet
+		AND b.StatusId NOT IN (-1, 101, 102, 103)
+		AND CustomerCategory NOT IN (27, 28)
+		AND CurrencyId <> 20
+		AND cb.TypeId = 6 -- to remove duplicate we use one of (6,7)
+	GROUP BY rptdate, CurrencyId, b.SiteID, cb.PartyId, b.ProductId
+	
+	UPDATE #TempDataCB SET
+		CommisionShare = td.TurnoverForCommision * cm.Rate,
+		CashInShare = td.CashInAmount * ci.Rate
+	FROM #TempDataCB td
+	JOIN #ChargeInfo AS cm ON cm.ProductID = 15 AND cm.TypeId = 6 AND (td.rptDate BETWEEN cm.FromDate AND cm.ToDate)
+	JOIN #ChargeInfo AS ci ON cm.ProductID = 15 AND ci.TypeId = 7 AND (td.rptDate BETWEEN ci.FromDate AND ci.ToDate)
+
+	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,ProductId, AmountToCompany)
+	SELECT SiteID, PartyId, rptDate, CurrencyId, ProductId, (Turnover - WinningPrize - Cashout - CommisionShare - CashInShare) * e.Rate
+	FROM #TempDataCB tcb
+	INNER JOIN #Exchange e ON tcb.rptDate = e.ExchangeDate AND tcb.CurrencyId = e.ExchangeID
+
+	-- include CO winloss
+	;WITH CO AS (
+		SELECT p.LicenseeId, p.PartyId, b.Winlostdate, b.Currency,
+			SUM(b.BuyBackAmt) AS BuyBackAmountSB,
+			SUM(b.BABuyBackAmt) AS BuyBackAmountBA,
+			SUM(b.TicketPayout) AS TicketsPayout,
+			SUM(b.BuyBackAmt * p.Rate) AS CashoutCommission
+		FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
+		INNER JOIN #ChargeInfo p ON b.SiteId = p.LicenseeId AND b.ProductId = p.ProductID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate
+		WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate
+			AND b.ProductID = 25 -- cashout
+			AND b.Currency <> 20
+			AND b.RoleID = 1 -- Member Level
+		GROUP BY p.LicenseeId, p.PartyId, b.Winlostdate, b.Currency
+	)
+	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,ProductId, AmountToCompany)
+	SELECT CO.LicenseeId, CO.PartyId, CO.Winlostdate, CO.Currency, 25, (TicketsPayout - BuyBackAmountSB - BuyBackAmountBA - CashoutCommission) * e.Rate
+	FROM CO INNER JOIN #Exchange e ON CO.Winlostdate = e.ExchangeDate AND CO.Currency = e.ExchangeID
+
+	-- include MGCLC, MGCRNG winloss
+	;WITH MGC AS (
+		SELECT p.LicenseeId, p.PartyId, b.RptDate, b.CurrencyID, p.ProductID
+			, SUM((-ISNULL(b.winloss, 0) - ISNULL(b.ProgressiveContribution, 0)) * p.Rate - ISNULL(b.AComm, 0)) Amount
+		FROM bodb_licenseereport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
+		INNER JOIN #ChargeInfo p ON p.LicenseeId=b.SiteId AND p.Bettype=b.BetTypeId AND b.RptDate BETWEEN p.FromDate AND p.ToDate
+		WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
+			AND (b.CurrencyID <> 20)
+			AND b.StatusId NOT IN (-1, 101, 102, 103)
+		GROUP BY p.LicenseeId, p.PartyId, b.rptDate, b.CurrencyID, p.ProductID
+	)
+	INSERT INTO #TempData(LicenseeId,PartyId,rptDate,CurrencyId,ProductId,AmountToCompany)
+	SELECT MGC.LicenseeId,MGC.PartyId,MGC.RptDate,MGC.CurrencyId,MGC.ProductID, MGC.Amount * e.Rate
+	FROM MGC INNER JOIN #Exchange e ON MGC.RptDate = e.ExchangeDate AND MGC.CurrencyId = e.ExchangeID
+
+	-- include CS winloss
+	INSERT INTO #TempData(LicenseeId,PartyId,rptDate,CurrencyID,ProductId,AmountToCompany)
+	SELECT b.SiteID,p.PartyID,b.rptDate,b.CurrencyID,6 -- rng casino
+	, SUM((
+		CASE WHEN b.bettype IN (2199, 2399, 2999) THEN 0 ELSE -MemberWL END + -- exclude jackpot tickets
+		CASE WHEN b.bettype IN (2198, 2398, 2998) THEN GrossWL ELSE 0 END -- exclude contrinution tickets ( grosswl = -awinloss = -contribution)
+	) * p.Rate * e.Rate)
+	FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+	INNER JOIN #ChargeInfo p ON b.SiteID = p.LicenseeId AND b.ProductID = p.ProductID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
+	INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND CurrencyID = e.ExchangeID
+	WHERE b.ProductID = 6 -- RNG casino
+		AND (b.CurrencyID <> 20)
+		AND b.StatusId NOT IN (-1, 101, 102, 103)
+		AND b.customercategory NOT IN (27, 28)
+	GROUP BY b.SiteID, b.rptdate, b.CurrencyID, p.PartyID
+
 /*--------------------------------------------------------------------------------------------------------------------------------
- * minfee settings
+ * minfee calculation
  *-------------------------------------------------------------------------------------------------------------------------------*/
 
 	DROP TABLE #Exchange
 	DROP TABLE #ChargeInfo
+	DROP TABLE #TempDataCB
+	DROP TABLE #TempData
 END
 GO
 
