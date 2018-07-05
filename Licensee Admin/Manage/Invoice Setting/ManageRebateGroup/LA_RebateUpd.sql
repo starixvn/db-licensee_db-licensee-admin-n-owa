@@ -168,6 +168,7 @@ BEGIN
 		, FromDate = @FromDate
 		, ToDate = @ToDate
 		, Remark = @Remark
+		, ModifiedDate = GETDATE()
 	WHERE DiscountGroupId = @GroupId
 
 	IF @@ERROR <> 0

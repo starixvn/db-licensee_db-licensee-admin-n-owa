@@ -148,8 +148,8 @@ BEGIN
 
 	--#Region Insert
 	--insert discount group header
-	INSERT INTO dbo.LA_DiscountGroupHeader(DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, [Priority], CalculationType)
-	VALUES(@GroupName, @DiscountGroupType, @CurrencyId, @FromDate, @ToDate, 1, @CalculationType)
+	INSERT INTO dbo.LA_DiscountGroupHeader(DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, [Priority], CalculationType,ModifiedDate)
+	VALUES(@GroupName, @DiscountGroupType, @CurrencyId, @FromDate, @ToDate, 1, @CalculationType,GETDATE())
 
 	IF @@ERROR <> 0
 	BEGIN

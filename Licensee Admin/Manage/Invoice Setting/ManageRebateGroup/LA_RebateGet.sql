@@ -44,7 +44,8 @@ BEGIN
 			Remark, 
 			@ProductIds AS ProductIds,
 			@PartyIds	AS PartyIds,
-			@Rate AS Rate
+			@Rate AS Rate,
+			ModifiedDate
 	FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK)
 	WHERE DiscountGroupId = @GroupId
 END

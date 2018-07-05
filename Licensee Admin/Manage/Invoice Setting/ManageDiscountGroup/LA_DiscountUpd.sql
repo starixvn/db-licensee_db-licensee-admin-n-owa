@@ -214,7 +214,8 @@ BEGIN
 		FromDate = @FromDate, 
 		ToDate = @ToDate,
 		DiscountGroupType = @DiscountGroupType,
-		CalculationType = @CalculationType
+		CalculationType = @CalculationType,
+		ModifiedDate = GETDATE()
 	WHERE DiscountGroupId = @DiscountGroupId
 	
 	IF @@ERROR <> 0
