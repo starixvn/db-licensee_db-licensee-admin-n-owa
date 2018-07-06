@@ -21,9 +21,6 @@ BEGIN
 	SELECT  h.DiscountGroupId, 
 			h.DiscountGroupName,
 			ISNULL(ex.Code, '') AS CurrencyName,
-			ISNULL(d.FromAmount, 0) AS FromAmount, 
-			ISNULL(d.ToAmount, 0)	AS ToAmount,
-			d.Rate,
 			h.FromDate,
 			h.ToDate,
 			h.CalculationType,
@@ -52,7 +49,6 @@ BEGIN
 				).value('/str[1]','VARCHAR(MAX)') 
 			, 1, 2, '') AS PayerList
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
-		LEFT JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON h.DiscountGroupId = d.DiscountGroupId
 		LEFT JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON h.DiscountGroupId = p.DiscountGroupId
 		LEFT JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
 		LEFT JOIN bodb02.dbo.Exchange ex WITH(NOLOCK) ON h.CurrencyId = ex.ExchangeId
@@ -60,12 +56,16 @@ BEGIN
 	GROUP BY h.DiscountGroupId, 
 			h.DiscountGroupName,
 			ISNULL(ex.Code, ''),
-			ISNULL(d.FromAmount, 0), 
-			ISNULL(d.ToAmount, 0),
-			d.Rate,
 			h.FromDate,
 			h.ToDate,
 			h.CalculationType,
 			h.DiscountGroupType
+
+	-- Get rate settings
+	SELECT h.DiscountGroupId, d.FromAmount, d.ToAmount, d.Rate	
+	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
+		 INNER JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON h.DiscountGroupId = d.DiscountGroupId
+	WHERE DiscountGroupType IN (1, 3)
+	ORDER BY DiscountGroupDetailId, FromAmount
 END
 GO
