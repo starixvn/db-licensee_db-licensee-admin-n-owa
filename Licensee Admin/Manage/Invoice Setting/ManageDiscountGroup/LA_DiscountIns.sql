@@ -3,7 +3,7 @@ USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountIns]
-	@GroupName			VARCHAR(50),
+	@DiscountGroupName	VARCHAR(50),
 	@DiscountGroupType	TINYINT, 
 	@CurrencyId			TINYINT,
 	@FromDate			DATE, 
@@ -60,7 +60,7 @@ BEGIN
 	DECLARE @MaxAmountValue MONEY = 10000000000000
 	
 	--check empty
-	IF ISNULL(@GroupName, '') = ''
+	IF ISNULL(@DiscountGroupName, '') = ''
 	BEGIN
 		SELECT @ErrCode = 501, @ErrMsg = 'Please fill out group name.'
 		RETURN
@@ -149,7 +149,7 @@ BEGIN
 	--#Region Insert
 	--insert discount group header
 	INSERT INTO dbo.LA_DiscountGroupHeader(DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, [Priority], CalculationType,ModifiedDate)
-	VALUES(@GroupName, @DiscountGroupType, @CurrencyId, @FromDate, @ToDate, 1, @CalculationType,GETDATE())
+	VALUES(@DiscountGroupName, @DiscountGroupType, @CurrencyId, @FromDate, @ToDate, 1, @CalculationType,GETDATE())
 
 	IF @@ERROR <> 0
 	BEGIN
