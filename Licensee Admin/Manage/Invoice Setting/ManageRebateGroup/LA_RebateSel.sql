@@ -42,7 +42,7 @@ BEGIN
 				WHERE aa.DiscountGroupId = h.DiscountGroupId
 				FOR XML PATH (''), ROOT('str'), TYPE 
 					).value('/str[1]','VARCHAR(MAX)') 
-			  , 1, 2, '') AS PayerList
+			  , 1, 2, '') AS PartyList
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
 		LEFT JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON h.DiscountGroupId = d.DiscountGroupId
 		LEFT JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON h.DiscountGroupId = p.DiscountGroupId

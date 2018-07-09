@@ -4,7 +4,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountUpd]
 	@DiscountGroupId	SMALLINT = 0,
-	@GroupName			VARCHAR(50),
+	@DiscountGroupName	NVARCHAR(50),
 	@DiscountGroupType	TINYINT, 
 	@CurrencyId			TINYINT,
 	@FromDate			DATE, 
@@ -60,7 +60,7 @@ BEGIN
 	DECLARE @MaxAmountValue MONEY = 10000000000000
 
 	--check empty
-	IF ISNULL(@GroupName, '') = ''
+	IF ISNULL(@DiscountGroupName, '') = ''
 	BEGIN
 		SELECT @ErrCode = 501, @ErrMsg = 'Group name required.'
 		RETURN
@@ -209,7 +209,7 @@ BEGIN
 
 	--update discount group header
 	UPDATE dbo.LA_DiscountGroupHeader WITH(ROWLOCK, UPDLOCK)
-	SET DiscountGroupName = @GroupName, 
+	SET DiscountGroupName = @DiscountGroupName, 
 		CurrencyId = @CurrencyId, 
 		FromDate = @FromDate, 
 		ToDate = @ToDate,
