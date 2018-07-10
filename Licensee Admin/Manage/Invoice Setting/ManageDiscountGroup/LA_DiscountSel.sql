@@ -23,20 +23,19 @@ BEGIN
 			ISNULL(ex.Code, '') AS CurrencyName,
 			h.FromDate,
 			h.ToDate,
-			h.CalculationType,
 			h.DiscountGroupType, 
 			STUFF((
 				SELECT ', ' + ISNULL(CAST(ppp.ProductName AS VARCHAR), '')
 				FROM dbo.LA_DiscountGroupProduct pp WITH (NOLOCK)
 					LEFT JOIN dbo.LA_f_Products3rd('') ppp ON pp.ProductId = ppp.Productid
-				WHERE pp.DiscountGroupId = h.DiscountGroupId
+				WHERE pp.DiscountGroupId = h.DiscountGroupId AND (CalculationType = 1 OR  CalculationType = 10)
 				FOR XML PATH (''))
 			  , 1, 2, '') AS CalculationProductList, 
 			STUFF((
 			SELECT ', ' + ISNULL(CAST(ppp.ProductName AS VARCHAR), '')
 			FROM dbo.LA_DiscountGroupProduct pp WITH (NOLOCK)
 				LEFT JOIN dbo.LA_f_Products3rd('') ppp ON pp.ProductId = ppp.Productid
-			WHERE pp.DiscountGroupId = h.DiscountGroupId AND IsDiscountProduct = 1
+			WHERE pp.DiscountGroupId = h.DiscountGroupId AND (CalculationType = 0 OR  CalculationType = 10)
 			FOR XML PATH (''))
 			, 1, 2, '') AS DiscountProductList, 
 			STUFF((
@@ -52,20 +51,19 @@ BEGIN
 		LEFT JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON h.DiscountGroupId = p.DiscountGroupId
 		LEFT JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
 		LEFT JOIN bodb02.dbo.Exchange ex WITH(NOLOCK) ON h.CurrencyId = ex.ExchangeId
-	WHERE DiscountGroupType IN (1, 3)
+	WHERE DiscountGroupType IN (1, 3, 11, 13)
 	GROUP BY h.DiscountGroupId, 
 			h.DiscountGroupName,
 			ISNULL(ex.Code, ''),
 			h.FromDate,
 			h.ToDate,
-			h.CalculationType,
 			h.DiscountGroupType
 
-	-- Get rate settings
+	-- Get rate settings 
 	SELECT h.DiscountGroupId, d.FromAmount, d.ToAmount, d.Rate	
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
 		 INNER JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON h.DiscountGroupId = d.DiscountGroupId
-	WHERE DiscountGroupType IN (1, 3)
+	WHERE DiscountGroupType IN (1, 3, 11, 13)
 	ORDER BY DiscountGroupDetailId, FromAmount
 END
 GO
