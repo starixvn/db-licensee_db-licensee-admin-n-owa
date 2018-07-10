@@ -20,6 +20,7 @@ AS
 	 - 20171219@Bruce: increase length for variables [#88197]
 	 - 20180302@Harper: Support SGD as base currency for AG WL report [RedmineID: #91339]
 	 - 20180716@bruce: add new group TEST for credit [#98126]
+	 - 20180628@Scofield: Update calculation formula for AG& GD report [#94283]
 	 
 	 Params:
 */
