@@ -10,7 +10,6 @@ ALTER PROCEDURE [dbo].[LA_DiscountIns]
 	@ToDate				DATE, 
 	@CalculationProductIds VARCHAR(512) = '', 
 	@DiscountProductIds VARCHAR(512) = '',
-	@CalculationType	INT, 
 	@RateSettingsData	VARCHAR(MAX) = '', 
 	@PartySettingsData	VARCHAR(MAX) = '', 
 	@ErrCode			INT = 0 OUTPUT, 
@@ -146,8 +145,8 @@ BEGIN
 
 	--#Region Insert
 	--insert discount group header
-	INSERT INTO dbo.LA_DiscountGroupHeader(DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, [Priority], CalculationType,ModifiedDate)
-	VALUES(@DiscountGroupName, @DiscountGroupType, @CurrencyId, @FromDate, @ToDate, 1, @CalculationType,GETDATE())
+	INSERT INTO dbo.LA_DiscountGroupHeader(DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, [Priority],ModifiedDate)
+	VALUES(@DiscountGroupName, @DiscountGroupType, @CurrencyId, @FromDate, @ToDate, 1,GETDATE())
 
 	IF @@ERROR <> 0
 	BEGIN

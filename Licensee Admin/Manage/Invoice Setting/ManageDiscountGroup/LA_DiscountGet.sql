@@ -51,7 +51,6 @@ BEGIN
 		, @DiscountProductIds		AS DiscountProductIds
 		, @CalculationProductList	AS CalculationProductList
 		, @DiscountProductList		AS DiscountProductList
-		, h.CalculationType
 		, h.ModifiedDate
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
 	INNER JOIN LA_f_BaseCurrency() c ON c.CurrencyId = h.CurrencyId

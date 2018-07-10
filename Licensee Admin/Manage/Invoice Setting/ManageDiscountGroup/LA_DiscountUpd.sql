@@ -11,7 +11,6 @@ ALTER PROCEDURE [dbo].[LA_DiscountUpd]
 	@ToDate				DATE, 
 	@CalculationProductIds VARCHAR(512) = '', 
 	@DiscountProductIds VARCHAR(512) = '',
-	@CalculationType	INT, 
 	@RateSettingsData	VARCHAR(MAX) = '', 
 	@PartySettingsData	VARCHAR(MAX) = '', 
 	@UserId				INT, 
@@ -214,7 +213,6 @@ BEGIN
 		FromDate = @FromDate, 
 		ToDate = @ToDate,
 		DiscountGroupType = @DiscountGroupType,
-		CalculationType = @CalculationType,
 		ModifiedDate = GETDATE()
 	WHERE DiscountGroupId = @DiscountGroupId
 	
