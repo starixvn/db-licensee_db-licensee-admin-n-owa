@@ -19,6 +19,9 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
+	DECLARE @ToBeCalculated TINYINT = 1
+	DECLARE @ToBeDiscounted TINYINT = 0
+	DECLARE @CalculateAndDiscount TINYINT = 10
 
 	--get products which has assigned to group
 	DECLARE 
@@ -31,13 +34,13 @@ BEGIN
 		 ,@CalculationProductList = COALESCE(@CalculationProductList + ',' + p.ProductName, p.ProductName)
 	FROM dbo.LA_DiscountGroupProduct d WITH(NOLOCK)
 	INNER JOIN LA_f_Products3rd('') p ON p.ProductID = d.ProductId
-	WHERE d.DiscountGroupId = @GroupId AND d.IsCalculationProduct = 1
+	WHERE d.DiscountGroupId = @GroupId AND d.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount)
 
 	SELECT @DiscountProductIds = COALESCE(@DiscountProductIds + ',' + CAST(p.ProductId AS VARCHAR), CAST(p.ProductId AS VARCHAR))
 		 ,@DiscountProductList = COALESCE(@DiscountProductList + ',' + p.ProductName, p.ProductName)
 	FROM dbo.LA_DiscountGroupProduct d WITH(NOLOCK)
 	INNER JOIN LA_f_Products3rd('') p ON p.ProductID = d.ProductId
-	WHERE d.DiscountGroupId = @GroupId AND d.IsDiscountProduct = 1
+	WHERE d.DiscountGroupId = @GroupId AND d.CalculationType IN (@ToBeDiscounted,@CalculateAndDiscount)
 
 	--get discount header
 	SELECT h.DiscountGroupId

@@ -125,7 +125,7 @@ BEGIN
 	ON (t.DiscountGroupId = @GroupId AND t.PartyId = s.PayerId)
 	WHEN NOT MATCHED BY TARGET
 		THEN INSERT(DiscountGroupId, PartyId, IsApplyDiscount)
-				VALUES(@GroupId, s.PayerId, 1)
+				VALUES(@GroupId, s.PayerId, 0)
 	WHEN NOT MATCHED BY SOURCE AND t.DiscountGroupId = @GroupId
 		THEN DELETE;
 
@@ -140,8 +140,8 @@ BEGIN
 	USING @Products AS s
 	ON (t.DiscountGroupId = @GroupId AND t.ProductId = s.ProductId)
 	WHEN NOT MATCHED BY TARGET
-		THEN INSERT(DiscountGroupId, ProductId, IsDiscountProduct, IsCalculationProduct)
-				VALUES(@GroupId, s.ProductId, 0, 1)
+		THEN INSERT(DiscountGroupId, ProductId, CalculationType)
+				VALUES(@GroupId, s.ProductId, 0)
 	WHEN NOT MATCHED BY SOURCE AND t.DiscountGroupId = @GroupId
 		THEN DELETE;
 

@@ -83,8 +83,8 @@ BEGIN
 	-- #Region Insert 
 
 	--insert rebate group header
-	INSERT INTO dbo.LA_DiscountGroupHeader(DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, Remark, [Priority], CalculationType, ModifiedDate)
-	VALUES(@GroupName, @RebateGroupType, 0, @FromDate, @ToDate, @Remark, 2, 0, GETDATE())
+	INSERT INTO dbo.LA_DiscountGroupHeader(DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, Remark, [Priority], ModifiedDate)
+	VALUES(@GroupName, @RebateGroupType, 0, @FromDate, @ToDate, @Remark, 2, GETDATE())
 
 	IF @@ERROR <> 0
 	BEGIN
@@ -111,8 +111,8 @@ BEGIN
 	END
 
 	--insert rebate group product
-	INSERT INTO dbo.LA_DiscountGroupProduct(DiscountGroupId, ProductId, IsDiscountProduct, IsCalculationProduct)
-	SELECT DISTINCT @GroupIdOut, ProductId, 0, 1
+	INSERT INTO dbo.LA_DiscountGroupProduct(DiscountGroupId, ProductId, CalculationType)
+	SELECT DISTINCT @GroupIdOut, ProductId, 0
 	FROM @Products
 
 	IF @@ERROR <> 0
@@ -125,7 +125,7 @@ BEGIN
 
 	--insert rebate group assignment
 	INSERT INTO dbo.LA_DiscountGroupAssignment(DiscountGroupId, PartyID, IsApplyDiscount)
-	SELECT DISTINCT @GroupIdOut, PayerId, 1
+	SELECT DISTINCT @GroupIdOut, PayerId, 0
 	FROM @Payers
 
 	IF @@ERROR <> 0

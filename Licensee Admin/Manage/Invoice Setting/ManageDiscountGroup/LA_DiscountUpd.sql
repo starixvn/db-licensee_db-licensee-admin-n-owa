@@ -57,6 +57,9 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @MaxAmountValue MONEY = 10000000000000
+	DECLARE @ToBeCalculated TINYINT = 1
+	DECLARE @ToBeDiscounted TINYINT = 0
+	DECLARE @CalculateAndDiscount TINYINT = 10
 
 	--check empty
 	IF ISNULL(@DiscountGroupName, '') = ''
@@ -65,7 +68,7 @@ BEGIN
 		RETURN
 	END
 
-	DECLARE @Products TABLE (ProductId TINYINT, IsDiscount BIT, IsCalculation BIT)
+	DECLARE @Products TABLE (ProductId TINYINT, CalculationType TINYINT)
 	DECLARE @PartySettings	TABLE (PartyId SMALLINT, Remark NVARCHAR(500), IsApplyDiscount BIT)
 	DECLARE @RateSettings	TABLE (DiscountDetailId SMALLINT, FromAmount MONEY, ToAmount MONEY, Rate MONEY, RowIndex INT)
 	
@@ -78,13 +81,13 @@ BEGIN
 		RETURN	
 	END
 
-	INSERT INTO @Products(ProductId, IsDiscount, IsCalculation)
-	SELECT val, 0, 1 FROM bodb02.dbo.strSplit(@CalculationProductIds, ',')
+	INSERT INTO @Products(ProductId, CalculationType)
+	SELECT val, @ToBeCalculated FROM bodb02.dbo.strSplit(@CalculationProductIds, ',')
 	
 	;MERGE @Products AS t 
 	USING bodb02.dbo.strSplit(@DiscountProductIds, ',') AS s ON t.ProductId = s.val
-		WHEN MATCHED THEN UPDATE SET IsDiscount = 1
-		WHEN NOT MATCHED THEN INSERT (ProductId, IsDiscount, IsCalculation) VALUES(s.val, 1, 0);
+		WHEN MATCHED THEN UPDATE SET CalculationType = @CalculateAndDiscount
+		WHEN NOT MATCHED THEN INSERT (ProductId, CalculationType) VALUES(s.val, @ToBeDiscounted);
 
 	--parse assigned payer to group
 	IF @PartySettingsData <> ''
@@ -176,9 +179,10 @@ BEGIN
 	;MERGE dbo.LA_DiscountGroupProduct WITH(ROWLOCK, UPDLOCK) AS t
 	USING @Products AS s
 	ON (t.DiscountGroupId = @DiscountGroupId AND t.ProductId = s.ProductId)
+	WHEN MATCHED THEN UPDATE SET CalculationType = s.CalculationType
 	WHEN NOT MATCHED BY TARGET
-		THEN INSERT(DiscountGroupId, ProductId, IsDiscountProduct, IsCalculationProduct)
-				VALUES(@DiscountGroupId, s.ProductId, s.IsDiscount, s.IsCalculation)
+		THEN INSERT(DiscountGroupId, ProductId, CalculationType)
+				VALUES(@DiscountGroupId, s.ProductId, s.CalculationType)
 	WHEN NOT MATCHED BY SOURCE AND t.DiscountGroupId = @DiscountGroupId
 		THEN DELETE;
 		
