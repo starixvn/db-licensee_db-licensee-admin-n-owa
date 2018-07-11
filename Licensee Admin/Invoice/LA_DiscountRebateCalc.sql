@@ -15,7 +15,9 @@ AS
 */
 
 BEGIN
-	CREATE TABLE #Result(
+	SET NOCOUNT ON
+
+/*	CREATE TABLE #Result(
 		PartyId			INT,
 		ProductId		INT,
 		WinLoss			MONEY,
@@ -462,7 +464,7 @@ BEGIN
 	DROP TABLE #TempDataCB
 	DROP TABLE #TempData
 	DROP TABLE #DiscountProducts
-	DROP TABLE #CalculateDiscountProducts
+	DROP TABLE #CalculateDiscountProducts */
 END
 GO
 
