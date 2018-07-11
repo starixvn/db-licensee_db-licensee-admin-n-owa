@@ -68,6 +68,13 @@ BEGIN
 		RETURN
 	END
 
+	--check exists
+	IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupName = @DiscountGroupName AND DiscountGroupType = @DiscountGroupType AND DiscountGroupId <> @DiscountGroupId)
+	BEGIN
+		SELECT @ErrCode = 502, @ErrMsg = 'Group name exists. Please try again.'
+		RETURN
+	END
+
 	DECLARE @Products TABLE (ProductId TINYINT, CalculationType TINYINT)
 	DECLARE @PartySettings	TABLE (PartyId SMALLINT, Remark NVARCHAR(500), IsApplyDiscount BIT)
 	DECLARE @RateSettings	TABLE (DiscountDetailId SMALLINT, FromAmount MONEY, ToAmount MONEY, Rate MONEY, RowIndex INT)
