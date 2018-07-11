@@ -2,7 +2,7 @@
 USE bodb_licensee
 GO
 
-ALTER PROCEDURE LA_DiscountGet 
+ALTER PROCEDURE [dbo].[LA_DiscountGet]
 	@GroupId INT
 AS
 /*  
