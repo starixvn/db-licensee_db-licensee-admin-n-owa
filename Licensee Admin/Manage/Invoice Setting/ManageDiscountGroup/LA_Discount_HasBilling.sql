@@ -44,7 +44,8 @@ BEGIN
 		INNER JOIN LA_InvoiceStatement id WITH(NOLOCK) ON ih.InvoiceHeaderId = id.InvoiceHeaderId
 		INNER JOIN @PartieSettings p ON ih.PartyId = p.PartyId AND id.ProductId = p.ProductId
 		WHERE ih.FromDate >= @FromDateDiscount AND ih.ToDate <= @ToDateDiscount
-			  AND ih.InvoiceType = @InvoiceTypeDiscount
+			  AND ih.InvoiceType = @InvoiceTypeDiscount 
+			  AND ih.StatusId = 0 -- normal invoice
 	))
 	BEGIN
 		SELECT @HasBilling = 1

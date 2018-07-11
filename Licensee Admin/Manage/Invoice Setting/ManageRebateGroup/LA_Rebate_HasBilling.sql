@@ -44,6 +44,7 @@ BEGIN
 		WHERE ih.FromDate >= @FromDateRebate AND ih.ToDate <= @ToDateRebate
 			  AND ih.InvoiceType = @InvoiceTypeRebate
 			  AND id.InvItemTypeId = @InvoiceItemTypeRebate
+			  AND ih.StatusId = 0 -- normal invoice
 	))
 	BEGIN
 		SELECT @HasBilling = 1
