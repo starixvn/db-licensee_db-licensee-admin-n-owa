@@ -46,8 +46,8 @@ BEGIN
 	SELECT h.DiscountGroupId
 		, h.DiscountGroupType
 		, h.DiscountGroupName
-		, c.CurrencyId
-		, c.CurrencyName
+		, c.exchangeid				AS CurrencyId
+		, c.Code					AS CurrencyName
 		, h.FromDate
 		, h.ToDate
 		, @CalculationProductIds	AS CalculationProductIds
@@ -56,7 +56,7 @@ BEGIN
 		, @DiscountProductList		AS DiscountProductList
 		, h.ModifiedDate
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
-	INNER JOIN LA_f_BaseCurrency() c ON c.CurrencyId = h.CurrencyId
+	INNER JOIN bodb02.dbo.exchange c ON c.exchangeid = h.CurrencyId
 	WHERE DiscountGroupId = @GroupId
 
 	--get discount setting rates
