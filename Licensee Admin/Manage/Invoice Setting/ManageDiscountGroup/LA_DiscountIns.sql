@@ -24,7 +24,7 @@ AS
 	DB: DB052.bodb_licensee   
 
 	Revisions:  
-
+		- 20180702@Parsons: Insert discount groups [#94282]
 	 Params:
 		@RateSettingsData = '<Root>
 								<RateSetting>

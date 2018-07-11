@@ -15,7 +15,7 @@ AS
 	 DB: DB052.bodb_licensee   
 
 	 Revisions:  
-
+		- 20180705@Parsons: Delete discount groups [#94282]
 	 Params:
 
 	 Explannation: 
