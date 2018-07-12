@@ -54,8 +54,8 @@ BEGIN
 	-- 1.3 include products that use to calculate discount
 	-- discount type
 	DECLARE @Rebate INT = 2
-	DECLARE @DiscountByGroupFee INT = 1
-	DECLARE @DiscountByGroupGrosswin INT = 3
+	DECLARE @DiscountByGroupFee INT = 11
+	DECLARE @DiscountByGroupGrosswin INT = 13
 
 	-- calculation type
 	DECLARE @ToBeDiscounted INT = 0
@@ -368,8 +368,8 @@ BEGIN
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 4. discount calculation
  *-------------------------------------------------------------------------------------------------------------------------------*/
-	DECLARE @DiscountIndividualFee INT = 11
-	DECLARE @DiscountIndividualGrosswin INT = 13
+	DECLARE @DiscountIndividualFee INT = 1
+	DECLARE @DiscountIndividualGrosswin INT = 3
 	DECLARE @Unlimited MONEY = 1000000000000
 
 	;WITH cte_Calculation AS(
