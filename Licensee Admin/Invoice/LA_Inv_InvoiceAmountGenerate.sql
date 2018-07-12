@@ -53,6 +53,7 @@ AS
 		+ 20180419@Scofield: update CB for FreePlay [#93907]
 		+ 20180525@Scofield: Incorporate 9wickets' data [#94950]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		+ 20180712@Bruce: Enhance Manage Discount group [#94282]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -410,72 +411,15 @@ BEGIN
 	WHERE	ProductID NOT IN (SELECT ProductId FROM @MinFeeGroup WHERE [@MinFeeGroup].PartyId = @PartyId)	
 			OR (FeeType = 2 AND (FromDate > ToDate))
 	-- End region
-	
-	-- Region: Get discount group info
-	DECLARE @DiscountGroupHeader AS TABLE (
-			DiscountGroupId		INT, 
-			DiscountGroupType	TINYINT,
-			PartyId				INT, 
-			CurrencyId			INT, 
-			FromDate			DATETIME, 
-			ToDate				DATETIME)
-		
-	INSERT INTO @DiscountGroupHeader(DiscountGroupId,DiscountGroupType,PartyId,CurrencyId,FromDate,ToDate)
-	(
-		SELECT	dg.DiscountGroupId,dg.DiscountGroupType,dga.PartyId, dg.CurrencyId, dg.FromDate, dg.ToDate
-		FROM	bodb_Licensee.dbo.LA_DiscountGroupHeader dg WITH(NOLOCK)
-				INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupAssignment dga WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
-		WHERE	@FromDate<= ToDate AND FromDate<=@ToDate
-				AND dga.PartyID = @PartyId		
-	)
-	
-	DELETE	FROM @DiscountGroupHeader
-	WHERE	ToDate < (SELECT	MAX(ToDate)
-					FROM	@DiscountGroupHeader
-					WHERE	DiscountGroupType = 1)
-			AND DiscountGroupType = 1
-	DELETE	FROM @DiscountGroupHeader
-	WHERE	ToDate < (SELECT	MAX(ToDate)
-					FROM	@DiscountGroupHeader
-					WHERE	DiscountGroupType = 2)
-			AND DiscountGroupType = 2
-	
-	DECLARE @DiscountGroup AS TABLE(
-			DiscountGroupId		SMALLINT,									
-			DiscountGroupType	TINYINT,																		
-			FromAmount			MONEY,
-			ToAmount			MONEY,
-			Rate				MONEY,
-			PartyId				INT,		
-			ProductId			TINYINT,
-			BaseCurrency		INT)
 
-	INSERT INTO @DiscountGroup (DiscountGroupId, DiscountGroupType, FromAmount, ToAmount, Rate, PartyId, ProductId , BaseCurrency)	
-	(
-		SELECT	dg.DiscountGroupId, 
-				dg.DiscountGroupType, 
-				dgd.FromAmount, 
-				dgd.ToAmount, 
-				dgd.Rate,
-				dg.PartyID,
-				dgp.ProductId, 
-				dg.CurrencyId
-		FROM	@DiscountGroupHeader dg 
-				INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupDetail dgd WITH(NOLOCK) ON dg.DiscountGroupId = dgd.DiscountGroupId
-				INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupProduct dgp WITH(NOLOCK) ON dg.DiscountGroupId = dgp.DiscountGroupId
-				
-		WHERE	dgp.ProductId IN ( SELECT DISTINCT ProductId FROM @PartyChargeInfo)			
-	)
-	-- End Region	
-	
-	-- Region: Validate the same base currency in ChargeInfo,MinFee & Discount/Rebate	
+	-- Region: Validate the same base currency in ChargeInfo,MinFee
 	DECLARE @BaseCurrencyCheck TABLE(
 			Party INT, 
 			Product INT, 
 			FeeType INT, 
 			BaseCurrencyCount INT, 
 			NonBaseCurrencyCount INT)
-	
+
 	INSERT INTO @BaseCurrencyCheck
 	SELECT	m.PartyId, 
 			m.ProductId, 
@@ -496,29 +440,8 @@ BEGIN
 		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
 		RETURN
 	END
-		
-	DELETE FROM @BaseCurrencyCheck	
-	INSERT INTO @BaseCurrencyCheck(Party, Product, BaseCurrencyCount, NonBaseCurrencyCount)
-	SELECT	d.PartyId, 
-			d.ProductId,
-			SUM(CASE WHEN d.BaseCurrency = @BaseCurrencyID THEN 1 ELSE 0 END) BaseCurrencyCount,
-			SUM(CASE WHEN d.BaseCurrency != @BaseCurrencyID THEN 1 ELSE 0 END) NonBaseCurrencyCount
-	FROM	@DiscountGroup d
-	WHERE	d.DiscountGroupType = 1
-	GROUP BY d.PartyId, d.ProductId
-	
-	IF EXISTS(SELECT 1 FROM @BaseCurrencyCheck WHERE BaseCurrencyCount = 0 AND NonBaseCurrencyCount > 0)
-	BEGIN
-		SELECT @ErrCode = 2, @ErrMsg = 'Please check the Exchange settings of Payer''s discount. Exchange of discount must be the same with Payer''s exchange.'
-		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
-		RETURN
-	END
-	
-	DELETE FROM @DiscountGroup
-	WHERE (BaseCurrency != @BaseCurrencyId AND DiscountGroupType = 1)
-	
-	-- End Region	
-		
+	-- End Region
+
 	-- Region: Get Amount by Product
 	CREATE	TABLE #TempData (
 			LicenseeId		INT, 
@@ -530,8 +453,7 @@ BEGIN
 			ProductId		TINYINT,
 			BettypeRef		INT, 
 			AmountToCompany MONEY,
-			IsApplyMinFee	BIT,
-			LicenseeWinLossBase MONEY)
+			IsApplyMinFee	BIT)
 	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,WinLoss,AComm,ProductId,BettypeRef)
 	(
 		SELECT	b.SiteID,
@@ -564,8 +486,7 @@ BEGIN
 									WHEN td.ProductId = 3 THEN (-td.WinLoss * p.Rate - td.AComm) * e.Rate
 									WHEN td.ProductId <> 3 THEN (-td.WinLoss * p.Rate) * e.Rate
 									ELSE 0 
-								END,
-			LicenseeWinLossBase = -td.WinLoss * e.Rate
+								END
 	FROM	#TempData td 
 			INNER JOIN @PartyChargeInfo p 
 				ON td.LicenseeId = p.LicenseeId 
@@ -626,15 +547,15 @@ BEGIN
 	JOIN @PartyChargeInfo AS cm ON cm.ProductID = @CBProductId AND cm.TypeId = @CommChargeType AND (td.rptDate BETWEEN cm.FromDate AND cm.ToDate)
 	JOIN @PartyChargeInfo AS ci ON cm.ProductID = @CBProductId AND ci.TypeId = @CashInShareChargeType AND (td.rptDate BETWEEN ci.FromDate AND ci.ToDate)
 	
-	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,ProductId, AmountToCompany, LicenseeWinLossBase)
-	SELECT LicenseeId, PartyId, rptDate, CurrencyId, ProductId, (Turnover - WinningPrize - Cashout - CommisionShare - CashInShare) * e.Rate, 0
+	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,ProductId, AmountToCompany)
+	SELECT LicenseeId, PartyId, rptDate, CurrencyId, ProductId, (Turnover - WinningPrize - Cashout - CommisionShare - CashInShare) * e.Rate
 	FROM #TempDataCB tcb
 	INNER JOIN #Exchange e ON tcb.rptDate = e.ExchangeDate AND tcb.CurrencyId = e.ExchangeID	
 	-- End region: Get Amount By Product CB
 	
 	-- Region: Get Amount By Product CO	
 	
-	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,ProductId, AmountToCompany, LicenseeWinLossBase)
+	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,ProductId, AmountToCompany)
 	(
 		SELECT
 			d.LicenseeId,			
@@ -642,8 +563,7 @@ BEGIN
 			d.Winlostdate,
 			d.Currency,
 			@COProductId,
-			(TicketsPayout - BuyBackAmountSB - BuyBackAmountBA - CashoutCommission) * e.Rate AS AmountToCompany,
-			0				
+			(TicketsPayout - BuyBackAmountSB - BuyBackAmountBA - CashoutCommission) * e.Rate AS AmountToCompany
 		FROM (
 			SELECT p.LicenseeId, p.PartyId, b.Winlostdate, b.Currency,
 				SUM(b.BuyBackAmt) AS BuyBackAmountSB,
@@ -751,7 +671,8 @@ BEGIN
 			ProductId		INT, 
 			InvoiceAmount	MONEY, 
 			AmountType		TINYINT,
-			Rate			MONEY)
+			Rate			MONEY,
+			Remark			NVARCHAR(4000))
 		
 	IF @InvoiceTypeId = @InvoiceTypeHostingFeesId
 	BEGIN 
@@ -820,49 +741,37 @@ BEGIN
 		-- End region
 	
 		-- Region: Apply Discount
-		DECLARE @TotalAmountDiscount MONEY = (	SELECT SUM(CASE WHEN i.InvoiceAmount < 0 THEN 0 ELSE i.InvoiceAmount END) 
-												FROM @InvoiceData i 
-												WHERE i.ProductId IN (SELECT ProductId FROM @DiscountGroup d WHERE d.DiscountGroupType = 1))
-		DELETE	FROM @DiscountGroup
-		WHERE	@TotalAmountDiscount NOT BETWEEN [@DiscountGroup].FromAmount AND [@DiscountGroup].ToAmount
-				AND [@DiscountGroup].DiscountGroupType = 1
-	
-		INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
-		(
-			SELECT	iv.PartyId, iv.ProductId, iv.InvoiceAmount * dg.Rate AS InvoiceAmount, @AmountTypeDiscount, dg.Rate
-			FROM	@InvoiceData iv INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
-			WHERE	dg.DiscountGroupType = 1
-		)	
+		DECLARE @DiscountProducts VARCHAR(1000) = NULL
+		SELECT @DiscountProducts = COALESCE(@DiscountProducts + ',' + ProductPrefix, ProductPrefix)
+		FROM dbo.LA_f_Products3rd('')
+		WHERE ProductID IN (SELECT i.ProductId FROM @InvoiceData i)
+
+		DECLARE @DiscountRebate TABLE(
+			PartyId			INT,
+			ProductId		INT,
+			Winloss			MONEY,
+			Fee				MONEY,
+			Discount		MONEY,
+			Rebate			MONEY,
+			DiscountRate	MONEY,
+			RebateRate		MONEY,
+			DiscountRemark	NVARCHAR(4000),
+			RebateRemark	NVARCHAR(4000)
+		)
+		INSERT INTO @DiscountRebate(PartyId,ProductId,Winloss,Fee,Discount,Rebate,DiscountRemark,RebateRemark,DiscountRate,RebateRate)
+		EXEC dbo.[LA_DiscountRebateCalc] @FromDate,@ToDate,@PartyId,@DiscountProducts,@BaseCurrencyName
+
+		INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate, Remark)
+		SELECT d.PartyId, d.ProductId, d.Discount, @AmountTypeDiscount, d.DiscountRate, d.DiscountRemark
+		FROM @DiscountRebate d INNER JOIN @InvoiceData i ON d.PartyId=i.PartyId AND d.ProductId=i.ProductId
+		WHERE d.Discount > 0
 		-- End Region
 
-		-- discount by winloss
-		INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
-		(
-			SELECT t.PartyId, t.ProductId, SUM(t.LicenseeWinLossBase * d.Rate), @AmountTypeDiscount, d.Rate
-			FROM #TempData t
-			INNER JOIN @DiscountGroup d ON d.ProductId = t.ProductId  AND d.DiscountGroupType = 3 AND t.PartyId=d.PartyId
-			GROUP BY t.PartyId, t.ProductId, d.Rate
-		)
-		--end discount by winloss
-
 		-- Region: Apply Rebate
-		INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate)
-		(
-			SELECT	iv.PartyId, 
-					iv.ProductId, 
-					(iv.InvoiceAmount - ISNULL((SELECT	SUM(i.InvoiceAmount)
-												FROM	@InvoiceData i
-												WHERE	i.AmountType = @AmountTypeDiscount
-														AND i.ProductId = iv.ProductId), 0))
-						* dg.Rate AS InvoiceAmount, 
-					@AmountTypeRebate, 
-					dg.Rate
-			FROM	@InvoiceData iv 
-					INNER JOIN @DiscountGroup dg ON iv.ProductId=dg.ProductId
-			WHERE	dg.DiscountGroupType = 2
-					AND iv.AmountType = @AmountTypeSoftwareFee
-		)
-	
+		INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate, Remark)
+		SELECT d.PartyId, d.ProductId, Rebate, @AmountTypeRebate, d.RebateRate, d.RebateRemark
+		FROM @DiscountRebate d INNER JOIN @InvoiceData i ON d.PartyId=i.PartyId AND d.ProductId=i.ProductId
+		WHERE i.AmountType = @AmountTypeSoftwareFee AND d.Rebate > 0
 		-- End Region
 
 		-- Region: Select data	
@@ -870,13 +779,14 @@ BEGIN
 				ProductId		INT,
 				ProductCode		VARCHAR(100),
 				ProductName		VARCHAR(500),
+				Remark			NVARCHAR(4000),
 				InvoiceAmount	MONEY,
 				AmountType		TINYINT,
 				Rate			MONEY,
 				AmfAmount		MONEY,
 				RemainingAmf	MONEY)
 
-		INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate)
+		INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate,Remark)
 		(
 			SELECT	id.ProductId,
 					CASE 
@@ -892,12 +802,13 @@ BEGIN
 						ELSE 0
 					END AS InvoiceAmount,
 					id.AmountType,
-					id.Rate
+					id.Rate,
+					id.Remark
 			FROM	@InvoiceData id  
 					LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON id.ProductId = p.Productid
 		)
 
-		INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate)
+		INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate,Remark)
 		(
 			SELECT	-1,
 					(	SELECT	f.ProductCode + ',' 
@@ -910,10 +821,11 @@ BEGIN
 					AS ProductName,
 					SUM(id.InvoiceAmount),
 					id.AmountType,
-					id.Rate
+					id.Rate,
+					id.Remark
 			FROM	@FinalResult id
 			WHERE	id.AmountType > @AmountTypeSoftwareFee
-			GROUP BY id.AmountType, id.Rate
+			GROUP BY id.AmountType, id.Rate, id.Remark
 		)	
 		UPDATE	@FinalResult
 		SET		ProductCode = LEFT(ProductCode, LEN(ProductCode) - 1),
@@ -999,7 +911,8 @@ BEGIN
 				f.AmountType,
 				f.Rate,
 				f.AmfAmount,
-				f.RemainingAmf
+				f.RemainingAmf,
+				f.Remark
 		FROM	@FinalResult f
 		WHERE (@InvoiceTypeId != 3		--not rebate
 				AND f.ProductId != -1	-- not summarized row

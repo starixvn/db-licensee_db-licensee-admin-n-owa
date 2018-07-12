@@ -21,21 +21,13 @@ BEGIN
 	-- 1.1 party list
 	DECLARE @PartyList TABLE(
 		PartyId			INT,
-		PartyName		VARCHAR(500),
-		BrandName		VARCHAR(500),
-		ParentId		INT,
 		IsSelected		BIT,
 		PartyGroupId	INT
 	)
-	INSERT INTO @PartyList(PartyId,PartyName,BrandName,ParentId)
-	EXEC dbo.LA_PartyListSel
-
-	-- remove unselected party
-	DELETE @PartyList WHERE ParentId = 0 OR PartyId NOT IN (SELECT val FROM dbo.strSplit(@PartyIds, ','))
-	
 	-- set selected = true
 	-- put each party to it individual group(indicated by -partyid)
-	UPDATE @PartyList SET IsSelected = 1,PartyGroupId=-PartyId;
+	INSERT INTO @PartyList(PartyId,IsSelected,PartyGroupId)
+	SELECT CAST(val AS INT),1,-1 * CAST(val AS INT) FROM dbo.strSplit(@PartyIds, ',')
 
 	-- 1.2 to calculate minfee: need to select all party in same group
 	-- 1.2.1 get actual party group id
@@ -256,6 +248,8 @@ BEGIN
 		,SUM(a.AmountToCompany) AS Fee
 		,CAST(0 AS MONEY) AS Discount
 		,CAST(0 AS MONEY) AS Rebate
+		,CAST(0 AS MONEY) AS DiscountRate
+		,CAST(0 AS MONEY) AS RebateRate
 		,CAST('' AS NVARCHAR(4000)) AS DiscountRemark
 		,CAST('' AS NVARCHAR(4000)) AS RebateRemark
 	INTO #Result
@@ -396,7 +390,7 @@ BEGIN
 				c.Winloss >= d.FromAmount AND c.Winloss < d.ToAmount
 			)
 	)
-	UPDATE r SET r.DiscountRemark = s.Remark
+	UPDATE r SET DiscountRemark = s.Remark, DiscountRate = c.Rate
 		,Discount = CASE
 			WHEN s.DiscountGroupType IN (@DiscountByGroupFee, @DiscountIndividualFee) THEN c.Rate * r.Fee
 			WHEN s.DiscountGroupType IN (@DiscountByGroupGrosswin, @DiscountIndividualGrosswin) THEN c.Rate * r.Winloss
@@ -435,11 +429,12 @@ BEGIN
 	-- 4.3 calculate rebate
 	UPDATE r SET 
 		Rebate = (r.Fee - r.Discount) * c.Rate,
-		RebateRemark = c.Remark
+		RebateRemark = c.Remark,
+		RebateRate = c.Rate
 	FROM #Result r INNER JOIN #RebateSettings c ON r.PartyId = c.PartyID AND r.ProductId = c.ProductId
 
 	-- result
-	SELECT PartyId, Winloss,Fee,Discount,Rebate,DIscountRemark,RebateRemark
+	SELECT PartyId,ProductId,Winloss,Fee,Discount,Rebate,DiscountRemark,RebateRemark,DiscountRate,RebateRate
 	FROM #Result
 	WHERE PartyId IN (SELECT a.PartyId FROM @PartyList a WHERE a.IsSelected = 1)
 		AND ProductId IN (SELECT b.ProductId FROM @ProductList b WHERE b.IsSelected = 1)
