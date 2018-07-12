@@ -60,6 +60,7 @@ BEGIN
 	DECLARE @ToBeCalculated TINYINT = 1
 	DECLARE @ToBeDiscounted TINYINT = 0
 	DECLARE @CalculateAndDiscount TINYINT = 10
+	DECLARE @RebateGroupType TINYINT = 2
 
 	--check empty
 	IF ISNULL(@DiscountGroupName, '') = ''
@@ -69,7 +70,7 @@ BEGIN
 	END
 
 	--check exists
-	IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupName = @DiscountGroupName AND DiscountGroupType = @DiscountGroupType AND DiscountGroupId <> @DiscountGroupId)
+	IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupName = @DiscountGroupName AND DiscountGroupType != @RebateGroupType AND DiscountGroupId <> @DiscountGroupId)
 	BEGIN
 		SELECT @ErrCode = 502, @ErrMsg = 'Group name exists. Please try again.'
 		RETURN
