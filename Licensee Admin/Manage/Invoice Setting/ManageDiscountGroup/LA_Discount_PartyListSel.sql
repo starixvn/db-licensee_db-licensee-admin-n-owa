@@ -32,7 +32,7 @@ BEGIN
 	SELECT a.PartyId, a.DiscountGroupId
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
 		INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
-	WHERE h.DiscountGroupType IN (1, 3)
+	WHERE h.DiscountGroupType IN (1,3,11,13)
 		AND (@FromDate IS NULL OR @FromDate <= h.ToDate)
 		AND (@ToDate IS NULL OR @ToDate >= h.FromDate)
 
