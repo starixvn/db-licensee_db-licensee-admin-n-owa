@@ -69,7 +69,7 @@ BEGIN
 		INNER JOIN @PartyList b ON a.PartyID=b.PartyId
 		WHERE b.IsSelected=1
 	)
-	SELECT DISTINCT h.DiscountGroupId, h.DiscountGroupType, a.PartyID, p.ProductId, p.CalculationType, a.IsApplyDiscount, h.CurrencyId, a.Remark
+	SELECT DISTINCT h.DiscountGroupId, h.DiscountGroupType, a.PartyID, p.ProductId, p.CalculationType, a.IsApplyDiscount, h.CurrencyId, a.Remark,h.FromDate
 	INTO #DiscountSettings
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
 	INNER JOIN cte_DiscountGroup c ON c.DiscountGroupId = h.DiscountGroupId
@@ -81,7 +81,19 @@ BEGIN
 			-- discount by individual party: get only selected party
 			a.PartyID = c.PartyID
 		)
-	WHERE h.DiscountGroupType != @Rebate AND h.FromDate<=@ToDate AND @FromDate<=h.ToDate
+	WHERE h.DiscountGroupType != @Rebate AND h.FromDate <= @ToDate AND @FromDate <= h.ToDate
+
+	-- only 1 discount per month for product/party
+	;WITH cte_Discount AS (
+		SELECT DiscountGroupType, PartyID, ProductId, MAX(FromDate) FromDate
+		FROM #DiscountSettings
+		GROUP BY DiscountGroupType, PartyID, ProductId
+		HAVING COUNT(1) > 1
+	)
+	DELETE d FROM #DiscountSettings d INNER JOIN cte_Discount c ON d.FromDate < c.FromDate
+		AND c.PartyID = d.PartyID 
+		AND c.ProductId = d.ProductId
+		AND c.DiscountGroupType = d.DiscountGroupType
 
 	-- 1.3.2 add discount calculation party
 	INSERT INTO @PartyList(PartyId,PartyGroupId,IsSelected)
@@ -109,9 +121,7 @@ BEGIN
 	SELECT @ProductCodes = COALESCE((@ProductCodes + ',' + CAST(ProductId AS VARCHAR(10))), CAST(ProductId AS VARCHAR(10)))
 	FROM dbo.LA_f_Products3rd('') a
 	WHERE a.ProductID IN (SELECT DISTINCT b.ProductId FROM @ProductList b)
-	select * from @PartyList
-	select * from @ProductList
-	return
+
 	-- 1.6 update party id list
 	SET @PartyIds = NULL
 	SELECT @PartyIds = COALESCE((@PartyIds + ',' + CAST(PartyId AS VARCHAR(10))), CAST(PartyId AS VARCHAR(10)))
@@ -217,7 +227,7 @@ BEGIN
 
 	-- 2.2 include CS winloss
 	INSERT INTO #TempData (PartyId,rptDate,ProductId,Winloss,AmountToCompany)
-	SELECT p.PartyID,b.rptDate, b.ProductID
+	SELECT p.PartyID,b.rptDate, 6 -- CS
 	, SUM((
 		CASE WHEN b.bettype IN (2199, 2399, 2999) THEN 0 ELSE -MemberWL END + -- exclude jackpot tickets
 		CASE WHEN b.bettype IN (2198, 2398, 2998) THEN GrossWL ELSE 0 END -- exclude contrinution tickets ( grosswl = -awinloss = -contribution)
@@ -246,7 +256,8 @@ BEGIN
 		,SUM(a.AmountToCompany) AS Fee
 		,CAST(0 AS MONEY) AS Discount
 		,CAST(0 AS MONEY) AS Rebate
-		,CAST('' AS NVARCHAR(4000)) AS Remark
+		,CAST('' AS NVARCHAR(4000)) AS DiscountRemark
+		,CAST('' AS NVARCHAR(4000)) AS RebateRemark
 	INTO #Result
 	FROM #TempData a
 	GROUP BY PartyId, ProductId
@@ -385,7 +396,7 @@ BEGIN
 				c.Winloss >= d.FromAmount AND c.Winloss < d.ToAmount
 			)
 	)
-	UPDATE r SET r.Remark = s.Remark
+	UPDATE r SET r.DiscountRemark = s.Remark
 		,Discount = CASE
 			WHEN s.DiscountGroupType IN (@DiscountByGroupFee, @DiscountIndividualFee) THEN c.Rate * r.Fee
 			WHEN s.DiscountGroupType IN (@DiscountByGroupGrosswin, @DiscountIndividualGrosswin) THEN c.Rate * r.Winloss
@@ -398,6 +409,40 @@ BEGIN
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 4. rebate calculation
  *-------------------------------------------------------------------------------------------------------------------------------*/
+	-- 4.1 get rebate settings
+	SELECT a.PartyID, p.ProductId, d.Rate, h.Remark,h.FromDate
+	INTO #RebateSettings
+	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
+	INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId=a.DiscountGroupId
+	INNER JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON p.DiscountGroupId=h.DiscountGroupId
+	INNER JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON d.DiscountGroupId=h.DiscountGroupId
+	INNER JOIN @PartyList l ON l.PartyId=a.PartyID AND l.IsSelected=1
+	WHERE h.DiscountGroupType=@Rebate
+		AND h.FromDate <= @ToDate
+		AND h.ToDate >= @FromDate
+
+	-- 4.2 only 1 rebate per month for product/party
+	;WITH cte_Rebate AS (
+		SELECT PartyID, ProductId, MAX(FromDate) FromDate
+		FROM #RebateSettings
+		GROUP BY PartyID, ProductId
+		HAVING COUNT(1) > 1
+	)
+	DELETE r FROM #RebateSettings r INNER JOIN cte_Rebate c ON r.FromDate < c.FromDate
+		AND c.PartyID = r.PartyID 
+		AND c.ProductId = r.ProductId
+
+	-- 4.3 calculate rebate
+	UPDATE r SET 
+		Rebate = (r.Fee - r.Discount) * c.Rate,
+		RebateRemark = c.Remark
+	FROM #Result r INNER JOIN #RebateSettings c ON r.PartyId = c.PartyID AND r.ProductId = c.ProductId
+
+	-- result
+	SELECT PartyId, Winloss,Fee,Discount,Rebate,DIscountRemark,RebateRemark
+	FROM #Result
+	WHERE PartyId IN (SELECT a.PartyId FROM @PartyList a WHERE a.IsSelected = 1)
+		AND ProductId IN (SELECT b.ProductId FROM @ProductList b WHERE b.IsSelected = 1)
 
 	DROP TABLE #Exchange
 	DROP TABLE #ChargeInfo
@@ -405,5 +450,6 @@ BEGIN
 	DROP TABLE #DiscountSettings
 	DROP TABLE #Result
 	DROP TABLE #MinFeeGroup
+	DROP TABLE #RebateSettings
 END
 GO
