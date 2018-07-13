@@ -12,6 +12,7 @@ AS
 	DB: DB052.bodb_licensee
 
 	Revisions:
+	 - 20180712@Bruce: Enhance Manage Discount group [#94282]
 	 - 20180716@bruce: add new group TEST for credit [#98126]
 	 - 20180607@Parsons: Integrate Pragmatic [#94108]
 
