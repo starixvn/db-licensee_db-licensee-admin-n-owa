@@ -124,20 +124,23 @@ BEGIN
 	GROUP BY p.PartyId, p.ProductID
 
 	-- get discount/rebate
-	DECLARE @DiscountRebate TABLE(
+	CREATE TABLE #AmountToCompany (
 		PartyId			INT,
 		ProductId		INT,
 		Winloss			MONEY,
 		Fee				MONEY,
 		Discount		MONEY,
-		Rebate			MONEY,
 		DiscountRate	MONEY,
-		RebateRate		MONEY,
 		DiscountRemark	NVARCHAR(4000),
-		RebateRemark	NVARCHAR(4000)
+		Rebate			MONEY,
+		RebateRate		MONEY,
+		RebateRemark	NVARCHAR(4000),
+		AmountToCompany	MONEY,
+		Minfee			MONEY,
+		IsChargedByMinFee BIT
 	)
-	INSERT INTO @DiscountRebate(PartyId,ProductId,Winloss,Fee,Discount,Rebate,DiscountRemark,RebateRemark,DiscountRate,RebateRate)
-	EXEC dbo.[LA_DiscountRebateCalc] @FromDate,@ToDate,@PartyIds,@ProductCodes,@BaseCurrencyName
+	INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark,AmountToCompany,Minfee,IsChargedByMinFee)
+	EXEC dbo.LA_AmountToCompanySel @FromDate,@ToDate,@PartyIds,@ProductCodes,@BaseCurrencyName
 
 	-- Sum products
 	BEGIN
@@ -185,7 +188,7 @@ BEGIN
 	FROM	@PartyRoot p
 			INNER JOIN bodb_licensee.dbo.OAS_Party (NOLOCK) op ON p.PartyId = op.PartyID
 			INNER JOIN @SumByProducts s ON p.PartyId = s.PartyId
-			LEFT JOIN @DiscountRebate r ON r.PartyId=p.PartyId AND s.ProductId=r.ProductId
+			LEFT JOIN #AmountToCompany r ON r.PartyId=p.PartyId AND s.ProductId=r.ProductId
 	GROUP BY p.PartyId, s.ProductId, op.PartyName
 
 	-- calculate licensing fee
@@ -213,6 +216,7 @@ BEGIN
 	DROP TABLE #Exchange
 	DROP TABLE #TempData
 	DROP TABLE #Result
+	DROP TABLE #AmountToCompany
 	-- End region
 END
 GO
