@@ -44,9 +44,9 @@ BEGIN
 			INNER JOIN dbo.LA_DiscountGroupProduct dp WITH(NOLOCK) ON dp.DiscountGroupId = h.DiscountGroupId
 			INNER JOIN bodb02.dbo.strSplit(@ProductIds, ',') p ON p.val = dp.ProductId
 	)
-	-- Exclude parties in cte_PartyHaveProductInProductIds
+	-- Exclude parties not in cte_PartyHaveProductInProductIds
 	DELETE @PartiesInAnyGroup
-	WHERE PartyId IN (SELECT PartyID FROM cte_PartyHaveProductInProductIds)
+	WHERE PartyId NOT IN (SELECT PartyID FROM cte_PartyHaveProductInProductIds)
 
 	--list of payer not in group
 	SELECT p.PartyId, PartyName, BrandName
