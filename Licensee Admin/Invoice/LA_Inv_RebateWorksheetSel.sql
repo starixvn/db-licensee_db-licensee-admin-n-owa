@@ -86,6 +86,25 @@ BEGIN
 	-- keep active products
 	DELETE @Products WHERE ProductId NOT IN (SELECT p.ProductId FROM @PartyChargeInfo p WHERE p.PartyId = @PartyId)
 
+	-- get amount to company,discount,rebate(only for some supported products
+	CREATE TABLE #AmountToCompany (
+		PartyId			INT,
+		ProductId		INT,
+		Winloss			MONEY,
+		Fee				MONEY,
+		Discount		MONEY,
+		DiscountRate	MONEY,
+		DiscountRemark	NVARCHAR(4000),
+		Rebate			MONEY,
+		RebateRate		MONEY,
+		RebateRemark	NVARCHAR(4000),
+		AmountToCompany	MONEY,
+		Minfee			MONEY,
+		IsChargedByMinFee BIT
+	)
+	INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark,AmountToCompany,Minfee,IsChargedByMinFee)
+	EXEC dbo.LA_AmountToCompanySel @FromDate,@ToDate,@PartyId,@ProductCodes,@BaseCurrency
+
 	-- Region: Get exchange rate info
 	CREATE	TABLE #Exchange (
 		ExchangeDate	DATE,
@@ -183,32 +202,16 @@ BEGIN
 		-- End region: include CO
 	END
 
-	-- discount /rebate
-	DECLARE @DiscountRebate TABLE(
-		PartyId			INT,
-		ProductId		INT,
-		Winloss			MONEY,
-		Fee				MONEY,
-		Discount		MONEY,
-		Rebate			MONEY,
-		DiscountRate	MONEY,
-		RebateRate		MONEY,
-		DiscountRemark	NVARCHAR(4000),
-		RebateRemark	NVARCHAR(4000)
-	)
-	INSERT INTO @DiscountRebate(PartyId,ProductId,Winloss,Fee,Discount,Rebate,DiscountRemark,RebateRemark,DiscountRate,RebateRate)
-	EXEC dbo.[LA_DiscountRebateCalc] @FromDate,@ToDate,@PartyId,@ProductCodes,@BaseCurrency
-
 	-- amount to company(licensing fee) - discount
 	INSERT INTO @Result(ProductId, AmountToCompany)
-	SELECT ProductId, CASE WHEN (Fee - Discount) < 0 THEN 0 ELSE Fee - Discount END FROM @DiscountRebate
+	SELECT ProductId, CASE WHEN (Fee - Discount) < 0 THEN 0 ELSE Fee - Discount END FROM #AmountToCompany
 
 	-- include no ticket product
 	INSERT INTO @Result
 	SELECT p.ProductId, 0 FROM @Products p
 	WHERE p.ProductId NOT IN (SELECT r.ProductId FROM @Result r)
 
-	DECLARE @Remark NVARCHAR(4000) = (SELECT TOP 1 x.RebateRemark FROM @DiscountRebate x WHERE ISNULL(x.RebateRemark,'') <> '')
+	DECLARE @Remark NVARCHAR(4000) = (SELECT TOP 1 x.RebateRemark FROM #AmountToCompany x WHERE ISNULL(x.RebateRemark,'') <> '')
 
 	select ISNULL(@Remark,'')		AS Remark,
 		@ToDate						AS ReportDate,
@@ -216,7 +219,7 @@ BEGIN
 		SUM(ISNULL(d.Rebate, 0))	AS TotalRebate,
 		SUM(rs.AmountToCompany )	AS TotalAmount
 	FROM @Result rs
-	LEFT JOIN @DiscountRebate d ON d.ProductId = rs.ProductId
+	LEFT JOIN #AmountToCompany d ON d.ProductId = rs.ProductId
 
 	SELECT r.ProductId,r.AmountToCompany FROM @Result r
 

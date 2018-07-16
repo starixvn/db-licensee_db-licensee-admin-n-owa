@@ -292,6 +292,25 @@ BEGIN
 	END
 	-- EndRegion
 	
+	-- get amount to company,discount,rebate(only for some supported products
+	CREATE TABLE #AmountToCompany (
+		PartyId			INT,
+		ProductId		INT,
+		Winloss			MONEY,
+		Fee				MONEY,
+		Discount		MONEY,
+		DiscountRate	MONEY,
+		DiscountRemark	NVARCHAR(4000),
+		Rebate			MONEY,
+		RebateRate		MONEY,
+		RebateRemark	NVARCHAR(4000),
+		AmountToCompany	MONEY,
+		Minfee			MONEY,
+		IsChargedByMinFee BIT
+	)
+	INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark,AmountToCompany,Minfee,IsChargedByMinFee)
+	EXEC dbo.LA_AmountToCompanySel @FromDate,@ToDate,@PartyId,@ProductCodes,@BaseCurrencyName
+
 	-- Region: Get party charge rate info	
 	DECLARE @PartyChargeInfo AS TABLE (
 			PartyId		INT,
@@ -309,6 +328,9 @@ BEGIN
 		FROM	dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId NOT IN (1, 15) --exclude RB, CB
 	)
+
+	-- exclude products have calculated
+	DELETE @PartyChargeInfo WHERE ProductID IN (SELECT a.ProductId FROM #AmountToCompany a)
 	
 	-- Get ChargeInfo for CB
 	DECLARE @CommChargeType INT = 6
@@ -468,24 +490,6 @@ BEGIN
 	)
 	-- End region: Get Amount By Product CO
 
-	-- get discount/rebate
-	DECLARE @DiscountRebate TABLE(
-		PartyId			INT,
-		ProductId		INT,
-		Winloss			MONEY,
-		Fee				MONEY,
-		IsChargedByMinFee BIT,
-		Discount		MONEY,
-		Rebate			MONEY,
-		DiscountRate	MONEY,
-		RebateRate		MONEY,
-		MinFee			MONEY,
-		DiscountRemark	NVARCHAR(4000),
-		RebateRemark	NVARCHAR(4000)
-	)
-	INSERT INTO @DiscountRebate(PartyId,ProductId,Winloss,Fee,Discount,Rebate,DiscountRemark,RebateRemark,DiscountRate,RebateRate,IsChargedByMinFee,MinFee)
-	EXEC dbo.[LA_DiscountRebateCalc] @FromDate,@ToDate,@PartyId,@ProductCodes,@BaseCurrencyName
-
 	DECLARE @InvoiceData	TABLE(
 			PartyId			INT,
 			ProductId		INT, 
@@ -496,7 +500,7 @@ BEGIN
 		
 	IF @InvoiceTypeId = @InvoiceTypeHostingFeesId
 	BEGIN 
-		DECLARE @IsApplyMinFee BIT = ISNULL((SELECT TOP 1 1 FROM @DiscountRebate WHERE PartyId = @PartyId AND IsChargedByMinFee=1),0)
+		DECLARE @IsApplyMinFee BIT = ISNULL((SELECT TOP 1 1 FROM #AmountToCompany WHERE PartyId = @PartyId AND IsChargedByMinFee=1),0)
 
 		-- Apply Min fee => Not waived
 		-- No Min fee => waived
@@ -539,7 +543,7 @@ BEGIN
 		-- Region: fee
 		INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType)
 		SELECT d.PartyId, d.ProductId, d.Fee, @AmountTypeSoftwareFee
-		FROM @DiscountRebate d
+		FROM #AmountToCompany d
 		-- End Region
 
 		-- product dont have minfee
@@ -557,13 +561,13 @@ BEGIN
 		-- Region: Discount
 		INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate, Remark)
 		SELECT d.PartyId, d.ProductId, d.Discount, @AmountTypeDiscount, d.DiscountRate, d.DiscountRemark
-		FROM @DiscountRebate d WHERE d.Discount > 0
+		FROM #AmountToCompany d WHERE d.Discount > 0
 		-- End Region
 
 		-- Region: Rebate
 		INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate, Remark)
 		SELECT d.PartyId, d.ProductId, Rebate, @AmountTypeRebate, d.RebateRate, d.RebateRemark
-		FROM @DiscountRebate d WHERE d.Rebate > 0
+		FROM #AmountToCompany d WHERE d.Rebate > 0
 		-- End Region
 
 		-- Region: Select data	
@@ -653,7 +657,7 @@ BEGIN
 			-- insert amf
 			IF @RemainingAmf > 0 
 			BEGIN
-				DECLARE @ProgratedMinfee MONEY = ISNULL((SELECT TOP 1 MinFee FROM @DiscountRebate WHERE ProductId = 0),0)
+				DECLARE @ProgratedMinfee MONEY = ISNULL((SELECT TOP 1 MinFee FROM #AmountToCompany WHERE ProductId = 0),0)
 				DECLARE @SBAfterDiscount MONEY = ISNULL((
 					SELECT SUM(CASE WHEN AmountType = 1 THEN InvoiceAmount ELSE -InvoiceAmount END)
 					FROM @FinalResult

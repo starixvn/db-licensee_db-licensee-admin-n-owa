@@ -43,6 +43,7 @@ AS
 		- 20182501@Bruce: Include exchange winloss [#87754]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 	    	- 20180703@Parsons: Integrate Pragmatic Win Loss [#94108]
+		- 20180712@Bruce: Enhance Manage Discount group [#94282]
 		- 20180718@Bruce: use decimal to void margin not match among reports [#94108]
 
 	Param's Explanation:  
@@ -183,107 +184,38 @@ BEGIN
 	)
 	-- End region
 
-	-- *************************************************************************************************************
-	-- *** Get minfee, waive when @Currency = 0 (all currencies) for 2 periods (current period and previous period)
-	-- *** - minfee: FeeType = 1, waive: FeeType = 2
-	-- *** - conditions: Product is in (PartyChargeInfo)
-	-- *** - waive: select only waive which has corresponding minfee config
-	-- *************************************************************************************************************
+	-- this table hold data from sp: LA_AmountToCompanySel
+	CREATE TABLE #AmountToCompany (
+		PartyId			INT,
+		ProductId		INT,
+		Winloss			MONEY,
+		Fee				MONEY,
+		Discount		MONEY,
+		DiscountRate	MONEY,
+		DiscountRemark	NVARCHAR(4000),
+		Rebate			MONEY,
+		RebateRate		MONEY,
+		RebateRemark	NVARCHAR(4000),
+		AmountToCompany	MONEY,
+		Minfee			MONEY,
+		IsChargedByMinFee	BIT,
+		IsCurrent			BIT
+	)
+
 	--  Minimum fee is calculated for all currencies that licensee offer. There is no minimum fee when data display individual currency.
 	IF @Currency = 0
 	BEGIN
-		-- Region: MinfeeGroup Date range
-		DECLARE @Month TINYINT = MONTH(@FromDate)
-		DECLARE @FirstDate DATETIME = DATEADD(mm, DATEDIFF(mm, 0, @FromDate), 0)
-		DECLARE @LastDate DATETIME = DATEADD (dd, -1, DATEADD(mm, DATEDIFF(mm, 0, @FromDate) + 1, 0))
-		DECLARE @DaysInMonth INT = DATEDIFF(day, @FirstDate, @LastDate) + 1
-		DECLARE @PrevFirstDate DATETIME = DATEADD(mm, DATEDIFF(mm, 0, @PrevFromDate), 0)
-		DECLARE @PrevLastDate DATETIME = DATEADD (dd, -1, DATEADD(mm, DATEDIFF(mm, 0, @PrevFromDate) + 1, 0))
-		DECLARE @PrevDaysInMonth INT = DATEDIFF(day, @PrevFirstDate, @PrevLastDate) + 1
+		-- current month
+		INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark,AmountToCompany,Minfee,IsChargedByMinFee)
+		EXEC bodb_licensee.dbo.LA_AmountToCompanySel @FromDate,@ToDate,@PartyIds,@ProductCodes,@BaseCurrencyName
 
-		DECLARE @MinFeeGroup TABLE(
-				IsCurrent		BIT,
-				FeeType			TINYINT,
-				PartyId			INT,
-				ProductId		INT,
-				CurrencyId		INT,
-				FeeAmount		MONEY,
-				FromDate		DATETIME,
-				ToDate			DATETIME,
-				MinFeeProrate	MONEY,
-				WaivedAmount	MONEY,
-				TotalAmount		MONEY,
-				MinFeeAmount	MONEY,
-				AmountToCompany	MONEY)
+		UPDATE #AmountToCompany SET IsCurrent = 1
 
-		INSERT INTO @MinFeeGroup(IsCurrent, FeeType ,PartyId,ProductId, CurrencyId ,FeeAmount ,FromDate ,ToDate)
-		(
-			SELECT	1 AS IsCurrent,
-					mf.FeeTypeId,
-					mf.PartyId,
-					mf.ProductId,
-					mf.CurrencyId,
-					mf.FeeAmount,
-					CASE WHEN @FromDate >= mf.FromDate THEN @FromDate ELSE mf.FromDate END AS FromDate,
-					CASE WHEN @ToDate < mf.ToDate THEN @ToDate ELSE mf.ToDate END AS ToDate
-			FROM	bodb_licensee.dbo.LA_MinFee mf WITH(NOLOCK)
-			WHERE	((mf.FeeTypeId = 1)
-						OR mf.FeeTypeId = 2 AND EXISTS (SELECT	PartyId
-														FROM	bodb_licensee.dbo.LA_MinFee m WITH(NOLOCK)
-														WHERE	m.FeeTypeId = 1
-																AND m.PartyId = mf.PartyId
-																AND m.ProductId = mf.ProductId
-																AND ((m.FromDate BETWEEN @FirstDate AND @LastDate)
-																	OR (m.ToDate BETWEEN @FirstDate AND @LastDate)
-																	OR (m.FromDate<@FirstDate AND @LastDate < m.ToDate)
-																)
-														)
-					)
-					AND mf.ProductId IN (SELECT ProductId FROM @PartyChargeInfo)
-					AND ((mf.FromDate BETWEEN @FirstDate AND @LastDate) 
-						OR (mf.ToDate BETWEEN @FirstDate AND @LastDate) 
-						OR (mf.FromDate<@FirstDate AND @LastDate < mf.ToDate)
-					)
-		)
+		-- previous month
+		INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark,AmountToCompany,Minfee,IsChargedByMinFee)
+		EXEC bodb_licensee.dbo.LA_AmountToCompanySel @PrevFromDate, @PrevToDate,@PartyIds,@ProductCodes,@BaseCurrencyName
 
-		SELECT	@FirstDate = DATEADD(mm, DATEDIFF(mm, 0, @PrevFromDate), 0)
-		SELECT	@LastDate = DATEADD (dd, -1, DATEADD(mm, DATEDIFF(mm, 0, @PrevFromDate) + 1, 0))
-		DECLARE @DaysInPrevMonth INT = DATEDIFF(day, @FirstDate, @LastDate) + 1
-
-		INSERT INTO @MinFeeGroup(IsCurrent, FeeType ,PartyId,ProductId, CurrencyId ,FeeAmount ,FromDate ,ToDate)
-		(
-			SELECT	0 AS IsCurrent,
-					mf.FeeTypeId,
-					mf.PartyId,
-					mf.ProductId,
-					mf.CurrencyId,
-					mf.FeeAmount,
-					CASE WHEN @PrevFromDate >= mf.FromDate THEN @PrevFromDate ELSE mf.FromDate END AS FromDate,
-					CASE WHEN @PrevToDate < mf.ToDate THEN @PrevToDate ELSE mf.ToDate END AS ToDate
-			FROM	bodb_licensee.dbo.LA_MinFee mf WITH(NOLOCK)
-			WHERE	((mf.FeeTypeId = 1)
-						OR mf.FeeTypeId = 2 AND EXISTS (SELECT	PartyId
-														FROM	bodb_licensee.dbo.LA_MinFee m WITH(NOLOCK)
-														WHERE	m.FeeTypeId = 1 
-																AND m.PartyId = mf.PartyId
-																AND m.ProductId = mf.ProductId
-																AND ((m.FromDate BETWEEN @FirstDate AND @LastDate) 
-																	OR (m.ToDate BETWEEN @FirstDate AND @LastDate) 
-																	OR (m.FromDate<@FirstDate AND @LastDate < m.ToDate)
-																)
-														)
-					)
-					AND mf.ProductId IN (SELECT ProductId FROM @PartyChargeInfo)
-					AND ((mf.FromDate BETWEEN @FirstDate AND @LastDate) 
-						OR (mf.ToDate BETWEEN @FirstDate AND @LastDate) 
-						OR (mf.FromDate<@FirstDate AND @LastDate < mf.ToDate)
-					)
-		)
-
-		DELETE	FROM @MinFeeGroup
-		WHERE	(FeeType = 2 AND FromDate > ToDate) OR
-				(PartyId NOT IN (SELECT g.PartyId FROM @PartyGroup g) AND
-					PartyId NOT IN (SELECT p.PartyId FROM @PartyIdTable p))
+		UPDATE #AmountToCompany SET IsCurrent = 0 WHERE IsCurrent IS NULL
 	END
 	-- End region
 
@@ -311,10 +243,6 @@ BEGIN
 		SET Rate = 1
 	END
 	-- End region
-
-	UPDATE m SET m.FeeAmount = m.FeeAmount * e.Rate
-	FROM @MinFeeGroup m
-	INNER JOIN #Exchange e ON m.ToDate = e.ExchangeDate AND m.CurrencyId = e.ExchangeID
 
 	-- Region: Get Amount by Product
 	CREATE	TABLE #TempData (
@@ -367,206 +295,10 @@ BEGIN
 
 	CREATE NONCLUSTERED INDEX Idx_InvoiceData ON #TempData (PartyId, ProductId)
 
---  Minimum fee is calculated for all currencies that licensee offer. There is no minimum fee when data display individual currency.
-	IF @Currency = 0
-	BEGIN
-		UPDATE  t
-		SET		t.IsApplyMinFee = 0
-		FROM	#TempData t INNER JOIN @MinFeeGroup m ON (t.rptDate BETWEEN m.FromDate AND m.ToDate OR t.rptDate BETWEEN @PrevFromDate AND @PrevToDate)
-				AND t.ProductId = m.ProductId
-				AND t.PartyId = m.PartyId
-		WHERE	m.FeeType=2
-		-- End region
-
-		-- Region: Check min fee group
-		--- calculate waived prorate (*)
-		UPDATE	amf
-		SET		MinFeeProrate = ((	SELECT	TOP 1 mfg.FeeAmount
-									FROM	@MinFeeGroup mfg
-									WHERE	mfg.FeeType = 1
-											AND amf.IsCurrent = mfg.IsCurrent
-											AND mfg.PartyId = amf.PartyId
-											AND mfg.ProductId = amf.ProductId)
-								/ (CASE WHEN amf.IsCurrent = 1 THEN @DaysInMonth ELSE @PrevDaysInMonth END)) * (DATEDIFF(DAY, FromDate, ToDate) + 1)
-		FROM	@MinFeeGroup amf
-		WHERE	FeeType = 2
-
-		--- sum amount under waived
-		UPDATE	amf
-		SET		amf.WaivedAmount = ISNULL((	SELECT	SUM(td.AmountToCompany)
-											FROM	#TempData td 
-											WHERE	amf.PartyId = td.PartyId
-													AND amf.ProductId = td.ProductId
-													AND td.rptDate BETWEEN amf.FromDate AND amf.ToDate), 0)
-		FROM	@MinFeeGroup amf
-		WHERE	amf.FeeType = 2
-
-		--- calculate min fee prorate (fee amount in month - waived amount (*)
-		UPDATE	amf
-		SET		amf.MinFeeProrate = ROUND((	amf.FeeAmount / (CASE WHEN amf.IsCurrent = 1 THEN @DaysInMonth ELSE @PrevDaysInMonth END)) * (DATEDIFF(DAY, FromDate, ToDate) + 1) -
-											ISNULL((SELECT	SUM(f.MinFeeProrate)
-													FROM	@MinFeeGroup f
-													WHERE	f.FeeType = 2
-															AND amf.IsCurrent = f.IsCurrent
-															AND amf.PartyId = f.PartyId
-															AND amf.ProductId = f.ProductId), 0), 2),
-				amf.WaivedAmount =  ISNULL((SELECT	CASE WHEN SUM(f.WaivedAmount) < 0 THEN 0 ELSE SUM(f.WaivedAmount) END
-											FROM	@MinFeeGroup f
-											WHERE	f.FeeType = 2
-													AND amf.IsCurrent = f.IsCurrent
-													AND amf.PartyId = f.PartyId
-													AND amf.ProductId = f.ProductId), 0),
-				amf.MinFeeAmount =  ISNULL((SELECT	SUM(td.AmountToCompany)
-											FROM	#TempData td 
-											WHERE	amf.PartyId = td.PartyId
-													AND td.rptDate BETWEEN amf.FromDate AND amf.ToDate
-													AND td.IsApplyMinFee IS NULL
-													AND amf.ProductId = td.ProductId), 0)
-		FROM	@MinFeeGroup amf
-		WHERE	amf.FeeType = 1
-		--- sum min fee amount
-		UPDATE	amf
-		SET		amf.TotalAmount =  amf.MinFeeAmount + amf.WaivedAmount
-		FROM	@MinFeeGroup amf
-		WHERE	amf.FeeType = 1
-	
-		DECLARE @TotalMinFees TABLE(
-			PartyGroupId		INT,
-			ProductId			INT,
-			TotalMinFee			MONEY,
-			TotalMinFeeAmount	MONEY,
-			IsCurrent			BIT
-		)
-		INSERT	INTO @TotalMinFees(PartyGroupId, ProductId, IsCurrent, TotalMinFee, TotalMinFeeAmount)
-		SELECT	pg.PartyGroupId, mf.ProductId, mf.IsCurrent,
-				SUM(mf.MinFeeProrate),
-				SUM(CASE WHEN mf.MinFeeAmount < 0 THEN 0 ELSE mf.MinFeeAmount END)
-		FROM	@MinFeeGroup mf
-		INNER JOIN @PartyGroup pg ON mf.PartyId = pg.PartyId
-		WHERE	mf.FeeType = 1
-		GROUP BY pg.PartyGroupId,mf.ProductId,mf.IsCurrent
-
-		-- update minfee group
-		UPDATE	amf
-		SET		amf.AmountToCompany =	CASE
-											WHEN t.TotalMinFeeAmount < t.TotalMinFee AND amf.MinFeeAmount < amf.MinFeeProrate 
-												THEN amf.MinFeeProrate + amf.WaivedAmount
-											ELSE amf.TotalAmount
-										END
-		FROM	@MinFeeGroup amf
-		INNER JOIN @PartyGroup pg ON pg.PartyId = amf.PartyId
-		INNER JOIN @TotalMinFees t ON amf.ProductId = t.ProductId AND t.PartyGroupId = pg.PartyGroupId AND t.IsCurrent = amf.IsCurrent
-		WHERE	amf.FeeType = 1
-		
-		-- update minfee non-group
-		UPDATE	amf
-		SET		amf.AmountToCompany =	CASE WHEN amf.MinFeeAmount < amf.MinFeeProrate
-												THEN amf.MinFeeProrate + amf.WaivedAmount
-											ELSE amf.TotalAmount
-										END
-		FROM	@MinFeeGroup amf
-		WHERE	amf.FeeType = 1 AND amf.AmountToCompany IS NULL
-	END
-	
-	-- ********************************************************************************************
-	-- *** Get Discount and Rebate Headers
-	-- *** Conditions: FromDate-ToDate intersect with @FromDate-@ToDate (@PreFromDate, @PreToDate)
-	-- ********************************************************************************************
-	-- Region: Discount & Rebate Settings
-	BEGIN
-	DECLARE @DiscountGroupHeader AS TABLE (
-			DiscountGroupId		INT,
-			DiscountGroupType	TINYINT,
-			PartyId				INT,
-			CurrencyId			INT,
-			FromDate			DATETIME,
-			ToDate				DATETIME,
-			IsCurrent			BIT)
-
-	INSERT INTO @DiscountGroupHeader(DiscountGroupId,DiscountGroupType,PartyId,CurrencyId,FromDate,ToDate,IsCurrent)
-	(
-		SELECT	dg.DiscountGroupId,dg.DiscountGroupType,dga.PartyId, dg.CurrencyId, dg.FromDate, dg.ToDate, 1
-		FROM	bodb_Licensee.dbo.LA_DiscountGroupHeader dg WITH(NOLOCK)
-				INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupAssignment dga WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
-		WHERE	@FromDate<= ToDate AND FromDate<=@ToDate
-	)
-
-	INSERT INTO @DiscountGroupHeader(DiscountGroupId,DiscountGroupType,PartyId,CurrencyId,FromDate,ToDate,IsCurrent)
-	(
-		SELECT	dg.DiscountGroupId,dg.DiscountGroupType,dga.PartyId, dg.CurrencyId, dg.FromDate, dg.ToDate, 0
-		FROM	bodb_Licensee.dbo.LA_DiscountGroupHeader dg WITH(NOLOCK)
-				INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupAssignment dga WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
-		WHERE	@PrevFromDate<= ToDate AND FromDate<=@PrevToDate
-	)
-
-	-- ********************************************
-	-- *** Get the lastest discount/rebate headers
-	-- ********************************************
-	DECLARE @DiscountGroupType INT = 1
-	WHILE @DiscountGroupType <= 2
-	BEGIN
-		DELETE	d FROM @DiscountGroupHeader d
-		WHERE	d.ToDate < (SELECT	MAX(g.ToDate)
-					FROM	@DiscountGroupHeader g
-					WHERE	g.DiscountGroupType = @DiscountGroupType AND g.IsCurrent = 1 AND d.PartyId = g.PartyId)
-			AND d.DiscountGroupType = @DiscountGroupType AND d.IsCurrent = 1
-			
-		DELETE	d FROM @DiscountGroupHeader d
-		WHERE	d.ToDate < (SELECT	MAX(g.ToDate)
-					FROM	@DiscountGroupHeader g
-					WHERE	g.DiscountGroupType = @DiscountGroupType AND g.IsCurrent = 0 AND d.PartyId = g.PartyId)
-			AND d.DiscountGroupType = @DiscountGroupType AND d.IsCurrent = 0
-			
-	   SET @DiscountGroupType = @DiscountGroupType + 1
-	END
-
-	-- **********************************************
-	-- *** Get Discount/Rebate Settings Infos
-	-- *** Conditions: ProductId in (PartyChargeInfo)
-	-- **********************************************
-	DECLARE @DiscountGroup AS TABLE(
-			DiscountGroupId		SMALLINT,
-			DiscountGroupType	TINYINT,
-			FromAmount			MONEY,
-			ToAmount			MONEY,
-			Rate				MONEY,
-			PartyId				INT,
-			ProductId			TINYINT,
-			BaseCurrency		INT,
-			IsCurrent			BIT)
-
-	INSERT INTO @DiscountGroup (DiscountGroupId, DiscountGroupType, FromAmount, ToAmount, Rate, PartyId, ProductId , BaseCurrency, IsCurrent)	
-	(
-		SELECT	dg.DiscountGroupId,
-				dg.DiscountGroupType,
-				dgd.FromAmount,
-				dgd.ToAmount,
-				dgd.Rate,
-				dg.PartyID,
-				dgp.ProductId,
-				dg.CurrencyId,
-				dg.IsCurrent
-		FROM	@DiscountGroupHeader dg 
-				INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupDetail dgd WITH(NOLOCK) ON dg.DiscountGroupId = dgd.DiscountGroupId
-				INNER JOIN bodb_Licensee.dbo.LA_DiscountGroupProduct dgp WITH(NOLOCK) ON dg.DiscountGroupId = dgp.DiscountGroupId
-		WHERE	dgp.ProductId IN ( SELECT DISTINCT ProductId FROM @PartyChargeInfo)
-	)
-
-	-- ***************************************************************
-	-- *** Convert Discount FromAmount, ToAmount to @BaseCurrencyName
-	-- *** Notes: Rebate does not have FromAmount, ToAmount
-	-- ***************************************************************
-	-- convert discount amount to base currency
-	UPDATE d SET
-		d.FromAmount = d.FromAmount * e.Rate,
-		d.ToAmount = d.ToAmount * e.Rate
-	FROM @DiscountGroup d
-	INNER JOIN #Exchange e ON
-		e.ExchangeDate =(CASE WHEN d.IsCurrent = 1 THEN @ToDate ELSE @PrevToDate END) AND
-		d.BaseCurrency = e.ExchangeID AND
-		d.DiscountGroupType = 1 -- discount = 1
-	END
-	-- End Region
+	-- insert zero winloss for case: product don't have any ticket
+	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,AComm,PComm,ProductId,AmountToCompany)
+	SELECT LicenseeId, PartyId, FromDate, @BaseCurrency,0,0,0,0,0,ProductID,0
+	FROM @PartyChargeInfo
 
 	-- Sum products
 	BEGIN
@@ -580,8 +312,11 @@ BEGIN
 			AmountToCompany	MONEY,
 			ProductId		INT,
 			IsCurrent		BIT,
-			HasMinFee		BIT
+			HasMinFee		BIT,
+			Discount		MONEY,
+			Rebate			MONEY
 		)
+		
 		-- sum by product
 		INSERT INTO @SumByProducts (PartyId,ProductId,IsCurrent,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,HasMinFee)
 		SELECT	PartyId
@@ -597,31 +332,14 @@ BEGIN
 		FROM #TempData
 		GROUP BY PartyId, ProductId, CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END
 
-		-- merge to minfee group
-		UPDATE s SET AmountToCompany = m.AmountToCompany, hasMinFee = CASE WHEN m.AmountToCompany=m.TotalAmount THEN 0 ELSE 1 END
+		-- apply minfee
+		UPDATE s SET 
+			AmountToCompany = m.Fee,
+			HasMinFee = m.IsChargedByMinFee,
+			Discount = m.Discount,
+			Rebate = m.Rebate
 		FROM @SumByProducts s
-		INNER JOIN @MinFeeGroup m ON m.PartyId = s.PartyId AND m.IsCurrent = s.IsCurrent AND m.ProductId = s.ProductId
-		WHERE m.FeeType = 1 -- min fee
-		
-		-- insert data for party-product which has min fee but doesn't has bet ticket
-		INSERT INTO @SumByProducts(PartyId, ProductId, IsCurrent, AmountToCompany, HasMinFee, BetCount, Turnover, WinLoss, AComm)
-		SELECT m.PartyId, m.ProductId, m.IsCurrent, m.AmountToCompany, 1, 0, 0, 0, 0
-		FROM @MinFeeGroup m
-		LEFT JOIN @SumByProducts s ON m.PartyId = s.PartyId AND m.ProductId = s.ProductId AND m.IsCurrent = s.IsCurrent
-		WHERE m.FeeType = 1 AND s.PartyId IS NULL	
-
-		-- filter discount
-		;WITH t AS(
-			SELECT SUM(s.AmountToCompany) Total, s.PartyId, s.IsCurrent,d.DiscountGroupId
-			FROM @SumByProducts s
-			INNER JOIN (SELECT DISTINCT DiscountGroupId,PartyId,ProductId,IsCurrent FROM @DiscountGroup WHERE DiscountGroupType = 1) AS d
-				ON s.PartyId=d.PartyId AND s.ProductId=d.ProductId AND s.IsCurrent=d.IsCurrent
-			GROUP BY s.PartyId, d.DiscountGroupId, s.IsCurrent
-		)
-		DELETE d
-		FROM @DiscountGroup d
-		INNER JOIN t ON t.DiscountGroupId = d.DiscountGroupId AND t.PartyId = d.PartyId AND t.IsCurrent = d.IsCurrent
-		WHERE d.DiscountGroupType = 1 AND t.Total NOT BETWEEN d.FromAmount AND d.ToAmount
+		INNER JOIN #AmountToCompany m ON m.PartyId = s.PartyId AND m.IsCurrent = s.IsCurrent AND m.ProductId = s.ProductId
 	END
 
 	-- Region: Result
@@ -651,8 +369,8 @@ BEGIN
 	-- ************************************
 	-- *** Calculate #Result for SportBook
 	-- ************************************
-	INSERT INTO #Result (PartyId, ProductId, PartyName, SportsbookFee, IsCurrent, BetCount, AverageBet, Turnover, WinLoss, Margin, OthersFee, SportbookDiscount, BACommission)
-	SELECT	p.PartyId, 
+	INSERT INTO #Result (PartyId, ProductId, PartyName, SportsbookFee, IsCurrent, BetCount, AverageBet, Turnover, WinLoss, Margin, OthersFee, SportbookDiscount, BACommission, SportbookRebate)
+	SELECT	p.PartyId,
 			s.ProductId,
 			(CASE op.PartyName WHEN '18bb' THEN 'PIH' WHEN 'IBC' THEN 'FDL' ELSE op.PartyName END) + (CASE WHEN s.HasMinFee = 1 AND s.AmountToCompany != 0 THEN ' *' ELSE '' END),
 			s.AmountToCompany,
@@ -663,76 +381,35 @@ BEGIN
 			s.WinLoss,
 			0 AS Margin,
 			0 AS OthersFee,
-			(CASE WHEN -s.WinLoss < 0 THEN 0 ELSE -s.WinLoss * ISNULL(d3.Rate, 0) END) + (CASE WHEN s.AmountToCompany < 0 THEN 0 ELSE s.AmountToCompany * ISNULL(d1.Rate, 0) END) AS SportbookDiscount,
-			0 AS BACommission
+			s.Discount,
+			0 AS BACommission,
+			s.Rebate
 	FROM	@PartyIdTable p
 			INNER JOIN bodb_licensee.dbo.OAS_Party (NOLOCK) op ON p.PartyId = op.PartyID
 			INNER JOIN @SumByProducts s ON p.PartyId = s.PartyId
-			LEFT JOIN @DiscountGroup d1 ON s.PartyId = d1.PartyId AND s.IsCurrent = d1.IsCurrent AND d1.ProductId = s.ProductId AND d1.DiscountGroupType = 1 -- discount = 1
-			LEFT JOIN @DiscountGroup d3 ON s.PartyId = d3.PartyId AND s.IsCurrent = d3.IsCurrent AND d3.ProductId = s.ProductId AND d3.DiscountGroupType = 3 -- discount = 3
 	WHERE	s.ProductId = 0
-	
-	-- Calculate Rebate
-	UPDATE #Result 
-	SET SportbookRebate = CASE WHEN (res.SportsbookFee - res.SportbookDiscount) < 0 THEN 0 ELSE (res.SportsbookFee - res.SportbookDiscount) * ISNULL(r.Rate, 0) END
-	FROM	#Result res
-	LEFT JOIN @DiscountGroup r ON res.PartyId = r.PartyId AND res.IsCurrent = r.IsCurrent AND r.ProductId = res.ProductId AND r.DiscountGroupType = 2 -- rebate = 2
-	WHERE	res.ProductId = 0
 
-	-- Sum other & discount/rebate
-	CREATE TABLE #SumOther (
-		IsCurrent		BIT,
-		PartyId			INT,
-		ProductId		INT,
-		AmountToCompany	MONEY,
-		NegativeAmount	MONEY,
-		BetCount		INT,
-		Turnover		MONEY,
-		WinLoss			MONEY,
-		BAComm			MONEY,
-		AmountToBA		MONEY,
-		Discount		MONEY
-	)
-	
 	-- ********************************************************
 	-- *** Calculate Other (!= SportBook) and Merge to #Result
 	-- ********************************************************
 	-- 31 exchange: include negative amount
-	INSERT INTO #SumOther(IsCurrent, PartyId, ProductId, BetCount, Turnover, WinLoss, BAComm, AmountToBA, NegativeAmount, AmountToCompany, Discount)
-	SELECT	t.IsCurrent,
-			t.PartyId,
-			t.ProductId,
-			t.BetCount,
-			t.Turnover,
-			CASE WHEN t.ProductId = 31 THEN t.PComm ELSE 0 END + t.WinLoss,
-			CASE WHEN t.ProductId = 3 THEN t.AComm ELSE 0 END BAComm,
-			CASE WHEN t.ProductId = 3 THEN t.AmountToCompany ELSE 0 END AmountToBA,
-			CASE WHEN t.ProductId = 31 THEN t.AmountToCompany ELSE 0 END NegativeAmount,
-			CASE WHEN t.ProductId IN(3,31) OR t.AmountToCompany < 0 THEN 0 ELSE t.AmountToCompany END AmountToCompany,
-			(CASE WHEN -t.WinLoss < 0 THEN 0 ELSE -t.WinLoss * ISNULL(d3.Rate, 0) END) + (CASE WHEN t.AmountToCompany < 0 THEN 0 ELSE t.AmountToCompany * ISNULL(d1.Rate, 0) END) AS Discount
-	FROM	@SumByProducts t
-	LEFT JOIN @DiscountGroup d1 ON t.PartyId = d1.PartyId AND t.IsCurrent = d1.IsCurrent AND d1.ProductId = t.ProductId AND d1.DiscountGroupType = 1 -- discount = 1
-	LEFT JOIN @DiscountGroup d3 ON t.PartyId = d3.PartyId AND t.IsCurrent = d3.IsCurrent AND d3.ProductId = t.ProductId AND d3.DiscountGroupType = 3 -- discount = 3
-	WHERE	t.ProductId != 0
-
 	;WITH sumOther AS (
-		SELECT	t.IsCurrent,
-				t.PartyId,
-				SUM(t.AmountToCompany) AmountToCompany,
-				SUM(t.NegativeAmount) NegativeAmount,
-				SUM(t.BetCount) BetCount,
-				SUM(t.Turnover) Turnover,
-				SUM(t.WinLoss) WinLoss,
-				SUM(t.BAComm) BAComm,
-				SUM(t.AmountToBA) AmountToBA,
-				SUM(t.Discount) Discount,
-				SUM(CASE WHEN (t.AmountToCompany - t.Discount) < 0 THEN 0 ELSE (t.AmountToCompany - t.Discount) * ISNULL(r.Rate, 0) END) Rebate
-		FROM	#SumOther t
-		LEFT JOIN @DiscountGroup r ON t.PartyId = r.PartyId AND t.IsCurrent = r.IsCurrent AND r.ProductId = t.ProductId AND r.DiscountGroupType = 2 -- rebate = 2
-		GROUP BY t.IsCurrent, t.PartyId
+		SELECT t.IsCurrent, t.PartyId, t.ProductId,
+			SUM(t.BetCount)		AS BetCount,
+			SUM(t.Turnover)		AS Turnover,
+			SUM(ISNULL(t.Discount,0))	AS Discount,
+			SUM(ISNULL(t.Rebate,0))		AS Rebate,
+			SUM(CASE WHEN t.ProductId = 31 THEN t.PComm ELSE 0 END + t.WinLoss)		AS WinLoss,
+			SUM(CASE WHEN t.ProductId = 3 THEN t.AComm ELSE 0 END)					AS BAComm,
+			SUM(CASE WHEN t.ProductId = 3 THEN t.AmountToCompany ELSE 0 END)		AS AmountToBA,
+			SUM(CASE WHEN t.ProductId = 31 THEN t.AmountToCompany ELSE 0 END)		AS NegativeAmount,
+			SUM(CASE WHEN t.ProductId IN(3,31) OR t.AmountToCompany < 0 THEN 0 ELSE t.AmountToCompany END) AmountToCompany
+		FROM @SumByProducts t
+		WHERE t.ProductId != 0
+		GROUP BY t.IsCurrent, t.PartyId, t.ProductId
 	)
-	MERGE	#Result r
-	USING	sumOther s ON r.PartyId = s.PartyId AND r.IsCurrent = s.IsCurrent
+	MERGE #Result r
+	USING sumOther s ON r.PartyId = s.PartyId AND r.IsCurrent = s.IsCurrent
 	WHEN MATCHED THEN 
 		UPDATE SET 
 			r.OthersFee = s.AmountToCompany

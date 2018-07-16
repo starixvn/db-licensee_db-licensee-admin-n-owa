@@ -43,6 +43,25 @@ BEGIN
 	SET @PartyIDs = (SELECT CAST(PartyId AS VARCHAR(10)) + ',' 
 	FROM @PartyRoot FOR XML PATH(''))
 
+	-- get discount/rebate
+	CREATE TABLE #AmountToCompany (
+		PartyId			INT,
+		ProductId		INT,
+		Winloss			MONEY,
+		Fee				MONEY,
+		Discount		MONEY,
+		DiscountRate	MONEY,
+		DiscountRemark	NVARCHAR(4000),
+		Rebate			MONEY,
+		RebateRate		MONEY,
+		RebateRemark	NVARCHAR(4000),
+		AmountToCompany	MONEY,
+		Minfee			MONEY,
+		IsChargedByMinFee BIT
+	)
+	INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark,AmountToCompany,Minfee,IsChargedByMinFee)
+	EXEC dbo.LA_AmountToCompanySel @FromDate,@ToDate,@PartyIds,@ProductCodes,@BaseCurrencyName
+
 	-- Region: Party charge info
 	DECLARE @PartyChargeInfo AS TABLE (
 			PartyId		INT,
@@ -122,25 +141,6 @@ BEGIN
 	SELECT p.PartyId, p.ProductID,0,0,0
 	FROM @PartyChargeInfo p
 	GROUP BY p.PartyId, p.ProductID
-
-	-- get discount/rebate
-	CREATE TABLE #AmountToCompany (
-		PartyId			INT,
-		ProductId		INT,
-		Winloss			MONEY,
-		Fee				MONEY,
-		Discount		MONEY,
-		DiscountRate	MONEY,
-		DiscountRemark	NVARCHAR(4000),
-		Rebate			MONEY,
-		RebateRate		MONEY,
-		RebateRemark	NVARCHAR(4000),
-		AmountToCompany	MONEY,
-		Minfee			MONEY,
-		IsChargedByMinFee BIT
-	)
-	INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark,AmountToCompany,Minfee,IsChargedByMinFee)
-	EXEC dbo.LA_AmountToCompanySel @FromDate,@ToDate,@PartyIds,@ProductCodes,@BaseCurrencyName
 
 	-- Sum products
 	BEGIN
