@@ -37,9 +37,7 @@ DECLARE @tmpLicensee AS TABLE (Fromdate DATETIME,PartyID INT,PartyGroupID INT)
 DECLARE @CreditLicensee	AS TABLE (PartyID INT)
 
 INSERT INTO @CreditLicensee
-SELECT PartyID 
-FROM dbo.OAS_Party WITH (NOLOCK)
-WHERE PartyName IN ('IBC','18bb', 'EU88')
+SELECT PartyID FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE ISNULL(IsDeposit,0) = 0
 
 INSERT INTO @tmpCompany
 SELECT PartyID 
@@ -201,7 +199,6 @@ SELECT d.PartyID
 	, CASE op.PartyName
 		WHEN 'IBC' THEN 'FDL'
 		WHEN '18bb'THEN 'PIH'
-		WHEN 'EU88'THEN 'TEST'
 		ELSE op.PartyName
 	END AS PartyName
 	, ISNULL(pd.BrandName,'') AS BrandName
