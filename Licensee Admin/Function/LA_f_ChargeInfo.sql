@@ -40,7 +40,6 @@ AS
 		- 20180508@Harper: Change PayToSupplier term of Exchange product [RedmineID: #94281]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 
-    select * FROM [LA_f_ChargeInfo_xtest]('14,15,16,17,18,25','2013-08-01','2013-08-30','NG','OA')
 */
 
 BEGIN
