@@ -35,10 +35,7 @@ AS
 		- 20180508@Harper: Change PayToSupplier term of Exchange product [RedmineID: #94281]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		
-    Param's Explanation:  
-	
-   
- SELECT * FROM LA_f_ChargeInfo3rd ('2018-04-01', '2016-05-0', 'GD', 'OA')  
+    Param's Explanation: 
 */  
 
 BEGIN       

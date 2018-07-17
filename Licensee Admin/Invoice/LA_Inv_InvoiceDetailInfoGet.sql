@@ -1,8 +1,5 @@
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="1" isNested="0"></info>*/
 USE bodb_licensee
-GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceDetailInfoGet] 
@@ -20,6 +17,7 @@ AS
    
 	Revisions: 
 		+ 2015.08.07: Invoice Detail Info - Get
+		- 20180716@bruce: add new group TEST for credit [#98126]
 */
 /*	Example:
 	USE bodb_licensee
@@ -156,6 +154,7 @@ BEGIN
 	
 	DROP TABLE #tmpResult
 END		
-
 GO
+
 GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceDetailInfoGet] TO bodbAdminNet
+GO

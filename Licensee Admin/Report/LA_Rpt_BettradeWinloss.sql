@@ -1,3 +1,4 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="1" isNested="0"></info>*/
 USE [bodb02]
 GO
 
@@ -18,6 +19,8 @@ AS
 		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 		- 20170505@Bruce: show INH [RedmineId: #75954]
 		- 20171219@Bruce: increase length for variables [#88197]
+		- 20180716@bruce: add new group TEST for credit [#98126]
+		
 	Param's Explanation:
 */
 SET NOCOUNT ON

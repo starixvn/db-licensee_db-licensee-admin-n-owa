@@ -1,8 +1,5 @@
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
-GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_ChargeRateInfoGet] 
@@ -21,6 +18,7 @@ AS
 	Revisions: 
 		+ 20150807@Bravo: Charge rate Info - Get
 		+ 20170802@Bruce: @ProductCode => @ProductCodes [#79905]
+		- 20180716@bruce: add new group TEST for credit [#98126]
 */
 /*	Example:
 	USE bodb_licensee
@@ -83,6 +81,7 @@ BEGIN
 	SELECT	c.*, p.ProductCode, p.ProductName
 	FROM	@PartyChargeInfo c INNER JOIN @Products p ON c.ProductID = p.ProductId	
 END		
-
 GO
+
 GRANT EXECUTE ON [dbo].[LA_Inv_ChargeRateInfoGet] TO bodbAdminNet
+GO

@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -18,6 +19,7 @@ AS
 		- 20160412@Bruce: Add grand total in THB
 		- 20171009@Harper: Get more info for MuayThai Parlay [Redmine: #82827]
 		- 20171219@Bruce: increase length for variables [#88197]
+		- 20180716@bruce: add new group TEST for credit [#98126]
 
 	Param's Explanation:
 		- @TicketType: 1 - Single; 2 - Parlay; 3 - All

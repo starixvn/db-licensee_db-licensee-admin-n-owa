@@ -16,6 +16,7 @@ AS
 
 	Revisions:
 		- 20171226: create SP
+		- 20180716@bruce: add new group TEST for credit [#98126]
 */
 BEGIN
 	SET NOCOUNT ON

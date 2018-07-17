@@ -16,6 +16,7 @@ AS
 	Revisions:
 		- 20171226@Bruce: create SP report for AMF Summary [RedmineID: #87039]
 		- 20180326@Harper: Change the way to get Waive month [RedmineID: #87039]
+		- 20180716@bruce: add new group TEST for credit [#98126]
 */
 BEGIN
 	SET NOCOUNT ON

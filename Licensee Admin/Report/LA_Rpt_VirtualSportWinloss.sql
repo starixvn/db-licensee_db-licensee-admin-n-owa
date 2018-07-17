@@ -2,11 +2,6 @@
 USE [bodb02]
 GO
 
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_VirtualSportWinloss]
 	@PartyIDs				VARCHAR(5500)
 	, @FromDate				SMALLDATETIME
@@ -34,6 +29,7 @@ AS
 		- 20171220@Parsons: increase length for variables [#88197]
 		- 20180301@Harper: Virtual Sports - Change of commercial terms between company and provider [RedmineID: #91255]
 		- 20180327@Harper: Add more Cozni as Parent Licensee [RedmineID: #85681]
+		- 20180716@bruce: add new group TEST for credit [#98126]
 
  * Param's Explanation:
  *  - @FromDate   : From date
@@ -196,3 +192,4 @@ END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_VirtualSportWinloss] TO [vnteam]
 GRANT EXECUTE ON [dbo].[LA_Rpt_VirtualSportWinloss] TO bodbAdminNet
+GO

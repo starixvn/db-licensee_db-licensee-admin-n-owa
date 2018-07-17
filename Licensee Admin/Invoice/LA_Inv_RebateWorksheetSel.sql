@@ -1,4 +1,6 @@
 /*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
+GO
 
 ALTER PROCEDURE dbo.LA_Inv_RebateWorksheetSel
 	@PartyId		INT
@@ -14,6 +16,7 @@ AS
 	  - 20171220@Parsons: increase length for variables [#88197]
 	  - 20180126@Bruce: Exclude Exchange-BX [#87754]
 	  - 20180419@Scofield: update CB for FreePlay [#93907]
+	  - 20180716@bruce: add new group TEST for credit [#98126]
 */
 BEGIN
 	SET NOCOUNT ON

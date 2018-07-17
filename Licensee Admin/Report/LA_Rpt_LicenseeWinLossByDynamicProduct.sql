@@ -19,6 +19,7 @@ AS
 		- 20171220@Parsons: increase length for variables [#88197]
 		- 20180131@Scofield: Add BX [#87754]
 		- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
+		- 20180716@bruce: add new group TEST for credit [#98126]
 */
 BEGIN
 	SET NOCOUNT ON

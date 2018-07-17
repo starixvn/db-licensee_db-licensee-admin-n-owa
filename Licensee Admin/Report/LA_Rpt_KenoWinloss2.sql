@@ -1,4 +1,6 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="1" isNested="0"></info>*/
+USE [bodb_licensee]
+GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_KenoWinloss2]
 	 @PartyIDs			VARCHAR(5500)
@@ -15,6 +17,7 @@ AS
 	- 20160331@Bruce: #55003 - Support new Keno report
 	- 20171219@Bruce: increase length for variables [#88197]
 	- 20180515@Scofield: Incorporate 9wickets data [#94950]
+	- 20180716@bruce: add new group TEST for credit [#98126]
 
  Param's Explanation:
 	- @FromDate		: From date

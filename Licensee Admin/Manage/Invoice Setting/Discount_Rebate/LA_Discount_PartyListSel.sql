@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="1" isNested="0"></info>*/
 USE bodb_licensee
 GO
 ALTER PROCEDURE [dbo].[LA_Discount_PartyListSel] @DiscountGroupType TINYINT
@@ -14,6 +15,7 @@ AS
 	 Task : Get list payer list
 	 DB: DB052.bodb_Licensee
 	 Revisions:     
+		- 20180716@bruce: add new group TEST for credit [#98126]
 		
 	 Params:
 		+ UserID : 

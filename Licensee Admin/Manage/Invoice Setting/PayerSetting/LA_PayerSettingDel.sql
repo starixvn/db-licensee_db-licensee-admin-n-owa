@@ -1,9 +1,5 @@
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="1" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerSettingDel]	 
@@ -19,7 +15,9 @@ AS
 	 Task : Delete payer Setting
 	 DB: DB052.bodb_Licensee  
    
-	 Revisions:     		  
+	 Revisions:     
+		- 20180716@bruce: add new group TEST for credit [#98126]
+		
 	 Params:		
 
 	 Example:
@@ -188,3 +186,4 @@ END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_PayerSettingDel] TO [vnteam] 
 GRANT EXECUTE ON [dbo].[LA_PayerSettingDel] TO bodbAdminNet
+GO

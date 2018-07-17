@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="1" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -26,6 +27,7 @@ AS
 		- 20170301@Scofield: update effective date for LicenseeProduct3rd
 		- 20170307@Scofield: update to not save rate, basic billing, first billing for MGC[#70050]
 		- 20170407@Scofield: log dataold [#73310]
+		- 20180716@bruce: add new group TEST for credit [#98126]
 
 	 Params:
 		+ @InvoiceSettingXML: '<ChargeSettings>

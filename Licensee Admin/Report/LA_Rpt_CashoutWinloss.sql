@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="1" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -14,6 +15,8 @@ AS
 	Revisions:
 		- 20170401@Harper: #73310_Change sum table for CashOut Product
 		- 20171219@Bruce: increase length for variables [#88197]
+		- 20180716@bruce: add new group TEST for credit [#98126]
+		
 	Param's Explanation:
 */
 SET NOCOUNT ON

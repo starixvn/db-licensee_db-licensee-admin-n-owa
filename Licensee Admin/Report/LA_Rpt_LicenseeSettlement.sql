@@ -1,4 +1,6 @@
 /*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+USE [bodb02]
+GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeSettlement]
 	  @PartyId				INT
@@ -34,6 +36,7 @@ AS
 			- 20180126@Bruce: include Exchange-BX [#87754]
 			- 20180419@Scofield: update CB for FreePlay [#93907]
 			- 20180515@Scofield: Incorporate 9wickets data [#94950]
+			- 20180716@bruce: add new group TEST for credit [#98126]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing

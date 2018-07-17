@@ -1,10 +1,7 @@
-﻿USE [bodb02]
+﻿/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_NumberGameWinloss]    Script Date: 01/12/2014 14:36:23 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
+
 ALTER PROCEDURE [dbo].[LA_Rpt_NumberGameWinloss]
 	 @PartyIDs				VARCHAR(5500)
 	, @FromDate				SMALLDATETIME
@@ -26,6 +23,8 @@ AS
 	- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	- 20170621@Bruce: include paytosupplier & netincome [#78398]
 	- 20171220@Parsons: increase length for variables [#88197]
+	- 20180716@bruce: add new group TEST for credit [#98126]
+	
  * Param's Explanation:
  *
  */
@@ -98,3 +97,4 @@ END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_NumberGameWinloss] TO [vnteam]
 GRANT EXECUTE ON [dbo].[LA_Rpt_NumberGameWinloss] TO bodbAdminNet
+GO

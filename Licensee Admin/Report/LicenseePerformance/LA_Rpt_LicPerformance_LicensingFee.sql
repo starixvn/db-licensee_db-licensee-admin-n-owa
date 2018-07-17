@@ -1,9 +1,5 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
-GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_LicPerformance_LicensingFee]    Script Date: 01/12/2014 14:40:20 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_LicensingFee]
@@ -29,6 +25,8 @@ AS
 	   - 20160506@Bravo: Add VB data.
 	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	   - 20171205@Bruce: fix partyid length [#87723]
+	   - 20180716@bruce: add new group TEST for credit [#98126]
+	   
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
 	  + @Currency : 0-All Currencies
@@ -169,3 +167,4 @@ END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicPerformance_LicensingFee] TO [vnteam] 
 GRANT EXECUTE ON [dbo].[LA_Rpt_LicPerformance_LicensingFee] TO bodbAdminNet 
+GO

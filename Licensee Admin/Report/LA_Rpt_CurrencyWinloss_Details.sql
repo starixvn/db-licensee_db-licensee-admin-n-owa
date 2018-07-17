@@ -1,4 +1,6 @@
 /*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+USE bodb02
+GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss_Details]
 	@PartyIDs			VARCHAR(5500)	= ''
@@ -26,6 +28,7 @@ AS
 	   - 20170801@Kenny: Filter data for Microgaming [RedmineID: #79311]
 	   - 20180130@Bruce: integrate Exchange product [#87754]
 	   - 20180515@Scofield: Incorporate 9wickets data [#94950]
+	   - 20180716@bruce: add new group TEST for credit [#98126]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
