@@ -1,9 +1,5 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
-GO
-/****** Object:  StoredProcedure [dbo].[LA_TotalTransByDate]    Script Date: 12/21/2015 06:47:11 ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_TotalTransByDate]          
@@ -320,8 +316,10 @@ BEGIN
 	DROP TABLE #tmpBetting 
 	DROP TABLE #data
 END
-
 GO
+
 GRANT EXECUTE ON [dbo].[LA_TotalTransByDate] TO [bodbLicenseeNet] AS [dbo]
 GO
+
 GRANT VIEW DEFINITION ON [dbo].[LA_TotalTransByDate] TO [vnteam] AS [dbo]
+GO
