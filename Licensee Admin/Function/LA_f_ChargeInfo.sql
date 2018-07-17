@@ -331,9 +331,3 @@ BEGIN
 	RETURN
 END
 GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_f_ChargeInfo] TO [vnteam]
-GO
-
-GRANT SELECT ON [dbo].[LA_f_ChargeInfo] TO bodbAdminNet
-GO
