@@ -328,6 +328,6 @@ BEGIN
 	   )
 	END
 
-	RETURN
-END
+	RETURN;
+END;
 GO
