@@ -27,7 +27,7 @@ AS
 */
 BEGIN
 	DECLARE @PartyIdString VARCHAR(4000) 
-	SELECT	@PartyIdString = COALESCE(@PartyIdString + ',', '') + CAST(PartyId AS VARCHAR(5))
+	SELECT	@PartyIdString = COALESCE(@PartyIdString + ',', '') + CAST(d.PartyId AS VARCHAR(5))
 	FROM	dbo.OAS_Party p WITH(NOLOCK)
 	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyId = d.PartyId
 	WHERE	PartyType = 1 AND ISNULL(IsDeposit,0) = 1
