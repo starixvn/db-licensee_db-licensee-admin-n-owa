@@ -23,6 +23,7 @@ AS
   - 20170315@Scofield: hard code for Bettrade BA [#70050]
   - 20180309@Bruce: Param @ListParty should increase length in SP LA_PayerSettingSel [#91814]
   - 20180716@bruce: add new group TEST for credit [#98126]
+  - 20180503@Parsons: fix: setting won't show when set start date from future[#94108]
 
   Params:
   + @PayerId : 0 get all Party
@@ -109,7 +110,7 @@ BEGIN
 						MAX(c.Fromdate) AS Fromdate,
 						MAX(c.Todate) AS Todate
 				FROM	@ChargeDetail c
-				WHERE	@CurrentDate BETWEEN c.Fromdate AND c.Todate
+				WHERE	@CurrentDate <= c.Todate
 				GROUP BY	c.PartyID,
 							c.ProductID) a
 		INNER JOIN @ChargeDetail b
@@ -147,7 +148,7 @@ BEGIN
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 			LEFT JOIN dbo.OAS_ChargeInfoSub s WITH(NOLOCK) ON ci.ChargeID = s.ChargeIdRef
 			LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON pd.BaseCurrencyId = e.exchangeid
-		WHERE @CurrentDate BETWEEN c.Fromdate AND c.Todate
+		WHERE @CurrentDate <= c.Todate
 
 	-- Hard code for Bettrade BA
 	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)

@@ -43,6 +43,7 @@ AS
 		- 20182501@Bruce: Include exchange winloss [#87754]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 	    	- 20180703@Parsons: Integrate Pragmatic Win Loss [#94108]
+		- 20180718@Bruce: use decimal to void margin not match among reports [#94108]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -149,7 +150,7 @@ BEGIN
 			PartyId		INT,
 			LicenseeId	INT,
 			ProductID	INT,
-			Rate		MONEY,
+			Rate		DECIMAL(7,5),
 			FromDate	SMALLDATETIME,
 			ToDate		SMALLDATETIME,
 			Bettype		INT)
@@ -755,8 +756,8 @@ BEGIN
 	UPDATE	r
 	SET	LaunchDate	= t.AffectedDate,
 		PartyName	= ISNULL(r.PartyName,op.PartyName),
-		AverageBet	= CASE WHEN r.BetCount = 0 THEN r.Turnover ELSE (r.Turnover / r.BetCount) END,
-		Margin		= CASE WHEN r.Turnover = 0 THEN r.WinLoss ELSE (-r.WinLoss/ r.Turnover) END,
+		AverageBet	= CASE WHEN r.BetCount = 0 THEN r.Turnover ELSE (CAST(r.Turnover AS DECIMAL(20,5)) / r.BetCount) END,
+		Margin		= CASE WHEN r.Turnover = 0 THEN r.WinLoss ELSE (-CAST(r.WinLoss AS DECIMAL(20,5))/ r.Turnover) END,
 		TotalFee	= ISNULL(r.SportsbookFee,0) + ISNULL(r.OthersFee,0) - ISNULL(r.SportbookDiscount,0) - ISNULL(r.OthersDiscount,0) - ISNULL(r.SportbookRebate,0) - ISNULL(r.OthersRebate,0)
 	FROM	#Result r
 	INNER JOIN @tmpPartySBLaunchDate t ON t.PartyID = r.PartyId
