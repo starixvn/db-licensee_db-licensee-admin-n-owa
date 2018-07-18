@@ -135,3 +135,6 @@ BEGIN
    RETURN;  
 END;
 GO
+
+GRANT SELECT ON [dbo].[LA_f_ChargeInfo3rd] TO bodbAdminNet
+GO
