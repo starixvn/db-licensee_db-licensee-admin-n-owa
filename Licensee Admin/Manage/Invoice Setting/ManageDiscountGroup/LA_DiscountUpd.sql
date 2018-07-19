@@ -70,7 +70,11 @@ BEGIN
 	END
 
 	--check exists
-	IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupName = @DiscountGroupName AND DiscountGroupType != @RebateGroupType AND DiscountGroupId <> @DiscountGroupId)
+	IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) 
+				WHERE DiscountGroupName = @DiscountGroupName 
+						AND DiscountGroupType != @RebateGroupType 
+						AND DiscountGroupId <> @DiscountGroupId 
+						AND DiscountGroupName not like N'%Expired%')
 	BEGIN
 		SELECT @ErrCode = 502, @ErrMsg = 'Group name exists. Please try again.'
 		RETURN
