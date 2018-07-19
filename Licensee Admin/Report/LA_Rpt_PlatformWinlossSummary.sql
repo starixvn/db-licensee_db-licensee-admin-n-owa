@@ -1,3 +1,4 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
 
@@ -16,7 +17,8 @@ AS
 		- 20160725@Bravo: create SP
 		- 20170123@Bruce: Update SP to support new layout: https://nexdev.net/projects/owa/wiki/LA_Platform_WinLoss_Summary
 		- 20170207@Bruce: exclude trial data and terminated [RedmindID: #60707]
-		- 20171219@Bruce: increase length for variables [#88197]
+		- 20171219@Bruce: increase length for variables [#88197]\
+		- 20180716@bruce: add new group TEST for credit [#98126]
 
 	Explanation:
 		- Desktop: contain the followings:

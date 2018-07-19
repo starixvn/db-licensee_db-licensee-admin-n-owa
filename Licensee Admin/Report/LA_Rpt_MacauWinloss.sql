@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -10,10 +11,12 @@ WITH RECOMPILE
 AS
 /*  Created: 20160329@Bruce
 	Task : Support settlement for Macau
-	DB: DBEXT/bodb02
+	DB: DBLIC-bodb_Licensee
 	Revisions:
 		- 20160329@Bruce: Create SP
 		- 20171219@Bruce: increase length for variables [#88197]
+		- 20180716@bruce: add new group TEST for credit [#98126]
+		
 	Param's Explanation:
 */
 BEGIN
@@ -277,3 +280,4 @@ END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_MacauWinloss] TO [vnteam]
 GRANT EXECUTE ON [dbo].[LA_Rpt_MacauWinloss] TO bodbAdminNet
+GO

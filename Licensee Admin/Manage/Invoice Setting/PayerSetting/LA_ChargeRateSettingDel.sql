@@ -1,9 +1,5 @@
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_ChargeRateSettingDel] 	
@@ -21,9 +17,11 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:     
-		-20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
-		-20150917@Victor: Support Chinese on Settings
-		-20161101@bruce.bui: support delete multiple rate
+		- 20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
+		- 20150917@Victor: Support Chinese on Settings
+		- 20161101@bruce.bui: support delete multiple rate
+		- 20180716@bruce: add new group TEST for credit [#98126]
+		
 	 Params:				
 */
 BEGIN
@@ -160,7 +158,10 @@ BEGIN
 			, @duration = @duration
 	END CATCH
 END
-
 GO
+
 GRANT VIEW DEFINITION ON [dbo].[LA_ChargeRateSettingDel] TO [vnteam] 
+GO
+
 GRANT EXECUTE ON [dbo].[LA_ChargeRateSettingDel] TO bodbAdminNet
+GO

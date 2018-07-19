@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -21,6 +22,7 @@ AS
   - 20170215@bruce.bui: sort product
   - 20170315@Scofield: hard code for Bettrade BA [#70050]
   - 20180309@Bruce: Param @ListParty should increase length in SP LA_PayerSettingSel [#91814]
+  - 20180716@bruce: add new group TEST for credit [#98126]
 
   Params:
   + @PayerId : 0 get all Party
@@ -333,3 +335,4 @@ DROP TABLE #Temp_ChargeInfo
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_PayerSettingSel] TO [vnteam]
 GRANT EXECUTE ON [dbo].[LA_PayerSettingSel] TO bodbAdminNet
+GO

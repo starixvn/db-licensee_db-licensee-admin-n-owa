@@ -1,9 +1,5 @@
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerSettingDetailSel]
@@ -24,6 +20,8 @@ AS
 		- 20170216@bruce.bui: [#70050]
 				+ sort product, include payername,
 				+ sort charge rate by expired
+		- 20180716@bruce: add new group TEST for credit [#98126]
+		
 	 Params:
 		+ @PayerId :specify Party
 		+ @@PayerGroup :	0 get all Party
@@ -191,3 +189,4 @@ END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_PayerSettingDetailSel] TO [vnteam] 
 GRANT EXECUTE ON [dbo].[LA_PayerSettingDetailSel] TO bodbAdminNet
+GO

@@ -21,6 +21,7 @@ AS
 		  - 20150312@Florent: add column brandname and fix case without SB
 		  - 20150412@Patrick: Add filter by PartyType
 		  - 20180403@Harper: Add more Cozni as parent license [RedmineID: #85681]
+		  - 20180713@bruce: Add new group TEST for credit side [#98126]
 
 	 Params:
 		+ UserID : 
@@ -36,9 +37,7 @@ DECLARE @tmpLicensee AS TABLE (Fromdate DATETIME,PartyID INT,PartyGroupID INT)
 DECLARE @CreditLicensee	AS TABLE (PartyID INT)
 
 INSERT INTO @CreditLicensee
-SELECT PartyID 
-FROM dbo.OAS_Party WITH (NOLOCK)
-WHERE PartyName IN ('IBC','18bb')
+SELECT PartyID FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE ISNULL(IsDeposit,0) = 0
 
 INSERT INTO @tmpCompany
 SELECT PartyID 

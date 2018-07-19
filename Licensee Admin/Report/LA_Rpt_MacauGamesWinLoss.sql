@@ -1,4 +1,6 @@
 /*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+USE bodb_Licensee
+GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_MacauGamesWinLoss]          
 	@PartyIds			VARCHAR(4000),
@@ -13,6 +15,8 @@ AS
 
 	 Revisions:  
 		- 20171201@Scofield: Create Macau Games Win Loss [#86573]
+		- 20180716@bruce: add new group TEST for credit [#98126]
+		
 	 Params:
 */
 BEGIN		

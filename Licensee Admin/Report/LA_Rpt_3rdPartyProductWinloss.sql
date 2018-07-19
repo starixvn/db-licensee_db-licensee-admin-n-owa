@@ -1,3 +1,4 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
 
@@ -20,6 +21,8 @@ AS
 		- 20150722@Florent: fix bug NoDraw filter
 		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 		- 20171219@Bruce: increase length for variables [#88197]
+		- 20180716@bruce: add new group TEST for credit [#98126]
+		
 	Param's Explanation:
 		+ @ProductCode:	+ 'GD'	Gold Deluxe
 */
@@ -200,5 +203,3 @@ GO
 
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_3rdPartyProductWinloss] TO [vnteam] AS [dbo]
 GO
-
-

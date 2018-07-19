@@ -20,11 +20,10 @@ AS
 	Revisions:
 		- 20170919@Bruce: create SP [RedmineID: #78294]
 		- 20171123@Sophia: Revise SP [RedmineID: #78294]
+		- 20180716@bruce: add new group TEST for credit [#98126]
 
 	Notes: @FromDate, @ToDate should be a full month range
-	Example :  EXEC LA_Rpt_LicenseeAnalysis  @PartyIDs = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,29,30,31,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72
-
-,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88', 
+	Example :  EXEC LA_Rpt_LicenseeAnalysis  @PartyIDs = '73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88', 
 			@ProductCodes = 'RB,NG,BA,LC,VS,CS,BG,KN,PTCS,AGC,GD,VG,BT,MGCLC,HF,MGCRNG,AB,VB,NG2,FW,CO,VS2,LT',
 			@FromDate =  '2017-01-01',  @ToDate = '2017-10-31' , @IsSkinView = 0
 */

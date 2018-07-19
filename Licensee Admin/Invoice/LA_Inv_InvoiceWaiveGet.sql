@@ -1,9 +1,5 @@
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceWaiveGet] 
@@ -18,6 +14,7 @@ AS
 	Revisions: 
 		+ 2017-05-09 @Scofield.Huynh: Create [#76132]
 		- 20171220@Parsons: increase length for variables [#88197]
+		- 20180716@bruce: add new group TEST for credit [#98126]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -322,3 +319,4 @@ END
 
 GO
 GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceWaiveGet] TO bodbAdminNet
+GO

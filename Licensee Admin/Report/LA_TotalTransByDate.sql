@@ -1,9 +1,5 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
-GO
-/****** Object:  StoredProcedure [dbo].[LA_TotalTransByDate]    Script Date: 12/21/2015 06:47:11 ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_TotalTransByDate]          
@@ -25,14 +21,16 @@ AS
 	 - 20160504@Bravo:	 Add VB Data
 	 - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	 - 20171220@Parsons: increase length for variables [#88197]
+	 - 20180716@bruce: add new group TEST for credit [#98126]
+	 
 	 Params:			   
 */
 BEGIN
- 
 	DECLARE @PartyIdString VARCHAR(4000) 
-	SELECT	@PartyIdString = COALESCE(@PartyIdString + ',', '') + CAST(PartyId AS VARCHAR(5))
-	FROM	OAS_Party
-	WHERE	PartyType=1 AND PartyID NOT IN (25,30)
+	SELECT	@PartyIdString = COALESCE(@PartyIdString + ',', '') + CAST(d.PartyId AS VARCHAR(5))
+	FROM	dbo.OAS_Party p WITH(NOLOCK)
+	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyId = d.PartyId
+	WHERE	PartyType = 1 AND ISNULL(IsDeposit,0) = 1
 	
 	DECLARE @ProductCode VARCHAR(200) = 'SB,RB,NG,LC,VS,KN,VG,BG,BA,AGC,GD,VB'
 	
@@ -64,7 +62,7 @@ BEGIN
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
 	(
 		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
-		FROM	dbo.LA_f_ChargeInfo('25,30', @FromDate, @ToDate, @ProductCode, 'OA', 0)		
+		FROM	dbo.LA_f_ChargeInfo('25,30,324', @FromDate, @ToDate, @ProductCode, 'OA', 0)		
 	)
 	
 	UPDATE	c
@@ -83,7 +81,7 @@ BEGIN
 	UPDATE	c
 	SET		c.ToParty = p.ParentId
 	FROM	@PartyChargeInfo c INNER JOIN @PartyParent p ON c.PartyId = p.PartyId
-	WHERE	c.ProductID=1 OR c.PartyId IN (25,30)
+	WHERE	c.ProductID=1 OR c.PartyId IN (25,30,324)
 	
 	CREATE TABLE #tmpBetting (rptDate char(10),rptDateFull DATETIME, product varchar(10),siteID INT,betcount INT, FromParty INT, ToParty INT)
 	
@@ -197,9 +195,10 @@ BEGIN
 	INTO	#data	 
 	FROM(
 			SELECT	b.rptDate,b.product,b.siteID,v.SiteName,sum(b.betcount) betcount,
-					CASE WHEN b.FromParty IN (25,30) THEN 'Credit' ELSE 'Deposit' END LicenseeType,
+					CASE WHEN b.FromParty IN (25,30,324) THEN 'Credit' ELSE 'Deposit' END LicenseeType,
 					CASE WHEN b.FromParty = 25 THEN 'FDL' 
 						 WHEN b.FromParty = 30 THEN 'PIH' 
+						 WHEN b.FromParty = 324 THEN 'TEST' 
 						 WHEN b.ToParty = 11 then 'Boping'
 						 WHEN b.ToParty IN (1,13) THEN 'OW'
 						 WHEN b.ToParty = 98 THEN 'Zelianta'						 
@@ -214,9 +213,10 @@ BEGIN
 								) LBP ON b.SiteID = lbp.LicenseeID 
 			WHERE	b.product  in ('SB','RB','NG','VS','LC','BA','KN','AGC', 'VG', 'GD', 'VB')
 			GROUP BY b.rptDate,b.product,b.siteID,v.SiteName,b.ToParty,b.FromParty,
-					CASE WHEN b.FromParty IN (25,30) THEN 'Credit' ELSE 'Deposit' END,
+					CASE WHEN b.FromParty IN (25,30,324) THEN 'Credit' ELSE 'Deposit' END,
 					CASE WHEN b.FromParty = 25 THEN 'FDL' 
 						 WHEN b.FromParty = 30 THEN 'PIH' 
+						 WHEN b.FromParty = 324 THEN 'TEST' 
 						 WHEN b.ToParty = 11 then 'Boping'
 						 WHEN b.ToParty IN (1,13) THEN 'OW'	
 						 WHEN b.ToParty = 98 THEN 'Zelianta'					 
@@ -316,8 +316,10 @@ BEGIN
 	DROP TABLE #tmpBetting 
 	DROP TABLE #data
 END
-
 GO
+
 GRANT EXECUTE ON [dbo].[LA_TotalTransByDate] TO [bodbLicenseeNet] AS [dbo]
 GO
+
 GRANT VIEW DEFINITION ON [dbo].[LA_TotalTransByDate] TO [vnteam] AS [dbo]
+GO

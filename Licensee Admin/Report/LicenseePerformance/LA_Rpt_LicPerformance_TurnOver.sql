@@ -1,11 +1,7 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_Rpt_LicPerformance_TurnOver]    Script Date: 01/12/2014 14:39:52 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-/****** Object:  Stored Procedure dbo.OA_Rpt_LicPerformance_TurnOver    Script Date: 3/4/2014 4:17:39 PM ******/
+
 ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_TurnOver] 
 	 @PartyIDs				VARCHAR(4000)	= ''
 	,	@Currency			INT				= 0
@@ -31,6 +27,8 @@ AS
 		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 		- 20171205@Bruce: fix partyid length [#87723]
 		- 20180118@Parsons: Data is incorrect when chosing cross month [#89351]
+		- 20180716@bruce: add new group TEST for credit [#98126]
+		
     Param's Explanation:  
 	   + @partyIDs : a string of list PartyID, separated by ','
 	   + @Currency : 0-All Currencies
@@ -193,3 +191,4 @@ END
 GO
 GRANT EXECUTE ON [dbo].[LA_Rpt_LicPerformance_TurnOver] TO [bodbAdminNet]
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicPerformance_TurnOver] TO [vnteam]
+GO

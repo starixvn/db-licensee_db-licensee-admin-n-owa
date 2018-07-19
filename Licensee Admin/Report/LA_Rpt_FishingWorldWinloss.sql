@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -9,12 +10,13 @@ ALTER PROCEDURE [dbo].[LA_Rpt_FishingWorldWinloss]
 AS
 
 /*
- * Created by : [20161220@Scofield.Huynh]
- * Task  : Get Fishing World Winloss
- * DB   : DB052.bodb_licensee
- *
- * Revisions:
- *	- 20171220@Parsons: increase length for variables [#88197]
+  Created by : [20161220@Scofield.Huynh]
+  Task  : Get Fishing World Winloss
+  DB   : DB052.bodb_licensee
+ 
+  Revisions:
+ 	- 20171220@Parsons: increase length for variables [#88197]
+	- 20180716@bruce: add new group TEST for credit [#98126]
  */
 BEGIN
 	SET NOCOUNT ON
@@ -212,3 +214,4 @@ END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_FishingWorldWinloss] TO [vnteam]
 GRANT EXECUTE ON [dbo].[LA_Rpt_FishingWorldWinloss] TO bodbAdminNet
+GO

@@ -1,9 +1,5 @@
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_ChargeRateValidate] 
@@ -18,7 +14,7 @@ AS
 	 Task : Validate list of Payers have applied to billing Invoice yet
 	 DB: DB052.bodb_Licensee
 	 Revisions:     
-		
+		- 20180716@bruce: add new group TEST for credit [#98126]
 	 Params:
 		+ @ChargeId : = 0 check all charge infor of Party
 		+ @Mode : 
@@ -82,3 +78,4 @@ END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_ChargeRateValidate] TO [vnteam] 
 GRANT EXECUTE ON [dbo].[LA_ChargeRateValidate] TO bodbAdminNet
+GO

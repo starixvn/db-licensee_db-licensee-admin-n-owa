@@ -1,3 +1,4 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
 
@@ -23,6 +24,7 @@ AS
 	- 20150705@Florent: add GBP
 	- 20170622@Scofield: get PayToSupplier [#78398]
 	- 20171220@Parsons: increase length for variables [#88197]
+	- 20180716@bruce: add new group TEST for credit [#98126]
 
  * Param's Explanation:    
  *  - @FromDate		: From date   
@@ -176,3 +178,4 @@ END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_KenoWinloss] TO [vnteam] 
 GRANT EXECUTE ON [dbo].[LA_Rpt_KenoWinloss] TO bodbAdminNet
+GO

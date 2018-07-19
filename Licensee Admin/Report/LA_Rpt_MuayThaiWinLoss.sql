@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -11,13 +12,14 @@ WITH RECOMPILE
 AS
 /*  Created: 20160302@Bravo
 	Task : Report - Muay Thai Win Loss
-	DB: DBEXT/bodb02
+	DB: DBLIC-bodb_licensee
 	Revisions:
 		- 20160302@Bravo: create sp on table sum
 		- 20160322@Bravo: fix bug currency name VND => INH
 		- 20160412@Bruce: Add grand total in THB
 		- 20171009@Harper: Get more info for MuayThai Parlay [Redmine: #82827]
 		- 20171219@Bruce: increase length for variables [#88197]
+		- 20180716@bruce: add new group TEST for credit [#98126]
 
 	Param's Explanation:
 		- @TicketType: 1 - Single; 2 - Parlay; 3 - All

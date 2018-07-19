@@ -1,4 +1,6 @@
 /*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+USE [bodb02]
+GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss]
 	  @PartyIDs				VARCHAR(4000)	= ''
@@ -24,6 +26,7 @@ AS
 	- 20171211: @Scofield - Support Colossus Bet, Bet Trade, Cashout [#87038]
 	- 20180130@Bruce: integrate Exchange product [#87754]
 	- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
+	- 20180716@bruce: add new group TEST for credit [#98126]
 
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','

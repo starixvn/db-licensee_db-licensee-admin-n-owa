@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -15,6 +16,7 @@ AS
 	 Task : Get list payer list
 	 DB: DB052.bodb_Licensee
 	 Revisions:     
+		- 20180716@bruce: add new group TEST for credit [#98126]
 		
 	 Params:
 		+ UserID : 
@@ -59,3 +61,4 @@ END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_PayerGroupPartyListSel] TO [vnteam] 
 GRANT EXECUTE ON [dbo].[LA_PayerGroupPartyListSel] TO bodbAdminNet 
+Go

@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
 GO
 
@@ -14,6 +15,8 @@ AS
 	 Revisions:
 		- 20170707@Scofield: Get report Bet Radar Virtual Sport Win Loss [#79310]
 		- 20171219@Bruce: increase length for variables [#88197]
+		- 20180716@bruce: add new group TEST for credit [#98126]
+		
 	 Params:
 */
 BEGIN
@@ -291,3 +294,4 @@ GRANT EXECUTE ON [dbo].[LA_Rpt_BetRadarVirtualSportWinLoss] TO [bodbLicenseeNet]
 GRANT EXECUTE ON [dbo].[LA_Rpt_BetRadarVirtualSportWinLoss] TO [bodbAdminNet] AS [dbo]
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_BetRadarVirtualSportWinLoss] TO [vnteam] AS [dbo]
+GO

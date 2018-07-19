@@ -33,11 +33,9 @@ AS
 		- 20180302@Harper: Inspired , Lupine, Star Express, AG is 3rd Licensee [#RedmineID: #91255]
 		- 20180327@Harper: Add more Cozni as Parent Licensee [RedmineID: #85681]
 		- 20180508@Harper: Change PayToSupplier term of Exchange product [RedmineID: #94281]
-
-    Param's Explanation:  
-	
-   
- SELECT * FROM LA_f_ChargeInfo3rd ('2018-04-01', '2016-05-0', 'GD', 'OA')  
+		- 20180716@bruce: add new group TEST for credit [#98126]
+		
+    Param's Explanation: 
 */  
 
 BEGIN       
@@ -72,12 +70,12 @@ BEGIN
 								)
     SELECT  DI.ChargeID ,
             CASE WHEN Di.FromParty IN (1, 11, 98, 9) THEN DI.FromParty 
-				 WHEN Di.FromParty IN (25, 30) THEN 999 
+				 WHEN Di.FromParty IN (25, 30, 324) THEN 999 
 				 ELSE Di. FromParty END,
             DI.ProductID ,
             DI.Rate ,
             DI.ChargeType ,
-			CASE WHEN Di.FromParty IN (25, 30) THEN 0 ELSE 1 END,
+			CASE WHEN Di.FromParty IN (25, 30, 324) THEN 0 ELSE 1 END,
             CASE WHEN @FromDate <= DI.FromDate 
 					THEN DI.FromDate
                     ELSE @FromDate
@@ -86,7 +84,7 @@ BEGIN
 					THEN DI.ToDate
                     ELSE @ToDate
             END,
-			CASE WHEN DI.FromParty IN (1, 11, 98, 9, 25, 30) THEN 1 ELSE 0 END
+			CASE WHEN DI.FromParty IN (1, 11, 98, 9, 25, 30, 324) THEN 1 ELSE 0 END
     FROM    dbo.OAS_ChargeInfo DI (NOLOCK)
             INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs (NOLOCK) ON DI.ChargeID = cs.ChargeID
                                                     AND cs.SystemID = @SystemID
@@ -136,4 +134,7 @@ BEGIN
 
    RETURN;  
 END;
+GO
+
+GRANT SELECT ON [dbo].[LA_f_ChargeInfo3rd] TO bodbAdminNet
 GO

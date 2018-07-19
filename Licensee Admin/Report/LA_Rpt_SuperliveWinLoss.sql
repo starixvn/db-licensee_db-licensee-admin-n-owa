@@ -1,4 +1,5 @@
-USE [bodb_Licensee]
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+USE [bodb02]
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_SuperliveWinLoss]
@@ -11,12 +12,14 @@ AS
 /*
 	 Created: 20160322@Forrest
 	 Task : Superlive Win Loss Report
-	 DB: DBLIC.bodb_licensee
+	 DB: DBEXT.bodb02
 
 	 Revisions:
 	 - 20160322@Forrest: Get Superlive Report Data.
 	 - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	 - 20171219@Bruce: increase length for variables [#88197]
+	 - 20180716@bruce: add new group TEST for credit [#98126]
+	 
 	 Params:
 	 - PartyIds: List Party Id.
 	 - FromDate: From Date.
@@ -257,3 +260,4 @@ GRANT EXECUTE ON [dbo].[LA_Rpt_SuperliveWinLoss] TO [bodbLicenseeNet] AS [dbo]
 GRANT EXECUTE ON [dbo].[LA_Rpt_SuperliveWinLoss] TO [bodbAdminNet] AS [dbo]
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_SuperliveWinLoss] TO [vnteam] AS [dbo]
+GO

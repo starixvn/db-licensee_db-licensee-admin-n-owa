@@ -18,6 +18,7 @@ AS
 		- 20171219@Bruce: increase length for variables [#88197]
 		- 20180321@Scofield: Implement Colossus Bets Freeplay [#89768]
 		- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
+		- 20180716@bruce: add new group TEST for credit [#98126]
 
 	Param's Explanation:
 */

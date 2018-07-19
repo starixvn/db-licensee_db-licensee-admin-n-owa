@@ -1,10 +1,6 @@
 /*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
 GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinLossByProduct]
 	@PartyIdString		VARCHAR(4000),
@@ -34,6 +30,7 @@ AS
 		- 20180131@Scofield: Add BX [#87754]
 		- 20180315@Bruce:Support Cozni licensees [#85681]
 		- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
+		- 20180716@bruce: add new group TEST for credit [#98126]
 */
 		
 /*	Example:
@@ -396,3 +393,4 @@ END
 
 GO
 GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeWinLossByProduct] TO bodbAdminNet
+GO

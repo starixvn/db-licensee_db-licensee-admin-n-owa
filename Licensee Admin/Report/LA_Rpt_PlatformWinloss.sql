@@ -1,3 +1,4 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE bodb02
 GO
 
@@ -16,6 +17,7 @@ AS
 		- 20170207@Bruce:	exclude ticket 904, refund tickets [RedmindID:	#60707]
 							exclude trial data and terminated
 		- 20171219@Bruce: increase length for variables [#88197]
+		- 20180716@bruce: add new group TEST for credit [#98126]
 
 	Explanation:
 	  + @PlatformType: 0: All
@@ -307,3 +309,4 @@ GRANT EXECUTE ON [dbo].[LA_Rpt_PlatformWinloss] TO [bodbLicenseeNet] AS [dbo]
 GRANT EXECUTE ON [dbo].[LA_Rpt_PlatformWinloss] TO [bodbAdminNet] AS [dbo]
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_PlatformWinloss] TO [vnteam] AS [dbo]
+GO

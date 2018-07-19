@@ -52,6 +52,7 @@ AS
 		+ 20180110@Bruce: deduct against invoice [#87039]
 		+ 20180419@Scofield: update CB for FreePlay [#93907]
 		+ 20180525@Scofield: Incorporate 9wickets' data [#94950]
+		- 20180716@bruce: add new group TEST for credit [#98126]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'

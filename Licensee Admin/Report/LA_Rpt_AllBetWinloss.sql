@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -17,6 +18,7 @@ AS
 	- 20170113@bruce: checking launchDate to exclude trial data
 	- 20170217@bruce: change deposit service charge to 9 [#70050]
 	- 20171220@Parsons: increase length for variables [#88197]
+	- 20180716@bruce: add new group TEST for credit [#98126]
 
  Param's Explanation:
 	- @FromDate			: From date
@@ -351,3 +353,4 @@ END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_AllBetWinloss] TO [vnteam]
 GRANT EXECUTE ON [dbo].[LA_Rpt_AllBetWinloss] TO bodbAdminNet
+GO

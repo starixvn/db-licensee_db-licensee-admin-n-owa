@@ -1,3 +1,4 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
 
@@ -26,6 +27,7 @@ AS
 	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	   - 20171205@Bruce: fix partyid length [#87723]
 	   - 20171219@Bruce: increase length for variables [#88197]
+	   - 20180716@bruce: add new group TEST for credit [#98126]
 
 	Param's Explanation:
 	  + @PartyIDs : a string of list PartyID, separated by ','
@@ -177,3 +179,4 @@ GO
 GRANT EXECUTE ON [dbo].[LA_Rpt_LicPerformance_Summary] TO [bodbLicenseeNet]
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicPerformance_Summary] TO [vnteam]
 GRANT EXECUTE ON [dbo].[LA_Rpt_LicPerformance_Summary] TO bodbAdminNet
+GO
