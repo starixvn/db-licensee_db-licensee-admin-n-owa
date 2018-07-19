@@ -129,7 +129,7 @@ BEGIN
 			)
 		AND NOT EXISTS (SELECT 1 FROM dbo.OAS_ChargeInfoSub WITH (NOLOCK) WHERE DI.ChargeID = ChargeIDRef)
 		AND DI.ChargeType != 11 -- rolling commission
-		AND NOT EXISTS (SELECT 1 FROM dbo.OAS_Party t WITH (NOLOCK) WHERE DI.FromParty NOT IN (25, 30, 321) AND DI.ToParty = t.PartyID AND t.PartyType = 3 AND (t.OldRefID IS NULL OR t.OldRefID IN (2, 3, 5, 6)))
+		AND NOT EXISTS (SELECT 1 FROM dbo.OAS_Party t WITH (NOLOCK) WHERE DI.FromParty NOT IN (25, 30, 324) AND DI.ToParty = t.PartyID AND t.PartyType = 3 AND (t.OldRefID IS NULL OR t.OldRefID IN (2, 3, 5, 6)))
 	ORDER BY p.PartyID
 		,Di.ProductID
 		

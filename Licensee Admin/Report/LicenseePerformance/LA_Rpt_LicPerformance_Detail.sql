@@ -164,7 +164,7 @@ BEGIN
 				CASE WHEN ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
 		FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', @ExcludeTest) ci
 		LEFT JOIN bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype
-		WHERE	((ci.PartyID IN (25,30,321) AND DI_Rate = 0) OR DI_Rate > 0) AND ProductId <> 1 --exclude RB
+		WHERE	((ci.PartyID IN (25,30,324) AND DI_Rate = 0) OR DI_Rate > 0) AND ProductId <> 1 --exclude RB
 	)
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
 	(
@@ -174,7 +174,7 @@ BEGIN
 				CASE WHEN ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
 		FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @PrevFromDate, @PrevToDate, @ProductCodes, 'OA', @ExcludeTest) ci
 		LEFT JOIN bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype
-		WHERE	((ci.PartyID IN (25,30,321) AND DI_Rate = 0) OR DI_Rate > 0) AND ProductId <> 1 --exclude RB
+		WHERE	((ci.PartyID IN (25,30,324) AND DI_Rate = 0) OR DI_Rate > 0) AND ProductId <> 1 --exclude RB
 	)
 	-- End region
 

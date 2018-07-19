@@ -62,7 +62,7 @@ BEGIN
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
 	(
 		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
-		FROM	dbo.LA_f_ChargeInfo('25,30,321', @FromDate, @ToDate, @ProductCode, 'OA', 0)		
+		FROM	dbo.LA_f_ChargeInfo('25,30,324', @FromDate, @ToDate, @ProductCode, 'OA', 0)		
 	)
 	
 	UPDATE	c
@@ -81,7 +81,7 @@ BEGIN
 	UPDATE	c
 	SET		c.ToParty = p.ParentId
 	FROM	@PartyChargeInfo c INNER JOIN @PartyParent p ON c.PartyId = p.PartyId
-	WHERE	c.ProductID=1 OR c.PartyId IN (25,30,321)
+	WHERE	c.ProductID=1 OR c.PartyId IN (25,30,324)
 	
 	CREATE TABLE #tmpBetting (rptDate char(10),rptDateFull DATETIME, product varchar(10),siteID INT,betcount INT, FromParty INT, ToParty INT)
 	
@@ -195,10 +195,10 @@ BEGIN
 	INTO	#data	 
 	FROM(
 			SELECT	b.rptDate,b.product,b.siteID,v.SiteName,sum(b.betcount) betcount,
-					CASE WHEN b.FromParty IN (25,30,321) THEN 'Credit' ELSE 'Deposit' END LicenseeType,
+					CASE WHEN b.FromParty IN (25,30,324) THEN 'Credit' ELSE 'Deposit' END LicenseeType,
 					CASE WHEN b.FromParty = 25 THEN 'FDL' 
 						 WHEN b.FromParty = 30 THEN 'PIH' 
-						 WHEN b.FromParty = 321 THEN 'TEST' 
+						 WHEN b.FromParty = 324 THEN 'TEST' 
 						 WHEN b.ToParty = 11 then 'Boping'
 						 WHEN b.ToParty IN (1,13) THEN 'OW'
 						 WHEN b.ToParty = 98 THEN 'Zelianta'						 
@@ -213,10 +213,10 @@ BEGIN
 								) LBP ON b.SiteID = lbp.LicenseeID 
 			WHERE	b.product  in ('SB','RB','NG','VS','LC','BA','KN','AGC', 'VG', 'GD', 'VB')
 			GROUP BY b.rptDate,b.product,b.siteID,v.SiteName,b.ToParty,b.FromParty,
-					CASE WHEN b.FromParty IN (25,30,321) THEN 'Credit' ELSE 'Deposit' END,
+					CASE WHEN b.FromParty IN (25,30,324) THEN 'Credit' ELSE 'Deposit' END,
 					CASE WHEN b.FromParty = 25 THEN 'FDL' 
 						 WHEN b.FromParty = 30 THEN 'PIH' 
-						 WHEN b.FromParty = 321 THEN 'TEST' 
+						 WHEN b.FromParty = 324 THEN 'TEST' 
 						 WHEN b.ToParty = 11 then 'Boping'
 						 WHEN b.ToParty IN (1,13) THEN 'OW'	
 						 WHEN b.ToParty = 98 THEN 'Zelianta'					 

@@ -70,12 +70,12 @@ BEGIN
 								)
     SELECT  DI.ChargeID ,
             CASE WHEN Di.FromParty IN (1, 11, 98, 9) THEN DI.FromParty 
-				 WHEN Di.FromParty IN (25, 30, 321) THEN 999 
+				 WHEN Di.FromParty IN (25, 30, 324) THEN 999 
 				 ELSE Di. FromParty END,
             DI.ProductID ,
             DI.Rate ,
             DI.ChargeType ,
-			CASE WHEN Di.FromParty IN (25, 30, 321) THEN 0 ELSE 1 END,
+			CASE WHEN Di.FromParty IN (25, 30, 324) THEN 0 ELSE 1 END,
             CASE WHEN @FromDate <= DI.FromDate 
 					THEN DI.FromDate
                     ELSE @FromDate
@@ -84,7 +84,7 @@ BEGIN
 					THEN DI.ToDate
                     ELSE @ToDate
             END,
-			CASE WHEN DI.FromParty IN (1, 11, 98, 9, 25, 30, 321) THEN 1 ELSE 0 END
+			CASE WHEN DI.FromParty IN (1, 11, 98, 9, 25, 30, 324) THEN 1 ELSE 0 END
     FROM    dbo.OAS_ChargeInfo DI (NOLOCK)
             INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs (NOLOCK) ON DI.ChargeID = cs.ChargeID
                                                     AND cs.SystemID = @SystemID
