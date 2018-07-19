@@ -12,7 +12,7 @@ WITH RECOMPILE
 AS
 /*  Created: 20160302@Bravo
 	Task : Report - Muay Thai Win Loss
-	DB: DBEXT/bodb02
+	DB: DBLIC-bodb_licensee
 	Revisions:
 		- 20160302@Bravo: create sp on table sum
 		- 20160322@Bravo: fix bug currency name VND => INH

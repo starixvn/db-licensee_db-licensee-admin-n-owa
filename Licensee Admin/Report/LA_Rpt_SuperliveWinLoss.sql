@@ -12,7 +12,7 @@ AS
 /*
 	 Created: 20160322@Forrest
 	 Task : Superlive Win Loss Report
-	 DB: DBLIC.bodb_licensee
+	 DB: DBEXT.bodb02
 
 	 Revisions:
 	 - 20160322@Forrest: Get Superlive Report Data.

@@ -11,7 +11,7 @@ WITH RECOMPILE
 AS
 /*  Created: 20160329@Bruce
 	Task : Support settlement for Macau
-	DB: DBEXT/bodb02
+	DB: DBLIC-bodb_Licensee
 	Revisions:
 		- 20160329@Bruce: Create SP
 		- 20171219@Bruce: increase length for variables [#88197]
