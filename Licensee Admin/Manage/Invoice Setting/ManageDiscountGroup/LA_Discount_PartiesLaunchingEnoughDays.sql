@@ -41,14 +41,14 @@ BEGIN
 
 	IF (EXISTS(SELECT TOP 1 PartyId
 		FROM @LaunchingDate
-		WHERE DATEDIFF(DAY, LaunchingDate, GETDATE()) <= @NumberOfEnougDays
+		WHERE DATEDIFF(DAY, LaunchingDate, GETDATE()) > @NumberOfEnougDays
 	))
 	BEGIN
-		SET @AreEnoughDays = 0
+		SET @AreEnoughDays = 1
 	END
 	ELSE
 	BEGIN
-		SET @AreEnoughDays = 1
+		SET @AreEnoughDays = 0
 	END
 	
 END
