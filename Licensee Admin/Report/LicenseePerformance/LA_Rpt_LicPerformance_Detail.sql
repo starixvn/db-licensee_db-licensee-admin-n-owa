@@ -394,7 +394,7 @@ BEGIN
 	-- ********************************************************
 	-- 31 exchange: include negative amount
 	;WITH sumOther AS (
-		SELECT t.IsCurrent, t.PartyId, t.ProductId,
+		SELECT t.IsCurrent, t.PartyId,
 			SUM(t.BetCount)		AS BetCount,
 			SUM(t.Turnover)		AS Turnover,
 			SUM(ISNULL(t.Discount,0))	AS Discount,
@@ -406,7 +406,7 @@ BEGIN
 			SUM(CASE WHEN t.ProductId IN(3,31) OR t.AmountToCompany < 0 THEN 0 ELSE t.AmountToCompany END) AmountToCompany
 		FROM @SumByProducts t
 		WHERE t.ProductId != 0
-		GROUP BY t.IsCurrent, t.PartyId, t.ProductId
+		GROUP BY t.IsCurrent, t.PartyId
 	)
 	MERGE #Result r
 	USING sumOther s ON r.PartyId = s.PartyId AND r.IsCurrent = s.IsCurrent
