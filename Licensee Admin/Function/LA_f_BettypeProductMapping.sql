@@ -32,6 +32,8 @@ AS
 		- 20171127@Sophia: #87257 - Support New range bettype for RNG casino
 		- 20171214@Sophia: #86640 - Add Exchange Citi Product
 		- 20180604@Bruce: #96383 - New Bettype range for VS2
+		- 20180420@Bruce: LA - Implement sum job for Pragmatic [RedmineId #93958]
+
 	Param's Explanation:
 
 */
@@ -51,9 +53,8 @@ BEGIN
 	   WHERE (typeid < 31
 		  OR typeid BETWEEN 121 AND 999
 		  OR typeid BETWEEN 1301 AND 1399)
-		  AND typeid NOT IN (901, 902, 903,904, 911, 912, 913, 914) -- Bettrade bettypes
- 
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND typeid NOT IN (901, 902, 903,904, 911, 912, 913, 914) -- Bettrade bettypes 
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'BA')
@@ -65,7 +66,7 @@ BEGIN
 		  OR typeid BETWEEN 121 AND 999
 		  OR typeid BETWEEN 1301 AND 1399)
 		  AND typeid NOT IN (901, 902, 903,904, 911, 912, 913, 914) -- Bettrade bettypes
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'RB')
@@ -74,7 +75,7 @@ BEGIN
 	   SELECT typeid, 1
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid IN (31, 32, 33, 41, 42, 43)
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'NG')
@@ -83,7 +84,7 @@ BEGIN
 	   SELECT typeid, 2
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 81 AND 120
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'LC')
@@ -92,7 +93,7 @@ BEGIN
 	   SELECT typeid, 4
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 1101 AND 1199
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'VS')
@@ -101,7 +102,7 @@ BEGIN
 	   SELECT typeid, 5
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 1201 AND 1299
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'CS')
@@ -113,7 +114,7 @@ BEGIN
 			  OR typeid BETWEEN 2101 AND 2399
 			  OR typeid BETWEEN 2901 AND 2999
 			  )
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 	
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'BG')
@@ -122,7 +123,7 @@ BEGIN
 	   SELECT typeid, 7
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid = 73
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'KN')
@@ -131,7 +132,7 @@ BEGIN
 	   SELECT typeid, 8
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 1501 AND 1599
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 	
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'MGCLC')
@@ -140,7 +141,7 @@ BEGIN
 	   SELECT typeid, 14
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 2001 AND 2007
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
     
     IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'MGCRNG')
@@ -149,7 +150,7 @@ BEGIN
 	   SELECT typeid, 17
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 2008 AND 2009
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'GD')
@@ -158,7 +159,7 @@ BEGIN
 	   SELECT typeid, 11
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 1701 AND 1799
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'BT')
@@ -167,7 +168,7 @@ BEGIN
 	   SELECT typeid, 13
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 901 AND 904
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'AGC')
@@ -176,7 +177,7 @@ BEGIN
 	   SELECT typeid, 10
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 1801 AND 1899
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'CF')
@@ -185,7 +186,7 @@ BEGIN
 	   SELECT typeid, 19
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid = 1003
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'CB')
@@ -194,7 +195,7 @@ BEGIN
 	   SELECT typeid, 15
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 18000 AND 18006
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'VB')
@@ -202,8 +203,17 @@ BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 22
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
-	   WHERE typeid BETWEEN 4001 AND 7999
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+	   WHERE typeid BETWEEN 4001 AND 4100
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+	END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'PP')
+	BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 32
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 4101 AND 4300
+		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 	
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'AB')
@@ -212,7 +222,7 @@ BEGIN
 	   SELECT typeid, 21
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 2401 AND 2499
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 	
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'FW')
@@ -221,7 +231,7 @@ BEGIN
 	   SELECT typeid, 24
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid  BETWEEN 1011 AND 1020
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'NG2')
@@ -230,7 +240,7 @@ BEGIN
 	   SELECT typeid, 23
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid  BETWEEN 2501 AND 2699
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'CO')
@@ -239,7 +249,7 @@ BEGIN
 	   SELECT typeid, 25
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 911 AND 914
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'VS2')
@@ -248,7 +258,7 @@ BEGIN
 	   SELECT typeid, 27
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 2700 AND 2829
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'LT')
@@ -257,7 +267,7 @@ BEGIN
 	   SELECT typeid, 28
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 1021 AND 1038
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'VG')
@@ -266,7 +276,7 @@ BEGIN
 	   SELECT typeid, 12
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid = 1900
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 	
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'BX')
@@ -275,7 +285,7 @@ BEGIN
 	   SELECT typeid, 31
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 8000 AND 8099
-		  AND (@Bettype = 0 OR (@Bettype != 0 AND typeid = @Bettype))
+		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 	
 	RETURN
