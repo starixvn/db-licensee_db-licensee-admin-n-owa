@@ -113,7 +113,7 @@ BEGIN
 	
 	-- 1.5 update product code list
 	SET @ProductCodes = NULL
-	SELECT @ProductCodes = COALESCE((@ProductCodes + ',' + CAST(ProductId AS VARCHAR(10))), CAST(ProductId AS VARCHAR(10)))
+	SELECT @ProductCodes = COALESCE((@ProductCodes + ',' + ProductPrefix), ProductPrefix)
 	FROM dbo.LA_f_Products3rd('') a
 	WHERE a.ProductID IN (SELECT DISTINCT b.ProductId FROM @ProductList b)
 
