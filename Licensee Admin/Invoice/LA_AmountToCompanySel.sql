@@ -2,7 +2,7 @@
 USE bodb_Licensee
 GO
 
-ALTER PROCEDURE [dbo].[LA_AmountToCompanySel] (
+ALTER PROCEDURE [dbo].[LA_AmountToCompanySel_UAT1] (
 	@FromDate		DATE,
 	@ToDate			DATE,
 	@PartyIds		VARCHAR(4000) = '',
@@ -199,7 +199,6 @@ BEGIN
 	)
 
 	CREATE NONCLUSTERED INDEX Idx_InvoiceData ON #tmpWinlossData (PartyId, ProductId)
-	-- 2.3 insert zero tickets: to fix no data when join
 
 	-- 2.1 include general products
 	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,Winloss,AmountToCompany)
@@ -221,35 +220,13 @@ BEGIN
 				AND b.ProductId NOT IN (6) -- exclude CS
 		GROUP BY b.rptdate, b.SiteId, p.PartyId, p.ProductId
 	)
-	
-	-- 2.2 include CS winloss
-	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,Winloss,AmountToCompany)
-	(
-		SELECT p.PartyID,b.rptDate, 6 -- CS
-		, SUM((
-			CASE WHEN b.bettype IN (2199, 2399, 2999) THEN 0 ELSE -MemberWL END + -- exclude jackpot tickets
-			CASE WHEN b.bettype IN (2198, 2398, 2998) THEN GrossWL ELSE 0 END -- exclude contrinution tickets ( grosswl = -awinloss = -contribution)
-		) * e.Rate)
-		, SUM((
-			CASE WHEN b.bettype IN (2199, 2399, 2999) THEN 0 ELSE -MemberWL END +
-			CASE WHEN b.bettype IN (2198, 2398, 2998) THEN GrossWL ELSE 0 END
-		) * p.Rate * e.Rate)
-		FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-		INNER JOIN #tmpChargeInfo p ON b.SiteID = p.LicenseeId AND b.ProductID = p.ProductID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
-		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND CurrencyID = e.ExchangeID
-		WHERE b.ProductID = 6 -- RNG casino
-			AND (b.CurrencyID <> 20)
-			AND b.StatusId NOT IN (-1, 101, 102, 103)
-			AND b.customercategory NOT IN (27, 28)
-		GROUP BY b.SiteID, b.rptdate, p.PartyID
-	)
 
-	-- insert product don't have any ticket
+	-- 2.2 insert product don't have any ticket
 	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,Winloss,AmountToCompany)
 	SELECT DISTINCT PartyId,@ToDate,ProductId, 0, 0
 	FROM @PartyList INNER JOIN @ProductList ON 1=1
 	
-	-- 2.4 create result
+	-- 2.3 create result
 	SELECT a.PartyId,a.ProductId
 		,SUM(a.Winloss) AS Winloss
 		,SUM(a.AmountToCompany) AS Fee
@@ -264,6 +241,9 @@ BEGIN
 	INTO #tmpResult
 	FROM #tmpWinlossData a
 	GROUP BY PartyId, ProductId
+
+	-- 2.4 treat negative fee as 0
+	UPDATE #tmpResult SET Fee = 0 WHERE Fee < 0
 
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 3. minfee calculation
