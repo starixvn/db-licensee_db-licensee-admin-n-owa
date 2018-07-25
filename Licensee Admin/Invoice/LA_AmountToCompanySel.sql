@@ -2,7 +2,7 @@
 USE bodb_Licensee
 GO
 
-ALTER PROCEDURE [dbo].[LA_AmountToCompanySel_UAT1] (
+ALTER PROCEDURE [dbo].[LA_AmountToCompanySel] (
 	@FromDate		DATE,
 	@ToDate			DATE,
 	@PartyIds		VARCHAR(4000) = '',
@@ -317,10 +317,10 @@ BEGIN
 
 	-- 3.7 calculate total amount to company = amount under waive time + amount out of waive range
 	UPDATE amf
-	SET amf.TotalAmount =  amf.MinFeeAmount + amf.WaivedAmount
+	SET amf.TotalAmount =  ISNULL(amf.MinFeeAmount,0) + amf.WaivedAmount
 	FROM #tmpMinFee amf
 	WHERE amf.FeeType = 1
-	
+
 	--3.8 calculate total minfee by group
 	DECLARE @TotalMinFees TABLE(
 		PartyGroupId				INT,
