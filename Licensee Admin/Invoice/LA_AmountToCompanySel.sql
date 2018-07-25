@@ -2,7 +2,7 @@
 USE bodb_Licensee
 GO
 
-ALTER PROCEDURE [dbo].[LA_AmountToCompanySel] (
+ALTER PROCEDURE [dbo].[LA_AmountToCompanySel_UAT1] (
 	@FromDate		DATE,
 	@ToDate			DATE,
 	@PartyIds		VARCHAR(4000) = '',
@@ -49,6 +49,8 @@ BEGIN
 	-- 1.3 include products that use to calculate discount
 	-- discount type
 	DECLARE @Rebate INT = 2
+	DECLARE @DiscountIndividualFee INT = 1
+	DECLARE @DiscountIndividualGrosswin INT = 3
 	DECLARE @DiscountByGroupFee INT = 11
 	DECLARE @DiscountByGroupGrosswin INT = 13
 
@@ -64,7 +66,10 @@ BEGIN
 		INNER JOIN @PartyList b ON a.PartyID=b.PartyId
 		WHERE b.IsSelected=1
 	)
-	SELECT DISTINCT h.DiscountGroupId, h.DiscountGroupType, a.PartyID, p.ProductId, p.CalculationType, a.IsApplyDiscount, h.CurrencyId, a.Remark,h.FromDate
+	-- put parties in discount group to its own group
+	-- put parties in individual discount group to new group by -partyid
+	SELECT DISTINCT h.DiscountGroupId, h.DiscountGroupType, a.PartyID, p.ProductId, p.CalculationType, a.IsApplyDiscount, h.CurrencyId, a.Remark,h.FromDate,
+		CASE WHEN h.DiscountGroupType IN (@DiscountIndividualFee, @DiscountIndividualGrosswin) THEN -a.PartyID ELSE h.DiscountGroupId END CalculationGroup
 	INTO #tmpDiscountSettings
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
 	INNER JOIN cte_DiscountGroup c ON c.DiscountGroupId = h.DiscountGroupId
@@ -357,26 +362,24 @@ BEGIN
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 4. discount calculation
  *-------------------------------------------------------------------------------------------------------------------------------*/
-	DECLARE @DiscountIndividualFee INT = 1
-	DECLARE @DiscountIndividualGrosswin INT = 3
 	DECLARE @Unlimited MONEY = 1000000000000
 
 	;WITH cte_Calculation AS(
-		SELECT s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId, SUM(r.Winloss) Winloss,SUM(r.Fee) Fee
+		SELECT s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId, SUM(r.Winloss) Winloss,SUM(r.Fee) Fee
 		FROM #tmpDiscountSettings s
 		INNER JOIN #tmpResult r ON s.PartyID = r.PartyId AND s.ProductId=r.ProductId
 		WHERE s.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount)
-		GROUP BY s.DiscountGroupId, s.DiscountGroupType,s.CurrencyId
+		GROUP BY s.DiscountGroupId, s.DiscountGroupType,s.CurrencyId,s.CalculationGroup
 	), cte_Detail AS(
-		SELECT d.DiscountGroupId, d.Rate
+		SELECT c.CalculationGroup, d.DiscountGroupId, d.Rate
 			,d.FromAmount * e.Rate AS FromAmount
 			,CASE WHEN d.ToAmount > @Unlimited THEN d.ToAmount ELSE (d.ToAmount + 1) * e.Rate END AS ToAmount
 		FROM dbo.LA_DiscountGroupDetail d
 		INNER JOIN cte_Calculation c ON d.DiscountGroupId=c.DiscountGroupId
 		INNER JOIN #tmpExchange e ON e.ExchangeId = c.CurrencyId AND e.exchangedate=@ToDate
 	), cte_Rate AS (
-		SELECT c.DiscountGroupId, d.Rate
-		FROM cte_Calculation c INNER JOIN cte_Detail d ON c.DiscountGroupId=d.DiscountGroupId
+		SELECT c.DiscountGroupId, d.Rate, c.CalculationGroup
+		FROM cte_Calculation c INNER JOIN cte_Detail d ON c.CalculationGroup=d.CalculationGroup
 		WHERE (
 				c.DiscountGroupType IN (@DiscountByGroupFee, @DiscountIndividualFee) AND
 				c.Fee >= d.FromAmount AND c.Fee < d.ToAmount
@@ -392,7 +395,7 @@ BEGIN
 		ELSE 0 END
 	FROM #tmpResult r
 	INNER JOIN #tmpDiscountSettings s ON s.PartyID = r.PartyId AND s.ProductId=r.ProductId
-	INNER JOIN cte_Rate c ON s.DiscountGroupId=c.DiscountGroupId
+	INNER JOIN cte_Rate c ON c.CalculationGroup = s.CalculationGroup
 	WHERE s.CalculationType IN (@ToBeDiscounted,@CalculateAndDiscount) AND s.IsApplyDiscount = 1
 
 /*--------------------------------------------------------------------------------------------------------------------------------
