@@ -22,7 +22,6 @@ BEGIN
 	SET NOCOUNT ON
 	DECLARE @FromDateDiscount DATETIME, @ToDateDiscount DATETIME, @InvoiceTypeDiscount INT = 1
 	DECLARE @PartieSettings TABLE(PartyId INT, ProductId INT)
-	DECLARE @ProductsSettings TABLE(PartyId INT, ProductId INT)
 
 	--#Region Get info of Discount 
 	-- Get Time range
