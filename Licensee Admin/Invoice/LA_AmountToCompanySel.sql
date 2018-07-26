@@ -184,7 +184,7 @@ BEGIN
 		m.MinFeeId
 	FROM dbo.LA_MinFee w WITH(NOLOCK)
 	INNER JOIN #tmpMinFee m ON w.PartyId=m.PartyId AND w.ProductId=m.ProductId
-	WHERE w.FeeTypeId = 2 AND w.FromDate <= m.ToDate AND w.FromDate <= m.ToDate
+	WHERE w.FeeTypeId = 2 AND w.FromDate <= m.ToDate AND m.FromDate <= w.ToDate
 
 	-- 1.8.3 exchange minfee amount to base currency
 	UPDATE m SET m.FeeAmount = m.FeeAmount * e.Rate
