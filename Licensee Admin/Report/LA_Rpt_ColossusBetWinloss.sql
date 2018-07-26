@@ -19,6 +19,7 @@ AS
 		- 20180321@Scofield: Implement Colossus Bets Freeplay [#89768]
 		- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20180619@Bruce: Amount Due To CB is incorrect in case CashInAmount = 0 [#97153]
 
 	Param's Explanation:
 */
@@ -217,7 +218,7 @@ BEGIN
 	GROUP BY s.FromDate, s.ToDate
 		
 	INSERT INTO @RateByPeriod(FromDate, ToDate, CommissionRate, CashInShareRate)
-	SELECT t.FromDate,t.ToDate,cm.Rate,cs.Rate
+	SELECT t.FromDate,t.ToDate,ISNULL(cm.Rate,0),ISNULL(cs.Rate,0)
 	FROM @TotalByPeriod t
 	LEFT JOIN @CBShare cm ON cm.TypeId = 6  -- Commission share
 		AND cm.FromDate = t.FromDate 
