@@ -2,7 +2,7 @@
 USE bodb_Licensee
 GO
 
-ALTER PROCEDURE [dbo].[LA_AmountToCompanySel_UAT1] (
+ALTER PROCEDURE [dbo].[LA_AmountToCompanySel] (
 	@FromDate		DATE,
 	@ToDate			DATE,
 	@PartyIds		VARCHAR(4000) = '',
@@ -343,7 +343,7 @@ BEGIN
 	UPDATE r SET DiscountRemark = s.Remark, DiscountRate = c.Rate
 		,Discount = CASE
 			WHEN s.DiscountGroupType IN (@DiscountByGroupFee, @DiscountIndividualFee) THEN c.Rate * r.Fee
-			WHEN s.DiscountGroupType IN (@DiscountByGroupGrosswin, @DiscountIndividualGrosswin) THEN c.Rate * r.Winloss
+			WHEN s.DiscountGroupType IN (@DiscountByGroupGrosswin, @DiscountIndividualGrosswin) THEN c.Rate * (CASE WHEN r.Winloss < 0 THEN 0 ELSE r.Winloss END)
 		ELSE 0 END
 	FROM #tmpResult r
 	INNER JOIN #tmpDiscountSettings s ON s.PartyID = r.PartyId AND s.ProductId=r.ProductId
