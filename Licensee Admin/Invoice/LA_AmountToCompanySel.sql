@@ -142,6 +142,8 @@ BEGIN
 	-- 1.8 minfee settings
 	DECLARE @FirstDate DATETIME = DATEADD(mm, DATEDIFF(mm, 0, @FromDate), 0)
 	DECLARE @LastDate DATETIME = DATEADD (dd, -1, DATEADD(mm, DATEDIFF(mm, 0, @FromDate) + 1, 0))
+	DECLARE @Month TINYINT = MONTH(@FromDate)
+	DECLARE @DaysInMonth INT = DATEDIFF(DAY, @FirstDate, @LastDate) + 1
 
 	CREATE TABLE #tmpMinFee (
 		FeeType			TINYINT,
@@ -151,45 +153,52 @@ BEGIN
 		FeeAmount		MONEY,
 		FromDate		DATETIME,
 		ToDate			DATETIME,
-		MinFeeProrate	MONEY,
-		WaivedAmount	MONEY,
-		TotalAmount		MONEY,
+		FeeUnderWaiveTime MONEY,
+		FeeOutOfWaiveTime MONEY,
 		MinFeeAmount	MONEY,
-		AmountToCompany	MONEY,
-		DaysOutOfWaiveTime	INT
+		MinFeeId		INT
 	)
 
 	-- 1.8.1 minfee
-	INSERT INTO #tmpMinFee(FeeType ,PartyId,ProductId, CurrencyId ,FeeAmount ,FromDate ,ToDate)
+	INSERT INTO #tmpMinFee(FeeType ,PartyId,ProductId, CurrencyId ,FeeAmount ,FromDate ,ToDate, MinFeeId)
 	SELECT mf.FeeTypeId,
 		mf.PartyId,
 		mf.ProductId,
 		mf.CurrencyId,
 		mf.FeeAmount,
 		CASE WHEN @FromDate >= mf.FromDate THEN @FromDate ELSE mf.FromDate END AS FromDate,
-		CASE WHEN @ToDate < mf.ToDate THEN @ToDate ELSE mf.ToDate END AS ToDate
+		CASE WHEN @ToDate < mf.ToDate THEN @ToDate ELSE mf.ToDate END AS ToDate,
+		mf.MinFeeId
 	FROM dbo.LA_MinFee mf WITH(NOLOCK)
 	INNER JOIN @PartyList p ON mf.PartyId = p.PartyId
 	INNER JOIN @ProductList c ON mf.ProductId=c.ProductID
 	WHERE mf.FeeTypeId = 1 AND @FromDate <= mf.ToDate AND mf.FromDate <= @ToDate
 	
 	-- 1.8.2 waive
-	INSERT INTO #tmpMinFee(FeeType ,PartyId,ProductId, CurrencyId ,FeeAmount ,FromDate ,ToDate)
-	SELECT a.FeeTypeId,
-		a.PartyId,
-		a.ProductId,
-		a.CurrencyId,
-		a.FeeAmount,
-		CASE WHEN @FromDate >= a.FromDate THEN @FromDate ELSE a.FromDate END AS FromDate,
-		CASE WHEN @ToDate < a.ToDate THEN @ToDate ELSE a.ToDate END AS ToDate
-	FROM dbo.LA_MinFee a WITH(NOLOCK)
-	INNER JOIN #tmpMinFee b ON a.PartyId=b.PartyId AND a.ProductId=b.ProductId
-	WHERE a.FeeTypeId = 2 AND a.FromDate <= b.ToDate AND b.FromDate <= a.ToDate
+	INSERT INTO #tmpMinFee(FeeType ,PartyId,ProductId, FromDate ,ToDate, MinFeeId)
+	SELECT w.FeeTypeId,
+		w.PartyId,
+		w.ProductId,
+		CASE WHEN w.FromDate < m.FromDate THEN m.FromDate ELSE w.FromDate END,
+		CASE WHEN w.ToDate > m.ToDate THEN m.ToDate ELSE w.ToDate END,
+		m.MinFeeId
+	FROM dbo.LA_MinFee w WITH(NOLOCK)
+	INNER JOIN #tmpMinFee m ON w.PartyId=m.PartyId AND w.ProductId=m.ProductId
+	WHERE w.FeeTypeId = 2 AND w.FromDate <= m.ToDate AND w.FromDate <= m.ToDate
 
 	-- 1.8.3 exchange minfee amount to base currency
 	UPDATE m SET m.FeeAmount = m.FeeAmount * e.Rate
 	FROM #tmpMinFee m
 	INNER JOIN #tmpExchange e ON m.ToDate = e.ExchangeDate AND m.CurrencyId = e.ExchangeID
+
+	-- 1.8.4 calculate minfee amount(exclude waite time)
+	UPDATE m SET m.MinFeeAmount = m.FeeAmount - (CAST(m.FeeAmount AS DECIMAL(20,10)) / @DaysInMonth) * ISNULL((
+		SELECT SUM(DATEDIFF(DAY, w.FromDate,w.ToDate) + 1)
+		FROM #tmpMinFee w
+		WHERE w.FeeType = 2 AND w.PartyId = m.PartyId AND w.ProductId = m.ProductId AND m.MinFeeId=w.MinFeeId
+	),0)
+	FROM #tmpMinFee m
+	WHERE m.FeeType = 1
 
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 2. winloss data
@@ -222,7 +231,6 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
-				AND b.ProductId NOT IN (6) -- exclude CS
 		GROUP BY b.rptdate, b.SiteId, p.PartyId, p.ProductId
 	)
 
@@ -253,107 +261,51 @@ BEGIN
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 3. minfee calculation
  *-------------------------------------------------------------------------------------------------------------------------------*/
-	DECLARE @Month TINYINT = MONTH(@FromDate)
-	DECLARE @DaysInMonth INT = DATEDIFF(day, @FirstDate, @LastDate) + 1
-
-	-- 3.1 mark data to be applied minfee under waive time
-	UPDATE t SET t.IsApplyMinFee = 0
-	FROM #tmpWinlossData t
-	INNER JOIN #tmpMinFee m ON t.ProductId = m.ProductId
-		AND (t.PartyId = m.PartyId )
-		AND (t.WinlossDate BETWEEN m.FromDate AND m.ToDate)
-	WHERE m.FeeType=2
-
-	-- 3.2 calculate minfee amount(minfee prograte) under waive time
-	UPDATE amf
-	SET MinFeeProrate = (DATEDIFF(DAY, FromDate, ToDate) + 1) * ((
-			SELECT TOP 1 mfg.FeeAmount
-			FROM #tmpMinFee mfg
-			WHERE mfg.FeeType = 1 AND mfg.PartyId = amf.PartyId AND mfg.ProductId = amf.ProductId
-		) / @DaysInMonth)
-	FROM #tmpMinFee amf
-	WHERE FeeType = 2
-
-	-- 3.3 calculate licensing fee under waive time
-	UPDATE amf SET amf.WaivedAmount = ISNULL((
-			SELECT SUM(td.AmountToCompany)
-			FROM #tmpWinlossData td
-			WHERE amf.PartyId = td.PartyId AND amf.ProductId = td.ProductId AND td.WinlossDate BETWEEN amf.FromDate AND amf.ToDate
-		), 0)
-	FROM #tmpMinFee amf
-	WHERE amf.FeeType = 2
-
-	--- 3.4 calculate waived values
-	;WITH cte_Waive AS(
-		SELECT PartyId,ProductId
-			, SUM(DATEDIFF(DAY, FromDate, ToDate) + 1) WaivedDays
-			, SUM(WaivedAmount) WaivedAmount
-			, SUM(MinFeeProrate) MinFeeProrate
-		FROM #tmpMinFee
-		WHERE FeeType = 2
-		GROUP BY PartyId,ProductId
+	-- 3.1 sum data to 2 parts
+	-- under waive time
+	-- out of waive time
+	;WITH Fee AS(
+		SELECT m.MinFeeId
+			, SUM(CASE WHEN t.ProductId IS NULL THEN 0 ELSE t.AmountToCompany END) FeeUnderWaiveTime
+			, SUM(CASE WHEN t.ProductId IS NULL THEN t.AmountToCompany ELSE 0 END) FeeOutOfWaiveTime
+		FROM #tmpWinlossData t
+		INNER JOIN #tmpMinFee m ON t.ProductId = m.ProductId AND t.PartyId = m.PartyId AND t.WinlossDate BETWEEN m.FromDate AND m.ToDate
+		LEFT JOIN #tmpMinFee w ON w.FeeType=2 AND w.MinFeeId=m.MinFeeId AND t.WinlossDate BETWEEN w.FromDate AND w.ToDate
+		WHERE m.FeeType=1
+		GROUP BY  m.MinFeeId
 	)
-	UPDATE a SET
-		-- number of days not in waive time
-		DaysOutOfWaiveTime = @DaysInMonth - ISNULL(WaivedDays,0)
-		-- Minfee = Minfee(setting) - minfee under waive time(calculate by single day)
-		,MinFeeProrate = ROUND(((a.FeeAmount / @DaysInMonth) * (DATEDIFF(DAY, a.FromDate, a.ToDate) + 1) - ISNULL(c.MinFeeProrate,0)),2)
-		-- total licensing fee under waive time
-		,WaivedAmount = ISNULL(c.WaivedAmount,0)
-	FROM #tmpMinFee a LEFT JOIN cte_Waive c ON a.PartyId=c.PartyId AND a.ProductId=c.ProductId
-	WHERE a.FeeType=1
+	UPDATE mf SET
+		FeeUnderWaiveTime = CASE WHEN f.FeeUnderWaiveTime < 0 THEN 0 ELSE f.FeeUnderWaiveTime END,
+		FeeOutOfWaiveTime = CASE WHEN f.FeeOutOfWaiveTime < 0 THEN 0 ELSE f.FeeOutOfWaiveTime END
+	FROM #tmpMinFee mf INNER JOIN Fee f ON mf.MinFeeId=f.MinFeeId
+	WHERE mf.FeeType=1
 
-	-- 3.5 total licensing fee not in waive time
-	;WITH fee AS(
-		SELECT a.PartyId,a.ProductId,SUM(ISNULL(t.AmountToCompany,0)) AS MinFeeAmount
-		FROM #tmpMinFee a 
-		LEFT JOIN #tmpWinlossData t ON a.PartyId=t.PartyId AND a.ProductId = t.ProductId
-		WHERE a.FeeType = 1 
-			AND t.IsApplyMinFee IS NULL
-			AND t.WinlossDate BETWEEN a.FromDate AND a.ToDate
-		GROUP BY a.PartyId,a.ProductId
-	)
-	UPDATE a SET MinFeeAmount = fee.MinFeeAmount
-	FROM #tmpMinFee a INNER JOIN fee ON a.PartyId=fee.PartyId AND a.ProductId=a.ProductId
-
-	-- 3.6 Set zero when WaivedAmount < 0 or no days under waive time
-	UPDATE #tmpMinFee SET WaivedAmount = 0 
-	WHERE FeeType = 1 AND WaivedAmount < 0 AND DaysOutOfWaiveTime > 0
-
-	-- 3.7 calculate total amount to company = amount under waive time + amount out of waive range
-	UPDATE amf
-	SET amf.TotalAmount =  ISNULL(amf.MinFeeAmount,0) + amf.WaivedAmount
-	FROM #tmpMinFee amf
-	WHERE amf.FeeType = 1
-
-	--3.8 calculate total minfee by group
+	--3.2 calculate total minfee by group
 	DECLARE @TotalMinFees TABLE(
-		PartyGroupId				INT,
-		ProductId					INT,
-		TotalMinFee					MONEY,
-		TotalAmountUnderMinfeeTime	MONEY
+		PartyGroupId	INT,
+		ProductId		INT,
+		TotalMinFee		MONEY,
+		TotalAmount		MONEY
 	)
-	INSERT INTO @TotalMinFees(PartyGroupId,ProductId, TotalMinFee, TotalAmountUnderMinfeeTime)
-	SELECT p.PartyGroupId,mf.ProductId,
-			SUM(mf.MinFeeProrate),-- actual min fee in given time range
-			SUM(CASE WHEN mf.MinFeeAmount < 0 THEN 0 ELSE ISNULL(mf.MinFeeAmount,0) END) -- total amount to company under minfee time(exclude waive range)
+	INSERT INTO @TotalMinFees(PartyGroupId,ProductId, TotalMinFee, TotalAmount)
+	SELECT p.PartyGroupId, mf.ProductId, SUM(mf.MinFeeAmount), SUM(mf.FeeOutOfWaiveTime)
 	FROM #tmpMinFee mf
 	INNER JOIN @PartyList p ON mf.PartyId = p.PartyId
 	WHERE mf.FeeType = 1
 	GROUP BY p.PartyGroupId, mf.ProductId
 
-	-- 3.9 calculate actual licensing fee
+	-- 3.3 calculate actual licensing fee
 	UPDATE r SET Fee = CASE
-			WHEN t.TotalAmountUnderMinfeeTime < t.TotalMinFee AND a.MinFeeAmount < a.MinFeeProrate
-				THEN a.MinFeeProrate + ISNULL(a.WaivedAmount,0)
-			ELSE ISNULL(a.TotalAmount,0)
+			WHEN t.TotalAmount < t.TotalMinFee AND a.FeeOutOfWaiveTime < a.MinFeeAmount
+				THEN a.MinFeeAmount + a.FeeUnderWaiveTime
+			ELSE a.FeeOutOfWaiveTime + a.FeeUnderWaiveTime
 		END,
 		IsChargedByMinFee = CASE
-			WHEN t.TotalAmountUnderMinfeeTime < t.TotalMinFee AND a.MinFeeAmount < a.MinFeeProrate
+			WHEN t.TotalAmount < t.TotalMinFee AND a.FeeOutOfWaiveTime < a.MinFeeAmount
 				THEN 1
 			ELSE 0
 		END,
-		Minfee = a.MinFeeProrate
+		Minfee = a.MinFeeAmount
 	FROM #tmpResult r
 	INNER JOIN @PartyList p ON r.PartyId=p.PartyId
 	INNER JOIN #tmpMinFee a ON a.PartyId = r.PartyId AND a.ProductId=r.ProductID AND a.FeeType = 1
