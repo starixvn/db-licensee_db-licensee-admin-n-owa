@@ -17,6 +17,7 @@ AS
 		- 20180123@Parsons: Create Exchange Win Loss [#87754]
 		- 20180508@Harper: Change PayToSupplier term of Exchange product [RedmineID: #94281]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20180612@Scofield: Modify Exchange WL Report with Licensee charge comm [#96768]
 
 	 Params:
 
@@ -93,11 +94,12 @@ BEGIN
 		TotalTrans	INT,
 		CustomerWinLoss MONEY,
 		CustomerComm	MONEY,
+		LicenseeComm	MONEY,
 		LicenseeWinloss MONEY,
 		LicensingFee	 MONEY,
 		PayToSupplier	MONEY)	
 	
-	INSERT INTO #Result (PartyID,PartyName,ParentId,ParentName,Winlossdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,CustomerComm,LicenseeWinloss,LicensingFee,PayToSupplier)
+	INSERT INTO #Result (PartyID,PartyName,ParentId,ParentName,Winlossdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,CustomerComm,LicenseeComm,LicenseeWinloss,LicensingFee,PayToSupplier)
 	SELECT ci.PartyId,
 		ci.PartyName,
 		ci.ParentId,
@@ -108,6 +110,7 @@ BEGIN
 		SUM(b.BetCount) AS TotalTrans,
 		SUM(b.MemberWL) AS CustomerWinLoss,
 		SUM(b.CommissionP) AS CustomerComm,
+		SUM(b.CommissionA) AS LicenseeComm,
 		SUM(-(b.MemberWL + b.CommissionP)) AS LicenseeWinloss,
 		SUM((-b.MemberWL * ci.Rate) - (b.CommissionA + b.CommissionP)) AS LicensingFee,
 		SUM((-b.MemberWL * rd.Rate) - (b.CommissionA + b.CommissionP)) AS PayToSupplier
@@ -145,6 +148,7 @@ BEGIN
 		Turnover		MONEY,
 		CustomerWinLoss	MONEY,
 		CustomerComm	MONEY,
+		LicenseeComm	MONEY,
 		LicenseeWinLoss	MONEY,
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY,
@@ -167,7 +171,8 @@ BEGIN
 		TotalTrans		INT,
 		Turnover		MONEY,
 		CustomerWinLoss	MONEY,
-		CustomerComm	MONEY,	
+		CustomerComm	MONEY,
+		LicenseeComm	MONEY,
 		CustomerTotal	MONEY,	
 		LicenseeWinLoss	MONEY,
 		LicensingFee	MONEY,
@@ -179,12 +184,13 @@ BEGIN
 	BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)
 		
-		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,CustomerComm,LicenseeWinLoss,LicensingFee,PayToSupplier)
+		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,CustomerComm,LicenseeComm,LicenseeWinLoss,LicensingFee,PayToSupplier)
 		SELECT @tempCurrency, td.ParentId,
 			SUM(td.TotalTrans) TotalTrans,
 			SUM(td.Turnover * e.BaseCurrencyRate) Turnover, 
 			SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss, 
 			SUM(td.CustomerComm * e.BaseCurrencyRate) CustomerComm,
+			SUM(td.LicenseeComm * e.BaseCurrencyRate) LicenseeComm,
 			SUM(td.LicenseeWinLoss * e.BaseCurrencyRate) LicenseeWinLoss,
 			SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
 			SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
@@ -192,12 +198,13 @@ BEGIN
 		ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.Winlossdate
 		GROUP BY td.ParentId
 
-		INSERT INTO @GrandTotal (CurrencyName, TotalTrans, Turnover, CustomerWinLoss, CustomerComm, CustomerTotal, LicenseeWinLoss, LicensingFee, PayToSupplier, CompanyIncome)
+		INSERT INTO @GrandTotal (CurrencyName, TotalTrans, Turnover, CustomerWinLoss, CustomerComm, LicenseeComm, CustomerTotal, LicenseeWinLoss, LicensingFee, PayToSupplier, CompanyIncome)
 		SELECT Currency,
 			SUM(TotalTrans),
 			SUM(Turnover),
 			SUM(CustomerWinLoss),
 			SUM(CustomerComm),
+			SUM(LicenseeComm),
 			-SUM(LicenseeWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(LicensingFee),
@@ -226,7 +233,7 @@ BEGIN
 			r.Turnover,
 			r.CustomerWinLoss,
 			r.CustomerComm,
-			-r.LicenseeWinLoss AS CustomerTotal,
+			r.LicenseeComm,
 			r.LicenseeWinLoss,
 			r.LicensingFee,
 			r.PayToSupplier,
@@ -252,7 +259,7 @@ BEGIN
 			CAST(r.Turnover * e.Rate AS MONEY) AS Turnover,
 			CAST(r.CustomerWinLoss * e.Rate AS MONEY) AS CustomerWinLoss,
 			CAST(r.CustomerComm * e.Rate AS MONEY) AS CustomerComm,
-			CAST((-LicenseeWinLoss) * e.Rate AS MONEY) AS CustomerTotal,
+			CAST(r.LicenseeComm * e.Rate AS MONEY) AS LicenseeComm,
 			CAST(LicenseeWinLoss * e.Rate AS MONEY) AS LicenseeWinLoss,
 			CAST(r.LicensingFee * e.Rate AS MONEY) AS LicensingFee,
 			CAST(r.PayToSupplier * e.Rate AS MONEY) AS PayToSupplier,
@@ -261,6 +268,7 @@ BEGIN
 			r.Turnover AS TurnoverOriginal,
 			r.CustomerWinLoss AS CustomerWinLossOriginal,
 			r.CustomerComm AS CustomerCommOriginal,
+			r.LicenseeComm AS LicenseeCommOriginal,
 			-(r.LicenseeWinLoss) AS CustomerTotalOriginal,
 			r.LicenseeWinLoss AS LicenseeWinLossOriginal,
 			r.LicensingFee AS LicensingFeeOriginal,
@@ -277,7 +285,7 @@ BEGIN
 			Turnover,
 			CustomerWinLoss,	
 			CustomerComm,
-			-LicenseeWinLoss  AS CustomerTotal,	
+			LicenseeComm,
 			LicenseeWinLoss,
 			LicensingFee,
 			PayToSupplier,
