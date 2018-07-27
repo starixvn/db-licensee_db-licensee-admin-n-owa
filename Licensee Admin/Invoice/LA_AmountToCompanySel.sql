@@ -270,8 +270,8 @@ BEGIN
 	-- out of waive time
 	;WITH Fee AS(
 		SELECT m.MinFeeId
-			, SUM(CASE WHEN t.ProductId IS NULL THEN 0 ELSE t.AmountToCompany END) FeeUnderWaiveTime
-			, SUM(CASE WHEN t.ProductId IS NULL THEN t.AmountToCompany ELSE 0 END) FeeOutOfWaiveTime
+			, SUM(CASE WHEN w.ProductId IS NULL THEN 0 ELSE t.AmountToCompany END) FeeUnderWaiveTime
+			, SUM(CASE WHEN w.ProductId IS NULL THEN t.AmountToCompany ELSE 0 END) FeeOutOfWaiveTime
 		FROM #tmpWinlossData t
 		INNER JOIN #tmpMinFee m ON t.ProductId = m.ProductId AND t.PartyId = m.PartyId AND t.WinlossDate BETWEEN m.FromDate AND m.ToDate
 		LEFT JOIN #tmpMinFee w ON w.FeeType=2 AND w.MinFeeId=m.MinFeeId AND t.WinlossDate BETWEEN w.FromDate AND w.ToDate
