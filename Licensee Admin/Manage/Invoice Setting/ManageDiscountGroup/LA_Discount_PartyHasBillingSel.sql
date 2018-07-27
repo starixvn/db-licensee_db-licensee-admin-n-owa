@@ -2,9 +2,8 @@
 USE bodb_licensee
 GO
 
-ALTER PROCEDURE [dbo].[LA_Discount_HasBilling]
-	@DiscountGroupId INT, 
-	@HasBilling BIT = 0 OUTPUT
+ALTER PROCEDURE [dbo].[LA_Discount_PartyHasBillingSel]
+	@DiscountGroupId INT
 AS
 /*  
 	 Created: 20180702@Parsons [#94282]
@@ -12,11 +11,11 @@ AS
 	 DB: DB052.bodb_licensee   
 
 	 Revisions:  
-		- 20180702@Parsons: Check this discount has not belong to any a invoice yet [#94282]
+		- 20180702@Parsons: Select party list has billing [#94282]
 
 	 Params:
 
-	 Explannation: 
+	 Explannation: EXEC LA_Discount_PartiesBillingSel @DiscountGroupId = 277
 */
 BEGIN
 	SET NOCOUNT ON
@@ -37,22 +36,12 @@ BEGIN
 	WHERE h.DiscountGroupId = @DiscountGroupId 
 	--#Endregion Get info of Discount
 
-	--#Region Check has not belong to any a invoice yet
-	IF(EXISTS(SELECT TOP 1 ih.PartyId
-		FROM LA_InvoiceHeader ih WITH(NOLOCK)
+	SELECT ih.PartyId
+	FROM LA_InvoiceHeader ih WITH(NOLOCK)
 		INNER JOIN LA_InvoiceStatement id WITH(NOLOCK) ON ih.InvoiceHeaderId = id.InvoiceHeaderId
 		INNER JOIN @PartieSettings p ON ih.PartyId = p.PartyId AND id.ProductId = p.ProductId
-		WHERE ih.FromDate >= @FromDateDiscount AND ih.ToDate <= @ToDateDiscount
-			  AND ih.InvoiceType = @InvoiceTypeDiscount 
-			  AND ih.StatusId = 0 -- normal invoice
-	))
-	BEGIN
-		SELECT @HasBilling = 1
-	END
-	ELSE
-	BEGIN
-		SELECT @HasBilling = 0
-	END
-	--#Endregion Check has not belong to any a invoice yet
+	WHERE ih.FromDate >= @FromDateDiscount AND ih.ToDate <= @ToDateDiscount
+			AND ih.InvoiceType = @InvoiceTypeDiscount 
+			AND ih.StatusId = 0 -- normal invoice
 END
 GO
