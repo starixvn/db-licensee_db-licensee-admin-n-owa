@@ -191,13 +191,17 @@ BEGIN
 	FROM #tmpMinFee m
 	INNER JOIN #tmpExchange e ON m.ToDate = e.ExchangeDate AND m.CurrencyId = e.ExchangeID
 
-	-- 1.8.4 calculate minfee amount(exclude waite time)
-	UPDATE m SET m.MinFeeAmount = m.FeeAmount - (CAST(m.FeeAmount AS DECIMAL(20,10)) / @DaysInMonth) * ISNULL((
-		SELECT SUM(DATEDIFF(DAY, w.FromDate,w.ToDate) + 1)
-		FROM #tmpMinFee w
-		WHERE w.FeeType = 2 AND w.PartyId = m.PartyId AND w.ProductId = m.ProductId AND m.MinFeeId=w.MinFeeId
-	),0)
+	-- 1.8.4 calculate minfee amount(exclude waive time)
+	-- (days in charged - days in waived) * FeeAmount / days in month
+	;WITH waivedDays AS (
+		SELECT MinFeeId, SUM(DATEDIFF(DAY, FromDate,ToDate) + 1) WaivedDays
+		FROM #tmpMinFee
+		WHERE FeeType = 2
+		GROUP BY MinFeeId
+	)
+	UPDATE m SET m.MinFeeAmount = ((DATEDIFF(DAY, m.FromDate,m.ToDate) + 1) - ISNULL(w.WaivedDays,0)) * CAST(m.FeeAmount AS DECIMAL(20,10)) / @DaysInMonth
 	FROM #tmpMinFee m
+	LEFT JOIN waivedDays w ON m.MinFeeId=w.MinFeeId
 	WHERE m.FeeType = 1
 
 /*--------------------------------------------------------------------------------------------------------------------------------
