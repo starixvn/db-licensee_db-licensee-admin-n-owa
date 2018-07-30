@@ -38,13 +38,13 @@ BEGIN
 	SET PartyGroupId=a.PartyGroupId
 	FROM @PartyList p
 	INNER JOIN dbo.LA_PartyGroupAssignment a WITH(NOLOCK) ON p.PartyId = a.PartyId
-	
+
 	-- 1.2.2 get party in same group
 	INSERT INTO @PartyList(PartyId,PartyGroupId,IsSelected)
 	SELECT DISTINCT a.PartyId, a.PartyGroupId,0
 	FROM dbo.LA_PartyGroupAssignment a WITH(NOLOCK)
-	INNER JOIN @PartyList p ON a.PartyGroupId=p.PartyGroupId
-	WHERE p.PartyId != a.PartyId
+	WHERE a.PartyId NOT IN (SELECT b.PartyId FROM @PartyList b)
+		AND a.PartyGroupId IN (SELECT c.PartyGroupId FROM @PartyList c)
 
 	-- 1.3 include products that use to calculate discount
 	-- discount type
@@ -173,7 +173,7 @@ BEGIN
 	INNER JOIN @PartyList p ON mf.PartyId = p.PartyId
 	INNER JOIN @ProductList c ON mf.ProductId=c.ProductID
 	WHERE mf.FeeTypeId = 1 AND @FromDate <= mf.ToDate AND mf.FromDate <= @ToDate
-	
+
 	-- 1.8.2 waive
 	INSERT INTO #tmpMinFee(FeeType ,PartyId,ProductId, FromDate ,ToDate, MinFeeId)
 	SELECT w.FeeTypeId,
