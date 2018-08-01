@@ -245,8 +245,9 @@ BEGIN
 	
 	-- 2.3 create result
 	SELECT a.PartyId,a.ProductId
-		,SUM(a.Winloss) AS Winloss
-		,SUM(a.AmountToCompany) AS Fee
+		,CAST(SUM(a.Winloss) AS MONEY) AS Winloss
+		,CAST(SUM(a.AmountToCompany) AS MONEY) AS AmountToCompany
+		,CAST(0 AS MONEY) AS Fee
 		,CAST(0 AS MONEY) AS Discount
 		,CAST(0 AS MONEY) AS Rebate
 		,CAST(0 AS MONEY) AS DiscountRate
@@ -259,8 +260,8 @@ BEGIN
 	FROM #tmpWinlossData a
 	GROUP BY PartyId, ProductId
 
-	-- 2.4 treat negative fee as 0
-	UPDATE #tmpResult SET Fee = 0 WHERE Fee < 0
+	-- 2.4 treat negative as 0
+	UPDATE #tmpResult SET Fee = CASE WHEN AmountToCompany < 0 THEN 0 ELSE AmountToCompany END
 
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 3. minfee calculation
@@ -392,15 +393,15 @@ BEGIN
 		,ProductId
 		,Winloss
 		,Fee
+		,CASE WHEN IsChargedByMinFee = 1 AND Fee > 0 THEN Fee ELSE AmountToCompany END NegativeFee
+		,Minfee
+		,IsChargedByMinFee
 		,Discount
 		,DiscountRate
 		,DiscountRemark
 		,Rebate
 		,RebateRate
 		,RebateRemark
-		,(Fee - Discount - Rebate)	AS AmountToCompany
-		,Minfee
-		,IsChargedByMinFee
 	FROM #tmpResult
 	WHERE PartyId IN (SELECT a.PartyId FROM @PartyList a WHERE a.IsSelected = 1)
 		AND ProductId IN (SELECT b.ProductId FROM @ProductList b WHERE b.IsSelected = 1)

@@ -98,11 +98,11 @@ BEGIN
 		Rebate			MONEY,
 		RebateRate		MONEY,
 		RebateRemark	NVARCHAR(4000),
-		AmountToCompany	MONEY,
+		NegativeFee		MONEY,
 		Minfee			MONEY,
 		IsChargedByMinFee BIT
 	)
-	INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark,AmountToCompany,Minfee,IsChargedByMinFee)
+	INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,NegativeFee,Minfee,IsChargedByMinFee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark)
 	EXEC dbo.LA_AmountToCompanySel @FromDate,@ToDate,@PartyId,@ProductCodes,@BaseCurrency
 
 	-- Region: Get exchange rate info
@@ -204,7 +204,8 @@ BEGIN
 
 	-- amount to company(licensing fee) - discount
 	INSERT INTO @Result(ProductId, AmountToCompany)
-	SELECT ProductId, CASE WHEN (Fee - Discount) < 0 THEN 0 ELSE Fee - Discount END FROM #AmountToCompany
+	SELECT ProductId, CASE WHEN NegativeFee < 0 THEN NegativeFee ELSE NegativeFee - Discount END
+	FROM #AmountToCompany
 
 	-- include no ticket product
 	INSERT INTO @Result
@@ -213,16 +214,17 @@ BEGIN
 
 	DECLARE @Remark NVARCHAR(4000) = (SELECT TOP 1 x.RebateRemark FROM #AmountToCompany x WHERE ISNULL(x.RebateRemark,'') <> '')
 
-	select ISNULL(@Remark,'')		AS Remark,
+	SELECT ISNULL(@Remark,'')		AS Remark,
 		@ToDate						AS ReportDate,
 		@BaseCurrency				AS CurrencyName,
 		SUM(ISNULL(d.Rebate, 0))	AS TotalRebate,
-		SUM(rs.AmountToCompany )	AS TotalAmount
+		SUM(ISNULL(d.Fee, rs.AmountToCompany) - ISNULL(d.Discount,0)) AS TotalAmount
 	FROM @Result rs
 	LEFT JOIN #AmountToCompany d ON d.ProductId = rs.ProductId
 
 	SELECT r.ProductId,r.AmountToCompany FROM @Result r
 
 	DROP TABLE #Exchange
+	DROP TABLE #AmountToCompany
 END
 GO

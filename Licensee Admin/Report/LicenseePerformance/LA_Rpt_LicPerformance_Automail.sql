@@ -55,11 +55,11 @@ BEGIN
 		Rebate			MONEY,
 		RebateRate		MONEY,
 		RebateRemark	NVARCHAR(4000),
-		AmountToCompany	MONEY,
+		NegativeFee		MONEY,
 		Minfee			MONEY,
 		IsChargedByMinFee BIT
 	)
-	INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark,AmountToCompany,Minfee,IsChargedByMinFee)
+	INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,NegativeFee,Minfee,IsChargedByMinFee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark)
 	EXEC dbo.LA_AmountToCompanySel @FromDate,@ToDate,@PartyIds,@ProductCodes,@BaseCurrencyName
 
 	-- Region: Party charge info
