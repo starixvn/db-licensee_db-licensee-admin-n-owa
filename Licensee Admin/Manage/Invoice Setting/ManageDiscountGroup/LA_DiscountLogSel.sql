@@ -31,6 +31,7 @@ BEGIN
 	INNER JOIN dbo.LA_User u WITH(NOLOCK) ON l.UserID = u.UserID
 	WHERE (@GroupId=0 OR l.CustID = @GroupId)
 		AND ((@ActionId=0 AND l.ActionID IN (5516,5517,5518)) OR l.ActionID = @ActionId)
-		AND l.LogDate BETWEEN @FromDate AND @ToDate
+		AND CAST(l.LogDate AS DATE) BETWEEN @FromDate AND @ToDate
+	ORDER BY LogID DESC
 END
 GO
