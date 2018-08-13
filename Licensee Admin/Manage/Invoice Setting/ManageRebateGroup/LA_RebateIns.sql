@@ -3,7 +3,7 @@ USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_RebateIns] 
-	@GroupName	VARCHAR(50), 
+	@GroupName	NVARCHAR(50), 
 	@FromDate	DATE, 
 	@ToDate		DATE, 
 	@ProductIds VARCHAR(512) = '', 

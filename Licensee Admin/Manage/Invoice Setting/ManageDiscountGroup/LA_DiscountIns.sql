@@ -3,7 +3,7 @@ USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountIns]
-	@DiscountGroupName	VARCHAR(50),
+	@DiscountGroupName	NVARCHAR(50),
 	@DiscountGroupType	TINYINT, 
 	@CurrencyId			TINYINT,
 	@FromDate			DATE, 
@@ -11,7 +11,7 @@ ALTER PROCEDURE [dbo].[LA_DiscountIns]
 	@CalculationProductIds VARCHAR(512) = '', 
 	@DiscountProductIds VARCHAR(512) = '',
 	@RateSettingsData	VARCHAR(MAX) = '', 
-	@PartySettingsData	VARCHAR(MAX) = '',  
+	@PartySettingsData	NVARCHAR(MAX) = '',  
 	@UserId				INT, 
 	@LoginIp			VARCHAR (50)	= '', 
 	@ErrCode			INT = 0 OUTPUT, 

@@ -12,7 +12,7 @@ ALTER PROCEDURE [dbo].[LA_DiscountUpd]
 	@CalculationProductIds VARCHAR(512) = '', 
 	@DiscountProductIds VARCHAR(512) = '',
 	@RateSettingsData	VARCHAR(MAX) = '', 
-	@PartySettingsData	VARCHAR(MAX) = '', 
+	@PartySettingsData	NVARCHAR(MAX) = '', 
 	@UserId				INT, 
 	@LoginIp			VARCHAR (50)	= '', 
 	@ErrCode			INT = 0 OUTPUT, 

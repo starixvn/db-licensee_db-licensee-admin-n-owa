@@ -4,7 +4,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_RebateUpd] 
 	@GroupId SMALLINT = 0,
-	@GroupName	VARCHAR(50), 
+	@GroupName	NVARCHAR(50), 
 	@FromDate	DATE, 
 	@ToDate		DATE, 
 	@ProductIds VARCHAR(512) = '', 
