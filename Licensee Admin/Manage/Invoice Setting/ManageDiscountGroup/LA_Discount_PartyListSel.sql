@@ -14,7 +14,7 @@ AS
 	 DB: DB052.bodb_licensee   
 
 	 Revisions:  
-		- 20180702@Parsons: Get list payer list [#94282]
+		- 20180702@Parsons: Get payer list [#94282]
 
 	 Explannation:
 */
@@ -29,24 +29,14 @@ BEGIN
 	-- Get Parties in any group
 	DECLARE @PartiesInAnyGroup TABLE (PartyId INT, DiscountGroupId SMALLINT)
 	INSERT INTO @PartiesInAnyGroup(PartyId, DiscountGroupId)
-	SELECT a.PartyId, a.DiscountGroupId
+	SELECT DISTINCT a.PartyId, a.DiscountGroupId
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
 		INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
+		INNER JOIN dbo.LA_DiscountGroupProduct dp WITH(NOLOCK) ON dp.DiscountGroupId = h.DiscountGroupId
+		INNER JOIN bodb02.dbo.strSplit(@ProductIds, ',') p ON dp.ProductId = p.val
 	WHERE h.DiscountGroupType IN (1,3,11,13)
 		AND (@FromDate IS NULL OR @FromDate <= h.ToDate)
 		AND (@ToDate IS NULL OR @ToDate >= h.FromDate)
-
-	--Get parties have at least one product in ProductIds
-	;WITH cte_PartyHaveProductInProductIds AS (
-		SELECT DISTINCT a.PartyID
-		FROM @PartiesInAnyGroup h
-			INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
-			INNER JOIN dbo.LA_DiscountGroupProduct dp WITH(NOLOCK) ON dp.DiscountGroupId = h.DiscountGroupId
-			INNER JOIN bodb02.dbo.strSplit(@ProductIds, ',') p ON p.val = dp.ProductId
-	)
-	-- Exclude parties not in cte_PartyHaveProductInProductIds
-	DELETE @PartiesInAnyGroup
-	WHERE PartyId NOT IN (SELECT PartyID FROM cte_PartyHaveProductInProductIds)
 
 	--list of payer not in group
 	SELECT p.PartyId, PartyName, BrandName
@@ -64,6 +54,5 @@ BEGIN
 		INNER JOIN dbo.OAS_Party pp WITH(NOLOCK) ON a.PartyId = pp.PartyID
 		INNER JOIN dbo.OAS_PartyDetail ppp WITH(NOLOCK) ON a.PartyId = ppp.PartyID
 	WHERE h.DiscountGroupId = @GroupId		
-	
 END
 GO
