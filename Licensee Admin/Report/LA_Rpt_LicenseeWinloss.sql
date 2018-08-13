@@ -27,6 +27,7 @@ AS
 	- 20180130@Bruce: integrate Exchange product [#87754]
 	- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
 	- 20180716@bruce: add new group TEST for credit [#98126]
+	- 20180703@Parsons: Integrate Pragmatic Win Loss [#94108]
 
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -52,7 +53,9 @@ BEGIN
 	CREATE TABLE #Data (rptDate DATE, PartyID INT, ProductID INT, Currency INT,BetTypeId INT, Turnover MONEY, Winloss MONEY, AWinloss MONEY, AComm MONEY, PComm MONEY, Betcount BIGINT)
 	
 	INSERT INTO @ChargeInfo(PartyID, LicenseeID, ProductID, BetTypeId, Rate, Fromdate, Todate)
-	SELECT DISTINCT PartyID, LicenseeID, ProductID, Bettype, DI_Rate, Fromdate, Todate
+	SELECT DISTINCT PartyID, LicenseeID, ProductID, Bettype, 
+			CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END,
+			Fromdate, Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', @excludeTest)
 	
 	/* BA Product Id = 3 */

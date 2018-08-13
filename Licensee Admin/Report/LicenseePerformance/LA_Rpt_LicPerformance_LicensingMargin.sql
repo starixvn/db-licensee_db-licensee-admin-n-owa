@@ -11,7 +11,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_LicensingMargin]
 	, @drawfilter			SMALLINT		= 1
 	, @excludeTest			BIT				= 0
 	, @IsConvert			BIT				= 1
-	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
+	, @BaseCurrencyName		VARCHAR(10)		= 'EUR'
 WITH RECOMPILE
 AS
  
@@ -26,6 +26,8 @@ AS
 	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	   - 20171205@Bruce: fix partyid length [#87723]
 	   - 20171212@Bruce: Add Average Margin [#87843]
+	   - 20180718@Bruce: Change default currency to EUR [#94108]
+	   
 	Param's Explanation:  
 	  + @PartyIDs : a string of list PartyID, separated by ','
 	  + @Currency : 0-All Currencies

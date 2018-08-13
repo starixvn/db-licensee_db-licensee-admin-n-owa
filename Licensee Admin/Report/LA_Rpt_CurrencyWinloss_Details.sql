@@ -29,6 +29,7 @@ AS
 	   - 20180130@Bruce: integrate Exchange product [#87754]
 	   - 20180515@Scofield: Incorporate 9wickets data [#94950]
 	   - 20180716@bruce: add new group TEST for credit [#98126]
+	   - 20180703@Parsons: Integrate Pragmatic Win Loss [#94108]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -93,7 +94,9 @@ BEGIN
 
 	INSERT INTO #tmpParty (PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Rate, Fromdate, Todate, Bettype)
 	(
-		SELECT DISTINCT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, Fromdate, Todate,
+		SELECT DISTINCT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, 
+						CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END,
+						Fromdate, Todate,
 						CASE WHEN ci.ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
 		FROM		bodb_licensee.dbo.LA_f_ChargeInfo (@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', @ExcludeTest) ci
 		LEFT JOIN   bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype AND (

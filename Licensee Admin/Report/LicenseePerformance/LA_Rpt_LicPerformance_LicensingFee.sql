@@ -25,8 +25,9 @@ AS
 	   - 20160506@Bravo: Add VB data.
 	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	   - 20171205@Bruce: fix partyid length [#87723]
-	   - 20180716@bruce: add new group TEST for credit [#98126]
-	   
+	   - 20180716@bruce: add new group TEST for credit [#98126]	   
+	   - 20180510@Bruce: Integrate Pragmatic [#94108]
+
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
 	  + @Currency : 0-All Currencies
@@ -75,7 +76,7 @@ BEGIN
 		SET @sdate = DATEADD(m, 1, @sdate)
 	END	
 
-	IF @ProductCode IN ('SB', 'NG', 'LC', 'VS', 'CS', 'VB')
+	IF @ProductCode IN ('SB', 'NG', 'LC', 'VS', 'CS', 'VB', 'PP')
 	BEGIN		
 		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, Winloss)
 		SELECT tp.PartyID, d.rptDate, d.CurrencyID, - SUM(d.Winloss * ISNULL(tp.Rate,0))

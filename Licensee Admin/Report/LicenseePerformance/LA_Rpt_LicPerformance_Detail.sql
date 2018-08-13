@@ -1,4 +1,5 @@
 /*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+
 USE [bodb02]
 GO
 
@@ -41,6 +42,8 @@ AS
 		- 20171205@Bruce: fix partyid length [#87723]
 		- 20182501@Bruce: Include exchange winloss [#87754]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+	    	- 20180703@Parsons: Integrate Pragmatic Win Loss [#94108]
+		- 20180718@Bruce: use decimal to void margin not match among reports [#94108]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -147,7 +150,7 @@ BEGIN
 			PartyId		INT,
 			LicenseeId	INT,
 			ProductID	INT,
-			Rate		MONEY,
+			Rate		DECIMAL(7,5),
 			FromDate	SMALLDATETIME,
 			ToDate		SMALLDATETIME,
 			Bettype		INT)
@@ -158,7 +161,8 @@ BEGIN
 	-- select bettype to avoid duplicated data of MGC
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
 	(
-		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, ci.DI_Rate, 
+		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, 
+				CASE WHEN ISNULL(ci.isDeposit, 0) = 1 THEN ci.DI_Rate ELSE 0 END,
 				CASE WHEN @ExcludeTest=1 THEN ci.Fromdate ELSE @Fromdate END, 	-- include trial data
 				CASE WHEN @ExcludeTest=1 THEN ci.ToDate ELSE @ToDate END,		-- include trial data
 				CASE WHEN ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
@@ -168,7 +172,8 @@ BEGIN
 	)
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
 	(
-		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, ci.DI_Rate,
+		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, 
+				CASE WHEN ISNULL(ci.isDeposit, 0) = 1 THEN ci.DI_Rate ELSE 0 END,
 				CASE WHEN @ExcludeTest=1 THEN ci.Fromdate ELSE @PrevFromDate END,	-- include trial data
 				CASE WHEN @ExcludeTest=1 THEN ci.ToDate ELSE @PrevToDate END,		-- include trial data
 				CASE WHEN ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
@@ -751,8 +756,8 @@ BEGIN
 	UPDATE	r
 	SET	LaunchDate	= t.AffectedDate,
 		PartyName	= ISNULL(r.PartyName,op.PartyName),
-		AverageBet	= CASE WHEN r.BetCount = 0 THEN r.Turnover ELSE (r.Turnover / r.BetCount) END,
-		Margin		= CASE WHEN r.Turnover = 0 THEN r.WinLoss ELSE (-r.WinLoss/ r.Turnover) END,
+		AverageBet	= CASE WHEN r.BetCount = 0 THEN r.Turnover ELSE (CAST(r.Turnover AS DECIMAL(20,5)) / r.BetCount) END,
+		Margin		= CASE WHEN r.Turnover = 0 THEN r.WinLoss ELSE (-CAST(r.WinLoss AS DECIMAL(20,5))/ r.Turnover) END,
 		TotalFee	= ISNULL(r.SportsbookFee,0) + ISNULL(r.OthersFee,0) - ISNULL(r.SportbookDiscount,0) - ISNULL(r.OthersDiscount,0) - ISNULL(r.SportbookRebate,0) - ISNULL(r.OthersRebate,0)
 	FROM	#Result r
 	INNER JOIN @tmpPartySBLaunchDate t ON t.PartyID = r.PartyId
