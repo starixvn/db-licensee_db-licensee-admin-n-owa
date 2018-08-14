@@ -34,11 +34,11 @@ BEGIN
 	-- SystemId   = 2 : LA
 	--
 	;WITH ChargeInfo AS(
-		SELECT ci.ProductId, ci.FromParty, ci.ToParty, ci.Rate, ci.FromDate, ci.ToDate, ci.ChargeID, ci.ChargeType AS [Type]
+		SELECT ci.ProductId, ci.FromParty, ci.ToParty, ci.Rate, ci.FromDate, ci.ToDate, ci.ChargeID, ci.ChargeType AS RateType
 		FROM dbo.OAS_ChargeInfo AS ci WITH (NOLOCK)
 		WHERE ProductId NOT IN (14, 17)
 		UNION ALL
-		SELECT s.ProductId, s.FromParty, s.ToParty, s.Rate, s.FromDate, s.ToDate, s.ChargeIdRef, s.BettypeRef AS [Type]
+		SELECT s.ProductId, s.FromParty, s.ToParty, s.Rate, s.FromDate, s.ToDate, s.ChargeIdRef, s.BettypeRef AS RateType
 		FROM dbo.OAS_ChargeInfoSub AS s WITH (NOLOCK)
 		WHERE s.ChargeType = 1
 	)
@@ -51,7 +51,7 @@ BEGIN
 			,f.FeeAmount
 			,ci.ProductId
 			,pd.IsDeposit
-			,ci.[Type]
+			,ci.RateType
 			,pd.BrandName
 	FROM ChargeInfo AS ci
 		INNER JOIN dbo.OAS_Party AS p WITH (NOLOCK) ON p.PartyID = ci.FromParty			-- Licensee
