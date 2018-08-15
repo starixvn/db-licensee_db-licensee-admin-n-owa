@@ -358,6 +358,29 @@ BEGIN
 		AND ci.FromDate <= @ToDate
 	-- End Get ChargeInfo for CB
 
+	DECLARE @DiscountCurrency INT = (
+		SELECT TOP 1 h.CurrencyId
+		FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
+		INNER JOIN dbo.LA_DiscountGroupHeader h WITH(NOLOCK) ON a.DiscountGroupId=h.DiscountGroupId
+		INNER JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON h.DiscountGroupId=p.DiscountGroupId
+		INNER JOIN #AmountToCompany c ON c.PartyId = a.PartyID AND c.ProductId=p.ProductId
+		WHERE h.DiscountGroupType != 2 -- rebate
+			AND h.FromDate <= @ToDate
+			AND h.ToDate >= @FromDate
+			AND a.PartyID = @PartyId
+			AND a.IsApplyDiscount = 1
+			AND ISNULL(c.DiscountRate,0) > 0
+			AND p.CalculationType IN (0,10) -- 0: discount, 10: discount & calculate
+		ORDER BY h.ToDate DESC
+	)
+
+	IF @DiscountCurrency IS NOT NULL AND @DiscountCurrency != @BaseCurrencyId
+	BEGIN
+		SELECT @ErrCode = 2, @ErrMsg = 'Please check the Exchange settings of Payer''s discount. Exchange of discount must be the same with Payer''s exchange.'
+		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
+		RETURN
+	END
+
 	-- Region: Get Amount by Product
 	CREATE	TABLE #TempData (
 			LicenseeId		INT, 
