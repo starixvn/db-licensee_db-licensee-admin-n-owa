@@ -36,11 +36,11 @@ BEGIN
 	WHERE h.DiscountGroupId = @DiscountGroupId 
 	--#Endregion Get info of Discount
 
-	SELECT ih.PartyId
+	SELECT DISTINCT ih.PartyId
 	FROM LA_InvoiceHeader ih WITH(NOLOCK)
 		INNER JOIN LA_InvoiceStatement id WITH(NOLOCK) ON ih.InvoiceHeaderId = id.InvoiceHeaderId
-		INNER JOIN @PartieSettings p ON ih.PartyId = p.PartyId AND id.ProductId = p.ProductId
-	WHERE ih.FromDate >= @FromDateDiscount AND ih.ToDate <= @ToDateDiscount
+		INNER JOIN @PartieSettings p ON ih.PartyId = p.PartyId AND id.ProductId = p.ProductId	
+	WHERE ih.ToDate >= @FromDateDiscount AND ih.ToDate <= @ToDateDiscount
 			AND ih.InvoiceType = @InvoiceTypeDiscount 
 			AND ih.StatusId = 0 -- normal invoice
 END
