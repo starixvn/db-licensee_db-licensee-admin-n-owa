@@ -11,7 +11,6 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_LicensingFee]
 	   , @IsConvert			BIT				= 0
 	   , @BaseCurrencyName	VARCHAR(10)		= 'GBP'
 	   , @drawfilter		SMALLINT		= 1
-	   , @excludeTest		BIT				= 0
 WITH RECOMPILE
 AS  
 /*  Created by: 20140930@Florent
@@ -27,12 +26,12 @@ AS
 	   - 20171205@Bruce: fix partyid length [#87723]
 	   - 20180716@bruce: add new group TEST for credit [#98126]	   
 	   - 20180510@Bruce: Integrate Pragmatic [#94108]
+	   - 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
 	  + @Currency : 0-All Currencies
 	  + @drawfilter: 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
-	  + @excludeTest: remove currency UUS
 	  + @ProductCode : string,
 		
 	  + @IsConvert: =1 : convert figure to 
@@ -52,7 +51,7 @@ BEGIN
 
      INSERT INTO #tmpParty( PartyID, LicenseeID, ProductID, Rate, Fromdate, Todate)
      SELECT PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
-     FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', @ExcludeTest)
+     FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 	
 	CREATE TABLE #rptLicFee (Licensee VARCHAR(20), rptDate VARCHAR(50), Fee MONEY)
 
@@ -88,7 +87,7 @@ BEGIN
 		    WHERE b.rptDate BETWEEN @FromDate AND @Todate
 				AND b.status NOT IN (-1, 101, 102, 103)
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
-				AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20)) 
+				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 		    GROUP BY rptDate, currencyID, tp.PartyID
 		    ) d 

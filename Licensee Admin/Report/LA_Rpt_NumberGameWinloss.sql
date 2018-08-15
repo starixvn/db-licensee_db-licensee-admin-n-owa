@@ -8,7 +8,6 @@ ALTER PROCEDURE [dbo].[LA_Rpt_NumberGameWinloss]
 	, @ToDate				SMALLDATETIME
 	, @Currency				INT				= 0
 	, @drawfilter			SMALLINT		= 0
-	, @excludeTest			BIT				= 0
 	, @IsConvert			BIT				= 1
 	, @BaseCurrencyName		VARCHAR(10)		= 'EUR'
 AS
@@ -24,6 +23,7 @@ AS
 	- 20170621@Bruce: include paytosupplier & netincome [#78398]
 	- 20171220@Parsons: increase length for variables [#88197]
 	- 20180716@bruce: add new group TEST for credit [#98126]
+	- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 	
  * Param's Explanation:
  *
@@ -48,7 +48,7 @@ BEGIN
 	-- ​Pay to Supplier: equals 40% of [Licensing Fee]
 	INSERT INTO #ChargeRate
 	SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, 0.4, c.Fromdate, c.Todate
-	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'NG', 'OA', @ExcludeTest) c
+	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'NG', 'OA') c
 
 	SELECT DISTINCT ExchangeDate, ExchangeId, BaseCurrencyRate AS Rate
 	INTO #Exchange
@@ -72,7 +72,7 @@ BEGIN
 			INNER JOIN #Exchange e ON b.CurrencyID = e.ExchangeId AND b.rptDate = e.ExchangeDate
 		WHERE b.rptDate BETWEEN lr.FromDate AND lr.ToDate
 			AND b.status NOT IN (-1, 101, 102, 103)
-			AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
+			AND (b.CurrencyID <> 20)
 			AND b.bettype BETWEEN 81 AND 120
 			AND b.customercategory NOT IN (27,28)
 		GROUP BY DATEADD(MONTH, DATEDIFF(MONTH, 0, b.rptDate), 0),lr.PartyID

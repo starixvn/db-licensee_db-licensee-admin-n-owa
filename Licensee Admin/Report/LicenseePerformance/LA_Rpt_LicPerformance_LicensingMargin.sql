@@ -9,7 +9,6 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_LicensingMargin]
 	, @ToDate				SMALLDATETIME
 	, @ProductCode			VARCHAR(500)	
 	, @drawfilter			SMALLINT		= 1
-	, @excludeTest			BIT				= 0
 	, @IsConvert			BIT				= 1
 	, @BaseCurrencyName		VARCHAR(10)		= 'EUR'
 WITH RECOMPILE
@@ -27,12 +26,12 @@ AS
 	   - 20171205@Bruce: fix partyid length [#87723]
 	   - 20171212@Bruce: Add Average Margin [#87843]
 	   - 20180718@Bruce: Change default currency to EUR [#94108]
+	   - 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 	   
 	Param's Explanation:  
 	  + @PartyIDs : a string of list PartyID, separated by ','
 	  + @Currency : 0-All Currencies
 	  + @drawfilter: 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
-	  + @excludeTest: remove currency UUS
 	  + @ProductCode : string,
 	 
 */  
@@ -50,7 +49,7 @@ BEGIN
 
 	INSERT INTO @tmpParty( PartyID, LicenseeID,ProductID, Fromdate, Todate)
 	SELECT DISTINCT PartyID, LicenseeID, ProductID, Fromdate, Todate
-	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', @ExcludeTest)
+	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 
 	CREATE TABLE #Exchange (ExchangeDate DATE, ExchangeId INT, Rate FLOAT)
 	INSERT INTO #Exchange (ExchangeDate, ExchangeId, Rate)
@@ -80,7 +79,7 @@ BEGIN
 	   WHERE b.rptDate BETWEEN @Fromdate AND @Todate
 		  AND b.Status NOT IN (-1, 101, 102, 103)
 		  AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
-		  AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
+		  AND (b.CurrencyID <> 20)
 	   GROUP BY tp.PartyID, b.rptDate, b.currencyID
 	END
 
@@ -102,7 +101,7 @@ BEGIN
 	   WHERE b.rptDate BETWEEN @FromDate AND @Todate
 		  AND b.Bettype IN (SELECT Bettype FROM @Bettype)
 		  AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
-		  AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
+		  AND (b.CurrencyID <> 20)
 		  AND b.status NOT IN (-1, 101, 102, 103)
 		  AND b.customercategory NOT IN (27, 28)
 	   GROUP BY tp.PartyID, rptDate, currencyID

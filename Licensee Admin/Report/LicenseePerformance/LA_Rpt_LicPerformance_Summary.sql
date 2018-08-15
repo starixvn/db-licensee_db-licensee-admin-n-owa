@@ -10,7 +10,6 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_Summary]
 	, @ProductCode		VARCHAR(200)
 	, @ReportType		TINYINT			= 2
 	, @drawfilter		SMALLINT		= 1
-	, @excludeTest		BIT				= 0
 	, @MoveBetsDay		SMALLDATETIME	= ''
 	, @IsConvert		BIT				= 0
 	, @BaseCurrencyName	VARCHAR(10)		= 'GBP'
@@ -28,13 +27,13 @@ AS
 	   - 20171205@Bruce: fix partyid length [#87723]
 	   - 20171219@Bruce: increase length for variables [#88197]
 	   - 20180716@bruce: add new group TEST for credit [#98126]
+	   - 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 
 	Param's Explanation:
 	  + @PartyIDs : a string of list PartyID, separated by ','
 	  + @Currency : 0-All Currencies
 	  + @ReportType: 1-Daily; 2-Monthly
 	  + @drawfilter: 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
-	  + @excludeTest: remove currency UUS
 	  + @BettypeID : 0-selected all bettype
 */
 BEGIN
@@ -50,7 +49,7 @@ BEGIN
 						, Rate MONEY, AffectedDate SMALLDATETIME, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
 	INSERT INTO @tmpParty(ChargeId, PartyID, LicenseeID, IsDeposit, ProductID, Rate, AffectedDate, FromDate, ToDate)
 	SELECT DISTINCT ChargeId, PartyID, LicenseeID, IsDeposit, ProductID, DI_Rate, AffectedDate, Fromdate, Todate
-	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', @ExcludeTest)
+	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 
 	CREATE TABLE #Result (PartyID INT, ReportType VARCHAR(8), TurnOver MONEY, CustomerWinlost MONEY, CommBA MONEY ,CommRB MONEY, Betcount BIGINT
 		, LicensingFee MONEY)
@@ -95,7 +94,7 @@ BEGIN
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.Bettype IN (SELECT Bettype FROM @Bettype)
 			AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
-			AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
+			AND (b.CurrencyID <> 20)
 			AND b.status NOT IN (-1, 101, 102, 103)
 			GROUP BY PartyID, b.rptDate, currencyID
 		)
@@ -130,7 +129,7 @@ BEGIN
 			WHERE  b.rptDate BETWEEN @Fromdate AND @ToDate
 			AND b.Bettype IN (SELECT Bettype FROM @Bettype)
 			AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
-			AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
+			AND (b.CurrencyID <> 20)
 			AND b.status NOT IN (-1, 101, 102, 103)
 			AND b.customercategory NOT IN (27, 28)
 			GROUP BY PartyID, b.rptDate, b.currencyID
