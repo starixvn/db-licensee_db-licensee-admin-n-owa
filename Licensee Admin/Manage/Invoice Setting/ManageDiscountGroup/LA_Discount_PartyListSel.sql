@@ -54,5 +54,6 @@ BEGIN
 		INNER JOIN dbo.OAS_Party pp WITH(NOLOCK) ON a.PartyId = pp.PartyID
 		INNER JOIN dbo.OAS_PartyDetail ppp WITH(NOLOCK) ON a.PartyId = ppp.PartyID
 	WHERE h.DiscountGroupId = @GroupId		
+		AND a.PartyID NOT IN (SELECT DISTINCT PartyId FROM @PartiesInAnyGroup WHERE DiscountGroupId != @GroupId)
 END
 GO
