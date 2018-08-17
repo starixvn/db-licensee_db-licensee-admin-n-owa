@@ -2,7 +2,7 @@
 USE bodb_licensee
 GO
 
-ALTER PROCEDURE [dbo].[LA_Discount_PartyListSel]
+ALTER PROCEDURE [dbo].[LA_Discount_AvailablePartyListSel]
 	@GroupId	SMALLINT = 0,
 	@FromDate	DATE = NULL, 
 	@ToDate		DATE = NULL,
@@ -22,18 +22,16 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @PartyList TABLE(PartyId INT, PartyName VARCHAR(100), BrandName VARCHAR(100), ParentId INT)
+	DECLARE @PartySettings TABLE(DiscountGroupId INT, PartyId INT, ProductId INT)
 
 	INSERT INTO @PartyList(PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel
 
-	-- Get Parties in any group
-	DECLARE @PartiesInAnyGroup TABLE (PartyId INT, DiscountGroupId SMALLINT)
-	INSERT INTO @PartiesInAnyGroup(PartyId, DiscountGroupId)
-	SELECT DISTINCT a.PartyId, a.DiscountGroupId
+	INSERT INTO @PartySettings(DiscountGroupId, PartyId, ProductId)
+	SELECT DISTINCT h.DiscountGroupId, a.PartyId, dp.ProductId
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
 		INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
 		INNER JOIN dbo.LA_DiscountGroupProduct dp WITH(NOLOCK) ON dp.DiscountGroupId = h.DiscountGroupId
-		INNER JOIN bodb02.dbo.strSplit(@ProductIds, ',') p ON dp.ProductId = p.val
 	WHERE h.DiscountGroupType IN (1,3,11,13)
 		AND (@FromDate IS NULL OR @FromDate <= h.ToDate)
 		AND (@ToDate IS NULL OR @ToDate >= h.FromDate)
@@ -41,19 +39,23 @@ BEGIN
 	--list of payer not in group
 	SELECT p.PartyId, PartyName, BrandName
 	FROM @PartyList p
-	WHERE p.ParentId NOT IN (999, 0)
-		AND p.PartyId NOT IN (999)
-		AND p.PartyId NOT IN (SELECT PartyId FROM @PartiesInAnyGroup)
+	WHERE p.PartyId NOT IN ( SELECT PartyId 
+							FROM @PartySettings
+							WHERE ProductId IN (SELECT val FROM bodb02.dbo.strSplit(@ProductIds, ',') ) )
+			AND p.ParentId NOT IN (999, 0)
+			AND p.PartyId NOT IN (999)
 
-	UNION	
+	UNION
 
 	--list of payer in group
-	SELECT a.PartyId, pp.PartyName, ppp.BrandName
-	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
-		INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
-		INNER JOIN dbo.OAS_Party pp WITH(NOLOCK) ON a.PartyId = pp.PartyID
-		INNER JOIN dbo.OAS_PartyDetail ppp WITH(NOLOCK) ON a.PartyId = ppp.PartyID
-	WHERE h.DiscountGroupId = @GroupId		
-		AND a.PartyID NOT IN (SELECT DISTINCT PartyId FROM @PartiesInAnyGroup WHERE DiscountGroupId != @GroupId)
+	SELECT p.PartyId, PartyName, BrandName
+	FROM @PartyList p
+	WHERE p.PartyId IN (SELECT PartyId 
+						FROM @PartySettings p1
+						WHERE DiscountGroupId = @GroupId 
+						AND NOT EXISTS (SELECT p2.PartyId 
+									FROM @PartySettings p2 
+									WHERE p2.PartyId = p1.PartyId AND DiscountGroupId != @GroupId 
+									AND ProductId IN (SELECT val FROM bodb02.dbo.strSplit(@ProductIds, ','))))
 END
 GO
