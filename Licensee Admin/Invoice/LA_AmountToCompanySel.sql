@@ -67,9 +67,8 @@ BEGIN
 		WHERE b.IsSelected=1
 	)
 	-- put parties in discount group to its own group
-	-- put parties in individual discount group to new group by -partyid
 	SELECT DISTINCT h.DiscountGroupId, h.DiscountGroupType, a.PartyID, p.ProductId, p.CalculationType, a.IsApplyDiscount, h.CurrencyId, a.Remark,h.FromDate,
-		CASE WHEN h.DiscountGroupType IN (@DiscountIndividualFee, @DiscountIndividualGrosswin) THEN -a.PartyID ELSE h.DiscountGroupId END CalculationGroup
+		CASE WHEN h.DiscountGroupType IN (@DiscountIndividualFee, @DiscountIndividualGrosswin) THEN -1 ELSE h.DiscountGroupId END CalculationGroup
 	INTO #tmpDiscountSettings
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
 	INNER JOIN cte_DiscountGroup c ON c.DiscountGroupId = h.DiscountGroupId
@@ -83,6 +82,11 @@ BEGIN
 		)
 	WHERE h.DiscountGroupType != @Rebate AND h.FromDate <= @ToDate AND @FromDate <= h.ToDate
 
+	-- 1.3.2
+	-- put parties of individual discount group to new unique group
+	DECLARE @CalculationGroup INT = 100 -- start group numer, it may any value
+	UPDATE #tmpDiscountSettings SET CalculationGroup = -@CalculationGroup, @CalculationGroup = @CalculationGroup + 1 WHERE CalculationGroup = -1
+
 	-- only 1 discount per month for product/party
 	;WITH cte_Discount AS (
 		SELECT DiscountGroupType, PartyID, ProductId, MAX(FromDate) FromDate
@@ -95,7 +99,7 @@ BEGIN
 		AND c.ProductId = d.ProductId
 		AND c.DiscountGroupType = d.DiscountGroupType
 
-	-- 1.3.2 add discount calculation party
+	-- 1.3.3 add discount calculation party
 	INSERT INTO @PartyList(PartyId,PartyGroupId,IsSelected)
 	SELECT DISTINCT a.PartyID, -a.PartyID, 0
 	FROM #tmpDiscountSettings a
