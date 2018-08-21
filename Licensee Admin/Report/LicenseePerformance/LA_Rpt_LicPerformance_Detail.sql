@@ -474,7 +474,7 @@ BEGIN
 	FROM	#Result r
 			LEFT JOIN (SELECT * FROM #Result WHERE IsCurrent = 0) p ON r.PartyId = p.PartyId
 	WHERE	r.IsCurrent = 1 AND r.PartyId IN (SELECT pt.PartyId FROM @PartyIdTable pt WHERE IsSelected = 1)
-		AND r.BetCount > 0 -- only show party has ticket, don't care previous month
+		AND (r.BetCount > 0 OR r.SportsbookFee > 0)-- only show party has ticket, don't care previous month
 
 	-- End region
 
