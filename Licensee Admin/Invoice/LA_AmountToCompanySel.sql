@@ -337,7 +337,7 @@ BEGIN
 		GROUP BY s.DiscountGroupId, s.DiscountGroupType,s.CurrencyId,s.CalculationGroup
 	), cte_Detail AS(
 		SELECT c.CalculationGroup, d.DiscountGroupId, d.Rate
-			,d.FromAmount * e.Rate AS FromAmount
+			,ISNULL(d.FromAmount,0) * e.Rate AS FromAmount
 			,CASE WHEN d.ToAmount > @Unlimited THEN d.ToAmount ELSE (d.ToAmount + 1) * e.Rate END AS ToAmount
 		FROM dbo.LA_DiscountGroupDetail d
 		INNER JOIN cte_Calculation c ON d.DiscountGroupId=c.DiscountGroupId
