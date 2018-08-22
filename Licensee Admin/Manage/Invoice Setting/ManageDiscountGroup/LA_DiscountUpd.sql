@@ -2,6 +2,10 @@
 USE bodb_licensee
 GO
 
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
+
 ALTER PROCEDURE [dbo].[LA_DiscountUpd]
 	@DiscountGroupId	SMALLINT = 0,
 	@DiscountGroupName	NVARCHAR(50),
