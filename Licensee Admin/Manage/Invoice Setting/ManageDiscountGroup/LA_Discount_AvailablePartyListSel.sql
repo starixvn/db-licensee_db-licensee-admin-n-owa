@@ -35,15 +35,14 @@ BEGIN
 	WHERE h.DiscountGroupType IN (1,3,11,13)
 		AND (@FromDate IS NULL OR @FromDate <= h.ToDate)
 		AND (@ToDate IS NULL OR @ToDate >= h.FromDate)
-
+		
 	--list of payer not in group
 	SELECT p.PartyId, PartyName, BrandName
 	FROM @PartyList p
-	WHERE p.PartyId NOT IN ( SELECT PartyId 
+	WHERE p.PartyId NOT IN (SELECT PartyId 
 							FROM @PartySettings
-							WHERE ProductId IN (SELECT val FROM bodb02.dbo.strSplit(@ProductIds, ',') ) )
+							WHERE ProductId IN (SELECT val FROM bodb02.dbo.strSplit(@ProductIds, ',') WHERE val != ''))
 			AND p.ParentId NOT IN (999, 0)
-			AND p.PartyId NOT IN (999)
 
 	UNION
 
@@ -56,6 +55,6 @@ BEGIN
 						AND NOT EXISTS (SELECT p2.PartyId 
 									FROM @PartySettings p2 
 									WHERE p2.PartyId = p1.PartyId AND DiscountGroupId != @GroupId 
-									AND ProductId IN (SELECT val FROM bodb02.dbo.strSplit(@ProductIds, ','))))
+									AND ProductId IN (SELECT val FROM bodb02.dbo.strSplit(@ProductIds, ',') WHERE val != '')))
 END
 GO
