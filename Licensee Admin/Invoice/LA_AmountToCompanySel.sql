@@ -252,9 +252,12 @@ BEGIN
 
 	-- 2.2 insert product don't have any ticket
 	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,Winloss,AmountToCompany)
-	SELECT DISTINCT PartyId,@ToDate,ProductId, 0, 0
-	FROM @PartyList INNER JOIN @ProductList ON 1=1
-	
+	SELECT DISTINCT PartyId,@ToDate,c.ProductId, 0, 0
+	FROM @PartyList p 
+	INNER JOIN @ProductList pd ON 1=1
+	INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON c.ProductID = pd.ProductID AND p.PartyId = c.FromParty
+	WHERE c.ToDate >= @FromDate  
+
 	-- 2.3 create result
 	SELECT a.PartyId,a.ProductId
 		,CAST(SUM(a.Winloss) AS MONEY) AS Winloss

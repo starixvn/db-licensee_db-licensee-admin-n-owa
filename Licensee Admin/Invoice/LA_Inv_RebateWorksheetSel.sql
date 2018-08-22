@@ -39,7 +39,9 @@ BEGIN
 	SELECT DISTINCT p.ProductID, p.ProductPrefix
 	FROM LA_f_Products3rd('') p
 	INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON c.ProductID = p.ProductID
-	WHERE c.FromParty = @PartyId AND c.ProductId NOT IN (1,23,13,14,17,31 ) --exclude RB,bettrade,NG2, MGCLC,MGCRNG,BX
+	WHERE c.FromParty = @PartyId 
+		AND c.ToDate >= @FromDate
+		AND c.ProductId NOT IN (1,23,13,14,17,31 ) --exclude RB,bettrade,NG2, MGCLC,MGCRNG,BX
 
 	-- Region: Party charge info
 	DECLARE @CB INT = 15, @CO INT = 25, @BA INT = 3
