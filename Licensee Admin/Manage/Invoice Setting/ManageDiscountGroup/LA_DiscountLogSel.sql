@@ -1,8 +1,8 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
-USE [bodb_licensee]
+/*<info serverAlias="DBLOG-bodb_CustomerLog" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+USE [bodb_CustomerLog]
 GO
 
-ALTER PROCEDURE [dbo].[LA_DiscountLogSel](
+CREATE PROCEDURE [dbo].[LA_DiscountLogSel](
 	@FromDate	DATE,
 	@ToDate		DATE,
 	@GroupId	INT = 0,
@@ -27,8 +27,8 @@ BEGIN
 	-- DiscountDel = 5518
 
 	SELECT l.LogId, l.LogDate, u.Username, l.ActionId, l.TypeId, l.Doing AS [Data]
-	FROM bodb_CustomerLog.dbo.UserLog_UserControl l WITH(NOLOCK)
-	INNER JOIN dbo.LA_User u WITH(NOLOCK) ON l.UserID = u.UserID
+	FROM dbo.UserLog_UserControl l WITH(NOLOCK)
+	INNER JOIN bodb_licensee.dbo.LA_User u WITH(NOLOCK) ON l.UserID = u.UserID
 	WHERE (@GroupId=0 OR l.CustID = @GroupId)
 		AND ((@ActionId=0 AND l.ActionID IN (5516,5517,5518)) OR l.ActionID = @ActionId)
 		AND CAST(l.LogDate AS DATE) BETWEEN @FromDate AND @ToDate
