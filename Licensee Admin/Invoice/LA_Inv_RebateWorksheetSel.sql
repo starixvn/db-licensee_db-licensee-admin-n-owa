@@ -171,7 +171,7 @@ BEGIN
 		JOIN @PartyChargeInfo AS ci ON cm.ProductID = @CB AND ci.TypeId = @CashInShareChargeType AND (td.rptDate BETWEEN ci.FromDate AND ci.ToDate)
 
 		INSERT INTO @Result(ProductId, AmountToCompany)
-		SELECT @CB, (Turnover - WinningPrize - Cashout - CommisionShare - CashInShare) * e.Rate
+		SELECT @CB, SUM((Turnover - WinningPrize - Cashout - CommisionShare - CashInShare) * e.Rate)
 		FROM #TempDataCB tcb
 		INNER JOIN #Exchange e ON tcb.rptDate = e.ExchangeDate AND tcb.CurrencyId = e.ExchangeID
 
@@ -197,7 +197,7 @@ BEGIN
 			GROUP BY b.Winlostdate, b.Currency
 		)
 		INSERT INTO @Result(ProductId, AmountToCompany)
-		SELECT @CO, (TicketsPayout - BuyBackAmountSB - BuyBackAmountBA - CashoutCommission) * e.Rate
+		SELECT @CO, SUM((TicketsPayout - BuyBackAmountSB - BuyBackAmountBA - CashoutCommission) * e.Rate)
 		FROM CO INNER JOIN #Exchange e ON CO.Winlostdate = e.ExchangeDate AND CO.Currency = e.ExchangeID
 		-- End region: include CO
 	END
@@ -222,7 +222,7 @@ BEGIN
 	FROM @Result rs
 	LEFT JOIN #AmountToCompany d ON d.ProductId = rs.ProductId
 
-	SELECT r.ProductId,r.AmountToCompany FROM @Result r
+	SELECT r.ProductId,ISNULL(r.AmountToCompany,0) FROM @Result r
 
 	DROP TABLE #Exchange
 	DROP TABLE #AmountToCompany
