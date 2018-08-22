@@ -2,7 +2,11 @@
 USE [bodb_CustomerLog]
 GO
 
-CREATE PROCEDURE [dbo].[LA_DiscountLogSel](
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
+
+ALTER PROCEDURE [dbo].[LA_DiscountLogSel](
 	@FromDate	DATE,
 	@ToDate		DATE,
 	@GroupId	INT = 0,
@@ -26,9 +30,8 @@ BEGIN
 	-- DiscountUpd = 5517
 	-- DiscountDel = 5518
 
-	SELECT l.LogId, l.LogDate, u.Username, l.ActionId, l.TypeId, l.Doing AS [Data]
+	SELECT l.LogId, l.LogDate, l.UserId, l.ActionId, l.TypeId, l.Doing AS [Data]
 	FROM dbo.UserLog_UserControl l WITH(NOLOCK)
-	INNER JOIN bodb_licensee.dbo.LA_User u WITH(NOLOCK) ON l.UserID = u.UserID
 	WHERE (@GroupId=0 OR l.CustID = @GroupId)
 		AND ((@ActionId=0 AND l.ActionID IN (5516,5517,5518)) OR l.ActionID = @ActionId)
 		AND CAST(l.LogDate AS DATE) BETWEEN @FromDate AND @ToDate
