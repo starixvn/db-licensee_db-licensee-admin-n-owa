@@ -228,7 +228,7 @@ BEGIN
 	FROM @Result rs
 	LEFT JOIN #AmountToCompany d ON d.ProductId = rs.ProductId
 
-	SELECT r.ProductId,ISNULL(r.AmountToCompany,0) FROM @Result r
+	SELECT r.ProductId,ISNULL(r.AmountToCompany,0) AmountToCompany FROM @Result r
 
 	DROP TABLE #Exchange
 	DROP TABLE #AmountToCompany
