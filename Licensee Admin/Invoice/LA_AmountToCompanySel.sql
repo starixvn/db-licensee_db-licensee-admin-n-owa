@@ -11,7 +11,8 @@ ALTER PROCEDURE [dbo].[LA_AmountToCompanySel] (
 	@ToDate			DATE,
 	@PartyIds		VARCHAR(4000) = '',
 	@ProductCodes	VARCHAR(1000) = '',
-	@BaseCurrency	VARCHAR(10) = 'EUR'
+	@BaseCurrency	VARCHAR(10) = 'EUR',
+	@CurrencyId		INT = 0
 )
 AS
 /*	Created: 20180703@Bruce
@@ -247,6 +248,7 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
+				AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId, p.ProductId
 	)
 
