@@ -214,6 +214,7 @@ BEGIN
 		END AS TurnoverOneworks,
 		r.LicensingFee
 	FROM r
+	WHERE r.Turnover != 0 OR r.WinLoss != 0 OR r.LicensingFee != 0
 	-- End region
 
 	-- Region: Drop tmp table
