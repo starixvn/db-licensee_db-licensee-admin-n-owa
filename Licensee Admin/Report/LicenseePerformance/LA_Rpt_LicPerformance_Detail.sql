@@ -209,13 +209,13 @@ BEGIN
 	--  Minimum fee is calculated for all currencies that licensee offer. There is no minimum fee when data display individual currency.
 		-- current month
 		INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,NegativeFee,Minfee,IsChargedByMinFee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark)
-		EXEC bodb_licensee.dbo.LA_AmountToCompanySel @FromDate,@ToDate,@PartyIds,@ProductCodes,@BaseCurrencyName,@BaseCurrency
+		EXEC bodb_licensee.dbo.LA_AmountToCompanySel @FromDate,@ToDate,@PartyIds,@ProductCodes,@BaseCurrencyName,@Currency
 
 		UPDATE #AmountToCompany SET IsCurrent = 1
 
 		-- previous month
 		INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,NegativeFee,Minfee,IsChargedByMinFee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark)
-		EXEC bodb_licensee.dbo.LA_AmountToCompanySel @PrevFromDate, @PrevToDate,@PartyIds,@ProductCodes,@BaseCurrencyName
+		EXEC bodb_licensee.dbo.LA_AmountToCompanySel @PrevFromDate, @PrevToDate,@PartyIds,@ProductCodes,@BaseCurrencyName,@Currency
 
 		UPDATE #AmountToCompany SET IsCurrent = 0 WHERE IsCurrent IS NULL
 	-- End region
