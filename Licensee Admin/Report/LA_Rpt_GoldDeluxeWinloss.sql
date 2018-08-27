@@ -132,7 +132,7 @@ BEGIN
 				s.IsPayToSupplier = 1 AND
 				s.ChargeType IN (@GrossWin, @CreditServiceCharge, @DepositServiceCharge)) -- @GrossWin for old setting 
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
-			  b.StatusId NOT IN (- 1, 101, 102, 103) AND
+			  b.StatusId NOT IN (- 1, 101, 102) AND
 			  b.CurrencyId <> 20 AND
 			  b.customercategory NOT IN (27,28)
 		GROUP BY b.rptDate, ci.PartyID, b.CurrencyID, ci.IsDeposit
