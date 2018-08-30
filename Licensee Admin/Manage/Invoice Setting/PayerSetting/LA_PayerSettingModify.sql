@@ -1,16 +1,14 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerSettingModify]
 	@PayerID				INT	
 	, @PayerGroupId			INT				= 0
-	, @DiscountGroupId		INT				= 0
-	, @RebateGroupId		INT				= 0
 	, @ChargeSettingXML		NVARCHAR (MAX)
 	, @MinFeeSettingXML		NVARCHAR (MAX)
 	, @WaiveSettingXML		NVARCHAR (MAX)
@@ -28,6 +26,8 @@ AS
 	 Revisions:     
 		- 20150918@Victor: Support Chinese on Settings
 		- 20170220@bruce: update payer settings [#70050]
+		- 20180706@bruce: enhance discount group [#94282]
+
 	 Params:				
 */
 BEGIN
@@ -58,40 +58,7 @@ BEGIN
 				RETURN
 			END
 	END
-	--Payer Discount
-	EXEC dbo.LA_PayerDiscountAssignmentModify
-		@PayerList			= @PayerID
-		, @DiscountGroupId	= @DiscountGroupId
-		, @UserID			= @UserID
-		, @Mode				= 'A'
-		, @LoginIP			= @LoginIP
-		, @ErrCode			= @ErrCode	OUTPUT
-		, @ErrMsg			= @ErrMsg	OUTPUT
-	IF @ErrCode <> 0 
-		BEGIN
-			--Rollback for payerGroup
-			IF (@OldPayerGroupId <> @DiscountGroupId AND @OldPayerGroupId = 0)
-				DELETE dbo.LA_PartyGroupAssignment WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID
-			RETURN
-		END
-	--Payer rebate
-	EXEC dbo.LA_PayerDiscountAssignmentModify
-		@PayerList			= @PayerID
-		, @DiscountGroupId	= @RebateGroupId
-		, @UserID			= @UserID
-		, @Mode				= 'A'
-		, @LoginIP			= @LoginIP
-		, @ErrCode			= @ErrCode	OUTPUT
-		, @ErrMsg			= @ErrMsg	OUTPUT
-	IF @ErrCode <> 0 
-		BEGIN
-			--Rollback for payerGroup
-			IF (@OldPayerGroupId <> @DiscountGroupId AND @OldPayerGroupId = 0)
-				DELETE dbo.LA_PartyGroupAssignment WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID
-			--Rollback discount
-			DELETE dbo.LA_DiscountGroupAssignment WITH (ROWLOCK, UPDLOCK) WHERE PartyID = @PayerID AND DiscountGroupId = @DiscountGroupId
-			RETURN
-		END
+
 	--Minfee
 	EXEC dbo.LA_MinFeeSettingModify
 		@PayerID				= @PayerID
@@ -104,12 +71,8 @@ BEGIN
 	IF @ErrCode <> 0 
 		BEGIN
 			--Rollback for payerGroup
-			IF (@OldPayerGroupId <> @DiscountGroupId AND @OldPayerGroupId = 0)
+			IF (@OldPayerGroupId = 0)
 				DELETE dbo.LA_PartyGroupAssignment WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID
-			--Rollback discount
-			DELETE dbo.LA_DiscountGroupAssignment WITH (ROWLOCK, UPDLOCK) WHERE PartyID = @PayerID AND DiscountGroupId = @DiscountGroupId
-			--Rollback rebate
-			DELETE dbo.LA_DiscountGroupAssignment WITH (ROWLOCK, UPDLOCK) WHERE PartyID = @PayerID AND DiscountGroupId = @RebateGroupId
 			RETURN
 		END
 	--Waive
@@ -124,12 +87,8 @@ BEGIN
 	IF @ErrCode <> 0 
 		BEGIN
 			--Rollback for payerGroup
-			IF (@OldPayerGroupId <> @DiscountGroupId AND @OldPayerGroupId = 0)
+			IF (@OldPayerGroupId = 0)
 				DELETE dbo.LA_PartyGroupAssignment WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID
-			--Rollback discount
-			DELETE dbo.LA_DiscountGroupAssignment WITH (ROWLOCK, UPDLOCK) WHERE PartyID = @PayerID AND DiscountGroupId = @DiscountGroupId
-			--Rollback rebate
-			DELETE dbo.LA_DiscountGroupAssignment WITH (ROWLOCK, UPDLOCK) WHERE PartyID = @PayerID AND DiscountGroupId = @RebateGroupId
 			--Rollback Minfee
 			IF ISNULL(@MinFeeInsertedList, 0) <> 0
 				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM bodb02.dbo.strSplit(@MinFeeInsertedList, ','))
@@ -147,12 +106,8 @@ BEGIN
 	IF @ErrCode <> 0 
 		BEGIN
 			--Rollback for payerGroup
-			IF (@OldPayerGroupId <> @DiscountGroupId AND @OldPayerGroupId = 0)
+			IF (@OldPayerGroupId = 0)
 				DELETE dbo.LA_PartyGroupAssignment WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID
-			--Rollback discount
-			DELETE dbo.LA_DiscountGroupAssignment WITH (ROWLOCK, UPDLOCK) WHERE PartyID = @PayerID AND DiscountGroupId = @DiscountGroupId
-			--Rollback rebate
-			DELETE dbo.LA_DiscountGroupAssignment WITH (ROWLOCK, UPDLOCK) WHERE PartyID = @PayerID AND DiscountGroupId = @RebateGroupId
 			--Rollback Minfee
 			IF ISNULL(@MinFeeInsertedList, 0) <> 0
 				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM bodb02.dbo.strSplit(@MinFeeInsertedList, ','))
