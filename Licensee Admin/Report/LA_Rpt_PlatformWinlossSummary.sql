@@ -19,15 +19,20 @@ AS
 		- 20170207@Bruce: exclude trial data and terminated [RedmindID: #60707]
 		- 20171219@Bruce: increase length for variables [#88197]\
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20180904@bruce: Support more platform type in Platform WL reports [#96191]
 
 	Explanation:
 		- Desktop: contain the followings:
-			Asia:	betfrom = d
-			China:	betfrom = a
-			Euro:	betfrom = e,u
+			Asia:		betfrom = d,g
+			China:		betfrom = a
+			Euro:		betfrom = e,u
+			New Asia:	betfrom = x
+			New China:	betfrom = y
+			New Euro:	betfrom = z
 		- Mobile: contain the followings:
 			WAP:	betfrom = m
 			Smart:	betfrom = s,l
+			Tablet: betfrom = r
 		- Other: betfrom is different from the aboves
 			=> use *
 */
@@ -86,7 +91,7 @@ BEGIN
 
 	-- #3: if data from moveBetsDay: get data from bettrans
 	-- else get data from rptWinLoss2
-	CREATE TABLE #Data (ReportDate DATETIME, CurrencyId INT, BetFrom NVARCHAR(1), Turnover MONEY, LicenseeWinLoss MONEY)
+	CREATE TABLE #Data (ReportDate DATETIME, CurrencyId INT, BetFrom NVARCHAR(1), Turnover DECIMAL(20,5), LicenseeWinLoss DECIMAL(20,5))
 
 	 -- get data from bettrans
 	IF @ToDate > @MoveBetsDay
@@ -97,7 +102,7 @@ BEGIN
 			SELECT
 				b.winlostdate,
 				l.CurrencyId,
-				CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END,
+				CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l', 'g', 'x', 'y', 'z', 'r') THEN b.betfrom ELSE '*' END,
 				SUM(b.stake),
 				SUM(-(b.winlost - b.actual_stake))
 			FROM dbo.bettrans b WITH (NOLOCK)
@@ -110,7 +115,7 @@ BEGIN
 					) -- SB bettypes
 				AND b.bettype NOT IN (901,902,903,904/*bettrade*/,911,912,913,914/*cashout*/)
 				AND NOT EXISTS (SELECT 1 FROM bodb_licensee.dbo.LicenseeBATransaction ba WITH(NOLOCK) WHERE b.transid = ba.transid)
-			GROUP BY b.winlostdate, l.CurrencyId, CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END
+			GROUP BY b.winlostdate, l.CurrencyId, CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l', 'g', 'x', 'y', 'z', 'r') THEN b.betfrom ELSE '*' END
 		)
 	END
 
@@ -123,7 +128,7 @@ BEGIN
 			SELECT
 				b.winlostdate,
 				l.CurrencyId,
-				CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END,
+				CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l', 'g', 'x', 'y', 'z', 'r') THEN b.betfrom ELSE '*' END,
 				SUM(b.turnover),
 				SUM(-b.winlost)
 			FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH ( NOLOCK )
@@ -134,7 +139,7 @@ BEGIN
 				AND b.statusID NOT IN (-1, 101, 102, 103)
 				AND b.bettype = 0 -- jobsum SB as 0
 				AND ISNULL(b.isBA,0) = 0
-			GROUP BY b.winlostdate, l.CurrencyId, CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END
+			GROUP BY b.winlostdate, l.CurrencyId, CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l', 'g', 'x', 'y', 'z', 'r') THEN b.betfrom ELSE '*' END
 		)
 	END
 
