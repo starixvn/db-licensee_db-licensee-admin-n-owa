@@ -167,15 +167,15 @@ BEGIN
 		SUM(CASE WHEN w.BetFrom IN ('m') THEN w.Turnover ELSE 0 END) TurnoverWap,
 		SUM(CASE WHEN w.BetFrom IN ('s','l') THEN w.Turnover ELSE 0 END) TurnoverSmart,
 		SUM(CASE WHEN w.BetFrom IN ('r') THEN w.Turnover ELSE 0 END) TurnoverTablet,
-		SUM(CASE WHEN w.BetFrom IN ('g','d') THEN w.Turnover ELSE 0 END) WinlossAsia,
-		SUM(CASE WHEN w.BetFrom IN ('a') THEN w.Turnover ELSE 0 END) WinlossChina,
-		SUM(CASE WHEN w.BetFrom IN ('e','u') THEN w.Turnover ELSE 0 END) WinlossEuro,
-		SUM(CASE WHEN w.BetFrom IN ('x') THEN w.Turnover ELSE 0 END) WinlossNewAsia,
-		SUM(CASE WHEN w.BetFrom IN ('y') THEN w.Turnover ELSE 0 END) WinlossNewChina,
-		SUM(CASE WHEN w.BetFrom IN ('z') THEN w.Turnover ELSE 0 END) WinlossNewEuro,
-		SUM(CASE WHEN w.BetFrom IN ('m') THEN w.Turnover ELSE 0 END) WinlossWap,
-		SUM(CASE WHEN w.BetFrom IN ('s','l') THEN w.Turnover ELSE 0 END) WinlossSmart,
-		SUM(CASE WHEN w.BetFrom IN ('r') THEN w.Turnover ELSE 0 END) WinlossTablet
+		SUM(CASE WHEN w.BetFrom IN ('g','d') THEN w.Winloss ELSE 0 END) WinlossAsia,
+		SUM(CASE WHEN w.BetFrom IN ('a') THEN w.Winloss ELSE 0 END) WinlossChina,
+		SUM(CASE WHEN w.BetFrom IN ('e','u') THEN w.Winloss ELSE 0 END) WinlossEuro,
+		SUM(CASE WHEN w.BetFrom IN ('x') THEN w.Winloss ELSE 0 END) WinlossNewAsia,
+		SUM(CASE WHEN w.BetFrom IN ('y') THEN w.Winloss ELSE 0 END) WinlossNewChina,
+		SUM(CASE WHEN w.BetFrom IN ('z') THEN w.Winloss ELSE 0 END) WinlossNewEuro,
+		SUM(CASE WHEN w.BetFrom IN ('m') THEN w.Winloss ELSE 0 END) WinlossWap,
+		SUM(CASE WHEN w.BetFrom IN ('s','l') THEN w.Winloss ELSE 0 END) WinlossSmart,
+		SUM(CASE WHEN w.BetFrom IN ('r') THEN w.Winloss ELSE 0 END) WinlossTablet
 	FROM #WinLoss w
 		INNER JOIN @ChargeInfo l ON w.LicenseeID = l.LicenseeId
 		INNER JOIN bodb_licensee..OAS_Party p ON l.PartyId = p.PartyID
