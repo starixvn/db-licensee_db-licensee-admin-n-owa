@@ -81,6 +81,7 @@ BEGIN
 	SELECT li.licenseeID, custID,currency, li.Fromdate, li.Todate
 	FROM  @ChargeInfo li
 		CROSS APPLY bodb_Licensee.dbo.f_SelLicenseeCust(li.licenseeID) lc
+	CREATE CLUSTERED INDEX ix_Cust_cl ON #Cust(CustId, Currency)
 
 	-- Get exchange rate info
 	CREATE TABLE #Exchange (ExchangeDate DATETIME, ExchangeID INT, CurrencyCode VARCHAR(10), Rate FLOAT)
@@ -163,7 +164,7 @@ BEGIN
 		SUM(CASE WHEN w.BetFrom IN ('x') THEN w.Turnover ELSE 0 END) TurnoverNewAsia,
 		SUM(CASE WHEN w.BetFrom IN ('y') THEN w.Turnover ELSE 0 END) TurnoverNewChina,
 		SUM(CASE WHEN w.BetFrom IN ('z') THEN w.Turnover ELSE 0 END) TurnoverNewEuro,
-		SUM(CASE WHEN w.BetFrom IN ('m') THEN w.Turnover ELSE 0 END) TurnoverWAP,
+		SUM(CASE WHEN w.BetFrom IN ('m') THEN w.Turnover ELSE 0 END) TurnoverWap,
 		SUM(CASE WHEN w.BetFrom IN ('s','l') THEN w.Turnover ELSE 0 END) TurnoverSmart,
 		SUM(CASE WHEN w.BetFrom IN ('r') THEN w.Turnover ELSE 0 END) TurnoverTablet,
 		SUM(CASE WHEN w.BetFrom IN ('g','d') THEN w.Turnover ELSE 0 END) WinlossAsia,
@@ -172,7 +173,7 @@ BEGIN
 		SUM(CASE WHEN w.BetFrom IN ('x') THEN w.Turnover ELSE 0 END) WinlossNewAsia,
 		SUM(CASE WHEN w.BetFrom IN ('y') THEN w.Turnover ELSE 0 END) WinlossNewChina,
 		SUM(CASE WHEN w.BetFrom IN ('z') THEN w.Turnover ELSE 0 END) WinlossNewEuro,
-		SUM(CASE WHEN w.BetFrom IN ('m') THEN w.Turnover ELSE 0 END) WinlossWAP,
+		SUM(CASE WHEN w.BetFrom IN ('m') THEN w.Turnover ELSE 0 END) WinlossWap,
 		SUM(CASE WHEN w.BetFrom IN ('s','l') THEN w.Turnover ELSE 0 END) WinlossSmart,
 		SUM(CASE WHEN w.BetFrom IN ('r') THEN w.Turnover ELSE 0 END) WinlossTablet
 	FROM #WinLoss w
