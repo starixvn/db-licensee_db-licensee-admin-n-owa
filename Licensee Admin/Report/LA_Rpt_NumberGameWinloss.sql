@@ -48,7 +48,7 @@ BEGIN
 	-- ​Pay to Supplier: equals 40% of [Licensing Fee]
 	INSERT INTO #ChargeRate
 	SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, 0.4, c.Fromdate, c.Todate
-	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'NG', 'OA') c
+	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'NG') c
 
 	SELECT DISTINCT ExchangeDate, ExchangeId, BaseCurrencyRate AS Rate
 	INTO #Exchange

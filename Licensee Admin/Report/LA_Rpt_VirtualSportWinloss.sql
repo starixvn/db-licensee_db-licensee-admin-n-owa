@@ -68,7 +68,7 @@ SET NOCOUNT ON
 	INSERT INTO @ChargeInfos(PartyId, ProductID, LicenseeId, IsDeposit, Rate, Fromdate, Todate)
 	(
 		SELECT c.PartyID, c.ProductID, c.LicenseeID, c.isDeposit,c.DI_Rate, c.Fromdate, c.Todate
-		FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'VS', 'OA') c 
+		FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'VS') c 
 	)	
 	
 	DELETE @ChargeInfos

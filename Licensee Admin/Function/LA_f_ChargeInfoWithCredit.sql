@@ -7,7 +7,6 @@ CREATE FUNCTION [dbo].[LA_f_ChargeInfoWithCredit] (
 	, @FromDate			DATETIME
 	, @ToDate			DATETIME
 	, @ProductCodes		VARCHAR(1000)
-	, @System			VARCHAR(10)		= 'OA'
 	)
 RETURNS @tbChargeInfo TABLE (
 	 ChargeID			INT
@@ -35,7 +34,7 @@ AS
 
 BEGIN
 	DECLARE @SystemID INT
-	SELECT @SystemID = id FROM dbo.Systems WITH (NOLOCK) WHERE SystemName = @System
+	SELECT @SystemID = id FROM dbo.Systems WITH (NOLOCK) WHERE SystemName = 'OA'
 
 	DECLARE @ProductTable TABLE (ProductID smallint, ProductPrefix varchar(20))
 	DECLARE @Bettype TABLE (ProductId smallint, BetTypeRef smallint, BetType smallint)

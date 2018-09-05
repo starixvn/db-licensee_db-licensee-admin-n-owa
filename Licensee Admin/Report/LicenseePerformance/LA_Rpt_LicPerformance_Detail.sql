@@ -170,7 +170,7 @@ BEGIN
 				ci.Fromdate,
 				ci.ToDate,
 				CASE WHEN ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
-		FROM	bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA') ci
+		FROM	bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, @ProductCodes) ci
 		LEFT JOIN bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype
 		WHERE	((ci.PartyID IN (25,30,324) AND DI_Rate = 0) OR DI_Rate > 0) AND ProductId <> 1 --exclude RB
 	)
@@ -181,7 +181,7 @@ BEGIN
 				ci.Fromdate,
 				ci.ToDate,
 				CASE WHEN ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
-		FROM	bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @PrevFromDate, @PrevToDate, @ProductCodes, 'OA') ci
+		FROM	bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @PrevFromDate, @PrevToDate, @ProductCodes) ci
 		LEFT JOIN bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype
 		WHERE	((ci.PartyID IN (25,30,324) AND DI_Rate = 0) OR DI_Rate > 0) AND ProductId <> 1 --exclude RB
 	)
