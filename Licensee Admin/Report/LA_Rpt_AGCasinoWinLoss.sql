@@ -20,6 +20,7 @@ AS
 	 - 20171219@Bruce: increase length for variables [#88197]
 	 - 20180302@Harper: Support SGD as base currency for AG WL report [RedmineID: #91339]
 	 - 20180716@bruce: add new group TEST for credit [#98126]
+	 - 20180628@Scofield: Update calculation formula for AG& GD report [#94283]
 	 
 	 Params:
 */
@@ -236,6 +237,10 @@ BEGIN
 			SUM(PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
+		
+		UPDATE @Total
+		SET PayToSupplier = 0
+		WHERE PayToSupplier < 0
 
 		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier)
 		SELECT Currency,
@@ -244,7 +249,7 @@ BEGIN
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(LicensingFee),
-			SUM(CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END)
+			SUM(PayToSupplier)
 		FROM @Total
 		WHERE Currency = @tempCurrency
 		GROUP BY Currency
@@ -314,8 +319,8 @@ BEGIN
 			CustomerWinLoss,
 			LicenseeWinLoss,
 			LicensingFee,
-			CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END PayToSupplier,
-			(LicensingFee - (CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END)) CompanyIncome
+			PayToSupplier,
+			(LicensingFee - PayToSupplier) CompanyIncome
 		FROM @Total t
 		WHERE Currency = @BaseCurrencyName
 	END
@@ -328,6 +333,7 @@ BEGIN
 END
 
 GO
+
 GRANT EXECUTE ON [dbo].[LA_Rpt_AGCasinoWinLoss] TO [bodbLicenseeNet] AS [dbo]
 GRANT EXECUTE ON [dbo].[LA_Rpt_AGCasinoWinLoss] TO [bodbAdminNet] AS [dbo]
 GO
