@@ -17,6 +17,7 @@ AS
 		- 20171219@Bruce: increase length for variables [#88197]
 		- 20180515@Scofield: Incorporate 9wickets data [#94950]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20180907@Parsons: Royalty fee updated for Keno& Lottery [#101168]
 		
 	 Params:
 */
@@ -50,7 +51,7 @@ BEGIN
 	INSERT INTO @ChargeInfos(PartyId, ProductID, LicenseeId, Rate, Rate3rd, Fromdate, Todate)
 	(
 		SELECT c.PartyID, c.ProductID, c.LicenseeID, c.DI_Rate,
-			CASE WHEN c.PartyId = 14 OR ISNULL(c.IsDeposit,0)=0 THEN 0.03 ELSE 0.05 END,
+			CASE WHEN c.PartyId = 14 OR ISNULL(c.IsDeposit,0)=0 OR @FromDate >= CAST('2018-8-1' AS DATETIME) THEN 0.03 ELSE 0.05 END,
 			c.Fromdate, c.Todate
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'LT', 'OA', 1) c
 
