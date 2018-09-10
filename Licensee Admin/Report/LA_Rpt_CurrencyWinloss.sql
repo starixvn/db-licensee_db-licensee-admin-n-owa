@@ -233,7 +233,7 @@ BEGIN
 		DELETE #Bettype WHERE ProductID IN (3,14,17,10,11,12,31)
 		DELETE #tmpParty WHERE ProductID IN (3,14,17,10,11,12,31)
 
-		SELECT b.BetCount, b.turnover,b.rptDate,b.CurrencyID,b.Bettype,b.[Status],b.winloss,b.WinlossA,b.CommissionA,b.commissionP,b.SiteID,b.leagueid,b.IsLive
+		SELECT b.BetCount,b.turnover,b.rptDate,b.CurrencyID,b.Bettype,b.[Status],b.winloss,b.WinlossA,b.CommissionA,b.commissionP,b.SiteID,b.leagueid,b.IsLive,bt.ProductId
 		INTO #Data
 		FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
 		INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
@@ -265,7 +265,7 @@ BEGIN
 					,SUM(CASE WHEN @drawfilter = 2 AND b.[Status] = 111 THEN 0 ELSE b.BetCount END) AS BetCount
 					,SUM(b.commissionP) AS commissionP
 			FROM #Data b
-			INNER JOIN #tmpParty p ON p.LicenseeID = b.SiteID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
+			INNER JOIN #tmpParty p ON p.LicenseeID = b.SiteID AND b.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId=b.ProductId
 			LEFT JOIN dbo.League l WITH(NOLOCK) ON b.leagueid = l.leagueid
 			WHERE b.CurrencyID<>20 AND
 					(@SportType = 0 OR (b.bettype NOT IN (9,29) AND (b.bettype NOT BETWEEN 31 AND 120) AND l.Sporttype = @Sporttype)) AND
