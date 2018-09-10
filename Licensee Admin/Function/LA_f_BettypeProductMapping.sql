@@ -33,6 +33,7 @@ AS
 		- 20171214@Sophia: #86640 - Add Exchange Citi Product
 		- 20180604@Bruce: #96383 - New Bettype range for VS2
 		- 20180420@Bruce: LA - Implement sum job for Pragmatic [RedmineId #93958]
+		- 20180910@Bruce: LA - Implement sum job for Poker & bullfighting [RedmineId #98487]		
 
 	Param's Explanation:
 
@@ -285,6 +286,24 @@ BEGIN
 	   SELECT typeid, 31
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 8000 AND 8099
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+    END
+	
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'BF')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 30
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid IN (1004)
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+    END
+	
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'PG')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 33
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 1401 AND 1499
 		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 	
