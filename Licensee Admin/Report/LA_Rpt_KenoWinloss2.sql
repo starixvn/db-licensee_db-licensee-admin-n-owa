@@ -18,6 +18,7 @@ AS
 	- 20171219@Bruce: increase length for variables [#88197]
 	- 20180515@Scofield: Incorporate 9wickets data [#94950]
 	- 20180716@bruce: add new group TEST for credit [#98126]
+	- 20180907@Parsons: Royalty fee updated for Keno& Lottery [#101168]
 
  Param's Explanation:
 	- @FromDate		: From date
@@ -139,7 +140,7 @@ BEGIN
 				s.MemberWL,
 				-s.MemberWL,
 				s.LicensingFee,
-				(-s.MemberWL) * (CASE WHEN g.PartyId IN (999, -1) THEN 0.03 ELSE 0.05 END)
+				(-s.MemberWL) * (CASE WHEN g.PartyId IN (@CreditGroupId, @12BetGroupId) OR @FromDate >= CAST('2018-8-1' AS DATETIME) THEN 0.03 ELSE 0.05 END)
 		FROM SumByDate s
 		INNER JOIN @PartyList p ON s.PartyId = p.PartyID
 		INNER JOIN @PartyList g ON p.ParentId = g.PartyId
