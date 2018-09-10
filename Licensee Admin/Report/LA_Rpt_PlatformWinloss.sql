@@ -42,6 +42,11 @@ BEGIN
 	IF DATEDIFF(MONTH,@FromDate,@ToDate) > 1
 		RETURN
 
+	-- supported betfrom
+	--
+	DECLARE @betfrom TABLE(betfrom CHAR(1))
+	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,s,l,g,x,y,z,r',',')
+
 	CREATE TABLE #WinLoss (
 		LicenseeID		INT,
 		Winlostdate		DATE,
@@ -116,7 +121,7 @@ BEGIN
 				AND (b.bettype<31 OR (b.bettype BETWEEN 121 AND 999) OR (b.Bettype BETWEEN 1301 and 1399)) --new tennis's bettypes
 				AND b.bettype NOT IN (901,902,903,904/*bettrade*/,911,912,913,914/*cashout*/)
 				AND ba.TransID IS NULL
-				AND b.betfrom IN ('d','a','e','u','m','s','l','g', 'x','y','z','r')
+				AND b.betfrom IN (SELECT bf.betfrom FROM @betfrom bf)
 			GROUP BY b.winlostdate, c.currency, c.LicenseeID,b.betfrom
 	END
 
@@ -145,7 +150,7 @@ BEGIN
 			AND b.bettype NOT IN (901,902,903,904/*bettrade*/,911,912,913,914/*cashout*/)
 			AND ISNULL(b.isBA,0) = 0
 			AND b.sporttype = 0
-			AND b.betfrom IN ('d','a','e','u','m','s','l','g', 'x','y','z','r')
+			AND b.betfrom IN (SELECT bf.betfrom FROM @betfrom bf)
 		GROUP BY
 			b.winlostdate,
 			b.currency,
