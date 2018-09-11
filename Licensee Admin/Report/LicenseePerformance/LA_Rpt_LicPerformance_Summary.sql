@@ -2,6 +2,10 @@
 USE [bodb02]
 GO
 
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
+
 ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_Summary]
 	 @PartyIDs			VARCHAR(4000)	= ''
 	, @Currency			INT				= 0

@@ -2,6 +2,10 @@
 USE bodb02
 GO
 
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
+
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss_Details] 
 	  @PartyID				INT
 	, @Currency				INT				= 0
