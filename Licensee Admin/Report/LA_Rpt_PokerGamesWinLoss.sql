@@ -21,7 +21,7 @@ AS
 		- 20180910@Scofield: Win loss reports for Poker Games & Bullfighting [#98487]
 	 Params:
 
-	 Explannation: EXEC LA_Rpt_PokerGamesWinLoss @BaseCurrencyName='EUR',@ToDate='2018-04-30 00:00:00',@PartyIds='14,15,25,30',@FromDate='2018-04-01 00:00:00'
+	 Explannation: EXEC LA_Rpt_PokerGamesWinLoss @BaseCurrencyName='EUR',@ToDate='2018-04-30 00:00:00',@PartyIds='25,30,324',@FromDate='2018-04-01 00:00:00'
 */
 BEGIN	
 	DECLARE @PGProductID INT = 33
@@ -40,8 +40,7 @@ BEGIN
 	INSERT INTO @ChargeInfos(PartyId, ProductID, LicenseeId, PayToSupplierRate, PayToExtraRate, CompanyIncomeRate, Fromdate, Todate)
 	(
 		SELECT c.PartyID, c.ProductID, c.LicenseeID, 0.04, 0.05, 0.06, c.Fromdate, c.Todate
-		--FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'PG', 'OA', 1) c		
-		FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'NG') c
+		FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'PG') c
 	)
 	-- End region
 
@@ -96,7 +95,8 @@ BEGIN
 		SUM((b.ExtraAmount / 10000 + b.ValidBetAmount) * ci.PayToExtraRate) AS PayToExtra,
 		SUM((b.ExtraAmount / 10000 + b.ValidBetAmount) * ci.CompanyIncomeRate) AS CompanyIncome		
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId 
+									AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 		INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate 
 		AND b.StatusId NOT IN (-1, 101, 102, 103) 
@@ -173,7 +173,8 @@ BEGIN
 				SUM(td.PayToExtra * e.BaseCurrencyRate) PayToExtra, 
 				SUM(td.CompanyIncome * e.BaseCurrencyRate) CompanyIncome
 			FROM #Result td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e 
-			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
+			ON e.ExchangeID = td.CurrencyId 
+				AND e.ExchangeDate = td.WinLossDate
 			GROUP BY td.ParentId, td.PartyId
 		)
 		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,GemBought,RakeAmount,InsuranceWinLoss,PayToSupplier,PayToExtra,CompanyIncome)
@@ -189,10 +190,6 @@ BEGIN
 			SUM(CompanyIncome)
 		FROM TotalByParty
 		GROUP BY ParentId
-		
-		--UPDATE @Total
-		--SET PayToSupplier = 0
-		--WHERE PayToSupplier < 0
 
 		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,GemBought,RakeAmount,InsuranceWinLoss,PayToSupplier,PayToExtra,CompanyIncome)
 		SELECT Currency,
@@ -241,7 +238,8 @@ BEGIN
 		r.PayToSupplier AS PayToSupplierOriginal,
 		r.PayToExtra AS PayToExtraOriginal,
 		r.CompanyIncome AS CompanyIncomeOriginal
-	FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
+	FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID 
+											AND e.ExchangeDate = r.WinLossDate
 
 	-- Grand Total
 	SELECT * FROM @GrandTotal
