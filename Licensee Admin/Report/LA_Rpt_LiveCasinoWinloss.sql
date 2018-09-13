@@ -2,6 +2,10 @@
 USE bodb02
 GO
 
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
+
 ALTER PROCEDURE [dbo].[LA_Rpt_LiveCasinoWinloss]
 	 @Partyids				VARCHAR(5500)
 	, @GameType				INT				= 0
@@ -9,7 +13,6 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LiveCasinoWinloss]
 	, @drawfilter			SMALLINT		= 0
 	, @FromDate				SMALLDATETIME
 	, @ToDate				SMALLDATETIME
-	, @excludeTest			BIT				= 0
 	, @IsConvert			BIT				= 1
 	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
 AS      
@@ -25,6 +28,7 @@ AS
 	- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	- 20171220@Parsons: increase length for variables [#88197]
 	- 20180716@bruce: add new group TEST for credit [#98126]
+	- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 	
  * Param's Explanation:    
  
@@ -52,7 +56,7 @@ BEGIN
 
     INSERT INTO #tmpParty
     SELECT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, DI_Rate, Fromdate, Todate
-    FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,'LC','OA',@ExcludeTest)
+    FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,'LC','OA',1)
 
 	
 	--For Deposit Licensees
@@ -83,7 +87,7 @@ BEGIN
 			INNER JOIN #tmpParty tp ON b.SiteID = tp.LicenseeID 			
 		WHERE b.rptDate BETWEEN tp.FromDate AND tp.ToDate
 			AND b.status NOT IN (-1, 101, 102, 103)
-			AND (@excludeTest = 0 OR (@excludeTest = 1 AND CurrencyID<>20))
+			AND (CurrencyID<>20)
 			AND ((bettype BETWEEN 1101 AND 1199 AND @GameType = 0) OR (bettype = @GameType))			
 			AND (@Currency = 0 OR  b.CurrencyID = @Currency)
 			AND b.customercategory NOT IN (27,28) 

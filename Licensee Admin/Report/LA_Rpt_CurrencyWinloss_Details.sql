@@ -2,6 +2,10 @@
 USE bodb02
 GO
 
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
+
 ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss_Details]
 	@PartyIDs			VARCHAR(5500)	= ''
 	, @Currency			INT				= 0
@@ -12,7 +16,6 @@ ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss_Details]
 	, @Bettype			INT				= 0
 	, @ReportBy			TINYINT			= 0
 	, @drawfilter		SMALLINT		= 1
-	, @excludeTest		BIT				= 0
 AS
 /*  Created: Florent.Nguyen
 	Date: 2014-09-04
@@ -30,11 +33,11 @@ AS
 	   - 20180515@Scofield: Incorporate 9wickets data [#94950]
 	   - 20180716@bruce: add new group TEST for credit [#98126]
 	   - 20180703@Parsons: Integrate Pragmatic Win Loss [#94108]
+	   - 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
 	  +	@drawfilter: 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
-	  + @excludeTest: remove currency UUS
 */
 BEGIN
 	SET NOCOUNT ON
@@ -98,7 +101,7 @@ BEGIN
 						CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END,
 						Fromdate, Todate,
 						CASE WHEN ci.ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
-		FROM		bodb_licensee.dbo.LA_f_ChargeInfo (@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', @ExcludeTest) ci
+		FROM		bodb_licensee.dbo.LA_f_ChargeInfo (@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
 		LEFT JOIN   bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype AND (
 					(ci.ProductId NOT IN (14,17)) OR 
 					(ci.ProductID = 14 AND sbr.Bettype BETWEEN 2001 AND 2007) OR
@@ -139,7 +142,7 @@ BEGIN
 			WHERE	(b.rptDate BETWEEN tp.Fromdate AND tp.ToDate) AND
 					 b.[Status] NOT IN (-1, 101, 102, 103) AND
 					(@Currency = 0 OR @Currency = b.CurrencyID) AND
-					(@excludeTest = 0 OR b.CurrencyID<>20) AND
+					(b.CurrencyID<>20) AND
 					(@SportType = 0 OR (b.bettype NOT IN (9,29) AND l.Sporttype = @SportType)) AND
 					((@ReportBy = 0) OR
 					 (@ReportBy = 1 AND b.IsLive=1 AND b.bettype NOT IN (9,29,10)) OR
@@ -173,7 +176,7 @@ BEGIN
 			WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate) AND
 					 b.StatusId NOT IN (-1, 101, 102, 103) AND
 					(@Currency = 0 OR @Currency = b.CurrencyID) AND
-					(@excludeTest = 0 OR b.CurrencyID<>20) AND
+					(b.CurrencyID<>20) AND
 					@SportType = 0 AND
 					@ReportBy = 0 AND
 					@Bettype = 0 AND
@@ -209,7 +212,7 @@ BEGIN
 			INNER JOIN #tmpParty p ON p.LicenseeId=b.SiteId AND p.Bettype=b.Bettype AND b.RptDate BETWEEN p.FromDate AND p.ToDate
 			LEFT JOIN dbo.League l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
 			WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
-				AND (@excludeTest = 0 OR b.CurrencyID<>20)
+				AND (b.CurrencyID<>20)
 				AND b.Status NOT IN (-1, 101, 102, 103)
 				AND (@Currency = 0 OR @Currency = b.CurrencyID)
 				AND (@SportType = 0 OR l.Sporttype = @SportType)
@@ -251,7 +254,7 @@ BEGIN
 			WHERE	(b.rptDate BETWEEN @Fromdate AND @ToDate) AND
 					 b.[Status] NOT IN (-1, 101, 102, 103) AND
 					(@Currency = 0 OR @Currency = b.CurrencyID) AND
-					(@excludeTest = 0 OR b.CurrencyID<>20) AND
+					(b.CurrencyID<>20) AND
 					(@SportType = 0 OR (b.bettype NOT IN (9,29) AND (b.bettype NOT BETWEEN 31 AND 120) AND l.Sporttype = @Sporttype)) AND
 					((@ReportBy = 0) OR
 					 (@ReportBy = 1 AND b.IsLive=1 AND b.bettype NOT IN (9,29,10,31,32,33)) OR

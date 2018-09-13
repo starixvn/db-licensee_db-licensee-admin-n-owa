@@ -2,6 +2,10 @@
 USE bodb02
 GO
 
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
+
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss_Details] 
 	  @PartyID				INT
 	, @Currency				INT				= 0
@@ -10,7 +14,6 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss_Details]
 	, @ProductCodes			VARCHAR(1000)	
 	, @ReportBy				TINYINT			= 1
 	, @DrawFilter			SMALLINT		= 1
-	, @ExcludeTest			BIT				= 0
 	, @IsConvert			BIT				= 0
 	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
 
@@ -30,13 +33,13 @@ AS
 	- 20180515@Scofield: Incorporate 9wickets data [#94950]
 	- 20180716@bruce: add new group TEST for credit [#98126]
 	- 20180703@Parsons: Integrate Pragmatic Win Loss [#94108]
+	- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
 		+ @Currency	:  0- All Currencies
 		+ @ReportBy: 1-Daily; 2-Monthly;  
 		+ @DrawFilter: 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
-		+ @excludeTest: add/remove currency UUS
 		+ @ProductCodes	: Products code :
 				. SB _ SportBook
 				. NG _ Number Game
@@ -64,7 +67,7 @@ BEGIN
 	SELECT DISTINCT PartyID, LicenseeID, ProductID, Bettype, 
 			CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END,
 			Fromdate, Todate
-	FROM bodb_licensee.dbo.LA_f_ChargeInfo (@PartyID, @FromDate, @ToDate, @ProductCodes, 'OA', @excludeTest)
+	FROM bodb_licensee.dbo.LA_f_ChargeInfo (@PartyID, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 	
 	INSERT INTO #Products(ProductID,ProductName)
 	SELECT DISTINCT Productid,ProductName
@@ -94,7 +97,7 @@ BEGIN
 				AND b.ProductID = 3
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
-				AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
+				AND (b.CurrencyID <> 20)
 				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
 			GROUP BY ci.PartyID, b.rptDate, b.ProductID, currencyID
 		)
@@ -167,7 +170,7 @@ BEGIN
 				AND b.ProductID IN (SELECT ProductId FROM #MicrogamingProducts)
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
-				AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
+				AND (b.CurrencyID <> 20)
 			GROUP BY ci.PartyID, b.rptDate, b.ProductID, currencyID, ci.BetTypeId
 		)
 		
@@ -220,7 +223,7 @@ BEGIN
 				AND b.ProductID = 1
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
-				AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
+				AND (b.CurrencyID <> 20)
 			GROUP BY ci.PartyID, b.rptDate, b.ProductID, currencyID
 		)
 		
@@ -257,16 +260,7 @@ BEGIN
 
 		INSERT INTO @CBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
 		SELECT PartyID,LicenseeID,DI_Rate,ChargeType,Fromdate,Todate
-		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyID,@FromDate,@ToDate,'CB','OA',@excludeTest)
-
-		-- Test Data
-		IF @excludeTest = 0
-		BEGIN	
-			UPDATE @CBShare SET TypeId = @CommChargeType WHERE Rate = 0 AND TypeId=1
-			INSERT INTO @CBShare(PartyId, LicenseeId, Rate, TypeId, FromDate, ToDate)
-			SELECT PartyId, LicenseeId, Rate, @CashInShareChargeType, FromDate, ToDate
-			FROM @CBShare WHERE Rate=0 AND TypeId=@CommChargeType
-		END
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyID,@FromDate,@ToDate,'CB','OA',1)		
 		-- End Region: Commision and Cash in share Rates
 
 		-- Region: Get Winloss Data
@@ -296,7 +290,7 @@ BEGIN
 		WHERE	ProductID = @CBProductId AND
 				CustomerCategory NOT IN (27, 28) AND
 				b.StatusId NOT IN (-1, 101, 102, 103) AND
-				(@ExcludeTest = 0 OR (@ExcludeTest = 1 AND b.CurrencyID <> 20)) AND
+				(b.CurrencyID <> 20) AND
 				(@Currency = 0 OR (@Currency <> 0 AND CurrencyId = @Currency)) AND
 				cb.TypeId = @CommChargeType -- to remove duplicate we use one of (6,7)
 		GROUP BY rptdate, CurrencyId
@@ -340,7 +334,7 @@ BEGIN
 					FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
 						INNER JOIN #ChargeInfo ci ON b.SiteId = ci.LicenseeID AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate AND b.ProductID = ci.ProductId					
 					WHERE b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate									
-						AND (@ExcludeTest = 0 OR (@ExcludeTest = 1 AND b.Currency <> 20))
+						AND (b.Currency <> 20)
 						AND(@Currency = 0 OR (@Currency <> 0 AND b.Currency = @Currency))
 						AND b.ProductID = @COProductId
 						AND b.RoleID = 1 -- Member
@@ -378,7 +372,7 @@ BEGIN
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN (0, @BTProductId)
 				WHERE b.RptDate BETWEEN ci.FromDate AND ci.ToDate
 					AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
-					AND (@ExcludeTest = 0 OR (@ExcludeTest = 1 AND b.CurrencyID <> 20))
+					AND (b.CurrencyID <> 20)
 					AND b.Status NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory IN (1001, 1002)
 				GROUP BY b.RptDate, b.CurrencyId
@@ -396,7 +390,7 @@ BEGIN
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (3)
 				WHERE b.RptDate BETWEEN ci.FromDate AND ci.ToDate
 					AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
-					AND (@ExcludeTest = 0 OR (@ExcludeTest = 1 AND b.CurrencyID <> 20))
+					AND (b.CurrencyID <> 20)
 					AND b.Status NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory = 1002 -- for BT BA
 				GROUP BY b.RptDate, b.CurrencyId
@@ -433,7 +427,7 @@ BEGIN
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
-				AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
+				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27,28)
 				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
 			GROUP BY b.rptDate, ci.PartyID, b.ProductID, b.CurrencyID

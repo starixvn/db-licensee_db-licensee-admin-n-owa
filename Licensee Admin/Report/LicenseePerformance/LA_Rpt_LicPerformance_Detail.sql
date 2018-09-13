@@ -17,7 +17,6 @@ ALTER PROCEDURE dbo.LA_Rpt_LicPerformance_Detail
 	, @BaseCurrency INT = 12
 	, @BaseCurrencyName VARCHAR(10) = 'GBP'
 	, @DrawFilter SMALLINT = 1
-	, @ExcludeTest BIT = 0
 AS
 /*	Created: 20141209@Patrick
 	Task: LicenseeAdmin - Get Licensee Performance Detail report
@@ -49,12 +48,12 @@ AS
 	    	- 20180703@Parsons: Integrate Pragmatic Win Loss [#94108]
 		- 20180712@Bruce: Enhance Manage Discount group [#94282]
 		- 20180718@Bruce: use decimal to void margin not match among reports [#94108]
+		- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
 	  + @Currency : 0-All Currencies
 	  + @drawfilter: 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
-	  + @excludeTest: remove currency UUS
 	  + @ProductCode : string,
 
 	  + @IsConvert: =1 : convert figure to
@@ -168,10 +167,10 @@ BEGIN
 	(
 		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, 
 				CASE WHEN ISNULL(ci.isDeposit, 0) = 1 THEN ci.DI_Rate ELSE 0 END,
-				CASE WHEN @ExcludeTest=1 THEN ci.Fromdate ELSE @Fromdate END, 	-- include trial data
-				CASE WHEN @ExcludeTest=1 THEN ci.ToDate ELSE @ToDate END,		-- include trial data
+				ci.Fromdate,
+				ci.ToDate,
 				CASE WHEN ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
-		FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', @ExcludeTest) ci
+		FROM	bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, @ProductCodes) ci
 		LEFT JOIN bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype
 		WHERE	((ci.PartyID IN (25,30,324) AND DI_Rate = 0) OR DI_Rate > 0) AND ProductId <> 1 --exclude RB
 	)
@@ -179,10 +178,10 @@ BEGIN
 	(
 		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, 
 				CASE WHEN ISNULL(ci.isDeposit, 0) = 1 THEN ci.DI_Rate ELSE 0 END,
-				CASE WHEN @ExcludeTest=1 THEN ci.Fromdate ELSE @PrevFromDate END,	-- include trial data
-				CASE WHEN @ExcludeTest=1 THEN ci.ToDate ELSE @PrevToDate END,		-- include trial data
+				ci.Fromdate,
+				ci.ToDate,
 				CASE WHEN ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
-		FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @PrevFromDate, @PrevToDate, @ProductCodes, 'OA', @ExcludeTest) ci
+		FROM	bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @PrevFromDate, @PrevToDate, @ProductCodes) ci
 		LEFT JOIN bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype
 		WHERE	((ci.PartyID IN (25,30,324) AND DI_Rate = 0) OR DI_Rate > 0) AND ProductId <> 1 --exclude RB
 	)
@@ -286,7 +285,7 @@ BEGIN
 													AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
 													AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
 		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate OR b.rptDate BETWEEN @PrevFromDate AND @PrevToDate)
-				AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
+				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
 				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund

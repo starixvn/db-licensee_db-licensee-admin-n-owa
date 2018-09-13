@@ -2,6 +2,10 @@
 USE [bodb02]
 GO
 
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
+
 ALTER PROCEDURE [dbo].[LA_Rpt_VirtualSportWinloss]
 	@PartyIDs				VARCHAR(5500)
 	, @FromDate				SMALLDATETIME
@@ -9,7 +13,6 @@ ALTER PROCEDURE [dbo].[LA_Rpt_VirtualSportWinloss]
 	, @SportType			INT			= 0
 	, @BetType				INT			= 0
 	, @drawfilter			SMALLINT	= 1
-	, @excludeTest			BIT			= 0
 	, @IsConvert			BIT			= 1
 	, @BaseCurrencyName		VARCHAR(10)	= 'EUR'
 AS
@@ -30,16 +33,14 @@ AS
 		- 20180301@Harper: Virtual Sports - Change of commercial terms between company and provider [RedmineID: #91255]
 		- 20180327@Harper: Add more Cozni as Parent Licensee [RedmineID: #85681]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 
  * Param's Explanation:
  *  - @FromDate   : From date
  *  - @ToDate   : To date
  *  - @Sporttype   : Sporttype
  *  - @BetList:  Bettype offered for Virtual sports (0:All Bettype)
- *  - @drawfilter:  'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
- *  - @excludeTest:
-			0 - Get all currency in date range from - to
-			1 - get only real currency from licensee_launch_date/from_date to to_date
+ *  - @drawfilter:  'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only) 
  */
 
 BEGIN
@@ -71,14 +72,11 @@ SET NOCOUNT ON
 	INSERT INTO @ChargeInfos(PartyId, ProductID, LicenseeId, IsDeposit, Rate, Fromdate, Todate)
 	(
 		SELECT c.PartyID, c.ProductID, c.LicenseeID, c.isDeposit,c.DI_Rate, c.Fromdate, c.Todate
-		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'VS', 'OA', 0) c 
-	)
+		FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'VS') c 
+	)	
 	
-	IF @excludeTest = 1
-	BEGIN
-		DELETE @ChargeInfos
-		WHERE IsDeposit = 1 AND Rate = 0
-	END	
+	DELETE @ChargeInfos
+	WHERE IsDeposit = 1 AND Rate = 0	
 	
 	DECLARE @PartyList AS TABLE (PartyId INT, PartyName	VARCHAR(100), BranchName VARCHAR(100), ParentId	INT)
 
@@ -105,35 +103,6 @@ SET NOCOUNT ON
 		UNION ALL
 		SELECT 999, 0, 5, 0.01, @FromDate, @ToDate
 	)	
-
-	IF @ExcludeTest = 0
-	BEGIN
-		;WITH affectedDate AS 
-		(
-			SELECT i.PartyID, i.ProductID, MIN (i.Fromdate) AS AffectedDate
-			FROM @Charge3rdInfos i
-			GROUP BY i.PartyID, i.ProductID						
-		)
-		INSERT INTO @Charge3rdInfos
-		        ( PartyID ,
-		          IsDeposit ,
-		          ProductID ,
-		          Rate ,
-		          Fromdate ,
-		          Todate
-		        )	
-		SELECT DISTINCT CASE WHEN c.PartyID IN (1, 11, 98, 9) THEN c.PartyID ELSE 999 END					
-					, CASE WHEN c.PartyID IN (1, 11, 98, 9) THEN 1 ELSE 0 END
-					, c.ProductID
-					, 0
-					, @FromDate
-					, CASE WHEN @ToDate >= DATEADD(D, - 1, ci.AffectedDate)
-							THEN DATEADD(D, - 1, ci.AffectedDate)
-					ELSE @ToDate END  
-		FROM @Charge3rdInfos c
-			LEFT JOIN affectedDate ci ON ci.PartyID = c.PartyID			
-		WHERE @FromDate < ci.AffectedDate
-	END
 
 	-- End Region: Charge 3rd
 
@@ -162,7 +131,7 @@ SET NOCOUNT ON
 			LEFT JOIN dbo.League l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.status NOT IN (-1, 101, 102, 103)
-			AND (@excludeTest = 0 OR (@excludeTest = 1 AND b.CurrencyID <> 20))
+			AND (b.CurrencyID <> 20)
 			AND b.bettype BETWEEN 1201 AND 1299
 			AND (@Sporttype = 0 OR ( @Sporttype<>0 AND l.Sporttype = @Sporttype))
 			AND (@bettype = 0 OR (b.bettype = @bettype AND @bettype <> 0))
