@@ -122,6 +122,7 @@ BEGIN
 				AND b.bettype NOT IN (901,902,903,904/*bettrade*/,911,912,913,914/*cashout*/)
 				AND ba.TransID IS NULL
 				AND b.betfrom IN (SELECT bf.betfrom FROM @betfrom bf)
+				AND b.currency <> 20
 			GROUP BY b.winlostdate, c.currency, c.LicenseeID,b.betfrom
 	END
 
@@ -151,6 +152,7 @@ BEGIN
 			AND ISNULL(b.isBA,0) = 0
 			AND b.sporttype = 0
 			AND b.betfrom IN (SELECT bf.betfrom FROM @betfrom bf)
+			AND b.currency <> 20
 		GROUP BY
 			b.winlostdate,
 			b.currency,
