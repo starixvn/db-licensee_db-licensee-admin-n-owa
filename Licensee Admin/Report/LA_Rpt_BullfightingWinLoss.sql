@@ -25,14 +25,14 @@ AS
 SET NOCOUNT ON
 BEGIN
 
-	DECLARE @ShareRate MONEY = 0.08
+	DECLARE @ShareRate DECIMAL(7, 5) = 0.08
 
 -- Region: Charge Info	
 	DECLARE @ChargeInfos AS TABLE (
 		PartyId		INT,
 		LicenseeId	INT,
 		ProductID	INT,
-		Rate		MONEY,
+		Rate		DECIMAL(7, 5),
 		FromDate	SMALLDATETIME,
 		ToDate		SMALLDATETIME)	
 	
@@ -58,6 +58,12 @@ BEGIN
 	FROM @PartyList p
 	WHERE NOT EXISTS (SELECT 1 FROM @ChargeInfos ci WHERE ci.PartyId = p.PartyId)
 	-- Endregion	
+
+	-- Region Bettype
+	CREATE TABLE #BettypeList  (Bettype SMALLINT, ProductId INT ) 
+	INSERT INTO #BettypeList (Bettype, ProductID)
+	SELECT bettype, ProductID FROM LA_f_BettypeProductMapping(0, 'BF')
+	-- Endregion
 
 	-- Region: #Result
 	CREATE TABLE #Result (
@@ -93,10 +99,10 @@ BEGIN
 		SUM(b.WinLoss * @ShareRate) - SUM(CommissionS * @ShareRate) AS PayToSupplier
 	FROM bodb_LicenseeReport..rpt_Betting b WITH (NOLOCK)
 		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
-		INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
+		INNER JOIN @PartyList p ON ci.PartyId = p.PartyId
+		INNER JOIN #BettypeList bt ON b.bettype = bt.Bettype
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
-		b.[Status] NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND 
-		b.Bettype = 1004 -- Bullfighting
+		b.[Status] NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20
 	GROUP BY b.rptDate, ci.PartyId, PartyName, ParentId, ParentName, b.CurrencyId
 	-- EndRegion #Result
 
@@ -219,8 +225,8 @@ BEGIN
 		(r.LicensingFee - r.PayToSupplier) AS CompanyIncomeOriginal
 	FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
 
-		-- Grand Total
-		SELECT * FROM @GrandTotal
+	-- Grand Total
+	SELECT * FROM @GrandTotal
 			
 	IF @BaseCurrencyName <> ''
 	BEGIN		
@@ -240,5 +246,8 @@ BEGIN
 	END
 	-- End Region
 
+	DROP TABLE #Exchange
+	DROP TABLE #Result
+	DROP TABLE #BettypeList
 END
 GO
