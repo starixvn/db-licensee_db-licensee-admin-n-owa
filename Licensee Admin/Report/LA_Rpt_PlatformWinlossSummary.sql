@@ -19,15 +19,20 @@ AS
 		- 20170207@Bruce: exclude trial data and terminated [RedmindID: #60707]
 		- 20171219@Bruce: increase length for variables [#88197]\
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20180904@bruce: Support more platform type in Platform WL reports [#96191]
 
 	Explanation:
 		- Desktop: contain the followings:
-			Asia:	betfrom = d
-			China:	betfrom = a
-			Euro:	betfrom = e,u
+			Asia:		betfrom = d,g
+			China:		betfrom = a
+			Euro:		betfrom = e,u
+			New Asia:	betfrom = x
+			New China:	betfrom = y
+			New Euro:	betfrom = z
 		- Mobile: contain the followings:
 			WAP:	betfrom = m
 			Smart:	betfrom = s,l
+			Tablet: betfrom = r
 		- Other: betfrom is different from the aboves
 			=> use *
 */
@@ -43,6 +48,11 @@ BEGIN
 			CAST(0 AS MONEY)		AS LicenseeWinLoss
 	RETURN
 	END
+
+	-- supported betfrom
+	--
+	DECLARE @betfrom TABLE(betfrom CHAR(1))
+	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,s,l,g,x,y,z,r',',')
 
 	-- #1: get licensee/customer and currency info
 	--
@@ -86,7 +96,7 @@ BEGIN
 
 	-- #3: if data from moveBetsDay: get data from bettrans
 	-- else get data from rptWinLoss2
-	CREATE TABLE #Data (ReportDate DATETIME, CurrencyId INT, BetFrom NVARCHAR(1), Turnover MONEY, LicenseeWinLoss MONEY)
+	CREATE TABLE #Data (ReportDate DATETIME, CurrencyId INT, BetFrom NVARCHAR(1), Turnover DECIMAL(20,5), LicenseeWinLoss DECIMAL(20,5))
 
 	 -- get data from bettrans
 	IF @ToDate > @MoveBetsDay
@@ -97,11 +107,12 @@ BEGIN
 			SELECT
 				b.winlostdate,
 				l.CurrencyId,
-				CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END,
+				ISNULL(b.betfrom,'*'),
 				SUM(b.stake),
 				SUM(-(b.winlost - b.actual_stake))
 			FROM dbo.bettrans b WITH (NOLOCK)
 				INNER JOIN #LicenseeCustInfo l ON l.CustId=b.recommend AND b.currency=l.CurrencyId AND b.winlostdate BETWEEN l.Fromdate AND l.Todate
+				LEFT JOIN @betfrom bf ON bf.betfrom=b.betfrom
 			WHERE b.statusID IN (111, 112, 113)
 				AND b.winlostdate BETWEEN @FromDate AND @ToDate
 				AND (b.bettype < 31
@@ -110,7 +121,7 @@ BEGIN
 					) -- SB bettypes
 				AND b.bettype NOT IN (901,902,903,904/*bettrade*/,911,912,913,914/*cashout*/)
 				AND NOT EXISTS (SELECT 1 FROM bodb_licensee.dbo.LicenseeBATransaction ba WITH(NOLOCK) WHERE b.transid = ba.transid)
-			GROUP BY b.winlostdate, l.CurrencyId, CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END
+			GROUP BY b.winlostdate, l.CurrencyId,ISNULL(b.betfrom,'*')
 		)
 	END
 
@@ -123,18 +134,19 @@ BEGIN
 			SELECT
 				b.winlostdate,
 				l.CurrencyId,
-				CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END,
+				ISNULL(b.betfrom,'*'),
 				SUM(b.turnover),
 				SUM(-b.winlost)
 			FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH ( NOLOCK )
 			INNER JOIN #LicenseeCustInfo l ON b.CustId = l.CustId AND b.Currency = l.CurrencyId AND b.winlostdate BETWEEN l.Fromdate AND l.Todate
+			LEFT JOIN @betfrom bf ON bf.betfrom=b.betfrom
 			WHERE b.Winlostdate BETWEEN @FromDate AND @TempToDate
 				AND b.sporttype = 0 -- jobsum SB as 0
 				AND b.roleid = 2 -- Sum on agent for better performance
 				AND b.statusID NOT IN (-1, 101, 102, 103)
 				AND b.bettype = 0 -- jobsum SB as 0
 				AND ISNULL(b.isBA,0) = 0
-			GROUP BY b.winlostdate, l.CurrencyId, CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END
+			GROUP BY b.winlostdate, l.CurrencyId,ISNULL(b.betfrom,'*')
 		)
 	END
 

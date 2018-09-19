@@ -18,14 +18,19 @@ AS
 							exclude trial data and terminated
 		- 20171219@Bruce: increase length for variables [#88197]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20180904@bruce: Support more platform type in Platform WL reports [#96191]
 
 	Explanation:
 	  + @PlatformType: 0: All
-					   1: Asia (d)
+					   1: Asia (d,g)
 					   2: China (a)
 					   3: Euro (e) (and Euro 12bet (u))
-					   4: WAP (m)
-					   5: SMARTPHONE (s,l)
+					   4: New Asia (x)
+					   5: New China (y)
+					   6: New Euro (z)
+					   7: WAP (m)
+					   8: SMARTPHONE (s,l)
+					   9: Tablet (r)
 
 	  + @excludeTest: remove currency UUS
 	  + @MoveBetsDay: The day we move tickets to bettrans14
@@ -37,20 +42,18 @@ BEGIN
 	IF DATEDIFF(MONTH,@FromDate,@ToDate) > 1
 		RETURN
 
+	-- supported betfrom
+	--
+	DECLARE @betfrom TABLE(betfrom CHAR(1))
+	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,s,l,g,x,y,z,r',',')
+
 	CREATE TABLE #WinLoss (
 		LicenseeID		INT,
 		Winlostdate		DATE,
 		CurrencyId		INT,
-		TurnoverAsia	MONEY,
-		WinlossAsia		MONEY,
-		TurnoverChina	MONEY,
-		WinlossChina	MONEY,
-		TurnoverEuro	MONEY,
-		WinlossEuro		MONEY,
-		TurnoverWap		MONEY,
-		WinlossWap		MONEY,
-		TurnoverSmart	MONEY,
-		WinlossSmart	MONEY
+		Turnover		DECIMAL(20,5),
+		Winloss			DECIMAL(20,5),
+		BetFrom			NVARCHAR(5)
 	)
 
 	DECLARE @MoveBetsDay SMALLDATETIME
@@ -60,48 +63,46 @@ BEGIN
 	DECLARE @FDate SMALLDATETIME
 	DECLARE @TDate SMALLDATETIME
 
-	CREATE TABLE #tempAg	(LicenseeID INT, custID INT, Currency INT, FromDate SMALLDATETIME, ToDate SMALLDATETIME)
-	DECLARE @tempDate TABLE (BalanceUpDay DATETIME, MoveBetsDay DATETIME)
+	-- balance update
+	--
+	DECLARE @BalanceUpDay TABLE (BalanceUpDay DATETIME, MoveBetsDay DATETIME)
+	INSERT INTO @BalanceUpDay
+	EXEC dbo.Lrf_SelBalanceUpDay
 
-	INSERT INTO @tempDate
-	EXEC Lrf_SelBalanceUpDay
-
-	SELECT @MoveBetsDay = (SELECT MoveBetsDay FROM @tempDate)
+	SELECT @MoveBetsDay = (SELECT MoveBetsDay FROM @BalanceUpDay)
 
 	--  Charge Info
-	DECLARE @LicenseeInfo AS TABLE (
-		PartyId		INT,
-		LicenseeId	INT,
-		Fromdate DATETIME,
-		Todate DATETIME
-	)
-
-	INSERT INTO @LicenseeInfo(PartyId, LicenseeId, Fromdate, Todate)
+	--
+	DECLARE @ChargeInfo AS TABLE (PartyId INT, LicenseeId INT, Fromdate DATETIME, Todate DATETIME)
+	INSERT INTO @ChargeInfo(PartyId, LicenseeId, Fromdate, Todate)
 	(
-		SELECT	PartyID, LicenseeID, Fromdate, Todate
-		FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'SB', 'OA', 1)
+		SELECT PartyID, LicenseeID, Fromdate, Todate
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'SB', 'OA', 1)
 	)
 
-	SELECT @FDate=@FromDate,@TDate=@ToDate
+	SELECT @FDate = @FromDate, @TDate = @ToDate
 
-	INSERT INTO #tempAg (LicenseeID, custID,currency, FromDate, ToDate)
-	SELECT li.licenseeID, custID,currency, li.Fromdate, li.Todate
-	FROM  @LicenseeInfo li
-		CROSS APPLY bodb_Licensee.dbo.f_SelLicenseeCust(li.licenseeID) lc
+	-- cust info
+	--
+	CREATE TABLE #Cust (LicenseeID INT, custID INT, Currency INT)
+	INSERT INTO #Cust (LicenseeID, custID, currency)
+	(
+		SELECT DISTINCT li.licenseeID, custID,currency
+		FROM @ChargeInfo li CROSS APPLY bodb_Licensee.dbo.f_SelLicenseeCust(li.licenseeID) lc
+		WHERE li.LicenseeId IS NOT NULL
+	)
+	CREATE CLUSTERED INDEX ix_Cust_cl ON #Cust(CustId, Currency)
 
 	-- Get exchange rate info
-	CREATE TABLE #Exchange (
-		ExchangeDate	DATETIME,
-		ExchangeID		INT,
-		CurrencyCode	VARCHAR(10),
-		Rate			FLOAT
+	CREATE TABLE #Exchange (ExchangeDate DATETIME, ExchangeID INT, CurrencyCode VARCHAR(10), Rate FLOAT)
+	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
+	(
+		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
+		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrency)
 	)
 
-	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrency)
-
-	-- Get data.
+	-- Get data: bettrans
+	--
 	IF @TDate>@MoveBetsDay
 	BEGIN
 		IF @FDate <= @MoveBetsDay
@@ -109,86 +110,30 @@ BEGIN
 		ELSE
 			SET @TempFromDate = @FDate
 
-		INSERT INTO #WinLoss (LicenseeID, Winlostdate, CurrencyId, TurnoverAsia, TurnoverChina, TurnoverEuro, TurnoverWap, TurnoverSmart, WinlossAsia, WinlossChina, WinlossEuro, WinlossWap, WinlossSmart)
+		INSERT INTO #WinLoss (LicenseeID, Winlostdate, CurrencyId, Turnover, Winloss, BetFrom)
 		SELECT
-			tma.LicenseeID,
+			c.LicenseeID,
 			b.winlostdate,
-			tma.currency,
-			SUM(
-				CASE
-					WHEN b.betfrom = 'd' THEN CASE WHEN b.bettype in (33,43) AND b.liveawayscore=0 THEN b.stake/2 ELSE b.stake END
-					ELSE 0
-				END
-			) TurnoverAsia,
-			SUM(
-				CASE
-					WHEN b.betfrom = 'a' THEN CASE WHEN b.bettype in (33,43) AND b.liveawayscore=0 THEN b.stake/2 ELSE b.stake END
-					ELSE 0
-				END
-			) TurnoverChina,
-			SUM(
-				CASE
-					WHEN b.betfrom IN ('e', 'u') THEN CASE WHEN b.bettype in (33,43) AND b.liveawayscore=0 THEN b.stake/2 ELSE b.stake END
-					ELSE 0
-				END
-			) TurnoverEuro,
-			SUM(
-				CASE
-					WHEN b.betfrom = 'm' THEN CASE WHEN b.bettype in (33,43) AND b.liveawayscore=0 THEN b.stake/2 ELSE b.stake END
-					ELSE 0
-				END
-			) TurnoverWap,
-			SUM(
-				CASE
-					WHEN b.betfrom IN ('s','l') THEN CASE WHEN b.bettype in (33,43) AND b.liveawayscore=0 THEN b.stake/2 ELSE b.stake END
-					ELSE 0
-				END
-			) TurnoverSmart,
-
-			-SUM(
-				CASE
-					WHEN b.betfrom = 'd' THEN CASE WHEN (b.bettype NOT BETWEEN 31 AND 33)  THEN (b.winlost - b.actual_stake) ELSE 0 END
-					ELSE 0
-				END
-			) WinlossAsia,
-			-SUM(
-				CASE
-					WHEN b.betfrom = 'a' THEN CASE WHEN (b.bettype NOT BETWEEN 31 AND 33)  THEN (b.winlost - b.actual_stake) ELSE 0 END
-					ELSE 0
-				END
-			) WinlossChina,
-			-SUM(
-				CASE
-					WHEN b.betfrom IN ('e', 'u') THEN CASE WHEN (b.bettype NOT BETWEEN 31 AND 33)  THEN (b.winlost - b.actual_stake) ELSE 0 END
-					ELSE 0
-				END
-			) WinlossEuro,
-			-SUM(
-				CASE
-					WHEN b.betfrom = 'm' THEN CASE WHEN (b.bettype NOT BETWEEN 31 AND 33)  THEN (b.winlost - b.actual_stake) ELSE 0 END
-					ELSE 0
-				END
-			) WinlossWap,
-			-SUM(
-				CASE
-					WHEN b.betfrom IN ('s','l') THEN CASE WHEN (b.bettype NOT BETWEEN 31 AND 33)  THEN (b.winlost - b.actual_stake) ELSE 0 END
-					ELSE 0
-				END
-			) WinlossSmart
+			c.currency,
+			SUM(CASE WHEN b.bettype IN (33,43) AND b.liveawayscore=0 THEN b.stake/2 ELSE b.stake END),
+			SUM(CASE WHEN (b.bettype NOT BETWEEN 31 AND 33) THEN -(b.winlost - b.actual_stake) ELSE 0 END),
+			b.betfrom
 			FROM dbo.bettrans b WITH (NOLOCK)
-				INNER JOIN #tempAg tma ON tma.CustID=b.recommend  AND b.currency = tma.currency
-											AND b.winlostdate BETWEEN tma.FromDate AND tma.ToDate
+			INNER JOIN #Cust c ON c.CustID = b.recommend AND b.currency = c.currency
+			LEFT JOIN bodb_licensee.dbo.LicenseeBATransaction ba WITH(NOLOCK) ON b.transid = ba.transid
 			WHERE
 				b.statusID  IN (111, 112, 113)
 				AND b.winlostdate BETWEEN @TempFromDate AND @TDate
-				AND (b.bettype<31 OR (b.bettype BETWEEN 121 AND 999)
-								  OR (b.Bettype BETWEEN 1301 and 1399) --new tennis's bettypes
-				)
+				AND (b.bettype<31 OR (b.bettype BETWEEN 121 AND 999) OR (b.Bettype BETWEEN 1301 and 1399)) --new tennis's bettypes
 				AND b.bettype NOT IN (901,902,903,904/*bettrade*/,911,912,913,914/*cashout*/)
-				AND NOT EXISTS (SELECT 1 FROM bodb_licensee.dbo.LicenseeBATransaction ba WITH(NOLOCK) WHERE b.transid = ba.transid)
-			GROUP BY  b.winlostdate, tma.currency, tma.LicenseeID
+				AND ba.TransID IS NULL
+				AND b.betfrom IN (SELECT bf.betfrom FROM @betfrom bf)
+				AND b.currency <> 20
+			GROUP BY b.winlostdate, c.currency, c.LicenseeID, b.betfrom
 	END
 
+	-- get data: rptLicWinloss2
+	--
 	IF @FDate <= @MoveBetsDay
 	BEGIN
 		IF @TDate >= @MoveBetsDay
@@ -196,74 +141,16 @@ BEGIN
 		ELSE
 			SET  @TempToDate = @TDate
 
-		INSERT INTO #WinLoss (LicenseeID, Winlostdate, CurrencyId, TurnoverAsia, TurnoverChina, TurnoverEuro, TurnoverWap, TurnoverSmart, WinlossAsia, WinlossChina, WinlossEuro, WinlossWap, WinlossSmart)
+		INSERT INTO #WinLoss (LicenseeID, Winlostdate, CurrencyId, Turnover, Winloss, BetFrom)
 		SELECT
 			ag.LicenseeID,
 			b.winlostdate,
 			ag.currency,
-			SUM(
-				CASE
-					WHEN b.betfrom = 'd' THEN b.turnover
-					ELSE 0
-				END
-			) TurnoverAsia,
-			SUM(
-				CASE
-					WHEN b.betfrom = 'a' THEN b.turnover
-					ELSE 0
-				END
-			) TurnoverChina,
-			SUM(
-				CASE
-					WHEN b.betfrom IN ('e', 'u') THEN b.turnover
-					ELSE 0
-				END
-			) TurnoverEuro,
-			SUM(
-				CASE
-					WHEN b.betfrom = 'm' THEN b.turnover
-					ELSE 0
-				END
-			) TurnoverWap,
-			SUM(
-				CASE
-					WHEN b.betfrom IN ('s','l') THEN b.turnover
-					ELSE 0
-				END
-			) TurnoverSmart,
-
-			-SUM(
-				CASE
-					WHEN b.betfrom = 'd' THEN CASE WHEN (b.sporttype <> 151)  THEN b.winlost ELSE 0 END
-					ELSE 0
-				END
-			) WinlossAsia,
-			-SUM(
-				CASE
-					WHEN b.betfrom = 'a' THEN CASE WHEN (b.sporttype <> 151)  THEN b.winlost ELSE 0 END
-					ELSE 0
-				END
-			) WinlossChina,
-			-SUM(
-				CASE
-					WHEN b.betfrom IN ('e', 'u') THEN CASE WHEN (b.sporttype <> 151)  THEN b.winlost ELSE 0 END
-					ELSE 0
-				END
-			) WinlossEuro,
-			-SUM(
-				CASE
-					WHEN b.betfrom = 'm' THEN CASE WHEN (b.sporttype <> 151)  THEN b.winlost ELSE 0 END
-					ELSE 0
-				END
-			) WinlossWap,
-			-SUM(
-				CASE
-					WHEN b.betfrom IN ('s','l') THEN CASE WHEN (b.sporttype <> 151)  THEN b.winlost ELSE 0 END
-					ELSE 0
-				END
-			) WinlossSmart
+			SUM(b.turnover),
+			SUM( CASE WHEN (b.sporttype <> 151) THEN -b.winlost ELSE 0 END),
+			b.betfrom
 		FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH ( NOLOCK )
-			INNER JOIN #tempAg ag ON b.CustId = ag.CustId AND b.Currency = ag.Currency AND b.winlostdate BETWEEN ag.FromDate AND ag.ToDate
+			INNER JOIN #Cust ag ON b.CustId = ag.CustId AND b.Currency = ag.Currency
 		WHERE
 			b.Winlostdate BETWEEN @FDate AND @TempToDate
 			AND b.roleid = 2
@@ -271,42 +158,55 @@ BEGIN
 			AND b.bettype NOT IN (901,902,903,904/*bettrade*/,911,912,913,914/*cashout*/)
 			AND ISNULL(b.isBA,0) = 0
 			AND b.sporttype = 0
+			AND b.betfrom IN (SELECT bf.betfrom FROM @betfrom bf)
+			AND b.currency <> 20
 		GROUP BY
 			b.winlostdate,
-			b.currency,
 			ag.LicenseeID,
-			ag.Currency
+			ag.Currency,
+			b.betfrom
 	END
 
 	SELECT
 		p.PartyName,
 		w.LicenseeID,
 		w.Winlostdate,
-		SUM(w.TurnoverAsia * e.Rate) TurnoverAsia,
-		SUM(w.TurnoverChina * e.Rate) TurnoverChina,
-		SUM(w.TurnoverEuro * e.Rate) TurnoverEuro,
-		SUM(w.TurnoverWap * e.Rate) TurnoverWap,
-		SUM(w.TurnoverSmart * e.Rate) TurnoverSmart,
-		SUM(w.WinlossAsia * e.Rate) WinlossAsia,
-		SUM(w.WinlossChina * e.Rate) WinlossChina,
-		SUM(w.WinlossEuro * e.Rate) WinlossEuro,
-		SUM(w.WinlossWap * e.Rate) WinlossWap,
-		SUM(w.WinlossSmart * e.Rate) WinlossSmart
+		CAST(SUM(CASE WHEN w.BetFrom IN ('g','d') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverAsia,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('a') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverChina,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('e','u') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverEuro,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('x') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverNewAsia,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('y') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverNewChina,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('z') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverNewEuro,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('m') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverWap,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('s','l') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverSmart,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('r') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverTablet,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('g','d') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossAsia,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('a') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossChina,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('e','u') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossEuro,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('x') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossNewAsia,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('y') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossNewChina,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('z') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossNewEuro,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('m') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossWap,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('s','l') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossSmart,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('r') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossTablet
 	FROM #WinLoss w
-		INNER JOIN #Exchange e ON w.CurrencyId = e.ExchangeID AND w.Winlostdate = e.ExchangeDate
-		INNER JOIN @LicenseeInfo l ON w.LicenseeID = l.LicenseeId
+		INNER JOIN #Exchange e ON e.ExchangeDate = w.Winlostdate and w.CurrencyId = e.ExchangeID
+		INNER JOIN @ChargeInfo l ON w.LicenseeID = l.LicenseeId AND w.Winlostdate BETWEEN l.Fromdate AND l.Todate
 		INNER JOIN bodb_licensee..OAS_Party p ON l.PartyId = p.PartyID
 	GROUP BY w.LicenseeID, w.Winlostdate,p.PartyName
 	ORDER BY w.LicenseeID, w.Winlostdate
 
 	DROP TABLE #Exchange
 	DROP TABLE #WinLoss
-	DROP TABLE #tempAg
+	DROP TABLE #Cust
 END
-
 GO
+
 GRANT EXECUTE ON [dbo].[LA_Rpt_PlatformWinloss] TO [bodbLicenseeNet] AS [dbo]
+GO
+
 GRANT EXECUTE ON [dbo].[LA_Rpt_PlatformWinloss] TO [bodbAdminNet] AS [dbo]
 GO
+
 GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_PlatformWinloss] TO [vnteam] AS [dbo]
 GO
