@@ -204,6 +204,10 @@ BEGIN
 		IsChargedByMinFee	BIT,
 		IsCurrent			BIT
 	)
+	IF(@IsConvert = 0)
+	BEGIN
+		SELECT @BaseCurrencyName = e.Code FROM bodb02.dbo.Exchange e WITH (NOLOCK) WHERE e.exchangeid = @Currency
+	END
 
 	--  Minimum fee is calculated for all currencies that licensee offer. There is no minimum fee when data display individual currency.
 		-- current month
