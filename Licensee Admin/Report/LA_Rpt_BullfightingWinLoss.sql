@@ -86,11 +86,11 @@ BEGIN
 		SUM(b.Turnover)				AS Turnover,
 		SUM(b.BetCount)				AS TotalTrans,
 		SUM(b.WinLoss)				AS CustomerWinLoss,
-		SUM(b.WinLoss * @ShareRate) AS WinLossShare,
+		SUM(-b.WinLoss * @ShareRate) AS WinLossShare,
 		SUM(CommissionS) AS CommissionGiven,
 		SUM((CommissionS * @ShareRate) / (1 - oddsspread)) AS CommissionShare,
 		SUM(b.WinLoss * ci.Rate) AS LicensingFee,
-		SUM(b.WinLoss * @ShareRate) - SUM(CommissionS * @ShareRate) AS PayToSupplier
+		SUM(-b.WinLoss * @ShareRate) - SUM((CommissionS * @ShareRate) / (1 - oddsspread)) AS PayToSupplier
 	FROM bodb_LicenseeReport..rpt_Betting b WITH (NOLOCK)
 		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 		INNER JOIN @PartyList p ON ci.PartyId = p.PartyId
