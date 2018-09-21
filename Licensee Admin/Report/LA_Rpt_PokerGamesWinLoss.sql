@@ -88,12 +88,12 @@ BEGIN
 		SUM(b.Turnover) AS Turnover,
 		SUM(b.BetCount) AS TotalTrans,
 		SUM(b.MemberWL) AS CustomerWinLoss,
-		SUM(CASE WHEN b.Bettype = 1499 THEN b.ExtraAmount / 10000 ELSE 0 END) AS GemBought,
+		SUM(CASE WHEN b.Bettype = 1499 THEN -b.ExtraAmount / 10000 ELSE 0 END) AS GemBought,
 		SUM(b.ValidBetAmount) AS RakeAmount,
-		SUM(CASE WHEN b.Bettype <> 1499 THEN b.ExtraAmount / 10000 ELSE 0 END) AS InsuranceWinLoss,
-		SUM((b.ExtraAmount / 10000 + b.ValidBetAmount) * ci.PayToSupplierRate) AS PayToSupplier,
-		SUM((b.ExtraAmount / 10000 + b.ValidBetAmount) * ci.PayToExtraRate) AS PayToExtra,
-		SUM((b.ExtraAmount / 10000 + b.ValidBetAmount) * ci.CompanyIncomeRate) AS CompanyIncome		
+		SUM(CASE WHEN b.Bettype <> 1499 THEN -b.ExtraAmount / 10000 ELSE 0 END) AS InsuranceWinLoss,
+		SUM((-b.ExtraAmount / 10000 + b.ValidBetAmount) * ci.PayToSupplierRate) AS PayToSupplier,
+		SUM((-b.ExtraAmount / 10000 + b.ValidBetAmount) * ci.PayToExtraRate) AS PayToExtra,
+		SUM((-b.ExtraAmount / 10000 + b.ValidBetAmount) * ci.CompanyIncomeRate) AS CompanyIncome		
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId 
 									AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
