@@ -191,34 +191,27 @@ BEGIN
 	CREATE TABLE #AmountToCompany (
 		PartyId			INT,
 		ProductId		INT,
-		Winloss			MONEY,
 		Fee				MONEY,
 		Discount		MONEY,
-		DiscountRate	MONEY,
-		DiscountRemark	NVARCHAR(4000),
 		Rebate			MONEY,
-		RebateRate		MONEY,
-		RebateRemark	NVARCHAR(4000),
-		NegativeFee		MONEY,
-		Minfee			MONEY,
 		IsChargedByMinFee	BIT,
 		IsCurrent			BIT
 	)
 	IF(@IsConvert = 0)
 	BEGIN
-		SELECT @BaseCurrencyName = e.Code FROM bodb02.dbo.Exchange e WITH (NOLOCK) WHERE e.exchangeid = @Currency
+		SELECT @BaseCurrencyName = e.Code, @BaseCurrency = @Currency FROM bodb02.dbo.Exchange e WITH (NOLOCK) WHERE e.exchangeid = @Currency
 	END
 
 	--  Minimum fee is calculated for all currencies that licensee offer. There is no minimum fee when data display individual currency.
 		-- current month
-		INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,NegativeFee,Minfee,IsChargedByMinFee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark)
-		EXEC bodb_licensee.dbo.LA_AmountToCompanySel @FromDate,@ToDate,@PartyIds,@ProductCodes,@BaseCurrencyName,@Currency
+		INSERT INTO #AmountToCompany(PartyId,ProductId,Fee,Discount,Rebate,IsChargedByMinFee)
+		EXEC bodb_licensee.dbo.LA_AmountToCompanyByDiscountCurrencySel @FromDate,@ToDate,@PartyIds,@ProductCodes,@BaseCurrencyName,@BaseCurrency,@Currency
 
 		UPDATE #AmountToCompany SET IsCurrent = 1
 
 		-- previous month
-		INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,NegativeFee,Minfee,IsChargedByMinFee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark)
-		EXEC bodb_licensee.dbo.LA_AmountToCompanySel @PrevFromDate, @PrevToDate,@PartyIds,@ProductCodes,@BaseCurrencyName,@Currency
+		INSERT INTO #AmountToCompany(PartyId,ProductId,Fee,Discount,Rebate,IsChargedByMinFee)
+		EXEC bodb_licensee.dbo.LA_AmountToCompanyByDiscountCurrencySel @PrevFromDate, @PrevToDate,@PartyIds,@ProductCodes,@BaseCurrencyName,@BaseCurrency,@Currency
 
 		UPDATE #AmountToCompany SET IsCurrent = 0 WHERE IsCurrent IS NULL
 	-- End region

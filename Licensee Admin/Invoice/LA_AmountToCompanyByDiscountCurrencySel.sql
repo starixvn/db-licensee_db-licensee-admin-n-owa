@@ -7,12 +7,13 @@ SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_AmountToCompanyByDiscountCurrencySel] (
-	@FromDate		DATE,
-	@ToDate			DATE,
-	@PartyIds		VARCHAR(4000) = '',
-	@ProductCodes	VARCHAR(1000) = '',
-	@BaseCurrencyName VARCHAR(10) = 'EUR',
-	@CurrencyId		INT = 0
+	@FromDate			DATE,
+	@ToDate				DATE,
+	@PartyIds			VARCHAR(4000) = '',
+	@ProductCodes		VARCHAR(1000) = '',
+	@BaseCurrencyName	VARCHAR(10) = 'EUR',
+	@BaseCurrencyId		INT			= 6,
+	@CurrencyId			INT			= 0
 )
 AS
 /*	Created: 20180924@Parsons
@@ -25,9 +26,6 @@ BEGIN
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 1. Prepare settings
  *-------------------------------------------------------------------------------------------------------------------------------*/
-	DECLARE @BaseCurrencyId INT
-	SELECT @BaseCurrencyId = CASE WHEN e.exchangeid = 78 THEN 6 ELSE e.exchangeid END FROM bodb02.dbo.Exchange e WITH (NOLOCK) WHERE e.Code= @BaseCurrencyName
-
 	-- product to be discounted
 	DECLARE @ProductList TABLE (ProductId INT, ToBeDiscounted BIT)
 	INSERT INTO @ProductList(ProductId,ToBeDiscounted)
