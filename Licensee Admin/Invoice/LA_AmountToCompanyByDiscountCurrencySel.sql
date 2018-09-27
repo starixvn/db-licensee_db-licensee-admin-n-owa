@@ -133,19 +133,12 @@ BEGIN
 	
 	IF(NOT EXISTS (SELECT TOP 1 ProductId FROM @ProductList))
 	BEGIN
-		SELECT	0 AS PartyId
+		SELECT 0 AS PartyId
 				,0	AS ProductId
-				,0	AS Winloss
 				,0	AS Fee
-				,0	AS NegativeFee
-				,0	AS Minfee
-				,0	AS IsChargedByMinFee
 				,0	AS Discount
-				,0	AS DiscountRate
-				,N''AS DiscountRemark
 				,0	AS Rebate
-				,0	AS RebateRate
-				,N''AS RebateRemark
+				,0	AS IsChargedByMinFee
 		WHERE 1 = 2
 
 		DROP TABLE #tmpDiscountSettings
@@ -176,8 +169,8 @@ BEGIN
 	CREATE TABLE #tmpExchange (
 		ExchangeDate		DATETIME,
 		ExchangeId			INT,
-		DiscountRate		FLOAT,
-		BaseRate			FLOAT,
+		RateByDiscountCurrency		FLOAT,
+		RateByBaseCurrency			FLOAT,
 		CurrencyId			INT,
 		CurrencyName		VARCHAR(10)
 	)
@@ -196,10 +189,10 @@ BEGIN
 	BEGIN
 		SELECT @tempCurrencyId = Id, @tempCurrencyName = Name FROM @BaseCurrencies WHERE IsApply IS NULL
 
-		INSERT INTO #tmpExchange(ExchangeDate, ExchangeId, DiscountRate, BaseRate, CurrencyId, CurrencyName)
+		INSERT INTO #tmpExchange(ExchangeDate, ExchangeId, RateByDiscountCurrency, RateByBaseCurrency, CurrencyId, CurrencyName)
 		SELECT ExchangeDate, ExchangeId
-				, BaseCurrencyRate AS DiscountRate
-				, CASE WHEN @tempCurrencyName = @BaseCurrencyName THEN BaseCurrencyRate ELSE NULL END  AS BaseRate
+				, BaseCurrencyRate AS RateByDiscountCurrency
+				, CASE WHEN @tempCurrencyName = @BaseCurrencyName THEN BaseCurrencyRate ELSE NULL END  AS RateByBaseCurrency
 				, @tempCurrencyId, @tempCurrencyName
 		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrencyName)
 		WHERE ExchangeDate BETWEEN @FromDate AND @ToDate
@@ -218,23 +211,23 @@ BEGIN
 		PartyId			INT,
 		ProductId		INT,
 		CurrencyId		INT,
-		DiscountFeeAmount	MONEY,
-		BaseFeeAmount		MONEY,
+		FeeAmountByDiscountCurrency	MONEY,
+		FeeAmountByBaseCurrency		MONEY,
 		FromDate		DATETIME,
 		ToDate			DATETIME,
-		DiscountFeeUnderWaiveTime	MONEY,
-		BaseFeeUnderWaiveTime		MONEY,
-		DiscountFeeOutOfWaiveTime	MONEY,
-		BaseFeeOutOfWaiveTime		MONEY,
-		DiscountMinFeeAmount			MONEY,
-		BaseMinFeeAmount				MONEY,
+		FeeUnderWaiveTimeByDiscountCurrency	MONEY,
+		FeeUnderWaiveTimeByBaseCurrency		MONEY,
+		FeeOutOfWaiveTimeByDiscountCurrency	MONEY,
+		FeeOutOfWaiveTimeByBaseCurrency		MONEY,
+		MinFeeAmountByDiscountCurrency			MONEY,
+		MinFeeAmountByBaseCurrency				MONEY,
 		MinFeeId					INT
 	)
 
 	IF(@CurrencyId = 0)
 	BEGIN
 		-- 1.8.1 minfee
-		INSERT INTO #tmpMinFee(FeeType,PartyId,ProductId,CurrencyId,DiscountFeeAmount,BaseFeeAmount,FromDate,ToDate,MinFeeId)
+		INSERT INTO #tmpMinFee(FeeType,PartyId,ProductId,CurrencyId,FeeAmountByDiscountCurrency,FeeAmountByBaseCurrency,FromDate,ToDate,MinFeeId)
 		SELECT mf.FeeTypeId,
 			mf.PartyId,
 			mf.ProductId,
@@ -263,8 +256,8 @@ BEGIN
 
 		-- 1.8.3 exchange minfee amount to currency accordingly
 		UPDATE m 
-			SET m.DiscountFeeAmount = m.DiscountFeeAmount * ed.DiscountRate,
-				m.BaseFeeAmount = m.BaseFeeAmount * eb.BaseRate
+			SET m.FeeAmountByDiscountCurrency = m.FeeAmountByDiscountCurrency * ed.RateByDiscountCurrency,
+				m.FeeAmountByBaseCurrency = m.FeeAmountByBaseCurrency * eb.RateByBaseCurrency
 		FROM #tmpMinFee m
 		INNER JOIN #tmpExchange eb ON m.ToDate = eb.ExchangeDate AND m.CurrencyId = eb.ExchangeID AND eb.CurrencyName = @BaseCurrencyName
 		INNER JOIN #tmpDiscountSettings ds ON ds.PartyId = m.PartyID AND m.ProductId = ds.ProductID 
@@ -279,8 +272,8 @@ BEGIN
 			GROUP BY MinFeeId
 		)
 		UPDATE m 
-			SET m.DiscountMinFeeAmount = ((DATEDIFF(DAY, m.FromDate,m.ToDate) + 1) - ISNULL(w.WaivedDays,0)) * CAST(m.DiscountFeeAmount AS DECIMAL(20,10)) / @DaysInMonth,
-				m.BaseMinFeeAmount = ((DATEDIFF(DAY, m.FromDate,m.ToDate) + 1) - ISNULL(w.WaivedDays,0)) * CAST(m.BaseFeeAmount AS DECIMAL(20,10)) / @DaysInMonth
+			SET m.MinFeeAmountByDiscountCurrency = ((DATEDIFF(DAY, m.FromDate,m.ToDate) + 1) - ISNULL(w.WaivedDays,0)) * CAST(m.FeeAmountByDiscountCurrency AS DECIMAL(20,10)) / @DaysInMonth,
+				m.MinFeeAmountByBaseCurrency = ((DATEDIFF(DAY, m.FromDate,m.ToDate) + 1) - ISNULL(w.WaivedDays,0)) * CAST(m.FeeAmountByBaseCurrency AS DECIMAL(20,10)) / @DaysInMonth
 		FROM #tmpMinFee m
 		LEFT JOIN waivedDays w ON m.MinFeeId=w.MinFeeId
 		WHERE m.FeeType = 1
@@ -292,25 +285,25 @@ BEGIN
 		PartyId			INT,
 		ProductId		TINYINT,
 		WinlossDate		DATE,
-		DiscountWinloss	DECIMAL(20,5),
-		BaseWinloss		DECIMAL(20,5),
-		DiscountAmountToCompany	DECIMAL(20,5),
-		BaseAmountToCompany		DECIMAL(20,5),
+		WinlossByDiscountCurrency	DECIMAL(20,5),
+		WinlossByBaseCurrency		DECIMAL(20,5),
+		AmountToCompanyByDiscountCurrency	DECIMAL(20,5),
+		AmountToCompanyByBaseCurrency		DECIMAL(20,5),
 		IsApplyMinFee	BIT
 	)
 
 	CREATE NONCLUSTERED INDEX Idx_InvoiceData ON #tmpWinlossData (PartyId, ProductId)
 
 	-- 2.1 include general products
-	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,DiscountWinloss,BaseWinloss,DiscountAmountToCompany,BaseAmountToCompany)
+	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,WinlossByDiscountCurrency,WinlossByBaseCurrency,AmountToCompanyByDiscountCurrency,AmountToCompanyByBaseCurrency)
 	(
 		SELECT	p.PartyId,
 				b.rptDate,
 				p.ProductId,
-				SUM(-ISNULL(b.MemberWL * ed.DiscountRate, 0)) AS DiscountWinloss,
-				SUM(-ISNULL(b.MemberWL * eb.BaseRate, 0))	  AS BaseWinloss,
-				SUM(-ISNULL(b.MemberWL * p.Rate * ed.DiscountRate, 0)) AS DiscountAmountToCompany,
-				SUM(-ISNULL(b.MemberWL * p.Rate * eb.BaseRate, 0))  AS BaseAmountToCompany
+				SUM(-ISNULL(b.MemberWL * ed.RateByDiscountCurrency, 0)) AS WinlossByDiscountCurrency,
+				SUM(-ISNULL(b.MemberWL * eb.RateByBaseCurrency, 0))	  AS WinlossByBaseCurrency,
+				SUM(-ISNULL(b.MemberWL * p.Rate * ed.RateByDiscountCurrency, 0)) AS AmountToCompanyByDiscountCurrency,
+				SUM(-ISNULL(b.MemberWL * p.Rate * eb.RateByBaseCurrency, 0))  AS AmountToCompanyByBaseCurrency
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #tmpExchange eb ON b.rptDate = eb.ExchangeDate AND b.CurrencyId = eb.ExchangeID AND eb.CurrencyName = @BaseCurrencyName
 			INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID 
@@ -326,7 +319,7 @@ BEGIN
 		GROUP BY b.rptdate, b.SiteId, p.PartyId, p.ProductId
 	)
 	-- 2.2 insert product don't have any ticket
-	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,DiscountWinloss,BaseWinloss,DiscountAmountToCompany,BaseAmountToCompany)
+	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,WinlossByDiscountCurrency,WinlossByBaseCurrency,AmountToCompanyByDiscountCurrency,AmountToCompanyByBaseCurrency)
 	SELECT DISTINCT PartyId,@ToDate,c.ProductId,0,0,0,0 
 	FROM @PartyList p 
 	INNER JOIN @ProductList pd ON 1=1
@@ -335,12 +328,12 @@ BEGIN
 
 	-- 2.3 create result
 	SELECT a.PartyId,a.ProductId
-		,CAST(SUM(a.DiscountWinloss) AS MONEY)  AS DiscountWinloss
-		,CAST(SUM(a.BaseWinloss) AS MONEY)		AS BaseWinloss
-		,CAST(SUM(a.DiscountAmountToCompany) AS MONEY)  AS DiscountAmountToCompany
-		,CAST(SUM(a.BaseAmountToCompany) AS MONEY)		AS BaseAmountToCompany
-		,CAST(0 AS MONEY) AS DiscountFee
-		,CAST(0 AS MONEY) AS BaseFee
+		,CAST(SUM(a.WinlossByDiscountCurrency) AS MONEY)  AS WinlossByDiscountCurrency
+		,CAST(SUM(a.WinlossByBaseCurrency) AS MONEY)		AS WinlossByBaseCurrency
+		,CAST(SUM(a.AmountToCompanyByDiscountCurrency) AS MONEY)  AS AmountToCompanyByDiscountCurrency
+		,CAST(SUM(a.AmountToCompanyByBaseCurrency) AS MONEY)		AS AmountToCompanyByBaseCurrency
+		,CAST(0 AS MONEY) AS FeeByDiscountCurrency
+		,CAST(0 AS MONEY) AS FeeByBaseCurrency
 		,CAST(0 AS MONEY)			AS Discount
 		,CAST(0 AS MONEY)			AS Rebate
 		,CAST(0 AS BIT)				AS IsChargedByMinFee
@@ -350,8 +343,8 @@ BEGIN
 
 	-- 2.4 treat negative as 0
 	UPDATE #tmpResult 
-			SET DiscountFee = CASE WHEN DiscountAmountToCompany < 0 THEN 0 ELSE DiscountAmountToCompany END,
-				BaseFee = CASE WHEN BaseAmountToCompany < 0 THEN 0 ELSE BaseAmountToCompany END
+			SET FeeByDiscountCurrency = CASE WHEN AmountToCompanyByDiscountCurrency < 0 THEN 0 ELSE AmountToCompanyByDiscountCurrency END,
+				FeeByBaseCurrency = CASE WHEN AmountToCompanyByBaseCurrency < 0 THEN 0 ELSE AmountToCompanyByBaseCurrency END
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 3. minfee calculation
  *-------------------------------------------------------------------------------------------------------------------------------*/
@@ -360,10 +353,10 @@ BEGIN
 	-- out of waive time
 	;WITH Fee AS(
 		SELECT m.MinFeeId
-			, SUM(CASE WHEN w.ProductId IS NULL THEN 0 ELSE t.DiscountAmountToCompany END) DiscountFeeUnderWaiveTime
-			, SUM(CASE WHEN w.ProductId IS NULL THEN 0 ELSE t.BaseAmountToCompany END)	BaseFeeUnderWaiveTime
-			, SUM(CASE WHEN w.ProductId IS NULL THEN t.DiscountAmountToCompany ELSE 0 END) DiscountFeeOutOfWaiveTime
-			, SUM(CASE WHEN w.ProductId IS NULL THEN t.BaseAmountToCompany ELSE 0 END) BaseFeeOutOfWaiveTime
+			, SUM(CASE WHEN w.ProductId IS NULL THEN 0 ELSE t.AmountToCompanyByDiscountCurrency END) FeeUnderWaiveTimeByDiscountCurrency
+			, SUM(CASE WHEN w.ProductId IS NULL THEN 0 ELSE t.AmountToCompanyByBaseCurrency END)	FeeUnderWaiveTimeByBaseCurrency
+			, SUM(CASE WHEN w.ProductId IS NULL THEN t.AmountToCompanyByDiscountCurrency ELSE 0 END) FeeOutOfWaiveTimeByDiscountCurrency
+			, SUM(CASE WHEN w.ProductId IS NULL THEN t.AmountToCompanyByBaseCurrency ELSE 0 END) FeeOutOfWaiveTimeByBaseCurrency
 		FROM #tmpWinlossData t
 		INNER JOIN #tmpMinFee m ON t.ProductId = m.ProductId AND t.PartyId = m.PartyId AND t.WinlossDate BETWEEN m.FromDate AND m.ToDate
 		LEFT JOIN #tmpMinFee w ON w.FeeType=2 AND w.MinFeeId=m.MinFeeId AND t.WinlossDate BETWEEN w.FromDate AND w.ToDate
@@ -371,10 +364,10 @@ BEGIN
 		GROUP BY  m.MinFeeId
 	)
 	UPDATE mf SET
-		DiscountFeeUnderWaiveTime = CASE WHEN f.DiscountFeeUnderWaiveTime < 0 THEN 0 ELSE f.DiscountFeeUnderWaiveTime END,
-		BaseFeeUnderWaiveTime = CASE WHEN f.BaseFeeUnderWaiveTime < 0 THEN 0 ELSE f.BaseFeeUnderWaiveTime END,
-		DiscountFeeOutOfWaiveTime = CASE WHEN f.DiscountFeeOutOfWaiveTime < 0 THEN 0 ELSE f.DiscountFeeOutOfWaiveTime END,
-		BaseFeeOutOfWaiveTime = CASE WHEN f.BaseFeeOutOfWaiveTime < 0 THEN 0 ELSE f.BaseFeeOutOfWaiveTime END
+		FeeUnderWaiveTimeByDiscountCurrency = CASE WHEN f.FeeUnderWaiveTimeByDiscountCurrency < 0 THEN 0 ELSE f.FeeUnderWaiveTimeByDiscountCurrency END,
+		FeeUnderWaiveTimeByBaseCurrency = CASE WHEN f.FeeUnderWaiveTimeByBaseCurrency < 0 THEN 0 ELSE f.FeeUnderWaiveTimeByBaseCurrency END,
+		FeeOutOfWaiveTimeByDiscountCurrency = CASE WHEN f.FeeOutOfWaiveTimeByDiscountCurrency < 0 THEN 0 ELSE f.FeeOutOfWaiveTimeByDiscountCurrency END,
+		FeeOutOfWaiveTimeByBaseCurrency = CASE WHEN f.FeeOutOfWaiveTimeByBaseCurrency < 0 THEN 0 ELSE f.FeeOutOfWaiveTimeByBaseCurrency END
 	FROM #tmpMinFee mf INNER JOIN Fee f ON mf.MinFeeId=f.MinFeeId
 	WHERE mf.FeeType=1
 	
@@ -382,31 +375,31 @@ BEGIN
 	DECLARE @TotalMinFees TABLE(
 		PartyGroupId	INT,
 		ProductId		INT,
-		TotalDiscountMinFee	MONEY,
-		TotalBaseMinFee		MONEY,
-		TotalDiscountAmount		MONEY,
-		TotalBaseAmount			MONEY
+		TotalMinFeeByDiscountCurrency	MONEY,
+		TotalMinFeeByBaseCurrency		MONEY,
+		TotalAmountByDiscountCurrency		MONEY,
+		TotalAmountByBaseCurrency			MONEY
 	)
-	INSERT INTO @TotalMinFees(PartyGroupId,ProductId,TotalDiscountMinFee,TotalBaseMinFee,TotalDiscountAmount,TotalBaseAmount)
-	SELECT p.PartyGroupId, mf.ProductId, SUM(mf.DiscountMinFeeAmount), SUM(mf.BaseMinFeeAmount), SUM(mf.DiscountFeeOutOfWaiveTime), SUM(mf.BaseFeeOutOfWaiveTime)
+	INSERT INTO @TotalMinFees(PartyGroupId,ProductId,TotalMinFeeByDiscountCurrency,TotalMinFeeByBaseCurrency,TotalAmountByDiscountCurrency,TotalAmountByBaseCurrency)
+	SELECT p.PartyGroupId, mf.ProductId, SUM(mf.MinFeeAmountByDiscountCurrency), SUM(mf.MinFeeAmountByBaseCurrency), SUM(mf.FeeOutOfWaiveTimeByDiscountCurrency), SUM(mf.FeeOutOfWaiveTimeByBaseCurrency)
 	FROM #tmpMinFee mf
 	INNER JOIN @PartyList p ON mf.PartyId = p.PartyId
 	WHERE mf.FeeType = 1
 	GROUP BY p.PartyGroupId, mf.ProductId
 
 	-- 3.3 calculate actual licensing fee
-	UPDATE r SET DiscountFee = CASE
-									WHEN t.TotalDiscountAmount < t.TotalDiscountMinFee AND a.DiscountFeeOutOfWaiveTime < a.DiscountMinFeeAmount
-										THEN a.DiscountMinFeeAmount + a.DiscountFeeUnderWaiveTime
-									ELSE a.DiscountFeeOutOfWaiveTime + a.DiscountFeeUnderWaiveTime
+	UPDATE r SET FeeByDiscountCurrency = CASE
+									WHEN t.TotalAmountByDiscountCurrency < t.TotalMinFeeByDiscountCurrency AND a.FeeOutOfWaiveTimeByDiscountCurrency < a.MinFeeAmountByDiscountCurrency
+										THEN a.MinFeeAmountByDiscountCurrency + a.FeeUnderWaiveTimeByDiscountCurrency
+									ELSE a.FeeOutOfWaiveTimeByDiscountCurrency + a.FeeUnderWaiveTimeByDiscountCurrency
 								END,
-					BaseFee =	CASE
-									WHEN t.TotalBaseAmount < t.TotalBaseMinFee AND a.BaseFeeOutOfWaiveTime < a.BaseMinFeeAmount
-										THEN a.BaseMinFeeAmount + a.BaseFeeUnderWaiveTime
-									ELSE a.BaseFeeOutOfWaiveTime + a.BaseFeeUnderWaiveTime
+					FeeByBaseCurrency =	CASE
+									WHEN t.TotalAmountByBaseCurrency < t.TotalMinFeeByBaseCurrency AND a.FeeOutOfWaiveTimeByBaseCurrency < a.MinFeeAmountByBaseCurrency
+										THEN a.MinFeeAmountByBaseCurrency + a.FeeUnderWaiveTimeByBaseCurrency
+									ELSE a.FeeOutOfWaiveTimeByBaseCurrency + a.FeeUnderWaiveTimeByBaseCurrency
 								END,
 		IsChargedByMinFee = CASE
-								WHEN t.TotalDiscountAmount < t.TotalDiscountMinFee AND a.DiscountFeeOutOfWaiveTime < a.DiscountMinFeeAmount
+								WHEN t.TotalAmountByDiscountCurrency < t.TotalMinFeeByDiscountCurrency AND a.FeeOutOfWaiveTimeByDiscountCurrency < a.MinFeeAmountByDiscountCurrency
 									THEN 1
 								ELSE 0
 							END
@@ -421,7 +414,7 @@ BEGIN
 	DECLARE @Unlimited MONEY = 1000000000000
 
 	;WITH cte_Calculation AS(
-		SELECT s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId, SUM(r.DiscountWinloss) Winloss,SUM(r.DiscountFee) Fee
+		SELECT s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId, SUM(r.WinlossByDiscountCurrency) WinlossByDiscountCurrency,SUM(r.FeeByDiscountCurrency) FeeByDiscountCurrency
 		FROM #tmpDiscountSettings s
 		INNER JOIN #tmpResult r ON s.PartyID = r.PartyId AND s.ProductId=r.ProductId
 		WHERE s.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount)
@@ -437,16 +430,16 @@ BEGIN
 		FROM cte_Calculation c INNER JOIN cte_Detail d ON c.CalculationGroup=d.CalculationGroup
 		WHERE (
 				c.DiscountGroupType IN (@DiscountByGroupFee, @DiscountIndividualFee) AND
-				c.Fee >= d.FromAmount AND c.Fee < d.ToAmount
+				c.FeeByDiscountCurrency >= d.FromAmount AND c.FeeByDiscountCurrency < d.ToAmount
 			) OR (
 				c.DiscountGroupType IN (@DiscountByGroupGrosswin, @DiscountIndividualGrosswin) AND
-				c.Winloss >= d.FromAmount AND c.Winloss < d.ToAmount
+				c.WinlossByDiscountCurrency >= d.FromAmount AND c.WinlossByDiscountCurrency < d.ToAmount
 			)
 	)
 	UPDATE r 
 	SET Discount =  CASE
-						WHEN s.DiscountGroupType IN (@DiscountByGroupFee, @DiscountIndividualFee) THEN c.Rate * r.BaseFee
-						WHEN s.DiscountGroupType IN (@DiscountByGroupGrosswin, @DiscountIndividualGrosswin) THEN c.Rate * (CASE WHEN r.BaseWinloss < 0 THEN 0 ELSE r.BaseWinloss END)
+						WHEN s.DiscountGroupType IN (@DiscountByGroupFee, @DiscountIndividualFee) THEN c.Rate * r.FeeByBaseCurrency
+						WHEN s.DiscountGroupType IN (@DiscountByGroupGrosswin, @DiscountIndividualGrosswin) THEN c.Rate * (CASE WHEN r.WinlossByBaseCurrency < 0 THEN 0 ELSE r.WinlossByBaseCurrency END)
 					ELSE 0 END
 	FROM #tmpResult r
 	INNER JOIN #tmpDiscountSettings s ON s.PartyID = r.PartyId AND s.ProductId=r.ProductId
@@ -480,13 +473,13 @@ BEGIN
 
 	-- 4.3 calculate rebate
 	UPDATE r SET 
-		Rebate = (r.BaseFee - r.Discount) * c.Rate
+		Rebate = (r.FeeByBaseCurrency - r.Discount) * c.Rate
 	FROM #tmpResult r INNER JOIN #tmpRebateSettings c ON r.PartyId = c.PartyID AND r.ProductId = c.ProductId
 
 	-- 5. return result
 		SELECT PartyId
 		,ProductId
-		,BaseFee AS Fee
+		,FeeByBaseCurrency AS Fee
 		,Discount
 		,Rebate
 		,IsChargedByMinFee
