@@ -162,13 +162,12 @@ BEGIN
 
 	-- 1.7 exchange
 	DECLARE @tempCurrencyName VARCHAR(10), @tempCurrencyId INT
-	DECLARE @BaseCurrencies TABLE(Id INT, Name VARCHAR(20), IsApply BIT )
+	DECLARE @BaseCurrencies TABLE(Id INT, Name VARCHAR(20))
 
 	CREATE TABLE #tmpExchange (
 		ExchangeDate		DATETIME,
 		ExchangeId			INT,
-		RateByDiscountCurrency		FLOAT,
-		RateByBaseCurrency			FLOAT,
+		Rate				FLOAT,
 		CurrencyId			INT,
 		CurrencyName		VARCHAR(10)
 	)
@@ -183,19 +182,18 @@ BEGIN
 		VALUES(@BaseCurrencyId,@BaseCurrencyName)
 	END
 
-	WHILE EXISTS (SELECT 1 FROM @BaseCurrencies WHERE IsApply IS NULL)
+	WHILE EXISTS (SELECT TOP 1 1 FROM @BaseCurrencies)
 	BEGIN
-		SELECT @tempCurrencyId = Id, @tempCurrencyName = Name FROM @BaseCurrencies WHERE IsApply IS NULL
+		SELECT TOP 1 @tempCurrencyId = Id, @tempCurrencyName = Name FROM @BaseCurrencies
 
-		INSERT INTO #tmpExchange(ExchangeDate, ExchangeId, RateByDiscountCurrency, RateByBaseCurrency, CurrencyId, CurrencyName)
+		INSERT INTO #tmpExchange(ExchangeDate, ExchangeId, Rate, CurrencyId, CurrencyName)
 		SELECT ExchangeDate, ExchangeId
-				, BaseCurrencyRate AS RateByDiscountCurrency
-				, CASE WHEN @tempCurrencyName = @BaseCurrencyName THEN BaseCurrencyRate ELSE NULL END  AS RateByBaseCurrency
+				, BaseCurrencyRate AS Rate
 				, @tempCurrencyId, @tempCurrencyName
 		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrencyName)
 		WHERE ExchangeDate BETWEEN @FromDate AND @ToDate
 
-		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrencyName 
+		DELETE @BaseCurrencies WHERE Name = @tempCurrencyName 
 	END
 
 	-- 1.8 minfee settings
@@ -254,8 +252,8 @@ BEGIN
 
 		-- 1.8.3 exchange minfee amount to currency accordingly
 		UPDATE m 
-			SET m.FeeAmountByDiscountCurrency = m.FeeAmountByDiscountCurrency * ed.RateByDiscountCurrency,
-				m.FeeAmountByBaseCurrency = m.FeeAmountByBaseCurrency * eb.RateByBaseCurrency
+			SET m.FeeAmountByDiscountCurrency = m.FeeAmountByDiscountCurrency * ed.Rate,
+				m.FeeAmountByBaseCurrency = m.FeeAmountByBaseCurrency * eb.Rate
 		FROM #tmpMinFee m
 		INNER JOIN #tmpExchange eb ON m.ToDate = eb.ExchangeDate AND m.CurrencyId = eb.ExchangeID AND eb.CurrencyName = @BaseCurrencyName
 		INNER JOIN #tmpDiscountSettings ds ON ds.PartyId = m.PartyID AND m.ProductId = ds.ProductID 
@@ -298,10 +296,10 @@ BEGIN
 		SELECT	p.PartyId,
 				b.rptDate,
 				p.ProductId,
-				SUM(-ISNULL(b.MemberWL * ed.RateByDiscountCurrency, 0)) AS WinlossByDiscountCurrency,
-				SUM(-ISNULL(b.MemberWL * eb.RateByBaseCurrency, 0))	  AS WinlossByBaseCurrency,
-				SUM(-ISNULL(b.MemberWL * p.Rate * ed.RateByDiscountCurrency, 0)) AS AmountToCompanyByDiscountCurrency,
-				SUM(-ISNULL(b.MemberWL * p.Rate * eb.RateByBaseCurrency, 0))  AS AmountToCompanyByBaseCurrency
+				SUM(-ISNULL(b.MemberWL * ed.Rate, 0)) AS WinlossByDiscountCurrency,
+				SUM(-ISNULL(b.MemberWL * eb.Rate, 0))	  AS WinlossByBaseCurrency,
+				SUM(-ISNULL(b.MemberWL * p.Rate * ed.Rate, 0)) AS AmountToCompanyByDiscountCurrency,
+				SUM(-ISNULL(b.MemberWL * p.Rate * eb.Rate, 0))  AS AmountToCompanyByBaseCurrency
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #tmpExchange eb ON b.rptDate = eb.ExchangeDate AND b.CurrencyId = eb.ExchangeID AND eb.CurrencyName = @BaseCurrencyName
 			INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID 
