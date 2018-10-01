@@ -49,6 +49,7 @@ AS
 		- 20180712@Bruce: Enhance Manage Discount group [#94282]
 		- 20180718@Bruce: use decimal to void margin not match among reports [#94108]
 		- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
+		- 20180924@Parsons: LA - LPID report - Apply one discount rate across all base currencies [#100046]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
