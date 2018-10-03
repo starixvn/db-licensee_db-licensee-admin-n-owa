@@ -252,12 +252,12 @@ BEGIN
 
 		-- 1.8.3 exchange minfee amount to currency accordingly
 		UPDATE m 
-			SET m.FeeAmountByDiscountCurrency = m.FeeAmountByDiscountCurrency * ed.Rate,
+			SET m.FeeAmountByDiscountCurrency = m.FeeAmountByDiscountCurrency * ISNULL(ed.Rate, eb.Rate),
 				m.FeeAmountByBaseCurrency = m.FeeAmountByBaseCurrency * eb.Rate
 		FROM #tmpMinFee m
 		INNER JOIN #tmpExchange eb ON m.ToDate = eb.ExchangeDate AND m.CurrencyId = eb.ExchangeID AND eb.CurrencyName = @BaseCurrencyName
-		INNER JOIN #tmpDiscountSettings ds ON ds.PartyId = m.PartyID AND m.ProductId = ds.ProductID 
-		INNER JOIN #tmpExchange ed ON m.ToDate = ed.ExchangeDate AND m.CurrencyId = ed.ExchangeID AND ed.CurrencyId = ds.CurrencyId
+		LEFT JOIN #tmpDiscountSettings ds ON ds.PartyId = m.PartyID AND m.ProductId = ds.ProductID 
+		LEFT JOIN #tmpExchange ed ON m.ToDate = ed.ExchangeDate AND m.CurrencyId = ed.ExchangeID AND ed.CurrencyId = ds.CurrencyId
 
 		-- 1.8.4 calculate minfee amount(exclude waive time)
 		-- (days in charged - days in waived) * FeeAmount / days in month
@@ -296,17 +296,17 @@ BEGIN
 		SELECT	p.PartyId,
 				b.rptDate,
 				p.ProductId,
-				SUM(-ISNULL(b.MemberWL * ed.Rate, 0)) AS WinlossByDiscountCurrency,
+				SUM(-ISNULL(b.MemberWL * ISNULL(ed.Rate, eb.Rate), 0)) AS WinlossByDiscountCurrency,
 				SUM(-ISNULL(b.MemberWL * eb.Rate, 0))	  AS WinlossByBaseCurrency,
-				SUM(-ISNULL(b.MemberWL * p.Rate * ed.Rate, 0)) AS AmountToCompanyByDiscountCurrency,
+				SUM(-ISNULL(b.MemberWL * p.Rate * ISNULL(ed.Rate, eb.Rate), 0)) AS AmountToCompanyByDiscountCurrency,
 				SUM(-ISNULL(b.MemberWL * p.Rate * eb.Rate, 0))  AS AmountToCompanyByBaseCurrency
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #tmpExchange eb ON b.rptDate = eb.ExchangeDate AND b.CurrencyId = eb.ExchangeID AND eb.CurrencyName = @BaseCurrencyName
 			INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID 
 					AND p.LicenseeId = b.SiteId
 					AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
-			INNER JOIN #tmpDiscountSettings ds ON ds.PartyId = p.PartyID AND b.ProductId = ds.ProductID 
-			INNER JOIN #tmpExchange ed ON b.rptDate = ed.ExchangeDate AND b.CurrencyId = ed.ExchangeID AND ed.CurrencyId = ds.CurrencyId
+			LEFT JOIN #tmpDiscountSettings ds ON ds.PartyId = p.PartyID AND b.ProductId = ds.ProductID 
+			LEFT JOIN #tmpExchange ed ON b.rptDate = ed.ExchangeDate AND b.CurrencyId = ed.ExchangeID AND ed.CurrencyId = ds.CurrencyId
 		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
@@ -314,6 +314,7 @@ BEGIN
 				AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId, p.ProductId
 	)
+	
 	-- 2.2 insert product don't have any ticket
 	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,WinlossByDiscountCurrency,WinlossByBaseCurrency,AmountToCompanyByDiscountCurrency,AmountToCompanyByBaseCurrency)
 	SELECT DISTINCT PartyId,@ToDate,c.ProductId,0,0,0,0 
