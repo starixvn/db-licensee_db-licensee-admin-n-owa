@@ -392,10 +392,8 @@ BEGIN
 			InvoiceAmount	MONEY,
 			AmountType		TINYINT,
 			Rate			MONEY,
-			AmfAmount		MONEY,
-			RemainingAmf	MONEY,
-			AGAmount		MONEY,
-			RemainingAG		MONEY)
+			DeductMonthlyFees	MONEY,
+			RemainingAmount	MONEY)
 
 	INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate,Remark)
 	(
@@ -481,7 +479,7 @@ BEGIN
 		SET @AmfAmount = (CASE WHEN @AmfAmount < @SBAfterDiscount THEN @AmfAmount ELSE @SBAfterDiscount END)
 		SET @AmfAmount = (CASE WHEN @AmfAmount < 0 THEN 0 ELSE @AmfAmount END)
 
-		UPDATE @FinalResult SET AmfAmount = @AmfAmount, RemainingAmf = @RemainingAmf - @AmfAmount
+		UPDATE @FinalResult SET DeductMonthlyFees = @AmfAmount, RemainingAmount = @RemainingAmf - @AmfAmount
 		WHERE AmountType = 1 AND ProductId = 0 -- SB
 	END
 
@@ -492,12 +490,12 @@ BEGIN
 	BEGIN
 		DECLARE @AGAmount MONEY = (CASE WHEN @RemainingAG < @AGMonthlyFee THEN @RemainingAG ELSE @AGMonthlyFee END)
 
-		UPDATE @FinalResult SET AGAmount = @AGAmount, RemainingAG = @RemainingAG - @AGAmount
+		UPDATE @FinalResult SET DeductMonthlyFees = @AGAmount, RemainingAmount = @RemainingAG - @AGAmount
 		WHERE AmountType = @AmountTypeSoftwareFee AND ProductId = 10 -- AG
 	END
 
 	DECLARE @TotalAmount MONEY = (
-		SELECT SUM((CASE WHEN AmountType=@AmountTypeDiscount THEN -InvoiceAmount ELSE InvoiceAmount END) - ISNULL(AmfAmount,0) - ISNULL(AGAmount,0))
+		SELECT SUM((CASE WHEN AmountType=@AmountTypeDiscount THEN -InvoiceAmount ELSE InvoiceAmount END) - ISNULL(DeductMonthlyFees,0))
 		FROM @FinalResult
 		WHERE ProductId != -1	-- not summarized row
 			AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount)
@@ -507,7 +505,7 @@ BEGIN
 	BEGIN
 		SET @TotalAmount = CASE WHEN @TotalAmount<0 THEN 0 ELSE @TotalAmount END
 		DECLARE @RemainingPrepayment MONEY = @Prepayment - @TotalAmount
-		INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmf)
+		INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
 		VALUES(0,'','',@DeductAgainstInvoice,
 			CASE WHEN @RemainingPrepayment >=0 THEN -@TotalAmount ELSE -@Prepayment END,
 			CASE WHEN @RemainingPrepayment >=0 THEN @RemainingPrepayment ELSE 0 END)
@@ -519,10 +517,8 @@ BEGIN
 			f.InvoiceAmount,
 			f.AmountType,
 			f.Rate,
-			f.AmfAmount,
-			f.RemainingAmf,
-			f.AGAmount,
-			f.RemainingAG,
+			f.DeductMonthlyFees,
+			f.RemainingAmount,
 			f.Remark
 	FROM	@FinalResult f
 	WHERE f.ProductId != -1	-- not summarized row
