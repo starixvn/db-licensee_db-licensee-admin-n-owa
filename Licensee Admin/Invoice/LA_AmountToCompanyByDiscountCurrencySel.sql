@@ -99,7 +99,7 @@ BEGIN
 			a.PartyID = c.PartyID
 		)
 	WHERE h.DiscountGroupType != @Rebate AND h.FromDate <= @ToDate AND @FromDate <= h.ToDate
-
+	
 	-- only 1 discount per month for product/party
 	;WITH cte_Discount AS (
 		SELECT DiscountGroupType, PartyID, ProductId, MAX(FromDate) FromDate
@@ -155,7 +155,7 @@ BEGIN
 	FROM (SELECT DISTINCT b.PartyId FROM @PartyList b) a
 	
 	-- 1.7 charge info
-	SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, ci.DI_Rate AS Rate, ci.Fromdate, ci.ToDate
+	SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, CAST(ci.DI_Rate AS DECIMAL(7, 5)) AS Rate, ci.Fromdate, ci.ToDate
 	INTO #tmpChargeInfo
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
 	WHERE DI_Rate > 0
@@ -171,6 +171,9 @@ BEGIN
 		CurrencyId			INT,
 		CurrencyName		VARCHAR(10)
 	)
+	CREATE NONCLUSTERED INDEX Idx_tmpExchange1 ON #tmpExchange (ExchangeDate, CurrencyId, ExchangeId)
+	CREATE NONCLUSTERED INDEX Idx_tmpExchange2 ON #tmpExchange (ExchangeDate, CurrencyName, ExchangeId)
+
 	INSERT INTO @BaseCurrencies(Id, Name)
 	SELECT DISTINCT ds.CurrencyId, e.Code 
 	FROM #tmpDiscountSettings ds
@@ -288,33 +291,62 @@ BEGIN
 		IsApplyMinFee	BIT
 	)
 
-	CREATE NONCLUSTERED INDEX Idx_InvoiceData ON #tmpWinlossData (PartyId, ProductId)
+	CREATE TABLE #temData (
+		PartyId			INT,
+		ProductId		TINYINT,
+		WinlossDate		DATE,
+		CurrencyId		INT,
+		MemberWL		MONEY,
+		Amount			DECIMAL(25, 8)
+	)
 
 	-- 2.1 include general products
-	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,WinlossByDiscountCurrency,WinlossByBaseCurrency,AmountToCompanyByDiscountCurrency,AmountToCompanyByBaseCurrency)
+	INSERT INTO #temData (PartyId,WinlossDate,ProductId,CurrencyId,MemberWL,Amount)
 	(
 		SELECT	p.PartyId,
 				b.rptDate,
 				p.ProductId,
-				SUM(-ISNULL(b.MemberWL * ISNULL(ed.Rate, eb.Rate), 0)) AS WinlossByDiscountCurrency,
-				SUM(-ISNULL(b.MemberWL * eb.Rate, 0))	  AS WinlossByBaseCurrency,
-				SUM(-ISNULL(b.MemberWL * p.Rate * ISNULL(ed.Rate, eb.Rate), 0)) AS AmountToCompanyByDiscountCurrency,
-				SUM(-ISNULL(b.MemberWL * p.Rate * eb.Rate, 0))  AS AmountToCompanyByBaseCurrency
+				b.CurrencyId,
+				b.MemberWL,
+				b.MemberWL * p.Rate
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN #tmpExchange eb ON b.rptDate = eb.ExchangeDate AND b.CurrencyId = eb.ExchangeID AND eb.CurrencyName = @BaseCurrencyName
-			INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID 
-					AND p.LicenseeId = b.SiteId
+			INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId 
 					AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
-			LEFT JOIN #tmpDiscountSettings ds ON ds.PartyId = p.PartyID AND b.ProductId = ds.ProductID 
-			LEFT JOIN #tmpExchange ed ON b.rptDate = ed.ExchangeDate AND b.CurrencyId = ed.ExchangeID AND ed.CurrencyId = ds.CurrencyId
+					AND b.ProductId = p.ProductID  
 		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
 				AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
-		GROUP BY b.rptdate, b.SiteId, p.PartyId, p.ProductId
 	)
-	
+
+	INSERT INTO #tmpWinlossData(WinlossDate,PartyId,ProductId,WinlossByBaseCurrency,AmountToCompanyByBaseCurrency)
+	SELECT	t.WinlossDate,
+			t.PartyId,
+			t.ProductId,
+			SUM(-t.MemberWL * eb.Rate) AS WinlossByBaseCurrency,
+			SUM(-t.Amount * eb.Rate) AS AmountToCompanyByBaseCurrency
+	FROM #temData t
+		INNER JOIN #tmpExchange eb ON eb.ExchangeDate = t.WinlossDate AND eb.CurrencyName = @BaseCurrencyName AND eb.ExchangeID = t.CurrencyId
+	GROUP BY t.WinlossDate, t.PartyId, t.ProductId
+
+	;WITH cte_winlossByDiscountCurrency AS (
+		SELECT	t.WinlossDate,
+				t.PartyId,
+				t.ProductId,
+				SUM(-ISNULL(t.MemberWL * ed.Rate, 0)) AS WinlossByDiscountCurrency,
+				SUM(-ISNULL(t.Amount * ed.Rate, 0)) AS AmountToCompanyByDiscountCurrency
+		FROM #temData t
+			INNER JOIN #tmpDiscountSettings ds ON ds.PartyId = t.PartyID AND t.ProductId = ds.ProductID 
+			INNER JOIN #tmpExchange ed ON t.WinlossDate = ed.ExchangeDate AND t.CurrencyId = ed.ExchangeID AND ed.CurrencyId = ds.CurrencyId
+		GROUP BY t.WinlossDate, t.PartyId, t.ProductId
+	)
+	UPDATE t
+	SET WinlossByDiscountCurrency = ISNULL(c.WinlossByDiscountCurrency, t.WinlossByBaseCurrency),
+		AmountToCompanyByBaseCurrency = ISNULL(c.AmountToCompanyByDiscountCurrency, t.AmountToCompanyByBaseCurrency) 
+	FROM #tmpWinlossData t
+	LEFT JOIN cte_winlossByDiscountCurrency c ON t.PartyId = c.PartyID AND t.WinlossDate = c.WinlossDate AND t.ProductId = c.ProductID 
+
 	-- 2.2 insert product don't have any ticket
 	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,WinlossByDiscountCurrency,WinlossByBaseCurrency,AmountToCompanyByDiscountCurrency,AmountToCompanyByBaseCurrency)
 	SELECT DISTINCT PartyId,@ToDate,c.ProductId,0,0,0,0 
