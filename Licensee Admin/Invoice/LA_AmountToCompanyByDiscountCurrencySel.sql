@@ -343,7 +343,7 @@ BEGIN
 	)
 	UPDATE t
 	SET WinlossByDiscountCurrency = ISNULL(c.WinlossByDiscountCurrency, t.WinlossByBaseCurrency),
-		AmountToCompanyByBaseCurrency = ISNULL(c.AmountToCompanyByDiscountCurrency, t.AmountToCompanyByBaseCurrency) 
+		AmountToCompanyByDiscountCurrency = ISNULL(c.AmountToCompanyByDiscountCurrency, t.AmountToCompanyByBaseCurrency)
 	FROM #tmpWinlossData t
 	LEFT JOIN cte_winlossByDiscountCurrency c ON t.PartyId = c.PartyID AND t.WinlossDate = c.WinlossDate AND t.ProductId = c.ProductID 
 
@@ -518,6 +518,7 @@ BEGIN
 
 	DROP TABLE #tmpExchange
 	DROP TABLE #tmpChargeInfo
+	DROP TABLE #temData
 	DROP TABLE #tmpWinlossData
 	DROP TABLE #tmpDiscountSettings
 	DROP TABLE #tmpResult
