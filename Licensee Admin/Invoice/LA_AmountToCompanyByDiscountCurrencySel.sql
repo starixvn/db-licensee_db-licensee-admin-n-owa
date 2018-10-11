@@ -155,7 +155,7 @@ BEGIN
 	FROM (SELECT DISTINCT b.PartyId FROM @PartyList b) a
 	
 	-- 1.7 charge info
-	SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, CAST(ci.DI_Rate AS DECIMAL(7, 5)) AS Rate, ci.Fromdate, ci.ToDate
+	SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, ci.DI_Rate AS Rate, ci.Fromdate, ci.ToDate
 	INTO #tmpChargeInfo
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
 	WHERE DI_Rate > 0
@@ -297,7 +297,7 @@ BEGIN
 		WinlossDate		DATE,
 		CurrencyId		INT,
 		MemberWL		MONEY,
-		Amount			DECIMAL(25, 8)
+		Amount			DECIMAL(20,5)
 	)
 
 	-- 2.1 include general products
