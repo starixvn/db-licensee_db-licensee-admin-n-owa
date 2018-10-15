@@ -162,41 +162,35 @@ BEGIN
 
 	-- 1.7 exchange
 	DECLARE @tempCurrencyName VARCHAR(10), @tempCurrencyId INT
-	DECLARE @BaseCurrencies TABLE(Id INT, Name VARCHAR(20))
+	DECLARE @BaseCurrencies TABLE(Id INT, [Name] VARCHAR(10))
 
 	CREATE TABLE #tmpExchange (
 		ExchangeDate		DATETIME,
 		ExchangeId			INT,
 		Rate				FLOAT,
-		CurrencyId			INT,
-		CurrencyName		VARCHAR(10)
+		BaseCurrencyId		INT
 	)
-	CREATE NONCLUSTERED INDEX Idx_tmpExchange1 ON #tmpExchange (ExchangeDate, CurrencyId, ExchangeId)
-	CREATE NONCLUSTERED INDEX Idx_tmpExchange2 ON #tmpExchange (ExchangeDate, CurrencyName, ExchangeId)
+	CREATE NONCLUSTERED INDEX Idx_tmpExchange ON #tmpExchange (BaseCurrencyId, ExchangeDate, ExchangeId)
 
-	INSERT INTO @BaseCurrencies(Id, Name)
-	SELECT DISTINCT ds.CurrencyId, e.Code 
-	FROM #tmpDiscountSettings ds
-	INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON e.exchangeid = ds.CurrencyId 
+	INSERT INTO @BaseCurrencies(Id)
+	SELECT DISTINCT ds.CurrencyId FROM #tmpDiscountSettings ds
 
-	IF NOT EXISTS (SELECT TOP 1 1 FROM #tmpDiscountSettings ds WHERE ds.CurrencyId = @BaseCurrencyId)
+	IF NOT EXISTS (SELECT TOP 1 1 FROM @BaseCurrencies WHERE Id = @BaseCurrencyId)
 	BEGIN
-		INSERT INTO @BaseCurrencies(Id, Name)
-		VALUES(@BaseCurrencyId,@BaseCurrencyName)
+		INSERT INTO @BaseCurrencies(Id) VALUES(@BaseCurrencyId)
 	END
 
 	WHILE EXISTS (SELECT TOP 1 1 FROM @BaseCurrencies)
 	BEGIN
-		SELECT TOP 1 @tempCurrencyId = Id, @tempCurrencyName = Name FROM @BaseCurrencies
+		SELECT TOP 1 @tempCurrencyId = Id, @tempCurrencyName = e.Code
+		FROM @BaseCurrencies b
+		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON e.exchangeid = b.Id
 
-		INSERT INTO #tmpExchange(ExchangeDate, ExchangeId, Rate, CurrencyId, CurrencyName)
-		SELECT ExchangeDate, ExchangeId
-				, BaseCurrencyRate AS Rate
-				, @tempCurrencyId, @tempCurrencyName
+		INSERT INTO #tmpExchange(ExchangeDate, ExchangeId, Rate, BaseCurrencyId)
+		SELECT ExchangeDate, ExchangeId, BaseCurrencyRate, @tempCurrencyId
 		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrencyName)
-		WHERE ExchangeDate BETWEEN @FromDate AND @ToDate
 
-		DELETE @BaseCurrencies WHERE Name = @tempCurrencyName 
+		DELETE @BaseCurrencies WHERE Id = @tempCurrencyId 
 	END
 
 	-- 1.8 minfee settings
@@ -258,9 +252,9 @@ BEGIN
 			SET m.FeeAmountByDiscountCurrency = m.FeeAmountByDiscountCurrency * ISNULL(ed.Rate, eb.Rate),
 				m.FeeAmountByBaseCurrency = m.FeeAmountByBaseCurrency * eb.Rate
 		FROM #tmpMinFee m
-		INNER JOIN #tmpExchange eb ON m.ToDate = eb.ExchangeDate AND m.CurrencyId = eb.ExchangeID AND eb.CurrencyName = @BaseCurrencyName
+		INNER JOIN #tmpExchange eb ON m.ToDate = eb.ExchangeDate AND m.CurrencyId = eb.ExchangeID AND eb.BaseCurrencyId = @BaseCurrencyId
 		LEFT JOIN #tmpDiscountSettings ds ON ds.PartyId = m.PartyID AND m.ProductId = ds.ProductID 
-		LEFT JOIN #tmpExchange ed ON m.ToDate = ed.ExchangeDate AND m.CurrencyId = ed.ExchangeID AND ed.CurrencyId = ds.CurrencyId
+		LEFT JOIN #tmpExchange ed ON m.ToDate = ed.ExchangeDate AND m.CurrencyId = ed.ExchangeID AND ed.BaseCurrencyId = ds.CurrencyId
 
 		-- 1.8.4 calculate minfee amount(exclude waive time)
 		-- (days in charged - days in waived) * FeeAmount / days in month
@@ -327,7 +321,7 @@ BEGIN
 			SUM(-t.MemberWL * eb.Rate) AS WinlossByBaseCurrency,
 			SUM(-t.Amount * eb.Rate) AS AmountToCompanyByBaseCurrency
 	FROM #temData t
-		INNER JOIN #tmpExchange eb ON eb.ExchangeDate = t.WinlossDate AND eb.CurrencyName = @BaseCurrencyName AND eb.ExchangeID = t.CurrencyId
+		INNER JOIN #tmpExchange eb ON eb.ExchangeDate = t.WinlossDate AND eb.BaseCurrencyId = @BaseCurrencyId AND eb.ExchangeID = t.CurrencyId
 	GROUP BY t.WinlossDate, t.PartyId, t.ProductId
 
 	;WITH cte_winlossByDiscountCurrency AS (
@@ -338,7 +332,7 @@ BEGIN
 				SUM(-ISNULL(t.Amount * ed.Rate, 0)) AS AmountToCompanyByDiscountCurrency
 		FROM #temData t
 			INNER JOIN #tmpDiscountSettings ds ON ds.PartyId = t.PartyID AND t.ProductId = ds.ProductID 
-			INNER JOIN #tmpExchange ed ON t.WinlossDate = ed.ExchangeDate AND t.CurrencyId = ed.ExchangeID AND ed.CurrencyId = ds.CurrencyId
+			INNER JOIN #tmpExchange ed ON t.WinlossDate = ed.ExchangeDate AND t.CurrencyId = ed.ExchangeID AND ed.BaseCurrencyId = ds.CurrencyId
 		GROUP BY t.WinlossDate, t.PartyId, t.ProductId
 	)
 	UPDATE t
@@ -383,7 +377,7 @@ BEGIN
 	;WITH Fee AS(
 		SELECT m.MinFeeId
 			, SUM(CASE WHEN w.ProductId IS NULL THEN 0 ELSE t.AmountToCompanyByDiscountCurrency END) FeeUnderWaiveTimeByDiscountCurrency
-			, SUM(CASE WHEN w.ProductId IS NULL THEN 0 ELSE t.AmountToCompanyByBaseCurrency END)	FeeUnderWaiveTimeByBaseCurrency
+			, SUM(CASE WHEN w.ProductId IS NULL THEN 0 ELSE t.AmountToCompanyByBaseCurrency END) FeeUnderWaiveTimeByBaseCurrency
 			, SUM(CASE WHEN w.ProductId IS NULL THEN t.AmountToCompanyByDiscountCurrency ELSE 0 END) FeeOutOfWaiveTimeByDiscountCurrency
 			, SUM(CASE WHEN w.ProductId IS NULL THEN t.AmountToCompanyByBaseCurrency ELSE 0 END) FeeOutOfWaiveTimeByBaseCurrency
 		FROM #tmpWinlossData t

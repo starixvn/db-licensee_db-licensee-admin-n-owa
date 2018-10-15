@@ -109,9 +109,11 @@ BEGIN
 	(
 		SELECT	PartyGroupId, PartyId
 		FROM	bodb_licensee.dbo.LA_PartyGroupAssignment WITH(NOLOCK)
-		WHERE	PartyGroupId IN (	SELECT	p1.PartyGroupId
-									FROM	bodb_licensee.dbo.LA_PartyGroupAssignment p1 WITH(NOLOCK)
-									WHERE	p1.PartyId IN (SELECT p2.PartyId FROM @PartyIdTable p2))
+		WHERE PartyGroupId IN (
+			SELECT DISTINCT p1.PartyGroupId  
+			FROM bodb_licensee.dbo.LA_PartyGroupAssignment p1 WITH(NOLOCK)
+			INNER JOIN @PartyIdTable p2 ON p1.PartyId=p2.PartyId  
+		)
 	)
 
 	-- ***********************************************************************************
@@ -135,16 +137,16 @@ BEGIN
 		SELECT ci.FromDate, ci.FromParty
 		FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)
 			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
-			INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping map ON map.ChargeID = ci.ChargeID and map.SystemID = 2
-		WHERE	ci.FromParty IN (SELECT PartyId FROM @PartyIdTable) AND
-				ci.ProductId NOT IN (SELECT DISTINCT ProductId FROM bodb_licensee.dbo.LA_Product3rdSub)
-		UNION ALL
-		SELECT s.FromDate, ci.FromParty
-		FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)
-			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
-			INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping map ON map.ChargeID = ci.ChargeID and map.SystemID = 2
-			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfoSub s WITH (NOLOCK) ON s.ChargeIDRef = ci.ChargeID AND s.FromParty = ci.FromParty
-		WHERE ci.FromParty IN (SELECT PartyId FROM @PartyIdTable)
+			INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping map WITH (NOLOCK) ON map.ChargeID = ci.ChargeID and map.SystemID = 2  
+		WHERE ci.FromParty IN (SELECT PartyId FROM @PartyIdTable) AND  
+				ci.ProductId NOT IN (SELECT DISTINCT ProductId FROM bodb_licensee.dbo.LA_Product3rdSub WITH (NOLOCK))  
+		UNION ALL  
+		SELECT s.FromDate, ci.FromParty  
+		FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)  
+			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty  
+			INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping map WITH (NOLOCK) ON map.ChargeID = ci.ChargeID and map.SystemID = 2  
+			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfoSub s WITH (NOLOCK) ON s.ChargeIDRef = ci.ChargeID AND s.FromParty = ci.FromParty  
+		WHERE ci.FromParty IN (SELECT PartyId FROM @PartyIdTable)  
 	)
 	INSERT INTO @tmpPartySBLaunchDate(AffectedDate,PartyID)
 	SELECT MIN(FromDate), FromParty FROM P GROUP BY FromParty
@@ -235,6 +237,8 @@ BEGIN
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@PrevFromDate, @PrevToDate, @BaseCurrencyName)
 
+	CREATE NONCLUSTERED INDEX Idx_Exchange ON #Exchange (ExchangeDate, ExchangeID)
+
 	IF @IsConvert = 0
 	BEGIN
 		UPDATE #Exchange
@@ -256,6 +260,7 @@ BEGIN
 			ProductId		TINYINT,
 			AmountToCompany MONEY,
 			IsApplyMinFee	BIT)
+
 	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,AComm,PComm,ProductId,AmountToCompany)
 	(
 		SELECT	b.SiteID,
@@ -290,8 +295,6 @@ BEGIN
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, e.Rate
 	)
-
-	CREATE NONCLUSTERED INDEX Idx_InvoiceData ON #TempData (PartyId, ProductId)
 
 	-- insert zero winloss for case: product don't have any ticket
 	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,AComm,PComm,ProductId,AmountToCompany)
