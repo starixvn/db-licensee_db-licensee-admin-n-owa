@@ -12,7 +12,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_GenerateAmountForSoftwareFee]
 	@BillerId			INT,
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
-	@ProductCodes		VARCHAR(100),
+	@ProductCodes		VARCHAR(500),
 	@Environment		VARCHAR(50),
 	@ErrCode			INT				= 0		OUTPUT,
 	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT,
