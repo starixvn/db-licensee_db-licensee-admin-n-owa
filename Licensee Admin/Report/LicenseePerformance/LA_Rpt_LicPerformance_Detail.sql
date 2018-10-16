@@ -49,6 +49,7 @@ AS
 		- 20180712@Bruce: Enhance Manage Discount group [#94282]
 		- 20180718@Bruce: use decimal to void margin not match among reports [#94108]
 		- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
+		- 20180924@Parsons: LA - LPID report - Apply one discount rate across all base currencies [#100046]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -108,9 +109,11 @@ BEGIN
 	(
 		SELECT	PartyGroupId, PartyId
 		FROM	bodb_licensee.dbo.LA_PartyGroupAssignment WITH(NOLOCK)
-		WHERE	PartyGroupId IN (	SELECT	p1.PartyGroupId
-									FROM	bodb_licensee.dbo.LA_PartyGroupAssignment p1 WITH(NOLOCK)
-									WHERE	p1.PartyId IN (SELECT p2.PartyId FROM @PartyIdTable p2))
+		WHERE PartyGroupId IN (
+			SELECT DISTINCT p1.PartyGroupId  
+			FROM bodb_licensee.dbo.LA_PartyGroupAssignment p1 WITH(NOLOCK)
+			INNER JOIN @PartyIdTable p2 ON p1.PartyId=p2.PartyId  
+		)
 	)
 
 	-- ***********************************************************************************
@@ -134,16 +137,16 @@ BEGIN
 		SELECT ci.FromDate, ci.FromParty
 		FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)
 			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
-			INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping map ON map.ChargeID = ci.ChargeID and map.SystemID = 2
-		WHERE	ci.FromParty IN (SELECT PartyId FROM @PartyIdTable) AND
-				ci.ProductId NOT IN (SELECT DISTINCT ProductId FROM bodb_licensee.dbo.LA_Product3rdSub)
-		UNION ALL
-		SELECT s.FromDate, ci.FromParty
-		FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)
-			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
-			INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping map ON map.ChargeID = ci.ChargeID and map.SystemID = 2
-			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfoSub s WITH (NOLOCK) ON s.ChargeIDRef = ci.ChargeID AND s.FromParty = ci.FromParty
-		WHERE ci.FromParty IN (SELECT PartyId FROM @PartyIdTable)
+			INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping map WITH (NOLOCK) ON map.ChargeID = ci.ChargeID and map.SystemID = 2  
+		WHERE ci.FromParty IN (SELECT PartyId FROM @PartyIdTable) AND  
+				ci.ProductId NOT IN (SELECT DISTINCT ProductId FROM bodb_licensee.dbo.LA_Product3rdSub WITH (NOLOCK))  
+		UNION ALL  
+		SELECT s.FromDate, ci.FromParty  
+		FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)  
+			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty  
+			INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping map WITH (NOLOCK) ON map.ChargeID = ci.ChargeID and map.SystemID = 2  
+			INNER JOIN bodb_licensee.dbo.OAS_ChargeInfoSub s WITH (NOLOCK) ON s.ChargeIDRef = ci.ChargeID AND s.FromParty = ci.FromParty  
+		WHERE ci.FromParty IN (SELECT PartyId FROM @PartyIdTable)  
 	)
 	INSERT INTO @tmpPartySBLaunchDate(AffectedDate,PartyID)
 	SELECT MIN(FromDate), FromParty FROM P GROUP BY FromParty
@@ -191,30 +194,27 @@ BEGIN
 	CREATE TABLE #AmountToCompany (
 		PartyId			INT,
 		ProductId		INT,
-		Winloss			MONEY,
 		Fee				MONEY,
 		Discount		MONEY,
-		DiscountRate	MONEY,
-		DiscountRemark	NVARCHAR(4000),
 		Rebate			MONEY,
-		RebateRate		MONEY,
-		RebateRemark	NVARCHAR(4000),
-		NegativeFee		MONEY,
-		Minfee			MONEY,
 		IsChargedByMinFee	BIT,
 		IsCurrent			BIT
 	)
+	IF(@IsConvert = 0)
+	BEGIN
+		SELECT @BaseCurrencyName = e.Code, @BaseCurrency = @Currency FROM bodb02.dbo.Exchange e WITH (NOLOCK) WHERE e.exchangeid = @Currency
+	END
 
 	--  Minimum fee is calculated for all currencies that licensee offer. There is no minimum fee when data display individual currency.
 		-- current month
-		INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,NegativeFee,Minfee,IsChargedByMinFee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark)
-		EXEC bodb_licensee.dbo.LA_AmountToCompanySel @FromDate,@ToDate,@PartyIds,@ProductCodes,@BaseCurrencyName,@Currency
+		INSERT INTO #AmountToCompany(PartyId,ProductId,Fee,Discount,Rebate,IsChargedByMinFee)
+		EXEC bodb_licensee.dbo.LA_AmountToCompanyByDiscountCurrencySel @FromDate,@ToDate,@PartyIds,@ProductCodes,@BaseCurrencyName,@BaseCurrency,@Currency
 
 		UPDATE #AmountToCompany SET IsCurrent = 1
 
 		-- previous month
-		INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,NegativeFee,Minfee,IsChargedByMinFee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark)
-		EXEC bodb_licensee.dbo.LA_AmountToCompanySel @PrevFromDate, @PrevToDate,@PartyIds,@ProductCodes,@BaseCurrencyName,@Currency
+		INSERT INTO #AmountToCompany(PartyId,ProductId,Fee,Discount,Rebate,IsChargedByMinFee)
+		EXEC bodb_licensee.dbo.LA_AmountToCompanyByDiscountCurrencySel @PrevFromDate, @PrevToDate,@PartyIds,@ProductCodes,@BaseCurrencyName,@BaseCurrency,@Currency
 
 		UPDATE #AmountToCompany SET IsCurrent = 0 WHERE IsCurrent IS NULL
 	-- End region
@@ -237,6 +237,8 @@ BEGIN
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@PrevFromDate, @PrevToDate, @BaseCurrencyName)
 
+	CREATE NONCLUSTERED INDEX Idx_Exchange ON #Exchange (ExchangeDate, ExchangeID)
+
 	IF @IsConvert = 0
 	BEGIN
 		UPDATE #Exchange
@@ -258,6 +260,7 @@ BEGIN
 			ProductId		TINYINT,
 			AmountToCompany MONEY,
 			IsApplyMinFee	BIT)
+
 	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,AComm,PComm,ProductId,AmountToCompany)
 	(
 		SELECT	b.SiteID,
@@ -292,8 +295,6 @@ BEGIN
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, e.Rate
 	)
-
-	CREATE NONCLUSTERED INDEX Idx_InvoiceData ON #TempData (PartyId, ProductId)
 
 	-- insert zero winloss for case: product don't have any ticket
 	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,AComm,PComm,ProductId,AmountToCompany)
