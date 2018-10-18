@@ -393,12 +393,6 @@ BEGIN
 	FROM #AmountToCompany d WHERE d.Discount > 0
 	-- End Region
 
-	-- Region: Rebate
-	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate, Remark)
-	SELECT d.PartyId, d.ProductId, Rebate, @AmountTypeRebate, d.RebateRate, d.RebateRemark
-	FROM #AmountToCompany d WHERE d.Rebate > 0
-	-- End Region
-
 	-- Region: Select data	
 	INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate,Remark)
 	(
@@ -490,7 +484,8 @@ BEGIN
 
 	-- insert AG setup fees
 	DECLARE @AGMonthlyFee MONEY
-	SELECT @AGMonthlyFee = SUM(ISNULL(InvoiceAmount, 0)) FROM @FinalResult WHERE ProductId = 10 -- AG Casino
+	SELECT @AGMonthlyFee = SUM(CASE WHEN AmountType = @AmountTypeSoftwareFee THEN InvoiceAmount ELSE -InvoiceAmount END)
+	FROM @FinalResult WHERE ProductId = 10 -- AG Casino
 	IF (@AGMonthlyFee > 0 AND @RemainingAG > 0)
 	BEGIN
 		DECLARE @AGAmount MONEY = (CASE WHEN @RemainingAG < @AGMonthlyFee THEN @RemainingAG ELSE @AGMonthlyFee END)
