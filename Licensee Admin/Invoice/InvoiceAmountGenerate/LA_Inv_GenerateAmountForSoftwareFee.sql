@@ -16,7 +16,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_GenerateAmountForSoftwareFee]
 	@Environment		VARCHAR(50),
 	@ErrCode			INT				= 0		OUTPUT,
 	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT,
-	@BaseCurrency		NVARCHAR(20)	= 'GBP'	OUTPUT,
+	@BaseCurrency		NVARCHAR(20)	= 'EUR'	OUTPUT,
 	@InvoiceTemplateName VARCHAR(200)	= ''	OUTPUT
 WITH RECOMPILE
 AS
@@ -42,32 +42,32 @@ BEGIN
 	DECLARE @LastDate DATETIME = DATEADD (dd, -1, DATEADD(mm, DATEDIFF(mm, 0, @FromDate) + 1, 0))
 	DECLARE @DaysInMonth INT = DATEDIFF(day, @FirstDate, @LastDate) + 1
 
-	DECLARE @EmptyTable AS TABLE(
-			ProductId	INT,
-			ProductCode	VARCHAR(20),
-			Productname	VARCHAR(200),
-			InvoiceAmount MONEY,
-			WithoutWaivedAmount MONEY,
-			AmountType	TINYINT
-	)
+	DECLARE	@FinalResult TABLE(
+			ProductId		INT,
+			ProductCode		VARCHAR(100),
+			ProductName		VARCHAR(500),
+			Remark			NVARCHAR(4000),
+			InvoiceAmount	MONEY,
+			AmountType		TINYINT,
+			Rate			MONEY,
+			DeductMonthlyFees	MONEY,
+			RemainingAmount	MONEY)
 
 	-- Region: Get base Currency
-	DECLARE @BaseCurrencyId INT = 12
-	DECLARE @BaseCurrencyName VARCHAR(10) = 'GBP'
+	DECLARE @BaseCurrencyId INT 
 	SET		@BaseCurrencyId = ISNULL((	SELECT TOP 1 opd.BaseCurrencyId
 										FROM dbo.OAS_PartyDetail opd WITH(NOLOCK)	
 										WHERE	opd.PartyID = @PartyId
-									), 12)
+									), 6)
 	
-	DECLARE @BaseCurrencyTable AS TABLE(Id INT, Name VARCHAR(10))
-	INSERT	INTO @BaseCurrencyTable(Id,Name)
+	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(10))
+	INSERT	INTO @BaseCurrencyTable(CurrencyId, CurrencyName)
 	EXECUTE bodb_Licensee.dbo.LA_SelBaseCurrency
 	
-	SELECT	@BaseCurrencyName = Name
-	FROM	@BaseCurrencyTable bct
-	WHERE	@BaseCurrencyId = bct.Id
+	SELECT	@BaseCurrency = CurrencyName
+	FROM	@BaseCurrencyTable
+	WHERE	@BaseCurrencyId = CurrencyId
 	
-	SELECT @BaseCurrency = @BaseCurrencyName	
 	-- End Region	
 
 	-- Region: Get template
@@ -89,7 +89,7 @@ BEGIN
 
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrency)
 	
 	-- End region
 
@@ -110,7 +110,7 @@ BEGIN
 		IsChargedByMinFee BIT
 	)
 	INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,NegativeFee,Minfee,IsChargedByMinFee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark)
-	EXEC dbo.LA_AmountToCompanySel @FromDate,@ToDate,@PartyId,@ProductCodes,@BaseCurrencyName
+	EXEC dbo.LA_AmountToCompanySel @FromDate,@ToDate,@PartyId,@ProductCodes,@BaseCurrency
 
 	-- Region: Get party charge rate info	
 	DECLARE @PartyChargeInfo AS TABLE (
@@ -184,7 +184,16 @@ BEGIN
 	)
 	BEGIN
 		SELECT @ErrCode = 1, @ErrMsg = 'Please check the Exchange settings of Payer''s minfee or minfee group. Exchange of minfee or minfees in group should be the same with Payer''s exchange.'
-		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
+		SELECT ProductId,
+			ProductCode,
+			ProductName,
+			InvoiceAmount,
+			AmountType,
+			Rate,
+			DeductMonthlyFees,
+			RemainingAmount,
+			Remark 
+		FROM @FinalResult
 		RETURN
 	END
 
@@ -209,7 +218,16 @@ BEGIN
 	IF @DiscountCurrency IS NOT NULL AND @DiscountCurrency != @BaseCurrencyId
 	BEGIN
 		SELECT @ErrCode = 2, @ErrMsg = 'Please check the Exchange settings of Payer''s discount. Exchange of discount must be the same with Payer''s exchange.'
-		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
+		SELECT ProductId,
+			ProductCode,
+			ProductName,
+			InvoiceAmount,
+			AmountType,
+			Rate,
+			DeductMonthlyFees,
+			RemainingAmount,
+			Remark 
+		FROM @FinalResult
 		RETURN
 	END
 
@@ -250,8 +268,6 @@ BEGIN
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, r.BettypeRef
 	)
 	
-	CREATE NONCLUSTERED INDEX Idx_InvoiceData ON #TempData (PartyId, ProductId)
-
 	UPDATE	#TempData
 	SET		AmountToCompany =	CASE  
 									WHEN td.ProductId = 3 THEN (-td.WinLoss * p.Rate - td.AComm) * e.Rate
@@ -384,17 +400,6 @@ BEGIN
 	-- End Region
 
 	-- Region: Select data	
-	DECLARE	@FinalResult TABLE(
-			ProductId		INT,
-			ProductCode		VARCHAR(100),
-			ProductName		VARCHAR(500),
-			Remark			NVARCHAR(4000),
-			InvoiceAmount	MONEY,
-			AmountType		TINYINT,
-			Rate			MONEY,
-			DeductMonthlyFees	MONEY,
-			RemainingAmount	MONEY)
-
 	INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate,Remark)
 	(
 		SELECT	id.ProductId,
@@ -471,16 +476,16 @@ BEGIN
 	BEGIN
 		DECLARE @ProgratedMinfee MONEY = ISNULL((SELECT TOP 1 MinFee FROM #AmountToCompany WHERE ProductId = 0),0)
 		DECLARE @SBAfterDiscount MONEY = ISNULL((
-			SELECT SUM(CASE WHEN AmountType = 1 THEN InvoiceAmount ELSE -InvoiceAmount END)
+			SELECT SUM(CASE WHEN AmountType = @AmountTypeSoftwareFee THEN InvoiceAmount ELSE -InvoiceAmount END)
 			FROM @FinalResult
-			WHERE ProductId = 0 AND AmountType IN (1,4) -- 1: Software fee, 4: discount
+			WHERE ProductId = 0 AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount) 
 		),0)
 		DECLARE @AmfAmount MONEY = (CASE WHEN @RemainingAmf < @ProgratedMinfee THEN @RemainingAmf ELSE @ProgratedMinfee END)
 		SET @AmfAmount = (CASE WHEN @AmfAmount < @SBAfterDiscount THEN @AmfAmount ELSE @SBAfterDiscount END)
 		SET @AmfAmount = (CASE WHEN @AmfAmount < 0 THEN 0 ELSE @AmfAmount END)
 
 		UPDATE @FinalResult SET DeductMonthlyFees = @AmfAmount, RemainingAmount = @RemainingAmf - @AmfAmount
-		WHERE AmountType = 1 AND ProductId = 0 -- SB
+		WHERE AmountType = @AmountTypeSoftwareFee AND ProductId = 0 -- SB
 	END
 
 	-- insert AG setup fees
