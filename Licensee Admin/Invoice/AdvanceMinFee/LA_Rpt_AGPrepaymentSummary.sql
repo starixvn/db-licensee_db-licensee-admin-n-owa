@@ -34,7 +34,7 @@ BEGIN
 		ParentName	VARCHAR(50),
 		PartyId		INT,
 		PartyName	VARCHAR(50),
-		Amount		DECIMAL(18, 2),
+		Amount		MONEY,
 		InvoiceNo	VARCHAR(50),
 		InvItemTypeId	INT
 	)
