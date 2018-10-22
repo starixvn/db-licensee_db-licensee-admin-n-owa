@@ -28,6 +28,9 @@ BEGIN
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionId=@FunctionId
 
+	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
+	EXEC dbo.LA_PartyListNonOfficialSel
+
 	-- Step 1: Get all invoiceStatement which has invItemTypeId in (25, 26)
 	DECLARE @AGPSummary TABLE(
 		ParentId	INT,
