@@ -15,7 +15,8 @@ ALTER PROCEDURE [dbo].[LA_DiscountIns]
 	@CalculationProductIds VARCHAR(512) = '', 
 	@DiscountProductIds VARCHAR(512) = '',
 	@RateSettingsData	VARCHAR(MAX) = '', 
-	@PartySettingsData	NVARCHAR(MAX) = '',  
+	@PartySettingsData	NVARCHAR(MAX) = '', 
+	@CurrencySettingsData	VARCHAR(MAX) = '',   
 	@UserId				INT, 
 	@LoginIp			VARCHAR (50)	= '', 
 	@ErrCode			INT = 0 OUTPUT, 
@@ -29,6 +30,8 @@ AS
 
 	Revisions:  
 		- 20180702@Parsons: Insert discount groups [#94282]
+		- 20181023@Parsons: Configure-discount-settings-by-currency [#99694]
+
 	 Params:
 		@RateSettingsData = '<Root>
 								<RateSetting>
@@ -57,6 +60,16 @@ AS
 									<IsApplyDiscount>0</IsApplyDiscount>
 								</PartySetting>
 							</Root>'
+		@CurrencySettingsData = '<Root>
+								<CurrencySetting>
+									<PartyId>1</PartyId>
+									<CurrencyId>2</Remark>
+								</CurrencySetting>
+								<CurrencySetting>
+									<PartyId>3</PartyId>
+									<CurrencyId>4</Remark>
+								</CurrencySetting>
+							</Root>'
 */
 BEGIN
 	SET NOCOUNT ON
@@ -81,7 +94,8 @@ BEGIN
 	END
 
 	DECLARE @Products TABLE (ProductId TINYINT, CalculationType TINYINT)
-	DECLARE @PartySettings	TABLE (PartyId SMALLINT, Remark NVARCHAR(500), IsApplyDiscount BIT)
+	DECLARE @PartySettings	TABLE (PartyId SMALLINT, Remark NVARCHAR(500), IsApplyDiscount BIT) 
+	DECLARE @CurrencySettings	TABLE (PartyId SMALLINT, CurrencyId INT)
 	DECLARE @RateSettings	TABLE (FromAmount MONEY, ToAmount MONEY, Rate MONEY, RowIndex INT)
 	
 	DECLARE @docHandler INT
@@ -115,6 +129,20 @@ BEGIN
 	
 		EXEC sp_xml_removedocument @docHandler
 	END
+
+	--parse setting currency
+	IF @CurrencySettingsData <> ''
+	BEGIN
+		EXEC sp_xml_preparedocument @docHandler OUTPUT, @CurrencySettingsData
+		INSERT INTO @CurrencySettings(PartyId, CurrencyId)
+		SELECT PartyId, CurrencyId
+		FROM OPENXML(@docHandler, 'Root/CurrencySetting')
+		WITH (PartyId	INT 'PartyId', 
+				CurrencyId	INT 'CurrencyId')
+	
+		EXEC sp_xml_removedocument @docHandler
+	END
+
 	--parse setting rate
 	IF @RateSettingsData <> ''
 	BEGIN
@@ -191,6 +219,19 @@ BEGIN
 		RETURN	
 	END
 
+	--insert discount group currency
+	INSERT INTO dbo.LA_DiscountGroupCurrency(DiscountGroupId, PartyID, CurrencyId)
+	SELECT DISTINCT @GroupIdOut, PartyId, CurrencyId
+	FROM @CurrencySettings
+
+	IF @@ERROR <> 0
+	BEGIN
+		DELETE dbo.LA_DiscountGroupHeader WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupAssignment WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
+		SELECT @ErrMsg = 'Insert failed. Please try again.', @ErrCode =  503
+		RETURN	
+	END
+
 	--insert discount group detail
 	INSERT INTO dbo.LA_DiscountGroupDetail(DiscountGroupId, FromAmount, ToAmount, Rate)
 	SELECT @GroupIdOut, FromAmount, ToAmount, Rate
@@ -200,6 +241,7 @@ BEGIN
 	BEGIN
 		DELETE dbo.LA_DiscountGroupHeader WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
 		DELETE dbo.LA_DiscountGroupAssignment WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupCurrency WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
 		SELECT @ErrMsg = 'Insert failed. Please try again.', @ErrCode =  503
 		RETURN	
 	END
@@ -213,6 +255,7 @@ BEGIN
 	BEGIN
 		DELETE dbo.LA_DiscountGroupHeader WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
 		DELETE dbo.LA_DiscountGroupAssignment WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupCurrency WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
 		DELETE dbo.LA_DiscountGroupDetail WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
 		SELECT @ErrMsg = 'Insert failed. Please try again.', @ErrCode =  503
 		RETURN	
