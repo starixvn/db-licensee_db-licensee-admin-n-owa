@@ -17,7 +17,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
 	@Environment		VARCHAR(50),
 	@ErrCode			INT				= 0		OUTPUT,
 	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT,
-	@BaseCurrency		NVARCHAR(20)	= 'GBP'	OUTPUT,
+	@BaseCurrency		VARCHAR(10)		= 'EUR'	OUTPUT,
 	@InvoiceTemplateName VARCHAR(200)	= ''	OUTPUT,
 	@HostingFeesExchangeName VARCHAR(20)= ''	OUTPUT,
 	@HostingFeesExchangeRate FLOAT		= 0		OUTPUT,

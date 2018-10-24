@@ -16,7 +16,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_GenerateAmountForSoftwareFee]
 	@Environment		VARCHAR(50),
 	@ErrCode			INT				= 0		OUTPUT,
 	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT,
-	@BaseCurrency		NVARCHAR(20)	= 'EUR'	OUTPUT,
+	@BaseCurrency		VARCHAR(10)		= 'EUR'	OUTPUT,
 	@InvoiceTemplateName VARCHAR(200)	= ''	OUTPUT
 WITH RECOMPILE
 AS
@@ -415,30 +415,6 @@ BEGIN
 		FROM	@InvoiceData id
 				LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON id.ProductId = p.Productid
 	)
-
-	INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate,Remark)
-	(
-		SELECT	-1,
-				(	SELECT	f.ProductCode + ',' 
-					FROM	@FinalResult f 
-					WHERE f.AmountType = id.AmountType AND f.Rate=id.Rate FOR XML PATH('')) 
-				AS ProductCode,
-				(	SELECT	f.ProductName + ',' 
-					FROM	@FinalResult f 
-					WHERE f.AmountType = id.AmountType AND f.Rate=id.Rate FOR XML PATH('')) 
-				AS ProductName,
-				SUM(id.InvoiceAmount),
-				id.AmountType,
-				id.Rate,
-				id.Remark
-		FROM	@FinalResult id
-		WHERE	id.AmountType > @AmountTypeSoftwareFee
-		GROUP BY id.AmountType, id.Rate, id.Remark
-	)	
-	UPDATE	@FinalResult
-	SET		ProductCode = LEFT(ProductCode, LEN(ProductCode) - 1),
-			ProductName = LEFT(ProductName, LEN(ProductName) - 1)
-	WHERE	ProductId = -1
 	
 	-- get AMF, AG and prepayment
 	DECLARE @AG INT = 25, @DeductAG INT = 26
@@ -458,12 +434,12 @@ BEGIN
 
 	-- insert zero amount
 	INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, AmountType)
-	SELECT pd.ProductID, pd.ProductPrefix, pd.ProductName, 0, @AmountTypeSoftwareFee
-	FROM (SELECT DISTINCT pci.ProductID 
+	SELECT p.ProductID, p.ProductPrefix, p.ProductName, 0, @AmountTypeSoftwareFee
+	FROM (SELECT DISTINCT pci.ProductID, pd.ProductPrefix, pd.ProductName 
 		FROM @PartyChargeInfo pci
+		INNER JOIN dbo.LA_f_Products3rd('') pd ON pci.ProductID = pd.ProductID
 		LEFT JOIN @FinalResult r ON pci.ProductID = r.ProductId
 		WHERE r.ProductId IS NULL) p
-	JOIN dbo.LA_f_Products3rd('') pd ON p.ProductID = pd.ProductID
 
 	-- insert amf
 	IF @RemainingAmf > 0 
@@ -485,7 +461,8 @@ BEGIN
 	-- insert AG setup fees
 	DECLARE @AGMonthlyFee MONEY
 	SELECT @AGMonthlyFee = SUM(CASE WHEN AmountType = @AmountTypeSoftwareFee THEN InvoiceAmount ELSE -InvoiceAmount END)
-	FROM @FinalResult WHERE ProductId = 10 -- AG Casino
+	FROM @FinalResult 
+	WHERE ProductId = 10 AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount)
 	IF (@AGMonthlyFee > 0 AND @RemainingAG > 0)
 	BEGIN
 		DECLARE @AGAmount MONEY = (CASE WHEN @RemainingAG < @AGMonthlyFee THEN @RemainingAG ELSE @AGMonthlyFee END)
@@ -510,7 +487,6 @@ BEGIN
 			f.RemainingAmount,
 			f.Remark
 	FROM	@FinalResult f
-	WHERE f.ProductId != -1	-- not summarized row
 	ORDER BY f.AmountType, f.ProductId
 
 	SELECT @ErrCode = 0, @ErrMsg = ''

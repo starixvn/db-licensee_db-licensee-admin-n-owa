@@ -38,7 +38,7 @@ BEGIN
 		PartyId		INT,
 		PartyName	VARCHAR(50),
 		Amount		MONEY,
-		InvoiceNo	VARCHAR(50),
+		InvoiceNo	NVARCHAR(100),
 		InvItemTypeId	INT
 	)
 	INSERT INTO @AGPSummary(ParentId, PartyId, PartyName, InvoiceNo, InvItemTypeId, Amount)
