@@ -17,7 +17,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
 	@Environment		VARCHAR(50),
 	@ErrCode			INT				= 0		OUTPUT,
 	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT,
-	@BaseCurrency		NVARCHAR(20)	= 'GBP'	OUTPUT,
+	@BaseCurrency		VARCHAR(10)		= 'EUR'	OUTPUT,
 	@InvoiceTemplateName VARCHAR(200)	= ''	OUTPUT,
 	@HostingFeesExchangeName VARCHAR(20)= ''	OUTPUT,
 	@HostingFeesExchangeRate FLOAT		= 0		OUTPUT,
@@ -58,6 +58,7 @@ AS
 		+ 20180525@Scofield: Incorporate 9wickets' data [#94950]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		+ 20180712@Bruce: Enhance Manage Discount group [#94282]
+		+ 20181002@Parsons: Integrate AG setup fee into invoices [#98485]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -637,8 +638,8 @@ BEGIN
 				InvoiceAmount	MONEY,
 				AmountType		TINYINT,
 				Rate			MONEY,
-				AmfAmount		MONEY,
-				RemainingAmf	MONEY)
+				DeductMonthlyFees	MONEY,
+				RemainingAmount	MONEY)
 
 		INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate,Remark)
 		(
@@ -686,72 +687,25 @@ BEGIN
 				ProductName = LEFT(ProductName, LEN(ProductName) - 1)
 		WHERE	ProductId = -1
 		
-		-- get AMF and prepayment
-		SELECT SUM(ISNULL(Income,0) - ISNULL(Expense,0)) Amount, s.InvItemTypeId
-		INTO #credit
-		FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
-		INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
-		WHERE s.InvItemTypeId IN (3,5,7,21,22,23,24) 
-			AND s.RefPartyId = @PartyId
-			AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
-			AND h.Environment = @Environment
-		GROUP BY s.InvItemTypeId
-
-		DECLARE @RemainingAmf MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeId IN (3,5,7,21)),0)
-		DECLARE @Prepayment MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeId IN (22,23,24)),0)
-
-		-- InvoiceType Software: 1
-		IF @InvoiceTypeId = 1			
-		BEGIN
-			-- insert zero amount
-			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, AmountType)
-			SELECT pd.ProductID, pd.ProductPrefix, pd.ProductName, 0, @AmountTypeSoftwareFee
-			FROM (SELECT DISTINCT pci.ProductID 
-				FROM @PartyChargeInfo pci
-				LEFT JOIN @FinalResult r ON pci.ProductID = r.ProductId
-				WHERE r.ProductId IS NULL) p
-			JOIN dbo.LA_f_Products3rd('') pd ON p.ProductID = pd.ProductID
-
-			-- insert amf
-			IF @RemainingAmf > 0 
-			BEGIN
-				DECLARE @ProgratedMinfee MONEY = ISNULL((SELECT TOP 1 MinFee FROM #AmountToCompany WHERE ProductId = 0),0)
-				DECLARE @SBAfterDiscount MONEY = ISNULL((
-					SELECT SUM(CASE WHEN AmountType = 1 THEN InvoiceAmount ELSE -InvoiceAmount END)
-					FROM @FinalResult
-					WHERE ProductId = 0 AND AmountType IN (1,4) -- 1: Software fee, 4: discount
-				),0)
-				DECLARE @AmfAmount MONEY = (CASE WHEN @RemainingAmf < @ProgratedMinfee THEN @RemainingAmf ELSE @ProgratedMinfee END)
-				SET @AmfAmount = (CASE WHEN @AmfAmount < @SBAfterDiscount THEN @AmfAmount ELSE @SBAfterDiscount END)
-				SET @AmfAmount = (CASE WHEN @AmfAmount < 0 THEN 0 ELSE @AmfAmount END)
-
-				UPDATE @FinalResult SET AmfAmount = @AmfAmount, RemainingAmf = @RemainingAmf - @AmfAmount
-				WHERE AmountType = 1 AND ProductId = 0 -- SB
-			END
-
-			DECLARE @TotalAmount MONEY = (
-				SELECT SUM((CASE WHEN AmountType=@AmountTypeDiscount THEN -InvoiceAmount ELSE InvoiceAmount END) - ISNULL(AmfAmount,0))
-				FROM @FinalResult
-				WHERE ProductId != -1	-- not summarized row
-					AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount)
-			)
-
-			IF @Prepayment>0
-			BEGIN
-				SET @TotalAmount = CASE WHEN @TotalAmount<0 THEN 0 ELSE @TotalAmount END
-				DECLARE @RemainingPrepayment MONEY = @Prepayment - @TotalAmount
-				INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmf)
-				VALUES(0,'','',@DeductAgainstInvoice,
-					CASE WHEN @RemainingPrepayment >=0 THEN -@TotalAmount ELSE -@Prepayment END,
-					CASE WHEN @RemainingPrepayment >=0 THEN @RemainingPrepayment ELSE 0 END)
-			END
-		END
-
 		-- 10: debit note for return amf
 		IF @InvoiceTypeId = 10
 		BEGIN
+			-- get AMF and prepayment
+			SELECT SUM(ISNULL(Income,0) - ISNULL(Expense,0)) Amount, s.InvItemTypeId
+			INTO #credit
+			FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
+			INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
+			WHERE s.InvItemTypeId IN (3,5,7,21,22,23,24) 
+				AND s.RefPartyId = @PartyId
+				AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
+				AND h.Environment = @Environment
+			GROUP BY s.InvItemTypeId
+
+			DECLARE @RemainingAmf MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeId IN (3,5,7,21)),0)
+			DECLARE @Prepayment MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeId IN (22,23,24)),0)
+
 			DELETE @FinalResult
-			INSERT INTO @FinalResult(AmountType, RemainingAmf, InvoiceAmount) VALUES (1, @RemainingAmf, @Prepayment)
+			INSERT INTO @FinalResult(AmountType, RemainingAmount, InvoiceAmount) VALUES (1, @RemainingAmf, @Prepayment)
 		END
 
 		SELECT	f.ProductId,
@@ -760,8 +714,8 @@ BEGIN
 				f.InvoiceAmount,
 				f.AmountType,
 				f.Rate,
-				f.AmfAmount,
-				f.RemainingAmf,
+				f.DeductMonthlyFees,
+				f.RemainingAmount,
 				f.Remark
 		FROM	@FinalResult f
 		WHERE (@InvoiceTypeId != 3		--not rebate
