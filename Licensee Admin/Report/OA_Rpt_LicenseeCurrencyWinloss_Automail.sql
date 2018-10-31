@@ -1,14 +1,5 @@
-USE [bodb02]
-GO
-/****** Object:  StoredProcedure [dbo].[OA_Rpt_LicenseeCurrencyWinloss_Automail]    Script Date: 12/07/2016 02:41:02 ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 
-/****** Object:  Stored Procedure dbo.OA_Rpt_LicenseeCurrencyWinloss_Automail    Script Date: 4/8/2013 11:18:17 PM ******/
-
-/****** Object:  Stored Procedure dbo.OA_Rpt_LicenseeCurrencyWinloss_Automail    Script Date: 11/28/2012 3:41:47 PM ******/
 ALTER PROCEDURE [dbo].[OA_Rpt_LicenseeCurrencyWinloss_Automail]  
  @Licensee        VARCHAR(1000),
  @Currency        INT = 0,
@@ -37,6 +28,7 @@ AS
     Revisions:  
         -20120814@Henry: add ShowLiveCasino 
         -20160726@Francis: Move SP to bodb_LicenseeReport - [Redmine: #60449]
+		- 20181031@Patrick: DB052 indexes revolution [RedmineID: #103572]
         
     Param's Explanation:  
       + @ReportType: 1-Live; 2-Non-Live; 0: All;  
@@ -175,7 +167,7 @@ BEGIN
                     '- SUM(CASE WHEN (b.bettype BETWEEN 1201 AND 1299) THEN (b.awinlost + b.winlost - b.actual_stake + b.comm) ELSE 0 END)  as AmtDueToVS,' + char(13) +
                     'COUNT(b.transid) * ' +  CASE WHEN @drawfilter = 2 THEN 'CASE WHEN b.statusID = 111 THEN 0 ELSE 1 END' ELSE '1' END + ' Betcount' + char(13) +
                     ',SUM(b.playercomm) as Playercomm' + char(13) +
-                'FROM dbo.bettrans b WITH (NOLOCK,INDEX=CIX_recommend_matchid_bettype)' + char(13) +    
+                'FROM dbo.bettrans b WITH (NOLOCK,INDEX=IX_recommend)' + char(13) +    
                     'INNER JOIN #tmpAg t ON b.recommend = t.custid'     + char(13) +
                     'LEFT JOIN [match] m with(nolock) ON b.matchid = m.matchid'     + char(13) +
                     'LEFT JOIN outright o with(nolock) ON b.matchid = o.orid'     + char(13) +
