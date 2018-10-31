@@ -6,7 +6,7 @@ SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 GO
 
-CREATE PROCEDURE [dbo].[LA_DiscountGroupCurrencySel]
+ALTER PROCEDURE [dbo].[LA_DiscountGroupCurrencySel]
 	@DiscountGroupId	INT,
 	@PartyId			INT
 AS
@@ -48,6 +48,5 @@ BEGIN
 	SELECT c.PartyId, c.CurrencyId, c.CurrencyCode AS CurrencyName, CASE WHEN d.CurrencyId IS NOT NULL THEN 1 ELSE 0 END IsSelected
 	FROM @CurrenciesOfLicensee c
 	LEFT JOIN LA_DiscountGroupCurrency d WITH(NOLOCK) ON d.PartyID = c.PartyId AND d.CurrencyId = c.CurrencyId AND d.DiscountGroupId = @DiscountGroupId
-	ORDER BY c.PartyId, c.CurrencyCode
 END
 GO
