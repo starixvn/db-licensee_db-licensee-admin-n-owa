@@ -121,6 +121,12 @@ BEGIN
 	LEFT JOIN @PartyList b ON a.PartyID = b.PartyId
 	WHERE b.PartyId IS NULL AND a.CalculationType IN (@ToBeCalculated, @CalculateAndDiscount)
 
+	-- 1.3.4 discount by currency
+	SELECT c.DiscountGroupId, c.PartyID, c.CurrencyId
+	INTO #tmpDiscountCurrency
+	FROM dbo.LA_DiscountGroupCurrency c WITH(NOLOCK)
+	WHERE c.DiscountGroupId IN (SELECT DISTINCT d.DiscountGroupId FROM #tmpDiscountSettings d)
+
 	-- 1.4 include discount calculation products
 	INSERT INTO @ProductList(ProductId,ToBeDiscounted)
 	SELECT DISTINCT ProductId,0
@@ -166,7 +172,7 @@ BEGIN
 	-- 1.7 charge info
 	SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, ci.DI_Rate AS Rate, ci.Fromdate, ci.ToDate
 	INTO #tmpChargeInfo
-	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
+	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
 	WHERE DI_Rate > 0
 
 	-- 1.7 exchange
@@ -252,39 +258,38 @@ BEGIN
 		WinlossDate		DATE,
 		Winloss			DECIMAL(20,5),
 		AmountToCompany	DECIMAL(20,5),
-		IsApplyMinFee	BIT
+		CurrencyId		INT
 	)
 
-	CREATE NONCLUSTERED INDEX Idx_InvoiceData ON #tmpWinlossData (PartyId, ProductId)
-
 	-- 2.1 include general products
-	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,Winloss,AmountToCompany)
+	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,CurrencyId,Winloss, AmountToCompany)
 	(
-		SELECT	p.PartyId,
-				b.rptDate,
-				p.ProductId,
-				SUM(-ISNULL(b.MemberWL * e.Rate, 0)),
-				SUM(-ISNULL(b.MemberWL * p.Rate * e.Rate, 0))
+		SELECT p.PartyId,
+			b.rptDate,
+			p.ProductId,
+			b.CurrencyId,
+			-SUM(b.MemberWL * e.Rate),
+			-SUM(b.MemberWL * p.Rate * e.Rate)
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-			INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID 
-					AND p.LicenseeId = b.SiteId
-					AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
-		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)
+		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
+		INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID 
+			AND p.LicenseeId = b.SiteId
+			AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
+		WHERE (b.rptDate BETWEEN @FromDate AND @ToDate)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
 				AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
-		GROUP BY b.rptdate, b.SiteId, p.PartyId, p.ProductId
+		GROUP BY p.PartyId,b.rptdate,p.ProductId,b.CurrencyId
 	)
 
 	-- 2.2 insert product don't have any ticket
-	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,Winloss,AmountToCompany)
-	SELECT DISTINCT PartyId,@ToDate,c.ProductId, 0, 0
+	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,CurrencyId,Winloss, AmountToCompany)
+	SELECT DISTINCT PartyId,@ToDate,c.ProductId,6, 0, 0-- default eur = 6
 	FROM @PartyList p 
 	INNER JOIN @ProductList pd ON 1=1
 	INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON c.ProductID = pd.ProductID AND p.PartyId = c.FromParty
-	WHERE c.ToDate >= @FromDate  
+	WHERE c.ToDate >= @FromDate
 
 	-- 2.3 create result
 	SELECT a.PartyId,a.ProductId
@@ -364,22 +369,40 @@ BEGIN
  *-------------------------------------------------------------------------------------------------------------------------------*/
 	DECLARE @Unlimited MONEY = 1000000000000
 
-	;WITH cte_Calculation AS(
-		SELECT s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId, SUM(r.Winloss) Winloss,SUM(r.Fee) Fee
-		FROM #tmpDiscountSettings s
-		INNER JOIN #tmpResult r ON s.PartyID = r.PartyId AND s.ProductId=r.ProductId
+	-- 4.1 discount by all currency
+	SELECT s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId, SUM(r.Winloss) Winloss,SUM(r.Fee) Fee
+	INTO #tmpDiscountCalculation
+	FROM #tmpDiscountSettings s
+	INNER JOIN #tmpDiscountCurrency c ON c.DiscountGroupId=s.DiscountGroupId AND c.CurrencyId = 0 -- all currency
+	INNER JOIN #tmpResult r ON s.PartyID = r.PartyId AND s.ProductId=r.ProductId
+	WHERE s.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount)
+	GROUP BY s.DiscountGroupId, s.DiscountGroupType,s.CurrencyId,s.CalculationGroup
+
+	-- 4.2 discount by currency
+	;WITH cte_DiscountCurrency AS(
+		SELECT s.CalculationGroup,s.ProductId, SUM(r.Winloss) Winloss,SUM(r.AmountToCompany) Fee
+		FROM #tmpWinlossData r
+		INNER JOIN #tmpDiscountCurrency c ON c.PartyID=r.PartyId AND c.CurrencyId=r.CurrencyId
+		INNER JOIN #tmpDiscountSettings s ON s.DiscountGroupId=c.DiscountGroupId AND s.ProductId=r.ProductId
 		WHERE s.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount)
-		GROUP BY s.DiscountGroupId, s.DiscountGroupType,s.CurrencyId,s.CalculationGroup
-	), cte_Detail AS(
+		GROUP BY s.CalculationGroup, s.ProductId
+	)
+	INSERT INTO #tmpDiscountCalculation(CalculationGroup,DiscountGroupId,DiscountGroupType,CurrencyId,Winloss,Fee)
+	SELECT s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId, SUM(CASE WHEN d.Winloss<0 THEN 0 ELSE d.Winloss END), SUM(CASE WHEN d.Fee<0 THEN 0 ELSE d.Fee END)
+	FROM cte_DiscountCurrency d
+	INNER JOIN #tmpDiscountSettings s ON s.CalculationGroup=d.CalculationGroup
+	GROUP BY s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId
+
+	;WITH cte_Detail AS(
 		SELECT c.CalculationGroup, d.DiscountGroupId, d.Rate
 			,ISNULL(d.FromAmount,0) * e.Rate AS FromAmount
 			,CASE WHEN d.ToAmount > @Unlimited THEN d.ToAmount ELSE (d.ToAmount + 1) * e.Rate END AS ToAmount
 		FROM dbo.LA_DiscountGroupDetail d
-		INNER JOIN cte_Calculation c ON d.DiscountGroupId=c.DiscountGroupId
+		INNER JOIN #tmpDiscountCalculation c ON d.DiscountGroupId=c.DiscountGroupId
 		INNER JOIN #tmpExchange e ON e.ExchangeId = c.CurrencyId AND e.exchangedate=@ToDate
 	), cte_Rate AS (
 		SELECT c.DiscountGroupId, d.Rate, c.CalculationGroup
-		FROM cte_Calculation c INNER JOIN cte_Detail d ON c.CalculationGroup=d.CalculationGroup
+		FROM #tmpDiscountCalculation c INNER JOIN cte_Detail d ON c.CalculationGroup=d.CalculationGroup
 		WHERE (
 				c.DiscountGroupType IN (@DiscountByGroupFee, @DiscountIndividualFee) AND
 				c.Fee >= d.FromAmount AND c.Fee < d.ToAmount
@@ -399,9 +422,9 @@ BEGIN
 	WHERE s.CalculationType IN (@ToBeDiscounted,@CalculateAndDiscount) AND s.IsApplyDiscount = 1
 
 /*--------------------------------------------------------------------------------------------------------------------------------
- * 4. rebate calculation
+ * 5. rebate calculation
  *-------------------------------------------------------------------------------------------------------------------------------*/
-	-- 4.1 get rebate settings
+	-- 5.1 get rebate settings
 	SELECT a.PartyID, p.ProductId, d.Rate, h.Remark,h.FromDate
 	INTO #tmpRebateSettings
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
@@ -413,7 +436,7 @@ BEGIN
 		AND h.FromDate <= @ToDate
 		AND h.ToDate >= @FromDate
 
-	-- 4.2 only 1 rebate per month for product/party
+	-- 5.2 only 1 rebate per month for product/party
 	;WITH cte_Rebate AS (
 		SELECT PartyID, ProductId, MAX(FromDate) FromDate
 		FROM #tmpRebateSettings
@@ -424,7 +447,7 @@ BEGIN
 		AND c.PartyID = r.PartyID 
 		AND c.ProductId = r.ProductId
 
-	-- 4.3 calculate rebate
+	-- 5.3 calculate rebate
 	UPDATE r SET 
 		Rebate = (r.Fee - r.Discount) * c.Rate,
 		RebateRemark = c.Remark,
@@ -456,5 +479,7 @@ BEGIN
 	DROP TABLE #tmpResult
 	DROP TABLE #tmpMinFee
 	DROP TABLE #tmpRebateSettings
+	DROP TABLE #tmpDiscountCurrency
+	DROP TABLE #tmpDiscountCalculation
 END
 GO
