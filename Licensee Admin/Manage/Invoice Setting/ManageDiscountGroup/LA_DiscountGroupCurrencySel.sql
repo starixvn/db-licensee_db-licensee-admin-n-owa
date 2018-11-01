@@ -48,5 +48,9 @@ BEGIN
 	SELECT c.PartyId, c.CurrencyId, c.CurrencyCode AS CurrencyName, CASE WHEN d.CurrencyId IS NOT NULL THEN 1 ELSE 0 END IsSelected
 	FROM @CurrenciesOfLicensee c
 	LEFT JOIN LA_DiscountGroupCurrency d WITH(NOLOCK) ON d.PartyID = c.PartyId AND d.CurrencyId = c.CurrencyId AND d.DiscountGroupId = @DiscountGroupId
+	UNION
+	SELECT dc.PartyID, CurrencyId, 'all-currencies' AS CurrencyName, 1 AS IsSelected
+	FROM LA_DiscountGroupCurrency dc WITH(NOLOCK) 
+	WHERE dc.DiscountGroupId = @DiscountGroupId AND dc.PartyId = @PartyID AND CurrencyId = 0
 END
 GO
