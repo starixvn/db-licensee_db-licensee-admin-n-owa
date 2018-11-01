@@ -320,7 +320,7 @@ BEGIN
 
 	INSERT INTO @Exchange(Currency, CurrencyName, CurrencyCode)
 	SELECT e.exchangeid, e.currency, e.Code
-	FROM bodb02.dbo.Exchange e WITH (NOLOCK)
+	FROM dbo.Exchange e WITH (NOLOCK)
 	WHERE e.exchangeid IN (SELECT DISTINCT Currency FROM #tmpWinLoss)
 	
 	UPDATE @Exchange

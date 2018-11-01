@@ -58,7 +58,7 @@ BEGIN
 	INSERT INTO @ChargeInfos(PartyId, LicenseeId, ParentID, Rate, Fromdate, Todate, ProductID, PartyName, ParentName)
 	(
 		SELECT	ci.PartyID, ci.LicenseeID, p.ParentID, ci.DI_Rate, ci.Fromdate, ci.ToDate, ci.ProductID, p.PartyName, p.ParentName
-		FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'BX', 'OA', 1) ci	
+		FROM	dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'BX', 'OA', 1) ci	
 			INNER JOIN @PartyList p ON ci.PartyID = p.PartyID	
 		WHERE	DI_Rate > 0 AND ci.ChargeType = 1 -- get PT
 	)
@@ -67,7 +67,7 @@ BEGIN
 	INSERT INTO @PartyCharge3rdInfo( LicenseeId, Rate, FromDate, ToDate, ProductID )	
 	(
 		SELECT DISTINCT p.LicenseeID, ci.DI_Rate, ci.Fromdate, ci.ToDate, ci.ProductID
-		FROM	bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'BX', 'OA') ci	
+		FROM	dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'BX', 'OA') ci	
 			INNER JOIN @ChargeInfos p ON ci.IsParent = 0 AND p.PartyID = ci.PartyId		
 		WHERE ci.ChargeType = 1 AND ci.IsDeposit = 1
 	)
@@ -75,7 +75,7 @@ BEGIN
 	INSERT INTO @PartyCharge3rdInfo( LicenseeId, Rate, FromDate, ToDate, ProductID )	
 	(
 		SELECT DISTINCT p.LicenseeID, ci.DI_Rate, ci.Fromdate, ci.ToDate, ci.ProductID
-		FROM	bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'BX', 'OA') ci	
+		FROM	dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'BX', 'OA') ci	
 			INNER JOIN @ChargeInfos p ON ci.IsParent = 1 AND p.ParentID = ci.PartyId		
 		WHERE ci.ChargeType = 1 AND ci.IsDeposit = 1
 			AND NOT EXISTS (SELECT 1 FROM @PartyCharge3rdInfo ci WHERE ci.LicenseeId = p.LicenseeId)

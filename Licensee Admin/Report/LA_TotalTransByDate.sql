@@ -152,7 +152,7 @@ BEGIN
 	FROM	bodb_LicenseeReport.dbo.rptDepWinlost_ThirdParty c WITH (NOLOCK)
 			INNER JOIN bodb02.dbo.Custinfo co WITH (NOLOCK) ON c.CustID = co.CustID	
 			INNER JOIN dbo.f_SelLicenseeCust(0) lc ON co.recommend = lc.CustID
-			LEFT JOIN bodb_licensee.dbo.LRF_f_Products3rd('VG') p ON c.ProductId = p.ProductID				
+			LEFT JOIN dbo.LRF_f_Products3rd('VG') p ON c.ProductId = p.ProductID				
 	WHERE	c.Winlostdate BETWEEN @FromDate AND @Todate
 			AND c.Currency <> 20
 	GROUP BY MONTH(c.Winlostdate), c.Winlostdate, p.ProductPrefix, lc.LicenseeID
@@ -164,7 +164,7 @@ BEGIN
 			b.SiteID, 
 			SUM(b.betcount) AS betcount
 	FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK) 
-			LEFT JOIN bodb_licensee.dbo.LRF_f_Products3rd('GD') p ON b.ProductId = p.ProductID				
+			LEFT JOIN dbo.LRF_f_Products3rd('GD') p ON b.ProductId = p.ProductID				
 	where	b.rptDate between @Fromdate AND @Todate
 			AND b.StatusId NOT IN (-1,103)
 			AND b.CurrencyID <> 20

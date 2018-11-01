@@ -62,7 +62,7 @@ BEGIN
 		IsApply		BIT
 	)
 	INSERT INTO @BaseCurrencies(CurrencyId, Code)
-	EXEC bodb_Licensee.dbo.LA_SelBaseCurrency
+	EXEC dbo.LA_SelBaseCurrency
 
 	IF (ISNULL(@BaseCurrencyName, '') = '')
 	BEGIN

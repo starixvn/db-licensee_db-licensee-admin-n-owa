@@ -90,9 +90,9 @@ BEGIN
 				ci.Fromdate, 
 				ci.ToDate,	
 				CASE WHEN ci.ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
-		FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
-		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci2 WITH(NOLOCK) ON ci.ChargeID = ci2.ChargeID
-		LEFT JOIN bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype
+		FROM	dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
+		INNER JOIN dbo.OAS_ChargeInfo ci2 WITH(NOLOCK) ON ci.ChargeID = ci2.ChargeID
+		LEFT JOIN Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype
 	)
 	-- End region
 
@@ -190,7 +190,7 @@ BEGIN
 			SUM(ISNULL(r.Discount,0)),
 			SUM(ISNULL(r.Rebate,0))
 	FROM	@PartyRoot p
-			INNER JOIN bodb_licensee.dbo.OAS_Party (NOLOCK) op ON p.PartyId = op.PartyID
+			INNER JOIN dbo.OAS_Party (NOLOCK) op ON p.PartyId = op.PartyID
 			INNER JOIN @SumByProducts s ON p.PartyId = s.PartyId
 			LEFT JOIN #AmountToCompany r ON r.PartyId=p.PartyId AND s.ProductId=r.ProductId
 	GROUP BY p.PartyId, s.ProductId, op.PartyName

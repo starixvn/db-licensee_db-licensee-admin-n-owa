@@ -62,7 +62,7 @@ BEGIN
 	
 	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(10))
 	INSERT	INTO @BaseCurrencyTable(CurrencyId, CurrencyName)
-	EXECUTE bodb_Licensee.dbo.LA_SelBaseCurrency
+	EXECUTE dbo.LA_SelBaseCurrency
 	
 	SELECT	@BaseCurrency = CurrencyName
 	FROM	@BaseCurrencyTable
@@ -147,10 +147,10 @@ BEGIN
 			ci.ChargeType,
 			CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
 			CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
-	FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
-		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
-		LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
-		LEFT JOIN bodb_licensee.dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
+	FROM dbo.OAS_Party p WITH(NOLOCK)
+		INNER JOIN dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
+		LEFT JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
+		LEFT JOIN dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
 	WHERE EXISTS(SELECT val FROM bodb02.dbo.strSplit(@ProductCodes, ',') WHERE val = 'CB')
 		AND FromParty = @PartyId
 		AND ProductID = @CBProductId
