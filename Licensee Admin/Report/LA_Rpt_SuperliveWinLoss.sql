@@ -1,5 +1,5 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
-USE [bodb02]
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_SuperliveWinLoss]
@@ -19,6 +19,7 @@ AS
 	 - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	 - 20171219@Bruce: increase length for variables [#88197]
 	 - 20180716@bruce: add new group TEST for credit [#98126]
+	 - 20181106@bruce: move sp to bodb_licensee [#103999]
 	 
 	 Params:
 	 - PartyIds: List Party Id.
