@@ -8,7 +8,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountUpd]
 	@DiscountGroupId	SMALLINT = 0,
-	@DiscountGroupName	NVARCHAR(100),
+	@DiscountGroupName	NVARCHAR(110),
 	@DiscountGroupType	TINYINT, 
 	@CurrencyId			TINYINT,
 	@FromDate			DATE, 
