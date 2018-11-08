@@ -19,6 +19,7 @@ AS
 		- 20171219@Bruce: increase length for variables [#88197]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180904@bruce: Support more platform type in Platform WL reports [#96191]
+		- 20181031@bruce: Cover betfrom 'o' in the report [#103999]
 
 	Explanation:
 	  + @PlatformType: 0: All
@@ -31,6 +32,7 @@ AS
 					   7: WAP (m)
 					   8: SMARTPHONE (s,l)
 					   9: Tablet (r)
+					  10: Mobile app for China (o)
 
 	  + @excludeTest: remove currency UUS
 	  + @MoveBetsDay: The day we move tickets to bettrans14
@@ -45,7 +47,7 @@ BEGIN
 	-- supported betfrom
 	--
 	DECLARE @betfrom TABLE(betfrom CHAR(1))
-	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,s,l,g,x,y,z,r',',')
+	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,s,l,g,x,y,z,r,o',',')
 
 	CREATE TABLE #WinLoss (
 		LicenseeID		INT,
@@ -180,6 +182,7 @@ BEGIN
 		CAST(SUM(CASE WHEN w.BetFrom IN ('m') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverWap,
 		CAST(SUM(CASE WHEN w.BetFrom IN ('s','l') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverSmart,
 		CAST(SUM(CASE WHEN w.BetFrom IN ('r') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverTablet,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('o') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverChinaApp,
 		CAST(SUM(CASE WHEN w.BetFrom IN ('g','d') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossAsia,
 		CAST(SUM(CASE WHEN w.BetFrom IN ('a') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossChina,
 		CAST(SUM(CASE WHEN w.BetFrom IN ('e','u') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossEuro,
@@ -188,7 +191,8 @@ BEGIN
 		CAST(SUM(CASE WHEN w.BetFrom IN ('z') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossNewEuro,
 		CAST(SUM(CASE WHEN w.BetFrom IN ('m') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossWap,
 		CAST(SUM(CASE WHEN w.BetFrom IN ('s','l') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossSmart,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('r') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossTablet
+		CAST(SUM(CASE WHEN w.BetFrom IN ('r') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossTablet,
+		CAST(SUM(CASE WHEN w.BetFrom IN ('o') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossChinaApp
 	FROM #WinLoss w
 		INNER JOIN #Exchange e ON e.ExchangeDate = w.Winlostdate and w.CurrencyId = e.ExchangeID
 		INNER JOIN @ChargeInfo l ON w.LicenseeID = l.LicenseeId AND w.Winlostdate BETWEEN l.Fromdate AND l.Todate

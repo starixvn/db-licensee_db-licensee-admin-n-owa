@@ -20,6 +20,7 @@ AS
 		- 20171219@Bruce: increase length for variables [#88197]\
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180904@bruce: Support more platform type in Platform WL reports [#96191]
+		- 20181031@bruce: Cover betfrom 'o' in the report [#103999]
 
 	Explanation:
 		- Desktop: contain the followings:
@@ -33,6 +34,7 @@ AS
 			WAP:	betfrom = m
 			Smart:	betfrom = s,l
 			Tablet: betfrom = r
+			App for China: o
 		- Other: betfrom is different from the aboves
 			=> use *
 */
@@ -52,7 +54,7 @@ BEGIN
 	-- supported betfrom
 	--
 	DECLARE @betfrom TABLE(betfrom CHAR(1))
-	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,s,l,g,x,y,z,r',',')
+	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,s,l,g,x,y,z,r,o',',')
 
 	-- #1: get licensee/customer and currency info
 	--
@@ -107,12 +109,12 @@ BEGIN
 			SELECT
 				b.winlostdate,
 				l.CurrencyId,
-				ISNULL(b.betfrom,'*'),
+				ISNULL(bf.betfrom,'*'),
 				SUM(b.stake),
 				SUM(-(b.winlost - b.actual_stake))
 			FROM dbo.bettrans b WITH (NOLOCK)
 				INNER JOIN #LicenseeCustInfo l ON l.CustId=b.recommend AND b.currency=l.CurrencyId AND b.winlostdate BETWEEN l.Fromdate AND l.Todate
-				LEFT JOIN @betfrom bf ON bf.betfrom=b.betfrom
+				LEFT JOIN @betfrom bf ON bf.betfrom=ISNULL(b.betfrom,'')
 			WHERE b.statusID IN (111, 112, 113)
 				AND b.winlostdate BETWEEN @FromDate AND @ToDate
 				AND (b.bettype < 31
@@ -121,7 +123,7 @@ BEGIN
 					) -- SB bettypes
 				AND b.bettype NOT IN (901,902,903,904/*bettrade*/,911,912,913,914/*cashout*/)
 				AND NOT EXISTS (SELECT 1 FROM bodb_licensee.dbo.LicenseeBATransaction ba WITH(NOLOCK) WHERE b.transid = ba.transid)
-			GROUP BY b.winlostdate, l.CurrencyId,ISNULL(b.betfrom,'*')
+			GROUP BY b.winlostdate, l.CurrencyId,ISNULL(bf.betfrom,'*')
 		)
 	END
 
@@ -134,19 +136,19 @@ BEGIN
 			SELECT
 				b.winlostdate,
 				l.CurrencyId,
-				ISNULL(b.betfrom,'*'),
+				ISNULL(bf.betfrom,'*'),
 				SUM(b.turnover),
 				SUM(-b.winlost)
 			FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH ( NOLOCK )
 			INNER JOIN #LicenseeCustInfo l ON b.CustId = l.CustId AND b.Currency = l.CurrencyId AND b.winlostdate BETWEEN l.Fromdate AND l.Todate
-			LEFT JOIN @betfrom bf ON bf.betfrom=b.betfrom
+			LEFT JOIN @betfrom bf ON bf.betfrom=ISNULL(b.betfrom,'')
 			WHERE b.Winlostdate BETWEEN @FromDate AND @TempToDate
 				AND b.sporttype = 0 -- jobsum SB as 0
 				AND b.roleid = 2 -- Sum on agent for better performance
 				AND b.statusID NOT IN (-1, 101, 102, 103)
 				AND b.bettype = 0 -- jobsum SB as 0
 				AND ISNULL(b.isBA,0) = 0
-			GROUP BY b.winlostdate, l.CurrencyId,ISNULL(b.betfrom,'*')
+			GROUP BY b.winlostdate, l.CurrencyId,ISNULL(bf.betfrom,'*')
 		)
 	END
 
