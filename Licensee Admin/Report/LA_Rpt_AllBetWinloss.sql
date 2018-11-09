@@ -106,7 +106,7 @@ BEGIN
 			IsApply		BIT
 		)
 		INSERT INTO @BaseCurrencies(CurrencyId, Code)
-		EXEC dbo.LA_SelBaseCurrency
+		EXEC bodb_Licensee.dbo.LA_SelBaseCurrency
 		
 		-- include HKD
 		INSERT INTO @BaseCurrencies(CurrencyId, Code) VALUES (5, 'HKD')

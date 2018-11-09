@@ -42,7 +42,7 @@ BEGIN
 		INSERT INTO @PartyChargeInfo(PartyId, LicenseeId,ProductID, Rate, Fromdate, Todate)
 		(
 			SELECT PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
-			FROM dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'KN', 'OA', 1)
+			FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'KN', 'OA', 1)
 			
 			UNION
 			
@@ -75,7 +75,7 @@ BEGIN
 		)
 
 		INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
-		EXEC dbo.LA_PartyListSel
+		EXEC bodb_licensee.dbo.LA_PartyListSel
 
 		-- This report has 3 group:
 		--		- 12Bet: 12Bet
@@ -243,7 +243,7 @@ BEGIN
 		RowIndex SMALLINT IDENTITY
 	)
 	INSERT INTO @BaseCurrencies(Id, Name)
-	EXEC dbo.LA_SelBaseCurrency
+	EXEC bodb_Licensee.dbo.LA_SelBaseCurrency
 
 	-- Calculate Grand total
 	BEGIN

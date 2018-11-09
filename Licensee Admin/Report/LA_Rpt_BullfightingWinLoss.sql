@@ -39,7 +39,7 @@ BEGIN
 	INSERT INTO @ChargeInfos(PartyId, ProductID, LicenseeId, Rate, Fromdate, Todate)
 	(
 		SELECT c.PartyID, c.ProductID, c.LicenseeID, c.DI_Rate, c.Fromdate, c.Todate
-		FROM dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'BF') c
+		FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'BF') c
 	)
 	-- End region
 

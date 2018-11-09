@@ -31,7 +31,7 @@ BEGIN
 		ParentId 	INT)
 	
 	INSERT INTO #PartyList
-	EXEC dbo.LA_PartyListSel
+	EXEC bodb_licensee.dbo.LA_PartyListSel
 	
 	UPDATE #PartyList SET PartyName = REPLACE(PartyName,' Licensees','') WHERE ParentId = 0
 	
@@ -53,10 +53,10 @@ BEGIN
 			CASE WHEN a.isDeposit = 0 THEN 0 ELSE DI_Rate END, 
 			CASE WHEN a.isDeposit = 0 THEN a.DI_Rate ELSE b.Rate END AS Rate3rd, 
 			a.Fromdate, a.Todate
-		FROM dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'FW', 'OA', 1) a
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'FW', 'OA', 1) a
 			LEFT JOIN #PartyList p ON a.PartyID = p.PartyId
 			LEFT JOIN #PartyList g ON p.ParentID = g.PartyID
-			LEFT JOIN dbo.OAS_ChargeInfo b WITH (NOLOCK) ON p.ParentId = b.FromParty AND a.ProductID = b.ProductID 
+			LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo b WITH (NOLOCK) ON p.ParentId = b.FromParty AND a.ProductID = b.ProductID 
 				AND (a.Fromdate BETWEEN b.FromDate AND b.ToDate OR a.Todate BETWEEN b.FromDate AND b.ToDate )		
 	)	
 	
@@ -67,7 +67,7 @@ BEGIN
 		IsApply		BIT)
 	
 	INSERT INTO @BaseCurrencies(CurrencyId, Code)
-	EXEC dbo.LA_SelBaseCurrency
+	EXEC bodb_Licensee.dbo.LA_SelBaseCurrency
 
 	IF (ISNULL(@BaseCurrencyName, '') = '')
 	BEGIN
