@@ -24,6 +24,7 @@ AS
   - 20180309@Bruce: Param @ListParty should increase length in SP LA_PayerSettingSel [#91814]
   - 20180716@bruce: add new group TEST for credit [#98126]
   - 20180503@Parsons: fix: setting won't show when set start date from future[#94108]
+  - 20181114@Parsons: Configure discount settings by currency [#99694]
 
   Params:
   + @PayerId : 0 get all Party
@@ -39,6 +40,13 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @Rebate INT = 2
+	DECLARE @DiscountIndividualFee INT = 1
+	DECLARE @DiscountIndividualGrosswin INT = 3
+	DECLARE @DiscountByGroupFee INT = 11
+	DECLARE @DiscountByGroupGrosswin INT = 13
+
 	DECLARE @ProductListAll VARCHAR(500) = '',
 			@ListParty VARCHAR(8000) = '',
 			@MinDate DATE,
@@ -307,7 +315,7 @@ BEGIN
 				OR d.FromDate BETWEEN c.FromDate AND c.ToDate
 				OR d.ToDate BETWEEN c.FromDate AND c.ToDate
 				)
-				AND d.DiscountGroupType = 1 -- discount
+				AND d.DiscountGroupType IN (@DiscountIndividualFee, @DiscountIndividualGrosswin, @DiscountByGroupFee, @DiscountByGroupGrosswin) -- discount
 			LEFT JOIN @Discount r
 				ON r.PartyId = c.PartyId
 				AND r.ProductId = c.ProductId
@@ -316,15 +324,15 @@ BEGIN
 				OR r.FromDate BETWEEN c.FromDate AND c.ToDate
 				OR r.ToDate BETWEEN c.FromDate AND c.ToDate
 				)
-				AND r.DiscountGroupType = 2 -- rebate
+				AND r.DiscountGroupType = @Rebate
 		WHERE ((@DiscountGroup = 0)
 			OR (@DiscountGroup <> 0
 			AND d.DiscountGroupId = @DiscountGroup
-			AND d.DiscountGroupType = 1))
+			AND d.DiscountGroupType IN (@DiscountIndividualFee, @DiscountIndividualGrosswin, @DiscountByGroupFee, @DiscountByGroupGrosswin)))
 			AND ((@RebateGroup = 0)
 			OR (@RebateGroup <> 0
 			AND r.DiscountGroupId = @RebateGroup
-			AND r.DiscountGroupType = 2))
+			AND r.DiscountGroupType = @Rebate))
 	)
 	SELECT Result.*
 	FROM Result
