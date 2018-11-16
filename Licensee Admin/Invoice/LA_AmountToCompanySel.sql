@@ -130,7 +130,7 @@ BEGIN
 	FROM dbo.LA_DiscountGroupCurrency c WITH(NOLOCK)
 	WHERE c.DiscountGroupId IN (SELECT DISTINCT d.DiscountGroupId FROM #tmpDiscountSettings d)
 
-	-- 1.4 include discount calculation products
+	-- 1.3.5 include discount calculation products
 	INSERT INTO @ProductList(ProductId,ToBeDiscounted)
 	SELECT DISTINCT ProductId,0
 	FROM #tmpDiscountSettings
@@ -283,7 +283,7 @@ BEGIN
 	INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON c.ProductID = pd.ProductID AND p.PartyId = c.FromParty
 	WHERE c.ToDate >= @FromDate
 
-	-- 2.4 create result
+	-- 2.3 create result
 	SELECT a.PartyId,a.ProductId
 		,CAST(SUM(a.Winloss) AS MONEY) AS Winloss
 		,CAST(SUM(a.AmountToCompany) AS MONEY) AS AmountToCompany
@@ -300,7 +300,7 @@ BEGIN
 	FROM #tmpWinlossData a
 	GROUP BY PartyId, ProductId
 
-	-- 2.5 treat negative as 0
+	-- 2.4 treat negative as 0
 	UPDATE #tmpResult SET Fee = CASE WHEN AmountToCompany < 0 THEN 0 ELSE AmountToCompany END
 
 /*--------------------------------------------------------------------------------------------------------------------------------
@@ -369,7 +369,7 @@ BEGIN
 		Fee 				MONEY,
 		IsDiscountByCurrency BIT
 	)
-	--select * from #tmpResult
+
 	-- 4.1 discount by all currency
 	INSERT INTO @tmpDiscountCalculation(CalculationGroup,DiscountGroupId,DiscountGroupType,CurrencyId,Winloss,Fee,IsDiscountByCurrency)
 	SELECT s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId, SUM(r.Winloss) Winloss,SUM(r.Fee) Fee,0

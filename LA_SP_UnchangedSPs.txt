@@ -1,1 +1,3 @@
 Licensee Admin\Invoice\LA_Inv_RebateWorksheetSel.sql
+Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_Detail.sql
+Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_Automail.sql
