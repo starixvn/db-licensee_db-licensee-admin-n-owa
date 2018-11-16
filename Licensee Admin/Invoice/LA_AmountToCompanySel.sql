@@ -439,7 +439,7 @@ BEGIN
 	FROM #tmpResult t
 	INNER JOIN #tmpDiscountSettings s ON t.PartyID = s.PartyID AND t.ProductID=s.ProductId
 	INNER JOIN cte_DiscountByCurrency d on d.CalculationGroup=s.CalculationGroup
-	WHERE t.Minfee = 0 OR (d.Discount > 0 AND (t.Fee - d.Discount) >= t.Minfee)
+	WHERE d.Discount > 0 AND (t.Fee - d.Discount) >= t.Minfee
 
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 5. rebate calculation
