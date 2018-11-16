@@ -380,16 +380,13 @@ BEGIN
 	GROUP BY s.DiscountGroupId, s.DiscountGroupType,s.CurrencyId,s.CalculationGroup
 
 	-- 4.2 discount by currency
-	-- only discount for parties aren't charged by minfee
 	-- only offer discount for licensing fee
 	INSERT INTO @tmpDiscountCalculation(CalculationGroup,DiscountGroupId,DiscountGroupType,CurrencyId,Winloss,Fee,IsDiscountByCurrency)
 	SELECT s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId, SUM(r.Winloss) Winloss,SUM(r.AmountToCompany) Fee,1
 	FROM #tmpWinlossData r
 	INNER JOIN @tmpDiscountCurrency c ON c.PartyID=r.PartyId AND c.CurrencyId=r.CurrencyId
 	INNER JOIN #tmpDiscountSettings s ON s.DiscountGroupId=c.DiscountGroupId AND s.ProductId=r.ProductId
-	INNER JOIN #tmpResult o ON o.PartyID = c.PartyId AND o.ProductID = r.ProductID
-	WHERE o.IsChargedByMinFee = 0
-		AND s.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount)
+	WHERE s.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount)
 		AND s.DiscountGroupType IN (@DiscountIndividualFee, @DiscountByGroupFee)
 	GROUP BY s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId
 
@@ -431,6 +428,7 @@ BEGIN
 	-- 4.5 discount by curency
 	-- not support gross win
 	-- not support multiple products
+	-- not discount if fee after discount less than minfee
 	;WITH cte_DiscountByCurrency AS(
 		SELECT c.CalculationGroup, c.Rate, c.Rate * (CASE WHEN s.Fee <0 THEN 0 ELSE s.Fee END) Discount
 		FROM @tmpDiscountCalculation s
@@ -441,7 +439,7 @@ BEGIN
 	FROM #tmpResult t
 	INNER JOIN #tmpDiscountSettings s ON t.PartyID = s.PartyID AND t.ProductID=s.ProductId
 	INNER JOIN cte_DiscountByCurrency d on d.CalculationGroup=s.CalculationGroup
-	WHERE t.Minfee = 0 OR (t.Fee - d.Discount) >= t.Minfee
+	WHERE t.Minfee = 0 OR (d.Discount > 0 AND (t.Fee - d.Discount) >= t.Minfee)
 
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 5. rebate calculation
