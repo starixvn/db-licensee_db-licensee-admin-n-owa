@@ -374,7 +374,7 @@ BEGIN
 	INSERT INTO @tmpDiscountCalculation(CalculationGroup,DiscountGroupId,DiscountGroupType,CurrencyId,Winloss,Fee,IsDiscountByCurrency)
 	SELECT s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId, SUM(r.Winloss) Winloss,SUM(r.Fee) Fee,0
 	FROM #tmpDiscountSettings s
-	INNER JOIN @tmpDiscountCurrency c ON c.DiscountGroupId=s.DiscountGroupId AND c.CurrencyId = 0 -- all currency
+	INNER JOIN @tmpDiscountCurrency c ON s.PartyId = c.PartyId AND c.DiscountGroupId=s.DiscountGroupId AND c.CurrencyId = 0 -- all currency
 	INNER JOIN #tmpResult r ON s.PartyID = r.PartyId AND s.ProductId=r.ProductId
 	WHERE s.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount)
 	GROUP BY s.DiscountGroupId, s.DiscountGroupType,s.CurrencyId,s.CalculationGroup
