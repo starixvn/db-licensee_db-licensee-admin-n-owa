@@ -35,6 +35,7 @@ AS
 	   - 20180703@Parsons: Integrate Pragmatic Win Loss [#94108]
 	   - 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 	   - 20180907@Bruce: Support multiple currency [#101160]
+	   - 20181119@bruce: Integrate Bidme games (GD product) [#103695]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -89,14 +90,16 @@ BEGIN
 		,Fromdate		SMALLDATETIME
 		,Todate			SMALLDATETIME
 		,Bettype		INT
+		,ChargeType		SMALLINT
 	)
 
-	INSERT INTO #tmpParty (PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Rate, Fromdate, Todate, Bettype)
+	INSERT INTO #tmpParty (PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Rate, Fromdate, Todate, Bettype, ChargeType)
 	(
 		SELECT DISTINCT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, 
 						CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END,
 						Fromdate, Todate,
-						CASE WHEN ci.ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
+						CASE WHEN ci.ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END,
+						CASE WHEN ci.ProductID = 11 THEN ci.ChargeType ELSE 1 END
 		FROM		bodb_licensee.dbo.LA_f_ChargeInfo (@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
 		LEFT JOIN   bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype AND (
 					(ci.ProductId NOT IN (14,17)) OR 
@@ -148,7 +151,7 @@ BEGIN
 		)
 	END
 
-	IF EXISTS (SELECT 1 FROM @ProductList WHERE ProductCode IN ('AGC','GD','VG','BX'))
+	IF (EXISTS (SELECT 1 FROM @ProductList WHERE ProductCode IN ('AGC','GD','VG','BX')) AND @SportType = 0 AND @ReportBy = 0 AND @Bettype = 0)
 	BEGIN
 		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Company, Betcount, Playercomm)
 		(
@@ -174,11 +177,28 @@ BEGIN
 					 b.StatusId NOT IN (-1, 101, 102, 103) AND
 					(@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c)) AND
 					(b.CurrencyID<>20) AND
-					@SportType = 0 AND
-					@ReportBy = 0 AND
-					@Bettype = 0 AND
 					b.CustomerCategory NOT IN (27,28) AND
-					p.ProductID IN (10,11,12,31)
+					p.ProductID IN (10,11,12,31) AND
+					p.ChargeType = 1 AND -- gross win
+					b.bettype <> 1706 -- exclude GD tip
+			GROUP BY b.rptDate
+					,p.PartyID
+					,b.CurrencyID
+
+			UNION ALL
+			-- GD tip
+			SELECT b.rptDate,p.PartyID,b.CurrencyId,0,0,0,0,0,0,0,0
+					,SUM(-b.MemberWL * p.Rate) AS Company
+					,SUM(b.Betcount * (CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END))
+					,0 AS commissionP
+			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			INNER JOIN #tmpParty p ON b.SiteID = p.LicenseeID AND p.ProductID=b.ProductID AND b.rptDate BETWEEN p.Fromdate AND p.Todate
+			WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate) AND
+					(@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c)) AND
+					(b.CurrencyID<>20) AND
+					p.ProductID = 11 AND
+					b.Bettype = 1706 AND 
+					p.ChargeType = 12 -- GD tip sharing
 			GROUP BY b.rptDate
 					,p.PartyID
 					,b.CurrencyID
