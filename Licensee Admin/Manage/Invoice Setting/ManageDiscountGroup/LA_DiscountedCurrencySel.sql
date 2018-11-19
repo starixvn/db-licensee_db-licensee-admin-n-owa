@@ -20,12 +20,12 @@ AS
 
 	 Params:
 
-	 Explannation: EXEC LA_DiscountedCurrencySel @PartyId = 14, @ProductIds = N'0,4'
+	 Explannation: EXEC LA_DiscountedCurrencySel @PartyId = 14, @ProductIds = N'0,4,8'
 */
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @DiscountGroupId INT
+	--Region: Get all currencies of party 
 	DECLARE @CurrenciesOfLicensee TABLE (CurrencyId INT, CurrencyCode VARCHAR(20), CurrencyName VARCHAR(20))
 	
 	INSERT INTO @CurrenciesOfLicensee(CurrencyId, CurrencyCode, CurrencyName)
@@ -45,19 +45,23 @@ BEGIN
 	    GROUP BY CurrencyCode
 	    HAVING COUNT(1) > 1
 	) c2 ON c1.CurrencyCode = c2.CurrencyCode
-	
-	SELECT @DiscountGroupId = MAX(a.DiscountGroupId)
-	FROM LA_DiscountGroupAssignment a WITH(NOLOCK)
-	INNER JOIN LA_DiscountGroupProduct p WITH(NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId 
-															AND p.ProductId IN (SELECT val FROM bodb02.dbo.strSplit(@ProductIds, ','))
-	WHERE a.PartyID = @PartyId
+	-- End Region: Get all currencies of party 
 
-	-- result
-	SELECT c.CurrencyCode
+	-- Region: select discounted currency of party
+	;WITH cte_DiscountSetting AS( 
+		SELECT p.ProductId, MAX(a.DiscountGroupId) AS DiscountGroupId
+		FROM LA_DiscountGroupAssignment a WITH(NOLOCK)
+		INNER JOIN LA_DiscountGroupProduct p WITH(NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId 
+																AND p.ProductId IN (SELECT val FROM bodb02.dbo.strSplit(@ProductIds, ','))
+		WHERE a.PartyID = @PartyId
+		GROUP BY p.ProductId )
+
+	SELECT ds.ProductId, c.CurrencyCode AS CurrencyName
 	FROM @CurrenciesOfLicensee c
-	INNER JOIN LA_DiscountGroupCurrency d WITH(NOLOCK) ON
-		d.PartyID = @PartyId AND 
-		d.DiscountGroupId = @DiscountGroupId AND
-		(d.CurrencyId = 0 OR d.CurrencyId = c.CurrencyId) -- all currency = 0
+	INNER JOIN LA_DiscountGroupCurrency dc WITH(NOLOCK) ON 
+			dc.PartyID = @PartyId AND
+			(dc.CurrencyId = 0 OR dc.CurrencyId = c.CurrencyId) -- all currency = 0
+	INNER JOIN cte_DiscountSetting ds ON ds.DiscountGroupId = dc.DiscountGroupId
+	-- End Region: select discounted currency of party
 END
 GO
