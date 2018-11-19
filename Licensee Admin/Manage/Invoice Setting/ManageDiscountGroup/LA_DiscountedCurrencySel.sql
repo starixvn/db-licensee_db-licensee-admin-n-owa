@@ -56,12 +56,16 @@ BEGIN
 		WHERE a.PartyID = @PartyId
 		GROUP BY p.ProductId )
 
-	SELECT ds.ProductId, c.CurrencyCode AS CurrencyName
-	FROM @CurrenciesOfLicensee c
-	INNER JOIN LA_DiscountGroupCurrency dc WITH(NOLOCK) ON 
-			dc.PartyID = @PartyId AND
-			(dc.CurrencyId = 0 OR dc.CurrencyId = c.CurrencyId) -- all currency = 0
-	INNER JOIN cte_DiscountSetting ds ON ds.DiscountGroupId = dc.DiscountGroupId
+	SELECT CONVERT(INT, val) AS ProductId, STUFF((
+				SELECT ', ' + ISNULL(CAST(c.CurrencyCode AS VARCHAR), '')
+					FROM @CurrenciesOfLicensee c
+					INNER JOIN LA_DiscountGroupCurrency dc WITH(NOLOCK) ON 
+							dc.PartyID = @PartyId AND
+							(dc.CurrencyId = 0 OR dc.CurrencyId = c.CurrencyId) -- all currency = 0
+					INNER JOIN cte_DiscountSetting ds ON ds.DiscountGroupId = dc.DiscountGroupId AND ds.ProductId = val
+				FOR XML PATH (''))
+			  , 1, 2, '') AS CurrencyNames
+	FROM bodb02.dbo.strSplit(@ProductIds, ',')
 	-- End Region: select discounted currency of party
 END
 GO
