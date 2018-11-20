@@ -20,6 +20,7 @@ AS
 		- 20180131@Scofield: Add BX [#87754]
 		- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20181119@bruce: Integrate Bidme games (GD product) [#103695]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -65,7 +66,10 @@ BEGIN
 	SELECT b.rptDate														AS WinLossDate,
 		b.SiteId															AS LicenseeId,
 		b.ProductId															AS ProductId,
-		ISNULL(sbr.BettypeRef, -1)											AS Bettype,
+		CASE
+			WHEN b.Bettype = 1706 THEN b.Bettype -- GD Tip
+			ELSE ISNULL(sbr.BettypeRef, -1)
+		END																	AS Bettype,
 		CAST(SUM(ISNULL(b.MemberWL * e.BaseCurrencyRate, 0)) AS MONEY)		AS Winloss,
 		CAST(SUM(ISNULL(b.GrossWL * e.BaseCurrencyRate, 0)) AS MONEY)		AS GrossWinLoss,
 		CAST(SUM(ISNULL(b.CommissionA * e.BaseCurrencyRate, 0)) AS MONEY)	AS Commission,
@@ -89,7 +93,10 @@ BEGIN
 		AND b.SiteID NOT IN (SELECT c.LicenseeId FROM @CreditLicenee c)
 		AND b.ProductID IN (SELECT p.ProductId FROM @Products p)
 		AND b.ProductID NOT IN (13,15,25) -- exclude BT, CB, CO
-	GROUP BY b.rptdate, b.SiteId, b.ProductId, ISNULL(sbr.BettypeRef, -1)
+	GROUP BY b.rptdate, b.SiteId, b.ProductId, CASE
+			WHEN b.Bettype = 1706 THEN b.Bettype -- GD Tip
+			ELSE ISNULL(sbr.BettypeRef, -1)
+		END
 
 	-- BT
 	IF EXISTS (SELECT 1 FROM @Products WHERE ProductId=13)
@@ -169,11 +176,11 @@ BEGIN
 	DECLARE @ProductCodes VARCHAR(500) = (SELECT ProductCode + ',' FROM @Products FOR XML PATH (''))
 	SELECT c.ProductId			AS ProductId,
 		c.LicenseeId			AS LicenseeId,
-		ISNULL(b.Bettype, -1)	AS Bettype,
+		CASE WHEN c.ProductId = 11 AND ChargeType = 12 THEN 1706 ELSE ISNULL(b.Bettype, -1) END AS Bettype, -- GD Tip
 		c.DI_Rate				AS Rate,
 		c.FromDate				AS FromDate,
 		c.ToDate				AS ToDate,
-		CASE WHEN c.ProductID=15 THEN ChargeType ELSE 1 END AS ChargeType
+		CASE WHEN c.ProductID =15 THEN ChargeType ELSE 1 END AS ChargeType
 	INTO #ChargeRates
 	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) c
 	LEFT JOIN dbo.Sport_Bettype_Reference b WITH(NOLOCK) ON b.BettypeRef = c.Bettype AND IsActive = 1
