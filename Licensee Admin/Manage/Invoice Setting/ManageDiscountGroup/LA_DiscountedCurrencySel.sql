@@ -51,6 +51,7 @@ BEGIN
 	;WITH cte_DiscountSetting AS( 
 		SELECT p.ProductId, MAX(a.DiscountGroupId) AS DiscountGroupId
 		FROM LA_DiscountGroupAssignment a WITH(NOLOCK)
+		INNER JOIN LA_DiscountGroupHeader h WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId AND h.DiscountGroupType IN (1, 3, 11, 13) 
 		INNER JOIN LA_DiscountGroupProduct p WITH(NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId 
 																AND p.ProductId IN (SELECT val FROM bodb02.dbo.strSplit(@ProductIds, ','))
 		WHERE a.PartyID = @PartyId
