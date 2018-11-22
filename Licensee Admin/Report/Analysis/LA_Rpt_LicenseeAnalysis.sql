@@ -29,18 +29,28 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	
-	-- remove un-support products
-	DECLARE @Products AS TABLE (ProductId INT,ProductCode VARCHAR(10))
 
-	INSERT INTO @Products(ProductCode,ProductId)
-	SELECT ProductPrefix,ProductID
+	-- discount type
+	DECLARE @Rebate INT = 2
+	DECLARE @DiscountIndividualFee INT = 1
+	DECLARE @DiscountIndividualGrosswin INT = 3
+	DECLARE @DiscountByGroupFee INT = 11
+	DECLARE @DiscountByGroupGrosswin INT = 13
+
+	-- calculation type
+	DECLARE @ToBeDiscounted INT = 0
+	DECLARE @ToBeCalculated INT = 1
+	DECLARE @CalculateAndDiscount INT = 10
+
+	-- remove un-support products
+	DECLARE @Products AS TABLE (ProductId INT,ProductCode VARCHAR(10), ToBeDiscounted BIT)
+
+	INSERT INTO @Products(ProductCode,ProductId, ToBeDiscounted)
+	SELECT ProductPrefix,ProductID, 1
 	FROM dbo.LA_f_Products3rd(@ProductCodes)
 	WHERE ProductID NOT IN (1,3,7,9,13,14,15,16,17,19,25)
 
-	SET @ProductCodes = STUFF((SELECT ',' + ProductCode FROM @Products FOR XML PATH('')),1,1,'')	
-			 
-	-- 1. Party groups
+	-- 1.1 Party groups
 	-- select all parties in the same group
 	DECLARE @PartyIdTable TABLE (PartyId INT, IsSelected BIT)
 	INSERT INTO @PartyIdTable SELECT DISTINCT val, 1 FROM dbo.strSplit(@PartyIDs, ',')
@@ -57,12 +67,81 @@ BEGIN
 										FROM	dbo.LA_PartyGroupAssignment p1 WITH(NOLOCK)
 										WHERE	p1.PartyId IN (SELECT p2.PartyId FROM @PartyIdTable p2))
 		)
+
+		INSERT INTO @PartyIdTable
+		SELECT DISTINCT PartyId, 0 FROM @PartyGroup WHERE PartyId NOT IN (SELECT p2.PartyId FROM @PartyIdTable p2)
 	END
 
-	INSERT INTO @PartyIdTable
-	SELECT DISTINCT PartyId, 0 FROM @PartyGroup WHERE PartyId NOT IN (SELECT p2.PartyId FROM @PartyIdTable p2)
+	-- 1.2 discount settings
+	;WITH cte_DiscountGroup AS(
+		SELECT DISTINCT a.DiscountGroupId, a.PartyID
+		FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
+		INNER JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON p.DiscountGroupId=a.DiscountGroupId
+		INNER JOIN @PartyIdTable b ON a.PartyID=b.PartyId
+		WHERE b.IsSelected=1
+			AND p.ProductId IN (SELECT c.ProductId FROM @Products c WHERE c.ToBeDiscounted=1)
+			AND p.CalculationType IN (@ToBeDiscounted, @CalculateAndDiscount)
+	)
+	-- 1.3
+	-- put parties in discount group to its own group
+	-- put parties of individual discount group to new unique virtual group, indicate by discountid & partyid
+	SELECT DISTINCT h.DiscountGroupId, h.DiscountGroupType, a.PartyID, p.ProductId, p.CalculationType, a.IsApplyDiscount, h.CurrencyId, h.FromDate,
+		CASE
+			WHEN h.DiscountGroupType IN (@DiscountIndividualFee, @DiscountIndividualGrosswin) THEN (CAST(h.DiscountGroupId AS INT) * 100000) + a.PartyID
+			ELSE h.DiscountGroupId
+		END CalculationGroup
+	INTO #tmpDiscountSettings
+	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
+	INNER JOIN cte_DiscountGroup c ON c.DiscountGroupId = h.DiscountGroupId
+	INNER JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON p.DiscountGroupId = h.DiscountGroupId
+	INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
+		AND (
+			-- discount by group: get all party in same group
+			h.DiscountGroupType IN (@DiscountByGroupFee,@DiscountByGroupGrosswin) OR
+			-- discount by individual party: get only selected party
+			a.PartyID = c.PartyID
+		)
+	WHERE h.DiscountGroupType != @Rebate AND h.FromDate <= @ToDate AND @FromDate <= h.ToDate
 
+	-- 1.4 only 1 discount per month for product/party
+	;WITH cte_Discount AS (
+		SELECT DiscountGroupType, PartyID, ProductId, MAX(FromDate) FromDate
+		FROM #tmpDiscountSettings
+		GROUP BY DiscountGroupType, PartyID, ProductId
+		HAVING COUNT(1) > 1
+	)
+	DELETE d FROM #tmpDiscountSettings d INNER JOIN cte_Discount c ON d.FromDate < c.FromDate
+		AND c.PartyID = d.PartyID 
+		AND c.ProductId = d.ProductId
+		AND c.DiscountGroupType = d.DiscountGroupType
+
+	-- 1.5 add discount calculation party
+	INSERT INTO @PartyIdTable(PartyId,IsSelected)
+	SELECT DISTINCT a.PartyID, 0
+	FROM #tmpDiscountSettings a
+	LEFT JOIN @PartyIdTable b ON a.PartyID = b.PartyId
+	WHERE b.PartyId IS NULL AND a.CalculationType IN (@ToBeCalculated, @CalculateAndDiscount)
+
+	-- 1.6 discount by currency
+	DECLARE @tmpDiscountCurrency TABLE(DiscountGroupId SMALLINT, PartyId INT, CurrencyId INT)
+
+	INSERT INTO @tmpDiscountCurrency(DiscountGroupId, PartyId, CurrencyId)
+	SELECT c.DiscountGroupId, c.PartyID, c.CurrencyId
+	FROM dbo.LA_DiscountGroupCurrency c WITH(NOLOCK)
+	WHERE c.DiscountGroupId IN (SELECT DISTINCT d.DiscountGroupId FROM #tmpDiscountSettings d)
+
+	-- 1.7 include discount calculation products
+	INSERT INTO @Products(ProductId,ProductCode,ToBeDiscounted)
+	SELECT DISTINCT s.ProductId,a.ProductPrefix, 0
+	FROM #tmpDiscountSettings s
+	INNER JOIN dbo.LA_f_Products3rd('') a ON a.ProductID = s.ProductId
+	WHERE CalculationType IN (@ToBeCalculated, @CalculateAndDiscount)
+		AND s.ProductId NOT IN (SELECT p.ProductId FROM @Products p)
+
+	-- 1.8 update product code & partyids
+	SET @ProductCodes = STUFF((SELECT ',' + ProductCode FROM @Products FOR XML PATH('')),1,1,'')
 	SET @PartyIds = STUFF((SELECT ',' + CAST(PartyId AS VARCHAR(10)) FROM @PartyIdTable FOR XML PATH('')),1,1,'')
+
 	-- End region
 
 	-- 2. Region: Party charge info
@@ -226,6 +305,8 @@ BEGIN
 				AND b.bettype NOT IN (901,902,903,904,911,912,913,914)
 			GROUP BY b.winlostdate, l.CurrencyId, CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END, bt.ProductID,l.PartyId
 		)
+
+		DROP TABLE #BettypeList
 	END
 	
 	-- 7.2. get data from rptWinLoss2
@@ -376,62 +457,30 @@ BEGIN
 	WHERE	amf.FeeType = 1 AND amf.AmountToCompany IS NULL
 	-- end region
 
-	-- 12. Get discount group info
-	DECLARE @DiscountGroupHeader AS TABLE (
-		DiscountGroupId		INT,
-		DiscountGroupType	TINYINT,
-		PartyId				INT,
-		CurrencyId			INT,
-		FromDate			DATETIME,
-		ToDate				DATETIME
-	)
-
-	INSERT INTO @DiscountGroupHeader(DiscountGroupId,DiscountGroupType,PartyId,CurrencyId,FromDate,ToDate)
-	(
-		SELECT dg.DiscountGroupId,dg.DiscountGroupType,dga.PartyId, dg.CurrencyId, dg.FromDate, dg.ToDate
-		FROM dbo.LA_DiscountGroupHeader dg WITH(NOLOCK)
-			INNER JOIN dbo.LA_DiscountGroupAssignment dga WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
-		WHERE @FromDate<= ToDate AND FromDate<=@ToDate AND dga.PartyID IN (SELECT p.PartyId FROM @PartyIdTable p)
-	)
+	-- 12. Get rebate setting
+	DECLARE @tmpRebateSettings TABLE(PartyId INT, ProductId INT, Rate DECIMAL(7,5), FromDate DATE)
 	
-	DELETE FROM @DiscountGroupHeader
-	WHERE ToDate < (SELECT MAX(ToDate) FROM @DiscountGroupHeader WHERE DiscountGroupType = 1) AND DiscountGroupType = 1
+	INSERT INTO @tmpRebateSettings(PartyId, ProductId, Rate, FromDate)
+	SELECT a.PartyID, p.ProductId, d.Rate, h.FromDate
+	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
+	INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId=a.DiscountGroupId
+	INNER JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON p.DiscountGroupId=h.DiscountGroupId
+	INNER JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON d.DiscountGroupId=h.DiscountGroupId
+	INNER JOIN @PartyIdTable l ON l.PartyId=a.PartyID AND l.IsSelected=1
+	WHERE h.DiscountGroupType=@Rebate
+		AND h.FromDate <= @ToDate
+		AND h.ToDate >= @FromDate
 
-	DELETE FROM @DiscountGroupHeader 
-	WHERE ToDate < (SELECT MAX(ToDate) FROM @DiscountGroupHeader WHERE DiscountGroupType = 2) AND DiscountGroupType = 2
-	
-	DECLARE @DiscountGroup AS TABLE(
-		DiscountGroupId		SMALLINT,
-		DiscountGroupType	TINYINT,
-		FromAmount			MONEY,
-		ToAmount			MONEY,
-		Rate				MONEY,
-		PartyId				INT,
-		ProductId			TINYINT,
-		BaseCurrency		INT
+	-- 12.1 only 1 rebate per month for product/party
+	;WITH cte_Rebate AS (
+		SELECT PartyID, ProductId, MAX(FromDate) FromDate
+		FROM @tmpRebateSettings
+		GROUP BY PartyID, ProductId
+		HAVING COUNT(1) > 1
 	)
-
-	INSERT INTO @DiscountGroup (DiscountGroupId, DiscountGroupType, FromAmount, ToAmount, Rate, PartyId, ProductId , BaseCurrency)	
-	(
-		SELECT dg.DiscountGroupId,
-			dg.DiscountGroupType,
-			dgd.FromAmount,
-			dgd.ToAmount,
-			dgd.Rate,
-			dg.PartyID,
-			dgp.ProductId,
-			dg.CurrencyId
-		FROM @DiscountGroupHeader dg 
-			INNER JOIN dbo.LA_DiscountGroupDetail dgd WITH(NOLOCK) ON dg.DiscountGroupId = dgd.DiscountGroupId
-			INNER JOIN dbo.LA_DiscountGroupProduct dgp WITH(NOLOCK) ON dg.DiscountGroupId = dgp.DiscountGroupId
-		WHERE dgp.ProductId IN (SELECT DISTINCT ProductId FROM @Products)
-	)
-
-	UPDATE d SET
-		d.FromAmount = d.FromAmount * e.Rate,
-		d.ToAmount = d.ToAmount * e.Rate
-	FROM @DiscountGroup d
-	INNER JOIN #Exchange e ON @ToDate BETWEEN e.FirstExchangeDateByMonth AND e.LastExchangeDateByMonth  AND d.BaseCurrency = e.ExchangeID AND d.DiscountGroupType = 1
+	DELETE r FROM @tmpRebateSettings r INNER JOIN cte_Rebate c ON r.FromDate < c.FromDate
+		AND c.PartyID = r.PartyID 
+		AND c.ProductId = r.ProductId
 	-- End Region
 
 	-- 13. sum by licensee
@@ -459,28 +508,91 @@ BEGIN
 	WHERE m.FeeType = 1 AND s.PartyId IS NULL
 	-- end region
 
-	-- 14. Apply Discount/rebate
-	;WITH t AS(
-		SELECT SUM(s.LicensingFee) Total, s.PartyId, d.DiscountGroupId
-		FROM #SumByLicensee s
-		INNER JOIN (SELECT DISTINCT DiscountGroupId,PartyId,ProductId FROM @DiscountGroup WHERE DiscountGroupType = 1) AS d
-			ON s.PartyId=d.PartyId AND s.ProductId=d.ProductId
-		GROUP BY s.PartyId, d.DiscountGroupId
+	-- 13. Apply Discount/rebate
+	-- 13.1. Get discount group info
+	DECLARE @Unlimited MONEY = 1000000000000
+	DECLARE @tmpDiscountCalculation TABLE(
+		CalculationGroup	INT,
+		DiscountGroupId		SMALLINT,
+		DiscountGroupType	TINYINT,
+		CurrencyId			INT,
+		Winloss				MONEY,
+		Fee 				MONEY,
+		IsDiscountByCurrency BIT
 	)
-	DELETE d
-	FROM @DiscountGroup d
-	INNER JOIN t ON t.DiscountGroupId = d.DiscountGroupId AND t.PartyId = d.PartyId
-	WHERE d.DiscountGroupType = 1 AND t.Total NOT BETWEEN d.FromAmount AND d.ToAmount
 
-	-- discount
-	UPDATE s SET Discount =	(CASE WHEN s.LicenseeWinLoss < 0 THEN 0 ELSE s.LicenseeWinLoss * ISNULL(d3.Rate, 0) END) + 
-							(CASE WHEN s.LicensingFee < 0 THEN 0 ELSE s.LicensingFee * ISNULL(d1.Rate, 0) END)
-	FROM #SumByLicensee s
-		LEFT JOIN @DiscountGroup d1 ON s.PartyId = d1.PartyId AND d1.ProductId = s.ProductId AND d1.DiscountGroupType = 1 -- discount by fee
-		LEFT JOIN @DiscountGroup d3 ON s.PartyId = d3.PartyId AND d3.ProductId = s.ProductId AND d3.DiscountGroupType = 3 -- discount by winloss	
-	-- End Region	
+	-- 13.2 discount by all currency
+	INSERT INTO @tmpDiscountCalculation(CalculationGroup,DiscountGroupId,DiscountGroupType,CurrencyId,Winloss,Fee,IsDiscountByCurrency)
+	SELECT s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId, SUM(r.LicenseeWinLoss) Winloss,SUM(r.LicensingFee) Fee,0
+	FROM #tmpDiscountSettings s
+	INNER JOIN @tmpDiscountCurrency c ON s.PartyId = c.PartyId AND c.DiscountGroupId=s.DiscountGroupId AND c.CurrencyId = 0 -- all currency
+	INNER JOIN #SumByLicensee r ON s.PartyID = r.PartyId AND s.ProductId=r.ProductId
+	WHERE s.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount)
+	GROUP BY s.DiscountGroupId, s.DiscountGroupType,s.CurrencyId,s.CalculationGroup
 
-	-- 15. licensee group
+	-- 13.3 discount by currency
+	-- only offer discount for licensing fee
+	INSERT INTO @tmpDiscountCalculation(CalculationGroup,DiscountGroupId,DiscountGroupType,CurrencyId,Winloss,Fee,IsDiscountByCurrency)
+	SELECT s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId, SUM(r.LicenseeWinLoss) Winloss,SUM(r.LicensingFee) Fee,1
+	FROM #Result r
+	INNER JOIN @tmpDiscountCurrency c ON c.PartyID=r.PartyId AND c.CurrencyId=r.CurrencyId
+	INNER JOIN #tmpDiscountSettings s ON s.DiscountGroupId=c.DiscountGroupId AND s.ProductId = r.ProductId AND s.PartyId = c.PartyId
+	WHERE s.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount)
+		AND s.DiscountGroupType IN (@DiscountIndividualFee, @DiscountByGroupFee)
+	GROUP BY s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId
+
+	-- 13.4 get discount rate
+	DECLARE @Rate TABLE(Rate DECIMAL(6,5), CalculationGroup INT, IsDiscountByCurrency BIT)
+	;WITH cte_Detail AS(
+		SELECT c.CalculationGroup, d.DiscountGroupId, d.Rate
+			,ISNULL(d.FromAmount,0) * e.Rate AS FromAmount
+			,CASE WHEN d.ToAmount > @Unlimited THEN d.ToAmount ELSE (d.ToAmount + 1) * e.Rate END AS ToAmount
+		FROM dbo.LA_DiscountGroupDetail d
+		INNER JOIN @tmpDiscountCalculation c ON d.DiscountGroupId=c.DiscountGroupId
+		INNER JOIN #Exchange e ON e.ExchangeId = c.CurrencyId AND e.LastExchangeDateByMonth=@ToDate
+	)
+	INSERT INTO @Rate(rate, CalculationGroup,IsDiscountByCurrency)
+	SELECT d.Rate, c.CalculationGroup, c.IsDiscountByCurrency
+	FROM @tmpDiscountCalculation c INNER JOIN cte_Detail d ON c.CalculationGroup=d.CalculationGroup
+	WHERE (
+			c.DiscountGroupType IN (@DiscountByGroupFee, @DiscountIndividualFee) AND
+			c.Fee >= d.FromAmount AND c.Fee < d.ToAmount
+		) OR (
+			c.DiscountGroupType IN (@DiscountByGroupGrosswin, @DiscountIndividualGrosswin) AND
+			c.Winloss >= d.FromAmount AND c.Winloss < d.ToAmount
+		)
+
+	-- 13.5 discount by all currencies
+	UPDATE r SET Discount = CASE
+			WHEN s.DiscountGroupType IN (@DiscountByGroupFee, @DiscountIndividualFee) THEN c.Rate * r.LicensingFee
+			WHEN s.DiscountGroupType IN (@DiscountByGroupGrosswin, @DiscountIndividualGrosswin) THEN c.Rate * (CASE WHEN r.LicenseeWinLoss < 0 THEN 0 ELSE r.LicenseeWinLoss END)
+		ELSE 0 END
+	FROM #SumByLicensee r
+	INNER JOIN #tmpDiscountSettings s ON s.PartyID = r.PartyId AND s.ProductId=r.ProductId
+	INNER JOIN @Rate c ON c.CalculationGroup = s.CalculationGroup
+	WHERE s.CalculationType IN (@ToBeDiscounted,@CalculateAndDiscount) 
+		AND s.IsApplyDiscount = 1
+		AND c.IsDiscountByCurrency = 0
+
+	-- 13.6 discount by curency
+	-- not support gross win
+	-- not support multiple products
+	-- not discount if fee after discount less than minfee
+	;WITH cte_DiscountByCurrency AS(
+		SELECT c.CalculationGroup, c.Rate, c.Rate * (CASE WHEN s.Fee <0 THEN 0 ELSE s.Fee END) Discount
+		FROM @tmpDiscountCalculation s
+		INNER JOIN @rate c ON c.CalculationGroup = s.CalculationGroup
+		WHERE c.IsDiscountByCurrency = 1
+	)
+	UPDATE t SET Discount = d.Discount
+	FROM #SumByLicensee t
+	INNER JOIN #tmpDiscountSettings s ON t.PartyID = s.PartyID AND t.ProductID=s.ProductId
+	INNER JOIN cte_DiscountByCurrency d on d.CalculationGroup=s.CalculationGroup
+	LEFT JOIN @MinFeeGroup m ON m.PartyId = t.PartyId AND m.ProductId = t.ProductId
+	WHERE d.Discount > 0 AND (t.LicensingFee - d.Discount) >= ISNULL(m.MinFeeProrate,0)
+	-- End Region
+
+	-- 14. licensee group
 	DECLARE @PartyList AS TABLE (PartyId INT, PartyName VARCHAR(100), BrandName VARCHAR(100), ParentID INT)
 	INSERT INTO @PartyList (PartyId, PartyName, BrandName, ParentID)
 	EXEC dbo.LA_PartyListSel
@@ -488,10 +600,9 @@ BEGIN
 
 	IF @IsSkinView = 0
 	BEGIN
-		-- rebate
-		UPDATE s SET Rebate = CASE WHEN (s.LicensingFee - s.Discount) < 0 THEN 0 ELSE (s.LicensingFee - s.Discount) * ISNULL(r.Rate, 0) END			
-		FROM #SumByLicensee s
-		LEFT JOIN @DiscountGroup r ON s.PartyId = r.PartyId AND r.ProductId = s.ProductId AND r.DiscountGroupType = 2 -- rebate = 2
+		-- calculate rebate
+		UPDATE s SET Rebate = CASE WHEN (s.LicensingFee - s.Discount) < 0 THEN 0 ELSE (s.LicensingFee - s.Discount) * ISNULL(r.Rate, 0) END
+		FROM #SumByLicensee s INNER JOIN @tmpRebateSettings r ON s.PartyId = r.PartyId AND r.ProductId = s.ProductId
 
 		SELECT p.PartyName 						AS ViewName
 			,SUM(ISNULL(s.LicenseeWinLoss,0))	AS WinLoss
@@ -517,8 +628,7 @@ BEGIN
 			SUM(d.Turnover)			Turnover,
 			SUM(d.LicenseeWinLoss)	LicenseeWinLoss,
 			SUM(d.LicensingFee)		LicensingFee,
-			CAST(0 AS MONEY)		Discount,
-			CAST(0 AS MONEY)		Rebate
+			CAST(0 AS MONEY)		Discount
 		INTO #SumBySkin
 		FROM #Result d
 		INNER JOIN @PartyIdTable pt ON pt.PartyId=d.PartyId
@@ -531,13 +641,11 @@ BEGIN
 			SELECT s.ProductId
 				,SUM(s.LicensingFee)	AS TotalFee
 				,SUM(s.Discount)		AS TotalDiscount
-				,SUM(s.Rebate)			AS TotalRebate
 			FROM #SumByLicensee s
 			GROUP BY s.ProductId
 		)
 		UPDATE s SET 
-			s.Discount = CASE WHEN t.TotalFee=0 THEN 0 ELSE t.TotalDiscount * (s.LicensingFee / t.TotalFee) END,
-			s.Rebate = CASE WHEN t.TotalFee=0 THEN 0 ELSE t.TotalRebate * (s.LicensingFee / t.TotalFee) END
+			s.Discount = CASE WHEN t.TotalFee=0 THEN 0 ELSE t.TotalDiscount * (s.LicensingFee / t.TotalFee) END
 		FROM #SumBySkin s
 		INNER JOIN t ON t.ProductId=s.ProductId
 
