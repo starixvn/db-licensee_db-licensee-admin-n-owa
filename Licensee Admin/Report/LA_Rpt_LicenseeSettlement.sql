@@ -251,10 +251,10 @@ BEGIN
 				, 0 AS PlayerComm
 				, SUM(CASE WHEN b.Bettype <> 1706 THEN -MemberWL ELSE 0 END * (1 - p.Rate)) AS LicenseeWL
 				, 0 AS LicenseeComm
-				, SUM(CASE WHEN b.Bettype = 1706 THEN MemberWL ELSE 0 END ) AS TipsAmount
-				, SUM(CASE WHEN b.Bettype = 1706 THEN MemberWL ELSE 0 END * ISNULL(t.Rate, 0)) AS TipsAmountDue
+				, SUM(CASE WHEN b.Bettype = 1706 THEN -MemberWL ELSE 0 END ) AS TipsAmount
+				, SUM(CASE WHEN b.Bettype = 1706 THEN -MemberWL ELSE 0 END * ISNULL(t.Rate, 0)) AS TipsAmountDue
 				, SUM(CASE WHEN b.Bettype <> 1706 THEN -MemberWL ELSE 0 END * (p.Rate) + 
-					(CASE WHEN b.Bettype = 1706 THEN MemberWL ELSE 0 END * ISNULL(t.Rate, 0))) AS Company
+					(CASE WHEN b.Bettype = 1706 THEN -MemberWL ELSE 0 END * ISNULL(t.Rate, 0))) AS Company
 				, SUM(b.betcount) AS BetCount
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN @ChargeInfo p ON (
