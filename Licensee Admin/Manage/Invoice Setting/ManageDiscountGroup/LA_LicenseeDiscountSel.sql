@@ -37,7 +37,8 @@ BEGIN
 	), cte_DiscountSetting AS( 
 		SELECT a.PartyID, h.ToDate
 		FROM LA_DiscountGroupHeader h WITH(NOLOCK)
-		INNER JOIN cte_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId)
+		INNER JOIN cte_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
+		WHERE h.DiscountGroupType IN (1, 3, 11, 13)) 
 
 	SELECT p.PartyName, ds.ToDate
 	FROM @Parties p
