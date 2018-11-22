@@ -125,7 +125,8 @@ BEGIN
 				b.SiteID = ci.LicenseeID AND
 				b.ProductID = ci.ProductId AND
 				b.rptDate BETWEEN ci.FromDate AND ci.ToDate AND
-				ci.IsPayToSupplier = 0)
+				ci.IsPayToSupplier = 0 AND
+				ci.ChargeType = @GrossWin)
 			LEFT JOIN #ChargeInfo r ON ( -- rolling commission rate
 				b.SiteID = r.LicenseeID AND
 				b.ProductID = r.ProductId AND
