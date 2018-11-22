@@ -50,6 +50,7 @@ AS
 		- 20180718@Bruce: use decimal to void margin not match among reports [#94108]
 		- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 		- 20180924@Parsons: LA - LPID report - Apply one discount rate across all base currencies [#100046]
+		- 20181122@Scofield: Integrate Bidme games (GD product) [#103695]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -172,7 +173,9 @@ BEGIN
 				CASE WHEN ISNULL(ci.isDeposit, 0) = 1 THEN ci.DI_Rate ELSE 0 END,
 				ci.Fromdate,
 				ci.ToDate,
-				CASE WHEN ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
+				CASE WHEN ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) 
+					WHEN ProductID = 11 AND ci.ChargeType = 12 THEN 1706 -- GD Tip
+					ELSE -1 END
 		FROM	bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, @ProductCodes) ci
 		LEFT JOIN bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype
 		WHERE	((ci.PartyID IN (25,30,324) AND DI_Rate = 0) OR DI_Rate > 0) AND ProductId <> 1 --exclude RB
@@ -183,12 +186,14 @@ BEGIN
 				CASE WHEN ISNULL(ci.isDeposit, 0) = 1 THEN ci.DI_Rate ELSE 0 END,
 				ci.Fromdate,
 				ci.ToDate,
-				CASE WHEN ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
+				CASE WHEN ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) 
+					WHEN ProductID = 11 AND ci.ChargeType = 12 THEN 1706 -- GD Tip
+					ELSE -1 END
 		FROM	bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @PrevFromDate, @PrevToDate, @ProductCodes) ci
 		LEFT JOIN bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype
 		WHERE	((ci.PartyID IN (25,30,324) AND DI_Rate = 0) OR DI_Rate > 0) AND ProductId <> 1 --exclude RB
 	)
-	-- End region
+	-- End region	
 
 	-- this table hold data from sp: LA_AmountToCompanySel
 	CREATE TABLE #AmountToCompany (
@@ -273,7 +278,7 @@ BEGIN
 													WHEN b.StatusId IN (114, 115) THEN 0.5
 											 ELSE 1 END
 										ELSE 1 END) * e.Rate,
-				SUM(ISNULL(b.MemberWL, 0)) * e.Rate,
+				SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE ISNULL(b.MemberWL, 0) END) * e.Rate,
 				SUM(ISNULL(b.CommissionA, 0)) * e.Rate,
 				SUM(ISNULL(b.CommissionP, 0)) * e.Rate,
 				p.ProductId,
