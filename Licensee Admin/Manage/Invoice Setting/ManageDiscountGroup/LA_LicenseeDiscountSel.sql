@@ -31,14 +31,16 @@ BEGIN
 	EXEC dbo.LA_PartyListNonOfficialSel
 	
 	;WITH cte_DiscountGroupAssignment AS(
-		SELECT MAX(DiscountGroupId) AS DiscountGroupId, PartyID 
-		FROM LA_DiscountGroupAssignment WITH(NOLOCK)
+		SELECT MAX(h.DiscountGroupId) AS DiscountGroupId, PartyID 
+		FROM LA_DiscountGroupAssignment a WITH(NOLOCK)
+		INNER JOIN LA_DiscountGroupHeader h WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
+		WHERE h.DiscountGroupType IN (1, 3, 11, 13)
 		GROUP BY PartyID
 	), cte_DiscountSetting AS( 
 		SELECT a.PartyID, h.ToDate
 		FROM LA_DiscountGroupHeader h WITH(NOLOCK)
 		INNER JOIN cte_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
-		WHERE h.DiscountGroupType IN (1, 3, 11, 13)) 
+		WHERE h.DiscountGroupType IN (1, 3, 11, 13))
 
 	SELECT p.PartyName, ds.ToDate
 	FROM @Parties p
