@@ -509,11 +509,14 @@ BEGIN
 		INNER JOIN @rate c ON c.CalculationGroup = s.CalculationGroup
 		WHERE c.IsDiscountByCurrency = 1
 	)
-	UPDATE t SET Discount = d.Discount
+	UPDATE t SET 
+		Discount =			CASE WHEN (t.FeeByBaseCurrency - d.Discount) < t.Minfee THEN 0 ELSE d.Discount END,
+		FeeByBaseCurrency =	CASE WHEN (t.FeeByBaseCurrency - d.Discount) < t.Minfee THEN t.Minfee ELSE t.FeeByBaseCurrency END,
+		IsChargedByMinFee =	CASE WHEN (t.FeeByBaseCurrency - d.Discount) < t.Minfee AND t.Minfee > 0 THEN 1 ELSE t.IsChargedByMinFee END
 	FROM #tmpResult t
 	INNER JOIN #tmpDiscountSettings s ON t.PartyID = s.PartyID AND t.ProductID=s.ProductId
 	INNER JOIN cte_DiscountByCurrency d on d.CalculationGroup=s.CalculationGroup
-	WHERE d.Discount > 0 AND (t.FeeByBaseCurrency - d.Discount) >= t.Minfee
+	WHERE d.Discount > 0
 
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 5. rebate calculation

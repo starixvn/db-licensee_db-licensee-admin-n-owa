@@ -584,12 +584,14 @@ BEGIN
 		INNER JOIN @rate c ON c.CalculationGroup = s.CalculationGroup
 		WHERE c.IsDiscountByCurrency = 1
 	)
-	UPDATE t SET Discount = d.Discount
+	UPDATE t SET
+		Discount =		CASE WHEN (t.LicensingFee - d.Discount) < m.MinFeeProrate THEN 0 ELSE d.Discount END,
+		LicensingFee =	CASE WHEN (t.LicensingFee - d.Discount) < m.MinFeeProrate THEN m.MinFeeProrate ELSE t.LicensingFee END
 	FROM #SumByLicensee t
 	INNER JOIN #tmpDiscountSettings s ON t.PartyID = s.PartyID AND t.ProductID=s.ProductId
 	INNER JOIN cte_DiscountByCurrency d on d.CalculationGroup=s.CalculationGroup
 	LEFT JOIN @MinFeeGroup m ON m.PartyId = t.PartyId AND m.ProductId = t.ProductId
-	WHERE d.Discount > 0 AND (t.LicensingFee - d.Discount) >= ISNULL(m.MinFeeProrate,0)
+	WHERE d.Discount > 0
 	-- End Region
 
 	-- 14. licensee group
