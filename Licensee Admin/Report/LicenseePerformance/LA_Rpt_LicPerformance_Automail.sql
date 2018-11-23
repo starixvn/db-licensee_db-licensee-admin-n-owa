@@ -19,6 +19,7 @@ AS
 	 - 20180712@Bruce: Enhance Manage Discount group [#94282]
 	 - 20180716@bruce: add new group TEST for credit [#98126]
 	 - 20180607@Parsons: Integrate Pragmatic [#94108]
+	 - 20181122@Scofield: Integrate Bidme games (GD product) [#103695]
 
 	Example:
 	USE bodb_licensee
@@ -89,7 +90,9 @@ BEGIN
 				ci2.ChargeType, 
 				ci.Fromdate, 
 				ci.ToDate,	
-				CASE WHEN ci.ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
+				CASE WHEN ci.ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) 
+					WHEN ci.ProductId = 11 AND ci.ChargeType = 12 THEN 1706 -- GD Tip
+					ELSE -1 END
 		FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
 		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci2 WITH(NOLOCK) ON ci.ChargeID = ci2.ChargeID
 		LEFT JOIN bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype
@@ -124,7 +127,7 @@ BEGIN
 	(
 		SELECT	p.PartyId,
 				SUM(ISNULL(b.Turnover, 0) * e.Rate),
-				SUM(ISNULL(b.MemberWL, 0) * e.Rate),
+				SUM((CASE WHEN b.Bettype = 1706 THEN 0 ELSE ISNULL(b.MemberWL, 0) END) * e.Rate),
 				SUM(((-ISNULL(b.MemberWL, 0) * p.Rate) - (CASE WHEN b.ProductId = 3 THEN ISNULL(b.CommissionA, 0) ELSE 0 END)) * e.Rate),
 				p.ProductId
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
