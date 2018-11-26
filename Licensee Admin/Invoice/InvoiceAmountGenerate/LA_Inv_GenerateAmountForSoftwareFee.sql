@@ -27,7 +27,6 @@ AS
    
 	Revisions: 
 		+ 20181004@Parsons: Integrate AG setup fee into invoices [#98485]
-		+ 20181126@Parsons: Integrate Bidme games (GD product) [#103695]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -42,8 +41,6 @@ BEGIN
 	DECLARE @FirstDate DATETIME = DATEADD(mm, DATEDIFF(mm, 0, @FromDate), 0)
 	DECLARE @LastDate DATETIME = DATEADD (dd, -1, DATEADD(mm, DATEDIFF(mm, 0, @FromDate) + 1, 0))
 	DECLARE @DaysInMonth INT = DATEDIFF(day, @FirstDate, @LastDate) + 1
-
-	DECLARE @GDProductId  INT = 11
 
 	DECLARE	@FinalResult TABLE(
 			ProductId		INT,
@@ -126,16 +123,15 @@ BEGIN
 			FromDate	SMALLDATETIME,
 			ToDate		SMALLDATETIME)
 
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, BettypeRef, Rate, Fromdate, Todate, TypeId)
+	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, BettypeRef, Rate, Fromdate, Todate)
 	(
-		SELECT	PartyID, LicenseeID, ProductID, Bettype, DI_Rate, Fromdate, Todate,
-				CASE WHEN ProductID = 11 THEN ChargeType ELSE 1 END AS ChargeType
+		SELECT	PartyID, LicenseeID, ProductID, Bettype, DI_Rate, Fromdate, Todate
 		FROM	dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId NOT IN (1, 15) --exclude RB, CB
 	)
 
 	-- exclude products have calculated
-	DELETE @PartyChargeInfo WHERE ProductID IN (SELECT a.ProductId FROM #AmountToCompany a WHERE ProductID <> @GDProductID)
+	DELETE @PartyChargeInfo WHERE ProductID IN (SELECT a.ProductId FROM #AmountToCompany a)
 	
 	-- Get ChargeInfo for CB
 	DECLARE @CommChargeType INT = 6
@@ -268,7 +264,7 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
-				AND b.ProductId NOT IN (@CBProductId, @COProductId, @GDProductId)
+				AND b.ProductId NOT IN (@CBProductId, @COProductId)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, r.BettypeRef
 	)
 	
@@ -364,37 +360,6 @@ BEGIN
 		INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.Currency = e.ExchangeID	
 	)
 	-- End region: Get Amount By Product CO
-	
-	-- Region: Get Amount By Product GD
-	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,ProductId,AmountToCompany)
-	(
-		SELECT p.LicenseeId, p.PartyId, b.rptDate, b.CurrencyId, @GDProductId,
-			SUM(CASE WHEN b.Bettype <> 1706 THEN -MemberWL ELSE 0 END * (p.Rate) + 
-				(CASE WHEN b.Bettype = 1706 THEN -MemberWL ELSE 0 END * ISNULL(t.Rate, 0))) AS Company
-		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN @PartyChargeInfo p ON (
-					b.SiteId = p.LicenseeID AND 
-					b.rptDate BETWEEN p.FromDate AND p.ToDate AND
-					p.TypeId = 1 -- Gross Win
-					)
-			LEFT JOIN @PartyChargeInfo t ON (
-					b.SiteId = t.LicenseeID AND 
-					b.rptDate BETWEEN t.FromDate AND t.ToDate AND
-					t.TypeId = 12 -- GD Tips
-					)
-		WHERE b.CurrencyId <> 20
-			AND b.ProductID = @GDProductId
-			AND b.StatusId NOT IN (-1, 101, 102, 103)
-			AND b.customercategory NOT IN (27, 28)
-		GROUP BY p.LicenseeId, p.PartyId, b.rptDate, b.CurrencyId
-	)
-	UPDATE	#TempData
-	SET		AmountToCompany = AmountToCompany * e.Rate	
-	FROM	#TempData td 
-			INNER JOIN @PartyChargeInfo p ON td.LicenseeId = p.LicenseeId AND td.rptDate BETWEEN p.FromDate AND p.ToDate
-			INNER JOIN #Exchange e ON td.rptDate = e.ExchangeDate AND td.CurrencyId = e.ExchangeID
-			WHERE td.ProductId = @GDProductId
-	-- End region: Get Amount By Product GD
 
 	DECLARE @InvoiceData	TABLE(
 			PartyId			INT,
@@ -407,7 +372,7 @@ BEGIN
 	-- Region: fee
 	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType)
 	SELECT d.PartyId, d.ProductId, d.Fee, @AmountTypeSoftwareFee
-	FROM #AmountToCompany d WHERE d.ProductId <> @GDProductID
+	FROM #AmountToCompany d
 	-- End Region
 
 	-- product dont have minfee
@@ -530,6 +495,6 @@ BEGIN
 	DROP TABLE #TempData
 	DROP TABLE #TempDataCB
 	DROP TABLE #AmountToCompany
-	DROP TABLE #credit
+
 END
 GO
