@@ -26,9 +26,6 @@ BEGIN
 	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT)
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel
-
-	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
-	EXEC dbo.LA_PartyListNonOfficialSel
 	
 	;WITH cte_DiscountGroupAssignment AS(
 		SELECT MAX(h.DiscountGroupId) AS DiscountGroupId, PartyID 
