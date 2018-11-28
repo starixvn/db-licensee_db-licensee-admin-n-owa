@@ -1,6 +1,8 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
+
+SET QUOTED_IDENTIFIER ON;SET ANSI_NULLS ON;GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeSettlement]
 	  @PartyId				INT
