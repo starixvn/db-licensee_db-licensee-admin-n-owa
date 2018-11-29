@@ -140,11 +140,13 @@ BEGIN
 				s.IsPayToSupplier = 1 AND
 				s.ChargeType IN (@GrossWin, @CreditServiceCharge, @DepositServiceCharge)) -- @GrossWin for old setting 
 			LEFT JOIN #ChargeInfo tipLicensee ON(
+				b.SiteID = tipLicensee.LicenseeID AND
 				b.ProductID = tipLicensee.ProductId AND
 				b.rptDate BETWEEN tipLicensee.FromDate AND tipLicensee.ToDate AND
 				tipLicensee.IsPayToSupplier = 0 AND
 				tipLicensee.ChargeType = @BidMeTipChargeType)
 			LEFT JOIN #ChargeInfo tipSupplier ON(
+				b.SiteID = tipSupplier.LicenseeID AND
 				b.ProductID = tipSupplier.ProductId AND
 				b.rptDate BETWEEN tipSupplier.FromDate AND tipSupplier.ToDate AND
 				tipSupplier.IsPayToSupplier = 1 AND
