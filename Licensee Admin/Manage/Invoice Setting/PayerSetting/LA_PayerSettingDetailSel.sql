@@ -20,7 +20,7 @@ AS
 		- 20170216@bruce.bui: [#70050]
 				+ sort product, include payername,
 				+ sort charge rate by expired
-		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20180716@bruce: add new group TEST for credit [#98126] 		- 20181115@Parsons: Configure discount settings by currency [#99694]
 		
 	 Params:
 		+ @PayerId :specify Party
@@ -35,6 +35,13 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @Rebate INT = 2
+	DECLARE @DiscountIndividualFee INT = 1
+	DECLARE @DiscountIndividualGrosswin INT = 3
+	DECLARE @DiscountByGroupFee INT = 11
+	DECLARE @DiscountByGroupGrosswin INT = 13
+
 	DECLARE @ProductListAll		VARCHAR(100) = ''		
 		, @MinDate				DATE 
 		, @MaxDate				DATE
@@ -122,13 +129,13 @@ BEGIN
 		LEFT JOIN (
 				SELECT PartyId, DiscountGroupId, DiscountGroupName 
 				FROM @Discount 
-				WHERE DiscountGroupType = 1 
+				WHERE DiscountGroupType IN (@DiscountIndividualFee, @DiscountIndividualGrosswin, @DiscountByGroupFee, @DiscountByGroupGrosswin)
 					AND @CurrentDate BETWEEN FromDate AND ToDate
 				) d1 ON c.PartyId = d1.PartyId --discount
 		LEFT JOIN (
 				SELECT PartyId, DiscountGroupId, DiscountGroupName 
 				FROM @Discount 
-				WHERE DiscountGroupType = 2
+				WHERE DiscountGroupType = @Rebate
 					AND @CurrentDate BETWEEN FromDate AND ToDate
 				) d2 ON c.PartyId = d2.PartyId --Rebate
 

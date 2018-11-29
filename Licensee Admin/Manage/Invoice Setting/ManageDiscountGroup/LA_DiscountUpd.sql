@@ -8,7 +8,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountUpd]
 	@DiscountGroupId	SMALLINT = 0,
-	@DiscountGroupName	NVARCHAR(50),
+	@DiscountGroupName	NVARCHAR(110),
 	@DiscountGroupType	TINYINT, 
 	@CurrencyId			TINYINT,
 	@FromDate			DATE, 
@@ -17,6 +17,7 @@ ALTER PROCEDURE [dbo].[LA_DiscountUpd]
 	@DiscountProductIds VARCHAR(512) = '',
 	@RateSettingsData	VARCHAR(MAX) = '', 
 	@PartySettingsData	NVARCHAR(MAX) = '', 
+	@CurrencySettingsData	VARCHAR(MAX) = '', 
 	@UserId				INT, 
 	@LoginIp			VARCHAR (50)	= '', 
 	@ErrCode			INT = 0 OUTPUT, 
@@ -29,6 +30,8 @@ AS
 
 	Revisions:  
 		- 20180704@Parsons: Update discount groups [#94282]
+		- 20181023@Parsons: Configure-discount-settings-by-currency [#99694]
+
 	 Params:
 		@RateSettingsData = '<Root>
 								<RateSetting>
@@ -56,6 +59,16 @@ AS
 									<Remark>hello2</Remark>
 									<IsApplyDiscount>0</IsApplyDiscount>
 								</PartySetting>
+							</Root>'
+		@CurrencySettingsData = '<Root>
+								<CurrencySetting>
+									<PartyId>1</PartyId>
+									<CurrencyId>2</Remark>
+								</CurrencySetting>
+								<CurrencySetting>
+									<PartyId>3</PartyId>
+									<CurrencyId>4</Remark>
+								</CurrencySetting>
 							</Root>'
 */
 BEGIN
@@ -86,6 +99,7 @@ BEGIN
 
 	DECLARE @Products TABLE (ProductId TINYINT, CalculationType TINYINT)
 	DECLARE @PartySettings	TABLE (PartyId SMALLINT, Remark NVARCHAR(500), IsApplyDiscount BIT)
+	DECLARE @CurrencySettings	TABLE (PartyId SMALLINT, CurrencyId INT)
 	DECLARE @RateSettings	TABLE (DiscountDetailId SMALLINT, FromAmount MONEY, ToAmount MONEY, Rate MONEY, RowIndex INT)
 	
 	DECLARE @docHandler INT
@@ -118,6 +132,20 @@ BEGIN
 	
 		EXEC sp_xml_removedocument @docHandler
 	END
+
+	--parse setting currency
+	IF @CurrencySettingsData <> ''
+	BEGIN
+		EXEC sp_xml_preparedocument @docHandler OUTPUT, @CurrencySettingsData
+		INSERT INTO @CurrencySettings(PartyId, CurrencyId)
+		SELECT PartyId, CurrencyId
+		FROM OPENXML(@docHandler, 'Root/CurrencySetting')
+		WITH (PartyId	INT 'PartyId', 
+				CurrencyId	INT 'CurrencyId')
+	
+		EXEC sp_xml_removedocument @docHandler
+	END
+
 	--parse setting rate
 	IF @RateSettingsData <> ''
 	BEGIN
@@ -182,6 +210,22 @@ BEGIN
 				VALUES(@DiscountGroupId, s.PartyId, s.Remark, s.IsApplyDiscount)
 	WHEN MATCHED
 		THEN UPDATE SET Remark = s.Remark, IsApplyDiscount = s.IsApplyDiscount
+	WHEN NOT MATCHED BY SOURCE AND t.DiscountGroupId = @DiscountGroupId
+		THEN DELETE;
+
+	IF @@ERROR <> 0
+	BEGIN
+		SELECT @ErrMsg = 'Update failed. Please try again.' , @ErrCode = 504
+		RETURN
+	END
+
+	--update discount group currency
+	;MERGE dbo.LA_DiscountGroupCurrency WITH(ROWLOCK) AS t
+	USING @CurrencySettings AS s
+	ON (t.DiscountGroupId = @DiscountGroupId AND t.PartyId = s.PartyId AND t.CurrencyId = s.CurrencyId)
+	WHEN NOT MATCHED BY TARGET
+		THEN INSERT(DiscountGroupId, PartyID, CurrencyId)
+				VALUES(@DiscountGroupId, s.PartyId, s.CurrencyId)
 	WHEN NOT MATCHED BY SOURCE AND t.DiscountGroupId = @DiscountGroupId
 		THEN DELETE;
 
