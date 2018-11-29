@@ -9,7 +9,8 @@ GO
 
 ALTER PROCEDURE dbo.LA_Rpt_LicPerformance_Alert
 	@FromDate DATE,
-	@ToDate DATE
+	@ToDate DATE,
+	@ProductCodes VARCHAR(500)
 AS
 /*	Created: 20181128@Parsons
 	Task: LA-Licensee Performance Alert
@@ -19,16 +20,12 @@ AS
 		- 20181128@Parsons: LA - Licensee Performance Alert [#104918]
 
 	Param's Explanation:
-	EXEC LA_Rpt_LicPerformance_Alert @FromDate = '2018-11-01', @ToDate = '2018-11-30'
+	EXEC LA_Rpt_LicPerformance_Alert @FromDate = '2018-9-01', @ToDate = '2018-9-30', @ProductCodes = 'SB'
 */
-
 BEGIN
 	SET NOCOUNT ON;
 	
-	DECLARE @BaseCurrencyName VARCHAR(3) = 'EUR',
-			@ProductCodes VARCHAR(2) = 'SB', 
-			@PrevFromDate DATE = DATEADD(M, -1,  @FromDate)
-			,@PrevToDate DATE = DATEADD(M, - 1, @ToDate)
+	DECLARE @BaseCurrencyName VARCHAR(3) = 'EUR'
 
 	-- Region Get @PartyIDs
 	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT)
@@ -39,7 +36,6 @@ BEGIN
 	SELECT @PartyIDs = COALESCE(@PartyIDs + ', ', '') + CAST(PartyId AS VARCHAR)
 	FROM @Parties  
 	WHERE ParentId in (1, 9, 11, 98)
-
 	-- Endregion Get @PartyIDs
 
 	-- Region: Party charge info
@@ -50,25 +46,13 @@ BEGIN
 			Rate		DECIMAL(7,5),
 			FromDate	DATE,
 			ToDate		DATE)
-
-	-- ***********************************************************************************************
-	-- *** Get ChargeInfo for @PartyIDs in 2 period: FromDate-ToDate, PreviousFromDate-PreviousToDate
-	-- ***********************************************************************************************
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
 	(
 		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, ci.DI_Rate, ci.Fromdate, ci.ToDate
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
 	)
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
-	(
-		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, ci.DI_Rate, ci.Fromdate, ci.ToDate
-		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @PrevFromDate, @PrevToDate, @ProductCodes, 'OA', 1) ci
-	)
-	-- End region
+	-- Endregion: Party charge info
 
-	-- **********************************************************************************************
-	-- *** Get Exchange info for @BaseCurrencyName in 2 periods (current period and previous period)
-	-- **********************************************************************************************
 	-- Region: Get exchange rate info
 	CREATE	TABLE #Exchange (
 			ExchangeDate	DATE,
@@ -80,41 +64,33 @@ BEGIN
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
-	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM dbo.LA_f_ExchangeDailySel(@PrevFromDate, @PrevToDate, @BaseCurrencyName)
-
 	CREATE NONCLUSTERED INDEX Idx_Exchange ON #Exchange (ExchangeDate, ExchangeID)
-	-- End region
+	-- End region: Get exchange rate info
 	
 	-- Region: Select Data	
 	;WITH cte_Data AS
 	(
 		SELECT	p.PartyId,
-				b.rptDate,
-				SUM(b.BetCount) AS BetCount,
+				SUM(ISNULL(b.BetCount, 0)) AS BetCount,
 				SUM(ISNULL(b.Turnover, 0) * e.Rate) AS Turnover
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 				INNER JOIN @PartyChargeInfo p ON	b.ProductId = p.ProductID 
 													AND p.LicenseeId = b.SiteId
 													AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
-		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate OR b.rptDate BETWEEN @PrevFromDate AND @PrevToDate)
+		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
 				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
-		GROUP BY p.PartyId, b.rptDate
+		GROUP BY p.PartyId
 	)
 	SELECT	d.PartyId,
 			(CASE p.PartyName WHEN '18bb' THEN 'PIH' WHEN 'IBC' THEN 'FDL' ELSE p.PartyName END) AS PartyName,
-			SUM((CASE WHEN MONTH(d.rptDate) = MONTH(@FromDate) THEN d.BetCount ELSE 0 END)) AS BetCount,
-			SUM((CASE WHEN MONTH(d.rptDate) = MONTH(@FromDate) THEN 0 ELSE d.BetCount END)) AS PreviousBetCount,
-			SUM((CASE WHEN MONTH(d.rptDate) = MONTH(@FromDate) THEN d.Turnover ELSE 0 END)) AS Turnover,
-			SUM((CASE WHEN MONTH(d.rptDate) = MONTH(@FromDate) THEN 0 ELSE d.Turnover END)) AS PreviousTurnover
-	FROM	cte_Data d
+			BetCount,
+			Turnover
+	FROM cte_Data d
 	INNER JOIN bodb_licensee.dbo.OAS_Party (NOLOCK) p ON d.PartyId = p.PartyID
-	GROUP BY d.PartyId, (CASE p.PartyName WHEN '18bb' THEN 'PIH' WHEN 'IBC' THEN 'FDL' ELSE p.PartyName END)
 	-- End region
 
 	DROP TABLE #Exchange
