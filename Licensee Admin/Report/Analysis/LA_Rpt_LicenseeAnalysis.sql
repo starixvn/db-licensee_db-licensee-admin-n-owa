@@ -689,9 +689,3 @@ BEGIN
 	DROP TABLE #BettypeList
 END
 GO 
- GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicenseeAnalysis] TO [vnteam]
-GO 
- GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeAnalysis] TO [bodbLicenseeNet]
-GO 
- GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeAnalysis] TO [bodbAdminNet]
-GO 
