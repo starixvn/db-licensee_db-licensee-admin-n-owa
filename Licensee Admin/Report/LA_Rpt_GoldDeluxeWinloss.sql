@@ -66,19 +66,33 @@ BEGIN
 	-- get payToSupplier's charge rate
 	;WITH CI AS (
 		SELECT ci.PartyId, ci.LicenseeId, ci.ProductId, ci.IsDeposit,
-			ISNULL(c1.Rate, c2.Rate) AS Rate,
-			ISNULL(c1.FromDate, c2.FromDate) AS FromDate,
-			ISNULL(c1.ToDate, c2.ToDate) AS ToDate,
-			ISNULL(c1.ChargeType, c2.ChargeType) AS ChargeType
+			ISNULL(partyConfig.Rate, groupConfig.Rate) AS Rate,
+			ISNULL(partyConfig.FromDate, groupConfig.FromDate) AS FromDate,
+			ISNULL(partyConfig.ToDate, groupConfig.ToDate) AS ToDate,
+			ISNULL(partyConfig.ChargeType, groupConfig.ChargeType) AS ChargeType
 		FROM #ChargeInfo ci
 		JOIN #PartyList pl ON pl.PartyId = ci.PartyID
-		LEFT JOIN dbo.OAS_ChargeInfo c1 WITH(NOLOCK) ON c1.FromParty = ci.PartyID AND c1.ToParty = @3rdPartyId AND (
-			c1.FromDate BETWEEN @FromDate AND @ToDate OR @FromDate BETWEEN c1.FromDate AND c1.ToDate
-		) -- individual charge rate
-		LEFT JOIN dbo.OAS_ChargeInfo c2 WITH(NOLOCK) ON c2.FromParty = pl.ParentId AND c2.ToParty = @3rdPartyId AND (
-			c2.FromDate BETWEEN @FromDate AND @ToDate OR @FromDate BETWEEN c2.FromDate AND c2.ToDate
+		LEFT JOIN dbo.OAS_ChargeInfo groupConfig WITH(NOLOCK) ON groupConfig.FromParty = pl.ParentId AND groupConfig.ToParty = @3rdPartyId AND (
+			groupConfig.FromDate BETWEEN @FromDate AND @ToDate OR @FromDate BETWEEN groupConfig.FromDate AND groupConfig.ToDate
 		) -- inherit from parent group
-		WHERE ci.ChargeType = @GrossWin
+		LEFT JOIN dbo.OAS_ChargeInfo partyConfig WITH(NOLOCK) ON partyConfig.FromParty = ci.PartyID AND partyConfig.ToParty = @3rdPartyId AND (
+			partyConfig.FromDate BETWEEN @FromDate AND @ToDate OR @FromDate BETWEEN partyConfig.FromDate AND partyConfig.ToDate
+		) AND partyConfig.ChargeType = groupConfig.ChargeType -- individual charge rate
+		WHERE ci.IsDeposit = 1 and ci.ChargeType = @GrossWin
+
+		UNION 
+
+		SELECT ci.PartyId, ci.LicenseeId, ci.ProductId, ci.IsDeposit,
+			partyConfig.Rate AS Rate,
+			partyConfig.FromDate AS FromDate,
+			partyConfig.ToDate AS ToDate,
+			partyConfig.ChargeType AS ChargeType
+		FROM #ChargeInfo ci
+		JOIN #PartyList pl ON pl.PartyId = ci.PartyID
+		LEFT JOIN dbo.OAS_ChargeInfo partyConfig WITH(NOLOCK) ON partyConfig.FromParty = ci.PartyID AND partyConfig.ToParty = @3rdPartyId AND (
+			partyConfig.FromDate BETWEEN @FromDate AND @ToDate OR @FromDate BETWEEN partyConfig.FromDate AND partyConfig.ToDate
+		) 
+		WHERE ci.IsDeposit = 0
 	)
 	INSERT INTO #ChargeInfo(PartyId, LicenseeId, ProductId, Rate, IsDeposit, ChargeType, IsPayToSupplier, Fromdate, Todate)
 	SELECT PartyID, LicenseeID, ProductID, Rate, isDeposit, ChargeType, 1,
