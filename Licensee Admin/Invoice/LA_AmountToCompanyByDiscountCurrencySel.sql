@@ -20,13 +20,9 @@ AS
 	Task : select amount to company by discount currency
 	DB: DB052/bodb_Licensee
 	Revisions:
-<<<<<<< HEAD
 		- 20180924@Parsons: LA - LPID report - Apply one discount rate across all base currencies [#100046]
-		- 20181114@Bruce: discount by currency [#99694]
-=======
-		- 20180924@Parsons: LA - LPID report - Apply one discount rate across all base currencies [#100046] 
+		- 20181114@Bruce: discount by currency [#99694] 
 		- 20181127@Parsons: Integrate Bidme games (GD product) [#103695]
->>>>>>> 62a4616... 103695 Integrate GD Tips in LA_AmountToCompanySel & LA_AmountToCompanyByDiscountCurrencySel.
 */
 BEGIN
 	SET NOCOUNT ON
@@ -171,12 +167,8 @@ BEGIN
 	FROM (SELECT DISTINCT b.PartyId FROM @PartyList b) a
 	
 	-- 1.7 charge info
-<<<<<<< HEAD
-	SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, CAST(ci.DI_Rate AS DECIMAL(6,5)) AS Rate, ci.Fromdate, ci.ToDate
-=======
-	SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, ci.DI_Rate AS Rate, ci.Fromdate, ci.ToDate,  
-					CASE WHEN ProductID=11 AND ChargeType=12 THEN 1706 ELSE -1 END AS Bettype -- GD Tip
->>>>>>> 62a4616... 103695 Integrate GD Tips in LA_AmountToCompanySel & LA_AmountToCompanyByDiscountCurrencySel.
+	SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, CAST(ci.DI_Rate AS DECIMAL(6,5)) AS Rate, ci.Fromdate, ci.ToDate 
+					,CASE WHEN ProductID=11 AND ChargeType=12 THEN 1706 ELSE -1 END AS Bettype -- GD Tip
 	INTO #tmpChargeInfo
 	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
 	WHERE DI_Rate > 0
@@ -295,19 +287,20 @@ BEGIN
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 2. winloss data
  *-------------------------------------------------------------------------------------------------------------------------------*/
-<<<<<<< HEAD
 	-- 2.1 include general products
 	SELECT	p.PartyId,
 			b.rptDate AS WinlossDate,
 			p.ProductId,
-			b.CurrencyId,
-			b.MemberWL,
-			(b.MemberWL * p.Rate) AS Amount
+			b.CurrencyId, 
+			CASE WHEN b.Bettype = 1706 THEN 0 ELSE ISNULL(b.MemberWL, 0) END AS MemberWL, -- exclude GD Tip 
+			CASE WHEN b.Bettype = 1706 THEN 0 ELSE ISNULL(b.MemberWL, 0) * p.Rate END AS Amount, -- exclude GD Tip 
+			CASE WHEN b.Bettype = 1706 THEN ISNULL(b.MemberWL, 0) * p.Rate ELSE 0 END AS ExtraAmount
 	INTO #temData
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId 
 				AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
-				AND b.ProductId = p.ProductID  
+				AND b.ProductId = p.ProductID   
+				AND b.Bettype = p.Bettype 
 	WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND (b.CurrencyID <> 20)
 			AND b.customercategory NOT IN (27, 28)
@@ -319,64 +312,12 @@ BEGIN
 			t.PartyId,
 			t.ProductId,
 			SUM(-t.MemberWL * eb.Rate) AS WinlossByBaseCurrency,
-			SUM(-t.Amount * eb.Rate) AS AmountToCompanyByBaseCurrency,
+			SUM(-t.Amount * eb.Rate) AS AmountToCompanyByBaseCurrency, 
+			SUM(-t.ExtraAmount * eb.Rate)	AS ExtraAmount,
 			CAST(0 AS MONEY) WinlossByDiscountBaseCurrency,
 			CAST(0 AS MONEY) AmountToCompanyByDiscountBaseCurrency,
 			t.CurrencyId
 		INTO #tmpWinlossData
-=======
-	CREATE TABLE #tmpWinlossData (
-		PartyId			INT,
-		ProductId		TINYINT,
-		WinlossDate		DATE,
-		WinlossByDiscountCurrency	DECIMAL(20,5),
-		WinlossByBaseCurrency		DECIMAL(20,5),
-		AmountToCompanyByDiscountCurrency	DECIMAL(20,5),
-		AmountToCompanyByBaseCurrency		DECIMAL(20,5),
-		GDTip			DECIMAL(20,5),
-		IsApplyMinFee	BIT
-	)
-
-	CREATE TABLE #temData (
-		PartyId			INT,
-		ProductId		TINYINT,
-		WinlossDate		DATE,
-		CurrencyId		INT,
-		MemberWL		MONEY,
-		Amount			DECIMAL(20,5), 
-		Bettype			SMALLINT
-	)
-
-	-- 2.1 include general products
-	INSERT INTO #temData (PartyId,WinlossDate,ProductId,CurrencyId,MemberWL,Amount,Bettype)
-	(
-		SELECT	p.PartyId,
-				b.rptDate,
-				p.ProductId,
-				b.CurrencyId,
-				ISNULL(b.MemberWL, 0),
-				ISNULL(b.MemberWL, 0) * p.Rate,
-				CASE WHEN b.Bettype = 1706 THEN b.BetCount ELSE -1 END AS Bettype
-		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId 
-					AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
-					AND b.ProductId = p.ProductID 
-					AND b.Bettype = p.Bettype 
-		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)
-				AND (b.CurrencyID <> 20)
-				AND b.customercategory NOT IN (27, 28)
-				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
-				AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
-	)
-
-	INSERT INTO #tmpWinlossData(WinlossDate,PartyId,ProductId,WinlossByBaseCurrency,AmountToCompanyByBaseCurrency,GDTip)
-	SELECT	t.WinlossDate,
-			t.PartyId,
-			t.ProductId,
-			SUM(CASE WHEN t.Bettype = 1706 THEN 0 ELSE -t.MemberWL * eb.Rate END) AS WinlossByBaseCurrency, -- exclude GD Tip
-			SUM(CASE WHEN t.Bettype = 1706 THEN 0 ELSE -t.Amount * eb.Rate END) AS AmountToCompanyByBaseCurrency, -- exclude GD Tip
-			SUM(CASE WHEN t.Bettype = 1706 THEN -t.MemberWL * eb.Rate ELSE 0 END) AS GDTip
->>>>>>> 62a4616... 103695 Integrate GD Tips in LA_AmountToCompanySel & LA_AmountToCompanyByDiscountCurrencySel.
 	FROM #temData t
 		INNER JOIN #tmpExchange eb ON eb.ExchangeDate = t.WinlossDate AND eb.BaseCurrencyId = @BaseCurrencyId AND eb.ExchangeID = t.CurrencyId
 	GROUP BY t.WinlossDate, t.PartyId, t.ProductId, t.CurrencyId
@@ -386,14 +327,9 @@ BEGIN
 		SELECT	t.WinlossDate,
 				t.PartyId,
 				t.ProductId,
-<<<<<<< HEAD
 				t.CurrencyId,
 				SUM(-ISNULL(t.MemberWL * ed.Rate, 0)) AS WinlossByDiscountBaseCurrency,
 				SUM(-ISNULL(t.Amount * ed.Rate, 0)) AS AmountToCompanyByDiscountBaseCurrency
-=======
-				SUM(CASE WHEN t.Bettype = 1706 THEN 0 ELSE -t.MemberWL * ed.Rate END)	AS WinlossByDiscountCurrency, -- exclude GD Tip
-				SUM(CASE WHEN t.Bettype = 1706 THEN 0 ELSE -t.Amount * ed.Rate END)		AS AmountToCompanyByDiscountCurrency -- exclude GD Tip
->>>>>>> 62a4616... 103695 Integrate GD Tips in LA_AmountToCompanySel & LA_AmountToCompanyByDiscountCurrencySel.
 		FROM #temData t
 			INNER JOIN #tmpDiscountSettings ds ON ds.PartyId = t.PartyID AND t.ProductId = ds.ProductID 
 			INNER JOIN #tmpExchange ed ON t.WinlossDate = ed.ExchangeDate AND t.CurrencyId = ed.ExchangeID AND ed.BaseCurrencyId = ds.CurrencyId
@@ -417,16 +353,10 @@ BEGIN
 	SELECT a.PartyId,a.ProductId
 		,CAST(SUM(a.WinlossByDiscountBaseCurrency) AS MONEY)  AS WinlossByDiscountBaseCurrency
 		,CAST(SUM(a.WinlossByBaseCurrency) AS MONEY)		AS WinlossByBaseCurrency
-<<<<<<< HEAD
 		,CAST(SUM(a.AmountToCompanyByDiscountBaseCurrency) AS MONEY)  AS AmountToCompanyByDiscountBaseCurrency
-		,CAST(SUM(a.AmountToCompanyByBaseCurrency) AS MONEY)		AS AmountToCompanyByBaseCurrency
+		,CAST(SUM(a.AmountToCompanyByBaseCurrency) AS MONEY)		AS AmountToCompanyByBaseCurrency 
+		,CAST(SUM(a.ExtraAmount) AS MONEY)							AS ExtraAmount
 		,CAST(0 AS MONEY) AS FeeByDiscountBaseCurrency
-=======
-		,CAST(SUM(a.AmountToCompanyByDiscountCurrency) AS MONEY)	AS AmountToCompanyByDiscountCurrency
-		,CAST(SUM(a.AmountToCompanyByBaseCurrency) AS MONEY)		AS AmountToCompanyByBaseCurrency
-		,CAST(SUM(a.GDTip) AS MONEY)								AS GDTip
-		,CAST(0 AS MONEY) AS FeeByDiscountCurrency
->>>>>>> 62a4616... 103695 Integrate GD Tips in LA_AmountToCompanySel & LA_AmountToCompanyByDiscountCurrencySel.
 		,CAST(0 AS MONEY) AS FeeByBaseCurrency
 		,CAST(0 AS MONEY)			AS Discount
 		,CAST(0 AS MONEY)			AS Rebate
@@ -438,13 +368,8 @@ BEGIN
 
 	-- 2.6 treat negative as 0
 	UPDATE #tmpResult 
-<<<<<<< HEAD
 			SET FeeByDiscountBaseCurrency = CASE WHEN AmountToCompanyByDiscountBaseCurrency < 0 THEN 0 ELSE AmountToCompanyByDiscountBaseCurrency END,
 				FeeByBaseCurrency = CASE WHEN AmountToCompanyByBaseCurrency < 0 THEN 0 ELSE AmountToCompanyByBaseCurrency END
-=======
-			SET FeeByDiscountCurrency = GDTip + (CASE WHEN AmountToCompanyByDiscountCurrency < 0 THEN 0 ELSE AmountToCompanyByDiscountCurrency END)
-				,FeeByBaseCurrency = GDTip + CASE WHEN AmountToCompanyByBaseCurrency < 0 THEN 0 ELSE AmountToCompanyByBaseCurrency END
->>>>>>> 62a4616... 103695 Integrate GD Tips in LA_AmountToCompanySel & LA_AmountToCompanyByDiscountCurrencySel.
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 3. minfee calculation
  *-------------------------------------------------------------------------------------------------------------------------------*/
@@ -631,8 +556,8 @@ BEGIN
 
 	-- 5. return result
 	SELECT PartyId
-		,ProductId
-		,FeeByBaseCurrency AS Fee
+		,ProductId 
+		,FeeByBaseCurrency + ExtraAmount AS Fee
 		,Discount
 		,Rebate
 		,IsChargedByMinFee

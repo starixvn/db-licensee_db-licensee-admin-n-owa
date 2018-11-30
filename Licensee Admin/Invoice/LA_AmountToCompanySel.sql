@@ -20,10 +20,10 @@ AS
 	DB: DB052/bodb_Licensee
 	Revisions:
 		- 20180703@Bruce: calculate discount,rebate [#94282]
-
-		- 20181114@Bruce: discount by currency [#99694]
+		- 20181114@Bruce: discount by currency [#99694] 
 		- 20181127@Parsons: Integrate Bidme games (GD product) [#103695]
 */
+
 BEGIN
 	SET NOCOUNT ON
 	
@@ -174,7 +174,7 @@ BEGIN
 	FROM (SELECT DISTINCT b.PartyId FROM @PartyList b) a
 	
 	-- 1.7 charge info
-	SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, ci.DI_Rate AS Rate, ci.Fromdate, ci.ToDate 
+	SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, CAST(ci.DI_Rate AS DECIMAL(6,5)) AS Rate, ci.Fromdate, ci.ToDate 
 					,CASE WHEN ProductID=11 AND ChargeType=12 THEN 1706 ELSE -1 END AS Bettype -- GD Tip
 	INTO #tmpChargeInfo
 	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
@@ -257,79 +257,27 @@ BEGIN
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 2. winloss data
  *-------------------------------------------------------------------------------------------------------------------------------*/
-<<<<<<< .mine
-	CREATE TABLE #tmpWinlossData (
-		PartyId			INT,
-		ProductId		TINYINT,
-		WinlossDate		DATE,
-		Winloss			DECIMAL(20,5),
-		AmountToCompany	DECIMAL(20,5),
-		GDTip			DECIMAL(20,5),
-		IsApplyMinFee	BIT
-	)
-
-	CREATE NONCLUSTERED INDEX Idx_InvoiceData ON #tmpWinlossData (PartyId, ProductId)
-
-=======
-
-
-
-
-
-
-
-
-
-
-
-
->>>>>>> .theirs
 	-- 2.1 include general products
-<<<<<<< .mine
-	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,Winloss,AmountToCompany,GDTip)
-	(
-		SELECT	p.PartyId,
-				b.rptDate,
-				p.ProductId,
-				SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss, -- exclude GD Tip 
-				SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE ISNULL(-b.MemberWL, 0) * p.Rate * e.Rate END) AS AmountToCompany, -- exclude GD Tip,
-				SUM(CASE WHEN b.Bettype = 1706 THEN ISNULL(-b.MemberWL, 0) * p.Rate * e.Rate ELSE 0 END) AS GDTip 
-		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-			INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID 
-					AND p.LicenseeId = b.SiteId
-					AND (b.rptDate BETWEEN p.FromDate AND p.ToDate) 
-					AND b.Bettype = p.Bettype 
-		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)
-				AND (b.CurrencyID <> 20)
-				AND b.customercategory NOT IN (27, 28)
-				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
-				AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
-		GROUP BY b.rptdate, b.SiteId, p.PartyId, p.ProductId
-	)
-=======
 	SELECT p.PartyId,
 		b.rptDate	AS WinlossDate,
 		p.ProductId,
 		b.CurrencyId,
-		-SUM(b.MemberWL * e.Rate) AS Winloss,
-		-SUM(b.MemberWL * p.Rate * e.Rate) AS AmountToCompany
+		SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss, -- exclude GD Tip 
+		SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE ISNULL(-b.MemberWL, 0) * p.Rate * e.Rate END) AS AmountToCompany, -- exclude GD Tip,
+		SUM(CASE WHEN b.Bettype = 1706 THEN ISNULL(-b.MemberWL, 0) * p.Rate * e.Rate ELSE 0 END) AS ExtraAmount 
 	INTO #tmpWinlossData
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 	INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 	INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID 
 		AND p.LicenseeId = b.SiteId
-		AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
+		AND (b.rptDate BETWEEN p.FromDate AND p.ToDate) 
+		AND b.Bettype = p.Bettype 
 	WHERE (b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND (b.CurrencyID <> 20)
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
 			AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
 	GROUP BY p.PartyId,b.rptdate,p.ProductId,b.CurrencyId
-
-
-
->>>>>>> .theirs
 
 	-- 2.2 insert product don't have any ticket
 	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,CurrencyId,Winloss, AmountToCompany)
@@ -342,8 +290,8 @@ BEGIN
 	-- 2.3 create result
 	SELECT a.PartyId,a.ProductId
 		,CAST(SUM(a.Winloss) AS MONEY) AS Winloss
-		,CAST(SUM(a.AmountToCompany) AS MONEY) AS AmountToCompany
-		,CAST(SUM(a.GDTip) AS MONEY) AS GDTip
+		,CAST(SUM(a.AmountToCompany) AS MONEY) AS AmountToCompany 
+		,CAST(SUM(a.ExtraAmount) AS MONEY) AS ExtraAmount
 		,CAST(0 AS MONEY) AS Fee
 		,CAST(0 AS MONEY) AS Discount
 		,CAST(0 AS MONEY) AS Rebate
@@ -358,7 +306,7 @@ BEGIN
 	GROUP BY PartyId, ProductId
 
 	-- 2.4 treat negative as 0
-	UPDATE #tmpResult SET Fee = GDTip + CASE WHEN AmountToCompany < 0 THEN 0 ELSE AmountToCompany END
+	UPDATE #tmpResult SET Fee = CASE WHEN AmountToCompany < 0 THEN 0 ELSE AmountToCompany END
 
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 3. minfee calculation
@@ -539,8 +487,8 @@ BEGIN
 	-- result
 	SELECT PartyId
 		,ProductId
-		,Winloss
-		,Fee
+		,Winloss 
+		,Fee + ExtraAmount AS Fee
 		,CASE WHEN IsChargedByMinFee = 1 AND Fee > 0 THEN Fee ELSE AmountToCompany END NegativeFee
 		,Minfee
 		,IsChargedByMinFee
