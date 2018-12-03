@@ -15,7 +15,7 @@ ALTER PROCEDURE dbo.LA_ModifyReportSettings
 AS
 /*	Created: 20181130@Parsons
 	Task: LA-Licensee Performance Alert
-	DB: DB052.bodb_Licensee
+	DB: DBLIC.bodb_Licensee
 
 	Revisions:
 		- 20181130@Parsons: LA - Licensee Performance Alert [#104918]
@@ -26,23 +26,21 @@ AS
 BEGIN
 	SET NOCOUNT ON;
 
-	;WITH cte_reportSettings AS 
-	(
-		SELECT @ReportSettingName AS ReportSettingName, @ConfigReportSetting AS ConfigReportSetting
-	)
-	MERGE dbo.LA_ReportSettings WITH(ROWLOCK) AS t
-	USING cte_reportSettings AS s
-	ON t.ReportSettingName = s.ReportSettingName
-	WHEN MATCHED THEN 
-		UPDATE SET t.ConfigReportSetting = s.ConfigReportSetting
-	WHEN NOT MATCHED BY TARGET THEN 
-		INSERT (ReportSettingName, ConfigReportSetting) 
-		VALUES (s.ReportSettingName, s.ConfigReportSetting)	
-	;
+	IF(EXISTS(SELECT TOP 1 1 FROM dbo.LA_ReportSettings WITH(ROWLOCK) WHERE @ReportSettingName = ReportSettingName))
+	BEGIN
+		UPDATE dbo.LA_ReportSettings 
+		SET ConfigReportSetting = @ConfigReportSetting
+		WHERE @ReportSettingName = ReportSettingName
+	END
+	ELSE
+	BEGIN
+		INSERT dbo.LA_ReportSettings (ReportSettingName, ConfigReportSetting) 
+		VALUES (@ReportSettingName, @ConfigReportSetting)	
+	END
 
 	IF @@ERROR <> 0
 	BEGIN
-		SELECT @ErrMsg = 'Modify failed. Please try again.' , @ErrCode = 504
+		SELECT @ErrMsg = ERROR_MESSAGE() , @ErrCode = 504
 		RETURN
 	END
 END
