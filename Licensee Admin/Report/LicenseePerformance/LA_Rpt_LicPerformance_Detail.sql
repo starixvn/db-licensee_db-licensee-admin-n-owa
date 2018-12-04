@@ -71,6 +71,7 @@ AS
 
 BEGIN
 	SET NOCOUNT ON
+	DECLARE @GD_Tip SMALLINT = 1706
 
 	-- *********************************************************************************************************
 	-- *** Calculate Previous FromDate, Previous ToDate from FromDate, ToDate
@@ -278,11 +279,11 @@ BEGIN
 													WHEN b.StatusId IN (114, 115) THEN 0.5
 											 ELSE 1 END
 										ELSE 1 END) * e.Rate,
-				SUM(ISNULL(b.MemberWL, 0)) * e.Rate,
+				SUM(CASE WHEN b.Bettype=@GD_Tip THEN 0 ELSE b.MemberWL END) * e.Rate,
 				SUM(ISNULL(b.CommissionA, 0)) * e.Rate,
 				SUM(ISNULL(b.CommissionP, 0)) * e.Rate,
 				p.ProductId,
-				SUM((-ISNULL(b.MemberWL, 0) * p.Rate) - (CASE 
+				SUM((CASE WHEN b.Bettype=@GD_Tip THEN 0 ELSE -b.MemberWL END * p.Rate) - (CASE 
 					WHEN b.ProductId = 3 THEN ISNULL(b.CommissionA, 0) -- BA
 					WHEN b.ProductID = 31 THEN ISNULL(b.CommissionA, 0) + ISNULL(b.CommissionP, 0) -- Exchange
 					ELSE 0 END)) * e.Rate
@@ -295,7 +296,7 @@ BEGIN
 		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate OR b.rptDate BETWEEN @PrevFromDate AND @PrevToDate)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
-				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914,1706)
+				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
 				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, e.Rate
@@ -493,5 +494,3 @@ BEGIN
 END
 GO
 
-GRANT EXECUTE ON [dbo].[LA_Rpt_LicPerformance_Detail] TO [bodbAdminNet]
-GO
