@@ -1,7 +1,11 @@
 /*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
-GO 
-SET QUOTED_IDENTIFIER ON;SET ANSI_NULLS ON;GO
+GO
+
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
+
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinLossByProduct]
 	@PartyIdString		VARCHAR(4000),
 	@FromDate			DATETIME,
@@ -406,7 +410,4 @@ BEGIN
 	DROP TABLE #TempData
 	DROP TABLE #LicenseeAmount
 END
-GO
-
-GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeWinLossByProduct] TO bodbAdminNet
 GO
