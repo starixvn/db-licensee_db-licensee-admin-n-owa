@@ -273,9 +273,11 @@ BEGIN
 	INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID 
 		AND p.LicenseeId = b.SiteId
 		AND (b.rptDate BETWEEN p.FromDate AND p.ToDate) 
-		AND (p.Bettype = -1 OR b.Bettype = p.Bettype)
+		AND (
+			(b.Bettype = p.Bettype AND p.ProductID = 11) OR 
+			(p.ProductID <> 11)
+		)
 	WHERE (b.rptDate BETWEEN @FromDate AND @ToDate)
-			AND (b.CurrencyID <> 20)
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
 			AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
