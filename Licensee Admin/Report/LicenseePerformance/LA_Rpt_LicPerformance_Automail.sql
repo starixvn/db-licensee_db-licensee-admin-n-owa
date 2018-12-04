@@ -73,7 +73,6 @@ BEGIN
 			LicenseeId	INT,
 			ProductID	INT,
 			Rate		MONEY,
-			TypeId		INT,
 			FromDate	SMALLDATETIME,
 			ToDate		SMALLDATETIME,
 			Bettype		INT)
@@ -83,19 +82,16 @@ BEGIN
 	-- ***********************************************************************************************
 	-- select bettype to avoid duplicated data of MGC
 
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, TypeId, Fromdate, Todate, Bettype)
+	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
 	(
 		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, 
 				CASE WHEN ISNULL(ci.isDeposit, 0) = 1 THEN ci.DI_Rate ELSE 0 END,
-				ci2.ChargeType, 
-				ci.Fromdate, 
-				ci.ToDate,	
-				CASE WHEN ci.ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) 
-					WHEN ci.ProductId = 11 AND ci.ChargeType = 12 THEN 1706 -- GD Tip
-					ELSE -1 END
+				ci.Fromdate,
+				ci.ToDate,
+				CASE WHEN ci.ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
 		FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
-		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci2 WITH(NOLOCK) ON ci.ChargeID = ci2.ChargeID
 		LEFT JOIN bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype
+		WHERE ci.ChargeType <> 12 -- exclude GD tip
 	)
 	-- End region
 
@@ -127,7 +123,7 @@ BEGIN
 	(
 		SELECT	p.PartyId,
 				SUM(ISNULL(b.Turnover, 0) * e.Rate),
-				SUM((CASE WHEN b.Bettype = 1706 THEN 0 ELSE ISNULL(b.MemberWL, 0) END) * e.Rate),
+				SUM(ISNULL(b.MemberWL, 0) * e.Rate),
 				SUM(((-ISNULL(b.MemberWL, 0) * p.Rate) - (CASE WHEN b.ProductId = 3 THEN ISNULL(b.CommissionA, 0) ELSE 0 END)) * e.Rate),
 				p.ProductId
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
@@ -140,6 +136,7 @@ BEGIN
 				AND b.CurrencyID <> 20
 				AND b.customercategory NOT IN (27, 28)
 				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
+				AND b.Bettype <> 1706
 		GROUP BY p.PartyId, p.ProductId
 	)
 

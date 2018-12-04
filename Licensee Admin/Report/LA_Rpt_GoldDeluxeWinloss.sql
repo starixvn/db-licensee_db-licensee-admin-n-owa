@@ -31,7 +31,7 @@ BEGIN
 	DECLARE @CreditServiceCharge	INT = 10
 	DECLARE @DepositServiceCharge	INT = 9
 	DECLARE @GrossWin				INT = 1
-	DECLARE @BidMeTipChargeType	INT = 12
+	DECLARE @BidMeTipChargeType		INT = 12
 
 	-- get partylist and parent group
 	CREATE TABLE #PartyList(

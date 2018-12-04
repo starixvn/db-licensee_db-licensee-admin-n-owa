@@ -30,6 +30,8 @@ BEGIN
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 1. Prepare settings
  *-------------------------------------------------------------------------------------------------------------------------------*/
+	DECLARE @GD_Tip SMALLINT = 1706
+
 	-- product to be discounted
 	DECLARE @ProductList TABLE (ProductId INT, ToBeDiscounted BIT)
 	INSERT INTO @ProductList(ProductId,ToBeDiscounted)
@@ -168,7 +170,7 @@ BEGIN
 	
 	-- 1.7 charge info
 	SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, CAST(ci.DI_Rate AS DECIMAL(6,5)) AS Rate, ci.Fromdate, ci.ToDate 
-					,CASE WHEN ProductID=11 AND ChargeType=12 THEN 1706 ELSE -1 END AS Bettype -- GD Tip
+					,CASE WHEN ProductID=11 AND ChargeType=12 THEN @GD_Tip ELSE -1 END AS Bettype -- GD Tip
 	INTO #tmpChargeInfo
 	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
 	WHERE DI_Rate > 0
@@ -292,15 +294,15 @@ BEGIN
 			b.rptDate AS WinlossDate,
 			p.ProductId,
 			b.CurrencyId, 
-			CASE WHEN b.Bettype = 1706 THEN 0 ELSE ISNULL(b.MemberWL, 0) END AS MemberWL, -- exclude GD Tip 
-			CASE WHEN b.Bettype = 1706 THEN 0 ELSE ISNULL(b.MemberWL, 0) * p.Rate END AS Amount, -- exclude GD Tip 
-			CASE WHEN b.Bettype = 1706 THEN ISNULL(b.MemberWL, 0) * p.Rate ELSE 0 END AS ExtraAmount
+			CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE ISNULL(b.MemberWL, 0) END AS MemberWL, -- exclude GD Tip 
+			CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE ISNULL(b.MemberWL, 0) * p.Rate END AS Amount, -- exclude GD Tip 
+			CASE WHEN b.Bettype = @GD_Tip THEN ISNULL(b.MemberWL, 0) * p.Rate ELSE 0 END AS ExtraAmount
 	INTO #temData
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId 
 				AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
 				AND b.ProductId = p.ProductID   
-				AND b.Bettype = p.Bettype 
+				AND (p.Bettype = -1 OR b.Bettype = p.Bettype)
 	WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND (b.CurrencyID <> 20)
 			AND b.customercategory NOT IN (27, 28)
