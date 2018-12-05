@@ -26,8 +26,12 @@ BEGIN
 	SET NOCOUNT ON;
 	
 	DECLARE @BaseCurrencyName VARCHAR(3) = 'EUR'
+			,@PrevFromDate DATE = DATEADD(M, -1,  @FromDate)
+			,@PrevToDate DATE = DATEADD(M, - 1, @ToDate)
 
 	-- Region: Get exchange rate info
+	-- *** Get Exchange info for @BaseCurrencyName in 2 periods (current period and previous period)
+	-- **********************************************************************************************
 	DECLARE @Exchange TABLE (
 			ExchangeDate	DATE,
 			ExchangeID		INT,
@@ -37,17 +41,23 @@ BEGIN
 	INSERT INTO @Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+
+	INSERT INTO @Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
+	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
+	FROM bodb02.dbo.LA_f_ExchangeDailySel(@PrevFromDate, @PrevToDate, @BaseCurrencyName)
 	-- End region: Get exchange rate info
 	
 	-- Select Result	
 	SELECT	p.PartyId, p.PartyName,
-			SUM(b.BetCount) AS BetCount,
-			SUM(b.Turnover * e.Rate) AS Turnover
+			SUM((CASE WHEN MONTH(b.rptDate) = MONTH(@FromDate) THEN b.BetCount ELSE 0 END)) AS BetCount,
+			SUM((CASE WHEN MONTH(b.rptDate) = MONTH(@FromDate) THEN 0 ELSE b.BetCount END)) AS PreviousBetCount,
+			SUM((CASE WHEN MONTH(b.rptDate) = MONTH(@FromDate) THEN b.Turnover * e.Rate ELSE 0 END)) AS Turnover,
+			SUM((CASE WHEN MONTH(b.rptDate) = MONTH(@FromDate) THEN 0 ELSE b.Turnover * e.Rate END)) AS PreviousTurnover
 	FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN dbo.OAS_Party (NOLOCK) p ON p.OldRefID = b.SiteId
 			INNER JOIN dbo.LA_f_Products3rd(@ProductCodes) pd ON b.ProductID = pd.ProductID
 			INNER JOIN @Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-	WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)
+	WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate OR b.rptDate BETWEEN @PrevFromDate AND @PrevToDate)
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
 			AND p.PartyType = 1 AND p.PartyName NOT IN ('IBC','18bb', 'EU88')
