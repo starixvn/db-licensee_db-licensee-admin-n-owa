@@ -688,6 +688,5 @@ BEGIN
 	DROP TABLE #Result
 	DROP TABLE #SumByLicensee
 	DROP TABLE #SportypeList 
-	DROP TABLE #BettypeList
 END
 GO 
