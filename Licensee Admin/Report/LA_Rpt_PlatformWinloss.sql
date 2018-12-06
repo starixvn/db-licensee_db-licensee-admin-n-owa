@@ -1,4 +1,4 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE bodb02
 GO
 
@@ -20,6 +20,7 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180904@bruce: Support more platform type in Platform WL reports [#96191]
 		- 20181031@bruce: Cover betfrom 'o' in the report [#103999]
+		- 20181206@bruce: Implement E-sport 2 [#105723]
 
 	Explanation:
 	  + @PlatformType: 0: All
@@ -112,6 +113,13 @@ BEGIN
 		ELSE
 			SET @TempFromDate = @FDate
 
+		SELECT b.transid, b.winlostdate, b.bettype,b.liveawayscore,b.stake,b.betfrom,b.statusID, b.winlost, b.actual_stake,b.recommend,b.currency
+		INTO #tmpBettrans
+		FROM dbo.bettrans b WITH (NOLOCK)
+		INNER JOIN (SELECT DISTINCT CustId FROM #Cust) c ON c.CustID = b.recommend 
+		INNER JOIN bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB') bt ON b.bettype = bt.Bettype
+		WHERE b.winlostdate BETWEEN @TempFromDate AND @TDate
+
 		INSERT INTO #WinLoss (LicenseeID, Winlostdate, CurrencyId, Turnover, Winloss, BetFrom)
 		SELECT
 			c.LicenseeID,
@@ -120,18 +128,17 @@ BEGIN
 			SUM(CASE WHEN b.bettype IN (33,43) AND b.liveawayscore=0 THEN b.stake/2 ELSE b.stake END),
 			SUM(CASE WHEN (b.bettype NOT BETWEEN 31 AND 33) THEN -(b.winlost - b.actual_stake) ELSE 0 END),
 			b.betfrom
-			FROM dbo.bettrans b WITH (NOLOCK)
-			INNER JOIN #Cust c ON c.CustID = b.recommend AND b.currency = c.currency
+			FROM #tmpBettrans b
+			INNER JOIN #Cust c ON c.CustID = b.recommend
 			LEFT JOIN bodb_licensee.dbo.LicenseeBATransaction ba WITH(NOLOCK) ON b.transid = ba.transid
-			WHERE
-				b.statusID  IN (111, 112, 113)
-				AND b.winlostdate BETWEEN @TempFromDate AND @TDate
-				AND (b.bettype<31 OR (b.bettype BETWEEN 121 AND 999) OR (b.Bettype BETWEEN 1301 and 1399)) --new tennis's bettypes
-				AND b.bettype NOT IN (901,902,903,904/*bettrade*/,911,912,913,914/*cashout*/)
+			WHERE b.statusID IN (111, 112, 113)
 				AND ba.TransID IS NULL
 				AND b.betfrom IN (SELECT bf.betfrom FROM @betfrom bf)
 				AND b.currency <> 20
+				AND b.currency = c.currency
 			GROUP BY b.winlostdate, c.currency, c.LicenseeID, b.betfrom
+
+		DROP TABLE #tmpBettrans
 	END
 
 	-- get data: rptLicWinloss2
@@ -204,13 +211,4 @@ BEGIN
 	DROP TABLE #WinLoss
 	DROP TABLE #Cust
 END
-GO
-
-GRANT EXECUTE ON [dbo].[LA_Rpt_PlatformWinloss] TO [bodbLicenseeNet] AS [dbo]
-GO
-
-GRANT EXECUTE ON [dbo].[LA_Rpt_PlatformWinloss] TO [bodbAdminNet] AS [dbo]
-GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_PlatformWinloss] TO [vnteam] AS [dbo]
 GO
