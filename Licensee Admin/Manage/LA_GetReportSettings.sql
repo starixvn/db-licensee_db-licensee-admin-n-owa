@@ -24,7 +24,7 @@ BEGIN
 	SET NOCOUNT ON;
 
 	SELECT ConfigReportSetting
-	FROM dbo.LA_ReportSettings WITH(ROWLOCK) 
+	FROM dbo.LA_ReportSettings WITH(NOLOCK) 
 	WHERE @ReportSettingName = ReportSettingName
 END
 GO
