@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" selecters="bodbAdminNet" viewers="vnteam" isFunction="1" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" selecters="bodbAdminNet" viewers="" isFunction="1" isNested="0"></info>*/
 USE bodb_Licensee
 GO
 
@@ -36,7 +36,8 @@ AS
 		- 20171214@Sophia: #86640 - Add Exchange Citi Product
 		- 20180604@Bruce: #96383 - New Bettype range for VS2
 		- 20180420@Bruce: LA - Implement sum job for Pragmatic [RedmineId #93958]
-		- 20180910@Bruce: LA - Implement sum job for Poker & bullfighting [RedmineId #98487]		
+		- 20180910@Bruce: LA - Implement sum job for Poker & bullfighting [RedmineId #98487]
+		- 20181204@Bruce: Implement E-sport 2  [RedmineId #105891]
 
 	Param's Explanation:
 
@@ -49,16 +50,17 @@ BEGIN
 	SELECT val FROM bodb02.dbo.Lrf_f_StringSplit(@ProductCodes, ',')
 
     IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'SB')
-	   --OR CHARINDEX('BA', @ProductCodes) <> 0
     BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 0
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE (typeid < 31
 		  OR typeid BETWEEN 121 AND 999
-		  OR typeid BETWEEN 1301 AND 1399)
-		  AND typeid NOT IN (901, 902, 903,904, 911, 912, 913, 914) -- Bettrade bettypes 
-		  AND (@Bettype = 0 OR typeid = @Bettype)
+		  OR typeid BETWEEN 9001 AND 9086
+		  OR typeid BETWEEN 1301 AND 1399
+		)
+		AND typeid NOT IN (901, 902, 903,904, 911, 912, 913, 914) -- Bettrade bettypes 
+		AND (@Bettype = 0 OR typeid = @Bettype)
     END
 
 	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'BA')
