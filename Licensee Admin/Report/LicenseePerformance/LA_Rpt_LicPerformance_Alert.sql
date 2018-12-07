@@ -29,6 +29,17 @@ BEGIN
 			,@PrevFromDate DATE = DATEADD(M, -1,  @FromDate)
 			,@PrevToDate DATE = DATEADD(M, - 1, @ToDate)
 
+	-- Region Get @Parties 
+	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, OldRefID INT)
+	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
+	EXEC bodb_licensee.dbo.LA_PartyListSel
+
+	UPDATE p
+	SET OldRefID = p2.OldRefID
+	FROM @Parties p
+	INNER JOIN dbo.OAS_Party (NOLOCK) p2 ON p.PartyId = p2.PartyId
+	-- Endregion Get @Parties 
+
 	-- Region: Get exchange rate info
 	-- *** Get Exchange info for @BaseCurrencyName in 2 periods (current period and previous period)
 	-- **********************************************************************************************
@@ -54,13 +65,13 @@ BEGIN
 			SUM((CASE WHEN MONTH(b.rptDate) = MONTH(@FromDate) THEN b.Turnover * e.Rate ELSE 0 END)) AS Turnover,
 			SUM((CASE WHEN MONTH(b.rptDate) = MONTH(@FromDate) THEN 0 ELSE b.Turnover * e.Rate END)) AS PreviousTurnover
 	FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN dbo.OAS_Party (NOLOCK) p ON p.OldRefID = b.SiteId
+			INNER JOIN @Parties p ON p.OldRefID = b.SiteID
 			INNER JOIN dbo.LA_f_Products3rd(@ProductCodes) pd ON b.ProductID = pd.ProductID
 			INNER JOIN @Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 	WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate OR b.rptDate BETWEEN @PrevFromDate AND @PrevToDate)
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
-			AND p.PartyType = 1 AND p.PartyName NOT IN ('IBC','18bb', 'EU88')
+			AND p.ParentId IN (1, 9, 11, 98)
 	GROUP BY p.PartyId, p.PartyName
 END
 GO
