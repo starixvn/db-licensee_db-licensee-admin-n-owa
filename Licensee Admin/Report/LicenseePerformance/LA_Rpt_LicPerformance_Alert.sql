@@ -34,6 +34,10 @@ BEGIN
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
 	EXEC bodb_licensee.dbo.LA_PartyListSel
 
+	DELETE
+	FROM @Parties
+	WHERE ParentID IN (0, 999)
+
 	UPDATE p
 	SET OldRefID = p2.OldRefID
 	FROM @Parties p
@@ -71,7 +75,6 @@ BEGIN
 	WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate OR b.rptDate BETWEEN @PrevFromDate AND @PrevToDate)
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
-			AND p.ParentId IN (1, 9, 11, 98)
 	GROUP BY p.PartyId, p.PartyName
 END
 GO
