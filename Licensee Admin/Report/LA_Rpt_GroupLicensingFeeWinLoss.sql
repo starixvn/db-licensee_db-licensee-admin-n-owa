@@ -343,29 +343,55 @@ BEGIN
 		GROUP BY ci.PartyID, b.Currency, b.ProductID
 	END	
 	
+	DECLARE @Exchange AS TABLE (Currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
 
-	SELECT b.PartyID
-		, CASE p.PartyName
-		 	WHEN '18bb' THEN 'PIH'
-		 	WHEN 'IBC'	THEN 'FDL'
-		 	ELSE p.PartyName
-		 	END AS PartyName
-		, b.CurrencyID
-		, ISNULL(ex.Code, '') AS CurrencyName
-		, b.ProductId
-		, CASE b.ProductId
-			WHEN 0 THEN 'Sportsbook'
-			ELSE prd.ProductName 
-		  END AS ProductName
-		, Company AS AmountToCompany
-	FROM #Report b
-	INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) 
-		ON p.PartyID = b.PartyID
-	LEFT JOIN dbo.Product3rd prd WITH(NOLOCK)
-		ON prd.ProductId = b.ProductId
-	LEFT JOIN bodb02.dbo.Exchange ex WITH(NOLOCK) 
-		ON b.CurrencyId = ex.ExchangeId
-	ORDER BY CASE p.PartyName WHEN '18bb' THEN 'PIH' WHEN 'IBC' THEN 'FDL' ELSE p.PartyName END
+	INSERT INTO @Exchange(Currency, CurrencyName, CurrencyCode)
+	SELECT e.exchangeid, e.currency, e.Code
+	FROM bodb02.dbo.Exchange e WITH (NOLOCK)
+	WHERE e.exchangeid IN (SELECT DISTINCT CurrencyID FROM #Report)
+	
+	UPDATE @Exchange
+	SET CurrencyCode = (CASE Currency
+					WHEN 51 THEN 'INH'
+					WHEN 75 THEN 'PTU'
+					WHEN 76 THEN 'PS'
+					WHEN 77 THEN 'PTH' 
+					ELSE CurrencyCode
+				END)
+	WHERE Currency IN (51, 75, 76, 77)
+
+	UPDATE e
+	SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'
+	FROM @Exchange e
+	WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1)
+	
+
+	;WITH tmpResult AS (
+		SELECT b.PartyID
+			, CASE p.PartyName
+				WHEN '18bb' THEN 'PIH'
+				WHEN 'IBC'	THEN 'FDL'
+				ELSE p.PartyName
+				END AS PartyName
+			, b.CurrencyID
+			, ex.CurrencyCode AS CurrencyName
+			, b.ProductId
+			, CASE b.ProductId
+				WHEN 0 THEN 'Sportsbook'
+				ELSE prd.ProductName 
+			  END AS ProductName
+			, Company AS AmountToCompany
+		FROM #Report b
+		INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) 
+			ON p.PartyID = b.PartyID
+		LEFT JOIN dbo.Product3rd prd WITH(NOLOCK)
+			ON prd.ProductId = b.ProductId
+		LEFT JOIN @Exchange ex 
+			ON b.CurrencyId = ex.Currency
+	)
+	SELECT PartyName, CurrencyName, ProductName, Sum(AmountToCompany) AS AmountToCompany
+	FROM tmpResult t
+	GROUP BY PartyName, CurrencyName, ProductName	
 	
 	DROP TABLE #Report
 	DROP TABLE #Data
