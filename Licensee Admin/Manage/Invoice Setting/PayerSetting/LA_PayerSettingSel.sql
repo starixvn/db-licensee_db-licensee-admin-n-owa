@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -160,7 +160,7 @@ BEGIN
 
 	-- Hard code for Bettrade BA
 	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)
-	SELECT ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, 0, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, 12
+	SELECT ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, 0, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, 13
 	FROM @ChargeInfo
 	WHERE ProductId = 13
 
@@ -338,10 +338,7 @@ BEGIN
 	FROM Result
 	INNER JOIN @ProductOrder po ON po.ProductId = Result.ProductId
 	ORDER BY Result.PayerID, po.OrderNumber
+	
+	DROP TABLE #Temp_ChargeInfo
 END
-DROP TABLE #Temp_ChargeInfo
-
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_PayerSettingSel] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_PayerSettingSel] TO bodbAdminNet
 GO
