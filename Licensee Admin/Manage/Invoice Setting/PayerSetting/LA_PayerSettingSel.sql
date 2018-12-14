@@ -25,6 +25,7 @@ AS
   - 20180716@bruce: add new group TEST for credit [#98126]
   - 20180503@Parsons: fix: setting won't show when set start date from future[#94108]
   - 20181114@Parsons: Configure discount settings by currency [#99694]
+  - 20181214@Parsons: Integrate Bidme games  [#103695]
 
   Params:
   + @PayerId : 0 get all Party
