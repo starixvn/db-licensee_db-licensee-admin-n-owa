@@ -130,7 +130,7 @@ BEGIN
 	INSERT INTO #Data(PartyId, ReportDate, CurrencyId, IsDeposit, Totaltrans, Turnover, ValidBetAmount, CustomerWL, TipAmount, LicenseeFeeWithoutTips, TipsAmountDueToCompany, Commission, NetWinLoss, CompanyTipShare, RoyaltyFee, TipsAmountDueToSupplier, RowId)
 	(
 		SELECT  ci.PartyID, b.rptDate, b.currencyID, ci.IsDeposit
-			, SUM(b.betcount) AS Totaltrans
+			, SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE b.betcount END) AS Totaltrans
 			, SUM(b.turnover) AS Turnover
 			, SUM(ISNULL(b.ValidBetAmount,0)) AS ValidBetAmount
 			, SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE b.MemberWL END) AS CustomerWL
