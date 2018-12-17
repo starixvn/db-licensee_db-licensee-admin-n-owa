@@ -319,11 +319,13 @@ BEGIN
 		SUM(ValidBetAmount) AS ValidBetAmount,
 		SUM(CustomerWinLoss) AS CustomerWinLoss,
 		SUM(TipAmount) AS TipAmount,
-		SUM(LicenseeFeeWithoutTips + TipsAmountDueToCompany) AS LicenseeFee,
+		SUM(LicenseeFeeWithoutTips) AS LicenseeFeeWithoutTips,
+		SUM(TipsAmountDueToCompany) AS TipsAmountDueToCompany,
 		SUM(Commission) AS Commission,
 		SUM(NetWinLoss) AS NetWinLoss,
 		SUM(CompanyTipShare) AS CompanyTipShare,
-		SUM(RoyaltyFee + TipsAmountDueToSupplier) AS PaytoSupplier 
+		SUM(RoyaltyFee) AS RoyaltyFee, 
+		SUM(TipsAmountDueToSupplier) AS TipsAmountDueToSupplier 
 	FROM @GrandTotals
 	WHERE Step = 2
 	GROUP BY CurrencyName
