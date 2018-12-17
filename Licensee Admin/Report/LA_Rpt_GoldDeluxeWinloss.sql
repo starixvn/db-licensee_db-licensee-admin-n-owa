@@ -115,16 +115,19 @@ BEGIN
 		ValidBetAmount	MONEY,
 		CustomerWL		MONEY,
 		TipAmount 		MONEY,
+		LicenseeFeeWithoutTips	MONEY,
+		TipsAmountDueToCompany	MONEY,
 		LicenseeFee		MONEY,
 		Commission		MONEY,
 		NetWinLoss		MONEY,
 		CompanyTipShare MONEY,
-		PayToSupplier	MONEY,
+		RoyaltyFee		MONEY,
+		TipsAmountDueToSupplier	MONEY,		
 		BaseCurrency	VARCHAR(10),
 		RowId			UNIQUEIDENTIFIER
 	)
 
-	INSERT INTO #Data(PartyId, ReportDate, CurrencyId, IsDeposit, Totaltrans, Turnover, ValidBetAmount, CustomerWL, TipAmount, LicenseeFee, Commission, NetWinLoss, CompanyTipShare, PayToSupplier, RowId)
+	INSERT INTO #Data(PartyId, ReportDate, CurrencyId, IsDeposit, Totaltrans, Turnover, ValidBetAmount, CustomerWL, TipAmount, LicenseeFeeWithoutTips, TipsAmountDueToCompany, Commission, NetWinLoss, CompanyTipShare, RoyaltyFee, TipsAmountDueToSupplier, RowId)
 	(
 		SELECT  ci.PartyID, b.rptDate, b.currencyID, ci.IsDeposit
 			, SUM(b.betcount) AS Totaltrans
@@ -132,11 +135,13 @@ BEGIN
 			, SUM(ISNULL(b.ValidBetAmount,0)) AS ValidBetAmount
 			, SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE b.MemberWL END) AS CustomerWL
 			, SUM(CASE WHEN b.Bettype = 1706 THEN -b.MemberWL ELSE 0 END) AS TipAmount
-			, SUM(CASE WHEN b.Bettype = 1706 THEN -b.MemberWL * tipLicensee.Rate ELSE -b.MemberWL * ci.Rate END) AS LicenseeFee
+			, SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE -b.MemberWL * ci.Rate END) AS LicenseeFeeWithoutTips
+			, SUM(CASE WHEN b.Bettype = 1706 THEN -b.MemberWL * tipLicensee.Rate ELSE 0 END) AS TipsAmountDueToCompany
 			, SUM(ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS Commission
 			, SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE -b.MemberWL END - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS NetWinLoss
 			, SUM(CASE WHEN b.Bettype = 1706 THEN -b.MemberWL * (1 - tipSupplier.Rate) ELSE 0 END) AS CompanyTipShare
-			, SUM(CASE WHEN b.Bettype = 1706 THEN -b.MemberWL * tipSupplier.Rate ELSE (-b.MemberWL - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) * ISNULL(s.Rate, 0) END) AS PayToSupplier
+			, SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE (-b.MemberWL - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) * ISNULL(s.Rate, 0) END) AS RoyaltyFee
+			, SUM(CASE WHEN b.Bettype = 1706 THEN -b.MemberWL * tipSupplier.Rate ELSE 0 END) AS TipsAmountDueToSupplier			
 			, NEWID()
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #ChargeInfo ci ON ( -- licensee charge rate
@@ -194,16 +199,18 @@ BEGIN
 	BEGIN
 		DECLARE @Currency VARCHAR(10) = (SELECT TOP 1 Code FROM @BaseCurrencies WHERE IsApplied IS NULL)
 
-		INSERT INTO #Data(PartyId, IsDeposit, ReportDate, CurrencyName, Totaltrans, BaseCurrency, Turnover, CustomerWL, TipAmount, LicenseeFee, Commission, NetWinLoss, CompanyTipShare, PayToSupplier, ValidBetAmount, RowId)
+		INSERT INTO #Data(PartyId, IsDeposit, ReportDate, CurrencyName, Totaltrans, BaseCurrency, Turnover, CustomerWL, TipAmount, LicenseeFeeWithoutTips, TipsAmountDueToCompany, Commission, NetWinLoss, CompanyTipShare, RoyaltyFee, TipsAmountDueToSupplier, ValidBetAmount, RowId)
 		SELECT d.PartyId, d.IsDeposit, d.ReportDate, e.Code, d.Totaltrans, @Currency,
 			d.Turnover * e.BaseCurrencyRate,
 			d.CustomerWL * e.BaseCurrencyRate,
 			d.TipAmount * e.BaseCurrencyRate,
-			d.LicenseeFee * e.BaseCurrencyRate,
+			d.LicenseeFeeWithoutTips * e.BaseCurrencyRate,
+			d.TipsAmountDueToCompany * e.BaseCurrencyRate,
 			d.Commission * e.BaseCurrencyRate,
 			d.NetWinLoss * e.BaseCurrencyRate,
 			d.CompanyTipShare * e.BaseCurrencyRate,
-			d.PayToSupplier * e.BaseCurrencyRate,
+			d.RoyaltyFee * e.BaseCurrencyRate,
+			d.TipsAmountDueToSupplier * e.BaseCurrencyRate,			
 			d.ValidBetAmount * e.BaseCurrencyRate,
 			d.RowId
 		FROM #Data d
@@ -227,16 +234,20 @@ BEGIN
 		o.TipAmount 		AS TipAmountOriginal,
 		d.ValidBetAmount,
 		o.ValidBetAmount	AS ValidBetAmountOriginal,
-		d.LicenseeFee,
-		o.LicenseeFee		AS LicenseeFeeOriginal,
+		d.LicenseeFeeWithoutTips,
+		o.LicenseeFeeWithoutTips		AS LicenseeFeeWithoutTipsOriginal,
+		d.TipsAmountDueToCompany,
+		o.TipsAmountDueToCompany		AS TipsAmountDueToCompanyOriginal,		
 		d.Commission,
 		o.Commission			AS CommissionOriginal,
 		d.NetWinLoss,
 		o.NetWinLoss		AS NetWinLossOriginal,
 		d.CompanyTipShare	AS CompanyTipShare,
 		o.CompanyTipShare	AS CompanyTipShareOriginal,
-		d.PayToSupplier,
-		o.PayToSupplier		AS PayToSupplierOriginal
+		d.RoyaltyFee,
+		o.RoyaltyFee		AS RoyaltyFeeOriginal,
+		d.TipsAmountDueToSupplier,
+		o.TipsAmountDueToSupplier		AS TipsAmountDueToSupplierOriginal		
 	FROM #Data d
 	INNER JOIN #Data o ON o.RowId = d.RowId AND o.BaseCurrency IS NULL
 	INNER JOIN #PartyList p1 ON d.PartyId = p1.PartyId
@@ -251,11 +262,13 @@ BEGIN
 		Turnover		MONEY,
 		CustomerWinLoss	MONEY,
 		TipAmount 		MONEY,
-		LicenseeFee		MONEY,		
+		LicenseeFeeWithoutTips	MONEY,
+		TipsAmountDueToCompany	MONEY,
 		Commission		MONEY,
 		NetWinLoss		MONEY,
 		CompanyTipShare MONEY,
-		PayToSupplier	MONEY,
+		RoyaltyFee		MONEY,
+		TipsAmountDueToSupplier	MONEY,
 		ValidBetAmount	MONEY,
 		Step			TINYINT
 	)
@@ -266,11 +279,13 @@ BEGIN
 		SUM(d.Turnover),
 		SUM(d.CustomerWL),
 		SUM(d.TipAmount),
-		SUM(d.LicenseeFee),
+		SUM(d.LicenseeFeeWithoutTips),
+		SUM(d.TipsAmountDueToCompany),
 		SUM(d.Commission),
 		SUM(d.NetWinLoss),
 		SUM(d.CompanyTipShare),
-		SUM(d.PayToSupplier),
+		SUM(d.RoyaltyFee),
+		SUM(d.TipsAmountDueToSupplier),
 		SUM(d.ValidBetAmount),
 		1 -- step 1
 	FROM #Data d
@@ -285,11 +300,13 @@ BEGIN
 		SUM(Turnover),
 		SUM(CustomerWinLoss),
 		SUM(TipAmount),
-		SUM(CASE WHEN LicenseeFee < 0 THEN 0 ELSE LicenseeFee END), -- negative amount = 0		
+		SUM(CASE WHEN LicenseeFeeWithoutTips < 0 THEN 0 ELSE LicenseeFeeWithoutTips END), -- negative amount = 0		
+		SUM(TipsAmountDueToCompany),
 		SUM(Commission),
 		SUM(NetWinLoss),
 		SUM(CompanyTipShare),
-		SUM(CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END), -- negative amount = 0		
+		SUM(CASE WHEN RoyaltyFee < 0 THEN 0 ELSE RoyaltyFee END), -- negative amount = 0		
+		SUM(TipsAmountDueToSupplier),
 		SUM(ValidBetAmount),
 		2 -- step 2
 	FROM @GrandTotals
@@ -302,11 +319,11 @@ BEGIN
 		SUM(ValidBetAmount) AS ValidBetAmount,
 		SUM(CustomerWinLoss) AS CustomerWinLoss,
 		SUM(TipAmount) AS TipAmount,
-		SUM(LicenseeFee) AS LicenseeFee,
+		SUM(LicenseeFeeWithoutTips + TipsAmountDueToCompany) AS LicenseeFee,
 		SUM(Commission) AS Commission,
 		SUM(NetWinLoss) AS NetWinLoss,
 		SUM(CompanyTipShare) AS CompanyTipShare,
-		SUM(PayToSupplier) AS PaytoSupplier 
+		SUM(RoyaltyFee + TipsAmountDueToSupplier) AS PaytoSupplier 
 	FROM @GrandTotals
 	WHERE Step = 2
 	GROUP BY CurrencyName
