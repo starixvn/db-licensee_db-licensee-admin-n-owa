@@ -294,7 +294,7 @@ BEGIN
 				, SUM(Turnover) AS Turnover
 				, SUM(CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE MemberWL END ) AS MemberWL
 				, SUM(CASE WHEN b.Bettype = @GD_Tip THEN -MemberWL ELSE 0 END ) AS TipAmount
-				, SUM(b.betcount) AS BetCount
+				, SUM(CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE b.BetCount END) AS BetCount
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
