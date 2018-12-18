@@ -273,7 +273,7 @@ BEGIN
 				p.PartyId,
 				b.rptDate,
 				b.CurrencyID,
-				SUM(b.BetCount * CASE WHEN @DrawFilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END),
+				SUM(CASE WHEN (@DrawFilter = 2 AND b.StatusId = 111) OR b.Bettype=@GD_Tip THEN 0 ELSE b.BetCount END),
 				SUM(b.Turnover * CASE WHEN @DrawFilter IN (2, 3) 
 										THEN CASE	WHEN b.StatusId = 111 THEN 0
 													WHEN b.StatusId IN (114, 115) THEN 0.5

@@ -47,7 +47,8 @@ AS
 	  + @MoveBetsDay: The day we move tickets to bettrans14
 */
 BEGIN
-	SET NOCOUNT ON
+	SET NOCOUNT ON 
+	DECLARE @GD_Tip SMALLINT = 1706
 
 	-- currency list
 	--
@@ -189,7 +190,7 @@ BEGIN
 					b.CustomerCategory NOT IN (27,28) AND
 					p.ProductID IN (10,11,12,31) AND
 					p.ChargeType = 1 AND -- gross win
-					b.bettype <> 1706 -- exclude GD tip
+					b.bettype <> @GD_Tip
 			GROUP BY b.rptDate
 					,p.PartyID
 					,b.CurrencyID
@@ -197,8 +198,8 @@ BEGIN
 			UNION ALL
 			-- GD tip
 			SELECT b.rptDate,p.PartyID,b.CurrencyId,0,0,0,0,0,0,0,0
-					,SUM(-b.MemberWL * p.Rate) AS Company
-					,SUM(b.Betcount * (CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END))
+					,SUM(-b.MemberWL * p.Rate) AS Company 
+					,0 AS Betcount
 					,0 AS commissionP
 			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #tmpParty p ON b.SiteID = p.LicenseeID AND p.ProductID=b.ProductID AND b.rptDate BETWEEN p.Fromdate AND p.Todate
@@ -206,7 +207,7 @@ BEGIN
 					(@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c)) AND
 					(b.CurrencyID<>20) AND
 					p.ProductID = 11 AND
-					b.Bettype = 1706 AND 
+					b.Bettype = @GD_Tip AND 
 					p.ChargeType = 12 -- GD tip sharing
 			GROUP BY b.rptDate
 					,p.PartyID

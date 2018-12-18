@@ -49,7 +49,7 @@ AS
 		+ @BaseCurrencyName: GBP, CNY, USD, EUR, MYR
 */
 BEGIN
-	SET NOCOUNT ON
+	SET NOCOUNT ON	DECLARE @GD_Tip SMALLINT = 1706
 
 	CREATE TABLE #Report (ReportDate DATE, CurrencyID INT, ProductID INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY, WinlossRB MONEY, 
 						AmtDueToBA MONEY, AmtDueToRB MONEY, CommBA MONEY, CommRB MONEY, Company MONEY, Betcount BIGINT)							
@@ -444,17 +444,21 @@ BEGIN
 				, SUM(b.Betcount)
 			FROM #Data b WITH (NOLOCK)
 				INNER JOIN #ChargeInfo ci ON b.rptDate BETWEEN ci.Fromdate AND ci.Todate
-			WHERE ci.ProductID=11 AND b.BetTypeId <> 1706 AND ci.ChargeType=1 -- gross win
+			WHERE ci.ProductID=11 
+				AND b.BetTypeId <> @GD_Tip 
+				AND ci.ChargeType=1 -- gross win
 			GROUP BY b.rptDate, b.Currency
 
 			UNION ALL
 			-- tip amount
 			SELECT b.rptDate, b.Currency, 11,0,0,0,0,0,0,0,0
 				, SUM(-b.Winloss * ci.Rate)
-				, SUM(b.Betcount)
+				, 0 AS Betcount
 			FROM #Data b WITH (NOLOCK)
 				INNER JOIN #ChargeInfo ci ON b.rptDate BETWEEN ci.Fromdate AND ci.Todate
-			WHERE ci.ProductID=11 AND b.BetTypeId = 1706 AND ci.ChargeType=12 -- GD tip
+			WHERE ci.ProductID=11 
+				AND b.BetTypeId = @GD_Tip 
+				AND ci.ChargeType=12 -- GD tip
 			GROUP BY b.rptDate, b.Currency
 		)
 	END
