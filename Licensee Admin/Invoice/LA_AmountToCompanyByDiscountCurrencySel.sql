@@ -346,8 +346,8 @@ BEGIN
 	LEFT JOIN cte_winlossByDiscountBaseCurrency c ON t.PartyId = c.PartyID AND t.WinlossDate = c.WinlossDate AND t.ProductId = c.ProductID AND t.CurrencyId = c.CurrencyId
 
 	-- 2.4 insert product don't have any ticket
-	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,WinlossByDiscountBaseCurrency,WinlossByBaseCurrency,AmountToCompanyByDiscountBaseCurrency,AmountToCompanyByBaseCurrency,CurrencyId)
-	SELECT DISTINCT PartyId,@ToDate,c.ProductId,0,0,0,0,6--EUR = 6
+	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,WinlossByDiscountBaseCurrency,WinlossByBaseCurrency,AmountToCompanyByDiscountBaseCurrency,AmountToCompanyByBaseCurrency,ExtraAmount,CurrencyId)
+	SELECT DISTINCT PartyId,@ToDate,c.ProductId,0,0,0,0,0,6--EUR = 6
 	FROM @PartyList p 
 	INNER JOIN @ProductList pd ON 1=1
 	INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON c.ProductID = pd.ProductID AND p.PartyId = c.FromParty

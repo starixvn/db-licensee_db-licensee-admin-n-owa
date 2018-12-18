@@ -284,8 +284,8 @@ BEGIN
 	GROUP BY p.PartyId,b.rptdate,p.ProductId,b.CurrencyId
 
 	-- 2.2 insert product don't have any ticket
-	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,CurrencyId,Winloss, AmountToCompany)
-	SELECT DISTINCT PartyId,@ToDate,c.ProductId,6, 0, 0-- default eur = 6
+	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,CurrencyId,Winloss,AmountToCompany,ExtraAmount)
+	SELECT DISTINCT PartyId,@ToDate,c.ProductId,6, 0, 0, 0-- default eur = 6
 	FROM @PartyList p 
 	INNER JOIN @ProductList pd ON 1=1
 	INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON c.ProductID = pd.ProductID AND p.PartyId = c.FromParty
