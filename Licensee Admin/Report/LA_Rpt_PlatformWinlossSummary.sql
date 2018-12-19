@@ -2,7 +2,7 @@
 USE [bodb02]
 GO
 
-ALTER PROCEDURE [dbo].[LA_Rpt_PlatformWinlossSummary_xtest]
+ALTER PROCEDURE [dbo].[LA_Rpt_PlatformWinlossSummary]
 	@PartyIDs		VARCHAR(4000),
 	@FromDate		SMALLDATETIME,
 	@ToDate			SMALLDATETIME,
