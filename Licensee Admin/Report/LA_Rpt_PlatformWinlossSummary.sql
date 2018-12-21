@@ -22,6 +22,7 @@ AS
 		- 20180904@bruce: Support more platform type in Platform WL reports [#96191]
 		- 20181031@bruce: Cover betfrom 'o' in the report [#103999]
 		- 20181206@bruce: Implement E-sport 2 [#105723]
+		- 20181220@bruce: Cover betfrom 'c' in the report [#106089]
 
 	Explanation:
 		- Desktop: contain the followings:
@@ -36,6 +37,7 @@ AS
 			Smart:	betfrom = s,l
 			Tablet: betfrom = r
 			App for China: o
+			Lite version: c
 		- Other: betfrom is different from the aboves
 			=> use *
 */
@@ -55,7 +57,7 @@ BEGIN
 	-- supported betfrom
 	--
 	DECLARE @betfrom TABLE(betfrom CHAR(1))
-	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,s,l,g,x,y,z,r,o',',')
+	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,s,l,g,x,y,z,r,o,c',',')
 
 	-- #1: get licensee/customer and currency info
 	--

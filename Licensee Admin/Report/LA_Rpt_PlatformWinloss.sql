@@ -21,6 +21,7 @@ AS
 		- 20180904@bruce: Support more platform type in Platform WL reports [#96191]
 		- 20181031@bruce: Cover betfrom 'o' in the report [#103999]
 		- 20181206@bruce: Implement E-sport 2 [#105723]
+		- 20181220@bruce: Cover betfrom 'c' in the report [#106089]
 
 	Explanation:
 	  + @PlatformType: 0: All
@@ -34,6 +35,7 @@ AS
 					   8: SMARTPHONE (s,l)
 					   9: Tablet (r)
 					  10: Mobile app for China (o)
+					  11: Mobile lite version (c)
 
 	  + @excludeTest: remove currency UUS
 	  + @MoveBetsDay: The day we move tickets to bettrans14
@@ -48,7 +50,7 @@ BEGIN
 	-- supported betfrom
 	--
 	DECLARE @betfrom TABLE(betfrom CHAR(1))
-	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,s,l,g,x,y,z,r,o',',')
+	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,s,l,g,x,y,z,r,o,c',',')
 
 	CREATE TABLE #WinLoss (
 		LicenseeID		INT,
@@ -56,7 +58,7 @@ BEGIN
 		CurrencyId		INT,
 		Turnover		DECIMAL(20,5),
 		Winloss			DECIMAL(20,5),
-		BetFrom			NVARCHAR(5)
+		BetFrom			VARCHAR(1)
 	)
 
 	DECLARE @MoveBetsDay SMALLDATETIME
@@ -101,7 +103,7 @@ BEGIN
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	(
 		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrency)
+		FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrency)
 	)
 
 	-- Get data: bettrans
@@ -178,34 +180,15 @@ BEGIN
 
 	SELECT
 		p.PartyName,
-		w.LicenseeID,
-		w.Winlostdate,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('g','d') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverAsia,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('a') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverChina,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('e','u') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverEuro,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('x') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverNewAsia,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('y') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverNewChina,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('z') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverNewEuro,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('m') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverWap,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('s','l') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverSmart,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('r') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverTablet,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('o') THEN w.Turnover * e.Rate ELSE 0 END) AS MONEY) TurnoverChinaApp,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('g','d') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossAsia,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('a') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossChina,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('e','u') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossEuro,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('x') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossNewAsia,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('y') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossNewChina,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('z') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossNewEuro,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('m') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossWap,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('s','l') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossSmart,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('r') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossTablet,
-		CAST(SUM(CASE WHEN w.BetFrom IN ('o') THEN w.Winloss * e.Rate ELSE 0 END) AS MONEY) WinlossChinaApp
+		w.WinlostDate,
+		w.BetFrom,
+		SUM(w.Turnover * e.Rate) AS Turnover,
+		SUM(w.Winloss * e.Rate) AS Winloss
 	FROM #WinLoss w
 		INNER JOIN #Exchange e ON e.ExchangeDate = w.Winlostdate and w.CurrencyId = e.ExchangeID
 		INNER JOIN @ChargeInfo l ON w.LicenseeID = l.LicenseeId AND w.Winlostdate BETWEEN l.Fromdate AND l.Todate
-		INNER JOIN bodb_licensee..OAS_Party p ON l.PartyId = p.PartyID
-	GROUP BY w.LicenseeID, w.Winlostdate,p.PartyName
-	ORDER BY w.LicenseeID, w.Winlostdate
+		INNER JOIN bodb_licensee.dbo.OAS_Party p ON l.PartyId = p.PartyID
+	GROUP BY w.Winlostdate, p.PartyName, w.BetFrom
 
 	DROP TABLE #Exchange
 	DROP TABLE #WinLoss
