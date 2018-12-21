@@ -1,5 +1,9 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
+GO
+
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeSettlement]
@@ -37,6 +41,7 @@ AS
 			- 20180419@Scofield: update CB for FreePlay [#93907]
 			- 20180515@Scofield: Incorporate 9wickets data [#94950]
 			- 20180716@bruce: add new group TEST for credit [#98126]
+			- 20181120@Parsons: Integrate Bidme games (GD product) [#103695]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -54,6 +59,7 @@ BEGIN
 
 	DECLARE @LicenseeID INT,
 			@DrawFilter SMALLINT = 1
+	DECLARE @GD_Tip SMALLINT = 1706
 
 	CREATE TABLE #Result
 	(
@@ -83,7 +89,9 @@ BEGIN
 		CashOutValue				MONEY,
 		TicketsPayout				MONEY,
 		CashoutCommission			MONEY,
-		BuyBackAmountAndComm		MONEY
+		BuyBackAmountAndComm		MONEY,
+		TipsAmount					MONEY,
+		TipsAmountDue				MONEY
 	)
 
 	CREATE TABLE #Exchange
@@ -94,23 +102,24 @@ BEGIN
 		Rate					DECIMAL(6,5)
 	)
 
-	DECLARE @tmpParty AS TABLE
+	DECLARE @ChargeInfo AS TABLE
 	(
-		PartyId	INT,
+		PartyId		INT,
 		LicenseeId	INT,
 		ProductID	INT,
-		Bettype	INT,
+		Bettype		INT,
 		Rate		MONEY,
 		FromDate	SMALLDATETIME,
 		ToDate		SMALLDATETIME
 	)
-	INSERT INTO @tmpParty(PartyId, LicenseeId, ProductID, Bettype, Rate, Fromdate, Todate)
+	INSERT INTO @ChargeInfo(PartyId, LicenseeId, ProductID, Bettype, Rate, Fromdate, Todate)
 	(
-		SELECT DISTINCT PartyID, LicenseeID, ProductID, Bettype, DI_Rate, Fromdate, Todate
+		SELECT DISTINCT PartyID, LicenseeID, ProductID,
+			CASE WHEN ProductID = 11 AND ChargeType = 12 THEN @GD_Tip ELSE Bettype END AS ChargeType
+			, DI_Rate, Fromdate, Todate
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyID, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE DI_Rate > 0
 	)
-
 	DECLARE @Bettype AS TABLE
 	(
 		Bettype		INT,
@@ -122,7 +131,7 @@ BEGIN
 		FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, @ProductCode)
 	)
 
-	SELECT @LicenseeID = LicenseeID FROM @tmpParty
+	SELECT @LicenseeID = LicenseeID FROM @ChargeInfo
 	IF @LicenseeID IS NULL
 	BEGIN
 		SELECT TOP 0
@@ -157,6 +166,10 @@ BEGIN
 		,CAST(0 AS MONEY)	AS ProgressivePayout
 		,CAST(0 AS MONEY)	AS ProgressiveFee
 		,CAST(0 AS MONEY)	AS ProgressiveFeeBase
+		,CAST(0 AS MONEY)	AS TipsAmount
+		,CAST(0 AS MONEY)	AS TipsAmountBase
+		,CAST(0 AS MONEY)	AS TipsAmountDue
+		,CAST(0 AS MONEY)	AS TipsAmountDueBase
 		RETURN
 	END
 
@@ -226,12 +239,12 @@ BEGIN
 				, SUM(b.TotalTrans) AS BetCount
 			FROM #DataWinloss3rd b WITH (NOLOCK)
 				INNER JOIN @TempAG ag ON b.Recommend = ag.CustId AND b.Currency = ag.CurrencyId
-				INNER JOIN @tmpParty p ON ag.LicenseeeID = p.LicenseeId
+				INNER JOIN @ChargeInfo p ON ag.LicenseeeID = p.LicenseeId
 			WHERE b.Winlostdate BETWEEN p.Fromdate AND p.Todate
 			GROUP BY b.Winlostdate, CurrencyID
 		)
 	END
-	ELSE IF (@ProductCode = 'GD' OR @ProductCode = 'VG') -- GD, VG
+	ELSE IF (@ProductCode = 'VG') -- VG
 	BEGIN
 		--get licensee recommend
 		INSERT INTO @TempAG(LicenseeeID, CustId, CurrencyId)
@@ -269,9 +282,48 @@ BEGIN
 				, SUM(b.TotalTrans) AS BetCount
 			FROM #DataWinloss3rd b WITH (NOLOCK)
 				INNER JOIN @TempAG ag ON b.Recommend = ag.CustId AND b.Currency = ag.CurrencyId
-				INNER JOIN @tmpParty p ON ag.LicenseeeID = p.LicenseeId
+				INNER JOIN @ChargeInfo p ON ag.LicenseeeID = p.LicenseeId
 			WHERE b.Winlostdate BETWEEN p.Fromdate AND p.Todate
 			GROUP BY b.Winlostdate, CurrencyID
+		)
+	END
+	ELSE IF (@ProductCode = 'GD') -- GD
+	BEGIN
+		;WITH cte_GD AS(
+			SELECT b.rptDate, b.CurrencyID, b.Bettype
+				, SUM(Turnover) AS Turnover
+				, SUM(CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE MemberWL END ) AS MemberWL
+				, SUM(CASE WHEN b.Bettype = @GD_Tip THEN -MemberWL ELSE 0 END ) AS TipAmount
+				, SUM(CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE b.BetCount END) AS BetCount
+			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
+				AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
+				AND b.StatusId NOT IN (-1, 101, 102, 103)
+				AND b.customercategory NOT IN (27, 28)
+				AND b.ProductID = 11-- GD
+				AND b.SiteId = @LicenseeID
+			GROUP BY b.rptDate, b.CurrencyId, b.Bettype
+		)
+		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, TipsAmount, TipsAmountDue, Company, Betcount)
+		(
+			SELECT
+				b.rptDate
+				, CurrencyID
+				, SUM(Turnover) AS Turnover
+				, SUM(MemberWL) AS Winlost
+				, 0 AS PlayerComm
+				, SUM(-MemberWL * (1 - p.Rate)) AS LicenseeWL
+				, 0 AS LicenseeComm
+				, SUM(TipAmount) AS TipsAmount
+				, SUM(TipAmount * p.Rate) AS TipsAmountDue
+				, SUM((-MemberWL * p.Rate) + (TipAmount * p.Rate)) AS Company
+				, SUM(b.betcount) AS BetCount
+			FROM cte_GD b
+				INNER JOIN @ChargeInfo p ON (
+					b.rptDate BETWEEN p.FromDate AND p.ToDate AND
+					p.Bettype = b.Bettype
+				)
+			GROUP BY b.rptDate, b.CurrencyId
 		)
 	END
 	ELSE IF (@ProductCode = 'MGCLC' OR @ProductCode = 'MGCRNG')
@@ -323,7 +375,7 @@ BEGIN
 				, SUM(ISNULL(b.ProgressivePayout, 0)) AS ProgressivePayout
 			FROM bodb_licenseereport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
 			INNER JOIN @Product3rdSubName s ON s.Bettype = b.BettypeId
-			INNER JOIN (SELECT DISTINCT LicenseeId, Bettype FROM @tmpParty) p ON b.SiteId = p.LicenseeID AND p.Bettype=s.BettypeRef
+			INNER JOIN (SELECT DISTINCT LicenseeId, Bettype FROM @ChargeInfo) p ON b.SiteId = p.LicenseeID AND p.Bettype=s.BettypeRef
 			WHERE b.SiteID = @LicenseeID
 				AND b.rptDate BETWEEN @FromDate AND @ToDate
 				AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
@@ -347,7 +399,7 @@ BEGIN
 				,SUM(d.ProgressiveContribution - d.ProgressivePayout)
 		FROM d
 		INNER JOIN @Product3rdSubName ps ON d.Bettype = ps.Bettype
-		INNER JOIN @tmpParty p ON d.SiteId = p.LicenseeID AND p.Bettype = ps.BettypeRef
+		INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID AND p.Bettype = ps.BettypeRef
 		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY rptDate, CurrencyID , ps.ProductName, d.Bettype
 	END
@@ -385,7 +437,7 @@ BEGIN
 					, SUM(CASE WHEN b.bettype = 901 AND b.CustomerCategory = 1001 THEN b.BuyBackAmount ELSE 0 END) AS BuyBackAmountSB -- 1001 : SB
 					, SUM(CASE WHEN b.bettype = 901 AND b.CustomerCategory = 1002 THEN b.BuyBackAmount ELSE 0 END) AS BuyBachAmountBA -- 1002 : BA
 				FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
-					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID
+					INNER JOIN @ChargeInfo p ON b.SiteId = p.LicenseeID
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN (0, 13)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
 					AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
@@ -405,7 +457,7 @@ BEGIN
 					, 0 AS BuyBackAmountSB
 					, 0 AS BuyBackAmountBA
 				FROM bodb_licenseereport.dbo.rpt_Betting_BA b WITH (NOLOCK)
-					INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID
+					INNER JOIN @ChargeInfo p ON b.SiteId = p.LicenseeID
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (3)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
 					AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
@@ -440,7 +492,7 @@ BEGIN
 				, SUM(betcount * CASE WHEN @drawfilter = 2 AND b.Status = 111 THEN 0 ELSE 1 END) AS BetCount
 			FROM
 				bodb_licenseereport.dbo.rpt_Betting_BA b WITH (NOLOCK)
-				INNER JOIN @tmpParty p ON b.SiteID = p.LicenseeId
+				INNER JOIN @ChargeInfo p ON b.SiteID = p.LicenseeId
 			WHERE
 				b.rptDate BETWEEN p.FromDate AND p.ToDate
 				AND b.SiteID = @LicenseeID
@@ -561,7 +613,7 @@ BEGIN
 							SUM(b.TicketPayout) AS TicketsPayout,
 							SUM(b.BuyBackAmt * p.Rate) AS CashoutCommission
 					FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
-						INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate
+						INNER JOIN @ChargeInfo p ON b.SiteId = p.LicenseeID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate
 					WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate
 						AND b.Currency <> 20
 						AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.Currency = @CurrencyId))
@@ -588,7 +640,7 @@ BEGIN
 				, SUM(-b.MemberWL * p.Rate - (b.CommissionA + b.CommissionP))
 				, SUM(b.BetCount)
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN @tmpParty p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
+				INNER JOIN @ChargeInfo p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			WHERE b.CurrencyId <> 20
 				AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
 				AND b.ProductID = @ExchangeProductId
@@ -629,7 +681,7 @@ BEGIN
 					AND b.customercategory NOT IN (27, 28)
 				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 			) d
-				INNER JOIN @tmpParty p ON d.SiteId = p.LicenseeID
+				INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
 			WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
 			GROUP BY rptDate, CurrencyID
 		)
@@ -673,6 +725,8 @@ BEGIN
 		, SUM(ISNULL(d.LicenseeWL, 0))					AS LicenseeWL
 		, SUM(ISNULL(d.LicenseeComm, 0))				AS LicenseeComm
 		, SUM(ISNULL(d.CashInShare, 0))					AS CashInShare
+		, SUM(ISNULL(d.TipsAmount, 0))					AS TipsAmount
+		, SUM(ISNULL(d.TipsAmountDue, 0))				AS TipsAmountDue
 		, SUM(ISNULL(d.Company, 0))						AS Company
 		, SUM(ISNULL(d.ProgressiveContribution, 0))		AS ProgressiveContribution
 		, SUM(ISNULL(d.ProgressivePayout, 0))			AS ProgressivePayout
@@ -698,6 +752,8 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeWL * e.Rate, 0)))					AS LicenseeWLBase
 		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeComm * e.Rate, 0)))				AS LicenseeCommBase
 		, CONVERT(MONEY, SUM(ISNULL(d.CashInShare * e.Rate, 0)))				AS CashInShareBase
+		, CONVERT(MONEY, SUM(ISNULL(d.TipsAmount * e.Rate, 0)))					AS TipsAmountBase
+		, CONVERT(MONEY, SUM(ISNULL(d.TipsAmountDue * e.Rate, 0)))				AS TipsAmountDueBase
 		, CONVERT(MONEY, SUM(ISNULL(d.Company* e.Rate, 0)))						AS CompanyBase
 		, CONVERT(MONEY, SUM(ISNULL(d.ProgressiveContribution * e.Rate, 0)))	AS ProgressiveContributionBase
 		, CONVERT(MONEY, SUM(ISNULL(d.ProgressiveFee * e.Rate, 0)))				AS ProgressiveFeeBase

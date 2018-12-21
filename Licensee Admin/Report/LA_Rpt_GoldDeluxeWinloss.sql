@@ -1,5 +1,9 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
+GO
+
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_GoldDeluxeWinloss]
@@ -16,6 +20,7 @@ AS
 		- 20171219@Bruce: increase length for variables [#88197]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180628@Scofield: Update calculation formula for AG& GD report [#94283]
+		- 20181119@Scofield: Integrate Bidme games  [#103695]
 		
 	Param's Explanation:
 */
@@ -30,6 +35,7 @@ BEGIN
 	DECLARE @CreditServiceCharge	INT = 10
 	DECLARE @DepositServiceCharge	INT = 9
 	DECLARE @GrossWin				INT = 1
+	DECLARE @BidMeTipChargeType		INT = 12
 
 	-- get partylist and parent group
 	CREATE TABLE #PartyList(
@@ -57,25 +63,40 @@ BEGIN
 	-- credit licensee display licensee fee as 0 -> set rate to 0
 	INSERT INTO #ChargeInfo(PartyId, LicenseeId, ProductId, Rate, IsDeposit, Fromdate, Todate, IsPayToSupplier, ChargeType)
 	(
-		SELECT DISTINCT PartyID, LicenseeId, ProductId, CASE WHEN IsDeposit=1 THEN DI_Rate ELSE 0 END, IsDeposit, Fromdate, Todate, 0, 1
+		SELECT DISTINCT PartyID, LicenseeId, ProductId, CASE WHEN IsDeposit=1 THEN DI_Rate ELSE 0 END, IsDeposit, Fromdate, Todate, 0, ChargeType
 		FROM dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'GD', 'OA', 1)
 	)
 
 	-- get payToSupplier's charge rate
 	;WITH CI AS (
 		SELECT ci.PartyId, ci.LicenseeId, ci.ProductId, ci.IsDeposit,
-			ISNULL(c1.Rate, c2.Rate) AS Rate,
-			ISNULL(c1.FromDate, c2.FromDate) AS FromDate,
-			ISNULL(c1.ToDate, c2.ToDate) AS ToDate,
-			ISNULL(c1.ChargeType, c2.ChargeType) AS ChargeType
+			ISNULL(partyConfig.Rate, groupConfig.Rate) AS Rate,
+			ISNULL(partyConfig.FromDate, groupConfig.FromDate) AS FromDate,
+			ISNULL(partyConfig.ToDate, groupConfig.ToDate) AS ToDate,
+			ISNULL(partyConfig.ChargeType, groupConfig.ChargeType) AS ChargeType
 		FROM #ChargeInfo ci
 		JOIN #PartyList pl ON pl.PartyId = ci.PartyID
-		LEFT JOIN dbo.OAS_ChargeInfo c1 WITH(NOLOCK) ON c1.FromParty = ci.PartyID AND c1.ToParty = @3rdPartyId AND (
-			c1.FromDate BETWEEN @FromDate AND @ToDate OR @FromDate BETWEEN c1.FromDate AND c1.ToDate
-		) -- individual charge rate
-		LEFT JOIN dbo.OAS_ChargeInfo c2 WITH(NOLOCK) ON c2.FromParty = pl.ParentId AND c2.ToParty = @3rdPartyId AND (
-			c2.FromDate BETWEEN @FromDate AND @ToDate OR @FromDate BETWEEN c2.FromDate AND c2.ToDate
+		LEFT JOIN dbo.OAS_ChargeInfo groupConfig WITH(NOLOCK) ON groupConfig.FromParty = pl.ParentId AND groupConfig.ToParty = @3rdPartyId AND (
+			groupConfig.FromDate BETWEEN @FromDate AND @ToDate OR @FromDate BETWEEN groupConfig.FromDate AND groupConfig.ToDate
 		) -- inherit from parent group
+		LEFT JOIN dbo.OAS_ChargeInfo partyConfig WITH(NOLOCK) ON partyConfig.FromParty = ci.PartyID AND partyConfig.ToParty = @3rdPartyId AND (
+			partyConfig.FromDate BETWEEN @FromDate AND @ToDate OR @FromDate BETWEEN partyConfig.FromDate AND partyConfig.ToDate
+		) AND partyConfig.ChargeType = groupConfig.ChargeType -- individual charge rate
+		WHERE ci.IsDeposit = 1 and ci.ChargeType = @GrossWin
+
+		UNION 
+
+		SELECT ci.PartyId, ci.LicenseeId, ci.ProductId, ci.IsDeposit,
+			partyConfig.Rate AS Rate,
+			partyConfig.FromDate AS FromDate,
+			partyConfig.ToDate AS ToDate,
+			partyConfig.ChargeType AS ChargeType
+		FROM #ChargeInfo ci
+		JOIN #PartyList pl ON pl.PartyId = ci.PartyID
+		LEFT JOIN dbo.OAS_ChargeInfo partyConfig WITH(NOLOCK) ON partyConfig.FromParty = ci.PartyID AND partyConfig.ToParty = @3rdPartyId AND (
+			partyConfig.FromDate BETWEEN @FromDate AND @ToDate OR @FromDate BETWEEN partyConfig.FromDate AND partyConfig.ToDate
+		) 
+		WHERE ci.IsDeposit = 0
 	)
 	INSERT INTO #ChargeInfo(PartyId, LicenseeId, ProductId, Rate, IsDeposit, ChargeType, IsPayToSupplier, Fromdate, Todate)
 	SELECT PartyID, LicenseeID, ProductID, Rate, isDeposit, ChargeType, 1,
@@ -93,32 +114,42 @@ BEGIN
 		Turnover		MONEY,
 		ValidBetAmount	MONEY,
 		CustomerWL		MONEY,
+		TipAmount 		MONEY,
+		LicenseeFeeWithoutTips	MONEY,
+		TipsAmountDueToCompany	MONEY,
 		LicenseeFee		MONEY,
 		Commission		MONEY,
-		NetWinLoss		MONEY,		
-		PayToSupplier	MONEY,
+		NetWinLoss		MONEY,
+		CompanyTipShare MONEY,
+		RoyaltyFee		MONEY,
+		TipsAmountDueToSupplier	MONEY,		
 		BaseCurrency	VARCHAR(10),
 		RowId			UNIQUEIDENTIFIER
 	)
 
-	INSERT INTO #Data(PartyId, ReportDate, CurrencyId, IsDeposit, Totaltrans, Turnover, ValidBetAmount, CustomerWL, LicenseeFee, Commission, NetWinLoss, PayToSupplier, RowId)
+	INSERT INTO #Data(PartyId, ReportDate, CurrencyId, IsDeposit, Totaltrans, Turnover, ValidBetAmount, CustomerWL, TipAmount, LicenseeFeeWithoutTips, TipsAmountDueToCompany, Commission, NetWinLoss, CompanyTipShare, RoyaltyFee, TipsAmountDueToSupplier, RowId)
 	(
 		SELECT  ci.PartyID, b.rptDate, b.currencyID, ci.IsDeposit
-			, SUM(b.betcount) AS Totaltrans
+			, SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE b.betcount END) AS Totaltrans
 			, SUM(b.turnover) AS Turnover
 			, SUM(ISNULL(b.ValidBetAmount,0)) AS ValidBetAmount
-			, SUM(b.MemberWL) AS CustomerWL
-			, SUM(-b.MemberWL * ci.Rate) AS LicenseeFee
+			, SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE b.MemberWL END) AS CustomerWL
+			, SUM(CASE WHEN b.Bettype = 1706 THEN -b.MemberWL ELSE 0 END) AS TipAmount
+			, SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE -b.MemberWL * ci.Rate END) AS LicenseeFeeWithoutTips
+			, SUM(CASE WHEN b.Bettype = 1706 THEN -b.MemberWL * tipLicensee.Rate ELSE 0 END) AS TipsAmountDueToCompany
 			, SUM(ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS Commission
-			, SUM(-b.MemberWL - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS NetWinLoss
-			, SUM((-b.MemberWL - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) * ISNULL(s.Rate, 0)) AS PayToSupplier
+			, SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE -b.MemberWL END - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS NetWinLoss
+			, SUM(CASE WHEN b.Bettype = 1706 THEN -b.MemberWL * (1 - tipSupplier.Rate) ELSE 0 END) AS CompanyTipShare
+			, SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE (-b.MemberWL - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) * ISNULL(s.Rate, 0) END) AS RoyaltyFee
+			, SUM(CASE WHEN b.Bettype = 1706 THEN -b.MemberWL * tipSupplier.Rate ELSE 0 END) AS TipsAmountDueToSupplier			
 			, NEWID()
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #ChargeInfo ci ON ( -- licensee charge rate
 				b.SiteID = ci.LicenseeID AND
 				b.ProductID = ci.ProductId AND
 				b.rptDate BETWEEN ci.FromDate AND ci.ToDate AND
-				ci.IsPayToSupplier = 0)
+				ci.IsPayToSupplier = 0 AND
+				(ci.IsDeposit = 0 OR (ci.IsDeposit = 1 AND ci.ChargeType = @GrossWin)))
 			LEFT JOIN #ChargeInfo r ON ( -- rolling commission rate
 				b.SiteID = r.LicenseeID AND
 				b.ProductID = r.ProductId AND
@@ -131,6 +162,18 @@ BEGIN
 				b.rptDate BETWEEN s.FromDate AND s.ToDate AND
 				s.IsPayToSupplier = 1 AND
 				s.ChargeType IN (@GrossWin, @CreditServiceCharge, @DepositServiceCharge)) -- @GrossWin for old setting 
+			LEFT JOIN #ChargeInfo tipLicensee ON(
+				b.SiteID = tipLicensee.LicenseeID AND
+				b.ProductID = tipLicensee.ProductId AND
+				b.rptDate BETWEEN tipLicensee.FromDate AND tipLicensee.ToDate AND
+				tipLicensee.IsPayToSupplier = 0 AND
+				tipLicensee.ChargeType = @BidMeTipChargeType)
+			LEFT JOIN #ChargeInfo tipSupplier ON(
+				b.SiteID = tipSupplier.LicenseeID AND
+				b.ProductID = tipSupplier.ProductId AND
+				b.rptDate BETWEEN tipSupplier.FromDate AND tipSupplier.ToDate AND
+				tipSupplier.IsPayToSupplier = 1 AND
+				tipSupplier.ChargeType = @BidMeTipChargeType)
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 			  b.StatusId NOT IN (- 1, 101, 102) AND
 			  b.CurrencyId <> 20 AND
@@ -156,14 +199,18 @@ BEGIN
 	BEGIN
 		DECLARE @Currency VARCHAR(10) = (SELECT TOP 1 Code FROM @BaseCurrencies WHERE IsApplied IS NULL)
 
-		INSERT INTO #Data(PartyId, IsDeposit, ReportDate, CurrencyName, Totaltrans, BaseCurrency, Turnover, CustomerWL, LicenseeFee, Commission, NetWinLoss, PayToSupplier, ValidBetAmount, RowId)
+		INSERT INTO #Data(PartyId, IsDeposit, ReportDate, CurrencyName, Totaltrans, BaseCurrency, Turnover, CustomerWL, TipAmount, LicenseeFeeWithoutTips, TipsAmountDueToCompany, Commission, NetWinLoss, CompanyTipShare, RoyaltyFee, TipsAmountDueToSupplier, ValidBetAmount, RowId)
 		SELECT d.PartyId, d.IsDeposit, d.ReportDate, e.Code, d.Totaltrans, @Currency,
 			d.Turnover * e.BaseCurrencyRate,
 			d.CustomerWL * e.BaseCurrencyRate,
-			d.LicenseeFee * e.BaseCurrencyRate,
+			d.TipAmount * e.BaseCurrencyRate,
+			d.LicenseeFeeWithoutTips * e.BaseCurrencyRate,
+			d.TipsAmountDueToCompany * e.BaseCurrencyRate,
 			d.Commission * e.BaseCurrencyRate,
 			d.NetWinLoss * e.BaseCurrencyRate,
-			d.PayToSupplier * e.BaseCurrencyRate,
+			d.CompanyTipShare * e.BaseCurrencyRate,
+			d.RoyaltyFee * e.BaseCurrencyRate,
+			d.TipsAmountDueToSupplier * e.BaseCurrencyRate,			
 			d.ValidBetAmount * e.BaseCurrencyRate,
 			d.RowId
 		FROM #Data d
@@ -183,16 +230,24 @@ BEGIN
 		o.Turnover			AS TurnoverOriginal,
 		d.CustomerWL		AS CustomerWinLoss,
 		o.CustomerWL		AS CustomerWinLossOriginal,
+		d.TipAmount 		AS TipAmount,
+		o.TipAmount 		AS TipAmountOriginal,
 		d.ValidBetAmount,
 		o.ValidBetAmount	AS ValidBetAmountOriginal,
-		d.LicenseeFee,
-		o.LicenseeFee		AS LicenseeFeeOriginal,
+		d.LicenseeFeeWithoutTips,
+		o.LicenseeFeeWithoutTips		AS LicenseeFeeWithoutTipsOriginal,
+		d.TipsAmountDueToCompany,
+		o.TipsAmountDueToCompany		AS TipsAmountDueToCompanyOriginal,		
 		d.Commission,
 		o.Commission			AS CommissionOriginal,
 		d.NetWinLoss,
 		o.NetWinLoss		AS NetWinLossOriginal,
-		d.PayToSupplier,
-		o.PayToSupplier		AS PayToSupplierOriginal
+		d.CompanyTipShare	AS CompanyTipShare,
+		o.CompanyTipShare	AS CompanyTipShareOriginal,
+		d.RoyaltyFee,
+		o.RoyaltyFee		AS RoyaltyFeeOriginal,
+		d.TipsAmountDueToSupplier,
+		o.TipsAmountDueToSupplier		AS TipsAmountDueToSupplierOriginal		
 	FROM #Data d
 	INNER JOIN #Data o ON o.RowId = d.RowId AND o.BaseCurrency IS NULL
 	INNER JOIN #PartyList p1 ON d.PartyId = p1.PartyId
@@ -206,10 +261,14 @@ BEGIN
 		Totaltrans		INT,
 		Turnover		MONEY,
 		CustomerWinLoss	MONEY,
-		LicenseeFee		MONEY,		
+		TipAmount 		MONEY,
+		LicenseeFeeWithoutTips	MONEY,
+		TipsAmountDueToCompany	MONEY,
 		Commission		MONEY,
 		NetWinLoss		MONEY,
-		PayToSupplier	MONEY,
+		CompanyTipShare MONEY,
+		RoyaltyFee		MONEY,
+		TipsAmountDueToSupplier	MONEY,
 		ValidBetAmount	MONEY,
 		Step			TINYINT
 	)
@@ -219,10 +278,14 @@ BEGIN
 		SUM(d.Totaltrans),
 		SUM(d.Turnover),
 		SUM(d.CustomerWL),
-		SUM(d.LicenseeFee),
+		SUM(d.TipAmount),
+		SUM(d.LicenseeFeeWithoutTips),
+		SUM(d.TipsAmountDueToCompany),
 		SUM(d.Commission),
 		SUM(d.NetWinLoss),
-		SUM(d.PayToSupplier),
+		SUM(d.CompanyTipShare),
+		SUM(d.RoyaltyFee),
+		SUM(d.TipsAmountDueToSupplier),
 		SUM(d.ValidBetAmount),
 		1 -- step 1
 	FROM #Data d
@@ -236,10 +299,14 @@ BEGIN
 		SUM(Totaltrans),
 		SUM(Turnover),
 		SUM(CustomerWinLoss),
-		SUM(CASE WHEN LicenseeFee < 0 THEN 0 ELSE LicenseeFee END), -- negative amount = 0		
+		SUM(TipAmount),
+		SUM(CASE WHEN LicenseeFeeWithoutTips < 0 THEN 0 ELSE LicenseeFeeWithoutTips END), -- negative amount = 0		
+		SUM(TipsAmountDueToCompany),
 		SUM(Commission),
 		SUM(NetWinLoss),
-		SUM(CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END), -- negative amount = 0		
+		SUM(CompanyTipShare),
+		SUM(CASE WHEN RoyaltyFee < 0 THEN 0 ELSE RoyaltyFee END), -- negative amount = 0		
+		SUM(TipsAmountDueToSupplier),
 		SUM(ValidBetAmount),
 		2 -- step 2
 	FROM @GrandTotals
@@ -251,10 +318,14 @@ BEGIN
 		SUM(Turnover) AS Turnover,
 		SUM(ValidBetAmount) AS ValidBetAmount,
 		SUM(CustomerWinLoss) AS CustomerWinLoss,
-		SUM(LicenseeFee) AS LicenseeFee,
+		SUM(TipAmount) AS TipAmount,
+		SUM(LicenseeFeeWithoutTips) AS LicenseeFeeWithoutTips,
+		SUM(TipsAmountDueToCompany) AS TipsAmountDueToCompany,
 		SUM(Commission) AS Commission,
 		SUM(NetWinLoss) AS NetWinLoss,
-		SUM(PayToSupplier) AS PaytoSupplier 
+		SUM(CompanyTipShare) AS CompanyTipShare,
+		SUM(RoyaltyFee) AS RoyaltyFee, 
+		SUM(TipsAmountDueToSupplier) AS TipsAmountDueToSupplier 
 	FROM @GrandTotals
 	WHERE Step = 2
 	GROUP BY CurrencyName

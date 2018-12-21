@@ -1,4 +1,4 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
 USE bodb02
 GO
 
@@ -34,6 +34,7 @@ AS
 	- 20180716@bruce: add new group TEST for credit [#98126]
 	- 20180703@Parsons: Integrate Pragmatic Win Loss [#94108]
 	- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
+	- 20181119@bruce: Integrate Bidme games (GD product) [#103695]
 
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -48,14 +49,14 @@ AS
 		+ @BaseCurrencyName: GBP, CNY, USD, EUR, MYR
 */
 BEGIN
-	SET NOCOUNT ON
+	SET NOCOUNT ON	DECLARE @GD_Tip SMALLINT = 1706
 
 	CREATE TABLE #Report (ReportDate DATE, CurrencyID INT, ProductID INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY, WinlossRB MONEY, 
 						AmtDueToBA MONEY, AmtDueToRB MONEY, CommBA MONEY, CommRB MONEY, Company MONEY, Betcount BIGINT)							
 	CREATE TABLE #Exchange (ExchangeId INT, ExchangeDate DATE, Code VARCHAR(20), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, CNY FLOAT, Base FLOAT)
 	CREATE TABLE #Data (rptDate DATE, PartyID INT, ProductID INT, Currency INT,BetTypeId INT, Turnover MONEY, Winloss MONEY, AWinloss MONEY, AComm MONEY, PComm MONEY, Betcount BIGINT)
 	CREATE TABLE #Products(ProductID INT, ProductName VARCHAR(50))
-	CREATE TABLE #ChargeInfo (PartyID INT, LicenseeID INT, ProductID INT, BetTypeID INT, Rate MONEY, Fromdate DATE , Todate DATE)
+	CREATE TABLE #ChargeInfo (PartyID INT, LicenseeID INT, ProductID INT, BetTypeID INT, Rate MONEY, Fromdate DATE , Todate DATE, ChargeType TINYINT)
 	
 	DECLARE @VNDCurrencyName VARCHAR(20)
 
@@ -63,10 +64,11 @@ BEGIN
 	FROM dbo.Exchange (NOLOCK)
 	WHERE ExchangeId = 51
 
-	INSERT INTO #ChargeInfo (PartyID, LicenseeID, ProductID, BetTypeID, Rate, Fromdate, Todate)
+	INSERT INTO #ChargeInfo (PartyID, LicenseeID, ProductID, BetTypeID, Rate, Fromdate, Todate, ChargeType)
 	SELECT DISTINCT PartyID, LicenseeID, ProductID, Bettype, 
 			CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END,
-			Fromdate, Todate
+			Fromdate, Todate,
+			CASE WHEN ProductID=11 THEN ChargeType ELSE 1 END -- include GD tip charge type
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo (@PartyID, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 	
 	INSERT INTO #Products(ProductID,ProductName)
@@ -247,7 +249,8 @@ BEGIN
 			GROUP BY b.rptDate, b.Currency, b.ProductID
 		)
 	END
-	
+
+	-- Colossus Bets
 	IF (SELECT COUNT(*) FROM #ChargeInfo WHERE ProductID = 15) > 0
 	BEGIN
 		-- Region: Local variables
@@ -312,7 +315,8 @@ BEGIN
 		
 		DROP TABLE #TempData
 	END
-	
+
+	-- Cashout
 	IF (SELECT COUNT(*) FROM #ChargeInfo WHERE ProductID = 25) > 0
 	BEGIN
 		DECLARE @COProductId INT = 25
@@ -343,7 +347,8 @@ BEGIN
 			GROUP BY d.Winlostdate, d.Currency
 		)
 	END
-	
+
+	-- BetTrade
 	IF (SELECT COUNT(*) FROM #ChargeInfo WHERE ProductID = 13) > 0
 	BEGIN
 		DECLARE @BTProductId INT = 13
@@ -400,8 +405,66 @@ BEGIN
 		)
 	END
 	
+	-- GD
+	IF (SELECT COUNT(*) FROM #ChargeInfo WHERE ProductID = 11) > 0
+	BEGIN
+		DELETE #Data
+
+		INSERT INTO #Data(rptDate, Currency, BetTypeId, Turnover, Winloss, Betcount)
+		(
+			SELECT b.rptDate, b.CurrencyID,b.Bettype
+				, SUM(b.turnover * 
+					CASE WHEN @drawfilter IN (2, 3) 
+						THEN CASE WHEN b.StatusId = 111 THEN 0
+							WHEN b.StatusId IN (114, 115)	THEN 0.5 ELSE 1	END
+						ELSE 1
+					END) Turnover
+				, SUM(b.MemberWL)
+				, SUM(b.betcount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) BetCount
+			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
+				AND b.StatusId NOT IN (- 1, 101, 102, 103)
+				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
+				AND (b.CurrencyID <> 20)
+				AND b.customercategory NOT IN (27,28)
+				AND b.ProductID = 11
+				AND b.SiteID IN (SELECT TOP 1 o.LicenseeID FROM #ChargeInfo o)
+			GROUP BY b.rptDate,b.CurrencyID,b.Bettype
+		)
+
+		INSERT INTO #Report (ReportDate, CurrencyID, ProductID, Turnover, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Company, Betcount)
+		(
+			-- licensing fee
+			SELECT b.rptDate, b.Currency, 11 -- GD = 11
+				, SUM(b.Turnover)
+				, SUM(b.Winloss)
+				, SUM(-b.Winloss)
+				, 0,0,0,0,0
+				, SUM(-b.Winloss * ci.Rate)
+				, SUM(b.Betcount)
+			FROM #Data b WITH (NOLOCK)
+				INNER JOIN #ChargeInfo ci ON b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+			WHERE ci.ProductID=11 
+				AND b.BetTypeId <> @GD_Tip 
+				AND ci.ChargeType=1 -- gross win
+			GROUP BY b.rptDate, b.Currency
+
+			UNION ALL
+			-- tip amount
+			SELECT b.rptDate, b.Currency, 11,0,0,0,0,0,0,0,0
+				, SUM(-b.Winloss * ci.Rate)
+				, 0 AS Betcount
+			FROM #Data b WITH (NOLOCK)
+				INNER JOIN #ChargeInfo ci ON b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+			WHERE ci.ProductID=11 
+				AND b.BetTypeId = @GD_Tip 
+				AND ci.ChargeType=12 -- GD tip
+			GROUP BY b.rptDate, b.Currency
+		)
+	END
+
 	DECLARE @ExcludedProductIds TABLE(ProductId INT)
-	INSERT INTO @ExcludedProductIds(ProductId) VALUES (1), (3), (14), (17), (15), (25), (13)
+	INSERT INTO @ExcludedProductIds(ProductId) VALUES (1), (3), (14), (17), (15), (25), (13), (11)
 	
 	IF (SELECT COUNT(*) FROM #ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) > 0
 	BEGIN
@@ -479,7 +542,7 @@ BEGIN
 	INSERT INTO @CurrencyTable(currency, CurrencyName, CurrencyCode)
 	SELECT t.CurrencyID, e.currency, e.Code
 	FROM (SELECT DISTINCT CurrencyID FROM #Report) t
-	INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON t.CurrencyID = e.exchangeid
+	INNER JOIN dbo.Exchange e WITH (NOLOCK) ON t.CurrencyID = e.exchangeid
 	
 	UPDATE @CurrencyTable
 	SET CurrencyCode = (CASE currency

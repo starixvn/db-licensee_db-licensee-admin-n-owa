@@ -1,8 +1,14 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
 ALTER PROCEDURE [dbo].[LA_LicenseeBillingInfoSel]
-	@PartyId		INT
+	  @PartyId		INT
 	, @ProductCode	VARCHAR(10)
 AS
 /*  Created: 20150318@Florent
@@ -19,6 +25,7 @@ AS
 		- 20161130@Bruce.bui: 
 			+ Update partyId from TINYINT to INT
 			+ Re-structure SP
+		- 20181220@Parsons: Integrate Bidme games  [#103695]
 	Param's Explanation:
 
 */
@@ -62,7 +69,7 @@ BEGIN
 		@BasisOfBilling = ci.BasisOfBilling
 	FROM @ChargeInfo ci
 	INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeId = cs.ChargeID AND cs.SystemID = 2
-	WHERE ci.FromParty = @PartyId AND ci.ProductID = @ProductId
+	WHERE ci.FromParty = @PartyId AND ci.ProductID = @ProductId AND ChargeType != 12
 	ORDER BY ci.FromDate DESC
 
 	SELECT TOP 1
@@ -81,5 +88,3 @@ BEGIN
 		, ISNULL(@MinimumFees, '') AS MinimumFees
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_LicenseeBillingInfoSel] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_LicenseeBillingInfoSel] TO bodbAdminNet

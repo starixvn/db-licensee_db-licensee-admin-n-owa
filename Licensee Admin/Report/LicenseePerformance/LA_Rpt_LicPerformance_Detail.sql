@@ -1,4 +1,4 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 
 USE [bodb02]
 GO
@@ -50,6 +50,7 @@ AS
 		- 20180718@Bruce: use decimal to void margin not match among reports [#94108]
 		- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 		- 20180924@Parsons: LA - LPID report - Apply one discount rate across all base currencies [#100046]
+		- 20181122@Scofield: Integrate Bidme games (GD product) [#103695]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -70,6 +71,7 @@ AS
 
 BEGIN
 	SET NOCOUNT ON
+	DECLARE @GD_Tip SMALLINT = 1706
 
 	-- *********************************************************************************************************
 	-- *** Calculate Previous FromDate, Previous ToDate from FromDate, ToDate
@@ -175,7 +177,9 @@ BEGIN
 				CASE WHEN ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
 		FROM	bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, @ProductCodes) ci
 		LEFT JOIN bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype
-		WHERE	((ci.PartyID IN (25,30,324) AND DI_Rate = 0) OR DI_Rate > 0) AND ProductId <> 1 --exclude RB
+		WHERE	((ci.PartyID IN (25,30,324) AND DI_Rate = 0) OR DI_Rate > 0)
+			AND ProductId <> 1 --exclude RB
+			AND ChargeType <> 12 -- exclude Gd tip
 	)
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
 	(
@@ -186,9 +190,11 @@ BEGIN
 				CASE WHEN ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
 		FROM	bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @PrevFromDate, @PrevToDate, @ProductCodes) ci
 		LEFT JOIN bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype
-		WHERE	((ci.PartyID IN (25,30,324) AND DI_Rate = 0) OR DI_Rate > 0) AND ProductId <> 1 --exclude RB
+		WHERE	((ci.PartyID IN (25,30,324) AND DI_Rate = 0) OR DI_Rate > 0)
+			AND ProductId <> 1 --exclude RB
+			AND ChargeType <> 12 -- exclude Gd tip
 	)
-	-- End region
+	-- End region	
 
 	-- this table hold data from sp: LA_AmountToCompanySel
 	CREATE TABLE #AmountToCompany (
@@ -267,17 +273,17 @@ BEGIN
 				p.PartyId,
 				b.rptDate,
 				b.CurrencyID,
-				SUM(b.BetCount * CASE WHEN @DrawFilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END),
+				SUM(CASE WHEN (@DrawFilter = 2 AND b.StatusId = 111) OR b.Bettype=@GD_Tip THEN 0 ELSE b.BetCount END),
 				SUM(b.Turnover * CASE WHEN @DrawFilter IN (2, 3) 
 										THEN CASE	WHEN b.StatusId = 111 THEN 0
 													WHEN b.StatusId IN (114, 115) THEN 0.5
 											 ELSE 1 END
 										ELSE 1 END) * e.Rate,
-				SUM(ISNULL(b.MemberWL, 0)) * e.Rate,
+				SUM(CASE WHEN b.Bettype=@GD_Tip THEN 0 ELSE b.MemberWL END) * e.Rate,
 				SUM(ISNULL(b.CommissionA, 0)) * e.Rate,
 				SUM(ISNULL(b.CommissionP, 0)) * e.Rate,
 				p.ProductId,
-				SUM((-ISNULL(b.MemberWL, 0) * p.Rate) - (CASE 
+				SUM((CASE WHEN b.Bettype=@GD_Tip THEN 0 ELSE -b.MemberWL END * p.Rate) - (CASE 
 					WHEN b.ProductId = 3 THEN ISNULL(b.CommissionA, 0) -- BA
 					WHEN b.ProductID = 31 THEN ISNULL(b.CommissionA, 0) + ISNULL(b.CommissionP, 0) -- Exchange
 					ELSE 0 END)) * e.Rate
@@ -488,5 +494,3 @@ BEGIN
 END
 GO
 
-GRANT EXECUTE ON [dbo].[LA_Rpt_LicPerformance_Detail] TO [bodbAdminNet]
-GO

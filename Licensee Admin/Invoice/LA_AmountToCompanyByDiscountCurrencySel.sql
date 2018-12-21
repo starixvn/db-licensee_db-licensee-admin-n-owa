@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_Licensee
 GO
 
@@ -21,7 +21,8 @@ AS
 	DB: DB052/bodb_Licensee
 	Revisions:
 		- 20180924@Parsons: LA - LPID report - Apply one discount rate across all base currencies [#100046]
-		- 20181114@Bruce: discount by currency [#99694]
+		- 20181114@Bruce: discount by currency [#99694] 
+		- 20181127@Parsons: Integrate Bidme games (GD product) [#103695]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -29,6 +30,8 @@ BEGIN
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 1. Prepare settings
  *-------------------------------------------------------------------------------------------------------------------------------*/
+	DECLARE @GD_Tip SMALLINT = 1706
+
 	-- product to be discounted
 	DECLARE @ProductList TABLE (ProductId INT, ToBeDiscounted BIT)
 	INSERT INTO @ProductList(ProductId,ToBeDiscounted)
@@ -166,7 +169,8 @@ BEGIN
 	FROM (SELECT DISTINCT b.PartyId FROM @PartyList b) a
 	
 	-- 1.7 charge info
-	SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, CAST(ci.DI_Rate AS DECIMAL(6,5)) AS Rate, ci.Fromdate, ci.ToDate
+	SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, CAST(ci.DI_Rate AS DECIMAL(6,5)) AS Rate, ci.Fromdate, ci.ToDate 
+					,CASE WHEN ProductID=11 AND ChargeType=12 THEN @GD_Tip ELSE -1 END AS Bettype -- GD Tip
 	INTO #tmpChargeInfo
 	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
 	WHERE DI_Rate > 0
@@ -289,16 +293,20 @@ BEGIN
 	SELECT	p.PartyId,
 			b.rptDate AS WinlossDate,
 			p.ProductId,
-			b.CurrencyId,
-			b.MemberWL,
-			(b.MemberWL * p.Rate) AS Amount
+			b.CurrencyId, 
+			CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE ISNULL(b.MemberWL, 0) END AS MemberWL, -- exclude GD Tip 
+			CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE ISNULL(b.MemberWL, 0) * p.Rate END AS Amount, -- exclude GD Tip 
+			CASE WHEN b.Bettype = @GD_Tip THEN ISNULL(b.MemberWL, 0) * p.Rate ELSE 0 END AS ExtraAmount
 	INTO #temData
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId 
 				AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
-				AND b.ProductId = p.ProductID  
+				AND b.ProductId = p.ProductID   
+				AND (
+					(b.Bettype = p.Bettype AND p.ProductID = 11) OR 
+					(p.ProductID <> 11)
+				)
 	WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)
-			AND (b.CurrencyID <> 20)
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
 			AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
@@ -308,7 +316,8 @@ BEGIN
 			t.PartyId,
 			t.ProductId,
 			SUM(-t.MemberWL * eb.Rate) AS WinlossByBaseCurrency,
-			SUM(-t.Amount * eb.Rate) AS AmountToCompanyByBaseCurrency,
+			SUM(-t.Amount * eb.Rate) AS AmountToCompanyByBaseCurrency, 
+			SUM(-t.ExtraAmount * eb.Rate)	AS ExtraAmount,
 			CAST(0 AS MONEY) WinlossByDiscountBaseCurrency,
 			CAST(0 AS MONEY) AmountToCompanyByDiscountBaseCurrency,
 			t.CurrencyId
@@ -337,8 +346,8 @@ BEGIN
 	LEFT JOIN cte_winlossByDiscountBaseCurrency c ON t.PartyId = c.PartyID AND t.WinlossDate = c.WinlossDate AND t.ProductId = c.ProductID AND t.CurrencyId = c.CurrencyId
 
 	-- 2.4 insert product don't have any ticket
-	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,WinlossByDiscountBaseCurrency,WinlossByBaseCurrency,AmountToCompanyByDiscountBaseCurrency,AmountToCompanyByBaseCurrency,CurrencyId)
-	SELECT DISTINCT PartyId,@ToDate,c.ProductId,0,0,0,0,6--EUR = 6
+	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,WinlossByDiscountBaseCurrency,WinlossByBaseCurrency,AmountToCompanyByDiscountBaseCurrency,AmountToCompanyByBaseCurrency,ExtraAmount,CurrencyId)
+	SELECT DISTINCT PartyId,@ToDate,c.ProductId,0,0,0,0,0,6--EUR = 6
 	FROM @PartyList p 
 	INNER JOIN @ProductList pd ON 1=1
 	INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON c.ProductID = pd.ProductID AND p.PartyId = c.FromParty
@@ -349,7 +358,8 @@ BEGIN
 		,CAST(SUM(a.WinlossByDiscountBaseCurrency) AS MONEY)  AS WinlossByDiscountBaseCurrency
 		,CAST(SUM(a.WinlossByBaseCurrency) AS MONEY)		AS WinlossByBaseCurrency
 		,CAST(SUM(a.AmountToCompanyByDiscountBaseCurrency) AS MONEY)  AS AmountToCompanyByDiscountBaseCurrency
-		,CAST(SUM(a.AmountToCompanyByBaseCurrency) AS MONEY)		AS AmountToCompanyByBaseCurrency
+		,CAST(SUM(a.AmountToCompanyByBaseCurrency) AS MONEY)		AS AmountToCompanyByBaseCurrency 
+		,CAST(SUM(a.ExtraAmount) AS MONEY)							AS ExtraAmount
 		,CAST(0 AS MONEY) AS FeeByDiscountBaseCurrency
 		,CAST(0 AS MONEY) AS FeeByBaseCurrency
 		,CAST(0 AS MONEY)			AS Discount
@@ -550,8 +560,8 @@ BEGIN
 
 	-- 5. return result
 	SELECT PartyId
-		,ProductId
-		,FeeByBaseCurrency AS Fee
+		,ProductId 
+		,FeeByBaseCurrency + ExtraAmount AS Fee
 		,Discount
 		,Rebate
 		,IsChargedByMinFee

@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -25,6 +25,7 @@ AS
   - 20180716@bruce: add new group TEST for credit [#98126]
   - 20180503@Parsons: fix: setting won't show when set start date from future[#94108]
   - 20181114@Parsons: Configure discount settings by currency [#99694]
+  - 20181214@Parsons: Integrate Bidme games  [#103695]
 
   Params:
   + @PayerId : 0 get all Party
@@ -55,11 +56,11 @@ BEGIN
 	SET @CurrentDate = CONVERT(DATE, GETDATE())
 	DECLARE @ChargeInfo AS TABLE(ChargeId INT, PartyId INT, PartyName VARCHAR(100), PartyGroupId INT, PartyGroupName VARCHAR(100), ProductId INT, ProductName VARCHAR(100),
 			BettypeRef INT,Rate MONEY, FromDate DATE, ToDate DATE, FirstBilling DATE, ExchangeID INT, ExchangeName VARCHAR(50), ChargeType TINYINT)
-	CREATE TABLE #Temp_ChargeInfo(ChargeId INT, PartyID INT, ProductID INT, BettypeRef INT,Rate MONEY, Fromdate DATE, Todate DATE)
+	CREATE TABLE #Temp_ChargeInfo(ChargeId INT, PartyID INT, ProductID INT, BettypeRef INT,Rate MONEY, Fromdate DATE, Todate DATE, ChargeType TINYINT)
 
 	DECLARE @Minfee AS TABLE(PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, FromDate DATE, ToDate DATE)
 	DECLARE @Discount AS TABLE(PartyId INT, ProductId INT, FromDate DATE, ToDate DATE, DiscountGroupId INT, FromAmount MONEY, ToAmount MONEY, Rate MONEY, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
-	DECLARE @ChargeDetail AS TABLE(ChargeID INT, PartyID INT, ProductID INT, BettypeRef INT,DI_Rate MONEY, Fromdate DATE, Todate DATE)
+	DECLARE @ChargeDetail AS TABLE(ChargeID INT, PartyID INT, ProductID INT, BettypeRef INT,DI_Rate MONEY, Fromdate DATE, Todate DATE, ChargeType TINYINT)
 
 	--Get list licensee,
 	SELECT	@ListParty = @ListParty + CAST(p.PartyID AS VARCHAR) + ','
@@ -89,7 +90,7 @@ BEGIN
 				ON ci.ChargeID = cs.ChargeID
 				AND cs.SystemID = 2
 
-	INSERT INTO @ChargeDetail (ChargeID, PartyID, ProductID, BettypeRef, DI_Rate, Fromdate, Todate)
+	INSERT INTO @ChargeDetail (ChargeID, PartyID, ProductID, BettypeRef, DI_Rate, Fromdate, Todate, ChargeType)
 		SELECT
 			ChargeID,
 			PartyID,
@@ -100,35 +101,39 @@ BEGIN
 			AS BettypeRef,
 			DI_Rate,
 			Fromdate,
-			Todate
+			Todate, 
+			ChargeType
 		FROM dbo.LA_f_ChargeInfo(@ListParty, @MinDate, @MaxDate, @ProductListAll, 'OA', 1)
 
-	INSERT INTO #Temp_ChargeInfo (ChargeID, PartyID, ProductID, BettypeRef, Rate, Fromdate, Todate)
-		SELECT
+	INSERT INTO #Temp_ChargeInfo (ChargeID, PartyID, ProductID, BettypeRef, Rate, Fromdate, Todate, ChargeType)
+		SELECT 
 			b.ChargeID,
 			a.PartyID,
 			a.ProductID,
 			b.BettypeRef,
 			b.DI_Rate,
 			a.Fromdate,
-			a.Todate
-		FROM (	SELECT
+			a.Todate, 
+			a.ChargeType
+		FROM (	SELECT 
 						c.PartyID,
 						c.ProductID,
+						c.ChargeType,
 						MAX(c.Fromdate) AS Fromdate,
 						MAX(c.Todate) AS Todate
 				FROM	@ChargeDetail c
 				WHERE	@CurrentDate <= c.Todate
 				GROUP BY	c.PartyID,
-							c.ProductID) a
+							c.ProductID, 
+							c.ChargeType) a
 		INNER JOIN @ChargeDetail b
 			ON a.PartyID = b.PartyID
 			AND a.ProductID = b.ProductID
 			AND a.Fromdate = b.Fromdate
 			AND a.Todate = b.Todate
-
+			
 	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)
-		SELECT
+		SELECT 
 			c.ChargeID,
 			c.PartyID,
 			CASE
@@ -160,7 +165,7 @@ BEGIN
 
 	-- Hard code for Bettrade BA
 	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)
-	SELECT ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, 0, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, 12
+	SELECT ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, 0, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, 13
 	FROM @ChargeInfo
 	WHERE ProductId = 13
 
@@ -338,10 +343,7 @@ BEGIN
 	FROM Result
 	INNER JOIN @ProductOrder po ON po.ProductId = Result.ProductId
 	ORDER BY Result.PayerID, po.OrderNumber
+	
+	DROP TABLE #Temp_ChargeInfo
 END
-DROP TABLE #Temp_ChargeInfo
-
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_PayerSettingSel] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_PayerSettingSel] TO bodbAdminNet
 GO

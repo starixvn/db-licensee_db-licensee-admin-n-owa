@@ -1,5 +1,9 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
+GO
+
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinLossByProduct]
@@ -32,6 +36,7 @@ AS
 		- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180510@Bruce: Integrate Pragmatic [#94108]
+		- 20181119@bruce: Integrate Bidme games (GD product) [#103695]
 */
 		
 /*	Example:
@@ -70,7 +75,10 @@ BEGIN
 
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, BettypeRef)
 	(
-		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate, Bettype -- this field should be BettypeRef not Bettype
+		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate, CASE
+				WHEN ProductId = 11 AND ChargeType = 12 THEN 1706
+				ELSE Bettype
+			END
 		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
 	)
@@ -91,7 +99,6 @@ BEGIN
 	-- Region: Get Winloss data
 	CREATE	TABLE #TempData (
 			LicenseeId	INT,
-			PartyId		INT,
 			rptDate		DATETIME,
 			CurrencyId	INT,
 			MemberWL	MONEY,
@@ -101,10 +108,9 @@ BEGIN
 			ProductId	TINYINT,
 			BettypeRef	INT)
 	
-	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,MemberWL,AWinLoss,AComm,PComm,ProductId,BettypeRef)
+	INSERT INTO #TempData (LicenseeId,rptDate,CurrencyId,MemberWL,AWinLoss,AComm,PComm,ProductId,BettypeRef)
 	(
 		SELECT	b.SiteID,
-				p.PartyId,
 				b.rptDate,
 				b.CurrencyID,
 				SUM(ISNULL(b.MemberWL, 0)) Winloss,
@@ -112,7 +118,10 @@ BEGIN
 				SUM(ISNULL(b.CommissionA, 0)) AS AComm,
 				SUM(ISNULL(b.CommissionP, 0)) AS PComm,
 				b.ProductId,
-				ISNULL(sbr.BettypeRef, -1)
+				CASE
+					WHEN b.Bettype = 1706 THEN b.Bettype -- GD Tip
+					ELSE ISNULL(sbr.BettypeRef, -1)
+				END
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON b.SiteID = p.OldRefID AND p.PartyType = 1
 				LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.Bettype = b.Bettype
@@ -120,11 +129,17 @@ BEGIN
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
-				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
+				AND b.Bettype NOT IN (
+					901,902,903,904,	-- BT
+					911,912,913,914 	-- CO
+				)
 				AND b.ProductID NOT IN (13,15,25)
-		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, b.ProductId, ISNULL(sbr.BettypeRef, -1)
+		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, b.ProductId,
+			CASE
+				WHEN b.Bettype = 1706 THEN b.Bettype -- GD Tip
+				ELSE ISNULL(sbr.BettypeRef, -1)
+			END
 	)
-	
 	-- EndRegion
 
 	-- Region: Generate licensee name & group
@@ -307,12 +322,11 @@ BEGIN
 	SET		CO = a.Amount
 	FROM	#LicenseeAmount d INNER JOIN @COWinLoss a ON a.LicenseeId = d.LicenseeId
 	-- End CO
-	
+
 	-- Others
 	;WITH AmountDueByProduct AS
 	(
-		SELECT	d.PartyId,
-				d.LicenseeId,
+		SELECT	d.LicenseeId,
 				ISNULL(SUM(CASE WHEN d.ProductId = 0  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS SB,
 				ISNULL(SUM(CASE WHEN d.ProductId = 2  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS NG,
 				ISNULL(SUM(CASE WHEN d.ProductId = 4  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS LC,
@@ -332,13 +346,12 @@ BEGIN
 				ISNULL(SUM(CASE WHEN d.ProductId = 31 THEN (-MemberWL * ci.Rate - (AComm + PComm)) * e.Rate ELSE 0 END),0) AS BX,
 				ISNULL(SUM(CASE WHEN d.ProductId = 32 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS PP
 		FROM	#TempData d
-				INNER JOIN @PartyChargeInfo ci ON	d.PartyId = ci.PartyId 
-													AND ci.ProductId = d.ProductId 
+				INNER JOIN @PartyChargeInfo ci ON	d.LicenseeId = ci.LicenseeId
+													AND ci.ProductId = d.ProductId
 													AND d.rptDate BETWEEN ci.FromDate AND ci.ToDate
 													AND d.BettypeRef = ci.BettypeRef
 				INNER JOIN #Exchange e ON d.rptDate = e.ExchangeDate AND d.CurrencyId = e.ExchangeID
-		GROUP BY d.PartyId,
-				 d.LicenseeId
+		GROUP BY d.LicenseeId
 	)
 	UPDATE	l
 	SET		SB = a.SB,
@@ -360,8 +373,8 @@ BEGIN
 			BX = a.BX,
 			PP = a.PP
 	FROM	#LicenseeAmount l
-			INNER JOIN AmountDueByProduct a ON a.LicenseeId = l.LicenseeId AND a.PartyId = l.PartyId
-	
+			INNER JOIN AmountDueByProduct a ON a.LicenseeId = l.LicenseeId
+
 	DELETE	FROM #LicenseeAmount
 	WHERE	SB IS NULL
 			AND RB IS NULL
@@ -386,16 +399,15 @@ BEGIN
 			AND LT IS NULL
 			AND BX IS NULL
 			AND PP IS NULL
-	SELECT	l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP
-	FROM	#LicenseeAmount l
-	ORDER BY l.GroupId, l.PartyId	
+
+	-- Result
+	SELECT l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP
+	FROM #LicenseeAmount l
+	ORDER BY l.GroupId, l.PartyId
 	-- EndRegion
 
 	DROP TABLE #Exchange
 	DROP TABLE #TempData
 	DROP TABLE #LicenseeAmount
 END
-
-GO
-GRANT EXECUTE ON [dbo].[LA_Rpt_LicenseeWinLossByProduct] TO bodbAdminNet
 GO
