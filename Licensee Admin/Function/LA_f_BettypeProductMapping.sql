@@ -71,6 +71,7 @@ BEGIN
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE (typeid < 31
 		  OR typeid BETWEEN 121 AND 999
+		  OR typeid BETWEEN 9001 AND 9399
 		  OR typeid BETWEEN 1301 AND 1399)
 		  AND typeid NOT IN (901, 902, 903,904, 911, 912, 913, 914) -- Bettrade bettypes
 		  AND (@Bettype = 0 OR typeid = @Bettype)
