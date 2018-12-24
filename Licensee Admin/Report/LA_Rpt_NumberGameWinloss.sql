@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
 
@@ -28,6 +28,7 @@ AS
 	- 20171220@Parsons: increase length for variables [#88197]
 	- 20180716@bruce: add new group TEST for credit [#98126]
 	- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
+	- 20181224@Bruce: include happy 5 [#105723]
 	
  * Param's Explanation:
  *
@@ -72,12 +73,12 @@ BEGIN
 			SUM(-b.Winloss * lr.Rate * e.Rate) AS OneworksRevenue,
 			SUM(CASE WHEN @drawfilter = 2 AND b.status = 111 THEN 0 ELSE b.BetCount END) AS BetCount
 		FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
+			INNER JOIN bodb_licensee.dbo.LA_f_BettypeProductMapping(0, 'NG') bt ON bt.Bettype = b.Bettype
 			INNER JOIN #ChargeRate lr ON b.SiteID = lr.LicenseeID AND b.rptDate BETWEEN lr.FromDate AND lr.ToDate
 			INNER JOIN #Exchange e ON b.CurrencyID = e.ExchangeId AND b.rptDate = e.ExchangeDate
 		WHERE b.rptDate BETWEEN lr.FromDate AND lr.ToDate
 			AND b.status NOT IN (-1, 101, 102, 103)
 			AND (b.CurrencyID <> 20)
-			AND b.bettype BETWEEN 81 AND 120
 			AND b.customercategory NOT IN (27,28)
 		GROUP BY DATEADD(MONTH, DATEDIFF(MONTH, 0, b.rptDate), 0),lr.PartyID
 	)
@@ -97,8 +98,4 @@ BEGIN
 	DROP TABLE	#Exchange
 	DROP TABLE	#ChargeRate
 END
-
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_NumberGameWinloss] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_Rpt_NumberGameWinloss] TO bodbAdminNet
 GO
