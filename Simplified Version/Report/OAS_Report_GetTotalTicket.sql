@@ -1,10 +1,9 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[OAS_Report_GetTotalTicket_xtest]    Script Date: 07/11/2014 10:28:19 AM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
 
 ALTER PROCEDURE [dbo].[OAS_Report_GetTotalTicket] 
      @NormalLicensee 	VARCHAR(1000)
@@ -22,6 +21,8 @@ AS
  	- 20141103@Florent: use new structure (#25393)
 	- 20150412@Patrick: Add filter by PartyType
 	- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+	- 20181206@bruce: Implement E-sport 2, HP5 [#105723]
+	
  * Param's Explanation:    
  *  - @NormalLicensee : List of normal licensee ID separated by ','  
  *  - @Operator   : List of operator ID separated by ','  
@@ -84,16 +85,12 @@ BEGIN
 			,b.SiteID
 			,SUM(b.betcount)
 		FROM bodb_licenseereport.dbo.rpt_betting b WITH (NOLOCK)
+		INNER JOIN bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB') bt ON bt.Bettype=b.Bettype
 		LEFT JOIN bodb02.dbo.League l WITH (NOLOCK) ON b.leagueid = l.leagueid
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.STATUS NOT IN (- 1, 103)
 			AND b.CurrencyID <> 20
 			AND ISNULL(b.CustomerCategory, 0) NOT IN (27, 28)
-			AND (
-				b.bettype < 31
-				OR b.bettype BETWEEN 121 AND 999
-				OR b.bettype BETWEEN 1301 AND 1399
-				)
 			AND b.bettype NOT IN (9, 29)
 			AND l.Sporttype = convert(VARCHAR(10), @SportID)
 		GROUP BY b.rptDate
@@ -128,16 +125,12 @@ BEGIN
 			,b.SiteID
 			,SUM(b.betcount)
 		FROM bodb_licenseereport.dbo.rpt_betting b WITH (NOLOCK)
+		INNER JOIN bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB') bt ON bt.Bettype=b.Bettype
 		LEFT JOIN bodb02.dbo.League l WITH (NOLOCK) ON b.leagueid = l.leagueid
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.STATUS NOT IN (- 1, 103)
 			AND b.CurrencyID <> 20
 			AND ISNULL(b.CustomerCategory, 0) NOT IN (27, 28)
-			AND (
-				b.bettype < 31
-				OR b.bettype BETWEEN 121 AND 999
-				OR b.bettype BETWEEN 1301 AND 1399
-				)
 		GROUP BY b.rptDate
 			,b.SiteID
 
@@ -453,5 +446,3 @@ BEGIN
 	DROP TABLE #tmpBetting_BA
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_Report_GetTotalTicket] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[OAS_Report_GetTotalTicket] TO bodbAdminNet 

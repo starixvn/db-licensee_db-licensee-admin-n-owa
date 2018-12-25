@@ -1,12 +1,10 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[OA_Rpt_LicenseeCurrencyWinloss]    Script Date: 12/07/2016 02:39:32 ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-/****** Object:  Stored Procedure dbo.OA_Rpt_LicenseeCurrencyWinloss    Script Date: 8/20/2013 1:10:37 PM ******/
-/****** Object:  Stored Procedure dbo.OA_Rpt_LicenseeCurrencyWinloss_xtest    Script Date: 2013-06-05 4:42:57 PM ******/
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+
 ALTER PROCEDURE [dbo].[OA_Rpt_LicenseeCurrencyWinloss]  
  @Licensee		VARCHAR(1000),
  @Currency		INT = 0,
@@ -43,6 +41,7 @@ AS
 	- 20130529@Jim: add RNG Casino 
 	- 20130716@Jim: update matchid for RNG Casino and Bingo
 	- 20160726@Francis: Move SP to bodb_LicenseeReport - [Redmine: #60449]
+	- 20181206@bruce: Implement E-sport 2, HP5 [#105723]
 		
 	Param's Explanation:  
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;  
@@ -165,16 +164,20 @@ BEGIN
 					'LEFT JOIN bodb_Licensee.dbo.LicenseeBATransaction_active BA WITH (NOLOCK) ON s.custid=ba.srecommend and b.transid = ba.transid'	 + char(13) +
 				'WHERE b.winlostdate BETWEEN ''' + convert(varchar(10),@TempFromDate, 120) + ''' AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
 					'AND b.statusID IN (111,112,113)' + char(13) +
-					--'AND b.matchid > 0 '	 + char(13) +
-					'AND ( b.matchid > 0 AND b.bettype < ' + CASE WHEN @ShowSB=1 THEN + ' 31 OR b.bettype BETWEEN 121 AND 999' ELSE '0' END +
+					'AND b.matchid > 0 ' + 
+						CASE WHEN @ShowSB=1 THEN 'AND b.bettype NOT IN (901, 902, 903,904, 911, 912, 913, 914) AND (' 
+							+ 'b.bettype < 31 OR '
+							+ 'b.bettype BETWEEN 121 AND 999 OR '
+							+ 'b.bettype BETWEEN 9001 AND 9399 OR '
+							+ 'b.bettype BETWEEN 1301 AND 1399 ' ELSE 'AND (b.bettype < 0' END +
 						CASE WHEN @ShowRB = 1 THEN ' OR b.bettype BETWEEN 31 AND 33' ELSE '' END + 
-						CASE WHEN @ShowLC=1 THEN ' OR b.bettype BETWEEN 1101 AND 1199' ELSE ''END+char(13)+
-						CASE WHEN @ShowVS=1 THEN ' OR b.bettype BETWEEN 1201 AND 1299' ELSE ''END+char(13)+
-						CASE WHEN @ShowNG = 1 THEN ' OR b.bettype BETWEEN 81 AND 120' ELSE '' END + ')' + char(13) +
-						CASE WHEN @ShowCS=1 THEN 'OR (b.bettype =71 AND b.matchid in (0,71))' ELSE '' END +char(13)+
+						CASE WHEN @ShowLC=1 THEN ' OR b.bettype BETWEEN 1101 AND 1199' ELSE '' END + char(13)+
+						CASE WHEN @ShowVS=1 THEN ' OR b.bettype BETWEEN 1201 AND 1299' ELSE '' END + char(13)+
+						CASE WHEN @ShowNG = 1 THEN ' OR b.bettype BETWEEN 81 AND 120 OR b.bettype BETWEEN 8101 AND 8120' ELSE '' END + char(13) +
+						CASE WHEN @ShowCS=1 THEN ' OR (b.bettype =71 AND b.matchid in (0,71))' ELSE '' END + ')' + char(13)+
 					CASE WHEN @bettype <> 0 THEN ' AND b.bettype = ' + convert(varchar(10), @Bettype)  ELSE '' END + char(13) +
-					'AND BA.transid IS NULL'	 + char(13) +	
-					CASE WHEN @SportID<>0 THEN 'AND ((b.bettype=10 AND l.Sporttype = ' + convert(varchar(10), @SportID) + ') OR (b.bettype NOT IN (9,29,10) AND b.bettype NOT BETWEEN 31 AND 120 AND m.sporttype = ' + convert(varchar(10), @SportID) + '))  ' ELSE '' END + char(13) +
+					' AND BA.transid IS NULL'  + char(13) +
+					CASE WHEN @SportID<>0 THEN ' AND ((b.bettype=10 AND l.Sporttype = ' + convert(varchar(10), @SportID) + ') OR (b.bettype NOT IN (9,29,10) AND b.bettype NOT BETWEEN 31 AND 120 AND m.sporttype = ' + convert(varchar(10), @SportID) + '))  ' ELSE '' END + char(13) +
 					CASE 
 						WHEN @ReportType=1 THEN 'AND b.Liveindicator=1 AND b.bettype NOT IN (9,29,10,31,32,33) '
 						WHEN @ReportType=2 THEN 'AND b.liveindicator=0 '
@@ -240,13 +243,17 @@ BEGIN
 					'INNER JOIN (SELECT VAL FROM strSplit(''' + @Licensee + ''','','')) s ON b.siteid = s.VAL'  + char(13) +
 					'LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID' + char(13) +
 				'WHERE b.rptDate BETWEEN ''' + convert(varchar(10),@FromDate, 120) + ''' AND ''' + convert(varchar(10),@TempToDate, 120) + '''' + char(13) + 
-					'AND b.status NOT IN (-1,103)' + char(13) +
-					'AND (b.bettype < ' + CASE WHEN @ShowSB=1 THEN + ' 31 OR b.bettype BETWEEN 121 AND 999' ELSE '0' END +
+					'AND b.status NOT IN (-1,103)' + char(13) + 'AND ' +
+					CASE WHEN @ShowSB=1 THEN 'b.bettype NOT IN (901, 902, 903,904, 911, 912, 913, 914) AND ('
+						+ 'b.bettype < 31 OR '
+						+ 'b.bettype BETWEEN 121 AND 999 OR '
+						+ 'b.bettype BETWEEN 9001 AND 9399 OR '
+						+ 'b.bettype BETWEEN 1301 AND 1399' ELSE '(b.bettype < 0' END +
 					CASE WHEN @ShowRB = 1 THEN ' OR b.bettype BETWEEN 31 AND 33' ELSE '' END + 
 					CASE WHEN @ShowLC=1 THEN ' OR b.bettype BETWEEN 1101 AND 1199' ELSE ''END+char(13)+
 					CASE WHEN @ShowVS=1 THEN ' OR b.bettype BETWEEN 1201 AND 1299' ELSE ''END+char(13)+
 					CASE WHEN @ShowCS=1 THEN ' OR b.bettype =71' ELSE ''END+char(13)+
-					CASE WHEN @ShowNG = 1 THEN ' OR b.bettype BETWEEN 81 AND 120' ELSE '' END + ')' + char(13) +
+					CASE WHEN @ShowNG = 1 THEN ' OR b.bettype BETWEEN 81 AND 120 OR b.bettype BETWEEN 8101 AND 8120' ELSE '' END + ')' + char(13) +
 					CASE WHEN @Currency <> 0 THEN 'AND CurrencyID=' + convert(varchar(10), @Currency) ELSE '' END + char(13) +
 					CASE WHEN @excludeTest=1 THEN 'AND CurrencyID<>20' ELSE '' END + char(13) +
 					CASE WHEN @bettype <> 0 THEN 'AND b.bettype=' + convert(varchar(10), @bettype) ELSE '' END + char(13) +
@@ -340,6 +347,3 @@ ELSE EXEC(@sql + @output)
  
 END
 GO
-GRANT EXECUTE ON [dbo].[OA_Rpt_LicenseeCurrencyWinloss] TO [bodbAdminNet] AS [dbo]
-GO
-GRANT VIEW DEFINITION ON [dbo].[OA_Rpt_LicenseeCurrencyWinloss] TO [vnteam] AS [dbo]
