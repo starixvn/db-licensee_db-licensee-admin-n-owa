@@ -2,9 +2,6 @@
 USE [bodb02]
 GO
 
-SET ANSI_NULLS ON;
-SET QUOTED_IDENTIFIER ON;
-
 ALTER PROCEDURE [dbo].[OA_Rpt_LicenseeCurrencyWinloss]  
  @Licensee		VARCHAR(1000),
  @Currency		INT = 0,

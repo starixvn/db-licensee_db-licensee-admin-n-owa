@@ -2,9 +2,6 @@
 USE [bodb02]
 GO
 
-SET ANSI_NULLS ON;
-SET QUOTED_IDENTIFIER ON;
-
 ALTER PROCEDURE [dbo].[OAS_Report_GetTotalTicket] 
      @NormalLicensee 	VARCHAR(1000)
 	,@Operator 		VARCHAR(1000)
