@@ -21,8 +21,9 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180904@bruce: Support more platform type in Platform WL reports [#96191]
 		- 20181031@bruce: Cover betfrom 'o' in the report [#103999]
-		- 20181206@bruce: Implement E-sport 2 [#105723]
-		- 20181220@bruce: Cover betfrom 'c' in the report [#106089]
+		- 20181206@bruce: [#105723]
+			+ Implement E-sport 2 [#105723]
+			+ Cover betfrom 'c' in the report
 
 	Explanation:
 		- Desktop: contain the followings:
