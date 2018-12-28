@@ -1,4 +1,4 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 
 ALTER PROCEDURE [dbo].[OA_Rpt_LicenseeCurrencyWinloss_Automail]  
  @Licensee        VARCHAR(1000),
@@ -29,6 +29,7 @@ AS
         -20120814@Henry: add ShowLiveCasino 
         -20160726@Francis: Move SP to bodb_LicenseeReport - [Redmine: #60449]
 		- 20181031@Patrick: DB052 indexes revolution [RedmineID: #103572]
+		- 20181206@bruce: Implement E-sport 2, HP5 [#105723]
         
     Param's Explanation:  
       + @ReportType: 1-Live; 2-Non-Live; 0: All;  
@@ -126,10 +127,10 @@ BEGIN
         SELECT @sql = @sql +
                 'INSERT INTO #tmpWinLoss' + char(13) +
                 'SELECT b.winlostdate,t.LicenseeID,b.currency,' + char(13) +
-                    'SUM(CASE WHEN (b.bettype<31 OR b.bettype BETWEEN 121 AND 999) THEN stake ELSE 0 END *' + char(13) +
+                    'SUM(CASE WHEN (b.bettype<31 OR b.bettype BETWEEN 121 AND 999 OR b.bettype BETWEEN 9001 AND 9399 OR b.bettype BETWEEN 1301 AND 1399) THEN stake ELSE 0 END *' + char(13) +
                     CASE WHEN @drawfilter IN (2,3) THEN ' CASE WHEN b.statusID = 111 THEN 0 WHEN (b.statusID = 112 OR b.statusID = 113)  AND ABS(modds) = 0.25 AND b.bettype IN(1,3,7,8,17,18) THEN 0.5 ELSE 1 END' ELSE '1' END + ') turnoverSB,' + char(13) +
                     
-                    'SUM(CASE WHEN (b.bettype BETWEEN 81 AND 120) THEN stake ELSE 0 END *' + char(13) +
+                    'SUM(CASE WHEN (b.bettype BETWEEN 81 AND 120 OR b.bettype BETWEEN 8101 AND 8120) THEN stake ELSE 0 END *' + char(13) +
                     CASE WHEN @drawfilter IN (2,3) THEN ' CASE WHEN b.statusID = 111 THEN 0 ELSE 1 END' ELSE '1' END + ') turnoverNG,' + char(13) +
                 
                     'SUM(CASE WHEN b.bettype BETWEEN 31 AND 33 THEN CASE WHEN b.bettype in (33, 43) AND b.liveawayscore = 0 THEN stake/2 ELSE stake END ELSE 0 END *' + char(13) +
@@ -144,16 +145,16 @@ BEGIN
                     
                     '0 as turnoverBA,' + char(13) +
                     
-                    'SUM(CASE WHEN (b.bettype<31 OR b.bettype BETWEEN 121 AND 999)  THEN (b.winlost - b.actual_stake) ELSE 0 END ) AS MemWinlossSB,' + char(13) +
-                    'SUM(CASE WHEN (b.bettype BETWEEN 81 AND 120)  THEN (b.winlost - b.actual_stake) ELSE 0 END ) AS MemWinlossNG,' + char(13) +
+                    'SUM(CASE WHEN (b.bettype<31 OR b.bettype BETWEEN 121 AND 999 OR b.bettype BETWEEN 9001 AND 9399 OR b.bettype BETWEEN 1301 AND 1399)  THEN (b.winlost - b.actual_stake) ELSE 0 END ) AS MemWinlossSB,' + char(13) +
+                    'SUM(CASE WHEN (b.bettype BETWEEN 81 AND 120 OR b.bettype BETWEEN 8101 AND 8120)  THEN (b.winlost - b.actual_stake) ELSE 0 END ) AS MemWinlossNG,' + char(13) +
                     'SUM(CASE WHEN b.bettype BETWEEN 31 AND 33 THEN (b.winlost - b.actual_stake) ELSE 0 END ) AS MemWinlossRB,' + char(13) +
                     'SUM(CASE WHEN b.bettype BETWEEN 1101 AND 1199 THEN (b.winlost - b.actual_stake) ELSE 0 END ) AS MemWinlossLC,' + char(13) +
                     'SUM(CASE WHEN b.bettype BETWEEN 1201 AND 1299 THEN (b.winlost - b.actual_stake) ELSE 0 END ) AS MemWinlossVS,' + char(13) +
                     
                     '0 AS MemWinlossBA,' + char(13) +
                     
-                    '- SUM(CASE WHEN (b.bettype<31 OR b.bettype BETWEEN 121 AND 999)  THEN (b.winlost - b.actual_stake) ELSE 0 END) AS WinlossSB ,' + char(13) +
-                    '- SUM(CASE WHEN (b.bettype BETWEEN 81 AND 120)  THEN (b.winlost - b.actual_stake) ELSE 0 END) AS WinlossNG ,' + char(13) +
+                    '- SUM(CASE WHEN (b.bettype<31 OR b.bettype BETWEEN 121 AND 999 OR b.bettype BETWEEN 9001 AND 9399 OR b.bettype BETWEEN 1301 AND 1399)  THEN (b.winlost - b.actual_stake) ELSE 0 END) AS WinlossSB ,' + char(13) +
+                    '- SUM(CASE WHEN (b.bettype BETWEEN 81 AND 120 OR b.bettype BETWEEN 8101 AND 8120)  THEN (b.winlost - b.actual_stake) ELSE 0 END) AS WinlossNG ,' + char(13) +
                     'SUM(CASE WHEN b.bettype BETWEEN 31 AND 33 THEN b.awinlost ELSE 0 END) AS WinlossRB,' + char(13) +
                     '- SUM(CASE WHEN b.bettype BETWEEN 1101 AND 1199 THEN (b.winlost - b.actual_stake) ELSE 0 END) AS WinlossLC,' + char(13) +
                     '- SUM(CASE WHEN b.bettype BETWEEN 1201 AND 1299 THEN (b.winlost - b.actual_stake) ELSE 0 END) AS WinlossVS,' + char(13) +
@@ -161,8 +162,8 @@ BEGIN
                     '- SUM ( CASE WHEN b.bettype BETWEEN 31 AND 33 THEN (b.winlost - b.actual_stake + awinlost + comm) ELSE 0 END) as AmountDueToRB,' + char(13) +
                     '0 as CommBA,' + char(13) +
                     'SUM ( CASE WHEN b.bettype BETWEEN 31 AND 33 THEN (comm) ELSE 0 END) as CommRB,' + char(13) +
-                    '- SUM(CASE WHEN (b.bettype<31 OR b.bettype BETWEEN 121 AND 999) THEN (b.awinlost + b.winlost - b.actual_stake + b.comm) ELSE 0 END)  as AmtDueToSB,' + char(13) +
-                    '- SUM(CASE WHEN (b.bettype BETWEEN 81 AND 120) THEN (b.awinlost + b.winlost - b.actual_stake + b.comm) ELSE 0 END)  as AmtDueToNG,' + char(13) +
+                    '- SUM(CASE WHEN (b.bettype<31 OR b.bettype BETWEEN 121 AND 999 OR b.bettype BETWEEN 9001 AND 9399 OR b.bettype BETWEEN 1301 AND 1399) THEN (b.awinlost + b.winlost - b.actual_stake + b.comm) ELSE 0 END)  as AmtDueToSB,' + char(13) +
+                    '- SUM(CASE WHEN (b.bettype BETWEEN 81 AND 120 OR b.bettype BETWEEN 8101 AND 8120) THEN (b.awinlost + b.winlost - b.actual_stake + b.comm) ELSE 0 END)  as AmtDueToNG,' + char(13) +
                     '- SUM(CASE WHEN (b.bettype BETWEEN 1101 AND 1199) THEN (b.awinlost + b.winlost - b.actual_stake + b.comm) ELSE 0 END)  as AmtDueToLC,' + char(13) +
                     '- SUM(CASE WHEN (b.bettype BETWEEN 1201 AND 1299) THEN (b.awinlost + b.winlost - b.actual_stake + b.comm) ELSE 0 END)  as AmtDueToVS,' + char(13) +
                     'COUNT(b.transid) * ' +  CASE WHEN @drawfilter = 2 THEN 'CASE WHEN b.statusID = 111 THEN 0 ELSE 1 END' ELSE '1' END + ' Betcount' + char(13) +
@@ -176,18 +177,18 @@ BEGIN
                 'WHERE b.winlostdate BETWEEN ''' + convert(varchar(10),@TempFromDate, 120) + ''' AND ''' + convert(varchar(10),@ToDate, 120) + '''' + char(13) +
                     'AND b.statusID IN (111,112,113)' + char(13) +
                     'AND b.matchid > 0 '     + char(13) +
-                    'AND (b.bettype < ' + CASE WHEN @ShowSB=1 THEN + ' 31 OR b.bettype BETWEEN 121 AND 999' ELSE '0' END +
+                    'AND (b.bettype < ' + CASE WHEN @ShowSB=1 THEN + ' 31 OR b.bettype BETWEEN 121 AND 999 OR b.bettype BETWEEN 9001 AND 9399 OR b.bettype BETWEEN 1301 AND 1399' ELSE '0' END +
                         CASE WHEN @ShowRB = 1 THEN ' OR b.bettype BETWEEN 31 AND 33' ELSE '' END + 
                         CASE WHEN @ShowLC = 1 THEN ' OR b.bettype BETWEEN 1101 AND 1199' ELSE '' END + 
                         CASE WHEN @ShowVS = 1 THEN ' OR b.bettype BETWEEN 1201 AND 1299' ELSE '' END + 
-                        CASE WHEN @ShowNG = 1 THEN ' OR b.bettype BETWEEN 81 AND 120' ELSE '' END + ')' + char(13) +
+                        CASE WHEN @ShowNG = 1 THEN ' OR b.bettype BETWEEN 81 AND 120 OR b.bettype BETWEEN 8101 AND 8120' ELSE '' END + ')' + char(13) +
                     CASE WHEN @bettype <> 0 THEN ' AND b.bettype = ' + convert(varchar(10), @Bettype)  ELSE '' END + char(13) +
                     'AND BA.transid IS NULL'     + char(13) +    
                     CASE WHEN @SportID<>0 THEN 'AND ((b.bettype=10 AND l.Sporttype = ' + convert(varchar(10), @SportID) + ') OR (b.bettype NOT IN (9,29,10) AND b.bettype NOT BETWEEN 31 AND 120 AND m.sporttype = ' + convert(varchar(10), @SportID) + '))  ' ELSE '' END + char(13) +
                     CASE 
                         WHEN @ReportType=1 THEN 'AND b.Liveindicator=1 AND b.bettype NOT IN (9,29,10,31,32,33) '
                         WHEN @ReportType=2 THEN 'AND b.liveindicator=0 '
-                        ELSE '' END + char(13) +
+                        ELSE '' END + char(13) + ' AND b.bettype NOT IN (901, 902, 903,904, 911, 912, 913, 914) ' +
                 'GROUP BY b.winlostdate, t.LicenseeID,b.currency, b.bettype  , b.statusID'    + char(13)        
     END
 END        
@@ -235,10 +236,10 @@ BEGIN
         SELECT @sql2 = @sql2 +
                 'INSERT INTO #tmpWinLoss' + char(13) +
                 'SELECT b.rptDate,b.siteID,b.currencyID,'  + char(13) +
-                    'SUM(CASE WHEN (b.bettype<31 OR b.bettype BETWEEN 121 AND 999) THEN turnover ELSE 0 END *' + char(13) +
+                    'SUM(CASE WHEN (b.bettype<31 OR b.bettype BETWEEN 121 AND 999 OR b.bettype BETWEEN 9001 AND 9399 OR b.bettype BETWEEN 1301 AND 1399) THEN turnover ELSE 0 END *' + char(13) +
                     CASE WHEN @drawfilter IN (2,3) THEN 'CASE WHEN b.status = 111  THEN 0 WHEN b.status IN (114,115) THEN 0.5 ELSE 1 END' ELSE '1' END + ') turnoverSB,' +  char(13) +
                 
-                    'SUM(CASE WHEN (b.bettype BETWEEN 81 AND 120) THEN turnover ELSE 0 END *' + char(13) +
+                    'SUM(CASE WHEN (b.bettype BETWEEN 81 AND 120 OR b.bettype BETWEEN 8101 AND 8120) THEN turnover ELSE 0 END *' + char(13) +
                     CASE WHEN @drawfilter IN (2,3) THEN 'CASE WHEN b.status = 111  THEN 0 WHEN b.status IN (114,115) THEN 0.5 ELSE 1 END' ELSE '1' END + ') turnoverNG,' +  char(13) +
                 
                     'SUM(CASE WHEN (b.bettype BETWEEN 31 AND 33) THEN turnover ELSE 0 END * CASE WHEN b.bettype=33 AND b.status IN (114,115) THEN 0.5 ELSE 1 END *' + char(13) +
@@ -253,8 +254,8 @@ BEGIN
                     
                     '0 as turnoverBA,' + char(13) +
                     
-                    'SUM(CASE WHEN (b.bettype<31 OR b.bettype BETWEEN 121 AND 999)  THEN (b.winloss) ELSE 0 END ) AS MemWinlossSB,' + char(13) +
-                    'SUM(CASE WHEN (b.bettype BETWEEN 81 AND 120)  THEN (b.winloss) ELSE 0 END ) AS MemWinlossNG,' + char(13) +
+                    'SUM(CASE WHEN (b.bettype<31 OR b.bettype BETWEEN 121 AND 999 OR b.bettype BETWEEN 9001 AND 9399 OR b.bettype BETWEEN 1301 AND 1399)  THEN (b.winloss) ELSE 0 END ) AS MemWinlossSB,' + char(13) +
+                    'SUM(CASE WHEN (b.bettype BETWEEN 81 AND 120 OR b.bettype BETWEEN 8101 AND 8120)  THEN (b.winloss) ELSE 0 END ) AS MemWinlossNG,' + char(13) +
                     'SUM(CASE WHEN b.bettype BETWEEN 31 AND 33 THEN (b.winloss) ELSE 0 END ) AS MemWinlossRB,' + char(13) +
                     'SUM(CASE WHEN (b.bettype BETWEEN 1101 AND 1199)  THEN (b.winloss) ELSE 0 END ) AS MemWinlossLC,' + char(13) +
                     'SUM(CASE WHEN (b.bettype BETWEEN 1201 AND 1299)  THEN (b.winloss) ELSE 0 END ) AS MemWinlossVS,' + char(13) +
@@ -262,8 +263,8 @@ BEGIN
                     '0 AS MemWinlossBA,' + char(13) +
                     
                     
-                    '- SUM(CASE WHEN (b.bettype<31 OR b.bettype BETWEEN 121 AND 999)  THEN b.winloss ELSE 0 END) AS WinlossSB ,'+ char(13) +
-                    '- SUM(CASE WHEN (b.bettype BETWEEN 81 AND 120)  THEN b.winloss ELSE 0 END) AS WinlossNG ,'+ char(13) +
+                    '- SUM(CASE WHEN (b.bettype<31 OR b.bettype BETWEEN 121 AND 999 OR b.bettype BETWEEN 9001 AND 9399 OR b.bettype BETWEEN 1301 AND 1399)  THEN b.winloss ELSE 0 END) AS WinlossSB ,'+ char(13) +
+                    '- SUM(CASE WHEN (b.bettype BETWEEN 81 AND 120 OR b.bettype BETWEEN 8101 AND 8120)  THEN b.winloss ELSE 0 END) AS WinlossNG ,'+ char(13) +
                     'SUM(CASE WHEN b.bettype BETWEEN 31 AND 33 THEN b.WinlossA ELSE 0 END) AS WinlossRB,' + char(13) +
                     '- SUM(CASE WHEN (b.bettype BETWEEN 1101 AND 1199)  THEN b.winloss ELSE 0 END) AS WinlossLC ,'+ char(13) +
                     '- SUM(CASE WHEN (b.bettype BETWEEN 1201 AND 1299)  THEN b.winloss ELSE 0 END) AS WinlossVS ,'+ char(13) +
@@ -271,8 +272,8 @@ BEGIN
                     '- SUM ( CASE WHEN b.bettype BETWEEN 31 AND 33 THEN (b.winloss+b.winlossA+b.CommissionA) ELSE 0 END) as AmountDueToRB,' + char(13) +
                     '0 as CommBA,' + char(13) +
                     'SUM ( CASE WHEN b.bettype BETWEEN 31 AND 33 THEN CommissionA ELSE 0 END) as CommRB,' + char(13) +
-                    '- SUM(CASE WHEN (b.bettype<31 OR b.bettype BETWEEN 121 AND 999) THEN b.winlossA + b.winloss + b.CommissionA ELSE 0 END)  as AmtDueToSB   ,' + char(13) +
-                    '- SUM(CASE WHEN (b.bettype BETWEEN 81 AND 120) THEN b.winlossA + b.winloss + b.CommissionA ELSE 0 END)  as AmtDueToNG   ,' + char(13) +
+                    '- SUM(CASE WHEN (b.bettype<31 OR b.bettype BETWEEN 121 AND 999 OR b.bettype BETWEEN 9001 AND 9399 OR b.bettype BETWEEN 1301 AND 1399) THEN b.winlossA + b.winloss + b.CommissionA ELSE 0 END)  as AmtDueToSB   ,' + char(13) +
+                    '- SUM(CASE WHEN (b.bettype BETWEEN 81 AND 120 OR b.bettype BETWEEN 8101 AND 8120) THEN b.winlossA + b.winloss + b.CommissionA ELSE 0 END)  as AmtDueToNG   ,' + char(13) +
                     '- SUM(CASE WHEN (b.bettype BETWEEN 1101 AND 1199) THEN b.winlossA + b.winloss + b.CommissionA ELSE 0 END)  as AmtDueToLC   ,' + char(13) +
                     '- SUM(CASE WHEN (b.bettype BETWEEN 1201 AND 1299) THEN b.winlossA + b.winloss + b.CommissionA ELSE 0 END)  as AmtDueToVS   ,' + char(13) +
                     'SUM(b.betcount) * ' +  CASE WHEN @drawfilter = 2 THEN 'CASE WHEN b.status = 111 THEN 0 ELSE 1 END' ELSE '1' END + ' Betcount' + char(13) +
@@ -282,11 +283,11 @@ BEGIN
                     'LEFT JOIN league l WITH (NOLOCK) ON b.LeagueID = l.LeagueID' + char(13) +
                 'WHERE b.rptDate BETWEEN ''' + convert(varchar(10),@FromDate, 120) + ''' AND ''' + convert(varchar(10),@TempToDate, 120) + '''' + char(13) + 
                     'AND b.status NOT IN (-1,103)' + char(13) +
-                    'AND (b.bettype < ' + CASE WHEN @ShowSB=1 THEN + ' 31 OR b.bettype BETWEEN 121 AND 999' ELSE '0' END +
+                    'AND (b.bettype < ' + CASE WHEN @ShowSB=1 THEN + ' 31 OR b.bettype BETWEEN 121 AND 999 OR b.bettype BETWEEN 9001 AND 9399 OR b.bettype BETWEEN 1301 AND 1399' ELSE '0' END +
                         CASE WHEN @ShowRB = 1 THEN ' OR b.bettype BETWEEN 31 AND 33' ELSE '' END + 
                         CASE WHEN @ShowLC = 1 THEN ' OR b.bettype BETWEEN 1101 AND 1199' ELSE '' END + 
                         CASE WHEN @ShowVS = 1 THEN ' OR b.bettype BETWEEN 1201 AND 1299' ELSE '' END + 
-                        CASE WHEN @ShowNG = 1 THEN ' OR b.bettype BETWEEN 81 AND 120' ELSE '' END + ')' + char(13) +
+                        CASE WHEN @ShowNG = 1 THEN ' OR b.bettype BETWEEN 81 AND 120 OR b.bettype BETWEEN 8101 AND 8120' ELSE '' END + ')' + char(13) +
                     CASE WHEN @Currency <> 0 THEN 'AND CurrencyID=' + convert(varchar(10), @Currency) ELSE '' END + char(13) +
                     CASE WHEN @excludeTest=1 THEN 'AND CurrencyID<>20' ELSE '' END + char(13) +
                     CASE WHEN @bettype <> 0 THEN 'AND b.bettype=' + convert(varchar(10), @bettype) ELSE '' END + char(13) +
@@ -294,7 +295,7 @@ BEGIN
                     CASE 
                         WHEN @ReportType=1 THEN 'AND b.IsLive=1 AND b.bettype NOT IN (9,29,10,31,32,33) '
                         WHEN @ReportType=2 THEN 'AND b.IsLive=0 '
-                        ELSE '' END + char(13) +
+                        ELSE '' END + char(13) + ' AND b.bettype NOT IN (901, 902, 903,904, 911, 912, 913, 914) ' + char(13) +
                 'GROUP BY  b.rptDate,  b.siteID,   b.currencyID,b.status' +  char(13) 
     END
             
@@ -444,9 +445,4 @@ END
 ELSE EXEC(@sql +  @sql2 + @output)
  
 END
-
-
 GO
-GRANT EXECUTE ON [dbo].[OA_Rpt_LicenseeCurrencyWinloss_Automail] TO [bodbAdminNet] AS [dbo]
-GO
-GRANT VIEW DEFINITION ON [dbo].[OA_Rpt_LicenseeCurrencyWinloss_Automail] TO [vnteam] AS [dbo]

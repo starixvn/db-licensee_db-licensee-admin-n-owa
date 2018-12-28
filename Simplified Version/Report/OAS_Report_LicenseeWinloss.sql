@@ -1,9 +1,5 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
-GO
-SET ANSI_NULLS ON
-GO
-
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[OAS_Report_LicenseeWinloss] 
@@ -33,6 +29,7 @@ AS
 	- 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
 	- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	- 20170405@Harper: #73310 - Remove Cashout Bettype
+	- 20181206@bruce: Implement E-sport 2, HP5 [#105723]
  * 
  * Param's Explanation:    
  *  - @ID   : Party ID  (include: LicenseeID, ResellerID)
@@ -180,14 +177,9 @@ BEGIN
 				END BetCount
 			,SUM(playercomm) AS Playercomm
 		FROM dbo.bettrans b WITH (NOLOCK)
+		INNER JOIN bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB') bt ON bt.Bettype=b.Bettype
 			 INNER JOIN @tmpAg ag ON b.recommend = ag.CustID AND b.currency=ag.currency
 		WHERE b.winlostdate BETWEEN @TempFromDate AND @TDate
-			/*AND Recommend IN (
-				SELECT custid
-				FROM @tmpAg
-				)*/
-			AND (Bettype < 31  OR (Bettype BETWEEN 121 AND 999) OR (Bettype BETWEEN 1301 AND 1399))
-			AND b.bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914) -- bettrade- Cashout bettypes
 			AND b.ruben = 1
 			AND b.statusID NOT IN (101, 102, 103)
 			AND tpositiontaking <> 0
@@ -240,11 +232,6 @@ BEGIN
 		WHERE b.Winlostdate BETWEEN @FDate AND @TempToDate
 			AND b.sporttype = 0 --just only sportsbook
 			AND b.roleid = 2
-			/*AND b.Recommend IN (
-				SELECT custid
-				FROM @tmpAg
-				)
-			 */
 			AND b.bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914)-- bettrade - Cashout bettypes
 			AND b.statusID <> 101
 			AND ISNULL(b.isBA, 0) = 0
@@ -299,11 +286,7 @@ BEGIN
 			 INNER JOIN @tmpAg ag ON b.recommend = ag.CustID AND b.Currency=ag.currency
 		WHERE b.Winlostdate BETWEEN @FDate AND @TempToDate
 			AND b.sporttype = 0 --just only sportsbook
-			AND b.roleid = 2
-			/*AND b.Recommend IN (
-				SELECT custid
-				FROM @tmpAg
-				)*/
+			AND b.roleid = 2			
 			AND b.statusID <> 101
 			AND ISNULL(b.isBA, 0) = 0
 		GROUP BY b.winlostdate
@@ -436,6 +419,3 @@ BEGIN
 	DROP TABLE #Exchange1
 END
 GO
-GRANT EXECUTE ON [dbo].[OAS_Report_LicenseeWinloss] TO [bodbAdminNet] AS [dbo]
-GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_Report_LicenseeWinloss] TO [vnteam] AS [dbo]

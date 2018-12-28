@@ -1,9 +1,5 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
-GO
-/****** Object:  StoredProcedure [dbo].[OAS_Report_NumberGameWinloss]    Script Date: 17/11/2014 11:22:04 AM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[OAS_Report_NumberGameWinloss] 
@@ -27,6 +23,7 @@ AS
  	- 20150202@Florent: base currency GBP
 	- 20150412@Patrick: Add filter by PartyType
 	- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+	- 20181206@bruce: HP5 [#105723]
 	
  * Param's Explanation:    
 	- @Currency: 0 : All
@@ -220,7 +217,7 @@ BEGIN
 			AND b.rptDate BETWEEN lr.FromDate AND lr.ToDate
 			AND b.STATUS NOT IN (- 1, 103)
 			AND CurrencyID <> 20
-			AND bettype BETWEEN 81 AND 120
+			AND (bettype BETWEEN 81 AND 120 OR bettype BETWEEN 8101 AND 8120)
 					--Exclude Licensees from Starlit, BA(FDL)
 			AND lr.ToPartyID NOT IN (
 				SELECT PartyID
@@ -293,7 +290,7 @@ BEGIN
 			AND b.rptDate BETWEEN lr.FromDate AND lr.ToDate
 			AND b.STATUS NOT IN (- 1, 103)
 			AND CurrencyID <> 20
-			AND bettype BETWEEN 81 AND 120
+			AND (bettype BETWEEN 81 AND 120 OR bettype BETWEEN 8101 AND 8120)
 			AND b.customercategory NOT IN (27, 28)
 			AND (
 				@Currency <= 0
@@ -678,5 +675,3 @@ BEGIN
 END
 
 GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_Report_NumberGameWinloss] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[OAS_Report_NumberGameWinloss] TO bodbAdminNet 
