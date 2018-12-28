@@ -236,7 +236,7 @@ BEGIN
         SELECT @sql2 = @sql2 +
                 'INSERT INTO #tmpWinLoss' + char(13) +
                 'SELECT b.rptDate,b.siteID,b.currencyID,'  + char(13) +
-                    'SUM(CASE WHEN (b.bettype<31 OR b.bettype BETWEEN 121 AND 999) THEN turnover ELSE 0 END *' + char(13) +
+                    'SUM(CASE WHEN (b.bettype<31 OR b.bettype BETWEEN 121 AND 999 OR b.bettype BETWEEN 9001 AND 9399 OR b.bettype BETWEEN 1301 AND 1399) THEN turnover ELSE 0 END *' + char(13) +
                     CASE WHEN @drawfilter IN (2,3) THEN 'CASE WHEN b.status = 111  THEN 0 WHEN b.status IN (114,115) THEN 0.5 ELSE 1 END' ELSE '1' END + ') turnoverSB,' +  char(13) +
                 
                     'SUM(CASE WHEN (b.bettype BETWEEN 81 AND 120 OR b.bettype BETWEEN 8101 AND 8120) THEN turnover ELSE 0 END *' + char(13) +
@@ -295,7 +295,7 @@ BEGIN
                     CASE 
                         WHEN @ReportType=1 THEN 'AND b.IsLive=1 AND b.bettype NOT IN (9,29,10,31,32,33) '
                         WHEN @ReportType=2 THEN 'AND b.IsLive=0 '
-                        ELSE '' END + char(13) + ' AND b.bettype NOT IN (901, 902, 903,904, 911, 912, 913, 914) ' +
+                        ELSE '' END + char(13) + ' AND b.bettype NOT IN (901, 902, 903,904, 911, 912, 913, 914) ' + char(13) +
                 'GROUP BY  b.rptDate,  b.siteID,   b.currencyID,b.status' +  char(13) 
     END
             
