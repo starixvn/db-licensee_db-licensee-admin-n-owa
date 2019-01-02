@@ -18,7 +18,8 @@ AS
 	Revisions: 
 		+ 20150807@Bravo: Charge rate Info - Get
 		+ 20170802@Bruce: @ProductCode => @ProductCodes [#79905]
-		- 20180716@bruce: add new group TEST for credit [#98126]
+		+ 20180716@bruce: add new group TEST for credit [#98126]
+		+ 20190102@bruce: include charge type [#107363]
 */
 /*	Example:
 	USE bodb_licensee
@@ -40,48 +41,54 @@ BEGIN
 	-- Region: Get party charge rate info	
 	DECLARE @PartyChargeInfo AS TABLE (
 		PartyId		INT,
-		LicenseeId	INT,
 		ProductID	INT,
 		Rate		MONEY,
 		FromDate	SMALLDATETIME,
 		ToDate		SMALLDATETIME,
-		RowNumber	INT)
+		RowNumber	INT,
+		ChargeType	INT)
 
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, RowNumber)
+	INSERT INTO @PartyChargeInfo(PartyId, ProductID, Rate, Fromdate, Todate, RowNumber, ChargeType)
 	(
-		SELECT	PartyID, LicenseeID, ProductID, MAX(DI_Rate), Fromdate, Todate, ROW_NUMBER() OVER (ORDER BY ProductId, Todate)
+		SELECT	PartyID, ProductID, MAX(DI_Rate), Fromdate, Todate, ROW_NUMBER() OVER (ORDER BY ProductId, Todate), ChargeType
 		FROM	dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
-		GROUP BY PartyID,LicenseeID,ProductID,Fromdate,Todate
+		GROUP BY PartyID,ProductID,Fromdate,Todate,ChargeType
 	)		
 	
 	-- End Region
 	
 	-- Region: Product Code
 	DECLARE @Products AS TABLE(
-			ProductId	INT,
-			ProductCode VARCHAR(10),
-			ProductName VARCHAR(200)
+		ProductId	INT,
+		ProductCode	VARCHAR(10),
+		ProductName	VARCHAR(200)
 	)
 	INSERT INTO @Products(ProductId,ProductCode, ProductName)
 	SELECT DISTINCT
 			i.ProductId,
 			CASE 
-				WHEN i.ProductId = 0 THEN 'SB' 
+				WHEN i.ProductId = 0 THEN 'SB'
 				ELSE p.ProductPrefix
 			END AS ProductCode,
 			CASE 
-				WHEN i.ProductId = 0 THEN 'Sportsbook' 
+				WHEN i.ProductId = 0 THEN 'Sportsbook'
 				ELSE p.ProductName
-			END AS ProductName			
-	FROM	@PartyChargeInfo i  
-			LEFT JOIN dbo.Product3rd p ON i.ProductId = p.Productid	
+			END AS ProductName
+	FROM	@PartyChargeInfo i
+			LEFT JOIN dbo.Product3rd p ON i.ProductId = p.Productid
 	-- End Region
-	
-	SELECT	c.*, p.ProductCode, p.ProductName
-	FROM	@PartyChargeInfo c INNER JOIN @Products p ON c.ProductID = p.ProductId	
-END		
-GO
 
-GRANT EXECUTE ON [dbo].[LA_Inv_ChargeRateInfoGet] TO bodbAdminNet
+	SELECT c.PartyId
+		, c.ProductID
+		, c.Rate
+		, c.FromDate
+		, c.ToDate
+		, c.RowNumber
+		, p.ProductCode
+		, p.ProductName
+		, c.ChargeType
+	FROM @PartyChargeInfo c INNER JOIN @Products p ON c.ProductID = p.ProductId
+	ORDER BY c.RowNumber
+END
 GO
