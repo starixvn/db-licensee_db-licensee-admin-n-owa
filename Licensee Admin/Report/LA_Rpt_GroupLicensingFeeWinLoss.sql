@@ -120,17 +120,7 @@ BEGIN
 			WHERE ci.ProductID=@GD_Product 
 				AND b.BetTypeId <> @GD_Tip 
 				AND ci.ChargeType=1 -- gross win
-			GROUP BY ci.PartyID, ci.ProductID, b.Currency
-
-			UNION ALL
-			-- tip amount
-			SELECT ci.PartyID, ci.ProductID, b.Currency, SUM(-b.Winloss * ci.Rate)
-			FROM #Data b WITH (NOLOCK)
-				INNER JOIN @ChargeInfo ci ON ci.LicenseeID = b.PartyID AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
-			WHERE ci.ProductID=@GD_Product 
-				AND b.BetTypeId = @GD_Tip 
-				AND ci.ChargeType=12 -- GD tip
-			GROUP BY ci.PartyID, ci.ProductID, b.Currency
+			GROUP BY ci.PartyID, ci.ProductID, b.Currency			
 		)
 	END
 
