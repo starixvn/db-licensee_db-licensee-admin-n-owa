@@ -229,9 +229,9 @@ BEGIN
 		LEFT JOIN @Exchange ex 
 			ON b.CurrencyId = ex.Currency
 	)
-	SELECT PartyName, CurrencyName, ProductName, Sum(AmountToCompany) AS AmountToCompany
+	SELECT PartyName, CurrencyName, ProductName, ProductId, Sum(AmountToCompany) AS AmountToCompany
 	FROM tmpResult t
-	GROUP BY PartyName, CurrencyName, ProductName	
+	GROUP BY PartyName, CurrencyName, ProductName, ProductId	
 	
 	/* Remove temp tables */
 	DROP TABLE #Report
