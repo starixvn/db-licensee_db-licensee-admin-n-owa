@@ -176,9 +176,35 @@ BEGIN
 	UPDATE e
 	SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'
 	FROM @Exchange e
-	WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1)
-	
+	WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1)	
 
+	/* Add data for products with no ticket*/
+	DECLARE @Currencies TABLE(CurrencyID INT, IsUsed BIT)
+	DECLARE @TempCurrency INT	
+
+	INSERT INTO @Currencies(CurrencyID)
+	SELECT DISTINCT CurrencyID 
+	FROM #Report
+
+	WHILE EXISTS (SELECT * FROM @Currencies WHERE IsUsed IS NULL)
+	BEGIN
+	   SET @TempCurrency = (SELECT TOP 1 CurrencyID FROM @Currencies WHERE IsUsed IS NULL)
+	   
+	   INSERT INTO #Report (PartyID, ProductID, CurrencyID, Company)
+	   SELECT tmp.PartyId, tmp.ProductId, @TempCurrency, 0
+	   FROM 		 
+		(
+		    SELECT DISTINCT PartyId, ProductId
+		    FROM @ChargeInfo
+		    EXCEPT
+		    SELECT DISTINCT PartyId, ProductId
+		    FROM #Report 
+		    WHERE CurrencyID = @TempCurrency
+		) tmp
+
+	   UPDATE @Currencies SET IsUsed = 1 WHERE CurrencyID = @TempCurrency
+	END
+	
 	/* Result */
 	;WITH tmpResult AS (
 		SELECT b.PartyID
