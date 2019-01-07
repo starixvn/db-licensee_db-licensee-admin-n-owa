@@ -163,29 +163,40 @@ BEGIN
 	/* Add data for products with no ticket*/
 	DECLARE @Currencies TABLE(CurrencyID INT, IsUsed BIT)
 	DECLARE @TempCurrency INT	
+	DECLARE @ChargeInfoPartyProducts TABLE(PartyId INT, ProductId INT, CurrencyID INT DEFAULT NULL)
 
 	INSERT INTO @Currencies(CurrencyID)
 	SELECT DISTINCT CurrencyID 
 	FROM #Report
-
+	
+	INSERT @ChargeInfoPartyProducts(PartyId, ProductId)
+	SELECT DISTINCT PartyId, ProductId
+	FROM @ChargeInfo
+	
 	WHILE EXISTS (SELECT * FROM @Currencies WHERE IsUsed IS NULL)
 	BEGIN
 	   SET @TempCurrency = (SELECT TOP 1 CurrencyID FROM @Currencies WHERE IsUsed IS NULL)
 	   
-	   INSERT INTO #Report (PartyID, ProductID, CurrencyID, Company)
-	   SELECT tmp.PartyId, tmp.ProductId, @TempCurrency, 0
-	   FROM 		 
-		(
-		    SELECT DISTINCT PartyId, ProductId
-		    FROM @ChargeInfo
-		    EXCEPT
-		    SELECT DISTINCT PartyId, ProductId
-		    FROM #Report 
-		    WHERE CurrencyID = @TempCurrency
-		) tmp
+	   INSERT INTO @ChargeInfoPartyProducts(PartyId, ProductId, CurrencyID)
+	   SELECT PartyId, ProductId, @TempCurrency
+	   FROM @ChargeInfoPartyProducts
+	   WHERE CurrencyID IS NULL
 
 	   UPDATE @Currencies SET IsUsed = 1 WHERE CurrencyID = @TempCurrency
 	END
+	
+	INSERT INTO #Report (PartyID, ProductID, CurrencyID, Company)
+    SELECT tmp.PartyId, tmp.ProductId, tmp.CurrencyID, 0
+    FROM 		 
+	(
+		SELECT c.PartyId, c.ProductId, c.CurrencyID
+		FROM (SELECT * FROM @ChargeInfoPartyProducts WHERE CurrencyID IS NOT NULL) c
+		LEFT JOIN #Report r 
+			ON c.PartyId = r.PartyId 
+				AND c.ProductId = r.ProductId
+				AND c.CurrencyID = r.CurrencyID
+		WHERE r.PartyId IS NULL		
+	) tmp	
 	
 	/* Result */
 	;WITH tmpResult AS (
