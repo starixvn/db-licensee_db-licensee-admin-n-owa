@@ -31,7 +31,7 @@ BEGIN
 	INSERT INTO @ChargeInfo(PartyID, LicenseeID, ProductID, Rate, Fromdate, Todate)
 	SELECT DISTINCT PartyID, LicenseeID, ProductID, CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END, Fromdate, Todate		
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
-	WHERE ProductId <> @GD_Product OR (ProductId = @GD_Product AND ChargeType = 1)
+	WHERE ChargeType <> 12 -- Exclude for GD Tips
 	
 	/* BA Product */
 	DECLARE @BA_Product INT = 3
