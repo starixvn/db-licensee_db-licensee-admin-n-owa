@@ -7,8 +7,8 @@ SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 GO
 
-ALTER PROCEDURE dbo.LA_GetReportSettings
-	@ReportSettingName		NVARCHAR(100)
+CREATE PROCEDURE dbo.LA_GetSettings
+	@Key		VARCHAR(100)
 AS
 /*	Created: 20181203@Parsons
 	Task: LA-Licensee Performance Alert
@@ -18,13 +18,13 @@ AS
 		- 20181203@Parsons: LA - Licensee Performance Alert [#104918]
 
 	Param's Explanation:
-	EXEC LA_GetReportSettings @ReportSettingName = N'LicenseePerformanceAlert'
+	EXEC LA_GetSettings 'LicenseePerformanceAlert'
 */
 BEGIN
 	SET NOCOUNT ON;
 
-	SELECT ConfigReportSetting
-	FROM dbo.LA_ReportSettings WITH(NOLOCK) 
-	WHERE @ReportSettingName = ReportSettingName
+	SELECT [Value]
+	FROM dbo.LA_Settings WITH(NOLOCK)
+	WHERE @Key = [Key]
 END
 GO
