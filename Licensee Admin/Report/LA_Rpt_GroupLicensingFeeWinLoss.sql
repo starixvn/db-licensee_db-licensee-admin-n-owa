@@ -138,10 +138,10 @@ BEGIN
 	END	
 	
 	/* Exchange */
-	DECLARE @Exchange AS TABLE (Currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
+	DECLARE @Exchange AS TABLE (Currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20), OriginalCurrencyCode VARCHAR(20))
 
-	INSERT INTO @Exchange(Currency, CurrencyName, CurrencyCode)
-	SELECT e.exchangeid, e.currency, e.Code
+	INSERT INTO @Exchange(Currency, CurrencyName, CurrencyCode, OriginalCurrencyCode)
+	SELECT e.exchangeid, e.currency, e.Code, e.Code
 	FROM bodb02.dbo.Exchange e WITH (NOLOCK)
 	WHERE e.exchangeid IN (SELECT DISTINCT CurrencyID FROM #Report)
 	
@@ -210,7 +210,9 @@ BEGIN
 			, ex.CurrencyCode AS CurrencyName
 			, b.ProductId
 			, prd.ProductName
-			, Company AS AmountToCompany
+			, CASE WHEN ex.OriginalCurrencyCode IN ('VND', 'IDR') THEN Company * 1000
+					ELSE Company 
+					END AS AmountToCompany
 		FROM #Report b
 		INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) 
 			ON p.PartyID = b.PartyID
