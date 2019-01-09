@@ -10,6 +10,7 @@ GO
 ALTER PROCEDURE dbo.LA_ModifySettings
 	@Key		VARCHAR(100),
 	@Value		VARCHAR(8000),
+	@UserId		INT,
 	@ErrCode	INT = 0				OUTPUT, 
 	@ErrMsg		VARCHAR(4000)= ''	OUTPUT
 AS
@@ -29,7 +30,7 @@ BEGIN
 
 	IF(EXISTS(SELECT TOP 1 1 FROM dbo.LA_Settings WITH(NOLOCK) WHERE @Key = [Key]))
 	BEGIN
-		UPDATE dbo.LA_Settings 
+		UPDATE dbo.LA_Settings WITH(ROWLOCK,UPDLOCK)
 		SET [Value] = @Value
 		WHERE @Key = [Key]
 	END
@@ -38,6 +39,16 @@ BEGIN
 		INSERT dbo.LA_Settings ([Key], [Value])
 		VALUES (@Key, @Value)
 	END
+
+	DECLARE @Doing NVARCHAR(MAX) = (SELECT @Key AS [Key], @Value AS [Value] FOR XML PATH(''))
+
+	EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_UserControl
+		@custid = 0,
+		@doing = @Doing,
+		@userid = @UserId,
+		@typeid = 0,
+		@actionid = 1,
+		@duration = 0
 
 	IF @@ERROR <> 0
 	BEGIN
