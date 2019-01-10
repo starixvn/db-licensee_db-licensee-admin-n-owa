@@ -58,7 +58,7 @@ BEGIN
 		@StartRun		DATETIME, 
 		@EndRun			DATETIME, 
 		@Duration		INT, 
-		@LogSPData		NVARCHAR(MAX) 
+		@Doing			NVARCHAR(MAX)
 
 	SET @StartRun = GETDATE()
 
@@ -146,54 +146,36 @@ BEGIN
 	END
 
 	-- #Region: Write Log
-	SET @LogSPData = CAST((SELECT
-						@NonOfficialPartyId	AS '@nop',
-						@LicenseeId			AS 'li',
-						@LicenseeName		AS 'ln',
-						@BrandName			AS 'bn',
-						@BaseCurrencyId		AS 'bci',
-						@LaunchDate			AS 'ld', 
-						@Minfee				AS 'mf',
-						@Waivemonth			AS 'wm',
-						@GroupId			AS 'gi',
-						@ProductIds			AS 'pis', 
-						@UserNames			AS 'uns', 
-						@FunctionKeys		AS 'fks', 
-						@ChargeInfoSettingData	AS 'cisd'
-						FOR XML PATH('z'), ROOT('r')
-					) AS VARCHAR(MAX))
-
 	SET @EndRun = GETDATE()
 	SET @Duration = DATEDIFF(MILLISECOND, @StartRun, @EndRun)
 
-	-- Get log action
-	DECLARE @ActionID INT = 0
-	SELECT @ActionID = ActionId
-	FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
-	WHERE SPName = 'LA_LaunchLicensee'
+	SET @Doing =(SELECT		@NonOfficialPartyId	AS NonOfficialPartyId,
+							@LicenseeId			AS LicenseeId,
+							@LicenseeName		AS LicenseeName,
+							@BrandName			AS BrandName,
+							@BaseCurrencyId		AS BaseCurrencyId,
+							@LaunchDate			AS LaunchDate, 
+							@Minfee				AS Minfee,
+							@Waivemonth			AS Waivemonth,
+							@GroupId			AS GroupId,
+							@ProductIds			AS ProductIds, 
+							@UserNames			AS UserNames, 
+							@FunctionKeys		AS FunctionKeys, 
+							@ChargeInfoSettingData	AS ChargeInfoSettingData
+							FOR XML PATH('')) 
 
-	BEGIN TRY
-		EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog 
-			@UserId = @UserID
-			, @IP = @LoginIP
-			, @LicenseeID = 0
-			, @CurrencyID = 0
-			, @SPName = 'LA_LaunchLicensee'
-			, @CustId = 0
-			, @ActionId = @ActionID
-			, @Duration = @Duration
-			, @Data = @LogSPData
-			, @OldData = ''
-	END TRY
-	BEGIN CATCH
-		EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP 
-			@UserID = @UserID
-			, @CustID = 0
-			, @ActionID = @ActionID
-			, @TrackingValue = @LogSPData
-			, @TrackingValue2 = ''
-			, @Duration = @Duration
-	END CATCH
+	EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_UserControl
+		@Custid = 0,
+		@Doing = @Doing,
+		@Userid = @UserId,
+		@Typeid = 0,
+		@Actionid = 5535,
+		@Duration = @Duration
+
+	IF @@ERROR <> 0
+	BEGIN
+		SELECT @ErrMsg = ERROR_MESSAGE() , @ErrCode = 503
+	END
 	-- #Endregion: Write Log
 END
 GO
