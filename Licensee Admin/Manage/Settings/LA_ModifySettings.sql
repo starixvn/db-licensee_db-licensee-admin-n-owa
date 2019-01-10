@@ -47,7 +47,7 @@ BEGIN
 		@doing = @Doing,
 		@userid = @UserId,
 		@typeid = 0,
-		@actionid = 1,
+		@actionid = 5534,
 		@duration = 0
 
 	IF @@ERROR <> 0
