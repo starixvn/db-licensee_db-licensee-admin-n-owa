@@ -20,7 +20,6 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
 	@ChargeInfoSettingData	VARCHAR(MAX),
 	@MinFeeSettingData	VARCHAR(MAX),
 	@UserId				INT, 
-	@LoginIp			VARCHAR (50)	= '', 
 	@ErrCode			INT				= 0		OUTPUT, 
 	@ErrMsg				VARCHAR(4000)	= ''	OUTPUT
 AS
