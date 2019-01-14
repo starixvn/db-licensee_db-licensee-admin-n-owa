@@ -31,7 +31,7 @@ BEGIN
 	BEGIN
 		UPDATE dbo.OAS_Party  
 		SET OldRefID   = @LicenseeId
-			,SetupName = @LicenseeName
+			,SetupName = PartyName
 			,PartyType = 1
 			,PartyName = @LicenseeName
 		WHERE PartyID = @NonOfficialPartyId
