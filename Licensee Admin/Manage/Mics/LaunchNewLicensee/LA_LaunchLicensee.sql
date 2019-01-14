@@ -41,6 +41,8 @@ AS
 									<Remark>create date 2019-01-08</Remark>
 									<BasisOfBilling>15% of Gross Win Launched on 2019-01-08</BasisOfBilling>
 									<ChargeType>1</ChargeType>
+									<FromDate>20190108</FromDate>
+									<ToDate>20500101</ToDate>
 								</ChargeInfoSetting>
 								<ChargeInfoSetting>
 									<ProductId>1</ProductId>
@@ -48,6 +50,8 @@ AS
 									<Remark>create date 2019-01-08</Remark>
 									<BasisOfBilling>10% of Gross Win Launched on 2019-01-08</BasisOfBilling>
 									<ChargeType>1</ChargeType>
+									<FromDate>20190108</FromDate>
+									<ToDate>20500101</ToDate>
 								</ChargeInfoSetting>
 							</Root>'
 */

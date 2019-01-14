@@ -32,6 +32,8 @@ AS
 									<Remark>create date 2019-01-08</Remark>
 									<BasisOfBilling>15% of Gross Win Launched on 2019-01-08</BasisOfBilling>
 									<ChargeType>1</ChargeType>
+									<FromDate>20190108</FromDate>
+									<ToDate>20500101</ToDate>
 								</ChargeInfoSetting>
 								<ChargeInfoSetting>
 									<ProductId>1</ProductId>
@@ -39,6 +41,8 @@ AS
 									<Remark>create date 2019-01-08</Remark>
 									<BasisOfBilling>10% of Gross Win Launched on 2019-01-08</BasisOfBilling>
 									<ChargeType>1</ChargeType>
+									<FromDate>20190108</FromDate>
+									<ToDate>20500101</ToDate>
 								</ChargeInfoSetting>
 							</Root>'
 */
@@ -46,7 +50,7 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @Products	TABLE (ProductId INT)
-	DECLARE @ChargeInfoSettings	TABLE (ProductId INT, Rate MONEY, Remark NVARCHAR(400), BasisOfBilling NVARCHAR(500), ChargeType INT) 
+	DECLARE @ChargeInfoSettings	TABLE (ProductId INT, Rate MONEY, Remark NVARCHAR(400), BasisOfBilling NVARCHAR(500), ChargeType INT, FromDate DATE, ToDate DATE) 
 	
 	INSERT INTO @Products(ProductId)
 	SELECT val FROM bodb02.dbo.strSplit(@ProductIds, ',')
@@ -56,36 +60,29 @@ BEGIN
 		DECLARE @docHandler INT
 		
 		EXEC sp_xml_preparedocument @docHandler OUTPUT, @ChargeInfoSettingData
-		INSERT INTO @ChargeInfoSettings(ProductId, Rate, Remark, BasisOfBilling, ChargeType)
-		SELECT ProductId, Rate, Remark,  BasisOfBilling, ChargeType
+		INSERT INTO @ChargeInfoSettings(ProductId, Rate, Remark, BasisOfBilling, ChargeType, FromDate, ToDate)
+		SELECT ProductId, Rate, Remark,  BasisOfBilling, ChargeType, FromDate, ToDate
 		FROM OPENXML(@docHandler, 'Root/ChargeInfoSetting')
 		WITH (ProductId	INT 'ProductId', 
 				Rate	MONEY 'Rate', 
 				Remark	NVARCHAR(400) 'Remark', 
 				BasisOfBilling NVARCHAR(500) 'BasisOfBilling',
-				ChargeType INT 'ChargeType')
+				ChargeType INT 'ChargeType',
+				FromDate DATE 'FromDate',
+				ToDate DATE 'ToDate')
 	
 		EXEC sp_xml_removedocument @docHandler
 	END
 	
 	-- #Region OAS_ChargeInfo & LA_ChargeInfo_SystemMapping
-	DECLARE @ProductId INT, @Rate MONEY, @Remark NVARCHAR(400), @BasisOfBilling NVARCHAR(500), @ChargeType INT
-	DECLARE @ChargeInfo_SystemMapping TABLE (ChargeID INT)
-	WHILE(EXISTS(SELECT ProductId FROM @ChargeInfoSettings))
-	BEGIN
-		SELECT TOP 1 @ProductId = ProductId, @Rate = Rate, @Remark = Remark, @BasisOfBilling = BasisOfBilling, @ChargeType = ChargeType FROM @ChargeInfoSettings
-
-		INSERT INTO dbo.OAS_ChargeInfo (ProductID, FromParty, ToParty, ParentChargeID, Rate, Remark, BasisOfBilling, ChargeType, FromDate, ToDate, BaseCurrencyId)
-		VALUES(@ProductId, @PartyId, @GroupId, 0, @Rate, @Remark, @BasisOfBilling, @ChargeType, @LaunchDate, '20500101', @BaseCurrencyId)
-
-		INSERT INTO @ChargeInfo_SystemMapping(ChargeID) VALUES(SCOPE_IDENTITY())
-
-		DELETE @ChargeInfoSettings WHERE ProductId = @ProductId AND ChargeType = @ChargeType
-	END
+	INSERT INTO dbo.OAS_ChargeInfo (ProductID, FromParty, ToParty, ParentChargeID, Rate, Remark, BasisOfBilling, ChargeType, FromDate, ToDate, BaseCurrencyId)
+	SELECT ProductId, @PartyId, @GroupId, 0, Rate, Remark, BasisOfBilling, ChargeType, FromDate, ToDate, @BaseCurrencyId
+	FROM @ChargeInfoSettings
 
 	INSERT INTO LA_ChargeInfo_SystemMapping(ChargeID, SystemID)
-	SELECT ChargeID, 2
-	FROM @ChargeInfo_SystemMapping
+	SELECT c1.ChargeID, 2
+	FROM dbo.OAS_ChargeInfo c1 WITH(NOLOCK)
+		INNER JOIN @ChargeInfoSettings c2  ON c1.FromParty = @PartyId AND c1.ToParty = @GroupId AND c1.ProductID = c2.ProductId AND c1.ChargeType = c2.ChargeType
 	-- #Endregion OAS_ChargeInfo & LA_ChargeInfo_SystemMapping
 
 	-- #Region LA_MinFee
