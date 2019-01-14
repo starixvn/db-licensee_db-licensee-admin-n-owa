@@ -6,7 +6,7 @@ SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 GO
 
-ALTER PROCEDURE [dbo].[LA_ChargeInfoIns]
+ALTER PROCEDURE [dbo].[LA_LaunchLicensee_ChargeInfoIns]
 	@PartyId				INT,
 	@BaseCurrencyId			TINYINT,
 	@LaunchDate				DATE, 

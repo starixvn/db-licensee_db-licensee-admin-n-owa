@@ -6,7 +6,7 @@ SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 GO
 
-ALTER PROCEDURE [dbo].[LA_NonOfficialPartyLaunch]
+ALTER PROCEDURE [dbo].[LA_LaunchLicensee_PartyIns]
 	@NonOfficialPartyId	INT,
 	@LicenseeId			INT,
 	@LicenseeName		VARCHAR(50),

@@ -92,7 +92,7 @@ BEGIN
 		RETURN
 	END
 
-	EXEC LA_NonOfficialPartyLaunch @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @BaseCurrencyId
+	EXEC LA_LaunchLicensee_PartyIns @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @BaseCurrencyId
 	
 	IF @@ERROR <> 0
 	BEGIN
@@ -103,7 +103,7 @@ BEGIN
 	DECLARE @PartyID	INT
 	SELECT @PartyID = PartyID FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyName = @LicenseeName
 
-	EXEC LA_ChargeInfoIns @PartyID, @BaseCurrencyId, @LaunchDate, @Minfee, @Waivemonth, @GroupId, @ProductIds, @ChargeInfoSettingData
+	EXEC LA_LaunchLicensee_ChargeInfoIns @PartyID, @BaseCurrencyId, @LaunchDate, @Minfee, @Waivemonth, @GroupId, @ProductIds, @ChargeInfoSettingData
 
 	IF @@ERROR <> 0
 	BEGIN
@@ -133,7 +133,7 @@ BEGIN
 	WHILE(EXISTS(SELECT 1 FROM @Functions))
 	BEGIN
 		SELECT TOP 1 @FunctionKey = FunctionKey FROM @Functions
-		EXEC LA_FunctionPartyIns @FunctionKey, @PartyID
+		EXEC LA_LaunchLicensee_FunctionPartyIns @FunctionKey, @PartyID
 
 		DELETE @Functions WHERE FunctionKey = @FunctionKey
 	END

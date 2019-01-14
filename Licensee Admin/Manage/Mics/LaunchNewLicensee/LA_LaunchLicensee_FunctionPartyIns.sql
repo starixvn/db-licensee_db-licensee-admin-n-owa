@@ -6,7 +6,7 @@ SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 GO
 
-ALTER PROCEDURE [dbo].[LA_FunctionPartyIns] 
+ALTER PROCEDURE [dbo].[LA_LaunchLicensee_FunctionPartyIns] 
 	@FunctionKey	NVARCHAR(100), 
 	@PartyId		INT	
 AS
