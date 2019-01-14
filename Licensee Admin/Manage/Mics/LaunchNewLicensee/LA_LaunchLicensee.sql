@@ -113,34 +113,31 @@ BEGIN
 	
 	IF @@ERROR <> 0
 	BEGIN
-		SELECT @ErrMsg = 'Launch licensee failed. Please try again.', @ErrCode =  503
+		SELECT @ErrMsg = 'Insert/Update LicenseeProduct3rd failed. Please try again.', @ErrCode =  503
 		RETURN
 	END
 
-	EXEC LA_LaunchLicensee_PartyIns @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @BaseCurrencyId
+	EXEC LA_LaunchLicensee_PartyIns @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @BaseCurrencyId, @ErrCode OUTPUT, @ErrMsg OUTPUT 
 	
-	IF @@ERROR <> 0
+	IF @ErrCode <> 0
 	BEGIN
-		SELECT @ErrMsg = 'Launch licensee failed. Please try again.', @ErrCode =  503
 		RETURN
 	END
 
 	DECLARE @PartyID	INT
 	SELECT @PartyID = PartyID FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyName = @LicenseeName
 
-	EXEC LA_LaunchLicensee_ChargeInfoIns @PartyID, @GroupId, @ChargeInfoSettingData
+	EXEC LA_LaunchLicensee_ChargeInfoIns @PartyID, @GroupId, @ChargeInfoSettingData, @ErrCode OUTPUT, @ErrMsg OUTPUT  
 
-	IF @@ERROR <> 0
+	IF @ErrCode <> 0
 	BEGIN
-		SELECT @ErrMsg = 'Launch licensee failed. Please try again.', @ErrCode =  503
 		RETURN
 	END
 
-	EXEC LA_LaunchLicensee_MinFeeIns @PartyID, @BaseCurrencyId, @MinFeeSettingData
+	EXEC LA_LaunchLicensee_MinFeeIns @PartyID, @BaseCurrencyId, @MinFeeSettingData, @ErrCode OUTPUT, @ErrMsg OUTPUT 
 
-	IF @@ERROR <> 0
+	IF @ErrCode <> 0
 	BEGIN
-		SELECT @ErrMsg = 'Launch licensee failed. Please try again.', @ErrCode =  503
 		RETURN
 	END
 
@@ -149,34 +146,42 @@ BEGIN
 	WHILE(EXISTS(SELECT 1 FROM @Users))
 	BEGIN
 		SELECT TOP 1 @UserName = UserName FROM @Users
-		EXEC LA_UserPartyIns @UserName, @LicenseeName 
+
+		INSERT INTO LA_UserParty (UserID, PartyID, Modifydate, Modifier, StatusID)
+		SELECT UserID, @PartyID, GETDATE(), @UserID, 1
+		FROM dbo.LA_User WITH (NOLOCK) 
+		WHERE Username = @UserName
 
 		DELETE @Users WHERE UserName = @UserName
+
+		IF @@ERROR <> 0
+		BEGIN
+			SELECT @ErrMsg = 'Insert LA_UserParty failed. Please try again.', @ErrCode =  503
+			RETURN
+		END
 	END
 	-- #Endregion LA_UserPartyIns
-
-	IF @@ERROR <> 0
-	BEGIN
-		SELECT @ErrMsg = 'Launch licensee failed. Please try again.', @ErrCode =  503
-		RETURN
-	END
 
 	-- #Region FunctionPartyIns
 	DECLARE @FunctionKey NVARCHAR(100), @FunctionId INT
 	WHILE(EXISTS(SELECT 1 FROM @Functions))
 	BEGIN
 		SELECT TOP 1 @FunctionKey = FunctionKey FROM @Functions
-		EXEC LA_LaunchLicensee_FunctionPartyIns @FunctionKey, @PartyID
+
+		INSERT INTO dbo.LA_FunctionParty (FunctionID, PartyID)
+		SELECT FunctionID, @PartyID
+		FROM dbo.LA_Function WITH (NOLOCK) 
+		WHERE FunctionKey = @FunctionKey
 
 		DELETE @Functions WHERE FunctionKey = @FunctionKey
+
+		IF @@ERROR <> 0
+		BEGIN
+			SELECT @ErrMsg = 'Insert LA_FunctionParty failed. Please try again.', @ErrCode =  503
+			RETURN
+		END
 	END
 	-- #Endregion FunctionPartyIns
-
-	IF @@ERROR <> 0
-	BEGIN
-		SELECT @ErrMsg = 'Launch licensee failed. Please try again.', @ErrCode =  503
-		RETURN
-	END
 
 	-- #Region: Write Log
 	SET @EndRun = GETDATE()

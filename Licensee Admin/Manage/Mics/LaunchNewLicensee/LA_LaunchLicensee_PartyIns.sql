@@ -11,7 +11,9 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee_PartyIns]
 	@LicenseeId			INT,
 	@LicenseeName		VARCHAR(50),
 	@BrandName			VARCHAR(100),
-	@BaseCurrencyId		TINYINT
+	@BaseCurrencyId		TINYINT,
+	@ErrCode			INT				= 0		OUTPUT, 
+	@ErrMsg				VARCHAR(4000)	= ''	OUTPUT
 AS
 /*
 	Created: 20190107@Parsons
@@ -45,6 +47,12 @@ BEGIN
 	END
 	-- #Endregion OAS_Party
 
+	IF @@ERROR <> 0
+	BEGIN
+		SELECT @ErrMsg = 'Insert/Update OAS_Party failed. Please try again.', @ErrCode =  503
+		RETURN
+	END
+
 	-- #Region OAS_PartyDetail
 	IF EXISTS(SELECT 1 FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE PartyID = @NonOfficialPartyId)
 	BEGIN
@@ -62,5 +70,11 @@ BEGIN
 		WHERE LicenseeID = @LicenseeId
 	END
 	-- #Endregion OAS_PartyDetail
+
+	IF @@ERROR <> 0
+	BEGIN
+		SELECT @ErrMsg = 'Insert/Update OAS_PartyDetail failed. Please try again.', @ErrCode =  503
+		RETURN
+	END
 END
 GO
