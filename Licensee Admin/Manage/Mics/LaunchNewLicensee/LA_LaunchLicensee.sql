@@ -13,13 +13,12 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
 	@BrandName			VARCHAR(100),
 	@BaseCurrencyId		TINYINT,
 	@LaunchDate			DATE, 
-	@Minfee				MONEY,
-	@Waivemonth			TINYINT,
 	@GroupId			INT,
 	@ProductIds			VARCHAR(1000)	= '', 
 	@UserNames			VARCHAR(4000)	= '', 
 	@FunctionKeys		VARCHAR(4000)	= '', 
 	@ChargeInfoSettingData	VARCHAR(MAX),
+	@MinFeeSettingData	VARCHAR(MAX),
 	@UserId				INT, 
 	@LoginIp			VARCHAR (50)	= '', 
 	@ErrCode			INT				= 0		OUTPUT, 
@@ -53,6 +52,29 @@ AS
 									<FromDate>20190108</FromDate>
 									<ToDate>20500101</ToDate>
 								</ChargeInfoSetting>
+							</Root>'
+
+							@MinFeeSettingData = '<Root>
+								<MinFeeSetting>
+									<ProductId>0</ProductId>
+									<FeeTypeId>1</FeeTypeId>
+									<FeeAmount>5000</FeeAmount>
+									<BaseCurrencyID>6</BaseCurrencyID>
+									<FromDate>20190108</FromDate>
+									<ToDate>20500101</ToDate>
+									<MinFeeTerm>EUR 5,000 (Waived for the first 3 months after launched)</MinFeeTerm>
+									<Priority>1</Priority>
+								</MinFeeSetting>
+								<MinFeeSetting>
+									<ProductId>0</ProductId>
+									<FeeTypeId>2</FeeTypeId>
+									<FeeAmount></FeeAmount>
+									<BaseCurrencyID>6</BaseCurrencyID>
+									<FromDate>20190108</FromDate>
+									<ToDate>20190407</ToDate>
+									<MinFeeTerm></MinFeeTerm>
+									<Priority>2</Priority>
+								</MinFeeSetting>
 							</Root>'
 */
 BEGIN
@@ -107,7 +129,15 @@ BEGIN
 	DECLARE @PartyID	INT
 	SELECT @PartyID = PartyID FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyName = @LicenseeName
 
-	EXEC LA_LaunchLicensee_ChargeInfoIns @PartyID, @BaseCurrencyId, @LaunchDate, @Minfee, @Waivemonth, @GroupId, @ProductIds, @ChargeInfoSettingData
+	EXEC LA_LaunchLicensee_ChargeInfoIns @PartyID, @GroupId, @ChargeInfoSettingData
+
+	IF @@ERROR <> 0
+	BEGIN
+		SELECT @ErrMsg = 'Launch licensee failed. Please try again.', @ErrCode =  503
+		RETURN
+	END
+
+	EXEC LA_LaunchLicensee_MinFeeIns @PartyID, @BaseCurrencyId, @MinFeeSettingData
 
 	IF @@ERROR <> 0
 	BEGIN
@@ -159,13 +189,12 @@ BEGIN
 							@BrandName			AS BrandName,
 							@BaseCurrencyId		AS BaseCurrencyId,
 							@LaunchDate			AS LaunchDate, 
-							@Minfee				AS Minfee,
-							@Waivemonth			AS Waivemonth,
 							@GroupId			AS GroupId,
 							@ProductIds			AS ProductIds, 
 							@UserNames			AS UserNames, 
 							@FunctionKeys		AS FunctionKeys, 
-							@ChargeInfoSettingData	AS ChargeInfoSettingData
+							@ChargeInfoSettingData	AS ChargeInfoSettingData,
+							@MinFeeSettingData	AS MinFeeSettingData
 							FOR XML PATH('')) 
 
 	EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_UserControl
