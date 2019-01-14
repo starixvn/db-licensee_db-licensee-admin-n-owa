@@ -31,6 +31,12 @@ BEGIN
 	-- #Region OAS_Party
 	IF(@NonOfficialPartyId > 0)
 	BEGIN
+		IF NOT EXISTS (SELECT TOP 1 1 FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyID = @NonOfficialPartyId) 
+		BEGIN
+			SELECT @ErrMsg = 'Party not found. Please try again.', @ErrCode =  505
+			RETURN
+		END
+
 		UPDATE dbo.OAS_Party  
 		SET OldRefID   = @LicenseeId
 			,SetupName = PartyName
