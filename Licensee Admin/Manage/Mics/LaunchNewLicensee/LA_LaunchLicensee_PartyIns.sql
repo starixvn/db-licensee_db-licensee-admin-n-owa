@@ -31,9 +31,15 @@ BEGIN
 	-- #Region OAS_Party
 	IF(@NonOfficialPartyId > 0)
 	BEGIN
-		IF NOT EXISTS (SELECT TOP 1 1 FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyID = @NonOfficialPartyId) 
+		IF NOT EXISTS (SELECT 1 FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyID = @NonOfficialPartyId) 
 		BEGIN
 			SELECT @ErrMsg = 'Party not found. Please try again.', @ErrCode =  505
+			RETURN
+		END
+
+		IF EXISTS (SELECT 1 FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyID <> @NonOfficialPartyId AND PartyName = @LicenseeName) 
+		BEGIN
+			SELECT @ErrMsg = 'Party name has already been existed. Please try again.', @ErrCode =  506
 			RETURN
 		END
 
@@ -46,10 +52,16 @@ BEGIN
 	END
 	ELSE
 	BEGIN
-		INSERT INTO dbo.OAS_Party(PartyName, PartyType, OldRefID)
-		VALUES(@LicenseeName, 1, @LicenseeId)
-		
-		SET @NonOfficialPartyId = SCOPE_IDENTITY()
+		IF EXISTS (SELECT 1 FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyName = @LicenseeName AND PartyType <> 1) 
+		BEGIN
+			UPDATE dbo.OAS_Party
+			SET PartyType = 1, OldRefID = @LicenseeId
+		END
+		ELSE
+		BEGIN
+			INSERT INTO dbo.OAS_Party(PartyName, PartyType, OldRefID)
+			VALUES(@LicenseeName, 1, @LicenseeId)
+		END
 	END
 	-- #Endregion OAS_Party
 
@@ -60,18 +72,20 @@ BEGIN
 	END
 
 	-- #Region OAS_PartyDetail
-	IF EXISTS(SELECT 1 FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE PartyID = @NonOfficialPartyId)
+	DECLARE @PartyId INT
+	SELECT @PartyId = PartyID FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyName = @LicenseeName
+	IF EXISTS(SELECT 1 FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE PartyID = @PartyId)
 	BEGIN
 		UPDATE dbo.OAS_PartyDetail  
 		SET BrandName = @BrandName,
 			BaseCurrencyId = @BaseCurrencyId,
 			StatusId = 1
-		WHERE PartyID = @NonOfficialPartyId
+		WHERE PartyID = @PartyId
 	END
 	ELSE
 	BEGIN
 		INSERT INTO dbo.OAS_PartyDetail (PartyID, IsDeposit, BrandName, CompanyName, IsAllowedMemberComm, BaseCurrencyId, StatusId)
-		SELECT @NonOfficialPartyId, IsDeposit, @BrandName, CompanyName, IsAllowedMemberComm, @BaseCurrencyId, 1
+		SELECT @PartyId, IsDeposit, @BrandName, CompanyName, IsAllowedMemberComm, @BaseCurrencyId, 1
 		FROM dbo.licensees WITH (NOLOCK)
 		WHERE LicenseeID = @LicenseeId
 	END
