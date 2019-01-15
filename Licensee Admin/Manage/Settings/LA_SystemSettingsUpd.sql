@@ -6,7 +6,7 @@ SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 GO
 
-CREATE PROCEDURE dbo.LA_SystemSettingsUpd
+ALTER PROCEDURE dbo.LA_SystemSettingsUpd
 	@Key		VARCHAR(100),
 	@Value		VARCHAR(8000),
 	@UserId		INT,
@@ -38,7 +38,7 @@ BEGIN
 
 	DECLARE @Doing NVARCHAR(MAX) = (SELECT @Key AS [Key], @Value AS [Value] FOR XML PATH(''))
 
-	EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_UserControl
+	EXEC DBLOG.bodb_CustomerLog.dbo.WriteLog_UserLog_UserControl
 		@custid = 0,
 		@doing = @Doing,
 		@userid = @UserId,
