@@ -86,7 +86,7 @@ BEGIN
 	SELECT @AMF = SUM(ISNULL(d.Income, 0))
 	FROM dbo.LA_InvoiceHeader h WITH (NOLOCK)
 		INNER JOIN dbo.LA_InvoiceStatement d WITH (NOLOCK) ON h.InvoiceHeaderId = d.InvoiceHeaderId
-	WHERE h.InvoiceType = 7 AND d.InvItemTypeId = 3 AND h.StatusId = 0					
+	WHERE h.InvoiceType = 7 AND d.InvItemTypeId = 3 AND h.StatusId = 0 AND h.Environment = 'PRO'					
 	AND h.PartyId = @PartyId
 	AND h.CurrencyId = @BaseCurrencyId
 
