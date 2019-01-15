@@ -52,11 +52,10 @@ BEGIN
 	END
 	ELSE
 	BEGIN
-		IF EXISTS (SELECT 1 FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyName = @LicenseeName AND PartyType <> 1) 
+		IF EXISTS (SELECT 1 FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyName = @LicenseeName AND PartyType IN (1, 5)) 
 		BEGIN
-			UPDATE dbo.OAS_Party
-			SET PartyType = 1, OldRefID = @LicenseeId
-			WHERE PartyName = @LicenseeName
+			SELECT @ErrMsg = 'Party name has already been existed. Please try again.', @ErrCode =  506
+			RETURN
 		END
 		ELSE
 		BEGIN
