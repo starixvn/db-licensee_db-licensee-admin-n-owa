@@ -1,5 +1,4 @@
 /*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-
 USE [bodb_Licensee]
 GO
 
@@ -7,7 +6,7 @@ SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 GO
 
-ALTER PROCEDURE dbo.LA_ModifySettings
+CREATE PROCEDURE dbo.LA_SystemSettingsUpd
 	@Key		VARCHAR(100),
 	@Value		VARCHAR(8000),
 	@UserId		INT,
@@ -20,23 +19,20 @@ AS
 
 	Revisions:
 		- 20181130@Parsons: LA - Licensee Performance Alert [#104918]
-
-	Param's Explanation:
-	EXEC LA_ModifyReportSettings @Key = N'1234', @Value = '234' 
 */
 BEGIN
 	SET NOCOUNT ON;
 	SELECT @ErrMsg = '' , @ErrCode = 0
 
-	IF(EXISTS(SELECT TOP 1 1 FROM dbo.LA_Settings WITH(NOLOCK) WHERE @Key = [Key]))
+	IF(EXISTS(SELECT TOP 1 1 FROM dbo.LA_SystemSettings WITH(NOLOCK) WHERE @Key = [Key]))
 	BEGIN
-		UPDATE dbo.LA_Settings WITH(ROWLOCK,UPDLOCK)
+		UPDATE dbo.LA_SystemSettings WITH(ROWLOCK,UPDLOCK)
 		SET [Value] = @Value
 		WHERE @Key = [Key]
 	END
 	ELSE
 	BEGIN
-		INSERT dbo.LA_Settings ([Key], [Value])
+		INSERT dbo.LA_SystemSettings ([Key], [Value])
 		VALUES (@Key, @Value)
 	END
 

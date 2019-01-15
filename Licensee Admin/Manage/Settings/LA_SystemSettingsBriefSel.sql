@@ -7,7 +7,7 @@ SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 GO
 
-CREATE PROCEDURE dbo.LA_SettingsBriefSel
+CREATE PROCEDURE dbo.LA_SystemSettingsBriefSel
 AS
 /*	Created: 20190108@Bruce
 	Task: LA-Licensee Performance Alert
@@ -20,6 +20,6 @@ BEGIN
 	SET NOCOUNT ON;
 
 	SELECT [Key], LEFT([Value], 100) AS [Value]
-	FROM dbo.LA_Settings WITH(NOLOCK)
+	FROM dbo.LA_SystemSettings WITH(NOLOCK)
 END
 GO

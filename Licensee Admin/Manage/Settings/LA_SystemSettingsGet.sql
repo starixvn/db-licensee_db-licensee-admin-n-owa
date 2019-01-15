@@ -7,7 +7,7 @@ SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 GO
 
-CREATE PROCEDURE dbo.LA_GetSettings
+CREATE PROCEDURE dbo.LA_SystemSettingsGet
 	@Key		VARCHAR(100)
 AS
 /*	Created: 20181203@Parsons
@@ -18,13 +18,13 @@ AS
 		- 20181203@Parsons: LA - Licensee Performance Alert [#104918]
 
 	Param's Explanation:
-	EXEC LA_GetSettings 'LicenseePerformanceAlert'
+	EXEC LA_SystemSettingsGet 'LicenseePerformanceAlert'
 */
 BEGIN
 	SET NOCOUNT ON;
 
 	SELECT [Value]
-	FROM dbo.LA_Settings WITH(NOLOCK)
+	FROM dbo.LA_SystemSettings WITH(NOLOCK)
 	WHERE @Key = [Key]
 END
 GO
