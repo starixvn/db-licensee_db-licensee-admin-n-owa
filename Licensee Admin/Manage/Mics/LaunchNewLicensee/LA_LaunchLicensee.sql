@@ -104,9 +104,6 @@ BEGIN
 	;MERGE dbo.LicenseeProduct3rd WITH(ROWLOCK) AS t
 	USING @Products AS s
 	ON (t.ProductID= s.ProductId AND t.LicenseeId = @LicenseeId)
-	WHEN NOT MATCHED BY TARGET
-		THEN INSERT(LicenseeID, ProductID, EffectiveDate)
-				VALUES(@LicenseeId, s.ProductId, @LaunchDate)
 	WHEN MATCHED
 		THEN UPDATE SET EffectiveDate = @LaunchDate;
 	-- #Endregion LicenseeProduct3rd
