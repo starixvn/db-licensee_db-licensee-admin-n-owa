@@ -56,6 +56,7 @@ BEGIN
 		BEGIN
 			UPDATE dbo.OAS_Party
 			SET PartyType = 1, OldRefID = @LicenseeId
+			WHERE PartyName = @LicenseeName
 		END
 		ELSE
 		BEGIN
