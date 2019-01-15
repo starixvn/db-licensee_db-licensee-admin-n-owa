@@ -101,11 +101,9 @@ BEGIN
 	SELECT val FROM bodb02.dbo.strSplit(@FunctionKeys, ',')
 
 	-- #Region LicenseeProduct3rd
-	;MERGE dbo.LicenseeProduct3rd WITH(ROWLOCK) AS t
-	USING @Products AS s
-	ON (t.ProductID= s.ProductId AND t.LicenseeId = @LicenseeId)
-	WHEN MATCHED
-		THEN UPDATE SET EffectiveDate = @LaunchDate;
+	UPDATE dbo.LicenseeProduct3rd
+	SET EffectiveDate = @LaunchDate
+	WHERE LicenseeId = @LicenseeId
 	-- #Endregion LicenseeProduct3rd
 	
 	IF @@ERROR <> 0
@@ -122,58 +120,61 @@ BEGIN
 	IF @ErrCode = 0
 	BEGIN
 		EXEC LA_LaunchLicensee_ChargeInfoIns @PartyID, @GroupId, @ChargeInfoSettingData, @ErrCode OUTPUT, @ErrMsg OUTPUT  
-
-		IF @ErrCode = 0
-		BEGIN
-			EXEC LA_LaunchLicensee_MinFeeIns @PartyID, @BaseCurrencyId, @MinFeeSettingData, @ErrCode OUTPUT, @ErrMsg OUTPUT
-			
-			IF @ErrCode = 0
-			BEGIN
-				-- #Region UserPartyIns
-				DECLARE @UserName VARCHAR(50)
-				WHILE(EXISTS(SELECT 1 FROM @Users))
-				BEGIN
-					SELECT TOP 1 @UserName = UserName FROM @Users
-
-					INSERT INTO LA_UserParty (UserID, PartyID, Modifydate, Modifier, StatusID)
-					SELECT UserID, @PartyID, GETDATE(), @UserID, 1
-					FROM dbo.LA_User WITH (NOLOCK) 
-					WHERE Username = @UserName
-
-					DELETE @Users WHERE UserName = @UserName
-
-					IF @@ERROR <> 0
-					BEGIN
-						SELECT @ErrMsg = 'Insert LA_UserParty failed. Please try again.', @ErrCode =  503
-					END
-					ELSE
-					BEGIN
-						-- #Region FunctionPartyIns
-						DECLARE @FunctionKey NVARCHAR(100), @FunctionId INT
-						WHILE(EXISTS(SELECT 1 FROM @Functions))
-						BEGIN
-							SELECT TOP 1 @FunctionKey = FunctionKey FROM @Functions
-
-							INSERT INTO dbo.LA_FunctionParty (FunctionID, PartyID)
-							SELECT FunctionID, @PartyID
-							FROM dbo.LA_Function WITH (NOLOCK) 
-							WHERE FunctionKey = @FunctionKey
-
-							DELETE @Functions WHERE FunctionKey = @FunctionKey
-
-							IF @@ERROR <> 0
-							BEGIN
-								SELECT @ErrMsg = 'Insert LA_FunctionParty failed. Please try again.', @ErrCode =  503
-							END
-						END
-						-- #Endregion FunctionPartyIns
-					END
-				END
-				-- #Endregion UserPartyIns
-			END
-		END
 	END
 	
+	IF @ErrCode = 0
+	BEGIN
+		EXEC LA_LaunchLicensee_MinFeeIns @PartyID, @BaseCurrencyId, @MinFeeSettingData, @ErrCode OUTPUT, @ErrMsg OUTPUT
+	END
+	
+	IF @ErrCode = 0
+	BEGIN
+		-- #Region UserPartyIns
+		DECLARE @UserName VARCHAR(50)
+		WHILE(EXISTS(SELECT 1 FROM @Users))
+		BEGIN
+			SELECT TOP 1 @UserName = UserName FROM @Users
+
+			INSERT INTO LA_UserParty (UserID, PartyID, Modifydate, Modifier, StatusID)
+			SELECT UserID, @PartyID, GETDATE(), @UserID, 1
+			FROM dbo.LA_User WITH (NOLOCK) 
+			WHERE Username = @UserName
+
+			DELETE @Users WHERE UserName = @UserName
+
+			IF @@ERROR <> 0
+			BEGIN
+				SELECT @ErrMsg = 'Insert LA_UserParty failed. Please try again.', @ErrCode =  503
+				DELETE @Users
+			END
+		END
+		-- #Endregion UserPartyIns
+	END
+
+	IF @ErrCode = 0
+	BEGIN
+		-- #Region FunctionPartyIns
+		DECLARE @FunctionKey NVARCHAR(100), @FunctionId INT
+		WHILE(EXISTS(SELECT 1 FROM @Functions))
+		BEGIN
+			SELECT TOP 1 @FunctionKey = FunctionKey FROM @Functions
+
+			INSERT INTO dbo.LA_FunctionParty (FunctionID, PartyID)
+			SELECT FunctionID, @PartyID
+			FROM dbo.LA_Function WITH (NOLOCK) 
+			WHERE FunctionKey = @FunctionKey
+
+			DELETE @Functions WHERE FunctionKey = @FunctionKey
+
+			IF @@ERROR <> 0
+			BEGIN
+				SELECT @ErrMsg = 'Insert LA_FunctionParty failed. Please try again.', @ErrCode =  503
+				DELETE @Functions
+			END
+		END
+		-- #Endregion FunctionPartyIns
+	END
+
 	IF @ErrCode <> 0
 	BEGIN
 		EXEC LA_LaunchLicensee_Rollback @PartyID, @GroupId
@@ -184,19 +185,19 @@ BEGIN
 	SET @EndRun = GETDATE()
 	SET @Duration = DATEDIFF(MILLISECOND, @StartRun, @EndRun)
 
-	SET @Doing =(SELECT		@NonOfficialPartyId	AS NonOfficialPartyId,
-							@LicenseeId			AS LicenseeId,
-							@LicenseeName		AS LicenseeName,
-							@BrandName			AS BrandName,
-							@BaseCurrencyId		AS BaseCurrencyId,
-							@LaunchDate			AS LaunchDate, 
-							@GroupId			AS GroupId,
-							@ProductIds			AS ProductIds, 
-							@UserNames			AS UserNames, 
-							@FunctionKeys		AS FunctionKeys, 
-							@ChargeInfoSettingData	AS ChargeInfoSettingData,
-							@MinFeeSettingData	AS MinFeeSettingData
-							FOR XML PATH('')) 
+	SET @Doing =(SELECT	@NonOfficialPartyId	AS NonOfficialPartyId,
+						@LicenseeId			AS LicenseeId,
+						@LicenseeName		AS LicenseeName,
+						@BrandName			AS BrandName,
+						@BaseCurrencyId		AS BaseCurrencyId,
+						@LaunchDate			AS LaunchDate, 
+						@GroupId			AS GroupId,
+						@ProductIds			AS ProductIds, 
+						@UserNames			AS UserNames, 
+						@FunctionKeys		AS FunctionKeys, 
+						@ChargeInfoSettingData	AS ChargeInfoSettingData,
+						@MinFeeSettingData	AS MinFeeSettingData
+						FOR XML PATH('')) 
 
 	EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_UserControl
 		@Custid = 0,
