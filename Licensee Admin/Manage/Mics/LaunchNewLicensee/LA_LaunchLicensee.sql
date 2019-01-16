@@ -199,7 +199,7 @@ BEGIN
 						@MinFeeSettingData	AS MinFeeSettingData
 						FOR XML PATH('')) 
 
-	EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_UserControl
+	EXEC DBLOG.bodb_CustomerLog.dbo.WriteLog_UserLog_UserControl
 		@Custid = 0,
 		@Doing = @Doing,
 		@Userid = @UserId,
