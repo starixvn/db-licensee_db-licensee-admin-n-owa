@@ -52,7 +52,7 @@ BEGIN
 	END
 	ELSE
 	BEGIN
-		IF EXISTS (SELECT 1 FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyName = @LicenseeName AND PartyType IN (1, 5)) 
+		IF EXISTS (SELECT 1 FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyName = @LicenseeName) 
 		BEGIN
 			SELECT @ErrMsg = 'Party name has already been existed. Please try again.', @ErrCode =  506
 			RETURN

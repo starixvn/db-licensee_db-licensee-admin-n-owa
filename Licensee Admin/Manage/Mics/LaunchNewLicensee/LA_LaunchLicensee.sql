@@ -115,7 +115,7 @@ BEGIN
 	EXEC LA_LaunchLicensee_PartyIns @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @BaseCurrencyId, @ErrCode OUTPUT, @ErrMsg OUTPUT 
 	
 	DECLARE @PartyID	INT
-	SELECT @PartyID = PartyID FROM OAS_Party WITH(NOLOCK) WHERE PartyName = @LicenseeName AND (ISNULL(@NonOfficialPartyId, 0) = 0 OR PartyID = @NonOfficialPartyId)
+	SELECT @PartyID = PartyID FROM OAS_Party WITH(NOLOCK) WHERE PartyName = @LicenseeName
 
 	IF @ErrCode = 0
 	BEGIN
