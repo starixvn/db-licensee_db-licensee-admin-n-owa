@@ -53,21 +53,27 @@ BEGIN
 	IF(@ChargeInfoSettingData <> '')
 	BEGIN
 		DECLARE @docHandler INT
-		
-		EXEC sp_xml_preparedocument @docHandler OUTPUT, @ChargeInfoSettingData
-		INSERT INTO @ChargeInfoSettings(ProductId, Rate, Remark, BasisOfBilling, ChargeType, FromDate, ToDate)
-		SELECT ProductId, Rate, Remark,  BasisOfBilling, ChargeType, FromDate, ToDate
-		FROM OPENXML(@docHandler, 'Root/ChargeInfoSetting')
-		WITH (ProductId	INT 'ProductId', 
-				Rate	MONEY 'Rate', 
-				Remark	NVARCHAR(400) 'Remark', 
-				BasisOfBilling NVARCHAR(500) 'BasisOfBilling',
-				ChargeType INT 'ChargeType',
-				FromDate DATE 'FromDate',
-				ToDate DATE 'ToDate',
-				BaseCurrencyID INT 'BaseCurrencyID')
+
+		BEGIN TRY
+			EXEC sp_xml_preparedocument @docHandler OUTPUT, @ChargeInfoSettingData
+			INSERT INTO @ChargeInfoSettings(ProductId, Rate, Remark, BasisOfBilling, ChargeType, FromDate, ToDate)
+			SELECT ProductId, Rate, Remark,  BasisOfBilling, ChargeType, FromDate, ToDate
+			FROM OPENXML(@docHandler, 'Root/ChargeInfoSetting')
+			WITH (ProductId	INT 'ProductId', 
+					Rate	MONEY 'Rate', 
+					Remark	NVARCHAR(400) 'Remark', 
+					BasisOfBilling NVARCHAR(500) 'BasisOfBilling',
+					ChargeType INT 'ChargeType',
+					FromDate DATE 'FromDate',
+					ToDate DATE 'ToDate',
+					BaseCurrencyID INT 'BaseCurrencyID')
 	
-		EXEC sp_xml_removedocument @docHandler
+			EXEC sp_xml_removedocument @docHandler
+		END TRY
+		BEGIN CATCH
+			SELECT @ErrMsg = 'Charge info setting data invalid. Please try again.', @ErrCode = 100
+			RETURN
+		END CATCH;
 	END
 	
 	-- #Region OAS_ChargeInfo & LA_ChargeInfo_SystemMapping

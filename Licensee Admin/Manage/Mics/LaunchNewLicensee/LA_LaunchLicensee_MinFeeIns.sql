@@ -54,21 +54,27 @@ BEGIN
 	IF(@MinFeeSettingData <> '')
 	BEGIN
 		DECLARE @docHandler INT
-		
-		EXEC sp_xml_preparedocument @docHandler OUTPUT, @MinFeeSettingData
-		INSERT INTO @MinFeeSettings(ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority], BaseCurrencyID)
-		SELECT ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority], BaseCurrencyID
-		FROM OPENXML(@docHandler, 'Root/MinFeeSetting')
-		WITH (ProductId	INT 'ProductId', 
-				FeeTypeId	TINYINT 'FeeTypeId', 
-				FeeAmount	MONEY 'FeeAmount', 
-				FromDate	DATE 'FromDate',
-				ToDate		DATE 'ToDate',
-				MinFeeTerm	NVARCHAR(1000) 'MinFeeTerm',
-				[Priority]	TINYINT 'Priority',
-				BaseCurrencyID INT 'BaseCurrencyID')
+
+		BEGIN TRY
+			EXEC sp_xml_preparedocument @docHandler OUTPUT, @MinFeeSettingData
+			INSERT INTO @MinFeeSettings(ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority], BaseCurrencyID)
+			SELECT ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority], BaseCurrencyID
+			FROM OPENXML(@docHandler, 'Root/MinFeeSetting')
+			WITH (ProductId	INT 'ProductId', 
+					FeeTypeId	TINYINT 'FeeTypeId', 
+					FeeAmount	MONEY 'FeeAmount', 
+					FromDate	DATE 'FromDate',
+					ToDate		DATE 'ToDate',
+					MinFeeTerm	NVARCHAR(1000) 'MinFeeTerm',
+					[Priority]	TINYINT 'Priority',
+					BaseCurrencyID INT 'BaseCurrencyID')
 	
-		EXEC sp_xml_removedocument @docHandler
+			EXEC sp_xml_removedocument @docHandler
+		END TRY
+		BEGIN CATCH
+			SELECT @ErrMsg = 'Minfee setting data invalid. Please try again.', @ErrCode = 100
+			RETURN
+		END CATCH;
 	END
 
 	INSERT INTO dbo.LA_MinFee(PartyId, ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority], CurrencyId)
