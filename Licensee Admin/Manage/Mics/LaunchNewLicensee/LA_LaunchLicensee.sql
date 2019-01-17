@@ -10,7 +10,7 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
 	@NonOfficialPartyId	INT,
 	@LicenseeId			INT,
 	@LicenseeName		VARCHAR(50),
-	@BrandName			VARCHAR(100),
+	@BrandName			VARCHAR(100)	= '',
 	@BaseCurrencyId		TINYINT,
 	@LaunchDate			DATE, 
 	@GroupId			INT,
@@ -18,7 +18,7 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
 	@UserNames			VARCHAR(4000)	= '', 
 	@FunctionKeys		VARCHAR(4000)	= '', 
 	@ChargeInfoSettingData	VARCHAR(MAX),
-	@MinFeeSettingData	VARCHAR(MAX),
+	@MinFeeSettingData	VARCHAR(MAX)	= '',
 	@UserId				INT, 
 	@ErrCode			INT				= 0		OUTPUT, 
 	@ErrMsg				VARCHAR(4000)	= ''	OUTPUT
