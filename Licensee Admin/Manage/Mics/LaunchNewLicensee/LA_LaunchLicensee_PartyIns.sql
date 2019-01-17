@@ -12,6 +12,7 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee_PartyIns]
 	@LicenseeName		VARCHAR(50),
 	@BrandName			VARCHAR(100),
 	@BaseCurrencyId		TINYINT,
+	@NewPartyId			INT				= 0		OUTPUT, 
 	@ErrCode			INT				= 0		OUTPUT, 
 	@ErrMsg				VARCHAR(4000)	= ''	OUTPUT
 AS
@@ -49,6 +50,8 @@ BEGIN
 			,PartyType = 1
 			,PartyName = @LicenseeName
 		WHERE PartyID = @NonOfficialPartyId
+
+		SET @NewPartyId = @NonOfficialPartyId
 	END
 	ELSE
 	BEGIN
@@ -61,6 +64,8 @@ BEGIN
 		BEGIN
 			INSERT INTO dbo.OAS_Party(PartyName, PartyType, OldRefID)
 			VALUES(@LicenseeName, 1, @LicenseeId)
+
+			SET @NewPartyId = SCOPE_IDENTITY()
 		END
 	END
 	-- #Endregion OAS_Party
@@ -72,20 +77,18 @@ BEGIN
 	END
 
 	-- #Region OAS_PartyDetail
-	DECLARE @PartyId INT
-	SELECT @PartyId = PartyID FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyName = @LicenseeName
-	IF EXISTS(SELECT 1 FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE PartyID = @PartyId)
+	IF EXISTS(SELECT 1 FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE PartyID = @NewPartyId)
 	BEGIN
 		UPDATE dbo.OAS_PartyDetail  
 		SET BrandName = @BrandName,
 			BaseCurrencyId = @BaseCurrencyId,
 			StatusId = 1
-		WHERE PartyID = @PartyId
+		WHERE PartyID = @NewPartyId
 	END
 	ELSE
 	BEGIN
 		INSERT INTO dbo.OAS_PartyDetail (PartyID, IsDeposit, BrandName, CompanyName, IsAllowedMemberComm, BaseCurrencyId, StatusId)
-		SELECT @PartyId, IsDeposit, @BrandName, CompanyName, IsAllowedMemberComm, @BaseCurrencyId, 1
+		SELECT @NewPartyId, IsDeposit, @BrandName, CompanyName, IsAllowedMemberComm, @BaseCurrencyId, 1
 		FROM dbo.licensees WITH (NOLOCK)
 		WHERE LicenseeID = @LicenseeId
 	END
