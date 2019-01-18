@@ -77,8 +77,8 @@ BEGIN
 	END
 	
 	-- #Region OAS_ChargeInfo & LA_ChargeInfo_SystemMapping
-	INSERT INTO dbo.OAS_ChargeInfo (ProductID, FromParty, ToParty, ParentChargeID, Rate, Remark, BasisOfBilling, ChargeType, FromDate, ToDate, BaseCurrencyId)
-	SELECT ProductId, @PartyId, @GroupId, 0, Rate, Remark, BasisOfBilling, ChargeType, FromDate, ToDate, BaseCurrencyId
+	INSERT INTO dbo.OAS_ChargeInfo (ProductID, FromParty, ToParty, ParentChargeID, Rate, Remark, BasisOfBilling, ChargeType, FirstOfBilling, FromDate, ToDate, BaseCurrencyId)
+	SELECT ProductId, @PartyId, @GroupId, 0, Rate, Remark, BasisOfBilling, ChargeType, FromDate, FromDate, ToDate, BaseCurrencyId
 	FROM @ChargeInfoSettings
 
 	IF @@ERROR <> 0
