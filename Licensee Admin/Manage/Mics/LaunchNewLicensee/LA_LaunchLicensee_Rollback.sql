@@ -28,6 +28,7 @@ BEGIN
 		SET OldRefID   = NULL
 			,SetupName = NULL
 			,PartyType = 5
+			,PartyName=ISNULL(SetupName, PartyName)
 		WHERE PartyID = @PartyId
 
 		UPDATE dbo.OAS_PartyDetail  

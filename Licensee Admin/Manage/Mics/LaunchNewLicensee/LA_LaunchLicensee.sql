@@ -87,10 +87,10 @@ BEGIN
 
 	SET @StartRun = GETDATE()
 
-	DECLARE @Products	TABLE (ProductId INT)
+	DECLARE @Products TABLE (ProductId INT)
 	
 	INSERT INTO @Products(ProductId)
-	SELECT val FROM bodb02.dbo.strSplit(@ProductIds, ',')
+	SELECT val FROM dbo.strSplit(@ProductIds, ',')
 
 	-- #Region LicenseeProduct3rd
 	UPDATE dbo.LicenseeProduct3rd
@@ -105,16 +105,16 @@ BEGIN
 	END
 	
 	DECLARE @NewPartyId	INT = 0
-	EXEC LA_LaunchLicensee_PartyIns @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @BaseCurrencyId, @NewPartyId OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT 
+	EXEC dbo.LA_LaunchLicensee_PartyIns @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @BaseCurrencyId, @NewPartyId OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT 
 	
 	IF @ErrCode = 0
 	BEGIN
-		EXEC LA_LaunchLicensee_ChargeInfoIns @NewPartyId, @GroupId, @ChargeInfoSettingData, @ErrCode OUTPUT, @ErrMsg OUTPUT  
+		EXEC dbo.LA_LaunchLicensee_ChargeInfoIns @NewPartyId, @GroupId, @ChargeInfoSettingData, @ErrCode OUTPUT, @ErrMsg OUTPUT  
 	END
 	
 	IF @ErrCode = 0
 	BEGIN
-		EXEC LA_LaunchLicensee_MinFeeIns @NewPartyId, @BaseCurrencyId, @MinFeeSettingData, @ErrCode OUTPUT, @ErrMsg OUTPUT
+		EXEC dbo.LA_LaunchLicensee_MinFeeIns @NewPartyId, @BaseCurrencyId, @MinFeeSettingData, @ErrCode OUTPUT, @ErrMsg OUTPUT
 	END
 	
 	IF @ErrCode = 0
@@ -122,7 +122,7 @@ BEGIN
 		INSERT INTO LA_UserParty (UserID, PartyID, Modifydate, Modifier, StatusID)
 		SELECT UserID, @NewPartyId, GETDATE(), @UserID, 1
 		FROM dbo.LA_User WITH (NOLOCK) 
-		WHERE Username IN (SELECT val FROM bodb02.dbo.strSplit(@UserNames, ','))
+		WHERE Username IN (SELECT val FROM dbo.strSplit(@UserNames, ','))
 
 		IF @@ERROR <> 0
 		BEGIN
@@ -135,7 +135,7 @@ BEGIN
 		INSERT INTO dbo.LA_FunctionParty (FunctionID, PartyID)
 		SELECT FunctionID, @NewPartyId
 		FROM dbo.LA_Function WITH (NOLOCK) 
-		WHERE FunctionKey IN (SELECT val FROM bodb02.dbo.strSplit(@FunctionKeys, ','))
+		WHERE FunctionKey IN (SELECT val FROM dbo.strSplit(@FunctionKeys, ','))
 
 		IF @@ERROR <> 0
 		BEGIN
@@ -145,7 +145,7 @@ BEGIN
 
 	IF @ErrCode <> 0
 	BEGIN
-		EXEC LA_LaunchLicensee_Rollback @NewPartyId, @GroupId
+		EXEC dbo.LA_LaunchLicensee_Rollback @NewPartyId, @GroupId
 		RETURN
 	END
 
