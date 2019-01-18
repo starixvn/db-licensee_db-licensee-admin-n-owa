@@ -88,17 +88,9 @@ BEGIN
 	SET @StartRun = GETDATE()
 
 	DECLARE @Products	TABLE (ProductId INT)
-	DECLARE @Users		TABLE (UserName VARCHAR(50))
-	DECLARE @Functions	TABLE (FunctionKey NVARCHAR(100))
 	
 	INSERT INTO @Products(ProductId)
 	SELECT val FROM bodb02.dbo.strSplit(@ProductIds, ',')
-
-	INSERT INTO @Users(UserName)
-	SELECT val FROM bodb02.dbo.strSplit(@UserNames, ',')
-
-	INSERT INTO @Functions(FunctionKey)
-	SELECT val FROM bodb02.dbo.strSplit(@FunctionKeys, ',')
 
 	-- #Region LicenseeProduct3rd
 	UPDATE dbo.LicenseeProduct3rd
@@ -127,50 +119,28 @@ BEGIN
 	
 	IF @ErrCode = 0
 	BEGIN
-		-- #Region UserPartyIns
-		DECLARE @UserName VARCHAR(50)
-		WHILE(EXISTS(SELECT 1 FROM @Users))
+		INSERT INTO LA_UserParty (UserID, PartyID, Modifydate, Modifier, StatusID)
+		SELECT UserID, @NewPartyId, GETDATE(), @UserID, 1
+		FROM dbo.LA_User WITH (NOLOCK) 
+		WHERE Username IN (SELECT val FROM bodb02.dbo.strSplit(@UserNames, ','))
+
+		IF @@ERROR <> 0
 		BEGIN
-			SELECT TOP 1 @UserName = UserName FROM @Users
-
-			INSERT INTO LA_UserParty (UserID, PartyID, Modifydate, Modifier, StatusID)
-			SELECT UserID, @NewPartyId, GETDATE(), @UserID, 1
-			FROM dbo.LA_User WITH (NOLOCK) 
-			WHERE Username = @UserName
-
-			DELETE @Users WHERE UserName = @UserName
-
-			IF @@ERROR <> 0
-			BEGIN
-				SELECT @ErrMsg = 'Insert LA_UserParty failed. Please try again.', @ErrCode =  503
-				DELETE @Users
-			END
+			SELECT @ErrMsg = 'Insert LA_UserParty failed. Please try again.', @ErrCode =  503
 		END
-		-- #Endregion UserPartyIns
 	END
 
 	IF @ErrCode = 0
 	BEGIN
-		-- #Region FunctionPartyIns
-		DECLARE @FunctionKey NVARCHAR(100), @FunctionId INT
-		WHILE(EXISTS(SELECT 1 FROM @Functions))
+		INSERT INTO dbo.LA_FunctionParty (FunctionID, PartyID)
+		SELECT FunctionID, @NewPartyId
+		FROM dbo.LA_Function WITH (NOLOCK) 
+		WHERE FunctionKey IN (SELECT val FROM bodb02.dbo.strSplit(@FunctionKeys, ','))
+
+		IF @@ERROR <> 0
 		BEGIN
-			SELECT TOP 1 @FunctionKey = FunctionKey FROM @Functions
-
-			INSERT INTO dbo.LA_FunctionParty (FunctionID, PartyID)
-			SELECT FunctionID, @NewPartyId
-			FROM dbo.LA_Function WITH (NOLOCK) 
-			WHERE FunctionKey = @FunctionKey
-
-			DELETE @Functions WHERE FunctionKey = @FunctionKey
-
-			IF @@ERROR <> 0
-			BEGIN
-				SELECT @ErrMsg = 'Insert LA_FunctionParty failed. Please try again.', @ErrCode =  503
-				DELETE @Functions
-			END
+			SELECT @ErrMsg = 'Insert LA_FunctionParty failed. Please try again.', @ErrCode =  503
 		END
-		-- #Endregion FunctionPartyIns
 	END
 
 	IF @ErrCode <> 0
