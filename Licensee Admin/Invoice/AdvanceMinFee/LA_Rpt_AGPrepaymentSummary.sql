@@ -47,7 +47,7 @@ BEGIN
 	(
 		SELECT p.ParentId, p.PartyId, p.PartyName, h.OfficialInvoiceNo, s.InvItemTypeId, 
 				CASE WHEN s.InvItemTypeId = @WriteOff THEN s.Description ELSE '' END,
-				SUM(ISNULL(s.Income, 0) -  ISNULL(s.Expense, 0))
+				SUM(ABS(ISNULL(s.Income, 0) -  ISNULL(s.Expense, 0)))
 		FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
 		INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) on h.InvoiceHeaderId=s.InvoiceHeaderId
 		INNER JOIN @Parties p ON p.PartyId = s.RefPartyId
@@ -64,7 +64,7 @@ BEGIN
 				PartyName,
 				SUM(CASE WHEN InvItemTypeId = @AGP THEN Amount ELSE 0 END) AS Prepayment,
 				SUM(CASE WHEN InvItemTypeId = @DeductAGP THEN Amount ELSE 0 END) AS TotalMonthlyFee,
-				SUM(CASE WHEN InvItemTypeId = @WriteOff	THEN -Amount ELSE 0 END) AS WriteOff
+				SUM(CASE WHEN InvItemTypeId = @WriteOff	THEN Amount ELSE 0 END) AS WriteOff
 		FROM @AGPSummary
 		GROUP BY ParentId, PartyId, PartyName
 	)
