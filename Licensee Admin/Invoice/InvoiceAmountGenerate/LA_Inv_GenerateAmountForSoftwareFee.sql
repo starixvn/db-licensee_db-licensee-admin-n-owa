@@ -27,6 +27,7 @@ AS
    
 	Revisions: 
 		+ 20181004@Parsons: Integrate AG setup fee into invoices [#98485]
+		+ 20190123@Parsons: Improve AG prepayment and discount setting [#104620]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -417,19 +418,19 @@ BEGIN
 	)
 	
 	-- get AMF, AG and prepayment
-	DECLARE @AG INT = 25, @DeductAG INT = 26
+	DECLARE @AG INT = 25, @DeductAG INT = 26, @WriteOff INT = 27
 	SELECT SUM(ISNULL(Income,0) - ISNULL(Expense,0)) Amount, s.InvItemTypeId
 	INTO #credit
 	FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
 	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
-	WHERE s.InvItemTypeId IN (3,5,7,21,22,23,24,@AG,@DeductAG)
+	WHERE s.InvItemTypeId IN (3,5,7,21,22,23,24,@AG,@DeductAG,@WriteOff)
 		AND s.RefPartyId = @PartyId
 		AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
 		AND h.Environment = @Environment
 	GROUP BY s.InvItemTypeId
 
 	DECLARE @RemainingAmf MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeId IN (3,5,7,21)),0)
-	DECLARE @RemainingAG MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeId IN (@AG, @DeductAG)),0)
+	DECLARE @RemainingAG MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeId IN (@AG, @DeductAG, @WriteOff)),0)
 	DECLARE @Prepayment MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeId IN (22,23,24)),0)
 
 	-- insert zero amount
