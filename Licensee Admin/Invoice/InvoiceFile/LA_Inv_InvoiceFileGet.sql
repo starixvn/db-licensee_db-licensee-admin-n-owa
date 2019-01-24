@@ -6,7 +6,7 @@ SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 GO
 
-CREATE PROCEDURE [dbo].LA_InvoiceFileGet (@InvoiceId INT)
+CREATE PROCEDURE [dbo].LA_Inv_InvoiceFileGet (@InvoiceId INT)
 AS
 /*	Created: 20190121@Bruce
 	Task : Get invoice pdf from DB

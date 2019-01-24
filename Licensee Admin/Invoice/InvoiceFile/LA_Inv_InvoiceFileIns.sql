@@ -6,7 +6,7 @@ SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 GO
 
-ALTER PROCEDURE [dbo].LA_InvoiceFileIns (
+ALTER PROCEDURE [dbo].LA_Inv_InvoiceFileIns (
 	@InvoiceId	INT,
 	@Data				VARBINARY(MAX),
 	@ErrMsg				VARCHAR(4000) = ''	OUTPUT,
