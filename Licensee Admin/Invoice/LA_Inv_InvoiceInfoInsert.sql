@@ -1,4 +1,9 @@
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert]
@@ -46,6 +51,7 @@ AS
 		+ 20180112@Bruce: increase description length [#89417]
 		+ 20180131@Bruce: support credit note for setup fee [#90274]
 		+ 20180109@Bruce: month of deduction [#87039]
+		+ 20190123@Bruce: Save invoices - Increased security [#96660]
 */
 
 BEGIN
@@ -110,22 +116,21 @@ BEGIN
 
 		-- generate Invoice No.
 		DECLARE @InvoiceNo VARCHAR(50) =  CAST(@InvoiceNumber AS VARCHAR(10))
-		SET @InvoiceNo = @InvoiceSymbol + (CASE WHEN @InvoiceNumber < 100 THEN RIGHT('000' + @InvoiceNo,3) ELSE @InvoiceNo END)
-
-		DECLARE @InvoiceTypeList TABLE(InvoiceTypeId TINYINT, InvoiceTypeName VARCHAR(10))
-		INSERT INTO @InvoiceTypeList VALUES (1,'SW'),(2,'BA'),(3,'RB'),(4,'CN'),(5,'DN'),(6,'HF'),(7,'SF'),(8,'OR'),(9,'PV'),(10,'DNAMF')
-		DECLARE @InvoiceTypeName VARCHAR(10) = (SELECT InvoiceTypeName FROM @InvoiceTypeList WHERE InvoiceTypeId = @InvoiceTypeId)
+		SET @InvoiceNo = @InvoiceSymbol + (CASE WHEN @InvoiceNumber < 100 THEN RIGHT('000' + @InvoiceNo, 3) ELSE @InvoiceNo END)
 
 		-- generate filename
-		DECLARE @InvoiceNoCount INT = (
-			SELECT COUNT(1) 
-			FROM dbo.LA_InvoiceHeader WITH(NOLOCK) 
-			WHERE InvoiceNumber = @InvoiceNumber AND InvoiceSymbol = @InvoiceSymbol AND Environment = @Environment
+		DECLARE @PartyName VARCHAR(50) = (SELECT REPLACE(CASE WHEN ISNULL(d.BrandName,'') = '' THEN p.PartyName ELSE d.BrandName END,' ', '-')
+			FROM dbo.OAS_Party p WITH(NOLOCK)
+			INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
+			WHERE p.PartyID = @PartyId
 		)
-		--{environment}-{invoice-type}-{invoice-number}-{create-date}-{gen-number}.pdf
-		SET @InvoiceFileName = @Environment + '-' + ISNULL(@InvoiceTypeName,CAST(@InvoiceTypeId AS VARCHAR(10))) + '-' + @InvoiceNo + '-' + CONVERT(varchar(50),@CurrentDateTime, 112) + '-' + CAST((@InvoiceNoCount + 1) AS VARCHAR(10)) + '.pdf'
 
-		INSERT	INTO dbo.LA_InvoiceHeader (BillerId, PartyId, CurrencyId, InvoiceSymbol, InvoiceNumber, FromDate, ToDate, InvoiceDate, DueDate, Amount, InvoiceType, StatusId, Note, HasSent, HasDeleted, CreatedBy, CreatedDateTime, IsSeparateProduct, MaxPCU, RateAmount, IsWaived, InvoicePath, Environment, OfficialInvoiceNo)
+		SET @InvoiceFileName = (SELECT REPLACE(b.BillerName,' ','-') + '-INV-' + @InvoiceNo + '-for-' + @PartyName + '.pdf'
+			FROM dbo.LA_BillerInfo b WITH(NOLOCK)
+			WHERE b.PartyId = @BillerId
+		)
+
+		INSERT INTO dbo.LA_InvoiceHeader (BillerId, PartyId, CurrencyId, InvoiceSymbol, InvoiceNumber, FromDate, ToDate, InvoiceDate, DueDate, Amount, InvoiceType, StatusId, Note, HasSent, HasDeleted, CreatedBy, CreatedDateTime, IsSeparateProduct, MaxPCU, RateAmount, IsWaived, InvoicePath, Environment, OfficialInvoiceNo)
 		VALUES
 		(
 				@BillerId,
@@ -274,7 +279,7 @@ BEGIN
 		-- setup fee=7
 		-- amf = 3
 		DECLARE @AMF MONEY = (SELECT SUM(Amount) FROM @Settlements WHERE ItemType=3)
-		IF @InvoiceTypeId=7 AND ISNULL(@AMF,0)>0 AND @Environment = 'PRO'
+		IF @InvoiceTypeId = 7 AND ISNULL(@AMF, 0) > 0 AND @Environment IN ('PRO','LOCAL','DEV')
 		BEGIN
 			-- find active minfee
 			-- minfee=1
@@ -361,11 +366,4 @@ BEGIN
 	END CATCH
 	-- End Region
 END
-
-GO
-
-GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceInfoInsert] TO bodbAdminNet
-GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_Inv_InvoiceInfoInsert] TO vnteam
 GO
