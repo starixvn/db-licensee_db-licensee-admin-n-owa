@@ -418,20 +418,32 @@ BEGIN
 	)
 	
 	-- get AMF, AG and prepayment
-	DECLARE @AG INT = 25, @DeductAG INT = 26, @WriteOff INT = 27
-	SELECT SUM(ISNULL(Income,0) - ISNULL(Expense,0)) Amount, s.InvItemTypeId
+	DECLARE @InvoiceItemTypes TABLE([Key] VARCHAR(50), [Value] INT)
+	DECLARE @AdvanceMinFee VARCHAR(50) = 'AdvanceMinFee', @PrepaymentKey VARCHAR(50) = 'Prepayment', @AGPrepayment VARCHAR(50) = 'AGPrepayment'
+
+	INSERT INTO @InvoiceItemTypes ([Key], [Value])
+	SELECT @AdvanceMinFee, value
+		FROM (VALUES(3), (5), (7), (21)) AS T1(value)
+	UNION ALL
+	SELECT @PrepaymentKey, value
+		FROM (VALUES(22), (23), (24)) AS T2(value)
+	UNION ALL
+	SELECT @AGPrepayment, value
+		FROM (VALUES(25), (26), (27)) AS T3(value)
+
+	SELECT SUM(ISNULL(Income,0) - ISNULL(Expense,0)) Amount, s.InvItemTypeId, invT.[Key] AS InvItemTypeKey 
 	INTO #credit
 	FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
 	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
-	WHERE s.InvItemTypeId IN (3,5,7,21,22,23,24,@AG,@DeductAG,@WriteOff)
-		AND s.RefPartyId = @PartyId
+	INNER JOIN @InvoiceItemTypes invT ON s.InvItemTypeId = invT.Value
+	WHERE s.RefPartyId = @PartyId
 		AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
 		AND h.Environment = @Environment
-	GROUP BY s.InvItemTypeId
+	GROUP BY s.InvItemTypeId, invT.[Key]
 
-	DECLARE @RemainingAmf MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeId IN (3,5,7,21)),0)
-	DECLARE @RemainingAG MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeId IN (@AG, @DeductAG, @WriteOff)),0)
-	DECLARE @Prepayment MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeId IN (22,23,24)),0)
+	DECLARE @RemainingAmf MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeKey = @AdvanceMinFee), 0)
+	DECLARE @RemainingAG MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeKey = @AGPrepayment), 0)
+	DECLARE @Prepayment MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeKey = @PrepaymentKey), 0)
 
 	-- insert zero amount
 	INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, AmountType)
