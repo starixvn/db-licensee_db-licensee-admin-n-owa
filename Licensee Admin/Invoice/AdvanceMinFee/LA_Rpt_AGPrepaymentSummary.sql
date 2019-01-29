@@ -39,13 +39,14 @@ BEGIN
 		PartyId		INT,
 		PartyName	VARCHAR(50),
 		Amount		MONEY,
+		InvoiceStatementId	BIGINT,
 		InvoiceNo	NVARCHAR(100),
 		InvItemTypeId	INT,
 		[Description]	NVARCHAR(500)
 	)
-	INSERT INTO @AGPSummary(ParentId, PartyId, PartyName, InvoiceNo, InvItemTypeId, [Description], Amount)
+	INSERT INTO @AGPSummary(ParentId, PartyId, PartyName, InvoiceNo, InvItemTypeId, InvoiceStatementId, [Description], Amount)
 	(
-		SELECT p.ParentId, p.PartyId, p.PartyName, h.OfficialInvoiceNo, s.InvItemTypeId, 
+		SELECT p.ParentId, p.PartyId, p.PartyName, h.OfficialInvoiceNo, s.InvItemTypeId, s.InvoiceStatementId, 
 				CASE WHEN s.InvItemTypeId = @WriteOff THEN s.Description ELSE '' END,
 				SUM(ABS(ISNULL(s.Income, 0) -  ISNULL(s.Expense, 0)))
 		FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
@@ -54,7 +55,7 @@ BEGIN
 		WHERE s.InvItemTypeId IN(@AGP, @DeductAGP, @WriteOff) AND p.ParentId > 0
 			AND h.StatusId = 0 -- 0: normal invoice
 			AND h.Environment=@Environment
-		GROUP BY p.ParentId, p.PartyId, p.PartyName, h.OfficialInvoiceNo, s.InvItemTypeId, s.Description
+		GROUP BY p.ParentId, p.PartyId, p.PartyName, h.OfficialInvoiceNo, s.InvItemTypeId, s.InvoiceStatementId, s.Description
 	)
 
 	-- Select summary
@@ -81,9 +82,8 @@ BEGIN
 			InvoiceNo,
 			Amount,
 			[Description]
-			
 	FROM @AGPSummary a
 	WHERE a.InvItemTypeId IN (@DeductAGP, @WriteOff) 
-	ORDER BY InvoiceNo 
+	ORDER BY InvoiceStatementId
 END
 GO
