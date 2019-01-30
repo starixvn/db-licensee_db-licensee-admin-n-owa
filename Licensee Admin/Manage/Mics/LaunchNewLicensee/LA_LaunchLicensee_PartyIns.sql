@@ -29,6 +29,12 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
+	IF EXISTS (SELECT 1 FROM dbo.OAS_Party WITH(NOLOCK) WHERE OldRefID = @LicenseeId AND PartyType = 1) 
+	BEGIN
+		SELECT @ErrMsg = 'Party has already been launched.', @ErrCode =  507
+		RETURN
+	END
+
 	-- #Region OAS_Party
 	IF(@NonOfficialPartyId > 0)
 	BEGIN
