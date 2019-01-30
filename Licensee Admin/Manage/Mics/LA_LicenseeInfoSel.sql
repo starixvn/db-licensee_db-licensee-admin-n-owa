@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 SET QUOTED_IDENTIFIER ON;
@@ -17,19 +17,19 @@ AS
 	- 20180125@Bruce: include branch name [#90029]
 	- 20180301@Parsons: inlclude CO to Licensee List [#90721]
 	- 20180801@Parsons: Rebuild licensee information report [#94283]
+	- 20190130@Bruce: Missing licensee group: Cozni [#108432]
 */
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @Groups AS TABLE (PartyID INT, PartyName VARCHAR(50))
+	DECLARE @Groups AS TABLE (PartyID INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT)
 	DECLARE @EmptyDate AS DATE = NULL
 
 	-- Group: 'ONEWorks','Boping', 'Zelianta', 'Price Feed'
-	INSERT INTO @Groups (PartyID, PartyName)
-	SELECT PartyID, PartyName
-	FROM dbo.OAS_Party WITH (NOLOCK)
-	WHERE PartyName IN ('ONEWorks','Boping', 'Zelianta', 'Price Feed')
-
+	INSERT INTO @Groups(PartyID,PartyName,BrandName,ParentId)
+	EXEC dbo.LA_PartyListSel
+	DELETE @Groups WHERE ParentId>0
+	UPDATE @Groups SET PartyName = REPLACE(PartyName,' Licensees','')
 	-- FILTERED CHARGE INFO
 	--
 	-- PartyType  = 1 : Licensee
