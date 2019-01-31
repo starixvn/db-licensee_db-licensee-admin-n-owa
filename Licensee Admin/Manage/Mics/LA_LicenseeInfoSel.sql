@@ -1,7 +1,8 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
-SET QUOTED_IDENTIFIER ON;
+
+SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 GO
 
@@ -17,19 +18,17 @@ AS
 	- 20180125@Bruce: include branch name [#90029]
 	- 20180301@Parsons: inlclude CO to Licensee List [#90721]
 	- 20180801@Parsons: Rebuild licensee information report [#94283]
+	- 20190130@Bruce: Missing licensee group: Cozni [#108432]
 */
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @Groups AS TABLE (PartyID INT, PartyName VARCHAR(50))
+	DECLARE @Groups AS TABLE (PartyID INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT)
 	DECLARE @EmptyDate AS DATE = NULL
 
 	-- Group: 'ONEWorks','Boping', 'Zelianta', 'Price Feed'
-	INSERT INTO @Groups (PartyID, PartyName)
-	SELECT PartyID, PartyName
-	FROM dbo.OAS_Party WITH (NOLOCK)
-	WHERE PartyName IN ('ONEWorks','Boping', 'Zelianta', 'Price Feed')
-
+	INSERT INTO @Groups(PartyID,PartyName,BrandName,ParentId)
+	EXEC dbo.LA_PartyListSel
 	-- FILTERED CHARGE INFO
 	--
 	-- PartyType  = 1 : Licensee
@@ -60,11 +59,10 @@ BEGIN
 		INNER JOIN dbo.OAS_Party AS p WITH (NOLOCK) ON p.PartyID = ci.FromParty			-- Licensee
 		INNER JOIN @Groups AS g ON ci.ToParty = g.PartyID								-- Group
 		INNER JOIN dbo.OAS_PartyDetail AS pd WITH (NOLOCK) ON pd.PartyID = p.PartyID	-- Credit
+		INNER JOIN dbo.LA_ChargeInfo_SystemMapping s WITH (NOLOCK) ON s.ChargeID=ci.ChargeID AND s.SystemID = 2
 		LEFT JOIN dbo.LA_Minfee AS f WITH (NOLOCK) ON f.PartyId = ci.FromParty AND f.ProductId=ci.ProductId AND f.FeeTypeId = 1 -- Min fee
 		LEFT JOIN dbo.LA_Minfee AS m WITH (NOLOCK) ON m.PartyId = ci.FromParty AND m.ProductId=ci.ProductId AND m.FeeTypeId = 2 -- Waive month
-	WHERE p.PartyType = 1 AND ci.ChargeID IN (	SELECT ChargeID 
-												FROM dbo.LA_ChargeInfo_SystemMapping WITH (NOLOCK)
-												WHERE SystemID = 2)
+	WHERE g.ParentId = 0 AND p.PartyType = 1
 	ORDER BY p.PartyName, pd.BrandName, ci.FromDate, ci.ProductID
 END
 GO
