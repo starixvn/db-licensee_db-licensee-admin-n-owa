@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 
 USE [bodb_Licensee]
 GO
@@ -21,8 +21,9 @@ AS
 
 	Revisions:
 		- 20171226: create SP
+		- 20190122@Parsons: Improve AG prepayment and discount setting [#104620]
 	Explanation:
-		@Option: 0-Write off, 1-deduct as AMF, 2-deduct against invoice
+		@Option: 0-Amf Prepayment Write off, 1-deduct as AMF, 2-deduct against invoice, 3-AG Prepayment write off
 */
 BEGIN
 	SET NOCOUNT ON
@@ -30,6 +31,8 @@ BEGIN
 	DECLARE @Description VARCHAR(100)
 	DECLARE @BillerId INT = 0
 	DECLARE @InvoiceTypeId INT = 12
+
+	DECLARE @AmfPrepaymentWriteOff INT = 0, @AGPrepaymentWriteOff INT = 3
 
 	SET @FromPartyId = ISNULL(@FromPartyId,0)
 	SET @ToPartyId = ISNULL(@ToPartyId,0)
@@ -104,7 +107,7 @@ BEGIN
 
 	-- write off
 	-- 21-amf, 23-prepayment
-	IF @Option = 0
+	IF @Option = @AmfPrepaymentWriteOff
 	BEGIN
 		IF @FromPartyId = 0
 		BEGIN
@@ -126,6 +129,19 @@ BEGIN
 			INSERT INTO @Transfer(ItemTypeId, RefPartyId, Amount, [Description])
 			VALUES (23, @FromPartyId,-@WriteOffAmount, @Description + CONVERT(VARCHAR, @WriteOffAmount, 1))
 		END
+	END
+	ELSE IF @Option = @AGPrepaymentWriteOff
+	BEGIN
+		IF @FromPartyId = 0
+		BEGIN
+			SELECT @ErrCode = 101, @ErrMsg = 'From Licensee is required.'
+			RETURN
+		END
+
+		SET @Description = 'Write off' + CHAR(13) + 'Amount: '
+
+		INSERT INTO @Transfer(ItemTypeId, RefPartyId, Amount, [Description])
+		VALUES (27, @FromPartyId,-@Amount, @Description + CONVERT(VARCHAR, @Amount, 1))
 	END
 	ELSE
 	BEGIN
@@ -241,7 +257,4 @@ BEGIN
 			, @duration = @duration
 	END CATCH
 END
-GO
-
-GRANT EXECUTE ON [dbo].[LA_Inv_TransferAmfAmount] TO bodbAdminNet
 GO

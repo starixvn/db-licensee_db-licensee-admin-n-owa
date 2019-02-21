@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 
 USE [bodb_Licensee]
 GO
@@ -19,10 +19,11 @@ AS
 
 	Revisions:
 		- 20181003@Parsons: Integrate AG setup fee into invoices [RedmineID: #98485]
+		- 20190122@Parsons: Improve AG prepayment and discount setting [#104620]
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @AGP INT = 25, @DeductAGP INT = 26
+	DECLARE @AGP INT = 25, @DeductAGP INT = 26, @WriteOff INT = 27
 
 	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT)
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
@@ -38,19 +39,23 @@ BEGIN
 		PartyId		INT,
 		PartyName	VARCHAR(50),
 		Amount		MONEY,
+		InvoiceStatementId	BIGINT,
 		InvoiceNo	NVARCHAR(100),
-		InvItemTypeId	INT
+		InvItemTypeId	INT,
+		[Description]	NVARCHAR(500)
 	)
-	INSERT INTO @AGPSummary(ParentId, PartyId, PartyName, InvoiceNo, InvItemTypeId, Amount)
+	INSERT INTO @AGPSummary(ParentId, PartyId, PartyName, InvoiceNo, InvItemTypeId, InvoiceStatementId, [Description], Amount)
 	(
-		SELECT p.ParentId, p.PartyId, p.PartyName, h.OfficialInvoiceNo, s.InvItemTypeId, SUM(CASE WHEN s.InvItemTypeId = @AGP THEN ISNULL(s.Income, 0) ELSE ISNULL(s.Expense, 0)END)
+		SELECT p.ParentId, p.PartyId, p.PartyName, h.OfficialInvoiceNo, s.InvItemTypeId, s.InvoiceStatementId, 
+				CASE WHEN s.InvItemTypeId = @WriteOff THEN s.Description ELSE '' END,
+				SUM(ABS(ISNULL(s.Income, 0) -  ISNULL(s.Expense, 0)))
 		FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
 		INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) on h.InvoiceHeaderId=s.InvoiceHeaderId
 		INNER JOIN @Parties p ON p.PartyId = s.RefPartyId
-		WHERE s.InvItemTypeId IN(@AGP,@DeductAGP) AND p.ParentId > 0
+		WHERE s.InvItemTypeId IN(@AGP, @DeductAGP, @WriteOff) AND p.ParentId > 0
 			AND h.StatusId = 0 -- 0: normal invoice
 			AND h.Environment=@Environment
-		GROUP BY p.ParentId, p.PartyId, p.PartyName, h.OfficialInvoiceNo, s.InvItemTypeId
+		GROUP BY p.ParentId, p.PartyId, p.PartyName, h.OfficialInvoiceNo, s.InvItemTypeId, s.InvoiceStatementId, s.Description
 	)
 
 	-- Select summary
@@ -59,7 +64,8 @@ BEGIN
 				PartyId,
 				PartyName,
 				SUM(CASE WHEN InvItemTypeId = @AGP THEN Amount ELSE 0 END) AS Prepayment,
-				SUM(CASE WHEN InvItemTypeId = @DeductAGP THEN Amount ELSE 0 END) AS TotalMonthlyFee
+				SUM(CASE WHEN InvItemTypeId = @DeductAGP THEN Amount ELSE 0 END) AS TotalMonthlyFee,
+				SUM(CASE WHEN InvItemTypeId = @WriteOff	THEN Amount ELSE 0 END) AS WriteOff
 		FROM @AGPSummary
 		GROUP BY ParentId, PartyId, PartyName
 	)
@@ -67,17 +73,17 @@ BEGIN
 			a.PartyId,
 			a.PartyName,
 			a.Prepayment,
-			(a.Prepayment - a.TotalMonthlyFee) AS Balance
+			(a.Prepayment - a.TotalMonthlyFee - a.WriteOff) AS Balance
 	FROM cte_agpSummary a 
 	INNER JOIN @Parties p ON a.ParentId = p.PartyId
 
 	-- Select invoice items
 	SELECT  a.PartyId,
 			InvoiceNo,
-			Amount
-			
+			Amount,
+			[Description]
 	FROM @AGPSummary a
-	WHERE a.InvItemTypeId = @DeductAGP
-	ORDER BY InvoiceNo 
+	WHERE a.InvItemTypeId IN (@DeductAGP, @WriteOff) 
+	ORDER BY InvoiceStatementId
 END
 GO
