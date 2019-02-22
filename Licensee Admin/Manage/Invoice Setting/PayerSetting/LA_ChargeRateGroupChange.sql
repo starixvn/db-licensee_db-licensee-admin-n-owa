@@ -39,14 +39,21 @@ BEGIN
 	SELECT ChargeID, ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling
 	FROM OAS_ChargeInfo WITH(NOLOCK)
 	WHERE FromParty = @PartyId AND ToParty IN (1,9,11,98)
-		  AND FromDate < @EffectiveDate AND ToDate > @EffectiveDate
-
+		  AND FromDate < @EffectiveDate AND ToDate >= @EffectiveDate
+	
 	--Step1: Expire all active charge rates at EffectiveDate - 1
+		-- 1.1 Update OAS_ChargeInfo
 	UPDATE c1
 	SET ToDate = DATEADD(DAY, -1, @EffectiveDate)
 	FROM OAS_ChargeInfo c1 WITH(NOLOCK) 
-	INNER JOIN @ChangeRateTable c2 ON c1.ChargeID = c2.ChargeID 
-	
+	INNER JOIN @ChangeRateTable c2 ON c1.ChargeID = c2.ChargeID
+
+		-- 1.2 Update OAS_ChargeInfoSub
+	UPDATE cs
+	SET ToDate = DATEADD(DAY, -1, @EffectiveDate)
+	FROM OAS_ChargeInfoSub cs WITH(NOLOCK) 
+	INNER JOIN @ChangeRateTable c ON cs.ChargeIdRef = c.ChargeID 
+
 	IF @@Error > 0
 	BEGIN
 		UPDATE c1
@@ -54,20 +61,35 @@ BEGIN
 		FROM OAS_ChargeInfo c1
 		INNER JOIN @ChangeRateTable c2 ON c1.ChargeID = c2.ChargeID
 
+		UPDATE cs
+		SET ToDate = c.ToDate
+		FROM OAS_ChargeInfoSub cs WITH(NOLOCK) 
+		INNER JOIN @ChangeRateTable c ON cs.ChargeIdRef = c.ChargeID 
+
 		SELECT @ErrMsg = 'Fail to expire all active charge rates', @ErrCode = 504
 		RETURN
 	END
 
 	--Step2: Copy charge rates to new group with FromDate = Effective date
+	DECLARE @InsertedResult TABLE (ChargeId INT, ProductId INT)
+
 		-- 2.1 OAS_ChargeInfo
 	INSERT INTO OAS_ChargeInfo(ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling)
+	OUTPUT INSERTED.ChargeID, INSERTED.ProductId INTO @InsertedResult(ChargeId, ProductId)
 	SELECT ProductID, FromParty, @GroupId, ParentChargeID, Rate, ChargeType, @EffectiveDate, ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling
 	FROM @ChangeRateTable
+
 		-- 2.2 LA_ChargeInfo_SystemMapping
 	INSERT INTO LA_ChargeInfo_SystemMapping(ChargeID, SystemID)
 	SELECT ChargeID, 2
-	FROM OAS_ChargeInfo WITH(NOLOCK)
-	WHERE FromParty = @PartyId AND ToParty = @GroupId AND FromDate = @EffectiveDate
+	FROM @InsertedResult
+
+		-- 2.3 OAS_ChargeInfoSub
+	INSERT INTO OAS_ChargeInfoSub (ProductID, BettypeRef, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, BaseCurrencyId, FirstOfBilling, BasisOfBilling, ChargeIdRef)
+	SELECT cs.ProductID, cs.BettypeRef, cs.FromParty, @GroupId , cs.ParentChargeID, cs.Rate, cs.ChargeType, @EffectiveDate, c.ToDate, cs.BaseCurrencyId, cs.FirstOfBilling, cs.BasisOfBilling, ins.ChargeId 
+	FROM [dbo].[OAS_ChargeInfoSub] cs WITH(NOLOCK)
+	INNER JOIN @ChangeRateTable c ON cs.ChargeIdRef = c.ChargeID
+	INNER JOIN @InsertedResult ins ON cs.ProductID = ins.ProductId
 
 	IF @@Error > 0
 	BEGIN
@@ -76,8 +98,18 @@ BEGIN
 		FROM OAS_ChargeInfo c1
 		INNER JOIN @ChangeRateTable c2 ON c1.ChargeID = c2.ChargeID
 		
-		DELETE OAS_ChargeInfo
-		WHERE FromParty = @PartyId AND ToParty = @GroupId AND FromDate = @EffectiveDate
+		DELETE c
+		FROM OAS_ChargeInfo c 
+		INNER JOIN @InsertedResult ins ON c.ChargeID = ins.ChargeID
+
+		UPDATE cs
+		SET ToDate = c.ToDate
+		FROM OAS_ChargeInfoSub cs WITH(NOLOCK) 
+		INNER JOIN @ChangeRateTable c ON cs.ChargeIdRef = c.ChargeID 
+
+		DELETE cs
+		FROM OAS_ChargeInfoSub cs 
+		INNER JOIN @InsertedResult ins ON cs.ChargeIdRef = ins.ChargeID
 
 		SELECT @ErrMsg = 'Fail to copy charge rates to new group', @ErrCode = 504
 		RETURN
