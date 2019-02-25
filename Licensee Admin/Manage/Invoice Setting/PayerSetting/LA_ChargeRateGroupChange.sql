@@ -32,25 +32,25 @@ BEGIN
 				@Doing			NVARCHAR(MAX)
 	SET @StartRun = GETDATE()
 
+	DECLARE @IsActived INT = 1, @IsActivating INT = 2, @IsExpired INT = 3
 	DECLARE @ProductListAll	VARCHAR(100) = '', @MinDate DATE, @MaxDate	DATE	
-	DECLARE @ChangeRateTable AS TABLE(ChargeID INT, ProductID INT, FromParty INT, ToParty INT, ParentChargeID INT, Rate MONEY, ChargeType TINYINT, FromDate DATE, ToDate DATE, Remark NVARCHAR(200), BaseCurrencyId TINYINT, FirstOfBilling DATE, BasisOfBilling NVARCHAR(4000), IsActived BIT)
 	
 	SELECT @ProductListAll = @ProductListAll + ProductPrefix + ','
 	FROM dbo.LA_f_Products3rd('')
-	SET @ProductListAll = REPLACE(SUBSTRING(@ProductListAll, 0, LEN(@ProductListAll)), 'RB', '') -- dont support RB
+	WHERE ProductPrefix <> 'RB' -- dont support RB
 
 	SELECT @MinDate = MIN(ci.FromDate), @MaxDate = MAX(ci.ToDate)
 	FROM dbo.OAS_ChargeInfo ci WITH (NOLOCK)
 	INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
 	WHERE ci.FromParty = @PartyId
 
-	INSERT INTO @ChangeRateTable(ChargeID, ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling, IsActived)
 	SELECT DISTINCT c1.ChargeID, c1.ProductID, FromParty, ToParty, ParentChargeID, Rate, c1.ChargeType, c1.FromDate, c1.ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling,
 			CASE
-				WHEN c1.FromDate < @EffectiveDate AND c1.ToDate >= @EffectiveDate THEN 1
-				WHEN c1.FromDate > DATEADD(DAY, -1, @EffectiveDate) THEN 0
-				ELSE NULL
-			END
+				WHEN c1.FromDate < @EffectiveDate AND c1.ToDate >= @EffectiveDate THEN @IsActived
+				WHEN c1.FromDate >= @EffectiveDate THEN @IsActivating
+				ELSE @IsExpired
+			END AS [Status]
+	INTO #ChangeRateTable
 	FROM OAS_ChargeInfo c1 WITH(NOLOCK)
 	INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @MinDate, @MaxDate, @ProductListAll, 'OA', 1) c2 ON c1.ChargeID = c2.ChargeID
 
@@ -59,29 +59,29 @@ BEGIN
 	UPDATE c1
 	SET ToDate = DATEADD(DAY, -1, @EffectiveDate)
 	FROM OAS_ChargeInfo c1 WITH(NOLOCK) 
-	INNER JOIN @ChangeRateTable c2 ON c1.ChargeID = c2.ChargeID
-	WHERE IsActived = 1
+	INNER JOIN #ChangeRateTable c2 ON c1.ChargeID = c2.ChargeID
+	WHERE [Status] = @IsActived
 
 		-- 1.2 Update OAS_ChargeInfoSub
 	UPDATE cs
 	SET ToDate = DATEADD(DAY, -1, @EffectiveDate)
 	FROM OAS_ChargeInfoSub cs WITH(NOLOCK) 
-	INNER JOIN @ChangeRateTable c ON cs.ChargeIdRef = c.ChargeID 
-	WHERE IsActived = 1
+	INNER JOIN #ChangeRateTable c ON cs.ChargeIdRef = c.ChargeID 
+	WHERE [Status] = @IsActived
 
 	IF @@Error > 0
 	BEGIN
 		UPDATE c1
 		SET c1.ToDate = c2.ToDate
 		FROM OAS_ChargeInfo c1 WITH(NOLOCK) 
-		INNER JOIN @ChangeRateTable c2 ON c1.ChargeID = c2.ChargeID
-		WHERE IsActived = 1
+		INNER JOIN #ChangeRateTable c2 ON c1.ChargeID = c2.ChargeID
+		WHERE [Status] = @IsActived
 
 		UPDATE cs
 		SET ToDate = c.ToDate
 		FROM OAS_ChargeInfoSub cs WITH(NOLOCK) 
-		INNER JOIN @ChangeRateTable c ON cs.ChargeIdRef = c.ChargeID
-		WHERE IsActived = 1 
+		INNER JOIN #ChangeRateTable c ON cs.ChargeIdRef = c.ChargeID
+		WHERE [Status] = @IsActived 
 
 		SELECT @ErrMsg = 'Fail to expire all active charge rates: ' + ERROR_MESSAGE(), @ErrCode = 504
 		RETURN
@@ -94,8 +94,8 @@ BEGIN
 	INSERT INTO OAS_ChargeInfo(ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling)
 	OUTPUT INSERTED.ChargeID, INSERTED.ProductId INTO @InsertedResult(ChargeId, ProductId)
 	SELECT ProductID, FromParty, @GroupId, ParentChargeID, Rate, ChargeType, @EffectiveDate, ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling
-	FROM @ChangeRateTable
-	WHERE IsActived = 1
+	FROM #ChangeRateTable
+	WHERE [Status] = @IsActived
 
 		-- 2.2 LA_ChargeInfo_SystemMapping
 	INSERT INTO LA_ChargeInfo_SystemMapping(ChargeID, SystemID)
@@ -106,17 +106,17 @@ BEGIN
 	INSERT INTO OAS_ChargeInfoSub (ProductID, BettypeRef, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, BaseCurrencyId, FirstOfBilling, BasisOfBilling, ChargeIdRef)
 	SELECT cs.ProductID, cs.BettypeRef, cs.FromParty, @GroupId , cs.ParentChargeID, cs.Rate, cs.ChargeType, @EffectiveDate, c.ToDate, cs.BaseCurrencyId, cs.FirstOfBilling, cs.BasisOfBilling, ins.ChargeId 
 	FROM [dbo].[OAS_ChargeInfoSub] cs WITH(NOLOCK)
-	INNER JOIN @ChangeRateTable c ON cs.ChargeIdRef = c.ChargeID
+	INNER JOIN #ChangeRateTable c ON cs.ChargeIdRef = c.ChargeID
 	INNER JOIN @InsertedResult ins ON cs.ProductID = ins.ProductId
-	WHERE IsActived = 1
+	WHERE [Status] = @IsActived
 
 	IF @@Error > 0
 	BEGIN
 		UPDATE c1
 		SET c1.ToDate = c2.ToDate
 		FROM OAS_ChargeInfo c1 WITH(NOLOCK) 
-		INNER JOIN @ChangeRateTable c2 ON c1.ChargeID = c2.ChargeID
-		WHERE IsActived = 1
+		INNER JOIN #ChangeRateTable c2 ON c1.ChargeID = c2.ChargeID
+		WHERE [Status] = @IsActived
 
 		DELETE c
 		FROM OAS_ChargeInfo c 
@@ -125,14 +125,14 @@ BEGIN
 		UPDATE cs
 		SET ToDate = c.ToDate
 		FROM OAS_ChargeInfoSub cs WITH(NOLOCK) 
-		INNER JOIN @ChangeRateTable c ON cs.ChargeIdRef = c.ChargeID 
-		WHERE IsActived = 1
+		INNER JOIN #ChangeRateTable c ON cs.ChargeIdRef = c.ChargeID 
+		WHERE [Status] = @IsActived
 
 		DELETE cs
 		FROM OAS_ChargeInfoSub cs 
 		INNER JOIN @InsertedResult ins ON cs.ChargeIdRef = ins.ChargeID
 
-		SELECT @ErrMsg = 'Fail to copy charge rates to new group: ' + ERROR_MESSAGE(), @ErrCode = 504
+		SELECT @ErrMsg = 'Fail to copy charge rates to new group: ' + ERROR_MESSAGE(), @ErrCode = 505
 		RETURN
 	END
 
@@ -146,14 +146,14 @@ BEGIN
 	UPDATE c1
 	SET ToParty = @GroupId
 	FROM OAS_ChargeInfo c1 WITH(NOLOCK) 
-	INNER JOIN @ChangeRateTable c2 ON c1.ChargeID = c2.ChargeID
-	WHERE IsActived = 0
+	INNER JOIN #ChangeRateTable c2 ON c1.ChargeID = c2.ChargeID
+	WHERE [Status] = @IsActivating
 		-- 3.2 OAS_ChargeInfoSub
 	UPDATE cs
 	SET ToParty = @GroupId
 	FROM OAS_ChargeInfoSub cs WITH(NOLOCK) 
-	INNER JOIN @ChangeRateTable c ON cs.ChargeID = c.ChargeID
-	WHERE IsActived = 0
+	INNER JOIN #ChangeRateTable c ON cs.ChargeIdRef = c.ChargeID
+	WHERE [Status] = @IsActivating
 
 	SET @EndRun = GETDATE()
 	SET @Duration = DATEDIFF (MILLISECOND, @StartRun, @EndRun)
@@ -176,5 +176,7 @@ BEGIN
 	BEGIN
 		SELECT @ErrMsg = 'Fail to write log: ' + ERROR_MESSAGE() , @ErrCode = 506
 	END
+
+	DROP TABLE #ChangeRateTable
 END
 GO
