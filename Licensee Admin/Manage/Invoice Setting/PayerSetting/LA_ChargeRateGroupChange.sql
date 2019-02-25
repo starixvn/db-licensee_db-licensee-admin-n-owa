@@ -169,7 +169,7 @@ BEGIN
 		@Doing = @Doing,
 		@Userid = @UserId,
 		@Typeid = 0,
-		@Actionid = 999,
+		@Actionid = 5546,
 		@Duration = @Duration
 
 	IF @@ERROR <> 0
