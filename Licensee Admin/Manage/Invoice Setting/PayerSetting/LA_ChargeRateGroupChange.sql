@@ -161,9 +161,12 @@ BEGIN
 	SET @Doing =(SELECT	@GroupId		AS GroupId,
 						@PartyId		AS PartyId,
 						@EffectiveDate	AS [EffectiveDate],
-						@UserId			AS	UserId
+						@UserId			AS	UserId,
+						(SELECT ChargeID, ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling, [Status]
+							FROM #ChangeRateTable
+							FOR XML PATH('ChangeRateTable'), TYPE) AS ChangeRateTables
 						FOR XML PATH('')) 
-
+	
 	EXEC DBLOG.bodb_CustomerLog.dbo.WriteLog_UserLog_UserControl
 		@Custid = 0,
 		@Doing = @Doing,
