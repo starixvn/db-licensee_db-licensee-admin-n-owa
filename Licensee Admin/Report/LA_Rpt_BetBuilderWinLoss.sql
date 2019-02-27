@@ -81,7 +81,7 @@ BEGIN
 		SUM(b.WinLoss) AS CustomerWinLoss,
 		SUM(-(b.WinLoss)) AS LicenseeWinloss,
 		SUM(CASE WHEN ci.isDeposit = 1 THEN (-b.WinLoss * ci.Rate)
-			ELSE b.Winloss + b.WinLossA + b.WinLossM + b.WinLossS + b.CommissionS END) LicensingFee
+			ELSE -(b.Winloss + b.WinLossA + b.WinLossM + b.WinLossS + b.CommissionS) END) LicensingFee
 	FROM bodb_LicenseeReport..rpt_Betting b WITH (NOLOCK)
 		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 		INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
