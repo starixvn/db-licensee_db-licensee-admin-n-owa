@@ -8,7 +8,8 @@ GO
 
 ALTER PROCEDURE [dbo].LA_GEN_LicPerformanceAnalysis_Invoice (
 	@InvoiceID		INT,
-	@ProductCodes VARCHAR(500)
+	@ProductCodes	VARCHAR(500),
+	@Environment	VARCHAR(10)
 )
 AS
 /*
@@ -24,7 +25,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @PartyId INT
+	DECLARE @PartyId INT = NULL
 	DECLARE @InvoiceStatus SMALLINT
 	DECLARE @InvoiceDate DATE
 	DECLARE @AdjustmentId INT = 9000
@@ -32,7 +33,10 @@ BEGIN
 	DECLARE @InvoiceStatus_Normal	SMALLINT = 0
 
 	SELECT @PartyId = PartyId, @InvoiceStatus = [StatusId], @InvoiceDate = DATEADD(month, DATEDIFF(month, 0, InvoiceDate), 0), @BaseCurrency = CurrencyId
-	FROM dbo.LA_InvoiceHeader WITH(NOLOCK) WHERE InvoiceHeaderId = @InvoiceID
+	FROM dbo.LA_InvoiceHeader WITH(NOLOCK) WHERE InvoiceHeaderId = @InvoiceID AND Environment = @Environment
+
+	-- stop generating, no invoice found
+	IF @PartyId IS NULL RETURN;
 
 	DECLARE @SiteId INT = (SELECT p.OldRefID FROM dbo.OAS_Party p WITH (NOLOCK) WHERE p.PartyID = @PartyId)
 
