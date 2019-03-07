@@ -2,7 +2,7 @@
 USE bodb_Licensee
 GO
 
-CREATE FUNCTION [dbo].[LA_f_AnalysisProduct] ()
+CREATE FUNCTION [dbo].[LA_f_LicPerformanceAnalysisProduct] ()
 RETURNS @tblProduct TABLE (
 	ProductId	INT,
 	ProductCode	VARCHAR(10),
