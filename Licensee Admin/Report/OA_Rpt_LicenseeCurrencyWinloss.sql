@@ -171,7 +171,7 @@ BEGIN
 							+ 'b.bettype < 31 OR '
 							+ 'b.bettype BETWEEN 121 AND 999 OR '
 							+ 'b.bettype BETWEEN 9001 AND 9399 OR '
-							+ 'b.bettype BETWEEN 1301 AND 1399 '
+							+ 'b.bettype BETWEEN 1301 AND 1399 OR '
 							+ 'b.bettype = 38 ' ELSE 'AND (b.bettype < 0' END +
 						CASE WHEN @ShowRB = 1 THEN ' OR b.bettype BETWEEN 31 AND 33' ELSE '' END + 
 						CASE WHEN @ShowLC=1 THEN ' OR b.bettype BETWEEN 1101 AND 1199' ELSE '' END + char(13)+
@@ -251,7 +251,7 @@ BEGIN
 						+ 'b.bettype < 31 OR '
 						+ 'b.bettype BETWEEN 121 AND 999 OR '
 						+ 'b.bettype BETWEEN 9001 AND 9399 OR '
-						+ 'b.bettype BETWEEN 1301 AND 1399'
+						+ 'b.bettype BETWEEN 1301 AND 1399 OR '
 						+ 'b.bettype = 38' ELSE '(b.bettype < 0' END +
 					CASE WHEN @ShowRB = 1 THEN ' OR b.bettype BETWEEN 31 AND 33' ELSE '' END + 
 					CASE WHEN @ShowLC=1 THEN ' OR b.bettype BETWEEN 1101 AND 1199' ELSE ''END+char(13)+
