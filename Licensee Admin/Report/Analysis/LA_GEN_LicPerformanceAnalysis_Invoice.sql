@@ -32,7 +32,7 @@ BEGIN
 	DECLARE @BaseCurrency INT = 6
 	DECLARE @InvoiceStatus_Normal	SMALLINT = 0
 
-	SELECT @PartyId = PartyId, @InvoiceStatus = [StatusId], @InvoiceDate = DATEADD(month, DATEDIFF(month, 0, InvoiceDate), 0), @BaseCurrency = CurrencyId
+	SELECT @PartyId = PartyId, @InvoiceStatus = [StatusId], @InvoiceDate = DATEADD(MONTH, DATEDIFF(MONTH, 0, InvoiceDate), 0), @BaseCurrency = CurrencyId
 	FROM dbo.LA_InvoiceHeader WITH(NOLOCK) WHERE InvoiceHeaderId = @InvoiceID AND Environment = @Environment
 
 	-- stop generating, no invoice found
@@ -203,7 +203,7 @@ BEGIN
 	IF	EXISTS (SELECT TOP 1 1 FROM @StatementItemList WHERE InvItemTypeId <> @InvItemType_SoftwareFee) AND
 		EXISTS (SELECT TOP 1 1 FROM @tmpProductList WHERE ProductId = @AdjustmentId)
 	BEGIN
-		EXEC dbo.LA_LicPerformanceAnalysis_AdjustmentGen @PartyId, @InvoiceDate
+		EXEC dbo.LA_GEN_LicPerformanceAnalysis_Adjustment @PartyId, @InvoiceDate, @Environment
 	END
 END
 GO 
