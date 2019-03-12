@@ -42,6 +42,7 @@ AS
 			- 20180515@Scofield: Incorporate 9wickets data [#94950]
 			- 20180716@bruce: add new group TEST for credit [#98126]
 			- 20181120@Parsons: Integrate Bidme games (GD product) [#103695]
+			- 20190312@Parsons: Integrate Promotion Prize (PP product) [#109014]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -648,6 +649,39 @@ BEGIN
 				AND b.customercategory NOT IN (27, 28)
 			GROUP BY b.rptDate, b.CurrencyId
 		)
+	END
+	ELSE IF (@ProductCode = 'PP')
+	BEGIN
+		DECLARE @PromotionPrize INT = 4300 
+
+		;WITH cte_WinLossData AS(
+			SELECT b.SiteId, b.rptDate, b.CurrencyID
+				, SUM(ISNULL(b.betcount, 0)) BetCount
+				, SUM(ISNULL(b.turnover, 0)) AS Turnover
+				, SUM(CASE WHEN b.BetTypeId <> @PromotionPrize THEN ISNULL(b.Winloss, 0) ELSE 0 END) Winloss
+				, SUM(CASE WHEN b.BetTypeId = @PromotionPrize THEN ISNULL(b.Winloss, 0) ELSE 0 END) AS WinningPrize
+				FROM bodb_LicenseeReport..rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
+					INNER JOIN @Bettype bt ON b.BetTypeId = bt.Bettype
+				WHERE
+					b.SiteID = @LicenseeID
+					AND b.rptDate BETWEEN @FromDate AND @ToDate
+					AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
+					AND (b.CurrencyID <> 20)
+					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
+		)
+		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, WinningPrize, Company)
+		SELECT rptDate, CurrencyID
+				, SUM(BetCount)		AS BetCount
+				, SUM(Turnover)		AS Turnover
+				, SUM(WinLoss + WinningPrize)	AS Winlost
+				, SUM(-Winloss * ( 1 - p.Rate))  AS LicenseeWL
+				, SUM(WinningPrize) AS WinningPrize
+				, SUM((-WinLoss * p.Rate) + WinningPrize) AS Company
+		FROM cte_WinLossData d
+			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
+		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
+		GROUP BY rptDate, CurrencyID
 	END
 	ELSE
 	BEGIN
