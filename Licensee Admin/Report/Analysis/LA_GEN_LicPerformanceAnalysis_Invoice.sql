@@ -203,7 +203,10 @@ BEGIN
 	IF	EXISTS (SELECT TOP 1 1 FROM @StatementItemList WHERE InvItemTypeId <> @InvItemType_SoftwareFee) AND
 		EXISTS (SELECT TOP 1 1 FROM @tmpProductList WHERE ProductId = @AdjustmentId)
 	BEGIN
-		EXEC dbo.LA_GEN_LicPerformanceAnalysis_Adjustment @PartyId, @InvoiceDate, @Environment
+		EXEC dbo.LA_GEN_LicPerformanceAnalysis_Adjustment 
+			@PartyIds = @PartyId, 
+			@ReportDate = @InvoiceDate, 
+			@Environment = @Environment
 	END
 END
 GO 
