@@ -116,7 +116,7 @@ BEGIN
 			SUM(b.BetCount) AS BetCount,
 			SUM(b.Turnover) AS Turnover,
 			SUM(b.Turnover * (CASE WHEN b.StatusId = 111 THEN 0 WHEN b.StatusId IN (114, 115) THEN 0.5 ELSE 1 END)) AS TurnoverNoDraw
-		INTO #tmpData
+		INTO #tmpPerfData
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		INNER JOIN @tmpChargeInfo p ON b.ProductId = p.ProductID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
@@ -151,7 +151,7 @@ BEGIN
 			DELETE @tmpBaseCurrencyList WHERE CurrencyId = @tmpCurrency
 
 			INSERT INTO @tmpAmountToCompany(PartyId,ProductId,Fee,Discount,Rebate,IsChargedByMinFee)
-			EXEC LA_AmountToCompanyByDiscountCurrencySel
+			EXEC dbo.LA_AmountToCompanyByDiscountCurrencySel
 				@FromDate = @FromDate,
 				@ToDate = @ToDate,
 				@PartyIDs = @PartyIDs,
@@ -166,7 +166,7 @@ BEGIN
 					SUM(b.Winloss * e.BaseCurrencyRate) AS Winloss,
 					SUM(b.Turnover * e.BaseCurrencyRate) AS Turnover,
 					SUM(b.TurnoverNoDraw * e.BaseCurrencyRate) AS TurnoverNoDraw
-				FROM #tmpData b
+				FROM #tmpPerfData b
 				INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate,@ToDate, @tmpCurrencyCode) e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 				GROUP BY b.ProductId
 			)
@@ -195,7 +195,7 @@ BEGIN
 			0
 		FROM @tmpAmountToCompany a
 
-		DROP TABLE #tmpData
+		DROP TABLE #tmpPerfData
 	END
 
 	-- mark adjustment values need to be regenerated
