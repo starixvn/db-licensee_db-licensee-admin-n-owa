@@ -206,7 +206,8 @@ BEGIN
 		EXEC dbo.LA_GEN_LicPerformanceAnalysis_Adjustment 
 			@PartyIds = @PartyId, 
 			@ReportDate = @InvoiceDate, 
-			@Environment = @Environment
+			@Environment = @Environment,
+			@IsOverwrite = 1
 	END
 END
 GO 
