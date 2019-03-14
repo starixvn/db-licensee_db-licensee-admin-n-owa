@@ -74,7 +74,7 @@ BEGIN
 	BEGIN
 		-- only generate product in selected invoice
 		--
-		DELETE bodb_LicenseeReport.dbo.tmp_rptLicPerformanceAnalysis
+		DELETE bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis
 		WHERE SiteId = @SiteId 
 			AND ReportDate = @InvoiceDate 
 			AND ProductId IN (SELECT s.ProductId FROM @StatementItemList s WHERE s.InvItemTypeId = @InvItemType_SoftwareFee)
@@ -192,7 +192,7 @@ BEGIN
 				UPDATE @tmpAmountToCompany SET CurrencyId = @tmpCurrency WHERE CurrencyId IS NULL
 			END
 
-			INSERT INTO bodb_LicenseeReport.dbo.tmp_rptLicPerformanceAnalysis(ReportDate,SiteId,ProductId,CurrencyId,IsBillingCurrency,BetCount,Turnover,TurnoverNoDraw,LicenseeWinloss,LicensingFee,Discount,Rebate,Adjustment)
+			INSERT INTO bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis(ReportDate,SiteId,ProductId,CurrencyId,IsBillingCurrency,BetCount,Turnover,TurnoverNoDraw,LicenseeWinloss,LicensingFee,Discount,Rebate,Adjustment)
 			SELECT @InvoiceDate,@SiteId,a.ProductId,a.CurrencyId,
 				CASE WHEN a.CurrencyId = @BaseCurrency THEN 1 ELSE 0 END AS IsBillingCurrency,
 				ISNULL(a.BetCount,0)		AS BetCount,

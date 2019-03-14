@@ -82,7 +82,7 @@ BEGIN
 		DECLARE @skip TABLE(SiteID INT, ProductId INT)
 		;WITH a AS(
 			SELECT DISTINCT SiteId, ProductId
-			FROM bodb_LicenseeReport.dbo.tmp_rptLicPerformanceAnalysis WITH(NOLOCK)
+			FROM bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis WITH(NOLOCK)
 			WHERE ReportDate = @ReportDate AND ProductId <> @AdjustmentId AND IsBillingCurrency = 1
 		),b AS(
 			SELECT DISTINCT LicenseeId, ProductId FROM #tmpPartyChargeRates
@@ -183,11 +183,11 @@ BEGIN
 		UPDATE #tmpPerfResult SET CurrencyId = @tmpCurrency WHERE CurrencyId IS NULL
 	END
 
-	DELETE a FROM bodb_LicenseeReport.dbo.tmp_rptLicPerformanceAnalysis a
+	DELETE a FROM bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis a
 	INNER JOIN @tmpPartyList p ON a.SiteId=p.SiteId
 	INNER JOIN #tmpPerfResult b ON b.PartyId=p.PartyId AND a.ProductId = b.ProductId AND a.ReportDate = @ReportDate AND a.CurrencyId = b.CurrencyId
 
-	INSERT INTO bodb_LicenseeReport.dbo.tmp_rptLicPerformanceAnalysis(ReportDate,SiteId,ProductId,CurrencyId,IsBillingCurrency,BetCount,Turnover,TurnoverNoDraw,LicenseeWinloss,LicensingFee,Discount,Rebate,Adjustment)
+	INSERT INTO bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis(ReportDate,SiteId,ProductId,CurrencyId,IsBillingCurrency,BetCount,Turnover,TurnoverNoDraw,LicenseeWinloss,LicensingFee,Discount,Rebate,Adjustment)
 	SELECT @ReportDate,p.SiteId,a.ProductId,a.CurrencyId,
 		CASE WHEN a.CurrencyId = p.BaseCurrencyId THEN 1 ELSE 0 END AS IsBillingCurrency,
 		ISNULL(a.BetCount,0)		AS BetCount,

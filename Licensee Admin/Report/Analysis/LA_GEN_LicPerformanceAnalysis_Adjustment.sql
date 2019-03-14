@@ -50,7 +50,7 @@ BEGIN
 	IF @IsOverwrite = 0 INSERT INTO @Skip(SiteId)
 	(
 		SELECT DISTINCT a.SiteId
-		FROM bodb_LicenseeReport.dbo.tmp_rptLicPerformanceAnalysis a WITH(NOLOCK)
+		FROM bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis a WITH(NOLOCK)
 		WHERE a.ReportDate = @ReportDate AND ProductId = @AdjustmentId
 	)
 
@@ -85,7 +85,7 @@ BEGIN
 
 	-- Remove old values
 	--
-	DELETE bodb_LicenseeReport.dbo.tmp_rptLicPerformanceAnalysis
+	DELETE bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis
 	WHERE ReportDate = @ReportDate AND ProductId = @AdjustmentId AND SiteId IN (SELECT a.SiteId FROM @tmpAmounts a)
 
 	-- Generate adjustment
@@ -97,7 +97,7 @@ BEGIN
 		SELECT TOP 1 @Code=Code, @CurrencyId = CurrencyId FROM @tmpBaseCurrencyList
 		DELETE @tmpBaseCurrencyList WHERE @Code = Code
 
-		INSERT INTO bodb_LicenseeReport.dbo.tmp_rptLicPerformanceAnalysis(ReportDate,SiteId,ProductId,CurrencyId,BetCount,Turnover,TurnoverNoDraw,LicenseeWinloss,LicensingFee,Discount,Rebate,IsBillingCurrency,Adjustment)
+		INSERT INTO bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis(ReportDate,SiteId,ProductId,CurrencyId,BetCount,Turnover,TurnoverNoDraw,LicenseeWinloss,LicensingFee,Discount,Rebate,IsBillingCurrency,Adjustment)
 		SELECT @ReportDate,SiteId,@AdjustmentId,@CurrencyId,0,0,0,0,0,0,0,
 			CASE WHEN @CurrencyId = BaseCurrencyId THEN 1 ELSE 0 END AS IsBillingCurrency,
 			SUM(CASE
