@@ -60,7 +60,7 @@ BEGIN
 
 	;WITH cte_Adjustment AS
 	(
-		SELECT CAST(CreatedDateTime AS DATE)AS StatementDate, (ISNULL(s.Income,0) -ISNULL(s.Expense,0)) AS Amount, h.CurrencyId, p.OldRefID AS SiteId, d.BaseCurrencyId
+		SELECT CAST(InvoiceDate AS DATE)AS StatementDate, (ISNULL(s.Income,0) -ISNULL(s.Expense,0)) AS Amount, h.CurrencyId, p.OldRefID AS SiteId, d.BaseCurrencyId
 		FROM dbo.LA_InvoiceHeader h WITH (NOLOCK)
 		INNER JOIN dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId=s.InvoiceHeaderId
 		INNER JOIN @AdjustmentItemTypes r ON r.Id = s.InvItemTypeId
