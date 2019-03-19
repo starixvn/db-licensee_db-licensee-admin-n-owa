@@ -23,9 +23,11 @@ AS
 		- 20180924@Parsons: LA - LPID report - Apply one discount rate across all base currencies [#100046]
 		- 20181114@Bruce: discount by currency [#99694] 
 		- 20181127@Parsons: Integrate Bidme games (GD product) [#103695]
+		- 20190319@bruce: Apply min fee rule for discount calculation [#109997]
 */
 BEGIN
 	SET NOCOUNT ON
+	DECLARE @ApplyMinfeeToDiscountDate DATE = '20190201'
 	
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 1. Prepare settings
@@ -524,6 +526,13 @@ BEGIN
 	INNER JOIN #tmpDiscountSettings s ON t.PartyID = s.PartyID AND t.ProductID=s.ProductId
 	INNER JOIN cte_DiscountByCurrency d on d.CalculationGroup=s.CalculationGroup
 	WHERE d.Discount > 0
+
+	-- 4.6 apply new discount term
+	-- fee after discount must >= minfee
+	IF (@FromDate >= @ApplyMinfeeToDiscountDate)
+	BEGIN
+		UPDATE #tmpResult SET Discount = FeeByBaseCurrency - Minfee WHERE (FeeByBaseCurrency - Discount) < Minfee
+	END
 
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 5. rebate calculation

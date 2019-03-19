@@ -12,7 +12,8 @@ ALTER PROCEDURE [dbo].[LA_AmountToCompanySel] (
 	@PartyIds		VARCHAR(4000) = '',
 	@ProductCodes	VARCHAR(1000) = '',
 	@BaseCurrency	VARCHAR(10) = 'EUR',
-	@CurrencyId		INT = 0
+	@CurrencyId		INT = 0,
+	@IsApplyDiscountMinfee BIT = 1
 )
 AS
 /*	Created: 20180703@Bruce
@@ -22,11 +23,17 @@ AS
 		- 20180703@Bruce: calculate discount,rebate [#94282]
 		- 20181114@Bruce: discount by currency [#99694] 
 		- 20181127@Parsons: Integrate Bidme games (GD product) [#103695]
+		- 20190319@bruce: Apply min fee rule for discount calculation [#109997]
+
+	Parameters:
+		@IsApplyDiscountMinfee: apply minfee term to discount value
 */
 
 BEGIN
 	SET NOCOUNT ON
-	
+
+	DECLARE @ApplyMinfeeToDiscountDate DATE = '20190201'
+
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 1. Prepare settings
  *-------------------------------------------------------------------------------------------------------------------------------*/
@@ -452,6 +459,15 @@ BEGIN
 	INNER JOIN #tmpDiscountSettings s ON t.PartyID = s.PartyID AND t.ProductID=s.ProductId
 	INNER JOIN cte_DiscountByCurrency d on d.CalculationGroup=s.CalculationGroup
 	WHERE d.Discount > 0
+
+	-- 4.6 apply new discount term
+	-- fee after discount must >= minfee
+	IF (@FromDate >= @ApplyMinfeeToDiscountDate AND @IsApplyDiscountMinfee = 1)
+	BEGIN
+		UPDATE #tmpResult SET Discount = Fee - Minfee WHERE (Fee - Discount) < Minfee
+	END
+
+	UPDATE #tmpResult SET DiscountRate=0, DiscountRemark='' WHERE Discount = 0
 
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 5. rebate calculation

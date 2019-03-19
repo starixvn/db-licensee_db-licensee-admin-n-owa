@@ -26,6 +26,7 @@ AS
 		- 20171123@Sophia: Revise SP [RedmineID: #78294]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20181119@bruce: Integrate Bidme games (GD product) [#103695]
+		- 20190319@bruce: Apply min fee rule for discount calculation [#109997]
 
 	Notes: @FromDate, @ToDate should be a full month range
 	Example :  EXEC LA_Rpt_LicenseeAnalysis  @PartyIDs = '73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88', 
@@ -34,6 +35,8 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @ApplyMinfeeToDiscountDate DATE = '20190201'
 
 	-- discount type
 	DECLARE @Rebate INT = 2
@@ -610,6 +613,16 @@ BEGIN
 	INNER JOIN cte_DiscountByCurrency d on d.CalculationGroup=s.CalculationGroup
 	LEFT JOIN @MinFeeGroup m ON m.PartyId = t.PartyId AND m.ProductId = t.ProductId
 	WHERE d.Discount > 0
+
+	-- 13.5 apply new discount term
+	-- fee after discount must >= minfee
+	IF (@FromDate >= @ApplyMinfeeToDiscountDate)
+	BEGIN
+		UPDATE t SET Discount = t.LicensingFee - m.MinFeeProrate
+		FROM #SumByLicensee t
+		INNER JOIN @MinFeeGroup m ON m.PartyId = t.PartyId AND m.ProductId = t.ProductId
+		WHERE (t.LicensingFee - t.Discount) < m.MinFeeProrate
+	END
 	-- End Region
 
 	-- 14. licensee group
