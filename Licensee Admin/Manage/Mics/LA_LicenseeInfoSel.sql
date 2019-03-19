@@ -55,6 +55,7 @@ BEGIN
 			,pd.IsDeposit
 			,ci.RateType
 			,pd.BrandName
+			,pd.InvoiceLanguage
 	FROM ChargeInfo AS ci
 		INNER JOIN dbo.OAS_Party AS p WITH (NOLOCK) ON p.PartyID = ci.FromParty			-- Licensee
 		INNER JOIN @Groups AS g ON ci.ToParty = g.PartyID								-- Group
