@@ -36,7 +36,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @ApplyMinfeeToDiscountDate DATE = '20190201'
+	DECLARE @ApplyMinfeeToDiscountDate DATE = '20190301'
 
 	-- discount type
 	DECLARE @Rebate INT = 2

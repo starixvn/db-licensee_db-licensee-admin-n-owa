@@ -27,7 +27,7 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @ApplyMinfeeToDiscountDate DATE = '20190201'
+	DECLARE @ApplyMinfeeToDiscountDate DATE = '20190301'
 	
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 1. Prepare settings
