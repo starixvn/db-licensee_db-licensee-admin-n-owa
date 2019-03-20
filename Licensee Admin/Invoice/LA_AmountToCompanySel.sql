@@ -32,7 +32,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @ApplyMinfeeToDiscountDate DATE = '20190301'
+	DECLARE @ApplyMinfeeToDiscountDate DATE = dbo.LA_f_ApplyDiscountMinfeeDate()
 
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 1. Prepare settings
