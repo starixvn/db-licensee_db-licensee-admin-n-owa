@@ -52,10 +52,13 @@ AS
 		+ 20180131@Bruce: support credit note for setup fee [#90274]
 		+ 20180109@Bruce: month of deduction [#87039]
 		+ 20190123@Bruce: Save invoices - Increased security [#96660]
+		+ 20190319@bruce: Apply min fee rule for discount calculation [#109997]
 */
 
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @GrossDiscount SMALLINT = 28
 
 	DECLARE 
 		@startRun		DATETIME, 
@@ -272,7 +275,7 @@ BEGIN
 		UPDATE dbo.LA_InvoiceHeader WITH(ROWLOCK,UPDLOCK)
 		SET Amount = (SELECT (SUM(ISNULL(s.Income, 0))- SUM(ISNULL(s.Expense, 0))) 
 						FROM  dbo.LA_InvoiceStatement s WITH(NOLOCK)
-						WHERE s.InvoiceHeaderId = @CurrentInvoiceHeaderId)
+						WHERE s.InvoiceHeaderId = @CurrentInvoiceHeaderId AND s.InvItemTypeId <> @GrossDiscount)
 		WHERE InvoiceHeaderId = @CurrentInvoiceHeaderId
 
 		-- month of deduction
