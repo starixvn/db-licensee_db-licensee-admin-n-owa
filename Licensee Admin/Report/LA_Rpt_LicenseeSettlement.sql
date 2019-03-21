@@ -131,7 +131,7 @@ BEGIN
 		SELECT Bettype, ProductID
 		FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, @ProductCode)
 	)
-
+	
 	SELECT @LicenseeID = LicenseeID FROM @ChargeInfo
 	IF @LicenseeID IS NULL
 	BEGIN
@@ -658,10 +658,10 @@ BEGIN
 			SELECT b.SiteId, b.rptDate, b.CurrencyID
 				, SUM(ISNULL(b.betcount, 0)) BetCount
 				, SUM(ISNULL(b.turnover, 0)) AS Turnover
-				, SUM(CASE WHEN b.BetTypeId <> @PromotionPrize THEN ISNULL(b.Winloss, 0) ELSE 0 END) Winloss
-				, SUM(CASE WHEN b.BetTypeId = @PromotionPrize THEN ISNULL(b.Winloss, 0) ELSE 0 END) AS WinningPrize
-				FROM bodb_LicenseeReport..rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
-					INNER JOIN @Bettype bt ON b.BetTypeId = bt.Bettype
+				, SUM(CASE WHEN b.Bettype <> @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) Winloss
+				, SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
+				FROM bodb_LicenseeReport..rpt_BettingByProduct b WITH (NOLOCK)
+					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype
 				WHERE
 					b.SiteID = @LicenseeID
 					AND b.rptDate BETWEEN @FromDate AND @ToDate
