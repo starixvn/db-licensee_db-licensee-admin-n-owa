@@ -33,6 +33,7 @@ AS
 	- 20180703@Parsons: Integrate Pragmatic Win Loss [#94108]
 	- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 	- 20181119@bruce: Integrate Bidme games (GD product) [#103695]
+	- 20190321@Parsons: Integrate-PP-Promotion-Prize [#109014]
 
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -46,7 +47,8 @@ AS
 		+ @BaseCurrencyName: GBP, CNY, USD, EUR, MYR
 */
 BEGIN
-	SET NOCOUNT ON	DECLARE @GD_Tip SMALLINT = 1706
+	SET NOCOUNT ON
+	DECLARE @GD_Tip SMALLINT = 1706, @PromotionPrize SMALLINT = 4300  
 
 	CREATE TABLE #Report (PartyID INT, ReportDate DATE, CurrencyID INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY, WinlossRB MONEY, 
 						AmtDueToBA MONEY, AmtDueToRB MONEY, CommBA MONEY, CommRB MONEY, Company MONEY, Betcount BIGINT)
@@ -466,8 +468,42 @@ BEGIN
 		)
 	END
 
+	-- PP
+	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = 32) > 0
+	BEGIN
+		;WITH cte_PPWinLossData AS(
+			SELECT b.SiteId, b.rptDate, b.CurrencyID
+				, SUM(ISNULL(b.betcount, 0)) BetCount
+				, SUM(ISNULL(b.turnover, 0)) AS Turnover
+				, SUM(CASE WHEN b.Bettype <> @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) Winloss
+				, SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
+				FROM bodb_LicenseeReport..rpt_BettingByProduct b WITH (NOLOCK)
+				INNER JOIN bodb_licensee.dbo.LA_f_BettypeProductMapping(0, 'PP') t ON b.Bettype = t.Bettype 
+				WHERE
+					b.ProductID = 32
+					AND b.rptDate BETWEEN @FromDate AND @ToDate
+					AND (@Currency = 0 OR b.CurrencyID = @Currency)
+					AND (b.CurrencyID <> 20)
+					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
+		)
+		INSERT INTO #Report (PartyID, ReportDate, CurrencyID, Betcount, Turnover, Winlost, LicenseeWL, Company)
+		(
+			SELECT ci.PartyID, b.rptDate, b.CurrencyId
+				, SUM(BetCount)		AS BetCount
+				, SUM(Turnover)		AS Turnover
+				, SUM(WinLoss + WinningPrize)	AS Winlost
+				, SUM(-Winloss * ( 1 - ci.Rate))  AS LicenseeWL
+				, SUM((-WinLoss * ci.Rate) + WinningPrize) AS Company
+			FROM cte_PPWinLossData b
+				INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND ci.ProductID = 32
+			WHERE b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+			GROUP BY ci.PartyID, b.rptDate, b.CurrencyId
+		)
+	END
+
 	DECLARE @ExcludedProductIds TABLE(ProductId INT)
-	INSERT INTO @ExcludedProductIds(ProductId) VALUES (1), (3), (14), (17), (15), (25), (13), (11)
+	INSERT INTO @ExcludedProductIds(ProductId) VALUES (1), (3), (14), (17), (15), (25), (13), (11), (32)
 
 	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) > 0
 	BEGIN
