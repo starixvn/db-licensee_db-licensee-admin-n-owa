@@ -444,7 +444,7 @@ BEGIN
 	-- 4.5 discount by curency
 	-- not support gross win
 	-- not support multiple products
-	-- not discount if charge by minfee and fee after discount less than minfee
+	-- not discount if fee after discount less than minfee
 	;WITH cte_DiscountByCurrency AS(
 		SELECT c.CalculationGroup, c.Rate, c.Rate * (CASE WHEN s.Fee <0 THEN 0 ELSE s.Fee END) Discount
 		FROM @tmpDiscountCalculation s
@@ -458,14 +458,13 @@ BEGIN
 	FROM #tmpResult t
 	INNER JOIN #tmpDiscountSettings s ON t.PartyID = s.PartyID AND t.ProductID=s.ProductId
 	INNER JOIN cte_DiscountByCurrency d on d.CalculationGroup=s.CalculationGroup
-	WHERE d.Discount > 0 AND t.IsChargedByMinFee=1
+	WHERE d.Discount > 0
 
 	-- 4.6 apply new discount term
-	-- if licensee is charged by minfee then fee after discount must >= minfee
-	-- 
+	-- fee after discount must >= minfee
 	IF (@FromDate >= @ApplyMinfeeToDiscountDate AND @IsApplyDiscountMinfee = 1)
 	BEGIN
-		UPDATE #tmpResult SET Discount = Fee - Minfee WHERE (Fee - Discount) < Minfee AND IsChargedByMinFee = 1
+		UPDATE #tmpResult SET Discount = Fee - Minfee WHERE (Fee - Discount) < Minfee
 	END
 
 	UPDATE #tmpResult SET DiscountRate=0, DiscountRemark='', Discount = 0 WHERE Discount <= 0

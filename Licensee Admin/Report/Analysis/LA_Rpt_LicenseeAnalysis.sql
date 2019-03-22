@@ -197,8 +197,7 @@ BEGIN
 		TotalAmount		MONEY,
 		MinFeeAmount	MONEY,
 		AmountToCompany	MONEY,
-		DaysOutOfWaiveTime	INT,
-		IsChargedByMinfee	BIT
+		DaysOutOfWaiveTime  INT
 	)
 
 	INSERT INTO @MinFeeGroup(FeeType ,PartyId,ProductId, CurrencyId ,FeeAmount ,FromDate ,ToDate)
@@ -462,8 +461,7 @@ BEGIN
 			WHEN t.TotalAmountUnderMinfeeTime < t.TotalMinFee AND amf.MinFeeAmount < amf.MinFeeProrate 
 				THEN amf.MinFeeProrate + amf.WaivedAmount
 			ELSE amf.TotalAmount
-		END,
-		IsChargedByMinfee = CASE WHEN t.TotalAmountUnderMinfeeTime < t.TotalMinFee AND amf.MinFeeAmount < amf.MinFeeProrate THEN 1 ELSE 0 END
+		END
 	FROM @MinFeeGroup amf
 	INNER JOIN @PartyGroup pg ON pg.PartyId = amf.PartyId
 	INNER JOIN @TotalMinFees t ON amf.ProductId = t.ProductId AND t.PartyGroupId = pg.PartyGroupId
@@ -474,8 +472,7 @@ BEGIN
 	SET		amf.AmountToCompany =	CASE WHEN amf.MinFeeAmount < amf.MinFeeProrate
 											THEN amf.MinFeeProrate + amf.WaivedAmount
 										ELSE amf.TotalAmount
-									END,
-			IsChargedByMinfee = CASE WHEN amf.MinFeeAmount < amf.MinFeeProrate THEN 1 ELSE 0 END
+									END
 	FROM	@MinFeeGroup amf
 	WHERE	amf.FeeType = 1 AND amf.AmountToCompany IS NULL
 	-- end region
@@ -603,7 +600,7 @@ BEGIN
 	-- 13.6 discount by curency
 	-- not support gross win
 	-- not support multiple products
-	-- not discount if charge by minfee and fee after discount less than minfee
+	-- not discount if fee after discount less than minfee
 	;WITH cte_DiscountByCurrency AS(
 		SELECT c.CalculationGroup, c.Rate, c.Rate * (CASE WHEN s.Fee <0 THEN 0 ELSE s.Fee END) Discount
 		FROM @tmpDiscountCalculation s
@@ -615,7 +612,7 @@ BEGIN
 	INNER JOIN #tmpDiscountSettings s ON t.PartyID = s.PartyID AND t.ProductID=s.ProductId
 	INNER JOIN cte_DiscountByCurrency d on d.CalculationGroup=s.CalculationGroup
 	LEFT JOIN @MinFeeGroup m ON m.PartyId = t.PartyId AND m.ProductId = t.ProductId
-	WHERE d.Discount > 0 AND ISNULL(m.IsChargedByMinfee,0) = 1
+	WHERE d.Discount > 0
 
 	-- 13.5 apply new discount term
 	-- fee after discount must >= minfee
@@ -624,8 +621,10 @@ BEGIN
 		UPDATE t SET Discount = t.LicensingFee - m.MinFeeProrate
 		FROM #SumByLicensee t
 		INNER JOIN @MinFeeGroup m ON m.PartyId = t.PartyId AND m.ProductId = t.ProductId
-		WHERE (t.LicensingFee - t.Discount) < m.MinFeeProrate AND m.IsChargedByMinfee=1
+		WHERE (t.LicensingFee - t.Discount) < m.MinFeeProrate
 	END
+
+	UPDATE #SumByLicensee SET Discount = 0 WHERE Discount < 0
 	-- End Region
 
 	-- 14. licensee group
