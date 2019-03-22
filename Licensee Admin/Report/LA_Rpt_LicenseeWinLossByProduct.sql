@@ -37,6 +37,7 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180510@Bruce: Integrate Pragmatic [#94108]
 		- 20181119@bruce: Integrate Bidme games (GD product) [#103695]
+	    - 20190322@Parsons: Integrate-PP-Promotion-Prize [#109014]
 */
 		
 /*	Example:
@@ -51,6 +52,8 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @GD_Tip SMALLINT = 1706, @PromotionPrize SMALLINT = 4300  
 	
 	-- Region: Get party charge rate info
 	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX,PP'
@@ -76,7 +79,7 @@ BEGIN
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, BettypeRef)
 	(
 		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate, CASE
-				WHEN ProductId = 11 AND ChargeType = 12 THEN 1706
+				WHEN ProductId = 11 AND ChargeType = 12 THEN @GD_Tip
 				ELSE Bettype
 			END
 		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
@@ -105,21 +108,23 @@ BEGIN
 			AWinLoss	MONEY,
 			AComm		MONEY,
 			PComm		MONEY,
+			WinningPrize	MONEY,
 			ProductId	TINYINT,
 			BettypeRef	INT)
 	
-	INSERT INTO #TempData (LicenseeId,rptDate,CurrencyId,MemberWL,AWinLoss,AComm,PComm,ProductId,BettypeRef)
+	INSERT INTO #TempData (LicenseeId,rptDate,CurrencyId,MemberWL,AWinLoss,AComm,PComm,WinningPrize,ProductId,BettypeRef)
 	(
 		SELECT	b.SiteID,
 				b.rptDate,
 				b.CurrencyID,
-				SUM(ISNULL(b.MemberWL, 0)) Winloss,
+				SUM(CASE WHEN b.Bettype <> @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) Winloss,
 				SUM(ISNULL(b.GrossWL, 0)) AS AWinLoss,
 				SUM(ISNULL(b.CommissionA, 0)) AS AComm,
 				SUM(ISNULL(b.CommissionP, 0)) AS PComm,
+				SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize,
 				b.ProductId,
 				CASE
-					WHEN b.Bettype = 1706 THEN b.Bettype -- GD Tip
+					WHEN b.Bettype = @GD_Tip THEN b.Bettype
 					ELSE ISNULL(sbr.BettypeRef, -1)
 				END
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
@@ -134,9 +139,10 @@ BEGIN
 					911,912,913,914 	-- CO
 				)
 				AND b.ProductID NOT IN (13,15,25)
+				AND (b.ProductID <> 32 OR b.Bettype IN (SELECT Bettype FROM dbo.LA_f_BettypeProductMapping(0, 'PP'))) 
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, b.ProductId,
 			CASE
-				WHEN b.Bettype = 1706 THEN b.Bettype -- GD Tip
+				WHEN b.Bettype = @GD_Tip THEN b.Bettype
 				ELSE ISNULL(sbr.BettypeRef, -1)
 			END
 	)
@@ -344,7 +350,7 @@ BEGIN
 				ISNULL(SUM(CASE WHEN d.ProductId = 27 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS BRVS,
 				ISNULL(SUM(CASE WHEN d.ProductId = 28 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS LT,
 				ISNULL(SUM(CASE WHEN d.ProductId = 31 THEN (-MemberWL * ci.Rate - (AComm + PComm)) * e.Rate ELSE 0 END),0) AS BX,
-				ISNULL(SUM(CASE WHEN d.ProductId = 32 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS PP
+				ISNULL(SUM(CASE WHEN d.ProductId = 32 THEN (-MemberWL * ci.Rate + WinningPrize) * e.Rate ELSE 0 END),0) AS PP
 		FROM	#TempData d
 				INNER JOIN @PartyChargeInfo ci ON	d.LicenseeId = ci.LicenseeId
 													AND ci.ProductId = d.ProductId
