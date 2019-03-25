@@ -25,9 +25,12 @@ AS
 		- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20181119@bruce: Integrate Bidme games (GD product) [#103695]
+	    - 20190322@Parsons: Integrate-PP-Promotion-Prize [#109014]
 */
 BEGIN
 	SET NOCOUNT ON
+	
+	DECLARE @GD_Tip SMALLINT = 1706, @PromotionPrize SMALLINT = 4300  
 
 	SELECT * INTO #Exchange FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
@@ -71,9 +74,9 @@ BEGIN
 		b.SiteId															AS LicenseeId,
 		b.ProductId															AS ProductId,
 		CASE
-			WHEN b.Bettype = 1706 THEN b.Bettype -- GD Tip
+			WHEN b.Bettype = @GD_Tip THEN b.Bettype
 			ELSE ISNULL(sbr.BettypeRef, -1)
-		END																	AS Bettype,
+		END																	AS Bettype, 
 		CAST(SUM(ISNULL(b.MemberWL * e.BaseCurrencyRate, 0)) AS MONEY)		AS Winloss,
 		CAST(SUM(ISNULL(b.GrossWL * e.BaseCurrencyRate, 0)) AS MONEY)		AS GrossWinLoss,
 		CAST(SUM(ISNULL(b.CommissionA * e.BaseCurrencyRate, 0)) AS MONEY)	AS Commission,
@@ -81,7 +84,7 @@ BEGIN
 		CAST(0 AS MONEY)	AS ActualStake,
 		CAST(0 AS MONEY)	AS BuyBackAmount,
 		CAST(0 AS MONEY)	AS Turnover,
-		CAST(0 AS MONEY)	AS CashOut,
+		CAST(0 AS MONEY)	AS CashOut, 
 		CAST(0 AS MONEY)	AS WinningPrize,
 		CAST(0 AS MONEY)	AS BuyBackAmountBA,
 		CAST(0 AS MONEY)	AS TicketsPayout
@@ -96,10 +99,10 @@ BEGIN
 		AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
 		AND b.SiteID NOT IN (SELECT c.LicenseeId FROM @CreditLicenee c)
 		AND b.ProductID IN (SELECT p.ProductId FROM @Products p)
-		AND b.ProductID NOT IN (13,15,25) -- exclude BT, CB, CO
-	GROUP BY b.rptdate, b.SiteId, b.ProductId, CASE
-			WHEN b.Bettype = 1706 THEN b.Bettype -- GD Tip
-			ELSE ISNULL(sbr.BettypeRef, -1)
+		AND b.ProductID NOT IN (13,15,25,32) -- exclude BT, CB, CO, PP
+	GROUP BY b.rptdate, b.SiteId, b.ProductId, 
+		CASE WHEN b.Bettype = @GD_Tip THEN b.Bettype
+			 ELSE ISNULL(sbr.BettypeRef, -1)
 		END
 
 	-- BT
@@ -159,6 +162,24 @@ BEGIN
 		GROUP BY b.Winlostdate,b.SiteId
 	END
 
+	-- PP
+	IF EXISTS (SELECT 1 FROM @Products WHERE ProductId=32)
+	BEGIN
+		INSERT INTO #Data(WinLossDate,LicenseeId,ProductId,Bettype,Winloss,WinningPrize)
+		SELECT b.rptDate, b.SiteId, b.ProductId, b.Bettype,
+			CAST(SUM(CASE WHEN b.Bettype <> @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END  * e.BaseCurrencyRate) AS MONEY)	AS Winloss,
+			CAST(SUM(CASE WHEN b.Bettype =  @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END  * e.BaseCurrencyRate) AS MONEY)	AS WinningPrize
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
+		INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
+		INNER JOIN dbo.LA_f_BettypeProductMapping(0, 'PP') bt ON bt.Bettype = b.Bettype
+		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
+			AND b.StatusId NOT IN (-1, 101, 102, 103)
+			AND b.CurrencyID <> 20
+			AND b.CustomerCategory NOT IN (27, 28)
+			AND b.ProductID = 32
+		GROUP BY b.rptDate, b.SiteId, b.ProductId, b.Bettype
+	END
+
 	-- get unknown parties
 	INSERT INTO #Parties(PartyId, PartyName, LicenseeId)
 	SELECT DISTINCT 0, 'Unknown-' + CAST(d.LicenseeId AS VARCHAR(10)), d.LicenseeId
@@ -180,7 +201,7 @@ BEGIN
 	DECLARE @ProductCodes VARCHAR(500) = (SELECT ProductCode + ',' FROM @Products FOR XML PATH (''))
 	SELECT c.ProductId			AS ProductId,
 		c.LicenseeId			AS LicenseeId,
-		CASE WHEN c.ProductId = 11 AND ChargeType = 12 THEN 1706 ELSE ISNULL(b.Bettype, -1) END AS Bettype, -- GD Tip
+		CASE WHEN c.ProductId = 11 AND ChargeType = 12 THEN @GD_Tip ELSE ISNULL(b.Bettype, -1) END AS Bettype,
 		c.DI_Rate				AS Rate,
 		c.FromDate				AS FromDate,
 		c.ToDate				AS ToDate,
@@ -200,7 +221,4 @@ BEGIN
 	DROP TABLE #Exchange
 	DROP TABLE #Parties
 END
-GO
-
-GRANT EXECUTE ON [dbo].LA_Rpt_LicenseeWinLossByDynamicProduct TO bodbAdminNet
 GO
