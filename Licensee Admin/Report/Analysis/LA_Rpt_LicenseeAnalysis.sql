@@ -197,7 +197,8 @@ BEGIN
 		TotalAmount		MONEY,
 		MinFeeAmount	MONEY,
 		AmountToCompany	MONEY,
-		DaysOutOfWaiveTime  INT
+		DaysOutOfWaiveTime	INT,
+		IsSharedMinfee		BIT
 	)
 
 	INSERT INTO @MinFeeGroup(FeeType ,PartyId,ProductId, CurrencyId ,FeeAmount ,FromDate ,ToDate)
@@ -331,9 +332,10 @@ BEGIN
 		INSERT INTO #SportypeList (SportType, ProductCode, ProductId)
 		SELECT s.SportType, s.ProductCode , p.ProductId
 		FROM bodb02.dbo.f_LicWinLoss_ProductSportType_Sel(@ProductCodes)  s
-		INNER JOIN @Products p ON p.ProductCode=s.ProductCode		
-		
+		INNER JOIN @Products p ON p.ProductCode=s.ProductCode
+
 		DECLARE @TempToDate SMALLDATETIME = CASE WHEN @ToDate >= @MoveBetsDay THEN @MoveBetsDay ELSE @ToDate END
+
 		INSERT INTO #Result(ReportDate, CurrencyId, BetFrom, Turnover, LicenseeWinLoss, ProductID,PartyId, Bettype)
 		(
 			SELECT
@@ -461,7 +463,8 @@ BEGIN
 			WHEN t.TotalAmountUnderMinfeeTime < t.TotalMinFee AND amf.MinFeeAmount < amf.MinFeeProrate 
 				THEN amf.MinFeeProrate + amf.WaivedAmount
 			ELSE amf.TotalAmount
-		END
+		END,
+		IsSharedMinfee = CASE WHEN t.TotalAmountUnderMinfeeTime >= t.TotalMinFee THEN 1 ELSE 0 END
 	FROM @MinFeeGroup amf
 	INNER JOIN @PartyGroup pg ON pg.PartyId = amf.PartyId
 	INNER JOIN @TotalMinFees t ON amf.ProductId = t.ProductId AND t.PartyGroupId = pg.PartyGroupId
@@ -522,7 +525,7 @@ BEGIN
 		END) AS LicensingFee
 	INTO #SumByLicensee FROM a
 	LEFT JOIN @MinFeeGroup amf ON amf.PartyId=a.PartyId AND amf.FeeType=1 AND amf.ProductId=a.ProductId
-	
+
 	-- insert data for party-product which has min fee but doesn't has bet ticket
 	INSERT INTO #SumByLicensee(PartyId, ProductId, LicensingFee,LicenseeWinLoss,Turnover,Discount,Rebate)
 	SELECT m.PartyId, m.ProductId, m.AmountToCompany, 0, 0, 0, 0
@@ -607,21 +610,21 @@ BEGIN
 		INNER JOIN @rate c ON c.CalculationGroup = s.CalculationGroup
 		WHERE c.IsDiscountByCurrency = 1
 	)
-	UPDATE t SET Discount = CASE WHEN (t.LicensingFee - d.Discount) < m.MinFeeProrate THEN t.LicensingFee - m.MinFeeProrate ELSE d.Discount END
+	UPDATE t SET Discount = CASE WHEN (t.LicensingFee - d.Discount) < m.MinFeeProrate AND ISNULL(m.IsSharedMinfee,0) = 0 THEN t.LicensingFee - m.MinFeeProrate ELSE d.Discount END
 	FROM #SumByLicensee t
 	INNER JOIN #tmpDiscountSettings s ON t.PartyID = s.PartyID AND t.ProductID=s.ProductId
 	INNER JOIN cte_DiscountByCurrency d on d.CalculationGroup=s.CalculationGroup
-	LEFT JOIN @MinFeeGroup m ON m.PartyId = t.PartyId AND m.ProductId = t.ProductId
+	LEFT JOIN @MinFeeGroup m ON m.PartyId = t.PartyId AND m.ProductId = t.ProductId ANd m.FeeType = 1
 	WHERE d.Discount > 0
 
-	-- 13.5 apply new discount term
+	-- 13.5 apply new discount term for licensee have not shared minfee
 	-- fee after discount must >= minfee
 	IF (@FromDate >= @ApplyMinfeeToDiscountDate)
 	BEGIN
 		UPDATE t SET Discount = t.LicensingFee - m.MinFeeProrate
 		FROM #SumByLicensee t
-		INNER JOIN @MinFeeGroup m ON m.PartyId = t.PartyId AND m.ProductId = t.ProductId
-		WHERE (t.LicensingFee - t.Discount) < m.MinFeeProrate
+		INNER JOIN @MinFeeGroup m ON m.PartyId = t.PartyId AND m.ProductId = t.ProductId ANd m.FeeType = 1
+		WHERE (t.LicensingFee - t.Discount) < m.MinFeeProrate AND ISNULL(m.IsSharedMinfee,0) = 0 
 	END
 
 	UPDATE #SumByLicensee SET Discount = 0 WHERE Discount < 0
@@ -703,5 +706,6 @@ BEGIN
 	DROP TABLE #Result
 	DROP TABLE #SumByLicensee
 	DROP TABLE #SportypeList 
+	DROP TABLE #tmpDiscountSettings
 END
 GO 

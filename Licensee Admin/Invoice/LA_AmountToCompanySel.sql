@@ -312,6 +312,7 @@ BEGIN
 		,CAST('' AS NVARCHAR(4000)) AS RebateRemark
 		,CAST(0 AS MONEY)			AS Minfee
 		,CAST(0 AS BIT)				AS IsChargedByMinFee
+		,CAST(0 AS BIT)				AS IsSharedMinfee
 	INTO #tmpResult
 	FROM #tmpWinlossData a
 	GROUP BY PartyId, ProductId
@@ -366,6 +367,7 @@ BEGIN
 				THEN 1
 			ELSE 0
 		END,
+		IsSharedMinfee = CASE WHEN t.TotalAmount >= t.TotalMinFee AND p.PartyGroupId > 0 THEN 1 ELSE 0 END,
 		Minfee = a.MinFeeAmount
 	FROM #tmpResult r
 	INNER JOIN @PartyList p ON r.PartyId=p.PartyId
@@ -444,7 +446,7 @@ BEGIN
 	-- 4.5 discount by curency
 	-- not support gross win
 	-- not support multiple products
-	-- not discount if fee after discount less than minfee
+	-- not discount if fee after discount less than minfee(in case minfee is not shared)
 	;WITH cte_DiscountByCurrency AS(
 		SELECT c.CalculationGroup, c.Rate, c.Rate * (CASE WHEN s.Fee <0 THEN 0 ELSE s.Fee END) Discount
 		FROM @tmpDiscountCalculation s
@@ -454,17 +456,17 @@ BEGIN
 	UPDATE t SET
 		DiscountRemark = s.Remark
 		, DiscountRate = d.Rate
-		, Discount = CASE WHEN (t.Fee - d.Discount) < t.Minfee THEN t.Fee - t.Minfee ELSE d.Discount END
+		, Discount = CASE WHEN (t.Fee - d.Discount) < t.Minfee AND t.IsSharedMinfee=0 THEN t.Fee - t.Minfee ELSE d.Discount END
 	FROM #tmpResult t
 	INNER JOIN #tmpDiscountSettings s ON t.PartyID = s.PartyID AND t.ProductID=s.ProductId
 	INNER JOIN cte_DiscountByCurrency d on d.CalculationGroup=s.CalculationGroup
 	WHERE d.Discount > 0
 
-	-- 4.6 apply new discount term
+	-- 4.6 apply new discount term for licensee have not shared minfee
 	-- fee after discount must >= minfee
 	IF (@FromDate >= @ApplyMinfeeToDiscountDate AND @IsApplyDiscountMinfee = 1)
 	BEGIN
-		UPDATE #tmpResult SET Discount = Fee - Minfee WHERE (Fee - Discount) < Minfee
+		UPDATE #tmpResult SET Discount = Fee - Minfee WHERE (Fee - Discount) < Minfee AND IsSharedMinfee = 0
 	END
 
 	UPDATE #tmpResult SET DiscountRate=0, DiscountRemark='', Discount = 0 WHERE Discount <= 0
