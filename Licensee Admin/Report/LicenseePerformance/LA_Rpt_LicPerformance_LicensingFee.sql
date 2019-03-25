@@ -1,4 +1,4 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
 
@@ -31,6 +31,7 @@ AS
 	   - 20180716@bruce: add new group TEST for credit [#98126]	   
 	   - 20180510@Bruce: Integrate Pragmatic [#94108]
 	   - 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
+	   - 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -79,7 +80,7 @@ BEGIN
 		SET @sdate = DATEADD(m, 1, @sdate)
 	END	
 
-	IF @ProductCode IN ('SB', 'NG', 'LC', 'VS', 'CS', 'VB', 'PP')
+	IF @ProductCode IN ('SB', 'NG', 'LC', 'VS', 'CS', 'VB')
 	BEGIN		
 		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, Winloss)
 		SELECT tp.PartyID, d.rptDate, d.CurrencyID, - SUM(d.Winloss * ISNULL(tp.Rate,0))
@@ -98,6 +99,32 @@ BEGIN
 			 INNER JOIN (SELECT DISTINCT PartyID, Rate, Fromdate, Todate FROM #tmpParty) tp ON tp.PartyID = d.PartyID 
 		WHERE d.rptDate  BETWEEN tp.Fromdate AND tp.Todate			
 		GROUP BY tp.PartyID, d.rptDate, d.currencyID		
+	END	
+
+	IF @ProductCode = 'PP'
+	BEGIN		
+		DECLARE @PromotionPrize SMALLINT = 4300
+		;WITH cte_PPWinLossData AS(
+			SELECT tp.PartyID, b.rptDate, b.CurrencyID
+				, SUM(CASE WHEN b.Bettype <> @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) Winloss
+				, SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
+				FROM bodb_LicenseeReport..rpt_BettingByProduct b WITH (NOLOCK)
+					INNER JOIN (SELECT DISTINCT PartyID, LicenseeID FROM #tmpParty) tp ON tp.LicenseeID = b.SiteID
+					INNER JOIN #bettype be ON b.bettype = be.bettype
+				WHERE b.rptDate BETWEEN @FromDate AND @ToDate
+					AND (b.CurrencyID <> 20)
+					AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
+					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+				GROUP BY tp.PartyID, b.rptDate, b.CurrencyID
+		)
+		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, Winloss)
+		(
+			SELECT tp.PartyID, b.rptDate, b.CurrencyId, SUM(-WinLoss*tp.Rate + WinningPrize)
+			FROM cte_PPWinLossData b
+				INNER JOIN (SELECT DISTINCT PartyID, Rate, Fromdate, Todate FROM #tmpParty) tp ON tp.PartyID = b.PartyID 
+			WHERE b.rptDate BETWEEN tp.Fromdate AND tp.Todate
+			GROUP BY tp.PartyID, b.rptDate, b.CurrencyId
+		)
 	END	
 
 	INSERT INTO #Exchange (ExchangeDate, ExchangeId, Rate)
@@ -123,7 +150,6 @@ BEGIN
 		INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON t.PartyId = p.PartyID
 		INNER JOIN #Exchange ee ON t.rptDate = ee.exchangedate AND t.CurrencyID = ee.ExchangeId
 	GROUP BY p.PartyName, DATENAME(YEAR, t.rptDate)  + '-' + DATENAME(MONTH, t.rptDate)
-	
 	
 	UPDATE #rptLicFee
 	SET Fee = 0
@@ -167,8 +193,4 @@ BEGIN
 	DROP TABLE #MY
 	DROP TABLE #bettype	
 END
-
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicPerformance_LicensingFee] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_Rpt_LicPerformance_LicensingFee] TO bodbAdminNet 
 GO
