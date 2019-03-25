@@ -45,12 +45,13 @@ AS
 		- 20171205@Bruce: fix partyid length [#87723]
 		- 20182501@Bruce: Include exchange winloss [#87754]
 		- 20180716@bruce: add new group TEST for credit [#98126]
-	    	- 20180703@Parsons: Integrate Pragmatic Win Loss [#94108]
+		- 20180703@Parsons: Integrate Pragmatic Win Loss [#94108]
 		- 20180712@Bruce: Enhance Manage Discount group [#94282]
 		- 20180718@Bruce: use decimal to void margin not match among reports [#94108]
 		- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 		- 20180924@Parsons: LA - LPID report - Apply one discount rate across all base currencies [#100046]
 		- 20181122@Scofield: Integrate Bidme games (GD product) [#103695]
+	    - 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -71,7 +72,7 @@ AS
 
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @GD_Tip SMALLINT = 1706
+	DECLARE @GD_Tip SMALLINT = 1706, @PromotionPrize SMALLINT = 4300
 
 	-- *********************************************************************************************************
 	-- *** Calculate Previous FromDate, Previous ToDate from FromDate, ToDate
@@ -263,11 +264,12 @@ BEGIN
 			WinLoss			MONEY,
 			AComm			MONEY,
 			PComm			MONEY,
+			WinningPrize	MONEY,
 			ProductId		TINYINT,
 			AmountToCompany MONEY,
 			IsApplyMinFee	BIT)
 
-	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,AComm,PComm,ProductId,AmountToCompany)
+	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,WinningPrize,AComm,PComm,ProductId,AmountToCompany)
 	(
 		SELECT	b.SiteID,
 				p.PartyId,
@@ -279,11 +281,12 @@ BEGIN
 													WHEN b.StatusId IN (114, 115) THEN 0.5
 											 ELSE 1 END
 										ELSE 1 END) * e.Rate,
-				SUM(CASE WHEN b.Bettype=@GD_Tip THEN 0 ELSE b.MemberWL END) * e.Rate,
+				SUM(CASE WHEN b.Bettype=@GD_Tip OR b.Bettype=@PromotionPrize THEN 0 ELSE b.MemberWL END) * e.Rate,
+				SUM(CASE WHEN b.Bettype=@PromotionPrize THEN b.MemberWL ELSE 0 END) * e.Rate,
 				SUM(ISNULL(b.CommissionA, 0)) * e.Rate,
 				SUM(ISNULL(b.CommissionP, 0)) * e.Rate,
 				p.ProductId,
-				SUM((CASE WHEN b.Bettype=@GD_Tip THEN 0 ELSE -b.MemberWL END * p.Rate) - (CASE 
+				SUM((CASE WHEN b.Bettype=@GD_Tip OR b.Bettype<>@PromotionPrize THEN 0 ELSE -b.MemberWL END * p.Rate) - (CASE 
 					WHEN b.ProductId = 3 THEN ISNULL(b.CommissionA, 0) -- BA
 					WHEN b.ProductID = 31 THEN ISNULL(b.CommissionA, 0) + ISNULL(b.CommissionP, 0) -- Exchange
 					ELSE 0 END)) * e.Rate
@@ -297,16 +300,16 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
-				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
-				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
+				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund 
+				AND (@Currency = 0 OR b.CurrencyID = @Currency)
+				AND (b.ProductID <> 32 OR b.Bettype IN (SELECT Bettype FROM dbo.LA_f_BettypeProductMapping(0, 'PP'))) 
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, e.Rate
 	)
 
 	-- insert zero winloss for case: product don't have any ticket
-	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,AComm,PComm,ProductId,AmountToCompany)
-	SELECT LicenseeId, PartyId, FromDate, @BaseCurrency,0,0,0,0,0,ProductID,0
+	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,WinningPrize,AComm,PComm,ProductId,AmountToCompany)
+	SELECT LicenseeId, PartyId, FromDate, @BaseCurrency,0,0,0,0,0,0,ProductID,0
 	FROM @PartyChargeInfo
-
 	-- Sum products
 	BEGIN
 		DECLARE @SumByProducts TABLE(
@@ -314,6 +317,7 @@ BEGIN
 			BetCount		INT,
 			Turnover		MONEY,
 			WinLoss			MONEY,
+			WinningPrize	MONEY,
 			AComm			MONEY,
 			PComm			MONEY,
 			AmountToCompany	MONEY,
@@ -325,23 +329,24 @@ BEGIN
 		)
 		
 		-- sum by product
-		INSERT INTO @SumByProducts (PartyId,ProductId,IsCurrent,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,HasMinFee)
+		INSERT INTO @SumByProducts (PartyId,ProductId,IsCurrent,BetCount,Turnover,WinLoss,WinningPrize,AComm,PComm,AmountToCompany,HasMinFee)
 		SELECT	PartyId
 				,ProductId
 				,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END) IsCurrent
 				,SUM(BetCount) BetCount
 				,SUM(Turnover) Turnover
-				,SUM(WinLoss) WinLoss
+				,SUM(WinLoss + WinningPrize) WinLoss
+				,SUM(WinningPrize) WinningPrize
 				,SUM(AComm) AComm
 				,SUM(PComm) PComm
-				,SUM(AmountToCompany) AmountToCompany
+				,SUM(AmountToCompany - WinningPrize) AmountToCompany
 				,0 HasMinFee
 		FROM #TempData
 		GROUP BY PartyId, ProductId, CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END
 
 		-- apply minfee
 		UPDATE s SET 
-			AmountToCompany = m.Fee,
+			AmountToCompany = m.Fee - WinningPrize,
 			HasMinFee = m.IsChargedByMinFee,
 			Discount = m.Discount,
 			Rebate = m.Rebate
@@ -493,4 +498,3 @@ BEGIN
 	-- End region
 END
 GO
-
