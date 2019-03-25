@@ -25,6 +25,7 @@ AS
 		- 20181127@Parsons: Integrate Bidme games (GD product) [#103695]
 		- 20190319@bruce: Apply min fee rule for discount calculation [#109997]
 		- 20190410@bruce: calculate discount for terminated licensee[111485]
+	    	- 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
 
 	Parameters:
 		@IsApplyDiscountMinfee: apply minfee term to discount value
@@ -38,7 +39,7 @@ BEGIN
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 1. Prepare settings
  *-------------------------------------------------------------------------------------------------------------------------------*/
-	DECLARE @GD_Tip SMALLINT = 1706
+	DECLARE @GD_Tip SMALLINT = 1706, @PromotionPrize SMALLINT = 4300
 	
 	-- product to be discounted
 	DECLARE @ProductList TABLE (ProductId INT, ToBeDiscounted BIT)
@@ -272,9 +273,10 @@ BEGIN
 		b.rptDate	AS WinlossDate,
 		p.ProductId,
 		b.CurrencyId,
-		SUM(CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss, -- exclude GD Tip 
-		SUM(CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE ISNULL(-b.MemberWL, 0) * p.Rate * e.Rate END) AS AmountToCompany, -- exclude GD Tip,
-		SUM(CASE WHEN b.Bettype = @GD_Tip THEN ISNULL(-b.MemberWL, 0) * p.Rate * e.Rate ELSE 0 END) AS ExtraAmount 
+		SUM(CASE WHEN b.Bettype = @GD_Tip OR b.Bettype = @PromotionPrize THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss,
+		SUM(CASE WHEN b.Bettype = @GD_Tip OR b.Bettype = @PromotionPrize THEN 0 ELSE ISNULL(-b.MemberWL, 0) * p.Rate * e.Rate END) AS AmountToCompany,
+		SUM(CASE WHEN b.Bettype = @GD_Tip THEN ISNULL(-b.MemberWL, 0) * p.Rate * e.Rate ELSE 0 END) AS ExtraAmount, 
+		SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) * e.Rate ELSE 0 END) AS WinningPrize 
 	INTO #tmpWinlossData
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 	INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
@@ -289,11 +291,12 @@ BEGIN
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
 			AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
+			AND (b.ProductID <> 32 OR b.Bettype IN (SELECT Bettype FROM dbo.LA_f_BettypeProductMapping(0, 'PP'))) 
 	GROUP BY p.PartyId,b.rptdate,p.ProductId,b.CurrencyId
 
 	-- 2.2 insert product don't have any ticket
-	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,CurrencyId,Winloss,AmountToCompany,ExtraAmount)
-	SELECT DISTINCT PartyId,@ToDate,c.ProductId,6, 0, 0, 0-- default eur = 6
+	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,CurrencyId,Winloss,AmountToCompany,ExtraAmount,WinningPrize)
+	SELECT DISTINCT PartyId,@ToDate,c.ProductId,6, 0, 0, 0, 0-- default eur = 6
 	FROM @PartyList p 
 	INNER JOIN @ProductList pd ON 1=1
 	INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON c.ProductID = pd.ProductID AND p.PartyId = c.FromParty
@@ -301,8 +304,8 @@ BEGIN
 
 	-- 2.3 create result
 	SELECT a.PartyId,a.ProductId
-		,CAST(SUM(a.Winloss) AS MONEY) AS Winloss
-		,CAST(SUM(a.AmountToCompany) AS MONEY) AS AmountToCompany 
+		,CAST(SUM(a.Winloss + WinningPrize) AS MONEY) AS Winloss
+		,CAST(SUM(a.AmountToCompany - WinningPrize) AS MONEY) AS AmountToCompany 
 		,CAST(SUM(a.ExtraAmount) AS MONEY) AS ExtraAmount
 		,CAST(0 AS MONEY) AS Fee
 		,CAST(0 AS MONEY) AS Discount
