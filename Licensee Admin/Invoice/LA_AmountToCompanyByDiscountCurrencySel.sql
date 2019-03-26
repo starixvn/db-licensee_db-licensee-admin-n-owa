@@ -367,7 +367,7 @@ BEGIN
 		,CAST(0 AS MONEY)			AS Discount
 		,CAST(0 AS MONEY)			AS Rebate
 		,CAST(0 AS BIT)				AS IsChargedByMinFee
-		,CAST(0 AS BIT)				AS IsSharedMinFee
+		,CAST(0 AS BIT)				AS IsApplyMinfeeToDiscount
 		,CAST(0 AS MONEY)			AS MinFee
 	INTO #tmpResult
 	FROM #tmpWinlossData a
@@ -435,7 +435,10 @@ BEGIN
 					THEN 1
 				ELSE 0
 			END,
-		IsSharedMinFee = CASE WHEN t.TotalAmountByDiscountBaseCurrency >= t.TotalMinFeeByDiscountBaseCurrency AND p.PartyGroupId >0 THEN 1 ELSE 0 END,
+		IsApplyMinfeeToDiscount = CASE
+			WHEN a.MinFeeAmountByBaseCurrency < a.FeeAmountByBaseCurrency AND a.FeeAmountByBaseCurrency > 0 THEN 0-- waived
+			WHEN t.TotalAmountByDiscountBaseCurrency >= t.TotalMinFeeByDiscountBaseCurrency AND p.PartyGroupId >0 THEN 0 -- reach group minfee goal
+			ELSE 1 END,
 		MinFee = a.MinFeeAmountByBaseCurrency
 	FROM #tmpResult r
 	INNER JOIN @PartyList p ON r.PartyId=p.PartyId
@@ -523,7 +526,7 @@ BEGIN
 		INNER JOIN @rate c ON c.CalculationGroup = s.CalculationGroup
 		WHERE c.IsDiscountByCurrency = 1
 	)
-	UPDATE t SET Discount = CASE WHEN (t.FeeByBaseCurrency - d.Discount) < t.Minfee AND IsSharedMinFee = 0 THEN t.FeeByBaseCurrency - t.Minfee ELSE d.Discount END
+	UPDATE t SET Discount = CASE WHEN (t.FeeByBaseCurrency - d.Discount) < t.Minfee AND t.IsApplyMinfeeToDiscount = 1 THEN t.FeeByBaseCurrency - t.Minfee ELSE d.Discount END
 	FROM #tmpResult t
 	INNER JOIN #tmpDiscountSettings s ON t.PartyID = s.PartyID AND t.ProductID=s.ProductId
 	INNER JOIN cte_DiscountByCurrency d on d.CalculationGroup=s.CalculationGroup
@@ -533,7 +536,7 @@ BEGIN
 	-- fee after discount must >= minfee
 	IF (@FromDate >= @ApplyMinfeeToDiscountDate)
 	BEGIN
-		UPDATE #tmpResult SET Discount = FeeByBaseCurrency - Minfee WHERE (FeeByBaseCurrency - Discount) < Minfee AND IsSharedMinFee = 0
+		UPDATE #tmpResult SET Discount = FeeByBaseCurrency - Minfee WHERE (FeeByBaseCurrency - Discount) < Minfee AND IsApplyMinfeeToDiscount = 1
 	END
 
 	UPDATE #tmpResult SET Discount = 0 WHERE Discount < 0
