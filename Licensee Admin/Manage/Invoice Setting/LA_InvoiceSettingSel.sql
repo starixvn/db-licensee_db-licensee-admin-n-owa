@@ -1,4 +1,3 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -12,10 +11,8 @@ AS
 	 DB: DB052.bodb_Licensee  
    
 	 Revisions:
-		- 20160808@Bravo: Hosting fees
-		- 20161129@Bruce: Add isactive status
-		- 20190326@Bruce: Include invoice language [#102830]
-
+		+ @Bravo-2016.08.08: Hosting fees
+		+ @Bruce-2016.11.29: Add isactive status
 	 Params:
 		+ 0 get all biller
 		+ <> 0 specify a biller 
@@ -48,7 +45,6 @@ BEGIN
 			  , 1, 2, '') AS ProductList
 		, i.ActiveAddress
 		, CASE WHEN pd.StatusId=1 THEN 1 ELSE 0 END AS IsActive
-		, pd.InvoiceLanguage
 	FROM dbo.OAS_Party p WITH (NOLOCK)
 		INNER JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON p.PartyID = b.PartyID		
 		INNER JOIN dbo.LA_InvoiceSetting i WITH (NOLOCK) ON i.ToPartyId = p.PartyID
@@ -63,11 +59,15 @@ BEGIN
 			WHEN ISNULL(pd.BrandName, '') != '' 
 				THEN pd.BrandName 
 			ELSE p1.PartyName 
-		  END, i.InvTypeId, InvTypeName, i.InvTempId, InvTemplateName, ISNULL(i.BankId, 0), i.ActiveAddress, pd.StatusId, pd.InvoiceLanguage
+		  END, i.InvTypeId, InvTypeName, i.InvTempId, InvTemplateName, ISNULL(i.BankId, 0), i.ActiveAddress, pd.StatusId
 	ORDER BY BillerName , CASE 
 			WHEN ISNULL(pd.BrandName, '') != '' 
 				THEN pd.BrandName 
 			ELSE p1.PartyName 
 		  END	
-END
+END			 	
+
+
 GO
+GRANT VIEW DEFINITION ON [dbo].[LA_InvoiceSettingSel] TO [vnteam] 
+GRANT EXECUTE ON [dbo].[LA_InvoiceSettingSel] TO bodbAdminNet 
