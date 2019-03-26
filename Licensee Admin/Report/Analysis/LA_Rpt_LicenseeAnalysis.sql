@@ -28,6 +28,7 @@ AS
 		- 20181119@bruce: Integrate Bidme games (GD product) [#103695]
 		- 20190319@bruce: Apply min fee rule for discount calculation [#109997]
 		- 20190410@bruce: calculate discount for terminated licensee[111485]
+	    	- 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
 
 	Notes: @FromDate, @ToDate should be a full month range
 	Example :  EXEC LA_Rpt_LicenseeAnalysis  @PartyIDs = '73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88', 
@@ -50,6 +51,8 @@ BEGIN
 	DECLARE @ToBeDiscounted INT = 0
 	DECLARE @ToBeCalculated INT = 1
 	DECLARE @CalculateAndDiscount INT = 10
+
+	DECLARE @GD_Tip SMALLINT = 1706, @PromotionPrize SMALLINT = 4300
 
 	-- remove un-support products
 	DECLARE @Products AS TABLE (ProductId INT,ProductCode VARCHAR(10), ToBeDiscounted BIT)
@@ -166,7 +169,7 @@ BEGIN
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
 	(
 		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, ci.DI_Rate, ci.Fromdate, ci.ToDate,
-			CASE WHEN ProductID=11 AND ChargeType=12 THEN 1706 ELSE -1 END -- GD Tip
+			CASE WHEN ProductID=11 AND ChargeType=12 THEN @GD_Tip ELSE -1 END
 		FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
 		WHERE	DI_Rate > 0
 	)
@@ -282,7 +285,7 @@ BEGIN
 		IsApplyMinFee		BIT,
 		Bettype				SMALLINT
 	)
- 
+
 	 -- 7.1. get data from bettrans
 	IF @ToDate > @MoveBetsDay
 	BEGIN
@@ -298,11 +301,11 @@ BEGIN
 				b.winlostdate,
 				l.CurrencyId,
 				CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END,
-				SUM(b.stake * e.Rate),
-				SUM(-(b.winlost - b.actual_stake) * e.Rate),
+				SUM(b.stake * e.Rate), 
+				SUM(-(b.winlost - b.actual_stake) * e.Rate), 
 				bt.ProductID,
 				l.PartyId,
-				CASE WHEN b.bettype = 1706 THEN b.bettype ELSE -1 END
+				CASE WHEN b.bettype = @GD_Tip OR b.bettype = @PromotionPrize THEN b.bettype ELSE -1 END
 			FROM bodb02.dbo.bettrans b WITH (NOLOCK)
 				INNER JOIN #LicenseeCustInfo l 
 					ON l.CustId = b.recommend 					
@@ -319,7 +322,7 @@ BEGIN
 				AND b.bettype NOT IN (901,902,903,904,911,912,913,914)
 			GROUP BY b.winlostdate, l.CurrencyId, bt.ProductID, l.PartyId
 				, CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END
-				, CASE WHEN b.bettype = 1706 THEN b.bettype ELSE -1 END
+				, CASE WHEN b.bettype = @GD_Tip OR b.bettype = @PromotionPrize THEN b.bettype ELSE -1 END
 		)
 
 		DROP TABLE #BettypeList
@@ -343,11 +346,11 @@ BEGIN
 				b.winlostdate,
 				b.Currency,
 				CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END,
-				SUM(b.turnover * e.Rate),
+				SUM(b.turnover * e.Rate), 
 				SUM(-b.winlost * e.Rate),
 				ps.ProductID,
 				l.PartyId,
-				CASE WHEN b.bettype = 1706 THEN b.bettype ELSE -1 END
+				CASE WHEN b.bettype = @GD_Tip OR b.bettype = @PromotionPrize THEN b.bettype ELSE -1 END
 			FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH ( NOLOCK )
 			CROSS APPLY (SELECT l.PartyId 
 						FROM #LicenseeCustInfo l 
@@ -368,12 +371,12 @@ BEGIN
 				AND ISNULL(b.isBA,0) = 0
 			GROUP BY b.winlostdate, b.Currency,l.PartyId,ps.ProductID
 				, CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END
-				, CASE WHEN b.bettype = 1706 THEN b.bettype ELSE -1 END
+				, CASE WHEN b.bettype = @GD_Tip OR b.bettype = @PromotionPrize THEN b.bettype ELSE -1 END
 		)
 	END
 	-- end region
 
-	-- 10. calculate licensing fee(amount to company)
+	-- 10. calculate licensing fee(amount to company) 
 	UPDATE d SET LicensingFee = (d.LicenseeWinLoss * p.Rate), FeeAfterDiscount=0,FeeAfterRebate=0
 	FROM #Result d
 	INNER JOIN @PartyChargeInfo p ON p.PartyId = d.PartyId 
@@ -519,16 +522,18 @@ BEGIN
 	;WITH a AS (
 		SELECT d.PartyId, d.ProductId,
 			SUM(d.Turnover)			Turnover,
-			SUM(CASE WHEN d.Bettype = 1706 THEN 0 ELSE d.LicenseeWinLoss END) LicenseeWinLoss, -- exclude GD Tip
-			SUM(CASE WHEN d.Bettype = 1706 THEN 0 ELSE d.LicensingFee END) LicensingFee, -- exclude GD Tip
-			SUM(CASE WHEN d.Bettype = 1706 THEN d.LicensingFee ELSE 0 END) GDTip,
+			SUM(CASE WHEN d.Bettype = @GD_Tip OR d.Bettype = @PromotionPrize THEN 0 ELSE d.LicenseeWinLoss END) LicenseeWinLoss,
+			SUM(CASE WHEN d.Bettype = @GD_Tip OR d.Bettype = @PromotionPrize THEN 0 ELSE d.LicensingFee END) LicensingFee,
+			SUM(CASE WHEN d.Bettype = @GD_Tip THEN d.LicensingFee ELSE 0 END) GDTip,
+			SUM(CASE WHEN d.Bettype = @PromotionPrize THEN d.LicenseeWinLoss ELSE 0 END)	WinningPrize,
 			CAST(0 AS MONEY)		Discount,
 			CAST(0 AS MONEY)		Rebate
 		FROM #Result d
 		GROUP BY d.PartyId, d.ProductId
 	)
 	SELECT a.LicenseeWinLoss,a.PartyId,a.ProductId,a.Turnover,a.Discount,a.Rebate,
-		ISNULL(a.GDTip, CAST(0 AS MONEY)) + (CASE
+		ISNULL(a.GDTip, CAST(0 AS MONEY)) + a.WinningPrize +
+		(CASE 
 			WHEN ISNULL(amf.AmountToCompany, a.LicensingFee) < 0 THEN CAST(0 AS MONEY)
 			ELSE ISNULL(amf.AmountToCompany, a.LicensingFee)
 		END) AS LicensingFee
