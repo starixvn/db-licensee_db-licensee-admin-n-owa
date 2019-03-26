@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -25,6 +26,7 @@ AS
 		+ 20170824@Bruce: use same invoice no for debit note and debit note for return amf [#76410]
 		+ 20171128@Bruce: use created date time instead of invoice date [#86399]
 		+ 20171205@Bruce: exclude void invoice [#87723]
+		+ 20190326@Bruce: Include invoice language [#102830]
 */
 /*	Example:
 	USE bodb_licensee
@@ -42,7 +44,8 @@ BEGIN
 		InvoiceTemplateId	SMALLINT,
 		InvoiceTemplateName	VARCHAR(50),
 		InvoiceTemplatePath	VARCHAR(255),
-		IsSeparateProduct	BIT
+		IsSeparateProduct	BIT,
+		InvoiceLanguage		VARCHAR(50)
 	)
 	INSERT INTO @InvoiceInfo(InvoiceTemplateId,InvoiceTemplateName,InvoiceTemplatePath)
 	(
@@ -91,17 +94,23 @@ BEGIN
 	
 	UPDATE	@InvoiceInfo
 	SET		InvoiceSymbol = @InvoiceSymbol,
-			InvoiceNumber = @InvoiceNumber
+			InvoiceNumber = @InvoiceNumber,
+			InvoiceLanguage = (SELECT TOP 1 d.InvoiceLanguage FROM dbo.OAS_PartyDetail d WHERE d.PartyID=@PayerId)
+	
 	UPDATE	@InvoiceInfo
 	SET		IsSeparateProduct = (SELECT TOP 1 i.IsSeparateProduct
 								FROM LA_InvoiceHeader i WITH(NOLOCK)
 								WHERE i.BillerId = @BillerId
 								ORDER BY i.InvoiceNumber DESC)
 	
-	SELECT	TOP 1 ii.InvoiceSymbol, ii.InvoiceNumber, ii.InvoiceTemplateId, ii.InvoiceTemplateName, ii.InvoiceTemplatePath, ii.IsSeparateProduct
-	FROM	@InvoiceInfo ii
+	SELECT TOP 1 ii.InvoiceSymbol
+		, ii.InvoiceNumber
+		, ii.InvoiceTemplateId
+		, ii.InvoiceTemplateName
+		, ii.InvoiceTemplatePath
+		, ISNULL(ii.IsSeparateProduct,0) AS IsSeparateProduct
+		, ISNULL(ii.InvoiceLanguage, 'en-US') AS InvoiceLanguage
+	FROM @InvoiceInfo ii
 
 END
-
 GO
-GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceBillerInfoGet] TO bodbAdminNet
