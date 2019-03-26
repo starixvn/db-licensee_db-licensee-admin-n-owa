@@ -19,6 +19,7 @@ AS
 	- 20180301@Parsons: inlclude CO to Licensee List [#90721]
 	- 20180801@Parsons: Rebuild licensee information report [#94283]
 	- 20190130@Bruce: Missing licensee group: Cozni [#108432]
+	- 20190318@Mason: Add InvoiceLanguage in SELECT statement [#110445]
 */
 BEGIN
 	SET NOCOUNT ON

@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -22,6 +23,7 @@ AS
 		+ @Bruce-2016-11-09: Include non-official payers
 			1: official payer
 			5: non-official payer
+		+ @Mason-2019-03-18: Add Invoice Language in SELECT statement [#110419]
 	 Params:
 	 Example:
 		EXEC dbo.LA_PayerInfoSel 14
