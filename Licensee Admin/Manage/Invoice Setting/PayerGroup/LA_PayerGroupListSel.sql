@@ -28,6 +28,7 @@ AS
 BEGIN	
 SET NOCOUNT ON 
 
+	DECLARE @CurrenDate DATE = GETDATE(), @MinFeeType TINYINT =  1
 	DECLARE @Result AS TABLE (PayerGroupID INT, PayerGroupName VARCHAR(50), NumberOfPayers INT, PayerList VARCHAR(1000), TotalMinFee MONEY)
 
 	INSERT INTO @Result(PayerGroupID , PayerGroupName, NumberOfPayers)
@@ -50,21 +51,16 @@ SET NOCOUNT ON
 	FROM @Result r
 
 	-- Update TotalMinFee
-	;WITH cte_Data AS(
-		SELECT pa.PartyGroupId, pa.PartyId, MAX(MinFeeId) AS MinFeeId 
+	;WITH cte_MinFee AS(
+		SELECT pa.PartyGroupId, SUM(ISNULL(FeeAmount, 0)) AS TotalMinFee 
 		FROM LA_PartyGroupAssignment pa WITH(NOLOCK)
 		INNER JOIN LA_MinFee mf WITH(NOLOCK) ON pa.PartyId = mf.PartyId
-		GROUP BY pa.PartyGroupId, pa.PartyId),
-	cte_Data2 AS(
-		SELECT PartyGroupId, SUM(ISNULL(mf.FeeAmount, 0)) AS TotalMinFee
-		FROM cte_Data d
-		INNER JOIN LA_MinFee mf WITH(NOLOCK) ON d.MinFeeId = mf.MinFeeId
-		GROUP BY PartyGroupId)
-	
+		WHERE mf.FeeTypeId = @MinFeeType AND @CurrenDate BETWEEN mf.FromDate AND mf.ToDate
+		GROUP BY pa.PartyGroupId)
 	UPDATE r
-	SET r.TotalMinFee = ISNULL(d.TotalMinFee, 0)			
+	SET r.TotalMinFee = ISNULL(mf.TotalMinFee, 0)			
 	FROM @Result r
-	LEFT JOIN cte_Data2 d ON r.PayerGroupID = d.PartyGroupId
+	LEFT JOIN cte_MinFee mf ON r.PayerGroupID = mf.PartyGroupId
 	
 	SELECT * FROM @Result
 END
