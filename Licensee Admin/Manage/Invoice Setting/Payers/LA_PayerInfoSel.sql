@@ -57,6 +57,3 @@ SET NOCOUNT ON
 		AND p.PartyType IN (1,5)
 END
 GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_PayerInfoSel] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_PayerInfoSel] TO bodbAdminNet
