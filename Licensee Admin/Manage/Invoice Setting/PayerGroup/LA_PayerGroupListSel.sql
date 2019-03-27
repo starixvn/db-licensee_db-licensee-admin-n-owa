@@ -28,9 +28,9 @@ AS
 BEGIN	
 SET NOCOUNT ON 
 
-	DECLARE @Result AS TABLE (PartyGroupId INT, PartyGroupName VARCHAR(50), NumberOfPayers INT, PayerList VARCHAR(1000), TotalMinFee MONEY)
+	DECLARE @Result AS TABLE (PayerGroupID INT, PayerGroupName VARCHAR(50), NumberOfPayers INT, PayerList VARCHAR(1000), TotalMinFee MONEY)
 
-	INSERT INTO @Result(PartyGroupId , PartyGroupName, NumberOfPayers)
+	INSERT INTO @Result(PayerGroupID , PayerGroupName, NumberOfPayers)
 	SELECT pg.PartyGroupId AS PayerGroupID, pg.PartyGroupName AS PayerGroupName, COUNT(pga.PartyId) AS NumberOfPayers
 	FROM dbo.LA_PartyGroup pg WITH (NOLOCK)		
 		LEFT JOIN dbo.LA_PartyGroupAssignment pga WITH (NOLOCK) ON pg.PartyGroupId = pga.PartyGroupId		
@@ -45,7 +45,7 @@ SET NOCOUNT ON
 				FROM dbo.LA_PartyGroupAssignment p WITH (NOLOCK)
 					LEFT JOIN dbo.OAS_Party p1 WITH (NOLOCK) ON p.PartyId = p1.PartyID
 					LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p1.PartyID = pd.PartyID
-				WHERE r.PartyGroupId = p.PartyGroupId					
+				WHERE r.PayerGroupID = p.PartyGroupId					
 				FOR XML PATH ('')), 1, 2, '') 			
 	FROM @Result r
 
@@ -64,7 +64,7 @@ SET NOCOUNT ON
 	UPDATE r
 	SET r.TotalMinFee = ISNULL(d.TotalMinFee, 0)			
 	FROM @Result r
-	LEFT JOIN cte_Data2 d ON r.PartyGroupId = d.PartyGroupId
+	LEFT JOIN cte_Data2 d ON r.PayerGroupID = d.PartyGroupId
 	
 	SELECT * FROM @Result
 END
