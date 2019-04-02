@@ -12,7 +12,8 @@ ALTER PROCEDURE [dbo].[LA_AmountToCompanySel] (
 	@PartyIds		VARCHAR(4000) = '',
 	@ProductCodes	VARCHAR(1000) = '',
 	@BaseCurrency	VARCHAR(10) = 'EUR',
-	@CurrencyId		INT = 0
+	@CurrencyId		INT = 0,
+	@IsApplyDiscountMinfee BIT = 1
 )
 AS
 /*	Created: 20180703@Bruce
@@ -22,11 +23,17 @@ AS
 		- 20180703@Bruce: calculate discount,rebate [#94282]
 		- 20181114@Bruce: discount by currency [#99694] 
 		- 20181127@Parsons: Integrate Bidme games (GD product) [#103695]
+		- 20190319@bruce: Apply min fee rule for discount calculation [#109997]
+
+	Parameters:
+		@IsApplyDiscountMinfee: apply minfee term to discount value
 */
 
 BEGIN
 	SET NOCOUNT ON
-	
+
+	DECLARE @ApplyMinfeeToDiscountDate DATE = dbo.LA_f_ApplyDiscountMinfeeDate()
+
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 1. Prepare settings
  *-------------------------------------------------------------------------------------------------------------------------------*/
@@ -305,6 +312,7 @@ BEGIN
 		,CAST('' AS NVARCHAR(4000)) AS RebateRemark
 		,CAST(0 AS MONEY)			AS Minfee
 		,CAST(0 AS BIT)				AS IsChargedByMinFee
+		,CAST(0 AS BIT)				AS IsApplyMinfeeToDiscount
 	INTO #tmpResult
 	FROM #tmpWinlossData a
 	GROUP BY PartyId, ProductId
@@ -359,6 +367,10 @@ BEGIN
 				THEN 1
 			ELSE 0
 		END,
+		IsApplyMinfeeToDiscount = CASE
+			WHEN a.MinFeeAmount < a.FeeAmount AND a.FeeAmount > 0 THEN 0-- waived
+			WHEN t.TotalAmount >= t.TotalMinFee AND p.PartyGroupId > 0 THEN 0 -- reach group minfee goal
+			ELSE 1 END,
 		Minfee = a.MinFeeAmount
 	FROM #tmpResult r
 	INNER JOIN @PartyList p ON r.PartyId=p.PartyId
@@ -447,11 +459,20 @@ BEGIN
 	UPDATE t SET
 		DiscountRemark = s.Remark
 		, DiscountRate = d.Rate
-		, Discount = CASE WHEN (t.Fee - d.Discount) < t.Minfee THEN t.Fee - t.Minfee ELSE d.Discount END
+		, Discount = CASE WHEN (t.Fee - d.Discount) < t.Minfee AND t.IsApplyMinfeeToDiscount=1 THEN t.Fee - t.Minfee ELSE d.Discount END
 	FROM #tmpResult t
 	INNER JOIN #tmpDiscountSettings s ON t.PartyID = s.PartyID AND t.ProductID=s.ProductId
 	INNER JOIN cte_DiscountByCurrency d on d.CalculationGroup=s.CalculationGroup
 	WHERE d.Discount > 0
+
+	-- 4.6 apply new discount term for licensee have not shared minfee
+	-- fee after discount must >= minfee
+	IF (@FromDate >= @ApplyMinfeeToDiscountDate AND @IsApplyDiscountMinfee = 1)
+	BEGIN
+		UPDATE #tmpResult SET Discount = Fee - Minfee WHERE (Fee - Discount) < Minfee AND IsApplyMinfeeToDiscount = 1
+	END
+
+	UPDATE #tmpResult SET DiscountRate=0, DiscountRemark='', Discount = 0 WHERE Discount <= 0
 
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 5. rebate calculation

@@ -23,9 +23,11 @@ AS
 		- 20180924@Parsons: LA - LPID report - Apply one discount rate across all base currencies [#100046]
 		- 20181114@Bruce: discount by currency [#99694] 
 		- 20181127@Parsons: Integrate Bidme games (GD product) [#103695]
+		- 20190319@bruce: Apply min fee rule for discount calculation [#109997]
 */
 BEGIN
 	SET NOCOUNT ON
+	DECLARE @ApplyMinfeeToDiscountDate DATE = dbo.LA_f_ApplyDiscountMinfeeDate()
 	
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 1. Prepare settings
@@ -365,6 +367,7 @@ BEGIN
 		,CAST(0 AS MONEY)			AS Discount
 		,CAST(0 AS MONEY)			AS Rebate
 		,CAST(0 AS BIT)				AS IsChargedByMinFee
+		,CAST(0 AS BIT)				AS IsApplyMinfeeToDiscount
 		,CAST(0 AS MONEY)			AS MinFee
 	INTO #tmpResult
 	FROM #tmpWinlossData a
@@ -418,20 +421,24 @@ BEGIN
 
 	-- 3.3 calculate actual licensing fee
 	UPDATE r SET FeeByDiscountBaseCurrency = CASE
-									WHEN t.TotalAmountByDiscountBaseCurrency < t.TotalMinFeeByDiscountBaseCurrency AND a.FeeOutOfWaiveTimeByDiscountBaseCurrency < a.MinFeeAmountByDiscountBaseCurrency
-										THEN a.MinFeeAmountByDiscountBaseCurrency + a.FeeUnderWaiveTimeByDiscountBaseCurrency
-									ELSE a.FeeOutOfWaiveTimeByDiscountBaseCurrency + a.FeeUnderWaiveTimeByDiscountBaseCurrency
-								END,
-					FeeByBaseCurrency =	CASE
-									WHEN t.TotalAmountByBaseCurrency < t.TotalMinFeeByBaseCurrency AND a.FeeOutOfWaiveTimeByBaseCurrency < a.MinFeeAmountByBaseCurrency
-										THEN a.MinFeeAmountByBaseCurrency + a.FeeUnderWaiveTimeByBaseCurrency
-									ELSE a.FeeOutOfWaiveTimeByBaseCurrency + a.FeeUnderWaiveTimeByBaseCurrency
-								END,
+				WHEN t.TotalAmountByDiscountBaseCurrency < t.TotalMinFeeByDiscountBaseCurrency AND a.FeeOutOfWaiveTimeByDiscountBaseCurrency < a.MinFeeAmountByDiscountBaseCurrency
+					THEN a.MinFeeAmountByDiscountBaseCurrency + a.FeeUnderWaiveTimeByDiscountBaseCurrency
+				ELSE a.FeeOutOfWaiveTimeByDiscountBaseCurrency + a.FeeUnderWaiveTimeByDiscountBaseCurrency
+			END,
+		FeeByBaseCurrency = CASE
+				WHEN t.TotalAmountByBaseCurrency < t.TotalMinFeeByBaseCurrency AND a.FeeOutOfWaiveTimeByBaseCurrency < a.MinFeeAmountByBaseCurrency
+					THEN a.MinFeeAmountByBaseCurrency + a.FeeUnderWaiveTimeByBaseCurrency
+				ELSE a.FeeOutOfWaiveTimeByBaseCurrency + a.FeeUnderWaiveTimeByBaseCurrency
+			END,
 		IsChargedByMinFee = CASE
-								WHEN t.TotalAmountByDiscountBaseCurrency < t.TotalMinFeeByDiscountBaseCurrency AND a.FeeOutOfWaiveTimeByDiscountBaseCurrency < a.MinFeeAmountByDiscountBaseCurrency
-									THEN 1
-								ELSE 0
-							END,
+				WHEN t.TotalAmountByDiscountBaseCurrency < t.TotalMinFeeByDiscountBaseCurrency AND a.FeeOutOfWaiveTimeByDiscountBaseCurrency < a.MinFeeAmountByDiscountBaseCurrency
+					THEN 1
+				ELSE 0
+			END,
+		IsApplyMinfeeToDiscount = CASE
+			WHEN a.MinFeeAmountByBaseCurrency < a.FeeAmountByBaseCurrency AND a.FeeAmountByBaseCurrency > 0 THEN 0-- waived
+			WHEN t.TotalAmountByDiscountBaseCurrency >= t.TotalMinFeeByDiscountBaseCurrency AND p.PartyGroupId >0 THEN 0 -- reach group minfee goal
+			ELSE 1 END,
 		MinFee = a.MinFeeAmountByBaseCurrency
 	FROM #tmpResult r
 	INNER JOIN @PartyList p ON r.PartyId=p.PartyId
@@ -512,19 +519,27 @@ BEGIN
 	-- 4.5 discount by curency
 	-- not support gross win
 	-- not support multiple products
-	-- not discount if fee after discount less than minfee
+	-- not discount if fee after discount less than minfee(in case minfee is not shared)
 	;WITH cte_DiscountByCurrency AS(
 		SELECT c.CalculationGroup, c.Rate, c.Rate * (CASE WHEN s.FeeBase <0 THEN 0 ELSE s.FeeBase END) Discount
 		FROM @tmpDiscountCalculation s
 		INNER JOIN @rate c ON c.CalculationGroup = s.CalculationGroup
 		WHERE c.IsDiscountByCurrency = 1
 	)
-	UPDATE t SET Discount = CASE WHEN (t.FeeByBaseCurrency - d.Discount) < t.Minfee THEN t.FeeByBaseCurrency - t.Minfee ELSE d.Discount END
+	UPDATE t SET Discount = CASE WHEN (t.FeeByBaseCurrency - d.Discount) < t.Minfee AND t.IsApplyMinfeeToDiscount = 1 THEN t.FeeByBaseCurrency - t.Minfee ELSE d.Discount END
 	FROM #tmpResult t
 	INNER JOIN #tmpDiscountSettings s ON t.PartyID = s.PartyID AND t.ProductID=s.ProductId
 	INNER JOIN cte_DiscountByCurrency d on d.CalculationGroup=s.CalculationGroup
 	WHERE d.Discount > 0
 
+	-- 4.6 apply new discount term for licensee have not shared minfee
+	-- fee after discount must >= minfee
+	IF (@FromDate >= @ApplyMinfeeToDiscountDate)
+	BEGIN
+		UPDATE #tmpResult SET Discount = FeeByBaseCurrency - Minfee WHERE (FeeByBaseCurrency - Discount) < Minfee AND IsApplyMinfeeToDiscount = 1
+	END
+
+	UPDATE #tmpResult SET Discount = 0 WHERE Discount < 0
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 5. rebate calculation
  *-------------------------------------------------------------------------------------------------------------------------------*/
