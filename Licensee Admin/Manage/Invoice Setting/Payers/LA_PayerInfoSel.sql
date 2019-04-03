@@ -18,12 +18,13 @@ AS
 	 DB: DB052.bodb_Licensee
 
 	 Revisions:
-		+ @Bravo-2016.08.08: Hosting fees
-		+ @Bruce-2016-09-05: Default active address is 1
-		+ @Bruce-2016-11-09: Include non-official payers
+		+ 20160808@Bravo: Hosting fees
+		+ 20160905@Bruce: Default active address is 1
+		+ 20161109@Bruce: Include non-official payers
 			1: official payer
 			5: non-official payer
-		+ @Mason-2019-03-18: Add Invoice Language in SELECT statement [#110419]
+		+ 20190318@Mason: Add Invoice Language in SELECT statement [#110419]
+		
 	 Params:
 	 Example:
 		EXEC dbo.LA_PayerInfoSel 14
