@@ -1,5 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
-USE [bodb_Licensee]
+/*<info serverAlias="DBLIC-bodb_LicenseeReport" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+USE [bodb_LicenseeReport]
 GO
 
 CREATE PROCEDURE [dbo].[LA_IsDataReady] 
@@ -18,7 +18,7 @@ BEGIN
 
 	DECLARE 
 		@Today DATE = GETDATE(),
-		@MaxDate DATE = (SELECT MAX(RptDate) FROM bodb_LicenseeReport.dbo.rpt_Betting WITH (NOLOCK)),
+		@MaxDate DATE = (SELECT MAX(RptDate) FROM dbo.rpt_Betting WITH (NOLOCK)),
 		@IsDataYesterdayReady BIT = 0,
 		@IsStagingBettrans VARCHAR(200) = (
 			SELECT TOP 1 VValue 
