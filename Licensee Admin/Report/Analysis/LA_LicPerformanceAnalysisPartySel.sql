@@ -22,14 +22,17 @@ BEGIN
 		WHERE a.PathCode LIKE (@PathCode + '%')
 	),
 	cte_LaunchDate AS (
-		SELECT p.PartyID, p.OldRefID, MIN(i.FromDate) AS LaunchDate
+		SELECT p.PartyID, p.OldRefID, p.PartyName, d.BrandName, MIN(i.FromDate) AS LaunchDate
 		FROM dbo.OAS_Party p WITH(NOLOCK)
 		INNER JOIN dbo.OAS_ChargeInfo i WITH(NOLOCK) ON p.PartyID = i.FromParty
+		INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID = d.PartyID
 		WHERE p.PartyType = 1
-		GROUP BY p.OldRefID,p.PartyID
+		GROUP BY p.PartyID, p.OldRefID, p.PartyName, d.BrandName
 	)
 	SELECT l.LicenseeID AS SiteId, 
 		l.LicenseeName,
+		p.PartyName,
+		p.BrandName,
 		g.ParentId AS GroupId,
 		g.GroupName,
 		CASE WHEN p.PartyID IS NULL THEN 0 ELSE 1 END AS IsLaunched,
