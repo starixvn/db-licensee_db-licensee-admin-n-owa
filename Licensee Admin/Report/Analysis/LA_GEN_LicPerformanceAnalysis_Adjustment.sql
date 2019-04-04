@@ -44,6 +44,15 @@ BEGIN
 	INSERT INTO @tmpBaseCurrencyList(CurrencyId,Code)
 	EXEC dbo.LA_SelBaseCurrency
 
+	-- party list
+	--
+	DECLARE @tmpPartyList TABLE(PartyId INT, SiteId INT, BaseCurrencyId INT)
+	INSERT INTO @tmpPartyList(PartyId,SiteId,BaseCurrencyId)
+	SELECT p.PartyID, p.OldRefID,d.BaseCurrencyId
+	FROM dbo.OAS_Party p WITH(NOLOCK)
+	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON d.PartyID=p.PartyID
+	WHERE p.PartyType = 1 AND p.PartyID IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
+
 	-- if not overwrite old values then skip
 	--
 	DECLARE @Skip TABLE(SiteId INT)
@@ -60,18 +69,15 @@ BEGIN
 
 	;WITH cte_Adjustment AS
 	(
-		SELECT CAST(InvoiceDate AS DATE)AS StatementDate, (ISNULL(s.Income,0) -ISNULL(s.Expense,0)) AS Amount, h.CurrencyId, p.OldRefID AS SiteId, d.BaseCurrencyId
+		SELECT CAST(InvoiceDate AS DATE)AS StatementDate, (ISNULL(s.Income,0) -ISNULL(s.Expense,0)) AS Amount, h.CurrencyId, p.SiteId, p.BaseCurrencyId
 		FROM dbo.LA_InvoiceHeader h WITH (NOLOCK)
 		INNER JOIN dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId=s.InvoiceHeaderId
 		INNER JOIN @AdjustmentItemTypes r ON r.Id = s.InvItemTypeId
-		INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID=h.PartyId
-		INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.partyId = d.PartyID
+		INNER JOIN @tmpPartyList p ON p.PartyID=h.PartyId
 		WHERE h.Environment = @Environment
 			AND h.StatusId = @InvoiceStatus_Normal
 			AND @ReportDate  = DATEADD(MONTH, DATEDIFF(MONTH, 0, InvoiceDate), 0)
-			AND h.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
-			AND p.OldRefID NOT IN (SELECT s.SiteId FROM @Skip s)
-			AND p.PartyType = 1 -- official party
+			AND p.SiteId NOT IN (SELECT s.SiteId FROM @Skip s)
 	)
 	INSERT INTO @tmpAmounts(SiteId,BaseCurrencyId, USD,EUR,MYR,GBP,CNY)
 	SELECT a.SiteId,a.BaseCurrencyId,
@@ -86,7 +92,9 @@ BEGIN
 	-- Remove old values
 	--
 	DELETE bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis
-	WHERE ReportDate = @ReportDate AND ProductId = @AdjustmentId AND SiteId IN (SELECT a.SiteId FROM @tmpAmounts a)
+	WHERE ReportDate = @ReportDate AND ProductId = @AdjustmentId 
+		AND SiteId IN (SELECT a.SiteId FROM @tmpPartyList a)
+		AND SiteId NOT IN (SELECT b.SiteId FROM @Skip b)
 
 	-- Generate adjustment
 	--
