@@ -1,20 +1,4 @@
 /*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,dwrs2" viewers="" isFunction="0" isNested="0"></info>*/
-USE bodb_Licensee
-GO
-
-ALTER PROCEDURE [dbo].LA_LicPerformanceAnalysisStatusSel
-AS
-/*  Created: 20190307@Bruce
-	Task : check generating status
-	DB: DBLIC.bodb_Licensee
-	Revisions:
-		- 20190307@Bruce: Create SP
-*/
-BEGIN
-	SELECT [Value] AS [Status]
-	FROM dbo.LA_SystemSettings
-	WHERE [Key] = 'LicenseePerformanceAnalysis_GeneratingStatus'
-END
 USE [bodb_licensee]
 GO
 
@@ -30,12 +14,11 @@ AS
 	Created: 20150312@Florent
 	Task : Get all BaseCurrency
 	DB: DB052.bodb_licensee
-	Revison:
+	
+	Revisions:
 		- 20150703@Florent: add currency MYR
 		- 20171220@Parsons: increase length for variables [#88197]
 
-	Revisions:
-	Param's Explanation:
 */
 SET NOCOUNT ON
 
