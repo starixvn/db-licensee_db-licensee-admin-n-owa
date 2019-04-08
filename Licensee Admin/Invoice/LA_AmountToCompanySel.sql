@@ -25,7 +25,7 @@ AS
 		- 20181127@Parsons: Integrate Bidme games (GD product) [#103695]
 		- 20190319@bruce: Apply min fee rule for discount calculation [#109997]
 		- 20190410@bruce: calculate discount for terminated licensee[111485]
-	    	- 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
+		- 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
 
 	Parameters:
 		@IsApplyDiscountMinfee: apply minfee term to discount value
@@ -283,15 +283,11 @@ BEGIN
 	INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID 
 		AND p.LicenseeId = b.SiteId
 		AND (b.rptDate BETWEEN p.FromDate AND p.ToDate) 
-		AND (
-			(b.Bettype = p.Bettype AND p.ProductID = 11) OR 
-			(p.ProductID <> 11)
-		)
+		AND (p.ProductID <> 11 OR b.Bettype = p.Bettype)
 	WHERE (b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
 			AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
-			AND (b.ProductID <> 32 OR b.Bettype IN (SELECT Bettype FROM dbo.LA_f_BettypeProductMapping(0, 'PP'))) 
 	GROUP BY p.PartyId,b.rptdate,p.ProductId,b.CurrencyId
 
 	-- 2.2 insert product don't have any ticket

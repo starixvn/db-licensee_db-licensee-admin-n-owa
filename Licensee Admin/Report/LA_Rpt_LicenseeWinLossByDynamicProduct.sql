@@ -171,7 +171,6 @@ BEGIN
 			CAST(SUM(CASE WHEN b.Bettype =  @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END  * e.BaseCurrencyRate) AS MONEY)	AS WinningPrize
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 		INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
-		INNER JOIN dbo.LA_f_BettypeProductMapping(0, 'PP') bt ON bt.Bettype = b.Bettype
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.StatusId NOT IN (-1, 101, 102, 103)
 			AND b.CurrencyID <> 20

@@ -302,7 +302,6 @@ BEGIN
 				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
 				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund 
 				AND (@Currency = 0 OR b.CurrencyID = @Currency)
-				AND (b.ProductID <> 32 OR b.Bettype IN (SELECT Bettype FROM dbo.LA_f_BettypeProductMapping(0, 'PP'))) 
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, e.Rate
 	)
 

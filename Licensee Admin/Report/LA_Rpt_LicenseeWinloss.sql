@@ -478,7 +478,6 @@ BEGIN
 				, SUM(CASE WHEN b.Bettype <> @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) Winloss
 				, SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
 				FROM bodb_LicenseeReport..rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN bodb_licensee.dbo.LA_f_BettypeProductMapping(0, 'PP') t ON b.Bettype = t.Bettype 
 				WHERE
 					b.ProductID = 32
 					AND b.rptDate BETWEEN @FromDate AND @ToDate
