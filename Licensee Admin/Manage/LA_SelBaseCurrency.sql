@@ -18,6 +18,7 @@ AS
 	Revisions:
 		- 20150703@Florent: add currency MYR
 		- 20171220@Parsons: increase length for variables [#88197]
+		- 20190408@Bruce: grant permission for dwrs2 [#105205]
 
 */
 SET NOCOUNT ON
