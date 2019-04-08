@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,dwrs2" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -13,12 +14,12 @@ AS
 	Created: 20150312@Florent
 	Task : Get all BaseCurrency
 	DB: DB052.bodb_licensee
-	Revison:
+	
+	Revisions:
 		- 20150703@Florent: add currency MYR
 		- 20171220@Parsons: increase length for variables [#88197]
+		- 20190408@Bruce: grant permission for dwrs2 [#105205]
 
-	Revisions:
-	Param's Explanation:
 */
 SET NOCOUNT ON
 
@@ -50,5 +51,3 @@ BEGIN
 	ORDER BY [Default] DESC
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_SelBaseCurrency] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_SelBaseCurrency] TO bodbAdminNet
