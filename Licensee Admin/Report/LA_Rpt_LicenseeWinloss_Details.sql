@@ -489,8 +489,8 @@ BEGIN
 				, SUM(BetCount)		AS BetCount
 				, SUM(Turnover)		AS Turnover
 				, SUM(WinLoss + WinningPrize)	AS Winlost
-				, SUM(-Winloss * ( 1 - ci.Rate))  AS LicenseeWL
-				, SUM((-WinLoss * ci.Rate) + WinningPrize) AS Company
+				, -SUM(WinLoss + WinningPrize)  AS LicenseeWL
+				, SUM((-WinLoss * ci.Rate) - WinningPrize) AS Company
 			FROM cte_PPWinLossData b
 				INNER JOIN #ChargeInfo ci ON b.SiteID = ci.LicenseeID AND ci.ProductID = 32
 			WHERE b.rptDate BETWEEN ci.Fromdate AND ci.Todate
