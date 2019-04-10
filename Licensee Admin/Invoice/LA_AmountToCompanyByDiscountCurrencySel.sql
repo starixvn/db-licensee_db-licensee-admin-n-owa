@@ -24,6 +24,7 @@ AS
 		- 20181114@Bruce: discount by currency [#99694] 
 		- 20181127@Parsons: Integrate Bidme games (GD product) [#103695]
 		- 20190319@bruce: Apply min fee rule for discount calculation [#109997]
+		- 20190410@bruce: calculate discount for terminated licensee[111485]
 */
 BEGIN
 	SET NOCOUNT ON

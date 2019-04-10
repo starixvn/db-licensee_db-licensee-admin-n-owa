@@ -27,6 +27,7 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20181119@bruce: Integrate Bidme games (GD product) [#103695]
 		- 20190319@bruce: Apply min fee rule for discount calculation [#109997]
+		- 20190410@bruce: calculate discount for terminated licensee[111485]
 
 	Notes: @FromDate, @ToDate should be a full month range
 	Example :  EXEC LA_Rpt_LicenseeAnalysis  @PartyIDs = '73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88', 
