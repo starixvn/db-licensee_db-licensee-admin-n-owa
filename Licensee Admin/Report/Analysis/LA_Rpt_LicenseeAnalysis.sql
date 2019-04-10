@@ -466,11 +466,12 @@ BEGIN
 		END,
 		IsApplyMinfeeToDiscount = CASE
 			WHEN t.TotalAmountUnderMinfeeTime >= t.TotalMinFee THEN 0
-			WHEN amf.MinFeeProrate < amf.FeeAmount AND amf.FeeAmount>0 THEN 0
+			WHEN amf.MinFeeProrate < amf.FeeAmount AND amf.FeeAmount>0 AND w.FeeType IS NOT NULL THEN 0
 		ELSE 1 END
 	FROM @MinFeeGroup amf
 	INNER JOIN @PartyGroup pg ON pg.PartyId = amf.PartyId
 	INNER JOIN @TotalMinFees t ON amf.ProductId = t.ProductId AND t.PartyGroupId = pg.PartyGroupId
+	LEFT JOIN @MinFeeGroup w ON w.PartyId = amf.PartyId AND amf.ProductId=w.ProductId AND w.FeeType = 2 -- waive
 	WHERE amf.FeeType = 1
 
 	-- 11.7 update minfee non-group
@@ -480,9 +481,10 @@ BEGIN
 				ELSE amf.TotalAmount
 			END,
 			IsApplyMinfeeToDiscount = CASE
-				WHEN amf.MinFeeProrate < amf.FeeAmount AND amf.FeeAmount>0 THEN 0
+				WHEN amf.MinFeeProrate < amf.FeeAmount AND amf.FeeAmount>0 AND w.FeeType IS NOT NULL THEN 0
 			ELSE 1 END
 	FROM	@MinFeeGroup amf
+	LEFT JOIN @MinFeeGroup w ON w.PartyId = amf.PartyId AND amf.ProductId=w.ProductId AND w.FeeType = 2 -- waive
 	WHERE	amf.FeeType = 1 AND amf.AmountToCompany IS NULL
 	-- end region
 
