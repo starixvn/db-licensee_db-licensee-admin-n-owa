@@ -139,7 +139,6 @@ BEGIN
 					911,912,913,914 	-- CO
 				)
 				AND b.ProductID NOT IN (13,15,25)
-				AND (b.ProductID <> 32 OR b.Bettype IN (SELECT Bettype FROM dbo.LA_f_BettypeProductMapping(0, 'PP'))) 
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, b.ProductId,
 			CASE
 				WHEN b.Bettype = @GD_Tip THEN b.Bettype
@@ -350,7 +349,7 @@ BEGIN
 				ISNULL(SUM(CASE WHEN d.ProductId = 27 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS BRVS,
 				ISNULL(SUM(CASE WHEN d.ProductId = 28 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS LT,
 				ISNULL(SUM(CASE WHEN d.ProductId = 31 THEN (-MemberWL * ci.Rate - (AComm + PComm)) * e.Rate ELSE 0 END),0) AS BX,
-				ISNULL(SUM(CASE WHEN d.ProductId = 32 THEN (-MemberWL * ci.Rate + WinningPrize) * e.Rate ELSE 0 END),0) AS PP
+				ISNULL(SUM(CASE WHEN d.ProductId = 32 THEN (-MemberWL * ci.Rate - WinningPrize) * e.Rate ELSE 0 END),0) AS PP
 		FROM	#TempData d
 				INNER JOIN @PartyChargeInfo ci ON	d.LicenseeId = ci.LicenseeId
 													AND ci.ProductId = d.ProductId

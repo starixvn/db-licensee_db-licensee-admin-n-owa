@@ -110,8 +110,8 @@ BEGIN
 				, SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
 				FROM bodb_LicenseeReport..rpt_BettingByProduct b WITH (NOLOCK)
 					INNER JOIN (SELECT DISTINCT PartyID, LicenseeID FROM #tmpParty) tp ON tp.LicenseeID = b.SiteID
-					INNER JOIN #bettype be ON b.bettype = be.bettype
-				WHERE b.rptDate BETWEEN @FromDate AND @ToDate
+				WHERE b.ProductID = 32
+					AND b.rptDate BETWEEN @FromDate AND @ToDate
 					AND (b.CurrencyID <> 20)
 					AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
 					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
