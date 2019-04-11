@@ -676,7 +676,7 @@ BEGIN
 				, SUM(WinLoss + WinningPrize)	AS Winlost
 				, SUM(-Winloss * ( 1 - p.Rate))  AS LicenseeWL
 				, SUM(WinningPrize) AS WinningPrize
-				, SUM((-WinLoss * p.Rate) + WinningPrize) AS Company
+				, SUM((-WinLoss * p.Rate) - WinningPrize) AS Company
 		FROM cte_WinLossData d
 			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
 		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
