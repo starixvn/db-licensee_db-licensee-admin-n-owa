@@ -300,9 +300,10 @@ BEGIN
 
 	-- 2.3 create result
 	SELECT a.PartyId,a.ProductId
-		,CAST(SUM(a.Winloss + WinningPrize) AS MONEY) AS Winloss
-		,CAST(SUM(a.AmountToCompany - WinningPrize) AS MONEY) AS AmountToCompany 
+		,CAST(SUM(a.Winloss) AS MONEY) AS Winloss
+		,CAST(SUM(a.AmountToCompany) AS MONEY) AS AmountToCompany 
 		,CAST(SUM(a.ExtraAmount) AS MONEY) AS ExtraAmount
+		,CAST(SUM(a.WinningPrize) AS MONEY) AS WinningPrize
 		,CAST(0 AS MONEY) AS Fee
 		,CAST(0 AS MONEY) AS Discount
 		,CAST(0 AS MONEY) AS Rebate
@@ -513,8 +514,8 @@ BEGIN
 	-- result
 	SELECT PartyId
 		,ProductId
-		,Winloss 
-		,Fee + ExtraAmount AS Fee
+		,Winloss + WinningPrize AS Winloss 
+		,Fee + ExtraAmount - WinningPrize AS Fee
 		,CASE WHEN IsChargedByMinFee = 1 AND Fee > 0 THEN Fee ELSE AmountToCompany END NegativeFee
 		,Minfee
 		,IsChargedByMinFee
