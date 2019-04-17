@@ -445,7 +445,7 @@ BEGIN
 	INNER JOIN @PartyList p ON r.PartyId=p.PartyId
 	INNER JOIN @tmpMinFee a ON a.PartyId = r.PartyId AND a.ProductId=r.ProductID AND a.FeeType = 1 -- minfee setting
 	INNER JOIN @TotalMinFees t ON a.ProductId = t.ProductId AND t.PartyGroupId=p.PartyGroupId
-	LEFT JOIN @tmpMinFee b ON a.PartyId = r.PartyId AND a.ProductId=r.ProductID AND b.FeeType = 2-- waive setting
+	LEFT JOIN @tmpMinFee b ON b.PartyId = r.PartyId AND b.ProductId=r.ProductID AND b.FeeType = 2-- waive setting
 
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 4. discount calculation
