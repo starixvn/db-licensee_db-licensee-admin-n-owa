@@ -26,6 +26,8 @@ AS
 			+ Update partyId from TINYINT to INT
 			+ Re-structure SP
 		- 20181220@Parsons: Integrate Bidme games  [#103695]
+		- 20190404@Bruce: Return fistbliing date [#102830]
+
 	Param's Explanation:
 
 */
@@ -80,10 +82,7 @@ BEGIN
 		AND m.PartyId = @PartyId
 		AND m.ProductId = @ProductId
 	
-	SELECT CASE
-			WHEN @FirstBilling IS NULL OR CAST(@FirstBilling AS DATE) <= CAST('19000101' AS DATE) THEN ''
-			ELSE CONVERT(VARCHAR(3),DATENAME(MONTH, DATEADD(MONTH, MONTH(@FirstBilling), - 1))) + '-' + SUBSTRING(CAST(YEAR(@FirstBilling) AS VARCHAR),3,2)
-		END AS FirstBilling
+	SELECT ISNULL(@FirstBilling, CAST('19000101' AS DATE)) AS FirstBilling
 		, ISNULL(@BasisOfBilling, '') AS BasisOfBilling
 		, ISNULL(@MinimumFees, '') AS MinimumFees
 END

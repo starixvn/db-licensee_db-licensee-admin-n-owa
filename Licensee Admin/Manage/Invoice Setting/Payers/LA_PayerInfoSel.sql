@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -17,11 +18,13 @@ AS
 	 DB: DB052.bodb_Licensee
 
 	 Revisions:
-		+ @Bravo-2016.08.08: Hosting fees
-		+ @Bruce-2016-09-05: Default active address is 1
-		+ @Bruce-2016-11-09: Include non-official payers
+		+ 20160808@Bravo: Hosting fees
+		+ 20160905@Bruce: Default active address is 1
+		+ 20161109@Bruce: Include non-official payers
 			1: official payer
 			5: non-official payer
+		+ 20190318@Mason: Add Invoice Language in SELECT statement [#110419]
+		
 	 Params:
 	 Example:
 		EXEC dbo.LA_PayerInfoSel 14
@@ -42,6 +45,7 @@ SET NOCOUNT ON
 		, p.PartyType
 		, ISNULL(p.SetupName, '') AS SetupName
 		, ISNULL(pd.BaseCurrencyId, 0) BaseCurrencyId
+		, pd.InvoiceLanguage
 	FROM dbo.OAS_Party p WITH (NOLOCK)
 		LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 		LEFT JOIN (
@@ -54,6 +58,3 @@ SET NOCOUNT ON
 		AND p.PartyType IN (1,5)
 END
 GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_PayerInfoSel] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_PayerInfoSel] TO bodbAdminNet
