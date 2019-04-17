@@ -72,7 +72,7 @@ AS
 
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @GD_Tip SMALLINT = 1706, @PromotionPrize SMALLINT = 4300
+	DECLARE @GD_Tip SMALLINT = 1706
 
 	-- *********************************************************************************************************
 	-- *** Calculate Previous FromDate, Previous ToDate from FromDate, ToDate
@@ -264,12 +264,11 @@ BEGIN
 			WinLoss			MONEY,
 			AComm			MONEY,
 			PComm			MONEY,
-			WinningPrize	MONEY,
 			ProductId		TINYINT,
 			AmountToCompany MONEY,
 			IsApplyMinFee	BIT)
 
-	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,WinningPrize,AComm,PComm,ProductId,AmountToCompany)
+	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,AComm,PComm,ProductId,AmountToCompany)
 	(
 		SELECT	b.SiteID,
 				p.PartyId,
@@ -281,12 +280,11 @@ BEGIN
 													WHEN b.StatusId IN (114, 115) THEN 0.5
 											 ELSE 1 END
 										ELSE 1 END) * e.Rate,
-				SUM(CASE WHEN b.Bettype=@GD_Tip OR b.Bettype=@PromotionPrize THEN 0 ELSE b.MemberWL END) * e.Rate,
-				SUM(CASE WHEN b.Bettype=@PromotionPrize THEN b.MemberWL ELSE 0 END) * e.Rate,
+				SUM(CASE WHEN b.Bettype=@GD_Tip THEN 0 ELSE b.MemberWL END) * e.Rate,
 				SUM(ISNULL(b.CommissionA, 0)) * e.Rate,
 				SUM(ISNULL(b.CommissionP, 0)) * e.Rate,
 				p.ProductId,
-				SUM((CASE WHEN b.Bettype=@GD_Tip OR b.Bettype<>@PromotionPrize THEN 0 ELSE -b.MemberWL END * p.Rate) - (CASE 
+				SUM((CASE WHEN b.Bettype=@GD_Tip THEN 0 ELSE -b.MemberWL END * p.Rate) - (CASE 
 					WHEN b.ProductId = 3 THEN ISNULL(b.CommissionA, 0) -- BA
 					WHEN b.ProductID = 31 THEN ISNULL(b.CommissionA, 0) + ISNULL(b.CommissionP, 0) -- Exchange
 					ELSE 0 END)) * e.Rate
@@ -306,9 +304,10 @@ BEGIN
 	)
 
 	-- insert zero winloss for case: product don't have any ticket
-	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,WinningPrize,AComm,PComm,ProductId,AmountToCompany)
-	SELECT LicenseeId, PartyId, FromDate, @BaseCurrency,0,0,0,0,0,0,ProductID,0
+	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,AComm,PComm,ProductId,AmountToCompany)
+	SELECT LicenseeId, PartyId, FromDate, @BaseCurrency,0,0,0,0,0,ProductID,0
 	FROM @PartyChargeInfo
+
 	-- Sum products
 	BEGIN
 		DECLARE @SumByProducts TABLE(
@@ -316,7 +315,6 @@ BEGIN
 			BetCount		INT,
 			Turnover		MONEY,
 			WinLoss			MONEY,
-			WinningPrize	MONEY,
 			AComm			MONEY,
 			PComm			MONEY,
 			AmountToCompany	MONEY,
@@ -328,24 +326,23 @@ BEGIN
 		)
 		
 		-- sum by product
-		INSERT INTO @SumByProducts (PartyId,ProductId,IsCurrent,BetCount,Turnover,WinLoss,WinningPrize,AComm,PComm,AmountToCompany,HasMinFee)
+		INSERT INTO @SumByProducts (PartyId,ProductId,IsCurrent,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,HasMinFee)
 		SELECT	PartyId
 				,ProductId
 				,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END) IsCurrent
 				,SUM(BetCount) BetCount
 				,SUM(Turnover) Turnover
-				,SUM(WinLoss + WinningPrize) WinLoss
-				,SUM(WinningPrize) WinningPrize
+				,SUM(WinLoss) WinLoss
 				,SUM(AComm) AComm
 				,SUM(PComm) PComm
-				,SUM(AmountToCompany - WinningPrize) AmountToCompany
+				,SUM(AmountToCompany) AmountToCompany
 				,0 HasMinFee
 		FROM #TempData
 		GROUP BY PartyId, ProductId, CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END
 
 		-- apply minfee
 		UPDATE s SET 
-			AmountToCompany = m.Fee - WinningPrize,
+			AmountToCompany = m.Fee,
 			HasMinFee = m.IsChargedByMinFee,
 			Discount = m.Discount,
 			Rebate = m.Rebate
@@ -414,7 +411,7 @@ BEGIN
 			SUM(CASE WHEN t.ProductId = 3 THEN t.AComm ELSE 0 END)					AS BAComm,
 			SUM(CASE WHEN t.ProductId = 3 THEN t.AmountToCompany ELSE 0 END)		AS AmountToBA,
 			SUM(CASE WHEN t.ProductId = 31 THEN t.AmountToCompany ELSE 0 END)		AS NegativeAmount,
-			SUM(CASE WHEN t.ProductId IN(3,31) OR t.AmountToCompany < 0 THEN 0 ELSE t.AmountToCompany END) AmountToCompany
+			SUM(CASE WHEN t.ProductId IN(3,31) OR (t.AmountToCompany < 0 AND t.ProductId <> 32) THEN 0 ELSE t.AmountToCompany END) AmountToCompany
 		FROM @SumByProducts t
 		WHERE t.ProductId != 0
 		GROUP BY t.IsCurrent, t.PartyId
