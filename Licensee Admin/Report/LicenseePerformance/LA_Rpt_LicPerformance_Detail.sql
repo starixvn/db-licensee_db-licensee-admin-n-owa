@@ -73,6 +73,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @GD_Tip SMALLINT = 1706
+	DECLARE @BAProductId INT = 3, @ExchangeProductId INT = 31, @PragmaticProductId INT = 32 
 
 	-- *********************************************************************************************************
 	-- *** Calculate Previous FromDate, Previous ToDate from FromDate, ToDate
@@ -285,8 +286,8 @@ BEGIN
 				SUM(ISNULL(b.CommissionP, 0)) * e.Rate,
 				p.ProductId,
 				SUM((CASE WHEN b.Bettype=@GD_Tip THEN 0 ELSE -b.MemberWL END * p.Rate) - (CASE 
-					WHEN b.ProductId = 3 THEN ISNULL(b.CommissionA, 0) -- BA
-					WHEN b.ProductID = 31 THEN ISNULL(b.CommissionA, 0) + ISNULL(b.CommissionP, 0) -- Exchange
+					WHEN b.ProductId = @BAProductId THEN ISNULL(b.CommissionA, 0)
+					WHEN b.ProductID = @ExchangeProductId THEN ISNULL(b.CommissionA, 0) + ISNULL(b.CommissionP, 0)
 					ELSE 0 END)) * e.Rate
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
@@ -407,11 +408,11 @@ BEGIN
 			SUM(t.Turnover)		AS Turnover,
 			SUM(ISNULL(t.Discount,0))	AS Discount,
 			SUM(ISNULL(t.Rebate,0))		AS Rebate,
-			SUM(CASE WHEN t.ProductId = 31 THEN t.PComm ELSE 0 END + t.WinLoss)		AS WinLoss,
-			SUM(CASE WHEN t.ProductId = 3 THEN t.AComm ELSE 0 END)					AS BAComm,
-			SUM(CASE WHEN t.ProductId = 3 THEN t.AmountToCompany ELSE 0 END)		AS AmountToBA,
-			SUM(CASE WHEN t.ProductId = 31 THEN t.AmountToCompany ELSE 0 END)		AS NegativeAmount,
-			SUM(CASE WHEN t.ProductId IN(3,31) OR (t.AmountToCompany < 0 AND t.ProductId <> 32) THEN 0 ELSE t.AmountToCompany END) AmountToCompany
+			SUM(CASE WHEN t.ProductId = @ExchangeProductId THEN t.PComm ELSE 0 END + t.WinLoss)							AS WinLoss,
+			SUM(CASE WHEN t.ProductId = @BAProductId THEN t.AComm ELSE 0 END)											AS BAComm,
+			SUM(CASE WHEN t.ProductId = @BAProductId THEN t.AmountToCompany ELSE 0 END)									AS AmountToBA,
+			SUM(CASE WHEN t.ProductId IN (@ExchangeProductId, @PragmaticProductId) THEN t.AmountToCompany ELSE 0 END)	AS NegativeAmount,
+			SUM(CASE WHEN t.ProductId IN(@BAProductId, @ExchangeProductId) OR t.AmountToCompany < 0 THEN 0 ELSE t.AmountToCompany END) AmountToCompany
 		FROM @SumByProducts t
 		WHERE t.ProductId != 0
 		GROUP BY t.IsCurrent, t.PartyId
