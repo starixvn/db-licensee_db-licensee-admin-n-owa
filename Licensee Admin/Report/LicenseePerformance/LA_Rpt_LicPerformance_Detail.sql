@@ -411,7 +411,7 @@ BEGIN
 			SUM(CASE WHEN t.ProductId = @ExchangeProductId THEN t.PComm ELSE 0 END + t.WinLoss)							AS WinLoss,
 			SUM(CASE WHEN t.ProductId = @BAProductId THEN t.AComm ELSE 0 END)											AS BAComm,
 			SUM(CASE WHEN t.ProductId = @BAProductId THEN t.AmountToCompany ELSE 0 END)									AS AmountToBA,
-			SUM(CASE WHEN t.ProductId IN (@ExchangeProductId, @PragmaticProductId) THEN t.AmountToCompany ELSE 0 END)	AS NegativeAmount,
+			SUM(CASE WHEN t.ProductId IN (@ExchangeProductId, @PragmaticProductId) AND t.AmountToCompany < 0 THEN t.AmountToCompany ELSE 0 END)	AS NegativeAmount,
 			SUM(CASE WHEN t.ProductId IN(@BAProductId, @ExchangeProductId) OR t.AmountToCompany < 0 THEN 0 ELSE t.AmountToCompany END) AmountToCompany
 		FROM @SumByProducts t
 		WHERE t.ProductId != 0
