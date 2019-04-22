@@ -662,7 +662,8 @@ BEGIN
 				, SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
 				FROM bodb_LicenseeReport..rpt_BettingByProduct b WITH (NOLOCK)
 				WHERE
-					b.SiteID = @LicenseeID
+					b.ProductID = 32
+					AND	b.SiteID = @LicenseeID
 					AND b.rptDate BETWEEN @FromDate AND @ToDate
 					AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
 					AND (b.CurrencyID <> 20)
