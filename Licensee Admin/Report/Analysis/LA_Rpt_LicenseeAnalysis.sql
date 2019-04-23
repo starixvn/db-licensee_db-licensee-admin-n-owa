@@ -27,6 +27,7 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20181119@bruce: Integrate Bidme games (GD product) [#103695]
 		- 20190319@bruce: Apply min fee rule for discount calculation [#109997]
+		- 20190410@bruce: calculate discount for terminated licensee[111485]
 
 	Notes: @FromDate, @ToDate should be a full month range
 	Example :  EXEC LA_Rpt_LicenseeAnalysis  @PartyIDs = '73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88', 
@@ -466,11 +467,12 @@ BEGIN
 		END,
 		IsApplyMinfeeToDiscount = CASE
 			WHEN t.TotalAmountUnderMinfeeTime >= t.TotalMinFee THEN 0
-			WHEN amf.MinFeeProrate < amf.FeeAmount AND amf.FeeAmount>0 THEN 0
+			WHEN amf.MinFeeProrate < amf.FeeAmount AND amf.FeeAmount>0 AND w.FeeType IS NOT NULL THEN 0
 		ELSE 1 END
 	FROM @MinFeeGroup amf
 	INNER JOIN @PartyGroup pg ON pg.PartyId = amf.PartyId
 	INNER JOIN @TotalMinFees t ON amf.ProductId = t.ProductId AND t.PartyGroupId = pg.PartyGroupId
+	LEFT JOIN @MinFeeGroup w ON w.PartyId = amf.PartyId AND amf.ProductId=w.ProductId AND w.FeeType = 2 -- waive
 	WHERE amf.FeeType = 1
 
 	-- 11.7 update minfee non-group
@@ -480,9 +482,10 @@ BEGIN
 				ELSE amf.TotalAmount
 			END,
 			IsApplyMinfeeToDiscount = CASE
-				WHEN amf.MinFeeProrate < amf.FeeAmount AND amf.FeeAmount>0 THEN 0
+				WHEN amf.MinFeeProrate < amf.FeeAmount AND amf.FeeAmount>0 AND w.FeeType IS NOT NULL THEN 0
 			ELSE 1 END
 	FROM	@MinFeeGroup amf
+	LEFT JOIN @MinFeeGroup w ON w.PartyId = amf.PartyId AND amf.ProductId=w.ProductId AND w.FeeType = 2 -- waive
 	WHERE	amf.FeeType = 1 AND amf.AmountToCompany IS NULL
 	-- end region
 

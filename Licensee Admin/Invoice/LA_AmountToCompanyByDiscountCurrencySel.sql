@@ -24,6 +24,7 @@ AS
 		- 20181114@Bruce: discount by currency [#99694] 
 		- 20181127@Parsons: Integrate Bidme games (GD product) [#103695]
 		- 20190319@bruce: Apply min fee rule for discount calculation [#109997]
+		- 20190410@bruce: calculate discount for terminated licensee[111485]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -436,14 +437,15 @@ BEGIN
 				ELSE 0
 			END,
 		IsApplyMinfeeToDiscount = CASE
-			WHEN a.MinFeeAmountByBaseCurrency < a.FeeAmountByBaseCurrency AND a.FeeAmountByBaseCurrency > 0 THEN 0-- waived
+			WHEN a.MinFeeAmountByBaseCurrency < a.FeeAmountByBaseCurrency AND a.FeeAmountByBaseCurrency > 0 AND b.FeeType IS NOT NULL THEN 0-- waived
 			WHEN t.TotalAmountByDiscountBaseCurrency >= t.TotalMinFeeByDiscountBaseCurrency AND p.PartyGroupId >0 THEN 0 -- reach group minfee goal
 			ELSE 1 END,
 		MinFee = a.MinFeeAmountByBaseCurrency
 	FROM #tmpResult r
 	INNER JOIN @PartyList p ON r.PartyId=p.PartyId
-	INNER JOIN @tmpMinFee a ON a.PartyId = r.PartyId AND a.ProductId=r.ProductID AND a.FeeType = 1
+	INNER JOIN @tmpMinFee a ON a.PartyId = r.PartyId AND a.ProductId=r.ProductID AND a.FeeType = 1 -- minfee setting
 	INNER JOIN @TotalMinFees t ON a.ProductId = t.ProductId AND t.PartyGroupId=p.PartyGroupId
+	LEFT JOIN @tmpMinFee b ON b.PartyId = r.PartyId AND b.ProductId=r.ProductID AND b.FeeType = 2-- waive setting
 
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 4. discount calculation
