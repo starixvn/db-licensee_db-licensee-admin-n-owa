@@ -56,8 +56,7 @@ BEGIN
 	SELECT DISTINCT ChargeId, PartyID, LicenseeID, IsDeposit, ProductID, DI_Rate, AffectedDate, Fromdate, Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 
-	CREATE TABLE #Result (PartyID INT, ReportType VARCHAR(8), TurnOver MONEY, CustomerWinlost MONEY, CommBA MONEY ,CommRB MONEY, Betcount BIGINT
-		, LicensingFee MONEY)
+	CREATE TABLE #Result (PartyID INT, ReportType VARCHAR(8), TurnOver MONEY, CustomerWinlost MONEY, CommBA MONEY ,CommRB MONEY, Betcount BIGINT, WinningPrize MONEY, LicensingFee MONEY)
 
 	CREATE TABLE #Temp (PartyID INT, Rptdate DATETIME, Currency INT, TurnOver MONEY, Winlost MONEY, CommBA MONEY, CommRB MONEY, WinningPrize MONEY, Betcount BIGINT)
 
@@ -160,8 +159,8 @@ BEGIN
 			GROUP BY PartyID, b.rptDate, b.currencyID
 		)
 	END
-	
-	INSERT INTO #Result
+
+	INSERT INTO #Result (PartyID, ReportType, TurnOver, CustomerWinlost, CommBA, CommRB, Betcount, WinningPrize, LicensingFee)
 	SELECT b.PartyID
 		, CONVERT(VARCHAR(6),b.rptDate,112)
 		, SUM(TurnOver * e.Rate)	AS Turnover
@@ -169,7 +168,8 @@ BEGIN
 		, SUM(CommBA * e.Rate) AS CommBA
 		, SUM(CommRB * e.Rate) AS CommRB
 		, SUM(Betcount) AS Betcount
-		, SUM((CASE WHEN @ProductCode = 'PP' AND b.Winlost > 0 THEN 0 ELSE -b.Winlost END * ISNULL(p.Rate,0) - ISNULL(WinningPrize, 0)) * e.Rate) AS LicenseeFee
+		, SUM(ISNULL(WinningPrize, 0) * e.Rate) AS WinningPrize
+		, SUM((-b.Winlost * ISNULL(p.Rate,0)) * e.Rate) AS LicensingFee
 	FROM #Temp b
 	INNER JOIN #Exchange e  ON e.ExchangeDate = b.Rptdate AND e.ExchangeId = b.Currency
 	INNER JOIN  (
@@ -180,7 +180,7 @@ BEGIN
 	
 	UPDATE #Result
 	SET LicensingFee = 0
-	WHERE @ProductCode <> 'PP' AND LicensingFee < 0
+	WHERE LicensingFee < 0
 
 	-------------------------final select -------------------------------
 	SELECT CAST((ReportType + '01') AS DATE) AS [DateTime]
@@ -189,7 +189,7 @@ BEGIN
 		, SUM(CommBA) AS AmtDueToBA
 		, SUM(CommRB) AS AmtDueToRB
 		, SUM(Betcount) AS BetCount
-		, SUM(LicensingFee) AS LicensingFee
+		, SUM(LicensingFee - WinningPrize) AS LicensingFee
 	FROM #Result
 	GROUP BY ReportType
 	ORDER BY ReportType ASC
