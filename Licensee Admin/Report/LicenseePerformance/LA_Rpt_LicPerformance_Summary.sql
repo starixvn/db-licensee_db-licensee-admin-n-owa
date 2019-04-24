@@ -110,8 +110,8 @@ BEGIN
 		INSERT INTO #Temp (PartyID, rptDate, Currency, CommBA, CommRB, Betcount, TurnOver, Winlost, WinningPrize)
 		(
 			SELECT tp.PartyID, b.rptDate, b.CurrencyID,0,0
-				, SUM(b.BetCount)
-				, SUM(b.Turnover)
+				, SUM(ISNULL(b.betcount, 0) * CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS BetCount
+				, SUM(ISNULL(b.turnover, 0) * CASE WHEN @drawfilter IN (2, 3) AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS TurnOver
 				, SUM(CASE WHEN b.Bettype <> @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS Winlost
 				, SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END)  AS WinningPrize
 				FROM bodb_LicenseeReport..rpt_BettingByProduct b WITH (NOLOCK)
@@ -120,6 +120,7 @@ BEGIN
 					AND b.rptDate BETWEEN @FromDate AND @ToDate
 					AND (b.CurrencyID <> 20)
 					AND (@Currency = 0 OR b.CurrencyID = @Currency)  
+					AND b.customercategory NOT IN (27, 28)
 					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
 				GROUP BY tp.PartyID, b.rptDate, b.CurrencyID
 		)

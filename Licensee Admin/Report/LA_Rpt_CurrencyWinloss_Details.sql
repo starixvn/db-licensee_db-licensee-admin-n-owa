@@ -243,8 +243,8 @@ BEGIN
 	BEGIN
 	;WITH cte_PPWinLossData AS(
 			SELECT b.SiteId, b.rptDate, b.CurrencyID
-				, SUM(ISNULL(b.betcount, 0)) BetCount
-				, SUM(ISNULL(b.turnover, 0)) AS Turnover
+				, SUM(ISNULL(b.betcount, 0) * CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS BetCount
+				, SUM(ISNULL(b.turnover, 0) * CASE WHEN @drawfilter IN (2, 3) AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS TurnOver
 				, SUM(CASE WHEN b.Bettype <> @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) Winloss
 				, SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
 				FROM bodb_LicenseeReport..rpt_BettingByProduct b WITH (NOLOCK)
@@ -254,6 +254,7 @@ BEGIN
 					AND (@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c))
 					AND (b.CurrencyID <> 20)
 					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+					AND b.CustomerCategory NOT IN (27,28)
 				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
 		INSERT INTO #tmpWinLoss(PartyID, Winlostdate, Currency, Betcount, TurnOver, Winlost, LicenseeWL, Company)
