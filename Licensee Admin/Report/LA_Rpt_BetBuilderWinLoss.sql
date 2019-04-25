@@ -172,10 +172,6 @@ BEGIN
 		FROM TotalByParty
 		GROUP BY ParentId
 
-		UPDATE @Total
-		SET PayToSupplier = 0
-		WHERE PayToSupplier < 0
-
 		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,CompanyIncome)
 		SELECT Currency,
 			SUM(TotalTrans),
@@ -188,6 +184,10 @@ BEGIN
 		FROM @Total
 		WHERE Currency = @tempCurrency
 		GROUP BY Currency
+		
+		UPDATE @GrandTotal
+		SET PayToSupplier = CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END,
+			CompanyIncome = LicensingFee - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END
 
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 	END	
