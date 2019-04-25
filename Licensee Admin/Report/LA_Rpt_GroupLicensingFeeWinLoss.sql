@@ -18,6 +18,7 @@ AS
 
 	Revisions:
 	   - 20181204@Scofield: create	
+	   - 20190425@Parsons: Integrate-PP-Promotion-Prize [#109014]
 */
 BEGIN
 	SET NOCOUNT ON	
@@ -105,9 +106,30 @@ BEGIN
 		)		
 	END
 
+	/* PP Product */	
+	DECLARE @PP_Product INT = 32, @PromotionPrize SMALLINT = 4300
+	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = @PP_Product) > 0
+	BEGIN
+	INSERT INTO #Report (PartyID, ProductId, CurrencyID, Company)
+		(
+			SELECT ci.PartyID, @PP_Product, b.CurrencyID, SUM(-b.MemberWL * ci.Rate) AS Company
+			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID 
+										 AND b.ProductID = ci.ProductID 
+										 AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
+				AND b.StatusId NOT IN (- 1, 101, 102, 103)
+				AND (b.CurrencyID <> 20)
+				AND b.customercategory NOT IN (27,28)
+				AND b.ProductID = @PP_Product
+				AND b.Bettype <> @PromotionPrize 				
+			GROUP BY ci.PartyID, b.CurrencyID
+		)
+	END
+
 	/* Other Products */
 	DECLARE @ExcludedProductIds TABLE(ProductId INT)
-	INSERT INTO @ExcludedProductIds(ProductId) VALUES (@BA_Product), (@CO_Product), (@GD_Product)
+	INSERT INTO @ExcludedProductIds(ProductId) VALUES (@BA_Product), (@CO_Product), (@GD_Product), (@PP_Product)
 	
 	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) > 0
 	BEGIN
