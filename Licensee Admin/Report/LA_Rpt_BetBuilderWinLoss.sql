@@ -20,6 +20,8 @@ AS
 	 Explannation: EXEC LA_Rpt_BetBuilderWinLoss @BaseCurrencyName='EUR',@ToDate='2018-04-30 00:00:00',@PartyIds='14,15,17,19,20,23,29,39,40,42,44,46,47,52,53,56,58,60,65,68,70,71,72,73,76,79,80,81,82,84,85,86,87,89,90,91,92,93,95,97,100,101,24,31,34,35,36,37,38,41,59,66,67,74,75,88,16,22,26,27,45,49,54,99,25,30',@FromDate='2018-04-01 00:00:00'
 */
 BEGIN	
+	DECLARE @Rate3rd MONEY = 0.04 
+
 	-- Region: Charge Info	
 	DECLARE @ChargeInfos AS TABLE (
 		PartyId		INT,
@@ -92,7 +94,7 @@ BEGIN
 	GROUP BY b.rptDate, ci.PartyId, PartyName, ParentId, ParentName, b.CurrencyId
 	
 	UPDATE #Result
-	SET PayToSupplier = LicensingFee * 0.2
+	SET PayToSupplier = LicensingFee * @Rate3rd
 	-- EndRegion #Result
 
 	-- Region: Exchange
@@ -166,9 +168,13 @@ BEGIN
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
-			SUM(CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END)
+			SUM(PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
+
+		UPDATE @Total
+		SET PayToSupplier = 0
+		WHERE PayToSupplier < 0
 
 		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,CompanyIncome)
 		SELECT Currency,
