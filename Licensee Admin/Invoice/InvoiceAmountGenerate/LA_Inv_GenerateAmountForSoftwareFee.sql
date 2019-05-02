@@ -28,6 +28,7 @@ AS
 	Revisions: 
 		+ 20181004@Parsons: Integrate AG setup fee into invoices [#98485]
 		+ 20190123@Parsons: Improve AG prepayment and discount setting [#104620]
+	    + 20190416@Parsons: Integrate-PP-Promotion-Prize [#109014]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -137,8 +138,11 @@ BEGIN
 	-- Get ChargeInfo for CB
 	DECLARE @CommChargeType INT = 6
 	DECLARE @CashInShareChargeType INT = 7
+
+	DECLARE @BAProductId INT = 3
 	DECLARE @CBProductId INT = 15
 	DECLARE @COProductId INT = 25
+	DECLARE @PPProductId INT = 32
 
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, TypeId, FromDate, ToDate)
 	SELECT	ci.FromParty,
@@ -271,8 +275,8 @@ BEGIN
 	
 	UPDATE	#TempData
 	SET		AmountToCompany =	CASE  
-									WHEN td.ProductId = 3 THEN (-td.WinLoss * p.Rate - td.AComm) * e.Rate
-									WHEN td.ProductId <> 3 THEN (-td.WinLoss * p.Rate) * e.Rate
+									WHEN td.ProductId = @BAProductId THEN (-td.WinLoss * p.Rate - td.AComm) * e.Rate
+									WHEN td.ProductId <> @BAProductId THEN (-td.WinLoss * p.Rate) * e.Rate
 									ELSE 0 
 								END
 	FROM	#TempData td 
@@ -407,7 +411,7 @@ BEGIN
 					ELSE p.ProductName
 					END AS ProductName,
 				CASE
-					WHEN id.InvoiceAmount > 0 OR id.ProductId = 3 OR id.ProductId = @CBProductId OR id.ProductId = @COProductId THEN id.InvoiceAmount
+					WHEN id.InvoiceAmount > 0 OR id.ProductId IN (@BAProductId, @CBProductId, @COProductId, @PPProductId) THEN id.InvoiceAmount
 					ELSE 0
 				END AS InvoiceAmount,
 				id.AmountType,

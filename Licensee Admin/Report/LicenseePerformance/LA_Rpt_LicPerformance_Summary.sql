@@ -1,4 +1,4 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
 
@@ -32,6 +32,7 @@ AS
 	   - 20171219@Bruce: increase length for variables [#88197]
 	   - 20180716@bruce: add new group TEST for credit [#98126]
 	   - 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
+	   - 20190412@Parsons: Integrate-PP-Promotion-Prize [#109014]
 
 	Param's Explanation:
 	  + @PartyIDs : a string of list PartyID, separated by ','
@@ -55,10 +56,9 @@ BEGIN
 	SELECT DISTINCT ChargeId, PartyID, LicenseeID, IsDeposit, ProductID, DI_Rate, AffectedDate, Fromdate, Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 
-	CREATE TABLE #Result (PartyID INT, ReportType VARCHAR(8), TurnOver MONEY, CustomerWinlost MONEY, CommBA MONEY ,CommRB MONEY, Betcount BIGINT
-		, LicensingFee MONEY)
+	CREATE TABLE #Result (PartyID INT, ReportType VARCHAR(8), TurnOver MONEY, CustomerWinlost MONEY, CommBA MONEY ,CommRB MONEY, Betcount BIGINT, WinningPrize MONEY, LicensingFee MONEY)
 
-	CREATE TABLE #Temp (PartyID INT	,Rptdate DATETIME, Currency INT, TurnOver MONEY, Winlost MONEY, CommBA MONEY, CommRB MONEY, Betcount BIGINT)
+	CREATE TABLE #Temp (PartyID INT, Rptdate DATETIME, Currency INT, TurnOver MONEY, Winlost MONEY, CommBA MONEY, CommRB MONEY, WinningPrize MONEY, Betcount BIGINT)
 
 	CREATE TABLE #Exchange (ExchangeDate SMALLDATETIME, ExchangeId INT, Rate FLOAT)
 	INSERT INTO #Exchange(ExchangeDate, ExchangeId, Rate)
@@ -71,7 +71,7 @@ BEGIN
 		SET Rate = 1
 	END
 
-	IF CHARINDEX('BA',@ProductCode) <> 0
+	IF @ProductCode = 'BA'
 	BEGIN
 		INSERT INTO #Temp (PartyID, Rptdate, Currency, TurnOver, Winlost, CommBA, CommRB, Betcount)
 		(
@@ -104,8 +104,29 @@ BEGIN
 		)
 	END
 
-	--exclude BA tickets
-	IF CHARINDEX('BA',@ProductCode) = 0
+	IF @ProductCode = 'PP'
+	BEGIN		
+		DECLARE @PromotionPrize SMALLINT = 4300
+		INSERT INTO #Temp (PartyID, rptDate, Currency, CommBA, CommRB, Betcount, TurnOver, Winlost, WinningPrize)
+		(
+			SELECT tp.PartyID, b.rptDate, b.CurrencyID,0,0
+				, SUM(ISNULL(b.betcount, 0) * CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS BetCount
+				, SUM(ISNULL(b.turnover, 0) * CASE WHEN @drawfilter IN (2, 3) AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS TurnOver
+				, SUM(CASE WHEN b.Bettype <> @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS Winlost
+				, SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END)  AS WinningPrize
+				FROM bodb_LicenseeReport..rpt_BettingByProduct b WITH (NOLOCK)
+					INNER JOIN (SELECT DISTINCT PartyID, LicenseeID FROM @tmpParty) tp ON tp.LicenseeID = b.SiteID
+				WHERE b.ProductID = 32
+					AND b.rptDate BETWEEN @FromDate AND @ToDate
+					AND (b.CurrencyID <> 20)
+					AND (@Currency = 0 OR b.CurrencyID = @Currency)  
+					AND b.customercategory NOT IN (27, 28)
+					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+				GROUP BY tp.PartyID, b.rptDate, b.CurrencyID
+		)
+	END
+
+	IF @ProductCode NOT IN('BA', 'PP')
 	BEGIN
 		INSERT INTO #Temp (PartyID, Rptdate, Currency, TurnOver, Winlost, CommBA, CommRB, Betcount)
 		(
@@ -140,15 +161,16 @@ BEGIN
 		)
 	END
 
-	INSERT INTO #Result
+	INSERT INTO #Result (PartyID, ReportType, TurnOver, CustomerWinlost, CommBA, CommRB, Betcount, WinningPrize, LicensingFee)
 	SELECT b.PartyID
 		, CONVERT(VARCHAR(6),b.rptDate,112)
-		, SUM(TurnOver * e.Rate) AS Turnover
-		, SUM(Winlost * e.Rate) AS CustomerWinlost
+		, SUM(TurnOver * e.Rate)	AS Turnover
+		, SUM((Winlost + ISNULL(WinningPrize, 0)) * e.Rate)	AS CustomerWinlost
 		, SUM(CommBA * e.Rate) AS CommBA
 		, SUM(CommRB * e.Rate) AS CommRB
 		, SUM(Betcount) AS Betcount
-		, - SUM(b.Winlost * ISNULL(p.Rate,0) * e.Rate) AS LicenseeFee
+		, SUM(ISNULL(WinningPrize, 0) * e.Rate) AS WinningPrize
+		, SUM((-b.Winlost * ISNULL(p.Rate,0)) * e.Rate) AS LicensingFee
 	FROM #Temp b
 	INNER JOIN #Exchange e  ON e.ExchangeDate = b.Rptdate AND e.ExchangeId = b.Currency
 	INNER JOIN  (
@@ -156,7 +178,7 @@ BEGIN
 		FROM @tmpParty
 	) p ON b.PartyID = p.PartyID AND b.rptDate BETWEEN p.Fromdate AND p.Todate
 	GROUP BY CONVERT(VARCHAR(6), b.rptDate, 112), b.PartyID
-
+	
 	UPDATE #Result
 	SET LicensingFee = 0
 	WHERE LicensingFee < 0
@@ -168,7 +190,7 @@ BEGIN
 		, SUM(CommBA) AS AmtDueToBA
 		, SUM(CommRB) AS AmtDueToRB
 		, SUM(Betcount) AS BetCount
-		, CASE WHEN SUM(LicensingFee) < 0 THEN 0 ELSE SUM(LicensingFee) END AS LicensingFee
+		, SUM(LicensingFee - WinningPrize) AS LicensingFee
 	FROM #Result
 	GROUP BY ReportType
 	ORDER BY ReportType ASC
@@ -177,9 +199,4 @@ BEGIN
 	DROP TABLE #Exchange
 	DROP TABLE #Temp
 END
-
-GO
-GRANT EXECUTE ON [dbo].[LA_Rpt_LicPerformance_Summary] TO [bodbLicenseeNet]
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicPerformance_Summary] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_Rpt_LicPerformance_Summary] TO bodbAdminNet
 GO

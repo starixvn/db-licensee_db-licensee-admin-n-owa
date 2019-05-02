@@ -45,12 +45,13 @@ AS
 		- 20171205@Bruce: fix partyid length [#87723]
 		- 20182501@Bruce: Include exchange winloss [#87754]
 		- 20180716@bruce: add new group TEST for credit [#98126]
-	    	- 20180703@Parsons: Integrate Pragmatic Win Loss [#94108]
+		- 20180703@Parsons: Integrate Pragmatic Win Loss [#94108]
 		- 20180712@Bruce: Enhance Manage Discount group [#94282]
 		- 20180718@Bruce: use decimal to void margin not match among reports [#94108]
 		- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 		- 20180924@Parsons: LA - LPID report - Apply one discount rate across all base currencies [#100046]
 		- 20181122@Scofield: Integrate Bidme games (GD product) [#103695]
+	    - 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -72,6 +73,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @GD_Tip SMALLINT = 1706
+	DECLARE @BAProductId INT = 3, @ExchangeProductId INT = 31, @PragmaticProductId INT = 32 
 
 	-- *********************************************************************************************************
 	-- *** Calculate Previous FromDate, Previous ToDate from FromDate, ToDate
@@ -284,8 +286,8 @@ BEGIN
 				SUM(ISNULL(b.CommissionP, 0)) * e.Rate,
 				p.ProductId,
 				SUM((CASE WHEN b.Bettype=@GD_Tip THEN 0 ELSE -b.MemberWL END * p.Rate) - (CASE 
-					WHEN b.ProductId = 3 THEN ISNULL(b.CommissionA, 0) -- BA
-					WHEN b.ProductID = 31 THEN ISNULL(b.CommissionA, 0) + ISNULL(b.CommissionP, 0) -- Exchange
+					WHEN b.ProductId = @BAProductId THEN ISNULL(b.CommissionA, 0)
+					WHEN b.ProductID = @ExchangeProductId THEN ISNULL(b.CommissionA, 0) + ISNULL(b.CommissionP, 0)
 					ELSE 0 END)) * e.Rate
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
@@ -297,8 +299,8 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
-				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
-				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
+				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund 
+				AND (@Currency = 0 OR b.CurrencyID = @Currency)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, e.Rate
 	)
 
@@ -406,11 +408,11 @@ BEGIN
 			SUM(t.Turnover)		AS Turnover,
 			SUM(ISNULL(t.Discount,0))	AS Discount,
 			SUM(ISNULL(t.Rebate,0))		AS Rebate,
-			SUM(CASE WHEN t.ProductId = 31 THEN t.PComm ELSE 0 END + t.WinLoss)		AS WinLoss,
-			SUM(CASE WHEN t.ProductId = 3 THEN t.AComm ELSE 0 END)					AS BAComm,
-			SUM(CASE WHEN t.ProductId = 3 THEN t.AmountToCompany ELSE 0 END)		AS AmountToBA,
-			SUM(CASE WHEN t.ProductId = 31 THEN t.AmountToCompany ELSE 0 END)		AS NegativeAmount,
-			SUM(CASE WHEN t.ProductId IN(3,31) OR t.AmountToCompany < 0 THEN 0 ELSE t.AmountToCompany END) AmountToCompany
+			SUM(CASE WHEN t.ProductId = @ExchangeProductId THEN t.PComm ELSE 0 END + t.WinLoss)							AS WinLoss,
+			SUM(CASE WHEN t.ProductId = @BAProductId THEN t.AComm ELSE 0 END)											AS BAComm,
+			SUM(CASE WHEN t.ProductId = @BAProductId THEN t.AmountToCompany ELSE 0 END)									AS AmountToBA,
+			SUM(CASE WHEN t.ProductId = @ExchangeProductId OR (t.ProductId = @PragmaticProductId AND t.AmountToCompany < 0) THEN t.AmountToCompany ELSE 0 END)	AS NegativeAmount,
+			SUM(CASE WHEN t.ProductId IN(@BAProductId, @ExchangeProductId) OR t.AmountToCompany < 0 THEN 0 ELSE t.AmountToCompany END) AmountToCompany
 		FROM @SumByProducts t
 		WHERE t.ProductId != 0
 		GROUP BY t.IsCurrent, t.PartyId
@@ -493,4 +495,3 @@ BEGIN
 	-- End region
 END
 GO
-
