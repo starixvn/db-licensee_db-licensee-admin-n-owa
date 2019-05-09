@@ -2,7 +2,7 @@
 USE bodb_licensee
 GO
 
-CREATE PROCEDURE [dbo].[LA_Rpt_BetBuilderWinLoss]
+ALTER PROCEDURE [dbo].[LA_Rpt_BetBuilderWinLoss]
 	@PartyIds			VARCHAR(4000),
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
@@ -20,7 +20,7 @@ AS
 	 Explannation: EXEC LA_Rpt_BetBuilderWinLoss @BaseCurrencyName='EUR',@ToDate='2018-04-30 00:00:00',@PartyIds='14,15,17,19,20,23,29,39,40,42,44,46,47,52,53,56,58,60,65,68,70,71,72,73,76,79,80,81,82,84,85,86,87,89,90,91,92,93,95,97,100,101,24,31,34,35,36,37,38,41,59,66,67,74,75,88,16,22,26,27,45,49,54,99,25,30',@FromDate='2018-04-01 00:00:00'
 */
 BEGIN	
-	DECLARE @Rate3rd MONEY = 0.04 
+	DECLARE @Rate3rd MONEY = 0.04 , @BACommissionRate MONEY = 0.0025, @BetBuilderBetTypeId INT = 38
 
 	-- Region: Charge Info	
 	DECLARE @ChargeInfos AS TABLE (
@@ -66,35 +66,64 @@ BEGIN
 		CurrencyId	INT,
 		Turnover	MONEY,
 		TotalTrans	INT,
-		CustomerWinLoss MONEY,
+		CustomerWinLossSB MONEY,
+		CustomerWinLossBA MONEY,
 		LicenseeWinloss MONEY,
+		BetBuilderBACommission MONEY,
 		LicensingFee	 MONEY,
 		PayToSupplier	MONEY)	
 
-	INSERT INTO #Result (PartyID,PartyName,ParentId,ParentName,Winlossdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee)
-	SELECT ci.PartyId,
-		p.PartyName,
-		p.ParentId,
-		p.ParentName,
-		b.rptDate,
-		b.CurrencyId,
-		SUM(b.Turnover) AS Turnover,
-		SUM(b.BetCount) AS TotalTrans,
-		SUM(b.WinLoss) AS CustomerWinLoss,
-		SUM(-(b.WinLoss)) AS LicenseeWinloss,
+	INSERT INTO #Result (PartyID,PartyName,ParentId,ParentName,Winlossdate,CurrencyId,Turnover,TotalTrans,CustomerWinLossSB,CustomerWinLossBA,LicenseeWinloss,BetBuilderBACommission,LicensingFee)
+	SELECT PartyId, PartyName, ParentId, ParentName, rptDate, CurrencyId,
+		SUM(Turnover)			AS Turnover,
+		SUM(TotalTrans)			AS TotalTrans,
+		SUM(CustomerWinLossSB)	AS CustomerWinLossSB,
+		SUM(CustomerWinLossBA)	AS CustomerWinLossBA,
+		SUM(LicenseeWinloss)	AS LicenseeWinloss,
+		SUM(BetBuilderBACommission) AS BetBuilderBACommission,
+		SUM(LicensingFee)		AS LicensingFee
+	FROM (
+		SELECT ci.PartyId, p.PartyName, p.ParentId, p.ParentName, b.rptDate, b.CurrencyId,
+		SUM(b.Turnover)		AS Turnover,
+		SUM(b.BetCount)		AS TotalTrans,
+		SUM(b.WinLoss)		AS CustomerWinLossSB,
+		0					AS CustomerWinLossBA,
+		SUM(-(b.WinLoss))	AS LicenseeWinloss,
+		0					AS BetBuilderBACommission,
 		SUM(CASE WHEN ci.isDeposit = 1 THEN (-b.WinLoss * ci.Rate)
 			ELSE -(b.Winloss + b.WinLossA + b.WinLossM + b.WinLossS + b.CommissionS) END) LicensingFee
-	FROM bodb_LicenseeReport..rpt_Betting b WITH (NOLOCK)
-		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
-		INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
-	WHERE b.rptDate BETWEEN @FromDate AND @ToDate 
-		AND b.Status NOT IN (-1, 101, 102, 103) 
-		AND b.CurrencyId <> 20
-		AND b.Bettype = 38 
-	GROUP BY b.rptDate, ci.PartyId, PartyName, ParentId, ParentName, b.CurrencyId
+		FROM bodb_LicenseeReport..rpt_Betting b WITH (NOLOCK)
+			INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+			INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
+		WHERE b.rptDate BETWEEN @FromDate AND @ToDate 
+			AND b.Status NOT IN (-1, 101, 102, 103) 
+			AND b.CurrencyId <> 20
+			AND b.Bettype = @BetBuilderBetTypeId 
+		GROUP BY ci.PartyId, p.PartyName, p.ParentId, p.ParentName, b.rptDate, b.CurrencyId
 	
+		UNION
+
+		SELECT ci.PartyId, p.PartyName, p.ParentId, p.ParentName, b.rptDate, b.CurrencyId,
+			SUM(b.Turnover)	AS Turnover,
+			SUM(b.BetCount)	AS TotalTrans,
+			0				AS CustomerWinLossSB,
+			SUM(b.WinLoss)	AS CustomerWinLossBA,
+			0				AS LicenseeWinloss,
+			SUM(ABS(b.WinLoss) * @BACommissionRate)	AS BetBuilderBACommission,
+			0				AS LicensingFee
+		FROM bodb_licenseereport.dbo.rpt_Betting_BA b WITH (NOLOCK)
+			INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+			INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
+		WHERE b.rptDate BETWEEN @FromDate AND @ToDate 
+			AND b.CurrencyID <> 20
+			AND b.Status NOT IN (-1, 101, 102, 103)
+			AND b.Bettype = @BetBuilderBetTypeId 
+		GROUP BY ci.PartyId, p.PartyName, p.ParentId, p.ParentName, b.rptDate, b.CurrencyId
+	) d
+	GROUP BY PartyId, PartyName, ParentId, ParentName, rptDate, CurrencyId
+
 	UPDATE #Result
-	SET PayToSupplier = LicensingFee * @Rate3rd
+	SET PayToSupplier = -(CustomerWinLossSB + CustomerWinLossBA) * @Rate3rd
 	-- EndRegion #Result
 
 	-- Region: Exchange
@@ -116,8 +145,10 @@ BEGIN
 		PartyId			INT,
 		TotalTrans		INT,
 		Turnover		MONEY,
-		CustomerWinLoss	MONEY,
+		CustomerWinLossSB	MONEY,
+		CustomerWinLossBA	MONEY,
 		LicenseeWinLoss	MONEY,
+		BetBuilderBACommission MONEY,
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY,
 		CompanyIncome	MONEY,
@@ -138,8 +169,10 @@ BEGIN
 		CurrencyName	VARCHAR(20),
 		TotalTrans		INT,
 		Turnover		MONEY,
-		CustomerWinLoss	MONEY,
+		CustomerWinLossSB	MONEY,
+		CustomerWinLossBA	MONEY,
 		LicenseeWinLoss	MONEY,
+		BetBuilderBACommission MONEY,
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY,
 		CompanyIncome	MONEY
@@ -150,44 +183,51 @@ BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)
 		
 		;WITH TotalByParty AS(
-			SELECT td.ParentId,
+			SELECT td.ParentId, td.PartyID,
 				SUM(td.TotalTrans) TotalTrans,
 				SUM(td.Turnover * e.BaseCurrencyRate) Turnover, 
-				SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss, 
+				SUM(td.CustomerWinLossSB * e.BaseCurrencyRate) CustomerWinLossSB, 
+				SUM(td.CustomerWinLossBA * e.BaseCurrencyRate) CustomerWinLossBA, 
 				SUM(td.LicenseeWinLoss * e.BaseCurrencyRate) LicenseeWinLoss, 
+				SUM(td.BetBuilderBACommission * e.BaseCurrencyRate) BetBuilderBACommission, 
 				SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
 				SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
 			FROM #Result td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e 
 			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
-			GROUP BY td.ParentId, td.PartyId
+			GROUP BY td.ParentId, td.PartyID
 		)
-		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
+		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLossSB,CustomerWinLossBA,LicenseeWinLoss,BetBuilderBACommission,LicensingFee,PayToSupplier,CompanyIncome)
 		SELECT @tempCurrency,ParentId,
 			SUM(TotalTrans),
 			SUM(Turnover),
-			SUM(CustomerWinLoss),
+			SUM(CustomerWinLossSB),
+			SUM(CustomerWinLossBA),
 			SUM(LicenseeWinLoss),
+			SUM(BetBuilderBACommission),
 			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
-			SUM(PayToSupplier)
+			SUM(PayToSupplier),
+			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END - (CustomerWinLossBA + BetBuilderBACommission) - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END)
 		FROM TotalByParty
 		GROUP BY ParentId
 
-		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,CompanyIncome)
+		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLossSB,CustomerWinLossBA,LicenseeWinLoss,BetBuilderBACommission,LicensingFee,PayToSupplier,CompanyIncome)
 		SELECT Currency,
 			SUM(TotalTrans),
 			SUM(Turnover),
-			SUM(CustomerWinLoss),
+			SUM(CustomerWinLossSB),
+			SUM(CustomerWinLossBA),
 			SUM(LicenseeWinLoss),
+			SUM(BetBuilderBACommission),
 			SUM(LicensingFee),
 			SUM(PayToSupplier),
-			SUM(LicensingFee - PayToSupplier)
+			SUM(CompanyIncome)
 		FROM @Total
 		WHERE Currency = @tempCurrency
 		GROUP BY Currency
 		
 		UPDATE @GrandTotal
-		SET PayToSupplier = CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END,
-			CompanyIncome = LicensingFee - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END
+		SET PayToSupplier = CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END--,
+			--CompanyIncome = LicensingFee - (CustomerWinLossBA + BetBuilderBACommission) - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END
 
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 	END	
@@ -204,19 +244,23 @@ BEGIN
 		e.CurrencyCode AS CurrencyName,
 		r.TotalTrans,
 		-- base
-		CAST(r.Turnover * e.Rate AS MONEY) AS Turnover,
-		CAST(r.CustomerWinLoss * e.Rate AS MONEY) AS CustomerWinLoss,
-		CAST(LicenseeWinLoss * e.Rate AS MONEY) AS LicenseeWinLoss,
-		CAST(r.LicensingFee * e.Rate AS MONEY) AS LicensingFee,
-		CAST(r.PayToSupplier * e.Rate AS MONEY) AS PayToSupplier,
-		CAST((r.LicensingFee - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome,
+		CAST(r.Turnover * e.Rate AS MONEY)			AS Turnover,
+		CAST(r.CustomerWinLossSB * e.Rate AS MONEY) AS CustomerWinLossSB,
+		CAST(r.CustomerWinLossBA * e.Rate AS MONEY) AS CustomerWinLossBA,
+		CAST(r.LicenseeWinLoss * e.Rate AS MONEY)	AS LicenseeWinLoss,
+		CAST(r.BetBuilderBACommission * e.Rate AS MONEY) AS BetBuilderBACommission,
+		CAST(r.LicensingFee * e.Rate AS MONEY)		AS LicensingFee,
+		CAST(r.PayToSupplier * e.Rate AS MONEY)		AS PayToSupplier,
+		CAST((r.LicensingFee - (CustomerWinLossBA + BetBuilderBACommission) - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome,
 		-- original
 		r.Turnover AS TurnoverOriginal,
-		r.CustomerWinLoss AS CustomerWinLossOriginal,
-		r.LicenseeWinLoss AS LicenseeWinLossOriginal,
+		r.CustomerWinLossSB AS CustomerWinLossSBOriginal,
+		r.CustomerWinLossBA AS CustomerWinLossBAOriginal,
+		r.LicenseeWinLoss	AS LicenseeWinLossOriginal,
+		r.BetBuilderBACommission AS BetBuilderBACommissionOriginal,
 		r.LicensingFee AS LicensingFeeOriginal,
 		r.PayToSupplier AS PayToSupplierOriginal,
-		(r.LicensingFee - r.PayToSupplier) AS CompanyIncomeOriginal
+		(r.LicensingFee - (CustomerWinLossBA + BetBuilderBACommission) - r.PayToSupplier) AS CompanyIncomeOriginal
 	FROM #Result r 
 	INNER JOIN #Exchange e 
 	ON r.CurrencyId = e.ExchangeID 
@@ -231,11 +275,13 @@ BEGIN
 		SELECT PartyId,
 			TotalTrans,
 			Turnover,
-			CustomerWinLoss,	
+			CustomerWinLossSB,	
+			CustomerWinLossBA,	
 			LicenseeWinLoss,
+			BetBuilderBACommission,
 			LicensingFee,
 			PayToSupplier,
-			(LicensingFee - PayToSupplier) AS CompanyIncome
+			CompanyIncome
 		FROM @Total t
 		WHERE Currency = @BaseCurrencyName
 	END
