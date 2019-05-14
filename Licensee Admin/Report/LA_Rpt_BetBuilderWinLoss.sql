@@ -196,7 +196,7 @@ BEGIN
 			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
 			GROUP BY td.ParentId, td.PartyID
 		)
-		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLossSB,CustomerWinLossBA,LicenseeWinLoss,BetBuilderBACommission,LicensingFee,PayToSupplier,CompanyIncome)
+		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLossSB,CustomerWinLossBA,LicenseeWinLoss,BetBuilderBACommission,LicensingFee,PayToSupplier)
 		SELECT @tempCurrency,ParentId,
 			SUM(TotalTrans),
 			SUM(Turnover),
@@ -205,8 +205,7 @@ BEGIN
 			SUM(LicenseeWinLoss),
 			SUM(BetBuilderBACommission),
 			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
-			SUM(PayToSupplier),
-			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END - (CustomerWinLossBA + BetBuilderBACommission) - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END)
+			SUM(PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
 
@@ -226,8 +225,8 @@ BEGIN
 		GROUP BY Currency
 		
 		UPDATE @GrandTotal
-		SET PayToSupplier = CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END--,
-			--CompanyIncome = LicensingFee - (CustomerWinLossBA + BetBuilderBACommission) - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END
+		SET PayToSupplier = CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END,
+			CompanyIncome = LicensingFee - (CustomerWinLossBA + BetBuilderBACommission) - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END
 
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 	END	
@@ -281,7 +280,7 @@ BEGIN
 			BetBuilderBACommission,
 			LicensingFee,
 			PayToSupplier,
-			CompanyIncome
+			(LicensingFee - (CustomerWinLossBA + BetBuilderBACommission) - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END) AS CompanyIncome
 		FROM @Total t
 		WHERE Currency = @BaseCurrencyName
 	END
