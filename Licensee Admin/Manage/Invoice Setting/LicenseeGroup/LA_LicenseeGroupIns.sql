@@ -6,10 +6,11 @@ SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 GO
 
-CREATE PROCEDURE [dbo].[LA_LicenseeGroupIns]
+ALTER PROCEDURE [dbo].[LA_LicenseeGroupIns]
 	@GroupName	VARCHAR(50),
 	@ParentId	INT,
 	@PartyData	VARCHAR(4000),
+	@GroupId	INT = 0 OUTPUT,
 	@ErrMsg		VARCHAR(200) = '' OUTPUT,
 	@ErrCode	int = 0 OUTPUT
 AS
@@ -43,7 +44,7 @@ BEGIN
 	END
 
 	INSERT INTO dbo.LA_CombinedGroup(GroupName, PathCode) VALUES (@GroupName, @PathCode)
-	DECLARE @GroupId INT = SCOPE_IDENTITY()
+	SET @GroupId = SCOPE_IDENTITY()
 
 	DECLARE @xml xml = @PartyData
 	INSERT INTO dbo.LA_CombinedGroupAssignment(GroupId, PartyId, GroupType)
