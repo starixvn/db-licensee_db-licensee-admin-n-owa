@@ -6,7 +6,8 @@ SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 GO
 
-CREATE PROCEDURE [dbo].[LA_LicenseeGroupAssignmentSel]
+ALTER PROCEDURE [dbo].[LA_LicenseeGroupAssignmentSel]
+	@PartyId INT = 0
 AS
 /*  
 	 Created: 20190514@Bruce[#111587]
@@ -20,9 +21,10 @@ AS
 BEGIN
 	SET NOCOUNT ON;
 	
-	SELECT p.PartyId, p.PartyName, pd.BrandName, ISNULL(a.GroupId, 0) AS GroupId
+	SELECT p.PartyId, p.PartyName, pd.BrandName, ISNULL(a.GroupId, 0) AS GroupId, ISNULL(a.GroupType, 0) AS GroupType
 	FROM dbo.OAS_Party p WITH(NOLOCK)
 	INNER JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON p.PartyID=pd.PartyID
 	LEFT JOIN dbo.LA_CombinedGroupAssignment a WITH(NOLOCK) ON p.PartyId = a.PartyId
 	WHERE p.PartyType = 1 AND pd.IsDeposit = 1 AND pd.StatusId = 1
+		AND (@PartyId = 0 OR p.PartyId = @PartyId)
 END
