@@ -69,18 +69,20 @@ BEGIN
 		CustomerWinLossSB MONEY,
 		CustomerWinLossBA MONEY,
 		LicenseeWinloss MONEY,
-		BetBuilderBACommission MONEY,
-		LicensingFee	 MONEY,
+		CommissionA MONEY,
+		CommissionS MONEY,
+		LicensingFee	MONEY,
 		PayToSupplier	MONEY)	
 
-	INSERT INTO #Result (PartyID,PartyName,ParentId,ParentName,Winlossdate,CurrencyId,Turnover,TotalTrans,CustomerWinLossSB,CustomerWinLossBA,LicenseeWinloss,BetBuilderBACommission,LicensingFee)
+	INSERT INTO #Result (PartyID,PartyName,ParentId,ParentName,Winlossdate,CurrencyId,Turnover,TotalTrans,CustomerWinLossSB,CustomerWinLossBA,LicenseeWinloss,CommissionA,CommissionS,LicensingFee)
 	SELECT PartyId, PartyName, ParentId, ParentName, rptDate, CurrencyId,
 		SUM(Turnover)			AS Turnover,
 		SUM(TotalTrans)			AS TotalTrans,
 		SUM(CustomerWinLossSB)	AS CustomerWinLossSB,
 		SUM(CustomerWinLossBA)	AS CustomerWinLossBA,
 		SUM(LicenseeWinloss)	AS LicenseeWinloss,
-		SUM(BetBuilderBACommission) AS BetBuilderBACommission,
+		SUM(CommissionA)		AS CommissionA,
+		SUM(CommissionS)		AS CommissionS,
 		SUM(LicensingFee)		AS LicensingFee
 	FROM (
 		SELECT ci.PartyId, p.PartyName, p.ParentId, p.ParentName, b.rptDate, b.CurrencyId,
@@ -89,7 +91,8 @@ BEGIN
 		SUM(b.WinLoss)		AS CustomerWinLossSB,
 		0					AS CustomerWinLossBA,
 		SUM(-(b.WinLoss))	AS LicenseeWinloss,
-		0					AS BetBuilderBACommission,
+		0					AS CommissionA,
+		SUM(CASE WHEN ci.isDeposit = 1 THEN	0 ELSE b.CommissionS END) AS CommissionS,
 		SUM(CASE WHEN ci.isDeposit = 1 THEN (-b.WinLoss * ci.Rate)
 			ELSE -(b.Winloss + b.WinLossA + b.WinLossM + b.WinLossS + b.CommissionS) END) LicensingFee
 		FROM bodb_LicenseeReport..rpt_Betting b WITH (NOLOCK)
@@ -109,7 +112,8 @@ BEGIN
 			0				AS CustomerWinLossSB,
 			SUM(b.WinLoss)	AS CustomerWinLossBA,
 			0				AS LicenseeWinloss,
-			SUM(b.CommissionA)	AS BetBuilderBACommission,
+			SUM(b.CommissionA)	AS CommissionA,
+			0				AS CommissionS,
 			0				AS LicensingFee
 		FROM bodb_licenseereport.dbo.rpt_Betting_BA b WITH (NOLOCK)
 			INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
@@ -123,7 +127,7 @@ BEGIN
 	GROUP BY PartyId, PartyName, ParentId, ParentName, rptDate, CurrencyId
 
 	UPDATE #Result
-	SET PayToSupplier = -(CustomerWinLossSB + CustomerWinLossBA) * @Rate3rd
+	SET PayToSupplier = -(CustomerWinLossSB + CustomerWinLossBA + CommissionA + CommissionS) * @Rate3rd
 	-- EndRegion #Result
 
 	-- Region: Exchange
@@ -148,7 +152,8 @@ BEGIN
 		CustomerWinLossSB	MONEY,
 		CustomerWinLossBA	MONEY,
 		LicenseeWinLoss	MONEY,
-		BetBuilderBACommission MONEY,
+		CommissionA		MONEY,
+		CommissionS		MONEY,
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY,
 		CompanyIncome	MONEY,
@@ -172,7 +177,8 @@ BEGIN
 		CustomerWinLossSB	MONEY,
 		CustomerWinLossBA	MONEY,
 		LicenseeWinLoss	MONEY,
-		BetBuilderBACommission MONEY,
+		CommissionA		MONEY,
+		CommissionS		MONEY,
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY,
 		CompanyIncome	MONEY
@@ -189,34 +195,37 @@ BEGIN
 				SUM(td.CustomerWinLossSB * e.BaseCurrencyRate) CustomerWinLossSB, 
 				SUM(td.CustomerWinLossBA * e.BaseCurrencyRate) CustomerWinLossBA, 
 				SUM(td.LicenseeWinLoss * e.BaseCurrencyRate) LicenseeWinLoss, 
-				SUM(td.BetBuilderBACommission * e.BaseCurrencyRate) BetBuilderBACommission, 
+				SUM(td.CommissionA * e.BaseCurrencyRate) CommissionA, 
+				SUM(td.CommissionS * e.BaseCurrencyRate) CommissionS, 
 				SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
 				SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
 			FROM #Result td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e 
 			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
 			GROUP BY td.ParentId, td.PartyID
 		)
-		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLossSB,CustomerWinLossBA,LicenseeWinLoss,BetBuilderBACommission,LicensingFee,PayToSupplier)
+		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLossSB,CustomerWinLossBA,LicenseeWinLoss,CommissionA,CommissionS,LicensingFee,PayToSupplier)
 		SELECT @tempCurrency,ParentId,
 			SUM(TotalTrans),
 			SUM(Turnover),
 			SUM(CustomerWinLossSB),
 			SUM(CustomerWinLossBA),
 			SUM(LicenseeWinLoss),
-			SUM(BetBuilderBACommission),
+			SUM(CommissionA),
+			SUM(CommissionS),
 			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
 			SUM(PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
 
-		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLossSB,CustomerWinLossBA,LicenseeWinLoss,BetBuilderBACommission,LicensingFee,PayToSupplier,CompanyIncome)
+		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLossSB,CustomerWinLossBA,LicenseeWinLoss,CommissionA,CommissionS,LicensingFee,PayToSupplier,CompanyIncome)
 		SELECT Currency,
 			SUM(TotalTrans),
 			SUM(Turnover),
 			SUM(CustomerWinLossSB),
 			SUM(CustomerWinLossBA),
 			SUM(LicenseeWinLoss),
-			SUM(BetBuilderBACommission),
+			SUM(CommissionA),
+			SUM(CommissionS),
 			SUM(LicensingFee),
 			SUM(PayToSupplier),
 			SUM(CompanyIncome)
@@ -226,7 +235,7 @@ BEGIN
 		
 		UPDATE @GrandTotal
 		SET PayToSupplier = CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END,
-			CompanyIncome = LicensingFee - (CustomerWinLossBA + BetBuilderBACommission) - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END
+			CompanyIncome = LicensingFee - (CustomerWinLossBA + CommissionA) - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END
 
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 	END	
@@ -247,19 +256,21 @@ BEGIN
 		CAST(r.CustomerWinLossSB * e.Rate AS MONEY) AS CustomerWinLossSB,
 		CAST(r.CustomerWinLossBA * e.Rate AS MONEY) AS CustomerWinLossBA,
 		CAST(r.LicenseeWinLoss * e.Rate AS MONEY)	AS LicenseeWinLoss,
-		CAST(r.BetBuilderBACommission * e.Rate AS MONEY) AS BetBuilderBACommission,
+		CAST(r.CommissionA * e.Rate AS MONEY)		AS CommissionA,
+		CAST(r.CommissionS * e.Rate AS MONEY)		AS CommissionS,
 		CAST(r.LicensingFee * e.Rate AS MONEY)		AS LicensingFee,
 		CAST(r.PayToSupplier * e.Rate AS MONEY)		AS PayToSupplier,
-		CAST((r.LicensingFee - (CustomerWinLossBA + BetBuilderBACommission) - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome,
+		CAST((r.LicensingFee - (CustomerWinLossBA + CommissionA) - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome,
 		-- original
 		r.Turnover AS TurnoverOriginal,
 		r.CustomerWinLossSB AS CustomerWinLossSBOriginal,
 		r.CustomerWinLossBA AS CustomerWinLossBAOriginal,
 		r.LicenseeWinLoss	AS LicenseeWinLossOriginal,
-		r.BetBuilderBACommission AS BetBuilderBACommissionOriginal,
+		r.CommissionA		AS CommissionAOriginal,
+		r.CommissionS		AS CommissionSOriginal,
 		r.LicensingFee AS LicensingFeeOriginal,
 		r.PayToSupplier AS PayToSupplierOriginal,
-		(r.LicensingFee - (CustomerWinLossBA + BetBuilderBACommission) - r.PayToSupplier) AS CompanyIncomeOriginal
+		(r.LicensingFee - (CustomerWinLossBA + CommissionA) - r.PayToSupplier) AS CompanyIncomeOriginal
 	FROM #Result r 
 	INNER JOIN #Exchange e 
 	ON r.CurrencyId = e.ExchangeID 
@@ -277,10 +288,11 @@ BEGIN
 			CustomerWinLossSB,	
 			CustomerWinLossBA,	
 			LicenseeWinLoss,
-			BetBuilderBACommission,
+			CommissionA,
+			CommissionS,
 			LicensingFee,
 			PayToSupplier,
-			(LicensingFee - (CustomerWinLossBA + BetBuilderBACommission) - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END) AS CompanyIncome
+			(LicensingFee - (CustomerWinLossBA + CommissionA) - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END) AS CompanyIncome
 		FROM @Total t
 		WHERE Currency = @BaseCurrencyName
 	END
