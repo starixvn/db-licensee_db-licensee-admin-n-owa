@@ -24,6 +24,7 @@ AS
 		- 20181206@bruce: [#105723]
 			+ Implement E-sport 2 [#105723]
 			+ Cover betfrom 'c' in the report
+		- 20190516@Parsons: Show Bet count in Platform Win Loss (Summary) Report [#113568]
 
 	Explanation:
 		- Desktop: contain the followings:
@@ -102,7 +103,7 @@ BEGIN
 
 	-- #3: if data from moveBetsDay: get data from bettrans
 	-- else get data from rptWinLoss2
-	CREATE TABLE #Data (ReportDate DATETIME, CurrencyId INT, BetFrom NVARCHAR(1), Turnover DECIMAL(20,5), LicenseeWinLoss DECIMAL(20,5))
+	CREATE TABLE #Data (ReportDate DATETIME, CurrencyId INT, BetFrom NVARCHAR(1), BetCount INT, Turnover DECIMAL(20,5), LicenseeWinLoss DECIMAL(20,5))
 
 	 -- get data from bettrans
 	IF @ToDate > @MoveBetsDay
@@ -116,12 +117,13 @@ BEGIN
 		INNER JOIN bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB') bt ON bt.Bettype = b.bettype
 		WHERE b.winlostdate BETWEEN @FromDate AND @ToDate
 
-		INSERT INTO #Data(ReportDate, CurrencyId, BetFrom, Turnover, LicenseeWinLoss)
+		INSERT INTO #Data(ReportDate, CurrencyId, BetFrom, BetCount, Turnover, LicenseeWinLoss)
 		(
 			SELECT
 				b.winlostdate,
 				l.CurrencyId,
 				ISNULL(bf.betfrom,'*'),
+				COUNT(*) AS BetCount,
 				SUM(b.stake),
 				SUM(-(b.winlost - b.actual_stake))
 			FROM #tmpBettrans b
@@ -142,12 +144,13 @@ BEGIN
 	IF @FromDate <= @MoveBetsDay
 	BEGIN
 		DECLARE @TempToDate SMALLDATETIME = CASE WHEN @ToDate >= @MoveBetsDay THEN @MoveBetsDay ELSE @ToDate END
-		INSERT INTO #Data(ReportDate, CurrencyId, BetFrom, Turnover, LicenseeWinLoss)
+		INSERT INTO #Data(ReportDate, CurrencyId, BetFrom, BetCount, Turnover, LicenseeWinLoss)
 		(
 			SELECT
 				b.winlostdate,
 				l.CurrencyId,
 				ISNULL(bf.betfrom,'*'),
+				SUM(b.BetCount),
 				SUM(b.turnover),
 				SUM(-b.winlost)
 			FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH ( NOLOCK )
@@ -178,6 +181,7 @@ BEGIN
 
 	;WITH Result AS (
 		SELECT d.BetFrom
+			, SUM(d.BetCount) BetCount
 			, SUM(d.Turnover * e.Rate) Turnover
 			, SUM(d.LicenseeWinLoss * e.Rate) LicenseeWinLoss
 		FROM #Data d
@@ -185,6 +189,7 @@ BEGIN
 		GROUP BY d.BetFrom
 	)
 	SELECT BetFrom
+		, BetCount
 		, CAST(Turnover AS MONEY) Turnover
 		, CAST(LicenseeWinLoss AS MONEY) LicenseeWinLoss
 	FROM Result
