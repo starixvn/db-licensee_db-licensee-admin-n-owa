@@ -189,7 +189,7 @@ BEGIN
 		GROUP BY d.BetFrom
 	)
 	SELECT BetFrom
-		, BetCount
+		, BetCount AS TotalTrans
 		, CAST(Turnover AS MONEY) Turnover
 		, CAST(LicenseeWinLoss AS MONEY) LicenseeWinLoss
 	FROM Result

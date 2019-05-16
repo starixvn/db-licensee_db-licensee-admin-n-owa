@@ -187,7 +187,7 @@ BEGIN
 		p.PartyName,
 		w.WinlostDate,
 		w.BetFrom,
-		SUM(w.BetCount) AS BetCount,
+		SUM(w.BetCount) AS TotalTrans,
 		SUM(w.Turnover * e.Rate) AS Turnover,
 		SUM(w.Winloss * e.Rate) AS Winloss
 	FROM #WinLoss w
