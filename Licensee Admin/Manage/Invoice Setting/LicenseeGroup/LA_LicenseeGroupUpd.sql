@@ -1,9 +1,9 @@
-﻿USE [bodb_licensee]
+﻿/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
-/****** Object:  StoredProcedure [dbo].[LA_LicenseeGroupUpd]    Script Date: 05/15/2019 16:10:18 ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
 GO
 
 CREATE PROCEDURE [dbo].[LA_LicenseeGroupUpd]
