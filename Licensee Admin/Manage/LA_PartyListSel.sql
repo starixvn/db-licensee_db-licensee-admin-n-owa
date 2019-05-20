@@ -6,24 +6,26 @@ ALTER PROCEDURE [dbo].[LA_PartyListSel]
 	 @UserID		INT	   = 0
 	,@FunctionID	INT	   = 0
 AS
-/*  
-	 Created: 20140814@Florent
-	 Task : get List Party of 
-	 DB: DBLIC.bodb_licensee, DBCUST.bodb_Licensee
-   
-	 Revisions:     
-		  - 20141031@Florent: Apply new Structure Using SystemMapping
-		  - 20150312@Florent: add column brandname and fix case without SB
-		  - 20150412@Patrick: Add filter by PartyType
-		  - 20180403@Harper: Add more Cozni as parent license [RedmineID: #85681]
-		  - 20180713@bruce: Add new group TEST for credit side [#98126]
 
-	 Params:
-		+ UserID : 
+/*
+	Created: 20140814@Florent
+	Task : get List Party of
+	DB: DBLIC.bodb_Licensee, DBCUST.bodb-Licensee
+   
+	Revisions:
+		- 20141031@Florent: Apply new Structure Using SystemMapping
+		- 20150312@Florent: add column brandname and fix case without SB
+		- 20150412@Patrick: Add filter by PartyType
+		- 20180403@Harper: Add more Cozni as parent license [RedmineID: #85681]
+		- 20180713@bruce: Add new group TEST for credit side [#98126]
+
+	Params:
+		+ UserID:
 			- 0 get list Party of All user
-		+ FunctionID : 
-			- 0 get list Party when config in manage User		
+		+ FunctionID:
+			- 0 get list Party when config in manage User
 */
+
 SET NOCOUNT ON
 
 DECLARE @suffix_Licensee NVARCHAR(20) = 'Licensees'
