@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -6,7 +6,7 @@ SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 GO
 
-CREATE PROCEDURE [dbo].[LA_LicenseeGroupUpd]
+ALTER PROCEDURE [dbo].[LA_LicenseeGroupUpd]
 	@GroupName	VARCHAR(50),
 	@ParentId	INT,
 	@PartyData	VARCHAR(4000),
@@ -54,10 +54,6 @@ BEGIN
 		SET GroupName = @GroupName, PathCode = @PathCode
 	WHERE GroupId = @GroupId
 	
-	UPDATE dbo.LA_CombinedGroupAssignment 
-		SET GroupId = 0
-	WHERE GroupId = @GroupId
-	
 	DECLARE @xml xml = @PartyData
 	DECLARE  @TemporaryTable TABLE( GroupId int, PartyId int, GroupType tinyint);
 	INSERT INTO @TemporaryTable (GroupId, PartyId, GroupType)
@@ -67,12 +63,12 @@ BEGIN
 	FROM @xml.nodes('/Root/Party') t(Party)
 	
 	MERGE INTO dbo.LA_CombinedGroupAssignment AS TAB1
-	USING @TemporaryTable As TAB2
-		ON TAB1.PartyId = TAB2.PartyId
-	WHEN MATCHED THEN 
-		UPDATE SET
-		TAB1.GroupId = TAB2.GroupId;
-		
+	USING @TemporaryTable As TAB2 ON TAB1.PartyId = TAB2.PartyId AND TAB1.GroupId = TAB2.GroupId
+	WHEN NOT MATCHED BY SOURCE AND TAB1.GroupId = @GroupId THEN 
+		DELETE
+	WHEN NOT MATCHED BY TARGET THEN
+		INSERT(GroupId, PartyId, GroupType) VALUES(TAB2.GroupId, TAB2.PartyId, TAB2.GroupType);
+
 	SET @ErrCode = 0
 	SET @ErrMsg = ''
 END
