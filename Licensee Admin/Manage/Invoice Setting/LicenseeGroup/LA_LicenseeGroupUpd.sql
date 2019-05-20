@@ -63,11 +63,14 @@ BEGIN
 	FROM @xml.nodes('/Root/Party') t(Party)
 	
 	MERGE INTO dbo.LA_CombinedGroupAssignment AS TAB1
-	USING @TemporaryTable As TAB2 ON TAB1.PartyId = TAB2.PartyId AND TAB1.GroupId = TAB2.GroupId
-	WHEN NOT MATCHED BY SOURCE AND TAB1.GroupId = @GroupId THEN 
-		DELETE
+	USING @TemporaryTable As TAB2
+		ON TAB1.PartyId = TAB2.PartyId AND TAB1.GroupId = TAB2.GroupId
+	WHEN MATCHED THEN 
+		UPDATE SET
+		TAB1.GroupType = TAB2.GroupType
 	WHEN NOT MATCHED BY TARGET THEN
-		INSERT(GroupId, PartyId, GroupType) VALUES(TAB2.GroupId, TAB2.PartyId, TAB2.GroupType);
+		INSERT (GroupId, PartyID, GroupType)
+		VALUES (TAB2.GroupId, TAB2.PartyID, TAB2.GroupType);
 
 	SET @ErrCode = 0
 	SET @ErrMsg = ''
