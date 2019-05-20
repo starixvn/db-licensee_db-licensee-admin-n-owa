@@ -1,27 +1,26 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[OAS_SelCurrencyByMultiParty]    Script Date: 07/11/2014 10:36:21 AM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
 
-ALTER PROCEDURE [dbo].[OAS_SelCurrencyByMultiParty] 
-	 @PartyIDs	VARCHAR(1000)
+ALTER PROCEDURE [dbo].[OAS_SelCurrencyByMultiParty]
+	 @PartyIDs		VARCHAR(1000)
 	,@excludeTest	BIT			 = 0
 AS
+
 /*
-Created: 20140925@Florent
-Task : Get all the currency by multi party
-Base : Acc_SelCurrencyByLicensee
-DB: DB052.bodb02
-Revisions:
-   - 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust 
-Param's Explanation:
+	Created: 20140925@Florent
+	Task: Get all the currency by multi party
+	DB: DBEXT.bodb02
+	
+	Revisions:
+	   - 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust 
+	
+	Param's Explanation:
 */
-SET NOCOUNT ON
 
 BEGIN
+	SET NOCOUNT ON
+
 	DECLARE @temp AS TABLE (currency INT)
 
 	BEGIN
@@ -61,5 +60,3 @@ BEGIN
 			END
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_SelCurrencyByMultiParty] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[OAS_SelCurrencyByMultiParty] TO bodbAdminNet 

@@ -1,9 +1,5 @@
+/*<info serverAlias="DBACC-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
-GO
-SET ANSI_NULLS ON
-GO
-
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[OAS_Rpt_AGCasinoWinloss] 
@@ -14,32 +10,35 @@ ALTER PROCEDURE [dbo].[OAS_Rpt_AGCasinoWinloss]
 	, @drawfilter	SMALLINT		= 1
 
 AS
-/*  
-    Created: Florent.Nguyen
+
+/*
+	Created: Florent.Nguyen
     Date: 2014-09-24
-    Task : AG Win Loss report 
-    DB: DBACC.bodb02  
-    Revisions:  
+    Task: AG Win Loss report
+    DB: DBACC.bodb02
+    
+	Revisions:
 		- 20141031@Florent: Apply new Structure Using SystemMapping
 		- 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust
 		- 20150202@Florent: base currency GBP
+		- 20190510@Percy: Remove DBLIC [RedmineID: #103658]
 
-	Param's Explanation:  
-	 @Currency: 0 : All
-				-1: Base on EUR
-				-2: Base on GBP
+	Param's Explanation:
+		@Currency:	0 : All
+					-1: Base on EUR
+					-2: Base on GBP
+
+	OAS_Rpt_AGCasinoWinloss
+		@PartyIDs = '15,16,17,18'
+		,@FromDate = '08-01-2014'
+		,@ToDate = '09-30-2014'
+		,@drawfilter = 3
 
 */
-/*
-OAS_Rpt_AGCasinoWinloss_xtest @PartyIDs = '15,16,17,18'
-	,@FromDate = '08-01-2014'
-	,@ToDate = '09-30-2014'
-	,@drawfilter = 3
-
-*/
-SET NOCOUNT ON
 
 BEGIN
+	SET NOCOUNT ON
+	
 	CREATE TABLE #tmpResult (
 		PartyID INT
 		,PartyName NVARCHAR(100)
@@ -66,22 +65,6 @@ BEGIN
 	FROM dbo.Exchange WITH (NOLOCK)
 	WHERE ExchangeId = 51
 
-	DECLARE @sql VARCHAR(8000)
-
-	SET @sql = 'SELECT CustID,Currency,PartyID,PartyName,FromDate,ToDate
-			 FROM OPENQUERY( DBLIC,''SELECT CustID,Currency,p.PartyID,p.PartyName,
-								CASE WHEN ''''' + CONVERT(VARCHAR(10), @Fromdate, 120) + ''''' <= ci.FromDate THEN ci.FromDate ELSE ''''' + CONVERT(VARCHAR(10), @Fromdate, 120) + ''''' END AS FromDate,
-								CASE WHEN ''''' + CONVERT(VARCHAR(10), @ToDate, 120) + '''''  >= ci.ToDate THEN ci.ToDate ELSE ''''' + CONVERT(VARCHAR(10), @ToDate, 120) + '''''  END AS ToDate
-								FROM bodb_Licensee.dbo.f_SelLicenseeCust(0) lc
-								    INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON lc.LicenseeID = p.OldRefID AND p.PartyType = 1	
-								    INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON ci.FromParty = p.PartyID
-								    INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 4
-				    WHERE Currency <> 20 AND p.PartyID IN (' + @PartyIDs + 
-		') AND ci.ChargeType = 1 AND ci.ProductID = 10
-						AND ( ''''' + CONVERT(VARCHAR(10), @Fromdate, 120) + ''''' BETWEEN ci.FromDate AND ci.ToDate OR ''''' + CONVERT(VARCHAR(10), @ToDate, 120) + ''''' BETWEEN ci.FromDate AND ci.ToDate)
-						AND (' + CAST(@Currency AS VARCHAR) + ' <= 0 OR lc.Currency = ' + CAST(@Currency AS VARCHAR) + ')''
-				    )'
-
 	INSERT INTO #tmpAg (
 		CustID
 		,Currency
@@ -90,7 +73,17 @@ BEGIN
 		,FromDate
 		,Todate
 		)
-	EXECUTE (@sql)
+	SELECT CustID,Currency,p.PartyID,p.PartyName,
+			CASE WHEN @Fromdate <= ci.FromDate THEN ci.FromDate ELSE @Fromdate END AS FromDate,
+			CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END AS ToDate
+	FROM bodb_Licensee.dbo.f_SelLicenseeCust(0) lc
+		INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON lc.LicenseeID = p.OldRefID AND p.PartyType = 1
+		INNER JOIN dbo.Lrf_f_StringSplit(@PartyIDs, ',') f ON p.PartyID = f.val
+		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON ci.FromParty = p.PartyID
+		INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 4
+	WHERE Currency <> 20 AND ci.ChargeType = 1 AND ci.ProductID = 10
+		AND (@Fromdate BETWEEN ci.FromDate AND ci.ToDate OR @ToDate BETWEEN ci.FromDate AND ci.ToDate)
+		AND (@Currency <= 0 OR lc.Currency = @Currency)
 
 	--select @sql
 	INSERT INTO #tmpResult (
@@ -154,8 +147,8 @@ BEGIN
 		,ci.MinAmount
 		,ci.MaxAmount
 	INTO #ChargeInfo
-	FROM DBLIC.bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK)
-	INNER JOIN DBLIC.bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID
+	FROM bodb_licensee.dbo.OAS_ChargeInfo ci WITH (NOLOCK)
+	INNER JOIN bodb_licensee.dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID
 		AND cs.SystemID = 4
 	WHERE ProductID = 10
 		AND ChargeType = 1
@@ -242,5 +235,3 @@ BEGIN
 	DROP TABLE #ChargeInfo
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_Rpt_AGCasinoWinloss] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[OAS_Rpt_AGCasinoWinloss] TO bodbAdminNet 

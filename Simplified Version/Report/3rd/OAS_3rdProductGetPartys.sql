@@ -1,24 +1,22 @@
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE [bodb_Licensee]
 GO
 
 ALTER PROCEDURE [dbo].[OAS_3rdProductGetPartys]
-@ProductID INT
-AS  
-  
-/*  
- * Created by : 20150320@Winnie
- * Task  : Get all licensees (compatible with the new structure) for 3rd product Winloss report 
- * DB   : DB052.bodb_Licensee  
- * Revisions :  
- * Param's Explanation:    
- * 
- */  
- 
+	@ProductID INT
+AS
+
+/*
+	Created by: 20150320@Winnie
+	Task: Get all licensees (compatible with the new structure) for 3rd product Winloss report
+	DB: DBLIC.bodb_Licensee
+	
+	Revisions:
+		- 20150525@Florent: remove un-use code
+
+	Param's Explanation:
+*/
+
 BEGIN
 	SET NOCOUNT ON  
 	SELECT DISTINCT case when p1.PartyName='Boping' then p1.PartyID else  ci.FromParty end AS PartyID,
@@ -41,7 +39,4 @@ BEGIN
 		and p.PartyType=1						
 		ORDER BY PartyName ASC
 END
-
 GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_3rdProductGetPartys] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[OAS_3rdProductGetPartys] TO bodbAdminNet 

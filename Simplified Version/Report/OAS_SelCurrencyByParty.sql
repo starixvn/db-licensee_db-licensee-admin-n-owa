@@ -1,33 +1,28 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
 
-/****** Object:  StoredProcedure [dbo].[OAS_SelCurrencyByParty]    Script Date: 07/11/2014 10:22:23 AM ******/
-SET ANSI_NULLS ON
-GO
-
-SET QUOTED_IDENTIFIER ON
-GO
-
-ALTER PROCEDURE [dbo].[OAS_SelCurrencyByParty] 
-	 @PartyID 	INT = 0
+ALTER PROCEDURE [dbo].[OAS_SelCurrencyByParty]
+	 @PartyID 		INT = 0
 	,@excludeTest 	BIT = 0
 AS
+
 /*
-Created: 20140328@Florent
-Task : Get all the currency by a party
-Base : Acc_SelCurrencyByLicensee
-DB: DB052.bodb02
+	Created: 20140328@Florent
+	Task: Get all the currency by a party
+	DB: DBEXT.bodb02
 
-Revisions:
-	- 20140415@Florent: exclude get currency from Boping
-	- 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust
-	- 20150412@Patrick: Add filter by PartyType
+	Revisions:
+		- 20140415@Florent: exclude get currency from Boping
+		- 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust
+		- 20150412@Patrick: Add filter by PartyType
 
-Param's Explanation:
+	Param's Explanation:
 */
-SET NOCOUNT ON
 
 BEGIN
+	SET NOCOUNT ON
+
 	DECLARE @temp AS TABLE (currency INT)
 	DECLARE @LicBoping INT
 
@@ -69,7 +64,4 @@ BEGIN
 			ELSE e.Code
 			END
 END
-
 GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_SelCurrencyByParty] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[OAS_SelCurrencyByParty] TO bodbAdminNet 

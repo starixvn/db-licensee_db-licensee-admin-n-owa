@@ -1,41 +1,37 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[OAS_Report_VirtualSportWinloss]    Script Date: 17/11/2014 11:22:30 AM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
 
-/****** Object:  Stored Procedure dbo.OAS_Report_VirtualSportWinloss_NewStruct    Script Date: 4/14/2014 13:15:15  ******/
-ALTER PROCEDURE [dbo].[OAS_Report_VirtualSportWinloss] 
+ALTER PROCEDURE [dbo].[OAS_Report_VirtualSportWinloss]
 	  @PartyID		INT
 	, @Currency		INT				= 0
 	, @drawfilter	SMALLINT		= 0
 	, @FromDate		SMALLDATETIME
 	, @ToDate		SMALLDATETIME
 	, @SportList	VARCHAR(1000)
-
 AS
-/*  
- * Created by : 20131219@Francis 
- * Task  : Get Winloss report for Virtual Sports (compatible with the new structure)
- * DB   : DB052.bodb02
- * Revisions :  
-	- 20140331@Florent: Aplly new report template
-	- 20140416@Florent: Change condition of time range 
-	- 20140410@Francis: Alter @drawfilter param's value to 0,1,2
- 	- 20141103@Florent: Fix formula for OW revenue, use new structure (#25393)
-	- 20141117@Florent: remove comm
-	- 20150202@Florent: base currency GBP
-	- 20150412@Patrick: Add filter by PartyType
-	- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 
- * Param's Explanation:    
- *   @Currency: 0 : All
-				-1: Base on EUR
-				-2: Base on GBP
- *  
- */
+/*
+	Created by: 20131219@Francis
+	Task: Get Winloss report for Virtual Sports (compatible with the new structure)
+	DB: DBEXT.bodb02
+	
+	Revisions :  
+		- 20140331@Florent: Aplly new report template
+		- 20140416@Florent: Change condition of time range 
+		- 20140410@Francis: Alter @drawfilter param's value to 0,1,2
+ 		- 20141103@Florent: Fix formula for OW revenue, use new structure (#25393)
+		- 20141117@Florent: remove comm
+		- 20150202@Florent: base currency GBP
+		- 20150412@Patrick: Add filter by PartyType
+		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+
+	Param's Explanation:    
+		@Currency:	0 : All
+					-1: Base on EUR
+					-2: Base on GBP
+*/
+
 BEGIN
 	SET NOCOUNT ON
 
@@ -515,7 +511,4 @@ BEGIN
 	DROP TABLE #Exchange
 	DROP TABLE #Exchange1
 END
-
 GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_Report_VirtualSportWinloss] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[OAS_Report_VirtualSportWinloss] TO bodbAdminNet 

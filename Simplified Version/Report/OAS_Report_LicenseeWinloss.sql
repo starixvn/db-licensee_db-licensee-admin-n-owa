@@ -1,11 +1,11 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
 
 ALTER PROCEDURE [dbo].[OAS_Report_LicenseeWinloss] 
-	 @PartyID 	INT
-	,@Currency 	INT 			= 0
-	,@FromDate 	SMALLDATETIME
+	 @PartyID 		INT
+	,@Currency 		INT 			= 0
+	,@FromDate 		SMALLDATETIME
 	,@ToDate 		SMALLDATETIME
 	,@ReportType 	TINYINT 		= 2
 	,@MoveBetsDay 	SMALLDATETIME
@@ -13,38 +13,42 @@ ALTER PROCEDURE [dbo].[OAS_Report_LicenseeWinloss]
 	,@drawfilter 	SMALLINT 		= 0
 	,@excludeTest 	BIT 			= 1
 AS
-/*  
- * Created by : 20131223@Francis 
- * Task  : Get Winloss report for Sportbook (compatible with the new structure)
- * DB   : DB052.bodb02
- * Revisions :  
-	- 20140327@Florent: remove paging
-	- 20140410@Francis: Fix showing data out of time-range bug
-	- 20140410@Francis: Alter @drawfilter param's value to 0,1,2
-	- 20141105@Florent: Apply new struct support multi-System
-	- 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust
-	- 20150202@Florent: base currency GBP
-	- 20150824@Florent: remove Bettrade bettypes
-	- 20160217@Victor: hotfix - remove bettrade bettypes [Redmine: 52120]
-	- 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
-	- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
-	- 20170405@Harper: #73310 - Remove Cashout Bettype
-	- 20181206@bruce: Implement E-sport 2, HP5 [#105723]
- * 
- * Param's Explanation:    
- *  - @ID   : Party ID  (include: LicenseeID, ResellerID)
- *  - @Currency: 0 : All
-				-1: Base on EUR
-				-2: Base on GBP
- *  - @FromDate  : From date  
- *  - @ToDate  : To date  
- *  - @ReportType : 1-Daily; 2-Monthly;  
- *  - @MoveBetsDay : The day we move tickets to bettrans14   
- *  - @IsOld  : 0 - query in table rptLicWinloss, 1 - query in table rptLicWinloss_old.   
- *  - @drawfilter : 'No Draw' filter is supportted (0:Normal 1:No Draw 2:No Draw for Turnover only)  
- *  - @excludeTest : remove currency UUS  
-                                                                exec OAS_Report_LicenseeWinloss 14,0,'2014-09-01','2014-09-30',2,'2014-09-20',0,0,0
- */
+
+/*
+	Created by : 20131223@Francis
+	Task: Get Winloss report for Sportbook (compatible with the new structure)
+	DB: DBEXT.bodb02
+	
+	Revisions:
+		- 20140327@Florent: remove paging
+		- 20140410@Francis: Fix showing data out of time-range bug
+		- 20140410@Francis: Alter @drawfilter param's value to 0,1,2
+		- 20141105@Florent: Apply new struct support multi-System
+		- 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust
+		- 20150202@Florent: base currency GBP
+		- 20150824@Florent: remove Bettrade bettypes
+		- 20160217@Victor: hotfix - remove bettrade bettypes [Redmine: 52120]
+		- 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
+		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+		- 20170405@Harper: #73310 - Remove Cashout Bettype
+		- 20181206@bruce: Implement E-sport 2, HP5 [#105723]
+
+	Param's Explanation:    
+		- @ID   : Party ID  (include: LicenseeID, ResellerID)
+		- @Currency: 0 : All
+					-1: Base on EUR
+					-2: Base on GBP
+		- @FromDate: From date
+		- @ToDate: To date
+		- @ReportType: 1-Daily; 2-Monthly;
+		- @MoveBetsDay: The day we move tickets to bettrans14
+		- @IsOld: 0 - query in table rptLicWinloss, 1 - query in table rptLicWinloss_old.
+		- @drawfilter: 'No Draw' filter is supportted (0:Normal 1:No Draw 2:No Draw for Turnover only)
+		- @excludeTest: remove currency UUS
+
+	exec OAS_Report_LicenseeWinloss 14,0,'2014-09-01','2014-09-30',2,'2014-09-20',0,0,0
+*/
+
 BEGIN
 	SET NOCOUNT ON
 

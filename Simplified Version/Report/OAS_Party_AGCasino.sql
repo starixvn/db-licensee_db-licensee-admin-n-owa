@@ -1,26 +1,22 @@
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE [bodb_Licensee]
 GO
 
 ALTER PROCEDURE [dbo].[OAS_Party_AGCasino]
 AS  
   
-/*  
- * Created by : 20140925@Florent 
- * Task  : Get all licensees (compatible with the new structure) for AGCasino Winloss report 
- * DB   : DB052.bodb_Licensee  
- * Revisions :  
- 	- 20141031@Florent: Apply new Structure Using SystemMapping
-     - 20141105@Florent: fix get brand name of licensee
+/*
+	Created by: 20140925@Florent
+	Task: Get all licensees (compatible with the new structure) for AGCasino Winloss report
+	DB: DBLIC.bodb_Licensee
 
- * Param's Explanation:    
- * 
- */  
- 
+	Revisions:
+ 		- 20141031@Florent: Apply new Structure Using SystemMapping
+		- 20141105@Florent: fix get brand name of licensee
+
+	Param's Explanation:    
+*/
+
 BEGIN
 	SET NOCOUNT ON  
 	SELECT DISTINCT case when p1.PartyName='Boping' then p1.PartyID else  ci.FromParty end AS PartyID,
@@ -43,7 +39,4 @@ BEGIN
 		and p.PartyType=1						
 		ORDER BY PartyName ASC
 END
-
 GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_Party_AGCasino] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[OAS_Party_AGCasino] TO bodbAdminNet 
