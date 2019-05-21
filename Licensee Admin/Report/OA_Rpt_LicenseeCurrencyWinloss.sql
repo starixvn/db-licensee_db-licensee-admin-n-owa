@@ -2,6 +2,10 @@
 USE [bodb02]
 GO
 
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
+
 ALTER PROCEDURE [dbo].[OA_Rpt_LicenseeCurrencyWinloss]  
  @Licensee		VARCHAR(1000),
  @Currency		INT = 0,
@@ -39,6 +43,7 @@ AS
 	- 20130716@Jim: update matchid for RNG Casino and Bingo
 	- 20160726@Francis: Move SP to bodb_LicenseeReport - [Redmine: #60449]
 	- 20181206@bruce: Implement E-sport 2, HP5 [#105723]
+	- 20190307@Parsons: Implement BetBuilder [Redmine: #108995]
 		
 	Param's Explanation:  
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;  
@@ -166,7 +171,8 @@ BEGIN
 							+ 'b.bettype < 31 OR '
 							+ 'b.bettype BETWEEN 121 AND 999 OR '
 							+ 'b.bettype BETWEEN 9001 AND 9399 OR '
-							+ 'b.bettype BETWEEN 1301 AND 1399 ' ELSE 'AND (b.bettype < 0' END +
+							+ 'b.bettype BETWEEN 1301 AND 1399 OR '
+							+ 'b.bettype = 38 ' ELSE 'AND (b.bettype < 0' END +
 						CASE WHEN @ShowRB = 1 THEN ' OR b.bettype BETWEEN 31 AND 33' ELSE '' END + 
 						CASE WHEN @ShowLC=1 THEN ' OR b.bettype BETWEEN 1101 AND 1199' ELSE '' END + char(13)+
 						CASE WHEN @ShowVS=1 THEN ' OR b.bettype BETWEEN 1201 AND 1299' ELSE '' END + char(13)+
@@ -245,7 +251,8 @@ BEGIN
 						+ 'b.bettype < 31 OR '
 						+ 'b.bettype BETWEEN 121 AND 999 OR '
 						+ 'b.bettype BETWEEN 9001 AND 9399 OR '
-						+ 'b.bettype BETWEEN 1301 AND 1399' ELSE '(b.bettype < 0' END +
+						+ 'b.bettype BETWEEN 1301 AND 1399 OR '
+						+ 'b.bettype = 38' ELSE '(b.bettype < 0' END +
 					CASE WHEN @ShowRB = 1 THEN ' OR b.bettype BETWEEN 31 AND 33' ELSE '' END + 
 					CASE WHEN @ShowLC=1 THEN ' OR b.bettype BETWEEN 1101 AND 1199' ELSE ''END+char(13)+
 					CASE WHEN @ShowVS=1 THEN ' OR b.bettype BETWEEN 1201 AND 1299' ELSE ''END+char(13)+

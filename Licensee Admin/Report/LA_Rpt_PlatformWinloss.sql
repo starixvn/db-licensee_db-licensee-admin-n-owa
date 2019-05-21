@@ -23,6 +23,7 @@ AS
 		- 20181206@bruce: [#105723]
 			+ Implement E-sport 2 [#105723]
 			+ Cover betfrom 'c' in the report
+		- 20190516@Parsons: Show Bet count in Platform Win Loss (Summary) Report [#113568]
 
 	Explanation:
 	  + @PlatformType: 0: All
@@ -57,6 +58,7 @@ BEGIN
 		LicenseeID		INT,
 		Winlostdate		DATE,
 		CurrencyId		INT,
+		BetCount		INT,
 		Turnover		DECIMAL(20,5),
 		Winloss			DECIMAL(20,5),
 		BetFrom			VARCHAR(1)
@@ -123,11 +125,12 @@ BEGIN
 		INNER JOIN bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB') bt ON b.bettype = bt.Bettype
 		WHERE b.winlostdate BETWEEN @TempFromDate AND @TDate
 
-		INSERT INTO #WinLoss (LicenseeID, Winlostdate, CurrencyId, Turnover, Winloss, BetFrom)
+		INSERT INTO #WinLoss (LicenseeID, Winlostdate, CurrencyId, BetCount, Turnover, Winloss, BetFrom)
 		SELECT
 			c.LicenseeID,
 			b.winlostdate,
 			c.currency,
+			COUNT(*) AS BetCount,
 			SUM(CASE WHEN b.bettype IN (33,43) AND b.liveawayscore=0 THEN b.stake/2 ELSE b.stake END),
 			SUM(CASE WHEN (b.bettype NOT BETWEEN 31 AND 33) THEN -(b.winlost - b.actual_stake) ELSE 0 END),
 			b.betfrom
@@ -153,11 +156,12 @@ BEGIN
 		ELSE
 			SET  @TempToDate = @TDate
 
-		INSERT INTO #WinLoss (LicenseeID, Winlostdate, CurrencyId, Turnover, Winloss, BetFrom)
+		INSERT INTO #WinLoss (LicenseeID, Winlostdate, CurrencyId, BetCount, Turnover, Winloss, BetFrom)
 		SELECT
 			ag.LicenseeID,
 			b.winlostdate,
 			ag.currency,
+			SUM(b.BetCount) AS BetCount,
 			SUM(b.turnover),
 			SUM( CASE WHEN (b.sporttype <> 151) THEN -b.winlost ELSE 0 END),
 			b.betfrom
@@ -183,6 +187,7 @@ BEGIN
 		p.PartyName,
 		w.WinlostDate,
 		w.BetFrom,
+		SUM(w.BetCount) AS TotalTrans,
 		SUM(w.Turnover * e.Rate) AS Turnover,
 		SUM(w.Winloss * e.Rate) AS Winloss
 	FROM #WinLoss w

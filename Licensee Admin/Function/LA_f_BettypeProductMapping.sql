@@ -2,6 +2,10 @@
 USE bodb_Licensee
 GO
 
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
+
 ALTER FUNCTION [dbo].[LA_f_BettypeProductMapping] (
 	 @Bettype	 	INT = 0
 	,@ProductCodes VARCHAR(1000)	
@@ -39,6 +43,7 @@ AS
 		- 20180910@Bruce: LA - Implement sum job for Poker & bullfighting [RedmineId #98487]
 		- 20181204@Bruce: Implement E-sport 2  [RedmineId #105891]
 		- 20181204@Bruce: Implement Happy 5,Reserved range for esport2 [RedmineId #105723]
+		- 20190307@Parsons: Implement BetBuilder [Redmine: #108995]
 
 	Param's Explanation:
 
@@ -59,6 +64,7 @@ BEGIN
 		  OR typeid BETWEEN 121 AND 999
 		  OR typeid BETWEEN 9001 AND 9399
 		  OR typeid BETWEEN 1301 AND 1399
+		  OR typeid = 38 -- BetBuilder
 		)
 		AND typeid NOT IN (901, 902, 903,904, 911, 912, 913, 914) -- Bettrade bettypes 
 		AND (@Bettype = 0 OR typeid = @Bettype)
@@ -70,9 +76,11 @@ BEGIN
 	   SELECT typeid, 3
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE (typeid < 31
-		  OR typeid BETWEEN 121 AND 999
-		  OR typeid BETWEEN 9001 AND 9399
-		  OR typeid BETWEEN 1301 AND 1399)
+			  OR typeid BETWEEN 121 AND 999
+			  OR typeid BETWEEN 9001 AND 9399
+			  OR typeid BETWEEN 1301 AND 1399
+			  OR typeid = 38 -- BetBuilder
+			 )
 		  AND typeid NOT IN (901, 902, 903,904, 911, 912, 913, 914) -- Bettrade bettypes
 		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
