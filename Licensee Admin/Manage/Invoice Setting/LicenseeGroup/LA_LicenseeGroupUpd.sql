@@ -10,7 +10,7 @@ ALTER PROCEDURE [dbo].[LA_LicenseeGroupUpd]
 	@GroupName	VARCHAR(50),
 	@ParentId	INT,
 	@PartyData	VARCHAR(4000),
-	@GroupId	INT OUTPUT,
+	@GroupId	INT,
 	@ErrMsg		VARCHAR(200) = '' OUTPUT,
 	@ErrCode	int = 0 OUTPUT
 AS
