@@ -30,10 +30,17 @@ BEGIN
 	DECLARE @PathCode VARCHAR(50) = '/'
 	DECLARE @ParentIdString VARCHAR(5) = CAST(@ParentId AS VARCHAR(5))
 
+	IF @GroupId < 0
+	BEGIN
+		SET @ErrCode = 1
+		SET @ErrMsg = 'Group Id does not exist.'
+		RETURN;
+	END
+
 	IF @GroupId = 0
 	BEGIN
 		SET @ErrCode = 1
-		SET @ErrMsg = 'GROUP ID NOT EXISTS'
+		SET @ErrMsg = 'Group Id is invalid.'
 		RETURN;
 	END
 	
