@@ -30,7 +30,7 @@ BEGIN
 	DECLARE @PathCode VARCHAR(50) = '/'
 	DECLARE @ParentIdString VARCHAR(5) = CAST(@ParentId AS VARCHAR(5))
 
-	IF (SELECT GroupId FROM dbo.LA_CombinedGroup WITH(NOLOCK) WHERE GroupId = @GroupId) IS NULL
+	IF NOT EXISTS (SELECT GroupId FROM dbo.LA_CombinedGroup WITH(NOLOCK) WHERE GroupId = @GroupId)
 	BEGIN
 		SET @ErrCode = 1
 		SET @ErrMsg = 'Group Id does not exist.'
