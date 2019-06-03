@@ -44,6 +44,7 @@ AS
 		- 20181204@Bruce: Implement E-sport 2  [RedmineId #105891]
 		- 20181204@Bruce: Implement Happy 5,Reserved range for esport2 [RedmineId #105723]
 		- 20190307@Parsons: Implement BetBuilder [Redmine: #108995]
+		- 20190603@Parsons: Extend Lottery's bet types range [Redmine: #114568]
 
 	Param's Explanation:
 
@@ -282,7 +283,7 @@ BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 28
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
-	   WHERE typeid BETWEEN 1021 AND 1038
+	   WHERE typeid BETWEEN 1021 AND 1049
 		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 
