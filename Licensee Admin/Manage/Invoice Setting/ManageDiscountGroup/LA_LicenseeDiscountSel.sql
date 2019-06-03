@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -15,6 +15,7 @@ AS
 
 	 Revisions:  
 		- 20181031@Parsons: Configure discount settings by currency [#99694]
+		- 20190603@Parsons: Return group name when exporting licensee list & discount setting [#114558]
 
 	 Params:
 
@@ -26,7 +27,7 @@ BEGIN
 	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT)
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel
-	
+
 	;WITH cte_DiscountGroupAssignment AS(
 		SELECT MAX(h.DiscountGroupId) AS DiscountGroupId, PartyID 
 		FROM LA_DiscountGroupAssignment a WITH(NOLOCK)
@@ -34,14 +35,15 @@ BEGIN
 		WHERE h.DiscountGroupType IN (1, 3, 11, 13)
 		GROUP BY PartyID
 	), cte_DiscountSetting AS( 
-		SELECT a.PartyID, h.ToDate
+		SELECT a.PartyID, h.DiscountGroupName, h.ToDate
 		FROM LA_DiscountGroupHeader h WITH(NOLOCK)
 		INNER JOIN cte_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
 		WHERE h.DiscountGroupType IN (1, 3, 11, 13))
 
-	SELECT p.PartyName, ds.ToDate
+	SELECT ds.DiscountGroupName, p.PartyName, ds.ToDate
 	FROM @Parties p
 	LEFT JOIN cte_DiscountSetting ds ON p.PartyId = ds.PartyID
 	WHERE p.ParentId != 0
+	ORDER BY ds.DiscountGroupName DESC
 END
 GO
