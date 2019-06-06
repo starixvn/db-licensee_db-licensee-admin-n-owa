@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -12,7 +12,8 @@ WITH RECOMPILE
 AS
 /*  Created: 20160302@Bravo
 	Task : Report - Muay Thai Win Loss
-	DB: DBLIC-bodb_licensee
+	DB: DBLIC.bodb_licensee
+	
 	Revisions:
 		- 20160302@Bravo: create sp on table sum
 		- 20160322@Bravo: fix bug currency name VND => INH
@@ -302,10 +303,4 @@ BEGIN
 	DROP TABLE #Result
 	DROP TABLE #GrandTotal
 END
-GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_MuayThaiWinLoss] TO [vnteam]
-GO
-
-GRANT EXECUTE ON [dbo].[LA_Rpt_MuayThaiWinLoss] TO [bodbAdminNet]
 GO

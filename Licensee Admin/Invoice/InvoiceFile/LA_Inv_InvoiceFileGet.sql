@@ -1,16 +1,14 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-USE bodb_Licensee
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE [bodb_licensee]
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
-CREATE PROCEDURE [dbo].LA_Inv_InvoiceFileGet (@InvoiceId INT)
+ALTER PROCEDURE [dbo].LA_Inv_InvoiceFileGet
+	@InvoiceId INT
 AS
 /*	Created: 20190121@Bruce
 	Task : Get invoice pdf from DB
-	DB: DB052/bodb_Licensee
+	DB: DBCUST.bodb_Licensee
+	
 	Revisions:
 		- 20190121@Bruce: Create SP [#96660]
 */

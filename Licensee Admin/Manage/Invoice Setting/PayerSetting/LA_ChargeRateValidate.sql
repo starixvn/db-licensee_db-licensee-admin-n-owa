@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -11,10 +11,12 @@ ALTER PROCEDURE [dbo].[LA_ChargeRateValidate]
 AS
 /*  
 	 Created: 20150504@Florent
-	 Task : Validate list of Payers have applied to billing Invoice yet
-	 DB: DB052.bodb_Licensee
+	 Task: Validate list of Payers have applied to billing Invoice yet
+	 DB: DBCUST.bodb_Licensee
+	 
 	 Revisions:     
 		- 20180716@bruce: add new group TEST for credit [#98126]
+	 
 	 Params:
 		+ @ChargeId : = 0 check all charge infor of Party
 		+ @Mode : 
@@ -74,8 +76,4 @@ BEGIN
 	END
 	
 END
-
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_ChargeRateValidate] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_ChargeRateValidate] TO bodbAdminNet
 GO

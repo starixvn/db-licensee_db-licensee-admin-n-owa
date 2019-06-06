@@ -2,10 +2,6 @@
 USE bodb_Licensee
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE [dbo].[LA_AmountToCompanyByDiscountCurrencySel] (
 	@FromDate			DATE,
 	@ToDate				DATE,
@@ -18,7 +14,8 @@ ALTER PROCEDURE [dbo].[LA_AmountToCompanyByDiscountCurrencySel] (
 AS
 /*	Created: 20180924@Parsons
 	Task : select amount to company by discount currency
-	DB: DB052/bodb_Licensee
+	DB: DBLIC.bodb_Licensee
+	
 	Revisions:
 		- 20180924@Parsons: LA - LPID report - Apply one discount rate across all base currencies [#100046]
 		- 20181114@Bruce: discount by currency [#99694] 

@@ -1,9 +1,5 @@
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+USE bodb_Licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_MinFeeSettingDel] 	
@@ -17,11 +13,13 @@ AS
 /*  
 	 Created: 20150504@Florent
 	 Task : Delete Minfee setting
-	 DB: DB052.bodb_Licensee  
+	 DB: DBCUST.bodb_Licensee  
    
 	 Revisions:     
 		- 20150618@Florent: add column Currency to LA_Minfee  
 		- 20150918@Victor: Support Chinese on Settings
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+	 
 	 Params:				
 */
 BEGIN
@@ -88,35 +86,17 @@ BEGIN
 		SELECT 	@ErrMsg = 'Delete failed. Please try again.', @ErrCode = 820	
 		RETURN		
 	END
-	--Write Log		
-	DECLARE @ActionID INT = 0
-	SELECT @ActionID = ActionId
-	FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
-	WHERE SPName = 'LA_MinFeeSettingDel'
 	
-	BEGIN TRY
-		EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog 
-			@UserId = @UserID
-			, @IP = @LoginIP
-			, @LicenseeID = 0
-			, @CurrencyID = 0
-			, @SPName = 'LA_MinFeeSettingDel'
-			, @CustId = 0
-			, @ActionId = @ActionID
-			, @Duration = @duration
-			, @Data = @logSPData
-			, @OldData = @logSPDataOld
-	END TRY
-	BEGIN CATCH
-		EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP 
-			@UserID = @UserID
-			, @CustID = 0
-			, @ActionID = @ActionID
-			, @TrackingValue = @LogSPData
-			, @TrackingValue2 = @logSPDataOld
-			, @duration = @duration
-	END CATCH
+	-- Write Log
+	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+		@UserId			= @UserID
+		,@IP			= @LoginIP
+		,@LicenseeID	= 0
+		,@CurrencyID	= 0
+		,@SPName		= 'LA_MinFeeSettingDel'
+		,@CustId		= 0
+		,@Duration		= @duration
+		,@Data			= @logSPData
+		,@OldData		= @logSPDataOld
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_MinFeeSettingDel] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_MinFeeSettingDel] TO bodbAdminNet

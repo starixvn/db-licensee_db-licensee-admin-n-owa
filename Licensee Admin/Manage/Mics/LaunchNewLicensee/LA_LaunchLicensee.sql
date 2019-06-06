@@ -1,9 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
@@ -26,10 +22,11 @@ AS
 /*
 	Created: 20190107@Parsons
 	Task : Launch new licensee
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
-	- 20190107@Parsons: Launch new licensee
+		- 20190107@Parsons: Launch new licensee
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -167,13 +164,13 @@ BEGIN
 						@MinFeeSettingData	AS MinFeeSettingData
 						FOR XML PATH('')) 
 
-	EXEC DBLOG.bodb_CustomerLog.dbo.WriteLog_UserLog_UserControl
-		@Custid = 0,
-		@Doing = @Doing,
-		@Userid = @UserId,
-		@Typeid = 0,
-		@Actionid = 5535,
-		@Duration = @Duration
+	EXEC CustDB.dbo.WriteLog_UserLog_UserControl_Wrapper
+		@CustID		= 0,
+		@Doing		= @Doing,
+		@UserID		= @UserID,
+		@TypeID		= 0,
+		@ActionID	= 5535,
+		@Duration	= @Duration
 
 	IF @@ERROR <> 0
 	BEGIN

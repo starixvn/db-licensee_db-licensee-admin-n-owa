@@ -1,4 +1,4 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
 
@@ -12,6 +12,7 @@ AS
 /*  Created: 20150825@Florent
 	Task : Report - Bettrade Winloss
 	DB: DBEXT/bodb02
+	
 	Revisions:
 		- 20160317@Bravo: Remove unused param: fix bug wrong actual stake in BTWinLoss report.
 		- 20160523@Bravo: https://nexdev.net/projects/owa/wiki/CR_20160519_UpdateBetTradeCommercialTerm
@@ -265,10 +266,4 @@ BEGIN
 	DROP TABLE #FinalResult
 	DROP TABLE #Bettype
 END
-GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_BettradeWinloss] TO [vnteam]
-GO
-
-GRANT EXECUTE ON [dbo].[LA_Rpt_BettradeWinloss] TO bodbAdminNet
 GO

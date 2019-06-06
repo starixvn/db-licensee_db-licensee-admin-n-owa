@@ -1,9 +1,5 @@
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_HostingFeesChargeRateSel]
@@ -13,10 +9,12 @@ AS
 /*
 	Created: 20160615@Bravo
 	Task : Get all hosting fees charge rate settings
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
-		20160705@Bruce: Update: get latest hosting fees setting of payer
+		- 20160705@Bruce: Update: get latest hosting fees setting of payer
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+	
 	Params:
 
 	Example:
@@ -132,12 +130,9 @@ BEGIN
 		INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 		INNER JOIN dbo.LA_HostingFees f WITH(NOLOCK) ON hs.HostingFeesId = f.HostingFeesId
 		INNER JOIN dbo.LA_HostingFeesTypes t WITH(NOLOCK) ON f.HostingFeesTypeId = t.HostingFeesTypeId
-		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FirstDate, @LastDate, 'EUR') c ON hs.BaseCurrencyId = c.ExchangeID
+		INNER JOIN CustDB.dbo.LA_f_ExchangeDailySel(@FirstDate, @LastDate, 'EUR') c ON hs.BaseCurrencyId = c.ExchangeID
 		INNER JOIN @ChargeRateInfo r ON hs.HostingFeesId = r.HostingFeesId
 	ORDER BY hs.FromParty
 
 END
 GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_HostingFeesChargeRateSel] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_HostingFeesChargeRateSel] TO bodbAdminNet

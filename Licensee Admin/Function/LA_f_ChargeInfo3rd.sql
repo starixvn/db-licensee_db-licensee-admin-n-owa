@@ -26,7 +26,7 @@ AS
 /*  
 	Created: 20170310@Harper  
     Task: Get Charge Information of Product 3rd  
-    DB: DBLIC.bodb_Licensee    
+    DB:   DBLIC.bodb_Licensee    
 	
 	Revisions:  
 		- 20180122@Harper: Fix return data rows [RedmineID: #89006]

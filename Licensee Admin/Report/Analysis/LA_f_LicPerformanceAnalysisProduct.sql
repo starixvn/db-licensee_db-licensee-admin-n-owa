@@ -1,8 +1,8 @@
-﻿/*<info serverAlias="DBLIC-bodb_Licensee" selecters="bodbAdminNet,dwrs2" viewers="" isFunction="1" isNested="0"></info>*/
+﻿/*<info serverAlias="DBLIC-bodb_Licensee" selecters="bodbAdminNet,dwrs2" isFunction="1" isNested="1"></info>*/
 USE bodb_Licensee
 GO
 
-CREATE FUNCTION [dbo].[LA_f_LicPerformanceAnalysisProduct] ()
+ALTER FUNCTION [dbo].[LA_f_LicPerformanceAnalysisProduct] ()
 RETURNS @tblProduct TABLE (
 	ProductId	INT,
 	ProductCode	VARCHAR(10),
@@ -12,6 +12,7 @@ AS
 /*  Created: 20190220@Bruce
 	Task : Get Charge Information for Credit
 	DB: DBLIC.bodb_Licensee
+	
 	Revisions:
 		- 20190220@Bruce: Create function		
 */
@@ -28,3 +29,4 @@ BEGIN
 	)
 	RETURN;
 END
+GO

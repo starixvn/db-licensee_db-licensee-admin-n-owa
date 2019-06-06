@@ -1,6 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-
-USE [bodb_Licensee]
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_PrepaidPartySel]
@@ -11,10 +10,10 @@ AS
 /*	Header:
 	Created: 20171226 - Bruce.Bui
 	Task : Manage AMF
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
-		- 20171226: create SP
+		- 20171226@Bruce: create SP
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20190122@Parsons: Improve AG prepayment and discount setting [#104620]
 */

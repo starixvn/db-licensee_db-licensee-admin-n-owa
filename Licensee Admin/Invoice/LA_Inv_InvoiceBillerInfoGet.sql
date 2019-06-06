@@ -1,10 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceBillerInfoGet] 
@@ -16,17 +11,17 @@ AS
 /*	Header:
 	Created: 2015.08.06 - Bravo.Tran
 	Task : Create Invoice 
-	DB: DBLIC/bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions: 
-		+ 20150806@Bravo: Invoice Biller Info - Get
-		+ 20151019@Victor: Support Chinese on Invoice's text fields
-		+ 20160728@Bruce: Software data fee & hosting fee have a same invoice no
-		+ 20170421@Bruce: Add environment filter
-		+ 20170824@Bruce: use same invoice no for debit note and debit note for return amf [#76410]
-		+ 20171128@Bruce: use created date time instead of invoice date [#86399]
-		+ 20171205@Bruce: exclude void invoice [#87723]
-		+ 20190326@Bruce: Include invoice language [#102830]
+		- 20150806@Bravo: Invoice Biller Info - Get
+		- 20151019@Victor: Support Chinese on Invoice's text fields
+		- 20160728@Bruce: Software data fee & hosting fee have a same invoice no
+		- 20170421@Bruce: Add environment filter
+		- 20170824@Bruce: use same invoice no for debit note and debit note for return amf [#76410]
+		- 20171128@Bruce: use created date time instead of invoice date [#86399]
+		- 20171205@Bruce: exclude void invoice [#87723]
+		- 20190326@Bruce: Include invoice language [#102830]
 */
 /*	Example:
 	USE bodb_licensee

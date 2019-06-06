@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -349,8 +349,4 @@ BEGIN
 	DROP TABLE #TempData
 	DROP TABLE #Exchange
 END
-
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_AllBetWinloss] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_Rpt_AllBetWinloss] TO bodbAdminNet
 GO

@@ -1,12 +1,13 @@
-﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,dwrs2" viewers="" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet,dwrs2" isFunction="0" isNested="0"></info>*/
 USE bodb_Licensee
 GO
 
-ALTER PROCEDURE [dbo].LA_LicPerformanceAnalysisStatusSel
+ALTER PROCEDURE [dbo].[LA_LicPerformanceAnalysisStatusSel]
 AS
 /*  Created: 20190307@Bruce
 	Task : check generating status
-	DB: DBLIC.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
+	
 	Revisions:
 		- 20190307@Bruce: Create SP
 */

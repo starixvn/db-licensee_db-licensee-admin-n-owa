@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -7,9 +8,11 @@ AS
 /*
 	Created: 20170223@scofield.huynh
 	Task : Get list of terminated payers [#70050]
-	DB: DB052.bodb_Licensee
+	DB: DBLIC.bodb_Licensee
 
 	Revisions:
+		- 20170223@Scofield: Initialize SP
+
 	Params:
 	Example:
 		EXEC dbo.LA_PartyListTerminatedSel
@@ -46,6 +49,3 @@ BEGIN
 	SELECT 1001, 'Terminated Licensees', '', 0
 END
 GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_PartyListTerminatedSel] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_PartyListTerminatedSel] TO bodbAdminNet

@@ -1,9 +1,5 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
 USE bodb02
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LiveCasinoWinloss]
@@ -18,22 +14,20 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LiveCasinoWinloss]
 AS      
   
 /*  
- * Created by : 201410919@Florent 
- * Task  : Get Live Casino Winloss 
- * DB   : DB052.bodb02  
- * Base on : OA_Rpt_LiveCasinoWinloss
- * Revisions :  
-    - 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
-	- 20150703@Florent: add GBP
-	- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
-	- 20171220@Parsons: increase length for variables [#88197]
-	- 20180716@bruce: add new group TEST for credit [#98126]
-	- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
+	Created by : 201410919@Florent 
+	Task  : Get Live Casino Winloss 
+	DB   : DBEXT.bodb02  
+
+	Revisions :  
+		- 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
+		- 20150703@Florent: add GBP
+		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+		- 20171220@Parsons: increase length for variables [#88197]
+		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 	
- * Param's Explanation:    
- 
- *  
- */  
+	Param's Explanation:    
+*/  
     
 BEGIN
 	SET NOCOUNT ON
@@ -161,8 +155,4 @@ BEGIN
 	DROP TABLE	#Exchange	
 	DROP TABLE	#tmpParty
 END
-
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LiveCasinoWinloss] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_Rpt_LiveCasinoWinloss] TO bodbAdminNet 
 GO

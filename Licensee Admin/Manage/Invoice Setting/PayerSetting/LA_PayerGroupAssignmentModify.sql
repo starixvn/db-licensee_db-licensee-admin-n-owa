@@ -1,4 +1,5 @@
-USE [bodb_licensee]
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+USE bodb_Licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerGroupAssignmentModify]
@@ -13,10 +14,12 @@ AS
 /*  
 	 Created: 20150422@Florent
 	 Task : add/modify Payer Group Assignment setting
-	 DB: DB052.bodb_Licensee
+	 DB: DBCUST.bodb_Licensee
 
 	 Revisions:
 	 	- 20171219@Bruce: increase length for variables [#88197]
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+	 
 	 Params:
 	 Example:
 	
@@ -38,7 +41,7 @@ SET NOCOUNT ON
 
 	INSERT INTO @PayerGroupList(PayerGroupId, PartyID)
 	SELECT @PayerGroupId, val 
-	FROM bodb02.dbo.strSplit(@PayerList, ',')
+	FROM dbo.strSplit(@PayerList, ',')
 	--validate 
 	EXEC dbo.LA_PayerGroupValidatePayerAssignment
 		@PayerGroupId	= @PayerGroupId
@@ -77,35 +80,17 @@ SET NOCOUNT ON
 		SET @endRun = GETDATE()
 		SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
 	END
-	--Write Log		
-	DECLARE @ActionID INT = 0
-	SELECT @ActionID = ActionId
-	FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
-	WHERE SPName = 'LA_PayerGroupAssignmentModify'
-	
-	BEGIN TRY
-		EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog 
-			@UserId = @UserID
-			, @IP = @LoginIP
-			, @LicenseeID = 0
-			, @CurrencyID = 0
-			, @SPName = 'LA_PayerGroupAssignmentModify'
-			, @CustId = 0
-			, @ActionId = @ActionID
-			, @Duration = @duration
-			, @Data = @logSPData
-			, @OldData = @logSPDataOld
-	END TRY
-	BEGIN CATCH
-		EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP 
-			@UserID = @UserID
-			, @CustID = 0
-			, @ActionID = @ActionID
-			, @TrackingValue = @LogSPData
-			, @TrackingValue2 = @logSPDataOld
-			, @duration = @duration
-	END CATCH
+
+	-- Write Log
+	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+		@UserId			= @UserID
+		,@IP			= @LoginIP
+		,@LicenseeID	= 0
+		,@CurrencyID	= 0
+		,@SPName		= 'LA_PayerGroupAssignmentModify'
+		,@CustId		= 0
+		,@Duration		= @duration
+		,@Data			= @logSPData
+		,@OldData		= @logSPDataOld
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_PayerGroupAssignmentModify] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_PayerGroupAssignmentModify] TO bodbAdminNet

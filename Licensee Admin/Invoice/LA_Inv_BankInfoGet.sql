@@ -1,9 +1,5 @@
-USE [bodb_licensee]
-GO
-/****** Object:  StoredProcedure [dbo].[LA_Inv_BankInfoGet]   Script Date: 07/29/2015 16:33:41 ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_BankInfoGet] 
@@ -13,10 +9,10 @@ AS
 /*	Header:
 	Created: 2015.08.06 - Bravo.Tran
 	Task : Create Invoice 
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
    
 	Revisions: 
-		+ 2015.08.06: Bank Info - Get
+		- 20150806@Bravo: Bank Info - Get
 */
 /*	Example:
 	use bodb_licensee
@@ -45,6 +41,4 @@ BEGIN
 			AND s.FromPartyId = @PayerId
 		
 END
-
 GO
-GRANT EXECUTE ON [dbo].[LA_Inv_BankInfoGet] TO bodbAdminNet

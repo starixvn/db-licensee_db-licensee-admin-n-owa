@@ -1,10 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,dwrs2" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,dwrs2" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_SelBaseCurrency]	
@@ -21,9 +16,8 @@ AS
 		- 20190408@Bruce: grant permission for dwrs2 [#105205]
 
 */
-SET NOCOUNT ON
-
 BEGIN
+	SET NOCOUNT ON
 	
 	SELECT CurrencyId, CurrencyName
 	FROM (

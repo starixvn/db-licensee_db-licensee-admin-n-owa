@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -11,7 +11,7 @@ AS
 /*  
 	 Created: 20180123@Parsons [#87754]
 	 Task : Get report Exchange Win Loss
-	 DB: DB052.bodb_licensee   
+	 DB: DBLIC.bodb_licensee   
 
 	 Revisions:  
 		- 20180123@Parsons: Create Exchange Win Loss [#87754]
@@ -298,10 +298,4 @@ BEGIN
 	DROP TABLE #Exchange
 	DROP TABLE #Result
 END
-GO
-
-GRANT EXECUTE ON [dbo].[LA_Rpt_ExchangeWinLoss] TO [bodbAdminNet]
-GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_ExchangeWinLoss] TO [vnteam] 
 GO

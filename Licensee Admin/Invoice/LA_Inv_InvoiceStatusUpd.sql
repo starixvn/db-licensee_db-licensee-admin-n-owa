@@ -1,8 +1,5 @@
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceStatusUpd]
@@ -17,10 +14,10 @@ AS
 /*	Header:
 	Created: 20170607@Bruce
 	Task :	Void invoice
-	DB:		DBLIC/bodb_Licensee
+	DB:		DBCUST.bodb_Licensee
 
 	Revisions:
-		20170607@Bruce: Create new SP for void invoice [RedmineID: #76411]
+		- 20170607@Bruce: Create new SP for void invoice [RedmineID: #76411]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -41,11 +38,4 @@ BEGIN
 
 	SELECT @ErrCode = 0, @ErrMsg = ''
 END
-
-GO
-
-GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceStatusUpd] TO bodbAdminNet
-GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_Inv_InvoiceStatusUpd] TO vnteam
 GO

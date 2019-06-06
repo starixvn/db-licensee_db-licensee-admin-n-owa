@@ -1,9 +1,5 @@
-USE [bodb_licensee]
-GO
-/****** Object:  StoredProcedure [dbo].[LA_FunctionSelByGroup]    Script Date: 9/8/2014 4:51:52 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_FunctionSelByGroup]
@@ -14,9 +10,11 @@ AS
 /*  
 	 Created: 20140814@Florent
 	 Task : Select Function list by Group
-	 DB: DB052.bodb_Licensee  
+	 DB: DBCUST.bodb_Licensee  
    
-	 Revisions:     
+	 Revisions:
+		- 20140814@Florent: Initialize SP
+
 	 Params :	 @AdminID: ID of User log on
 */
 SET NOCOUNT ON
@@ -54,7 +52,4 @@ BEGIN
 		  ,f.StatusID
 		  ,FunctionKey	
 END
-
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_FunctionSelByGroup] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_FunctionSelByGroup] TO bodbAdminNet 

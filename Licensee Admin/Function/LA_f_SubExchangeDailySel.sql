@@ -1,5 +1,4 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="1" isNested="0"></info>*/
-
+/*<info serverAlias="DBEXT-bodb02,DBCUST-CustDB" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
 ALTER FUNCTION [dbo].[LA_f_SubExchangeDailySel] (
 	@FromDate					SMALLDATETIME
 	, @ToDate					SMALLDATETIME
@@ -8,12 +7,12 @@ ALTER FUNCTION [dbo].[LA_f_SubExchangeDailySel] (
 /*  
 	Created: 20171107@Don
 	Task : Get sub exchange daily
-	DB: DBEXT.bodb02
-	Revisions:  
+	DB: DBEXT.bodb02, DBCUST.CustDB
+	
+	Revisions:
+		- 20171107@Don: Initial version [RedmineID: #84163]
 
 	Param's Explanation:  			
-	- 20171107@Don: Initial version [RedmineID: #84163]
-
 */
 RETURNS @tempDate TABLE 
 	(

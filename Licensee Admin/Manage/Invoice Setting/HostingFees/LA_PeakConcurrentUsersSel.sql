@@ -1,4 +1,5 @@
-USE bodb_licensee
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE dbo.LA_PeakConcurrentUsersSel
@@ -9,7 +10,10 @@ AS
 /*	Created by: Bruce
 	Date: 2016-06-13
 	Task: Get peak concurrent users for Licensee
-	DB: DB052.bodb_Licensee
+	DB: DBLIC.bodb_Licensee
+
+	Revisions:
+		- 20160613@Bruce: Initialize SP
 */
 BEGIN
 	SET NOCOUNT ON
@@ -57,6 +61,3 @@ BEGIN
 	EXEC('SELECT * FROM OPENQUERY(DBONUSER, ''' + @OpenQuery + ''')')
 END
 GO
-
-GRANT VIEW DEFINITION ON [dbo].LA_PeakConcurrentUsersSel TO [vnteam] 
-GRANT EXECUTE ON [dbo].LA_PeakConcurrentUsersSel TO bodbAdminNet 

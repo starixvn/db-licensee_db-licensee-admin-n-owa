@@ -1,7 +1,4 @@
-/*<info serverAlias="DBEXT-bodb02" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
-USE [bodb02]
-GO
-
+/*<info serverAlias="DBEXT-bodb02,DBCUST-CustDB" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
 ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
 	@fromdate DATETIME
 	, @todate DATETIME
@@ -11,7 +8,7 @@ ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
 /*  
 	Created: 20150320@Patrick
 	Task: Get exhange daily
-	DB: DBEXT.bodb02
+	DB: DBEXT.bodb02, DBCUST.CustDB
 	
 	Revisions:  
 		- 20160413@Francis: Support THB Base Currency

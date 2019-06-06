@@ -1,9 +1,5 @@
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_UserUpdIsActive]
@@ -15,12 +11,13 @@ ALTER PROCEDURE [dbo].[LA_UserUpdIsActive]
 	,@ErrCode		INT = 0 OUTPUT  
 	,@ErrMsg		NVARCHAR(1000) = '' OUTPUT 
 AS
-/*  
- * Created: 20140820@Florent
- * Task : Set active / in-active a User
- * DB: DB052.bodb_Licensee  
- *  
- * Revisions:     
+/*
+	Created: 20140820@Florent
+	Task : Set active / in-active a User
+	DB: DBCUST.bodb_Licensee  
+	
+	Revisions:
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 */
 SET NOCOUNT ON
 BEGIN
@@ -80,17 +77,15 @@ BEGIN
 	    'IP="'+ coalesce(cast(@LoginIP as varchar(30)),space(1)) + '" />'  
 
     SET @endRun = getdate()  
-    SET @duration  = datediff (millisecond,@startRun,@endRun)   
+    SET @duration  = datediff (millisecond,@startRun,@endRun)
 
-    EXEC dbo.OA_WriteLog_UserLog_RunSP  
-	    @UserID = @Creator,   
-	    @CustID = @UserID,
-	    @SPName='LA_UserUpdIsActive',
-	    --@ActionID = 0,  
-	    @TrackingValue = @LogSPData,  
-	    @TrackingValue2 = @LogSPDataOld,  
-	    @duration = @duration
+	-- Write Log
+	EXEC CustDB.LA_WriteLog_UserLog_RunSP_Wrapper
+		@UserID				= @Creator  
+		,@CustID			= @UserID
+		,@SPName			= 'LA_UserUpdIsActive'
+		,@TrackingValue		= @LogSPData
+		,@TrackingValue2	= @LogSPDataOld
+		,@Duration			= @Duration
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_UserUpdIsActive] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_UserUpdIsActive] TO bodbAdminNet 

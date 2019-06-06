@@ -1,3 +1,4 @@
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -8,11 +9,11 @@ AS
 /*	Header:
 	Created: 2015.08.06 - Bravo.Tran
 	Task : Create Invoice 
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
    
 	Revisions: 
-		+ 20150806@Bravo: Invoice Type Info - Get
-		+ 20170717@Bruce: show product for type = 1 only [#79905]
+		- 20150806@Bravo: Invoice Type Info - Get
+		- 20170717@Bruce: show product for type = 1 only [#79905]
 */
 /*	Example:
 	USE bodb_licensee
@@ -32,8 +33,5 @@ BEGIN
 			INNER JOIN dbo.LA_InvoiceType it WITH(NOLOCK) ON ivs.InvTypeId = it.InvTypeId 
 			LEFT JOIN dbo.LA_f_Products3rd('') p ON ivs.ProductId = p.Productid AND it.InvTypeId = 1 -- software & data fee
 	WHERE	ivs.FromPartyId = @PayerId AND ivs.ToPartyId = @BillerId
-	
 END		
-
 GO
-GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceTypeInfoGet] TO bodbAdminNet

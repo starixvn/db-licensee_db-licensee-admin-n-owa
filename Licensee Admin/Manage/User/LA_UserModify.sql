@@ -1,30 +1,28 @@
-USE [bodb_licensee]
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+USE bodb_licensee
 GO
-/****** Object:  StoredProcedure [dbo].[LA_UserModify]    Script Date: 9/8/2014 4:59:36 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
+
 ALTER PROCEDURE [dbo].[LA_UserModify] 
 	 @UserID		INT OUTPUT
 	,@GroupID		INT
-	,@UserName	NVARCHAR(50)
+	,@UserName		nvarchar(50)
 	,@DisplayName	NVARCHAR(50)
 	,@UserPwd		VARCHAR(50)	 = ''
-	,@UserSalt	VARCHAR(50)	 = ''
-	,@IsActive	BIT
+	,@UserSalt		varchar(50)=''
+	,@IsActive		bit
 	,@Creator		INT
-	,@Language	VARCHAR(20)	 = 'en-us'
+	,@Language		varchar(20) = 'en-us'
 	,@LoginIP		VARCHAR(30)	 = ''
 	,@ErrCode		INT			 = 0 OUTPUT
 	,@ErrMsg		NVARCHAR(1000)	 = '' OUTPUT
 AS
-/*  
- * Created: 20140820@Florent
- * Task : Add or modify a user
- * DB: DB052.bodb_Licensee  
- *  
- * Revisions:     
+/*
+	Created: 20140820@Florent
+	Task : Add or modify a user
+	DB: DBCUST.bodb_Licensee  
+	
+	Revisions:
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 */
 SET NOCOUNT ON
 
@@ -145,32 +143,15 @@ esce(cast(@Creator AS VARCHAR(20)), space(1)) + '" ' + 'IP="' + coalesce(cast(@L
 	SET @endRun = getdate()
 	SET @duration = datediff(millisecond, @startRun, @endRun)
 
-	IF LEN(ISNULL(@LogSPDataOld, '')) = 0
-	BEGIN
-		SELECT @LogSPData = REPLACE(@LogSPData, 'LA_UsersModify', 'LA_UsersModify_Create')
-
-		EXEC dbo.OA_WriteLog_UserLog_RunSP @UserID = @Creator
-			,@CustID = @UserID
-			,@SPName = 'LA_UsersModify_Create'
 			,
-			--@ActionID = 0,  
-			@TrackingValue = @LogSPData
-			,@TrackingValue2 = @LogSPDataOld
-			,@duration = @duration
-	END
-	ELSE
-	BEGIN
-		EXEC dbo.OA_WriteLog_UserLog_RunSP @UserID = @Creator
-			,@CustID = @UserID
-			,@SPName = 'LA_UsersModify'
-			,
-			--@ActionID = 0,  
-			@TrackingValue = @LogSPData
-			,@TrackingValue2 = @LogSPDataOld
-			,@duration = @duration
-	END
+    
+	-- Write Log
+	EXEC CustDB.LA_WriteLog_UserLog_RunSP_Wrapper
+		@UserID				= @Creator  
+		,@CustID			= @UserID
+		,@SPName			= 'LA_UsersModify'
+		,@TrackingValue		= @LogSPData
+		,@TrackingValue2	= @LogSPDataOld
+		,@Duration			= @Duration
 END
-
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_UserModify] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_UserModify] TO bodbAdminNet 

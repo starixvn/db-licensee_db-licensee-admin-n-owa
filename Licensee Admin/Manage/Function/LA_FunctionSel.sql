@@ -1,9 +1,5 @@
-USE [bodb_licensee]
-GO
-/****** Object:  StoredProcedure [dbo].[LA_FunctionSel]    Script Date: 9/8/2014 4:51:24 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_FunctionSel] 	
@@ -12,9 +8,11 @@ AS
 /*  
 	 Created: 20140814@Florent
 	 Task : Select Function list 
-	 DB: DB052.bodb_Licensee  
+	 DB: DBCUST.bodb_Licensee  
    
-	 Revisions:     
+	 Revisions:
+		- 20140814@Florent: Initialize SP
+
 	 Params :	 
 
 */
@@ -44,5 +42,3 @@ FROM
 
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_FunctionSel] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_FunctionSel] TO bodbAdminNet 

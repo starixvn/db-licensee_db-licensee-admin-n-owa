@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -10,7 +10,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceWaiveGet]
 AS
 /*	Header:
 	Created: 2017-05-09 - @Scofield.Huynh
-	DB: DB052.bodb_Licensee   
+	DB: DBLIC.bodb_Licensee   
 	Revisions: 
 		+ 2017-05-09 @Scofield.Huynh: Create [#76132]
 		- 20171220@Parsons: increase length for variables [#88197]
@@ -316,7 +316,4 @@ BEGIN
 	DROP TABLE #Exchange
 	DROP TABLE #TempData
 END		
-
-GO
-GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceWaiveGet] TO bodbAdminNet
 GO

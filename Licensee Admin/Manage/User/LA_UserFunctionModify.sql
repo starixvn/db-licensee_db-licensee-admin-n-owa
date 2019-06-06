@@ -1,25 +1,23 @@
-USE [bodb_licensee]
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+USE bodb_licensee
 GO
-/****** Object:  StoredProcedure [dbo].[LA_UserFunctionModify]    Script Date: 9/8/2014 4:58:32 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
+
 ALTER PROCEDURE [dbo].[LA_UserFunctionModify]
 	 @UserID		int
      ,@FunctionIDs	VARCHAR(5500)
 	,@Creator		int	
-	,@Language	varchar(20) = 'en-us'
+	,@Language		varchar(20) = 'en-us'
 	,@LoginIP		varchar(30)=''
 	,@ErrCode		int = 0 OUTPUT  
 	,@ErrMsg		nvarchar(1000) = '' OUTPUT 
 AS
-/*  
- * Created: 20140820@Florent
- * Task : Add or modify a user permission of Function(s)
- * DB: DB052.bodb_Licensee  
- *  
- * Revisions:     
+/*
+	Created: 20140820@Florent
+	Task : Add or modify a user permission of Function(s)
+	DB: DBCUST.bodb_Licensee  
+	
+	Revisions:
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 */
 SET NOCOUNT ON
 DECLARE @startRun datetime  
@@ -118,17 +116,15 @@ BEGIN
 		    'IP="'+ coalesce(cast(@LoginIP as varchar(30)),space(1)) + '" />'  
 
     SET @endRun = getdate()  
-    SET @duration  = datediff (millisecond,@startRun,@endRun)   
+    SET @duration  = datediff (millisecond,@startRun,@endRun)
 
-    EXEC dbo.OA_WriteLog_UserLog_RunSP  
-	    @UserID = @Creator,   
-	    @CustID = @UserID,
-	    @SPName='LA_UserFunctionModify',
-	    --@ActionID = 0,  
-	    @TrackingValue = @LogSPData,  
-	    @TrackingValue2 = @LogSPDataOld,  
-	    @duration = @duration
+	-- Write Log
+	EXEC CustDB.LA_WriteLog_UserLog_RunSP_Wrapper
+		@UserID				= @Creator  
+		,@CustID			= @UserID
+		,@SPName			= 'LA_UserFunctionModify'
+		,@TrackingValue		= @LogSPData
+		,@TrackingValue2	= @LogSPDataOld
+		,@Duration			= @Duration
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_UserFunctionModify] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_UserFunctionModify] TO bodbAdminNet 

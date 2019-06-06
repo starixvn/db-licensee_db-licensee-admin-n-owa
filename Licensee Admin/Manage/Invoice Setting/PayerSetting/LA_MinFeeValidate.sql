@@ -1,9 +1,5 @@
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_MinFeeValidate] 
@@ -16,8 +12,10 @@ AS
 /*  
 	 Created: 20150504@Florent
 	 Task : Validate list of Payers have applied to billing Invoice yet
-	 DB: DB052.bodb_Licensee
-	 Revisions:     
+	 DB: DBCUST.bodb_Licensee
+
+	 Revisions:
+		- 20150504@Florent: Initialize SP
 		
 	 Params:
 		+ @@MinfeeId : = 0 check all Minfee info of Party
@@ -67,7 +65,4 @@ BEGIN
 	END
 	
 END
-
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_MinFeeValidate] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_MinFeeValidate] TO bodbAdminNet

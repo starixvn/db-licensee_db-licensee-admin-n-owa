@@ -1,9 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON;
-SET QUOTED_IDENTIFIER ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoInsert]
@@ -35,24 +31,25 @@ AS
 /*  Header:
 	Created: 2015.08.06 - Bravo.Tran
 	Task : Create Invoice
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
-		+ 20150806@Bravo: Save invoice
-		+ 20151019@Victor: Support Chinese on Invoice's text fields
-		+ 20160718@Bruce: Hosting fees - Insert hosting fees info
-		+ 20170421@Bruce: Add environment filter
-		+ 20170608@Bruce: Save details, reuse invoice no of voided invoice [#76411]
-		+ 20170721@Scofield: Update to save data to InvoiceStatement [#79905]
-		+ 20170824@Bruce: Support debit note for return AMF [#76410]
-		+ 20171026@Bruce: redmine id [#85256]
+		- 20150806@Bravo: Save invoice
+		- 20151019@Victor: Support Chinese on Invoice's text fields
+		- 20160718@Bruce: Hosting fees - Insert hosting fees info
+		- 20170421@Bruce: Add environment filter
+		- 20170608@Bruce: Save details, reuse invoice no of voided invoice [#76411]
+		- 20170721@Scofield: Update to save data to InvoiceStatement [#79905]
+		- 20170824@Bruce: Support debit note for return AMF [#76410]
+		- 20171026@Bruce: redmine id [#85256]
 				- add invoice date
 				- insert product id to statement
-		+ 20180112@Bruce: increase description length [#89417]
-		+ 20180131@Bruce: support credit note for setup fee [#90274]
-		+ 20180109@Bruce: month of deduction [#87039]
-		+ 20190123@Bruce: Save invoices - Increased security [#96660]
-		+ 20190319@bruce: Apply min fee rule for discount calculation [#109997]
+		- 20180112@Bruce: increase description length [#89417]
+		- 20180131@Bruce: support credit note for setup fee [#90274]
+		- 20180109@Bruce: month of deduction [#87039]
+		- 20190123@Bruce: Save invoices - Increased security [#96660]
+		- 20190319@bruce: Apply min fee rule for discount calculation [#109997]
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 */
 
 BEGIN
@@ -341,32 +338,17 @@ BEGIN
 		FOR XML PATH('h'), TYPE)
 	SET @logSPData = CAST(@xml AS NVARCHAR(MAX))
 
-	--get log action
-	DECLARE @ActionID INT = 0
-	SELECT @ActionID = ActionId
-	FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
-	WHERE SPName = 'LA_Inv_InvoiceInfoInsert'
-
-	BEGIN TRY
-		EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog @UserId = @UserID
-			, @IP = @LoginIP
-			, @LicenseeID = 0
-			, @CurrencyID = 0
-			, @SPName = 'LA_Inv_InvoiceInfoInsert'
-			, @CustId = 0
-			, @ActionId = @ActionID
-			, @Duration = @duration
-			, @Data = @logSPData
-			, @OldData = ''
-	END TRY
-	BEGIN CATCH
-		EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP @UserID = @UserID
-			, @CustID = 0
-			, @ActionID = @ActionID
-			, @TrackingValue = @LogSPData
-			, @TrackingValue2 = ''
-			, @duration = @duration
-	END CATCH
+	-- Write Log
+	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+		@UserId			= @UserID
+		,@IP			= @LoginIP
+		,@LicenseeID	= 0
+		,@CurrencyID	= 0
+		,@SPName		= 'LA_Inv_InvoiceInfoInsert'
+		,@CustId		= 0
+		,@Duration		= @duration
+		,@Data			= @logSPData
+		,@OldData		= ''
 	-- End Region
 END
 GO

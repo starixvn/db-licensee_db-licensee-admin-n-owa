@@ -1,4 +1,4 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
 USE bodb02
 GO
 
@@ -11,16 +11,14 @@ ALTER PROCEDURE [dbo].[LA_Rpt_MicrogamingWinlossGMT0]
 AS
 /*  Created: 20150804@Florent
 	Task : Report - Microgaming Casino GMT + 0
-	DB: DB052.bodb02
-	Modified:
-	- Feature 44698.
-	- Feature 54152.
+	DB: DBEXT.bodb02
+	
 	Revisions:
-	- 20151201@Forrest: Add Microgaming RNG and change data flow.
-	- 20160316@Forrest: Change SporttypeRef to Sporttype.
-	- 20160530@Forrest: Update new formula
-	- 20171219@Bruce: increase length for variables [#88197]
-	- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20151201@Forrest: Add Microgaming RNG and change data flow.
+		- 20160316@Forrest: Change SporttypeRef to Sporttype.
+		- 20160530@Forrest: Update new formula
+		- 20171219@Bruce: increase length for variables [#88197]
+		- 20180716@bruce: add new group TEST for credit [#98126]
 	
 	Param's Explanation:
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -421,10 +419,4 @@ BEGIN
 	DROP TABLE #Exchange
 	DROP TABLE #SumData
 END
-GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_MicrogamingWinlossGMT0] TO [vnteam]
-GO
-
-GRANT EXECUTE ON [dbo].[LA_Rpt_MicrogamingWinlossGMT0] TO [bodbAdminNet]
 GO

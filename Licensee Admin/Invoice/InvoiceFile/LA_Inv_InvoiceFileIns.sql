@@ -1,9 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-USE bodb_Licensee
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE [dbo].LA_Inv_InvoiceFileIns (
@@ -15,7 +11,8 @@ ALTER PROCEDURE [dbo].LA_Inv_InvoiceFileIns (
 AS
 /*	Created: 20190121@Bruce
 	Task : Save invoice pdf to DB
-	DB: DB052/bodb_Licensee
+	DB: DBCUST.bodb_Licensee
+	
 	Revisions:
 		- 20190121@Bruce: Create SP [#96660]
 */

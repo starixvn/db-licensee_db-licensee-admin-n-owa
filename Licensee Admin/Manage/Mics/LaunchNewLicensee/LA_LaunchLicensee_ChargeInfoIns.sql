@@ -1,22 +1,18 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
 USE [bodb_licensee]
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_LaunchLicensee_ChargeInfoIns]
 	@PartyId				INT,
 	@GroupId				INT,
 	@ChargeInfoSettingData	VARCHAR(MAX),
-	@ErrCode			INT				= 0		OUTPUT, 
-	@ErrMsg				VARCHAR(4000)	= ''	OUTPUT
+	@ErrCode				INT				= 0		OUTPUT, 
+	@ErrMsg					VARCHAR(4000)	= ''	OUTPUT
 AS
 /*
 	Created: 20190107@Parsons
 	Task : Launch new licensee
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
 	- 20190107@Parsons: Launch new licensee

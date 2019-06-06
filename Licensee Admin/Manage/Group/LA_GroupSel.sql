@@ -1,9 +1,5 @@
-USE [bodb_licensee]
-GO
-/****** Object:  StoredProcedure [dbo].[LA_GroupSel]    Script Date: 9/12/2014 11:09:41 AM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_GroupSel] 
@@ -13,9 +9,10 @@ AS
 /*  
 	 Created: 20140819@Florent
 	 Task : Select Group list 
-	 DB: DB052.bodb_Licensee  
+	 DB: DBCUST.bodb_Licensee  
    
-	 Revisions:     
+	 Revisions:
+		- 20140819@Florent: Initialize SP
 */
 SET NOCOUNT ON
 BEGIN	
@@ -30,7 +27,4 @@ BEGIN
 		 --AND g.GroupID > 0
      ORDER BY g.GroupID DESC
 END
- 
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_GroupSel] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_GroupSel] TO bodbAdminNet 

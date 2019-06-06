@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -11,7 +11,7 @@ AS
 /*
  Created by	: [20160331@Bruce]
  Task		: Get Keno Winloss
- DB			: DB052.bodb_licensee
+ DB			: DBLIC.bodb_licensee
 
  Revisions:
 	- 20160331@Bruce: #55003 - Support new Keno report

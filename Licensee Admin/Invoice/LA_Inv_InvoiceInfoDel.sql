@@ -1,3 +1,4 @@
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -8,22 +9,16 @@ AS
 /*  Header:
 	Created: 2017.08.24@Bruce
 	Task : Delete invalid invoice
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
-		20170824@Bruce: Create New SP to delete Invoice [RedmineID: #76410]
+		- 20170824@Bruce: Create New SP to delete Invoice [RedmineID: #76410]
 */
 
 BEGIN
 	SET NOCOUNT ON
 	
-	DELETE dbo.LA_InvoiceHeader WHERE InvoiceHeaderId = @InvoiceHeaderId
-	DELETE dbo.LA_InvoiceStatement WHERE InvoiceHeaderId = @InvoiceHeaderId
+	DELETE dbo.LA_InvoiceHeader WITH (ROWLOCK, UPDLOCK) WHERE InvoiceHeaderId = @InvoiceHeaderId
+	DELETE dbo.LA_InvoiceStatement WITH (ROWLOCK, UPDLOCK) WHERE InvoiceHeaderId = @InvoiceHeaderId
 END
-GO
-
-GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceInfoDel] TO bodbAdminNet
-GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_Inv_InvoiceInfoDel] TO vnteam
 GO

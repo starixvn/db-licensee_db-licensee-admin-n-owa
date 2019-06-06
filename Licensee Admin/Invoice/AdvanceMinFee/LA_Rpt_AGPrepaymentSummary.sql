@@ -1,10 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_AGPrepaymentSummary]
@@ -15,7 +10,7 @@ AS
 /*	Header:
 	Created: 20181003 - Parsons
 	Task : Get AG Casino Prepayment Summary
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
 		- 20181003@Parsons: Integrate AG setup fee into invoices [RedmineID: #98485]

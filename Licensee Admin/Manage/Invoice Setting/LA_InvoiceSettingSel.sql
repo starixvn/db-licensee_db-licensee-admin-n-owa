@@ -1,3 +1,4 @@
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -8,11 +9,11 @@ AS
 /*  
 	 Created: 20150408@Florent
 	 Task : Get Inoive setting
-	 DB: DB052.bodb_Licensee  
+	 DB: DBCUST.bodb_Licensee  
    
 	 Revisions:
-		+ @Bravo-2016.08.08: Hosting fees
-		+ @Bruce-2016.11.29: Add isactive status
+		- 20160808@Bravo: Hosting fees
+		- 20161129@Bruce: Add isactive status
 	 Params:
 		+ 0 get all biller
 		+ <> 0 specify a biller 
@@ -66,8 +67,4 @@ BEGIN
 			ELSE p1.PartyName 
 		  END	
 END			 	
-
-
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_InvoiceSettingSel] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_InvoiceSettingSel] TO bodbAdminNet 

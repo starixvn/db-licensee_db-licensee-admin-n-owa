@@ -1,18 +1,13 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-
-USE [bodb_Licensee]
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
-CREATE PROCEDURE dbo.LA_SystemSettingsGet
+ALTER PROCEDURE dbo.LA_SystemSettingsGet
 	@Key		VARCHAR(100)
 AS
 /*	Created: 20181203@Parsons
 	Task: LA-Licensee Performance Alert
-	DB: DBLIC.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
 		- 20181203@Parsons: LA - Licensee Performance Alert [#104918]

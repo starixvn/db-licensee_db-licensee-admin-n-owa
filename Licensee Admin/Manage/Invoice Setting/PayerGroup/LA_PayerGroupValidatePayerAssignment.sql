@@ -1,10 +1,7 @@
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
 USE [bodb_licensee]
 GO
 
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
 ALTER PROCEDURE [dbo].[LA_PayerGroupValidatePayerAssignment] 
 	@PayerGroupId		INT
 	, @PayerIdList		VARCHAR(4000)	= ''
@@ -15,8 +12,10 @@ AS
 /*  
 	 Created: 20150423@Florent
 	 Task : Validate list of Payers have applied to billing Invoice yet
-	 DB: DB052.bodb_Licensee
-	 Revisions:     
+	 DB: DBCUST.bodb_Licensee
+	 
+	 Revisions:
+		- 20150423@Florent: Initialize SP
 		
 	 Params:
 		+ @Mode : 
@@ -70,5 +69,3 @@ BEGIN
 	
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_PayerGroupValidatePayerAssignment] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_PayerGroupValidatePayerAssignment] TO bodbAdminNet 

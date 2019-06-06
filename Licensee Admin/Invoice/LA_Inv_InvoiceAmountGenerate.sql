@@ -1,10 +1,5 @@
 /*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-
-USE [bodb_Licensee]
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
@@ -29,36 +24,36 @@ AS
 /*	Header:
 	Created: 2015.08.06 - Bravo.Tran
 	Task : Create Invoice 
-	DB: DB052.bodb_Licensee
+	DB: DBLIC.bodb_Licensee
    
 	Revisions: 
-		+ 2015.08.06 @Bravo.Tran: Invoice Amount - Generate
-		+ 2015.09.22 @Bravo.Tran: Invoice Amount - Fix bug wrong Total amount under Discount.
-		+ 2015.11.09 @Bravo.Tran: Invoice Amount - Enhance prorate min fee.
-		+ 2016.06.27 @Bravo.Tran: Invoice Amount - Hosting Fess amount.
-		+ 2016.07.19 @Bruce.Bui: Adding hosting fees extra info.
-		+ 2016.09.27 @Bruce.Bui: Get MaxPCU case full month waive
-		+ 2016.10.24 @Bruce.Bui: Add new discount type = 3
-		+ 2016.09.27 @Bruce.Bui: Get MaxPCU case full month waive
-		+ 2016.11.04 @Scofield.Huynh: Update for CB
-		+ 2017.03.06 @bruce: include BA amount =0 [RedmindID: #72806]
-		+ 2017.03.07 @Scofield: include amount = 0 for all products [RedmindID: #72806]
-		+ 2017.04.03 @Scofield: update for Cashout [RedmindID: #73310]
-		+ 2017.04.04 @Harper: using new sum table for Cashout Product [RedmindID: #73310]
-		+ 2017.05.05 @Bruce: Correct Product name in Description [RedmindID: #75950]
-		+ 2017.07.18 @Bruce: restructure invoice db [RedmindID: #79905]
-		+ 2017.07.21 @Scofield: Update Amount Type [#79905]
-		+ 2017.07.21 @Bruce: Calculate AMF amount [#76410]
-		+ 2017.10.02 @Bruce: add environment to parameter list [#84038]
-		+ 2017.10.27 @Bruce: show individual discount by product [#85256]		
-		+ 20171113@Bruce: Modified error message [RedmineID: #84163]
-		+ 20171220@Parsons: increase length for variables [#88197]
-		+ 20180110@Bruce: deduct against invoice [#87039]
-		+ 20180419@Scofield: update CB for FreePlay [#93907]
-		+ 20180525@Scofield: Incorporate 9wickets' data [#94950]
+		- 20150806@Bravo.Tran: Invoice Amount - Generate
+		- 20150922@Bravo.Tran: Invoice Amount - Fix bug wrong Total amount under Discount.
+		- 20151109@Bravo.Tran: Invoice Amount - Enhance prorate min fee.
+		- 20160627@Bravo.Tran: Invoice Amount - Hosting Fess amount.
+		- 20160719@Bruce.Bui: Adding hosting fees extra info.
+		- 20160927@Bruce.Bui: Get MaxPCU case full month waive
+		- 20161024@Bruce.Bui: Add new discount type = 3
+		- 20160927@Bruce.Bui: Get MaxPCU case full month waive
+		- 20161104@Scofield.Huynh: Update for CB
+		- 20170306@bruce: include BA amount =0 [RedmindID: #72806]
+		- 20170307@Scofield: include amount = 0 for all products [RedmindID: #72806]
+		- 20170403@Scofield: update for Cashout [RedmindID: #73310]
+		- 20170404@Harper: using new sum table for Cashout Product [RedmindID: #73310]
+		- 20170505@Bruce: Correct Product name in Description [RedmindID: #75950]
+		- 20170718@Bruce: restructure invoice db [RedmindID: #79905]
+		- 20170721@Scofield: Update Amount Type [#79905]
+		- 20170721@Bruce: Calculate AMF amount [#76410]
+		- 20171002@Bruce: add environment to parameter list [#84038]
+		- 20171027@Bruce: show individual discount by product [#85256]		
+		- 20171113@Bruce: Modified error message [RedmineID: #84163]
+		- 20171220@Parsons: increase length for variables [#88197]
+		- 20180110@Bruce: deduct against invoice [#87039]
+		- 20180419@Scofield: update CB for FreePlay [#93907]
+		- 20180525@Scofield: Incorporate 9wickets' data [#94950]
 		- 20180716@bruce: add new group TEST for credit [#98126]
-		+ 20180712@Bruce: Enhance Manage Discount group [#94282]
-		+ 20181002@Parsons: Integrate AG setup fee into invoices [#98485]
+		- 20180712@Bruce: Enhance Manage Discount group [#94282]
+		- 20181002@Parsons: Integrate AG setup fee into invoices [#98485]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'

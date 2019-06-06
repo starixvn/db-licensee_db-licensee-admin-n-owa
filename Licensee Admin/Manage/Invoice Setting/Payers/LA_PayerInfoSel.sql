@@ -1,10 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerInfoSel]
@@ -15,7 +10,7 @@ AS
 /*
 	 Created: 20150414@Florent
 	 Task : get Payer Information by Id
-	 DB: DB052.bodb_Licensee
+	 DB: DBCUST.bodb_Licensee
 
 	 Revisions:
 		+ 20160808@Bravo: Hosting fees

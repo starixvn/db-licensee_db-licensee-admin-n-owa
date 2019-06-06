@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -11,15 +11,15 @@ ALTER PROCEDURE [dbo].[LA_ChargeRateGroupChange]
 	@ErrMsg			NVARCHAR(1000)	= ''	OUTPUT
 AS
 /*
-  Created: 20190221@Parsons
-  Task : Get Payer setting
-  DB: DB052.bodb_Licensee
+	Created: 20190221@Parsons
+	Task: Get Payer setting
+	DB: DBCUST.bodb_Licensee
 
-  Revisions:
-  - 20190221@Parsons: Manage Payer Setting - changing party group [#109189]
+	Revisions:
+		- 20190221@Parsons: Manage Payer Setting - changing party group [#109189]
 
-  Params:
-  Example:
+	Params:
+	Example:
 */
 BEGIN
 	SET NOCOUNT ON

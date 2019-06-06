@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee,DBLIC-bodb_licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
 USE bodb_licensee
 GO
 
@@ -6,9 +6,9 @@ ALTER FUNCTION [dbo].[LA_f_Products3rd] (@Products VARCHAR(1000))
 RETURNS @tbProducts TABLE (ProductID INT, ProductPrefix VARCHAR(10), ProductName VARCHAR(100))
 AS
 
-/*  Created: 20150413@Florent  
+/*  Created: 20150413@Florent
     Task: Get Products Information
-    DB: DBLIC.bodb_Licensee  
+    DB: DBCUST.bodb_Licensee, DBLIC.bodb_licensee
     
 	Revisions:
 		- 20150413@Florent: Initialize function

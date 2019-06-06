@@ -1,23 +1,20 @@
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_UserSelAll]
 	@Username	 varchar(50) = '',
 	@GroupID	 int = 0
 AS
-/*  
- * Created: 20140820@Florent
- * Task : get all users
- * DB: DB052.bodb_Licensee  
- *  
- * Revisions:   
- Param's Explanation:
+/*
+	Created: 20140820@Florent
+	Task : get all users
+	DB: DBCUST.bodb_Licensee  
 	
+	Revisions:
+		- 20140820@Florent: Initialize SP
+
+	Param's Explanation:
 */
 SET NOCOUNT ON
 
@@ -45,6 +42,3 @@ BEGIN
 	ORDER BY g.GroupName
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_UserSelAll] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_UserSelAll] TO bodbAdminNet 
-

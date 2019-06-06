@@ -1,3 +1,4 @@
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -8,10 +9,10 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceReferenceGet]
 AS
 /*	
 	Created: 2017.07.19 - Scofield.Huynh [#79905]
-	DB:		DBLIC/bodb_Licensee	
+	DB:		DBCUST.bodb_Licensee	
 
-	Revision:
-		20180131@Bruce: support credit note for setup fee [#90274]
+	Revisions:
+		- 20180131@Bruce: support credit note for setup fee [#90274]
 */
 BEGIN
 	SELECT OfficialInvoiceNo	AS InvoiceNo,
@@ -25,10 +26,4 @@ BEGIN
 		AND Environment = @Environment
 	ORDER BY CreatedDateTime
 END
-GO
-
-GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceReferenceGet] TO bodbAdminNet
-GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_Inv_InvoiceReferenceGet] TO vnteam
 GO

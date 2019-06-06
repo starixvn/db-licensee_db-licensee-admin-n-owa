@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
 USE bodb_Licensee
 GO
 
@@ -11,7 +11,7 @@ AS
 /*  
 	 Created: 20171201@Scofield [#86573]
 	 Task : Get report Macau Games Win Loss
-	 DB: DB052.bodb_licensee   
+	 DB: DBLIC.bodb_licensee   
 
 	 Revisions:  
 		- 20171201@Scofield: Create Macau Games Win Loss [#86573]

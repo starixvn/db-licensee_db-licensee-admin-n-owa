@@ -1,4 +1,5 @@
-USE [bodb_licensee]
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+USE bodb_Licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_MinFeeSettingModify]
@@ -13,7 +14,7 @@ AS
 /*
 	 Created: 2015042$@Florent
 	 Task : Add/ Modify Minfee setting
-	 DB: DB052.bodb_Licensee
+	 DB: DBCUST.bodb_Licensee
 	 Notes: only update MinFee or waive month at time
 
 	 Revisions:
@@ -21,6 +22,7 @@ AS
 		- 20150831@Bravo: fix bug - Min fee term & Basis of billing max length.
 		- 20150917@Victor: Support Chinese on Settings
 		- 20170220@bruce: refactor sp [#70050]
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 
 	 Params:
 		+ @InvoiceSettingXML: '<MinFeeSettings>
@@ -198,32 +200,16 @@ BEGIN
 	SET @endRun = GETDATE()
 	SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
 
-	--Write Log
-	BEGIN TRY
-		EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog
-			@UserId = @UserID
-			, @IP = @LoginIP
-			, @LicenseeID = 0
-			, @CurrencyID = 0
-			, @SPName = 'LA_MinFeeSettingModify'
-			, @CustId = 0
-			, @ActionId = @ActionID
-			, @Duration = @duration
-			, @Data = @logSPData
-			, @OldData = @logSPDataOld
-	END TRY
-	BEGIN CATCH
-		EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP
-			@UserID = @UserID
-			, @CustID = 0
-			, @ActionID = @ActionID
-			, @TrackingValue = @LogSPData
-			, @TrackingValue2 = @logSPDataOld
-			, @duration = @duration
-	END CATCH
+	-- Write Log
+	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+		@UserId			= @UserID
+		,@IP			= @LoginIP
+		,@LicenseeID	= 0
+		,@CurrencyID	= 0
+		,@SPName		= 'LA_MinFeeSettingModify'
+		,@CustId		= 0
+		,@Duration		= @duration
+		,@Data			= @logSPData
+		,@OldData		= @logSPDataOld
 END
-GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_MinFeeSettingModify] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_MinFeeSettingModify] TO bodbAdminNet
 GO

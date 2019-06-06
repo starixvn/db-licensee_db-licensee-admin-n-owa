@@ -1,9 +1,7 @@
-USE [bodb_licensee]
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
+
 ALTER PROCEDURE [dbo].[LA_FunctionPartysModify]
 	 @FunctionID	INT
 	,@PartyIDs	VARCHAR(5500) --'1,2,3,4'
@@ -14,12 +12,12 @@ ALTER PROCEDURE [dbo].[LA_FunctionPartysModify]
 	,@ErrMsg		NVARCHAR(1000)	 = ''     OUTPUT 
 AS
 /*  
- * Created: 20140820@Florent
- * Task : Assign party(s) to Function
- * DB: DB052.bodb_Licensee  
- *  
- * Revisions:     
-*/BEGIN
+	Created: 20140820@Florent
+	Task : Assign party(s) to Function
+	DB: DBCUST.bodb_Licensee  
+	
+	Revisions:
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 	SET NOCOUNT ON
 
 	DECLARE @startRun  DATETIME
@@ -80,16 +78,12 @@ serID="' + coalesce(cast(@Creator AS VARCHAR(20)), space(1)) + '" ' + 'IP="' + c
 	SET @endRun = getdate()
 	SET @duration = datediff(millisecond, @startRun, @endRun)
 
-	EXEC dbo.OA_WriteLog_UserLog_RunSP @UserID = @Creator
-		,@CustID = 0
-		,@SPName = 'LA_FunctionPartysModify'
-		,
-		--@ActionID = 0,  
-		@TrackingValue = @LogSPData
-		,@TrackingValue2 = @LogSPData2
-		,@duration = @duration
+EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+	@UserID				= @Creator
+	,@CustID			= 0
+	,@SPName			= 'LA_FunctionPartysModify'
+	,@TrackingValue		= @LogSPData
+	,@TrackingValue2	= @LogSPData2
+	,@duration			= @duration
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_FunctionPartysModify] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_FunctionPartysModify] TO bodbAdminNet 
-

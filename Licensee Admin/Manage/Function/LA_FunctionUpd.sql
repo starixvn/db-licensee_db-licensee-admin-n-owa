@@ -1,9 +1,5 @@
-USE [bodb_licensee]
-GO
-/****** Object:  StoredProcedure [dbo].[LA_FunctionUpd]    Script Date: 9/8/2014 4:52:37 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_FunctionUpd] 
@@ -25,10 +21,11 @@ AS
 /*  
 	 Created: 20140814@Florent
 	 Task : Modify Function
-	 DB: DB052.bodb_Licensee  
+	 DB: DBCUST.bodb_Licensee  
    
 	 Revisions:
-		+ 20150904@Bravo: update function key
+		- 20150904@Bravo: update function key
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 */
 SET NOCOUNT ON
 DECLARE
@@ -103,19 +100,16 @@ BEGIN
 		'Language="'+ coalesce(cast(@Language AS VARCHAR(20)),space(1)) + '" ' +  
 		'IP="'+ coalesce(cast(@LoginIP AS VARCHAR(50)),space(1)) + '" />'
 
-		  SET @endRun = getdate()
-		  SET @duration  = datediff (millisecond, @startRun, @endRun)
+		SET @endRun = getdate()
+		SET @duration  = datediff (millisecond, @startRun, @endRun)
 
-		  EXEC dbo.OA_WriteLog_UserLog_RunSP
-			  @UserID = @Creator,
-			  @CustID = 0,
-			  @SPName ='LA_FunctionUpd',
-			  @TrackingValue = @LogSPData,
-			  @TrackingValue2 = @LogSPDataOld,
-			  @duration = @duration
+		EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+			@UserID				= @Creator
+			,@CustID			= 0
+			,@SPName			= 'LA_FunctionUpd'
+			,@TrackingValue		= @LogSPData
+			,@TrackingValue2	= @LogSPDataOld
+			,@duration			= @duration
 	END
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_FunctionUpd] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_FunctionUpd] TO bodbAdminNet 
-

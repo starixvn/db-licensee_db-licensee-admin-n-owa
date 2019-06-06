@@ -1,33 +1,30 @@
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_UpdateUser]
 	 @UserID		INT 
 	,@GroupID		int
-	,@UserName	nvarchar(50)
+	,@UserName		nvarchar(50)
 	,@DisplayName	nvarchar(50)
 	,@UserPwd		varchar(50)=''
-	,@UserSalt	varchar(50)=''
-	,@IsActive	bit
-	,@PartyIDs	VARCHAR(5500) --'1,2,3,4'
+	,@UserSalt		varchar(50)=''
+	,@IsActive		bit
+	,@PartyIDs		VARCHAR(5500) --'1,2,3,4'
 	,@FunctionIDs	VARCHAR(5500) --'12,15,18'
 	,@Creator		INT
-	,@Language	VARCHAR(20) = 'en-us'
+	,@Language		VARCHAR(20) = 'en-us'
 	,@LoginIP		VARCHAR(30)=''
 	,@ErrCode		INT = 0 OUTPUT  
 	,@ErrMsg		NVARCHAR(1000) = '' OUTPUT 
 AS
-/*  
- * Created: 20140820@Florent
- * Task : Update new User and grant permission
- * DB: DB052.bodb_Licensee  
- *  
- * Revisions:     
+/*
+	Created: 20140820@Florent
+	Task : Update new User and grant permission
+	DB: DBCUST.bodb_Licensee  
+	
+	Revisions:
+		- 20140820@Florent: Initialize SP
 */
 
 SET NOCOUNT ON
@@ -100,7 +97,3 @@ BEGIN
     END
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_UpdateUser] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_UpdateUser] TO bodbAdminNet 
-
-

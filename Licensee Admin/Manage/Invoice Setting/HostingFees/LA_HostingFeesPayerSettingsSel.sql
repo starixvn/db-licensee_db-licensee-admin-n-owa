@@ -1,9 +1,5 @@
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_HostingFeesPayerSettingsSel]
@@ -12,10 +8,11 @@ AS
 /*
 	Created: 201600708@Bruce
 	Task : Get all hosting fees settings of payer
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
-		201600708@Bruce: create
+		- 201600708@Bruce: create
+	
 	Params:
 
 	Example:
@@ -60,6 +57,3 @@ BEGIN
 	ORDER BY s.SettingType, s.FromDate
 END
 GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_HostingFeesPayerSettingsSel] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_HostingFeesPayerSettingsSel] TO bodbAdminNet

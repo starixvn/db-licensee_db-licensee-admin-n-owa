@@ -1,6 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-
-USE [bodb_Licensee]
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_Licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_TransferAmfAmount]
@@ -17,11 +16,13 @@ AS
 /*	Header:
 	Created: 20171226 - Bruce.Bui
 	Task : Manage AMF
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
 		- 20171226: create SP
 		- 20190122@Parsons: Improve AG prepayment and discount setting [#104620]
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+	
 	Explanation:
 		@Option: 0-Amf Prepayment Write off, 1-deduct as AMF, 2-deduct against invoice, 3-AG Prepayment write off
 */
@@ -229,32 +230,16 @@ BEGIN
 		FOR XML PATH('h'), TYPE)
 	SET @logSPData = CAST(@xml AS NVARCHAR(MAX))
 
-	--get log action
-	DECLARE @ActionID INT = 0
-	SELECT @ActionID = ISNULL(ActionId,0)
-	FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
-	WHERE SPName = 'LA_Inv_TransferAmfAmount'
-
-	BEGIN TRY
-		EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog
-			@UserId = @UserID
-			, @IP = @LoginIP
-			, @LicenseeID = 0
-			, @CurrencyID = 0
-			, @SPName = 'LA_Inv_TransferAmfAmount'
-			, @CustId = 0
-			, @ActionId = @ActionID
-			, @Duration = @duration
-			, @Data = @logSPData
-			, @OldData = ''
-	END TRY
-	BEGIN CATCH
-		EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP @UserID = @UserID
-			, @CustID = 0
-			, @ActionID = @ActionID
-			, @TrackingValue = @LogSPData
-			, @TrackingValue2 = ''
-			, @duration = @duration
-	END CATCH
+	-- Write Log
+	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+		@UserId			= @UserID
+		,@IP			= @LoginIP
+		,@LicenseeID	= 0
+		,@CurrencyID	= 0
+		,@SPName		= 'LA_Inv_TransferAmfAmount'
+		,@CustId		= 0
+		,@Duration		= @duration
+		,@Data			= @logSPData
+		,@OldData		= ''
 END
 GO

@@ -1,9 +1,5 @@
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountAssignmentSettingDel] 	
@@ -16,10 +12,12 @@ ALTER PROCEDURE [dbo].[LA_DiscountAssignmentSettingDel]
 AS
 /*  
 	 Created: 20150427@Florent
-	 Task : Delete discount setting
-	 DB: DB052.bodb_Licensee  
+	 Task: Delete discount setting
+	 DB: DBCUST.bodb_Licensee  
    
-	 Revisions:     
+	 Revisions:
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+
 	 Params:				
 */
 BEGIN
@@ -83,35 +81,16 @@ BEGIN
 		END
 	END
 
-	--Write Log		
-	DECLARE @ActionID INT = 0
-	SELECT @ActionID = ActionId
-	FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
-	WHERE SPName = 'LA_DiscountAssignmentSettingDel'
-	
-	BEGIN TRY
-		EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog 
-			@UserId = @UserID
-			, @IP = @LoginIP
-			, @LicenseeID = 0
-			, @CurrencyID = 0
-			, @SPName = 'LA_DiscountAssignmentSettingDel'
-			, @CustId = 0
-			, @ActionId = @ActionID
-			, @Duration = @duration
-			, @Data = @logSPData
-			, @OldData = @logSPDataOld
-	END TRY
-	BEGIN CATCH
-		EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP 
-			@UserID = @UserID
-			, @CustID = 0
-			, @ActionID = @ActionID
-			, @TrackingValue = @LogSPData
-			, @TrackingValue2 = @logSPDataOld
-			, @duration = @duration
-	END CATCH
+	-- Write Log
+	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+		@UserId			= @UserID
+		,@IP			= @LoginIP
+		,@LicenseeID	= 0
+		,@CurrencyID	= 0
+		,@SPName		= 'LA_DiscountAssignmentSettingDel'
+		,@CustId		= 0
+		,@Duration		= @duration
+		,@Data			= @logSPData
+		,@OldData		= @logSPDataOld
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_DiscountAssignmentSettingDel] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_DiscountAssignmentSettingDel] TO bodbAdminNet

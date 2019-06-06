@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -13,11 +13,12 @@ AS
 /*	Header:
 	Created: 2015.08.07 - Bravo.Tran
 	Task : Create Invoice 
-	DB: DB052.bodb_licensee
+	DB: DBLIC.bodb_licensee
    
 	Revisions: 
 		+ 2015.08.07: Invoice Detail Info - Get
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20190510@Percy: Remove DBEXT [RedmineID: #103658]
 */
 /*	Example:
 	USE bodb_licensee
@@ -110,7 +111,7 @@ BEGIN
 		
 		BEGIN TRY
 			INSERT INTO #tmpResult(Game,WinLostDate,Currency,CurrencyName,Betcount,Turnover,MemberWinLoss,MemberComm,LicenseeWL,LicenseeComm,Company,TurnoverBase,MemberWinLossBase,LicenseeWLBase,CompanyBaseCurrency)
-			EXECUTE DBEXT.bodb02.dbo.LA_Rpt_LicenseeSettlement @PartyId, @TempFromDate, @TempToDate, @TempProductCode, 0, @BaseCurrencyName	
+			EXECUTE bodb02.dbo.LA_Rpt_LicenseeSettlement @PartyId, @TempFromDate, @TempToDate, @TempProductCode, 0, @BaseCurrencyName	
 			 
 		END TRY
 		BEGIN CATCH
@@ -154,7 +155,4 @@ BEGIN
 	
 	DROP TABLE #tmpResult
 END		
-GO
-
-GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceDetailInfoGet] TO bodbAdminNet
 GO

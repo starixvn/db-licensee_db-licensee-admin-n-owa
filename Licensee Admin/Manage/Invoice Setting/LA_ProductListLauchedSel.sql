@@ -1,9 +1,5 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_ProductListLauchedSel]
@@ -12,7 +8,7 @@ AS
 /*  
 	 Created: 20170224@scofield.huynh
 	 Task : get All Launched Products
-	 DB: DB052.bodb_Licensee  
+	 DB: DBLIC.bodb_Licensee  
    
 	 Revisions:     	
 		- 20170301@Scofield: Update to exclude 'RB', 'BG', 'PTCS', 'HF' and inclucde 'SB' [#70050]
@@ -46,5 +42,3 @@ BEGIN
 	
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_ProductListLauchedSel] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_ProductListLauchedSel] TO bodbAdminNet 

@@ -1,9 +1,5 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_LicensingMargin]
@@ -20,8 +16,7 @@ AS
  
 /*  Created by: 20140930@Florent
 	Task : LicenseeAdmin - Get Licensee Perfomance TurnOver Report for each Licensee in one month
-	DB: DB052.bodb02  
-	Base on: [OA_Rpt_LicPerformance_LicensingMargin]
+	DB: DBEXT.bodb02  
    
 	Revisions:  
 	   - 20141226@Florent: enhance SP
@@ -161,8 +156,4 @@ BEGIN
 	DROP TABLE #Temp
 	DROP TABLE #Exchange
 END
-GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_LicPerformance_LicensingMargin] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_Rpt_LicPerformance_LicensingMargin] TO bodbAdminNet
 GO
