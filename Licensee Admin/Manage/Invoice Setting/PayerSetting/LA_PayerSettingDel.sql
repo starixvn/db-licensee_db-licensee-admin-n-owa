@@ -1,5 +1,5 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-USE bodb_licensee
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerSettingDel]	 
@@ -13,7 +13,7 @@ AS
 /*  
 	 Created: 20150420@Florent
 	 Task : Delete payer Setting
-	 DB: DBCUST.bodb_Licensee  
+	 DB: DB052.bodb_Licensee  
    
 	 Revisions:     
 		- 20180716@bruce: add new group TEST for credit [#98126]
@@ -183,4 +183,7 @@ BEGIN
 		SET @i = @i + 1 
 	END	
 END			 	
+GO
+GRANT VIEW DEFINITION ON [dbo].[LA_PayerSettingDel] TO [vnteam] 
+GRANT EXECUTE ON [dbo].[LA_PayerSettingDel] TO bodbAdminNet
 GO

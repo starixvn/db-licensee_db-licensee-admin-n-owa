@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -13,15 +13,14 @@ ALTER PROCEDURE [dbo].[LA_ChargeRateSettingDel]
 AS
 /*  
 	 Created: 20150427@Florent
-	 Task: Delete Charge rate setting
-	 DB: DBCUST.bodb_Licensee  
+	 Task : Delete Charge rate setting
+	 DB: DB052.bodb_Licensee  
    
 	 Revisions:     
 		- 20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
 		- 20150917@Victor: Support Chinese on Settings
 		- 20161101@bruce.bui: support delete multiple rate
 		- 20180716@bruce: add new group TEST for credit [#98126]
-		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		
 	 Params:				
 */
@@ -130,17 +129,39 @@ BEGIN
 		SELECT 	@ErrMsg = 'Delete failed. Please try again.', @ErrCode = 710	
 		RETURN		
 	END
-
-	-- Write Log
-	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
-		@UserId			= @UserID
-		,@IP			= @LoginIP
-		,@LicenseeID	= 0
-		,@CurrencyID	= 0
-		,@SPName		= 'LA_ChargeRateSettingDel'
-		,@CustId		= 0
-		,@Duration		= @duration
-		,@Data			= @logSPData
-		,@OldData		= @logSPDataOld
+	--Write Log		
+	DECLARE @ActionID INT = 0
+	SELECT @ActionID = ActionId
+	FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
+	WHERE SPName = 'LA_ChargeRateSettingDel'
+	
+	BEGIN TRY
+		EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog 
+			@UserId = @UserID
+			, @IP = @LoginIP
+			, @LicenseeID = 0
+			, @CurrencyID = 0
+			, @SPName = 'LA_ChargeRateSettingDel'
+			, @CustId = 0
+			, @ActionId = @ActionID
+			, @Duration = @duration
+			, @Data = @logSPData
+			, @OldData = @logSPDataOld
+	END TRY
+	BEGIN CATCH
+		EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP 
+			@UserID = @UserID
+			, @CustID = 0
+			, @ActionID = @ActionID
+			, @TrackingValue = @LogSPData
+			, @TrackingValue2 = @logSPDataOld
+			, @duration = @duration
+	END CATCH
 END
+GO
+
+GRANT VIEW DEFINITION ON [dbo].[LA_ChargeRateSettingDel] TO [vnteam] 
+GO
+
+GRANT EXECUTE ON [dbo].[LA_ChargeRateSettingDel] TO bodbAdminNet
 GO

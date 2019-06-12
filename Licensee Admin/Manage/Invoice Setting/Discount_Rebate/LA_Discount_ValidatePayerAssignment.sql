@@ -1,9 +1,6 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
 USE bodb_licensee
 GO
-
-ALTER PROCEDURE [dbo].[LA_Discount_ValidatePayerAssignment]
-	@DiscountGroupId INT
+ALTER PROCEDURE [dbo].[LA_Discount_ValidatePayerAssignment] @DiscountGroupId INT
 	, @PayerIdList VARCHAR(4000) = ''
 	, @Mode VARCHAR(10) = 'R'
 
@@ -12,11 +9,9 @@ ALTER PROCEDURE [dbo].[LA_Discount_ValidatePayerAssignment]
 AS
 /*  
 	 Created: 20150422@Patrick
-	 Task: Validate list of Payers have applied to billing Invoice yet
+	 Task : Validate list of Payers have applied to billing Invoice yet
 	 DB: DB052.bodb_Licensee
-	 
-	 Revisions:
-		- 20150422@Patrick: Initialize SP
+	 Revisions:     
 		
 	 Params:
 		+ @Mode : 
@@ -102,4 +97,7 @@ If you want to stop the rebate program for the Payer, please set To date of the 
 	END
 	
 END
+GO
+GRANT VIEW DEFINITION ON dbo.LA_Discount_ValidatePayerAssignment TO vnteam
+GRANT EXECUTE ON dbo.LA_Discount_ValidatePayerAssignment TO bodbAdminNet
 GO

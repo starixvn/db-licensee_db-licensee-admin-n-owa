@@ -1,16 +1,20 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceTypeGet] 	
+	  
 AS
 /*	Header:
 	Created:2015.08.21 - Bravo.Tran
 	Task :	Create Invoice 
-	DB:		DBCUST.bodb_Licensee
+	DB:		DB052.bodb_Licensee
    
 	Revisions: 
-		- 20150807@Bravo: Invoice Type List - Get
+		+ 2015.08.07: Invoice Type List - Get
 */
 /*	Example:
 	USE bodb_licensee
@@ -20,6 +24,9 @@ BEGIN
 	SET NOCOUNT ON
 	
 	SELECT i.InvTypeId, i.InvTypeName
-	FROM dbo.LA_InvoiceType i WITH (NOLOCK)
-END
+	FROM dbo.LA_InvoiceType i
+	
+END		
+
 GO
+GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceTypeGet] TO bodbAdminNet
