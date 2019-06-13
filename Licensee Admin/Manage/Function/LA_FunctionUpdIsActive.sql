@@ -54,10 +54,18 @@ BEGIN
 		FROM dbo.LA_Function f WITH (NOLOCK)
 		WHERE FunctionID = @FunctionID
 
-		SELECT @LogSPDataOld = '<LA_FunctionUpd FunctionID="' + coalesce(cast(FunctionID AS VARCHAR(10)), space(1)) + '" ' + 'FunctionName="' + coalesce(cast(FunctionName AS NVARCHAR(50)), space(1)) + '" ' + 'FunctionKey="' + coalesce(cast(FunctionKey AS NVARCH
-AR(50)), space(1)) + '" ' + 'FunctionDesc="' + coalesce(cast(FunctionDesc AS NVARCHAR(50)), space(1)) + '" ' + 'ParentID="' + coalesce(cast(ParentID AS VARCHAR(10)), space(1)) + '" ' + 'ParentName="' + coalesce(cast(ParentName AS NVARCHAR(50)), space(1)) 
-+ '" ' + 'URL="' + coalesce(cast(URL AS VARCHAR(100)), space(1)) + '" ' + 'CreatedDate="' + coalesce(cast(CreatedDate AS VARCHAR(50)), space(1)) + '" ' + 'ModifiedDate="' + coalesce(cast(ModifiedDate AS VARCHAR(50)), space(1)) + '" ' + 'DisplayOrder="' + 
-coalesce(cast(DisplayOrder AS VARCHAR(10)), space(1)) + '" ' + 'Creator="' + coalesce(cast(Creator AS VARCHAR(10)), space(1)) + '" ' + 'StatusID="' + coalesce(cast(StatusID AS VARCHAR(20)), space(1)) + '" />'
+		SELECT @LogSPDataOld = '<LA_FunctionUpd FunctionID="' + coalesce(cast(FunctionID AS VARCHAR(10)), space(1)) + '" '
+											+ 'FunctionName="' + coalesce(cast(FunctionName AS NVARCHAR(50)), space(1)) + '" '
+											+ 'FunctionKey="' + coalesce(cast(FunctionKey AS NVARCHAR(50)), space(1)) + '" '
+											+ 'FunctionDesc="' + coalesce(cast(FunctionDesc AS NVARCHAR(50)), space(1)) + '" '
+											+ 'ParentID="' + coalesce(cast(ParentID AS VARCHAR(10)), space(1)) + '" '
+											+ 'ParentName="' + coalesce(cast(ParentName AS NVARCHAR(50)), space(1)) + '" '
+											+ 'URL="' + coalesce(cast(URL AS VARCHAR(100)), space(1)) + '" '
+											+ 'CreatedDate="' + coalesce(cast(CreatedDate AS VARCHAR(50)), space(1)) + '" '
+											+ 'ModifiedDate="' + coalesce(cast(ModifiedDate AS VARCHAR(50)), space(1)) + '" '
+											+ 'DisplayOrder="' + coalesce(cast(DisplayOrder AS VARCHAR(10)), space(1)) + '" '
+											+ 'Creator="' + coalesce(cast(Creator AS VARCHAR(10)), space(1)) + '" '
+											+ 'StatusID="' + coalesce(cast(StatusID AS VARCHAR(20)), space(1)) + '" />'
 		FROM dbo.LA_Function WITH (NOLOCK)
 		WHERE FunctionID = @FunctionID
 
@@ -70,9 +78,7 @@ coalesce(cast(DisplayOrder AS VARCHAR(10)), space(1)) + '" ' + 'Creator="' + coa
 		IF len(@FunctionDesc) = 0
 			SELECT @FunctionDesc = @FunctionName
 
-		UPDATE dbo.LA_Function
-		WITH (ROWLOCK,UPDLOCK)
-
+		UPDATE dbo.LA_Function WITH (ROWLOCK)
 		SET StatusID = @IsActive
 		WHERE FunctionID = @FunctionID
 
@@ -84,11 +90,19 @@ coalesce(cast(DisplayOrder AS VARCHAR(10)), space(1)) + '" ' + 'Creator="' + coa
 			RETURN
 		END
 
-		SELECT @LogSPData = '<LA_FunctionUpd FunctionID="' + coalesce(cast(@FunctionID AS VARCHAR(10)), space(1)) + '" ' + 'FunctionName="' + coalesce(cast(@FunctionName AS NVARCHAR(50)), space(1)) + '" ' + 'FunctionKey="' + coalesce(cast(@FunctionKey AS NVARCH
-AR(50)), space(1)) + '" ' + 'FunctionDesc="' + coalesce(cast(@FunctionDesc AS NVARCHAR(50)), space(1)) + '" ' + 'ParentID="' + coalesce(cast(@ParentID AS VARCHAR(10)), space(1)) + '" ' + 'ParentName="' + coalesce(cast(@ParentName AS NVARCHAR(50)), space(1
-)) + '" ' + 'URL="' + coalesce(cast(@URL AS VARCHAR(100)), space(1)) + '" ' + 'ModifiedDate="' + coalesce(cast(GETDATE() AS VARCHAR(50)), space(1)) + '" ' + 'DisplayOrder="' + coalesce(cast(@DisplayOrder AS VARCHAR(10)), space(1)) + '" ' + 'Creator="' + c
-oalesce(cast(@Creator AS VARCHAR(10)), space(1)) + '" ' + 'StatusID="' + coalesce(cast(@IsActive AS VARCHAR(20)), space(1)) + '" ' + 'Language="' + coalesce(cast(@Language AS VARCHAR(20)), space(1)) + '" ' + 'IP="' + coalesce(cast(@LoginIP AS VARCHAR(50))
-, space(1)) + '" />'
+		SELECT @LogSPData = '<LA_FunctionUpd FunctionID="' + coalesce(cast(@FunctionID AS VARCHAR(10)), space(1)) + '" '
+										+ 'FunctionName="' + coalesce(cast(@FunctionName AS NVARCHAR(50)), space(1)) + '" '
+										+ 'FunctionKey="' + coalesce(cast(@FunctionKey AS NVARCHAR(50)), space(1)) + '" '
+										+ 'FunctionDesc="' + coalesce(cast(@FunctionDesc AS NVARCHAR(50)), space(1)) + '" '
+										+ 'ParentID="' + coalesce(cast(@ParentID AS VARCHAR(10)), space(1)) + '" '
+										+ 'ParentName="' + coalesce(cast(@ParentName AS NVARCHAR(50)), space(1)) + '" '
+										+ 'URL="' + coalesce(cast(@URL AS VARCHAR(100)), space(1)) + '" '
+										+ 'ModifiedDate="' + coalesce(cast(GETDATE() AS VARCHAR(50)), space(1)) + '" '
+										+ 'DisplayOrder="' + coalesce(cast(@DisplayOrder AS VARCHAR(10)), space(1)) + '" '
+										+ 'Creator="' + coalesce(cast(@Creator AS VARCHAR(10)), space(1)) + '" '
+										+ 'StatusID="' + coalesce(cast(@IsActive AS VARCHAR(20)), space(1)) + '" '
+										+ 'Language="' + coalesce(cast(@Language AS VARCHAR(20)), space(1)) + '" '
+										+ 'IP="' + coalesce(cast(@LoginIP AS VARCHAR(50)), space(1)) + '" />'
 
 		SET @endRun = getdate()
 		SET @duration  = datediff (millisecond, @startRun, @endRun)

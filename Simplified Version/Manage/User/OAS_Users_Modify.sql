@@ -10,7 +10,7 @@ ALTER PROCEDURE [dbo].[OAS_Users_Modify]
 	@UserPwd		VARCHAR(50)		= '',
 	@UserSalt		VARCHAR(50)		= '',
 	@IsActive		BIT,
- @IsTest  BIT,  
+	@IsTest			BIT,
 	@CreatedDate	DATETIME,
 	@ModifiedDate	DATETIME,
 	@Creator		INT,
@@ -35,7 +35,7 @@ AS
 		- @Role: Role (1 : Admin, 2 : User)
 		- @UserPwd: Password
 		- @UserSalt: User salt
- *  - 		  @IsTest  : Is user a test user 
+		- @IsTest: Is user a test user
 		- @IsActive: Is active or not
 		- @CreatedDate: Created date
 		- @ModifiedDate: Modified date
@@ -82,7 +82,7 @@ BEGIN
 				DisplayName		= @DisplayName,
 				Role			= @Role,
 				IsActive		= @IsActive,
-			   IsTest = @IsTest,
+				IsTest			= @IsTest,
 				ModifiedDate	= @ModifiedDate,
 				UserPwd			= @UserPwd,
 				UserSalt		= @UserSalt
@@ -91,12 +91,12 @@ BEGIN
 		ELSE
 		BEGIN
 			UPDATE dbo.OAS_Users WITH (UPDLOCK, ROWLOCK)
-			SET UserName = @UserName,
-				DisplayName = @DisplayName,
-				Role = @Role,
-				IsActive = @IsActive,
-			   	IsTest = @IsTest,
-				ModifiedDate = @ModifiedDate
+			SET UserName		= @UserName,
+				DisplayName		= @DisplayName,
+				Role			= @Role,
+				IsActive		= @IsActive,
+			   	IsTest			= @IsTest,
+				ModifiedDate	= @ModifiedDate
 			WHERE UserID = @UserID
 		END
 
@@ -124,7 +124,7 @@ BEGIN
 				Role,
 				UserSalt,
 				IsActive,
-			   IsTest,  
+				IsTest,
 				Creator,
 				CreatedDate,
 				ModifiedDate
@@ -137,7 +137,7 @@ BEGIN
 				@Role,
 				@UserSalt,
 				@IsActive,
-			   @IsTest,  
+				@IsTest,
 				@Creator,
 				@CreatedDate,
 				@ModifiedDate
@@ -158,7 +158,7 @@ BEGIN
 											'DisplayName="' + COALESCE(CAST(@DisplayName AS VARCHAR(20)), SPACE(1)) + '" ' +
 											'Role="' + COALESCE(CAST(@Role AS VARCHAR(20)), SPACE(1)) + '" ' +
 											'IsActive="' + COALESCE(CAST(@IsActive AS VARCHAR(20)), SPACE(1)) + '" ' +
- 'IsTest="' + COALESCE(CAST(@IsTest AS VARCHAR(20)), SPACE(1)) + '" ' +    
+											'IsTest="' + COALESCE(CAST(@IsTest AS VARCHAR(20)), SPACE(1)) + '" ' +    
 											'ModifiedDate="' + COALESCE(CAST(@ModifiedDate AS VARCHAR(20)), SPACE(1)) + '" ' +
 											'Language="' + COALESCE(CAST(@Language AS VARCHAR(20)), SPACE(1)) + '" ' +
 											'UserID="' + COALESCE(CAST(@Creator AS VARCHAR(20)), SPACE(1)) + '" ' +

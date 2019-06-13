@@ -41,21 +41,21 @@ BEGIN
 			WHERE UserID = @UserID
 			)
 	BEGIN
-		SELECT @LogSPDataOld = '<LA_UsersModify CustID="' + coalesce(cast(@UserID AS VARCHAR(10)), space(1)) + '" ' + 'UserName="' + coalesce(cast(UserName AS VARCHAR(20)), space(1)) + '" ' + 'DisplayName="' + coalesce(cast(DisplayName AS VARCHAR(20)), space(1)
-) + '" ' + 'StatusID="' + coalesce(cast(StatusID AS VARCHAR(20)), space(1)) + '" ' + 'ModifiedDate="' + coalesce(cast(ModifiedDate AS VARCHAR(20)), space(1)) + '" ' + 'Language="' + coalesce(cast(@Language AS VARCHAR(20)), space(1)) + '" ' + 'UserID="' + 
-coalesce(cast(@Creator AS VARCHAR(20)), space(1)) + '" ' + 'IP="' + coalesce(cast(@LoginIP AS VARCHAR(30)), space(1)) + '" />'
+		SELECT @LogSPDataOld = '<LA_UsersModify CustID="' + coalesce(cast(@UserID AS VARCHAR(10)), space(1)) + '" '
+											+ 'UserName="' + coalesce(cast(UserName AS VARCHAR(20)), space(1)) + '" '
+											+ 'DisplayName="' + coalesce(cast(DisplayName AS VARCHAR(20)), space(1)) + '" '
+											+ 'StatusID="' + coalesce(cast(StatusID AS VARCHAR(20)), space(1)) + '" '
+											+ 'ModifiedDate="' + coalesce(cast(ModifiedDate AS VARCHAR(20)), space(1)) + '" '
+											+ 'Language="' + coalesce(cast(@Language AS VARCHAR(20)), space(1)) + '" '
+											+ 'UserID="' + coalesce(cast(@Creator AS VARCHAR(20)), space(1)) + '" '
+											+ 'IP="' + coalesce(cast(@LoginIP AS VARCHAR(30)), space(1)) + '" />'
 		FROM dbo.LA_User WITH (NOLOCK)
 		WHERE UserID = @UserID
 
 		IF @UserPwd <> ''
 			AND @UserSalt <> ''
 		BEGIN
-			UPDATE dbo.LA_User
-			WITH (
-					UPDLOCK
-					,ROWLOCK
-					)
-
+			UPDATE dbo.LA_User WITH (UPDLOCK)
 			SET UserName = @UserName
 				,DisplayName = @DisplayName
 				,StatusID = @IsActive
@@ -67,12 +67,7 @@ coalesce(cast(@Creator AS VARCHAR(20)), space(1)) + '" ' + 'IP="' + coalesce(cas
 		END
 		ELSE
 		BEGIN
-			UPDATE dbo.LA_User
-			WITH (
-					UPDLOCK
-					,ROWLOCK
-					)
-
+			UPDATE dbo.LA_User WITH (UPDLOCK)
 			SET UserName = @UserName
 				,DisplayName = @DisplayName
 				,StatusID = @IsActive
@@ -136,15 +131,18 @@ coalesce(cast(@Creator AS VARCHAR(20)), space(1)) + '" ' + 'IP="' + coalesce(cas
 		END
 	END
 
-	SELECT @LogSPData = '<LA_UsersModify CustID="' + coalesce(cast(@UserID AS VARCHAR(10)), space(1)) + '" ' + 'UserName="' + coalesce(cast(@UserName AS VARCHAR(20)), space(1)) + '" ' + 'DisplayName="' + coalesce(cast(@DisplayName AS VARCHAR(20)), space(1)) 
-+ '" ' + 'StatusID="' + coalesce(cast(@IsActive AS VARCHAR(20)), space(1)) + '" ' + 'ModifiedDate="' + coalesce(cast(GETDATE() AS VARCHAR(20)), space(1)) + '" ' + 'Language="' + coalesce(cast(@Language AS VARCHAR(20)), space(1)) + '" ' + 'UserID="' + coal
-esce(cast(@Creator AS VARCHAR(20)), space(1)) + '" ' + 'IP="' + coalesce(cast(@LoginIP AS VARCHAR(30)), space(1)) + '" />'
+	SELECT @LogSPData = '<LA_UsersModify CustID="' + coalesce(cast(@UserID AS VARCHAR(10)), space(1)) + '" '
+									+ 'UserName="' + coalesce(cast(@UserName AS VARCHAR(20)), space(1)) + '" '
+									+ 'DisplayName="' + coalesce(cast(@DisplayName AS VARCHAR(20)), space(1)) + '" '
+									+ 'StatusID="' + coalesce(cast(@IsActive AS VARCHAR(20)), space(1)) + '" '
+									+ 'ModifiedDate="' + coalesce(cast(GETDATE() AS VARCHAR(20)), space(1)) + '" '
+									+ 'Language="' + coalesce(cast(@Language AS VARCHAR(20)), space(1)) + '" '
+									+ 'UserID="' + coalesce(cast(@Creator AS VARCHAR(20)), space(1)) + '" '
+									+ 'IP="' + coalesce(cast(@LoginIP AS VARCHAR(30)), space(1)) + '" />'
 
 	SET @endRun = getdate()
 	SET @duration = datediff(millisecond, @startRun, @endRun)
 
-			,
-    
 	-- Write Log
 	EXEC CustDB.LA_WriteLog_UserLog_RunSP_Wrapper
 		@UserID				= @Creator  

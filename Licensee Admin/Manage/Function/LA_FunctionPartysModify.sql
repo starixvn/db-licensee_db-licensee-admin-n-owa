@@ -4,9 +4,9 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_FunctionPartysModify]
 	 @FunctionID	INT
-	,@PartyIDs	VARCHAR(5500) --'1,2,3,4'
+	,@PartyIDs		VARCHAR(5500) --'1,2,3,4'
 	,@Creator		INT
-	,@Language	VARCHAR(20)	 = 'en-us'
+	,@Language		VARCHAR(20)	 = 'en-us'
 	,@LoginIP		VARCHAR(30)	 =''
 	,@ErrCode		INT			 = 0	    OUTPUT  
 	,@ErrMsg		NVARCHAR(1000)	 = ''     OUTPUT 
@@ -18,6 +18,8 @@ AS
 	
 	Revisions:
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+*/
+BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @startRun  DATETIME
@@ -40,11 +42,13 @@ AS
 		FROM dbo.LA_FunctionParty WITH (NOLOCK)
 		WHERE FunctionID = @FunctionID
 
-		SELECT @LogSPData2 = '<LA_FunctionPartysModify FunctionID="' + coalesce(cast(@FunctionID AS VARCHAR(10)), space(1)) + '" ' + 'PartyID="' + coalesce(@PartyListOld, space(1)) + '" ' + 'Language="' + coalesce(cast(@Language AS VARCHAR(20)), space(1)) + '" 
-' + 'UserID="' + coalesce(cast(@Creator AS VARCHAR(20)), space(1)) + '" ' + 'IP="' + coalesce(cast(@LoginIP AS VARCHAR(30)), space(1)) + '" />'
+		SELECT @LogSPData2 = '<LA_FunctionPartysModify FunctionID="' + coalesce(cast(@FunctionID AS VARCHAR(10)), space(1)) + '" '
+													+ 'PartyID="' + coalesce(@PartyListOld, space(1)) + '" '
+													+ 'Language="' + coalesce(cast(@Language AS VARCHAR(20)), space(1)) + '" '
+													+ 'UserID="' + coalesce(cast(@Creator AS VARCHAR(20)), space(1)) + '" '
+													+ 'IP="' + coalesce(cast(@LoginIP AS VARCHAR(30)), space(1)) + '" />'
 
-		DELETE
-		FROM dbo.LA_FunctionParty WITH (ROWLOCK)
+		DELETE dbo.LA_FunctionParty WITH (ROWLOCK, UPDLOCK)
 		WHERE FunctionID = @FunctionID
 
 		IF @@Error > 0
@@ -72,18 +76,21 @@ AS
 		RETURN
 	END
 
-	SELECT @LogSPData = '<LA_FunctionPartysModify FunctionID="' + coalesce(cast(@FunctionID AS VARCHAR(10)), space(1)) + '" ' + 'PartyID="' + coalesce(@PartyIDs, space(1)) + '" ' + 'Language="' + coalesce(cast(@Language AS VARCHAR(20)), space(1)) + '" ' + 'U
-serID="' + coalesce(cast(@Creator AS VARCHAR(20)), space(1)) + '" ' + 'IP="' + coalesce(cast(@LoginIP AS VARCHAR(30)), space(1)) + '" />'
+	SELECT @LogSPData = '<LA_FunctionPartysModify FunctionID="' + coalesce(cast(@FunctionID AS VARCHAR(10)), space(1)) + '" '
+												+ 'PartyID="' + coalesce(@PartyIDs, space(1)) + '" '
+												+ 'Language="' + coalesce(cast(@Language AS VARCHAR(20)), space(1)) + '" '
+												+ 'UserID="' + coalesce(cast(@Creator AS VARCHAR(20)), space(1)) + '" '
+												+ 'IP="' + coalesce(cast(@LoginIP AS VARCHAR(30)), space(1)) + '" />'
 
 	SET @endRun = getdate()
 	SET @duration = datediff(millisecond, @startRun, @endRun)
 
-EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
-	@UserID				= @Creator
-	,@CustID			= 0
-	,@SPName			= 'LA_FunctionPartysModify'
-	,@TrackingValue		= @LogSPData
-	,@TrackingValue2	= @LogSPData2
-	,@duration			= @duration
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+		@UserID				= @Creator
+		,@CustID			= 0
+		,@SPName			= 'LA_FunctionPartysModify'
+		,@TrackingValue		= @LogSPData
+		,@TrackingValue2	= @LogSPData2
+		,@duration			= @duration
 END
 GO
