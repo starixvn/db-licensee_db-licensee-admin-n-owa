@@ -104,7 +104,7 @@ SET @endRun = getdate()
 SET @duration  = datediff (millisecond,@startRun,@endRun)
 
 -- Write Log
-EXEC CustDB.LA_WriteLog_UserLog_RunSP_Wrapper
+EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
 	@UserID				= @Creator  
 	,@CustID			= @UserID
 	,@SPName			= 'LA_UserPartysModify'
