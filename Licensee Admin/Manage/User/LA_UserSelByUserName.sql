@@ -16,6 +16,7 @@ AS
  * DB: DB052.bodb_Licensee  
  *  
  * Revisions:   
+    - 20141022@Florent: add column 'UserSalt'
  Param's Explanation:
 	
 */
@@ -27,6 +28,7 @@ BEGIN
 	SELECT
 		u.UserID,
 		u.UserName,
+		u.UserSalt,
 		u.DisplayName,		
 		u.StatusID IsActive,
 		u.CreatedDate,
@@ -43,6 +45,7 @@ BEGIN
 		((@GroupID=0) OR (@GroupID<>0 AND g.GroupID = @GroupID))
 		AND ((@Username='') OR (@Username<>'' AND u.Username = @Username))
 	ORDER BY g.GroupName
+END
 END
 GO
 GRANT VIEW DEFINITION ON [dbo].[LA_UserSelByUserName] TO [vnteam] 

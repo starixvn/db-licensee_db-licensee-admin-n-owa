@@ -12,14 +12,15 @@ AS
 SET NOCOUNT ON  
   
 SELECT  
-	 u.UserID,  
-	 u.Username,  
-	 u.DisplayName,    
-	 u.Role,    
-	 u.IsActive,  
-	 u.CreatedDate,  
-	 u.ModifiedDate,  
-	 u.Creator,  
+	 u.UserID,
+	 u.Username,
+	 u.DisplayName,
+	 u.Role,
+	 u.IsActive,
+	 u.IsTest,
+	 u.CreatedDate,
+	 u.ModifiedDate,
+	 u.Creator,
 	 ISNULL(p.Username, '') AS CreatorName  
 FROM  
 	 dbo.OAS_Users AS u WITH (NOLOCK)  

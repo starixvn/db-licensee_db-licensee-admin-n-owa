@@ -7,6 +7,7 @@ CREATE PROCEDURE [dbo].[OAS_Users_Modify]
  @UserPwd  VARCHAR(50)  = '',  
  @UserSalt  VARCHAR(50)  = '',  
  @IsActive  BIT,  
+ @IsTest  BIT,  
  @CreatedDate DATETIME,  
  @ModifiedDate DATETIME,  
  @Creator  INT,  
@@ -30,6 +31,7 @@ AS
  *  - @UserPwd  : Password  
  *  - @UserSalt  : User salt  
  *  - @IsActive  : Is active or not  
+ *  - @IsTest  : Is user a test user 
  *  - @CreatedDate : Created date  
  *  - @ModifiedDate : Modified date  
  *  - @Creator  : Creator user ID  
@@ -58,6 +60,7 @@ IF EXISTS(SELECT 1 FROM dbo.OAS_Users WITH (NOLOCK) WHERE UserID = @UserID)
 		  'DisplayName="' + COALESCE(CAST(DisplayName AS VARCHAR(20)), SPACE(1)) + '" ' +    
 		  'Role="' + COALESCE(CAST(Role AS VARCHAR(20)), SPACE(1)) + '" ' +    
 		  'IsActive="' + COALESCE(CAST(IsActive AS VARCHAR(20)), SPACE(1)) + '" ' +    
+		  'IsTest="' + COALESCE(CAST(IsTest AS VARCHAR(20)), SPACE(1)) + '" ' +    
 		  'ModifiedDate="' + COALESCE(CAST(ModifiedDate AS VARCHAR(20)), SPACE(1)) + '" ' +    
 		  'Language="' + COALESCE(CAST(@Language AS VARCHAR(20)), SPACE(1)) + '" ' +    
 		  'UserID="' + COALESCE(CAST(@Creator AS VARCHAR(20)), SPACE(1)) + '" ' +   
@@ -74,6 +77,7 @@ IF EXISTS(SELECT 1 FROM dbo.OAS_Users WITH (NOLOCK) WHERE UserID = @UserID)
 			   DisplayName = @DisplayName,  
 			   Role = @Role,  
 			   IsActive = @IsActive,    
+			   IsTest = @IsTest,
 			   ModifiedDate = @ModifiedDate,  
 			   UserPwd = @UserPwd,  
 			   UserSalt = @UserSalt  
@@ -87,7 +91,8 @@ IF EXISTS(SELECT 1 FROM dbo.OAS_Users WITH (NOLOCK) WHERE UserID = @UserID)
 			   UserName = @UserName,  
 			   DisplayName = @DisplayName,  
 			   Role = @Role,  
-			   IsActive = @IsActive,    
+			   IsActive = @IsActive,
+			   IsTest = @IsTest,
 			   ModifiedDate = @ModifiedDate   
 			  WHERE  
 			   UserID = @UserID  
@@ -121,6 +126,7 @@ ELSE
 			   Role,  
 			   UserSalt,  
 			   IsActive,  
+			   IsTest,  
 			   Creator,  
 			   CreatedDate,  
 			   ModifiedDate    
@@ -133,6 +139,7 @@ ELSE
 			   @Role,  
 			   @UserSalt,  
 			   @IsActive,  
+			   @IsTest,  
 			   @Creator,  
 			   @CreatedDate,  
 			   @ModifiedDate  
@@ -155,6 +162,7 @@ SELECT @LogSPData = '<OAS_Users_Modify CustID="'+ COALESCE(CAST(@UserID AS VARCH
  'DisplayName="' + COALESCE(CAST(@DisplayName AS VARCHAR(20)), SPACE(1)) + '" ' +    
  'Role="' + COALESCE(CAST(@Role AS VARCHAR(20)), SPACE(1)) + '" ' +    
  'IsActive="' + COALESCE(CAST(@IsActive AS VARCHAR(20)), SPACE(1)) + '" ' +    
+ 'IsTest="' + COALESCE(CAST(@IsTest AS VARCHAR(20)), SPACE(1)) + '" ' +    
  'ModifiedDate="' + COALESCE(CAST(@ModifiedDate AS VARCHAR(20)), SPACE(1)) + '" ' +    
  'Language="' + COALESCE(CAST(@Language AS VARCHAR(20)), SPACE(1)) + '" ' +    
  'UserID="' + COALESCE(CAST(@Creator AS VARCHAR(20)), SPACE(1)) + '" ' +    
