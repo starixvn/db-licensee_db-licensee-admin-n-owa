@@ -17,6 +17,7 @@ AS
 
 	Revisions:
 		- 20190221@Parsons: Manage Payer Setting - changing party group [#109189]
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 
 	Params:
 	Example:
@@ -167,13 +168,13 @@ BEGIN
 							FOR XML PATH('ChangeRateTable'), TYPE) AS ChangeRateTables
 						FOR XML PATH('')) 
 	
-	EXEC DBLOG.bodb_CustomerLog.dbo.WriteLog_UserLog_UserControl
-		@Custid = 0,
-		@Doing = @Doing,
-		@Userid = @UserId,
-		@Typeid = 0,
-		@Actionid = 5546,
-		@Duration = @Duration
+	EXEC CustDB.dbo.WriteLog_UserLog_UserControl_Wrapper
+		@CustID		= 0
+		,@Doing		= @Doing
+		,@UserID	= @UserId
+		,@TypeID	= 0
+		,@ActionID	= 5546
+		,@Duration	= @Duration
 
 	IF @@ERROR <> 0
 	BEGIN
