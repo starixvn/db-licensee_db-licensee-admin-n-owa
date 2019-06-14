@@ -10,25 +10,25 @@ ALTER PROCEDURE [dbo].[NAP_SpecialCustSetting_WriteLog_Wrapper]
     @Data		XML,
     @OldData	XML
 AS
+
 /*
-	Created: Dom
-	Date: 2014-08-29
-	Task: Insert log customer setting
-	DB: DBCUST.bodb_CustomerLog, DBLOG.bodb_CustomerLog
+	Created: 20190510@Percy
+	DB: DBCUST-bodb_CustomerLog, DBLOG.bodb_CustomerLog
+	Task: SpecialCustSetting WriteLog
         
 	Revisions:
-		- 20140829@Dom: Initialize SP
+		- 20190510@Percy: Initialize SP [RedmineID: #103658]
 */
+
 BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @ActionID INT = 0
-	SELECT	@ActionID = ActionId
-	FROM DBLOG.bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
-	WHERE SPName = @SPName
+
+	EXEC dbo.WriteLog_LogAction_Lic_GetActionID @SPName = @SPName, @ActionID = @ActionID OUTPUT
 	
 	BEGIN TRY
-		EXEC DBLOG.bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog 
+		EXEC DBLOG.bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog
 			@UserId			= @UserId
 			,@IP			= @IP
 			,@LicenseeID	= @LicenseeID
@@ -41,7 +41,7 @@ BEGIN
 			,@OldData		= @OldData
 	END TRY
 	BEGIN CATCH
-		EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog 
+		EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog
 			@UserId			= @UserId
 			,@IP			= @IP
 			,@LicenseeID	= @LicenseeID
