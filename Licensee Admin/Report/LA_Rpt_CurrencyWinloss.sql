@@ -112,7 +112,7 @@ BEGIN
 						CASE WHEN ci.ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END,
 						CASE WHEN ci.ProductID = 11 THEN ci.ChargeType ELSE 1 END
 		FROM		bodb_licensee.dbo.LA_f_ChargeInfo (@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
-		LEFT JOIN   bodb_licensee..Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype AND (
+		LEFT JOIN   bodb_licensee.dbo.Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype AND (
 					(ci.ProductId NOT IN (14,17)) OR 
 					(ci.ProductID = 14 AND sbr.Bettype BETWEEN 2001 AND 2007) OR
 					(ci.ProductID = 17 AND sbr.Bettype BETWEEN 2008 AND 2009))
@@ -256,7 +256,7 @@ BEGIN
 				, SUM(ISNULL(b.turnover, 0) * CASE WHEN @drawfilter IN (2, 3) AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS TurnOver
 				, SUM(CASE WHEN b.Bettype <> @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) Winloss
 				, SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
-				FROM bodb_LicenseeReport..rpt_BettingByProduct b WITH (NOLOCK)
+				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				WHERE
 					b.ProductID = 32
 					AND b.rptDate BETWEEN @FromDate AND @ToDate

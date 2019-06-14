@@ -91,7 +91,7 @@ BEGIN
 		SUM((CommissionS * @ShareRate) / (1 - oddsspread)) AS CommissionShare,
 		SUM(b.WinLoss * ci.Rate) AS LicensingFee,
 		SUM(-b.WinLoss * @ShareRate) - SUM((CommissionS * @ShareRate) / (1 - oddsspread)) AS PayToSupplier
-	FROM bodb_LicenseeReport..rpt_Betting b WITH (NOLOCK)
+	FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
 		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 		INNER JOIN @PartyList p ON ci.PartyId = p.PartyId
 		INNER JOIN LA_f_BettypeProductMapping(0, 'BF') bt ON b.bettype = bt.Bettype

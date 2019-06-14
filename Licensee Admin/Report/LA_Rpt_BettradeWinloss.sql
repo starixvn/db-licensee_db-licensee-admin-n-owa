@@ -85,7 +85,7 @@ BEGIN
 		CASE WHEN c.FromDate > @ToDate THEN @FromDate ELSE c.FromDate END,
 		CASE WHEN c.FromDate > @ToDate THEN @ToDate ELSE c.ToDate END,
 		CASE WHEN c.FromDate > @ToDate THEN 0 ELSE c.Rate END
-	FROM bodb_licensee..OAS_ChargeInfo c
+	FROM bodb_licensee.dbo.OAS_ChargeInfo c
 	WHERE c.ProductID = 13 AND c.ChargeType = 8
 
 	BEGIN
@@ -210,7 +210,7 @@ BEGIN
 		IsApply BIT
 	)
 	INSERT INTO @BaseCurrencies(Id, Name)
-	EXEC bodb_licensee..LA_SelBaseCurrency
+	EXEC bodb_licensee.dbo.LA_SelBaseCurrency
 
 	CREATE TABLE #ExchangeBase (
 		ExchangeDate	DATE,

@@ -81,7 +81,7 @@ BEGIN
 		- SUM(b.MemberWL) AS LicenseeWinloss,
 		SUM(-b.MemberWL * ci.Rate) AS LicensingFee,
 		SUM(-b.MemberWL * ci.Rate3rd) AS PayToSupplier
-	FROM bodb_LicenseeReport..rpt_BettingByProduct b WITH (NOLOCK)
+	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)

@@ -660,7 +660,7 @@ BEGIN
 				, SUM(ISNULL(b.turnover, 0)) AS Turnover
 				, SUM(CASE WHEN b.Bettype <> @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) Winloss
 				, SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
-				FROM bodb_LicenseeReport..rpt_BettingByProduct b WITH (NOLOCK)
+				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				WHERE
 					b.ProductID = 32
 					AND	b.SiteID = @LicenseeID

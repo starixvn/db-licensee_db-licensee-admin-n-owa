@@ -58,7 +58,7 @@ BEGIN
 			CASE WHEN pr.BettypeRef = 2001 THEN 'Generic Games' ELSE 'Branded Games' END AS GameTypeName
 	FROM bodb_licensee.dbo.Sport_Bettype_Reference sp WITH (NOLOCK)
 		INNER JOIN bodb_licensee.dbo.LA_Product3rdSub pr WITH (NOLOCK) ON sp.BettypeRef = pr.BettypeRef
-	WHERE pr.BettypeRef IN (SELECT val FROM bodb02..strSplit(@GameTypes, ','))
+	WHERE pr.BettypeRef IN (SELECT val FROM bodb02.dbo.strSplit(@GameTypes, ','))
 	GROUP BY sp.Sporttype, sp.Bettype, pr.BettypeRef
 
 	-- Endregion
@@ -68,7 +68,7 @@ BEGIN
 	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + prd.ProductPrefix
 	FROM @ProductsRef pr
 		INNER JOIN (SELECT Productid, ProductPrefix
-					FROM bodb_licensee..Product3rd WITH (NOLOCK)
+					FROM bodb_licensee.dbo.Product3rd WITH (NOLOCK)
 					WHERE Productid IN (SELECT [@ProductsRef].ProductId FROM @ProductsRef)) prd
 		ON pr.ProductId = prd.Productid
 	GROUP BY prd.Productid, prd.ProductPrefix
@@ -105,7 +105,7 @@ BEGIN
 	)
 
 	INSERT INTO @BaseCurrencies(Id, Name)
-	EXEC bodb_licensee..LA_SelBaseCurrency
+	EXEC bodb_licensee.dbo.LA_SelBaseCurrency
 
 	-- Endregion
 
