@@ -35,7 +35,7 @@ BEGIN
 
 	DECLARE @Doing NVARCHAR(MAX) = (SELECT @Key AS [Key], @Value AS [Value] FOR XML PATH(''))
 
-	EXEC CustBD.dbo.WriteLog_UserLog_UserControl_Wrapper
+	EXEC CustDB.dbo.WriteLog_UserLog_UserControl_Wrapper
 		@CustID		= 0
 		,@Doing		= @Doing
 		,@UserID	= @UserID

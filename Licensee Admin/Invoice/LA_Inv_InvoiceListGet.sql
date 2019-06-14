@@ -117,7 +117,7 @@ BEGIN
 	-- Region: Base currency
 	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(10))
 	INSERT	INTO @BaseCurrencyTable(CurrencyId,CurrencyName)
-	EXECUTE bodb_Licensee.dbo.LA_SelBaseCurrency
+	EXECUTE bodb_Licensee.dbo.LA_BaseCurrency_Sel
 	-- End Region
 
 	-- Region: Get data

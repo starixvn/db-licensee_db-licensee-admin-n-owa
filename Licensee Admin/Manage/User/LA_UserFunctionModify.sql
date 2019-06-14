@@ -74,16 +74,16 @@ BEGIN
     --check case when user choice only 1 function, must be add parentID for him
     IF EXISTS( SELECT DISTINCT ParentID 
 				FROM LA_Function 
-				WHERE FunctionID IN( SELECT val FROM bodb02.dbo.strSplit (@FunctionIDs,','))
-				AND ParentID NOT IN (SELECT val FROM bodb02.dbo.strSplit (@FunctionIDs,','))
+				WHERE FunctionID IN( SELECT val FROM dbo.strSplit (@FunctionIDs,','))
+				AND ParentID NOT IN (SELECT val FROM dbo.strSplit (@FunctionIDs,','))
 		  )
     BEGIN
 	    SELECT @FunctionIDs = @FunctionIDs + ',' +CONVERT(varchar(10),A.ParentID) FROM
 		  (
 			 SELECT DISTINCT ParentID 
 				FROM LA_Function 
-				WHERE FunctionID IN( SELECT val FROM bodb02.dbo.strSplit (@FunctionIDs,','))
-				AND ParentID NOT IN (SELECT val FROM bodb02.dbo.strSplit (@FunctionIDs,','))
+				WHERE FunctionID IN( SELECT val FROM dbo.strSplit (@FunctionIDs,','))
+				AND ParentID NOT IN (SELECT val FROM dbo.strSplit (@FunctionIDs,','))
 		  ) A
     END   
     
