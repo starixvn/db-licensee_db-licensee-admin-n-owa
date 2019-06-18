@@ -130,11 +130,6 @@ BEGIN
 		RETURN
 	END
 
-	DECLARE @ActionID INT = 0
-	SELECT @ActionID = ActionId
-	FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
-	WHERE SPName = 'LA_MinFeeSettingModify'
-
 	DELETE @MinFeeSetting WHERE IsEdit = 0
 
 	-- write log

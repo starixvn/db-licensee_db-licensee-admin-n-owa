@@ -1,10 +1,5 @@
 /*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-
 USE [bodb_Licensee]
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_GenerateAmountForSoftwareFee]
@@ -23,12 +18,13 @@ AS
 /*	Header:
 	Created: 2018.10.04 - Parsons
 	Task : Generate amount for software fee
-	DB: DB052.bodb_Licensee
+	DB: DBLIC.bodb_Licensee
    
 	Revisions: 
-		+ 20181004@Parsons: Integrate AG setup fee into invoices [#98485]
-		+ 20190123@Parsons: Improve AG prepayment and discount setting [#104620]
-	    + 20190416@Parsons: Integrate-PP-Promotion-Prize [#109014]
+		- 20181004@Parsons: Integrate AG setup fee into invoices [#98485]
+		- 20190123@Parsons: Improve AG prepayment and discount setting [#104620]
+	    - 20190416@Parsons: Integrate-PP-Promotion-Prize [#109014]
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -73,12 +69,19 @@ BEGIN
 	-- End Region	
 
 	-- Region: Get template
-	SELECT @InvoiceTemplateName = ( SELECT	TOP 1 t.InvTemplateName
-									FROM	dbo.LA_InvoiceSetting i WITH(NOLOCK)
-											INNER JOIN dbo.LA_InvoiceTemplate t WITH(NOLOCK) ON i.InvTempId = t.InvTemplateId
-									WHERE	i.FromPartyId = @PartyId
-											AND i.ToPartyId = @BillerId
-											AND i.InvTypeId = @AmountTypeSoftwareFee)
+	DECLARE @sql NVARCHAR(MAX)
+	DECLARE @tblInvoiceTemplates TABLE (InvoiceTemplateName NVARCHAR(10))
+
+	SELECT @sql = 'SELECT InvoiceTemplateName
+					FROM OPENQUERY(DBCUST, ''SELECT InvoiceTemplateName FROM bodb_Licensee.dbo.LA_f_GetInvoiceTemplate('
+																							+ CONVERT(VARCHAR(10), @PartyId)
+																							+ ', ' + CONVERT(VARCHAR(10), @BillerId)
+																							+ ', ' + CONVERT(VARCHAR(10), @AmountTypeSoftwareFee)
+																							+ ')'')'
+	INSERT INTO @tblInvoiceTemplates (InvoiceTemplateName)
+	EXEC (@sql)
+
+	SELECT @InvoiceTemplateName = InvoiceTemplateName FROM @tblInvoiceTemplates
 	-- End Region
 
 	-- Region: Get exchange rate info
@@ -435,14 +438,20 @@ BEGIN
 	SELECT @AGPrepayment, value
 		FROM (VALUES(25), (26), (27)) AS T3(value)
 
-	SELECT SUM(ISNULL(Income,0) - ISNULL(Expense,0)) Amount, s.InvItemTypeId, invT.[Key] AS InvItemTypeKey 
+	DECLARE @tblInvoiceAmounts TABLE (Income MONEY, Expense MONEY, InvItemTypeId INT)
+	SELECT @sql = 'SELECT Income, Expense, InvItemTypeId
+					FROM OPENQUERY(DBCUST, ''SELECT Income, Expense, InvItemTypeId FROM bodb_Licensee.dbo.LA_f_GetInvoiceAmount(' 
+																							+ CONVERT(VARCHAR(10), @PartyId)
+																							+ ', 0'
+																							+ ', ''''' + ISNULL(@Environment, '') + ''''''
+																							+ ')'')'
+	INSERT INTO @tblInvoiceAmounts (Income, Expense, InvItemTypeId)
+	EXEC (@sql)
+	
+	SELECT SUM(ISNULL(s.Income,0) - ISNULL(s.Expense,0)) AS Amount, s.InvItemTypeId, invT.[Key] AS InvItemTypeKey 
 	INTO #credit
-	FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
-	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
-	INNER JOIN @InvoiceItemTypes invT ON s.InvItemTypeId = invT.Value
-	WHERE s.RefPartyId = @PartyId
-		AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
-		AND h.Environment = @Environment
+	FROM @tblInvoiceAmounts s
+		INNER JOIN @InvoiceItemTypes invT ON s.InvItemTypeId = invT.Value
 	GROUP BY s.InvItemTypeId, invT.[Key]
 
 	DECLARE @RemainingAmf MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeKey = @AdvanceMinFee), 0)

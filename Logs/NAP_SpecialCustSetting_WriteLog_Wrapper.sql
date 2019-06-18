@@ -25,7 +25,7 @@ BEGIN
 
 	DECLARE @ActionID INT = 0
 
-	EXEC dbo.WriteLog_LogAction_Lic_GetActionID @SPName = @SPName, @ActionID = @ActionID OUTPUT
+	EXEC DBLOG.bodb_CustomerLog.dbo.WriteLog_LogAction_Lic_GetActionID @SPName = @SPName, @ActionID = @ActionID OUTPUT
 	
 	BEGIN TRY
 		EXEC DBLOG.bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog
