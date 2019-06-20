@@ -36,7 +36,7 @@ BEGIN
 			ISNULL(d.BaseCurrencyId, 0)		AS BaseCurrencyId, 
 			ISNULL(p.OldRefID, 0)			AS OldRefID,   
 			ISNULL(d.InvoiceLanguage, '')	AS InvoiceLanguage,
-			CASE WHEN EXISTS(SELECT TOP 1 1 FROM dbo.f_SelLicenseeCust(0) AS lc WHERE ISNULL(p.OldRefID, 0) = lc.LicenseeID) THEN 1 ELSE 0 END AS HasNotOfferedCurrency,
+			CASE WHEN NOT EXISTS(SELECT TOP 1 1 FROM dbo.f_SelLicenseeCust(0) AS lc WHERE p.PartyType = 1 AND ISNULL(p.OldRefID, 0) = lc.LicenseeID) THEN 1 ELSE 0 END AS HasNotOfferedCurrency,
 			CASE WHEN ISNULL(pbg.NumberOfGroups, 0) > 1 THEN 1 ELSE 0 END AreBelongingMoreThanOneGroup 
 	FROM OAS_Party p WITH(NOLOCK)
 	INNER JOIN OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID = d.PartyID
