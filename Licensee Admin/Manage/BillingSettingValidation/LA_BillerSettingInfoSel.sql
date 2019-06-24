@@ -20,7 +20,9 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	
-	SELECT b.BillerName, Address1, CASE WHEN ISNULL(DATALENGTH(Logo), 0) > 0 THEN 1 ELSE 0 END HasLogo, ISNULL(p.PartyID, 0) AS PartyId
+	SELECT b.PartyId AS BillerId, b.BillerName, Address1, 
+			CASE WHEN ISNULL(DATALENGTH(Logo), 0) > 0 THEN 1 ELSE 0 END HasLogo, 
+			ISNULL(p.PartyID, 0) AS PartyId
 	FROM LA_BillerInfo b WITH(NOLOCK)
 	LEFT JOIN OAS_Party p WITH(NOLOCK) ON b.PartyId = p.PartyID AND p.PartyType = 4 -- Biller
 	WHERE @PartyId = 0 or b.PartyId = @PartyId
