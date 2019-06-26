@@ -2,6 +2,10 @@
 USE [bodb_licensee]
 GO
 
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
+
 ALTER PROCEDURE [dbo].[LA_PayerSettingDetailSel]
 	@PayerId			INT
 AS
@@ -22,6 +26,7 @@ AS
 				+ sort charge rate by expired
 		- 20180716@bruce: add new group TEST for credit [#98126] 
 		- 20181115@Parsons: Configure discount settings by currency [#99694]
+		- 20190626@Parsons: Validate billing configuration [#109600]
 		- 20180731@Mason: Integrate-Card-Club [#116096]
 		
 	 Params:
@@ -50,7 +55,7 @@ BEGIN
 		, @CurrentDate			DATE
 
 	SET @CurrentDate = CONVERT(DATE, GETDATE())
-	DECLARE @ChargeInfo AS TABLE (ChargeId INT, PartyId INT, ProductId INT, BettypeRef INT, Rate MONEY, ChargeType SMALLINT, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), BasisOfBilling NVARCHAR(MAX), ExchangeID INT)	
+	DECLARE @ChargeInfo AS TABLE (ChargeId INT, PartyId INT, ProductId INT, BettypeRef INT, Rate MONEY, ChargeType SMALLINT, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), BasisOfBilling NVARCHAR(MAX), ExchangeID INT, ToPartyId INT)	
 	DECLARE @Minfee AS TABLE(FeeId INT, PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, CurrencyId INT, MinFeeTerm NVARCHAR(MAX), FromDate DATE, ToDate DATE)
 	DECLARE @PayerSettingHeader AS TABLE(PartyId INT, PayerGroupID INT, PayerGroupName VARCHAR(100), ExchangeID INT, DiscountGroupID INT, DiscountGroupName VARCHAR(100), RebateGroupID INT, RebateGroupName VARCHAR(100))
 	DECLARE @Discount AS TABLE(PartyId INT, ProductId INT, FromDate DATE, ToDate DATE,DiscountGroupId INT, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
@@ -67,7 +72,7 @@ BEGIN
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
 	WHERE ci.FromParty = @PayerId
 	
-	INSERT INTO @ChargeInfo(ChargeId, PartyId, ProductId, BettypeRef, Rate, ChargeType, FromDate, ToDate, FirstBilling, BasisOfBilling, ExchangeID)
+	INSERT INTO @ChargeInfo(ChargeId, PartyId, ProductId, BettypeRef, Rate, ChargeType, FromDate, ToDate, FirstBilling, BasisOfBilling, ExchangeID, ToPartyId)
 	SELECT c.ChargeID		
 		, c.PartyID
 		, c.ProductID		
@@ -82,12 +87,13 @@ BEGIN
 		, CASE WHEN c.ProductID IN (14,17) THEN cs.FirstOfBilling ELSE ci.FirstOfBilling END AS FirstOfBilling
 		, CASE WHEN c.ProductID IN (14,17) THEN cs.BasisOfBilling ELSE ci.BasisOfBilling END AS BasisOfBilling
 		, pd.BaseCurrencyId
+		, ci.ToParty
 	FROM dbo.LA_f_ChargeInfo(@PayerId, @MinDate, @MaxDate, @ProductListAll, 'OA', 1) c
 		LEFT JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID
 		LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID				
 		LEFT JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 		LEFT JOIN dbo.OAS_ChargeInfoSub cs WITH(NOLOCK) ON ci.ChargeID = cs.ChargeIdRef AND c.Bettype = cs.BettypeRef
-
+	
 	--======Min fee Area ===---
 	INSERT INTO @Minfee(FeeId, PartyId, ProductId, FeeTypeId, FeeAmount, CurrencyId, MinFeeTerm, FromDate, ToDate)
 	SELECT MinFeeId , PartyId, ProductId, FeeTypeId, FeeAmount, CurrencyId, MinFeeTerm, FromDate, ToDate 
@@ -112,8 +118,15 @@ BEGIN
 			ELSE ProductId -- keep as it is
 		END
 	FROM dbo.LA_f_Products3rd('')
-
+		
 	-- payer setting
+	DECLARE @CurrentBillingGroup INT
+	;WITH cte_PartyBelongingToGroup AS(SELECT DISTINCT ToPartyId FROM @ChargeInfo)
+	SELECT @CurrentBillingGroup = CASE WHEN NOT EXISTS(SELECT DISTINCT ToPartyId FROM cte_PartyBelongingToGroup) THEN 0 -- Party is not in any group
+									   WHEN (SELECT COUNT(ToPartyId) FROM cte_PartyBelongingToGroup) > 1 THEN -1 -- Party is belonging more than one group
+									   ELSE (SELECT TOP 1 ToPartyId FROM cte_PartyBelongingToGroup)
+								  END
+
 	SELECT TOP 1 c.PartyId			AS PayerID	
 		, pg.PartyGroupId		AS PayerGroupId
 		, pg.PartyGroupName		AS PayerGroupName
@@ -123,6 +136,7 @@ BEGIN
 		, d2.DiscountGroupId	AS RebateGroupID
 		, d2.DiscountGroupName	AS RebateGroupName
 		, CASE WHEN ISNULL(pd.BrandName,'')<>'' THEN pd.BrandName + ' (' +p.PartyName+')' ELSE p.PartyName END PayerName
+		, @CurrentBillingGroup AS CurrentBillingGroup
 	FROM @ChargeInfo c
 		INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID=c.PartyId
 		INNER JOIN dbo.OAS_PartyDetail pd ON pd.PartyId=c.PartyId
