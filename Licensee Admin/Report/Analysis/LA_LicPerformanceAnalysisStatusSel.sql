@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet,dwrs2" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_Licensee
 GO
 
@@ -13,6 +13,6 @@ AS
 */
 BEGIN
 	SELECT [Value] AS [Status]
-	FROM dbo.LA_SystemSettings
+	FROM dbo.LA_SystemSettings WITH (NOLOCK)
 	WHERE [Key] = 'LicenseePerformanceAnalysis_GeneratingStatus'
 END
