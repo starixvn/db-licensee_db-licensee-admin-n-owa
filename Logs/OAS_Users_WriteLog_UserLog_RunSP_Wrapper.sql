@@ -29,7 +29,25 @@ AS
 		- @Duration:
 */
 
-BEGIN    
+BEGIN
+	SET NOCOUNT ON
+
+	IF @SPName LIKE '%_xtest'
+		SELECT @SPName = LEFT(@SPName, LEN(@SPName) - 6)
+	ELSE IF @SPName LIKE '%_xpre'
+			OR @SPName LIKE '%_UAT1'
+			OR @SPName LIKE '%_UAT2'
+			OR @SPName LIKE '%_UAT3'
+			OR @SPName LIKE '%_UAT4'
+		SELECT @SPName = LEFT(@SPName, LEN(@SPName) - 5)
+
+	SELECT @ActionID = ISNULL(@ActionID, 0)
+
+	IF @ActionID = 0
+	BEGIN
+		SELECT @ActionID = ActionID FROM DBLOG.bodb_CustomerLog.dbo.OAS_LogAction WITH (NOLOCK) WHERE SPName = @SPName
+	END
+
 	BEGIN TRY
 		EXEC DBLOG.bodb_CustomerLog.dbo.OAS_Users_WriteLog_UserLog_RunSP
 			@UserID			= @UserID,

@@ -30,7 +30,7 @@ AS
 */
 
 BEGIN    
-	SET NOCOUNT ON;
+	SET NOCOUNT ON
 
 	INSERT INTO dbo.OAS_UserLog_RunSP
 	(
@@ -42,15 +42,15 @@ BEGIN
 		TrackingValue2,
 		Duration
 	)
-	SELECT
+	VALUES
+	(
 		@UserID,
 		@CustID,
 		@Doing,
-		ActionId,
+		@ActionId,
 		@TrackingValue,
 		@TrackingValue2,
 		@Duration
-	FROM dbo.OAS_LogAction WITH (NOLOCK)
-	WHERE SPName = @SPName
+	)
 END
 GO

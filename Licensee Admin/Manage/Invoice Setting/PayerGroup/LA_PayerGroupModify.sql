@@ -47,7 +47,7 @@ SET NOCOUNT ON
 	
 	INSERT INTO @PayerGroupList(PayerGroupId, PartyID)
 	SELECT @PayerGroupId, val 
-	FROM bodb02.dbo.strSplit(@PayerList, ',')
+	FROM dbo.strSplit(@PayerList, ',')
 
 	--check case insert
 	IF EXISTS (SELECT 1 FROM dbo.LA_PartyGroup WITH (NOLOCK) WHERE PartyGroupName = @PayerGroupName AND @IsEdit = 0)

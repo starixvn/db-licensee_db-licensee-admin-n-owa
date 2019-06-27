@@ -39,6 +39,8 @@ BEGIN
 		, @endRun		DATETIME
 		, @duration		INT
 		, @xml			XML
+		, @LogData		NVARCHAR(MAX)
+
 	-- Time start
 	SET @startRun = GETDATE()
 
@@ -85,6 +87,7 @@ BEGIN
 
 	SET @endRun = GETDATE()
 	SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun)
+	SELECT @LogData = CONVERT(NVARCHAR(MAX), @xml)
 
 	-- Write Log
 	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
@@ -95,7 +98,7 @@ BEGIN
 		,@SPName		= 'LA_PayerNonOfficialIns'
 		,@CustId		= 0
 		,@Duration		= @duration
-		,@Data			= @xml
+		,@Data			= @LogData
 		,@OldData		= ''
 END
 GO

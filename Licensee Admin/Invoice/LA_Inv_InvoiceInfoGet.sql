@@ -26,7 +26,7 @@ BEGIN
 	
 	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(10))
 	INSERT	INTO @BaseCurrencyTable(CurrencyId,CurrencyName)
-	EXECUTE bodb_Licensee.dbo.LA_SelBaseCurrency
+	EXECUTE CustDB.dbo.LA_BaseCurrency_Sel
 	
 	SELECT TOP 1	
 			i.InvoiceHeaderId,

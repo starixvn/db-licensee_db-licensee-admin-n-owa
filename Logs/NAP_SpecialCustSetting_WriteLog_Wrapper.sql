@@ -7,8 +7,8 @@ ALTER PROCEDURE [dbo].[NAP_SpecialCustSetting_WriteLog_Wrapper]
     @SPName		VARCHAR(50),
     @CustId		INT,
     @Duration	INT,
-    @Data		XML,
-    @OldData	XML
+    @Data		NVARCHAR(MAX),
+    @OldData	NVARCHAR(MAX)
 AS
 
 /*
@@ -24,6 +24,15 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @ActionID INT = 0
+
+	IF @SPName LIKE '%_xtest'
+		SELECT @SPName = LEFT(@SPName, LEN(@SPName) - 6)
+	ELSE IF @SPName LIKE '%_xpre'
+			OR @SPName LIKE '%_UAT1'
+			OR @SPName LIKE '%_UAT2'
+			OR @SPName LIKE '%_UAT3'
+			OR @SPName LIKE '%_UAT4'
+		SELECT @SPName = LEFT(@SPName, LEN(@SPName) - 5)
 
 	EXEC DBLOG.bodb_CustomerLog.dbo.WriteLog_LogAction_Lic_GetActionID @SPName = @SPName, @ActionID = @ActionID OUTPUT
 	

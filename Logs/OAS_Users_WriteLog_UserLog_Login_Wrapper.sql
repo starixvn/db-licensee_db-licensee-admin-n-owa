@@ -30,6 +30,8 @@ AS
 */
 
 BEGIN
+	SET NOCOUNT ON
+
 	BEGIN TRY
 		EXEC DBLOG.bodb_CustomerLog.dbo.OAS_Users_WriteLog_UserLog_Login
 			@UserID			= @UserID,

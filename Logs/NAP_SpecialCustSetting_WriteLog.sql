@@ -8,8 +8,8 @@ ALTER PROCEDURE [dbo].[NAP_SpecialCustSetting_WriteLog]
     @CustId		INT,
     @ActionId	INT,
     @Duration	INT,
-    @Data		XML,
-    @OldData	XML
+    @Data		NVARCHAR(MAX),
+    @OldData	NVARCHAR(MAX)
 AS
 /*
 	Created: Dom
@@ -24,6 +24,6 @@ BEGIN
 	SET NOCOUNT ON
 
 	INSERT INTO dbo.Userlog_LicenseeSetting (UserId,IP,LicenseeID,CurrencyID,SPName,CustId,ActionId,Duration,Data,OldData)
-	VALUES(@UserId,@IP,@LicenseeID,@CurrencyID,@SPName,@CustId,@ActionId,@Duration,@Data,@OldData)
+	SELECT @UserId,@IP,@LicenseeID,@CurrencyID,@SPName,@CustId,@ActionId,@Duration,CONVERT(XML, @Data),CONVERT(XML, @OldData)
 END
 GO
