@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="1" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
 USE bodb_licensee
 GO
 
@@ -25,8 +25,8 @@ AS
 
 /*  
 	Created: 20170310@Harper  
-    Task :  Get Charge Information of Product 3rd  
-    DB:   DBLIC/bodb_Licensee    
+    Task: Get Charge Information of Product 3rd  
+    DB: DBLIC.bodb_Licensee    
 	
 	Revisions:  
 		- 20180122@Harper: Fix return data rows [RedmineID: #89006]
@@ -134,7 +134,4 @@ BEGIN
 
    RETURN;  
 END;
-GO
-
-GRANT SELECT ON [dbo].[LA_f_ChargeInfo3rd] TO bodbAdminNet
 GO

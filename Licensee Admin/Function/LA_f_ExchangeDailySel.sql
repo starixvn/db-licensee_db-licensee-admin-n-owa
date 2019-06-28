@@ -1,9 +1,5 @@
+/*<info serverAlias="DBEXT-bodb02" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
 USE [bodb02]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
@@ -14,16 +10,16 @@ ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
 	
 /*  
 	Created: 20150320@Patrick
-	Task : Get exhange daily
-	DB: DB052.bodb02
-	Original: Lrf_f_GetExchangeDaily
+	Task: Get exhange daily
+	DB: DBEXT.bodb02
+	
 	Revisions:  
 		- 20160413@Francis: Support THB Base Currency
 		- 20160920@Harper : Support HKD Base Currency
 		- 20170712@Harper: Support IDR Base Currency [RedmineID: #79309]
 		- 20180301@Harper: Support SGD as base currency [RedmineID: #91339]  
 
-	Param's Explanation:  				
+	Param's Explanation:				
 */
 RETURNS @tempDate TABLE (exchangedate DATETIME, ExchangeId INT, Code VARCHAR(5)
 		, BaseCurrencyRate FLOAT
@@ -80,5 +76,3 @@ BEGIN
 RETURN 
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_f_ExchangeDailySel] TO [vnteam] 
-GRANT SELECT ON [dbo].[LA_f_ExchangeDailySel] TO bodbAdminNet 

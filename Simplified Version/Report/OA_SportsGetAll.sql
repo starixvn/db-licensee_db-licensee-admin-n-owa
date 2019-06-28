@@ -14,8 +14,8 @@ AS
 		- 20120314@Henry: get only sports <= 99 [RedmineID: #103658]
 */
 
-BEGIN  
-	SET NOCOUNT ON   
+BEGIN
+	SET NOCOUNT ON
 
 	SELECT Sporttype, SportName
 	FROM dbo.Sports WITH (NOLOCK)

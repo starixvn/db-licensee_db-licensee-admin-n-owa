@@ -1,3 +1,4 @@
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -7,11 +8,14 @@ ALTER PROCEDURE [dbo].[LA_ExchangeRateBillingSel]
 	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
 
 AS
-/*  Created: 20150318@Florent
-	Task : Report - Licensee Settlement Report
-	DB: DB052.bodb02
+/*
+	Created: 20150318@Florent
+	Task: Report - Licensee Settlement Report
+	DB: DBLIC.bodb_licensee
+	
 	Revisions:
 		- 20171219@Bruce: increase length for variables [#88197]
+	
 	Param's Explanation:
 		+ @CurrencyIds: currency id list
 		+ @ExchangeDate:
@@ -36,5 +40,3 @@ BEGIN
 	DROP TABLE #tmpCurrency
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_ExchangeRateBillingSel] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_ExchangeRateBillingSel] TO bodbAdminNet
