@@ -1,25 +1,24 @@
-﻿ALTER PROCEDURE [dbo].[OA_SportsGetAll]
+﻿/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE [bodb02]
+GO
+
+ALTER PROCEDURE [dbo].[OA_SportsGetAll]
 AS
-/*    
- Created : Kos    
- Date : 2011-11-22  
-    Task : Get all sport types  
-    DB  : DB052.bodb02    
-     
-    Revisions:      
-    20120314@Henry: get only sports <= 99
-*/  
+
+/*
+	Created: 20111122@Kos
+	DB: DBEXT.bodb02
+	Task: Get all sport types of Sportsbook
+
+	Revisions:
+		- 20120314@Henry: get only sports <= 99 [RedmineID: #103658]
+*/
 
 BEGIN  
 	SET NOCOUNT ON   
 
-	SELECT Sporttype,SportName  
-	FROM Sports WITH (NOLOCK)  
+	SELECT Sporttype, SportName
+	FROM dbo.Sports WITH (NOLOCK)
 	WHERE sporttype <= 99
 END  
-
-
 GO
-GRANT EXECUTE ON [dbo].[OA_SportsGetAll] TO [bodbAdminNet] 
-GO
-GRANT VIEW DEFINITION ON [dbo].[OA_SportsGetAll] TO [vnteam]  
