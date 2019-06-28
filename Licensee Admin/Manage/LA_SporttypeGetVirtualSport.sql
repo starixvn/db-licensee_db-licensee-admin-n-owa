@@ -1,33 +1,26 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_SporttypeGetVirtualSport]    Script Date: 9/8/2014 5:06:24 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
+
 ALTER PROCEDURE [dbo].[LA_SporttypeGetVirtualSport]
 AS
-/*    
- Created : Florent    
- Base on : OA_SporttypeGetVirtualSport
- Date : 2014-08-28  
-    Task : Get all sport types for virtual sport 
-    DB  : DB052.bodb02    
+
+/*
+	Created: Florent    
+	Date: 2014-08-28
+	Task: Get all sport types for virtual sport 
+	DB: DBEXT.bodb02    
      
-    Revisions:      
-    
+    Revisions:
+		- 20140828@Florent: Initialize SP
 */  
 
 BEGIN  
 	SET NOCOUNT ON   
 
-	SELECT Sporttype,SportName  
-	FROM Sports WITH (NOLOCK)  
+	SELECT Sporttype, SportName
+	FROM dbo.Sports WITH (NOLOCK)
 	WHERE sporttype BETWEEN 180 AND 199
-	ORDER BY sporttype ASC 
+	ORDER BY sporttype ASC
 END  
-
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_SporttypeGetVirtualSport] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_SporttypeGetVirtualSport] TO bodbAdminNet 
-
