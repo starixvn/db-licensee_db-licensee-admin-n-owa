@@ -1,13 +1,17 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
 GO
-
-ALTER PROCEDURE [dbo].LA_Rpt_AGCasinoWinLoss
+declare
+--alter PROCEDURE [dbo].LA_Rpt_AGCasinoWinLoss_xtest
 	@PartyIds			VARCHAR(4000),
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
 	@BaseCurrencyName	VARCHAR(20)
-AS
+--AS
+select @PartyIds			='14,15,16,17,18,19,20,21,22,23,24,25,27,29,30,31,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,52,53,54,55,56,58,59,60,61,62,63,64,65,66,67,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,95,96,97,99,100,101,114,115,124,127,128,129,131,132,133,135,141,142,143,148,151,153,157',
+	@FromDate			='20190501',
+	@ToDate				='20190531',
+	@BaseCurrencyName	='eur'
 /*
 	 Created: 20160420@Bravo
 	 Task : Get report AG Casino Win Loss
@@ -21,6 +25,7 @@ AS
 	 - 20180302@Harper: Support SGD as base currency for AG WL report [RedmineID: #91339]
 	 - 20180716@bruce: add new group TEST for credit [#98126]
 	 - 20180628@Scofield: Update calculation formula for AG& GD report [#94283]
+	 - 20190627@Bruce: Select data from rpt_BettingByProduct [#113641]
 	 
 	 Params:
 */
