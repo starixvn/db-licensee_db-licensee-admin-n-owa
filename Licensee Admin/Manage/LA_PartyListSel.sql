@@ -1,10 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee,DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
 USE [bodb_licensee]
-GO
-/****** Object:  StoredProcedure [dbo].[LA_PartyListSel]    Script Date: 01/12/2014 14:42:31 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_PartyListSel]
@@ -14,7 +9,7 @@ AS
 /*  
 	 Created: 20140814@Florent
 	 Task : get List Party of 
-	 DB: DB052.bodb_Licensee  
+	 DB: DBLIC.bodb_licensee, DBCUST.bodb_Licensee
    
 	 Revisions:     
 		  - 20141031@Florent: Apply new Structure Using SystemMapping
@@ -222,5 +217,3 @@ DROP TABLE #Party
 DROP TABLE #data
 DROP TABLE #ListParty
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_PartyListSel] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_PartyListSel] TO bodbAdminNet 
