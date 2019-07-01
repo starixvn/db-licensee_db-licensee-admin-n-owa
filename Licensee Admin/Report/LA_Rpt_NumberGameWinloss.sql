@@ -206,21 +206,6 @@ BEGIN
 	-- End Region
 	
 	-- Region: Select Data
-	-- Select data by currency
-	SELECT
-		r.WinLossDate,
-		e.CurrencyCode,
-		r.PartyId,
-		SUM(r.TotalTrans),
-		CAST(SUM(r.Turnover * e.Rate) AS MONEY) AS Turnover,
-		CAST(SUM(r.CustomerWinLoss * e.Rate) AS MONEY) AS CustomerWinLoss,
-		CAST(SUM(r.LicenseeWinLoss * e.Rate) AS MONEY) AS LicenseeWinLoss,
-		CAST(SUM(r.LicensingFee * e.Rate) AS MONEY) AS LicenseeFee,
-		CAST(SUM(r.PayToSupplier * e.Rate) AS MONEY) AS PayToSupplier,
-		CAST(SUM(r.LicensingFee - r.PayToSupplier)) AS CompanyIncome
-	FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.WinLossDate = e.ExchangeDate 
-	GROUP BY e.CurrencyCode, PartyId, r.WinLossDate
-	
 	-- Select data by Parties
 	SELECT 
 		r.PartyId,
@@ -230,12 +215,12 @@ BEGIN
 		e.CurrencyCode AS CurrencyName,
 		-- Select by origin currency
 		r.TotalTrans,
-		r.Turnover AS Turnover,
-		CAST((r.CustomerWinLoss) AS MONEY) AS CustomerWinLoss,
-		CAST((r.LicenseeWinLoss) AS MONEY) AS LicenseeWinLoss,
-		CAST((r.LicensingFee) AS MONEY) AS LicenseeFee,
-		CAST((r.PayToSupplier)AS MONEY) AS PayToSupplier,
-		r.LicensingFee - r.PayToSupplier AS CompanyIncome,
+		r.Turnover AS TurnoverOriginal,
+		CAST((r.CustomerWinLoss) AS MONEY) AS CustomerWinLossOriginal,
+		CAST((r.LicenseeWinLoss) AS MONEY) AS LicenseeWinLossOriginal,
+		CAST((r.LicensingFee) AS MONEY) AS LicenseeFeeOriginal,
+		CAST((r.PayToSupplier)AS MONEY) AS PayToSupplierOriginal,
+		r.LicensingFee - r.PayToSupplier AS CompanyIncomeOriginal,
 		-- Select by base currency
 		r.Turnover * e.Rate AS Turnover,
 		CAST((r.CustomerWinLoss * e.Rate) AS MONEY) AS CustomerWinLoss,
