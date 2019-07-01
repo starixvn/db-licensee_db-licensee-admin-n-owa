@@ -8,7 +8,7 @@ declare
 	@ToDate				DATETIME,
 	@BaseCurrencyName	VARCHAR(20)
 --AS
-select @PartyIds			='14,15,16,17,18,19,20,21,22,23,24,25,27,29,30,31,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,52,53,54,55,56,58,59,60,61,62,63,64,65,66,67,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,95,96,97,99,100,101,114,115,124,127,128,129,131,132,133,135,141,142,143,148,151,153,157',
+select @PartyIds			='14',--,15,16,17,18,19,20,21,22,23,24,25,27,29,30,31,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,52,53,54,55,56,58,59,60,61,62,63,64,65,66,67,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,95,96,97,99,100,101,114,115,124,127,128,129,131,132,133,135,141,142,143,148,151,153,157',
 	@FromDate			='20190501',
 	@ToDate				='20190531',
 	@BaseCurrencyName	='eur'
@@ -58,8 +58,6 @@ BEGIN
 
 	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC LA_PartyListSel
-
-	UPDATE @PartyList SET PartyName = REPLACE(PartyName, ' Licensees', '') WHERE ParentId = 0
 	-- Endregion
 
 	SELECT pc.PartyId
@@ -224,7 +222,7 @@ BEGIN
 			r.PartyName,
 			r.ParentId,
 			r.ParentName,
-			r.rptDate,
+			r.rptDate AS WinLossDate,
 			r.CurrencyId,
 			e.CurrencyCode AS CurrencyName,
 			r.TotalTrans,
@@ -246,7 +244,7 @@ BEGIN
 			r.PartyName,
 			r.ParentId,
 			r.ParentName,
-			r.rptDate,
+			r.rptDate AS WinLossDate,
 			r.CurrencyId,
 			e.CurrencyCode AS CurrencyName,
 			r.TotalTrans,
