@@ -1,10 +1,7 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
 USE [bodb02]
 GO
 
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
 ALTER PROCEDURE [dbo].[LA_Rpt_ThirdPartyProductWinloss] 
 	@ProductCodes		VARCHAR(100)	
 	, @Recommend		VARCHAR(8000)	= ''
@@ -16,9 +13,11 @@ AS
 /*  
     Created: Florent.Nguyen
     Date: 2015-03-26
-    Task : Get product winloss of third party
+    Task: Get product winloss of third party
     DB: DBEXT.bodb02  
-    Revisions:  		
+    
+	Revisions:
+		- 20150326@Florent: Initialize SP
 
 	Param's Explanation:  
 		@DrawFilter :	1 Normal
@@ -61,7 +60,4 @@ BEGIN
 		AND (c.ProductId IN ( SELECT ProductID FROM bodb_licensee.dbo.LRF_f_Products3rd(@ProductCodes)))
 	GROUP BY co.recommend, c.Winlostdate, c.Currency		
 END
-
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_ThirdPartyProductWinloss] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_Rpt_ThirdPartyProductWinloss] TO bodbAdminNet

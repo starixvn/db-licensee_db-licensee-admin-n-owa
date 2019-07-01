@@ -1,23 +1,20 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
-/****** Object:  StoredProcedure [dbo].[LA_BetTypesGetAll]    Script Date: 9/8/2014 5:07:48 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
+
 ALTER PROCEDURE [dbo].[LA_BetTypesGetAll]
 	@ProductCode VARCHAR(200) = 'SB'
 AS
-/*    
- Created : FLorent	    
- Date : 2014-09-03  
-    Task : Get all bettypes  
-    Base on : OA_BetTypesGetAll
-    DB  : DB052.bodb02    
-     
+
+/*
+	Created: FLorent	    
+	Date: 2014-09-03  
+    Task: Get all bettypes  
+	DB: DBEXT.bodb02    
+    
     Revisions:
-	- 20150302@Florent: Fix bettype of VS same name and use function LA_f_BettypeProductMapping
-	- 20160114@Bruce: Adding ProductCode column
+		- 20150302@Florent: Fix bettype of VS same name and use function LA_f_BettypeProductMapping
+		- 20160114@Bruce: Adding ProductCode column
 */  
 BEGIN  
 	SET NOCOUNT ON
@@ -41,6 +38,3 @@ BEGIN
 	
 END
 GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_BetTypesGetAll] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_BetTypesGetAll] TO bodbAdminNet
