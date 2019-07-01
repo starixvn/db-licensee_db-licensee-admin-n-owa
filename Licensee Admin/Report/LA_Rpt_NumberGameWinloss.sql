@@ -245,6 +245,9 @@ BEGIN
 		r.LicensingFee - r.PayToSupplier AS CompanyIncome
 	FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.WinLossDate = e.ExchangeDate
 	
+	-- Select Grand Total
+	SELECT * FROM @GrandTotal
+	
 	-- Total
 	SELECT PartyId,
 		TotalTrans,
@@ -257,7 +260,6 @@ BEGIN
 	FROM @Total t
 	WHERE Currency = @BaseCurrencyName
 	
-	SELECT * FROM @GrandTotal
 	-- End Region
 	
 	DROP TABLE	#Party
