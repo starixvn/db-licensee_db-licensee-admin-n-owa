@@ -1,5 +1,5 @@
 ﻿/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
-USE [bodb02]
+USE [bodb_licensee]
 GO
 
 SET QUOTED_IDENTIFIER ON;
@@ -16,7 +16,7 @@ AS
 /*
  * Created by : [20140904@Florent.Nguyen]
  * Task  : Get Number Game Winloss
- * DB   : DB052.bodb02
+ * DB   : bodb_licensee
  * Revisions :
 	- 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
 	- 20150703@Florent: add GBP
