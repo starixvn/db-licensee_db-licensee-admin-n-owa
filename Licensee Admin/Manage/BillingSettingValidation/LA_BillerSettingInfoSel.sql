@@ -22,9 +22,9 @@ BEGIN
 	
 	SELECT b.PartyId AS BillerId, b.BillerName, Address1, 
 			CASE WHEN ISNULL(DATALENGTH(Logo), 0) > 0 THEN 1 ELSE 0 END HasLogo, 
-			ISNULL(p.PartyID, 0) AS PartyId
+			ISNULL(p.PartyType, 0) AS PartyType
 	FROM LA_BillerInfo b WITH(NOLOCK)
-	LEFT JOIN OAS_Party p WITH(NOLOCK) ON b.PartyId = p.PartyID AND p.PartyType = 4 -- Biller
-	WHERE @PartyId = 0 or b.PartyId = @PartyId
+	LEFT JOIN OAS_Party p WITH(NOLOCK) ON b.PartyId = p.PartyID
+	WHERE @PartyId = 0 OR b.PartyId = @PartyId
 END
 GO
