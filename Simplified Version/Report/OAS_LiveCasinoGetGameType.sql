@@ -1,21 +1,16 @@
-﻿USE [bodb02]
-GO
-/****** Object:  StoredProcedure [dbo].[OAS_LiveCasinoGetGameType]    Script Date: 01/13/2014 22:49:25 ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+﻿/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE [bodb02]
 GO
 
-
-ALTER  PROCEDURE [dbo].[OAS_LiveCasinoGetGameType]
+ALTER PROCEDURE [dbo].[OAS_LiveCasinoGetGameType]
 AS
 /*    
 	Created: 20130508@Jim
-    Task : Add Game types filter for Live Casino Win Loss report 
-    DB  : DB052.bodb02    
+    Task: Add Game types filter for Live Casino Win Loss report 
+    DB: DBEXT.bodb02    
      
     Revisions:      
-		-- 20140114@Jim: return all GameType of Live Casino
+		- 20140114@Jim: return all GameType of Live Casino
 */  
 
 BEGIN  
@@ -33,6 +28,3 @@ BEGIN
 	*/
 END
 GO
-GRANT EXECUTE ON [dbo].[OAS_LiveCasinoGetGameType] TO [bodbAdminNet] AS [dbo]
-GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_LiveCasinoGetGameType] TO [vnteam] AS [dbo]
