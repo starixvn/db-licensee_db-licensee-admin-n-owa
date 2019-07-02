@@ -347,7 +347,7 @@ BEGIN
 
 	IF EXISTS (
 			SELECT TOP 1 1
-			FROM bodb_licensee.dbo.LicenseeEventLog(NOLOCK)
+			FROM bodb_licensee.dbo.LA_f_LicenseeEventLog()
 			WHERE SystemID = 4
 				AND ActionID = 3
 				AND ObjectID = 3
