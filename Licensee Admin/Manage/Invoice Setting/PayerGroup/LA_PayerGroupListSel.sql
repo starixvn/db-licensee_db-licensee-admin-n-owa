@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -9,10 +9,11 @@ AS
 /*  
 	 Created: 20150422@Florent
 	 Task : get List Payer Group by all or by Id
-	 DB: DBLIC.bodb_Licensee  
+	 DB: DBCUST.bodb_Licensee  
    
 	 Revisions:
-		  - 20180327@Parsons: Apply min fee rule for discount calculation [#109997]     		  
+		  - 20180327@Parsons: Apply min fee rule for discount calculation [#109997]
+
 	 Params:
 		+ 0 get all payer
 		+ <> 0 specify a payer

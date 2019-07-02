@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -7,10 +7,11 @@ AS
 /*  
 	 Created: 20180727@Parsons [#94282]
 	 Task : Enhance Manage Discount group function to support more discount schemes
-	 DB: DB052.bodb_licensee   
+	 DB: DBCUST.bodb_licensee   
 
 	 Revisions:  
 		- 20180727@Parsons: get licensee info [#94282]
+	 
 	 Params:
 
 	 Explannation: EXEC LA_LicenseeSel

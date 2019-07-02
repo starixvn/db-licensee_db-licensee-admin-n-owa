@@ -1,9 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeInfoSel]
@@ -11,15 +7,15 @@ AS
 /*
 	Created: 20151007@Bruce
 	Task : Get Licensee information
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
-	- 20151007@Bruce: Get Licensee information
-	- 20180125@Bruce: include branch name [#90029]
-	- 20180301@Parsons: inlclude CO to Licensee List [#90721]
-	- 20180801@Parsons: Rebuild licensee information report [#94283]
-	- 20190130@Bruce: Missing licensee group: Cozni [#108432]
-	- 20190318@Mason: Add InvoiceLanguage in SELECT statement [#110445]
+		- 20151007@Bruce: Get Licensee information
+		- 20180125@Bruce: include branch name [#90029]
+		- 20180301@Parsons: inlclude CO to Licensee List [#90721]
+		- 20180801@Parsons: Rebuild licensee information report [#94283]
+		- 20190130@Bruce: Missing licensee group: Cozni [#108432]
+		- 20190318@Mason: Add InvoiceLanguage in SELECT statement [#110445]
 */
 BEGIN
 	SET NOCOUNT ON

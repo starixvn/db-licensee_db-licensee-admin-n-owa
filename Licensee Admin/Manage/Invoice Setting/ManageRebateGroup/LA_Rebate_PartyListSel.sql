@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -10,7 +10,7 @@ AS
 /*  
 	 Created: 20180529@Parsons [#94282]
 	 Task : Enhance Manage Discount group function to support more discount schemes
-	 DB: DBLIC.bodb_licensee   
+	 DB: DBCUST.bodb_licensee   
 
 	 Revisions:  
 		- 20180529@Parsons: Get list payer list [#94282]

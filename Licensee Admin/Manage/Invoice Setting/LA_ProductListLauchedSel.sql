@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -6,13 +6,14 @@ ALTER PROCEDURE [dbo].[LA_ProductListLauchedSel]
 	@PayerId	INT	= 0	
 AS
 /*  
-	 Created: 20170224@scofield.huynh
-	 Task : get All Launched Products
-	 DB: DBLIC.bodb_Licensee  
+	Created: 20170224@scofield.huynh
+	Task : get All Launched Products
+	DB: DBCUST.bodb_Licensee  
    
-	 Revisions:     	
+	Revisions:     	
 		- 20170301@Scofield: Update to exclude 'RB', 'BG', 'PTCS', 'HF' and inclucde 'SB' [#70050]
-	 Example:
+	
+	Example:
 		EXEC dbo.LA_ProductListLauchedSel
 */
 BEGIN

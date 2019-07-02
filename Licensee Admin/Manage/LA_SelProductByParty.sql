@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -9,7 +9,7 @@ AS
 /*
 Created: 20150312@Florent
 Task : Get all product by a party
-DB: DBLIC.bodb_licensee
+DB: DBCUST.bodb_licensee
 
 Revisions:
 	- 20150312@Florent: Initialize SP
@@ -43,6 +43,5 @@ BEGIN
 				END
 		ORDER BY pr.Productid
 	END
-	
 END
 GO

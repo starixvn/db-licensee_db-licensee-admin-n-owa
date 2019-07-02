@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -8,7 +8,7 @@ AS
 /*  
 	 Created: 20150413@Florent
 	 Task : get List Products by Payerid or get all
-	 DB: DBLIC.bodb_Licensee  
+	 DB: DBCUST.bodb_Licensee  
    
 	 Revisions:
 		- 20150413@Florent: Initialize SP

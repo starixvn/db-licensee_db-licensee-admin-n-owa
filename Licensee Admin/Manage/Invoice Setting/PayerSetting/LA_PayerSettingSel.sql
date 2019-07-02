@@ -1,43 +1,42 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerSettingSel]
-  @PayerId			INT = 0
- ,@PayerGroup		INT = 0
- ,@DiscountGroup	INT = 0
- ,@RebateGroup		INT = 0
+	@PayerId		INT = 0
+	,@PayerGroup	INT = 0
+	,@DiscountGroup	INT = 0
+	,@RebateGroup	INT = 0
 AS
 /*
-  Created: 20150420@Florent
-  Task : Get Payer setting
-  DB: DB052.bodb_Licensee
+	Created: 20150420@Florent
+	Task : Get Payer setting
+	DB: DBCUST.bodb_Licensee
 
-  Revisions:
-  - 20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
-  - 20161025@Scofield: exclude Colossus Bet from ChargeInfo
-  - 20161031@bruce.bui: include CB, charge type
-  - 20170208@bruce.bui: include terminated licensees
-  - 20170214@bruce.bui: show sub charge type
-  - 20170215@bruce.bui: sort product
-  - 20170315@Scofield: hard code for Bettrade BA [#70050]
-  - 20180309@Bruce: Param @ListParty should increase length in SP LA_PayerSettingSel [#91814]
-  - 20180716@bruce: add new group TEST for credit [#98126]
-  - 20180503@Parsons: fix: setting won't show when set start date from future[#94108]
-  - 20181114@Parsons: Configure discount settings by currency [#99694]
-  - 20181214@Parsons: Integrate Bidme games  [#103695]
+	Revisions:
+		- 20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
+		- 20161025@Scofield: exclude Colossus Bet from ChargeInfo
+		- 20161031@bruce.bui: include CB, charge type
+		- 20170208@bruce.bui: include terminated licensees
+		- 20170214@bruce.bui: show sub charge type
+		- 20170215@bruce.bui: sort product
+		- 20170315@Scofield: hard code for Bettrade BA [#70050]
+		- 20180309@Bruce: Param @ListParty should increase length in SP LA_PayerSettingSel [#91814]
+		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20180503@Parsons: fix: setting won't show when set start date from future[#94108]
+		- 20181114@Parsons: Configure discount settings by currency [#99694]
+		- 20181214@Parsons: Integrate Bidme games  [#103695]
 
-  Params:
-  + @PayerId : 0 get all Party
-     <> 0 specify Party
-  + @@PayerGroup : 0 get all Party
-       <> 0 specify Party
-  + @@DiscountGroup : 0 get all Party
-       <> 0 specify Party
-  + @@RebateGroup : 0 get all Party
-       <> 0 specify Party
-  Example:
-
+	Params:
+	+ @PayerId : 0 get all Party
+		<> 0 specify Party
+	+ @@PayerGroup : 0 get all Party
+		<> 0 specify Party
+	+ @@DiscountGroup : 0 get all Party
+		<> 0 specify Party
+	+ @@RebateGroup : 0 get all Party
+		<> 0 specify Party
+	Example:
 */
 BEGIN
 	SET NOCOUNT ON
@@ -160,7 +159,7 @@ BEGIN
 			INNER JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 			LEFT JOIN dbo.OAS_ChargeInfoSub s WITH(NOLOCK) ON ci.ChargeID = s.ChargeIdRef
-			LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON pd.BaseCurrencyId = e.exchangeid
+			LEFT JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON pd.BaseCurrencyId = e.exchangeid
 		WHERE @CurrentDate <= c.Todate
 
 	-- Hard code for Bettrade BA
@@ -180,7 +179,7 @@ BEGIN
 		FROM dbo.LA_MinFee WITH (NOLOCK)
 		WHERE EXISTS (SELECT
 				val
-			FROM bodb02.dbo.strSplit(@ListParty, ',')
+			FROM dbo.strSplit(@ListParty, ',')
 			WHERE PartyID = val)
 				AND @CurrentDate BETWEEN FromDate AND ToDate
 
@@ -204,7 +203,7 @@ BEGIN
 			INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK)
 				ON a.DiscountGroupId = p.DiscountGroupId
 		WHERE EXISTS (	SELECT val
-						FROM bodb02.dbo.strSplit(@ListParty, ',')
+						FROM dbo.strSplit(@ListParty, ',')
 						WHERE a.PartyID = val)
 			AND @CurrentDate BETWEEN h.FromDate AND h.ToDate
 		GROUP BY	a.PartyID,

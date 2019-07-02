@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -8,7 +8,7 @@ AS
 /*
 	Created: 20170223@scofield.huynh
 	Task : Get list of terminated payers [#70050]
-	DB: DBLIC.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
 		- 20170223@Scofield: Initialize SP
