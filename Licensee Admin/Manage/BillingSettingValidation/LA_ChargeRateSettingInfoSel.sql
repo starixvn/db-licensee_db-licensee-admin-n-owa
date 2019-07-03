@@ -20,16 +20,16 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	SELECT p.PartyID, p.PartyName, p.PartyType, FromDate, ToDate, ProductID, 
-				ISNULL(Rate, 0)			AS Rate, 
-				ISNULL(FromParty, 0)	AS FromParty, 
-				ISNULL(ToParty, 0)		AS ToParty,
-				ISNULL(ChargeType, 0)	AS ChargeType,
-				ISNULL(SystemID, 0)		AS SystemID
-	FROM OAS_Party p WITH(NOLOCK) 
-	LEFT JOIN OAS_ChargeInfo ci WITH(NOLOCK) ON p.PartyID = ci.FromParty
+	SELECT p.PartyId, p.PartyName, p.PartyType, ci.FromDate, ci.ToDate, 
+		ISNULL(ci.ProductId, -1)		AS ProductId, 
+		ISNULL(ci.Rate, 0)			AS Rate, 
+		ISNULL(ci.FromParty, 0)		AS FromParty, 
+		ISNULL(ci.ToParty, 0)		AS ToParty,
+		ISNULL(ci.ChargeType, 0)	AS ChargeType
+	FROM dbo.OAS_Party p WITH(NOLOCK) 
+	LEFT JOIN dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON p.PartyID = ci.FromParty
 	LEFT JOIN LA_ChargeInfo_SystemMapping cs WITH(NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
-	WHERE (@PartyId = 0 OR @PartyId = p.PartyID) AND (ToDate IS NULL OR ToDate >= GETDATE())
-		  AND PartyID NOT IN (1,9,11,98) 	
+	WHERE (@PartyId = 0 OR @PartyId = p.PartyID)
+		AND p.PartyType IN (1,5) -- 1-official, 5-non-offcial
 END
 GO
