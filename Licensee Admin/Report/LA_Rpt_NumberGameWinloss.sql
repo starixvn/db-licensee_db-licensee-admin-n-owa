@@ -185,7 +185,7 @@ BEGIN
 		r.PartyName,
 		r.ParentId,
 		r.ParentName,
-		r.Winlostdate,
+		r.Winlostdate AS WinLossDate,
 		e.CurrencyCode AS CurrencyName,
 		-- Select by origin currency
 		r.TotalTrans,
