@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -226,3 +226,4 @@ BEGIN
 	DROP TABLE	#ChargeRate
 	DROP TABLE  #TempData
 END
+GO
