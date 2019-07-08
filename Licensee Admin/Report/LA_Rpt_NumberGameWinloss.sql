@@ -29,7 +29,7 @@ AS
  */
 
 BEGIN
-	SET NOCOUNT OFF
+	SET NOCOUNT ON
 
 	CREATE TABLE #Party (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
 	INSERT INTO #Party EXEC bodb_licensee.dbo.LA_PartyListSel
