@@ -31,8 +31,8 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	CREATE TABLE #Party (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
-	INSERT INTO #Party EXEC bodb_licensee.dbo.LA_PartyListSel
+	CREATE TABLE #PartyList (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
+	INSERT INTO #PartyList EXEC bodb_licensee.dbo.LA_PartyListSel
 
 	CREATE TABLE #ChargeRate (
 		PartyID			INT
@@ -97,8 +97,8 @@ BEGIN
 		ParentId = pa.PartyId,
 		ParentName = pa.PartyName
 	FROM #TempData td
-		INNER JOIN #Party p ON td.PartyID = p.PartyId
-		INNER JOIN #Party pa ON P.ParentId = PA.PartyId
+		INNER JOIN #PartyList p ON td.PartyID = p.PartyId
+		INNER JOIN #PartyList pa ON P.ParentId = PA.PartyId
 	
 	DECLARE @Total TABLE (
 		PartyId			INT,
@@ -221,7 +221,7 @@ BEGIN
 	
 	-- End Region
 	
-	DROP TABLE	#Party
+	DROP TABLE	#PartyList
 	DROP TABLE	#Exchange
 	DROP TABLE	#ChargeRate
 	DROP TABLE  #TempData
