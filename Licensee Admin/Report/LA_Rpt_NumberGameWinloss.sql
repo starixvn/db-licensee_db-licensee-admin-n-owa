@@ -98,11 +98,6 @@ BEGIN
 	-- EndRegion
 	
 	UPDATE td SET
-		
-		
-	FROM #tempData td
-	
-	UPDATE td SET
 		PartyName = p.PartyName,
 		ParentId = pa.PartyId,
 		ParentName = pa.PartyName
