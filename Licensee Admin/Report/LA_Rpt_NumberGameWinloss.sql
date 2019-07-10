@@ -81,16 +81,26 @@ BEGIN
 		b.CurrencyId,
 		SUM(b.Turnover) AS Turnover,
 		SUM(b.BetCount) AS TotalTrans,
-		SUM(b.MemberWL) AS CustomerWinLoss,
-		- SUM(b.MemberWL) AS LicenseeWinloss,
-		SUM(-b.MemberWL * ci.Rate) AS LicensingFee,
-		SUM(-b.MemberWL * ci.Rate3rd) AS PayToSupplier
-	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+		SUM(b.WinLoss) AS CustomerWinLoss,
+		- SUM(b.WinLoss) AS LicenseeWinloss,
+		- SUM(CASE WHEN ci.PartyID IN (25,30,324) 
+					THEN  (b.WinLoss + b.WinLossA + WinLossM + WinLossS + b.CommissionS)
+					ELSE (b.WinLoss * ci.Rate) END) AS LicensingFee,
+		- SUM(CASE WHEN ci.PartyID IN (25,30,324) 
+					THEN (b.WinLoss + b.WinLossA + WinLossM + WinLossS + b.CommissionS) * ci.Rate3rd
+					ELSE (b.WinLoss * ci.Rate3rd) END) AS PayToSupplier
+	FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
+		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
-		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
+		b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
+		AND b.Bettype in (Select Bettype FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'NG'))
 	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
 	-- EndRegion
+	
+	UPDATE td SET
+		
+		
+	FROM #tempData td
 	
 	UPDATE td SET
 		PartyName = p.PartyName,
