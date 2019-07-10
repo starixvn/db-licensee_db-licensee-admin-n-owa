@@ -20,7 +20,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	SELECT p.PartyID, PartyName, PartyType, dgd.Rate, dgp.ProductID, ISNULL(dg.DiscountGroupId, 0)	AS DiscountGroupId
+	SELECT p.PartyID, PartyName, PartyType, dgd.Rate, dgp.ProductID, ISNULL(dg.DiscountGroupId, 0)	AS RebateGroupId
 		   ,MAX(dg.FromDate) AS FromDate, MAX(dg.ToDate) AS ToDate
 	FROM OAS_Party p WITH(NOLOCK) 
 		LEFT JOIN LA_DiscountGroupAssignment dga WITH(NOLOCK) ON p.PartyID = dga.PartyId
