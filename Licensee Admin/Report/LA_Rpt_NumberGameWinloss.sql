@@ -102,7 +102,7 @@ BEGIN
 		SUM(b.WinLoss) AS CustomerWinLoss,
 		- SUM(b.WinLoss) AS LicenseeWinloss,
 		- SUM(b.WinLoss + b.WinLossA + WinLossM + WinLossS + b.CommissionS) AS LicensingFee,
-		- SUM(b.WinLoss * ci.Rate3rd) AS PayToSupplier
+		- SUM((b.WinLoss + b.WinLossA + WinLossM + WinLossS + b.CommissionS) * ci.Rate3rd) AS PayToSupplier
 	FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
 		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
