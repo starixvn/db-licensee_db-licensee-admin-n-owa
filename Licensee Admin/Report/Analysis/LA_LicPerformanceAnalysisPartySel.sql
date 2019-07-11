@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,dwrs2" viewers="" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_Licensee
 GO
 
@@ -8,7 +8,8 @@ ALTER PROCEDURE [dbo].LA_LicPerformanceAnalysisPartySel (
 AS
 /*  Created: 20190306@Bruce
 	Task : Get party & group info for licensee performance analysis report
-	DB: DBLIC.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
+	
 	Revisions:
 		- 20190306@Bruce: Create SP
 */
@@ -43,3 +44,4 @@ BEGIN
 	LEFT JOIN cte_Group g ON g.GroupId = a.GroupId
 	WHERE l.IsDeposit = 1
 END
+GO
