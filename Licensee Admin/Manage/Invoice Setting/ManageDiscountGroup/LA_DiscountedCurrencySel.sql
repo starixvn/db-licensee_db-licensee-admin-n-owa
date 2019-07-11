@@ -1,9 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountedCurrencySel]
@@ -13,7 +9,7 @@ AS
 /*  
 	 Created: 20181116@Parsons [#99694]
 	 Task : Configure discount settings by currency
-	 DB: DB052.bodb_licensee   
+	 DB: DBCUST.bodb_licensee   
 
 	 Revisions:  
 		- 20181116@Parsons: Configure discount settings by currency [#99694]
@@ -30,9 +26,9 @@ BEGIN
 	
 	INSERT INTO @CurrenciesOfLicensee(CurrencyId, CurrencyCode, CurrencyName)
 	SELECT DISTINCT lc.Currency, e.Code, CASE WHEN lc.Currency = 51 THEN 'VND' ELSE e.currency END AS CurrencyName
-	FROM dbo.f_SelLicenseeCust(0) AS lc
+	FROM dbo.LA_f_SelLicenseeCust(0) AS lc
 	INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON lc.LicenseeID = p.OldRefID 
-	INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
+	INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
 	WHERE lc.Currency <> 20 -- exclude test
 			AND p.PartyID = @PartyId
 	
@@ -53,7 +49,7 @@ BEGIN
 		FROM LA_DiscountGroupAssignment a WITH(NOLOCK)
 		INNER JOIN LA_DiscountGroupHeader h WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId AND h.DiscountGroupType IN (1, 3, 11, 13) 
 		INNER JOIN LA_DiscountGroupProduct p WITH(NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId 
-																AND p.ProductId IN (SELECT val FROM bodb02.dbo.strSplit(@ProductIds, ','))
+																AND p.ProductId IN (SELECT val FROM dbo.strSplit(@ProductIds, ','))
 		WHERE a.PartyID = @PartyId
 		GROUP BY p.ProductId )
 
@@ -66,7 +62,7 @@ BEGIN
 					INNER JOIN cte_DiscountSetting ds ON ds.DiscountGroupId = dc.DiscountGroupId AND ds.ProductId = val
 				FOR XML PATH (''))
 			  , 1, 2, '') AS CurrencyNames
-	FROM bodb02.dbo.strSplit(@ProductIds, ',')
+	FROM dbo.strSplit(@ProductIds, ',')
 	-- End Region: select discounted currency of party
 END
 GO

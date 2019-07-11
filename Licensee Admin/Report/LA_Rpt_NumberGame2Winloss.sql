@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -12,12 +12,12 @@ AS
 /*
   Created by : [20161214@Scofield.Huynh]
   Task  : Get Number Game 2 Winloss
-  DB   : DB052.bodb_licensee
+  DB   : DBLIC.bodb_licensee
  
-  Revision:
+  Revisions:
  	- 20171220@Parsons: increase length for variables [#88197]
 	- 20180716@bruce: add new group TEST for credit [#98126]
- */
+*/
 BEGIN
 	SET NOCOUNT ON
 
@@ -180,8 +180,4 @@ BEGIN
 	DROP TABLE #TempData
 	DROP TABLE #GrandTotals
 END    
-
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_NumberGame2Winloss] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_Rpt_NumberGame2Winloss] TO bodbAdminNet
 GO

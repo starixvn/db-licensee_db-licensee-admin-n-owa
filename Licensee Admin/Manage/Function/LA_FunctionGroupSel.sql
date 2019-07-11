@@ -1,8 +1,5 @@
-USE [bodb_licensee]
-GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_FunctionGroupSel]
@@ -11,7 +8,7 @@ AS
 /*	Header:
 	Created:2015.09.04 - Bravo.Tran
 	Task :	Enhance Manage Function 
-	DB:		DB052.bodb_Licensee
+	DB:		DBCUST.bodb_Licensee
    
 	Revisions: 
 		+ 20150904@Bravo: get function groups
@@ -24,9 +21,7 @@ BEGIN
 	SET NOCOUNT ON
 	
 	SELECT f.GroupID
-	FROM dbo.LA_GroupFunction f		
+	FROM dbo.LA_GroupFunction f WITH (NOLOCK)
 	WHERE f.FunctionID = @FunctionId 		
 END		
-
 GO
-GRANT EXECUTE ON [dbo].[LA_FunctionGroupSel] TO bodbAdminNet

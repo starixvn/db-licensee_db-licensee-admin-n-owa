@@ -1,11 +1,8 @@
-USE [bodb_licensee]
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+USE bodb_licensee
 GO
-/****** Object:  StoredProcedure [dbo].[LA_SelCurrencyByParty]    Script Date: 9/8/2014 4:55:03 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-ALTER PROCEDURE  [dbo].[LA_SelCurrencyByParty]		
+
+ALTER PROCEDURE [dbo].[LA_SelCurrencyByParty]		
 	 @PartyID		INT				= 0
 	, @excludeTest	BIT				= 0
 	, @SystemMode	VARCHAR(10)		= 'LA'
@@ -13,13 +10,13 @@ AS
 /*
 Created: 20140828@Florent
 Task : Get all the currency by a party
-Base : Acc_SelCurrencyByLicensee
-DB: DB052.bodb_licensee
-Revison:
+DB: DBCUST.bodb_Licensee
+
+Revisions:
     - 20141218@Florent: add more currency from credit licensee   
 	- 20150105@Florent: use f_SelLicenseeCust
 	- 20150312@Florent: add systemmode to use on report settlement
-Revisions:
+
 Param's Explanation:
 */
 SET NOCOUNT ON
@@ -30,7 +27,7 @@ BEGIN
 	BEGIN
 		INSERT INTO @temp
 		SELECT DISTINCT Currency
-		FROM dbo.f_SelLicenseeCust(0) AS lc
+		FROM dbo.LA_f_SelLicenseeCust(0) AS lc
 		INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON lc.LicenseeID = p.OldRefID
 		WHERE (
 				@PartyID = 0
@@ -54,14 +51,14 @@ BEGIN
 	BEGIN
 	    INSERT INTO @temp
 	    SELECT DISTINCT exchangeid
-	    FROM bodb02.dbo.Exchange
+	    FROM CustDB.dbo.Exchange
 	    WHERE exchangeid NOT IN (SELECT Currency FROM @temp)
 	END
 	DECLARE @temp1 AS TABLE (currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
 	INSERT INTO @temp1(currency, CurrencyName, CurrencyCode)
 	SELECT t.currency, e.currency, e.Code
 	FROM @temp t
-	INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON t.currency = e.exchangeid
+	INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON t.currency = e.exchangeid
 
 	UPDATE t1
 	SET CurrencyCode = t1.CurrencyCode + ' (' + CurrencyName + ')'
@@ -87,5 +84,3 @@ BEGIN
 	ORDER BY CurrencyName
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_SelCurrencyByParty] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_SelCurrencyByParty] TO bodbAdminNet 

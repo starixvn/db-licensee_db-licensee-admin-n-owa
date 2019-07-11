@@ -1,5 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
-
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -7,15 +6,14 @@ ALTER PROCEDURE [dbo].[LA_CumulativeRebateGroupInfoSel]
 AS  
 /*
 	Created: 2017.11.02 - Bruce.bui
-	Task : Select rebate group info
-	DB: DB052.bodb_Licensee  
+	Task: Select rebate group info
+	DB: DBCUST.bodb_Licensee  
 
-Revisions:
-	- 20171102@Bruce: Create New SP [RedmineID: #84163]
+	Revisions:
+		- 20171102@Bruce: Create New SP [RedmineID: #84163]
 	
-Example:
-	USE bodb_licensee
-	EXEC [LA_CumulativeRebateGroupInfoSel]
+	Example:
+		EXEC [LA_CumulativeRebateGroupInfoSel]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -37,10 +35,4 @@ BEGIN
 	SELECT * FROM @RebateGroup WHERE Id > 0
 
 END
-GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_CumulativeRebateGroupInfoSel] TO [vnteam]
-GO
-
-GRANT EXECUTE ON [dbo].[LA_CumulativeRebateGroupInfoSel] TO bodbAdminNet
 GO

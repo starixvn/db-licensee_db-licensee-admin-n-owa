@@ -1,30 +1,28 @@
-USE [bodb_licensee]
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+USE bodb_licensee
 GO
-/****** Object:  StoredProcedure [dbo].[LA_UserModify]    Script Date: 9/8/2014 4:59:36 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
+
 ALTER PROCEDURE [dbo].[LA_UserModify] 
 	 @UserID		INT OUTPUT
 	,@GroupID		INT
-	,@UserName	NVARCHAR(50)
+	,@UserName		nvarchar(50)
 	,@DisplayName	NVARCHAR(50)
 	,@UserPwd		VARCHAR(50)	 = ''
-	,@UserSalt	VARCHAR(50)	 = ''
-	,@IsActive	BIT
+	,@UserSalt		varchar(50)=''
+	,@IsActive		bit
 	,@Creator		INT
-	,@Language	VARCHAR(20)	 = 'en-us'
+	,@Language		varchar(20) = 'en-us'
 	,@LoginIP		VARCHAR(30)	 = ''
 	,@ErrCode		INT			 = 0 OUTPUT
 	,@ErrMsg		NVARCHAR(1000)	 = '' OUTPUT
 AS
-/*  
- * Created: 20140820@Florent
- * Task : Add or modify a user
- * DB: DB052.bodb_Licensee  
- *  
- * Revisions:     
+/*
+	Created: 20140820@Florent
+	Task : Add or modify a user
+	DB: DBCUST.bodb_Licensee  
+	
+	Revisions:
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 */
 SET NOCOUNT ON
 
@@ -43,21 +41,21 @@ BEGIN
 			WHERE UserID = @UserID
 			)
 	BEGIN
-		SELECT @LogSPDataOld = '<LA_UsersModify CustID="' + coalesce(cast(@UserID AS VARCHAR(10)), space(1)) + '" ' + 'UserName="' + coalesce(cast(UserName AS VARCHAR(20)), space(1)) + '" ' + 'DisplayName="' + coalesce(cast(DisplayName AS VARCHAR(20)), space(1)
-) + '" ' + 'StatusID="' + coalesce(cast(StatusID AS VARCHAR(20)), space(1)) + '" ' + 'ModifiedDate="' + coalesce(cast(ModifiedDate AS VARCHAR(20)), space(1)) + '" ' + 'Language="' + coalesce(cast(@Language AS VARCHAR(20)), space(1)) + '" ' + 'UserID="' + 
-coalesce(cast(@Creator AS VARCHAR(20)), space(1)) + '" ' + 'IP="' + coalesce(cast(@LoginIP AS VARCHAR(30)), space(1)) + '" />'
+		SELECT @LogSPDataOld = '<LA_UsersModify CustID="' + coalesce(cast(@UserID AS VARCHAR(10)), space(1)) + '" '
+											+ 'UserName="' + coalesce(cast(UserName AS VARCHAR(20)), space(1)) + '" '
+											+ 'DisplayName="' + coalesce(cast(DisplayName AS VARCHAR(20)), space(1)) + '" '
+											+ 'StatusID="' + coalesce(cast(StatusID AS VARCHAR(20)), space(1)) + '" '
+											+ 'ModifiedDate="' + coalesce(cast(ModifiedDate AS VARCHAR(20)), space(1)) + '" '
+											+ 'Language="' + coalesce(cast(@Language AS VARCHAR(20)), space(1)) + '" '
+											+ 'UserID="' + coalesce(cast(@Creator AS VARCHAR(20)), space(1)) + '" '
+											+ 'IP="' + coalesce(cast(@LoginIP AS VARCHAR(30)), space(1)) + '" />'
 		FROM dbo.LA_User WITH (NOLOCK)
 		WHERE UserID = @UserID
 
 		IF @UserPwd <> ''
 			AND @UserSalt <> ''
 		BEGIN
-			UPDATE dbo.LA_User
-			WITH (
-					UPDLOCK
-					,ROWLOCK
-					)
-
+			UPDATE dbo.LA_User WITH (UPDLOCK)
 			SET UserName = @UserName
 				,DisplayName = @DisplayName
 				,StatusID = @IsActive
@@ -69,12 +67,7 @@ coalesce(cast(@Creator AS VARCHAR(20)), space(1)) + '" ' + 'IP="' + coalesce(cas
 		END
 		ELSE
 		BEGIN
-			UPDATE dbo.LA_User
-			WITH (
-					UPDLOCK
-					,ROWLOCK
-					)
-
+			UPDATE dbo.LA_User WITH (UPDLOCK)
 			SET UserName = @UserName
 				,DisplayName = @DisplayName
 				,StatusID = @IsActive
@@ -138,39 +131,25 @@ coalesce(cast(@Creator AS VARCHAR(20)), space(1)) + '" ' + 'IP="' + coalesce(cas
 		END
 	END
 
-	SELECT @LogSPData = '<LA_UsersModify CustID="' + coalesce(cast(@UserID AS VARCHAR(10)), space(1)) + '" ' + 'UserName="' + coalesce(cast(@UserName AS VARCHAR(20)), space(1)) + '" ' + 'DisplayName="' + coalesce(cast(@DisplayName AS VARCHAR(20)), space(1)) 
-+ '" ' + 'StatusID="' + coalesce(cast(@IsActive AS VARCHAR(20)), space(1)) + '" ' + 'ModifiedDate="' + coalesce(cast(GETDATE() AS VARCHAR(20)), space(1)) + '" ' + 'Language="' + coalesce(cast(@Language AS VARCHAR(20)), space(1)) + '" ' + 'UserID="' + coal
-esce(cast(@Creator AS VARCHAR(20)), space(1)) + '" ' + 'IP="' + coalesce(cast(@LoginIP AS VARCHAR(30)), space(1)) + '" />'
+	SELECT @LogSPData = '<LA_UsersModify CustID="' + coalesce(cast(@UserID AS VARCHAR(10)), space(1)) + '" '
+									+ 'UserName="' + coalesce(cast(@UserName AS VARCHAR(20)), space(1)) + '" '
+									+ 'DisplayName="' + coalesce(cast(@DisplayName AS VARCHAR(20)), space(1)) + '" '
+									+ 'StatusID="' + coalesce(cast(@IsActive AS VARCHAR(20)), space(1)) + '" '
+									+ 'ModifiedDate="' + coalesce(cast(GETDATE() AS VARCHAR(20)), space(1)) + '" '
+									+ 'Language="' + coalesce(cast(@Language AS VARCHAR(20)), space(1)) + '" '
+									+ 'UserID="' + coalesce(cast(@Creator AS VARCHAR(20)), space(1)) + '" '
+									+ 'IP="' + coalesce(cast(@LoginIP AS VARCHAR(30)), space(1)) + '" />'
 
 	SET @endRun = getdate()
 	SET @duration = datediff(millisecond, @startRun, @endRun)
 
-	IF LEN(ISNULL(@LogSPDataOld, '')) = 0
-	BEGIN
-		SELECT @LogSPData = REPLACE(@LogSPData, 'LA_UsersModify', 'LA_UsersModify_Create')
-
-		EXEC dbo.OA_WriteLog_UserLog_RunSP @UserID = @Creator
-			,@CustID = @UserID
-			,@SPName = 'LA_UsersModify_Create'
-			,
-			--@ActionID = 0,  
-			@TrackingValue = @LogSPData
-			,@TrackingValue2 = @LogSPDataOld
-			,@duration = @duration
-	END
-	ELSE
-	BEGIN
-		EXEC dbo.OA_WriteLog_UserLog_RunSP @UserID = @Creator
-			,@CustID = @UserID
-			,@SPName = 'LA_UsersModify'
-			,
-			--@ActionID = 0,  
-			@TrackingValue = @LogSPData
-			,@TrackingValue2 = @LogSPDataOld
-			,@duration = @duration
-	END
+	-- Write Log
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+		@UserID				= @Creator  
+		,@CustID			= @UserID
+		,@SPName			= 'LA_UsersModify'
+		,@TrackingValue		= @LogSPData
+		,@TrackingValue2	= @LogSPDataOld
+		,@Duration			= @Duration
 END
-
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_UserModify] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_UserModify] TO bodbAdminNet 

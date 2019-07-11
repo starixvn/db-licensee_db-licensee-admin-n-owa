@@ -1,8 +1,5 @@
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceInfoGet] 
@@ -14,8 +11,8 @@ AS
 	DB: DB052.bodb_Licensee
    
 	Revisions: 
-		+ 2015.08.07: Invoice Info - Get
-        + 20160805@Bruce: Include hosting fee info
+		- 20150807@Bravo: Invoice Info - Get
+        - 20160805@Bruce: Include hosting fee info
         - 20171220@Parsons: increase length for variables [#88197]
 */
 /*	Example:
@@ -29,7 +26,7 @@ BEGIN
 	
 	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(10))
 	INSERT	INTO @BaseCurrencyTable(CurrencyId,CurrencyName)
-	EXECUTE bodb_Licensee.dbo.LA_SelBaseCurrency
+	EXECUTE CustDB.dbo.LA_BaseCurrency_Sel
 	
 	SELECT TOP 1	
 			i.InvoiceHeaderId,
@@ -79,6 +76,4 @@ BEGIN
 			LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON i.ProductId = p.Productid	
 	WHERE	i.InvoiceHeaderId = @InvoiceHeaderId
 END		
-
 GO
-GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceInfoGet] TO bodbAdminNet

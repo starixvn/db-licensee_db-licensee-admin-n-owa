@@ -1,9 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" selecters="bodbAdminNet" viewers="" isFunction="1" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
 USE bodb_Licensee
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER FUNCTION [dbo].[LA_f_BettypeProductMapping] (
@@ -16,7 +12,8 @@ RETURNS @tbBettypeProduct TABLE (
 AS
 /*	Created: 20141111@Florent
 	Task : Get bettype product mapping
-	DB: DB052/bodb_Licensee
+	DB: DBLIC.bodb_Licensee
+	
 	Revisions:
 		- 20150202@Patrick: Add more product: Bingo & Keno
 		- 20150414@Jim: add MicroGaming

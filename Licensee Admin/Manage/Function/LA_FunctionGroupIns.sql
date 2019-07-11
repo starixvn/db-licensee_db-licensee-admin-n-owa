@@ -1,8 +1,5 @@
-USE [bodb_licensee]
-GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_FunctionGroupIns]
@@ -16,10 +13,10 @@ AS
 /*	Header:
 	Created:2015.09.04 - Bravo.Tran
 	Task :	Enhance Manage Function 
-	DB:		DB052.bodb_Licensee
+	DB:		DBCUST.bodb_Licensee
    
 	Revisions: 
-		+ 20150904@Bravo: add function group
+		- 20150904@Bravo: add function group
 */
 /*	Example:
 	USE bodb_licensee
@@ -56,7 +53,7 @@ BEGIN
 		WHERE STOPVAL > 0
 		OPTION (MAXRECURSION 0)
 		
-		DELETE FROM dbo.LA_GroupFunction 
+		DELETE FROM dbo.LA_GroupFunction WITH (ROWLOCK, UPDLOCK)
 		WHERE FunctionID = @FunctionId
 		
 		INSERT INTO dbo.LA_GroupFunction(FunctionId, GroupID)
@@ -77,6 +74,4 @@ BEGIN
 		SELECT @ErrCode = 1, @ErrMsg = 'Invalid Input. Insert failed!!!'
 	END
 END		
-
 GO
-GRANT EXECUTE ON [dbo].[LA_FunctionGroupIns] TO bodbAdminNet

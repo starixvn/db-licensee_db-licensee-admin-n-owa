@@ -1,8 +1,5 @@
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceListGet]
@@ -17,15 +14,15 @@ AS
 /*	Header:
 	Created:2015.08.21 - Bravo.Tran
 	Task :	Create Invoice
-	DB:		DBLIC/bodb_Licensee
+	DB:		DBCUST.bodb_Licensee
 
 	Revisions:
-		+ 20150807@Bravo: Invoice Info List - Get
-		+ 20151019@Victor: Support Chinese on Invoice's text fields
-		+ 20170330@Bruce: include invoice path [RedmineID: #74096]
-		+ 20170606@Bruce: include invoice status, invoiceno [RedmineID: #76411]
-		+ 20170927@Bruce: increase PayerIds size to 4000 [#79905]
-		+ 20171030@Bruce: filter invoice date [#85256]
+		- 20150807@Bravo: Invoice Info List - Get
+		- 20151019@Victor: Support Chinese on Invoice's text fields
+		- 20170330@Bruce: include invoice path [RedmineID: #74096]
+		- 20170606@Bruce: include invoice status, invoiceno [RedmineID: #76411]
+		- 20170927@Bruce: increase PayerIds size to 4000 [#79905]
+		- 20171030@Bruce: filter invoice date [#85256]
 		- 20171220@Parsons: increase length for variables [#88197]
 */
 /*	Example:
@@ -120,7 +117,7 @@ BEGIN
 	-- Region: Base currency
 	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(10))
 	INSERT	INTO @BaseCurrencyTable(CurrencyId,CurrencyName)
-	EXECUTE bodb_Licensee.dbo.LA_SelBaseCurrency
+	EXECUTE CustDB.dbo.LA_BaseCurrency_Sel
 	-- End Region
 
 	-- Region: Get data
@@ -158,10 +155,4 @@ BEGIN
 	-- End Region
 
 END
-
-GO
-
-GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceListGet] TO bodbAdminNet
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Inv_InvoiceListGet] TO vnteam
 GO

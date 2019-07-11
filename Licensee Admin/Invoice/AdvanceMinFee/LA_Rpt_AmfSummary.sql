@@ -1,5 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
-
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
 GO
 
@@ -11,7 +10,7 @@ AS
 /*	Header:
 	Created: 20171226 - Bruce.Bui
 	Task : Manage AMF
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
 		- 20171226@Bruce: create SP report for AMF Summary [RedmineID: #87039]
@@ -204,7 +203,4 @@ BEGIN
 
 	DROP TABLE #Statement
 END
-GO
-
-GRANT EXECUTE ON [dbo].[LA_Rpt_AmfSummary] TO bodbAdminNet
 GO

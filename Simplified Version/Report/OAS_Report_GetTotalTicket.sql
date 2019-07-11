@@ -1,31 +1,33 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
 
 ALTER PROCEDURE [dbo].[OAS_Report_GetTotalTicket] 
      @NormalLicensee 	VARCHAR(1000)
-	,@Operator 		VARCHAR(1000)
-	,@FromDate 		SMALLDATETIME
+	,@Operator 			VARCHAR(1000)
+	,@FromDate 			SMALLDATETIME
 	,@ToDate 			SMALLDATETIME
-	,@SportID 		INT 			= 0
-	,@GroupBy 		TINYINT 		= 2
+	,@SportID 			INT 			= 0
+	,@GroupBy 			TINYINT 		= 2
 AS
-/*  
- * Created by : 20131203@Francis 
- * Task  : Get Total Transactions report for Sportbook (compatible with the new structure)
- * DB   : DB052.bodb02
- * Revisions :  
- 	- 20141103@Florent: use new structure (#25393)
-	- 20150412@Patrick: Add filter by PartyType
-	- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
-	- 20181206@bruce: Implement E-sport 2, HP5 [#105723]
+/*
+	Created by : 20131203@Francis
+	Task: Get Total Transactions report for Sportbook (compatible with the new structure)
+	DB: DBEXT.bodb02
+
+	Revisions:
+ 		- 20141103@Florent: use new structure (#25393)
+		- 20150412@Patrick: Add filter by PartyType
+		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+		- 20181206@bruce: Implement E-sport 2, HP5 [#105723]
 	
- * Param's Explanation:    
- *  - @NormalLicensee : List of normal licensee ID separated by ','  
- *  - @Operator   : List of operator ID separated by ','  
- *  - @GroupBy: + Value = 1: Daily grouping type
-			    + Value = 2: Monthly grouping type
- */
+	Param's Explanation:    
+		- @NormalLicensee: List of normal licensee ID separated by ','
+		- @Operator: List of operator ID separated by ','
+		- @GroupBy: + Value = 1: Daily grouping type
+					+ Value = 2: Monthly grouping type
+*/
+
 BEGIN
 	SELECT @Fromdate = ltrim(rtrim(@Fromdate))
 		,@Todate = ltrim(rtrim(@Todate))

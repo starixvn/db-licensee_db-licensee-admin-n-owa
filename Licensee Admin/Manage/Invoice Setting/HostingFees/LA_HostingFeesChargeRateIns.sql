@@ -1,9 +1,5 @@
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_HostingFeesChargeRateIns]
@@ -18,10 +14,12 @@ ALTER PROCEDURE [dbo].[LA_HostingFeesChargeRateIns]
 AS
 /*  
 	 Created: 20160620@Bravo
-	 Task : Insert hosting fees charge rate settings
-	 DB: DB052.bodb_Licensee  
+	 Task: Insert hosting fees charge rate settings
+	 DB: DBCUST.bodb_Licensee  
    
 	 Revisions:
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+
 	 Params:
 		+ @XmlChargeRates: '<ChargeRates>
 								<ChargeRate>
@@ -245,39 +243,16 @@ BEGIN
 	SET @endRun = GETDATE()
 	SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
 
-	DECLARE @SpName VARCHAR(100) = 'LA_HostingFeesChargeRateIns'
-	DECLARE @ActionID INT = ISNULL((
-		SELECT ActionId
-		FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
-		WHERE SPName = @SpName
-	),0)
-
-	BEGIN TRY
-		EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog
-			@UserId = @UserID
-			, @IP = @LoginIP
-			, @LicenseeID = 0
-			, @CurrencyID = 0
-			, @SPName = @SpName
-			, @CustId = 0
-			, @ActionId = @ActionID
-			, @Duration = @duration
-			, @Data = @logData
-			, @OldData = @logDataOld
-	END TRY
-	BEGIN CATCH
-		EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP
-			@UserID = @UserID
-			, @CustID = 0
-			, @ActionID = @ActionID
-			, @TrackingValue = @logData
-			, @TrackingValue2 = @logDataOld
-			, @duration = @duration
-	END CATCH
-
+	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+		@UserId			= @UserID
+		,@IP			= @LoginIP
+		,@LicenseeID	= 0
+		,@CurrencyID	= 0
+		,@SPName		= 'LA_HostingFeesChargeRateIns'
+		,@CustId		= 0
+		,@Duration		= @duration
+		,@Data			= @logData
+		,@OldData		= @logDataOld
 	-- EndRegion
 END
 GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_HostingFeesChargeRateIns] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_HostingFeesChargeRateIns] TO bodbAdminNet

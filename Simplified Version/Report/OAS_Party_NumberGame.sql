@@ -1,26 +1,22 @@
-USE [bodb_licensee]
-GO
-/****** Object:  StoredProcedure [dbo].[OAS_Party_NumberGame_xtest]    Script Date: 07/11/2014 10:23:38 AM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE [bodb_Licensee]
 GO
 
 ALTER PROCEDURE [dbo].[OAS_Party_NumberGame]
-AS  
-  
-/*  
- * Created by : 20140328@Florent 
- * Task  : Get all licensees (compatible with the new structure) for NumberGame Winloss report 
- * DB   : DB052.bodb_Licensee  
- * Revisions :  
-    - 20141031@Florent: Apply new Structure Using SystemMapping
-    - 20141105@Florent: fix get brand name of licensee
+AS
+
+/*
+	Created by: 20140328@Florent
+	Task: Get all licensees (compatible with the new structure) for NumberGame Winloss report
+	DB: DBLIC.bodb_Licensee
+
+	Revisions:
+		- 20141031@Florent: Apply new Structure Using SystemMapping
+		- 20141105@Florent: fix get brand name of licensee
  	
- * Param's Explanation:    
- * 
- */  
- 
+	Param's Explanation:
+*/
+
 BEGIN
 	SET NOCOUNT ON  
 	SELECT DISTINCT case when p1.PartyName='Boping' then p1.PartyID else  ci.FromParty end AS PartyID,
@@ -44,7 +40,4 @@ BEGIN
 			   AND cs.SystemID = 4
 		ORDER BY PartyName asc 
 END
-
 GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_Party_NumberGame] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[OAS_Party_NumberGame] TO bodbAdminNet 

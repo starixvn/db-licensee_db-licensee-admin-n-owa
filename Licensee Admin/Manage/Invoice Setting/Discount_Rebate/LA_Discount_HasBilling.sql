@@ -1,13 +1,18 @@
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
-ALTER PROCEDURE dbo.LA_Discount_HasBilling @DiscountGroupId INT
+
+ALTER PROCEDURE dbo.LA_Discount_HasBilling
+	@DiscountGroupId INT
 	, @HasBilling BIT = 0 OUTPUT
 AS
 /*  
 	 Created: 20150422@Patrick
-	 Task : Check this discount has not belong to any a invoice yet
-	 DB: DB052.bodb_Licensee
-	 Revisions:     
+	 Task: Check this discount has not belong to any a invoice yet
+	 DB: DBCUST.bodb_Licensee
+	 
+	 Revisions:
+		- 20150422@Patrick: Initialize SP
 		
 	 Params:
 		+ @Mode : 
@@ -35,7 +40,4 @@ BEGIN
 	END
 
 END
-GO
-GRANT VIEW DEFINITION ON dbo.LA_Discount_HasBilling TO vnteam
-GRANT EXECUTE ON dbo.LA_Discount_HasBilling TO bodbAdminNet
 GO

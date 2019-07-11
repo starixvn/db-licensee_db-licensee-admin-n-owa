@@ -1,9 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountGroupCurrencySel]
@@ -13,7 +9,7 @@ AS
 /*  
 	 Created: 20181022@Parsons [#99694]
 	 Task : Configure discount settings by currency
-	 DB: DB052.bodb_licensee   
+	 DB: DBCUST.bodb_licensee   
 
 	 Revisions:  
 		- 20181022@Parsons: Configure discount settings by currency [#99694]
@@ -29,9 +25,9 @@ BEGIN
 	
 	INSERT INTO @CurrenciesOfLicensee(PartyId, CurrencyId, CurrencyCode, CurrencyName)
 	SELECT DISTINCT p.PartyId, lc.Currency, e.Code, CASE WHEN lc.Currency = 51 THEN 'VND' ELSE e.currency END AS CurrencyName
-	FROM dbo.f_SelLicenseeCust(0) AS lc
+	FROM dbo.LA_f_SelLicenseeCust(0) AS lc
 	INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON lc.LicenseeID = p.OldRefID 
-	INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
+	INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
 	WHERE lc.Currency <> 20 -- exclude test
 			AND p.PartyID = @PartyId
 	

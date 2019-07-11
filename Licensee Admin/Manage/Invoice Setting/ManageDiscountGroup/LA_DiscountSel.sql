@@ -1,17 +1,13 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountSel]
 AS
 /*  
 	 Created: 20180627@Parsons [#94282]
-	 Task : Enhance Manage Discount group function to support more discount schemes
-	 DB: DB052.bodb_licensee   
+	 Task: Enhance Manage Discount group function to support more discount schemes
+	 DB: DBCUST.bodb_licensee   
 
 	 Revisions:  
 		- 20180627@Parsons: Get discount groups info [#94282]
@@ -54,7 +50,7 @@ BEGIN
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
 		LEFT JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON h.DiscountGroupId = p.DiscountGroupId
 		LEFT JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
-		LEFT JOIN bodb02.dbo.Exchange ex WITH(NOLOCK) ON h.CurrencyId = ex.ExchangeId
+		LEFT JOIN CustDB.dbo.Exchange ex WITH(NOLOCK) ON h.CurrencyId = ex.ExchangeId
 	WHERE DiscountGroupType IN (1, 3, 11, 13)
 	GROUP BY h.DiscountGroupId, 
 			h.DiscountGroupName,

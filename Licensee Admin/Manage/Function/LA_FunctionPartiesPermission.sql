@@ -1,4 +1,5 @@
-USE [bodb_licensee]
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_FunctionPartiesPermission]
@@ -8,7 +9,10 @@ AS
 /*	Header:
 	Created: 20170221@Bruce
 	Task : #70050: Add function permission for licensee
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
+
+	Revisions:
+		- 20170221@Bruce: Initialize SP
 */
 BEGIN
 	SET NOCOUNT ON
@@ -73,8 +77,4 @@ BEGIN
 	WHERE EXISTS (SELECT 1 FROM @FunctionKeys fk WHERE fk.FunctionKey = f.FunctionKey) AND
 		NOT EXISTS (SELECT 1 FROM dbo.LA_FunctionParty fp WITH(NOLOCK) WHERE PartyID = @PartyId AND fp.FunctionID=f.FunctionID)
 END
-GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_FunctionPartiesPermission] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_FunctionPartiesPermission] TO bodbAdminNet
 GO

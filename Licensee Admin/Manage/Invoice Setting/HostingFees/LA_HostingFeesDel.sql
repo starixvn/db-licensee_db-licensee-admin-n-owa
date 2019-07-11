@@ -1,9 +1,5 @@
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_HostingFeesDel]
@@ -16,9 +12,11 @@ AS
 /*  
 	 Created: 20160615@Bravo
 	 Task : Delete hosting fees settings
-	 DB: DB052.bodb_Licensee  
+	 DB: DBCUST.bodb_Licensee  
    
 	 Revisions:
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+
 	 Params:
 		
 	 Example:
@@ -62,39 +60,15 @@ BEGIN
 	SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
 
 	-- Write Log
-	DECLARE @SpName VARCHAR(100) = 'LA_HostingFeesDel'
-	DECLARE @ActionID INT = ISNULL((
-		SELECT ActionId
-		FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
-		WHERE SPName = @SpName
-	),0)
-	
-	BEGIN TRY
-		EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog
-			@UserId = @UserID
-			, @IP = @LoginIP
-			, @LicenseeID = 0
-			, @CurrencyID = 0
-			, @SPName = @SpName
-			, @CustId = 0
-			, @ActionId = @ActionID
-			, @Duration = @duration
-			, @Data = ''
-			, @OldData = @logData
-	END TRY
-	BEGIN CATCH
-		EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP
-			@UserID = @UserID
-			, @CustID = 0
-			, @ActionID = @ActionID
-			, @TrackingValue = ''
-			, @TrackingValue2 = @logData
-			, @duration = @duration
-	END CATCH	
-	--
+	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+		@UserId			= @UserID
+		,@IP			= @LoginIP
+		,@LicenseeID	= 0
+		,@CurrencyID	= 0
+		,@SPName		= 'LA_HostingFeesDel'
+		,@CustId		= 0
+		,@Duration		= @duration
+		,@Data			= ''
+		,@OldData		= @logData
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_HostingFeesDel] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_HostingFeesDel] TO bodbAdminNet 
-
- 

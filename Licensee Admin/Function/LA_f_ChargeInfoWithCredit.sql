@@ -1,8 +1,8 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" selecters="bodbAdminNet" viewers="vnteam" isFunction="1" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
 USE [bodb_licensee]
 GO
 
-CREATE FUNCTION [dbo].[LA_f_ChargeInfoWithCredit] (
+ALTER FUNCTION [dbo].[LA_f_ChargeInfoWithCredit] (
 	@PartyIDs			VARCHAR(4000)
 	, @FromDate			DATETIME
 	, @ToDate			DATETIME
@@ -26,10 +26,10 @@ RETURNS @tbChargeInfo TABLE (
 AS
 /*  Created: 20180815@Scofield
     Task : Get Charge Information for Credit
-    DB: DBLIC/bodb_Licensee
-    Param's Explanation:
+    DB: DBLIC.bodb_Licensee
+    
 	Revisions:
-		- 98623@Scofield: Get charge rate for Credits		
+		- 20180815@Scofield: Get charge rate for Credits		
 */
 
 BEGIN

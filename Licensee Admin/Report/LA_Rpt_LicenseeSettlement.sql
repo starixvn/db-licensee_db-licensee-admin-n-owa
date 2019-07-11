@@ -1,9 +1,5 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="1"></info>*/
 USE [bodb02]
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeSettlement]
@@ -18,7 +14,8 @@ AS
 	/*  Created: 20150313@Florent
 		Task : Report - Licensee Settlement Report
 		Base on : IMS_Rpt_LicenseeSettlement
-		DB: DB052.bodb02
+		DB: DBEXT.bodb02
+		
 		Revisions:
 			- 20150407@Florent: add filter no draw for BA Settlement
 			- 20150505@Florent: Integrate Gold Deluxe and Voidbridge

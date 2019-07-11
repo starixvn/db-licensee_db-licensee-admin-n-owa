@@ -1,8 +1,5 @@
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoicePathSel]
@@ -11,10 +8,10 @@ AS
 /*	
 	Created: 20170330@Bruce
 	Task :	Get invoice metadata [#74096]
-	DB:		DBLIC/bodb_Licensee
+	DB:		DBCUST.bodb_Licensee
 
-	Revision:
-		+ 20170609@Bruce: add filename [#76411]
+	Revisions:
+		- 20170609@Bruce: add filename [#76411]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -30,9 +27,4 @@ BEGIN
 		INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON d.PartyID = i.PartyId
 	WHERE InvoiceHeaderId = @InvoiceId
 END		
-
-GO
-GRANT EXECUTE ON [dbo].[LA_Inv_InvoicePathSel] TO bodbAdminNet
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Inv_InvoicePathSel] TO vnteam
 GO

@@ -1,23 +1,19 @@
-USE [bodb_licensee]
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
-/****** Object:  StoredProcedure [dbo].[LA_User_ReCheckIn]    Script Date: 9/8/2014 4:57:45 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
+
 ALTER PROCEDURE [dbo].[LA_User_ReCheckIn]     
-	@On_UserID	INT,    
+	@On_UserID		INT,    
 	@IsKickedOut	BIT = 0 OUTPUT    
 AS    
 
 /*
-	Creator:  20140820@Florent
+	Creator: 20140820@Florent
 	Task: ReCheckIN
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
-		
-
+		- 20140820@Florent: Initialize SP
 */
 SET NOCOUNT ON  
 BEGIN
@@ -40,7 +36,4 @@ BEGIN
 	    SET @IsKickedOut = 0    
     
 END
-
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_User_ReCheckIn] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_User_ReCheckIn] TO bodbAdminNet 

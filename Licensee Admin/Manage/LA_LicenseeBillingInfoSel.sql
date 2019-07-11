@@ -1,10 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeBillingInfoSel]
@@ -13,8 +8,7 @@ ALTER PROCEDURE [dbo].[LA_LicenseeBillingInfoSel]
 AS
 /*  Created: 20150318@Florent
 	Task : Report - Licensee Settlement Report
-	Base on : IMS_LicenseeBillingInfoSel
-	DB: DBLIC/bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
 		- 201505628@Florent: implement code

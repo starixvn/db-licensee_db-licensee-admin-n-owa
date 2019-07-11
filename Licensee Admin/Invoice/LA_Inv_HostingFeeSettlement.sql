@@ -1,4 +1,6 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
+GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_HostingFeeSettlement]
 	@PayerId	INT,
@@ -6,7 +8,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_HostingFeeSettlement]
 	@ToDate	DATETIME
 AS
 /*	Task : Get hostingfees settlement
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
 		+ 20160718@Bruce: Create

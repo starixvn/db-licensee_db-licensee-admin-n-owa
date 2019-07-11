@@ -1,9 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_Discount_AvailablePartyListSel]
@@ -15,7 +11,7 @@ AS
 /*  
 	 Created: 20180702@Parsons [#94282]
 	 Task : Enhance Manage Discount group function to support more discount schemes
-	 DB: DB052.bodb_licensee   
+	 DB: DBCUST.bodb_licensee   
 
 	 Revisions:  
 		- 20180702@Parsons: Get payer list [#94282]
@@ -45,7 +41,7 @@ BEGIN
 	FROM @PartyList p
 	WHERE p.PartyId NOT IN (SELECT PartyId 
 							FROM @PartySettings
-							WHERE ProductId IN (SELECT val FROM bodb02.dbo.strSplit(@ProductIds, ',') WHERE val != ''))
+							WHERE ProductId IN (SELECT val FROM dbo.strSplit(@ProductIds, ',') WHERE val != ''))
 			AND p.ParentId NOT IN (999, 0)
 
 	UNION
@@ -59,6 +55,6 @@ BEGIN
 						AND NOT EXISTS (SELECT p2.PartyId 
 									FROM @PartySettings p2 
 									WHERE p2.PartyId = p1.PartyId AND DiscountGroupId != @GroupId 
-									AND ProductId IN (SELECT val FROM bodb02.dbo.strSplit(@ProductIds, ',') WHERE val != '')))
+									AND ProductId IN (SELECT val FROM dbo.strSplit(@ProductIds, ',') WHERE val != '')))
 END
 GO

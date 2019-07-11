@@ -1,9 +1,5 @@
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerListSel]
@@ -12,7 +8,7 @@ AS
 /*
 	Created: 20150414@Florent
 	Task : get List Payer by all or by Id
-	DB: DB052.bodb_Licensee  
+	DB: DBCUST.bodb_Licensee  
 
 	Revisions:
 		- 20150917@Victor: support Chinese on settings
@@ -61,7 +57,3 @@ BEGIN
 	-- 5: non-offcial licensee
 END
 GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_PayerListSel] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_PayerListSel] TO bodbAdminNet
-

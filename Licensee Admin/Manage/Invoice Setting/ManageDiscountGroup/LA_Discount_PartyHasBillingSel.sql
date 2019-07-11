@@ -1,9 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_Discount_PartyHasBillingSel]
@@ -11,8 +7,8 @@ ALTER PROCEDURE [dbo].[LA_Discount_PartyHasBillingSel]
 AS
 /*  
 	 Created: 20180702@Parsons [#94282]
-	 Task : Enhance Manage Discount group function to support more discount schemes
-	 DB: DB052.bodb_licensee   
+	 Task: Enhance Manage Discount group function to support more discount schemes
+	 DB: DBCUST.bodb_licensee   
 
 	 Revisions:  
 		- 20180702@Parsons: Select party list has billing [#94282]

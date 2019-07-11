@@ -1,5 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
-USE [bodb_licensee]
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerNonOfficialIns]
@@ -23,11 +23,12 @@ AS
 /*
 	Created: 20161109@bruce.bui
 	Task : Insert non official payer
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
-	- 20161124@scofield: check unique BrandName
-	- 20180318@mason: Add @InvoiceLanguage parameter [#110445]
+		- 20161124@scofield: check unique BrandName
+		- 20180318@mason: Add @InvoiceLanguage parameter [#110445]
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 */
 BEGIN
 
@@ -38,6 +39,8 @@ BEGIN
 		, @endRun		DATETIME
 		, @duration		INT
 		, @xml			XML
+		, @LogData		NVARCHAR(MAX)
+
 	-- Time start
 	SET @startRun = GETDATE()
 
@@ -84,36 +87,18 @@ BEGIN
 
 	SET @endRun = GETDATE()
 	SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun)
+	SELECT @LogData = CONVERT(NVARCHAR(MAX), @xml)
 
-	--Write Log
-	DECLARE @ActionID INT = 0
-	DECLARE @SPName VARCHAR(50) = 'LA_PayerNonOfficialIns'
-
-	SELECT @ActionID = ActionId
-	FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
-	WHERE SPName = @SPName
-
-	BEGIN TRY
-		EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog 
-			@UserId = @UserID
-			, @IP = @LoginIP
-			, @LicenseeID = 0
-			, @CurrencyID = 0
-			, @SPName = @SPName
-			, @CustId = 0
-			, @ActionId = @ActionID
-			, @Duration = @duration
-			, @Data = @xml
-			, @OldData = ''
-	END TRY
-	BEGIN CATCH
-		EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP
-			@UserID = @UserID
-			, @CustID = 0
-			, @ActionID = @ActionID
-			, @TrackingValue = @xml
-			, @TrackingValue2 = ''
-			, @duration = @duration
-	END CATCH	
+	-- Write Log
+	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+		@UserId			= @UserID
+		,@IP			= @LoginIP
+		,@LicenseeID	= 0
+		,@CurrencyID	= 0
+		,@SPName		= 'LA_PayerNonOfficialIns'
+		,@CustId		= 0
+		,@Duration		= @duration
+		,@Data			= @LogData
+		,@OldData		= ''
 END
 GO

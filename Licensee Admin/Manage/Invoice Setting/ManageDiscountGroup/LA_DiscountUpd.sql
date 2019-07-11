@@ -1,9 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountUpd]
@@ -25,12 +21,13 @@ ALTER PROCEDURE [dbo].[LA_DiscountUpd]
 AS
 /*  
 	Created: 20180704@Parsons [#94282]
-	Task : Enhance Manage Discount group function to support more discount schemes
-	DB: DB052.bodb_licensee   
+	Task: Enhance Manage Discount group function to support more discount schemes
+	DB: DBCUST.bodb_licensee   
 
 	Revisions:  
 		- 20180704@Parsons: Update discount groups [#94282]
 		- 20181023@Parsons: Configure-discount-settings-by-currency [#99694]
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 
 	 Params:
 		@RateSettingsData = '<Root>
@@ -112,10 +109,10 @@ BEGIN
 	END
 
 	INSERT INTO @Products(ProductId, CalculationType)
-	SELECT val, @ToBeCalculated FROM bodb02.dbo.strSplit(@CalculationProductIds, ',')
+	SELECT val, @ToBeCalculated FROM dbo.strSplit(@CalculationProductIds, ',')
 	
 	;MERGE @Products AS t 
-	USING bodb02.dbo.strSplit(@DiscountProductIds, ',') AS s ON t.ProductId = s.val
+	USING dbo.strSplit(@DiscountProductIds, ',') AS s ON t.ProductId = s.val
 		WHEN MATCHED THEN UPDATE SET CalculationType = @CalculateAndDiscount
 		WHEN NOT MATCHED THEN INSERT (ProductId, CalculationType) VALUES(s.val, @ToBeDiscounted);
 

@@ -1,9 +1,5 @@
-USE [bodb_licensee]
-GO
-/****** Object:  StoredProcedure [dbo].[LA_UserCheckIn]    Script Date: 9/8/2014 4:58:09 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_UserCheckIn]
@@ -14,9 +10,12 @@ ALTER PROCEDURE [dbo].[LA_UserCheckIn]
 AS
 
 /*
-	Creator:  20140820@Florent
+	Creator: 20140820@Florent
 	Task: CheckIN
-	DB: DB052.bodb_Licensee	
+	DB: DBCUST.bodb_Licensee
+
+	Revisions:
+		- 20140820@Florent: Initialize SP
 */
 
 SET NOCOUNT ON
@@ -31,6 +30,3 @@ BEGIN
     SELECT @On_UserID = SCOPE_IDENTITY()
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_UserCheckIn] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_UserCheckIn] TO bodbAdminNet 
-

@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -8,7 +8,7 @@ AS
 /*  
 	 Created: 20150420@Florent
 	 Task : Get Payer setting
-	 DB: DB052.bodb_Licensee  
+	 DB: DBCUST.bodb_Licensee  
    
 	 Revisions:  
 		- 20150618@Florent: add column Currency to LA_Minfee   		  
@@ -20,7 +20,8 @@ AS
 		- 20170216@bruce.bui: [#70050]
 				+ sort product, include payername,
 				+ sort charge rate by expired
-		- 20180716@bruce: add new group TEST for credit [#98126] 		- 20181115@Parsons: Configure discount settings by currency [#99694]
+		- 20180716@bruce: add new group TEST for credit [#98126] 
+		- 20181115@Parsons: Configure discount settings by currency [#99694]
 		
 	 Params:
 		+ @PayerId :specify Party
@@ -175,7 +176,7 @@ BEGIN
 		, ToDate
 	FROM @Minfee m
 		INNER JOIN dbo.LA_f_Products3rd('') pr ON m.ProductID = pr.ProductID
-		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON m.CurrencyId = e.exchangeid
+		INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON m.CurrencyId = e.exchangeid
 		INNER JOIN @ProductOrder po ON pr.ProductID = po.ProductId
 	WHERE FeeTypeId = 1 -- Miniumfee
 	ORDER BY po.ProductOrder, m.FromDate
@@ -193,7 +194,4 @@ BEGIN
 	WHERE w.FeeTypeId = 2 -- waive
 	ORDER BY po.ProductOrder, w.FromDate
 END
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_PayerSettingDetailSel] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_PayerSettingDetailSel] TO bodbAdminNet
 GO

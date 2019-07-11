@@ -1,5 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
-
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -12,10 +11,11 @@ AS
 /*
 	Created: 20171030@Harper
 	Description: Report to get data of the current cumulative SB rebate for user
-	DB: DBLIC.bodb_licensee
+	DB: DBCUST.bodb_licensee
 
 	Revisions: 
 		- 20171030@Harper: Create new SP Cumulative SB Rebate Settlement Report [#RedmineID: 84163]
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 
 	EXEC LA_Rpt_CumulativeSBRebateSettlement @SettingGroupID = 8, @BaseCurrencyName = 'EUR', @Environment = 'LOCAL'
 */
@@ -50,7 +50,7 @@ BEGIN
 	SELECT d.SettingGroupHeaderId, d.TargetAmount, 
 			d.CurrencyId, e.Code, d.[Period], d.Rate, d.FromDate, d.ToDate, d.RestartDate
 	FROM dbo.LA_SettingGroupDetail d WITH (NOLOCK)
-		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON d.CurrencyId = e.exchangeid
+		INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON d.CurrencyId = e.exchangeid
 	WHERE d.SettingGroupHeaderId = @SettingGroupID AND d.[Status] = 'Active'
 
 	IF (SELECT ToDate FROM @tmpDiscountDetail) < GETDATE()
@@ -94,7 +94,7 @@ BEGIN
 	-- #Region: Get Exchange Rate	
 	INSERT INTO #Exchange(FirstExchangeDateByMonth, LastExchangeDateByMonth, ExchangeID, Rate)
 	SELECT FirstExchangeDateByMonth, LastExchangeDateByMonth, ExchangeID, BaseCurrencyRate
-	FROM bodb02.dbo.LA_f_SubExchangedailySel(@FromDateOfGroupSetting, @FirstDayCurrMonth, @BaseCurrencyName)
+	FROM CustDB.dbo.LA_f_SubExchangedailySel(@FromDateOfGroupSetting, @FirstDayCurrMonth, @BaseCurrencyName)
 	-- #EndRegion: Get Exchange Rate
 	
 	-- #Region: Get SB Invoice Data

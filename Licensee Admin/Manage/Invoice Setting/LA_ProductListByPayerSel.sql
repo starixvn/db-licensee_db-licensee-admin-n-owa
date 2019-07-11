@@ -1,9 +1,5 @@
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_ProductListByPayerSel]
@@ -12,9 +8,11 @@ AS
 /*  
 	 Created: 20150413@Florent
 	 Task : get List Products by Payerid or get all
-	 DB: DB052.bodb_Licensee  
+	 DB: DBCUST.bodb_Licensee  
    
-	 Revisions:     		  
+	 Revisions:
+		- 20150413@Florent: Initialize SP
+
 	 Params:
 		+ 0 get all products
 		+ <> 0 all product by PayerID
@@ -30,9 +28,5 @@ BEGIN
 		LEFT JOIN dbo.LA_f_Products3rd('') pd ON c.ProductID = pd.ProductID	
 	WHERE (@PayerId = 0 OR p.PartyID = @PayerId)
 	GROUP BY c.ProductID, pd.ProductPrefix, pd.ProductName
-	
-	
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_ProductListByPayerSel] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_ProductListByPayerSel] TO bodbAdminNet 

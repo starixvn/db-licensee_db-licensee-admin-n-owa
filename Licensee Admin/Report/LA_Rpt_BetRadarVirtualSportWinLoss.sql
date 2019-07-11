@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" sFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
 GO
 
@@ -11,7 +11,8 @@ AS
 /*
 	 Created: 20170707@Scofield [#79310]
 	 Task : Get report Bet Radar Virtual Sport Win Loss
-	 DB: DB052.bodb_licensee
+	 DB: DBLIC.bodb_licensee
+	 
 	 Revisions:
 		- 20170707@Scofield: Get report Bet Radar Virtual Sport Win Loss [#79310]
 		- 20171219@Bruce: increase length for variables [#88197]
@@ -288,10 +289,4 @@ BEGIN
 	DROP TABLE #Exchange
 	DROP TABLE #Result
 END
-
-GO
-GRANT EXECUTE ON [dbo].[LA_Rpt_BetRadarVirtualSportWinLoss] TO [bodbLicenseeNet] AS [dbo]
-GRANT EXECUTE ON [dbo].[LA_Rpt_BetRadarVirtualSportWinLoss] TO [bodbAdminNet] AS [dbo]
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_BetRadarVirtualSportWinLoss] TO [vnteam] AS [dbo]
 GO

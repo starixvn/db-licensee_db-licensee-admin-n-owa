@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -13,8 +13,8 @@ ALTER PROCEDURE [dbo].[LA_ChargeRateSettingModify]
 AS
 /*
 	 Created: 20150423@Florent
-	 Task : Add/ Modify Charge rate setting
-	 DB: DB052.bodb_Licensee
+	 Task: Add/ Modify Charge rate setting
+	 DB: DBCUST.bodb_Licensee
 
 	 Revisions:
 		- 20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
@@ -28,6 +28,7 @@ AS
 		- 20170307@Scofield: update to not save rate, basic billing, first billing for MGC[#70050]
 		- 20170407@Scofield: log dataold [#73310]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 
 	 Params:
 		+ @InvoiceSettingXML: '<ChargeSettings>
@@ -62,10 +63,6 @@ BEGIN
 			, @MinDate			DATE
 			, @MaxDate			DATE
 	SET @startRun = GETDATE()
-	DECLARE @ActionID INT = 0
-	SELECT @ActionID = ActionId
-	FROM bodb_CustomerLog.dbo.LogAction_Lic WITH (NOLOCK)
-	WHERE SPName = 'LA_ChargeRateSettingModify'
 
 	IF ISNULL(@ChargeSettingXML, '') = '' RETURN
 
@@ -319,29 +316,17 @@ BEGIN
 		SET @endRun = GETDATE()
 		SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun)
 
-		--Write Log
-		BEGIN TRY
-			EXEC bodb_CustomerLog.dbo.NAP_SpecialCustSetting_WriteLog
-				@UserId = @UserID
-				, @IP = @LoginIP
-				, @LicenseeID = 0
-				, @CurrencyID = 0
-				, @SPName = 'LA_ChargeRateSettingModify'
-				, @CustId = 0
-				, @ActionId = @ActionID
-				, @Duration = @duration
-				, @Data = @logSPData
-				, @OldData = @logSPDataOld
-		END TRY
-		BEGIN CATCH
-			EXEC bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP
-				@UserID = @UserID
-				, @CustID = 0
-				, @ActionID = @ActionID
-				, @TrackingValue = @LogSPData
-				, @TrackingValue2 = @logSPDataOld
-				, @duration = @duration
-		END CATCH
+		-- Write Log
+		EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+			@UserId			= @UserID
+			,@IP			= @LoginIP
+			,@LicenseeID	= 0
+			,@CurrencyID	= 0
+			,@SPName		= 'LA_ChargeRateSettingModify'
+			,@CustId		= 0
+			,@Duration		= @duration
+			,@Data			= @logSPData
+			,@OldData		= @logSPDataOld
 	END
 	ELSE
 	BEGIN
@@ -358,8 +343,4 @@ BEGIN
 		RETURN
 	END
 END
-GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_ChargeRateSettingModify] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_ChargeRateSettingModify] TO bodbAdminNet
 GO

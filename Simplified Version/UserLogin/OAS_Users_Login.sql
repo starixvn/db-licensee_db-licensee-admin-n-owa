@@ -1,32 +1,35 @@
-﻿ALTER PROCEDURE [dbo].[OAS_Users_Login]	
+﻿/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE [bodb_Licensee]
+GO 
+
+ALTER PROCEDURE [dbo].[OAS_Users_Login]
 	@Username VARCHAR(50)
 AS
 
 /*
- *	Created by	: [20111512@Kos]
- *	Task		: Get user and password for the login user
- *	DB			: DB052.bodb_Licensee
- *	Revisions	:
- *
- *	Param's Explanation:  
- *		- @Username		: Username
- */
+	Created by: [20111512@Kos]
+	Task: Get user and password for the login user
+	DB: DBCUST.bodb_Licensee
+	
+	Revisions:
+		- 20190510@Percy: Move SP to DBCUST.bodb_Licensee [RedmineID: #103658]
+	
+	Param's Explanation:  
+		- @Username: Username
+*/
 
-SET NOCOUNT ON
+BEGIN
+	SET NOCOUNT ON
 
-SELECT UserID,
-	Username,
-	UserPwd,
-	UserSalt,
-	DisplayName,
-	Role,
-	IsActive,
-	IsTest  
-FROM dbo.OAS_Users WITH (NOLOCK)
-WHERE Username = @Username
-
-
+	SELECT UserID,
+		Username,
+		UserPwd,
+		UserSalt,
+		DisplayName,
+		Role,
+		IsActive,
+		IsTest
+	FROM dbo.OAS_Users WITH (NOLOCK)
+	WHERE Username = @Username
+END
 GO
-GRANT EXECUTE ON [dbo].[OAS_Users_Login] TO [bodbAdminNet] 
-GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_Users_Login] TO [vnteam]  

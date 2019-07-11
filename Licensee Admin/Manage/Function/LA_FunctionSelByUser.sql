@@ -1,9 +1,5 @@
-USE [bodb_licensee]
-GO
-/****** Object:  StoredProcedure [dbo].[LA_FunctionSelByUser]    Script Date: 9/8/2014 4:52:14 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_FunctionSelByUser]
@@ -13,9 +9,11 @@ AS
 /*  
 	 Created: 20140814@Florent
 	 Task : Select Function list by User
-	 DB: DB052.bodb_Licensee  
+	 DB: DBCUST.bodb_Licensee  
    
-	 Revisions:     
+	 Revisions:
+		- 20140814@Florent: Initialize SP
+
 	 Params :	 @getAll : 0 : get only Function active
 				    : 1 : get all function both active and not
 */
@@ -41,5 +39,3 @@ BEGIN
 		  --AND (@getAll = 1 or f.StatusID != @getAll)
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_FunctionSelByUser] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_FunctionSelByUser] TO bodbAdminNet 

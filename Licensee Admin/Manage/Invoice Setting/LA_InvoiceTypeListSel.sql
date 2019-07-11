@@ -1,9 +1,5 @@
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_InvoiceTypeListSel]
@@ -12,10 +8,10 @@ AS
 /*  
 	 Created: 20150413@Florent
 	 Task : get List Invoice type by all or id
-	 DB: DB052.bodb_Licensee  
+	 DB: DBCUST.bodb_Licensee  
    
 	 Revisions:     		  
-		+ 20180109@bruce: filter invoice type by IsVisible=1 [#87039]
+		- 20180109@bruce: filter invoice type by IsVisible=1 [#87039]
 	 Params:
 		+ 0 get all Invoice type
 		+ <> 0 specify a Invoice type
@@ -28,7 +24,4 @@ BEGIN
 	FROM dbo.LA_InvoiceType WITH (NOLOCK)
 	WHERE (@InvoiceTypeId = 0 OR InvTypeId = @InvoiceTypeId) AND IsVisible=1
 END
-
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_InvoiceTypeListSel] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_InvoiceTypeListSel] TO bodbAdminNet 

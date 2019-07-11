@@ -1,30 +1,29 @@
-USE [bodb_licensee]
-GO
-/****** Object:  StoredProcedure [dbo].[OAS_Party_TotalTrans]    Script Date: 07/11/2014 10:27:31 AM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE [bodb_Licensee]
 GO
 
-/****** Object:  Stored Procedure dbo.OAS_Party_TotalTrans    Script Date: 12/31/2013 10:38:18  ******/
-ALTER PROCEDURE [dbo].[OAS_Party_TotalTrans] 
-	 @FromDate 	SMALLDATETIME
+ALTER PROCEDURE [dbo].[OAS_Party_TotalTrans]
+	 @FromDate 		SMALLDATETIME
 	,@ToDate 		SMALLDATETIME
 	,@ExcludeTest 	BIT 			= 1
 AS
-/*  
- * Created by : 20131126@Francis 
- * Task  : Get all licensees (compatible with the new structure) for Total Trans report 
- * DB   : DB052.bodb_Licensee  
- * Revisions :  
- 	- 20141031@Florent: Apply new Structure Using SystemMapping
-	- 20141105@Florent: fix get brand name of licensee
-	- 20150412@Patrick: Add filter by PartyType
 
- * Param's Explanation:    
- *  - @ExcludeTest: to exclude Spondemo (a test licensee)
- exec [OAS_Party_TotalTrans_xtest] '2014-09-01','2014-09-30'
- */
+/*
+	Created by: 20131126@Francis
+	Task: Get all licensees (compatible with the new structure) for Total Trans report
+	DB: DB052.bodb_Licensee
+	
+	Revisions:
+ 		- 20141031@Florent: Apply new Structure Using SystemMapping
+		- 20141105@Florent: fix get brand name of licensee
+		- 20150412@Patrick: Add filter by PartyType
+
+	Param's Explanation:    
+		- @ExcludeTest: to exclude Spondemo (a test licensee)
+
+	exec [OAS_Party_TotalTrans] '2014-09-01','2014-09-30'
+*/
+
 BEGIN
 	SET NOCOUNT ON
 
@@ -38,7 +37,7 @@ BEGIN
 								    END AS PartyName
 		,ci.ParentChargeID
 	FROM dbo.OAS_ChargeInfo ci WITH (NOLOCK)
-	     INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON ci.FromParty = p.PartyID
+	    INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON ci.FromParty = p.PartyID
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 4
 		LEFT JOIN dbo.LA_ChargeInfo_MinFee cm WITH (NOLOCK) ON ci.ChargeID = cm.ChargeID
 		LEFT JOIN dbo.OAS_PartyDetail pd (NOLOCK) ON p.PartyID = pd.PartyID
@@ -68,5 +67,3 @@ BEGIN
 	ORDER BY ci.ParentChargeID ASC
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_Party_TotalTrans] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[OAS_Party_TotalTrans] TO bodbAdminNet 

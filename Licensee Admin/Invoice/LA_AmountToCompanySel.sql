@@ -1,9 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
 USE bodb_Licensee
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_AmountToCompanySel] (
@@ -18,7 +14,8 @@ ALTER PROCEDURE [dbo].[LA_AmountToCompanySel] (
 AS
 /*	Created: 20180703@Bruce
 	Task : calculate discount, rebate, licensing fee in one invoice period(one month)
-	DB: DB052/bodb_Licensee
+	DB: DBLIC.bodb_Licensee
+	
 	Revisions:
 		- 20180703@Bruce: calculate discount,rebate [#94282]
 		- 20181114@Bruce: discount by currency [#99694] 

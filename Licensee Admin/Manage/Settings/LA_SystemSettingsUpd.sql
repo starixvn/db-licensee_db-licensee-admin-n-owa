@@ -1,9 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-USE [bodb_Licensee]
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE dbo.LA_SystemSettingsUpd
@@ -15,10 +11,11 @@ ALTER PROCEDURE dbo.LA_SystemSettingsUpd
 AS
 /*	Created: 20181130@Parsons
 	Task: LA-Licensee Performance Alert
-	DB: DBLIC.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
 		- 20181130@Parsons: LA - Licensee Performance Alert [#104918]
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 */
 BEGIN
 	SET NOCOUNT ON;
@@ -38,13 +35,13 @@ BEGIN
 
 	DECLARE @Doing NVARCHAR(MAX) = (SELECT @Key AS [Key], @Value AS [Value] FOR XML PATH(''))
 
-	EXEC DBLOG.bodb_CustomerLog.dbo.WriteLog_UserLog_UserControl
-		@custid = 0,
-		@doing = @Doing,
-		@userid = @UserId,
-		@typeid = 0,
-		@actionid = 5534,
-		@duration = 0
+	EXEC CustDB.dbo.WriteLog_UserLog_UserControl_Wrapper
+		@CustID		= 0
+		,@Doing		= @Doing
+		,@UserID	= @UserID
+		,@TypeID	= 0
+		,@ActionID	= 5534
+		,@Duration	= 0
 
 	IF @@ERROR <> 0
 	BEGIN

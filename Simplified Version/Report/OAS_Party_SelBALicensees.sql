@@ -1,27 +1,23 @@
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE [bodb_Licensee]
 GO
 
 ALTER PROCEDURE [dbo].[OAS_Party_SelBALicensees]   
 	@ExcludeTest BIT = 1
-AS  
-  
+AS
 
-/*  
- * Created by : 20131126@Francis 
- * Task  : Get all licensees (compatible with the new structure) for Sportbook Winloss report 
- * DB   : DB052.bodb_Licensee  
- * Revisions :  
- 	- 20141031@Florent: Apply new Structure Using SystemMapping
-    - 20141105@Florent: fix get brand name of licensee
-	- 20150412@Patrick: Add filter by PartyType
+/*
+	Created by: 20131126@Francis
+	Task: Get all licensees (compatible with the new structure) for Sportbook Winloss report
+	DB: DBLIC.bodb_Licensee
 
- * Param's Explanation:    
- * - @ExcludeTest: to exclude Spondemo (a test licensee)
+	Revisions:
+ 		- 20141031@Florent: Apply new Structure Using SystemMapping
+		- 20141105@Florent: fix get brand name of licensee
+		- 20150412@Patrick: Add filter by PartyType
+
+	Param's Explanation:
+		- @ExcludeTest: to exclude Spondemo (a test licensee)
  */  
  
 BEGIN
@@ -60,5 +56,3 @@ BEGIN
 
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_Party_SelBALicensees]TO [vnteam]
-GRANT EXECUTE ON [dbo].[OAS_Party_SelBALicensees]TO bodbAdminNet

@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -12,6 +12,7 @@ AS
 /*  Created: 20170328@scofield.huynh
 	Task : Report - Cashout Winloss
 	DB: DBLIC.bodb_licensee
+	
 	Revisions:
 		- 20170401@Harper: #73310_Change sum table for CashOut Product
 		- 20171219@Bruce: increase length for variables [#88197]
@@ -234,10 +235,4 @@ BEGIN
 	DROP TABLE #ExchangeBase
 	DROP TABLE #Result
 END
-GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_CashoutWinloss] TO [vnteam]
-GO
-
-GRANT EXECUTE ON [dbo].[LA_Rpt_CashoutWinloss] TO [bodbAdminNet]
 GO

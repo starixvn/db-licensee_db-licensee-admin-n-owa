@@ -1,9 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
 USE bodb_Licensee
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].LA_GEN_LicPerformanceAnalysis_Adjustment (
@@ -17,7 +13,7 @@ AS
 	Created: BRUCE
 	Date: 20190312
 	Task: Licensee Performance Analysis (PowerBI)
-	DB: bodb_licensee
+	DB: DBLIC.bodb_licensee
 	Remark: generate licensee performance analysis report: adjustment values
 
 	Revisions:

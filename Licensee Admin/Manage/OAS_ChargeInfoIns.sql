@@ -1,5 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbLicenseeNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
-
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[OAS_ChargeInfoIns] 
 	@ProductName			NVARCHAR(10)
 	, @FromPartyName		NVARCHAR(50)
@@ -22,9 +21,9 @@ ALTER PROCEDURE [dbo].[OAS_ChargeInfoIns]
 AS
 /*
 	Created: 20140424@Florent
-	Task : Add new charge into OAS_ChargeInfo
-	Base : 
-	DB: DB052.bodb_licensee
+	Task: Add new charge into OAS_ChargeInfo
+	Base: 
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
 		- 20140506@Florent: get exact name of licensee
@@ -254,7 +253,7 @@ BEGIN
 		INSERT INTO dbo.LA_ChargeInfo_SystemMapping (ChargeID, SystemID)
 		SELECT @ChargeId, s.id
 		FROM dbo.Systems s WITH (NOLOCK)
-		WHERE s.SystemName IN (SELECT val FROM bodb02.dbo.strSplit(@System, ','))
+		WHERE s.SystemName IN (SELECT val FROM dbo.strSplit(@System, ','))
 
 	END
 	ELSE

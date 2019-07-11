@@ -1,11 +1,7 @@
-USE [bodb_licensee]
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
-/****** Object:  StoredProcedure [dbo].[LA_UserPwdReset]    Script Date: 9/8/2014 5:01:39 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-/****** Object:  Stored Procedure dbo.OA_UserPwdReset    Script Date: 10/21/2011 7:48:20 PM ******/
+
 ALTER PROCEDURE [dbo].[LA_UserPwdReset]
 	@AdminID int,	
 	@UserID int,	
@@ -20,8 +16,10 @@ AS
 /*
 	Created by: [20140820@Florent]
 	Task: Reset Pwd of a Licensee user
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
+	
 	Revisions:
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 */
 
 SET NOCOUNT ON
@@ -65,17 +63,16 @@ BEGIN
 	'IP="'+ coalesce(cast(@LoginIP as varchar(30)),space(1)) + '" />'  
 
     set @endRun = getdate()  
-    set @duration  = datediff (millisecond,@startRun,@endRun)   
-    ---------------------------  
-    EXEC dbo.OA_WriteLog_UserLog_RunSP  
-	@UserID = @AdminID,   
-	@CustID = @UserID,  
-	@SPName='LA_UserPwdReset',
-	@ActionID = 2,  
-	@TrackingValue = @LogSPData,  
-	@TrackingValue2 = @LogSPDataOld,  
-	@duration = @duration
+    set @duration  = datediff (millisecond,@startRun,@endRun)
 
+	-- Write Log
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+		@UserID				= @AdminID  
+		,@CustID			= @UserID
+		,@SPName			= 'LA_UserPwdReset'
+		,@TrackingValue		= @LogSPData
+		,@TrackingValue2	= @LogSPDataOld
+		,@Duration			= @Duration
 END
 ELSE
 BEGIN
@@ -90,6 +87,3 @@ BEGIN
     return    
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_UserPwdReset] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_UserPwdReset] TO bodbAdminNet 
-

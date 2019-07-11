@@ -1,23 +1,17 @@
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_BankInfoSel]
 	 @BillerId	INT	= 0	
 AS
 /*  
-	 Created: 20150604@Florent
-	 Task : get list bank info 
-	 DB: DB052.bodb_Licensee  
+	Created: 20150604@Florent
+	Task : get list bank info 
+	DB: DBCUST.bodb_Licensee  
    
-	 Revisions:     		  
-	 Params:		
-	 Example:
-		EXEC dbo.LA_BankInfoSel 1
+	Revisions:
+		- 20150604@Florent: Initialize SP
+	
+	Params:		
+	Example: EXEC dbo.LA_BankInfoSel @BillerId = 1
 */
 BEGIN
 
@@ -39,9 +33,5 @@ BEGIN
 		INNER JOIN dbo.LA_BankInfo b WITH (NOLOCK) ON p.PartyID = b.PartyID
 	WHERE p.PartyType = 4
 		AND (@BillerId = 0 OR p.PartyID = @BillerId)
-		
 END
-
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_BankInfoSel] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_BankInfoSel] TO bodbAdminNet 

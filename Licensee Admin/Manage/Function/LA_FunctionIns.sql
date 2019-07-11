@@ -1,13 +1,9 @@
-USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_FunctionIns] 
-	@FunctionID	INT OUTPUT,
+	@FunctionID		INT OUTPUT,
 	@FunctionName	nvarchar(50),
 	@FunctionDesc	nvarchar(50) = '',
 	@GroupIDs		Varchar(5500) = '', -- '1,2,3'
@@ -20,16 +16,17 @@ ALTER PROCEDURE [dbo].[LA_FunctionIns]
 	@Language		VARCHAR(20) = 'en-us',
 	@LoginIP		VARCHAR(30) = '',
 	@ErrCode		INT = 0 OUTPUT,
-	@ErrMsg		NVARCHAR(1000) = '' OUTPUT
+	@ErrMsg			NVARCHAR(1000) = '' OUTPUT
 AS
 
 /*  
 	 Created: 20140814@Florent
 	 Task : Create new Function
-	 DB: DB052.bodb_Licensee  
+	 DB: DBCUST.bodb_Licensee  
    
 	 Revisions:     
-		+ 20150904@Bravo: add default function permission
+		- 20150904@Bravo: add default function permission
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 */
 SET NOCOUNT ON
 DECLARE
@@ -67,7 +64,7 @@ BEGIN
 		--Add to Group Function
 		INSERT INTO dbo.LA_GroupFunction WITH (ROWLOCK) (GroupID,FunctionID)
 		SELECT val,@FunctionID
-		FROM bodb02.dbo.strSplit(@GroupIDs,',')
+		FROM dbo.strSplit(@GroupIDs,',')
 		
 		-- Add to User Function
 		INSERT INTO dbo.LA_UserFunction
@@ -84,10 +81,9 @@ BEGIN
 		END 
 	END	
 	SELECT @FunctionID	
-	--Write Log	
 	
-
-	   SELECT @LogSPData =
+	--Write Log	
+	SELECT @LogSPData =
 		'<LA_FunctionIns FunctionID="'+ coalesce(cast(@FunctionID AS VARCHAR(10)),space(1)) + '" ' +
 		'FunctionName="'+ coalesce(cast(@FunctionName AS NVARCHAR(50)),space(1)) + '" ' +
 		'FunctionKey="'+ coalesce(cast(@FunctionKey AS NVARCHAR(50)),space(1)) + '" ' +
@@ -103,17 +99,15 @@ BEGIN
 		'Language="'+ coalesce(cast(@Language AS VARCHAR(20)),space(1)) + '" ' +  
 		'IP="'+ coalesce(cast(@LoginIP AS VARCHAR(50)),space(1)) + '" />'
 
-	   SET @endRun = getdate()
-	   SET @duration  = datediff (millisecond, @startRun, @endRun)
+	SET @endRun = getdate()
+	SET @duration  = datediff (millisecond, @startRun, @endRun)
 
-	   EXEC dbo.OA_WriteLog_UserLog_RunSP
-		   @UserID = @Creator,
-		   @CustID = 0,
-		   @SPName ='LA_FunctionIns',
-		   @TrackingValue = @LogSPData,
-		   @TrackingValue2 = @LogSPDataOld,
-		   @duration = @duration
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+		@UserID				= @Creator
+		,@CustID			= 0
+		,@SPName			= 'LA_FunctionIns'
+		,@TrackingValue		= @LogSPData
+		,@TrackingValue2	= @LogSPDataOld
+		,@duration			= @duration
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_FunctionIns] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_FunctionIns] TO bodbAdminNet 

@@ -1,8 +1,5 @@
-USE [bodb_licensee]
-GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_SelProductByParty] 
@@ -12,10 +9,11 @@ AS
 /*
 Created: 20150312@Florent
 Task : Get all product by a party
-DB: DB052.bodb_licensee
-Revison:
+DB: DBCUST.bodb_licensee
 
 Revisions:
+	- 20150312@Florent: Initialize SP
+
 Param's Explanation:
 */
 SET NOCOUNT ON
@@ -45,8 +43,5 @@ BEGIN
 				END
 		ORDER BY pr.Productid
 	END
-	
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_SelProductByParty] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_SelProductByParty] TO bodbAdminNet

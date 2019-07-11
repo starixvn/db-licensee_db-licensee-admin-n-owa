@@ -1,11 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
-
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerGroupListSel]
@@ -15,10 +9,11 @@ AS
 /*  
 	 Created: 20150422@Florent
 	 Task : get List Payer Group by all or by Id
-	 DB: DB052.bodb_Licensee  
+	 DB: DBCUST.bodb_Licensee  
    
 	 Revisions:
-		  - 20180327@Parsons: Apply min fee rule for discount calculation [#109997]     		  
+		  - 20180327@Parsons: Apply min fee rule for discount calculation [#109997]
+
 	 Params:
 		+ 0 get all payer
 		+ <> 0 specify a payer

@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
 GO
 
@@ -331,11 +331,4 @@ BEGIN
 	DROP TABLE #Exchange
 	DROP TABLE #Result
 END
-
-GO
-
-GRANT EXECUTE ON [dbo].[LA_Rpt_AGCasinoWinLoss] TO [bodbLicenseeNet] AS [dbo]
-GRANT EXECUTE ON [dbo].[LA_Rpt_AGCasinoWinLoss] TO [bodbAdminNet] AS [dbo]
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_AGCasinoWinLoss] TO [vnteam] AS [dbo]
 GO

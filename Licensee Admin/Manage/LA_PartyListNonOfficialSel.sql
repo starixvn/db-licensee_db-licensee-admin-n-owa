@@ -1,4 +1,5 @@
-USE [bodb_licensee]
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_PartyListNonOfficialSel]
@@ -6,9 +7,11 @@ AS
 /*
 	Created: 20161109@bruce.bui
 	Task : Get list of non-official payer
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
+		- 20161109@Bruce: Initialize SP
+
 	Params:
 	Example:
 		EXEC dbo.LA_PartyListNonOfficialSel
@@ -37,6 +40,3 @@ BEGIN
 	SELECT 1000, 'Non-Official Licensees', '', 0
 END
 GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_PartyListNonOfficialSel] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_PartyListNonOfficialSel] TO bodbAdminNet

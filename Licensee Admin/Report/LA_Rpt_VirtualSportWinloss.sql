@@ -1,9 +1,5 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_VirtualSportWinloss]
@@ -18,11 +14,11 @@ ALTER PROCEDURE [dbo].[LA_Rpt_VirtualSportWinloss]
 AS
 
 /*
- * Created by	: [20140911@Florent]
- * Task			: Get Virtual Sports Winloss
- * DB			: DB052.bodb02
- * Base on		: [OA_Rpt_VirtualSportWinloss]
- * Revisions	:
+	Created by: [20140911@Florent]
+	Task: Get Virtual Sports Winloss
+	DB: DBEXT.bodb02
+	
+	Revisions:
 		- 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
 		- 20150326@Florent: fix filter drawfilter
 		- 20150703@Florent: add GBP
@@ -35,13 +31,13 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 
- * Param's Explanation:
- *  - @FromDate   : From date
- *  - @ToDate   : To date
- *  - @Sporttype   : Sporttype
- *  - @BetList:  Bettype offered for Virtual sports (0:All Bettype)
- *  - @drawfilter:  'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only) 
- */
+	Param's Explanation:
+		- @FromDate   : From date
+		- @ToDate   : To date
+		- @Sporttype   : Sporttype
+		- @BetList:  Bettype offered for Virtual sports (0:All Bettype)
+		- @drawfilter:  'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only) 
+*/
 
 BEGIN
 
@@ -157,8 +153,4 @@ SET NOCOUNT ON
 
 	DROP TABLE  #TempExchange	
 END
-
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_VirtualSportWinloss] TO [vnteam]
-GRANT EXECUTE ON [dbo].[LA_Rpt_VirtualSportWinloss] TO bodbAdminNet
 GO

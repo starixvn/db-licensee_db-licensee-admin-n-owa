@@ -1,4 +1,4 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
 
@@ -9,28 +9,30 @@ ALTER PROCEDURE [dbo].[OAS_Report_NumberGameWinloss]
 	, @FromDate		SMALLDATETIME
 	, @ToDate		SMALLDATETIME
 AS
-/*  
- * Created by : 20131213@Francis 
- * Task  : Get Winloss report for Number Game (compatible with the new structure)
- * DB   : DB052.bodb02
- * Revisions :  
-	- 20140327@Florent: Apply new report template
-	- 20140411@Florent: Show Boping in one total line
-	- 20140416@Florent: Change condition of time range 
-	- 20140410@Francis: Alter @drawfilter param's value to 0,1,2
-	- 20141103@Florent: Fix formula for OW revenue, use new structure (#25393)
-	- 20141117@Florent: Remove comm
- 	- 20150202@Florent: base currency GBP
-	- 20150412@Patrick: Add filter by PartyType
-	- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
-	- 20181206@bruce: HP5 [#105723]
-	
- * Param's Explanation:    
-	- @Currency: 0 : All
-				-1: Base on EUR
-				-2: Base on GBP
 
-exec OAS_Report_NumberGameWinloss_xtest 14,0,0,'2014-09-01','2014-09-30'
+/*
+	Created by: 20131213@Francis
+	Task: Get Winloss report for Number Game (compatible with the new structure)
+	DB: DBEXT.bodb02
+
+	Revisions :  
+		- 20140327@Florent: Apply new report template
+		- 20140411@Florent: Show Boping in one total line
+		- 20140416@Florent: Change condition of time range 
+		- 20140410@Francis: Alter @drawfilter param's value to 0,1,2
+		- 20141103@Florent: Fix formula for OW revenue, use new structure (#25393)
+		- 20141117@Florent: Remove comm
+ 		- 20150202@Florent: base currency GBP
+		- 20150412@Patrick: Add filter by PartyType
+		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+		- 20181206@bruce: HP5 [#105723]
+	
+	Param's Explanation:    
+		- @Currency: 0 : All
+					-1: Base on EUR
+					-2: Base on GBP
+
+	exec OAS_Report_NumberGameWinloss 14,0,0,'2014-09-01','2014-09-30'
 */
 BEGIN
 	SET NOCOUNT ON
@@ -345,7 +347,7 @@ BEGIN
 
 	IF EXISTS (
 			SELECT TOP 1 1
-			FROM bodb_licensee.dbo.LicenseeEventLog(NOLOCK)
+			FROM bodb_licensee.dbo.LA_f_LicenseeEventLog()
 			WHERE SystemID = 4
 				AND ActionID = 3
 				AND ObjectID = 3
@@ -673,5 +675,4 @@ BEGIN
 	DROP TABLE #Exchange1
 	DROP TABLE #Result
 END
-
 GO

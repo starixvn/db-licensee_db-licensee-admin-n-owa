@@ -1,9 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_BullfightingWinLoss]
@@ -20,7 +16,7 @@ AS
 		- 20180911@Parsons: WL report for Poker Games& Bullfighting [#98487]
 
 	Param's Explanation: 
-	EXEC LA_Rpt_BullfightingWinLoss @BaseCurrencyName='EUR',@ToDate='2018-08-31 00:00:00',@PartyIds='14,15,17,19,20,23,29,39,40,42,44,46,47,52,53,56,58,60,65,68,70,71,72,73,76,79,80,81,82,84,85,86,87,89,90,91,92,93,95,97,100,101,24,31,34,35,36,37,38,41,59,66,67,74,75,88,16,22,26,27,45,49,54,99,25,30',@FromDate='2018-08-01'
+	EXEC LA_Rpt_BullfightingWinLoss @BaseCurrencyName='EUR',@ToDate='2018-08-31',@PartyIds='1',@FromDate='2018-08-01'
 */
 SET NOCOUNT ON
 BEGIN

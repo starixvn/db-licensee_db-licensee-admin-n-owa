@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -13,7 +13,7 @@ AS
 /*	Header:
 	Created: 2015.08.07 - Bravo.Tran
 	Task : Create Invoice 
-	DB: DB052.bodb_licensee
+	DB: DBCUST.bodb_licensee
    
 	Revisions: 
 		+ 20150807@Bravo: Charge rate Info - Get

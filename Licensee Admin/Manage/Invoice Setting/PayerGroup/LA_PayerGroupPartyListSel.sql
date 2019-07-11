@@ -1,10 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerGroupPartyListSel] 
@@ -15,7 +10,8 @@ AS
 /*  
 	 Created: 20150423@Florent
 	 Task : Get list payer list
-	 DB: DB052.bodb_Licensee
+	 DB: DBCUST.bodb_Licensee
+	 
 	 Revisions:     
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180327@Parsons: Apply min fee rule for discount calculation [#109997]   

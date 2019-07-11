@@ -1,11 +1,7 @@
-USE [bodb_licensee]
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb_licensee
 GO
-/****** Object:  StoredProcedure [dbo].[LA_UserPasswordUpd]    Script Date: 9/8/2014 5:01:19 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-/****** Object:  Stored Procedure dbo.OA_UserPasswordUpd    Script Date: 10/21/2011 7:48:20 PM ******/
+
 ALTER PROCEDURE [dbo].[LA_UserPasswordUpd]  
     @AdminID int,
     @UserID int, 
@@ -17,13 +13,14 @@ ALTER PROCEDURE [dbo].[LA_UserPasswordUpd]
     @ErrCode int = 0 OUTPUT,  
     @ErrMsg nvarchar(4000) = '' OUTPUT     
 AS  
-/*  
- * Created: 20140822@Florent
- * Task : User change password
- * DB: DB052.bodb_Licensee  
- *  
- * Revisions:     
-*/  
+/*
+	Created: 20140822@Florent
+	Task : User change password
+	DB: DBCUST.bodb_Licensee  
+	
+	Revisions:
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+*/
 BEGIN  
 	SET NOCOUNT ON;  
 	
@@ -85,21 +82,18 @@ BEGIN
 		'IP="'+ coalesce(cast(@LoginIP as varchar(30)),space(1)) + '" />'  
 
 	SET @endRun = getdate()  
-	SET @duration  = datediff (millisecond,@startRun,@endRun)   
+	SET @duration  = datediff (millisecond,@startRun,@endRun)
 
-		EXEC dbo.OA_WriteLog_UserLog_RunSP  
-		@UserID = @AdminID,   
-		@CustID = @UserID,
-		@SPName='LA_UserPasswordUpd',
-		--@ActionID = 0,  
-		@TrackingValue = @LogSPData,  
-		@TrackingValue2 = @LogSPDataOld,  
-		@duration = @duration
+	-- Write Log
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+		@UserID				= @AdminID 
+		,@CustID			= @UserID
+		,@SPName			= 'LA_UserPasswordUpd'
+		,@TrackingValue		= @LogSPData
+		,@TrackingValue2	= @LogSPDataOld
+		,@Duration			= @Duration
 		
 	SET NOCOUNT OFF
 
 END
 GO
-GRANT VIEW DEFINITION ON [dbo].[LA_UserPasswordUpd] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_UserPasswordUpd] TO bodbAdminNet 
-

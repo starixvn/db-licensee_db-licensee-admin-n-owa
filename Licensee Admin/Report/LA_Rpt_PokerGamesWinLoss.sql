@@ -1,12 +1,8 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
-CREATE PROCEDURE [dbo].[LA_Rpt_PokerGamesWinLoss]
+ALTER PROCEDURE [dbo].[LA_Rpt_PokerGamesWinLoss]
 	@PartyIds			VARCHAR(4000),
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
@@ -15,7 +11,7 @@ AS
 /*  
 	 Created: 20180910@Scofield [#94108]
 	 Task : Get Poker Games Report
-	 DB: DB052.bodb_licensee   
+	 DB: DBLIC.bodb_licensee   
 
 	 Revisions:  
 		- 20180910@Scofield: Win loss reports for Poker Games & Bullfighting [#98487]

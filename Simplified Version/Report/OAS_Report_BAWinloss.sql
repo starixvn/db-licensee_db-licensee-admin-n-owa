@@ -1,48 +1,46 @@
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
-GO
-SET ANSI_NULLS ON
-GO
-
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[OAS_Report_BAWinloss] 
 	@PartyID		INT
-	,@FromDate	DATETIME
+	,@FromDate		DATETIME
 	,@ToDate		DATETIME
-	,@Currency	INT		  = 0
-	,@ExchangeID	VARCHAR(5)  = 'EUR'
-	,@ReportBy	TINYINT	  = 1
+	,@Currency		INT		  = 0
+	,@ExchangeID	VARCHAR(5)= 'EUR'
+	,@ReportBy		TINYINT	  = 1
 	,@DrawFilter	TINYINT	  = 0
 AS
+
 /*
- * Created by : 20131223@Francis
- * Task : Get Winloss report for Sportbook (compatible with the new structure)
- * DB: DB052.bodb02
- * Original: [OAS_Report_BAWinloss]
- * Revisions:
-   - 20140410@Francis: Fix showing data out of time-range bug
-   - 20141103@Florent: Fix formula for OW revenue, use new structure (#25393)
-   - 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust 
-   - 20150202@Florent: base currency GBP
-   - 20150824@Florent: remove bettrade ticket
-   - 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
-   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
-   - 20170405@Harper: #73310 - Remove Cashout Bettype
+	Created by : 20131223@Francis
+	Task: Get Winloss report for Sportbook (compatible with the new structure)
+	DB: DBEXT.bodb02
+	Original: [OAS_Report_BAWinloss]
 
- *
- * Params explanation:
- *	- @ReportBy: 0 - Daily, 1 - Monthly
-	- @Currency: 0 : All
-				-1: Base on EUR
-				-2: Base on GBP
+	Revisions:
+	   - 20140410@Francis: Fix showing data out of time-range bug
+	   - 20141103@Florent: Fix formula for OW revenue, use new structure (#25393)
+	   - 20141120@Winnie: change from LicenseeCust to f_SelLicenseeCust 
+	   - 20150202@Florent: base currency GBP
+	   - 20150824@Florent: remove bettrade ticket
+	   - 20160808@Bravo: #57972 - LA/ OWA - Change Commercial Terms for BetTrade
+	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+	   - 20170405@Harper: #73310 - Remove Cashout Bettype
+
+	Params explanation:
+		- @ReportBy: 0 - Daily, 1 - Monthly
+		- @Currency: 0 : All
+					-1: Base on EUR
+					-2: Base on GBP
 
 
- *	- @DrawFilter: 
- *		+ 0  Normal 
- *		+ 1  No draw (only win and loss tickets are calculated) 
- *		+ 2  No draw for Turnover only (the draw tickets will be calculated in the Total Trans, Turnover of these tickets will not be calculated)
- */
+		- @DrawFilter: 
+			+ 0  Normal 
+			+ 1  No draw (only win and loss tickets are calculated) 
+			+ 2  No draw for Turnover only (the draw tickets will be calculated in the Total Trans, Turnover of these tickets will not be calculated)
+*/
+
 BEGIN
 	SET NOCOUNT ON
 
@@ -335,11 +333,4 @@ BEGIN
 	DROP TABLE #BAWinLoss
 	DROP TABLE #TempExchange
 END
-
-GO
-
-GRANT VIEW DEFINITION ON [dbo].[OAS_Report_BAWinloss] TO [vnteam] 
-GO
-
-GRANT EXECUTE ON [dbo].[OAS_Report_BAWinloss] TO bodbAdminNet 
 GO

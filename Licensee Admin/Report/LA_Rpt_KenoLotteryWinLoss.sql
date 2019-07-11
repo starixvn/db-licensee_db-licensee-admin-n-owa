@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -11,7 +11,8 @@ AS
 /*
 	 Created: 20170705@Scofield [#79310]
 	 Task : Get report Keno Lottery Win Loss
-	 DB: DB052.bodb_licensee
+	 DB: DBLIC.bodb_licensee
+	 
 	 Revisions:
 		- 20170705@Scofield: Create Keno Lottery Winloss [#79310]
 		- 20171219@Bruce: increase length for variables [#88197]
@@ -308,4 +309,3 @@ BEGIN
 	DROP TABLE #Result
 END
 GO
-

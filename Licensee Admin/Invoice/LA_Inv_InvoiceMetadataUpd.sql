@@ -1,9 +1,5 @@
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_InvoiceMetadataUpd]
@@ -18,7 +14,10 @@ AS
 /*  
 	Created: 20170330@Bruce
 	Task : Update invoice metadata [#74096]
-	DB: DB052.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
+
+	Revisions:
+		- 20170330@Bruce: Initialize SP
 */
 BEGIN
 	SET NOCOUNT ON
@@ -29,9 +28,4 @@ BEGIN
 		Environment = @Environment
 	WHERE InvoiceHeaderId = @InvoiceId
 END
-GO
-
-GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceMetadataUpd] TO bodbAdminNet
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Inv_InvoiceMetadataUpd] TO vnteam
 GO

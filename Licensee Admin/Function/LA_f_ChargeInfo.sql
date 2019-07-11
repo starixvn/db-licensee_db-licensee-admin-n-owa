@@ -1,5 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="1" isNested="0"></info>*/
-USE [bodb_licensee]
+/*<info serverAlias="DBCUST-bodb_licensee,DBLIC-bodb_licensee" selecters="bodbAdminNet,bodbLicenseeNet" isFunction="1" isNested="1"></info>*/
+USE bodb_licensee
 GO
 
 ALTER FUNCTION [dbo].[LA_f_ChargeInfo] (
@@ -28,8 +28,8 @@ RETURNS @tbChargeInfo TABLE (
 AS
 /*  Created: 20141111@Florent
     Task : Get Charge Information
-    DB: DBLIC/bodb_Licensee
-    Param's Explanation:
+    DB: DBLIC.bodb_Licensee, DBCUST.bodb_Licensee
+    
 	Revisions:
 		- 20150710@Florent: support product MicroGaming with multi charge rate
 		- 20150825@Florent: change fiter ChargeType = 1 to ChargeType != 2 (support new ChargeType 5)
@@ -39,6 +39,8 @@ AS
 		- 20171227@Sophia: output column ChargeType [Redmine: #82408]
 		- 20180508@Harper: Change PayToSupplier term of Exchange product [RedmineID: #94281]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+
 
 */
 
@@ -56,15 +58,19 @@ BEGIN
 			ELSE p3.Productid
 			END
 			, s.val
-	FROM bodb02.dbo.strSplit(@ProductCodes, ',') s
+	FROM dbo.strSplit(@ProductCodes, ',') s
 		LEFT JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.val = p3.ProductPrefix
-	
+
 	INSERT INTO @Bettype(ProductId, BetTypeRef, Bettype)
-	SELECT pt.ProductID, sbr.BettypeRef, sbm.BetType
+	SELECT pt.ProductID, sbr.BettypeRef, p.BetType
 	FROM @ProductTable pt
-	 INNER JOIN bodb02.dbo.Products p ON pt.ProductPrefix = p.ProductPrefix
-	 INNER JOIN bodb02.dbo.SportBettypeMatrix sbm ON p.ProductID = sbm.ProductID
-	 INNER JOIN dbo.Sport_Bettype_Reference sbr ON sbm.BetType = sbr.Bettype
+		INNER JOIN (
+			SELECT ProductPrefix, BetType
+			FROM OPENQUERY(DBPRO, 'SELECT DISTINCT p.ProductPrefix, sbm.BetType
+									FROM bodb02.dbo.Products p WITH (NOLOCK)
+										INNER JOIN bodb02.dbo.SportBettypeMatrix sbm WITH (NOLOCK) ON p.ProductID = sbm.ProductID') -- for DBCUST
+		) AS p ON p.ProductPrefix = pt.ProductPrefix
+		INNER JOIN dbo.Sport_Bettype_Reference sbr ON p.BetType = sbr.Bettype
 		
 	DECLARE @Cte_AffectDate TABLE (AffectedDate DATE, PartyID INT, ProductID INT) 
 
@@ -235,7 +241,7 @@ BEGIN
 							ELSE p3.Productid
 							END AS Productid
 						 ,p3.ProductPrefix
-					FROM bodb02.dbo.strSplit(@ProductCodes, ',') s
+					FROM dbo.strSplit(@ProductCodes, ',') s
 					LEFT JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.val = p3.ProductPrefix
 					) pr ON pr.ProductPrefix = 'RB'
 			LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
@@ -329,7 +335,4 @@ BEGIN
 
 	RETURN;
 END;
-GO
-
-GRANT SELECT ON [dbo].[LA_f_ChargeInfo] TO bodbAdminNet
 GO

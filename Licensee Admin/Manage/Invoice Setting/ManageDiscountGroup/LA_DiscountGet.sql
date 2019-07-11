@@ -1,9 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountGet]
@@ -61,7 +57,7 @@ BEGIN
 		, @DiscountProductList		AS DiscountProductList
 		, h.ModifiedDate
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
-	INNER JOIN bodb02.dbo.exchange c ON c.exchangeid = h.CurrencyId
+		INNER JOIN CustDB.dbo.exchange c WITH (NOLOCK) ON c.exchangeid = h.CurrencyId
 	WHERE DiscountGroupId = @GroupId
 	-- endregion
 
@@ -97,10 +93,10 @@ BEGIN
 	
 	INSERT INTO @CurrenciesOfLicensee(PartyId, CurrencyId, CurrencyCode, CurrencyName)
 	SELECT DISTINCT p.PartyId, lc.Currency, e.Code, CASE WHEN lc.Currency = 51 THEN 'VND' ELSE e.currency END AS CurrencyName
-	FROM dbo.f_SelLicenseeCust(0) AS lc
+	FROM dbo.LA_f_SelLicenseeCust(0) AS lc
 	INNER JOIN dbo.OAS_Party pp WITH (NOLOCK) ON lc.LicenseeID = pp.OldRefID 
 	INNER JOIN @PartyTable p ON pp.PartyID = p.PartyId
-	INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
+	INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
 	WHERE lc.Currency <> 20 -- exclude test
 	
 	UPDATE c1
