@@ -1,13 +1,17 @@
-﻿ALTER PROCEDURE [dbo].[OAS_SporttypeGetVirtualSport]
+﻿/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE [bodb02]
+GO
+
+ALTER PROCEDURE [dbo].[OAS_SporttypeGetVirtualSport]
 AS
 /*    
- Created : Henry    
- Date : 2012-08-28  
-    Task : Get all sport types for virtual sport 
-    DB  : DB052.bodb02    
+	Created: Henry
+	Date: 2012-08-28
+	Task: Get all sport types for virtual sport
+	DB: DBEXT.bodb02
      
-    Revisions:      
-    
+	Revisions:
+		- 20120828@Henry: Initialize SP
 */  
 
 BEGIN  
@@ -17,10 +21,5 @@ BEGIN
 	FROM Sports WITH (NOLOCK)  
 	WHERE sporttype BETWEEN 180 AND 199
 	ORDER BY sporttype ASC 
-END  
-
-
+END
 GO
-GRANT EXECUTE ON [dbo].[OAS_SporttypeGetVirtualSport] TO [bodbAdminNet] 
-GO
-GRANT VIEW DEFINITION ON [dbo].[OAS_SporttypeGetVirtualSport] TO [vnteam]   
