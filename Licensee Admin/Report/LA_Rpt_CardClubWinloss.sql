@@ -8,7 +8,6 @@ ALTER PROCEDURE [dbo].[LA_Rpt_CardClubWinloss]
 	@ToDate				DATETIME,
 	@BaseCurrencyName	VARCHAR(20)
 AS
-
 /*
  * Created by : [20190710@Mason.Nguyen]
  * Task  : Get Card Club Winloss
@@ -22,7 +21,7 @@ BEGIN
 
 	CREATE TABLE #PartyList (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
 	INSERT INTO #PartyList EXEC bodb_licensee.dbo.LA_PartyListSel
-
+	
 	CREATE TABLE #ChargeRate (
 		PartyID			INT
 		,LicenseeID		INT
@@ -33,10 +32,11 @@ BEGIN
 		,Fromdate		SMALLDATETIME
 		,Todate			SMALLDATETIME
 	)
-	-- ​Pay to Supplier: equals 40%(0.4) of [Licensing Fee]
+	
+	-- ​Pay to Supplier: equals 2.5%(0.025) of [Licensing Fee]
 	INSERT INTO #ChargeRate
 	SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, 0.025, c.Fromdate, c.Todate
-	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'CC') c
+	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'CC') c
 
 	CREATE TABLE #Exchange (
 		ExchangeDate	DATE,
@@ -44,7 +44,7 @@ BEGIN
 		CurrencyCode	VARCHAR(10),
 		Rate			FLOAT
 	)
-
+	
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
@@ -64,6 +64,25 @@ BEGIN
 		LicensingFee MONEY,
 		PayToSupplier MONEY)
 
+	-- Calculate for desposit
+	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
+	SELECT ci.PartyId,
+		b.rptDate as Winlostdate,
+		b.CurrencyId,
+		SUM(b.Turnover) AS Turnover,
+		SUM(b.BetCount) AS TotalTrans,
+		SUM(b.MemberWL) AS CustomerWinLoss,
+		- SUM(b.MemberWL) AS LicenseeWinloss,
+		SUM(-b.MemberWL * ci.Rate) AS LicensingFee,
+		SUM(-b.MemberWL * ci.Rate3rd) AS PayToSupplier
+	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
+		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
+		AND ci.isDeposit = 1
+	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
+	
+	-- Calculate for credit
 	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee, PayToSupplier)
 	SELECT ci.PartyId,
 		b.rptDate as Winlostdate,
@@ -72,17 +91,14 @@ BEGIN
 		SUM(b.BetCount) AS TotalTrans,
 		SUM(b.WinLoss) AS CustomerWinLoss,
 		- SUM(b.WinLoss) AS LicenseeWinloss,
-		- SUM(CASE WHEN ci.PartyID IN (25,30,324) 
-					THEN  (b.WinLoss + b.WinLossA + WinLossM + WinLossS + b.CommissionS)
-					ELSE (b.WinLoss * ci.Rate) END) AS LicensingFee,
-		- SUM(CASE WHEN ci.PartyID IN (25,30,324) 
-					THEN (b.WinLoss + b.WinLossA + WinLossM + WinLossS + b.CommissionS) * ci.Rate3rd
-					ELSE (b.WinLoss * ci.Rate3rd) END) AS PayToSupplier
+		- SUM(b.WinLoss + b.WinLossA + WinLossM + WinLossS + b.CommissionS) AS LicensingFee,
+		- SUM(b.WinLoss * ci.Rate3rd) AS PayToSupplier
 	FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
 		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 		b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
-		AND b.Bettype in (Select Bettype FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'CC'))
+		AND b.Bettype in (Select Bettype FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'NG'))
+		AND ci.isDeposit = 0
 	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
 	-- EndRegion
 	
@@ -125,7 +141,7 @@ BEGIN
 		PayToSupplier	MONEY,
 		CompanyIncome	MONEY
 	)
-
+	
 	WHILE EXISTS (SELECT TOP 1 1 FROM @BaseCurrencies)
 	BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies)
@@ -148,14 +164,10 @@ BEGIN
 			SUM(Turnover),
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
-			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
+			SUM(LicensingFee),
 			SUM(PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
-
-		UPDATE @Total
-		SET PayToSupplier = 0
-		WHERE PayToSupplier < 0
 
 		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
 		SELECT Currency,
@@ -187,7 +199,7 @@ BEGIN
 		CAST((r.CustomerWinLoss) AS MONEY) AS CustomerWinLossOriginal,
 		CAST((r.LicenseeWinLoss) AS MONEY) AS LicenseeWinLossOriginal,
 		CAST((r.LicensingFee) AS MONEY) AS LicensingFeeOriginal,
-		CAST((r.PayToSupplier)AS MONEY) AS PayToSupplierOriginal,
+		CAST((r.PayToSupplier) AS MONEY) AS PayToSupplierOriginal,
 		r.LicensingFee - r.PayToSupplier AS CompanyIncomeOriginal,
 		-- Select by base currency
 		r.Turnover * e.Rate AS Turnover,
@@ -218,6 +230,6 @@ BEGIN
 	DROP TABLE	#PartyList
 	DROP TABLE	#Exchange
 	DROP TABLE	#ChargeRate
-	DROP TABLE  #TempData
+	DROP TABLE  #TempData	
 END
 GO
