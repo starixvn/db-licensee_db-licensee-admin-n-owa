@@ -20,27 +20,32 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	
 	DECLARE @ChargeRateInfo TABLE(FromParty INT, ToParty INT)
+	DECLARE @LicenseeId INT = 0
 
-	;WITH cte_ChargeRateInfo AS (
-		SELECT DISTINCT FromParty, ToParty 
-		FROM [dbo].[OAS_ChargeInfo] WITH(NOLOCK)
-		WHERE ToParty IN (1,9,11,98) AND ToDate >= GETDATE()
-	), cte_PartyBelongToGroups AS(
-		SELECT FromParty, COUNT(ToParty) AS NumberOfGroups
-		FROM cte_ChargeRateInfo 
-		GROUP BY FromParty)
+	IF @PartyId <> 0 SELECT @LicenseeId = OldRefID FROM OAS_Party WITH(NOLOCK) WHERE PartyID = @PartyId	
+
+	DECLARE @tblLicenseeCurrency AS TABLE(LicenseeId INT, CurrencyCount INT)
+	INSERT INTO @tblLicenseeCurrency(LicenseeId, CurrencyCount)
+	SELECT c.LicenseeID,COUNT(c.Currency)
+	FROM dbo.LicenseeCust c WITH(NOLOCK)
+	WHERE @LicenseeId = 0 OR c.LicenseeID = @LicenseeId AND c.Currency <> 20 -- test currency
+	GROUP BY c.LicenseeID
 
 	SELECT P.PartyID, p.PartyName, p.PartyType,
 			ISNULL(d.BaseCurrencyId, 0)		AS BaseCurrencyId, 
-			ISNULL(p.OldRefID, 0)			AS OldRefID,   
+			ISNULL(p.OldRefID, 0)			AS LicenseeId,   
 			ISNULL(d.InvoiceLanguage, '')	AS InvoiceLanguage,
-			CASE WHEN NOT EXISTS(SELECT TOP 1 1 FROM dbo.f_SelLicenseeCust(0) AS lc WHERE p.PartyType = 1 AND ISNULL(p.OldRefID, 0) = lc.LicenseeID) THEN 1 ELSE 0 END AS HasNotOfferedCurrency,
-			CASE WHEN ISNULL(pbg.NumberOfGroups, 0) > 1 THEN 1 ELSE 0 END AreBelongingMoreThanOneGroup 
+			ISNULL(c.CurrencyCount, 0)		AS CurrencyCount
 	FROM OAS_Party p WITH(NOLOCK)
 	INNER JOIN OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID = d.PartyID
-	LEFT JOIN cte_PartyBelongToGroups pbg ON p.PartyID = pbg.FromParty
-	WHERE @PartyId = 0 OR @PartyId = p.PartyID
+	LEFT JOIN @tblLicenseeCurrency c ON c.LicenseeId = p.OldRefID
+	WHERE (@PartyId = 0 OR @PartyId = p.PartyID)
+		AND p.PartyType NOT IN (2,3,4,5)
+	--(1, 'Payer'),
+	--(2, 'Reseller'),
+	--(3, '3rd'),
+	--(4, 'Biller'),
+	--(5, 'Non-Official')
 END
 GO
