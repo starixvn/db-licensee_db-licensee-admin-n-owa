@@ -121,7 +121,6 @@ BEGIN
 		INNER JOIN #PartyList pa ON P.ParentId = PA.PartyId
 	
 	DECLARE @Total TABLE (
-		PartyId			INT,
 		TotalTrans		INT,
 		Turnover		MONEY,
 		CustomerWinLoss	MONEY,
@@ -151,22 +150,22 @@ BEGIN
 		PayToSupplier	MONEY,
 		CompanyIncome	MONEY
 	)
-
+	
 	WHILE EXISTS (SELECT TOP 1 1 FROM @BaseCurrencies)
 	BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies)
 
-		INSERT INTO @Total (Currency,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier)
-		SELECT td.ParentId,
+		INSERT INTO @Total (Currency,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
+		SELECT @tempCurrency AS Currency,
 			SUM(td.TotalTrans) TotalTrans,
 			SUM(td.Turnover * e.BaseCurrencyRate) Turnover,
 			SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss,
 			SUM(td.LicenseeWinLoss * e.BaseCurrencyRate) LicenseeWinLoss,
 			SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
 			SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
-		FROM #TempData td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e
-		ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.Winlostdate
-		GROUP BY td.ParentId
+			FROM #TempData td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e
+			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.Winlostdate
+			GROUP BY td.ParentId
 
 		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
 		SELECT Currency,
@@ -186,7 +185,6 @@ BEGIN
 	
 	-- Select data by Parties
 	SELECT 
-		r.PartyId,
 		r.PartyName,
 		r.ParentId,
 		r.ParentName,
@@ -198,7 +196,7 @@ BEGIN
 		CAST((r.CustomerWinLoss) AS MONEY) AS CustomerWinLossOriginal,
 		CAST((r.LicenseeWinLoss) AS MONEY) AS LicenseeWinLossOriginal,
 		CAST((r.LicensingFee) AS MONEY) AS LicensingFeeOriginal,
-		CAST((r.PayToSupplier)AS MONEY) AS PayToSupplierOriginal,
+		CAST((r.PayToSupplier) AS MONEY) AS PayToSupplierOriginal,
 		r.LicensingFee - r.PayToSupplier AS CompanyIncomeOriginal,
 		-- Select by base currency
 		r.Turnover * e.Rate AS Turnover,
@@ -213,8 +211,7 @@ BEGIN
 	SELECT * FROM @GrandTotal
 	
 	-- Total
-	SELECT PartyId,
-		TotalTrans,
+	SELECT TotalTrans,
 		Turnover,
 		CustomerWinLoss,
 		LicenseeWinLoss,
@@ -229,6 +226,6 @@ BEGIN
 	DROP TABLE	#PartyList
 	DROP TABLE	#Exchange
 	DROP TABLE	#ChargeRate
-	DROP TABLE  #TempData
+	DROP TABLE  #TempData	
 END
 GO
