@@ -111,7 +111,7 @@ BEGIN
 		INNER JOIN #PartyList pa ON P.ParentId = PA.PartyId
 	
 	DECLARE @Total TABLE (
-		PartyId			INT,
+		ParentId		INT,
 		TotalTrans		INT,
 		Turnover		MONEY,
 		CustomerWinLoss	MONEY,
@@ -146,28 +146,19 @@ BEGIN
 	BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies)
 
-		;WITH TotalByParty AS(
-			SELECT td.ParentId,
-				SUM(td.TotalTrans) TotalTrans,
-				SUM(td.Turnover * e.BaseCurrencyRate) Turnover,
-				SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss,
-				SUM(td.LicenseeWinLoss * e.BaseCurrencyRate) LicenseeWinLoss,
-				SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
-				SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
+		INSERT INTO @Total (ParentId, Currency,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
+		SELECT 
+			ParentId,
+			@tempCurrency AS Currency,
+			SUM(td.TotalTrans) TotalTrans,
+			SUM(td.Turnover * e.BaseCurrencyRate) Turnover,
+			SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss,
+			SUM(td.LicenseeWinLoss * e.BaseCurrencyRate) LicenseeWinLoss,
+			SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
+			SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
 			FROM #TempData td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e
 			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.Winlostdate
-			GROUP BY td.ParentId, td.PartyId
-		)
-		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier)
-		SELECT @tempCurrency,ParentId,
-			SUM(TotalTrans),
-			SUM(Turnover),
-			SUM(CustomerWinLoss),
-			SUM(LicenseeWinLoss),
-			SUM(LicensingFee),
-			SUM(PayToSupplier)
-		FROM TotalByParty
-		GROUP BY ParentId
+			GROUP BY td.ParentId
 
 		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
 		SELECT Currency,
@@ -187,7 +178,7 @@ BEGIN
 	
 	-- Select data by Parties
 	SELECT 
-		r.PartyId,
+		r.PartyId
 		r.PartyName,
 		r.ParentId,
 		r.ParentName,
@@ -214,7 +205,8 @@ BEGIN
 	SELECT * FROM @GrandTotal
 	
 	-- Total
-	SELECT PartyId,
+	SELECT 
+		ParentId,
 		TotalTrans,
 		Turnover,
 		CustomerWinLoss,
