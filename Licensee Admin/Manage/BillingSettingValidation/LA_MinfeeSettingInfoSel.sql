@@ -20,7 +20,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	SELECT p.PartyID, PartyName, PartyType, MAX(FromDate) AS FromDate, MAX(ToDate) AS ToDate, ProductID, 
+	SELECT p.PartyID, PartyName, PartyType, FromDate , ToDate, ProductID, 
 				ISNULL(FeeTypeId, 0)			AS FeeTypeId, 
 				ISNULL(pg.PartyGroupId, 0)		AS PartyGroupId, 
 				ISNULL(pd.BaseCurrencyId, 0)	AS BaseCurrencyId, 
@@ -30,13 +30,8 @@ BEGIN
 		LEFT JOIN LA_MinFee mf WITH(NOLOCK) ON p.PartyID = mf.PartyId
 		LEFT JOIN LA_PartyGroupAssignment pga WITH(NOLOCK) ON p.PartyID = pga.PartyId
 		LEFT JOIN LA_PartyGroup pg WITH(NOLOCK) ON pg.PartyGroupId = pga.PartyGroupId
-	WHERE (@PartyId = 0 OR @PartyId = p.PartyID) AND (ToDate IS NULL OR ToDate >= GETDATE())
+	WHERE (@PartyId = 0 OR @PartyId = p.PartyID)
 		  AND p.PartyID NOT IN (1,9,11,98)
 		  AND pd.IsDeposit = 1
-	GROUP BY p.PartyID, PartyName, PartyType, ProductID, 
-				ISNULL(FeeTypeId, 0),
-				ISNULL(pg.PartyGroupId, 0), 
-				ISNULL(pd.BaseCurrencyId, 0), 
-				ISNULL(mf.CurrencyId, 0)
 END
 GO

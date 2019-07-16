@@ -20,18 +20,15 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	SELECT p.PartyID, PartyName, PartyType, dgd.Rate, dgp.ProductID, ISNULL(dg.DiscountGroupId, 0)	AS RebateGroupId
-		   ,MAX(dg.FromDate) AS FromDate, MAX(dg.ToDate) AS ToDate
+	SELECT p.PartyID, PartyName, PartyType, dgd.Rate, dgp.ProductID, ISNULL(dg.DiscountGroupId, 0)	AS RebateGroupId, dg.FromDate, dg.ToDate
 	FROM OAS_Party p WITH(NOLOCK) 
 		LEFT JOIN LA_DiscountGroupAssignment dga WITH(NOLOCK) ON p.PartyID = dga.PartyId
 		LEFT JOIN LA_DiscountGroupHeader dg WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
 		LEFT JOIN LA_DiscountGroupProduct dgp WITH(NOLOCK) ON dga.DiscountGroupId = dgp.DiscountGroupId
 		LEFT JOIN LA_DiscountGroupDetail dgd WITH(NOLOCK) ON dga.DiscountGroupId = dgd.DiscountGroupId
 	WHERE (@PartyId = 0 OR @PartyId = p.PartyID) 
-			AND (dg.ToDate IS NULL OR dg.ToDate >= GETDATE())
 			AND p.PartyID NOT IN (1,9,11,98, -- ParentId of deposit
 												25,30,324) -- Credit 
 			AND (dg.DiscountGroupType IS NULL OR dg.DiscountGroupType = 2) -- Rebate
-	GROUP BY p.PartyID, PartyName, PartyType, dgd.Rate, dgp.ProductID, ISNULL(dg.DiscountGroupId, 0)
 END
 GO
