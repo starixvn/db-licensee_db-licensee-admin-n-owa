@@ -19,6 +19,7 @@ AS
 	- 20180515@Scofield: Incorporate 9wickets data [#94950]
 	- 20180716@bruce: add new group TEST for credit [#98126]
 	- 20180907@Parsons: Royalty fee updated for Keno& Lottery [#101168]
+	- 20190716@Bruce: Integrate CN88 data in LA [#116859]
 
  Param's Explanation:
 	- @FromDate		: From date
@@ -62,7 +63,6 @@ BEGIN
 					OR ci.FromDate BETWEEN @FromDate AND @ToDate
 					OR ci.ToDate BETWEEN @FromDate AND @ToDate)
 		)
-		
 	END
 
 	-- Party List
@@ -83,7 +83,8 @@ BEGIN
 		--		- ONEWorks: ONEWorks & Boping
 		DECLARE	@12BetGroupId INT = -1,
 				@OneWorksGroupId INT = 1,
-				@CreditGroupId INT = 999
+				@CreditGroupId INT = 999,
+				@CN88PartyId INT = (SELECT a.PartyID FROM dbo.OAS_Party a WITH(NOLOCK) WHERE a.PartyName='CN88')
 
 		UPDATE @PartyList SET PartyName = RTRIM(REPLACE(PartyName,'Licensees','')) WHERE ParentId = 0
 		UPDATE @PartyList SET ParentId = @OneWorksGroupId WHERE ParentId IN (11,98)
@@ -129,23 +130,18 @@ BEGIN
 			GROUP BY b.rptdate, b.SiteId, p.PartyId, b.CurrencyID
 		)
 		INSERT INTO #TempData (PartyId,PartyName,ParentId,ParentName,WinLossDate,CurrencyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
-		SELECT	p.PartyId,
-				p.PartyName,
-				g.PartyId,
-				g.PartyName,
-				s.rptDate,
-				s.CurrencyId,
-				s.TotalTrans,
-				s.Turnover,
-				s.MemberWL,
-				-s.MemberWL,
-				s.LicensingFee,
-				(-s.MemberWL) * (CASE WHEN g.PartyId IN (@CreditGroupId, @12BetGroupId) OR @FromDate >= CAST('2018-8-1' AS DATETIME) THEN 0.03 ELSE 0.05 END)
+		SELECT	p.PartyId,p.PartyName,g.PartyId,g.PartyName,s.rptDate,s.CurrencyId,s.TotalTrans,s.Turnover,s.MemberWL,-s.MemberWL,s.LicensingFee,
+				(-s.MemberWL) * (CASE 
+						WHEN p.PartyId = @CN88PartyId THEN 0.015
+						WHEN g.PartyId IN (@CreditGroupId, @12BetGroupId) OR @FromDate >= CAST('2018-8-1' AS DATETIME) THEN 0.03 
+						ELSE 0.05 
+					END)
 		FROM SumByDate s
 		INNER JOIN @PartyList p ON s.PartyId = p.PartyID
 		INNER JOIN @PartyList g ON p.ParentId = g.PartyId
 		-- Credit licensees & 12Bet: 3% on Gross Win
 		-- Other licenees: 5% on Gross Win
+		-- CN88: 1.5% of winloss
 	END
 
 	-- Result data
