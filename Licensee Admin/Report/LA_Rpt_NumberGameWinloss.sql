@@ -121,6 +121,7 @@ BEGIN
 		INNER JOIN #PartyList pa ON P.ParentId = PA.PartyId
 	
 	DECLARE @Total TABLE (
+		ParentId		INT,
 		TotalTrans		INT,
 		Turnover		MONEY,
 		CustomerWinLoss	MONEY,
@@ -155,8 +156,10 @@ BEGIN
 	BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies)
 
-		INSERT INTO @Total (Currency,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
-		SELECT @tempCurrency AS Currency,
+		INSERT INTO @Total (ParentId, Currency,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
+		SELECT 
+			ParentId,
+			@tempCurrency AS Currency,
 			SUM(td.TotalTrans) TotalTrans,
 			SUM(td.Turnover * e.BaseCurrencyRate) Turnover,
 			SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss,
@@ -185,6 +188,7 @@ BEGIN
 	
 	-- Select data by Parties
 	SELECT 
+		r.PartyId,
 		r.PartyName,
 		r.ParentId,
 		r.ParentName,
@@ -211,7 +215,8 @@ BEGIN
 	SELECT * FROM @GrandTotal
 	
 	-- Total
-	SELECT TotalTrans,
+	SELECT ParentId,
+		TotalTrans,
 		Turnover,
 		CustomerWinLoss,
 		LicenseeWinLoss,
