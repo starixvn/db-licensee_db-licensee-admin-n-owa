@@ -156,28 +156,17 @@ BEGIN
 	BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies)
 
-		;WITH TotalByParty AS(
-			SELECT td.ParentId,
-				SUM(td.TotalTrans) TotalTrans,
-				SUM(td.Turnover * e.BaseCurrencyRate) Turnover,
-				SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss,
-				SUM(td.LicenseeWinLoss * e.BaseCurrencyRate) LicenseeWinLoss,
-				SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
-				SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
-			FROM #TempData td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e
-			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.Winlostdate
-			GROUP BY td.ParentId, td.PartyId
-		)
-		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier)
-		SELECT @tempCurrency,ParentId,
-			SUM(TotalTrans),
-			SUM(Turnover),
-			SUM(CustomerWinLoss),
-			SUM(LicenseeWinLoss),
-			SUM(LicensingFee),
-			SUM(PayToSupplier)
-		FROM TotalByParty
-		GROUP BY ParentId
+		INSERT INTO @Total (Currency,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier)
+		SELECT td.ParentId,
+			SUM(td.TotalTrans) TotalTrans,
+			SUM(td.Turnover * e.BaseCurrencyRate) Turnover,
+			SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss,
+			SUM(td.LicenseeWinLoss * e.BaseCurrencyRate) LicenseeWinLoss,
+			SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
+			SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
+		FROM #TempData td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e
+		ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.Winlostdate
+		GROUP BY td.ParentId
 
 		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
 		SELECT Currency,
