@@ -31,5 +31,7 @@ BEGIN
 	LEFT JOIN LA_ChargeInfo_SystemMapping cs WITH(NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
 	WHERE (@PartyId = 0 OR @PartyId = p.PartyID)
 		AND p.PartyType IN (1,5) -- 1-official, 5-non-offcial
+		AND PartyID NOT IN (1,9,11,98, -- ParentId of deposit
+										25,30,324) -- Credit 	
 END
 GO

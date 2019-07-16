@@ -31,6 +31,8 @@ BEGIN
 	LEFT JOIN LA_InvoiceSetting ivs WITH(NOLOCK) ON p.PartyID = ivs.FromPartyId
 	LEFT JOIN LA_InvoiceTemplate ivt WITH(NOLOCK) ON ivs.InvTempId = ivt.InvTemplateId
 	LEFT JOIN LA_BillerInfo b WITH(NOLOCK) ON ivs.ToPartyId = b.PartyId
-	WHERE @PartyId = 0 OR @PartyId = p.PartyID
+	WHERE @PartyId = 0 OR @PartyId = p.PartyID 
+			AND p.PartyID NOT IN (1,9,11,98, -- ParentId of deposit
+												25,30,324) -- Credit 
 END
 GO

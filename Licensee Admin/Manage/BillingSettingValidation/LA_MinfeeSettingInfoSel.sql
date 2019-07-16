@@ -32,6 +32,7 @@ BEGIN
 		LEFT JOIN LA_PartyGroup pg WITH(NOLOCK) ON pg.PartyGroupId = pga.PartyGroupId
 	WHERE (@PartyId = 0 OR @PartyId = p.PartyID) AND (ToDate IS NULL OR ToDate >= GETDATE())
 		  AND p.PartyID NOT IN (1,9,11,98)
+		  AND pd.IsDeposit = 1
 	GROUP BY p.PartyID, PartyName, PartyType, ProductID, 
 				ISNULL(FeeTypeId, 0),
 				ISNULL(pg.PartyGroupId, 0), 

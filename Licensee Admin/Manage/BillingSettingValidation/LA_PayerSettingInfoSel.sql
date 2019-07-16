@@ -42,6 +42,7 @@ BEGIN
 	LEFT JOIN @tblLicenseeCurrency c ON c.LicenseeId = p.OldRefID
 	WHERE (@PartyId = 0 OR @PartyId = p.PartyID)
 		AND p.PartyType NOT IN (2,3,4,5)
+		AND d.IsDeposit = 1
 	--(1, 'Payer'),
 	--(2, 'Reseller'),
 	--(3, '3rd'),
