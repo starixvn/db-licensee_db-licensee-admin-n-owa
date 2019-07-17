@@ -47,6 +47,9 @@ AS
 BEGIN
 	DECLARE @SystemID INT
 	SELECT @SystemID = id FROM dbo.Systems WITH (NOLOCK) WHERE SystemName = @System
+	
+	DECLARE @CreditLicensees AS TABLE(PartyId INT)
+	INSERT INTO @CreditLicensees SELECT PartyId FROM dbo.OAS_PartyDetail WITH(NOLOCK) WHERE IsDeposit = 0
 
 	DECLARE @ProductTable TABLE (ProductID smallint, ProductPrefix varchar(20))
 	DECLARE @Bettype TABLE (ProductId smallint, BetTypeRef smallint, BetType smallint)
@@ -135,7 +138,7 @@ BEGIN
 			)
 		AND NOT EXISTS (SELECT 1 FROM dbo.OAS_ChargeInfoSub WITH (NOLOCK) WHERE DI.ChargeID = ChargeIDRef)
 		AND DI.ChargeType != 11 -- rolling commission
-		AND NOT EXISTS (SELECT 1 FROM dbo.OAS_Party t WITH (NOLOCK) WHERE DI.FromParty NOT IN (25, 30, 324) AND DI.ToParty = t.PartyID AND t.PartyType = 3 AND (t.OldRefID IS NULL OR t.OldRefID IN (2, 3, 5, 6)))
+		AND NOT EXISTS (SELECT 1 FROM dbo.OAS_Party t WITH (NOLOCK) WHERE DI.FromParty NOT IN (SELECT cl.PartyId FROM @CreditLicensees cl) AND DI.ToParty = t.PartyID AND t.PartyType = 3 AND (t.OldRefID IS NULL OR t.OldRefID IN (2, 3, 5, 6)))
 	ORDER BY p.PartyID
 		,Di.ProductID
 		
