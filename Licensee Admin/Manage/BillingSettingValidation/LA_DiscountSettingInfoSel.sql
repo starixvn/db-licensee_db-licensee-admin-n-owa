@@ -26,6 +26,9 @@ BEGIN
 		   , ISNULL(CalculationType, 0) AS CalculationType
 		   , dg.FromDate
 		   , dg.ToDate
+		   , dgd.FromAmount
+		   , dgd.ToAmount
+		   , dgd.DiscountGroupDetailId
 	FROM OAS_Party p WITH(NOLOCK) 
 		LEFT JOIN LA_DiscountGroupAssignment dga WITH(NOLOCK) ON p.PartyID = dga.PartyId
 		LEFT JOIN LA_DiscountGroupHeader dg WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
