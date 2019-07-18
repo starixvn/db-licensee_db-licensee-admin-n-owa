@@ -24,7 +24,7 @@ BEGIN
 	INSERT INTO @CreditLicensees SELECT PartyId FROM dbo.OAS_PartyDetail WITH(NOLOCK) WHERE IsDeposit = 0
 
 	SELECT p.PartyID, PartyName, PartyType, dgd.Rate, dgp.ProductID
-		   , ISNULL(dg.DiscountGroupId, 0) AS DiscountGroupId, dg.CurrencyId AS CurrencyId
+		   , ISNULL(dg.DiscountGroupId, 0) AS DiscountGroupId, dg.CurrencyId AS CurrencyId, dg.DiscountGroupName
 		   , ISNULL(DiscountGroupType, 0) AS DiscountGroupType
 		   , ISNULL(CalculationType, 0) AS CalculationType
 		   , dg.FromDate

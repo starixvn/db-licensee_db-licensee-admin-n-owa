@@ -23,7 +23,7 @@ BEGIN
 	DECLARE @CreditLicensees AS TABLE(PartyId INT)
 	INSERT INTO @CreditLicensees SELECT PartyId FROM dbo.OAS_PartyDetail WITH(NOLOCK) WHERE IsDeposit = 0
 
-	SELECT p.PartyID, PartyName, PartyType, dgd.Rate, dgp.ProductID, ISNULL(dg.DiscountGroupId, 0)	AS RebateGroupId, dg.FromDate, dg.ToDate
+	SELECT p.PartyID, PartyName, PartyType, dgd.Rate, dgp.ProductID, ISNULL(dg.DiscountGroupId, 0)	AS RebateGroupId, dg.DiscountGroupName AS RebateGroupName, dg.FromDate, dg.ToDate
 	FROM OAS_Party p WITH(NOLOCK) 
 		LEFT JOIN LA_DiscountGroupAssignment dga WITH(NOLOCK) ON p.PartyID = dga.PartyId
 		LEFT JOIN LA_DiscountGroupHeader dg WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
