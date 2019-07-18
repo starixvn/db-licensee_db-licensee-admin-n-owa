@@ -19,6 +19,9 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
+	
+	DECLARE @CreditLicensees AS TABLE(PartyId INT)
+	INSERT INTO @CreditLicensees SELECT PartyId FROM dbo.OAS_PartyDetail WITH(NOLOCK) WHERE IsDeposit = 0
 
 	SELECT p.PartyID, PartyName, PartyType, dgd.Rate, dgp.ProductID
 		   , ISNULL(dg.DiscountGroupId, 0) AS DiscountGroupId, dg.CurrencyId AS CurrencyId
@@ -35,8 +38,8 @@ BEGIN
 		LEFT JOIN LA_DiscountGroupProduct dgp WITH(NOLOCK) ON dga.DiscountGroupId = dgp.DiscountGroupId
 		LEFT JOIN LA_DiscountGroupDetail dgd WITH(NOLOCK) ON dga.DiscountGroupId = dgd.DiscountGroupId
 	WHERE (@PartyId = 0 OR @PartyId = p.PartyID) 
-			AND p.PartyID NOT IN (1,9,11,98, -- ParentId of deposit
-										25,30,324) -- Credit 	
+			AND p.PartyID NOT IN (1,9,11,98)
+			AND p.PartyID NOT IN (SELECT cl.PartyId FROM @CreditLicensees cl)
 			AND (dg.DiscountGroupType IS NULL OR dg.DiscountGroupType != 2) -- Rebate
 END
 GO

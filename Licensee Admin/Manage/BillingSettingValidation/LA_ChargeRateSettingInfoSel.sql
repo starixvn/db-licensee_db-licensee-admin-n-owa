@@ -20,6 +20,9 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
+	DECLARE @CreditLicensees AS TABLE(PartyId INT)
+	INSERT INTO @CreditLicensees SELECT PartyId FROM dbo.OAS_PartyDetail WITH(NOLOCK) WHERE IsDeposit = 0
+
 	SELECT p.PartyId, p.PartyName, p.PartyType, ci.FromDate, ci.ToDate, 
 		ISNULL(ci.ProductId, -1)		AS ProductId, 
 		ISNULL(ci.Rate, 0)			AS Rate, 
@@ -31,7 +34,7 @@ BEGIN
 	LEFT JOIN LA_ChargeInfo_SystemMapping cs WITH(NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
 	WHERE (@PartyId = 0 OR @PartyId = p.PartyID)
 		AND p.PartyType IN (1,5) -- 1-official, 5-non-offcial
-		AND PartyID NOT IN (1,9,11,98, -- ParentId of deposit
-										25,30,324) -- Credit 	
+		AND PartyID NOT IN (1,9,11,98)
+		AND PartyID NOT IN (SELECT cl.PartyId FROM @CreditLicensees cl)
 END
 GO

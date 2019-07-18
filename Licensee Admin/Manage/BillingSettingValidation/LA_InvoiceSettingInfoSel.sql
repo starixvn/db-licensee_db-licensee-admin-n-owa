@@ -19,6 +19,9 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
+	
+	DECLARE @CreditLicensees AS TABLE(PartyId INT)
+	INSERT INTO @CreditLicensees SELECT PartyId FROM dbo.OAS_PartyDetail WITH(NOLOCK) WHERE IsDeposit = 0
 
 	SELECT p.PartyID, p.PartyName, p.PartyType,
 			ISNULL(ivs.ToPartyId, 0)		AS ToPartyId, 
@@ -32,7 +35,7 @@ BEGIN
 	LEFT JOIN LA_InvoiceTemplate ivt WITH(NOLOCK) ON ivs.InvTempId = ivt.InvTemplateId
 	LEFT JOIN LA_BillerInfo b WITH(NOLOCK) ON ivs.ToPartyId = b.PartyId
 	WHERE @PartyId = 0 OR @PartyId = p.PartyID 
-			AND p.PartyID NOT IN (1,9,11,98, -- ParentId of deposit
-												25,30,324) -- Credit 
+			AND p.PartyID NOT IN (1,9,11,98)
+			AND p.PartyID NOT IN (SELECT cl.PartyId FROM @CreditLicensees cl)
 END
 GO
