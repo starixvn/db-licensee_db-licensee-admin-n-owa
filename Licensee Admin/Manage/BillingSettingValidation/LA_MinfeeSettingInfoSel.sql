@@ -20,11 +20,12 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	SELECT p.PartyID, PartyName, PartyType, FromDate , ToDate, ProductID, pg.PartyGroupName, 
+	SELECT p.PartyID, PartyName, PartyType, FromDate , ToDate, ProductID, pg.PartyGroupName,
 				ISNULL(FeeTypeId, 0)			AS FeeTypeId, 
 				ISNULL(pg.PartyGroupId, 0)		AS PartyGroupId, 
 				ISNULL(pd.BaseCurrencyId, 0)	AS BaseCurrencyId, 
-				ISNULL(mf.CurrencyId, 0)		AS CurrencyId
+				ISNULL(mf.CurrencyId, 0)		AS CurrencyId,
+				ISNULL(mf.MinFeeId, 0)			AS MinFeeId
 	FROM OAS_Party p WITH(NOLOCK) 
 		INNER JOIN OAS_PartyDetail pd WITH(NOLOCK) ON p.PartyID = pd.PartyID 
 		LEFT JOIN LA_MinFee mf WITH(NOLOCK) ON p.PartyID = mf.PartyId
