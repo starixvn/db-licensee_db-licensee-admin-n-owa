@@ -97,7 +97,7 @@ BEGIN
 		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 		b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
-		AND b.Bettype in (Select Bettype FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'NG'))
+		AND b.Bettype in (Select Bettype FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'CC'))
 		AND ci.isDeposit = 0
 	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
 	-- EndRegion
@@ -178,7 +178,7 @@ BEGIN
 	
 	-- Select data by Parties
 	SELECT 
-		r.PartyId
+		r.PartyId,
 		r.PartyName,
 		r.ParentId,
 		r.ParentName,
