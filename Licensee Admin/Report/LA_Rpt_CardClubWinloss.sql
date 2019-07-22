@@ -12,6 +12,7 @@ AS
  * Created by : [20190710@Mason.Nguyen]
  * Task  : Get Card Club Winloss
  * Revisions
+	- 20190710@Mason: Intergrate Card Club [#116096]
  * Param's Explanation:
  *
  */
