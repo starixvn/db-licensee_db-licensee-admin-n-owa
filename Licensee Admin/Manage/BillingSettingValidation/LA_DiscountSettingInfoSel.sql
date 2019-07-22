@@ -32,6 +32,7 @@ BEGIN
 		   , dgd.FromAmount
 		   , dgd.ToAmount
 		   , dgd.DiscountGroupDetailId
+		   , dga.IsApplyDiscount
 	FROM OAS_Party p WITH(NOLOCK) 
 		LEFT JOIN LA_DiscountGroupAssignment dga WITH(NOLOCK) ON p.PartyID = dga.PartyId
 		LEFT JOIN LA_DiscountGroupHeader dg WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
