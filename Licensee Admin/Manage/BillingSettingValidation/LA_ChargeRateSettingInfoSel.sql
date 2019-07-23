@@ -39,8 +39,8 @@ BEGIN
 	LEFT JOIN LA_ChargeInfo_SystemMapping cs WITH(NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
 	WHERE (@PartyId = 0 OR @PartyId = p.PartyID)
 		AND p.PartyType IN (1,5) -- 1-official, 5-non-offcial
-		AND ISNULL(ci.ChargeType, 0) NOT IN (2, 3) -- odd type & type no longer use
-		AND ISNULL(ci.ToParty, 0) IN (SELECT ParentId FROM @Deposits)
+		AND (ci.ChargeType IS NULL OR ci.ChargeType NOT IN (2, 3)) -- odd type & type no longer use
+		AND (ci.ToParty IS NULL OR ci.ToParty IN (SELECT ParentId FROM @Deposits))
 		AND PartyID NOT IN (SELECT ParentId FROM @Deposits)
 		AND PartyID NOT IN (SELECT cl.PartyId FROM @CreditLicensees cl)
 END
