@@ -23,6 +23,13 @@ BEGIN
 	CREATE TABLE #PartyList (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
 	INSERT INTO #PartyList EXEC bodb_licensee.dbo.LA_PartyListSel
 	
+	-- Get 3rd Rate
+	DECLARE @3rdRate AS TABLE(PartyID INT, ProductID INT, DI_Rate MONEY, IsDeposit INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
+	INSERT INTO @3rdRate
+	SELECT DISTINCT p.PartyId, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r.Todate 
+	FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'CC', 'OA') r 
+	INNER JOIN #PartyList p on p.ParentId = r.PartyID
+
 	CREATE TABLE #ChargeRate (
 		PartyID			INT
 		,LicenseeID		INT
@@ -34,10 +41,11 @@ BEGIN
 		,Todate			SMALLDATETIME
 	)
 	
-	-- ​Pay to Supplier: equals 2.5%(0.025) of [Licensing Fee]
+	-- ​Pay to Supplier: equals 2.5%(0.025) of [Licensing Fee] -- Join Charge rate and 3rd Rate
 	INSERT INTO #ChargeRate
-	SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, 0.025, c.Fromdate, c.Todate
+	SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'CC') c
+	INNER JOIN @3rdRate r ON r.PartyID = c.PartyID and r.ProductID = c.ProductID
 
 	CREATE TABLE #Exchange (
 		ExchangeDate	DATE,
