@@ -27,6 +27,12 @@ BEGIN
 	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC LA_PartyListSel
 
+	DECLARE @PartyHasProductBA AS TABLE(PartyId INT)
+	INSERT INTO @PartyHasProductBA (PartyId)
+	SELECT DISTINCT FromParty 
+	FROM OAS_ChargeInfo ci WITH(NOLOCK)
+	WHERE ci.ToDate >= GETDATE() AND ci.ToParty = 1 /*OW*/ AND ci.ProductID = 3 /*BA*/ 
+
 	SELECT p.PartyID, p.PartyName, p.PartyType,
 			ISNULL(ivs.ToPartyId, 0)		AS ToPartyId, 
 			ISNULL(ivs.InvTypeId, 0)		AS InvTypeId, 
@@ -34,12 +40,14 @@ BEGIN
 			ISNULL(ivs.InvTempId, 0)		AS InvSettingTemplateId, 
 			ISNULL(ivt.InvTemplateId, 0)	AS InvTemplateId,
 			ISNULL(b.PartyId, 0)			AS BillerId, 
-			ISNULL(pList.ParentId, 0)		AS ParentId
+			ISNULL(pList.ParentId, 0)		AS ParentId,
+			CASE WHEN pBA.PartyId IS NULL THEN 0 ELSE 1 END		AS HasProductBA
 	FROM OAS_Party p WITH(NOLOCK) 
 	LEFT JOIN LA_InvoiceSetting ivs WITH(NOLOCK) ON p.PartyID = ivs.FromPartyId
 	LEFT JOIN LA_InvoiceTemplate ivt WITH(NOLOCK) ON ivs.InvTempId = ivt.InvTemplateId
 	LEFT JOIN LA_BillerInfo b WITH(NOLOCK) ON ivs.ToPartyId = b.PartyId
 	LEFT JOIN @PartyList pList ON P.PartyID = pList.PartyId
+	LEFT JOIN @PartyHasProductBA pBA ON p.PartyID = pBA.PartyId
 	WHERE (@PartyId = 0 OR @PartyId = p.PartyID) 
 			AND p.PartyID NOT IN (1,9,11,98)
 			AND p.PartyID NOT IN (SELECT cl.PartyId FROM @CreditLicensees cl)
