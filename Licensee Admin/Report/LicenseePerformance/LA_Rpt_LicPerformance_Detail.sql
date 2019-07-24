@@ -172,7 +172,7 @@ BEGIN
 	-- ***********************************************************************************************
 	-- select bettype to avoid duplicated data of MGC
 	DECLARE @CreditLicensees AS TABLE(PartyId INT)
-	INSERT INTO @CreditLicensees SELECT PartyId FROM dbo.OAS_PartyDetail WITH(NOLOCK) WHERE IsDeposit = 0
+	INSERT INTO @CreditLicensees SELECT PartyId FROM bodb_licensee.dbo.OAS_PartyDetail WITH(NOLOCK) WHERE IsDeposit = 0
 	
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
 	(
