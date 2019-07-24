@@ -29,7 +29,8 @@ AS
     DB: DBLIC.bodb_Licensee
     
 	Revisions:
-		- 20180815@Scofield: Get charge rate for Credits		
+		- 20180815@Scofield: Get charge rate for Credits	
+		- 20190718@Bruce: Integrate CN88 data in LA [#116859]
 */
 
 BEGIN

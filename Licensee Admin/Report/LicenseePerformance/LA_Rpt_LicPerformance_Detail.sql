@@ -52,6 +52,7 @@ AS
 		- 20180924@Parsons: LA - LPID report - Apply one discount rate across all base currencies [#100046]
 		- 20181122@Scofield: Integrate Bidme games (GD product) [#103695]
 	    - 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
+		- 20190718@Bruce: Integrate CN88 data in LA [#116859]	    
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','

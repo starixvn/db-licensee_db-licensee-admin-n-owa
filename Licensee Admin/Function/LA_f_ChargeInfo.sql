@@ -40,7 +40,7 @@ AS
 		- 20180508@Harper: Change PayToSupplier term of Exchange product [RedmineID: #94281]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
-
+		- 20190718@Bruce: Integrate CN88 data in LA [#116859]
 
 */
 

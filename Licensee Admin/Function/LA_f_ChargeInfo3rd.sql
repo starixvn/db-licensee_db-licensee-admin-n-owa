@@ -34,7 +34,7 @@ AS
 		- 20180327@Harper: Add more Cozni as Parent Licensee [RedmineID: #85681]
 		- 20180508@Harper: Change PayToSupplier term of Exchange product [RedmineID: #94281]
 		- 20180716@bruce: add new group TEST for credit [#98126]
-		
+		- 20190718@Bruce: Integrate CN88 data in LA [#116859]
     Param's Explanation: 
 */  
 
