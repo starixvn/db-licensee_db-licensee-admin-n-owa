@@ -26,7 +26,7 @@ BEGIN
 	SELECT p.PartyID, PartyName, PartyType, dgd.Rate, dgp.ProductID
 		   , ISNULL(dg.DiscountGroupId, 0) AS DiscountGroupId, dg.CurrencyId AS CurrencyId, dg.DiscountGroupName
 		   , ISNULL(DiscountGroupType, 0) AS DiscountGroupType
-		   , ISNULL(CalculationType, 0) AS CalculationType
+		   , CalculationType
 		   , dg.FromDate
 		   , dg.ToDate
 		   , dgd.FromAmount
