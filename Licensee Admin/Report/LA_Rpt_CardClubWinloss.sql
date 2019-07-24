@@ -59,6 +59,8 @@ BEGIN
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	
+	UPDATE #Exchange SET CurrencyCode = 'INH' WHERE ExchangeID = 51
+	
 	-- Region: TempData
 	CREATE TABLE #TempData (
 		PartyID INT,
