@@ -22,8 +22,8 @@ AS
 	- 20180716@bruce: add new group TEST for credit [#98126]
 	- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 	- 20181224@Bruce: include happy 5 [#105723]
-	- 20190626@Mason: Implement new view for Number Game
-	
+	- 20190626@Mason: Implement new view for Number Game [#113641]
+	- 20190718@Mason: Integrate CN88 data in LA (PayToSupplier = 0.015 GRR) [#116859]
  * Param's Explanation:
  *
  */
@@ -121,6 +121,12 @@ BEGIN
 	FROM #TempData td
 		INNER JOIN #PartyList p ON td.PartyID = p.PartyId
 		INNER JOIN #PartyList pa ON P.ParentId = PA.PartyId
+		
+	--Region Update PayToSupplier = 0.015 * Licensee WL for CN88
+	UPDATE td SET
+		td.PayToSupplier = td.LicenseeWinloss * 0.015
+	FROM #TempData td 
+	WHERE PartyID IN (SELECT p.PartyID FROM OAS_Party p WHERE p.PartyName = 'CN88')
 	
 	DECLARE @Total TABLE (
 		ParentId		INT,

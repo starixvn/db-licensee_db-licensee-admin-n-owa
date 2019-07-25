@@ -19,6 +19,7 @@ AS
 		- 20180515@Scofield: Incorporate 9wickets data [#94950]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180907@Parsons: Royalty fee updated for Keno& Lottery [#101168]
+		- 20190716@Bruce: Integrate CN88 data in LA [#116859]
 		
 	 Params:
 */
@@ -77,6 +78,13 @@ BEGIN
 				OR ci.FromDate BETWEEN @FromDate AND @ToDate
 				OR ci.ToDate BETWEEN @FromDate AND @ToDate)
 	)
+
+	-- CN88
+	-- pay to supplier = 1.5% of winloss
+	UPDATE @ChargeInfos SET Rate3rd = 0.015
+	WHERE PartyId = (SELECT a.PartyID FROM dbo.OAS_Party a WITH(NOLOCK) WHERE a.PartyName='CN88')
+
+
 	-- End region
 
 	-- Region: TempData

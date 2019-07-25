@@ -34,13 +34,16 @@ AS
 		- 20180327@Harper: Add more Cozni as Parent Licensee [RedmineID: #85681]
 		- 20180508@Harper: Change PayToSupplier term of Exchange product [RedmineID: #94281]
 		- 20180716@bruce: add new group TEST for credit [#98126]
-		
+		- 20190718@Bruce: Integrate CN88 data in LA [#116859]
     Param's Explanation: 
 */  
 
 BEGIN       
     DECLARE @SystemID INT
 	DECLARE @tmpCompany	AS TABLE (ID INT IDENTITY, PartyID INT)
+	
+	DECLARE @CreditLicensees AS TABLE(PartyId INT)
+	INSERT INTO @CreditLicensees SELECT PartyId FROM dbo.OAS_PartyDetail WITH(NOLOCK) WHERE IsDeposit = 0
 
     SELECT  @SystemID = id
     FROM    dbo.Systems WITH ( NOLOCK )
@@ -70,12 +73,12 @@ BEGIN
 								)
     SELECT  DI.ChargeID ,
             CASE WHEN Di.FromParty IN (1, 11, 98, 9) THEN DI.FromParty 
-				 WHEN Di.FromParty IN (25, 30, 324) THEN 999 
+				 WHEN cl.PartyID IS NOT NULL THEN 999 
 				 ELSE Di. FromParty END,
             DI.ProductID ,
             DI.Rate ,
             DI.ChargeType ,
-			CASE WHEN Di.FromParty IN (25, 30, 324) THEN 0 ELSE 1 END,
+			CASE WHEN cl.PartyID IS NOT NULL THEN 0 ELSE 1 END,
             CASE WHEN @FromDate <= DI.FromDate 
 					THEN DI.FromDate
                     ELSE @FromDate
@@ -84,13 +87,14 @@ BEGIN
 					THEN DI.ToDate
                     ELSE @ToDate
             END,
-			CASE WHEN DI.FromParty IN (1, 11, 98, 9, 25, 30, 324) THEN 1 ELSE 0 END
+			CASE WHEN DI.FromParty IN (1, 11, 98, 9) OR cl.PartyID IS NOT NULL THEN 1 ELSE 0 END
     FROM    dbo.OAS_ChargeInfo DI (NOLOCK)
             INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs (NOLOCK) ON DI.ChargeID = cs.ChargeID
                                                     AND cs.SystemID = @SystemID
             INNER JOIN dbo.OAS_Party t (NOLOCK) ON DI.ToParty = t.PartyID
                                                     AND t.PartyType = 3
                                                     AND (t.OldRefID IS NULL OR t.OldRefID IN (2, 3, 5, 6))
+			LEFT JOIN @CreditLicensees cl ON cl.PartyID = Di.FromParty
     WHERE   ( @FromDate BETWEEN DI.FromDate AND DI.ToDate
                 OR @ToDate BETWEEN DI.FromDate AND DI.ToDate
                 OR DI.FromDate BETWEEN @FromDate AND @ToDate

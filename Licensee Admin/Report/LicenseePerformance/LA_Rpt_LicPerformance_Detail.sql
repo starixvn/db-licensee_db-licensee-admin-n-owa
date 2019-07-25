@@ -52,6 +52,7 @@ AS
 		- 20180924@Parsons: LA - LPID report - Apply one discount rate across all base currencies [#100046]
 		- 20181122@Scofield: Integrate Bidme games (GD product) [#103695]
 	    - 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
+		- 20190718@Bruce: Integrate CN88 data in LA [#116859]	    
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -170,6 +171,9 @@ BEGIN
 	-- *** Get ChargeInfo for @PartyIDs in 2 period: FromDate-ToDate, PreviousFromDate-PreviousToDate
 	-- ***********************************************************************************************
 	-- select bettype to avoid duplicated data of MGC
+	DECLARE @CreditLicensees AS TABLE(PartyId INT)
+	INSERT INTO @CreditLicensees SELECT PartyId FROM bodb_licensee.dbo.OAS_PartyDetail WITH(NOLOCK) WHERE IsDeposit = 0
+	
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
 	(
 		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, 
@@ -179,7 +183,7 @@ BEGIN
 				CASE WHEN ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
 		FROM	bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, @ProductCodes) ci
 		LEFT JOIN bodb_licensee.dbo.Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype
-		WHERE	((ci.PartyID IN (25,30,324) AND DI_Rate = 0) OR DI_Rate > 0)
+		WHERE	((ci.PartyID IN (SELECT cl.PartyId FROM @CreditLicensees cl) AND DI_Rate = 0) OR DI_Rate > 0)
 			AND ProductId <> 1 --exclude RB
 			AND ChargeType <> 12 -- exclude Gd tip
 	)
@@ -192,7 +196,7 @@ BEGIN
 				CASE WHEN ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END
 		FROM	bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @PrevFromDate, @PrevToDate, @ProductCodes) ci
 		LEFT JOIN bodb_licensee.dbo.Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype
-		WHERE	((ci.PartyID IN (25,30,324) AND DI_Rate = 0) OR DI_Rate > 0)
+		WHERE	((ci.PartyID IN (SELECT cl.PartyId FROM @CreditLicensees cl) AND DI_Rate = 0) OR DI_Rate > 0)
 			AND ProductId <> 1 --exclude RB
 			AND ChargeType <> 12 -- exclude Gd tip
 	)
