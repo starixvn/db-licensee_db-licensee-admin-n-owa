@@ -121,11 +121,7 @@ BEGIN
 		
 	-- payer setting
 	DECLARE @CurrentBillingGroup INT
-	;WITH cte_PartyBelongingToGroup AS(SELECT DISTINCT ToPartyId FROM @ChargeInfo)
-	SELECT @CurrentBillingGroup = CASE WHEN NOT EXISTS(SELECT DISTINCT ToPartyId FROM cte_PartyBelongingToGroup) THEN 0 -- Party is not in any group
-									   WHEN (SELECT COUNT(ToPartyId) FROM cte_PartyBelongingToGroup) > 1 THEN -1 -- Party is belonging more than one group
-									   ELSE (SELECT TOP 1 ToPartyId FROM cte_PartyBelongingToGroup)
-								  END
+	SELECT @CurrentBillingGroup = ISNULL((SELECT TOP 1 ToPartyId FROM @ChargeInfo ORDER BY FromDate DESC), 0)
 
 	SELECT TOP 1 c.PartyId			AS PayerID	
 		, pg.PartyGroupId		AS PayerGroupId
