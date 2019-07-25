@@ -376,6 +376,7 @@ BEGIN
 			,CAST(0 AS MONEY) Discount
 			,CAST(0 AS MONEY) MinFee
 			,CAST(0 AS BIT) IsApplyMinfeeToDiscount
+			,CAST(0 AS BIT) IsChargedByMinFee
 		INTO #tmpResult
 		FROM #tmpWinlossData a  
 		GROUP BY a.PartyID, a.ProductId  
@@ -429,11 +430,11 @@ BEGIN
 					THEN a.MinFeeAmount + a.FeeUnderWaiveTime
 				ELSE a.FeeOutOfWaiveTime + a.FeeUnderWaiveTime
 			END,
-			--IsChargedByMinFee = CASE
-			--	WHEN t.TotalAmount < t.TotalMinFee AND a.FeeOutOfWaiveTime < a.MinFeeAmount
-			--		THEN 1
-			--	ELSE 0
-			--END,
+			IsChargedByMinFee = CASE
+				WHEN t.TotalAmount < t.TotalMinFee AND a.FeeOutOfWaiveTime < a.MinFeeAmount
+					THEN 1
+				ELSE 0
+			END,
 			IsApplyMinfeeToDiscount = CASE
 				WHEN a.MinFeeAmount < a.FeeAmount AND a.FeeAmount > 0 AND b.FeeType IS NOT NULL THEN 0-- waived
 				WHEN t.TotalAmount >= t.TotalMinFee AND p.PartyGroupId > 0 THEN 0 -- reach group minfee goal
@@ -611,12 +612,13 @@ BEGIN
 /*-----------------
  * aggregate
  *-----------------*/
+
 	;WITH a AS (
 		SELECT r.PartyID
 			, SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
 			, SUM(r.LicensingFee + r.ExtraAmount) LicensingFee
 			, SUM(r.Discount) Discount
-			, SUM(r.MinFee) MinFee
+			, SUM(CASE WHEN r.IsChargedByMinFee = 1 THEN r.MinFee - r.Discount - r.AmountToCompany ELSE 0 END) AdjustedMinFee
 		FROM #tmpResult r
 		INNER JOIN @partyList p ON r.PartyID=p.PartyId
 		WHERE p.PartyId IN (SELECT p.PartyId FROM @partyList p WHERE p.IsSelected=1)
@@ -628,7 +630,13 @@ BEGIN
 		FROM @credit c
 		GROUP BY c.PartyId
 	)
-	SELECT p.PartyId, p.PartyName, a.AmountToCompany,a.LicensingFee,a.MinFee,a.Discount,b.Prepayment,b.Others
+	SELECT p.PartyId, p.PartyName,
+		CAST(a.AmountToCompany AS MONEY) AmountToCompany,
+		CAST(a.LicensingFee AS MONEY) LicensingFee,
+		CAST(a.AdjustedMinFee AS MONEY) AdjustedMinFee,
+		a.Discount,
+		b.Prepayment,
+		b.Others
 	FROM a LEFT JOIN b ON a.PartyID=b.PartyId
 	INNER JOIN @partyList p ON p.PartyId = a.PartyID
 	WHERE p.IsSelected = 1
