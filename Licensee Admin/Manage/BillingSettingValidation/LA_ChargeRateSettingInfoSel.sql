@@ -21,13 +21,10 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @CreditLicensees AS TABLE(PartyId INT)
-	DECLARE @Deposits AS TABLE(ParentId INT)
-
 	INSERT INTO @CreditLicensees SELECT PartyId FROM dbo.OAS_PartyDetail WITH(NOLOCK) WHERE IsDeposit = 0
-	INSERT INTO @Deposits(ParentId) VALUES(1), (9), (11), (98)
 
 	SELECT p.PartyId, p.PartyName, p.PartyType, ci.FromDate, ci.ToDate, 
-		ISNULL(ci.ProductId, -1)		AS ProductId, 
+		ISNULL(ci.ProductId, -1)	AS ProductId, 
 		ISNULL(ci.Rate, 0)			AS Rate, 
 		ISNULL(ci.FromParty, 0)		AS FromParty, 
 		ISNULL(ci.ToParty, 0)		AS ToParty,
@@ -40,8 +37,8 @@ BEGIN
 	WHERE (@PartyId = 0 OR @PartyId = p.PartyID)
 		AND p.PartyType IN (1,5) -- 1-official, 5-non-offcial
 		AND (ci.ChargeType IS NULL OR ci.ChargeType NOT IN (2, 3)) -- odd type & type no longer use
-		AND (ci.ToParty IS NULL OR ci.ToParty IN (SELECT ParentId FROM @Deposits))
-		AND PartyID NOT IN (SELECT ParentId FROM @Deposits)
-		AND PartyID NOT IN (SELECT cl.PartyId FROM @CreditLicensees cl)
+		AND (ci.ToParty IS NULL OR ci.ToParty IN (SELECT bg.PartyID FROM LA_f_BillingGroupSel() bg))
+		AND p.PartyID NOT IN (SELECT bg.PartyID FROM LA_f_BillingGroupSel() bg)
+		AND p.PartyID NOT IN (SELECT cl.PartyId FROM @CreditLicensees cl)
 END
 GO

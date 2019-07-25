@@ -30,7 +30,7 @@ BEGIN
 		LEFT JOIN LA_DiscountGroupProduct dgp WITH(NOLOCK) ON dga.DiscountGroupId = dgp.DiscountGroupId
 		LEFT JOIN LA_DiscountGroupDetail dgd WITH(NOLOCK) ON dga.DiscountGroupId = dgd.DiscountGroupId
 	WHERE (@PartyId = 0 OR @PartyId = p.PartyID) 
-			AND p.PartyID NOT IN (1,9,11,98)
+			AND p.PartyID NOT IN (SELECT bg.PartyID FROM LA_f_BillingGroupSel() bg)
 			AND p.PartyID NOT IN (SELECT cl.PartyId FROM @CreditLicensees cl)
 			AND (dg.DiscountGroupType IS NULL OR dg.DiscountGroupType = 2) -- Rebate
 END

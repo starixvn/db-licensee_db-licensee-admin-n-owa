@@ -49,7 +49,7 @@ BEGIN
 	LEFT JOIN @PartyList pList ON P.PartyID = pList.PartyId
 	LEFT JOIN @PartyHasProductBA pBA ON p.PartyID = pBA.PartyId
 	WHERE (@PartyId = 0 OR @PartyId = p.PartyID) 
-			AND p.PartyID NOT IN (1,9,11,98)
+			AND p.PartyID NOT IN (SELECT bg.PartyID FROM LA_f_BillingGroupSel() bg)
 			AND p.PartyID NOT IN (SELECT cl.PartyId FROM @CreditLicensees cl)
 END
 GO

@@ -32,7 +32,7 @@ BEGIN
 		LEFT JOIN LA_PartyGroupAssignment pga WITH(NOLOCK) ON p.PartyID = pga.PartyId
 		LEFT JOIN LA_PartyGroup pg WITH(NOLOCK) ON pg.PartyGroupId = pga.PartyGroupId
 	WHERE (@PartyId = 0 OR @PartyId = p.PartyID)
-		  AND p.PartyID NOT IN (1,9,11,98)
+		  AND p.PartyID NOT IN (SELECT bg.PartyID FROM LA_f_BillingGroupSel() bg)
 		  AND pd.IsDeposit = 1
 END
 GO
