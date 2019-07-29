@@ -7,7 +7,7 @@ SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountSettingInfoSel]
-@PartyId INT = 0
+@PartyIds			VARCHAR(4000)
 AS
 /*
 	Created: 20190711@Parsons
@@ -38,7 +38,7 @@ BEGIN
 		LEFT JOIN LA_DiscountGroupHeader dg WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
 		LEFT JOIN LA_DiscountGroupProduct dgp WITH(NOLOCK) ON dga.DiscountGroupId = dgp.DiscountGroupId
 		LEFT JOIN LA_DiscountGroupDetail dgd WITH(NOLOCK) ON dga.DiscountGroupId = dgd.DiscountGroupId
-	WHERE (@PartyId = 0 OR @PartyId = p.PartyID) 
+	WHERE p.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
 			AND p.PartyID NOT IN (SELECT bg.PartyID FROM LA_f_BillingGroupSel() bg)
 			AND p.PartyID NOT IN (SELECT cl.PartyId FROM @CreditLicensees cl)
 			AND (dg.DiscountGroupType IS NULL OR dg.DiscountGroupType != 2) -- Rebate

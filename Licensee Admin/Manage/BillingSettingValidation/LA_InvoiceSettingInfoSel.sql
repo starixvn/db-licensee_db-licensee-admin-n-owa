@@ -7,7 +7,7 @@ SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_InvoiceSettingInfoSel]
-@PartyId INT = 0
+@PartyIds			VARCHAR(4000)
 AS
 /*
 	Created: 20190624@Parsons
@@ -48,7 +48,7 @@ BEGIN
 	LEFT JOIN LA_BillerInfo b WITH(NOLOCK) ON ivs.ToPartyId = b.PartyId
 	LEFT JOIN @PartyList pList ON P.PartyID = pList.PartyId
 	LEFT JOIN @PartyHasProductBA pBA ON p.PartyID = pBA.PartyId
-	WHERE (@PartyId = 0 OR @PartyId = p.PartyID) 
+	WHERE p.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
 			AND p.PartyID NOT IN (SELECT bg.PartyID FROM LA_f_BillingGroupSel() bg)
 			AND p.PartyID NOT IN (SELECT cl.PartyId FROM @CreditLicensees cl)
 END

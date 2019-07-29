@@ -7,7 +7,7 @@ SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerSettingInfoSel]
-@PartyId INT = 0
+@PartyIds			VARCHAR(4000)
 AS
 /*
 	Created: 20190620@Parsons
@@ -21,15 +21,14 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @ChargeRateInfo TABLE(FromParty INT, ToParty INT)
-	DECLARE @LicenseeId INT = 0
-
-	IF @PartyId <> 0 SELECT @LicenseeId = OldRefID FROM OAS_Party WITH(NOLOCK) WHERE PartyID = @PartyId	
 
 	DECLARE @tblLicenseeCurrency AS TABLE(LicenseeId INT, CurrencyCount INT)
 	INSERT INTO @tblLicenseeCurrency(LicenseeId, CurrencyCount)
 	SELECT c.LicenseeID,COUNT(c.Currency)
 	FROM dbo.LicenseeCust c WITH(NOLOCK)
-	WHERE @LicenseeId = 0 OR c.LicenseeID = @LicenseeId AND c.Currency <> 20 -- test currency
+		INNER JOIN OAS_Party p WITH(NOLOCK) ON p.OldRefID = c.LicenseeID
+	WHERE p.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
+		  AND c.Currency <> 20 -- test currency
 	GROUP BY c.LicenseeID
 
 	SELECT P.PartyID, p.PartyName, p.PartyType,
@@ -40,7 +39,7 @@ BEGIN
 	FROM OAS_Party p WITH(NOLOCK)
 	INNER JOIN OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID = d.PartyID
 	LEFT JOIN @tblLicenseeCurrency c ON c.LicenseeId = p.OldRefID
-	WHERE (@PartyId = 0 OR @PartyId = p.PartyID)
+	WHERE p.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
 		AND p.PartyType NOT IN (2,3,4,5)
 		AND d.IsDeposit = 1
 	--(1, 'Payer'),

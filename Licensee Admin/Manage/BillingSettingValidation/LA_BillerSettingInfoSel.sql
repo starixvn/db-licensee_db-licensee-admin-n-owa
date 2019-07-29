@@ -7,7 +7,7 @@ SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_BillerSettingInfoSel]
-@PartyId INT = 0
+@PartyIds			VARCHAR(4000)
 AS
 /*
 	Created: 20190618@Parsons
@@ -25,6 +25,6 @@ BEGIN
 			ISNULL(p.PartyType, 0) AS PartyType
 	FROM LA_BillerInfo b WITH(NOLOCK)
 	LEFT JOIN OAS_Party p WITH(NOLOCK) ON b.PartyId = p.PartyID
-	WHERE @PartyId = 0 OR b.PartyId = @PartyId
+	WHERE b.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
 END
 GO

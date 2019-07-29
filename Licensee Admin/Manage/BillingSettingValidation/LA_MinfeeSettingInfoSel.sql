@@ -7,7 +7,7 @@ SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_MinfeeSettingInfoSel]
-@PartyId INT = 0
+@PartyIds			VARCHAR(4000)
 AS
 /*
 	Created: 20190626@Parsons
@@ -31,7 +31,7 @@ BEGIN
 		LEFT JOIN LA_MinFee mf WITH(NOLOCK) ON p.PartyID = mf.PartyId
 		LEFT JOIN LA_PartyGroupAssignment pga WITH(NOLOCK) ON p.PartyID = pga.PartyId
 		LEFT JOIN LA_PartyGroup pg WITH(NOLOCK) ON pg.PartyGroupId = pga.PartyGroupId
-	WHERE (@PartyId = 0 OR @PartyId = p.PartyID)
+	WHERE p.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
 		  AND p.PartyID NOT IN (SELECT bg.PartyID FROM LA_f_BillingGroupSel() bg)
 		  AND pd.IsDeposit = 1
 END

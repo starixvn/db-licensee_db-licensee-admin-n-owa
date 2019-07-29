@@ -7,7 +7,7 @@ SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_ChargeRateSettingInfoSel]
-@PartyId INT = 0
+@PartyIds			VARCHAR(4000)
 AS
 /*
 	Created: 20190625@Parsons
@@ -34,7 +34,7 @@ BEGIN
 	FROM dbo.OAS_Party p WITH(NOLOCK) 
 	LEFT JOIN dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON p.PartyID = ci.FromParty
 	LEFT JOIN LA_ChargeInfo_SystemMapping cs WITH(NOLOCK) ON ci.ChargeID = cs.ChargeID
-	WHERE (@PartyId = 0 OR @PartyId = p.PartyID)
+	WHERE p.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
 		AND p.PartyType IN (1,5) -- 1-official, 5-non-offcial
 		AND (cs.SystemID IS NULL OR cs.SystemID = 2)
 		AND (ci.ChargeType IS NULL OR ci.ChargeType NOT IN (2, 3)) -- odd type & type no longer use
