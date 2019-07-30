@@ -114,16 +114,30 @@ BEGIN
 	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
 	-- EndRegion
 	
-	UPDATE td SET
-		PartyName = p.PartyName,
-		ParentId = pa.PartyId,
-		ParentName = pa.PartyName
+	-- Region: Calculate result
+	CREATE TABLE #Result (
+		PartyId			INT,
+		PartyName		VARCHAR(100),
+		ParentId		INT,
+		ParentName		VARCHAR(100),
+		WinLossDate		DATETIME,
+		CurrencyId		INT,
+		TotalTrans		INT,
+		Turnover		MONEY,
+		CustomerWinLoss	MONEY,
+		LicenseeWinLoss	MONEY,
+		LicensingFee	MONEY,
+		PayToSupplier	MONEY
+	)
+	
+	INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, PayToSupplier)
+	SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.Winlostdate, td.CurrencyId, td.TotalTrans, td.Turnover, td.CustomerWinLoss, td.LicenseeWinloss, td.LicensingFee, td.PayToSupplier
 	FROM #TempData td
-		INNER JOIN #PartyList p ON td.PartyID = p.PartyId
-		INNER JOIN #PartyList pa ON P.ParentId = PA.PartyId
+		INNER JOIN #PartyList p ON td.PartyId = p.PartyID
+		INNER JOIN #PartyList pa ON p.ParentId = pa.PartyId	
 	
 	DECLARE @Total TABLE (
-		ParentId		INT,
+		PartyId			INT,
 		TotalTrans		INT,
 		Turnover		MONEY,
 		CustomerWinLoss	MONEY,
@@ -158,20 +172,33 @@ BEGIN
 	BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies)
 
-		INSERT INTO @Total (ParentId, Currency,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
-		SELECT 
-			ParentId,
-			@tempCurrency AS Currency,
-			SUM(td.TotalTrans) TotalTrans,
-			SUM(td.Turnover * e.BaseCurrencyRate) Turnover,
-			SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss,
-			SUM(td.LicenseeWinLoss * e.BaseCurrencyRate) LicenseeWinLoss,
-			SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
-			SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
-			FROM #TempData td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e
-			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.Winlostdate
-			GROUP BY td.ParentId
-
+		;WITH TotalByParty AS(
+			SELECT td.ParentId,
+				SUM(td.TotalTrans) TotalTrans,
+				SUM(td.Turnover * e.BaseCurrencyRate) Turnover,
+				SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss,
+				SUM(td.LicenseeWinLoss * e.BaseCurrencyRate) LicenseeWinLoss,
+				SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
+				SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
+			FROM #Result td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e
+			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
+			GROUP BY td.ParentId, td.PartyId
+		)
+		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier)
+		SELECT @tempCurrency,ParentId,
+			SUM(TotalTrans),
+			SUM(Turnover),
+			SUM(CustomerWinLoss),
+			SUM(LicenseeWinLoss),
+			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
+			SUM(PayToSupplier)
+		FROM TotalByParty
+		GROUP BY ParentId
+		
+		UPDATE @Total
+		SET PayToSupplier = 0
+		WHERE PayToSupplier < 0
+		
 		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
 		SELECT Currency,
 			SUM(TotalTrans),
@@ -194,7 +221,7 @@ BEGIN
 		r.PartyName,
 		r.ParentId,
 		r.ParentName,
-		r.Winlostdate AS WinLossDate,
+		r.WinLossDate,
 		e.CurrencyCode AS CurrencyName,
 		-- Select by origin currency
 		r.TotalTrans,
@@ -211,14 +238,14 @@ BEGIN
 		CAST((r.LicensingFee * e.Rate) AS MONEY) AS LicensingFee,
 		CAST((r.PayToSupplier * e.Rate)AS MONEY) AS PayToSupplier,
 		r.LicensingFee - r.PayToSupplier AS CompanyIncome
-	FROM #TempData r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.Winlostdate = e.ExchangeDate
+	FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.WinLossDate = e.ExchangeDate
 	
 	-- Select Grand Total
 	SELECT * FROM @GrandTotal
 	
 	-- Total
 	SELECT 
-		ParentId,
+		PartyId,
 		TotalTrans,
 		Turnover,
 		CustomerWinLoss,
@@ -235,5 +262,6 @@ BEGIN
 	DROP TABLE	#Exchange
 	DROP TABLE	#ChargeRate
 	DROP TABLE  #TempData	
+	DROP TABLE  #Result
 END
 GO
