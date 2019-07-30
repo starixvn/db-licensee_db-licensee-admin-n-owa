@@ -191,7 +191,7 @@ BEGIN
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
-			SUM(PayToSupplier)
+			SUM(CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END)
 		FROM TotalByParty
 		GROUP BY ParentId
 		
