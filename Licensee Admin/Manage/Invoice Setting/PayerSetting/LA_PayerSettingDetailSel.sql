@@ -43,7 +43,7 @@ BEGIN
 	DECLARE @DiscountByGroupFee INT = 11
 	DECLARE @DiscountByGroupGrosswin INT = 13
 
-	DECLARE @ProductListAll		VARCHAR(100) = ''		
+	DECLARE @ProductListAll		VARCHAR(150) = ''		
 		, @MinDate				DATE 
 		, @MaxDate				DATE
 		, @CurrentDate			DATE
