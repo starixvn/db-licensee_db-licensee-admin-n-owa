@@ -22,6 +22,7 @@ AS
 				+ sort charge rate by expired
 		- 20180716@bruce: add new group TEST for credit [#98126] 
 		- 20181115@Parsons: Configure discount settings by currency [#99694]
+		- 20180731@Mason: Integrate-Card-Club [#116096]
 		
 	 Params:
 		+ @PayerId :specify Party
@@ -43,7 +44,7 @@ BEGIN
 	DECLARE @DiscountByGroupFee INT = 11
 	DECLARE @DiscountByGroupGrosswin INT = 13
 
-	DECLARE @ProductListAll		VARCHAR(150) = ''		
+	DECLARE @ProductListAll		VARCHAR(500) = ''		
 		, @MinDate				DATE 
 		, @MaxDate				DATE
 		, @CurrentDate			DATE
