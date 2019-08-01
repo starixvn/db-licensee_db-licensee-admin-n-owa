@@ -2,7 +2,7 @@
 USE bodb_licensee
 GO
 
-CREATE FUNCTION [dbo].LA_f_LicRecon_SpecialDiscountSel()
+CREATE FUNCTION [dbo].LA_f_LicenseeReconciliationDiscountSel()
 /*  
 	Created: 20190725@Bruce
 	Task : The list of licensee who takes Sportsbook PT 91% on NAP; and on LA: 12% licensing fee, 3% discount
