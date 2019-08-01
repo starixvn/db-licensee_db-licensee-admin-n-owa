@@ -28,7 +28,8 @@ AS
 		- 20170307@Scofield: update to not save rate, basic billing, first billing for MGC[#70050]
 		- 20170407@Scofield: log dataold [#73310]
 		- 20180716@bruce: add new group TEST for credit [#98126]
-		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658] 
+		- 20190801@Parsons: Validate billing configuration [#109600]
 
 	 Params:
 		+ @InvoiceSettingXML: '<ChargeSettings>
@@ -277,7 +278,7 @@ BEGIN
 			INSERT INTO LA_ChargeInfo_SystemMapping (ChargeID, SystemID)
 			SELECT m.ChargeID, 4
 			FROM @MergeResult m
-			WHERE m.ProductId IN (SELECT p.ProductId FROM dbo.LRF_f_Products3rd('SB,NG,VS,LC,AGC,GD,VG') p)
+			WHERE m.ProductId IN (SELECT p.ProductId FROM dbo.LRF_f_Products3rd('SB,NG,VS,LC,AGC,GD,VG,BA') p)
 				AND m.[$action] = 'INSERT'
 		END
 
