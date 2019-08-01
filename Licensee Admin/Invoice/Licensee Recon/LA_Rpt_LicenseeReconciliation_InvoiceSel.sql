@@ -2,24 +2,20 @@
 USE [bodb_Licensee]
 GO
 
-declare--ALTER PROCEDURE [dbo].LA_Rpt_LicenseeReconciliation
+CREATE PROCEDURE [dbo].LA_Rpt_LicenseeReconciliation_InvoiceSel
 	@PartyIds		VARCHAR(4000),
 	@FromDate		DATETIME,
 	@ToDate			DATETIME,
 	@Environment	VARCHAR(50),
 	@BaseCurrency	VARCHAR(5)
---AS
+AS
 /*	Header:
-	Created: 2018.10.04 - Parsons
-	Task : Generate amount for software fee
+	Task : Generate invoice amount for licensee
 	DB: DBLIC.bodb_Licensee
    
 	Revisions: 
 		- 20190723@Bruce: Create Sp
-*/select @PartyIds='14,15,16',
-	@FromDate='20190501',
-	@ToDate	 ='20190531',
-	@Environment='uat',@BaseCurrency='eur'
+*/
 BEGIN
 	SET NOCOUNT ON
 	
@@ -376,7 +372,6 @@ BEGIN
 			,CAST(0 AS MONEY) Discount
 			,CAST(0 AS MONEY) MinFee
 			,CAST(0 AS BIT) IsApplyMinfeeToDiscount
-			,CAST(0 AS BIT) IsChargedByMinFee
 		INTO #tmpResult
 		FROM #tmpWinlossData a  
 		GROUP BY a.PartyID, a.ProductId  
@@ -430,11 +425,11 @@ BEGIN
 					THEN a.MinFeeAmount + a.FeeUnderWaiveTime
 				ELSE a.FeeOutOfWaiveTime + a.FeeUnderWaiveTime
 			END,
-			IsChargedByMinFee = CASE
-				WHEN t.TotalAmount < t.TotalMinFee AND a.FeeOutOfWaiveTime < a.MinFeeAmount
-					THEN 1
-				ELSE 0
-			END,
+			--IsChargedByMinFee = CASE
+			--	WHEN t.TotalAmount < t.TotalMinFee AND a.FeeOutOfWaiveTime < a.MinFeeAmount
+			--		THEN 1
+			--	ELSE 0
+			--END,
 			IsApplyMinfeeToDiscount = CASE
 				WHEN a.MinFeeAmount < a.FeeAmount AND a.FeeAmount > 0 AND b.FeeType IS NOT NULL THEN 0-- waived
 				WHEN t.TotalAmount >= t.TotalMinFee AND p.PartyGroupId > 0 THEN 0 -- reach group minfee goal
@@ -618,7 +613,7 @@ BEGIN
 			, SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
 			, SUM(r.LicensingFee + r.ExtraAmount) LicensingFee
 			, SUM(r.Discount) Discount
-			, SUM(CASE WHEN r.IsChargedByMinFee = 1 THEN r.MinFee - r.Discount - r.AmountToCompany ELSE 0 END) AdjustedMinFee
+			--, SUM(r.LicensingFee - r.Discount - r.AmountToCompany) AdjustedMinFee
 		FROM #tmpResult r
 		INNER JOIN @partyList p ON r.PartyID=p.PartyId
 		WHERE p.PartyId IN (SELECT p.PartyId FROM @partyList p WHERE p.IsSelected=1)
@@ -630,10 +625,9 @@ BEGIN
 		FROM @credit c
 		GROUP BY c.PartyId
 	)
-	SELECT p.PartyId, p.PartyName,
+	SELECT p.PartyId,p.PartyName,
 		CAST(a.AmountToCompany AS MONEY) AmountToCompany,
 		CAST(a.LicensingFee AS MONEY) LicensingFee,
-		CAST(a.AdjustedMinFee AS MONEY) AdjustedMinFee,
 		a.Discount,
 		b.Prepayment,
 		b.Others
