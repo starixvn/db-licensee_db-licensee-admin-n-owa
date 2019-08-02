@@ -38,4 +38,10 @@ SET NOCOUNT ON
 		  p.PartyType = 1 AND d.IsDeposit = 1 AND d.StatusId = 1 AND 
 		  (@UserID = 0 OR up.UserID = @UserID) AND 
 		  (@FunctionID = 0 OR fp.FunctionID = @FunctionID)
+
+	UNION 
+
+	SELECT b.PartyID, ISNULL(b.BillerName, p.PartyName) AS PartyName, '' AS BrandName
+	FROM dbo.LA_BillerInfo b WITH (NOLOCK)
+		LEFT JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = b.PartyID 
 GO
