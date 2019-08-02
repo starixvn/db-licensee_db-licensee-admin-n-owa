@@ -24,7 +24,8 @@ SET NOCOUNT ON
 
 	;WITH cte_TerminatedPartyIds AS(
 		SELECT FromParty AS PartyId
-				FROM OAS_ChargeInfo
+				FROM OAS_ChargeInfo WITH(NOLOCK)
+				WHERE ChargeType NOT IN (2, 3) -- Old type & No longer used
 				GROUP BY FromParty
 				HAVING MAX(ToDate) < CONVERT(DATE, GETDATE())
 	)
