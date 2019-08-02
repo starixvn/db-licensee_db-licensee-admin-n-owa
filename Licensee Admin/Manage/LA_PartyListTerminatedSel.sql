@@ -41,7 +41,7 @@ BEGIN
 		SELECT FromParty 
 		FROM (SELECT FromParty AS FromParty, MAX(ToDate) AS ToDate 
 			  FROM OAS_ChargeInfo
-			  WHERE ChargeType = 1
+			  WHERE ChargeType NOT IN (2, 3) -- Old type & No longer used
 			  GROUP BY FromParty ) candidateParties
 		WHERE ToDate < CONVERT(DATE, GETDATE() )
 	) AND p.PartyType = 1 AND d.IsDeposit = 1 AND d.StatusId = 1 AND up.UserID = @UserID
