@@ -12,6 +12,7 @@ AS
 
 	Revisions:
 		- 20170223@Scofield: Initialize SP
+		- 20190802@Parsons: Validate billing configuration [#109600]
 
 	Params:
 	Example:
@@ -40,8 +41,9 @@ BEGIN
 		SELECT FromParty 
 		FROM (SELECT FromParty AS FromParty, MAX(ToDate) AS ToDate 
 			  FROM OAS_ChargeInfo
-			  GROUP BY FromParty) candidateParties
-		WHERE ToDate < CONVERT(DATE, GETDATE())
+			  WHERE ChargeType = 1
+			  GROUP BY FromParty ) candidateParties
+		WHERE ToDate < CONVERT(DATE, GETDATE() )
 	) AND p.PartyType = 1 AND d.IsDeposit = 1 AND d.StatusId = 1 AND up.UserID = @UserID
 
 	UNION ALL
