@@ -30,7 +30,12 @@ BEGIN
 		ISNULL(ci.ToParty, 0)		AS ToParty,
 		ISNULL(ci.ChargeType, 0)	AS ChargeType,
 		ISNULL(ci.ChargeID, 0)		AS ChargeID,
-		ISNULL(cs.ChargeID, 0)		AS SystemMappingChargeId
+		ISNULL(cs.ChargeID, 0)		AS SystemMappingChargeId,
+		(SELECT COUNT(ivs.ToPartyId)
+			FROM LA_InvoiceSetting ivs WITH(NOLOCK)
+			WHERE ci.FromParty IS NOT NULL
+				  AND ci.FromParty = ivs.FromPartyId 
+				  AND ci.ProductID = ivs.ProductId) AS PartyBillingCount
 	FROM dbo.OAS_Party p WITH(NOLOCK) 
 	LEFT JOIN dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON p.PartyID = ci.FromParty
 	LEFT JOIN LA_ChargeInfo_SystemMapping cs WITH(NOLOCK) ON ci.ChargeID = cs.ChargeID
