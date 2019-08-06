@@ -42,7 +42,7 @@ AS
 		- 20181204@Bruce: Implement Happy 5,Reserved range for esport2 [RedmineId #105723]
 		- 20190307@Parsons: Implement BetBuilder [Redmine: #108995]
 		- 20190603@Parsons: Extend Lottery's bet types range [Redmine: #114568]
-		- 20191207@Mason: Add Card Club Win Loss report [RedmineId #116096]
+		- 20190712@Mason: Add Card Club Win Loss report [RedmineId #116096]
 
 	Param's Explanation:
 

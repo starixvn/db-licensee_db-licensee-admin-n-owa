@@ -1,2 +1,2 @@
-Licensee Admin\Report\LA_Rpt_VirtualSportWinloss.sql
-Licensee Admin\Report\LA_Rpt_BetRadarVirtualSportWinLoss.sql
+Licensee Admin\Manage\Mics\LaunchNewLicensee\LA_LaunchLicensee.sql
+Licensee Admin\Manage\Invoice Setting\PayerSetting\LA_PayerSettingModify.sql

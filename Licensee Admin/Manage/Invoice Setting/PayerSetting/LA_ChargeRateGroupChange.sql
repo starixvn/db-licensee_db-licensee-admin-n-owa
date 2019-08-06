@@ -18,6 +18,7 @@ AS
 	Revisions:
 		- 20190221@Parsons: Manage Payer Setting - changing party group [#109189]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20190801@Parsons: Validate billing configuration [#109600]
 
 	Params:
 	Example:
@@ -102,6 +103,14 @@ BEGIN
 	INSERT INTO LA_ChargeInfo_SystemMapping(ChargeID, SystemID)
 	SELECT ChargeID, 2
 	FROM @InsertedResult
+
+	IF @GroupId = 1 -- ONEWorks
+	BEGIN
+		INSERT INTO LA_ChargeInfo_SystemMapping (ChargeID, SystemID)
+		SELECT ci.ChargeID, 4
+		FROM @InsertedResult ci
+		WHERE ci.ProductId IN (SELECT p.ProductId FROM dbo.LRF_f_Products3rd('SB,NG,VS,LC,AGC,GD,VG,BA') p)
+	END
 
 		-- 2.3 OAS_ChargeInfoSub
 	INSERT INTO OAS_ChargeInfoSub (ProductID, BettypeRef, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, BaseCurrencyId, FirstOfBilling, BasisOfBilling, ChargeIdRef)

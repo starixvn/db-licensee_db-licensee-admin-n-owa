@@ -38,6 +38,7 @@ AS
 		- 20180510@Bruce: Integrate Pragmatic [#94108]
 		- 20181119@bruce: Integrate Bidme games (GD product) [#103695]
 	    - 20190322@Parsons: Integrate-PP-Promotion-Prize [#109014]
+	    - 20190725@Mason: Integrate-Card-Club [#116096]
 */
 		
 /*	Example:
@@ -56,7 +57,7 @@ BEGIN
 	DECLARE @GD_Tip SMALLINT = 1706, @PromotionPrize SMALLINT = 4300  
 	
 	-- Region: Get party charge rate info
-	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX,PP'
+	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX,PP,CC'
 	
 	-- Region: Get Party ID
 	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)
@@ -185,7 +186,8 @@ BEGIN
 		BRVS		MONEY, -- Bet Radar
 		LT			MONEY, -- Lottery
 		BX			MONEY, -- Exchange
-		PP			MONEY  -- Pragmatic
+		PP			MONEY,  -- Pragmatic
+		CC			MONEY	-- Card Club
 	)						  
 	INSERT INTO #LicenseeAmount(GroupName, GroupId, LicenseeId, PartyId,PartyName)
 	SELECT	REPLACE(p.PartyName,' Licensees','') AS PartyName,
@@ -349,7 +351,8 @@ BEGIN
 				ISNULL(SUM(CASE WHEN d.ProductId = 27 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS BRVS,
 				ISNULL(SUM(CASE WHEN d.ProductId = 28 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS LT,
 				ISNULL(SUM(CASE WHEN d.ProductId = 31 THEN (-MemberWL * ci.Rate - (AComm + PComm)) * e.Rate ELSE 0 END),0) AS BX,
-				ISNULL(SUM(CASE WHEN d.ProductId = 32 THEN (-MemberWL * ci.Rate - WinningPrize) * e.Rate ELSE 0 END),0) AS PP
+				ISNULL(SUM(CASE WHEN d.ProductId = 32 THEN (-MemberWL * ci.Rate - WinningPrize) * e.Rate ELSE 0 END),0) AS PP,
+				ISNULL(SUM(CASE WHEN d.ProductId = 34 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS CC
 		FROM	#TempData d
 				INNER JOIN @PartyChargeInfo ci ON	d.LicenseeId = ci.LicenseeId
 													AND ci.ProductId = d.ProductId
@@ -376,7 +379,8 @@ BEGIN
 			BRVS = a.BRVS,
 			LT = a.LT,
 			BX = a.BX,
-			PP = a.PP
+			PP = a.PP,
+			CC = a.CC
 	FROM	#LicenseeAmount l
 			INNER JOIN AmountDueByProduct a ON a.LicenseeId = l.LicenseeId
 
@@ -404,9 +408,10 @@ BEGIN
 			AND LT IS NULL
 			AND BX IS NULL
 			AND PP IS NULL
+			AND CC IS NULL
 
 	-- Result
-	SELECT l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP
+	SELECT l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP, l.CC
 	FROM #LicenseeAmount l
 	ORDER BY l.GroupId, l.PartyId
 	-- EndRegion

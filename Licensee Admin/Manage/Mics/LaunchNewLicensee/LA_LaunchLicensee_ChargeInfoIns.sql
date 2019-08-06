@@ -16,6 +16,7 @@ AS
 
 	Revisions:
 	- 20190107@Parsons: Launch new licensee
+	- 20190801@Parsons: Validate billing configuration [#109600]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -87,6 +88,15 @@ BEGIN
 	SELECT c1.ChargeID, 2
 	FROM dbo.OAS_ChargeInfo c1 WITH(NOLOCK)
 		INNER JOIN @ChargeInfoSettings c2  ON c1.FromParty = @PartyId AND c1.ToParty = @GroupId AND c1.ProductID = c2.ProductId AND c1.ChargeType = c2.ChargeType
+	
+	IF @GroupId = 1 -- ONEWorks
+	BEGIN
+		INSERT INTO LA_ChargeInfo_SystemMapping (ChargeID, SystemID)
+		SELECT c1.ChargeID, 4
+		FROM dbo.OAS_ChargeInfo c1 WITH(NOLOCK)
+		INNER JOIN @ChargeInfoSettings c2  ON c1.FromParty = @PartyId AND c1.ToParty = @GroupId AND c1.ProductID = c2.ProductId AND c1.ChargeType = c2.ChargeType
+		WHERE c1.ProductId IN (SELECT p.ProductId FROM dbo.LRF_f_Products3rd('SB,NG,VS,LC,AGC,GD,VG,BA') p)
+	END
 		
 	IF @@ERROR <> 0
 	BEGIN
