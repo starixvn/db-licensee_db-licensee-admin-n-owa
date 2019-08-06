@@ -1,12 +1,12 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
 GO
 
-ALTER PROCEDURE [dbo].LA_LicenseeBillingCurrencySel(@UserID INT = 0,@FunctionID INT = 0)
+CREATE PROCEDURE [dbo].LA_PartyBaseCurrencySel
 AS
 /*	Header:
 	Task : Get licensee base currency
-	DB: DBLIC.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
    
 	Revisions: 
 		- 20190723@Bruce: Create Sp
@@ -21,7 +21,7 @@ BEGIN
 		ParentId	INT
 	)
 	INSERT INTO @allParty(PartyId,PartyName,BrandName,ParentId)
-	EXEC dbo.LA_PartyListSel @UserID, @FunctionID
+	EXEC dbo.LA_PartyListSel
 
 	DELETE @allParty WHERE ParentId = 0
 

@@ -2,10 +2,10 @@
 USE bodb02
 GO
 
-CREATE PROCEDURE [dbo].LA_Rpt_LicenseeReconciliation_NAPSel
-	@LicenseeCode		VARCHAR(50) = '',
-	@FromDate			DATETIME,
-	@ToDate				DATETIME
+ALTER PROCEDURE [dbo].LA_Rpt_LicenseeReconciliation_NAPSel
+	@PartyIds	VARCHAR(4000),
+	@FromDate	DATETIME,
+	@ToDate		DATETIME
 AS
 /*	Header:
 	Created: 20190801@Bruce
@@ -19,18 +19,19 @@ BEGIN
 	SET NOCOUNT ON
 
 	-- get licensee code list
-	DECLARE @licenseeCodeList TABLE (Username VARCHAR(50),LicenseeName VARCHAR(50))
-	INSERT INTO @licenseeCodeList(Username,LicenseeName)
-	SELECT username, licenseename
-	FROM OPENQUERY(DBCUST,'SELECT username, licenseename FROM bodb_Licensee.dbo.Acc_f_LicenseeTransfer_GetCode() WHERE StatusId = 1')
-	WHERE @LicenseeCode = '' OR username = @LicenseeCode
+	DECLARE @licenseeCodeList TABLE (PartyId INT, PartyName VARCHAR(50),LicenseeCode VARCHAR(50), LicenseeName VARCHAR(50), LicenseeId INT)
+	INSERT INTO @licenseeCodeList(PartyId,PartyName,LicenseeCode,LicenseeName,LicenseeId)
+	EXEC DBCUST.bodb_licensee.dbo.LA_LicenseeCodeSel
 
 	-- licensee code to cust id
-	DECLARE @customer AS TABLE (CustId int,Username VARCHAR(50),LicenseeName VARCHAR(50))
+	-- some licensees may have same licensee code
+	--
+	DECLARE @customer AS TABLE (CustId int,Username VARCHAR(50))
 	INSERT INTO @customer
-	SELECT c.custid, c.Username,l.LicenseeName
+	SELECT DISTINCT c.custid, c.Username
 	FROM dbo.Customer c WITH(NOLOCK)
-	INNEr JOIN @licenseeCodeList l ON l.Username=c.username
+	INNER JOIN @licenseeCodeList l ON l.LicenseeCode=c.username
+	WHERE l.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
 
 	DECLARE @tmpBalanceUpDay AS TABLE (BalanceUpDay DATE, MoveBetsDay DATE)
 	INSERT INTO @tmpBalanceUpDay(BalanceUpDay,MoveBetsDay)
@@ -107,7 +108,7 @@ BEGIN
 		DROP TABLE #transfer_fi
 	END
 
-	SELECT c.LicenseeName,t.Super, t.LicenseeCode, t.Amount
+	SELECT t.Super, t.LicenseeCode, t.Amount
 	FROM #transfer t
 	INNER JOIN @customer c ON t.LicenseeCode = c.Username
 
