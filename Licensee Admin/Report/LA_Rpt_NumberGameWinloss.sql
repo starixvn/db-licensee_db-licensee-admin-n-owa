@@ -24,8 +24,10 @@ AS
 	- 20181224@Bruce: include happy 5 [#105723]
 	- 20190626@Mason: Implement new view for Number Game [#113641]
 	- 20190718@Mason: Integrate CN88 data in LA (PayToSupplier = 0.015 GRR) [#116859]
+	- 20190808@Parsons: Provide House Turnover In NG WL Report [Redmine: #117674]
+
  * Param's Explanation:
- *
+ EXEC LA_Rpt_NumberGameWinloss @PartyIds = '14,15,16,17,18,19', @FromDate = '20190101', @ToDate = '20190808', @BaseCurrencyName = 'EUR'
  */
 
 BEGIN
@@ -71,17 +73,19 @@ BEGIN
 		Winlostdate DATETIME,
 		CurrencyId INT,
 		Turnover MONEY,
+		HouseTurnover MONEY,
 		TotalTrans INT,
 		CustomerWinLoss MONEY,
 		LicenseeWinloss MONEY,
 		LicensingFee MONEY,
 		PayToSupplier MONEY)
 
-	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
+	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,HouseTurnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
 	SELECT ci.PartyId,
 		b.rptDate as Winlostdate,
 		b.CurrencyId,
 		SUM(b.Turnover) AS Turnover,
+		SUM(b.ExtraAmount) AS HouseTurnover,
 		SUM(b.BetCount) AS TotalTrans,
 		SUM(b.MemberWL) AS CustomerWinLoss,
 		- SUM(b.MemberWL) AS LicenseeWinloss,
@@ -95,11 +99,12 @@ BEGIN
 	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
 	
 	-- Calculate for credit
-	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee, PayToSupplier)
+	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,HouseTurnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee, PayToSupplier)
 	SELECT ci.PartyId,
 		b.rptDate as Winlostdate,
 		b.CurrencyId,
 		SUM(b.Turnover) AS Turnover,
+		SUM(b.ExtraAmount) AS HouseTurnover,
 		SUM(b.BetCount) AS TotalTrans,
 		SUM(b.WinLoss) AS CustomerWinLoss,
 		- SUM(b.WinLoss) AS LicenseeWinloss,
@@ -132,6 +137,7 @@ BEGIN
 		ParentId		INT,
 		TotalTrans		INT,
 		Turnover		MONEY,
+		HouseTurnover	MONEY,
 		CustomerWinLoss	MONEY,
 		LicenseeWinLoss	MONEY,
 		LicensingFee	MONEY,
@@ -153,6 +159,7 @@ BEGIN
 		CurrencyName	VARCHAR(20),
 		TotalTrans		INT,
 		Turnover		MONEY,
+		HouseTurnover	MONEY,
 		CustomerWinLoss	MONEY,
 		LicenseeWinLoss	MONEY,
 		LicensingFee	MONEY,
@@ -164,12 +171,13 @@ BEGIN
 	BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies)
 
-		INSERT INTO @Total (ParentId, Currency,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
+		INSERT INTO @Total (ParentId, Currency,TotalTrans,Turnover,HouseTurnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
 		SELECT 
 			ParentId,
 			@tempCurrency AS Currency,
 			SUM(td.TotalTrans) TotalTrans,
 			SUM(td.Turnover * e.BaseCurrencyRate) Turnover,
+			SUM(td.HouseTurnover * e.BaseCurrencyRate) HouseTurnover,
 			SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss,
 			SUM(td.LicenseeWinLoss * e.BaseCurrencyRate) LicenseeWinLoss,
 			SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
@@ -178,10 +186,11 @@ BEGIN
 			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.Winlostdate
 			GROUP BY td.ParentId
 
-		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
+		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,HouseTurnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
 		SELECT Currency,
 			SUM(TotalTrans),
 			SUM(Turnover),
+			SUM(HouseTurnover),
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(LicensingFee),
@@ -205,6 +214,7 @@ BEGIN
 		-- Select by origin currency
 		r.TotalTrans,
 		r.Turnover AS TurnoverOriginal,
+		r.HouseTurnover AS HouseTurnoverOriginal,
 		CAST((r.CustomerWinLoss) AS MONEY) AS CustomerWinLossOriginal,
 		CAST((r.LicenseeWinLoss) AS MONEY) AS LicenseeWinLossOriginal,
 		CAST((r.LicensingFee) AS MONEY) AS LicensingFeeOriginal,
@@ -212,6 +222,7 @@ BEGIN
 		r.LicensingFee - r.PayToSupplier AS CompanyIncomeOriginal,
 		-- Select by base currency
 		r.Turnover * e.Rate AS Turnover,
+		r.HouseTurnover * e.Rate AS HouseTurnover,
 		CAST((r.CustomerWinLoss * e.Rate) AS MONEY) AS CustomerWinLoss,
 		CAST((r.LicenseeWinLoss * e.Rate) AS MONEY) AS LicenseeWinLoss,
 		CAST((r.LicensingFee * e.Rate) AS MONEY) AS LicensingFee,
@@ -226,6 +237,7 @@ BEGIN
 	SELECT ParentId,
 		TotalTrans,
 		Turnover,
+		HouseTurnover,
 		CustomerWinLoss,
 		LicenseeWinLoss,
 		LicensingFee,
