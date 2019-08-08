@@ -2,7 +2,7 @@
 USE [bodb_Licensee]
 GO
 
-CREATE PROCEDURE [dbo].LA_PartyBaseCurrencySel
+ALTEr PROCEDURE [dbo].LA_PartyBaseCurrencySel
 AS
 /*	Header:
 	Task : Get licensee base currency
@@ -25,11 +25,11 @@ BEGIN
 
 	DELETE @allParty WHERE ParentId = 0
 
-	SELECT p.PartyId, p.PartyName,l.LicenseeName,d.BaseCurrencyId
+	SELECT p.PartyId, p.PartyName,e.Code AS BaseCurrencyCode,d.BaseCurrencyId
 	FROM @allParty p
-	INNER JOIN OAS_Party p2 WITH(NOLOCK) ON p.PartyId=p2.PartyID
+	INNER JOIN dbo.OAS_Party p2 WITH(NOLOCK) ON p.PartyId=p2.PartyID
 	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyId=d.PartyID
-	INNER JOIN dbo.Licensees l WITH(NOLOCK) ON l.LicenseeID=p2.OldRefID
+	INNER JOIN CustDb.dbo.Exchange e WITH(NOLOCK) ON d.BaseCurrencyId=e.exchangeid
 	WHERE d.IsDeposit = 1
 END
 GO

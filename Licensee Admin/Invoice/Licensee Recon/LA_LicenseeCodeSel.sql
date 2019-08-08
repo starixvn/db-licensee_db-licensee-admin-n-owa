@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -6,7 +6,7 @@ CREATE PROCEDURE [dbo].LA_LicenseeCodeSel
 /*  
 	Created: 20190725@Bruce
 	Task : Get licensee code list for Licensee Reconciliation
-	DB: DBCUST.bodb_licensee
+	DB: DBLIC.bodb_licensee
 	
 	Revisions:
 		- 20190725@Bruce: create SP

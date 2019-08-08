@@ -2,7 +2,7 @@
 USE [bodb_Licensee]
 GO
 
-CREATE PROCEDURE [dbo].LA_Rpt_LicenseeReconciliation_InvoiceSel
+ALTER PROCEDURE [dbo].LA_Rpt_LicenseeReconciliation_InvoiceSel
 	@PartyIds		VARCHAR(4000),
 	@FromDate		DATETIME,
 	@ToDate			DATETIME,
@@ -608,12 +608,15 @@ BEGIN
  * aggregate
  *-----------------*/
 
+	DECLARE @licenseeCodeList TABLE (PartyId INT, PartyName VARCHAR(50), LicenseeCode VARCHAR(50), LicenseeName VARCHAR(50), LicenseeId INT)
+	INSERT INTO @licenseeCodeList(PartyId,PartyName,LicenseeCode,LicenseeName,LicenseeId)
+	EXEC dbo.LA_LicenseeCodeSel
+
 	;WITH a AS (
 		SELECT r.PartyID
 			, SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
 			, SUM(r.LicensingFee + r.ExtraAmount) LicensingFee
 			, SUM(r.Discount) Discount
-			--, SUM(r.LicensingFee - r.Discount - r.AmountToCompany) AdjustedMinFee
 		FROM #tmpResult r
 		INNER JOIN @partyList p ON r.PartyID=p.PartyId
 		WHERE p.PartyId IN (SELECT p.PartyId FROM @partyList p WHERE p.IsSelected=1)
@@ -625,15 +628,24 @@ BEGIN
 		FROM @credit c
 		GROUP BY c.PartyId
 	)
-	SELECT p.PartyId,p.PartyName,
-		CAST(a.AmountToCompany AS MONEY) AmountToCompany,
-		CAST(a.LicensingFee AS MONEY) LicensingFee,
-		a.Discount,
-		b.Prepayment,
-		b.Others
+	SELECT l.LicenseeCode
+		,UPPER(@BaseCurrency) AS CurrencyName
+		,STUFF((
+				SELECT ' & ' + lc.PartyName
+				FROM @licenseeCodeList lc 
+				WHERE l.LicenseeCode = lc.LicenseeCode
+				FOR XML PATH(''),TYPE).value('(./text())[1]','VARCHAR(200)')
+			,1,3,'')					AS PartyName
+		,SUM(a.AmountToCompany)			AS AmountToCompany
+		,SUM(a.LicensingFee)			AS LicensingFee
+		,SUM(a.Discount)				AS Discount
+		,SUM(ISNULL(b.Prepayment,0))	AS Prepayment
+		,SUM(ISNULL(b.Others,0))		AS Others
 	FROM a LEFT JOIN b ON a.PartyID=b.PartyId
 	INNER JOIN @partyList p ON p.PartyId = a.PartyID
+	INNER JOIN @licenseeCodeList l ON l.PartyId=p.PartyId
 	WHERE p.IsSelected = 1
+	GROUP BY l.LicenseeCode
 
 	DROP TABLE #tmpResult
 	DROP TABLE #tmpBettingByProduct
