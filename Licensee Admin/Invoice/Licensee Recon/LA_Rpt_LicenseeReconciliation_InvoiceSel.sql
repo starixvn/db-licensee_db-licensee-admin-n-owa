@@ -610,7 +610,7 @@ BEGIN
 
 	DECLARE @licenseeCodeList TABLE (PartyId INT, PartyName VARCHAR(50), LicenseeCode VARCHAR(50), LicenseeName VARCHAR(50), LicenseeId INT)
 	INSERT INTO @licenseeCodeList(PartyId,PartyName,LicenseeCode,LicenseeName,LicenseeId)
-	EXEC dbo.LA_LicenseeCodeSel
+	EXEC DBCUST.bodb_licensee.dbo.LA_LicenseeCodeSel
 
 	;WITH a AS (
 		SELECT r.PartyID
