@@ -108,9 +108,10 @@ BEGIN
 		DROP TABLE #transfer_fi
 	END
 
-	SELECT t.Super, t.LicenseeCode, t.Amount
+	SELECT t.Super, t.LicenseeCode, SUM(t.Amount) Amount
 	FROM #transfer t
 	INNER JOIN @customer c ON t.LicenseeCode = c.Username
+	GROUP BY t.LicenseeCode,t.Super
 
 	DROP TABLE #transfer
 END

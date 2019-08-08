@@ -7,7 +7,8 @@ ALTER PROCEDURE [dbo].LA_Rpt_LicenseeReconciliation_InvoiceSel
 	@FromDate		DATETIME,
 	@ToDate			DATETIME,
 	@Environment	VARCHAR(50),
-	@BaseCurrency	VARCHAR(5)
+	@BaseCurrency	VARCHAR(5),
+	@IsShowDetail	BIT = 0
 AS
 /*	Header:
 	Task : Generate invoice amount for licensee
@@ -34,9 +35,9 @@ BEGIN
 	-- supported products
 	-- 
 	DECLARE @supportedProducts VARCHAR(100) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX'
-	DECLARE @productList TABLE(ProductId INT, Code VARCHAR(5))
-	INSERT INTO @productList
-	SELECT ProductID, ProductPrefix FROM dbo.LA_f_Products3rd(@supportedProducts)
+	DECLARE @productList TABLE(ProductId INT, Code VARCHAR(5), Name VARCHAR(50))
+	INSERT INTO @productList(ProductId,Code,Name)
+	SELECT ProductID, ProductPrefix,ProductName FROM dbo.LA_f_Products3rd(@supportedProducts)
 
 	-- get party list
 	--
@@ -565,7 +566,7 @@ BEGIN
 		'from bodb_Licensee.dbo.LA_InvoiceStatement s with(nolock) '+
 		'inner join bodb_Licensee.dbo.LA_InvoiceHeader h with(nolock) on s.InvoiceHeaderId=h.InvoiceHeaderId '+
 		'where s.RefPartyId in ('+@PartyIds+') and isnull(h.StatusId, 0) = 0'
-	DECLARE @openQuery VARCHAR(1000) = 'SELECT * FROM OPENQUERY(DBCUST,'''+@statementQuery+''')'
+	DECLARE @openQuery VARCHAR(8000) = 'SELECT * FROM OPENQUERY(DBCUST,'''+@statementQuery+''')'
 
 	DECLARE @statement TABLE(Income MONEY,Expense MONEY,InvItemTypeId SMALLINT,Environment VARCHAR(10),PartyId INT)
 	INSERT INTO @statement(Income,Expense,InvItemTypeId,Environment,PartyId)
@@ -611,41 +612,57 @@ BEGIN
 	DECLARE @licenseeCodeList TABLE (PartyId INT, PartyName VARCHAR(50), LicenseeCode VARCHAR(50), LicenseeName VARCHAR(50), LicenseeId INT)
 	INSERT INTO @licenseeCodeList(PartyId,PartyName,LicenseeCode,LicenseeName,LicenseeId)
 	EXEC DBCUST.bodb_licensee.dbo.LA_LicenseeCodeSel
-
-	;WITH a AS (
-		SELECT r.PartyID
+	
+	IF @IsShowDetail = 1
+	BEGIN
+		SELECT l.LicenseeCode
+			, pl.Name AS ProductName
+			, UPPER(@BaseCurrency) AS CurrencyName
 			, SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
 			, SUM(r.LicensingFee + r.ExtraAmount) LicensingFee
 			, SUM(r.Discount) Discount
 		FROM #tmpResult r
 		INNER JOIN @partyList p ON r.PartyID=p.PartyId
-		WHERE p.PartyId IN (SELECT p.PartyId FROM @partyList p WHERE p.IsSelected=1)
-		GROUP BY r.PartyId
-	), b AS (
-		SELECT c.PartyId,
-			SUM(CASE WHEN c.[Key] IN ('AMF', 'AGP', 'PRE') THEN Amount ELSE 0 END) Prepayment,
-			SUM(CASE WHEN c.[Key] = 'OTHER' THEN Amount ELSE 0 END) Others
-		FROM @credit c
-		GROUP BY c.PartyId
-	)
-	SELECT l.LicenseeCode
-		,UPPER(@BaseCurrency) AS CurrencyName
-		,STUFF((
-				SELECT ' & ' + lc.PartyName
-				FROM @licenseeCodeList lc 
-				WHERE l.LicenseeCode = lc.LicenseeCode
-				FOR XML PATH(''),TYPE).value('(./text())[1]','VARCHAR(200)')
-			,1,3,'')					AS PartyName
-		,SUM(a.AmountToCompany)			AS AmountToCompany
-		,SUM(a.LicensingFee)			AS LicensingFee
-		,SUM(a.Discount)				AS Discount
-		,SUM(ISNULL(b.Prepayment,0))	AS Prepayment
-		,SUM(ISNULL(b.Others,0))		AS Others
-	FROM a LEFT JOIN b ON a.PartyID=b.PartyId
-	INNER JOIN @partyList p ON p.PartyId = a.PartyID
-	INNER JOIN @licenseeCodeList l ON l.PartyId=p.PartyId
-	WHERE p.IsSelected = 1
-	GROUP BY l.LicenseeCode
+		INNER JOIN @licenseeCodeList l ON l.PartyId=p.PartyId
+		INNEr JOIN @productList pl ON r.ProductID = pl.ProductId
+		WHERE p.IsSelected=1
+		GROUP BY l.LicenseeCode, pl.Name
+	END
+	ELSE
+	BEGIN
+		;WITH a AS (
+			SELECT r.PartyID
+				, SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
+				, SUM(r.LicensingFee + r.ExtraAmount) LicensingFee
+				, SUM(r.Discount) Discount
+			FROM #tmpResult r
+			GROUP BY r.PartyId
+		), b AS (
+			SELECT c.PartyId,
+				SUM(CASE WHEN c.[Key] IN ('AMF', 'AGP', 'PRE') THEN Amount ELSE 0 END) Prepayment,
+				SUM(CASE WHEN c.[Key] = 'OTHER' THEN Amount ELSE 0 END) Others
+			FROM @credit c
+			GROUP BY c.PartyId
+		)
+		SELECT l.LicenseeCode
+			,UPPER(@BaseCurrency) AS CurrencyName
+			,STUFF((
+					SELECT ' & ' + lc.PartyName
+					FROM @licenseeCodeList lc 
+					WHERE l.LicenseeCode = lc.LicenseeCode
+					FOR XML PATH(''),TYPE).value('(./text())[1]','VARCHAR(200)')
+				,1,3,'')					AS PartyName
+			,SUM(a.AmountToCompany)			AS AmountToCompany
+			,SUM(a.LicensingFee)			AS LicensingFee
+			,SUM(a.Discount)				AS Discount
+			,SUM(ISNULL(b.Prepayment,0))	AS Prepayment
+			,SUM(ISNULL(b.Others,0))		AS Others
+		FROM a LEFT JOIN b ON a.PartyID=b.PartyId
+		INNER JOIN @partyList p ON p.PartyId = a.PartyID
+		INNER JOIN @licenseeCodeList l ON l.PartyId=p.PartyId
+		WHERE p.IsSelected = 1
+		GROUP BY l.LicenseeCode
+	END
 
 	DROP TABLE #tmpResult
 	DROP TABLE #tmpBettingByProduct
