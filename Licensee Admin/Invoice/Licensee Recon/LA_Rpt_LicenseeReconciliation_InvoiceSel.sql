@@ -605,6 +605,7 @@ BEGIN
 	FROM @credit c
 	INNER JOIN cte_FeeAfterDiscount a ON a.PartyID=c.PartyId AND c.[Key]='PRE'
 	INNER JOIN cte_Deduction b ON a.PartyID=b.PartyId
+	WHERE c.Remaining > 0
 /*-----------------
  * aggregate
  *-----------------*/
