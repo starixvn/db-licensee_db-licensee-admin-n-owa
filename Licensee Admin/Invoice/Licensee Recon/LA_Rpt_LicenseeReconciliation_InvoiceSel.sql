@@ -582,15 +582,19 @@ BEGIN
 
 	UPDATE @credit SET Remaining = 0 WHERE Remaining<0 AND [Key] IN ('AMF', 'AGP', 'PRE')
 
-	-- calculate AMF, AG-Prepayment
+	UPDATE c SET 
+		FeeAfterDiscount = r.LicensingFee - Discount,
+		Amount = (CASE WHEN c.Remaining < r.MinFee THEN c.Remaining ELSE r.MinFee END)
+	FROM @credit c INNER JOIN #tmpResult r ON r.PartyID=c.PartyId
+	WHERE r.ProductID = @SB AND c.[Key] = 'AMF'
+
+	-- AG-Prepayment
 	--
 	UPDATE c SET 
 		FeeAfterDiscount = r.LicensingFee - Discount,
-		Amount = CASE 
-			WHEN r.ProductID = @SB THEN (CASE WHEN c.Remaining < r.MinFee THEN c.Remaining ELSE r.MinFee END)
-			ELSE c.Remaining END
+		Amount = c.Remaining
 	FROM @credit c INNER JOIN #tmpResult r ON r.PartyID=c.PartyId
-	WHERE r.ProductID IN (@SB, @AG) AND c.[Key] IN ('AMF', 'AGP')
+	WHERE r.ProductID = @AG AND c.[Key] = 'AGP'
 
 	UPDATE c SET Amount = (CASE WHEN c.Amount < c.FeeAfterDiscount THEN c.Amount ELSE c.FeeAfterDiscount END) FROM @credit c
 
