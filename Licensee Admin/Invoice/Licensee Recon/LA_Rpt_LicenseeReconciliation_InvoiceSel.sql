@@ -543,6 +543,38 @@ BEGIN
 		UPDATE #tmpResult SET Discount = 0 WHERE Discount <= 0
 	END
 /*-----------------
+ * Rebate
+ *-----------------*/
+	-- get rebate settings
+	DECLARE @tmpRebateSettings TABLE(PartyId INT, ProductId INT, Rate DECIMAL(7,5), FromDate DATE)
+	
+	INSERT INTO @tmpRebateSettings(PartyId, ProductId, Rate, FromDate)
+	SELECT a.PartyID, p.ProductId, d.Rate, h.FromDate
+	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
+	INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId=a.DiscountGroupId
+	INNER JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON p.DiscountGroupId=h.DiscountGroupId
+	INNER JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON d.DiscountGroupId=h.DiscountGroupId
+	INNER JOIN @PartyList l ON l.PartyId=a.PartyID AND l.IsSelected=1
+	WHERE h.DiscountGroupType=@Rebate
+		AND h.FromDate <= @ToDate
+		AND h.ToDate >= @FromDate
+
+	-- only 1 rebate per month for product/party
+	;WITH cte_Rebate AS (
+		SELECT PartyID, ProductId, MAX(FromDate) FromDate
+		FROM @tmpRebateSettings
+		GROUP BY PartyID, ProductId
+		HAVING COUNT(1) > 1
+	)
+	DELETE r FROM @tmpRebateSettings r INNER JOIN cte_Rebate c ON r.FromDate < c.FromDate
+		AND c.PartyID = r.PartyID 
+		AND c.ProductId = r.ProductId
+
+	-- calculate rebate
+	UPDATE r SET Discount = r.Discount + (r.LicensingFee - r.Discount) * c.Rate
+	FROM #tmpResult r INNER JOIN @tmpRebateSettings c ON r.PartyId = c.PartyID AND r.ProductId = c.ProductId
+
+/*-----------------
  * prepayment
  *-----------------*/
 	-- define AMF, AG and prepayment
