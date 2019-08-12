@@ -19,9 +19,9 @@ BEGIN
 	SET NOCOUNT ON
 
 	-- get licensee code list
-	DECLARE @licenseeCodeList TABLE (PartyId INT, PartyName VARCHAR(50),LicenseeCode VARCHAR(50), LicenseeName VARCHAR(50), LicenseeId INT)
-	INSERT INTO @licenseeCodeList(PartyId,PartyName,LicenseeCode,LicenseeName,LicenseeId)
-	EXEC DBCUST.bodb_licensee.dbo.LA_LicenseeCodeSel
+	DECLARE @licenseeCodeList TABLE (PartyId INT, LicenseeCode VARCHAR(50))
+	INSERT INTO @licenseeCodeList(PartyId,LicenseeCode)
+	SELECT PartyID, LicenseeCode FROM DBCUST.bodb_licensee.dbo.OAS_PartyDetail WITH(NOLOCK) WHERE LicenseeCode IS NOT NULL
 
 	-- licensee code to cust id
 	-- some licensees may have same licensee code

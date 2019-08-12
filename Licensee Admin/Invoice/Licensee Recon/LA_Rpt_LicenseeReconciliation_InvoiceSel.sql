@@ -44,15 +44,17 @@ BEGIN
 	DECLARE @partyList AS TABLE(
 		PartyId			INT,
 		PartyName		VARCHAR(50),
+		LicenseeCode	VARCHAR(50),
 		IsSelected		BIT,
 		PartyGroupId	INT
 	)
 	-- set selected = true
 	-- put each party to its individual group(indicated by -partyid)
-	INSERT INTO @partyList(PartyId,PartyName,IsSelected,PartyGroupId)
-	SELECT PartyID,PartyName,1,-PartyID FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyID IN(
-		SELECT val FROM dbo.strSplit(@PartyIds, ',')
-	)
+	INSERT INTO @partyList(PartyId,PartyName,LicenseeCode,IsSelected,PartyGroupId)
+	SELECT p.PartyID,p.PartyName,d.LicenseeCode,1,-p.PartyID
+	FROM dbo.OAS_Party p WITH(NOLOCK)
+	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
+	WHERE p.PartyID IN(SELECT val FROM dbo.strSplit(@PartyIds, ',')) AND d.LicenseeCode IS NOT NULL
 
 	-- to calculate minfee: need to select all party in same group
 	-- get actual party group id
@@ -613,14 +615,9 @@ BEGIN
 /*-----------------
  * aggregate
  *-----------------*/
-
-	DECLARE @licenseeCodeList TABLE (PartyId INT, PartyName VARCHAR(50), LicenseeCode VARCHAR(50), LicenseeName VARCHAR(50), LicenseeId INT)
-	INSERT INTO @licenseeCodeList(PartyId,PartyName,LicenseeCode,LicenseeName,LicenseeId)
-	EXEC DBCUST.bodb_licensee.dbo.LA_LicenseeCodeSel
-	
 	IF @IsShowDetail = 1
 	BEGIN
-		SELECT l.LicenseeCode
+		SELECT p.LicenseeCode
 			, pl.Name AS ProductName
 			, UPPER(@BaseCurrency) AS CurrencyName
 			, SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
@@ -628,10 +625,9 @@ BEGIN
 			, SUM(r.Discount) Discount
 		FROM #tmpResult r
 		INNER JOIN @partyList p ON r.PartyID=p.PartyId
-		INNER JOIN @licenseeCodeList l ON l.PartyId=p.PartyId
 		INNEr JOIN @productList pl ON r.ProductID = pl.ProductId
 		WHERE p.IsSelected=1
-		GROUP BY l.LicenseeCode, pl.Name
+		GROUP BY p.LicenseeCode, pl.Name
 	END
 	ELSE
 	BEGIN
@@ -649,12 +645,12 @@ BEGIN
 			FROM @credit c
 			GROUP BY c.PartyId
 		)
-		SELECT l.LicenseeCode
+		SELECT p.LicenseeCode
 			,UPPER(@BaseCurrency) AS CurrencyName
 			,STUFF((
 					SELECT ' & ' + lc.PartyName
-					FROM @licenseeCodeList lc 
-					WHERE l.LicenseeCode = lc.LicenseeCode
+					FROM @partyList lc 
+					WHERE p.LicenseeCode = lc.LicenseeCode
 					FOR XML PATH(''),TYPE).value('(./text())[1]','VARCHAR(200)')
 				,1,3,'')					AS PartyName
 			,SUM(a.AmountToCompany)			AS AmountToCompany
@@ -664,9 +660,8 @@ BEGIN
 			,SUM(ISNULL(b.Others,0))		AS Others
 		FROM a LEFT JOIN b ON a.PartyID=b.PartyId
 		INNER JOIN @partyList p ON p.PartyId = a.PartyID
-		INNER JOIN @licenseeCodeList l ON l.PartyId=p.PartyId
 		WHERE p.IsSelected = 1
-		GROUP BY l.LicenseeCode
+		GROUP BY p.LicenseeCode
 	END
 
 	DROP TABLE #tmpResult
