@@ -35,7 +35,9 @@ BEGIN
 
 	DECLARE @tmpBalanceUpDay AS TABLE (BalanceUpDay DATE, MoveBetsDay DATE)
 	INSERT INTO @tmpBalanceUpDay(BalanceUpDay,MoveBetsDay)
-	EXEC Age_SelBalanceUpDay
+	-- EXEC Age_SelBalanceUpDay
+	-- TEST
+	VALUES ('20190719','20190728')
 
 	DECLARE @balanceUpDay DATE = (SELECT BalanceUpDay FROM @tmpBalanceUpDay)
 
