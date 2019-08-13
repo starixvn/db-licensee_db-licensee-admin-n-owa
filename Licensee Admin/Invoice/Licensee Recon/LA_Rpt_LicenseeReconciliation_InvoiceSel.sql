@@ -368,9 +368,9 @@ BEGIN
 		-- create result table
 		--
 		SELECT a.PartyID,a.ProductId
-			,SUM(ISNULL(a.AmountToCompany,0)) AmountToCompany
-			,SUM(ISNULL(a.ExtraAmount,0)) ExtraAmount
-			,SUM(ISNULL(a.Winloss,0)) Winloss
+			,CAST(SUM(ISNULL(a.AmountToCompany,0)) AS MONEY) AmountToCompany
+			,CAST(SUM(ISNULL(a.ExtraAmount,0)) AS MONEY) ExtraAmount
+			,CAST(SUM(ISNULL(a.Winloss,0)) AS MONEY) Winloss
 			,CAST(0 AS MONEY) LicensingFee
 			,CAST(0 AS MONEY) Discount
 			,CAST(0 AS MONEY) MinFee
@@ -582,68 +582,34 @@ BEGIN
 	DECLARE @SB INT = 0, @AG INT = 10
 	DECLARE @InvoiceItemTypes TABLE([Key] VARCHAR(5), [Value] INT)
 
-	INSERT INTO @InvoiceItemTypes ([Key], [Value])
-	SELECT 'AMF', val FROM dbo.strSplit('3,5,7,21',',')
-
-	INSERT INTO @InvoiceItemTypes ([Key], [Value])
-	SELECT 'PRE', val FROM dbo.strSplit('22,23,24',',')
-
-	INSERT INTO @InvoiceItemTypes ([Key], [Value])
-	SELECT 'AGP', val FROM  dbo.strSplit('25,26,27',',')
+	INSERT INTO @InvoiceItemTypes ([Key], [Value]) VALUES
+		 ('AMF', 3)		-- Advance billing for minimum fees for 4th, 5th & 6th month
+		,('AMF', 5)		-- Deduct advanced minimum fees
+		,('PRE', 22)	-- Prepayment
+		,('PRE', 24)	-- Deduct against invoice
+		,('AGP', 25)	-- Prepayment for AG product
+		,('AGP', 26)	-- Deduct AG Prepayment
 
 	INSERT INTO @InvoiceItemTypes ([Key], [Value])
 	SELECT 'OTHER', val FROM  dbo.strSplit('11,12,13,14,17',',')
 
 	-- get statement
-	DECLARE @statementQuery VARCHAR(4000) = 
-		'select s.Income,s.Expense,InvItemTypeId,h.Environment,s.RefPartyId '+
-		'from bodb_Licensee.dbo.LA_InvoiceStatement s with(nolock) '+
-		'inner join bodb_Licensee.dbo.LA_InvoiceHeader h with(nolock) on s.InvoiceHeaderId=h.InvoiceHeaderId '+
-		'where s.RefPartyId in ('+@PartyIds+') and isnull(h.StatusId, 0) = 0'
-	DECLARE @openQuery VARCHAR(8000) = 'SELECT * FROM OPENQUERY(DBCUST,'''+@statementQuery+''')'
+	DECLARE @statement TABLE(Income MONEY,Expense MONEY,InvItemTypeId SMALLINT,PartyId INT)
+	INSERT INTO @statement(Income,Expense,InvItemTypeId,PartyId)
+	SELECT s.Income, s.Expense,s.InvItemTypeId,h.PartyId
+	FROM DBCUST.bodb_licensee.dbo.LA_InvoiceHeader h WITH(NOLOCK)
+	INNER JOIN DBCUST.bodb_licensee.dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId=s.InvoiceHeaderId
+	WHERE h.StatusId = 0-- normal invoice
+		AND h.Environment = @Environment
+		AND h.InvoiceDate BETWEEN @FromDate AND @ToDate
+		AND s.InvItemTypeId IN (SELECT i.[Value] FROM @InvoiceItemTypes i)
+		AND h.PartyId IN (SELECT p.PartyId FROM @partyList p WHERE p.IsSelected = 1)
 
-	DECLARE @statement TABLE(Income MONEY,Expense MONEY,InvItemTypeId SMALLINT,Environment VARCHAR(10),PartyId INT)
-	INSERT INTO @statement(Income,Expense,InvItemTypeId,Environment,PartyId)
-	EXEC (@openQuery)
-
-	DECLARE @credit TABLE(Amount MONEY,Remaining MONEY,FeeAfterDiscount MONEY,[Key] VARCHAR(50),PartyId INT)
-	INSERT INTO @credit(Remaining, [Key], PartyId,Amount,FeeAfterDiscount)
-	SELECT SUM(ISNULL(s.Income,0) - ISNULL(s.Expense,0)), i.[Key], s.PartyId,0,0
+	DECLARE @credit TABLE(Amount MONEY,[Key] VARCHAR(50),PartyId INT)
+	INSERT INTO @credit(Amount, [Key], PartyId)
+	SELECT SUM(ISNULL(s.Income,0) - ISNULL(s.Expense,0)), i.[Key], s.PartyId
 	FROM @statement s INNER JOIN @InvoiceItemTypes i ON s.InvItemTypeId = i.Value
-	WHERE s.Environment = @Environment
-		AND s.PartyId IN (SELECT p.PartyId FROM @partyList p WHERE p.IsSelected=1)
 	GROUP BY i.[Key],s.PartyId
-
-	UPDATE @credit SET Remaining = 0 WHERE Remaining<0 AND [Key] IN ('AMF', 'AGP', 'PRE')
-
-	UPDATE c SET 
-		FeeAfterDiscount = r.LicensingFee - Discount,
-		Amount = (CASE WHEN c.Remaining < r.MinFee THEN c.Remaining ELSE r.MinFee END)
-	FROM @credit c INNER JOIN #tmpResult r ON r.PartyID=c.PartyId
-	WHERE r.ProductID = @SB AND c.[Key] = 'AMF'
-
-	-- AG-Prepayment
-	--
-	UPDATE c SET 
-		FeeAfterDiscount = r.LicensingFee - Discount,
-		Amount = c.Remaining
-	FROM @credit c INNER JOIN #tmpResult r ON r.PartyID=c.PartyId
-	WHERE r.ProductID = @AG AND c.[Key] = 'AGP'
-
-	UPDATE c SET Amount = (CASE WHEN c.Amount < c.FeeAfterDiscount THEN c.Amount ELSE c.FeeAfterDiscount END) FROM @credit c
-
-	-- calculate deduction against invoice - prepayment
-	--
-	;WITH cte_FeeAfterDiscount AS (
-		SELECT r.PartyId, SUM(r.LicensingFee - r.Discount) Amount FROM #tmpResult r GROUP BY r.PartyID
-	), cte_Deduction AS(
-		SELECT c.PartyId, SUM(c.Amount) Amount FROM @credit c WHERE [Key] IN ('AMF', 'AGP') GROUP BY c.PartyId
-	)
-	UPDATE c SET c.Amount = CASE WHEN c.Remaining < (a.Amount - b.Amount) THEN c.Remaining ELSE (a.Amount - b.Amount) END
-	FROM @credit c
-	INNER JOIN cte_FeeAfterDiscount a ON a.PartyID=c.PartyId AND c.[Key]='PRE'
-	INNER JOIN cte_Deduction b ON a.PartyID=b.PartyId
-	WHERE c.Remaining > 0
 /*-----------------
  * aggregate
  *-----------------*/
