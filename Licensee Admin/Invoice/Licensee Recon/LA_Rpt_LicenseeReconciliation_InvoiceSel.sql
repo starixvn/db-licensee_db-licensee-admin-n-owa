@@ -583,15 +583,15 @@ BEGIN
 	DECLARE @InvoiceItemTypes TABLE([Key] VARCHAR(5), [Value] INT)
 
 	INSERT INTO @InvoiceItemTypes ([Key], [Value]) VALUES
-		 ('AMF', 3)		-- Advance billing for minimum fees for 4th, 5th & 6th month
-		,('AMF', 5)		-- Deduct advanced minimum fees
-		,('PRE', 22)	-- Prepayment
+		 --('AMF', 3)		-- Advance billing for minimum fees for 4th, 5th & 6th month
+		 ('AMF', 5)		-- Deduct advanced minimum fees
+		--,('PRE', 22)	-- Prepayment
 		,('PRE', 24)	-- Deduct against invoice
-		,('AGP', 25)	-- Prepayment for AG product
+		--,('AGP', 25)	-- Prepayment for AG product
 		,('AGP', 26)	-- Deduct AG Prepayment
 
 	INSERT INTO @InvoiceItemTypes ([Key], [Value])
-	SELECT 'OTHER', val FROM  dbo.strSplit('11,12,13,14,17',',')
+	SELECT 'OTHER', val FROM  dbo.strSplit('11,12,13,14,17,20',',')
 
 	-- get statement
 	DECLARE @statement TABLE(Income MONEY,Expense MONEY,InvItemTypeId SMALLINT,PartyId INT)
