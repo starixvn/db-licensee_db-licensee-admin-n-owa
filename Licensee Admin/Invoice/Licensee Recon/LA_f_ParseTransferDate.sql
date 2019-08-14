@@ -1,8 +1,8 @@
-/*<info serverAlias="DBACC-bodb02" selecters="bodbAdminNet" viewers="" isFunction="1" isNested="0"></info>*/
+/*<info serverAlias="DBACC-bodb02" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
 USE bodb02
 GO
 
-CREATE FUNCTION [dbo].[LA_f_ParseTransferDate](@Remark VARCHAR(150))
+ALTER FUNCTION [dbo].[LA_f_ParseTransferDate](@Remark VARCHAR(150))
 /*  
 	Created: 20190814@Bruce
 	Task : Parse transfer date in remark
@@ -20,3 +20,4 @@ BEGIN
 	
 	RETURN CONVERT(DATE ,@value, 106);
 END
+GO
