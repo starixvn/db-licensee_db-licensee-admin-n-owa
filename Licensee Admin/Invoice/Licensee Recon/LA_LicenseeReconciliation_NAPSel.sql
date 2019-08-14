@@ -2,7 +2,7 @@
 USE bodb02
 GO
 
-ALTER PROCEDURE [dbo].LA_Rpt_LicenseeReconciliation_NAPSel
+ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_NAPSel]
 	@PartyIds	VARCHAR(4000),
 	@FromDate	DATETIME,
 	@ToDate		DATETIME

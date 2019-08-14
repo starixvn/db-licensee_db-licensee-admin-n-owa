@@ -2,7 +2,7 @@
 USE [bodb_Licensee]
 GO
 
-ALTER PROCEDURE [dbo].LA_Rpt_LicenseeReconciliation_InvoiceSel
+CREATE PROCEDURE [dbo].[LA_LicenseeReconciliation_InvoiceSel]
 	@PartyIds		VARCHAR(4000),
 	@FromDate		DATETIME,
 	@ToDate			DATETIME,
@@ -50,8 +50,11 @@ BEGIN
 	)
 	-- set selected = true
 	-- put each party to its individual group(indicated by -partyid)
-	INSERT INTO @partyList(PartyId,PartyName,LicenseeCode,IsSelected,PartyGroupId)
-	SELECT p.PartyID,p.PartyName,d.LicenseeCode,1,-p.PartyID
+	INSERT INTO @partyList(PartyId, PartyName, IsSelected, PartyGroupId, LicenseeCode)
+	SELECT p.PartyID, p.PartyName
+		, 1 AS IsSelected
+		, -p.PartyID AS PartyGroupId
+		, CASE WHEN ISNULL(d.LicenseeCode,'') = '' THEN CAST(p.PartyID AS VARCHAR(10)) ELSE d.LicenseeCode END
 	FROM dbo.OAS_Party p WITH(NOLOCK)
 	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
 	WHERE p.PartyID IN(SELECT val FROM dbo.strSplit(@PartyIds, ',')) AND d.LicenseeCode IS NOT NULL
