@@ -93,7 +93,7 @@ BEGIN
 	BEGIN
 		DECLARE @_ToDate DATE = (CASE WHEN @ToDate < @balanceUpDay THEN @ToDate ELSE DATEADD(day, -1, @balanceUpDay) END)
 
-		SELECT transid, custid, actual_stake, winlost, refno,isReversal,  dbo.LA_f_ParseTransferDate(b.transdesc) as rptdate
+		SELECT transid, custid, actual_stake, winlost, refno,isReversal,  dbo.LA_f_ParseTransferDate(fi.transdesc) as rptdate
 		INTO #transfer_fi
 		FROM bodb_Archive.dbo.transfer_fi fi WITH(NOLOCK)
 		WHERE fi.winlostdate BETWEEN @FromDate AND @_ToDate AND fi.bettype = 21003 AND ISNULL(isReversal,0) = 0
