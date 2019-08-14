@@ -1,15 +1,15 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
 GO
 
-ALTER PROCEDURE [dbo].[LA_LicenseeReconiliation_PartySel](
+CREATE PROCEDURE [dbo].[LA_LicenseeReconiliation_PartySel](
 	@UserId			INT = 0,
 	@FunctionKey	NVARCHAR(100) = ''
 )
 AS
 /*	Header:
 	Task : Get list of licensee for Reconciliation report
-	DB: DBCUST.bodb_Licensee
+	DB: DBLIC.bodb_Licensee
    
 	Revisions: 
 		- 20190723@Bruce: Create Sp [#111586]
@@ -37,7 +37,7 @@ BEGIN
 	FROM @partyList p
 	INNER JOIN dbo.OAS_Party p2 WITH(NOLOCK) ON p.PartyId=p2.PartyID
 	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyId=d.PartyID
-	INNER JOIN CustDb.dbo.Exchange e WITH(NOLOCK) ON d.BaseCurrencyId=e.exchangeid
+	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON d.BaseCurrencyId=e.exchangeid
 	WHERE d.IsDeposit = 1
 END
 GO
