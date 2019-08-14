@@ -3,9 +3,8 @@ USE bodb02
 GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_NAPSel]
-	@PartyIds	VARCHAR(4000),
-	@FromDate	DATETIME,
-	@ToDate		DATETIME
+	@PartyIds		VARCHAR(4000),
+	@ReportMonth	DATETIME
 AS
 /*	Header:
 	Created: 20190801@Bruce
@@ -17,6 +16,14 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
+
+	-- Transfer amount from current month is for last month
+	-- Example: To get transfer amount of July we get data of August
+	-- 
+	-- So the filter range is from July to August
+	--
+	DECLARE @FromDate DATE = DATEADD(MONTH, DATEDIFF(MONTH, 0, @ReportMonth), 0)
+	DECLARE @ToDate DATE =  DATEADD(DAY, -1, DATEADD(MONTH, 2, @FromDate))
 
 	-- get licensee code list
 	DECLARE @licenseeCodeList TABLE (PartyId INT, LicenseeCode VARCHAR(50))
@@ -53,7 +60,7 @@ BEGIN
 	BEGIN
 		DECLARE @_FromDate DATE = (CASE WHEN @FromDate >= @balanceUpDay THEN @FromDate ELSE @balanceUpDay END)
 		
-		SELECT b.actual_stake,b.winlost, b.Username, b.refno,b.transid,b.custid
+		SELECT b.actual_stake,b.winlost, b.Username, b.refno,b.transid,b.custid, dbo.LA_f_ParseTransferDate(b.transdesc) as rptdate
 		INTO #bettrans
 		FROM dbo.bettrans b WITH(NOLOCK)
 		WHERE b.winlostdate BETWEEN @_FromDate AND @ToDate AND b.bettype = 21003 AND b.oddsid=0
@@ -62,6 +69,7 @@ BEGIN
 		SELECT SUM((b.actual_stake-b.winlost)), b.Username, b.refno
 		FROM #bettrans b
 		INNER JOIN @customer c ON  c.custid=b.custid
+		WHERE YEAR(b.rptdate) = YEAR(@ReportMonth) AND MONTH(b.rptdate) = MONTH(@ReportMonth)
 		GROUP BY b.Username, b.refno
 
 		-- exclude reversal tickets
@@ -85,7 +93,7 @@ BEGIN
 	BEGIN
 		DECLARE @_ToDate DATE = (CASE WHEN @ToDate < @balanceUpDay THEN @ToDate ELSE DATEADD(day, -1, @balanceUpDay) END)
 
-		SELECT transid, custid, actual_stake, winlost, refno,isReversal
+		SELECT transid, custid, actual_stake, winlost, refno,isReversal,  dbo.LA_f_ParseTransferDate(b.transdesc) as rptdate
 		INTO #transfer_fi
 		FROM bodb_Archive.dbo.transfer_fi fi WITH(NOLOCK)
 		WHERE fi.winlostdate BETWEEN @FromDate AND @_ToDate AND fi.bettype = 21003 AND ISNULL(isReversal,0) = 0
@@ -94,6 +102,7 @@ BEGIN
 		SELECT (b.actual_stake-b.winlost) Amount, c.Username, b.refno
 		FROM #transfer_fi b
 		INNER JOIN @customer c ON  c.custid=b.custid
+		WHERE YEAR(b.rptdate) = YEAR(@ReportMonth) AND MONTH(b.rptdate) = MONTH(@ReportMonth)
 
 		;with x as (
 			SELECT b.RefNo, MIN(a.transid) transid1, MAX(a.transid) transid2
