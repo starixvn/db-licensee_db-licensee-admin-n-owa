@@ -7,6 +7,7 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee_PartyIns]
 	@LicenseeId			INT,
 	@LicenseeName		VARCHAR(50),
 	@BrandName			VARCHAR(100),
+	@LicenseeCode		VARCHAR(50),
 	@BaseCurrencyId		TINYINT,
 	@NewPartyId			INT				= 0		OUTPUT, 
 	@ErrCode			INT				= 0		OUTPUT, 
@@ -78,19 +79,22 @@ BEGIN
 		RETURN
 	END
 
+	IF @LicenseeCode = '' SET @LicenseeCode = NULL
+
 	-- #Region OAS_PartyDetail
 	IF EXISTS(SELECT 1 FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE PartyID = @NewPartyId)
 	BEGIN
 		UPDATE dbo.OAS_PartyDetail  
 		SET BrandName = @BrandName,
 			BaseCurrencyId = @BaseCurrencyId,
-			StatusId = 1
+			StatusId = 1,
+			LicenseeCode = @LicenseeCode
 		WHERE PartyID = @NewPartyId
 	END
 	ELSE
 	BEGIN
-		INSERT INTO dbo.OAS_PartyDetail (PartyID, IsDeposit, BrandName, CompanyName, IsAllowedMemberComm, BaseCurrencyId, StatusId)
-		SELECT @NewPartyId, IsDeposit, @BrandName, CompanyName, IsAllowedMemberComm, @BaseCurrencyId, 1
+		INSERT INTO dbo.OAS_PartyDetail (PartyID, IsDeposit, BrandName, CompanyName, IsAllowedMemberComm, BaseCurrencyId, StatusId, LicenseeCode)
+		SELECT @NewPartyId, IsDeposit, @BrandName, CompanyName, IsAllowedMemberComm, @BaseCurrencyId, 1, @LicenseeCode
 		FROM dbo.licensees WITH (NOLOCK)
 		WHERE LicenseeID = @LicenseeId
 	END

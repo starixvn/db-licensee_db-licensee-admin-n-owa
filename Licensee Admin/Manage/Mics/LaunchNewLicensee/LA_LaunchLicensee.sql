@@ -7,6 +7,7 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
 	@LicenseeId			INT,
 	@LicenseeName		VARCHAR(50),
 	@BrandName			VARCHAR(100)	= '',
+	@LicenseeCode		VARCHAR(50)		= '',
 	@BaseCurrencyId		TINYINT,
 	@LaunchDate			DATE, 
 	@GroupId			INT,
@@ -102,7 +103,7 @@ BEGIN
 	END
 	
 	DECLARE @NewPartyId	INT = 0
-	EXEC dbo.LA_LaunchLicensee_PartyIns @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @BaseCurrencyId, @NewPartyId OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT 
+	EXEC dbo.LA_LaunchLicensee_PartyIns @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @LicenseeCode, @BaseCurrencyId, @NewPartyId OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT 
 	
 	IF @ErrCode = 0
 	BEGIN
@@ -153,6 +154,7 @@ BEGIN
 	SET @Doing =(SELECT	@NonOfficialPartyId	AS NonOfficialPartyId,
 						@LicenseeId			AS LicenseeId,
 						@LicenseeName		AS LicenseeName,
+						@LicenseeCode		AS LicenseeCode,
 						@BrandName			AS BrandName,
 						@BaseCurrencyId		AS BaseCurrencyId,
 						@LaunchDate			AS LaunchDate, 
