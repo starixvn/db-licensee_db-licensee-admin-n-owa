@@ -13,7 +13,7 @@ AS
 	DB: DBACC.bodb02
 
 	Revisions: 
-		- 20190801@Bruce: Create Sp
+		- 20190801@Bruce: Create Sp [#111586]
 */
 BEGIN
 	SET NOCOUNT ON

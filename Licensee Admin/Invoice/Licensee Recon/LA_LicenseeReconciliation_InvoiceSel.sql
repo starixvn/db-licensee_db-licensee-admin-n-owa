@@ -15,7 +15,7 @@ AS
 	DB: DBLIC.bodb_Licensee
    
 	Revisions: 
-		- 20190723@Bruce: Create Sp
+		- 20190723@Bruce: Create Sp [#111586]
 */
 BEGIN
 	SET NOCOUNT ON
