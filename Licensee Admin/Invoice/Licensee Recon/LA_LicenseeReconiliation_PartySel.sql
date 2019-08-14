@@ -2,7 +2,7 @@
 USE [bodb_Licensee]
 GO
 
-CREATE PROCEDURE [dbo].[LA_LicenseeReconiliation_PartySel](
+ALTER PROCEDURE [dbo].[LA_LicenseeReconiliation_PartySel](
 	@UserId			INT = 0,
 	@FunctionKey	NVARCHAR(100) = ''
 )
@@ -33,7 +33,7 @@ BEGIN
 
 	SELECT p.PartyId, p.PartyName, d.BaseCurrencyId
 		, e.Code AS BaseCurrencyCode
-		, CASE WHEN ISNULL(d.LicenseeCode,'') = '' THEN CAST(p.PartyID AS VARCHAR(10)) ELSE d.LicenseeCode END
+		, CASE WHEN ISNULL(d.LicenseeCode,'') = '' THEN CAST(p.PartyID AS VARCHAR(10)) ELSE d.LicenseeCode END LicenseeCode
 	FROM @partyList p
 	INNER JOIN dbo.OAS_Party p2 WITH(NOLOCK) ON p.PartyId=p2.PartyID
 	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyId=d.PartyID
