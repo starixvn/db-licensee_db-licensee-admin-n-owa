@@ -41,6 +41,7 @@ SET NOCOUNT ON
 		, ISNULL(p.SetupName, '') AS SetupName
 		, ISNULL(pd.BaseCurrencyId, 0) BaseCurrencyId
 		, pd.InvoiceLanguage
+		, pd.LicenseeCode
 	FROM dbo.OAS_Party p WITH (NOLOCK)
 		LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 		LEFT JOIN (

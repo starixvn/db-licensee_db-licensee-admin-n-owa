@@ -10,6 +10,7 @@ ALTER PROCEDURE [dbo].[LA_PayerModify]
 	, @AttnName			NVARCHAR (125)	= ''
 	, @Address1			NVARCHAR (255)	= ''
 	, @Address2			NVARCHAR (255)	= ''
+	, @LicenseeCode		VARCHAR (50)	= ''
 	, @PayerName		VARCHAR (50)
 	, @BaseCurrencyId	INT
 	, @UserID			INT
@@ -64,6 +65,7 @@ BEGIN
 					, Address2			AS '@a2'
 					, BaseCurrencyId	AS '@bc'
 					, InvoiceLanguage	AS '@il'
+					, LicenseeCode		AS '@lc'
 			FROM dbo.OAS_Party p  WITH (NOLOCK)
 				INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 			WHERE p.PartyId = @PayerID
@@ -79,6 +81,7 @@ BEGIN
 			, Address1 = @Address1
 			, Address2 = @Address2
 			, InvoiceLanguage = @InvoiceLanguage
+			, LicenseeCode = CASE WHEN @LicenseeCode = '' THEN NULL ELSE @LicenseeCode END
 		WHERE PartyId = @PayerID
 
 		-- only non-official payer can edit payer name, status, deposit status
@@ -127,6 +130,7 @@ BEGIN
 					, @Address2			AS '@a2'
 					, @BaseCurrencyId	AS '@bc'
 					, @InvoiceLanguage	AS '@il'
+					, @LicenseeCode		AS '@lc'
 			FROM dbo.OAS_Party p WITH (NOLOCK)
 				INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 			WHERE p.PartyID = @PayerId
