@@ -628,7 +628,8 @@ BEGIN
 		INNER JOIN @partyList p ON r.PartyID=p.PartyId
 		INNEr JOIN @productList pl ON r.ProductID = pl.ProductId
 		WHERE p.IsSelected=1
-		GROUP BY p.LicenseeCode, pl.Name
+		GROUP BY pl.ProductId, p.LicenseeCode, pl.Name
+		ORDER BY pl.ProductId
 	END
 	ELSE
 	BEGIN
