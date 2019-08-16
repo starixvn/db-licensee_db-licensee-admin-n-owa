@@ -24,8 +24,6 @@ BEGIN
 	DECLARE @ToDate DATE =  DATEADD(DAY, -1, DATEADD(MONTH, 1, @FromDate))
 	DECLARE @Yesterday DATE = DATEADD(DAY, -1, GETDATE())
 
-	IF (@ToDate > @Yesterday) SET @ToDate = @Yesterday
-
 	-- get licensee code list
 	DECLARE @licenseeCodeList TABLE (PartyId INT, LicenseeCode VARCHAR(50))
 	INSERT INTO @licenseeCodeList(PartyId,LicenseeCode)
@@ -55,9 +53,9 @@ BEGIN
 
 	DECLARE @tmpBalanceUpDay AS TABLE (BalanceUpDay DATE, MoveBetsDay DATE)
 	INSERT INTO @tmpBalanceUpDay(BalanceUpDay,MoveBetsDay)
-	EXEC LRF_SelBalanceUpDay
+	--EXEC LRF_SelBalanceUpDay
 	-- TEST
-	--VALUES ('20190719','20190728')
+	VALUES ('20190805','20190810')
 
 	DECLARE @balanceUpDay DATE = (SELECT BalanceUpDay FROM @tmpBalanceUpDay)
 
