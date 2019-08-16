@@ -29,63 +29,55 @@ BEGIN
 	-- get licensee code list
 	DECLARE @licenseeCodeList TABLE (PartyId INT, LicenseeCode VARCHAR(50))
 	INSERT INTO @licenseeCodeList(PartyId,LicenseeCode)
-	SELECT PartyID, LicenseeCode FROM DBCUST.bodb_licensee.dbo.OAS_PartyDetail WITH(NOLOCK) WHERE ISNULL(LicenseeCode, '') <> ''
+	SELECT PartyID, LicenseeCode FROM bodb_licensee.dbo.OAS_PartyDetail WITH(NOLOCK) WHERE ISNULL(LicenseeCode, '') <> ''
 
 	-- licensee code to cust id
 	-- some licensees may have same licensee code
 	--
-	DECLARE @customer AS TABLE (CustId int,Username VARCHAR(50))
+	DECLARE @customer AS TABLE (CustId INT,Username VARCHAR(50))
 	INSERT INTO @customer
 	SELECT DISTINCT c.custid, c.Username
 	FROM dbo.Customer c WITH(NOLOCK)
 	INNER JOIN @licenseeCodeList l ON l.LicenseeCode=c.username
 	WHERE l.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
 
+	-- licensee super
+	--
+	DECLARE @super AS TABLE(SuperId INT, SuperCode VARCHAR(50), CustId INT, LicenseeCode VARCHAR(50))
+	INSERT INTO @super(SuperId, SuperCode, CustId, LicenseeCode)
+	SELECT s.custid, s.username, c.CustId, c.Username
+	FROM dbo.Dep_CustSuper s WITH(NOLOCK)
+	INNER JOIN bodb_licensee.dbo.Licensees l WITH(NOLOCK) ON s.[site] = l.LicenseeName AND l.IsDeposit = 1
+	INNER JOIN bodb_licensee.dbo.OAS_Party p WITH(NOLOCK) ON l.LicenseeID = p.OldRefID AND p.PartyType = 1
+	INNER JOIN bodb_licensee.dbo.OAS_PartyDetail d WITH(NOLOCK) ON d.PartyID = p.PartyID
+	INNER JOIN @customer c ON c.Username = d.LicenseeCode
+	WHERE ISNULL(d.LicenseeCode, '') <> ''
+
 	DECLARE @tmpBalanceUpDay AS TABLE (BalanceUpDay DATE, MoveBetsDay DATE)
 	INSERT INTO @tmpBalanceUpDay(BalanceUpDay,MoveBetsDay)
-	-- EXEC Age_SelBalanceUpDay
+	EXEC LRF_SelBalanceUpDay
 	-- TEST
-	VALUES ('20190719','20190728')
+	--VALUES ('20190719','20190728')
 
 	DECLARE @balanceUpDay DATE = (SELECT BalanceUpDay FROM @tmpBalanceUpDay)
 
 	CREATE TABLE #transfer(
-		Amount			MONEY,
-		Super			VARCHAR(50),
-		LicenseeCode	VARCHAR(50),
-		RefNo			BIGINT
+		Amount	MONEY,
+		RefNo	BIGINT,
+		CustId	INT
 	)
+
+	CREATE NONCLUSTERED INDEX Idx_transfer ON #transfer (RefNo, CustId)
 
 	-- bettrans
 	IF @ToDate >= @balanceUpDay
 	BEGIN
 		DECLARE @_FromDate DATE = (CASE WHEN @FromDate >= @balanceUpDay THEN @FromDate ELSE @balanceUpDay END)
 
-		SELECT b.actual_stake,b.winlost, b.Username, b.refno,b.transid,b.custid
-		INTO #bettrans
+		INSERT INTO #transfer(Amount, RefNo, CustId)
+		SELECT winlost - actual_stake, refno, custid
 		FROM dbo.bettrans b WITH(NOLOCK)
 		WHERE b.winlostdate BETWEEN @_FromDate AND @ToDate AND b.bettype = 21003 AND b.oddsid=0
-
-		INSERT INTO #transfer (Amount, LicenseeCode,RefNo)
-		SELECT SUM((b.actual_stake-b.winlost)), b.Username, b.refno
-		FROM #bettrans b
-		INNER JOIN @customer c ON  c.custid=b.custid
-		GROUP BY b.Username, b.refno
-
-		-- exclude reversal tickets
-		DELETE #transfer WHERE Amount = 0
-
-		;with x as (
-			SELECT b.RefNo, MIN(a.transid) transid1, MAX(a.transid) transid2
-			FROM #bettrans a INNER JOIN #transfer b ON a.refno=b.RefNo
-			GROUP BY b.RefNo
-		)
-		UPDATE b SET Super = a.Username
-		FROM #bettrans a
-		INNER JOIN x ON a.refno=x.RefNo AND a.transid IN(x.transid1,x.transid2)
-		INNER JOIN #transfer b ON b.RefNo=a.refno AND a.Username<>b.LicenseeCode
-
-		DROP TABLE #bettrans
 	END
 
 	-- transfer
@@ -93,35 +85,18 @@ BEGIN
 	BEGIN
 		DECLARE @_ToDate DATE = (CASE WHEN @ToDate < @balanceUpDay THEN @ToDate ELSE DATEADD(day, -1, @balanceUpDay) END)
 
-		SELECT transid, custid, actual_stake, winlost, refno,isReversal
-		INTO #transfer_fi
+		INSERT INTO #transfer(Amount, RefNo, CustId)
+		SELECT winlost - actual_stake, refno, custid
 		FROM bodb_Archive.dbo.transfer_fi fi WITH(NOLOCK)
 		WHERE fi.winlostdate BETWEEN @FromDate AND @_ToDate AND fi.bettype = 21003 AND ISNULL(isReversal,0) = 0
-
-		INSERT INTO #transfer (Amount, LicenseeCode,RefNo)
-		SELECT (b.actual_stake-b.winlost) Amount, c.Username, b.refno
-		FROM #transfer_fi b
-		INNER JOIN @customer c ON  c.custid=b.custid
-
-		;with x as (
-			SELECT b.RefNo, MIN(a.transid) transid1, MAX(a.transid) transid2
-			FROM #transfer_fi a INNER JOIN #transfer b ON a.refno=b.RefNo
-			WHERE b.Super IS NULL
-			GROUP BY b.RefNo
-		)
-		UPDATE b SET Super = c.Username
-		FROM #transfer_fi a
-		INNER JOIN x ON a.refno=x.RefNo AND a.transid IN(x.transid1,x.transid2)
-		INNER JOIN dbo.customer c WITH(NOLOCK) ON c.custid=a.custid
-		INNER JOIN #transfer b ON b.RefNo=a.refno AND c.Username<>b.LicenseeCode
-
-		DROP TABLE #transfer_fi
 	END
 
-	SELECT t.Super, t.LicenseeCode, SUM(t.Amount) Amount
-	FROM #transfer t
-	INNER JOIN @customer c ON t.LicenseeCode = c.Username
-	GROUP BY t.LicenseeCode,t.Super
+	SELECT SUM(a.Amount) Amount, c.LicenseeCode, c.SuperCode AS Super
+	FROM #transfer a
+	INNER JOIN #transfer b ON a.refno = b.refno
+	INNER JOIN @super c ON a.custid = c.CustId and b.custid = c.SuperId
+	GROUP BY c.LicenseeCode, c.SuperCode
+	HAVING SUM(a.Amount) <> 0
 
 	DROP TABLE #transfer
 END
