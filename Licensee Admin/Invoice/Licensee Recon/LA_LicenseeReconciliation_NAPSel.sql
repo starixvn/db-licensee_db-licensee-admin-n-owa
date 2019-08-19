@@ -53,9 +53,7 @@ BEGIN
 
 	DECLARE @tmpBalanceUpDay AS TABLE (BalanceUpDay DATE, MoveBetsDay DATE)
 	INSERT INTO @tmpBalanceUpDay(BalanceUpDay,MoveBetsDay)
-	--EXEC LRF_SelBalanceUpDay
-	-- TEST
-	VALUES ('20190805','20190810')
+	EXEC LRF_SelBalanceUpDay
 
 	DECLARE @balanceUpDay DATE = (SELECT BalanceUpDay FROM @tmpBalanceUpDay)
 
