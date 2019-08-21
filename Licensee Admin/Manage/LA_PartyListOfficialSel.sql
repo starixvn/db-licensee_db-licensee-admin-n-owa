@@ -6,9 +6,9 @@ SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 GO
 
-CREATE PROCEDURE [dbo].[LA_PartyListOfficialSel]
+ALTER PROCEDURE [dbo].[LA_PartyListOfficialSel]
 	 @UserID		INT	   = 0,
-	 @FunctionID	INT	   = 0
+	 @FunctionKey	NVARCHAR(100)	= ''
 AS
 
 /*
@@ -18,6 +18,7 @@ AS
 
 	Revisions:
 	- 20190731@Parsons: Validate billing configuration [#109600]
+	- 20190821@Parsons: Enhancement for code release process [#118627]
 */
 
 SET NOCOUNT ON
@@ -34,10 +35,11 @@ SET NOCOUNT ON
 		INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID = d.PartyID
 		INNER JOIN dbo.LA_UserParty up WITH (NOLOCK) ON p.PartyID = up.PartyID
 		INNER JOIN dbo.LA_FunctionParty fp WITH (NOLOCK) ON p.PartyID = fp.PartyID 
+		INNER JOIN dbo.LA_Function f WITH(NOLOCK) ON fp.FunctionID = f.FunctionID
 	WHERE p.PartyID NOT IN ( SELECT PartyId FROM cte_TerminatedPartyIds) AND
 		  p.PartyType = 1 AND d.IsDeposit = 1 AND d.StatusId = 1 AND 
 		  (@UserID = 0 OR up.UserID = @UserID) AND 
-		  (@FunctionID = 0 OR fp.FunctionID = @FunctionID)
+		  (@FunctionKey = '' OR f.FunctionKey = @FunctionKey)
 
 	UNION 
 
