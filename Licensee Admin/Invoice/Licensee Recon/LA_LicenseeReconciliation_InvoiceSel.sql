@@ -269,10 +269,8 @@ BEGIN
 		--  
 		SELECT p.PartyID,b.rptDate,p.ProductId,b.CurrencyId,
 			CAST(0 AS MONEY) AS ExtraAmount,
-			SUM(ISNULL(b.MemberWL, 0) * e.Rate) AS Winloss,
-			SUM((
-				ISNULL(-b.MemberWL, 0) * p.Rate - (CASE WHEN b.ProductID=@BA THEN ISNULL(b.CommissionA,0) ELSE 0 END)
-			) * e.Rate) AS AmountToCompany
+			SUM(ISNULL(-b.MemberWL, 0) * e.Rate) AS Winloss,
+			SUM((ISNULL(-b.MemberWL, 0) * p.Rate - (CASE WHEN b.ProductID=@BA THEN ISNULL(b.CommissionA,0) ELSE 0 END)) * e.Rate) AS AmountToCompany
 		INTO #tmpWinlossData
 		FROM #tmpBettingByProduct b
 		INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID AND p.LicenseeId = b.SiteId AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
