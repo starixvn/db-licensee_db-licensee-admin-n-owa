@@ -5,7 +5,7 @@ GO
 ALTER PROCEDURE [dbo].[LA_Rpt_AGPrepaymentSummary]
 	@Environment		VARCHAR(50),
 	@UserId				INT,
-	@FunctionId			INT
+	@FunctionKey		NVARCHAR(100)
 AS
 /*	Header:
 	Created: 20181003 - Parsons
@@ -14,7 +14,8 @@ AS
 
 	Revisions:
 		- 20181003@Parsons: Integrate AG setup fee into invoices [RedmineID: #98485]
-		- 20190122@Parsons: Improve AG prepayment and discount setting [#104620]
+		- 20190122@Parsons: Improve AG prepayment and discount setting [#104620] 
+		- 20190821@Parsons: Enhancement for code release process [#118627]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -22,7 +23,7 @@ BEGIN
 
 	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT)
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
-	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionId=@FunctionId
+	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionKey=@FunctionKey
 
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListNonOfficialSel
