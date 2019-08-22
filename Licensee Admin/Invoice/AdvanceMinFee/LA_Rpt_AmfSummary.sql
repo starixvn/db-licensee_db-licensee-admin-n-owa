@@ -5,7 +5,7 @@ GO
 ALTER PROCEDURE [dbo].[LA_Rpt_AmfSummary]
 	@Environment		VARCHAR(50),
 	@UserId				INT,
-	@FunctionId			INT
+	@FunctionKey		NVARCHAR(100)
 AS
 /*	Header:
 	Created: 20171226 - Bruce.Bui
@@ -16,6 +16,7 @@ AS
 		- 20171226@Bruce: create SP report for AMF Summary [RedmineID: #87039]
 		- 20180326@Harper: Change the way to get Waive month [RedmineID: #87039]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20190821@Parsons: Enhancement for code release process [#118627]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -24,7 +25,7 @@ BEGIN
 
 	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT)
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
-	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionId=@FunctionId
+	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionKey=@FunctionKey
 	
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListNonOfficialSel
