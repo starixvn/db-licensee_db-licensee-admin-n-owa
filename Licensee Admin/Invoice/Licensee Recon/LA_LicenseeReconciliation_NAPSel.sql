@@ -22,7 +22,6 @@ BEGIN
 	-- 
 	DECLARE @FromDate DATE = DATEADD(MONTH, DATEDIFF(MONTH, 0, @ReportMonth) + 1, 0)
 	DECLARE @ToDate DATE =  DATEADD(DAY, -1, DATEADD(MONTH, 1, @FromDate))
-	DECLARE @Yesterday DATE = DATEADD(DAY, -1, GETDATE())
 
 	-- get licensee code list
 	DECLARE @licenseeCodeList TABLE (PartyId INT, LicenseeCode VARCHAR(50))
