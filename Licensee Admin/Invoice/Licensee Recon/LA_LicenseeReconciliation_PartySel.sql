@@ -2,7 +2,7 @@
 USE [bodb_Licensee]
 GO
 
-ALTER PROCEDURE [dbo].[LA_LicenseeReconiliation_PartySel](
+ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_PartySel](
 	@UserId			INT = 0,
 	@FunctionKey	NVARCHAR(100) = ''
 )

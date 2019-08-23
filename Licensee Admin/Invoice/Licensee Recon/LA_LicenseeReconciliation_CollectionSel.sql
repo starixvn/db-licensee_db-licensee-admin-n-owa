@@ -2,7 +2,7 @@
 USE bodb02
 GO
 
-CREATE PROCEDURE [dbo].LA_LicenseeReconiliation_CollectionSel
+CREATE PROCEDURE [dbo].LA_LicenseeReconciliation_CollectionSel
 	@PartyIds	VARCHAR(4000),
 	@FromDate	DATETIME,
 	@ToDate		DATETIME
