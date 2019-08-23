@@ -6,8 +6,8 @@ CREATE PROCEDURE [dbo].[LA_LicenseeReconciliation_InvoiceSel]
 	@PartyIds		VARCHAR(4000),
 	@FromDate		DATETIME,
 	@ToDate			DATETIME,
-	@Environment	VARCHAR(50),
 	@BaseCurrency	VARCHAR(5),
+	@Environment	VARCHAR(50) = 'DEV',
 	@IsShowDetail	BIT = 0
 AS
 /*	Header:

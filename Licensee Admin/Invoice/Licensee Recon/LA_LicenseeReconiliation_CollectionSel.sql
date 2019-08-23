@@ -95,14 +95,14 @@ BEGIN
 	UPDATE st SET OpeningBalance = (OpeningBalance + ob.amount)
 	FROM #statement st INNER JOIN cte_OpeningBalance ob ON st.CustId = ob.custid
 
-	CREATE TABLE #collection(CustId INT, Amount Money)
+	CREATE TABLE #collection(CustId INT, Amount Money, CollectedDate DATE)
 
 	IF @ToDate >= @balanceUpDay
 	BEGIN
 		DECLARE @_FromDate DATE = (CASE WHEN @FromDate >= @balanceUpDay THEN @FromDate ELSE @balanceUpDay END)
 
-		INSERT INTO #collection(CustId,Amount)
-		SELECT tc.CustId, (tc.Credit - tc.Debit)
+		INSERT INTO #collection(CustId,Amount,CollectedDate)
+		SELECT tc.CustId, (tc.Credit - tc.Debit),tc.WinlostDate
 		FROM dbo.Transfer_Coll tc WITH(NOLOCK)
 		INNER JOIN #statement s ON tc.CustId = s.CustId
 		WHERE tc.WinlostDate BETWEEN @_FromDate AND @ToDate
@@ -112,8 +112,8 @@ BEGIN
 	BEGIN
 		DECLARE @_ToDate DATE = (CASE WHEN @ToDate < @balanceUpDay THEN @ToDate ELSE DATEADD(day, -1, @balanceUpDay) END)
 
-		INSERT INTO #collection(CustId,Amount)
-		SELECT tc.CustId, (tc.Credit - tc.Debit) amount
+		INSERT INTO #collection(CustId,Amount,CollectedDate)
+		SELECT tc.CustId, (tc.Credit - tc.Debit),tc.WinlostDate
 		FROM bodb_archive.dbo.Transfer_Coll_bk tc WITH(NOLOCK)
 		INNER JOIN #statement s ON tc.CustId = s.CustId
 		WHERE tc.WinlostDate BETWEEN @FromDate AND @_ToDate
