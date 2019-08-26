@@ -115,7 +115,7 @@ SET NOCOUNT ON
 	CREATE TABLE #Result (
 		PartyId			INT,
 		PartyName		VARCHAR(100),
-		WinlostDate		DATETIME,
+		WinLossDate		DATETIME,
 		SportType		SMALLINT,
 		BetType			SMALLINT,
 		BetCount		INT,
@@ -149,11 +149,11 @@ SET NOCOUNT ON
 			AND b.customercategory NOT IN (27,28)
 		GROUP BY b.rptDate,b.currencyID,c.PartyID,c.PartyName,l.sporttype, b.bettype
 	)
-	INSERT INTO #Result(PartyId, PartyName, WinlostDate, SportType, BetType, BetCount, Turnover, GrossWinloss, PayToSupplier, OneworksIncome, NetIncome)
+	INSERT INTO #Result(PartyId, PartyName, WinLossDate, SportType, BetType, BetCount, Turnover, GrossWinloss, PayToSupplier, OneworksIncome, NetIncome)
 	SELECT
 		d.PartyId,
 		d.PartyName,
-		d.rptDate AS WinlostDate,
+		d.rptDate AS WinLossDate,
 		d.SportType,
 		d.BetType,
 		SUM(d.betcount) AS BetCount,
@@ -172,7 +172,7 @@ SET NOCOUNT ON
 	FROM #Result r
 		INNER JOIN @Charge3rdInfos ci_3rd ON r.PartyId = ci_3rd.PartyId
 
-	SELECT PartyName, WinlostDate, SportType, BetType, BetCount, Turnover, GrossWinloss, PayToSupplier, OneworksIncome, NetIncome
+	SELECT PartyName, WinLossDate, SportType, BetType, BetCount, Turnover, GrossWinloss, PayToSupplier, OneworksIncome, NetIncome
 	FROM #Result
 	-- End Region: Return Result
 
