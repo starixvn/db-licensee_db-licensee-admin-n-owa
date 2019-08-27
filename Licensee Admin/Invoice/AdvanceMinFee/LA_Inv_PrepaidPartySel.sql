@@ -16,7 +16,7 @@ AS
 		- 20171226@Bruce: create SP
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20190122@Parsons: Improve AG prepayment and discount setting [#104620]
-		- 20190821@Parsons: Enhancement for code release process [#118627]
+		- 20190821@Parsons: Improve the ability to maintain systems [#118627]
 */
 BEGIN
 	SET NOCOUNT ON

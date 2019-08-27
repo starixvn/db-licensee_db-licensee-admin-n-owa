@@ -18,7 +18,7 @@ AS
 		- 20150412@Patrick: Add filter by PartyType
 		- 20180403@Harper: Add more Cozni as parent license [RedmineID: #85681]
 		- 20180713@bruce: Add new group TEST for credit side [#98126]
-		- 20190821@Parsons: Enhancement for code release process [#118627]
+		- 20190821@Parsons: Improve the ability to maintain systems [#118627]
 
 	Params:
 		+ UserID:

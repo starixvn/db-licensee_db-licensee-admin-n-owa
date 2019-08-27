@@ -18,7 +18,7 @@ AS
 
 	Revisions:
 	- 20190731@Parsons: Validate billing configuration [#109600]
-	- 20190821@Parsons: Enhancement for code release process [#118627]
+	- 20190821@Parsons: Improve the ability to maintain systems [#118627]
 */
 
 SET NOCOUNT ON
