@@ -24,6 +24,7 @@ AS
 			+ Implement E-sport 2 [#105723]
 			+ Cover betfrom 'c' in the report
 		- 20190516@Parsons: Show Bet count in Platform Win Loss (Summary) Report [#113568]
+		- 20190827@Bruce: Add new betfrom 't' [#118998]
 
 	Explanation:
 	  + @PlatformType: 0: All
@@ -38,6 +39,7 @@ AS
 					   9: Tablet (r)
 					  10: Mobile app for China (o)
 					  11: Mobile lite version (c)
+					  12: Others(t)
 
 	  + @excludeTest: remove currency UUS
 	  + @MoveBetsDay: The day we move tickets to bettrans14
@@ -52,7 +54,7 @@ BEGIN
 	-- supported betfrom
 	--
 	DECLARE @betfrom TABLE(betfrom CHAR(1))
-	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,s,l,g,x,y,z,r,o,c',',')
+	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,s,l,g,x,y,z,r,o,c,t',',')
 
 	CREATE TABLE #WinLoss (
 		LicenseeID		INT,
