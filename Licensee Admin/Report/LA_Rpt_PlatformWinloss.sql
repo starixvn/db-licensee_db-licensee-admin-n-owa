@@ -32,14 +32,13 @@ AS
 					   2: China (a)
 					   3: Euro (e) (and Euro 12bet (u))
 					   4: New Asia (x)
-					   5: New China (y)
-					   6: New Euro (z)
-					   7: WAP (m)
-					   8: SMARTPHONE (s,l)
-					   9: Tablet (r)
-					  10: Mobile app for China (o)
-					  11: Mobile lite version (c)
-					  12: Others(t)
+					   5: New Euro (z)
+					   6: WAP (m)
+					   7: SMARTPHONE (l)
+					   8: Tablet (r)
+					   9: Mobile app for China (o)
+					  10: Mobile lite version (c)
+					  11: Others(t)
 
 	  + @excludeTest: remove currency UUS
 	  + @MoveBetsDay: The day we move tickets to bettrans14
@@ -54,7 +53,7 @@ BEGIN
 	-- supported betfrom
 	--
 	DECLARE @betfrom TABLE(betfrom CHAR(1))
-	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,s,l,g,x,y,z,r,o,c,t',',')
+	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,l,g,x,z,r,o,c,t',',')
 
 	CREATE TABLE #WinLoss (
 		LicenseeID		INT,
