@@ -1,5 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-USE [bodb_licensee]
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE [bodb02]
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_VirtualSportWinloss]
@@ -16,7 +16,7 @@ AS
 /*
 	Created by: [20140911@Florent]
 	Task: Get Virtual Sports Winloss
-	DB: DBLIC-bodb_Licensee"
+	DB: DBEXT.bodb02
 	
 	Revisions:
 		- 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
@@ -69,7 +69,7 @@ SET NOCOUNT ON
 	INSERT INTO @ChargeInfos(PartyId, ProductID, LicenseeId, IsDeposit, Rate, Fromdate, Todate)
 	(
 		SELECT c.PartyID, c.ProductID, c.LicenseeID, c.isDeposit,c.DI_Rate, c.Fromdate, c.Todate
-		FROM dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'VS') c 
+		FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'VS') c 
 	)	
 	
 	DELETE @ChargeInfos
@@ -78,7 +78,7 @@ SET NOCOUNT ON
 	DECLARE @PartyList AS TABLE (PartyId INT, PartyName	VARCHAR(100), BranchName VARCHAR(100), ParentId	INT)
 
 	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
-	EXEC dbo.LA_PartyListSel
+	EXEC bodb_licensee.dbo.LA_PartyListSel
 		
 	DELETE p
 	FROM @PartyList p
@@ -96,7 +96,7 @@ SET NOCOUNT ON
 	INSERT INTO @Charge3rdInfos ( PartyID ,IsDeposit ,ProductID ,Rate ,Fromdate ,Todate )	
 	(
 		SELECT c.PartyID, c.isDeposit, c.ProductID, c.DI_Rate, c.Fromdate, c.Todate
-		FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'VS', 'OA') c 
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'VS', 'OA') c 
 		UNION ALL
 		SELECT 999, 0, 5, 0.01, @FromDate, @ToDate
 	)	
@@ -106,7 +106,7 @@ SET NOCOUNT ON
 	-- Region: Get Echange Rate
 	SELECT DISTINCT ExchangeDate, ExchangeId, BaseCurrencyRate AS Rate
 	INTO #TempExchange
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	
 	IF @IsConvert = 0 UPDATE #TempExchange SET Rate = 1
 	-- End region: Get Exchange Rate
@@ -139,7 +139,7 @@ SET NOCOUNT ON
 		FROM bodb_licenseereport.dbo.rpt_Betting b WITH ( NOLOCK)
 			INNER JOIN @ChargeInfos c ON c.LicenseeID = b.siteID AND b.rptDate BETWEEN c.Fromdate AND c.Todate
 			INNER JOIN @Charge3rdInfos c3 ON c3.PartyID = c.ParentID AND b.rptDate BETWEEN c3.Fromdate AND c3.Todate
-			LEFT JOIN bodb02.dbo.League l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
+			LEFT JOIN dbo.League l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.status NOT IN (-1, 101, 102, 103)
 			AND (b.CurrencyID <> 20)
