@@ -56,7 +56,7 @@ BEGIN
 
 	DECLARE @tmpBalanceUpDay AS TABLE (BalanceUpDay DATE, MoveBetsDay DATE)
 	INSERT INTO @tmpBalanceUpDay(BalanceUpDay,MoveBetsDay)
-	EXEC LRF_SelBalanceUpDay
+	EXEC dbo.Age_SelBalanceUpDay
 
 	DECLARE @balanceUpDay DATE = (SELECT BalanceUpDay FROM @tmpBalanceUpDay)
 	DECLARE @previousDate DATE = DATEADD(DAY,-1, @FromDate)
