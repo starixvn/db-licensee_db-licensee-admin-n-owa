@@ -19,6 +19,7 @@ AS
 			1: official payer
 			5: non-official payer
 		+ 20190318@Mason: Add Invoice Language in SELECT statement [#110419]
+		+ 20190829@Bruce: Adding Licensee Code [#111586]
 		
 	 Params:
 	 Example:

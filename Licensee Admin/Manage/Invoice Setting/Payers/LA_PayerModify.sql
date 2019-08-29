@@ -34,6 +34,7 @@ AS
 		- 20161124@scofield: check unique BrandName
 		- 20180318@mason: Add @InvoiceLanguage parameter [#110445]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20190829@Bruce: Adding Licensee Code [#111586]
 */
 BEGIN
 	SET NOCOUNT ON

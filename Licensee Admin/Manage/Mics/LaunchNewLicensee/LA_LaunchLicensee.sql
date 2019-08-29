@@ -28,6 +28,7 @@ AS
 	Revisions:
 		- 20190107@Parsons: Launch new licensee
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20190829@Bruce: Adding Licensee Code [#111586]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
