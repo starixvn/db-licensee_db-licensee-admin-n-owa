@@ -322,8 +322,10 @@ BEGIN
 				CommisionShare = td.TurnoverForCommision * cm.Rate,  
 				CashoutShare = td.CashInAmount * ci.Rate  
 			FROM #tmpDataCB td  
-			JOIN #tmpChargeInfo AS cm ON cm.ProductID = @CB AND cm.ChargeType = @CommissionShare_ChargeType AND (td.rptDate BETWEEN cm.FromDate AND cm.ToDate)  
-			JOIN #tmpChargeInfo AS ci ON cm.ProductID = @CB AND ci.ChargeType = @CashinShare_ChargeType AND (td.rptDate BETWEEN ci.FromDate AND ci.ToDate)  
+			JOIN #tmpChargeInfo AS cm ON cm.ProductID = @CB AND cm.ChargeType = @CommissionShare_ChargeType 
+				AND (td.rptDate BETWEEN cm.FromDate AND cm.ToDate) AND cm.PartyID = td.PartyID
+			JOIN #tmpChargeInfo AS ci ON cm.ProductID = @CB AND ci.ChargeType = @CashinShare_ChargeType 
+				AND (td.rptDate BETWEEN ci.FromDate AND ci.ToDate) AND ci.PartyID = td.PartyID
 
 			INSERT INTO #tmpWinlossData(PartyID,rptDate,ProductID,CurrencyId,Winloss,ExtraAmount,AmountToCompany)  
 			SELECT PartyID, @FromDate, @CB,0,0,0
