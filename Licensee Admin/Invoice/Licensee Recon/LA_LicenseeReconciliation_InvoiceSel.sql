@@ -248,11 +248,12 @@ BEGIN
 		,@GD	SMALLINT = 11
 		,@CB	SMALLINT = 15
 		,@CO	SMALLINT = 25
+		,@BX	SMALLINT = 31
 		,@PP	SMALLINT = 32
 
 	BEGIN
-		SELECT b.SiteID,b.rptDate,b.ProductId,b.CurrencyId,b.Bettype,b.MemberWL,b.CommissionA
-			,b.WinPrizeAmount,b.CashOutAmount,b.BuyBackAmount,b.Turnover
+		SELECT b.SiteID,b.rptDate,b.ProductId,b.CurrencyId,b.Bettype,b.CommissionA,b.CommissionP
+			,b.WinPrizeAmount,b.CashOutAmount,b.BuyBackAmount,b.Turnover, ISNULL(-b.MemberWL, 0) LicWinloss
 			,CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN b.Turnover ELSE b.ExtraAmount END TurnoverForCommision
 		INTO #tmpBettingByProduct
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
@@ -269,8 +270,13 @@ BEGIN
 		--  
 		SELECT p.PartyID,b.rptDate,p.ProductId,b.CurrencyId,
 			CAST(0 AS MONEY) AS ExtraAmount,
-			SUM(ISNULL(-b.MemberWL, 0) * e.Rate) AS Winloss,
-			SUM((ISNULL(-b.MemberWL, 0) * p.Rate - (CASE WHEN b.ProductID=@BA THEN ISNULL(b.CommissionA,0) ELSE 0 END)) * e.Rate) AS AmountToCompany
+			SUM((b.LicWinloss + (CASE WHEN b.ProductID = @BX THEN b.CommissionA ELSE 0 END)) * e.Rate) AS Winloss,
+			SUM((b.LicWinloss * p.Rate - (CASE
+					WHEN b.ProductID = @BA THEN ISNULL(b.CommissionA,0)
+					WHEN b.ProductID = @BX THEN (b.CommissionA + b.CommissionP)
+					ELSE 0
+				END)
+			) * e.Rate) AS AmountToCompany
 		INTO #tmpWinlossData
 		FROM #tmpBettingByProduct b
 		INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID AND p.LicenseeId = b.SiteId AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
@@ -292,8 +298,8 @@ BEGIN
 		INSERT INTO #tmpWinlossData(PartyID,rptDate,ProductID,CurrencyId, Winloss,AmountToCompany,ExtraAmount)
 		SELECT p.PartyID,b.rptDate,p.ProductId,b.CurrencyId,0,0,
 			SUM(CASE
-				WHEN b.Bettype = @GDTip_Bettype THEN -ISNULL(b.MemberWL, 0) * p.Rate * e.Rate
-				WHEN b.Bettype = @PromotionPrize_Bettype THEN -ISNULL(b.MemberWL, 0) * e.Rate
+				WHEN b.Bettype = @GDTip_Bettype THEN b.LicWinloss * p.Rate * e.Rate
+				WHEN b.Bettype = @PromotionPrize_Bettype THEN b.LicWinloss * e.Rate
 				ELSE 0 END)
 		FROM #tmpBettingByProduct b  
 		INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID AND p.LicenseeId = b.SiteId AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)  
