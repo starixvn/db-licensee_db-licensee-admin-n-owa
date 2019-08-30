@@ -168,7 +168,8 @@ SET NOCOUNT ON
 	ORDER BY d.rptDate ASC, d.PartyName, d.sporttype, d.bettype
 	
 	Update r
-	SET PayToSupplier = GrossWinloss * ci_3rd.Rate
+	SET PayToSupplier = GrossWinloss * ci_3rd.Rate,
+		NetIncome = OneworksIncome - (GrossWinloss * ci_3rd.Rate)
 	FROM #Result r
 		INNER JOIN @Charge3rdInfos ci_3rd ON r.PartyId = ci_3rd.PartyId
 
