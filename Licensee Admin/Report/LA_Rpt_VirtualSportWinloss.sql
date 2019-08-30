@@ -30,6 +30,7 @@ AS
 		- 20180327@Harper: Add more Cozni as Parent Licensee [RedmineID: #85681]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
+		- 20190815@Parsons: Modify VS report to compute correct "pay to supplier" fee [#118337]
 
 	Param's Explanation:
 		- @FromDate   : From date
@@ -111,6 +112,20 @@ SET NOCOUNT ON
 	-- End region: Get Exchange Rate
 
 	-- Region: Return Result
+	CREATE TABLE #Result (
+		PartyId			INT,
+		PartyName		VARCHAR(100),
+		WinLossDate		DATETIME,
+		SportType		SMALLINT,
+		BetType			SMALLINT,
+		BetCount		INT,
+		Turnover		MONEY,
+		GrossWinloss	MONEY,
+		PayToSupplier	MONEY,
+		OneworksIncome	MONEY,
+		NetIncome		MONEY
+	)
+
 	;WITH d AS (
 		SELECT b.rptDate, b.currencyID, c.PartyID, c.PartyName, l.sporttype, b.bettype
 			, SUM(CASE
@@ -134,23 +149,36 @@ SET NOCOUNT ON
 			AND b.customercategory NOT IN (27,28)
 		GROUP BY b.rptDate,b.currencyID,c.PartyID,c.PartyName,l.sporttype, b.bettype
 	)
+	INSERT INTO #Result(PartyId, PartyName, WinLossDate, SportType, BetType, BetCount, Turnover, GrossWinloss, PayToSupplier, OneworksIncome, NetIncome)
 	SELECT
+		d.PartyId,
 		d.PartyName,
-		d.rptDate AS WinlostDate,
+		d.rptDate AS WinLossDate,
 		d.SportType,
 		d.BetType,
-		ISNULL(SUM(d.betcount), 0) AS BetCount,
-		CAST(ISNULL(SUM(d.turnover * ex.Rate),0) AS MONEY) AS Turnover,
-		CAST(ISNULL(SUM(d.GrossWinloss * ex.Rate),0) AS MONEY) AS GrossWinloss,
-		CAST(ISNULL(SUM(d.PayToSupplier * ex.Rate),0) AS MONEY) AS PayToSupplier,
-		CAST(ISNULL(SUM(d.OneworksIncome * ex.Rate),0) AS MONEY) AS OneworksIncome,
-		CAST(ISNULL(SUM((d.OneworksIncome - d.PayToSupplier) * ex.Rate),0) AS MONEY) AS NetIncome
+		SUM(d.betcount) AS BetCount,
+		SUM(d.turnover * ex.Rate)		AS Turnover,
+		SUM(d.GrossWinloss * ex.Rate)	AS GrossWinloss,
+		SUM(d.PayToSupplier * ex.Rate)	AS PayToSupplier,
+		SUM(d.OneworksIncome * ex.Rate)	AS OneworksIncome,
+		SUM((d.OneworksIncome - d.PayToSupplier) * ex.Rate) AS NetIncome
 	FROM d
 		INNER JOIN #TempExchange ex ON d.rptDate = ex.exchangedate and d.currencyID = ex.ExchangeId		
-	GROUP BY d.sporttype, d.bettype, d.rptDate, d.PartyName
+	GROUP BY d.PartyId, d.sporttype, d.bettype, d.rptDate, d.PartyName
 	ORDER BY d.rptDate ASC, d.PartyName, d.sporttype, d.bettype
+	
+	Update r
+	SET PayToSupplier = GrossWinloss * ci_3rd.Rate,
+		NetIncome = OneworksIncome - (GrossWinloss * ci_3rd.Rate)
+	FROM #Result r
+		INNER JOIN @Charge3rdInfos ci_3rd ON r.PartyId = ci_3rd.PartyId
+
+	SELECT PartyName, WinLossDate, SportType, BetType, BetCount, Turnover, GrossWinloss, PayToSupplier, OneworksIncome, NetIncome
+	FROM #Result
 	-- End Region: Return Result
 
 	DROP TABLE  #TempExchange	
+	DROP TABLE  #Result	
+	
 END
 GO
