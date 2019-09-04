@@ -62,7 +62,7 @@ BEGIN
 	END
 
 
-	SET @LicenseeCode = (CASE WHEN TRIM(@LicenseeCode) = '' THEN NULL ELSE TRIM(@LicenseeCode) END)
+	SET @LicenseeCode = (CASE WHEN @LicenseeCode = '' THEN NULL ELSE @LicenseeCode END)
 
 	INSERT INTO dbo.OAS_Party(PartyName, Description, PartyType) VALUES (@PayerName, 'Non-Official', 5)
 	SET @PayerId = SCOPE_IDENTITY()
