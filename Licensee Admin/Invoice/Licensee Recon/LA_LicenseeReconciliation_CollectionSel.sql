@@ -2,7 +2,7 @@
 USE bodb02
 GO
 
-CREATE PROCEDURE [dbo].LA_LicenseeReconciliation_CollectionSel
+ALTER PROCEDURE [dbo].LA_LicenseeReconciliation_CollectionSel
 	@PartyIds	VARCHAR(4000),
 	@FromDate	DATETIME,
 	@ToDate		DATETIME
@@ -27,29 +27,35 @@ BEGIN
 	INNER JOIN bodb_licensee.dbo.OAS_PartyDetail d WITH(NOLOCK) ON d.PartyID=p.PartyID
 	WHERE p.PartyType = 1
 		AND ISNULL(d.LicenseeCode, '') <> ''
-		AND p.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
+		AND p.PartyId IN (SELECT s.val FROM dbo.strSplit(@PartyIds,',') s)
 
+	CREATE TABLE #collection(CustId INT, Amount Money, CollectedDate DATE)
 	CREATE TABLE #statement(
 		CustId				INT,
-		--LicenseeCode		VARCHAR(50),
+		LicenseeCode		VARCHAR(50),
 		LicenseeName		VARCHAR(100),
-		OpeningBalance		MONEY,
+		OpeningBalance		MONEY
+	)
+
+	CREATE TABLE #tmpOB(
+		CustId				INT,
 		OpeningBalanceDate	DATE
 	)
 
 	CREATE NONCLUSTERED INDEX Idx_tmp_statement ON #statement (CustId)
+	CREATE NONCLUSTERED INDEX Idx_tmp_OB ON #tmpOB (CustId)
 
 	-- licensee code to cust id
 	-- some licensees may have same licensee code
 	-- Ex: Licensee A, Licensee B => Licensee A & Licensee B
 	--
-	INSERT INTO #statement(CustId,LicenseeName, OpeningBalance, OpeningBalanceDate)
+	INSERT INTO #statement(CustId,LicenseeName, LicenseeCode, OpeningBalance)
 	SELECT c.custid, STUFF((
 			SELECT ' & ' + lc.PartyName
 			FROM @licenseeCodeList lc 
 			WHERE c.username = lc.LicenseeCode
 			FOR XML PATH(''),TYPE).value('(./text())[1]','VARCHAR(200)')
-		,1,3,''), 0, '19000101'
+		,1,3,''), c.username, NULL
 	FROM dbo.Customer c WITH(NOLOCK)
 	INNER JOIN @licenseeCodeList l ON l.LicenseeCode=c.username
 	GROUP BY c.custid, c.Username
@@ -58,44 +64,72 @@ BEGIN
 	INSERT INTO @tmpBalanceUpDay(BalanceUpDay,MoveBetsDay)
 	EXEC dbo.Age_SelBalanceUpDay
 
-	DECLARE @balanceUpDay DATE = (SELECT BalanceUpDay FROM @tmpBalanceUpDay)
-	DECLARE @previousDate DATE = DATEADD(DAY,-1, @FromDate)
+	DECLARE @balanceUpDay DATE, @moveBetsDay DATE
+	SELECT @balanceUpDay = BalanceUpDay, @moveBetsDay = MoveBetsDay FROM @tmpBalanceUpDay
 
-	IF @previousDate >= @balanceUpDay
+	DECLARE @OpeningBalanceDate DATE = DATEADD(DAY,-1,@FromDate)
+	DECLARE @step TINYINT = 0
+
+	-- rptTotalBalance_Active
+	-- step 1
+	IF @FromDate > @moveBetsDay
 	BEGIN
-		UPDATE s SET
-			OpeningBalance = a.OpeningBalance,
-			OpeningBalanceDate = a.WinlostDate
+		SET @step = 1
+
+		INSERT INTO #tmpOB(CustId,OpeningBalanceDate)
+		SELECT a.CustID, MAX(a.WinlostDate)
 		FROM #statement s
 		INNER JOIN bodb_Report.dbo.rptTotalBalance_Active a WITH(NOLOCK) ON s.CustId = a.CustID
-		WHERE a.WinlostDate = @previousDate
+		WHERE a.WinlostDate < @FromDate
+		GROUP BY a.CustID
+
+		UPDATE s SET OpeningBalance = a.OpeningBalance
+		FROM #statement s
+		INNER JOIN #tmpOB t ON t.CustId=s.CustId
+		INNER JOIN bodb_Report.dbo.rptTotalBalance_Active a WITH(NOLOCK) ON t.CustId = a.CustID AND t.OpeningBalanceDate=a.WinlostDate
 	END
-	ELSE
+
+	-- rptstatement
+	-- step 2
+	IF (@FromDate > @balanceUpDay AND @FromDate <= @moveBetsDay) OR (EXISTS (SELECT TOP 1 1 FROM #statement WHERE OpeningBalance IS NULL) AND @step = 1)
 	BEGIN
-		;WITH cte_OpeningBalanceDate AS (
-			SELECT MAX(rs.accdate) accdate, rs.custid
-			FROM #statement s INNER JOIN bodb_Report.dbo.Statement rs WITH (NOLOCK) ON s.CustId = rs.custid
-			WHERE rs.transtype = 'Bal'
-				AND rs.transdesc = 'OPENING BALANCE'
-				AND rs.accdate <= @previousDate
-			GROUP BY rs.custid
-		)
-		UPDATE s SET OpeningBalanceDate = ob.accdate, OpeningBalance = r.totalamt
-		FROM #statement s INNER JOIN cte_OpeningBalanceDate ob ON s.CustId = ob.custid
-		INNER JOIN bodb_Report.dbo.Statement r WITH (NOLOCK) ON r.custid=s.CustId and r.accdate=ob.accdate
+		DELETE #tmpOB
+		SET @step = 2
+
+		INSERT INTO #tmpOB(CustId,OpeningBalanceDate)
+		SELECT a.CustID, MAX(a.WinlostDate)
+		FROM #statement s
+		INNER JOIN bodb_report.dbo.rptstatement a WITH(NOLOCK) ON s.CustId = a.CustID
+		WHERE a.WinlostDate < @FromDate AND s.OpeningBalance IS NULL
+		GROUP BY a.CustID
+		
+		UPDATE s SET OpeningBalance = a.OpeningBalance
+		FROM #statement s
+		INNER JOIN #tmpOB t ON t.CustId=s.CustId
+		INNER JOIN bodb_Report.dbo.rptstatement a WITH(NOLOCK) ON t.CustId = a.CustID AND t.OpeningBalanceDate=a.WinlostDate
 	END
 
-	;WITH cte_OpeningBalance AS(
-		SELECT tf.custid, SUM(tf.winlost - tf.actual_stake) amount
-		FROM bodb_archive.dbo.transfer_fi tf WITH(NOLOCK)
-		INNER JOIN #statement s ON s.CustId=tf.custid
-		WHERE tf.winlostdate BETWEEN s.OpeningBalanceDate AND @previousDate
-		GROUP BY tf.custid
-	)
-	UPDATE st SET OpeningBalance = (OpeningBalance + ob.amount)
-	FROM #statement st INNER JOIN cte_OpeningBalance ob ON st.CustId = ob.custid
+	-- rptstatement_Old
+	-- step 3
+	IF @FromDate <= @balanceUpDay OR (EXISTS (SELECT TOP 1 1 FROM #statement WHERE OpeningBalance IS NULL) AND @step = 2)
+	BEGIN
+		DELETE #tmpOB
+		SET @step = 3
 
-	CREATE TABLE #collection(CustId INT, Amount Money, CollectedDate DATE)
+		INSERT INTO #tmpOB(CustId,OpeningBalanceDate)
+		SELECT a.CustID, MAX(a.WinlostDate)
+		FROM #statement s
+		INNER JOIN bodb_report.dbo.rptstatement_Old a WITH(NOLOCK) ON s.CustId = a.CustID
+		WHERE a.WinlostDate < @FromDate AND s.OpeningBalance IS NULL
+		GROUP BY a.CustID
+		
+		UPDATE s SET OpeningBalance = a.OpeningBalance
+		FROM #statement s
+		INNER JOIN #tmpOB t ON t.CustId=s.CustId
+		INNER JOIN bodb_Report.dbo.rptstatement a WITH(NOLOCK) ON t.CustId = a.CustID AND t.OpeningBalanceDate=a.WinlostDate
+	END
+
+	UPDATE #statement SET OpeningBalance = 0 WHERE OpeningBalance iS NULL
 
 	IF @ToDate >= @balanceUpDay
 	BEGIN
@@ -124,5 +158,6 @@ BEGIN
 
 	DROP TABLE #statement
 	DROP TABLE #collection
+	DROP TABLE #tmpOB
 END
 GO
