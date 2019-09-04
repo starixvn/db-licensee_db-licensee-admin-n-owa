@@ -35,7 +35,8 @@ BEGIN
 			ISNULL(d.BaseCurrencyId, 0)		AS BaseCurrencyId, 
 			ISNULL(p.OldRefID, 0)			AS LicenseeId,   
 			ISNULL(d.InvoiceLanguage, '')	AS InvoiceLanguage,
-			ISNULL(c.CurrencyCount, 0)		AS CurrencyCount
+			ISNULL(c.CurrencyCount, 0)		AS CurrencyCount,
+			ISNULL(d.LicenseeCode, '')		AS LicenseeCode
 	FROM OAS_Party p WITH(NOLOCK)
 	INNER JOIN OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID = d.PartyID
 	LEFT JOIN @tblLicenseeCurrency c ON c.LicenseeId = p.OldRefID
