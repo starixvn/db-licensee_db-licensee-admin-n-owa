@@ -2,7 +2,7 @@
 USE [bodb_Licensee]
 GO
 
-CREATE PROCEDURE [dbo].[LA_LicenseeReconciliation_InvoiceSel]
+ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_InvoiceSel]
 	@PartyIds		VARCHAR(4000),
 	@FromDate		DATETIME,
 	@ToDate			DATETIME,
@@ -382,6 +382,7 @@ BEGIN
 			,CAST(SUM(ISNULL(a.Winloss,0)) AS MONEY) Winloss
 			,CAST(0 AS MONEY) LicensingFee
 			,CAST(0 AS MONEY) Discount
+			,CAST(0 AS MONEY) Rebate
 			,CAST(0 AS MONEY) MinFee
 			,CAST(0 AS BIT) IsApplyMinfeeToDiscount
 		INTO #tmpResult
@@ -580,7 +581,7 @@ BEGIN
 		AND c.ProductId = r.ProductId
 
 	-- calculate rebate
-	UPDATE r SET Discount = r.Discount + (r.LicensingFee - r.Discount) * c.Rate
+	UPDATE r SET Rebate =(r.LicensingFee - r.Discount) * c.Rate
 	FROM #tmpResult r INNER JOIN @tmpRebateSettings c ON r.PartyId = c.PartyID AND r.ProductId = c.ProductId
 
 /*-----------------
@@ -630,6 +631,7 @@ BEGIN
 			, SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
 			, SUM(r.LicensingFee + r.ExtraAmount) LicensingFee
 			, SUM(r.Discount) Discount
+			, SUM(r.Rebate) Rebate
 		FROM #tmpResult r
 		INNER JOIN @partyList p ON r.PartyID=p.PartyId
 		INNEr JOIN @productList pl ON r.ProductID = pl.ProductId
@@ -644,6 +646,7 @@ BEGIN
 				, SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
 				, SUM(r.LicensingFee + r.ExtraAmount) LicensingFee
 				, SUM(r.Discount) Discount
+				, SUM(r.Rebate) Rebate
 			FROM #tmpResult r
 			GROUP BY r.PartyId
 		), b AS (
@@ -664,6 +667,7 @@ BEGIN
 			,SUM(a.AmountToCompany)			AS AmountToCompany
 			,SUM(a.LicensingFee)			AS LicensingFee
 			,SUM(a.Discount)				AS Discount
+			,SUM(a.Rebate)					AS Rebate
 			,SUM(ISNULL(b.Prepayment,0))	AS Prepayment
 			,SUM(ISNULL(b.Others,0))		AS Others
 		FROM a LEFT JOIN b ON a.PartyID=b.PartyId
