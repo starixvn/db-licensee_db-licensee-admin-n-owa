@@ -32,9 +32,9 @@ BEGIN
 	-- licensee code to cust id
 	-- some licensees may have same licensee code
 	--
-	DECLARE @customer AS TABLE (CustId INT,Username VARCHAR(50))
+	DECLARE @customer AS TABLE (CustId INT,Username VARCHAR(50), sitename VARCHAR(10))
 	INSERT INTO @customer
-	SELECT custid, Username
+	SELECT custid, Username, [site]
 	FROM dbo.Customer WITH(NOLOCK)
 	WHERE username IN (SELECT LicenseeCode FROM @licenseeCodeList)
 
@@ -45,10 +45,7 @@ BEGIN
 	SELECT s.custid, s.username, c.CustId, c.Username
 	FROM dbo.Dep_CustSuper s WITH(NOLOCK)
 	INNER JOIN bodb_licensee.dbo.Licensees l WITH(NOLOCK) ON s.[site] = l.LicenseeName AND l.IsDeposit = 1
-	INNER JOIN bodb_licensee.dbo.OAS_Party p WITH(NOLOCK) ON l.LicenseeID = p.OldRefID AND p.PartyType = 1
-	INNER JOIN bodb_licensee.dbo.OAS_PartyDetail d WITH(NOLOCK) ON d.PartyID = p.PartyID
-	INNER JOIN @customer c ON c.Username = d.LicenseeCode
-	WHERE ISNULL(d.LicenseeCode, '') <> ''
+	INNER JOIN @customer c ON s.[site] = c.sitename
 
 	DECLARE @tmpBalanceUpDay AS TABLE (BalanceUpDay DATE, MoveBetsDay DATE)
 	INSERT INTO @tmpBalanceUpDay(BalanceUpDay,MoveBetsDay)
