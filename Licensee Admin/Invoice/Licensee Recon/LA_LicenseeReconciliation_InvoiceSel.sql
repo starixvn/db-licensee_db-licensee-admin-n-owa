@@ -389,8 +389,8 @@ BEGIN
 		GROUP BY a.PartyID, a.ProductId  
 
 		-- treat negative as 0  
-		-- excepts: BA,CB,CO
-		UPDATE #tmpResult SET LicensingFee = CASE WHEN ProductID NOT IN (@BA,@CB,@CO) AND AmountToCompany < 0 THEN 0 ELSE AmountToCompany END  
+		-- excepts: BA, CB, CO, BX
+		UPDATE #tmpResult SET LicensingFee = CASE WHEN ProductID NOT IN (@BA,@CB,@CO,@BX) AND AmountToCompany < 0 THEN 0 ELSE AmountToCompany END
 	END
 /*-----------------
  * minfee
