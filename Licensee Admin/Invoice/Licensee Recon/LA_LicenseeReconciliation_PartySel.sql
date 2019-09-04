@@ -40,7 +40,7 @@ BEGIN
 	INNER JOIN dbo.OAS_Party p2 WITH(NOLOCK) ON p.PartyId=p2.PartyID
 	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyId=d.PartyID
 	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON d.BaseCurrencyId=e.exchangeid
-	WHERE d.IsDeposit = 1 AND p.ParentId > 0
+	WHERE d.IsDeposit = 1 AND p.ParentId > 0 AND d.StatusId = 1
 	UNION ALL
 	SELECT PartyId, PartyName,0,0,'','' FROM @partyList WHERE ParentId = 0
 END

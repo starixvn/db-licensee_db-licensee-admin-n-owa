@@ -24,19 +24,19 @@ BEGIN
 	DECLARE @ToDate DATE =  DATEADD(DAY, -1, DATEADD(MONTH, 1, @FromDate))
 
 	-- get licensee code list
-	DECLARE @licenseeCodeList TABLE (PartyId INT, LicenseeCode VARCHAR(50))
-	INSERT INTO @licenseeCodeList(PartyId,LicenseeCode)
-	SELECT PartyID, LicenseeCode FROM bodb_licensee.dbo.OAS_PartyDetail WITH(NOLOCK) WHERE ISNULL(LicenseeCode, '') <> ''
+	DECLARE @licenseeCodeList TABLE (LicenseeCode VARCHAR(50))
+	INSERT INTO @licenseeCodeList(LicenseeCode)
+	SELECT LicenseeCode FROM bodb_licensee.dbo.OAS_PartyDetail WITH(NOLOCK)
+	WHERE ISNULL(LicenseeCode, '') <> '' AND PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
 
 	-- licensee code to cust id
 	-- some licensees may have same licensee code
 	--
 	DECLARE @customer AS TABLE (CustId INT,Username VARCHAR(50))
 	INSERT INTO @customer
-	SELECT DISTINCT c.custid, c.Username
-	FROM dbo.Customer c WITH(NOLOCK)
-	INNER JOIN @licenseeCodeList l ON l.LicenseeCode=c.username
-	WHERE l.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
+	SELECT custid, Username
+	FROM dbo.Customer WITH(NOLOCK)
+	WHERE username IN (SELECT LicenseeCode FROM @licenseeCodeList)
 
 	-- licensee super
 	--
