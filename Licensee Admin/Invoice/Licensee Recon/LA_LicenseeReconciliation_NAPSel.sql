@@ -26,16 +26,17 @@ BEGIN
 	-- get licensee code list
 	DECLARE @licenseeCodeList TABLE (LicenseeCode VARCHAR(50))
 	INSERT INTO @licenseeCodeList(LicenseeCode)
-	SELECT LicenseeCode FROM bodb_licensee.dbo.OAS_PartyDetail WITH(NOLOCK)
+	SELECT LicenseeCode FROM DBCUST.bodb_licensee.dbo.OAS_PartyDetail WITH(NOLOCK)
 	WHERE ISNULL(LicenseeCode, '') <> '' AND PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
 
 	-- licensee code to cust id
 	-- some licensees may have same licensee code
 	--
-	DECLARE @customer AS TABLE (CustId INT,Username VARCHAR(50), sitename VARCHAR(10))
+	DECLARE @customer AS TABLE (CustId INT, Username VARCHAR(50), LicenseeName VARCHAR(50))
 	INSERT INTO @customer
-	SELECT custid, Username, [site]
-	FROM dbo.Customer WITH(NOLOCK)
+	SELECT c.custid, c.Username, t.LicenseeName
+	FROM dbo.Customer c WITH(NOLOCK)
+	INNER JOIN DBCUST.bodb_licensee.dbo.LicenseeTransferCode t WITH(NOLOCK) ON c.CustId = t.CustId
 	WHERE username IN (SELECT LicenseeCode FROM @licenseeCodeList)
 
 	-- licensee super
@@ -44,8 +45,7 @@ BEGIN
 	INSERT INTO @super(SuperId, SuperCode, CustId, LicenseeCode)
 	SELECT s.custid, s.username, c.CustId, c.Username
 	FROM dbo.Dep_CustSuper s WITH(NOLOCK)
-	INNER JOIN bodb_licensee.dbo.Licensees l WITH(NOLOCK) ON s.[site] = l.LicenseeName AND l.IsDeposit = 1
-	INNER JOIN @customer c ON s.[site] = c.sitename
+	INNER JOIN @customer c ON s.[site] = c.LicenseeName
 
 	DECLARE @tmpBalanceUpDay AS TABLE (BalanceUpDay DATE, MoveBetsDay DATE)
 	INSERT INTO @tmpBalanceUpDay(BalanceUpDay,MoveBetsDay)
