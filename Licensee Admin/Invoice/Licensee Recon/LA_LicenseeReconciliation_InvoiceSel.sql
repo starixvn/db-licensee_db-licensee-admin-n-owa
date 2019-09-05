@@ -30,7 +30,11 @@ BEGIN
  *-----------------*/
 	-- get base currency
 	--
-	DECLARE @baseCurrencyId INT = (SELECT CurrencyId FROM dbo.LA_f_BaseCurrency() WHERE CurrencyName=@BaseCurrency)
+	DECLARE @baseCurrencyId INT = (
+		SELECT Currencyid 
+		FROM OPENQUERY(DBCUST, 'EXEC CustDB.dbo.LA_BaseCurrency_Sel') 
+		WHERE CurrencyName = @BaseCurrency
+	)
 
 	-- supported products
 	-- 
