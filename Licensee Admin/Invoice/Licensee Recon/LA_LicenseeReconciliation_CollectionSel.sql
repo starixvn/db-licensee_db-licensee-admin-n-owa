@@ -19,15 +19,20 @@ BEGIN
 	SET NOCOUNT ON
 
 	-- get licensee code list
-	--
-	DECLARE @licenseeCodeList TABLE (PartyId INT, PartyName VARCHAR(50), LicenseeCode VARCHAR(50))
-	INSERT INTO @licenseeCodeList(PartyId, PartyName,LicenseeCode)
-	SELECT p.PartyID, p.PartyName, d.LicenseeCode
-	FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
-	INNER JOIN bodb_licensee.dbo.OAS_PartyDetail d WITH(NOLOCK) ON d.PartyID=p.PartyID
-	WHERE p.PartyType = 1
-		AND ISNULL(d.LicenseeCode, '') <> ''
-		AND p.PartyId IN (SELECT s.val FROM dbo.strSplit(@PartyIds,',') s)
+	CREATE TABLE #licensees (
+		CustId			INT,
+		PartyId			INT,
+		BaseCurrencyId	INT,
+		ParentId		INT,
+		LicenseeName	VARCHAR(50),
+		BaseCurrencyCode VARCHAR(5),
+		LicenseeCode	VARCHAR(50)
+	)
+	
+	INSERT INTO #licensees(PartyId,BaseCurrencyId,ParentId,LicenseeName,BaseCurrencyCode,LicenseeCode)
+	EXEC('EXEC bodb_licensee.dbo.LA_LicenseeReconciliation_PartySel') AT DBCUST
+
+	DELETE #licensees WHERE PartyId NOT IN (SELECT val FROM dbo.strSplit(@PartyIds,',')) OR ISNULL(LicenseeCode,'')=''
 
 	CREATE TABLE #collection(CustId INT, Amount Money, CollectedDate DATE)
 	CREATE TABLE #statement(
@@ -51,13 +56,13 @@ BEGIN
 	--
 	INSERT INTO #statement(CustId,LicenseeName, LicenseeCode, OpeningBalance)
 	SELECT c.custid, STUFF((
-			SELECT ' & ' + lc.PartyName
-			FROM @licenseeCodeList lc 
+			SELECT ' & ' + lc.LicenseeName
+			FROM #licensees lc 
 			WHERE c.username = lc.LicenseeCode
 			FOR XML PATH(''),TYPE).value('(./text())[1]','VARCHAR(200)')
 		,1,3,''), c.username, NULL
 	FROM dbo.Customer c WITH(NOLOCK)
-	INNER JOIN @licenseeCodeList l ON l.LicenseeCode=c.username
+	INNER JOIN #licensees l ON l.LicenseeCode=c.username
 	GROUP BY c.custid, c.Username
 
 	DECLARE @tmpBalanceUpDay AS TABLE (BalanceUpDay DATE, MoveBetsDay DATE)
@@ -159,5 +164,6 @@ BEGIN
 	DROP TABLE #statement
 	DROP TABLE #collection
 	DROP TABLE #tmpOB
+	DROP TABLE #licensees
 END
 GO

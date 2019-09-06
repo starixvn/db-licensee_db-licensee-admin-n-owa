@@ -1,19 +1,42 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
 GO
 
-ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_PartySel]
+create PROCEDURE [dbo].[LA_LicenseeReconciliation_PartySel]
 AS
 /*	Header:
 	Task : Get list of licensee for Reconciliation report
-	DB: DBLIC.bodb_Licensee
+	DB: DBCUST-bodb_licensee
 
 	Revisions: 
 		- 20190723@Bruce: Create Sp [#111586]
 */
 BEGIN
 	SET NOCOUNT ON
+	
+	-- get licensees have mapped in oas_party
+	--
+	SELECT tc.CustId,d.LicenseeCode,d.BaseCurrencyId
+		, CAST(NULL AS INT) ParentId
+		, ISNULL(d.partyId, tc.CustId) PartyId
+		, tc.LicenseeName AS PartyName
+	INTO #licensees
+	FROM bodb_licensee.dbo.LicenseeTransferCode tc WITH(NOLOCK)
+	LEFT JOIN bodb_licensee.dbo.Licensees l WITH(NOLOCK) ON tc.LicenseeName=l.LicenseeName
+	LEFT JOIN bodb_licensee.dbo.oas_party p WITH(NOLOCK) ON l.LicenseeID=p.OldRefID AND p.PartyType IN (1,5)
+	LEFT JOIN bodb_licensee.dbo.oas_partydetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
+	WHERE tc.statusid=1
+	
+	-- for those licensees haven't mapped
+	-- get data from dbo.customer
+	--
+	UPDATE l SET LicenseeCode = c.username, BaseCurrencyId = c.currency
+	FROM #licensees l
+	INNER JOIN CustDB.dbo.Customer c WITH(NOLOCK) ON l.CustId=c.CustId
+	WHERE ISNULL(l.LicenseeCode,'') = ''
 
+	-- get party list in LA system
+	--
 	DECLARE @partyList TABLE(
 		PartyId				INT,
 		PartyName			VARCHAR(50),
@@ -27,21 +50,38 @@ BEGIN
 	INSERT INTO @partyList(PartyId,PartyName,BrandName,ParentId)
 	EXEC dbo.LA_PartyListNonOfficialSel
 
-	-- Remove credit licensees
+	DELETE @partyList WHERE ParentId = 999 OR (PartyId = 999 AND ParentId = 0) -- Remove credit licensees
+
+	-- map billing group
 	--
-	DELETE @partyList WHERE ParentId = 999 OR (PartyId = 999 AND ParentId = 0)
+	UPDATE l SET ParentId = pl.ParentId
+	FROM #licensees l
+	INNER JOIN @partyList pl ON l.PartyId = pl.PartyId
+	WHERE pl.ParentId > 0
+
+	-- licensees don't have group
+	-- put them to Undefined group
+	--
+	DECLARE @OtherGroup INT = 1000000
+	UPDATE #licensees SET ParentId = @OtherGroup WHERE ParentId IS NULL
+
+	DECLARE @billingGroup TABLE(GroupId INT)
+	INSERT INTO @billingGroup SELECT DISTINCT ParentId FROM #licensees
 
 	-- select data
 	--
-	SELECT p.PartyId, p.PartyName, d.BaseCurrencyId, p.ParentId
+	SELECT l.PartyId, l.BaseCurrencyId, l.ParentId,l.PartyName
 		, e.Code AS BaseCurrencyCode
-		, CASE WHEN ISNULL(d.LicenseeCode,'') = '' THEN CAST(p.PartyID AS VARCHAR(10)) ELSE d.LicenseeCode END LicenseeCode
-	FROM @partyList p
-	INNER JOIN dbo.OAS_Party p2 WITH(NOLOCK) ON p.PartyId=p2.PartyID
-	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyId=d.PartyID
-	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON d.BaseCurrencyId=e.exchangeid
-	WHERE d.IsDeposit = 1 AND p.ParentId > 0 AND d.StatusId = 1
+		, l.LicenseeCode
+	FROM #licensees l
+	INNER JOIN CustDB.dbo.Exchange e WITH(NOLOCK) ON l.BaseCurrencyId=e.exchangeid
+	WHERE ISNULL(l.LicenseeCode,'') <> ''
 	UNION ALL
-	SELECT PartyId, PartyName,0,0,'','' FROM @partyList WHERE ParentId = 0
+	SELECT PartyId, 0, 0, PartyName, '', '' FROM @partyList
+	WHERE ParentId = 0 AND PartyId IN (SELECT GroupId FROM @billingGroup)
+	UNION ALL
+	SELECT @OtherGroup, 0, 0, 'Others', '', '' FROM @billingGroup WHERE GroupId = @OtherGroup
+
+	DROP TABLE #licensees
 END
 GO

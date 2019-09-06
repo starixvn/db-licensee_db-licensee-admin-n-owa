@@ -24,28 +24,32 @@ BEGIN
 	DECLARE @ToDate DATE =  DATEADD(DAY, -1, DATEADD(MONTH, 1, @FromDate))
 
 	-- get licensee code list
-	DECLARE @licenseeCodeList TABLE (LicenseeCode VARCHAR(50))
-	INSERT INTO @licenseeCodeList(LicenseeCode)
-	SELECT LicenseeCode FROM DBCUST.bodb_licensee.dbo.OAS_PartyDetail WITH(NOLOCK)
-	WHERE ISNULL(LicenseeCode, '') <> '' AND PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
+	CREATE TABLE #licensees (
+		CustId			INT,
+		PartyId			INT,
+		BaseCurrencyId	INT,
+		ParentId		INT,
+		LicenseeName	VARCHAR(50),
+		BaseCurrencyCode VARCHAR(5),
+		LicenseeCode	VARCHAR(50),
+		SuperId			INT,
+		SuperCode		VARCHAR(50)
+	)
+	
+	INSERT INTO #licensees(PartyId,BaseCurrencyId,ParentId,LicenseeName,BaseCurrencyCode,LicenseeCode)
+	EXEC('EXEC bodb_licensee.dbo.LA_LicenseeReconciliation_PartySel') AT DBCUST
 
-	-- licensee code to cust id
-	-- some licensees may have same licensee code
-	--
-	DECLARE @customer AS TABLE (CustId INT, Username VARCHAR(50), LicenseeName VARCHAR(50))
-	INSERT INTO @customer
-	SELECT c.custid, c.Username, t.LicenseeName
-	FROM dbo.Customer c WITH(NOLOCK)
-	INNER JOIN DBCUST.bodb_licensee.dbo.LicenseeTransferCode t WITH(NOLOCK) ON c.CustId = t.CustId
-	WHERE username IN (SELECT LicenseeCode FROM @licenseeCodeList)
+	DELETE #licensees WHERE PartyId NOT IN (SELECT val FROM dbo.strSplit(@PartyIds,',')) OR ISNULL(LicenseeCode,'')=''
+
+	UPDATE l SET custid=c.custid
+	FROM #licensees l
+	INNER JOIN dbo.Customer c WITH(NOLOCK) on c.username=l.LicenseeCode	
 
 	-- licensee super
 	--
-	DECLARE @super AS TABLE(SuperId INT, SuperCode VARCHAR(50), CustId INT, LicenseeCode VARCHAR(50))
-	INSERT INTO @super(SuperId, SuperCode, CustId, LicenseeCode)
-	SELECT s.custid, s.username, c.CustId, c.Username
+	UPDATE c SET superid= s.custid, SuperCode = s.username
 	FROM dbo.Dep_CustSuper s WITH(NOLOCK)
-	INNER JOIN @customer c ON s.[site] = c.LicenseeName
+	INNER JOIN #licensees c ON s.[site] = c.LicenseeName
 
 	DECLARE @tmpBalanceUpDay AS TABLE (BalanceUpDay DATE, MoveBetsDay DATE)
 	INSERT INTO @tmpBalanceUpDay(BalanceUpDay,MoveBetsDay)
@@ -86,10 +90,11 @@ BEGIN
 	SELECT SUM(a.Amount) Amount, c.LicenseeCode, c.SuperCode AS Super
 	FROM #transfer a
 	INNER JOIN #transfer b ON a.refno = b.refno
-	INNER JOIN @super c ON a.custid = c.CustId and b.custid = c.SuperId
+	INNER JOIN #licensees c ON a.custid = c.CustId and b.custid = c.SuperId
 	GROUP BY c.LicenseeCode, c.SuperCode
 	HAVING SUM(a.Amount) <> 0
 
 	DROP TABLE #transfer
+	DROP TABLE #licensees
 END
 GO
