@@ -30,10 +30,9 @@ AS
 	Explanation:
 		- Desktop: contain the followings:
 			Asia:		betfrom = d,g
-			China:		betfrom = a
+			China:		betfrom = a,z
 			Euro:		betfrom = e,u
 			New Asia:	betfrom = x
-			New Euro:	betfrom = z
 		- Mobile: contain the followings:
 			WAP:	betfrom = m
 			Smart:	betfrom = l

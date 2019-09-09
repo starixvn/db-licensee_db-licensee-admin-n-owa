@@ -27,12 +27,11 @@ AS
 		- 20190827@Bruce: Add new betfrom 't' [#118998]
 
 	Explanation:
-	  + @PlatformType: 0: All
+	  + @PlatformType:
 					   1: Asia (d,g)
-					   2: China (a)
-					   3: Euro (e) (and Euro 12bet (u))
-					   4: New Asia (x)
-					   5: New Euro (z)
+					   2: New Asia (x)
+					   3: China (a,z)
+					   4: Euro (e,u)
 					   6: WAP (m)
 					   7: SMARTPHONE (l)
 					   8: Tablet (r)
