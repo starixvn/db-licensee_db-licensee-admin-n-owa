@@ -30,16 +30,14 @@ BEGIN
 	--
 	DECLARE @partyList AS TABLE(
 		PartyId			INT,
-		PartyName		VARCHAR(50),
 		LicenseeCode	VARCHAR(50),
 		CurrencyName	VARCHAR(5)
 	)
-	INSERT INTO @partyList(PartyId, PartyName, LicenseeCode, CurrencyName)
-	SELECT p.PartyID, p.PartyName, d.LicenseeCode, b.CurrencyName
-	FROM dbo.OAS_Party p WITH(NOLOCK)
-	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
+	INSERT INTO @partyList(PartyId, LicenseeCode, CurrencyName)
+	SELECT d.PartyID, d.LicenseeCode, b.CurrencyName
+	FROM dbo.OAS_PartyDetail d WITH(NOLOCK)
 	INNER JOIN @baseCurrencyList b ON d.BaseCurrencyId = b.CurrencyId
-	WHERE p.PartyID IN(SELECT val FROM dbo.strSplit(@PartyIds, ',')) AND d.LicenseeCode IS NOT NULL
+	WHERE d.PartyID IN(SELECT val FROM dbo.strSplit(@PartyIds, ',')) AND d.LicenseeCode IS NOT NULL
 
 	DECLARE @AmountTypeSoftwareFee INT = 1
 	DECLARE @AmountTypeSetupFee INT = 7
@@ -65,12 +63,6 @@ BEGIN
 	SELECT p.LicenseeCode, p.CurrencyName
 		, SUM(ISNULL(s.Amount,0) - ISNULL(s.Prepayment,0)) LicensingFee
 		, SUM(s.Prepayment) Prepayment
-		, STUFF((
-			SELECT ' & ' + lc.PartyName
-			FROM @partyList lc 
-			WHERE p.LicenseeCode = lc.LicenseeCode
-			FOR XML PATH(''),TYPE).value('(./text())[1]','VARCHAR(200)')
-		,1,3,'') PartyName
 	FROM @partyList p
 	INNER JOIN @statement s ON p.PartyId = s.PartyId
 	GROUP BY p.LicenseeCode, p.CurrencyName

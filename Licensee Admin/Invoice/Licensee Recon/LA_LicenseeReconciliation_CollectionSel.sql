@@ -18,27 +18,13 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	-- get licensee code list
-	CREATE TABLE #licensees (
-		CustId			INT,
-		PartyId			INT,
-		BaseCurrencyId	INT,
-		ParentId		INT,
-		LicenseeName	VARCHAR(50),
-		BaseCurrencyCode VARCHAR(5),
-		LicenseeCode	VARCHAR(50)
-	)
-	
-	INSERT INTO #licensees(PartyId,BaseCurrencyId,ParentId,LicenseeName,BaseCurrencyCode,LicenseeCode)
-	EXEC('EXEC bodb_licensee.dbo.LA_LicenseeReconciliation_PartySel') AT DBCUST
-
-	DELETE #licensees WHERE PartyId NOT IN (SELECT val FROM dbo.strSplit(@PartyIds,',')) OR ISNULL(LicenseeCode,'')=''
+	DECLARE @partyIdList TABLE(Id INT)
+	INSERT INTO @partyIdList SELECT val FROM dbo.strSplit(@PartyIds,',')
 
 	CREATE TABLE #collection(CustId INT, Amount Money, CollectedDate DATE)
 	CREATE TABLE #statement(
 		CustId				INT,
 		LicenseeCode		VARCHAR(50),
-		LicenseeName		VARCHAR(100),
 		OpeningBalance		MONEY
 	)
 
@@ -50,21 +36,26 @@ BEGIN
 	CREATE NONCLUSTERED INDEX Idx_tmp_statement ON #statement (CustId)
 	CREATE NONCLUSTERED INDEX Idx_tmp_OB ON #tmpOB (CustId)
 
-	-- licensee code to cust id
-	-- some licensees may have same licensee code
-	-- Ex: Licensee A, Licensee B => Licensee A & Licensee B
+	-- map licensee
 	--
-	INSERT INTO #statement(CustId,LicenseeName, LicenseeCode, OpeningBalance)
-	SELECT c.custid, STUFF((
-			SELECT ' & ' + lc.LicenseeName
-			FROM #licensees lc 
-			WHERE c.username = lc.LicenseeCode
-			FOR XML PATH(''),TYPE).value('(./text())[1]','VARCHAR(200)')
-		,1,3,''), c.username, NULL
-	FROM dbo.Customer c WITH(NOLOCK)
-	INNER JOIN #licensees l ON l.LicenseeCode=c.username
-	GROUP BY c.custid, c.Username
+	INSERT INTO #statement(CustId,LicenseeCode)
+	SELECT c.CustId, c.username
+	FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+	INNER JOIN bodb_licensee.dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
+	INNER JOIN @partyIdList pl ON pl.Id = p.PartyID
+	INNER JOIN dbo.Customer c WITH(NOLOCK) on c.username=d.LicenseeCode
+	WHERE p.PartyType IN (1,5) AND pl.Id > 0
 
+	-- map unidentified licensees
+	-- indicated by -custid
+	INSERT INTO #statement(CustId,LicenseeCode)
+	SELECT c.custid, c.username
+	FROM dbo.Customer c WITH(NOLOCK)
+	INNER JOIN @partyIdList pl ON c.custid = -pl.Id
+	WHERE pl.Id < 0
+
+	-- balance up day
+	--
 	DECLARE @tmpBalanceUpDay AS TABLE (BalanceUpDay DATE, MoveBetsDay DATE)
 	INSERT INTO @tmpBalanceUpDay(BalanceUpDay,MoveBetsDay)
 	EXEC dbo.Age_SelBalanceUpDay
@@ -164,6 +155,5 @@ BEGIN
 	DROP TABLE #statement
 	DROP TABLE #collection
 	DROP TABLE #tmpOB
-	DROP TABLE #licensees
 END
 GO

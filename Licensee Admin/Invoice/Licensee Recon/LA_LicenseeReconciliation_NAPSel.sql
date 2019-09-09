@@ -23,33 +23,41 @@ BEGIN
 	DECLARE @FromDate DATE = DATEADD(MONTH, DATEDIFF(MONTH, 0, @ReportMonth) + 1, 0)
 	DECLARE @ToDate DATE =  DATEADD(DAY, -1, DATEADD(MONTH, 1, @FromDate))
 
+	DECLARE @partyIdList TABLE(Id INT)
+	INSERT INTO @partyIdList SELECT val FROM dbo.strSplit(@PartyIds,',')
+
 	-- get licensee code list
 	CREATE TABLE #licensees (
 		CustId			INT,
-		PartyId			INT,
-		BaseCurrencyId	INT,
-		ParentId		INT,
-		LicenseeName	VARCHAR(50),
-		BaseCurrencyCode VARCHAR(5),
 		LicenseeCode	VARCHAR(50),
 		SuperId			INT,
 		SuperCode		VARCHAR(50)
 	)
-	
-	INSERT INTO #licensees(PartyId,BaseCurrencyId,ParentId,LicenseeName,BaseCurrencyCode,LicenseeCode)
-	EXEC('EXEC bodb_licensee.dbo.LA_LicenseeReconciliation_PartySel') AT DBCUST
 
-	DELETE #licensees WHERE PartyId NOT IN (SELECT val FROM dbo.strSplit(@PartyIds,',')) OR ISNULL(LicenseeCode,'')=''
+	-- map licensee
+	--
+	INSERT INTO #licensees(CustId,LicenseeCode)
+	SELECT c.CustId, c.username
+	FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+	INNER JOIN bodb_licensee.dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
+	INNER JOIN @partyIdList pl ON pl.Id = p.PartyID
+	INNER JOIN dbo.Customer c WITH(NOLOCK) on c.username=d.LicenseeCode
+	WHERE p.PartyType IN (1,5) AND pl.Id > 0
 
-	UPDATE l SET custid=c.custid
-	FROM #licensees l
-	INNER JOIN dbo.Customer c WITH(NOLOCK) on c.username=l.LicenseeCode	
+	-- map unidentified licensees
+	-- indicated by -custid
+	INSERT INTO #licensees(CustId,LicenseeCode)
+	SELECT c.custid, c.username
+	FROM dbo.Customer c WITH(NOLOCK)
+	INNER JOIN @partyIdList pl ON c.custid = -pl.Id
+	WHERE pl.Id < 0
 
 	-- licensee super
 	--
 	UPDATE c SET superid= s.custid, SuperCode = s.username
-	FROM dbo.Dep_CustSuper s WITH(NOLOCK)
-	INNER JOIN #licensees c ON s.[site] = c.LicenseeName
+	FROM #licensees c
+	INNER JOIN DBCUST.bodb_licensee.dbo.LicenseeTransferCode tc WITH(NOLOCK) ON c.CustId = tc.CustId
+	INNER JOIN dbo.Dep_CustSuper s WITH(NOLOCK) ON s.[site] = tc.LicenseeName
 
 	DECLARE @tmpBalanceUpDay AS TABLE (BalanceUpDay DATE, MoveBetsDay DATE)
 	INSERT INTO @tmpBalanceUpDay(BalanceUpDay,MoveBetsDay)
