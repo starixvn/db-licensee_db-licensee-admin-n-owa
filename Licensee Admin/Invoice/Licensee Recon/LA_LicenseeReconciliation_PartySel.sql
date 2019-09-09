@@ -2,7 +2,7 @@
 USE [bodb_Licensee]
 GO
 
-create PROCEDURE [dbo].[LA_LicenseeReconciliation_PartySel]
+CREATE PROCEDURE [dbo].[LA_LicenseeReconciliation_PartySel]
 AS
 /*	Header:
 	Task : Get list of licensee for Reconciliation report
@@ -62,8 +62,8 @@ BEGIN
 	-- licensees don't have group
 	-- put them to Undefined group
 	--
-	DECLARE @OtherGroup INT = 1000000
-	UPDATE #licensees SET ParentId = @OtherGroup WHERE ParentId IS NULL
+	DECLARE @Unidentified INT = 1002
+	UPDATE #licensees SET ParentId = @Unidentified WHERE ParentId IS NULL
 
 	DECLARE @billingGroup TABLE(GroupId INT)
 	INSERT INTO @billingGroup SELECT DISTINCT ParentId FROM #licensees
@@ -80,7 +80,7 @@ BEGIN
 	SELECT PartyId, 0, 0, PartyName, '', '' FROM @partyList
 	WHERE ParentId = 0 AND PartyId IN (SELECT GroupId FROM @billingGroup)
 	UNION ALL
-	SELECT @OtherGroup, 0, 0, 'Others', '', '' FROM @billingGroup WHERE GroupId = @OtherGroup
+	SELECT @Unidentified, 0, 0, 'Unidentified', '', '' FROM @billingGroup WHERE GroupId = @Unidentified
 
 	DROP TABLE #licensees
 END
