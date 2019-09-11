@@ -662,12 +662,6 @@ BEGIN
 		)
 		SELECT p.LicenseeCode
 			,UPPER(@BaseCurrency) AS CurrencyName
-			,STUFF((
-					SELECT ' & ' + lc.PartyName
-					FROM @partyList lc 
-					WHERE p.LicenseeCode = lc.LicenseeCode
-					FOR XML PATH(''),TYPE).value('(./text())[1]','VARCHAR(200)')
-				,1,3,'')					AS PartyName
 			,SUM(a.AmountToCompany)			AS AmountToCompany
 			,SUM(a.LicensingFee)			AS LicensingFee
 			,SUM(a.Discount)				AS Discount
