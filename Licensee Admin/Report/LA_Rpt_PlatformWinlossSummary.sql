@@ -25,18 +25,17 @@ AS
 			+ Implement E-sport 2 [#105723]
 			+ Cover betfrom 'c' in the report
 		- 20190516@Parsons: Show Bet count in Platform Win Loss (Summary) Report [#113568]
+		- 20190827@Bruce: Add new betfrom 't' [#118998]
 
 	Explanation:
 		- Desktop: contain the followings:
 			Asia:		betfrom = d,g
-			China:		betfrom = a
+			China:		betfrom = a,z
 			Euro:		betfrom = e,u
 			New Asia:	betfrom = x
-			New China:	betfrom = y
-			New Euro:	betfrom = z
 		- Mobile: contain the followings:
 			WAP:	betfrom = m
-			Smart:	betfrom = s,l
+			Smart:	betfrom = l
 			Tablet: betfrom = r
 			App for China: o
 			Lite version: c
@@ -59,7 +58,7 @@ BEGIN
 	-- supported betfrom
 	--
 	DECLARE @betfrom TABLE(betfrom CHAR(1))
-	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,s,l,g,x,y,z,r,o,c',',')
+	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,l,g,x,z,r,o,c,t',',')
 
 	-- #1: get licensee/customer and currency info
 	--
