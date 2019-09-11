@@ -23,6 +23,7 @@ AS
 		- 20190319@bruce: Apply min fee rule for discount calculation [#109997]
 		- 20190410@bruce: calculate discount for terminated licensee[111485]
 		- 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
+		- 20190911@Bruce: Support Exchange product in invoices [#119846]
 
 	Parameters:
 		@IsApplyDiscountMinfee: apply minfee term to discount value
@@ -147,8 +148,8 @@ BEGIN
 		AND ProductId NOT IN (SELECT p.ProductId FROM @ProductList p)
 
 	-- remove unsupported products
-	DELETE @ProductList WHERE ProductID IN (1,3,23,13,14,17,31,15,25) -- exclude RB,BA,NG2,bettrade,MGCLC,MGCRNG,BX,CB,CO
-	
+	DELETE @ProductList WHERE ProductID IN (1,3,23,13,14,17,15,25) -- exclude RB,BA,NG2,bettrade,MGCLC,MGCRNG,CB,CO
+
 	IF(NOT EXISTS (SELECT TOP 1 ProductId FROM @ProductList))
 	BEGIN
 		SELECT	0 AS PartyId
@@ -265,6 +266,8 @@ BEGIN
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 2. winloss data
  *-------------------------------------------------------------------------------------------------------------------------------*/
+	DECLARE @BX INT = 31 -- exchange
+
 	-- 2.1 include general products
 	SELECT p.PartyId,
 		b.rptDate	AS WinlossDate,
@@ -272,7 +275,10 @@ BEGIN
 		b.CurrencyId,
 		SUM(CASE WHEN b.Bettype = @GD_Tip OR b.Bettype = @PromotionPrize THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss,
 		SUM(CASE WHEN b.Bettype = @GD_Tip OR b.Bettype = @PromotionPrize THEN 0 ELSE ISNULL(-b.MemberWL, 0) * p.Rate * e.Rate END) AS AmountToCompany,
-		SUM(CASE WHEN b.Bettype = @GD_Tip THEN ISNULL(-b.MemberWL, 0) * p.Rate * e.Rate ELSE 0 END) AS ExtraAmount, 
+		SUM(CASE 
+			WHEN b.Bettype = @GD_Tip THEN ISNULL(-b.MemberWL, 0) * p.Rate * e.Rate
+			WHEN b.ProductID = @BX THEN -(b.CommissionA + b.CommissionP) * e.Rate
+			ELSE 0 END) AS ExtraAmount, 
 		SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) * e.Rate ELSE 0 END) AS WinningPrize 
 	INTO #tmpWinlossData
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
@@ -316,7 +322,7 @@ BEGIN
 	GROUP BY PartyId, ProductId
 
 	-- 2.4 treat negative as 0
-	UPDATE #tmpResult SET Fee = CASE WHEN AmountToCompany < 0 THEN 0 ELSE AmountToCompany END
+	UPDATE #tmpResult SET Fee = CASE WHEN AmountToCompany < 0 AND ProductID NOT IN (@BX) THEN 0 ELSE AmountToCompany END
 
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 3. minfee calculation
