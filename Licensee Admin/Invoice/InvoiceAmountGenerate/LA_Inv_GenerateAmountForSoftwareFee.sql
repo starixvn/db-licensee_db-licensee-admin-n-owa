@@ -145,6 +145,7 @@ BEGIN
 	DECLARE @BAProductId INT = 3
 	DECLARE @CBProductId INT = 15
 	DECLARE @COProductId INT = 25
+	DECLARE @BXProductId INT = 31
 	DECLARE @PPProductId INT = 32
 
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, TypeId, FromDate, ToDate)
@@ -414,7 +415,7 @@ BEGIN
 					ELSE p.ProductName
 					END AS ProductName,
 				CASE
-					WHEN id.InvoiceAmount > 0 OR id.ProductId IN (@BAProductId, @CBProductId, @COProductId, @PPProductId) THEN id.InvoiceAmount
+					WHEN id.InvoiceAmount > 0 OR id.ProductId IN (@BAProductId, @CBProductId, @COProductId, @PPProductId,@BXProductId) THEN id.InvoiceAmount
 					ELSE 0
 				END AS InvoiceAmount,
 				id.AmountType,
