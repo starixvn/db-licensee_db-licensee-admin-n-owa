@@ -33,16 +33,32 @@ BEGIN
 
 	DECLARE @UnofficialGroup INT = 1000
 	DECLARE @UnidentifiedGroup INT = 1002
-
+	
+	-- official licensees
+	--
 	UPDATE l SET
-		l.ParentId = (CASE WHEN p.PartyType = 5 THEN @UnofficialGroup ELSE NULL END),
+		l.LicenseeName = p.Partyname,
+		l.BaseCurrencyId = d.BaseCurrencyId,
+		l.PartyId = d.PartyID
+	FROM #licensees l
+	INNER JOIN dbo.Licensees ls WITH(NOLOCK) ON l.LicenseeName = ls.LicenseeName
+	INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.OldRefID = ls.LicenseeID
+	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON d.PartyID = p.PartyID
+	WHERE d.StatusId = 1 AND p.PartyType = 1
+
+	-- non-official licensees
+	--
+	UPDATE l SET
+		l.ParentId = @UnofficialGroup,
+		l.LicenseeName = p.Partyname,
 		l.BaseCurrencyId = d.BaseCurrencyId,
 		l.PartyId = d.PartyID
 	FROM #licensees l
 	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON d.LicenseeCode = l.LicenseeCode
-	INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON d.PartyId = p.PartyId
-	WHERE d.StatusId = 1 AND p.PartyType IN (1,5)
+	INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = d.PartyID
+	WHERE d.StatusId = 1 AND p.PartyType = 5
 
+	-- Billing group
 	-- get party list in LA system
 	--
 	DECLARE @partyList TABLE(
@@ -62,7 +78,7 @@ BEGIN
 	UPDATE l SET ParentId = pl.ParentId
 	FROM #licensees l
 	INNER JOIN @partyList pl ON l.PartyId = pl.PartyId
-	WHERE pl.ParentId > 0
+	WHERE pl.ParentId > 0 AND l.ParentId IS NULL
 
 	-- licensees don't have group
 	-- put them to Undefined group
