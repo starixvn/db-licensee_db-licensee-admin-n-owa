@@ -27,16 +27,11 @@ BEGIN
 	INSERT INTO @partyIdList SELECT val FROM dbo.strSplit(@PartyIds,',')
 
 	-- get licensee code list
-	CREATE TABLE #licensees (
-		CustId			INT,
-		LicenseeCode	VARCHAR(50),
-		SuperId			INT,
-		SuperCode		VARCHAR(50)
-	)
+	 DECLARE @licensees TABLE (CustId INT, LicenseeCode VARCHAR(50))   
 
 	-- map licensee
 	--
-	INSERT INTO #licensees(CustId,LicenseeCode)
+	INSERT INTO @licensees(CustId,LicenseeCode)
 	SELECT c.CustId, c.username
 	FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
 	INNER JOIN bodb_licensee.dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
@@ -46,7 +41,7 @@ BEGIN
 
 	-- map unidentified licensees
 	-- indicated by -custid
-	INSERT INTO #licensees(CustId,LicenseeCode)
+	INSERT INTO @licensees(CustId,LicenseeCode)
 	SELECT c.custid, c.username
 	FROM dbo.Customer c WITH(NOLOCK)
 	INNER JOIN @partyIdList pl ON c.custid = -pl.Id
@@ -54,8 +49,10 @@ BEGIN
 
 	-- licensee super
 	--
-	UPDATE c SET superid= s.custid, SuperCode = s.username
-	FROM #licensees c
+	DECLARE @licenseeSupers TABLE(CustId INT, LicenseeCode VARCHAR(50),SuperId INT, SuperCode VARCHAR(50))
+	INSERT INTO @licenseeSupers(CustId,LicenseeCode,SuperId, SuperCode)
+	SELECT c.CustId, c.LicenseeCode, s.custid, s.username
+	FROM @licensees c
 	INNER JOIN DBCUST.bodb_licensee.dbo.LicenseeTransferCode tc WITH(NOLOCK) ON c.CustId = tc.CustId
 	INNER JOIN dbo.Dep_CustSuper s WITH(NOLOCK) ON s.[site] = tc.LicenseeName
 
@@ -98,11 +95,10 @@ BEGIN
 	SELECT SUM(a.Amount) Amount, c.LicenseeCode, c.SuperCode AS Super
 	FROM #transfer a
 	INNER JOIN #transfer b ON a.refno = b.refno
-	INNER JOIN #licensees c ON a.custid = c.CustId and b.custid = c.SuperId
+	INNER JOIN @licenseeSupers c ON a.custid = c.CustId and b.custid = c.SuperId
 	GROUP BY c.LicenseeCode, c.SuperCode
 	HAVING SUM(a.Amount) <> 0
 
 	DROP TABLE #transfer
-	DROP TABLE #licensees
 END
 GO
