@@ -49,12 +49,20 @@ BEGIN
 
 	-- licensee super
 	--
+	SELECT tc.CustId, tc.LicenseeName INTO #LicenseeTransferCode
+	FROM DBCUST.bodb_licensee.dbo.LicenseeTransferCode tc WITH(NOLOCK)
+
 	DECLARE @licenseeSupers TABLE(CustId INT, LicenseeCode VARCHAR(50),SuperId INT, SuperCode VARCHAR(50))
+
+	-- many licensee may have same code
+	--
 	INSERT INTO @licenseeSupers(CustId,LicenseeCode,SuperId, SuperCode)
-	SELECT c.CustId, c.LicenseeCode, s.custid, s.username
+	SELECT DISTINCT c.CustId, c.LicenseeCode, s.custid, s.username
 	FROM @licensees c
-	INNER JOIN DBCUST.bodb_licensee.dbo.LicenseeTransferCode tc WITH(NOLOCK) ON c.CustId = tc.CustId
+	INNER JOIN #LicenseeTransferCode tc ON c.CustId = tc.CustId
 	INNER JOIN dbo.Dep_CustSuper s WITH(NOLOCK) ON s.[site] = tc.LicenseeName
+
+	DROP TABLE #LicenseeTransferCode
 
 	DECLARE @tmpBalanceUpDay AS TABLE (BalanceUpDay DATE, MoveBetsDay DATE)
 	INSERT INTO @tmpBalanceUpDay(BalanceUpDay,MoveBetsDay)

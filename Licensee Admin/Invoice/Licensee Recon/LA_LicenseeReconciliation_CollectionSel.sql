@@ -38,7 +38,9 @@ BEGIN
 
 	-- map licensee
 	--
-	INSERT INTO #statement(CustId,LicenseeCode)
+	DECLARE @tmpCust TABLE(CustId INT,LicenseeCode VARCHAR(50))
+
+	INSERT INTO @tmpCust(CustId,LicenseeCode)
 	SELECT c.CustId, c.username
 	FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
 	INNER JOIN bodb_licensee.dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
@@ -48,11 +50,18 @@ BEGIN
 
 	-- map unidentified licensees
 	-- indicated by -custid
-	INSERT INTO #statement(CustId,LicenseeCode)
+	INSERT INTO @tmpCust(CustId,LicenseeCode)
 	SELECT c.custid, c.username
 	FROM dbo.Customer c WITH(NOLOCK)
 	INNER JOIN @partyIdList pl ON c.custid = -pl.Id
 	WHERE pl.Id < 0
+
+	-- many licensees may have same code
+	--
+	-- remove duplicated code
+	--
+	INSERT INTO #statement(CustId,LicenseeCode)
+	SELECT DISTINCT CustId, LicenseeCode FROM @tmpCust
 
 	-- balance up day
 	--

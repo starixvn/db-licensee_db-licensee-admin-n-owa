@@ -50,13 +50,13 @@ BEGIN
 	INSERT INTO @statement(PartyId, Amount, Prepayment)
 	SELECT p.PartyId, h.Amount, SUM(ISNULL(s.Income,0) - ISNULL(s.Expense,0))
 	FROM @partyList p
-	LEFT JOIN DBCUST.bodb_licensee.dbo.LA_InvoiceHeader h WITH(NOLOCK) 
+	LEFT JOIN bodb_licensee.dbo.LA_InvoiceHeader h WITH(NOLOCK) 
 		ON p.PartyId = h.PartyId
 			AND h.StatusId = 0-- normal invoice
 			AND h.Environment = @Environment
 			AND h.InvoiceDate BETWEEN @FromDate AND @ToDate
 			AND h.InvoiceType IN (@AmountTypeSoftwareFee,@AmountTypeSetupFee)
-	LEFT JOIN DBCUST.bodb_licensee.dbo.LA_InvoiceStatement s WITH(NOLOCK) 
+	LEFT JOIN bodb_licensee.dbo.LA_InvoiceStatement s WITH(NOLOCK) 
 		ON h.InvoiceHeaderId=s.InvoiceHeaderId AND s.InvItemTypeId IN (@AMF,@AGP)
 	GROUP BY p.PartyId, h.Amount, s.InvItemTypeId
 
