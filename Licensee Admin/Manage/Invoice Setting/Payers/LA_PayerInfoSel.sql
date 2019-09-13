@@ -19,6 +19,7 @@ AS
 			1: official payer
 			5: non-official payer
 		+ 20190318@Mason: Add Invoice Language in SELECT statement [#110419]
+		+ 20190829@Bruce: Adding Licensee Code [#111586]
 		
 	 Params:
 	 Example:
@@ -41,6 +42,7 @@ SET NOCOUNT ON
 		, ISNULL(p.SetupName, '') AS SetupName
 		, ISNULL(pd.BaseCurrencyId, 0) BaseCurrencyId
 		, pd.InvoiceLanguage
+		, pd.LicenseeCode
 	FROM dbo.OAS_Party p WITH (NOLOCK)
 		LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 		LEFT JOIN (

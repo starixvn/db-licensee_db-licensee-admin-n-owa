@@ -7,6 +7,7 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
 	@LicenseeId			INT,
 	@LicenseeName		VARCHAR(50),
 	@BrandName			VARCHAR(100)	= '',
+	@LicenseeCode		VARCHAR(50)		= '',
 	@BaseCurrencyId		TINYINT,
 	@LaunchDate			DATE, 
 	@GroupId			INT,
@@ -27,6 +28,7 @@ AS
 	Revisions:
 		- 20190107@Parsons: Launch new licensee
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20190829@Bruce: Adding Licensee Code [#111586]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -102,7 +104,7 @@ BEGIN
 	END
 	
 	DECLARE @NewPartyId	INT = 0
-	EXEC dbo.LA_LaunchLicensee_PartyIns @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @BaseCurrencyId, @NewPartyId OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT 
+	EXEC dbo.LA_LaunchLicensee_PartyIns @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @LicenseeCode, @BaseCurrencyId, @NewPartyId OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT 
 	
 	IF @ErrCode = 0
 	BEGIN
@@ -153,6 +155,7 @@ BEGIN
 	SET @Doing =(SELECT	@NonOfficialPartyId	AS NonOfficialPartyId,
 						@LicenseeId			AS LicenseeId,
 						@LicenseeName		AS LicenseeName,
+						@LicenseeCode		AS LicenseeCode,
 						@BrandName			AS BrandName,
 						@BaseCurrencyId		AS BaseCurrencyId,
 						@LaunchDate			AS LaunchDate, 
