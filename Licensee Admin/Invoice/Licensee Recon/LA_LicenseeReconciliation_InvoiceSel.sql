@@ -50,18 +50,17 @@ BEGIN
 	INSERT INTO @statement(PartyId, Amount, Prepayment)
 	SELECT p.PartyId, h.Amount, SUM(ISNULL(s.Income,0) - ISNULL(s.Expense,0))
 	FROM @partyList p
-	LEFT JOIN bodb_licensee.dbo.LA_InvoiceHeader h WITH(NOLOCK) 
-		ON p.PartyId = h.PartyId
-			AND h.StatusId = 0-- normal invoice
-			AND h.Environment = @Environment
-			AND h.InvoiceDate BETWEEN @FromDate AND @ToDate
-			AND h.InvoiceType IN (@AmountTypeSoftwareFee,@AmountTypeSetupFee)
-	LEFT JOIN bodb_licensee.dbo.LA_InvoiceStatement s WITH(NOLOCK) 
-		ON h.InvoiceHeaderId=s.InvoiceHeaderId AND s.InvItemTypeId IN (@AMF,@AGP)
-	GROUP BY p.PartyId, h.Amount, s.InvItemTypeId
+	INNER JOIN bodb_licensee.dbo.LA_InvoiceHeader h WITH(NOLOCK) ON p.PartyId = h.PartyId
+	INNER JOIN bodb_licensee.dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId
+	WHERE h.StatusId = 0-- normal invoice
+		AND h.Environment = @Environment
+		AND h.InvoiceDate BETWEEN @FromDate AND @ToDate
+		AND h.InvoiceType IN (@AmountTypeSoftwareFee,@AmountTypeSetupFee)
+		AND s.InvItemTypeId IN (@AMF,@AGP)
+	GROUP BY p.PartyId, h.InvoiceHeaderId, h.Amount
 
 	SELECT p.LicenseeCode, p.CurrencyName
-		, SUM(ISNULL(s.Amount,0) - ISNULL(s.Prepayment,0)) LicensingFee
+		, SUM(s.Amount - s.Prepayment) LicensingFee
 		, SUM(s.Prepayment) Prepayment
 	FROM @partyList p
 	INNER JOIN @statement s ON p.PartyId = s.PartyId
