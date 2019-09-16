@@ -51,12 +51,11 @@ BEGIN
 	SELECT p.PartyId, h.Amount, SUM(ISNULL(s.Income,0) - ISNULL(s.Expense,0))
 	FROM @partyList p
 	INNER JOIN bodb_licensee.dbo.LA_InvoiceHeader h WITH(NOLOCK) ON p.PartyId = h.PartyId
-	INNER JOIN bodb_licensee.dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId
+	LEFT JOIN bodb_licensee.dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId AND s.InvItemTypeId IN (@AMF,@AGP)
 	WHERE h.StatusId = 0-- normal invoice
 		AND h.Environment = @Environment
 		AND h.InvoiceDate BETWEEN @FromDate AND @ToDate
 		AND h.InvoiceType IN (@AmountTypeSoftwareFee,@AmountTypeSetupFee)
-		AND s.InvItemTypeId IN (@AMF,@AGP)
 	GROUP BY p.PartyId, h.InvoiceHeaderId, h.Amount
 
 	SELECT p.LicenseeCode, p.CurrencyName
