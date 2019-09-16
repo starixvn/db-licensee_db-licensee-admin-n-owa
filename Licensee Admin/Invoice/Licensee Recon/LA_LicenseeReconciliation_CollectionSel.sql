@@ -131,10 +131,10 @@ BEGIN
 		UPDATE s SET OpeningBalance = a.OpeningBalance
 		FROM #statement s
 		INNER JOIN #tmpOB t ON t.CustId=s.CustId
-		INNER JOIN bodb_Report.dbo.rptstatement a WITH(NOLOCK) ON t.CustId = a.CustID AND t.OpeningBalanceDate=a.WinlostDate
+		INNER JOIN bodb_Report.dbo.rptstatement_Old a WITH(NOLOCK) ON t.CustId = a.CustID AND t.OpeningBalanceDate=a.WinlostDate
 	END
 
-	UPDATE #statement SET OpeningBalance = 0 WHERE OpeningBalance iS NULL
+	UPDATE #statement SET OpeningBalance = 0 WHERE OpeningBalance IS NULL
 
 	IF @ToDate >= @balanceUpDay
 	BEGIN
