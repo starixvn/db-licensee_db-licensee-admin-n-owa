@@ -4,7 +4,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_UserSettingUpd]
 	@UserId			INT,
-	@Id				INT,
+	@Id				INT				= 0,
 	@Data			VARCHAR(8000),
 	@FunctionKey	NVARCHAR(100),
 	@ErrCode		INT				= 0		OUTPUT, 
