@@ -72,7 +72,6 @@ BEGIN
 	DECLARE @balanceUpDay DATE, @moveBetsDay DATE
 	SELECT @balanceUpDay = BalanceUpDay, @moveBetsDay = MoveBetsDay FROM @tmpBalanceUpDay
 
-	DECLARE @OpeningBalanceDate DATE = DATEADD(DAY,-1,@FromDate)
 	DECLARE @step TINYINT = 0
 
 	-- rptTotalBalance_Active
@@ -85,7 +84,7 @@ BEGIN
 		SELECT a.CustID, MAX(a.WinlostDate)
 		FROM #statement s
 		INNER JOIN bodb_Report.dbo.rptTotalBalance_Active a WITH(NOLOCK) ON s.CustId = a.CustID
-		WHERE a.WinlostDate < @FromDate
+		WHERE a.WinlostDate <= @FromDate
 		GROUP BY a.CustID
 
 		UPDATE s SET OpeningBalance = a.OpeningBalance
@@ -108,7 +107,7 @@ BEGIN
 		WHERE a.WinlostDate < @FromDate AND s.OpeningBalance IS NULL
 		GROUP BY a.CustID
 		
-		UPDATE s SET OpeningBalance = a.OpeningBalance
+		UPDATE s SET OpeningBalance = a.closingbalance
 		FROM #statement s
 		INNER JOIN #tmpOB t ON t.CustId=s.CustId
 		INNER JOIN bodb_Report.dbo.rptstatement a WITH(NOLOCK) ON t.CustId = a.CustID AND t.OpeningBalanceDate=a.WinlostDate
@@ -128,7 +127,7 @@ BEGIN
 		WHERE a.WinlostDate < @FromDate AND s.OpeningBalance IS NULL
 		GROUP BY a.CustID
 		
-		UPDATE s SET OpeningBalance = a.OpeningBalance
+		UPDATE s SET OpeningBalance = a.closingbalance
 		FROM #statement s
 		INNER JOIN #tmpOB t ON t.CustId=s.CustId
 		INNER JOIN bodb_Report.dbo.rptstatement_Old a WITH(NOLOCK) ON t.CustId = a.CustID AND t.OpeningBalanceDate=a.WinlostDate
