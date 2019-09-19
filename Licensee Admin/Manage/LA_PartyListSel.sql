@@ -70,8 +70,14 @@ WHERE ci.ChargeType = 1
     AND ci.FromParty NOT IN ( SELECT PartyID FROM @CreditLicensee)
 
 DECLARE @FunctionID INT
-SELECT @FunctionID = FunctionID FROM LA_Function WITH(NOLOCK) WHERE FunctionKey = @FunctionKey
-SET @FunctionID = ISNULL(@FunctionID, 0)
+IF(@FunctionKey = '')
+BEGIN
+	SET @FunctionID = 0
+END
+ELSE
+BEGIN
+	SELECT @FunctionID = FunctionID FROM LA_Function WITH(NOLOCK) WHERE FunctionKey = @FunctionKey
+END	
 
 BEGIN
 	CREATE TABLE #Party (
@@ -84,7 +90,7 @@ BEGIN
 		, BrandName		NVARCHAR(100)
 		, ParentID		INT)
 
-	IF (@FunctionKey = '' AND @UserID > 0) --get list Party of 1 User		
+	IF (@FunctionID = 0 AND @UserID > 0) --get list Party of 1 User		
 	BEGIN
 		
 		INSERT INTO #Party(PartyID, PartyGroupID)
@@ -105,7 +111,7 @@ BEGIN
 		)
 	END
 
-	IF (@USERID = 0 AND @FunctionKey <> '') --get list Party assign to 1 Function
+	IF (@USERID = 0 AND @FunctionID > 0) --get list Party assign to 1 Function
 	BEGIN
 		INSERT INTO #Party(PartyID, PartyGroupID)
 		(
@@ -125,7 +131,7 @@ BEGIN
 		)
 	END
 
-	IF (@USERID > 0 AND @FunctionKey <> '' ) --get Party List By User and Function
+	IF (@USERID > 0 AND @FunctionID > 0 ) --get Party List By User and Function
 	BEGIN
 		SELECT up.PartyID, Up.UserID, fp.FunctionID, Up.StatusID
 		INTO #userFunctionParty
@@ -159,7 +165,7 @@ BEGIN
 	END
 END
 
-IF (@USERID = 0 AND @FunctionKey = '' ) --getAll Party List 
+IF (@USERID = 0 AND @FunctionID = 0 ) --getAll Party List 
 BEGIN
 	INSERT INTO #Party(PartyID, PartyGroupID)
 	(
