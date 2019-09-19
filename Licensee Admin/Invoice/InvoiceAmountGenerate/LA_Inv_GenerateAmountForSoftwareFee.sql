@@ -25,6 +25,7 @@ AS
 		- 20190123@Parsons: Improve AG prepayment and discount setting [#104620]
 	    - 20190416@Parsons: Integrate-PP-Promotion-Prize [#109014]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20190911@Bruce: Support Exchange product in invoices [#119846]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -145,6 +146,7 @@ BEGIN
 	DECLARE @BAProductId INT = 3
 	DECLARE @CBProductId INT = 15
 	DECLARE @COProductId INT = 25
+	DECLARE @BXProductId INT = 31
 	DECLARE @PPProductId INT = 32
 
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, TypeId, FromDate, ToDate)
@@ -414,7 +416,7 @@ BEGIN
 					ELSE p.ProductName
 					END AS ProductName,
 				CASE
-					WHEN id.InvoiceAmount > 0 OR id.ProductId IN (@BAProductId, @CBProductId, @COProductId, @PPProductId) THEN id.InvoiceAmount
+					WHEN id.InvoiceAmount > 0 OR id.ProductId IN (@BAProductId, @CBProductId, @COProductId, @PPProductId,@BXProductId) THEN id.InvoiceAmount
 					ELSE 0
 				END AS InvoiceAmount,
 				id.AmountType,
