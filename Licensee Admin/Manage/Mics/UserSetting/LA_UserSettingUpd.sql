@@ -37,12 +37,6 @@ BEGIN
 
 	UPDATE LA_UserSettings
 	SET [Data] = @Data
-	WHERE UserId = @UserId AND FunctionKey = @FunctionKey AND Id = @Id
-
-	IF @@ERROR <> 0
-	BEGIN
-		SELECT @ErrMsg = 'Update [LA_UserSettings] failed. Please try again.', @ErrCode =  504
-		RETURN
-	END
+	WHERE Id = @Id
 END
 GO

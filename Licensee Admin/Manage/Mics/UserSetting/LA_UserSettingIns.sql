@@ -36,12 +36,6 @@ BEGIN
 	END
 
 	INSERT INTO [dbo].[LA_UserSettings] (UserId, FunctionKey, [Name], [Data])
-	VALUES(@UserId, @FunctionKey, @Name, @Data) 
-
-	IF @@ERROR <> 0
-	BEGIN
-		SELECT @ErrMsg = 'Insert [LA_UserSettings] failed. Please try again.', @ErrCode =  503
-		RETURN
-	END
+	VALUES(@UserId, @FunctionKey, @Name, @Data)
 END
 GO

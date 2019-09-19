@@ -22,13 +22,7 @@ BEGIN
 	IF EXISTS (SELECT TOP 1 1 FROM [dbo].[LA_UserSettings] WITH(NOLOCK) WHERE Id = @Id)
 	BEGIN
 		DELETE [dbo].[LA_UserSettings]
-		WHERE Id = @Id 
-
-		IF @@ERROR <> 0
-		BEGIN
-			SELECT 	@ErrMsg = 'Delete failed. Please try again.', @ErrCode = 501	
-			RETURN
-		END
+		WHERE Id = @Id
 	END
 	ELSE
 	BEGIN

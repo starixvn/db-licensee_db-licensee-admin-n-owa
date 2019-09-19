@@ -20,6 +20,6 @@ BEGIN
 
 	SELECT Id, [Name], [Data]
 	FROM LA_UserSettings WITH(NOLOCK)
-	WHERE Id = ISNULL(@Id, 0)
+	WHERE Id = @Id
 END
 GO
