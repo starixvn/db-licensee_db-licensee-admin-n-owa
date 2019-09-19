@@ -25,6 +25,7 @@ AS
 		- 20190123@Parsons: Improve AG prepayment and discount setting [#104620]
 	    - 20190416@Parsons: Integrate-PP-Promotion-Prize [#109014]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20190911@Bruce: Support Exchange product in invoices [#119846]
 */
 BEGIN
 	SET NOCOUNT ON
