@@ -669,7 +669,7 @@ BEGIN
 		SELECT p.LicenseeCode
 			,UPPER(@BaseCurrency) AS CurrencyName
 			,SUM(a.AmountToCompany)			AS AmountToCompany
-			,SUM(a.LicensingFee + b.SetupFee) AS LicensingFee
+			,SUM(a.LicensingFee + ISNULL(b.SetupFee,0)) AS LicensingFee
 			,SUM(a.Discount)				AS Discount
 			,SUM(a.Rebate)					AS Rebate
 			,SUM(ISNULL(b.Prepayment,0))	AS Prepayment
