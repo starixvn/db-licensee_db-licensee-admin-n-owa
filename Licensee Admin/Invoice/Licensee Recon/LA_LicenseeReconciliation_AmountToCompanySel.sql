@@ -608,7 +608,7 @@ BEGIN
 	IF @IncludeSetupFee = 1
 	BEGIN
 		INSERT INTO @InvoiceItemTypes ([Key], [Value]) VALUES
-			('SETUPFEE', 2),-- Setupfee
+			('STFEE', 2),-- Setupfee
 			('AMF', 3) -- AMF
 	END
 
@@ -662,7 +662,7 @@ BEGIN
 			SELECT c.PartyId,
 				SUM(CASE WHEN c.[Key] IN ('AMF', 'AGP', 'PRE') THEN Amount ELSE 0 END) Prepayment,
 				SUM(CASE WHEN c.[Key] = 'OTHER' THEN Amount ELSE 0 END) Others,
-				SUM(CASE WHEN c.[Key] = 'SETUPFEE' THEN Amount ELSE 0 END) SetupFee
+				SUM(CASE WHEN c.[Key] = 'STFEE' THEN Amount ELSE 0 END) SetupFee
 			FROM @credit c
 			GROUP BY c.PartyId
 		)
