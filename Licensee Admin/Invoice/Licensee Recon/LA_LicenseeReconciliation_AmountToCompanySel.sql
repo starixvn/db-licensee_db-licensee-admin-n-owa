@@ -8,8 +8,7 @@ ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_AmountToCompanySel]
 	@ToDate			DATETIME,
 	@BaseCurrency	VARCHAR(5),
 	@Environment	VARCHAR(50) = 'DEV',
-	@IsShowDetail		BIT = 0,
-	@IncludeSetupFee	BIT = 0
+	@IsShowDetail	BIT = 0
 AS
 /*	Header:
 	Task : Generate invoice amount for licensee
@@ -598,20 +597,15 @@ BEGIN
 	DECLARE @InvoiceItemTypes TABLE([Key] VARCHAR(5), [Value] INT)
 
 	INSERT INTO @InvoiceItemTypes ([Key], [Value]) VALUES
-		 ('AMF', 5)	-- Deduct advanced minimum fees
+		 --('AMF', 3)		-- Advance billing for minimum fees for 4th, 5th & 6th month
+		 ('AMF', 5)		-- Deduct advanced minimum fees
+		--,('PRE', 22)	-- Prepayment
 		,('PRE', 24)	-- Deduct against invoice
+		--,('AGP', 25)	-- Prepayment for AG product
 		,('AGP', 26)	-- Deduct AG Prepayment
 
 	INSERT INTO @InvoiceItemTypes ([Key], [Value])
 	SELECT 'OTHER', val FROM  dbo.strSplit('11,12,13,14,17,20',',')
-
-	IF @IncludeSetupFee = 1
-	BEGIN
-		INSERT INTO @InvoiceItemTypes ([Key], [Value]) VALUES
-			('STFEE', 2),-- Setupfee
-			('AMF', 3), -- Advanced minfee
-			('AMF', 25) -- AG prepayment
-	END
 
 	-- get statement
 	DECLARE @statement TABLE(Income MONEY,Expense MONEY,InvItemTypeId SMALLINT,PartyId INT)
@@ -662,15 +656,14 @@ BEGIN
 		), b AS (
 			SELECT c.PartyId,
 				SUM(CASE WHEN c.[Key] IN ('AMF', 'AGP', 'PRE') THEN Amount ELSE 0 END) Prepayment,
-				SUM(CASE WHEN c.[Key] = 'OTHER' THEN Amount ELSE 0 END) Others,
-				SUM(CASE WHEN c.[Key] = 'STFEE' THEN Amount ELSE 0 END) SetupFee
+				SUM(CASE WHEN c.[Key] = 'OTHER' THEN Amount ELSE 0 END) Others
 			FROM @credit c
 			GROUP BY c.PartyId
 		)
 		SELECT p.LicenseeCode
 			,UPPER(@BaseCurrency) AS CurrencyName
 			,SUM(a.AmountToCompany)			AS AmountToCompany
-			,SUM(a.LicensingFee + ISNULL(b.SetupFee,0)) AS LicensingFee
+			,SUM(a.LicensingFee)			AS LicensingFee
 			,SUM(a.Discount)				AS Discount
 			,SUM(a.Rebate)					AS Rebate
 			,SUM(ISNULL(b.Prepayment,0))	AS Prepayment
