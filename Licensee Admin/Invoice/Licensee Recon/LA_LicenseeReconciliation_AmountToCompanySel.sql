@@ -609,7 +609,8 @@ BEGIN
 	BEGIN
 		INSERT INTO @InvoiceItemTypes ([Key], [Value]) VALUES
 			('STFEE', 2),-- Setupfee
-			('AMF', 3) -- AMF
+			('AMF', 3), -- Advanced minfee
+			('AMF', 25) -- AG prepayment
 	END
 
 	-- get statement
