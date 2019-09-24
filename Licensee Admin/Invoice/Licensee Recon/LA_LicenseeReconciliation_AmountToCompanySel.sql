@@ -8,7 +8,8 @@ ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_AmountToCompanySel]
 	@ToDate			DATETIME,
 	@BaseCurrency	VARCHAR(5),
 	@Environment	VARCHAR(50) = 'DEV',
-	@IsShowDetail	BIT = 0
+	@IsShowDetail		BIT = 0,
+	@IncludeSetupFee	BIT = 0
 AS
 /*	Header:
 	Task : Generate invoice amount for licensee
@@ -597,22 +598,26 @@ BEGIN
 	DECLARE @InvoiceItemTypes TABLE([Key] VARCHAR(5), [Value] INT)
 
 	INSERT INTO @InvoiceItemTypes ([Key], [Value]) VALUES
-		 --('AMF', 3)		-- Advance billing for minimum fees for 4th, 5th & 6th month
-		 ('AMF', 5)		-- Deduct advanced minimum fees
-		--,('PRE', 22)	-- Prepayment
+		 ('AMF', 5)	-- Deduct advanced minimum fees
 		,('PRE', 24)	-- Deduct against invoice
-		--,('AGP', 25)	-- Prepayment for AG product
 		,('AGP', 26)	-- Deduct AG Prepayment
 
 	INSERT INTO @InvoiceItemTypes ([Key], [Value])
 	SELECT 'OTHER', val FROM  dbo.strSplit('11,12,13,14,17,20',',')
 
+	IF @IncludeSetupFee = 1
+	BEGIN
+		INSERT INTO @InvoiceItemTypes ([Key], [Value]) VALUES
+			('SETUPFEE', 2),-- Setupfee
+			('AMF', 3) -- AMF
+	END
+
 	-- get statement
 	DECLARE @statement TABLE(Income MONEY,Expense MONEY,InvItemTypeId SMALLINT,PartyId INT)
 	INSERT INTO @statement(Income,Expense,InvItemTypeId,PartyId)
 	SELECT s.Income, s.Expense,s.InvItemTypeId,h.PartyId
-	FROM DBCUST.bodb_licensee.dbo.LA_InvoiceHeader h WITH(NOLOCK)
-	INNER JOIN DBCUST.bodb_licensee.dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId=s.InvoiceHeaderId
+	FROM dbo.LA_InvoiceHeader h WITH(NOLOCK)
+	INNER JOIN dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId=s.InvoiceHeaderId
 	WHERE h.StatusId = 0-- normal invoice
 		AND h.Environment = @Environment
 		AND h.InvoiceDate BETWEEN @FromDate AND @ToDate
@@ -656,14 +661,15 @@ BEGIN
 		), b AS (
 			SELECT c.PartyId,
 				SUM(CASE WHEN c.[Key] IN ('AMF', 'AGP', 'PRE') THEN Amount ELSE 0 END) Prepayment,
-				SUM(CASE WHEN c.[Key] = 'OTHER' THEN Amount ELSE 0 END) Others
+				SUM(CASE WHEN c.[Key] = 'OTHER' THEN Amount ELSE 0 END) Others,
+				SUM(CASE WHEN c.[Key] = 'SETUPFEE' THEN Amount ELSE 0 END) SetupFee
 			FROM @credit c
 			GROUP BY c.PartyId
 		)
 		SELECT p.LicenseeCode
 			,UPPER(@BaseCurrency) AS CurrencyName
 			,SUM(a.AmountToCompany)			AS AmountToCompany
-			,SUM(a.LicensingFee)			AS LicensingFee
+			,SUM(a.LicensingFee + b.SetupFee) AS LicensingFee
 			,SUM(a.Discount)				AS Discount
 			,SUM(a.Rebate)					AS Rebate
 			,SUM(ISNULL(b.Prepayment,0))	AS Prepayment
