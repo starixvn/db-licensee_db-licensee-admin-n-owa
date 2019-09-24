@@ -4,7 +4,8 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_InvoiceSel]
 	@PartyIds		VARCHAR(4000),
-	@ReportMonth	DATETIME,
+	@FromDate		DATE,
+	@ToDate			DATE,
 	@Environment	VARCHAR(50) = 'DEV'
 AS
 /*	Header:
@@ -13,12 +14,10 @@ AS
    
 	Revisions: 
 		- 20190905@Bruce: Create Sp [#111586]
+		- 20190924@Bruce: Include setupfee only [#120220]
 */
 BEGIN
 	SET NOCOUNT ON
-	
-	DECLARE @FromDate DATETIME = DATEADD(mm, DATEDIFF(mm, 0, @ReportMonth), 0)
-	DECLARE @ToDate DATETIME = DATEADD (dd, -1, DATEADD(mm, DATEDIFF(mm, 0, @ReportMonth) + 1, 0))
 
 	-- get base currency
 	--
@@ -39,30 +38,22 @@ BEGIN
 	INNER JOIN @baseCurrencyList b ON d.BaseCurrencyId = b.CurrencyId
 	WHERE d.PartyID IN(SELECT val FROM dbo.strSplit(@PartyIds, ',')) AND d.LicenseeCode IS NOT NULL
 
-	DECLARE @AmountTypeSoftwareFee INT = 1
-	DECLARE @AmountTypeSetupFee INT = 7
-	DECLARE @AMF INT = 3
-	DECLARE @AGP INT = 25
-
 	-- get statement
-	DECLARE @statement TABLE(Amount MONEY,Prepayment MONEY,PartyId INT)
-
-	INSERT INTO @statement(PartyId, Amount, Prepayment)
-	SELECT p.PartyId, h.Amount, SUM(ISNULL(s.Income,0) - ISNULL(s.Expense,0))
+	SELECT p.LicenseeCode, b.CurrencyName
+		, SUM(CASE WHEN s.InvItemTypeId = 2  THEN ISNULL(s.Income,0) - ISNULL(s.Expense,0) ELSE 0 END) LicensingFee
+		, SUM(CASE WHEN s.InvItemTypeId <> 2 THEN ISNULL(s.Income,0) - ISNULL(s.Expense,0) ELSE 0 END) Prepayment
 	FROM @partyList p
 	INNER JOIN bodb_licensee.dbo.LA_InvoiceHeader h WITH(NOLOCK) ON p.PartyId = h.PartyId
-	LEFT JOIN bodb_licensee.dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId AND s.InvItemTypeId IN (@AMF,@AGP)
+	INNER JOIN bodb_licensee.dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId
+	INNER JOIN @baseCurrencyList b ON h.CurrencyId = b.CurrencyId
 	WHERE h.StatusId = 0-- normal invoice
 		AND h.Environment = @Environment
 		AND h.InvoiceDate BETWEEN @FromDate AND @ToDate
-		AND h.InvoiceType IN (@AmountTypeSoftwareFee,@AmountTypeSetupFee)
-	GROUP BY p.PartyId, h.InvoiceHeaderId, h.Amount
-
-	SELECT p.LicenseeCode, p.CurrencyName
-		, SUM(s.Amount - s.Prepayment) LicensingFee
-		, SUM(s.Prepayment) Prepayment
-	FROM @partyList p
-	INNER JOIN @statement s ON p.PartyId = s.PartyId
-	GROUP BY p.LicenseeCode, p.CurrencyName
+		AND h.InvoiceType = 7 -- setup fee
+		AND s.InvItemTypeId IN (2,3,25)
+		-- 2 setupfee amount
+		-- 3 amf amount
+		-- 25 AG prepayment
+	GROUP BY p.LicenseeCode, b.CurrencyName
 END
 GO
