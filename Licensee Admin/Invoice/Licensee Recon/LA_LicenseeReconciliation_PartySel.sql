@@ -21,6 +21,7 @@ BEGIN
 		, CAST(NULL AS INT) PartyId
 		, CAST(NULL AS VARCHAR(50)) LicenseeCode
 		, CAST(NULL AS INT) BaseCurrencyId
+		, CAST(NULL AS DATE) EndDate
 	INTO #licensees
 	FROM DBCUST.bodb_licensee.dbo.LicenseeTransferCode tc WITH(NOLOCK)
 	WHERE tc.StatusId = 1
@@ -88,6 +89,20 @@ BEGIN
 	DECLARE @billingGroup TABLE(GroupId INT)
 	INSERT INTO @billingGroup SELECT DISTINCT ParentId FROM #licensees
 
+	-- get licensee's end date
+	--
+	;WITH a AS (
+		SELECT c.FromParty, MAX(c.ToDate) ToDate
+		FROM dbo.OAS_ChargeInfo c WITH(NOLOCK)
+		INNER JOIN dbo.LA_ChargeInfo_SystemMapping s WITH(NOLOCK) ON c.ChargeID=s.ChargeID AND s.SystemID=2
+		INNER JOIN #licensees l ON l.PartyId = c.FromParty
+		WHERE l.PartyId IS NOT NULL AND l.ParentId > 0
+		GROUP BY c.FromParty
+	)
+	UPDATE l SET EndDate = a.todate
+	FROM #licensees l INNER JOIN a ON a.FromParty=l.PartyId
+
+	DECLARE @defaultDate DATE = '20500101'
 	-- select data
 	--
 	SELECT ISNULL(l.PartyId, -l.Custid) PartyId
@@ -96,15 +111,16 @@ BEGIN
 		, l.BaseCurrencyId
 		, e.Code AS BaseCurrencyCode
 		, l.LicenseeCode
+		, ISNULL(l.EndDate,@defaultDate) EndDate
 	FROM #licensees l
 	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON l.BaseCurrencyId=e.exchangeid
 	UNION ALL
-	SELECT PartyId, 0, PartyName, 0, '', '' FROM @partyList
+	SELECT PartyId, 0, PartyName, 0, '', '',@defaultDate FROM @partyList
 	WHERE ParentId = 0 AND PartyId IN (SELECT GroupId FROM @billingGroup)
 	UNION ALL
-	SELECT @UnofficialGroup, 0, 'Non-Official Licensees',0, '', '' FROM @billingGroup WHERE GroupId = @UnofficialGroup
+	SELECT @UnofficialGroup, 0, 'Non-Official Licensees',0, '', '',@defaultDate FROM @billingGroup WHERE GroupId = @UnofficialGroup
 	UNION ALL
-	SELECT @UnidentifiedGroup, 0, 'Unidentified',0, '', '' FROM @billingGroup WHERE GroupId = @UnidentifiedGroup
+	SELECT @UnidentifiedGroup, 0, 'Unidentified',0, '', '',@defaultDate FROM @billingGroup WHERE GroupId = @UnidentifiedGroup
 
 	DROP TABLE #licensees
 END
