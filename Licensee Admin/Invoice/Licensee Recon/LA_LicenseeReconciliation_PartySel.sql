@@ -105,7 +105,7 @@ BEGIN
 	FROM #licensees l INNER JOIN a ON a.FromParty=l.PartyId
 
 	DECLARE @defaultEndDate DATE = (SELECT MAX(EndDate) FROM #licensees)
-	DECLARE @defaultStartDate DATE = (SELECT MAX(StartDate) FROM #licensees)
+	DECLARE @defaultStartDate DATE = (SELECT MIN(StartDate) FROM #licensees)
 
 	-- select data
 	--
