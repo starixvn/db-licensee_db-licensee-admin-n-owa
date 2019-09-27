@@ -10,6 +10,7 @@ AS
 
 	Revisions: 
 		- 20190723@Bruce: Create Sp [#111586]
+		- 20190927@Bruce: Include fromdate, todate of charge info [#120220]
 */
 BEGIN
 	SET NOCOUNT ON

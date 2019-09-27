@@ -16,6 +16,7 @@ AS
    
 	Revisions: 
 		- 20190723@Bruce: Create Sp [#111586]
+		- 20190927@Bruce: Remove DBCUST alias [#120220]
 */
 BEGIN
 	SET NOCOUNT ON
