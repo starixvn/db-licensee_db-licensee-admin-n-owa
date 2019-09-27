@@ -13,6 +13,7 @@ AS
 	Revisions:
 		- 20170223@Scofield: Initialize SP
 		- 20190802@Parsons: Validate billing configuration [#109600]
+		- 20190920@Bruce: fix bug: show all terminated licensees [#118627]
 
 	Params:
 	Example:
@@ -36,15 +37,13 @@ BEGIN
 	SELECT p.PartyID, p.PartyName, d.BrandName, 1001 AS ParentID
 	FROM dbo.OAS_Party p WITH(NOLOCK)
 	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID = d.PartyID
-	INNER JOIN dbo.LA_UserParty up WITH (NOLOCK) ON p.PartyID = up.PartyID
-	WHERE p.PartyID IN (
-		SELECT FromParty 
-		FROM (SELECT FromParty AS FromParty, MAX(ToDate) AS ToDate 
-			  FROM OAS_ChargeInfo
-			  WHERE ChargeType NOT IN (2, 3) -- Old type & No longer used
-			  GROUP BY FromParty ) candidateParties
-		WHERE ToDate < CONVERT(DATE, GETDATE() )
-	) AND p.PartyType = 1 AND d.IsDeposit = 1 AND d.StatusId = 1 AND up.UserID = @UserID
+	WHERE (@UserID = 0 OR p.PartyID IN (
+		SELECT up.PartyID FROM dbo.LA_UserParty up WITH (NOLOCK) WHERE up.UserID = @UserID
+	)) AND p.PartyID IN (
+		SELECT FromParty FROM dbo.OAS_ChargeInfo WITH(NOLOCK)
+		WHERE FromParty > 0 AND ChargeType NOT IN (2, 3) -- Old type & No longer used
+		GROUP BY FromParty HAVING MAX(ToDate) < CONVERT(DATE, GETDATE())
+	) AND p.PartyType = 1 AND d.IsDeposit = 1 AND d.StatusId = 1
 
 	UNION ALL
 

@@ -5,7 +5,7 @@ GO
 ALTER PROCEDURE [dbo].[LA_Inv_AmfPartySel]
 	@HasAmf			BIT,
 	@UserId			INT,
-	@FunctionId		INT,
+	@FunctionKey	NVARCHAR(100),
 	@Environment	VARCHAR(50)
 AS
 /*	Header:
@@ -16,13 +16,14 @@ AS
 	Revisions:
 		- 20171226: create SP
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20190821@Parsons: Improve the ability to maintain systems [#118627]
 */
 BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, HasAmf BIT)
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
-	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionId=@FunctionId
+	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionKey=@FunctionKey
 
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListNonOfficialSel

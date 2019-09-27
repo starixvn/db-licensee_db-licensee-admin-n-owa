@@ -4,7 +4,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_PartyListSel]
 	 @UserID		INT	   = 0
-	,@FunctionID	INT	   = 0
+	,@FunctionKey	NVARCHAR(100)	= ''
 AS
 
 /*
@@ -18,6 +18,7 @@ AS
 		- 20150412@Patrick: Add filter by PartyType
 		- 20180403@Harper: Add more Cozni as parent license [RedmineID: #85681]
 		- 20180713@bruce: Add new group TEST for credit side [#98126]
+		- 20190821@Parsons: Improve the ability to maintain systems [#118627]
 
 	Params:
 		+ UserID:
@@ -67,6 +68,16 @@ FROM dbo.OAS_ChargeInfo ci WITH (NOLOCK)
 WHERE ci.ChargeType = 1 
     AND cm.SystemID = 2
     AND ci.FromParty NOT IN ( SELECT PartyID FROM @CreditLicensee)
+
+DECLARE @FunctionID INT
+IF(@FunctionKey = '')
+BEGIN
+	SET @FunctionID = 0
+END
+ELSE
+BEGIN
+	SELECT @FunctionID = FunctionID FROM LA_Function WITH(NOLOCK) WHERE FunctionKey = @FunctionKey
+END	
 
 BEGIN
 	CREATE TABLE #Party (
