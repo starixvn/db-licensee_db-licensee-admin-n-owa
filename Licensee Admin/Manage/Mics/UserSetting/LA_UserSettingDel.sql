@@ -4,6 +4,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_UserSettingDel]
 	@Id				INT,
+	@UserId			INT,
 	@ErrCode		INT				= 0		OUTPUT, 
 	@ErrMsg			VARCHAR(4000)	= ''	OUTPUT
 AS
@@ -19,7 +20,7 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	IF EXISTS (SELECT TOP 1 1 FROM [dbo].[LA_UserSettings] WITH(NOLOCK) WHERE Id = @Id)
+	IF EXISTS (SELECT TOP 1 1 FROM [dbo].[LA_UserSettings] WITH(NOLOCK) WHERE Id = @Id AND UserId = @UserId)
 	BEGIN
 		DELETE [dbo].[LA_UserSettings]
 		WHERE Id = @Id
