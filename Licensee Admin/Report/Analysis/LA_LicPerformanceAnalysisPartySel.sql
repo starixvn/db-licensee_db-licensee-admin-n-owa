@@ -12,6 +12,7 @@ AS
 	
 	Revisions:
 		- 20190306@Bruce: Create SP
+		- 20190930@Bruce: Change licensee's launch date in Licensees Performance Analysis [#121129]
 */
 BEGIN
 	;WITH cte_Group AS (
@@ -37,7 +38,7 @@ BEGIN
 		g.ParentId AS GroupId,
 		g.GroupName,
 		CASE WHEN p.PartyID IS NULL THEN 0 ELSE 1 END AS IsLaunched,
-		CASE WHEN p.PartyID IS NULL THEN NULL ELSE ISNULL(l.AffectedDate, p.LaunchDate) END AS LaunchDate
+		p.LaunchDate
 	FROM dbo.Licensees l WITH(NOLOCK)
 	LEFT JOIN cte_LaunchDate p WITH(NOLOCK) ON p.OldRefID = l.LicenseeID
 	LEFT JOIN dbo.LA_CombinedGroupAssignment a WITH(NOLOCK) ON p.PartyID = a.PartyId
