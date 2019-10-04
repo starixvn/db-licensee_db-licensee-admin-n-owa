@@ -6,7 +6,8 @@ ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_InvoiceSel]
 	@PartyIds		VARCHAR(4000),
 	@FromDate		DATE,
 	@ToDate			DATE,
-	@Environment	VARCHAR(50) = 'DEV'
+	@Environment	VARCHAR(50) = 'DEV',
+	@IsShowDetail	BIT = 0
 AS
 /*	Header:
 	Task : Generate invoice amount for licensee
@@ -38,22 +39,43 @@ BEGIN
 	INNER JOIN @baseCurrencyList b ON d.BaseCurrencyId = b.CurrencyId
 	WHERE d.PartyID IN(SELECT val FROM dbo.strSplit(@PartyIds, ',')) AND d.LicenseeCode IS NOT NULL
 
-	-- get statement
-	SELECT p.LicenseeCode, b.CurrencyName
-		, SUM(CASE WHEN s.InvItemTypeId = 2  THEN ISNULL(s.Income,0) - ISNULL(s.Expense,0) ELSE 0 END) LicensingFee
-		, SUM(CASE WHEN s.InvItemTypeId <> 2 THEN ISNULL(s.Income,0) - ISNULL(s.Expense,0) ELSE 0 END) Prepayment
+	DECLARE @N_FromDate DATE = DATEADD(MONTH, DATEDIFF(MONTH, 0, @FromDate) + 1, 0)
+	DECLARE @N_ToDate DATE = DATEADD (DAY, -1, DATEADD(MONTH, 1, @N_FromDate))
+
+	SELECT p.LicenseeCode, b.CurrencyName, r.ProductName
+		,SUM(CASE WHEN InvItemTypeId = 1 THEN ISNULL(Income,0) ELSE 0 END) LicensingFee
+		,SUM(CASE WHEN InvItemTypeId = 4 THEN ISNULL(Expense,0) ELSE 0 END) Discount
+		,SUM(CASE WHEN InvItemTypeId = 6 THEN ISNULL(Expense,0) ELSE 0 END) Rebate
+		,SUM(CASE WHEN InvItemTypeId IN (5,24,26) THEN ISNULL(Expense,0) ELSE 0 END) Prepayment
+		,SUM(CASE WHEN InvItemTypeId IN (11,12,13,14,17,20) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Others
+	INTO #result
 	FROM @partyList p
-	INNER JOIN bodb_licensee.dbo.LA_InvoiceHeader h WITH(NOLOCK) ON p.PartyId = h.PartyId
-	INNER JOIN bodb_licensee.dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId
+	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON p.PartyId = h.PartyId
 	INNER JOIN @baseCurrencyList b ON h.CurrencyId = b.CurrencyId
+	INNER JOIN dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId
+	INNER JOIN dbo.LA_f_Products3rd('') r ON r.ProductID = s.ProductId
 	WHERE h.StatusId = 0-- normal invoice
 		AND h.Environment = @Environment
-		AND h.InvoiceDate BETWEEN @FromDate AND @ToDate
-		AND h.InvoiceType = 7 -- setup fee
-		AND s.InvItemTypeId IN (2,3,25)
-		-- 2 setupfee amount
-		-- 3 amf amount
-		-- 25 AG prepayment
-	GROUP BY p.LicenseeCode, b.CurrencyName
+		AND (
+			(h.InvoiceDate BETWEEN @FromDate AND @ToDate AND h.InvoiceType IN (1,3)) OR 
+			(h.InvoiceDate BETWEEN @N_FromDate AND @N_ToDate AND h.InvoiceType IN (4,5))
+		)
+	GROUP BY p.LicenseeCode, b.CurrencyName, r.ProductName
+	
+	IF @IsShowDetail = 0
+	BEGIN
+		SELECT LicenseeCode
+			,SUM(LicensingFee) LicensingFee
+			,SUM(Discount) Discount
+			,SUM(Rebate) Rebate
+			,SUM(Prepayment) Prepayment
+			,SUM(Others) Others
+		FROM #result
+		GROUP BY LicenseeCode
+	END
+	ELSE BEGIN
+		SELECT * FROM #result
+	END
+	DROP TABLE #result
 END
 GO
