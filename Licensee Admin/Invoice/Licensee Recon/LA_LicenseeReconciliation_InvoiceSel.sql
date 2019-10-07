@@ -6,8 +6,7 @@ ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_InvoiceSel]
 	@PartyIds		VARCHAR(4000),
 	@FromDate		DATE,
 	@ToDate			DATE,
-	@Environment	VARCHAR(50) = 'DEV',
-	@IsShowDetail	BIT = 0
+	@Environment	VARCHAR(50) = 'DEV'
 AS
 /*	Header:
 	Task : Generate invoice amount for licensee
@@ -54,7 +53,7 @@ BEGIN
 	INNER JOIN @baseCurrencyList b ON h.CurrencyId = b.CurrencyId
 	INNER JOIN dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId
 	INNER JOIN dbo.LA_f_Products3rd('') r ON r.ProductID = s.ProductId
-	WHERE h.StatusId = 0-- normal invoice
+	WHERE (@IsShowDetail = 0 OR h.InvoiceType = 1) AND h.StatusId = 0-- normal invoice
 		AND h.Environment = @Environment
 		AND (
 			(h.InvoiceDate BETWEEN @FromDate AND @ToDate AND h.InvoiceType IN (1,3)) OR 
@@ -62,20 +61,15 @@ BEGIN
 		)
 	GROUP BY p.LicenseeCode, b.CurrencyName, r.ProductName
 	
-	IF @IsShowDetail = 0
-	BEGIN
-		SELECT LicenseeCode
-			,SUM(LicensingFee) LicensingFee
-			,SUM(Discount) Discount
-			,SUM(Rebate) Rebate
-			,SUM(Prepayment) Prepayment
-			,SUM(Others) Others
-		FROM #result
-		GROUP BY LicenseeCode
-	END
-	ELSE BEGIN
-		SELECT * FROM #result
-	END
+	SELECT LicenseeCode
+		,SUM(LicensingFee) LicensingFee
+		,SUM(Discount) Discount
+		,SUM(Rebate) Rebate
+		,SUM(Prepayment) Prepayment
+		,SUM(Others) Others
+	FROM #result
+	GROUP BY LicenseeCode
+
 	DROP TABLE #result
 END
 GO
