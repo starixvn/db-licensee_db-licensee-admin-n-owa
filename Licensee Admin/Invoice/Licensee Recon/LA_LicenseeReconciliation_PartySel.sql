@@ -117,15 +117,16 @@ BEGIN
 		, l.LicenseeCode
 		, ISNULL(l.StartDate,@defaultStartDate) StartDate
 		, ISNULL(l.EndDate,@defaultEndDate) EndDate
+		, l.CustId
 	FROM #licensees l
 	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON l.BaseCurrencyId=e.exchangeid
 	UNION ALL
-	SELECT PartyId, 0, PartyName, 0, '', '',@defaultStartDate,@defaultEndDate FROM @partyList
+	SELECT PartyId, 0, PartyName, 0, '', '',@defaultStartDate,@defaultEndDate,0 FROM @partyList
 	WHERE ParentId = 0 AND PartyId IN (SELECT GroupId FROM @billingGroup)
 	UNION ALL
-	SELECT @UnofficialGroup, 0, 'Non-Official Licensees',0, '', '',@defaultStartDate,@defaultEndDate FROM @billingGroup WHERE GroupId = @UnofficialGroup
+	SELECT @UnofficialGroup, 0, 'Non-Official Licensees',0, '', '',@defaultStartDate,@defaultEndDate,0 FROM @billingGroup WHERE GroupId = @UnofficialGroup
 	UNION ALL
-	SELECT @UnidentifiedGroup, 0, 'Unidentified',0, '', '',@defaultStartDate,@defaultEndDate FROM @billingGroup WHERE GroupId = @UnidentifiedGroup
+	SELECT @UnidentifiedGroup, 0, 'Unidentified',0, '', '',@defaultStartDate,@defaultEndDate,0 FROM @billingGroup WHERE GroupId = @UnidentifiedGroup
 
 	DROP TABLE #licensees
 END
