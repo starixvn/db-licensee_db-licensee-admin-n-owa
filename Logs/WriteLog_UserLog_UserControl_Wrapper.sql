@@ -1,7 +1,4 @@
-/*<info serverAlias="DBCUST-CustDB" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
-USE [CustDB]
-GO
-
+/*<info serverAlias="DBCUST-CustDB" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="1"></info>*/
 ALTER PROCEDURE [dbo].[WriteLog_UserLog_UserControl_Wrapper]
 	@CustID		INT
 	,@Doing		NVARCHAR(MAX) = NULL
