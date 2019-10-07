@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBCUST-bodb_CustomerLog,DBLOG-bodb_CustomerLog" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+﻿/*<info serverAlias="DBCUST-bodb_CustomerLog,DBLOG-bodb_CustomerLog" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="1"></info>*/
 ALTER PROCEDURE [dbo].[WriteLog_UserLog_UserControl]
 	@CustID		INT
 	,@Doing		NVARCHAR(MAX) = NULL
