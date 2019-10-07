@@ -53,7 +53,7 @@ BEGIN
 	INNER JOIN @baseCurrencyList b ON h.CurrencyId = b.CurrencyId
 	INNER JOIN dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId
 	INNER JOIN dbo.LA_f_Products3rd('') r ON r.ProductID = s.ProductId
-	WHERE (@IsShowDetail = 0 OR h.InvoiceType = 1) AND h.StatusId = 0-- normal invoice
+	WHERE h.StatusId = 0-- normal invoice
 		AND h.Environment = @Environment
 		AND (
 			(h.InvoiceDate BETWEEN @FromDate AND @ToDate AND h.InvoiceType IN (1,3)) OR 
