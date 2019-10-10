@@ -8,7 +8,8 @@ ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_AmountToCompanySel]
 	@ToDate			DATETIME,
 	@BaseCurrency	VARCHAR(5),
 	@Environment	VARCHAR(50) = 'DEV',
-	@IsShowDetail	BIT = 0
+	@IsShowDetail	BIT = 0,
+	@IsSyncProductWithInvoice BIT = 0
 AS
 /*	Header:
 	Task : Generate invoice amount for licensee
@@ -595,6 +596,8 @@ END
 /*-----------------
  * get issued invoice
  *-----------------*/
+ IF @IsSyncProductWithInvoice = 1
+ BEGIN
 	-- invoice header
 	--
 	SELECT h.PartyId, s.ProductId INTO #productFees
@@ -614,6 +617,8 @@ END
 	LEFT JOIN #productFees s ON r.PartyID=s.PartyId AND r.ProductID=s.ProductId
 	WHERE r.PartyID IN (SELECT p.PartyId FROM #productFees p) AND s.ProductId IS NULL
 
+	DROP TABLE #productFees
+END
 /*-----------------
  * aggregate
  *-----------------*/
@@ -650,6 +655,5 @@ END
 	DROP TABLE #tmpDiscountSettings
 	DROP TABLE #tmpExchange
 	DROP TABLE #tmpWinlossData
-	DROP TABLE #productFees
 END
 GO
