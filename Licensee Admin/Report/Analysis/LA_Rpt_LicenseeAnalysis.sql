@@ -1,19 +1,11 @@
 /*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
-USE bodb_licensee
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
-ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeAnalysis] (
+ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeAnalysis]
 	@PartyIDs		VARCHAR(4000),
 	@ProductCodes	VARCHAR(200),
 	@FromDate		SMALLDATETIME,
 	@ToDate			SMALLDATETIME,
 	@BaseCurrency	VARCHAR(20)		= 'EUR',
 	@IsSkinView		BIT				= 0
-)
 AS
 /*
 	Created: BRUCE
@@ -28,7 +20,8 @@ AS
 		- 20181119@bruce: Integrate Bidme games (GD product) [#103695]
 		- 20190319@bruce: Apply min fee rule for discount calculation [#109997]
 		- 20190410@bruce: calculate discount for terminated licensee[111485]
-	    	- 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
+	    - 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
+		- 20191010@Percy: Replace LicenseeBATransaction to LicenseeBATransaction_active [RedmineID: #103656]
 
 	Notes: @FromDate, @ToDate should be a full month range
 	Example :  EXEC LA_Rpt_LicenseeAnalysis  @PartyIDs = '73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88', 
@@ -318,7 +311,7 @@ BEGIN
 						AND b.winlostdate BETWEEN e.FirstExchangeDateByMonth AND e.LastExchangeDateByMonth
 			WHERE b.statusID IN (111, 112, 113) 
 				AND b.winlostdate BETWEEN @TempFromDate AND @ToDate
-				AND NOT EXISTS (SELECT 1 FROM dbo.LicenseeBATransaction ba WITH(NOLOCK) WHERE b.transid = ba.transid)
+				AND NOT EXISTS (SELECT 1 FROM dbo.LicenseeBATransaction_active ba WITH(NOLOCK) WHERE b.transid = ba.transid)
 				AND b.bettype NOT IN (901,902,903,904,911,912,913,914)
 			GROUP BY b.winlostdate, l.CurrencyId, bt.ProductID, l.PartyId
 				, CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END
