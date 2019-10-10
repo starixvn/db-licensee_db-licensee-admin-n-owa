@@ -39,8 +39,8 @@ BEGIN
 
 	SELECT p.LicenseeCode, b.CurrencyName, r.ProductName
 		,SUM(CASE WHEN InvItemTypeId = 1 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) LicensingFee
-		,SUM(CASE WHEN InvItemTypeId = 4 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Discount
-		,SUM(CASE WHEN InvItemTypeId = 6 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Rebate
+		,SUM(CASE WHEN InvItemTypeId = 4 THEN ISNULL(Expense,0) ELSE 0 END) Discount
+		,SUM(CASE WHEN InvItemTypeId = 6 THEN ISNULL(Expense,0) ELSE 0 END) Rebate
 		,SUM(CASE WHEN InvItemTypeId IN (5,24,26) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Prepayment
 		,SUM(CASE WHEN InvItemTypeId IN (11,12,13,14,17,20) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Others
 	INTO #result
