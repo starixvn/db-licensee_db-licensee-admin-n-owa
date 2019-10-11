@@ -610,9 +610,14 @@ END
 		AND s.InvItemTypeId=1 -- software data fee
 	GROUP BY h.PartyId, s.ProductId
 
-	-- Remove unsupported products (product not issued invoice)
+	-- Sync re-calculated product
 	--
-	DELETE r
+	UPDATE r SET 
+		 AmountToCompany = (r.AmountToCompany + r.ExtraAmount)
+		,ExtraAmount = 0
+		,LicensingFee = 0
+		,Discount = 0
+		,Rebate = 0
 	FROM #tmpResult r
 	LEFT JOIN #productFees s ON r.PartyID=s.PartyId AND r.ProductID=s.ProductId
 	WHERE r.PartyID IN (SELECT p.PartyId FROM #productFees p) AND s.ProductId IS NULL
