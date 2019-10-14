@@ -15,6 +15,7 @@ AS
 	Revisions: 
 		- 20190905@Bruce: Create Sp [#111586]
 		- 20190924@Bruce: Include actual invoice, prepayment, cn/dn data [#120220]
+		- 20191014@Bruce: Include setupfee data [#120220]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -43,6 +44,8 @@ BEGIN
 		,SUM(CASE WHEN InvItemTypeId = 6 THEN ISNULL(Expense,0) ELSE 0 END) Rebate
 		,SUM(CASE WHEN InvItemTypeId IN (5,24,26) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Prepayment
 		,SUM(CASE WHEN InvItemTypeId IN (11,12,13,14,17,20) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Others
+		,SUM(CASE WHEN InvItemTypeId = 3 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) AMF
+		,SUM(CASE WHEN InvItemTypeId = 2 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) SetupFee
 	INTO #result
 	FROM @partyList p
 	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON p.PartyId = h.PartyId
@@ -52,7 +55,7 @@ BEGIN
 	WHERE h.StatusId = 0-- normal invoice
 		AND h.Environment = @Environment
 		AND (
-			(h.InvoiceDate BETWEEN @FromDate AND @ToDate AND h.InvoiceType IN (1,3)) OR 
+			(h.InvoiceDate BETWEEN @FromDate AND @ToDate AND h.InvoiceType IN (1,3,7)) OR 
 			(h.InvoiceDate BETWEEN @N_FromDate AND @N_ToDate AND h.InvoiceType IN (4,5))
 		)
 	GROUP BY p.LicenseeCode, b.CurrencyName, r.ProductName
