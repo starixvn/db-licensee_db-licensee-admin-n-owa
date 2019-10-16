@@ -1,0 +1,3 @@
+Licensee Admin\Report\Analysis\LA_Rpt_LicenseeAnalysis.sql
+Licensee Admin\Report\LA_Rpt_PlatformWinloss.sql
+Licensee Admin\Report\LA_Rpt_PlatformWinlossSummary.sql
