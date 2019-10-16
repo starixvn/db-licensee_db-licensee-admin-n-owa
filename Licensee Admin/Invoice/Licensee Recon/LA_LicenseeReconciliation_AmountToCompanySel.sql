@@ -8,7 +8,7 @@ ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_AmountToCompanySel]
 	@ToDate			DATETIME,
 	@BaseCurrency	VARCHAR(5),
 	@Environment	VARCHAR(50) = 'DEV',
-	@IsShowDetail	BIT = 0,
+	@IsShowSettlementDetail	BIT = 0,
 	@IsSyncProductWithInvoice BIT = 0
 AS
 /*	Header:
@@ -403,7 +403,7 @@ BEGIN
 /*-----------------
  * minfee
  *-----------------*/
-IF @IsShowDetail = 0
+IF @IsShowSettlementDetail = 0
 BEGIN
 	-- sum data to 2 parts
 	--
@@ -475,7 +475,7 @@ END
 		Fee 				MONEY,
 		IsDiscountByCurrency BIT
 	)
-IF @IsShowDetail = 0
+IF @IsShowSettlementDetail = 0
 BEGIN
 	-- discount by all currency
 	INSERT INTO @tmpDiscountCalculation(CalculationGroup,DiscountGroupId,DiscountGroupType,CurrencyId,Winloss,Fee,IsDiscountByCurrency)
@@ -563,7 +563,7 @@ END
 /*-----------------
  * Rebate
  *-----------------*/
-IF @IsShowDetail = 0
+IF @IsShowSettlementDetail = 0
 BEGIN
 	-- get rebate settings
 	DECLARE @tmpRebateSettings TABLE(PartyId INT, ProductId INT, Rate DECIMAL(7,5), FromDate DATE)
@@ -628,7 +628,7 @@ END
 /*-----------------
  * aggregate
  *-----------------*/
-	IF @IsShowDetail = 1
+	IF @IsShowSettlementDetail = 1
 	BEGIN
 		SELECT p.LicenseeCode
 			, pl.Name AS ProductName
