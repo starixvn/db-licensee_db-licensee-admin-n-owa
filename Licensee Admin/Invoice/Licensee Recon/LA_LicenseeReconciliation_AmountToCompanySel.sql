@@ -9,7 +9,8 @@ ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_AmountToCompanySel]
 	@BaseCurrency	VARCHAR(5),
 	@Environment	VARCHAR(50) = 'DEV',
 	@IsShowSettlementDetail	BIT = 0,
-	@IsSyncProductWithInvoice BIT = 0
+	@IsSyncProductWithInvoice BIT = 0,
+	@IsGroupByPartyId BIT = 0
 AS
 /*	Header:
 	Task : Generate invoice amount for licensee
@@ -639,6 +640,19 @@ END
 		WHERE p.IsSelected=1
 		GROUP BY pl.ProductId, p.LicenseeCode, pl.Name
 		ORDER BY pl.ProductId
+	END
+	ELSE IF @IsGroupByPartyId = 1
+	BEGIN
+		SELECT p.PartyId
+			,UPPER(@BaseCurrency) AS CurrencyName
+			,SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
+			,SUM(r.LicensingFee + r.ExtraAmount) LicensingFee
+			,SUM(r.Discount) Discount
+			,SUM(r.Rebate) Rebate
+		FROM #tmpResult r
+		INNER JOIN @partyList p ON p.PartyId = r.PartyID
+		WHERE p.IsSelected = 1
+		GROUP BY p.PartyId
 	END
 	ELSE
 	BEGIN

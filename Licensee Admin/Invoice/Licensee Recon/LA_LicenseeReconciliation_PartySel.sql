@@ -2,7 +2,10 @@
 USE [bodb_Licensee]
 GO
 
-ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_PartySel](@BillingDate DATE = NULL)
+ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_PartySel](
+	@BillingDate DATE = NULL,
+	@IncludeAll BIT = 0
+)
 AS
 /*	Header:
 	Task : Get list of licensee for Reconciliation report
@@ -62,6 +65,16 @@ BEGIN
 	INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = d.PartyID
 	WHERE d.StatusId = 1 AND p.PartyType = 5
 
+	IF @IncludeAll = 1
+	BEGIN
+		INSERT INTO #licensees(LicenseeName, BaseCurrencyId, PartyId,CustId, ParentId)
+		SELECT p.PartyName, d.BaseCurrencyId, p.PartyID,0, CASE WHEN p.PartyType = 5 THEN @UnofficialGroup ELSE NULL END
+		FROM dbo.OAS_PartyDetail d
+		INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = d.PartyID
+		WHERE p.PartyType IN (1,5)
+			AND d.IsDeposit = 1
+			AND p.PartyID NOT IN (SELECT l.PartyId FROM #licensees l WHERE l.PartyId > 0)
+	END
 	-- get charge rate
 	--
 	SELECT c.FromParty, c.ToParty,c.FromDate, c.ToDate, l.ParentId
@@ -140,12 +153,13 @@ BEGIN
 		, l.LicenseeName
 		, l.BaseCurrencyId
 		, e.Code AS BaseCurrencyCode
-		, l.LicenseeCode
+		, UPPER(l.LicenseeCode) LicenseeCode
 		, ISNULL(l.StartDate,@defaultStartDate) StartDate
 		, ISNULL(l.EndDate,@defaultEndDate) EndDate
 		, l.CustId
 	FROM #licensees l
 	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON l.BaseCurrencyId=e.exchangeid
+	WHERE (ISNULL(l.CustId,0) > 0 OR ISNULL(l.PartyId,0)>0) AND (@BillingDate IS NULL OR @BillingDate >= ISNULL(l.StartDate,@defaultStartDate))
 	UNION ALL
 	SELECT PartyId, 0, PartyName, 0, '', '',@defaultStartDate,@defaultEndDate,0 FROM @partyList
 	WHERE ParentId = 0 AND PartyId IN (SELECT GroupId FROM @billingGroup)
