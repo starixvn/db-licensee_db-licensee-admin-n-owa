@@ -14,8 +14,7 @@ AS
    
 	Revisions: 
 		- 20190905@Bruce: Create Sp [#111586]
-		- 20190924@Bruce: Include actual invoice, prepayment, cn/dn data [#120220]
-		- 20191014@Bruce: Include setupfee data [#120220]
+		- 20190924@Bruce: Include actual invoice, prepayment, cn/dn data and setupfee amount [#120220]
 */
 BEGIN
 	SET NOCOUNT ON
