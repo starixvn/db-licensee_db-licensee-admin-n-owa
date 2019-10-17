@@ -34,7 +34,12 @@ BEGIN
 	INSERT INTO @partyList(PartyId, LicenseeCode)
 	SELECT d.PartyID, d.LicenseeCode
 	FROM dbo.OAS_PartyDetail d WITH(NOLOCK)
-	WHERE d.PartyID IN(SELECT val FROM dbo.strSplit(@PartyIds, ',')) AND (@IsGroupByPartyId = 1 OR d.LicenseeCode IS NOT NULL)
+	WHERE @IsGroupByPartyId = 1 OR d.LicenseeCode IS NOT NULL
+
+	IF @PartyIds <> 'All'
+	BEGIN
+		DELETE @partyList WHERE PartyID NOT IN (SELECT val FROM dbo.strSplit(@PartyIds, ','))
+	END
 
 	DECLARE @N_FromDate DATE = DATEADD(MONTH, DATEDIFF(MONTH, 0, @FromDate) + 1, 0)
 	DECLARE @N_ToDate DATE = DATEADD (DAY, -1, DATEADD(MONTH, 1, @N_FromDate))
