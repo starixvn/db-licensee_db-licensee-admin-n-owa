@@ -2,19 +2,22 @@
 USE [bodb_Licensee]
 GO
 
-ALTER PROCEDURE [dbo].[LA_Inv_GenerateAmountForSoftwareFee]
-	@PartyId			INT,
+--ALTER PROCEDURE [dbo].[LA_Inv_GenerateAmountForSoftwareFee]
+DECLARE	@PartyId			INT,
 	@BillerId			INT,
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
 	@ProductCodes		VARCHAR(500),
 	@Environment		VARCHAR(50),
-	@ErrCode			INT				= 0		OUTPUT,
-	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT,
-	@BaseCurrency		VARCHAR(10)		= 'EUR'	OUTPUT,
-	@InvoiceTemplateName VARCHAR(200)	= ''	OUTPUT
-WITH RECOMPILE
-AS
+	@ErrCode			INT				= 0,		--OUTPUT,
+	@ErrMsg				NVARCHAR(1000)	= '',	--OUTPUT,
+	@BaseCurrency		VARCHAR(10)		= 'EUR',	--OUTPUT,
+	@InvoiceTemplateName VARCHAR(200)	= ''	--OUTPUT
+--WITH RECOMPILE
+--AS
+SELECT @BaseCurrency='EUR',@PartyId=14,@BillerId=362,@FromDate='2019-09-01 00:00:00',@ToDate='2019-09-30 00:00:00',@ProductCodes='SB,NG,BA,VS,CS,KN,AGC,GD,CB,AB,VB,FW,CO,VS2,LT,BX,PP',@Environment='UAT'
+
+
 /*	Header:
 	Created: 2018.10.04 - Parsons
 	Task : Generate amount for software fee
@@ -26,6 +29,7 @@ AS
 	    - 20190416@Parsons: Integrate-PP-Promotion-Prize [#109014]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20190911@Bruce: Support Exchange product in invoices [#119846]
+		- 20191017@Parsons: Non-peak hour promotion [#119538]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -33,7 +37,8 @@ BEGIN
 	DECLARE @AmountTypeSoftwareFee INT = 1,
 		@AmountTypeDiscount INT = 4,
 		@AmountTypeRebate INT = 6,
-		@DeductAgainstInvoice INT = 24
+		@DeductAgainstInvoice INT = 24,
+		@DeductNonePeakHourPromotion INT = 29
 
 	-- Region: Check Invoice Type is Rebate
 	DECLARE @Month TINYINT = MONTH(@FromDate)
@@ -505,6 +510,24 @@ BEGIN
 		VALUES(0,'','',@DeductAgainstInvoice,0,@Prepayment)
 	END
 
+	-- Region insert Promotion amount
+	IF(EXISTS(SELECT val FROM bodb02.dbo.strSplit(@ProductCodes, ',') WHERE val = 'SB'))
+	BEGIN
+		DECLARE @PromotionAmount MONEY
+		SELECT @PromotionAmount = SUM(p.Prize * e.Rate)
+		FROM bodb_LicenseeReport.dbo.rpt_NPHPromotion p WITH (NOLOCK)
+		JOIN @PartyChargeInfo pc ON p.SiteID = pc.LicenseeId
+			INNER JOIN #Exchange e ON p.RptDate = e.ExchangeDate AND p.CurrencyID = e.ExchangeID
+			WHERE p.RptDate BETWEEN @FromDate and @ToDate
+		
+		IF(ISNULL(@PromotionAmount, 0) > 0)
+		BEGIN
+			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
+			VALUES(0,'','',@DeductNonePeakHourPromotion,@PromotionAmount,0)
+		END
+	END
+	-- End region insert Promotion amount
+
 	SELECT	f.ProductId,
 			f.ProductCode,
 			f.ProductName,
@@ -523,6 +546,7 @@ BEGIN
 	DROP TABLE #TempData
 	DROP TABLE #TempDataCB
 	DROP TABLE #AmountToCompany
+	DROP TABLE #credit
 
 END
 GO
