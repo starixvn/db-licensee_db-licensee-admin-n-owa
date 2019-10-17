@@ -1,9 +1,7 @@
 /*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
---use bodb_licenseeReport
---grant execute on [LA_LicenseeReconciliation_SummarySel] to bodbAdminNet
---GRANT SELECT ON dbo.rptLicenseeReconciliation TO bodbAdminNet  
+
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_SummarySel]
 	@Month	DATE,
 	@Environment VARCHAR(10)
@@ -14,7 +12,7 @@ AS
 	DB: DBLIC.bodb_licensee
 
 	Revisions: 
-		- 20191017@Bruce: Create Sp [#120220]
+		- 20191017@Bruce: Create Sp [#112229]
 */
 BEGIN
 	SET NOCOUNT ON

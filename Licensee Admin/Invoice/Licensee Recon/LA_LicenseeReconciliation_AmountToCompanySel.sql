@@ -19,6 +19,7 @@ AS
 	Revisions: 
 		- 20190723@Bruce: Create Sp [#111586]
 		- 20190927@Bruce: Remove prepayment section and Include CardClub [#120220]
+		- 20191017@Bruce: Group by party id [#112229]		
 */
 BEGIN
 	SET NOCOUNT ON

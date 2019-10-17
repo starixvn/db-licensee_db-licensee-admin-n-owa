@@ -14,7 +14,7 @@ AS
 	Revisions: 
 		- 20190723@Bruce: Create Sp [#111586]
 		- 20190927@Bruce: Include fromdate, todate of charge info [#120220]
-		- 20191015@Bruce: Get billing group by billing date [#120220]
+		- 20191015@Bruce: Get billing group by billing date [#112229]
 */
 BEGIN
 	SET NOCOUNT ON

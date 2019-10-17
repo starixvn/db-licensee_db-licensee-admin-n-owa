@@ -16,7 +16,7 @@ AS
 	Revisions: 
 		- 20190905@Bruce: Create Sp [#111586]
 		- 20190924@Bruce: Include actual invoice, prepayment, cn/dn data and setupfee amount [#120220]
-		- 20191016@Bruce: group data by code or by party id [#120220]
+		- 20191016@Bruce: group data by code or by party id [#112229]
 */
 BEGIN
 	SET NOCOUNT ON
