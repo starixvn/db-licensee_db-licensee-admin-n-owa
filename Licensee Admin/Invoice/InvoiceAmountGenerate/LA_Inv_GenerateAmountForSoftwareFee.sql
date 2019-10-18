@@ -2,21 +2,19 @@
 USE [bodb_Licensee]
 GO
 
---ALTER PROCEDURE [dbo].[LA_Inv_GenerateAmountForSoftwareFee]
-DECLARE	@PartyId			INT,
+ALTER PROCEDURE [dbo].[LA_Inv_GenerateAmountForSoftwareFee]
+	@PartyId			INT,
 	@BillerId			INT,
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
 	@ProductCodes		VARCHAR(500),
 	@Environment		VARCHAR(50),
-	@ErrCode			INT				= 0,		--OUTPUT,
-	@ErrMsg				NVARCHAR(1000)	= '',	--OUTPUT,
-	@BaseCurrency		VARCHAR(10)		= 'EUR',	--OUTPUT,
-	@InvoiceTemplateName VARCHAR(200)	= ''	--OUTPUT
---WITH RECOMPILE
---AS
-SELECT @BaseCurrency='EUR',@PartyId=14,@BillerId=362,@FromDate='2019-09-01 00:00:00',@ToDate='2019-09-30 00:00:00',@ProductCodes='SB,NG,BA,VS,CS,KN,AGC,GD,CB,AB,VB,FW,CO,VS2,LT,BX,PP',@Environment='UAT'
-
+	@ErrCode			INT				= 0		OUTPUT,
+	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT,
+	@BaseCurrency		VARCHAR(10)		= 'EUR'	OUTPUT,
+	@InvoiceTemplateName VARCHAR(200)	= ''	OUTPUT
+WITH RECOMPILE
+AS
 
 /*	Header:
 	Created: 2018.10.04 - Parsons
