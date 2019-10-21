@@ -418,7 +418,7 @@ BEGIN
 		UPDATE r
 		SET PromotionSportsbook = p.Prize
 		FROM #Result r
-			INNER JOIN cte_Promotion p ON r.PartyId = r.PartyId AND r.IsCurrent = r.IsCurrent
+			INNER JOIN cte_Promotion p ON r.PartyId = r.PartyId AND r.IsCurrent = p.IsCurrent
 	END
 
 	-- ********************************************************
