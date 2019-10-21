@@ -405,33 +405,21 @@ BEGIN
 	WHERE	s.ProductId = 0
 
 	/*Update Promotion column*/
-	;WITH cte_CurrenMonthPromotion AS(
-		SELECT pc.PartyID, SUM(r.Prize * cExchange.Rate) AS Prize
+	IF(EXISTS(SELECT val FROM bodb02.dbo.strSplit(@ProductCodes, ',') WHERE val = 'SB'))
+	BEGIN
+		;WITH cte_Promotion AS(
+			SELECT pc.PartyId, r.SiteID,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END) IsCurrent, SUM(r.Prize * cExchange.Rate) AS Prize
 			FROM bodb_LicenseeReport.dbo.rpt_NPHPromotion r WITH (NOLOCK)
-				INNER JOIN bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'SB', 'OA', 1) pc ON r.SiteID = pc.LicenseeId
+				INNER JOIN (SELECT DISTINCT PartyId, LicenseeId FROM @PartyChargeInfo WHERE ProductID = 0) pc ON r.SiteID = pc.LicenseeId
 				INNER JOIN #Exchange cExchange ON r.RptDate = cExchange.ExchangeDate AND r.CurrencyID = cExchange.ExchangeID
-				WHERE r.RptDate BETWEEN @FromDate and @ToDate
-		GROUP BY pc.PartyID
-	)
-	UPDATE r
-	SET PromotionSportsbook = Prize
-	FROM #Result r
-	INNER JOIN cte_CurrenMonthPromotion c ON r.PartyId = c.PartyID
-	WHERE IsCurrent = 1
-
-	;WITH cte_PreviousMonthPromotion AS(
-		SELECT pc.PartyID, SUM(r.Prize * cExchange.Rate) AS Prize
-			FROM bodb_LicenseeReport.dbo.rpt_NPHPromotion r WITH (NOLOCK)
-				INNER JOIN bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'SB', 'OA', 1) pc ON r.SiteID = pc.LicenseeId
-				INNER JOIN #Exchange cExchange ON r.RptDate = cExchange.ExchangeDate AND r.CurrencyID = cExchange.ExchangeID
-				WHERE r.RptDate BETWEEN @PrevFromDate and @PrevToDate
-		GROUP BY pc.PartyID
-	)
-	UPDATE r
-	SET PromotionSportsbook = ISNULL(Prize, 0)
-	FROM #Result r
-	INNER JOIN cte_PreviousMonthPromotion c ON r.PartyId = c.PartyID
-	WHERE IsCurrent = 0
+				WHERE (r.RptDate BETWEEN @FromDate AND @ToDate) OR (r.RptDate BETWEEN @PrevFromDate AND @PrevToDate)
+				GROUP BY pc.PartyId, r.SiteID, (CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END)
+		)
+		UPDATE r
+		SET PromotionSportsbook = p.Prize
+		FROM #Result r
+			INNER JOIN cte_Promotion p ON r.PartyId = r.PartyId AND r.IsCurrent = r.IsCurrent
+	END
 
 	-- ********************************************************
 	-- *** Calculate Other (!= SportBook) and Merge to #Result
