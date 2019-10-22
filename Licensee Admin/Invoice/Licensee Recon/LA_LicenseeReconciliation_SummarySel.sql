@@ -26,6 +26,8 @@ BEGIN
 		ProductFees,
 		Discount,
 		Rebate,
+		Others,
+		Prepayment,
 		ClosingBalance,
 		CurrencyName,
 		SettlementDetails
