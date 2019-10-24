@@ -43,6 +43,7 @@ AS
 		- 20190307@Parsons: Implement BetBuilder [Redmine: #108995]
 		- 20190603@Parsons: Extend Lottery's bet types range [Redmine: #114568]
 		- 20190712@Mason: Add Card Club Win Loss report [RedmineId #116096]
+		- 20191024@Pasons: Non-peak hour promotion [#119538]    
 
 	Param's Explanation:
 
@@ -330,6 +331,15 @@ BEGIN
 		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 	
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'NPHP')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 37
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid = 17000
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+	END
+
 	RETURN
 END
 GO
