@@ -1,14 +1,12 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
-USE bodb02
-GO
-
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_PlatformWinloss]
 	 @PartyIds		VARCHAR(4000),
 	 @FromDate		SMALLDATETIME,
 	 @ToDate		SMALLDATETIME,
 	 @BaseCurrency  VARCHAR(20)
 AS
-/*  Created: 20160512@Bravo
+/*
+	Created: 20160512@Bravo
     Task : Platform WinLoss Report
     DB: DBEXT/bodb02
 
@@ -25,6 +23,7 @@ AS
 			+ Cover betfrom 'c' in the report
 		- 20190516@Parsons: Show Bet count in Platform Win Loss (Summary) Report [#113568]
 		- 20190827@Bruce: Add new betfrom 't' [#118998]
+		- 20191010@Percy: Replace LicenseeBATransaction to LicenseeBATransaction_active [RedmineID: #103656]
 
 	Explanation:
 	  + @PlatformType:
@@ -136,7 +135,7 @@ BEGIN
 			b.betfrom
 			FROM #tmpBettrans b
 			INNER JOIN #Cust c ON c.CustID = b.recommend
-			LEFT JOIN bodb_licensee.dbo.LicenseeBATransaction ba WITH(NOLOCK) ON b.transid = ba.transid
+			LEFT JOIN bodb_licensee.dbo.LicenseeBATransaction_active ba WITH(NOLOCK) ON b.transid = ba.transid
 			WHERE b.statusID IN (111, 112, 113)
 				AND ba.TransID IS NULL
 				AND b.betfrom IN (SELECT bf.betfrom FROM @betfrom bf)

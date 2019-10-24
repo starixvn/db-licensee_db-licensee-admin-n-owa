@@ -1,17 +1,14 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
-USE [bodb02]
-GO
-
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_PlatformWinlossSummary]
 	@PartyIDs		VARCHAR(4000),
 	@FromDate		SMALLDATETIME,
 	@ToDate			SMALLDATETIME,
 	@BaseCurrency	VARCHAR(20) = 'EUR'
 AS
-/*	Created: Bravo
-	Date: 2016-07-25
+/*
+	Created: 20160725@Bravo
 	Task: Platform Win Loss (Summary) #redmind: https://nexdev.net/issues/60707
-	DB: DB052.bodb02
+	DB: DBEXT.bodb02
 
 	Revisions:
 		- 20160725@Bravo: create SP
@@ -26,6 +23,7 @@ AS
 			+ Cover betfrom 'c' in the report
 		- 20190516@Parsons: Show Bet count in Platform Win Loss (Summary) Report [#113568]
 		- 20190827@Bruce: Add new betfrom 't' [#118998]
+		- 20191010@Percy: Replace LicenseeBATransaction to LicenseeBATransaction_active [RedmineID: #103656]
 
 	Explanation:
 		- Desktop: contain the followings:
@@ -127,7 +125,7 @@ BEGIN
 				SUM(-(b.winlost - b.actual_stake))
 			FROM #tmpBettrans b
 				INNER JOIN #LicenseeCustInfo l ON l.CustId=b.recommend
-				LEFT JOIN bodb_licensee.dbo.LicenseeBATransaction ba WITH(NOLOCK) ON b.transid = ba.transid
+				LEFT JOIN bodb_licensee.dbo.LicenseeBATransaction_active ba WITH(NOLOCK) ON b.transid = ba.transid
 				LEFT JOIN @betfrom bf ON bf.betfrom=ISNULL(b.betfrom,'')
 			WHERE b.statusID IN (111, 112, 113)
 				AND ba.TransID IS NULL
