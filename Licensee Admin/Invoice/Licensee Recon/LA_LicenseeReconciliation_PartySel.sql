@@ -77,7 +77,7 @@ BEGIN
 	END
 	-- get charge rate
 	--
-	SELECT c.FromParty, c.ToParty,c.FromDate, c.ToDate, l.ParentId
+	SELECT c.FromParty, c.ToParty,c.FromDate, c.ToDate
 		,DATEADD(MONTH, DATEDIFF(MONTH, 0, c.FromDate), 0) StartMonth
 		,DATEADD(DAY,-1,DATEADD(MONTH, DATEDIFF(MONTH, 0, c.ToDate) + 1, 0)) EndMonth
 	INTO #chargeRate
@@ -137,7 +137,7 @@ BEGIN
 	;WITH a AS (
 		SELECT c.FromParty,MIN(c.FromDate) FromDate, MAX(c.ToDate) ToDate
 		FROM #chargeRate c
-		WHERE c.ParentId > 0
+		WHERE c.ToParty IN (SELECT GroupId FROM @billingGroup)
 		GROUP BY c.FromParty
 	)
 	UPDATE l SET EndDate = a.todate, StartDate=a.FromDate
