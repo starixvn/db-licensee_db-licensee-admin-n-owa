@@ -74,6 +74,8 @@ BEGIN
 			,SUM(Rebate) Rebate
 			,SUM(Prepayment) Prepayment
 			,SUM(Others) Others
+			,SUM(SetupFee) SetupFee
+			,SUM(AMF) AMF
 		FROM #result
 		GROUP BY LicenseeCode, CurrencyName
 	END
@@ -85,6 +87,8 @@ BEGIN
 			,SUM(Rebate) Rebate
 			,SUM(Prepayment) Prepayment
 			,SUM(Others) Others
+			,SUM(SetupFee) SetupFee
+			,SUM(AMF) AMF
 		FROM #result
 		GROUP BY PartyId, CurrencyName
 	END
