@@ -135,7 +135,7 @@ BEGIN
 	-- get licensee's end date
 	--
 	;WITH a AS (
-		SELECT c.FromParty,MIN(c.FromDate) FromDate, MAX(c.ToDate) ToDate
+		SELECT c.FromParty,MIN(c.StartMonth) FromDate, MAX(c.EndMonth) ToDate
 		FROM #chargeRate c
 		WHERE c.ToParty IN (SELECT GroupId FROM @billingGroup)
 		GROUP BY c.FromParty
