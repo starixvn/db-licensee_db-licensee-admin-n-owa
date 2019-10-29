@@ -72,6 +72,7 @@ BEGIN
 	IF @IsGroupByPartyId = 0
 	BEGIN
 		SELECT LicenseeCode,CurrencyName
+			,0 AS PartyId
 			,SUM(LicensingFee) LicensingFee
 			,SUM(Discount) Discount
 			,SUM(Rebate) Rebate
@@ -85,6 +86,7 @@ BEGIN
 	ELSE
 	BEGIN
 		SELECT PartyId,CurrencyName
+			,'' AS LicenseeCode
 			,SUM(LicensingFee) LicensingFee
 			,SUM(Discount) Discount
 			,SUM(Rebate) Rebate
