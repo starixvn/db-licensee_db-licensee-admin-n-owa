@@ -75,6 +75,7 @@ BEGIN
 			AND d.IsDeposit = 1
 			AND p.PartyID NOT IN (SELECT l.PartyId FROM #licensees l WHERE l.PartyId > 0)
 	END
+
 	-- get charge rate
 	--
 	SELECT c.FromParty, c.ToParty,c.FromDate, c.ToDate
@@ -98,24 +99,7 @@ BEGIN
 
 	INSERT INTO @partyList(PartyId,PartyName,BrandName,ParentId)
 	EXEC dbo.LA_PartyListSel
-
-	IF @BillingDate IS NULL
-	BEGIN
-		DELETE @partyList WHERE ParentId = 999 OR (PartyId = 999 AND ParentId = 0) -- Remove credit licensees
-	END
-	ELSE
-	BEGIN
-		DELETE @partyList WHERE ParentId > 0
-
-		;WITH a AS (
-			SELECT c.FromParty, c.ToParty,ROW_NUMBER() OVER (PARTITION BY c.FromParty ORDER BY c.FromDate DESC) Number
-			FROM #chargeRate c
-			WHERE @BillingDate BETWEEN StartMonth AND EndMonth
-				AND c.ToParty IN (SELECT b.PartyId FROM @partyList b)
-		)
-		INSERT INTO @partyList(PartyId,ParentId)
-		SELECT FromParty,ToParty FROM a WHERE a.Number = 1
-	END
+	DELETE @partyList WHERE ParentId = 999 OR (PartyId = 999 AND ParentId = 0) -- Remove credit licensees
 
 	-- map billing group
 	--
