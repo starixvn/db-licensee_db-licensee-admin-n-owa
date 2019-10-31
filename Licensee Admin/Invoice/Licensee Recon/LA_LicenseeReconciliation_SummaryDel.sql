@@ -18,6 +18,9 @@ BEGIN
 	SET NOCOUNT ON
 
 	DELETE bodb_licenseeReport.dbo.rptLicenseeReconciliation
-	WHERE AccDate = @AccDate AND Environment=@Environment
+	WHERE Environment=@Environment
+		AND AccDate = @AccDate
+		AND (@Environment <> 'PRO' OR @AccDate > '20190930')
+		-- We manually inserted data for August and Septemper 2019 on PRO so they should be locked from deleting
 END
 GO
