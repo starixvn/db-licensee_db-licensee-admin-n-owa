@@ -3,8 +3,9 @@ USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_SummaryDel]
-	@AccDate			DATE,
-	@Environment		VARCHAR(10)
+	@AccDate		DATE,
+	@Environment	VARCHAR(10),
+	@ForceDelete	BIT = 0
 AS
 /*	Header:
 	Created: 20191017@Bruce
@@ -20,7 +21,7 @@ BEGIN
 	DELETE bodb_licenseeReport.dbo.rptLicenseeReconciliation
 	WHERE Environment=@Environment
 		AND AccDate = @AccDate
-		AND (@Environment <> 'PRO' OR @AccDate > '20190930')
+		AND (@ForceDelete = 1 OR @Environment <> 'PRO' OR @AccDate > '20190930')
 		-- We manually inserted data for August and Septemper 2019 on PRO so they should be locked from deleting
 END
 GO
