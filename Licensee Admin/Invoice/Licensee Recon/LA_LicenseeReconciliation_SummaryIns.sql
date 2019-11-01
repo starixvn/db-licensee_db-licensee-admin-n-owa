@@ -3,19 +3,8 @@ USE bodb_licensee
 GO
  
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_SummaryIns]
-	@AccDate			DATE,
-	@PartyId			INT,
-	@OpeningBalance		MONEY,
-	@AmountToCompany	MONEY,
-	@ProductFees		MONEY,
-	@Discount			MONEY,
-	@Rebate				MONEY,
-	@Others				MONEY,
-	@Prepayment			MONEY,
-	@ClosingBalance		MONEY,
-	@CurrencyName		VARCHAR(10),
-	@SettlementDetails	VARCHAR(4000),
-	@Environment		VARCHAR(10)
+	@XmlData		XML,
+	@Environment	VARCHAR(10)
 AS
 /*	Header:
 	Created: 20191017@Bruce
@@ -29,6 +18,7 @@ BEGIN
 	SET NOCOUNT ON
 
 	INSERT INTO bodb_licenseeReport.dbo.rptLicenseeReconciliation(
+		Environment,
 		AccDate,
 		PartyId,
 		OpeningBalance,
@@ -38,24 +28,23 @@ BEGIN
 		Rebate,
 		ClosingBalance,
 		CurrencyName,
-		SettlementDetails,
-		Environment,
 		Others,
-		Prepayment)
-	VALUES(
-		@AccDate,
-		@PartyId,
-		@OpeningBalance,
-		@AmountToCompany,
-		@ProductFees,
-		@Discount,
-		@Rebate,
-		@ClosingBalance,
-		@CurrencyName,
-		@SettlementDetails,
-		@Environment,
-		@Others,
-		@Prepayment)
+		Prepayment,
+		SettlementDetails)
+	SELECT @Environment,
+		t.Party.value('@ad', 'DATE')	AS AccDate,
+		t.Party.value('@pi', 'INT')		AS PartyId,
+		t.Party.value('@ob', 'MONEY')	AS OpeningBalance,
+		t.Party.value('@ac', 'MONEY')	AS AmountToCompany,
+		t.Party.value('@pf', 'MONEY')	AS ProductFees,
+		t.Party.value('@dc', 'MONEY')	AS Discount,
+		t.Party.value('@rb', 'MONEY')	AS Rebate,
+		t.Party.value('@co', 'MONEY')	AS ClosingBalance,
+		t.Party.value('@cn', 'VARCHAR(10)') AS CurrencyName,
+		t.Party.value('@ot', 'MONEY')	AS Others,
+		t.Party.value('@pp', 'MONEY')	AS Prepayment,
+		t.Party.value('text()[1]', 'VARCHAR(4000)')	AS SettlementDetails
+	FROM @XmlData.nodes('/root/r') t(Party)
 
 END
 GO
