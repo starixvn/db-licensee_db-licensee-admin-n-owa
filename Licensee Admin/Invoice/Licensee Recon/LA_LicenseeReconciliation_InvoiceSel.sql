@@ -18,7 +18,7 @@ AS
 		- 20190924@Bruce: Include actual invoice, prepayment, cn/dn data and setupfee amount [#120220]
 		- 20191016@Bruce: [#112229]
 			+ Group data by code or by party id
-			+ Check FromDate for sofrware data fee( type =1 )
+			+ Check FromDate for sofrware data fee & Rebate ( type = 1 )
 */
 BEGIN
 	SET NOCOUNT ON
@@ -63,8 +63,8 @@ BEGIN
 	WHERE h.StatusId = 0-- normal invoice
 		AND h.Environment = @Environment
 		AND (
-			(h.FromDate BETWEEN @FromDate AND @ToDate AND h.InvoiceType = 1) OR
-			(h.InvoiceDate BETWEEN @FromDate AND @ToDate AND h.InvoiceType IN (3,7)) OR
+			(h.FromDate BETWEEN @FromDate AND @ToDate AND h.InvoiceType IN (1,3)) OR
+			(h.InvoiceDate BETWEEN @FromDate AND @ToDate AND h.InvoiceType = 7) OR
 			(h.InvoiceDate BETWEEN @N_FromDate AND @N_ToDate AND h.InvoiceType IN (4,5))
 		)
 	GROUP BY p.LicenseeCode, b.CurrencyName, r.ProductName, p.PartyId
