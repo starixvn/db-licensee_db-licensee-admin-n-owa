@@ -57,7 +57,9 @@ BEGIN
 		WHERE tc.WinlostDate BETWEEN @FromDate AND @_ToDate
 	END
 
-	SELECT CustId,Amount,CollectedDate FROM #collection
+	SELECT CustId,CollectedDate, SUM(Amount) Amount	
+	FROM #collection
+	GROUP BY CustId,CollectedDate
 
 	DROP TABLE #collection
 END
