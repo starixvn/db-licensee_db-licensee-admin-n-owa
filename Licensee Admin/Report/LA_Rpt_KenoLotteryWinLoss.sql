@@ -238,7 +238,7 @@ BEGIN
 		GROUP BY Currency
 
 		UPDATE @GrandTotal
-		SET CompanyIncome = LicensingFee - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END
+		SET CompanyIncome = LicensingFee - PayToSupplier
 
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 	END
@@ -305,7 +305,7 @@ BEGIN
 			LicenseeWinLoss,
 			LicensingFee,
 			PayToSupplier,
-			(LicensingFee - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END) AS CompanyIncome
+			(LicensingFee - PayToSupplier) AS CompanyIncome
 		FROM @Total t
 		WHERE Currency = @BaseCurrencyName
 	END
