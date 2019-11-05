@@ -233,7 +233,7 @@ BEGIN
 			SUM(LicenseeWinLoss),
 			SUM(LicensingFee),
 			SUM(PayToSupplier),
-			SUM(LicensingFee - PayToSupplier)
+			SUM((LicensingFee - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END))
 		FROM @Total
 		WHERE Currency = @tempCurrency
 		GROUP BY Currency
@@ -303,7 +303,7 @@ BEGIN
 			LicenseeWinLoss,
 			LicensingFee,
 			PayToSupplier,
-			(LicensingFee - PayToSupplier) AS CompanyIncome
+			(LicensingFee - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END) AS CompanyIncome
 		FROM @Total t
 		WHERE Currency = @BaseCurrencyName
 	END
