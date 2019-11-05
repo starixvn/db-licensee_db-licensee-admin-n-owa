@@ -225,18 +225,20 @@ BEGIN
 		FROM TotalByParty
 		GROUP BY ParentId
 
-		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
+		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier)
 		SELECT Currency,
 			SUM(TotalTrans),
 			SUM(Turnover),
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(LicensingFee),
-			SUM(PayToSupplier),
-			SUM((LicensingFee - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END))
+			SUM(PayToSupplier)
 		FROM @Total
 		WHERE Currency = @tempCurrency
 		GROUP BY Currency
+
+		UPDATE @GrandTotal
+		SET CompanyIncome = LicensingFee - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END
 
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 	END
