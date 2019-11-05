@@ -20,6 +20,7 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180907@Parsons: Royalty fee updated for Keno& Lottery [#101168]
 		- 20190716@Bruce: Integrate CN88 data in LA [#116859]
+		- 20191105@Parsons: Get The Calculation Of PayToSupplier Fee Modified [#123342]
 		
 	 Params:
 */
@@ -223,10 +224,6 @@ BEGIN
 			SUM(PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
-
-		UPDATE @Total
-		SET PayToSupplier = 0
-		WHERE PayToSupplier < 0
 
 		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
 		SELECT Currency,
