@@ -16,6 +16,7 @@ AS
 	 DB: DB052.bodb_Licensee
 	 Revisions:     
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20191111@bruce: Change-HA-Proxy-IP [#122960]
 		
 	 Params:
 		+ UserID : 

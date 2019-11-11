@@ -15,6 +15,7 @@ AS
 	 Revisions:     
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180327@Parsons: Apply min fee rule for discount calculation [#109997]   
+		- 20191111@bruce: Change-HA-Proxy-IP [#122960]
 		
 	 Params:
 		+ UserID : 
