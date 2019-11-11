@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 ALTER PROCEDURE [dbo].[LA_Discount_PartyListSel] @DiscountGroupType TINYINT
@@ -29,9 +29,12 @@ BEGIN
 		SET @CurrencyId = 0
 
 	DECLARE @PartyList TABLE(PartyId INT, PartyName VARCHAR(100), BrandName VARCHAR(100), ParentId INT)
+	DECLARE @FunctionKey VARCHAR(50) = ''
 	
+	IF @FunctionId > 0 SET @FunctionKey = (SELECT FunctionKey FROM dbo.LA_Function WITH(NOLOCK) WHERE FunctionID = @FunctionId)	
+
 	INSERT INTO @PartyList(PartyId, PartyName, BrandName, ParentId)
-	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionId = @FunctionId
+	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionKey = @FunctionKey
 
 	DECLARE @PartiesInAnyGroup TABLE (PartyId INT, DiscountId SMALLINT)
 	INSERT INTO @PartiesInAnyGroup(PartyId, DiscountId)
@@ -64,7 +67,4 @@ BEGIN
 		WHERE h.DiscountGroupId = @DiscountGroupId
 	END
 END
-GO
-GRANT VIEW DEFINITION ON dbo.LA_Discount_PartyListSel TO vnteam
-GRANT EXECUTE ON dbo.LA_Discount_PartyListSel TO bodbAdminNet
 GO

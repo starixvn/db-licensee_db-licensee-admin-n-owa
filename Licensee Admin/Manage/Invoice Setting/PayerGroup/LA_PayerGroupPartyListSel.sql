@@ -28,9 +28,12 @@ BEGIN
 	 
 	DECLARE @CurrenDate DATE = GETDATE(), @MinFeeType TINYINT =  1
 	DECLARE @PartyList TABLE(PartyId INT, PartyName VARCHAR(100), BrandName VARCHAR(100), ParentId INT, TotalMinFee MONEY)
+	DECLARE @FunctionKey VARCHAR(50) = ''
 	
+	IF @FunctionId > 0 SET @FunctionKey = (SELECT FunctionKey FROM dbo.LA_Function WITH(NOLOCK) WHERE FunctionID = @FunctionId)	
+
 	INSERT INTO @PartyList(PartyId, PartyName, BrandName, ParentId)
-	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionId = @FunctionId
+	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionKey = @FunctionKey
 	DELETE @PartyList WHERE ParentId IN (0, 999)
 
 	;WITH cte_MinFee AS(
