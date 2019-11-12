@@ -15,6 +15,7 @@ AS
 	 Revisions:     
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180327@Parsons: Apply min fee rule for discount calculation [#109997]   
+		- 20191111@bruce: Change-HA-Proxy-IP [#122960]
 		
 	 Params:
 		+ UserID : 
@@ -28,9 +29,12 @@ BEGIN
 	 
 	DECLARE @CurrenDate DATE = GETDATE(), @MinFeeType TINYINT =  1
 	DECLARE @PartyList TABLE(PartyId INT, PartyName VARCHAR(100), BrandName VARCHAR(100), ParentId INT, TotalMinFee MONEY)
+	DECLARE @FunctionKey VARCHAR(50) = ''
 	
+	IF @FunctionId > 0 SET @FunctionKey = (SELECT FunctionKey FROM dbo.LA_Function WITH(NOLOCK) WHERE FunctionID = @FunctionId)	
+
 	INSERT INTO @PartyList(PartyId, PartyName, BrandName, ParentId)
-	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionId = @FunctionId
+	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionKey = @FunctionKey
 	DELETE @PartyList WHERE ParentId IN (0, 999)
 
 	;WITH cte_MinFee AS(
