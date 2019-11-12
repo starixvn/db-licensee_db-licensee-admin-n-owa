@@ -15,7 +15,7 @@ AS
 	Revisions: 
 		- 20190820@Bruce: Create Sp [#111586]
 		- 20190927@Bruce: Update OpeningBalance, ClosingBalance [#120220]
-		- 20191017@Bruce: Filter by custid [#112229]
+		- 20191017@Bruce: Filter by custid [#122229]
 */
 BEGIN
 	SET NOCOUNT ON

@@ -16,7 +16,7 @@ AS
 	Revisions: 
 		- 20190905@Bruce: Create Sp [#111586]
 		- 20190924@Bruce: Include actual invoice, prepayment, cn/dn data and setupfee amount [#120220]
-		- 20191016@Bruce: [#112229]
+		- 20191016@Bruce: [#122229]
 			+ Group data by code or by party id
 			+ Check FromDate for sofrware data fee & Rebate ( type = 1 )
 */
