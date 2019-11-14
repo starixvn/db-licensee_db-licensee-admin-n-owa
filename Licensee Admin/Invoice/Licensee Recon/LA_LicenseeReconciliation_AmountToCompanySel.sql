@@ -4,8 +4,8 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_AmountToCompanySel]
 	@PartyIds		VARCHAR(4000),
-	@FromDate		DATETIME,
-	@ToDate			DATETIME,
+	@FromDate		DATE,
+	@ToDate			DATE,
 	@BaseCurrency	VARCHAR(5),
 	@Environment	VARCHAR(50) = 'DEV',
 	@IsShowSettlementDetail	BIT = 0,
@@ -19,11 +19,13 @@ AS
 	Revisions: 
 		- 20190723@Bruce: Create Sp [#111586]
 		- 20190927@Bruce: Remove prepayment section and Include CardClub [#120220]
-		- 20191017@Bruce: Group by party id [#122229]		
+		- 20191017@Bruce: Group by party id [#122229]
 */
 BEGIN
 	SET NOCOUNT ON
-	
+
+	IF @ToDate > GETDATE() SET @ToDate = GETDATE()
+
 	DECLARE @AmountTypeSoftwareFee INT = 1,
 		@AmountTypeDiscount INT = 4,
 		@AmountTypeRebate INT = 6,
