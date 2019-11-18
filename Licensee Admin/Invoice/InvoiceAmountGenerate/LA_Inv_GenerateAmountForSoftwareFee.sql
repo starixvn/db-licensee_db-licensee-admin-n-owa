@@ -36,7 +36,7 @@ BEGIN
 		@AmountTypeDiscount INT = 4,
 		@AmountTypeRebate INT = 6,
 		@DeductAgainstInvoice INT = 24,
-		@DeductNonePeakHourPromotion INT = 29
+		@DeductNonPeakHourPromotion INT = 29
 
 	-- Region: Check Invoice Type is Rebate
 	DECLARE @Month TINYINT = MONTH(@FromDate)
@@ -512,8 +512,8 @@ BEGIN
 	IF(EXISTS(SELECT val FROM bodb02.dbo.strSplit(@ProductCodes, ',') WHERE val = 'SB'))
 	BEGIN
 		DECLARE @PromotionAmount MONEY
-		SELECT @PromotionAmount = SUM(p.Prize * e.Rate)
-		FROM bodb_LicenseeReport.dbo.rpt_NPHPromotion p WITH (NOLOCK)
+		SELECT @PromotionAmount = SUM(p.RedemptionPrize * e.Rate)
+		FROM bodb_LicenseeReport.dbo.rpt_LicPromotion p WITH (NOLOCK)
 			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'SB', 'OA', 1) pc ON p.SiteID = pc.LicenseeId
 			INNER JOIN #Exchange e ON p.RptDate = e.ExchangeDate AND p.CurrencyID = e.ExchangeID
 			WHERE p.RptDate BETWEEN @FromDate and @ToDate
@@ -521,7 +521,7 @@ BEGIN
 		IF(ISNULL(@PromotionAmount, 0) > 0)
 		BEGIN
 			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
-			VALUES(0,'','',@DeductNonePeakHourPromotion,@PromotionAmount,0)
+			VALUES(0,'','',@DeductNonPeakHourPromotion,@PromotionAmount,0)
 		END
 	END
 	-- End region insert Promotion amount
