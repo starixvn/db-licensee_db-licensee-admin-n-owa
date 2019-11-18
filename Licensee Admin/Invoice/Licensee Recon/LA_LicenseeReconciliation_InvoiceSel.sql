@@ -6,7 +6,8 @@ ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_InvoiceSel]
 	@PartyIds		VARCHAR(4000),
 	@FromDate		DATE,
 	@ToDate			DATE,
-	@Environment	VARCHAR(50) = 'DEV'
+	@Environment	VARCHAR(50) = 'DEV',
+	@IsGroupByPartyId	BIT = 0
 AS
 /*	Header:
 	Task : Generate invoice amount for licensee
@@ -15,6 +16,9 @@ AS
 	Revisions: 
 		- 20190905@Bruce: Create Sp [#111586]
 		- 20190924@Bruce: Include actual invoice, prepayment, cn/dn data and setupfee amount [#120220]
+		- 20191016@Bruce: [#122229]
+			+ Group data by code or by party id
+			+ Check FromDate for sofrware data fee & Rebate ( type = 1 )
 */
 BEGIN
 	SET NOCOUNT ON
@@ -32,18 +36,23 @@ BEGIN
 	INSERT INTO @partyList(PartyId, LicenseeCode)
 	SELECT d.PartyID, d.LicenseeCode
 	FROM dbo.OAS_PartyDetail d WITH(NOLOCK)
-	WHERE d.PartyID IN(SELECT val FROM dbo.strSplit(@PartyIds, ',')) AND d.LicenseeCode IS NOT NULL
+	WHERE @IsGroupByPartyId = 1 OR d.LicenseeCode IS NOT NULL
+
+	IF @PartyIds <> 'All'
+	BEGIN
+		DELETE @partyList WHERE PartyID NOT IN (SELECT val FROM dbo.strSplit(@PartyIds, ','))
+	END
 
 	DECLARE @N_FromDate DATE = DATEADD(MONTH, DATEDIFF(MONTH, 0, @FromDate) + 1, 0)
 	DECLARE @N_ToDate DATE = DATEADD (DAY, -1, DATEADD(MONTH, 1, @N_FromDate))
 
-	SELECT p.LicenseeCode, b.CurrencyName, r.ProductName
+	SELECT p.LicenseeCode, b.CurrencyName, r.ProductName, p.PartyId
 		,SUM(CASE WHEN InvItemTypeId = 1 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) LicensingFee
 		,SUM(CASE WHEN InvItemTypeId = 4 THEN ISNULL(Expense,0) ELSE 0 END) Discount
 		,SUM(CASE WHEN InvItemTypeId = 6 THEN ISNULL(Expense,0) ELSE 0 END) Rebate
 		,SUM(CASE WHEN InvItemTypeId IN (5,24,26) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Prepayment
 		,SUM(CASE WHEN InvItemTypeId IN (11,12,13,14,17,20) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Others
-		,SUM(CASE WHEN InvItemTypeId = 3 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) AMF
+		,SUM(CASE WHEN InvItemTypeId IN (3,25) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) AMF
 		,SUM(CASE WHEN InvItemTypeId = 2 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) SetupFee
 	INTO #result
 	FROM @partyList p
@@ -54,19 +63,40 @@ BEGIN
 	WHERE h.StatusId = 0-- normal invoice
 		AND h.Environment = @Environment
 		AND (
-			(h.InvoiceDate BETWEEN @FromDate AND @ToDate AND h.InvoiceType IN (1,3,7)) OR 
+			(h.FromDate BETWEEN @FromDate AND @ToDate AND h.InvoiceType IN (1,3)) OR
+			(h.InvoiceDate BETWEEN @FromDate AND @ToDate AND h.InvoiceType = 7) OR
 			(h.InvoiceDate BETWEEN @N_FromDate AND @N_ToDate AND h.InvoiceType IN (4,5))
 		)
-	GROUP BY p.LicenseeCode, b.CurrencyName, r.ProductName
-	
-	SELECT LicenseeCode,CurrencyName
-		,SUM(LicensingFee) LicensingFee
-		,SUM(Discount) Discount
-		,SUM(Rebate) Rebate
-		,SUM(Prepayment) Prepayment
-		,SUM(Others) Others
-	FROM #result
-	GROUP BY LicenseeCode, CurrencyName
+	GROUP BY p.LicenseeCode, b.CurrencyName, r.ProductName, p.PartyId
+
+	IF @IsGroupByPartyId = 0
+	BEGIN
+		SELECT LicenseeCode,CurrencyName
+			,0 AS PartyId
+			,SUM(LicensingFee) LicensingFee
+			,SUM(Discount) Discount
+			,SUM(Rebate) Rebate
+			,SUM(Prepayment) Prepayment
+			,SUM(Others) Others
+			,SUM(SetupFee) SetupFee
+			,SUM(AMF) AMF
+		FROM #result
+		GROUP BY LicenseeCode, CurrencyName
+	END
+	ELSE
+	BEGIN
+		SELECT PartyId,CurrencyName
+			,'' AS LicenseeCode
+			,SUM(LicensingFee) LicensingFee
+			,SUM(Discount) Discount
+			,SUM(Rebate) Rebate
+			,SUM(Prepayment) Prepayment
+			,SUM(Others) Others
+			,SUM(SetupFee) SetupFee
+			,SUM(AMF) AMF
+		FROM #result
+		GROUP BY PartyId, CurrencyName
+	END
 
 	DROP TABLE #result
 END

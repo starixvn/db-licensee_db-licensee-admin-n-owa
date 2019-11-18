@@ -2,7 +2,10 @@
 USE [bodb_Licensee]
 GO
 
-ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_PartySel]
+ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_PartySel](
+	@BillingDate DATE = NULL,
+	@IncludeAll BIT = 0
+)
 AS
 /*	Header:
 	Task : Get list of licensee for Reconciliation report
@@ -11,6 +14,7 @@ AS
 	Revisions: 
 		- 20190723@Bruce: Create Sp [#111586]
 		- 20190927@Bruce: Include fromdate, todate of charge info [#120220]
+		- 20191015@Bruce: Get billing group by billing date [#122229]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -61,6 +65,28 @@ BEGIN
 	INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = d.PartyID
 	WHERE d.StatusId = 1 AND p.PartyType = 5
 
+	IF @IncludeAll = 1
+	BEGIN
+		INSERT INTO #licensees(LicenseeName, BaseCurrencyId, PartyId,CustId, ParentId)
+		SELECT p.PartyName, d.BaseCurrencyId, p.PartyID,0, CASE WHEN p.PartyType = 5 THEN @UnofficialGroup ELSE NULL END
+		FROM dbo.OAS_PartyDetail d
+		INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = d.PartyID
+		WHERE p.PartyType IN (1,5)
+			AND d.IsDeposit = 1
+			AND p.PartyID NOT IN (SELECT l.PartyId FROM #licensees l WHERE l.PartyId > 0)
+	END
+
+	-- get charge rate
+	--
+	SELECT c.FromParty, c.ToParty,c.FromDate, c.ToDate
+		,DATEADD(MONTH, DATEDIFF(MONTH, 0, c.FromDate), 0) StartMonth
+		,DATEADD(DAY,-1,DATEADD(MONTH, DATEDIFF(MONTH, 0, c.ToDate) + 1, 0)) EndMonth
+	INTO #chargeRate
+	FROM dbo.OAS_ChargeInfo c WITH(NOLOCK)
+	INNER JOIN dbo.LA_ChargeInfo_SystemMapping s WITH(NOLOCK) ON c.ChargeID=s.ChargeID AND s.SystemID=2
+	INNER JOIN #licensees l ON l.PartyId = c.FromParty
+	WHERE l.PartyId IS NOT NULL
+
 	-- Billing group
 	-- get party list in LA system
 	--
@@ -73,7 +99,6 @@ BEGIN
 
 	INSERT INTO @partyList(PartyId,PartyName,BrandName,ParentId)
 	EXEC dbo.LA_PartyListSel
-
 	DELETE @partyList WHERE ParentId = 999 OR (PartyId = 999 AND ParentId = 0) -- Remove credit licensees
 
 	-- map billing group
@@ -94,11 +119,9 @@ BEGIN
 	-- get licensee's end date
 	--
 	;WITH a AS (
-		SELECT c.FromParty,MIN(c.FromDate) FromDate, MAX(c.ToDate) ToDate
-		FROM dbo.OAS_ChargeInfo c WITH(NOLOCK)
-		INNER JOIN dbo.LA_ChargeInfo_SystemMapping s WITH(NOLOCK) ON c.ChargeID=s.ChargeID AND s.SystemID=2
-		INNER JOIN #licensees l ON l.PartyId = c.FromParty
-		WHERE l.PartyId IS NOT NULL AND l.ParentId > 0
+		SELECT c.FromParty,MIN(c.StartMonth) FromDate, MAX(c.EndMonth) ToDate
+		FROM #chargeRate c
+		WHERE c.ToParty IN (SELECT GroupId FROM @billingGroup)
 		GROUP BY c.FromParty
 	)
 	UPDATE l SET EndDate = a.todate, StartDate=a.FromDate
@@ -114,12 +137,13 @@ BEGIN
 		, l.LicenseeName
 		, l.BaseCurrencyId
 		, e.Code AS BaseCurrencyCode
-		, l.LicenseeCode
+		, UPPER(l.LicenseeCode) LicenseeCode
 		, ISNULL(l.StartDate,@defaultStartDate) StartDate
 		, ISNULL(l.EndDate,@defaultEndDate) EndDate
 		, l.CustId
 	FROM #licensees l
 	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON l.BaseCurrencyId=e.exchangeid
+	WHERE (ISNULL(l.CustId,0) > 0 OR ISNULL(l.PartyId,0)>0) AND (@BillingDate IS NULL OR @BillingDate >= ISNULL(l.StartDate,@defaultStartDate))
 	UNION ALL
 	SELECT PartyId, 0, PartyName, 0, '', '',@defaultStartDate,@defaultEndDate,0 FROM @partyList
 	WHERE ParentId = 0 AND PartyId IN (SELECT GroupId FROM @billingGroup)
@@ -129,5 +153,6 @@ BEGIN
 	SELECT @UnidentifiedGroup, 0, 'Unidentified',0, '', '',@defaultStartDate,@defaultEndDate,0 FROM @billingGroup WHERE GroupId = @UnidentifiedGroup
 
 	DROP TABLE #licensees
+	DROP TABLE #chargeRate
 END
 GO

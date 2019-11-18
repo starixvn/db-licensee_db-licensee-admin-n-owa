@@ -4,12 +4,13 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_AmountToCompanySel]
 	@PartyIds		VARCHAR(4000),
-	@FromDate		DATETIME,
-	@ToDate			DATETIME,
+	@FromDate		DATE,
+	@ToDate			DATE,
 	@BaseCurrency	VARCHAR(5),
 	@Environment	VARCHAR(50) = 'DEV',
 	@IsShowSettlementDetail	BIT = 0,
-	@IsSyncProductWithInvoice BIT = 0
+	@IsSyncProductWithInvoice BIT = 0,
+	@IsGroupByPartyId BIT = 0
 AS
 /*	Header:
 	Task : Generate invoice amount for licensee
@@ -18,10 +19,13 @@ AS
 	Revisions: 
 		- 20190723@Bruce: Create Sp [#111586]
 		- 20190927@Bruce: Remove prepayment section and Include CardClub [#120220]
+		- 20191017@Bruce: Group by party id [#122229]
 */
 BEGIN
 	SET NOCOUNT ON
-	
+
+	IF @ToDate > GETDATE() SET @ToDate = GETDATE()
+
 	DECLARE @AmountTypeSoftwareFee INT = 1,
 		@AmountTypeDiscount INT = 4,
 		@AmountTypeRebate INT = 6,
@@ -629,29 +633,61 @@ END
  *-----------------*/
 	IF @IsShowSettlementDetail = 1
 	BEGIN
-		SELECT p.LicenseeCode
-			, pl.Name AS ProductName
-			, UPPER(@BaseCurrency) AS CurrencyName
-			, SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
-		FROM #tmpResult r
-		INNER JOIN @partyList p ON r.PartyID=p.PartyId
-		INNER JOIN @productList pl ON r.ProductID = pl.ProductId
-		WHERE p.IsSelected=1
-		GROUP BY pl.ProductId, p.LicenseeCode, pl.Name
-		ORDER BY pl.ProductId
+		IF @IsGroupByPartyId = 1
+		BEGIN	
+			SELECT p.PartyId
+				, pl.Name AS ProductName
+				, pl.ProductId
+				, UPPER(@BaseCurrency) AS CurrencyName
+				, SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
+			FROM #tmpResult r
+			INNER JOIN @partyList p ON r.PartyID=p.PartyId
+			INNER JOIN @productList pl ON r.ProductID = pl.ProductId
+			WHERE p.IsSelected=1
+			GROUP BY pl.ProductId, p.PartyId, pl.Name
+		END
+		ELSE
+		BEGIN
+			SELECT p.LicenseeCode
+				, pl.Name AS ProductName
+				, UPPER(@BaseCurrency) AS CurrencyName
+				, SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
+			FROM #tmpResult r
+			INNER JOIN @partyList p ON r.PartyID=p.PartyId
+			INNER JOIN @productList pl ON r.ProductID = pl.ProductId
+			WHERE p.IsSelected=1
+			GROUP BY pl.ProductId, p.LicenseeCode, pl.Name
+			ORDER BY pl.ProductId
+		END
 	END
 	ELSE
 	BEGIN
-		SELECT UPPER(p.LicenseeCode) AS LicenseeCode
-			,UPPER(@BaseCurrency) AS CurrencyName
-			,SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
-			,SUM(r.LicensingFee + r.ExtraAmount) LicensingFee
-			,SUM(r.Discount) Discount
-			,SUM(r.Rebate) Rebate
-		FROM #tmpResult r
-		INNER JOIN @partyList p ON p.PartyId = r.PartyID
-		WHERE p.IsSelected = 1
-		GROUP BY p.LicenseeCode
+		IF @IsGroupByPartyId = 1
+		BEGIN
+			SELECT p.PartyId
+				,UPPER(@BaseCurrency) AS CurrencyName
+				,SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
+				,SUM(r.LicensingFee + r.ExtraAmount) LicensingFee
+				,SUM(r.Discount) Discount
+				,SUM(r.Rebate) Rebate
+			FROM #tmpResult r
+			INNER JOIN @partyList p ON p.PartyId = r.PartyID
+			WHERE p.IsSelected = 1
+			GROUP BY p.PartyId
+		END
+		ELSE
+		BEGIN
+			SELECT UPPER(p.LicenseeCode) AS LicenseeCode
+				,UPPER(@BaseCurrency) AS CurrencyName
+				,SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
+				,SUM(r.LicensingFee + r.ExtraAmount) LicensingFee
+				,SUM(r.Discount) Discount
+				,SUM(r.Rebate) Rebate
+			FROM #tmpResult r
+			INNER JOIN @partyList p ON p.PartyId = r.PartyID
+			WHERE p.IsSelected = 1
+			GROUP BY p.LicenseeCode
+		END
 	END
 
 	DROP TABLE #tmpResult
