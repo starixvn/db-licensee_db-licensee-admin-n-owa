@@ -92,8 +92,6 @@ BEGIN
 	)
 	-- End region
 	
-	select * from @PartyChargeInfo
-	
 	-- Region: Get exchange rate info
 	CREATE	TABLE #Exchange (
 			ExchangeDate	DATE,
@@ -105,8 +103,6 @@ BEGIN
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	-- End region
-	
-	select * from #Exchange
 	
 	-- Region: Get Winloss data
 	CREATE	TABLE #TempData (
@@ -153,7 +149,6 @@ BEGIN
 				ELSE ISNULL(sbr.BettypeRef, -1)
 			END
 	)
-	select * from #TempData where ProductId = 34
 	-- EndRegion
 
 	-- Region: Generate licensee name & group
