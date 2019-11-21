@@ -150,7 +150,6 @@ BEGIN
 				ELSE ISNULL(sbr.BettypeRef, -1)
 			END
 	)
-
 	-- EndRegion
 
 	-- Region: Generate licensee name & group
