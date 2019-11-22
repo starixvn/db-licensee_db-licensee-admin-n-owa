@@ -333,8 +333,9 @@ BEGIN
 	FROM	#LicenseeAmount d INNER JOIN @COWinLoss a ON a.LicenseeId = d.LicenseeId
 	-- End CO
 
-	-- Calculate amount for products whose charge rate is affected by currency
-	DECLARE @AmountDueByProductAndCurrency AS TABLE (
+	-- Calculate amount for products 
+	-- For SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, PP, CC: charge rate is affected by currency
+	DECLARE @AmountDueByProduct AS TABLE (
 		LicenseeId INT,
 		SB MONEY,
 		NG MONEY,
@@ -348,10 +349,16 @@ BEGIN
 		FW MONEY,
 		LT MONEY,
 		PP MONEY,
-		CC MONEY
+		CC MONEY,
+		LC MONEY,
+		VG MONEY,
+		MGCLC MONEY,
+		MGCRNG MONEY,
+		BRVS MONEY,
+		BX MONEY
 	)
 	
-	INSERT INTO @AmountDueByProductAndCurrency
+	INSERT INTO @AmountDueByProduct
 	SELECT d.LicenseeId,
 			ISNULL(SUM(CASE WHEN d.ProductId = 0  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS SB,
 			ISNULL(SUM(CASE WHEN d.ProductId = 2  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS NG,
@@ -365,7 +372,13 @@ BEGIN
 			ISNULL(SUM(CASE WHEN d.ProductId = 24 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS FW,
 			ISNULL(SUM(CASE WHEN d.ProductId = 28 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS LT,
 			ISNULL(SUM(CASE WHEN d.ProductId = 32 THEN (-MemberWL * ISNULL(cm.Rate, ci.Rate) - WinningPrize) * e.Rate ELSE 0 END),0) AS PP,
-			ISNULL(SUM(CASE WHEN d.ProductId = 34 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS CC
+			ISNULL(SUM(CASE WHEN d.ProductId = 34 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS CC,
+			ISNULL(SUM(CASE WHEN d.ProductId = 27 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS BRVS,
+			ISNULL(SUM(CASE WHEN d.ProductId = 4  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS LC,
+			ISNULL(SUM(CASE WHEN d.ProductId = 12 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS VG,
+			ISNULL(SUM(CASE WHEN d.ProductId = 14 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS MGCLC,
+			ISNULL(SUM(CASE WHEN d.ProductId = 17 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS MGCRNG,
+			ISNULL(SUM(CASE WHEN d.ProductId = 31 THEN (-MemberWL * ci.Rate - (AComm + PComm)) * e.Rate ELSE 0 END),0) AS BX
 	FROM	#TempData d
 				INNER JOIN @PartyChargeInfo ci ON	d.LicenseeId = ci.LicenseeId
 													AND ci.ProductId = d.ProductId
@@ -374,36 +387,8 @@ BEGIN
 				LEFT JOIN dbo.LA_ChargeInfo_CurrencyRateMapping cm ON ci.ChargeId = cm.ChargeId AND d.CurrencyId = cm.CurrencyId
 				INNER JOIN #Exchange e ON d.rptDate = e.ExchangeDate AND d.CurrencyId = e.ExchangeID
 		GROUP BY d.LicenseeId
-	-- End by currency
+	-- End calculate amount
 
-	-- Calculate for others products
-	DECLARE @AmountDueByProduct AS TABLE (
-		LicenseeId INT,
-		LC MONEY,
-		VG MONEY,
-		MGCLC MONEY,
-		MGCRNG MONEY,
-		BRVS MONEY,
-		BX MONEY
-	)
-
-	INSERT INTO @AmountDueByProduct
-	SELECT	d.LicenseeId,
-				ISNULL(SUM(CASE WHEN d.ProductId = 4  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS LC,
-				ISNULL(SUM(CASE WHEN d.ProductId = 12 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS VG,
-				ISNULL(SUM(CASE WHEN d.ProductId = 14 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS MGCLC,
-				ISNULL(SUM(CASE WHEN d.ProductId = 17 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS MGCRNG,
-				ISNULL(SUM(CASE WHEN d.ProductId = 27 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS BRVS,
-				ISNULL(SUM(CASE WHEN d.ProductId = 31 THEN (-MemberWL * ci.Rate - (AComm + PComm)) * e.Rate ELSE 0 END),0) AS BX
-		FROM	#TempData d
-				INNER JOIN @PartyChargeInfo ci ON	d.LicenseeId = ci.LicenseeId
-													AND ci.ProductId = d.ProductId
-													AND d.rptDate BETWEEN ci.FromDate AND ci.ToDate
-													AND d.BettypeRef = ci.BettypeRef
-				INNER JOIN #Exchange e ON d.rptDate = e.ExchangeDate AND d.CurrencyId = e.ExchangeID
-		GROUP BY d.LicenseeId
-	-- End others products
-	
 	UPDATE	l
 	SET		SB = a.SB,
 			NG = a.NG,
@@ -417,12 +402,8 @@ BEGIN
 			FW = a.FW,
 			LT = a.LT,
 			PP = a.PP,
-			CC = a.CC
-	FROM	#LicenseeAmount l
-			INNER JOIN @AmountDueByProductAndCurrency a ON a.LicenseeId = l.LicenseeId
-			
-	UPDATE	l
-	SET		LC = a.LC,
+			CC = a.CC,
+			LC = a.LC,
 			VG = a.VG,
 			MGCLC = a.MGCLC,
 			MGCRNG = a.MGCRNG,
