@@ -103,6 +103,7 @@ BEGIN
 
 	DECLARE @ChargeInfo AS TABLE
 	(
+		ChargeId 	INT,
 		PartyId		INT,
 		LicenseeId	INT,
 		ProductID	INT,
@@ -111,9 +112,9 @@ BEGIN
 		FromDate	SMALLDATETIME,
 		ToDate		SMALLDATETIME
 	)
-	INSERT INTO @ChargeInfo(PartyId, LicenseeId, ProductID, Bettype, Rate, Fromdate, Todate)
+	INSERT INTO @ChargeInfo(ChargeId, PartyId, LicenseeId, ProductID, Bettype, Rate, Fromdate, Todate)
 	(
-		SELECT DISTINCT PartyID, LicenseeID, ProductID,
+		SELECT DISTINCT ChargeId, PartyID, LicenseeID, ProductID,
 			CASE WHEN ProductID = 11 AND ChargeType = 12 THEN @GD_Tip ELSE Bettype END AS ChargeType
 			, DI_Rate, Fromdate, Todate
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyID, @FromDate, @ToDate, @ProductCode, 'OA', 1)
@@ -228,19 +229,20 @@ BEGIN
 		(
 			SELECT
 				b.Winlostdate
-				, CurrencyID
+				, ag.CurrencyID
 				, SUM(Turnover) AS Turnover
 				, SUM(WinLoss) AS Winlost
 				, 0 AS PlayerComm
-				, - SUM(Winloss * ( 1 - p.Rate)) AS LicenseeWL
+				, - SUM(Winloss * ( 1 - ISNULL(cm.Rate, p.Rate))) AS LicenseeWL
 				, 0 AS LicenseeComm
-				, - SUM(WinLoss * p.Rate) AS Company
+				, - SUM(WinLoss * ISNULL(cm.Rate, p.Rate)) AS Company
 				, SUM(b.TotalTrans) AS BetCount
 			FROM #DataWinloss3rd b WITH (NOLOCK)
 				INNER JOIN @TempAG ag ON b.Recommend = ag.CustId AND b.Currency = ag.CurrencyId
 				INNER JOIN @ChargeInfo p ON ag.LicenseeeID = p.LicenseeId
+				LEFT JOIN bodb_licensee.dbo.LA_ChargeInfo_CurrencyRate cm ON p.ChargeId = cm.ChargeId AND b.Currency = cm.CurrencyId
 			WHERE b.Winlostdate BETWEEN p.Fromdate AND p.Todate
-			GROUP BY b.Winlostdate, CurrencyID
+			GROUP BY b.Winlostdate, ag.CurrencyID
 		)
 	END
 	ELSE IF (@ProductCode = 'VG') -- VG
@@ -303,25 +305,27 @@ BEGIN
 				AND b.SiteId = @LicenseeID
 			GROUP BY b.rptDate, b.CurrencyId, b.Bettype
 		)
+		
 		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, TipsAmount, TipsAmountDue, Company, Betcount)
 		(
 			SELECT
 				b.rptDate
-				, CurrencyID
+				, b.CurrencyID
 				, SUM(Turnover) AS Turnover
 				, SUM(MemberWL) AS Winlost
 				, 0 AS PlayerComm
-				, SUM(-MemberWL * (1 - p.Rate)) AS LicenseeWL
+				, SUM(-MemberWL * (1 - ISNULL(cm.Rate, p.Rate))) AS LicenseeWL
 				, 0 AS LicenseeComm
 				, SUM(TipAmount) AS TipsAmount
-				, SUM(TipAmount * p.Rate) AS TipsAmountDue
-				, SUM((-MemberWL * p.Rate) + (TipAmount * p.Rate)) AS Company
+				, SUM(TipAmount * ISNULL(cm.Rate, p.Rate)) AS TipsAmountDue
+				, SUM((-MemberWL * ISNULL(cm.Rate, p.Rate)) + (TipAmount * ISNULL(cm.Rate, p.Rate))) AS Company
 				, SUM(b.betcount) AS BetCount
 			FROM cte_GD b
 				INNER JOIN @ChargeInfo p ON (
 					b.rptDate BETWEEN p.FromDate AND p.ToDate AND
 					p.Bettype = b.Bettype
 				)
+				LEFT JOIN bodb_licensee.dbo.LA_ChargeInfo_CurrencyRate cm ON p.ChargeId = cm.ChargeId AND b.CurrencyId = cm.CurrencyId
 			GROUP BY b.rptDate, b.CurrencyId
 		)
 	END
@@ -670,17 +674,18 @@ BEGIN
 				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
 		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, WinningPrize, Company)
-		SELECT rptDate, CurrencyID
+		SELECT rptDate, d.CurrencyID
 				, SUM(BetCount)		AS BetCount
 				, SUM(Turnover)		AS Turnover
 				, SUM(WinLoss)	AS Winlost
-				, SUM(-Winloss * ( 1 - p.Rate))  AS LicenseeWL
+				, SUM(-Winloss * (1 - ISNULL(cm.Rate, p.Rate)))  AS LicenseeWL
 				, SUM(WinningPrize) AS WinningPrize
-				, SUM((-WinLoss * p.Rate)) AS Company
+				, SUM(-WinLoss * ISNULL(cm.Rate, p.Rate)) AS Company
 		FROM cte_WinLossData d
 			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeInfo_CurrencyRate cm ON p.ChargeId = cm.ChargeId AND d.CurrencyId = cm.CurrencyId 
 		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
-		GROUP BY rptDate, CurrencyID
+		GROUP BY rptDate, d.CurrencyID
 	END
 	ELSE
 	BEGIN
@@ -688,13 +693,17 @@ BEGIN
 		(
 			SELECT
 				rptDate
-				, CurrencyID
+				, d.CurrencyID
 				, SUM(Turnover) AS turnover
 				, SUM(WinLoss) AS Winlost
 				, SUM(PComm) AS PlayerComm
-				, - SUM(Winloss * ( 1 - p.Rate)) AS LicenseeWL
+				, CASE WHEN @ProductCode IN ('SB','NG','VS','CS','KN','AB','VB','FW','VS2','LT','CC') THEN -SUM(Winloss * ( 1 - ISNULL(cr.Rate, p.Rate))) 
+																									  ELSE -SUM(Winloss * ( 1 - p.Rate)) END 
+																									  AS LicenseeWL
 				, SUM(AComm - PComm) AS LicenseeComm
-				, - SUM(WinLoss * p.Rate + AComm) AS Company
+				, CASE WHEN @ProductCode IN ('SB','NG','VS','CS','KN','AB','VB','FW','VS2','LT','CC') THEN -SUM(WinLoss * ISNULL(cr.Rate, p.Rate) + AComm) 
+																									  ELSE -SUM(WinLoss * p.Rate + AComm) END 
+																									  AS Company
 				, SUM(BetCount) AS BetCount
 			FROM (
 				SELECT b.SiteId, b.rptDate, b.CurrencyID
@@ -715,8 +724,9 @@ BEGIN
 				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 			) d
 				INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
+				LEFT JOIN bodb_licensee.dbo.LA_ChargeInfo_CurrencyRate cr ON p.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
 			WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
-			GROUP BY rptDate, CurrencyID
+			GROUP BY rptDate, d.CurrencyID
 		)
 	END	
 	
