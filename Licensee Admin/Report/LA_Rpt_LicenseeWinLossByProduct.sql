@@ -39,6 +39,7 @@ AS
 		- 20181119@bruce: Integrate Bidme games (GD product) [#103695]
 	    - 20190322@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	    - 20190725@Mason: Integrate-Card-Club [#116096]
+		- 20191121@Mason: Setup_billing_terms_by_Currency  [#120005]
 	    - 20191205@Parsons: PP tournament [#123958]
 */
 		
@@ -384,7 +385,7 @@ BEGIN
 													AND ci.ProductId = d.ProductId
 													AND d.rptDate BETWEEN ci.FromDate AND ci.ToDate
 													AND d.BettypeRef = ci.BettypeRef
-				LEFT JOIN dbo.LA_ChargeInfo_CurrencyRateMapping cm ON ci.ChargeId = cm.ChargeId AND d.CurrencyId = cm.CurrencyId
+				LEFT JOIN dbo.LA_ChargeInfo_CurrencyRate cm ON ci.ChargeId = cm.ChargeId AND d.CurrencyId = cm.CurrencyId
 				INNER JOIN #Exchange e ON d.rptDate = e.ExchangeDate AND d.CurrencyId = e.ExchangeID
 		GROUP BY d.LicenseeId
 	-- End calculate amount

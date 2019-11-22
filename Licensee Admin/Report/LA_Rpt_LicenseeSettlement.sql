@@ -40,6 +40,7 @@ AS
 			- 20180716@bruce: add new group TEST for credit [#98126]
 			- 20181120@Parsons: Integrate Bidme games (GD product) [#103695]
 			- 20190312@Parsons: Integrate Promotion Prize (PP product) [#109014]
+			- 20191122@Mason: Setup billing terms by Currency  [#120005]
 			- 20191205@Parsons: PP tournament [#123958]  
 
 		Param's Explanation:
