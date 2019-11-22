@@ -409,7 +409,7 @@ BEGIN
 	BEGIN
 		;WITH cte_Promotion AS(
 			SELECT pc.PartyId, r.SiteID,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END) IsCurrent, SUM(r.RedemptionPrize * cExchange.Rate) AS Prize
-			FROM bodb_LicenseeReport.dbo.rpt_LicPromotion r WITH (NOLOCK)
+			FROM bodb_LicenseeReport.dbo.rptLicPromotion r WITH (NOLOCK)
 				INNER JOIN (SELECT DISTINCT PartyId, LicenseeId FROM @PartyChargeInfo WHERE ProductID = 0) pc ON r.SiteID = pc.LicenseeId
 				INNER JOIN #Exchange cExchange ON r.RptDate = cExchange.ExchangeDate AND r.CurrencyID = cExchange.ExchangeID
 				WHERE (r.RptDate BETWEEN @FromDate AND @ToDate) OR (r.RptDate BETWEEN @PrevFromDate AND @PrevToDate)

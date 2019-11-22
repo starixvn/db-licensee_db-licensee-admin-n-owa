@@ -513,7 +513,7 @@ BEGIN
 	BEGIN
 		DECLARE @PromotionAmount MONEY
 		SELECT @PromotionAmount = SUM(p.RedemptionPrize * e.Rate)
-		FROM bodb_LicenseeReport.dbo.rpt_LicPromotion p WITH (NOLOCK)
+		FROM bodb_LicenseeReport.dbo.rptLicPromotion p WITH (NOLOCK)
 			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'SB', 'OA', 1) pc ON p.SiteID = pc.LicenseeId
 			INNER JOIN #Exchange e ON p.RptDate = e.ExchangeDate AND p.CurrencyID = e.ExchangeID
 			WHERE p.RptDate BETWEEN @FromDate and @ToDate
