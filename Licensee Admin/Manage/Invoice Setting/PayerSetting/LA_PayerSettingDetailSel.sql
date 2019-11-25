@@ -28,6 +28,7 @@ AS
 		- 20181115@Parsons: Configure discount settings by currency [#99694]
 		- 20190626@Parsons: Validate billing configuration [#109600]
 		- 20180731@Mason: Integrate-Card-Club [#116096]
+		- 20191125@Parsons: Set terms by currency [#FeatureID 120005]
 		
 	 Params:
 		+ @PayerId :specify Party
@@ -38,7 +39,7 @@ AS
 		+ @@RebateGroup :	0 get all Party
 							<> 0 specify Party
 	 Example:
-				exec [LA_PayerSettingDetailSel] 15
+				exec [LA_PayerSettingDetailSel] 14
 */
 BEGIN
 	SET NOCOUNT ON
@@ -204,5 +205,10 @@ BEGIN
 		INNER JOIN @ProductOrder po ON pr.ProductID = po.ProductId
 	WHERE w.FeeTypeId = 2 -- waive
 	ORDER BY po.ProductOrder, w.FromDate
+
+	-- Charge rate by currency settings
+	SELECT c1.ChargeID, c1.CurrencyID, c1.Rate
+	FROM LA_ChargeRateByCurrency c1 WITH(NOLOCK)
+		INNER JOIN @ChargeInfo c2 ON c1.ChargeID = c2.ChargeId
 END
 GO
