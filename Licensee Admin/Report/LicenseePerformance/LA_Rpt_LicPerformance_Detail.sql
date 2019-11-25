@@ -181,9 +181,9 @@ BEGIN
 	DECLARE @CreditLicensees AS TABLE(PartyId INT)
 	INSERT INTO @CreditLicensees SELECT PartyId FROM bodb_licensee.dbo.OAS_PartyDetail WITH(NOLOCK) WHERE IsDeposit = 0
 	
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
+	INSERT INTO @PartyChargeInfo(ChargeId, PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
 	(
-		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, 
+		SELECT DISTINCT ci.ChargeID, ci.PartyID, ci.LicenseeID, ci.ProductID, 
 				CASE WHEN ISNULL(ci.isDeposit, 0) = 1 THEN ci.DI_Rate ELSE 0 END,
 				ci.Fromdate,
 				ci.ToDate,
@@ -194,9 +194,9 @@ BEGIN
 			AND ProductId <> 1 --exclude RB
 			AND ChargeType <> 12 -- exclude Gd tip
 	)
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
+	INSERT INTO @PartyChargeInfo(ChargeId, PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
 	(
-		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, 
+		SELECT DISTINCT ci.ChargeID, ci.PartyID, ci.LicenseeID, ci.ProductID, 
 				CASE WHEN ISNULL(ci.isDeposit, 0) = 1 THEN ci.DI_Rate ELSE 0 END,
 				ci.Fromdate,
 				ci.ToDate,
