@@ -55,6 +55,7 @@ AS
 	    - 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
 		- 20190718@Bruce: Integrate CN88 data in LA [#116859]
 		- 20191021@Parsons: Non-peak hour promotion [#119538]    
+		- 20191125@Mason: Setup billing terms by Currency  [#120005]
 	    - 20191205@Parsons: PP tournament [#123958]
 
 	Param's Explanation:  
@@ -164,6 +165,7 @@ BEGIN
 
 	-- Region: Party charge info
 	DECLARE @PartyChargeInfo AS TABLE (
+			ChargeId	INT,
 			PartyId		INT,
 			LicenseeId	INT,
 			ProductID	INT,
@@ -179,9 +181,9 @@ BEGIN
 	DECLARE @CreditLicensees AS TABLE(PartyId INT)
 	INSERT INTO @CreditLicensees SELECT PartyId FROM bodb_licensee.dbo.OAS_PartyDetail WITH(NOLOCK) WHERE IsDeposit = 0
 	
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
+	INSERT INTO @PartyChargeInfo(ChargeId, PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
 	(
-		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, 
+		SELECT DISTINCT ci.ChargeID, ci.PartyID, ci.LicenseeID, ci.ProductID, 
 				CASE WHEN ISNULL(ci.isDeposit, 0) = 1 THEN ci.DI_Rate ELSE 0 END,
 				ci.Fromdate,
 				ci.ToDate,
@@ -192,9 +194,9 @@ BEGIN
 			AND ProductId <> 1 --exclude RB
 			AND ChargeType <> 12 -- exclude Gd tip
 	)
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
+	INSERT INTO @PartyChargeInfo(ChargeId, PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
 	(
-		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, 
+		SELECT DISTINCT ci.ChargeID, ci.PartyID, ci.LicenseeID, ci.ProductID, 
 				CASE WHEN ISNULL(ci.isDeposit, 0) = 1 THEN ci.DI_Rate ELSE 0 END,
 				ci.Fromdate,
 				ci.ToDate,
@@ -294,7 +296,9 @@ BEGIN
 				SUM(ISNULL(b.CommissionA, 0)) * e.Rate,
 				SUM(ISNULL(b.CommissionP, 0)) * e.Rate,
 				p.ProductId,
-				SUM((CASE WHEN b.Bettype=@GD_Tip THEN 0 ELSE -b.MemberWL END * p.Rate) - (CASE 
+				SUM((CASE WHEN b.Bettype=@GD_Tip THEN 0 
+						  WHEN b.ProductID IN (0,2,5,6,8,10,11,21,22,24,27,28,32,34) THEN -b.MemberWL * ISNULL(cr.Rate, p.Rate)
+						  ELSE -b.MemberWL * p.Rate END ) - (CASE 
 					WHEN b.ProductId = @BAProductId THEN ISNULL(b.CommissionA, 0)
 					WHEN b.ProductID = @ExchangeProductId THEN ISNULL(b.CommissionA, 0) + ISNULL(b.CommissionP, 0)
 					ELSE 0 END)) * e.Rate
@@ -304,6 +308,7 @@ BEGIN
 													AND p.LicenseeId = b.SiteId
 													AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
 													AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
+				LEFT JOIN bodb_licensee.dbo.LA_ChargeInfo_CurrencyRate cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
 		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate OR b.rptDate BETWEEN @PrevFromDate AND @PrevToDate)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)

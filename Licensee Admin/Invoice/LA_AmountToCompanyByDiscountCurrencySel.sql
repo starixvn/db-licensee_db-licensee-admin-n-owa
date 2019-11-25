@@ -23,6 +23,7 @@ AS
 		- 20190319@bruce: Apply min fee rule for discount calculation [#109997]
 		- 20190410@bruce: calculate discount for terminated licensee[111485]
 		- 20190417@Parsons: Integrate-PP-Promotion-Prize [#109014]
+		- 20191125@Mason: Setup billing terms by Currency  [#120005]
 		- 20191206@Parsons: PP tournament [#123958]
 */
 BEGIN

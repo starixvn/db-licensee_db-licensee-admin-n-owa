@@ -385,7 +385,7 @@ BEGIN
 													AND ci.ProductId = d.ProductId
 													AND d.rptDate BETWEEN ci.FromDate AND ci.ToDate
 													AND d.BettypeRef = ci.BettypeRef
-				LEFT JOIN dbo.LA_ChargeInfo_CurrencyRate cm ON ci.ChargeId = cm.ChargeId AND d.CurrencyId = cm.CurrencyId
+				LEFT JOIN dbo.LA_ChargeInfo_CurrencyRate cm WITH (NOLOCK) ON ci.ChargeId = cm.ChargeId AND d.CurrencyId = cm.CurrencyId
 				INNER JOIN #Exchange e ON d.rptDate = e.ExchangeDate AND d.CurrencyId = e.ExchangeID
 		GROUP BY d.LicenseeId
 	-- End calculate amount
