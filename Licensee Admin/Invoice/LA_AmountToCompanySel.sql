@@ -24,6 +24,7 @@ AS
 		- 20190410@bruce: calculate discount for terminated licensee[111485]
 		- 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
 		- 20190911@Bruce: Support Exchange product in invoices [#119846]
+		- 20191125@Mason: Setup billing terms by Currency  [#120005]
 	    - 20191206@Parsons: PP tournament [#123958]
 
 	Parameters:
@@ -186,7 +187,7 @@ BEGIN
 	FROM (SELECT DISTINCT b.PartyId FROM @PartyList b) a
 	
 	-- 1.7 charge info
-	SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, CAST(ci.DI_Rate AS DECIMAL(6,5)) AS Rate, ci.Fromdate, ci.ToDate 
+	SELECT DISTINCT ci.ChargeID, ci.PartyID, ci.LicenseeID, ci.ProductID, CAST(ci.DI_Rate AS DECIMAL(6,5)) AS Rate, ci.Fromdate, ci.ToDate 
 					,CASE WHEN ProductID=11 AND ChargeType=12 THEN @GD_Tip ELSE -1 END AS Bettype -- GD Tip
 	INTO #tmpChargeInfo
 	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
@@ -277,9 +278,9 @@ BEGIN
 		p.ProductId,
 		b.CurrencyId,
 		SUM(CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss,
-		SUM(CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE ISNULL(-b.MemberWL, 0) * p.Rate * e.Rate END) AS AmountToCompany,
+		SUM(CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) * e.Rate END) AS AmountToCompany,
 		SUM(CASE 
-			WHEN b.Bettype = @GD_Tip THEN ISNULL(-b.MemberWL, 0) * p.Rate * e.Rate
+			WHEN b.Bettype = @GD_Tip THEN ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) * e.Rate
 			WHEN b.ProductID = @BX THEN -(b.CommissionA + b.CommissionP) * e.Rate
 			ELSE 0 END) AS ExtraAmount
 	INTO #tmpWinlossData
@@ -290,6 +291,7 @@ BEGIN
 		AND (b.rptDate BETWEEN p.FromDate AND p.ToDate) 
 		AND (p.ProductID <> 11 OR b.Bettype = p.Bettype)
 		AND (b.Bettype NOT IN (@PPTournament, @PromotionPrize))
+	LEFT JOIN bodb_licensee.dbo.LA_ChargeInfo_CurrencyRate cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeID AND b.CurrencyId = cr.CurrencyID
 	WHERE (b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
