@@ -173,7 +173,7 @@ BEGIN
 	FROM (SELECT DISTINCT b.PartyId FROM @PartyList b) a
 	
 	-- 1.7 charge info
-	SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, CAST(ci.DI_Rate AS DECIMAL(6,5)) AS Rate, ci.Fromdate, ci.ToDate 
+	SELECT DISTINCT ci.ChargeID, ci.PartyID, ci.LicenseeID, ci.ProductID, CAST(ci.DI_Rate AS DECIMAL(6,5)) AS Rate, ci.Fromdate, ci.ToDate 
 					,CASE WHEN ProductID=11 AND ChargeType=12 THEN @GD_Tip ELSE -1 END AS Bettype -- GD Tip
 	INTO #tmpChargeInfo
 	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
@@ -299,8 +299,8 @@ BEGIN
 			p.ProductId,
 			b.CurrencyId, 
 			CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE ISNULL(b.MemberWL, 0) END AS MemberWL,
-			CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE ISNULL(b.MemberWL, 0) * p.Rate END AS Amount,
-			CASE WHEN b.Bettype = @GD_Tip THEN ISNULL(b.MemberWL, 0) * p.Rate ELSE 0 END AS ExtraAmount
+			CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE ISNULL(b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) END AS Amount,
+			CASE WHEN b.Bettype = @GD_Tip THEN ISNULL(b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) ELSE 0 END AS ExtraAmount
 	INTO #temData
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId 
@@ -308,11 +308,11 @@ BEGIN
 				AND b.ProductId = p.ProductID   
 				AND (p.ProductID <> 11 OR b.Bettype = p.Bettype)
 				AND (b.Bettype NOT IN (@PPTournament, @PromotionPrize))
+		LEFT JOIN dbo.LA_ChargeInfo_CurrencyRate cr WITH (NOLOCK) ON p.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
 	WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
 			AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
-
 	-- 2.2 convert to base
 	SELECT	t.WinlossDate,
 			t.PartyId,
