@@ -308,7 +308,7 @@ BEGIN
 													AND p.LicenseeId = b.SiteId
 													AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
 													AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
-				LEFT JOIN bodb_licensee.dbo.LA_ChargeInfo_CurrencyRate cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
+				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrencye cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
 		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate OR b.rptDate BETWEEN @PrevFromDate AND @PrevToDate)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)

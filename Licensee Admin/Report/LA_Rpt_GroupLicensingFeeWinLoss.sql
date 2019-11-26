@@ -98,7 +98,7 @@ BEGIN
 				ON b.SiteID = ci.LicenseeID
 				AND b.ProductID = ci.ProductID
 				AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
-			LEFT JOIN dbo.LA_ChargeInfo_CurrencyRate cr WITH (NOLOCK) ON ci.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
+			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
@@ -122,7 +122,7 @@ BEGIN
 			INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID 
 										 AND b.ProductID = ci.ProductID 
 										 AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
-			LEFT JOIN dbo.LA_ChargeInfo_CurrencyRate cr WITH (NOLOCK) ON ci.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
+			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND b.customercategory NOT IN (27,28)
@@ -165,7 +165,7 @@ BEGIN
 			ON ci.PartyID = b.PartyID 
 				AND b.ProductID = ci.ProductID				
 				AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
-		LEFT JOIN dbo.LA_ChargeInfo_CurrencyRate cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND b.Currency = cr.CurrencyID
+		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND b.Currency = cr.CurrencyID
 		GROUP BY ci.PartyID, b.Currency, b.ProductID
 	END	
 	

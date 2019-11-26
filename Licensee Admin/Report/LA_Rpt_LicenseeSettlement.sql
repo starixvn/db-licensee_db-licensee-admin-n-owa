@@ -241,7 +241,7 @@ BEGIN
 			FROM #DataWinloss3rd b WITH (NOLOCK)
 				INNER JOIN @TempAG ag ON b.Recommend = ag.CustId AND b.Currency = ag.CurrencyId
 				INNER JOIN @ChargeInfo p ON ag.LicenseeeID = p.LicenseeId
-				LEFT JOIN bodb_licensee.dbo.LA_ChargeInfo_CurrencyRate cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND b.Currency = cm.CurrencyId
+				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND b.Currency = cm.CurrencyId
 			WHERE b.Winlostdate BETWEEN p.Fromdate AND p.Todate
 			GROUP BY b.Winlostdate, ag.CurrencyID
 		)
@@ -326,7 +326,7 @@ BEGIN
 					b.rptDate BETWEEN p.FromDate AND p.ToDate AND
 					p.Bettype = b.Bettype
 				)
-				LEFT JOIN bodb_licensee.dbo.LA_ChargeInfo_CurrencyRate cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND b.CurrencyId = cm.CurrencyId
+				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND b.CurrencyId = cm.CurrencyId
 			GROUP BY b.rptDate, b.CurrencyId
 		)
 	END
@@ -684,7 +684,7 @@ BEGIN
 				, SUM(-WinLoss * ISNULL(cm.Rate, p.Rate)) AS Company
 		FROM cte_WinLossData d
 			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
-			LEFT JOIN bodb_licensee.dbo.LA_ChargeInfo_CurrencyRate cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND d.CurrencyId = cm.CurrencyId 
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND d.CurrencyId = cm.CurrencyId 
 		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY rptDate, d.CurrencyID
 	END
@@ -725,7 +725,7 @@ BEGIN
 				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 			) d
 				INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
-				LEFT JOIN bodb_licensee.dbo.LA_ChargeInfo_CurrencyRate cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
+				LEFT JOIN bodb_licensee.dbo.LA_LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
 			WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
 			GROUP BY rptDate, d.CurrencyID
 		)
