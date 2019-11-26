@@ -20,18 +20,19 @@ AS
 	   - 20181204@Scofield: create	
 	   - 20190425@Parsons: Integrate-PP-Promotion-Prize [#109014] 
 	   - 20191216@Parsons: PP tournament [#123958]
+	   - 20191125@Mason: Setup billing terms by Currency [#120005]
 */
 BEGIN
 	SET NOCOUNT ON	
 	
 	DECLARE @GD_Product INT = 11
-	DECLARE @ChargeInfo TABLE(PartyID INT, LicenseeID INT, ProductID INT,Rate MONEY, Fromdate DATE, Todate DATE)
+	DECLARE @ChargeInfo TABLE(ChargeID INT, PartyID INT, LicenseeID INT, ProductID INT,Rate MONEY, Fromdate DATE, Todate DATE)
 	CREATE TABLE #Data (rptDate DATE, PartyID INT, ProductID INT, Currency INT, BetTypeId INT, Winloss MONEY, AComm MONEY)
 	CREATE TABLE #Report (PartyID INT, ProductID INT, CurrencyID INT, Company MONEY)						
 	
 	/* ChargeInfo */
-	INSERT INTO @ChargeInfo(PartyID, LicenseeID, ProductID, Rate, Fromdate, Todate)
-	SELECT DISTINCT PartyID, LicenseeID, ProductID, CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END, Fromdate, Todate		
+	INSERT INTO @ChargeInfo(ChargeID, PartyID, LicenseeID, ProductID, Rate, Fromdate, Todate)
+	SELECT DISTINCT ChargeID, PartyID, LicenseeID, ProductID, CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END, Fromdate, Todate		
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 	WHERE ChargeType <> 12 -- Exclude for GD Tips
 	
@@ -91,12 +92,13 @@ BEGIN
 	BEGIN
 		INSERT INTO #Report (PartyID, ProductId, CurrencyID, Company)
 		(
-			SELECT ci.PartyID, @GD_Product, b.CurrencyID, SUM(-b.MemberWL * ci.Rate) AS Company
+			SELECT ci.PartyID, @GD_Product, b.CurrencyID, SUM(-b.MemberWL * ISNULL(cr.Rate,ci.Rate)) AS Company
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN @ChargeInfo ci 
 				ON b.SiteID = ci.LicenseeID
 				AND b.ProductID = ci.ProductID
 				AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+			LEFT JOIN dbo.LA_ChargeInfo_CurrencyRate cr WITH (NOLOCK) ON ci.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
@@ -115,11 +117,12 @@ BEGIN
 	BEGIN
 	INSERT INTO #Report (PartyID, ProductId, CurrencyID, Company)
 		(
-			SELECT ci.PartyID, @PP_Product, b.CurrencyID, SUM(-b.MemberWL * ci.Rate) AS Company
+			SELECT ci.PartyID, @PP_Product, b.CurrencyID, SUM(-b.MemberWL * ISNULL(cr.Rate,ci.Rate)) AS Company
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID 
 										 AND b.ProductID = ci.ProductID 
 										 AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+			LEFT JOIN dbo.LA_ChargeInfo_CurrencyRate cr WITH (NOLOCK) ON ci.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND b.customercategory NOT IN (27,28)
@@ -152,12 +155,17 @@ BEGIN
 		)
 
 		INSERT INTO #Report (PartyID, ProductID, CurrencyID, Company)
-		SELECT ci.PartyID, b.ProductID, b.Currency, SUM(-b.Winloss * ci.Rate) AS Company
+		SELECT ci.PartyID, 
+			   b.ProductID, 
+			   b.Currency, 
+			   CASE WHEN b.ProductID IN (0,2,5,6,8,10,21,22,24,27,28,34) THEN SUM(-b.Winloss * ISNULL(cr.Rate, ci.Rate))
+			        ELSE SUM(-b.Winloss * ci.Rate) END AS Company
 		FROM #Data b WITH (NOLOCK)
-		INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci 
+		INNER JOIN (SELECT DISTINCT ChargeID, PartyID, Fromdate, Todate, ProductID, Rate FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci 
 			ON ci.PartyID = b.PartyID 
 				AND b.ProductID = ci.ProductID				
 				AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+		LEFT JOIN dbo.LA_ChargeInfo_CurrencyRate cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND b.Currency = cr.CurrencyID
 		GROUP BY ci.PartyID, b.Currency, b.ProductID
 	END	
 	
