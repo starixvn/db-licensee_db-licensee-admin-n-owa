@@ -725,7 +725,7 @@ BEGIN
 				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 			) d
 				INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
-				LEFT JOIN bodb_licensee.dbo.LA_LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
+				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
 			WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
 			GROUP BY rptDate, d.CurrencyID
 		)
