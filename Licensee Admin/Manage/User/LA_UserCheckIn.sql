@@ -16,11 +16,12 @@ AS
 
 	Revisions:
 		- 20140820@Florent: Initialize SP
+		- 20191127@Bruce: Only update non-kicked out records [#119538]
 */
 
 SET NOCOUNT ON
 BEGIN
-    UPDATE LA_OnUser with (ROWLOCK,UPDLOCK) SET IsKickedout=1 WHERE CustID = @CustID
+    UPDATE LA_OnUser with (ROWLOCK,UPDLOCK) SET IsKickedout = 1 WHERE CustID = @CustID AND IsKickedout = 0
     	
     INSERT INTO dbo.LA_OnUser
 	    (custid, NetSessionID, IsKickedout, IP)
