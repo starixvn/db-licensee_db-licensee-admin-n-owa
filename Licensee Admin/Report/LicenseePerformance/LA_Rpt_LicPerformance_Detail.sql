@@ -420,7 +420,6 @@ BEGIN
 		FROM #Result r
 			INNER JOIN cte_Promotion p ON r.PartyId = p.PartyId AND r.IsCurrent = p.IsCurrent
 	END
-
 	-- ********************************************************
 	-- *** Calculate Other (!= SportBook) and Merge to #Result
 	-- ********************************************************
@@ -467,7 +466,7 @@ BEGIN
 		PartyName	= ISNULL(r.PartyName,op.PartyName),
 		AverageBet	= CASE WHEN r.BetCount = 0 THEN r.Turnover ELSE (CAST(r.Turnover AS DECIMAL(20,5)) / r.BetCount) END,
 		Margin		= CASE WHEN r.Turnover = 0 THEN r.WinLoss ELSE (-CAST(r.WinLoss AS DECIMAL(20,5))/ r.Turnover) END,
-		TotalFee	= ISNULL(r.SportsbookFee,0) + ISNULL(r.OthersFee,0) - ISNULL(r.SportbookDiscount,0) - ISNULL(r.OthersDiscount,0) - ISNULL(r.SportbookRebate,0) - ISNULL(r.OthersRebate,0) - ISNULL(r.PromotionSportsbook,0)
+		TotalFee	= ISNULL(r.SportsbookFee,0) + ISNULL(r.OthersFee,0) - ISNULL(r.SportbookDiscount,0) - ISNULL(r.OthersDiscount,0) - ISNULL(r.SportbookRebate,0) - ISNULL(r.OthersRebate,0)
 	FROM	#Result r
 	INNER JOIN @tmpPartySBLaunchDate t ON t.PartyID = r.PartyId
 	INNER JOIN bodb_licensee.dbo.OAS_Party (NOLOCK) op ON r.PartyId = op.PartyID
@@ -503,8 +502,8 @@ BEGIN
 			CASE WHEN ISNULL(p.OthersRebate,0) > 0 THEN p.OthersRebate ELSE 0 END 					AS PreviousRebateOthers,
 			ISNULL(r.PromotionSportsbook, 0)														AS PromotionSportsbook,
 			ISNULL(p.PromotionSportsbook, 0)														AS PreviousPromotionSportsbook,
-			(CASE WHEN r.TotalFee > 0 THEN r.TotalFee ELSE 0 END) + ISNULL(r.NegativeAmount,0)		AS TotalLicensingFee,
-			(CASE WHEN p.TotalFee > 0 THEN p.TotalFee ELSE 0 END) + ISNULL(p.NegativeAmount,0)		AS PreviousTotalLicensingFee
+			(CASE WHEN r.TotalFee > 0 THEN r.TotalFee ELSE 0 END) + ISNULL(r.NegativeAmount,0) - ISNULL(r.PromotionSportsbook,0)	AS TotalLicensingFee,
+			(CASE WHEN p.TotalFee > 0 THEN p.TotalFee ELSE 0 END) + ISNULL(p.NegativeAmount,0) - ISNULL(p.PromotionSportsbook,0)	AS PreviousTotalLicensingFee
 	FROM	#Result r
 			LEFT JOIN (SELECT * FROM #Result WHERE IsCurrent = 0) p ON r.PartyId = p.PartyId
 	WHERE	r.IsCurrent = 1 AND r.PartyId IN (SELECT pt.PartyId FROM @PartyIdTable pt WHERE IsSelected = 1)
