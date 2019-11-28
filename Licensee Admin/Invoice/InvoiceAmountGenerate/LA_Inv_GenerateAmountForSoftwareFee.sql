@@ -509,12 +509,12 @@ BEGIN
 	END
 
 	-- Region insert Promotion amount
-	IF(EXISTS(SELECT val FROM bodb02.dbo.strSplit(@ProductCodes, ',') WHERE val = 'SB'))
+	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = 0))
 	BEGIN
 		DECLARE @PromotionAmount MONEY
 		SELECT @PromotionAmount = SUM(p.RedemptionPrize * e.Rate)
 		FROM bodb_LicenseeReport.dbo.rptLicPromotion p WITH (NOLOCK)
-			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'SB', 'OA', 1) pc ON p.SiteID = pc.LicenseeId
+			INNER JOIN @PartyChargeInfo pc ON p.SiteID = pc.LicenseeId
 			INNER JOIN #Exchange e ON p.RptDate = e.ExchangeDate AND p.CurrencyID = e.ExchangeID
 			WHERE p.RptDate BETWEEN @FromDate and @ToDate
 		

@@ -405,7 +405,7 @@ BEGIN
 	WHERE	s.ProductId = 0
 
 	/*Update Promotion column*/
-	IF(EXISTS(SELECT val FROM bodb02.dbo.strSplit(@ProductCodes, ',') WHERE val = 'SB'))
+	IF(EXISTS(SELECT TOP 1 1 FROM #Result))
 	BEGIN
 		;WITH cte_Promotion AS(
 			SELECT pc.PartyId, r.SiteID,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END) IsCurrent, SUM(r.RedemptionPrize * cExchange.Rate) AS Prize
