@@ -56,9 +56,10 @@ BEGIN
 	DECLARE @FromDate DATE = DATEADD(MONTH,DATEDIFF(MONTH,0,@ReportMonth),0)
 	DECLARE @ToDate DATE = DATEADD(DAY,-1,DATEADD(MONTH,1,@FromDate))
 
-	SELECT -b.MemberWL*c.DI_Rate AS AmountToCompany, c.PartyID, b.CurrencyId,b.rptDate INTO #data
+	SELECT -b.MemberWL * ISNULL(cr.Rate, c.DI_Rate) AS AmountToCompany, c.PartyID, b.CurrencyId,b.rptDate INTO #data
 	FROM bodb_licenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 	INNER JOIN dbo.LA_f_ChargeInfo(@partyIds,@FromDate,@ToDate,'SB','OA',1) c ON b.SiteId=c.LicenseeId AND b.ProductId=c.ProductId
+	LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr ON cr.ChargeId = c.ChargeId AND cr.CurrencyId = b.CurrencyId
 	WHERE b.rptDate BETWEEN c.Fromdate AND c.Todate
 		AND b.customercategory NOT IN (27, 28)
 		AND b.StatusId NOT IN (-1, 101, 102, 103)
