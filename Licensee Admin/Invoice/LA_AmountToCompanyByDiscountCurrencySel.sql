@@ -314,6 +314,7 @@ BEGIN
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
 			AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
+
 	-- 2.2 convert to base
 	SELECT	t.WinlossDate,
 			t.PartyId,

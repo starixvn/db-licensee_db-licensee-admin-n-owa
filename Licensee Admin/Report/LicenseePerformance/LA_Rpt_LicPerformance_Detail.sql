@@ -296,9 +296,7 @@ BEGIN
 				SUM(ISNULL(b.CommissionA, 0)) * e.Rate,
 				SUM(ISNULL(b.CommissionP, 0)) * e.Rate,
 				p.ProductId,
-				SUM((CASE WHEN b.Bettype=@GD_Tip THEN 0 
-						  WHEN b.ProductID IN (0,2,5,6,8,10,11,21,22,24,27,28,32,34) THEN -b.MemberWL * ISNULL(cr.Rate, p.Rate)
-						  ELSE -b.MemberWL * p.Rate END ) - (CASE 
+				SUM((CASE WHEN b.Bettype=@GD_Tip THEN 0 ELSE -b.MemberWL * ISNULL(cr.Rate, p.Rate) END) - (CASE 
 					WHEN b.ProductId = @BAProductId THEN ISNULL(b.CommissionA, 0)
 					WHEN b.ProductID = @ExchangeProductId THEN ISNULL(b.CommissionA, 0) + ISNULL(b.CommissionP, 0)
 					ELSE 0 END)) * e.Rate
@@ -308,7 +306,7 @@ BEGIN
 													AND p.LicenseeId = b.SiteId
 													AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
 													AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
-				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrencye cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
+				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
 		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate OR b.rptDate BETWEEN @PrevFromDate AND @PrevToDate)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)

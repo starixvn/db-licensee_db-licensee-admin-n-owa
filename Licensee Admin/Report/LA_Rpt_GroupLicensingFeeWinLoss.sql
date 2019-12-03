@@ -155,11 +155,7 @@ BEGIN
 		)
 
 		INSERT INTO #Report (PartyID, ProductID, CurrencyID, Company)
-		SELECT ci.PartyID, 
-			   b.ProductID, 
-			   b.Currency, 
-			   CASE WHEN b.ProductID IN (0,2,5,6,8,10,21,22,24,27,28,34) THEN SUM(-b.Winloss * ISNULL(cr.Rate, ci.Rate))
-			        ELSE SUM(-b.Winloss * ci.Rate) END AS Company
+		SELECT ci.PartyID, b.ProductID, b.Currency, SUM(-b.Winloss * ISNULL(cr.Rate, ci.Rate)) AS Company
 		FROM #Data b WITH (NOLOCK)
 		INNER JOIN (SELECT DISTINCT ChargeID, PartyID, Fromdate, Todate, ProductID, Rate FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci 
 			ON ci.PartyID = b.PartyID 

@@ -318,8 +318,8 @@ BEGIN
 				, SUM(-MemberWL * (1 - ISNULL(cm.Rate, p.Rate))) AS LicenseeWL
 				, 0 AS LicenseeComm
 				, SUM(TipAmount) AS TipsAmount
-				, SUM(TipAmount * ISNULL(cm.Rate, p.Rate)) AS TipsAmountDue
-				, SUM((-MemberWL * ISNULL(cm.Rate, p.Rate)) + (TipAmount * ISNULL(cm.Rate, p.Rate))) AS Company
+				, SUM(TipAmount * p.Rate) AS TipsAmountDue
+				, SUM((-MemberWL * ISNULL(cm.Rate, p.Rate)) + (TipAmount * p.Rate)) AS Company
 				, SUM(b.betcount) AS BetCount
 			FROM cte_GD b
 				INNER JOIN @ChargeInfo p ON (
@@ -698,13 +698,9 @@ BEGIN
 				, SUM(Turnover) AS turnover
 				, SUM(WinLoss) AS Winlost
 				, SUM(PComm) AS PlayerComm
-				, CASE WHEN @ProductCode IN ('SB','NG','VS','CS','KN','AB','VB','FW','VS2','LT','CC') THEN -SUM(Winloss * ( 1 - ISNULL(cr.Rate, p.Rate))) 
-																									  ELSE -SUM(Winloss * ( 1 - p.Rate)) END 
-																									  AS LicenseeWL
+				, SUM(-Winloss * ( 1 - ISNULL(cr.Rate, p.Rate))) AS LicenseeWL
 				, SUM(AComm - PComm) AS LicenseeComm
-				, CASE WHEN @ProductCode IN ('SB','NG','VS','CS','KN','AB','VB','FW','VS2','LT','CC') THEN -SUM(WinLoss * ISNULL(cr.Rate, p.Rate) + AComm) 
-																									  ELSE -SUM(WinLoss * p.Rate + AComm) END 
-																									  AS Company
+				, SUM(-WinLoss * ISNULL(cr.Rate, p.Rate) + AComm) AS Company
 				, SUM(BetCount) AS BetCount
 			FROM (
 				SELECT b.SiteId, b.rptDate, b.CurrencyID
