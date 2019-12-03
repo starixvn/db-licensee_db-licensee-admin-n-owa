@@ -2,7 +2,7 @@
 USE [bodb_licensee]
 GO
 
-ALTER PROCEDURE [dbo].[LA_ChargeRateSettingUpd]
+ALTER PROCEDURE [dbo].[LA_ChargeRateSettingByCurrencyModify]
 	  @ChargeID				INT
 	, @MasterRate			MONEY
 	, @DetailChargeRateSettingXml		NVARCHAR (MAX)
