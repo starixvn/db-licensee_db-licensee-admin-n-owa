@@ -16,12 +16,15 @@ AS
 	 Revisions:  
 		- 20180508@Parsons: Integrate Pragmatic Win Loss [#94108]
 		- 20190308@Parsons: Integrate PP promotion prize [#109014]
+		- 20191204@Bruce: PP tournament [#123958]
+
 	 Params:
 
 	 Explannation: EXEC LA_Rpt_PragmaticWinLoss @BaseCurrencyName='EUR',@ToDate='2018-04-30 00:00:00',@PartyIds='14,15,17,19,20,23,29,39,40,42,44,46,47,52,53,56,58,60,65,68,70,71,72,73,76,79,80,81,82,84,85,86,87,89,90,91,92,93,95,97,100,101,24,31,34,35,36,37,38,41,59,66,67,74,75,88,16,22,26,27,45,49,54,99,25,30',@FromDate='2018-04-01 00:00:00'
 */
 BEGIN	
 	DECLARE @PromotionPrize INT = 4300
+	DECLARE @PPTournament INT = 4299
 
 	-- Region: Charge Info	
 	DECLARE @ChargeInfos AS TABLE (
@@ -74,7 +77,7 @@ BEGIN
 		PartyID		INT,
 		PartyName	NVARCHAR(100),
 		ParentId	INT,
-		ParentName	VARCHAR(100),	
+		ParentName	VARCHAR(100),
 		Winlossdate DATETIME,
 		CurrencyId	INT,
 		Turnover	MONEY,
@@ -92,13 +95,13 @@ BEGIN
 		p.ParentName,
 		b.RptDate3rd,
 		b.CurrencyId,
-		SUM(b.Turnover) AS Turnover,
-		SUM(b.BetCount) AS TotalTrans,
-		SUM(CASE WHEN b.BetTypeId = @PromotionPrize THEN b.Winloss ELSE 0 END ) AS WinPrizeAmount,
-		SUM(CASE WHEN b.BetTypeId <> @PromotionPrize THEN b.Winloss ELSE 0 END) AS CustomerWinLoss,
-		SUM(-(CASE WHEN b.BetTypeId <> @PromotionPrize THEN b.Winloss ELSE 0 END)) AS LicenseeWinloss,
-		SUM(-(CASE WHEN b.BetTypeId <> @PromotionPrize THEN b.Winloss ELSE 0 END) * ci.Rate) AS LicensingFee,
-		SUM(-(CASE WHEN b.BetTypeId <> @PromotionPrize THEN b.Winloss ELSE 0 END) * ci.Rate3rd) AS PayToSupplier
+		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE b.Turnover END) AS Turnover,
+		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE b.BetCount END) AS TotalTrans,
+		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN b.Winloss ELSE 0 END) AS WinPrizeAmount,
+		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE b.Winloss END) AS CustomerWinLoss,
+		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE -b.Winloss END) AS LicenseeWinloss,
+		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE -b.Winloss * ci.Rate END) AS LicensingFee,
+		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE -b.Winloss * ci.Rate3rd END) AS PayToSupplier
 	FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
 		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
 		INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
@@ -247,9 +250,9 @@ BEGIN
 			SUM(TotalTrans),
 			SUM(Turnover),
 			SUM(WinPrizeAmount),
-			SUM(CustomerWinLoss + WinPrizeAmount),
-			SUM(LicenseeWinLoss - WinPrizeAmount),
-			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END - WinPrizeAmount),
+			SUM(CustomerWinLoss),
+			SUM(LicenseeWinLoss),
+			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
 			SUM(PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
@@ -274,8 +277,8 @@ BEGIN
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(LicensingFee),
-			SUM(PayToSupplier - WinPrizeAmount),
-			SUM(LicensingFee - PayToSupplier + WinPrizeAmount)
+			SUM(PayToSupplier),
+			SUM(LicensingFee - PayToSupplier)
 		FROM @Total
 		WHERE Currency = @tempCurrency
 		GROUP BY Currency
@@ -297,22 +300,18 @@ BEGIN
 			-- base
 			CAST(r.Turnover * e.Rate AS MONEY) AS Turnover,
 			CAST(r.WinPrizeAmount * e.Rate AS MONEY) AS WinPrizeAmount,
-			CAST((r.CustomerWinLoss + r.WinPrizeAmount) * e.Rate AS MONEY) AS CustomerWinLoss,
-			CAST((LicenseeWinLoss - r.WinPrizeAmount) * e.Rate AS MONEY) AS LicenseeWinLoss,
-			CAST(r.LicensingFee * e.Rate AS MONEY) AS LicensingFeeWithoutWinPrizeAmount,
-			CAST((r.LicensingFee - r.WinPrizeAmount) * e.Rate AS MONEY) AS LicensingFee,
-			CAST(r.PayToSupplier * e.Rate AS MONEY) AS PayToSupplierWithoutWinPrizeAmount,
-			CAST((r.PayToSupplier - r.WinPrizeAmount) * e.Rate AS MONEY) AS PayToSupplier,
+			CAST(r.CustomerWinLoss * e.Rate AS MONEY) AS CustomerWinLoss,
+			CAST(LicenseeWinLoss * e.Rate AS MONEY) AS LicenseeWinLoss,
+			CAST(r.LicensingFee * e.Rate AS MONEY) AS LicensingFee,
+			CAST(r.PayToSupplier * e.Rate AS MONEY) AS PayToSupplier,
 			CAST((r.LicensingFee - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome,
 			-- original
 			r.Turnover			AS TurnoverOriginal,
 			r.WinPrizeAmount	AS WinPrizeAmountOriginal,
-			r.CustomerWinLoss + r.WinPrizeAmount AS CustomerWinLossOriginal,
-			r.LicenseeWinLoss - r.WinPrizeAmount AS LicenseeWinLossOriginal,
-			r.LicensingFee		AS LicensingFeeWithoutWinPrizeAmountOriginal,
-			r.LicensingFee - r.WinPrizeAmount AS LicensingFeeOriginal,
-			r.PayToSupplier		AS PayToSupplierWithoutWinPrizeAmountOriginal,
-			r.PayToSupplier - r.WinPrizeAmount AS PayToSupplierOriginal,
+			r.CustomerWinLoss	AS CustomerWinLossOriginal,
+			r.LicenseeWinLoss	AS LicenseeWinLossOriginal,
+			r.LicensingFee		AS LicensingFeeOriginal,
+			r.PayToSupplier		AS PayToSupplierOriginal,
 			(r.LicensingFee - r.PayToSupplier) AS CompanyIncomeOriginal
 		FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
 
@@ -326,11 +325,11 @@ BEGIN
 			TotalTrans,
 			Turnover,
 			WinPrizeAmount,
-			CustomerWinLoss,	
+			CustomerWinLoss,
 			LicenseeWinLoss,
 			LicensingFee,
-			PayToSupplier - WinPrizeAmount AS PayToSupplier,
-			(LicensingFee - PayToSupplier + WinPrizeAmount) AS CompanyIncome
+			PayToSupplier AS PayToSupplier,
+			(LicensingFee - PayToSupplier) AS CompanyIncome
 		FROM @Total t
 		WHERE Currency = @BaseCurrencyName
 	END
