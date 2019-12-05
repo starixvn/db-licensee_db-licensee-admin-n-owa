@@ -112,8 +112,7 @@ BEGIN
 			SELECT tp.PartyID, b.rptDate, b.CurrencyID,0,0
 				, SUM(ISNULL(b.betcount, 0) * CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS BetCount
 				, SUM(ISNULL(b.turnover, 0) * CASE WHEN @drawfilter IN (2, 3) AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS TurnOver
-				, SUM(CASE WHEN b.Bettype <> @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS Winlost
-				, SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END)  AS WinningPrize
+				, SUM(ISNULL(b.MemberWL, 0)) as Winlost
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 					INNER JOIN (SELECT DISTINCT PartyID, LicenseeID FROM @tmpParty) tp ON tp.LicenseeID = b.SiteID
 				WHERE b.ProductID = 32
@@ -122,6 +121,7 @@ BEGIN
 					AND (@Currency = 0 OR b.CurrencyID = @Currency)  
 					AND b.customercategory NOT IN (27, 28)
 					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+					AND b.Bettype NOT IN(@PPTournament, @PromotionPrize)
 				GROUP BY tp.PartyID, b.rptDate, b.CurrencyID
 		)
 	END
@@ -165,7 +165,7 @@ BEGIN
 	SELECT b.PartyID
 		, CONVERT(VARCHAR(6),b.rptDate,112)
 		, SUM(TurnOver * e.Rate)	AS Turnover
-		, SUM((Winlost + ISNULL(WinningPrize, 0)) * e.Rate)	AS CustomerWinlost
+		, SUM(Winlost * e.Rate)	AS CustomerWinlost
 		, SUM(CommBA * e.Rate) AS CommBA
 		, SUM(CommRB * e.Rate) AS CommRB
 		, SUM(Betcount) AS Betcount
@@ -190,7 +190,7 @@ BEGIN
 		, SUM(CommBA) AS AmtDueToBA
 		, SUM(CommRB) AS AmtDueToRB
 		, SUM(Betcount) AS BetCount
-		, SUM(LicensingFee - WinningPrize) AS LicensingFee
+		, SUM(LicensingFee) AS LicensingFee
 	FROM #Result
 	GROUP BY ReportType
 	ORDER BY ReportType ASC
