@@ -33,6 +33,7 @@ AS
 	   - 20180716@bruce: add new group TEST for credit [#98126]
 	   - 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 	   - 20190412@Parsons: Integrate-PP-Promotion-Prize [#109014]
+	   - 20191205@Mason: PP tournament [#123958]
 
 	Param's Explanation:
 	  + @PartyIDs : a string of list PartyID, separated by ','
@@ -56,9 +57,9 @@ BEGIN
 	SELECT DISTINCT ChargeId, PartyID, LicenseeID, IsDeposit, ProductID, DI_Rate, AffectedDate, Fromdate, Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 
-	CREATE TABLE #Result (PartyID INT, ReportType VARCHAR(8), TurnOver MONEY, CustomerWinlost MONEY, CommBA MONEY ,CommRB MONEY, Betcount BIGINT, WinningPrize MONEY, LicensingFee MONEY)
+	CREATE TABLE #Result (PartyID INT, ReportType VARCHAR(8), TurnOver MONEY, CustomerWinlost MONEY, CommBA MONEY ,CommRB MONEY, Betcount BIGINT, LicensingFee MONEY)
 
-	CREATE TABLE #Temp (PartyID INT, Rptdate DATETIME, Currency INT, TurnOver MONEY, Winlost MONEY, CommBA MONEY, CommRB MONEY, WinningPrize MONEY, Betcount BIGINT)
+	CREATE TABLE #Temp (PartyID INT, Rptdate DATETIME, Currency INT, TurnOver MONEY, Winlost MONEY, CommBA MONEY, CommRB MONEY, Betcount BIGINT)
 
 	CREATE TABLE #Exchange (ExchangeDate SMALLDATETIME, ExchangeId INT, Rate FLOAT)
 	INSERT INTO #Exchange(ExchangeDate, ExchangeId, Rate)
@@ -162,7 +163,7 @@ BEGIN
 		)
 	END
 
-	INSERT INTO #Result (PartyID, ReportType, TurnOver, CustomerWinlost, CommBA, CommRB, Betcount, WinningPrize, LicensingFee)
+	INSERT INTO #Result (PartyID, ReportType, TurnOver, CustomerWinlost, CommBA, CommRB, Betcount, LicensingFee)
 	SELECT b.PartyID
 		, CONVERT(VARCHAR(6),b.rptDate,112)
 		, SUM(TurnOver * e.Rate)	AS Turnover
@@ -170,7 +171,6 @@ BEGIN
 		, SUM(CommBA * e.Rate) AS CommBA
 		, SUM(CommRB * e.Rate) AS CommRB
 		, SUM(Betcount) AS Betcount
-		, SUM(ISNULL(WinningPrize, 0) * e.Rate) AS WinningPrize
 		, SUM((-b.Winlost * ISNULL(p.Rate,0)) * e.Rate) AS LicensingFee
 	FROM #Temp b
 	INNER JOIN #Exchange e  ON e.ExchangeDate = b.Rptdate AND e.ExchangeId = b.Currency
