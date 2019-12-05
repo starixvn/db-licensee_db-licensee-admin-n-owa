@@ -107,7 +107,8 @@ BEGIN
 	IF @ProductCode = 'PP'
 	BEGIN		
 		DECLARE @PromotionPrize SMALLINT = 4300
-		INSERT INTO #Temp (PartyID, rptDate, Currency, CommBA, CommRB, Betcount, TurnOver, Winlost, WinningPrize)
+		DECLARE @PPTournament SMALLINT = 4299
+		INSERT INTO #Temp (PartyID, rptDate, Currency, CommBA, CommRB, Betcount, TurnOver, Winlost)
 		(
 			SELECT tp.PartyID, b.rptDate, b.CurrencyID,0,0
 				, SUM(ISNULL(b.betcount, 0) * CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS BetCount
