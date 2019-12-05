@@ -41,6 +41,7 @@ AS
 	   - 20180907@Bruce: Support multiple currency [#101160]
 	   - 20181119@bruce: Integrate Bidme games (GD product) [#103695]
 	   - 20190322@Parsons: Integrate-PP-Promotion-Prize [#109014]
+	   - 20191205@Parsons: PP tournament [#123958]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -49,7 +50,9 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON 
-	DECLARE @GD_Tip SMALLINT = 1706, @PromotionPrize SMALLINT = 4300  
+	DECLARE @GD_Tip SMALLINT = 1706, 
+	@PPTournament SMALLINT = 4299,
+	@PromotionPrize SMALLINT = 4300  
 
 	-- currency list
 	--
@@ -254,8 +257,7 @@ BEGIN
 			SELECT b.SiteId, b.rptDate, b.CurrencyID
 				, SUM(ISNULL(b.betcount, 0) * CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS BetCount
 				, SUM(ISNULL(b.turnover, 0) * CASE WHEN @drawfilter IN (2, 3) AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS TurnOver
-				, SUM(CASE WHEN b.Bettype <> @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) Winloss
-				, SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
+				, SUM(ISNULL(b.MemberWL, 0)) Winloss
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				WHERE
 					b.ProductID = 32
@@ -264,6 +266,7 @@ BEGIN
 					AND (b.CurrencyID <> 20)
 					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory NOT IN (27,28)
+					AND b.Bettype NOT IN(@PPTournament, @PromotionPrize)
 				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
 		INSERT INTO #tmpWinLoss(PartyID, Winlostdate, Currency, Betcount, TurnOver, Winlost, LicenseeWL, Company)
@@ -271,9 +274,9 @@ BEGIN
 			SELECT tp.PartyID, b.rptDate, b.CurrencyId
 				, SUM(BetCount)		AS BetCount
 				, SUM(Turnover)		AS Turnover
-				, SUM(WinLoss + WinningPrize)	AS Winlost
-				, -SUM(WinLoss + WinningPrize)  AS LicenseeWL
-				, SUM((-WinLoss * tp.Rate) - WinningPrize) AS Company
+				, SUM(WinLoss)		AS Winlost
+				, SUM(-WinLoss)		AS LicenseeWL
+				, SUM((-WinLoss * tp.Rate)) AS Company
 			FROM cte_PPWinLossData b
 				INNER JOIN #tmpParty tp ON b.SiteID = tp.LicenseeID AND tp.ProductID = 32
 			WHERE b.rptDate BETWEEN tp.Fromdate AND tp.Todate
