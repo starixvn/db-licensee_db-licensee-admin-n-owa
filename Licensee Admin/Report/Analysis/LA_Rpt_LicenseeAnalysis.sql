@@ -22,6 +22,7 @@ AS
 		- 20190410@bruce: calculate discount for terminated licensee[111485]
 	    - 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
 		- 20191010@Percy: Replace LicenseeBATransaction to LicenseeBATransaction_active [RedmineID: #103656]
+		- 20191205@Mason: PP tournament [#123958]
 
 	Notes: @FromDate, @ToDate should be a full month range
 	Example :  EXEC LA_Rpt_LicenseeAnalysis  @PartyIDs = '73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88', 
@@ -45,7 +46,7 @@ BEGIN
 	DECLARE @ToBeCalculated INT = 1
 	DECLARE @CalculateAndDiscount INT = 10
 
-	DECLARE @GD_Tip SMALLINT = 1706, @PromotionPrize SMALLINT = 4300
+	DECLARE @GD_Tip SMALLINT = 1706, @PromotionPrize SMALLINT = 4300, @PPTournament SMALLINT = 4299
 
 	-- remove un-support products
 	DECLARE @Products AS TABLE (ProductId INT,ProductCode VARCHAR(10), ToBeDiscounted BIT)
@@ -298,7 +299,7 @@ BEGIN
 				SUM(-(b.winlost - b.actual_stake) * e.Rate), 
 				bt.ProductID,
 				l.PartyId,
-				CASE WHEN b.bettype = @GD_Tip OR b.bettype = @PromotionPrize THEN b.bettype ELSE -1 END
+				CASE WHEN b.bettype = @GD_Tip THEN b.bettype ELSE -1 END
 			FROM bodb02.dbo.bettrans b WITH (NOLOCK)
 				INNER JOIN #LicenseeCustInfo l 
 					ON l.CustId = b.recommend 					
@@ -312,10 +313,10 @@ BEGIN
 			WHERE b.statusID IN (111, 112, 113) 
 				AND b.winlostdate BETWEEN @TempFromDate AND @ToDate
 				AND NOT EXISTS (SELECT 1 FROM dbo.LicenseeBATransaction_active ba WITH(NOLOCK) WHERE b.transid = ba.transid)
-				AND b.bettype NOT IN (901,902,903,904,911,912,913,914)
+				AND b.bettype NOT IN (901,902,903,904,911,912,913,914,@PPTournament,@PromotionPrize)
 			GROUP BY b.winlostdate, l.CurrencyId, bt.ProductID, l.PartyId
 				, CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END
-				, CASE WHEN b.bettype = @GD_Tip OR b.bettype = @PromotionPrize THEN b.bettype ELSE -1 END
+				, CASE WHEN b.bettype = @GD_Tip THEN b.bettype ELSE -1 END
 		)
 
 		DROP TABLE #BettypeList
@@ -343,7 +344,7 @@ BEGIN
 				SUM(-b.winlost * e.Rate),
 				ps.ProductID,
 				l.PartyId,
-				CASE WHEN b.bettype = @GD_Tip OR b.bettype = @PromotionPrize THEN b.bettype ELSE -1 END
+				CASE WHEN b.bettype = @GD_Tip THEN b.bettype ELSE -1 END
 			FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH ( NOLOCK )
 			CROSS APPLY (SELECT l.PartyId 
 						FROM #LicenseeCustInfo l 
@@ -360,11 +361,11 @@ BEGIN
 			WHERE b.Winlostdate BETWEEN @FromDate AND @TempToDate
 				AND b.roleid = 2 -- Sum on agent for better performance
 				AND b.statusID NOT IN (-1, 101, 102, 103)
-				AND b.bettype NOT IN (901,902,903,904,911,912,913,914)
+				AND b.bettype NOT IN (901,902,903,904,911,912,913,914,@PPTournament,@PromotionPrize)
 				AND ISNULL(b.isBA,0) = 0
 			GROUP BY b.winlostdate, b.Currency,l.PartyId,ps.ProductID
 				, CASE WHEN b.betfrom IN ('d','a','e', 'u','m','s','l') THEN b.betfrom ELSE '*' END
-				, CASE WHEN b.bettype = @GD_Tip OR b.bettype = @PromotionPrize THEN b.bettype ELSE -1 END
+				, CASE WHEN b.bettype = @GD_Tip THEN b.bettype ELSE -1 END
 		)
 	END
 	-- end region
@@ -515,17 +516,16 @@ BEGIN
 	;WITH a AS (
 		SELECT d.PartyId, d.ProductId,
 			SUM(d.Turnover)			Turnover,
-			SUM(CASE WHEN d.Bettype = @GD_Tip OR d.Bettype = @PromotionPrize THEN 0 ELSE d.LicenseeWinLoss END) LicenseeWinLoss,
-			SUM(CASE WHEN d.Bettype = @GD_Tip OR d.Bettype = @PromotionPrize THEN 0 ELSE d.LicensingFee END) LicensingFee,
+			SUM(CASE WHEN d.Bettype = @GD_Tip THEN 0 ELSE d.LicenseeWinLoss END) LicenseeWinLoss,
+			SUM(CASE WHEN d.Bettype = @GD_Tip THEN 0 ELSE d.LicensingFee END) LicensingFee,
 			SUM(CASE WHEN d.Bettype = @GD_Tip THEN d.LicensingFee ELSE 0 END) GDTip,
-			SUM(CASE WHEN d.Bettype = @PromotionPrize THEN d.LicenseeWinLoss ELSE 0 END)	WinningPrize,
 			CAST(0 AS MONEY)		Discount,
 			CAST(0 AS MONEY)		Rebate
 		FROM #Result d
 		GROUP BY d.PartyId, d.ProductId
 	)
 	SELECT a.LicenseeWinLoss,a.PartyId,a.ProductId,a.Turnover,a.Discount,a.Rebate,
-		ISNULL(a.GDTip, CAST(0 AS MONEY)) + a.WinningPrize +
+		ISNULL(a.GDTip, CAST(0 AS MONEY)) +
 		(CASE 
 			WHEN ISNULL(amf.AmountToCompany, a.LicensingFee) < 0 THEN CAST(0 AS MONEY)
 			ELSE ISNULL(amf.AmountToCompany, a.LicensingFee)
