@@ -251,45 +251,12 @@ BEGIN
 		)
 	END
 
-	IF EXISTS (SELECT 1 FROM @ProductList WHERE ProductCode = 'PP')
-	BEGIN
-	;WITH cte_PPWinLossData AS(
-			SELECT b.SiteId, b.rptDate, b.CurrencyID
-				, SUM(ISNULL(b.betcount, 0) * CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS BetCount
-				, SUM(ISNULL(b.turnover, 0) * CASE WHEN @drawfilter IN (2, 3) AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS TurnOver
-				, SUM(ISNULL(b.MemberWL, 0)) Winloss
-				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				WHERE
-					b.ProductID = 32
-					AND b.rptDate BETWEEN @FromDate AND @ToDate
-					AND (@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c))
-					AND (b.CurrencyID <> 20)
-					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
-					AND b.CustomerCategory NOT IN (27,28)
-					AND b.Bettype NOT IN(@PPTournament, @PromotionPrize)
-				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
-		)
-		INSERT INTO #tmpWinLoss(PartyID, Winlostdate, Currency, Betcount, TurnOver, Winlost, LicenseeWL, Company)
-		(
-			SELECT tp.PartyID, b.rptDate, b.CurrencyId
-				, SUM(BetCount)		AS BetCount
-				, SUM(Turnover)		AS Turnover
-				, SUM(WinLoss)		AS Winlost
-				, SUM(-WinLoss)		AS LicenseeWL
-				, SUM((-WinLoss * tp.Rate)) AS Company
-			FROM cte_PPWinLossData b
-				INNER JOIN #tmpParty tp ON b.SiteID = tp.LicenseeID AND tp.ProductID = 32
-			WHERE b.rptDate BETWEEN tp.Fromdate AND tp.Todate
-			GROUP BY tp.PartyID, b.rptDate, b.CurrencyId
-		)
-	END
-
-	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode NOT IN ('BA','MGCLC','MGCRNG','AGC','GD','VG','BX','PP'))
+	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode NOT IN ('BA','MGCLC','MGCRNG','AGC','GD','VG','BX'))
 	BEGIN
 		
 		--exclude BA,MGCLC, MGCRNG,AGC,GD,VG,BX
-		DELETE #Bettype WHERE ProductID IN (3,14,17,10,11,12,31,32)
-		DELETE #tmpParty WHERE ProductID IN (3,14,17,10,11,12,31,32)
+		DELETE #Bettype WHERE ProductID IN (3,14,17,10,11,12,31)
+		DELETE #tmpParty WHERE ProductID IN (3,14,17,10,11,12,31)
 
 		SELECT b.BetCount,b.turnover,b.rptDate,b.CurrencyID,b.Bettype,b.[Status],b.winloss,b.WinlossA,b.CommissionA,b.commissionP,b.SiteID,b.leagueid,b.IsLive,bt.ProductId
 		INTO #tmpData
@@ -301,6 +268,7 @@ BEGIN
 			AND (@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c))
 			AND b.SiteID IN (SELECT p.LicenseeId FROM #tmpParty p)
 			AND b.rptDate BETWEEN @FromDate AND @ToDate
+			AND b.Bettype NOT IN(@PPTournament, @PromotionPrize)
 
 		;WITH cte_Data AS
 		(
@@ -321,7 +289,7 @@ BEGIN
 					,SUM(CASE WHEN b.bettype IN (31,32, 33) THEN CommissionA ELSE 0 END) as CommRB
 					,SUM(CASE WHEN b.bettype NOT IN (31,32, 33) THEN -(b.winloss) ELSE CAST(0 AS MONEY) END) AS Company
 					,SUM(CASE WHEN @drawfilter = 2 AND b.[Status] = 111 THEN 0 ELSE b.BetCount END) AS BetCount
-					,SUM(b.commissionP) AS Playercomm
+					,SUM(CASE WHEN b.ProductId = 32 THEN 0 ELSE b.commissionP END) AS Playercomm
 			FROM #tmpData b
 			LEFT JOIN dbo.League l WITH(NOLOCK) ON b.leagueid = l.leagueid
 			WHERE (@SportType = 0 OR (b.bettype NOT IN (9,29) AND (b.bettype NOT BETWEEN 31 AND 120) AND l.Sporttype = @Sporttype)) AND
