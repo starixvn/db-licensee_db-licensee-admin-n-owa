@@ -40,6 +40,7 @@ AS
 			- 20180716@bruce: add new group TEST for credit [#98126]
 			- 20181120@Parsons: Integrate Bidme games (GD product) [#103695]
 			- 20190312@Parsons: Integrate Promotion Prize (PP product) [#109014]
+			- 20191205@Parsons: PP tournament [#123958]  
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -649,14 +650,15 @@ BEGIN
 	END
 	ELSE IF (@ProductCode = 'PP')
 	BEGIN
-		DECLARE @PromotionPrize INT = 4300 
+		DECLARE @PPTournament SMALLINT = 4299,   
+				@PromotionPrize SMALLINT = 4300 
 
 		;WITH cte_WinLossData AS(
 			SELECT b.SiteId, b.rptDate, b.CurrencyID
-				, SUM(ISNULL(b.betcount, 0)) BetCount
-				, SUM(ISNULL(b.turnover, 0)) AS Turnover
-				, SUM(CASE WHEN b.Bettype <> @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) Winloss
-				, SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
+				, SUM(CASE WHEN b.Bettype NOT IN(@PPTournament, @PromotionPrize) THEN ISNULL(b.BetCount, 0) ELSE 0 END) BetCount
+				, SUM(CASE WHEN b.Bettype NOT IN(@PPTournament, @PromotionPrize) THEN ISNULL(b.Turnover, 0) ELSE 0 END) AS Turnover
+				, SUM(CASE WHEN b.Bettype NOT IN(@PPTournament, @PromotionPrize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) Winloss
+				, SUM(CASE WHEN b.Bettype IN(@PPTournament, @PromotionPrize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				WHERE
 					b.ProductID = 32
@@ -671,10 +673,10 @@ BEGIN
 		SELECT rptDate, CurrencyID
 				, SUM(BetCount)		AS BetCount
 				, SUM(Turnover)		AS Turnover
-				, SUM(WinLoss + WinningPrize)	AS Winlost
+				, SUM(WinLoss)	AS Winlost
 				, SUM(-Winloss * ( 1 - p.Rate))  AS LicenseeWL
 				, SUM(WinningPrize) AS WinningPrize
-				, SUM((-WinLoss * p.Rate) - WinningPrize) AS Company
+				, SUM((-WinLoss * p.Rate)) AS Company
 		FROM cte_WinLossData d
 			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
 		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
