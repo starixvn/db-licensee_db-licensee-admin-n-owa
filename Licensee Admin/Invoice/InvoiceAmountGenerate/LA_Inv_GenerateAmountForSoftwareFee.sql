@@ -28,6 +28,7 @@ AS
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20190911@Bruce: Support Exchange product in invoices [#119846]
 		- 20191017@Parsons: Non-peak hour promotion [#119538]
+		- 20191209@Parsons: PP tournament [#123958] 
 */
 BEGIN
 	SET NOCOUNT ON
@@ -36,7 +37,8 @@ BEGIN
 		@AmountTypeDiscount INT = 4,
 		@AmountTypeRebate INT = 6,
 		@DeductAgainstInvoice INT = 24,
-		@DeductSabaPromotion INT = 29
+		@DeductSabaPromotion INT = 29,
+		@DeductPPPrizes INT = 30
 
 	-- Region: Check Invoice Type is Rebate
 	DECLARE @Month TINYINT = MONTH(@FromDate)
@@ -525,7 +527,26 @@ BEGIN
 		END
 	END
 	-- End region insert Promotion amount
-
+	-- Region Deduct promotion prizes
+	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = 32))
+	BEGIN
+		DECLARE @PPPrize MONEY
+		SELECT @PPPrize = SUM(b.MemberWL * e.Rate)
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'PP', 'OA', 1) pc ON b.SiteID = pc.LicenseeId
+			INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
+		WHERE b.Bettype IN (4299, 4300) -- PP Prize
+			AND b.rptDate BETWEEN @FromDate AND @ToDate
+			AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+ 		
+		IF(ISNULL(@PPPrize, 0) > 0)
+		BEGIN
+			INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,AmountType,InvoiceAmount,RemainingAmount)
+			VALUES(0,'','',@DeductPPPrizes,@PPPrize,0)
+		END
+	END
+	-- End region Deduct promotion prizes
+ 
 	SELECT	f.ProductId,
 			f.ProductCode,
 			f.ProductName,
