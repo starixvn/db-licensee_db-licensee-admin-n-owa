@@ -20,6 +20,7 @@ AS
 			+ Group data by code or by party id
 			+ Check FromDate for sofrware data fee & Rebate ( type = 1 )
 		- 20191219@Bruce: Exclude credit notes in calculation of Recon and Collection sheet [#125779]
+		- 20191210@Bruce: Include Promotion [#123958]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -55,6 +56,7 @@ BEGIN
 		,SUM(CASE WHEN InvItemTypeId IN (11,12,13,14,17,20) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Others
 		,SUM(CASE WHEN InvItemTypeId IN (3,25) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) AMF
 		,SUM(CASE WHEN InvItemTypeId = 2 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) SetupFee
+		,SUM(CASE WHEN InvItemTypeId = 30 THEN ISNULL(Expense,0) ELSE 0 END) Promotion
 	INTO #result
 	FROM @partyList p
 	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON p.PartyId = h.PartyId
@@ -82,6 +84,7 @@ BEGIN
 			,SUM(Others) Others
 			,SUM(SetupFee) SetupFee
 			,SUM(AMF) AMF
+			,SUM(Promotion) Promotion
 		FROM #result
 		GROUP BY LicenseeCode, CurrencyName
 	END
@@ -96,6 +99,7 @@ BEGIN
 			,SUM(Others) Others
 			,SUM(SetupFee) SetupFee
 			,SUM(AMF) AMF
+			,SUM(Promotion) Promotion
 		FROM #result
 		GROUP BY PartyId, CurrencyName
 	END

@@ -14,6 +14,7 @@ AS
 
 	Revisions: 
 		- 20191017@Bruce: Create Sp [#122229]
+		- 20191210@Bruce: Include Promotion amount [#123958]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -29,6 +30,7 @@ BEGIN
 		Rebate,
 		Others,
 		Prepayment,
+		Promotion,
 		ClosingBalance,
 		CurrencyName
 	FROM bodb_licenseeReport.dbo.rptLicenseeReconciliation WITH(NOLOCK)
