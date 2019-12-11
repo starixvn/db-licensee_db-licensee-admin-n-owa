@@ -30,7 +30,7 @@ BEGIN
 		Rebate,
 		Others,
 		Prepayment,
-		Promotion,
+		ISNULL(Promotion,0) Promotion,
 		ClosingBalance,
 		CurrencyName
 	FROM bodb_licenseeReport.dbo.rptLicenseeReconciliation WITH(NOLOCK)
