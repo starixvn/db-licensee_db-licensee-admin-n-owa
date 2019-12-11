@@ -41,6 +41,7 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20190718@Bruce: Integrate CN88 data in LA [#116859]
+		- 20191211@Parsons: Non-peak hour promotion [#119538]
 
 */
 
@@ -214,7 +215,7 @@ BEGIN
 
 
     --get more licensee for racing product
-	IF CHARINDEX('RB', @ProductCodes) <> 0
+	IF EXISTS(SELECT TOP 1 1 FROM @ProductTable WHERE ProductPrefix = 'RB')
 	BEGIN
 		INSERT INTO @tbChargeInfo (ChargeID, PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Bettype, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate, ChargeType)
 		SELECT

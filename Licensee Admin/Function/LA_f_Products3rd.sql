@@ -12,6 +12,7 @@ AS
     
 	Revisions:
 		- 20150413@Florent: Initialize function
+		- 20191211@Parsons: Non-peak hour promotion [#119538]
 */
 
 BEGIN   
@@ -28,7 +29,11 @@ BEGIN
 	END
 	ELSE
 	BEGIN
-		IF CHARINDEX( 'SB', @Products) <> 0
+		DECLARE @ProductCodes TABLE (ProductCode VARCHAR(10))
+		INSERT INTO @ProductCodes(ProductCode)
+		SELECT val FROM dbo.strSplit(@Products, ',')
+
+		IF EXISTS(SELECT TOP 1 1 FROM @ProductCodes WHERE ProductCode = 'SB')
 		BEGIN
 			INSERT INTO @tbProducts(ProductID, ProductPrefix, ProductName)
 			SELECT 0, 'SB', 'Sportsbook'				
@@ -37,9 +42,8 @@ BEGIN
 		INSERT INTO @tbProducts(ProductID, ProductPrefix, ProductName)
 		SELECT ProductID, ProductPrefix, ProductName 
 		FROM dbo.Product3rd WITH (NOLOCK)
-		WHERE ProductPrefix IN (SELECT val FROM dbo.strSplit(@Products,','))
-			AND ProductId <> 0
-			
+			INNER JOIN @ProductCodes ON ProductCode = ProductPrefix
+		WHERE ProductId <> 0
 	END
 	
 	DELETE @tbProducts WHERE ProductID IS NULL
