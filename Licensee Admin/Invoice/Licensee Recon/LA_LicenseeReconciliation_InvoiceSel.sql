@@ -56,7 +56,7 @@ BEGIN
 		,SUM(CASE WHEN InvItemTypeId IN (11,12,13,14,17,20) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Others
 		,SUM(CASE WHEN InvItemTypeId IN (3,25) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) AMF
 		,SUM(CASE WHEN InvItemTypeId = 2 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) SetupFee
-		,SUM(CASE WHEN InvItemTypeId = 30 THEN ISNULL(Expense,0) ELSE 0 END) Promotion
+		,SUM(CASE WHEN InvItemTypeId IN (29,30) THEN ISNULL(Expense,0) ELSE 0 END) Promotion
 	INTO #result
 	FROM @partyList p
 	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON p.PartyId = h.PartyId
