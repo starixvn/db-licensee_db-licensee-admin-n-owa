@@ -331,7 +331,7 @@ BEGIN
 		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 	
-	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'NPHP')
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'SPR')
     BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 37
