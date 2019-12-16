@@ -20,6 +20,7 @@ AS
 	- 20180716@bruce: add new group TEST for credit [#98126]
 	- 20180907@Parsons: Royalty fee updated for Keno& Lottery [#101168]
 	- 20190716@Bruce: Integrate CN88 data in LA [#116859]
+	- 20191216@Parsons: Modify pay to supplier's formula for Keno WL report [#125014]
 
  Param's Explanation:
 	- @FromDate		: From date
@@ -276,8 +277,6 @@ BEGIN
 
 			UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @TempCurrency
 		END
-
-		UPDATE @TotalByGroups SET PayToSupplier = CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END
 
 		INSERT INTO @GrandTotal(CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
 		SELECT	CurrencyName,
