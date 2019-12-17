@@ -47,11 +47,26 @@ BEGIN
 		,Fromdate		SMALLDATETIME
 		,Todate			SMALLDATETIME
 	)
-	-- ​Pay to Supplier: equals 50%(0.5) of [Licensing Fee]
+	-- ​Pay to Supplier: equals 40%(0.4) of [Licensing Fee]
 	-- Except CN88 = 1.5%
 	INSERT INTO #ChargeRate
-	SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, 0.5, c.Fromdate, c.Todate
+	SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, 0.4, c.Fromdate, c.Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'NG') c
+
+	-- From 01 Dec 2019, pay to supplier = 50%
+	BEGIN
+		DECLARE @EffectiveDateForNewRate DATE = '20191201'
+
+		INSERT INTO #ChargeRate
+		SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.Rate, c.Rate3rd, c.Fromdate, DATEADD(DAY,-1,@EffectiveDateForNewRate)
+		FROM #ChargeRate c
+		WHERE Fromdate < @EffectiveDateForNewRate AND @EffectiveDateForNewRate <= ToDate
+
+		UPDATE #ChargeRate SET
+			Fromdate = (CASE WHEN Fromdate < @EffectiveDateForNewRate THEN @EffectiveDateForNewRate ELSE Fromdate END),
+			Rate3rd = 0.5
+		WHERE @EffectiveDateForNewRate <= Todate
+	END
 
 	CREATE TABLE #Exchange (
 		ExchangeDate	DATE,
