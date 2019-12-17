@@ -25,6 +25,7 @@ AS
 	- 20190626@Mason: Implement new view for Number Game [#113641]
 	- 20190718@Mason: Integrate CN88 data in LA (PayToSupplier = 0.015 GRR) [#116859]
 	- 20190808@Parsons: Provide House Turnover In NG WL Report [Redmine: #117674]
+	- 20191217@Bruce: Update NG/H5 3rd rate [#125515]
 
  * Param's Explanation:
  EXEC LA_Rpt_NumberGameWinloss @PartyIds = '14,15,16,17,18,19', @FromDate = '20190101', @ToDate = '20190808', @BaseCurrencyName = 'EUR'
@@ -46,9 +47,10 @@ BEGIN
 		,Fromdate		SMALLDATETIME
 		,Todate			SMALLDATETIME
 	)
-	-- ​Pay to Supplier: equals 40%(0.4) of [Licensing Fee]
+	-- ​Pay to Supplier: equals 50%(0.5) of [Licensing Fee]
+	-- Except CN88 = 1.5%
 	INSERT INTO #ChargeRate
-	SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, 0.4, c.Fromdate, c.Todate
+	SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, 0.5, c.Fromdate, c.Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'NG') c
 
 	CREATE TABLE #Exchange (
