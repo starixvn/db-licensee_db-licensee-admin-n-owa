@@ -19,6 +19,7 @@ AS
 		- 20191016@Bruce: [#122229]
 			+ Group data by code or by party id
 			+ Check FromDate for sofrware data fee & Rebate ( type = 1 )
+		- 20191219@Bruce: Exclude credit notes in calculation of Recon and Collection sheet [#125779]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -61,6 +62,7 @@ BEGIN
 	INNER JOIN dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId
 	LEFT JOIN dbo.LA_f_Products3rd('') r ON r.ProductID = s.ProductId
 	WHERE h.StatusId = 0-- normal invoice
+		AND h.InvoiceHeaderId NOT IN (6208, 6207) -- temporary exclude these credit notes
 		AND h.Environment = @Environment
 		AND (
 			(h.FromDate BETWEEN @FromDate AND @ToDate AND h.InvoiceType IN (1,3)) OR
