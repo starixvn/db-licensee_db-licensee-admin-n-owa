@@ -481,7 +481,7 @@ BEGIN
 	-- End region
 
 	/*Update PromotionOthers column*/
-	IF(EXISTS(SELECT TOP 1 1 FROM #Result WHERE ProductId = 32/*PP*/))
+	IF(EXISTS(SELECT TOP 1 1 FROM @PartyChargeInfo WHERE ProductId = 32/*PP*/))
 	BEGIN
 		;WITH cte_PromotionOthers AS(
 		SELECT pc.PartyId, r.SiteID,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END) IsCurrent, SUM(r.MemberWL * cExchange.Rate) AS Prize
