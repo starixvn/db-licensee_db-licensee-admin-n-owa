@@ -18,6 +18,7 @@ ALTER PROCEDURE dbo.LA_Rpt_LicPerformance_Detail
 	, @BaseCurrencyName VARCHAR(10) = 'GBP'
 	, @DrawFilter SMALLINT = 1
 AS
+
 /*	Created: 20141209@Patrick
 	Task: LicenseeAdmin - Get Licensee Performance Detail report
 	DB: DB052.bodb02
@@ -408,7 +409,7 @@ BEGIN
 			INNER JOIN @SumByProducts s ON p.PartyId = s.PartyId
 	WHERE	s.ProductId = 0
 
-	/*Update Promotion column*/
+	/*Update PromotionSportsbook column*/
 	IF(EXISTS(SELECT TOP 1 1 FROM #Result))
 	BEGIN
 		;WITH cte_PromotionSportsbook AS(
@@ -426,23 +427,6 @@ BEGIN
 		SET PromotionSportsbook = p.Prize
 		FROM #Result r
 			INNER JOIN cte_PromotionSportsbook p ON r.PartyId = p.PartyId AND r.IsCurrent = p.IsCurrent
-
-		;WITH cte_PromotionOthers AS(
-		SELECT pc.PartyId, r.SiteID,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END) IsCurrent, SUM(r.MemberWL * cExchange.Rate) AS Prize
-		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
-			INNER JOIN (SELECT DISTINCT PartyId, LicenseeId FROM @PartyChargeInfo WHERE ProductID = 0) pc ON r.SiteID = pc.LicenseeId
-			INNER JOIN #Exchange cExchange ON r.RptDate = cExchange.ExchangeDate AND r.CurrencyID = cExchange.ExchangeID
-		WHERE r.Bettype IN (4299, 4300) -- PP Prize
-			AND r.rptDate BETWEEN @FromDate AND @ToDate
-			AND r.[StatusId] NOT IN (-1, 101, 102, 103)
-			AND ((r.RptDate BETWEEN @FromDate AND @ToDate) OR (r.RptDate BETWEEN @PrevFromDate AND @PrevToDate))
-			AND (@Currency = 0 OR @Currency = r.CurrencyId)
-			GROUP BY pc.PartyId, r.SiteID, (CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END)
-		)
-		UPDATE r
-		SET PromotionOthers = p.Prize
-		FROM #Result r
-			INNER JOIN cte_PromotionOthers p ON r.PartyId = p.PartyId AND r.IsCurrent = p.IsCurrent
 	END
 	-- ********************************************************
 	-- *** Calculate Other (!= SportBook) and Merge to #Result
@@ -495,6 +479,27 @@ BEGIN
 	INNER JOIN @tmpPartySBLaunchDate t ON t.PartyID = r.PartyId
 	INNER JOIN bodb_licensee.dbo.OAS_Party (NOLOCK) op ON r.PartyId = op.PartyID
 	-- End region
+
+	/*Update PromotionOthers column*/
+	IF(EXISTS(SELECT TOP 1 1 FROM #Result WHERE ProductId = 32/*PP*/))
+	BEGIN
+		;WITH cte_PromotionOthers AS(
+		SELECT pc.PartyId, r.SiteID,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END) IsCurrent, SUM(r.MemberWL * cExchange.Rate) AS Prize
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
+			INNER JOIN (SELECT DISTINCT PartyId, LicenseeId FROM @PartyChargeInfo WHERE ProductID = 32) pc ON r.SiteID = pc.LicenseeId
+			INNER JOIN #Exchange cExchange ON r.RptDate = cExchange.ExchangeDate AND r.CurrencyID = cExchange.ExchangeID
+		WHERE r.Bettype IN (4299, 4300) -- PP Prize
+			AND r.rptDate BETWEEN @FromDate AND @ToDate
+			AND r.[StatusId] NOT IN (-1, 101, 102, 103)
+			AND ((r.RptDate BETWEEN @FromDate AND @ToDate) OR (r.RptDate BETWEEN @PrevFromDate AND @PrevToDate))
+			AND (@Currency = 0 OR @Currency = r.CurrencyId)
+			GROUP BY pc.PartyId, r.SiteID, (CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END)
+		)
+		UPDATE r
+		SET PromotionOthers = p.Prize
+		FROM #Result r
+			INNER JOIN cte_PromotionOthers p ON r.PartyId = p.PartyId AND r.IsCurrent = p.IsCurrent
+	END
 
 	-- Region: Select Data	
 	SELECT	r.PartyId,
