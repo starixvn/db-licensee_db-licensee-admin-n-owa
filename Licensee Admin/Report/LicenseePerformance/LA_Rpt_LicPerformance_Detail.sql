@@ -379,6 +379,7 @@ BEGIN
 		SportbookRebate		MONEY,
 		OthersRebate		MONEY,
 		PromotionSportsbook	MONEY,
+		PromotionOthers		MONEY,
 		TotalFee			MONEY,
 		NegativeAmount		MONEY,
 		IsCurrent			BIT
@@ -410,7 +411,7 @@ BEGIN
 	/*Update Promotion column*/
 	IF(EXISTS(SELECT TOP 1 1 FROM #Result))
 	BEGIN
-		;WITH cte_Promotion AS(
+		;WITH cte_PromotionSportsbook AS(
 			SELECT pc.PartyId, r.SiteID,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END) IsCurrent, SUM(r.MemberWL * cExchange.Rate) AS Prize
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
 				INNER JOIN (SELECT DISTINCT PartyId, LicenseeId FROM @PartyChargeInfo WHERE ProductID = 0) pc ON r.SiteID = pc.LicenseeId
@@ -421,7 +422,23 @@ BEGIN
 		UPDATE r
 		SET PromotionSportsbook = p.Prize
 		FROM #Result r
-			INNER JOIN cte_Promotion p ON r.PartyId = p.PartyId AND r.IsCurrent = p.IsCurrent
+			INNER JOIN cte_PromotionSportsbook p ON r.PartyId = p.PartyId AND r.IsCurrent = p.IsCurrent
+
+		;WITH cte_PromotionOthers AS(
+		SELECT pc.PartyId, r.SiteID,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END) IsCurrent, SUM(r.MemberWL * cExchange.Rate) AS Prize
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
+			INNER JOIN (SELECT DISTINCT PartyId, LicenseeId FROM @PartyChargeInfo WHERE ProductID = 0) pc ON r.SiteID = pc.LicenseeId
+			INNER JOIN #Exchange cExchange ON r.RptDate = cExchange.ExchangeDate AND r.CurrencyID = cExchange.ExchangeID
+		WHERE r.Bettype IN (4299, 4300) -- PP Prize
+			AND r.rptDate BETWEEN @FromDate AND @ToDate
+			AND r.[StatusId] NOT IN (-1, 101, 102, 103)
+			AND ((r.RptDate BETWEEN @FromDate AND @ToDate) OR (r.RptDate BETWEEN @PrevFromDate AND @PrevToDate))
+			GROUP BY pc.PartyId, r.SiteID, (CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END)
+		)
+		UPDATE r
+		SET PromotionOthers = p.Prize
+		FROM #Result r
+			INNER JOIN cte_PromotionOthers p ON r.PartyId = p.PartyId AND r.IsCurrent = p.IsCurrent
 	END
 	-- ********************************************************
 	-- *** Calculate Other (!= SportBook) and Merge to #Result
@@ -505,8 +522,10 @@ BEGIN
 			CASE WHEN ISNULL(p.OthersRebate,0) > 0 THEN p.OthersRebate ELSE 0 END 					AS PreviousRebateOthers,
 			ISNULL(r.PromotionSportsbook, 0)														AS PromotionSportsbook,
 			ISNULL(p.PromotionSportsbook, 0)														AS PreviousPromotionSportsbook,
-			(CASE WHEN r.TotalFee > 0 THEN r.TotalFee ELSE 0 END) + ISNULL(r.NegativeAmount,0) - ISNULL(r.PromotionSportsbook,0)	AS TotalLicensingFee,
-			(CASE WHEN p.TotalFee > 0 THEN p.TotalFee ELSE 0 END) + ISNULL(p.NegativeAmount,0) - ISNULL(p.PromotionSportsbook,0)	AS PreviousTotalLicensingFee
+			ISNULL(r.PromotionOthers, 0)															AS PromotionOthers,
+			ISNULL(p.PromotionOthers, 0)															AS PreviousPromotionOthers,
+			(CASE WHEN r.TotalFee > 0 THEN r.TotalFee ELSE 0 END) + ISNULL(r.NegativeAmount,0) - ISNULL(r.PromotionSportsbook,0) - ISNULL(r.PromotionOthers,0)	AS TotalLicensingFee,
+			(CASE WHEN p.TotalFee > 0 THEN p.TotalFee ELSE 0 END) + ISNULL(p.NegativeAmount,0) - ISNULL(p.PromotionSportsbook,0) - ISNULL(r.PromotionOthers,0)	AS PreviousTotalLicensingFee
 	FROM	#Result r
 			LEFT JOIN (SELECT * FROM #Result WHERE IsCurrent = 0) p ON r.PartyId = p.PartyId
 	WHERE	r.IsCurrent = 1 AND r.PartyId IN (SELECT pt.PartyId FROM @PartyIdTable pt WHERE IsSelected = 1)
