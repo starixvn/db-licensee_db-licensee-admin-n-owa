@@ -489,7 +489,6 @@ BEGIN
 			INNER JOIN (SELECT DISTINCT PartyId, LicenseeId FROM @PartyChargeInfo WHERE ProductID = 32) pc ON r.SiteID = pc.LicenseeId
 			INNER JOIN #Exchange cExchange ON r.RptDate = cExchange.ExchangeDate AND r.CurrencyID = cExchange.ExchangeID
 		WHERE r.Bettype IN (4299, 4300) -- PP Prize
-			AND r.rptDate BETWEEN @FromDate AND @ToDate
 			AND r.[StatusId] NOT IN (-1, 101, 102, 103)
 			AND ((r.RptDate BETWEEN @FromDate AND @ToDate) OR (r.RptDate BETWEEN @PrevFromDate AND @PrevToDate))
 			AND (@Currency = 0 OR @Currency = r.CurrencyId)
