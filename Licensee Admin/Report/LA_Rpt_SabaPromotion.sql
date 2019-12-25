@@ -61,58 +61,56 @@ BEGIN
 	UPDATE #Exchange SET CurrencyCode = 'INH' WHERE ExchangeID = 51
 	-- ** End Region
 	
+	-- ** Offer Currency
+	DECLARE @OfferedCurrency AS TABLE (CurrencyId INT)
+	INSERT INTO @OfferedCurrency (CurrencyId)
+	SELECT e.ExchangeID FROM #Exchange e WHERE e.CurrencyCode IN ('CNY', 'THB', 'IDR', 'INH', 'MYR')
+	
 	-- ** Region: TempData
 	CREATE TABLE #TempData (
 		PartyID					INT,
 		PartyName				NVARCHAR(100),
-		WinlostDate				DATETIME,
+		WinLossDate				DATETIME,
 		NumberOfCoupon			INT,
 		NumberOfRedemption		INT,
 		NonPeakHourTrans		INT,
 		PromoDayTrans			INT,
 		PromoDayTurnover		MONEY,
+		PromoDayTurnoverOrigin	MONEY,
 		PrizeRedeemed			MONEY,
-		IsCurrent				BIT,
-		CurrencyId				INT)
+		PrizeRedeemedOrigin		MONEY,
+		CurrencyCode			VARCHAR(3))
 
 	-- Calculate for desposit
-	INSERT INTO #TempData (PartyID,PartyName,WinlostDate,NumberOfCoupon,NumberOfRedemption,NonPeakHourTrans,PromoDayTrans,PromoDayTurnover,
-						   PrizeRedeemed,CurrencyId)	
+	INSERT INTO #TempData (PartyID,PartyName,WinLossDate,NumberOfCoupon,NumberOfRedemption,NonPeakHourTrans,PromoDayTrans,PromoDayTurnover,PrizeRedeemed,PromoDayTurnoverOrigin,
+						   PrizeRedeemedOrigin,CurrencyCode)	
 	SELECT si.PartyId
 		   ,p.PartyName
-		   ,nph.RptDateGMT AS WinlostDate
+		   ,nph.RptDateGMT AS WinLossDate
 		   ,SUM (nph.CouponCount) AS NumberOfCoupon
 		   ,SUM (nph.RedemptionCount) AS NumberOfRedemption
 		   ,CASE WHEN @IsShowWonLose = 0 THEN SUM(nph.BetCountOfPromoTime) ELSE SUM(nph.BetCountOfPromoTime_WonLose) END AS NonPeakHourTrans
 		   ,CASE WHEN @IsShowWonLose = 0 THEN SUM(nph.BetCount) ELSE SUM(nph.BetCount_WonLose) END AS PromoDayTrans
+		   -- Select origin 
 		   ,CASE WHEN @IsShowWonLose = 0 THEN SUM(nph.Turnover * e.Rate) ELSE SUM(nph.Turnover_WonLose * e.Rate) END AS PromoDayTurnover
 		   ,SUM(nph.RedemptionPrize * e.Rate) AS PrizeRedeemed 
-		   ,nph.CurrencyID
+		   -- Select by base currency
+		   ,CASE WHEN @IsShowWonLose = 0 THEN SUM(nph.Turnover) ELSE SUM(nph.Turnover_WonLose) END AS PromoDayTurnoverOrigin
+		   ,SUM(nph.RedemptionPrize) AS PrizeRedeemedOrigin
+		   ,e.CurrencyCode 
 	FROM bodb_LicenseeReport.dbo.rptLicPromotion nph WITH (NOLOCK)
 		INNER JOIN @SiteIds si ON nph.SiteID = si.LicenseeId
 		INNER JOIN #PartyList p ON si.PartyId = p.PartyId
-		INNER JOIN #Exchange e ON e.ExchangeID = nph.CurrencyID AND e.ExchangeDate = nph.RptDateGMT
+		INNER JOIN #Exchange e ON e.ExchangeID = nph.CurrencyID
 	WHERE nph.RptDateGMT BETWEEN si.FromDate AND si.ToDate 
 		AND nph.CurrencyId <> 20
 		AND si.isDeposit = 1
 		AND nph.TimeZone = 8
-		AND e.CurrencyCode IN ('CNY', 'THB', 'IDR', 'INH', 'MYR')
-	GROUP BY nph.RptDateGMT, si.PartyId, p.PartyName, nph.CurrencyID
+		AND nph.CurrencyID IN (SELECT CurrencyID FROM @OfferedCurrency)
+	GROUP BY nph.RptDateGMT, si.PartyId, p.PartyName, e.CurrencyCode
 	-- ** End region
 	
-	-- ** Select Raw Data
-	SELECT 
-		t.PartyId
-		,t.PartyName
-		,t.WinlostDate AS WinLossDate
-		,SUM(t.NumberOfCoupon) AS NumberOfCoupon
-		,SUM(t.NumberOfRedemption) AS NumberOfRedemption
-		,SUM(t.NonPeakHourTrans) AS NonPeakHoursTrans
-		,SUM(t.PromoDayTrans) AS PromoDayTrans
-		,SUM(t.PromoDayTurnover) AS PromoDayTurnover
-		,SUM(t.PrizeRedeemed) AS PrizeRedeemed
-	FROM #TempData t
-	GROUP BY t.WinlostDate, t.PartyID, t.PartyName, t.IsCurrent
+	SELECT * FROM #TempData
 	
 	DROP TABLE	#PartyList
 	DROP TABLE	#Exchange
