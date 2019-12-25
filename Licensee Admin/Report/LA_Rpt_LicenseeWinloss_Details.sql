@@ -37,6 +37,7 @@ AS
 	- 20181119@bruce: Integrate Bidme games (GD product) [#103695]
 	- 20190322@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	- 20191204@Bruce: PP tournament [#123958]
+	- 20191225@Bruce: billing term by currency [#120005]
 
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -444,10 +445,11 @@ BEGIN
 				, SUM(b.Winloss)
 				, SUM(-b.Winloss)
 				, 0,0,0,0,0
-				, SUM(-b.Winloss * ci.Rate)
+				, SUM(-b.Winloss * ISNULL(cc.Rate,ci.Rate))
 				, SUM(b.Betcount)
 			FROM #Data b WITH (NOLOCK)
 				INNER JOIN #ChargeInfo ci ON b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc ON cc.ChargeID=ci.ChargeId AND b.Currency=cc.CurrencyID
 			WHERE ci.ProductID=11 
 				AND b.BetTypeId <> @GD_Tip 
 				AND ci.ChargeType=1 -- gross win
@@ -504,10 +506,11 @@ BEGIN
 			, SUM(b.turnover) Turnover
 			, SUM(b.Winloss + CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS Winloss
 			, - SUM(b.Winloss + CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS LicenseeWL
-			, SUM(-b.Winloss * ci.Rate - CASE WHEN b.ProductID=31 THEN (b.AComm + b.PComm) ELSE 0 END) AS Company
+			, SUM(-b.Winloss * ISNULL(cc.Rate,ci.Rate) - CASE WHEN b.ProductID=31 THEN (b.AComm + b.PComm) ELSE 0 END) AS Company
 			, SUM(b.betcount) AS betcount
 		FROM #Data b WITH (NOLOCK)
-			INNER JOIN (SELECT DISTINCT Fromdate, Todate, ProductID, Rate FROM #ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON b.ProductID = ci.ProductID
+			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate FROM #ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc ON cc.ChargeID=ci.ChargeId AND b.Currency=cc.CurrencyID
 		WHERE b.rptDate BETWEEN ci.Fromdate AND ci.Todate
 		GROUP BY b.rptDate, b.Currency, b.ProductID
 	END
