@@ -22,12 +22,14 @@ AS
 	 - 20180716@bruce: add new group TEST for credit [#98126]
 	 - 20180628@Scofield: Update calculation formula for AG& GD report [#94283]
 	 - 20190627@Bruce: Select data from rpt_BettingByProduct [#113641]
+	 - 20191226@Mason: Set billing term by currency [#120005]
 	 
 	 Params:
 */
 BEGIN
 	-- Region: Charge Info
 	DECLARE @PartyChargeInfo AS TABLE (
+		ChargeId	INT,
 		PartyId		INT,
 		LicenseeId	INT,
 		ProductID	INT,
@@ -36,9 +38,9 @@ BEGIN
 		ToDate		SMALLDATETIME
 	)
 
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
+	INSERT INTO @PartyChargeInfo(ChargeId, PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
 	(
-		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
+		SELECT	ChargeId, PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
 		FROM	dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'AGC', 'OA', 1)
 		WHERE	DI_Rate > 0
 	)
@@ -59,19 +61,20 @@ BEGIN
 	SELECT pc.PartyId
 		,c.rptDate
 		,c.CurrencyId
-		,SUM(c.Turnover)			AS Turnover
-		,SUM(c.BetCount)			AS TotalTrans
-		,SUM(c.MemberWL)			AS CustomerWinLoss
-		,-SUM(c.MemberWL)			AS LicenseeWinloss
-		,SUM(-c.MemberWL * pc.Rate) AS LicensingFee
-		,CAST(0 AS INT)				AS ParentId
-		,CAST('' AS VARCHAR(50))	AS PartyName
-		,CAST('' AS VARCHAR(50))	AS ParentName
-		,CAST(0 AS MONEY)			AS ApplyValue
-		,CAST(0 AS MONEY)			AS PayToSupplier
+		,SUM(c.Turnover)								AS Turnover
+		,SUM(c.BetCount)								AS TotalTrans
+		,SUM(c.MemberWL)								AS CustomerWinLoss
+		,-SUM(c.MemberWL)								AS LicenseeWinloss
+		,SUM(-c.MemberWL * ISNULL(cr.Rate, pc.Rate))	AS LicensingFee
+		,CAST(0 AS INT)									AS ParentId
+		,CAST('' AS VARCHAR(50))						AS PartyName
+		,CAST('' AS VARCHAR(50))						AS ParentName
+		,CAST(0 AS MONEY)								AS ApplyValue
+		,CAST(0 AS MONEY)								AS PayToSupplier
 	INTO #TempData
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct c WITH (NOLOCK)
 		INNER JOIN @PartyChargeInfo pc ON pc.LicenseeId = c.SiteID AND c.ProductID = pc.ProductID AND c.rptDate BETWEEN pc.FromDate AND pc.ToDate
+		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr ON pc.ChargeId = cr.ChargeID AND cr.CurrencyID = c.CurrencyId
 	WHERE c.CurrencyId <> 20 -- exclude test currency
 		AND c.customercategory NOT IN (27, 28)
 		AND c.StatusId BETWEEN 111 AND 115
