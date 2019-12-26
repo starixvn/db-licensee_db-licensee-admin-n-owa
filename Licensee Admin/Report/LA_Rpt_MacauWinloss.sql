@@ -16,6 +16,7 @@ AS
 		- 20160329@Bruce: Create SP
 		- 20171219@Bruce: increase length for variables [#88197]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20191226@Mason: Set billing term by currency [#120005]
 		
 	Param's Explanation:
 */
@@ -32,6 +33,7 @@ BEGIN
 	-- Charge Info
 	BEGIN
 		DECLARE @PartyChargeInfo AS TABLE (
+			ChargeId	INT,
 			PartyId		INT,
 			LicenseeId	INT,
 			ProductID	INT,
@@ -40,15 +42,15 @@ BEGIN
 			ToDate		SMALLDATETIME
 		)
 
-		INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
+		INSERT INTO @PartyChargeInfo(ChargeId, PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
 		(
-			SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
+			SELECT	ChargeId, PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
 			FROM	dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'VG', 'OA', 1)
 			WHERE	DI_Rate > 0
 
 			UNION ALL
 
-			SELECT	ci.FromParty, 0, ci.ProductID, Rate,
+			SELECT	ci.ChargeID, ci.FromParty, 0, ci.ProductID, Rate,
 					CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
 					CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
 			FROM	dbo.OAS_ChargeInfo ci WITH(NOLOCK)
@@ -103,7 +105,7 @@ BEGIN
 				SUM(ISNULL(b.BetCount, 0)) TotalTrans,
 				SUM(ISNULL(b.Turnover, 0)) Turnover,
 				SUM(ISNULL(b.Winlost, 0)) MemberWL,
-				SUM(ISNULL(-b.Winlost, 0) * p.Rate) LicensingFee,
+				SUM(ISNULL(-b.Winlost, 0) * ISNULL(cr.Rate, p.Rate)) LicensingFee,
 				SUM(ISNULL(-b.Winlost, 0) * f.Rate) PayToSupplier
 		FROM	bodb_LicenseeReport.dbo.rptDepWinlost_ThirdParty b WITH (NOLOCK)
 			INNER JOIN bodb02.dbo.Custinfo co WITH (NOLOCK) ON b.CustID = co.CustID
@@ -114,6 +116,7 @@ BEGIN
 			INNER JOIN @PartyChargeInfo f ON b.ProductID = f.ProductID
 				AND f.LicenseeId = 0
 				AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate
+			LEFT JOIN dbo.LA_ChargeRateByCurrency cr ON cr.ChargeID = p.ChargeId AND cr.CurrencyID = b.Currency
 		WHERE	b.Winlostdate BETWEEN @FromDate AND @ToDate AND (b.Currency <> 20)
 		GROUP BY b.Winlostdate, p.LicenseeId, p.PartyId, b.Currency
 	END
