@@ -13,6 +13,7 @@ AS
  * Task  : Get Card Club Winloss
  * Revisions
 	- 20190710@Mason: Intergrate Card Club [#116096]
+	- 20191226@Mason: Set Billing Term By Currency [#120005]
  * Param's Explanation:
  *
  */
@@ -31,7 +32,8 @@ BEGIN
 	INNER JOIN #PartyList p on p.ParentId = r.PartyID
 
 	CREATE TABLE #ChargeRate (
-		PartyID			INT
+		ChargeId		INT
+		,PartyID		INT
 		,LicenseeID		INT
 		,isDeposit		INT
 		,ProductID		INT
@@ -43,7 +45,7 @@ BEGIN
 	
 	-- ​Pay to Supplier: equals 2.5%(0.025) of [Licensing Fee] -- Join Charge rate and 3rd Rate
 	INSERT INTO #ChargeRate
-	SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate
+	SELECT  c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'CC') c
 	INNER JOIN @3rdRate r ON r.PartyID = c.PartyID and r.ProductID = c.ProductID
 	WHERE (c.DI_Rate = 0 AND c.isDeposit = 0) OR (c.DI_Rate > 0 and c.isDeposit = 1)
@@ -85,10 +87,11 @@ BEGIN
 		SUM(b.BetCount) AS TotalTrans,
 		SUM(b.MemberWL) AS CustomerWinLoss,
 		- SUM(b.MemberWL) AS LicenseeWinloss,
-		SUM(-b.MemberWL * ci.Rate) AS LicensingFee,
+		SUM(-b.MemberWL * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
 		SUM(-b.MemberWL * ci.Rate3rd) AS PayToSupplier
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr ON cr.ChargeId = ci.ChargeId AND cr.CurrencyId = b.CurrencyId 
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
 		AND ci.isDeposit = 1
@@ -184,7 +187,7 @@ BEGIN
 			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
 			GROUP BY td.ParentId, td.PartyId
 		)
-		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier)
+		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
 		SELECT @tempCurrency,ParentId,
 			SUM(TotalTrans),
 			SUM(Turnover),
