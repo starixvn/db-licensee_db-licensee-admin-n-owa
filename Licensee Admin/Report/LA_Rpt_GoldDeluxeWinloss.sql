@@ -175,7 +175,8 @@ BEGIN
 				b.rptDate BETWEEN tipSupplier.FromDate AND tipSupplier.ToDate AND
 				tipSupplier.IsPayToSupplier = 1 AND
 				tipSupplier.ChargeType = @BidMeTipChargeType)
-			LEFT JOIN dbo.LA_ChargeRateByCurrency cr ON cr.ChargeId = ci.ChargeId AND cr.CurrencyID = b.CurrencyId
+			LEFT JOIN dbo.LA_ChargeRateByCurrency cr ON  -- @Charge rate by currency
+				cr.ChargeId = ci.ChargeId AND cr.CurrencyID = b.CurrencyId
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 			  b.StatusId NOT IN (- 1, 101, 102) AND
 			  b.CurrencyId <> 20 AND
