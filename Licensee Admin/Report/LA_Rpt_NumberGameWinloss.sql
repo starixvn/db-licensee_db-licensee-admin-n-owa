@@ -26,6 +26,7 @@ AS
 	- 20190718@Mason: Integrate CN88 data in LA (PayToSupplier = 0.015 GRR) [#116859]
 	- 20190808@Parsons: Provide House Turnover In NG WL Report [Redmine: #117674]
 	- 20191217@Bruce: Update NG/H5 3rd rate [#125515]
+	- 20191226@Mason: Set Term By Currency [#120005]
 
  * Param's Explanation:
  EXEC LA_Rpt_NumberGameWinloss @PartyIds = '14,15,16,17,18,19', @FromDate = '20190101', @ToDate = '20190808', @BaseCurrencyName = 'EUR'
@@ -38,7 +39,8 @@ BEGIN
 	INSERT INTO #PartyList EXEC bodb_licensee.dbo.LA_PartyListSel
 
 	CREATE TABLE #ChargeRate (
-		PartyID			INT
+		ChargeId		INT
+		,PartyID		INT
 		,LicenseeID		INT
 		,isDeposit		INT
 		,ProductID		INT
@@ -50,7 +52,7 @@ BEGIN
 	-- ​Pay to Supplier: equals 40%(0.4) of [Licensing Fee]
 	-- Except CN88 = 1.5%
 	INSERT INTO #ChargeRate
-	SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, 0.4, c.Fromdate, c.Todate
+	SELECT c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, 0.4, c.Fromdate, c.Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'NG') c
 
 	-- From 01 Dec 2019, pay to supplier = 50%
@@ -58,7 +60,7 @@ BEGIN
 		DECLARE @EffectiveDateForNewRate DATE = '20191201'
 
 		INSERT INTO #ChargeRate
-		SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.Rate, c.Rate3rd, c.Fromdate, DATEADD(DAY,-1,@EffectiveDateForNewRate)
+		SELECT c.ChargeId, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.Rate, c.Rate3rd, c.Fromdate, DATEADD(DAY,-1,@EffectiveDateForNewRate)
 		FROM #ChargeRate c
 		WHERE Fromdate < @EffectiveDateForNewRate AND @EffectiveDateForNewRate <= ToDate
 
@@ -106,10 +108,11 @@ BEGIN
 		SUM(b.BetCount) AS TotalTrans,
 		SUM(b.MemberWL) AS CustomerWinLoss,
 		- SUM(b.MemberWL) AS LicenseeWinloss,
-		SUM(-b.MemberWL * ci.Rate) AS LicensingFee,
-		SUM(-b.MemberWL * ci.Rate * ci.Rate3rd) AS PayToSupplier
+		SUM(-b.MemberWL * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
+		SUM(-b.MemberWL * ISNULL(cr.Rate, ci.Rate) * ci.Rate3rd) AS PayToSupplier
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+		LEFT JOIN dbo.LA_ChargeRateByCurrency cr ON ci.ChargeId = cr.ChargeId AND cr.CurrencyId = b.CurrencyId
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
 		AND ci.isDeposit = 1
