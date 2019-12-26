@@ -101,7 +101,7 @@ BEGIN
 	FROM bodb_LicenseeReport.dbo.rptLicPromotion nph WITH (NOLOCK)
 		INNER JOIN @SiteIds si ON nph.SiteID = si.LicenseeId
 		INNER JOIN #PartyList p ON si.PartyId = p.PartyId
-		INNER JOIN #Exchange e ON e.ExchangeID = nph.CurrencyID
+		INNER JOIN #Exchange e ON e.ExchangeID = nph.CurrencyID AND e.ExchangeDate = nph.RptDateGMT
 	WHERE nph.RptDateGMT BETWEEN si.FromDate AND si.ToDate 
 		AND nph.CurrencyId <> 20
 		AND si.isDeposit = 1
