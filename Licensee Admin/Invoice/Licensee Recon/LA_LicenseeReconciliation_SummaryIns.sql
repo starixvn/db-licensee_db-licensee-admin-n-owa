@@ -13,6 +13,7 @@ AS
 
 	Revisions: 
 		- 20191017@Bruce: Create Sp [#122229]
+		- 20191210@Bruce: Add promotion [#123958]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -30,6 +31,7 @@ BEGIN
 		CurrencyName,
 		Others,
 		Prepayment,
+		Promotion,
 		SettlementDetails)
 	SELECT @Environment,
 		t.Party.value('@ad', 'DATE')	AS AccDate,
@@ -43,6 +45,7 @@ BEGIN
 		t.Party.value('@cn', 'VARCHAR(10)') AS CurrencyName,
 		t.Party.value('@ot', 'MONEY')	AS Others,
 		t.Party.value('@pp', 'MONEY')	AS Prepayment,
+		t.Party.value('@pm', 'MONEY')	AS Promotion,
 		t.Party.value('text()[1]', 'VARCHAR(4000)')	AS SettlementDetails
 	FROM @XmlData.nodes('/root/r') t(Party)
 

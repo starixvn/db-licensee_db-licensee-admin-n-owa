@@ -20,6 +20,7 @@ AS
 		- 20190723@Bruce: Create Sp [#111586]
 		- 20190927@Bruce: Remove prepayment section and Include CardClub [#120220]
 		- 20191017@Bruce: Group by party id [#122229]
+		- 20191209@Bruce: Include PP tournament [123958]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -30,6 +31,22 @@ BEGIN
 		@AmountTypeDiscount INT = 4,
 		@AmountTypeRebate INT = 6,
 		@DeductAgainstInvoice INT = 24
+
+	DECLARE @GDTip_ChargeType			SMALLINT = 12
+		,@CommissionShare_ChargeType	SMALLINT = 6
+		,@CashinShare_ChargeType		SMALLINT = 7
+		,@CashoutComm_ChargeType		SMALLINT = 5
+		,@SabaPromotion_Bettype		SMALLINT = 17000
+		,@PromotionPrize_Bettype	SMALLINT = 4300
+		,@PPTournament_Bettype		SMALLINT = 4299
+		,@GDTip_Bettype				SMALLINT = 1706
+		,@BA	SMALLINT = 3
+		,@GD	SMALLINT = 11
+		,@CB	SMALLINT = 15
+		,@CO	SMALLINT = 25
+		,@BX	SMALLINT = 31
+		,@PP	SMALLINT = 32
+		,@SPR	SMALLINT = 37
 
 /*-----------------
  * Settings
@@ -248,28 +265,17 @@ BEGIN
 /*-----------------
  * Winloss data
  *-----------------*/
-	DECLARE @GDTip_ChargeType			SMALLINT = 12
-		,@CommissionShare_ChargeType	SMALLINT = 6
-		,@CashinShare_ChargeType		SMALLINT = 7
-		,@CashoutComm_ChargeType		SMALLINT = 5
-		,@PromotionPrize_Bettype	SMALLINT = 4300
-		,@GDTip_Bettype				SMALLINT = 1706  
-		,@BA	SMALLINT = 3
-		,@GD	SMALLINT = 11
-		,@CB	SMALLINT = 15
-		,@CO	SMALLINT = 25
-		,@BX	SMALLINT = 31
-		,@PP	SMALLINT = 32
-
 	BEGIN
-		SELECT b.SiteID,b.rptDate,b.ProductId,b.CurrencyId,b.Bettype,b.CommissionA,b.CommissionP
-			,b.WinPrizeAmount,b.CashOutAmount,b.BuyBackAmount,b.Turnover, ISNULL(-b.MemberWL, 0) LicWinloss
+		SELECT b.SiteID,b.rptDate,b.ProductId,b.CurrencyId,b.CommissionA,b.CommissionP
+			,b.WinPrizeAmount,b.CashOutAmount,b.BuyBackAmount,b.Turnover
+			,ISNULL(-b.MemberWL, 0) LicWinloss
+			,CASE WHEN b.ProductID = @SPR THEN @SabaPromotion_Bettype ELSE b.Bettype END Bettype
 			,CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN b.Turnover ELSE b.ExtraAmount END TurnoverForCommision
 		INTO #tmpBettingByProduct
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		WHERE (b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND b.SiteID IN (SELECT DISTINCT c.LicenseeID FROM #tmpChargeInfo c)
-			AND b.ProductID IN (SELECT p.ProductId FROM @productList p)
+			AND (b.ProductID = @SPR OR b.ProductID IN (SELECT p.ProductId FROM @productList p))
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
 
@@ -279,6 +285,7 @@ BEGIN
 		-- excludes: golddeluxe bidme tip, pragmatic promotion prize, colossus bet
 		--  
 		SELECT p.PartyID,b.rptDate,p.ProductId,b.CurrencyId,
+			CAST(0 AS MONEY) AS Promotion,
 			CAST(0 AS MONEY) AS ExtraAmount,
 			SUM((b.LicWinloss + (CASE WHEN b.ProductID = @BX THEN b.CommissionA ELSE 0 END)) * e.Rate) AS Winloss,
 			SUM((b.LicWinloss * p.Rate - (CASE
@@ -299,26 +306,26 @@ BEGIN
 			)
 			AND b.Bettype NOT IN (
 				@GDTip_Bettype,
-				@PromotionPrize_Bettype
+				@PromotionPrize_Bettype,
+				@PPTournament_Bettype
 			)
 		GROUP BY p.PartyID,b.rptdate,p.ProductId,b.CurrencyId
 
 		-- includes extra values: gdtip, promotion prize
 		--
-		INSERT INTO #tmpWinlossData(PartyID,rptDate,ProductID,CurrencyId, Winloss,AmountToCompany,ExtraAmount)
+		INSERT INTO #tmpWinlossData(PartyID,rptDate,ProductID,CurrencyId, Winloss,AmountToCompany,ExtraAmount, Promotion)
 		SELECT p.PartyID,b.rptDate,p.ProductId,b.CurrencyId,0,0,
-			SUM(CASE
-				WHEN b.Bettype = @GDTip_Bettype THEN b.LicWinloss * p.Rate * e.Rate
-				WHEN b.Bettype = @PromotionPrize_Bettype THEN b.LicWinloss * e.Rate
-				ELSE 0 END)
-		FROM #tmpBettingByProduct b  
-		INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID AND p.LicenseeId = b.SiteId AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)  
-		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID  
-		WHERE b.Bettype IN (@GDTip_Bettype,@PromotionPrize_Bettype)  
-			AND (p.ProductID = @PP OR p.ChargeType = @GDTip_ChargeType)  
-		GROUP BY p.PartyID,b.rptdate,p.ProductId,b.CurrencyId  
+			SUM(CASE WHEN b.Bettype = @GDTip_Bettype THEN b.LicWinloss * p.Rate * e.Rate ELSE 0 END),
+			SUM(CASE WHEN b.Bettype IN (@PromotionPrize_Bettype,@PPTournament_Bettype,@SabaPromotion_Bettype) THEN -b.LicWinloss * e.Rate ELSE 0 END)
+		FROM #tmpBettingByProduct b
+		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = (CASE WHEN p.ProductID = 0 THEN @SPR ELSE p.ProductID END)
+		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
+		WHERE b.rptDate BETWEEN p.FromDate AND p.ToDate
+			AND p.ProductID IN (0,@GD,@PP)
+			AND b.Bettype IN (@PromotionPrize_Bettype,@PPTournament_Bettype,@GDTip_Bettype,@SabaPromotion_Bettype)
+		GROUP BY p.PartyID,b.rptdate,p.ProductId,b.CurrencyId
 
-		-- CB  
+		-- CB
 		BEGIN
 			SELECT cb.PartyID,b.rptdate,b.CurrencyId,  
 				SUM(ISNULL(TurnoverForCommision,0)) TurnoverForCommision,  
@@ -388,7 +395,8 @@ BEGIN
 		--
 		SELECT a.PartyID,a.ProductId
 			,CAST(SUM(ISNULL(a.AmountToCompany,0)) AS MONEY) AmountToCompany
-			,CAST(SUM(ISNULL(a.ExtraAmount,0)) AS MONEY) ExtraAmount
+			,SUM(ISNULL(a.ExtraAmount,0)) ExtraAmount
+			,SUM(ISNULL(a.Promotion,0)) Promotion
 			,CAST(SUM(ISNULL(a.Winloss,0)) AS MONEY) Winloss
 			,CAST(0 AS MONEY) LicensingFee
 			,CAST(0 AS MONEY) Discount
@@ -670,6 +678,7 @@ END
 				,SUM(r.LicensingFee + r.ExtraAmount) LicensingFee
 				,SUM(r.Discount) Discount
 				,SUM(r.Rebate) Rebate
+				,SUM(r.Promotion) Promotion
 			FROM #tmpResult r
 			INNER JOIN @partyList p ON p.PartyId = r.PartyID
 			WHERE p.IsSelected = 1
@@ -683,6 +692,7 @@ END
 				,SUM(r.LicensingFee + r.ExtraAmount) LicensingFee
 				,SUM(r.Discount) Discount
 				,SUM(r.Rebate) Rebate
+				,SUM(r.Promotion) Promotion
 			FROM #tmpResult r
 			INNER JOIN @partyList p ON p.PartyId = r.PartyID
 			WHERE p.IsSelected = 1

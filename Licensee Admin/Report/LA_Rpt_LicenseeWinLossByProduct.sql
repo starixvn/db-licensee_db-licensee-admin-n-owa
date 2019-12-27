@@ -39,6 +39,7 @@ AS
 		- 20181119@bruce: Integrate Bidme games (GD product) [#103695]
 	    - 20190322@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	    - 20190725@Mason: Integrate-Card-Club [#116096]
+	    - 20191205@Parsons: PP tournament [#123958]
 */
 		
 /*	Example:
@@ -54,7 +55,9 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @GD_Tip SMALLINT = 1706, @PromotionPrize SMALLINT = 4300  
+	DECLARE @GD_Tip SMALLINT = 1706,  
+	@PPTournament SMALLINT = 4299,
+	@PromotionPrize SMALLINT = 4300  
 	
 	-- Region: Get party charge rate info
 	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX,PP,CC'
@@ -109,20 +112,18 @@ BEGIN
 			AWinLoss	MONEY,
 			AComm		MONEY,
 			PComm		MONEY,
-			WinningPrize	MONEY,
 			ProductId	TINYINT,
 			BettypeRef	INT)
 	
-	INSERT INTO #TempData (LicenseeId,rptDate,CurrencyId,MemberWL,AWinLoss,AComm,PComm,WinningPrize,ProductId,BettypeRef)
+	INSERT INTO #TempData (LicenseeId,rptDate,CurrencyId,MemberWL,AWinLoss,AComm,PComm,ProductId,BettypeRef)
 	(
 		SELECT	b.SiteID,
 				b.rptDate,
 				b.CurrencyID,
-				SUM(CASE WHEN b.Bettype <> @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) Winloss,
+				SUM(ISNULL(b.MemberWL, 0)) Winloss,
 				SUM(ISNULL(b.GrossWL, 0)) AS AWinLoss,
 				SUM(ISNULL(b.CommissionA, 0)) AS AComm,
 				SUM(ISNULL(b.CommissionP, 0)) AS PComm,
-				SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize,
 				b.ProductId,
 				CASE
 					WHEN b.Bettype = @GD_Tip THEN b.Bettype
@@ -137,7 +138,8 @@ BEGIN
 				AND b.customercategory NOT IN (27, 28)
 				AND b.Bettype NOT IN (
 					901,902,903,904,	-- BT
-					911,912,913,914 	-- CO
+					911,912,913,914, 	-- CO
+					@PPTournament, @PromotionPrize -- PP
 				)
 				AND b.ProductID NOT IN (13,15,25)
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, b.ProductId,
@@ -351,7 +353,7 @@ BEGIN
 				ISNULL(SUM(CASE WHEN d.ProductId = 27 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS BRVS,
 				ISNULL(SUM(CASE WHEN d.ProductId = 28 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS LT,
 				ISNULL(SUM(CASE WHEN d.ProductId = 31 THEN (-MemberWL * ci.Rate - (AComm + PComm)) * e.Rate ELSE 0 END),0) AS BX,
-				ISNULL(SUM(CASE WHEN d.ProductId = 32 THEN (-MemberWL * ci.Rate - WinningPrize) * e.Rate ELSE 0 END),0) AS PP,
+				ISNULL(SUM(CASE WHEN d.ProductId = 32 THEN (-MemberWL * ci.Rate) * e.Rate ELSE 0 END),0) AS PP,
 				ISNULL(SUM(CASE WHEN d.ProductId = 34 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS CC
 		FROM	#TempData d
 				INNER JOIN @PartyChargeInfo ci ON	d.LicenseeId = ci.LicenseeId

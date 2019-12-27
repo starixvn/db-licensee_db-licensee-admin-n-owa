@@ -33,6 +33,7 @@ AS
 	   - 20180716@bruce: add new group TEST for credit [#98126]
 	   - 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 	   - 20190412@Parsons: Integrate-PP-Promotion-Prize [#109014]
+	   - 20191205@Mason: PP tournament [#123958]
 
 	Param's Explanation:
 	  + @PartyIDs : a string of list PartyID, separated by ','
@@ -56,9 +57,9 @@ BEGIN
 	SELECT DISTINCT ChargeId, PartyID, LicenseeID, IsDeposit, ProductID, DI_Rate, AffectedDate, Fromdate, Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 
-	CREATE TABLE #Result (PartyID INT, ReportType VARCHAR(8), TurnOver MONEY, CustomerWinlost MONEY, CommBA MONEY ,CommRB MONEY, Betcount BIGINT, WinningPrize MONEY, LicensingFee MONEY)
+	CREATE TABLE #Result (PartyID INT, ReportType VARCHAR(8), TurnOver MONEY, CustomerWinlost MONEY, CommBA MONEY ,CommRB MONEY, Betcount BIGINT, LicensingFee MONEY)
 
-	CREATE TABLE #Temp (PartyID INT, Rptdate DATETIME, Currency INT, TurnOver MONEY, Winlost MONEY, CommBA MONEY, CommRB MONEY, WinningPrize MONEY, Betcount BIGINT)
+	CREATE TABLE #Temp (PartyID INT, Rptdate DATETIME, Currency INT, TurnOver MONEY, Winlost MONEY, CommBA MONEY, CommRB MONEY, Betcount BIGINT)
 
 	CREATE TABLE #Exchange (ExchangeDate SMALLDATETIME, ExchangeId INT, Rate FLOAT)
 	INSERT INTO #Exchange(ExchangeDate, ExchangeId, Rate)
@@ -107,13 +108,13 @@ BEGIN
 	IF @ProductCode = 'PP'
 	BEGIN		
 		DECLARE @PromotionPrize SMALLINT = 4300
-		INSERT INTO #Temp (PartyID, rptDate, Currency, CommBA, CommRB, Betcount, TurnOver, Winlost, WinningPrize)
+		DECLARE @PPTournament SMALLINT = 4299
+		INSERT INTO #Temp (PartyID, rptDate, Currency, CommBA, CommRB, Betcount, TurnOver, Winlost)
 		(
 			SELECT tp.PartyID, b.rptDate, b.CurrencyID,0,0
 				, SUM(ISNULL(b.betcount, 0) * CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS BetCount
 				, SUM(ISNULL(b.turnover, 0) * CASE WHEN @drawfilter IN (2, 3) AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS TurnOver
-				, SUM(CASE WHEN b.Bettype <> @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS Winlost
-				, SUM(CASE WHEN b.Bettype = @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END)  AS WinningPrize
+				, SUM(ISNULL(b.MemberWL, 0)) as Winlost
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 					INNER JOIN (SELECT DISTINCT PartyID, LicenseeID FROM @tmpParty) tp ON tp.LicenseeID = b.SiteID
 				WHERE b.ProductID = 32
@@ -122,6 +123,7 @@ BEGIN
 					AND (@Currency = 0 OR b.CurrencyID = @Currency)  
 					AND b.customercategory NOT IN (27, 28)
 					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+					AND b.Bettype NOT IN(@PPTournament, @PromotionPrize)
 				GROUP BY tp.PartyID, b.rptDate, b.CurrencyID
 		)
 	END
@@ -161,15 +163,14 @@ BEGIN
 		)
 	END
 
-	INSERT INTO #Result (PartyID, ReportType, TurnOver, CustomerWinlost, CommBA, CommRB, Betcount, WinningPrize, LicensingFee)
+	INSERT INTO #Result (PartyID, ReportType, TurnOver, CustomerWinlost, CommBA, CommRB, Betcount, LicensingFee)
 	SELECT b.PartyID
 		, CONVERT(VARCHAR(6),b.rptDate,112)
 		, SUM(TurnOver * e.Rate)	AS Turnover
-		, SUM((Winlost + ISNULL(WinningPrize, 0)) * e.Rate)	AS CustomerWinlost
+		, SUM(Winlost * e.Rate)	AS CustomerWinlost
 		, SUM(CommBA * e.Rate) AS CommBA
 		, SUM(CommRB * e.Rate) AS CommRB
 		, SUM(Betcount) AS Betcount
-		, SUM(ISNULL(WinningPrize, 0) * e.Rate) AS WinningPrize
 		, SUM((-b.Winlost * ISNULL(p.Rate,0)) * e.Rate) AS LicensingFee
 	FROM #Temp b
 	INNER JOIN #Exchange e  ON e.ExchangeDate = b.Rptdate AND e.ExchangeId = b.Currency
@@ -190,7 +191,7 @@ BEGIN
 		, SUM(CommBA) AS AmtDueToBA
 		, SUM(CommRB) AS AmtDueToRB
 		, SUM(Betcount) AS BetCount
-		, SUM(LicensingFee - WinningPrize) AS LicensingFee
+		, SUM(LicensingFee) AS LicensingFee
 	FROM #Result
 	GROUP BY ReportType
 	ORDER BY ReportType ASC

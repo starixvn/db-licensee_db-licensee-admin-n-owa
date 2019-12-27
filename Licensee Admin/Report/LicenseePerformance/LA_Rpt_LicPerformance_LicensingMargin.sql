@@ -26,6 +26,7 @@ AS
 	   - 20171212@Bruce: Add Average Margin [#87843]
 	   - 20180718@Bruce: Change default currency to EUR [#94108]
 	   - 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
+	   - 20191205@Parsons: PP tournament [#123958]
 	   
 	Param's Explanation:  
 	  + @PartyIDs : a string of list PartyID, separated by ','
@@ -36,7 +37,9 @@ AS
 */  
 BEGIN  
 	SET NOCOUNT ON  
-	
+	DECLARE  @PPTournament SMALLINT = 4299,
+			 @PromotionPrize SMALLINT = 4300  
+
 	CREATE TABLE #rptLicMargin (PartyName NVARCHAR(200), ReportDate SMALLDATETIME, Margin MONEY)
 	CREATE TABLE #Temp (PartyID INT, rptDate DATETIME, CurrencyID INT, Winloss MONEY, TurnOver MONEY)
 	DECLARE @Bettype TABLE (Bettype INT, ProductID INT)
@@ -98,7 +101,7 @@ BEGIN
 	   FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
 		  INNER JOIN (SELECT DISTINCT PartyID, LicenseeID FROM @tmpParty) tp ON tp.LicenseeID = b.SiteID
 	   WHERE b.rptDate BETWEEN @FromDate AND @Todate
-		  AND b.Bettype IN (SELECT Bettype FROM @Bettype)
+		  AND b.Bettype IN (SELECT Bettype FROM @Bettype WHERE Bettype NOT IN(@PPTournament, @PromotionPrize))
 		  AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
 		  AND (b.CurrencyID <> 20)
 		  AND b.status NOT IN (-1, 101, 102, 103)

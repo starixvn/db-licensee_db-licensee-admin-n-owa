@@ -26,11 +26,12 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20181119@bruce: Integrate Bidme games (GD product) [#103695]
 	    - 20190322@Parsons: Integrate-PP-Promotion-Prize [#109014]
+	    - 20191205@Mason: PP tournament [#123958]
 */
 BEGIN
 	SET NOCOUNT ON
 	
-	DECLARE @GD_Tip SMALLINT = 1706, @PromotionPrize SMALLINT = 4300  
+	DECLARE @GD_Tip SMALLINT = 1706, @PromotionPrize SMALLINT = 4300, @PPTournament SMALLINT = 4299 
 
 	SELECT * INTO #Exchange FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
@@ -96,7 +97,7 @@ BEGIN
 		AND b.StatusId NOT IN (-1, 101, 102, 103)
 		AND b.CurrencyID <> 20
 		AND b.CustomerCategory NOT IN (27, 28)
-		AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
+		AND b.Bettype NOT IN (901,902,903,904,911,912,913,914,@PromotionPrize,@PPTournament)
 		AND b.SiteID NOT IN (SELECT c.LicenseeId FROM @CreditLicenee c)
 		AND b.ProductID IN (SELECT p.ProductId FROM @Products p)
 		AND b.ProductID NOT IN (13,15,25,32) -- exclude BT, CB, CO, PP
@@ -166,9 +167,9 @@ BEGIN
 	IF EXISTS (SELECT 1 FROM @Products WHERE ProductId=32)
 	BEGIN
 		INSERT INTO #Data(WinLossDate,LicenseeId,ProductId,Bettype,Winloss,WinningPrize)
-		SELECT b.rptDate, b.SiteId, b.ProductId, b.Bettype,
-			CAST(SUM(CASE WHEN b.Bettype <> @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END  * e.BaseCurrencyRate) AS MONEY)	AS Winloss,
-			CAST(SUM(CASE WHEN b.Bettype =  @PromotionPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END  * e.BaseCurrencyRate) AS MONEY)	AS WinningPrize
+		SELECT b.rptDate, b.SiteId, b.ProductId, b.Bettype, 
+		CAST(SUM(ISNULL(b.MemberWL, 0) * e.BaseCurrencyRate) AS MONEY), 
+		CAST(SUM(ISNULL(b.MemberWL, 0) * e.BaseCurrencyRate) AS MONEY)
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 		INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
@@ -176,6 +177,7 @@ BEGIN
 			AND b.CurrencyID <> 20
 			AND b.CustomerCategory NOT IN (27, 28)
 			AND b.ProductID = 32
+			AND b.Bettype NOT IN (@PromotionPrize, @PPTournament)
 		GROUP BY b.rptDate, b.SiteId, b.ProductId, b.Bettype
 	END
 
