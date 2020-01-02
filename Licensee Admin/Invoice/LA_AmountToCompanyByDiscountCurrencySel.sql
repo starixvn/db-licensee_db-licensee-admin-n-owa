@@ -309,7 +309,7 @@ BEGIN
 				AND b.ProductId = p.ProductID   
 				AND (p.ProductID <> 11 OR b.Bettype = p.Bettype)
 				AND (b.Bettype NOT IN (@PPTournament, @PromotionPrize))
-		LEFT JOIN dbo.LA_ChargeInfo_CurrencyRate cr WITH (NOLOCK) ON p.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
+		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
 	WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
