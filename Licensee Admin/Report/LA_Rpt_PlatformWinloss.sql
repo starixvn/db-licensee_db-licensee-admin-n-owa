@@ -1,4 +1,7 @@
 /*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE bodb02
+GO
+
 ALTER PROCEDURE [dbo].[LA_Rpt_PlatformWinloss]
 	 @PartyIds		VARCHAR(4000),
 	 @FromDate		SMALLDATETIME,
@@ -24,6 +27,7 @@ AS
 		- 20190516@Parsons: Show Bet count in Platform Win Loss (Summary) Report [#113568]
 		- 20190827@Bruce: Add new betfrom 't' [#118998]
 		- 20191010@Percy: Replace LicenseeBATransaction to LicenseeBATransaction_active [RedmineID: #103656]
+		- 20191223@Bruce: Adding betform v and 0 [#118998]
 
 	Explanation:
 	  + @PlatformType:
@@ -36,7 +40,8 @@ AS
 					   8: Tablet (r)
 					   9: Mobile app for China (o)
 					  10: Mobile lite version (c)
-					  11: Others(t)
+					  11: Native App (0)
+					  12: Others(t,v)
 
 	  + @excludeTest: remove currency UUS
 	  + @MoveBetsDay: The day we move tickets to bettrans14
@@ -51,7 +56,7 @@ BEGIN
 	-- supported betfrom
 	--
 	DECLARE @betfrom TABLE(betfrom CHAR(1))
-	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,l,g,x,z,r,o,c,t',',')
+	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,l,g,x,z,r,o,c,t,0,v',',')
 
 	CREATE TABLE #WinLoss (
 		LicenseeID		INT,
