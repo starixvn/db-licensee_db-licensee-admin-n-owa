@@ -372,7 +372,7 @@ BEGIN
 			ISNULL(SUM(CASE WHEN d.ProductId = 21 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS AB,
 			ISNULL(SUM(CASE WHEN d.ProductId = 24 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS FW,
 			ISNULL(SUM(CASE WHEN d.ProductId = 28 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS LT,
-			ISNULL(SUM(CASE WHEN d.ProductId = 32 THEN (-MemberWL * ISNULL(cm.Rate, ci.Rate) - WinningPrize) * e.Rate ELSE 0 END),0) AS PP,
+			ISNULL(SUM(CASE WHEN d.ProductId = 32 THEN (-MemberWL * ISNULL(cm.Rate, ci.Rate)) * e.Rate ELSE 0 END),0) AS PP,
 			ISNULL(SUM(CASE WHEN d.ProductId = 34 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS CC,
 			ISNULL(SUM(CASE WHEN d.ProductId = 27 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS BRVS,
 			ISNULL(SUM(CASE WHEN d.ProductId = 4  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS LC,
