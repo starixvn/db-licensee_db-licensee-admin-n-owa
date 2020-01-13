@@ -35,7 +35,7 @@ BEGIN
 	SET @StartRun = GETDATE()
 
 	DECLARE @IsActived INT = 1, @IsActivating INT = 2, @IsExpired INT = 3
-	DECLARE @ProductListAll	VARCHAR(100) = '', @MinDate DATE, @MaxDate	DATE	
+	DECLARE @ProductListAll	VARCHAR(100) = '', @MinDate DATE, @MaxDate DATE	
 	
 	SELECT @ProductListAll = @ProductListAll + ProductPrefix + ','
 	FROM dbo.LA_f_Products3rd('')
@@ -90,7 +90,8 @@ BEGIN
 	END
 
 	--Step2: Copy charge rates to new group with FromDate = Effective date
-	DECLARE @InsertedResult TABLE (ChargeId INT, ProductId INT)
+	DECLARE @InsertedResult TABLE (ChargeId INT, ProductId INT, CurrencyId INT)
+	DECLARE @DetailRate TABLE (Rate DECIMAL, CurrencyId INT, ProductId INT, GroupId INT)
 
 		-- 2.1 OAS_ChargeInfo
 	INSERT INTO OAS_ChargeInfo(ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling)
@@ -98,6 +99,16 @@ BEGIN
 	SELECT ProductID, FromParty, @GroupId, ParentChargeID, Rate, ChargeType, @EffectiveDate, ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling
 	FROM #ChangeRateTable
 	WHERE [Status] = @IsActived
+	
+		-- 2.2 LA_ChargeRateByCurrency
+	INSERT INTO @DetailRate(Rate, CurrencyId, ProductId)
+	SELECT cr.Rate, crt.BaseCurrencyId, crt.ProductID, crt.ToParty
+	FROM #ChangeRateTable crt INNER JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr ON crt.ChargeID = cr.ChargeID AND crt.BaseCurrencyId = cr.CurrencyID
+	
+	INSERT INTO LA_ChargeRateByCurrency
+	SELECT ir.ChargeId, dr.CurrencyId, dr.Rate
+	FROM @DetailRate dr INNER JOIN @InsertedResult ir ON dr.ProductId = dr.ProductId
+	INNER JOIN #ChangeRateTable crt ON dr.CurrencyId = crt.BaseCurrencyId AND dr.GroupId = crt.ToParty
 
 		-- 2.2 LA_ChargeInfo_SystemMapping
 	INSERT INTO LA_ChargeInfo_SystemMapping(ChargeID, SystemID)
@@ -164,6 +175,7 @@ BEGIN
 	FROM OAS_ChargeInfoSub cs WITH(NOLOCK) 
 	INNER JOIN #ChangeRateTable c ON cs.ChargeIdRef = c.ChargeID
 	WHERE [Status] = @IsActivating
+		-- 3.3 LA_ChargeRatebyCurrency
 
 	SET @EndRun = GETDATE()
 	SET @Duration = DATEDIFF (MILLISECOND, @StartRun, @EndRun)
