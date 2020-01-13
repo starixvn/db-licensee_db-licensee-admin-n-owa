@@ -101,7 +101,7 @@ BEGIN
 	WHERE [Status] = @IsActived
 	
 		-- 2.2 LA_ChargeRateByCurrency
-	INSERT INTO @DetailRate(Rate, CurrencyId, ProductId)
+	INSERT INTO @DetailRate(Rate, CurrencyId, ProductId, GroupId)
 	SELECT cr.Rate, crt.BaseCurrencyId, crt.ProductID, crt.ToParty
 	FROM #ChangeRateTable crt INNER JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr ON crt.ChargeID = cr.ChargeID AND crt.BaseCurrencyId = cr.CurrencyID
 	
