@@ -19,7 +19,7 @@ AS
 		- 20190221@Parsons: Manage Payer Setting - changing party group [#109189]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20190801@Parsons: Validate billing configuration [#109600]
-		- 20200113@Mason: Billing term by currency [#120005]
+		- 20200113@Parsons: Billing term by currency [#120005]
 
 	Params:
 	Example:
@@ -52,7 +52,8 @@ BEGIN
 				WHEN c1.FromDate < @EffectiveDate AND c1.ToDate >= @EffectiveDate THEN @IsActived
 				WHEN c1.FromDate >= @EffectiveDate THEN @IsActivating
 				ELSE @IsExpired
-			END AS [Status]
+			END AS [Status],
+			0 AS IsInserted
 	INTO #ChangeRateTable
 	FROM OAS_ChargeInfo c1 WITH(NOLOCK)
 	INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @MinDate, @MaxDate, @ProductListAll, 'OA', 1) c2 ON c1.ChargeID = c2.ChargeID
@@ -92,6 +93,33 @@ BEGIN
 
 	--Step2: Copy charge rates to new group with FromDate = Effective date
 	DECLARE @InsertedResult TABLE (ChargeId INT, ProductId INT)
+	
+	-- 2.1 OAS_ChargeInfo
+	DECLARE @OldChargeId INT, @NewChargeId INT, @ProductId INT
+	WHILE EXISTS (SELECT TOP 1 1 FROM #ChangeRateTable WHERE IsInserted = 0 AND [Status] = @IsActived)
+	BEGIN
+		SELECT TOP 1 @OldChargeId = ChargeID, @ProductId = ProductID FROM #ChangeRateTable WHERE IsInserted = 0 AND [Status] = @IsActived
+
+		-- Insert OAS_ChargeInfo
+		INSERT INTO OAS_ChargeInfo(ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling)
+		SELECT ProductID, FromParty, @GroupId, ParentChargeID, Rate, ChargeType, @EffectiveDate, ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling
+		FROM #ChangeRateTable
+		WHERE [Status] = @IsActived AND ChargeID = @OldChargeId
+
+		SET @NewChargeId = SCOPE_IDENTITY()
+		-- Insert InsertedResult
+			INSERT INTO @InsertedResult(ChargeId, ProductId)
+			VALUES(@NewChargeId, @ProductId)
+
+		-- Insert LA_ChargeRateByCurrency
+		INSERT INTO LA_ChargeRateByCurrency(ChargeID, CurrencyID, Rate)
+		SELECT ChargeID, CurrencyID, Rate
+		FROM LA_ChargeRateByCurrency
+		WHERE ChargeID = @OldChargeId
+
+		-- Exlude item which is inserted
+		UPDATE #ChangeRateTable SET IsInserted = 1 WHERE ChargeID = @OldChargeId
+	END
 
 		-- 2.1 OAS_ChargeInfo
 	INSERT INTO OAS_ChargeInfo(ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling)
