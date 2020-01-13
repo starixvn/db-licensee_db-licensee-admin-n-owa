@@ -19,6 +19,7 @@ AS
 		- 20190221@Parsons: Manage Payer Setting - changing party group [#109189]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20190801@Parsons: Validate billing configuration [#109600]
+		- 20200113@Mason: Billing term by currency [#120005]
 
 	Params:
 	Example:
