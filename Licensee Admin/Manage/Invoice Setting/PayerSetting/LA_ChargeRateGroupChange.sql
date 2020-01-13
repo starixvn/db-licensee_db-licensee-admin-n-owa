@@ -92,7 +92,7 @@ BEGIN
 
 	--Step2: Copy charge rates to new group with FromDate = Effective date
 	DECLARE @InsertedResult TABLE (ChargeId INT, ProductId INT, CurrencyId INT)
-	DECLARE @DetailRate TABLE (Rate DECIMAL, CurrencyId INT, ProductId INT, GroupId INT)
+	DECLARE @DetailRate TABLE (Rate DECIMAL, CurrencyId INT, ProductId INT, GroupId INT, ChargeType INT)
 
 		-- 2.1 OAS_ChargeInfo
 	INSERT INTO OAS_ChargeInfo(ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling)
@@ -102,14 +102,14 @@ BEGIN
 	WHERE [Status] = @IsActived
 	
 		-- 2.2 LA_ChargeRateByCurrency
-	INSERT INTO @DetailRate(Rate, CurrencyId, ProductId, GroupId)
-	SELECT cr.Rate, crt.BaseCurrencyId, crt.ProductID, crt.ToParty
+	INSERT INTO @DetailRate(Rate, CurrencyId, ProductId, GroupId, ChargeType)
+	SELECT cr.Rate, crt.BaseCurrencyId, crt.ProductID, crt.ToParty, crt.ChargeType
 	FROM #ChangeRateTable crt INNER JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr ON crt.ChargeID = cr.ChargeID AND crt.BaseCurrencyId = cr.CurrencyID
 	
 	INSERT INTO LA_ChargeRateByCurrency
 	SELECT ir.ChargeId, dr.CurrencyId, dr.Rate
 	FROM @DetailRate dr INNER JOIN @InsertedResult ir ON dr.ProductId = dr.ProductId
-	INNER JOIN #ChangeRateTable crt ON dr.CurrencyId = crt.BaseCurrencyId AND dr.GroupId = crt.ToParty
+	INNER JOIN #ChangeRateTable crt ON dr.CurrencyId = crt.BaseCurrencyId AND dr.GroupId = crt.ToParty AND dr.ChargeType = crt.ChargeType
 
 		-- 2.2 LA_ChargeInfo_SystemMapping
 	INSERT INTO LA_ChargeInfo_SystemMapping(ChargeID, SystemID)
