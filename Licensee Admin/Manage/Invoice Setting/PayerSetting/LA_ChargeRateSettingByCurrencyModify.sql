@@ -64,7 +64,7 @@ BEGIN
 	WHERE ChargeID = @ChargeID
 
 	-- Insert charge rate by currency
-	SELECT * FROM @ChargeSettings
+	
 	;MERGE [dbo].[LA_ChargeRateByCurrency] WITH(ROWLOCK, UPDLOCK) AS t
 	USING @ChargeSettings AS s
 	ON (t.ChargeId = s.ChargeID AND t.CurrencyID = s.CurrencyID)
