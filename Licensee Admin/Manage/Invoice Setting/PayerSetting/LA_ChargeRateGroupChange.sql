@@ -94,7 +94,7 @@ BEGIN
 	--Step2: Copy charge rates to new group with FromDate = Effective date
 	DECLARE @InsertedResult TABLE (ChargeId INT, ProductId INT)
 	
-	-- 2.1 OAS_ChargeInfo
+	-- 2.1 OAS_ChargeInfo & LA_ChargeRateByCurrency
 	DECLARE @OldChargeId INT, @NewChargeId INT, @ProductId INT
 	WHILE EXISTS (SELECT TOP 1 1 FROM #ChangeRateTable WHERE IsInserted = 0 AND [Status] = @IsActived)
 	BEGIN
@@ -120,13 +120,6 @@ BEGIN
 		-- Exlude item which is inserted
 		UPDATE #ChangeRateTable SET IsInserted = 1 WHERE ChargeID = @OldChargeId
 	END
-
-		-- 2.1 OAS_ChargeInfo
-	INSERT INTO OAS_ChargeInfo(ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling)
-	OUTPUT INSERTED.ChargeID, INSERTED.ProductId INTO @InsertedResult(ChargeId, ProductId)
-	SELECT ProductID, FromParty, @GroupId, ParentChargeID, Rate, ChargeType, @EffectiveDate, ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling
-	FROM #ChangeRateTable
-	WHERE [Status] = @IsActived
 
 		-- 2.2 LA_ChargeInfo_SystemMapping
 	INSERT INTO LA_ChargeInfo_SystemMapping(ChargeID, SystemID)
