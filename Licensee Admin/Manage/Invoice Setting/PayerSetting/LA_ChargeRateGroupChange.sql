@@ -113,7 +113,7 @@ BEGIN
 
 		-- Insert LA_ChargeRateByCurrency
 		INSERT INTO LA_ChargeRateByCurrency(ChargeID, CurrencyID, Rate)
-		SELECT ChargeID, CurrencyID, Rate
+		SELECT @NewChargeId, CurrencyID, Rate
 		FROM LA_ChargeRateByCurrency
 		WHERE ChargeID = @OldChargeId
 
