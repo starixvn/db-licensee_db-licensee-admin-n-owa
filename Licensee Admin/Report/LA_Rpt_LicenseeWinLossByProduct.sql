@@ -359,7 +359,7 @@ BEGIN
 		BX MONEY
 	)
 	
-	INSERT INTO @AmountDueByProduct
+	INSERT INTO @AmountDueByProduct(LicenseeId, SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, PP, CC, BRVS, LC, VG, MGCLC, MGCRNG, BX)
 	SELECT d.LicenseeId,
 			ISNULL(SUM(CASE WHEN d.ProductId = 0  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS SB,
 			ISNULL(SUM(CASE WHEN d.ProductId = 2  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS NG,
