@@ -39,6 +39,7 @@ AS
 		- 20181119@bruce: Integrate Bidme games (GD product) [#103695]
 	    - 20190322@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	    - 20190725@Mason: Integrate-Card-Club [#116096]
+		- 20191121@Mason: Setup_billing_terms_by_Currency  [#120005]
 	    - 20191205@Parsons: PP tournament [#123958]
 */
 		
@@ -72,6 +73,7 @@ BEGIN
 	-- End Region
 	
 	DECLARE @PartyChargeInfo AS TABLE (
+			ChargeId	INT,
 			PartyId		INT,
 			LicenseeId	INT,
 			ProductID	INT,
@@ -80,9 +82,9 @@ BEGIN
 			FromDate	SMALLDATETIME,
 			ToDate		SMALLDATETIME)
 
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, BettypeRef)
+	INSERT INTO @PartyChargeInfo(ChargeId, PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, BettypeRef)
 	(
-		SELECT	PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate, CASE
+		SELECT	ChargeId, PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate, CASE
 				WHEN ProductId = 11 AND ChargeType = 12 THEN @GD_Tip
 				ELSE Bettype
 			END
@@ -332,60 +334,85 @@ BEGIN
 	FROM	#LicenseeAmount d INNER JOIN @COWinLoss a ON a.LicenseeId = d.LicenseeId
 	-- End CO
 
-	-- Others
-	;WITH AmountDueByProduct AS
-	(
-		SELECT	d.LicenseeId,
-				ISNULL(SUM(CASE WHEN d.ProductId = 0  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS SB,
-				ISNULL(SUM(CASE WHEN d.ProductId = 2  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS NG,
-				ISNULL(SUM(CASE WHEN d.ProductId = 4  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS LC,
-				ISNULL(SUM(CASE WHEN d.ProductId = 5  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS VS,
-				ISNULL(SUM(CASE WHEN d.ProductId = 6  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS CS,
-				ISNULL(SUM(CASE WHEN d.ProductId = 8  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS KN,
-				ISNULL(SUM(CASE WHEN d.ProductId = 10 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS AGC,
-				ISNULL(SUM(CASE WHEN d.ProductId = 11 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS GD,
-				ISNULL(SUM(CASE WHEN d.ProductId = 12 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS VG,
-				ISNULL(SUM(CASE WHEN d.ProductId = 14 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS MGCLC,
-				ISNULL(SUM(CASE WHEN d.ProductId = 17 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS MGCRNG,
-				ISNULL(SUM(CASE WHEN d.ProductId = 22 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS VB,
-				ISNULL(SUM(CASE WHEN d.ProductId = 21 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS AB,
-				ISNULL(SUM(CASE WHEN d.ProductId = 24 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS FW,
-				ISNULL(SUM(CASE WHEN d.ProductId = 27 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS BRVS,
-				ISNULL(SUM(CASE WHEN d.ProductId = 28 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS LT,
-				ISNULL(SUM(CASE WHEN d.ProductId = 31 THEN (-MemberWL * ci.Rate - (AComm + PComm)) * e.Rate ELSE 0 END),0) AS BX,
-				ISNULL(SUM(CASE WHEN d.ProductId = 32 THEN (-MemberWL * ci.Rate) * e.Rate ELSE 0 END),0) AS PP,
-				ISNULL(SUM(CASE WHEN d.ProductId = 34 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS CC
-		FROM	#TempData d
+	-- Calculate amount for products 
+	-- For SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, PP, CC: charge rate is affected by currency
+	DECLARE @AmountDueByProduct AS TABLE (
+		LicenseeId INT,
+		SB MONEY,
+		NG MONEY,
+		VS MONEY,
+		CS MONEY,
+		KN MONEY,
+		AGC MONEY,
+		GD MONEY,
+		AB MONEY,
+		VB MONEY,
+		FW MONEY,
+		LT MONEY,
+		PP MONEY,
+		CC MONEY,
+		LC MONEY,
+		VG MONEY,
+		MGCLC MONEY,
+		MGCRNG MONEY,
+		BRVS MONEY,
+		BX MONEY
+	)
+	
+	INSERT INTO @AmountDueByProduct(LicenseeId, SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, PP, CC, BRVS, LC, VG, MGCLC, MGCRNG, BX)
+	SELECT d.LicenseeId,
+			ISNULL(SUM(CASE WHEN d.ProductId = 0  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS SB,
+			ISNULL(SUM(CASE WHEN d.ProductId = 2  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS NG,
+			ISNULL(SUM(CASE WHEN d.ProductId = 5  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VS,
+			ISNULL(SUM(CASE WHEN d.ProductId = 6  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS CS,
+			ISNULL(SUM(CASE WHEN d.ProductId = 8  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS KN,
+			ISNULL(SUM(CASE WHEN d.ProductId = 10 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS AGC,
+			ISNULL(SUM(CASE WHEN d.ProductId = 11 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS GD,
+			ISNULL(SUM(CASE WHEN d.ProductId = 22 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VB,
+			ISNULL(SUM(CASE WHEN d.ProductId = 21 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS AB,
+			ISNULL(SUM(CASE WHEN d.ProductId = 24 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS FW,
+			ISNULL(SUM(CASE WHEN d.ProductId = 28 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS LT,
+			ISNULL(SUM(CASE WHEN d.ProductId = 32 THEN (-MemberWL * ISNULL(cm.Rate, ci.Rate)) * e.Rate ELSE 0 END),0) AS PP,
+			ISNULL(SUM(CASE WHEN d.ProductId = 34 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS CC,
+			ISNULL(SUM(CASE WHEN d.ProductId = 27 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS BRVS,
+			ISNULL(SUM(CASE WHEN d.ProductId = 4  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS LC,
+			ISNULL(SUM(CASE WHEN d.ProductId = 12 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS VG,
+			ISNULL(SUM(CASE WHEN d.ProductId = 14 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS MGCLC,
+			ISNULL(SUM(CASE WHEN d.ProductId = 17 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS MGCRNG,
+			ISNULL(SUM(CASE WHEN d.ProductId = 31 THEN (-MemberWL * ci.Rate - (AComm + PComm)) * e.Rate ELSE 0 END),0) AS BX
+	FROM	#TempData d
 				INNER JOIN @PartyChargeInfo ci ON	d.LicenseeId = ci.LicenseeId
 													AND ci.ProductId = d.ProductId
 													AND d.rptDate BETWEEN ci.FromDate AND ci.ToDate
 													AND d.BettypeRef = ci.BettypeRef
+				LEFT JOIN dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON ci.ChargeId = cm.ChargeId AND d.CurrencyId = cm.CurrencyId
 				INNER JOIN #Exchange e ON d.rptDate = e.ExchangeDate AND d.CurrencyId = e.ExchangeID
 		GROUP BY d.LicenseeId
-	)
+	-- End calculate amount
+
 	UPDATE	l
 	SET		SB = a.SB,
 			NG = a.NG,
-			LC = a.LC,
 			VS = a.VS,
 			CS = a.CS,
 			KN = a.KN,
 			AGC = a.AGC,
 			GD = a.GD,
-			VG = a.VG,
-			MGCLC = a.MGCLC,
-			MGCRNG = a.MGCRNG,
 			VB = a.VB,
 			AB = a.AB,
 			FW = a.FW,
-			BRVS = a.BRVS,
 			LT = a.LT,
-			BX = a.BX,
 			PP = a.PP,
-			CC = a.CC
+			CC = a.CC,
+			LC = a.LC,
+			VG = a.VG,
+			MGCLC = a.MGCLC,
+			MGCRNG = a.MGCRNG,
+			BRVS = a.BRVS,
+			BX = a.BX
 	FROM	#LicenseeAmount l
-			INNER JOIN AmountDueByProduct a ON a.LicenseeId = l.LicenseeId
-
+			INNER JOIN @AmountDueByProduct a ON a.LicenseeId = l.LicenseeId
+	
 	DELETE	FROM #LicenseeAmount
 	WHERE	SB IS NULL
 			AND RB IS NULL

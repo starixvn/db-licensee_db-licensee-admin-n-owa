@@ -55,6 +55,7 @@ AS
 	    - 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
 		- 20190718@Bruce: Integrate CN88 data in LA [#116859]
 		- 20191021@Parsons: Non-peak hour promotion [#119538]    
+		- 20191125@Mason: Setup billing terms by Currency  [#120005]
 	    - 20191205@Parsons: PP tournament [#123958]
 
 	Param's Explanation:  
@@ -164,6 +165,7 @@ BEGIN
 
 	-- Region: Party charge info
 	DECLARE @PartyChargeInfo AS TABLE (
+			ChargeId	INT,
 			PartyId		INT,
 			LicenseeId	INT,
 			ProductID	INT,
@@ -294,7 +296,7 @@ BEGIN
 				SUM(ISNULL(b.CommissionA, 0)) * e.Rate,
 				SUM(ISNULL(b.CommissionP, 0)) * e.Rate,
 				p.ProductId,
-				SUM((CASE WHEN b.Bettype=@GD_Tip THEN 0 ELSE -b.MemberWL END * p.Rate) - (CASE 
+				SUM((CASE WHEN b.Bettype=@GD_Tip THEN 0 ELSE -b.MemberWL * ISNULL(cr.Rate, p.Rate) END) - (CASE 
 					WHEN b.ProductId = @BAProductId THEN ISNULL(b.CommissionA, 0)
 					WHEN b.ProductID = @ExchangeProductId THEN ISNULL(b.CommissionA, 0) + ISNULL(b.CommissionP, 0)
 					ELSE 0 END)) * e.Rate
@@ -304,6 +306,7 @@ BEGIN
 													AND p.LicenseeId = b.SiteId
 													AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
 													AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
+				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
 		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate OR b.rptDate BETWEEN @PrevFromDate AND @PrevToDate)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)

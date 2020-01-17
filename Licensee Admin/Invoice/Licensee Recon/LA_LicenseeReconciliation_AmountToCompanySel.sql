@@ -182,7 +182,7 @@ BEGIN
 
 	-- charge info
 	--
-	SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, CAST(ci.DI_Rate AS DECIMAL(6,5)) AS Rate, ci.Fromdate, ci.ToDate,ci.ChargeType
+	SELECT DISTINCT ci.ChargeId ,ci.PartyID, ci.LicenseeID, ci.ProductID, CAST(ci.DI_Rate AS DECIMAL(6,5)) AS Rate, ci.Fromdate, ci.ToDate,ci.ChargeType
 	INTO #tmpChargeInfo
 	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @supportedProducts, 'OA', 1) ci
 	WHERE DI_Rate > 0
@@ -288,7 +288,7 @@ BEGIN
 			CAST(0 AS MONEY) AS Promotion,
 			CAST(0 AS MONEY) AS ExtraAmount,
 			SUM((b.LicWinloss + (CASE WHEN b.ProductID = @BX THEN b.CommissionA ELSE 0 END)) * e.Rate) AS Winloss,
-			SUM((b.LicWinloss * p.Rate - (CASE
+			SUM((b.LicWinloss * ISNULL(cr.Rate, p.Rate) - (CASE
 					WHEN b.ProductID = @BA THEN ISNULL(b.CommissionA,0)
 					WHEN b.ProductID = @BX THEN (b.CommissionA + b.CommissionP)
 					ELSE 0
@@ -298,6 +298,7 @@ BEGIN
 		FROM #tmpBettingByProduct b
 		INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID AND p.LicenseeId = b.SiteId AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
+		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
 		WHERE p.ChargeType NOT IN (
 				@CashoutComm_ChargeType,
 				@CommissionShare_ChargeType,
