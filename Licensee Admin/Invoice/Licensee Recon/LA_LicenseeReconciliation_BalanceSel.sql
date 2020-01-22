@@ -4,7 +4,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_BalanceSel]
 	@CustIds		VARCHAR(8000),
-	@FromDate	DATETIME
+	@ReportDate	DATETIME
 AS
 /*	Header:
 	Created: 20200122@Parsons
@@ -56,12 +56,12 @@ BEGIN
 	DECLARE @balanceUpDay DATE, @moveBetsDay DATE
 	SELECT @balanceUpDay = BalanceUpDay, @moveBetsDay = MoveBetsDay FROM @tmpBalanceUpDay
 
-	DECLARE @OpeningBalanceDate DATE = DATEADD(DAY,-1,@FromDate)
+	DECLARE @OpeningBalanceDate DATE = DATEADD(DAY,-1,@ReportDate)
 	DECLARE @step TINYINT = 0
 
 	-- rptTotalBalance_Active
 	-- step 1
-	IF @FromDate > @moveBetsDay
+	IF @ReportDate > @moveBetsDay
 	BEGIN
 		SET @step = 1
 
@@ -69,7 +69,7 @@ BEGIN
 		SELECT a.CustID, MAX(a.WinlostDate)
 		FROM #statement s
 		INNER JOIN bodb_Report.dbo.rptTotalBalance_Active a WITH(NOLOCK) ON s.CustId = a.CustID
-		WHERE a.WinlostDate <= @FromDate
+		WHERE a.WinlostDate <= @ReportDate
 		GROUP BY a.CustID
 
 		UPDATE s SET OpeningBalance = a.OpeningBalance
@@ -80,7 +80,7 @@ BEGIN
 
 	-- rptstatement
 	-- step 2
-	IF (@FromDate > @balanceUpDay AND @FromDate <= @moveBetsDay) OR (EXISTS (SELECT TOP 1 1 FROM #statement WHERE OpeningBalance IS NULL) AND @step = 1)
+	IF (@ReportDate > @balanceUpDay AND @ReportDate <= @moveBetsDay) OR (EXISTS (SELECT TOP 1 1 FROM #statement WHERE OpeningBalance IS NULL) AND @step = 1)
 	BEGIN
 		DELETE #tmpOB
 		SET @step = 2
@@ -89,7 +89,7 @@ BEGIN
 		SELECT a.CustID, MAX(a.WinlostDate)
 		FROM #statement s
 		INNER JOIN bodb_report.dbo.rptstatement a WITH(NOLOCK) ON s.CustId = a.CustID
-		WHERE a.WinlostDate < @FromDate AND s.OpeningBalance IS NULL
+		WHERE a.WinlostDate < @ReportDate AND s.OpeningBalance IS NULL
 		GROUP BY a.CustID
 		
 		UPDATE s SET OpeningBalance = a.closingbalance
@@ -100,7 +100,7 @@ BEGIN
 
 	-- rptstatement_Old
 	-- step 3
-	IF @FromDate <= @balanceUpDay OR (EXISTS (SELECT TOP 1 1 FROM #statement WHERE OpeningBalance IS NULL) AND @step = 2)
+	IF @ReportDate <= @balanceUpDay OR (EXISTS (SELECT TOP 1 1 FROM #statement WHERE OpeningBalance IS NULL) AND @step = 2)
 	BEGIN
 		DELETE #tmpOB
 		SET @step = 3
@@ -109,7 +109,7 @@ BEGIN
 		SELECT a.CustID, MAX(a.WinlostDate)
 		FROM #statement s
 		INNER JOIN bodb_report.dbo.rptstatement_Old a WITH(NOLOCK) ON s.CustId = a.CustID
-		WHERE a.WinlostDate < @FromDate AND s.OpeningBalance IS NULL
+		WHERE a.WinlostDate < @ReportDate AND s.OpeningBalance IS NULL
 		GROUP BY a.CustID
 		
 		UPDATE s SET OpeningBalance = a.closingbalance
