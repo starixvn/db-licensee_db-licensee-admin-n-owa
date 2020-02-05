@@ -254,6 +254,7 @@ BEGIN
 	--result
 	;WITH Result AS (
 		SELECT DISTINCT
+			c.ChargeId		AS ChargeID,
 			c.PartyId		AS PayerID,
 			PartyName		AS PayerName,
 			PartyGroupId	AS PayerGroupID,
