@@ -23,6 +23,7 @@ AS
 	    - 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
 		- 20191010@Percy: Replace LicenseeBATransaction to LicenseeBATransaction_active [RedmineID: #103656]
 		- 20191205@Mason: PP tournament [#123958]
+		- 20190206@Mason: Set billing term by currency [#120005]
 
 	Notes: @FromDate, @ToDate should be a full month range
 	Example :  EXEC LA_Rpt_LicenseeAnalysis  @PartyIDs = '73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88', 
@@ -152,6 +153,7 @@ BEGIN
 
 	-- 2. Region: Party charge info
 	DECLARE @PartyChargeInfo AS TABLE(
+		ChargeId	INT,
 		PartyId		INT,
 		LicenseeId	INT,
 		ProductID	INT,
@@ -160,9 +162,9 @@ BEGIN
 		ToDate		SMALLDATETIME,
 		Bettype		SMALLINT
 	)
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
+	INSERT INTO @PartyChargeInfo(ChargeId, PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, Bettype)
 	(
-		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, ci.DI_Rate, ci.Fromdate, ci.ToDate,
+		SELECT DISTINCT ci.ChargeID, ci.PartyID, ci.LicenseeID, ci.ProductID, ci.DI_Rate, ci.Fromdate, ci.ToDate,
 			CASE WHEN ProductID=11 AND ChargeType=12 THEN @GD_Tip ELSE -1 END
 		FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
 		WHERE	DI_Rate > 0
@@ -371,12 +373,28 @@ BEGIN
 	-- end region
 
 	-- 10. calculate licensing fee(amount to company) 
-	UPDATE d SET LicensingFee = (d.LicenseeWinLoss * p.Rate), FeeAfterDiscount=0,FeeAfterRebate=0
+	-- Calculate licensee fee affected charge rate by currency for SB,NG,VS,CS,KN,AGC,GD,AB,VB,FW,VS2,LT,PP,CC
+	UPDATE d SET LicensingFee = (d.LicenseeWinLoss * ISNULL(cr.Rate, p.Rate)), 
+				 FeeAfterDiscount=0,
+				 FeeAfterRebate=0
 	FROM #Result d
 	INNER JOIN @PartyChargeInfo p ON p.PartyId = d.PartyId 
 		AND p.ProductId=d.ProductId 
 		AND d.ReportDate BETWEEN p.FromDate AND p.ToDate
 		AND p.Bettype = d.Bettype
+	LEFT JOIN dbo.LA_ChargeRateByCurrency cr ON p.ChargeId = cr.ChargeId AND d.CurrencyId = cr.CurrencyID
+	WHERE d.ProductId IN (0,2,5,6,8,10,11,21,22,24,27,28,32,34)
+	
+	-- Calulate licensing fee for remain product
+	UPDATE d SET LicensingFee = (d.LicenseeWinLoss * p.Rate), 
+				 FeeAfterDiscount=0,
+				 FeeAfterRebate=0
+	FROM #Result d
+	INNER JOIN @PartyChargeInfo p ON p.PartyId = d.PartyId 
+		AND p.ProductId=d.ProductId 
+		AND d.ReportDate BETWEEN p.FromDate AND p.ToDate
+		AND p.Bettype = d.Bettype
+	WHERE d.ProductId NOT IN (0,2,5,6,8,10,11,21,22,24,27,28,32,34)
 
 	UPDATE d SET LicensingFee = 0, FeeAfterDiscount=0,FeeAfterRebate=0
 	FROM #Result d
