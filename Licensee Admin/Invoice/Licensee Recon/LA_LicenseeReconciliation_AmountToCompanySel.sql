@@ -21,6 +21,7 @@ AS
 		- 20190927@Bruce: Remove prepayment section and Include CardClub [#120220]
 		- 20191017@Bruce: Group by party id [#122229]
 		- 20191209@Bruce: Include PP tournament [123958]
+		- 20200117@Mason: Setup billing terms by Currency  [#120005]
 */
 BEGIN
 	SET NOCOUNT ON

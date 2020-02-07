@@ -12,6 +12,7 @@ AS
 
 	Revisions: 
 		- 20191007@Bruce: Create Sp [#120220]
+		- 20200117@Mason: Setup billing terms by Currency  [#120005]
 */
 BEGIN
 	SET NOCOUNT ON
