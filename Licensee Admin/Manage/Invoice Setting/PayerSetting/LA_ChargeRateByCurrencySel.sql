@@ -45,7 +45,8 @@ BEGIN
 		cr.ChargeID		AS ChargeId, 
 		cr.CurrencyID	AS CurrencyId, 
 		ci.CurrencyCode	AS CurrencyCode, 
-		cr.Rate			AS Rate
+		cr.Rate			AS Rate,
+		r.ChargeType	AS ChargeType
 	FROM dbo.LA_ChargeRateByCurrency cr 
 	INNER JOIN @ChargeDetail r ON cr.ChargeID = r.ChargeID
 	LEFT JOIN @CurrencyInfo ci ON ci.CurrencyId = cr.CurrencyID
