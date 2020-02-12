@@ -36,7 +36,8 @@ AS
 	- 20190321@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	- 20191204@Bruce: PP tournament [#123958]
 	- 20191225@Bruce: billing term by currency [#120005]
-
+	- 20200212@Mason: billing term by currency [#120005]
+	
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
 		+ @Currency	:  0- All Currencies
@@ -507,7 +508,7 @@ BEGIN
 				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914, @PromotionPrize, @PPTournament)
 			GROUP BY b.rptDate, ci.PartyID, b.ProductID, b.CurrencyID
 		)
-
+		
 		INSERT INTO #Report (PartyID, ReportDate, CurrencyID, Turnover, Winlost, LicenseeWL,Company, Betcount)
 		SELECT ci.PartyID, rptDate, b.Currency
 			, SUM(b.turnover) Turnover
@@ -516,12 +517,12 @@ BEGIN
 			, SUM(-b.Winloss * ISNULL(cc.Rate,ci.Rate) - CASE WHEN b.ProductID=31 THEN (b.AComm + b.PComm) ELSE 0 END) AS Company
 			, SUM(b.betcount) AS betcount
 		FROM #Data b WITH (NOLOCK)
-			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
+			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate, ChargeId FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc ON cc.ChargeID=ci.ChargeId AND cc.CurrencyID=b.Currency
 		WHERE b.rptDate BETWEEN ci.Fromdate AND ci.Todate
 		GROUP BY ci.PartyID, b.rptDate, b.Currency
 	END
-
+	
 	-- treat NULL as zero
 	--
 	UPDATE #Report SET
