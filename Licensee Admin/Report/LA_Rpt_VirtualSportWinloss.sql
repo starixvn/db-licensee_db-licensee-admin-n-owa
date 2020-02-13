@@ -142,7 +142,7 @@ SET NOCOUNT ON
 			INNER JOIN @ChargeInfos c ON c.LicenseeID = b.siteID AND b.rptDate BETWEEN c.Fromdate AND c.Todate
 			INNER JOIN @Charge3rdInfos c3 ON c3.PartyID = c.ParentID AND b.rptDate BETWEEN c3.Fromdate AND c3.Todate
 			LEFT JOIN dbo.League l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
-			LEFT JOIN dbo.LA_ChargeRateByCurrency cr ON cr.ChargeId = c.ChargeId AND cr.CurrencyId = b.CurrencyId
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr ON cr.ChargeId = c.ChargeId AND cr.CurrencyId = b.CurrencyId
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.status NOT IN (-1, 101, 102, 103)
 			AND (b.CurrencyID <> 20)
