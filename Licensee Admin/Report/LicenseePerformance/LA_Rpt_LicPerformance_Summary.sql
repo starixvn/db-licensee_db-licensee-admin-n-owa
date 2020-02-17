@@ -91,10 +91,10 @@ BEGIN
 			, SUM(betcount *
 					CASE WHEN @drawfilter = 2 AND b.status = 111 THEN 0
 						ELSE 1 END) AS BetCount
-			, SUM(-b.winloss * tp.Rate) AS LicensingFee
+			,0
 			FROM bodb_LicenseeReport.dbo.rpt_Betting_BA b WITH (NOLOCK)
 			INNER JOIN(
-					SELECT DISTINCT PartyID, LicenseeID, Rate
+					SELECT DISTINCT PartyID, LicenseeID
 					FROM @tmpParty
 			)tp ON b.SiteID = tp.LicenseeID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
