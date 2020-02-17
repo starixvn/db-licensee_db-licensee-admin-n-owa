@@ -17,6 +17,7 @@ AS
 		- 20180508@Parsons: Integrate Pragmatic Win Loss [#94108]
 		- 20190308@Parsons: Integrate PP promotion prize [#109014]
 		- 20191204@Bruce: PP tournament [#123958]
+		- 20200217@Mason: Set billing term by currency [#120005]
 
 	 Params:
 
@@ -28,6 +29,7 @@ BEGIN
 
 	-- Region: Charge Info	
 	DECLARE @ChargeInfos AS TABLE (
+		ChargeId	INT,
 		PartyId		INT,
 		LicenseeId	INT,
 		isDeposit	BIT,
@@ -38,9 +40,9 @@ BEGIN
 		ToDate		SMALLDATETIME)	
 	
 	-- get licenseeFee's charge rate
-	INSERT INTO @ChargeInfos(PartyId, ProductID, LicenseeId, isDeposit, Rate, Fromdate, Todate)
+	INSERT INTO @ChargeInfos(ChargeId, PartyId, ProductID, LicenseeId, isDeposit, Rate, Fromdate, Todate)
 	(
-		SELECT DISTINCT c.PartyID, c.ProductID, c.LicenseeID, ISNULL(c.isDeposit, 0) AS isDeposit,
+		SELECT DISTINCT c.ChargeID, c.PartyID, c.ProductID, c.LicenseeID, ISNULL(c.isDeposit, 0) AS isDeposit,
 			CASE WHEN ISNULL(c.isDeposit, 0) = 1 THEN c.DI_Rate ELSE 0 END,
 			c.Fromdate, c.Todate
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'PP', 'OA', 1) c		
@@ -100,11 +102,12 @@ BEGIN
 		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN b.Winloss ELSE 0 END) AS WinPrizeAmount,
 		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE b.Winloss END) AS CustomerWinLoss,
 		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE -b.Winloss END) AS LicenseeWinloss,
-		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE -b.Winloss * ci.Rate END) AS LicensingFee,
+		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE -b.Winloss * ISNULL(cr.Rate, ci.Rate) END) AS LicensingFee,
 		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE -b.Winloss * ci.Rate3rd END) AS PayToSupplier
 	FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
 		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
 		INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
+		LEFT JOIN dbo.LA_ChargeRateByCurrency cr ON cr.ChargeID = ci.ChargeId AND cr.CurrencyID = b.CurrencyId
 	WHERE b.RptDate3rd BETWEEN @FromDate AND @ToDate AND
 		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20
 		AND b.BetTypeId BETWEEN 4101 AND 4300
