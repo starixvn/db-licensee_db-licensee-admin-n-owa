@@ -95,7 +95,7 @@ BEGIN
 	SELECT r.PartyId, r.PartyName, r.GroupName, b.RptDate3rd, b.CurrencyId, b.BetCount, b.Turnover, b.Winloss, -b.Winloss, 
 		(-b.Winloss) * ISNULL(cr.Rate, r.Rate), 
 		(-b.Winloss) * r.Rate3rd, 
-		((-b.Winloss) * r.Rate) - ((-b.Winloss) * r.Rate3rd)
+		((-b.Winloss) * ISNULL(cr.Rate, r.Rate)) - ((-b.Winloss) * r.Rate3rd)
 	FROM bodb_licenseereport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK) 
 	INNER JOIN @ChargeRate r ON b.SiteID = r.LicenseeId AND b.RptDate3rd BETWEEN r.FromDate AND r.ToDate
 	LEFT JOIN dbo.LA_ChargeRateByCurrency cr ON cr.ChargeID = r.ChargeId AND cr.CurrencyID = b.CurrencyId
