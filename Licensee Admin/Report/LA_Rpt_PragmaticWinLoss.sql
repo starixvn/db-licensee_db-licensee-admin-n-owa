@@ -90,6 +90,7 @@ BEGIN
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY)	
 
+	-- Calculate for deposit
 	INSERT INTO #Result (PartyID,PartyName,ParentId,ParentName,Winlossdate,CurrencyId,Turnover,TotalTrans,WinPrizeAmount,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
 	SELECT ci.PartyId,
 		p.PartyName,
@@ -111,9 +112,54 @@ BEGIN
 	WHERE b.RptDate3rd BETWEEN @FromDate AND @ToDate AND
 		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20
 		AND b.BetTypeId BETWEEN 4101 AND 4300
+		AND ci.isDeposit = 1
 	GROUP BY b.RptDate3rd, ci.PartyId, PartyName, ParentId, ParentName, b.CurrencyId
 	-- EndRegion #Result
-
+	
+	-- Region: Charge Info	
+	DECLARE @CreditChargeInfos AS TABLE (
+		PartyId		INT,
+		LicenseeId	INT,
+		isDeposit	BIT,
+		ProductID	INT,
+		Rate		MONEY,
+		Rate3rd		MONEY,
+		FromDate	SMALLDATETIME,
+		ToDate		SMALLDATETIME)	
+	
+	-- get licenseeFee's charge rate
+	INSERT INTO @CreditChargeInfos(PartyId, ProductID, LicenseeId, isDeposit, Rate, Fromdate, Todate)
+	(
+		SELECT DISTINCT c.PartyID, c.ProductID, c.LicenseeID, ISNULL(c.isDeposit, 0) AS isDeposit,
+			CASE WHEN ISNULL(c.isDeposit, 0) = 1 THEN c.DI_Rate ELSE 0 END,
+			c.Fromdate, c.Todate
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'PP', 'OA', 1) c		
+	)
+	-- End region
+	INSERT INTO #Result (PartyID,PartyName,ParentId,ParentName,Winlossdate,CurrencyId,Turnover,TotalTrans,WinPrizeAmount,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
+	SELECT ci.PartyId,
+		p.PartyName,
+		p.ParentId,
+		p.ParentName,
+		b.RptDate3rd,
+		b.CurrencyId,
+		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE b.Turnover END) AS Turnover,
+		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE b.BetCount END) AS TotalTrans,
+		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN b.Winloss ELSE 0 END) AS WinPrizeAmount,
+		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE b.Winloss END) AS CustomerWinLoss,
+		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE -b.Winloss END) AS LicenseeWinloss,
+		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE -b.Winloss * ci.Rate END) AS LicensingFee,
+		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE -b.Winloss * ci.Rate3rd END) AS PayToSupplier
+	FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
+		INNER JOIN @CreditChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
+		INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
+	WHERE b.RptDate3rd BETWEEN @FromDate AND @ToDate AND
+		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20
+		AND b.BetTypeId BETWEEN 4101 AND 4300
+		AND ci.isDeposit = 0
+	GROUP BY b.RptDate3rd, ci.PartyId, PartyName, ParentId, ParentName, b.CurrencyId
+	-- EndRegion #Result
+	
 	-- Region: Exchange
 	CREATE TABLE #Exchange (
 		ExchangeDate	DATE,
@@ -177,7 +223,7 @@ BEGIN
 	INSERT INTO @RateOfCredit(PartyId, Rate, MinAmount, MaxAmount, BaseCurrencyId)
 	SELECT DISTINCT	ci.FromParty, ci.Rate, MinAmount, MaxAmount, BaseCurrencyId
 	FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
-	INNER JOIN @ChargeInfos ci2 ON ci.FromParty = ci2.PartyId 
+	INNER JOIN @CreditChargeInfos ci2 ON ci.FromParty = ci2.PartyId 
 	WHERE ci2.isDeposit = 0 AND ci.ProductID = 32
 
 	-- Region TotalAmountOfCreditGroup
