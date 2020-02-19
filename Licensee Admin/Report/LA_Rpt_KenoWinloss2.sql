@@ -87,8 +87,10 @@ BEGIN
 		DECLARE	@12BetGroupId INT = -1,
 				@OneWorksGroupId INT = 1,
 				@CreditGroupId INT = 999,
-				@CN88PartyId INT = (SELECT a.PartyID FROM dbo.OAS_Party a WITH(NOLOCK) WHERE a.PartyName='CN88')
-
+				@CN88PartyId INT = (SELECT a.PartyID FROM dbo.OAS_Party a WITH(NOLOCK) WHERE a.PartyName='CN88'),
+				@TianboPartyId INT = 432,
+				@BobbetPartyId INT = 346
+				
 		UPDATE @PartyList SET PartyName = RTRIM(REPLACE(PartyName,'Licensees','')) WHERE ParentId = 0
 		UPDATE @PartyList SET ParentId = @OneWorksGroupId WHERE ParentId IN (11,98)
 		UPDATE @PartyList SET ParentId = @12BetGroupId WHERE PartyId = 14 -- 12bet
@@ -138,6 +140,7 @@ BEGIN
 				(-s.MemberWL) * (CASE 
 						WHEN p.PartyId = @CN88PartyId THEN 0.015
 						WHEN g.PartyId IN (@CreditGroupId, @12BetGroupId) OR @FromDate >= CAST('2018-8-1' AS DATETIME) THEN 0.03 
+						WHEN g.PartyId IN (@TianboPartyId, @BobbetPartyId) THEN 0.02
 						ELSE 0.05 
 					END)
 		FROM SumByDate s
