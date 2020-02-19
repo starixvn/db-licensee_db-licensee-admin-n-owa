@@ -22,6 +22,7 @@ AS
 	- 20190716@Bruce: Integrate CN88 data in LA [#116859]
 	- 20191216@Parsons: Modify pay to supplier's formula for Keno WL report [#125014]
 	- 20191226@Mason: Set term by currency [#120005]
+	- 20200219@Mason: Update RNG Keno term [#128563]
 
  Param's Explanation:
 	- @FromDate		: From date
