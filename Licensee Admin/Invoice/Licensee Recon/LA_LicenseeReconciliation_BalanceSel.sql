@@ -4,7 +4,8 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_BalanceSel]
 	@CustIds		VARCHAR(8000),
-	@ReportDate	DATETIME
+	@ReportDate		DATETIME,
+	@Environment	VARCHAR(50) = 'DEV'
 AS
 /*	Header:
 	Created: 20200122@Parsons
@@ -12,7 +13,8 @@ AS
 	DB: DBACC.bodb02
 
 	Revisions: 
-		- 20200122@Parsons: Create Sp [#125221]
+		- 20200122@Parsons: - Create Sp [#125221]
+							- Fix Setup Fee issue [#125221]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -46,6 +48,23 @@ BEGIN
 	--
 	INSERT INTO #statement(CustId,LicenseeCode)
 	SELECT DISTINCT CustId, LicenseeCode FROM @tmpCust
+
+	-- ***Setup fee issue***
+	--
+	-- Remove cust which has not been issued Software Data Fee
+	;WITH cte_ValidCustTable AS
+	(   SELECT DISTINCT s.CustId
+		FROM #statement s
+			INNER JOIN DBLIC.bodb_licensee.dbo.OAS_PartyDetail d WITH(NOLOCK) ON d.LicenseeCode = s.LicenseeCode
+			INNER JOIN DBLIC.bodb_licensee.dbo.LA_InvoiceHeader h WITH(NOLOCK) ON d.PartyId = h.PartyId
+		WHERE h.StatusId = 0-- normal invoice
+			AND h.InvoiceHeaderId NOT IN (6208, 6207) -- temporary exclude these credit notes
+			AND h.Environment = @Environment
+			AND InvoiceType = 1
+			AND (h.FromDate < @ReportDate)
+    )
+	DELETE #statement
+	WHERE CustId NOT IN (SELECT cte.CustId FROM cte_ValidCustTable cte)
 
 	-- balance up day
 	--
