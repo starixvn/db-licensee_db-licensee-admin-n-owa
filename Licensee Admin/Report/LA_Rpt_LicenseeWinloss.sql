@@ -36,7 +36,7 @@ AS
 	- 20190321@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	- 20191204@Bruce: PP tournament [#123958]
 	- 20191225@Bruce: billing term by currency [#120005]
-	- 20200212@Mason: billing term by currency [#120005]
+						- @Mason: Correct SP
 	
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','

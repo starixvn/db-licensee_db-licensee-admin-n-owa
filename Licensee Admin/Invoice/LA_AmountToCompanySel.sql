@@ -26,7 +26,6 @@ AS
 		- 20190911@Bruce: Support Exchange product in invoices [#119846]
 		- 20191125@Mason: Setup billing terms by Currency  [#120005]
 	    - 20191206@Parsons: PP tournament [#123958]
-		- 20191125@Mason: Setup billing terms by Currency  [#120005]
 
 	Parameters:
 		@IsApplyDiscountMinfee: apply minfee term to discount value
