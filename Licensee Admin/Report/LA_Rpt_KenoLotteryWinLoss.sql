@@ -115,7 +115,7 @@ BEGIN
 		SUM(-b.MemberWL * ci.Rate3rd) AS PayToSupplier
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
-		LEFT JOIN dbo.LA_ChargeRateByCurrency cr ON cr.ChargeID = ci.ChargeId AND cr.CurrencyID = b.CurrencyId
+		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeId AND cr.CurrencyID = b.CurrencyId
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
 	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId

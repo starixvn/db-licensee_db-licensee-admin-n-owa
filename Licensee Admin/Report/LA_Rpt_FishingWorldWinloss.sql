@@ -98,7 +98,7 @@ BEGIN
 		((-b.Winloss) * ISNULL(cr.Rate, r.Rate)) - ((-b.Winloss) * r.Rate3rd)
 	FROM bodb_licenseereport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK) 
 	INNER JOIN @ChargeRate r ON b.SiteID = r.LicenseeId AND b.RptDate3rd BETWEEN r.FromDate AND r.ToDate
-	LEFT JOIN dbo.LA_ChargeRateByCurrency cr ON cr.ChargeID = r.ChargeId AND cr.CurrencyID = b.CurrencyId
+	LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = r.ChargeId AND cr.CurrencyID = b.CurrencyId
 	WHERE b.StatusId NOT IN (-1, 101, 102, 103)
 		AND b.Bettypeid BETWEEN  1011 AND 1020
 		AND b.CurrencyId <> 20

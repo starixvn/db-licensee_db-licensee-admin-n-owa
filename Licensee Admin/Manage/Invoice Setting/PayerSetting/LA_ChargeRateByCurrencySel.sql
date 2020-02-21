@@ -11,7 +11,7 @@ AS
 	DB: DBLIC.bodb_Licensee
 
 	Revisions:
-		- 20200205@Mason: Create SP
+		- 20200205@Mason: Create SP [#Feature ID: 120005 Set billing term by currency]
 
 	Params:
 	+ @PayerId : 0 get all Party
@@ -33,7 +33,7 @@ BEGIN
 			Fromdate,
 			Todate, 
 			ChargeType
-		FROM dbo.OAS_ChargeInfo ci
+		FROM dbo.OAS_ChargeInfo ci WITH (NOLOCK)
 		WHERE (@PayerId = 0 OR ci.FromParty = @PayerId)
 		
 	DECLARE @CurrencyInfo AS TABLE (CurrencyId INT, CurrencyCode VARCHAR(20), CurrencyName VARCHAR(20))
@@ -47,7 +47,7 @@ BEGIN
 		ci.CurrencyCode	AS CurrencyCode, 
 		cr.Rate			AS Rate,
 		r.ChargeType	AS ChargeType
-	FROM dbo.LA_ChargeRateByCurrency cr 
+	FROM dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK)
 	INNER JOIN @ChargeDetail r ON cr.ChargeID = r.ChargeID
 	LEFT JOIN @CurrencyInfo ci ON ci.CurrencyId = cr.CurrencyID
 END

@@ -100,7 +100,7 @@ BEGIN
 		FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
 			INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 			INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
-			LEFT JOIN dbo.LA_ChargeRateByCurrency cr ON cr.ChargeID = ci.ChargeId AND cr.CurrencyID = b.CurrencyID
+			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeId AND cr.CurrencyID = b.CurrencyID
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate 
 			AND b.Status NOT IN (-1, 101, 102, 103) 
 			AND b.CurrencyId <> 20

@@ -21,6 +21,7 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180628@Scofield: Update calculation formula for AG& GD report [#94283]
 		- 20181119@Scofield: Integrate Bidme games  [#103695]
+		- 20200221@Mason: Set billing terms by currency  [#120005]
 		
 	Param's Explanation:
 */
@@ -175,7 +176,7 @@ BEGIN
 				b.rptDate BETWEEN tipSupplier.FromDate AND tipSupplier.ToDate AND
 				tipSupplier.IsPayToSupplier = 1 AND
 				tipSupplier.ChargeType = @BidMeTipChargeType)
-			LEFT JOIN dbo.LA_ChargeRateByCurrency cr ON  -- @Charge rate by currency
+			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON  -- @Charge rate by currency
 				cr.ChargeId = ci.ChargeId AND cr.CurrencyID = b.CurrencyId
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 			  b.StatusId NOT IN (- 1, 101, 102) AND

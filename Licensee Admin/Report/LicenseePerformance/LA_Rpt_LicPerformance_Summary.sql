@@ -119,7 +119,7 @@ BEGIN
 				, SUM(ISNULL(- b.MemberWL, 0) * ISNULL(cr.Rate, tp.Rate)) AS LicensingFee
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 					INNER JOIN (SELECT DISTINCT ChargeId, PartyID, LicenseeID, Rate FROM @tmpParty) tp ON tp.LicenseeID = b.SiteID
-					LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr ON cr.ChargeID = tp.ChargeId AND cr.CurrencyID = b.CurrencyId
+					LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = tp.ChargeId AND cr.CurrencyID = b.CurrencyId
 				WHERE b.ProductID = 32
 					AND b.rptDate BETWEEN @FromDate AND @ToDate
 					AND (b.CurrencyID <> 20)
@@ -156,7 +156,7 @@ BEGIN
 					SELECT DISTINCT ChargeId, PartyID, LicenseeID, Rate--, Bettype
 					FROM @tmpParty
 			)tp ON b.SiteID = tp.LicenseeID-- AND b.Bettype = tp.Bettype
-			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr ON cr.ChargeID = tp.ChargeId AND cr.CurrencyID = b.CurrencyID
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = tp.ChargeId AND cr.CurrencyID = b.CurrencyID
 			WHERE  b.rptDate BETWEEN @Fromdate AND @ToDate
 			AND b.Bettype IN (SELECT Bettype FROM @Bettype)
 			AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))

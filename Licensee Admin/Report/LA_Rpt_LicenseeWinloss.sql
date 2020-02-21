@@ -455,7 +455,7 @@ BEGIN
 				, SUM(b.Betcount)
 			FROM #Data b WITH (NOLOCK)
 				INNER JOIN @ChargeInfo ci ON ci.LicenseeID = b.PartyID AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
-				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc ON cc.ChargeID=ci.ChargeId AND cc.CurrencyID=b.Currency
+				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID=ci.ChargeId AND cc.CurrencyID=b.Currency
 			WHERE ci.ProductID=11 
 				AND b.BetTypeId <> @GD_Tip 
 				AND ci.ChargeType=1 -- gross win
@@ -518,7 +518,7 @@ BEGIN
 			, SUM(b.betcount) AS betcount
 		FROM #Data b WITH (NOLOCK)
 			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate, ChargeId FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
-			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc ON cc.ChargeID=ci.ChargeId AND cc.CurrencyID=b.Currency
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID=ci.ChargeId AND cc.CurrencyID=b.Currency
 		WHERE b.rptDate BETWEEN ci.Fromdate AND ci.Todate
 		GROUP BY ci.PartyID, b.rptDate, b.Currency
 	END

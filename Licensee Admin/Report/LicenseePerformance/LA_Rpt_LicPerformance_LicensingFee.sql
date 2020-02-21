@@ -99,7 +99,7 @@ BEGIN
 		    GROUP BY rptDate, currencyID, tp.PartyID
 		    ) d 
 			 INNER JOIN (SELECT DISTINCT PartyID, Rate, Fromdate, Todate, ChargeID FROM #tmpParty) tp ON tp.PartyID = d.PartyID
-			 LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc ON d.CurrencyID = cc.CurrencyID AND tp.ChargeID = cc.ChargeID 
+			 LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON d.CurrencyID = cc.CurrencyID AND tp.ChargeID = cc.ChargeID 
 		WHERE d.rptDate  BETWEEN tp.Fromdate AND tp.Todate			
 		GROUP BY tp.PartyID, d.rptDate, d.currencyID		
 	END	
@@ -124,7 +124,7 @@ BEGIN
 		(
 			SELECT tp.PartyID, b.rptDate, b.CurrencyId, SUM(-Winloss * ISNULL(cc.Rate, tp.Rate))			FROM cte_PPWinLossData b
 				INNER JOIN (SELECT DISTINCT PartyID, Rate, Fromdate, Todate, ChargeID FROM #tmpParty) tp ON tp.PartyID = b.PartyID
-				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc ON b.CurrencyID = cc.CurrencyID AND tp.ChargeID = cc.ChargeID 
+				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON b.CurrencyID = cc.CurrencyID AND tp.ChargeID = cc.ChargeID 
 			WHERE b.rptDate BETWEEN tp.Fromdate AND tp.Todate
 			GROUP BY tp.PartyID, b.rptDate, b.CurrencyId
 		)

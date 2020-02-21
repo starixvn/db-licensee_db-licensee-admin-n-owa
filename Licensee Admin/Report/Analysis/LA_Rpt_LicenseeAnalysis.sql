@@ -382,7 +382,7 @@ BEGIN
 		AND p.ProductId=d.ProductId 
 		AND d.ReportDate BETWEEN p.FromDate AND p.ToDate
 		AND p.Bettype = d.Bettype
-	LEFT JOIN dbo.LA_ChargeRateByCurrency cr ON p.ChargeId = cr.ChargeId AND d.CurrencyId = cr.CurrencyID
+	LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND d.CurrencyId = cr.CurrencyID
 	WHERE d.ProductId IN (0,2,5,6,8,10,11,21,22,24,27,28,32,34)
 	
 	-- Calulate licensing fee for remain product

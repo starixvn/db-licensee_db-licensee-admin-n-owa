@@ -60,7 +60,7 @@ BEGIN
 	SELECT -b.MemberWL * ISNULL(cr.Rate, c.DI_Rate) AS AmountToCompany, c.PartyID, b.CurrencyId,b.rptDate INTO #data
 	FROM bodb_licenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 	INNER JOIN dbo.LA_f_ChargeInfo(@partyIds,@FromDate,@ToDate,'SB','OA',1) c ON b.SiteId=c.LicenseeId AND b.ProductId=c.ProductId
-	LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr ON cr.ChargeId = c.ChargeId AND cr.CurrencyId = b.CurrencyId
+	LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeId = c.ChargeId AND cr.CurrencyId = b.CurrencyId
 	WHERE b.rptDate BETWEEN c.Fromdate AND c.Todate
 		AND b.customercategory NOT IN (27, 28)
 		AND b.StatusId NOT IN (-1, 101, 102, 103)

@@ -127,7 +127,7 @@ BEGIN
 					INNER JOIN @PartyChargeInfo p ON b.ProductID = p.ProductID
 													AND b.SiteID = p.LicenseeId
 													AND b.rptDate BETWEEN p.FromDate AND p.ToDate
-					LEFT JOIN dbo.LA_ChargeRateByCurrency cr ON p.ChargeId = cr.ChargeID AND cr.CurrencyID = b.CurrencyId
+					LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeID AND cr.CurrencyID = b.CurrencyId
 			WHERE	b.rptDate BETWEEN @TmpFromDate AND @ToDate
 					AND (b.CurrencyID <> 20)
 					AND b.StatusId BETWEEN 111 AND 113
@@ -164,7 +164,7 @@ BEGIN
 					INNER JOIN @PartyChargeInfo p ON b.ProductID = p.ProductID
 													AND b.SiteID = p.LicenseeId
 													AND b.rptDate BETWEEN p.FromDate AND p.ToDate
-					LEFT JOIN dbo.LA_ChargeRateByCurrency cr ON cr.ChargeID = p.ChargeId AND cr.CurrencyID = b.CurrencyId
+					LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeId AND cr.CurrencyID = b.CurrencyId
 			WHERE	b.rptDate BETWEEN @FromDate AND @TmpToDate
 					AND (b.CurrencyID <> 20)
 					AND b.StatusId BETWEEN 111 AND 113

@@ -74,7 +74,7 @@ BEGIN
 	INTO #TempData
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct c WITH (NOLOCK)
 		INNER JOIN @PartyChargeInfo pc ON pc.LicenseeId = c.SiteID AND c.ProductID = pc.ProductID AND c.rptDate BETWEEN pc.FromDate AND pc.ToDate
-		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr ON pc.ChargeId = cr.ChargeID AND cr.CurrencyID = c.CurrencyId
+		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON pc.ChargeId = cr.ChargeID AND cr.CurrencyID = c.CurrencyId
 	WHERE c.CurrencyId <> 20 -- exclude test currency
 		AND c.customercategory NOT IN (27, 28)
 		AND c.StatusId BETWEEN 111 AND 115

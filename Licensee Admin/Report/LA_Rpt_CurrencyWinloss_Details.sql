@@ -181,7 +181,7 @@ BEGIN
 					,SUM(b.commissionP)
 			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #tmpParty p ON b.SiteID = p.LicenseeID AND p.ProductID=b.ProductID AND b.rptDate BETWEEN p.Fromdate AND p.Todate
-			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc ON cc.ChargeID = p.ChargeId AND b.CurrencyId=cc.CurrencyID
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID = p.ChargeId AND b.CurrencyId=cc.CurrencyID
 			WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate) AND
 					 b.StatusId NOT IN (-1, 101, 102, 103) AND
 					(@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c)) AND
@@ -299,7 +299,7 @@ BEGIN
 		SELECT a.rptDate,p.PartyID,a.CurrencyID,TurnOver, winloss, LicenseeWL, WinlossRB, 0, AmtDueToRB, 0, CommRB, Company * ISNULL(cc.rate,p.Rate), Betcount, Playercomm
 		FROM cte_Data a
 		INNER JOIN #tmpParty p ON p.LicenseeID = a.SiteID AND a.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId=a.ProductId
-		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc ON cc.ChargeID = p.ChargeId AND a.CurrencyId=cc.CurrencyID
+		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID = p.ChargeId AND a.CurrencyId=cc.CurrencyID
 
 		DROP TABLE #tmpData
 	END

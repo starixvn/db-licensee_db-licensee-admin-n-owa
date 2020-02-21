@@ -126,7 +126,7 @@ BEGIN
 			INNER JOIN @PartyChargeInfo p ON (b.ProductID = p.ProductID) AND
 											 (b.SiteID = p.LicenseeId) AND
 											 (b.rptDate BETWEEN p.FromDate AND p.ToDate)
-			LEFT JOIN dbo.LA_ChargeRateByCurrency cr ON cr.ChargeID = p.ChargeId AND cr.CurrencyID = b.CurrencyId
+			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeId AND cr.CurrencyID = b.CurrencyId
 			WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate) AND
 					(b.CurrencyID <> 20) AND
 					(b.customercategory NOT IN (27, 28)) AND
