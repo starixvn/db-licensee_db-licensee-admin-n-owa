@@ -16,6 +16,7 @@ AS
 	 Revisions:  
 		- 20171201@Scofield: Create Macau Games Win Loss [#86573]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20200217@Mason: Set billing term by currency [#120005]
 		
 	 Params:
 */
@@ -23,6 +24,7 @@ BEGIN
 
 	-- Region: Charge Info	
 	DECLARE @ChargeInfos AS TABLE (
+		ChargeId	INT,
 		PartyId		INT,
 		ParentId	INT,		
 		LicenseeId	INT,
@@ -32,9 +34,9 @@ BEGIN
 		FromDate	SMALLDATETIME,
 		ToDate		SMALLDATETIME)	
 	
-	INSERT INTO @ChargeInfos(PartyId, ProductID, LicenseeId, Rate, Rate3rd, Fromdate, Todate)
+	INSERT INTO @ChargeInfos(ChargeId, PartyId, ProductID, LicenseeId, Rate, Rate3rd, Fromdate, Todate)
 	(
-		SELECT c.PartyID, c.ProductID, c.LicenseeID, 
+		SELECT c.ChargeID, c.PartyID, c.ProductID, c.LicenseeID, 
 			CASE WHEN ISNULL(c.IsDeposit,0)=0 THEN 0 ELSE c.DI_Rate END,
 			CASE WHEN ISNULL(c.IsDeposit,0)=0 THEN 0.02 ELSE 0.035 END,
 			c.Fromdate, c.Todate
@@ -79,10 +81,11 @@ BEGIN
 		SUM(b.BetCount) AS TotalTrans,
 		SUM(b.MemberWL) AS CustomerWinLoss,
 		- SUM(b.MemberWL) AS LicenseeWinloss,
-		SUM(-b.MemberWL * ci.Rate) AS LicensingFee,
+		SUM(-b.MemberWL * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
 		SUM(-b.MemberWL * ci.Rate3rd) AS PayToSupplier
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeID AND cr.CurrencyID = b.CurrencyId
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
 	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId

@@ -15,6 +15,7 @@ AS
 
 	 Revisions:  
 		- 20190221@Scofield: Bet Builder Win Loss [#108995]
+		- 20200213@Mason: Set billing term by currency [120005]
 	 Params:
 
 	 Explannation: EXEC LA_Rpt_BetBuilderWinLoss @BaseCurrencyName='EUR',@ToDate='2018-04-30 00:00:00',@PartyIds='14,15,17,19,20,23,29,39,40,42,44,46,47,52,53,56,58,60,65,68,70,71,72,73,76,79,80,81,82,84,85,86,87,89,90,91,92,93,95,97,100,101,24,31,34,35,36,37,38,41,59,66,67,74,75,88,16,22,26,27,45,49,54,99,25,30',@FromDate='2018-04-01 00:00:00'
@@ -24,6 +25,7 @@ BEGIN
 
 	-- Region: Charge Info	
 	DECLARE @ChargeInfos AS TABLE (
+		ChargeId	INT,
 		PartyId		INT,
 		LicenseeId	INT,
 		isDeposit	BIT,
@@ -32,9 +34,9 @@ BEGIN
 		FromDate	SMALLDATETIME,
 		ToDate		SMALLDATETIME)	
 	
-	INSERT INTO @ChargeInfos(PartyId, ProductID, LicenseeId, isDeposit, Rate, Fromdate, Todate)
+	INSERT INTO @ChargeInfos(ChargeId, PartyId, ProductID, LicenseeId, isDeposit, Rate, Fromdate, Todate)
 	(
-		SELECT DISTINCT c.PartyID, c.ProductID, c.LicenseeID, ISNULL(c.isDeposit, 0) AS isDeposit, 
+		SELECT DISTINCT c.ChargeID, c.PartyID, c.ProductID, c.LicenseeID, ISNULL(c.isDeposit, 0) AS isDeposit, 
 			CASE WHEN ISNULL(c.isDeposit, 0) = 1 THEN c.DI_Rate ELSE 0 END, c.Fromdate, c.Todate
 		FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'SB') c		
 	)
@@ -93,11 +95,12 @@ BEGIN
 		SUM(-(b.WinLoss))	AS LicenseeWinloss,
 		0					AS CommissionA,
 		SUM(CASE WHEN ci.isDeposit = 1 THEN	0 ELSE b.CommissionS END) AS CommissionS,
-		SUM(CASE WHEN ci.isDeposit = 1 THEN (-b.WinLoss * ci.Rate)
+		SUM(CASE WHEN ci.isDeposit = 1 THEN (-b.WinLoss * ISNULL(cr.Rate, ci.Rate))
 			ELSE -(b.Winloss + b.WinLossA + b.WinLossM + b.WinLossS + b.CommissionS) END) LicensingFee
 		FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
 			INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 			INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
+			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeId AND cr.CurrencyID = b.CurrencyID
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate 
 			AND b.Status NOT IN (-1, 101, 102, 103) 
 			AND b.CurrencyId <> 20

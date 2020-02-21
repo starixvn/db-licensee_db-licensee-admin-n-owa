@@ -21,6 +21,7 @@ AS
 		- 20171009@Harper: Get more info for MuayThai Parlay [Redmine: #82827]
 		- 20171219@Bruce: increase length for variables [#88197]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20200213@Mason: Set billing term by currency [#120005]
 
 	Param's Explanation:
 		- @TicketType: 1 - Single; 2 - Parlay; 3 - All
@@ -29,6 +30,7 @@ SET NOCOUNT ON
 BEGIN
 	-- Region: Charge Info
 	DECLARE @PartyChargeInfo AS TABLE (
+		ChargeId	INT,
 		PartyId		INT,
 		LicenseeId	INT,
 		IsDeposit   BIT,
@@ -40,9 +42,9 @@ BEGIN
 
 	DECLARE @ShareRate MONEY = 0.03
 
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, IsDeposit, ProductID, Rate, Fromdate, Todate)
+	INSERT INTO @PartyChargeInfo(ChargeId, PartyId, LicenseeId, IsDeposit, ProductID, Rate, Fromdate, Todate)
 	(
-		SELECT	PartyID, LicenseeID, isDeposit, ProductID, DI_Rate, Fromdate, Todate
+		SELECT	ChargeID, PartyID, LicenseeID, isDeposit, ProductID, DI_Rate, Fromdate, Todate
 		FROM	dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'SB', 'OA', 0)
 	)
 	-- End region
@@ -119,12 +121,13 @@ BEGIN
 					SUM(ISNULL(b.AdjustedCommShare, 0)) CommShare,
 					SUM(CASE WHEN p.IsDeposit = 0
 							THEN ISNULL(b.AdjustedLicenseeWL, 0)
-							ELSE ISNULL(-b.AdjustedCustomerWL, 0) * p.Rate
+							ELSE ISNULL(-b.AdjustedCustomerWL, 0) * ISNULL(cr.Rate, p.Rate)
 						END) AmtLicensee
 			FROM	bodb_LicenseeReport.dbo.rpt_BettingBySport b WITH (NOLOCK)
 					INNER JOIN @PartyChargeInfo p ON b.ProductID = p.ProductID
 													AND b.SiteID = p.LicenseeId
 													AND b.rptDate BETWEEN p.FromDate AND p.ToDate
+					LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeID AND cr.CurrencyID = b.CurrencyId
 			WHERE	b.rptDate BETWEEN @TmpFromDate AND @ToDate
 					AND (b.CurrencyID <> 20)
 					AND b.StatusId BETWEEN 111 AND 113
@@ -155,12 +158,13 @@ BEGIN
 					SUM(ISNULL(b.CommShare, 0)) CommShare,
 					SUM(CASE WHEN p.IsDeposit = 0
 							THEN ISNULL(b.LicenseeWL, 0)
-							ELSE ISNULL(-b.CustomerWL, 0) * p.Rate
+							ELSE ISNULL(-b.CustomerWL, 0) * ISNULL(cr.Rate, p.Rate)
 						END) AmtLicensee
 			FROM	bodb_LicenseeReport.dbo.rpt_BettingBySport b WITH (NOLOCK)
 					INNER JOIN @PartyChargeInfo p ON b.ProductID = p.ProductID
 													AND b.SiteID = p.LicenseeId
 													AND b.rptDate BETWEEN p.FromDate AND p.ToDate
+					LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeId AND cr.CurrencyID = b.CurrencyId
 			WHERE	b.rptDate BETWEEN @FromDate AND @TmpToDate
 					AND (b.CurrencyID <> 20)
 					AND b.StatusId BETWEEN 111 AND 113

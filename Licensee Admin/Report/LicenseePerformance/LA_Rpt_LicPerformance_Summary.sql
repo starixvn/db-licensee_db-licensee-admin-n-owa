@@ -34,6 +34,7 @@ AS
 	   - 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 	   - 20190412@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	   - 20191205@Mason: PP tournament [#123958]
+	   - 20200217@Mason: Set billing term by currency [#120005]
 
 	Param's Explanation:
 	  + @PartyIDs : a string of list PartyID, separated by ','
@@ -59,7 +60,7 @@ BEGIN
 
 	CREATE TABLE #Result (PartyID INT, ReportType VARCHAR(8), TurnOver MONEY, CustomerWinlost MONEY, CommBA MONEY ,CommRB MONEY, Betcount BIGINT, LicensingFee MONEY)
 
-	CREATE TABLE #Temp (PartyID INT, Rptdate DATETIME, Currency INT, TurnOver MONEY, Winlost MONEY, CommBA MONEY, CommRB MONEY, Betcount BIGINT)
+	CREATE TABLE #Temp (PartyID INT, Rptdate DATETIME, Currency INT, TurnOver MONEY, Winlost MONEY, CommBA MONEY, CommRB MONEY, Betcount BIGINT, LicensingFee MONEY)
 
 	CREATE TABLE #Exchange (ExchangeDate SMALLDATETIME, ExchangeId INT, Rate FLOAT)
 	INSERT INTO #Exchange(ExchangeDate, ExchangeId, Rate)
@@ -74,7 +75,7 @@ BEGIN
 
 	IF @ProductCode = 'BA'
 	BEGIN
-		INSERT INTO #Temp (PartyID, Rptdate, Currency, TurnOver, Winlost, CommBA, CommRB, Betcount)
+		INSERT INTO #Temp (PartyID, Rptdate, Currency, TurnOver, Winlost, CommBA, CommRB, Betcount, LicensingFee)
 		(
 			SELECT PartyID, b.rptDate , b.currencyID
 			, SUM(b.turnover *
@@ -85,12 +86,12 @@ BEGIN
 						ELSE 1 END
 				) TurnOver
 			, SUM(b.winloss) Winloss
-			--, 0 AS LicenseeFee
 			, SUM(b.CommissionA) AS CommBA
 			, 0 AS CommRB
 			, SUM(betcount *
 					CASE WHEN @drawfilter = 2 AND b.status = 111 THEN 0
 						ELSE 1 END) AS BetCount
+			,0
 			FROM bodb_LicenseeReport.dbo.rpt_Betting_BA b WITH (NOLOCK)
 			INNER JOIN(
 					SELECT DISTINCT PartyID, LicenseeID
@@ -109,14 +110,16 @@ BEGIN
 	BEGIN		
 		DECLARE @PromotionPrize SMALLINT = 4300
 		DECLARE @PPTournament SMALLINT = 4299
-		INSERT INTO #Temp (PartyID, rptDate, Currency, CommBA, CommRB, Betcount, TurnOver, Winlost)
+		INSERT INTO #Temp (PartyID, rptDate, Currency, CommBA, CommRB, Betcount, TurnOver, Winlost, LicensingFee)
 		(
 			SELECT tp.PartyID, b.rptDate, b.CurrencyID,0,0
 				, SUM(ISNULL(b.betcount, 0) * CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS BetCount
 				, SUM(ISNULL(b.turnover, 0) * CASE WHEN @drawfilter IN (2, 3) AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS TurnOver
 				, SUM(ISNULL(b.MemberWL, 0)) as Winlost
+				, SUM(ISNULL(- b.MemberWL, 0) * ISNULL(cr.Rate, tp.Rate)) AS LicensingFee
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-					INNER JOIN (SELECT DISTINCT PartyID, LicenseeID FROM @tmpParty) tp ON tp.LicenseeID = b.SiteID
+					INNER JOIN (SELECT DISTINCT ChargeId, PartyID, LicenseeID, Rate FROM @tmpParty) tp ON tp.LicenseeID = b.SiteID
+					LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = tp.ChargeId AND cr.CurrencyID = b.CurrencyId
 				WHERE b.ProductID = 32
 					AND b.rptDate BETWEEN @FromDate AND @ToDate
 					AND (b.CurrencyID <> 20)
@@ -130,7 +133,7 @@ BEGIN
 
 	IF @ProductCode NOT IN('BA', 'PP')
 	BEGIN
-		INSERT INTO #Temp (PartyID, Rptdate, Currency, TurnOver, Winlost, CommBA, CommRB, Betcount)
+		INSERT INTO #Temp (PartyID, Rptdate, Currency, TurnOver, Winlost, CommBA, CommRB, Betcount, LicensingFee)
 		(
 			SELECT PartyID, b.rptDate, b.currencyID
 			, SUM(b.turnover
@@ -142,17 +145,18 @@ BEGIN
 						ELSE 1 END
 				) TurnOver
 			, SUM(b.winloss) AS Winlost
-			--, 0 AS LicenseeFee
 			, 0 AS CommBA
 			, SUM(CASE WHEN b.bettype BETWEEN 31 AND 33 THEN b.CommissionA ELSE 0 END ) AS CommRB
 			, SUM(b.betcount *
 					CASE WHEN @drawfilter = 2 AND b.Status = 111 THEN 0
 					ELSE 1 END) AS BetCount
+			, SUM(-b.WinLoss * ISNULL(cr.Rate, tp.Rate)) AS LicensingFee
 			FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH ( NOLOCK )
 			INNER JOIN(
-					SELECT DISTINCT PartyID, LicenseeID--, Bettype
+					SELECT DISTINCT ChargeId, PartyID, LicenseeID, Rate--, Bettype
 					FROM @tmpParty
 			)tp ON b.SiteID = tp.LicenseeID-- AND b.Bettype = tp.Bettype
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = tp.ChargeId AND cr.CurrencyID = b.CurrencyID
 			WHERE  b.rptDate BETWEEN @Fromdate AND @ToDate
 			AND b.Bettype IN (SELECT Bettype FROM @Bettype)
 			AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
@@ -171,7 +175,7 @@ BEGIN
 		, SUM(CommBA * e.Rate) AS CommBA
 		, SUM(CommRB * e.Rate) AS CommRB
 		, SUM(Betcount) AS Betcount
-		, SUM((-b.Winlost * ISNULL(p.Rate,0)) * e.Rate) AS LicensingFee
+		, SUM(b.LicensingFee * e.Rate) AS LicensingFee
 	FROM #Temp b
 	INNER JOIN #Exchange e  ON e.ExchangeDate = b.Rptdate AND e.ExchangeId = b.Currency
 	INNER JOIN  (

@@ -16,6 +16,7 @@ AS
 	Revisions:
 		- 20171220@Parsons: increase length for variables [#88197]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20200213@Mason: Set billing term by currency [#120005]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -36,6 +37,7 @@ BEGIN
 	
 	-- ChargeRate
 	DECLARE @ChargeRate AS TABLE (
+		ChargeId	INT,
 		PartyId		INT,
 		PartyName	VARCHAR(100),
 		GroupName	VARCHAR(100),
@@ -46,9 +48,9 @@ BEGIN
 		FromDate	DATETIME,
 		ToDate		DATETIME)	
 
-	INSERT INTO @ChargeRate(PartyId, PartyName, GroupName, LicenseeId, ProductID, Rate, Rate3rd, Fromdate, Todate)
+	INSERT INTO @ChargeRate(ChargeId, PartyId, PartyName, GroupName, LicenseeId, ProductID, Rate, Rate3rd, Fromdate, Todate)
 	(
-		SELECT a.PartyID, p.PartyName, g.PartyName, LicenseeID, a.ProductID, 
+		SELECT a.ChargeID, a.PartyID, p.PartyName, g.PartyName, LicenseeID, a.ProductID, 
 			CASE WHEN a.isDeposit = 0 THEN 0 ELSE DI_Rate END, 
 			CASE WHEN a.isDeposit = 0 THEN a.DI_Rate ELSE b.Rate END AS Rate3rd, 
 			a.Fromdate, a.Todate
@@ -91,11 +93,12 @@ BEGIN
 		
 	INSERT INTO #TempData (PartyId, PartyName, GroupName, RptDate, CurrencyId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, PayToSupplier, CompanyIncome)
 	SELECT r.PartyId, r.PartyName, r.GroupName, b.RptDate3rd, b.CurrencyId, b.BetCount, b.Turnover, b.Winloss, -b.Winloss, 
-		(-b.Winloss) * r.Rate, 
+		(-b.Winloss) * ISNULL(cr.Rate, r.Rate), 
 		(-b.Winloss) * r.Rate3rd, 
-		((-b.Winloss) * r.Rate) - ((-b.Winloss) * r.Rate3rd)
+		((-b.Winloss) * ISNULL(cr.Rate, r.Rate)) - ((-b.Winloss) * r.Rate3rd)
 	FROM bodb_licenseereport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK) 
 	INNER JOIN @ChargeRate r ON b.SiteID = r.LicenseeId AND b.RptDate3rd BETWEEN r.FromDate AND r.ToDate
+	LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = r.ChargeId AND cr.CurrencyID = b.CurrencyId
 	WHERE b.StatusId NOT IN (-1, 101, 102, 103)
 		AND b.Bettypeid BETWEEN  1011 AND 1020
 		AND b.CurrencyId <> 20

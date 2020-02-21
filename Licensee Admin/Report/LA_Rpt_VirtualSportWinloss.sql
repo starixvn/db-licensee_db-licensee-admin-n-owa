@@ -31,6 +31,7 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 		- 20190815@Parsons: Modify VS report to compute correct "pay to supplier" fee [#118337]
+		- 20191226@Mason: Set Term By Currency [#120005]
 
 	Param's Explanation:
 		- @FromDate   : From date
@@ -45,7 +46,8 @@ BEGIN
 SET NOCOUNT ON	
 	
 	DECLARE @ChargeInfos AS TABLE (
-		PartyID			INT
+		ChargeID		INT
+		,PartyID		INT
 		,PartyName		VARCHAR(50)
 		,ParentID		INT		
 		,LicenseeID		INT
@@ -66,9 +68,9 @@ SET NOCOUNT ON
 		)	
 
 	-- Region: Charge Info	
-	INSERT INTO @ChargeInfos(PartyId, ProductID, LicenseeId, IsDeposit, Rate, Fromdate, Todate)
+	INSERT INTO @ChargeInfos(ChargeID, PartyId, ProductID, LicenseeId, IsDeposit, Rate, Fromdate, Todate)
 	(
-		SELECT c.PartyID, c.ProductID, c.LicenseeID, c.isDeposit,c.DI_Rate, c.Fromdate, c.Todate
+		SELECT c.ChargeID, c.PartyID, c.ProductID, c.LicenseeID, c.isDeposit, c.DI_Rate, c.Fromdate, c.Todate
 		FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'VS') c 
 	)	
 	
@@ -134,12 +136,13 @@ SET NOCOUNT ON
 				ELSE b.Turnover END) AS Turnover
 			, SUM(-b.Winloss) AS GrossWinloss
 			, SUM(-b.Winloss * c3.Rate) AS PayToSupplier
-			, SUM(-b.Winloss * c.Rate) AS OneworksIncome
+			, SUM(-b.Winloss * ISNULL(cr.Rate, c.Rate)) AS OneworksIncome
 			, SUM(CASE WHEN @drawfilter = 2 AND b.status = 111 THEN 0 ELSE BetCount END) AS BetCount
 		FROM bodb_licenseereport.dbo.rpt_Betting b WITH ( NOLOCK)
 			INNER JOIN @ChargeInfos c ON c.LicenseeID = b.siteID AND b.rptDate BETWEEN c.Fromdate AND c.Todate
 			INNER JOIN @Charge3rdInfos c3 ON c3.PartyID = c.ParentID AND b.rptDate BETWEEN c3.Fromdate AND c3.Todate
 			LEFT JOIN dbo.League l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeId = c.ChargeId AND cr.CurrencyId = b.CurrencyId
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.status NOT IN (-1, 101, 102, 103)
 			AND (b.CurrencyID <> 20)

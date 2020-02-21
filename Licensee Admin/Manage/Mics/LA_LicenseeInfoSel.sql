@@ -16,6 +16,7 @@ AS
 		- 20180801@Parsons: Rebuild licensee information report [#94283]
 		- 20190130@Bruce: Missing licensee group: Cozni [#108432]
 		- 20190318@Mason: Add InvoiceLanguage in SELECT statement [#110445]
+		- 20200212@Mason: Set billing term by currency [#120005]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -53,6 +54,7 @@ BEGIN
 			,ci.RateType
 			,pd.BrandName
 			,pd.InvoiceLanguage
+			,ci.ChargeId
 	FROM ChargeInfo AS ci
 		INNER JOIN dbo.OAS_Party AS p WITH (NOLOCK) ON p.PartyID = ci.FromParty			-- Licensee
 		INNER JOIN @Groups AS g ON ci.ToParty = g.PartyID								-- Group

@@ -33,6 +33,7 @@ AS
 	   - 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 	   - 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	   - 20191205@Parsons: PP tournament [#123958]
+	   - 20191226@Parsons: Setup billing terms by Currency  [#120005]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -49,15 +50,15 @@ BEGIN
 	SET NOCOUNT ON  
 
 	CREATE TABLE #Bettype (Bettype INT, ProductID INT)
-     CREATE TABLE #tmpParty (PartyID INT, LicenseeID INT, ProductID INT, Rate MONEY, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
+    CREATE TABLE #tmpParty (PartyID INT, LicenseeID INT, ProductID INT, Rate MONEY, Fromdate SMALLDATETIME, Todate SMALLDATETIME, ChargeID INT)
 
-     INSERT INTO #Bettype( Bettype, ProductID)
-     SELECT Bettype,ProductID 
+    INSERT INTO #Bettype( Bettype, ProductID)
+    SELECT Bettype,ProductID 
 	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,@ProductCode)
 
-     INSERT INTO #tmpParty( PartyID, LicenseeID, ProductID, Rate, Fromdate, Todate)
-     SELECT PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
-     FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', 1)
+    INSERT INTO #tmpParty(PartyID, LicenseeID, ProductID, Rate, Fromdate, Todate, ChargeID)
+    SELECT PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate, ChargeID
+    FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 	
 	CREATE TABLE #rptLicFee (Licensee VARCHAR(20), rptDate VARCHAR(50), LicensingFee MONEY)
 
@@ -84,7 +85,7 @@ BEGIN
 	IF @ProductCode IN ('SB', 'NG', 'LC', 'VS', 'CS', 'VB')
 	BEGIN		
 		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, LicensingFee)
-		SELECT tp.PartyID, d.rptDate, d.CurrencyID, - SUM(d.Winloss * ISNULL(tp.Rate,0))
+		SELECT tp.PartyID, d.rptDate, d.CurrencyID, - SUM(d.Winloss * ISNULL(cc.Rate, tp.Rate))
 		FROM (
 		    SELECT rptDate, currencyID, tp.PartyID, SUM(winloss) AS Winloss
 		    FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK) 
@@ -97,7 +98,8 @@ BEGIN
 				AND b.customercategory NOT IN (27, 28)
 		    GROUP BY rptDate, currencyID, tp.PartyID
 		    ) d 
-			 INNER JOIN (SELECT DISTINCT PartyID, Rate, Fromdate, Todate FROM #tmpParty) tp ON tp.PartyID = d.PartyID 
+			 INNER JOIN (SELECT DISTINCT PartyID, Rate, Fromdate, Todate, ChargeID FROM #tmpParty) tp ON tp.PartyID = d.PartyID
+			 LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON d.CurrencyID = cc.CurrencyID AND tp.ChargeID = cc.ChargeID 
 		WHERE d.rptDate  BETWEEN tp.Fromdate AND tp.Todate			
 		GROUP BY tp.PartyID, d.rptDate, d.currencyID		
 	END	
@@ -120,9 +122,9 @@ BEGIN
 		)
 		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, LicensingFee)
 		(
-			SELECT tp.PartyID, b.rptDate, b.CurrencyId, SUM(-Winloss * tp.Rate)
-			FROM cte_PPWinLossData b
-				INNER JOIN (SELECT DISTINCT PartyID, Rate, Fromdate, Todate FROM #tmpParty) tp ON tp.PartyID = b.PartyID 
+			SELECT tp.PartyID, b.rptDate, b.CurrencyId, SUM(-Winloss * ISNULL(cc.Rate, tp.Rate))			FROM cte_PPWinLossData b
+				INNER JOIN (SELECT DISTINCT PartyID, Rate, Fromdate, Todate, ChargeID FROM #tmpParty) tp ON tp.PartyID = b.PartyID
+				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON b.CurrencyID = cc.CurrencyID AND tp.ChargeID = cc.ChargeID 
 			WHERE b.rptDate BETWEEN tp.Fromdate AND tp.Todate
 			GROUP BY tp.PartyID, b.rptDate, b.CurrencyId
 		)

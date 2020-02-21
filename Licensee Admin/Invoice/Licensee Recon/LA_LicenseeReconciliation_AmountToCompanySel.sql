@@ -21,6 +21,7 @@ AS
 		- 20190927@Bruce: Remove prepayment section and Include CardClub [#120220]
 		- 20191017@Bruce: Group by party id [#122229]
 		- 20191209@Bruce: Include PP tournament [123958]
+		- 20200117@Mason: Setup billing terms by Currency  [#120005]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -298,7 +299,7 @@ BEGIN
 		FROM #tmpBettingByProduct b
 		INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID AND p.LicenseeId = b.SiteId AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
+		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
 		WHERE p.ChargeType NOT IN (
 				@CashoutComm_ChargeType,
 				@CommissionShare_ChargeType,

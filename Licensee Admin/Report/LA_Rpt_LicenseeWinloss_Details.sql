@@ -37,6 +37,7 @@ AS
 	- 20181119@bruce: Integrate Bidme games (GD product) [#103695]
 	- 20190322@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	- 20191204@Bruce: PP tournament [#123958]
+	- 20191225@Bruce: billing term by currency [#120005]
 
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -59,9 +60,9 @@ BEGIN
 	CREATE TABLE #Report (ReportDate DATE, CurrencyID INT, ProductID INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY, WinlossRB MONEY, 
 						AmtDueToBA MONEY, AmtDueToRB MONEY, CommBA MONEY, CommRB MONEY, Company MONEY, Betcount INT)
 	CREATE TABLE #Exchange (ExchangeId INT, ExchangeDate DATE, Code VARCHAR(20), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, CNY FLOAT, Base FLOAT)
-	CREATE TABLE #Data (rptDate DATE,ProductID INT, Currency INT,BetTypeId INT, Turnover MONEY, Winloss MONEY, AWinloss MONEY, AComm MONEY, PComm MONEY, Betcount BIGINT)
+	CREATE TABLE #Data (PartyID INT, rptDate DATE,ProductID INT, Currency INT,BetTypeId INT, Turnover MONEY, Winloss MONEY, AWinloss MONEY, AComm MONEY, PComm MONEY, Betcount BIGINT)
 	CREATE TABLE #Products(ProductID INT, ProductName VARCHAR(50))
-	CREATE TABLE #ChargeInfo (LicenseeID INT, ProductID INT, BetTypeID INT, Rate MONEY, Fromdate DATE , Todate DATE, ChargeType TINYINT)
+	CREATE TABLE #ChargeInfo (PartyID INT, LicenseeID INT, ProductID INT, BetTypeID INT, Rate MONEY, Fromdate DATE , Todate DATE, ChargeType TINYINT, ChargeID INT)
 	
 	DECLARE @VNDCurrencyName VARCHAR(20)
 
@@ -69,11 +70,12 @@ BEGIN
 	FROM dbo.Exchange (NOLOCK)
 	WHERE ExchangeId = 51
 
-	INSERT INTO #ChargeInfo (LicenseeID, ProductID, BetTypeID, Rate, Fromdate, Todate, ChargeType)
-	SELECT DISTINCT LicenseeID, ProductID, Bettype, 
+	INSERT INTO #ChargeInfo (PartyID, LicenseeID, ProductID, BetTypeID, Rate, Fromdate, Todate, ChargeType, ChargeID)
+	SELECT DISTINCT PartyID, LicenseeID, ProductID, Bettype, 
 			CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END,
 			Fromdate, Todate,
-			CASE WHEN ProductID=11 THEN ChargeType ELSE 1 END -- include GD tip charge type
+			CASE WHEN ProductID=11 THEN ChargeType ELSE 1 END, -- include GD tip charge type
+			ChargeID
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo (@PartyID, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 	
 	INSERT INTO #Products(ProductID,ProductName)
@@ -444,10 +446,11 @@ BEGIN
 				, SUM(b.Winloss)
 				, SUM(-b.Winloss)
 				, 0,0,0,0,0
-				, SUM(-b.Winloss * ci.Rate)
+				, SUM(-b.Winloss * ISNULL(cc.Rate,ci.Rate))
 				, SUM(b.Betcount)
 			FROM #Data b WITH (NOLOCK)
 				INNER JOIN #ChargeInfo ci ON b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID=ci.ChargeId AND b.Currency=cc.CurrencyID
 			WHERE ci.ProductID=11 
 				AND b.BetTypeId <> @GD_Tip 
 				AND ci.ChargeType=1 -- gross win
@@ -474,9 +477,9 @@ BEGIN
 	BEGIN
 		DELETE #Data
 		
-		INSERT INTO #Data(rptDate, ProductID, Currency, Turnover, Winloss, PComm, AComm, Betcount)
+		INSERT INTO #Data(PartyID, rptDate, ProductID, Currency, Turnover, Winloss, PComm, AComm, Betcount)
 		(
-			SELECT  b.rptDate, b.ProductID, b.currencyID
+			SELECT ci.PartyID, b.rptDate, b.ProductID, b.currencyID
 				, SUM(b.turnover * 
 					CASE WHEN b.bettype = 33 AND b.StatusId IN (114, 115) THEN 0.5 ELSE 1 END * 
 					CASE WHEN @drawfilter IN (2, 3)	
@@ -489,14 +492,14 @@ BEGIN
 				, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionA ELSE 0 END)
 				, SUM(b.betcount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) BetCount
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN (SELECT DISTINCT LicenseeId, ProductID FROM #ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
+				INNER JOIN (SELECT DISTINCT PartyID, LicenseeId, ProductID FROM #ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27,28)
-				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914,@PromotionPrize, @PPTournament)
-			GROUP BY b.rptDate, b.ProductID, b.CurrencyID
+				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914, @PromotionPrize, @PPTournament)
+			GROUP BY ci.PartyID, b.rptDate, b.ProductID, b.CurrencyID
 		)
 		
 		INSERT INTO #Report (ReportDate, CurrencyID, ProductID, Turnover, Winlost, LicenseeWL, Company, Betcount)
@@ -504,10 +507,11 @@ BEGIN
 			, SUM(b.turnover) Turnover
 			, SUM(b.Winloss + CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS Winloss
 			, - SUM(b.Winloss + CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS LicenseeWL
-			, SUM(-b.Winloss * ci.Rate - CASE WHEN b.ProductID=31 THEN (b.AComm + b.PComm) ELSE 0 END) AS Company
+			, SUM(-b.Winloss * ISNULL(cc.Rate,ci.Rate) - CASE WHEN b.ProductID=31 THEN (b.AComm + b.PComm) ELSE 0 END) AS Company
 			, SUM(b.betcount) AS betcount
 		FROM #Data b WITH (NOLOCK)
-			INNER JOIN (SELECT DISTINCT Fromdate, Todate, ProductID, Rate FROM #ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON b.ProductID = ci.ProductID
+			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate, ChargeID FROM #ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID=ci.ChargeId AND b.Currency=cc.CurrencyID
 		WHERE b.rptDate BETWEEN ci.Fromdate AND ci.Todate
 		GROUP BY b.rptDate, b.Currency, b.ProductID
 	END

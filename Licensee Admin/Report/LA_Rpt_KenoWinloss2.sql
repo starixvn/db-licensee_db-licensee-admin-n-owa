@@ -21,6 +21,7 @@ AS
 	- 20180907@Parsons: Royalty fee updated for Keno& Lottery [#101168]
 	- 20190716@Bruce: Integrate CN88 data in LA [#116859]
 	- 20191216@Parsons: Modify pay to supplier's formula for Keno WL report [#125014]
+	- 20191226@Mason: Set term by currency [#120005]
 
  Param's Explanation:
 	- @FromDate		: From date
@@ -33,6 +34,7 @@ BEGIN
 	-- Charge Info
 	BEGIN
 		DECLARE @PartyChargeInfo AS TABLE (
+			ChargeId	INT,
 			PartyId		INT,
 			LicenseeId	INT,
 			ProductID	INT,
@@ -41,15 +43,15 @@ BEGIN
 			ToDate		SMALLDATETIME
 		)
 
-		INSERT INTO @PartyChargeInfo(PartyId, LicenseeId,ProductID, Rate, Fromdate, Todate)
+		INSERT INTO @PartyChargeInfo(ChargeId, PartyId, LicenseeId,ProductID, Rate, Fromdate, Todate)
 		(
-			SELECT PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
+			SELECT ChargeId, PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
 			FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'KN', 'OA', 1)
 			
 			UNION
 			
 			-- get Credit settings with rate = 0
-			SELECT p.PartyID, lb.LabelID AS LicenseeID, ci.ProductId, ci.Rate, 
+			SELECT ci.ChargeID, p.PartyID, lb.LabelID AS LicenseeID, ci.ProductId, ci.Rate, 
 				CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
 				CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
 			FROM OAS_ChargeInfo ci
@@ -119,11 +121,12 @@ BEGIN
 					SUM(ISNULL(b.BetCount, 0)) TotalTrans,
 					SUM(ISNULL(b.Turnover, 0)) Turnover,
 					SUM(ISNULL(b.MemberWL, 0)) MemberWL,
-					SUM(ISNULL(-b.MemberWL, 0) * p.Rate) LicensingFee
+					SUM(ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate)) LicensingFee
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN @PartyChargeInfo p ON (b.ProductID = p.ProductID) AND
 											 (b.SiteID = p.LicenseeId) AND
 											 (b.rptDate BETWEEN p.FromDate AND p.ToDate)
+			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeId AND cr.CurrencyID = b.CurrencyId
 			WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate) AND
 					(b.CurrencyID <> 20) AND
 					(b.customercategory NOT IN (27, 28)) AND

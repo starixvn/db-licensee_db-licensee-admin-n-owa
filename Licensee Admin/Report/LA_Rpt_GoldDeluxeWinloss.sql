@@ -21,6 +21,7 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180628@Scofield: Update calculation formula for AG& GD report [#94283]
 		- 20181119@Scofield: Integrate Bidme games  [#103695]
+		- 20200221@Mason: Set billing terms by currency  [#120005]
 		
 	Param's Explanation:
 */
@@ -48,7 +49,8 @@ BEGIN
 	UPDATE #PartyList SET PartyName = REPLACE(PartyName,' Licensees', '') WHERE ParentId = 0
 
 	CREATE TABLE #ChargeInfo(
-		PartyId					INT
+		ChargeId				INT
+		,PartyId				INT
 		, LicenseeId			INT
 		, IsDeposit				INT
 		, ProductId				INT
@@ -61,15 +63,15 @@ BEGIN
 
 	-- get licenseeFee's charge rate
 	-- credit licensee display licensee fee as 0 -> set rate to 0
-	INSERT INTO #ChargeInfo(PartyId, LicenseeId, ProductId, Rate, IsDeposit, Fromdate, Todate, IsPayToSupplier, ChargeType)
+	INSERT INTO #ChargeInfo(ChargeId, PartyId, LicenseeId, ProductId, Rate, IsDeposit, Fromdate, Todate, IsPayToSupplier, ChargeType)
 	(
-		SELECT DISTINCT PartyID, LicenseeId, ProductId, CASE WHEN IsDeposit=1 THEN DI_Rate ELSE 0 END, IsDeposit, Fromdate, Todate, 0, ChargeType
+		SELECT DISTINCT ChargeId, PartyID, LicenseeId, ProductId, CASE WHEN IsDeposit=1 THEN DI_Rate ELSE 0 END, IsDeposit, Fromdate, Todate, 0, ChargeType
 		FROM dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'GD', 'OA', 1)
 	)
 
 	-- get payToSupplier's charge rate
 	;WITH CI AS (
-		SELECT ci.PartyId, ci.LicenseeId, ci.ProductId, ci.IsDeposit,
+		SELECT ci.ChargeId, ci.PartyId, ci.LicenseeId, ci.ProductId, ci.IsDeposit,
 			ISNULL(partyConfig.Rate, groupConfig.Rate) AS Rate,
 			ISNULL(partyConfig.FromDate, groupConfig.FromDate) AS FromDate,
 			ISNULL(partyConfig.ToDate, groupConfig.ToDate) AS ToDate,
@@ -86,7 +88,7 @@ BEGIN
 
 		UNION 
 
-		SELECT ci.PartyId, ci.LicenseeId, ci.ProductId, ci.IsDeposit,
+		SELECT ci.ChargeId, ci.PartyId, ci.LicenseeId, ci.ProductId, ci.IsDeposit,
 			partyConfig.Rate AS Rate,
 			partyConfig.FromDate AS FromDate,
 			partyConfig.ToDate AS ToDate,
@@ -98,8 +100,8 @@ BEGIN
 		) 
 		WHERE ci.IsDeposit = 0
 	)
-	INSERT INTO #ChargeInfo(PartyId, LicenseeId, ProductId, Rate, IsDeposit, ChargeType, IsPayToSupplier, Fromdate, Todate)
-	SELECT PartyID, LicenseeID, ProductID, Rate, isDeposit, ChargeType, 1,
+	INSERT INTO #ChargeInfo(ChargeId, PartyId, LicenseeId, ProductId, Rate, IsDeposit, ChargeType, IsPayToSupplier, Fromdate, Todate)
+	SELECT ChargeId, PartyID, LicenseeID, ProductID, Rate, isDeposit, ChargeType, 1,
 		(CASE WHEN Fromdate < @FromDate THEN @FromDate ELSE Fromdate END),
 		(CASE WHEN Todate > @ToDate THEN @ToDate ELSE Todate END)
 	FROM CI
@@ -135,7 +137,7 @@ BEGIN
 			, SUM(ISNULL(b.ValidBetAmount,0)) AS ValidBetAmount
 			, SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE b.MemberWL END) AS CustomerWL
 			, SUM(CASE WHEN b.Bettype = 1706 THEN -b.MemberWL ELSE 0 END) AS TipAmount
-			, SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE -b.MemberWL * ci.Rate END) AS LicenseeFeeWithoutTips
+			, SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE -b.MemberWL * ISNULL(cr.Rate, ci.Rate) END) AS LicenseeFeeWithoutTips
 			, SUM(CASE WHEN b.Bettype = 1706 THEN -b.MemberWL * tipLicensee.Rate ELSE 0 END) AS TipsAmountDueToCompany
 			, SUM(ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS Commission
 			, SUM(CASE WHEN b.Bettype = 1706 THEN 0 ELSE -b.MemberWL END - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS NetWinLoss
@@ -174,6 +176,8 @@ BEGIN
 				b.rptDate BETWEEN tipSupplier.FromDate AND tipSupplier.ToDate AND
 				tipSupplier.IsPayToSupplier = 1 AND
 				tipSupplier.ChargeType = @BidMeTipChargeType)
+			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON  -- @Charge rate by currency
+				cr.ChargeId = ci.ChargeId AND cr.CurrencyID = b.CurrencyId
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 			  b.StatusId NOT IN (- 1, 101, 102) AND
 			  b.CurrencyId <> 20 AND

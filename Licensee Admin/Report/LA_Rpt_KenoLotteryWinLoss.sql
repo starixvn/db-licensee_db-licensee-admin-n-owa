@@ -21,6 +21,7 @@ AS
 		- 20180907@Parsons: Royalty fee updated for Keno& Lottery [#101168]
 		- 20190716@Bruce: Integrate CN88 data in LA [#116859]
 		- 20191105@Parsons: Get The Calculation Of PayToSupplier Fee Modified [#123342]
+		- 20191226@Mason: Set billing term by currency [#120005]
 		
 	 Params:
 */
@@ -43,6 +44,7 @@ BEGIN
 	-- Region: Charge Info
 	DECLARE @LTProductID INT = (SELECT ProductID FROM bodb_licensee.dbo.Product3rd WHERE ProductPrefix = 'LT')
 	DECLARE @ChargeInfos AS TABLE (
+		ChargeId	INT,
 		PartyId		INT,
 		LicenseeId	INT,
 		ProductID	INT,
@@ -51,9 +53,9 @@ BEGIN
 		FromDate	SMALLDATETIME,
 		ToDate		SMALLDATETIME)
 
-	INSERT INTO @ChargeInfos(PartyId, ProductID, LicenseeId, Rate, Rate3rd, Fromdate, Todate)
+	INSERT INTO @ChargeInfos(ChargeId, PartyId, ProductID, LicenseeId, Rate, Rate3rd, Fromdate, Todate)
 	(
-		SELECT c.PartyID, c.ProductID, c.LicenseeID, c.DI_Rate,
+		SELECT c.ChargeID, c.PartyID, c.ProductID, c.LicenseeID, c.DI_Rate,
 			CASE WHEN c.PartyId = 14 OR ISNULL(c.IsDeposit,0)=0 OR @FromDate >= CAST('2018-8-1' AS DATETIME) THEN 0.03 ELSE 0.05 END,
 			c.Fromdate, c.Todate
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'LT', 'OA', 1) c
@@ -61,7 +63,7 @@ BEGIN
 		UNION
 
 		-- get Credit settings with rate = 0
-		SELECT p.PartyID, ci.ProductId, lb.LabelID AS LicenseeID, ci.Rate, 0.03 AS Rate3rd,
+		SELECT ci.ChargeID, p.PartyID, ci.ProductId, lb.LabelID AS LicenseeID, ci.Rate, 0.03 AS Rate3rd,
 			CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate
 				ELSE @FromDate END,
 			CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate
@@ -109,10 +111,11 @@ BEGIN
 		SUM(b.BetCount) AS TotalTrans,
 		SUM(b.MemberWL) AS CustomerWinLoss,
 		- SUM(b.MemberWL) AS LicenseeWinloss,
-		SUM(-b.MemberWL * ci.Rate) AS LicensingFee,
+		SUM(-b.MemberWL * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
 		SUM(-b.MemberWL * ci.Rate3rd) AS PayToSupplier
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeId AND cr.CurrencyID = b.CurrencyId
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
 	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId

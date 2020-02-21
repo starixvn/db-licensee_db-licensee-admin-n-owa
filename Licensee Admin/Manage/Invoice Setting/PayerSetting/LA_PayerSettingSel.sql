@@ -26,6 +26,7 @@ AS
 		- 20180503@Parsons: fix: setting won't show when set start date from future[#94108]
 		- 20181114@Parsons: Configure discount settings by currency [#99694]
 		- 20181214@Parsons: Integrate Bidme games  [#103695]
+		- 20200206@Mason: Set billing term by currency  [#120005]
 
 	Params:
 	+ @PayerId : 0 get all Party
@@ -254,6 +255,7 @@ BEGIN
 	--result
 	;WITH Result AS (
 		SELECT DISTINCT
+			c.ChargeId		AS ChargeID,
 			c.PartyId		AS PayerID,
 			PartyName		AS PayerName,
 			PartyGroupId	AS PayerGroupID,

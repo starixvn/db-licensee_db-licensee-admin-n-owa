@@ -42,6 +42,7 @@ AS
 	   - 20181119@bruce: Integrate Bidme games (GD product) [#103695]
 	   - 20190322@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	   - 20191205@Parsons: PP tournament [#123958]
+	   - 20191225@Bruce: billing term by currency [#120005]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -105,15 +106,17 @@ BEGIN
 		,Todate			SMALLDATETIME
 		,Bettype		INT
 		,ChargeType		SMALLINT
+		,ChargeId		INT
 	)
 
-	INSERT INTO #tmpParty (PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Rate, Fromdate, Todate, Bettype, ChargeType)
+	INSERT INTO #tmpParty (PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Rate, Fromdate, Todate, Bettype, ChargeType, ChargeId)
 	(
 		SELECT DISTINCT PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, 
 						CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END,
 						Fromdate, Todate,
 						CASE WHEN ci.ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END,
-						CASE WHEN ci.ProductID = 11 THEN ci.ChargeType ELSE 1 END
+						CASE WHEN ci.ProductID = 11 THEN ci.ChargeType ELSE 1 END,
+						ci.ChargeId
 		FROM		bodb_licensee.dbo.LA_f_ChargeInfo (@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
 		LEFT JOIN   bodb_licensee.dbo.Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype AND (
 					(ci.ProductId NOT IN (14,17)) OR 
@@ -182,11 +185,12 @@ BEGIN
 					,0 AS AmtDueToRB
 					,0 AS CommBA
 					,0 AS CommRB
-					,SUM(-b.MemberWL * p.Rate - CASE WHEN b.ProductID=31 THEN (b.CommissionA + b.CommissionP) ELSE 0 END) AS Company
+					,SUM(-b.MemberWL * ISNULL(cc.rate,p.Rate) - CASE WHEN b.ProductID=31 THEN (b.CommissionA + b.CommissionP) ELSE 0 END) AS Company
 					,SUM(b.Betcount * (CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END)) 
 					,SUM(b.commissionP)
 			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #tmpParty p ON b.SiteID = p.LicenseeID AND p.ProductID=b.ProductID AND b.rptDate BETWEEN p.Fromdate AND p.Todate
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID = p.ChargeId AND b.CurrencyId=cc.CurrencyID
 			WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate) AND
 					 b.StatusId NOT IN (-1, 101, 102, 103) AND
 					(@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c)) AND
@@ -302,9 +306,10 @@ BEGIN
 					,b.Status
 		)
 		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Company, Betcount, Playercomm)
-		SELECT a.rptDate,p.PartyID,a.CurrencyID,TurnOver, winloss, LicenseeWL, WinlossRB, 0, AmtDueToRB, 0, CommRB, Company*p.Rate, Betcount, Playercomm
+		SELECT a.rptDate,p.PartyID,a.CurrencyID,TurnOver, winloss, LicenseeWL, WinlossRB, 0, AmtDueToRB, 0, CommRB, Company*ISNULL(cc.rate,p.rate), Betcount, Playercomm
 		FROM cte_Data a
 		INNER JOIN #tmpParty p ON p.LicenseeID = a.SiteID AND a.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId=a.ProductId
+		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID = p.ChargeId AND a.CurrencyId=cc.CurrencyID
 
 		DROP TABLE #tmpData
 	END
