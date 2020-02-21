@@ -16,7 +16,7 @@ AS
 		- 20180801@Parsons: Rebuild licensee information report [#94283]
 		- 20190130@Bruce: Missing licensee group: Cozni [#108432]
 		- 20190318@Mason: Add InvoiceLanguage in SELECT statement [#110445]
-		- 20200212@Mason: Set billing term by currency [#110445]
+		- 20200212@Mason: Set billing term by currency [#120005]
 */
 BEGIN
 	SET NOCOUNT ON
