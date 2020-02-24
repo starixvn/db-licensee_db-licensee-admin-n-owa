@@ -2,7 +2,7 @@
 USE [bodb_licensee]
 GO
 
-CREATE PROCEDURE [dbo].[LA_Rpt_SpadeGamingWinloss]
+ALTER PROCEDURE [dbo].[LA_Rpt_SpadeGamingWinloss]
 	@PartyIds			VARCHAR(4000),
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
@@ -228,7 +228,7 @@ BEGIN
 		LicenseeWinLoss,
 		LicensingFee,
 		PayToSupplier,
-		(LicensingFee - PayToSupplier) AS CompanyIncome
+		(LicensingFee - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END) AS CompanyIncome
 	FROM @Total t
 	WHERE Currency = @BaseCurrencyName
 	-- End Region
