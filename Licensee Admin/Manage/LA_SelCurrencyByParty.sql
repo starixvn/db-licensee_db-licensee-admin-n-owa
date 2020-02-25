@@ -16,6 +16,7 @@ Revisions:
     - 20141218@Florent: add more currency from credit licensee   
 	- 20150105@Florent: use f_SelLicenseeCust
 	- 20150312@Florent: add systemmode to use on report settlement
+	- 20200225@Parsons: Support-HID-currency [#128856]
 
 Param's Explanation:
 */
@@ -78,6 +79,8 @@ BEGIN
 				THEN CASE WHEN @SystemMode = 'LA' THEN 'INH'
 						  WHEN @SystemMode = 'INV' THEN 'VND'
 					 END
+			WHEN 92
+				THEN 'HID'
 			ELSE CurrencyCode
 			END AS CurrencyName
 	FROM @temp1 t

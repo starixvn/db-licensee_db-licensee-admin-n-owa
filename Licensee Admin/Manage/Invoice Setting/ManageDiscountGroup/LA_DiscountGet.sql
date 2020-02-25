@@ -13,6 +13,7 @@ AS
 	 Revisions:  
 		- 20180628@Parsons: Get discount groups info [#94282]
 		- 20181022@Parsons: Configure discount settings by currency [#99694]
+		- 20200225@Parsons: Support-HID-currency [#128856]
 
 	 Params:
 
@@ -92,13 +93,15 @@ BEGIN
 	DECLARE @CurrenciesOfLicensee TABLE (PartyId INT, CurrencyId INT, CurrencyCode VARCHAR(20), CurrencyName VARCHAR(20))
 	
 	INSERT INTO @CurrenciesOfLicensee(PartyId, CurrencyId, CurrencyCode, CurrencyName)
-	SELECT DISTINCT p.PartyId, lc.Currency, e.Code, CASE WHEN lc.Currency = 51 THEN 'VND' ELSE e.currency END AS CurrencyName
+	SELECT DISTINCT p.PartyId, lc.Currency, 
+					CASE WHEN lc.Currency = 92 THEN 'HID' ELSE e.Code END AS Code, 
+					CASE WHEN lc.Currency = 51 THEN 'VND' ELSE e.currency END AS CurrencyName
 	FROM dbo.LA_f_SelLicenseeCust(0) AS lc
 	INNER JOIN dbo.OAS_Party pp WITH (NOLOCK) ON lc.LicenseeID = pp.OldRefID 
 	INNER JOIN @PartyTable p ON pp.PartyID = p.PartyId
 	INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
 	WHERE lc.Currency <> 20 -- exclude test
-	
+
 	UPDATE c1
 	SET c1.CurrencyCode = c1.CurrencyCode + ' (' + c1.CurrencyName + ')'
 	FROM @CurrenciesOfLicensee c1
