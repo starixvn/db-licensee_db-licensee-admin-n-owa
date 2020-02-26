@@ -140,13 +140,14 @@ BEGIN
 		SELECT	p.PartyId,p.PartyName,g.PartyId,g.PartyName,s.rptDate,s.CurrencyId,s.TotalTrans,s.Turnover,s.MemberWL,-s.MemberWL,s.LicensingFee,
 				(-s.MemberWL) * (CASE 
 						WHEN p.PartyId = @CN88PartyId THEN 0.015
+						WHEN p.PartyId IN (@TianboPartyId, @BobbetPartyId) THEN 0.02
 						WHEN g.PartyId IN (@CreditGroupId, @12BetGroupId) OR @FromDate >= CAST('2018-8-1' AS DATETIME) THEN 0.03 
-						WHEN g.PartyId IN (@TianboPartyId, @BobbetPartyId) THEN 0.02
 						ELSE 0.05 
 					END)
 		FROM SumByDate s
 		INNER JOIN @PartyList p ON s.PartyId = p.PartyID
 		INNER JOIN @PartyList g ON p.ParentId = g.PartyId
+		-- Tianbo & Bobbet: 0.02%
 		-- Credit licensees & 12Bet: 3% on Gross Win
 		-- Other licenees: 5% on Gross Win
 		-- CN88: 1.5% of winloss
