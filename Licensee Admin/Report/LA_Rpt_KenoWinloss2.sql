@@ -147,7 +147,7 @@ BEGIN
 		FROM SumByDate s
 		INNER JOIN @PartyList p ON s.PartyId = p.PartyID
 		INNER JOIN @PartyList g ON p.ParentId = g.PartyId
-		-- Tianbo & Bobbet: 0.02%
+		-- Tianbo & Bobbet: 2%
 		-- Credit licensees & 12Bet: 3% on Gross Win
 		-- Other licenees: 5% on Gross Win
 		-- CN88: 1.5% of winloss
