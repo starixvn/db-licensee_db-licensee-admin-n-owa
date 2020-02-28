@@ -1,6 +1,4 @@
 /*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-USE [bodb_licensee]
-GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_KenoWinloss2]
 	 @PartyIDs			VARCHAR(5500)
@@ -22,6 +20,7 @@ AS
 	- 20190716@Bruce: Integrate CN88 data in LA [#116859]
 	- 20191216@Parsons: Modify pay to supplier's formula for Keno WL report [#125014]
 	- 20191226@Mason: Set term by currency [#120005]
+	- 20200219@Mason: Update RNG Keno term [#128563]
 
  Param's Explanation:
 	- @FromDate		: From date
@@ -46,7 +45,7 @@ BEGIN
 		INSERT INTO @PartyChargeInfo(ChargeId, PartyId, LicenseeId,ProductID, Rate, Fromdate, Todate)
 		(
 			SELECT ChargeId, PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
-			FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'KN', 'OA', 1)
+			FROM dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'KN', 'OA', 1)
 			
 			UNION
 			
@@ -54,11 +53,11 @@ BEGIN
 			SELECT ci.ChargeID, p.PartyID, lb.LabelID AS LicenseeID, ci.ProductId, ci.Rate, 
 				CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
 				CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
-			FROM OAS_ChargeInfo ci
-			INNER JOIN dbo.OAS_Party p ON ci.FromParty = p.PartyID	AND ci.ChargeType != 2 AND p.PartyType = 1
+			FROM OAS_ChargeInfo ci WITH (NOLOCK)
+			INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON ci.FromParty = p.PartyID AND ci.ChargeType != 2 AND p.PartyType = 1
 			INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
 			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
-			LEFT JOIN dbo.labels lb(NOLOCK) ON p.OldRefID = lb.LicenseeID
+			LEFT JOIN dbo.labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
 			WHERE ci.Productid = 8 and ci.Rate = 0 AND ISNULL(pd.IsDeposit, 0) = 0 AND
 				p.PartyID IN (SELECT VAL FROM strSplit(@PartyIDs, ','))	AND
 				(	@FromDate BETWEEN ci.FromDate AND ci.ToDate
@@ -78,7 +77,7 @@ BEGIN
 		)
 
 		INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
-		EXEC bodb_licensee.dbo.LA_PartyListSel
+		EXEC dbo.LA_PartyListSel
 
 		-- This report has 3 group:
 		--		- 12Bet: 12Bet
@@ -87,8 +86,10 @@ BEGIN
 		DECLARE	@12BetGroupId INT = -1,
 				@OneWorksGroupId INT = 1,
 				@CreditGroupId INT = 999,
-				@CN88PartyId INT = (SELECT a.PartyID FROM dbo.OAS_Party a WITH(NOLOCK) WHERE a.PartyName='CN88')
-
+				@CN88PartyId INT = (SELECT a.PartyID FROM dbo.OAS_Party a WITH(NOLOCK) WHERE a.PartyName='CN88'),
+				@TianboPartyId INT = 432,
+				@BobbetPartyId INT = 346
+				
 		UPDATE @PartyList SET PartyName = RTRIM(REPLACE(PartyName,'Licensees','')) WHERE ParentId = 0
 		UPDATE @PartyList SET ParentId = @OneWorksGroupId WHERE ParentId IN (11,98)
 		UPDATE @PartyList SET ParentId = @12BetGroupId WHERE PartyId = 14 -- 12bet
@@ -137,12 +138,14 @@ BEGIN
 		SELECT	p.PartyId,p.PartyName,g.PartyId,g.PartyName,s.rptDate,s.CurrencyId,s.TotalTrans,s.Turnover,s.MemberWL,-s.MemberWL,s.LicensingFee,
 				(-s.MemberWL) * (CASE 
 						WHEN p.PartyId = @CN88PartyId THEN 0.015
+						WHEN p.PartyId IN (@TianboPartyId, @BobbetPartyId) THEN 0.02
 						WHEN g.PartyId IN (@CreditGroupId, @12BetGroupId) OR @FromDate >= CAST('2018-8-1' AS DATETIME) THEN 0.03 
 						ELSE 0.05 
 					END)
 		FROM SumByDate s
 		INNER JOIN @PartyList p ON s.PartyId = p.PartyID
 		INNER JOIN @PartyList g ON p.ParentId = g.PartyId
+		-- Tianbo & Bobbet: 2%
 		-- Credit licensees & 12Bet: 3% on Gross Win
 		-- Other licenees: 5% on Gross Win
 		-- CN88: 1.5% of winloss
@@ -187,7 +190,7 @@ BEGIN
 					td.PayToSupplier,
 					td.LicensingFee - td.PayToSupplier
 			FROM #TempData td
-			INNER JOIN bodb02.dbo.Exchange e ON td.CurrencyId = e.ExchangeID
+			INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON td.CurrencyId = e.ExchangeID
 		END
 		ELSE
 		BEGIN
@@ -243,7 +246,7 @@ BEGIN
 		RowIndex SMALLINT IDENTITY
 	)
 	INSERT INTO @BaseCurrencies(Id, Name)
-	EXEC bodb_Licensee.dbo.LA_SelBaseCurrency
+	EXEC dbo.LA_SelBaseCurrency
 
 	-- Calculate Grand total
 	BEGIN
