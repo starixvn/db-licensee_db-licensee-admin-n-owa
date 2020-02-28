@@ -54,6 +54,7 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180712@Bruce: Enhance Manage Discount group [#94282]
 		- 20181002@Parsons: Integrate AG setup fee into invoices [#98485]
+		- 20200228@Parsons: Support-HID-currency [#128856]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -236,6 +237,7 @@ BEGIN
 																WHEN 75 THEN 'PTU'
 																WHEN 76 THEN 'PS'
 																WHEN 77 THEN 'PTH'
+																WHEN 92 THEN 'HID'
 																ELSE e.CurrencyCode
 															END,
 								@HostingFeesExchangeRate = e.Rate

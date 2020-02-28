@@ -22,6 +22,7 @@ AS
 		- 20190716@Bruce: Integrate CN88 data in LA [#116859]
 		- 20191105@Parsons: Get The Calculation Of PayToSupplier Fee Modified [#123342]
 		- 20191226@Mason: Set billing term by currency [#120005]
+		- 20200228@Parsons: Support-HID-currency [#128856]
 		
 	 Params:
 */
@@ -162,9 +163,10 @@ BEGIN
 					WHEN 75 THEN 'PTU'
 					WHEN 76 THEN 'PS'
 					WHEN 77 THEN 'PTH'
+					WHEN 92 THEN 'HID'
 					ELSE CurrencyCode
 				END)
-	WHERE ExchangeId IN (51, 75, 76, 77)
+	WHERE ExchangeId IN (51, 75, 76, 77, 92)
 
 	-- End Region
 

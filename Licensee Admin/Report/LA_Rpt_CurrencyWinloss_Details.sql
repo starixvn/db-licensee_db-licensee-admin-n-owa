@@ -314,9 +314,10 @@ BEGIN
 					WHEN 75 THEN 'PTU'
 					WHEN 76 THEN 'PS'
 					WHEN 77 THEN 'PTH' 
+					WHEN 92 THEN 'HID'
 					ELSE Code
 				END)
-	WHERE ExchangeId IN (51, 75, 76, 77)
+	WHERE ExchangeId IN (51, 75, 76, 77, 92)
 	
 	SELECT	w.PartyID,
 			CASE WHEN p.PartyName ='18bb' THEN 'PIH'

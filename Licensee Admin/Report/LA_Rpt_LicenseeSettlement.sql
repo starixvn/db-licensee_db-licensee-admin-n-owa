@@ -42,6 +42,7 @@ AS
 			- 20190312@Parsons: Integrate Promotion Prize (PP product) [#109014]
 			- 20191122@Mason: Setup billing terms by Currency  [#120005]
 			- 20191205@Parsons: PP tournament [#123958]  
+			- 20200228@Parsons: Support-HID-currency [#128856]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -735,10 +736,11 @@ BEGIN
 	SET CurrencyCode = (CASE ExchangeId
 							WHEN 75 THEN 'PTU'
 							WHEN 76 THEN 'PS'
-							WHEN 77 THEN 'PTH' 
+							WHEN 77 THEN 'PTH'
+							WHEN 92 THEN 'HID' 
 							ELSE CurrencyCode
 						END)
-	WHERE ExchangeId IN (75, 76, 77)	
+	WHERE ExchangeId IN (75, 76, 77, 92)	
 	
 	;WITH sortedExchange AS (
 		SELECT ExchangeID, CurrencyCode, ROW_NUMBER() OVER (PARTITION BY CurrencyCode ORDER BY ExchangeId) RowNumber

@@ -43,6 +43,7 @@ AS
 	   - 20190322@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	   - 20191205@Parsons: PP tournament [#123958]
 	   - 20191225@Bruce: billing term by currency [#120005]
+	   - 20200228@Parsons: Support-HID-currency [#128856]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -359,10 +360,11 @@ BEGIN
 					WHEN 51 THEN 'INH'
 					WHEN 75 THEN 'PTU'
 					WHEN 76 THEN 'PS'
-					WHEN 77 THEN 'PTH' 
+					WHEN 77 THEN 'PTH'
+					WHEN 92 THEN 'HID' 
 					ELSE CurrencyCode
 				END)
-	WHERE Currency IN (51, 75, 76, 77)
+	WHERE Currency IN (51, 75, 76, 77, 92)
 
 	UPDATE e
 	SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'
