@@ -42,6 +42,7 @@ BEGIN
 	EXEC dbo.LA_PayerCurrencySel @PayerId = @PayerId
 	
 	UPDATE @CurrencyInfo SET CurrencyCode = CASE WHEN CurrencyId = 92 THEN 'HID' END
+	WHERE CurrencyId = 92
 
 	-- Get charge rate by currency
 	SELECT 
