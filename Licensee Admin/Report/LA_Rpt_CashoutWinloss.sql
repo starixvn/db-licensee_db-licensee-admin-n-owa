@@ -17,6 +17,7 @@ AS
 		- 20170401@Harper: #73310_Change sum table for CashOut Product
 		- 20171219@Bruce: increase length for variables [#88197]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20200302@Mason: Support HID currency [#128856]
 		
 	Param's Explanation:
 */
@@ -76,6 +77,10 @@ BEGIN
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+	
+	UPDATE #Exchange SET CurrencyCode = CASE WHEN ExchangeID = 51 THEN 'INH' 
+											 WHEN ExchangeID = 92 THEN 'HID' END
+	WHERE ExchangeID IN (51,92)
 
 	DECLARE @SharingCharge TABLE (
 		PartyId INT,
@@ -145,7 +150,7 @@ BEGIN
 		d.PartyID				AS PartyID,
 		p.PartyName				AS PartyName,
 		d.CurrencyId,
-		CASE WHEN e.CurrencyCode='VND' THEN 'INH' ELSE e.CurrencyCode END AS CurrencyName,
+		e.CurrencyCode AS CurrencyName,
 		SUM(CashoutTimes) AS CashoutTimes,
 		SUM(CashoutTickets) AS CashoutTickets,
 		SUM(CashoutValue * e.Rate) AS CashoutValue,

@@ -27,6 +27,7 @@ AS
 	- 20190808@Parsons: Provide House Turnover In NG WL Report [Redmine: #117674]
 	- 20191217@Bruce: Update NG/H5 3rd rate [#125515]
 	- 20191226@Mason: Set Term By Currency [#120005]
+	- 20200203@Mason: Support HID currency [#128856]
 
  * Param's Explanation:
  EXEC LA_Rpt_NumberGameWinloss @PartyIds = '14,15,16,17,18,19', @FromDate = '20190101', @ToDate = '20190808', @BaseCurrencyName = 'EUR'
@@ -81,7 +82,9 @@ BEGIN
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	
-	UPDATE #Exchange SET CurrencyCode = 'INH' WHERE ExchangeID = 51 
+	UPDATE #Exchange SET CurrencyCode = CASE WHEN ExchangeID = 51 THEN 'INH' 
+											 WHEN ExchangeID = 92 THEN 'HID' END
+	WHERE ExchangeID IN (51, 92) 
 	
 	-- Region: TempData
 	CREATE TABLE #TempData (
