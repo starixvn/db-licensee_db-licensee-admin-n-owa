@@ -20,6 +20,7 @@ AS
 		- 20180419@Bruce: Implement Colossus Bets Freeplay(part 2) [#93907]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180619@Bruce: Amount Due To CB is incorrect in case CashInAmount = 0 [#97153]
+		- 20200302@Parsons: Support-HID-currency [#128856]
 
 	Param's Explanation:
 */
@@ -153,7 +154,7 @@ BEGIN
 				g.PartyName, 
 				td.rptDate, 
 				td.CurrencyId, 
-				e.Code, 				
+				CASE WHEN ExchangeId = 92 THEN 'HID' WHEN ExchangeId = 51 THEN 'INH' ELSE e.Code END, 				
 				td.TotalTrans, 			
 				td.Turnover, 
 				td.TurnoverForCommision,
@@ -270,7 +271,7 @@ BEGIN
 			ParentId,
 			ParentName,
 			WinLossDate,
-			CASE WHEN CurrencyName='VND' THEN 'INH' ELSE CurrencyName END CurrencyName,
+			CurrencyName,
 			TotalTrans,
 			ISNULL(Turnover, 0) Turnover,
 			ISNULL(Prize, 0) Prize,

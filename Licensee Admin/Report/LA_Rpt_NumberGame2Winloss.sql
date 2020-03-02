@@ -143,7 +143,9 @@ BEGIN
 			p.PartyName,
 			g.PartyName,
 			t.RptDate,
-			CASE WHEN e.Code='VND' THEN 'INH' ELSE e.Code END,
+			CASE WHEN e.ExchangeId = 92 THEN 'HID' 
+				 WHEN e.ExchangeId = 51 THEN 'INH' 
+				 ELSE e.Code END,
 			t.TotalTrans,
 			t.Turnover * e.BaseCurrencyRate,
 			t.CustomerWinLoss * e.BaseCurrencyRate,

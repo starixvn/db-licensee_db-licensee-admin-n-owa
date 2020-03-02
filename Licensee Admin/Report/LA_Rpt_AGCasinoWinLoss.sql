@@ -23,6 +23,7 @@ AS
 	 - 20180628@Scofield: Update calculation formula for AG& GD report [#94283]
 	 - 20190627@Bruce: Select data from rpt_BettingByProduct [#113641]
 	 - 20191226@Mason: Set billing term by currency [#120005]
+	 - 20200302@Parsons: Support-HID-currency [#128856]
 	 
 	 Params:
 */
@@ -126,7 +127,9 @@ BEGIN
 	)
 
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, Rate, CurrencyCode)
-	SELECT ExchangeDate, ExchangeID, BaseCurrencyRate, CASE WHEN ExchangeID = 51 THEN 'INH' ELSE Code END
+	SELECT ExchangeDate, ExchangeID, BaseCurrencyRate, CASE WHEN ExchangeId = 92 THEN 'HID' 
+															WHEN ExchangeId = 51 THEN 'INH' ELSE Code 
+													   END
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	-- End
 

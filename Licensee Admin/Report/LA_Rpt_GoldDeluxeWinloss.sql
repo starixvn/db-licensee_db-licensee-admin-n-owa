@@ -22,6 +22,7 @@ AS
 		- 20180628@Scofield: Update calculation formula for AG& GD report [#94283]
 		- 20181119@Scofield: Integrate Bidme games  [#103695]
 		- 20200221@Mason: Set billing terms by currency  [#120005]
+		- 20200302@Parsons: Support-HID-currency [#128856]
 		
 	Param's Explanation:
 */
@@ -204,7 +205,7 @@ BEGIN
 		DECLARE @Currency VARCHAR(10) = (SELECT TOP 1 Code FROM @BaseCurrencies WHERE IsApplied IS NULL)
 
 		INSERT INTO #Data(PartyId, IsDeposit, ReportDate, CurrencyName, Totaltrans, BaseCurrency, Turnover, CustomerWL, TipAmount, LicenseeFeeWithoutTips, TipsAmountDueToCompany, Commission, NetWinLoss, CompanyTipShare, RoyaltyFee, TipsAmountDueToSupplier, ValidBetAmount, RowId)
-		SELECT d.PartyId, d.IsDeposit, d.ReportDate, e.Code, d.Totaltrans, @Currency,
+		SELECT d.PartyId, d.IsDeposit, d.ReportDate, CASE WHEN ExchangeId = 92 THEN 'HID' WHEN ExchangeId = 51 THEN 'INH' ELSE Code END, d.Totaltrans, @Currency,
 			d.Turnover * e.BaseCurrencyRate,
 			d.CustomerWL * e.BaseCurrencyRate,
 			d.TipAmount * e.BaseCurrencyRate,
@@ -228,7 +229,7 @@ BEGIN
 		p1.PartyName,
 		d.IsDeposit,
 		d.ReportDate,
-		CASE WHEN d.CurrencyName='VND' THEN 'INH' ELSE d.CurrencyName END CurrencyName,
+		d.CurrencyName,
 		d.Totaltrans,
 		d.Turnover,
 		o.Turnover			AS TurnoverOriginal,
