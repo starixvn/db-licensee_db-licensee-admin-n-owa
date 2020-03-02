@@ -20,6 +20,7 @@ AS
 	 - 20171219@Bruce: increase length for variables [#88197]
 	 - 20180716@bruce: add new group TEST for credit [#98126]
 	 - 20181106@bruce: move sp to bodb_licensee [#103999]
+	 - 20200302@Mason: Support HID currency [#128856]
 	 
 	 Params:
 	 - PartyIds: List Party Id.
@@ -78,8 +79,9 @@ SET NOCOUNT ON
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
 	UPDATE #Exchange
-	SET CurrencyCode = 'INH'
-	WHERE ExchangeID = 51
+	SET CurrencyCode =  CASE WHEN ExchangeID = 51 THEN 'INH'
+							 WHEN ExchangeID = 92 THEN 'HID' END
+	WHERE ExchangeID IN (51, 92)
 
 	-- End region
 
