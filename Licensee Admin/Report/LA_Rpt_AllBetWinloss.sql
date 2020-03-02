@@ -203,6 +203,7 @@ BEGIN
 		
 		UPDATE #Exchange SET Code = CASE WHEN ExchangeId = 51 THEN 'INH'
 										 WHEN ExchangeId = 92 THEN 'HID' END
+		WHERE ExchangeId IN (51,92)
 
 		;WITH StagingData AS (
 			SELECT	t.PartyId,

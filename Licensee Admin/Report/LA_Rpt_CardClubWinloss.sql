@@ -64,6 +64,7 @@ BEGIN
 	
 	UPDATE #Exchange SET CurrencyCode = CASE WHEN ExchangeID = 51 THEN 'INH'
 											 WHEN ExchangeID = 92 THEN 'HID' END
+	WHERE ExchangeID IN (51, 92)
 											 
 	-- Region: TempData
 	CREATE TABLE #TempData (
