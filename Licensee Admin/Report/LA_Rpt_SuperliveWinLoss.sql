@@ -257,10 +257,3 @@ SET NOCOUNT ON
 	DROP TABLE #Exchange
 	DROP TABLE #TempData
 END
-
-GO
-GRANT EXECUTE ON [dbo].[LA_Rpt_SuperliveWinLoss] TO [bodbLicenseeNet] AS [dbo]
-GRANT EXECUTE ON [dbo].[LA_Rpt_SuperliveWinLoss] TO [bodbAdminNet] AS [dbo]
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_SuperliveWinLoss] TO [vnteam] AS [dbo]
-GO
