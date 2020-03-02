@@ -17,6 +17,7 @@ AS
 		- 20171220@Parsons: increase length for variables [#88197]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20200213@Mason: Set billing term by currency [#120005]
+		- 20200302@Mason: Support HID currency [#128856]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -141,7 +142,8 @@ BEGIN
 			t.PartyName,
 			t.GroupName,
 			t.RptDate,
-			CASE WHEN e.Code='VND' THEN 'INH' ELSE e.Code END,
+			CASE WHEN e.ExchangeId = 51 THEN 'INH' 
+			     WHEN e.ExchangeId = 92 THEN 'HID' ELSE e.Code END,
 			t.TotalTrans,
 			t.Turnover * e.BaseCurrencyRate,
 			t.CustomerWinLoss * e.BaseCurrencyRate,

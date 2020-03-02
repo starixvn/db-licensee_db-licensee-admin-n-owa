@@ -18,6 +18,7 @@ AS
 		- 20190308@Parsons: Integrate PP promotion prize [#109014]
 		- 20191204@Bruce: PP tournament [#123958]
 		- 20200217@Mason: Set billing term by currency [#120005]
+		- 20200302@Mason: Support HID currency [#128856]
 
 	 Params:
 
@@ -173,7 +174,8 @@ BEGIN
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
-	UPDATE #Exchange SET CurrencyCode = 'INH' WHERE ExchangeID = 51
+	UPDATE #Exchange SET CurrencyCode = CASE WHEN ExchangeID = 51 THEN 'INH' 
+											 WHEN ExchangeID = 92 THEN 'HID' END
 	-- End Region
 	
 	DECLARE @Total TABLE (

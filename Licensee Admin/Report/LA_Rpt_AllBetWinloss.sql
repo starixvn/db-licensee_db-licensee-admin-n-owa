@@ -19,6 +19,7 @@ AS
 	- 20170217@bruce: change deposit service charge to 9 [#70050]
 	- 20171220@Parsons: increase length for variables [#88197]
 	- 20180716@bruce: add new group TEST for credit [#98126]
+	- 20200203@Mason: Suport HID currency [#128856]
 
  Param's Explanation:
 	- @FromDate			: From date
@@ -199,6 +200,9 @@ BEGIN
 		INSERT INTO #Exchange(ExchangeDate, ExchangeId,Code,Rate)
 		SELECT exchangedate, ExchangeId,Code, BaseCurrencyRate
 		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @TempCurrency)
+		
+		UPDATE #Exchange SET Code = CASE WHEN ExchangeId = 51 THEN 'INH'
+										 WHEN ExchangeId = 92 THEN 'HID' END
 
 		;WITH StagingData AS (
 			SELECT	t.PartyId,
@@ -255,8 +259,8 @@ BEGIN
 						p.PartyName,
 						r.PartyId,
 						@FromDate AS ReportDate, -- dummy data,
-						CASE WHEN r.OriginalCurrency='VND' THEN 'INH' ELSE r.OriginalCurrency END OriginalCurrency,
-						CASE WHEN r.RegisteredCurrency='VND' THEN 'INH' ELSE r.RegisteredCurrency END RegisteredCurrency,
+						r.OriginalCurrency AS OriginalCurrency,
+						r.RegisteredCurrency AS RegisteredCurrency,
 						SUM(r.TotalTrans) AS TotalTrans,
 						SUM(r.TurnoverBased) AS Turnover,
 						SUM(r.ValidBetAmountBased) AS ValidBetAmount,
@@ -282,8 +286,8 @@ BEGIN
 						'' AS PartyName,	-- dummy data
 						0 AS PartyId,		-- dummy data
 						r.ReportDate,
-						CASE WHEN r.OriginalCurrency='VND' THEN 'INH' ELSE r.OriginalCurrency END OriginalCurrency,
-						CASE WHEN r.RegisteredCurrency='VND' THEN 'INH' ELSE r.RegisteredCurrency END RegisteredCurrency,
+						r.OriginalCurrency AS OriginalCurrency,
+						r.RegisteredCurrency AS RegisteredCurrency,
 						SUM(r.TotalTrans) AS TotalTrans,
 						SUM(r.Turnover) AS Turnover,
 						SUM(r.ValidBetAmount) AS ValidBetAmount,

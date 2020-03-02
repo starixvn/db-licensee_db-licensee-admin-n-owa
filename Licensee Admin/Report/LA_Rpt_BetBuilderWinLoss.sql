@@ -15,7 +15,8 @@ AS
 
 	 Revisions:  
 		- 20190221@Scofield: Bet Builder Win Loss [#108995]
-		- 20200213@Mason: Set billing term by currency [120005]
+		- 20200213@Mason: Set billing term by currency [#120005]
+		- 20200302@Mason: Support HID currency [#128856]
 	 Params:
 
 	 Explannation: EXEC LA_Rpt_BetBuilderWinLoss @BaseCurrencyName='EUR',@ToDate='2018-04-30 00:00:00',@PartyIds='14,15,17,19,20,23,29,39,40,42,44,46,47,52,53,56,58,60,65,68,70,71,72,73,76,79,80,81,82,84,85,86,87,89,90,91,92,93,95,97,100,101,24,31,34,35,36,37,38,41,59,66,67,74,75,88,16,22,26,27,45,49,54,99,25,30',@FromDate='2018-04-01 00:00:00'
@@ -145,7 +146,8 @@ BEGIN
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
-	UPDATE #Exchange SET CurrencyCode = 'INH' WHERE ExchangeID = 51
+	UPDATE #Exchange SET CurrencyCode = CASE WHEN ExchangeID = 51 THEN 'INH' 
+											 WHEN ExchangeID = 92 THEN 'HID' END
 	-- End Region
 	
 	DECLARE @Total TABLE (

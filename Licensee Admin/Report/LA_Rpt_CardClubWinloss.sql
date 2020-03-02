@@ -14,6 +14,7 @@ AS
  * Revisions
 	- 20190710@Mason: Intergrate Card Club [#116096]
 	- 20191226@Mason: Set Billing Term By Currency [#120005]
+	- 20200302@Mason: Support HID currency [#128856]
  * Param's Explanation:
  *
  */
@@ -61,8 +62,9 @@ BEGIN
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	
-	UPDATE #Exchange SET CurrencyCode = 'INH' WHERE ExchangeID = 51
-	
+	UPDATE #Exchange SET CurrencyCode = CASE WHEN ExchangeID = 51 THEN 'INH'
+											 WHEN ExchangeID = 92 THEN 'HID' END
+											 
 	-- Region: TempData
 	CREATE TABLE #TempData (
 		PartyID INT,
