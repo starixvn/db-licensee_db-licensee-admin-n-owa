@@ -92,7 +92,7 @@ BEGIN
 		CASE WHEN c.FromDate > @ToDate THEN @FromDate ELSE c.FromDate END,
 		CASE WHEN c.FromDate > @ToDate THEN @ToDate ELSE c.ToDate END,
 		CASE WHEN c.FromDate > @ToDate THEN 0 ELSE c.Rate END
-	FROM bodb_licensee.dbo.OAS_ChargeInfo c
+	FROM bodb_licensee.dbo.OAS_ChargeInfo c WITH (NOLOCK)
 	WHERE c.ProductID = @ProductId AND c.ChargeType = @ProfitSharingChargeType
 
 	BEGIN
