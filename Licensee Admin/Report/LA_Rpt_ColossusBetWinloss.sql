@@ -162,7 +162,7 @@ BEGIN
 				td.CashOut, 
 				td.CashInAmount
 			FROM #TempData td 
-				INNER JOIN bodb02.dbo.Exchange e ON td.CurrencyId = e.ExchangeID
+				INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON td.CurrencyId = e.ExchangeID
 				INNER JOIN @PartyList p ON td.PartyId = p.PartyID
 				INNER JOIN @PartyList g ON p.ParentId = g.PartyId
 	END

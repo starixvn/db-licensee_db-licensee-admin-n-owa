@@ -2,10 +2,6 @@
 USE [bodb_licensee]
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_GoldDeluxeWinloss]
 	  @PartyIds			VARCHAR(4000)
 	, @FromDate			DATETIME

@@ -2,10 +2,6 @@
 USE bodb02
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss]
 	@PartyIDs				VARCHAR(5500)	= ''
 	, @CurrencyIds			VARCHAR(4000)	= ''
@@ -344,7 +340,7 @@ BEGIN
 			SUM(Playercomm * e.Rate) AS Playercomm
 	FROM #tmpWinLoss w
 	INNER JOIN #DailyExchange e ON w.Winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
-	LEFT JOIN bodb_licensee.dbo.OAS_Party p ON w.PartyID = p.PartyID
+	LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON w.PartyID = p.PartyID
 	GROUP BY w.PartyID,p.PartyName
 	ORDER BY w.PartyID,p.PartyName
 

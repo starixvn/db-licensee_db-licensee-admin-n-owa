@@ -96,7 +96,7 @@ BEGIN
 		)
 		INSERT INTO @PlayCurrencySettings
 		SELECT SiteId, MemberCurrency,PlayCurrency,FromDate,ToDate
-		FROM OPENQUERY(DB06,'SELECT SiteId, MemberCurrency,PlayCurrency,FromDate,ToDate FROM bodb02.dbo.PlayCurrencySetting WITH(NOLOCK) WHERE SportType=211')
+		FROM OPENQUERY(DBACC,'SELECT SiteId, MemberCurrency,PlayCurrency,FromDate,ToDate FROM bodb02.dbo.PlayCurrencySetting WITH(NOLOCK) WHERE SportType=211')
 	END
 
 	-- Base currencies
