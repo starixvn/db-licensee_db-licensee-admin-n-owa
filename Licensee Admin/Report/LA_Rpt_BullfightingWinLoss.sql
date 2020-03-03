@@ -14,6 +14,7 @@ AS
 	DB: DBLIC-bodb_licensee
 	Revisions:
 		- 20180911@Parsons: WL report for Poker Games& Bullfighting [#98487]
+		- 20200303@Mason: Support HID currency [#128856]
 
 	Param's Explanation: 
 	EXEC LA_Rpt_BullfightingWinLoss @BaseCurrencyName='EUR',@ToDate='2018-08-31',@PartyIds='1',@FromDate='2018-08-01'
@@ -108,7 +109,9 @@ BEGIN
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
-	UPDATE #Exchange SET CurrencyCode = 'INH' WHERE ExchangeID = 51
+	UPDATE #Exchange SET CurrencyCode = CASE WHEN ExchangeID = 51 THEN 'INH' 
+											 WHEN ExchangeID = 92 THEN 'HID' END
+	WHERE ExchangeID IN (51, 92)
 	-- End Region
 
 	DECLARE @Total TABLE (

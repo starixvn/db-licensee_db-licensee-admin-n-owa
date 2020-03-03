@@ -15,6 +15,7 @@ AS
 
 	 Revisions:  
 		- 20180910@Scofield: Win loss reports for Poker Games & Bullfighting [#98487]
+		- 20200303@Mason: Support HID currency [#128856]
 	 Params:
 
 	 Explannation: EXEC LA_Rpt_PokerGamesWinLoss @BaseCurrencyName='EUR',@ToDate='2018-04-30 00:00:00',@PartyIds='25,30,324',@FromDate='2018-04-01 00:00:00'
@@ -113,7 +114,9 @@ BEGIN
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
-	UPDATE #Exchange SET CurrencyCode = 'INH' WHERE ExchangeID = 51
+	UPDATE #Exchange SET CurrencyCode = CASE WHEN ExchangeID = 51 THEN 'INH' 
+											 WHEN ExchangeID = 92 THEN 'HID' END
+	WHERE ExchangeID IN (51, 92)
 	-- End Region
 	
 	DECLARE @Total TABLE (
