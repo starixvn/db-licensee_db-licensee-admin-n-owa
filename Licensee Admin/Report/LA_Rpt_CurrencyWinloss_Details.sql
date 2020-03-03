@@ -2,10 +2,6 @@
 USE bodb02
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss_Details]
 	@PartyIDs			VARCHAR(5500)	= ''
 	, @CurrencyIds		VARCHAR(4000)	= ''

@@ -2,13 +2,9 @@
 USE bodb_licensee
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_GroupLicensingFeeWinLoss]
 	@PartyIDs				VARCHAR(5500)	= ''
-	, @ProductCodes		VARCHAR(5500) = ''	
+	, @ProductCodes			VARCHAR(5500) = ''	
 	, @FromDate				SMALLDATETIME
 	, @ToDate				SMALLDATETIME	
 AS

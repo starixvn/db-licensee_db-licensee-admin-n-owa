@@ -2,10 +2,6 @@
 USE bodb02
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss_Details] 
 	  @PartyID				INT
 	, @Currency				INT				= 0
@@ -81,7 +77,7 @@ BEGIN
 	
 	INSERT INTO #Products(ProductID,ProductName)
 	SELECT DISTINCT Productid,ProductName
-	FROM bodb_licensee.dbo.Product3rd
+	FROM bodb_licensee.dbo.Product3rd WITH (NOLOCK)
 	
 	INSERT INTO #Products(ProductID,ProductName) VALUES (0,'Sportsbook')
 	
