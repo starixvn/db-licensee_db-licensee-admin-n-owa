@@ -63,8 +63,7 @@ BEGIN
 															WHEN ExchangeID = 92 THEN 'HID' 
 															ELSE Code END
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)									 
-
-
+	
 	-- Region: TempData
 	CREATE TABLE #TempData (
 		PartyID INT,
