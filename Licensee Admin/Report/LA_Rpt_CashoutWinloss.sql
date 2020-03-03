@@ -25,7 +25,7 @@ SET NOCOUNT ON
 BEGIN
 	DECLARE @LicenseeID INT
 	DECLARE @ProductCode VARCHAR(6)	= 'CO'
-	DECLARE @ProductId INT = (SELECT Productid FROM dbo.Product3rd WHERE ProductPrefix = 'CO')
+	DECLARE @ProductId INT = (SELECT Productid FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductPrefix = 'CO')
 	DECLARE @ProfitSharingChargeType INT = 8
 	DECLARE @SBProductId INT = 0
 	DECLARE @BAProductId INT = 3

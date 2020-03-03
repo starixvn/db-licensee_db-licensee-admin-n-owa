@@ -570,8 +570,8 @@ BEGIN
 
 			INSERT INTO @EmptyTable
 			SELECT p.Productid, p.ProductPrefix, s.ProductName, 0, d.Amount * e.Rate, @AmountTypeMonthlyHostingFee
-			FROM @Settings s INNER JOIN dbo.Product3rd p WITH(NOLOCK) ON s.ProductName = p.ProductName
-				INNER JOIN dbo.LA_HostingFeesDetail d WITH(NOLOCK) ON s.FeesId = d.HostingFeesId AND @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
+			FROM @Settings s INNER JOIN dbo.Product3rd p WITH (NOLOCK) ON s.ProductName = p.ProductName
+				INNER JOIN dbo.LA_HostingFeesDetail d WITH (NOLOCK) ON s.FeesId = d.HostingFeesId AND @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
 				INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
 			WHERE s.SettingType = 1
 
