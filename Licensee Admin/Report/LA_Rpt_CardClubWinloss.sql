@@ -59,12 +59,13 @@ BEGIN
 	)
 	
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
+	SELECT ExchangeDate, 
+	ExchangeID, 
+	CASE WHEN ExchangeID = 51 THEN 'INH' 
+		 WHEN ExchangeID = 92 THEN 'HID' 
+		 ELSE Code END, 
+	BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
-	
-	UPDATE #Exchange SET CurrencyCode = CASE WHEN ExchangeID = 51 THEN 'INH'
-											 WHEN ExchangeID = 92 THEN 'HID' END
-	WHERE ExchangeID IN (51, 92)
 											 
 	-- Region: TempData
 	CREATE TABLE #TempData (

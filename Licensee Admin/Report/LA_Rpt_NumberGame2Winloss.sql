@@ -17,6 +17,7 @@ AS
   Revisions:
  	- 20171220@Parsons: increase length for variables [#88197]
 	- 20180716@bruce: add new group TEST for credit [#98126]
+	- 20200303@Mason: Support HID currency [#128856]
 */
 BEGIN
 	SET NOCOUNT ON

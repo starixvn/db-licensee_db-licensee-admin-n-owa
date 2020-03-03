@@ -39,6 +39,7 @@ AS
 	   - 20190322@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	   - 20191205@Parsons: PP tournament [#123958]
 	   - 20191225@Bruce: billing term by currency [#120005]
+	   - 20200303@Mason: Suport HID currency [#128856]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
