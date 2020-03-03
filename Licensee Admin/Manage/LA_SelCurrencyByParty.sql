@@ -52,7 +52,7 @@ BEGIN
 	BEGIN
 	    INSERT INTO @temp
 	    SELECT DISTINCT exchangeid
-	    FROM CustDB.dbo.Exchange
+	    FROM CustDB.dbo.Exchange WITH (NOLOCK)
 	    WHERE exchangeid NOT IN (SELECT Currency FROM @temp)
 	END
 	DECLARE @temp1 AS TABLE (currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))

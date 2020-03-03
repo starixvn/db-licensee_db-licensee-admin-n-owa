@@ -437,7 +437,7 @@ BEGIN
 				p.ProductId,
 				r.BettypeRef
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				LEFT JOIN dbo.Sport_Bettype_Reference r ON b.Bettype = r.Bettype
+				LEFT JOIN dbo.Sport_Bettype_Reference r WITH (NOLOCK) ON b.Bettype = r.Bettype
 				INNER JOIN @PartyChargeInfo p ON	b.ProductId = p.ProductID 
 													AND p.LicenseeId = b.SiteId
 													AND (b.Bettype = -1 OR r.BettypeRef = p.BettypeRef)
@@ -570,8 +570,8 @@ BEGIN
 
 			INSERT INTO @EmptyTable
 			SELECT p.Productid, p.ProductPrefix, s.ProductName, 0, d.Amount * e.Rate, @AmountTypeMonthlyHostingFee
-			FROM @Settings s INNER JOIN dbo.Product3rd p ON s.ProductName = p.ProductName
-				INNER JOIN dbo.LA_HostingFeesDetail d ON s.FeesId = d.HostingFeesId AND @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
+			FROM @Settings s INNER JOIN dbo.Product3rd p WITH (NOLOCK) ON s.ProductName = p.ProductName
+				INNER JOIN dbo.LA_HostingFeesDetail d WITH (NOLOCK) ON s.FeesId = d.HostingFeesId AND @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
 				INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
 			WHERE s.SettingType = 1
 
