@@ -74,13 +74,10 @@ BEGIN
 		WHERE ci.ChargeType != @ProfitSharingChargeType
 	)
 
-	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, 
-	ExchangeID, 
-	CASE WHEN ExchangeID = 51 THEN 'INH' 
-		 WHEN ExchangeID = 92 THEN 'HID' 
-		 ELSE Code END, 
-	BaseCurrencyRate
+	INSERT INTO #Exchange(ExchangeDate, ExchangeID, Rate, CurrencyCode)
+	SELECT ExchangeDate, ExchangeID, BaseCurrencyRate, CASE WHEN ExchangeID = 51 THEN 'INH' 
+															WHEN ExchangeID = 92 THEN 'HID' 
+															ELSE Code END
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
 	DECLARE @SharingCharge TABLE (

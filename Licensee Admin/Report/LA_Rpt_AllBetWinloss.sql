@@ -197,11 +197,10 @@ BEGIN
 	BEGIN
 		SET @TempCurrency = (SELECT TOP 1 Code FROM @BaseCurrencies WHERE IsApply IS NULL)
 		
-		INSERT INTO #Exchange(ExchangeDate, ExchangeId,Code,Rate)
-		SELECT exchangedate, ExchangeId, 
-		CASE WHEN ExchangeId = 92 THEN 'HID' 
-			 WHEN ExchangeId = 51 THEN 'INH' ELSE Code END, 
-		BaseCurrencyRate
+		INSERT INTO #Exchange(ExchangeDate, ExchangeId, Rate, Code)
+		SELECT exchangedate, ExchangeId, BaseCurrencyRate, CASE WHEN ExchangeId = 92 THEN 'HID' 
+																WHEN ExchangeId = 51 THEN 'INH' 
+																ELSE Code END
 		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @TempCurrency)
 
 		;WITH StagingData AS (
