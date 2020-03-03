@@ -41,7 +41,7 @@ BEGIN
 		,Todate			SMALLDATETIME
 	)
 	
-	-- ​Pay to Supplier: equals 2.5%(0.025) of [Licensing Fee] -- Join Charge rate and 3rd Rate
+	-- ​Pay to Supplier: equals 3.5%(0.035) of [Licensee Win Loss]
 	INSERT INTO #ChargeRate
 	SELECT c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'SG') c
@@ -59,7 +59,9 @@ BEGIN
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	
-	UPDATE #Exchange SET CurrencyCode = 'INH' WHERE ExchangeID = 51
+	UPDATE #Exchange SET CurrencyCode = CASE WHEN ExchangeID = 51 THEN 'INH' 
+											 WHEN ExchangeID = 92 THEN 'HID' END
+	WHERE ExchangeID IN (51,92)
 	
 	-- Region: TempData
 	CREATE TABLE #TempData (
