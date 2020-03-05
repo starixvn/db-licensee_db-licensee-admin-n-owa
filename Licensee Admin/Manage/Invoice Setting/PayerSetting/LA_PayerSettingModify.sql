@@ -8,6 +8,7 @@ ALTER PROCEDURE [dbo].[LA_PayerSettingModify]
 	, @ChargeSettingXML		NVARCHAR (MAX)
 	, @MinFeeSettingXML		NVARCHAR (MAX)
 	, @WaiveSettingXML		NVARCHAR (MAX)
+	, @SpecialTreatmentXml	NVARCHAR (MAX)
 	, @ExchangeID			INT
 	, @UserID				INT
 	, @LoginIP				VARCHAR (50)	= ''
@@ -24,6 +25,7 @@ AS
 		- 20170220@bruce: update payer settings [#70050]
 		- 20180706@bruce: enhance discount group [#94282]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20200305@Parsons: Special handling for INH market [#FeatureID 128570]
 
 	 Params:				
 */
@@ -33,7 +35,7 @@ BEGIN
 			, @MinDate			DATE 
 			, @MaxDate			DATE
 	
-	DECLARE @OldPayerGroupId INT, @MinFeeInsertedList VARCHAR(100), @WaiveInsertedList VARCHAR(100)
+	DECLARE @OldPayerGroupId INT, @MinFeeInsertedList VARCHAR(100), @WaiveInsertedList VARCHAR(100), @SpecialTreatmentInsertedList VARCHAR(100)
 
 	IF (@ExchangeID IS NULL) SET @ExchangeID = (SELECT ISNULL(BaseCurrencyId, 0) FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE PartyID = @PayerID)
 
@@ -91,6 +93,29 @@ BEGIN
 				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM bodb02.dbo.strSplit(@MinFeeInsertedList, ','))
 			RETURN
 		END
+	--INH Special treatment
+	EXEC dbo.LA_PartySpecialTreatmentModify
+		@PayerID					= @PayerID
+		, @SpecialTreatmentXml		= @SpecialTreatmentXml
+		, @UserID					= @UserID
+		, @LoginIP					= @LoginIP
+		, @ErrCode					= @ErrCode		OUTPUT
+		, @ErrMsg					= @ErrMsg		OUTPUT
+		, @SpecialTreatmentInsertedList	= @SpecialTreatmentInsertedList OUTPUT
+	IF @ErrCode <> 0 
+	BEGIN
+		--Rollback for payerGroup
+		IF (@OldPayerGroupId = 0)
+			DELETE dbo.LA_PartyGroupAssignment WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID
+		--Rollback Minfee
+		IF ISNULL(@MinFeeInsertedList, 0) <> 0
+			DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM bodb02.dbo.strSplit(@MinFeeInsertedList, ','))
+		--Rollback waive
+		IF ISNULL(@WaiveInsertedList, 0 ) <> 0
+				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM bodb02.dbo.strSplit(@WaiveInsertedList, ','))
+		RETURN
+	END
+
 	--Modify Chargerate Setting
 	EXEC dbo.LA_ChargeRateSettingModify
 		@PayerID				= @PayerID
@@ -111,6 +136,9 @@ BEGIN
 			--Rollback waive
 			IF ISNULL(@WaiveInsertedList, 0 ) <> 0
 				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM bodb02.dbo.strSplit(@WaiveInsertedList, ','))
+			--Rollback INH Special treatment
+			IF ISNULL(@SpecialTreatmentInsertedList, 0 ) <> 0
+				DELETE dbo.LA_PartySpecialTreatment WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND Id IN (SELECT val FROM bodb02.dbo.strSplit(@SpecialTreatmentInsertedList, ','))
 			RETURN
 		END
 
