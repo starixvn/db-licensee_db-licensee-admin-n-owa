@@ -172,7 +172,7 @@ BEGIN
 			SUM(Turnover),
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
-			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
+			SUM(LicensingFee),
 			SUM(PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
@@ -184,8 +184,8 @@ BEGIN
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(LicensingFee),
-			SUM(CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END),
-			SUM(LicensingFee - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END)
+			SUM(PayToSupplier),
+			SUM(LicensingFee - PayToSupplier)
 		FROM @Total
 		WHERE Currency = @tempCurrency
 		GROUP BY Currency
