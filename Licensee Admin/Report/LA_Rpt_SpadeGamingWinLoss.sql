@@ -172,7 +172,7 @@ BEGIN
 			SUM(Turnover),
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
-			SUM(LicensingFee),
+			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
 			SUM(PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
