@@ -21,6 +21,7 @@ AS
 	- 20191216@Parsons: Modify pay to supplier's formula for Keno WL report [#125014]
 	- 20191226@Mason: Set term by currency [#120005]
 	- 20200219@Mason: Update RNG Keno term [#128563]
+	- 20200228@Parsons: Support-HID-currency [#128856]
 
  Param's Explanation:
 	- @FromDate		: From date
@@ -181,6 +182,7 @@ BEGIN
 						WHEN e.ExchangeID = 75 THEN 'PTU'
 						WHEN e.ExchangeID = 76 THEN 'PS'
 						WHEN e.ExchangeID = 77 THEN 'PTH'
+						WHEN e.ExchangeID = 92 THEN 'HID'
 						ELSE e.Code END AS CurrencyName,
 					td.TotalTrans,
 					td.Turnover,
@@ -204,6 +206,7 @@ BEGIN
 						WHEN e.ExchangeID = 75 THEN 'PTU'
 						WHEN e.ExchangeID = 76 THEN 'PS'
 						WHEN e.ExchangeID = 77 THEN 'PTH'
+						WHEN e.ExchangeID = 92 THEN 'HID'
 						ELSE e.Code END AS CurrencyName,
 					td.TotalTrans,
 					td.Turnover * e.BaseCurrencyRate,

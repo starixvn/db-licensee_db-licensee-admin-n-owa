@@ -19,6 +19,7 @@ AS
 	- 20170217@bruce: change deposit service charge to 9 [#70050]
 	- 20171220@Parsons: increase length for variables [#88197]
 	- 20180716@bruce: add new group TEST for credit [#98126]
+	- 20200203@Mason: Suport HID currency [#128856]
 
  Param's Explanation:
 	- @FromDate			: From date
@@ -95,7 +96,7 @@ BEGIN
 		)
 		INSERT INTO @PlayCurrencySettings
 		SELECT SiteId, MemberCurrency,PlayCurrency,FromDate,ToDate
-		FROM OPENQUERY(DB06,'SELECT SiteId, MemberCurrency,PlayCurrency,FromDate,ToDate FROM bodb02.dbo.PlayCurrencySetting WITH(NOLOCK) WHERE SportType=211')
+		FROM OPENQUERY(DBACC,'SELECT SiteId, MemberCurrency,PlayCurrency,FromDate,ToDate FROM bodb02.dbo.PlayCurrencySetting WITH(NOLOCK) WHERE SportType=211')
 	END
 
 	-- Base currencies
@@ -196,8 +197,10 @@ BEGIN
 	BEGIN
 		SET @TempCurrency = (SELECT TOP 1 Code FROM @BaseCurrencies WHERE IsApply IS NULL)
 		
-		INSERT INTO #Exchange(ExchangeDate, ExchangeId,Code,Rate)
-		SELECT exchangedate, ExchangeId,Code, BaseCurrencyRate
+		INSERT INTO #Exchange(ExchangeDate, ExchangeId, Rate, Code)
+		SELECT exchangedate, ExchangeId, BaseCurrencyRate, CASE WHEN ExchangeId = 92 THEN 'HID' 
+																WHEN ExchangeId = 51 THEN 'INH' 
+																ELSE Code END
 		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @TempCurrency)
 
 		;WITH StagingData AS (
@@ -255,8 +258,8 @@ BEGIN
 						p.PartyName,
 						r.PartyId,
 						@FromDate AS ReportDate, -- dummy data,
-						CASE WHEN r.OriginalCurrency='VND' THEN 'INH' ELSE r.OriginalCurrency END OriginalCurrency,
-						CASE WHEN r.RegisteredCurrency='VND' THEN 'INH' ELSE r.RegisteredCurrency END RegisteredCurrency,
+						r.OriginalCurrency AS OriginalCurrency,
+						r.RegisteredCurrency AS RegisteredCurrency,
 						SUM(r.TotalTrans) AS TotalTrans,
 						SUM(r.TurnoverBased) AS Turnover,
 						SUM(r.ValidBetAmountBased) AS ValidBetAmount,
@@ -282,8 +285,8 @@ BEGIN
 						'' AS PartyName,	-- dummy data
 						0 AS PartyId,		-- dummy data
 						r.ReportDate,
-						CASE WHEN r.OriginalCurrency='VND' THEN 'INH' ELSE r.OriginalCurrency END OriginalCurrency,
-						CASE WHEN r.RegisteredCurrency='VND' THEN 'INH' ELSE r.RegisteredCurrency END RegisteredCurrency,
+						r.OriginalCurrency AS OriginalCurrency,
+						r.RegisteredCurrency AS RegisteredCurrency,
 						SUM(r.TotalTrans) AS TotalTrans,
 						SUM(r.Turnover) AS Turnover,
 						SUM(r.ValidBetAmount) AS ValidBetAmount,

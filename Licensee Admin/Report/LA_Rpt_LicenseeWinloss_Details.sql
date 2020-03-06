@@ -2,10 +2,6 @@
 USE bodb02
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss_Details] 
 	  @PartyID				INT
 	, @Currency				INT				= 0
@@ -38,6 +34,7 @@ AS
 	- 20190322@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	- 20191204@Bruce: PP tournament [#123958]
 	- 20191225@Bruce: billing term by currency [#120005]
+	- 20200228@Parsons: Support-HID-currency [#128856]
 
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -80,7 +77,7 @@ BEGIN
 	
 	INSERT INTO #Products(ProductID,ProductName)
 	SELECT DISTINCT Productid,ProductName
-	FROM bodb_licensee.dbo.Product3rd
+	FROM bodb_licensee.dbo.Product3rd WITH (NOLOCK)
 	
 	INSERT INTO #Products(ProductID,ProductName) VALUES (0,'Sportsbook')
 	
@@ -565,10 +562,11 @@ BEGIN
 					WHEN 51 THEN 'INH'
 					WHEN 75 THEN 'PTU'
 					WHEN 76 THEN 'PS'
-					WHEN 77 THEN 'PTH' 
+					WHEN 77 THEN 'PTH'
+					WHEN 92 THEN 'HID'
 					ELSE CurrencyCode
 				END)
-	WHERE currency IN (51, 75, 76, 77)	
+	WHERE currency IN (51, 75, 76, 77, 92)	
 
 	UPDATE t1
 	SET CurrencyCode = t1.CurrencyCode + ' (' + CurrencyName + ')'

@@ -2,10 +2,6 @@
 USE bodb02
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss_Details]
 	@PartyIDs			VARCHAR(5500)	= ''
 	, @CurrencyIds		VARCHAR(4000)	= ''
@@ -39,6 +35,7 @@ AS
 	   - 20190322@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	   - 20191205@Parsons: PP tournament [#123958]
 	   - 20191225@Bruce: billing term by currency [#120005]
+	   - 20200303@Mason: Suport HID currency [#128856]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -314,9 +311,10 @@ BEGIN
 					WHEN 75 THEN 'PTU'
 					WHEN 76 THEN 'PS'
 					WHEN 77 THEN 'PTH' 
+					WHEN 92 THEN 'HID'
 					ELSE Code
 				END)
-	WHERE ExchangeId IN (51, 75, 76, 77)
+	WHERE ExchangeId IN (51, 75, 76, 77, 92)
 	
 	SELECT	w.PartyID,
 			CASE WHEN p.PartyName ='18bb' THEN 'PIH'

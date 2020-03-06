@@ -54,6 +54,7 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180712@Bruce: Enhance Manage Discount group [#94282]
 		- 20181002@Parsons: Integrate AG setup fee into invoices [#98485]
+		- 20200228@Parsons: Support-HID-currency [#128856]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -236,6 +237,7 @@ BEGIN
 																WHEN 75 THEN 'PTU'
 																WHEN 76 THEN 'PS'
 																WHEN 77 THEN 'PTH'
+																WHEN 92 THEN 'HID'
 																ELSE e.CurrencyCode
 															END,
 								@HostingFeesExchangeRate = e.Rate
@@ -435,7 +437,7 @@ BEGIN
 				p.ProductId,
 				r.BettypeRef
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				LEFT JOIN dbo.Sport_Bettype_Reference r ON b.Bettype = r.Bettype
+				LEFT JOIN dbo.Sport_Bettype_Reference r WITH (NOLOCK) ON b.Bettype = r.Bettype
 				INNER JOIN @PartyChargeInfo p ON	b.ProductId = p.ProductID 
 													AND p.LicenseeId = b.SiteId
 													AND (b.Bettype = -1 OR r.BettypeRef = p.BettypeRef)
@@ -568,8 +570,8 @@ BEGIN
 
 			INSERT INTO @EmptyTable
 			SELECT p.Productid, p.ProductPrefix, s.ProductName, 0, d.Amount * e.Rate, @AmountTypeMonthlyHostingFee
-			FROM @Settings s INNER JOIN dbo.Product3rd p ON s.ProductName = p.ProductName
-				INNER JOIN dbo.LA_HostingFeesDetail d ON s.FeesId = d.HostingFeesId AND @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
+			FROM @Settings s INNER JOIN dbo.Product3rd p WITH (NOLOCK) ON s.ProductName = p.ProductName
+				INNER JOIN dbo.LA_HostingFeesDetail d WITH (NOLOCK) ON s.FeesId = d.HostingFeesId AND @HostingFeesMaxPCU BETWEEN d.VCMFrom AND d.VCMTo
 				INNER JOIN #Exchange e ON d.BaseCurrencyId = e.ExchangeID AND e.ExchangeDate = @ToDate
 			WHERE s.SettingType = 1
 

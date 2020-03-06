@@ -2,13 +2,9 @@
 USE bodb_licensee
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_GroupLicensingFeeWinLoss]
 	@PartyIDs				VARCHAR(5500)	= ''
-	, @ProductCodes		VARCHAR(5500) = ''	
+	, @ProductCodes			VARCHAR(5500) = ''	
 	, @FromDate				SMALLDATETIME
 	, @ToDate				SMALLDATETIME	
 AS
@@ -21,6 +17,7 @@ AS
 	   - 20190425@Parsons: Integrate-PP-Promotion-Prize [#109014] 
 	   - 20191216@Parsons: PP tournament [#123958]
 	   - 20191125@Mason: Setup billing terms by Currency [#120005]
+	   - 20200228@Parsons: Support-HID-currency [#128856]
 */
 BEGIN
 	SET NOCOUNT ON	
@@ -178,10 +175,11 @@ BEGIN
 					WHEN 51 THEN 'INH'
 					WHEN 75 THEN 'PTU'
 					WHEN 76 THEN 'PS'
-					WHEN 77 THEN 'PTH' 
+					WHEN 77 THEN 'PTH'
+					WHEN 92 THEN 'HID' 
 					ELSE CurrencyCode
 				END)
-	WHERE Currency IN (51, 75, 76, 77)
+	WHERE Currency IN (51, 75, 76, 77, 92)
 
 	UPDATE e
 	SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'

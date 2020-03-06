@@ -17,6 +17,7 @@ AS
 		- 20170401@Harper: #73310_Change sum table for CashOut Product
 		- 20171219@Bruce: increase length for variables [#88197]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20200302@Mason: Support HID currency [#128856]
 		
 	Param's Explanation:
 */
@@ -24,7 +25,7 @@ SET NOCOUNT ON
 BEGIN
 	DECLARE @LicenseeID INT
 	DECLARE @ProductCode VARCHAR(6)	= 'CO'
-	DECLARE @ProductId INT = (SELECT Productid FROM dbo.Product3rd WHERE ProductPrefix = 'CO')
+	DECLARE @ProductId INT = (SELECT Productid FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductPrefix = 'CO')
 	DECLARE @ProfitSharingChargeType INT = 8
 	DECLARE @SBProductId INT = 0
 	DECLARE @BAProductId INT = 3
@@ -73,8 +74,10 @@ BEGIN
 		WHERE ci.ChargeType != @ProfitSharingChargeType
 	)
 
-	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
+	INSERT INTO #Exchange(ExchangeDate, ExchangeID, Rate, CurrencyCode)
+	SELECT ExchangeDate, ExchangeID, BaseCurrencyRate, CASE WHEN ExchangeID = 51 THEN 'INH' 
+															WHEN ExchangeID = 92 THEN 'HID' 
+															ELSE Code END
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
 	DECLARE @SharingCharge TABLE (
@@ -87,7 +90,7 @@ BEGIN
 		CASE WHEN c.FromDate > @ToDate THEN @FromDate ELSE c.FromDate END,
 		CASE WHEN c.FromDate > @ToDate THEN @ToDate ELSE c.ToDate END,
 		CASE WHEN c.FromDate > @ToDate THEN 0 ELSE c.Rate END
-	FROM bodb_licensee.dbo.OAS_ChargeInfo c
+	FROM bodb_licensee.dbo.OAS_ChargeInfo c WITH (NOLOCK)
 	WHERE c.ProductID = @ProductId AND c.ChargeType = @ProfitSharingChargeType
 
 	BEGIN
@@ -145,7 +148,7 @@ BEGIN
 		d.PartyID				AS PartyID,
 		p.PartyName				AS PartyName,
 		d.CurrencyId,
-		CASE WHEN e.CurrencyCode='VND' THEN 'INH' ELSE e.CurrencyCode END AS CurrencyName,
+		e.CurrencyCode AS CurrencyName,
 		SUM(CashoutTimes) AS CashoutTimes,
 		SUM(CashoutTickets) AS CashoutTickets,
 		SUM(CashoutValue * e.Rate) AS CashoutValue,

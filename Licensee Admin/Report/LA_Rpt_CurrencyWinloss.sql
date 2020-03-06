@@ -2,10 +2,6 @@
 USE bodb02
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss]
 	@PartyIDs				VARCHAR(5500)	= ''
 	, @CurrencyIds			VARCHAR(4000)	= ''
@@ -43,6 +39,7 @@ AS
 	   - 20190322@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	   - 20191205@Parsons: PP tournament [#123958]
 	   - 20191225@Bruce: billing term by currency [#120005]
+	   - 20200228@Parsons: Support-HID-currency [#128856]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -343,7 +340,7 @@ BEGIN
 			SUM(Playercomm * e.Rate) AS Playercomm
 	FROM #tmpWinLoss w
 	INNER JOIN #DailyExchange e ON w.Winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
-	LEFT JOIN bodb_licensee.dbo.OAS_Party p ON w.PartyID = p.PartyID
+	LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON w.PartyID = p.PartyID
 	GROUP BY w.PartyID,p.PartyName
 	ORDER BY w.PartyID,p.PartyName
 
@@ -359,10 +356,11 @@ BEGIN
 					WHEN 51 THEN 'INH'
 					WHEN 75 THEN 'PTU'
 					WHEN 76 THEN 'PS'
-					WHEN 77 THEN 'PTH' 
+					WHEN 77 THEN 'PTH'
+					WHEN 92 THEN 'HID' 
 					ELSE CurrencyCode
 				END)
-	WHERE Currency IN (51, 75, 76, 77)
+	WHERE Currency IN (51, 75, 76, 77, 92)
 
 	UPDATE e
 	SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'

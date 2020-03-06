@@ -18,6 +18,7 @@ AS
 		- 20180508@Harper: Change PayToSupplier term of Exchange product [RedmineID: #94281]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20180612@Scofield: Modify Exchange WL Report with Licensee charge comm [#96768]
+		- 20200302@Parsons: Support-HID-currency [#128856]
 
 	 Params:
 
@@ -135,11 +136,11 @@ BEGIN
 		Rate			FLOAT
 	)	
 	
-	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
+	INSERT INTO #Exchange(ExchangeDate, ExchangeID, Rate, CurrencyCode)
+	SELECT ExchangeDate, ExchangeID, BaseCurrencyRate, CASE WHEN ExchangeId = 92 THEN 'HID' 
+															WHEN ExchangeId = 51 THEN 'INH' ELSE Code 
+													   END
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
-		
-	UPDATE #Exchange SET CurrencyCode = 'INH' WHERE ExchangeID = 51
 	-- End Region
 	
 	DECLARE @Total TABLE (

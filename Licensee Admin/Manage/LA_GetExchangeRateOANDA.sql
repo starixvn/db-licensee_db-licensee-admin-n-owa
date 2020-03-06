@@ -11,6 +11,7 @@ AS
 	
 	Revisions:
 		- 20180518@Scofield: create [#94950]
+		- 20200228@Parsons: Support-HID-currency [#128856]
 */  
 	SET NOCOUNT ON 
  
@@ -28,6 +29,7 @@ AS
 				WHEN edo.ExchangeId = 75 THEN 'PTU'
 				WHEN edo.ExchangeId = 76 THEN 'PS'
 				WHEN edo.ExchangeId = 77 THEN 'PTH'
+				WHEN edo.ExchangeId = 92 THEN 'HID'
 				ELSE edo.Code 
 			END CurrencyCode,
 			edo.EUR,

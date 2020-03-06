@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -20,6 +20,7 @@ AS
 	 - 20171219@Bruce: increase length for variables [#88197]
 	 - 20180716@bruce: add new group TEST for credit [#98126]
 	 - 20181106@bruce: move sp to bodb_licensee [#103999]
+	 - 20200302@Mason: Support HID currency [#128856]
 	 
 	 Params:
 	 - PartyIds: List Party Id.
@@ -73,13 +74,11 @@ SET NOCOUNT ON
 		Rate			FLOAT
 	)
 
-	INSERT INTO #Exchange
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
+	INSERT INTO #Exchange(ExchangeDate, ExchangeID, Rate, CurrencyCode)
+	SELECT ExchangeDate, ExchangeID, BaseCurrencyRate, CASE WHEN ExchangeID = 51 THEN 'INH' 
+															WHEN ExchangeID = 92 THEN 'HID' 
+															ELSE Code END
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
-
-	UPDATE #Exchange
-	SET CurrencyCode = 'INH'
-	WHERE ExchangeID = 51
 
 	-- End region
 
@@ -255,10 +254,3 @@ SET NOCOUNT ON
 	DROP TABLE #Exchange
 	DROP TABLE #TempData
 END
-
-GO
-GRANT EXECUTE ON [dbo].[LA_Rpt_SuperliveWinLoss] TO [bodbLicenseeNet] AS [dbo]
-GRANT EXECUTE ON [dbo].[LA_Rpt_SuperliveWinLoss] TO [bodbAdminNet] AS [dbo]
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_Rpt_SuperliveWinLoss] TO [vnteam] AS [dbo]
-GO

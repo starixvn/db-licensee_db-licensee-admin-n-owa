@@ -13,6 +13,7 @@ AS
 
 	 Revisions:  
 		- 20181022@Parsons: Configure discount settings by currency [#99694]
+		- 20200225@Parsons: Support-HID-currency [#128856]
 
 	 Params:
 
@@ -24,7 +25,9 @@ BEGIN
 	DECLARE @CurrenciesOfLicensee TABLE (PartyId INT, CurrencyId INT, CurrencyCode VARCHAR(20), CurrencyName VARCHAR(20))
 	
 	INSERT INTO @CurrenciesOfLicensee(PartyId, CurrencyId, CurrencyCode, CurrencyName)
-	SELECT DISTINCT p.PartyId, lc.Currency, e.Code, CASE WHEN lc.Currency = 51 THEN 'VND' ELSE e.currency END AS CurrencyName
+	SELECT DISTINCT p.PartyId, lc.Currency, 
+					CASE WHEN lc.Currency = 92 THEN 'HID' ELSE e.Code END AS Code, 
+					CASE WHEN lc.Currency = 51 THEN 'VND' ELSE e.currency END AS CurrencyName
 	FROM dbo.LA_f_SelLicenseeCust(0) AS lc
 	INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON lc.LicenseeID = p.OldRefID 
 	INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid

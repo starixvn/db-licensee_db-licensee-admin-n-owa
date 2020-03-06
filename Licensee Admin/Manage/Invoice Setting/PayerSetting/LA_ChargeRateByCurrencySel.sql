@@ -12,6 +12,7 @@ AS
 
 	Revisions:
 		- 20200205@Mason: Create SP [#Feature ID: 120005 Set billing term by currency]
+		- 20200302@Mason: Support HID currency [#128856]
 
 	Params:
 	+ @PayerId : 0 get all Party
@@ -39,6 +40,8 @@ BEGIN
 	DECLARE @CurrencyInfo AS TABLE (CurrencyId INT, CurrencyCode VARCHAR(20), CurrencyName VARCHAR(20))
 	INSERT INTO @CurrencyInfo
 	EXEC dbo.LA_PayerCurrencySel @PayerId = @PayerId
+	
+	UPDATE @CurrencyInfo SET CurrencyCode = 'HID' WHERE CurrencyId = 92
 
 	-- Get charge rate by currency
 	SELECT 

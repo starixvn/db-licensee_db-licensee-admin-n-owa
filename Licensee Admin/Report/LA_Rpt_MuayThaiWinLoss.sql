@@ -22,6 +22,7 @@ AS
 		- 20171219@Bruce: increase length for variables [#88197]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20200213@Mason: Set billing term by currency [#120005]
+		- 20200302@Parsons: Support-HID-currency [#128856]
 
 	Param's Explanation:
 		- @TicketType: 1 - Single; 2 - Parlay; 3 - All
@@ -70,13 +71,11 @@ BEGIN
 		Rate			FLOAT
 	)
 
-	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
+	INSERT INTO #Exchange(ExchangeDate, ExchangeID, Rate, CurrencyCode)
+	SELECT ExchangeDate, ExchangeID, BaseCurrencyRate, CASE WHEN ExchangeID = 51 THEN 'INH' 
+															WHEN ExchangeID = 92 THEN 'HID' 
+															ELSE Code END
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
-
-	UPDATE #Exchange
-	SET CurrencyCode = 'INH'
-	WHERE ExchangeID = 51
 	-- End region
 
 	-- Region: Get Winloss data
