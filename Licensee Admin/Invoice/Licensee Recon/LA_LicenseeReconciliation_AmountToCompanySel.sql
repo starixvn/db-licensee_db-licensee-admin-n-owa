@@ -22,6 +22,7 @@ AS
 		- 20191017@Bruce: Group by party id [#122229]
 		- 20191209@Bruce: Include PP tournament [123958]
 		- 20200117@Mason: Setup billing terms by Currency  [#120005]
+		- 20200309@Parsons: Intergrate SpadeGaming [#123959]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -62,7 +63,7 @@ BEGIN
 
 	-- supported products
 	-- 
-	DECLARE @supportedProducts VARCHAR(100) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC'
+	DECLARE @supportedProducts VARCHAR(100) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG'
 	DECLARE @productList TABLE(ProductId INT, Code VARCHAR(5), Name VARCHAR(50))
 	INSERT INTO @productList(ProductId,Code,Name)
 	SELECT ProductID, ProductPrefix,ProductName FROM dbo.LA_f_Products3rd(@supportedProducts)
