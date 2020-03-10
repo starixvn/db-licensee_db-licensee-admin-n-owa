@@ -55,7 +55,8 @@ BEGIN
 			AmountType		TINYINT,
 			Rate			MONEY,
 			DeductMonthlyFees	MONEY,
-			RemainingAmount	MONEY)
+			RemainingAmount	MONEY,
+			IsSpecialTreatment BIT)
 
 	-- Region: Get base Currency
 	DECLARE @BaseCurrencyId INT 
@@ -118,7 +119,8 @@ BEGIN
 		RebateRemark	NVARCHAR(4000),
 		NegativeFee		MONEY,
 		Minfee			MONEY,
-		IsChargedByMinFee BIT
+		IsChargedByMinFee BIT,
+		IsSpecialTreatment BIT
 	)
 	INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,NegativeFee,Minfee,IsChargedByMinFee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark)
 	EXEC dbo.LA_AmountToCompanySel @FromDate,@ToDate,@PartyId,@ProductCodes,@BaseCurrency
@@ -382,11 +384,17 @@ BEGIN
 			InvoiceAmount	MONEY, 
 			AmountType		TINYINT,
 			Rate			MONEY,
-			Remark			NVARCHAR(4000))
-		
+			Remark			NVARCHAR(4000),
+			IsSpecialTreatment BIT)
+	DECLARE @IsSpecialTreatment BIT = 0, @CurrentDate DATE = GETDATE(), @INH_CurrencyID INT = 51
+
+	IF(EXISTS(SELECT TOP 1 1 FROM [dbo].[LA_PartySpecialTreatment] WITH(NOLOCK) WHERE @CurrentDate BETWEEN FromDate AND ToDate))
+	BEGIN
+		SET @IsSpecialTreatment = 1
+	END	
 	-- Region: fee
-	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType)
-	SELECT d.PartyId, d.ProductId, d.Fee, @AmountTypeSoftwareFee
+	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, IsSpecialTreatment)
+	SELECT d.PartyId, d.ProductId, d.Fee, @AmountTypeSoftwareFee, IsSpecialTreatment
 	FROM #AmountToCompany d
 	-- End Region
 
@@ -399,6 +407,19 @@ BEGIN
 				@AmountTypeSoftwareFee
 		FROM	#TempData td 
 		WHERE	td.ProductId NOT IN (SELECT td2.ProductId FROM @InvoiceData td2)
+				AND (@IsSpecialTreatment = 0 OR td.CurrencyId <> @INH_CurrencyID)
+		GROUP	BY td.PartyId, td.ProductId
+	)
+	INSERT INTO @InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType,IsSpecialTreatment)
+	(
+		SELECT	td.PartyId,
+				td.ProductId,
+				SUM(td.AmountToCompany),
+				@AmountTypeSoftwareFee,
+				1
+		FROM	#TempData td 
+		WHERE	td.ProductId NOT IN (SELECT td2.ProductId FROM @InvoiceData td2)
+				AND (@IsSpecialTreatment = 1 AND td.CurrencyId = @INH_CurrencyID)
 		GROUP	BY td.PartyId, td.ProductId
 	)
 
@@ -409,7 +430,7 @@ BEGIN
 	-- End Region
 
 	-- Region: Select data	
-	INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate,Remark)
+	INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate,Remark,IsSpecialTreatment)
 	(
 		SELECT	id.ProductId,
 				CASE 
@@ -426,7 +447,8 @@ BEGIN
 				END AS InvoiceAmount,
 				id.AmountType,
 				id.Rate,
-				id.Remark
+				id.Remark,
+				id.IsSpecialTreatment
 		FROM	@InvoiceData id
 				LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON id.ProductId = p.Productid
 	)
@@ -555,9 +577,10 @@ BEGIN
 			f.Rate,
 			f.DeductMonthlyFees,
 			f.RemainingAmount,
-			f.Remark
+			f.Remark,
+			f.IsSpecialTreatment
 	FROM	@FinalResult f
-	ORDER BY f.AmountType, f.ProductId
+	ORDER BY f.AmountType, f.ProductId, f.IsSpecialTreatment
 
 	SELECT @ErrCode = 0, @ErrMsg = ''
 
