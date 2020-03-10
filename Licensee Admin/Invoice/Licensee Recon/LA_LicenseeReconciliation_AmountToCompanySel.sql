@@ -324,7 +324,7 @@ BEGIN
 		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = (CASE WHEN p.ProductID = 0 THEN @SPR ELSE p.ProductID END)
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 		WHERE b.rptDate BETWEEN p.FromDate AND p.ToDate
-			AND p.ProductID IN (0,@GD,@PP)
+			AND (p.ProductID IN(0, @PP) OR p.ChargeType = @GDTip_ChargeType)
 			AND b.Bettype IN (@PromotionPrize_Bettype,@PPTournament_Bettype,@GDTip_Bettype,@SabaPromotion_Bettype)
 		GROUP BY p.PartyID,b.rptdate,p.ProductId,b.CurrencyId
 
