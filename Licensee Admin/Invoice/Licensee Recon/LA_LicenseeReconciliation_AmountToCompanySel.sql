@@ -518,7 +518,7 @@ BEGIN
 		SELECT c.CalculationGroup, d.DiscountGroupId, d.Rate
 			,ISNULL(d.FromAmount,0) * e.Rate AS FromAmount
 			,CASE WHEN d.ToAmount > @Unlimited THEN d.ToAmount ELSE (d.ToAmount + 1) * e.Rate END AS ToAmount
-		FROM dbo.LA_DiscountGroupDetail d
+		FROM dbo.LA_DiscountGroupDetail d WITH(NOLOCK)
 		INNER JOIN @tmpDiscountCalculation c ON d.DiscountGroupId=c.DiscountGroupId
 		INNER JOIN #tmpExchange e ON e.ExchangeId = c.CurrencyId AND e.exchangedate=@ToDate
 	)

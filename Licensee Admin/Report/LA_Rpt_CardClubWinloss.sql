@@ -15,6 +15,7 @@ AS
 	- 20190710@Mason: Intergrate Card Club [#116096]
 	- 20191226@Mason: Set Billing Term By Currency [#120005]
 	- 20200302@Mason: Support HID currency [#128856]
+	- 20200311@Mason: Spadegaming Integration [#123959]
  * Param's Explanation:
  *
  */
