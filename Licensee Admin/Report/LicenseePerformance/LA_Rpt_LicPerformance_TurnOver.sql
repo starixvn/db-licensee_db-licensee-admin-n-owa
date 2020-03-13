@@ -28,6 +28,7 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]		
 		- 20180510@Bruce: Integrate Pragmatic [#94108]
 		- 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
+		- 20200311@Mason: Spadegaming integration [#123959]
 
     Param's Explanation:  
 	   + @partyIDs : a string of list PartyID, separated by ','
@@ -107,7 +108,7 @@ BEGIN
     END
 
     --exclude BA tickets
-    IF @ProductCode IN ('SB', 'RB', 'NG', 'LC', 'VS', 'CS', 'VB', 'PP')
+    IF @ProductCode IN ('SB', 'RB', 'NG', 'LC', 'VS', 'CS', 'VB', 'PP', 'SG')
     BEGIN		
 	   INSERT INTO #Tmp(PartyId, rptDate, CurrencyId, TurnOver)
 	   (

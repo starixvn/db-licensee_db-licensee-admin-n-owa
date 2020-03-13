@@ -15,6 +15,7 @@ AS
 	- 20190710@Mason: Intergrate Card Club [#116096]
 	- 20191226@Mason: Set Billing Term By Currency [#120005]
 	- 20200302@Mason: Support HID currency [#128856]
+	- 20200311@Mason: Spadegaming Integration [#123959]
  * Param's Explanation:
  *
  */
@@ -195,13 +196,9 @@ BEGIN
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
-			SUM(CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END)
+			SUM(PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
-		
-		UPDATE @Total
-		SET PayToSupplier = 0
-		WHERE PayToSupplier < 0
 		
 		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
 		SELECT Currency,

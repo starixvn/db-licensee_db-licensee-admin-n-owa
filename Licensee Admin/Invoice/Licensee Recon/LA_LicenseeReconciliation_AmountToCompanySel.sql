@@ -22,6 +22,7 @@ AS
 		- 20191017@Bruce: Group by party id [#122229]
 		- 20191209@Bruce: Include PP tournament [123958]
 		- 20200117@Mason: Setup billing terms by Currency  [#120005]
+		- 20200309@Parsons: Intergrate SpadeGaming [#123959]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -62,7 +63,7 @@ BEGIN
 
 	-- supported products
 	-- 
-	DECLARE @supportedProducts VARCHAR(100) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC'
+	DECLARE @supportedProducts VARCHAR(100) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG'
 	DECLARE @productList TABLE(ProductId INT, Code VARCHAR(5), Name VARCHAR(50))
 	INSERT INTO @productList(ProductId,Code,Name)
 	SELECT ProductID, ProductPrefix,ProductName FROM dbo.LA_f_Products3rd(@supportedProducts)
@@ -323,7 +324,7 @@ BEGIN
 		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = (CASE WHEN p.ProductID = 0 THEN @SPR ELSE p.ProductID END)
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 		WHERE b.rptDate BETWEEN p.FromDate AND p.ToDate
-			AND p.ProductID IN (0,@GD,@PP)
+			AND (p.ProductID IN(0, @PP) OR p.ChargeType = @GDTip_ChargeType)
 			AND b.Bettype IN (@PromotionPrize_Bettype,@PPTournament_Bettype,@GDTip_Bettype,@SabaPromotion_Bettype)
 		GROUP BY p.PartyID,b.rptdate,p.ProductId,b.CurrencyId
 
@@ -517,7 +518,7 @@ BEGIN
 		SELECT c.CalculationGroup, d.DiscountGroupId, d.Rate
 			,ISNULL(d.FromAmount,0) * e.Rate AS FromAmount
 			,CASE WHEN d.ToAmount > @Unlimited THEN d.ToAmount ELSE (d.ToAmount + 1) * e.Rate END AS ToAmount
-		FROM dbo.LA_DiscountGroupDetail d
+		FROM dbo.LA_DiscountGroupDetail d WITH(NOLOCK)
 		INNER JOIN @tmpDiscountCalculation c ON d.DiscountGroupId=c.DiscountGroupId
 		INNER JOIN #tmpExchange e ON e.ExchangeId = c.CurrencyId AND e.exchangedate=@ToDate
 	)

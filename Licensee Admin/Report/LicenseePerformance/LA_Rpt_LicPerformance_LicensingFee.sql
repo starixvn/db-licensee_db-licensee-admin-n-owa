@@ -34,6 +34,7 @@ AS
 	   - 20190325@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	   - 20191205@Parsons: PP tournament [#123958]
 	   - 20191226@Parsons: Setup billing terms by Currency  [#120005]
+	   - 20200311@Mason: Spadegaming integration  [#123959]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -82,7 +83,7 @@ BEGIN
 		SET @sdate = DATEADD(m, 1, @sdate)
 	END	
 
-	IF @ProductCode IN ('SB', 'NG', 'LC', 'VS', 'CS', 'VB')
+	IF @ProductCode IN ('SB', 'NG', 'LC', 'VS', 'CS', 'VB', 'SG')
 	BEGIN		
 		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, LicensingFee)
 		SELECT tp.PartyID, d.rptDate, d.CurrencyID, - SUM(d.Winloss * ISNULL(cc.Rate, tp.Rate))
