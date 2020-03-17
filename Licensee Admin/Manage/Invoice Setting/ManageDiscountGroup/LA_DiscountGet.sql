@@ -15,6 +15,7 @@ AS
 		- 20180628@Parsons: Get discount groups info [#94282]
 		- 20181022@Parsons: Configure discount settings by currency [#99694]
 		- 20200225@Parsons: Support-HID-currency [#128856]
+		- 20200317@Mason: INH market special handling [#128570]
 
 	 Params:
 
