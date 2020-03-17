@@ -3,7 +3,8 @@ USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountGet]
-	@GroupId INT
+	@GroupId		INT,
+	@TreatmentTime	DATETIME
 AS
 /*  
 	 Created: 20180628@Parsons [#94282]
@@ -118,5 +119,10 @@ BEGIN
 		d.PartyID = c.PartyId AND 
 		d.DiscountGroupId = @GroupId AND
 		(d.CurrencyId = 0 OR d.CurrencyId = c.CurrencyId) -- all currency = 0
+		
+	-- Get list of special treatment parties
+	SELECT ps.PartyId
+	FROM dbo.LA_PartySpecialTreatment ps
+	WHERE @TreatmentTime BETWEEN ps.FromDate AND ps.ToDate
 END
 GO
