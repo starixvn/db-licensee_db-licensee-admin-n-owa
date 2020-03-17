@@ -3,8 +3,7 @@ USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountGet]
-	@GroupId		INT,
-	@TreatmentTime	DATETIME
+	@GroupId		INT
 AS
 /*  
 	 Created: 20180628@Parsons [#94282]
@@ -26,6 +25,7 @@ BEGIN
 	DECLARE @ToBeCalculated TINYINT = 1
 	DECLARE @ToBeDiscounted TINYINT = 0
 	DECLARE @CalculateAndDiscount TINYINT = 10
+	DECLARE @TreatmentTime DATETIME = GETDATE()
 
 	--get products which has assigned to group
 	DECLARE 
@@ -123,7 +123,7 @@ BEGIN
 		
 	-- Get list of special treatment parties
 	SELECT ps.PartyId
-	FROM dbo.LA_PartySpecialTreatment ps
+	FROM dbo.LA_PartySpecialTreatment ps WITH (NOLOCK)
 	WHERE @TreatmentTime BETWEEN ps.FromDate AND ps.ToDate
 END
 GO
