@@ -28,6 +28,7 @@ AS
 		- 20190827@Bruce: Add new betfrom 't' [#118998]
 		- 20191010@Percy: Replace LicenseeBATransaction to LicenseeBATransaction_active [RedmineID: #103656]
 		- 20191223@Bruce: Adding betform v and 0 [#118998]
+		- 202000318@Parsons: Handle new betfrom v,1,2,3 into their own category [#130645]
 
 	Explanation:
 	  + @PlatformType:
@@ -40,8 +41,11 @@ AS
 					   8: Tablet (r)
 					   9: Mobile app for China (o)
 					  10: Mobile lite version (c)
-					  11: Native App (0)
-					  12: Others(t,v)
+					  11: OddsFeed (v)
+					  12: ESportsWebDesktop (1)
+					  13: ESportsWebMobile (2)
+					  14: ESportsAPP (3)
+					  15: Others(t)
 
 	  + @excludeTest: remove currency UUS
 	  + @MoveBetsDay: The day we move tickets to bettrans14
@@ -56,7 +60,7 @@ BEGIN
 	-- supported betfrom
 	--
 	DECLARE @betfrom TABLE(betfrom CHAR(1))
-	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,l,g,x,z,r,o,c,t,0,v',',')
+	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,l,g,x,z,r,o,c,t,0,v,1,2,3',',')
 
 	CREATE TABLE #WinLoss (
 		LicenseeID		INT,
@@ -197,7 +201,7 @@ BEGIN
 	FROM #WinLoss w
 		INNER JOIN #Exchange e ON e.ExchangeDate = w.Winlostdate and w.CurrencyId = e.ExchangeID
 		INNER JOIN @ChargeInfo l ON w.LicenseeID = l.LicenseeId AND w.Winlostdate BETWEEN l.Fromdate AND l.Todate
-		INNER JOIN bodb_licensee.dbo.OAS_Party p ON l.PartyId = p.PartyID
+		INNER JOIN bodb_licensee.dbo.OAS_Party p WITH(NOLOCK) ON l.PartyId = p.PartyID
 	GROUP BY w.Winlostdate, p.PartyName, w.BetFrom
 
 	DROP TABLE #Exchange
