@@ -45,6 +45,7 @@ AS
 		- 20190712@Mason: Add Card Club Win Loss report [RedmineId #116096]
 		- 20191024@Pasons: Non-peak hour promotion [#119538]    
 		- 20191223@Pasons: Integrate Spadegaming [#123959]    
+		- 20200302@Pasons: Integrate Virtual Games [#125222]
 
 	Param's Explanation:
 
@@ -347,6 +348,15 @@ BEGIN
 	   SELECT typeid, 36
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 4301 AND 4600
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+	END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'VRG')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 38
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 4601 AND 4900
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
