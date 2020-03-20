@@ -1,0 +1,1 @@
+Licensee Admin/Report/LA_Rpt_CardClubWinloss.sql
