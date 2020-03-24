@@ -16,6 +16,7 @@ AS
 	- 20191226@Mason: Set Billing Term By Currency [#120005]
 	- 20200302@Mason: Support HID currency [#128856]
 	- 20200311@Mason: Spadegaming Integration [#123959]
+	- 20200312@Parsons: Add new bet type for Card club [#129061]
  * Param's Explanation:
  *
  */
@@ -79,27 +80,12 @@ BEGIN
 		LicenseeWinloss MONEY,
 		LicensingFee MONEY,
 		PayToSupplier MONEY)
-
-	-- Calculate for desposit
-	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
-	SELECT ci.PartyId,
-		b.rptDate as Winlostdate,
-		b.CurrencyId,
-		SUM(b.Turnover) AS Turnover,
-		SUM(b.BetCount) AS TotalTrans,
-		SUM(b.MemberWL) AS CustomerWinLoss,
-		- SUM(b.MemberWL) AS LicenseeWinloss,
-		SUM(-b.MemberWL * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
-		SUM(-b.MemberWL * ci.Rate3rd) AS PayToSupplier
-	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
-		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeId = ci.ChargeId AND cr.CurrencyId = b.CurrencyId 
-	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
-		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
-		AND ci.isDeposit = 1
-	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
+	/*
+	  For normal tickets ( not Midas's tickets): Licensee WL x 2.5%
+	  For Midas's tickets: Licensee WL x 3.5%
+	*/
+	DECLARE @MidasTicketType INT = 1902, @MidasRate3rd DECIMAL(4,3) = 0.035
 	
-	-- Calculate for credit
 	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee, PayToSupplier)
 	SELECT ci.PartyId,
 		b.rptDate as Winlostdate,
@@ -108,14 +94,15 @@ BEGIN
 		SUM(b.BetCount) AS TotalTrans,
 		SUM(b.WinLoss) AS CustomerWinLoss,
 		- SUM(b.WinLoss) AS LicenseeWinloss,
-		- SUM(b.WinLoss + b.WinLossA + WinLossM + WinLossS + b.CommissionS) AS LicensingFee,
-		- SUM(b.WinLoss * ci.Rate3rd) AS PayToSupplier
+		- SUM(CASE WHEN ci.isDeposit = 1 THEN (b.WinLoss * ISNULL(cr.Rate, ci.Rate))
+				ELSE (b.WinLoss + b.WinLossA + WinLossM + WinLossS + b.CommissionS) END) AS LicensingFee,
+		- SUM(b.WinLoss * (CASE WHEN b.Bettype = @MidasTicketType THEN @MidasRate3rd ELSE ci.Rate3rd END)) AS PayToSupplier
 	FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
 		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeId = ci.ChargeId AND cr.CurrencyId = b.CurrencyId 
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 		b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
 		AND b.Bettype in (Select Bettype FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'CC'))
-		AND ci.isDeposit = 0
 	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
 	-- EndRegion
 	
