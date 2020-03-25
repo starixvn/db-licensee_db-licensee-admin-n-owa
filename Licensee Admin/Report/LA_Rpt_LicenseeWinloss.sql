@@ -2,10 +2,6 @@
 USE [bodb02]
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss]
 	  @PartyIDs				VARCHAR(4000)	= ''
 	, @Currency				INT				= 0
@@ -51,7 +47,7 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @GD_Tip SMALLINT = 1706
+	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007
 	DECLARE @PromotionPrize SMALLINT = 4300
 	DECLARE @PPTournament SMALLINT = 4299
 
@@ -68,7 +64,7 @@ BEGIN
 	SELECT DISTINCT PartyID, LicenseeID, ProductID, Bettype,
 			CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END,
 			Fromdate, Todate,
-			CASE WHEN ProductID=11 THEN ChargeType ELSE 1 END, -- include GD tip charge type
+			CASE WHEN ProductID IN(11, 39) THEN ChargeType ELSE 1 END, -- include Tip charge type
 			ChargeID
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 	
@@ -416,8 +412,8 @@ BEGIN
 		)
 	END
 
-	-- GD
-	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = 11) > 0
+	-- GD, SAG
+	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID IN (11, 39)) > 0
 	BEGIN
 		DELETE #Data
 
@@ -433,13 +429,13 @@ BEGIN
 				, SUM(b.MemberWL)
 				, SUM(b.betcount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) BetCount
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+					INNER JOIN @ChargeInfo o ON b.SiteID = o.LicenseeID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
-				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
+				AND (@Currency = 0 OR b.CurrencyID = @Currency)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27,28)
-				AND b.ProductID = 11
-				AND b.SiteID IN (SELECT DISTINCT o.LicenseeID FROM @ChargeInfo o WHERE o.ProductID=11)
+				AND b.ProductID IN (11, 39)
 			GROUP BY b.rptDate, b.SiteID, b.CurrencyID,b.Bettype
 		)
 
@@ -456,8 +452,8 @@ BEGIN
 			FROM #Data b WITH (NOLOCK)
 				INNER JOIN @ChargeInfo ci ON ci.LicenseeID = b.PartyID AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
 				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID=ci.ChargeId AND cc.CurrencyID=b.Currency
-			WHERE ci.ProductID=11 
-				AND b.BetTypeId <> @GD_Tip 
+			WHERE ci.ProductID IN(11,39) 
+				AND b.BetTypeId NOT IN (@GD_Tip, @SAG_Tip) 
 				AND ci.ChargeType=1 -- gross win
 			GROUP BY ci.PartyID, b.rptDate, b.Currency
 
@@ -468,15 +464,15 @@ BEGIN
 				, 0
 			FROM #Data b WITH (NOLOCK)
 				INNER JOIN @ChargeInfo ci ON ci.LicenseeID = b.PartyID AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
-			WHERE ci.ProductID=11 
-				AND b.BetTypeId = @GD_Tip 
-				AND ci.ChargeType=12 -- GD tip
+			WHERE ci.ProductID IN (11, 39)  
+				AND b.BetTypeId IN (@GD_Tip, @SAG_Tip) 
+				AND ci.ChargeType = 12 -- Tip amount
 			GROUP BY ci.PartyID, b.rptDate, b.Currency
 		)
 	END
 
 	DECLARE @ExcludedProductIds TABLE(ProductId INT)
-	INSERT INTO @ExcludedProductIds(ProductId) VALUES (1), (3), (14), (17), (15), (25), (13), (11)
+	INSERT INTO @ExcludedProductIds(ProductId) VALUES (1), (3), (14), (17), (15), (25), (13), (11), (39)
 
 	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) > 0
 	BEGIN
