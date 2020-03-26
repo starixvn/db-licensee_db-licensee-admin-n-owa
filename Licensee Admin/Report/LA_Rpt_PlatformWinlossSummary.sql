@@ -28,6 +28,7 @@ AS
 		- 20190827@Bruce: Add new betfrom 't' [#118998]
 		- 20191010@Percy: Replace LicenseeBATransaction to LicenseeBATransaction_active [RedmineID: #103656]
 		- 20191223@Bruce: Adding betform v and 0 [#118998]
+		- 202000326@Parsons: Handle new betfrom v,1,2,3 into their own category [#130645]
 
 	Explanation:
 		- Desktop: contain the followings:
@@ -35,13 +36,18 @@ AS
 			China:		betfrom = a,z
 			Euro:		betfrom = e,u
 			New Asia:	betfrom = x
+			ESportsWebDesktop: 1
 		- Mobile: contain the followings:
 			WAP:	betfrom = m
 			Smart:	betfrom = l
 			Tablet: betfrom = r
 			App for China: o
 			Lite version: c
-			Nitive App: 0
+			Native App: 0
+			ESportsWebMobile: 2
+			ESportsAPP: 3
+		- OddsFeed: contain the followings:
+			OddsFeed: v
 		- Other: betfrom is different from the aboves
 			=> use *
 */
@@ -61,7 +67,7 @@ BEGIN
 	-- supported betfrom
 	--
 	DECLARE @betfrom TABLE(betfrom CHAR(1))
-	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,l,g,x,z,r,o,c,t,0',',')
+	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,l,g,x,z,r,o,c,t,0,v,1,2,3',',')
 
 	-- #1: get licensee/customer and currency info
 	--
