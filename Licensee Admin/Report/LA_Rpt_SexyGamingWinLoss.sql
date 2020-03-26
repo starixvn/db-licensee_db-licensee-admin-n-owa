@@ -27,7 +27,7 @@ BEGIN
 	DECLARE @3rdRate AS TABLE(PartyID INT, ProductID INT, DI_Rate MONEY, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
 	INSERT INTO @3rdRate
 	SELECT DISTINCT p.PartyId, r.ProductID, r.DI_Rate, r.Fromdate, r.Todate 
-	FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'SGG', 'OA') r 
+	FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'SXG', 'OA') r 
 	INNER JOIN #PartyList p on p.ParentId = r.PartyID
 	WHERE r.IsDeposit = 0
 
@@ -45,7 +45,7 @@ BEGIN
 	-- ​Pay to Supplier: equals 3% of [Licensee Win Loss]
 	INSERT INTO #ChargeRate
 	SELECT DISTINCT c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate
-	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'SGG') c
+	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'SXG') c
 	INNER JOIN @3rdRate r ON r.PartyID = c.PartyID and r.ProductID = c.ProductID
 	WHERE (c.DI_Rate = 0 AND c.isDeposit = 0)
 
