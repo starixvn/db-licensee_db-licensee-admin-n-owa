@@ -2,7 +2,7 @@
 USE [bodb_licensee]
 GO
 
-CREATE PROCEDURE [dbo].[LA_Rpt_SexyGamingWinloss]
+ALTER PROCEDURE [dbo].[LA_Rpt_SexyGamingWinLoss]
 	@PartyIds			VARCHAR(4000),
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
@@ -32,8 +32,7 @@ BEGIN
 	WHERE r.IsDeposit = 0
 
 	CREATE TABLE #ChargeRate (
-		ChargeID		INT
-		,PartyID		INT
+		PartyID			INT
 		,LicenseeID		INT
 		,ProductID		INT
 		,Rate			MONEY
@@ -44,7 +43,7 @@ BEGIN
 	
 	-- ​Pay to Supplier: equals 3% of [Licensee Win Loss]
 	INSERT INTO #ChargeRate
-	SELECT DISTINCT c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate
+	SELECT DISTINCT c.PartyID, c.LicenseeID, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'SXG') c
 	INNER JOIN @3rdRate r ON r.PartyID = c.PartyID and r.ProductID = c.ProductID
 	WHERE (c.DI_Rate = 0 AND c.isDeposit = 0)
