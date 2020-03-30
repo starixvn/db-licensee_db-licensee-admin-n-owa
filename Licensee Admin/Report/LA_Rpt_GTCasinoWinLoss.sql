@@ -42,7 +42,7 @@ BEGIN
 		,Todate			SMALLDATETIME
 	)
 	
-	-- ​Pay to Supplier: equals 3% (0.03) of [Licensee Win Loss]
+	-- ​Pay to Supplier: equals 5% (0.05) of [Licensee Win Loss]
 	INSERT INTO #ChargeRate
 	SELECT DISTINCT c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'GTC') c
