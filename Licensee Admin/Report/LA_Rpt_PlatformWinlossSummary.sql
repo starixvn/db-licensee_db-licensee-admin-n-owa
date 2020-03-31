@@ -67,7 +67,8 @@ BEGIN
 	-- supported betfrom
 	--
 	DECLARE @betfrom TABLE(betfrom CHAR(1))
-	INSERT INTO @betfrom SELECT val FROM dbo.strSplit('d,a,e,u,m,l,g,x,z,r,o,c,t,0,v,1,2,3',',')
+	INSERT INTO @betfrom
+	SELECT val FROM (VALUES('d'),('a'),('e'),('u'),('m'),('l'),('g'),('x'),('z'),('r'),('o'),('c'),('t'),('0'),('v'),('1'),('2'),('3'))v(val)
 
 	-- #1: get licensee/customer and currency info
 	--
