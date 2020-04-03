@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -135,12 +135,48 @@ BEGIN
 		GROUP BY b.rptDate, ci.PartyID, b.CurrencyID, ci.IsDeposit
 	)
 
-	/*
-	    *****Update Deposit's RoyaltyFee***
-		1. Sum all data
-		2. Get rate3rd based on sum value
-		3. Update deposit only
-	*/ 
+	--Region Update deposit's pay to supplier
+	/*  To specific, 5% If Σ OneWorks Licensee Gross WL >= 10M CNY
+		To specific, 5% If Σ [Boping & Zelianta] Licensee Gross WL >= 10M CNY */
+
+	DECLARE @OneWorks INT = 1, @Boping INT = 11, @Zelianta INT = 98, @BopingAndZelianta INT = 99
+	DECLARE @ApplyRange TABLE (ParentId INT, SumApplyValue MONEY, ApplyRate MONEY)
+	
+	INSERT INTO @ApplyRange (ParentId, SumApplyValue)
+	SELECT CASE p.ParentId WHEN @OneWorks THEN @OneWorks ELSE @BopingAndZelianta END, SUM(-d.CustomerWL * ec.BaseCurrencyRate)
+	FROM #Data d
+	INNER JOIN @PartyList p ON d.PartyId = p.PartyId
+	INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, 'CNY') ec ON d.CurrencyId = ec.ExchangeID AND ec.ExchangeDate = d.ReportDate
+	WHERE ISNULL(d.IsDeposit, 0) = 1
+	GROUP BY CASE p.ParentId WHEN @OneWorks THEN @OneWorks ELSE @BopingAndZelianta END
+
+	UPDATE @ApplyRange
+	SET ApplyRate = CASE WHEN (ParentId = @OneWorks AND SumApplyValue >= 10000000)
+								OR (ParentId = @BopingAndZelianta AND SumApplyValue >= 10000000)
+								THEN 0.05
+								ELSE 0.06 
+					END
+
+	;WITH cte_DepositData AS(
+		SELECT CASE p.ParentId WHEN @OneWorks THEN @OneWorks ELSE @BopingAndZelianta END AS ParentId,
+					d.PartyId, -d.CustomerWL AS LicenseeWL
+		FROM #Data d
+		INNER JOIN @PartyList p ON d.PartyId = p.PartyId
+		WHERE ISNULL(d.IsDeposit, 0) = 1 AND ISNULL(p.IsSelected, 0) = 1
+	)
+	UPDATE d
+	SET d.RoyaltyFee = a.ApplyRate * (d2.LicenseeWL * a.ApplyRate)
+	FROM #Data d
+	INNER JOIN cte_DepositData d2 ON d.PartyId = d2.PartyId
+	INNER JOIN @ApplyRange a ON d2.ParentId = a.ParentId
+
+	-- Delete list of licensee which is not selected
+	DELETE d
+	FROM #Data d
+	INNER JOIN @PartyList p ON d.PartyId = p.PartyId
+	WHERE ISNULL(p.IsSelected, 0) = 0
+
+	--End-Region Update deposit's pay to supplier
 
 	DECLARE @BaseCurrencies TABLE(CurrencyId	INT, Code	VARCHAR(10))
 	INSERT INTO @BaseCurrencies(CurrencyId, Code)
