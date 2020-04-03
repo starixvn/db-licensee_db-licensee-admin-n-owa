@@ -428,7 +428,8 @@ BEGIN
 			BX = a.BX,
 			SG = a.SG,
 			VRG = a.VRG,
-			SAG = a.SAG
+			SAG = a.SAG,
+			I4D = a.I4D
 	FROM	#LicenseeAmount l
 			INNER JOIN @AmountDueByProduct a ON a.LicenseeId = l.LicenseeId
 	
@@ -460,6 +461,7 @@ BEGIN
 			AND SG IS NULL
 			AND VRG IS NULL
 			AND SAG IS NULL
+			AND I4D IS NULL
 
 	-- Result
 	SELECT l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP, l.CC, l.SG, l.VRG, l.SAG, l.I4D
