@@ -55,6 +55,7 @@ AS
 		- 20180712@Bruce: Enhance Manage Discount group [#94282]
 		- 20181002@Parsons: Integrate AG setup fee into invoices [#98485]
 		- 20200228@Parsons: Support-HID-currency [#128856]
+		- 20200406@Parsons: Issue rebate worksheet [#131874]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -623,7 +624,7 @@ BEGIN
 		-- Region: Rebate
 		INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate, Remark)
 		SELECT d.PartyId, d.ProductId, Rebate, @AmountTypeRebate, d.RebateRate, d.RebateRemark
-		FROM #AmountToCompany d WHERE d.Rebate > 0
+		FROM #AmountToCompany d
 		-- End Region
 
 		-- Region: Select data	
