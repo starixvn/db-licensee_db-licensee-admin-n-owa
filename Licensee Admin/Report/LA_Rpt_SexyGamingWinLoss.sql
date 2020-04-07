@@ -21,13 +21,13 @@ BEGIN
 	SET NOCOUNT ON
 
 	CREATE TABLE #PartyList (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
-	INSERT INTO #PartyList EXEC bodb_licensee.dbo.LA_PartyListSel
+	INSERT INTO #PartyList EXEC dbo.LA_PartyListSel
 	
 	-- Get 3rd Rate for credit
 	DECLARE @3rdRate AS TABLE(PartyID INT, ProductID INT, DI_Rate MONEY, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
 	INSERT INTO @3rdRate
 	SELECT DISTINCT p.PartyId, r.ProductID, r.DI_Rate, r.Fromdate, r.Todate 
-	FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'SXG', 'OA') r 
+	FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'SXG', 'OA') r 
 	INNER JOIN #PartyList p on p.ParentId = r.PartyID
 	WHERE r.IsDeposit = 0
 
@@ -44,7 +44,7 @@ BEGIN
 	-- ​Pay to Supplier: equals 3% of [Licensee Win Loss]
 	INSERT INTO #ChargeRate
 	SELECT DISTINCT c.PartyID, c.LicenseeID, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate
-	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'SXG') c
+	FROM dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'SXG') c
 	INNER JOIN @3rdRate r ON r.PartyID = c.PartyID and r.ProductID = c.ProductID
 	WHERE (c.DI_Rate = 0 AND c.isDeposit = 0)
 
@@ -135,7 +135,7 @@ BEGIN
 		Name VARCHAR(20)
 	)
 	INSERT INTO @BaseCurrencies(Id, Name)
-	EXEC bodb_licensee.dbo.LA_SelBaseCurrency
+	EXEC dbo.LA_SelBaseCurrency
 
 	DECLARE @GrandTotal TABLE (
 		CurrencyName	VARCHAR(20),
