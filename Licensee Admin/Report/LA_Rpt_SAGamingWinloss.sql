@@ -2,18 +2,19 @@
 USE [bodb_licensee]
 GO
 
---ALTER PROCEDURE [dbo].[LA_Rpt_SAGamingWinloss]
-declare	  @PartyIds			VARCHAR(4000)
+ALTER PROCEDURE [dbo].[LA_Rpt_SAGamingWinloss]
+	  @PartyIds			VARCHAR(4000)
 	, @FromDate			DATETIME
 	, @ToDate			DATETIME
 	, @BaseCurrencyName	VARCHAR(10) = 'EUR'
---AS
-select @BaseCurrencyName='EUR',@ToDate='2019-05-31 00:00:00',@PartyIds='14,34,30',@FromDate='2019-05-01 00:00:00'
+AS
+--select @BaseCurrencyName='EUR',@ToDate='2019-05-31 00:00:00',@PartyIds='14,34,30',@FromDate='2019-05-01 00:00:00'
 
 /*  Created: 20200401@Parsons
 	Task : Report - SA Gaming win loss
 	DB: DB052.bodb_licensee
-	Revisions:
+	Revisions: 
+	    - 20200409@Parsons: Integrate SA Gaming [#129276]
 		
 	Param's Explanation:
 */
