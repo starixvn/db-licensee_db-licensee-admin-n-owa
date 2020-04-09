@@ -36,6 +36,7 @@ AS
 	   - 20191205@Parsons: PP tournament [#123958]
 	   - 20191225@Bruce: billing term by currency [#120005]
 	   - 20200303@Mason: Suport HID currency [#128856]
+	   - 20200409@Parsons: Integrate SA Gaming [#129276]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -43,7 +44,7 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @GD_Tip SMALLINT = 1706, 
+	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007,
 	@PPTournament SMALLINT = 4299,
 	@PromotionPrize SMALLINT = 4300
 
@@ -103,7 +104,7 @@ BEGIN
 						CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END,
 						Fromdate, Todate,
 						CASE WHEN ci.ProductId IN (14,17) THEN ISNULL(sbr.Bettype, ci.Bettype) ELSE -1 END,
-						CASE WHEN ci.ProductID = 11 THEN ci.ChargeType ELSE 1 END,
+						CASE WHEN ci.ProductID IN(11,39) THEN ci.ChargeType ELSE 1 END,
 						ci.ChargeID
 		FROM		bodb_licensee.dbo.LA_f_ChargeInfo (@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
 		LEFT JOIN   bodb_licensee.dbo.Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.BettypeRef = ci.Bettype AND (
@@ -259,7 +260,7 @@ BEGIN
 			AND (@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c))
 			AND b.SiteID IN (SELECT p.LicenseeId FROM #tmpParty p)
 			AND b.rptDate BETWEEN @FromDate AND @ToDate
-			AND b.Bettype NOT IN(@PPTournament, @PromotionPrize)
+			AND b.Bettype NOT IN(@PPTournament, @PromotionPrize, @SAG_Tip)
 
 		;WITH cte_Data AS
 		(
@@ -295,7 +296,7 @@ BEGIN
 		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Company, Betcount, Playercomm)
 		SELECT a.rptDate,p.PartyID,a.CurrencyID,TurnOver, winloss, LicenseeWL, WinlossRB, 0, AmtDueToRB, 0, CommRB, Company * ISNULL(cc.rate,p.Rate), Betcount, Playercomm
 		FROM cte_Data a
-		INNER JOIN #tmpParty p ON p.LicenseeID = a.SiteID AND a.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId=a.ProductId
+		INNER JOIN #tmpParty p ON p.LicenseeID = a.SiteID AND a.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId=a.ProductId AND p.ChargeType = 1
 		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID = p.ChargeId AND a.CurrencyId=cc.CurrencyID
 
 		DROP TABLE #tmpData
