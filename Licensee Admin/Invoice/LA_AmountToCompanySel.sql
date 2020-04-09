@@ -26,6 +26,7 @@ AS
 		- 20190911@Bruce: Support Exchange product in invoices [#119846]
 		- 20191125@Mason: Setup billing terms by Currency  [#120005]
 	    - 20191206@Parsons: PP tournament [#123958]
+	    - 20200409@Parsons: Integrate SA Gaming [#129276]
 
 	Parameters:
 		@IsApplyDiscountMinfee: apply minfee term to discount value
@@ -39,7 +40,7 @@ BEGIN
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 1. Prepare settings
  *-------------------------------------------------------------------------------------------------------------------------------*/
-	DECLARE @GD_Tip SMALLINT = 1706, 
+	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007,
 			@PPTournament SMALLINT = 4299,
 			@PromotionPrize SMALLINT = 4300
 	
@@ -188,7 +189,11 @@ BEGIN
 	
 	-- 1.7 charge info
 	SELECT DISTINCT ci.ChargeID, ci.PartyID, ci.LicenseeID, ci.ProductID, CAST(ci.DI_Rate AS DECIMAL(6,5)) AS Rate, ci.Fromdate, ci.ToDate 
-					,CASE WHEN ProductID=11 AND ChargeType=12 THEN @GD_Tip ELSE -1 END AS Bettype -- GD Tip
+					,CASE 
+						WHEN ProductID=11 AND ChargeType=12 THEN @GD_Tip
+						WHEN ProductID=39 AND ChargeType=12 THEN @SAG_Tip
+						ELSE -1 
+					END AS Bettype -- Tips
 	INTO #tmpChargeInfo
 	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
 	WHERE DI_Rate > 0
@@ -277,10 +282,10 @@ BEGIN
 		b.rptDate	AS WinlossDate,
 		p.ProductId,
 		b.CurrencyId,
-		SUM(CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss,
-		SUM(CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) * e.Rate END) AS AmountToCompany,
+		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss,
+		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN 0 ELSE ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) * e.Rate END) AS AmountToCompany,
 		SUM(CASE 
-			WHEN b.Bettype = @GD_Tip THEN ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) * e.Rate
+			WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) * e.Rate
 			WHEN b.ProductID = @BX THEN -(b.CommissionA + b.CommissionP) * e.Rate
 			ELSE 0 END) AS ExtraAmount
 	INTO #tmpWinlossData
@@ -289,7 +294,7 @@ BEGIN
 	INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID 
 		AND p.LicenseeId = b.SiteId
 		AND (b.rptDate BETWEEN p.FromDate AND p.ToDate) 
-		AND (p.ProductID <> 11 OR b.Bettype = p.Bettype)
+		AND (p.ProductID NOT IN (11, 39) OR b.Bettype = p.Bettype)
 		AND (b.Bettype NOT IN (@PPTournament, @PromotionPrize))
 	LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeID AND b.CurrencyId = cr.CurrencyID
 	WHERE (b.rptDate BETWEEN @FromDate AND @ToDate)
