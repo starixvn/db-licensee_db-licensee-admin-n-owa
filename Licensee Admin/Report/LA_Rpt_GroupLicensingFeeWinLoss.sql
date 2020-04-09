@@ -18,6 +18,7 @@ AS
 	   - 20191216@Parsons: PP tournament [#123958]
 	   - 20191125@Mason: Setup billing terms by Currency [#120005]
 	   - 20200228@Parsons: Support-HID-currency [#128856]
+	   - 20200409@Parsons: Integrate SA Gaming [#129276]
 */
 BEGIN
 	SET NOCOUNT ON	
@@ -147,7 +148,7 @@ BEGIN
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27,28)
-				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
+				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914,3007)--@SAG_Tip = 3007
 			GROUP BY b.rptDate, ci.PartyID, b.ProductID, b.CurrencyID
 		)
 
