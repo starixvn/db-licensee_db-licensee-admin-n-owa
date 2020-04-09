@@ -3,10 +3,6 @@
 USE [bodb02]
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE dbo.LA_Rpt_LicPerformance_Detail
 	@PartyIDs VARCHAR(4000) = ''
 	, @Currency INT = 0
@@ -57,6 +53,7 @@ AS
 		- 20191021@Parsons: Non-peak hour promotion [#119538]    
 		- 20191125@Mason: Setup billing terms by Currency  [#120005]
 	    - 20191205@Parsons: PP tournament [#123958]
+	    - 20200409@Parsons: Integrate SA Gaming [#129276]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -77,7 +74,7 @@ AS
 
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @GD_Tip SMALLINT = 1706
+	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007
 	DECLARE @BAProductId INT = 3, @ExchangeProductId INT = 31, @PragmaticProductId INT = 32, 
 			@PPTournament SMALLINT = 4299,
 			@PromotionPrize SMALLINT = 4300
@@ -286,17 +283,17 @@ BEGIN
 				p.PartyId,
 				b.rptDate,
 				b.CurrencyID,
-				SUM(CASE WHEN (@DrawFilter = 2 AND b.StatusId = 111) OR b.Bettype=@GD_Tip THEN 0 ELSE b.BetCount END),
+				SUM(CASE WHEN (@DrawFilter = 2 AND b.StatusId = 111) OR b.Bettype IN(@GD_Tip, @SAG_Tip) THEN 0 ELSE b.BetCount END),
 				SUM(b.Turnover * CASE WHEN @DrawFilter IN (2, 3) 
 										THEN CASE	WHEN b.StatusId = 111 THEN 0
 													WHEN b.StatusId IN (114, 115) THEN 0.5
 											 ELSE 1 END
 										ELSE 1 END) * e.Rate,
-				SUM(CASE WHEN b.Bettype=@GD_Tip THEN 0 ELSE b.MemberWL END) * e.Rate,
+				SUM(CASE WHEN b.Bettype IN(@GD_Tip, @SAG_Tip) THEN 0 ELSE b.MemberWL END) * e.Rate,
 				SUM(ISNULL(b.CommissionA, 0)) * e.Rate,
 				SUM(ISNULL(b.CommissionP, 0)) * e.Rate,
 				p.ProductId,
-				SUM((CASE WHEN b.Bettype=@GD_Tip THEN 0 ELSE -b.MemberWL * ISNULL(cr.Rate, p.Rate) END) - (CASE 
+				SUM((CASE WHEN b.Bettype IN(@GD_Tip, @SAG_Tip) THEN 0 ELSE -b.MemberWL * ISNULL(cr.Rate, p.Rate) END) - (CASE 
 					WHEN b.ProductId = @BAProductId THEN ISNULL(b.CommissionA, 0)
 					WHEN b.ProductID = @ExchangeProductId THEN ISNULL(b.CommissionA, 0) + ISNULL(b.CommissionP, 0)
 					ELSE 0 END)) * e.Rate
@@ -310,7 +307,7 @@ BEGIN
 		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate OR b.rptDate BETWEEN @PrevFromDate AND @PrevToDate)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
-				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914,@PPTournament,@PromotionPrize)
+				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914,@PPTournament,@SAG_Tip)
 				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund 
 				AND (@Currency = 0 OR b.CurrencyID = @Currency)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, e.Rate
