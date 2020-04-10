@@ -28,6 +28,7 @@ AS
 	- 20191217@Bruce: Update NG/H5 3rd rate [#125515]
 	- 20191226@Mason: Set Term By Currency [#120005]
 	- 20200203@Mason: Support HID currency [#128856]
+	- 20200409@Mason: Integrate SA Gaming [#129276]
 
  * Param's Explanation:
  EXEC LA_Rpt_NumberGameWinloss @PartyIds = '14,15,16,17,18,19', @FromDate = '20190101', @ToDate = '20190808', @BaseCurrencyName = 'EUR'

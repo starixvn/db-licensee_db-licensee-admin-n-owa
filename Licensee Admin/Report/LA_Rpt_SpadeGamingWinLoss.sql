@@ -13,6 +13,7 @@ AS
  * Task  : Get SpadeGaming Winloss
  * Revisions
 	- 20200219@Mason: Intergrate SpadeGaming [#123959]
+	- 20200409@Mason: Integrate SA Gaming [#129276]
  * Param's Explanation:
  *
  */
@@ -217,7 +218,7 @@ BEGIN
 		CAST((r.CustomerWinLoss * e.Rate) AS MONEY) AS CustomerWinLoss,
 		CAST((r.LicenseeWinLoss * e.Rate) AS MONEY) AS LicenseeWinLoss,
 		CAST((r.LicensingFee * e.Rate) AS MONEY) AS LicensingFee,
-		CAST((r.PayToSupplier * e.Rate)AS MONEY) AS PayToSupplier,
+		CAST((r.PayToSupplier * e.Rate)AS MONEY) AS PayToSupplier
 	FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.WinLossDate = e.ExchangeDate
 	
 	-- Select Grand Total

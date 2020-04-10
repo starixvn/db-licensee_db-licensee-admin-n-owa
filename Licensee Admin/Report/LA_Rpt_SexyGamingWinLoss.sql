@@ -13,6 +13,7 @@ AS
  * Task  : Get SexyGaming Winloss
  * Revisions
 	- 20200325@Mason: Intergrate SexyGaming [#130948]
+	- 20200409@Mason: Integrate SA Gaming [#129276]
  * Param's Explanation:
  *
  */
