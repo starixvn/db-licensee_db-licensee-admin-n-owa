@@ -8,7 +8,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_SAGamingWinloss]
 	, @ToDate			DATETIME
 	, @BaseCurrencyName	VARCHAR(10) = 'EUR'
 AS
---select @BaseCurrencyName='EUR',@ToDate='2020-02-29 00:00:00',@PartyIds='31',@FromDate='2020-02-01 00:00:00'
+--select @BaseCurrencyName='CNY',@ToDate='2020-02-29 00:00:00',@PartyIds='31',@FromDate='2020-02-01 00:00:00'
 
 /*  Created: 20200401@Parsons
 	Task : Report - SA Gaming win loss
@@ -124,7 +124,7 @@ BEGIN
 			, SUM(ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS RollingCommission
 			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN 0 ELSE -b.MemberWL END - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS NetWinLoss
 			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN -b.MemberWL * tipLicensee.Rate ELSE 0 END) AS CompanyTipShare
-			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN 0 ELSE (-b.MemberWL - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) * ISNULL(s.Rate, 0) END) AS RoyaltyFee
+			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN 0 ELSE -b.MemberWL END - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0) * ISNULL(s.Rate, 0)) AS RoyaltyFee
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #ChargeInfo ci ON ( -- licensee charge rate
 				b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate AND
@@ -148,6 +148,7 @@ BEGIN
 			  b.customercategory NOT IN (27,28)
 		GROUP BY b.rptDate, ci.PartyID, b.CurrencyID, ci.IsDeposit
 	)
+
 	--Region Update deposit's pay to supplier
 	/*  To specific, 5% If Σ OneWorks Licensee Gross WL >= 10M CNY
 		To specific, 5% If Σ [Boping & Zelianta] Licensee Gross WL >= 10M CNY */
@@ -169,17 +170,17 @@ BEGIN
 								ELSE 0.06 
 					END
 
-	;WITH cte_DepositData AS(
+	;WITH cte_SelectedDepositSettings AS(
 		SELECT CASE p.ParentId WHEN @OneWorks THEN @OneWorks ELSE @BopingAndZelianta END AS ParentId,
-					d.PartyId, -d.CustomerWL AS LicenseeWL
+					d.PartyId
 		FROM #Data d
 		INNER JOIN @PartyList p ON d.PartyId = p.PartyId
 		WHERE ISNULL(d.IsDeposit, 0) = 1 AND ISNULL(p.IsSelected, 0) = 1
 	)
 	UPDATE d
-	SET d.RoyaltyFee = a.ApplyRate * (d2.LicenseeWL * a.ApplyRate)
+	SET d.RoyaltyFee = a.ApplyRate * (d.NetWinLoss)
 	FROM #Data d
-	INNER JOIN cte_DepositData d2 ON d.PartyId = d2.PartyId
+	INNER JOIN cte_SelectedDepositSettings d2 ON d.PartyId = d2.PartyId
 	INNER JOIN @ApplyRange a ON d2.ParentId = a.ParentId
 
 	-- Delete list of licensee which is not selected
@@ -211,7 +212,7 @@ BEGIN
 	)
 	
 	INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, TotalTrans, Turnover, ValidBetAmount, TipAmount, CustomerWinLoss, LicensingFee, RollingCommission, NetWinLoss, CompanyTipShare, PayToSupplier, CompanyIncome)
-	SELECT d.PartyId, p.PartyName, pa.PartyId, pa.PartyName, d.ReportDate, CurrencyId, TotalTrans, Turnover, ValidBetAmount, TipAmount, CustomerWL, LicenseeFee, RollingCommission, NetWinLoss, CompanyTipShare, RoyaltyFee + CompanyTipShare, LicenseeFee - (RoyaltyFee + CompanyTipShare)
+	SELECT d.PartyId, p.PartyName, pa.PartyId, pa.PartyName, d.ReportDate, CurrencyId, TotalTrans, Turnover, ValidBetAmount, TipAmount, CustomerWL, LicenseeFee + CompanyTipShare, RollingCommission, NetWinLoss, CompanyTipShare, RoyaltyFee + CompanyTipShare, LicenseeFee - (RoyaltyFee + CompanyTipShare)
 	FROM #Data d
 		INNER JOIN @PartyList p ON d.PartyId = p.PartyID
 		INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId	
