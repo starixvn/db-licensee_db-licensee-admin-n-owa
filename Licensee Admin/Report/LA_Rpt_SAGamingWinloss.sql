@@ -8,7 +8,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_SAGamingWinloss]
 	, @ToDate			DATETIME
 	, @BaseCurrencyName	VARCHAR(10) = 'EUR'
 AS
---select @BaseCurrencyName='EUR',@ToDate='2019-05-31 00:00:00',@PartyIds='14,34,30',@FromDate='2019-05-01 00:00:00'
+--select @BaseCurrencyName='EUR',@ToDate='2020-02-29 00:00:00',@PartyIds='31',@FromDate='2020-02-01 00:00:00'
 
 /*  Created: 20200401@Parsons
 	Task : Report - SA Gaming win loss
@@ -24,7 +24,7 @@ BEGIN
 	-- charge type
 	DECLARE @GrossWin				INT = 1
 	DECLARE @CreditServiceCharge	INT = 10
-	DECLARE @RollingCommissionType	INT = 11
+	DECLARE @RollingRollingCommissionType	INT = 11
 	DECLARE @TipChargeType			INT = 12
 
 	-- Tips
@@ -45,8 +45,6 @@ BEGIN
 	SELECT @PartyIds = COALESCE(@PartyIds + ', ', '') + CAST(PartyId AS VARCHAR(4)) 
 	FROM @PartyList
 	WHERE ParentId <> 0
-	
-	SELECT @PartyIds
 
 	CREATE TABLE #ChargeInfo(
 		ChargeId				INT
@@ -80,6 +78,21 @@ BEGIN
 	WHERE ISNULL(CI3rd.IsDeposit, 0) = 0
 	-- Endregion
 
+	CREATE TABLE #Exchange (
+		ExchangeDate	DATE,
+		ExchangeID		INT,
+		CurrencyCode	VARCHAR(10),
+		Rate			FLOAT
+	)
+	
+	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
+	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
+	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+	
+	UPDATE #Exchange SET CurrencyCode = CASE WHEN ExchangeID = 51 THEN 'INH' 
+											 WHEN ExchangeID = 92 THEN 'HID' END
+	WHERE ExchangeID IN (51,92)
+
 	CREATE TABLE #Data (
 		PartyId			INT,
 		IsDeposit		BIT,
@@ -92,14 +105,14 @@ BEGIN
 		CustomerWL		MONEY,
 		TipAmount 		MONEY,
 		LicenseeFee		MONEY,
-		Commission		MONEY,
+		RollingCommission	MONEY,
 		NetWinLoss		MONEY,
 		CompanyTipShare MONEY,
 		RoyaltyFee		MONEY,
 		BaseCurrency	VARCHAR(10)
 	)
 
-	INSERT INTO #Data(PartyId, ReportDate, CurrencyId, IsDeposit, Totaltrans, Turnover, ValidBetAmount, CustomerWL, TipAmount, LicenseeFee, Commission, NetWinLoss, CompanyTipShare, RoyaltyFee)
+	INSERT INTO #Data(PartyId, ReportDate, CurrencyId, IsDeposit, Totaltrans, Turnover, ValidBetAmount, CustomerWL, TipAmount, LicenseeFee, RollingCommission, NetWinLoss, CompanyTipShare, RoyaltyFee)
 	(
 		SELECT  ci.PartyID, b.rptDate, b.currencyID, ci.IsDeposit
 			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN 0 ELSE b.betcount END) AS Totaltrans
@@ -108,7 +121,7 @@ BEGIN
 			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN 0 ELSE b.MemberWL END) AS CustomerWL
 			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN -b.MemberWL ELSE 0 END) AS TipAmount
 			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN 0 ELSE -b.MemberWL * ISNULL(cr.Rate, ci.Rate) END) AS LicenseeFee
-			, SUM(ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS Commission
+			, SUM(ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS RollingCommission
 			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN 0 ELSE -b.MemberWL END - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS NetWinLoss
 			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN -b.MemberWL * tipLicensee.Rate ELSE 0 END) AS CompanyTipShare
 			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN 0 ELSE (-b.MemberWL - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) * ISNULL(s.Rate, 0) END) AS RoyaltyFee
@@ -117,10 +130,10 @@ BEGIN
 				b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate AND
 				ci.IsPayToSupplier = 0 AND
 				(ci.IsDeposit = 0 OR (ci.IsDeposit = 1 AND ci.ChargeType = @GrossWin)))
-			LEFT JOIN #ChargeInfo r ON ( -- rolling commission rate
+			LEFT JOIN #ChargeInfo r ON ( -- rolling RollingCommission rate
 				b.SiteID = r.LicenseeID AND b.ProductID = r.ProductId AND b.rptDate BETWEEN r.FromDate AND r.ToDate AND
 				r.IsPayToSupplier = 1 AND 
-				r.ChargeType = @RollingCommissionType)
+				r.ChargeType = @RollingRollingCommissionType)
 			LEFT JOIN #ChargeInfo s ON ( -- service charge rate
 				b.SiteID = s.LicenseeID AND b.ProductID = s.ProductId AND b.rptDate BETWEEN s.FromDate AND s.ToDate AND
 				s.IsPayToSupplier = 1 AND
@@ -135,11 +148,9 @@ BEGIN
 			  b.customercategory NOT IN (27,28)
 		GROUP BY b.rptDate, ci.PartyID, b.CurrencyID, ci.IsDeposit
 	)
-
 	--Region Update deposit's pay to supplier
 	/*  To specific, 5% If Σ OneWorks Licensee Gross WL >= 10M CNY
 		To specific, 5% If Σ [Boping & Zelianta] Licensee Gross WL >= 10M CNY */
-
 	DECLARE @OneWorks INT = 1, @Boping INT = 11, @Zelianta INT = 98, @BopingAndZelianta INT = 99
 	DECLARE @ApplyRange TABLE (ParentId INT, SumApplyValue MONEY, ApplyRate MONEY)
 	
@@ -176,8 +187,65 @@ BEGIN
 	FROM #Data d
 	INNER JOIN @PartyList p ON d.PartyId = p.PartyId
 	WHERE ISNULL(p.IsSelected, 0) = 0
-
 	--End-Region Update deposit's pay to supplier
+
+	-- Region: Calculate result
+	CREATE TABLE #Result (
+		PartyId			INT,
+		PartyName		VARCHAR(100),
+		ParentId		INT,
+		ParentName		VARCHAR(100),
+		WinLossDate		DATETIME,
+		CurrencyId		INT,
+		TotalTrans		INT,
+		Turnover		MONEY,
+		ValidBetAmount	MONEY,
+		TipAmount 		MONEY,
+		CustomerWinLoss	MONEY,
+		LicensingFee	MONEY,
+		RollingCommission	MONEY,
+		NetWinLoss		MONEY,
+		CompanyTipShare MONEY,
+		PayToSupplier	MONEY,
+		CompanyIncome		MONEY
+	)
+	
+	INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, TotalTrans, Turnover, ValidBetAmount, TipAmount, CustomerWinLoss, LicensingFee, RollingCommission, NetWinLoss, CompanyTipShare, PayToSupplier, CompanyIncome)
+	SELECT d.PartyId, p.PartyName, pa.PartyId, pa.PartyName, d.ReportDate, CurrencyId, TotalTrans, Turnover, ValidBetAmount, TipAmount, CustomerWL, LicenseeFee, RollingCommission, NetWinLoss, CompanyTipShare, RoyaltyFee + CompanyTipShare, LicenseeFee - (RoyaltyFee + CompanyTipShare)
+	FROM #Data d
+		INNER JOIN @PartyList p ON d.PartyId = p.PartyID
+		INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId	
+	
+	DECLARE @Total TABLE (
+		PartyId			INT,
+		TotalTrans		INT,
+		Turnover		MONEY,
+		ValidBetAmount	MONEY,
+		TipAmount	MONEY,
+		CustomerWinLoss	MONEY,
+		LicensingFee	MONEY,
+		RollingCommission	MONEY,
+		NetWinLoss		MONEY,
+		CompanyTipShare MONEY,
+		PayToSupplier	MONEY,
+		CompanyIncome		MONEY,
+		Currency		VARCHAR(20)
+	)
+
+	DECLARE @GrandTotal TABLE (
+		CurrencyName	VARCHAR(20),
+		TotalTrans		INT,
+		Turnover		MONEY,
+		ValidBetAmount	MONEY,
+		TipAmount		MONEY,
+		CustomerWinLoss	MONEY,
+		LicensingFee	MONEY,
+		RollingCommission	MONEY,
+		NetWinLoss		MONEY,
+		CompanyTipShare MONEY,
+		PayToSupplier	MONEY,
+		CompanyIncome		MONEY
+	)
 
 	DECLARE @BaseCurrencies TABLE(CurrencyId	INT, Code	VARCHAR(10))
 	INSERT INTO @BaseCurrencies(CurrencyId, Code)
@@ -186,30 +254,118 @@ BEGIN
 	WHILE EXISTS (SELECT TOP 1 1 FROM @BaseCurrencies)
 	BEGIN
 		DECLARE @Currency VARCHAR(10) = (SELECT TOP 1 Code FROM @BaseCurrencies)
-
-		-- 1. INSERT INTO @Total
-		SELECT d.PartyId, d.IsDeposit, d.ReportDate, CASE WHEN ExchangeId = 92 THEN 'HID' WHEN ExchangeId = 51 THEN 'INH' ELSE Code END, d.Totaltrans, @Currency,
-			d.Turnover * e.BaseCurrencyRate,
-			d.CustomerWL * e.BaseCurrencyRate,
-			d.TipAmount * e.BaseCurrencyRate,
-			d.LicenseeFee * e.BaseCurrencyRate,
-			d.Commission * e.BaseCurrencyRate,
-			d.NetWinLoss * e.BaseCurrencyRate,
-			d.CompanyTipShare * e.BaseCurrencyRate,
-			d.RoyaltyFee * e.BaseCurrencyRate,	
-			d.ValidBetAmount * e.BaseCurrencyRate
-		FROM #Data d
-		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @Currency) e ON e.ExchangeId = d.CurrencyId AND e.exchangedate = d.ReportDate
-
-		-- 2. INSERT INTO @GrandTotal
+		
+		;WITH TotalByParty AS(
+			SELECT td.ParentId,
+				SUM(td.TotalTrans) TotalTrans,
+				SUM(td.Turnover * e.BaseCurrencyRate) Turnover,
+				SUM(td.ValidBetAmount * e.BaseCurrencyRate) ValidBetAmount,
+				SUM(td.TipAmount * e.BaseCurrencyRate) TipAmount,
+				SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss,
+				SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
+				SUM(td.RollingCommission * e.BaseCurrencyRate) RollingCommission,
+				SUM(td.NetWinLoss * e.BaseCurrencyRate) NetWinLoss,
+				SUM(td.CompanyTipShare * e.BaseCurrencyRate) CompanyTipShare,
+				SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier,
+				SUM(td.CompanyIncome * e.BaseCurrencyRate) CompanyIncome
+			FROM #Result td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @Currency) e
+			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
+			GROUP BY td.ParentId, td.PartyId
+		)
+		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,ValidBetAmount,TipAmount,CustomerWinLoss,LicensingFee,RollingCommission,NetWinLoss,CompanyTipShare,PayToSupplier,CompanyIncome)
+		SELECT @Currency,ParentId,
+			SUM(TotalTrans),
+			SUM(Turnover),
+			SUM(ValidBetAmount),
+			SUM(TipAmount),
+			SUM(CustomerWinLoss),
+			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
+			SUM(RollingCommission),
+			SUM(NetWinLoss),
+			SUM(CompanyTipShare),
+			SUM(PayToSupplier),
+			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END - PayToSupplier)
+		FROM TotalByParty
+		GROUP BY ParentId
+		
+		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,ValidBetAmount,TipAmount,CustomerWinLoss,LicensingFee,RollingCommission,NetWinLoss,CompanyTipShare,PayToSupplier,CompanyIncome)
+		SELECT Currency,
+			SUM(TotalTrans),
+			SUM(Turnover),
+			SUM(ValidBetAmount),
+			SUM(TipAmount),
+			SUM(CustomerWinLoss),
+			SUM(LicensingFee),
+			SUM(RollingCommission),
+			SUM(NetWinLoss),
+			SUM(CompanyTipShare),
+			SUM(PayToSupplier),
+			SUM(LicensingFee - PayToSupplier)
+		FROM @Total
+		WHERE Currency = @Currency
+		GROUP BY Currency
 
 		DELETE @BaseCurrencies WHERE Code = @Currency
 	END
 
-	SELECT * FROM #ChargeInfo
-	SELECT * FROM #Data
+	-- Select data by Parties
+	SELECT 
+		r.PartyId,
+		r.PartyName,
+		r.ParentId,
+		r.ParentName,
+		r.WinLossDate,
+		e.CurrencyCode AS CurrencyName,
+		-- Select by origin currency
+		r.TotalTrans,
+		r.Turnover AS TurnoverOriginal,
+		CAST((r.ValidBetAmount) AS MONEY) AS ValidBetAmountOriginal,
+		CAST((r.TipAmount) AS MONEY) AS TipAmountOriginal,
+		CAST((r.CustomerWinLoss) AS MONEY) AS CustomerWinLossOriginal,
+		CAST((r.LicensingFee) AS MONEY) AS LicensingFeeOriginal,
+		CAST((r.RollingCommission) AS MONEY) AS RollingCommissionOriginal,
+		CAST((r.NetWinLoss) AS MONEY) AS NetWinLossOriginal,
+		CAST((r.CompanyTipShare) AS MONEY) AS CompanyTipShareOriginal,
+		CAST((r.PayToSupplier) AS MONEY) AS PayToSupplierOriginal,
+		r.LicensingFee - r.PayToSupplier AS CompanyIncomeOriginal,
+		-- Select by base currency
+		r.Turnover * e.Rate AS Turnover,
+		CAST((r.ValidBetAmount * e.Rate) AS MONEY) AS ValidBetAmount,
+		CAST((r.TipAmount * e.Rate) AS MONEY) AS TipAmount,
+		CAST((r.CustomerWinLoss * e.Rate) AS MONEY) AS CustomerWinLoss,
+		CAST((r.LicensingFee * e.Rate) AS MONEY) AS LicensingFee,
+		CAST((r.RollingCommission * e.Rate) AS MONEY) AS RollingCommission,
+		CAST((r.NetWinLoss * e.Rate) AS MONEY) AS NetWinLoss,
+		CAST((r.RollingCommission * e.Rate) AS MONEY) AS RollingCommission,
+		CAST((r.CompanyTipShare * e.Rate) AS MONEY) AS CompanyTipShare,
+		CAST((r.PayToSupplier * e.Rate) AS MONEY) AS PayToSupplier,
+		CAST((r.LicensingFee - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome
+	FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.WinLossDate = e.ExchangeDate
+	
+	-- Select Grand Total
+	SELECT * FROM @GrandTotal
+	
+	-- Total
+	SELECT 
+		PartyId,
+		TotalTrans,
+		Turnover,
+		ValidBetAmount,
+		TipAmount,
+		CustomerWinLoss,
+		LicensingFee,
+		RollingCommission,
+		NetWinLoss,
+		CompanyTipShare,
+		PayToSupplier,
+		CompanyIncome
+	FROM @Total t
+	WHERE Currency = @BaseCurrencyName
+	-- End Region
 
+	DROP TABLE #Result
 	DROP TABLE #ChargeInfo
 	DROP TABLE #Data
+	DROP TABLE #Exchange
 END
 GO
