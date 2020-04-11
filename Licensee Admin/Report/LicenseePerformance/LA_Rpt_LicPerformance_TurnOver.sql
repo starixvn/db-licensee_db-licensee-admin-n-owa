@@ -31,6 +31,7 @@ AS
 		- 20200311@Mason: Spadegaming integration [#123959]
 	    - 20200317@Parsons: Integrate Virtual Games [#125222]
 	    - 20200323@Parsons: Intergrate Indo 4D [#130910]
+	    - 20200411@Parsons: Integrate Table Games [#131166]
 
     Param's Explanation:  
 	   + @partyIDs : a string of list PartyID, separated by ','
@@ -110,7 +111,7 @@ BEGIN
     END
 
     --exclude BA tickets
-    IF @ProductCode IN ('SB', 'RB', 'NG', 'LC', 'VS', 'CS', 'VB', 'PP', 'SG', 'VRG', 'I4D')
+    IF @ProductCode IN ('SB', 'RB', 'NG', 'LC', 'VS', 'CS', 'VB', 'PP', 'SG', 'VRG', 'I4D', 'TG')
     BEGIN		
 	   INSERT INTO #Tmp(PartyId, rptDate, CurrencyId, TurnOver)
 	   (
