@@ -24,7 +24,7 @@ BEGIN
 	-- charge type
 	DECLARE @GrossWin				INT = 1
 	DECLARE @CreditServiceCharge	INT = 10
-	DECLARE @RollingRollingCommissionType	INT = 11
+	DECLARE @RollingRollingCommType	INT = 11
 	DECLARE @TipChargeType			INT = 12
 
 	-- Tips
@@ -105,14 +105,14 @@ BEGIN
 		CustomerWL		MONEY,
 		TipAmount 		MONEY,
 		LicenseeFee		MONEY,
-		RollingCommission	MONEY,
+		RollingComm	MONEY,
 		NetWinLoss		MONEY,
 		CompanyTipShare MONEY,
 		RoyaltyFee		MONEY,
 		BaseCurrency	VARCHAR(10)
 	)
 
-	INSERT INTO #Data(PartyId, ReportDate, CurrencyId, IsDeposit, Totaltrans, Turnover, ValidBetAmount, CustomerWL, TipAmount, LicenseeFee, RollingCommission, NetWinLoss, CompanyTipShare, RoyaltyFee)
+	INSERT INTO #Data(PartyId, ReportDate, CurrencyId, IsDeposit, Totaltrans, Turnover, ValidBetAmount, CustomerWL, TipAmount, LicenseeFee, RollingComm, NetWinLoss, CompanyTipShare, RoyaltyFee)
 	(
 		SELECT  ci.PartyID, b.rptDate, b.currencyID, ci.IsDeposit
 			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN 0 ELSE b.betcount END) AS Totaltrans
@@ -121,7 +121,7 @@ BEGIN
 			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN 0 ELSE b.MemberWL END) AS CustomerWL
 			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN -b.MemberWL ELSE 0 END) AS TipAmount
 			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN 0 ELSE -b.MemberWL * ISNULL(cr.Rate, ci.Rate) END) AS LicenseeFee
-			, SUM(ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS RollingCommission
+			, SUM(ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS RollingComm
 			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN 0 ELSE -b.MemberWL END - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS NetWinLoss
 			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN -b.MemberWL * tipLicensee.Rate ELSE 0 END) AS CompanyTipShare
 			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN 0 ELSE -b.MemberWL END - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0) * ISNULL(s.Rate, 0)) AS RoyaltyFee
@@ -130,10 +130,10 @@ BEGIN
 				b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate AND
 				ci.IsPayToSupplier = 0 AND
 				(ci.IsDeposit = 0 OR (ci.IsDeposit = 1 AND ci.ChargeType = @GrossWin)))
-			LEFT JOIN #ChargeInfo r ON ( -- rolling RollingCommission rate
+			LEFT JOIN #ChargeInfo r ON ( -- rolling RollingComm rate
 				b.SiteID = r.LicenseeID AND b.ProductID = r.ProductId AND b.rptDate BETWEEN r.FromDate AND r.ToDate AND
 				r.IsPayToSupplier = 1 AND 
-				r.ChargeType = @RollingRollingCommissionType)
+				r.ChargeType = @RollingRollingCommType)
 			LEFT JOIN #ChargeInfo s ON ( -- service charge rate
 				b.SiteID = s.LicenseeID AND b.ProductID = s.ProductId AND b.rptDate BETWEEN s.FromDate AND s.ToDate AND
 				s.IsPayToSupplier = 1 AND
@@ -204,15 +204,15 @@ BEGIN
 		TipAmount 		MONEY,
 		CustomerWinLoss	MONEY,
 		LicensingFee	MONEY,
-		RollingCommission	MONEY,
+		RollingComm	MONEY,
 		NetWinLoss		MONEY,
 		CompanyTipShare MONEY,
 		PayToSupplier	MONEY,
 		CompanyIncome		MONEY
 	)
 	
-	INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, TotalTrans, Turnover, ValidBetAmount, TipAmount, CustomerWinLoss, LicensingFee, RollingCommission, NetWinLoss, CompanyTipShare, PayToSupplier, CompanyIncome)
-	SELECT d.PartyId, p.PartyName, pa.PartyId, pa.PartyName, d.ReportDate, CurrencyId, TotalTrans, Turnover, ValidBetAmount, TipAmount, CustomerWL, LicenseeFee + CompanyTipShare, RollingCommission, NetWinLoss, CompanyTipShare, RoyaltyFee + CompanyTipShare, LicenseeFee - (RoyaltyFee + CompanyTipShare)
+	INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, TotalTrans, Turnover, ValidBetAmount, TipAmount, CustomerWinLoss, LicensingFee, RollingComm, NetWinLoss, CompanyTipShare, PayToSupplier, CompanyIncome)
+	SELECT d.PartyId, p.PartyName, pa.PartyId, pa.PartyName, d.ReportDate, CurrencyId, TotalTrans, Turnover, ValidBetAmount, TipAmount, CustomerWL, LicenseeFee + CompanyTipShare, RollingComm, NetWinLoss, CompanyTipShare, RoyaltyFee + CompanyTipShare, LicenseeFee - (RoyaltyFee + CompanyTipShare)
 	FROM #Data d
 		INNER JOIN @PartyList p ON d.PartyId = p.PartyID
 		INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId	
@@ -225,7 +225,7 @@ BEGIN
 		TipAmount	MONEY,
 		CustomerWinLoss	MONEY,
 		LicensingFee	MONEY,
-		RollingCommission	MONEY,
+		RollingComm	MONEY,
 		NetWinLoss		MONEY,
 		CompanyTipShare MONEY,
 		PayToSupplier	MONEY,
@@ -241,7 +241,7 @@ BEGIN
 		TipAmount		MONEY,
 		CustomerWinLoss	MONEY,
 		LicensingFee	MONEY,
-		RollingCommission	MONEY,
+		RollingComm	MONEY,
 		NetWinLoss		MONEY,
 		CompanyTipShare MONEY,
 		PayToSupplier	MONEY,
@@ -264,7 +264,7 @@ BEGIN
 				SUM(td.TipAmount * e.BaseCurrencyRate) TipAmount,
 				SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss,
 				SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
-				SUM(td.RollingCommission * e.BaseCurrencyRate) RollingCommission,
+				SUM(td.RollingComm * e.BaseCurrencyRate) RollingComm,
 				SUM(td.NetWinLoss * e.BaseCurrencyRate) NetWinLoss,
 				SUM(td.CompanyTipShare * e.BaseCurrencyRate) CompanyTipShare,
 				SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier,
@@ -273,7 +273,7 @@ BEGIN
 			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
 			GROUP BY td.ParentId, td.PartyId
 		)
-		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,ValidBetAmount,TipAmount,CustomerWinLoss,LicensingFee,RollingCommission,NetWinLoss,CompanyTipShare,PayToSupplier,CompanyIncome)
+		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,ValidBetAmount,TipAmount,CustomerWinLoss,LicensingFee,RollingComm,NetWinLoss,CompanyTipShare,PayToSupplier,CompanyIncome)
 		SELECT @Currency,ParentId,
 			SUM(TotalTrans),
 			SUM(Turnover),
@@ -281,7 +281,7 @@ BEGIN
 			SUM(TipAmount),
 			SUM(CustomerWinLoss),
 			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
-			SUM(RollingCommission),
+			SUM(RollingComm),
 			SUM(NetWinLoss),
 			SUM(CompanyTipShare),
 			SUM(PayToSupplier),
@@ -289,7 +289,7 @@ BEGIN
 		FROM TotalByParty
 		GROUP BY ParentId
 		
-		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,ValidBetAmount,TipAmount,CustomerWinLoss,LicensingFee,RollingCommission,NetWinLoss,CompanyTipShare,PayToSupplier,CompanyIncome)
+		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,ValidBetAmount,TipAmount,CustomerWinLoss,LicensingFee,RollingComm,NetWinLoss,CompanyTipShare,PayToSupplier,CompanyIncome)
 		SELECT Currency,
 			SUM(TotalTrans),
 			SUM(Turnover),
@@ -297,7 +297,7 @@ BEGIN
 			SUM(TipAmount),
 			SUM(CustomerWinLoss),
 			SUM(LicensingFee),
-			SUM(RollingCommission),
+			SUM(RollingComm),
 			SUM(NetWinLoss),
 			SUM(CompanyTipShare),
 			SUM(PayToSupplier),
@@ -324,7 +324,7 @@ BEGIN
 		CAST((r.TipAmount) AS MONEY) AS TipAmountOriginal,
 		CAST((r.CustomerWinLoss) AS MONEY) AS CustomerWinLossOriginal,
 		CAST((r.LicensingFee) AS MONEY) AS LicensingFeeOriginal,
-		CAST((r.RollingCommission) AS MONEY) AS RollingCommissionOriginal,
+		CAST((r.RollingComm) AS MONEY) AS RollingCommOriginal,
 		CAST((r.NetWinLoss) AS MONEY) AS NetWinLossOriginal,
 		CAST((r.CompanyTipShare) AS MONEY) AS CompanyTipShareOriginal,
 		CAST((r.PayToSupplier) AS MONEY) AS PayToSupplierOriginal,
@@ -335,9 +335,9 @@ BEGIN
 		CAST((r.TipAmount * e.Rate) AS MONEY) AS TipAmount,
 		CAST((r.CustomerWinLoss * e.Rate) AS MONEY) AS CustomerWinLoss,
 		CAST((r.LicensingFee * e.Rate) AS MONEY) AS LicensingFee,
-		CAST((r.RollingCommission * e.Rate) AS MONEY) AS RollingCommission,
+		CAST((r.RollingComm * e.Rate) AS MONEY) AS RollingComm,
 		CAST((r.NetWinLoss * e.Rate) AS MONEY) AS NetWinLoss,
-		CAST((r.RollingCommission * e.Rate) AS MONEY) AS RollingCommission,
+		CAST((r.RollingComm * e.Rate) AS MONEY) AS RollingComm,
 		CAST((r.CompanyTipShare * e.Rate) AS MONEY) AS CompanyTipShare,
 		CAST((r.PayToSupplier * e.Rate) AS MONEY) AS PayToSupplier,
 		CAST((r.LicensingFee - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome
@@ -355,7 +355,7 @@ BEGIN
 		TipAmount,
 		CustomerWinLoss,
 		LicensingFee,
-		RollingCommission,
+		RollingComm,
 		NetWinLoss,
 		CompanyTipShare,
 		PayToSupplier,
