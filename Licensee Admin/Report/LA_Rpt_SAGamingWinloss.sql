@@ -69,7 +69,7 @@ BEGIN
 
 	-- Region: Insert Rate3rd for Credit's charge rate
 	INSERT INTO #ChargeInfo(ChargeId, PartyId, LicenseeId, ProductId, Rate, IsDeposit, ChargeType, IsPayToSupplier, Fromdate, Todate)
-	SELECT CI3rd.ChargeId, CI3rd.PartyID, LicenseeID, CI3rd.ProductID, Rate, 0, CI3rd.ChargeType, 1,
+	SELECT CI3rd.ChargeId, CI3rd.PartyID, LicenseeID, CI3rd.ProductID, CI3rd.DI_Rate, 0, CI3rd.ChargeType, 1,
 		(CASE WHEN CI3rd.Fromdate < @FromDate THEN @FromDate ELSE CI3rd.Fromdate END),
 		(CASE WHEN CI3rd.Todate > @ToDate THEN @ToDate ELSE CI3rd.Todate END)
 	FROM #ChargeInfo ci
