@@ -93,6 +93,7 @@ BEGIN
 		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeID AND cr.CurrencyID = b.CurrencyId
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 		b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
+		AND b.Bettype in (Select Bettype FROM LA_f_BettypeProductMapping(0,'VB'))
 	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
 	-- EndRegion
 	
