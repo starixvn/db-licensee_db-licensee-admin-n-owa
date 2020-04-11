@@ -8,7 +8,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_SAGamingWinloss]
 	, @ToDate			DATETIME
 	, @BaseCurrencyName	VARCHAR(10) = 'EUR'
 AS
---select @BaseCurrencyName='CNY',@ToDate='2020-02-29 00:00:00',@PartyIds='31',@FromDate='2020-02-01 00:00:00'
+--select @BaseCurrencyName='CNY',@ToDate='2020-01-31 00:00:00',@PartyIds='25,30',@FromDate='2020-01-01 00:00:00'
 
 /*  Created: 20200401@Parsons
 	Task : Report - SA Gaming win loss
@@ -68,8 +68,8 @@ BEGIN
 	)
 
 	-- Region: Insert Rate3rd for Credit's charge rate
-	INSERT INTO #ChargeInfo(ChargeId, PartyId, LicenseeId, ProductId, Rate, IsDeposit, ChargeType, IsPayToSupplier, Fromdate, Todate)
-	SELECT CI3rd.ChargeId, CI3rd.PartyID, LicenseeID, CI3rd.ProductID, CI3rd.DI_Rate, 0, CI3rd.ChargeType, 1,
+	INSERT INTO #ChargeInfo(PartyId, LicenseeId, ProductId, Rate, IsDeposit, ChargeType, IsPayToSupplier, Fromdate, Todate)
+	SELECT DISTINCT CI3rd.PartyID, LicenseeID, CI3rd.ProductID, CI3rd.DI_Rate, 0, CI3rd.ChargeType, 1,
 		(CASE WHEN CI3rd.Fromdate < @FromDate THEN @FromDate ELSE CI3rd.Fromdate END),
 		(CASE WHEN CI3rd.Todate > @ToDate THEN @ToDate ELSE CI3rd.Todate END)
 	FROM #ChargeInfo ci
@@ -128,8 +128,7 @@ BEGIN
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #ChargeInfo ci ON ( -- licensee charge rate
 				b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate AND
-				ci.IsPayToSupplier = 0 AND
-				(ci.IsDeposit = 0 OR (ci.IsDeposit = 1 AND ci.ChargeType = @GrossWin)))
+				ci.IsPayToSupplier = 0 AND ci.ChargeType = @GrossWin)
 			LEFT JOIN #ChargeInfo r ON ( -- rolling RollingComm rate
 				b.SiteID = r.LicenseeID AND b.ProductID = r.ProductId AND b.rptDate BETWEEN r.FromDate AND r.ToDate AND
 				r.IsPayToSupplier = 1 AND 
