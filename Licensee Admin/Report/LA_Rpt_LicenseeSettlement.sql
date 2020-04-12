@@ -297,7 +297,9 @@ BEGIN
 	END
 	ELSE IF (@ProductCode = 'GD' OR @ProductCode = 'SAG') --GD && SAG
 	BEGIN
-		;WITH cte_GD AS(
+		DECLARE @Product_Id INT
+		SELECT TOP 1 @Product_Id = ProductId FROM @ChargeInfo
+		;WITH cte_TempData AS(
 			SELECT b.rptDate, b.CurrencyID, b.Bettype
 				, SUM(Turnover) AS Turnover
 				, SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN 0 ELSE MemberWL END ) AS MemberWL
@@ -308,8 +310,8 @@ BEGIN
 				AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND b.customercategory NOT IN (27, 28)
-				AND b.ProductID IN (11,39)
 				AND b.SiteId = @LicenseeID
+				AND b.ProductID = @Product_Id
 			GROUP BY b.rptDate, b.CurrencyId, b.Bettype
 		)
 		
@@ -327,7 +329,7 @@ BEGIN
 				, SUM(TipAmount * p.Rate) AS TipsAmountDue
 				, SUM((-MemberWL * ISNULL(cm.Rate, p.Rate)) + (TipAmount * p.Rate)) AS Company
 				, SUM(b.betcount) AS BetCount
-			FROM cte_GD b
+			FROM cte_TempData b
 				INNER JOIN @ChargeInfo p ON (
 					b.rptDate BETWEEN p.FromDate AND p.ToDate AND
 					p.Bettype = b.Bettype
