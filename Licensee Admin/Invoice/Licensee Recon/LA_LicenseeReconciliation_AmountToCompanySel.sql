@@ -24,6 +24,7 @@ AS
 		- 20200117@Mason: Setup billing terms by Currency  [#120005]
 		- 20200309@Parsons: Intergrate SpadeGaming [#123959]
 		- 20200316@Parsons: Integrate Virtual Games [#125222]
+		- 20200412@Parsons: Integrate SA Gaming [#129276]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -43,6 +44,7 @@ BEGIN
 		,@PromotionPrize_Bettype	SMALLINT = 4300
 		,@PPTournament_Bettype		SMALLINT = 4299
 		,@GDTip_Bettype				SMALLINT = 1706
+		,@SAGTip_Bettype			SMALLINT = 3007
 		,@BA	SMALLINT = 3
 		,@GD	SMALLINT = 11
 		,@CB	SMALLINT = 15
@@ -64,7 +66,7 @@ BEGIN
 
 	-- supported products
 	-- 
-	DECLARE @supportedProducts VARCHAR(100) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG'
+	DECLARE @supportedProducts VARCHAR(100) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG'
 	DECLARE @productList TABLE(ProductId INT, Code VARCHAR(5), Name VARCHAR(50))
 	INSERT INTO @productList(ProductId,Code,Name)
 	SELECT ProductID, ProductPrefix,ProductName FROM dbo.LA_f_Products3rd(@supportedProducts)
@@ -311,7 +313,8 @@ BEGIN
 			AND b.Bettype NOT IN (
 				@GDTip_Bettype,
 				@PromotionPrize_Bettype,
-				@PPTournament_Bettype
+				@PPTournament_Bettype,
+				@SAGTip_Bettype
 			)
 		GROUP BY p.PartyID,b.rptdate,p.ProductId,b.CurrencyId
 
@@ -319,14 +322,14 @@ BEGIN
 		--
 		INSERT INTO #tmpWinlossData(PartyID,rptDate,ProductID,CurrencyId, Winloss,AmountToCompany,ExtraAmount, Promotion)
 		SELECT p.PartyID,b.rptDate,p.ProductId,b.CurrencyId,0,0,
-			SUM(CASE WHEN b.Bettype = @GDTip_Bettype THEN b.LicWinloss * p.Rate * e.Rate ELSE 0 END),
+			SUM(CASE WHEN b.Bettype IN(@GDTip_Bettype, @SAGTip_Bettype) THEN b.LicWinloss * p.Rate * e.Rate ELSE 0 END),
 			SUM(CASE WHEN b.Bettype IN (@PromotionPrize_Bettype,@PPTournament_Bettype,@SabaPromotion_Bettype) THEN -b.LicWinloss * e.Rate ELSE 0 END)
 		FROM #tmpBettingByProduct b
 		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = (CASE WHEN p.ProductID = 0 THEN @SPR ELSE p.ProductID END)
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 		WHERE b.rptDate BETWEEN p.FromDate AND p.ToDate
 			AND (p.ProductID IN(0, @PP) OR p.ChargeType = @GDTip_ChargeType)
-			AND b.Bettype IN (@PromotionPrize_Bettype,@PPTournament_Bettype,@GDTip_Bettype,@SabaPromotion_Bettype)
+			AND b.Bettype IN (@PromotionPrize_Bettype,@PPTournament_Bettype,@GDTip_Bettype,@SabaPromotion_Bettype, @SAGTip_Bettype)
 		GROUP BY p.PartyID,b.rptdate,p.ProductId,b.CurrencyId
 
 		-- CB
