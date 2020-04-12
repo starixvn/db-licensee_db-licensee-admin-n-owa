@@ -22,6 +22,7 @@ AS
 	  - 20180419@Scofield: update CB for FreePlay [#93907]
 	  - 20180716@bruce: add new group TEST for credit [#98126]
 	  - 20180712@Bruce: Enhance Manage Discount group [#94282]
+	  - 20200412@Parsons: Integrate SA Gaming [#129276]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -224,7 +225,11 @@ BEGIN
 		@ToDate						AS ReportDate,
 		@BaseCurrency				AS CurrencyName,
 		SUM(ISNULL(d.Rebate, 0))	AS TotalRebate,
-		SUM(ISNULL(d.Fee, rs.AmountToCompany) - ISNULL(d.Discount,0)) AS TotalAmount
+		SUM(
+			CASE WHEN rs.ProductId IN (11,39) THEN ISNULL(rs.AmountToCompany,0) 
+				ELSE ISNULL(d.Fee, rs.AmountToCompany) 
+			END	 
+			- ISNULL(d.Discount,0)) AS TotalAmount
 	FROM @Result rs
 	LEFT JOIN #AmountToCompany d ON d.ProductId = rs.ProductId
 
