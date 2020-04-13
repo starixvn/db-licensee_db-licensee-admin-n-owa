@@ -2,7 +2,7 @@
 USE [bodb_licensee]
 GO
 
-CREATE PROCEDURE [dbo].[LA_Rpt_BBINLiveCasinoWinLoss]
+ALTER PROCEDURE [dbo].[LA_Rpt_BBINLiveCasinoWinLoss]
 	@PartyIds			VARCHAR(4000),
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
