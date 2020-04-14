@@ -38,7 +38,7 @@ BEGIN
 	SET NOCOUNT ON
 
 	CREATE TABLE #PartyList (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
-	INSERT INTO #PartyList EXEC bodb_licensee.dbo.LA_PartyListSel
+	INSERT INTO #PartyList EXEC LA_PartyListSel
 
 	CREATE TABLE #ChargeRate (
 		ChargeId		INT
@@ -55,7 +55,7 @@ BEGIN
 	-- Except CN88 = 1.5%
 	INSERT INTO #ChargeRate
 	SELECT c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, 0.4, c.Fromdate, c.Todate
-	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'NG') c
+	FROM LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'NG') c
 
 	-- From 01 Dec 2019, pay to supplier = 50%
 	BEGIN
@@ -136,7 +136,7 @@ BEGIN
 		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 		b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
-		AND b.Bettype in (Select Bettype FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'NG'))
+		AND b.Bettype in (Select Bettype FROM LA_f_BettypeProductMapping(0,'NG'))
 		AND ci.isDeposit = 0
 	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
 	-- EndRegion
@@ -175,7 +175,7 @@ BEGIN
 		Name VARCHAR(20)
 	)
 	INSERT INTO @BaseCurrencies(Id, Name)
-	EXEC bodb_licensee.dbo.LA_SelBaseCurrency
+	EXEC LA_SelBaseCurrency
 
 	DECLARE @GrandTotal TABLE (
 		CurrencyName	VARCHAR(20),

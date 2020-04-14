@@ -8,6 +8,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinLossByProduct]
 	@ToDate				DATETIME,
 	@BaseCurrencyName	VARCHAR(10)
 AS
+
 /*	Header:
 	Created: 2015.08.06 - Bravo.Tran
 	Task : Create Invoice 
@@ -323,7 +324,7 @@ BEGIN
 			SUM(b.BuyBackAmt * p.Rate * e.Rate) AS CashoutCommission	
 		FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
 			INNER JOIN @PartyChargeInfo p ON b.SiteId = p.LicenseeID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate AND p.ProductID = b.ProductID
-			INNER JOIN #Exchange e ON e.ExchangeID=b.Currency AND e.ExchangeDate = b.Winlostdate
+			INNER JOIN #Exchange e ON e.ExchangeID = b.Currency AND e.ExchangeDate = b.Winlostdate
 		WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate									
 			AND b.Currency <> 20
 			AND b.RoleID = 1 -- Member

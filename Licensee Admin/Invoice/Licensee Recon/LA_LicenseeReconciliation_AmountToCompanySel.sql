@@ -303,7 +303,7 @@ BEGIN
 		FROM #tmpBettingByProduct b
 		INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID AND p.LicenseeId = b.SiteId AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
+		LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
 		WHERE p.ChargeType NOT IN (
 				@CashoutComm_ChargeType,
 				@CommissionShare_ChargeType,
@@ -589,10 +589,10 @@ BEGIN
 	INSERT INTO @tmpRebateSettings(PartyId, ProductId, Rate, FromDate)
 	SELECT a.PartyID, p.ProductId, d.Rate, h.FromDate
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
-	INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId=a.DiscountGroupId
-	INNER JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON p.DiscountGroupId=h.DiscountGroupId
-	INNER JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON d.DiscountGroupId=h.DiscountGroupId
-	INNER JOIN @PartyList l ON l.PartyId=a.PartyID AND l.IsSelected=1
+	INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
+	INNER JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON p.DiscountGroupId = h.DiscountGroupId
+	INNER JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON d.DiscountGroupId = h.DiscountGroupId
+	INNER JOIN @PartyList l ON l.PartyId = a.PartyID AND l.IsSelected = 1
 	WHERE h.DiscountGroupType=@Rebate
 		AND h.FromDate <= @ToDate
 		AND h.ToDate >= @FromDate
@@ -609,7 +609,7 @@ BEGIN
 		AND c.ProductId = r.ProductId
 
 	-- calculate rebate
-	UPDATE r SET Rebate =(r.LicensingFee - r.Discount) * c.Rate
+	UPDATE r SET Rebate = (r.LicensingFee - r.Discount) * c.Rate
 	FROM #tmpResult r INNER JOIN @tmpRebateSettings c ON r.PartyId = c.PartyID AND r.ProductId = c.ProductId
 END
 /*-----------------

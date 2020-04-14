@@ -2,10 +2,6 @@
 USE [bodb_Licensee]
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE [dbo].LA_Rpt_LicenseeWinLossByDynamicProduct
 	@ProductIdString	VARCHAR(200),
 	@FromDate			DATETIME,
@@ -29,6 +25,7 @@ AS
 	    - 20191205@Mason: PP tournament [#123958]
 	    - 20200409@Parsons: Integrate SA Gaming [#129276]
 */
+
 BEGIN
 	SET NOCOUNT ON
 	

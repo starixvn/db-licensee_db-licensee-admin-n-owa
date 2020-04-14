@@ -31,7 +31,7 @@ BEGIN
 	/* ChargeInfo */
 	INSERT INTO @ChargeInfo(ChargeID, PartyID, LicenseeID, ProductID, Rate, Fromdate, Todate)
 	SELECT DISTINCT ChargeID, PartyID, LicenseeID, ProductID, CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END, Fromdate, Todate		
-	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
+	FROM LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 	WHERE ChargeType <> 12 -- Exclude for GD Tips
 	
 	/* BA Product */
@@ -241,12 +241,9 @@ BEGIN
 					ELSE Company 
 					END AS AmountToCompany
 		FROM #Report b
-		INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) 
-			ON p.PartyID = b.PartyID
-		LEFT JOIN LA_f_Products3rd('') prd
-			ON prd.ProductId = b.ProductId
-		LEFT JOIN @Exchange ex 
-			ON b.CurrencyId = ex.Currency
+		INNER JOIN OAS_Party p WITH (NOLOCK) ON p.PartyID = b.PartyID
+			LEFT JOIN LA_f_Products3rd('') prd ON prd.ProductId = b.ProductId
+			LEFT JOIN @Exchange ex ON b.CurrencyId = ex.Currency
 	)
 	SELECT PartyName, CurrencyName, ProductName, ProductId, Sum(AmountToCompany) AS AmountToCompany
 	FROM tmpResult t

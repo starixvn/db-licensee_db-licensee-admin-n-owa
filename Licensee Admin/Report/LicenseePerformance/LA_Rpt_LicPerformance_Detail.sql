@@ -1,5 +1,4 @@
 /*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
-
 USE [bodb02]
 GO
 
@@ -102,7 +101,7 @@ BEGIN
 	-- Region: Split party id	
 	DECLARE @PartyIdTable TABLE (PartyId INT, IsSelected BIT)
 	INSERT INTO @PartyIdTable
-	SELECT val, 1 FROM bodb02.dbo.Lrf_f_StringSplit(@PartyIDs, ',')
+	SELECT val, 1 FROM Lrf_f_StringSplit(@PartyIDs, ',')
 	-- End region
 
 	-- ************************************************************************
@@ -218,7 +217,7 @@ BEGIN
 	)
 	IF(@IsConvert = 0)
 	BEGIN
-		SELECT @BaseCurrencyName = e.Code, @BaseCurrency = @Currency FROM bodb02.dbo.Exchange e WITH (NOLOCK) WHERE e.exchangeid = @Currency
+		SELECT @BaseCurrencyName = e.Code, @BaseCurrency = @Currency FROM Exchange e WITH (NOLOCK) WHERE e.exchangeid = @Currency
 	END
 
 	--  Minimum fee is calculated for all currencies that licensee offer. There is no minimum fee when data display individual currency.
@@ -247,11 +246,11 @@ BEGIN
 
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+	FROM LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(@PrevFromDate, @PrevToDate, @BaseCurrencyName)
+	FROM LA_f_ExchangeDailySel(@PrevFromDate, @PrevToDate, @BaseCurrencyName)
 
 	CREATE NONCLUSTERED INDEX Idx_Exchange ON #Exchange (ExchangeDate, ExchangeID)
 

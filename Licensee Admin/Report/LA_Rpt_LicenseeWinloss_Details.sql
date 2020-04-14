@@ -14,6 +14,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss_Details]
 	, @BaseCurrencyName		VARCHAR(10)		= 'EUR'
 
 AS
+
 /*  Created:  Forrest.Nguyen
 	Date: 20151020
 	Original: LA_Rpt_LicenseeWinloss_Details

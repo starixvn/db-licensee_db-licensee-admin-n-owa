@@ -13,6 +13,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss]
 	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
 WITH RECOMPILE
 AS
+
 /*  Created:  Forrest.Nguyen
 	Date: 20151020
 	Original: LA_Rpt_LicenseeWinloss

@@ -206,8 +206,7 @@ BEGIN
 		INSERT INTO @TempAG(LicenseeeID, CustId, CurrencyId)
 		SELECT DISTINCT LicenseeID, CustID, Currency
 		FROM bodb_licensee.dbo.f_SelLicenseeCust(@LicenseeID)
-		WHERE (@CurrencyId = 0 OR (@CurrencyId <> 0 AND Currency = @CurrencyId))
-			AND Currency <> 20
+		WHERE (@CurrencyId = 0 OR Currency = @CurrencyId) AND Currency <> 20
 
 		SELECT @Recommend = @Recommend + CAST(CustID AS VARCHAR) + ','
 		FROM @TempAG
