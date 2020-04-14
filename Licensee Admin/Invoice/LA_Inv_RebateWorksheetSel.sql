@@ -2,15 +2,12 @@
 USE bodb_licensee
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE dbo.LA_Inv_RebateWorksheetSel
 	@PartyId		INT
 	, @FromDate		SMALLDATETIME
 	, @ToDate		SMALLDATETIME
 AS
+
 /*	Created: 20170417@Bruce
 	Task: Rebate worksheet [#76133]
 	DB: bodb_licensee
@@ -227,9 +224,8 @@ BEGIN
 		SUM(ISNULL(d.Rebate, 0))	AS TotalRebate,
 		SUM(
 			CASE WHEN rs.ProductId IN (11,39) THEN ISNULL(rs.AmountToCompany,0) 
-				ELSE ISNULL(d.Fee, rs.AmountToCompany) 
-			END	 
-			- ISNULL(d.Discount,0)) AS TotalAmount
+				ELSE ISNULL(d.Fee, rs.AmountToCompany) - ISNULL(d.Discount,0)
+			END	) AS TotalAmount
 	FROM @Result rs
 	LEFT JOIN #AmountToCompany d ON d.ProductId = rs.ProductId
 
