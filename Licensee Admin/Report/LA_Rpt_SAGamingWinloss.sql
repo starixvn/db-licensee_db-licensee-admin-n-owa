@@ -8,7 +8,6 @@ ALTER PROCEDURE [dbo].[LA_Rpt_SAGamingWinloss]
 	, @ToDate			DATETIME
 	, @BaseCurrencyName	VARCHAR(10) = 'EUR'
 AS
---select @BaseCurrencyName='EUR',@ToDate='2019-12-31 00:00:00',@PartyIds='323',@FromDate='2019-12-01 00:00:00'
 
 /*  Created: 20200401@Parsons
 	Task : Report - SA Gaming win loss
@@ -143,7 +142,7 @@ BEGIN
 				tipLicensee.ChargeType = @TipChargeType)
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeId = ci.ChargeId AND cr.CurrencyID = b.CurrencyId
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
-			  b.StatusId NOT IN (- 1, 101, 102) AND
+			  b.StatusId NOT IN (- 1, 101, 102, 103) AND
 			  b.customercategory NOT IN (27,28)
 		GROUP BY b.rptDate, ci.PartyID, b.CurrencyID, ci.IsDeposit
 	)
