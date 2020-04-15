@@ -22,9 +22,15 @@ BEGIN
 	
 	DECLARE @ProductCodes AS VARCHAR(1000) = 'TG'
 	DECLARE @System AS VARCHAR(10) = 'OA'
+	DECLARE @12BetGroupId AS INT = 14
 
 	CREATE TABLE #PartyList (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
 	INSERT INTO #PartyList EXEC bodb_licensee.dbo.LA_PartyListSel
+	
+	-- Separate 12Bet to separated group
+	UPDATE #PartyList
+	SET ParentId = @12BetGroupId
+	WHERE PartyId = @12BetGroupId
 	
 	-- Get 3rd Rate
 	DECLARE @3rdRate AS TABLE(PartyID INT, ProductID INT, DI_Rate MONEY, IsDeposit INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
@@ -45,7 +51,9 @@ BEGIN
 		,Todate			SMALLDATETIME
 	)
 	
-	-- ​Pay to Supplier: equals 3%(0.03) of [Licensee Win Loss]
+	-- ​Pay to Supplier: 
+	--- OW, Boping, Zelanta equals 3%(0.03) of [Licensee Win Loss]
+	--- 12BET Group: 3% (0.03) of [Licensee Win Loss]
 	INSERT INTO #ChargeRate
 	SELECT DISTINCT c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, @ProductCodes) c
@@ -221,7 +229,7 @@ BEGIN
 		CAST((r.LicenseeWinLoss * e.Rate) AS MONEY) AS LicenseeWinLoss,
 		CAST((r.LicensingFee * e.Rate) AS MONEY) AS LicensingFee,
 		CAST((r.PayToSupplier * e.Rate)AS MONEY) AS PayToSupplier,
-		r.LicensingFee - r.PayToSupplier AS CompanyIncome
+		CAST((r.LicensingFee - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome
 	FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.WinLossDate = e.ExchangeDate
 	
 	-- Select Grand Total
