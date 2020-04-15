@@ -12,7 +12,7 @@ AS
 /*
  * Created by : [20140904@Florent.Nguyen]
  * Task  : Get Number Game Winloss
- * DB   : DB052.bodb02
+ * DB   : DBLIC.bodb_Licensee
  * Revisions :
 	- 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
 	- 20150703@Florent: add GBP
@@ -153,7 +153,7 @@ BEGIN
 	UPDATE td SET
 		td.PayToSupplier = td.LicenseeWinloss * 0.015
 	FROM #TempData td 
-	WHERE PartyID IN (SELECT p.PartyID FROM OAS_Party p WHERE p.PartyName = 'CN88')
+	WHERE PartyID IN (SELECT p.PartyID FROM OAS_Party p WITH(NOLOCK) WHERE p.PartyName = 'CN88')
 	
 	DECLARE @Total TABLE (
 		ParentId		INT,

@@ -240,7 +240,7 @@ BEGIN
 				, SUM(b.BetCount * (CASE WHEN @drawfilter = 2 AND b.[Status] = 111 THEN 0 ELSE 1 END))
 				, 0 as Playercomm
 			FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
-			INNER JOIN #tmpParty p ON p.LicenseeId=b.SiteId AND p.Bettype=b.Bettype AND b.RptDate BETWEEN p.FromDate AND p.ToDate
+			INNER JOIN #tmpParty p ON p.LicenseeId=b.SiteId AND p.Bettype = b.Bettype
 			LEFT JOIN dbo.League l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
 			WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
 				AND (b.CurrencyID<>20)

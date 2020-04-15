@@ -130,7 +130,7 @@ BEGIN
 				SUM(ISNULL(b.CommissionP, 0)) AS PComm,
 				b.ProductId,
 				CASE
-					WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN b.Bettype
+					WHEN b.Bettype = @GD_Tip THEN b.Bettype
 					ELSE ISNULL(sbr.BettypeRef, -1)
 				END
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
@@ -144,12 +144,12 @@ BEGIN
 					901,902,903,904,	-- BT
 					911,912,913,914, 	-- CO
 					@PPTournament, @PromotionPrize, -- PP
-					@SAG_Tip
+					@SAG_Tip -- SAG
 				)
 				AND b.ProductID NOT IN (13,15,25)
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, b.ProductId,
 			CASE
-				WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN b.Bettype
+				WHEN b.Bettype = @GD_Tip THEN b.Bettype
 				ELSE ISNULL(sbr.BettypeRef, -1)
 			END
 	)

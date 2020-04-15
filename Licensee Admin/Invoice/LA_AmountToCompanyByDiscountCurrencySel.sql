@@ -499,7 +499,7 @@ BEGIN
 		SELECT c.CalculationGroup, d.DiscountGroupId, d.Rate
 			,ISNULL(d.FromAmount,0) AS FromAmount
 			,CASE WHEN d.ToAmount > @Unlimited THEN d.ToAmount ELSE (d.ToAmount + 1) END AS ToAmount
-		FROM dbo.LA_DiscountGroupDetail d
+		FROM dbo.LA_DiscountGroupDetail d WITH(NOLOCK)
 		INNER JOIN @tmpDiscountCalculation c ON d.DiscountGroupId=c.DiscountGroupId
 	)
 	INSERT INTO @Rate(rate, CalculationGroup,IsDiscountByCurrency)
