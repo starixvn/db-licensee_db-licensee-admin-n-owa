@@ -43,10 +43,11 @@ AS
 		- 20190307@Parsons: Implement BetBuilder [Redmine: #108995]
 		- 20190603@Parsons: Extend Lottery's bet types range [Redmine: #114568]
 		- 20190712@Mason: Add Card Club Win Loss report [RedmineId #116096]
-		- 20191024@Pasons: Non-peak hour promotion [#119538]    
-		- 20191223@Pasons: Integrate Spadegaming [#123959]    
-		- 20200302@Pasons: Integrate Virtual Games [#125222]
+		- 20191024@Parsons: Non-peak hour promotion [#119538]    
+		- 20191223@Parsons: Integrate Spadegaming [#123959]    
+		- 20200302@Parsons: Integrate Virtual Games [#125222]
 		- 20200326@Pasons: Integrate Sexy Gaming [#130948]
+		- 20200411@Parsons: Integrate Tables Games [#131166]
 
 	Param's Explanation:
 
@@ -367,6 +368,15 @@ BEGIN
 	   SELECT typeid, 45
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 3101 AND 3199
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+	END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'TG')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 40
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 4901 AND 5000
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
