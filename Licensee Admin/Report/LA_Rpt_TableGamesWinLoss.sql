@@ -70,7 +70,7 @@ BEGIN
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, Rate, CurrencyCode)
 	SELECT ExchangeDate, ExchangeID, BaseCurrencyRate, CASE WHEN ExchangeID = 51 THEN 'INH'
 															WHEN ExchangeID = 92 THEN 'HID' 
-															END
+															ELSE Code END
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	
 	-- Region: TempData
