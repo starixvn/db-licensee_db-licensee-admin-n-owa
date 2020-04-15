@@ -46,8 +46,8 @@ AS
 		- 20191024@Parsons: Non-peak hour promotion [#119538]    
 		- 20191223@Parsons: Integrate Spadegaming [#123959]    
 		- 20200302@Parsons: Integrate Virtual Games [#125222]
-		- 20200411@Parsons: Integrate Tables Games [#131166]
 		- 20200326@Pasons: Integrate Sexy Gaming [#130948]
+		- 20200411@Parsons: Integrate Tables Games [#131166]
 
 	Param's Explanation:
 
