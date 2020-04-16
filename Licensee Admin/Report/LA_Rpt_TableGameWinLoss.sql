@@ -2,7 +2,7 @@
 USE [bodb_licensee]
 GO
 
-ALTER PROCEDURE [dbo].[LA_Rpt_TableGamesWinLoss]
+CREATE PROCEDURE [dbo].[LA_Rpt_TableGameWinLoss]
 	@PartyIds			VARCHAR(4000),
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
@@ -12,7 +12,7 @@ AS
  * Created by : [20200406@Mason.Nguyen]
  * Task  : Get Table Games Win Loss
  * Revisions
-	- 20200406@Mason: Integrate Table Games [#131166]
+	- 20200406@Mason: Integrate Table Game [#131166]
  * Param's Explanation:
  *
  */
