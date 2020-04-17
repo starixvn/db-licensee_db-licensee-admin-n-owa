@@ -18,6 +18,7 @@ AS
 	   - 20191216@Parsons: PP tournament [#123958]
 	   - 20191125@Mason: Setup billing terms by Currency [#120005]
 	   - 20200228@Parsons: Support-HID-currency [#128856]
+	   - 20200409@Parsons: Integrate SA Gaming [#129276]
 */
 BEGIN
 	SET NOCOUNT ON	
@@ -30,7 +31,7 @@ BEGIN
 	/* ChargeInfo */
 	INSERT INTO @ChargeInfo(ChargeID, PartyID, LicenseeID, ProductID, Rate, Fromdate, Todate)
 	SELECT DISTINCT ChargeID, PartyID, LicenseeID, ProductID, CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END, Fromdate, Todate		
-	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
+	FROM LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 	WHERE ChargeType <> 12 -- Exclude for GD Tips
 	
 	/* BA Product */
@@ -147,7 +148,7 @@ BEGIN
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27,28)
-				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
+				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914,3007)--@SAG_Tip = 3007
 			GROUP BY b.rptDate, ci.PartyID, b.ProductID, b.CurrencyID
 		)
 
@@ -240,12 +241,9 @@ BEGIN
 					ELSE Company 
 					END AS AmountToCompany
 		FROM #Report b
-		INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) 
-			ON p.PartyID = b.PartyID
-		LEFT JOIN LA_f_Products3rd('') prd
-			ON prd.ProductId = b.ProductId
-		LEFT JOIN @Exchange ex 
-			ON b.CurrencyId = ex.Currency
+		INNER JOIN OAS_Party p WITH (NOLOCK) ON p.PartyID = b.PartyID
+			LEFT JOIN LA_f_Products3rd('') prd ON prd.ProductId = b.ProductId
+			LEFT JOIN @Exchange ex ON b.CurrencyId = ex.Currency
 	)
 	SELECT PartyName, CurrencyName, ProductName, ProductId, Sum(AmountToCompany) AS AmountToCompany
 	FROM tmpResult t

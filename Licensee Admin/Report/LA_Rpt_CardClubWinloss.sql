@@ -17,6 +17,7 @@ AS
 	- 20200302@Mason: Support HID currency [#128856]
 	- 20200311@Mason: Spadegaming Integration [#123959]
 	- 20200312@Parsons: Add new bet type for Card club [#129061]
+	- 20200409@Mason: Integrate SA Gaming [#129276]
  * Param's Explanation:
  *
  */
@@ -225,7 +226,7 @@ BEGIN
 		CAST((r.LicenseeWinLoss * e.Rate) AS MONEY) AS LicenseeWinLoss,
 		CAST((r.LicensingFee * e.Rate) AS MONEY) AS LicensingFee,
 		CAST((r.PayToSupplier * e.Rate)AS MONEY) AS PayToSupplier,
-		r.LicensingFee - r.PayToSupplier AS CompanyIncome
+		CAST((r.LicensingFee - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome
 	FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.WinLossDate = e.ExchangeDate
 	
 	-- Select Grand Total

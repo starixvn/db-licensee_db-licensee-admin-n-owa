@@ -8,6 +8,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinLossByProduct]
 	@ToDate				DATETIME,
 	@BaseCurrencyName	VARCHAR(10)
 AS
+
 /*	Header:
 	Created: 2015.08.06 - Bravo.Tran
 	Task : Create Invoice 
@@ -39,6 +40,7 @@ AS
 	    - 20191205@Parsons: PP tournament [#123958]
 	    - 20200226@Mason: Spadegaming-integration [#123959]
 	    - 20200316@Parsons: Integrate Virtual Games [#125222]
+	    - 20200409@Parsons: Integrate SA Gaming [#129276]
 */
 		
 /*	Example:
@@ -54,12 +56,12 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @GD_Tip SMALLINT = 1706,  
+	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007,
 	@PPTournament SMALLINT = 4299,
 	@PromotionPrize SMALLINT = 4300  
 	
 	-- Region: Get party charge rate info
-	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX,PP,CC,SG,VRG'
+	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX,PP,CC,SG,VRG,SAG'
 	
 	-- Region: Get Party ID
 	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)
@@ -82,15 +84,17 @@ BEGIN
 
 	INSERT INTO @PartyChargeInfo(ChargeId, PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, BettypeRef)
 	(
-		SELECT	ChargeId, PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate, CASE
-				WHEN ProductId = 11 AND ChargeType = 12 THEN @GD_Tip
+		SELECT	ChargeId, PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate, 
+				CASE
+					WHEN ProductId = 11 AND ChargeType = 12 THEN @GD_Tip
+					WHEN ProductId = 39 AND ChargeType = 12 THEN @SAG_Tip
 				ELSE Bettype
 			END
 		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
 	)
 	-- End region
-	
+
 	-- Region: Get exchange rate info
 	CREATE	TABLE #Exchange (
 			ExchangeDate	DATE,
@@ -139,7 +143,8 @@ BEGIN
 				AND b.Bettype NOT IN (
 					901,902,903,904,	-- BT
 					911,912,913,914, 	-- CO
-					@PPTournament, @PromotionPrize -- PP
+					@PPTournament, @PromotionPrize, -- PP
+					@SAG_Tip -- SAG
 				)
 				AND b.ProductID NOT IN (13,15,25)
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, b.ProductId,
@@ -191,7 +196,8 @@ BEGIN
 		PP			MONEY, -- Pragmatic
 		CC			MONEY, -- Card Club
 		SG			MONEY, -- Spadegaming
-		VRG			MONEY -- Virtual Games
+		VRG			MONEY, -- Virtual Games
+		SAG			MONEY -- SA Gaming
 	)						  
 	INSERT INTO #LicenseeAmount(GroupName, GroupId, LicenseeId, PartyId,PartyName)
 	SELECT	REPLACE(p.PartyName,' Licensees','') AS PartyName,
@@ -318,7 +324,7 @@ BEGIN
 			SUM(b.BuyBackAmt * p.Rate * e.Rate) AS CashoutCommission	
 		FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
 			INNER JOIN @PartyChargeInfo p ON b.SiteId = p.LicenseeID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate AND p.ProductID = b.ProductID
-			INNER JOIN #Exchange e ON e.ExchangeID=b.Currency AND e.ExchangeDate = b.Winlostdate
+			INNER JOIN #Exchange e ON e.ExchangeID = b.Currency AND e.ExchangeDate = b.Winlostdate
 		WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate									
 			AND b.Currency <> 20
 			AND b.RoleID = 1 -- Member
@@ -335,7 +341,7 @@ BEGIN
 	-- End CO
 
 	-- Calculate amount for products 
-	-- For SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, PP, CC, SG, VRG: charge rate is affected by currency
+	-- For SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, PP, CC, SG, VRG, SAG: charge rate is affected by currency
 	DECLARE @AmountDueByProduct AS TABLE (
 		LicenseeId INT,
 		SB MONEY,
@@ -358,10 +364,11 @@ BEGIN
 		BRVS MONEY,
 		BX MONEY,
 		SG MONEY,
-		VRG MONEY
+		VRG MONEY,
+		SAG MONEY
 	)
 	
-	INSERT INTO @AmountDueByProduct(LicenseeId, SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, PP, CC, BRVS, LC, VG, MGCLC, MGCRNG, BX, SG, VRG)
+	INSERT INTO @AmountDueByProduct(LicenseeId, SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, PP, CC, BRVS, LC, VG, MGCLC, MGCRNG, BX, SG, VRG, SAG)
 	SELECT d.LicenseeId,
 			ISNULL(SUM(CASE WHEN d.ProductId = 0  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS SB,
 			ISNULL(SUM(CASE WHEN d.ProductId = 2  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS NG,
@@ -383,7 +390,8 @@ BEGIN
 			ISNULL(SUM(CASE WHEN d.ProductId = 17 THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS MGCRNG,
 			ISNULL(SUM(CASE WHEN d.ProductId = 31 THEN (-MemberWL * ci.Rate - (AComm + PComm)) * e.Rate ELSE 0 END),0) AS BX,
 			ISNULL(SUM(CASE WHEN d.ProductId = 36 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS SG,
-			ISNULL(SUM(CASE WHEN d.ProductId = 38 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VRG
+			ISNULL(SUM(CASE WHEN d.ProductId = 38 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VRG,
+			ISNULL(SUM(CASE WHEN d.ProductId = 39 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS SAG
 	FROM	#TempData d
 				INNER JOIN @PartyChargeInfo ci ON	d.LicenseeId = ci.LicenseeId
 													AND ci.ProductId = d.ProductId
@@ -415,7 +423,8 @@ BEGIN
 			BRVS = a.BRVS,
 			BX = a.BX,
 			SG = a.SG,
-			VRG = a.VRG
+			VRG = a.VRG,
+			SAG = a.SAG
 	FROM	#LicenseeAmount l
 			INNER JOIN @AmountDueByProduct a ON a.LicenseeId = l.LicenseeId
 	
@@ -446,9 +455,10 @@ BEGIN
 			AND CC IS NULL
 			AND SG IS NULL
 			AND VRG IS NULL
+			AND SAG IS NULL
 
 	-- Result
-	SELECT l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP, l.CC, l.SG, l.VRG
+	SELECT l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP, l.CC, l.SG, l.VRG, l.SAG
 	FROM #LicenseeAmount l
 	ORDER BY l.GroupId, l.PartyId
 	-- EndRegion

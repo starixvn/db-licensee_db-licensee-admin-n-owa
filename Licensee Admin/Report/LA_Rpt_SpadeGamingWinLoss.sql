@@ -13,6 +13,7 @@ AS
  * Task  : Get SpadeGaming Winloss
  * Revisions
 	- 20200219@Mason: Intergrate SpadeGaming [#123959]
+	- 20200409@Mason: Integrate SA Gaming [#129276]
  * Param's Explanation:
  *
  */
@@ -21,13 +22,13 @@ BEGIN
 	SET NOCOUNT ON
 
 	CREATE TABLE #PartyList (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
-	INSERT INTO #PartyList EXEC bodb_licensee.dbo.LA_PartyListSel
+	INSERT INTO #PartyList EXEC LA_PartyListSel
 	
 	-- Get 3rd Rate
 	DECLARE @3rdRate AS TABLE(PartyID INT, ProductID INT, DI_Rate MONEY, IsDeposit INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
 	INSERT INTO @3rdRate
 	SELECT DISTINCT p.PartyId, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r.Todate 
-	FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'SG', 'OA') r 
+	FROM LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'SG', 'OA') r 
 	INNER JOIN #PartyList p on p.ParentId = r.PartyID
 
 	CREATE TABLE #ChargeRate (
@@ -45,7 +46,7 @@ BEGIN
 	-- ​Pay to Supplier: equals 3.5%(0.035) of [Licensee Win Loss]
 	INSERT INTO #ChargeRate
 	SELECT DISTINCT c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate
-	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'SG') c
+	FROM LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'SG') c
 	INNER JOIN @3rdRate r ON r.PartyID = c.PartyID and r.ProductID = c.ProductID
 	WHERE (c.DI_Rate = 0 AND c.isDeposit = 0) OR (c.DI_Rate > 0 and c.isDeposit = 1)
 
@@ -139,7 +140,7 @@ BEGIN
 		Name VARCHAR(20)
 	)
 	INSERT INTO @BaseCurrencies(Id, Name)
-	EXEC bodb_licensee.dbo.LA_SelBaseCurrency
+	EXEC LA_SelBaseCurrency
 
 	DECLARE @GrandTotal TABLE (
 		CurrencyName	VARCHAR(20),
@@ -218,7 +219,7 @@ BEGIN
 		CAST((r.LicenseeWinLoss * e.Rate) AS MONEY) AS LicenseeWinLoss,
 		CAST((r.LicensingFee * e.Rate) AS MONEY) AS LicensingFee,
 		CAST((r.PayToSupplier * e.Rate)AS MONEY) AS PayToSupplier,
-		r.LicensingFee - r.PayToSupplier AS CompanyIncome
+		CAST((r.LicensingFee - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome
 	FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.WinLossDate = e.ExchangeDate
 	
 	-- Select Grand Total

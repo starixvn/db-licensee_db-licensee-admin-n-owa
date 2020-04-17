@@ -42,7 +42,8 @@ AS
 			- 20190312@Parsons: Integrate Promotion Prize (PP product) [#109014]
 			- 20191122@Mason: Setup billing terms by Currency  [#120005]
 			- 20191205@Parsons: PP tournament [#123958]  
-			- 20200228@Parsons: Support-HID-currency [#128856]
+			- 20200228@Parsons: Support-HID-currency [#128856] 
+			- 20200412@Parsons: Integrate SA Gaming [#129276]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -60,7 +61,8 @@ BEGIN
 
 	DECLARE @LicenseeID INT,
 			@DrawFilter SMALLINT = 1
-	DECLARE @GD_Tip SMALLINT = 1706
+	DECLARE @GD_Tip SMALLINT = 1706,
+			@SAG_Tip SMALLINT = 3007
 
 	CREATE TABLE #Result
 	(
@@ -117,7 +119,10 @@ BEGIN
 	INSERT INTO @ChargeInfo(ChargeId, PartyId, LicenseeId, ProductID, Bettype, Rate, Fromdate, Todate)
 	(
 		SELECT DISTINCT ChargeId, PartyID, LicenseeID, ProductID,
-			CASE WHEN ProductID = 11 AND ChargeType = 12 THEN @GD_Tip ELSE Bettype END AS ChargeType
+			CASE 
+				WHEN ProductID = 11 AND ChargeType = 12 THEN @GD_Tip
+				WHEN ProductID = 39 AND ChargeType = 12 THEN @SAG_Tip 
+			ELSE Bettype END AS ChargeType
 			, DI_Rate, Fromdate, Todate
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyID, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE DI_Rate > 0
@@ -201,8 +206,7 @@ BEGIN
 		INSERT INTO @TempAG(LicenseeeID, CustId, CurrencyId)
 		SELECT DISTINCT LicenseeID, CustID, Currency
 		FROM bodb_licensee.dbo.f_SelLicenseeCust(@LicenseeID)
-		WHERE (@CurrencyId = 0 OR (@CurrencyId <> 0 AND Currency = @CurrencyId))
-			AND Currency <> 20
+		WHERE (@CurrencyId = 0 OR Currency = @CurrencyId) AND Currency <> 20
 
 		SELECT @Recommend = @Recommend + CAST(CustID AS VARCHAR) + ','
 		FROM @TempAG
@@ -290,21 +294,23 @@ BEGIN
 			GROUP BY b.Winlostdate, CurrencyID
 		)
 	END
-	ELSE IF (@ProductCode = 'GD') -- GD
+	ELSE IF (@ProductCode = 'GD' OR @ProductCode = 'SAG') --GD && SAG
 	BEGIN
-		;WITH cte_GD AS(
+		DECLARE @Product_Id INT
+		SELECT TOP 1 @Product_Id = ProductId FROM @ChargeInfo
+		;WITH cte_TempData AS(
 			SELECT b.rptDate, b.CurrencyID, b.Bettype
 				, SUM(Turnover) AS Turnover
-				, SUM(CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE MemberWL END ) AS MemberWL
-				, SUM(CASE WHEN b.Bettype = @GD_Tip THEN -MemberWL ELSE 0 END ) AS TipAmount
-				, SUM(CASE WHEN b.Bettype = @GD_Tip THEN 0 ELSE b.BetCount END) AS BetCount
+				, SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN 0 ELSE MemberWL END ) AS MemberWL
+				, SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN -MemberWL ELSE 0 END ) AS TipAmount
+				, SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN 0 ELSE b.BetCount END) AS BetCount
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND b.customercategory NOT IN (27, 28)
-				AND b.ProductID = 11-- GD
 				AND b.SiteId = @LicenseeID
+				AND b.ProductID = @Product_Id
 			GROUP BY b.rptDate, b.CurrencyId, b.Bettype
 		)
 		
@@ -322,7 +328,7 @@ BEGIN
 				, SUM(TipAmount * p.Rate) AS TipsAmountDue
 				, SUM((-MemberWL * ISNULL(cm.Rate, p.Rate)) + (TipAmount * p.Rate)) AS Company
 				, SUM(b.betcount) AS BetCount
-			FROM cte_GD b
+			FROM cte_TempData b
 				INNER JOIN @ChargeInfo p ON (
 					b.rptDate BETWEEN p.FromDate AND p.ToDate AND
 					p.Bettype = b.Bettype

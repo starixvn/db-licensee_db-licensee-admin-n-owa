@@ -2,15 +2,12 @@
 USE bodb_licensee
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE dbo.LA_Inv_RebateWorksheetSel
 	@PartyId		INT
 	, @FromDate		SMALLDATETIME
 	, @ToDate		SMALLDATETIME
 AS
+
 /*	Created: 20170417@Bruce
 	Task: Rebate worksheet [#76133]
 	DB: bodb_licensee
@@ -22,6 +19,7 @@ AS
 	  - 20180419@Scofield: update CB for FreePlay [#93907]
 	  - 20180716@bruce: add new group TEST for credit [#98126]
 	  - 20180712@Bruce: Enhance Manage Discount group [#94282]
+	  - 20200412@Parsons: Integrate SA Gaming [#129276]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -61,7 +59,7 @@ BEGIN
 	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
 	(
 		SELECT DISTINCT ci.PartyID, ci.LicenseeID, ci.ProductID, ci.DI_Rate, ci.Fromdate, ci.ToDate
-		FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
+		FROM	LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
 		WHERE	DI_Rate > 0 AND ProductID <> @CB -- exclude CB
 	)
 
@@ -77,9 +75,9 @@ BEGIN
 			ci.ChargeType,
 			CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
 			CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
-	FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
-		INNER JOIN bodb_licensee.dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
-		LEFT JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
+	FROM OAS_Party p WITH(NOLOCK)
+		INNER JOIN OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
+		LEFT JOIN OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
 	WHERE EXISTS(SELECT TOP 1 1 FROM @Products WHERE ProductId=@CB)
 		AND FromParty = @PartyId
 		AND ProductID = @CB
@@ -224,7 +222,11 @@ BEGIN
 		@ToDate						AS ReportDate,
 		@BaseCurrency				AS CurrencyName,
 		SUM(ISNULL(d.Rebate, 0))	AS TotalRebate,
-		SUM(ISNULL(d.Fee, rs.AmountToCompany) - ISNULL(d.Discount,0)) AS TotalAmount
+		SUM(
+			CASE 
+				WHEN rs.ProductId IN (11,39) THEN ISNULL(rs.AmountToCompany,0) 
+				ELSE ISNULL(d.Fee, rs.AmountToCompany) - ISNULL(d.Discount,0)
+			END	) AS TotalAmount
 	FROM @Result rs
 	LEFT JOIN #AmountToCompany d ON d.ProductId = rs.ProductId
 

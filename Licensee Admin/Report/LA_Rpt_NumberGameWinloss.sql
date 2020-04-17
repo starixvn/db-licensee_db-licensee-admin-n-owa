@@ -12,7 +12,7 @@ AS
 /*
  * Created by : [20140904@Florent.Nguyen]
  * Task  : Get Number Game Winloss
- * DB   : DB052.bodb02
+ * DB   : DBLIC.bodb_Licensee
  * Revisions :
 	- 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
 	- 20150703@Florent: add GBP
@@ -28,6 +28,7 @@ AS
 	- 20191217@Bruce: Update NG/H5 3rd rate [#125515]
 	- 20191226@Mason: Set Term By Currency [#120005]
 	- 20200203@Mason: Support HID currency [#128856]
+	- 20200409@Mason: Integrate SA Gaming [#129276]
 
  * Param's Explanation:
  EXEC LA_Rpt_NumberGameWinloss @PartyIds = '14,15,16,17,18,19', @FromDate = '20190101', @ToDate = '20190808', @BaseCurrencyName = 'EUR'
@@ -37,7 +38,7 @@ BEGIN
 	SET NOCOUNT ON
 
 	CREATE TABLE #PartyList (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
-	INSERT INTO #PartyList EXEC bodb_licensee.dbo.LA_PartyListSel
+	INSERT INTO #PartyList EXEC LA_PartyListSel
 
 	CREATE TABLE #ChargeRate (
 		ChargeId		INT
@@ -54,7 +55,7 @@ BEGIN
 	-- Except CN88 = 1.5%
 	INSERT INTO #ChargeRate
 	SELECT c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, 0.4, c.Fromdate, c.Todate
-	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'NG') c
+	FROM LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'NG') c
 
 	-- From 01 Dec 2019, pay to supplier = 50%
 	BEGIN
@@ -135,7 +136,7 @@ BEGIN
 		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 		b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
-		AND b.Bettype in (Select Bettype FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'NG'))
+		AND b.Bettype in (Select Bettype FROM LA_f_BettypeProductMapping(0,'NG'))
 		AND ci.isDeposit = 0
 	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
 	-- EndRegion
@@ -152,7 +153,7 @@ BEGIN
 	UPDATE td SET
 		td.PayToSupplier = td.LicenseeWinloss * 0.015
 	FROM #TempData td 
-	WHERE PartyID IN (SELECT p.PartyID FROM OAS_Party p WHERE p.PartyName = 'CN88')
+	WHERE PartyID IN (SELECT p.PartyID FROM OAS_Party p WITH(NOLOCK) WHERE p.PartyName = 'CN88')
 	
 	DECLARE @Total TABLE (
 		ParentId		INT,
@@ -174,7 +175,7 @@ BEGIN
 		Name VARCHAR(20)
 	)
 	INSERT INTO @BaseCurrencies(Id, Name)
-	EXEC bodb_licensee.dbo.LA_SelBaseCurrency
+	EXEC LA_SelBaseCurrency
 
 	DECLARE @GrandTotal TABLE (
 		CurrencyName	VARCHAR(20),
@@ -248,7 +249,7 @@ BEGIN
 		CAST((r.LicenseeWinLoss * e.Rate) AS MONEY) AS LicenseeWinLoss,
 		CAST((r.LicensingFee * e.Rate) AS MONEY) AS LicensingFee,
 		CAST((r.PayToSupplier * e.Rate)AS MONEY) AS PayToSupplier,
-		r.LicensingFee - r.PayToSupplier AS CompanyIncome
+		CAST((r.LicensingFee - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome
 	FROM #TempData r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.Winlostdate = e.ExchangeDate
 	
 	-- Select Grand Total
