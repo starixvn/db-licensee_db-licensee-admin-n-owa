@@ -85,8 +85,8 @@ BEGIN
 		SUM(-b.WinLoss * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
 		SUM(-b.WinLoss * 
 		CASE 
-			WHEN ci.IsDeposit = 1 THEN (CASE WHEN b.Bettype BETWEEN 4044 AND 4050 THEN 0.035 ELSE 0.045 END)
-			ELSE (CASE WHEN b.Bettype BETWEEN 4044 AND 4050 THEN 0.02 ELSE 0.03 END)
+			WHEN ci.IsDeposit = 1 THEN (CASE WHEN b.Bettype BETWEEN 4001 AND 4050 THEN 0.035 ELSE 0.045 END)
+			ELSE (CASE WHEN b.Bettype BETWEEN 4001 AND 4050 THEN 0.02 ELSE 0.03 END)
 		END) AS PayToSupplier
 	FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
 		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
