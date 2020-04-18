@@ -1,3 +1,12 @@
 Licensee Admin/Manage/Invoice Setting/PayerSetting/LA_PayerSettingModify.sql
 Licensee Admin/Function/LA_f_BettypeProductMapping.sql
+Licensee Admin/Report/LA_Rpt_CurrencyWinloss.sql
+Licensee Admin/Report/LA_Rpt_CurrencyWinloss_Details.sql
+Licensee Admin/Report/LA_Rpt_LicenseeWinLossByProduct.sql
+Licensee Admin/Report/LA_Rpt_LicenseeSettlement.sql
 
+Licensee Admin/Report/LicenseePerformance/LA_Rpt_LicPerformance_Detail.sql
+Licensee Admin/Report/LicenseePerformance/LA_Rpt_LicPerformance_LicensingFee.sql
+Licensee Admin/Report/LicenseePerformance/LA_Rpt_LicPerformance_LicensingMargin.sql
+Licensee Admin/Report/LicenseePerformance/LA_Rpt_LicPerformance_Summary.sql
+Licensee Admin/Report/LicenseePerformance/LA_Rpt_LicPerformance_TurnOver.sql
