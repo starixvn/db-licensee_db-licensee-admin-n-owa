@@ -46,8 +46,9 @@ AS
 		- 20191024@Parsons: Non-peak hour promotion [#119538]    
 		- 20191223@Parsons: Integrate Spadegaming [#123959]    
 		- 20200302@Parsons: Integrate Virtual Games [#125222]
-		- 20200326@Pasons: Integrate Sexy Gaming [#130948]
+		- 20200326@Parsons: Integrate Sexy Gaming [#130948]
 		- 20200411@Parsons: Integrate Tables Games [#131166]
+		- 20200415@Pasons: Integrate SA Gaming [#129276]  
 
 	Param's Explanation:
 
@@ -377,6 +378,15 @@ BEGIN
 	   SELECT typeid, 40
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 4901 AND 5000
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+	END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'SAG')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 39
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 3001 AND 3099
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
