@@ -49,6 +49,7 @@ AS
 		- 20200326@Parsons: Integrate Sexy Gaming [#130948]
 		- 20200411@Parsons: Integrate Tables Games [#131166]
 		- 20200415@Pasons: Integrate SA Gaming [#129276]  
+		- 20200418@Parsons: Integrate BBIN Live Casino [#132237]
 
 	Param's Explanation:
 
@@ -387,6 +388,15 @@ BEGIN
 	   SELECT typeid, 39
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 3001 AND 3099
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+	END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'BBIN')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 47
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid = 3300 
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
