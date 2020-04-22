@@ -43,6 +43,7 @@ AS
 	    - 20200409@Parsons: Integrate SA Gaming [#129276]
 		- 20200423@Parsons: Intergrate Indo 4D [#130910]
 		- 20200411@Parsons: Integrate Table Games [#131166]
+		- 20200423@Parsons: Integrate Saba.club [#132730]
 */
 		
 /*	Example:
@@ -63,7 +64,7 @@ BEGIN
 	@PromotionPrize SMALLINT = 4300  
 	
 	-- Region: Get party charge rate info
-	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX,PP,CC,SG,VRG,SAG,I4D,TG'
+	DECLARE @ProductCode VARCHAR(100)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX,PP,CC,SG,VRG,SAG,I4D,TG,SBC'
 	
 	-- Region: Get Party ID
 	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)
@@ -201,7 +202,8 @@ BEGIN
 		VRG			MONEY, -- Virtual Games
 		SAG			MONEY, -- SA Gaming
 		I4D			MONEY, -- Indo 4D
-		TG			MONEY -- Table Games
+		TG			MONEY, -- Table Games
+		SBC			MONEY -- Saba.club
 	)						  
 	INSERT INTO #LicenseeAmount(GroupName, GroupId, LicenseeId, PartyId,PartyName)
 	SELECT	REPLACE(p.PartyName,' Licensees','') AS PartyName,
@@ -345,7 +347,7 @@ BEGIN
 	-- End CO
 
 	-- Calculate amount for products 
-	-- For SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, PP, CC, SG, VRG, SAG, I4D, TG: charge rate is affected by currency
+	-- For SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, PP, CC, SG, VRG, SAG, I4D, TG, SBC: charge rate is affected by currency
 	DECLARE @AmountDueByProduct AS TABLE (
 		LicenseeId INT,
 		SB MONEY,
@@ -371,10 +373,11 @@ BEGIN
 		VRG MONEY,
 		SAG MONEY,
 		I4D MONEY,
-		TG MONEY
+		TG MONEY,
+		SBC MONEY
 	)
 	
-	INSERT INTO @AmountDueByProduct(LicenseeId, SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, PP, CC, BRVS, LC, VG, MGCLC, MGCRNG, BX, SG, VRG, SAG, I4D, TG)
+	INSERT INTO @AmountDueByProduct(LicenseeId, SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, PP, CC, BRVS, LC, VG, MGCLC, MGCRNG, BX, SG, VRG, SAG, I4D, TG, SBC)
 	SELECT d.LicenseeId,
 			ISNULL(SUM(CASE WHEN d.ProductId = 0  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS SB,
 			ISNULL(SUM(CASE WHEN d.ProductId = 2  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS NG,
@@ -399,7 +402,8 @@ BEGIN
 			ISNULL(SUM(CASE WHEN d.ProductId = 38 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VRG,
 			ISNULL(SUM(CASE WHEN d.ProductId = 39 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS SAG,
 			ISNULL(SUM(CASE WHEN d.ProductId = 43 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS I4D,
-			ISNULL(SUM(CASE WHEN d.ProductId = 40 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS TG
+			ISNULL(SUM(CASE WHEN d.ProductId = 40 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS TG,
+			ISNULL(SUM(CASE WHEN d.ProductId = 42 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS SBC
 	FROM	#TempData d
 				INNER JOIN @PartyChargeInfo ci ON	d.LicenseeId = ci.LicenseeId
 													AND ci.ProductId = d.ProductId
@@ -434,7 +438,8 @@ BEGIN
 			VRG = a.VRG,
 			SAG = a.SAG,
 			I4D = a.I4D,
-			TG = a.TG
+			TG = a.TG,
+			SBC = a.SBC
 	FROM	#LicenseeAmount l
 			INNER JOIN @AmountDueByProduct a ON a.LicenseeId = l.LicenseeId
 	
@@ -467,9 +472,10 @@ BEGIN
 			AND VRG IS NULL
 			AND SAG IS NULL
 			AND I4D IS NULL
+			AND SBC IS NULL
 
 	-- Result
-	SELECT l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP, l.CC, l.SG, l.VRG, l.SAG, l.I4D, l.TG
+	SELECT l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP, l.CC, l.SG, l.VRG, l.SAG, l.I4D, l.TG, l.SBC
 	FROM #LicenseeAmount l
 	ORDER BY l.GroupId, l.PartyId
 	-- EndRegion

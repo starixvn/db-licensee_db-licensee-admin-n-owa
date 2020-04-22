@@ -34,6 +34,7 @@ AS
 	   - 20200317@Parsons: Integrate Virtual Games [#125222]
 	   - 20200323@Parsons: Intergrate Indo 4D [#130910]
 	   - 20200411@Parsons: Integrate Table Games [#131166]
+	   - 20200423@Parsons: Integrate Saba.club [#132730]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -82,7 +83,7 @@ BEGIN
 		SET @sdate = DATEADD(m, 1, @sdate)
 	END	
 
-	IF @ProductCode IN ('SB', 'NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG', 'I4D', 'TG')
+	IF @ProductCode IN ('SB', 'NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG', 'I4D', 'TG', 'SBC')
 	BEGIN		
 		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, LicensingFee)
 		SELECT tp.PartyID, d.rptDate, d.CurrencyID, - SUM(d.Winloss * ISNULL(cc.Rate, tp.Rate))
