@@ -24,6 +24,7 @@ AS
 		- 20200117@Mason: Setup billing terms by Currency  [#120005]
 		- 20200309@Parsons: Intergrate SpadeGaming [#123959]
 		- 20200316@Parsons: Integrate Virtual Games [#125222]
+		- 20200323@Parsons: Intergrate Indo 4D [#130910]
 		- 20200412@Parsons: Integrate SA Gaming [#129276]
 */
 BEGIN
@@ -66,7 +67,7 @@ BEGIN
 
 	-- supported products
 	-- 
-	DECLARE @supportedProducts VARCHAR(100) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG'
+	DECLARE @supportedProducts VARCHAR(100) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D'
 	DECLARE @productList TABLE(ProductId INT, Code VARCHAR(5), Name VARCHAR(50))
 	INSERT INTO @productList(ProductId,Code,Name)
 	SELECT ProductID, ProductPrefix,ProductName FROM dbo.LA_f_Products3rd(@supportedProducts)

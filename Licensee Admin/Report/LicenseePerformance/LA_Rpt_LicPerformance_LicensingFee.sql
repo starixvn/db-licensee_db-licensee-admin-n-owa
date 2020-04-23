@@ -32,6 +32,7 @@ AS
 	   - 20191226@Parsons: Setup billing terms by Currency  [#120005]
 	   - 20200311@Mason: Spadegaming integration  [#123959]
 	   - 20200317@Parsons: Integrate Virtual Games [#125222]
+	   - 20200323@Parsons: Intergrate Indo 4D [#130910]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -80,7 +81,7 @@ BEGIN
 		SET @sdate = DATEADD(m, 1, @sdate)
 	END	
 
-	IF @ProductCode IN ('SB', 'NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG')
+	IF @ProductCode IN ('SB', 'NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG', 'I4D')
 	BEGIN		
 		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, LicensingFee)
 		SELECT tp.PartyID, d.rptDate, d.CurrencyID, - SUM(d.Winloss * ISNULL(cc.Rate, tp.Rate))

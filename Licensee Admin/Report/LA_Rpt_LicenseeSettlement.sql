@@ -44,6 +44,7 @@ AS
 			- 20191205@Parsons: PP tournament [#123958]  
 			- 20200228@Parsons: Support-HID-currency [#128856] 
 			- 20200412@Parsons: Integrate SA Gaming [#129276]
+			- 20200403@Parsons: Indo 4D Integration [#130910]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -697,12 +698,13 @@ BEGIN
 	END
 	ELSE
 	BEGIN
-		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
+		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, ActualStake, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
 		(
 			SELECT
 				rptDate
 				, d.CurrencyID
 				, SUM(Turnover) AS turnover
+				, SUM(ActualStake) AS ActualStake
 				, SUM(WinLoss) AS Winlost
 				, SUM(PComm) AS PlayerComm
 				, SUM(-Winloss * ( 1 - ISNULL(cr.Rate, p.Rate))) AS LicenseeWL
@@ -712,6 +714,7 @@ BEGIN
 			FROM (
 				SELECT b.SiteId, b.rptDate, b.CurrencyID
 				, SUM(ISNULL(b.turnover, 0)) AS Turnover
+				, SUM(CASE WHEN @ProductCode = 'I4D' THEN ISNULL(b.ExtraAmount, 0) ELSE 0 END) AS ActualStake
 				, SUM(ISNULL(b.winloss, 0)) Winloss
 				, SUM(ISNULL(b.CommissionP, 0)) AS PComm
 				, SUM(ISNULL(b.CommissionA, 0)) AS AComm
@@ -721,7 +724,7 @@ BEGIN
 				WHERE
 					b.SiteID = @LicenseeID
 					AND b.rptDate BETWEEN @FromDate AND @ToDate
-					AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
+					AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
 					AND (b.CurrencyID <> 20)
 					AND b.[Status] NOT IN (-1, 101, 102, 103)
 					AND b.customercategory NOT IN (27, 28)

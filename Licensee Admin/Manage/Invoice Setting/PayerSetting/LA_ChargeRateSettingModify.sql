@@ -30,6 +30,7 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658] 
 		- 20190801@Parsons: Validate billing configuration [#109600]
+		- 20200417@Parsons: Indo 4D Integration [#130910]
 
 	 Params:
 		+ @InvoiceSettingXML: '<ChargeSettings>
@@ -193,7 +194,7 @@ BEGIN
 		SELECT TOP 1 @ToParty = c.ToParty, @ParentChargeID = c.ParentChargeID
 		FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
 			INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON c.ChargeID = cs.ChargeID AND cs.SystemID = 2
-		WHERE FromParty = @PayerID
+		WHERE FromParty = @PayerID AND c.ToParty IN (1, 9, 11, 98)
 		ORDER BY FromDate DESC
 
 		SET @Remark = @Remark + 'created date: ' + CONVERT(VARCHAR(20), GETDATE(), 101)

@@ -21,6 +21,7 @@ AS
 			+ Re-structure SP
 		- 20181220@Parsons: Integrate Bidme games  [#103695]
 		- 20190404@Bruce: Return fistbliing date [#102830]
+		- 20200418@Parsons: Indo 4D Integration [#130910]
 
 	Param's Explanation:
 
@@ -57,7 +58,7 @@ BEGIN
 		INSERT INTO @ChargeInfo
 		SELECT ProductID,FromParty,ChargeType,FirstOfBilling,FromDate,BasisOfBilling,ChargeID,ChargeId
 		FROM dbo.OAS_ChargeInfo ci WITH (NOLOCK)
-		WHERE FromParty = @PartyId AND ChargeType != 2
+		WHERE FromParty = @PartyId AND ChargeType != 2 AND ToParty IN (1,9,11,98)
 	END
 
 	SELECT TOP 1

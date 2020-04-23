@@ -18,6 +18,7 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20200217@Mason: Set billing term by currency [#120005]
 		- 20200302@Parsons: Support-HID-currency [#128856]
+		- 20200411@Parsons: Add new Macau Games [#130955]
 		
 	 Params:
 */
@@ -31,16 +32,15 @@ BEGIN
 		LicenseeId	INT,
 		ProductID	INT,
 		Rate		MONEY,
-		Rate3rd		MONEY,
 		FromDate	SMALLDATETIME,
-		ToDate		SMALLDATETIME)	
+		ToDate		SMALLDATETIME,
+		IsDeposit	BIT)	
 	
-	INSERT INTO @ChargeInfos(ChargeId, PartyId, ProductID, LicenseeId, Rate, Rate3rd, Fromdate, Todate)
+	INSERT INTO @ChargeInfos(ChargeId, PartyId, ProductID, LicenseeId, Rate, Fromdate, Todate, IsDeposit)
 	(
 		SELECT c.ChargeID, c.PartyID, c.ProductID, c.LicenseeID, 
 			CASE WHEN ISNULL(c.IsDeposit,0)=0 THEN 0 ELSE c.DI_Rate END,
-			CASE WHEN ISNULL(c.IsDeposit,0)=0 THEN 0.02 ELSE 0.035 END,
-			c.Fromdate, c.Todate
+			c.Fromdate, c.Todate, ISNULL(c.IsDeposit,0)
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'VB', 'OA', 1) c		
 	)		
 	-- End region
@@ -80,15 +80,20 @@ BEGIN
 		b.CurrencyId,
 		SUM(b.Turnover) AS Turnover,
 		SUM(b.BetCount) AS TotalTrans,
-		SUM(b.MemberWL) AS CustomerWinLoss,
-		- SUM(b.MemberWL) AS LicenseeWinloss,
-		SUM(-b.MemberWL * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
-		SUM(-b.MemberWL * ci.Rate3rd) AS PayToSupplier
-	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+		SUM(b.WinLoss) AS CustomerWinLoss,
+		- SUM(b.WinLoss) AS LicenseeWinloss,
+		SUM(-b.WinLoss * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
+		SUM(-b.WinLoss * 
+		CASE 
+			WHEN ci.IsDeposit = 1 THEN (CASE WHEN b.Bettype BETWEEN 4001 AND 4050 THEN 0.035 ELSE 0.045 END)
+			ELSE (CASE WHEN b.Bettype BETWEEN 4001 AND 4050 THEN 0.02 ELSE 0.03 END)
+		END) AS PayToSupplier
+	FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
+		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeID AND cr.CurrencyID = b.CurrencyId
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
-		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
+		b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
+		AND b.Bettype in (Select Bettype FROM LA_f_BettypeProductMapping(0,'VB'))
 	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
 	-- EndRegion
 	
