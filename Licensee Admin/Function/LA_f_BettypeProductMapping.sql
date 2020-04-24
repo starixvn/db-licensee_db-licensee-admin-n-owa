@@ -51,7 +51,7 @@ AS
 		- 20200415@Parsons: Integrate SA Gaming [#129276]  
 		- 20200418@Parsons: Integrate BBIN Live Casino [#132237]
 		- 20200422@Parsons: Indo 4D Integration [#130910]
-		- 20200327@Pasons: Integrate GT Casino [#131165]
+		- 20200424@Pasons: Integrate IBCBET Live Casino [#131165]
 
 	Param's Explanation:
 
@@ -411,7 +411,7 @@ BEGIN
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
-	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'GTC')
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'IBCLC')
     BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 46
