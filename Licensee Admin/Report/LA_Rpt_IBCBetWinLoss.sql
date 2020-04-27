@@ -12,7 +12,7 @@ AS
  * Created by : [20200327@Parsons]
  * Task  : Get IBCBet Winloss
  * Revisions
-	- 20200327@Parsons: Intergrate GTCasino [#131165]
+	- 20200427@Parsons: Intergrate IBCBet Win loss [#131165]
  * Param's Explanation:
  *
  */
