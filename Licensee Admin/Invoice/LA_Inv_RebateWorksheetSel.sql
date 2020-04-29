@@ -20,6 +20,7 @@ AS
 	  - 20180716@bruce: add new group TEST for credit [#98126]
 	  - 20180712@Bruce: Enhance Manage Discount group [#94282]
 	  - 20200412@Parsons: Integrate SA Gaming [#129276]
+	  - 20200427@Parsons: Intergrate IBCBet Win loss [#131165]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -224,7 +225,11 @@ BEGIN
 		SUM(ISNULL(d.Rebate, 0))	AS TotalRebate,
 		SUM(
 			CASE 
-				WHEN rs.ProductId IN (11,39) THEN ISNULL(rs.AmountToCompany,0) 
+				WHEN rs.ProductId IN (11,39) THEN 
+					CASE 
+						WHEN ISNULL(rs.AmountToCompany,0) < 0 THEN 0 
+						ELSE ISNULL(rs.AmountToCompany,0) 
+					END 
 				ELSE ISNULL(d.Fee, rs.AmountToCompany) - ISNULL(d.Discount,0)
 			END	) AS TotalAmount
 	FROM @Result rs
