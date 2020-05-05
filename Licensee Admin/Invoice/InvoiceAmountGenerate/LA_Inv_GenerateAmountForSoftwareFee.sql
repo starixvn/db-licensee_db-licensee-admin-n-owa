@@ -250,7 +250,7 @@ BEGIN
 		RETURN
 	END
 
-	-- Region: Get Amount by Product
+	-- Region: Get Amount by Product (The remaining products)
 	CREATE	TABLE #TempData (
 			LicenseeId		INT, 
 			PartyId			INT, 
@@ -388,17 +388,17 @@ BEGIN
 			Rate			MONEY,
 			Remark			NVARCHAR(4000),
 			IsSpecialTreatment BIT)
-	DECLARE @IsSpecialTreatment BIT = 0, @CurrentDate DATE = GETDATE(), @INH_CurrencyID INT = 51
+	DECLARE @IsSpecialTreatmentPeriod BIT = 0, @CurrentDate DATE = GETDATE(), @INH_CurrencyID INT = 51
 
 	IF(EXISTS(SELECT TOP 1 1 FROM [dbo].[LA_PartySpecialTreatment] WITH(NOLOCK) WHERE PartyId = @PartyId AND @CurrentDate BETWEEN FromDate AND ToDate))
 	BEGIN
-		SET @IsSpecialTreatment = 1
+		SET @IsSpecialTreatmentPeriod = 1
 	END	
 	-- Region: fee
 	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, IsSpecialTreatment)
 	SELECT d.PartyId, d.ProductId, d.Fee, @AmountTypeSoftwareFee, IsSpecialTreatment
 	FROM #AmountToCompany d
-	-- End Region
+	-- End Region: fee
 
 	-- product dont have minfee
 	INSERT INTO @InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType)
@@ -409,7 +409,7 @@ BEGIN
 				@AmountTypeSoftwareFee
 		FROM	#TempData td 
 		WHERE	td.ProductId NOT IN (SELECT td2.ProductId FROM @InvoiceData td2)
-				AND (@IsSpecialTreatment = 0 OR td.CurrencyId <> @INH_CurrencyID)
+				AND (@IsSpecialTreatmentPeriod = 0 OR td.CurrencyId <> @INH_CurrencyID)
 		GROUP	BY td.PartyId, td.ProductId
 	)
 	INSERT INTO @InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType,IsSpecialTreatment)
@@ -421,7 +421,7 @@ BEGIN
 				1
 		FROM	#TempData td 
 		WHERE	td.ProductId NOT IN (SELECT td2.ProductId FROM @InvoiceData td2)
-				AND (@IsSpecialTreatment = 1 AND td.CurrencyId = @INH_CurrencyID)
+				AND (@IsSpecialTreatmentPeriod = 1 AND td.CurrencyId = @INH_CurrencyID)
 		GROUP	BY td.PartyId, td.ProductId
 	)
 
