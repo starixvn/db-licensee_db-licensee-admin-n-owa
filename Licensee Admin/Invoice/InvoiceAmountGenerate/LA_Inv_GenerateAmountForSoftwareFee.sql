@@ -389,7 +389,7 @@ BEGIN
 			IsSpecialTreatment BIT)
 	DECLARE @IsSpecialTreatment BIT = 0, @CurrentDate DATE = GETDATE(), @INH_CurrencyID INT = 51
 
-	IF(EXISTS(SELECT TOP 1 1 FROM [dbo].[LA_PartySpecialTreatment] WITH(NOLOCK) WHERE @CurrentDate BETWEEN FromDate AND ToDate))
+	IF(EXISTS(SELECT TOP 1 1 FROM [dbo].[LA_PartySpecialTreatment] WITH(NOLOCK) WHERE PartyId = @PartyId AND @CurrentDate BETWEEN FromDate AND ToDate))
 	BEGIN
 		SET @IsSpecialTreatment = 1
 	END	
