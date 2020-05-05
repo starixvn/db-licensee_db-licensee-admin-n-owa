@@ -29,6 +29,7 @@ AS
 		- 20190911@Bruce: Support Exchange product in invoices [#119846]
 		- 20191017@Parsons: Non-peak hour promotion [#119538]
 		- 20191209@Parsons: PP tournament [#123958] 
+		- 20200505@Parsons: Special handling for INH market [#128570]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -122,7 +123,7 @@ BEGIN
 		IsChargedByMinFee BIT,
 		IsSpecialTreatment BIT
 	)
-	INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,NegativeFee,Minfee,IsChargedByMinFee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark)
+	INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,NegativeFee,Minfee,IsChargedByMinFee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark,IsSpecialTreatment)
 	EXEC dbo.LA_AmountToCompanySel @FromDate,@ToDate,@PartyId,@ProductCodes,@BaseCurrency
 
 	-- Region: Get party charge rate info	
