@@ -388,9 +388,12 @@ BEGIN
 			Rate			MONEY,
 			Remark			NVARCHAR(4000),
 			IsSpecialTreatment BIT)
-	DECLARE @IsSpecialTreatmentPeriod BIT = 0, @CurrentDate DATE = GETDATE(), @INH_CurrencyID INT = 51
+	DECLARE @IsSpecialTreatmentPeriod BIT = 0, @INH_CurrencyID INT = 51
 
-	IF(EXISTS(SELECT TOP 1 1 FROM [dbo].[LA_PartySpecialTreatment] WITH(NOLOCK) WHERE PartyId = @PartyId AND @CurrentDate BETWEEN FromDate AND ToDate))
+	IF(EXISTS(SELECT TOP 1 1 
+				FROM [dbo].[LA_PartySpecialTreatment] WITH(NOLOCK) 
+				WHERE PartyId = @PartyId 
+						AND @FromDate <= ToDate AND FromDate <= @ToDate))
 	BEGIN
 		SET @IsSpecialTreatmentPeriod = 1
 	END	
