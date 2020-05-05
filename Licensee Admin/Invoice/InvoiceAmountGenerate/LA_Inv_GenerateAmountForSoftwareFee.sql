@@ -41,7 +41,6 @@ BEGIN
 		@DeductSabaPromotion INT = 29,
 		@DeductPPPrizes INT = 30
 
-	-- Region: Check Invoice Type is Rebate
 	DECLARE @Month TINYINT = MONTH(@FromDate)
 	DECLARE @FirstDate DATETIME = DATEADD(mm, DATEDIFF(mm, 0, @FromDate), 0)
 	DECLARE @LastDate DATETIME = DATEADD (dd, -1, DATEADD(mm, DATEDIFF(mm, 0, @FromDate) + 1, 0))
@@ -64,7 +63,7 @@ BEGIN
 	SET		@BaseCurrencyId = ISNULL((	SELECT TOP 1 opd.BaseCurrencyId
 										FROM dbo.OAS_PartyDetail opd WITH(NOLOCK)	
 										WHERE	opd.PartyID = @PartyId
-									), 6)
+									), 6)-- Default is EUR
 	
 	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(10))
 	INSERT	INTO @BaseCurrencyTable(CurrencyId, CurrencyName)
@@ -106,7 +105,7 @@ BEGIN
 	
 	-- End region
 
-	-- get amount to company,discount,rebate(only for some supported products
+	-- get amount to company,discount,rebate(only for some supported products)
 	CREATE TABLE #AmountToCompany (
 		PartyId			INT,
 		ProductId		INT,
@@ -146,7 +145,7 @@ BEGIN
 
 	-- exclude products have calculated
 	DELETE @PartyChargeInfo WHERE ProductID IN (SELECT a.ProductId FROM #AmountToCompany a)
-	
+
 	-- Get ChargeInfo for CB
 	DECLARE @CommChargeType INT = 6
 	DECLARE @CashInShareChargeType INT = 7
@@ -157,24 +156,26 @@ BEGIN
 	DECLARE @BXProductId INT = 31
 	DECLARE @PPProductId INT = 32
 
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, TypeId, FromDate, ToDate)
-	SELECT	ci.FromParty,
-			CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END AS LicenseeId,
-			@CBProductId,
-			ci.Rate,
-			ci.ChargeType,
-			CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
-			CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
-	FROM dbo.OAS_Party p WITH(NOLOCK)
-		INNER JOIN dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
-		LEFT JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
-		LEFT JOIN dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
-	WHERE EXISTS(SELECT val FROM bodb02.dbo.strSplit(@ProductCodes, ',') WHERE val = 'CB')
-		AND FromParty = @PartyId
-		AND ProductID = @CBProductId
-		AND ChargeType IN (@CommChargeType,@CashInShareChargeType)
-		AND @FromDate <= ci.ToDate
-		AND ci.FromDate <= @ToDate
+	IF(CHARINDEX('CB', @ProductCodes) > 0 AND EXISTS(SELECT TOP 1 1 FROM bodb02.dbo.strSplit(@ProductCodes, ',') WHERE val = 'CB'))
+	BEGIN
+		INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, TypeId, FromDate, ToDate)
+		SELECT	ci.FromParty,
+				CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END AS LicenseeId,
+				@CBProductId,
+				ci.Rate,
+				ci.ChargeType,
+				CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
+				CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
+		FROM dbo.OAS_Party p WITH(NOLOCK)
+			INNER JOIN dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
+			LEFT JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
+			LEFT JOIN dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
+		WHERE FromParty = @PartyId
+			AND ProductID = @CBProductId
+			AND ChargeType IN (@CommChargeType,@CashInShareChargeType)
+			AND @FromDate <= ci.ToDate
+			AND ci.FromDate <= @ToDate
+	END
 	-- End Get ChargeInfo for CB
 
 	-- check payer exchange & minfee exchange
