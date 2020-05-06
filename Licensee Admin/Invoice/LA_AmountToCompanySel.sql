@@ -27,6 +27,7 @@ AS
 		- 20191125@Mason: Setup billing terms by Currency  [#120005]
 	    - 20191206@Parsons: PP tournament [#123958]
 	    - 20200409@Parsons: Integrate SA Gaming [#129276]
+		- 20200505@Parsons: Special handling for INH market [#128570]
 
 	Parameters:
 		@IsApplyDiscountMinfee: apply minfee term to discount value
@@ -312,26 +313,36 @@ BEGIN
 	WHERE c.ToDate >= @FromDate
 
 	-- 2.3 create result
-	SELECT a.PartyId,a.ProductId
-		,CAST(SUM(a.Winloss) AS MONEY) AS Winloss
-		,CAST(SUM(a.AmountToCompany) AS MONEY) AS AmountToCompany 
-		,CAST(SUM(a.ExtraAmount) AS MONEY) AS ExtraAmount
-		,CAST(0 AS MONEY) AS Fee
-		,CAST(0 AS MONEY) AS Discount
-		,CAST(0 AS MONEY) AS Rebate
-		,CAST(0 AS MONEY) AS DiscountRate
-		,CAST(0 AS MONEY) AS RebateRate
-		,CAST('' AS NVARCHAR(4000)) AS DiscountRemark
-		,CAST('' AS NVARCHAR(4000)) AS RebateRemark
-		,CAST(0 AS MONEY)			AS Minfee
-		,CAST(0 AS BIT)				AS IsChargedByMinFee
-		,CAST(0 AS BIT)				AS IsApplyMinfeeToDiscount
-	INTO #tmpResult
-	FROM #tmpWinlossData a
-	GROUP BY PartyId, ProductId
+	DECLARE @FinalResult TABLE(PartyId INT, ProductId INT, Winloss MONEY, AmountToCompany MONEY, ExtraAmount MONEY, Fee MONEY, Discount MONEY, Rebate MONEY, DiscountRate MONEY, RebateRate MONEY, DiscountRemark NVARCHAR(4000), RebateRemark NVARCHAR(4000), Minfee MONEY, IsChargedByMinFee BIT, IsApplyMinfeeToDiscount BIT, IsSpecialTreatment BIT)
+	DECLARE @INH_CurrencyID INT = 51 
+		
+		-- Others
+	INSERT INTO @FinalResult(PartyId, ProductId, Winloss, AmountToCompany, ExtraAmount, Fee, Discount, Rebate, DiscountRate, RebateRate, DiscountRemark, RebateRemark, Minfee, IsChargedByMinFee, IsApplyMinfeeToDiscount, IsSpecialTreatment)
+	SELECT d.PartyId,d.ProductId
+		,SUM(d.Winloss)
+		,SUM(d.AmountToCompany)
+		,SUM(d.ExtraAmount)
+		,0,0,0,0,0,'','',0,0,0,0
+	FROM #tmpWinlossData d
+		LEFT JOIN [dbo].[LA_PartySpecialTreatment] s WITH(NOLOCK) ON d.PartyID = s.PartyId AND d.WinlossDate BETWEEN s.FromDate AND s.ToDate
+	WHERE s.Id IS NULL OR d.CurrencyId <> @INH_CurrencyID
+	GROUP BY d.PartyId, ProductId
+
+		-- INH only
+	INSERT INTO @FinalResult(PartyId, ProductId, Winloss, AmountToCompany, ExtraAmount, Fee, Discount, Rebate, DiscountRate, RebateRate, DiscountRemark, RebateRemark, Minfee, IsChargedByMinFee, IsApplyMinfeeToDiscount, IsSpecialTreatment)
+	SELECT d.PartyId,d.ProductId
+		,SUM(d.Winloss)
+		,SUM(d.AmountToCompany)
+		,SUM(d.ExtraAmount)
+		,SUM(d.AmountToCompany)
+		,0,0,0,0,'','',0,0,0,1
+	FROM #tmpWinlossData d
+		 INNER JOIN [dbo].[LA_PartySpecialTreatment] s WITH(NOLOCK) ON d.PartyID = s.PartyId AND d.WinlossDate BETWEEN s.FromDate AND s.ToDate
+	WHERE d.CurrencyId = @INH_CurrencyID
+	GROUP BY d.PartyId, ProductId
 
 	-- 2.4 treat negative as 0
-	UPDATE #tmpResult SET Fee = CASE WHEN AmountToCompany < 0 AND ProductID NOT IN (@BX) THEN 0 ELSE AmountToCompany END
+	UPDATE @FinalResult SET Fee = CASE WHEN AmountToCompany < 0 AND ProductID NOT IN (@BX) THEN 0 ELSE AmountToCompany END
 
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 3. minfee calculation
@@ -385,11 +396,12 @@ BEGIN
 			WHEN t.TotalAmount >= t.TotalMinFee AND p.PartyGroupId > 0 THEN 0 -- reach group minfee goal
 			ELSE 1 END,
 		Minfee = a.MinFeeAmount
-	FROM #tmpResult r
-	INNER JOIN @PartyList p ON r.PartyId=p.PartyId
-	INNER JOIN @tmpMinFee a ON a.PartyId = r.PartyId AND a.ProductId=r.ProductID AND a.FeeType = 1 -- minfee setting
-	INNER JOIN @TotalMinFees t ON a.ProductId = t.ProductId AND t.PartyGroupId=p.PartyGroupId
+	FROM @FinalResult r
+	INNER JOIN @PartyList p ON r.PartyId = p.PartyId
+	INNER JOIN @tmpMinFee a ON a.PartyId = r.PartyId AND a.ProductId = r.ProductID AND a.FeeType = 1 -- minfee setting
+	INNER JOIN @TotalMinFees t ON a.ProductId = t.ProductId AND t.PartyGroupId = p.PartyGroupId
 	LEFT JOIN @tmpMinFee b ON b.PartyId = r.PartyId AND b.ProductId=r.ProductID AND b.FeeType = 2-- waive setting
+	WHERE IsSpecialTreatment = 0
 
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 4. discount calculation
@@ -410,9 +422,9 @@ BEGIN
 	SELECT s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId, SUM(r.Winloss) Winloss,SUM(r.Fee) Fee,0
 	FROM #tmpDiscountSettings s
 	INNER JOIN @tmpDiscountCurrency c ON s.PartyId = c.PartyId AND c.DiscountGroupId=s.DiscountGroupId AND c.CurrencyId = 0 -- all currency
-	INNER JOIN #tmpResult r ON s.PartyID = r.PartyId AND s.ProductId=r.ProductId
-	WHERE s.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount)
-	GROUP BY s.DiscountGroupId, s.DiscountGroupType,s.CurrencyId,s.CalculationGroup
+	INNER JOIN @FinalResult r ON s.PartyID = r.PartyId AND s.ProductId=r.ProductId
+	WHERE s.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount) AND IsSpecialTreatment = 0
+	GROUP BY s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId
 
 	-- 4.2 discount by currency
 	-- only offer discount for licensing fee
@@ -421,6 +433,7 @@ BEGIN
 	FROM #tmpWinlossData r
 	INNER JOIN @tmpDiscountCurrency c ON c.PartyID=r.PartyId AND c.CurrencyId=r.CurrencyId
 	INNER JOIN #tmpDiscountSettings s ON s.DiscountGroupId=c.DiscountGroupId AND s.ProductId = r.ProductId AND s.PartyId = c.PartyId
+	--Parsons: Need to join here to exclude INH, if the party is in special treatment period
 	WHERE s.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount)
 		AND s.DiscountGroupType IN (@DiscountIndividualFee, @DiscountByGroupFee)
 	GROUP BY s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId
@@ -447,20 +460,21 @@ BEGIN
 			c.Winloss >= d.FromAmount AND c.Winloss < d.ToAmount
 		)
 
-	-- 4.4 discount by all currencies
+	-- 4.4 UPDATE: discount by all currencies
 	UPDATE r SET DiscountRemark = s.Remark, DiscountRate = c.Rate
 		,Discount = CASE
 			WHEN s.DiscountGroupType IN (@DiscountByGroupFee, @DiscountIndividualFee) THEN c.Rate * r.Fee
 			WHEN s.DiscountGroupType IN (@DiscountByGroupGrosswin, @DiscountIndividualGrosswin) THEN c.Rate * (CASE WHEN r.Winloss < 0 THEN 0 ELSE r.Winloss END)
 		ELSE 0 END
-	FROM #tmpResult r
+	FROM @FinalResult r
 	INNER JOIN #tmpDiscountSettings s ON s.PartyID = r.PartyId AND s.ProductId=r.ProductId
 	INNER JOIN @Rate c ON c.CalculationGroup = s.CalculationGroup
 	WHERE s.CalculationType IN (@ToBeDiscounted,@CalculateAndDiscount) 
 		AND s.IsApplyDiscount = 1
 		AND c.IsDiscountByCurrency = 0
+		AND r.IsSpecialTreatment = 0
 
-	-- 4.5 discount by curency
+	-- 4.5 UPDATE: discount by curency
 	-- not support gross win
 	-- not support multiple products
 	-- not discount if fee after discount less than minfee
@@ -470,23 +484,25 @@ BEGIN
 		INNER JOIN @rate c ON c.CalculationGroup = s.CalculationGroup
 		WHERE c.IsDiscountByCurrency = 1
 	)
-	UPDATE t SET
+	UPDATE r SET
 		DiscountRemark = s.Remark
 		, DiscountRate = d.Rate
-		, Discount = CASE WHEN (t.Fee - d.Discount) < t.Minfee AND t.IsApplyMinfeeToDiscount=1 THEN t.Fee - t.Minfee ELSE d.Discount END
-	FROM #tmpResult t
-	INNER JOIN #tmpDiscountSettings s ON t.PartyID = s.PartyID AND t.ProductID=s.ProductId
-	INNER JOIN cte_DiscountByCurrency d on d.CalculationGroup=s.CalculationGroup
-	WHERE d.Discount > 0
+		, Discount = CASE WHEN (r.Fee - d.Discount) < r.Minfee AND r.IsApplyMinfeeToDiscount = 1 THEN r.Fee - r.Minfee ELSE d.Discount END
+	FROM @FinalResult r
+	INNER JOIN #tmpDiscountSettings s ON r.PartyID = s.PartyID AND r.ProductID = s.ProductId
+	INNER JOIN cte_DiscountByCurrency d on d.CalculationGroup = s.CalculationGroup
+	WHERE d.Discount > 0 AND r.IsSpecialTreatment = 0
 
 	-- 4.6 apply new discount term for licensee have not shared minfee
 	-- fee after discount must >= minfee
 	IF (@FromDate >= @ApplyMinfeeToDiscountDate AND @IsApplyDiscountMinfee = 1)
 	BEGIN
-		UPDATE #tmpResult SET Discount = Fee - Minfee WHERE (Fee - Discount) < Minfee AND IsApplyMinfeeToDiscount = 1
+		UPDATE @FinalResult 
+		SET Discount = Fee - Minfee
+		WHERE (Fee - Discount) < Minfee AND IsApplyMinfeeToDiscount = 1 AND IsSpecialTreatment = 0
 	END
 
-	UPDATE #tmpResult SET DiscountRate=0, DiscountRemark='', Discount = 0 WHERE Discount <= 0
+	UPDATE @FinalResult SET DiscountRate=0, DiscountRemark='', Discount = 0 WHERE Discount <= 0 AND IsSpecialTreatment = 0
 
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 5. rebate calculation
@@ -521,7 +537,8 @@ BEGIN
 		Rebate = (r.Fee - r.Discount) * c.Rate,
 		RebateRemark = c.Remark,
 		RebateRate = c.Rate
-	FROM #tmpResult r INNER JOIN @tmpRebateSettings c ON r.PartyId = c.PartyID AND r.ProductId = c.ProductId
+	FROM @FinalResult r INNER JOIN @tmpRebateSettings c ON r.PartyId = c.PartyID AND r.ProductId = c.ProductId
+	WHERE r.IsSpecialTreatment = 0
 
 	-- result
 	SELECT PartyId
@@ -537,7 +554,8 @@ BEGIN
 		,Rebate
 		,RebateRate
 		,RebateRemark
-	FROM #tmpResult
+		,IsSpecialTreatment
+	FROM @FinalResult
 	WHERE PartyId IN (SELECT a.PartyId FROM @PartyList a WHERE a.IsSelected = 1)
 		AND ProductId IN (SELECT b.ProductId FROM @ProductList b WHERE b.ToBeDiscounted = 1)
 
@@ -545,6 +563,5 @@ BEGIN
 	DROP TABLE #tmpChargeInfo
 	DROP TABLE #tmpWinlossData
 	DROP TABLE #tmpDiscountSettings
-	DROP TABLE #tmpResult
 END
 GO
