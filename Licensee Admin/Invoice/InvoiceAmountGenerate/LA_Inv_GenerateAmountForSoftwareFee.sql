@@ -431,7 +431,7 @@ BEGIN
 	-- Region: Discount
 	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate, Remark)
 	SELECT d.PartyId, d.ProductId, d.Discount, @AmountTypeDiscount, d.DiscountRate, d.DiscountRemark
-	FROM #AmountToCompany d WHERE d.Discount > 0
+	FROM #AmountToCompany d WHERE d.Discount > 0 AND IsSpecialTreatment = 0
 	-- End Region
 
 	-- Region: Select data	
@@ -508,7 +508,7 @@ BEGIN
 		DECLARE @SBAfterDiscount MONEY = ISNULL((
 			SELECT SUM(CASE WHEN AmountType = @AmountTypeSoftwareFee THEN InvoiceAmount ELSE -InvoiceAmount END)
 			FROM @FinalResult
-			WHERE ProductId = 0 AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount) 
+			WHERE ProductId = 0 AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount) AND IsSpecialTreatment = 0 
 		),0)
 
 		DECLARE @AmfAmount MONEY
@@ -523,13 +523,13 @@ BEGIN
 	DECLARE @AGMonthlyFee MONEY
 	SELECT @AGMonthlyFee = SUM(CASE WHEN AmountType = @AmountTypeSoftwareFee THEN InvoiceAmount ELSE -InvoiceAmount END)
 	FROM @FinalResult 
-	WHERE ProductId = 10 AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount)
+	WHERE ProductId = 10 AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount) AND IsSpecialTreatment = 0
 	IF (@AGMonthlyFee > 0 AND @RemainingAG > 0)
 	BEGIN
 		DECLARE @AGAmount MONEY = (CASE WHEN @RemainingAG < @AGMonthlyFee THEN @RemainingAG ELSE @AGMonthlyFee END)
 
 		UPDATE @FinalResult SET DeductMonthlyFees = @AGAmount, RemainingAmount = @RemainingAG
-		WHERE AmountType = @AmountTypeSoftwareFee AND ProductId = 10 -- AG
+		WHERE IsSpecialTreatment = 0 AND AmountType = @AmountTypeSoftwareFee AND ProductId = 10 -- AG
 	END
 
 	IF @Prepayment>0
