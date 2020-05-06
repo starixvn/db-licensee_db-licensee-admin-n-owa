@@ -206,7 +206,7 @@ BEGIN
 	)
 	-- End region	
 
-	-- this table hold data from sp: LA_AmountToCompanySel
+	-- this table hold data from sp: LA_AmountToCompanyByDiscountCurrencySel
 	CREATE TABLE #AmountToCompany (
 		PartyId			INT,
 		ProductId		INT,

@@ -510,9 +510,10 @@ BEGIN
 			FROM @FinalResult
 			WHERE ProductId = 0 AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount) 
 		),0)
-		DECLARE @AmfAmount MONEY = (CASE WHEN @RemainingAmf < @ProgratedMinfee THEN @RemainingAmf ELSE @ProgratedMinfee END)
-		SET @AmfAmount = (CASE WHEN @AmfAmount < @SBAfterDiscount THEN @AmfAmount ELSE @SBAfterDiscount END)
-		SET @AmfAmount = (CASE WHEN @AmfAmount < 0 THEN 0 ELSE @AmfAmount END)
+
+		DECLARE @AmfAmount MONEY
+		SELECT @AmfAmount = CASE WHEN MIN(Amount) < 0 THEN 0 ELSE MIN(Amount) END
+		FROM (VALUES(@SBAfterDiscount), (@ProgratedMinfee),(@RemainingAmf))v(Amount)
 
 		UPDATE @FinalResult SET DeductMonthlyFees = @AmfAmount, RemainingAmount = @RemainingAmf
 		WHERE AmountType = @AmountTypeSoftwareFee AND ProductId = 0 -- SB
