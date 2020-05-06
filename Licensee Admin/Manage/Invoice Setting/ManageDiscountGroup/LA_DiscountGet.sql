@@ -25,7 +25,7 @@ BEGIN
 	DECLARE @ToBeCalculated TINYINT = 1
 	DECLARE @ToBeDiscounted TINYINT = 0
 	DECLARE @CalculateAndDiscount TINYINT = 10
-	DECLARE @TreatmentTime DATETIME = GETDATE()
+	DECLARE @CurrentTime DATETIME = GETDATE()
 
 	--get products which has assigned to group
 	DECLARE 
@@ -124,6 +124,6 @@ BEGIN
 	-- Get list of special treatment parties
 	SELECT ps.PartyId
 	FROM dbo.LA_PartySpecialTreatment ps WITH (NOLOCK)
-	WHERE @TreatmentTime BETWEEN ps.FromDate AND ps.ToDate
+	WHERE @CurrentTime BETWEEN ps.FromDate AND ps.ToDate
 END
 GO
