@@ -33,6 +33,7 @@ AS
 	    - 20200323@Parsons: Intergrate Indo 4D [#130910]
 	    - 20200411@Parsons: Integrate Table Games [#131166]
 	    - 20200423@Parsons: Integrate Saba.club [#132730]
+		- 20200507@Parsons: Integrate Sexy Gaming for deposit licensees [#132665]
 
     Param's Explanation:  
 	   + @partyIDs : a string of list PartyID, separated by ','
@@ -112,7 +113,7 @@ BEGIN
     END
 
     --exclude BA tickets
-    IF @ProductCode IN ('SB', 'RB', 'NG', 'LC', 'VS', 'CS', 'VB', 'PP', 'SG', 'VRG', 'I4D', 'TG', 'SBC')
+    IF @ProductCode IN ('SB', 'RB', 'NG', 'LC', 'VS', 'CS', 'VB', 'PP', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG')
     BEGIN		
 	   INSERT INTO #Tmp(PartyId, rptDate, CurrencyId, TurnOver)
 	   (
