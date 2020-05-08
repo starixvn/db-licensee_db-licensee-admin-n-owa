@@ -87,15 +87,16 @@ BEGIN
 		b.CurrencyId,
 		SUM(b.Turnover) AS Turnover,
 		SUM(b.BetCount) AS TotalTrans,
-		SUM(b.MemberWL) AS CustomerWinLoss,
-		- SUM(b.MemberWL) AS LicenseeWinloss,
-		SUM(-b.MemberWL * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
-		SUM(-b.MemberWL * ISNULL(ci.Rate3rd, 0)) AS PayToSupplier
-	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+		SUM(b.Winloss) AS CustomerWinLoss,
+		- SUM(b.Winloss) AS LicenseeWinloss,
+		SUM(-b.Winloss * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
+		SUM(-b.Winloss * ISNULL(ci.Rate3rd, 0)) AS PayToSupplier
+	FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
+		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
 		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND cr.CurrencyID = b.CurrencyId
-	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
-		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
+	WHERE b.RptDate3rd BETWEEN @FromDate AND @ToDate
+		AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 
+		AND b.BetTypeId BETWEEN 3101 AND 3199
 	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
 	-- End region
 	
