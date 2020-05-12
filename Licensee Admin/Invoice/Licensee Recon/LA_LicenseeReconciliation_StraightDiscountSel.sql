@@ -1,7 +1,7 @@
 /*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
--- exec [LA_LicenseeReconciliation_StraightDiscountSel] '20190101'
+
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_StraightDiscountSel]
 	@ReportMonth	DATE
 AS
@@ -13,6 +13,12 @@ AS
 	Revisions: 
 		- 20191007@Bruce: Create Sp [#120220]
 		- 20200117@Mason: Setup billing terms by Currency  [#120005]
+		- 20200512@Parsons: Special handling for INH market [#128570]
+	Example:
+		USE bodb_licensee
+		GO
+
+		EXEC [LA_LicenseeReconciliation_StraightDiscountSel] '20190101'
 */
 BEGIN
 	SET NOCOUNT ON
@@ -57,7 +63,8 @@ BEGIN
 	DECLARE @FromDate DATE = DATEADD(MONTH,DATEDIFF(MONTH,0,@ReportMonth),0)
 	DECLARE @ToDate DATE = DATEADD(DAY,-1,DATEADD(MONTH,1,@FromDate))
 
-	SELECT -b.MemberWL * ISNULL(cr.Rate, c.DI_Rate) AS AmountToCompany, c.PartyID, b.CurrencyId,b.rptDate INTO #data
+	SELECT -b.MemberWL * ISNULL(cr.Rate, c.DI_Rate) AS AmountToCompany, c.PartyID, b.CurrencyId,b.rptDate 
+	INTO #data
 	FROM bodb_licenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 	INNER JOIN dbo.LA_f_ChargeInfo(@partyIds,@FromDate,@ToDate,'SB','OA',1) c ON b.SiteId=c.LicenseeId AND b.ProductId=c.ProductId
 	LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeId = c.ChargeId AND cr.CurrencyId = b.CurrencyId
@@ -90,4 +97,3 @@ BEGIN
 	DROP TABLE #data
 END
 GO
-
