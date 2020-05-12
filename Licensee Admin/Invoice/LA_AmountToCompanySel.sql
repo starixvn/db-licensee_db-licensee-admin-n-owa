@@ -357,7 +357,8 @@ BEGIN
 		FROM #tmpWinlossData t
 		INNER JOIN @tmpMinFee m ON t.ProductId = m.ProductId AND t.PartyId = m.PartyId AND t.WinlossDate BETWEEN m.FromDate AND m.ToDate
 		LEFT JOIN @tmpMinFee w ON w.FeeType=2 AND w.MinFeeId=m.MinFeeId AND t.WinlossDate BETWEEN w.FromDate AND w.ToDate
-		WHERE m.FeeType=1
+		LEFT JOIN [dbo].[LA_PartySpecialTreatment] s WITH(NOLOCK) ON t.PartyID = s.PartyId AND t.WinlossDate BETWEEN s.FromDate AND s.ToDate
+		WHERE m.FeeType=1 AND (s.Id IS NULL OR t.CurrencyId <> @INH_CurrencyID)
 		GROUP BY  m.MinFeeId
 	)
 	UPDATE mf SET
@@ -431,11 +432,12 @@ BEGIN
 	INSERT INTO @tmpDiscountCalculation(CalculationGroup,DiscountGroupId,DiscountGroupType,CurrencyId,Winloss,Fee,IsDiscountByCurrency)
 	SELECT s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId, SUM(r.Winloss) Winloss,SUM(r.AmountToCompany) Fee,1
 	FROM #tmpWinlossData r
-	INNER JOIN @tmpDiscountCurrency c ON c.PartyID=r.PartyId AND c.CurrencyId=r.CurrencyId
-	INNER JOIN #tmpDiscountSettings s ON s.DiscountGroupId=c.DiscountGroupId AND s.ProductId = r.ProductId AND s.PartyId = c.PartyId
-	--Parsons: Need to join here to exclude INH, if the party is in special treatment period
+	INNER JOIN @tmpDiscountCurrency c ON c.PartyID=r.PartyId AND c.CurrencyId = r.CurrencyId
+	INNER JOIN #tmpDiscountSettings s ON s.DiscountGroupId = c.DiscountGroupId AND s.ProductId = r.ProductId AND s.PartyId = c.PartyId
+	LEFT JOIN [dbo].[LA_PartySpecialTreatment] st WITH(NOLOCK) ON r.PartyID = st.PartyId AND r.WinlossDate BETWEEN st.FromDate AND st.ToDate
 	WHERE s.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount)
 		AND s.DiscountGroupType IN (@DiscountIndividualFee, @DiscountByGroupFee)
+		AND (st.Id IS NULL OR r.CurrencyId <> @INH_CurrencyID)
 	GROUP BY s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId
 
 	DECLARE @Rate TABLE(Rate DECIMAL(6,5), CalculationGroup INT, IsDiscountByCurrency BIT)
