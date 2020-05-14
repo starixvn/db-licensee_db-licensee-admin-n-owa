@@ -13,6 +13,7 @@ AS
  * Task  : Get Table Games Win Loss
  * Revisions
 	- 20200406@Mason: Integrate Table Game [#131166]
+	- 20200514@Mason: Integrate Saba.club [#132730]
  * Param's Explanation:
  *
  */
@@ -185,9 +186,9 @@ BEGIN
 			SUM(Turnover),
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
-			SUM(LicensingFee),
+			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
 			SUM(PayToSupplier),
-			SUM(LicensingFee - PayToSupplier)
+			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END - PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
 		
