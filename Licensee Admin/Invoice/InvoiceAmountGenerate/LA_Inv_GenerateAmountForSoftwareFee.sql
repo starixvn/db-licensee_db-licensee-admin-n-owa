@@ -55,8 +55,7 @@ BEGIN
 			AmountType		TINYINT,
 			Rate			MONEY,
 			DeductMonthlyFees	MONEY,
-			RemainingAmount	MONEY,
-			IsSpecialTreatment BIT)
+			RemainingAmount	MONEY)
 
 	-- Region: Get base Currency
 	DECLARE @BaseCurrencyId INT 
@@ -119,10 +118,9 @@ BEGIN
 		RebateRemark	NVARCHAR(4000),
 		NegativeFee		MONEY,
 		Minfee			MONEY,
-		IsChargedByMinFee BIT,
-		IsSpecialTreatment BIT
+		IsChargedByMinFee BIT
 	)
-	INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,NegativeFee,Minfee,IsChargedByMinFee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark,IsSpecialTreatment)
+	INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,NegativeFee,Minfee,IsChargedByMinFee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark)
 	EXEC dbo.LA_AmountToCompanySel @FromDate,@ToDate,@PartyId,@ProductCodes,@BaseCurrency
 
 	-- Region: Get party charge rate info	
@@ -386,20 +384,11 @@ BEGIN
 			InvoiceAmount	MONEY, 
 			AmountType		TINYINT,
 			Rate			MONEY,
-			Remark			NVARCHAR(4000),
-			IsSpecialTreatment BIT)
-	DECLARE @IsSpecialTreatmentPeriod BIT = 0, @INH_CurrencyID INT = 51
+			Remark			NVARCHAR(4000))
 
-	IF(EXISTS(SELECT TOP 1 1 
-				FROM [dbo].[LA_PartySpecialTreatment] WITH(NOLOCK) 
-				WHERE PartyId = @PartyId 
-						AND @FromDate <= ToDate AND FromDate <= @ToDate))
-	BEGIN
-		SET @IsSpecialTreatmentPeriod = 1
-	END	
 	-- Region: fee
-	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, IsSpecialTreatment)
-	SELECT d.PartyId, d.ProductId, d.Fee, @AmountTypeSoftwareFee, IsSpecialTreatment
+	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType)
+	SELECT d.PartyId, d.ProductId, d.Fee, @AmountTypeSoftwareFee
 	FROM #AmountToCompany d
 	-- End Region: fee
 
@@ -412,30 +401,17 @@ BEGIN
 				@AmountTypeSoftwareFee
 		FROM	#TempData td 
 		WHERE	td.ProductId NOT IN (SELECT td2.ProductId FROM @InvoiceData td2)
-				AND (@IsSpecialTreatmentPeriod = 0 OR td.CurrencyId <> @INH_CurrencyID)
-		GROUP	BY td.PartyId, td.ProductId
-	)
-	INSERT INTO @InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType,IsSpecialTreatment)
-	(
-		SELECT	td.PartyId,
-				td.ProductId,
-				SUM(td.AmountToCompany),
-				@AmountTypeSoftwareFee,
-				1
-		FROM	#TempData td 
-		WHERE	td.ProductId NOT IN (SELECT td2.ProductId FROM @InvoiceData td2)
-				AND (@IsSpecialTreatmentPeriod = 1 AND td.CurrencyId = @INH_CurrencyID)
 		GROUP	BY td.PartyId, td.ProductId
 	)
 
 	-- Region: Discount
 	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate, Remark)
 	SELECT d.PartyId, d.ProductId, d.Discount, @AmountTypeDiscount, d.DiscountRate, d.DiscountRemark
-	FROM #AmountToCompany d WHERE d.Discount > 0 AND IsSpecialTreatment = 0
+	FROM #AmountToCompany d WHERE d.Discount > 0
 	-- End Region
 
 	-- Region: Select data	
-	INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate,Remark,IsSpecialTreatment)
+	INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate,Remark)
 	(
 		SELECT	id.ProductId,
 				CASE 
@@ -452,8 +428,7 @@ BEGIN
 				END AS InvoiceAmount,
 				id.AmountType,
 				id.Rate,
-				id.Remark,
-				id.IsSpecialTreatment
+				id.Remark
 		FROM	@InvoiceData id
 				LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON id.ProductId = p.Productid
 	)
@@ -508,7 +483,7 @@ BEGIN
 		DECLARE @SBAfterDiscount MONEY = ISNULL((
 			SELECT SUM(CASE WHEN AmountType = @AmountTypeSoftwareFee THEN InvoiceAmount ELSE -InvoiceAmount END)
 			FROM @FinalResult
-			WHERE ProductId = 0 AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount) AND IsSpecialTreatment = 0 
+			WHERE ProductId = 0 AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount)
 		),0)
 
 		DECLARE @AmfAmount MONEY
@@ -523,13 +498,13 @@ BEGIN
 	DECLARE @AGMonthlyFee MONEY
 	SELECT @AGMonthlyFee = SUM(CASE WHEN AmountType = @AmountTypeSoftwareFee THEN InvoiceAmount ELSE -InvoiceAmount END)
 	FROM @FinalResult 
-	WHERE ProductId = 10 AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount) AND IsSpecialTreatment = 0
+	WHERE ProductId = 10 AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount)
 	IF (@AGMonthlyFee > 0 AND @RemainingAG > 0)
 	BEGIN
 		DECLARE @AGAmount MONEY = (CASE WHEN @RemainingAG < @AGMonthlyFee THEN @RemainingAG ELSE @AGMonthlyFee END)
 
 		UPDATE @FinalResult SET DeductMonthlyFees = @AGAmount, RemainingAmount = @RemainingAG
-		WHERE IsSpecialTreatment = 0 AND AmountType = @AmountTypeSoftwareFee AND ProductId = 10 -- AG
+		WHERE AmountType = @AmountTypeSoftwareFee AND ProductId = 10 -- AG
 	END
 
 	IF @Prepayment>0
@@ -583,10 +558,9 @@ BEGIN
 			f.Rate,
 			f.DeductMonthlyFees,
 			f.RemainingAmount,
-			f.Remark,
-			f.IsSpecialTreatment
+			f.Remark
 	FROM	@FinalResult f
-	ORDER BY f.AmountType, f.ProductId, f.IsSpecialTreatment
+	ORDER BY f.AmountType, f.ProductId
 
 	SELECT @ErrCode = 0, @ErrMsg = ''
 

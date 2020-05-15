@@ -2,17 +2,16 @@
 USE bodb_Licensee
 GO
 
---ALTER PROCEDURE [dbo].[LA_AmountToCompanyByDiscountCurrencySel] (
-DECLARE	@FromDate			DATE,
+ALTER PROCEDURE [dbo].[LA_AmountToCompanyByDiscountCurrencySel] (
+	@FromDate			DATE,
 	@ToDate				DATE,
 	@PartyIds			VARCHAR(4000) = '',
 	@ProductCodes		VARCHAR(1000) = '',
 	@BaseCurrencyName	VARCHAR(10) = 'EUR',
 	@BaseCurrencyId		INT = 6,
 	@CurrencyId			INT = 0
---)
---AS
-SELECT @ToDate='2020-04-30 00:00:00',@FromDate='2020-04-01 00:00:00',@BaseCurrencyName='EUR',@PartyIDs='74',@ProductCodes='SB'
+)
+AS
 /*	Created: 20180924@Parsons
 	Task : select amount to company by discount currency
 	DB: DBLIC.bodb_Licensee
@@ -379,18 +378,6 @@ BEGIN
 	FROM #tmpWinlossData a
 	GROUP BY PartyId, ProductId
 
-	-- Parsons's Note:
-	/*
-	  1. Separated into 2 part
-	  2. Calculate based on Non-INH ticket only
-	  3. Final select: Sum all
-	  Expected: 
-	    + Fee: 12k (5k Minfee + 7k INH)
-		+ Discount: 0
-		+ Rebate: 500
-		+ Total: 11500
-	*/
-
 	-- 2.6 treat negative as 0
 	UPDATE @FinalResult 
 			SET FeeByDiscountBaseCurrency = CASE WHEN AmountToCompanyByDiscountBaseCurrency < 0 THEN 0 ELSE AmountToCompanyByDiscountBaseCurrency END,
@@ -498,8 +485,10 @@ BEGIN
 	FROM #tmpWinlossData r
 	INNER JOIN @tmpDiscountCurrency c ON c.PartyID=r.PartyId AND c.CurrencyId=r.CurrencyId
 	INNER JOIN #tmpDiscountSettings s ON s.DiscountGroupId=c.DiscountGroupId AND s.ProductId=r.ProductId AND s.PartyId = c.PartyId
+	LEFT JOIN [dbo].[LA_PartySpecialTreatment] st WITH(NOLOCK) ON r.PartyID = st.PartyId AND r.WinlossDate BETWEEN st.FromDate AND st.ToDate
 	WHERE s.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount)
 		AND s.DiscountGroupType IN (@DiscountIndividualFee, @DiscountByGroupFee)
+		AND (st.Id IS NULL OR r.CurrencyId <> 51) -- INH
 	GROUP BY s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId
 
 	DECLARE @Rate TABLE(Rate DECIMAL(6,5), CalculationGroup INT, IsDiscountByCurrency BIT)

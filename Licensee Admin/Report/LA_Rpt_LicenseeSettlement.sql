@@ -45,7 +45,6 @@ AS
 			- 20200228@Parsons: Support-HID-currency [#128856] 
 			- 20200412@Parsons: Integrate SA Gaming [#129276]
 			- 20200403@Parsons: Indo 4D Integration [#130910]
-			- 20200505@Mason: Special handling for INH [#128570]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -752,17 +751,6 @@ BEGIN
 						END)
 	WHERE ExchangeId IN (75, 76, 77, 92)	
 	
-	--- Determine party is special treatment
-	DECLARE @IsSpecialTreatmentPeriod AS BIT = 0,
-			@INH_CurrencyId AS INT = 51
-			
-	IF (EXISTS (SELECT TOP 1 1 FROM bodb_licensee.dbo.LA_PartySpecialTreatment ps WITH (NOLOCK) WHERE @PartyId = ps.PartyId AND @FromDate <= ps.ToDate 
-																															AND ps.FromDate <= @ToDate))
-	BEGIN
-		SET @IsSpecialTreatmentPeriod = 1
-	END
-	---------------------------------
-	
 	;WITH sortedExchange AS 
 	(
 		SELECT ExchangeID, CurrencyCode, ROW_NUMBER() OVER (PARTITION BY CurrencyCode ORDER BY ExchangeId) RowNumber
@@ -771,7 +759,7 @@ BEGIN
 	SELECT
 		ISNULL(d.Game, '')			AS Game
 		, @ToDate					AS WinLostDate
-		, se.ExchangeID				AS CurrencyId
+		, se.ExchangeID		AS CurrencyId
 		, se.CurrencyCode			AS CurrencyName
 		, e.Rate					AS ExchangeRate
 		, SUM(Betcount)				AS Betcount
@@ -828,27 +816,15 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.TicketsPayout * e.Rate, 0)))				AS TicketsPayoutBase
 		, CONVERT(MONEY, SUM(ISNULL(d.CashoutCommission * e.Rate, 0)))			AS CashoutCommissionBase
 		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountAndComm * e.Rate, 0)))		AS BuyBackAmountAndCommBase
-	INTO #SelectedData
 	FROM #Result d
 	INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
 	INNER JOIN sortedExchange se ON se.CurrencyCode = e.CurrencyCode
 	WHERE se.RowNumber = 1 -- remove duplicate currency codes have different id
 	GROUP BY se.ExchangeID,se.CurrencyCode, e.Rate, d.Game
 	ORDER BY se.ExchangeID
-	
-	
-	---- Select data all currency
-	SELECT * FROM #SelectedData sd
-	WHERE (@IsSpecialTreatmentPeriod = 0 OR sd.CurrencyId <> @INH_CurrencyId)
-
-	--- Select data by INH currency if party has special treatment (@IsSpecialTreatmentPeriod = 1)
-	SELECT * FROM #SelectedData sd
-	WHERE @IsSpecialTreatmentPeriod = 1 AND sd.CurrencyId = @INH_CurrencyId
-	
 
 	DROP TABLE #Exchange
 	DROP TABLE #Result
 	DROP TABLE #DataWinloss3rd
-	DROP TABLE #SelectedData
 END
 GO
