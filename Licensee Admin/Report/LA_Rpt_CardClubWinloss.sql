@@ -86,7 +86,7 @@ BEGIN
 	  For normal tickets ( not Midas's tickets): Licensee WL x 2.5%
 	  For Midas's tickets: Licensee WL x 3.5%
 	*/
-	DECLARE @TaiXiu_BettypeId INT = 1902, @XocDia_BettypeId INT = 1903, @3DLottery_BettypeId INT = 1904, @HiLo_BettypeId INT = 1905, @MidasRate3rd DECIMAL(4,3) = 0.035
+	DECLARE @TaiXiu_BettypeId INT = 1902, @XocDia_BettypeId INT = 1903, @Lotto3_BettypeId INT = 1904, @HiLo_BettypeId INT = 1905, @MidasRate3rd DECIMAL(4,3) = 0.035
 	
 	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee, PayToSupplier)
 	SELECT ci.PartyId,
@@ -98,7 +98,7 @@ BEGIN
 		- SUM(b.WinLoss) AS LicenseeWinloss,
 		- SUM(CASE WHEN ci.isDeposit = 1 THEN (b.WinLoss * ISNULL(cr.Rate, ci.Rate))
 				ELSE (b.WinLoss + b.WinLossA + WinLossM + WinLossS + b.CommissionS) END) AS LicensingFee,
-		- SUM(b.WinLoss * (CASE WHEN b.Bettype IN (@TaiXiu_BettypeId, @XocDia_BettypeId, @3DLottery_BettypeId, @HiLo_BettypeId) THEN @MidasRate3rd ELSE ci.Rate3rd END)) AS PayToSupplier
+		- SUM(b.WinLoss * (CASE WHEN b.Bettype IN (@TaiXiu_BettypeId, @XocDia_BettypeId, @Lotto3_BettypeId, @HiLo_BettypeId) THEN @MidasRate3rd ELSE ci.Rate3rd END)) AS PayToSupplier
 	FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
 		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 		LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeId = ci.ChargeId AND cr.CurrencyId = b.CurrencyId 
