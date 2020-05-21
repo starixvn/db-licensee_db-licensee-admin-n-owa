@@ -52,6 +52,7 @@ AS
 		- 20200418@Parsons: Integrate BBIN Live Casino [#132237]
 		- 20200422@Parsons: Indo 4D Integration [#130910]
 		- 20200424@Pasons: Integrate IBCBET Live Casino [#131165]
+		- 20200423@Parsons: Integrate Saba-Club [#132730]
 
 	Param's Explanation:
 
@@ -417,6 +418,15 @@ BEGIN
 	   SELECT typeid, 46
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 3201 AND 3299
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+	END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'SBC')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 42
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 1611 AND 1699
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
