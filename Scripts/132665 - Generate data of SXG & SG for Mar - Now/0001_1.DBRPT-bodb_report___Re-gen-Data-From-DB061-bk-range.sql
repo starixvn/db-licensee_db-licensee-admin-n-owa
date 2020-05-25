@@ -31,6 +31,10 @@ BEGIN
 
 		DELETE FROM dbo.rpt_ThirdPartyWL_ExtraGMT WITH(ROWLOCK)
 		WHERE rptDate = @WinlostDate
+			AND (
+					BetTypeId BETWEEN 4301 AND 4600 -- SG
+					OR BetTypeId BETWEEN 3101 AND 3199 -- SXG
+				)
 		
 		INSERT INTO dbo.rpt_ThirdPartyWL_ExtraGMT(RptDate, RptDate3rd, SiteId, BetTypeId, CurrencyId, StatusId, BetCount, Turnover, Winloss, AComm, PComm, ProgressiveContribution, ProgressivePayout,ValidBetAmount)
 		SELECT CAST(b.winlostdate AS DATE)	AS Rptdate
