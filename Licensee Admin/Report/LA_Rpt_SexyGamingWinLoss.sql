@@ -83,7 +83,7 @@ BEGIN
 	-- Calculate for desposit & credit
 	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
 	SELECT ci.PartyId,
-		b.rptDate as Winlostdate,
+		b.RptDate3rd as Winlostdate,
 		b.CurrencyId,
 		SUM(b.Turnover) AS Turnover,
 		SUM(b.BetCount) AS TotalTrans,
@@ -97,7 +97,7 @@ BEGIN
 	WHERE b.RptDate3rd BETWEEN @FromDate AND @ToDate
 		AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 
 		AND b.BetTypeId BETWEEN 3101 AND 3199
-	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
+	GROUP BY b.RptDate3rd, ci.PartyId, b.CurrencyId
 	-- End region
 	
 	-- Region: Calculate result
