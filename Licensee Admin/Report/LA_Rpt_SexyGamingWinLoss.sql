@@ -14,6 +14,7 @@ AS
  * Revisions
 	- 20200325@Mason: Intergrate SexyGaming [#130948]
 	- 20200409@Mason: Integrate SA Gaming [#129276]
+	- 20200508@Parsons: Integrate Sexy Gaming for deposit licensees [#132665]
  * Param's Explanation:
  *
  */
@@ -24,17 +25,18 @@ BEGIN
 	CREATE TABLE #PartyList (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
 	INSERT INTO #PartyList EXEC dbo.LA_PartyListSel
 	
-	-- Get 3rd Rate for credit
-	DECLARE @3rdRate AS TABLE(PartyID INT, ProductID INT, DI_Rate MONEY, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
+	-- Get 3rd Rate
+	DECLARE @3rdRate AS TABLE(PartyID INT, ProductID INT, DI_Rate MONEY, IsDeposit INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
 	INSERT INTO @3rdRate
-	SELECT DISTINCT p.PartyId, r.ProductID, r.DI_Rate, r.Fromdate, r.Todate 
+	SELECT DISTINCT p.PartyId, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r.Todate 
 	FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'SXG', 'OA') r 
 	INNER JOIN #PartyList p on p.ParentId = r.PartyID
-	WHERE r.IsDeposit = 0
 
 	CREATE TABLE #ChargeRate (
-		PartyID			INT
+		ChargeID		INT
+		,PartyID		INT
 		,LicenseeID		INT
+		,isDeposit		INT
 		,ProductID		INT
 		,Rate			MONEY
 		,Rate3rd		MONEY
@@ -44,10 +46,10 @@ BEGIN
 	
 	-- ​Pay to Supplier: equals 3% of [Licensee Win Loss]
 	INSERT INTO #ChargeRate
-	SELECT DISTINCT c.PartyID, c.LicenseeID, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate
-	FROM dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'SXG') c
+	SELECT DISTINCT c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate
+	FROM LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'SXG') c
 	INNER JOIN @3rdRate r ON r.PartyID = c.PartyID and r.ProductID = c.ProductID
-	WHERE (c.DI_Rate = 0 AND c.isDeposit = 0)
+	WHERE (c.DI_Rate = 0 AND c.isDeposit = 0) OR (c.DI_Rate > 0 and c.isDeposit = 1)
 
 	CREATE TABLE #Exchange (
 		ExchangeDate	DATE,
@@ -59,7 +61,8 @@ BEGIN
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, Rate, CurrencyCode)
 	SELECT ExchangeDate, ExchangeID, BaseCurrencyRate, CASE WHEN ExchangeID = 51 THEN 'INH'
 															WHEN ExchangeID = 92 THEN 'HID' 
-															ELSE Code END
+															ELSE Code 
+														END
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	
 	-- Region: TempData
@@ -77,22 +80,24 @@ BEGIN
 		LicensingFee MONEY,
 		PayToSupplier MONEY)
 
-	-- Calculate for credit
+	-- Calculate for desposit & credit
 	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
 	SELECT ci.PartyId,
-		b.rptDate as Winlostdate,
+		b.RptDate3rd as Winlostdate,
 		b.CurrencyId,
 		SUM(b.Turnover) AS Turnover,
 		SUM(b.BetCount) AS TotalTrans,
-		SUM(b.MemberWL) AS CustomerWinLoss,
-		- SUM(b.MemberWL) AS LicenseeWinloss,
-		SUM(-b.MemberWL * ISNULL(ci.Rate, 0)) AS LicensingFee,
-		SUM(-b.MemberWL * ISNULL(ci.Rate3rd, 0)) AS PayToSupplier
-	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
-	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
-		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
-	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
+		SUM(b.Winloss) AS CustomerWinLoss,
+		- SUM(b.Winloss) AS LicenseeWinloss,
+		SUM(-b.Winloss * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
+		SUM(-b.Winloss * ISNULL(ci.Rate3rd, 0)) AS PayToSupplier
+	FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
+		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
+		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND cr.CurrencyID = b.CurrencyId
+	WHERE b.RptDate3rd BETWEEN @FromDate AND @ToDate
+		AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 
+		AND b.BetTypeId BETWEEN 3101 AND 3199
+	GROUP BY b.RptDate3rd, ci.PartyId, b.CurrencyId
 	-- End region
 	
 	-- Region: Calculate result
@@ -171,9 +176,9 @@ BEGIN
 			SUM(Turnover),
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
-			SUM(LicensingFee),
+			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
 			SUM(PayToSupplier),
-			SUM(LicensingFee - PayToSupplier)
+			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END - PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
 		

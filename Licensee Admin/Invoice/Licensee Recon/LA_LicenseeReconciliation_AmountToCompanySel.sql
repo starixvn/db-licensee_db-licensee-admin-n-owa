@@ -27,6 +27,8 @@ AS
 		- 20200323@Parsons: Intergrate Indo 4D [#130910]
 		- 20200412@Parsons: Integrate SA Gaming [#129276]
 		- 20200411@Parsons: Integrate Table Games [#131166]
+		- 20200422@Parsons: Integrate Saba.club [#132730]
+		- 20200507@Parsons: Integrate Sexy Gaming for deposit licensees [#132665]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -68,7 +70,7 @@ BEGIN
 
 	-- supported products
 	-- 
-	DECLARE @supportedProducts VARCHAR(100) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG'
+	DECLARE @supportedProducts VARCHAR(100) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG'
 	DECLARE @productList TABLE(ProductId INT, Code VARCHAR(5), Name VARCHAR(50))
 	INSERT INTO @productList(ProductId,Code,Name)
 	SELECT ProductID, ProductPrefix,ProductName FROM dbo.LA_f_Products3rd(@supportedProducts)
