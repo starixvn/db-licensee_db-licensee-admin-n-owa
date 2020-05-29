@@ -247,11 +247,11 @@ BEGIN
 		)
 	END
 
-	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode NOT IN ('BA','MGCLC','MGCRNG','AGC','GD','VG','BX'))
+	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode NOT IN ('BA','MGCLC','MGCRNG','AGC','GD','VG','BX', 'RB'))
 	BEGIN
-		--exclude BA,MGCLC, MGCRNG,AGC,GD,VG,BX
-		DELETE #Bettype WHERE ProductID IN (3,14,17,10,11,12,31)
-		DELETE #tmpParty WHERE ProductID IN (3,14,17,10,11,12,31)
+		--exclude RB,BA,MGCLC, MGCRNG,AGC,GD,VG,BX
+		DELETE #Bettype WHERE ProductID IN (1,3,14,17,10,11,12,31)
+		DELETE #tmpParty WHERE ProductID IN (1,3,14,17,10,11,12,31)
 
 		SELECT b.BetCount,b.turnover,b.rptDate,b.CurrencyID,b.Bettype,b.[Status],b.winloss,b.WinlossA,b.CommissionA,b.commissionP,b.SiteID,b.leagueid,b.IsLive,bt.ProductId
 		INTO #tmpData
