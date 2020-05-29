@@ -2,8 +2,8 @@
 USE bodb02
 GO
 
-ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss]
-	@PartyIDs				VARCHAR(5500)	= ''
+--ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss]
+DECLARE	@PartyIDs				VARCHAR(5500)	= ''
 	, @CurrencyIds			VARCHAR(4000)	= ''
 	, @FromDate				SMALLDATETIME
 	, @ToDate				SMALLDATETIME
@@ -14,7 +14,9 @@ ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss]
 	, @drawfilter			SMALLINT		= 1
 	, @IsConvert			BIT				= 0
 	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
-AS
+--AS
+SELECT @IsConvert=1,@CurrencyIds=NULL,@FromDate='2018-04-01 00:00:00',@SportType=0,@ReportBy=0,@ToDate='2018-04-30 00:00:00',@PartyIDs='31',@BaseCurrencyName='EUR',@ProductCodes='SB,RB',@drawfilter=1,@Bettype=0
+
 /*  Created: Florent.Nguyen
 	Date: 2014-09-03
 	Task : Licensee Currency Winlost Report
@@ -82,11 +84,8 @@ BEGIN
 		TurnOver		MONEY,
 		Winlost			MONEY,
 		LicenseeWL		MONEY,
-		WinlossRB		MONEY,
 		AmtDueToBA		MONEY,
-		AmtDueToRB		MONEY,
 		CommBA			MONEY,
-		CommRB			MONEY,
 		Company			MONEY,
 		Betcount		BIGINT,
 		Playercomm		MONEY
@@ -129,7 +128,7 @@ BEGIN
 	SELECT Bettype, ProductID
 	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(@Bettype, @ProductCodes)
 	CREATE INDEX IX_Bettype ON #Bettype(Bettype, ProductID)
-	
+
 	IF EXISTS (SELECT 1 FROM @ProductList WHERE ProductCode='BA')
 	BEGIN
 		--BA rpt_Betting_BA
@@ -169,7 +168,7 @@ BEGIN
 
 	IF (EXISTS (SELECT 1 FROM @ProductList WHERE ProductCode IN ('AGC','GD','VG','BX')) AND @SportType = 0 AND @ReportBy = 0 AND @Bettype = 0)
 	BEGIN
-		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Company, Betcount, Playercomm)
+		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm)
 		(
 			SELECT b.rptDate,p.PartyID,b.CurrencyId
 					,SUM(b.Turnover * 
@@ -179,11 +178,8 @@ BEGIN
 							  ELSE 1 END))
 					,SUM(b.MemberWL + CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END)
 					,SUM(-b.MemberWL - CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END)
-					,0 AS WinlossRB
 					,0 AS AmtDueToBA
-					,0 AS AmtDueToRB
 					,0 AS CommBA
-					,0 AS CommRB
 					,SUM(-b.MemberWL * ISNULL(cc.rate,p.Rate) - CASE WHEN b.ProductID=31 THEN (b.CommissionA + b.CommissionP) ELSE 0 END) AS Company
 					,SUM(b.Betcount * (CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END)) 
 					,SUM(b.commissionP)
@@ -224,7 +220,7 @@ BEGIN
 
 	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode IN ('MGCLC','MGCRNG'))
 	BEGIN
-		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Company, Betcount, Playercomm)
+		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm)
 		(
 			SELECT b.RptDate, p.PartyId,b.CurrencyID
 				, SUM(b.Turnover * (CASE	WHEN @drawfilter IN (2, 3) AND b.[Status] = 111			THEN 0
@@ -232,11 +228,8 @@ BEGIN
 											ELSE 1 END))
 				, SUM(b.WinLoss) Winloss
 				, -SUM(b.WinLoss) AS LicenseeWL
-				, 0 AS WinlossRB
 				, 0 AS AmtDueToBA
-				, 0 AS AmtDueToRB
 				, 0 AS CommBA
-				, 0 AS CommRB
 				, -SUM(b.WinLoss* p.Rate) AS Company
 				, SUM(b.BetCount * (CASE WHEN @drawfilter = 2 AND b.[Status] = 111 THEN 0 ELSE 1 END))
 				, 0 as Playercomm
@@ -256,7 +249,6 @@ BEGIN
 
 	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode NOT IN ('BA','MGCLC','MGCRNG','AGC','GD','VG','BX'))
 	BEGIN
-		
 		--exclude BA,MGCLC, MGCRNG,AGC,GD,VG,BX
 		DELETE #Bettype WHERE ProductID IN (3,14,17,10,11,12,31)
 		DELETE #tmpParty WHERE ProductID IN (3,14,17,10,11,12,31)
@@ -287,9 +279,6 @@ BEGIN
 						) AS Turnover
 					,SUM(b.winloss) AS winloss
 					,SUM(CASE WHEN b.bettype NOT IN (31,32, 33) THEN -b.winloss ELSE 0 END) AS LicenseeWL
-					,SUM(CASE WHEN b.bettype IN (31,32, 33) THEN b.WinlossA ELSE 0 END) AS WinlossRB
-					,SUM(CASE WHEN b.bettype IN (31,32, 33) THEN -(b.winloss + b.winlossA + b.CommissionA) ELSE 0 END) AS AmtDueToRB
-					,SUM(CASE WHEN b.bettype IN (31,32, 33) THEN CommissionA ELSE 0 END) as CommRB
 					,SUM(CASE WHEN b.bettype NOT IN (31,32, 33) THEN -(b.winloss) ELSE CAST(0 AS MONEY) END) AS Company
 					,SUM(CASE WHEN @drawfilter = 2 AND b.[Status] = 111 THEN 0 ELSE b.BetCount END) AS BetCount
 					,SUM(CASE WHEN b.ProductId = 32 THEN 0 ELSE b.commissionP END) AS Playercomm
@@ -304,8 +293,8 @@ BEGIN
 					,b.Bettype
 					,b.Status
 		)
-		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Company, Betcount, Playercomm)
-		SELECT a.rptDate,p.PartyID,a.CurrencyID,TurnOver, winloss, LicenseeWL, WinlossRB, 0, AmtDueToRB, 0, CommRB, Company*ISNULL(cc.rate,p.rate), Betcount, Playercomm
+		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm)
+		SELECT a.rptDate,p.PartyID,a.CurrencyID,TurnOver, winloss, LicenseeWL, 0, 0, Company * ISNULL(cc.rate,p.rate), Betcount, Playercomm
 		FROM cte_Data a
 		INNER JOIN #tmpParty p ON p.LicenseeID = a.SiteID AND a.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId=a.ProductId AND p.ChargeType = 1
 		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID = p.ChargeId AND a.CurrencyId=cc.CurrencyID
@@ -332,11 +321,8 @@ BEGIN
 			SUM(TurnOver * e.Rate)		AS Turnover,
 			SUM(Winlost * e.Rate)		AS Winlost,
 			SUM(LicenseeWL * e.Rate)	AS LicenseeWL,
-			SUM(WinlossRB * e.Rate)		AS WinlossRB,
 			SUM(CommBA * e.Rate)		AS CommBA,
-			SUM(CommRB * e.Rate)		AS CommRB,
 			SUM(AmtDuetoBA * e.Rate)	AS AmtDuetoBA,
-			SUM(AmtDuetoRB * e.Rate)	AS AmtDuetoRB,
 			SUM(Company * e.Rate)		AS Company,
 			SUM(Betcount)				AS Betcount,
 			SUM(Playercomm * e.Rate)	AS Playercomm
@@ -377,11 +363,8 @@ BEGIN
 			SUM(TurnOver * e.Rate)		AS Turnover,
 			SUM(Winlost * e.Rate)		AS Winlost,
 			SUM(LicenseeWL * e.Rate)	AS LicenseeWL,
-			SUM(WinlossRB * e.Rate)		AS WinlossRB,
 			SUM(CommBA * e.Rate)		AS CommBA,
-			SUM(CommRB * e.Rate)		AS CommRB,
 			SUM(AmtDuetoBA * e.Rate)	AS AmtDuetoBA,
-			SUM(AmtDuetoRB * e.Rate)	AS AmtDuetoRB,
 			SUM(Company * e.Rate)		AS Company,
 			SUM(Betcount)				AS Betcount,
 			SUM(Playercomm * e.Rate)	AS Playercomm
