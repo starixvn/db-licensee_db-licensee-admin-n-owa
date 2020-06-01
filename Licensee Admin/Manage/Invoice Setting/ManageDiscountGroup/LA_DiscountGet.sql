@@ -75,11 +75,6 @@ BEGIN
 	-- endregion
 
 	--get list of licensees
-	DECLARE @SpecialTreatmentParty AS TABLE(PartyId INT)
-	INSERT INTO @SpecialTreatmentParty(PartyId)
-	SELECT PartyId FROM dbo.LA_PartySpecialTreatment pst WITH (NOLOCK)
-	WHERE @CurrentTime BETWEEN pst.FromDate AND pst.ToDate
-	
 	DECLARE @PartyTable AS TABLE(DiscountGroupId SMALLINT, PartyId INT, PartyName VARCHAR(50), IsApplyDiscount BIT, IsSpecialTreatment BIT, Remark NVARCHAR(4000))
 	
 	INSERT INTO @PartyTable(DiscountGroupId, PartyId , PartyName, IsApplyDiscount, IsSpecialTreatment, Remark)
@@ -91,7 +86,7 @@ BEGIN
 			Remark
 	FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
 	INNER JOIN dbo.OAS_Party p WITH(NOLOCK)ON p.PartyID = a.PartyID
-	LEFT JOIN @SpecialTreatmentParty pst ON p.PartyID = pst.PartyID
+	LEFT JOIN (SELECT PartyId FROM dbo.LA_PartySpecialTreatment WITH(NOLOCK) WHERE @CurrentTime BETWEEN FromDate AND ToDate) pst ON p.PartyID = pst.PartyID
 	WHERE DiscountGroupId = @GroupId
 
 	SELECT DiscountGroupId,PartyId,PartyName,IsApplyDiscount,IsSpecialTreatment,Remark 
