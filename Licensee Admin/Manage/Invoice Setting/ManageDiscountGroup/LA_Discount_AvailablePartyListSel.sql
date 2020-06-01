@@ -15,17 +15,31 @@ AS
 
 	 Revisions:  
 		- 20180702@Parsons: Get payer list [#94282]
+		- 20200601@Mason: INH market special handling [#128570]
 
 	 Explannation:
 */
 BEGIN
 	SET NOCOUNT ON
+	
+	DECLARE @CurrentTime DATETIME = GETDATE()
 
-	DECLARE @PartyList TABLE(PartyId INT, PartyName VARCHAR(100), BrandName VARCHAR(100), ParentId INT)
+	DECLARE @PartyList TABLE(PartyId INT, PartyName VARCHAR(100), BrandName VARCHAR(100), ParentId INT, IsSpecialTreatment BIT)
 	DECLARE @PartySettings TABLE(DiscountGroupId INT, PartyId INT, ProductId INT)
 
 	INSERT INTO @PartyList(PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel
+	
+	-- Get special treatment party
+	DECLARE @SpecialTreatmentPartyIds TABLE(PartyId INT)
+	INSERT INTO @SpecialTreatmentPartyIds
+	SELECT PartyId FROM dbo.LA_PartySpecialTreatment
+	WHERE @CurrentTime BETWEEN FromDate AND ToDate
+	
+	UPDATE @PartyList
+		SET IsSpecialTreatment = CASE WHEN pst.PartyId IS NULL THEN 0 ELSE 1 END
+	FROM @PartyList p LEFT JOIN @SpecialTreatmentPartyIds pst ON p.PartyId = pst.PartyId
+	--
 
 	INSERT INTO @PartySettings(DiscountGroupId, PartyId, ProductId)
 	SELECT DISTINCT h.DiscountGroupId, a.PartyId, dp.ProductId
@@ -37,7 +51,7 @@ BEGIN
 		AND (@ToDate IS NULL OR @ToDate >= h.FromDate)
 		
 	--list of payer not in group
-	SELECT p.PartyId, PartyName, BrandName
+	SELECT p.PartyId, PartyName, BrandName, IsSpecialTreatment
 	FROM @PartyList p
 	WHERE p.PartyId NOT IN (SELECT PartyId 
 							FROM @PartySettings
@@ -47,7 +61,7 @@ BEGIN
 	UNION
 
 	--list of payer in group
-	SELECT p.PartyId, PartyName, BrandName
+	SELECT p.PartyId, PartyName, BrandName, IsSpecialTreatment
 	FROM @PartyList p
 	WHERE p.PartyId IN (SELECT PartyId 
 						FROM @PartySettings p1

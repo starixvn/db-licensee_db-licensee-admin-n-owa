@@ -75,19 +75,26 @@ BEGIN
 	-- endregion
 
 	--get list of licensees
-	DECLARE @PartyTable AS TABLE(DiscountGroupId SMALLINT, PartyId INT, PartyName VARCHAR(50), IsApplyDiscount BIT, Remark NVARCHAR(4000))
+	DECLARE @SpecialTreatmentParty AS TABLE(PartyId INT)
+	INSERT INTO @SpecialTreatmentParty(PartyId)
+	SELECT PartyId FROM dbo.LA_PartySpecialTreatment pst WITH (NOLOCK)
+	WHERE @CurrentTime BETWEEN pst.FromDate AND pst.ToDate
 	
-	INSERT INTO @PartyTable(DiscountGroupId, PartyId , PartyName, IsApplyDiscount, Remark)
+	DECLARE @PartyTable AS TABLE(DiscountGroupId SMALLINT, PartyId INT, PartyName VARCHAR(50), IsApplyDiscount BIT, IsSpecialTreatment BIT, Remark NVARCHAR(4000))
+	
+	INSERT INTO @PartyTable(DiscountGroupId, PartyId , PartyName, IsApplyDiscount, IsSpecialTreatment, Remark)
 	SELECT DiscountGroupId,
 			p.PartyId,
 			p.PartyName,
 			IsApplyDiscount,
-			Remark 
+			CASE WHEN pst.PartyId IS NULL THEN 0 ELSE 1 END AS IsSpecialTreatment,
+			Remark
 	FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
-	INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = a.PartyID
+	INNER JOIN dbo.OAS_Party p WITH(NOLOCK)ON p.PartyID = a.PartyID
+	LEFT JOIN @SpecialTreatmentParty pst ON p.PartyID = pst.PartyID
 	WHERE DiscountGroupId = @GroupId
 
-	SELECT DiscountGroupId,PartyId,PartyName,IsApplyDiscount,Remark 
+	SELECT DiscountGroupId,PartyId,PartyName,IsApplyDiscount,IsSpecialTreatment,Remark 
 	FROM @PartyTable
 	--endregion 
 
@@ -120,10 +127,5 @@ BEGIN
 		d.PartyID = c.PartyId AND 
 		d.DiscountGroupId = @GroupId AND
 		(d.CurrencyId = 0 OR d.CurrencyId = c.CurrencyId) -- all currency = 0
-		
-	-- Get list of special treatment parties
-	SELECT ps.PartyId
-	FROM dbo.LA_PartySpecialTreatment ps WITH (NOLOCK)
-	WHERE @CurrentTime BETWEEN ps.FromDate AND ps.ToDate
 END
 GO
