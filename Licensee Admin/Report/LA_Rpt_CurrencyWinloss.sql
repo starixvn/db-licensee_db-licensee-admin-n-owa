@@ -2,8 +2,8 @@
 USE bodb02
 GO
 
---ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss]
-DECLARE	@PartyIDs				VARCHAR(5500)	= ''
+ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss]
+	@PartyIDs				VARCHAR(5500)	= ''
 	, @CurrencyIds			VARCHAR(4000)	= ''
 	, @FromDate				SMALLDATETIME
 	, @ToDate				SMALLDATETIME
@@ -14,8 +14,7 @@ DECLARE	@PartyIDs				VARCHAR(5500)	= ''
 	, @drawfilter			SMALLINT		= 1
 	, @IsConvert			BIT				= 0
 	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
---AS
-SELECT @IsConvert=1,@CurrencyIds=NULL,@FromDate='2018-04-01 00:00:00',@SportType=0,@ReportBy=0,@ToDate='2018-04-30 00:00:00',@PartyIDs='31',@BaseCurrencyName='EUR',@ProductCodes='SB,RB',@drawfilter=1,@Bettype=0
+AS
 
 /*  Created: Florent.Nguyen
 	Date: 2014-09-03
@@ -43,6 +42,7 @@ SELECT @IsConvert=1,@CurrencyIds=NULL,@FromDate='2018-04-01 00:00:00',@SportType
 	   - 20191225@Bruce: billing term by currency [#120005]
 	   - 20200228@Parsons: Support-HID-currency [#128856]
 	   - 20200409@Parsons: Integrate SA Gaming [#129276]
+	   - 20200601@Parsons: Amend Currency WL report [#135055]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
