@@ -132,7 +132,7 @@ BEGIN
 	IF EXISTS (SELECT 1 FROM @ProductList WHERE ProductCode='BA')
 	BEGIN
 		--BA rpt_Betting_BA
-		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, WinlossRB, AmtDueToBA, AmtDueToRB, CommBA, CommRB, Company,Betcount, Playercomm)
+		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company,Betcount, Playercomm)
 		(
 			SELECT	b.rptDate,
 					tp.PartyID,
@@ -142,11 +142,8 @@ BEGIN
 											ELSE 1 END),
 					SUM(b.WinLoss),
 					0 as LicenseeWL,
-					0 AS WinlossRB,
 					- SUM((b.WinLoss * tp.Rate ) + b.CommissionA) AS AmountDueToBA,
-					0 as AmountDueToRB,
 					SUM (CommissionA),
-					0 as CommRB,
 					0 as Company,
 					SUM(b.BetCount) * (CASE	WHEN @drawfilter = 2 AND b.[Status] = 111 THEN 0 ELSE 1 END),
 					SUM(b.CommissionP)
@@ -200,7 +197,7 @@ BEGIN
 
 			UNION ALL
 			-- GD tip
-			SELECT b.rptDate,p.PartyID,b.CurrencyId,0,0,0,0,0,0,0,0
+			SELECT b.rptDate,p.PartyID,b.CurrencyId,0,0,0,0,0
 					,SUM(-b.MemberWL * p.Rate) AS Company 
 					,0 AS Betcount
 					,0 AS commissionP
