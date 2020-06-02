@@ -583,7 +583,7 @@ BEGIN
 		UPDATE #tmpResult SET Discount = LicensingFee - Minfee WHERE (LicensingFee - Discount) < Minfee AND IsApplyMinfeeToDiscount = 1
 	END
 
-	UPDATE #tmpResult SET Discount = 0 WHERE Discount <= 0
+	UPDATE #tmpResult SET Discount = 0 WHERE Discount <= 0 OR (LicensingFee - Discount) < 0
 END
 /*-----------------
  * Rebate

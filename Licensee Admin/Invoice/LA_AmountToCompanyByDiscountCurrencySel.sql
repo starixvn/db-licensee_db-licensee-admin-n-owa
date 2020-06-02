@@ -547,7 +547,9 @@ BEGIN
 		UPDATE @FinalResult SET Discount = FeeByBaseCurrency - Minfee WHERE (FeeByBaseCurrency - Discount) < Minfee AND IsApplyMinfeeToDiscount = 1
 	END
 
-	UPDATE @FinalResult SET Discount = 0 WHERE Discount < 0
+	UPDATE @FinalResult 
+	SET Discount = 0 
+	WHERE Discount < 0 OR (FeeByBaseCurrency - Discount) < 0
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 5. rebate calculation
  *-------------------------------------------------------------------------------------------------------------------------------*/

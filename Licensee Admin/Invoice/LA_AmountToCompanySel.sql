@@ -485,7 +485,9 @@ BEGIN
 		WHERE (Fee - Discount) < Minfee AND IsApplyMinfeeToDiscount = 1 
 	END
 
-	UPDATE @FinalResult SET DiscountRate=0, DiscountRemark='', Discount = 0 WHERE Discount <= 0
+	UPDATE @FinalResult 
+	SET DiscountRate = 0, DiscountRemark='', Discount = 0
+	WHERE Discount <= 0 OR (Fee - Discount) < 0
 
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 5. rebate calculation
