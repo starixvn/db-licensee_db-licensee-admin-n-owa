@@ -38,7 +38,7 @@ BEGIN
 	
 	UPDATE @PartyList
 		SET IsSpecialTreatment = CASE WHEN pst.PartyId IS NULL THEN 0 ELSE 1 END
-	FROM @PartyList p LEFT JOIN (SELECT PartyId FROM dbo.LA_PartySpecialTreatment WITH(NOLOCK) WHERE @CurrentTime BETWEEN FromDate AND ToDate) pst ON p.PartyId = pst.PartyId
+	FROM @PartyList p LEFT JOIN dbo.LA_PartySpecialTreatment pst ON p.PartyID = pst.PartyID AND @CurrentTime BETWEEN pst.FromDate AND pst.ToDate
 	--
 
 	INSERT INTO @PartySettings(DiscountGroupId, PartyId, ProductId)

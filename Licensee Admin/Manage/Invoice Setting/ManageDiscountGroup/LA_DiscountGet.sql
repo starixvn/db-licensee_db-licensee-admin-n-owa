@@ -86,7 +86,7 @@ BEGIN
 			Remark
 	FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
 	INNER JOIN dbo.OAS_Party p WITH(NOLOCK)ON p.PartyID = a.PartyID
-	LEFT JOIN (SELECT PartyId FROM dbo.LA_PartySpecialTreatment WITH(NOLOCK) WHERE @CurrentTime BETWEEN FromDate AND ToDate) pst ON p.PartyID = pst.PartyID
+	LEFT JOIN dbo.LA_PartySpecialTreatment pst ON p.PartyID = pst.PartyID AND @CurrentTime BETWEEN pst.FromDate AND pst.ToDate
 	WHERE DiscountGroupId = @GroupId
 
 	SELECT DiscountGroupId,PartyId,PartyName,IsApplyDiscount,IsSpecialTreatment,Remark 
