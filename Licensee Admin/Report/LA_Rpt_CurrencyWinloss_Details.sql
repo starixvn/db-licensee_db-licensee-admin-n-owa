@@ -159,10 +159,10 @@ BEGIN
 		(
 			SELECT b.rptDate,p.PartyID,b.CurrencyId
 					,SUM(b.Turnover * 
-						(CASE WHEN b.Bettype=33 AND b.[StatusId] IN (114,115) THEN 0.5 ELSE 1 END) *
-						(CASE WHEN @drawfilter IN (2, 3) AND b.[StatusId] = 111  THEN 0
-							  WHEN @drawfilter IN (2, 3) AND b.[StatusId] IN (114,115) THEN 0.5
-							  ELSE 1 END))
+									(CASE	WHEN @drawfilter IN (2, 3) AND b.[StatusId] = 111  THEN 0
+											WHEN @drawfilter IN (2, 3) AND b.[StatusId] IN (114,115) THEN 0.5
+											ELSE 1 
+									 END))
 					,SUM(b.MemberWL + CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END)
 					,SUM(-b.MemberWL - CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END)
 					,0 AS AmtDueToBA
@@ -259,21 +259,21 @@ BEGIN
 					,b.CurrencyID
 					,b.ProductID
 					,SUM(b.Turnover * 
-							(CASE WHEN b.Bettype = 33 AND b.[Status] IN (114,115) THEN 0.5 ELSE 1 END) *
-							(CASE WHEN @drawfilter IN (2, 3) AND b.[Status] = 111  THEN 0
-									WHEN @drawfilter IN (2, 3) AND b.[Status] IN (114,115) AND b.bettype <> 33 THEN 0.5
-									ELSE 1 END)
+									(CASE	WHEN @drawfilter IN (2, 3) AND b.[Status] = 111  THEN 0
+											WHEN @drawfilter IN (2, 3) AND b.[Status] IN (114,115) THEN 0.5
+											ELSE 1 
+									 END)
 						) AS Turnover
-					,SUM(b.winloss) AS winloss
-					,SUM(CASE WHEN b.bettype NOT IN (31,32, 33) THEN -b.winloss ELSE 0 END) AS LicenseeWL
-					,SUM(CASE WHEN b.bettype NOT IN (31,32, 33) THEN -(b.winloss) ELSE CAST(0 AS MONEY) END) AS Company
+					,SUM(b.winloss)		AS winloss
+					,SUM(-b.winloss)	AS LicenseeWL
+					,SUM(-b.winloss)	AS Company
 					,SUM(CASE WHEN @drawfilter = 2 AND b.[Status] = 111 THEN 0 ELSE b.BetCount END) AS BetCount
 					,SUM(CASE WHEN b.ProductId = 32 THEN 0 ELSE b.commissionP END) AS Playercomm
 			FROM #tmpData b
 			LEFT JOIN dbo.League l WITH(NOLOCK) ON b.leagueid = l.leagueid
 			WHERE (@SportType = 0 OR (b.bettype NOT IN (9,29) AND (b.bettype NOT BETWEEN 31 AND 120) AND l.Sporttype = @Sporttype)) AND
 				((@ReportBy = 0) OR
-					(@ReportBy = 1 AND b.IsLive=1 AND b.bettype NOT IN (9,29,10,31,32,33)) OR
+					(@ReportBy = 1 AND b.IsLive=1 AND b.bettype NOT IN (9,29,10)) OR
 					(@ReportBy = 2 AND b.IsLive=0))
 			GROUP BY b.rptDate,b.SiteID,b.CurrencyID,b.ProductID
 					-- need to be group by below fields to avoid decimal fraction mismatch
