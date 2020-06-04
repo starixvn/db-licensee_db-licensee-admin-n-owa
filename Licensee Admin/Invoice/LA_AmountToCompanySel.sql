@@ -350,6 +350,12 @@ BEGIN
 	FROM @tmpMinFee mf INNER JOIN Fee f ON mf.MinFeeId=f.MinFeeId
 	WHERE mf.FeeType=1
 
+	-- Convert null value to 0
+	UPDATE @tmpMinFee
+	SET FeeUnderWaiveTime = CASE WHEN FeeUnderWaiveTime IS NULL THEN 0 ELSE FeeUnderWaiveTime END,
+		FeeOutOfWaiveTime = CASE WHEN FeeOutOfWaiveTime IS NULL THEN 0 ELSE FeeOutOfWaiveTime END
+	WHERE FeeType = 1
+
 	--3.2 calculate total minfee by group
 	DECLARE @TotalMinFees TABLE(
 		PartyGroupId	INT,
