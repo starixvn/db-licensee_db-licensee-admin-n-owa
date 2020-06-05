@@ -53,6 +53,7 @@ AS
 		- 20191125@Mason: Setup billing terms by Currency  [#120005]
 	    - 20191205@Parsons: PP tournament [#123958]
 	    - 20200409@Parsons: Integrate SA Gaming [#129276]
+	    - 20200605@Parsons: Get Full Data For Licensee Groups [#135452]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -534,9 +535,8 @@ BEGIN
 			(CASE WHEN r.TotalFee > 0 THEN r.TotalFee ELSE 0 END) + ISNULL(r.NegativeAmount,0) - ISNULL(r.PromotionSportsbook,0) - ISNULL(r.PromotionOthers,0)	AS TotalLicensingFee,
 			(CASE WHEN p.TotalFee > 0 THEN p.TotalFee ELSE 0 END) + ISNULL(p.NegativeAmount,0) - ISNULL(p.PromotionSportsbook,0) - ISNULL(p.PromotionOthers,0)	AS PreviousTotalLicensingFee
 	FROM	#Result r
-			LEFT JOIN (SELECT * FROM #Result WHERE IsCurrent = 0) p ON r.PartyId = p.PartyId
+			FULL JOIN (SELECT * FROM #Result WHERE IsCurrent = 0) p ON r.PartyId = p.PartyId
 	WHERE	r.IsCurrent = 1 AND r.PartyId IN (SELECT pt.PartyId FROM @PartyIdTable pt WHERE IsSelected = 1)
-		AND (r.BetCount > 0 OR r.SportsbookFee > 0)-- only show party has ticket, don't care previous month
 
 	-- End region
 
