@@ -247,7 +247,7 @@ BEGIN
 	IF(@CurrencyId = 0)
 	BEGIN
 		-- 1.8.1 minfee
-		INSERT INTO @tmpMinFee(FeeType,PartyId,ProductId,CurrencyId,FeeAmountByDiscountBaseCurrency,FeeAmountByBaseCurrency,FromDate,ToDate,MinFeeId)
+		INSERT INTO @tmpMinFee(FeeType,PartyId,ProductId,CurrencyId,FeeAmountByDiscountBaseCurrency,FeeAmountByBaseCurrency,FromDate,ToDate,MinFeeId,FeeUnderWaiveTimeByDiscountBaseCurrency,FeeUnderWaiveTimeByBaseCurrency,FeeOutOfWaiveTimeByDiscountBaseCurrency,FeeOutOfWaiveTimeByBaseCurrency)
 		SELECT mf.FeeTypeId,
 			mf.PartyId,
 			mf.ProductId,
@@ -256,7 +256,8 @@ BEGIN
 			mf.FeeAmount,
 			CASE WHEN @FromDate >= mf.FromDate THEN @FromDate ELSE mf.FromDate END AS FromDate,
 			CASE WHEN @ToDate < mf.ToDate THEN @ToDate ELSE mf.ToDate END AS ToDate,
-			mf.MinFeeId
+			mf.MinFeeId,
+			0,0,0,0
 		FROM dbo.LA_MinFee mf WITH(NOLOCK)
 		INNER JOIN @PartyList p ON mf.PartyId = p.PartyId
 		INNER JOIN @ProductList c ON mf.ProductId=c.ProductID

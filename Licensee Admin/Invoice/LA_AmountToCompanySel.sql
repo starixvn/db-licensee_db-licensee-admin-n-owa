@@ -228,7 +228,7 @@ BEGIN
 	IF(@CurrencyId = 0)
 	BEGIN
 		-- 1.8.1 minfee
-		INSERT INTO @tmpMinFee(FeeType ,PartyId,ProductId, CurrencyId ,FeeAmount ,FromDate ,ToDate, MinFeeId)
+		INSERT INTO @tmpMinFee(FeeType ,PartyId,ProductId, CurrencyId ,FeeAmount ,FromDate ,ToDate, MinFeeId, FeeUnderWaiveTime, FeeOutOfWaiveTime)
 		SELECT mf.FeeTypeId,
 			mf.PartyId,
 			mf.ProductId,
@@ -236,7 +236,8 @@ BEGIN
 			mf.FeeAmount,
 			CASE WHEN @FromDate >= mf.FromDate THEN @FromDate ELSE mf.FromDate END AS FromDate,
 			CASE WHEN @ToDate < mf.ToDate THEN @ToDate ELSE mf.ToDate END AS ToDate,
-			mf.MinFeeId
+			mf.MinFeeId,
+			0,0
 		FROM dbo.LA_MinFee mf WITH(NOLOCK)
 		INNER JOIN @PartyList p ON mf.PartyId = p.PartyId
 		INNER JOIN @ProductList c ON mf.ProductId=c.ProductID
@@ -349,12 +350,6 @@ BEGIN
 		FeeOutOfWaiveTime = CASE WHEN f.FeeOutOfWaiveTime < 0 THEN 0 ELSE f.FeeOutOfWaiveTime END
 	FROM @tmpMinFee mf INNER JOIN Fee f ON mf.MinFeeId=f.MinFeeId
 	WHERE mf.FeeType=1
-
-	-- Convert null value to 0
-	UPDATE @tmpMinFee
-	SET FeeUnderWaiveTime = CASE WHEN FeeUnderWaiveTime IS NULL THEN 0 ELSE FeeUnderWaiveTime END,
-		FeeOutOfWaiveTime = CASE WHEN FeeOutOfWaiveTime IS NULL THEN 0 ELSE FeeOutOfWaiveTime END
-	WHERE FeeType = 1
 
 	--3.2 calculate total minfee by group
 	DECLARE @TotalMinFees TABLE(
