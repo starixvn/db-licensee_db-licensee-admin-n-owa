@@ -751,8 +751,7 @@ BEGIN
 						END)
 	WHERE ExchangeId IN (75, 76, 77, 92)	
 	
-	;WITH sortedExchange AS 
-	(
+	;WITH sortedExchange AS (
 		SELECT ExchangeID, CurrencyCode, ROW_NUMBER() OVER (PARTITION BY CurrencyCode ORDER BY ExchangeId) RowNumber
 		FROM #Exchange
 	)

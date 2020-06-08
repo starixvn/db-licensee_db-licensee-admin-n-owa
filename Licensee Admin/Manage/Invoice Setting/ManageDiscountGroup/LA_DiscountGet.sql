@@ -3,7 +3,7 @@ USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountGet]
-	@GroupId		INT
+	@GroupId INT
 AS
 /*  
 	 Created: 20180628@Parsons [#94282]
@@ -80,9 +80,9 @@ BEGIN
 			p.PartyId,
 			p.PartyName,
 			IsApplyDiscount,
-			Remark
+			Remark 
 	FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
-	INNER JOIN dbo.OAS_Party p WITH(NOLOCK)ON p.PartyID = a.PartyID
+	INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = a.PartyID
 	WHERE DiscountGroupId = @GroupId
 
 	SELECT DiscountGroupId,PartyId,PartyName,IsApplyDiscount,Remark 
