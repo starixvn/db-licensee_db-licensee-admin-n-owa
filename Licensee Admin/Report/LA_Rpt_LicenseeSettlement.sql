@@ -820,7 +820,7 @@ BEGIN
 	INNER JOIN sortedExchange se ON se.CurrencyCode = e.CurrencyCode
 	WHERE se.RowNumber = 1 -- remove duplicate currency codes have different id
 	GROUP BY se.ExchangeID,se.CurrencyCode, e.Rate, d.Game
-	ORDER BY se.ExchangeID 
+	ORDER BY se.ExchangeID	
 
 	DROP TABLE #Exchange
 	DROP TABLE #Result

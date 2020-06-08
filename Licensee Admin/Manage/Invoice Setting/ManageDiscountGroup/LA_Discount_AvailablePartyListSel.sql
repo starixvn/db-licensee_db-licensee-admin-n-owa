@@ -26,7 +26,7 @@ BEGIN
 
 	INSERT INTO @PartyList(PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel
-	
+
 	INSERT INTO @PartySettings(DiscountGroupId, PartyId, ProductId)
 	SELECT DISTINCT h.DiscountGroupId, a.PartyId, dp.ProductId
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
