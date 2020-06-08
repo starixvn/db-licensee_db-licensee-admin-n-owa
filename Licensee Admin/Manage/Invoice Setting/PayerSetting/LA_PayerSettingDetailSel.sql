@@ -210,5 +210,6 @@ BEGIN
 	SELECT c1.ChargeID, c1.CurrencyID, c1.Rate
 	FROM LA_ChargeRateByCurrency c1 WITH(NOLOCK)
 		INNER JOIN @ChargeInfo c2 ON c1.ChargeID = c2.ChargeId
+
 END
 GO

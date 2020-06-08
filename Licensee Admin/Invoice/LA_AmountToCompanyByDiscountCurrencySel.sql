@@ -486,10 +486,8 @@ BEGIN
 	FROM #tmpWinlossData r
 	INNER JOIN @tmpDiscountCurrency c ON c.PartyID=r.PartyId AND c.CurrencyId=r.CurrencyId
 	INNER JOIN #tmpDiscountSettings s ON s.DiscountGroupId=c.DiscountGroupId AND s.ProductId=r.ProductId AND s.PartyId = c.PartyId
-	LEFT JOIN [dbo].[LA_PartySpecialTreatment] st WITH(NOLOCK) ON r.PartyID = st.PartyId AND r.WinlossDate BETWEEN st.FromDate AND st.ToDate
 	WHERE s.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount)
 		AND s.DiscountGroupType IN (@DiscountIndividualFee, @DiscountByGroupFee)
-		AND (st.Id IS NULL OR r.CurrencyId <> 51) -- INH
 	GROUP BY s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId
 
 	DECLARE @Rate TABLE(Rate DECIMAL(6,5), CalculationGroup INT, IsDiscountByCurrency BIT)

@@ -91,7 +91,6 @@ BEGIN
 				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM bodb02.dbo.strSplit(@MinFeeInsertedList, ','))
 			RETURN
 		END
-
 	--Modify Chargerate Setting
 	EXEC dbo.LA_ChargeRateSettingModify
 		@PayerID				= @PayerID
