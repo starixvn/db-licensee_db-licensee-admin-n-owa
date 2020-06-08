@@ -14,7 +14,6 @@ AS
 		- 20180628@Parsons: Get discount groups info [#94282]
 		- 20181022@Parsons: Configure discount settings by currency [#99694]
 		- 20200225@Parsons: Support-HID-currency [#128856]
-		- 20200317@Mason: INH market special handling [#128570]
 
 	 Params:
 
@@ -25,7 +24,6 @@ BEGIN
 	DECLARE @ToBeCalculated TINYINT = 1
 	DECLARE @ToBeDiscounted TINYINT = 0
 	DECLARE @CalculateAndDiscount TINYINT = 10
-	DECLARE @CurrentTime DATETIME = GETDATE()
 
 	--get products which has assigned to group
 	DECLARE 
@@ -75,21 +73,19 @@ BEGIN
 	-- endregion
 
 	--get list of licensees
-	DECLARE @PartyTable AS TABLE(DiscountGroupId SMALLINT, PartyId INT, PartyName VARCHAR(50), IsApplyDiscount BIT, IsSpecialTreatment BIT, Remark NVARCHAR(4000))
+	DECLARE @PartyTable AS TABLE(DiscountGroupId SMALLINT, PartyId INT, PartyName VARCHAR(50), IsApplyDiscount BIT, Remark NVARCHAR(4000))
 	
-	INSERT INTO @PartyTable(DiscountGroupId, PartyId , PartyName, IsApplyDiscount, IsSpecialTreatment, Remark)
+	INSERT INTO @PartyTable(DiscountGroupId, PartyId , PartyName, IsApplyDiscount, Remark)
 	SELECT DiscountGroupId,
 			p.PartyId,
 			p.PartyName,
 			IsApplyDiscount,
-			CASE WHEN pst.PartyId IS NULL THEN 0 ELSE 1 END AS IsSpecialTreatment,
 			Remark
 	FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
 	INNER JOIN dbo.OAS_Party p WITH(NOLOCK)ON p.PartyID = a.PartyID
-	LEFT JOIN dbo.LA_PartySpecialTreatment pst ON p.PartyID = pst.PartyID AND @CurrentTime BETWEEN pst.FromDate AND pst.ToDate
 	WHERE DiscountGroupId = @GroupId
 
-	SELECT DiscountGroupId,PartyId,PartyName,IsApplyDiscount,IsSpecialTreatment,Remark 
+	SELECT DiscountGroupId,PartyId,PartyName,IsApplyDiscount,Remark 
 	FROM @PartyTable
 	--endregion 
 

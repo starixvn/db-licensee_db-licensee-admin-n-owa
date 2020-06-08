@@ -29,7 +29,6 @@ AS
 		- 20190626@Parsons: Validate billing configuration [#109600]
 		- 20180731@Mason: Integrate-Card-Club [#116096]
 		- 20191125@Parsons: Set terms by currency [#FeatureID 120005]
-		- 20200305@Parsons: Special handling for INH market [#FeatureID 128570]
 		
 	 Params:
 		+ @PayerId :specify Party
@@ -211,10 +210,5 @@ BEGIN
 	SELECT c1.ChargeID, c1.CurrencyID, c1.Rate
 	FROM LA_ChargeRateByCurrency c1 WITH(NOLOCK)
 		INNER JOIN @ChargeInfo c2 ON c1.ChargeID = c2.ChargeId
-	
-	-- INH Special treatment
-	SELECT Id, FromDate, ToDate
-	FROM LA_PartySpecialTreatment WITH(NOLOCK)
-	WHERE PartyId = @PayerId
 END
 GO
