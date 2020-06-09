@@ -39,7 +39,6 @@ AS
 
 BEGIN       
     DECLARE @SystemID INT
-	DECLARE @tmpCompany	AS TABLE (ID INT IDENTITY, PartyID INT, ProductID INT)
 	
 	DECLARE @CreditLicensees AS TABLE(PartyId INT)
 	INSERT INTO @CreditLicensees SELECT PartyId FROM dbo.OAS_PartyDetail WITH(NOLOCK) WHERE IsDeposit = 0
@@ -92,18 +91,19 @@ BEGIN
             AND DI.ProductID IN ( SELECT ProductID FROM @ProductTable )
             AND NOT EXISTS ( SELECT 1 FROM dbo.OAS_ChargeInfoSub (NOLOCK) WHERE DI.ChargeID = ChargeIdRef )   
 
-	-- Region: Force get all deposit setting
+	-- Region: Force get all deposit setting(In case of having OW setting only. Ex: AB)
 	BEGIN
-		INSERT INTO @tmpCompany (PartyID, ProductID)
-		SELECT PartyID, ProductID
-		FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)
-			CROSS JOIN @ProductTable pro
-		WHERE PartyName IN ('ONEWorks', 'Boping', 'Zelianta', 'Cozni')
-			AND NOT EXISTS (SELECT 1 FROM @tbChargeInfo c WHERE c.PartyID = p.PartyID AND c.ProductID = pro.ProductID)
-
+		;WITH cte_MissingBillingGroupSetting AS
+		(
+			SELECT PartyID, ProductID
+			FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)
+				CROSS JOIN @ProductTable pro
+			WHERE PartyName IN ('ONEWorks', 'Boping', 'Zelianta', 'Cozni')
+				AND NOT EXISTS (SELECT 1 FROM @tbChargeInfo c WHERE c.PartyID = p.PartyID AND c.ProductID = pro.ProductID)
+		)
 		INSERT INTO @tbChargeInfo(ChargeID, PartyID, ProductID, DI_Rate, ChargeType, IsDeposit, Fromdate, Todate, IsParent)
 		SELECT ChargeID, c.PartyID, c.ProductID, DI_Rate, ChargeType, IsDeposit, Fromdate, Todate, IsParent
-		FROM @tmpCompany c
+		FROM cte_MissingBillingGroupSetting c
 		INNER JOIN @tbChargeInfo ci ON ci.PartyID = 1 AND c.ProductID = ci.ProductID
 	END
 	
