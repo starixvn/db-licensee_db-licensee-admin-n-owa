@@ -28,6 +28,7 @@ AS
 		- 20180702@Parsons: Insert discount groups [#94282]
 		- 20181023@Parsons: Configure-discount-settings-by-currency [#99694]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20200609@Parsons: Special handling for INH market [#128570]
 
 	 Params:
 		@RateSettingsData = '<Root>
@@ -91,7 +92,7 @@ BEGIN
 	END
 
 	DECLARE @Products TABLE (ProductId TINYINT, CalculationType TINYINT)
-	DECLARE @PartySettings	TABLE (PartyId SMALLINT, Remark NVARCHAR(500), IsApplyDiscount BIT) 
+	DECLARE @PartySettings	TABLE (PartyId SMALLINT, Remark NVARCHAR(500), IsApplyDiscount BIT, IsSpecialTreatment BIT) 
 	DECLARE @CurrencySettings	TABLE (PartyId SMALLINT, CurrencyId INT)
 	DECLARE @RateSettings	TABLE (FromAmount MONEY, ToAmount MONEY, Rate MONEY, RowIndex INT)
 	
@@ -117,12 +118,13 @@ BEGIN
 	IF @PartySettingsData <> ''
 	BEGIN
 		EXEC sp_xml_preparedocument @docHandler OUTPUT, @PartySettingsData
-		INSERT INTO @PartySettings(PartyId, Remark, IsApplyDiscount)
-		SELECT PartyId, Remark,  IsApplyDiscount
+		INSERT INTO @PartySettings(PartyId, Remark, IsApplyDiscount, IsSpecialTreatment)
+		SELECT PartyId, Remark,  IsApplyDiscount, IsSpecialTreatment
 		FROM OPENXML(@docHandler, 'Root/PartySetting')
 		WITH (PartyId	INT 'PartyId', 
 				Remark	NVARCHAR(4000) 'Remark', 
-				IsApplyDiscount BIT 'IsApplyDiscount')
+				IsApplyDiscount BIT 'IsApplyDiscount',
+				IsSpecialTreatment BIT 'IsSpecialTreatment')
 	
 		EXEC sp_xml_removedocument @docHandler
 	END
@@ -205,8 +207,8 @@ BEGIN
 	END
 
 	--insert discount group assignment
-	INSERT INTO dbo.LA_DiscountGroupAssignment(DiscountGroupId, PartyID, Remark, IsApplyDiscount)
-	SELECT DISTINCT @GroupIdOut, PartyId, Remark, IsApplyDiscount
+	INSERT INTO dbo.LA_DiscountGroupAssignment(DiscountGroupId, PartyID, Remark, IsApplyDiscount, IsSpecialTreatment)
+	SELECT DISTINCT @GroupIdOut, PartyId, Remark, IsApplyDiscount, IsSpecialTreatment
 	FROM @PartySettings
 
 	IF @@ERROR <> 0

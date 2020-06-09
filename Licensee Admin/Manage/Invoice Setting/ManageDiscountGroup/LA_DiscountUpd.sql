@@ -28,6 +28,7 @@ AS
 		- 20180704@Parsons: Update discount groups [#94282]
 		- 20181023@Parsons: Configure-discount-settings-by-currency [#99694]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20200609@Parsons: Special handling for INH market [#128570]
 
 	 Params:
 		@RateSettingsData = '<Root>
@@ -50,11 +51,13 @@ AS
 									<PartyId>1</PartyId>
 									<Remark>hello1</Remark>
 									<IsApplyDiscount>1</IsApplyDiscount>
+									<IsSpecialTreatment>1</IsSpecialTreatment>
 								</PartySetting>
 								<PartySetting>
 									<PartyId>2</PartyId>
 									<Remark>hello2</Remark>
 									<IsApplyDiscount>0</IsApplyDiscount>
+									<IsSpecialTreatment>0</IsSpecialTreatment>
 								</PartySetting>
 							</Root>'
 		@CurrencySettingsData = '<Root>
@@ -95,7 +98,7 @@ BEGIN
 	END
 
 	DECLARE @Products TABLE (ProductId TINYINT, CalculationType TINYINT)
-	DECLARE @PartySettings	TABLE (PartyId SMALLINT, Remark NVARCHAR(500), IsApplyDiscount BIT)
+	DECLARE @PartySettings	TABLE (PartyId SMALLINT, Remark NVARCHAR(500), IsApplyDiscount BIT, IsSpecialTreatment BIT)
 	DECLARE @CurrencySettings	TABLE (PartyId SMALLINT, CurrencyId INT)
 	DECLARE @RateSettings	TABLE (DiscountDetailId SMALLINT, FromAmount MONEY, ToAmount MONEY, Rate MONEY, RowIndex INT)
 	
@@ -120,12 +123,13 @@ BEGIN
 	IF @PartySettingsData <> ''
 	BEGIN
 		EXEC sp_xml_preparedocument @docHandler OUTPUT, @PartySettingsData
-		INSERT INTO @PartySettings(PartyId, Remark, IsApplyDiscount)
-		SELECT PartyId, Remark,  IsApplyDiscount
+		INSERT INTO @PartySettings(PartyId, Remark, IsApplyDiscount, IsSpecialTreatment)
+		SELECT PartyId, Remark,  IsApplyDiscount, IsSpecialTreatment
 		FROM OPENXML(@docHandler, 'Root/PartySetting')
 		WITH (PartyId	INT 'PartyId', 
 				Remark	NVARCHAR(4000) 'Remark', 
-				IsApplyDiscount BIT 'IsApplyDiscount')
+				IsApplyDiscount BIT 'IsApplyDiscount',
+				IsSpecialTreatment BIT 'IsSpecialTreatment')
 	
 		EXEC sp_xml_removedocument @docHandler
 	END
@@ -203,10 +207,10 @@ BEGIN
 	USING @PartySettings AS s
 	ON (t.DiscountGroupId = @DiscountGroupId AND t.PartyId = s.PartyId)
 	WHEN NOT MATCHED BY TARGET
-		THEN INSERT(DiscountGroupId, PartyID, Remark, IsApplyDiscount)
-				VALUES(@DiscountGroupId, s.PartyId, s.Remark, s.IsApplyDiscount)
+		THEN INSERT(DiscountGroupId, PartyID, Remark, IsApplyDiscount, IsSpecialTreatment)
+				VALUES(@DiscountGroupId, s.PartyId, s.Remark, s.IsApplyDiscount, s.IsSpecialTreatment)
 	WHEN MATCHED
-		THEN UPDATE SET Remark = s.Remark, IsApplyDiscount = s.IsApplyDiscount
+		THEN UPDATE SET Remark = s.Remark, IsApplyDiscount = s.IsApplyDiscount, IsSpecialTreatment = s.IsSpecialTreatment
 	WHEN NOT MATCHED BY SOURCE AND t.DiscountGroupId = @DiscountGroupId
 		THEN DELETE;
 
