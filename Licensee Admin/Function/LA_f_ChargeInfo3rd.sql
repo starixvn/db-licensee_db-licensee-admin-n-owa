@@ -59,17 +59,7 @@ BEGIN
     FROM    bodb02.dbo.strSplit(@ProductCodes, ',') s
             LEFT JOIN dbo.Product3rd p3 WITH ( NOLOCK ) ON s.val = p3.ProductPrefix	
 
-    INSERT  INTO @tbChargeInfo
-								( ChargeID ,
-									PartyID ,
-									ProductID ,
-									DI_Rate ,
-									ChargeType ,
-									IsDeposit,
-									Fromdate ,
-									Todate,
-									IsParent
-								)
+    INSERT  INTO @tbChargeInfo(ChargeID, PartyID, ProductID, DI_Rate, ChargeType, IsDeposit, Fromdate, Todate, IsParent)
     SELECT  DI.ChargeID ,
             CASE WHEN Di.FromParty IN (1, 11, 98, 9) THEN DI.FromParty 
 				 WHEN cl.PartyID IS NOT NULL THEN 999 
@@ -102,10 +92,8 @@ BEGIN
             AND DI.ProductID IN ( SELECT ProductID FROM @ProductTable )
             AND NOT EXISTS ( SELECT 1 FROM dbo.OAS_ChargeInfoSub (NOLOCK) WHERE DI.ChargeID = ChargeIdRef )   
 
-	-- Force get all deposit setting
+	-- Region: Force get all deposit setting
 	BEGIN
-		DECLARE @PartyID INT, @ProductID INT, @n INT, @m INT
-
 		INSERT INTO @tmpCompany (PartyID, ProductID)
 		SELECT PartyID, ProductID
 		FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)
@@ -113,31 +101,13 @@ BEGIN
 		WHERE PartyName IN ('ONEWorks', 'Boping', 'Zelianta', 'Cozni')
 			AND NOT EXISTS (SELECT 1 FROM @tbChargeInfo c WHERE c.PartyID = p.PartyID AND c.ProductID = pro.ProductID)
 
-		SELECT @n = 1
-			  ,@m = MAX(ID) FROM @tmpCompany
-	
-		WHILE (@n <= @m)	  
-		BEGIN
-			SELECT @PartyID = PartyID, @ProductID = ProductID FROM @tmpCompany WHERE ID = @n
-			INSERT INTO @tbChargeInfo
-					( ChargeID ,
-					  PartyID ,
-					  ProductID ,
-					  DI_Rate ,
-					  ChargeType ,
-					  IsDeposit ,
-					  Fromdate ,
-					  Todate,
-					  IsParent
-					)
-			SELECT ChargeID, @PartyID, ProductID, DI_Rate, ChargeType, IsDeposit, Fromdate, Todate, IsParent
-			FROM @tbChargeInfo
-			WHERE PartyID = 1 AND ProductID = @ProductID
-		
-			SET @n = @n + 1 	
-		END
+		INSERT INTO @tbChargeInfo(ChargeID, PartyID, ProductID, DI_Rate, ChargeType, IsDeposit, Fromdate, Todate, IsParent)
+		SELECT ChargeID, c.PartyID, c.ProductID, DI_Rate, ChargeType, IsDeposit, Fromdate, Todate, IsParent
+		FROM @tmpCompany c
+		INNER JOIN @tbChargeInfo ci ON ci.PartyID = 1 AND c.ProductID = ci.ProductID
 	END
-
+	
+	-- End-Region: Force get all deposit setting
 	RETURN;  
 END;
 GO
