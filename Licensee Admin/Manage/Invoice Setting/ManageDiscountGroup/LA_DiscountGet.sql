@@ -14,6 +14,7 @@ AS
 		- 20180628@Parsons: Get discount groups info [#94282]
 		- 20181022@Parsons: Configure discount settings by currency [#99694]
 		- 20200225@Parsons: Support-HID-currency [#128856]
+		- 20200609@Mason: Special handling for INH market [#128570]
 
 	 Params:
 
@@ -86,7 +87,7 @@ BEGIN
 	INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = a.PartyID
 	WHERE DiscountGroupId = @GroupId
 
-	SELECT DiscountGroupId,PartyId,PartyName,IsApplyDiscount,Remark, IsSpecialTreatment
+	SELECT DiscountGroupId,PartyId,PartyName,IsApplyDiscount,Remark,IsSpecialTreatment
 	FROM @PartyTable
 	--endregion 
 

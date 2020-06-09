@@ -54,6 +54,7 @@ AS
 	    - 20191205@Parsons: PP tournament [#123958]
 	    - 20200409@Parsons: Integrate SA Gaming [#129276]
 	    - 20200605@Parsons: Get Full Data For Licensee Groups [#135452]
+		- 20200609@Parsons: Special handling for INH market [#128570]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
