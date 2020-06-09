@@ -73,19 +73,20 @@ BEGIN
 	-- endregion
 
 	--get list of licensees
-	DECLARE @PartyTable AS TABLE(DiscountGroupId SMALLINT, PartyId INT, PartyName VARCHAR(50), IsApplyDiscount BIT, Remark NVARCHAR(4000))
+	DECLARE @PartyTable AS TABLE(DiscountGroupId SMALLINT, PartyId INT, PartyName VARCHAR(50), IsApplyDiscount BIT, Remark NVARCHAR(4000), IsSpecialTreatment BIT)
 	
-	INSERT INTO @PartyTable(DiscountGroupId, PartyId , PartyName, IsApplyDiscount, Remark)
+	INSERT INTO @PartyTable(DiscountGroupId, PartyId , PartyName, IsApplyDiscount, Remark, IsSpecialTreatment)
 	SELECT DiscountGroupId,
 			p.PartyId,
 			p.PartyName,
 			IsApplyDiscount,
-			Remark 
+			Remark,
+			a.IsSpecialTreatment
 	FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
 	INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = a.PartyID
 	WHERE DiscountGroupId = @GroupId
 
-	SELECT DiscountGroupId,PartyId,PartyName,IsApplyDiscount,Remark 
+	SELECT DiscountGroupId,PartyId,PartyName,IsApplyDiscount,Remark, IsSpecialTreatment
 	FROM @PartyTable
 	--endregion 
 
