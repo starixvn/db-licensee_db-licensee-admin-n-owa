@@ -440,6 +440,15 @@ BEGIN
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'RNGW')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 50
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 5500 AND 5599
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+	END
+
 	RETURN
 END
 GO
