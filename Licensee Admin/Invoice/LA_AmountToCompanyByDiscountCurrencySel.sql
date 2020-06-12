@@ -463,13 +463,12 @@ BEGIN
 		CurrencyId			INT,
 		Winloss				MONEY,
 		Fee 				MONEY,
-		IsDiscountByCurrency BIT,
 		FeeBase 				MONEY
 	)
 
 	-- 4.1 discount by all currency
-	INSERT INTO @tmpDiscountCalculation(CalculationGroup,DiscountGroupId,DiscountGroupType,CurrencyId,Winloss,Fee,IsDiscountByCurrency)
-	SELECT s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId, SUM(r.WinlossByDiscountBaseCurrency),SUM(r.FeeByDiscountBaseCurrency),0
+	INSERT INTO @tmpDiscountCalculation(CalculationGroup,DiscountGroupId,DiscountGroupType,CurrencyId,Winloss,Fee)
+	SELECT s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId, SUM(r.WinlossByDiscountBaseCurrency),SUM(r.FeeByDiscountBaseCurrency)
 	FROM #tmpDiscountSettings s
 	INNER JOIN @tmpDiscountCurrency c ON s.PartyId = c.PartyId AND c.DiscountGroupId=s.DiscountGroupId AND c.CurrencyId = 0 -- all currency
 	INNER JOIN @FinalResult r ON s.PartyID = r.PartyId AND s.ProductId=r.ProductId
@@ -478,8 +477,8 @@ BEGIN
 
 	-- 4.2 discount by currency
 	-- only offer discount for licensing fee
-	INSERT INTO @tmpDiscountCalculation(CalculationGroup,DiscountGroupId,DiscountGroupType,CurrencyId,IsDiscountByCurrency,Winloss,Fee,FeeBase)
-	SELECT s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId,1,
+	INSERT INTO @tmpDiscountCalculation(CalculationGroup,DiscountGroupId,DiscountGroupType,CurrencyId,Winloss,Fee,FeeBase)
+	SELECT s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId,
 		SUM(r.WinlossByDiscountBaseCurrency),
 		SUM(r.AmountToCompanyByDiscountBaseCurrency),
 		SUM(r.AmountToCompanyByBaseCurrency)
@@ -490,8 +489,8 @@ BEGIN
 		AND s.DiscountGroupType IN (@DiscountIndividualFee, @DiscountByGroupFee)
 	GROUP BY s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId
 
-	DECLARE @Rate TABLE(Rate DECIMAL(6,5), CalculationGroup INT, IsDiscountByCurrency BIT)
 
+	DECLARE @Rate TABLE(Rate DECIMAL(6,5), CalculationGroup INT, DiscountGroupType INT)
 	-- 4.3 get rate
 	;WITH cte_Detail AS(
 		SELECT c.CalculationGroup, d.DiscountGroupId, d.Rate
@@ -500,9 +499,11 @@ BEGIN
 		FROM dbo.LA_DiscountGroupDetail d WITH(NOLOCK)
 		INNER JOIN @tmpDiscountCalculation c ON d.DiscountGroupId=c.DiscountGroupId
 	)
-	INSERT INTO @Rate(rate, CalculationGroup,IsDiscountByCurrency)
-	SELECT d.Rate, c.CalculationGroup, c.IsDiscountByCurrency
-	FROM @tmpDiscountCalculation c INNER JOIN cte_Detail d ON c.CalculationGroup=d.CalculationGroup
+	INSERT INTO @Rate(rate, CalculationGroup, DiscountGroupType)
+	SELECT d.Rate, c.CalculationGroup, c.DiscountGroupType
+	FROM 
+		(SELECT CalculationGroup, DiscountGroupType, SUM(Fee) Fee, SUM(Winloss) Winloss FROM @tmpDiscountCalculation GROUP BY CalculationGroup, DiscountGroupType) c 
+	INNER JOIN cte_Detail d ON c.CalculationGroup=d.CalculationGroup
 	WHERE (
 			c.DiscountGroupType IN (@DiscountByGroupFee, @DiscountIndividualFee) AND
 			c.Fee >= d.FromAmount AND c.Fee < d.ToAmount
@@ -521,7 +522,6 @@ BEGIN
 	INNER JOIN @Rate c ON c.CalculationGroup = s.CalculationGroup
 	WHERE s.CalculationType IN (@ToBeDiscounted,@CalculateAndDiscount) 
 		AND s.IsApplyDiscount = 1
-		AND c.IsDiscountByCurrency = 0
 
 	-- 4.5 discount by curency
 	-- not support gross win
