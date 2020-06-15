@@ -1,7 +1,4 @@
 /*<info serverAlias="DBLIC-bodb_licensee,DBACC-bodb_licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
-USE bodb_licensee
-GO
-
 ALTER FUNCTION [dbo].[LA_f_ChargeInfo3rd]
     (
       @FromDate DATETIME ,
@@ -35,12 +32,13 @@ AS
 		- 20180508@Harper: Change PayToSupplier term of Exchange product [RedmineID: #94281]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20190718@Bruce: Integrate CN88 data in LA [#116859]
+		- 20200529@Percy: Add condition by productID for get all deposit setting [RedmineID: #134867]
+
     Param's Explanation: 
 */  
 
 BEGIN       
     DECLARE @SystemID INT
-	DECLARE @tmpCompany	AS TABLE (ID INT IDENTITY, PartyID INT)
 	
 	DECLARE @CreditLicensees AS TABLE(PartyId INT)
 	INSERT INTO @CreditLicensees SELECT PartyId FROM dbo.OAS_PartyDetail WITH(NOLOCK) WHERE IsDeposit = 0
@@ -60,21 +58,11 @@ BEGIN
     FROM    bodb02.dbo.strSplit(@ProductCodes, ',') s
             LEFT JOIN dbo.Product3rd p3 WITH ( NOLOCK ) ON s.val = p3.ProductPrefix	
 
-    INSERT  INTO @tbChargeInfo
-								( ChargeID ,
-									PartyID ,
-									ProductID ,
-									DI_Rate ,
-									ChargeType ,
-									IsDeposit,
-									Fromdate ,
-									Todate,
-									IsParent
-								)
+    INSERT  INTO @tbChargeInfo(ChargeID, PartyID, ProductID, DI_Rate, ChargeType, IsDeposit, Fromdate, Todate, IsParent)
     SELECT  DI.ChargeID ,
             CASE WHEN Di.FromParty IN (1, 11, 98, 9) THEN DI.FromParty 
 				 WHEN cl.PartyID IS NOT NULL THEN 999 
-				 ELSE Di. FromParty END,
+				 ELSE Di.FromParty END,
             DI.ProductID ,
             DI.Rate ,
             DI.ChargeType ,
@@ -103,39 +91,23 @@ BEGIN
             AND DI.ProductID IN ( SELECT ProductID FROM @ProductTable )
             AND NOT EXISTS ( SELECT 1 FROM dbo.OAS_ChargeInfoSub (NOLOCK) WHERE DI.ChargeID = ChargeIdRef )   
 
-
-	DECLARE @PartyID INT, @n INT, @m INT
-
-	INSERT INTO @tmpCompany (PartyID)
-	SELECT PartyID
-	FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)
-	WHERE PartyName IN ('ONEWorks','Boping', 'Zelianta', 'Cozni')
-		AND NOT EXISTS (SELECT 1 FROM @tbChargeInfo WHERE PartyID = p.PartyID)
-
-	SELECT @n = 1
-		  ,@m = MAX(ID) FROM @tmpCompany
-	
-	WHILE (@n <= @m)	  
+	-- Region: Force get all deposit setting(In case of having OW setting only. Ex: AB)
 	BEGIN
-		SELECT @PartyID = PartyID FROM @tmpCompany WHERE ID = @n
-		INSERT INTO @tbChargeInfo
-		        ( ChargeID ,
-		          PartyID ,
-		          ProductID ,
-		          DI_Rate ,
-		          ChargeType ,
-		          IsDeposit ,
-		          Fromdate ,
-		          Todate,
-				  IsParent
-		        )
-		SELECT ChargeID, @PartyID, ProductID, DI_Rate, ChargeType, IsDeposit, Fromdate, Todate, IsParent
-		FROM @tbChargeInfo
-		WHERE PartyID = 1
-		
-		SET @n = @n + 1 	
+		;WITH cte_MissingBillingGroupSetting AS
+		(
+			SELECT PartyID, ProductID
+			FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)
+				CROSS JOIN @ProductTable pro
+			WHERE PartyName IN ('ONEWorks', 'Boping', 'Zelianta', 'Cozni')
+				AND NOT EXISTS (SELECT 1 FROM @tbChargeInfo c WHERE c.PartyID = p.PartyID AND c.ProductID = pro.ProductID)
+		)
+		INSERT INTO @tbChargeInfo(ChargeID, PartyID, ProductID, DI_Rate, ChargeType, IsDeposit, Fromdate, Todate, IsParent)
+		SELECT ChargeID, c.PartyID, c.ProductID, DI_Rate, ChargeType, IsDeposit, Fromdate, Todate, IsParent
+		FROM cte_MissingBillingGroupSetting c
+		INNER JOIN @tbChargeInfo ci ON ci.PartyID = 1 AND c.ProductID = ci.ProductID
 	END
-
-   RETURN;  
+	
+	-- End-Region: Force get all deposit setting
+	RETURN;  
 END;
 GO
