@@ -3,7 +3,7 @@ USE [bodb02]
 GO
 
 ALTER PROCEDURE [dbo].[LA_SporttypeListSel](
-	@ProductCodes VARCHAR(500)
+	@ProductCodes VARCHAR(200)
 )
 AS
 
@@ -15,7 +15,6 @@ AS
 	
 	Revisions:
 		- 20170816@Percy: Change data type of Sporttype [RedmineID: #73545]
-		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 */
 
 BEGIN

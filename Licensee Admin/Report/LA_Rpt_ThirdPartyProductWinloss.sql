@@ -3,7 +3,7 @@ USE [bodb02]
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_ThirdPartyProductWinloss] 
-	@ProductCodes		VARCHAR(500)	
+	@ProductCodes		VARCHAR(100)	
 	, @Recommend		VARCHAR(8000)	= ''
 	, @Currency 		INT 			= 0
 	, @DrawFilter		TINYINT			= 1
@@ -18,7 +18,6 @@ AS
     
 	Revisions:
 		- 20150326@Florent: Initialize SP
-		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 
 	Param's Explanation:  
 		@DrawFilter :	1 Normal

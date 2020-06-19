@@ -6,7 +6,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 ALTER PROCEDURE [dbo].[LA_Rpt_3rdProductWinloss] 
-	@ProductCodes		VARCHAR(500)	
+	@ProductCodes		VARCHAR(100)	
 	, @Recommend		VARCHAR(MAX)	= ''
 	, @Currency 		INT 			= 0
 	, @FromDate 		SMALLDATETIME
@@ -21,7 +21,6 @@ AS
     DB: DBACC.bodb02  
     Revisions:  		
 		- 20150518@Florent: Add param @DrawFilter
-		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 	Param's Explanation:  
 */
 SET NOCOUNT ON

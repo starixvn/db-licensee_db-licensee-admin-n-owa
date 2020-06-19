@@ -24,13 +24,12 @@ AS
 		- 20170220@bruce: update payer settings [#70050]
 		- 20180706@bruce: enhance discount group [#94282]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
-		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 
 	 Params:				
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @ProductListAll		VARCHAR(500) = ''
+	DECLARE @ProductListAll		VARCHAR(100) = ''
 			, @MinDate			DATE 
 			, @MaxDate			DATE
 	

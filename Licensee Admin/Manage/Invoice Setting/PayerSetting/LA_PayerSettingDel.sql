@@ -17,7 +17,6 @@ AS
    
 	 Revisions:     
 		- 20180716@bruce: add new group TEST for credit [#98126]
-		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 		
 	 Params:		
 
@@ -28,7 +27,7 @@ BEGIN
 	SET NOCOUNT ON
 	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData VARCHAR(5000), @logSPDataOld VARCHAR(5000),	@xml XML	
 	SET @startRun = GETDATE()
-	DECLARE @ProductListAll		VARCHAR(500) = ''		
+	DECLARE @ProductListAll		VARCHAR(100) = ''		
 		, @MinDate				DATE 
 		, @MaxDate				DATE
 		, @DiscountGroupId		INT

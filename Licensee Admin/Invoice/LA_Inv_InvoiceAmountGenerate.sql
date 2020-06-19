@@ -56,7 +56,6 @@ AS
 		- 20181002@Parsons: Integrate AG setup fee into invoices [#98485]
 		- 20200228@Parsons: Support-HID-currency [#128856]
 		- 20200406@Parsons: Issue rebate worksheet [#131874]
-		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -631,7 +630,7 @@ BEGIN
 		-- Region: Select data	
 		DECLARE	@FinalResult TABLE(
 				ProductId		INT,
-				ProductCode		VARCHAR(500),
+				ProductCode		VARCHAR(100),
 				ProductName		VARCHAR(500),
 				Remark			NVARCHAR(4000),
 				InvoiceAmount	MONEY,

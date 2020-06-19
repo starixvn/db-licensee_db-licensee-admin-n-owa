@@ -15,7 +15,6 @@ AS
 	 DB: DB052.bodb_Licensee
 	 Revisions:     
 		- 20180716@bruce: add new group TEST for credit [#98126]
-		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 	 Params:
 		+ @ChargeId : = 0 check all charge infor of Party
 		+ @Mode : 
@@ -27,7 +26,7 @@ BEGIN
 	IF ISNULL(@PayerIdList , '') = '' OR ISNULL(@ChargeId, 0) = 0
 		RETURN
 
-	DECLARE @PayerNameList VARCHAR(4000), @ProductListAll VARCHAR(500) = '', @MinDate DATE , @MaxDate DATE
+	DECLARE @PayerNameList VARCHAR(4000), @ProductListAll VARCHAR(100) = '', @MinDate DATE , @MaxDate DATE
 	
 	DECLARE @ChargeRate AS TABLE (ChargeId INT, PartyId INT, ProductId INT, FromDate DATE, ToDate DATE)	
 	--get list Product

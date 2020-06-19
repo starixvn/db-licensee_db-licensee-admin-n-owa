@@ -23,7 +23,6 @@ AS
 		- 20150917@Victor: Support Chinese on Settings
 		- 20170220@bruce: refactor sp [#70050]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
-		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 
 	 Params:
 		+ @InvoiceSettingXML: '<MinFeeSettings>
@@ -52,7 +51,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX),	@xml XML
-	DECLARE @ProductListAll		VARCHAR(500) = ''
+	DECLARE @ProductListAll		VARCHAR(100) = ''
 			, @MinDate			DATE 
 			, @MaxDate			DATE
 	SET @startRun = GETDATE()

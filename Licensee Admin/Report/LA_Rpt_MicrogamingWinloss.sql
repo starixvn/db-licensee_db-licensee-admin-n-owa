@@ -20,7 +20,6 @@ AS
 		- 20160530@Forrest: Update new formula
 		- 20171219@Bruce: increase length for variables [#88197]
 		- 20180716@bruce: add new group TEST for credit [#98126]
-		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 	
 	Param's Explanation:
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -35,7 +34,7 @@ SET NOCOUNT ON
 BEGIN
 	-- Region Default Constant
 
-	DECLARE @ProductCodes VARCHAR(500)
+	DECLARE @ProductCodes VARCHAR(50)
 
 	-- Endregion
 
