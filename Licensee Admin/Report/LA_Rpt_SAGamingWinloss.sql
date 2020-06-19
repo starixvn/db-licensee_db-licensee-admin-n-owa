@@ -66,6 +66,15 @@ BEGIN
 		SELECT DISTINCT ChargeId, PartyID, LicenseeId, ProductId, CASE WHEN IsDeposit=1 THEN DI_Rate ELSE 0 END, IsDeposit, Fromdate, Todate, 0, ChargeType
 		FROM dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'SAG')
 	)
+	
+	-- Region: Update ParentId of Expired Group Accordingly
+	UPDATE p
+	SET p.ParentId = ci.ToParty
+	FROM @PartyList p
+	INNER JOIN #ChargeInfo c ON p.PartyId = c.PartyId
+	INNER JOIN OAS_ChargeInfo ci WITH(NOLOCK) ON c.ChargeId = ci.ChargeID
+	WHERE p.ParentId IN (1,9,11,98)
+	-- End-Region: Update ParentId of Expired Group Accordingly
 
 	-- Region: Insert Rate3rd for Credit's charge rate
 	INSERT INTO #ChargeInfo(PartyId, LicenseeId, ProductId, Rate, IsDeposit, ChargeType, IsPayToSupplier, Fromdate, Todate)
