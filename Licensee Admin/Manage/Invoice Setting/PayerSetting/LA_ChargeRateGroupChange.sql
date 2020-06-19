@@ -20,6 +20,7 @@ AS
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20190801@Parsons: Validate billing configuration [#109600]
 		- 20200113@Parsons: Billing term by currency [#120005]
+		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 
 	Params:
 	Example:
@@ -36,7 +37,7 @@ BEGIN
 	SET @StartRun = GETDATE()
 
 	DECLARE @IsActived INT = 1, @IsActivating INT = 2, @IsExpired INT = 3
-	DECLARE @ProductListAll	VARCHAR(100) = '', @MinDate DATE, @MaxDate	DATE	
+	DECLARE @ProductListAll	VARCHAR(500) = '', @MinDate DATE, @MaxDate	DATE	
 	
 	SELECT @ProductListAll = @ProductListAll + ProductPrefix + ','
 	FROM dbo.LA_f_Products3rd('')

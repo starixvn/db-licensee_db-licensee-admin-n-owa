@@ -6,7 +6,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceDetailInfoGet]
 	 @PartyId			INT,  
 	 @FromDate			DATETIME,
 	 @ToDate			DATETIME,  
-	 @ProductCode		VARCHAR(200),
+	 @ProductCode		VARCHAR(500),
 	 @CurrencyId		INT			= 0	,
 	 @BaseCurrencyName VARCHAR(20)	= 'GBP'
 AS
@@ -18,6 +18,7 @@ AS
 	Revisions: 
 		+ 2015.08.07: Invoice Detail Info - Get
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 */
 /*	Example:
 	USE bodb_licensee

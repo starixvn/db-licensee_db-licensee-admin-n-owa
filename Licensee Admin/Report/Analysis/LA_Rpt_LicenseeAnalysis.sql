@@ -1,7 +1,7 @@
 /*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeAnalysis]
 	@PartyIDs		VARCHAR(4000),
-	@ProductCodes	VARCHAR(200),
+	@ProductCodes	VARCHAR(500),
 	@FromDate		SMALLDATETIME,
 	@ToDate			SMALLDATETIME,
 	@BaseCurrency	VARCHAR(20)		= 'EUR',
@@ -24,6 +24,7 @@ AS
 		- 20191010@Percy: Replace LicenseeBATransaction to LicenseeBATransaction_active [RedmineID: #103656]
 		- 20191205@Mason: PP tournament [#123958]
 		- 20190206@Mason: Set billing term by currency [#120005]
+		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 
 	Notes: @FromDate, @ToDate should be a full month range
 	Example :  EXEC LA_Rpt_LicenseeAnalysis  @PartyIDs = '73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88', 

@@ -21,13 +21,14 @@ AS
 		- 20150917@Victor: Support Chinese on Settings
 		- 20161101@bruce.bui: support delete multiple rate
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 		
 	 Params:				
 */
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX),	@xml XML
-	DECLARE @ProductListAll		VARCHAR(100) = ''
+	DECLARE @ProductListAll		VARCHAR(500) = ''
 			, @MinDate			DATE 
 			, @MaxDate			DATE
 	SET @startRun = GETDATE()

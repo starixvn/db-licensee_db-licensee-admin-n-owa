@@ -19,13 +19,14 @@ AS
 	 Task : Delete discount setting
 	 DB: DB052.bodb_Licensee  
    
-	 Revisions:     
+	 Revisions:   
+		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 	 Params:				
 */
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData VARCHAR(5000), @logSPDataOld VARCHAR(5000),	@xml XML
-	DECLARE @ProductListAll		VARCHAR(100) = ''
+	DECLARE @ProductListAll		VARCHAR(500) = ''
 			, @MinDate			DATE 
 			, @MaxDate			DATE
 	DECLARE @Discount AS TABLE(Idx INT IDENTITY(1,1), DiscountGroupId INT, PartyId INT)

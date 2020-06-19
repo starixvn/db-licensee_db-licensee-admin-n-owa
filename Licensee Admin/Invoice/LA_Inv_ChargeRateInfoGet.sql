@@ -6,7 +6,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_ChargeRateInfoGet]
 	 @PartyId			INT,  
 	 @FromDate			DATETIME,
 	 @ToDate			DATETIME,  
-	 @ProductCodes		VARCHAR(200),
+	 @ProductCodes		VARCHAR(500),
 	 @CurrencyId		INT			= 0	,
 	 @BaseCurrencyName VARCHAR(20)	= 'GBP'
 AS
@@ -20,6 +20,7 @@ AS
 		+ 20170802@Bruce: @ProductCode => @ProductCodes [#79905]
 		+ 20180716@bruce: add new group TEST for credit [#98126]
 		+ 20190102@bruce: include charge type [#107363]
+		+ 20200619@Happy: Increase the length of @ProductCode params [#128570]
 */
 /*	Example:
 	USE bodb_licensee

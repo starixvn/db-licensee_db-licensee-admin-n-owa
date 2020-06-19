@@ -8,7 +8,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
 	@InvoiceTypeId		INT,
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
-	@ProductCodes		VARCHAR(100),
+	@ProductCodes		VARCHAR(500),
 	@Environment		VARCHAR(50),
 	@ErrCode			INT				= 0		OUTPUT,
 	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT,
@@ -56,6 +56,7 @@ AS
 		- 20181002@Parsons: Integrate AG setup fee into invoices [#98485]
 		- 20200228@Parsons: Support-HID-currency [#128856]
 		- 20200406@Parsons: Issue rebate worksheet [#131874]
+		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -267,7 +268,7 @@ BEGIN
 		
 	IF @InvoiceTypeId = 3 -- rebate
 	BEGIN
-		DECLARE @ProductCodeString VARCHAR(100) = ''
+		DECLARE @ProductCodeString VARCHAR(500) = ''
 		SELECT  @ProductCodeString = @ProductCodeString + p.ProductCode + ','
 		FROM(
 				SELECT	CASE 
@@ -630,7 +631,7 @@ BEGIN
 		-- Region: Select data	
 		DECLARE	@FinalResult TABLE(
 				ProductId		INT,
-				ProductCode		VARCHAR(100),
+				ProductCode		VARCHAR(500),
 				ProductName		VARCHAR(500),
 				Remark			NVARCHAR(4000),
 				InvoiceAmount	MONEY,
