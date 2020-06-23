@@ -8,7 +8,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
 	@InvoiceTypeId		INT,
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
-	@ProductCodes		VARCHAR(100),
+	@ProductCodes		VARCHAR(500),
 	@Environment		VARCHAR(50),
 	@ErrCode			INT				= 0		OUTPUT,
 	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT,
@@ -267,7 +267,7 @@ BEGIN
 		
 	IF @InvoiceTypeId = 3 -- rebate
 	BEGIN
-		DECLARE @ProductCodeString VARCHAR(100) = ''
+		DECLARE @ProductCodeString VARCHAR(500) = ''
 		SELECT  @ProductCodeString = @ProductCodeString + p.ProductCode + ','
 		FROM(
 				SELECT	CASE 

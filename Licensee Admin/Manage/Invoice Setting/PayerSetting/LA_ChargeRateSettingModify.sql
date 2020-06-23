@@ -31,6 +31,7 @@ AS
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658] 
 		- 20190801@Parsons: Validate billing configuration [#109600]
 		- 20200417@Parsons: Indo 4D Integration [#130910]
+		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 
 	 Params:
 		+ @InvoiceSettingXML: '<ChargeSettings>
@@ -61,7 +62,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX),	@xml XML
-	DECLARE @ProductListAll		VARCHAR(100) = ''
+	DECLARE @ProductListAll		VARCHAR(500) = ''
 			, @MinDate			DATE
 			, @MaxDate			DATE
 	SET @startRun = GETDATE()

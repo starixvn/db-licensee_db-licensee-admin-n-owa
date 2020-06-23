@@ -54,6 +54,7 @@ AS
 	    - 20191205@Parsons: PP tournament [#123958]
 	    - 20200409@Parsons: Integrate SA Gaming [#129276]
 	    - 20200605@Parsons: Get Full Data For Licensee Groups [#135452]
+		- 20200609@Parsons: Special handling for INH market [#128570]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -206,7 +207,7 @@ BEGIN
 	)
 	-- End region	
 
-	-- this table hold data from sp: LA_AmountToCompanySel
+	-- this table hold data from sp: LA_AmountToCompanyByDiscountCurrencySel
 	CREATE TABLE #AmountToCompany (
 		PartyId			INT,
 		ProductId		INT,
