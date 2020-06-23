@@ -29,6 +29,7 @@ AS
 	    - 20200409@Parsons: Integrate SA Gaming [#129276]
 		- 20200505@Parsons: Special handling for INH market [#128570] 
 		- 20200714@Parsons: Implement PP Jackpot [RedmineID: #137306]
+		- 20200803@Parsons: Implement Group Min Fee [#134492]
 
 	Parameters:
 		@IsApplyDiscountMinfee: apply minfee term to discount value
@@ -76,7 +77,7 @@ BEGIN
 	SELECT DISTINCT a.PartyId, a.PartyGroupId,0
 	FROM dbo.LA_PartyGroupAssignment a WITH(NOLOCK)
 	WHERE a.PartyId NOT IN (SELECT b.PartyId FROM @PartyList b)
-		AND a.PartyGroupId IN (SELECT c.PartyGroupId FROM @PartyList c)
+		AND a.PartyGroupId IN (SELECT c.PartyGroupId FROM @PartyList c) -- Refactor: Join instead of IN
 
 	-- 1.3 include products that use to calculate discount
 	-- discount type
@@ -370,6 +371,7 @@ BEGIN
 	GROUP BY p.PartyGroupId, mf.ProductId
 
 	-- 3.3 calculate actual licensing fee
+		-- 3.3.1 actual licensing fee as usual	
 	UPDATE r SET Fee = CASE
 			WHEN t.TotalAmount < t.TotalMinFee AND a.FeeOutOfWaiveTime < a.MinFeeAmount
 				THEN a.MinFeeAmount + a.FeeUnderWaiveTime
@@ -390,7 +392,7 @@ BEGIN
 	INNER JOIN @tmpMinFee a ON a.PartyId = r.PartyId AND a.ProductId = r.ProductID AND a.FeeType = 1 -- minfee setting
 	INNER JOIN @TotalMinFees t ON a.ProductId = t.ProductId AND t.PartyGroupId = p.PartyGroupId
 	LEFT JOIN @tmpMinFee b ON b.PartyId = r.PartyId AND b.ProductId=r.ProductID AND b.FeeType = 2-- waive setting
-
+		-- 3.3.2 Update licensing fee of primary licensee
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 4. discount calculation
  *-------------------------------------------------------------------------------------------------------------------------------*/
