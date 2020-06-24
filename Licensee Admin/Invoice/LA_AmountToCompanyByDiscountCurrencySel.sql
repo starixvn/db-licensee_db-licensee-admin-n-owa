@@ -27,7 +27,7 @@ AS
 		- 20191206@Parsons: PP tournament [#123958]
 	    - 20200409@Parsons: Integrate SA Gaming [#129276]
 		- 20200512@Parsons: Special handling for INH market [#128570]
-		- 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#134452]
+		- 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -380,7 +380,7 @@ BEGIN
 	FROM #tmpWinlossData a
 	GROUP BY PartyId, ProductId
 
-	-- 2.6 treat negative as 0 (Except 9Wsports-316, 9wickets-459)
+	-- 2.6 treat negative as 0 (Except 9wickets-316, 9Wsports-459)
 	UPDATE @FinalResult 
 			SET FeeByDiscountBaseCurrency = CASE WHEN AmountToCompanyByDiscountBaseCurrency < 0 AND PartyId NOT IN (316, 459) THEN 0 ELSE AmountToCompanyByDiscountBaseCurrency END,
 				FeeByBaseCurrency		  =	CASE WHEN AmountToCompanyByBaseCurrency < 0  AND PartyId NOT IN (316, 459)THEN 0 ELSE AmountToCompanyByBaseCurrency END

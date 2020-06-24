@@ -30,7 +30,7 @@ AS
 		- 20200422@Parsons: Integrate Saba.club [#132730]
 		- 20200507@Parsons: Integrate Sexy Gaming for deposit licensees [#132665]
 		- 20200528@Parsons: Special handling for INH market [#128570] 
-		- 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#134452]
+		- 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -423,7 +423,7 @@ BEGIN
 
 		-- treat negative as 0  
 		-- excepts: BA, CB, CO, BX
-				--  9Wsports-316, 9wickets-459
+				--  9wickets-316, 9Wsports-459
 		UPDATE #tmpResult SET LicensingFee = CASE WHEN AmountToCompany < 0 AND ProductID NOT IN (@BA,@CB,@CO,@BX) AND PartyId NOT IN (316, 459) THEN 0 ELSE AmountToCompany END
 	END
 /*-----------------

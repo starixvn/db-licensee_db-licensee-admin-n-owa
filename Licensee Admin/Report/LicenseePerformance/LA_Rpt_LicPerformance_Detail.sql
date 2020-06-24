@@ -13,7 +13,6 @@ ALTER PROCEDURE dbo.LA_Rpt_LicPerformance_Detail
 	, @BaseCurrencyName VARCHAR(10) = 'GBP'
 	, @DrawFilter SMALLINT = 1
 AS
-
 /*	Created: 20141209@Patrick
 	Task: LicenseeAdmin - Get Licensee Performance Detail report
 	DB: DB052.bodb02
@@ -54,7 +53,8 @@ AS
 	    - 20191205@Parsons: PP tournament [#123958]
 	    - 20200409@Parsons: Integrate SA Gaming [#129276]
 	    - 20200605@Parsons: Get Full Data For Licensee Groups [#135452]
-		- 20200609@Parsons: Special handling for INH market [#128570]
+		- 20200609@Parsons: Special handling for INH market [#128570] 
+		- 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -517,8 +517,8 @@ BEGIN
 			CASE WHEN ISNULL(p.BACommission,0) > 0 THEN ISNULL(p.BACommission,0) ELSE 0 END			AS PreviousBACommission,
 			ISNULL(r.AmountToBA, 0)																	AS AmountDueToBA,		-- Keep as it is
 			ISNULL(p.AmountToBA, 0)																	AS PreviousAmountDueToBA,
-			CASE WHEN r.SportsbookFee > 0 THEN r.SportsbookFee ELSE 0 END							AS SportsbookFee,
-			CASE WHEN ISNULL(p.SportsbookFee,0) > 0 THEN p.SportsbookFee ELSE 0 END					AS PreviousSportsbookFee,
+			CASE WHEN r.SportsbookFee > 0 OR r.PartyId IN (316, 459) THEN r.SportsbookFee ELSE 0 END			AS SportsbookFee, -- 9wickets-316, 9Wsports-459
+			CASE WHEN ISNULL(p.SportsbookFee,0) > 0 OR r.PartyId IN (316, 459) THEN p.SportsbookFee ELSE 0 END	AS PreviousSportsbookFee,
 			ISNULL(r.OthersFee,0) + ISNULL(r.NegativeAmount,0)										AS OtherProductsFee,
 			ISNULL(p.OthersFee,0) + ISNULL(p.NegativeAmount,0)										AS PreviousOtherProductsFee,
 			CASE WHEN r.SportbookDiscount > 0 THEN r.SportbookDiscount ELSE 0 END					AS DiscountSportsbook,
@@ -533,8 +533,8 @@ BEGIN
 			ISNULL(p.PromotionSportsbook, 0)														AS PreviousPromotionSportsbook,
 			ISNULL(r.PromotionOthers, 0)															AS PromotionOthers,
 			ISNULL(p.PromotionOthers, 0)															AS PreviousPromotionOthers,
-			(CASE WHEN r.TotalFee > 0 THEN r.TotalFee ELSE 0 END) + ISNULL(r.NegativeAmount,0) - ISNULL(r.PromotionSportsbook,0) - ISNULL(r.PromotionOthers,0)	AS TotalLicensingFee,
-			(CASE WHEN p.TotalFee > 0 THEN p.TotalFee ELSE 0 END) + ISNULL(p.NegativeAmount,0) - ISNULL(p.PromotionSportsbook,0) - ISNULL(p.PromotionOthers,0)	AS PreviousTotalLicensingFee
+			(CASE WHEN r.TotalFee > 0 OR r.PartyId IN (316, 459) THEN r.TotalFee ELSE 0 END) + ISNULL(r.NegativeAmount,0) - ISNULL(r.PromotionSportsbook,0) - ISNULL(r.PromotionOthers,0)	AS TotalLicensingFee,
+			(CASE WHEN p.TotalFee > 0 OR r.PartyId IN (316, 459) THEN p.TotalFee ELSE 0 END) + ISNULL(p.NegativeAmount,0) - ISNULL(p.PromotionSportsbook,0) - ISNULL(p.PromotionOthers,0)	AS PreviousTotalLicensingFee
 	FROM	#Result r
 			FULL JOIN (SELECT * FROM #Result WHERE IsCurrent = 0) p ON r.PartyId = p.PartyId
 	WHERE	r.IsCurrent = 1 AND r.PartyId IN (SELECT pt.PartyId FROM @PartyIdTable pt WHERE IsSelected = 1)

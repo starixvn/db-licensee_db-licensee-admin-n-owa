@@ -36,6 +36,7 @@ AS
 	   - 20200411@Parsons: Integrate Table Games [#131166]
 	   - 20200423@Parsons: Integrate Saba.club [#132730]
 	   - 20200507@Parsons: Integrate Sexy Gaming for deposit licensees [#132665]
+	   - 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -62,7 +63,7 @@ BEGIN
     SELECT PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate, ChargeID
     FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 	
-	CREATE TABLE #rptLicFee (Licensee VARCHAR(20), rptDate VARCHAR(50), LicensingFee MONEY)
+	CREATE TABLE #rptLicFee (PartyId INT, Licensee VARCHAR(20), rptDate VARCHAR(50), LicensingFee MONEY)
 
 	CREATE TABLE #Temp (PartyId INT, rptDate DATETIME, CurrencyID INT,LicensingFee MONEY)
 	
@@ -142,8 +143,8 @@ BEGIN
 			SET Rate = 1
 		END
 	
-	INSERT INTO #rptLicFee(Licensee, rptDate, LicensingFee)
-	SELECT 
+	INSERT INTO #rptLicFee(PartyId, Licensee, rptDate, LicensingFee)
+	SELECT p.PartyId, 
 		CASE p.PartyName
 			 WHEN '18bb' THEN 'PIH'
 			 WHEN 'IBC'  THEN 'FDL'
@@ -154,11 +155,11 @@ BEGIN
 	FROM #Temp t
 		INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON t.PartyId = p.PartyID
 		INNER JOIN #Exchange ee ON t.rptDate = ee.exchangedate AND t.CurrencyID = ee.ExchangeId
-	GROUP BY p.PartyName, DATENAME(YEAR, t.rptDate)  + '-' + DATENAME(MONTH, t.rptDate)
-	
+	GROUP BY p.PartyId, p.PartyName, DATENAME(YEAR, t.rptDate)  + '-' + DATENAME(MONTH, t.rptDate)
+
 	UPDATE #rptLicFee
 	SET LicensingFee = 0
-	WHERE LicensingFee < 0 
+	WHERE LicensingFee < 0 AND PartyId NOT IN (316, 459) --9wickets-316, 9Wsports-459
 	--------------------------------- view result  -------------------------------------------
 	--SELECT @cols = STUFF((SELECT ',' + QUOTENAME(seq )
  --                   FROM 
