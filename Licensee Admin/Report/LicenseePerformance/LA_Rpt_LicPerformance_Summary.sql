@@ -2,17 +2,12 @@
 USE [bodb02]
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_Summary]
 	 @PartyIDs			VARCHAR(4000)	= ''
 	, @Currency			INT				= 0
 	, @FromDate			SMALLDATETIME
 	, @ToDate			SMALLDATETIME
 	, @ProductCode		VARCHAR(200)
-	, @ReportType		TINYINT			= 2
 	, @drawfilter		SMALLINT		= 1
 	, @MoveBetsDay		SMALLDATETIME	= ''
 	, @IsConvert		BIT				= 0
@@ -41,14 +36,12 @@ AS
 	Param's Explanation:
 	  + @PartyIDs : a string of list PartyID, separated by ','
 	  + @Currency : 0-All Currencies
-	  + @ReportType: 1-Daily; 2-Monthly
 	  + @drawfilter: 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
-	  + @BettypeID : 0-selected all bettype
 */
 BEGIN
 	SET NOCOUNT ON
 
-	SET @ReportType = 2 -- only allow monthly
+	DECLARE @CurrencyTest INT = 20
 	DECLARE @Bettype TABLE(Bettype INT, ProductID INT)
 	INSERT INTO @Bettype
 	SELECT Bettype, ProductID
@@ -101,7 +94,7 @@ BEGIN
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.Bettype IN (SELECT Bettype FROM @Bettype)
 			AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
-			AND (b.CurrencyID <> 20)
+			AND (b.CurrencyID <> @CurrencyTest)
 			AND b.status NOT IN (-1, 101, 102, 103)
 			GROUP BY PartyID, b.rptDate, currencyID
 		)
@@ -123,7 +116,7 @@ BEGIN
 					LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = tp.ChargeId AND cr.CurrencyID = b.CurrencyId
 				WHERE b.ProductID = 32
 					AND b.rptDate BETWEEN @FromDate AND @ToDate
-					AND (b.CurrencyID <> 20)
+					AND (b.CurrencyID <> @CurrencyTest)
 					AND (@Currency = 0 OR b.CurrencyID = @Currency)  
 					AND b.customercategory NOT IN (27, 28)
 					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
@@ -156,7 +149,7 @@ BEGIN
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = tp.ChargeId AND cr.CurrencyID = b.CurrencyID
 			WHERE  b.rptDate BETWEEN @Fromdate AND @ToDate
 			AND (@Currency = 0 OR b.CurrencyID = @Currency)
-			AND (b.CurrencyID <> 20)
+			AND (b.CurrencyID <> @CurrencyTest)
 			AND b.StatusId NOT IN (-1, 101, 102, 103)
 			AND b.customercategory NOT IN (27, 28)
 			GROUP BY PartyID, b.rptDate, b.currencyID
@@ -166,14 +159,14 @@ BEGIN
 	INSERT INTO #Result (PartyID, ReportType, TurnOver, CustomerWinlost, CommBA, Betcount, LicensingFee)
 	SELECT b.PartyID
 		, CONVERT(VARCHAR(6),b.rptDate,112)
-		, SUM(TurnOver * e.Rate)	AS Turnover
-		, SUM(Winlost * e.Rate)	AS CustomerWinlost
-		, SUM(CommBA * e.Rate) AS CommBA
-		, SUM(Betcount) AS Betcount
-		, SUM(b.LicensingFee * e.Rate) AS LicensingFee
+		, SUM(TurnOver * e.Rate)				AS Turnover
+		, SUM(Winlost * e.Rate)					AS CustomerWinlost
+		, SUM(CommBA * e.Rate)					AS CommBA
+		, SUM(Betcount)							AS Betcount
+		, SUM(b.LicensingFee * e.Rate)			AS LicensingFee
 	FROM #Temp b
 	INNER JOIN #Exchange e  ON e.ExchangeDate = b.Rptdate AND e.ExchangeId = b.Currency
-	INNER JOIN @tmpParty p ON b.PartyID = p.PartyID AND b.rptDate BETWEEN p.Fromdate AND p.Todate
+	INNER JOIN @tmpParty p  ON b.PartyID = p.PartyID AND b.rptDate BETWEEN p.Fromdate AND p.Todate
 	GROUP BY CONVERT(VARCHAR(6), b.rptDate, 112), b.PartyID
 	
 	UPDATE #Result
@@ -181,12 +174,12 @@ BEGIN
 	WHERE LicensingFee < 0 AND PartyID NOT IN (316, 459) -- 9wickets, 9Wsports only for SB
 
 	-------------------------final select -------------------------------
-	SELECT CAST((ReportType + '01') AS DATE) AS [DateTime]
-		, SUM(TurnOver) AS TurnOver
-		, SUM(CustomerWinlost) AS CustomerWinlost
-		, SUM(CommBA) AS AmtDueToBA
-		, SUM(Betcount) AS BetCount
-		, SUM(LicensingFee) AS LicensingFee
+	SELECT CAST((ReportType + '01') AS DATE)	AS [DateTime]
+		, SUM(TurnOver)							AS TurnOver
+		, SUM(CustomerWinlost)					AS CustomerWinlost
+		, SUM(CommBA)							AS AmtDueToBA
+		, SUM(Betcount)							AS BetCount
+		, SUM(LicensingFee)						AS LicensingFee
 	FROM #Result
 	GROUP BY ReportType
 	ORDER BY ReportType ASC
