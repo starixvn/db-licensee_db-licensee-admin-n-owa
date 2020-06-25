@@ -35,6 +35,7 @@ AS
 	   - 20190412@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	   - 20191205@Mason: PP tournament [#123958]
 	   - 20200217@Mason: Set billing term by currency [#120005]
+	   - 20200625@Mason: Keep Negative SB Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334]
 
 	Param's Explanation:
 	  + @PartyIDs : a string of list PartyID, separated by ','
@@ -186,7 +187,7 @@ BEGIN
 	
 	UPDATE #Result
 	SET LicensingFee = 0
-	WHERE LicensingFee < 0
+	WHERE LicensingFee < 0 AND PartyID NOT IN (316, 459) -- 9wickets, 9Wsports only for SB
 
 	-------------------------final select -------------------------------
 	SELECT CAST((ReportType + '01') AS DATE) AS [DateTime]
