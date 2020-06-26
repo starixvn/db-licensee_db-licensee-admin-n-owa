@@ -53,6 +53,7 @@ AS
 		- 20200422@Parsons: Indo 4D Integration [#130910]
 		- 20200424@Pasons: Integrate IBCBET Live Casino [#131165]
 		- 20200423@Parsons: Integrate Saba-Club [#132730]
+		- 20200610@Parsons: Implement RNG WAR and ION [#134452]
 
 	Param's Explanation:
 
@@ -427,6 +428,24 @@ BEGIN
 	   SELECT typeid, 42
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 1611 AND 1699
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+	END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'ION')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 52
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 5601 AND 5699
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+	END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'RNGW')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 50
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 5500 AND 5599
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
