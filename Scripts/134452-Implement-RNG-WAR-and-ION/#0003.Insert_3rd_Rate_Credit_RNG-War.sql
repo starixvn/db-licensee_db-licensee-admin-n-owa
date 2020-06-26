@@ -41,8 +41,8 @@ BEGIN
 								,[BaseCurrencyId]
 								,[FirstOfBilling]
 								,[BasisOfBilling])
-	VALUES (@RNGWarProductId, 25, @3rdPartyId, 0, 0.04, 1, '2020-04-01', '2050-01-01', null, null, null, null, null, null),
-		   (@RNGWarProductId, 30, @3rdPartyId, 0, 0.04, 1, '2020-04-01', '2050-01-01', null, null, null, null, null, null)
+	VALUES (@RNGWarProductId, 25, @3rdPartyId, 0, 0.04, 1, '2020-06-16', '2050-01-01', null, null, null, null, null, null),
+		   (@RNGWarProductId, 30, @3rdPartyId, 0, 0.04, 1, '2020-06-16', '2050-01-01', null, null, null, null, null, null)
 	
 	SET @HasInsertSetting = 1
 END
