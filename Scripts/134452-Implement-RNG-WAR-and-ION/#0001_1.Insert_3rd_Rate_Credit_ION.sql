@@ -42,8 +42,8 @@ BEGIN
 								,[BaseCurrencyId]
 								,[FirstOfBilling]
 								,[BasisOfBilling])
-	VALUES (@IONProductId, 25, @3rdPartyId, 0, 0.05, 1, '2020-06-16', '2050-01-01', null, null, null, null, null, null),
-		   (@IONProductId, 30, @3rdPartyId, 0, 0.05, 1, '2020-06-16', '2050-01-01', null, null, null, null, null, null)
+	VALUES (@IONProductId, 25, @3rdPartyId, 0, 0.05, 1, '2020-06-01', '2050-01-01', null, null, null, null, null, null),
+		   (@IONProductId, 30, @3rdPartyId, 0, 0.05, 1, '2020-06-01', '2050-01-01', null, null, null, null, null, null)
 	
 	SET @HasInsertSetting = 1
 END

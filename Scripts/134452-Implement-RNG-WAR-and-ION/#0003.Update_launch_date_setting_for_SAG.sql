@@ -9,7 +9,7 @@
 USE bodb_licensee
 GO
 
-DECLARE @LaunchedDate DATE = '2020-06-18'
+DECLARE @LaunchedDate DATE = '2020-06-01'
 
 UPDATE dbo.OAS_ChargeInfo WITH (UPDLOCK,ROWLOCK)
 SET FromDate = @LaunchedDate

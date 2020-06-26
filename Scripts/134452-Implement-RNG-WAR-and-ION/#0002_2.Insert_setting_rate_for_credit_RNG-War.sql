@@ -31,8 +31,8 @@ BEGIN
 								,[BaseCurrencyId]
 								,[FirstOfBilling]
 								,[BasisOfBilling])
-	VALUES(@RNGWarProductId, 25, 1, 0, 0, 1, '2020-06-16', '2050-01-01', null, null, null, null, null, null),
-		  (@RNGWarProductId, 30, 1, 0, 0, 1, '2020-06-16', '2050-01-01', null, null, null, null, null, null)
+	VALUES(@RNGWarProductId, 25, 1, 0, 0, 1, '2020-06-01', '2050-01-01', null, null, null, null, null, null),
+		  (@RNGWarProductId, 30, 1, 0, 0, 1, '2020-06-01', '2050-01-01', null, null, null, null, null, null)
 	
 	SET @HasInsertSetting = 1
 END

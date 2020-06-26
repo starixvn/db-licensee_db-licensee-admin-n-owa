@@ -1,7 +1,7 @@
 /*<info serverAlias="DBLIC-bodb_LicenseeReport"></info>*/
 /*
 	Created: 20200626@Parsons
-	Task:   Generate data of SAG for 18/06 - Now [#FeatureID 134452]
+	Task:   Generate data of SAG for 01/06 - Now [#FeatureID 134452]
 	DB:	    DBLIC-bodb_LicenseeReport
 	Remark:	Re-gen data for SAG - range bettrans14
 */
