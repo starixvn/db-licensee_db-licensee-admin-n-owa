@@ -13,15 +13,15 @@ DECLARE @HasInsertSetting BIT = 0;
 DECLARE @RNGWarProductCode VARCHAR(10) = 'RNGW'
 
 -- 3rd party
-IF NOT EXISTS (SELECT PartyID FROM bodb_licensee.dbo.OAS_Party WHERE PartyName = @RNGWarProductCode AND PartyType = 3)
+IF NOT EXISTS (SELECT PartyID FROM bodb_licensee.dbo.OAS_Party WITH(NOLOCK) WHERE PartyName = @RNGWarProductCode AND PartyType = 3)
 BEGIN 
 	INSERT bodb_licensee.dbo.OAS_Party (PartyName, [Description], PartyType, OldRefID, SetupName)
 	VALUES (@RNGWarProductCode, 'RNG War', 3, null, null)
 END
 
-DECLARE @3rdPartyId INT = (SELECT p.PartyID FROM bodb_licensee.dbo.OAS_Party p WHERE p.PartyType = 3 and p.PartyName = @RNGWarProductCode)
+DECLARE @3rdPartyId INT = (SELECT p.PartyID FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK) WHERE p.PartyType = 3 and p.PartyName = @RNGWarProductCode)
 
-IF NOT EXISTS (SELECT ChargeID FROM OAS_ChargeInfo 
+IF NOT EXISTS (SELECT ChargeID FROM OAS_ChargeInfo WITH(NOLOCK)
 							   WHERE FromParty IN (25, 30) 
 									  AND ToParty = @3rdPartyId
 									  AND ProductID = @RNGWarProductId)
@@ -50,7 +50,7 @@ END
 IF @HasInsertSetting = 1
 BEGIN
 	INSERT INTO LA_ChargeInfo_SystemMapping(ChargeID ,SystemID)
-	SELECT ChargeID, 2 FROM OAS_ChargeInfo 
+	SELECT ChargeID, 2 FROM OAS_ChargeInfo WITH(NOLOCK)
 	WHERE FromParty IN (25, 30) 
 		  AND ToParty = @3rdPartyId
 		  AND ProductID = @RNGWarProductId 

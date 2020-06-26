@@ -11,7 +11,7 @@ GO
 DECLARE @RNGWarProductId INT = 50
 DECLARE @HasInsertSetting BIT = 0;
 
-IF NOT EXISTS (SELECT ChargeID FROM OAS_ChargeInfo 
+IF NOT EXISTS (SELECT ChargeID FROM OAS_ChargeInfo WITH(NOLOCK)
 							   WHERE FromParty IN (25,30) 
 									  AND ToParty = 1
 									  AND ProductID = @RNGWarProductId)
@@ -40,7 +40,7 @@ END
 IF @HasInsertSetting = 1
 BEGIN
 	INSERT INTO LA_ChargeInfo_SystemMapping(ChargeID ,SystemID)
-	SELECT ChargeID, 2 FROM OAS_ChargeInfo 
+	SELECT ChargeID, 2 FROM OAS_ChargeInfo WITH(NOLOCK) 
 	WHERE FromParty IN (25,30) 
 		  AND ToParty = 1
 		  AND ProductID = @RNGWarProductId 

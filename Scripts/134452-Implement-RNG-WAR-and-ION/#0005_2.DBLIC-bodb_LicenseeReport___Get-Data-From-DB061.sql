@@ -18,7 +18,7 @@ BEGIN
 		
 	INSERT INTO dbo.rpt_ThirdPartyWL_ExtraGMT (RptDate, RptDate3rd, SiteId, BetTypeId, CurrencyId, StatusId, BetCount, Turnover, Winloss, AComm, PComm, ProgressiveContribution, ProgressivePayout, ValidBetAmount)
 	SELECT RptDate, RptDate3rd, SiteId, BetTypeId, CurrencyId, StatusId, BetCount, Turnover, Winloss, AComm, PComm, ProgressiveContribution, ProgressivePayout, ValidBetAmount
-	FROM DBRPT.bodb_report.dbo.rpt_ThirdPartyWL_ExtraGMT
+	FROM DBRPT.bodb_report.dbo.rpt_ThirdPartyWL_ExtraGMT WITH(NOLOCK)
 	WHERE rptDate = @WinlostDate
 			AND BetTypeId BETWEEN 3001 AND 3099 -- SAG
 END
