@@ -10,11 +10,5 @@
 USE bodb_LicenseeReport
 GO
 
-EXEC GEN_rptBetting @date = '20200616', @date2 = '20200626', @ProductCodes = 'ION,RNGW'
-GO
-
 EXEC GEN_rptBettingByProduct @date = '20200616', @date2 = '20200626', @DataSource = 'Rpt_Betting', @SeparatedProductID = 0, @ProductCodes = 'ION,RNGW'
-GO
-
-EXEC Task_PostStaging
 GO
