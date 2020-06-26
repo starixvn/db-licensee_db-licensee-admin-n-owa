@@ -11,6 +11,6 @@ GO
 
 DECLARE @LaunchedDate DATE = '2020-06-18'
 
-UPDATE dbo.OAS_ChargeInfo
+UPDATE dbo.OAS_ChargeInfo WITH (UPDLOCK,ROWLOCK)
 SET FromDate = @LaunchedDate
 WHERE ChargeID IN (3640,3641,3642,3643,3644,3645)
