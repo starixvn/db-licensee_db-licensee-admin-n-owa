@@ -11,7 +11,7 @@ GO
 
 DECLARE 
 		@FromDate DATE = '2020-06-19', -- Current BU Date
-		@ToDate DATE = '2020-06-21' -- Current MB Date
+		@ToDate DATE = '2020-06-24' -- Current MB Date
 
 BEGIN
 	DECLARE @ErrMsg VARCHAR(200)

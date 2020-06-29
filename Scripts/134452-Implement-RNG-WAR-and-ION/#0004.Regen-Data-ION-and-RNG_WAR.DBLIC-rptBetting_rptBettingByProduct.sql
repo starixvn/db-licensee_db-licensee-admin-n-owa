@@ -10,5 +10,5 @@
 USE bodb_LicenseeReport
 GO
 
-EXEC GEN_rptBettingByProduct @date = '20200601', @date2 = '20200626', @DataSource = 'Rpt_Betting', @SeparatedProductID = 0, @ProductCodes = 'ION,RNGW'
+EXEC GEN_rptBettingByProduct @date = '20200601', @date2 = '20200629', @DataSource = 'Rpt_Betting', @SeparatedProductID = 0, @ProductCodes = 'ION,RNGW'
 GO
