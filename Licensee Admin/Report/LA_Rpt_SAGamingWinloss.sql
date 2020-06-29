@@ -153,7 +153,8 @@ BEGIN
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeId = ci.ChargeId AND cr.CurrencyID = b.CurrencyId
 		WHERE b.RptDate3rd BETWEEN @FromDate AND @ToDate AND
 			  b.StatusId NOT IN (- 1, 101, 102, 103) AND
-			  b.BetTypeId BETWEEN 3001 AND 3099 
+			  b.BetTypeId BETWEEN 3001 AND 3099 AND
+			  b.CurrencyId <> 20 -- UUS - Currency testing
 		GROUP BY b.RptDate3rd, ci.PartyID, b.CurrencyID, ci.IsDeposit
 	)
 
