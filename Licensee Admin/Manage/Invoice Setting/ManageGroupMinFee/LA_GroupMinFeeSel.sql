@@ -23,7 +23,7 @@ BEGIN
 	SET NOCOUNT ON;
 	
 	DECLARE @MinFeeType TINYINT = 1
-	DECLARE @Result AS TABLE (GroupMinFeeID SMALLINT, GroupName VARCHAR(50), NumberOfPayers INT, PayerList VARCHAR(1000), FromDate DATE, ToDate DATE, GroupMinFee MONEY, PrimaryLicensee VARCHAR(50))
+	DECLARE @Result AS TABLE (GroupMinFeeID SMALLINT, GroupName NVARCHAR(110), NumberOfPayers INT, PayerList VARCHAR(1000), FromDate DATE, ToDate DATE, GroupMinFee MONEY, PrimaryLicensee VARCHAR(50))
 
 	INSERT INTO @Result(GroupMinFeeID , GroupName, NumberOfPayers, FromDate, ToDate, PrimaryLicensee)
 	SELECT h.GroupMinFeeID AS GroupMinFeeID
@@ -31,6 +31,9 @@ BEGIN
 			,COUNT(a.PartyID) AS NumberOfPayers
 			,h.FromDate AS FromDate
 			,h.ToDate AS ToDate
+			,(SELECT TOP(1) mfd.MinimumFee
+				FROM dbo.LA_GroupMinFeeDetail mfd RIGHT JOIN dbo.LA_GroupMinFeeHeader mfh ON mfd.GroupMinFeeID = mfh.GroupMinFeeID 
+				ORDER BY ToDate DESC) AS GroupMinFee
 			,(SELECT p.PartyName 
 				FROM dbo.LA_GroupMinFeeAssignment mfa WITH(NOLOCK) 
 					LEFT JOIN dbo.OAS_Party p ON mfa.PartyID = p.PartyID 
@@ -50,18 +53,6 @@ BEGIN
 				WHERE r.GroupMinFeeID = mfa.GroupMinFeeID				
 				FOR XML PATH ('')), 1, 2, '') 			
 	FROM @Result r
-	
-	-- Update GroupMinFee
-	;WITH cte_MinFee AS(
-		SELECT mfa.GroupMinFeeID, SUM(ISNULL(mf.FeeAmount, 0)) AS GroupMinFee
-		FROM dbo.LA_GroupMinFeeAssignment mfa WITH(NOLOCK)
-			INNER JOIN LA_MinFee mf WITH(NOLOCK) ON mfa.PartyId = mf.PartyId
-		WHERE mf.FeeTypeId = @MinFeeType
-		GROUP BY mfa.GroupMinFeeID)
-	UPDATE r
-	SET r.GroupMinFee = ISNULL(mf.GroupMinFee, 0)		
-	FROM @Result r
-		LEFT JOIN cte_MinFee mf ON r.GroupMinFeeID = mf.GroupMinFeeID
 	
 	SELECT * FROM @Result
 END
