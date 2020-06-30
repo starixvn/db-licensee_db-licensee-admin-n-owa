@@ -3,7 +3,7 @@ USE [bodb_licensee]
 GO
 
 CREATE PROCEDURE [dbo].[LA_GroupMinFeeSel]
-	 @GroupMinFeeId	INT	= 0	
+	 @GroupMinFeeID	INT	= 0	
 AS
 /*  
 	 Created: 20200629@Happy
@@ -13,11 +13,11 @@ AS
 	 Revisions:
 		 
 	 Params:
-		- @GroupMinFeeId:
+		- @GroupMinFeeID:
 			= 0: get all group
 			<> 0: specific group
 	 Example:
-		EXEC dbo.LA_GroupMinFeeSel @GroupMinFeeId = 0 
+		EXEC dbo.LA_GroupMinFeeSel @GroupMinFeeID = 0 
 */
 BEGIN
 	SET NOCOUNT ON;
@@ -33,7 +33,7 @@ BEGIN
 			,h.ToDate AS ToDate
 	FROM dbo.LA_GroupMinFeeHeader h WITH(NOLOCK)
 		LEFT JOIN dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK) ON h.GroupMinFeeID = a.GroupMinFeeID
-	WHERE (@GroupMinFeeID=0 OR h.GroupMinFeeID = @GroupMinFeeID)
+	WHERE (@GroupMinFeeID = 0 OR h.GroupMinFeeID = @GroupMinFeeID)
 	GROUP BY h.GroupMinFeeID, h.Name, h.FromDate, h.ToDate
 	
 	-- Update PayerList column
@@ -51,23 +51,23 @@ BEGIN
 	;WITH cte_GroupMinFee AS(
 		SELECT TOP(1) WITH TIES mfd.GroupMinFeeID, mfd.MinimumFee AS GroupMinFee
 		FROM dbo.LA_GroupMinFeeDetail mfd 
-		WHERE (@GroupMinFeeId = 0 OR mfd.GroupMinFeeID = @GroupMinFeeId)
+		WHERE (@GroupMinFeeID = 0 OR mfd.GroupMinFeeID = @GroupMinFeeID)
 		ORDER BY ROW_NUMBER() OVER(PARTITION BY mfd.GroupMinFeeID order by mfd.ToDate DESC))
 	UPDATE r
 	SET r.GroupMinFee = mf.GroupMinFee
 	FROM @Result r
-	LEFT JOIN cte_GroupMinFee mf on mf.GroupMinFeeID = r.GroupMinFeeID
+		LEFT JOIN cte_GroupMinFee mf on mf.GroupMinFeeID = r.GroupMinFeeID
 			
 	--Update PrimaryLicensee column
 	;WITH cte_PrimaryLicensee AS(
 		SELECT mfa.GroupMinFeeID, p.PartyName AS PrimaryLicensee
 		FROM dbo.LA_GroupMinFeeAssignment mfa
-		INNER JOIN dbo.OAS_Party p ON p.PartyID = mfa.PartyID
-		WHERE mfa.IsPrimary = 1 AND (@GroupMinFeeId = 0 OR mfa.GroupMinFeeID = @GroupMinFeeId))
+			INNER JOIN dbo.OAS_Party p ON p.PartyID = mfa.PartyID
+		WHERE mfa.IsPrimary = 1 AND (@GroupMinFeeID = 0 OR mfa.GroupMinFeeID = @GroupMinFeeID))
 	UPDATE r
 	SET r.PrimaryLicensee = pm.PrimaryLicensee
 	FROM @Result r
-	LEFT JOIN cte_PrimaryLicensee pm on pm.GroupMinFeeID = r.GroupMinFeeID
+		LEFT JOIN cte_PrimaryLicensee pm ON pm.GroupMinFeeID = r.GroupMinFeeID
 			
 	SELECT * FROM @Result
 END
