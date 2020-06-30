@@ -2,8 +2,8 @@
 USE [bodb_licensee]
 GO
 
-CREATE PROCEDURE [dbo].[LA_GroupMinFeeSel]
-	 @GroupMinFeeID	INT	= 0	
+ALTER PROCEDURE [dbo].[LA_GroupMinFeeSel]
+	 @GroupMinFeeID	SMALLINT	= 0	
 AS
 /*  
 	 Created: 20200629@Happy
@@ -39,10 +39,10 @@ BEGIN
 	-- Update PayerList column
 	UPDATE r
 	SET r.PayerList = STUFF((
-				SELECT ', ' + CAST(CASE WHEN ISNULL(pd.BrandName, '') != '' THEN pd.BrandName ELSE p.PartyName END AS VARCHAR)
-				FROM dbo.LA_GroupMinFeeAssignment mfa WITH (NOLOCK)
-					LEFT JOIN dbo.OAS_Party p WITH (NOLOCK) ON mfa.PartyID = p.PartyID
-					LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
+				SELECT ', ' + CAST(CASE WHEN ISNULL(pd.BrandName, '') <> '' THEN pd.BrandName ELSE p.PartyName END AS VARCHAR)
+				FROM dbo.LA_GroupMinFeeAssignment mfa WITH(NOLOCK)
+					LEFT JOIN dbo.OAS_Party p WITH(NOLOCK) ON mfa.PartyID = p.PartyID
+					LEFT JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON p.PartyID = pd.PartyID
 				WHERE r.GroupMinFeeID = mfa.GroupMinFeeID				
 				FOR XML PATH ('')), 1, 2, '') 			
 	FROM @Result r
@@ -50,7 +50,7 @@ BEGIN
 	--Update GroupMinFee column
 	;WITH cte_GroupMinFee AS(
 		SELECT TOP(1) WITH TIES mfd.GroupMinFeeID, mfd.MinimumFee AS GroupMinFee
-		FROM dbo.LA_GroupMinFeeDetail mfd 
+		FROM dbo.LA_GroupMinFeeDetail mfd WITH(NOLOCK)
 		WHERE (@GroupMinFeeID = 0 OR mfd.GroupMinFeeID = @GroupMinFeeID)
 		ORDER BY ROW_NUMBER() OVER(PARTITION BY mfd.GroupMinFeeID order by mfd.ToDate DESC))
 	UPDATE r
@@ -61,8 +61,8 @@ BEGIN
 	--Update PrimaryLicensee column
 	;WITH cte_PrimaryLicensee AS(
 		SELECT mfa.GroupMinFeeID, p.PartyName AS PrimaryLicensee
-		FROM dbo.LA_GroupMinFeeAssignment mfa
-			INNER JOIN dbo.OAS_Party p ON p.PartyID = mfa.PartyID
+		FROM dbo.LA_GroupMinFeeAssignment mfa WITH(NOLOCK)
+			INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = mfa.PartyID
 		WHERE mfa.IsPrimary = 1 AND (@GroupMinFeeID = 0 OR mfa.GroupMinFeeID = @GroupMinFeeID))
 	UPDATE r
 	SET r.PrimaryLicensee = pm.PrimaryLicensee
