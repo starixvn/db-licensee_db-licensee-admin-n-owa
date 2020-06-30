@@ -14,6 +14,7 @@ AS
 	DB: DB052.bodb_licensee
 	Revisions: 
 	    - 20200409@Parsons: Integrate SA Gaming [#129276]
+	    - 20200615@Parsons: Change data source to rpt_ThirdPartyWL_ExtraGMT [#134452]
 		
 	Param's Explanation:
 */
@@ -65,6 +66,15 @@ BEGIN
 		SELECT DISTINCT ChargeId, PartyID, LicenseeId, ProductId, CASE WHEN IsDeposit=1 THEN DI_Rate ELSE 0 END, IsDeposit, Fromdate, Todate, 0, ChargeType
 		FROM dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'SAG')
 	)
+	
+	-- Region: Update ParentId of Expired Group Accordingly
+	UPDATE p
+	SET p.ParentId = ci.ToParty
+	FROM @PartyList p
+	INNER JOIN #ChargeInfo c ON p.PartyId = c.PartyId
+	INNER JOIN OAS_ChargeInfo ci WITH(NOLOCK) ON c.ChargeId = ci.ChargeID
+	WHERE p.ParentId IN (1,9,11,98)
+	-- End-Region: Update ParentId of Expired Group Accordingly
 
 	-- Region: Insert Rate3rd for Credit's charge rate
 	INSERT INTO #ChargeInfo(PartyId, LicenseeId, ProductId, Rate, IsDeposit, ChargeType, IsPayToSupplier, Fromdate, Todate)
@@ -113,38 +123,39 @@ BEGIN
 
 	INSERT INTO #Data(PartyId, ReportDate, CurrencyId, IsDeposit, Totaltrans, Turnover, ValidBetAmount, CustomerWL, TipAmount, LicensingFeeWithoutTips, RollingComm, NetWinLoss, CompanyTipShare, RoyaltyFee)
 	(
-		SELECT  ci.PartyID, b.rptDate, b.currencyID, ci.IsDeposit
-			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN 0 ELSE b.betcount END) AS Totaltrans
+		SELECT  ci.PartyID, b.RptDate3rd, b.currencyID, ci.IsDeposit
+			, SUM(CASE WHEN b.BetTypeId = @SAG_Tips THEN 0 ELSE b.betcount END) AS Totaltrans
 			, SUM(b.turnover) AS Turnover
 			, SUM(ISNULL(b.ValidBetAmount,0)) AS ValidBetAmount
-			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN 0 ELSE b.MemberWL END) AS CustomerWL
-			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN -b.MemberWL ELSE 0 END) AS TipAmount
-			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN 0 ELSE -b.MemberWL * ISNULL(cr.Rate, ci.Rate) END) AS LicensingFeeWithoutTips
+			, SUM(CASE WHEN b.BetTypeId = @SAG_Tips THEN 0 ELSE b.Winloss END) AS CustomerWL
+			, SUM(CASE WHEN b.BetTypeId = @SAG_Tips THEN -b.Winloss ELSE 0 END) AS TipAmount
+			, SUM(CASE WHEN b.BetTypeId = @SAG_Tips THEN 0 ELSE -b.Winloss * ISNULL(cr.Rate, ci.Rate) END) AS LicensingFeeWithoutTips
 			, SUM(ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS RollingComm
-			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN 0 ELSE -b.MemberWL END - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS NetWinLoss
-			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN -b.MemberWL * tipLicensee.Rate ELSE 0 END) AS CompanyTipShare
-			, SUM(CASE WHEN b.Bettype = @SAG_Tips THEN 0 ELSE (-b.MemberWL - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) * ISNULL(s.Rate, 0) END) AS RoyaltyFee
-		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			, SUM(CASE WHEN b.BetTypeId = @SAG_Tips THEN 0 ELSE -b.Winloss END - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS NetWinLoss
+			, SUM(CASE WHEN b.BetTypeId = @SAG_Tips THEN -b.Winloss * tipLicensee.Rate ELSE 0 END) AS CompanyTipShare
+			, SUM(CASE WHEN b.BetTypeId = @SAG_Tips THEN 0 ELSE (-b.Winloss - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) * ISNULL(s.Rate, 0) END) AS RoyaltyFee
+		FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
 			INNER JOIN #ChargeInfo ci ON ( -- licensee charge rate
-				b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate AND
+				b.SiteID = ci.LicenseeID AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate AND
 				ci.IsPayToSupplier = 0 AND ci.ChargeType = @GrossWin)
 			LEFT JOIN #ChargeInfo r ON ( -- rolling RollingComm rate
-				b.SiteID = r.LicenseeID AND b.ProductID = r.ProductId AND b.rptDate BETWEEN r.FromDate AND r.ToDate AND
+				b.SiteID = r.LicenseeID AND b.RptDate3rd BETWEEN r.FromDate AND r.ToDate AND
 				r.IsPayToSupplier = 1 AND 
 				r.ChargeType = @RollingRollingCommType)
 			LEFT JOIN #ChargeInfo s ON ( -- service charge rate
-				b.SiteID = s.LicenseeID AND b.ProductID = s.ProductId AND b.rptDate BETWEEN s.FromDate AND s.ToDate AND
+				b.SiteID = s.LicenseeID AND b.RptDate3rd BETWEEN s.FromDate AND s.ToDate AND
 				s.IsPayToSupplier = 1 AND
 				s.ChargeType = @CreditServiceCharge)
 			LEFT JOIN #ChargeInfo tipLicensee ON(
-				b.SiteID = tipLicensee.LicenseeID AND b.ProductID = tipLicensee.ProductId AND b.rptDate BETWEEN tipLicensee.FromDate AND tipLicensee.ToDate AND
+				b.SiteID = tipLicensee.LicenseeID AND b.RptDate3rd BETWEEN tipLicensee.FromDate AND tipLicensee.ToDate AND
 				tipLicensee.IsPayToSupplier = 0 AND
 				tipLicensee.ChargeType = @TipChargeType)
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeId = ci.ChargeId AND cr.CurrencyID = b.CurrencyId
-		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
+		WHERE b.RptDate3rd BETWEEN @FromDate AND @ToDate AND
 			  b.StatusId NOT IN (- 1, 101, 102, 103) AND
-			  b.customercategory NOT IN (27,28)
-		GROUP BY b.rptDate, ci.PartyID, b.CurrencyID, ci.IsDeposit
+			  b.BetTypeId BETWEEN 3001 AND 3099 AND
+			  b.CurrencyId <> 20 -- UUS - Currency testing
+		GROUP BY b.RptDate3rd, ci.PartyID, b.CurrencyID, ci.IsDeposit
 	)
 
 	--Region Update deposit's pay to supplier

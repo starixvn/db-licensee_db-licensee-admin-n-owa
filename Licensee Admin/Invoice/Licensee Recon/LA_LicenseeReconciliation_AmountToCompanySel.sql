@@ -29,7 +29,8 @@ AS
 		- 20200411@Parsons: Integrate Table Games [#131166]
 		- 20200422@Parsons: Integrate Saba.club [#132730]
 		- 20200507@Parsons: Integrate Sexy Gaming for deposit licensees [#132665]
-		- 20200528@Parsons: Special handling for INH market [#128570]
+		- 20200528@Parsons: Special handling for INH market [#128570] 
+		- 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -71,8 +72,8 @@ BEGIN
 
 	-- supported products
 	-- 
-	DECLARE @supportedProducts VARCHAR(100) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG'
-	DECLARE @productList TABLE(ProductId INT, Code VARCHAR(5), Name VARCHAR(50))
+	DECLARE @supportedProducts VARCHAR(500) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG'
+	DECLARE @productList TABLE(ProductId INT, Code VARCHAR(10), Name VARCHAR(100))
 	INSERT INTO @productList(ProductId,Code,Name)
 	SELECT ProductID, ProductPrefix,ProductName FROM dbo.LA_f_Products3rd(@supportedProducts)
 
@@ -422,7 +423,8 @@ BEGIN
 
 		-- treat negative as 0  
 		-- excepts: BA, CB, CO, BX
-		UPDATE #tmpResult SET LicensingFee = CASE WHEN ProductID NOT IN (@BA,@CB,@CO,@BX) AND AmountToCompany < 0 THEN 0 ELSE AmountToCompany END
+				--  9wickets-316, 9Wsports-459
+		UPDATE #tmpResult SET LicensingFee = CASE WHEN AmountToCompany < 0 AND ProductID NOT IN (@BA,@CB,@CO,@BX) AND PartyId NOT IN (316, 459) THEN 0 ELSE AmountToCompany END
 	END
 /*-----------------
  * minfee

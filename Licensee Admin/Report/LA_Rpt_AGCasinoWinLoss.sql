@@ -24,6 +24,7 @@ AS
 	 - 20190627@Bruce: Select data from rpt_BettingByProduct [#113641]
 	 - 20191226@Mason: Set billing term by currency [#120005]
 	 - 20200302@Parsons: Support-HID-currency [#128856]
+	 - 20200622@Parsons: Update ParentId of Expired Group Accordingly. [#134452]
 	 
 	 Params:
 */
@@ -57,6 +58,14 @@ BEGIN
 
 	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC LA_PartyListSel
+
+	-- Update ParentId of Expired Group Accordingly
+	UPDATE p
+	SET p.ParentId = ci.ToParty
+	FROM @PartyList p
+	INNER JOIN @PartyChargeInfo c ON p.PartyId = c.PartyId
+	INNER JOIN OAS_ChargeInfo ci WITH(NOLOCK) ON c.ChargeId = ci.ChargeID
+	WHERE p.ParentId IN (1,9,11,98)
 	-- Endregion
 
 	SELECT pc.PartyId
