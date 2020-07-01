@@ -2,7 +2,7 @@
 USE [bodb_licensee]
 GO
 
-CREATE PROCEDURE [dbo].[LA_GroupMinFeeDetailIns]
+ALTER PROCEDURE [dbo].[LA_GroupMinFeeDetailIns]
 	@GroupMinFeeId				SMALLINT,
 	@GroupMinFeeSettingData		VARCHAR(MAX),
 	@ErrorCode					INT				= 0		OUTPUT,
@@ -40,7 +40,7 @@ BEGIN
 	
 	IF ISNULL(@GroupMinFeeSettingData, '') = '' RETURN
 	
-	DECLARE @GroupMinFeeSettings TABLE(ProductId INT, CurrencyId INT, FromDate DATE, ToDate DATE, MinFee MONEY, MinimumFeeTerm NVARCHAR(500))
+	DECLARE @GroupMinFeeSettings TABLE(Idx INT IDENTITY(1, 1), ProductId INT, CurrencyId INT, FromDate DATE, ToDate DATE, MinFee MONEY, MinimumFeeTerm NVARCHAR(500))
 	DECLARE @docHandler INT
 	
 	BEGIN TRY
@@ -58,25 +58,25 @@ BEGIN
 		EXEC sp_xml_removedocument @docHandler
 	END TRY
 	BEGIN CATCH
-		SELECT @ErrMsg = 'Group MinFee setting data invalid. Please try again.', @ErrorCode = 100
+		SELECT @ErrorMsg = 'Group MinFee setting data invalid. Please try again.', @ErrorCode = 100
 		RETURN
 	END CATCH
 	
 	-- FromDate must less than ToDate
 	IF EXISTS (SELECT TOP 1 1 FROM @GroupMinFeeSettings WHERE FromDate > ToDate)
 	BEGIN
-		SELECT @ErrMsg = 'From Date could not be later than To Date', @ErrCode = 801
+		SELECT @ErrorMsg = 'From Date could not be later than To Date', @ErrorCode = 506
 		RETURN
 	END
 	
-	-- Check time overlapping
+	--Duplicated from date/ to date between settings
 	IF EXISTS (
 		SELECT TOP 1 1
 		FROM @GroupMinFeeSettings a 
-			LEFT JOIN @GroupMinFeeSettings b ON a.Idx != b.Idx AND a.ProductId = b.ProductId
+			LEFT JOIN @GroupMinFeeSettings b ON a.Idx <> b.Idx AND a.ProductId = b.ProductId AND a.CurrencyId = b.CurrencyId
 		WHERE(a.FromDate <= b.ToDate AND a.ToDate >= B.FromDate))
 	BEGIN
-		SELECT @ErrMsg = 'From date/To date are overlapped with the others, please try again!', @ErrCode = 800
+		SELECT @ErrorMsg = 'Cannot save the setting, please check From date/To date.', @ErrorCode = 506
 		RETURN
 	END
 	

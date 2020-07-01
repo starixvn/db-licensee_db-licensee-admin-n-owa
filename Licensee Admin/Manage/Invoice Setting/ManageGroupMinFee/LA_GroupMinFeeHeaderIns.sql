@@ -2,13 +2,13 @@
 USE bodb_Licensee
 GO
 
-CREATE PROCEDURE [dbo].[LA_GroupMinFeeHeaderIns]
+ALTER PROCEDURE [dbo].[LA_GroupMinFeeHeaderIns]
 	@GroupName			NVARCHAR(110),
 	@FromDate			DATE,
 	@ToDate				DATE,
 	@NewGroupMinFeeId	SMALLINT		= 0		OUTPUT,
-	@ErrCode			INT				= 0		OUTPUT, 
-	@ErrMsg				VARCHAR(4000)	= ''	OUTPUT
+	@ErrorCode			INT				= 0		OUTPUT, 
+	@ErrorMsg			VARCHAR(4000)	= ''	OUTPUT
 AS
 /*
 	Created: 20200630@Happy
@@ -25,13 +25,13 @@ BEGIN
 	
 	IF EXISTS (SELECT 1 FROM dbo.LA_GroupMinFeeHeader WITH(NOLOCK) WHERE Name = @GroupName)
 	BEGIN
-		SELECT @ErrorMsg = 'Group name exists please try again!', @ErrCode = 506
+		SELECT @ErrorMsg = 'Group name exists please try again.', @ErrorCode = 506
 		RETURN
 	END
 	
 	IF (@FromDate >= @ToDate)
 	BEGIN
-		SELECT @ErrMsg = 'Cannot save the setting, please check From date/To date!', @ErrCode = 100
+		SELECT @ErrorMsg = 'Cannot save the setting, please check From date/To date.', @ErrorCode = 100
 		RETURN
 	END
 	
@@ -42,7 +42,7 @@ BEGIN
 	
 	IF @@ERROR <> 0
 	BEGIN
-		SELECT @ErrMsg = 'Insert/Update LA_GroupMinFeeHeader failed. Please try again.', @ErrCode = 503
+		SELECT @ErrorMsg = 'Insert/Update LA_GroupMinFeeHeader failed. Please try again.', @ErrorCode = 503
 		RETURN
 	END
 END

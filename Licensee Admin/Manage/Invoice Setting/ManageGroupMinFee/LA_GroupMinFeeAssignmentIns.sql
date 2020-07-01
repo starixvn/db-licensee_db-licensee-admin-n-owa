@@ -2,10 +2,10 @@
 USE [bodb_licensee]
 GO
 
-CREATE PROCEDURE [dbo].[LA_GroupMinFeeAssignmentIns]
+ALTER PROCEDURE [dbo].[LA_GroupMinFeeAssignmentIns]
 	@GroupMinFeeID			SMALLINT,
 	@LicenseeSettingData	VARCHAR(MAX),
-	@ErrorCode				INT =			0		OUTPUT,
+	@ErrorCode				INT				= 0		OUTPUT,
 	@ErrorMsg				VARCHAR(4000)	= ''	OUTPUT
 AS
 /*
@@ -14,11 +14,9 @@ AS
 	DB: DBCUST.bodb_Licensee
 
 	Revisions:
-	- 20190107@Parsons: Launch new licensee
 
 	Param's Explannation: 
-						@LicenseeSettingData = 
-							'<Root>
+						@LicenseeSettingData = '<Root>
 								<LicenseeSetting>
 									<PartyID>1</PartyID>
 									<IsPrimary>1</IsPrimary>
@@ -55,7 +53,20 @@ BEGIN
 	END
 	
 	--A licensee belongs to only 1 group min fee
-	IF EXISTS (SELECT 1 FROM @LicenseeSettings WHERE PartyID IN (SELECT PartyID FROM dbo.LA_GroupMinFeeAssignment WITH(NOLOCK)))
+	DECLARE @HeaderFromDate DATE,
+			@HeaderToDate DATE
+			
+	SELECT @HeaderFromDate = FromDate, @HeaderToDate = ToDate
+	FROM dbo.LA_GroupMinFeeHeader
+	WHERE GroupMinFeeID = @GroupMinFeeID
+	
+	IF EXISTS (
+		SELECT 1 FROM @LicenseeSettings 
+		WHERE PartyID IN 
+					(SELECT mfa.PartyID 
+						FROM dbo.LA_GroupMinFeeAssignment mfa WITH(NOLOCK)
+							INNER JOIN dbo.LA_GroupMinFeeHeader mfh WITH(NOLOCK) ON mfa.GroupMinFeeID = mfh.GroupMinFeeID 
+						WHERE @HeaderFromDate <= mfh.ToDate AND @HeaderToDate >= mfh.FromDate))
 	BEGIN
 		SELECT @ErrorMsg = 'A licensee belongs to only 1 group min fee.', @ErrorCode = 506
 		RETURN
@@ -69,9 +80,9 @@ BEGIN
 	END
 	
 	--A group min fee must have 1 primary licensee.
-	IF EXISTS (SELECT 1 FROM @LicenseeSettings HAVING COUNT(IsPrimary) <> 1)
+	IF EXISTS (SELECT 1 FROM @LicenseeSettings HAVING COUNT(CASE IsPrimary WHEN 1 THEN 1 ELSE NULL END) <> 1)
 	BEGIN
-		SELECT @ErrorMsg = 'Please assign the primary licensee!', @ErrorCode = 506
+		SELECT @ErrorMsg = 'Please assign the primary licensee.', @ErrorCode = 506
 		RETURN
 	END
 	

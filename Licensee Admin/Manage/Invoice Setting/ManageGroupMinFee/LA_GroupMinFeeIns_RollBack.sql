@@ -2,7 +2,7 @@
 USE [bodb_licensee]
 GO
 
-CREATE PROCEDURE [dbo].[LA_GroupMinFee_RollBack]
+ALTER PROCEDURE [dbo].[LA_GroupMinFeeIns_RollBack]
 	@GroupMinFeeId SMALLINT
 AS
 /*
