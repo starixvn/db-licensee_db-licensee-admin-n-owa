@@ -5,8 +5,8 @@ GO
 ALTER PROCEDURE [dbo].[LA_GroupMinFeeDetailIns]
 	@GroupMinFeeId				SMALLINT,
 	@GroupMinFeeSettingData		VARCHAR(MAX),
-	@ErrorCode					INT				= 0		OUTPUT,
-	@ErrorMsg					VARCHAR(4000)	= ''	OUTPUT
+	@ErrCode					INT				= 0		OUTPUT,
+	@ErrMsg						VARCHAR(4000)	= ''	OUTPUT
 AS
 /*
 	Created: 20200630@Happy
@@ -58,14 +58,14 @@ BEGIN
 		EXEC sp_xml_removedocument @docHandler
 	END TRY
 	BEGIN CATCH
-		SELECT @ErrorMsg = 'Group MinFee setting data invalid. Please try again.', @ErrorCode = 100
+		SELECT @ErrMsg = 'Group MinFee setting data invalid. Please try again.', @ErrCode = 100
 		RETURN
 	END CATCH
 	
-	-- FromDate must less than ToDate
+	--FromDate must less than ToDate
 	IF EXISTS (SELECT TOP 1 1 FROM @GroupMinFeeSettings WHERE FromDate > ToDate)
 	BEGIN
-		SELECT @ErrorMsg = 'From Date could not be later than To Date', @ErrorCode = 506
+		SELECT @ErrMsg = 'From Date could not be later than To Date', @ErrCode = 506
 		RETURN
 	END
 	
@@ -76,7 +76,23 @@ BEGIN
 			LEFT JOIN @GroupMinFeeSettings b ON a.Idx <> b.Idx AND a.ProductId = b.ProductId AND a.CurrencyId = b.CurrencyId
 		WHERE(a.FromDate <= b.ToDate AND a.ToDate >= B.FromDate))
 	BEGIN
-		SELECT @ErrorMsg = 'Cannot save the setting, please check From date/To date.', @ErrorCode = 506
+		SELECT @ErrMsg = 'Cannot save the setting, please check From date/To date.', @ErrCode = 506
+		RETURN
+	END
+	
+	--Check setting time exceeds master time range
+	DECLARE @HeaderFromDate DATE,
+			@HeaderToDate DATE
+			
+	SELECT @HeaderFromDate = FromDate, @HeaderToDate = ToDate 
+	FROM dbo.LA_GroupMinFeeHeader WITH(NOLOCK) 
+	WHERE GroupMinFeeID = @GroupMinFeeId
+	
+	IF EXISTS (
+		SELECT TOP 1 1
+		FROM @GroupMinFeeSettings WHERE (@HeaderFromDate <= ToDate AND @HeaderToDate >= FromDate))
+	BEGIN
+		SELECT @ErrMsg = 'Cannot save the setting, please check From date/To date.', @ErrCode = 506
 		RETURN
 	END
 	
@@ -86,7 +102,7 @@ BEGIN
 	
 	IF @@ERROR <> 0
 	BEGIN
-		SELECT @ErrorMsg = 'Insert LA_GroupMinFeeDetail failed. Please try again.', @ErrorCode = 503
+		SELECT @ErrMsg = 'Insert LA_GroupMinFeeDetail failed. Please try again.', @ErrCode = 503
 		RETURN
 	END
 END

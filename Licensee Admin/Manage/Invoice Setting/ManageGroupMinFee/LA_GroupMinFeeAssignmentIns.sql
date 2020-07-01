@@ -5,8 +5,8 @@ GO
 ALTER PROCEDURE [dbo].[LA_GroupMinFeeAssignmentIns]
 	@GroupMinFeeID			SMALLINT,
 	@LicenseeSettingData	VARCHAR(MAX),
-	@ErrorCode				INT				= 0		OUTPUT,
-	@ErrorMsg				VARCHAR(4000)	= ''	OUTPUT
+	@ErrCode				INT				= 0		OUTPUT,
+	@ErrMsg					VARCHAR(4000)	= ''	OUTPUT
 AS
 /*
 	Created: 20200630@Happy
@@ -47,7 +47,7 @@ BEGIN
 			EXEC sp_xml_removedocument @docHandler
 		END TRY
 		BEGIN CATCH
-			SELECT @ErrorMsg = 'Licensee setting data invalid. Please try again.', @ErrorCode = 100
+			SELECT @ErrMsg = 'Licensee setting data invalid. Please try again.', @ErrCode = 100
 			RETURN
 		END CATCH;
 	END
@@ -59,30 +59,29 @@ BEGIN
 	SELECT @HeaderFromDate = FromDate, @HeaderToDate = ToDate
 	FROM dbo.LA_GroupMinFeeHeader
 	WHERE GroupMinFeeID = @GroupMinFeeID
-	
+	--Check if a licensee belongs to a group min fee isnt expired
 	IF EXISTS (
-		SELECT 1 FROM @LicenseeSettings 
-		WHERE PartyID IN 
-					(SELECT mfa.PartyID 
-						FROM dbo.LA_GroupMinFeeAssignment mfa WITH(NOLOCK)
-							INNER JOIN dbo.LA_GroupMinFeeHeader mfh WITH(NOLOCK) ON mfa.GroupMinFeeID = mfh.GroupMinFeeID 
-						WHERE @HeaderFromDate <= mfh.ToDate AND @HeaderToDate >= mfh.FromDate))
+		SELECT 1 
+		FROM @LicenseeSettings s
+			LEFT JOIN dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK) ON s.PartyID = a.PartyID
+			INNER JOIN dbo.LA_GroupMinFeeHeader h WITH(NOLOCK) ON a.GroupMinFeeID = h.GroupMinFeeID
+		WHERE (@HeaderFromDate <= h.ToDate AND @HeaderToDate >= h.FromDate))
 	BEGIN
-		SELECT @ErrorMsg = 'A licensee belongs to only 1 group min fee.', @ErrorCode = 506
+		SELECT @ErrMsg = 'A licensee belongs to only 1 group min fee.', @ErrCode = 506
 		RETURN
 	END
 	
 	--A group min fee should have at least 2 payers
 	IF EXISTS (SELECT 1 FROM @LicenseeSettings HAVING COUNT(PartyID) < 2)
 	BEGIN
-		SELECT @ErrorMsg = 'Should has at least 2 payers in group.', @ErrorCode = 506
+		SELECT @ErrMsg = 'Should has at least 2 payers in group.', @ErrCode = 506
 		RETURN
 	END
 	
 	--A group min fee must have 1 primary licensee.
 	IF EXISTS (SELECT 1 FROM @LicenseeSettings HAVING COUNT(CASE IsPrimary WHEN 1 THEN 1 ELSE NULL END) <> 1)
 	BEGIN
-		SELECT @ErrorMsg = 'Please assign the primary licensee.', @ErrorCode = 506
+		SELECT @ErrMsg = 'Please assign the primary licensee.', @ErrCode = 506
 		RETURN
 	END
 	
@@ -92,7 +91,7 @@ BEGIN
 	
 	IF @@ERROR <> 0
 	BEGIN
-		SELECT @ErrorMsg = 'Insert LA_GroupMinFeeAssignment failed. Please try again.', @ErrorCode = 503
+		SELECT @ErrMsg = 'Insert LA_GroupMinFeeAssignment failed. Please try again.', @ErrCode = 503
 		RETURN
 	END
 END
