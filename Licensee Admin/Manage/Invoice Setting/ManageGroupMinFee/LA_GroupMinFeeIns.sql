@@ -9,7 +9,10 @@ ALTER PROCEDURE [dbo].[LA_GroupMinFeeIns]
 	@LicenseeSettingData		VARCHAR(MAX),
 	@GroupMinFeeSettingData		VARCHAR(MAX),
 	@ErrCode					INT				= 0		OUTPUT, 
-	@ErrMsg						VARCHAR(4000)	= ''	OUTPUT
+	@ErrMsg						VARCHAR(4000)	= ''	OUTPUT,
+	@UserId						INT, 
+	@LoginIp					VARCHAR (50)	= '',
+	@NewGroupMinFeeId			SMALLINT = 0 			OUTPUT
 AS
 /*
 	Created: 20200630@Happy
@@ -51,8 +54,6 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON;
-	
-	DECLARE @NewGroupMinFeeId SMALLINT = 0
 	EXEC dbo.LA_GroupMinFeeHeaderIns @GroupName, @FromDate, @ToDate, @NewGroupMinFeeId OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT
 	
 	IF @ErrCode = 0
