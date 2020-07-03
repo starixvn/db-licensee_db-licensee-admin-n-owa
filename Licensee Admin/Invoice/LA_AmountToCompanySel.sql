@@ -2,16 +2,17 @@
 USE bodb_Licensee
 GO
 
-ALTER PROCEDURE [dbo].[LA_AmountToCompanySel] (
-	@FromDate		DATE,
+--ALTER PROCEDURE [dbo].[LA_AmountToCompanySel] (
+DECLARE	@FromDate		DATE,
 	@ToDate			DATE,
 	@PartyIds		VARCHAR(4000) = '',
 	@ProductCodes	VARCHAR(1000) = '',
 	@BaseCurrency	VARCHAR(10) = 'EUR',
 	@CurrencyId		INT = 0,
 	@IsApplyDiscountMinfee BIT = 1
-)
-AS
+SELECT @PartyIds='399,368,394', @FromDate='2020-06-01 00:00:00',@ToDate='2020-06-30 00:00:00',@ProductCodes='SB'
+--)
+--AS
 /*	Created: 20180703@Bruce
 	Task : calculate discount, rebate, licensing fee in one invoice period(one month)
 	DB: DBLIC.bodb_Licensee
@@ -55,29 +56,34 @@ BEGIN
 	SELECT ProductID, 1 FROM dbo.LA_f_Products3rd(@ProductCodes)
 
 	-- 1.1 party list
-	DECLARE @PartyList TABLE(
-		PartyId			INT,
-		IsSelected		BIT,
-		PartyGroupId	INT
-	)
+	DECLARE @PartyList TABLE(PartyId INT, IsSelected BIT, GroupMinFeeId	INT)
+
 	-- set selected = true
 	-- put each party to it individual group(indicated by -partyid)
-	INSERT INTO @PartyList(PartyId,IsSelected,PartyGroupId)
+	INSERT INTO @PartyList(PartyId, IsSelected, GroupMinFeeId)
 	SELECT CAST(val AS INT),1,-1 * CAST(val AS INT) FROM dbo.strSplit(@PartyIds, ',')
 
 	-- 1.2 to calculate minfee: need to select all party in same group
 	-- 1.2.1 get actual party group id
+	;WITH cte_GroupMinFeeSetting AS
+	(
+		SELECT TOP(1) WITH TIES h.GroupMinFeeID, a.PartyID
+		FROM @PartyList p
+			INNER JOIN dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK) ON p.PartyId = a.PartyId
+			INNER JOIN dbo.LA_GroupMinFeeHeader h WITH(NOLOCK) ON a.GroupMinFeeId = h.GroupMinFeeId
+		ORDER BY ROW_NUMBER() OVER(PARTITION BY a.PartyID ORDER BY h.ToDate DESC)
+	)
 	UPDATE p
-	SET PartyGroupId=a.PartyGroupId
+	SET GroupMinFeeId = a.GroupMinFeeId
 	FROM @PartyList p
-	INNER JOIN dbo.LA_PartyGroupAssignment a WITH(NOLOCK) ON p.PartyId = a.PartyId
+	INNER JOIN cte_GroupMinFeeSetting a ON p.PartyId = a.PartyId
 
 	-- 1.2.2 get party in same group
-	INSERT INTO @PartyList(PartyId,PartyGroupId,IsSelected)
-	SELECT DISTINCT a.PartyId, a.PartyGroupId,0
-	FROM dbo.LA_PartyGroupAssignment a WITH(NOLOCK)
-	WHERE a.PartyId NOT IN (SELECT b.PartyId FROM @PartyList b)
-		AND a.PartyGroupId IN (SELECT c.PartyGroupId FROM @PartyList c) -- Refactor: Join instead of IN
+	INSERT INTO @PartyList(PartyId, GroupMinFeeId, IsSelected)
+	SELECT DISTINCT a.PartyId, a.GroupMinFeeId,0
+	FROM dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK)
+		INNER JOIN @PartyList c ON a.GroupMinFeeId = c.GroupMinFeeId
+	WHERE NOT EXISTS (SELECT TOP 1 b.PartyId FROM @PartyList b WHERE a.PartyId = b.PartyId)
 
 	-- 1.3 include products that use to calculate discount
 	-- discount type
@@ -136,7 +142,7 @@ BEGIN
 		AND c.DiscountGroupType = d.DiscountGroupType
 
 	-- 1.3.3 add discount calculation party
-	INSERT INTO @PartyList(PartyId,PartyGroupId,IsSelected)
+	INSERT INTO @PartyList(PartyId,GroupMinFeeId,IsSelected)
 	SELECT DISTINCT a.PartyID, -a.PartyID, 0
 	FROM #tmpDiscountSettings a
 	LEFT JOIN @PartyList b ON a.PartyID = b.PartyId
@@ -354,43 +360,39 @@ BEGIN
 		FeeUnderWaiveTime = CASE WHEN f.FeeUnderWaiveTime < 0 THEN 0 ELSE f.FeeUnderWaiveTime END,
 		FeeOutOfWaiveTime = CASE WHEN f.FeeOutOfWaiveTime < 0 THEN 0 ELSE f.FeeOutOfWaiveTime END
 	FROM @tmpMinFee mf INNER JOIN Fee f ON mf.MinFeeId=f.MinFeeId
-	WHERE mf.FeeType=1
-
-	--3.2 calculate total minfee by group
-	DECLARE @TotalMinFees TABLE(
-		PartyGroupId	INT,
-		ProductId		INT,
-		TotalMinFee		MONEY,
-		TotalAmount		MONEY
-	)
-	INSERT INTO @TotalMinFees(PartyGroupId,ProductId, TotalMinFee, TotalAmount)
-	SELECT p.PartyGroupId, mf.ProductId, SUM(mf.MinFeeAmount), SUM(mf.FeeOutOfWaiveTime)
-	FROM @tmpMinFee mf
-	INNER JOIN @PartyList p ON mf.PartyId = p.PartyId
 	WHERE mf.FeeType = 1
-	GROUP BY p.PartyGroupId, mf.ProductId
+
+	--3.2 Calculate total minfee by group --(Convert to @BaseCurrency)
+	DECLARE @TotalMinFees TABLE(GroupMinFeeId INT, ProductId INT, TotalMinFee MONEY)
+	
+	INSERT INTO @TotalMinFees(GroupMinFeeId, ProductId, TotalMinFee)
+	SELECT TOP(1) WITH TIES mfd.GroupMinFeeID, ProductId, mfd.MinimumFee * e.Rate AS GroupMinFee
+	FROM dbo.LA_GroupMinFeeDetail mfd WITH(NOLOCK)
+		INNER JOIN @PartyList p ON mfd.GroupMinFeeID = p.GroupMinFeeId
+		INNER JOIN #tmpExchange e ON e.ExchangeId = mfd.CurrencyId AND e.exchangedate = @ToDate
+	ORDER BY ROW_NUMBER() OVER(PARTITION BY mfd.GroupMinFeeID order by mfd.ToDate DESC)
 
 	-- 3.3 calculate actual licensing fee
 		-- 3.3.1 actual licensing fee as usual	
 	UPDATE r SET Fee = CASE
-			WHEN t.TotalAmount < t.TotalMinFee AND a.FeeOutOfWaiveTime < a.MinFeeAmount
+			WHEN /*t.TotalAmount < t.TotalMinFee AND*/ a.FeeOutOfWaiveTime < a.MinFeeAmount
 				THEN a.MinFeeAmount + a.FeeUnderWaiveTime
-			ELSE a.FeeOutOfWaiveTime + a.FeeUnderWaiveTime
+			ELSE a.FeeOutOfWaiveTime + a.FeeUnderWaiveTime -- Apply all in case of GroupMinFeeID <> 0
 		END,
 		IsChargedByMinFee = CASE
-			WHEN t.TotalAmount < t.TotalMinFee AND a.FeeOutOfWaiveTime < a.MinFeeAmount
+			WHEN /*t.TotalAmount < t.TotalMinFee AND*/ a.FeeOutOfWaiveTime < a.MinFeeAmount -- GroupMinFeeID <> 0
 				THEN 1
 			ELSE 0
 		END,
-		IsApplyMinfeeToDiscount = CASE
+		IsApplyMinfeeToDiscount = CASE -- GroupMinFeeID <> 0 THEN (Considering...)
 			WHEN a.MinFeeAmount < a.FeeAmount AND a.FeeAmount > 0 AND b.FeeType IS NOT NULL THEN 0-- waived
-			WHEN t.TotalAmount >= t.TotalMinFee AND p.PartyGroupId > 0 THEN 0 -- reach group minfee goal
+			WHEN /*t.TotalAmount >= t.TotalMinFee AND*/ p.GroupMinFeeId > 0 THEN 0 -- reach group minfee goal
 			ELSE 1 END,
 		Minfee = a.MinFeeAmount
 	FROM @FinalResult r
 	INNER JOIN @PartyList p ON r.PartyId = p.PartyId
 	INNER JOIN @tmpMinFee a ON a.PartyId = r.PartyId AND a.ProductId = r.ProductID AND a.FeeType = 1 -- minfee setting
-	INNER JOIN @TotalMinFees t ON a.ProductId = t.ProductId AND t.PartyGroupId = p.PartyGroupId
+	INNER JOIN @TotalMinFees t ON a.ProductId = t.ProductId AND t.GroupMinFeeId = p.GroupMinFeeId
 	LEFT JOIN @tmpMinFee b ON b.PartyId = r.PartyId AND b.ProductId=r.ProductID AND b.FeeType = 2-- waive setting
 		-- 3.3.2 Update licensing fee of primary licensee
 /*--------------------------------------------------------------------------------------------------------------------------------
