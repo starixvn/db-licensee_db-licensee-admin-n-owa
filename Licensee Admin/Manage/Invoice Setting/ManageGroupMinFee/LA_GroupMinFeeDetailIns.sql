@@ -20,7 +20,7 @@ AS
 							<GroupMinFeeSetting>
 								<ProductId>0</ProductId>
 								<MinimumFee>5000</MinimumFee>
-								<MinFeeTerms>EUR 5,000 (Waived for the first 3 months after launched)</MinFeeTerms>
+								<MinimumFeeTerm>EUR 5,000 (Waived for the first 3 months after launched)</MinimumFeeTerm>
 								<CurrencyId>6</CurrencyId>
 								<FromDate>20190108</FromDate>
 								<ToDate>20500101</ToDate>
@@ -28,7 +28,7 @@ AS
 							<GroupMinFeeSetting>
 								<ProductId>0</ProductId>
 								<MinimumFee>2</MinimumFee>
-								<MinFeeTerms></MinFeeTerms>
+								<MinimumFeeTerm></MinimumFeeTerm>
 								<CurrencyId>6</CurrencyId>
 								<FromDate>20190108</FromDate>
 								<ToDate>20190407</ToDate>
@@ -58,7 +58,7 @@ BEGIN
 		EXEC sp_xml_removedocument @docHandler
 	END TRY
 	BEGIN CATCH
-		SELECT @ErrMsg = 'Group MinFee setting data invalid. Please try again.', @ErrCode = 100
+		SELECT @ErrMsg = 'Group Min Fee setting data invalid. Please try again.', @ErrCode = 100
 		RETURN
 	END CATCH
 	
