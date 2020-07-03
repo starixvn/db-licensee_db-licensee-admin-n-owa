@@ -19,7 +19,7 @@ AS
 						@GroupMinFeeSettingData = '<Root>
 							<GroupMinFeeSetting>
 								<ProductId>0</ProductId>
-								<MinFee>5000</MinFee>
+								<MinimumFee>5000</MinimumFee>
 								<MinFeeTerms>EUR 5,000 (Waived for the first 3 months after launched)</MinFeeTerms>
 								<CurrencyId>6</CurrencyId>
 								<FromDate>20190108</FromDate>
@@ -27,7 +27,7 @@ AS
 							</GroupMinFeeSetting>
 							<GroupMinFeeSetting>
 								<ProductId>0</ProductId>
-								<MinFee>2</MinFee>
+								<MinimumFee>2</MinimumFee>
 								<MinFeeTerms></MinFeeTerms>
 								<CurrencyId>6</CurrencyId>
 								<FromDate>20190108</FromDate>
@@ -40,19 +40,19 @@ BEGIN
 	
 	IF ISNULL(@GroupMinFeeSettingData, '') = '' RETURN
 	
-	DECLARE @GroupMinFeeSettings TABLE(Idx INT IDENTITY(1, 1), ProductId INT, CurrencyId INT, FromDate DATE, ToDate DATE, MinFee MONEY, MinimumFeeTerm NVARCHAR(500))
+	DECLARE @GroupMinFeeSettings TABLE(Idx INT IDENTITY(1, 1), ProductId INT, CurrencyId INT, FromDate DATE, ToDate DATE, MinimumFee MONEY, MinimumFeeTerm NVARCHAR(500))
 	DECLARE @docHandler INT
 	
 	BEGIN TRY
 		EXEC sp_xml_preparedocument @docHandler OUTPUT, @GroupMinFeeSettingData
-		INSERT INTO @GroupMinFeeSettings(ProductId, CurrencyId, FromDate, ToDate, MinFee, MinimumFeeTerm)
-		SELECT ProductId, CurrencyId, FromDate, ToDate, MinFee, MinimumFeeTerm
+		INSERT INTO @GroupMinFeeSettings(ProductId, CurrencyId, FromDate, ToDate, MinimumFee, MinimumFeeTerm)
+		SELECT ProductId, CurrencyId, FromDate, ToDate, MinimumFee, MinimumFeeTerm
 		FROM OPENXML(@docHandler, 'Root/GroupMinFeeSetting')
 		WITH(ProductId INT 'ProductId',
 				CurrencyId INT 'CurrencyId',
 				FromDate DATE 'FromDate',
 				ToDate DATE 'ToDate',
-				MinFee MONEY 'MinFee',
+				MinimumFee MONEY 'MinFee',
 				MinimumFeeTerm NVARCHAR(500) 'MinimumFeeTerm')
 				
 		EXEC sp_xml_removedocument @docHandler
@@ -90,14 +90,14 @@ BEGIN
 	
 	IF EXISTS (
 		SELECT TOP 1 1
-		FROM @GroupMinFeeSettings WHERE (@HeaderFromDate <= ToDate AND @HeaderToDate >= FromDate))
+		FROM @GroupMinFeeSettings WHERE (FromDate < @HeaderFromDate OR ToDate > @HeaderToDate))
 	BEGIN
 		SELECT @ErrMsg = 'Cannot save the setting, please check From date/To date.', @ErrCode = 506
 		RETURN
 	END
 	
 	INSERT INTO dbo.LA_GroupMinFeeDetail(GroupMinFeeID, ProductID, CurrencyId, FromDate, ToDate, MinimumFee, MinimumFeeTerm)
-	SELECT @GroupMinFeeId, ProductId, CurrencyId, FromDate, ToDate, MinFee, MinimumFeeTerm
+	SELECT @GroupMinFeeId, ProductId, CurrencyId, FromDate, ToDate, MinimumFee, MinimumFeeTerm
 	FROM @GroupMinFeeSettings
 	
 	IF @@ERROR <> 0
