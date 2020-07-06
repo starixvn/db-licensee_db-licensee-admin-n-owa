@@ -61,9 +61,11 @@ BEGIN
 	SET NOCOUNT ON;
 	
 	--#Region LA_GroupMinFeeHeader
+	IF CAST(@GroupMinFeeHeaderOldData AS VARCHAR(MAX)) = ''	RETURN
+	
 	DECLARE @HeaderTable TABLE (GroupMinFeeID SMALLINT, Name NVARCHAR(110), FromDate DATE, ToDate DATE)
 	DECLARE @docHandler INT
-	
+
 	BEGIN TRY
 		EXEC sp_xml_preparedocument @docHandler OUTPUT, @GroupMinFeeHeaderOldData
 		INSERT INTO @HeaderTable(GroupMinFeeID, Name, FromDate, ToDate)
@@ -80,14 +82,16 @@ BEGIN
 		SELECT @ErrMsg = 'Header backup data invalid. Please try again.', @ErrCode = 100
 		RETURN
 	END CATCH;
-	
+
 	UPDATE t WITH(ROWLOCK, UPDLOCK)
 	SET t.Name = s.Name, t.FromDate = s.FromDate, t.ToDate = s.ToDate
 	FROM dbo.LA_GroupMinFeeHeader t
-	INNER JOIN @HeaderTable s ON t.GroupMinFeeID = s.GroupMinFeeID 
+	INNER JOIN @HeaderTable s ON t.GroupMinFeeID = s.GroupMinFeeID
 	--#Endregion
 	
 	--#Region LA_GroupMinFeeAssignment
+	IF CAST(@LicenseeSettingOldData AS VARCHAR(MAX)) = '' RETURN
+	
 	DECLARE @LicenseeSettingTable TABLE (PartyID INT, IsPrimary BIT)
 	
 	BEGIN TRY
@@ -115,6 +119,8 @@ BEGIN
 	--#Endregion
 	
 	--#Region LA_GroupMinFeeDetail
+	IF CAST(@GroupMinFeeSettingOldData AS VARCHAR(MAX)) = ''
+
 	DECLARE @GroupMinFeeSettingTable TABLE (ProductID INT, CurrencyId INT, FromDate DATE, ToDate DATE, MinimumFee MONEY, MinimumFeeTerm NVARCHAR(500))
 	
 	BEGIN TRY
