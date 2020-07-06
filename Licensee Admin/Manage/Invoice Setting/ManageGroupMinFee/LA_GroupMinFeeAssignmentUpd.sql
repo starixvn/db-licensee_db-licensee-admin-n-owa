@@ -85,7 +85,9 @@ BEGIN
 		THEN UPDATE SET t.IsPrimary = s.IsPrimary
 	WHEN NOT MATCHED BY TARGET
 		THEN INSERT(GroupMinFeeID, PartyID, IsPrimary)
-				VALUES(s.GroupMinFeeID, s.PartyID, s.IsPrimary);
+				VALUES(s.GroupMinFeeID, s.PartyID, s.IsPrimary)
+	WHEN NOT MATCHED BY SOURCE AND t.GroupMinFeeID = @GroupMinFeeID
+		THEN DELETE;
 	
 	--A group min fee should have at least 2 payers
 	IF EXISTS (SELECT 1 

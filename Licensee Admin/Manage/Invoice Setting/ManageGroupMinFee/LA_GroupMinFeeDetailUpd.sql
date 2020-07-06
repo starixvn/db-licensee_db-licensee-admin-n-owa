@@ -109,15 +109,15 @@ BEGIN
 	USING @GroupMinFeeSettings AS s
 	ON(t.GroupMinFeeID = s.GroupMinFeeID AND t.ProductID = s.ProductID AND t.CurrencyID = s.CurrencyID AND t.FromDate = s.FromDate)
 	WHEN MATCHED
-		THEN UPDATE SET t.ProductID = s.ProductID, 
-						t.CurrencyID = s.CurrencyID, 
-						t.FromDate = s.FromDate, 
+		THEN UPDATE SET t.FromDate = s.FromDate, 
 						t.ToDate = s.ToDate, 
 						t.MinimumFee = s.MinimumFee, 
 						t.MinimumFeeTerm = s.MinimumFeeTerm
 	WHEN NOT MATCHED BY TARGET
 		THEN INSERT(GroupMinFeeID, ProductID, CurrencyID, FromDate, ToDate, MinimumFee, MinimumFeeTerm)
-				VALUES(s.GroupMinFeeID, s.ProductID, s.CurrencyID, s.FromDate, s.ToDate, s.MinimumFee, s.MinimumFeeTerm);
+				VALUES(s.GroupMinFeeID, s.ProductID, s.CurrencyID, s.FromDate, s.ToDate, s.MinimumFee, s.MinimumFeeTerm)
+	WHEN NOT MATCHED BY SOURCE AND t.GroupMinFeeID = @GroupMinFeeID
+		THEN DELETE;
 	
 	IF @@ERROR <> 0
 	BEGIN
