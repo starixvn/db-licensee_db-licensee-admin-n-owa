@@ -64,7 +64,7 @@ BEGIN
 		FROM @LicenseeSettings s
 			INNER JOIN dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK) ON s.PartyID = a.PartyID
 			INNER JOIN dbo.LA_GroupMinFeeHeader h WITH(NOLOCK) ON a.GroupMinFeeID = h.GroupMinFeeID
-		WHERE (@HeaderFromDate <= h.ToDate AND @HeaderToDate >= h.FromDate))
+		WHERE (@HeaderFromDate <= h.ToDate AND @HeaderToDate >= h.FromDate AND s.GroupMinFeeID <> a.GroupMinFeeID))
 	BEGIN
 		SELECT @ErrMsg = 'A licensee belongs to only 1 group min fee.', @ErrCode = 506
 		RETURN

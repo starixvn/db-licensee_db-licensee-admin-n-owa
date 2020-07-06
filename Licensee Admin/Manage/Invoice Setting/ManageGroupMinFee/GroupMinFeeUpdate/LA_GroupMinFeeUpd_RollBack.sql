@@ -61,7 +61,7 @@ BEGIN
 	SET NOCOUNT ON;
 	
 	--#Region LA_GroupMinFeeHeader
-	IF CAST(@GroupMinFeeHeaderOldData AS VARCHAR(MAX)) = ''	RETURN
+	IF CAST(@GroupMinFeeHeaderOldData AS VARCHAR(MAX)) IS NULL	RETURN
 	
 	DECLARE @HeaderTable TABLE (GroupMinFeeID SMALLINT, Name NVARCHAR(110), FromDate DATE, ToDate DATE)
 	DECLARE @docHandler INT
@@ -90,7 +90,7 @@ BEGIN
 	--#Endregion
 	
 	--#Region LA_GroupMinFeeAssignment
-	IF CAST(@LicenseeSettingOldData AS VARCHAR(MAX)) = '' RETURN
+	IF CAST(@LicenseeSettingOldData AS VARCHAR(MAX)) IS NULL RETURN
 	
 	DECLARE @LicenseeSettingTable TABLE (PartyID INT, IsPrimary BIT)
 	
@@ -119,7 +119,7 @@ BEGIN
 	--#Endregion
 	
 	--#Region LA_GroupMinFeeDetail
-	IF CAST(@GroupMinFeeSettingOldData AS VARCHAR(MAX)) = ''
+	IF CAST(@GroupMinFeeSettingOldData AS VARCHAR(MAX)) IS NULL RETURN
 
 	DECLARE @GroupMinFeeSettingTable TABLE (ProductID INT, CurrencyId INT, FromDate DATE, ToDate DATE, MinimumFee MONEY, MinimumFeeTerm NVARCHAR(500))
 	
