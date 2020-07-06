@@ -60,9 +60,9 @@ BEGIN
 	WHERE GroupMinFeeID = @GroupMinFeeID
 	--Check if a licensee belongs to a group min fee isnt expired
 	IF EXISTS (
-		SELECT 1 
+		SELECT TOP 1 1 
 		FROM @LicenseeSettings s
-			LEFT JOIN dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK) ON s.PartyID = a.PartyID
+			INNER JOIN dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK) ON s.PartyID = a.PartyID
 			INNER JOIN dbo.LA_GroupMinFeeHeader h WITH(NOLOCK) ON a.GroupMinFeeID = h.GroupMinFeeID
 		WHERE (@HeaderFromDate <= h.ToDate AND @HeaderToDate >= h.FromDate))
 	BEGIN
