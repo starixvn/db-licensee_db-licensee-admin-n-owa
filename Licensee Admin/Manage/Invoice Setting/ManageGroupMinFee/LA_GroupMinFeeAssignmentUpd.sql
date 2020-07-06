@@ -69,6 +69,24 @@ BEGIN
 		SELECT @ErrMsg = 'A licensee belongs to only 1 group min fee.', @ErrCode = 506
 		RETURN
 	END
+		
+	--A group min fee should have at least 2 payers
+	IF EXISTS (SELECT 1 
+				FROM @LicenseeSettings 
+				HAVING COUNT(PartyID) < 2)
+	BEGIN
+		SELECT @ErrMsg = 'Should have at least 2 payers in group.', @ErrCode = 506
+		RETURN
+	END
+	
+	--A group min fee must have 1 primary licensee.
+	IF EXISTS (SELECT 1 
+				FROM @LicenseeSettings
+				HAVING COUNT(CASE IsPrimary WHEN 1 THEN 1 ELSE NULL END) <> 1)
+	BEGIN
+		SELECT @ErrMsg = 'Please assign the primary licensee.', @ErrCode = 506
+		RETURN
+	END
 	
 	--#Region backup
 	SET @OldData = (
@@ -88,26 +106,6 @@ BEGIN
 				VALUES(s.GroupMinFeeID, s.PartyID, s.IsPrimary)
 	WHEN NOT MATCHED BY SOURCE AND t.GroupMinFeeID = @GroupMinFeeID
 		THEN DELETE;
-	
-	--A group min fee should have at least 2 payers
-	IF EXISTS (SELECT 1 
-				FROM dbo.LA_GroupMinFeeAssignment WITH(NOLOCK) 
-				WHERE GroupMinFeeID = @GroupMinFeeID 
-				HAVING COUNT(PartyID) < 2)
-	BEGIN
-		SELECT @ErrMsg = 'Should has at least 2 payers in group.', @ErrCode = 506
-		RETURN
-	END
-	
-	--A group min fee must have 1 primary licensee.
-	IF EXISTS (SELECT 1 
-				FROM dbo.LA_GroupMinFeeAssignment WITH(NOLOCK)
-				WHERE GroupMinFeeID = @GroupMinFeeID 
-				HAVING COUNT(CASE IsPrimary WHEN 1 THEN 1 ELSE NULL END) <> 1)
-	BEGIN
-		SELECT @ErrMsg = 'Please assign the primary licensee.', @ErrCode = 506
-		RETURN
-	END
 	
 	IF @@ERROR <> 0
 	BEGIN

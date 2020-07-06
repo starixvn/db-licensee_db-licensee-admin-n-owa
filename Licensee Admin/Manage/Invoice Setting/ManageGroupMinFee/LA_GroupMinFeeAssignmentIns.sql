@@ -74,7 +74,7 @@ BEGIN
 	--A group min fee should have at least 2 payers
 	IF EXISTS (SELECT 1 FROM @LicenseeSettings HAVING COUNT(PartyID) < 2)
 	BEGIN
-		SELECT @ErrMsg = 'Should has at least 2 payers in group.', @ErrCode = 506
+		SELECT @ErrMsg = 'Should have at least 2 payers in group.', @ErrCode = 506
 		RETURN
 	END
 	
