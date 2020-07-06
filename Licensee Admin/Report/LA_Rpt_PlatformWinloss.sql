@@ -29,6 +29,7 @@ AS
 		- 20191010@Percy: Replace LicenseeBATransaction to LicenseeBATransaction_active [RedmineID: #103656]
 		- 20191223@Bruce: Adding betform v and 0 [#118998]
 		- 202000318@Parsons: Handle new betfrom v,1,2,3 into their own category [#130645]
+		- 20200706@Parsons: Add new betfrom eGame Mobile and eGamer Desktop [#136414]
 
 	Explanation:
 	  + @PlatformType:
@@ -45,7 +46,10 @@ AS
 					  12: ESportsWebDesktop (1)
 					  13: ESportsWebMobile (2)
 					  14: ESportsAPP (3)
-					  15: Others(t)
+					  15: eGameDesktop (4)
+					  16: eGameMobile (5)
+					  17: eGameAPP (6)
+					  18: Others(t)
 
 	  + @excludeTest: remove currency UUS
 	  + @MoveBetsDay: The day we move tickets to bettrans14
@@ -61,7 +65,7 @@ BEGIN
 	--
 	DECLARE @betfrom TABLE(betfrom CHAR(1))
 	INSERT INTO @betfrom 
-	SELECT val FROM (VALUES('d'),('a'),('e'),('u'),('m'),('l'),('g'),('x'),('z'),('r'),('o'),('c'),('t'),('0'),('v'),('1'),('2'),('3'))v(val)
+	SELECT val FROM (VALUES('d'),('a'),('e'),('u'),('m'),('l'),('g'),('x'),('z'),('r'),('o'),('c'),('t'),('0'),('v'),('1'),('2'),('3'),('4'),('5'),('6'))v(val)
 
 	CREATE TABLE #WinLoss (
 		LicenseeID		INT,
