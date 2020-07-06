@@ -10,8 +10,6 @@ ALTER PROCEDURE [dbo].[LA_GroupMinFeeIns]
 	@GroupMinFeeSettingData		VARCHAR(MAX),
 	@ErrCode					INT				= 0		OUTPUT, 
 	@ErrMsg						VARCHAR(4000)	= ''	OUTPUT,
-	@UserId						INT, 
-	@LoginIp					VARCHAR (50)	= '',
 	@NewGroupMinFeeId			SMALLINT = 0 			OUTPUT
 AS
 /*
