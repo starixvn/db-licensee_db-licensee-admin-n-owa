@@ -106,7 +106,7 @@ BEGIN
 	END CATCH;
 	
 	DELETE 
-	FROM dbo.LA_GroupMinFeeAssignment
+	FROM dbo.LA_GroupMinFeeAssignment WITH(ROWLOCK)
 	WHERE GroupMinFeeID = @GroupMinFeeID
 	
 	INSERT INTO LA_GroupMinFeeAssignment(GroupMinFeeID, PartyID, IsPrimary)
@@ -137,7 +137,7 @@ BEGIN
 	END CATCH;
 	
 	DELETE 
-	FROM dbo.LA_GroupMinFeeDetail
+	FROM dbo.LA_GroupMinFeeDetail WITH(ROWLOCK)
 	WHERE GroupMinFeeID = @GroupMinFeeID
 	
 	INSERT INTO dbo.LA_GroupMinFeeDetail(GroupMinFeeID, ProductID, CurrencyId, FromDate, ToDate, MinimumFee, MinimumFeeTerm)
