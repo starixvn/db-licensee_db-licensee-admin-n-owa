@@ -52,7 +52,7 @@ BEGIN
 				CurrencyId INT 'CurrencyId',
 				FromDate DATE 'FromDate',
 				ToDate DATE 'ToDate',
-				MinimumFee MONEY 'MinFee',
+				MinimumFee MONEY 'MinimumFee',
 				MinimumFeeTerm NVARCHAR(500) 'MinimumFeeTerm')
 				
 		EXEC sp_xml_removedocument @docHandler

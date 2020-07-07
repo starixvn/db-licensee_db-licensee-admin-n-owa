@@ -15,7 +15,7 @@ AS
 	 DB: DBCUST.bodb_licensee   
 
 	 Revisions:  
-		- 20200703@Mason: Delete discount groups [#94282]
+		- 20200703@Mason: Implement Group Min Fee [#134492]
 	 
 	 Params:
 
