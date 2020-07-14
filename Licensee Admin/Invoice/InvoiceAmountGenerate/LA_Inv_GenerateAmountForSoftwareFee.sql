@@ -29,7 +29,8 @@ AS
 		- 20190911@Bruce: Support Exchange product in invoices [#119846]
 		- 20191017@Parsons: Non-peak hour promotion [#119538]
 		- 20191209@Parsons: PP tournament [#123958] 
-		- 20200505@Parsons: Special handling for INH market [#128570]
+		- 20200505@Parsons: Special handling for INH market [#128570] 
+		- 20200714@Parsons: Implement PP Jackpot [RedmineID: #137306]
 */
 BEGIN
 	SET NOCOUNT ON

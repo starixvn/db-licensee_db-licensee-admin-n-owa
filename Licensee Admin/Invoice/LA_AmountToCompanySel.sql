@@ -27,7 +27,8 @@ AS
 		- 20191125@Mason: Setup billing terms by Currency  [#120005]
 	    - 20191206@Parsons: PP tournament [#123958]
 	    - 20200409@Parsons: Integrate SA Gaming [#129276]
-		- 20200505@Parsons: Special handling for INH market [#128570]
+		- 20200505@Parsons: Special handling for INH market [#128570] 
+		- 20200714@Parsons: Implement PP Jackpot [RedmineID: #137306]
 
 	Parameters:
 		@IsApplyDiscountMinfee: apply minfee term to discount value
