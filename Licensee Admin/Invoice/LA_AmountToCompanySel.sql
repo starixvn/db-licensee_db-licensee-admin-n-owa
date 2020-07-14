@@ -43,6 +43,8 @@ BEGIN
  * 1. Prepare settings
  *-------------------------------------------------------------------------------------------------------------------------------*/
 	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007,
+			@PP_Contribution SMALLINT = 4297,
+			@PP_JackpotPrize SMALLINT = 4298,
 			@PPTournament SMALLINT = 4299,
 			@PromotionPrize SMALLINT = 4300
 	
@@ -285,8 +287,9 @@ BEGIN
 		b.rptDate	AS WinlossDate,
 		p.ProductId,
 		b.CurrencyId,
-		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss,
-		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN 0 ELSE ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) * e.Rate END) AS AmountToCompany,
+		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @PP_Contribution) THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss,
+		SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 * e.Rate END) AS PP_Contribution,
+		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @PP_Contribution) THEN 0 ELSE ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) * e.Rate END) AS AmountToCompany,
 		SUM(CASE 
 			WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) * e.Rate
 			WHEN b.ProductID = @BX THEN -(b.CommissionA + b.CommissionP) * e.Rate
@@ -298,7 +301,7 @@ BEGIN
 		AND p.LicenseeId = b.SiteId
 		AND (b.rptDate BETWEEN p.FromDate AND p.ToDate) 
 		AND (p.ProductID NOT IN (11, 39) OR b.Bettype = p.Bettype)
-		AND (b.Bettype NOT IN (@PPTournament, @PromotionPrize))
+		AND (b.Bettype NOT IN (@PPTournament, @PromotionPrize, @PP_JackpotPrize))
 	LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeID AND b.CurrencyId = cr.CurrencyID
 	WHERE (b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND b.customercategory NOT IN (27, 28)
@@ -307,8 +310,8 @@ BEGIN
 	GROUP BY p.PartyId,b.rptdate,p.ProductId,b.CurrencyId
 
 	-- 2.2 insert product don't have any ticket
-	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,CurrencyId,Winloss,AmountToCompany,ExtraAmount)
-	SELECT DISTINCT PartyId,@ToDate,c.ProductId,6, 0, 0, 0-- default eur = 6
+	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,CurrencyId,Winloss,PP_Contribution,AmountToCompany,ExtraAmount)
+	SELECT DISTINCT PartyId,@ToDate,c.ProductId,6, 0, 0, 0, 0-- default eur = 6
 	FROM @PartyList p 
 	INNER JOIN @ProductList pd ON 1=1
 	INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON c.ProductID = pd.ProductID AND p.PartyId = c.FromParty
@@ -321,7 +324,7 @@ BEGIN
 	INSERT INTO @FinalResult(PartyId, ProductId, Winloss, AmountToCompany, ExtraAmount, Fee, Discount, Rebate, DiscountRate, RebateRate, DiscountRemark, RebateRemark, Minfee, IsChargedByMinFee, IsApplyMinfeeToDiscount)
 	SELECT d.PartyId,d.ProductId
 		,SUM(d.Winloss)
-		,SUM(d.AmountToCompany)
+		,SUM(d.AmountToCompany - d.PP_Contribution)
 		,SUM(d.ExtraAmount)
 		,0,0,0,0,0,'','',0,0,0
 	FROM #tmpWinlossData d
