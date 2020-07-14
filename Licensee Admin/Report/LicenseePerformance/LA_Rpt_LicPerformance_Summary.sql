@@ -87,15 +87,12 @@ BEGIN
 						ELSE 1 END) AS BetCount
 			,0
 			FROM bodb_LicenseeReport.dbo.rpt_Betting_BA b WITH (NOLOCK)
-			INNER JOIN(
-					SELECT DISTINCT PartyID, LicenseeID
-					FROM @tmpParty
-			)tp ON b.SiteID = tp.LicenseeID
+			INNER JOIN(SELECT DISTINCT PartyID, LicenseeID, Fromdate, Todate FROM @tmpParty)tp ON b.SiteID = tp.LicenseeID AND b.rptDate BETWEEN tp.Fromdate AND tp.Todate
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
-			AND b.Bettype IN (SELECT Bettype FROM @Bettype)
-			AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
-			AND (b.CurrencyID <> @CurrencyTest)
-			AND b.status NOT IN (-1, 101, 102, 103)
+					AND b.Bettype IN (SELECT Bettype FROM @Bettype)
+					AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))
+					AND (b.CurrencyID <> @CurrencyTest)
+					AND b.status NOT IN (-1, 101, 102, 103)
 			GROUP BY PartyID, b.rptDate, currencyID
 		)
 	END
@@ -112,7 +109,7 @@ BEGIN
 				, SUM(ISNULL(b.MemberWL, 0)) as Winlost
 				, SUM(ISNULL(- b.MemberWL, 0) * ISNULL(cr.Rate, tp.Rate)) AS LicensingFee
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-					INNER JOIN (SELECT DISTINCT ChargeId, PartyID, LicenseeID, Rate FROM @tmpParty) tp ON tp.LicenseeID = b.SiteID
+					INNER JOIN (SELECT DISTINCT ChargeId, PartyID, LicenseeID, Rate, Fromdate, Todate FROM @tmpParty) tp ON tp.LicenseeID = b.SiteID AND b.rptDate BETWEEN tp.Fromdate AND tp.Todate
 					LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = tp.ChargeId AND cr.CurrencyID = b.CurrencyId
 				WHERE b.ProductID = 32
 					AND b.rptDate BETWEEN @FromDate AND @ToDate
@@ -145,7 +142,7 @@ BEGIN
 					ELSE 1 END) AS BetCount
 			, SUM(-b.MemberWL * ISNULL(cr.Rate, tp.Rate)) AS LicensingFee
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH ( NOLOCK )
-			INNER JOIN @tmpParty tp ON b.SiteID = tp.LicenseeID	AND b.ProductID = tp.ProductID
+			INNER JOIN @tmpParty tp ON b.SiteID = tp.LicenseeID	AND b.ProductID = tp.ProductID AND b.rptDate BETWEEN tp.Fromdate AND tp.Todate
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = tp.ChargeId AND cr.CurrencyID = b.CurrencyID
 			WHERE  b.rptDate BETWEEN @Fromdate AND @ToDate
 			AND (@Currency = 0 OR b.CurrencyID = @Currency)
