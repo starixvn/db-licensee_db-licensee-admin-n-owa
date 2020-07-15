@@ -29,6 +29,7 @@ AS
 		- 20191010@Percy: Replace LicenseeBATransaction to LicenseeBATransaction_active [RedmineID: #103656]
 		- 20191223@Bruce: Adding betform v and 0 [#118998]
 		- 202000326@Parsons: Handle new betfrom v,1,2,3 into their own category [#130645]
+		- 20200706@Parsons: Add new betfrom eGame Mobile and eGamer Desktop [#136414]
 
 	Explanation:
 		- Desktop: contain the followings:
@@ -37,6 +38,7 @@ AS
 			Euro:		betfrom = e,u
 			New Asia:	betfrom = x
 			ESportsWebDesktop: 1
+			eGamer Desktop: 4
 		- Mobile: contain the followings:
 			WAP:	betfrom = m
 			Smart:	betfrom = l
@@ -46,6 +48,8 @@ AS
 			Native App: 0
 			ESportsWebMobile: 2
 			ESportsAPP: 3
+			eGameMobile: 5
+			eGameAPP: 6
 		- OddsFeed: contain the followings:
 			OddsFeed: v
 		- Other: betfrom is different from the aboves
@@ -68,7 +72,7 @@ BEGIN
 	--
 	DECLARE @betfrom TABLE(betfrom CHAR(1))
 	INSERT INTO @betfrom
-	SELECT val FROM (VALUES('d'),('a'),('e'),('u'),('m'),('l'),('g'),('x'),('z'),('r'),('o'),('c'),('t'),('0'),('v'),('1'),('2'),('3'))v(val)
+	SELECT val FROM (VALUES('d'),('a'),('e'),('u'),('m'),('l'),('g'),('x'),('z'),('r'),('o'),('c'),('t'),('0'),('v'),('1'),('2'),('3'),('4'),('5'),('6'))v(val)
 
 	-- #1: get licensee/customer and currency info
 	--
@@ -83,8 +87,8 @@ BEGIN
 
 	-- get cust list
 	DECLARE @KeenOceanID INT = (SELECT LicenseeID FROM bodb_licensee.dbo.Licensees WITH (NOLOCK) WHERE LicenseeName LIKE 'KeenOcean')
-	DECLARE @RMB INT = (SELECT ExchangeID FROM bodb02.dbo.Exchange WITH (NOLOCK) WHERE currency = 'RMB')
-	DECLARE @YUN INT = (SELECT ExchangeID FROM bodb02.dbo.Exchange WITH (NOLOCK) WHERE currency = 'YUN')
+	DECLARE @RMB INT = (SELECT ExchangeID FROM dbo.Exchange WITH (NOLOCK) WHERE currency = 'RMB')
+	DECLARE @YUN INT = (SELECT ExchangeID FROM dbo.Exchange WITH (NOLOCK) WHERE currency = 'YUN')
 
 	;WITH Cust AS (
 		SELECT c.LicenseeID, c.CustID, c.Currency, l.Fromdate, l.Todate
@@ -186,7 +190,7 @@ BEGIN
 
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrency)
+	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrency)
 
 	;WITH Result AS (
 		SELECT d.BetFrom
