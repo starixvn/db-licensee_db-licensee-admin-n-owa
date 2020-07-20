@@ -54,6 +54,7 @@ AS
 		- 20200424@Pasons: Integrate IBCBET Live Casino [#131165]
 		- 20200423@Parsons: Integrate Saba-Club [#132730]
 		- 20200610@Parsons: Implement RNG WAR and ION [#134452]
+		- 20200717@Parsons: Extend bet type range for Lottery [#137840]
 
 	Param's Explanation:
 
@@ -292,7 +293,7 @@ BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 28
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
-	   WHERE typeid BETWEEN 1021 AND 1049
+	   WHERE typeid BETWEEN 1021 AND 1099
 		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 
