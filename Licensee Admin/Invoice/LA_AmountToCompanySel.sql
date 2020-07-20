@@ -314,7 +314,7 @@ BEGIN
 		;WITH cte_PPWinLossData AS(
 			SELECT b.SiteId, b.rptDate, b.CurrencyID,
 			SUM(CASE WHEN b.Bettype = @PP_Contribution THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS LicenseeWL,
-			SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 * e.Rate END) AS Contribution
+			SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) * e.Rate ELSE 0 END) AS Contribution
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 			INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID AND p.LicenseeId = b.SiteId AND (b.rptDate BETWEEN p.FromDate AND p.ToDate) AND (b.Bettype NOT IN (@PPTournament, @PromotionPrize, @PP_JackpotPrize))
