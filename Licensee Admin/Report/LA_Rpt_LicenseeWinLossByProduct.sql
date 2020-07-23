@@ -45,6 +45,7 @@ AS
 		- 20200411@Parsons: Integrate Table Games [#131166]
 		- 20200423@Parsons: Integrate Saba.club [#132730]
 		- 20200507@Parsons: Integrate Sexy Gaming for deposit licensees [#132665]
+		- 20200722@Happy: Implement PP Jackpot [137306]
 */
 		
 /*	Example:
@@ -61,6 +62,8 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007,
+	@PPContribution SMALLINT = 4297,
+	@PPJackpotPrize SMALLINT = 4298,
 	@PPTournament SMALLINT = 4299,
 	@PromotionPrize SMALLINT = 4300  
 	
@@ -347,6 +350,34 @@ BEGIN
 	SET		CO = a.Amount
 	FROM	#LicenseeAmount d INNER JOIN @COWinLoss a ON a.LicenseeId = d.LicenseeId
 	-- End CO
+	
+	-- PP
+	DECLARE @PragmaticID INT = 32
+	DECLARE @PPWinLoss AS TABLE (LicenseeID INT, Amount MONEY)
+	;WITH t AS (
+		SELECT b.SiteId, b.rptDate, b.CurrencyID,
+			SUM(CASE WHEN b.Bettype = @PPContribution THEN 0 else (ISNULL(-b.MemberWL, 0)) END) AS LicenseeWL,
+			SUM(CASE WHEN b.Bettype = @PPContribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Contribution,
+			SUM(CASE WHEN b.Bettype = @PPJackpotPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS JackpotPrize, -- House phai tra
+			SUM(CASE WHEN b.Bettype IN(@PromotionPrize, @PPTournament) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS PromotionPrize
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
+		WHERE b.ProductID = @PragmaticID
+			AND b.rptDate BETWEEN @FromDate AND @ToDate
+			AND b.CustomerCategory NOT IN (27, 28)
+			AND b.StatusId NOT IN (-1, 101, 102, 103)
+			AND b.StatusId IN (111,112,113)
+		GROUP BY b.rptdate, b.SiteId, b.CurrencyID
+	)
+	INSERT INTO @PPWinLoss
+	SELECT t.SiteId, SUM((t.LicenseeWL - t.Contribution) * e.Rate + t.Contribution - t.JackpotPrize - t.PromotionPrize)
+	FROM t
+		INNER JOIN #Exchange e ON t.rptDate = e.ExchangeDate AND t.CurrencyId = e.ExchangeID
+	GROUP BY t.SiteId
+
+	UPDATE	d
+	SET		PP = a.Amount
+	FROM	#LicenseeAmount d INNER JOIN @PPWinLoss a ON a.LicenseeId = d.LicenseeId
+	-- End PP
 
 	-- Calculate amount for products 
 	-- For SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, PP, CC, SG, VRG, SAG, I4D, TG, SBC, SXG: charge rate is affected by currency
@@ -393,7 +424,6 @@ BEGIN
 			ISNULL(SUM(CASE WHEN d.ProductId = 21 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS AB,
 			ISNULL(SUM(CASE WHEN d.ProductId = 24 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS FW,
 			ISNULL(SUM(CASE WHEN d.ProductId = 28 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS LT,
-			ISNULL(SUM(CASE WHEN d.ProductId = 32 THEN (-MemberWL * ISNULL(cm.Rate, ci.Rate)) * e.Rate ELSE 0 END),0) AS PP,
 			ISNULL(SUM(CASE WHEN d.ProductId = 34 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS CC,
 			ISNULL(SUM(CASE WHEN d.ProductId = 27 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS BRVS,
 			ISNULL(SUM(CASE WHEN d.ProductId = 4  THEN -MemberWL * ci.Rate * e.Rate ELSE 0 END),0) AS LC,
@@ -430,7 +460,6 @@ BEGIN
 			AB = a.AB,
 			FW = a.FW,
 			LT = a.LT,
-			PP = a.PP,
 			CC = a.CC,
 			LC = a.LC,
 			VG = a.VG,
