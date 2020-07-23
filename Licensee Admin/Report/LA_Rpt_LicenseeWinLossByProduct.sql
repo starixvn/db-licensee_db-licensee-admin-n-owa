@@ -45,7 +45,7 @@ AS
 		- 20200411@Parsons: Integrate Table Games [#131166]
 		- 20200423@Parsons: Integrate Saba.club [#132730]
 		- 20200507@Parsons: Integrate Sexy Gaming for deposit licensees [#132665]
-		- 20200722@Happy: Implement PP Jackpot [137306]
+		- 20200722@Happy: Implement PP Jackpot [#137306]
 */
 		
 /*	Example:
@@ -62,12 +62,13 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007,
-	@PPContribution SMALLINT = 4297,
-	@PPJackpotPrize SMALLINT = 4298,
-	@PPTournament SMALLINT = 4299,
-	@PromotionPrize SMALLINT = 4300  
-	
-	-- Region: Get party charge rate info
+									 @PPContribution SMALLINT = 4297,
+									 @PPJackpotPrize SMALLINT = 4298,
+									 @PPTournament SMALLINT = 4299,
+									 @PromotionPrize SMALLINT = 4300  
+	DECLARE @PragmaticID INT = 32
+
+	-- Region: Get party charge rate info 
 	DECLARE @ProductCode VARCHAR(500)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX,PP,CC,SG,VRG,SAG,I4D,TG,SBC,SXG'
 	
 	-- Region: Get Party ID
@@ -145,15 +146,13 @@ BEGIN
 				LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.Bettype = b.Bettype
 		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
-				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.Bettype NOT IN (
 					901,902,903,904,	-- BT
 					911,912,913,914, 	-- CO
-					@PPTournament, @PromotionPrize, -- PP
 					@SAG_Tip -- SAG
 				)
-				AND b.ProductID NOT IN (13,15,25)
+				AND b.ProductID NOT IN (13,15,25,@PragmaticID)
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, b.ProductId,
 			CASE
 				WHEN b.Bettype = @GD_Tip THEN b.Bettype
@@ -351,32 +350,31 @@ BEGIN
 	FROM	#LicenseeAmount d INNER JOIN @COWinLoss a ON a.LicenseeId = d.LicenseeId
 	-- End CO
 	
-	-- PP
-	DECLARE @PragmaticID INT = 32
-	DECLARE @PPWinLoss AS TABLE (LicenseeID INT, Amount MONEY)
-	;WITH t AS (
+	-- Pragmatic
+	DECLARE @TotalAmount MONEY 
+	;WITH cte_PPWinLossData AS 
+	(
 		SELECT b.SiteId, b.rptDate, b.CurrencyID,
-			SUM(CASE WHEN b.Bettype = @PPContribution THEN 0 else (ISNULL(-b.MemberWL, 0)) END) AS LicenseeWL,
-			SUM(CASE WHEN b.Bettype = @PPContribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Contribution,
-			SUM(CASE WHEN b.Bettype = @PPJackpotPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS JackpotPrize, -- House phai tra
-			SUM(CASE WHEN b.Bettype IN(@PromotionPrize, @PPTournament) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS PromotionPrize
+			SUM(CASE WHEN b.Bettype IN (@PPTournament, @PromotionPrize, @PPContribution, @PPJackpotPrize) THEN 0 ELSE (ISNULL(-b.MemberWL, 0) * e.Rate) END) AS LicenseeWL,
+			SUM(CASE WHEN b.Bettype = @PPContribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END * e.Rate) AS Contribution,
+			SUM(CASE WHEN b.Bettype = @PPJackpotPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END * e.Rate) AS JackpotPrize,
+			SUM(CASE WHEN b.Bettype IN (@PromotionPrize, @PPTournament) THEN ISNULL(b.MemberWL, 0) ELSE 0 END * e.Rate) AS PromotionPrize
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
+		INNER JOIN #Exchange e ON e.ExchangeID = b.CurrencyId AND e.ExchangeDate = b.rptDate
 		WHERE b.ProductID = @PragmaticID
 			AND b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.CustomerCategory NOT IN (27, 28)
-			AND b.StatusId NOT IN (-1, 101, 102, 103)
-			AND b.StatusId IN (111,112,113)
+			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject, Void, Refund
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 	)
-	INSERT INTO @PPWinLoss
-	SELECT t.SiteId, SUM((t.LicenseeWL - t.Contribution) * e.Rate + t.Contribution - t.JackpotPrize - t.PromotionPrize)
-	FROM t
-		INNER JOIN #Exchange e ON t.rptDate = e.ExchangeDate AND t.CurrencyId = e.ExchangeID
-	GROUP BY t.SiteId
+	SELECT @TotalAmount = SUM((LicenseeWL - Contribution) * ISNULL(cr.Rate, p.Rate) + d.Contribution - d.JackpotPrize - d.PromotionPrize)
+	FROM cte_PPWinLossData d
+	INNER JOIN @PartyChargeInfo p ON p.LicenseeId = d.SiteId AND (d.rptDate BETWEEN p.FromDate AND p.ToDate) 
+	LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeID AND d.CurrencyId = cr.CurrencyID
+	WHERE p.ProductID = @PragmaticID AND d.rptDate BETWEEN p.Fromdate AND p.Todate
 
-	UPDATE	d
-	SET		PP = a.Amount
-	FROM	#LicenseeAmount d INNER JOIN @PPWinLoss a ON a.LicenseeId = d.LicenseeId
+	UPDATE	#LicenseeAmount
+	SET		PP = @TotalAmount
 	-- End PP
 
 	-- Calculate amount for products 
@@ -411,7 +409,7 @@ BEGIN
 		SXG MONEY
 	)
 	
-	INSERT INTO @AmountDueByProduct(LicenseeId, SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, PP, CC, BRVS, LC, VG, MGCLC, MGCRNG, BX, SG, VRG, SAG, I4D, TG, SBC, SXG)
+	INSERT INTO @AmountDueByProduct(LicenseeId, SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, CC, BRVS, LC, VG, MGCLC, MGCRNG, BX, SG, VRG, SAG, I4D, TG, SBC, SXG)
 	SELECT d.LicenseeId,
 			ISNULL(SUM(CASE WHEN d.ProductId = 0  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS SB,
 			ISNULL(SUM(CASE WHEN d.ProductId = 2  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS NG,
