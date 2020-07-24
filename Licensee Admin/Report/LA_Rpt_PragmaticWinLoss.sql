@@ -19,14 +19,17 @@ AS
 		- 20191204@Bruce: PP tournament [#123958]
 		- 20200217@Mason: Set billing term by currency [#120005]
 		- 20200302@Mason: Support HID currency [#128856]
+		- 20200723@Parsons: Implement PP Jackpot [#137306]
 
 	 Params:
 
 	 Explannation: EXEC LA_Rpt_PragmaticWinLoss @BaseCurrencyName='EUR',@ToDate='2018-04-30 00:00:00',@PartyIds='14,15,17,19,20,23,29,39,40,42,44,46,47,52,53,56,58,60,65,68,70,71,72,73,76,79,80,81,82,84,85,86,87,89,90,91,92,93,95,97,100,101,24,31,34,35,36,37,38,41,59,66,67,74,75,88,16,22,26,27,45,49,54,99,25,30',@FromDate='2018-04-01 00:00:00'
 */
 BEGIN	
-	DECLARE @PromotionPrize INT = 4300
-	DECLARE @PPTournament INT = 4299
+	DECLARE  @Contribution INT = 4297,
+			 @JackpotPrize INT = 4298,
+			 @PPTournament INT = 4299,
+			 @PromotionPrize INT = 4300
 
 	-- Region: Charge Info	
 	DECLARE @ChargeInfos AS TABLE (
@@ -86,34 +89,57 @@ BEGIN
 		Turnover	MONEY,
 		TotalTrans	INT,
 		WinPrizeAmount MONEY,
+		Contribution	MONEY,
+		JackpotPrize	MONEY,
 		CustomerWinLoss MONEY,
 		LicenseeWinloss MONEY,
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY)	
 
 	-- Calculate for deposit
-	INSERT INTO #Result (PartyID,PartyName,ParentId,ParentName,Winlossdate,CurrencyId,Turnover,TotalTrans,WinPrizeAmount,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
+	;WITH cte_WinLossData AS
+	(
+		SELECT ci.PartyId,
+			b.RptDate3rd,
+			b.CurrencyId,
+			b.SiteId,
+			SUM(CASE WHEN b.BetTypeId IN (@Contribution,@JackpotPrize,@PromotionPrize,@PPTournament) THEN 0 ELSE b.Turnover END) AS Turnover,
+			SUM(CASE WHEN b.BetTypeId IN (@Contribution,@JackpotPrize,@PromotionPrize,@PPTournament) THEN 0 ELSE b.BetCount END) AS TotalTrans,
+			SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN b.Winloss ELSE 0 END) AS WinPrizeAmount,
+			SUM(CASE WHEN b.BetTypeId = @Contribution THEN -b.AWinloss ELSE 0 END) AS LicenseeContribution,
+			SUM(CASE WHEN b.BetTypeId = @Contribution THEN ProgressiveContribution ELSE 0 END) AS FullContribution,
+			SUM(CASE WHEN b.BetTypeId = @JackpotPrize THEN b.Winloss ELSE 0 END) AS JackpotPrize,
+			SUM(CASE WHEN b.BetTypeId IN (@Contribution,@JackpotPrize,@PromotionPrize,@PPTournament) THEN 0 ELSE b.Winloss END) AS CustomerWinLoss,
+			SUM(CASE WHEN b.BetTypeId IN (@Contribution,@JackpotPrize,@PromotionPrize,@PPTournament) THEN 0 ELSE -b.Winloss END) AS LicenseeWinloss
+		FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
+			INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
+			INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
+		WHERE b.RptDate3rd BETWEEN @FromDate AND @ToDate AND
+			b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20
+			AND b.BetTypeId BETWEEN 4101 AND 4300
+			AND ci.isDeposit = 1
+		GROUP BY b.RptDate3rd, ci.PartyId, b.CurrencyId, b.SiteId
+	)
+	INSERT INTO #Result (PartyID,PartyName,ParentId,ParentName,Winlossdate,CurrencyId,Turnover,TotalTrans,WinPrizeAmount,Contribution,JackpotPrize,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
 	SELECT ci.PartyId,
 		p.PartyName,
 		p.ParentId,
 		p.ParentName,
 		b.RptDate3rd,
 		b.CurrencyId,
-		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE b.Turnover END) AS Turnover,
-		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE b.BetCount END) AS TotalTrans,
-		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN b.Winloss ELSE 0 END) AS WinPrizeAmount,
-		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE b.Winloss END) AS CustomerWinLoss,
-		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE -b.Winloss END) AS LicenseeWinloss,
-		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE -b.Winloss * ISNULL(cr.Rate, ci.Rate) END) AS LicensingFee,
-		SUM(CASE WHEN b.BetTypeId IN (@PromotionPrize,@PPTournament) THEN 0 ELSE -b.Winloss * ci.Rate3rd END) AS PayToSupplier
-	FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
+		SUM(Turnover),
+		SUM(TotalTrans),
+		SUM(WinPrizeAmount),
+		SUM(LicenseeContribution),
+		SUM(JackpotPrize),
+		SUM(CustomerWinLoss),
+		SUM(LicenseeWinloss),
+		SUM((-CustomerWinLoss - LicenseeContribution) * ISNULL(cr.Rate, ci.Rate) + LicenseeContribution - JackpotPrize - WinPrizeAmount) AS LicensingFee,
+		SUM((-CustomerWinLoss - FullContribution) * ci.Rate3rd - WinPrizeAmount) AS PayToSupplier
+	FROM cte_WinLossData b
 		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
 		INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
 		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeId AND cr.CurrencyID = b.CurrencyId
-	WHERE b.RptDate3rd BETWEEN @FromDate AND @ToDate AND
-		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20
-		AND b.BetTypeId BETWEEN 4101 AND 4300
-		AND ci.isDeposit = 1
 	GROUP BY b.RptDate3rd, ci.PartyId, PartyName, ParentId, ParentName, b.CurrencyId
 	-- EndRegion #Result
 	
@@ -182,6 +208,8 @@ BEGIN
 		TotalTrans		INT,
 		Turnover		MONEY,
 		WinPrizeAmount	MONEY,
+		Contribution	MONEY,
+		JackpotPrize	MONEY,
 		CustomerWinLoss	MONEY,
 		LicenseeWinLoss	MONEY,
 		LicensingFee	MONEY,
@@ -205,6 +233,8 @@ BEGIN
 		TotalTrans		INT,
 		Turnover		MONEY,
 		WinPrizeAmount	MONEY,
+		Contribution	MONEY,
+		JackpotPrize	MONEY,
 		CustomerWinLoss	MONEY,
 		LicenseeWinLoss	MONEY,
 		LicensingFee	MONEY,
@@ -288,6 +318,8 @@ BEGIN
 				SUM(td.TotalTrans) TotalTrans,
 				SUM(td.Turnover * e.BaseCurrencyRate) Turnover, 
 				SUM(td.WinPrizeAmount * e.BaseCurrencyRate) WinPrizeAmount,
+				SUM(td.Contribution * e.BaseCurrencyRate) Contribution,
+				SUM(td.JackpotPrize * e.BaseCurrencyRate) JackpotPrize,
 				SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss, 
 				SUM(td.LicenseeWinLoss * e.BaseCurrencyRate) LicenseeWinLoss, 
 				SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
@@ -296,14 +328,16 @@ BEGIN
 			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
 			GROUP BY td.ParentId, td.PartyId
 		)
-		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,WinPrizeAmount,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
+		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,WinPrizeAmount,Contribution,JackpotPrize,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
 		SELECT @tempCurrency,ParentId,
 			SUM(TotalTrans),
 			SUM(Turnover),
 			SUM(WinPrizeAmount),
+			SUM(Contribution),
+			SUM(JackpotPrize),
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
-			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
+			SUM(LicensingFee),
 			SUM(PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
@@ -315,16 +349,14 @@ BEGIN
 		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@ToDate, @ToDate, @tempCurrency) e ON e.ExchangeId = @CreditBaseCurrencyId
 		WHERE t.PartyId = 999  AND t.Currency = @tempCurrency
 		-- Endregion update Total of Creadit
-
-		UPDATE @Total
-		SET PayToSupplier = 0
-		WHERE PayToSupplier < 0
 		
-		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,WinPrizeAmount,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,CompanyIncome)
+		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,WinPrizeAmount,Contribution,JackpotPrize,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,CompanyIncome)
 		SELECT Currency,
 			SUM(TotalTrans),
 			SUM(Turnover),
 			SUM(WinPrizeAmount),
+			SUM(Contribution),
+			SUM(JackpotPrize),
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(LicensingFee),
@@ -349,16 +381,20 @@ BEGIN
 			e.CurrencyCode AS CurrencyName,
 			r.TotalTrans,
 			-- base
-			CAST(r.Turnover * e.Rate AS MONEY) AS Turnover,
-			CAST(r.WinPrizeAmount * e.Rate AS MONEY) AS WinPrizeAmount,
-			CAST(r.CustomerWinLoss * e.Rate AS MONEY) AS CustomerWinLoss,
-			CAST(LicenseeWinLoss * e.Rate AS MONEY) AS LicenseeWinLoss,
-			CAST(r.LicensingFee * e.Rate AS MONEY) AS LicensingFee,
-			CAST(r.PayToSupplier * e.Rate AS MONEY) AS PayToSupplier,
+			CAST(r.Turnover * e.Rate AS MONEY)			AS Turnover,
+			CAST(r.WinPrizeAmount * e.Rate AS MONEY)	AS WinPrizeAmount,
+			CAST(r.Contribution * e.Rate AS MONEY)		AS Contribution,
+			CAST(r.JackpotPrize * e.Rate AS MONEY)		AS JackpotPrize,
+			CAST(r.CustomerWinLoss * e.Rate AS MONEY)	AS CustomerWinLoss,
+			CAST(LicenseeWinLoss * e.Rate AS MONEY)		AS LicenseeWinLoss,
+			CAST(r.LicensingFee * e.Rate AS MONEY)		AS LicensingFee,
+			CAST(r.PayToSupplier * e.Rate AS MONEY)		AS PayToSupplier,
 			CAST((r.LicensingFee - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome,
 			-- original
 			r.Turnover			AS TurnoverOriginal,
 			r.WinPrizeAmount	AS WinPrizeAmountOriginal,
+			r.Contribution		AS ContributionOriginal,
+			r.JackpotPrize		AS JackpotPrizeOriginal,
 			r.CustomerWinLoss	AS CustomerWinLossOriginal,
 			r.LicenseeWinLoss	AS LicenseeWinLossOriginal,
 			r.LicensingFee		AS LicensingFeeOriginal,
@@ -376,10 +412,12 @@ BEGIN
 			TotalTrans,
 			Turnover,
 			WinPrizeAmount,
+			Contribution,
+			JackpotPrize,
 			CustomerWinLoss,
 			LicenseeWinLoss,
 			LicensingFee,
-			PayToSupplier AS PayToSupplier,
+			PayToSupplier,
 			(LicensingFee - PayToSupplier) AS CompanyIncome
 		FROM @Total t
 		WHERE Currency = @BaseCurrencyName
