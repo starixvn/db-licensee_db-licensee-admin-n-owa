@@ -83,6 +83,7 @@ BEGIN
 		Cashout						MONEY,
 		PlayerComm					MONEY,
 		LicenseeWL					MONEY,
+		LicenseeChargeRate			MONEY,
 		LicenseeComm				MONEY,
 		BettradeComm				MONEY,
 		CashInShare					MONEY,
@@ -680,7 +681,7 @@ BEGIN
 		;WITH cte_WinLossData AS(
 			SELECT b.SiteId, b.rptDate, b.CurrencyID
 				, SUM(CASE WHEN b.Bettype NOT IN(@PPTournament, @PromotionPrize, @PP_Contribution, @PP_JackpotPrize) THEN ISNULL(b.BetCount, 0) ELSE 0 END) BetCount
-				, SUM(CASE WHEN b.Bettype NOT IN(@PPTournament, @PromotionPrize, @PP_Contribution, @PP_JackpotPrize) THEN ISNULL(b.Turnover, 0) ELSE 0 END) AS Turnover
+				, SUM(CASE WHEN b.Bettype NOT IN(@PPTournament, @PromotionPrize, @PP_Contribution, @PP_JackpotPrize) THEN ISNULL(b.Turnover, 0) ELSE 0 END) Turnover
 				, SUM(CASE WHEN b.Bettype NOT IN(@PPTournament, @PromotionPrize, @PP_Contribution, @PP_JackpotPrize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) MemberWL
 				, SUM(CASE WHEN b.Bettype IN(@PPTournament, @PromotionPrize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
 				, SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Contribution
@@ -694,15 +695,13 @@ BEGIN
 					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
 				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
-		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, WinningPrize, Contribution, JackpotPrize, Company)
+		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, WinningPrize, Contribution, JackpotPrize, Company)
 		SELECT rptDate, d.CurrencyID
 				, SUM(BetCount)		AS BetCount
 				, SUM(Turnover)		AS Turnover
 				, SUM(MemberWL)		AS Winlost
-				, SUM(CASE
-						WHEN MemberWL < 0 THEN (-MemberWL - Contribution) * (1 - ISNULL(cm.Rate, p.Rate))
-						ELSE -MemberWL * (1 - ISNULL(cm.Rate, p.Rate)) - Contribution
-						END)  AS LicenseeWL
+				, SUM((-MemberWL - Contribution) * (1 - ISNULL(cm.Rate, p.Rate)))  AS LicenseeWL
+				, SUM((-MemberWL - Contribution) * ISNULL(cm.Rate, p.Rate))  AS LicenseeChargeRate
 				, SUM(WinningPrize) AS WinningPrize
 				, SUM(Contribution) AS Contribution
 				, SUM(JackpotPrize) AS JackpotPrize
@@ -793,6 +792,7 @@ BEGIN
 		, SUM(ISNULL(d.PlayerComm, 0))					AS MemberComm
 		, SUM(ISNULL(d.BettradeComm, 0))				AS BettradeComm
 		, SUM(ISNULL(d.LicenseeWL, 0))					AS LicenseeWL
+		, SUM(ISNULL(d.LicenseeChargeRate, 0))			AS LicenseeChargeRate
 		, SUM(ISNULL(d.LicenseeComm, 0))				AS LicenseeComm
 		, SUM(ISNULL(d.CashInShare, 0))					AS CashInShare
 		, SUM(ISNULL(d.TipsAmount, 0))					AS TipsAmount
@@ -822,6 +822,7 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.Cashout * e.Rate, 0)))					AS CashoutBase
 		, CONVERT(MONEY, SUM(ISNULL(d.PlayerComm * e.Rate, 0)))					AS MemberCommBase
 		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeWL * e.Rate, 0)))					AS LicenseeWLBase
+		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeChargeRate * e.Rate, 0)))			AS LicenseeChargeRateBase
 		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeComm * e.Rate, 0)))				AS LicenseeCommBase
 		, CONVERT(MONEY, SUM(ISNULL(d.CashInShare * e.Rate, 0)))				AS CashInShareBase
 		, CONVERT(MONEY, SUM(ISNULL(d.TipsAmount * e.Rate, 0)))					AS TipsAmountBase
