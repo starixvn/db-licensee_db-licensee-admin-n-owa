@@ -94,6 +94,7 @@ BEGIN
 		CustomerWinLoss MONEY,
 		LicenseeWinloss MONEY,
 		LicensingFee	MONEY,
+		LicenseeChargeRate	MONEY,
 		PayToSupplier	MONEY)	
 
 	-- Calculate for deposit
@@ -120,7 +121,7 @@ BEGIN
 			AND ci.isDeposit = 1
 		GROUP BY b.RptDate3rd, ci.PartyId, b.CurrencyId, b.SiteId
 	)
-	INSERT INTO #Result (PartyID,PartyName,ParentId,ParentName,Winlossdate,CurrencyId,Turnover,TotalTrans,WinPrizeAmount,Contribution,JackpotPrize,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
+	INSERT INTO #Result (PartyID,PartyName,ParentId,ParentName,Winlossdate,CurrencyId,Turnover,TotalTrans,WinPrizeAmount,Contribution,JackpotPrize,CustomerWinLoss,LicenseeWinloss,LicensingFee,LicenseeChargeRate,PayToSupplier)
 	SELECT ci.PartyId,
 		p.PartyName,
 		p.ParentId,
@@ -135,6 +136,7 @@ BEGIN
 		SUM(CustomerWinLoss),
 		SUM(LicenseeWinloss),
 		SUM((-CustomerWinLoss - LicenseeContribution) * ISNULL(cr.Rate, ci.Rate) + LicenseeContribution - JackpotPrize - WinPrizeAmount) AS LicensingFee,
+		SUM((-CustomerWinLoss - LicenseeContribution) * ISNULL(cr.Rate, ci.Rate)) AS LicenseeChargeRate,
 		SUM((-CustomerWinLoss - FullContribution) * ci.Rate3rd - WinPrizeAmount) AS PayToSupplier
 	FROM cte_WinLossData b
 		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
@@ -388,6 +390,7 @@ BEGIN
 			CAST(r.CustomerWinLoss * e.Rate AS MONEY)	AS CustomerWinLoss,
 			CAST(LicenseeWinLoss * e.Rate AS MONEY)		AS LicenseeWinLoss,
 			CAST(r.LicensingFee * e.Rate AS MONEY)		AS LicensingFee,
+			CAST(r.LicenseeChargeRate * e.Rate AS MONEY)		AS LicenseeChargeRate,
 			CAST(r.PayToSupplier * e.Rate AS MONEY)		AS PayToSupplier,
 			CAST((r.LicensingFee - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome,
 			-- original
@@ -398,6 +401,7 @@ BEGIN
 			r.CustomerWinLoss	AS CustomerWinLossOriginal,
 			r.LicenseeWinLoss	AS LicenseeWinLossOriginal,
 			r.LicensingFee		AS LicensingFeeOriginal,
+			r.LicenseeChargeRate		AS LicenseeChargeRateOriginal,
 			r.PayToSupplier		AS PayToSupplierOriginal,
 			(r.LicensingFee - r.PayToSupplier) AS CompanyIncomeOriginal
 		FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
