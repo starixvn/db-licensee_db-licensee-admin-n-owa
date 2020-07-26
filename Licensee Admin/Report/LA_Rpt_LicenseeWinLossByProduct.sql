@@ -367,7 +367,7 @@ BEGIN
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 	), cte_PPLicensingWL AS
 	(
-		SELECT p.PartyId, SUM(CASE WHEN (LicenseeWL - Contribution) < 0 THEN 0  ELSE (LicenseeWL - Contribution) * ISNULL(cr.Rate, p.Rate)END  + d.Contribution - d.JackpotPrize - d.PromotionPrize) AS TotalAmount
+		SELECT p.PartyId, SUM((LicenseeWL - Contribution) * ISNULL(cr.Rate, p.Rate)) LiceningFee, SUM(d.Contribution) Contribution, SUM(d.JackpotPrize) JackpotPrize, SUM(d.PromotionPrize) PromotionPrize
 		FROM cte_PPWinLossData d
 		INNER JOIN @PartyChargeInfo p ON p.LicenseeId = d.SiteId AND (d.rptDate BETWEEN p.FromDate AND p.ToDate) 
 		LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeID AND d.CurrencyId = cr.CurrencyID
@@ -375,7 +375,7 @@ BEGIN
 		GROUP BY p.PartyId
 	)
 	UPDATE	l
-	SET		l.PP = cte.TotalAmount
+	SET		l.PP = CASE WHEN LiceningFee < 0 THEN 0 ELSE LiceningFee END + Contribution - JackpotPrize - PromotionPrize
 	FROM #LicenseeAmount l
 	INNER JOIN cte_PPLicensingWL cte ON l.PartyId = cte.PartyId 
 	-- End PP
