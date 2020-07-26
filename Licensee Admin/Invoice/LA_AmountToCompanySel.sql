@@ -281,14 +281,15 @@ BEGIN
  * 2. winloss data
  *-------------------------------------------------------------------------------------------------------------------------------*/
 	DECLARE @BX INT = 31, -- exchange
-			@Pragmatic INT = 32
+
 	-- 2.1 include general products
 	SELECT p.PartyId,
 		b.rptDate	AS WinlossDate,
 		p.ProductId,
 		b.CurrencyId,
-		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss,
-		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN 0 ELSE ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) * e.Rate END) AS AmountToCompany,
+		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @PP_Contribution) THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss,
+		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN 0 ELSE (ISNULL(-b.MemberWL, 0) - CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) 
+																	* ISNULL(cr.Rate, p.Rate) * e.Rate END) AS AmountToCompany,
 		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) * e.Rate
 				 WHEN b.ProductID = @BX THEN -(b.CommissionA + b.CommissionP) * e.Rate
 				 ELSE 0 
@@ -300,36 +301,14 @@ BEGIN
 		AND p.LicenseeId = b.SiteId
 		AND (b.rptDate BETWEEN p.FromDate AND p.ToDate) 
 		AND (p.ProductID NOT IN (11, 39) OR b.Bettype = p.Bettype)
-		AND (b.Bettype NOT IN (@PPTournament, @PromotionPrize))
+		AND (b.Bettype NOT IN (@PPTournament, @PromotionPrize, @PP_JackpotPrize))
 	LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeID AND b.CurrencyId = cr.CurrencyID
 	WHERE (b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
 			AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
-			AND b.ProductID <> @Pragmatic
 	GROUP BY p.PartyId,b.rptdate,p.ProductId,b.CurrencyId
 
-	IF (EXISTS(SELECT TOP 1 1 FROM #tmpChargeInfo WHERE ProductID = @Pragmatic))
-	BEGIN
-		;WITH cte_PPWinLossData AS(
-			SELECT b.SiteId, b.rptDate, b.CurrencyID,
-			SUM(CASE WHEN b.Bettype = @PP_Contribution THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS LicenseeWL,
-			SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) * e.Rate ELSE 0 END) AS Contribution
-			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-			INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID AND p.LicenseeId = b.SiteId AND (b.rptDate BETWEEN p.FromDate AND p.ToDate) AND (b.Bettype NOT IN (@PPTournament, @PromotionPrize, @PP_JackpotPrize))
-			WHERE b.ProductID = @Pragmatic AND (b.rptDate BETWEEN @FromDate AND @ToDate) AND b.customercategory NOT IN (27, 28) AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
-					AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject, Void, Refund
-			GROUP BY b.rptdate, b.SiteId, b.CurrencyID
-		)
-		INSERT INTO #tmpWinlossData(PartyId, WinlossDate, ProductId, CurrencyId, Winloss, AmountToCompany, ExtraAmount)
-		SELECT p.PartyId,d.rptDate,p.ProductId,d.CurrencyId,SUM(LicenseeWL),SUM((LicenseeWL - Contribution) * ISNULL(cr.Rate, p.Rate)) AS AmountToCompany,0 AS ExtraAmount
-		FROM cte_PPWinLossData d
-		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = d.SiteId AND (d.rptDate BETWEEN p.FromDate AND p.ToDate) 
-		LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeID AND d.CurrencyId = cr.CurrencyID
-		WHERE p.ProductID = @Pragmatic AND d.rptDate BETWEEN p.Fromdate AND p.Todate
-		GROUP BY p.PartyId,d.rptdate,p.ProductId,d.CurrencyId
-	END
 	-- 2.2 insert product don't have any ticket
 	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,CurrencyId,Winloss,AmountToCompany,ExtraAmount)
 	SELECT DISTINCT PartyId,@ToDate,c.ProductId,6, 0, 0, 0-- default eur = 6
