@@ -201,7 +201,8 @@ BEGIN
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, Rate, CurrencyCode)
 	SELECT ExchangeDate, ExchangeID, BaseCurrencyRate, CASE WHEN ExchangeID = 51 THEN 'INH' 
 															WHEN ExchangeID = 92 THEN 'HID' 
-															ELSE Code END
+															ELSE Code 
+													   END
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	-- End Region
 	
@@ -222,11 +223,7 @@ BEGIN
 
 	-- Region: Calculate Grand Total
 	DECLARE @tempCurrency VARCHAR(20)
-	DECLARE @BaseCurrencies TABLE(
-		Id INT,
-		Name VARCHAR(20),
-		IsApply BIT
-	)
+	DECLARE @BaseCurrencies TABLE(Id INT, Name VARCHAR(20), IsApply BIT)
 	INSERT INTO @BaseCurrencies(Id, Name)
 	EXEC LA_SelBaseCurrency
 
@@ -244,7 +241,7 @@ BEGIN
 		CompanyIncome	MONEY
 	)
 
-	DECLARE @TotalOfCredit MONEY = 0
+	DECLARE @TotalPayToSupplierOfCredit MONEY = 0
 
 	-- Region Credit
 	DECLARE @RateOfCredit AS TABLE (
@@ -272,17 +269,17 @@ BEGIN
 
 	--Endregion TotalAmountOfCreditGroup
 
-	-- Region @TotalOfCredit
+	-- Region @TotalPayToSupplierOfCredit
 	;WITH cte_RateOfCredit AS (
 		SELECT DISTINCT Rate, MinAmount, MaxAmount
 		FROM @RateOfCredit
 	)
-	SELECT @TotalOfCredit = SUM(CASE 
+	SELECT @TotalPayToSupplierOfCredit = SUM(CASE 
 								WHEN @TotalAmountWinLoss  > MaxAmount THEN MaxAmount 
 								WHEN (@TotalAmountWinLoss  - MinAmount) > 0 THEN (@TotalAmountWinLoss  - MinAmount) 
 								ELSE 0 END  * r.Rate) 
 	FROM cte_RateOfCredit r
-	-- Endregion @TotalOfCredit
+	-- Endregion @TotalPayToSupplierOfCredit
 	
 	-- Region Update PayToSupplier for #Result
 	DECLARE @Rate3rdAgaintsNegativeAmount MONEY = (SELECT TOP 1 Rate FROM @RateOfCredit ORDER BY MinAmount)
@@ -303,9 +300,9 @@ BEGIN
 				Winlossdate
 	)
 	UPDATE r
-	SET r.PayToSupplier = CASE 
-							WHEN r.CustomerWinLoss > 0 THEN (-r.CustomerWinLoss*@Rate3rdAgaintsNegativeAmount)
-							ELSE ProgressiveAmount END
+	SET r.PayToSupplier = CASE  WHEN r.CustomerWinLoss > 0 THEN (-r.CustomerWinLoss*@Rate3rdAgaintsNegativeAmount)
+								ELSE ProgressiveAmount 
+						  END
 	FROM #Result r
 	INNER JOIN SumByPropressiveAmount s ON r.PartyId = s.PartyID AND r.CurrencyId = s.CurrencyId AND r.Winlossdate = s.Winlossdate
 	-- Endregion Update PayToSupplier for #Result
@@ -317,15 +314,16 @@ BEGIN
 		
 		;WITH TotalByParty AS(
 			SELECT td.ParentId,
-				SUM(td.TotalTrans) TotalTrans,
-				SUM(td.Turnover * e.BaseCurrencyRate) Turnover, 
-				SUM(td.WinPrizeAmount * e.BaseCurrencyRate) WinPrizeAmount,
-				SUM(td.Contribution * e.BaseCurrencyRate) Contribution,
-				SUM(td.JackpotPrize * e.BaseCurrencyRate) JackpotPrize,
-				SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss, 
-				SUM(td.LicenseeWinLoss * e.BaseCurrencyRate) LicenseeWinLoss, 
-				SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
-				SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
+				SUM(td.TotalTrans)								TotalTrans,
+				SUM(td.Turnover * e.BaseCurrencyRate)			Turnover, 
+				SUM(td.WinPrizeAmount * e.BaseCurrencyRate)		WinPrizeAmount,
+				SUM(td.Contribution * e.BaseCurrencyRate)		Contribution,
+				SUM(td.JackpotPrize * e.BaseCurrencyRate)		JackpotPrize,
+				SUM(td.CustomerWinLoss * e.BaseCurrencyRate)	CustomerWinLoss, 
+				SUM(td.LicenseeWinLoss * e.BaseCurrencyRate)	LicenseeWinLoss, 
+				SUM(td.LicensingFee * e.BaseCurrencyRate)		LicensingFee,
+				SUM(td.LicenseeChargeRate * e.BaseCurrencyRate) LicenseeChargeRate,
+				SUM(td.PayToSupplier * e.BaseCurrencyRate)		PayToSupplier
 			FROM #Result td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e 
 			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
 			GROUP BY td.ParentId, td.PartyId
@@ -339,14 +337,18 @@ BEGIN
 			SUM(JackpotPrize),
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
-			SUM(LicensingFee),
+			SUM(CASE WHEN LicenseeChargeRate < 0 THEN 0 ELSE LicenseeChargeRate END + Contribution - JackpotPrize - WinPrizeAmount),
 			SUM(PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
-		
+
+		UPDATE @Total
+		SET PayToSupplier = 0
+		WHERE PayToSupplier < 0
+
 		-- Region update Total of Creadit
 		Update t
-		SET PayToSupplier = @TotalOfCredit * e.BaseCurrencyRate
+		SET PayToSupplier = @TotalPayToSupplierOfCredit * e.BaseCurrencyRate
 		FROM @Total t
 		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@ToDate, @ToDate, @tempCurrency) e ON e.ExchangeId = @CreditBaseCurrencyId
 		WHERE t.PartyId = 999  AND t.Currency = @tempCurrency
