@@ -137,7 +137,7 @@ BEGIN
 		SUM(LicenseeWinloss),
 		SUM((-CustomerWinLoss - LicenseeContribution) * ISNULL(cr.Rate, ci.Rate) + LicenseeContribution - JackpotPrize - WinPrizeAmount) AS LicensingFee,
 		SUM((-CustomerWinLoss - LicenseeContribution) * ISNULL(cr.Rate, ci.Rate)) AS LicenseeChargeRate,
-		SUM((-CustomerWinLoss - FullContribution) * ci.Rate3rd - WinPrizeAmount) AS PayToSupplier
+		SUM((-CustomerWinLoss - FullContribution) * ci.Rate3rd) AS PayToSupplier
 	FROM cte_WinLossData b
 		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
 		INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
@@ -338,9 +338,13 @@ BEGIN
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(CASE WHEN LicenseeChargeRate < 0 THEN 0 ELSE LicenseeChargeRate END + Contribution - JackpotPrize - WinPrizeAmount),
-			SUM(CASE WHEN (PayToSupplier - WinPrizeAmount) < 0 THEN 0 ELSE (PayToSupplier - WinPrizeAmount) END - WinPrizeAmount)
+			SUM(PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
+
+		UPDATE @Total
+		SET PayToSupplier = CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END - WinPrizeAmount
+		WHERE PartyId IN (1,9,11,98) AND @tempCurrency = Currency
 
 		-- Region update Total of Creadit
 		Update t
@@ -389,8 +393,8 @@ BEGIN
 			CAST(LicenseeWinLoss * e.Rate AS MONEY)		AS LicenseeWinLoss,
 			CAST(r.LicensingFee * e.Rate AS MONEY)		AS LicensingFee,
 			CAST(r.LicenseeChargeRate * e.Rate AS MONEY)		AS LicenseeChargeRate,
-			CAST(r.PayToSupplier * e.Rate AS MONEY)		AS PayToSupplier,
-			CAST((r.LicensingFee - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome,
+			CAST((CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END - WinPrizeAmount) * e.Rate AS MONEY)		AS PayToSupplier,
+			CAST((r.LicensingFee - (CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END - WinPrizeAmount)) * e.Rate AS MONEY) AS CompanyIncome,
 			-- original
 			r.Turnover			AS TurnoverOriginal,
 			r.WinPrizeAmount	AS WinPrizeAmountOriginal,
@@ -400,8 +404,8 @@ BEGIN
 			r.LicenseeWinLoss	AS LicenseeWinLossOriginal,
 			r.LicensingFee		AS LicensingFeeOriginal,
 			r.LicenseeChargeRate		AS LicenseeChargeRateOriginal,
-			r.PayToSupplier		AS PayToSupplierOriginal,
-			(r.LicensingFee - r.PayToSupplier) AS CompanyIncomeOriginal
+			CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END - WinPrizeAmount		AS PayToSupplierOriginal,
+			(r.LicensingFee - (CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END - WinPrizeAmount)) AS CompanyIncomeOriginal
 		FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
 
 		-- Grand Total
