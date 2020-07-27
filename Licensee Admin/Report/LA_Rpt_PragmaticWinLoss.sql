@@ -314,16 +314,16 @@ BEGIN
 		
 		;WITH TotalByParty AS(
 			SELECT td.ParentId,
-				SUM(td.TotalTrans)								TotalTrans,
-				SUM(td.Turnover * e.BaseCurrencyRate)			Turnover, 
-				SUM(td.WinPrizeAmount * e.BaseCurrencyRate)		WinPrizeAmount,
-				SUM(td.Contribution * e.BaseCurrencyRate)		Contribution,
-				SUM(td.JackpotPrize * e.BaseCurrencyRate)		JackpotPrize,
-				SUM(td.CustomerWinLoss * e.BaseCurrencyRate)	CustomerWinLoss, 
-				SUM(td.LicenseeWinLoss * e.BaseCurrencyRate)	LicenseeWinLoss, 
-				SUM(td.LicensingFee * e.BaseCurrencyRate)		LicensingFee,
-				SUM(td.LicenseeChargeRate * e.BaseCurrencyRate) LicenseeChargeRate,
-				SUM(td.PayToSupplier * e.BaseCurrencyRate)		PayToSupplier
+				SUM(td.TotalTrans)											TotalTrans,
+				SUM(td.Turnover * e.BaseCurrencyRate)						Turnover, 
+				SUM(td.WinPrizeAmount * e.BaseCurrencyRate)					WinPrizeAmount,
+				SUM(ISNULL(td.Contribution, 0) * e.BaseCurrencyRate)		Contribution,
+				SUM(ISNULL(td.JackpotPrize, 0) * e.BaseCurrencyRate)		JackpotPrize,
+				SUM(td.CustomerWinLoss * e.BaseCurrencyRate)				CustomerWinLoss, 
+				SUM(td.LicenseeWinLoss * e.BaseCurrencyRate)				LicenseeWinLoss, 
+				SUM(td.LicensingFee * e.BaseCurrencyRate)					LicensingFee,
+				SUM(ISNULL(td.LicenseeChargeRate, 0) * e.BaseCurrencyRate)	LicenseeChargeRate,
+				SUM(td.PayToSupplier * e.BaseCurrencyRate)					PayToSupplier
 			FROM #Result td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e 
 			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
 			GROUP BY td.ParentId, td.PartyId
