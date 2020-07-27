@@ -338,13 +338,9 @@ BEGIN
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(CASE WHEN LicenseeChargeRate < 0 THEN 0 ELSE LicenseeChargeRate END + Contribution - JackpotPrize - WinPrizeAmount),
-			SUM(PayToSupplier)
+			SUM(CASE WHEN (PayToSupplier - WinPrizeAmount) < 0 THEN 0 ELSE (PayToSupplier - WinPrizeAmount) END - WinPrizeAmount)
 		FROM TotalByParty
 		GROUP BY ParentId
-
-		UPDATE @Total
-		SET PayToSupplier = 0
-		WHERE PayToSupplier < 0
 
 		-- Region update Total of Creadit
 		Update t
