@@ -30,7 +30,8 @@ AS
 		- 20200422@Parsons: Integrate Saba.club [#132730]
 		- 20200507@Parsons: Integrate Sexy Gaming for deposit licensees [#132665]
 		- 20200528@Parsons: Special handling for INH market [#128570] 
-		- 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334]
+		- 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334] 
+		- 20200727@Parsons: Implement PP Jackpot [RedmineID: #137306]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -46,9 +47,11 @@ BEGIN
 		,@CommissionShare_ChargeType	SMALLINT = 6
 		,@CashinShare_ChargeType		SMALLINT = 7
 		,@CashoutComm_ChargeType		SMALLINT = 5
-		,@SabaPromotion_Bettype		SMALLINT = 17000
-		,@PromotionPrize_Bettype	SMALLINT = 4300
+		,@SabaPromotion_Bettype			SMALLINT = 17000
+		,@PPContribution_Bettype		SMALLINT = 4297
+		,@PPJackpotPrize_Bettype		SMALLINT = 4298
 		,@PPTournament_Bettype		SMALLINT = 4299
+		,@PromotionPrize_Bettype	SMALLINT = 4300
 		,@GDTip_Bettype				SMALLINT = 1706
 		,@SAGTip_Bettype			SMALLINT = 3007
 		,@BA	SMALLINT = 3
@@ -281,8 +284,9 @@ BEGIN
 		SELECT b.SiteID,b.rptDate,b.ProductId,b.CurrencyId,b.CommissionA,b.CommissionP
 			,b.WinPrizeAmount,b.CashOutAmount,b.BuyBackAmount,b.Turnover
 			,ISNULL(-b.MemberWL, 0) LicWinloss
-			,CASE WHEN b.ProductID = @SPR THEN @SabaPromotion_Bettype ELSE b.Bettype END Bettype
-			,CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN b.Turnover ELSE b.ExtraAmount END TurnoverForCommision
+			,CASE WHEN b.Bettype = @PPContribution_Bettype THEN ISNULL(-b.GrossWL, 0) ELSE 0 END	Contribution
+			,CASE WHEN b.ProductID = @SPR THEN @SabaPromotion_Bettype ELSE b.Bettype END			Bettype
+			,CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN b.Turnover ELSE b.ExtraAmount END			TurnoverForCommision
 		INTO #tmpBettingByProduct
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		WHERE (b.rptDate BETWEEN @FromDate AND @ToDate)
@@ -294,13 +298,17 @@ BEGIN
 		CREATE INDEX IX_tmpBettingByProduct ON #tmpBettingByProduct(SiteId, ProductId)
 
 		-- calculate amount to company
-		-- excludes: golddeluxe bidme tip, pragmatic promotion prize, colossus bet
+		-- excludes: golddeluxe bidme tip, PP JP & Prize, colossus bet
 		--  
 		SELECT p.PartyID,b.rptDate,p.ProductId,b.CurrencyId,
 			CAST(0 AS MONEY) AS Promotion,
 			CAST(0 AS MONEY) AS ExtraAmount,
+			CAST(0 AS MONEY) AS Contribution,
+			CAST(0 AS MONEY) AS JackPotPrize,
+			CAST(0 AS MONEY) AS PromotionPrize,
 			SUM((b.LicWinloss + (CASE WHEN b.ProductID = @BX THEN b.CommissionA ELSE 0 END)) * e.Rate) AS Winloss,
-			SUM((b.LicWinloss * ISNULL(cr.Rate, p.Rate) - (CASE
+			SUM(((b.LicWinloss - Contribution) * ISNULL(cr.Rate, p.Rate) - 
+				(CASE
 					WHEN b.ProductID = @BA THEN ISNULL(b.CommissionA,0)
 					WHEN b.ProductID = @BX THEN (b.CommissionA + b.CommissionP)
 					ELSE 0
@@ -319,24 +327,28 @@ BEGIN
 			)
 			AND b.Bettype NOT IN (
 				@GDTip_Bettype,
-				@PromotionPrize_Bettype,
+				@PPJackpotPrize_Bettype,
 				@PPTournament_Bettype,
+				@PromotionPrize_Bettype,
 				@SAGTip_Bettype
 			)
 		GROUP BY p.PartyID,b.rptdate,p.ProductId,b.CurrencyId
 
-		-- includes extra values: gdtip, promotion prize
+		-- includes extra values: gdtip, PP JP & Prize
 		--
-		INSERT INTO #tmpWinlossData(PartyID,rptDate,ProductID,CurrencyId, Winloss,AmountToCompany,ExtraAmount, Promotion)
+		INSERT INTO #tmpWinlossData(PartyID,rptDate,ProductID,CurrencyId,Winloss,AmountToCompany,ExtraAmount,Promotion,Contribution,JackPotPrize,PromotionPrize)
 		SELECT p.PartyID,b.rptDate,p.ProductId,b.CurrencyId,0,0,
 			SUM(CASE WHEN b.Bettype IN(@GDTip_Bettype, @SAGTip_Bettype) THEN b.LicWinloss * p.Rate * e.Rate ELSE 0 END),
-			SUM(CASE WHEN b.Bettype IN (@PromotionPrize_Bettype,@PPTournament_Bettype,@SabaPromotion_Bettype) THEN -b.LicWinloss * e.Rate ELSE 0 END)
+			SUM(CASE WHEN b.Bettype = @SabaPromotion_Bettype THEN -b.LicWinloss * e.Rate ELSE 0 END),
+			SUM(Contribution),
+			SUM(CASE WHEN b.Bettype = @PPJackpotPrize_Bettype THEN -b.LicWinloss * e.Rate ELSE 0 END),
+			SUM(CASE WHEN b.Bettype IN (@PPTournament_Bettype, @PromotionPrize_Bettype) THEN -b.LicWinloss * e.Rate ELSE 0 END)
 		FROM #tmpBettingByProduct b
 		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = (CASE WHEN p.ProductID = 0 THEN @SPR ELSE p.ProductID END)
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 		WHERE b.rptDate BETWEEN p.FromDate AND p.ToDate
 			AND (p.ProductID IN(0, @PP) OR p.ChargeType = @GDTip_ChargeType)
-			AND b.Bettype IN (@PromotionPrize_Bettype,@PPTournament_Bettype,@GDTip_Bettype,@SabaPromotion_Bettype, @SAGTip_Bettype)
+			AND b.Bettype IN (@PPContribution_Bettype,@PPJackpotPrize_Bettype,@PromotionPrize_Bettype,@PPTournament_Bettype,@GDTip_Bettype,@SabaPromotion_Bettype,@SAGTip_Bettype)
 		GROUP BY p.PartyID,b.rptdate,p.ProductId,b.CurrencyId
 
 		-- CB
@@ -408,10 +420,13 @@ BEGIN
 		-- create result table
 		--
 		SELECT a.PartyID,a.ProductId
-			,CAST(SUM(ISNULL(a.AmountToCompany,0)) AS MONEY) AmountToCompany
-			,SUM(ISNULL(a.ExtraAmount,0)) ExtraAmount
-			,SUM(ISNULL(a.Promotion,0)) Promotion
-			,CAST(SUM(ISNULL(a.Winloss,0)) AS MONEY) Winloss
+			,CAST(SUM(ISNULL(a.AmountToCompany,0)) AS MONEY)	AmountToCompany
+			,SUM(ISNULL(a.ExtraAmount,0))						ExtraAmount
+			,SUM(ISNULL(a.Promotion,0))							Promotion
+			,SUM(ISNULL(a.Contribution,0))					    Contribution
+			,SUM(ISNULL(a.JackPotPrize,0))						JackPotPrize
+			,SUM(ISNULL(a.PromotionPrize,0))					PromotionPrize
+			,CAST(SUM(ISNULL(a.Winloss,0)) AS MONEY)			Winloss
 			,CAST(0 AS MONEY) LicensingFee
 			,CAST(0 AS MONEY) Discount
 			,CAST(0 AS MONEY) Rebate
@@ -712,8 +727,8 @@ END
 		ELSE
 		BEGIN
 			SELECT UPPER(p.LicenseeCode) AS LicenseeCode
-				,UPPER(@BaseCurrency) AS CurrencyName
-				,SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
+				,UPPER(@BaseCurrency) AS CurrencyName 
+				,SUM(CASE WHEN r.ProductID = 32 AND r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) AmountToCompany
 				,SUM(r.LicensingFee + r.ExtraAmount) LicensingFee
 				,SUM(r.Discount) Discount
 				,SUM(r.Rebate) Rebate
