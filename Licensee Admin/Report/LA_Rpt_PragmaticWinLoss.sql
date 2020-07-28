@@ -241,10 +241,12 @@ BEGIN
 		CompanyIncome	MONEY
 	)
 
-	DECLARE @TotalPayToSupplierOfCredit MONEY = 0
+	DECLARE @TotalPayToSupplierOfCredit MONEY = 0,
+			@NumberOfTiers INT
 
 	-- Region Credit
 	DECLARE @RateOfCredit AS TABLE (
+		RowIndex TINYINT IDENTITY(1,1),
 		PartyId			INT,
 		Rate			MONEY,
 		MinAmount		MONEY,
@@ -256,7 +258,9 @@ BEGIN
 	FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
 	INNER JOIN @CreditChargeInfos ci2 ON ci.FromParty = ci2.PartyId 
 	WHERE ci2.isDeposit = 0 AND ci.ProductID = 32
+	ORDER BY MaxAmount DESC
 
+	SELECT @NumberOfTiers = COUNT(*) FROM @RateOfCredit
 	-- Region TotalAmountOfCreditGroup
 	DECLARE @TotalAmountWinLoss  MONEY
 	DECLARE @CreditBaseCurrencyName VARCHAR(10), @CreditBaseCurrencyId INT
@@ -270,27 +274,23 @@ BEGIN
 	--Endregion TotalAmountOfCreditGroup
 
 	-- Region @TotalPayToSupplierOfCredit
-	;WITH cte_RateOfCredit AS (
-		SELECT DISTINCT Rate, MinAmount, MaxAmount
-		FROM @RateOfCredit
-	)
 	SELECT @TotalPayToSupplierOfCredit = SUM(CASE 
 								WHEN @TotalAmountWinLoss  > MaxAmount THEN MaxAmount 
 								WHEN (@TotalAmountWinLoss  - MinAmount) > 0 THEN (@TotalAmountWinLoss  - MinAmount) 
+								WHEN @TotalAmountWinLoss < 0 AND r.RowIndex = @NumberOfTiers THEN @TotalAmountWinLoss
 								ELSE 0 END  * r.Rate) 
-	FROM cte_RateOfCredit r
+	FROM @RateOfCredit r
 	-- Endregion @TotalPayToSupplierOfCredit
 	
 	-- Region Update PayToSupplier for #Result
-	DECLARE @Rate3rdAgaintsNegativeAmount MONEY = (SELECT TOP 1 Rate FROM @RateOfCredit ORDER BY MinAmount)
-		
 	;WITH SumByPropressiveAmount AS(
 		SELECT  r.PartyId,
 				CurrencyId,
 				Winlossdate,
 				SUM(CASE 
 					WHEN (-r.CustomerWinLoss*e.BaseCurrencyRate) > MaxAmount THEN MaxAmount 
-					WHEN (-r.CustomerWinLoss*e.BaseCurrencyRate  - MinAmount) > 0 THEN (-r.CustomerWinLoss*e.BaseCurrencyRate - MinAmount) 
+					WHEN (-r.CustomerWinLoss*e.BaseCurrencyRate  - MinAmount) > 0 THEN (-r.CustomerWinLoss*e.BaseCurrencyRate - MinAmount)
+					WHEN -r.CustomerWinLoss*e.BaseCurrencyRate < 0 AND roc.RowIndex = @NumberOfTiers THEN -r.CustomerWinLoss*e.BaseCurrencyRate 
 					ELSE 0 END  * roc.Rate / e.BaseCurrencyRate)  AS ProgressiveAmount
 		FROM #Result r 
 		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CreditBaseCurrencyName) e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.Winlossdate
@@ -300,9 +300,7 @@ BEGIN
 				Winlossdate
 	)
 	UPDATE r
-	SET r.PayToSupplier = CASE  WHEN r.CustomerWinLoss > 0 THEN (-r.CustomerWinLoss*@Rate3rdAgaintsNegativeAmount)
-								ELSE ProgressiveAmount 
-						  END
+	SET r.PayToSupplier = ProgressiveAmount
 	FROM #Result r
 	INNER JOIN SumByPropressiveAmount s ON r.PartyId = s.PartyID AND r.CurrencyId = s.CurrencyId AND r.Winlossdate = s.Winlossdate
 	-- Endregion Update PayToSupplier for #Result
