@@ -21,6 +21,7 @@ AS
 			+ Check FromDate for sofrware data fee & Rebate ( type = 1 )
 		- 20191219@Bruce: Exclude credit notes in calculation of Recon and Collection sheet [#125779]
 		- 20191210@Bruce: Include Promotion [#123958]
+		- 20200729@Parsons: Implement PP Jackpot [RedmineID: #137306]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -49,14 +50,14 @@ BEGIN
 	DECLARE @N_ToDate DATE = DATEADD (DAY, -1, DATEADD(MONTH, 1, @N_FromDate))
 
 	SELECT p.LicenseeCode, b.CurrencyName, r.ProductName, p.PartyId
-		,SUM(CASE WHEN InvItemTypeId = 1 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) LicensingFee
+		,SUM(CASE WHEN InvItemTypeId IN (1,30,31,32) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) LicensingFee
 		,SUM(CASE WHEN InvItemTypeId = 4 THEN ISNULL(Expense,0) ELSE 0 END) Discount
 		,SUM(CASE WHEN InvItemTypeId = 6 THEN ISNULL(Expense,0) ELSE 0 END) Rebate
 		,SUM(CASE WHEN InvItemTypeId IN (5,24,26) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Prepayment
 		,SUM(CASE WHEN InvItemTypeId IN (11,12,13,14,17,20) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Others
 		,SUM(CASE WHEN InvItemTypeId IN (3,25) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) AMF
 		,SUM(CASE WHEN InvItemTypeId = 2 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) SetupFee
-		,SUM(CASE WHEN InvItemTypeId IN (29,30) THEN ISNULL(Expense,0) ELSE 0 END) Promotion
+		,SUM(CASE WHEN InvItemTypeId = 29 THEN ISNULL(Expense,0) ELSE 0 END) Promotion
 	INTO #result
 	FROM @partyList p
 	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON p.PartyId = h.PartyId
