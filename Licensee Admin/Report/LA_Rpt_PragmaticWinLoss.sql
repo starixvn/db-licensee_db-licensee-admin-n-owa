@@ -246,7 +246,7 @@ BEGIN
 
 	-- Region Credit
 	DECLARE @RateOfCredit AS TABLE (
-		RowIndex TINYINT IDENTITY(1,1),
+		RowIndex		TINYINT,
 		PartyId			INT,
 		Rate			MONEY,
 		MinAmount		MONEY,
@@ -258,9 +258,20 @@ BEGIN
 	FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
 	INNER JOIN @CreditChargeInfos ci2 ON ci.FromParty = ci2.PartyId 
 	WHERE ci2.isDeposit = 0 AND ci.ProductID = 32
-	ORDER BY MaxAmount DESC
 
-	SELECT @NumberOfTiers = COUNT(*) FROM @RateOfCredit
+	-- Update Row Index
+	;WITH cte_RowIndex AS(
+		SELECT ROW_NUMBER() OVER (PARTITION BY PartyId ORDER BY MaxAmount DESC) AS RowIndex, 
+		PartyId, 
+		Rate FROM @RateOfCredit
+	)
+	UPDATE @RateOfCredit 
+	SET RowIndex = ri.RowIndex
+	FROM @RateOfCredit r INNER JOIN cte_RowIndex ri
+		ON r.PartyId = ri.PartyId AND r.Rate = ri.Rate
+
+	SELECT @NumberOfTiers = MAX(RowIndex) FROM @RateOfCredit
+
 	-- Region TotalAmountOfCreditGroup
 	DECLARE @TotalAmountWinLoss  MONEY
 	DECLARE @CreditBaseCurrencyName VARCHAR(10), @CreditBaseCurrencyId INT
@@ -274,13 +285,17 @@ BEGIN
 	--Endregion TotalAmountOfCreditGroup
 
 	-- Region @TotalPayToSupplierOfCredit
+	;WITH cte_Rate AS(
+		SELECT DISTINCT r.MinAmount, r.MaxAmount, r.Rate, r.RowIndex
+		FROM @RateOfCredit r
+	)
 	SELECT @TotalPayToSupplierOfCredit = SUM(CASE 
-								WHEN @TotalAmountWinLoss  > MaxAmount THEN MaxAmount 
-								WHEN (@TotalAmountWinLoss  - MinAmount) > 0 THEN (@TotalAmountWinLoss  - MinAmount) 
-								WHEN @TotalAmountWinLoss < 0 AND r.RowIndex = @NumberOfTiers THEN @TotalAmountWinLoss
-								ELSE 0 END  * r.Rate) 
-	FROM @RateOfCredit r
-	-- Endregion @TotalPayToSupplierOfCredit
+									WHEN @TotalAmountWinLoss > r.MaxAmount THEN r.MaxAmount
+									WHEN @TotalAmountWinLoss  - r.MinAmount > 0 THEN @TotalAmountWinLoss  - MinAmount 
+									WHEN @TotalAmountWinLoss < 0 AND r.RowIndex = @NumberOfTiers THEN @TotalAmountWinLoss
+									ELSE 0 END * r.Rate)
+	FROM cte_Rate r
+	--Endregion @TotalPayToSupplierOfCredit
 	
 	-- Region Update PayToSupplier for #Result
 	;WITH SumByPropressiveAmount AS(
