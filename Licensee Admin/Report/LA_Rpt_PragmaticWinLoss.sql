@@ -241,12 +241,11 @@ BEGIN
 		CompanyIncome	MONEY
 	)
 
-	DECLARE @TotalPayToSupplierOfCredit MONEY = 0,
-			@NumberOfTiers INT
+	DECLARE @TotalPayToSupplierOfCredit MONEY = 0, @NumberOfTiers INT = 2
 
 	-- Region Credit
 	DECLARE @RateOfCredit AS TABLE (
-		RowIndex		TINYINT,
+		RowIndex TINYINT IDENTITY(1,1),
 		PartyId			INT,
 		Rate			MONEY,
 		MinAmount		MONEY,
@@ -258,19 +257,7 @@ BEGIN
 	FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
 	INNER JOIN @CreditChargeInfos ci2 ON ci.FromParty = ci2.PartyId 
 	WHERE ci2.isDeposit = 0 AND ci.ProductID = 32
-
-	-- Update Row Index
-	;WITH cte_RowIndex AS(
-		SELECT ROW_NUMBER() OVER (PARTITION BY PartyId ORDER BY MaxAmount DESC) AS RowIndex, 
-		PartyId, 
-		Rate FROM @RateOfCredit
-	)
-	UPDATE @RateOfCredit 
-	SET RowIndex = ri.RowIndex
-	FROM @RateOfCredit r INNER JOIN cte_RowIndex ri
-		ON r.PartyId = ri.PartyId AND r.Rate = ri.Rate
-
-	SELECT @NumberOfTiers = MAX(RowIndex) FROM @RateOfCredit
+	ORDER BY FromParty, MaxAmount DESC
 
 	-- Region TotalAmountOfCreditGroup
 	DECLARE @TotalAmountWinLoss  MONEY
@@ -285,34 +272,27 @@ BEGIN
 	--Endregion TotalAmountOfCreditGroup
 
 	-- Region @TotalPayToSupplierOfCredit
-	;WITH cte_Rate AS(
-		SELECT DISTINCT r.MinAmount, r.MaxAmount, r.Rate, r.RowIndex
-		FROM @RateOfCredit r
-	)
 	SELECT @TotalPayToSupplierOfCredit = SUM(CASE 
-									WHEN @TotalAmountWinLoss > r.MaxAmount THEN r.MaxAmount
-									WHEN @TotalAmountWinLoss  - r.MinAmount > 0 THEN @TotalAmountWinLoss  - MinAmount 
-									WHEN @TotalAmountWinLoss < 0 AND r.RowIndex = @NumberOfTiers THEN @TotalAmountWinLoss
-									ELSE 0 END * r.Rate)
-	FROM cte_Rate r
-	--Endregion @TotalPayToSupplierOfCredit
-	
+								WHEN @TotalAmountWinLoss  > MaxAmount THEN MaxAmount 
+								WHEN (@TotalAmountWinLoss  - MinAmount) > 0 THEN (@TotalAmountWinLoss  - MinAmount) 
+								WHEN @TotalAmountWinLoss < 0 AND r.RowIndex % @NumberOfTiers = 0 THEN @TotalAmountWinLoss
+								ELSE 0 END  * r.Rate) 
+	FROM @RateOfCredit r
+	WHERE RowIndex <= @NumberOfTiers
+	-- Endregion @TotalPayToSupplierOfCredit
+
 	-- Region Update PayToSupplier for #Result
 	;WITH SumByPropressiveAmount AS(
-		SELECT  r.PartyId,
-				CurrencyId,
-				Winlossdate,
+		SELECT  r.PartyId,CurrencyId,Winlossdate,
 				SUM(CASE 
 					WHEN (-r.CustomerWinLoss*e.BaseCurrencyRate) > MaxAmount THEN MaxAmount 
 					WHEN (-r.CustomerWinLoss*e.BaseCurrencyRate  - MinAmount) > 0 THEN (-r.CustomerWinLoss*e.BaseCurrencyRate - MinAmount)
-					WHEN -r.CustomerWinLoss*e.BaseCurrencyRate < 0 AND roc.RowIndex = @NumberOfTiers THEN -r.CustomerWinLoss*e.BaseCurrencyRate 
+					WHEN -r.CustomerWinLoss*e.BaseCurrencyRate < 0 AND roc.RowIndex % @NumberOfTiers = 0 THEN -r.CustomerWinLoss*e.BaseCurrencyRate 
 					ELSE 0 END  * roc.Rate / e.BaseCurrencyRate)  AS ProgressiveAmount
 		FROM #Result r 
 		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CreditBaseCurrencyName) e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.Winlossdate
 		INNER JOIN @RateOfCredit roc ON r.PartyID = roc.PartyID
-		GROUP BY r.PartyId,
-				CurrencyId,
-				Winlossdate
+		GROUP BY r.PartyId,CurrencyId,Winlossdate
 	)
 	UPDATE r
 	SET r.PayToSupplier = ProgressiveAmount
