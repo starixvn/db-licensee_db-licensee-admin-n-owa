@@ -721,7 +721,7 @@ END
 				,SUM(CASE WHEN r.ProductID = 32 THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					 ELSE r.AmountToCompany + r.ExtraAmount END) AmountToCompany
-				,SUM(r.LicensingFee + r.ExtraAmount) LicensingFee
+				,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) LicensingFee
 				,SUM(r.Discount) Discount
 				,SUM(r.Rebate) Rebate
 				,SUM(r.Promotion) Promotion
@@ -737,7 +737,7 @@ END
 				, SUM(CASE WHEN r.ProductID = 32 THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					  ELSE r.AmountToCompany + r.ExtraAmount END) AmountToCompany
-				,SUM(r.LicensingFee + r.ExtraAmount) LicensingFee
+				,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) LicensingFee
 				,SUM(r.Discount) Discount
 				,SUM(r.Rebate) Rebate
 				,SUM(r.Promotion) Promotion
