@@ -687,7 +687,9 @@ END
 				, pl.Name AS ProductName
 				, pl.ProductId
 				, UPPER(@BaseCurrency) AS CurrencyName
-				, SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
+				, SUM(CASE WHEN r.ProductID = 32 THEN 
+										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
+					  ELSE r.AmountToCompany + r.ExtraAmount END) AmountToCompany
 			FROM #tmpResult r
 			INNER JOIN @partyList p ON r.PartyID=p.PartyId
 			INNER JOIN @productList pl ON r.ProductID = pl.ProductId
@@ -699,7 +701,9 @@ END
 			SELECT p.LicenseeCode
 				, pl.Name AS ProductName
 				, UPPER(@BaseCurrency) AS CurrencyName
-				, SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
+				, SUM(CASE WHEN r.ProductID = 32 THEN 
+										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
+					  ELSE r.AmountToCompany + r.ExtraAmount END) AmountToCompany
 			FROM #tmpResult r
 			INNER JOIN @partyList p ON r.PartyID=p.PartyId
 			INNER JOIN @productList pl ON r.ProductID = pl.ProductId
@@ -714,7 +718,9 @@ END
 		BEGIN
 			SELECT p.PartyId
 				,UPPER(@BaseCurrency) AS CurrencyName
-				,SUM(r.AmountToCompany + r.ExtraAmount) AmountToCompany
+				,SUM(CASE WHEN r.ProductID = 32 THEN 
+										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
+					 ELSE r.AmountToCompany + r.ExtraAmount END) AmountToCompany
 				,SUM(r.LicensingFee + r.ExtraAmount) LicensingFee
 				,SUM(r.Discount) Discount
 				,SUM(r.Rebate) Rebate
@@ -728,7 +734,9 @@ END
 		BEGIN
 			SELECT UPPER(p.LicenseeCode) AS LicenseeCode
 				,UPPER(@BaseCurrency) AS CurrencyName 
-				,SUM(CASE WHEN r.ProductID = 32 AND r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) AmountToCompany
+				, SUM(CASE WHEN r.ProductID = 32 THEN 
+										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
+					  ELSE r.AmountToCompany + r.ExtraAmount END) AmountToCompany
 				,SUM(r.LicensingFee + r.ExtraAmount) LicensingFee
 				,SUM(r.Discount) Discount
 				,SUM(r.Rebate) Rebate
