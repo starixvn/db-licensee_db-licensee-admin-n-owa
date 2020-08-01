@@ -340,7 +340,7 @@ BEGIN
 		SELECT p.PartyID,b.rptDate,p.ProductId,b.CurrencyId,0,0,
 			SUM(CASE WHEN b.Bettype IN(@GDTip_Bettype, @SAGTip_Bettype) THEN b.LicWinloss * p.Rate * e.Rate ELSE 0 END),
 			SUM(CASE WHEN b.Bettype = @SabaPromotion_Bettype THEN -b.LicWinloss * e.Rate ELSE 0 END),
-			SUM(Contribution),
+			SUM(Contribution * e.Rate),
 			SUM(CASE WHEN b.Bettype = @PPJackpotPrize_Bettype THEN -b.LicWinloss * e.Rate ELSE 0 END),
 			SUM(CASE WHEN b.Bettype IN (@PPTournament_Bettype, @PromotionPrize_Bettype) THEN -b.LicWinloss * e.Rate ELSE 0 END)
 		FROM #tmpBettingByProduct b
