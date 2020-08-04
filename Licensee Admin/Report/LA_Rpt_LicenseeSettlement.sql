@@ -44,7 +44,8 @@ AS
 			- 20191205@Parsons: PP tournament [#123958]  
 			- 20200228@Parsons: Support-HID-currency [#128856] 
 			- 20200412@Parsons: Integrate SA Gaming [#129276]
-			- 20200403@Parsons: Indo 4D Integration [#130910]
+			- 20200403@Parsons: Indo 4D Integration [#130910] 
+		    - 20200719@Parsons: Implement PP Jackpot [RedmineID: #137306]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -77,9 +78,12 @@ BEGIN
 		BuyBackAmountBA				MONEY,
 		Winlost						MONEY,
 		WinningPrize				MONEY,
+		Contribution				MONEY,
+		JackpotPrize				MONEY,
 		Cashout						MONEY,
 		PlayerComm					MONEY,
 		LicenseeWL					MONEY,
+		LicenseeChargeRate			MONEY,
 		LicenseeComm				MONEY,
 		BettradeComm				MONEY,
 		CashInShare					MONEY,
@@ -152,6 +156,9 @@ BEGIN
 		,CAST(0 AS MONEY)	AS ActualStake
 		,CAST(0 AS MONEY)	AS BuyBackAmount
 		,CAST(0 AS MONEY)	AS MemberWinLoss
+		,CAST(0 AS MONEY)	AS WinningPrize
+		,CAST(0 AS MONEY)	AS Contribution
+		,CAST(0 AS MONEY)	AS JackpotPrize
 		,CAST(0 AS MONEY)	AS MemberComm
 		,CAST(0 AS MONEY)	AS BettradeComm
 		,CAST(0 AS MONEY)	AS LicenseeWL
@@ -162,6 +169,9 @@ BEGIN
 		,CAST(0 AS MONEY)	AS BuyBackAmountBase
 		,CAST(0 AS MONEY)	AS BettradeCommBase
 		,CAST(0 AS MONEY)	AS MemberWinLossBase
+		,CAST(0 AS MONEY)	AS WinningPrizeBase
+		,CAST(0 AS MONEY)	AS ContributionBase
+		,CAST(0 AS MONEY)	AS JackpotPrizeBase
 		,CAST(0 AS MONEY)	AS MemberCommBase
 		,CAST(0 AS MONEY)	AS LicenseeWLBase
 		,CAST(0 AS MONEY)	AS LicenseeCommBase
@@ -663,33 +673,39 @@ BEGIN
 	END
 	ELSE IF (@ProductCode = 'PP')
 	BEGIN
-		DECLARE @PPTournament SMALLINT = 4299,   
+		DECLARE @PP_Contribution SMALLINT = 4297,
+				@PP_JackpotPrize SMALLINT = 4298,
+				@PPTournament SMALLINT = 4299,   
 				@PromotionPrize SMALLINT = 4300 
 
 		;WITH cte_WinLossData AS(
 			SELECT b.SiteId, b.rptDate, b.CurrencyID
-				, SUM(CASE WHEN b.Bettype NOT IN(@PPTournament, @PromotionPrize) THEN ISNULL(b.BetCount, 0) ELSE 0 END) BetCount
-				, SUM(CASE WHEN b.Bettype NOT IN(@PPTournament, @PromotionPrize) THEN ISNULL(b.Turnover, 0) ELSE 0 END) AS Turnover
-				, SUM(CASE WHEN b.Bettype NOT IN(@PPTournament, @PromotionPrize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) Winloss
+				, SUM(CASE WHEN b.Bettype NOT IN(@PPTournament, @PromotionPrize, @PP_Contribution, @PP_JackpotPrize) THEN ISNULL(b.BetCount, 0) ELSE 0 END) BetCount
+				, SUM(CASE WHEN b.Bettype NOT IN(@PPTournament, @PromotionPrize, @PP_Contribution, @PP_JackpotPrize) THEN ISNULL(b.Turnover, 0) ELSE 0 END) Turnover
+				, SUM(CASE WHEN b.Bettype NOT IN(@PPTournament, @PromotionPrize, @PP_Contribution, @PP_JackpotPrize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) MemberWL
 				, SUM(CASE WHEN b.Bettype IN(@PPTournament, @PromotionPrize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
+				, SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Contribution
+				, SUM(CASE WHEN b.Bettype = @PP_JackpotPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS JackpotPrize
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				WHERE
 					b.ProductID = 32
 					AND	b.SiteID = @LicenseeID
 					AND b.rptDate BETWEEN @FromDate AND @ToDate
 					AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
-					AND (b.CurrencyID <> 20)
 					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
 				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
-		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, WinningPrize, Company)
+		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, WinningPrize, Contribution, JackpotPrize, Company)
 		SELECT rptDate, d.CurrencyID
 				, SUM(BetCount)		AS BetCount
 				, SUM(Turnover)		AS Turnover
-				, SUM(WinLoss)	AS Winlost
-				, SUM(-Winloss * (1 - ISNULL(cm.Rate, p.Rate)))  AS LicenseeWL
+				, SUM(MemberWL)		AS Winlost
+				, SUM((-MemberWL - Contribution) * (1 - ISNULL(cm.Rate, p.Rate)))  AS LicenseeWL
+				, SUM((-MemberWL - Contribution) * ISNULL(cm.Rate, p.Rate))  AS LicenseeChargeRate
 				, SUM(WinningPrize) AS WinningPrize
-				, SUM(-WinLoss * ISNULL(cm.Rate, p.Rate)) AS Company
+				, SUM(Contribution) AS Contribution
+				, SUM(JackpotPrize) AS JackpotPrize
+				, SUM((-MemberWL - Contribution) * ISNULL(cm.Rate, p.Rate) + Contribution - JackpotPrize - WinningPrize) AS Company
 		FROM cte_WinLossData d
 			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND d.CurrencyId = cm.CurrencyId 
@@ -770,10 +786,13 @@ BEGIN
 		, SUM(ISNULL(d.BuyBackAmountBA, 0))				AS BuyBackAmountBA
 		, SUM(ISNULL(d.Winlost, 0))						AS MemberWinLoss
 		, SUM(ISNULL(d.WinningPrize, 0))				AS WinningPrize
+		, SUM(ISNULL(d.Contribution, 0))				AS Contribution
+		, SUM(ISNULL(d.JackpotPrize, 0))				AS JackpotPrize
 		, SUM(ISNULL(d.Cashout, 0))						AS Cashout
 		, SUM(ISNULL(d.PlayerComm, 0))					AS MemberComm
 		, SUM(ISNULL(d.BettradeComm, 0))				AS BettradeComm
 		, SUM(ISNULL(d.LicenseeWL, 0))					AS LicenseeWL
+		, SUM(ISNULL(d.LicenseeChargeRate, 0))			AS LicenseeChargeRate
 		, SUM(ISNULL(d.LicenseeComm, 0))				AS LicenseeComm
 		, SUM(ISNULL(d.CashInShare, 0))					AS CashInShare
 		, SUM(ISNULL(d.TipsAmount, 0))					AS TipsAmount
@@ -798,9 +817,12 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.BettradeComm * e.Rate, 0)))				AS BettradeCommBase
 		, CONVERT(MONEY, SUM(ISNULL(d.Winlost * e.Rate, 0)))					AS MemberWinLossBase
 		, CONVERT(MONEY, SUM(ISNULL(d.WinningPrize * e.Rate, 0)))				AS WinningPrizeBase
+		, CONVERT(MONEY, SUM(ISNULL(d.Contribution * e.Rate, 0)))				AS ContributionBase
+		, CONVERT(MONEY, SUM(ISNULL(d.JackpotPrize* e.Rate, 0)))				AS JackpotPrizeBase
 		, CONVERT(MONEY, SUM(ISNULL(d.Cashout * e.Rate, 0)))					AS CashoutBase
 		, CONVERT(MONEY, SUM(ISNULL(d.PlayerComm * e.Rate, 0)))					AS MemberCommBase
 		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeWL * e.Rate, 0)))					AS LicenseeWLBase
+		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeChargeRate * e.Rate, 0)))			AS LicenseeChargeRateBase
 		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeComm * e.Rate, 0)))				AS LicenseeCommBase
 		, CONVERT(MONEY, SUM(ISNULL(d.CashInShare * e.Rate, 0)))				AS CashInShareBase
 		, CONVERT(MONEY, SUM(ISNULL(d.TipsAmount * e.Rate, 0)))					AS TipsAmountBase

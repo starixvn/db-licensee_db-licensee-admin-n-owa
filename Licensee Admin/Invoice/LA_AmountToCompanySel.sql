@@ -27,7 +27,8 @@ AS
 		- 20191125@Mason: Setup billing terms by Currency  [#120005]
 	    - 20191206@Parsons: PP tournament [#123958]
 	    - 20200409@Parsons: Integrate SA Gaming [#129276]
-		- 20200505@Parsons: Special handling for INH market [#128570]
+		- 20200505@Parsons: Special handling for INH market [#128570] 
+		- 20200714@Parsons: Implement PP Jackpot [RedmineID: #137306]
 
 	Parameters:
 		@IsApplyDiscountMinfee: apply minfee term to discount value
@@ -42,6 +43,8 @@ BEGIN
  * 1. Prepare settings
  *-------------------------------------------------------------------------------------------------------------------------------*/
 	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007,
+			@PP_Contribution SMALLINT = 4297,
+			@PP_JackpotPrize SMALLINT = 4298,
 			@PPTournament SMALLINT = 4299,
 			@PromotionPrize SMALLINT = 4300
 	
@@ -284,12 +287,13 @@ BEGIN
 		b.rptDate	AS WinlossDate,
 		p.ProductId,
 		b.CurrencyId,
-		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss,
-		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN 0 ELSE ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) * e.Rate END) AS AmountToCompany,
-		SUM(CASE 
-			WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) * e.Rate
-			WHEN b.ProductID = @BX THEN -(b.CommissionA + b.CommissionP) * e.Rate
-			ELSE 0 END) AS ExtraAmount
+		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @PP_Contribution) THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss,
+		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN 0 ELSE (ISNULL(-b.MemberWL, 0) - CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) 
+																	* ISNULL(cr.Rate, p.Rate) * e.Rate END) AS AmountToCompany,
+		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) * e.Rate
+				 WHEN b.ProductID = @BX THEN -(b.CommissionA + b.CommissionP) * e.Rate
+				 ELSE 0 
+			END) AS ExtraAmount
 	INTO #tmpWinlossData
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 	INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
@@ -297,7 +301,7 @@ BEGIN
 		AND p.LicenseeId = b.SiteId
 		AND (b.rptDate BETWEEN p.FromDate AND p.ToDate) 
 		AND (p.ProductID NOT IN (11, 39) OR b.Bettype = p.Bettype)
-		AND (b.Bettype NOT IN (@PPTournament, @PromotionPrize))
+		AND (b.Bettype NOT IN (@PPTournament, @PromotionPrize, @PP_JackpotPrize))
 	LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeID AND b.CurrencyId = cr.CurrencyID
 	WHERE (b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND b.customercategory NOT IN (27, 28)

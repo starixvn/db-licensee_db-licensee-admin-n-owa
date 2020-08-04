@@ -29,7 +29,8 @@ AS
 		- 20190911@Bruce: Support Exchange product in invoices [#119846]
 		- 20191017@Parsons: Non-peak hour promotion [#119538]
 		- 20191209@Parsons: PP tournament [#123958] 
-		- 20200505@Parsons: Special handling for INH market [#128570]
+		- 20200505@Parsons: Special handling for INH market [#128570] 
+		- 20200714@Parsons: Implement PP Jackpot [RedmineID: #137306]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -39,7 +40,9 @@ BEGIN
 		@AmountTypeRebate INT = 6,
 		@DeductAgainstInvoice INT = 24,
 		@DeductSabaPromotion INT = 29,
-		@DeductPPPrizes INT = 30
+		@DeductPPPrizes INT = 30,
+		@PP_Contribution_InvItemType INT = 31,
+		@PP_JackpotPrize_InvItemType INT = 32
 
 	DECLARE @Month TINYINT = MONTH(@FromDate)
 	DECLARE @FirstDate DATETIME = DATEADD(mm, DATEDIFF(mm, 0, @FromDate), 0)
@@ -530,23 +533,37 @@ BEGIN
 		END
 	END
 	-- End region insert Promotion amount
-	-- Region Deduct promotion prizes
+	-- Region PP: Tournament Prizes, Promotion, Contribution, Jackpot Prize  
 	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = 32))
 	BEGIN
-		DECLARE @PPPrize MONEY
-		SELECT @PPPrize = SUM(b.MemberWL * e.Rate)
-		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'PP', 'OA', 1) pc ON b.SiteID = pc.LicenseeId
-			INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-		WHERE b.Bettype IN (4299, 4300) -- PP Prize
-			AND b.rptDate BETWEEN @FromDate AND @ToDate
-			AND b.[StatusId] NOT IN (-1, 101, 102, 103)
- 		
-		IF(ISNULL(@PPPrize, 0) > 0)
-		BEGIN
-			INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,AmountType,InvoiceAmount,RemainingAmount)
-			VALUES(0,'','',@DeductPPPrizes,@PPPrize,0)
-		END
+		DECLARE @PP_Contribution_Bettype SMALLINT = 4297,
+				@PP_JackpotPrize_Bettype SMALLINT = 4298,
+				@PPTournament_Bettype SMALLINT = 4299,
+				@PromotionPrize_Bettype SMALLINT = 4300
+		;WITH cte_Pragmatic_ExtraAmount AS
+		(
+			SELECT b.Bettype, SUM(CASE WHEN b.Bettype = @PP_Contribution_Bettype THEN -b.GrossWL ELSE b.MemberWL END  * e.Rate) AS ExtraAmount
+			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+				INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'PP', 'OA', 1) pc ON b.SiteID = pc.LicenseeId
+				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
+			WHERE b.Bettype IN (@PP_Contribution_Bettype, @PP_JackpotPrize_Bettype, @PPTournament_Bettype, @PromotionPrize_Bettype)
+				AND b.rptDate BETWEEN @FromDate AND @ToDate
+				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+			GROUP BY b.Bettype
+		)
+		INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,AmountType,InvoiceAmount,RemainingAmount)
+		SELECT 0, '', '', CASE 
+								WHEN Bettype = @PP_Contribution_Bettype THEN @PP_Contribution_InvItemType
+								WHEN Bettype = @PP_JackpotPrize_Bettype THEN @PP_JackpotPrize_InvItemType
+								ELSE  @DeductPPPrizes
+							END, SUM(ExtraAmount), 0
+		FROM cte_Pragmatic_ExtraAmount
+		GROUP BY CASE 
+					WHEN Bettype = @PP_Contribution_Bettype THEN @PP_Contribution_InvItemType
+					WHEN Bettype = @PP_JackpotPrize_Bettype THEN @PP_JackpotPrize_InvItemType
+					ELSE  @DeductPPPrizes
+				 END
+		
 	END
 	-- End region Deduct promotion prizes
  
