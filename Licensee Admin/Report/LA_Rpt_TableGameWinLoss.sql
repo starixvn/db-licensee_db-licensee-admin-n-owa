@@ -14,6 +14,7 @@ AS
  * Revisions
 	- 20200406@Mason: Integrate Table Game [#131166]
 	- 20200514@Mason: Integrate Saba.club [#132730]
+	- 20200805@Parsons: Adjust royalty fee terms for Keno, Lottery, Table Games [#136891] 
  * Param's Explanation:
  *
  */
@@ -23,7 +24,9 @@ BEGIN
 	
 	DECLARE @ProductCodes AS VARCHAR(1000) = 'TG'
 	DECLARE @System AS VARCHAR(10) = 'OA'
-	DECLARE @12BetGroupId AS INT = 14
+	DECLARE @12BetGroupId AS INT = 14,
+			@TianboPartyId INT = 432,
+			@BobbetPartyId INT = 346
 
 	CREATE TABLE #PartyList (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
 	INSERT INTO #PartyList EXEC bodb_licensee.dbo.LA_PartyListSel
@@ -56,7 +59,12 @@ BEGIN
 	--- OW, Boping, Zelanta equals 3%(0.03) of [Licensee Win Loss]
 	--- 12BET Group: 3% (0.03) of [Licensee Win Loss]
 	INSERT INTO #ChargeRate
-	SELECT DISTINCT c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate
+	SELECT DISTINCT c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate AS Rate, 
+						CASE WHEN @FromDate >= CAST('2020-07-01' AS DATETIME) THEN 
+												CASE WHEN c.PartyID IN (@TianboPartyId, @BobbetPartyId) THEN 0.02 ELSE 0.036  END 
+							 ELSE r.DI_Rate 
+						END  AS Rate3rd, 
+						c.Fromdate, c.Todate
 	FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, @ProductCodes) c
 	INNER JOIN @3rdRate r ON r.PartyID = c.PartyID and r.ProductID = c.ProductID
 	WHERE (c.DI_Rate = 0 AND c.isDeposit = 0) OR (c.DI_Rate > 0 and c.isDeposit = 1)

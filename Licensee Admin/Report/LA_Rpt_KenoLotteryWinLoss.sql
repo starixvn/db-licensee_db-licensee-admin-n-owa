@@ -22,7 +22,8 @@ AS
 		- 20190716@Bruce: Integrate CN88 data in LA [#116859]
 		- 20191105@Parsons: Get The Calculation Of PayToSupplier Fee Modified [#123342]
 		- 20191226@Mason: Set billing term by currency [#120005]
-		- 20200228@Parsons: Support-HID-currency [#128856]
+		- 20200228@Parsons: Support-HID-currency [#128856] 
+		- 20200805@Parsons: Adjust royalty fee terms for Keno, Lottery, Table Games [#136891]
 		
 	 Params:
 */
@@ -34,7 +35,10 @@ BEGIN
 	EXEC LA_PartyListSel
 
 	DECLARE	@12BetGroupId INT = -1,
-		@OneWorksGroupId INT = 1
+			@OneWorksGroupId INT = 1,
+			@TianboPartyId INT = 432,
+			@BobbetPartyId INT = 346
+
 	UPDATE @PartyList SET ParentId = @OneWorksGroupId WHERE ParentId IN (11,98)
 	UPDATE @PartyList SET ParentId = @12BetGroupId WHERE PartyId = 14 -- 12bet
 
@@ -57,14 +61,19 @@ BEGIN
 	INSERT INTO @ChargeInfos(ChargeId, PartyId, ProductID, LicenseeId, Rate, Rate3rd, Fromdate, Todate)
 	(
 		SELECT c.ChargeID, c.PartyID, c.ProductID, c.LicenseeID, c.DI_Rate,
-			CASE WHEN c.PartyId = 14 OR ISNULL(c.IsDeposit,0)=0 OR @FromDate >= CAST('2018-8-1' AS DATETIME) THEN 0.03 ELSE 0.05 END,
+			CASE 
+				WHEN @FromDate >= CAST('2020-07-01' AS DATETIME) THEN 
+												CASE WHEN c.PartyID IN (@TianboPartyId, @BobbetPartyId) THEN 0.02 ELSE 0.036  END 
+				WHEN c.PartyId = 14 OR ISNULL(c.IsDeposit,0)=0 OR @FromDate >= CAST('2018-8-1' AS DATETIME) THEN 0.03 
+				ELSE 0.05 
+			END,
 			c.Fromdate, c.Todate
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'LT', 'OA', 1) c
 
 		UNION
 
 		-- get Credit settings with rate = 0
-		SELECT ci.ChargeID, p.PartyID, ci.ProductId, lb.LabelID AS LicenseeID, ci.Rate, 0.03 AS Rate3rd,
+		SELECT ci.ChargeID, p.PartyID, ci.ProductId, lb.LabelID AS LicenseeID, ci.Rate, CASE WHEN @FromDate >= CAST('2020-07-01' AS DATETIME) THEN 0.036 ELSE 0.03 END AS Rate3rd,
 			CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate
 				ELSE @FromDate END,
 			CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate
