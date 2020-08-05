@@ -16,6 +16,7 @@ AS
 	DB: DBCUST.bodb_Licensee
 
 	Revisions:
+		- 20200703@Happy: Implement Group Min Fee [#134492]
 
 	Param's Explannation:
 		@GroupMinFeeHeaderOldData = '<Root>

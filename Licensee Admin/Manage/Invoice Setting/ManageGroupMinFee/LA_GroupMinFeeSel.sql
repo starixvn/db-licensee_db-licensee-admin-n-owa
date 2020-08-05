@@ -11,7 +11,8 @@ AS
 	 DB: DBLIC.bodb_Licensee  
    
 	 Revisions:
-		 
+		- 20200629@Happy: Implement Group Min Fee [#134492]
+		
 	 Params:
 		- @GroupMinFeeID:
 			= 0: get all group
