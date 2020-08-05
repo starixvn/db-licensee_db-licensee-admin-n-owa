@@ -2,17 +2,16 @@
 USE bodb_Licensee
 GO
 
---ALTER PROCEDURE [dbo].[LA_AmountToCompanySel] (
-DECLARE	@FromDate		DATE,
+ALTER PROCEDURE [dbo].[LA_AmountToCompanySel] (
+	@FromDate		DATE,
 	@ToDate			DATE,
 	@PartyIds		VARCHAR(4000) = '',
 	@ProductCodes	VARCHAR(1000) = '',
 	@BaseCurrency	VARCHAR(10) = 'EUR',
 	@CurrencyId		INT = 0,
 	@IsApplyDiscountMinfee BIT = 1
-SELECT @PartyIds='399,368,394', @FromDate='2020-06-01 00:00:00',@ToDate='2020-06-30 00:00:00',@ProductCodes='SB'
---)
---AS
+)
+AS
 /*	Created: 20180703@Bruce
 	Task : calculate discount, rebate, licensing fee in one invoice period(one month)
 	DB: DBLIC.bodb_Licensee
