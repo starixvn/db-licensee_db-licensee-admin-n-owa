@@ -21,7 +21,8 @@ AS
 	- 20191216@Parsons: Modify pay to supplier's formula for Keno WL report [#125014]
 	- 20191226@Mason: Set term by currency [#120005]
 	- 20200219@Mason: Update RNG Keno term [#128563]
-	- 20200228@Parsons: Support-HID-currency [#128856]
+	- 20200228@Parsons: Support-HID-currency [#128856] 
+	- 20200805@Parsons: Adjust royalty fee terms for Keno, Lottery, Table Games [#136891] 
 
  Param's Explanation:
 	- @FromDate		: From date
@@ -140,6 +141,7 @@ BEGIN
 				(-s.MemberWL) * (CASE 
 						WHEN p.PartyId = @CN88PartyId THEN 0.015
 						WHEN p.PartyId IN (@TianboPartyId, @BobbetPartyId) THEN 0.02
+						WHEN @FromDate >= CAST('2020-07-01' AS DATETIME) THEN 0.036
 						WHEN g.PartyId IN (@CreditGroupId, @12BetGroupId) OR @FromDate >= CAST('2018-8-1' AS DATETIME) THEN 0.03 
 						ELSE 0.05 
 					END)
