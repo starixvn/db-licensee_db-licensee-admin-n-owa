@@ -28,7 +28,6 @@ IF NOT EXISTS (SELECT ActionID FROM dbo.LogAction WITH (NOLOCK)
 							WHERE ActionID IN (@LA_GroupMinFeeInsLogId, @LA_GroupMinFeeUpdLogId, @LA_GroupMinFeeDelLogId))
 BEGIN
 	INSERT INTO [dbo].[LogAction]
-INSERT INTO [dbo].[LogAction]
            ([ActionID]
            ,[SPName]
            ,[ActionNameEN]
