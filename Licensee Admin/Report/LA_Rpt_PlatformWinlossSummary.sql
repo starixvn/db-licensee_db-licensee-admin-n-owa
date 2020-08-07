@@ -3,7 +3,8 @@ USE bodb02
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_PlatformWinlossSummary]
-	@PartyIDs		VARCHAR(4000),
+	@PartyIDs		VARCHAR(4000), 
+	@Platforms		VARCHAR(500),
 	@FromDate		SMALLDATETIME,
 	@ToDate			SMALLDATETIME,
 	@BaseCurrency	VARCHAR(20) = 'EUR'
@@ -28,8 +29,9 @@ AS
 		- 20190827@Bruce: Add new betfrom 't' [#118998]
 		- 20191010@Percy: Replace LicenseeBATransaction to LicenseeBATransaction_active [RedmineID: #103656]
 		- 20191223@Bruce: Adding betform v and 0 [#118998]
-		- 202000326@Parsons: Handle new betfrom v,1,2,3 into their own category [#130645]
+		- 20200326@Parsons: Handle new betfrom v,1,2,3 into their own category [#130645]
 		- 20200706@Parsons: Add new betfrom eGame Mobile and eGamer Desktop [#136414]
+		- 20200807@Parsons: Filter data by platform : Platform WL (summary, detail) [#138249]
 
 	Explanation:
 		- Desktop: contain the followings:
@@ -72,7 +74,9 @@ BEGIN
 	--
 	DECLARE @betfrom TABLE(betfrom CHAR(1))
 	INSERT INTO @betfrom
-	SELECT val FROM (VALUES('d'),('a'),('e'),('u'),('m'),('l'),('g'),('x'),('z'),('r'),('o'),('c'),('t'),('0'),('v'),('1'),('2'),('3'),('4'),('5'),('6'))v(val)
+	SELECT v.val  
+	FROM (VALUES('d'),('a'),('e'),('u'),('m'),('l'),('g'),('x'),('z'),('r'),('o'),('c'),('t'),('0'),('v'),('1'),('2'),('3'),('4'),('5'),('6'))v(val)
+	INNER JOIN strSplit(@Platforms, ',') bf ON v.val = bf.val
 
 	-- #1: get licensee/customer and currency info
 	--
