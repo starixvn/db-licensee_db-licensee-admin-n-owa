@@ -399,7 +399,7 @@ BEGIN
 		SELECT p.GroupMinFeeId, r.ProductId, SUM(r.Fee) AS TotalAmount
 		FROM @FinalResult r
 		INNER JOIN @PartyList p ON r.PartyId = p.PartyId
-		INNER JOIN @TotalMinFees t ON p.GroupMinFeeId = t.GroupMinFeeId
+		INNER JOIN @TotalMinFees t ON p.GroupMinFeeId = t.GroupMinFeeId AND r.ProductId = t.ProductId
 		WHERE p.GroupMinFeeId > 0
 		GROUP BY p.GroupMinFeeId, r.ProductId
 	),
@@ -532,7 +532,7 @@ BEGIN
 		SELECT p.GroupMinFeeId, r.ProductId, SUM(r.Fee - Discount) AS TotalAmount
 		FROM @FinalResult r
 		INNER JOIN @PartyList p ON r.PartyId = p.PartyId
-		INNER JOIN @TotalMinFees t ON p.GroupMinFeeId = t.GroupMinFeeId
+		INNER JOIN @TotalMinFees t ON p.GroupMinFeeId = t.GroupMinFeeId AND r.ProductId = t.ProductId
 		WHERE p.GroupMinFeeId > 0
 		GROUP BY p.GroupMinFeeId, r.ProductId
 	),
