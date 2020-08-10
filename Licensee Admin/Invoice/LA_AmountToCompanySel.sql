@@ -103,8 +103,7 @@ BEGIN
 		FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
 		INNER JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON p.DiscountGroupId=a.DiscountGroupId
 		INNER JOIN @PartyList b ON a.PartyID=b.PartyId
-		WHERE b.IsSelected=1
-			AND p.ProductId IN (SELECT c.ProductId FROM @ProductList c WHERE c.ToBeDiscounted=1)
+		WHERE p.ProductId IN (SELECT c.ProductId FROM @ProductList c WHERE c.ToBeDiscounted=1)
 			AND p.CalculationType IN (@ToBeDiscounted, @CalculateAndDiscount)
 	)
 	-- 1.3.2
