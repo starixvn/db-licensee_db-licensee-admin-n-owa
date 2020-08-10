@@ -369,6 +369,7 @@ BEGIN
 	FROM dbo.LA_GroupMinFeeDetail mfd WITH(NOLOCK)
 		INNER JOIN @PartyList p ON mfd.GroupMinFeeID = p.GroupMinFeeId
 		INNER JOIN #tmpExchange e ON e.ExchangeId = mfd.CurrencyId AND e.exchangedate = @ToDate
+	WHERE @FromDate BETWEEN mfd.FromDate AND mfd.ToDate
 	ORDER BY ROW_NUMBER() OVER(PARTITION BY mfd.GroupMinFeeID order by mfd.ToDate DESC)
 
 	-- 3.3 calculate actual licensing fee
@@ -391,7 +392,6 @@ BEGIN
 	FROM @FinalResult r
 	INNER JOIN @PartyList p ON r.PartyId = p.PartyId
 	INNER JOIN @tmpMinFee a ON a.PartyId = r.PartyId AND a.ProductId = r.ProductID AND a.FeeType = 1 -- minfee setting
-	INNER JOIN @TotalMinFees t ON a.ProductId = t.ProductId AND t.GroupMinFeeId = p.GroupMinFeeId
 	LEFT JOIN @tmpMinFee b ON b.PartyId = r.PartyId AND b.ProductId=r.ProductID AND b.FeeType = 2-- waive setting
 		-- 3.3.2 Update licensing fee of primary licensee
 	;WITH cte_TotalAmount AS 
