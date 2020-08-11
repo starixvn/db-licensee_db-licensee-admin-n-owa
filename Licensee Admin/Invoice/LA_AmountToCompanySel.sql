@@ -323,7 +323,7 @@ BEGIN
 	WHERE c.ToDate >= @FromDate
 
 	-- 2.3 create result
-	DECLARE @FinalResult TABLE(PartyId INT, ProductId INT, Winloss MONEY, AmountToCompany MONEY, ExtraAmount MONEY, Fee MONEY, Discount MONEY, Rebate MONEY, DiscountRate MONEY, RebateRate MONEY, DiscountRemark NVARCHAR(4000), RebateRemark NVARCHAR(4000), Minfee MONEY, IsChargedByMinFee BIT, IsApplyMinfeeToDiscount BIT)
+	DECLARE @FinalResult TABLE(PartyId INT, ProductId INT, Winloss MONEY, AmountToCompany MONEY, ExtraAmount MONEY, Fee MONEY, Discount MONEY, Rebate MONEY, DiscountRate MONEY, RebateRate MONEY, DiscountRemark NVARCHAR(4000), RebateRemark NVARCHAR(4000), Minfee MONEY, IsChargedByMinFee BIT, IsApplyMinfeeToDiscount BIT, IsChargeByGroupMinFee BIT)
 	DECLARE @INH_CurrencyID INT = 51 
 		
 	INSERT INTO @FinalResult(PartyId, ProductId, Winloss, AmountToCompany, ExtraAmount, Fee, Discount, Rebate, DiscountRate, RebateRate, DiscountRemark, RebateRemark, Minfee, IsChargedByMinFee, IsApplyMinfeeToDiscount)
@@ -410,7 +410,8 @@ BEGIN
 		WHERE r.TotalAmount < t.TotalMinFee
 	)
 	UPDATE r
-	SET r.Fee += d.DifferentAmount
+	SET r.Fee += d.DifferentAmount,
+		r.IsChargeByGroupMinFee = 1
 	FROM @FinalResult r
 	INNER JOIN LA_GroupMinFeeAssignment a ON r.PartyId = a.PartyID
 	INNER JOIN cte_DifferentAmount d ON a.GroupMinFeeID = d.GroupMinFeeId AND r.ProductId = d.ProductId
@@ -561,7 +562,8 @@ BEGIN
 		WHERE r.TotalAmount < t.TotalMinFee
 	)
 	UPDATE r
-	SET r.Fee += d.DifferentAmount
+	SET r.Fee += d.DifferentAmount,
+		r.IsChargeByGroupMinFee = 1
 	FROM @FinalResult r
 	INNER JOIN LA_GroupMinFeeAssignment a ON r.PartyId = a.PartyID
 	INNER JOIN cte_DifferentAmount d ON a.GroupMinFeeID = d.GroupMinFeeId AND r.ProductId = d.ProductId
@@ -606,7 +608,7 @@ BEGIN
 		,ProductId
 		,Winloss 
 		,Fee + ExtraAmount AS Fee
-		,CASE WHEN IsChargedByMinFee = 1 AND Fee > 0 THEN Fee ELSE AmountToCompany END NegativeFee
+		,CASE WHEN (IsChargedByMinFee = 1 OR ISNULL(IsChargeByGroupMinFee, 0) = 1) AND Fee > 0 THEN Fee ELSE AmountToCompany END NegativeFee
 		,Minfee
 		,IsChargedByMinFee
 		,Discount
