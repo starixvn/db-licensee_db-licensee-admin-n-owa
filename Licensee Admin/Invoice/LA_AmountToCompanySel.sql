@@ -522,6 +522,24 @@ BEGIN
 		WHERE (Fee - Discount) < Minfee AND IsApplyMinfeeToDiscount = 1 
 	END
 
+	-- Adjust Discount of primary licensee to be make sure that (TotalFee - TotalDiscount) >= cte.TotalMinFee  
+	;WITH cte_tmpDiscountGroupMinFee AS 
+	(
+		SELECT p.GroupMinFeeId, r.ProductId, t.TotalMinFee, SUM(r.Fee) AS TotalFee, SUM(r.Discount) AS TotalDiscount
+		FROM @FinalResult r
+		INNER JOIN @PartyList p ON r.PartyId = p.PartyId
+		INNER JOIN @TotalMinFees t ON p.GroupMinFeeId = t.GroupMinFeeId AND r.ProductId = t.ProductId
+		WHERE p.GroupMinFeeId > 0
+		GROUP BY p.GroupMinFeeId, r.ProductId, t.TotalMinFee
+	)
+	UPDATE r
+	SET r.Discount = cte.TotalFee - (cte.TotalDiscount - r.Discount) - cte.TotalMinFee
+	FROM @FinalResult r
+	INNER JOIN @PartyList p ON r.PartyId = p.PartyId
+	INNER JOIN cte_tmpDiscountGroupMinFee cte ON p.GroupMinFeeId = cte.GroupMinFeeId AND r.ProductId = cte.ProductId
+	INNER JOIN LA_GroupMinFeeAssignment a WITH(NOLOCK) ON r.PartyId = a.PartyID
+	WHERE a.IsPrimary = 1 AND Discount > 0 AND (cte.TotalFee - cte.TotalDiscount) < cte.TotalMinFee
+
 	UPDATE @FinalResult 
 	SET DiscountRate = 0, DiscountRemark='', Discount = 0
 	WHERE Discount <= 0 OR (Fee - Discount) < 0
