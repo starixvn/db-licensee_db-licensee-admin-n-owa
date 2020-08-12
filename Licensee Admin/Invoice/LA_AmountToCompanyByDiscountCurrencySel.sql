@@ -584,7 +584,7 @@ BEGIN
 	SET Discount = 0 
 	WHERE Discount < 0 OR (FeeByBaseCurrency - Discount) < 0
 
-	-- Adjust Discount of primary licensee to be make sure that (TotalFee - TotalDiscount) >= cte.TotalMinFee  
+	-- Region: Adjust Discount of primary licensee to be make sure that (TotalFee - TotalDiscount) >= cte.TotalMinFee  
 	;WITH cte_tmpDiscountGroupMinFee AS 
 	(
 		SELECT p.GroupMinFeeId, r.ProductId, t.TotalMinFee, SUM(r.FeeByBaseCurrency) AS TotalFee, SUM(r.Discount) AS TotalDiscount
@@ -601,6 +601,11 @@ BEGIN
 	INNER JOIN cte_tmpDiscountGroupMinFee cte ON p.GroupMinFeeId = cte.GroupMinFeeId AND r.ProductId = cte.ProductId
 	INNER JOIN LA_GroupMinFeeAssignment a WITH(NOLOCK) ON r.PartyId = a.PartyID
 	WHERE a.IsPrimary = 1 AND Discount > 0 AND (cte.TotalFee - cte.TotalDiscount) < cte.TotalMinFee
+	-- End-Region: Adjust Discount of primary licensee to be make sure that (TotalFee - TotalDiscount) >= cte.TotalMinFee  
+
+	UPDATE @FinalResult 
+	SET Discount = 0
+	WHERE Discount <= 0 OR (FeeByBaseCurrency - Discount) < 0
 
 	;WITH cte_TotalAmount AS 
 	(
