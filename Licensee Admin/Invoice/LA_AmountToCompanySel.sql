@@ -385,7 +385,7 @@ BEGIN
 		END,
 		IsApplyMinfeeToDiscount = CASE
 			WHEN a.MinFeeAmount < a.FeeAmount AND a.FeeAmount > 0 AND b.FeeType IS NOT NULL THEN 0-- waived
-			WHEN p.GroupMinFeeID > 0 AND p.GroupMinFeeId > 0 THEN 0 -- reach group minfee goal
+			WHEN p.GroupMinFeeID > 0 THEN 0 -- reach group minfee goal
 			ELSE 1 END,
 		Minfee = a.MinFeeAmount
 	FROM @FinalResult r
@@ -522,6 +522,10 @@ BEGIN
 		SET Discount = Fee - Minfee
 		WHERE (Fee - Discount) < Minfee AND IsApplyMinfeeToDiscount = 1 
 	END
+	
+	UPDATE @FinalResult 
+	SET DiscountRate = 0, DiscountRemark='', Discount = 0
+	WHERE Discount <= 0 OR (Fee - Discount) < 0
 
 	-- Adjust Discount of primary licensee to be make sure that (TotalFee - TotalDiscount) >= cte.TotalMinFee  
 	;WITH cte_tmpDiscountGroupMinFee AS 
@@ -540,10 +544,6 @@ BEGIN
 	INNER JOIN cte_tmpDiscountGroupMinFee cte ON p.GroupMinFeeId = cte.GroupMinFeeId AND r.ProductId = cte.ProductId
 	INNER JOIN LA_GroupMinFeeAssignment a WITH(NOLOCK) ON r.PartyId = a.PartyID
 	WHERE a.IsPrimary = 1 AND Discount > 0 AND (cte.TotalFee - cte.TotalDiscount) < cte.TotalMinFee
-
-	UPDATE @FinalResult 
-	SET DiscountRate = 0, DiscountRemark='', Discount = 0
-	WHERE Discount <= 0 OR (Fee - Discount) < 0
 
 	;WITH cte_TotalAmount AS 
 	(
