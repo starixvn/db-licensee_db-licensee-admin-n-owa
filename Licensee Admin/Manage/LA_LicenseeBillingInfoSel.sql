@@ -22,7 +22,8 @@ AS
 		- 20181220@Parsons: Integrate Bidme games  [#103695]
 		- 20190404@Bruce: Return fistbliing date [#102830]
 		- 20200418@Parsons: Indo 4D Integration [#130910]
-
+		- 20200812@Happy: Get min fee terms with GMF higher priority [#134492]
+		
 	Param's Explanation:
 
 */
@@ -68,14 +69,25 @@ BEGIN
 	INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeId = cs.ChargeID AND cs.SystemID = 2
 	WHERE ci.FromParty = @PartyId AND ci.ProductID = @ProductId AND ChargeType != 12
 	ORDER BY ci.FromDate DESC
-
-	SELECT TOP 1
-		@MinimumFees = m.MinFeeTerm
-	FROM dbo.LA_MinFee m WITH (NOLOCK)
-	WHERE CONVERT(DATE, GETDATE()) BETWEEN m.FromDate AND m.ToDate
-		AND m.FeeTypeId = 1
-		AND m.PartyId = @PartyId
-		AND m.ProductId = @ProductId
+	
+	--Get fee term
+	SELECT @MinimumFees = MinimumFeeTerm 
+	FROM dbo.LA_GroupMinFeeDetail d WITH(NOLOCK)
+		INNER JOIN dbo.LA_GroupMinFeeAssignment a ON a.GroupMinFeeID = d.GroupMinFeeID
+	WHERE CONVERT(DATE, GETDATE()) BETWEEN d.FromDate AND d.ToDate
+		AND a.PartyID = @PartyId
+		AND d.ProductID = @ProductId
+	
+	IF ISNULL(@MinimumFees, '') = ''
+	BEGIN
+		SELECT TOP 1
+			@MinimumFees = m.MinFeeTerm
+		FROM dbo.LA_MinFee m WITH (NOLOCK)
+		WHERE CONVERT(DATE, GETDATE()) BETWEEN m.FromDate AND m.ToDate
+			AND m.FeeTypeId = 1
+			AND m.PartyId = @PartyId
+			AND m.ProductId = @ProductId
+	END
 	
 	SELECT ISNULL(@FirstBilling, CAST('19000101' AS DATE)) AS FirstBilling
 		, ISNULL(@BasisOfBilling, '') AS BasisOfBilling
