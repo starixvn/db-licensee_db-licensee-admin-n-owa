@@ -71,9 +71,9 @@ BEGIN
 	ORDER BY ci.FromDate DESC
 	
 	--Get fee term
-	SELECT @MinimumFees = MinimumFeeTerm 
+	SELECT @MinimumFees = d.MinimumFeeTerm 
 	FROM dbo.LA_GroupMinFeeDetail d WITH(NOLOCK)
-		INNER JOIN dbo.LA_GroupMinFeeAssignment a ON a.GroupMinFeeID = d.GroupMinFeeID
+		INNER JOIN dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK) ON a.GroupMinFeeID = d.GroupMinFeeID
 	WHERE CONVERT(DATE, GETDATE()) BETWEEN d.FromDate AND d.ToDate
 		AND a.PartyID = @PartyId
 		AND d.ProductID = @ProductId
