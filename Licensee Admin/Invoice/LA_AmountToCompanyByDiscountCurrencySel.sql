@@ -372,7 +372,7 @@ BEGIN
 	WHERE c.ToDate >= @FromDate  
 
 	-- 2.5 create result
-	DECLARE @FinalResult TABLE(PartyId INT, ProductId INT, WinlossByDiscountBaseCurrency MONEY, WinlossByBaseCurrency MONEY, AmountToCompanyByDiscountBaseCurrency MONEY, AmountToCompanyByBaseCurrency MONEY, ExtraAmount MONEY, FeeByDiscountBaseCurrency MONEY, FeeByBaseCurrency MONEY, Discount MONEY, Rebate MONEY, IsChargedByMinFee BIT, IsApplyMinfeeToDiscount BIT, MinFee MONEY)
+	DECLARE @FinalResult TABLE(PartyId INT, ProductId INT, WinlossByDiscountBaseCurrency MONEY, WinlossByBaseCurrency MONEY, AmountToCompanyByDiscountBaseCurrency MONEY, AmountToCompanyByBaseCurrency MONEY, ExtraAmount MONEY, FeeByDiscountBaseCurrency MONEY, FeeByBaseCurrency MONEY, Discount MONEY, Rebate MONEY, IsChargedByMinFee BIT, IsApplyMinfeeToDiscount BIT, MinFee MONEY, IsChargedByGroupMinFee BIT)
 
 	INSERT INTO @FinalResult
 	SELECT a.PartyId,a.ProductId
@@ -470,7 +470,8 @@ BEGIN
 		WHERE r.TotalAmount < t.TotalMinFee
 	)
 	UPDATE r
-	SET r.FeeByBaseCurrency += d.DifferentAmount
+	SET r.FeeByBaseCurrency += d.DifferentAmount,
+		IsChargeByGroupMinFee = 1
 	FROM @FinalResult r
 	INNER JOIN LA_GroupMinFeeAssignment a ON r.PartyId = a.PartyID
 	INNER JOIN cte_DifferentAmount d ON a.GroupMinFeeID = d.GroupMinFeeId AND r.ProductId = d.ProductId
@@ -624,7 +625,8 @@ BEGIN
 		WHERE r.TotalAmount < t.TotalMinFee
 	)
 	UPDATE r
-	SET r.FeeByBaseCurrency += d.DifferentAmount
+	SET r.FeeByBaseCurrency += d.DifferentAmount,
+		IsChargeByGroupMinFee = 1
 	FROM @FinalResult r
 	INNER JOIN LA_GroupMinFeeAssignment a ON r.PartyId = a.PartyID
 	INNER JOIN cte_DifferentAmount d ON a.GroupMinFeeID = d.GroupMinFeeId AND r.ProductId = d.ProductId
@@ -669,6 +671,7 @@ BEGIN
 		,Discount
 		,Rebate
 		,IsChargedByMinFee
+		,ISNULL(IsChargeByGroupMinFee, 0) AS IsChargeByGroupMinFee
 	FROM @FinalResult
 	WHERE PartyId IN (SELECT a.PartyId FROM @PartyList a WHERE a.IsSelected = 1)
 		AND ProductId IN (SELECT b.ProductId FROM @ProductList b WHERE b.ToBeDiscounted = 1)
