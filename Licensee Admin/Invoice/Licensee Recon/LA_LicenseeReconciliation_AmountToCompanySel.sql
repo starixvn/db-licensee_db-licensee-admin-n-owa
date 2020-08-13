@@ -31,7 +31,8 @@ AS
 		- 20200507@Parsons: Integrate Sexy Gaming for deposit licensees [#132665]
 		- 20200528@Parsons: Special handling for INH market [#128570] 
 		- 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334] 
-		- 20200727@Parsons: Implement PP Jackpot [RedmineID: #137306]
+		- 20200727@Parsons: Implement PP Jackpot [RedmineID: #137306] 
+		- 20200813@Parsons: Implement Group Min Fee [#134492]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -82,16 +83,10 @@ BEGIN
 
 	-- get party list
 	--
-	DECLARE @partyList AS TABLE(
-		PartyId			INT,
-		PartyName		VARCHAR(50),
-		LicenseeCode	VARCHAR(50),
-		IsSelected		BIT,
-		PartyGroupId	INT
-	)
+	DECLARE @partyList TABLE(PartyId INT, PartyName	VARCHAR(50), LicenseeCode VARCHAR(50), IsSelected BIT, GroupMinFeeId INT)
 	-- set selected = true
 	-- put each party to its individual group(indicated by -partyid)
-	INSERT INTO @partyList(PartyId, PartyName, IsSelected, PartyGroupId, LicenseeCode)
+	INSERT INTO @partyList(PartyId, PartyName, IsSelected, GroupMinFeeId, LicenseeCode)
 	SELECT p.PartyID, p.PartyName
 		, 1 AS IsSelected
 		, -p.PartyID AS PartyGroupId
@@ -102,17 +97,25 @@ BEGIN
 
 	-- to calculate minfee: need to select all party in same group
 	-- get actual party group id
+	;WITH cte_GroupMinFeeSetting AS
+	(
+		SELECT TOP(1) WITH TIES h.GroupMinFeeID, a.PartyID
+		FROM @PartyList p
+			INNER JOIN dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK) ON p.PartyId = a.PartyId
+			INNER JOIN dbo.LA_GroupMinFeeHeader h WITH(NOLOCK) ON a.GroupMinFeeId = h.GroupMinFeeId
+		ORDER BY ROW_NUMBER() OVER(PARTITION BY a.PartyID ORDER BY h.ToDate DESC)
+	)
 	UPDATE p
-	SET PartyGroupId=a.PartyGroupId
-	FROM @partyList p
-	INNER JOIN dbo.LA_PartyGroupAssignment a WITH(NOLOCK) ON p.PartyId = a.PartyId
+	SET GroupMinFeeId = a.GroupMinFeeId
+	FROM @PartyList p
+	INNER JOIN cte_GroupMinFeeSetting a ON p.PartyId = a.PartyId
 
 	-- include party in same group for minfee calculation
-	INSERT INTO @partyList(PartyId,PartyGroupId,IsSelected)
-	SELECT DISTINCT a.PartyId, a.PartyGroupId,0
-	FROM dbo.LA_PartyGroupAssignment a WITH(NOLOCK)
-	WHERE a.PartyId NOT IN (SELECT b.PartyId FROM @partyList b)
-		AND a.PartyGroupId IN (SELECT c.PartyGroupId FROM @partyList c)
+	INSERT INTO @PartyList(PartyId, GroupMinFeeId, IsSelected)
+	SELECT DISTINCT a.PartyId, a.GroupMinFeeId,0
+	FROM dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK)
+		INNER JOIN @PartyList c ON a.GroupMinFeeId = c.GroupMinFeeId
+	WHERE NOT EXISTS (SELECT TOP 1 b.PartyId FROM @PartyList b WHERE a.PartyId = b.PartyId)
 
 	-- discount settings
 	--
@@ -133,8 +136,7 @@ BEGIN
 			FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
 			INNER JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON p.DiscountGroupId=a.DiscountGroupId
 			INNER JOIN @partyList b ON a.PartyID=b.PartyId
-			WHERE b.IsSelected=1
-				AND p.ProductId IN (SELECT c.ProductId FROM @productList c)
+			WHERE p.ProductId IN (SELECT c.ProductId FROM @productList c)
 				AND p.CalculationType IN (@ToBeDiscounted, @CalculateAndDiscount)
 		)
 		-- put parties in discount group to its own group
@@ -173,7 +175,7 @@ BEGIN
 
 		-- include more parties from discount settings
 		--
-		INSERT INTO @partyList(PartyId,PartyGroupId,IsSelected)
+		INSERT INTO @partyList(PartyId,GroupMinFeeId,IsSelected)
 		SELECT DISTINCT a.PartyID, -a.PartyID, 0
 		FROM #tmpDiscountSettings a
 		LEFT JOIN @partyList b ON a.PartyID = b.PartyId
@@ -467,41 +469,56 @@ BEGIN
 	WHERE mf.FeeType=1
 
 	-- calculate total minfee by group
-	DECLARE @totalMinFees TABLE(
-		PartyGroupId	INT,
-		ProductId		INT,
-		TotalMinFee		MONEY,
-		TotalAmount		MONEY
-	)
-	INSERT INTO @totalMinFees(PartyGroupId,ProductId, TotalMinFee, TotalAmount)
-	SELECT p.PartyGroupId, mf.ProductId, SUM(mf.MinFeeAmount), SUM(mf.FeeOutOfWaiveTime)
-	FROM @tmpMinFee mf
-	INNER JOIN @partyList p ON mf.PartyId = p.PartyId
-	WHERE mf.FeeType = 1
-	GROUP BY p.PartyGroupId, mf.ProductId
+	DECLARE @TotalMinFees TABLE(GroupMinFeeId INT, ProductId INT, TotalMinFee MONEY)
+	
+	INSERT INTO @TotalMinFees(GroupMinFeeId, ProductId, TotalMinFee)
+	SELECT TOP(1) WITH TIES mfd.GroupMinFeeID, ProductId, mfd.MinimumFee * e.Rate AS GroupMinFee
+	FROM dbo.LA_GroupMinFeeDetail mfd WITH(NOLOCK)
+		INNER JOIN @PartyList p ON mfd.GroupMinFeeID = p.GroupMinFeeId
+		INNER JOIN #tmpExchange e ON e.ExchangeId = mfd.CurrencyId AND e.exchangedate = @ToDate
+	WHERE @FromDate BETWEEN mfd.FromDate AND mfd.ToDate
+	ORDER BY ROW_NUMBER() OVER(PARTITION BY mfd.GroupMinFeeID order by mfd.ToDate DESC)
 
 	-- apply minfee if amount to company do not reach the goal
-	--
+	-- 3.3.1 actual licensing fee as usual	
 	UPDATE r SET LicensingFee = CASE
-			WHEN t.TotalAmount < t.TotalMinFee AND a.FeeOutOfWaiveTime < a.MinFeeAmount
+			WHEN p.GroupMinFeeId <= 0 AND a.FeeOutOfWaiveTime < a.MinFeeAmount
 				THEN a.MinFeeAmount + a.FeeUnderWaiveTime
 			ELSE a.FeeOutOfWaiveTime + a.FeeUnderWaiveTime
 		END,
-		--IsChargedByMinFee = CASE
-		--	WHEN t.TotalAmount < t.TotalMinFee AND a.FeeOutOfWaiveTime < a.MinFeeAmount
-		--		THEN 1
-		--	ELSE 0
-		--END,
 		IsApplyMinfeeToDiscount = CASE
 			WHEN a.MinFeeAmount < a.FeeAmount AND a.FeeAmount > 0 AND b.FeeType IS NOT NULL THEN 0-- waived
-			WHEN t.TotalAmount >= t.TotalMinFee AND p.PartyGroupId > 0 THEN 0 -- reach group minfee goal
+			WHEN p.GroupMinFeeID > 0 THEN 0 -- reach group minfee goal
 			ELSE 1 END,
 		Minfee = a.MinFeeAmount
 	FROM #tmpResult r
 	INNER JOIN @partyList p ON r.PartyId=p.PartyId
 	INNER JOIN @tmpMinFee a ON a.PartyId = r.PartyId AND a.ProductId=r.ProductID AND a.FeeType = 1 -- minfee setting
-	INNER JOIN @totalMinFees t ON a.ProductId = t.ProductId AND t.PartyGroupId=p.PartyGroupId
 	LEFT JOIN @tmpMinFee b ON b.PartyId = r.PartyId AND b.ProductId=r.ProductID AND b.FeeType = 2-- waive setting
+
+	-- 3.3.2 Update licensing fee of primary licensee
+	;WITH cte_TotalAmount AS 
+	(
+		SELECT p.GroupMinFeeId, r.ProductId, SUM(r.LicensingFee) AS TotalAmount
+		FROM #tmpResult r
+		INNER JOIN @PartyList p ON r.PartyId = p.PartyId
+		INNER JOIN @TotalMinFees t ON p.GroupMinFeeId = t.GroupMinFeeId AND r.ProductId = t.ProductId
+		WHERE p.GroupMinFeeId > 0
+		GROUP BY p.GroupMinFeeId, r.ProductId
+	),
+	cte_DifferentAmount AS
+	(
+		SELECT t.GroupMinFeeId , r.ProductId, (t.TotalMinFee - r.TotalAmount) DifferentAmount
+		FROM cte_TotalAmount r
+		INNER JOIN @TotalMinFees t ON r.GroupMinFeeId = t.GroupMinFeeId
+		WHERE r.TotalAmount < t.TotalMinFee
+	)
+	UPDATE r
+	SET r.LicensingFee += d.DifferentAmount
+	FROM #tmpResult r
+	INNER JOIN LA_GroupMinFeeAssignment a ON r.PartyId = a.PartyID
+	INNER JOIN cte_DifferentAmount d ON a.GroupMinFeeID = d.GroupMinFeeId AND r.ProductId = d.ProductId
+	WHERE a.IsPrimary = 1
 END
 /*-----------------
  * discount
@@ -608,8 +625,54 @@ BEGIN
 	BEGIN
 		UPDATE #tmpResult SET Discount = LicensingFee - Minfee WHERE (LicensingFee - Discount) < Minfee AND IsApplyMinfeeToDiscount = 1
 	END
+	
+	UPDATE #tmpResult SET Discount = 0 WHERE Discount <= 0 OR (LicensingFee - Discount) < 0
+
+	-- Region: Adjust Discount of primary licensee to be make sure that (TotalFee - TotalDiscount) >= cte.TotalMinFee  
+	;WITH cte_tmpDiscountGroupMinFee AS 
+	(
+		SELECT p.GroupMinFeeId, r.ProductId, t.TotalMinFee, SUM(r.LicensingFee) AS TotalFee, SUM(r.Discount) AS TotalDiscount
+		FROM #tmpResult r
+		INNER JOIN @PartyList p ON r.PartyId = p.PartyId
+		INNER JOIN @TotalMinFees t ON p.GroupMinFeeId = t.GroupMinFeeId AND r.ProductId = t.ProductId
+		WHERE p.GroupMinFeeId > 0
+		GROUP BY p.GroupMinFeeId, r.ProductId, t.TotalMinFee
+	)
+	UPDATE r
+	SET r.Discount = cte.TotalFee - (cte.TotalDiscount - r.Discount) - cte.TotalMinFee
+	FROM #tmpResult r
+	INNER JOIN @PartyList p ON r.PartyId = p.PartyId
+	INNER JOIN cte_tmpDiscountGroupMinFee cte ON p.GroupMinFeeId = cte.GroupMinFeeId AND r.ProductId = cte.ProductId
+	INNER JOIN LA_GroupMinFeeAssignment a WITH(NOLOCK) ON r.PartyId = a.PartyID
+	WHERE a.IsPrimary = 1 AND Discount > 0 AND (cte.TotalFee - cte.TotalDiscount) < cte.TotalMinFee
+	-- End-Region: Adjust Discount of primary licensee to be make sure that (TotalFee - TotalDiscount) >= cte.TotalMinFee 
 
 	UPDATE #tmpResult SET Discount = 0 WHERE Discount <= 0 OR (LicensingFee - Discount) < 0
+
+	-- Region: Case 3: One of Licensee in the group has discount. It makes the total licensing fee of the group is less than group min fee.  
+	;WITH cte_TotalAmount AS 
+	(
+		SELECT p.GroupMinFeeId, r.ProductId, SUM(r.LicensingFee - Discount) AS TotalAmount
+		FROM #tmpResult r
+		INNER JOIN @PartyList p ON r.PartyId = p.PartyId
+		INNER JOIN @TotalMinFees t ON p.GroupMinFeeId = t.GroupMinFeeId AND r.ProductId = t.ProductId
+		WHERE p.GroupMinFeeId > 0
+		GROUP BY p.GroupMinFeeId, r.ProductId
+	),
+	cte_DifferentAmount AS
+	(
+		SELECT t.GroupMinFeeId , r.ProductId, (t.TotalMinFee - r.TotalAmount) DifferentAmount
+		FROM cte_TotalAmount r
+		INNER JOIN @TotalMinFees t ON r.GroupMinFeeId = t.GroupMinFeeId
+		WHERE r.TotalAmount < t.TotalMinFee
+	)
+	UPDATE r
+	SET r.LicensingFee += d.DifferentAmount
+	FROM #tmpResult r
+	INNER JOIN LA_GroupMinFeeAssignment a ON r.PartyId = a.PartyID
+	INNER JOIN cte_DifferentAmount d ON a.GroupMinFeeID = d.GroupMinFeeId AND r.ProductId = d.ProductId
+	WHERE a.IsPrimary = 1
+	-- EndRegion: Case 3: One of Licensee in the group has discount. It makes the total licensing fee of the group is less than group min fee.  
 END
 /*-----------------
  * Rebate
