@@ -3,16 +3,16 @@ USE [bodb02]
 GO
 
 ALTER PROCEDURE dbo.LA_Rpt_LicPerformance_Detail
-	@PartyIDs VARCHAR(4000) = ''
-	, @Currency INT = 0
-	, @FromDate SMALLDATETIME
-	, @ToDate SMALLDATETIME
+	@PartyIDs		VARCHAR(4000) = ''
+	, @Currency		INT = 0
+	, @FromDate		SMALLDATETIME
+	, @ToDate		SMALLDATETIME
 	, @ProductCodes VARCHAR(500)
-	, @IsConvert BIT = 0
+	, @IsConvert	BIT = 0
 	, @BaseCurrency INT = 12
 	, @BaseCurrencyName VARCHAR(10) = 'GBP'
-	, @DrawFilter SMALLINT = 1
-	, @LicenseePaying SMALLINT = 0
+	, @DrawFilter	SMALLINT = 1
+	, @LicenseePaying INT = 0
 AS
 
 /*	Created: 20141209@Patrick
@@ -222,7 +222,7 @@ BEGIN
 		Discount		MONEY,
 		Rebate			MONEY,
 		IsChargedByMinFee		BIT,
-		IsChargeByGroupMinFee	BIT,
+		IsChargedByGroupMinFee	BIT,
 		IsCurrent			BIT
 	)
 	IF(@IsConvert = 0)
@@ -232,13 +232,13 @@ BEGIN
 
 	--  Minimum fee is calculated for all currencies that licensee offer. There is no minimum fee when data display individual currency.
 		-- current month
-		INSERT INTO #AmountToCompany(PartyId,ProductId,Fee,Discount,Rebate,IsChargedByMinFee,IsChargeByGroupMinFee)
+		INSERT INTO #AmountToCompany(PartyId,ProductId,Fee,Discount,Rebate,IsChargedByMinFee,IsChargedByGroupMinFee)
 		EXEC bodb_licensee.dbo.LA_AmountToCompanyByDiscountCurrencySel @FromDate,@ToDate,@PartyIds,@ProductCodes,@BaseCurrencyName,@BaseCurrency,@Currency
 
 		UPDATE #AmountToCompany SET IsCurrent = 1
 
 		-- previous month
-		INSERT INTO #AmountToCompany(PartyId,ProductId,Fee,Discount,Rebate,IsChargedByMinFee,IsChargeByGroupMinFee)
+		INSERT INTO #AmountToCompany(PartyId,ProductId,Fee,Discount,Rebate,IsChargedByMinFee,IsChargedByGroupMinFee)
 		EXEC bodb_licensee.dbo.LA_AmountToCompanyByDiscountCurrencySel @PrevFromDate, @PrevToDate,@PartyIds,@ProductCodes,@BaseCurrencyName,@BaseCurrency,@Currency
 
 		UPDATE #AmountToCompany SET IsCurrent = 0 WHERE IsCurrent IS NULL
@@ -340,13 +340,13 @@ BEGIN
 			ProductId		INT,
 			IsCurrent		BIT,
 			HasMinFee		BIT,
-			IsChargeByGroupMinFee BIT,
+			IsChargedByGroupMinFee BIT,
 			Discount		MONEY,
 			Rebate			MONEY
 		)
 		
 		-- sum by product
-		INSERT INTO @SumByProducts (PartyId,ProductId,IsCurrent,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,HasMinFee,IsChargeByGroupMinFee)
+		INSERT INTO @SumByProducts (PartyId,ProductId,IsCurrent,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,HasMinFee,IsChargedByGroupMinFee)
 		SELECT	PartyId
 				,ProductId
 				,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END) IsCurrent
@@ -357,7 +357,7 @@ BEGIN
 				,SUM(PComm) PComm
 				,SUM(AmountToCompany) AmountToCompany
 				,0 HasMinFee
-				,0 IsChargeByGroupMinFee
+				,0 IsChargedByGroupMinFee
 		FROM #TempData
 		GROUP BY PartyId, ProductId, CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END
 
@@ -365,7 +365,7 @@ BEGIN
 		UPDATE s SET 
 			AmountToCompany = m.Fee,
 			HasMinFee = m.IsChargedByMinFee,
-			IsChargeByGroupMinFee = m.IsChargeByGroupMinFee,
+			IsChargedByGroupMinFee = m.IsChargedByGroupMinFee,
 			Discount = m.Discount,
 			Rebate = m.Rebate
 		FROM @SumByProducts s
@@ -420,9 +420,9 @@ BEGIN
 			INNER JOIN bodb_licensee.dbo.OAS_Party (NOLOCK) op ON p.PartyId = op.PartyID
 			INNER JOIN @SumByProducts s ON p.PartyId = s.PartyId
 	WHERE	s.ProductId = 0 AND (@LicenseePaying = 0 
-									OR (@LicenseePaying = 1 AND HasMinFee = 0 AND IsChargeByGroupMinFee = 0)
+									OR (@LicenseePaying = 1 AND HasMinFee = 0 AND IsChargedByGroupMinFee = 0)
 									OR (@LicenseePaying = 2 AND HasMinFee = 1)
-									OR (@LicenseePaying = 3 AND IsChargeByGroupMinFee = 1)
+									OR (@LicenseePaying = 3 AND IsChargedByGroupMinFee = 1)
 								)
 
 	/*Update PromotionSportsbook column*/

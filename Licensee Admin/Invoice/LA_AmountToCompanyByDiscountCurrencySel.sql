@@ -381,7 +381,7 @@ BEGIN
 		,SUM(a.AmountToCompanyByDiscountBaseCurrency)
 		,SUM(a.AmountToCompanyByBaseCurrency)
 		,SUM(a.ExtraAmount)
-		,0,0,0,0,0,0,0
+		,0,0,0,0,0,0,0,0
 	FROM #tmpWinlossData a
 	GROUP BY PartyId, ProductId
 
@@ -471,7 +471,7 @@ BEGIN
 	)
 	UPDATE r
 	SET r.FeeByBaseCurrency += d.DifferentAmount,
-		IsChargeByGroupMinFee = 1
+		IsChargedByGroupMinFee = 1
 	FROM @FinalResult r
 	INNER JOIN LA_GroupMinFeeAssignment a ON r.PartyId = a.PartyID
 	INNER JOIN cte_DifferentAmount d ON a.GroupMinFeeID = d.GroupMinFeeId AND r.ProductId = d.ProductId
@@ -607,7 +607,8 @@ BEGIN
 	UPDATE @FinalResult 
 	SET Discount = 0
 	WHERE Discount <= 0 OR (FeeByBaseCurrency - Discount) < 0
-
+	 
+	-- Region: Case 3: One of Licensee in the group has discount. It makes the total licensing fee of the group is less than group min fee.  
 	;WITH cte_TotalAmount AS 
 	(
 		SELECT p.GroupMinFeeId, r.ProductId, SUM(r.FeeByBaseCurrency - Discount) AS TotalAmount
@@ -626,11 +627,12 @@ BEGIN
 	)
 	UPDATE r
 	SET r.FeeByBaseCurrency += d.DifferentAmount,
-		IsChargeByGroupMinFee = 1
+		IsChargedByGroupMinFee = 1
 	FROM @FinalResult r
 	INNER JOIN LA_GroupMinFeeAssignment a ON r.PartyId = a.PartyID
 	INNER JOIN cte_DifferentAmount d ON a.GroupMinFeeID = d.GroupMinFeeId AND r.ProductId = d.ProductId
-	WHERE a.IsPrimary = 1
+	WHERE a.IsPrimary = 1 
+	-- EndRegion: Case 3: One of Licensee in the group has discount. It makes the total licensing fee of the group is less than group min fee.  
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 5. rebate calculation
  *-------------------------------------------------------------------------------------------------------------------------------*/
@@ -671,7 +673,7 @@ BEGIN
 		,Discount
 		,Rebate
 		,IsChargedByMinFee
-		,ISNULL(IsChargeByGroupMinFee, 0) AS IsChargeByGroupMinFee
+		,ISNULL(IsChargedByGroupMinFee, 0) AS IsChargedByGroupMinFee
 	FROM @FinalResult
 	WHERE PartyId IN (SELECT a.PartyId FROM @PartyList a WHERE a.IsSelected = 1)
 		AND ProductId IN (SELECT b.ProductId FROM @ProductList b WHERE b.ToBeDiscounted = 1)

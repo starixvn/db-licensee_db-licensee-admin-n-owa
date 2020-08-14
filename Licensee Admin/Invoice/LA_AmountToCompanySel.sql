@@ -549,7 +549,8 @@ BEGIN
 	UPDATE @FinalResult 
 	SET DiscountRate = 0, DiscountRemark='', Discount = 0
 	WHERE Discount <= 0 OR (Fee - Discount) < 0
-
+ 
+	-- Region: Case 3: One of Licensee in the group has discount. It makes the total licensing fee of the group is less than group min fee.  
 	;WITH cte_TotalAmount AS 
 	(
 		SELECT p.GroupMinFeeId, r.ProductId, SUM(r.Fee - Discount) AS TotalAmount
@@ -572,7 +573,8 @@ BEGIN
 	FROM @FinalResult r
 	INNER JOIN LA_GroupMinFeeAssignment a ON r.PartyId = a.PartyID
 	INNER JOIN cte_DifferentAmount d ON a.GroupMinFeeID = d.GroupMinFeeId AND r.ProductId = d.ProductId
-	WHERE a.IsPrimary = 1
+	WHERE a.IsPrimary = 1 
+	-- EndRegion: Case 3: One of Licensee in the group has discount. It makes the total licensing fee of the group is less than group min fee.  
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 5. rebate calculation
  *-------------------------------------------------------------------------------------------------------------------------------*/
