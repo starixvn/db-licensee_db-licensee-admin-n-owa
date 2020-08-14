@@ -339,14 +339,14 @@ BEGIN
 			AmountToCompany	MONEY,
 			ProductId		INT,
 			IsCurrent		BIT,
-			HasMinFee		BIT,
+			IsChargedByMinFee	   BIT,
 			IsChargedByGroupMinFee BIT,
 			Discount		MONEY,
 			Rebate			MONEY
 		)
 		
 		-- sum by product
-		INSERT INTO @SumByProducts (PartyId,ProductId,IsCurrent,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,HasMinFee,IsChargedByGroupMinFee)
+		INSERT INTO @SumByProducts (PartyId,ProductId,IsCurrent,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,IsChargedByMinFee,IsChargedByGroupMinFee)
 		SELECT	PartyId
 				,ProductId
 				,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END) IsCurrent
@@ -356,7 +356,7 @@ BEGIN
 				,SUM(AComm) AComm
 				,SUM(PComm) PComm
 				,SUM(AmountToCompany) AmountToCompany
-				,0 HasMinFee
+				,0 IsChargedByMinFee
 				,0 IsChargedByGroupMinFee
 		FROM #TempData
 		GROUP BY PartyId, ProductId, CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END
@@ -364,7 +364,7 @@ BEGIN
 		-- apply minfee
 		UPDATE s SET 
 			AmountToCompany = m.Fee,
-			HasMinFee = m.IsChargedByMinFee,
+			IsChargedByMinFee = m.IsChargedByMinFee,
 			IsChargedByGroupMinFee = m.IsChargedByGroupMinFee,
 			Discount = m.Discount,
 			Rebate = m.Rebate
@@ -395,16 +395,18 @@ BEGIN
 		PromotionOthers		MONEY,
 		TotalFee			MONEY,
 		NegativeAmount		MONEY,
-		IsCurrent			BIT
+		IsCurrent			BIT,
+		IsChargedByMinFee BIT,
+		IsChargedByGroupMinFee BIT
 	)
 
 	-- ************************************
 	-- *** Calculate #Result for SportBook
 	-- ************************************
-	INSERT INTO #Result (PartyId, ProductId, PartyName, SportsbookFee, IsCurrent, BetCount, AverageBet, Turnover, WinLoss, Margin, OthersFee, SportbookDiscount, BACommission, SportbookRebate)
+	INSERT INTO #Result (PartyId, ProductId, PartyName, SportsbookFee, IsCurrent, BetCount, AverageBet, Turnover, WinLoss, Margin, OthersFee, SportbookDiscount, BACommission, SportbookRebate, IsChargedByMinFee, IsChargedByGroupMinFee)
 	SELECT	p.PartyId,
 			s.ProductId,
-			(CASE op.PartyName WHEN '18bb' THEN 'PIH' WHEN 'IBC' THEN 'FDL' ELSE op.PartyName END) + (CASE WHEN s.HasMinFee = 1 AND s.AmountToCompany != 0 THEN ' *' ELSE '' END),
+			(CASE op.PartyName WHEN '18bb' THEN 'PIH' WHEN 'IBC' THEN 'FDL' ELSE op.PartyName END) + (CASE WHEN s.IsChargedByMinFee = 1 AND s.AmountToCompany != 0 THEN ' *' ELSE '' END),
 			s.AmountToCompany,
 			s.IsCurrent,
 			s.BetCount,
@@ -415,15 +417,13 @@ BEGIN
 			0 AS OthersFee,
 			s.Discount,
 			0 AS BACommission,
-			s.Rebate
+			s.Rebate,
+			s.IsChargedByMinFee,
+			s.IsChargedByGroupMinFee
 	FROM	@PartyIdTable p
 			INNER JOIN bodb_licensee.dbo.OAS_Party (NOLOCK) op ON p.PartyId = op.PartyID
 			INNER JOIN @SumByProducts s ON p.PartyId = s.PartyId
-	WHERE	s.ProductId = 0 AND (@LicenseePaying = 0 
-									OR (@LicenseePaying = 1 AND HasMinFee = 0 AND IsChargedByGroupMinFee = 0)
-									OR (@LicenseePaying = 2 AND HasMinFee = 1)
-									OR (@LicenseePaying = 3 AND IsChargedByGroupMinFee = 1)
-								)
+	WHERE	s.ProductId = 0
 
 	/*Update PromotionSportsbook column*/
 	IF(EXISTS(SELECT TOP 1 1 FROM #Result))
@@ -553,7 +553,11 @@ BEGIN
 	FROM	#Result r
 			FULL JOIN (SELECT * FROM #Result WHERE IsCurrent = 0) p ON r.PartyId = p.PartyId
 	WHERE	r.IsCurrent = 1 AND r.PartyId IN (SELECT pt.PartyId FROM @PartyIdTable pt WHERE IsSelected = 1)
-
+			AND (@LicenseePaying = 0 
+									OR (@LicenseePaying = 1 AND r.IsChargedByMinFee = 0 AND r.IsChargedByGroupMinFee = 0)
+									OR (@LicenseePaying = 2 AND r.IsChargedByMinFee = 1)
+									OR (@LicenseePaying = 3 AND r.IsChargedByGroupMinFee = 1)
+								)
 	-- End region
 
 	-- Region: Drop tmp table

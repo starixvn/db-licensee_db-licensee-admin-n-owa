@@ -596,7 +596,8 @@ BEGIN
 		GROUP BY p.GroupMinFeeId, r.ProductId, t.TotalMinFee
 	)
 	UPDATE r
-	SET r.Discount = cte.TotalFee - (cte.TotalDiscount - r.Discount) - cte.TotalMinFee
+	SET r.Discount = cte.TotalFee - (cte.TotalDiscount - r.Discount) - cte.TotalMinFee,
+		r.IsChargedByGroupMinFee = 1
 	FROM @FinalResult r
 	INNER JOIN @PartyList p ON r.PartyId = p.PartyId
 	INNER JOIN cte_tmpDiscountGroupMinFee cte ON p.GroupMinFeeId = cte.GroupMinFeeId AND r.ProductId = cte.ProductId
