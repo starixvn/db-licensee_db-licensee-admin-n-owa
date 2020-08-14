@@ -70,6 +70,7 @@ BEGIN
 		FROM @PartyList p
 			INNER JOIN dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK) ON p.PartyId = a.PartyId
 			INNER JOIN dbo.LA_GroupMinFeeHeader h WITH(NOLOCK) ON a.GroupMinFeeId = h.GroupMinFeeId
+		WHERE @FromDate BETWEEN h.FromDate AND h.ToDate
 		ORDER BY ROW_NUMBER() OVER(PARTITION BY a.PartyID ORDER BY h.ToDate DESC)
 	)
 	UPDATE p
