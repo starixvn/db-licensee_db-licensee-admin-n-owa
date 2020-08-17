@@ -29,7 +29,7 @@ AS
 							<GroupMinFeeSetting>
 								<ProductId>0</ProductId>
 								<MinimumFee>2</MinimumFee>
-								<MinimumFeeTerm></MinimumFeeTerm>
+								<MinimumFeeTerm />
 								<CurrencyId>6</CurrencyId>
 								<FromDate>20190108</FromDate>
 								<ToDate>20190407</ToDate>

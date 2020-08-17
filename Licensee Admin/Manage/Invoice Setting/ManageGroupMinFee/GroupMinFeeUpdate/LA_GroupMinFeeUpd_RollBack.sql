@@ -43,7 +43,7 @@ AS
 										<GroupMinFeeSetting>
 											<ProductId>0</ProductId>
 											<MinimumFee>5000</MinimumFee>
-											<MinFeeTerms>EUR 5,000 (Waived for the first 3 months after launched)</MinFeeTerms>
+											<MinimumFeeTerm>EUR 5,000 (Waived for the first 3 months after launched)</MinimumFeeTerm>
 											<CurrencyId>6</CurrencyId>
 											<FromDate>20190108</FromDate>
 											<ToDate>20500101</ToDate>
@@ -51,7 +51,7 @@ AS
 										<GroupMinFeeSetting>
 											<ProductId>0</ProductId>
 											<MinimumFee>2</MinimumFee>
-											<MinFeeTerms></MinFeeTerms>
+											<MinimumFeeTerm />
 											<CurrencyId>6</CurrencyId>
 											<FromDate>20190108</FromDate>
 											<ToDate>20190407</ToDate>

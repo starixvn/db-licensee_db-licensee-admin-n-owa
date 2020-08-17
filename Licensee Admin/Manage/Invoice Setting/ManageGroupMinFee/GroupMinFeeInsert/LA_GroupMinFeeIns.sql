@@ -22,29 +22,29 @@ AS
 
 	Param's Explannation: 
 						@LicenseeSettingData = '<Root>
-								<LicenseeSetting>
-									<PartyID>1</PartyID>
-									<IsPrimary>1</IsPrimary>
-								</LicenseeSetting>
-								<LicenseeSetting>
-									<PartyID>2</PartyID>
-									<IsPrimary>0</IsPrimary>
-								</LicenseeSetting>
+							<LicenseeSetting>
+								<PartyID>1</PartyID>
+								<IsPrimary>1</IsPrimary>
+							</LicenseeSetting>
+							<LicenseeSetting>
+								<PartyID>2</PartyID>
+								<IsPrimary>0</IsPrimary>
+							</LicenseeSetting>
 						</Root>'
 						
 						@GroupMinFeeSettingData = '<Root>
 							<GroupMinFeeSetting>
 								<ProductId>0</ProductId>
-								<MinFee>5000</MinFee>
-								<MinFeeTerms>EUR 5,000 (Waived for the first 3 months after launched)</MinFeeTerms>
+								<MinimumFee>5000</MinimumFee>
+								<MinimumFeeTerm>EUR 5,000 (Waived for the first 3 months after launched)</MinimumFeeTerm>
 								<CurrencyId>6</CurrencyId>
 								<FromDate>20190108</FromDate>
 								<ToDate>20500101</ToDate>
 							</GroupMinFeeSetting>
 							<GroupMinFeeSetting>
 								<ProductId>0</ProductId>
-								<MinFee>2</MinFee>
-								<MinFeeTerms></MinFeeTerms>
+								<MinimumFee>2</MinimumFee>
+								<MinimumFeeTerm />
 								<CurrencyId>6</CurrencyId>
 								<FromDate>20190108</FromDate>
 								<ToDate>20190407</ToDate>
