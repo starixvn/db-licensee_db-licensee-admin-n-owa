@@ -15,32 +15,35 @@ AS
 
 	 Params:
 
-	 Explannation: EXEC LA_GroupMinFee_BillingPartySel @@GroupMinFeeId = 1
+	 Explannation: EXEC LA_GroupMinFee_BillingPartySel @GroupMinFeeId = 1
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @GroupFromDate DATETIME, @GroupToDate DATETIME, @InvoiceTypeGroupMinFee INT = 1, @SB_ProductId INT = 0
+
+	DECLARE @GroupFromDate DATETIME, @GroupToDate DATETIME, @SoftwareDataFee INT = 1
 	DECLARE @PartiesSettings TABLE(PartyId INT, ProductId INT)
 
 	--#Region Get info of Discount 
-	-- Get Time range
+		-- Get Time range
 	SELECT @GroupFromDate = FromDate, @GroupToDate = ToDate
 	FROM dbo.LA_GroupMinFeeHeader WITH(NOLOCK)
 	WHERE GroupMinFeeID = @GroupMinFeeId
-	-- Get Party List
+
+		-- Get Party List
 	INSERT INTO @PartiesSettings(PartyId, ProductId)
-	SELECT a.PartyID, @SB_ProductId
+	SELECT a.PartyID, d.ProductID
 	FROM dbo.LA_GroupMinFeeHeader h WITH(NOLOCK) 	 
 		INNER JOIN dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK) ON h.GroupMinFeeID = a.GroupMinFeeID
+		INNER JOIN dbo.LA_GroupMinFeeDetail d WITH(NOLOCK) ON h.GroupMinFeeID = d.GroupMinFeeID
 	WHERE h.GroupMinFeeID = @GroupMinFeeId 
 	--#Endregion Get info of Discount
 
 	SELECT DISTINCT ih.PartyId
 	FROM dbo.LA_InvoiceHeader ih WITH(NOLOCK)
 		INNER JOIN dbo.LA_InvoiceStatement id WITH(NOLOCK) ON ih.InvoiceHeaderId = id.InvoiceHeaderId
-		INNER JOIN @PartiesSettings p ON ih.PartyId = p.PartyId AND id.ProductId = p.ProductId	
+		INNER JOIN @PartiesSettings p ON ih.PartyId = p.PartyId AND id.ProductId = p.ProductId
 	WHERE ih.ToDate >= @GroupFromDate AND ih.ToDate <= @GroupToDate
-			AND ih.InvoiceType = @InvoiceTypeGroupMinFee 
+			AND ih.InvoiceType = @SoftwareDataFee 
 			AND ih.StatusId = 0 -- normal invoice
 END
 GO

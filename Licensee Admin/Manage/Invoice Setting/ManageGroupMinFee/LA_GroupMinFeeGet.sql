@@ -18,12 +18,13 @@ AS
 BEGIN
 	SET NOCOUNT ON;
 	
-	--#Region Get GroupMinFee header
-	SELECT GroupMinFeeID, Name AS GroupName, FromDate, ToDate 
+	--#Region LA_GroupMinFeeHeader
+	SELECT GroupMinFeeID, [Name] AS GroupName, FromDate, ToDate 
 	FROM dbo.LA_GroupMinFeeHeader WITH(NOLOCK)
 	WHERE GroupMinFeeID = @GroupMinFeeID
+	--#EndRegion LA_GroupMinFeeHeader
 	
-	--#Region Get GroupMinFee assignment
+	--#Region LA_GroupMinFeeAssignment
 	SELECT GroupMinFeeID, 
 			p.PartyID, 
 			p.PartyName, 
@@ -31,10 +32,10 @@ BEGIN
 	FROM dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK)
 		INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON a.PartyID = p.PartyID
 	WHERE GroupMinFeeID = @GroupMinFeeID
-	--#Endregion
+	--#Endregion LA_GroupMinFeeAssignment
 	
-	--#Region Get GroupMinFee detail
-	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(10))
+	--#Region LA_GroupMinFeeDetail
+	DECLARE @BaseCurrencyTable TABLE(CurrencyId INT, CurrencyName VARCHAR(10))
 	INSERT	INTO @BaseCurrencyTable(CurrencyId,CurrencyName)
 	EXECUTE CustDB.dbo.LA_BaseCurrency_Sel
 	
@@ -43,7 +44,6 @@ BEGIN
 		INNER JOIN LA_f_Products3rd('') p ON p.ProductID = d.ProductId
 		INNER JOIN @BaseCurrencyTable c ON c.CurrencyId = d.CurrencyId
 	WHERE GroupMinFeeID = @GroupMinFeeID
-
-	--#Endregion
+	--#Endregion LA_GroupMinFeeDetail
 END
 GO
