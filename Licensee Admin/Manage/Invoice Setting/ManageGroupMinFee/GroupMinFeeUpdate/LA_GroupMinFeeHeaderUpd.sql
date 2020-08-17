@@ -25,7 +25,7 @@ AS
 BEGIN
 	SET NOCOUNT ON;
 	
-	IF EXISTS (SELECT 1 FROM dbo.LA_GroupMinFeeHeader WITH(NOLOCK) WHERE (Name = @GroupName AND GroupMinFeeID <> @GroupMinFeeID))
+	IF EXISTS (SELECT TOP 1 1 FROM dbo.LA_GroupMinFeeHeader WITH(NOLOCK) WHERE ([Name] = @GroupName AND GroupMinFeeID <> @GroupMinFeeID))
 	BEGIN
 		SELECT @ErrMsg = 'Group name exists please try again.', @ErrCode = 506
 		RETURN
@@ -33,14 +33,14 @@ BEGIN
 
 	--#Region backup
 	SET @OldData = (
-		SELECT GroupMinFeeID, Name, FromDate, ToDate
+		SELECT GroupMinFeeID, [Name], FromDate, ToDate
 		FROM dbo.LA_GroupMinFeeHeader WITH(NOLOCK)
 		WHERE GroupMinFeeID = @GroupMinFeeID FOR XML PATH('GroupMinFeeHeader'), ROOT('Root'))
-	--#Endregion
+	--#Endregion backup
 	
 	--Region update
 	UPDATE dbo.LA_GroupMinFeeHeader WITH(ROWLOCK, UPDLOCK)
-	SET Name = @GroupName,
+	SET [Name] = @GroupName,
 		FromDate = @FromDate,
 		ToDate = @ToDate
 	WHERE GroupMinFeeID = @GroupMinFeeID
@@ -50,6 +50,6 @@ BEGIN
 		SELECT @ErrMsg = 'Update LA_GroupMinFeeHeader failed. Please try again.', @ErrCode = 503
 		RETURN
 	END
-	--#Endregion
+	--#Endregion update
 END
 GO

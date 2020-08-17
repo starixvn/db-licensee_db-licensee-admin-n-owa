@@ -31,6 +31,7 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON;
+
 	DECLARE @LicenseeSettings TABLE (GroupMinFeeID SMALLINT, PartyID INT, IsPrimary BIT)
 	
 	IF(@LicenseeSettingData <> '')
@@ -59,6 +60,7 @@ BEGIN
 	SELECT @HeaderFromDate = FromDate, @HeaderToDate = ToDate
 	FROM dbo.LA_GroupMinFeeHeader WITH(NOLOCK)
 	WHERE GroupMinFeeID = @GroupMinFeeID
+
 	--Check if a licensee belongs to a group min fee isnt expired
 	IF EXISTS (
 		SELECT TOP 1 1 

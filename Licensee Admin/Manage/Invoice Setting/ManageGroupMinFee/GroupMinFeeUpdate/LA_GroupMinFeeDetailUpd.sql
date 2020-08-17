@@ -19,23 +19,23 @@ AS
 
 	Param's Explannation: 
 						@GroupMinFeeSettingData = '<Root>
-							<GroupMinFeeSetting>
-								<ProductId>0</ProductId>
-								<MinimumFee>5000</MinimumFee>
-								<MinimumFeeTerm>EUR 5,000 (Waived for the first 3 months after launched)</MinimumFeeTerm>
-								<CurrencyId>6</CurrencyId>
-								<FromDate>20190108</FromDate>
-								<ToDate>20500101</ToDate>
-							</GroupMinFeeSetting>
-							<GroupMinFeeSetting>
-								<ProductId>0</ProductId>
-								<MinimumFee>2</MinimumFee>
-								<MinimumFeeTerm />
-								<CurrencyId>6</CurrencyId>
-								<FromDate>20190108</FromDate>
-								<ToDate>20190407</ToDate>
-							</GroupMinFeeSetting>
-						</Root>'
+													<GroupMinFeeSetting>
+														<ProductId>0</ProductId>
+														<MinimumFee>5000</MinimumFee>
+														<MinimumFeeTerm>EUR 5,000 (Waived for the first 3 months after launched)</MinimumFeeTerm>
+														<CurrencyId>6</CurrencyId>
+														<FromDate>20190108</FromDate>
+														<ToDate>20500101</ToDate>
+													</GroupMinFeeSetting>
+													<GroupMinFeeSetting>
+														<ProductId>0</ProductId>
+														<MinimumFee>2</MinimumFee>
+														<MinimumFeeTerm />
+														<CurrencyId>6</CurrencyId>
+														<FromDate>20190108</FromDate>
+														<ToDate>20190407</ToDate>
+													</GroupMinFeeSetting>
+												</Root>'
 */
 BEGIN
 	SET NOCOUNT ON;
@@ -67,7 +67,7 @@ BEGIN
 	--FromDate must less than ToDate
 	IF EXISTS (SELECT TOP 1 1 FROM @GroupMinFeeSettings WHERE FromDate > ToDate)
 	BEGIN
-		SELECT @ErrMsg = 'From Date could not be later than To Date', @ErrCode = 506
+		SELECT @ErrMsg = 'FromDate could not be later than ToDate', @ErrCode = 506
 		RETURN
 	END
 	
@@ -119,6 +119,7 @@ BEGIN
 				VALUES(s.GroupMinFeeID, s.ProductID, s.CurrencyID, s.FromDate, s.ToDate, s.MinimumFee, s.MinimumFeeTerm)
 	WHEN NOT MATCHED BY SOURCE AND t.GroupMinFeeID = @GroupMinFeeID
 		THEN DELETE;
+	--#EndRegion update
 	
 	IF @@ERROR <> 0
 	BEGIN

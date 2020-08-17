@@ -61,6 +61,7 @@ AS
 BEGIN
 	SET NOCOUNT ON;
 	DECLARE @docHandler INT
+
 	--#Region LA_GroupMinFeeHeader
 	IF (@GroupMinFeeHeaderOldData IS NOT NULL AND @GroupMinFeeHeaderOldData.exist('*') <> 0)
 	BEGIN
@@ -84,11 +85,11 @@ BEGIN
 		END CATCH;
 
 		UPDATE t WITH(ROWLOCK, UPDLOCK)
-		SET t.Name = s.Name, t.FromDate = s.FromDate, t.ToDate = s.ToDate
+		SET t.[Name] = s.[Name], t.FromDate = s.FromDate, t.ToDate = s.ToDate
 		FROM dbo.LA_GroupMinFeeHeader t
 		INNER JOIN @HeaderTable s ON t.GroupMinFeeID = s.GroupMinFeeID
 	END
-	--#Endregion
+	--#Endregion LA_GroupMinFeeHeader
 	
 	--#Region LA_GroupMinFeeAssignment
 	IF(@LicenseeSettingOldData IS NOT NULL AND @LicenseeSettingOldData.exist('*') <> 0)
@@ -101,7 +102,7 @@ BEGIN
 			SELECT PartyID, IsPrimary
 			FROM OPENXML(@docHandler, 'Root/LicenseeSetting')
 			WITH(PartyID INT 'PartyID',
-					IsPrimary BIT 'IsPrimary')
+				 IsPrimary BIT 'IsPrimary')
 				
 			EXEC sp_xml_removedocument @docHandler
 		END TRY
@@ -118,7 +119,7 @@ BEGIN
 		SELECT @GroupMinFeeID, PartyID, IsPrimary
 		FROM @LicenseeSettingTable
 	END
-	--#Endregion
+	--#Endregion LA_GroupMinFeeAssignment
 	
 	--#Region LA_GroupMinFeeDetail
 	IF(@GroupMinFeeSettingOldData IS NOT NULL AND @GroupMinFeeSettingOldData.exist('*') <> 0)
@@ -152,6 +153,6 @@ BEGIN
 		SELECT @GroupMinFeeID, ProductID, CurrencyId, FromDate, ToDate, MinimumFee, MinimumFeeTerm
 		FROM @GroupMinFeeSettingTable
 	END
-	--#Endregion
+	--#Endregion LA_GroupMinFeeDetail
 END
 GO
