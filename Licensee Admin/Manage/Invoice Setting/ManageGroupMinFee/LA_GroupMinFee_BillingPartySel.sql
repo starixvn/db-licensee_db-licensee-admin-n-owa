@@ -38,7 +38,7 @@ BEGIN
 	WHERE h.GroupMinFeeID = @GroupMinFeeId 
 	--#Endregion Get info of Discount
 
-	SELECT DISTINCT ih.PartyId
+	SELECT DISTINCT ih.PartyId, ih.FromDate AS BillingFromDate, ih.ToDate AS BillingToDate
 	FROM dbo.LA_InvoiceHeader ih WITH(NOLOCK)
 		INNER JOIN dbo.LA_InvoiceStatement id WITH(NOLOCK) ON ih.InvoiceHeaderId = id.InvoiceHeaderId
 		INNER JOIN @PartiesSettings p ON ih.PartyId = p.PartyId AND id.ProductId = p.ProductId
