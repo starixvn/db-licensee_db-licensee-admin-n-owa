@@ -517,7 +517,7 @@ BEGIN
 	UPDATE r
 	SET r.LicensingFee += d.DifferentAmount
 	FROM #tmpResult r
-	INNER JOIN LA_GroupMinFeeAssignment a ON r.PartyId = a.PartyID
+	INNER JOIN LA_GroupMinFeeAssignment a WITH(NOLOCK) ON r.PartyId = a.PartyID
 	INNER JOIN cte_DifferentAmount d ON a.GroupMinFeeID = d.GroupMinFeeId AND r.ProductId = d.ProductId
 	WHERE a.IsPrimary = 1
 END

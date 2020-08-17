@@ -75,7 +75,7 @@ BEGIN
 		SELECT TOP 1 1
 		FROM @GroupMinFeeSettings a 
 			LEFT JOIN @GroupMinFeeSettings b ON a.Idx <> b.Idx AND a.ProductId = b.ProductId AND a.CurrencyId = b.CurrencyId
-		WHERE(a.FromDate <= b.ToDate AND a.ToDate >= B.FromDate))
+		WHERE(a.FromDate <= b.ToDate AND a.ToDate >= b.FromDate))
 	BEGIN
 		SELECT @ErrMsg = 'Cannot save the setting, please check From date/To date.', @ErrCode = 506
 		RETURN

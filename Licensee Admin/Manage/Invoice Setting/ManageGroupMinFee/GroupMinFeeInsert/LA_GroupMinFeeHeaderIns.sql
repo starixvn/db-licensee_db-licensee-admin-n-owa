@@ -19,12 +19,11 @@ AS
 		- 20200630@Happy: Implement Group Min Fee [#134492]
 
 	Param's Explannation: 
-
 */
 BEGIN
 	SET NOCOUNT ON;
 	
-	IF EXISTS (SELECT 1 FROM dbo.LA_GroupMinFeeHeader WITH(NOLOCK) WHERE Name = @GroupName)
+	IF EXISTS (SELECT 1 FROM dbo.LA_GroupMinFeeHeader WITH(NOLOCK) WHERE [Name] = @GroupName)
 	BEGIN
 		SELECT @ErrMsg = 'Group name exists please try again.', @ErrCode = 506
 		RETURN
