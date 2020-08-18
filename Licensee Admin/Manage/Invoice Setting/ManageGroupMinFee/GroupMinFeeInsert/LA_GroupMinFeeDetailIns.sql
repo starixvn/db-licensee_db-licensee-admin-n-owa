@@ -4,7 +4,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_GroupMinFeeDetailIns]
 	@GroupMinFeeId				SMALLINT,
-	@GroupMinFeeSettingData		VARCHAR(MAX),
+	@GroupMinFeeSettingData		NVARCHAR(MAX),
 	@ErrCode					INT				= 0		OUTPUT,
 	@ErrMsg						VARCHAR(4000)	= ''	OUTPUT
 AS

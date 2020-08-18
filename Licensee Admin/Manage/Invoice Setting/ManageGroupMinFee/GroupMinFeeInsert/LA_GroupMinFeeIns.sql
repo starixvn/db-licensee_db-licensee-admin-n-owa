@@ -6,8 +6,8 @@ ALTER PROCEDURE [dbo].[LA_GroupMinFeeIns]
 	@GroupName					NVARCHAR(110),
 	@FromDate					DATE,
 	@ToDate						DATE,
-	@LicenseeSettingData		VARCHAR(MAX),
-	@GroupMinFeeSettingData		VARCHAR(MAX),
+	@LicenseeSettingData		NVARCHAR(MAX),
+	@GroupMinFeeSettingData		NVARCHAR(MAX),
 	@ErrCode					INT				= 0		OUTPUT, 
 	@ErrMsg						VARCHAR(4000)	= ''	OUTPUT,
 	@NewGroupMinFeeId			SMALLINT = 0 			OUTPUT
