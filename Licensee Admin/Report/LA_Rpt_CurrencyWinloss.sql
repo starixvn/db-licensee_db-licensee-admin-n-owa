@@ -349,7 +349,7 @@ BEGIN
 					 ELSE t.CurrencyCode 
 				END AS CurrencyName,
 				w.currency,
-				MONTH(w.Winlostdate)		AS ReportMonth,
+				w.Winlostdate				AS ReportDate,
 				SUM(TurnOver * e.Rate)		AS Turnover,
 				SUM(Winlost * e.Rate)		AS Winlost,
 				SUM(LicenseeWL * e.Rate)	AS LicenseeWL,
@@ -362,8 +362,8 @@ BEGIN
 		INNER JOIN #DailyExchange e ON w.Winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
 		LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON w.PartyID = p.PartyID
 		LEFT JOIN @Exchange t ON w.Currency = t.Currency
-		GROUP BY w.PartyID,p.PartyName, CASE WHEN w.Currency = @CurrencyTest THEN e.Code ELSE t.CurrencyCode END, w.currency, MONTH(w.Winlostdate)
-		ORDER BY w.PartyID,p.PartyName, CASE WHEN w.Currency = @CurrencyTest THEN e.Code ELSE t.CurrencyCode END, MONTH(w.Winlostdate)
+		GROUP BY w.PartyID,p.PartyName, CASE WHEN w.Currency = @CurrencyTest THEN e.Code ELSE t.CurrencyCode END, w.currency, w.Winlostdate
+		ORDER BY w.PartyID,p.PartyName, CASE WHEN w.Currency = @CurrencyTest THEN e.Code ELSE t.CurrencyCode END, w.Winlostdate
 	END
 
 	--Report Group By Currency
