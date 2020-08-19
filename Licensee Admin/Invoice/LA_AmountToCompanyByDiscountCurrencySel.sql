@@ -423,7 +423,7 @@ BEGIN
 	SELECT TOP(1) WITH TIES mfd.GroupMinFeeID, ProductId, mfd.MinimumFee * e.Rate AS GroupMinFee
 	FROM dbo.LA_GroupMinFeeDetail mfd WITH(NOLOCK)
 		INNER JOIN @PartyList p ON mfd.GroupMinFeeID = p.GroupMinFeeId
-		INNER JOIN #tmpExchange e ON e.ExchangeId = mfd.CurrencyId AND e.exchangedate = @ToDate
+		INNER JOIN #tmpExchange e ON e.ExchangeId = mfd.CurrencyId AND e.exchangedate = @ToDate AND e.BaseCurrencyId = mfd.CurrencyId  
 	WHERE @FromDate BETWEEN mfd.FromDate AND mfd.ToDate
 	ORDER BY ROW_NUMBER() OVER(PARTITION BY mfd.GroupMinFeeID order by mfd.ToDate DESC)
 
