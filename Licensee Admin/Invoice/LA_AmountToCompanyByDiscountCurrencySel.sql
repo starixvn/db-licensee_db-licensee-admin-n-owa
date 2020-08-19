@@ -166,6 +166,7 @@ BEGIN
 				,0	AS Discount
 				,0	AS Rebate
 				,0	AS IsChargedByMinFee
+				,0  AS IsChargedByGroupMinFee
 		WHERE 1 = 2
 
 		DROP TABLE #tmpDiscountSettings
