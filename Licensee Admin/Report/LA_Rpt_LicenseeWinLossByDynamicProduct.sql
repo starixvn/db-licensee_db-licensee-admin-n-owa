@@ -24,6 +24,7 @@ AS
 	    - 20190322@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	    - 20191205@Mason: PP tournament [#123958]
 	    - 20200409@Parsons: Integrate SA Gaming [#129276]
+	    - 20200820@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
 */
 
 BEGIN
