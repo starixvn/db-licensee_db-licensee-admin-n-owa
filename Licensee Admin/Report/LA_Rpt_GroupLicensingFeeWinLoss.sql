@@ -18,7 +18,8 @@ AS
 	   - 20191216@Parsons: PP tournament [#123958]
 	   - 20191125@Mason: Setup billing terms by Currency [#120005]
 	   - 20200228@Parsons: Support-HID-currency [#128856]
-	   - 20200409@Parsons: Integrate SA Gaming [#129276]
+	   - 20200409@Parsons: Integrate SA Gaming [#129276] 
+	   - 20200820@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
 */
 BEGIN
 	SET NOCOUNT ON	
@@ -108,14 +109,17 @@ BEGIN
 	END
 
 	/* PP Product */	
-	DECLARE @PP_Product INT = 32,  
+	DECLARE @PP_Product INT = 32, 
+			@PP_Contribution SMALLINT = 4297,
+			@PP_JackpotPrize SMALLINT = 4298,
 			@PPTournament SMALLINT = 4299,
 			@PromotionPrize SMALLINT = 4300
 	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = @PP_Product) > 0
 	BEGIN
 	INSERT INTO #Report (PartyID, ProductId, CurrencyID, Company)
 		(
-			SELECT ci.PartyID, @PP_Product, b.CurrencyID, SUM(-b.MemberWL * ISNULL(cr.Rate,ci.Rate)) AS Company
+			SELECT ci.PartyID, @PP_Product, b.CurrencyID, SUM((-b.MemberWL - CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END)
+																* ISNULL(cr.Rate,ci.Rate)) AS Company
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID 
 										 AND b.ProductID = ci.ProductID 
@@ -125,7 +129,7 @@ BEGIN
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND b.customercategory NOT IN (27,28)
 				AND b.ProductID = @PP_Product
-				AND b.Bettype NOT IN (@PPTournament, @PromotionPrize) 				
+				AND b.Bettype NOT IN (@PPTournament, @PromotionPrize, @PP_JackpotPrize)
 			GROUP BY ci.PartyID, b.CurrencyID
 		)
 	END
