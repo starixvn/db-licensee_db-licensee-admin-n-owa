@@ -24,13 +24,18 @@ AS
 	    - 20190322@Parsons: Integrate-PP-Promotion-Prize [#109014]
 	    - 20191205@Mason: PP tournament [#123958]
 	    - 20200409@Parsons: Integrate SA Gaming [#129276]
-	    - 20200820@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
+	    - 20200820@Happy: Implement PP JP Changes In Reports Phase 2 [#139055]
 */
 
 BEGIN
 	SET NOCOUNT ON
 	
-	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007, @PromotionPrize SMALLINT = 4300, @PPTournament SMALLINT = 4299 
+	DECLARE @GD_Tip SMALLINT = 1706,
+			@SAG_Tip SMALLINT = 3007,
+			@PP_Contribution SMALLINT = 4297,
+			@PP_JackpotPrize SMALLINT = 4298,
+			@PPTournament SMALLINT = 4299,
+			@PromotionPrize SMALLINT = 4300
 
 	SELECT * INTO #Exchange FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
@@ -87,7 +92,8 @@ BEGIN
 		CAST(0 AS MONEY)	AS CashOut, 
 		CAST(0 AS MONEY)	AS WinningPrize,
 		CAST(0 AS MONEY)	AS BuyBackAmountBA,
-		CAST(0 AS MONEY)	AS TicketsPayout
+		CAST(0 AS MONEY)	AS TicketsPayout,
+		CAST(0 AS MONEY)    AS Contribution
 	INTO #Data
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 	INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
@@ -165,10 +171,10 @@ BEGIN
 	-- PP
 	IF EXISTS (SELECT 1 FROM @Products WHERE ProductId=32)
 	BEGIN
-		INSERT INTO #Data(WinLossDate,LicenseeId,ProductId,Bettype,Winloss,WinningPrize)
+		INSERT INTO #Data(WinLossDate,LicenseeId,ProductId,Bettype,Winloss,Contribution)
 		SELECT b.rptDate, b.SiteId, b.ProductId, b.Bettype, 
-		CAST(SUM(ISNULL(b.MemberWL, 0) * e.BaseCurrencyRate) AS MONEY), 
-		CAST(SUM(ISNULL(b.MemberWL, 0) * e.BaseCurrencyRate) AS MONEY)
+		CAST(SUM(ISNULL(-b.MemberWL, 0) * e.BaseCurrencyRate) AS MONEY),
+		CAST(SUM((CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) * e.BaseCurrencyRate) AS MONEY)
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 		INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
@@ -176,7 +182,7 @@ BEGIN
 			AND b.CurrencyID <> 20
 			AND b.CustomerCategory NOT IN (27, 28)
 			AND b.ProductID = 32
-			AND b.Bettype NOT IN (@PromotionPrize, @PPTournament)
+			AND b.Bettype NOT IN (@PromotionPrize, @PPTournament, @PP_JackpotPrize)
 		GROUP BY b.rptDate, b.SiteId, b.ProductId, b.Bettype
 	END
 
