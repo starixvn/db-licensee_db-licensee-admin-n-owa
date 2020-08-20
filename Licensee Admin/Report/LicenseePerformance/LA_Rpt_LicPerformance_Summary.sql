@@ -32,6 +32,7 @@ AS
 	   - 20200217@Mason: Set billing term by currency [#120005]
 	   - 20200625@Mason: Keep Negative SB Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334]
 	   - 20200629@Parsons: Enhance loading time for Licensee Performance report [#136341]
+	   - 20200820@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
 
 	Param's Explanation:
 	  + @PartyIDs : a string of list PartyID, separated by ','
@@ -99,15 +100,18 @@ BEGIN
 
 	IF @ProductCode = 'PP'
 	BEGIN		
-		DECLARE @PromotionPrize SMALLINT = 4300
-		DECLARE @PPTournament SMALLINT = 4299
+		DECLARE @PP_Contribution SMALLINT = 4297,
+				@PP_JackpotPrize SMALLINT = 4298,
+				@PPTournament SMALLINT = 4299,
+				@PromotionPrize SMALLINT = 4300
 		INSERT INTO #Temp (PartyID, rptDate, Currency, CommBA, Betcount, TurnOver, Winlost, LicensingFee)
 		(
 			SELECT tp.PartyID, b.rptDate, b.CurrencyID,0
-				, SUM(ISNULL(b.betcount, 0) * CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS BetCount
-				, SUM(ISNULL(b.turnover, 0) * CASE WHEN @drawfilter IN (2, 3) AND b.[StatusId] = 111 THEN 0 ELSE 1 END) AS TurnOver
-				, SUM(ISNULL(b.MemberWL, 0)) as Winlost
-				, SUM(ISNULL(- b.MemberWL, 0) * ISNULL(cr.Rate, tp.Rate)) AS LicensingFee
+				, SUM(ISNULL(b.betcount, 0) * CASE WHEN (@drawfilter = 2 AND b.[StatusId] = 111) OR b.Bettype = @PP_Contribution THEN 0 ELSE 1 END) BetCount
+				, SUM(ISNULL(b.turnover, 0) * CASE WHEN (@drawfilter IN (2, 3) AND b.[StatusId] = 111) OR b.Bettype = @PP_Contribution THEN 0 ELSE 1 END) TurnOver
+				, SUM(CASE WHEN b.Bettype = @PP_Contribution THEN 0 ELSE ISNULL(b.MemberWL, 0) END) Winlost
+				, SUM((ISNULL(- b.MemberWL, 0) - CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) 
+								* ISNULL(cr.Rate, tp.Rate)) LicensingFee
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 					INNER JOIN (SELECT DISTINCT ChargeId, PartyID, LicenseeID, Rate, Fromdate, Todate FROM @tmpParty) tp ON tp.LicenseeID = b.SiteID AND b.rptDate BETWEEN tp.Fromdate AND tp.Todate
 					LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = tp.ChargeId AND cr.CurrencyID = b.CurrencyId
@@ -117,7 +121,7 @@ BEGIN
 					AND (@Currency = 0 OR b.CurrencyID = @Currency)  
 					AND b.customercategory NOT IN (27, 28)
 					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
-					AND b.Bettype NOT IN(@PPTournament, @PromotionPrize)
+					AND b.Bettype NOT IN(@PPTournament, @PromotionPrize, @PP_JackpotPrize)
 				GROUP BY tp.PartyID, b.rptDate, b.CurrencyID
 		)
 	END
