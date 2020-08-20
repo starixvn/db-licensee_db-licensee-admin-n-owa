@@ -37,6 +37,7 @@ AS
 	   - 20200423@Parsons: Integrate Saba.club [#132730]
 	   - 20200507@Parsons: Integrate Sexy Gaming for deposit licensees [#132665]
 	   - 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334]
+	   - 20200820@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -109,23 +110,28 @@ BEGIN
 
 	IF @ProductCode = 'PP'
 	BEGIN		
-		DECLARE @PPTournament SMALLINT = 4299, @PromotionPrize SMALLINT = 4300
+		DECLARE @PP_Contribution SMALLINT = 4297,
+				@PP_JackpotPrize SMALLINT = 4298,
+				@PPTournament SMALLINT = 4299,
+				@PromotionPrize SMALLINT = 4300
 		;WITH cte_PPWinLossData AS(
 			SELECT tp.PartyID, b.rptDate, b.CurrencyID
-				, SUM(ISNULL(b.MemberWL, 0)) Winloss
+				, SUM(ISNULL(-b.MemberWL, 0)) LicenseeWL
+				, SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) Contribution
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 					INNER JOIN (SELECT DISTINCT PartyID, LicenseeID FROM #tmpParty) tp ON tp.LicenseeID = b.SiteID
 				WHERE b.ProductID = 32
 					AND b.rptDate BETWEEN @FromDate AND @ToDate
 					AND (b.CurrencyID <> 20)
-					AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
+					AND (@Currency = 0 OR b.CurrencyID = @Currency)  
 					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
-					AND b.Bettype NOT IN (@PPTournament, @PromotionPrize)
+					AND b.Bettype NOT IN (@PPTournament, @PromotionPrize,@PP_JackpotPrize)
 				GROUP BY tp.PartyID, b.rptDate, b.CurrencyID
 		)
 		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, LicensingFee)
 		(
-			SELECT tp.PartyID, b.rptDate, b.CurrencyId, SUM(-Winloss * ISNULL(cc.Rate, tp.Rate))			FROM cte_PPWinLossData b
+			SELECT tp.PartyID, b.rptDate, b.CurrencyId, SUM((LicenseeWL - Contribution) * ISNULL(cc.Rate, tp.Rate))			
+			FROM cte_PPWinLossData b
 				INNER JOIN (SELECT DISTINCT PartyID, Rate, Fromdate, Todate, ChargeID FROM #tmpParty) tp ON tp.PartyID = b.PartyID
 				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON b.CurrencyID = cc.CurrencyID AND tp.ChargeID = cc.ChargeID 
 			WHERE b.rptDate BETWEEN tp.Fromdate AND tp.Todate
