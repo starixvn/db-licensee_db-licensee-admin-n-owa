@@ -58,6 +58,7 @@ AS
 		- 20200609@Parsons: Special handling for INH market [#128570] 
 		- 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334]
 		- 20200813@Parsons: Implement Group Min Fee [#134492]
+	    - 20200821@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -84,6 +85,8 @@ BEGIN
 	SET NOCOUNT ON
 	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007
 	DECLARE @BAProductId INT = 3, @ExchangeProductId INT = 31, @PragmaticProductId INT = 32, 
+			@PP_Contribution SMALLINT = 4297,
+			@PP_JackpotPrize SMALLINT = 4298,
 			@PPTournament SMALLINT = 4299,
 			@PromotionPrize SMALLINT = 4300
 
@@ -284,28 +287,34 @@ BEGIN
 			PComm			MONEY,
 			ProductId		TINYINT,
 			AmountToCompany MONEY,
-			IsApplyMinFee	BIT)
+			IsApplyMinFee	BIT,
+			ExtraAmount		MONEY)
 
-	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,AComm,PComm,ProductId,AmountToCompany)
+	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,AComm,PComm,ProductId,AmountToCompany,ExtraAmount)
 	(
 		SELECT	b.SiteID,
 				p.PartyId,
 				b.rptDate,
 				b.CurrencyID,
-				SUM(CASE WHEN (@DrawFilter = 2 AND b.StatusId = 111) OR b.Bettype IN(@GD_Tip, @SAG_Tip) THEN 0 ELSE b.BetCount END),
+				SUM(CASE WHEN (@DrawFilter = 2 AND b.StatusId = 111) OR b.Bettype IN(@GD_Tip, @PPTournament,@PromotionPrize,@PP_JackpotPrize,@PP_Contribution) THEN 0 ELSE b.BetCount END) AS BetCount,
 				SUM(b.Turnover * CASE WHEN @DrawFilter IN (2, 3) 
 										THEN CASE	WHEN b.StatusId = 111 THEN 0
 													WHEN b.StatusId IN (114, 115) THEN 0.5
 											 ELSE 1 END
-										ELSE 1 END) * e.Rate,
-				SUM(CASE WHEN b.Bettype IN(@GD_Tip, @SAG_Tip) THEN 0 ELSE b.MemberWL END) * e.Rate,
+										ELSE 1 END) * e.Rate AS Turnover,
+				SUM(CASE WHEN b.Bettype IN(@GD_Tip, @PPTournament,@PromotionPrize,@PP_JackpotPrize,@PP_Contribution) THEN 0 ELSE b.MemberWL END) * e.Rate AS WinLoss,
 				SUM(ISNULL(b.CommissionA, 0)) * e.Rate,
 				SUM(ISNULL(b.CommissionP, 0)) * e.Rate,
 				p.ProductId,
-				SUM((CASE WHEN b.Bettype IN(@GD_Tip, @SAG_Tip) THEN 0 ELSE -b.MemberWL * ISNULL(cr.Rate, p.Rate) END) - (CASE 
-					WHEN b.ProductId = @BAProductId THEN ISNULL(b.CommissionA, 0)
-					WHEN b.ProductID = @ExchangeProductId THEN ISNULL(b.CommissionA, 0) + ISNULL(b.CommissionP, 0)
-					ELSE 0 END)) * e.Rate
+				SUM((CASE  WHEN b.Bettype IN(@GD_Tip, @PPTournament,@PromotionPrize,@PP_JackpotPrize,@PP_Contribution) THEN 0 ELSE -b.MemberWL * ISNULL(cr.Rate, p.Rate) END) - 
+					(CASE  WHEN b.ProductId = @BAProductId THEN ISNULL(b.CommissionA, 0)
+						   WHEN b.ProductID = @ExchangeProductId THEN ISNULL(b.CommissionA, 0) + ISNULL(b.CommissionP, 0)
+					       ELSE 0 
+				     END)) * e.Rate AS AmountToCompany,
+				SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0)
+						 WHEN b.Bettype IN (@PPTournament,@PromotionPrize,@PP_JackpotPrize) THEN ISNULL(-b.MemberWL, 0)
+						 ELSE 0
+					END) * e.Rate AS ExtraAmount
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 				INNER JOIN @PartyChargeInfo p ON	b.ProductId = p.ProductID 
@@ -316,7 +325,7 @@ BEGIN
 		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate OR b.rptDate BETWEEN @PrevFromDate AND @PrevToDate)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
-				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914,@PPTournament,@PromotionPrize,@SAG_Tip)
+				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914,@SAG_Tip)
 				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund 
 				AND (@Currency = 0 OR b.CurrencyID = @Currency)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, e.Rate
@@ -342,20 +351,22 @@ BEGIN
 			IsChargedByMinFee	   BIT,
 			IsChargedByGroupMinFee BIT,
 			Discount		MONEY,
-			Rebate			MONEY
+			Rebate			MONEY,
+			ExtraAmount		MONEY
 		)
 		
 		-- sum by product
-		INSERT INTO @SumByProducts (PartyId,ProductId,IsCurrent,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,IsChargedByMinFee,IsChargedByGroupMinFee)
+		INSERT INTO @SumByProducts (PartyId,ProductId,IsCurrent,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,ExtraAmount,IsChargedByMinFee,IsChargedByGroupMinFee)
 		SELECT	PartyId
 				,ProductId
 				,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END) IsCurrent
-				,SUM(BetCount) BetCount
-				,SUM(Turnover) Turnover
-				,SUM(WinLoss) WinLoss
-				,SUM(AComm) AComm
-				,SUM(PComm) PComm
-				,SUM(AmountToCompany) AmountToCompany
+				,SUM(BetCount)
+				,SUM(Turnover)
+				,SUM(WinLoss)
+				,SUM(AComm)
+				,SUM(PComm)
+				,SUM(AmountToCompany)
+				,SUM(ExtraAmount)
 				,0 IsChargedByMinFee
 				,0 IsChargedByGroupMinFee
 		FROM #TempData
@@ -363,7 +374,7 @@ BEGIN
 
 		-- apply minfee
 		UPDATE s SET 
-			AmountToCompany = m.Fee,
+			AmountToCompany = m.Fee + ExtraAmount,
 			IsChargedByMinFee = m.IsChargedByMinFee,
 			IsChargedByGroupMinFee = m.IsChargedByGroupMinFee,
 			Discount = m.Discount,
@@ -458,7 +469,7 @@ BEGIN
 			SUM(CASE WHEN t.ProductId = @BAProductId THEN t.AComm ELSE 0 END)											AS BAComm,
 			SUM(CASE WHEN t.ProductId = @BAProductId THEN t.AmountToCompany ELSE 0 END)									AS AmountToBA,
 			SUM(CASE WHEN t.ProductId = @ExchangeProductId OR (t.ProductId = @PragmaticProductId AND t.AmountToCompany < 0) THEN t.AmountToCompany ELSE 0 END)	AS NegativeAmount,
-			SUM(CASE WHEN t.ProductId IN(@BAProductId, @ExchangeProductId) OR t.AmountToCompany < 0 THEN 0 ELSE t.AmountToCompany END) AmountToCompany
+			SUM(CASE WHEN t.ProductId IN(@BAProductId, @ExchangeProductId) OR t.AmountToCompany < 0 THEN 0 ELSE t.AmountToCompany END) AS AmountToCompany
 		FROM @SumByProducts t
 		WHERE t.ProductId != 0
 		GROUP BY t.IsCurrent, t.PartyId
@@ -484,7 +495,7 @@ BEGIN
 			0,
 			s.AmountToCompany
 		);
-
+	
 	UPDATE	r
 	SET	LaunchDate	= t.AffectedDate,
 		PartyName	= ISNULL(r.PartyName,op.PartyName),
@@ -495,26 +506,6 @@ BEGIN
 	INNER JOIN @tmpPartySBLaunchDate t ON t.PartyID = r.PartyId
 	INNER JOIN bodb_licensee.dbo.OAS_Party (NOLOCK) op ON r.PartyId = op.PartyID
 	-- End region
-
-	/*Update PromotionOthers column*/
-	IF(EXISTS(SELECT TOP 1 1 FROM @PartyChargeInfo WHERE ProductId = 32/*PP*/))
-	BEGIN
-		;WITH cte_PromotionOthers AS(
-		SELECT pc.PartyId, r.SiteID,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END) IsCurrent, SUM(r.MemberWL * cExchange.Rate) AS Prize
-		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
-			INNER JOIN (SELECT DISTINCT PartyId, LicenseeId FROM @PartyChargeInfo WHERE ProductID = 32) pc ON r.SiteID = pc.LicenseeId
-			INNER JOIN #Exchange cExchange ON r.RptDate = cExchange.ExchangeDate AND r.CurrencyID = cExchange.ExchangeID
-		WHERE r.Bettype IN (4299, 4300) -- PP Prize
-			AND r.[StatusId] NOT IN (-1, 101, 102, 103)
-			AND ((r.RptDate BETWEEN @FromDate AND @ToDate) OR (r.RptDate BETWEEN @PrevFromDate AND @PrevToDate))
-			AND (@Currency = 0 OR @Currency = r.CurrencyId)
-			GROUP BY pc.PartyId, r.SiteID, (CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END)
-		)
-		UPDATE r
-		SET PromotionOthers = p.Prize
-		FROM #Result r
-			INNER JOIN cte_PromotionOthers p ON r.PartyId = p.PartyId AND r.IsCurrent = p.IsCurrent
-	END
 
 	-- Region: Select Data	
 	SELECT	r.PartyId,
