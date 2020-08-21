@@ -173,7 +173,7 @@ BEGIN
 	BEGIN
 		INSERT INTO #Data(WinLossDate,LicenseeId,ProductId,Bettype,Winloss,Contribution)
 		SELECT b.rptDate, b.SiteId, b.ProductId, b.Bettype, 
-		CAST(SUM((CASE WHEN b.Bettype <> @PP_Contribution THEN ISNULL(b.MemberWL, 0) ELSE 0 END) * e.BaseCurrencyRate) AS MONEY),
+		CAST(SUM((CASE WHEN b.Bettype = @PP_Contribution THEN 0 ELSE ISNULL(b.MemberWL, 0) END) * e.BaseCurrencyRate) AS MONEY),
 		CAST(SUM((CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) * e.BaseCurrencyRate) AS MONEY)
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 		INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
