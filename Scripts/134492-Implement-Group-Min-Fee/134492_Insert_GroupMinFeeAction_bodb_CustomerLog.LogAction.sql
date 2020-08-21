@@ -1,4 +1,6 @@
-	/*<info serverAlias="DBLOG-bodb_CustomerLog"></info>*/
+/*<info serverAlias="DBLOG-bodb_CustomerLog"></info>*/
+USE [bodb_CustomerLog]
+GO
 
 /*
 	Created: 20200806@Mason
@@ -20,6 +22,7 @@ DECLARE @LA_GroupMinFeeDel_ActionName VARCHAR(50) = 'Delete Group Min Fee'
 DECLARE @LA_GroupMinFeeInsLogId INT = 5569
 DECLARE @LA_GroupMinFeeUpdLogId INT = 5570
 DECLARE @LA_GroupMinFeeDelLogId	INT	= 5571
+
 
 IF NOT EXISTS (SELECT ActionID FROM dbo.LogAction WITH (NOLOCK) 
 							WHERE ActionID IN (@LA_GroupMinFeeInsLogId, @LA_GroupMinFeeUpdLogId, @LA_GroupMinFeeDelLogId))
