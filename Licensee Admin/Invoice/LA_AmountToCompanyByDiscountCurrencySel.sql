@@ -28,7 +28,8 @@ AS
 	    - 20200409@Parsons: Integrate SA Gaming [#129276]
 		- 20200512@Parsons: Special handling for INH market [#128570]
 		- 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334] 
-		- 20200812@Parsons: Implement Group Min Fee [#134492]
+		- 20200812@Parsons: Implement Group Min Fee [#134492] 
+	    - 20200821@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -39,6 +40,8 @@ BEGIN
  *-------------------------------------------------------------------------------------------------------------------------------*/
 	DECLARE @GD_Tip SMALLINT = 1706,
 			@SAG_Tip SMALLINT = 3007,
+			@PP_Contribution SMALLINT = 4297,
+			@PP_JackpotPrize SMALLINT = 4298,
 			@PPTournament SMALLINT = 4299,
 			@PromotionPrize SMALLINT = 4300
 
@@ -315,8 +318,9 @@ BEGIN
 			b.rptDate AS WinlossDate,
 			p.ProductId,
 			b.CurrencyId, 
-			CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN 0 ELSE ISNULL(b.MemberWL, 0) END AS MemberWL,
-			CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN 0 ELSE ISNULL(b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) END AS Amount,
+			CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @PP_Contribution) THEN 0 ELSE ISNULL(b.MemberWL, 0) END AS MemberWL,
+			CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN 0 ELSE (ISNULL(b.MemberWL, 0) - CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(b.GrossWL, 0) ELSE 0 END) 
+																   * ISNULL(cr.Rate, p.Rate) END AS Amount,
 			CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN ISNULL(b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) ELSE 0 END AS ExtraAmount
 	INTO #temData
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
@@ -324,7 +328,7 @@ BEGIN
 				AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
 				AND b.ProductId = p.ProductID   
 				AND (p.ProductID NOT IN (11,39) OR b.Bettype = p.Bettype)
-				AND (b.Bettype NOT IN (@PPTournament, @PromotionPrize))
+				AND (b.Bettype NOT IN (@PPTournament, @PromotionPrize, @PP_JackpotPrize))
 		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
 	WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND b.customercategory NOT IN (27, 28)
