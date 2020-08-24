@@ -267,9 +267,7 @@ BEGIN
 											ELSE 1 
 									 END)
 						) AS Turnover
-					,SUM(CASE WHEN b.Bettype = @PP_Contribution THEN 0 ELSE b.winloss END)	AS winloss
-					,SUM(CASE WHEN b.Bettype = @PP_Contribution THEN 0 ELSE -b.winloss END)	AS LicenseeWL
-					,SUM(CASE WHEN b.Bettype = @PP_Contribution THEN 0 ELSE -b.winloss END)	AS Company
+					,SUM(CASE WHEN b.Bettype = @PP_Contribution THEN 0 ELSE b.winloss END)	AS MemberWL
 					,SUM(CASE WHEN (@drawfilter = 2 AND b.[Status] = 111) OR b.Bettype = @PP_Contribution THEN 0 ELSE b.BetCount END) AS BetCount
 					,SUM(CASE WHEN b.ProductId = 32 THEN 0 ELSE b.commissionP END) AS Playercomm 
 					,SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.WinLossA, 0) ELSE 0 END) Contribution
@@ -285,7 +283,7 @@ BEGIN
 					,b.Status
 		)
 		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm)
-		SELECT a.rptDate,p.PartyID,a.CurrencyID,TurnOver, winloss, LicenseeWL, 0, 0, (Company - Contribution) * ISNULL(cc.rate,p.Rate), Betcount, Playercomm
+		SELECT a.rptDate,p.PartyID,a.CurrencyID,TurnOver,MemberWL,-MemberWL, 0, 0, (-MemberWL - Contribution) * ISNULL(cc.rate,p.Rate), Betcount, Playercomm
 		FROM cte_Data a
 		INNER JOIN #tmpParty p ON p.LicenseeID = a.SiteID AND a.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId=a.ProductId AND p.ChargeType = 1
 		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID = p.ChargeId AND a.CurrencyId=cc.CurrencyID
