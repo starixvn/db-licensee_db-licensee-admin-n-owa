@@ -43,6 +43,7 @@ AS
 	   - 20200228@Parsons: Support-HID-currency [#128856]
 	   - 20200409@Parsons: Integrate SA Gaming [#129276]
 	   - 20200601@Parsons: Amend Currency WL report [#135055]
+	   - 20200821@Happy: Implement PP Jackpot changes in reports phase 2 [#139055]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -52,8 +53,10 @@ AS
 BEGIN
 	SET NOCOUNT ON 
 	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007,
-	@PPTournament SMALLINT = 4299,
-	@PromotionPrize SMALLINT = 4300  
+			@PP_Contribution SMALLINT = 4297,
+			@PP_JackpotPrize SMALLINT = 4298,
+			@PPTournament SMALLINT = 4299,
+			@PromotionPrize SMALLINT = 4300
 
 	DECLARE @CurrencyTest INT = 20
 	-- currency list
@@ -243,12 +246,52 @@ BEGIN
 			GROUP BY p.PartyId, b.rptDate, b.CurrencyID
 		)
 	END
-
-	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode NOT IN ('BA','MGCLC','MGCRNG','AGC','GD','VG','BX', 'RB'))
+	
+	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode IN ('PP'))
 	BEGIN
-		--exclude RB,BA,MGCLC, MGCRNG,AGC,GD,VG,BX
-		DELETE #Bettype WHERE ProductID IN (1,3,14,17,10,11,12,31)
-		DELETE #tmpParty WHERE ProductID IN (1,3,14,17,10,11,12,31)
+		;WITH cte_PPData AS
+		(
+			SELECT	b.rptDate
+					,b.SiteID
+					,b.CurrencyID
+					,b.ProductID
+					, SUM(b.Turnover * (CASE	WHEN @drawfilter IN (2, 3) AND b.[StatusId] = 111			THEN 0
+												WHEN @drawfilter IN (2, 3) AND b.[StatusId] IN (114,115)	THEN 0.5
+												ELSE 1 END)) TurnOver
+					, SUM(CASE WHEN b.Bettype = @PP_Contribution THEN 0 ELSE ISNULL(b.MemberWL, 0) END) MemberWL
+					, SUM(b.betcount * CASE WHEN (b.Bettype = @PP_Contribution OR (@drawfilter = 2 AND b.StatusId = 111)) THEN 0 ELSE 1 END) BetCount
+					, SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) Contribution
+				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+				WHERE b.rptDate BETWEEN @FromDate AND @ToDate
+					AND b.ProductID = 32
+					AND b.StatusId NOT IN (- 1, 101, 102, 103)
+					AND (@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c))
+					AND (b.CurrencyID <> @CurrencyTest)
+					AND b.CustomerCategory NOT IN (27,28)
+					AND b.Bettype NOT IN (@PPTournament, @PromotionPrize, @PP_JackpotPrize)
+				GROUP BY b.rptDate,b.SiteID,b.CurrencyID,b.ProductID
+					-- need to be group by below fields to avoid decimal fraction mismatch
+					,b.Bettype
+					,b.[StatusId]
+		)
+		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, Company, Betcount)
+		SELECT a.rptDate, a.SiteID, a.CurrencyId
+			, SUM(a.TurnOver) TurnOver
+			, SUM(a.MemberWL) Winlost
+			, SUM(-a.MemberWL) LicenseeWL
+			, SUM((-a.MemberWL - a.Contribution) * ISNULL(cc.Rate, p.Rate)) AS Company
+			, SUM(a.BetCount) AS BetCount
+		FROM cte_PPData a
+			INNER JOIN #tmpParty p ON p.LicenseeID = a.SiteID AND (a.rptDate BETWEEN p.FromDate AND p.ToDate) AND p.ProductId = a.ProductId AND p.ChargeType = 1		
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID = p.ChargeId AND cc.CurrencyID = a.CurrencyId
+		GROUP BY a.rptDate, a.SiteID, a.CurrencyId
+	END
+
+	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode NOT IN ('BA','MGCLC','MGCRNG','AGC','GD','VG','BX', 'RB','PP'))
+	BEGIN
+		--exclude RB,BA,MGCLC, MGCRNG,AGC,GD,VG,BX,PP
+		DELETE #Bettype WHERE ProductID IN (1,3,14,17,10,11,12,31,32)
+		DELETE #tmpParty WHERE ProductID IN (1,3,14,17,10,11,12,31,32)
 
 		SELECT b.BetCount,b.turnover,b.rptDate,b.CurrencyID,b.Bettype,b.[Status],b.winloss,b.WinlossA,b.CommissionA,b.commissionP,b.SiteID,b.leagueid,b.IsLive,bt.ProductId
 		INTO #tmpData
@@ -260,7 +303,7 @@ BEGIN
 			AND (@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c))
 			AND b.SiteID IN (SELECT p.LicenseeId FROM #tmpParty p)
 			AND b.rptDate BETWEEN @FromDate AND @ToDate
-			AND b.Bettype NOT IN(@PPTournament, @PromotionPrize,@SAG_Tip)
+			AND b.Bettype NOT IN(@SAG_Tip)
 
 		;WITH cte_Data AS
 		(
@@ -278,7 +321,7 @@ BEGIN
 					,SUM(-b.winloss)	AS LicenseeWL
 					,SUM(-b.winloss)	AS Company
 					,SUM(CASE WHEN @drawfilter = 2 AND b.[Status] = 111 THEN 0 ELSE b.BetCount END) AS BetCount
-					,SUM(CASE WHEN b.ProductId = 32 THEN 0 ELSE b.commissionP END) AS Playercomm
+					,SUM(b.commissionP) AS Playercomm
 			FROM #tmpData b
 			LEFT JOIN dbo.League l WITH(NOLOCK) ON b.leagueid = l.leagueid
 			WHERE (@SportType = 0 OR (b.bettype NOT IN (9,29) AND (b.bettype NOT BETWEEN 31 AND 120) AND l.Sporttype = @Sporttype)) AND
