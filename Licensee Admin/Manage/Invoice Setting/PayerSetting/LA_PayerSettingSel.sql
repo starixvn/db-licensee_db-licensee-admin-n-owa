@@ -133,6 +133,12 @@ BEGIN
 			AND a.Fromdate = b.Fromdate
 			AND a.Todate = b.Todate
 			
+	;WITH cte_GroupMinFeeData AS(
+	SELECT TOP(1) WITH TIES a.PartyID, h.GroupMinFeeID, h.[Name]
+	FROM dbo.LA_GroupMinFeeHeader h WITH(NOLOCK)
+	INNER JOIN LA_GroupMinFeeAssignment a ON a.GroupMinFeeID = h.GroupMinFeeID
+	ORDER BY ROW_NUMBER() OVER(PARTITION BY a.PartyID ORDER BY h.ToDate DESC))
+			
 	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, GroupMinFeeID, GroupMinFeeName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)
 		SELECT 
 			c.ChargeID,
@@ -141,8 +147,8 @@ BEGIN
 				WHEN ISNULL(pd.BrandName, '') != '' THEN pd.BrandName
 				ELSE p.PartyName
 			END AS PartyName,
-			mfh.GroupMinFeeID,
-			mfh.[Name],
+			gmf.GroupMinFeeID,
+			gmf.[Name],
 			c.ProductID,
 			pr.ProductName,
 			c.BettypeRef,
@@ -156,8 +162,7 @@ BEGIN
 		FROM #Temp_ChargeInfo c
 			INNER JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID
 			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
-			LEFT JOIN dbo.LA_GroupMinFeeAssignment mfa WITH (NOLOCK) ON c.PartyID = mfa.PartyID
-			LEFT JOIN dbo.LA_GroupMinFeeHeader mfh WITH (NOLOCK) ON mfa.GroupMinFeeID = mfh.GroupMinFeeID
+			LEFT JOIN cte_GroupMinFeeData gmf ON c.PartyID = gmf.PartyID
 			INNER JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 			LEFT JOIN dbo.OAS_ChargeInfoSub s WITH(NOLOCK) ON ci.ChargeID = s.ChargeIdRef
