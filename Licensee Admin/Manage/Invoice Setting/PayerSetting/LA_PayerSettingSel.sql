@@ -4,7 +4,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_PayerSettingSel]
 	@PayerId		INT = 0
-	,@PayerGroup	INT = 0
+	,@GroupMinFee	INT = 0
 	,@DiscountGroup	INT = 0
 	,@RebateGroup	INT = 0
 AS
@@ -27,11 +27,12 @@ AS
 		- 20181114@Parsons: Configure discount settings by currency [#99694]
 		- 20181214@Parsons: Integrate Bidme games  [#103695]
 		- 20200206@Mason: Set billing term by currency  [#120005]
+		- 20200824@Happy: Enhancement requests for Currency WL Report and Platform WL Report [#138249]
 
 	Params:
 	+ @PayerId : 0 get all Party
 		<> 0 specify Party
-	+ @@PayerGroup : 0 get all Party
+	+ @@GroupMinFee : 0 get all GroupMinFee
 		<> 0 specify Party
 	+ @@DiscountGroup : 0 get all Party
 		<> 0 specify Party
@@ -54,7 +55,7 @@ BEGIN
 			@MaxDate DATE,
 			@CurrentDate DATE
 	SET @CurrentDate = CONVERT(DATE, GETDATE())
-	DECLARE @ChargeInfo AS TABLE(ChargeId INT, PartyId INT, PartyName VARCHAR(100), PartyGroupId INT, PartyGroupName VARCHAR(100), ProductId INT, ProductName VARCHAR(100),
+	DECLARE @ChargeInfo AS TABLE(ChargeId INT, PartyId INT, PartyName VARCHAR(100), GroupMinFeeID INT, GroupMinFeeName VARCHAR(100), ProductId INT, ProductName VARCHAR(100),
 			BettypeRef INT,Rate MONEY, FromDate DATE, ToDate DATE, FirstBilling DATE, ExchangeID INT, ExchangeName VARCHAR(50), ChargeType TINYINT)
 	CREATE TABLE #Temp_ChargeInfo(ChargeId INT, PartyID INT, ProductID INT, BettypeRef INT,Rate MONEY, Fromdate DATE, Todate DATE, ChargeType TINYINT)
 
@@ -67,14 +68,14 @@ BEGIN
 	FROM	dbo.OAS_Party p WITH (NOLOCK)
 			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK)
 				ON p.PartyID = pd.PartyID
-			LEFT JOIN dbo.LA_PartyGroupAssignment pga WITH (NOLOCK)
-				ON p.PartyID = pga.PartyId
+			LEFT JOIN dbo.LA_GroupMinFeeAssignment mfa WITH (NOLOCK)
+				ON p.PartyID = mfa.PartyId
 	WHERE	PartyType = 1
 			AND pd.IsDeposit = 1
 			AND (@PayerId = 0
 			OR p.PartyID = @PayerId)
-			AND (@PayerGroup = 0
-			OR pga.PartyGroupId = @PayerGroup)
+			AND (@GroupMinFee = 0
+			OR mfa.GroupMinFeeID = @GroupMinFee)
 
 	SET @ListParty = SUBSTRING(@ListParty, 0, LEN(@ListParty))
 	--get list Product
@@ -132,7 +133,7 @@ BEGIN
 			AND a.Fromdate = b.Fromdate
 			AND a.Todate = b.Todate
 			
-	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)
+	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, GroupMinFeeID, GroupMinFeeName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)
 		SELECT 
 			c.ChargeID,
 			c.PartyID,
@@ -140,8 +141,8 @@ BEGIN
 				WHEN ISNULL(pd.BrandName, '') != '' THEN pd.BrandName
 				ELSE p.PartyName
 			END AS PartyName,
-			pg.PartyGroupId,
-			pg.PartyGroupName,
+			mfh.GroupMinFeeID,
+			mfh.[Name],
 			c.ProductID,
 			pr.ProductName,
 			c.BettypeRef,
@@ -155,8 +156,8 @@ BEGIN
 		FROM #Temp_ChargeInfo c
 			INNER JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID
 			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
-			LEFT JOIN dbo.LA_PartyGroupAssignment pga WITH (NOLOCK) ON c.PartyID = pga.PartyId
-			LEFT JOIN dbo.LA_PartyGroup pg WITH (NOLOCK) ON pga.PartyGroupId = pg.PartyGroupId
+			LEFT JOIN dbo.LA_GroupMinFeeAssignment mfa WITH (NOLOCK) ON c.PartyID = mfa.PartyID
+			LEFT JOIN dbo.LA_GroupMinFeeHeader mfh WITH (NOLOCK) ON mfa.GroupMinFeeID = mfh.GroupMinFeeID
 			INNER JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 			LEFT JOIN dbo.OAS_ChargeInfoSub s WITH(NOLOCK) ON ci.ChargeID = s.ChargeIdRef
@@ -164,8 +165,8 @@ BEGIN
 		WHERE @CurrentDate <= c.Todate
 
 	-- Hard code for Bettrade BA
-	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)
-	SELECT ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, 0, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, 13
+	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, GroupMinFeeID, GroupMinFeeName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)
+	SELECT ChargeId, PartyId, PartyName, GroupMinFeeID, GroupMinFeeName, ProductId, ProductName, BettypeRef, 0, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, 13
 	FROM @ChargeInfo
 	WHERE ProductId = 13
 
@@ -219,7 +220,7 @@ BEGIN
 					d.Rate
 
 	-- get terminated
-	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, PartyGroupId, PartyGroupName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)
+	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, GroupMinFeeID, GroupMinFeeName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)
 	SELECT DISTINCT -1,
 		d.PartyID,
 		CASE
@@ -258,8 +259,8 @@ BEGIN
 			c.ChargeId		AS ChargeID,
 			c.PartyId		AS PayerID,
 			PartyName		AS PayerName,
-			PartyGroupId	AS PayerGroupID,
-			PartyGroupName	AS PayerGroupName,
+			GroupMinFeeID	AS GroupMinFeeID,
+			GroupMinFeeName	AS GroupMinFeeName,
 			c.ProductId		AS ProductId,
 			ProductName		AS ProductName,
 			FirstBilling	AS FirstBilling,
