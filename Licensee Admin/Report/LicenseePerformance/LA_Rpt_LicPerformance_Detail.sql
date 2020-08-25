@@ -374,7 +374,7 @@ BEGIN
 
 		-- apply minfee
 		UPDATE s SET 
-			AmountToCompany = m.Fee + ExtraAmount,
+			AmountToCompany = m.Fee + ISNULL(ExtraAmount, 0),
 			IsChargedByMinFee = m.IsChargedByMinFee,
 			IsChargedByGroupMinFee = m.IsChargedByGroupMinFee,
 			Discount = m.Discount,
