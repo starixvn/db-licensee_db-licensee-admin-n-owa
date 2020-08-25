@@ -29,15 +29,11 @@ AS
 		- 20190626@Parsons: Validate billing configuration [#109600]
 		- 20180731@Mason: Integrate-Card-Club [#116096]
 		- 20191125@Parsons: Set terms by currency [#FeatureID 120005]
+		- 20200825@Happy: Enhancement requests for Currency WL Report and Platform WL Report [#138249]
 		
 	 Params:
 		+ @PayerId :specify Party
-		+ @@PayerGroup :	0 get all Party
-							<> 0 specify Party
-		+ @@DiscountGroup : 0 get all Party
-							<> 0 specify Party
-		+ @@RebateGroup :	0 get all Party
-							<> 0 specify Party
+		
 	 Example:
 				exec [LA_PayerSettingDetailSel] 14
 */
@@ -58,7 +54,6 @@ BEGIN
 	SET @CurrentDate = CONVERT(DATE, GETDATE())
 	DECLARE @ChargeInfo AS TABLE (ChargeId INT, PartyId INT, ProductId INT, BettypeRef INT, Rate MONEY, ChargeType SMALLINT, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), BasisOfBilling NVARCHAR(MAX), ExchangeID INT, ToPartyId INT)	
 	DECLARE @Minfee AS TABLE(FeeId INT, PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, CurrencyId INT, MinFeeTerm NVARCHAR(MAX), FromDate DATE, ToDate DATE)
-	DECLARE @PayerSettingHeader AS TABLE(PartyId INT, PayerGroupID INT, PayerGroupName VARCHAR(100), ExchangeID INT, DiscountGroupID INT, DiscountGroupName VARCHAR(100), RebateGroupID INT, RebateGroupName VARCHAR(100))
 	DECLARE @Discount AS TABLE(PartyId INT, ProductId INT, FromDate DATE, ToDate DATE,DiscountGroupId INT, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
 
 	--get list Product
@@ -124,9 +119,9 @@ BEGIN
 	DECLARE @CurrentBillingGroup INT
 	SELECT @CurrentBillingGroup = ISNULL((SELECT TOP 1 ToPartyId FROM @ChargeInfo ORDER BY FromDate DESC), 0)
 
-	SELECT TOP 1 c.PartyId			AS PayerID	
-		, pg.PartyGroupId		AS PayerGroupId
-		, pg.PartyGroupName		AS PayerGroupName
+	SELECT TOP 1 c.PartyId		AS PayerID	
+		, mfh.GroupMinFeeID		AS GroupMinFeeID
+		, mfh.[Name]			AS GroupMinFeeName
 		, c.ExchangeID
 		, d1.DiscountGroupId	AS DiscountGroupID
 		, d1.DiscountGroupName	AS DiscountGroupName
@@ -137,8 +132,8 @@ BEGIN
 	FROM @ChargeInfo c
 		INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID=c.PartyId
 		INNER JOIN dbo.OAS_PartyDetail pd ON pd.PartyId=c.PartyId
-		LEFT JOIN dbo.LA_PartyGroupAssignment pga WITH (NOLOCK) ON  c.PartyId = pga.PartyId
-		LEFT JOIN dbo.LA_PartyGroup pg WITH (NOLOCK) ON  pga.PartyGroupId = pg.PartyGroupId
+		LEFT JOIN dbo.LA_GroupMinFeeAssignment mfa WITH (NOLOCK) ON  c.PartyId = mfa.PartyID
+		LEFT JOIN dbo.LA_GroupMinFeeHeader mfh WITH (NOLOCK) ON  mfa.GroupMinFeeID = mfh.GroupMinFeeID
 		LEFT JOIN (
 				SELECT PartyId, DiscountGroupId, DiscountGroupName 
 				FROM @Discount 
