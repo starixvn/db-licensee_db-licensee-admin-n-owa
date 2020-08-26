@@ -12,9 +12,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss_Details]
 	, @DrawFilter			SMALLINT		= 1
 	, @IsConvert			BIT				= 0
 	, @BaseCurrencyName		VARCHAR(10)		= 'EUR'
-
 AS
-
 /*  Created:  Forrest.Nguyen
 	Date: 20151020
 	Original: LA_Rpt_LicenseeWinloss_Details
@@ -38,6 +36,7 @@ AS
 	- 20200228@Parsons: Support-HID-currency [#128856]
 	- 20200325@Parsons: Integrate SA Gaming [#129276]
 	- 20200707@Parsons: Calculate Margin and remove Racing related data field [#137171]
+	- 20200818@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
 
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -53,9 +52,11 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007
-	DECLARE @PromotionPrize SMALLINT = 4300
-	DECLARE @PPTournament SMALLINT = 4299
+	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007,
+			@PP_Contribution SMALLINT = 4297,
+			@PP_JackpotPrize SMALLINT = 4298,
+			@PPTournament SMALLINT = 4299,
+			@PromotionPrize SMALLINT = 4300
 	DECLARE @CurrencyTest INT = 20
 
 	CREATE TABLE #Report (ReportDate DATE, CurrencyID INT, ProductID INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY,
@@ -422,43 +423,47 @@ BEGIN
 	BEGIN
 		DELETE #Data
 		
-		INSERT INTO #Data(PartyID, rptDate, ProductID, Currency, Turnover, Winloss, PComm, AComm, Betcount)
-		(
-			SELECT ci.PartyID, b.rptDate, b.ProductID, b.currencyID
-				, SUM(b.turnover * 
-					CASE WHEN b.bettype = 33 AND b.StatusId IN (114, 115) THEN 0.5 ELSE 1 END * 
-					CASE WHEN @drawfilter IN (2, 3)	
-							THEN CASE WHEN b.StatusId = 111 THEN 0 WHEN b.StatusId IN (114, 115) AND b.Bettype != 33
-								THEN 0.5 ELSE 1
-							END	ELSE 1
-					END) Turnover
-				, SUM(b.MemberWL)
-				, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END)
-				, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionA ELSE 0 END)
-				, SUM(b.betcount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) BetCount
-			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN (SELECT DISTINCT PartyID, LicenseeId, ProductID FROM #ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
-			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
-				AND b.StatusId NOT IN (- 1, 101, 102, 103)
-				AND (@Currency = 0 OR b.CurrencyID = @Currency)
-				AND (b.CurrencyID <> @CurrencyTest)
-				AND b.customercategory NOT IN (27,28)
-				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914, @PromotionPrize, @PPTournament, @SAG_Tip)
-			GROUP BY ci.PartyID, b.rptDate, b.ProductID, b.CurrencyID
-		)
+		SELECT ci.PartyID, b.rptDate, b.ProductID, b.CurrencyId
+			, SUM(b.turnover * 
+				CASE WHEN b.bettype = 33 AND b.StatusId IN (114, 115) THEN 0.5 ELSE 1 END * 
+				CASE WHEN @drawfilter IN (2, 3)	
+						THEN CASE WHEN b.StatusId = 111 THEN 0 
+						          WHEN b.StatusId IN (114, 115) AND b.Bettype != 33 THEN 0.5 
+								  ELSE 1
+							  END	
+						ELSE 1
+				END) Turnover
+			, SUM(b.MemberWL) Winloss
+			, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END) PComm
+			, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionA ELSE 0 END) AComm
+			, SUM(b.betcount * CASE WHEN (@drawfilter = 2 AND b.StatusId = 111) OR b.Bettype = @PP_Contribution THEN 0 ELSE 1 END) BetCount 
+			, SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) Contribution
+		INTO #TmpData
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			INNER JOIN (SELECT DISTINCT PartyID, LicenseeId, ProductID FROM #ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
+		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
+			AND b.StatusId NOT IN (- 1, 101, 102, 103)
+			AND (@Currency = 0 OR b.CurrencyID = @Currency)
+			AND (b.CurrencyID <> @CurrencyTest)
+			AND b.customercategory NOT IN (27,28)
+			AND b.Bettype NOT IN (901,902,903,904,911,912,913,914,@SAG_Tip,@PromotionPrize,@PPTournament,@PP_JackpotPrize)
+		GROUP BY ci.PartyID, b.rptDate, b.ProductID, b.CurrencyID
+		
 		
 		INSERT INTO #Report (ReportDate, CurrencyID, ProductID, Turnover, Winlost, LicenseeWL, Company, Betcount)
-		SELECT rptDate, b.Currency, b.ProductID
+		SELECT rptDate, b.CurrencyId, b.ProductID
 			, SUM(b.turnover) Turnover
 			, SUM(b.Winloss + CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS Winloss
-			, - SUM(b.Winloss + CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS LicenseeWL
-			, SUM(-b.Winloss * ISNULL(cc.Rate,ci.Rate) - CASE WHEN b.ProductID=31 THEN (b.AComm + b.PComm) ELSE 0 END) AS Company
+			, SUM(-b.Winloss + CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS LicenseeWL
+			, SUM((-b.Winloss - Contribution) * ISNULL(cc.Rate,ci.Rate) - CASE WHEN b.ProductID=31 THEN (b.AComm + b.PComm) ELSE 0 END) AS Company
 			, SUM(b.betcount) AS betcount
-		FROM #Data b WITH (NOLOCK)
+		FROM #TmpData b WITH (NOLOCK)
 			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate, ChargeID, ChargeType FROM #ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
-			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID=ci.ChargeId AND b.Currency=cc.CurrencyID
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID=ci.ChargeId AND b.CurrencyId=cc.CurrencyID
 		WHERE b.rptDate BETWEEN ci.Fromdate AND ci.Todate AND ci.ChargeType = 1 -- Gross Win
-		GROUP BY b.rptDate, b.Currency, b.ProductID
+		GROUP BY b.rptDate, b.CurrencyId, b.ProductID
+		
+		DROP TABLE #TmpData
 	END
 
 	INSERT INTO #Exchange(ExchangeDate, ExchangeId, Code, USD, EUR, MYR, GBP, CNY)

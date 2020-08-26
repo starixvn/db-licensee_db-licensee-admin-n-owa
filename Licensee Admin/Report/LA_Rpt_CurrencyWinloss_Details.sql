@@ -37,7 +37,8 @@ AS
 	   - 20191225@Bruce: billing term by currency [#120005]
 	   - 20200303@Mason: Suport HID currency [#128856]
 	   - 20200409@Parsons: Integrate SA Gaming [#129276]
-	   - 20200601@Parsons: Amend Currency WL report [#135055]
+	   - 20200601@Parsons: Amend Currency WL report [#135055] 
+	   - 20200824@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -47,8 +48,10 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007,
-	@PPTournament SMALLINT = 4299,
-	@PromotionPrize SMALLINT = 4300
+			@PP_Contribution SMALLINT = 4297,
+			@PP_JackpotPrize SMALLINT = 4298,
+			@PPTournament SMALLINT = 4299,
+			@PromotionPrize SMALLINT = 4300
 
 	-- currency list
 	--
@@ -250,7 +253,7 @@ BEGIN
 			AND (@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c))
 			AND b.SiteID IN (SELECT p.LicenseeId FROM #tmpParty p)
 			AND b.rptDate BETWEEN @FromDate AND @ToDate
-			AND b.Bettype NOT IN(@PPTournament, @PromotionPrize, @SAG_Tip)
+			AND b.Bettype NOT IN(@PPTournament, @PromotionPrize, @PP_JackpotPrize, @SAG_Tip)
 
 		;WITH cte_Data AS
 		(
@@ -264,11 +267,10 @@ BEGIN
 											ELSE 1 
 									 END)
 						) AS Turnover
-					,SUM(b.winloss)		AS winloss
-					,SUM(-b.winloss)	AS LicenseeWL
-					,SUM(-b.winloss)	AS Company
-					,SUM(CASE WHEN @drawfilter = 2 AND b.[Status] = 111 THEN 0 ELSE b.BetCount END) AS BetCount
-					,SUM(CASE WHEN b.ProductId = 32 THEN 0 ELSE b.commissionP END) AS Playercomm
+					,SUM(CASE WHEN b.Bettype = @PP_Contribution THEN 0 ELSE b.winloss END)	AS MemberWL
+					,SUM(CASE WHEN (@drawfilter = 2 AND b.[Status] = 111) OR b.Bettype = @PP_Contribution THEN 0 ELSE b.BetCount END) AS BetCount
+					,SUM(CASE WHEN b.ProductId = 32 THEN 0 ELSE b.commissionP END) AS Playercomm 
+					,SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.WinLossA, 0) ELSE 0 END) Contribution
 			FROM #tmpData b
 			LEFT JOIN dbo.League l WITH(NOLOCK) ON b.leagueid = l.leagueid
 			WHERE (@SportType = 0 OR (b.bettype NOT IN (9,29) AND (b.bettype NOT BETWEEN 31 AND 120) AND l.Sporttype = @Sporttype)) AND
@@ -281,7 +283,7 @@ BEGIN
 					,b.Status
 		)
 		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm)
-		SELECT a.rptDate,p.PartyID,a.CurrencyID,TurnOver, winloss, LicenseeWL, 0, 0, Company * ISNULL(cc.rate,p.Rate), Betcount, Playercomm
+		SELECT a.rptDate,p.PartyID,a.CurrencyID,TurnOver,MemberWL,-MemberWL, 0, 0, (-MemberWL - Contribution) * ISNULL(cc.rate,p.Rate), Betcount, Playercomm
 		FROM cte_Data a
 		INNER JOIN #tmpParty p ON p.LicenseeID = a.SiteID AND a.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId=a.ProductId AND p.ChargeType = 1
 		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID = p.ChargeId AND a.CurrencyId=cc.CurrencyID

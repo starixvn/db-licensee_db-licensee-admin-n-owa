@@ -2,10 +2,6 @@
 USE bodb_licensee
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE [dbo].LA_GEN_LicPerformanceAnalysis_Report (
 	@FromDate		DATE,
 	@ToDate			DATE,
@@ -24,6 +20,7 @@ AS
 
 	Revisions:
 		- 20190312@Bruce: create SP [RedmineID: #105205]
+		- 20200821@Parsons: Add one more column into result set [#139055]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -133,6 +130,7 @@ BEGIN
 		Discount			MONEY,
 		Rebate				MONEY,
 		IsChargedByMinFee	BIT,
+		IsChargedByGroupMinFee BIT,
 		Winloss				MONEY,
 		Turnover			MONEY,
 		TurnoverNoDraw		MONEY,
@@ -150,7 +148,7 @@ BEGIN
 		SELECT TOP 1 @tmpCurrencyCode = Code, @tmpCurrency = CurrencyId FROM @tmpBaseCurrencyList
 		DELETE @tmpBaseCurrencyList WHERE CurrencyId = @tmpCurrency
 
-		INSERT INTO #tmpPerfResult(PartyId,ProductId,Fee,Discount,Rebate,IsChargedByMinFee)
+		INSERT INTO #tmpPerfResult(PartyId,ProductId,Fee,Discount,Rebate,IsChargedByMinFee,IsChargedByGroupMinFee)
 		EXEC dbo.[LA_AmountToCompanyByDiscountCurrencySel]
 			@FromDate = @FromDate,
 			@ToDate = @ToDate,
@@ -205,4 +203,4 @@ BEGIN
 	DROP TABLE #tmpPerfResult
 	DROP TABLE #tmpPerfData
 END
-GO 
+GO
