@@ -132,13 +132,20 @@ BEGIN
 			AND a.ProductID = b.ProductID
 			AND a.Fromdate = b.Fromdate
 			AND a.Todate = b.Todate
-			
-	;WITH cte_GroupMinFeeData AS(
-	SELECT TOP(1) WITH TIES a.PartyID, h.GroupMinFeeID, h.[Name]
-	FROM dbo.LA_GroupMinFeeHeader h WITH(NOLOCK)
-	INNER JOIN LA_GroupMinFeeAssignment a ON a.GroupMinFeeID = h.GroupMinFeeID
-	ORDER BY ROW_NUMBER() OVER(PARTITION BY a.PartyID ORDER BY h.ToDate DESC))
-			
+
+	DECLARE @GroupMinFeeData AS TABLE (PartyId INT, GroupMinFeeId INT, [Name] VARCHAR(500))
+	IF (@GroupMinFee = 0) -- Get lastest Groups
+		INSERT INTO @GroupMinFeeData(PartyId, GroupMinFeeId, [Name])
+		SELECT TOP(1) WITH TIES a.PartyID, h.GroupMinFeeID, h.[Name]
+		FROM dbo.LA_GroupMinFeeHeader h WITH(NOLOCK)
+		INNER JOIN LA_GroupMinFeeAssignment a ON a.GroupMinFeeID = h.GroupMinFeeID
+		ORDER BY ROW_NUMBER() OVER(PARTITION BY a.PartyID ORDER BY h.ToDate DESC) 
+	ELSE -- Get specific group
+		INSERT INTO @GroupMinFeeData(PartyId, GroupMinFeeId, [Name])
+		SELECT a.PartyID, a.GroupMinFeeID, h.Name
+		FROM dbo.LA_GroupMinFeeHeader h INNER JOIN dbo.LA_GroupMinFeeAssignment a ON h.GroupMinFeeID = a.GroupMinFeeID
+		WHERE h.GroupMinFeeID = @GroupMinFee
+
 	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, GroupMinFeeID, GroupMinFeeName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)
 		SELECT 
 			c.ChargeID,
@@ -162,7 +169,7 @@ BEGIN
 		FROM #Temp_ChargeInfo c
 			INNER JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID
 			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
-			LEFT JOIN cte_GroupMinFeeData gmf ON c.PartyID = gmf.PartyID
+			LEFT JOIN @GroupMinFeeData gmf ON c.PartyID = gmf.PartyID
 			INNER JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 			LEFT JOIN dbo.OAS_ChargeInfoSub s WITH(NOLOCK) ON ci.ChargeID = s.ChargeIdRef
