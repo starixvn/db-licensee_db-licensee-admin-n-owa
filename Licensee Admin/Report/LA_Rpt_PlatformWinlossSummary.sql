@@ -139,19 +139,19 @@ BEGIN
 			SELECT
 				b.winlostdate,
 				l.CurrencyId,
-				ISNULL(bf.betfrom,'*'),
+				bf.betfrom,
 				COUNT(*) AS BetCount,
 				SUM(b.stake),
 				SUM(-(b.winlost - b.actual_stake))
 			FROM #tmpBettrans b
 				INNER JOIN #LicenseeCustInfo l ON l.CustId=b.recommend
+				INNER JOIN @betfrom bf ON bf.betfrom=ISNULL(b.betfrom,'')
 				LEFT JOIN bodb_licensee.dbo.LicenseeBATransaction_active ba WITH(NOLOCK) ON b.transid = ba.transid
-				LEFT JOIN @betfrom bf ON bf.betfrom=ISNULL(b.betfrom,'')
 			WHERE b.statusID IN (111, 112, 113)
 				AND ba.TransID IS NULL
 				AND b.currency=l.CurrencyId
 				AND b.winlostdate BETWEEN l.Fromdate AND l.Todate
-			GROUP BY b.winlostdate, l.CurrencyId,ISNULL(bf.betfrom,'*')
+			GROUP BY b.winlostdate, l.CurrencyId,bf.betfrom
 		)
 
 		DROP TABLE #tmpBettrans
@@ -166,20 +166,20 @@ BEGIN
 			SELECT
 				b.winlostdate,
 				l.CurrencyId,
-				ISNULL(bf.betfrom,'*'),
+				bf.betfrom,
 				SUM(b.BetCount),
 				SUM(b.turnover),
 				SUM(-b.winlost)
 			FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH ( NOLOCK )
 			INNER JOIN #LicenseeCustInfo l ON b.CustId = l.CustId AND b.Currency = l.CurrencyId AND b.winlostdate BETWEEN l.Fromdate AND l.Todate
-			LEFT JOIN @betfrom bf ON bf.betfrom=ISNULL(b.betfrom,'')
+			INNER JOIN @betfrom bf ON bf.betfrom=ISNULL(b.betfrom,'')
 			WHERE b.Winlostdate BETWEEN @FromDate AND @TempToDate
 				AND b.sporttype = 0 -- jobsum SB as 0
 				AND b.roleid = 2 -- Sum on agent for better performance
 				AND b.statusID NOT IN (-1, 101, 102, 103)
 				AND b.bettype = 0 -- jobsum SB as 0
 				AND ISNULL(b.isBA,0) = 0
-			GROUP BY b.winlostdate, l.CurrencyId,ISNULL(bf.betfrom,'*')
+			GROUP BY b.winlostdate, l.CurrencyId,bf.betfrom
 		)
 	END
 
