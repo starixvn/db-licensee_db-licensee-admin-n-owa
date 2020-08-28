@@ -13,8 +13,8 @@ ALTER PROCEDURE dbo.LA_Rpt_LicPerformance_Detail
 	, @BaseCurrencyName VARCHAR(10) = 'GBP'
 	, @DrawFilter	SMALLINT = 1
 	, @LicenseePaying INT = 0
+	, @PreviousPeriodType INT = 1
 AS
-
 /*	Created: 20141209@Patrick
 	Task: LicenseeAdmin - Get Licensee Performance Detail report
 	DB: DB052.bodb02
@@ -59,6 +59,7 @@ AS
 		- 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334]
 		- 20200813@Parsons: Implement Group Min Fee [#134492]
 	    - 20200821@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
+	    - 20200828@Parsons: Provide data of "this month last year" [#136417]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -79,6 +80,8 @@ AS
 					=1 : Normal fee 
 					=2 : Minimum fee
 					=3 : Group min fee 
+	  + @PreviousPeriodType: = 1: Same month last year
+	                         = 2: Last month
 */
 
 BEGIN
@@ -99,10 +102,8 @@ BEGIN
 	-- *********************************************************************************************************
 	-- Region: get period date	
 	DECLARE @PrevFromDate DATE, @PrevToDate DATE
-	SELECT @PrevFromDate = DATEADD(M, -1,  @FromDate)
-		, @PrevToDate = CASE WHEN DATEDIFF(D, @ToDate, DATEADD(S, - 1, DATEADD(MM, DATEDIFF(M, 0, @ToDate) + 1, 0))) = 0
-						THEN DATEADD(S, - 1, DATEADD(MM, DATEDIFF(M, 0, @ToDate), 0))
-						ELSE DATEADD(MM, - 1, @ToDate) END
+	SET @PrevFromDate = CASE WHEN @PreviousPeriodType = 1 THEN DATEADD(yy, -1,  @FromDate) ELSE DATEADD(M, -1,  @FromDate) END 
+	SET @PrevToDate = CASE WHEN @PreviousPeriodType = 1 THEN DATEADD(yy, - 1, @ToDate) ELSE DATEADD(M, - 1, @ToDate) END 
 	-- End region
 
 	-- ******************************************************************* 
