@@ -23,6 +23,7 @@ AS
 		- 20170220@bruce: update payer settings [#70050]
 		- 20180706@bruce: enhance discount group [#94282]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20200831@Mason: Remove redundant code of @PayerGroupId [#138249]
 
 	 Params:				
 */
