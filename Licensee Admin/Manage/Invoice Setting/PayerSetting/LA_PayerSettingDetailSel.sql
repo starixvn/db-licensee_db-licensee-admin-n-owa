@@ -2,10 +2,6 @@
 USE [bodb_licensee]
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE [dbo].[LA_PayerSettingDetailSel]
 	@PayerId			INT
 AS
@@ -29,7 +25,7 @@ AS
 		- 20190626@Parsons: Validate billing configuration [#109600]
 		- 20180731@Mason: Integrate-Card-Club [#116096]
 		- 20191125@Parsons: Set terms by currency [#FeatureID 120005]
-		- 20200825@Happy: Enhancement requests for Currency WL Report and Platform WL Report [#138249]
+		- 20200825@Happy: Updae from PayerGroup to GroupMinFee [#138249]
 		
 	 Params:
 		+ @PayerId :specify Party

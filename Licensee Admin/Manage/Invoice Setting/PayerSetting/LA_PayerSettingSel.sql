@@ -27,7 +27,7 @@ AS
 		- 20181114@Parsons: Configure discount settings by currency [#99694]
 		- 20181214@Parsons: Integrate Bidme games  [#103695]
 		- 20200206@Mason: Set billing term by currency  [#120005]
-		- 20200824@Happy: Enhancement requests for Currency WL Report and Platform WL Report [#138249]
+		- 20200824@Happy: Updae from PayerGroup to GroupMinFee [#138249]
 
 	Params:
 	+ @PayerId : 0 get all Party
