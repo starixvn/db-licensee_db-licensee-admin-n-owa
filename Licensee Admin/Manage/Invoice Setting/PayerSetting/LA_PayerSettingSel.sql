@@ -247,23 +247,19 @@ BEGIN
 		END
 	FROM dbo.LA_f_Products3rd('')
 
-	-- Get Group Min Fee
-	DECLARE @GroupMinFeeData AS TABLE(PartyID INT, GroupMinFeeID INT, [Name] VARCHAR(500))
-	INSERT INTO @GroupMinFeeData
-	SELECT TOP(1) WITH TIES a.PartyID, h.GroupMinFeeID, h.[Name]
+	--result
+	;WITH cte_GroupMinFeeData AS (
+		SELECT TOP(1) WITH TIES a.PartyID, h.[Name] AS GroupMinFeeName
 		FROM dbo.LA_GroupMinFeeHeader h WITH(NOLOCK)
 		INNER JOIN LA_GroupMinFeeAssignment a ON a.GroupMinFeeID = h.GroupMinFeeID
 		WHERE @GroupMinFee = 0 OR h.GroupMinFeeID = @GroupMinFee
 		ORDER BY ROW_NUMBER() OVER(PARTITION BY a.PartyID ORDER BY h.ToDate DESC)
-
-	--result
-	;WITH Result AS (
+    ),Result AS (
 		SELECT DISTINCT
 			c.ChargeId		AS ChargeID,
 			c.PartyId		AS PayerID,
 			PartyName		AS PayerName,
-			gmf.GroupMinFeeID	AS GroupMinFeeID,
-			gmf.[Name]		AS GroupMinFeeName,
+			gmf.GroupMinFeeName		AS GroupMinFeeName,
 			c.ProductId		AS ProductId,
 			ProductName		AS ProductName,
 			FirstBilling	AS FirstBilling,
@@ -299,7 +295,7 @@ BEGIN
 			c.ExchangeName AS ExchangeName,
 			c.ChargeType
 		FROM @ChargeInfo c
-			LEFT JOIN @GroupMinFeeData gmf ON c.PartyId = gmf.PartyID -- Group Min Fee
+			LEFT JOIN cte_GroupMinFeeData gmf ON c.PartyId = gmf.PartyID -- Group Min Fee
 			LEFT JOIN @Minfee m
 				ON c.PartyId = m.PartyId
 				AND c.ProductId = m.ProductId
