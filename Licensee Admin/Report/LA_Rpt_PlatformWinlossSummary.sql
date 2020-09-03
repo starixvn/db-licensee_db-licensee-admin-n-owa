@@ -3,7 +3,8 @@ USE bodb02
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_PlatformWinlossSummary]
-	@PartyIDs		VARCHAR(4000),
+	@PartyIDs		VARCHAR(4000), 
+	@Platforms		VARCHAR(500),
 	@FromDate		SMALLDATETIME,
 	@ToDate			SMALLDATETIME,
 	@BaseCurrency	VARCHAR(20) = 'EUR'
@@ -28,8 +29,9 @@ AS
 		- 20190827@Bruce: Add new betfrom 't' [#118998]
 		- 20191010@Percy: Replace LicenseeBATransaction to LicenseeBATransaction_active [RedmineID: #103656]
 		- 20191223@Bruce: Adding betform v and 0 [#118998]
-		- 202000326@Parsons: Handle new betfrom v,1,2,3 into their own category [#130645]
+		- 20200326@Parsons: Handle new betfrom v,1,2,3 into their own category [#130645]
 		- 20200706@Parsons: Add new betfrom eGame Mobile and eGamer Desktop [#136414]
+		- 20200807@Parsons: Filter data by platform : Platform WL (summary, detail) [#138249]
 
 	Explanation:
 		- Desktop: contain the followings:
@@ -70,9 +72,11 @@ BEGIN
 
 	-- supported betfrom
 	--
-	DECLARE @betfrom TABLE(betfrom CHAR(1))
-	INSERT INTO @betfrom
-	SELECT val FROM (VALUES('d'),('a'),('e'),('u'),('m'),('l'),('g'),('x'),('z'),('r'),('o'),('c'),('t'),('0'),('v'),('1'),('2'),('3'),('4'),('5'),('6'))v(val)
+	DECLARE @betfrom TABLE(betfrom CHAR(1), IsSelected BIT)
+	INSERT INTO @betfrom(betfrom, IsSelected)
+	SELECT v.val, CASE WHEN bf.val IS NOT NULL THEN 1 ELSE 0 END  
+	FROM (VALUES ('*'),('d'),('a'),('e'),('u'),('m'),('l'),('g'),('x'),('z'),('r'),('o'),('c'),('t'),('0'),('v'),('1'),('2'),('3'),('4'),('5'),('6'))v(val)
+	LEFT JOIN strSplit(@Platforms, ',') bf ON v.val = bf.val
 
 	-- #1: get licensee/customer and currency info
 	--
@@ -192,7 +196,7 @@ BEGIN
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrency)
 
-	;WITH Result AS (
+	;WITH cte_Result AS (
 		SELECT d.BetFrom
 			, SUM(d.BetCount) BetCount
 			, SUM(d.Turnover * e.Rate) Turnover
@@ -201,11 +205,13 @@ BEGIN
 		INNER JOIN #Exchange e ON d.CurrencyId = e.ExchangeID AND d.ReportDate = e.ExchangeDate
 		GROUP BY d.BetFrom
 	)
-	SELECT BetFrom
+	SELECT r.BetFrom
 		, BetCount AS TotalTrans
 		, CAST(Turnover AS MONEY) Turnover
 		, CAST(LicenseeWinLoss AS MONEY) LicenseeWinLoss
-	FROM Result
+	FROM cte_Result r
+	LEFT JOIN @betfrom bf ON r.BetFrom = bf.betfrom
+	WHERE ISNULL(bf.IsSelected, 0) = 1
 
 	DROP TABLE #Exchange
 	DROP TABLE #LicenseeCustInfo

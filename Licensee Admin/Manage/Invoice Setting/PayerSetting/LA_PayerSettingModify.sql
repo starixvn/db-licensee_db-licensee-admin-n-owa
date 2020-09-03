@@ -4,7 +4,6 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_PayerSettingModify]
 	@PayerID				INT	
-	, @PayerGroupId			INT				= 0
 	, @ChargeSettingXML		NVARCHAR (MAX)
 	, @MinFeeSettingXML		NVARCHAR (MAX)
 	, @WaiveSettingXML		NVARCHAR (MAX)
@@ -24,6 +23,7 @@ AS
 		- 20170220@bruce: update payer settings [#70050]
 		- 20180706@bruce: enhance discount group [#94282]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20200831@Mason: Remove redundant code of @PayerGroupId [#138249]
 
 	 Params:				
 */
@@ -33,28 +33,9 @@ BEGIN
 			, @MinDate			DATE 
 			, @MaxDate			DATE
 	
-	DECLARE @OldPayerGroupId INT, @MinFeeInsertedList VARCHAR(100), @WaiveInsertedList VARCHAR(100)
+	DECLARE @MinFeeInsertedList VARCHAR(100), @WaiveInsertedList VARCHAR(100)
 
 	IF (@ExchangeID IS NULL) SET @ExchangeID = (SELECT ISNULL(BaseCurrencyId, 0) FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE PartyID = @PayerID)
-
-	--backup old data
-	SELECT @OldPayerGroupId = ISNULL(a.PartyGroupId, 0) FROM dbo.LA_PartyGroupAssignment a WITH (NOLOCK) WHERE a.PartyId = @PayerID	
-	-- Payer Group Assignment
-	IF (ISNULL(@OldPayerGroupId, 0) = 0)
-	BEGIN	
-		EXEC dbo.LA_PayerGroupAssignmentModify
-			@PayerList			= @PayerID
-			, @PayerGroupId		= @PayerGroupId
-			, @UserID			= @UserID
-			, @Mode				= 'A' -- case add
-			, @LoginIP			= @LoginIP
-			, @ErrCode			= @ErrCode	OUTPUT
-			, @ErrMsg			= @ErrMsg	OUTPUT
-		IF @ErrCode <> 0 
-			BEGIN
-				RETURN
-			END
-	END
 
 	--Minfee
 	EXEC dbo.LA_MinFeeSettingModify
@@ -67,9 +48,6 @@ BEGIN
 		, @MinfeeInsertedList	= @MinFeeInsertedList  OUTPUT
 	IF @ErrCode <> 0 
 		BEGIN
-			--Rollback for payerGroup
-			IF (@OldPayerGroupId = 0)
-				DELETE dbo.LA_PartyGroupAssignment WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID
 			RETURN
 		END
 	--Waive
@@ -83,9 +61,6 @@ BEGIN
 		, @MinfeeInsertedList	= @WaiveInsertedList OUTPUT
 	IF @ErrCode <> 0 
 		BEGIN
-			--Rollback for payerGroup
-			IF (@OldPayerGroupId = 0)
-				DELETE dbo.LA_PartyGroupAssignment WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID
 			--Rollback Minfee
 			IF ISNULL(@MinFeeInsertedList, 0) <> 0
 				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM bodb02.dbo.strSplit(@MinFeeInsertedList, ','))
@@ -102,9 +77,6 @@ BEGIN
 
 	IF @ErrCode <> 0 
 		BEGIN
-			--Rollback for payerGroup
-			IF (@OldPayerGroupId = 0)
-				DELETE dbo.LA_PartyGroupAssignment WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID
 			--Rollback Minfee
 			IF ISNULL(@MinFeeInsertedList, 0) <> 0
 				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM bodb02.dbo.strSplit(@MinFeeInsertedList, ','))

@@ -14,6 +14,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss]
 	, @drawfilter			SMALLINT		= 1
 	, @IsConvert			BIT				= 0
 	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
+	, @GroupByType			SMALLINT		= 1
 AS
 
 /*  Created: Florent.Nguyen
@@ -43,12 +44,14 @@ AS
 	   - 20200228@Parsons: Support-HID-currency [#128856]
 	   - 20200409@Parsons: Integrate SA Gaming [#129276]
 	   - 20200601@Parsons: Amend Currency WL report [#135055]
+	   - 20200806@Happy: Enhancement requests for Currency WL Report and Platform WL Report [#138249]
 	   - 20200821@Happy: Implement PP Jackpot changes in reports phase 2 [#139055]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
 	  +	@drawfilter: 'No Draw' filter is supportted (1:Normal 2:No Draw 3:No Draw for Turnover only)
 	  + @MoveBetsDay: The day we move tickets to bettrans14
+	  + @GroupByType: 1-Group by Licensees; 2-Group by Currency
 */
 BEGIN
 	SET NOCOUNT ON 
@@ -311,26 +314,6 @@ BEGIN
 		UPDATE #DailyExchange
 		SET Rate = 1
 	END
-
-	SELECT	w.PartyID,
-			CASE WHEN p.PartyName ='18bb' THEN 'PIH'
-				 WHEN p.PartyName ='IBC' THEN 'FDL'
-				 ELSE p.PartyName
-			END AS PartyName,
-			SUM(TurnOver * e.Rate)		AS Turnover,
-			SUM(Winlost * e.Rate)		AS Winlost,
-			SUM(LicenseeWL * e.Rate)	AS LicenseeWL,
-			SUM(CommBA * e.Rate)		AS CommBA,
-			SUM(AmtDuetoBA * e.Rate)	AS AmtDuetoBA,
-			SUM(Company * e.Rate)		AS Company,
-			SUM(Betcount)				AS Betcount,
-			SUM(Playercomm * e.Rate)	AS Playercomm
-	FROM #tmpWinLoss w
-	INNER JOIN #DailyExchange e ON w.Winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
-	LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON w.PartyID = p.PartyID
-	GROUP BY w.PartyID,p.PartyName
-	ORDER BY w.PartyID,p.PartyName
-
 	DECLARE @Exchange AS TABLE (Currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
 
 	INSERT INTO @Exchange(Currency, CurrencyName, CurrencyCode)
@@ -353,25 +336,58 @@ BEGIN
 	SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'
 	FROM @Exchange e
 	WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1)
+	
+	--Report Group By Licensee
+	IF (@GroupByType = 1)
+	BEGIN
+		SELECT	w.PartyID,
+				CASE WHEN p.PartyName ='18bb' THEN 'PIH'
+					 WHEN p.PartyName ='IBC' THEN 'FDL'
+					 ELSE p.PartyName
+				END AS PartyName,
+				CASE WHEN w.Currency = @CurrencyTest THEN e.Code
+					 ELSE t.CurrencyCode 
+				END AS CurrencyName,
+				w.currency,
+				w.Winlostdate				AS ReportDate,
+				SUM(TurnOver * e.Rate)		AS Turnover,
+				SUM(Winlost * e.Rate)		AS Winlost,
+				SUM(LicenseeWL * e.Rate)	AS LicenseeWL,
+				SUM(CommBA * e.Rate)		AS CommBA,
+				SUM(AmtDuetoBA * e.Rate)	AS AmtDuetoBA,
+				SUM(Company * e.Rate)		AS Company,
+				SUM(Betcount)				AS Betcount,
+				SUM(Playercomm * e.Rate)	AS Playercomm
+		FROM #tmpWinLoss w
+		INNER JOIN #DailyExchange e ON w.Winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
+		LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON w.PartyID = p.PartyID
+		LEFT JOIN @Exchange t ON w.Currency = t.Currency
+		GROUP BY w.PartyID,p.PartyName, CASE WHEN w.Currency = @CurrencyTest THEN e.Code ELSE t.CurrencyCode END, w.currency, w.Winlostdate
+		ORDER BY w.PartyID,p.PartyName, CASE WHEN w.Currency = @CurrencyTest THEN e.Code ELSE t.CurrencyCode END, w.Winlostdate
+	END
 
-	SELECT	CASE 
-				WHEN w.Currency = @CurrencyTest THEN e.Code
-				ELSE t.CurrencyCode 
-			END AS currencyName,
-			w.currency,
-			SUM(TurnOver * e.Rate)		AS Turnover,
-			SUM(Winlost * e.Rate)		AS Winlost,
-			SUM(LicenseeWL * e.Rate)	AS LicenseeWL,
-			SUM(CommBA * e.Rate)		AS CommBA,
-			SUM(AmtDuetoBA * e.Rate)	AS AmtDuetoBA,
-			SUM(Company * e.Rate)		AS Company,
-			SUM(Betcount)				AS Betcount,
-			SUM(Playercomm * e.Rate)	AS Playercomm
-	FROM #tmpWinLoss w	
-	INNER JOIN #DailyExchange e ON w.Winlostdate = e.ExchangeDate AND w.Currency = e.ExchangeId
-	LEFT JOIN @Exchange t ON w.Currency = t.Currency
-	GROUP BY CASE WHEN w.Currency = @CurrencyTest THEN e.Code ELSE t.CurrencyCode END, w.currency
-	ORDER BY CASE WHEN w.Currency = @CurrencyTest THEN e.Code ELSE t.CurrencyCode END
+	--Report Group By Currency
+	IF (@GroupByType = 2)
+	BEGIN
+		SELECT CASE 
+					WHEN w.Currency = @CurrencyTest THEN e.Code
+					ELSE t.CurrencyCode 
+				END AS currencyName,
+				w.currency,
+				SUM(TurnOver * e.Rate)		AS Turnover,
+				SUM(Winlost * e.Rate)		AS Winlost,
+				SUM(LicenseeWL * e.Rate)	AS LicenseeWL,
+				SUM(CommBA * e.Rate)		AS CommBA,
+				SUM(AmtDuetoBA * e.Rate)	AS AmtDuetoBA,
+				SUM(Company * e.Rate)		AS Company,
+				SUM(Betcount)				AS Betcount,
+				SUM(Playercomm * e.Rate)	AS Playercomm
+		FROM #tmpWinLoss w	
+		INNER JOIN #DailyExchange e ON w.Winlostdate = e.ExchangeDate AND w.Currency = e.ExchangeId
+		LEFT JOIN @Exchange t ON w.Currency = t.Currency
+		GROUP BY CASE WHEN w.Currency = @CurrencyTest THEN e.Code ELSE t.CurrencyCode END, w.currency
+		ORDER BY CASE WHEN w.Currency = @CurrencyTest THEN e.Code ELSE t.CurrencyCode END
+	END
 
 	DROP TABLE #tmpWinLoss
 	DROP TABLE #Bettype

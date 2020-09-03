@@ -4,6 +4,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_PlatformWinloss]
 	 @PartyIds		VARCHAR(4000),
+	 @Platforms		VARCHAR(500),
 	 @FromDate		SMALLDATETIME,
 	 @ToDate		SMALLDATETIME,
 	 @BaseCurrency  VARCHAR(20)
@@ -28,8 +29,9 @@ AS
 		- 20190827@Bruce: Add new betfrom 't' [#118998]
 		- 20191010@Percy: Replace LicenseeBATransaction to LicenseeBATransaction_active [RedmineID: #103656]
 		- 20191223@Bruce: Adding betform v and 0 [#118998]
-		- 202000318@Parsons: Handle new betfrom v,1,2,3 into their own category [#130645]
+		- 20200318@Parsons: Handle new betfrom v,1,2,3 into their own category [#130645]
 		- 20200706@Parsons: Add new betfrom eGame Mobile and eGamer Desktop [#136414]
+		- 20200807@Parsons: Filter data by platform : Platform WL (summary, detail) [#138249]
 
 	Explanation:
 	  + @PlatformType:
@@ -65,7 +67,9 @@ BEGIN
 	--
 	DECLARE @betfrom TABLE(betfrom CHAR(1))
 	INSERT INTO @betfrom 
-	SELECT val FROM (VALUES('d'),('a'),('e'),('u'),('m'),('l'),('g'),('x'),('z'),('r'),('o'),('c'),('t'),('0'),('v'),('1'),('2'),('3'),('4'),('5'),('6'))v(val)
+	SELECT v.val 
+	FROM (VALUES('d'),('a'),('e'),('u'),('m'),('l'),('g'),('x'),('z'),('r'),('o'),('c'),('t'),('0'),('v'),('1'),('2'),('3'),('4'),('5'),('6'))v(val)
+	INNER JOIN strSplit(@Platforms, ',') bf ON v.val = bf.val
 
 	CREATE TABLE #WinLoss (
 		LicenseeID		INT,
@@ -149,10 +153,10 @@ BEGIN
 			b.betfrom
 			FROM #tmpBettrans b
 			INNER JOIN #Cust c ON c.CustID = b.recommend
+			INNER JOIN @betfrom bf ON b.betfrom = bf.betfrom
 			LEFT JOIN bodb_licensee.dbo.LicenseeBATransaction_active ba WITH(NOLOCK) ON b.transid = ba.transid
 			WHERE b.statusID IN (111, 112, 113)
 				AND ba.TransID IS NULL
-				AND b.betfrom IN (SELECT bf.betfrom FROM @betfrom bf)
 				AND b.currency <> 20
 				AND b.currency = c.currency
 			GROUP BY b.winlostdate, c.currency, c.LicenseeID, b.betfrom
@@ -180,6 +184,7 @@ BEGIN
 			b.betfrom
 		FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH ( NOLOCK )
 			INNER JOIN #Cust ag ON b.CustId = ag.CustId AND b.Currency = ag.Currency
+			INNER JOIN @betfrom bf ON b.betfrom = bf.betfrom
 		WHERE
 			b.Winlostdate BETWEEN @FDate AND @TempToDate
 			AND b.roleid = 2
@@ -187,7 +192,6 @@ BEGIN
 			AND b.bettype NOT IN (901,902,903,904/*bettrade*/,911,912,913,914/*cashout*/)
 			AND ISNULL(b.isBA,0) = 0
 			AND b.sporttype = 0
-			AND b.betfrom IN (SELECT bf.betfrom FROM @betfrom bf)
 			AND b.currency <> 20
 		GROUP BY
 			b.winlostdate,
