@@ -15,6 +15,7 @@ ALTER PROCEDURE dbo.LA_Rpt_LicPerformance_Detail
 	, @LicenseePaying INT = 0
 	, @PreviousPeriodType INT = 1
 AS
+
 /*	Created: 20141209@Patrick
 	Task: LicenseeAdmin - Get Licensee Performance Detail report
 	DB: DB052.bodb02
@@ -360,7 +361,7 @@ BEGIN
 		INSERT INTO @SumByProducts (PartyId,ProductId,IsCurrent,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,ExtraAmount,IsChargedByMinFee,IsChargedByGroupMinFee)
 		SELECT	PartyId
 				,ProductId
-				,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END) IsCurrent
+				,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) AND YEAR(rptDate) = YEAR(@FromDate) THEN 1 ELSE 0 END) IsCurrent
 				,SUM(BetCount)
 				,SUM(Turnover)
 				,SUM(WinLoss)
@@ -371,7 +372,7 @@ BEGIN
 				,0 IsChargedByMinFee
 				,0 IsChargedByGroupMinFee
 		FROM #TempData
-		GROUP BY PartyId, ProductId, CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END
+		GROUP BY PartyId, ProductId, (CASE WHEN MONTH(rptDate) = MONTH(@FromDate) AND YEAR(rptDate) = YEAR(@FromDate) THEN 1 ELSE 0 END)
 
 		-- apply minfee
 		UPDATE s SET 
