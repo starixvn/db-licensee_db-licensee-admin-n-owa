@@ -103,8 +103,15 @@ BEGIN
 	-- *********************************************************************************************************
 	-- Region: get period date	
 	DECLARE @PrevFromDate DATE, @PrevToDate DATE
-	SET @PrevFromDate = CASE WHEN @PreviousPeriodType = 1 THEN DATEADD(yy, -1,  @FromDate) ELSE DATEADD(M, -1,  @FromDate) END 
-	SET @PrevToDate = CASE WHEN @PreviousPeriodType = 1 THEN DATEADD(yy, - 1, @ToDate) ELSE DATEADD(M, - 1, @ToDate) END 
+	
+	DECLARE @LastDateInCurrentMonth DATETIME = DATEADD(SS,-1,DATEADD(MM,DATEDIFF(MM,0,@ToDate)+1,0))
+	
+	SET @PrevFromDate = CASE WHEN @PreviousPeriodType = 1 THEN DATEADD(yy, -1,  @FromDate) ELSE DATEADD(MM, -1,  @FromDate) END 
+	SET @PrevToDate = CASE WHEN @PreviousPeriodType = 1 THEN CASE WHEN DATEDIFF(DD, @ToDate, @LastDateInCurrentMonth) = 0 THEN DATEADD(YY, -1, DATEADD(MM, DATEDIFF(MM, -1, @ToDate), 0)) - 1 
+																														  ELSE DATEADD(YY, - 1, @ToDate) END -- same month last year
+					  ELSE CASE WHEN DATEDIFF(DD, @ToDate, @LastDateInCurrentMonth) = 0 THEN DATEADD(MM, DATEDIFF(MM, -1, @ToDate)-1, -1)
+																						ELSE DATEADD(MM, - 1, @ToDate) 
+																						END END -- last month
 	-- End region
 
 	-- ******************************************************************* 
