@@ -104,19 +104,31 @@ BEGIN
 	-- ***		- FromDate, ToDate: 20200601, 20200630 --> PreviousFromDate, PreviousToDate: 20200501, 20200531
 	-- *********************************************************************************************************
 	-- Region: get period date	
-	DECLARE @PrevFromDate DATE, @PrevToDate DATE
+	DECLARE @PrevFromDate DATE = CASE WHEN @PreviousPeriodType = 1 THEN DATEADD(yy, -1,  @FromDate) ELSE DATEADD(MM, -1,  @FromDate) END 
+	DECLARE @PrevToDate DATE
 	
-	DECLARE @LastDateInCurrentMonth DATETIME = DATEADD(SS,-1,DATEADD(MM,DATEDIFF(MM,0,@ToDate)+1,0))
-	
-	SET @PrevFromDate = CASE WHEN @PreviousPeriodType = 1 THEN DATEADD(yy, -1,  @FromDate) ELSE DATEADD(MM, -1,  @FromDate) END 
-	SET @PrevToDate = CASE WHEN @PreviousPeriodType = 1 THEN 
-														CASE WHEN DATEDIFF(DD, @ToDate, @LastDateInCurrentMonth) = 0 THEN DATEADD(YY, -1, DATEADD(MM, DATEDIFF(MM, -1, @ToDate), 0)) - 1 
-															 ELSE DATEADD(YY, - 1, @ToDate) 
-													    END -- same month last year
-					  ELSE CASE WHEN DATEDIFF(DD, @ToDate, @LastDateInCurrentMonth) = 0 THEN DATEADD(MM, DATEDIFF(MM, -1, @ToDate)-1, -1)
-								ELSE DATEADD(MM, - 1, @ToDate) 
-							END 
-					  END -- last month
+	DECLARE @FirstDateNextMonth DATETIME = DATEADD(MM, DATEDIFF(MM, -1, @ToDate), 0)
+	DECLARE @LastDateInCurrentMonth DATETIME = DATEADD(SS, -1, @FirstDateNextMonth)
+	DECLARE @IsSelectedFullDayOfMonth BIT = 0
+	IF(DATEDIFF(DD, @ToDate, @LastDateInCurrentMonth) = 0)
+	BEGIN
+		SET @IsSelectedFullDayOfMonth = 1
+	END
+
+	IF(@PreviousPeriodType = 1) -- Same month last year
+	BEGIN
+		DECLARE @FirstDateOfNextMonthLastYear DATETIME = DATEADD(MM, DATEDIFF(MM, -1, @ToDate) - 12, 0)
+		SET @PrevToDate = CASE WHEN @IsSelectedFullDayOfMonth = 1 THEN DATEADD(SS, -1, @FirstDateOfNextMonthLastYear) 
+							   ELSE DATEADD(YY, - 1, @ToDate) 
+						  END 
+	END
+	ELSE -- Last month
+	BEGIN
+		DECLARE @FirstDateCurrentMonth DATETIME = DATEADD(MM, DATEDIFF(MM, 0, @FromDate), 0)
+		SET @PrevToDate = CASE WHEN @IsSelectedFullDayOfMonth = 1 THEN DATEADD(SS, -1, @FirstDateCurrentMonth)
+							   ELSE DATEADD(MM, - 1, @ToDate) 
+						  END
+	END
 	-- End region
 
 	-- ******************************************************************* 
