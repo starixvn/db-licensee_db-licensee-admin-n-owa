@@ -36,7 +36,8 @@ AS
 						- @Mason: Correct SP
 	- 20200325@Parsons: Integrate SA Gaming [#129276]
 	- 20200707@Parsons: Calculate Margin and remove Racing related data field [#137171]
-	- 20200818@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
+	- 20200818@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055] 
+	- 20200916@Parsons: Fix bug duplicate data in case of product having multiple setting rate [#138984]
 	
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -460,6 +461,14 @@ BEGIN
 			AND b.Bettype NOT IN (901,902,903,904,911,912,913,914,@SAG_Tip,@PromotionPrize,@PPTournament,@PP_JackpotPrize)
 		GROUP BY b.rptDate, ci.PartyID, b.ProductID, b.CurrencyID
 
+		;WITH cte_ChargInfo AS
+		(
+		    SELECT TOP(1) WITH TIES PartyID, Fromdate, Todate, ci.ProductID, Rate, ChargeType, ChargeId
+			FROM @ChargeInfo ci
+			LEFT JOIN @ExcludedProductIds p ON ci.ProductID = p.ProductID
+			WHERE p.ProductId IS NULL
+			ORDER BY ROW_NUMBER() OVER(PARTITION BY PartyID, Fromdate, Todate, ci.ProductID, Rate, ChargeType ORDER BY ChargeId)
+		)
 		INSERT INTO #Report (PartyID, ReportDate, CurrencyID, Turnover, Winlost, LicenseeWL,Company, Betcount)
 		SELECT ci.PartyID, rptDate, b.CurrencyId
 			, SUM(b.turnover) Turnover
@@ -468,14 +477,13 @@ BEGIN
 			, SUM((-b.Winloss - Contribution) * ISNULL(cc.Rate,ci.Rate) - CASE WHEN b.ProductID=31 THEN (b.AComm + b.PComm) ELSE 0 END) AS Company
 			, SUM(b.betcount) AS betcount
 		FROM #TmpData b WITH (NOLOCK)
-			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate, ChargeId, ChargeType FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
+			INNER JOIN cte_ChargInfo ci	ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID=ci.ChargeId AND cc.CurrencyID=b.CurrencyId
 		WHERE b.rptDate BETWEEN ci.Fromdate AND ci.Todate AND ci.ChargeType = 1 -- Gross Win
 		GROUP BY ci.PartyID, b.rptDate, b.CurrencyId
 
 		DROP TABLE #TmpData
 	END
-	
 	-- treat NULL as zero
 	--
 	UPDATE #Report SET
