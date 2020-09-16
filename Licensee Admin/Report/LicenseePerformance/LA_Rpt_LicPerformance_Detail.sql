@@ -13,6 +13,7 @@ ALTER PROCEDURE dbo.LA_Rpt_LicPerformance_Detail
 	, @BaseCurrencyName VARCHAR(10) = 'GBP'
 	, @DrawFilter	SMALLINT = 1
 	, @LicenseePaying INT = 0
+	, @PreviousPeriodType INT = 1
 AS
 
 /*	Created: 20141209@Patrick
@@ -59,6 +60,7 @@ AS
 		- 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334]
 		- 20200813@Parsons: Implement Group Min Fee [#134492]
 	    - 20200821@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
+	    - 20200828@Parsons: Provide data of "this month last year" [#136417]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -79,6 +81,8 @@ AS
 					=1 : Normal fee 
 					=2 : Minimum fee
 					=3 : Group min fee 
+	  + @PreviousPeriodType: = 1: Same month last year
+	                         = 2: Last month
 */
 
 BEGIN
@@ -96,13 +100,35 @@ BEGIN
 	-- *** For special cases:
 	-- *** 		- FromDate, ToDate: 20170315, 20170330 --> PreviousFromDate, PreviousToDate: 20170215, 20170228
 	-- *** 		- FromDate, ToDate: 20170330, 20170330 --> PreviousFromDate, PreviousToDate: 20170228, 20170228
+	-- *** Previous month should display full month
+	-- ***		- FromDate, ToDate: 20200601, 20200630 --> PreviousFromDate, PreviousToDate: 20200501, 20200531
 	-- *********************************************************************************************************
 	-- Region: get period date	
-	DECLARE @PrevFromDate DATE, @PrevToDate DATE
-	SELECT @PrevFromDate = DATEADD(M, -1,  @FromDate)
-		, @PrevToDate = CASE WHEN DATEDIFF(D, @ToDate, DATEADD(S, - 1, DATEADD(MM, DATEDIFF(M, 0, @ToDate) + 1, 0))) = 0
-						THEN DATEADD(S, - 1, DATEADD(MM, DATEDIFF(M, 0, @ToDate), 0))
-						ELSE DATEADD(MM, - 1, @ToDate) END
+	DECLARE @PrevFromDate DATE = CASE WHEN @PreviousPeriodType = 1 THEN DATEADD(yy, -1,  @FromDate) ELSE DATEADD(MM, -1,  @FromDate) END 
+	DECLARE @PrevToDate DATE
+	
+	DECLARE @FirstDateNextMonth DATETIME = DATEADD(MM, DATEDIFF(MM, -1, @ToDate), 0)
+	DECLARE @LastDateInCurrentMonth DATETIME = DATEADD(SS, -1, @FirstDateNextMonth)
+	DECLARE @IsSelectedFullDayOfMonth BIT = 0
+	IF(DATEDIFF(DD, @ToDate, @LastDateInCurrentMonth) = 0)
+	BEGIN
+		SET @IsSelectedFullDayOfMonth = 1
+	END
+
+	IF(@PreviousPeriodType = 1) -- Same month last year
+	BEGIN
+		DECLARE @FirstDateOfNextMonthLastYear DATETIME = DATEADD(MM, DATEDIFF(MM, -1, @ToDate) - 12, 0)
+		SET @PrevToDate = CASE WHEN @IsSelectedFullDayOfMonth = 1 THEN DATEADD(SS, -1, @FirstDateOfNextMonthLastYear) 
+							   ELSE DATEADD(YY, - 1, @ToDate) 
+						  END 
+	END
+	ELSE -- Last month
+	BEGIN
+		DECLARE @FirstDateCurrentMonth DATETIME = DATEADD(MM, DATEDIFF(MM, 0, @FromDate), 0)
+		SET @PrevToDate = CASE WHEN @IsSelectedFullDayOfMonth = 1 THEN DATEADD(SS, -1, @FirstDateCurrentMonth)
+							   ELSE DATEADD(MM, - 1, @ToDate) 
+						  END
+	END
 	-- End region
 
 	-- ******************************************************************* 
@@ -359,7 +385,7 @@ BEGIN
 		INSERT INTO @SumByProducts (PartyId,ProductId,IsCurrent,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,ExtraAmount,IsChargedByMinFee,IsChargedByGroupMinFee)
 		SELECT	PartyId
 				,ProductId
-				,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END) IsCurrent
+				,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) AND YEAR(rptDate) = YEAR(@FromDate) THEN 1 ELSE 0 END) IsCurrent
 				,SUM(BetCount)
 				,SUM(Turnover)
 				,SUM(WinLoss)
@@ -370,7 +396,7 @@ BEGIN
 				,0 IsChargedByMinFee
 				,0 IsChargedByGroupMinFee
 		FROM #TempData
-		GROUP BY PartyId, ProductId, CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END
+		GROUP BY PartyId, ProductId, (CASE WHEN MONTH(rptDate) = MONTH(@FromDate) AND YEAR(rptDate) = YEAR(@FromDate) THEN 1 ELSE 0 END)
 
 		-- apply minfee
 		UPDATE s SET 
@@ -440,7 +466,7 @@ BEGIN
 	IF(EXISTS(SELECT TOP 1 1 FROM #Result))
 	BEGIN
 		;WITH cte_PromotionSportsbook AS(
-			SELECT pc.PartyId, r.SiteID,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END) IsCurrent, SUM(r.MemberWL * cExchange.Rate) AS Prize
+			SELECT pc.PartyId, r.SiteID,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) AND YEAR(rptDate) = YEAR(@FromDate) THEN 1 ELSE 0 END) IsCurrent, SUM(r.MemberWL * cExchange.Rate) AS Prize
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
 				INNER JOIN (SELECT DISTINCT PartyId, LicenseeId FROM @PartyChargeInfo WHERE ProductID = 0) pc ON r.SiteID = pc.LicenseeId
 				INNER JOIN #Exchange cExchange ON r.RptDate = cExchange.ExchangeDate AND r.CurrencyID = cExchange.ExchangeID
@@ -448,7 +474,7 @@ BEGIN
 						AND r.ProductID = 37 -- Saba promotion
 						AND (@Currency = 0 OR @Currency = r.CurrencyId)
 
-				GROUP BY pc.PartyId, r.SiteID, (CASE WHEN MONTH(rptDate) = MONTH(@FromDate) THEN 1 ELSE 0 END)
+				GROUP BY pc.PartyId, r.SiteID, (CASE WHEN MONTH(rptDate) = MONTH(@FromDate) AND YEAR(rptDate) = YEAR(@FromDate) THEN 1 ELSE 0 END)
 		)
 		UPDATE r
 		SET PromotionSportsbook = p.Prize

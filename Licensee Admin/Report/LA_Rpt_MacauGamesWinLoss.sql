@@ -19,6 +19,7 @@ AS
 		- 20200217@Mason: Set billing term by currency [#120005]
 		- 20200302@Parsons: Support-HID-currency [#128856]
 		- 20200411@Parsons: Add new Macau Games [#130955]
+		- 20200903@Parsons: Add new games and bet types for Macau Games [#139815]
 		
 	 Params:
 */
@@ -61,6 +62,12 @@ BEGIN
 	WHERE NOT EXISTS (SELECT 1 FROM @ChargeInfos ci WHERE ci.PartyId = p.PartyId)
 	-- Endregion	
 
+	DECLARE @BlueprintBettype TABLE(Bettype INT )
+	INSERT INTO @BlueprintBettype
+	SELECT BetType
+	FROM bodb02.dbo.SportBettypeMatrix WITH(NOLOCK)
+	WHERE SubProduct = 'Blueprint'
+
 	-- Region: TempData
 	CREATE TABLE #TempData (
 		PartyID INT,
@@ -85,11 +92,12 @@ BEGIN
 		SUM(-b.WinLoss * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
 		SUM(-b.WinLoss * 
 		CASE 
-			WHEN ci.IsDeposit = 1 THEN (CASE WHEN b.Bettype BETWEEN 4001 AND 4050 THEN 0.035 ELSE 0.045 END)
-			ELSE (CASE WHEN b.Bettype BETWEEN 4001 AND 4050 THEN 0.02 ELSE 0.03 END)
+			WHEN ci.IsDeposit = 1 THEN (CASE WHEN bp.Bettype IS NOT NULL THEN 0.045 ELSE 0.035 END)
+			ELSE (CASE WHEN bp.Bettype IS NOT NULL THEN 0.03 ELSE 0.02 END)
 		END) AS PayToSupplier
 	FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
 		INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+		LEFT JOIN @BlueprintBettype bp ON b.Bettype = bp.Bettype
 		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeID AND cr.CurrencyID = b.CurrencyId
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 		b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
