@@ -352,7 +352,9 @@ BEGIN
 			SUM(JackpotPrize),
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
-			SUM(CASE WHEN LicenseeChargeRate < 0 THEN 0 ELSE LicenseeChargeRate END + Contribution - JackpotPrize - WinPrizeAmount),
+			SUM(CASE WHEN ParentId = 999 THEN 0 -- Credit Licensee: always is 0
+			         ELSE CASE WHEN LicenseeChargeRate < 0 THEN 0 ELSE LicenseeChargeRate END + Contribution - JackpotPrize - WinPrizeAmount
+				END),
 			SUM(PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
