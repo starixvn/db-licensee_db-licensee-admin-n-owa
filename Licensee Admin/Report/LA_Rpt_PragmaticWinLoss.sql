@@ -190,7 +190,7 @@ BEGIN
 	GROUP BY b.RptDate3rd, ci.PartyId, b.CurrencyId, b.SiteId
 	)
 
-	INSERT INTO #Result (PartyID,PartyName,ParentId,ParentName,Winlossdate,CurrencyId,Turnover,TotalTrans,WinPrizeAmount,Contribution,JackpotPrize,CustomerWinLoss,LicenseeWinloss,PayToSupplier)
+	INSERT INTO #Result (PartyID,PartyName,ParentId,ParentName,Winlossdate,CurrencyId,Turnover,TotalTrans,WinPrizeAmount,Contribution,JackpotPrize,CustomerWinLoss,LicenseeWinloss,PayToSupplier,LicensingFee,LicenseeChargeRate)
 	SELECT ci.PartyId,
 		p.PartyName,
 		p.ParentId,
@@ -204,7 +204,8 @@ BEGIN
 		SUM(JackpotPrize),
 		SUM(CustomerWinLoss),
 		SUM(LicenseeWinloss),
-		SUM((-CustomerWinLoss - FullContribution) * ci.Rate3rd) AS PayToSupplier
+		SUM((-CustomerWinLoss - FullContribution) * ci.Rate3rd) AS PayToSupplier,
+		0,0
 	FROM cte_WinLossData b
 		INNER JOIN @CreditChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
 		INNER JOIN @PartyList p ON ci.PartyId = p.PartyId
