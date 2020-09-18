@@ -46,6 +46,7 @@ AS
 		- 20200423@Parsons: Integrate Saba.club [#132730]
 		- 20200507@Parsons: Integrate Sexy Gaming for deposit licensees [#132665]
 		- 20200722@Happy: Implement PP Jackpot [#137306]
+		- 20200918@Parsons: Implement PP JP for Credit [#138984]
 */
 		
 /*	Example:
@@ -92,7 +93,9 @@ BEGIN
 
 	INSERT INTO @PartyChargeInfo(ChargeId, PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate, BettypeRef)
 	(
-		SELECT	ChargeId, PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate, 
+		SELECT	DISTINCT ChargeId, PartyID, LicenseeID, ProductID, 
+				CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END, 
+				Fromdate, Todate, 
 				CASE
 					WHEN ProductId = 11 AND ChargeType = 12 THEN @GD_Tip
 					WHEN ProductId = 39 AND ChargeType = 12 THEN @SAG_Tip
@@ -369,13 +372,19 @@ BEGIN
 	(
 		SELECT p.PartyId, SUM((LicenseeWL - Contribution) * ISNULL(cr.Rate, p.Rate)) LiceningFee, SUM(d.Contribution) Contribution, SUM(d.JackpotPrize) JackpotPrize, SUM(d.PromotionPrize) PromotionPrize
 		FROM cte_PPWinLossData d
-		INNER JOIN @PartyChargeInfo p ON p.LicenseeId = d.SiteId AND (d.rptDate BETWEEN p.FromDate AND p.ToDate) 
+		INNER JOIN 
+		( 
+			SELECT TOP(1) WITH TIES PartyID, LicenseeId, Fromdate, Todate, ci.ProductID, Rate, ChargeId
+			FROM @PartyChargeInfo ci
+			ORDER BY ROW_NUMBER() OVER(PARTITION BY PartyID, Fromdate, Todate, ci.ProductID, Rate ORDER BY ChargeId)
+		) p ON p.LicenseeId = d.SiteId AND (d.rptDate BETWEEN p.FromDate AND p.ToDate) 
 		LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeID AND d.CurrencyId = cr.CurrencyID
 		WHERE p.ProductID = @PragmaticID AND d.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY p.PartyId
 	)
 	UPDATE	l
-	SET		l.PP = CASE WHEN LiceningFee < 0 THEN 0 ELSE LiceningFee END + Contribution - JackpotPrize - PromotionPrize
+	SET		l.PP = CASE WHEN LiceningFee < 0 THEN 0 ELSE LiceningFee END + 
+				   CASE WHEN l.PartyId IN(25,30) THEN 0 ELSE Contribution - JackpotPrize - PromotionPrize END 
 	FROM #LicenseeAmount l
 	INNER JOIN cte_PPLicensingWL cte ON l.PartyId = cte.PartyId 
 	-- End PP
