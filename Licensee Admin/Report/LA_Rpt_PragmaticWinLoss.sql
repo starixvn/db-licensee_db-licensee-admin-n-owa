@@ -286,7 +286,7 @@ BEGIN
 	DECLARE @CreditBaseCurrencyName VARCHAR(10), @CreditBaseCurrencyId INT
 	SELECT TOP 1 @CreditBaseCurrencyName = Name, @CreditBaseCurrencyId = BaseCurrencyId FROM @BaseCurrencies b INNER JOIN @RateOfCredit c ON c.BaseCurrencyId=b.Id
 
-	SELECT @TotalAmountWinLoss = SUM(-r.CustomerWinLoss*e.BaseCurrencyRate)
+	SELECT @TotalAmountWinLoss = SUM((-r.CustomerWinLoss - Contribution) * e.BaseCurrencyRate)
 	FROM #Result r
 	INNER JOIN (SELECT DISTINCT PartyId FROM @RateOfCredit) roc ON r.PartyID = roc.PartyId
 	INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CreditBaseCurrencyName) e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.Winlossdate
