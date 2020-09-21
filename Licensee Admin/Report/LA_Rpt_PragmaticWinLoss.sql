@@ -433,7 +433,7 @@ BEGIN
 		-- Total By Party
 		;WITH cte_TempData AS
 		(
-		  SELECT r.PartyId, r.PartyName,
+		  SELECT r.PartyId, r.PartyName, r.ParentId,
 			SUM(r.TotalTrans) TotalTrans,
 			SUM(CAST(r.Turnover * e.Rate AS MONEY))			AS Turnover,
 			SUM(CAST(r.WinPrizeAmount * e.Rate AS MONEY))	AS WinPrizeAmount,
@@ -445,10 +445,10 @@ BEGIN
 			SUM(CAST((r.PayToSupplier - WinPrizeAmount) * e.Rate AS MONEY)) AS PayToSupplier
 			FROM #Result r 
 			INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
-			GROUP BY r.PartyId, r.PartyName
+			GROUP BY r.PartyId, r.PartyName, r.ParentId
 		), cte_TempResult AS
 		(
-			SELECT PartyId,PartyName,TotalTrans,Turnover,WinPrizeAmount,Contribution,JackpotPrize,CustomerWinLoss,LicenseeWinLoss
+			SELECT PartyId,PartyName,ParentId,TotalTrans,Turnover,WinPrizeAmount,Contribution,JackpotPrize,CustomerWinLoss,LicenseeWinLoss
 				,CASE WHEN PartyID IN(25,30) THEN 0 
 					  ELSE CASE WHEN LicenseeChargeRate > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - WinPrizeAmount 
 				 END AS LicensingFee
