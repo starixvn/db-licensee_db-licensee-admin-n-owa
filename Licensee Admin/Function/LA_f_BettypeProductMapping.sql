@@ -55,7 +55,8 @@ AS
 		- 20200423@Parsons: Integrate Saba-Club [#132730]
 		- 20200610@Parsons: Implement RNG WAR and ION [#134452]
 		- 20200717@Parsons: Extend bet type range for Lottery [#137840] 
-		- 20200810@Parsons: Implement Saba Loyalty Program [#139167] 
+		- 20200810@Parsons: Implement Saba Loyalty Program [#139167]  
+		- 20200909@Parsons: Integrate PG Soft [#138983]  
 
 	Param's Explanation:
 
@@ -451,6 +452,15 @@ BEGIN
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'PGS')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 55
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 6001 AND 6300
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+	END
+	
 	RETURN
 END
 GO
