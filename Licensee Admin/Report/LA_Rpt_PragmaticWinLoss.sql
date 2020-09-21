@@ -308,7 +308,7 @@ BEGIN
 		SELECT  r.PartyId,CurrencyId,Winlossdate,
 				SUM(CASE 
 					WHEN ((r.LicenseeWinloss - Contribution) * e.BaseCurrencyRate) > MaxAmount THEN MaxAmount 
-					WHEN ((r.LicenseeWinloss - Contribution) * e.BaseCurrencyRate  - MinAmount) > 0 THEN (-r.CustomerWinLoss*e.BaseCurrencyRate - MinAmount)
+					WHEN ((r.LicenseeWinloss - Contribution) * e.BaseCurrencyRate  - MinAmount) > 0 THEN ((r.LicenseeWinloss - Contribution) * e.BaseCurrencyRate - MinAmount)
 					WHEN (r.LicenseeWinloss - Contribution) * e.BaseCurrencyRate < 0 AND roc.RowIndex % @NumberOfTiers = 0 THEN (r.LicenseeWinloss - Contribution) * e.BaseCurrencyRate 
 					ELSE 0 END  * roc.Rate / e.BaseCurrencyRate)  AS ProgressiveAmount
 		FROM #Result r 
