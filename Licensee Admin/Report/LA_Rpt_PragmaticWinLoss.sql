@@ -391,8 +391,8 @@ BEGIN
 	END	
 	-- End Region
 
-	-- Region: Select Data
-		-- Result
+	-- Region: Select Result
+	-- Currency report
 		SELECT r.PartyId,
 			r.PartyName,
 			r.ParentId,
@@ -424,29 +424,58 @@ BEGIN
 			PayToSupplier - WinPrizeAmount		AS PayToSupplierOriginal,
 			(r.LicensingFee - (PayToSupplier - WinPrizeAmount)) AS CompanyIncomeOriginal
 		FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
-
+	
 		-- Grand Total
 		SELECT * FROM @GrandTotal
-			
-	IF @BaseCurrencyName <> ''
-	BEGIN		
-		-- Total
-		SELECT PartyId,
-			TotalTrans,
-			Turnover,
-			WinPrizeAmount,
-			Contribution,
-			JackpotPrize,
-			CustomerWinLoss,
-			LicenseeWinLoss,
-			LicensingFee,
-			PayToSupplier,
-			(LicensingFee - PayToSupplier) AS CompanyIncome
+
+	IF @BaseCurrencyName <> '' -- Group By Licensee
+	BEGIN
+		-- Total By Party
+		;WITH cte_TempData AS
+		(
+		  SELECT r.PartyId, r.PartyName,
+			SUM(r.TotalTrans) TotalTrans,
+			SUM(CAST(r.Turnover * e.Rate AS MONEY))			AS Turnover,
+			SUM(CAST(r.WinPrizeAmount * e.Rate AS MONEY))	AS WinPrizeAmount,
+			SUM(CAST(r.Contribution * e.Rate AS MONEY))		AS Contribution,
+			SUM(CAST(r.JackpotPrize * e.Rate AS MONEY))		AS JackpotPrize,
+			SUM(CAST(r.CustomerWinLoss * e.Rate AS MONEY))	AS CustomerWinLoss,
+			SUM(CAST(LicenseeWinLoss * e.Rate AS MONEY))		AS LicenseeWinLoss,
+			SUM(CAST(r.LicenseeChargeRate * e.Rate AS MONEY)) AS LicenseeChargeRate,
+			SUM(CAST((r.PayToSupplier - WinPrizeAmount) * e.Rate AS MONEY)) AS PayToSupplier
+			FROM #Result r 
+			INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
+			GROUP BY r.PartyId, r.PartyName
+		), cte_TempResult AS
+		(
+			SELECT PartyId,PartyName,TotalTrans,Turnover,WinPrizeAmount,Contribution,JackpotPrize,CustomerWinLoss,LicenseeWinLoss
+				,CASE WHEN PartyID IN(25,30) THEN 0 
+					  ELSE CASE WHEN LicenseeChargeRate > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - WinPrizeAmount 
+				 END AS LicensingFee
+				, CASE WHEN PartyID IN(25,30)
+						THEN (SELECT TOP 1 SUM(CASE 
+							WHEN r2.LicenseeWinLoss - r2.Contribution > MaxAmount THEN MaxAmount 
+							WHEN r2.LicenseeWinLoss - r2.Contribution - MinAmount > 0 THEN r2.LicenseeWinLoss - r2.Contribution - MinAmount 
+							WHEN r2.LicenseeWinLoss - r2.Contribution < 0 AND roc.RowIndex % @NumberOfTiers = 0 THEN r2.LicenseeWinLoss - r2.Contribution
+							ELSE 0 END  * roc.Rate)
+							FROM @RateOfCredit roc
+							INNER JOIN cte_TempData r2 ON r2.PartyID = roc.PartyId
+							WHERE r1.PartyID = r2.PartyID)
+						ELSE  PayToSupplier
+				  END AS PayToSupplier
+			FROM cte_TempData r1
+		)
+		SELECT *, LicensingFee - PayToSupplier AS CompanyIncome
+		FROM cte_TempResult
+
+		-- Total By Party Group
+		SELECT PartyId,TotalTrans,Turnover,WinPrizeAmount,Contribution,JackpotPrize,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,
+			   LicensingFee - PayToSupplier AS CompanyIncome
 		FROM @Total t
 		WHERE Currency = @BaseCurrencyName
 	END
 	-- End Region
-
+	
 	DROP TABLE #Exchange
 	DROP TABLE #Result
 END
