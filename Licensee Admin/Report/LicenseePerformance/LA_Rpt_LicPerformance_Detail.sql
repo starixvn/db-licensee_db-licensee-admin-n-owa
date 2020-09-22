@@ -60,7 +60,8 @@ AS
 		- 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334]
 		- 20200813@Parsons: Implement Group Min Fee [#134492]
 	    - 20200821@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
-	    - 20200828@Parsons: Provide data of "this month last year" [#136417]
+	    - 20200828@Parsons: Provide data of "this month last year" [#136417] 
+		- 20200910@Parsons: Implement PP JP for Credit [#138984]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -397,7 +398,7 @@ BEGIN
 				,0 IsChargedByGroupMinFee
 		FROM #TempData
 		GROUP BY PartyId, ProductId, (CASE WHEN MONTH(rptDate) = MONTH(@FromDate) AND YEAR(rptDate) = YEAR(@FromDate) THEN 1 ELSE 0 END)
-		
+
 		-- apply minfee
 		UPDATE s SET 
 			AmountToCompany = CASE WHEN pd.IsDeposit = 0 THEN 0 ELSE m.Fee + ISNULL(ExtraAmount, 0) END,
@@ -409,7 +410,7 @@ BEGIN
 		INNER JOIN #AmountToCompany m ON m.PartyId = s.PartyId AND m.IsCurrent = s.IsCurrent AND m.ProductId = s.ProductId
 		INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = s.PartyId
 	END
-	
+
 	-- Region: Result
 	CREATE TABLE #Result (
 		PartyId				INT,
@@ -533,7 +534,7 @@ BEGIN
 	INNER JOIN @tmpPartySBLaunchDate t ON t.PartyID = r.PartyId
 	INNER JOIN bodb_licensee.dbo.OAS_Party (NOLOCK) op ON r.PartyId = op.PartyID
 	-- End region
-	
+
 	-- Region: Select Data	
 	SELECT	r.PartyId,
 			(CASE r.PartyName WHEN '18bb' THEN 'PIH' WHEN 'IBC' THEN 'FDL' ELSE r.PartyName END) AS PartyName,
