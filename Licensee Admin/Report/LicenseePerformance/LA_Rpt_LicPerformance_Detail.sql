@@ -401,14 +401,14 @@ BEGIN
 
 		-- apply minfee
 		UPDATE s SET 
-			AmountToCompany = CASE WHEN pd.IsDeposit = 0 THEN 0 ELSE m.Fee + ISNULL(ExtraAmount, 0) END,
+			AmountToCompany = CASE WHEN credit.PartyId IS NULL OR s.ProductId = 0 THEN m.Fee + ISNULL(ExtraAmount, 0) ELSE 0 END,
 			IsChargedByMinFee = m.IsChargedByMinFee,
 			IsChargedByGroupMinFee = m.IsChargedByGroupMinFee,
 			Discount = m.Discount,
 			Rebate = m.Rebate
 		FROM @SumByProducts s
 		INNER JOIN #AmountToCompany m ON m.PartyId = s.PartyId AND m.IsCurrent = s.IsCurrent AND m.ProductId = s.ProductId
-		INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = s.PartyId
+		LEFT JOIN @CreditLicensees credit ON credit.PartyId = s.PartyId
 	END
 
 	-- Region: Result
