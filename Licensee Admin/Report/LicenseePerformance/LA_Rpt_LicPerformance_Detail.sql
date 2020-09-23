@@ -60,7 +60,8 @@ AS
 		- 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334]
 		- 20200813@Parsons: Implement Group Min Fee [#134492]
 	    - 20200821@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
-	    - 20200828@Parsons: Provide data of "this month last year" [#136417]
+	    - 20200828@Parsons: Provide data of "this month last year" [#136417] 
+		- 20200910@Parsons: Implement PP JP for Credit [#138984]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -400,13 +401,14 @@ BEGIN
 
 		-- apply minfee
 		UPDATE s SET 
-			AmountToCompany = m.Fee + ISNULL(ExtraAmount, 0),
+			AmountToCompany = CASE WHEN credit.PartyId IS NULL OR s.ProductId = 0 THEN m.Fee + ISNULL(ExtraAmount, 0) ELSE 0 END,
 			IsChargedByMinFee = m.IsChargedByMinFee,
 			IsChargedByGroupMinFee = m.IsChargedByGroupMinFee,
 			Discount = m.Discount,
 			Rebate = m.Rebate
 		FROM @SumByProducts s
 		INNER JOIN #AmountToCompany m ON m.PartyId = s.PartyId AND m.IsCurrent = s.IsCurrent AND m.ProductId = s.ProductId
+		LEFT JOIN @CreditLicensees credit ON credit.PartyId = s.PartyId
 	END
 
 	-- Region: Result
