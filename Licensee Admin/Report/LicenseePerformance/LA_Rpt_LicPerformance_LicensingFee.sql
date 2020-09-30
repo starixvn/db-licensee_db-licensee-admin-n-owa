@@ -39,6 +39,7 @@ AS
 	   - 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334]
 	   - 20200820@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
 	   - 20200909@Parsons: Implement PG Soft [RedmineID: #138983]
+	   - 20200930@Parsons: Implement Joker Games [RedmineID: #141421]
 
 
 	Param's Explanation:  
@@ -88,7 +89,7 @@ BEGIN
 		SET @sdate = DATEADD(m, 1, @sdate)
 	END	
 
-	IF @ProductCode IN ('SB', 'NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS')
+	IF @ProductCode IN ('SB', 'NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK')
 	BEGIN		
 		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, LicensingFee)
 		SELECT tp.PartyID, d.rptDate, d.CurrencyID, - SUM(d.Winloss * ISNULL(cc.Rate, tp.Rate))

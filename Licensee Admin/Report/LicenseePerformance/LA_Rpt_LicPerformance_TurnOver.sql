@@ -35,6 +35,7 @@ AS
 	    - 20200423@Parsons: Integrate Saba.club [#132730]
 		- 20200507@Parsons: Integrate Sexy Gaming for deposit licensees [#132665]
 	    - 20200909@Parsons: Implement PG Soft [RedmineID: #138983]
+	    - 20200930@Parsons: Implement Joker Games [RedmineID: #141421]
 
     Param's Explanation:  
 	   + @partyIDs : a string of list PartyID, separated by ','
@@ -114,7 +115,7 @@ BEGIN
     END
 
     --exclude BA tickets
-    IF @ProductCode IN ('SB', 'RB', 'NG', 'LC', 'VS', 'CS', 'VB', 'PP', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS')
+    IF @ProductCode IN ('SB', 'RB', 'NG', 'LC', 'VS', 'CS', 'VB', 'PP', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK')
     BEGIN		
 	   INSERT INTO #Tmp(PartyId, rptDate, CurrencyId, TurnOver)
 	   (

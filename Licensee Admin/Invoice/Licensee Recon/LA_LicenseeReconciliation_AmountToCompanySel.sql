@@ -34,6 +34,7 @@ AS
 		- 20200727@Parsons: Implement PP Jackpot [RedmineID: #137306] 
 		- 20200813@Parsons: Implement Group Min Fee [#134492]
 		- 20200909@Parsons: Implement PG Soft [RedmineID: #138983]
+		- 20200930@Parsons: Implement Joker Games [RedmineID: #141421]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -77,7 +78,7 @@ BEGIN
 
 	-- supported products
 	-- 
-	DECLARE @supportedProducts VARCHAR(500) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS'
+	DECLARE @supportedProducts VARCHAR(500) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK'
 	DECLARE @productList TABLE(ProductId INT, Code VARCHAR(10), Name VARCHAR(100))
 	INSERT INTO @productList(ProductId,Code,Name)
 	SELECT ProductID, ProductPrefix,ProductName FROM dbo.LA_f_Products3rd(@supportedProducts)
