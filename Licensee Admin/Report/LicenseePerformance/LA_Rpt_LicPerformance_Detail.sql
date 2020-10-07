@@ -543,6 +543,7 @@ BEGIN
 			CASE ISNULL(rLeft.PartyName, rRight.PartyName) WHEN '18bb' THEN 'PIH' WHEN 'IBC' THEN 'FDL' ELSE ISNULL(rLeft.PartyName, rRight.PartyName) END AS PartyName,
 			ISNULL(rLeft.LaunchDate, rRight.LaunchDate) AS LaunchDate,
 			ISNULL(rLeft.BetCount,0)																	AS TotalTrans,
+			ISNULL(rRight.BetCount,0)																	AS PreviousTotalTrans,
 			ISNULL(rLeft.AverageBet,0)																	AS AverageBetValue,
 			ISNULL(rLeft.Turnover,0)																	AS Turnover,
 			ISNULL(rRight.Turnover,0)																	AS PreviousTurnover,
@@ -581,7 +582,7 @@ BEGIN
 								
 	) SELECT * FROM cte_Result r
 	  INNER JOIN @PartyIdTable p ON r.PartyId = p.PartyId 
-	  WHERE p.IsSelected = 1 AND (r.TotalTrans > 0 OR r.SportsbookFee > 0 OR r.PreviousSportsbookFee > 0)
+	  WHERE p.IsSelected = 1 AND (r.TotalTrans > 0 OR r.PreviousTotalTrans > 0 OR r.SportsbookFee > 0 OR r.PreviousSportsbookFee > 0)
 	
 	-- End region
 
