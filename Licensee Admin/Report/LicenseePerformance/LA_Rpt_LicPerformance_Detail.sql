@@ -576,9 +576,9 @@ BEGIN
 	FROM	(SELECT * FROM #Result WHERE IsCurrent = 1) rLeft
 			FULL JOIN (SELECT * FROM #Result WHERE IsCurrent = 0) rRight ON rLeft.PartyId = rRight.PartyId
 	WHERE	@LicenseePaying = 0 
-			OR (@LicenseePaying = 1 AND ((rLeft.IsChargedByMinFee = 0 AND rLeft.IsChargedByGroupMinFee = 0) OR (rRight.IsChargedByMinFee = 0 AND rRight.IsChargedByGroupMinFee = 0)))
-			OR (@LicenseePaying = 2 AND (rLeft.IsChargedByMinFee = 1 OR rRight.IsChargedByMinFee = 1))
-			OR (@LicenseePaying = 3 AND (rLeft.IsChargedByGroupMinFee = 1 OR rRight.IsChargedByGroupMinFee = 1 ))
+			OR (@LicenseePaying = 1 AND rLeft.IsChargedByMinFee = 0 AND rLeft.IsChargedByGroupMinFee = 0)
+			OR (@LicenseePaying = 2 AND rLeft.IsChargedByMinFee = 1)
+			OR (@LicenseePaying = 3 AND rLeft.IsChargedByGroupMinFee = 1)
 								
 	) SELECT * FROM cte_Result r
 	  INNER JOIN @PartyIdTable p ON r.PartyId = p.PartyId 
