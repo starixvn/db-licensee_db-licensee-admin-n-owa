@@ -34,7 +34,7 @@ BEGIN
 								,[BaseCurrencyId]
 								,[FirstOfBilling]
 								,[BasisOfBilling])
-	SELECT @JKProductId, b.PartyID, @3rdPartyId, 0, 0.03, 1, '2020-09-21', '2050-01-01', null, null, null, null, null, null
+	SELECT @JKProductId, b.PartyID, @3rdPartyId, 0, 0.03, 1, '2020-09-30', '2050-01-01', null, null, null, null, null, null
 	FROM @BillingGroups b
 	
 	SET @HasInsertSetting = 1
