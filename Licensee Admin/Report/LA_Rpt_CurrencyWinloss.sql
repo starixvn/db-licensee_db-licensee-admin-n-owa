@@ -48,6 +48,7 @@ AS
 	   - 20200821@Happy: Implement PP Jackpot changes in reports phase 2 [#139055]
 	   - 20201021@Happy: Arcadia Gaming offers Bonus [#143597]
 	   - 20201111@Happy: Changing OddsSpread for licensee [#142345]
+	   - 20201209@Mason: Saba.club - Offer Freebet tickets [#141423]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -60,7 +61,6 @@ BEGIN
 	DECLARE @GD_Tip SMALLINT = 1706,
 			@PP_Contribution SMALLINT = 4297,
 			@OddSpread_BetType SMALLINT = 999
-
 	DECLARE @CurrencyTest INT = 20
 	-- currency list
 	--
@@ -269,6 +269,7 @@ BEGIN
 			AND b.SiteID IN (SELECT p.LicenseeId FROM #tmpParty p)
 			AND b.rptDate BETWEEN @FromDate AND @ToDate
 			AND eb.BettypeID IS NULL
+			AND	bt.ProductID <> 42 OR (bt.ProductID = 42 AND b.TicketType <> @FreeBetTicketType)
 
 		;WITH cte_Data AS
 		(
