@@ -38,6 +38,7 @@ AS
 		- 20201104@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
 	    - 20201118@Parsons: Changing OddsSpread for licensee [#142345]
 	    - 20201217@Parsons: Saba.club - Offer Freebet tickets [#141423]
+		- 20201223@Happy: Implement WM [#141357]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -85,7 +86,7 @@ BEGIN
 
 	-- supported products
 	-- 
-	DECLARE @supportedProducts VARCHAR(500) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK'
+	DECLARE @supportedProducts VARCHAR(500) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM'
 	DECLARE @productList TABLE(ProductId INT, Code VARCHAR(10), Name VARCHAR(100))
 	INSERT INTO @productList(ProductId,Code,Name)
 	SELECT ProductID, ProductPrefix,ProductName FROM dbo.LA_f_Products3rd(@supportedProducts)
