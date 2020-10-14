@@ -269,7 +269,7 @@ BEGIN
 			AND b.SiteID IN (SELECT p.LicenseeId FROM #tmpParty p)
 			AND b.rptDate BETWEEN @FromDate AND @ToDate
 			AND eb.BettypeID IS NULL
-			AND	bt.ProductID <> 42 OR (bt.ProductID = 42 AND b.TicketType <> @FreeBetTicketType)
+			AND	bt.ProductID <> @SabaClubProductId OR ISNULL(b.TicketType, 0) <> @FreeBetTicketType
 
 		;WITH cte_Data AS
 		(

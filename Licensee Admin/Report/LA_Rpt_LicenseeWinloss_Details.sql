@@ -39,6 +39,7 @@ AS
 	- 20200818@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
 	- 20201021@Mason: Arcadia Gaming - Add Bonus feature [#143597]
 	- 20201111@Happy: Changing OddsSpread for Licensee [#142345]
+	- 20201209@Mason: Saba.club - Offer Freebet tickets [#141423]
 
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -443,6 +444,7 @@ BEGIN
 			AND (b.CurrencyID <> @CurrencyTest)
 			AND b.customercategory NOT IN (27,28)
 			AND eb.BettypeID IS NULL
+			AND b.ProductID <> @SabaClubProductId OR ISNULL(b.TicketType, 0) <> @FreeBetTicketType
 		GROUP BY ci.PartyID, b.rptDate, b.ProductID, b.CurrencyID
 
 		INSERT INTO #Report (ReportDate, CurrencyID, ProductID, Turnover, Winlost, LicenseeWL, Company, Betcount, OddsSpreadCost)
