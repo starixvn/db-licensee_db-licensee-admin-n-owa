@@ -27,6 +27,7 @@ AS
 	    - 20200820@Happy: Implement PP JP Changes In Reports Phase 2 [#139055]
 	    - 20201026@Happy: Arcadia Gaming Add Bonus [#143597]
 	    - 20201118@Happy: Changing OddsSpread for licensee [#142345]
+	    - 20201209@Happy: Saba.club - Offer Freebet tickets [#141423]
 */
 
 BEGIN
@@ -105,6 +106,7 @@ BEGIN
 		AND b.SiteID NOT IN (SELECT c.LicenseeId FROM @CreditLicenee c)
 		AND b.ProductID IN (SELECT p.ProductId FROM @Products p)
 		AND b.ProductID NOT IN (13,15,25,32) -- exclude BT, CB, CO, PP
+		AND (b.ProductID <> @SabaClubProductId OR ISNULL(b.TicketType, 0) <> @FreeBetTicketType)
 	GROUP BY b.rptdate, b.SiteId, b.ProductId, 
 		CASE WHEN b.Bettype = @GD_Tip THEN b.Bettype
 			 ELSE ISNULL(sbr.BettypeRef, -1)

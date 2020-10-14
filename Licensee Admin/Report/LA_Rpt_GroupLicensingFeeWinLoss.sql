@@ -22,6 +22,7 @@ AS
 	   - 20200820@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
 	   - 20201023@Parsons: Arcadia Gaming Add Bonus [#143597]  
 	   - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
+	   - 20201209@Happy: Saba.club - Offer Freebet tickets [#141423]
 */
 BEGIN
 	SET NOCOUNT ON	
@@ -161,6 +162,8 @@ BEGIN
 	END
 
 	/* Other Products */
+	DECLARE @FreeBetTicketType SMALLINT = 2,
+			@SabaClubProductId SMALLINT = 42
 	DECLARE @ExcludedProductIds TABLE(ProductId INT)
 	INSERT INTO @ExcludedProductIds(ProductId) VALUES (@SB_Product), (@BA_Product), (@CO_Product), (@GD_Product), (@PP_Product)
 	
@@ -180,6 +183,7 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27,28)
 				AND eb.BettypeID IS NULL
+				AND (b.ProductID <> @SabaClubProductId OR ISNULL(b.TicketType, 0) <> @FreeBetTicketType)
 			GROUP BY b.rptDate, ci.PartyID, b.ProductID, b.CurrencyID
 		)
 

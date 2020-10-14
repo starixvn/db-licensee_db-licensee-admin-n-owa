@@ -36,6 +36,7 @@ AS
 	   - 20201026@Happy: Arcadia Gaming Add Bonus [#143597]
 	   - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
 
+	   - 20201014@Happy: Saba.club - Offer Freebet tickets [#141423]
 	Param's Explanation:
 	  + @PartyIDs : a string of list PartyID, separated by ','
 	  + @Currency : 0-All Currencies
@@ -155,6 +156,8 @@ BEGIN
 
 	IF @ProductCode NOT IN('BA', 'PP', 'SB')
 	BEGIN
+		DECLARE @FreeBetTicketType SMALLINT = 2,
+				@SabaClubProductId SMALLINT = 42
 		INSERT INTO #Temp (PartyID, Rptdate, Currency, TurnOver, Winlost, CommBA, Betcount, LicensingFee)
 		(
 			SELECT PartyID, b.rptDate, b.currencyID
