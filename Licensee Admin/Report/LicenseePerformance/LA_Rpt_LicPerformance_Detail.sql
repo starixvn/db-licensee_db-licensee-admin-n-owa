@@ -62,6 +62,7 @@ AS
 	    - 20200821@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
 	    - 20200828@Parsons: Provide data of "this month last year" [#136417] 
 		- 20200910@Parsons: Implement PP JP for Credit [#138984]
+		- 20201007@Parsons: Always show party row regardless of having data or not [#142970]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -535,48 +536,54 @@ BEGIN
 	INNER JOIN bodb_licensee.dbo.OAS_Party (NOLOCK) op ON r.PartyId = op.PartyID
 	-- End region
 
-	-- Region: Select Data	
-	SELECT	r.PartyId,
-			(CASE r.PartyName WHEN '18bb' THEN 'PIH' WHEN 'IBC' THEN 'FDL' ELSE r.PartyName END) AS PartyName,
-			r.LaunchDate,
-			r.BetCount																				AS TotalTrans,
-			r.AverageBet																			AS AverageBetValue,
-			ISNULL(r.Turnover,0)																	AS Turnover,
-			ISNULL(p.Turnover,0)																	AS PreviousTurnover,
-			ISNULL(r.WinLoss,0)																		AS GrossWinLoss,
-			ISNULL(p.WinLoss,0)																		AS PreviousGrossWinLoss,
-			ISNULL(r.Margin,0)																		AS Margin,
-			ISNULL(p.Margin,0)																		AS PreviousMargin,
-			CASE WHEN ISNULL(r.BACommission,0) > 0 THEN ISNULL(r.BACommission,0) ELSE 0 END			AS BACommission,		-- Negative number is displayed as 0
-			CASE WHEN ISNULL(p.BACommission,0) > 0 THEN ISNULL(p.BACommission,0) ELSE 0 END			AS PreviousBACommission,
-			ISNULL(r.AmountToBA, 0)																	AS AmountDueToBA,		-- Keep as it is
-			ISNULL(p.AmountToBA, 0)																	AS PreviousAmountDueToBA,
-			CASE WHEN r.SportsbookFee > 0 OR r.PartyId IN (316, 459) THEN r.SportsbookFee ELSE 0 END			AS SportsbookFee, -- 9wickets-316, 9Wsports-459
-			CASE WHEN ISNULL(p.SportsbookFee,0) > 0 OR r.PartyId IN (316, 459) THEN p.SportsbookFee ELSE 0 END	AS PreviousSportsbookFee,
-			ISNULL(r.OthersFee,0) + ISNULL(r.NegativeAmount,0)										AS OtherProductsFee,
-			ISNULL(p.OthersFee,0) + ISNULL(p.NegativeAmount,0)										AS PreviousOtherProductsFee,
-			CASE WHEN r.SportbookDiscount > 0 THEN r.SportbookDiscount ELSE 0 END					AS DiscountSportsbook,
-			CASE WHEN ISNULL(p.SportbookDiscount,0) > 0 THEN p.SportbookDiscount ELSE 0 END			AS PreviousDiscountSportsbook,
-			CASE WHEN r.OthersDiscount > 0 THEN r.OthersDiscount ELSE 0 END 						AS DiscountOthers,
-			CASE WHEN ISNULL(p.OthersDiscount,0) > 0 THEN p.OthersDiscount ELSE 0 END				AS PreviousDiscountOthers,
-			CASE WHEN r.SportbookRebate > 0 THEN r.SportbookRebate ELSE 0 END 						AS RebateSportsbook,
-			CASE WHEN ISNULL(p.SportbookRebate,0) > 0 THEN p.SportbookRebate ELSE 0 END 			AS PreviousRebateSportsbook,
-			CASE WHEN r.OthersRebate > 0 THEN r.OthersRebate ELSE 0 END 							AS RebateOthers,
-			CASE WHEN ISNULL(p.OthersRebate,0) > 0 THEN p.OthersRebate ELSE 0 END 					AS PreviousRebateOthers,
-			ISNULL(r.PromotionSportsbook, 0)														AS PromotionSportsbook,
-			ISNULL(p.PromotionSportsbook, 0)														AS PreviousPromotionSportsbook,
-			ISNULL(r.PromotionOthers, 0)															AS PromotionOthers,
-			ISNULL(p.PromotionOthers, 0)															AS PreviousPromotionOthers,
-			(CASE WHEN r.TotalFee > 0 OR r.PartyId IN (316, 459) THEN r.TotalFee ELSE 0 END) + ISNULL(r.NegativeAmount,0) - ISNULL(r.PromotionSportsbook,0) - ISNULL(r.PromotionOthers,0)	AS TotalLicensingFee,
-			(CASE WHEN p.TotalFee > 0 OR r.PartyId IN (316, 459) THEN p.TotalFee ELSE 0 END) + ISNULL(p.NegativeAmount,0) - ISNULL(p.PromotionSportsbook,0) - ISNULL(p.PromotionOthers,0)	AS PreviousTotalLicensingFee
-	FROM	#Result r
-			FULL JOIN (SELECT * FROM #Result WHERE IsCurrent = 0) p ON r.PartyId = p.PartyId
-	WHERE	r.IsCurrent = 1 AND r.PartyId IN (SELECT pt.PartyId FROM @PartyIdTable pt WHERE IsSelected = 1)
-			AND (@LicenseePaying = 0 
-									OR (@LicenseePaying = 1 AND r.IsChargedByMinFee = 0 AND r.IsChargedByGroupMinFee = 0)
-									OR (@LicenseePaying = 2 AND r.IsChargedByMinFee = 1)
-									OR (@LicenseePaying = 3 AND r.IsChargedByGroupMinFee = 1)
-								)
+	-- Region: Select Data
+	;WITH cte_Result AS
+	(
+		SELECT	ISNULL(rLeft.PartyId, rRight.PartyId) AS PartyId,
+			CASE ISNULL(rLeft.PartyName, rRight.PartyName) WHEN '18bb' THEN 'PIH' WHEN 'IBC' THEN 'FDL' ELSE ISNULL(rLeft.PartyName, rRight.PartyName) END AS PartyName,
+			ISNULL(rLeft.LaunchDate, rRight.LaunchDate) AS LaunchDate,
+			ISNULL(rLeft.BetCount,0)																	AS TotalTrans,
+			ISNULL(rRight.BetCount,0)																	AS PreviousTotalTrans,
+			ISNULL(rLeft.AverageBet,0)																	AS AverageBetValue,
+			ISNULL(rLeft.Turnover,0)																	AS Turnover,
+			ISNULL(rRight.Turnover,0)																	AS PreviousTurnover,
+			ISNULL(rLeft.WinLoss,0)																		AS GrossWinLoss,
+			ISNULL(rRight.WinLoss,0)																	AS PreviousGrossWinLoss,
+			ISNULL(rLeft.Margin,0)																		AS Margin,
+			ISNULL(rRight.Margin,0)																		AS PreviousMargin,
+			CASE WHEN ISNULL(rLeft.BACommission,0) > 0 THEN ISNULL(rLeft.BACommission,0) ELSE 0 END		AS BACommission,		-- Negative number is displayed as 0
+			CASE WHEN ISNULL(rRight.BACommission,0) > 0 THEN ISNULL(rRight.BACommission,0) ELSE 0 END	AS PreviousBACommission,
+			ISNULL(rLeft.AmountToBA, 0)																	AS AmountDueToBA,		-- Keep as it is
+			ISNULL(rRight.AmountToBA, 0)																AS PreviousAmountDueToBA,
+			CASE WHEN rLeft.SportsbookFee > 0 OR rLeft.PartyId IN (316, 459) THEN rLeft.SportsbookFee ELSE 0 END				AS SportsbookFee, -- 9wickets-316, 9Wsports-459
+			CASE WHEN ISNULL(rRight.SportsbookFee,0) > 0 OR rLeft.PartyId IN (316, 459) THEN rRight.SportsbookFee ELSE 0 END	AS PreviousSportsbookFee,
+			ISNULL(rLeft.OthersFee,0) + ISNULL(rLeft.NegativeAmount,0)										AS OtherProductsFee,
+			ISNULL(rRight.OthersFee,0) + ISNULL(rRight.NegativeAmount,0)									AS PreviousOtherProductsFee,
+			CASE WHEN rLeft.SportbookDiscount > 0 THEN rLeft.SportbookDiscount ELSE 0 END					AS DiscountSportsbook,
+			CASE WHEN ISNULL(rRight.SportbookDiscount,0) > 0 THEN rRight.SportbookDiscount ELSE 0 END		AS PreviousDiscountSportsbook,
+			CASE WHEN rLeft.OthersDiscount > 0 THEN rLeft.OthersDiscount ELSE 0 END 						AS DiscountOthers,
+			CASE WHEN ISNULL(rRight.OthersDiscount,0) > 0 THEN rRight.OthersDiscount ELSE 0 END				AS PreviousDiscountOthers,
+			CASE WHEN rLeft.SportbookRebate > 0 THEN rLeft.SportbookRebate ELSE 0 END 						AS RebateSportsbook,
+			CASE WHEN ISNULL(rRight.SportbookRebate,0) > 0 THEN rRight.SportbookRebate ELSE 0 END 			AS PreviousRebateSportsbook,
+			CASE WHEN rLeft.OthersRebate > 0 THEN rLeft.OthersRebate ELSE 0 END 							AS RebateOthers,
+			CASE WHEN ISNULL(rRight.OthersRebate,0) > 0 THEN rRight.OthersRebate ELSE 0 END 				AS PreviousRebateOthers,
+			ISNULL(rLeft.PromotionSportsbook, 0)															AS PromotionSportsbook,
+			ISNULL(rRight.PromotionSportsbook, 0)															AS PreviousPromotionSportsbook,
+			ISNULL(rLeft.PromotionOthers, 0)																AS PromotionOthers,
+			ISNULL(rRight.PromotionOthers, 0)																AS PreviousPromotionOthers,
+			(CASE WHEN rLeft.TotalFee > 0 OR rLeft.PartyId IN (316, 459) THEN rLeft.TotalFee ELSE 0 END) + ISNULL(rLeft.NegativeAmount,0) - ISNULL(rLeft.PromotionSportsbook,0) - ISNULL(rLeft.PromotionOthers,0)	AS TotalLicensingFee,
+			(CASE WHEN rRight.TotalFee > 0 OR rLeft.PartyId IN (316, 459) THEN rRight.TotalFee ELSE 0 END) + ISNULL(rRight.NegativeAmount,0) - ISNULL(rRight.PromotionSportsbook,0) - ISNULL(rRight.PromotionOthers,0)	AS PreviousTotalLicensingFee
+	FROM	(SELECT * FROM #Result WHERE IsCurrent = 1) rLeft
+			FULL JOIN (SELECT * FROM #Result WHERE IsCurrent = 0) rRight ON rLeft.PartyId = rRight.PartyId
+	WHERE	@LicenseePaying = 0 
+			OR (@LicenseePaying = 1 AND rLeft.IsChargedByMinFee = 0 AND rLeft.IsChargedByGroupMinFee = 0)
+			OR (@LicenseePaying = 2 AND rLeft.IsChargedByMinFee = 1)
+			OR (@LicenseePaying = 3 AND rLeft.IsChargedByGroupMinFee = 1)
+								
+	) SELECT * FROM cte_Result r
+	  INNER JOIN @PartyIdTable p ON r.PartyId = p.PartyId 
+	  WHERE p.IsSelected = 1 AND (r.TotalTrans > 0 OR r.PreviousTotalTrans > 0 OR r.SportsbookFee > 0 OR r.PreviousSportsbookFee > 0)
+	
 	-- End region
 
 	-- Region: Drop tmp table
