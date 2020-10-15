@@ -444,7 +444,7 @@ BEGIN
 			AND (b.CurrencyID <> @CurrencyTest)
 			AND b.customercategory NOT IN (27,28)
 			AND eb.BettypeID IS NULL
-			AND b.ProductID <> @SabaClubProductId OR ISNULL(b.TicketType, 0) <> @FreeBetTicketType
+			AND (b.ProductID <> @SabaClubProductId OR ISNULL(b.TicketType, 0) <> @FreeBetTicketType)
 		GROUP BY ci.PartyID, b.rptDate, b.ProductID, b.CurrencyID
 
 		INSERT INTO #Report (ReportDate, CurrencyID, ProductID, Turnover, Winlost, LicenseeWL, Company, Betcount, OddsSpreadCost)
