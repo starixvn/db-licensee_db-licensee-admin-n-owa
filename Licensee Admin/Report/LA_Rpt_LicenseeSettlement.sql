@@ -48,6 +48,7 @@ AS
 		    - 20200719@Parsons: Implement PP Jackpot [RedmineID: #137306]
 			- 20201022@Mason: Arcadia Gaming - Add Bonus feature [#143597]
 			- 20201111@Mason: Change request of Odds Spread [#142345]
+			- 20201209@Mason: Saba.club - Offer Freebet tickets [#141423]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -66,7 +67,9 @@ BEGIN
 	DECLARE @LicenseeID INT,
 			@DrawFilter SMALLINT = 1
 	DECLARE @GD_Tip SMALLINT = 1706,
-			@SAG_Tip SMALLINT = 3007
+			@SAG_Tip SMALLINT = 3007,
+			@FreeBetTicketType SMALLINT = 2,
+			@SabaClubProductId SMALLINT = 42
 
 	CREATE TABLE #Result
 	(
@@ -103,7 +106,8 @@ BEGIN
 		TipsAmount					MONEY,
 		TipsAmountDue				MONEY,
 		OddsSpreadCost				MONEY,
-		GrossCompany				MONEY
+		GrossCompany				MONEY,
+		FreeBetAmount				MONEY
 	)
 
 	CREATE TABLE #Exchange
@@ -196,6 +200,8 @@ BEGIN
 		,CAST(0 AS MONEY)	AS OddsSpreadCostBase
 		,CAST(0 AS MONEY)	AS GrossCompany
 		,CAST(0 AS MONEY)	AS GrossCompanyBase
+		,CAST(0 AS MONEY)	AS FreeBetAmount
+		,CAST(0 AS MONEY)	AS FreeBetAmountBase
 		RETURN
 	END
 
@@ -789,7 +795,7 @@ BEGIN
 	END
 	ELSE
 	BEGIN
-		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, ActualStake, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
+		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, ActualStake, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount, FreeBetAmount)
 		(
 			SELECT
 				rptDate
@@ -800,16 +806,18 @@ BEGIN
 				, SUM(PComm) AS PlayerComm
 				, SUM(-Winloss * ( 1 - ISNULL(cr.Rate, p.Rate))) AS LicenseeWL
 				, SUM(AComm - PComm) AS LicenseeComm
-				, SUM(-WinLoss * ISNULL(cr.Rate, p.Rate) + AComm) AS Company
+				, SUM(-WinLoss * ISNULL(cr.Rate, p.Rate) + AComm - FreeBetAmount) AS Company
 				, SUM(BetCount) AS BetCount
+				, SUM(FreeBetAmount) AS FreeBetAmount
 			FROM (
 				SELECT b.SiteId, b.rptDate, b.CurrencyID
 				, SUM(ISNULL(b.turnover, 0)) AS Turnover
 				, SUM(CASE WHEN @ProductCode = 'I4D' THEN ISNULL(b.ExtraAmount, 0) ELSE 0 END) AS ActualStake
-				, SUM(ISNULL(b.winloss, 0)) Winloss
+				, SUM(CASE WHEN bt.ProductId = @SabaClubProductId AND ISNULL(b.TicketType, 0) = @FreeBetTicketType THEN 0 ELSE ISNULL(b.winloss, 0) END) AS Winloss
 				, SUM(ISNULL(b.CommissionP, 0)) AS PComm
 				, SUM(ISNULL(b.CommissionA, 0)) AS AComm
-				, SUM(ISNULL(b.betcount, 0)) BetCount
+				, SUM(CASE WHEN bt.ProductId = @SabaClubProductId AND ISNULL(b.TicketType, 0) = @FreeBetTicketType THEN 0 ELSE ISNULL(b.betcount, 0) END) AS BetCount
+				, SUM(CASE WHEN bt.ProductId = @SabaClubProductId AND ISNULL(b.TicketType, 0) = @FreeBetTicketType THEN ISNULL(b.winloss, 0) ELSE 0 END) AS FreeBetAmount
 				FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype
 				WHERE
@@ -884,6 +892,7 @@ BEGIN
 		, SUM(ISNULL(d.BuyBackAmountAndComm, 0))		AS BuyBackAmountAndComm
 		, SUM(ISNULL(d.GrossCompany, 0))				AS GrossCompany
 		, SUM(ISNULL(d.OddsSpreadCost, 0))				AS OddsSpreadCost
+		, SUM(ISNULL(d.FreeBetAmount, 0))				AS FreeBetAmount
 
 		--Base on currency
 		, CONVERT(MONEY, SUM(ISNULL(d.Turnover * e.Rate, 0)))					AS TurnoverBase
@@ -916,6 +925,7 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountAndComm * e.Rate, 0)))		AS BuyBackAmountAndCommBase
 		, CONVERT(MONEY, SUM(ISNULL(d.GrossCompany * e.Rate, 0)))				AS GrossCompanyBase
 		, CONVERT(MONEY, SUM(ISNULL(d.OddsSpreadCost * e.Rate, 0)))				AS OddsSpreadCostBase
+		, CONVERT(MONEY, SUM(ISNULL(d.FreeBetAmount * e.Rate, 0)))				AS FreeBetAmountBase
 	FROM #Result d
 	INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
 	INNER JOIN sortedExchange se ON se.CurrencyCode = e.CurrencyCode
