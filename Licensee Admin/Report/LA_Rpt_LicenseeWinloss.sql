@@ -37,6 +37,7 @@ AS
 	- 20200325@Parsons: Integrate SA Gaming [#129276]
 	- 20200707@Parsons: Calculate Margin and remove Racing related data field [#137171]
 	- 20200818@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
+	- 20201021@Mason: Arcadia Gaming - Add Bonus feature [#143597]
 	
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -55,7 +56,8 @@ BEGIN
 			@PP_Contribution SMALLINT = 4297,
 			@PP_JackpotPrize SMALLINT = 4298,
 			@PPTournament SMALLINT = 4299,
-			@PromotionPrize SMALLINT = 4300
+			@PromotionPrize SMALLINT = 4300,
+			@ArcadiaGaming_Bonus SMALLINT = 1906
 	DECLARE @CurrencyTest INT = 20
 
 	CREATE TABLE #Report (PartyID INT, ReportDate DATE, CurrencyID INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY, 
@@ -457,7 +459,7 @@ BEGIN
 			AND (@Currency = 0 OR b.CurrencyID = @Currency)
 			AND (b.CurrencyID <> @CurrencyTest)
 			AND b.customercategory NOT IN (27,28)
-			AND b.Bettype NOT IN (901,902,903,904,911,912,913,914,@SAG_Tip,@PromotionPrize,@PPTournament,@PP_JackpotPrize)
+			AND b.Bettype NOT IN (901,902,903,904,911,912,913,914,@SAG_Tip,@PromotionPrize,@PPTournament,@PP_JackpotPrize,@ArcadiaGaming_Bonus)
 		GROUP BY b.rptDate, ci.PartyID, b.ProductID, b.CurrencyID
 
 		INSERT INTO #Report (PartyID, ReportDate, CurrencyID, Turnover, Winlost, LicenseeWL,Company, Betcount)
