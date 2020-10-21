@@ -39,6 +39,7 @@ AS
 	   - 20200409@Parsons: Integrate SA Gaming [#129276]
 	   - 20200601@Parsons: Amend Currency WL report [#135055] 
 	   - 20200824@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
+	   - 20201021@Happy: Arcadia Gaming offers Bonus [#143597]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -51,7 +52,8 @@ BEGIN
 			@PP_Contribution SMALLINT = 4297,
 			@PP_JackpotPrize SMALLINT = 4298,
 			@PPTournament SMALLINT = 4299,
-			@PromotionPrize SMALLINT = 4300
+			@PromotionPrize SMALLINT = 4300,
+			@ArcadiaGaming_Bonus SMALLINT = 1906
 
 	-- currency list
 	--
@@ -253,7 +255,7 @@ BEGIN
 			AND (@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c))
 			AND b.SiteID IN (SELECT p.LicenseeId FROM #tmpParty p)
 			AND b.rptDate BETWEEN @FromDate AND @ToDate
-			AND b.Bettype NOT IN(@PPTournament, @PromotionPrize, @PP_JackpotPrize, @SAG_Tip)
+			AND b.Bettype NOT IN(@PPTournament, @PromotionPrize, @PP_JackpotPrize, @SAG_Tip, @ArcadiaGaming_Bonus)
 
 		;WITH cte_Data AS
 		(
