@@ -56,12 +56,8 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON 
-	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007,
-			@PP_Contribution SMALLINT = 4297,
-			@PP_JackpotPrize SMALLINT = 4298,
-			@PPTournament SMALLINT = 4299,
-			@PromotionPrize SMALLINT = 4300,
-			@ArcadiaGaming_Bonus SMALLINT = 1906
+	DECLARE @GD_Tip SMALLINT = 1706,
+			@PP_Contribution SMALLINT = 4297
 
 	DECLARE @CurrencyTest INT = 20
 	-- currency list
@@ -268,7 +264,7 @@ BEGIN
 			AND (@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c))
 			AND b.SiteID IN (SELECT p.LicenseeId FROM #tmpParty p)
 			AND b.rptDate BETWEEN @FromDate AND @ToDate
-			AND b.Bettype NOT IN(@PPTournament, @PromotionPrize, @PP_JackpotPrize, @SAG_Tip, @ArcadiaGaming_Bonus)
+			AND NOT EXISTS (SELECT TOP 1 1 FROM bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') e WHERE b.Bettype = e.BettypeID)
 
 		;WITH cte_Data AS
 		(
