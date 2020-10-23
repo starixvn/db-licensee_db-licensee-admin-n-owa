@@ -53,12 +53,8 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007,
-			@PP_Contribution SMALLINT = 4297,
-			@PP_JackpotPrize SMALLINT = 4298,
-			@PPTournament SMALLINT = 4299,
-			@PromotionPrize SMALLINT = 4300,
-			@ArcadiaGaming_Bonus SMALLINT = 1906
+	DECLARE @GD_Tip SMALLINT = 1706,
+			@PP_Contribution SMALLINT = 4297
 	DECLARE @CurrencyTest INT = 20
 
 	CREATE TABLE #Report (ReportDate DATE, CurrencyID INT, ProductID INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY,
@@ -67,12 +63,6 @@ BEGIN
 	CREATE TABLE #Data (PartyID INT, rptDate DATE,ProductID INT, Currency INT,BetTypeId INT, Turnover MONEY, Winloss MONEY, AWinloss MONEY, AComm MONEY, PComm MONEY, Betcount BIGINT)
 	CREATE TABLE #Products(ProductID INT, ProductName VARCHAR(50))
 	CREATE TABLE #ChargeInfo (PartyID INT, LicenseeID INT, ProductID INT, BetTypeID INT, Rate MONEY, Fromdate DATE , Todate DATE, ChargeType TINYINT, ChargeID INT)
-	
-	DECLARE @VNDCurrencyName VARCHAR(20)
-
-	SELECT @VNDCurrencyName = currency
-	FROM dbo.Exchange (NOLOCK)
-	WHERE ExchangeId = 51
 
 	INSERT INTO #ChargeInfo (PartyID, LicenseeID, ProductID, BetTypeID, Rate, Fromdate, Todate, ChargeType, ChargeID)
 	SELECT DISTINCT PartyID, LicenseeID, ProductID, Bettype, 
@@ -111,7 +101,7 @@ BEGIN
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR b.CurrencyID = @Currency)
 				AND (b.CurrencyID <> @CurrencyTest)
-				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
+				AND NOT EXISTS (SELECT TOP 1 1 FROM bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('13,25','') e WHERE b.Bettype = e.BettypeID)
 			GROUP BY b.rptDate, b.ProductID, currencyID
 		)
 		
@@ -448,7 +438,7 @@ BEGIN
 			AND (@Currency = 0 OR b.CurrencyID = @Currency)
 			AND (b.CurrencyID <> @CurrencyTest)
 			AND b.customercategory NOT IN (27,28)
-			AND b.Bettype NOT IN (901,902,903,904,911,912,913,914,@SAG_Tip,@PromotionPrize,@PPTournament,@PP_JackpotPrize,@ArcadiaGaming_Bonus)
+			AND NOT EXISTS (SELECT TOP 1 1 FROM bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') e WHERE b.Bettype = e.BettypeID)
 		GROUP BY ci.PartyID, b.rptDate, b.ProductID, b.CurrencyID
 		
 		
