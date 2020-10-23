@@ -48,6 +48,7 @@ AS
 		- 20200722@Happy: Implement PP Jackpot [#137306]
 		- 20200909@Parsons: Implement PG Soft [RedmineID: #138983] 
 		- 20200930@Parsons: Implement Joker Games [RedmineID: #141421]
+		- 20201023@Parsons: Arcadia Gaming Add Bonus [#143597]  
 */
 		
 /*	Example:
@@ -63,11 +64,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007,
-									 @PPContribution SMALLINT = 4297,
-									 @PPJackpotPrize SMALLINT = 4298,
-									 @PPTournament SMALLINT = 4299,
-									 @PromotionPrize SMALLINT = 4300  
+	DECLARE @GD_Tip SMALLINT = 1706 
 	DECLARE @PragmaticID INT = 32
 
 	-- Region: Get party charge rate info 
@@ -97,7 +94,7 @@ BEGIN
 		SELECT	ChargeId, PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate, 
 				CASE
 					WHEN ProductId = 11 AND ChargeType = 12 THEN @GD_Tip
-					WHEN ProductId = 39 AND ChargeType = 12 THEN @SAG_Tip
+					WHEN ProductId = 39 AND ChargeType = 12 THEN 3007 --SAG_Tip
 				ELSE Bettype
 			END
 		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
@@ -149,11 +146,7 @@ BEGIN
 		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND b.customercategory NOT IN (27, 28)
-				AND b.Bettype NOT IN (
-					901,902,903,904,	-- BT
-					911,912,913,914, 	-- CO
-					@SAG_Tip -- SAG
-				)
+				AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('','') e WHERE b.Bettype = e.BettypeID)
 				AND b.ProductID NOT IN (13,15,25,@PragmaticID)
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, b.ProductId,
 			CASE
@@ -355,6 +348,10 @@ BEGIN
 	-- End CO
 	
 	-- Pragmatic
+	DECLARE @PPContribution SMALLINT = 4297,
+			@PPJackpotPrize SMALLINT = 4298,
+			@PPTournament SMALLINT = 4299,
+			@PromotionPrize SMALLINT = 4300 
 	;WITH cte_PPWinLossData AS 
 	(
 		SELECT b.SiteId, b.rptDate, b.CurrencyID,
