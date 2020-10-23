@@ -101,7 +101,6 @@ BEGIN
 		BuyBackAmountAndComm		MONEY,
 		TipsAmount					MONEY,
 		TipsAmountDue				MONEY,
-		Promotion					MONEY
 	)
 
 	CREATE TABLE #Exchange
@@ -190,8 +189,6 @@ BEGIN
 		,CAST(0 AS MONEY)	AS TipsAmountBase
 		,CAST(0 AS MONEY)	AS TipsAmountDue
 		,CAST(0 AS MONEY)	AS TipsAmountDueBase
-		,CAST(0 AS MONEY)	AS Promotion
-		,CAST(0 AS MONEY)	AS PromotionBase
 		RETURN
 	END
 
@@ -720,34 +717,22 @@ BEGIN
 	BEGIN
 		DECLARE @ArcadiaGaming_Bonus SMALLINT = 1906
 
-		;WITH cte_WinLossData AS(
-			SELECT b.SiteId, b.rptDate, b.CurrencyID
-				, SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE ISNULL(b.BetCount, 0) END) AS BetCount
-				, SUM(ISNULL(b.Turnover, 0)) Turnover
-				, SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS MemberWL
-				, SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS Promotion
-				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				WHERE
-					b.ProductID = 34
-					AND	b.SiteID = @LicenseeID
-					AND b.rptDate BETWEEN @FromDate AND @ToDate
-					AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
-					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
-				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
-		)
-		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, Company, Promotion)
-		SELECT rptDate, d.CurrencyID
-				, SUM(BetCount)		AS BetCount
-				, SUM(Turnover)		AS Turnover
-				, SUM(MemberWL)		AS Winlost
-				, SUM(-MemberWL * (1 - ISNULL(cm.Rate, p.Rate)))  AS LicenseeWL
-				, SUM(-MemberWL * ISNULL(cm.Rate, p.Rate)) AS Company
-				, SUM(Promotion)	AS Promotion
-		FROM cte_WinLossData d
-			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
-			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND d.CurrencyId = cm.CurrencyId 
-		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
-		GROUP BY rptDate, d.CurrencyID
+		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, Company, WinningPrize)
+		SELECT b.rptDate, b.CurrencyId
+				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE ISNULL(b.BetCount, 0) END) AS BetCount
+				,SUM(ISNULL(b.Turnover, 0)) Turnover
+				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS WinLost
+				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE -ISNULL(b.MemberWL, 0) END * (1 - ISNULL(cm.Rate, p.Rate)))  AS LicenseeWL
+				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE -ISNULL(b.MemberWL, 0) END * ISNULL(cm.Rate, p.Rate)) AS Company
+				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+		INNER JOIN @ChargeInfo p ON b.SiteId = p.LicenseeID
+		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND b.CurrencyId = cm.CurrencyId
+		WHERE b.ProductID = 34
+			AND b.rptDate BETWEEN p.Fromdate AND p.Todate
+			AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
+			AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+		GROUP BY rptDate, b.CurrencyID
 	END
 	ELSE
 	BEGIN
@@ -844,7 +829,6 @@ BEGIN
 		, SUM(ISNULL(d.TicketsPayout, 0))				AS TicketsPayout
 		, SUM(ISNULL(d.CashoutCommission, 0))			AS CashoutCommission
 		, SUM(ISNULL(d.BuyBackAmountAndComm, 0))		AS BuyBackAmountAndComm
-		, SUM(ISNULL(d.Promotion, 0))					AS Promotion
 
 		--Base on currency
 		, CONVERT(MONEY, SUM(ISNULL(d.Turnover * e.Rate, 0)))					AS TurnoverBase
@@ -875,7 +859,6 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.TicketsPayout * e.Rate, 0)))				AS TicketsPayoutBase
 		, CONVERT(MONEY, SUM(ISNULL(d.CashoutCommission * e.Rate, 0)))			AS CashoutCommissionBase
 		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountAndComm * e.Rate, 0)))		AS BuyBackAmountAndCommBase
-		, CONVERT(MONEY, SUM(ISNULL(d.Promotion * e.Rate, 0)))					AS PromotionBase
 	FROM #Result d
 	INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
 	INNER JOIN sortedExchange se ON se.CurrencyCode = e.CurrencyCode
