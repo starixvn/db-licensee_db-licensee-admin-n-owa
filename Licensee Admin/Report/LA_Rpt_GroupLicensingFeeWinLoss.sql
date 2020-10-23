@@ -162,8 +162,6 @@ BEGIN
 	END
 
 	/* Other Products */
-	DECLARE @FreeBetTicketType SMALLINT = 2,
-			@SabaClubProductId SMALLINT = 42
 	DECLARE @ExcludedProductIds TABLE(ProductId INT)
 	INSERT INTO @ExcludedProductIds(ProductId) VALUES (@SB_Product), (@BA_Product), (@CO_Product), (@GD_Product), (@PP_Product)
 	
@@ -183,7 +181,7 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27,28)
 				AND eb.BettypeID IS NULL
-				AND (b.ProductID <> @SabaClubProductId OR ISNULL(b.TicketType, 0) <> @FreeBetTicketType)
+				AND	b.TicketType <> 2 -- Free_Bets_TicketType
 			GROUP BY b.rptDate, ci.PartyID, b.ProductID, b.CurrencyID
 		)
 

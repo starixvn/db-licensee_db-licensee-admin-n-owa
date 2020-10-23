@@ -156,8 +156,6 @@ BEGIN
 
 	IF @ProductCode NOT IN('BA', 'PP', 'SB')
 	BEGIN
-		DECLARE @FreeBetTicketType SMALLINT = 2,
-				@SabaClubProductId SMALLINT = 42
 		INSERT INTO #Temp (PartyID, Rptdate, Currency, TurnOver, Winlost, CommBA, Betcount, LicensingFee)
 		(
 			SELECT PartyID, b.rptDate, b.currencyID

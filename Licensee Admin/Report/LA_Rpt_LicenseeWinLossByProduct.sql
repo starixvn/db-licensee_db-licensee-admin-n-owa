@@ -151,7 +151,7 @@ BEGIN
 				AND b.customercategory NOT IN (27, 28)
 				AND eb.BettypeID IS NULL
 				AND b.ProductID NOT IN (13,15,25,@PragmaticID)
-				AND b.ProductID <> @SabaClubProductId OR ISNULL(b.TicketType, 0) <> @FreeBetTicketType
+				AND	b.TicketType <> 2 -- Free_Bets_TicketType
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, b.ProductId,
 			CASE
 				WHEN b.Bettype = @GD_Tip THEN b.Bettype

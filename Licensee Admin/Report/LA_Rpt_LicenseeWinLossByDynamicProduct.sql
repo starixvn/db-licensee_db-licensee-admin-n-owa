@@ -106,7 +106,7 @@ BEGIN
 		AND b.SiteID NOT IN (SELECT c.LicenseeId FROM @CreditLicenee c)
 		AND b.ProductID IN (SELECT p.ProductId FROM @Products p)
 		AND b.ProductID NOT IN (13,15,25,32) -- exclude BT, CB, CO, PP
-		AND (b.ProductID <> @SabaClubProductId OR ISNULL(b.TicketType, 0) <> @FreeBetTicketType)
+		AND	b.TicketType <> 2 -- Free_Bets_TicketType
 	GROUP BY b.rptdate, b.SiteId, b.ProductId, 
 		CASE WHEN b.Bettype = @GD_Tip THEN b.Bettype
 			 ELSE ISNULL(sbr.BettypeRef, -1)
