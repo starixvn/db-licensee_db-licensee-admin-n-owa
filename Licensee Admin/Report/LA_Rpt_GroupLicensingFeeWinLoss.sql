@@ -20,6 +20,7 @@ AS
 	   - 20200228@Parsons: Support-HID-currency [#128856]
 	   - 20200409@Parsons: Integrate SA Gaming [#129276] 
 	   - 20200820@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
+	   - 20201023@Parsons: Arcadia Gaming Add Bonus [#143597]  
 */
 BEGIN
 	SET NOCOUNT ON	
@@ -51,7 +52,7 @@ BEGIN
 				AND b.ProductID = @BA_Product
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
-				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
+				AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('','') e WHERE b.Bettype = e.BettypeID)
 			GROUP BY ci.PartyID, b.ProductID, currencyID
 		)
 	END	
@@ -110,10 +111,7 @@ BEGIN
 
 	/* PP Product */	
 	DECLARE @PP_Product INT = 32, 
-			@PP_Contribution SMALLINT = 4297,
-			@PP_JackpotPrize SMALLINT = 4298,
-			@PPTournament SMALLINT = 4299,
-			@PromotionPrize SMALLINT = 4300
+			@PP_Contribution SMALLINT = 4297
 	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = @PP_Product) > 0
 	BEGIN
 	INSERT INTO #Report (PartyID, ProductId, CurrencyID, Company)
@@ -129,7 +127,7 @@ BEGIN
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND b.customercategory NOT IN (27,28)
 				AND b.ProductID = @PP_Product
-				AND b.Bettype NOT IN (@PPTournament, @PromotionPrize, @PP_JackpotPrize)
+				AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('','4297') e WHERE b.Bettype = e.BettypeID)
 			GROUP BY ci.PartyID, b.CurrencyID
 		)
 	END
@@ -152,7 +150,7 @@ BEGIN
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27,28)
-				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914,3007)--@SAG_Tip = 3007
+				AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('','') e WHERE b.Bettype = e.BettypeID)
 			GROUP BY b.rptDate, ci.PartyID, b.ProductID, b.CurrencyID
 		)
 
