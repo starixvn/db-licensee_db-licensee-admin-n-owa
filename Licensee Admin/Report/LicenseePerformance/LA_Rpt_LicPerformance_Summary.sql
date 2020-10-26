@@ -33,6 +33,7 @@ AS
 	   - 20200625@Mason: Keep Negative SB Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334]
 	   - 20200629@Parsons: Enhance loading time for Licensee Performance report [#136341]
 	   - 20200820@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
+	   - 20201026@Happy: Arcadia Gaming Add Bonus [#143597]
 
 	Param's Explanation:
 	  + @PartyIDs : a string of list PartyID, separated by ','
@@ -100,10 +101,7 @@ BEGIN
 
 	IF @ProductCode = 'PP'
 	BEGIN		
-		DECLARE @PP_Contribution SMALLINT = 4297,
-				@PP_JackpotPrize SMALLINT = 4298,
-				@PPTournament SMALLINT = 4299,
-				@PromotionPrize SMALLINT = 4300
+		DECLARE @PP_Contribution SMALLINT = 4297
 		INSERT INTO #Temp (PartyID, rptDate, Currency, CommBA, Betcount, TurnOver, Winlost, LicensingFee)
 		(
 			SELECT tp.PartyID, b.rptDate, b.CurrencyID,0
@@ -121,7 +119,7 @@ BEGIN
 					AND (@Currency = 0 OR b.CurrencyID = @Currency)  
 					AND b.customercategory NOT IN (27, 28)
 					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
-					AND b.Bettype NOT IN(@PPTournament, @PromotionPrize, @PP_JackpotPrize)
+					AND NOT EXISTS (SELECT TOP 1 1 FROM bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','4297') e WHERE b.Bettype = e.BettypeID)
 				GROUP BY tp.PartyID, b.rptDate, b.CurrencyID
 		)
 	END
@@ -153,6 +151,7 @@ BEGIN
 			AND (b.CurrencyID <> @CurrencyTest)
 			AND b.StatusId NOT IN (-1, 101, 102, 103)
 			AND b.customercategory NOT IN (27, 28)
+			AND NOT EXISTS (SELECT TOP 1 1 FROM bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('34','') e WHERE b.Bettype = e.BettypeID)
 			GROUP BY PartyID, b.rptDate, b.currencyID
 		)
 	END
