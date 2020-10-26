@@ -58,6 +58,7 @@ AS
 		- 20200810@Parsons: Implement Saba Loyalty Program [#139167]  
 		- 20200909@Parsons: Integrate PG Soft [#138983]  
 		- 20200921@Parsons: Integrate Joker Games [#141421]  
+		- 20201008@Parsons: Integrate WM Live Casino [#141357]  
 
 	Param's Explanation:
 
@@ -468,6 +469,15 @@ BEGIN
 	   SELECT typeid, 56
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 6401 AND 6700
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+	END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'WM')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 51
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 3401 AND 3499
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
