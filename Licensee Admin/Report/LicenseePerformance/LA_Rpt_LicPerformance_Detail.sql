@@ -63,6 +63,7 @@ AS
 	    - 20200828@Parsons: Provide data of "this month last year" [#136417] 
 		- 20200910@Parsons: Implement PP JP for Credit [#138984]
 		- 20201007@Parsons: Always show party row regardless of having data or not [#142970]
+		- 20201027@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -304,7 +305,6 @@ BEGIN
 
 	-- Region: Get Amount by Product
 	CREATE	TABLE #TempData (
-			LicenseeId		INT,
 			PartyId			INT,
 			rptDate			DATETIME,
 			CurrencyId		INT,
@@ -318,33 +318,29 @@ BEGIN
 			IsApplyMinFee	BIT,
 			ExtraAmount		MONEY)
 
-	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,AComm,PComm,ProductId,AmountToCompany,ExtraAmount)
+	;WITH cte_DataSource AS
 	(
-		SELECT	b.SiteID,
+	  SELECT	b.SiteID,
 				p.PartyId,
 				b.rptDate,
 				b.CurrencyID,
-				SUM(CASE WHEN (@DrawFilter = 2 AND b.StatusId = 111) OR b.Bettype IN(@GD_Tip, @PPTournament,@PromotionPrize,@PP_JackpotPrize,@PP_Contribution) THEN 0 ELSE b.BetCount END) AS BetCount,
+				p.ProductId,
+				SUM(CASE WHEN (@DrawFilter = 2 AND b.StatusId = 111) THEN 0 ELSE b.BetCount END) AS BetCount,
 				SUM(b.Turnover * CASE WHEN @DrawFilter IN (2, 3) 
 										THEN CASE	WHEN b.StatusId = 111 THEN 0
 													WHEN b.StatusId IN (114, 115) THEN 0.5
 											 ELSE 1 END
-										ELSE 1 END) * e.Rate AS Turnover,
-				SUM(CASE WHEN b.Bettype IN(@GD_Tip, @PPTournament,@PromotionPrize,@PP_JackpotPrize,@PP_Contribution) THEN 0 ELSE b.MemberWL END) * e.Rate AS WinLoss,
-				SUM(ISNULL(b.CommissionA, 0)) * e.Rate,
-				SUM(ISNULL(b.CommissionP, 0)) * e.Rate,
-				p.ProductId,
-				SUM((CASE  WHEN b.Bettype IN(@GD_Tip, @PPTournament,@PromotionPrize,@PP_JackpotPrize,@PP_Contribution) THEN 0 ELSE -b.MemberWL * ISNULL(cr.Rate, p.Rate) END) - 
+										ELSE 1 END) AS Turnover,
+				SUM(b.MemberWL) AS WinLoss,
+				SUM(ISNULL(b.CommissionA, 0)) AComm,
+				SUM(ISNULL(b.CommissionP, 0)) PComm,
+				SUM(-b.MemberWL * ISNULL(cr.Rate, p.Rate) - 
 					(CASE  WHEN b.ProductId = @BAProductId THEN ISNULL(b.CommissionA, 0)
 						   WHEN b.ProductID = @ExchangeProductId THEN ISNULL(b.CommissionA, 0) + ISNULL(b.CommissionP, 0)
-					       ELSE 0 
-				     END)) * e.Rate AS AmountToCompany,
-				SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0)
-						 WHEN b.Bettype IN (@PPTournament,@PromotionPrize,@PP_JackpotPrize) THEN ISNULL(-b.MemberWL, 0)
-						 ELSE 0
-					END) * e.Rate AS ExtraAmount
+					       ELSE 0
+				     END)) AS AmountToCompany,
+				0 AS ExtraAmount
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 				INNER JOIN @PartyChargeInfo p ON	b.ProductId = p.ProductID 
 													AND p.LicenseeId = b.SiteId
 													AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
@@ -353,15 +349,64 @@ BEGIN
 		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate OR b.rptDate BETWEEN @PrevFromDate AND @PrevToDate)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
-				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914,@SAG_Tip)
+				AND NOT EXISTS (SELECT TOP 1 1 FROM bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') e WHERE b.Bettype = e.BettypeID)
 				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund 
 				AND (@Currency = 0 OR b.CurrencyID = @Currency)
-		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, e.Rate
+		GROUP BY b.rptdate, b.SiteId, p.PartyId, b.CurrencyID, p.ProductId
+
+		UNION ALL
+
+		SELECT	b.SiteID,
+				p.PartyId,
+				b.rptDate,
+				b.CurrencyID,
+				p.ProductId,
+				0 BetCount,
+				0 Turnover,
+				0 WinLoss,
+				0 AComm,
+				0 PComm,
+				0 AmountToCompany,
+				SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0)
+						 WHEN b.Bettype IN (@PPTournament,@PromotionPrize,@PP_JackpotPrize) THEN ISNULL(-b.MemberWL, 0)
+						 ELSE 0
+					END) AS ExtraAmount
+		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+				INNER JOIN @PartyChargeInfo p ON	b.ProductId = p.ProductID 
+													AND p.LicenseeId = b.SiteId
+													AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
+													AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
+				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
+		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate OR b.rptDate BETWEEN @PrevFromDate AND @PrevToDate)
+				AND (b.CurrencyID <> 20)
+				AND b.customercategory NOT IN (27, 28)
+				AND EXISTS (SELECT TOP 1 1 FROM bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') e WHERE b.Bettype = e.BettypeID)
+				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund 
+				AND (@Currency = 0 OR b.CurrencyID = @Currency)
+		GROUP BY b.rptdate, b.SiteId, p.PartyId, b.CurrencyID, p.ProductId
+	)
+
+	INSERT INTO #TempData (PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,AComm,PComm,ProductId,AmountToCompany,ExtraAmount)
+	(
+		SELECT	b.PartyId,
+				b.rptDate,
+				b.CurrencyID,
+				SUM(BetCount)				AS BetCount,
+				SUM(b.Turnover * e.Rate)	AS Turnover,
+				SUM(WinLoss * e.Rate)		AS WinLoss,
+				SUM(b.AComm * e.Rate)		AS AComm,
+				SUM(b.PComm * e.Rate)		AS PComm,
+				b.ProductId,
+				SUM(AmountToCompany * e.Rate)	AS AmountToCompany,
+				SUM(ExtraAmount * e.Rate)		AS ExtraAmount
+		FROM	cte_DataSource b WITH (NOLOCK)
+				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
+		GROUP BY b.PartyId, b.rptdate, b.CurrencyID, b.ProductId
 	)
 
 	-- insert zero winloss for case: product don't have any ticket
-	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,AComm,PComm,ProductId,AmountToCompany)
-	SELECT LicenseeId, PartyId, FromDate, @BaseCurrency,0,0,0,0,0,ProductID,0
+	INSERT INTO #TempData (PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,AComm,PComm,ProductId,AmountToCompany)
+	SELECT PartyId, FromDate, @BaseCurrency,0,0,0,0,0,ProductID,0
 	FROM @PartyChargeInfo
 
 	-- Sum products
