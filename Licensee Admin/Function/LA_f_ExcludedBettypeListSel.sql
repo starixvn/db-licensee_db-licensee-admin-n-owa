@@ -29,6 +29,9 @@ BEGIN
 		SELECT 0 AS ProductID, BettypeID, [Description]
 		FROM (VALUES(999, 'SB - Adjusted Odds')) AS v(BettypeID, [Description]) --SB
 			UNION ALL
+		SELECT 11 AS ProductID, BettypeID, [Description]
+		FROM (VALUES(1706, 'GD Tips')) AS v(BettypeID, [Description]) -- GD
+			UNION ALL
 		SELECT 13 AS ProductID, BettypeID, [Description]
 		FROM (VALUES(901,''),(902,''),(903,''),(904,'')) AS v(BettypeID, [Description]) --Bettrade
 			UNION ALL
