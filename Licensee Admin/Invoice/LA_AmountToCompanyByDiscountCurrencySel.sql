@@ -327,7 +327,8 @@ BEGIN
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId 
 				AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
-				AND b.ProductId = p.ProductID   
+				AND b.ProductId = p.ProductID    
+				AND (p.ProductID NOT IN (11,39) OR b.Bettype = p.Bettype)
 				AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('', '1706,3007,4297') e WHERE b.Bettype = e.BettypeID)
 		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
 	WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)

@@ -30,7 +30,8 @@ AS
 		- 20191017@Parsons: Non-peak hour promotion [#119538]
 		- 20191209@Parsons: PP tournament [#123958] 
 		- 20200505@Parsons: Special handling for INH market [#128570] 
-		- 20200714@Parsons: Implement PP Jackpot [RedmineID: #137306]
+		- 20200714@Parsons: Implement PP Jackpot [RedmineID: #137306] 
+		- 20201028@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -567,6 +568,23 @@ BEGIN
 	END
 	-- End region Deduct promotion prizes
  
+	-- Region Arcadia Gaming: Bonus amount
+	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = 34))
+	BEGIN
+		DECLARE @BonusAmount MONEY
+		SELECT @BonusAmount = SUM(p.MemberWL * e.Rate)
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct p WITH (NOLOCK) 
+			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'CC', 'OA', 1) pc ON p.SiteID = pc.LicenseeId
+			INNER JOIN #Exchange e ON p.RptDate = e.ExchangeDate AND p.CurrencyID = e.ExchangeID
+			WHERE p.RptDate BETWEEN @FromDate AND @ToDate AND p.ProductID = 34 AND p.Bettype = 1906 -- Arcadia Gaming
+
+		IF(ISNULL(@BonusAmount, 0) > 0)
+		BEGIN
+			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
+			VALUES(0,'','',33,@BonusAmount,0)
+		END
+	END
+	-- End region
 	SELECT	f.ProductId,
 			f.ProductCode,
 			f.ProductName,

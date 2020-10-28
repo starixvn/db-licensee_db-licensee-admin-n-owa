@@ -95,7 +95,8 @@ BEGIN
 			@PP_Contribution SMALLINT = 4297,
 			@PP_JackpotPrize SMALLINT = 4298,
 			@PPTournament SMALLINT = 4299,
-			@PromotionPrize SMALLINT = 4300
+			@PromotionPrize SMALLINT = 4300,
+			@ArcadiaGamingBonus SMALLINT = 1906
 
 	-- *********************************************************************************************************
 	-- *** Calculate Previous FromDate, Previous ToDate from FromDate, ToDate
@@ -368,7 +369,7 @@ BEGIN
 				0 PComm,
 				0 AmountToCompany,
 				SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0)
-						 WHEN b.Bettype IN (@PPTournament,@PromotionPrize,@PP_JackpotPrize) THEN ISNULL(-b.MemberWL, 0)
+						 WHEN b.Bettype IN (@PPTournament,@PromotionPrize,@PP_JackpotPrize,@ArcadiaGamingBonus) THEN ISNULL(-b.MemberWL, 0)
 						 ELSE 0
 					END) AS ExtraAmount
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
