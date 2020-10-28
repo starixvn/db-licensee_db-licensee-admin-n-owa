@@ -264,7 +264,7 @@ BEGIN
 			AND (@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c))
 			AND b.SiteID IN (SELECT p.LicenseeId FROM #tmpParty p)
 			AND b.rptDate BETWEEN @FromDate AND @ToDate
-			AND NOT EXISTS (SELECT TOP 1 1 FROM bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') e WHERE b.Bettype = e.BettypeID)
+			AND NOT EXISTS (SELECT TOP 1 1 FROM bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','4297') e WHERE b.Bettype = e.BettypeID)
 
 		;WITH cte_Data AS
 		(

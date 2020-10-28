@@ -307,7 +307,6 @@ BEGIN
 	INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID 
 		AND p.LicenseeId = b.SiteId
 		AND (b.rptDate BETWEEN p.FromDate AND p.ToDate) 
-		AND b.Bettype = p.Bettype
 		AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('', '1706,3007,4297') e WHERE b.Bettype = e.BettypeID)
 	LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeID AND b.CurrencyId = cr.CurrencyID
 	WHERE (b.rptDate BETWEEN @FromDate AND @ToDate)

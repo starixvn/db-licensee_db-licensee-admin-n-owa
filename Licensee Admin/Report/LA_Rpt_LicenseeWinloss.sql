@@ -455,7 +455,7 @@ BEGIN
 			AND (@Currency = 0 OR b.CurrencyID = @Currency)
 			AND (b.CurrencyID <> @CurrencyTest)
 			AND b.customercategory NOT IN (27,28)
-			AND NOT EXISTS (SELECT TOP 1 1 FROM bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') e WHERE b.Bettype = e.BettypeID)
+			AND NOT EXISTS (SELECT TOP 1 1 FROM bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','4297') e WHERE b.Bettype = e.BettypeID)
 		GROUP BY b.rptDate, ci.PartyID, b.ProductID, b.CurrencyID
 
 		INSERT INTO #Report (PartyID, ReportDate, CurrencyID, Turnover, Winlost, LicenseeWL,Company, Betcount)
