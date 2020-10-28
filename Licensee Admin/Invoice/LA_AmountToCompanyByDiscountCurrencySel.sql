@@ -30,6 +30,7 @@ AS
 		- 20200624@Parsons: Keep Negative Licensing Fee for 2 special licensees 9wickets, 9Wsports [#136334] 
 		- 20200812@Parsons: Implement Group Min Fee [#134492] 
 	    - 20200821@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
+		- 20201027@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -327,8 +328,8 @@ BEGIN
 		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId 
 				AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
 				AND b.ProductId = p.ProductID   
-				AND (p.ProductID NOT IN (11,39) OR b.Bettype = p.Bettype)
-				AND (b.Bettype NOT IN (@PPTournament, @PromotionPrize, @PP_JackpotPrize))
+				AND b.Bettype = p.Bettype
+				AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('', '1706,3007,4297') e WHERE b.Bettype = e.BettypeID)
 		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
 	WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND b.customercategory NOT IN (27, 28)

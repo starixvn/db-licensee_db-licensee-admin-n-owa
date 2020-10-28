@@ -30,6 +30,7 @@ AS
 		- 20200505@Parsons: Special handling for INH market [#128570] 
 		- 20200714@Parsons: Implement PP Jackpot [RedmineID: #137306]
 		- 20200803@Parsons: Implement Group Min Fee [#134492]
+		- 20201027@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
 
 	Parameters:
 		@IsApplyDiscountMinfee: apply minfee term to discount value
@@ -306,8 +307,8 @@ BEGIN
 	INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID 
 		AND p.LicenseeId = b.SiteId
 		AND (b.rptDate BETWEEN p.FromDate AND p.ToDate) 
-		AND (p.ProductID NOT IN (11, 39) OR b.Bettype = p.Bettype)
-		AND (b.Bettype NOT IN (@PPTournament, @PromotionPrize, @PP_JackpotPrize))
+		AND b.Bettype = p.Bettype
+		AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('', '1706,3007,4297') e WHERE b.Bettype = e.BettypeID)
 	LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeID AND b.CurrencyId = cr.CurrencyID
 	WHERE (b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND b.customercategory NOT IN (27, 28)
