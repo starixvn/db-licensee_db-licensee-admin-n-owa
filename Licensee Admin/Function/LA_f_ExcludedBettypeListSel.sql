@@ -20,7 +20,9 @@ AS
 		- 20201023@Parsons: LA Arcadia Gaming Add Bonus [#143597]  
 
 	Param's Explanation:
-
+		@ProductIDs: Filter by list of products 
+		@ExceptedBettypeIDs: Do not return these bettype. 
+			Ex: SELECT * FROM LA_f_ExcludedBettypeListSel('', '4297')
 */
 
 BEGIN
