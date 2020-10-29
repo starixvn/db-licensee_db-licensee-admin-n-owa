@@ -146,7 +146,7 @@ BEGIN
 		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND b.customercategory NOT IN (27, 28)
-				AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('','') e WHERE b.Bettype = e.BettypeID)
+				AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('','1706') e WHERE b.Bettype = e.BettypeID)
 				AND b.ProductID NOT IN (13,15,25,@PragmaticID)
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, b.ProductId,
 			CASE
