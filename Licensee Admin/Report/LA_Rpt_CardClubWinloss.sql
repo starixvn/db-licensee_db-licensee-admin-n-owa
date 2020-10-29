@@ -117,8 +117,8 @@ BEGIN
 		SUM(TotalTrans),
 		SUM(CustomerWinLoss),
 		- SUM(CustomerWinLoss) AS LicenseeWinLoss,
-		- SUM(CASE WHEN ci.isDeposit = 1 THEN (s.CustomerWinLoss * ISNULL(cr.Rate, ci.Rate)) ELSE s.CreditLicensingFee END) AS LicensingFee,
-		- SUM(CustomerWinLoss * (CASE WHEN s.Bettype IN (@TaiXiu_BettypeId, @XocDia_BettypeId, @Lotto3_BettypeId, @HiLo_BettypeId) THEN @MidasRate3rd ELSE ci.Rate3rd END)),
+		SUM(CASE WHEN ci.isDeposit = 1 THEN (-s.CustomerWinLoss  * ISNULL(cr.Rate, ci.Rate)) ELSE s.CreditLicensingFee END - s.Promotion) AS LicensingFee,
+		SUM(-CustomerWinLoss * (CASE WHEN s.Bettype IN (@TaiXiu_BettypeId, @XocDia_BettypeId, @Lotto3_BettypeId, @HiLo_BettypeId) THEN @MidasRate3rd ELSE ci.Rate3rd END) - s.Promotion),
 		SUM(s.Promotion) AS Promotion
 	FROM cte_Summary s INNER JOIN #ChargeRate ci ON s.SiteID = ci.LicenseeId AND Winlostdate BETWEEN ci.FromDate AND ci.ToDate
 	LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeId = ci.ChargeId AND cr.CurrencyId = s.CurrencyId
