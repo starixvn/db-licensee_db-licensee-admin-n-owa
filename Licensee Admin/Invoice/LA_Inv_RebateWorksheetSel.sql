@@ -229,7 +229,7 @@ BEGIN
 	(
 		SELECT pc.ProductID, SUM(CASE WHEN b.Bettype = @PP_Contribution_Bettype THEN -b.GrossWL ELSE -b.MemberWL END  * e.Rate) AS ExtraAmount
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'PP,CC', 'OA', 1) pc ON b.SiteID = pc.LicenseeId
+			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'PP,CC', 'OA', 1) pc ON b.SiteID = pc.LicenseeId AND b.ProductID = pc.ProductID
 			INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 			INNER JOIN LA_f_ExcludedBettypeListSel('32,34', '') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND b.[StatusId] NOT IN (-1, 101, 102, 103)
