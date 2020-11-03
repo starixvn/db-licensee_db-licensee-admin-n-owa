@@ -100,7 +100,7 @@ BEGIN
 		CashoutCommission			MONEY,
 		BuyBackAmountAndComm		MONEY,
 		TipsAmount					MONEY,
-		TipsAmountDue				MONEY,
+		TipsAmountDue				MONEY
 	)
 
 	CREATE TABLE #Exchange
@@ -716,22 +716,32 @@ BEGIN
 	ELSE IF (@ProductCode = 'CC')
 	BEGIN
 		DECLARE @ArcadiaGaming_Bonus SMALLINT = 1906
-
+		;WITH cte_ArcadiaData AS
+		(
+			SELECT b.SiteId, b.rptDate, b.CurrencyId
+				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE ISNULL(b.BetCount, 0) END) AS BetCount
+				,SUM(ISNULL(b.Turnover, 0)) AS Turnover
+				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS MemberWL
+				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
+			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			WHERE b.ProductID = 34
+				AND b.rptDate BETWEEN @FromDate AND @ToDate
+				AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
+				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+			GROUP BY b.SiteId, rptDate, b.CurrencyID
+		)
 		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, Company, WinningPrize)
 		SELECT b.rptDate, b.CurrencyId
-				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE ISNULL(b.BetCount, 0) END) AS BetCount
-				,SUM(ISNULL(b.Turnover, 0)) Turnover
-				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS WinLost
-				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE -ISNULL(b.MemberWL, 0) END * (1 - ISNULL(cm.Rate, p.Rate)))  AS LicenseeWL
-				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE -ISNULL(b.MemberWL, 0) END * ISNULL(cm.Rate, p.Rate)) AS Company
-				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
-		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			,SUM(Betcount) 
+			,SUM(Turnover) 
+			,SUM(MemberWL) 
+			,SUM(-MemberWL * (1 - ISNULL(cm.Rate, p.Rate)))				AS LicenseeWL
+			,SUM(-MemberWL * ISNULL(cm.Rate, p.Rate) - WinningPrize)	AS Company
+			,SUM(WinningPrize) 
+		FROM cte_ArcadiaData b
 		INNER JOIN @ChargeInfo p ON b.SiteId = p.LicenseeID
 		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND b.CurrencyId = cm.CurrencyId
-		WHERE b.ProductID = 34
-			AND b.rptDate BETWEEN p.Fromdate AND p.Todate
-			AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
-			AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+		WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY rptDate, b.CurrencyID
 	END
 	ELSE
