@@ -22,6 +22,7 @@ AS
 	  - 20200412@Parsons: Integrate SA Gaming [#129276]
 	  - 20200427@Parsons: Intergrate IBCBet Win loss [#131165]
 	  - 20200805@Parsons: Show net amount for PP in summary sheet [#138932]
+	  - 20201103@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -218,24 +219,27 @@ BEGIN
 	SELECT p.ProductId, 0 FROM @Products p
 	WHERE p.ProductId NOT IN (SELECT r.ProductId FROM @Result r)
 
-	--Region Show net amount for PP in summary sheet
-	DECLARE @ExtraPragmaticAmount MONEY
+	--Region Show net amount for PP,CC in summary sheet
 	DECLARE @PP_Contribution_Bettype SMALLINT = 4297,
 			@PP_JackpotPrize_Bettype SMALLINT = 4298,
 			@PPTournament_Bettype SMALLINT = 4299,
-			@PromotionPrize_Bettype SMALLINT = 4300
-	SELECT @ExtraPragmaticAmount = SUM(CASE WHEN b.Bettype = @PP_Contribution_Bettype THEN -b.GrossWL ELSE -b.MemberWL END  * e.Rate)
-			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'PP', 'OA', 1) pc ON b.SiteID = pc.LicenseeId
-				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-			WHERE b.Bettype IN (@PP_Contribution_Bettype, @PP_JackpotPrize_Bettype, @PPTournament_Bettype, @PromotionPrize_Bettype)
-				AND b.rptDate BETWEEN @FromDate AND @ToDate
-				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
-	
+			@PromotionPrize_Bettype SMALLINT = 4300,
+			@CC_ArcadiaBonus_Bettype SMALLINT = 1906
+	;WITH cte_ExtraAmountData AS 
+	(
+		SELECT pc.ProductID, SUM(CASE WHEN b.Bettype = @PP_Contribution_Bettype THEN -b.GrossWL ELSE -b.MemberWL END  * e.Rate) AS ExtraAmount
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'PP,CC', 'OA', 1) pc ON b.SiteID = pc.LicenseeId
+			INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
+			INNER JOIN LA_f_ExcludedBettypeListSel('32,34', '') eb ON b.Bettype = eb.BettypeID
+		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+		GROUP BY pc.ProductID
+	)
 	UPDATE @Result
-	SET AmountToCompany = CASE WHEN AmountToCompany < 0 THEN 0 ELSE AmountToCompany END + ISNULL(@ExtraPragmaticAmount, 0)
-	WHERE ProductId = 32
-	--End-Region Show net amount for PP in summary sheet
+	SET AmountToCompany = CASE WHEN AmountToCompany < 0 THEN 0 ELSE AmountToCompany END + ISNULL(ExtraAmount, 0)
+	FROM @Result r
+	INNER JOIN cte_ExtraAmountData cte ON r.ProductId = cte.ProductID
+	--End-Region Show net amount for PP,CC in summary sheet
 
 	DECLARE @Remark NVARCHAR(4000) = (SELECT TOP 1 x.RebateRemark FROM #AmountToCompany x WHERE ISNULL(x.RebateRemark,'') <> '')
 
@@ -250,7 +254,7 @@ BEGIN
 						WHEN ISNULL(rs.AmountToCompany,0) < 0 THEN 0 
 						ELSE ISNULL(rs.AmountToCompany,0) 
 					END
-				WHEN rs.ProductId = 32 THEN ISNULL(rs.AmountToCompany,0)
+				WHEN rs.ProductId IN(32,34) THEN ISNULL(rs.AmountToCompany,0)
 				ELSE ISNULL(d.Fee, rs.AmountToCompany) - ISNULL(d.Discount,0)
 			END	) AS TotalAmount
 	FROM @Result rs
