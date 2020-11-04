@@ -117,7 +117,7 @@ BEGIN
 		SUM(TotalTrans),
 		SUM(CustomerWinLoss),
 		- SUM(CustomerWinLoss) AS LicenseeWinLoss,
-		SUM(CASE WHEN ci.isDeposit = 1 THEN (-s.CustomerWinLoss  * ISNULL(cr.Rate, ci.Rate)) ELSE s.CreditLicensingFee END - s.Promotion) AS LicensingFee,
+		SUM(CASE WHEN ci.isDeposit = 1 THEN (-s.CustomerWinLoss  * ISNULL(cr.Rate, ci.Rate)) ELSE s.CreditLicensingFee END) AS LicensingFee,
 		SUM(-CustomerWinLoss * (CASE WHEN s.Bettype IN (@TaiXiu_BettypeId, @XocDia_BettypeId, @Lotto3_BettypeId, @HiLo_BettypeId) THEN @MidasRate3rd ELSE ci.Rate3rd END) - s.Promotion),
 		SUM(s.Promotion) AS Promotion
 	FROM cte_Summary s INNER JOIN #ChargeRate ci ON s.SiteID = ci.LicenseeId AND Winlostdate BETWEEN ci.FromDate AND ci.ToDate
@@ -206,7 +206,7 @@ BEGIN
 			SUM(Turnover),
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
-			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
+			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END - Promotion),
 			SUM(PayToSupplier),
 			SUM(Promotion)
 		FROM TotalByParty
@@ -242,17 +242,17 @@ BEGIN
 		r.Turnover AS TurnoverOriginal,
 		CAST((r.CustomerWinLoss) AS MONEY) AS CustomerWinLossOriginal,
 		CAST((r.LicenseeWinLoss) AS MONEY) AS LicenseeWinLossOriginal,
-		CAST((r.LicensingFee) AS MONEY) AS LicensingFeeOriginal,
+		CAST((r.LicensingFee - r.Promotion) AS MONEY) AS LicensingFeeOriginal,
 		CAST((r.PayToSupplier) AS MONEY) AS PayToSupplierOriginal,
-		r.LicensingFee - r.PayToSupplier AS CompanyIncomeOriginal,
+		(r.LicensingFee - r.Promotion) - r.PayToSupplier AS CompanyIncomeOriginal,
 		CAST((r.Promotion) AS MONEY) AS PromotionOriginal,
 		-- Select by base currency
 		r.Turnover * e.Rate AS Turnover,
 		CAST((r.CustomerWinLoss * e.Rate) AS MONEY) AS CustomerWinLoss,
 		CAST((r.LicenseeWinLoss * e.Rate) AS MONEY) AS LicenseeWinLoss,
-		CAST((r.LicensingFee * e.Rate) AS MONEY) AS LicensingFee,
+		CAST(((r.LicensingFee - r.Promotion) * e.Rate) AS MONEY) AS LicensingFee,
 		CAST((r.PayToSupplier * e.Rate)AS MONEY) AS PayToSupplier,
-		CAST((r.LicensingFee - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome,
+		CAST(((r.LicensingFee - r.Promotion) - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome,
 		CAST((r.Promotion * e.Rate)AS MONEY) AS Promotion
 	FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.WinLossDate = e.ExchangeDate
 	
