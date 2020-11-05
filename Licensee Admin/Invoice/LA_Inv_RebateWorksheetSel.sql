@@ -238,7 +238,7 @@ BEGIN
 	UPDATE @Result
 	SET AmountToCompany = CASE WHEN AmountToCompany < 0 THEN 0 ELSE AmountToCompany END + ISNULL(ExtraAmount, 0)
 	FROM @Result r
-	INNER JOIN cte_ExtraAmountData cte ON r.ProductId = cte.ProductID
+	LEFT JOIN cte_ExtraAmountData cte ON r.ProductId = cte.ProductID
 	--End-Region Show net amount for PP,CC in summary sheet
 
 	DECLARE @Remark NVARCHAR(4000) = (SELECT TOP 1 x.RebateRemark FROM #AmountToCompany x WHERE ISNULL(x.RebateRemark,'') <> '')
