@@ -333,7 +333,7 @@ BEGIN
 				@CashinShare_ChargeType,
 				@GDTip_ChargeType
 			)
-			AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel_UAT1('11,32,34,39', '4297') eb WHERE b.Bettype = eb.BettypeID)
+			AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('11,32,34,39', '4297') eb WHERE b.Bettype = eb.BettypeID)
 		GROUP BY p.PartyID,b.rptdate,p.ProductId,b.CurrencyId
 
 		-- includes extra values: gdtip, PP JP & Prize
@@ -350,7 +350,7 @@ BEGIN
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 		WHERE b.rptDate BETWEEN p.FromDate AND p.ToDate
 			AND (p.ProductID IN(0, @PP, @CC) OR p.ChargeType = @GDTip_ChargeType)
-			AND (b.Bettype = @SabaPromotion_Bettype OR EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel_UAT1('11,32,34,39', '') eb WHERE b.Bettype = eb.BettypeID))
+			AND (b.Bettype = @SabaPromotion_Bettype OR EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('11,32,34,39', '') eb WHERE b.Bettype = eb.BettypeID))
 		GROUP BY p.PartyID,b.rptdate,p.ProductId,b.CurrencyId
 
 		-- CB
