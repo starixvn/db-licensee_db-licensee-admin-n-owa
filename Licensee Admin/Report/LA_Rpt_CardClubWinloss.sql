@@ -242,17 +242,15 @@ BEGIN
 		r.Turnover AS TurnoverOriginal,
 		CAST((r.CustomerWinLoss) AS MONEY) AS CustomerWinLossOriginal,
 		CAST((r.LicenseeWinLoss) AS MONEY) AS LicenseeWinLossOriginal,
-		CAST((r.LicensingFee - r.Promotion) AS MONEY) AS LicensingFeeOriginal,
+		CAST((r.LicensingFee) AS MONEY) AS AmountWithoutPromotionOriginal,
 		CAST((r.PayToSupplier) AS MONEY) AS PayToSupplierOriginal,
-		(r.LicensingFee - r.Promotion) - r.PayToSupplier AS CompanyIncomeOriginal,
 		CAST((r.Promotion) AS MONEY) AS PromotionOriginal,
 		-- Select by base currency
 		r.Turnover * e.Rate AS Turnover,
 		CAST((r.CustomerWinLoss * e.Rate) AS MONEY) AS CustomerWinLoss,
 		CAST((r.LicenseeWinLoss * e.Rate) AS MONEY) AS LicenseeWinLoss,
-		CAST(((r.LicensingFee - r.Promotion) * e.Rate) AS MONEY) AS LicensingFee,
+		CAST((r.LicensingFee * e.Rate) AS MONEY) AS AmountWithoutPromotion,
 		CAST((r.PayToSupplier * e.Rate)AS MONEY) AS PayToSupplier,
-		CAST(((r.LicensingFee - r.Promotion) - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome,
 		CAST((r.Promotion * e.Rate)AS MONEY) AS Promotion
 	FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.WinLossDate = e.ExchangeDate
 	
