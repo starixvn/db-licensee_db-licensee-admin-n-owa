@@ -100,8 +100,7 @@ BEGIN
 			SUM(b.Turnover) AS Turnover,
 			SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE b.BetCount END) AS TotalTrans,
 			SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE b.WinLoss END) AS CustomerWinLoss,
-			SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN b.WinLoss ELSE 0 END) AS Promotion,
-			SUM(CASE WHEN ci.isDeposit = 1 THEN 0 ELSE b.WinLoss + b.WinLossA + b.WinLossM + b.WinLossS + b.CommissionM END) AS CreditLicensingFee
+			SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN b.WinLoss ELSE 0 END) AS Promotion
 		FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
 		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate 
@@ -117,7 +116,7 @@ BEGIN
 		SUM(TotalTrans),
 		SUM(CustomerWinLoss),
 		- SUM(CustomerWinLoss) AS LicenseeWinLoss,
-		SUM(CASE WHEN ci.isDeposit = 1 THEN (-s.CustomerWinLoss  * ISNULL(cr.Rate, ci.Rate)) ELSE s.CreditLicensingFee END) AS LicensingFee,
+		SUM(CASE WHEN ci.isDeposit = 1 THEN (-s.CustomerWinLoss  * ISNULL(cr.Rate, ci.Rate)) ELSE 0 END) AS LicensingFee,
 		SUM(-CustomerWinLoss * (CASE WHEN s.Bettype IN (@TaiXiu_BettypeId, @XocDia_BettypeId, @Lotto3_BettypeId, @HiLo_BettypeId) THEN @MidasRate3rd ELSE ci.Rate3rd END) - s.Promotion),
 		SUM(s.Promotion) AS Promotion
 	FROM cte_Summary s INNER JOIN #ChargeRate ci ON s.SiteID = ci.LicenseeId AND Winlostdate BETWEEN ci.FromDate AND ci.ToDate
