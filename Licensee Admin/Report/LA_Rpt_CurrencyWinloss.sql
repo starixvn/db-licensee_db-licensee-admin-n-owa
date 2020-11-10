@@ -46,6 +46,7 @@ AS
 	   - 20200601@Parsons: Amend Currency WL report [#135055]
 	   - 20200806@Happy: Enhancement requests for Currency WL Report and Platform WL Report [#138249]
 	   - 20200821@Happy: Implement PP Jackpot changes in reports phase 2 [#139055]
+	   - 20201021@Happy: Arcadia Gaming offers Bonus [#143597]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -55,11 +56,8 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON 
-	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007,
-			@PP_Contribution SMALLINT = 4297,
-			@PP_JackpotPrize SMALLINT = 4298,
-			@PPTournament SMALLINT = 4299,
-			@PromotionPrize SMALLINT = 4300
+	DECLARE @GD_Tip SMALLINT = 1706,
+			@PP_Contribution SMALLINT = 4297
 
 	DECLARE @CurrencyTest INT = 20
 	-- currency list
@@ -260,13 +258,14 @@ BEGIN
 		INTO #tmpData
 		FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
 		INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
+		LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','4297') eb ON b.Bettype = eb.BettypeID
 		WHERE b.CurrencyID <> @CurrencyTest
 			AND b.[Status] NOT IN (-1, 101, 102, 103)
 			AND b.CustomerCategory NOT IN (27,28)
 			AND (@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c))
 			AND b.SiteID IN (SELECT p.LicenseeId FROM #tmpParty p)
 			AND b.rptDate BETWEEN @FromDate AND @ToDate
-			AND b.Bettype NOT IN(@PPTournament, @PromotionPrize, @PP_JackpotPrize, @SAG_Tip)
+			AND eb.BettypeID IS NULL
 
 		;WITH cte_Data AS
 		(

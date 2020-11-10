@@ -20,6 +20,7 @@ AS
 	   - 20200228@Parsons: Support-HID-currency [#128856]
 	   - 20200409@Parsons: Integrate SA Gaming [#129276] 
 	   - 20200820@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
+	   - 20201023@Parsons: Arcadia Gaming Add Bonus [#143597]  
 */
 BEGIN
 	SET NOCOUNT ON	
@@ -47,11 +48,12 @@ BEGIN
 				ON b.SiteID = ci.LicenseeID 
 					AND b.ProductID = ci.ProductID
 					AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+			LEFT JOIN LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeID
 			WHERE b.rptDate BETWEEN @Fromdate AND @Todate
 				AND b.ProductID = @BA_Product
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
-				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
+				AND eb.BettypeID IS NULL
 			GROUP BY ci.PartyID, b.ProductID, currencyID
 		)
 	END	
@@ -110,10 +112,7 @@ BEGIN
 
 	/* PP Product */	
 	DECLARE @PP_Product INT = 32, 
-			@PP_Contribution SMALLINT = 4297,
-			@PP_JackpotPrize SMALLINT = 4298,
-			@PPTournament SMALLINT = 4299,
-			@PromotionPrize SMALLINT = 4300
+			@PP_Contribution SMALLINT = 4297
 	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = @PP_Product) > 0
 	BEGIN
 	INSERT INTO #Report (PartyID, ProductId, CurrencyID, Company)
@@ -125,11 +124,12 @@ BEGIN
 										 AND b.ProductID = ci.ProductID 
 										 AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
+			LEFT JOIN LA_f_ExcludedBettypeListSel('','4297') eb ON b.Bettype = eb.BettypeID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND b.customercategory NOT IN (27,28)
 				AND b.ProductID = @PP_Product
-				AND b.Bettype NOT IN (@PPTournament, @PromotionPrize, @PP_JackpotPrize)
+				AND eb.BettypeID IS NULL
 			GROUP BY ci.PartyID, b.CurrencyID
 		)
 	END
@@ -148,11 +148,12 @@ BEGIN
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN (SELECT DISTINCT PartyId, LicenseeId, ProductID FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci 
 					ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
+			LEFT JOIN LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27,28)
-				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914,3007)--@SAG_Tip = 3007
+				AND eb.BettypeID IS NULL
 			GROUP BY b.rptDate, ci.PartyID, b.ProductID, b.CurrencyID
 		)
 

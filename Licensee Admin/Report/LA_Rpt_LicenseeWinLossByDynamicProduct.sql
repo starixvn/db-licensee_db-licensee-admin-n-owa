@@ -25,17 +25,14 @@ AS
 	    - 20191205@Mason: PP tournament [#123958]
 	    - 20200409@Parsons: Integrate SA Gaming [#129276]
 	    - 20200820@Happy: Implement PP JP Changes In Reports Phase 2 [#139055]
+	    - 20201026@Happy: Arcadia Gaming Add Bonus [#143597]
 */
 
 BEGIN
 	SET NOCOUNT ON
 	
 	DECLARE @GD_Tip SMALLINT = 1706,
-			@SAG_Tip SMALLINT = 3007,
-			@PP_Contribution SMALLINT = 4297,
-			@PP_JackpotPrize SMALLINT = 4298,
-			@PPTournament SMALLINT = 4299,
-			@PromotionPrize SMALLINT = 4300
+			@PP_Contribution SMALLINT = 4297
 
 	SELECT * INTO #Exchange FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
@@ -98,11 +95,12 @@ BEGIN
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 	INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
 	LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.Bettype = b.Bettype
+	LEFT JOIN LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeID
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 		AND b.StatusId NOT IN (-1, 101, 102, 103)
 		AND b.CurrencyID <> 20
 		AND b.CustomerCategory NOT IN (27, 28)
-		AND b.Bettype NOT IN (901,902,903,904,911,912,913,914,@PromotionPrize,@PPTournament,@SAG_Tip)
+		AND eb.BettypeID IS NULL
 		AND b.SiteID NOT IN (SELECT c.LicenseeId FROM @CreditLicenee c)
 		AND b.ProductID IN (SELECT p.ProductId FROM @Products p)
 		AND b.ProductID NOT IN (13,15,25,32) -- exclude BT, CB, CO, PP
@@ -177,12 +175,13 @@ BEGIN
 		CAST(SUM((CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) * e.BaseCurrencyRate) AS MONEY)
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 		INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
+		LEFT JOIN LA_f_ExcludedBettypeListSel('','4297') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.StatusId NOT IN (-1, 101, 102, 103)
 			AND b.CurrencyID <> 20
 			AND b.CustomerCategory NOT IN (27, 28)
 			AND b.ProductID = 32
-			AND b.Bettype NOT IN (@PromotionPrize, @PPTournament, @PP_JackpotPrize)
+			AND eb.BettypeID IS NULL
 		GROUP BY b.rptDate, b.SiteId, b.ProductId, b.Bettype
 	END
 
