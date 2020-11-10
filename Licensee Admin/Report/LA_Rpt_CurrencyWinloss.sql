@@ -258,13 +258,14 @@ BEGIN
 		INTO #tmpData
 		FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
 		INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
+		LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','4297') eb ON b.Bettype = eb.BettypeID
 		WHERE b.CurrencyID <> @CurrencyTest
 			AND b.[Status] NOT IN (-1, 101, 102, 103)
 			AND b.CustomerCategory NOT IN (27,28)
 			AND (@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c))
 			AND b.SiteID IN (SELECT p.LicenseeId FROM #tmpParty p)
 			AND b.rptDate BETWEEN @FromDate AND @ToDate
-			AND NOT EXISTS (SELECT TOP 1 1 FROM bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','4297') e WHERE b.Bettype = e.BettypeID)
+			AND eb.BettypeID IS NULL
 
 		;WITH cte_Data AS
 		(

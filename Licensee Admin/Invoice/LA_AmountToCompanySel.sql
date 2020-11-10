@@ -308,12 +308,13 @@ BEGIN
 		AND p.LicenseeId = b.SiteId
 		AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)  
 		AND (p.ProductID NOT IN (11, 39) OR b.Bettype = p.Bettype)
-		AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('', '1706,3007,4297') e WHERE b.Bettype = e.BettypeID)
 	LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeID AND b.CurrencyId = cr.CurrencyID
+	LEFT JOIN LA_f_ExcludedBettypeListSel('', '1706,3007,4297') eb ON b.Bettype = eb.BettypeID
 	WHERE (b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
 			AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
+			AND eb.BettypeID IS NULL
 	GROUP BY p.PartyId,b.rptdate,p.ProductId,b.CurrencyId
 
 	-- 2.2 insert product don't have any ticket

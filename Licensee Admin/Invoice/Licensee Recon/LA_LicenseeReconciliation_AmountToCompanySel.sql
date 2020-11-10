@@ -327,13 +327,14 @@ BEGIN
 		INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID AND p.LicenseeId = b.SiteId AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 		LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
+		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39', '4297') eb ON b.Bettype = eb.BettypeID
 		WHERE p.ChargeType NOT IN (
 				@CashoutComm_ChargeType,
 				@CommissionShare_ChargeType,
 				@CashinShare_ChargeType,
 				@GDTip_ChargeType
 			)
-			AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('11,32,34,39', '4297') eb WHERE b.Bettype = eb.BettypeID)
+			AND eb.BettypeID IS NULL
 		GROUP BY p.PartyID,b.rptdate,p.ProductId,b.CurrencyId
 
 		-- includes extra values: gdtip, PP JP & Prize
@@ -348,9 +349,10 @@ BEGIN
 		FROM #tmpBettingByProduct b
 		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = (CASE WHEN p.ProductID = 0 THEN @SPR ELSE p.ProductID END)
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
+		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39', '') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN p.FromDate AND p.ToDate
 			AND (p.ProductID IN(0, @PP, @CC) OR p.ChargeType = @GDTip_ChargeType)
-			AND (b.Bettype = @SabaPromotion_Bettype OR EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('11,32,34,39', '') eb WHERE b.Bettype = eb.BettypeID))
+			AND (b.Bettype = @SabaPromotion_Bettype OR eb.BettypeID IS NOT NULL)
 		GROUP BY p.PartyID,b.rptdate,p.ProductId,b.CurrencyId
 
 		-- CB

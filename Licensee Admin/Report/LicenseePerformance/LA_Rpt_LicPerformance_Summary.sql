@@ -113,13 +113,14 @@ BEGIN
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 					INNER JOIN (SELECT DISTINCT ChargeId, PartyID, LicenseeID, Rate, Fromdate, Todate FROM @tmpParty) tp ON tp.LicenseeID = b.SiteID AND b.rptDate BETWEEN tp.Fromdate AND tp.Todate
 					LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = tp.ChargeId AND cr.CurrencyID = b.CurrencyId
+					LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','4297') eb ON b.Bettype = eb.BettypeID
 				WHERE b.ProductID = 32
 					AND b.rptDate BETWEEN @FromDate AND @ToDate
 					AND (b.CurrencyID <> @CurrencyTest)
 					AND (@Currency = 0 OR b.CurrencyID = @Currency)  
 					AND b.customercategory NOT IN (27, 28)
 					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
-					AND NOT EXISTS (SELECT TOP 1 1 FROM bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','4297') e WHERE b.Bettype = e.BettypeID)
+					AND eb.BettypeID IS NULL
 				GROUP BY tp.PartyID, b.rptDate, b.CurrencyID
 		)
 	END
@@ -146,12 +147,13 @@ BEGIN
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH ( NOLOCK )
 			INNER JOIN @tmpParty tp ON b.SiteID = tp.LicenseeID	AND b.ProductID = tp.ProductID AND b.rptDate BETWEEN tp.Fromdate AND tp.Todate
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = tp.ChargeId AND cr.CurrencyID = b.CurrencyID
+			LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('34','') eb ON b.Bettype = eb.BettypeID
 			WHERE  b.rptDate BETWEEN @Fromdate AND @ToDate
 			AND (@Currency = 0 OR b.CurrencyID = @Currency)
 			AND (b.CurrencyID <> @CurrencyTest)
 			AND b.StatusId NOT IN (-1, 101, 102, 103)
 			AND b.customercategory NOT IN (27, 28)
-			AND NOT EXISTS (SELECT TOP 1 1 FROM bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('34','') e WHERE b.Bettype = e.BettypeID)
+			AND eb.BettypeID IS NULL
 			GROUP BY PartyID, b.rptDate, b.currencyID
 		)
 	END

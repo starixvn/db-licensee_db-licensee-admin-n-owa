@@ -48,11 +48,12 @@ BEGIN
 				ON b.SiteID = ci.LicenseeID 
 					AND b.ProductID = ci.ProductID
 					AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+			LEFT JOIN LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeID
 			WHERE b.rptDate BETWEEN @Fromdate AND @Todate
 				AND b.ProductID = @BA_Product
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
-				AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('','') e WHERE b.Bettype = e.BettypeID)
+				AND eb.BettypeID IS NULL
 			GROUP BY ci.PartyID, b.ProductID, currencyID
 		)
 	END	
@@ -123,11 +124,12 @@ BEGIN
 										 AND b.ProductID = ci.ProductID 
 										 AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
+			LEFT JOIN LA_f_ExcludedBettypeListSel('','4297') eb ON b.Bettype = eb.BettypeID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND b.customercategory NOT IN (27,28)
 				AND b.ProductID = @PP_Product
-				AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('','4297') e WHERE b.Bettype = e.BettypeID)
+				AND eb.BettypeID IS NULL
 			GROUP BY ci.PartyID, b.CurrencyID
 		)
 	END
@@ -146,11 +148,12 @@ BEGIN
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN (SELECT DISTINCT PartyId, LicenseeId, ProductID FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci 
 					ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
+			LEFT JOIN LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27,28)
-				AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('','') e WHERE b.Bettype = e.BettypeID)
+				AND eb.BettypeID IS NULL
 			GROUP BY b.rptDate, ci.PartyID, b.ProductID, b.CurrencyID
 		)
 

@@ -95,11 +95,12 @@ BEGIN
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 	INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
 	LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.Bettype = b.Bettype
+	LEFT JOIN LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeID
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 		AND b.StatusId NOT IN (-1, 101, 102, 103)
 		AND b.CurrencyID <> 20
 		AND b.CustomerCategory NOT IN (27, 28)
-		AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('','') e WHERE b.Bettype = e.BettypeID)
+		AND eb.BettypeID IS NULL
 		AND b.SiteID NOT IN (SELECT c.LicenseeId FROM @CreditLicenee c)
 		AND b.ProductID IN (SELECT p.ProductId FROM @Products p)
 		AND b.ProductID NOT IN (13,15,25,32) -- exclude BT, CB, CO, PP
@@ -174,12 +175,13 @@ BEGIN
 		CAST(SUM((CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) * e.BaseCurrencyRate) AS MONEY)
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 		INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
+		LEFT JOIN LA_f_ExcludedBettypeListSel('','4297') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.StatusId NOT IN (-1, 101, 102, 103)
 			AND b.CurrencyID <> 20
 			AND b.CustomerCategory NOT IN (27, 28)
 			AND b.ProductID = 32
-			AND NOT EXISTS (SELECT TOP 1 1 FROM LA_f_ExcludedBettypeListSel('','4297') e WHERE b.Bettype = e.BettypeID)
+			AND eb.BettypeID IS NULL
 		GROUP BY b.rptDate, b.SiteId, b.ProductId, b.Bettype
 	END
 
