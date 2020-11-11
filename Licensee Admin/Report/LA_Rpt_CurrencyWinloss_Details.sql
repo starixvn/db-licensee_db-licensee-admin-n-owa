@@ -40,6 +40,7 @@ AS
 	   - 20200601@Parsons: Amend Currency WL report [#135055] 
 	   - 20200824@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
 	   - 20201021@Happy: Arcadia Gaming offers Bonus [#143597]
+	   - 20201111@Happy: Changing OddsSpread for licensee [#142345]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -49,7 +50,8 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @GD_Tip SMALLINT = 1706,
-			@PP_Contribution SMALLINT = 4297
+			@PP_Contribution SMALLINT = 4297,
+			@OddSpread_BetType SMALLINT = 999
 
 	-- currency list
 	--
@@ -79,7 +81,8 @@ BEGIN
 		CommBA			MONEY,
 		Company			MONEY,
 		Betcount		BIGINT,
-		Playercomm		MONEY
+		Playercomm		MONEY,
+		OddsSpreadCost	MONEY
 	)
 
 	CREATE INDEX IX_tmpWinloss ON #tmpWinLoss(PartyID, Winlostdate, Currency)
@@ -245,7 +248,7 @@ BEGIN
 		INTO #tmpData
 		FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
 		INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
-		LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','4297') eb ON b.Bettype = eb.BettypeID
+		LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','999,4297') eb ON b.Bettype = eb.BettypeID
 		WHERE b.CurrencyID<>20
 			AND b.[Status] NOT IN (-1, 101, 102, 103)
 			AND b.CustomerCategory NOT IN (27,28)
@@ -266,10 +269,10 @@ BEGIN
 											ELSE 1 
 									 END)
 						) AS Turnover
-					,SUM(CASE WHEN b.Bettype = @PP_Contribution THEN 0 ELSE b.winloss END)	AS MemberWL
-					,SUM(CASE WHEN (@drawfilter = 2 AND b.[Status] = 111) OR b.Bettype = @PP_Contribution THEN 0 ELSE b.BetCount END) AS BetCount
+					,SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @OddSpread_BetType) THEN 0 ELSE b.winloss END)	AS MemberWL
+					,SUM(CASE WHEN (@drawfilter = 2 AND b.[Status] = 111) OR b.Bettype IN (@PP_Contribution, @OddSpread_BetType) THEN 0 ELSE b.BetCount END) AS BetCount
 					,SUM(CASE WHEN b.ProductId = 32 THEN 0 ELSE b.commissionP END) AS Playercomm 
-					,SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.WinLossA, 0) ELSE 0 END) Contribution
+					,SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @OddSpread_BetType) THEN ISNULL(-b.WinLossA, 0) ELSE 0 END) WinlossA
 			FROM #tmpData b
 			LEFT JOIN dbo.League l WITH(NOLOCK) ON b.leagueid = l.leagueid
 			WHERE (@SportType = 0 OR (b.bettype NOT IN (9,29) AND (b.bettype NOT BETWEEN 31 AND 120) AND l.Sporttype = @Sporttype)) AND
@@ -281,8 +284,19 @@ BEGIN
 					,b.Bettype
 					,b.Status
 		)
-		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm)
-		SELECT a.rptDate,p.PartyID,a.CurrencyID,TurnOver,MemberWL,-MemberWL, 0, 0, (-MemberWL - Contribution) * ISNULL(cc.rate,p.Rate), Betcount, Playercomm
+		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm, OddsSpreadCost)
+		SELECT a.rptDate
+			  ,p.PartyID
+			  ,a.CurrencyID
+			  ,TurnOver
+			  ,MemberWL
+			  ,-MemberWL
+			  ,0
+			  ,0
+			  ,(CASE WHEN a.ProductID = 32 THEN -WinlossA ELSE WinlossA END -MemberWL) * ISNULL(cc.rate,p.Rate)
+			  ,Betcount
+			  ,Playercomm
+			  ,WinlossA
 		FROM cte_Data a
 		INNER JOIN #tmpParty p ON p.LicenseeID = a.SiteID AND a.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId=a.ProductId AND p.ChargeType = 1
 		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID = p.ChargeId AND a.CurrencyId=cc.CurrencyID
@@ -319,6 +333,7 @@ BEGIN
 			SUM(Company) AS Company,
 			SUM(Betcount) AS Betcount,
 			SUM(Playercomm) AS Playercomm,
+			SUM(OddsSpreadCost) AS OddsSpreadCost,
 			SUM(TurnOver * e.MYR) AS TurnoverMYR,
 			SUM(Winlost * e.MYR) AS WinlostMYR,
 			SUM(LicenseeWL * e.MYR) AS LicenseeWLMYR,
@@ -326,6 +341,7 @@ BEGIN
 			SUM(AmtDuetoBA*e.MYR) AS AmtDuetoBAMYR,
 			SUM(Company * e.MYR) AS CompanyMYR,
 			SUM(Playercomm * e.MYR) AS PlayercommMYR,
+			SUM(OddsSpreadCost * e.MYR) AS OddsSpreadCostMYR,
 			SUM(TurnOver * e.USD) AS TurnoverUSD,
 			SUM(Winlost * e.USD) AS WinlostUSD,
 			SUM(LicenseeWL * e.USD) AS LicenseeWLUSD,
@@ -333,6 +349,7 @@ BEGIN
 			SUM(AmtDuetoBA * e.USD) AS AmtDuetoBAUSD,
 			SUM(Company * e.USD) AS CompanyUSD,
 			SUM(Playercomm * e.USD) AS PlayercommUSD,
+			SUM(OddsSpreadCost * e.USD) AS OddsSpreadCostUSD,
 			SUM(TurnOver * e.EUR) AS TurnoverEUR,
 			SUM(Winlost * e.EUR) AS WinlostEUR,
 			SUM(LicenseeWL * e.EUR) AS LicenseeWLEUR,
@@ -340,13 +357,15 @@ BEGIN
 			SUM(AmtDuetoBA*e.EUR) AS AmtDuetoBAEUR,
 			SUM(Company * e.EUR) AS CompanyEUR,
 			SUM(Playercomm * e.EUR) AS PlayercommEUR,
+			SUM(OddsSpreadCost * e.EUR) AS OddsSpreadCostEUR,
 			SUM(TurnOver * e.GBP) AS TurnoverGBP,
 			SUM(Winlost * e.GBP) AS WinlostGBP,
 			SUM(LicenseeWL * e.GBP) AS LicenseeWLGBP,
 			SUM(CommBA * e.GBP) AS CommBAGBP,
 			SUM(AmtDuetoBA * e.GBP) AS AmtDuetoBAGBP,
 			SUM(Company * e.GBP) AS CompanyGBP,
-			SUM(Playercomm * e.GBP) AS PlayercommGBP
+			SUM(Playercomm * e.GBP) AS PlayercommGBP,
+			SUM(OddsSpreadCost * e.GBP) AS OddsSpreadCostGBP
 	FROM #tmpWinLoss w
 		INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = w.PartyID
 		INNER JOIN #TempExchange e ON w.Winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
