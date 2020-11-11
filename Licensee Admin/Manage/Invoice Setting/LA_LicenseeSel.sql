@@ -21,10 +21,8 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	
-	SELECT p.PartyID, MIN(l.EffectiveDate) AS AffectedDate
-	FROM OAS_Party p WITH(NOLOCK)
-		INNER JOIN LicenseeProduct3rd l WITH(NOLOCK) ON l.LicenseeID = p.OldRefID
-	WHERE p.PartyType IN (1, 5)
-	GROUP BY p.PartyID
+	SELECT FromParty AS PartyID, MIN(FromDate) AS AffectedDate
+	FROM OAS_ChargeInfo ci WITH(NOLOCK)
+	GROUP BY FromParty
 END
 GO
