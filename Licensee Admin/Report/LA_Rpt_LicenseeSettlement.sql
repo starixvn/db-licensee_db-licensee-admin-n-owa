@@ -47,6 +47,7 @@ AS
 			- 20200403@Parsons: Indo 4D Integration [#130910] 
 		    - 20200719@Parsons: Implement PP Jackpot [RedmineID: #137306]
 			- 20201022@Mason: Arcadia Gaming - Add Bonus feature [#143597]
+			- 20201111@Mason: Change request of Odds Spread [#142345]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -100,7 +101,9 @@ BEGIN
 		CashoutCommission			MONEY,
 		BuyBackAmountAndComm		MONEY,
 		TipsAmount					MONEY,
-		TipsAmountDue				MONEY
+		TipsAmountDue				MONEY,
+		OddspreadCost				MONEY,
+		NetCompany					MONEY
 	)
 
 	CREATE TABLE #Exchange
@@ -189,6 +192,10 @@ BEGIN
 		,CAST(0 AS MONEY)	AS TipsAmountBase
 		,CAST(0 AS MONEY)	AS TipsAmountDue
 		,CAST(0 AS MONEY)	AS TipsAmountDueBase
+		,CAST(0 AS MONEY)	AS NetCompany
+		,CAST(0 AS MONEY)	AS NetCompanyBase
+		,CAST(0 AS MONEY)	AS OddspreadCost
+		,CAST(0 AS MONEY)	AS OddspreadCostBase
 		RETURN
 	END
 
@@ -744,6 +751,42 @@ BEGIN
 		WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY rptDate, b.CurrencyID
 	END
+	ELSE IF(@ProductCode = 'SB') -- Sportsbook
+	BEGIN
+		DECLARE @OddspreadCost_BetType SMALLINT = 999
+		;WITH cte_SB AS 
+		(
+			SELECT b.SiteId, b.rptDate, b.CurrencyID
+				,SUM(ISNULL(b.turnover, 0)) AS	Turnover
+				,SUM(ISNULL(b.winloss, 0))	AS	Winloss
+				,SUM(ISNULL(b.betcount, 0)) AS	BetCount
+				,SUM(CASE WHEN b.Bettype = @OddspreadCost_BetType THEN ISNULL(-b.WinLossA, 0) ELSE 0 END) AS OddSpreadCost
+			FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
+				INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype
+			WHERE
+				b.SiteID = @LicenseeID
+				AND b.rptDate BETWEEN @FromDate AND @ToDate
+				AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
+				AND (b.CurrencyID <> 20)
+				AND b.[Status] NOT IN (-1, 101, 102, 103)
+				AND b.customercategory NOT IN (27, 28)
+			GROUP BY b.rptdate, b.SiteId, b.CurrencyID
+		)
+		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, Company, NetCompany, OddSpreadCost, Betcount)
+		SELECT rptDate, d.CurrencyID
+			,SUM(Turnover)											 AS Turnover
+			,SUM(WinLoss)											 AS Winlost
+			,SUM(-Winloss * ( 1 - ISNULL(cr.Rate, p.Rate)))			 AS LicenseeWL
+			,SUM(-WinLoss * ISNULL(cr.Rate, p.Rate))				 AS Company
+			,SUM(-WinLoss * ISNULL(cr.Rate, p.Rate) + OddSpreadCost) AS NetCompany
+			,SUM(OddSpreadCost)										 AS OddSpreadCost
+			,SUM(BetCount)											 AS BetCount
+		FROM cte_SB d
+			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
+		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
+		GROUP BY rptDate, d.CurrencyID
+	END
 	ELSE
 	BEGIN
 		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, ActualStake, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
@@ -839,6 +882,8 @@ BEGIN
 		, SUM(ISNULL(d.TicketsPayout, 0))				AS TicketsPayout
 		, SUM(ISNULL(d.CashoutCommission, 0))			AS CashoutCommission
 		, SUM(ISNULL(d.BuyBackAmountAndComm, 0))		AS BuyBackAmountAndComm
+		, SUM(ISNULL(d.NetCompany, 0))					AS NetCompany
+		, SUM(ISNULL(d.OddspreadCost, 0))				AS OddspreadCost
 
 		--Base on currency
 		, CONVERT(MONEY, SUM(ISNULL(d.Turnover * e.Rate, 0)))					AS TurnoverBase
@@ -869,6 +914,8 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.TicketsPayout * e.Rate, 0)))				AS TicketsPayoutBase
 		, CONVERT(MONEY, SUM(ISNULL(d.CashoutCommission * e.Rate, 0)))			AS CashoutCommissionBase
 		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountAndComm * e.Rate, 0)))		AS BuyBackAmountAndCommBase
+		, CONVERT(MONEY, SUM(ISNULL(d.NetCompany * e.Rate, 0)))					AS NetCompanyBase
+		, CONVERT(MONEY, SUM(ISNULL(d.OddspreadCost * e.Rate, 0)))				AS OddspreadCostBase
 	FROM #Result d
 	INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
 	INNER JOIN sortedExchange se ON se.CurrencyCode = e.CurrencyCode
