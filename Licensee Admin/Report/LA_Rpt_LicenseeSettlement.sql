@@ -103,7 +103,7 @@ BEGIN
 		TipsAmount					MONEY,
 		TipsAmountDue				MONEY,
 		OddspreadCost				MONEY,
-		NetCompany					MONEY
+		GrossCompany				MONEY
 	)
 
 	CREATE TABLE #Exchange
@@ -772,13 +772,13 @@ BEGIN
 				AND b.customercategory NOT IN (27, 28)
 			GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
-		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, Company, NetCompany, OddSpreadCost, Betcount)
+		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, GrossCompany, Company, OddSpreadCost, Betcount)
 		SELECT rptDate, d.CurrencyID
 			,SUM(Turnover)											 AS Turnover
 			,SUM(WinLoss)											 AS Winlost
 			,SUM(-Winloss * ( 1 - ISNULL(cr.Rate, p.Rate)))			 AS LicenseeWL
-			,SUM(-WinLoss * ISNULL(cr.Rate, p.Rate))				 AS Company
-			,SUM(-WinLoss * ISNULL(cr.Rate, p.Rate) + OddSpreadCost) AS NetCompany
+			,SUM(-WinLoss * ISNULL(cr.Rate, p.Rate))				 AS GrossCompany
+			,SUM(-WinLoss * ISNULL(cr.Rate, p.Rate) + OddSpreadCost) AS Company
 			,SUM(OddSpreadCost)										 AS OddSpreadCost
 			,SUM(BetCount)											 AS BetCount
 		FROM cte_SB d
@@ -882,7 +882,7 @@ BEGIN
 		, SUM(ISNULL(d.TicketsPayout, 0))				AS TicketsPayout
 		, SUM(ISNULL(d.CashoutCommission, 0))			AS CashoutCommission
 		, SUM(ISNULL(d.BuyBackAmountAndComm, 0))		AS BuyBackAmountAndComm
-		, SUM(ISNULL(d.NetCompany, 0))					AS NetCompany
+		, SUM(ISNULL(d.GrossCompany, 0))				AS GrossCompany
 		, SUM(ISNULL(d.OddspreadCost, 0))				AS OddspreadCost
 
 		--Base on currency
@@ -914,7 +914,7 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.TicketsPayout * e.Rate, 0)))				AS TicketsPayoutBase
 		, CONVERT(MONEY, SUM(ISNULL(d.CashoutCommission * e.Rate, 0)))			AS CashoutCommissionBase
 		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountAndComm * e.Rate, 0)))		AS BuyBackAmountAndCommBase
-		, CONVERT(MONEY, SUM(ISNULL(d.NetCompany * e.Rate, 0)))					AS NetCompanyBase
+		, CONVERT(MONEY, SUM(ISNULL(d.GrossCompany * e.Rate, 0)))				AS GrossCompanyBase
 		, CONVERT(MONEY, SUM(ISNULL(d.OddspreadCost * e.Rate, 0)))				AS OddspreadCostBase
 	FROM #Result d
 	INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
