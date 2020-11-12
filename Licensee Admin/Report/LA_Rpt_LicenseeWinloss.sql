@@ -38,6 +38,7 @@ AS
 	- 20200707@Parsons: Calculate Margin and remove Racing related data field [#137171]
 	- 20200818@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
 	- 20201021@Mason: Arcadia Gaming - Add Bonus feature [#143597]
+	- 20201111@Happy: Changing OddsSpread for Licensee [#142345]
 	
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -53,11 +54,12 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @GD_Tip SMALLINT = 1706, 
-			@PP_Contribution SMALLINT = 4297
+			@PP_Contribution SMALLINT = 4297,
+			@OddSpread_BetType SMALLINT = 999
 	DECLARE @CurrencyTest INT = 20
 
 	CREATE TABLE #Report (PartyID INT, ReportDate DATE, CurrencyID INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY, 
-						AmtDueToBA MONEY, CommBA MONEY, Company MONEY, Betcount INT)
+						AmtDueToBA MONEY, CommBA MONEY, Company MONEY, Betcount INT, OddsSpreadCost MONEY)
 
 	CREATE TABLE #Exchange(ExchangeId INT, ExchangeDate DATE, Code VARCHAR(20), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, CNY FLOAT, Base FLOAT)
 	
@@ -440,18 +442,18 @@ BEGIN
 						END
 						ELSE 1
 				END) Turnover 
-			, SUM(CASE WHEN b.Bettype = @PP_Contribution THEN 0 ELSE b.MemberWL END) Winloss
+			, SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @OddSpread_BetType) THEN 0 ELSE b.MemberWL END) Winloss
 			, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END) PComm
 			, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionA ELSE 0 END) AComm
-			, SUM(b.betcount * CASE WHEN (@drawfilter = 2 AND b.StatusId = 111) OR b.Bettype = @PP_Contribution THEN 0 ELSE 1 END) BetCount 
-			, SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) Contribution
+			, SUM(b.betcount * CASE WHEN (@drawfilter = 2 AND b.StatusId = 111) OR b.Bettype IN (@PP_Contribution, @OddSpread_BetType) THEN 0 ELSE 1 END) BetCount 
+			, SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @OddSpread_BetType) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AWinloss
 		INTO #TmpData
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN (
 				SELECT DISTINCT PartyId, LicenseeId, ProductID 
 				FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)
 			) ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
-			LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','4297') eb ON b.Bettype = eb.BettypeID
+			LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','999,4297') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.StatusId NOT IN (- 1, 101, 102, 103)
 			AND (@Currency = 0 OR b.CurrencyID = @Currency)
@@ -460,13 +462,14 @@ BEGIN
 			AND eb.BettypeID IS NULL
 		GROUP BY b.rptDate, ci.PartyID, b.ProductID, b.CurrencyID
 
-		INSERT INTO #Report (PartyID, ReportDate, CurrencyID, Turnover, Winlost, LicenseeWL,Company, Betcount)
+		INSERT INTO #Report (PartyID, ReportDate, CurrencyID, Turnover, Winlost, LicenseeWL,Company, Betcount, OddsSpreadCost)
 		SELECT ci.PartyID, rptDate, b.CurrencyId
 			, SUM(b.turnover) Turnover
 			, SUM(b.Winloss + CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS Winloss
 			, SUM(-b.Winloss + CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS LicenseeWL
-			, SUM((-b.Winloss - Contribution) * ISNULL(cc.Rate,ci.Rate) - CASE WHEN b.ProductID=31 THEN (b.AComm + b.PComm) ELSE 0 END) AS Company
+			, SUM((-b.Winloss - CASE WHEN b.ProductID = 32 THEN AWinloss ELSE 0 END) * ISNULL(cc.Rate,ci.Rate) - CASE WHEN b.ProductID=31 THEN (b.AComm + b.PComm) ELSE 0 END) AS Company
 			, SUM(b.betcount) AS betcount
+			, SUM(AWinloss) AS OddsSpreadCost
 		FROM #TmpData b WITH (NOLOCK)
 			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate, ChargeId, ChargeType FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID=ci.ChargeId AND cc.CurrencyID=b.CurrencyId
@@ -524,6 +527,7 @@ BEGIN
 		, CAST(SUM(AmtDueToBA * e.Base) AS MONEY) AS AmountDueToBA
 		, CAST(SUM(CommBA * e.Base) AS MONEY) AS BACommission
 		, CAST(SUM(Company * e.Base) AS MONEY) AS AmountCompany
+		, CAST(SUM(OddsSpreadCost * e.Base) AS MONEY) AS OddsSpreadCost
 		--MYR
 		, CAST(SUM(Turnover * e.MYR) AS MONEY) AS TurnoverMYR
 		, CAST(SUM(Winlost * e.MYR) AS MONEY) AS CustomerWinLossMYR
@@ -531,6 +535,7 @@ BEGIN
 		, CAST(SUM(AmtDueToBA * e.MYR) AS MONEY) AS AmountDueToBAMYR
 		, CAST(SUM(CommBA * e.MYR) AS MONEY) AS BACommissionMYR
 		, CAST(SUM(Company * e.MYR) AS MONEY) AS AmountCompanyMYR
+		, CAST(SUM(OddsSpreadCost * e.MYR) AS MONEY) AS OddsSpreadCostMYR
 		--USD
 		, CAST(SUM(Turnover * e.USD) AS MONEY) AS TurnoverUSD
 		, CAST(SUM(Winlost * e.USD) AS MONEY) AS CustomerWinLossUSD
@@ -538,6 +543,7 @@ BEGIN
 		, CAST(SUM(AmtDueToBA * e.USD) AS MONEY) AS AmountDueToBAUSD
 		, CAST(SUM(CommBA * e.USD) AS MONEY) AS BACommissionUSD
 		, CAST(SUM(Company * e.USD) AS MONEY) AS AmountCompanyUSD
+		, CAST(SUM(OddsSpreadCost * e.USD) AS MONEY) AS OddsSpreadCostUSD
 		--EUR
 		, CAST(SUM(Turnover * e.EUR) AS MONEY) AS TurnoverEUR
 		, CAST(SUM(Winlost * e.EUR) AS MONEY) AS CustomerWinLossEUR
@@ -545,6 +551,7 @@ BEGIN
 		, CAST(SUM(AmtDueToBA * e.EUR) AS MONEY) AS AmountDueToBAEUR
 		, CAST(SUM(CommBA * e.EUR) AS MONEY) AS BACommissionEUR
 		, CAST(SUM(Company * e.EUR) AS MONEY) AS AmountCompanyEUR
+		, CAST(SUM(OddsSpreadCost * e.EUR) AS MONEY) AS OddsSpreadCostEUR
 		--GBP
 		, CAST(SUM(Turnover * e.GBP) AS MONEY) AS TurnoverGBP
 		, CAST(SUM(Winlost * e.GBP) AS MONEY) AS CustomerWinLossGBP
@@ -552,6 +559,7 @@ BEGIN
 		, CAST(SUM(AmtDueToBA * e.GBP) AS MONEY) AS AmountDueToBAGBP
 		, CAST(SUM(CommBA * e.GBP) AS MONEY) AS BACommissionGBP
 		, CAST(SUM(Company * e.GBP) AS MONEY) AS AmountCompanyGBP
+		, CAST(SUM(OddsSpreadCost * e.GBP) AS MONEY) AS OddsSpreadCostGBP
 		--CNY
 		, CAST(SUM(Turnover * e.CNY) AS MONEY) AS TurnoverCNY
 		, CAST(SUM(Winlost * e.CNY) AS MONEY) AS CustomerWinLossCNY
@@ -559,6 +567,7 @@ BEGIN
 		, CAST(SUM(AmtDueToBA * e.CNY) AS MONEY) AS AmountDueToBACNY
 		, CAST(SUM(CommBA * e.CNY) AS MONEY) AS BACommissionCNY
 		, CAST(SUM(Company * e.CNY) AS MONEY) AS AmountCompanyCNY
+		, CAST(SUM(OddsSpreadCost * e.CNY) AS MONEY) AS OddsSpreadCostCNY
 	FROM #Report b
 		INNER JOIN #Exchange e ON e.ExchangeDate = b.ReportDate AND e.ExchangeId = b.CurrencyID
 		INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON p.PartyID = b.PartyID
