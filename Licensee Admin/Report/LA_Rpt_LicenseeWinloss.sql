@@ -55,7 +55,7 @@ BEGIN
 	SET NOCOUNT ON
 	DECLARE @GD_Tip SMALLINT = 1706, 
 			@PP_Contribution SMALLINT = 4297,
-			@OddSpread_BetType SMALLINT = 999
+			@OddsSpread_BetType SMALLINT = 999
 	DECLARE @CurrencyTest INT = 20
 
 	CREATE TABLE #Report (PartyID INT, ReportDate DATE, CurrencyID INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY, 
@@ -442,11 +442,11 @@ BEGIN
 						END
 						ELSE 1
 				END) Turnover 
-			, SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @OddSpread_BetType) THEN 0 ELSE b.MemberWL END) Winloss
+			, SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @OddsSpread_BetType) THEN 0 ELSE b.MemberWL END) Winloss
 			, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END) PComm
 			, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionA ELSE 0 END) AComm
-			, SUM(b.betcount * CASE WHEN (@drawfilter = 2 AND b.StatusId = 111) OR b.Bettype IN (@PP_Contribution, @OddSpread_BetType) THEN 0 ELSE 1 END) BetCount 
-			, SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @OddSpread_BetType) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AWinloss
+			, SUM(b.betcount * CASE WHEN (@drawfilter = 2 AND b.StatusId = 111) OR b.Bettype IN (@PP_Contribution, @OddsSpread_BetType) THEN 0 ELSE 1 END) BetCount 
+			, SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @OddsSpread_BetType) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AWinloss
 		INTO #TmpData
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN (
