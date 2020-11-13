@@ -11,6 +11,7 @@ AS
 
 	 Revisions:  
 		- 20180727@Parsons: get licensee info [#94282]
+		- 20201104@Parsons: Group Min Fee & Discount Group - Enhance to check the launch date of Licensee [#144502]
 	 
 	 Params:
 
@@ -20,9 +21,8 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	
-	SELECT p.PartyID, l.*
-	FROM Licensees l WITH(NOLOCK)
-		INNER JOIN OAS_Party p WITH(NOLOCK) ON l.LicenseeID = p.OldRefID
-	WHERE p.PartyType IN (1, 5)
+	SELECT FromParty AS PartyID, MIN(FromDate) AS AffectedDate
+	FROM OAS_ChargeInfo ci WITH(NOLOCK)
+	GROUP BY FromParty
 END
 GO
