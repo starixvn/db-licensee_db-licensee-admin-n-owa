@@ -102,7 +102,7 @@ BEGIN
 		BuyBackAmountAndComm		MONEY,
 		TipsAmount					MONEY,
 		TipsAmountDue				MONEY,
-		OddspreadCost				MONEY,
+		OddsSpreadCost				MONEY,
 		GrossCompany				MONEY
 	)
 
@@ -192,10 +192,10 @@ BEGIN
 		,CAST(0 AS MONEY)	AS TipsAmountBase
 		,CAST(0 AS MONEY)	AS TipsAmountDue
 		,CAST(0 AS MONEY)	AS TipsAmountDueBase
-		,CAST(0 AS MONEY)	AS NetCompany
-		,CAST(0 AS MONEY)	AS NetCompanyBase
-		,CAST(0 AS MONEY)	AS OddspreadCost
-		,CAST(0 AS MONEY)	AS OddspreadCostBase
+		,CAST(0 AS MONEY)	AS OddsSpreadCost
+		,CAST(0 AS MONEY)	AS OddsSpreadCostBase
+		,CAST(0 AS MONEY)	AS GrossCompany
+		,CAST(0 AS MONEY)	AS GrossCompanyBase
 		RETURN
 	END
 
@@ -753,34 +753,34 @@ BEGIN
 	END
 	ELSE IF(@ProductCode = 'SB') -- Sportsbook
 	BEGIN
-		DECLARE @OddspreadCost_BetType SMALLINT = 999
+		DECLARE @OddsSpreadCost_BetType SMALLINT = 999
 		;WITH cte_SB AS 
 		(
 			SELECT b.SiteId, b.rptDate, b.CurrencyID
 				,SUM(ISNULL(b.turnover, 0)) AS	Turnover
-				,SUM(ISNULL(b.winloss, 0))	AS	Winloss
+				,SUM(ISNULL(b.MemberWL, 0))	AS	MemberWinloss
 				,SUM(ISNULL(b.betcount, 0)) AS	BetCount
-				,SUM(CASE WHEN b.Bettype = @OddspreadCost_BetType THEN ISNULL(-b.WinLossA, 0) ELSE 0 END) AS OddSpreadCost
-			FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
-				INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype
+				,SUM(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS OddsSpreadCost
+			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			WHERE
 				b.SiteID = @LicenseeID
 				AND b.rptDate BETWEEN @FromDate AND @ToDate
 				AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
 				AND (b.CurrencyID <> 20)
-				AND b.[Status] NOT IN (-1, 101, 102, 103)
+				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND b.customercategory NOT IN (27, 28)
+				AND b.ProductID = 0
 			GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
-		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, GrossCompany, Company, OddSpreadCost, Betcount)
+		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, GrossCompany, Company, OddsSpreadCost, Betcount)
 		SELECT rptDate, d.CurrencyID
-			,SUM(Turnover)											 AS Turnover
-			,SUM(WinLoss)											 AS Winlost
-			,SUM(-Winloss * ( 1 - ISNULL(cr.Rate, p.Rate)))			 AS LicenseeWL
-			,SUM(-WinLoss * ISNULL(cr.Rate, p.Rate))				 AS GrossCompany
-			,SUM(-WinLoss * ISNULL(cr.Rate, p.Rate) + OddSpreadCost) AS Company
-			,SUM(OddSpreadCost)										 AS OddSpreadCost
-			,SUM(BetCount)											 AS BetCount
+			,SUM(Turnover)													AS Turnover
+			,SUM(MemberWinloss)												AS Winlost
+			,SUM(-MemberWinloss * ( 1 - ISNULL(cr.Rate, p.Rate)))			AS LicenseeWL
+			,SUM(-MemberWinloss * ISNULL(cr.Rate, p.Rate))					AS GrossCompany
+			,SUM(-MemberWinloss * ISNULL(cr.Rate, p.Rate) + OddsSpreadCost) AS Company
+			,SUM(OddsSpreadCost)											AS OddsSpreadCost
+			,SUM(BetCount)													AS BetCount
 		FROM cte_SB d
 			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
@@ -883,7 +883,7 @@ BEGIN
 		, SUM(ISNULL(d.CashoutCommission, 0))			AS CashoutCommission
 		, SUM(ISNULL(d.BuyBackAmountAndComm, 0))		AS BuyBackAmountAndComm
 		, SUM(ISNULL(d.GrossCompany, 0))				AS GrossCompany
-		, SUM(ISNULL(d.OddspreadCost, 0))				AS OddspreadCost
+		, SUM(ISNULL(d.OddsSpreadCost, 0))				AS OddsSpreadCost
 
 		--Base on currency
 		, CONVERT(MONEY, SUM(ISNULL(d.Turnover * e.Rate, 0)))					AS TurnoverBase
@@ -915,7 +915,7 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.CashoutCommission * e.Rate, 0)))			AS CashoutCommissionBase
 		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountAndComm * e.Rate, 0)))		AS BuyBackAmountAndCommBase
 		, CONVERT(MONEY, SUM(ISNULL(d.GrossCompany * e.Rate, 0)))				AS GrossCompanyBase
-		, CONVERT(MONEY, SUM(ISNULL(d.OddspreadCost * e.Rate, 0)))				AS OddspreadCostBase
+		, CONVERT(MONEY, SUM(ISNULL(d.OddsSpreadCost * e.Rate, 0)))				AS OddsSpreadCostBase
 	FROM #Result d
 	INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
 	INNER JOIN sortedExchange se ON se.CurrencyCode = e.CurrencyCode
