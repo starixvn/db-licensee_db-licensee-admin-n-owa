@@ -2,8 +2,8 @@
 USE [bodb_licensee]
 GO
 
-CREATE PROCEDURE [dbo].[LA_PartyListOddsSpreadSel]
-	 @PartyID		INT	   = 0
+ALTER PROCEDURE [dbo].[LA_PartyListOddsSpreadSel]
+	 @PartyIds		VARCHAR(1000) = ''
 AS
 
 /*
@@ -15,9 +15,9 @@ AS
 		- 20201110@Parsons: Change-Request-Of-Odds-Spread [#142345]
 
 	Params:
-		+ PartyID:
-			- 0 get all
-		+ Ex: EXEC LA_PartyListOddsSpreadSel @PartyID=14
+		+ @PartyIds:
+			- Empty: get all
+		+ Ex: EXEC LA_PartyListOddsSpreadSel @PartyIds='14,389'
 */
 
 SET NOCOUNT ON
@@ -34,6 +34,7 @@ SET NOCOUNT ON
 	FROM bodb_licensee.dbo.OAS_Party p
 	INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd ON p.PartyID = pd.PartyID
 	INNER JOIN cte_SiteIds s ON p.OldRefID = s.SiteID
-	WHERE @PartyID = 0 OR @PartyID = p.PartyID
+	LEFT JOIN bodb02.dbo.strSplit(@PartyIds, ',') p2 ON p.PartyID = p2.val 
+	WHERE @PartyIds = '' OR p2.val IS NOT NULL
 
 GO
