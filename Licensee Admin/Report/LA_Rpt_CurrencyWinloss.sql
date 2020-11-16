@@ -306,7 +306,7 @@ BEGIN
 			   ,-MemberWL
 			   ,0
 			   ,0
-			   ,(CASE WHEN a.ProductID = 32 THEN -WinlossA ELSE WinlossA END -MemberWL) * ISNULL(cc.rate,p.Rate)
+			   ,(-MemberWL - CASE WHEN a.ProductID = 32 THEN WinlossA ELSE 0 END) * ISNULL(cc.Rate, p.Rate)
 			   ,Betcount
 			   ,Playercomm
 			   ,WinlossA
