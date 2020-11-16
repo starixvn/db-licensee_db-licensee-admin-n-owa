@@ -31,6 +31,7 @@ AS
 		- 20200714@Parsons: Implement PP Jackpot [RedmineID: #137306]
 		- 20200803@Parsons: Implement Group Min Fee [#134492]
 		- 20201027@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
+	    - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
 
 	Parameters:
 		@IsApplyDiscountMinfee: apply minfee term to discount value
@@ -48,7 +49,8 @@ BEGIN
 			@PP_Contribution SMALLINT = 4297,
 			@PP_JackpotPrize SMALLINT = 4298,
 			@PPTournament SMALLINT = 4299,
-			@PromotionPrize SMALLINT = 4300
+			@PromotionPrize SMALLINT = 4300,
+			@SB_AdjustedOdds SMALLINT = 999
 	
 	-- product to be discounted
 	DECLARE @ProductList TABLE (ProductId INT, ToBeDiscounted BIT)
@@ -288,20 +290,20 @@ BEGIN
  * 2. winloss data
  *-------------------------------------------------------------------------------------------------------------------------------*/
 	DECLARE @BX INT = 31 -- exchange
+	DECLARE @TmpWinlossData TABLE(PartyId INT, WinlossDate DATETIME, ProductId INT, CurrencyId INT, Winloss MONEY, AmountToCompany MONEY, ExtraAmount MONEY)
 
 	-- 2.1 include general products
-	SELECT p.PartyId,
-		b.rptDate	AS WinlossDate,
-		p.ProductId,
-		b.CurrencyId,
-		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @PP_Contribution) THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss,
-		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN 0 ELSE (ISNULL(-b.MemberWL, 0) - CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) 
-																	* ISNULL(cr.Rate, p.Rate) * e.Rate END) AS AmountToCompany,
+	;WITH cte_Data AS
+	(
+		SELECT p.PartyId, b.rptDate, p.ProductId, b.CurrencyId,
+		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @PP_Contribution,@SB_AdjustedOdds) THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss, 
+		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @SB_AdjustedOdds) THEN 0 ELSE (ISNULL(-b.MemberWL, 0) - CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) 
+																	* ISNULL(cr.Rate, p.Rate) * e.Rate END) AS LicencingFeeAdjustedOdds, 
+		SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS OddsSpreadCost,
 		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) * e.Rate
 				 WHEN b.ProductID = @BX THEN -(b.CommissionA + b.CommissionP) * e.Rate
 				 ELSE 0 
 			END) AS ExtraAmount
-	INTO #tmpWinlossData
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 	INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 	INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID 
@@ -309,16 +311,20 @@ BEGIN
 		AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)  
 		AND (p.ProductID NOT IN (11, 39) OR b.Bettype = p.Bettype)
 	LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeID AND b.CurrencyId = cr.CurrencyID
-	LEFT JOIN LA_f_ExcludedBettypeListSel('', '1706,3007,4297') eb ON b.Bettype = eb.BettypeID
+	LEFT JOIN LA_f_ExcludedBettypeListSel('', '999,1706,3007,4297') eb ON b.Bettype = eb.BettypeID
 	WHERE (b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
 			AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
 			AND eb.BettypeID IS NULL
 	GROUP BY p.PartyId,b.rptdate,p.ProductId,b.CurrencyId
+	)
+	INSERT INTO @TmpWinlossData(PartyId,WinlossDate,ProductId,CurrencyId,Winloss,AmountToCompany,ExtraAmount)
+	SELECT PartyId, rptDate, ProductId, CurrencyId, Winloss, LicencingFeeAdjustedOdds + OddsSpreadCost, ExtraAmount
+	FROM cte_Data 
 
 	-- 2.2 insert product don't have any ticket
-	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,CurrencyId,Winloss,AmountToCompany,ExtraAmount)
+	INSERT INTO @TmpWinlossData (PartyId,WinlossDate,ProductId,CurrencyId,Winloss,AmountToCompany,ExtraAmount)
 	SELECT DISTINCT PartyId,@ToDate,c.ProductId,6, 0, 0, 0-- default eur = 6
 	FROM @PartyList p 
 	INNER JOIN @ProductList pd ON 1=1
@@ -335,7 +341,7 @@ BEGIN
 		,SUM(d.AmountToCompany)
 		,SUM(d.ExtraAmount)
 		,0,0,0,0,0,'','',0,0,0
-	FROM #tmpWinlossData d
+	FROM @TmpWinlossData d
 	GROUP BY d.PartyId, ProductId
 
 	-- 2.4 treat negative as 0
@@ -351,7 +357,7 @@ BEGIN
 		SELECT m.MinFeeId
 			, SUM(CASE WHEN w.ProductId IS NULL THEN 0 ELSE t.AmountToCompany END) FeeUnderWaiveTime
 			, SUM(CASE WHEN w.ProductId IS NULL THEN t.AmountToCompany ELSE 0 END) FeeOutOfWaiveTime
-		FROM #tmpWinlossData t
+		FROM @TmpWinlossData t
 		INNER JOIN @tmpMinFee m ON t.ProductId = m.ProductId AND t.PartyId = m.PartyId AND t.WinlossDate BETWEEN m.FromDate AND m.ToDate
 		LEFT JOIN @tmpMinFee w ON w.FeeType=2 AND w.MinFeeId=m.MinFeeId AND t.WinlossDate BETWEEN w.FromDate AND w.ToDate
 		WHERE m.FeeType=1
@@ -445,7 +451,7 @@ BEGIN
 	-- only offer discount for licensing fee
 	INSERT INTO @tmpDiscountCalculation(CalculationGroup,DiscountGroupId,DiscountGroupType,CurrencyId,Winloss,Fee)
 	SELECT s.CalculationGroup,s.DiscountGroupId,s.DiscountGroupType,s.CurrencyId, SUM(r.Winloss) Winloss,SUM(r.AmountToCompany) Fee
-	FROM #tmpWinlossData r
+	FROM @TmpWinlossData r
 	INNER JOIN @tmpDiscountCurrency c ON c.PartyID=r.PartyId AND c.CurrencyId = r.CurrencyId
 	INNER JOIN #tmpDiscountSettings s ON s.DiscountGroupId = c.DiscountGroupId AND s.ProductId = r.ProductId AND s.PartyId = c.PartyId
 	WHERE s.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount)
@@ -495,7 +501,7 @@ BEGIN
 	;WITH cte_Fee AS
 	(
 		SELECT r.PartyID, r.ProductID, SUM(r.AmountToCompany) as FeeBase
-		FROM #tmpWinlossData r
+		FROM @TmpWinlossData r
 		INNER JOIN @tmpDiscountCurrency c ON c.PartyID = r.PartyId AND c.CurrencyId = r.CurrencyId
 		INNER JOIN #tmpDiscountSettings s ON s.DiscountGroupId = c.DiscountGroupId AND s.ProductId = r.ProductId AND s.PartyId = c.PartyId
 		WHERE s.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount)
@@ -633,7 +639,6 @@ BEGIN
 
 	DROP TABLE #tmpExchange
 	DROP TABLE #tmpChargeInfo
-	DROP TABLE #tmpWinlossData
 	DROP TABLE #tmpDiscountSettings
 END
 GO
