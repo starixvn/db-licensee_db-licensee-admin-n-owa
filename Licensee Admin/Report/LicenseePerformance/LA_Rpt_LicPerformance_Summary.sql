@@ -34,6 +34,7 @@ AS
 	   - 20200629@Parsons: Enhance loading time for Licensee Performance report [#136341]
 	   - 20200820@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
 	   - 20201026@Happy: Arcadia Gaming Add Bonus [#143597]
+	   - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
 
 	Param's Explanation:
 	  + @PartyIDs : a string of list PartyID, separated by ','
@@ -125,7 +126,34 @@ BEGIN
 		)
 	END
 
-	IF @ProductCode NOT IN('BA', 'PP')
+	IF @ProductCode = 'SB'
+	BEGIN
+		DECLARE @SB_AdjustedOdds SMALLINT = 999
+		;WITH cte_SBData AS 
+		(
+			SELECT ci.PartyID, b.rptDate, b.CurrencyID,0 CommBA
+				, SUM(ISNULL(b.betcount, 0) * CASE WHEN (@drawfilter = 2 AND b.[StatusId] = 111) OR b.Bettype = @SB_AdjustedOdds THEN 0 ELSE 1 END) BetCount
+				, SUM(ISNULL(b.turnover, 0) * CASE WHEN (@drawfilter IN (2, 3) AND b.[StatusId] = 111) OR b.Bettype = @SB_AdjustedOdds THEN 0 ELSE 1 END) TurnOver
+				, SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN 0 ELSE ISNULL(b.MemberWL, 0) END) Winlost
+				, SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN 0 ELSE ISNULL(-b.MemberWL, 0) END * ISNULL(cr.Rate, ci.Rate)) AS LicencingFeeAdjustedOdds
+				, SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS OddsSpreadCost
+				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+					INNER JOIN (SELECT DISTINCT ChargeId, PartyID, LicenseeID, Rate, Fromdate, Todate FROM @tmpParty) ci ON ci.LicenseeID = b.SiteID AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+					LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeId AND cr.CurrencyID = b.CurrencyId
+				WHERE b.ProductID = 0
+					AND b.rptDate BETWEEN @FromDate AND @ToDate
+					AND (b.CurrencyID <> @CurrencyTest)
+					AND (@Currency = 0 OR b.CurrencyID = @Currency)  
+					AND b.customercategory NOT IN (27, 28)
+					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+				GROUP BY ci.PartyID, b.rptDate, b.CurrencyID
+		)
+		INSERT INTO #Temp (PartyID, rptDate, Currency, CommBA, Betcount, TurnOver, Winlost, LicensingFee)
+		SELECT PartyID, rptDate, CurrencyID, 0, BetCount, TurnOver, Winlost, LicencingFeeAdjustedOdds + OddsSpreadCost
+		FROM cte_SBData 
+	END
+
+	IF @ProductCode NOT IN('BA', 'PP', 'SB')
 	BEGIN
 		INSERT INTO #Temp (PartyID, Rptdate, Currency, TurnOver, Winlost, CommBA, Betcount, LicensingFee)
 		(
