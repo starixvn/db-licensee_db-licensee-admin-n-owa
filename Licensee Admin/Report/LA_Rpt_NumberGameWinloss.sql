@@ -150,7 +150,7 @@ BEGIN
 			SUM(r.LicenseeWinloss), 
 			SUM(r.LicensingFee),
 			SUM((r.LicensingFee - CASE
-									WHEN r.SiteID = 1487/*IBCIndo*/ THEN ExtraPT
+									WHEN r.SiteID IN (1487/*IBCIndo*/, 1547/*76666b*/) THEN ExtraPT
 									ELSE 0
 								  END) * ci.Rate3rd) AS PayToSupplier
 	FROM cte_CreditData r
