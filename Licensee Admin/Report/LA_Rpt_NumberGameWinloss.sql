@@ -127,7 +127,7 @@ BEGIN
 	;WITH cte_CreditData AS 
 	(
 		SELECT b.SiteID, b.rptDate as Winlostdate, b.CurrencyId,
-		-SUM(b.WinLossE + b.CommissionE) AS ExtraPT,
+		SUM(b.WinLossE + b.CommissionE) AS ExtraPT,
 		SUM(b.Turnover)		AS Turnover,
 		SUM(b.ExtraAmount)	AS HouseTurnover,
 		SUM(b.BetCount)		AS TotalTrans,
