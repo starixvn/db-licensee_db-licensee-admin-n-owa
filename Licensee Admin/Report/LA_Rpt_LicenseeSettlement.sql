@@ -754,13 +754,13 @@ BEGIN
 	ELSE IF(@ProductCode = 'SB') -- Sportsbook
 	BEGIN
 		DECLARE @OddsSpreadCost_BetType SMALLINT = 999
-		;WITH cte_SB AS 
+		;WITH cte_SB AS
 		(
 			SELECT b.SiteId, b.rptDate, b.CurrencyID
-				,SUM(ISNULL(b.turnover, 0)) AS	Turnover
-				,SUM(ISNULL(b.MemberWL, 0))	AS	MemberWinloss
-				,SUM(ISNULL(b.betcount, 0)) AS	BetCount
-				,SUM(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS OddsSpreadCost
+				,SUM(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN 0 ELSE ISNULL(b.turnover, 0) END)	AS Turnover
+				,SUM(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN 0 ELSE ISNULL(b.MemberWL, 0) END)	AS MemberWinloss
+				,SUM(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN 0 ELSE ISNULL(b.betcount, 0) END)	AS BetCount
+				,SUM(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN ISNULL(-b.GrossWL, 0) ELSE 0 END)	AS OddsSpreadCost
 			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			WHERE
 				b.SiteID = @LicenseeID
