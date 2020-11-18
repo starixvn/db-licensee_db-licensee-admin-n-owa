@@ -155,6 +155,7 @@ BEGIN
 								  END) * ci.Rate3rd) AS PayToSupplier
 	FROM cte_CreditData r
 	INNER JOIN #ChargeRate ci ON r.SiteID = ci.LicenseeId AND r.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
+	WHERE ci.isDeposit = 0
 	GROUP BY ci.PartyID, r.Winlostdate, r.CurrencyId
 
 	-- EndRegion
