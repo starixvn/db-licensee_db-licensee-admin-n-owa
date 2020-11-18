@@ -26,6 +26,7 @@ AS
 	    - 20200409@Parsons: Integrate SA Gaming [#129276]
 	    - 20200820@Happy: Implement PP JP Changes In Reports Phase 2 [#139055]
 	    - 20201026@Happy: Arcadia Gaming Add Bonus [#143597]
+	    - 20201118@Happy: Changing OddsSpread for licensee [#142345]
 */
 
 BEGIN
@@ -95,7 +96,7 @@ BEGIN
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 	INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
 	LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.Bettype = b.Bettype
-	LEFT JOIN LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeID
+	LEFT JOIN LA_f_ExcludedBettypeListSel('','999') eb ON b.Bettype = eb.BettypeID
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 		AND b.StatusId NOT IN (-1, 101, 102, 103)
 		AND b.CurrencyID <> 20
