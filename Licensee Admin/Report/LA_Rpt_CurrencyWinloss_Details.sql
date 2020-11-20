@@ -263,12 +263,12 @@ BEGIN
 					,b.SiteID
 					,b.CurrencyID
 					,b.ProductID
-					,SUM(b.Turnover * 
+					,SUM(CASE WHEN b.Bettype = @OddSpread_BetType THEN 0 ELSE b.Turnover * 
 									(CASE	WHEN @drawfilter IN (2, 3) AND b.[Status] = 111  THEN 0
 											WHEN @drawfilter IN (2, 3) AND b.[Status] IN (114,115) THEN 0.5
 											ELSE 1 
 									 END)
-						) AS Turnover
+						END) AS Turnover
 					,SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @OddSpread_BetType) THEN 0 ELSE b.winloss END)	AS MemberWL
 					,SUM(CASE WHEN (@drawfilter = 2 AND b.[Status] = 111) OR b.Bettype IN (@PP_Contribution, @OddSpread_BetType) THEN 0 ELSE b.BetCount END) AS BetCount
 					,SUM(CASE WHEN b.ProductId = 32 THEN 0 ELSE b.commissionP END) AS Playercomm 
