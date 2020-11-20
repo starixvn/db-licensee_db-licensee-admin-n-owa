@@ -434,13 +434,13 @@ BEGIN
 		DELETE #Data
 
 		SELECT  b.rptDate, ci.PartyID, b.ProductID, b.CurrencyId
-			, SUM(b.turnover * 
-				CASE WHEN @drawfilter IN (2, 3) THEN 
+			, SUM(CASE WHEN b.Bettype = @OddsSpread_BetType THEN 0 ELSE b.turnover * 
+				(CASE WHEN @drawfilter IN (2, 3) THEN 
 						CASE WHEN b.StatusId = 111 THEN 0
 								WHEN b.StatusId IN (114, 115)	THEN 0.5 
 								ELSE 1	
 						END
-						ELSE 1
+						ELSE 1 END)
 				END) Turnover 
 			, SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @OddsSpread_BetType) THEN 0 ELSE b.MemberWL END) Winloss
 			, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END) PComm
