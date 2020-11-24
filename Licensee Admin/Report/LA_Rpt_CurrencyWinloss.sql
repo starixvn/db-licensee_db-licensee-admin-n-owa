@@ -309,7 +309,7 @@ BEGIN
 			   ,(-MemberWL - CASE WHEN a.ProductID = 32 THEN WinlossA ELSE 0 END) * ISNULL(cc.Rate, p.Rate)
 			   ,Betcount
 			   ,Playercomm
-			   ,WinlossA
+			   ,CASE WHEN a.ProductID = 0 THEN WinlossA ELSE 0 END
 		FROM cte_Data a
 		INNER JOIN #tmpParty p ON p.LicenseeID = a.SiteID AND a.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId=a.ProductId AND p.ChargeType = 1
 		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID = p.ChargeId AND a.CurrencyId=cc.CurrencyID
