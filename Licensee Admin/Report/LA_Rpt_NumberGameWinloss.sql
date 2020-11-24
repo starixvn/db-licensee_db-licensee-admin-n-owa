@@ -29,6 +29,7 @@ AS
 	- 20191226@Mason: Set Term By Currency [#120005]
 	- 20200203@Mason: Support HID currency [#128856]
 	- 20200409@Mason: Integrate SA Gaming [#129276]
+	- 20201109@Parsons: Add ExtraPT in Number Game Win Loss Report [RedmineID: #142969]
 
  * Param's Explanation:
  EXEC LA_Rpt_NumberGameWinloss @PartyIds = '14,15,16,17,18,19', @FromDate = '20190101', @ToDate = '20190808', @BaseCurrencyName = 'EUR'
@@ -87,29 +88,31 @@ BEGIN
 	
 	-- Region: TempData
 	CREATE TABLE #TempData (
-		PartyID INT,
-		PartyName NVARCHAR(100),
-		ParentId INT,
-		ParentName NVARCHAR(100),
-		Winlostdate DATETIME,
-		CurrencyId INT,
-		Turnover MONEY,
-		HouseTurnover MONEY,
-		TotalTrans INT,
+		PartyID			INT,
+		PartyName		NVARCHAR(100),
+		ParentId		INT,
+		ParentName		NVARCHAR(100),
+		Winlostdate		DATETIME,
+		CurrencyId		INT,
+		Turnover		MONEY,
+		HouseTurnover	MONEY,
+		TotalTrans		INT,
 		CustomerWinLoss MONEY,
 		LicenseeWinloss MONEY,
-		LicensingFee MONEY,
-		PayToSupplier MONEY)
+		LicensingFee	MONEY,
+		ExtraPT 		MONEY,
+		PayToSupplier	MONEY)
 
-	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,HouseTurnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
+	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,ExtraPT,Turnover,HouseTurnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
 	SELECT ci.PartyId,
 		b.rptDate as Winlostdate,
 		b.CurrencyId,
+		0,
 		SUM(b.Turnover) AS Turnover,
 		SUM(b.ExtraAmount) AS HouseTurnover,
 		SUM(b.BetCount) AS TotalTrans,
 		SUM(b.MemberWL) AS CustomerWinLoss,
-		- SUM(b.MemberWL) AS LicenseeWinloss,
+		SUM(-b.MemberWL) AS LicenseeWinloss,
 		SUM(-b.MemberWL * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
 		SUM(-b.MemberWL * ISNULL(cr.Rate, ci.Rate) * ci.Rate3rd) AS PayToSupplier
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
@@ -121,24 +124,40 @@ BEGIN
 	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
 	
 	-- Calculate for credit
-	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,HouseTurnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee, PayToSupplier)
-	SELECT ci.PartyId,
-		b.rptDate as Winlostdate,
-		b.CurrencyId,
-		SUM(b.Turnover) AS Turnover,
-		SUM(b.ExtraAmount) AS HouseTurnover,
-		SUM(b.BetCount) AS TotalTrans,
-		SUM(b.WinLoss) AS CustomerWinLoss,
-		- SUM(b.WinLoss) AS LicenseeWinloss,
-		- SUM(b.WinLoss + b.WinLossA + WinLossM + WinLossS + b.CommissionS) AS LicensingFee,
-		- SUM((b.WinLoss + b.WinLossA + WinLossM + WinLossS + b.CommissionS) * ci.Rate3rd) AS PayToSupplier
-	FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
-		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
-	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
-		b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
-		AND b.Bettype in (Select Bettype FROM LA_f_BettypeProductMapping(0,'NG'))
-		AND ci.isDeposit = 0
-	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
+	;WITH cte_CreditData AS 
+	(
+		SELECT b.SiteID, b.rptDate as Winlostdate, b.CurrencyId,
+		SUM(ISNULL(b.WinLossE, 0) +  ISNULL(b.CommissionE, 0)) AS ExtraPT,
+		SUM(b.Turnover)		AS Turnover,
+		SUM(b.ExtraAmount)	AS HouseTurnover,
+		SUM(b.BetCount)		AS TotalTrans,
+		SUM(b.WinLoss)		AS CustomerWinLoss,
+		SUM(-b.WinLoss)		AS LicenseeWinloss,
+		- SUM(b.WinLoss + b.WinLossA + WinLossM + WinLossS + b.CommissionS)		AS LicensingFee
+		FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
+		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
+			b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
+			AND b.Bettype in (Select Bettype FROM LA_f_BettypeProductMapping(0,'NG'))
+		GROUP BY b.SiteID, b.rptDate, b.CurrencyId
+	)
+	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,ExtraPT,Turnover,HouseTurnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
+	SELECT ci.PartyID, r.Winlostdate, r.CurrencyID,
+			SUM(r.ExtraPT),
+			SUM(r.Turnover), 
+			SUM(r.HouseTurnover), 
+			SUM(r.TotalTrans), 
+			SUM(r.CustomerWinLoss), 
+			SUM(r.LicenseeWinloss), 
+			SUM(r.LicensingFee),
+			SUM((r.LicensingFee - CASE
+									WHEN r.SiteID IN (1487/*IBCIndo*/, 1547/*76666b*/) THEN ExtraPT
+									ELSE 0
+								  END) * ci.Rate3rd) AS PayToSupplier
+	FROM cte_CreditData r
+	INNER JOIN #ChargeRate ci ON r.SiteID = ci.LicenseeId AND r.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
+	WHERE ci.isDeposit = 0
+	GROUP BY ci.PartyID, r.Winlostdate, r.CurrencyId
+
 	-- EndRegion
 	
 	UPDATE td SET
@@ -163,6 +182,7 @@ BEGIN
 		CustomerWinLoss	MONEY,
 		LicenseeWinLoss	MONEY,
 		LicensingFee	MONEY,
+		ExtraPT 		MONEY,
 		PayToSupplier	MONEY,
 		CompanyIncome	MONEY,
 		Currency		VARCHAR(20)
@@ -170,10 +190,7 @@ BEGIN
 
 	-- Region: Calculate Grand Total
 	DECLARE @tempCurrency VARCHAR(20)
-	DECLARE @BaseCurrencies TABLE(
-		Id INT,
-		Name VARCHAR(20)
-	)
+	DECLARE @BaseCurrencies TABLE(Id INT, [Name] VARCHAR(20))
 	INSERT INTO @BaseCurrencies(Id, Name)
 	EXEC LA_SelBaseCurrency
 
@@ -185,6 +202,7 @@ BEGIN
 		CustomerWinLoss	MONEY,
 		LicenseeWinLoss	MONEY,
 		LicensingFee	MONEY,
+		ExtraPT 		MONEY,
 		PayToSupplier	MONEY,
 		CompanyIncome	MONEY
 	)
@@ -193,22 +211,24 @@ BEGIN
 	BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies)
 
-		INSERT INTO @Total (ParentId, Currency,TotalTrans,Turnover,HouseTurnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
+		INSERT INTO @Total (ParentId, Currency,TotalTrans,Turnover,HouseTurnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,ExtraPT,PayToSupplier,CompanyIncome)
 		SELECT 
 			ParentId,
 			@tempCurrency AS Currency,
-			SUM(td.TotalTrans) TotalTrans,
-			SUM(td.Turnover * e.BaseCurrencyRate) Turnover,
-			SUM(td.HouseTurnover * e.BaseCurrencyRate) HouseTurnover,
-			SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss,
-			SUM(td.LicenseeWinLoss * e.BaseCurrencyRate) LicenseeWinLoss,
-			SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
-			SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
+			SUM(td.TotalTrans),
+			SUM(td.Turnover * e.BaseCurrencyRate),
+			SUM(td.HouseTurnover * e.BaseCurrencyRate),
+			SUM(td.CustomerWinLoss * e.BaseCurrencyRate),
+			SUM(td.LicenseeWinLoss * e.BaseCurrencyRate),
+			SUM(td.LicensingFee * e.BaseCurrencyRate),
+			SUM(td.ExtraPT * e.BaseCurrencyRate),
+			SUM(td.PayToSupplier * e.BaseCurrencyRate),
+			SUM((LicensingFee - ExtraPT - PayToSupplier) * e.BaseCurrencyRate) AS CompanyIncome
 			FROM #TempData td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e
 			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.Winlostdate
 			GROUP BY td.ParentId
 
-		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,HouseTurnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
+		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,HouseTurnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,ExtraPT,PayToSupplier,CompanyIncome)
 		SELECT Currency,
 			SUM(TotalTrans),
 			SUM(Turnover),
@@ -216,8 +236,9 @@ BEGIN
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(LicensingFee),
+			SUM(ExtraPT),
 			SUM(PayToSupplier),
-			SUM(LicensingFee - PayToSupplier)
+			SUM(CompanyIncome)
 		FROM @Total
 		WHERE Currency = @tempCurrency
 		GROUP BY Currency
@@ -231,42 +252,34 @@ BEGIN
 		r.PartyName,
 		r.ParentId,
 		r.ParentName,
-		r.Winlostdate AS WinLossDate,
-		e.CurrencyCode AS CurrencyName,
+		r.Winlostdate				AS WinLossDate,
+		e.CurrencyCode				AS CurrencyName,
 		-- Select by origin currency
 		r.TotalTrans,
-		r.Turnover AS TurnoverOriginal,
-		r.HouseTurnover AS HouseTurnoverOriginal,
-		CAST((r.CustomerWinLoss) AS MONEY) AS CustomerWinLossOriginal,
-		CAST((r.LicenseeWinLoss) AS MONEY) AS LicenseeWinLossOriginal,
-		CAST((r.LicensingFee) AS MONEY) AS LicensingFeeOriginal,
-		CAST((r.PayToSupplier) AS MONEY) AS PayToSupplierOriginal,
-		r.LicensingFee - r.PayToSupplier AS CompanyIncomeOriginal,
+		r.Turnover					AS TurnoverOriginal,
+		r.HouseTurnover				AS HouseTurnoverOriginal,
+		CAST((r.CustomerWinLoss) AS MONEY)	AS CustomerWinLossOriginal,
+		CAST((r.LicenseeWinLoss) AS MONEY)	AS LicenseeWinLossOriginal,
+		CAST((r.LicensingFee) AS MONEY)		AS LicensingFeeOriginal,
+		CAST((r.ExtraPT) AS MONEY)			AS ExtraPTOriginal,
+		CAST((r.PayToSupplier) AS MONEY)	AS PayToSupplierOriginal,
+		r.LicensingFee - ExtraPT - r.PayToSupplier	AS CompanyIncomeOriginal,
 		-- Select by base currency
 		r.Turnover * e.Rate AS Turnover,
 		r.HouseTurnover * e.Rate AS HouseTurnover,
 		CAST((r.CustomerWinLoss * e.Rate) AS MONEY) AS CustomerWinLoss,
 		CAST((r.LicenseeWinLoss * e.Rate) AS MONEY) AS LicenseeWinLoss,
-		CAST((r.LicensingFee * e.Rate) AS MONEY) AS LicensingFee,
+		CAST((r.LicensingFee * e.Rate) AS MONEY)	AS LicensingFee,
+		CAST((r.ExtraPT * e.Rate) AS MONEY)			AS ExtraPT,
 		CAST((r.PayToSupplier * e.Rate)AS MONEY) AS PayToSupplier,
-		CAST((r.LicensingFee - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome
+		CAST((r.LicensingFee - ExtraPT - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome
 	FROM #TempData r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.Winlostdate = e.ExchangeDate
 	
 	-- Select Grand Total
 	SELECT * FROM @GrandTotal
 	
 	-- Total
-	SELECT ParentId,
-		TotalTrans,
-		Turnover,
-		HouseTurnover,
-		CustomerWinLoss,
-		LicenseeWinLoss,
-		LicensingFee,
-		PayToSupplier,
-		(LicensingFee - PayToSupplier) AS CompanyIncome
-	FROM @Total t
-	WHERE Currency = @BaseCurrencyName
+	SELECT * FROM @Total WHERE Currency = @BaseCurrencyName
 	
 	-- End Region
 	
