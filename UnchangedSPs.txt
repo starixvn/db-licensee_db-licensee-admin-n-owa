@@ -1,4 +1,4 @@
 Licensee Admin/Invoice/InvoiceAmountGenerate/LA_Inv_GenerateAmountForSoftwareFee.sql
-Licensee Admin/Invoice/LA_Inv_InvoiceAmountGenerate.sql
-Licensee Admin/Invoice/LA_Inv_RebateWorksheetSel.sql
 Licensee Admin/Report/LicenseePerformance/LA_Rpt_LicPerformance_Detail.sql
+Licensee Admin/Invoice/LA_Inv_RebateWorksheetSel.sql
+Licensee Admin/Invoice/LA_Inv_InvoiceAmountGenerate.sql
