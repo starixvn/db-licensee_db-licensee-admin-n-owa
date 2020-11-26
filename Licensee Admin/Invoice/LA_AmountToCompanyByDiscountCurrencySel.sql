@@ -364,8 +364,8 @@ BEGIN
 				t.PartyId,
 				t.ProductId,
 				t.CurrencyId,
-				SUM(-ISNULL(t.MemberWL * ed.Rate, 0)) AS WinlossByDiscountBaseCurrency,
-				SUM(-ISNULL(t.Amount * ed.Rate, 0)) AS AmountToCompanyByDiscountBaseCurrency
+				SUM(ISNULL(t.MemberWL * ed.Rate, 0)) AS WinlossByDiscountBaseCurrency,
+				SUM(ISNULL(t.Amount * ed.Rate, 0)) AS AmountToCompanyByDiscountBaseCurrency
 		FROM @TemData t
 			INNER JOIN #tmpDiscountSettings ds ON ds.PartyId = t.PartyID AND t.ProductId = ds.ProductID 
 			INNER JOIN #tmpExchange ed ON t.WinlossDate = ed.ExchangeDate AND t.CurrencyId = ed.ExchangeID AND ed.BaseCurrencyId = ds.CurrencyId
@@ -436,7 +436,7 @@ BEGIN
 	SELECT TOP(1) WITH TIES mfd.GroupMinFeeID, ProductId, mfd.MinimumFee * e.Rate AS GroupMinFee
 	FROM dbo.LA_GroupMinFeeDetail mfd WITH(NOLOCK)
 		INNER JOIN @PartyList p ON mfd.GroupMinFeeID = p.GroupMinFeeId
-		INNER JOIN #tmpExchange e ON e.ExchangeId = mfd.CurrencyId AND e.exchangedate = @ToDate AND e.BaseCurrencyId = mfd.CurrencyId  
+		INNER JOIN #tmpExchange e ON e.ExchangeId = mfd.CurrencyId AND e.exchangedate = @ToDate AND e.BaseCurrencyId = @BaseCurrencyId
 	WHERE @FromDate BETWEEN mfd.FromDate AND mfd.ToDate
 	ORDER BY ROW_NUMBER() OVER(PARTITION BY mfd.GroupMinFeeID order by mfd.ToDate DESC)
 
