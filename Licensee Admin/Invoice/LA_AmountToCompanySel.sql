@@ -299,7 +299,7 @@ BEGIN
 		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @PP_Contribution,@SB_AdjustedOdds) THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss, 
 		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @SB_AdjustedOdds) THEN 0 ELSE (ISNULL(-b.MemberWL, 0) - CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) 
 																	* ISNULL(cr.Rate, p.Rate) * e.Rate END) AS LicencingFeeAdjustedOdds, 
-		SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS OddsSpreadCost,
+		SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN ISNULL(-b.GrossWL, 0) ELSE 0 END * e.Rate) AS OddsSpreadCost,
 		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) * e.Rate
 				 WHEN b.ProductID = @BX THEN -(b.CommissionA + b.CommissionP) * e.Rate
 				 ELSE 0 
