@@ -279,7 +279,9 @@ BEGIN
 						INNER JOIN dbo.LA_DiscountGroupHeader dh WITH(NOLOCK) ON dp.DiscountGroupId = dh.DiscountGroupId
 						INNER JOIN dbo.LA_DiscountGroupAssignment da WITH(NOLOCK) ON dh.DiscountGroupId = da.DiscountGroupId
 				WHERE	da.PartyID = @PartyId
-						AND dh.DiscountGroupType = 2
+						AND dh.DiscountGroupType = 2 -- Rebate
+						AND dh.FromDate <= @ToDate
+						AND dh.ToDate >= @FromDate
 			) p
 				
 		IF @ProductCodeString = '' OR @ProductCodeString = ','
