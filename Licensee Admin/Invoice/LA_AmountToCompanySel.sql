@@ -32,6 +32,7 @@ AS
 		- 20200803@Parsons: Implement Group Min Fee [#134492]
 		- 20201027@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
 	    - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
+		- 20201130@Parsons: Saba.club - Offer Freebet tickets [#141423]
 
 	Parameters:
 		@IsApplyDiscountMinfee: apply minfee term to discount value
@@ -317,6 +318,7 @@ BEGIN
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
 			AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
 			AND eb.BettypeID IS NULL
+			AND	b.TicketType <> 2 -- Free_Bets_TicketType
 	GROUP BY p.PartyId,b.rptdate,p.ProductId,b.CurrencyId
 	)
 	INSERT INTO @TmpWinlossData(PartyId,WinlossDate,ProductId,CurrencyId,Winloss,AmountToCompany,ExtraAmount)
