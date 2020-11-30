@@ -59,6 +59,7 @@ AS
 		- 20200909@Parsons: Integrate PG Soft [#138983]  
 		- 20200921@Parsons: Integrate Joker Games [#141421]  
 		- 20201008@Parsons: Integrate WM Live Casino [#141357]  
+		- 20201130@Parsons: Integrate Leap Gaming Virtual Sports [#145339]
 
 	Param's Explanation:
 
@@ -478,6 +479,15 @@ BEGIN
 	   SELECT typeid, 51
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 3401 AND 3499
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+	END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'VS3')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 49
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 5301 AND 5399
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
