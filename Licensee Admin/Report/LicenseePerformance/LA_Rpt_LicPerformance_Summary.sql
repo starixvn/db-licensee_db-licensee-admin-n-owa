@@ -36,7 +36,6 @@ AS
 	   - 20201026@Happy: Arcadia Gaming Add Bonus [#143597]
 	   - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
 
-	   - 20201014@Happy: Saba.club - Offer Freebet tickets [#141423]
 	Param's Explanation:
 	  + @PartyIDs : a string of list PartyID, separated by ','
 	  + @Currency : 0-All Currencies
