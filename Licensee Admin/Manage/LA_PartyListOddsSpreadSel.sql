@@ -28,7 +28,6 @@ SET NOCOUNT ON
 		FROM  DBPRO.bodb02.dbo.LicSiteSetting ss WITH(NOLOCK)
 		INNER JOIN DBCUST.SiteConfig.dbo.LicVendorProfile vp WITH(NOLOCK) ON ss.SiteId = vp.SiteId
 		INNER JOIN bodb_licensee.dbo.view_site_list vsl ON vp.SiteName = vsl.SiteName
-		WHERE ss.ApplyDeductedSpread = 1
 	)
 	SELECT	p.PartyID, p.PartyName, p.OldRefID AS SiteId
 	FROM bodb_licensee.dbo.OAS_Party p
