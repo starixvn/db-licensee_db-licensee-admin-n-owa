@@ -32,6 +32,7 @@ AS
 		- 20200505@Parsons: Special handling for INH market [#128570] 
 		- 20200714@Parsons: Implement PP Jackpot [RedmineID: #137306] 
 		- 20201028@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
+		- 20201130@Parsons: Saba.club - Offer Freebet tickets [#141423]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -585,6 +586,26 @@ BEGIN
 		END
 	END
 	-- End region
+
+	-- Region Saba.club Free Bets: Free Bets amount
+	DECLARE @Saba_clubProductID INT = 42
+	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = @Saba_clubProductID))
+	BEGIN
+		DECLARE @FreeBetsAmount MONEY
+		SELECT @FreeBetsAmount = SUM(p.MemberWL * e.Rate)
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct p WITH (NOLOCK) 
+			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'SBC', 'OA', 1) pc ON p.SiteID = pc.LicenseeId
+			INNER JOIN #Exchange e ON p.RptDate = e.ExchangeDate AND p.CurrencyID = e.ExchangeID
+			WHERE p.RptDate BETWEEN @FromDate AND @ToDate AND p.ProductID = @Saba_clubProductID AND p.TicketType = 2
+				
+		IF(ISNULL(@FreeBetsAmount, 0) > 0)
+		BEGIN
+			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
+			VALUES(0,'','',34,@FreeBetsAmount,0)
+		END
+	END
+	-- End region
+
 	SELECT	f.ProductId,
 			f.ProductCode,
 			f.ProductName,
