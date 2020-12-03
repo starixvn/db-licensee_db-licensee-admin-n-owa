@@ -40,6 +40,7 @@ AS
 	    - 20201217@Parsons: Saba.club - Offer Freebet tickets [#141423]
 		- 20201223@Happy: Implement WM [#141357]
 		- 20201223@Parsons: Integrate Leap Gaming Virtual Sports [#145339]
+		- 20201230@Parsons: Integrate Gold Diamond Gaming [#145340]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -87,7 +88,7 @@ BEGIN
 
 	-- supported products
 	-- 
-	DECLARE @supportedProducts VARCHAR(500) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3'
+	DECLARE @supportedProducts VARCHAR(500) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG'
 	DECLARE @productList TABLE(ProductId INT, Code VARCHAR(10), Name VARCHAR(100))
 	INSERT INTO @productList(ProductId,Code,Name)
 	SELECT ProductID, ProductPrefix,ProductName FROM dbo.LA_f_Products3rd(@supportedProducts)
