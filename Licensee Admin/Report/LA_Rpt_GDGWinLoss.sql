@@ -36,11 +36,6 @@ BEGIN
 	FROM @PartyList p1
 	INNER JOIN bodb02.dbo.strSplit(@PartyIds, ',') p2 ON p1.PartyId = p2.val
 
-	SET @PartyIds = '';
-	SELECT @PartyIds = COALESCE(@PartyIds + ', ', '') + CAST(PartyId AS VARCHAR(4)) 
-	FROM @PartyList
-	WHERE ParentId <> 0
-
 	CREATE TABLE #ChargeInfo(
 		ChargeId				INT
 		,PartyId				INT
@@ -61,17 +56,8 @@ BEGIN
 		SELECT DISTINCT ChargeId, PartyID, LicenseeId, ProductId, CASE WHEN IsDeposit=1 THEN DI_Rate ELSE 0 END, IsDeposit, Fromdate, Todate, 0, ChargeType
 		FROM dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'GDG')
 	)
-	
-	-- Region: Update ParentId of Expired Group Accordingly
-	UPDATE p
-	SET p.ParentId = ci.ToParty
-	FROM @PartyList p
-	INNER JOIN #ChargeInfo c ON p.PartyId = c.PartyId
-	INNER JOIN OAS_ChargeInfo ci WITH(NOLOCK) ON c.ChargeId = ci.ChargeID
-	WHERE p.ParentId IN (1,9,11,98)
-	-- End-Region: Update ParentId of Expired Group Accordingly
 
-	-- Region: Insert Rate3rd for Credit's charge rate
+	-- Region: Insert Rate3rd
 	INSERT INTO #ChargeInfo(PartyId, LicenseeId, ProductId, Rate, IsDeposit, ChargeType, IsPayToSupplier, Fromdate, Todate)
 	SELECT DISTINCT CI3rd.PartyID, LicenseeID, CI3rd.ProductID, CI3rd.DI_Rate, 0, CI3rd.ChargeType, 1,
 		(CASE WHEN CI3rd.Fromdate < @FromDate THEN @FromDate ELSE CI3rd.Fromdate END),
@@ -79,7 +65,6 @@ BEGIN
 	FROM #ChargeInfo ci
 	INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
 	INNER JOIN LA_f_ChargeInfo3rd (@FromDate, @ToDate, 'GDG', 'OA') CI3rd ON p.ParentId = CI3rd.PartyID AND ci.ProductID = CI3rd.ProductID
-	WHERE ISNULL(CI3rd.IsDeposit, 0) = 0
 	-- Endregion
 	
 	CREATE TABLE #Exchange (
@@ -122,13 +107,11 @@ BEGIN
 			, SUM(-b.MemberWL * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee
 			, SUM(ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS RollingComm
 			, SUM(-b.MemberWL - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) AS NetWinLoss
-			, SUM(CASE WHEN ci.IsDeposit = 1 THEN ISNULL(ci.Rate, 0) ELSE ISNULL(s.Rate, 0) END
-				* (-b.MemberWL - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0))) AS PayToSupplier
+			, SUM((-b.MemberWL - ISNULL(b.ValidBetAmount, 0) * ISNULL(r.Rate, 0)) * ISNULL(s.Rate, 0)) AS PayToSupplier
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #ChargeInfo ci ON ( -- licensee charge rate
 				b.SiteID = ci.LicenseeID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate AND
-				ci.IsPayToSupplier = 0 AND 
-				(ci.IsDeposit = 0 OR ci.ChargeType = @DepositServiceCharge))
+				ci.IsPayToSupplier = 0)
 			LEFT JOIN #ChargeInfo r ON ( -- RollingComm rate
 				b.SiteID = r.LicenseeID AND b.rptDate BETWEEN r.FromDate AND r.ToDate AND
 				r.IsPayToSupplier = 1 AND 
@@ -136,7 +119,7 @@ BEGIN
 			LEFT JOIN #ChargeInfo s ON ( -- service charge rate
 				b.SiteID = s.LicenseeID AND b.rptDate BETWEEN s.FromDate AND s.ToDate AND
 				s.IsPayToSupplier = 1 AND
-				s.ChargeType = @CreditServiceCharge)
+				s.ChargeType IN (@DepositServiceCharge, @CreditServiceCharge))
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeId = ci.ChargeId AND cr.CurrencyID = b.CurrencyId
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 			  b.StatusId NOT IN (- 1, 101, 102, 103) AND
