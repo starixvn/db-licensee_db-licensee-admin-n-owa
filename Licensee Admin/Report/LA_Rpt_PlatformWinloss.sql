@@ -32,6 +32,7 @@ AS
 		- 20200318@Parsons: Handle new betfrom v,1,2,3 into their own category [#130645]
 		- 20200706@Parsons: Add new betfrom eGame Mobile and eGamer Desktop [#136414]
 		- 20200807@Parsons: Filter data by platform : Platform WL (summary, detail) [#138249]
+		- 20201204@Happy: Changing OddsSpread for Licensee [#142345]
 
 	Explanation:
 	  + @PlatformType:
@@ -87,6 +88,7 @@ BEGIN
 	DECLARE @MaxOldDate SMALLDATETIME
 	DECLARE @FDate SMALLDATETIME
 	DECLARE @TDate SMALLDATETIME
+	DECLARE @OddsSpreadCost_BetType SMALLINT = 999
 
 	-- balance update
 	--
@@ -141,6 +143,7 @@ BEGIN
 		INNER JOIN (SELECT DISTINCT CustId FROM #Cust) c ON c.CustID = b.recommend 
 		INNER JOIN bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB') bt ON b.bettype = bt.Bettype
 		WHERE b.winlostdate BETWEEN @TempFromDate AND @TDate
+			AND b.bettype <> @OddsSpreadCost_BetType
 
 		INSERT INTO #WinLoss (LicenseeID, Winlostdate, CurrencyId, BetCount, Turnover, Winloss, BetFrom)
 		SELECT
@@ -189,7 +192,7 @@ BEGIN
 			b.Winlostdate BETWEEN @FDate AND @TempToDate
 			AND b.roleid = 2
 			AND b.statusID  NOT IN (-1, 101, 102, 103)
-			AND b.bettype NOT IN (901,902,903,904/*bettrade*/,911,912,913,914/*cashout*/)
+			AND b.bettype NOT IN (901,902,903,904/*bettrade*/,911,912,913,914/*cashout*/, @OddsSpreadCost_BetType)
 			AND ISNULL(b.isBA,0) = 0
 			AND b.sporttype = 0
 			AND b.currency <> 20

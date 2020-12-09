@@ -32,6 +32,7 @@ AS
 		- 20200326@Parsons: Handle new betfrom v,1,2,3 into their own category [#130645]
 		- 20200706@Parsons: Add new betfrom eGame Mobile and eGamer Desktop [#136414]
 		- 20200807@Parsons: Filter data by platform : Platform WL (summary, detail) [#138249]
+		- 20201204@Happy: Changing OddsSpread for Licensee [#142345]
 
 	Explanation:
 		- Desktop: contain the followings:
@@ -59,7 +60,7 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-
+	DECLARE @OddsSpreadCost_BetType SMALLINT = 999
 	-- Only support 6 months
 	IF DATEDIFF(MONTH,@FromDate,@ToDate) > 6
 	BEGIN
@@ -133,6 +134,7 @@ BEGIN
 		INNER JOIN (SELECT DISTINCT CustId FROM #LicenseeCustInfo) l ON l.CustId=b.recommend
 		INNER JOIN bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB') bt ON bt.Bettype = b.bettype
 		WHERE b.winlostdate BETWEEN @FromDate AND @ToDate
+			AND b.bettype <> @OddsSpreadCost_BetType
 
 		INSERT INTO #Data(ReportDate, CurrencyId, BetFrom, BetCount, Turnover, LicenseeWinLoss)
 		(

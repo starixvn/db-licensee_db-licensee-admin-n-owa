@@ -56,6 +56,7 @@ AS
 		- 20181002@Parsons: Integrate AG setup fee into invoices [#98485]
 		- 20200228@Parsons: Support-HID-currency [#128856]
 		- 20200406@Parsons: Issue rebate worksheet [#131874]
+		- 20201202@Parsons: Add more condition to get only one rebate setting at the one time [#142345]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -279,7 +280,9 @@ BEGIN
 						INNER JOIN dbo.LA_DiscountGroupHeader dh WITH(NOLOCK) ON dp.DiscountGroupId = dh.DiscountGroupId
 						INNER JOIN dbo.LA_DiscountGroupAssignment da WITH(NOLOCK) ON dh.DiscountGroupId = da.DiscountGroupId
 				WHERE	da.PartyID = @PartyId
-						AND dh.DiscountGroupType = 2
+						AND dh.DiscountGroupType = 2 -- Rebate
+						AND dh.FromDate <= @ToDate
+						AND dh.ToDate >= @FromDate
 			) p
 				
 		IF @ProductCodeString = '' OR @ProductCodeString = ','

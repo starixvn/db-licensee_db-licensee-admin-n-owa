@@ -36,6 +36,7 @@ AS
 		- 20200909@Parsons: Implement PG Soft [RedmineID: #138983]
 		- 20200930@Parsons: Implement Joker Games [RedmineID: #141421]
 		- 20201104@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
+	    - 20201118@Parsons: Changing OddsSpread for licensee [#142345]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -59,6 +60,7 @@ BEGIN
 		,@GDTip_Bettype				SMALLINT = 1706
 		,@SAGTip_Bettype			SMALLINT = 3007
 		,@CC_ArcadiaBonus_Bettype	SMALLINT = 1906
+		,@SB_AdjustedOdds_Bettype	SMALLINT = 999
 		,@BA	SMALLINT = 3
 		,@GD	SMALLINT = 11
 		,@CB	SMALLINT = 15
@@ -292,7 +294,7 @@ BEGIN
 		SELECT b.SiteID,b.rptDate,b.ProductId,b.CurrencyId,b.CommissionA,b.CommissionP
 			,b.WinPrizeAmount,b.CashOutAmount,b.BuyBackAmount,b.Turnover
 			,ISNULL(-b.MemberWL, 0) LicWinloss
-			,CASE WHEN b.Bettype = @PPContribution_Bettype THEN ISNULL(-b.GrossWL, 0) ELSE 0 END	Contribution
+			,CASE WHEN b.Bettype IN (@PPContribution_Bettype, @SB_AdjustedOdds_Bettype) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END GrossWL
 			,CASE WHEN b.ProductID = @SPR THEN @SabaPromotion_Bettype ELSE b.Bettype END			Bettype
 			,CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN b.Turnover ELSE b.ExtraAmount END			TurnoverForCommision
 		INTO #tmpBettingByProduct
@@ -307,7 +309,7 @@ BEGIN
 
 		-- calculate amount to company
 		-- excludes: golddeluxe bidme tip, PP JP & Prize, colossus bet
-		--  
+		-- 
 		SELECT p.PartyID,b.rptDate,p.ProductId,b.CurrencyId,
 			CAST(0 AS MONEY) AS Promotion,
 			CAST(0 AS MONEY) AS ExtraAmount,
@@ -315,13 +317,13 @@ BEGIN
 			CAST(0 AS MONEY) AS JackPotPrize,
 			CAST(0 AS MONEY) AS PromotionPrize,
 			SUM((b.LicWinloss + (CASE WHEN b.ProductID = @BX THEN b.CommissionA ELSE 0 END)) * e.Rate) AS Winloss,
-			SUM(((b.LicWinloss - Contribution) * ISNULL(cr.Rate, p.Rate) - 
+			SUM((((b.LicWinloss - CASE WHEN b.ProductID = @PP THEN GrossWL ELSE 0 END) * ISNULL(cr.Rate, p.Rate) - 
 				(CASE
 					WHEN b.ProductID = @BA THEN ISNULL(b.CommissionA,0)
 					WHEN b.ProductID = @BX THEN (b.CommissionA + b.CommissionP)
 					ELSE 0
 				END)
-			) * e.Rate) AS AmountToCompany
+				) + CASE WHEN b.ProductID = 0 THEN GrossWL ELSE 0 END) * e.Rate) AS AmountToCompany
 		INTO #tmpWinlossData
 		FROM #tmpBettingByProduct b
 		INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID AND p.LicenseeId = b.SiteId AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
@@ -336,14 +338,13 @@ BEGIN
 			)
 			AND eb.BettypeID IS NULL
 		GROUP BY p.PartyID,b.rptdate,p.ProductId,b.CurrencyId
-
 		-- includes extra values: gdtip, PP JP & Prize
 		--
 		INSERT INTO #tmpWinlossData(PartyID,rptDate,ProductID,CurrencyId,Winloss,AmountToCompany,ExtraAmount,Promotion,Contribution,JackPotPrize,PromotionPrize)
 		SELECT p.PartyID,b.rptDate,p.ProductId,b.CurrencyId,0,0,
 			SUM(CASE WHEN b.Bettype IN(@GDTip_Bettype, @SAGTip_Bettype) THEN b.LicWinloss * p.Rate * e.Rate ELSE 0 END),
 			SUM(CASE WHEN b.Bettype = @SabaPromotion_Bettype THEN -b.LicWinloss * e.Rate ELSE 0 END),
-			SUM(Contribution * e.Rate),
+			SUM(GrossWL * e.Rate),
 			SUM(CASE WHEN b.Bettype = @PPJackpotPrize_Bettype THEN -b.LicWinloss * e.Rate ELSE 0 END),
 			SUM(CASE WHEN b.Bettype IN (@PPTournament_Bettype, @PromotionPrize_Bettype, @CC_ArcadiaBonus_Bettype) THEN -b.LicWinloss * e.Rate ELSE 0 END)
 		FROM #tmpBettingByProduct b

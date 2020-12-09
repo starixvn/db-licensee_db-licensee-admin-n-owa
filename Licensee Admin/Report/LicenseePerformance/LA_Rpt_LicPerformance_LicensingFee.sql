@@ -40,6 +40,7 @@ AS
 	   - 20200820@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
 	   - 20200909@Parsons: Implement PG Soft [RedmineID: #138983]
 	   - 20200930@Parsons: Implement Joker Games [RedmineID: #141421]
+	   - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
 
 
 	Param's Explanation:  
@@ -89,7 +90,7 @@ BEGIN
 		SET @sdate = DATEADD(m, 1, @sdate)
 	END	
 
-	IF @ProductCode IN ('SB', 'NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK')
+	IF @ProductCode IN ('NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK')
 	BEGIN		
 		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, LicensingFee)
 		SELECT tp.PartyID, d.rptDate, d.CurrencyID, - SUM(d.Winloss * ISNULL(cc.Rate, tp.Rate))
@@ -110,6 +111,30 @@ BEGIN
 		WHERE d.rptDate  BETWEEN tp.Fromdate AND tp.Todate			
 		GROUP BY tp.PartyID, d.rptDate, d.currencyID		
 	END	
+
+	IF @ProductCode = 'SB'
+	BEGIN		
+		DECLARE @SB_Product INT = 0, 
+				@SB_AdjustedOdds SMALLINT = 999
+		;WITH cte_TempData AS 
+		(
+			SELECT  ci.PartyID, b.rptDate, b.currencyID
+			, SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN 0 ELSE ISNULL(-b.MemberWL, 0) END * ISNULL(cr.Rate, ci.Rate)) AS LicencingFeeAdjustedOdds
+			, SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS OddsSpreadCost
+			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			INNER JOIN #tmpParty ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND b.CurrencyId = cr.CurrencyID
+			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
+				AND b.ProductID = @SB_Product
+				AND b.StatusId NOT IN (- 1, 101, 102, 103)
+				AND (b.CurrencyID <> 20)
+				AND b.customercategory NOT IN (27,28)
+			GROUP BY ci.PartyID, b.rptDate, b.currencyID
+		)
+		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, LicensingFee)
+		SELECT PartyID, rptDate, CurrencyId, LicencingFeeAdjustedOdds + OddsSpreadCost
+		FROM cte_TempData
+	END
 
 	IF @ProductCode = 'PP'
 	BEGIN		

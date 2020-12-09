@@ -49,6 +49,7 @@ AS
 		- 20200909@Parsons: Implement PG Soft [RedmineID: #138983] 
 		- 20200930@Parsons: Implement Joker Games [RedmineID: #141421]
 		- 20201023@Parsons: Arcadia Gaming Add Bonus [#143597]  
+	    - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
 */
 		
 /*	Example:
@@ -382,6 +383,31 @@ BEGIN
 	INNER JOIN cte_PPLicensingWL cte ON l.PartyId = cte.PartyId 
 	-- End PP
 
+	-- SportsBook
+	DECLARE @SB_Product INT = 0, 
+			@SB_AdjustedOdds SMALLINT = 999
+	;WITH cte_SBWinLost AS 
+	(
+		SELECT  ci.PartyID
+		, SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN 0 ELSE ISNULL(-b.MemberWL, 0) END * ISNULL(cr.Rate, ci.Rate) * e.Rate) AS LicencingFeeAdjustedOdds
+		, SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN ISNULL(-b.GrossWL, 0) ELSE 0 END * e.Rate) AS OddsSpreadCost
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+		INNER JOIN @PartyChargeInfo ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+		INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
+		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND b.CurrencyId = cr.CurrencyID
+		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
+			AND b.ProductID = @SB_Product
+			AND b.StatusId NOT IN (- 1, 101, 102, 103)
+			AND (b.CurrencyID <> 20)
+			AND b.customercategory NOT IN (27,28)
+		GROUP BY ci.PartyID
+	)
+	UPDATE	l
+	SET		l.SB = LicencingFeeAdjustedOdds + OddsSpreadCost
+	FROM #LicenseeAmount l
+	INNER JOIN cte_SBWinLost cte ON l.PartyId = cte.PartyId 
+	-- End SportsBook
+
 	-- Calculate amount for products 
 	-- For SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, PP, CC, SG, VRG, SAG, I4D, TG, SBC, SXG, PGS, JK: charge rate is affected by currency
 	DECLARE @AmountDueByProduct AS TABLE (
@@ -416,9 +442,8 @@ BEGIN
 		JK	MONEY
 	)
 	
-	INSERT INTO @AmountDueByProduct(LicenseeId, SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, CC, BRVS, LC, VG, MGCLC, MGCRNG, BX, SG, VRG, SAG, I4D, TG, SBC, SXG, PGS, JK)
+	INSERT INTO @AmountDueByProduct(LicenseeId,  NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, CC, BRVS, LC, VG, MGCLC, MGCRNG, BX, SG, VRG, SAG, I4D, TG, SBC, SXG, PGS, JK)
 	SELECT d.LicenseeId,
-			ISNULL(SUM(CASE WHEN d.ProductId = 0  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS SB,
 			ISNULL(SUM(CASE WHEN d.ProductId = 2  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS NG,
 			ISNULL(SUM(CASE WHEN d.ProductId = 5  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VS,
 			ISNULL(SUM(CASE WHEN d.ProductId = 6  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS CS,
@@ -456,8 +481,7 @@ BEGIN
 	-- End calculate amount
 
 	UPDATE	l
-	SET		SB = a.SB,
-			NG = a.NG,
+	SET		NG = a.NG,
 			VS = a.VS,
 			CS = a.CS,
 			KN = a.KN,

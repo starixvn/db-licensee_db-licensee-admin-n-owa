@@ -15,6 +15,7 @@ AS
 		+ 2017-05-09 @Scofield.Huynh: Create [#76132]
 		- 20171220@Parsons: increase length for variables [#88197]
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20201202@Mason: Change request Odds Spread [#142345]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -64,6 +65,7 @@ BEGIN
 	FROM	@PartyGroup 
 	
 	DECLARE @PartyChargeInfo AS TABLE (
+			ChargeId	INT,
 			PartyId		INT,
 			LicenseeId	INT,
 			ProductID	INT,
@@ -73,9 +75,9 @@ BEGIN
 			FromDate	SMALLDATETIME,
 			ToDate		SMALLDATETIME)
 
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, BettypeRef, Rate, Fromdate, Todate)
+	INSERT INTO @PartyChargeInfo(ChargeId, PartyId, LicenseeId, ProductID, BettypeRef, Rate, Fromdate, Todate)
 	(
-		SELECT	PartyID, LicenseeID, ProductID, Bettype, DI_Rate, Fromdate, Todate
+		SELECT DISTINCT ChargeId, PartyID, LicenseeID, ProductID, Bettype, DI_Rate, Fromdate, Todate
 		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId NOT IN (1, 15) --exclude RB, CB
 	)
@@ -142,6 +144,7 @@ BEGIN
 			OR (FeeType = 2 AND (FromDate > ToDate))
 
 	-- Region: Get Amount by Product
+	DECLARE @OddsSpreadCost_BetType INT = 999
 	CREATE	TABLE #TempData (
 			LicenseeId		INT, 
 			PartyId			INT, 
@@ -151,21 +154,23 @@ BEGIN
 			ProductId		TINYINT,
 			BettypeRef		INT, 
 			AmountToCompany MONEY,
-			IsApplyMinFee	BIT)
-	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,WinLoss,ProductId,BettypeRef)
+			IsApplyMinFee	BIT,
+			OddsSpreadCost	MONEY)
+	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,WinLoss,ProductId,BettypeRef,OddsSpreadCost)
 	(
 		SELECT	b.SiteID,
 				p.PartyId, 
 				b.rptDate, 
 				b.CurrencyID, 
-				SUM(ISNULL(b.MemberWL, 0)) Winloss, 
+				SUM(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN 0 ELSE (ISNULL(b.MemberWL, 0)) END) Winloss, 
 				p.ProductId,
-				r.BettypeRef
+				r.BettypeRef,
+				SUM(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) OddsSpreadCost
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				LEFT JOIN dbo.Sport_Bettype_Reference r ON b.Bettype = r.Bettype
 				INNER JOIN @PartyChargeInfo p ON	b.ProductId = p.ProductID 
 													AND p.LicenseeId = b.SiteId
-													AND (b.Bettype = -1 OR r.BettypeRef = p.BettypeRef)
+													AND (b.Bettype = -1 OR b.Bettype = @OddsSpreadCost_BetType OR r.BettypeRef = p.BettypeRef)
 													AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
@@ -178,7 +183,7 @@ BEGIN
 	CREATE NONCLUSTERED INDEX Idx_InvoiceData ON #TempData (PartyId, ProductId)
 
 	UPDATE	#TempData
-	SET		AmountToCompany = (-td.WinLoss * p.Rate) * e.Rate
+	SET		AmountToCompany = (-td.WinLoss * ISNULL(cr.Rate, p.Rate) + td.OddsSpreadCost) * e.Rate
 	FROM	#TempData td 
 			INNER JOIN @PartyChargeInfo p 
 				ON td.LicenseeId = p.LicenseeId 
@@ -186,7 +191,8 @@ BEGIN
 						OR 
 					(td.ProductId = p.ProductID AND td.BettypeRef = p.BettypeRef AND td.ProductId IN (SELECT DISTINCT Productid FROM dbo.LA_Product3rdSub WITH(NOLOCK))))
 				AND td.rptDate BETWEEN p.FromDate AND p.ToDate
-			INNER JOIN #Exchange e ON td.rptDate = e.ExchangeDate AND td.CurrencyId = e.ExchangeID	
+			INNER JOIN #Exchange e ON td.rptDate = e.ExchangeDate AND td.CurrencyId = e.ExchangeID
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND td.CurrencyID = cr.CurrencyId
 
 	UPDATE  t
 	SET		t.IsApplyMinFee = 0

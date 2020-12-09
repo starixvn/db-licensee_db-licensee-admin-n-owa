@@ -21,6 +21,7 @@ AS
 	   - 20200409@Parsons: Integrate SA Gaming [#129276] 
 	   - 20200820@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
 	   - 20201023@Parsons: Arcadia Gaming Add Bonus [#143597]  
+	   - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
 */
 BEGIN
 	SET NOCOUNT ON	
@@ -134,9 +135,34 @@ BEGIN
 		)
 	END
 
+	/* SB Product */	
+	DECLARE @SB_Product INT = 0, 
+			@SB_AdjustedOdds SMALLINT = 999
+	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = @SB_Product) > 0
+	BEGIN
+		;WITH cte_TempData AS 
+		(
+			SELECT  ci.PartyID, b.ProductID, b.currencyID
+			, SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN 0 ELSE ISNULL(-b.MemberWL, 0) END * ISNULL(cr.Rate, ci.Rate)) AS LicencingFeeAdjustedOdds
+			, SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS OddsSpreadCost
+			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND b.CurrencyId = cr.CurrencyID
+			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
+				AND b.ProductID = @SB_Product
+				AND b.StatusId NOT IN (- 1, 101, 102, 103)
+				AND (b.CurrencyID <> 20)
+				AND b.customercategory NOT IN (27,28)
+			GROUP BY ci.PartyID, b.ProductID, b.CurrencyID
+		)
+		INSERT INTO #Report (PartyID, ProductID, CurrencyID, Company)
+		SELECT PartyID, b.ProductID, b.CurrencyId, LicencingFeeAdjustedOdds + OddsSpreadCost
+		FROM cte_TempData b
+	END
+
 	/* Other Products */
 	DECLARE @ExcludedProductIds TABLE(ProductId INT)
-	INSERT INTO @ExcludedProductIds(ProductId) VALUES (@BA_Product), (@CO_Product), (@GD_Product), (@PP_Product)
+	INSERT INTO @ExcludedProductIds(ProductId) VALUES (@SB_Product), (@BA_Product), (@CO_Product), (@GD_Product), (@PP_Product)
 	
 	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) > 0
 	BEGIN
