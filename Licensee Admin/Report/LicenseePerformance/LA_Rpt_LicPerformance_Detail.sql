@@ -64,6 +64,7 @@ AS
 		- 20200910@Parsons: Implement PP JP for Credit [#138984]
 		- 20201007@Parsons: Always show party row regardless of having data or not [#142970]
 		- 20201027@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
+		- 20201209@Parsons: Saba.club - Offer Freebet tickets [#141423]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -352,6 +353,7 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND eb.BettypeID IS NULL
+				AND	b.TicketType <> 2 -- Free_Bets_TicketType
 				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund 
 				AND (@Currency = 0 OR b.CurrencyID = @Currency)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId, b.CurrencyID, p.ProductId
@@ -532,6 +534,7 @@ BEGIN
 		FROM #Result r
 			INNER JOIN cte_PromotionSportsbook p ON r.PartyId = p.PartyId AND r.IsCurrent = p.IsCurrent
 	END
+
 	-- ********************************************************
 	-- *** Calculate Other (!= SportBook) and Merge to #Result
 	-- ********************************************************
@@ -583,6 +586,25 @@ BEGIN
 	INNER JOIN @tmpPartySBLaunchDate t ON t.PartyID = r.PartyId
 	INNER JOIN bodb_licensee.dbo.OAS_Party (NOLOCK) op ON r.PartyId = op.PartyID
 	-- End region
+
+	/*Update Promotion Others column*/
+	DECLARE @Saba_clubProductID INT = 42
+	;WITH cte_PromotionSabaclub AS(
+			SELECT pc.PartyId, r.SiteID,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) AND YEAR(rptDate) = YEAR(@FromDate) THEN 1 ELSE 0 END) IsCurrent, SUM(r.MemberWL * cExchange.Rate) AS Prize
+			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
+				INNER JOIN (SELECT DISTINCT PartyId, LicenseeId FROM @PartyChargeInfo WHERE ProductID = @Saba_clubProductID) pc ON r.SiteID = pc.LicenseeId
+				INNER JOIN #Exchange cExchange ON r.RptDate = cExchange.ExchangeDate AND r.CurrencyID = cExchange.ExchangeID
+				WHERE ((r.RptDate BETWEEN @FromDate AND @ToDate) OR (r.RptDate BETWEEN @PrevFromDate AND @PrevToDate)) 
+						AND r.ProductID = @Saba_clubProductID
+						AND (@Currency = 0 OR @Currency = r.CurrencyId)
+						AND r.TicketType = 2
+
+				GROUP BY pc.PartyId, r.SiteID, (CASE WHEN MONTH(rptDate) = MONTH(@FromDate) AND YEAR(rptDate) = YEAR(@FromDate) THEN 1 ELSE 0 END)
+		)
+	UPDATE r
+	SET PromotionOthers = p.Prize
+	FROM #Result r
+		INNER JOIN cte_PromotionSabaclub p ON r.PartyId = p.PartyId AND r.IsCurrent = p.IsCurrent
 
 	-- Region: Select Data
 	;WITH cte_Result AS
