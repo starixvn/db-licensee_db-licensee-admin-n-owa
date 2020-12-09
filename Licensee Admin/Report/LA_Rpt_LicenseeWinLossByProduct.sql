@@ -49,10 +49,10 @@ AS
 		- 20200909@Parsons: Implement PG Soft [RedmineID: #138983] 
 		- 20200930@Parsons: Implement Joker Games [RedmineID: #141421]
 		- 20201023@Parsons: Arcadia Gaming Add Bonus [#143597]
-		- 20201130@Parsons: Integrate Leap Gaming Virtual Sports [#145339]  
 	    - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
 		- 20201209@Mason: Saba.club - Offer Freebet tickets [#141423]
 		- 20201223@Happy: Implement WM [#141357]
+		- 20201223@Parsons: Integrate Leap Gaming Virtual Sports [#145339]  
 */
 		
 /*	Example:
