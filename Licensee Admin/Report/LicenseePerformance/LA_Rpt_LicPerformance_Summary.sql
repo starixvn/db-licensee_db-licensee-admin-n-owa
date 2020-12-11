@@ -35,6 +35,7 @@ AS
 	   - 20200820@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
 	   - 20201026@Happy: Arcadia Gaming Add Bonus [#143597]
 	   - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
+	   - 20201211@Happy: Saba.club - Offer Freebet tickets [#141423]
 
 	Param's Explanation:
 	  + @PartyIDs : a string of list PartyID, separated by ','
@@ -182,6 +183,7 @@ BEGIN
 			AND b.StatusId NOT IN (-1, 101, 102, 103)
 			AND b.customercategory NOT IN (27, 28)
 			AND eb.BettypeID IS NULL
+			AND b.TicketType <> 2 -- Free_Bets_TicketType
 			GROUP BY PartyID, b.rptDate, b.currencyID
 		)
 	END
