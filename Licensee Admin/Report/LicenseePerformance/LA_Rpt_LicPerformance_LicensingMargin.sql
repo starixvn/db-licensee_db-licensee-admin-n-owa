@@ -110,7 +110,7 @@ BEGIN
 		  AND (b.CurrencyID <> 20)
 		  AND b.status NOT IN (-1, 101, 102, 103)
 		  AND b.customercategory NOT IN (27, 28)
-		  AND b.TicketType <> 2 -- Free_Bets_TicketType
+		  AND ISNULL(b.TicketType, 0) <> 2 -- Free_Bets_TicketType
 	   GROUP BY tp.PartyID, rptDate, currencyID
 	END
 

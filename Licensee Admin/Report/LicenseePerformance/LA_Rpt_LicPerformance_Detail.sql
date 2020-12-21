@@ -353,7 +353,7 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
 				AND eb.BettypeID IS NULL
-				AND	b.TicketType <> 2 -- Free_Bets_TicketType
+				AND	ISNULL(b.TicketType, 0) <> 2 -- Free_Bets_TicketType
 				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund 
 				AND (@Currency = 0 OR b.CurrencyID = @Currency)
 		GROUP BY b.rptdate, b.SiteId, p.PartyId, b.CurrencyID, p.ProductId
@@ -597,7 +597,7 @@ BEGIN
 				WHERE ((r.RptDate BETWEEN @FromDate AND @ToDate) OR (r.RptDate BETWEEN @PrevFromDate AND @PrevToDate)) 
 						AND r.ProductID = @Saba_clubProductID
 						AND (@Currency = 0 OR @Currency = r.CurrencyId)
-						AND r.TicketType = 2
+						AND ISNULL(r.TicketType, 0) = 2
 
 				GROUP BY pc.PartyId, r.SiteID, (CASE WHEN MONTH(rptDate) = MONTH(@FromDate) AND YEAR(rptDate) = YEAR(@FromDate) THEN 1 ELSE 0 END)
 		)

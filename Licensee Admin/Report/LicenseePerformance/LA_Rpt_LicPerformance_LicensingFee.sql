@@ -105,7 +105,7 @@ BEGIN
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
-				AND	b.TicketType <> 2 -- Free_Bets_TicketType
+				AND	ISNULL(b.TicketType, 0) <> 2 -- Free_Bets_TicketType
 		    GROUP BY rptDate, currencyID, tp.PartyID
 		    ) d 
 			 INNER JOIN (SELECT DISTINCT PartyID, Rate, Fromdate, Todate, ChargeID FROM #tmpParty) tp ON tp.PartyID = d.PartyID
