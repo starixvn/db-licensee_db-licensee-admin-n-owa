@@ -797,10 +797,10 @@ BEGIN
 		;WITH cte_SBC AS
 		(
 			SELECT b.SiteId, b.rptDate, b.CurrencyID
-				,SUM(CASE WHEN b.TicketType = @FreeBetTicketType THEN 0 ELSE ISNULL(b.turnover, 0) END)	AS Turnover
-				,SUM(CASE WHEN b.TicketType = @FreeBetTicketType THEN 0 ELSE ISNULL(b.MemberWL, 0) END)	AS MemberWinloss
-				,SUM(CASE WHEN b.TicketType = @FreeBetTicketType THEN 0 ELSE ISNULL(b.betcount, 0) END)	AS BetCount
-				,SUM(CASE WHEN b.TicketType = @FreeBetTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END)	AS FreeBetAmount
+				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType THEN 0 ELSE ISNULL(b.turnover, 0) END)	AS Turnover
+				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType THEN 0 ELSE ISNULL(b.MemberWL, 0) END)	AS MemberWinloss
+				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType THEN 0 ELSE ISNULL(b.betcount, 0) END)	AS BetCount
+				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END)	AS FreeBetAmount
 			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			WHERE
 				b.SiteID = @LicenseeID

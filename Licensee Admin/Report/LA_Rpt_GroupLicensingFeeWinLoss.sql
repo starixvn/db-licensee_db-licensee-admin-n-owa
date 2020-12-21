@@ -181,7 +181,7 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27,28)
 				AND eb.BettypeID IS NULL
-				AND	b.TicketType <> 2 -- Free_Bets_TicketType
+				AND	ISNULL(b.TicketType,0) <> 2 -- Free_Bets_TicketType
 			GROUP BY b.rptDate, ci.PartyID, b.ProductID, b.CurrencyID
 		)
 
