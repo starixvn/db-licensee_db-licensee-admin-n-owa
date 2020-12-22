@@ -756,9 +756,9 @@ END
 				, pl.Name AS ProductName
 				, pl.ProductId
 				, UPPER(@BaseCurrency) AS CurrencyName
-				, SUM(CASE WHEN r.ProductID IN(32, 34, 42) THEN 
+				, SUM(CASE WHEN r.ProductID = 32 THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
-					  ELSE r.AmountToCompany + r.ExtraAmount END) AmountToCompany
+					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 			FROM #tmpResult r
 			INNER JOIN @partyList p ON r.PartyID=p.PartyId
 			INNER JOIN @productList pl ON r.ProductID = pl.ProductId
@@ -770,9 +770,9 @@ END
 			SELECT p.LicenseeCode
 				, pl.Name AS ProductName
 				, UPPER(@BaseCurrency) AS CurrencyName
-				, SUM(CASE WHEN r.ProductID IN(32, 34, 42) THEN 
+				, SUM(CASE WHEN r.ProductID = 32 THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
-					  ELSE r.AmountToCompany + r.ExtraAmount END) AmountToCompany
+					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 			FROM #tmpResult r
 			INNER JOIN @partyList p ON r.PartyID=p.PartyId
 			INNER JOIN @productList pl ON r.ProductID = pl.ProductId
@@ -787,9 +787,9 @@ END
 		BEGIN
 			SELECT p.PartyId
 				,UPPER(@BaseCurrency) AS CurrencyName
-				,SUM(CASE WHEN r.ProductID IN(32,34,42) THEN 
+				,SUM(CASE WHEN r.ProductID = 32 THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
-					 ELSE r.AmountToCompany + r.ExtraAmount END) AmountToCompany
+					 ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 				,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) LicensingFee
 				,SUM(r.Discount) Discount
 				,SUM(r.Rebate) Rebate
@@ -803,9 +803,9 @@ END
 		BEGIN
 			SELECT UPPER(p.LicenseeCode) AS LicenseeCode
 				,UPPER(@BaseCurrency) AS CurrencyName 
-				, SUM(CASE WHEN r.ProductID IN(32, 34, 42) THEN 
+				, SUM(CASE WHEN r.ProductID = 32 THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
-					  ELSE r.AmountToCompany + r.ExtraAmount END) AmountToCompany
+					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 				,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) LicensingFee
 				,SUM(r.Discount) Discount
 				,SUM(r.Rebate) Rebate
