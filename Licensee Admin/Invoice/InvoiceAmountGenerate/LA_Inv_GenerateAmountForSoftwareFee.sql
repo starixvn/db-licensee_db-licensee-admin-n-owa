@@ -596,7 +596,7 @@ BEGIN
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct p WITH (NOLOCK) 
 			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'SBC', 'OA', 1) pc ON p.SiteID = pc.LicenseeId
 			INNER JOIN #Exchange e ON p.RptDate = e.ExchangeDate AND p.CurrencyID = e.ExchangeID
-			WHERE p.RptDate BETWEEN @FromDate AND @ToDate AND p.ProductID = @Saba_clubProductID AND p.TicketType = 2
+			WHERE p.RptDate BETWEEN @FromDate AND @ToDate AND p.ProductID = @Saba_clubProductID AND ISNULL(p.TicketType, 0) = 2
 				
 		IF(ISNULL(@FreeBetsAmount, 0) > 0)
 		BEGIN

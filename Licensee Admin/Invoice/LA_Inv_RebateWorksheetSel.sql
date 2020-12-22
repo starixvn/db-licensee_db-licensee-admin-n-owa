@@ -234,7 +234,7 @@ BEGIN
 			INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 			LEFT JOIN LA_f_ExcludedBettypeListSel('32,34', '') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND b.[StatusId] NOT IN (-1, 101, 102, 103)
-			AND (b.TicketType = 2 OR eb.BettypeID IS NOT NULL)
+			AND (ISNULL(b.TicketType, 0) = 2 OR eb.BettypeID IS NOT NULL)
 		GROUP BY pc.ProductID
 	)
 	UPDATE @Result

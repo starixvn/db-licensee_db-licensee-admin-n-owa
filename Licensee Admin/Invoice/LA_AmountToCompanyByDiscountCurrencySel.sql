@@ -339,7 +339,7 @@ BEGIN
 				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
 				AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
 				AND eb.BettypeID IS NULL 
-				AND	b.TicketType <> 2 -- Free_Bets_TicketType
+				AND	ISNULL(b.TicketType, 0) <> 2 -- Free_Bets_TicketType
 		GROUP BY p.PartyId,b.rptdate,p.ProductId,b.CurrencyId
 	) 
 	INSERT INTO @TemData(PartyId,WinlossDate,ProductId,CurrencyId,MemberWL,Amount,ExtraAmount)
