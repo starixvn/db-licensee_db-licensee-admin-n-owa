@@ -28,6 +28,7 @@ AS
 	   - 20180815@Scofield: Remove "Exclude Test Data" checkbox [#98623]
 	   - 20191205@Parsons: PP tournament [#123958]
 	   - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
+	   - 20201211@Happy: Saba.club - Offer Freebet tickets [#141423]
 	   
 	Param's Explanation:  
 	  + @PartyIDs : a string of list PartyID, separated by ','
@@ -109,6 +110,7 @@ BEGIN
 		  AND (b.CurrencyID <> 20)
 		  AND b.status NOT IN (-1, 101, 102, 103)
 		  AND b.customercategory NOT IN (27, 28)
+		  AND ISNULL(b.TicketType, 0) <> 2 -- Free_Bets_TicketType
 	   GROUP BY tp.PartyID, rptDate, currencyID
 	END
 

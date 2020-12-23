@@ -48,6 +48,7 @@ AS
 		    - 20200719@Parsons: Implement PP Jackpot [RedmineID: #137306]
 			- 20201022@Mason: Arcadia Gaming - Add Bonus feature [#143597]
 			- 20201111@Mason: Change request of Odds Spread [#142345]
+			- 20201209@Mason: Saba.club - Offer Freebet tickets [#141423]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -103,7 +104,8 @@ BEGIN
 		TipsAmount					MONEY,
 		TipsAmountDue				MONEY,
 		OddsSpreadCost				MONEY,
-		GrossCompany				MONEY
+		GrossCompany				MONEY,
+		FreeBetAmount				MONEY
 	)
 
 	CREATE TABLE #Exchange
@@ -196,6 +198,8 @@ BEGIN
 		,CAST(0 AS MONEY)	AS OddsSpreadCostBase
 		,CAST(0 AS MONEY)	AS GrossCompany
 		,CAST(0 AS MONEY)	AS GrossCompanyBase
+		,CAST(0 AS MONEY)	AS FreeBetAmount
+		,CAST(0 AS MONEY)	AS FreeBetAmountBase
 		RETURN
 	END
 
@@ -787,6 +791,41 @@ BEGIN
 		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY rptDate, d.CurrencyID
 	END
+	ELSE IF (@ProductCode = 'SBC')
+	BEGIN
+		DECLARE @FreeBetTicketType INT = 2
+		;WITH cte_SBC AS
+		(
+			SELECT b.SiteId, b.rptDate, b.CurrencyID
+				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType THEN 0 ELSE ISNULL(b.turnover, 0) END)	AS Turnover
+				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType THEN 0 ELSE ISNULL(b.MemberWL, 0) END)	AS MemberWinloss
+				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType THEN 0 ELSE ISNULL(b.betcount, 0) END)	AS BetCount
+				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END)	AS FreeBetAmount
+			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			WHERE
+				b.SiteID = @LicenseeID
+				AND b.rptDate BETWEEN @FromDate AND @ToDate
+				AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
+				AND (b.CurrencyID <> 20)
+				AND b.StatusId NOT IN (-1, 101, 102, 103)
+				AND b.customercategory NOT IN (27, 28)
+				AND b.ProductID = 42
+			GROUP BY b.rptdate, b.SiteId, b.CurrencyID
+		)
+		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, Company, FreeBetAmount, Betcount)
+		SELECT rptDate, d.CurrencyID
+			,SUM(Turnover)													AS Turnover
+			,SUM(MemberWinloss)												AS Winlost
+			,SUM(-MemberWinloss * ( 1 - ISNULL(cr.Rate, p.Rate)))			AS LicenseeWL
+			,SUM(-MemberWinloss * ISNULL(cr.Rate, p.Rate) - FreeBetAmount)	AS Company
+			,SUM(FreeBetAmount)												AS FreeBetAmount
+			,SUM(BetCount)													AS BetCount
+		FROM cte_SBC d
+			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
+		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
+		GROUP BY rptDate, d.CurrencyID
+	END
 	ELSE
 	BEGIN
 		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, ActualStake, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
@@ -806,10 +845,10 @@ BEGIN
 				SELECT b.SiteId, b.rptDate, b.CurrencyID
 				, SUM(ISNULL(b.turnover, 0)) AS Turnover
 				, SUM(CASE WHEN @ProductCode = 'I4D' THEN ISNULL(b.ExtraAmount, 0) ELSE 0 END) AS ActualStake
-				, SUM(ISNULL(b.winloss, 0)) Winloss
+				, SUM(ISNULL(b.winloss, 0)) AS Winloss
 				, SUM(ISNULL(b.CommissionP, 0)) AS PComm
 				, SUM(ISNULL(b.CommissionA, 0)) AS AComm
-				, SUM(ISNULL(b.betcount, 0)) BetCount
+				, SUM(ISNULL(b.betcount, 0)) AS BetCount
 				FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype
 				WHERE
@@ -826,7 +865,7 @@ BEGIN
 			WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
 			GROUP BY rptDate, d.CurrencyID
 		)
-	END	
+	END
 	
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
@@ -884,6 +923,7 @@ BEGIN
 		, SUM(ISNULL(d.BuyBackAmountAndComm, 0))		AS BuyBackAmountAndComm
 		, SUM(ISNULL(d.GrossCompany, 0))				AS GrossCompany
 		, SUM(ISNULL(d.OddsSpreadCost, 0))				AS OddsSpreadCost
+		, SUM(ISNULL(d.FreeBetAmount, 0))				AS FreeBetAmount
 
 		--Base on currency
 		, CONVERT(MONEY, SUM(ISNULL(d.Turnover * e.Rate, 0)))					AS TurnoverBase
@@ -916,6 +956,7 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountAndComm * e.Rate, 0)))		AS BuyBackAmountAndCommBase
 		, CONVERT(MONEY, SUM(ISNULL(d.GrossCompany * e.Rate, 0)))				AS GrossCompanyBase
 		, CONVERT(MONEY, SUM(ISNULL(d.OddsSpreadCost * e.Rate, 0)))				AS OddsSpreadCostBase
+		, CONVERT(MONEY, SUM(ISNULL(d.FreeBetAmount * e.Rate, 0)))				AS FreeBetAmountBase
 	FROM #Result d
 	INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
 	INNER JOIN sortedExchange se ON se.CurrencyCode = e.CurrencyCode

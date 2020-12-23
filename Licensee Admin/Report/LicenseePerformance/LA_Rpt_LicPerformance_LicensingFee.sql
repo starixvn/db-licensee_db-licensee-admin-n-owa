@@ -41,6 +41,7 @@ AS
 	   - 20200909@Parsons: Implement PG Soft [RedmineID: #138983]
 	   - 20200930@Parsons: Implement Joker Games [RedmineID: #141421]
 	   - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
+	   - 20201211@Happy: Saba.club - Offer Freebet tickets [#141423]
 
 
 	Param's Explanation:  
@@ -104,6 +105,7 @@ BEGIN
 				AND (@Currency = 0 OR (@Currency <> 0 AND b.CurrencyID = @Currency))  
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27, 28)
+				AND	ISNULL(b.TicketType, 0) <> 2 -- Free_Bets_TicketType
 		    GROUP BY rptDate, currencyID, tp.PartyID
 		    ) d 
 			 INNER JOIN (SELECT DISTINCT PartyID, Rate, Fromdate, Todate, ChargeID FROM #tmpParty) tp ON tp.PartyID = d.PartyID
