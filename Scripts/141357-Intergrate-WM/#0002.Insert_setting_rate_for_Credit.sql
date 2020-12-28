@@ -32,8 +32,8 @@ BEGIN
 								,[BaseCurrencyId]
 								,[FirstOfBilling]
 								,[BasisOfBilling])
-	VALUES(@WMProductId, 25, 1, 0, 0, 1, '2020-10-31', '2050-01-01', null, null, null, null, null, null),
-		  (@WMProductId, 30, 1, 0, 0, 1, '2020-10-31', '2050-01-01', null, null, null, null, null, null)
+	VALUES(@WMProductId, 25, 1, 0, 0, 1, '2020-11-12', '2050-01-01', null, null, null, null, null, null),
+		  (@WMProductId, 30, 1, 0, 0, 1, '2020-11-12', '2050-01-01', null, null, null, null, null, null)
 	
 	SET @HasInsertSetting = 1
 END
