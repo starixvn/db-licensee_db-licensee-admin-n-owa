@@ -42,6 +42,8 @@ AS
 	   - 20200930@Parsons: Implement Joker Games [RedmineID: #141421]
 	   - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
 	   - 20201211@Happy: Saba.club - Offer Freebet tickets [#141423]
+	   - 20201223@Happy: Implement WM [#141357]
+	   - 20201223@Parsons: Integrate Leap Gaming Virtual Sports [#145339]  
 
 
 	Param's Explanation:  
@@ -91,7 +93,7 @@ BEGIN
 		SET @sdate = DATEADD(m, 1, @sdate)
 	END	
 
-	IF @ProductCode IN ('NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK')
+	IF @ProductCode IN ('NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK', 'WM', 'VS3')
 	BEGIN		
 		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, LicensingFee)
 		SELECT tp.PartyID, d.rptDate, d.CurrencyID, - SUM(d.Winloss * ISNULL(cc.Rate, tp.Rate))

@@ -24,6 +24,7 @@ AS
 	  - 20200805@Parsons: Show net amount for PP in summary sheet [#138932]
 	  - 20201103@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
 	  - 20201216@Parsons: Saba.club - Offer Freebet tickets [#141423]
+	  - 20201228@Parsons: Should include SBC & CC negative amount [#141357]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -127,7 +128,7 @@ BEGIN
 	-- End region
 
 	-- Region: Get Amount by Product
-	DECLARE @Result TABLE(ProductId INT, AmountToCompany MONEY)
+	DECLARE @Result TABLE(ProductId INT, AmountToCompany MONEY, ExtraAmount MONEY)
 
 	-- include BA
 	IF EXISTS(SELECT * FROM @Products WHERE ProductId = @BA)
@@ -216,7 +217,7 @@ BEGIN
 	FROM #AmountToCompany
 
 	-- include no ticket product
-	INSERT INTO @Result
+	INSERT INTO @Result(ProductId, AmountToCompany)
 	SELECT p.ProductId, 0 FROM @Products p
 	WHERE p.ProductId NOT IN (SELECT r.ProductId FROM @Result r)
 
@@ -237,12 +238,12 @@ BEGIN
 			AND (ISNULL(b.TicketType, 0) = 2 OR eb.BettypeID IS NOT NULL)
 		GROUP BY pc.ProductID
 	)
-	UPDATE @Result
-	SET AmountToCompany = CASE WHEN AmountToCompany < 0 THEN 0 ELSE AmountToCompany END + ISNULL(ExtraAmount, 0)
+	UPDATE r
+	SET r.ExtraAmount = ISNULL(cte.ExtraAmount, 0) 
 	FROM @Result r
 	LEFT JOIN cte_ExtraAmountData cte ON r.ProductId = cte.ProductID
 	WHERE r.ProductId IN (32,34,42)
-	--End-Region Show net amount for PP,CC in summary sheet
+	--End-Region Show net amount for PP,CC,SBC in summary sheet
 
 	DECLARE @Remark NVARCHAR(4000) = (SELECT TOP 1 x.RebateRemark FROM #AmountToCompany x WHERE ISNULL(x.RebateRemark,'') <> '')
 
@@ -252,18 +253,21 @@ BEGIN
 		SUM(ISNULL(d.Rebate, 0))	AS TotalRebate,
 		SUM(
 			CASE 
-				WHEN rs.ProductId IN (11,39) THEN 
+				WHEN rs.ProductId IN (11,39,32,34,42) THEN 
 					CASE 
 						WHEN ISNULL(rs.AmountToCompany,0) < 0 THEN 0 
 						ELSE ISNULL(rs.AmountToCompany,0) 
-					END
-				WHEN rs.ProductId IN(32,34,42) THEN ISNULL(rs.AmountToCompany,0)
+					END + ISNULL(rs.ExtraAmount, 0)
 				ELSE ISNULL(d.Fee, rs.AmountToCompany) - ISNULL(d.Discount,0)
-			END	) AS TotalAmount
+			END) AS TotalAmount
 	FROM @Result rs
 	LEFT JOIN #AmountToCompany d ON d.ProductId = rs.ProductId
 
-	SELECT r.ProductId,ISNULL(r.AmountToCompany,0) AmountToCompany FROM @Result r
+	SELECT r.ProductId, CASE 
+							WHEN r.ProductId = 32 AND ISNULL(r.AmountToCompany,0) < 0 THEN 0 
+							ELSE ISNULL(r.AmountToCompany,0) 
+						END + ISNULL(ExtraAmount, 0) AmountToCompany 
+	FROM @Result r
 
 	DROP TABLE #Exchange
 	DROP TABLE #AmountToCompany
