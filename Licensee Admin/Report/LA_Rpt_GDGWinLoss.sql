@@ -215,11 +215,11 @@ BEGIN
 			SUM(Turnover),
 			SUM(ValidBetAmount),
 			SUM(CustomerWinLoss),
-			SUM(LicensingFee),
+			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
 			SUM(RollingComm),
 			SUM(NetWinLoss),
 			SUM(PayToSupplier),
-			SUM(LicensingFee - PayToSupplier)
+			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END - PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
 		
