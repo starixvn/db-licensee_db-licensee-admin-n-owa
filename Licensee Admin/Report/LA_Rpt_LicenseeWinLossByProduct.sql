@@ -53,7 +53,8 @@ AS
 		- 20201209@Mason: Saba.club - Offer Freebet tickets [#141423]
 		- 20201223@Happy: Implement WM [#141357]
 		- 20201223@Parsons: Integrate Leap Gaming Virtual Sports [#145339]  
-		- 20201230@Parsons: Integrate Gold Diamond Gaming [#145340]
+		- 20201230@Parsons: Integrate Gold Diamond Gaming [#145340] 
+		- 20201231@Parsons: Integrate Big Gaming [#145342]
 */
 		
 /*	Example:
@@ -73,7 +74,7 @@ BEGIN
 	DECLARE @PragmaticID INT = 32
 
 	-- Region: Get party charge rate info 
-	DECLARE @ProductCode VARCHAR(500)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX,PP,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG'
+	DECLARE @ProductCode VARCHAR(500)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX,PP,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG,BG'
 	
 	-- Region: Get Party ID
 	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)

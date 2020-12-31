@@ -45,6 +45,7 @@ AS
 	   - 20201223@Happy: Implement WM [#141357]
 	   - 20201223@Parsons: Integrate Leap Gaming Virtual Sports [#145339]  
 	   - 20201230@Parsons: Integrate Gold Diamond Gaming [#145340]
+	   - 20201231@Parsons: Integrate Big Gaming [#145342]
 
 
 	Param's Explanation:  
@@ -94,7 +95,7 @@ BEGIN
 		SET @sdate = DATEADD(m, 1, @sdate)
 	END	
 
-	IF @ProductCode IN ('NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK', 'WM', 'VS3', 'GDG')
+	IF @ProductCode IN ('NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK', 'WM', 'VS3', 'GDG', 'BG')
 	BEGIN		
 		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, LicensingFee)
 		SELECT tp.PartyID, d.rptDate, d.CurrencyID, - SUM(d.Winloss * ISNULL(cc.Rate, tp.Rate))
