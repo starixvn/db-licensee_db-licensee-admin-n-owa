@@ -503,7 +503,7 @@ BEGIN
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
-	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'BG')
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'BGG')
     BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 57
