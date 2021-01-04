@@ -11,13 +11,13 @@ GO
 
 DECLARE @BGProductId INT = 57
 DECLARE @HasInsertSetting BIT = 0;
-DECLARE @BGProductCode VARCHAR(10) = 'BG'
+DECLARE @BGProductCode VARCHAR(10) = 'BGG'
 
 -- 3rd party
 IF NOT EXISTS (SELECT PartyID FROM bodb_licensee.dbo.OAS_Party WITH(NOLOCK) WHERE PartyName = @BGProductCode AND PartyType = 3)
 BEGIN 
 	INSERT bodb_licensee.dbo.OAS_Party (PartyName, [Description], PartyType, OldRefID, SetupName)
-	VALUES (@BGProductCode, 'BG', 3, null, null)
+	VALUES (@BGProductCode, 'BGG', 3, null, null)
 END
 
 DECLARE @3rdPartyId INT = (SELECT p.PartyID FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK) WHERE p.PartyType = 3 and p.PartyName = @BGProductCode)

@@ -16,7 +16,7 @@ DECLARE @HasInsertSetting BIT = 0
 INSERT INTO @BillingGroups(PartyID)
 VALUES(1), (9), (11), (98)
 
-DECLARE @3rdPartyId INT = (SELECT p.PartyID FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK) WHERE p.PartyType = 3 and p.PartyName = 'BG')
+DECLARE @3rdPartyId INT = (SELECT p.PartyID FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK) WHERE p.PartyType = 3 and p.PartyName = 'BGG')
 IF NOT EXISTS (SELECT TOP 1 ChargeID FROM OAS_ChargeInfo WITH(NOLOCK) WHERE ProductID = @BGProductId AND FromParty IN (1,9,11,98) AND ToParty = @3rdPartyId )
 BEGIN
 	-------**** Insert 3rd Rate for Deposit ****---------
