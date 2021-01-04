@@ -62,6 +62,7 @@ AS
 		- 20201130@Parsons: Integrate Leap Gaming Virtual Sports [#145339]
 		- 20201203@Parsons: Integrate Gold Diamond Gaming [#145340]
 		- 20210104@Parsons: Integrate Big Gaming [#145342]
+		- 20210104@Parsons: Integrate MaxGame [#147375]
 
 	Param's Explanation:
 
@@ -511,6 +512,14 @@ BEGIN
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'MXG')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 60
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 5401 AND 5499
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+	END
 	RETURN
 END
 GO
