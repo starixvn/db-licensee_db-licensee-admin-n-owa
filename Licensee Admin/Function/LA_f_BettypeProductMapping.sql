@@ -61,6 +61,7 @@ AS
 		- 20201008@Parsons: Integrate WM Live Casino [#141357]  
 		- 20201130@Parsons: Integrate Leap Gaming Virtual Sports [#145339]
 		- 20201203@Parsons: Integrate Gold Diamond Gaming [#145340]
+		- 20210104@Parsons: Integrate Big Gaming [#145342]
 
 	Param's Explanation:
 
@@ -498,6 +499,15 @@ BEGIN
 	   SELECT typeid, 59
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 5701 AND 5799
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+	END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'BG')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 57
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 3501 AND 3599
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
