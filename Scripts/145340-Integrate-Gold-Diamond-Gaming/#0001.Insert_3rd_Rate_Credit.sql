@@ -13,6 +13,13 @@ DECLARE @GDGProductId INT = 59
 DECLARE @HasInsertSetting BIT = 0;
 DECLARE @GDGProductCode VARCHAR(10) = 'GDG'
 
+DECLARE @AffectedDate DATE = '2020-12-03'
+DECLARE @CreditService_ChargeType INT = 10
+DECLARE @CreditService_ChargeRate DECIMAL(4, 3) = 0.035
+
+DECLARE @RollingCommission_ChargeType INT = 11
+DECLARE @RollingCommission_ChargeRate DECIMAL(4, 3) = 0.01
+
 -- 3rd party
 IF NOT EXISTS (SELECT PartyID FROM bodb_licensee.dbo.OAS_Party WITH(NOLOCK) WHERE PartyName = @GDGProductCode AND PartyType = 3)
 BEGIN 
@@ -42,8 +49,13 @@ BEGIN
 								,[BaseCurrencyId]
 								,[FirstOfBilling]
 								,[BasisOfBilling])
-	VALUES (@GDGProductId, 25, @3rdPartyId, 0, 0.035, 10, '2020-12-03', '2050-01-01', null, null, null, null, null, null),
-		   (@GDGProductId, 30, @3rdPartyId, 0, 0.035, 10, '2020-12-03', '2050-01-01', null, null, null, null, null, null)
+	VALUES -- 1. Service charge rate
+			(@GDGProductId, 25, @3rdPartyId, 0, @CreditService_ChargeRate, @CreditService_ChargeType, @AffectedDate, '2050-01-01', null, null, null, null, null, null)
+		   ,(@GDGProductId, 30, @3rdPartyId, 0, @CreditService_ChargeRate, @CreditService_ChargeType, @AffectedDate, '2050-01-01', null, null, null, null, null, null)
+		   
+		   --2. Rolling commission rate
+		   ,(@GDGProductId, 25, @3rdPartyId, 0, @RollingCommission_ChargeRate, @RollingCommission_ChargeType, @AffectedDate, '2050-01-01', null, null, null, null, null, null)
+		   ,(@GDGProductId, 30, @3rdPartyId, 0, @RollingCommission_ChargeRate, @RollingCommission_ChargeType, @AffectedDate, '2050-01-01', null, null, null, null, null, null)
 	
 	SET @HasInsertSetting = 1
 END

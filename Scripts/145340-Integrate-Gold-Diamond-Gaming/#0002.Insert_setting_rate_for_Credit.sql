@@ -32,8 +32,8 @@ BEGIN
 								,[BaseCurrencyId]
 								,[FirstOfBilling]
 								,[BasisOfBilling])
-	VALUES(@GDGProductId, 25, 1, 0, 0.01, 11, '2020-12-03', '2050-01-01', null, null, null, null, null, null),
-		  (@GDGProductId, 30, 1, 0, 0.01, 11, '2020-12-03', '2050-01-01', null, null, null, null, null, null)
+	VALUES(@GDGProductId, 25, 1, 0, 0, 1, '2020-12-03', '2050-01-01', null, null, null, null, null, null),
+		  (@GDGProductId, 30, 1, 0, 0, 1, '2020-12-03', '2050-01-01', null, null, null, null, null, null)
 	
 	SET @HasInsertSetting = 1
 END
