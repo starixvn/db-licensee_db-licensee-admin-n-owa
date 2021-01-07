@@ -21,6 +21,7 @@ BEGIN
 	SET NOCOUNT ON
 
 	-- charge type
+	DECLARE @GrossWin				INT = 1
 	DECLARE @DepositServiceCharge	INT = 9
 	DECLARE @CreditServiceCharge	INT = 10
 	DECLARE @RollingCommType		INT = 11
@@ -111,7 +112,7 @@ BEGIN
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #ChargeInfo ci ON ( -- licensee charge rate
 				b.SiteID = ci.LicenseeID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate AND
-				ci.IsPayToSupplier = 0)
+				ci.IsPayToSupplier = 0 AND ci.ChargeType = @GrossWin)
 			LEFT JOIN #ChargeInfo r ON ( -- RollingComm rate
 				b.SiteID = r.LicenseeID AND b.rptDate BETWEEN r.FromDate AND r.ToDate AND
 				r.IsPayToSupplier = 1 AND 
