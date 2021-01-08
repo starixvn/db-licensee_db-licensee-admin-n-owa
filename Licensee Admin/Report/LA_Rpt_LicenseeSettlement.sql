@@ -49,6 +49,7 @@ AS
 			- 20201022@Mason: Arcadia Gaming - Add Bonus feature [#143597]
 			- 20201111@Mason: Change request of Odds Spread [#142345]
 			- 20201209@Mason: Saba.club - Offer Freebet tickets [#141423]
+			- 20210108@Mason: Saba.club - Integrate Slot Game [#147977]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -793,14 +794,19 @@ BEGIN
 	END
 	ELSE IF (@ProductCode = 'SBC')
 	BEGIN
-		DECLARE @FreeBetTicketType INT = 2
+		DECLARE @FreeBetTicketType INT = 2,
+				@SBC_Contribution INT = 1698,
+				@SBC_JackpotPrize INT = 1699
+
 		;WITH cte_SBC AS
 		(
 			SELECT b.SiteId, b.rptDate, b.CurrencyID
-				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType THEN 0 ELSE ISNULL(b.turnover, 0) END)	AS Turnover
-				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType THEN 0 ELSE ISNULL(b.MemberWL, 0) END)	AS MemberWinloss
-				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType THEN 0 ELSE ISNULL(b.betcount, 0) END)	AS BetCount
-				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END)	AS FreeBetAmount
+				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType OR b.Bettype IN (@SBC_Contribution, @SBC_JackpotPrize) THEN 0 ELSE ISNULL(b.turnover, 0) END) AS Turnover
+				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType OR b.Bettype IN (@SBC_Contribution, @SBC_JackpotPrize) THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS MemberWinloss
+				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType OR b.Bettype IN (@SBC_Contribution, @SBC_JackpotPrize) THEN 0 ELSE ISNULL(b.betcount, 0) END) AS BetCount
+				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS FreeBetAmount
+				,SUM(CASE WHEN b.Bettype = @SBC_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Contribution
+				,SUM(CASE WHEN b.Bettype = @SBC_JackpotPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS JackpotPrize
 			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			WHERE
 				b.SiteID = @LicenseeID
@@ -812,14 +818,17 @@ BEGIN
 				AND b.ProductID = 42
 			GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
-		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, Company, FreeBetAmount, Betcount)
+		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, Company, FreeBetAmount, Betcount, Contribution, JackpotPrize)
 		SELECT rptDate, d.CurrencyID
-			,SUM(Turnover)													AS Turnover
-			,SUM(MemberWinloss)												AS Winlost
-			,SUM(-MemberWinloss * ( 1 - ISNULL(cr.Rate, p.Rate)))			AS LicenseeWL
-			,SUM(-MemberWinloss * ISNULL(cr.Rate, p.Rate) - FreeBetAmount)	AS Company
-			,SUM(FreeBetAmount)												AS FreeBetAmount
-			,SUM(BetCount)													AS BetCount
+			,SUM(Turnover)		AS Turnover
+			,SUM(MemberWinloss) AS Winlost
+			,SUM((-MemberWinloss - Contribution) * ( 1 - ISNULL(cr.Rate, p.Rate)))	AS LicenseeWL
+			,SUM((-MemberWinloss - Contribution) * ISNULL(cr.Rate, p.Rate))			AS LicenseeChargeRate
+			,SUM((-MemberWinloss-Contribution) * ISNULL(cr.Rate, p.Rate) + Contribution - JackpotPrize - FreeBetAmount) AS Company
+			,SUM(FreeBetAmount)	AS FreeBetAmount
+			,SUM(BetCount)		AS BetCount
+			,SUM(Contribution)	AS Contribution
+			,SUM(JackpotPrize)	AS JackpotPrize	
 		FROM cte_SBC d
 			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
@@ -866,7 +875,7 @@ BEGIN
 			GROUP BY rptDate, d.CurrencyID
 		)
 	END
-	
+
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
 	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)	
