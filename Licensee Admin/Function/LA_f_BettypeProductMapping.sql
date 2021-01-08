@@ -63,7 +63,7 @@ AS
 		- 20201203@Parsons: Integrate Gold Diamond Gaming [#145340]
 		- 20210104@Parsons: Integrate Big Gaming [#145342]
 		- 20210104@Parsons: Integrate MaxGame [#147375]
-
+		- 20210104@Parsons: Integrate Happy 5 Linked Games [#147544]
 	Param's Explanation:
 
 */
@@ -118,7 +118,9 @@ BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 2
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
-	   WHERE (typeid BETWEEN 81 AND 120 OR typeid BETWEEN 8101 AND 8120)
+	   WHERE (typeid BETWEEN 81 AND 120 
+				OR typeid BETWEEN 8101 AND 8120
+				OR typeid BETWEEN 3601 AND 3610)
 		  AND (@Bettype = 0 OR typeid = @Bettype)
     END
 
