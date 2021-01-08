@@ -36,6 +36,7 @@ AS
 	   - 20201026@Happy: Arcadia Gaming Add Bonus [#143597]
 	   - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
 	   - 20201211@Happy: Saba.club - Offer Freebet tickets [#141423]
+	   - 20200106@Parsons: Fix No Draw on TurnOver issue [#148317]
 
 	Param's Explanation:
 	  + @PartyIDs : a string of list PartyID, separated by ','
@@ -134,7 +135,11 @@ BEGIN
 		(
 			SELECT ci.PartyID, b.rptDate, b.CurrencyID,0 CommBA
 				, SUM(ISNULL(b.betcount, 0) * CASE WHEN (@drawfilter = 2 AND b.[StatusId] = 111) OR b.Bettype = @SB_AdjustedOdds THEN 0 ELSE 1 END) BetCount
-				, SUM(ISNULL(b.turnover, 0) * CASE WHEN (@drawfilter IN (2, 3) AND b.[StatusId] = 111) OR b.Bettype = @SB_AdjustedOdds THEN 0 ELSE 1 END) TurnOver
+				, SUM(ISNULL(b.turnover, 0) * CASE WHEN @drawfilter IN (2, 3) THEN
+																				CASE WHEN b.StatusId = 111 OR b.Bettype = @SB_AdjustedOdds THEN 0
+																					 WHEN b.StatusId IN (114, 115) THEN 0.5
+																				ELSE 1 END
+											   ELSE 1 END) TurnOver
 				, SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN 0 ELSE ISNULL(b.MemberWL, 0) END) Winlost
 				, SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN 0 ELSE ISNULL(-b.MemberWL, 0) END * ISNULL(cr.Rate, ci.Rate)) AS LicencingFeeAdjustedOdds
 				, SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS OddsSpreadCost
