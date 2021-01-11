@@ -184,9 +184,9 @@ BEGIN
 			AND b.StatusId NOT IN (-1, 101, 102, 103)
 			AND b.CurrencyID <> 20
 			AND b.CustomerCategory NOT IN (27, 28)
-			AND b.ProductID IN (32, 42)
 			AND eb.BettypeID IS NULL
 			AND ISNULL(b.TicketType, 0) <> 2 --Free_Bets_TicketType
+			AND b.ProductID IN (SELECT ProductID FROM @Products WHERE ProductID IN (32,42))
 		GROUP BY b.rptDate, b.SiteId, b.ProductId, b.Bettype
 	END
 
