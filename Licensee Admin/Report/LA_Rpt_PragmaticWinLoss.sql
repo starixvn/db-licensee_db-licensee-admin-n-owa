@@ -21,6 +21,7 @@ AS
 		- 20200302@Mason: Support HID currency [#128856]
 		- 20200723@Parsons: Implement PP Jackpot [#137306]
 		- 20200910@Parsons: Implement PP JP for Credit [#138984]
+		- 20210112@Mason: Fix bug : Pay to Supplier is incorrect with other based currency [#147375]
 
 	 Params:
 
@@ -364,7 +365,7 @@ BEGIN
 		SET PayToSupplier = @TotalPayToSupplierOfCredit * e.BaseCurrencyRate
 		FROM @Total t
 		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@ToDate, @ToDate, @tempCurrency) e ON e.ExchangeId = @CreditBaseCurrencyId
-		WHERE t.PartyId = 999  AND t.Currency = @tempCurrency
+		WHERE t.PartyId = 999  AND t.Currency = @BaseCurrencyName
 		-- Endregion update Total of Creadit
 
 		UPDATE @Total
