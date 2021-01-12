@@ -3,7 +3,7 @@ USE [bodb_Licensee]
 GO
 
 ALTER PROCEDURE [dbo].LA_Rpt_LicenseeWinLossByDynamicProduct
-	@ProductIdString	VARCHAR(200),
+	@ProductIdString	VARCHAR(500),
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
 	@BaseCurrencyName	VARCHAR(10) = 'EUR'
@@ -171,23 +171,23 @@ BEGIN
 	END
 
 	-- PP and SBC
-	IF EXISTS (SELECT 1 FROM @Products WHERE ProductId IN (32, 42))
+	IF EXISTS (SELECT TOP 1 1 FROM @Products WHERE ProductId IN (32, 42))
 	BEGIN
 		INSERT INTO #Data(WinLossDate,LicenseeId,ProductId,Bettype,Winloss,Contribution)
-		SELECT b.rptDate, b.SiteId, b.ProductId, b.Bettype, 
+		SELECT b.rptDate, b.SiteId, b.ProductId, -1, 
 		CAST(SUM((CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution) THEN 0 ELSE ISNULL(b.MemberWL, 0) END) * e.BaseCurrencyRate) AS MONEY),
 		CAST(SUM((CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) * e.BaseCurrencyRate) AS MONEY)
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 		INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
 		LEFT JOIN LA_f_ExcludedBettypeListSel('','4297,1698') eb ON b.Bettype = eb.BettypeID
+		INNER JOIN @Products p ON p.ProductId = b.ProductID AND p.ProductId IN (32, 42)
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.StatusId NOT IN (-1, 101, 102, 103)
 			AND b.CurrencyID <> 20
 			AND b.CustomerCategory NOT IN (27, 28)
 			AND eb.BettypeID IS NULL
 			AND ISNULL(b.TicketType, 0) <> 2 --Free_Bets_TicketType
-			AND b.ProductID IN (SELECT ProductID FROM @Products WHERE ProductID IN (32,42))
-		GROUP BY b.rptDate, b.SiteId, b.ProductId, b.Bettype
+		GROUP BY b.rptDate, b.SiteId, b.ProductId
 	END
 
 	-- get unknown parties
