@@ -2,19 +2,22 @@
 USE [bodb_licensee]
 GO
 
-CREATE PROCEDURE [dbo].[LA_Rpt_JokerWinLoss]
+ALTER PROCEDURE [dbo].[LA_Rpt_JokerWinLoss]
 	@PartyIds			VARCHAR(4000),
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
-	@BaseCurrencyName	VARCHAR(20)
+	@BaseCurrencyName	VARCHAR(20),
+	@Timezone			INT
 AS
 /*
  * Created by : [20200914@Parsons.Nguyen]
  * Task  : Get Joker Win Loss
  * Revisions
 	- 20200930@Parsons: Integrate Joker [#138983]
+	- 20210113@Happy: Provide Timezone filter for Joker Games Win Loss Report
  * Param's Explanation:
- *
+ *		@Timezone: = 1: GMT-4
+ *				   = 2: GMT+8	 
  */
 
 BEGIN
@@ -80,22 +83,48 @@ BEGIN
 		PayToSupplier MONEY)
 
 	-- Calculate for desposit & credit
-	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
-	SELECT ci.PartyId,
-		b.rptDate as Winlostdate,
-		b.CurrencyId,
-		SUM(b.Turnover) AS Turnover,
-		SUM(b.BetCount) AS TotalTrans,
-		SUM(b.MemberWL) AS CustomerWinLoss,
-		- SUM(b.MemberWL) AS LicenseeWinloss,
-		SUM(-b.MemberWL * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
-		SUM(-b.MemberWL * ci.Rate3rd) AS PayToSupplier
-	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
-		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND cr.CurrencyID = b.CurrencyId
-	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
-		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
-	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
+	IF(@Timezone = 2) --GMT+8
+	BEGIN
+		INSERT INTO #TempData(PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
+		SELECT ci.PartyId,
+			b.RptDate3rd as Winlostdate,
+			b.CurrencyId,
+			SUM(b.Turnover) AS Turnover,
+			SUM(b.BetCount) AS TotalTrans,
+			SUM(b.Winloss) AS CustomerWinLoss,
+			SUM(-b.Winloss) AS LicenseeWinloss,
+			SUM(-b.Winloss * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
+			SUM(-b.Winloss * ISNULL(ci.Rate3rd, 0)) AS PayToSupplier
+		FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH(NOLOCK)
+			INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
+			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH(NOLOCK) ON cr.ChargeID = ci.ChargeID AND cr.CurrencyID = b.CurrencyId
+		WHERE b.RptDate3rd BETWEEN @FromDate AND @ToDate
+			AND b.StatusId NOT IN (-1, 101, 102, 103) 
+			AND b.CurrencyId <> 20 
+			AND b.BetTypeId BETWEEN 6401 AND 6700
+		GROUP BY b.RptDate3rd, ci.PartyId, b.CurrencyId
+	END
+	ELSE --GMT-4
+	BEGIN
+		INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
+		SELECT ci.PartyId,
+			b.rptDate		  AS Winlostdate,
+			b.CurrencyId,
+			SUM(b.Turnover)   AS Turnover,
+			SUM(b.BetCount)	  AS TotalTrans,
+			SUM(b.MemberWL)	  AS CustomerWinLoss,
+			SUM(-b.MemberWL)  AS LicenseeWinloss,
+			SUM(-b.MemberWL * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
+			SUM(-b.MemberWL * ISNULL(ci.Rate3rd, 0))	AS PayToSupplier
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND cr.CurrencyID = b.CurrencyId
+		WHERE b.rptDate BETWEEN @FromDate AND @ToDate 
+			AND b.StatusId NOT IN (-1, 101, 102, 103) 
+			AND b.CurrencyId <> 20 
+			AND b.CustomerCategory NOT IN (27,28)
+		GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
+	END
 	-- End region
 	
 	-- Region: Calculate result
