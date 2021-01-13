@@ -10,7 +10,7 @@ AS
 /*  
 	 Created: 20180508@Parsons [#94108]
 	 Task : Get report Pragmatic Win Loss
-	 DB: DB052.bodb_licensee   
+	 DB: DB052.bodb_licensee
 
 	 Revisions:  
 		- 20180508@Parsons: Integrate Pragmatic Win Loss [#94108]
@@ -285,38 +285,13 @@ BEGIN
 	DECLARE @CreditBaseCurrencyName VARCHAR(10), @CreditBaseCurrencyId INT
 	SELECT TOP 1 @CreditBaseCurrencyName = Name, @CreditBaseCurrencyId = BaseCurrencyId FROM @BaseCurrencies b INNER JOIN @RateOfCredit c ON c.BaseCurrencyId=b.Id
 
-	-- Get Total Amount Of Credit group base on EUR
-	DECLARE @TotalAmountWinLossEUR MONEY, @TotalAmountWinLossBase MONEY
-	SELECT @TotalAmountWinLossEUR = SUM((-r.CustomerWinLoss - Contribution) * e.BaseCurrencyRate)
+		-- Region: @TotalAmount_BasedOn_CreditBaseCurrencyName
+	DECLARE @TotalAmount_BasedOn_CreditBaseCurrencyName MONEY, @TotalAmountWinLossBase MONEY
+	SELECT @TotalAmount_BasedOn_CreditBaseCurrencyName = SUM((-r.CustomerWinLoss - Contribution) * e.BaseCurrencyRate)
 	FROM #Result r
 	INNER JOIN (SELECT DISTINCT PartyId FROM @RateOfCredit) roc ON r.PartyID = roc.PartyId
 	INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CreditBaseCurrencyName) e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.Winlossdate
-	-- End region
-
-	DECLARE @TotalPayToSuppliers AS TABLE (PayToSupplierOfCredit MONEY, Currency VARCHAR(20))
-	DECLARE @tempCurrencyId INT
-	WHILE EXISTS (SELECT * FROM @BaseCurrencies WHERE IsCalculationTotal IS NULL)
-	BEGIN
-		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsCalculationTotal IS NULL)
-		SET @tempCurrencyId = (SELECT TOP 1 Id FROM @BaseCurrencies WHERE IsCalculationTotal IS NULL)
-
-		SELECT @TotalAmountWinLossBase = SUM((-r.CustomerWinLoss - Contribution) * e.BaseCurrencyRate)
-		FROM #Result r
-		INNER JOIN (SELECT DISTINCT PartyId FROM @RateOfCredit) roc ON r.PartyID = roc.PartyId
-		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.Winlossdate
-
-		INSERT INTO @TotalPayToSuppliers(PayToSupplierOfCredit, Currency)
-		SELECT SUM(CASE WHEN @TotalAmountWinLossEUR  > MaxAmount THEN MaxAmount * e.BaseCurrencyRate
-						WHEN (@TotalAmountWinLossEUR  - MinAmount) > 0 THEN (@TotalAmountWinLossBase  - (MinAmount * e.BaseCurrencyRate)) 
-						WHEN @TotalAmountWinLossEUR < 0 AND r.RowIndex % @NumberOfTiers = 0 THEN @TotalAmountWinLossBase
-						ELSE 0 END  * r.Rate),
-				@tempCurrency
-		FROM @RateOfCredit r
-		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@ToDate, @ToDate, @tempCurrency) e ON e.ExchangeId = @CreditBaseCurrencyId
-		WHERE RowIndex <= @NumberOfTiers
-
-		UPDATE @BaseCurrencies SET IsCalculationTotal = 1 WHERE Name = @tempCurrency
-	END
+		-- End region: @TotalAmount_BasedOn_CreditBaseCurrencyName
 	--Endregion TotalAmountOfCreditGroup
 
 	-- Region Update PayToSupplier for #Result
@@ -376,11 +351,24 @@ BEGIN
 		GROUP BY ParentId
 
 		-- Region update Total of Creadit
-		UPDATE t
-		SET PayToSupplier = p.PayToSupplierOfCredit
-		FROM @Total t
-		INNER JOIN @TotalPayToSuppliers p ON t.Currency = p.Currency
-		WHERE t.PartyId = 999  AND t.Currency = @tempCurrency
+			;WITH SumByPropressiveAmount AS(
+				SELECT  r.PartyId,
+						SUM(CASE 
+							WHEN @TotalAmount_BasedOn_CreditBaseCurrencyName > MaxAmount THEN MaxAmount * e.BaseCurrencyRate 
+							WHEN @TotalAmount_BasedOn_CreditBaseCurrencyName  - MinAmount > 0 THEN (r.LicenseeWinloss - Contribution) - (MinAmount * e.BaseCurrencyRate)
+							WHEN @TotalAmount_BasedOn_CreditBaseCurrencyName < 0 AND roc.RowIndex % @NumberOfTiers = 0 THEN r.LicenseeWinloss - Contribution
+							ELSE 0 END  * roc.Rate)  AS ProgressiveAmount
+				FROM @Total r 
+				INNER JOIN @RateOfCredit roc ON RowIndex <= @NumberOfTiers
+				INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@ToDate, @ToDate, @tempCurrency) e ON @CreditBaseCurrencyId = e.ExchangeID
+				WHERE r.Currency = @tempCurrency AND r.PartyId = 999 
+				GROUP BY r.PartyId 
+			)
+			UPDATE t
+			SET PayToSupplier = ProgressiveAmount
+			FROM @Total t
+			INNER JOIN SumByPropressiveAmount s ON t.PartyId = s.PartyID
+			WHERE t.Currency = @tempCurrency
 		-- Endregion update Total of Creadit
 
 		UPDATE @Total
