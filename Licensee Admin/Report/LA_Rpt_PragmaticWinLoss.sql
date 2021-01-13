@@ -435,7 +435,13 @@ BEGIN
 	IF @BaseCurrencyName <> '' -- Group By Licensee
 	BEGIN
 		-- Total By Party
-		;WITH cte_TempData AS
+		;WITH cte_TotalWinLossAmountByParty_BaseOn_CreditCurrency AS
+		(
+			SELECT r.PartyId AS PartyId, SUM((r.LicenseeWinloss - r.Contribution) * e.BaseCurrencyRate) AS TotalWinLossAmount
+			FROM #Result r
+			INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CreditBaseCurrencyId) e ON @CreditBaseCurrencyId = e.ExchangeID AND r.Winlossdate = e.exchangedate
+			GROUP BY r.PartyId
+		), cte_TempData AS
 		(
 		  SELECT r.PartyId, r.PartyName, r.ParentId,
 			SUM(r.TotalTrans) TotalTrans,
@@ -457,13 +463,15 @@ BEGIN
 					  ELSE CASE WHEN LicenseeChargeRate > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - WinPrizeAmount 
 				 END AS LicensingFee
 				, CASE WHEN PartyID IN(25,30)
-						THEN (SELECT TOP 1 SUM(CASE 
-							WHEN r2.LicenseeWinLoss - r2.Contribution > MaxAmount THEN MaxAmount 
-							WHEN r2.LicenseeWinLoss - r2.Contribution - MinAmount > 0 THEN r2.LicenseeWinLoss - r2.Contribution - MinAmount 
-							WHEN r2.LicenseeWinLoss - r2.Contribution < 0 AND roc.RowIndex % @NumberOfTiers = 0 THEN r2.LicenseeWinLoss - r2.Contribution
+						THEN (SELECT TOP 1 SUM(CASE
+							WHEN r3.TotalWinLossAmount > MaxAmount THEN MaxAmount * e.BaseCurrencyRate 
+							WHEN r3.TotalWinLossAmount - MinAmount > 0 THEN (r2.LicenseeWinLoss - r2.Contribution) - (MinAmount * e.BaseCurrencyRate)
+							WHEN r3.TotalWinLossAmount < 0 AND roc.RowIndex % @NumberOfTiers = 0 THEN r2.LicenseeWinLoss - r2.Contribution
 							ELSE 0 END  * roc.Rate)
 							FROM @RateOfCredit roc
 							INNER JOIN cte_TempData r2 ON r2.PartyID = roc.PartyId
+							INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@ToDate, @ToDate, @BaseCurrencyName) e ON @CreditBaseCurrencyId = e.ExchangeID 
+							INNER JOIN cte_TotalWinLossAmountByParty_BaseOn_CreditCurrency r3 ON r3.PartyID = r2.PartyID
 							WHERE r1.PartyID = r2.PartyID)
 						ELSE  PayToSupplier
 				  END AS PayToSupplier
