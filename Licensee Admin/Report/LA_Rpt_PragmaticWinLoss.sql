@@ -1,7 +1,6 @@
 /*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_PragmaticWinLoss]
 	@PartyIds			VARCHAR(4000),
 	@FromDate			DATETIME,
@@ -246,7 +245,7 @@ BEGIN
 
 	-- Region: Calculate Grand Total
 	DECLARE @tempCurrency VARCHAR(20)
-	DECLARE @BaseCurrencies TABLE(Id INT, Name VARCHAR(20), IsApply BIT)
+	DECLARE @BaseCurrencies TABLE(Id INT, Name VARCHAR(20), IsApply BIT, IsCalculationTotal BIT)
 	INSERT INTO @BaseCurrencies(Id, Name)
 	EXEC LA_SelBaseCurrency
 
@@ -264,7 +263,7 @@ BEGIN
 		CompanyIncome	MONEY
 	)
 
-	DECLARE @TotalPayToSupplierOfCredit MONEY = 0, @NumberOfTiers INT = 2
+	DECLARE @NumberOfTiers INT = 2
 
 	-- Region Credit
 	DECLARE @RateOfCredit AS TABLE (
@@ -283,26 +282,42 @@ BEGIN
 	ORDER BY FromParty, MaxAmount DESC
 
 	-- Region TotalAmountOfCreditGroup
-	DECLARE @TotalAmountWinLoss  MONEY
 	DECLARE @CreditBaseCurrencyName VARCHAR(10), @CreditBaseCurrencyId INT
 	SELECT TOP 1 @CreditBaseCurrencyName = Name, @CreditBaseCurrencyId = BaseCurrencyId FROM @BaseCurrencies b INNER JOIN @RateOfCredit c ON c.BaseCurrencyId=b.Id
 
-	SELECT @TotalAmountWinLoss = SUM((-r.CustomerWinLoss - Contribution) * e.BaseCurrencyRate)
+	-- Get Total Amount Of Credit group base on EUR
+	DECLARE @TotalAmountWinLossEUR MONEY, @TotalAmountWinLossBase MONEY
+	SELECT @TotalAmountWinLossEUR = SUM((-r.CustomerWinLoss - Contribution) * e.BaseCurrencyRate)
 	FROM #Result r
 	INNER JOIN (SELECT DISTINCT PartyId FROM @RateOfCredit) roc ON r.PartyID = roc.PartyId
 	INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CreditBaseCurrencyName) e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.Winlossdate
+	-- End region
 
+	DECLARE @TotalPayToSuppliers AS TABLE (PayToSupplierOfCredit MONEY, Currency VARCHAR(20))
+	DECLARE @tempCurrencyId INT
+	WHILE EXISTS (SELECT * FROM @BaseCurrencies WHERE IsCalculationTotal IS NULL)
+	BEGIN
+		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsCalculationTotal IS NULL)
+		SET @tempCurrencyId = (SELECT TOP 1 Id FROM @BaseCurrencies WHERE IsCalculationTotal IS NULL)
+
+		SELECT @TotalAmountWinLossBase = SUM((-r.CustomerWinLoss - Contribution) * e.BaseCurrencyRate)
+		FROM #Result r
+		INNER JOIN (SELECT DISTINCT PartyId FROM @RateOfCredit) roc ON r.PartyID = roc.PartyId
+		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.Winlossdate
+
+		INSERT INTO @TotalPayToSuppliers(PayToSupplierOfCredit, Currency)
+		SELECT SUM(CASE WHEN @TotalAmountWinLossEUR  > MaxAmount THEN MaxAmount * e.BaseCurrencyRate
+						WHEN (@TotalAmountWinLossEUR  - MinAmount) > 0 THEN (@TotalAmountWinLossBase  - (MinAmount * e.BaseCurrencyRate)) 
+						WHEN @TotalAmountWinLossEUR < 0 AND r.RowIndex % @NumberOfTiers = 0 THEN @TotalAmountWinLossBase
+						ELSE 0 END  * r.Rate),
+				@tempCurrency
+		FROM @RateOfCredit r
+		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@ToDate, @ToDate, @tempCurrency) e ON e.ExchangeId = @CreditBaseCurrencyId
+		WHERE RowIndex <= @NumberOfTiers
+
+		UPDATE @BaseCurrencies SET IsCalculationTotal = 1 WHERE Name = @tempCurrency
+	END
 	--Endregion TotalAmountOfCreditGroup
-
-	-- Region @TotalPayToSupplierOfCredit
-	SELECT @TotalPayToSupplierOfCredit = SUM(CASE 
-								WHEN @TotalAmountWinLoss  > MaxAmount THEN MaxAmount 
-								WHEN (@TotalAmountWinLoss  - MinAmount) > 0 THEN (@TotalAmountWinLoss  - MinAmount) 
-								WHEN @TotalAmountWinLoss < 0 AND r.RowIndex % @NumberOfTiers = 0 THEN @TotalAmountWinLoss
-								ELSE 0 END  * r.Rate) 
-	FROM @RateOfCredit r
-	WHERE RowIndex <= @NumberOfTiers
-	-- Endregion @TotalPayToSupplierOfCredit
 
 	-- Region Update PayToSupplier for #Result
 	;WITH SumByPropressiveAmount AS(
@@ -361,11 +376,11 @@ BEGIN
 		GROUP BY ParentId
 
 		-- Region update Total of Creadit
-		Update t
-		SET PayToSupplier = @TotalPayToSupplierOfCredit * e.BaseCurrencyRate
+		UPDATE t
+		SET PayToSupplier = p.PayToSupplierOfCredit
 		FROM @Total t
-		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@ToDate, @ToDate, @tempCurrency) e ON e.ExchangeId = @CreditBaseCurrencyId
-		WHERE t.PartyId = 999  AND t.Currency = @BaseCurrencyName
+		INNER JOIN @TotalPayToSuppliers p ON t.Currency = p.Currency
+		WHERE t.PartyId = 999  AND t.Currency = @tempCurrency
 		-- Endregion update Total of Creadit
 
 		UPDATE @Total
@@ -425,7 +440,7 @@ BEGIN
 			PayToSupplier - WinPrizeAmount		AS PayToSupplierOriginal,
 			(r.LicensingFee - (PayToSupplier - WinPrizeAmount)) AS CompanyIncomeOriginal
 		FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.WinLossDate
-	
+
 		-- Grand Total
 		SELECT * FROM @GrandTotal
 
