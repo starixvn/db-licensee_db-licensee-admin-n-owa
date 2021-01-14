@@ -439,7 +439,7 @@ BEGIN
 		(
 			SELECT r.PartyId AS PartyId, SUM((r.LicenseeWinloss - r.Contribution) * e.BaseCurrencyRate) AS TotalWinLossAmount
 			FROM #Result r
-			INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CreditBaseCurrencyId) e ON @CreditBaseCurrencyId = e.ExchangeID AND r.Winlossdate = e.exchangedate
+			INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CreditBaseCurrencyName) e ON r.CurrencyId = e.ExchangeID AND r.Winlossdate = e.exchangedate
 			GROUP BY r.PartyId
 		), cte_TempData AS
 		(
