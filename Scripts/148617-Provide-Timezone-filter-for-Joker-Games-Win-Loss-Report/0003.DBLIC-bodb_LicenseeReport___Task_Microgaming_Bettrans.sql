@@ -10,7 +10,7 @@ USE bodb_LicenseeReport
 GO
 
 DECLARE 
-		@FromDate DATE = '2021-01-10', -- Current MB Date + 1, MB: 2021-01-09
+		@FromDate DATE = '2021-01-11', -- Current MB Date + 1, MB: 2021-01-10
 		@ToDate	DATE = '2021-01-15' -- Current Date
 
 BEGIN

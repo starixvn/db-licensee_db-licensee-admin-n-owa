@@ -10,8 +10,8 @@ USE bodb_LicenseeReport
 GO
 
 DECLARE 
-		@FromDate DATE = '2021-01-01', -- Current BU Date
-		@ToDate DATE = '2021-01-09' -- Current MB Date
+		@FromDate DATE = '2021-01-08', -- Current BU Date
+		@ToDate DATE = '2021-01-10' -- Current MB Date
 
 BEGIN
 	DECLARE @ErrMsg VARCHAR(200)
