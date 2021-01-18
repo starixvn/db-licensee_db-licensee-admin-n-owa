@@ -22,7 +22,7 @@ BEGIN
 	WHILE (@Winlostdate <= @Todate)
 	BEGIN
 		SELECT @ErrMsg = 'WinlostDate=' + CONVERT(VARCHAR(20), @WinlostDate, 120)
-		RAISERROR(@ErrMsg, 1, 0) WITH NOWAIT
+		RAISERROR(@ErrMsg, 0, 1) WITH NOWAIT
 
 		DELETE dbo.rpt_ThirdPartyWL_ExtraGMT WITH (ROWLOCK, UPDLOCK)
 		WHERE RptDate = @Winlostdate

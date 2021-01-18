@@ -11,7 +11,7 @@ GO
 
 DECLARE 
 		@FromDate DATE = '2021-01-08', -- Current BU Date
-		@ToDate DATE = '2021-01-10' -- Current MB Date
+		@ToDate DATE = '2021-01-13' -- Current MB Date
 
 BEGIN
 	DECLARE @ErrMsg VARCHAR(200)
@@ -22,7 +22,7 @@ BEGIN
 	WHILE @WinlostDate <= @ToDate
 	BEGIN
 		SELECT @ErrMsg = 'WinlostDate=' + CONVERT(VARCHAR(20), @WinlostDate, 120)
-		RAISERROR(@ErrMsg, 1, 0) WITH NOWAIT
+		RAISERROR(@ErrMsg, 0, 1) WITH NOWAIT
 
 		EXEC dbo.Task_Microgaming_Bettrans14 @FromDate = @WinlostDate, @ToDate = @WinlostDate
 

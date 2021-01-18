@@ -10,7 +10,7 @@ USE bodb_LicenseeReport
 GO
 
 DECLARE 
-		@FromDate DATE = '2021-01-11', -- Current MB Date + 1, MB: 2021-01-10
+		@FromDate DATE = '2021-01-14', -- Current MB Date + 1, MB: 2021-01-10
 		@ToDate	DATE = '2021-01-15' -- Current Date
 
 BEGIN
@@ -22,7 +22,7 @@ BEGIN
 	WHILE @WinlostDate <= @ToDate
 	BEGIN
 		SELECT @ErrMsg = 'WinlostDate=' + CONVERT(VARCHAR(20), @WinlostDate, 120)
-		RAISERROR(@ErrMsg, 1, 0) WITH NOWAIT
+		RAISERROR(@ErrMsg, 0, 1) WITH NOWAIT
 
 		EXEC dbo.Task_Microgaming_Bettrans @WinlossDate = @WinlostDate
 
