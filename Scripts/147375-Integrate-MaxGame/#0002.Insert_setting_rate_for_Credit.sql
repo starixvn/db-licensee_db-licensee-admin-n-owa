@@ -32,8 +32,8 @@ BEGIN
 								,[BaseCurrencyId]
 								,[FirstOfBilling]
 								,[BasisOfBilling])
-	VALUES(@MXGProductId, 25, 1, 0, 0, 1, '2021-01-01', '2050-01-01', null, null, null, null, null, null),
-		  (@MXGProductId, 30, 1, 0, 0, 1, '2021-01-01', '2050-01-01', null, null, null, null, null, null)
+	VALUES(@MXGProductId, 25, 1, 0, 0, 1, '2021-01-25', '2050-01-01', null, null, null, null, null, null),
+		  (@MXGProductId, 30, 1, 0, 0, 1, '2021-01-25', '2050-01-01', null, null, null, null, null, null)
 	
 	SET @HasInsertSetting = 1
 END

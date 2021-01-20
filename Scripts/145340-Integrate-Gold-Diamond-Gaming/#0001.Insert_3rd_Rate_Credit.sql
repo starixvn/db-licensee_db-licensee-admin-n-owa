@@ -13,7 +13,7 @@ DECLARE @GDGProductId INT = 59
 DECLARE @HasInsertSetting BIT = 0;
 DECLARE @GDGProductCode VARCHAR(10) = 'GDG'
 
-DECLARE @AffectedDate DATE = '2020-12-03'
+DECLARE @AffectedDate DATE = '2020-12-28'
 DECLARE @CreditService_ChargeType INT = 10
 DECLARE @CreditService_ChargeRate DECIMAL(4, 3) = 0.035
 
