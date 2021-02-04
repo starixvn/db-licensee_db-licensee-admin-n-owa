@@ -368,22 +368,23 @@ BEGIN
 			@PPTournament SMALLINT = 4299,
 			@PromotionPrize SMALLINT = 4300,
 			@SBC_Contribution SMALLINT = 1698,
-			@SBC_JackpotPrize SMALLINT = 1699
+			@SBC_JackpotPrize SMALLINT = 1699,
+			@FreeBetTicketType TINYINT = 2
 	;WITH cte_WinLossData AS 
 	(
 		SELECT b.SiteId, b.rptDate, b.CurrencyID, b.ProductID,
-			SUM(CASE WHEN b.Bettype IN (@PPTournament, @PromotionPrize, @PPContribution, @PPJackpotPrize, @SBC_Contribution, @SBC_JackpotPrize) THEN 0 
+			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType OR b.Bettype IN (@PPTournament, @PromotionPrize, @PPContribution, @PPJackpotPrize, @SBC_Contribution, @SBC_JackpotPrize) THEN 0 
 				ELSE (ISNULL(-b.MemberWL, 0) * e.Rate) END) AS LicenseeWL,
 			SUM(CASE WHEN b.Bettype IN (@PPContribution, @SBC_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END * e.Rate) AS Contribution,
 			SUM(CASE WHEN b.Bettype IN (@PPJackpotPrize, @SBC_JackpotPrize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END * e.Rate) AS JackpotPrize,
-			SUM(CASE WHEN b.Bettype IN (@PromotionPrize, @PPTournament) THEN ISNULL(b.MemberWL, 0) ELSE 0 END * e.Rate) AS PromotionPrize
+			SUM(CASE WHEN b.Bettype IN (@PromotionPrize, @PPTournament) THEN ISNULL(b.MemberWL, 0) ELSE 0 END * e.Rate) AS PromotionPrize,
+			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS FreeBets
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 		INNER JOIN #Exchange e ON e.ExchangeID = b.CurrencyId AND e.ExchangeDate = b.rptDate
 		WHERE b.ProductID IN (@PragmaticID, @SBC_ProductID)
 			AND b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.CustomerCategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject, Void, Refund
-			AND	ISNULL(b.TicketType, 0) <> 2 -- Free_Bets_TicketType
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, b.ProductID
 	), cte_LicensingWL AS
 	(
@@ -391,7 +392,8 @@ BEGIN
 			SUM((LicenseeWL - Contribution) * ISNULL(cr.Rate, p.Rate)) LicensingFee, 
 			SUM(d.Contribution) Contribution, 
 			SUM(d.JackpotPrize) JackpotPrize, 
-			SUM(d.PromotionPrize) PromotionPrize
+			SUM(d.PromotionPrize) PromotionPrize,
+			SUM(d.FreeBets) FreeBets
 		FROM cte_WinLossData d
 		INNER JOIN @PartyChargeInfo p ON p.LicenseeId = d.SiteId AND (d.rptDate BETWEEN p.FromDate AND p.ToDate) AND p.ProductID = d.ProductID
 		LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeID AND d.CurrencyId = cr.CurrencyID
@@ -401,7 +403,7 @@ BEGIN
 	)
 	UPDATE	l
 	SET		l.PP  = CASE WHEN pp.LicensingFee < 0 THEN 0 ELSE pp.LicensingFee END + pp.Contribution - pp.JackpotPrize - pp.PromotionPrize,
-			l.SBC = CASE WHEN sbc.LicensingFee < 0 THEN 0 ELSE sbc.LicensingFee END + sbc.Contribution - sbc.JackpotPrize
+			l.SBC = CASE WHEN sbc.LicensingFee < 0 THEN 0 ELSE sbc.LicensingFee END + sbc.Contribution - sbc.JackpotPrize - sbc.FreeBets
 	FROM #LicenseeAmount l
 	LEFT JOIN cte_LicensingWL pp ON l.PartyId = pp.PartyId AND pp.ProductID = @PragmaticID
 	LEFT JOIN cte_LicensingWL sbc ON l.PartyId = sbc.PartyId AND sbc.ProductID = @SBC_ProductID
