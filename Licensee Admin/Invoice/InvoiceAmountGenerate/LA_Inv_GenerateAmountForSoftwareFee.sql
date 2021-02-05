@@ -33,6 +33,7 @@ AS
 		- 20200714@Parsons: Implement PP Jackpot [RedmineID: #137306] 
 		- 20201028@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
 		- 20201130@Parsons: Saba.club - Offer Freebet tickets [#141423]
+		- 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -587,22 +588,35 @@ BEGIN
 	END
 	-- End region
 
-	-- Region Saba.club Free Bets: Free Bets amount
+	-- Region Saba.club
 	DECLARE @Saba_clubProductID INT = 42
 	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = @Saba_clubProductID))
 	BEGIN
-		DECLARE @FreeBetsAmount MONEY
-		SELECT @FreeBetsAmount = SUM(p.MemberWL * e.Rate)
-		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct p WITH (NOLOCK) 
-			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'SBC', 'OA', 1) pc ON p.SiteID = pc.LicenseeId
-			INNER JOIN #Exchange e ON p.RptDate = e.ExchangeDate AND p.CurrencyID = e.ExchangeID
-			WHERE p.RptDate BETWEEN @FromDate AND @ToDate AND p.ProductID = @Saba_clubProductID AND ISNULL(p.TicketType, 0) = 2
-				
-		IF(ISNULL(@FreeBetsAmount, 0) > 0)
-		BEGIN
-			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
-			VALUES(0,'','',34,@FreeBetsAmount,0)
-		END
+		DECLARE @SBC_Contribution_Bettype SMALLINT = 1698,
+				@SBC_JackpotPrize_Bettype SMALLINT = 1699
+		;WITH cte_Pragmatic_ExtraAmount AS
+		(
+			SELECT b.Bettype, ISNULL(b.TicketType, 0) TicketType, SUM(CASE WHEN b.Bettype = @SBC_Contribution_Bettype THEN -b.GrossWL ELSE b.MemberWL END * e.Rate) AS ExtraAmount
+			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+				INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'SBC', 'OA', 1) pc ON b.SiteID = pc.LicenseeId
+				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
+			WHERE (ISNULL(b.TicketType, 0) = 2 OR b.Bettype IN (@SBC_Contribution_Bettype, @SBC_JackpotPrize_Bettype))
+				AND b.rptDate BETWEEN @FromDate AND @ToDate
+				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+			GROUP BY b.Bettype, ISNULL(b.TicketType, 0)
+		)
+		INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,AmountType,InvoiceAmount,RemainingAmount)
+		SELECT 0, '', '', CASE 
+								WHEN Bettype = @SBC_Contribution_Bettype THEN 35
+								WHEN Bettype = @SBC_JackpotPrize_Bettype THEN 36
+								ELSE 34
+							END, SUM(ExtraAmount), 0
+		FROM cte_Pragmatic_ExtraAmount
+		GROUP BY CASE 
+					WHEN Bettype = @SBC_Contribution_Bettype THEN 35
+					WHEN Bettype = @SBC_JackpotPrize_Bettype THEN 36
+					ELSE 34
+				 END
 	END
 	-- End region
 
