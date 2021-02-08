@@ -24,6 +24,7 @@ AS
 		- 20200729@Parsons: Implement PP Jackpot [RedmineID: #137306]
 		- 20201104@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
 	    - 20201218@Parsons: Saba.club - Offer Freebet tickets [#141423]
+	   - 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
 */
 BEGIN
 	SET NOCOUNT ON
