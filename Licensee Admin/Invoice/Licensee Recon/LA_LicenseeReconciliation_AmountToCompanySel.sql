@@ -43,6 +43,7 @@ AS
 		- 20201230@Parsons: Integrate Gold Diamond Gaming [#145340]
 		- 20201231@Parsons: Integrate Big Gaming [#145342]
 		- 20210106@Happy: Integrate MaxGame [#147375]
+	    - 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
 */
 BEGIN
 	SET NOCOUNT ON

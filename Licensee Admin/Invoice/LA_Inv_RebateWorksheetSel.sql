@@ -25,6 +25,7 @@ AS
 	  - 20201103@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
 	  - 20201216@Parsons: Saba.club - Offer Freebet tickets [#141423]
 	  - 20201228@Parsons: Should include SBC & CC negative amount [#141357]
+	  - 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -223,17 +224,16 @@ BEGIN
 
 	--Region Show net amount for PP,CC,SBC in summary sheet
 	DECLARE @PP_Contribution_Bettype SMALLINT = 4297,
-			@PP_JackpotPrize_Bettype SMALLINT = 4298,
-			@PPTournament_Bettype SMALLINT = 4299,
-			@PromotionPrize_Bettype SMALLINT = 4300,
-			@CC_ArcadiaBonus_Bettype SMALLINT = 1906
+			@CC_ArcadiaBonus_Bettype SMALLINT = 1906,
+			@SBC_Contribution_Bettype SMALLINT = 1698
+
 	;WITH cte_ExtraAmountData AS 
 	(
-		SELECT pc.ProductID, SUM(CASE WHEN b.Bettype = @PP_Contribution_Bettype THEN -b.GrossWL ELSE -b.MemberWL END  * e.Rate) AS ExtraAmount
+		SELECT pc.ProductID, SUM(CASE WHEN b.Bettype IN(@PP_Contribution_Bettype, @SBC_Contribution_Bettype) THEN -b.GrossWL ELSE -b.MemberWL END  * e.Rate) AS ExtraAmount
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'PP,CC,SBC', 'OA', 1) pc ON b.SiteID = pc.LicenseeId AND b.ProductID = pc.ProductID
 			INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-			LEFT JOIN LA_f_ExcludedBettypeListSel('32,34', '') eb ON b.Bettype = eb.BettypeID
+			LEFT JOIN LA_f_ExcludedBettypeListSel('32,34,42', '') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND b.[StatusId] NOT IN (-1, 101, 102, 103)
 			AND (ISNULL(b.TicketType, 0) = 2 OR eb.BettypeID IS NOT NULL)
 		GROUP BY pc.ProductID
