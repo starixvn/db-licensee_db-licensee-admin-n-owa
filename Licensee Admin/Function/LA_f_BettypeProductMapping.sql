@@ -64,6 +64,7 @@ AS
 		- 20210104@Parsons: Integrate Big Gaming [#145342]
 		- 20210104@Parsons: Integrate MaxGame [#147375]
 		- 20210104@Parsons: Integrate Happy 5 Linked Games [#147544]
+		- 20210203@Parsons: Integrate Saba Red Envelope [#149935]
 	Param's Explanation:
 
 */
@@ -357,7 +358,7 @@ BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 37
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
-	   WHERE (typeid = 17000 OR typeid = 17003)
+	   WHERE typeid IN (17000, 17003, 17004)
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
