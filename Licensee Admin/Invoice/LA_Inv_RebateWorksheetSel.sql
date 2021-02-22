@@ -264,7 +264,7 @@ BEGIN
 	LEFT JOIN #AmountToCompany d ON d.ProductId = rs.ProductId
 
 	SELECT r.ProductId, CASE 
-							WHEN r.ProductId = 32 AND ISNULL(r.AmountToCompany,0) < 0 THEN 0 
+							WHEN r.ProductId IN (32, 42) AND ISNULL(r.AmountToCompany,0) < 0 THEN 0 
 							ELSE ISNULL(r.AmountToCompany,0) 
 						END + ISNULL(ExtraAmount, 0) AmountToCompany 
 	FROM @Result r
