@@ -617,6 +617,7 @@ BEGIN
 					WHEN Bettype = @SBC_JackpotPrize_Bettype THEN 36
 					ELSE 34
 				 END
+		HAVING SUM(ExtraAmount) > 0
 	END
 	-- End region
 
