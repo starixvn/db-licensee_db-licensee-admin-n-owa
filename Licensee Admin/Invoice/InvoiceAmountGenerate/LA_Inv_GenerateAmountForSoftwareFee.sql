@@ -594,7 +594,7 @@ BEGIN
 	BEGIN
 		DECLARE @SBC_Contribution_Bettype SMALLINT = 1698,
 				@SBC_JackpotPrize_Bettype SMALLINT = 1699
-		;WITH cte_Pragmatic_ExtraAmount AS
+		;WITH cte_SabaClub_ExtraAmount AS
 		(
 			SELECT b.Bettype, ISNULL(b.TicketType, 0) TicketType, SUM(CASE WHEN b.Bettype = @SBC_Contribution_Bettype THEN -b.GrossWL ELSE b.MemberWL END * e.Rate) AS ExtraAmount
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
@@ -611,7 +611,7 @@ BEGIN
 								WHEN Bettype = @SBC_JackpotPrize_Bettype THEN 36
 								ELSE 34
 							END, SUM(ExtraAmount), 0
-		FROM cte_Pragmatic_ExtraAmount
+		FROM cte_SabaClub_ExtraAmount
 		GROUP BY CASE 
 					WHEN Bettype = @SBC_Contribution_Bettype THEN 35
 					WHEN Bettype = @SBC_JackpotPrize_Bettype THEN 36

@@ -403,7 +403,7 @@ BEGIN
 	UPDATE	l
 	SET		l.PP  = CASE WHEN pp.LicensingFee < 0 THEN 0 ELSE pp.LicensingFee END + pp.Contribution - pp.JackpotPrize - pp.ExtraAmount,
 			l.SBC = CASE WHEN sbc.LicensingFee < 0 THEN 0 ELSE sbc.LicensingFee END + sbc.Contribution - sbc.JackpotPrize - sbc.ExtraAmount,
-			l.CC = cc.LicensingFee - cc.ExtraAmount
+			l.CC = CASE WHEN cc.LicensingFee < 0 THEN 0 ELSE cc.LicensingFee END - cc.ExtraAmount
 	FROM #LicenseeAmount l
 	LEFT JOIN cte_LicensingWL pp ON l.PartyId = pp.PartyId AND pp.ProductID = @PragmaticID
 	LEFT JOIN cte_LicensingWL sbc ON l.PartyId = sbc.PartyId AND sbc.ProductID = @SBC_ProductID
