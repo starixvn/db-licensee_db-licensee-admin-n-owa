@@ -49,6 +49,7 @@ AS
 	   - 20201021@Happy: Arcadia Gaming offers Bonus [#143597]
 	   - 20201111@Happy: Changing OddsSpread for licensee [#142345]
 	   - 20201209@Mason: Saba.club - Offer Freebet tickets [#141423]
+	   - 20210108@Mason: Saba.club - Integrate Slot Game [#147977]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -60,8 +61,13 @@ BEGIN
 	SET NOCOUNT ON 
 	DECLARE @GD_Tip SMALLINT = 1706,
 			@PP_Contribution SMALLINT = 4297,
+			@SBC_Contribution SMALLINT = 1698,
 			@OddSpread_BetType SMALLINT = 999
 	DECLARE @CurrencyTest INT = 20
+
+	DECLARE @PP_ProductId INT = 32,
+			@SBC_ProductId INT = 42
+	
 	-- currency list
 	--
 	DECLARE @IsAllCurrency BIT = 0
@@ -261,7 +267,7 @@ BEGIN
 		INTO #tmpData
 		FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK)
 		INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
-		LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','999,4297') eb ON b.Bettype = eb.BettypeID
+		LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','999,4297,1698') eb ON b.Bettype = eb.BettypeID
 		WHERE b.CurrencyID <> @CurrencyTest
 			AND b.[Status] NOT IN (-1, 101, 102, 103)
 			AND b.CustomerCategory NOT IN (27,28)
@@ -283,10 +289,10 @@ BEGIN
 											ELSE 1
 									 END)
 						END) AS Turnover
-					,SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @OddSpread_BetType) THEN 0 ELSE b.winloss END)	AS MemberWL
-					,SUM(CASE WHEN (@drawfilter = 2 AND b.[Status] = 111) OR b.Bettype IN (@PP_Contribution, @OddSpread_BetType) THEN 0 ELSE b.BetCount END) AS BetCount
+					,SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @OddSpread_BetType) THEN 0 ELSE b.winloss END)	AS MemberWL
+					,SUM(CASE WHEN (@drawfilter = 2 AND b.[Status] = 111) OR b.Bettype IN (@PP_Contribution, @SBC_Contribution, @OddSpread_BetType) THEN 0 ELSE b.BetCount END) AS BetCount
 					,SUM(CASE WHEN b.ProductId = 32 THEN 0 ELSE b.commissionP END) AS Playercomm
-					,SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @OddSpread_BetType) THEN ISNULL(-b.WinLossA, 0) ELSE 0 END) WinlossA
+					,SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @OddSpread_BetType) THEN ISNULL(-b.WinLossA, 0) ELSE 0 END) WinlossA
 			FROM #tmpData b
 			LEFT JOIN dbo.League l WITH(NOLOCK) ON b.leagueid = l.leagueid
 			WHERE (@SportType = 0 OR (b.bettype NOT IN (9,29) AND (b.bettype NOT BETWEEN 31 AND 120) AND l.Sporttype = @Sporttype)) AND
@@ -307,7 +313,7 @@ BEGIN
 			   ,-MemberWL
 			   ,0
 			   ,0
-			   ,(-MemberWL - CASE WHEN a.ProductID = 32 THEN WinlossA ELSE 0 END) * ISNULL(cc.Rate, p.Rate)
+			   ,(-MemberWL - CASE WHEN a.ProductID IN (@PP_ProductId, @SBC_ProductId) THEN WinlossA ELSE 0 END) * ISNULL(cc.Rate, p.Rate)
 			   ,Betcount
 			   ,Playercomm
 			   ,CASE WHEN a.ProductID = 0 THEN WinlossA ELSE 0 END

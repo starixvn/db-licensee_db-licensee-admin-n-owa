@@ -43,6 +43,7 @@ AS
 		- 20201230@Parsons: Integrate Gold Diamond Gaming [#145340]
 		- 20201231@Parsons: Integrate Big Gaming [#145342]
 		- 20210106@Happy: Integrate MaxGame [#147375]
+	    - 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -67,6 +68,8 @@ BEGIN
 		,@SAGTip_Bettype			SMALLINT = 3007
 		,@CC_ArcadiaBonus_Bettype	SMALLINT = 1906
 		,@SB_AdjustedOdds_Bettype	SMALLINT = 999
+		,@SBC_Contribution SMALLINT = 1698
+		,@SBC_JackpotPrize SMALLINT = 1699
 		,@BA	SMALLINT = 3
 		,@GD	SMALLINT = 11
 		,@CB	SMALLINT = 15
@@ -301,7 +304,7 @@ BEGIN
 		SELECT b.SiteID,b.rptDate,b.ProductId,b.CurrencyId,b.CommissionA,b.CommissionP
 			,b.WinPrizeAmount,b.CashOutAmount,b.BuyBackAmount,b.Turnover,b.TicketType
 			,ISNULL(-b.MemberWL, 0) LicWinloss
-			,CASE WHEN b.Bettype IN (@PPContribution_Bettype, @SB_AdjustedOdds_Bettype) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END GrossWL
+			,CASE WHEN b.Bettype IN (@PPContribution_Bettype, @SB_AdjustedOdds_Bettype, @SBC_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END GrossWL
 			,CASE WHEN b.ProductID = @SPR THEN @SabaPromotion_Bettype ELSE b.Bettype END			Bettype
 			,CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN b.Turnover ELSE b.ExtraAmount END			TurnoverForCommision
 		INTO #tmpBettingByProduct
@@ -324,7 +327,7 @@ BEGIN
 			CAST(0 AS MONEY) AS JackPotPrize,
 			CAST(0 AS MONEY) AS PromotionPrize,
 			SUM((b.LicWinloss + (CASE WHEN b.ProductID = @BX THEN b.CommissionA ELSE 0 END)) * e.Rate) AS Winloss,
-			SUM((((b.LicWinloss - CASE WHEN b.ProductID = @PP THEN GrossWL ELSE 0 END) * ISNULL(cr.Rate, p.Rate) - 
+			SUM((((b.LicWinloss - CASE WHEN b.ProductID IN (@PP, @SBC) THEN GrossWL ELSE 0 END) * ISNULL(cr.Rate, p.Rate) - 
 				(CASE
 					WHEN b.ProductID = @BA THEN ISNULL(b.CommissionA,0)
 					WHEN b.ProductID = @BX THEN (b.CommissionA + b.CommissionP)
@@ -336,7 +339,7 @@ BEGIN
 		INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID AND p.LicenseeId = b.SiteId AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 		LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
-		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39', '4297') eb ON b.Bettype = eb.BettypeID
+		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39,42', '4297,1698') eb ON b.Bettype = eb.BettypeID
 		WHERE p.ChargeType NOT IN (
 				@CashoutComm_ChargeType,
 				@CommissionShare_ChargeType,
@@ -353,12 +356,12 @@ BEGIN
 			SUM(CASE WHEN b.Bettype IN(@GDTip_Bettype, @SAGTip_Bettype) THEN b.LicWinloss * p.Rate * e.Rate ELSE 0 END) ExtraAmount,
 			SUM(CASE WHEN b.Bettype = @SabaPromotion_Bettype THEN -b.LicWinloss * e.Rate ELSE 0 END) Promotion,
 			SUM(GrossWL * e.Rate) Contribution,
-			SUM(CASE WHEN b.Bettype = @PPJackpotPrize_Bettype THEN -b.LicWinloss * e.Rate ELSE 0 END) JackPotPrize,
+			SUM(CASE WHEN b.Bettype IN (@PPJackpotPrize_Bettype, @SBC_JackpotPrize) THEN -b.LicWinloss * e.Rate ELSE 0 END) JackPotPrize,
 			SUM(CASE WHEN ISNULL(b.TicketType, 0) = 2 OR b.Bettype IN (@PPTournament_Bettype, @PromotionPrize_Bettype, @CC_ArcadiaBonus_Bettype) THEN -b.LicWinloss * e.Rate ELSE 0 END) PromotionPrize
 		FROM #tmpBettingByProduct b
 		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = (CASE WHEN p.ProductID = 0 THEN @SPR ELSE p.ProductID END)
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39', '') eb ON b.Bettype = eb.BettypeID
+		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39,42', '') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN p.FromDate AND p.ToDate
 			AND (p.ProductID IN(0, @PP, @CC, @SBC) OR p.ChargeType = @GDTip_ChargeType)
 			AND (b.Bettype = @SabaPromotion_Bettype OR eb.BettypeID IS NOT NULL OR ISNULL(b.TicketType, 0) = 2)
@@ -761,7 +764,7 @@ END
 				, pl.Name AS ProductName
 				, pl.ProductId
 				, UPPER(@BaseCurrency) AS CurrencyName
-				, SUM(CASE WHEN r.ProductID = 32 THEN 
+				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC) THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 			FROM #tmpResult r
@@ -775,7 +778,7 @@ END
 			SELECT p.LicenseeCode
 				, pl.Name AS ProductName
 				, UPPER(@BaseCurrency) AS CurrencyName
-				, SUM(CASE WHEN r.ProductID = 32 THEN 
+				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC) THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 			FROM #tmpResult r
@@ -792,7 +795,7 @@ END
 		BEGIN
 			SELECT p.PartyId
 				,UPPER(@BaseCurrency) AS CurrencyName
-				,SUM(CASE WHEN r.ProductID = 32 THEN 
+				,SUM(CASE WHEN r.ProductID IN (@PP, @SBC) THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					 ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 				,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) LicensingFee
@@ -808,7 +811,7 @@ END
 		BEGIN
 			SELECT UPPER(p.LicenseeCode) AS LicenseeCode
 				,UPPER(@BaseCurrency) AS CurrencyName 
-				, SUM(CASE WHEN r.ProductID = 32 THEN 
+				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC) THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 				,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) LicensingFee

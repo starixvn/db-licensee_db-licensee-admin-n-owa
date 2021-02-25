@@ -23,6 +23,7 @@ AS
 	   - 20201023@Parsons: Arcadia Gaming Add Bonus [#143597]  
 	   - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
 	   - 20201209@Happy: Saba.club - Offer Freebet tickets [#141423]
+	   - 20210111@Happy: Saba.club - Integrate Slot Game [#147977]
 */
 BEGIN
 	SET NOCOUNT ON	
@@ -112,27 +113,31 @@ BEGIN
 		)		
 	END
 
-	/* PP Product */	
+	/* PP and SBC Products */	
 	DECLARE @PP_Product INT = 32, 
-			@PP_Contribution SMALLINT = 4297
-	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = @PP_Product) > 0
+			@PP_Contribution SMALLINT = 4297,
+			@SBC_Product INT = 42,
+			@SBC_Contribution SMALLINT = 1698
+	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID IN (@PP_Product, @SBC_Product)) > 0
 	BEGIN
 	INSERT INTO #Report (PartyID, ProductId, CurrencyID, Company)
 		(
-			SELECT ci.PartyID, @PP_Product, b.CurrencyID, SUM((-b.MemberWL - CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END)
-																* ISNULL(cr.Rate,ci.Rate)) AS Company
+			SELECT ci.PartyID, b.ProductID, b.CurrencyID, 
+					SUM((-b.MemberWL - CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END)
+						* ISNULL(cr.Rate,ci.Rate)) AS Company
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID 
 										 AND b.ProductID = ci.ProductID 
 										 AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
-			LEFT JOIN LA_f_ExcludedBettypeListSel('','4297') eb ON b.Bettype = eb.BettypeID
+			LEFT JOIN LA_f_ExcludedBettypeListSel('','4297,1698') eb ON b.Bettype = eb.BettypeID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND b.customercategory NOT IN (27,28)
-				AND b.ProductID = @PP_Product
+				AND b.ProductID IN (@PP_Product, @SBC_Product)
 				AND eb.BettypeID IS NULL
-			GROUP BY ci.PartyID, b.CurrencyID
+				AND	ISNULL(b.TicketType,0) <> 2 -- Free_Bets_TicketType
+			GROUP BY ci.PartyID, b.ProductID, b.CurrencyID
 		)
 	END
 
@@ -163,7 +168,7 @@ BEGIN
 
 	/* Other Products */
 	DECLARE @ExcludedProductIds TABLE(ProductId INT)
-	INSERT INTO @ExcludedProductIds(ProductId) VALUES (@SB_Product), (@BA_Product), (@CO_Product), (@GD_Product), (@PP_Product)
+	INSERT INTO @ExcludedProductIds(ProductId) VALUES (@SB_Product), (@BA_Product), (@CO_Product), (@GD_Product), (@PP_Product), (@SBC_Product)
 	
 	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) > 0
 	BEGIN
@@ -181,7 +186,6 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27,28)
 				AND eb.BettypeID IS NULL
-				AND	ISNULL(b.TicketType,0) <> 2 -- Free_Bets_TicketType
 			GROUP BY b.rptDate, ci.PartyID, b.ProductID, b.CurrencyID
 		)
 

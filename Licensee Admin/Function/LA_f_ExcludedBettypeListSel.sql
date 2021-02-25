@@ -18,6 +18,7 @@ AS
 	
 	Revisions:
 		- 20201023@Parsons: LA Arcadia Gaming Add Bonus [#143597]  
+		- 20210501@Parsons: Saba Club - Integrate Slot Game [#147977]  
 
 	Param's Explanation:
 		@ProductIDs: Filter by list of products 
@@ -48,6 +49,9 @@ BEGIN
 			UNION ALL
 		SELECT 39 AS ProductID, BettypeID, [Description]
 		FROM (VALUES(3007, 'SAG Tips')) AS v(BettypeID, [Description]) -- SAG
+			UNION ALL
+		SELECT 42 AS ProductID, BettypeID, [Description]
+		FROM (VALUES(1698, 'SBC Jackpot Contribution'), (1699, 'SBC Jackpot Prize')) AS v(BettypeID, [Description]) -- SBC
 	)
 	INSERT INTO @Result (ProductID, BettypeID, [Description])
 	SELECT r.* 
