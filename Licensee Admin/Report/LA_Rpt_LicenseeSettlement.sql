@@ -50,6 +50,7 @@ AS
 			- 20201111@Mason: Change request of Odds Spread [#142345]
 			- 20201209@Mason: Saba.club - Offer Freebet tickets [#141423]
 			- 20210108@Mason: Saba.club - Integrate Slot Game [#147977]
+			- 20210108@Parsons: Settlement report - Enhance Company column of Arcadia Gaming, Saba.Club, PP [#150629]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -727,14 +728,14 @@ BEGIN
 	END
 	ELSE IF (@ProductCode = 'CC')
 	BEGIN
-		DECLARE @ArcadiaGaming_Bonus SMALLINT = 1906
+		DECLARE @ArcadiaGaming_Bonus_BettypeID SMALLINT = 1906
 		;WITH cte_ArcadiaData AS
 		(
 			SELECT b.SiteId, b.rptDate, b.CurrencyId
-				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE ISNULL(b.BetCount, 0) END) AS BetCount
+				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus_BettypeID THEN 0 ELSE ISNULL(b.BetCount, 0) END) AS BetCount
 				,SUM(ISNULL(b.Turnover, 0)) AS Turnover
-				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS MemberWL
-				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
+				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus_BettypeID THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS MemberWL
+				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus_BettypeID THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			WHERE b.ProductID = 34
 				AND b.rptDate BETWEEN @FromDate AND @ToDate
@@ -742,12 +743,13 @@ BEGIN
 				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
 			GROUP BY b.SiteId, rptDate, b.CurrencyID
 		)
-		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, Company, WinningPrize)
+		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, Company, WinningPrize)
 		SELECT b.rptDate, b.CurrencyId
 			,SUM(Betcount) 
 			,SUM(Turnover) 
 			,SUM(MemberWL) 
 			,SUM(-MemberWL * (1 - ISNULL(cm.Rate, p.Rate)))				AS LicenseeWL
+			,SUM(-MemberWL * ISNULL(cm.Rate, p.Rate))					AS LicenseeChargeRate
 			,SUM(-MemberWL * ISNULL(cm.Rate, p.Rate) - WinningPrize)	AS Company
 			,SUM(WinningPrize) 
 		FROM cte_ArcadiaData b
