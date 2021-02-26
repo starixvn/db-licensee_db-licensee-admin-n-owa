@@ -65,6 +65,7 @@ AS
 SET NOCOUNT ON
 BEGIN
 	SET @ProductCode = LTRIM(RTRIM(REPLACE(@ProductCode,',','')))
+	DECLARE @TotalLicenseeChargeRate MONEY 
 
 	DECLARE @LicenseeID INT,
 			@DrawFilter SMALLINT = 1
@@ -709,7 +710,7 @@ BEGIN
 					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
 				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
-		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, WinningPrize, Contribution, JackpotPrize, Company)
+		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, WinningPrize, Contribution, JackpotPrize)
 		SELECT rptDate, d.CurrencyID
 				, SUM(BetCount)		AS BetCount
 				, SUM(Turnover)		AS Turnover
@@ -719,12 +720,17 @@ BEGIN
 				, SUM(WinningPrize) AS WinningPrize
 				, SUM(Contribution) AS Contribution
 				, SUM(JackpotPrize) AS JackpotPrize
-				, SUM((-MemberWL - Contribution) * ISNULL(cm.Rate, p.Rate) + Contribution - JackpotPrize - WinningPrize) AS Company
 		FROM cte_WinLossData d
 			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND d.CurrencyId = cm.CurrencyId 
 		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY rptDate, d.CurrencyID
+
+		SELECT @TotalLicenseeChargeRate = SUM(LicenseeChargeRate)
+		FROM #Result
+
+		UPDATE #Result
+		SET Company = CASE WHEN @TotalLicenseeChargeRate > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - WinningPrize
 	END
 	ELSE IF (@ProductCode = 'CC')
 	BEGIN
@@ -743,20 +749,25 @@ BEGIN
 				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
 			GROUP BY b.SiteId, rptDate, b.CurrencyID
 		)
-		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, Company, WinningPrize)
+		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, WinningPrize)
 		SELECT b.rptDate, b.CurrencyId
 			,SUM(Betcount) 
 			,SUM(Turnover) 
 			,SUM(MemberWL) 
 			,SUM(-MemberWL * (1 - ISNULL(cm.Rate, p.Rate)))				AS LicenseeWL
 			,SUM(-MemberWL * ISNULL(cm.Rate, p.Rate))					AS LicenseeChargeRate
-			,SUM(-MemberWL * ISNULL(cm.Rate, p.Rate) - WinningPrize)	AS Company
 			,SUM(WinningPrize) 
 		FROM cte_ArcadiaData b
 		INNER JOIN @ChargeInfo p ON b.SiteId = p.LicenseeID
 		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND b.CurrencyId = cm.CurrencyId
 		WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY rptDate, b.CurrencyID
+
+		SELECT @TotalLicenseeChargeRate = SUM(LicenseeChargeRate)
+		FROM #Result
+
+		UPDATE #Result
+		SET Company = CASE WHEN @TotalLicenseeChargeRate > 0 THEN LicenseeChargeRate ELSE 0 END - WinningPrize
 	END
 	ELSE IF(@ProductCode = 'SB') -- Sportsbook
 	BEGIN
@@ -820,13 +831,12 @@ BEGIN
 				AND b.ProductID = 42
 			GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
-		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, Company, FreeBetAmount, Betcount, Contribution, JackpotPrize)
+		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, FreeBetAmount, Betcount, Contribution, JackpotPrize)
 		SELECT rptDate, d.CurrencyID
 			,SUM(Turnover)		AS Turnover
 			,SUM(MemberWinloss) AS Winlost
 			,SUM((-MemberWinloss - Contribution) * ( 1 - ISNULL(cr.Rate, p.Rate)))	AS LicenseeWL
 			,SUM((-MemberWinloss - Contribution) * ISNULL(cr.Rate, p.Rate))			AS LicenseeChargeRate
-			,SUM((-MemberWinloss-Contribution) * ISNULL(cr.Rate, p.Rate) + Contribution - JackpotPrize - FreeBetAmount) AS Company
 			,SUM(FreeBetAmount)	AS FreeBetAmount
 			,SUM(BetCount)		AS BetCount
 			,SUM(Contribution)	AS Contribution
@@ -836,6 +846,12 @@ BEGIN
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
 		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY rptDate, d.CurrencyID
+
+		SELECT @TotalLicenseeChargeRate = SUM(LicenseeChargeRate)
+		FROM #Result
+
+		UPDATE #Result
+		SET Company = CASE WHEN @TotalLicenseeChargeRate > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - FreeBetAmount
 	END
 	ELSE
 	BEGIN
