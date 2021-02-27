@@ -65,7 +65,7 @@ AS
 SET NOCOUNT ON
 BEGIN
 	SET @ProductCode = LTRIM(RTRIM(REPLACE(@ProductCode,',','')))
-	DECLARE @TotalLicenseeChargeRate MONEY 
+	DECLARE @TotalLicenseeChargeRate_InBaseCurrency MONEY 
 
 	DECLARE @LicenseeID INT,
 			@DrawFilter SMALLINT = 1
@@ -118,6 +118,19 @@ BEGIN
 		CurrencyCode			VARCHAR(10),
 		Rate					DECIMAL(6,5)
 	)
+	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
+	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
+	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)	
+							
+	UPDATE #Exchange
+	SET CurrencyCode = (CASE ExchangeId
+							WHEN 75 THEN 'PTU'
+							WHEN 76 THEN 'PS'
+							WHEN 77 THEN 'PTH'
+							WHEN 92 THEN 'HID' 
+							ELSE CurrencyCode
+						END)
+	WHERE ExchangeId IN (75, 76, 77, 92)
 
 	DECLARE @ChargeInfo AS TABLE
 	(
@@ -726,11 +739,12 @@ BEGIN
 		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY rptDate, d.CurrencyID
 
-		SELECT @TotalLicenseeChargeRate = SUM(LicenseeChargeRate)
-		FROM #Result
+		SELECT @TotalLicenseeChargeRate_InBaseCurrency = SUM(LicenseeChargeRate * e.Rate)
+		FROM #Result r
+		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
 
 		UPDATE #Result
-		SET Company = CASE WHEN @TotalLicenseeChargeRate > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - WinningPrize
+		SET Company = CASE WHEN @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - WinningPrize
 	END
 	ELSE IF (@ProductCode = 'CC')
 	BEGIN
@@ -763,11 +777,12 @@ BEGIN
 		WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY rptDate, b.CurrencyID
 
-		SELECT @TotalLicenseeChargeRate = SUM(LicenseeChargeRate)
-		FROM #Result
+		SELECT @TotalLicenseeChargeRate_InBaseCurrency = SUM(LicenseeChargeRate * e.Rate)
+		FROM #Result r
+		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
 
 		UPDATE #Result
-		SET Company = CASE WHEN @TotalLicenseeChargeRate > 0 THEN LicenseeChargeRate ELSE 0 END - WinningPrize
+		SET Company = CASE WHEN @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END - WinningPrize
 	END
 	ELSE IF(@ProductCode = 'SB') -- Sportsbook
 	BEGIN
@@ -847,11 +862,12 @@ BEGIN
 		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY rptDate, d.CurrencyID
 
-		SELECT @TotalLicenseeChargeRate = SUM(LicenseeChargeRate)
-		FROM #Result
+		SELECT @TotalLicenseeChargeRate_InBaseCurrency = SUM(LicenseeChargeRate * e.Rate)
+		FROM #Result r
+		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
 
 		UPDATE #Result
-		SET Company = CASE WHEN @TotalLicenseeChargeRate > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - FreeBetAmount
+		SET Company = CASE WHEN @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - FreeBetAmount
 	END
 	ELSE
 	BEGIN
@@ -893,20 +909,6 @@ BEGIN
 			GROUP BY rptDate, d.CurrencyID
 		)
 	END
-
-	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)	
-							
-	UPDATE #Exchange
-	SET CurrencyCode = (CASE ExchangeId
-							WHEN 75 THEN 'PTU'
-							WHEN 76 THEN 'PS'
-							WHEN 77 THEN 'PTH'
-							WHEN 92 THEN 'HID' 
-							ELSE CurrencyCode
-						END)
-	WHERE ExchangeId IN (75, 76, 77, 92)	
 	
 	;WITH sortedExchange AS (
 		SELECT ExchangeID, CurrencyCode, ROW_NUMBER() OVER (PARTITION BY CurrencyCode ORDER BY ExchangeId) RowNumber
