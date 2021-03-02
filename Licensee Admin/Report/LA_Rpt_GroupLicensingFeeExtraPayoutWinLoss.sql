@@ -28,98 +28,68 @@ BEGIN
 	
 	DECLARE @TotalServiceFee MONEY
 
-	-- PP
-	IF EXISTS (SELECT 1 FROM LA_f_Products3rd(@ProductCodes) WHERE ProductPrefix = 'PP')
-	BEGIN
-		DECLARE @PP_Contribution SMALLINT = 4297,
+	DECLARE @PP_Contribution SMALLINT = 4297,
 			@PP_JackpotPrize SMALLINT = 4298,
 			@PP_Tournament SMALLINT = 4299,
-			@PP_PromotionPrize SMALLINT = 4300
+			@PP_PromotionPrize SMALLINT = 4300,
 
-		;WITH cte_Data_PP AS(
-			SELECT b.rptDate, b.SiteID, b.ProductID, b.CurrencyId,
-				SUM(CASE WHEN b.Bettype NOT IN(@PP_Tournament, @PP_PromotionPrize, @PP_Contribution, @PP_JackpotPrize) THEN ISNULL(b.BetCount, 0) ELSE 0 END) AS BetCount,
-				SUM(CASE WHEN b.Bettype NOT IN(@PP_Tournament, @PP_PromotionPrize, @PP_Contribution, @PP_JackpotPrize) THEN ISNULL(b.Turnover, 0) ELSE 0 END) AS Turnover,
-				SUM(CASE WHEN b.Bettype NOT IN(@PP_Tournament, @PP_PromotionPrize, @PP_Contribution, @PP_JackpotPrize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS CustomerWL,
-				SUM(CASE WHEN b.Bettype NOT IN(@PP_Tournament, @PP_PromotionPrize, @PP_Contribution, @PP_JackpotPrize) THEN ISNULL(-b.MemberWL, 0) ELSE 0 END) AS LicenseeWL,
-				SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Contribution,
-				SUM(CASE WHEN b.Bettype = @PP_JackpotPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS JackpotPrize,
-				SUM(CASE WHEN b.Bettype IN (@PP_PromotionPrize, @PP_Tournament) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS PromotionPrize
-			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
-			INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
-			WHERE b.ProductID = 32
-			GROUP BY b.SiteID, b.ProductID, b.CurrencyId, b.rptDate
-		)
-		INSERT INTO @Data(rptDate, ProductId, PartyId, CurrencyId, Turnover, BetCount, CustomerWL, LicenseeWL, Contribution, JackpotPrize, PromotionPrize, ServiceFee)
-		SELECT c.rptDate, c.ProductID AS ProductId, 
-			ci.PartyID AS PartyId, 
-			c.CurrencyId AS CurrencyId,
-			SUM(c.Turnover) AS Turnover,
-			SUM(c.BetCount)	AS BetCount,
-			SUM(c.CustomerWL) AS CustomerWL,
-			SUM(c.LicenseeWL) AS LicenseeWL,
-			SUM(c.Contribution)	AS Contribution,
-			SUM(c.JackpotPrize)	AS JackpotPrize,
-			SUM(c.PromotionPrize) AS PromotionPrize,
-			SUM((c.LicenseeWL - c.Contribution) * ci.Rate) AS ServiceFee
-		FROM cte_Data_PP c
-		INNER JOIN @ChargeInfo ci ON c.SiteID = ci.LicenseeID AND c.ProductID = ci.ProductID
-		GROUP BY ci.PartyID, c.ProductID, c.CurrencyId, c.rptDate
+			@SBC_Contribution SMALLINT = 1698,
+			@SBC_Jackpot SMALLINT = 1699,
+			@FreeBetsTicketType SMALLINT = 2,
 
-		SELECT @TotalServiceFee = SUM(ServiceFee)
-		FROM @Data
-		WHERE ProductId = 32
+			@PP_ProductId SMALLINT = 32,
+			@SBC_ProductId SMALLINT = 42
 
-		UPDATE @Data
-		SET LicensingFee = CASE WHEN @TotalServiceFee < 0 THEN 0 ELSE ServiceFee END + Contribution - JackpotPrize - PromotionPrize
-		WHERE ProductId = 32
-	END
+	;WITH cte_Data AS(
+		SELECT b.rptDate, b.SiteID, b.ProductID, b.CurrencyId,
+			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR 
+						b.Bettype NOT IN (@PP_Tournament,@PP_PromotionPrize,@PP_Contribution,@PP_JackpotPrize,@SBC_Contribution,@SBC_Jackpot) THEN ISNULL(b.BetCount, 0) 
+						ELSE 0 END) AS BetCount,
+			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR 
+						b.Bettype NOT IN (@PP_Tournament,@PP_PromotionPrize,@PP_Contribution,@PP_JackpotPrize,@SBC_Contribution,@SBC_Jackpot) THEN ISNULL(b.Turnover, 0) 
+						ELSE 0 END) AS Turnover,
+			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR 
+						b.Bettype NOT IN (@PP_Tournament,@PP_PromotionPrize,@PP_Contribution,@PP_JackpotPrize,@SBC_Contribution,@SBC_Jackpot) THEN ISNULL(b.MemberWL, 0) 
+						ELSE 0 END) AS CustomerWL,
+			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR 
+						b.Bettype NOT IN (@PP_Tournament,@PP_PromotionPrize,@PP_Contribution,@PP_JackpotPrize,@SBC_Contribution,@SBC_Jackpot) THEN ISNULL(-b.MemberWL, 0) 
+						ELSE 0 END) AS LicenseeWL,
+			SUM(CASE WHEN b.Bettype = @PP_Contribution OR b.Bettype = @SBC_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Contribution,
+			SUM(CASE WHEN b.Bettype = @PP_JackpotPrize OR b.Bettype = @SBC_Jackpot THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS JackpotPrize,
+			SUM(CASE WHEN b.Bettype IN (@PP_PromotionPrize, @PP_Tournament) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS PromotionPrize,
+			SUM(CASE WHEN ISNULL(b.TicketType, 0) = @FreeBetsTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS FreeBetAmount
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
+		INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+		WHERE b.ProductID IN (@PP_ProductId, @SBC_ProductId)
+		GROUP BY b.SiteID, b.ProductID, b.CurrencyId, b.rptDate
+	)
+	INSERT INTO @Data(rptDate, ProductId, PartyId, CurrencyId, Turnover, BetCount, CustomerWL, LicenseeWL, Contribution, JackpotPrize, PromotionPrize, ServiceFee)
+	SELECT c.rptDate, c.ProductID AS ProductId, 
+		ci.PartyID AS PartyId, 
+		c.CurrencyId AS CurrencyId,
+		SUM(c.Turnover) AS Turnover,
+		SUM(c.BetCount)	AS BetCount,
+		SUM(c.CustomerWL) AS CustomerWL,
+		SUM(c.LicenseeWL) AS LicenseeWL,
+		SUM(c.Contribution)	AS Contribution,
+		SUM(c.JackpotPrize)	AS JackpotPrize,
+		SUM(c.PromotionPrize) AS PromotionPrize,
+		SUM((c.LicenseeWL - c.Contribution) * ci.Rate) AS ServiceFee
+	FROM cte_Data c
+	INNER JOIN @ChargeInfo ci ON c.SiteID = ci.LicenseeID AND c.ProductID = ci.ProductID
+	GROUP BY ci.PartyID, c.ProductID, c.CurrencyId, c.rptDate
 
-	-- SBC
-	IF EXISTS (SELECT 1 FROM LA_f_Products3rd(@ProductCodes) WHERE ProductPrefix = 'SBC')
-	BEGIN
-		DECLARE	@SBC_Contribution SMALLINT = 1698,
-				@SBC_Jackpot SMALLINT = 1699,
-				@FreeBetsTicketType SMALLINT = 2
-
-		;WITH cte_Data_SBC AS(
-			SELECT b.rptDate, b.SiteID, b.ProductID, b.CurrencyId,
-				SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR b.Bettype IN (@SBC_Contribution, @SBC_Jackpot) THEN 0 ELSE ISNULL(b.betcount, 0) END) AS BetCount,
-				SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR b.Bettype IN (@SBC_Contribution, @SBC_Jackpot) THEN 0 ELSE ISNULL(b.turnover, 0) END) AS Turnover,
-				SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR b.Bettype IN (@SBC_Contribution, @SBC_Jackpot) THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS CustomerWL,
-				SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR b.Bettype IN (@SBC_Contribution, @SBC_Jackpot) THEN 0 ELSE ISNULL(-b.MemberWL, 0) END) AS LicenseeWL,
-				SUM(CASE WHEN b.Bettype IN (@SBC_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Contribution,
-				SUM(CASE WHEN b.Bettype IN (@SBC_Jackpot) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS JackpotPrize,
-				SUM(CASE WHEN ISNULL(b.TicketType, 0) = @FreeBetsTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS FreeBetAmount
-			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
-			INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
-			WHERE b.ProductID = 42
-			GROUP BY b.SiteID, b.ProductID, b.CurrencyId, b.rptDate)
-
-		INSERT INTO @Data(rptDate, ProductId, PartyId, CurrencyId, Turnover, BetCount, CustomerWL, LicenseeWL, Contribution, JackpotPrize, FreeBetAmount, ServiceFee)
-		SELECT c.rptDate, c.ProductID AS ProductId, 
-			ci.PartyID AS PartyId, 
-			c.CurrencyId AS CurrencyId,
-			SUM(c.Turnover)		 AS Turnover,
-			SUM(c. BetCount)	 AS BetCount,
-			SUM(c.CustomerWL)	 AS CustomerWL,
-			SUM(c.LicenseeWL)	 AS LicenseeWL,
-			SUM(c.Contribution)	 AS Contribution,
-			SUM(c.JackpotPrize)	 AS JackpotPrize,
-			SUM(c.FreeBetAmount) AS FreeBetAmount,
-			SUM((c.LicenseeWL - c.Contribution) * ci.Rate) AS ServiceFee
-		FROM cte_Data_SBC c
-		INNER JOIN @ChargeInfo ci ON c.SiteID = ci.LicenseeID AND c.ProductID = ci.ProductID
-		GROUP BY ci.PartyID, c.ProductID, c.CurrencyId, c.rptDate
-
-		SELECT @TotalServiceFee = SUM(ServiceFee)
-		FROM @Data
-		WHERE ProductId = 42
-
-		UPDATE @Data
-		SET LicensingFee = CASE WHEN @TotalServiceFee < 0 THEN 0 ELSE ServiceFee END + Contribution - JackpotPrize - FreeBetAmount
-		WHERE ProductId = 42
-	END
+	;WITH cte_TotalServiceFee_BaseCurrency AS(
+		SELECT d.ProductId, SUM(d.ServiceFee * e.BaseCurrencyRate) AS TotalServiceFee_InBaseCurrency
+		FROM @Data d 
+		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, 'EUR') e ON d.CurrencyId = e.ExchangeId AND e.exchangedate = d.rptDate
+		GROUP BY d.ProductId
+	)
+	UPDATE d
+	SET d.LicensingFee = CASE WHEN d.ProductId = 32 THEN CASE WHEN t.TotalServiceFee_InBaseCurrency < 0 THEN 0 ELSE d.ServiceFee END + d.Contribution - d.JackpotPrize - d.PromotionPrize
+													ELSE CASE WHEN t.TotalServiceFee_InBaseCurrency < 0 THEN 0 ELSE d.ServiceFee END + d.Contribution - d.JackpotPrize - d.FreeBetAmount END
+	FROM @Data d 
+	INNER JOIN cte_TotalServiceFee_BaseCurrency t ON d.ProductId = t.ProductId
 
 	SELECT 
 		-- Original
