@@ -15,6 +15,7 @@ AS
 	Revisions: 
 		- 20200122@Parsons: - Create Sp [#125221]
 							- Fix Setup Fee issue [#125221]
+		- 20210303@Sophia: Enhance performance [redmine: #151031]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -127,18 +128,22 @@ BEGIN
 		INNER JOIN bodb_Report.dbo.rptstatement a WITH(NOLOCK) ON t.CustId = a.CustID AND t.OpeningBalanceDate=a.WinlostDate
 	END
 
+
 	-- rptstatement_Old
 	-- step 3
 	IF @ReportDate <= @balanceUpDay OR (EXISTS (SELECT TOP 1 1 FROM #statement WHERE OpeningBalance IS NULL) AND @step = 2)
 	BEGIN
 		DELETE #tmpOB
 		SET @step = 3
+		
+		DECLARE @MinDate Date  
+		SELECT  @MinDate = DATEADD(DAY, -14, @ReportDate) 	
 
 		INSERT INTO #tmpOB(CustId,OpeningBalanceDate)
 		SELECT a.CustID, MAX(a.WinlostDate)
 		FROM #statement s
 		INNER JOIN bodb_report.dbo.rptstatement_Old a WITH(NOLOCK) ON s.CustId = a.CustID
-		WHERE a.WinlostDate < @ReportDate AND s.OpeningBalance IS NULL
+		WHERE a.WinlostDate > @MinDate AND a.WinlostDate < @ReportDate AND s.OpeningBalance IS NULL
 		GROUP BY a.CustID
 		
 		UPDATE s SET OpeningBalance = a.closingbalance
