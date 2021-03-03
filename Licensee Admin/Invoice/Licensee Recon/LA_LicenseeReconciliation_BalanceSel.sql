@@ -28,7 +28,8 @@ BEGIN
 
 	CREATE TABLE #tmpOB(
 		CustId				INT,
-		OpeningBalanceDate	DATE
+		OpeningBalanceDate	DATE,
+		Closingbalance		MONEY
 	)
 
 	CREATE NONCLUSTERED INDEX Idx_tmp_statement ON #statement (CustId)
@@ -135,10 +136,10 @@ BEGIN
 	BEGIN
 		DELETE #tmpOB
 		SET @step = 3
-		
+	/*	
 		DECLARE @MinDate Date  
 		SELECT  @MinDate = DATEADD(DAY, -14, @ReportDate) 	
-
+	
 		INSERT INTO #tmpOB(CustId,OpeningBalanceDate)
 		SELECT a.CustID, MAX(a.WinlostDate)
 		FROM #statement s
@@ -150,6 +151,23 @@ BEGIN
 		FROM #statement s
 		INNER JOIN #tmpOB t ON t.CustId=s.CustId
 		INNER JOIN bodb_Report.dbo.rptstatement_Old a WITH(NOLOCK) ON t.CustId = a.CustID AND t.OpeningBalanceDate=a.WinlostDate
+	*/
+	
+		INSERT INTO #tmpOB(CustId,OpeningBalanceDate, Closingbalance)
+		SELECT a.CustID, a.WinlostDate, a.Closingbalance
+		FROM #statement s
+		CROSS APPLY (SELECT TOP 1 CustID, WinlostDate, Closingbalance
+					FROM  bodb_report.dbo.rptstatement_Old a WITH(NOLOCK) 
+					WHERE a.custID = s.CustID and a.WinlostDate < @ReportDate
+					ORDER BY WinlostDate DESC
+						) a  	
+		WHERE s.OpeningBalance IS NULL
+		
+						
+		UPDATE s SET OpeningBalance = t.Closingbalance
+		FROM #statement s
+		INNER JOIN #tmpOB t ON t.CustId=s.CustId		 
+						
 	END
 
 	SELECT * FROM #statement
