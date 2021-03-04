@@ -4,7 +4,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_BalanceSel]
 	@CustIds		VARCHAR(8000),
-	@ReportDate		DATETIME,
+	@ReportDate		DATE,
 	@Environment	VARCHAR(50) = 'DEV'
 AS
 /*	Header:
