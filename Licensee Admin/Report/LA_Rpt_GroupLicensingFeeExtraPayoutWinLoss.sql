@@ -66,7 +66,7 @@ BEGIN
 		WHERE b.ProductID IN (@PP_ProductId, @SBC_ProductId)
 		GROUP BY b.SiteID, b.ProductID, b.CurrencyId, b.rptDate
 	)
-	INSERT INTO @Data(rptDate, ProductId, PartyId, CurrencyId, Turnover, BetCount, CustomerWL, LicenseeWL, Contribution, JackpotPrize, PromotionPrize, ServiceFee)
+	INSERT INTO @Data(rptDate, ProductId, PartyId, CurrencyId, Turnover, BetCount, CustomerWL, LicenseeWL, Contribution, JackpotPrize, PromotionPrize, FreeBetAmount, ServiceFee)
 	SELECT d.rptDate, d.ProductID,ci.PartyID, d.CurrencyId,
 		SUM(d.Turnover) AS Turnover,
 		SUM(d.BetCount)	AS BetCount,
@@ -75,6 +75,7 @@ BEGIN
 		SUM(d.Contribution)	AS Contribution,
 		SUM(d.JackpotPrize)	AS JackpotPrize,
 		SUM(d.PromotionPrize) AS PromotionPrize,
+		SUM(d.FreeBetAmount) AS FreeBetAmount,
 		SUM((d.LicenseeWL - d.Contribution) * ci.Rate) AS ServiceFee
 	FROM cte_Data d
 	INNER JOIN @ChargeInfo ci ON d.SiteID = ci.LicenseeID AND d.ProductID = ci.ProductID
