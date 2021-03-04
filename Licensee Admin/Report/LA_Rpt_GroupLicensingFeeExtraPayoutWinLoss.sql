@@ -87,7 +87,8 @@ BEGIN
 		GROUP BY d.ProductId
 	)
 	UPDATE d
-	SET d.LicensingFee = CASE WHEN t.TotalServiceFee_InBaseCurrency < 0 THEN 0 ELSE d.ServiceFee END + d.Contribution - d.JackpotPrize - d.PromotionPrize - d.FreeBetAmount
+	SET d.LicensingFee = CASE WHEN t.TotalServiceFee_InBaseCurrency < 0 
+									THEN 0 ELSE d.ServiceFee END + d.Contribution - d.JackpotPrize - ISNULL(d.PromotionPrize,0) - ISNULL(d.FreeBetAmount,0)
 	FROM @Data d 
 	INNER JOIN cte_TotalServiceFee_BaseCurrency t ON d.ProductId = t.ProductId
 
