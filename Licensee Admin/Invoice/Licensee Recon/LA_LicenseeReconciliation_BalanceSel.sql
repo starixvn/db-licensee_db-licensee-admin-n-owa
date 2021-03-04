@@ -136,29 +136,17 @@ BEGIN
 	BEGIN
 		DELETE #tmpOB
 		SET @step = 3
-	/*	
-		DECLARE @MinDate Date  
-		SELECT  @MinDate = DATEADD(DAY, -14, @ReportDate) 	
 	
-		INSERT INTO #tmpOB(CustId,OpeningBalanceDate)
-		SELECT a.CustID, MAX(a.WinlostDate)
-		FROM #statement s
-		INNER JOIN bodb_report.dbo.rptstatement_Old a WITH(NOLOCK) ON s.CustId = a.CustID
-		WHERE a.WinlostDate > @MinDate AND a.WinlostDate < @ReportDate AND s.OpeningBalance IS NULL
-		GROUP BY a.CustID
-		
-		UPDATE s SET OpeningBalance = a.closingbalance
-		FROM #statement s
-		INNER JOIN #tmpOB t ON t.CustId=s.CustId
-		INNER JOIN bodb_Report.dbo.rptstatement_Old a WITH(NOLOCK) ON t.CustId = a.CustID AND t.OpeningBalanceDate=a.WinlostDate
-	*/
+		DECLARE @MinDate Date  
+		SELECT  @MinDate = DATEADD(DAY, -14, @ReportDate) 		
+	 
 	
 		INSERT INTO #tmpOB(CustId,OpeningBalanceDate, Closingbalance)
 		SELECT a.CustID, a.WinlostDate, a.Closingbalance
 		FROM #statement s
 		CROSS APPLY (SELECT TOP 1 CustID, WinlostDate, Closingbalance
 					FROM  bodb_report.dbo.rptstatement_Old a WITH(NOLOCK) 
-					WHERE a.custID = s.CustID and a.WinlostDate < @ReportDate
+					WHERE a.custID = s.CustID and a.WinlostDate < @ReportDate AND a.WinlostDate >= @MinDate 
 					ORDER BY WinlostDate DESC
 						) a  	
 		WHERE s.OpeningBalance IS NULL
