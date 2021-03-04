@@ -78,6 +78,7 @@ BEGIN
 		SUM((d.LicenseeWL - d.Contribution) * ci.Rate) AS ServiceFee
 	FROM cte_Data d
 	INNER JOIN @ChargeInfo ci ON d.SiteID = ci.LicenseeID AND d.ProductID = ci.ProductID
+	LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
 	GROUP BY ci.PartyID, d.ProductID, d.CurrencyId, d.rptDate
 
 	;WITH cte_TotalServiceFee_BaseCurrency AS(
