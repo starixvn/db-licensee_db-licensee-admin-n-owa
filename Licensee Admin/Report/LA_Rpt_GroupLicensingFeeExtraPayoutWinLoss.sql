@@ -83,16 +83,16 @@ BEGIN
 	GROUP BY ci.PartyID, d.ProductID, d.CurrencyId, d.rptDate
 
 	;WITH cte_TotalServiceFee_BaseCurrency AS(
-		SELECT d.ProductId, SUM(d.ServiceFee * e.BaseCurrencyRate) AS TotalServiceFee_InBaseCurrency
+		SELECT d.ProductId, d.PartyId, SUM(d.ServiceFee * e.BaseCurrencyRate) AS TotalServiceFee_InBaseCurrency_ByParty
 		FROM @Data d 
 		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, 'EUR') e ON d.CurrencyId = e.ExchangeId AND e.exchangedate = d.rptDate
-		GROUP BY d.ProductId
+		GROUP BY d.ProductId, d.PartyId
 	)
 	UPDATE d
-	SET d.LicensingFee = CASE WHEN t.TotalServiceFee_InBaseCurrency < 0 
+	SET d.LicensingFee = CASE WHEN t.TotalServiceFee_InBaseCurrency_ByParty < 0 
 									THEN 0 ELSE d.ServiceFee END + d.Contribution - d.JackpotPrize - ISNULL(d.PromotionPrize,0) - ISNULL(d.FreeBetAmount,0)
 	FROM @Data d 
-	INNER JOIN cte_TotalServiceFee_BaseCurrency t ON d.ProductId = t.ProductId
+	INNER JOIN cte_TotalServiceFee_BaseCurrency t ON d.ProductId = t.ProductId AND d.PartyId = t.PartyId
 
 	SELECT 
 		-- Original
