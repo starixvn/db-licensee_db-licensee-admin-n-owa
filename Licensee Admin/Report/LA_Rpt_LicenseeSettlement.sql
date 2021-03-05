@@ -50,6 +50,7 @@ AS
 			- 20201111@Mason: Change request of Odds Spread [#142345]
 			- 20201209@Mason: Saba.club - Offer Freebet tickets [#141423]
 			- 20210108@Mason: Saba.club - Integrate Slot Game [#147977]
+			- 20210108@Parsons: Settlement report - Enhance Company column of Arcadia Gaming, Saba.Club, PP [#150629]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -64,6 +65,7 @@ AS
 SET NOCOUNT ON
 BEGIN
 	SET @ProductCode = LTRIM(RTRIM(REPLACE(@ProductCode,',','')))
+	DECLARE @TotalLicenseeChargeRate_InBaseCurrency MONEY 
 
 	DECLARE @LicenseeID INT,
 			@DrawFilter SMALLINT = 1
@@ -116,6 +118,19 @@ BEGIN
 		CurrencyCode			VARCHAR(10),
 		Rate					DECIMAL(6,5)
 	)
+	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
+	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
+	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)	
+							
+	UPDATE #Exchange
+	SET CurrencyCode = (CASE ExchangeId
+							WHEN 75 THEN 'PTU'
+							WHEN 76 THEN 'PS'
+							WHEN 77 THEN 'PTH'
+							WHEN 92 THEN 'HID' 
+							ELSE CurrencyCode
+						END)
+	WHERE ExchangeId IN (75, 76, 77, 92)
 
 	DECLARE @ChargeInfo AS TABLE
 	(
@@ -708,7 +723,7 @@ BEGIN
 					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
 				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
-		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, WinningPrize, Contribution, JackpotPrize, Company)
+		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, WinningPrize, Contribution, JackpotPrize)
 		SELECT rptDate, d.CurrencyID
 				, SUM(BetCount)		AS BetCount
 				, SUM(Turnover)		AS Turnover
@@ -718,23 +733,29 @@ BEGIN
 				, SUM(WinningPrize) AS WinningPrize
 				, SUM(Contribution) AS Contribution
 				, SUM(JackpotPrize) AS JackpotPrize
-				, SUM((-MemberWL - Contribution) * ISNULL(cm.Rate, p.Rate) + Contribution - JackpotPrize - WinningPrize) AS Company
 		FROM cte_WinLossData d
 			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND d.CurrencyId = cm.CurrencyId 
 		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY rptDate, d.CurrencyID
+
+		SELECT @TotalLicenseeChargeRate_InBaseCurrency = SUM(LicenseeChargeRate * e.Rate)
+		FROM #Result r
+		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
+
+		UPDATE #Result
+		SET Company = CASE WHEN @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - WinningPrize
 	END
 	ELSE IF (@ProductCode = 'CC')
 	BEGIN
-		DECLARE @ArcadiaGaming_Bonus SMALLINT = 1906
+		DECLARE @ArcadiaGaming_Bonus_BettypeID SMALLINT = 1906
 		;WITH cte_ArcadiaData AS
 		(
 			SELECT b.SiteId, b.rptDate, b.CurrencyId
-				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE ISNULL(b.BetCount, 0) END) AS BetCount
+				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus_BettypeID THEN 0 ELSE ISNULL(b.BetCount, 0) END) AS BetCount
 				,SUM(ISNULL(b.Turnover, 0)) AS Turnover
-				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS MemberWL
-				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
+				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus_BettypeID THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS MemberWL
+				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus_BettypeID THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			WHERE b.ProductID = 34
 				AND b.rptDate BETWEEN @FromDate AND @ToDate
@@ -742,19 +763,26 @@ BEGIN
 				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
 			GROUP BY b.SiteId, rptDate, b.CurrencyID
 		)
-		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, Company, WinningPrize)
+		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, WinningPrize)
 		SELECT b.rptDate, b.CurrencyId
 			,SUM(Betcount) 
 			,SUM(Turnover) 
 			,SUM(MemberWL) 
 			,SUM(-MemberWL * (1 - ISNULL(cm.Rate, p.Rate)))				AS LicenseeWL
-			,SUM(-MemberWL * ISNULL(cm.Rate, p.Rate) - WinningPrize)	AS Company
+			,SUM(-MemberWL * ISNULL(cm.Rate, p.Rate))					AS LicenseeChargeRate
 			,SUM(WinningPrize) 
 		FROM cte_ArcadiaData b
 		INNER JOIN @ChargeInfo p ON b.SiteId = p.LicenseeID
 		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND b.CurrencyId = cm.CurrencyId
 		WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY rptDate, b.CurrencyID
+
+		SELECT @TotalLicenseeChargeRate_InBaseCurrency = SUM(LicenseeChargeRate * e.Rate)
+		FROM #Result r
+		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
+
+		UPDATE #Result
+		SET Company = CASE WHEN @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END - WinningPrize
 	END
 	ELSE IF(@ProductCode = 'SB') -- Sportsbook
 	BEGIN
@@ -818,13 +846,12 @@ BEGIN
 				AND b.ProductID = 42
 			GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
-		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, Company, FreeBetAmount, Betcount, Contribution, JackpotPrize)
+		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, FreeBetAmount, Betcount, Contribution, JackpotPrize)
 		SELECT rptDate, d.CurrencyID
 			,SUM(Turnover)		AS Turnover
 			,SUM(MemberWinloss) AS Winlost
 			,SUM((-MemberWinloss - Contribution) * ( 1 - ISNULL(cr.Rate, p.Rate)))	AS LicenseeWL
 			,SUM((-MemberWinloss - Contribution) * ISNULL(cr.Rate, p.Rate))			AS LicenseeChargeRate
-			,SUM((-MemberWinloss-Contribution) * ISNULL(cr.Rate, p.Rate) + Contribution - JackpotPrize - FreeBetAmount) AS Company
 			,SUM(FreeBetAmount)	AS FreeBetAmount
 			,SUM(BetCount)		AS BetCount
 			,SUM(Contribution)	AS Contribution
@@ -834,6 +861,13 @@ BEGIN
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
 		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY rptDate, d.CurrencyID
+
+		SELECT @TotalLicenseeChargeRate_InBaseCurrency = SUM(LicenseeChargeRate * e.Rate)
+		FROM #Result r
+		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
+
+		UPDATE #Result
+		SET Company = CASE WHEN @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - FreeBetAmount
 	END
 	ELSE
 	BEGIN
@@ -875,20 +909,6 @@ BEGIN
 			GROUP BY rptDate, d.CurrencyID
 		)
 	END
-
-	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)	
-							
-	UPDATE #Exchange
-	SET CurrencyCode = (CASE ExchangeId
-							WHEN 75 THEN 'PTU'
-							WHEN 76 THEN 'PS'
-							WHEN 77 THEN 'PTH'
-							WHEN 92 THEN 'HID' 
-							ELSE CurrencyCode
-						END)
-	WHERE ExchangeId IN (75, 76, 77, 92)	
 	
 	;WITH sortedExchange AS (
 		SELECT ExchangeID, CurrencyCode, ROW_NUMBER() OVER (PARTITION BY CurrencyCode ORDER BY ExchangeId) RowNumber
