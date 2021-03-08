@@ -4,7 +4,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_BalanceSel]
 	@CustIds		VARCHAR(8000),
-	@ReportDate		DATETIME,
+	@ReportDate		DATE,
 	@Environment	VARCHAR(50) = 'DEV'
 AS
 /*	Header:
@@ -15,6 +15,7 @@ AS
 	Revisions: 
 		- 20200122@Parsons: - Create Sp [#125221]
 							- Fix Setup Fee issue [#125221]
+		- 20210303@Sophia: Enhance performance [redmine: #151031]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -27,7 +28,8 @@ BEGIN
 
 	CREATE TABLE #tmpOB(
 		CustId				INT,
-		OpeningBalanceDate	DATE
+		OpeningBalanceDate	DATE,
+		Closingbalance		MONEY
 	)
 
 	CREATE NONCLUSTERED INDEX Idx_tmp_statement ON #statement (CustId)
@@ -127,24 +129,33 @@ BEGIN
 		INNER JOIN bodb_Report.dbo.rptstatement a WITH(NOLOCK) ON t.CustId = a.CustID AND t.OpeningBalanceDate=a.WinlostDate
 	END
 
+
 	-- rptstatement_Old
 	-- step 3
 	IF @ReportDate <= @balanceUpDay OR (EXISTS (SELECT TOP 1 1 FROM #statement WHERE OpeningBalance IS NULL) AND @step = 2)
 	BEGIN
 		DELETE #tmpOB
 		SET @step = 3
-
-		INSERT INTO #tmpOB(CustId,OpeningBalanceDate)
-		SELECT a.CustID, MAX(a.WinlostDate)
+	
+		DECLARE @MinDate Date  
+		SELECT  @MinDate = DATEADD(DAY, -14, @ReportDate) 		
+	 
+	
+		INSERT INTO #tmpOB(CustId,OpeningBalanceDate, Closingbalance)
+		SELECT a.CustID, a.WinlostDate, a.Closingbalance
 		FROM #statement s
-		INNER JOIN bodb_report.dbo.rptstatement_Old a WITH(NOLOCK) ON s.CustId = a.CustID
-		WHERE a.WinlostDate < @ReportDate AND s.OpeningBalance IS NULL
-		GROUP BY a.CustID
+		CROSS APPLY (SELECT TOP 1 CustID, WinlostDate, Closingbalance
+					FROM  bodb_report.dbo.rptstatement_Old a WITH(NOLOCK) 
+					WHERE a.custID = s.CustID and a.WinlostDate < @ReportDate AND a.WinlostDate >= @MinDate 
+					ORDER BY WinlostDate DESC
+						) a  	
+		WHERE s.OpeningBalance IS NULL
 		
-		UPDATE s SET OpeningBalance = a.closingbalance
+						
+		UPDATE s SET OpeningBalance = t.Closingbalance
 		FROM #statement s
-		INNER JOIN #tmpOB t ON t.CustId=s.CustId
-		INNER JOIN bodb_Report.dbo.rptstatement_Old a WITH(NOLOCK) ON t.CustId = a.CustID AND t.OpeningBalanceDate=a.WinlostDate
+		INNER JOIN #tmpOB t ON t.CustId=s.CustId		 
+						
 	END
 
 	SELECT * FROM #statement
