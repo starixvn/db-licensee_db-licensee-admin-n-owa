@@ -65,6 +65,7 @@ AS
 		- 20210104@Parsons: Integrate MaxGame [#147375]
 		- 20210104@Parsons: Integrate Happy 5 Linked Games [#147544]
 		- 20210203@Parsons: Integrate Saba Red Envelope [#149935]
+		- 20210308@Parsons: Integrate Sports Lottery Product [#150866]
 	Param's Explanation:
 
 */
@@ -523,6 +524,17 @@ BEGIN
 	   WHERE typeid BETWEEN 5401 AND 5499
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
+
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'SLT')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 63
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 3611 AND 3620
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+	END
+
+
 	RETURN
 END
 GO
