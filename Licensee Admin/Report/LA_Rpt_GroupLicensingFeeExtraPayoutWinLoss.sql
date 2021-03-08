@@ -24,7 +24,7 @@ BEGIN
 	FROM dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 
 	DECLARE @Data AS TABLE(rptDate DATE, PartyId INT, ProductId INT, CurrencyId INT, Turnover MONEY, BetCount INT, CustomerWL MONEY, LicenseeWL MONEY,
-						Contribution MONEY, ServiceFee MONEY, JackpotPrize MONEY, FreeBetAmount MONEY, PromotionPrize MONEY, LicensingFee MONEY, BaseCurrencyId INT)
+						Contribution MONEY, ServiceFee MONEY, JackpotPrize MONEY, FreeBetAmount MONEY, PromotionPrize MONEY, LicensingFee MONEY, BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
 	
 	DECLARE @TotalServiceFee MONEY
 
@@ -83,25 +83,18 @@ BEGIN
 	GROUP BY ci.PartyID, d.ProductID, d.CurrencyId, d.rptDate
 
 	UPDATE d
-	SET d.BaseCurrencyId = pd.BaseCurrencyId
+	SET d.BaseCurrencyId = pd.BaseCurrencyId, d.BaseCurrencyName = e.Code
 	FROM @Data d
 	INNER JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON d.PartyId = pd.PartyID
-
-	-- Get based currencies by party
-	DECLARE @BaseCurrenciesByParty AS TABLE(ProductId INT, PartyId INT, BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
-
-	INSERT INTO @BaseCurrenciesByParty(ProductId, PartyId, BaseCurrencyId, BaseCurrencyName)
-	SELECT DISTINCT d.ProductID, d.PartyId, pd.BaseCurrencyId, e.Code
-	FROM @Data d
-	INNER JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = d.PartyID
-	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON pd.BaseCurrencyId = e.ExchangeId
-	-- end region
+	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON e.ExchangeId = pd.BaseCurrencyId
 
 	-- Get all base currency
 	DECLARE @BaseCurrencies AS TABLE(BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
 	INSERT INTO @BaseCurrencies(BaseCurrencyId, BaseCurrencyName)
-	SELECT DISTINCT b.BaseCurrencyId, b.BaseCurrencyName
-	FROM @BaseCurrenciesByParty b
+	SELECT DISTINCT pd.BaseCurrencyId, e.Code
+	FROM @Data d
+	INNER JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = d.PartyID
+	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON pd.BaseCurrencyId = e.ExchangeId
 
 	-- Get BaseCurrencyRate
 	DECLARE @ExchangeRate AS TABLE(BaseCurrencyId INT, ExchangeId INT, ExchangeDate DATETIME, BaseCurrencyRate FLOAT, Code VARCHAR(10))
@@ -142,6 +135,8 @@ BEGIN
 		p.PartyName				AS PartyName,
 		d.CurrencyId			AS Currency,
 		e.Code					AS CurrencyName,
+		d.BaseCurrencyId		AS BaseCurrencyId,
+		d.BaseCurrencyName		AS BaseCurrencyName,
 		SUM(d.Turnover)			AS Turnover,
 		SUM(d.BetCount)			AS Betcount,
 		SUM(d.CustomerWL)		AS MemberWinloss,
@@ -167,16 +162,15 @@ BEGIN
 	INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON d.PartyId = p.PartyID
 	INNER JOIN @ExchangeRate e ON d.CurrencyId = e.ExchangeId AND e.exchangedate = d.rptDate AND e.BaseCurrencyId = d.BaseCurrencyId
 	INNER JOIN LA_f_Products3rd(@ProductCodes) prd ON prd.ProductId = d.ProductId
-	GROUP BY d.ProductId, prd.ProductName, prd.ProductPrefix, d.PartyId, p.PartyName, d.CurrencyId, e.Code
+	GROUP BY d.ProductId, prd.ProductName, prd.ProductPrefix, d.PartyId, p.PartyName, d.CurrencyId, e.Code, d.BaseCurrencyId, d.BaseCurrencyName
 
-	-- Get data
+	-- Get report data
 	SELECT * FROM #Result
 
 	-- Get exchange rate
-	SELECT c.ProductCode, c.CurrencyName, r.BaseCurrencyRate, b.BaseCurrencyName
-	FROM #Result c
-	INNER JOIN @BaseCurrenciesByParty b ON b.ProductId = c.ProductId
-	INNER JOIN @ExchangeRate r ON b.BaseCurrencyId = r.BaseCurrencyId and c.Currency = r.ExchangeId and r.ExchangeDate = @ToDate
+	SELECT DISTINCT r.ProductCode, r.CurrencyName, e.BaseCurrencyRate, r.BaseCurrencyName
+	FROM #Result r 
+	INNER JOIN @ExchangeRate e ON r.BaseCurrencyId = e.BaseCurrencyId AND r.Currency = e.ExchangeId AND e.ExchangeDate = @ToDate
 
 	DROP TABLE #Result
 END
