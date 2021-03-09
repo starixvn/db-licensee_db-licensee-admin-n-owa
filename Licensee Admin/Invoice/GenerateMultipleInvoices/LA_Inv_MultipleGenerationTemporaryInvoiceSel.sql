@@ -2,16 +2,16 @@
 USE [bodb_Licensee]
 GO
 
---CREATE PROCEDURE [dbo].[LA_Inv_MultipleGenerationTemporaryInvoiceSel]
---CREATE PROCEDURE [dbo].[LA_Inv_Sel]
+--ALTER PROCEDURE [dbo].[LA_Inv_MultipleGenerationTemporaryInvoiceSel]
 DECLARE	@PartyIds			VARCHAR(500),
-	@FromDate			DATETIME,
-	@ToDate				DATETIME,
+	@FromDate			DATE,
+	@ToDate				DATE,
 	@Environment		VARCHAR(10),
 	@ErrCode			INT				= 0,--		OUTPUT,
 	@ErrMsg				NVARCHAR(1000)	= ''--	OUTPUT
 --AS
-SELECT @PartyIds = '14,15,24,74', @FromDate = '2020-11-01', @ToDate = '2020-11-30', @Environment = 'LOCAL'
+SELECT @Environment='LOCAL',@PartyIds='14,15,24,74',@FromDate='2020-11-01 00:00:00',@ToDate='2020-11-30 00:00:00'
+--SELECT @PartyIds = '14,15,24,74', @FromDate = '2020-11-01', @ToDate = '2020-11-30', @Environment = 'LOCAL'
 /*	Header:
 	Created: 2021.03.02 - Parsons
 	Task : Support a function to export all invoices at once: Generate Multiple Temporary Invoice
@@ -23,7 +23,7 @@ SELECT @PartyIds = '14,15,24,74', @FromDate = '2020-11-01', @ToDate = '2020-11-3
 BEGIN
 	SET NOCOUNT ON
 	
-	DECLARE @InvoiceTypeSoftwareFee INT = 1, @InvoiceTypeRebate INT = 6, @InvoiceTypeHostingFee INT = 8,
+	DECLARE @InvoiceTypeSoftwareFee INT = 1, @InvoiceTypeRebate INT = 3, @InvoiceTypeHostingFee INT = 8,
 		@SportsBookProductId INT = 0, @BAProductId INT = 3, @CBProductId INT = 15, @COProductId INT = 25, @ExchangeProductId INT = 31, @PPProductId INT = 32,
 		@PP_Contribution SMALLINT = 4297, @PP_JackpotPrize SMALLINT = 4298, @PPTournament SMALLINT = 4299, @PromotionPrize SMALLINT = 4300, @ArcadiaGamingBonus SMALLINT = 1906, @SBC_Contribution SMALLINT = 1698, @SBC_JackpotPrize SMALLINT = 1699,
 
@@ -40,22 +40,48 @@ BEGIN
 
 	DECLARE @ProductCodes VARCHAR(500) = 'SB' --'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG,BGG,MXG'
 
-	-- Region: Get base Currency
-	DECLARE @PartyBaseCurrencyIds TABLE(PartyID INT, PartyName VARCHAR(100), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
-	INSERT INTO @PartyBaseCurrencyIds(PartyID, PartyName, BaseCurrencyId, BaseCurrencyName)
-	SELECT p.val, op.PartyName, ISNULL(pd.BaseCurrencyId, 6), ISNULL(e.Code, 'EUR')
+	-- Region: Get Party Settings
+	DECLARE @PartySettings TABLE(PartyID INT, PartyName VARCHAR(100), BillerId INT, BillerName VARCHAR(100), ProductCodes VARCHAR(100), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50))
+
+	INSERT INTO @PartySettings(PartyID, PartyName, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage)
+	SELECT p.val, op.PartyName, ISNULL(pd.BaseCurrencyId, 6), ISNULL(e.Code, 'EUR'), pd.InvoiceLanguage
 	FROM strSplit(@PartyIds, ',') p
 	LEFT JOIN OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.val
 	LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON e.exchangeid = pd.BaseCurrencyId
 	LEFT JOIN bodb_licensee.dbo.OAS_Party op WITH(NOLOCK) ON p.val = op.PartyID
-	-- End Region Get base Currency	 
+
+	DECLARE @InvoiceSettings TABLE(PartyID INT, BillerId INT,BillerName VARCHAR(100),InvTypeId Smallint, ProductIds VARCHAR(100))
+	INSERT INTO @InvoiceSettings(PartyID,BillerId,BillerName, InvTypeId, ProductIds)
+	SELECT ivs.FromPartyId, ivs.ToPartyId AS BillerID, b.BillerName, InvTypeId, STUFF((SELECT ',' + ProductPrefix
+																	  FROM LA_InvoiceSetting t2
+																	  INNER JOIN dbo.Product3rd p WITH(NOLOCK) ON t2.ProductId = p.Productid
+																	  WHERE ivs.InvTypeId = 1 AND t2.FromPartyId = ivs.FromPartyId AND t2.ToPartyId = ivs.ToPartyId AND t2.InvTypeId = ivs.InvTypeId
+																	  FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 1, '') AS ProductCodes
+	FROM LA_InvoiceSetting ivs WITH(NOLOCK)
+	INNER JOIN strSplit(@PartyIds, ',') p on ivs.FromPartyId = p.val
+	INNER JOIN OAS_Party op WITH(NOLOCK) ON ivs.ToPartyId = op.PartyID
+	INNER JOIN DBCUST.bodb_licensee.dbo.LA_BillerInfo b WITH (NOLOCK) ON ivs.ToPartyId = b.PartyID	
+	WHERE InvTypeId IN (1, 3, 6)
+	AND ((p.val= 14 and ivs.ToPartyId = 265) OR (p.val= 15 and ivs.ToPartyId = 362) OR (p.val= 24 and ivs.ToPartyId = 122) OR (p.val= 74 and ivs.ToPartyId = 116))-- Remove this later
+	GROUP BY ivs.FromPartyId, ivs.ToPartyId, b.BillerName, InvTypeId
+
+	--SELECT '@InvoiceSettings', * FROM @InvoiceSettings ORDER BY PartyID, BillerId -- PARS
+	UPDATE  s
+	SET BillerId = ivs.BillerId,
+		BillerName = ivs.BillerName,
+		ProductCodes = ivs.ProductIds
+	FROM @PartySettings s
+	INNER JOIN @InvoiceSettings ivs ON s.PartyID = ivs.PartyID
+
+	-- SELECT '@PartySettings', * FROM @PartySettings -- PARS
+	-- End Region Get Party Settings
 
 	DECLARE @FinalResult TABLE (PartyId INT,InvoiceHeaderId BIGINT, InvoiceSymbol NVARCHAR(20),InvoiceNumber INT,BillerId INT,LicensingFee MONEY, Discount MONEY,InvoiceType TINYINT, InvoicePath NVARCHAR(255))
 	-- #Region: Get issued invoices
 	INSERT INTO @FinalResult(PartyId, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, BillerId, LicensingFee, InvoiceType, InvoicePath)
 	SELECT h.PartyId,h.InvoiceHeaderId,h.InvoiceSymbol,h.InvoiceNumber,h.BillerId,h.Amount,h.InvoiceType,h.InvoicePath
-	FROM @PartyBaseCurrencyIds pbc
-	INNER JOIN LA_InvoiceHeader h WITH(NOLOCK) ON pbc.PartyId = h.PartyId
+	FROM @PartySettings ps
+	INNER JOIN LA_InvoiceHeader h WITH(NOLOCK) ON ps.PartyId = h.PartyId AND ps.BillerId = h.BillerId
 	WHERE h.StatusId = 0 AND h.Environment = @Environment
 		AND InvoiceType IN (@InvoiceTypeSoftwareFee, @InvoiceTypeRebate, @InvoiceTypeHostingFee)
 		AND (h.FromDate = @FromDate AND h.ToDate = @ToDate)
@@ -83,7 +109,7 @@ BEGIN
 		DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(10), IsCalculatedExchange BIT, IsCalculationAmountToCompany BIT)
 		INSERT	INTO @BaseCurrencyTable(CurrencyId, CurrencyName)
 		SELECT DISTINCT BaseCurrencyId, BaseCurrencyName
-		FROM @PartyBaseCurrencyIds
+		FROM @PartySettings
 
 		WHILE EXISTS (SELECT TOP 1 1 FROM @BaseCurrencyTable WHERE ISNULL(IsCalculatedExchange, 0) = 0)
 		BEGIN
@@ -121,7 +147,7 @@ BEGIN
 			SELECT TOP 1 @tempCurrencyId = CurrencyId, @tempCurrencyName = CurrencyName FROM @BaseCurrencyTable b WHERE ISNULL(IsCalculationAmountToCompany, 0) = 0
 
 			SELECT @Temp_PartyIds = COALESCE(@Temp_PartyIds + ', ', '') + CAST(PartyID AS VARCHAR(20))
-			FROM @PartyBaseCurrencyIds
+			FROM @PartySettings
 			WHERE BaseCurrencyId = @tempCurrencyId
 
 			INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,NegativeFee,Minfee,IsChargedByMinFee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark)
@@ -270,8 +296,9 @@ BEGIN
 	INSERT INTO @FinalResult(PartyId, InvoiceType, LicensingFee)
 	SELECT d.PartyId, @InvoiceTypeSoftwareFee, SUM(CASE WHEN AmountToCompany > 0 OR ProductId IN (@BAProductId, @CBProductId, @COProductId, @PPProductId, @ExchangeProductId) THEN AmountToCompany ELSE 0 END) AS Amount
 	FROM @SumByProducts d
+	INNER JOIN @InvoiceSettings ivs ON d.PartyId = ivs.PartyID
 	LEFT JOIN @FinalResult r ON d.PartyId = r.PartyId AND r.InvoiceType = @InvoiceTypeSoftwareFee
-	WHERE r.PartyId IS NULL
+	WHERE r.PartyId IS NULL AND ivs.InvTypeId = @InvoiceTypeSoftwareFee --AND ivs.ProductIds 
 	GROUP BY d.PartyId
 	-- End Region: Licensing Fee
 
@@ -294,15 +321,16 @@ BEGIN
 	INSERT INTO @FinalResult(PartyId, InvoiceType, LicensingFee)
 	SELECT d.PartyId,  @InvoiceTypeRebate, SUM(d.Rebate)
 	FROM @SumByProducts d
+	INNER JOIN @InvoiceSettings ivs ON d.PartyId = ivs.PartyID
 	LEFT JOIN @FinalResult r ON d.PartyId = r.PartyId AND r.InvoiceType = @InvoiceTypeRebate
-	WHERE r.PartyId IS NULL AND d.Rebate > 0 
+	WHERE ivs.InvTypeId = @InvoiceTypeRebate AND r.PartyId IS NULL AND d.Rebate > 0 
 	GROUp BY d.PartyId
 	-- End Region: Rebate
 
 		--select * from #TempData ORDER BY PartyId, ProductId -- pars 
 		--select * from #AmountToCompany ORDER BY PartyId, ProductId -- pars
 		--select * from @SumByProducts ORDER BY PartyId, ProductId -- pars
-		select '@FinalResult', * from @FinalResult ORDER BY PartyId-- pars
+		--select '@FinalResult', * from @FinalResult ORDER BY PartyId-- pars
 	---- Region: Select data
 
 	--Region: Get AMF, AG and prepayment
@@ -342,7 +370,8 @@ BEGIN
 		-- insert amf
 		IF @RemainingAmf > 0
 		BEGIN
-			; WITH cte_ProgratedMinfee AS
+			print 'cte_ProgratedMinfee'
+			/*; WITH cte_ProgratedMinfee AS
 			(
 				SELECT PartyId, MinFee 
 				FROM #AmountToCompany WHERE ProductId = @SportsBookProductId
@@ -354,7 +383,7 @@ BEGIN
 				WHERE ProductId = @SportsBookProductId AND InvoiceType IN (@InvoiceTypeSoftwareFee, @InvoiceTypeDiscount)
 				GROUP BY PartyId
 			)*/
-			SELECT 'cte_ProgratedMinfee', * FROM cte_ProgratedMinfee
+			SELECT 'cte_ProgratedMinfee', * FROM cte_ProgratedMinfee*/
 			/*
 			DECLARE @AmfAmount MONEY
 			SELECT @AmfAmount = CASE WHEN MIN(Amount) < 0 THEN 0 ELSE MIN(Amount) END
@@ -386,22 +415,32 @@ BEGIN
 	END
 	--End Region: Get AMF, AG and prepayment
 
-	SELECT	r.PartyId, pbc.PartyName, r.InvoiceType, r.BillerId, r.InvoiceHeaderId, r.InvoiceSymbol, r.InvoiceNumber, r.InvoicePath, pbc.BaseCurrencyId, pbc.BaseCurrencyName,
+	SELECT	r.PartyId, ps.PartyName, r.InvoiceType AS ItemType, ps.BillerId, ps.BillerName, r.InvoiceHeaderId, r.InvoiceSymbol, r.InvoiceNumber, 
+			r.InvoicePath, ps.BaseCurrencyId, ps.BaseCurrencyName, ps.ProductCodes, ps.InvoiceLanguage,
 			SUM(CASE WHEN r.InvoiceType = @InvoiceTypeRebate THEN 0 ELSE r.LicensingFee END) LicensingFee,
 			SUM(ISNULL(r.Discount, 0))		Discount,
 			SUM(CASE WHEN r.InvoiceType = @InvoiceTypeRebate THEN r.LicensingFee ELSE 0 END) Rebate
 			--r.DeductMonthlyFees
-	FROM	@FinalResult r
-		INNER JOIN @PartyBaseCurrencyIds pbc ON r.PartyId = pbc.PartyID
-	GROUP BY r.PartyId, pbc.PartyName, r.InvoiceType, r.BillerId, r.InvoiceHeaderId, r.InvoiceSymbol, r.InvoiceNumber, r.InvoicePath, pbc.BaseCurrencyId, pbc.BaseCurrencyName
-
+	FROM @FinalResult r
+		 INNER JOIN @PartySettings ps ON r.PartyId = ps.PartyID
+	GROUP BY r.PartyId, ps.PartyName, r.InvoiceType, ps.BillerId, ps.BillerName, r.InvoiceHeaderId, r.InvoiceSymbol, r.InvoiceNumber, 
+			r.InvoicePath, ps.BaseCurrencyId, ps.BaseCurrencyName, ps.ProductCodes, ps.InvoiceLanguage
+	
 	SELECT @ErrCode = 0, @ErrMsg = ''
 
 	/*Note
-		1. LA_Inv_InvoiceBillerInfoGet
-		2. Bo sung CO, CB, v.vv
-		3. Symbol thi chi can check theo Biller
-		4. Check setting ben Payer de bik gen invoice type nao (Limit Licensing Fee (Software Fee --> Product), Rebate & Hosting Fee)
+		1. Bo sung CO, CB, v.vv
+		2. Symbol thi chi can check theo Biller (SP tham khao LA_Inv_InvoiceBillerInfoGet)
+			- Step 1: Get latest InvoiceSymbol & InvoiceNumber
+			- Step 2: Update dua theo order number
+		3. Check setting ben Payer de bik gen invoice type nao (Limit Licensing Fee (Software Fee --> Product), Rebate & Hosting Fee) -> DONE
+		4. Hosting Fee
+
+		FAQ:
+		1. Get issued invoices
+			- Co bi change BillerId khong? if yes, khong can filter tren billerId
+			- Date chinh xac hay giao nhau?
+		2. 
 	*/
 	DROP TABLE #Exchange
 	DROP TABLE #TempData
