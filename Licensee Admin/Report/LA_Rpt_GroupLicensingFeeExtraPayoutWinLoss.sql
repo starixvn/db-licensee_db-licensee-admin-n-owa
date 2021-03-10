@@ -53,10 +53,6 @@ BEGIN
 						b.Bettype IN (@PP_Tournament,@PP_PromotionPrize,@PP_Contribution,@PP_JackpotPrize,@SBC_Contribution,@SBC_Jackpot) THEN 0 
 					 ELSE ISNULL(b.MemberWL, 0) 
 				END) AS CustomerWL,
-			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR 
-						b.Bettype IN (@PP_Tournament,@PP_PromotionPrize,@PP_Contribution,@PP_JackpotPrize,@SBC_Contribution,@SBC_Jackpot) THEN 0
-					 ELSE ISNULL(-b.MemberWL, 0)  
-				END) AS LicenseeWL,
 			SUM(CASE WHEN b.Bettype = @PP_Contribution OR b.Bettype = @SBC_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END)	AS Contribution,
 			SUM(CASE WHEN b.Bettype = @PP_JackpotPrize OR b.Bettype = @SBC_Jackpot THEN ISNULL(b.MemberWL, 0) ELSE 0 END)		AS JackpotPrize,
 			SUM(CASE WHEN b.Bettype IN (@PP_PromotionPrize, @PP_Tournament) THEN ISNULL(b.MemberWL, 0) ELSE 0 END)				AS PromotionPrize,
@@ -71,12 +67,12 @@ BEGIN
 		SUM(d.Turnover) AS Turnover,
 		SUM(d.BetCount)	AS BetCount,
 		SUM(d.CustomerWL) AS CustomerWL,
-		SUM(d.LicenseeWL) AS LicenseeWL,
+		SUM((-d.CustomerWL - d.Contribution) * (1 - ISNULL(cr.Rate, ci.Rate))) AS LicenseeWL,
 		SUM(d.Contribution)	AS Contribution,
 		SUM(d.JackpotPrize)	AS JackpotPrize,
 		SUM(d.PromotionPrize) AS PromotionPrize,
 		SUM(d.FreeBetAmount) AS FreeBetAmount,
-		SUM((d.LicenseeWL - d.Contribution) * ci.Rate) AS ServiceFee
+		SUM((-d.CustomerWL - d.Contribution) * ISNULL(cr.Rate, ci.Rate)) AS ServiceFee
 	FROM cte_Data d
 	INNER JOIN @ChargeInfo ci ON d.SiteID = ci.LicenseeID AND d.ProductID = ci.ProductID
 	LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
