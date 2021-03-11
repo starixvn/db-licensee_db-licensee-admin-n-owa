@@ -41,7 +41,7 @@ BEGIN
 	DECLARE @ProductCodes VARCHAR(500) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG,BGG,MXG'
 
 	-- Region: Get Party Settings
-	DECLARE @PartySettings TABLE(IndexNumber INT, PartyID INT, PartyName VARCHAR(100), BillerId INT, BillerName VARCHAR(100), ProductCodes VARCHAR(100), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT)
+	DECLARE @PartySettings TABLE(IndexNumber INT, PartyID INT, PartyName VARCHAR(100), BillerId INT, BillerName VARCHAR(100), ProductCodes VARCHAR(100), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, InvTemplateName VARCHAR(50))
 
 	INSERT INTO @PartySettings(IndexNumber, PartyID, PartyName, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage)
 	SELECT p.rank, p.val, op.PartyName, ISNULL(pd.BaseCurrencyId, 6), ISNULL(e.Code, 'EUR'), pd.InvoiceLanguage
@@ -50,9 +50,9 @@ BEGIN
 	LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON e.exchangeid = pd.BaseCurrencyId
 	LEFT JOIN bodb_licensee.dbo.OAS_Party op WITH(NOLOCK) ON p.val = op.PartyID
 
-	DECLARE @InvoiceSettings TABLE(PartyID INT, BillerId INT,BillerName VARCHAR(100),InvTypeId Smallint, ProductCodes VARCHAR(100))
-	INSERT INTO @InvoiceSettings(PartyID,BillerId,BillerName, InvTypeId, ProductCodes)
-	SELECT ivs.FromPartyId, ivs.ToPartyId AS BillerID, b.BillerName, InvTypeId, STUFF((SELECT ',' + CASE WHEN t2.ProductId = 0 THEN 'SB' ELSE ProductPrefix END
+	DECLARE @InvoiceSettings TABLE(PartyID INT, BillerId INT,BillerName VARCHAR(100),InvTypeId Smallint, ProductCodes VARCHAR(100), InvTemplateName VARCHAR(50))
+	INSERT INTO @InvoiceSettings(PartyID,BillerId,BillerName, InvTypeId, InvTemplateName, ProductCodes)
+	SELECT ivs.FromPartyId, ivs.ToPartyId AS BillerID, b.BillerName, InvTypeId, t.InvTemplateName, STUFF((SELECT ',' + CASE WHEN t2.ProductId = 0 THEN 'SB' ELSE ProductPrefix END
 																	  FROM LA_InvoiceSetting t2
 																	  LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON t2.ProductId = p.Productid
 																	  WHERE ivs.InvTypeId = 1 AND t2.FromPartyId = ivs.FromPartyId AND t2.ToPartyId = ivs.ToPartyId AND t2.InvTypeId = ivs.InvTypeId
@@ -61,15 +61,17 @@ BEGIN
 	INNER JOIN strSplit(@PartyIds, ',') p on ivs.FromPartyId = p.val
 	INNER JOIN OAS_Party op WITH(NOLOCK) ON ivs.ToPartyId = op.PartyID
 	INNER JOIN DBCUST.bodb_licensee.dbo.LA_BillerInfo b WITH (NOLOCK) ON ivs.ToPartyId = b.PartyID	
+	INNER JOIN dbo.LA_InvoiceTemplate t WITH(NOLOCK) ON ivs.InvTempId = t.InvTemplateId
 	WHERE InvTypeId IN (1, 3, 6)
 	AND ((p.val= 14 and ivs.ToPartyId = 265) OR (p.val= 364 and ivs.ToPartyId = 265) OR (p.val= 15 and ivs.ToPartyId = 362) OR (p.val= 24 and ivs.ToPartyId = 122) OR (p.val= 74 and ivs.ToPartyId = 116))-- Remove this later
-	GROUP BY ivs.FromPartyId, ivs.ToPartyId, b.BillerName, InvTypeId
+	GROUP BY ivs.FromPartyId, ivs.ToPartyId, b.BillerName, InvTypeId, InvTemplateName
 
 	--SELECT '@InvoiceSettings', * FROM @InvoiceSettings ORDER BY PartyID, BillerId -- PARS
 	UPDATE  s
 	SET BillerId = ivs.BillerId,
 		BillerName = ivs.BillerName,
-		ProductCodes = ivs.ProductCodes
+		ProductCodes = ivs.ProductCodes,
+		s.InvTemplateName = ivs.InvTemplateName
 	FROM @PartySettings s
 	INNER JOIN @InvoiceSettings ivs ON s.PartyID = ivs.PartyID
 
@@ -439,9 +441,14 @@ BEGIN
 		INNER JOIN cte_PartyInvoiceNo cte ON ps.PartyID = cte.PartyID
 	END
 	--#EndRegion InvoiceNo
-	
+	SELECT * FROM @PartySettings
+	/*
+		1. Theo BillerID
+		2. Theo IndexOrder
+		3. Skip IssuedInvoice (Có InvoiceHeaderId > 0)
+	*/
 	SELECT	r.PartyId, ps.PartyName, r.InvoiceType AS ItemType, ps.BillerId, ps.BillerName, r.InvoiceHeaderId, r.InvoiceSymbol, r.InvoiceNumber, 
-			r.InvoicePath, ps.BaseCurrencyId, ps.BaseCurrencyName, ps.ProductCodes, ps.InvoiceLanguage,
+			r.InvoicePath, ps.BaseCurrencyId, ps.BaseCurrencyName, ps.ProductCodes, ps.InvoiceLanguage, ps.InvTemplateName,
 			SUM(CASE WHEN r.InvoiceType = @InvoiceTypeRebate THEN 0 ELSE r.LicensingFee END) LicensingFee,
 			SUM(ISNULL(r.Discount, 0))		Discount,
 			SUM(CASE WHEN r.InvoiceType = @InvoiceTypeRebate THEN r.LicensingFee ELSE 0 END) Rebate
@@ -449,7 +456,7 @@ BEGIN
 	FROM @FinalResult r
 		 INNER JOIN @PartySettings ps ON r.PartyId = ps.PartyID
 	GROUP BY ps.IndexNumber, r.PartyId, ps.PartyName, r.InvoiceType, ps.BillerId, ps.BillerName, r.InvoiceHeaderId, r.InvoiceSymbol, r.InvoiceNumber, 
-			r.InvoicePath, ps.BaseCurrencyId, ps.BaseCurrencyName, ps.ProductCodes, ps.InvoiceLanguage
+			r.InvoicePath, ps.BaseCurrencyId, ps.BaseCurrencyName, ps.ProductCodes, ps.InvoiceLanguage, ps.InvTemplateName
 	ORDER BY ps.IndexNumber
 	
 	SELECT @ErrCode = 0, @ErrMsg = ''
