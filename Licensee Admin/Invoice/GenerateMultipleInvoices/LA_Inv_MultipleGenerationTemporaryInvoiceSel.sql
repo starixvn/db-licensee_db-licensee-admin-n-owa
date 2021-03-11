@@ -277,21 +277,25 @@ BEGIN
 		
 		-- sum by product
 		INSERT INTO @SumByProducts (PartyId,ProductId,AComm,PComm,AmountToCompany,ExtraAmount)
-		SELECT	PartyId,ProductId
+		SELECT	t.PartyId,t.ProductId
 				,SUM(AComm)
 				,SUM(PComm)
 				,SUM(AmountToCompany)
 				,SUM(ExtraAmount)
-		FROM #TempData
-		GROUP BY PartyId, ProductId
-
+		FROM #TempData t
+		INNER JOIN @PartySettings ps ON t.PartyId = ps.PartyID
+		INNER JOIN LA_InvoiceSetting ivs WITH(NOLOCK) ON ps.PartyID = ivs.FromPartyId AND ps.BillerId = ivs.ToPartyId 
+		WHERE t.ProductId = ivs.ProductId
+		GROUP BY t.PartyId, t.ProductId
+		
 		-- apply minfee
 		UPDATE s 
 		SET AmountToCompany = m.Fee + ISNULL(ExtraAmount, 0),
 			Discount = m.Discount,
 			Rebate = m.Rebate
 		FROM @SumByProducts s
-		INNER JOIN #AmountToCompany m ON m.PartyId = s.PartyId AND m.ProductId = s.ProductId -- Filter by ProductList here if need
+		INNER JOIN #AmountToCompany m ON m.PartyId = s.PartyId AND m.ProductId = s.ProductId
+
 	END
 
 	-- Region: Licensing Fee
