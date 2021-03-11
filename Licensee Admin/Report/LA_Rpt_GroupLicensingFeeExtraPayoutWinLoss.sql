@@ -79,7 +79,7 @@ BEGIN
 		SUM(d.JackpotPrize)	AS JackpotPrize,
 		SUM(d.PromotionPrize) AS PromotionPrize,
 		SUM(d.FreeBetAmount) AS FreeBetAmount,
-		SUM((-d.CustomerWL - ISNULL(d.Contribution, 0)) * ISNULL(cr.Rate, ci.Rate)) AS ServiceFee
+		SUM((-d.CustomerWL - d.Contribution) * ISNULL(cr.Rate, ci.Rate)) AS ServiceFee
 	FROM cte_Data d
 	INNER JOIN @ChargeInfo ci ON d.SiteID = ci.LicenseeID AND d.ProductID = ci.ProductID
 	LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
@@ -125,7 +125,7 @@ BEGIN
 	)
 	UPDATE d
 	SET d.LicensingFee = CASE WHEN t.TotalServiceFee_InBaseCurrency_ByParty < 0 
-								THEN 0 ELSE d.ServiceFee END + ISNULL(d.Contribution,0) - ISNULL(d.JackpotPrize,0) - ISNULL(d.PromotionPrize,0) - ISNULL(d.FreeBetAmount,0)
+								THEN 0 ELSE d.ServiceFee END + d.Contribution - d.JackpotPrize - d.PromotionPrize - d.FreeBetAmount
 	FROM @Data d 
 	INNER JOIN cte_TotalServiceFee_BaseCurrency t ON d.ProductId = t.ProductId AND d.PartyId = t.PartyId
 	
