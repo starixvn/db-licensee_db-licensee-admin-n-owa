@@ -10,7 +10,7 @@ DECLARE	@PartyIds			VARCHAR(500),
 	@ErrCode			INT				= 0,--		OUTPUT,
 	@ErrMsg				NVARCHAR(1000)	= ''--	OUTPUT
 --AS
-SELECT @Environment='LOCAL',@PartyIds='14,15,74,24',@FromDate='2020-11-01 00:00:00',@ToDate='2020-11-30 00:00:00'
+SELECT @Environment='LOCAL',@PartyIds='14,364,15,74,24',@FromDate='2020-11-01 00:00:00',@ToDate='2020-11-30 00:00:00'
 --SELECT @PartyIds = '14,15,24,74', @FromDate = '2020-11-01', @ToDate = '2020-11-30', @Environment = 'LOCAL'
 /*	Header:
 	Created: 2021.03.02 - Parsons
@@ -38,7 +38,7 @@ BEGIN
 	DECLARE @LastDate DATETIME = DATEADD (dd, -1, DATEADD(mm, DATEDIFF(mm, 0, @FromDate) + 1, 0))
 	DECLARE @DaysInMonth INT = DATEDIFF(day, @FirstDate, @LastDate) + 1
 
-	DECLARE @ProductCodes VARCHAR(500) = 'SB' --'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG,BGG,MXG'
+	DECLARE @ProductCodes VARCHAR(500) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG,BGG,MXG'
 
 	-- Region: Get Party Settings
 	DECLARE @PartySettings TABLE(IndexNumber INT, PartyID INT, PartyName VARCHAR(100), BillerId INT, BillerName VARCHAR(100), ProductCodes VARCHAR(100), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT)
@@ -50,11 +50,11 @@ BEGIN
 	LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON e.exchangeid = pd.BaseCurrencyId
 	LEFT JOIN bodb_licensee.dbo.OAS_Party op WITH(NOLOCK) ON p.val = op.PartyID
 
-	DECLARE @InvoiceSettings TABLE(PartyID INT, BillerId INT,BillerName VARCHAR(100),InvTypeId Smallint, ProductIds VARCHAR(100))
-	INSERT INTO @InvoiceSettings(PartyID,BillerId,BillerName, InvTypeId, ProductIds)
-	SELECT ivs.FromPartyId, ivs.ToPartyId AS BillerID, b.BillerName, InvTypeId, STUFF((SELECT ',' + ProductPrefix
+	DECLARE @InvoiceSettings TABLE(PartyID INT, BillerId INT,BillerName VARCHAR(100),InvTypeId Smallint, ProductCodes VARCHAR(100))
+	INSERT INTO @InvoiceSettings(PartyID,BillerId,BillerName, InvTypeId, ProductCodes)
+	SELECT ivs.FromPartyId, ivs.ToPartyId AS BillerID, b.BillerName, InvTypeId, STUFF((SELECT ',' + CASE WHEN t2.ProductId = 0 THEN 'SB' ELSE ProductPrefix END
 																	  FROM LA_InvoiceSetting t2
-																	  INNER JOIN dbo.Product3rd p WITH(NOLOCK) ON t2.ProductId = p.Productid
+																	  LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON t2.ProductId = p.Productid
 																	  WHERE ivs.InvTypeId = 1 AND t2.FromPartyId = ivs.FromPartyId AND t2.ToPartyId = ivs.ToPartyId AND t2.InvTypeId = ivs.InvTypeId
 																	  FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 1, '') AS ProductCodes
 	FROM LA_InvoiceSetting ivs WITH(NOLOCK)
@@ -62,14 +62,14 @@ BEGIN
 	INNER JOIN OAS_Party op WITH(NOLOCK) ON ivs.ToPartyId = op.PartyID
 	INNER JOIN DBCUST.bodb_licensee.dbo.LA_BillerInfo b WITH (NOLOCK) ON ivs.ToPartyId = b.PartyID	
 	WHERE InvTypeId IN (1, 3, 6)
-	AND ((p.val= 14 and ivs.ToPartyId = 265) OR (p.val= 15 and ivs.ToPartyId = 362) OR (p.val= 24 and ivs.ToPartyId = 122) OR (p.val= 74 and ivs.ToPartyId = 116))-- Remove this later
+	AND ((p.val= 14 and ivs.ToPartyId = 265) OR (p.val= 364 and ivs.ToPartyId = 265) OR (p.val= 15 and ivs.ToPartyId = 362) OR (p.val= 24 and ivs.ToPartyId = 122) OR (p.val= 74 and ivs.ToPartyId = 116))-- Remove this later
 	GROUP BY ivs.FromPartyId, ivs.ToPartyId, b.BillerName, InvTypeId
 
 	--SELECT '@InvoiceSettings', * FROM @InvoiceSettings ORDER BY PartyID, BillerId -- PARS
 	UPDATE  s
 	SET BillerId = ivs.BillerId,
 		BillerName = ivs.BillerName,
-		ProductCodes = ivs.ProductIds
+		ProductCodes = ivs.ProductCodes
 	FROM @PartySettings s
 	INNER JOIN @InvoiceSettings ivs ON s.PartyID = ivs.PartyID
 
@@ -289,7 +289,7 @@ BEGIN
 			Discount = m.Discount,
 			Rebate = m.Rebate
 		FROM @SumByProducts s
-		INNER JOIN #AmountToCompany m ON m.PartyId = s.PartyId AND m.ProductId = s.ProductId
+		INNER JOIN #AmountToCompany m ON m.PartyId = s.PartyId AND m.ProductId = s.ProductId -- Filter by ProductList here if need
 	END
 
 	-- Region: Licensing Fee
@@ -298,7 +298,7 @@ BEGIN
 	FROM @SumByProducts d
 	INNER JOIN @InvoiceSettings ivs ON d.PartyId = ivs.PartyID
 	LEFT JOIN @FinalResult r ON d.PartyId = r.PartyId AND r.InvoiceType = @InvoiceTypeSoftwareFee
-	WHERE r.PartyId IS NULL AND ivs.InvTypeId = @InvoiceTypeSoftwareFee --AND ivs.ProductIds 
+	WHERE r.PartyId IS NULL AND ivs.InvTypeId = @InvoiceTypeSoftwareFee --AND ivs.ProductCodes 
 	GROUP BY d.PartyId
 	-- End Region: Licensing Fee
 
@@ -439,6 +439,7 @@ BEGIN
 		INNER JOIN cte_PartyInvoiceNo cte ON ps.PartyID = cte.PartyID
 	END
 	--#EndRegion InvoiceNo
+	
 	SELECT	r.PartyId, ps.PartyName, r.InvoiceType AS ItemType, ps.BillerId, ps.BillerName, r.InvoiceHeaderId, r.InvoiceSymbol, r.InvoiceNumber, 
 			r.InvoicePath, ps.BaseCurrencyId, ps.BaseCurrencyName, ps.ProductCodes, ps.InvoiceLanguage,
 			SUM(CASE WHEN r.InvoiceType = @InvoiceTypeRebate THEN 0 ELSE r.LicensingFee END) LicensingFee,
