@@ -64,6 +64,9 @@ BEGIN
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 		INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 		WHERE b.ProductID IN (@PP_ProductId, @SBC_ProductId, @CC_ProductId)
+		AND (b.CurrencyID <> 20)
+		AND b.StatusId NOT IN (-1, 101, 102, 103)
+		AND b.customercategory NOT IN (27, 28)
 		GROUP BY b.SiteID, b.ProductID, b.CurrencyId, b.rptDate
 	)
 	INSERT INTO @Data(rptDate, ProductId, PartyId, CurrencyId, Turnover, BetCount, CustomerWL, LicenseeWL, Contribution, JackpotPrize, PromotionPrize, FreeBetAmount, ServiceFee)
