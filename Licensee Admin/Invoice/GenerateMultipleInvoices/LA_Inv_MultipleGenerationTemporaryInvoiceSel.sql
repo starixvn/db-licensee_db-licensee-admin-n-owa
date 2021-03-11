@@ -41,7 +41,7 @@ BEGIN
 	DECLARE @ProductCodes VARCHAR(500) = 'SB' --'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG,BGG,MXG'
 
 	-- Region: Get Party Settings
-	DECLARE @PartySettings TABLE(PartyID INT, PartyName VARCHAR(100), BillerId INT, BillerName VARCHAR(100), ProductCodes VARCHAR(100), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50))
+	DECLARE @PartySettings TABLE(PartyID INT, PartyName VARCHAR(100), BillerId INT, BillerName VARCHAR(100), ProductCodes VARCHAR(100), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT)
 
 	INSERT INTO @PartySettings(PartyID, PartyName, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage)
 	SELECT p.val, op.PartyName, ISNULL(pd.BaseCurrencyId, 6), ISNULL(e.Code, 'EUR'), pd.InvoiceLanguage
@@ -319,7 +319,7 @@ BEGIN
 
 	-- Region: Rebate
 	INSERT INTO @FinalResult(PartyId, InvoiceType, LicensingFee)
-	SELECT d.PartyId,  @InvoiceTypeRebate, SUM(d.Rebate)
+	SELECT d.PartyId,  @InvoiceTypeRebate, -SUM(d.Rebate)
 	FROM @SumByProducts d
 	INNER JOIN @InvoiceSettings ivs ON d.PartyId = ivs.PartyID
 	LEFT JOIN @FinalResult r ON d.PartyId = r.PartyId AND r.InvoiceType = @InvoiceTypeRebate
@@ -415,6 +415,30 @@ BEGIN
 	END
 	--End Region: Get AMF, AG and prepayment
 
+	--#Region InvoiceNo
+	BEGIN
+		;WITH cte_PartyInvoiceNo AS
+		(
+			SELECT ps.PartyID, ps.PartyName, ps.BillerId, ps.BillerName, iv.InvoiceSymbol, iv.InvoiceNumber
+			FROM @PartySettings ps
+			CROSS APPLY
+			(
+				SELECT TOP 1 iv.InvoiceSymbol, MAX(iv.InvoiceNumber) InvoiceNumber
+				FROM LA_InvoiceHeader iv WITH(NOLOCK)
+				WHERE iv.StatusId = 0 AND iv.Environment = @Environment
+						AND InvoiceType IN (@InvoiceTypeSoftwareFee, @InvoiceTypeRebate, @InvoiceTypeHostingFee)
+						AND iv.BillerId = ps.BillerID
+				GROUP BY iv.InvoiceSymbol, CreatedDateTime--, iv.PartyId, iv.BillerId, CreatedDateTime
+				ORDER BY CreatedDateTime DESC
+			) iv
+		)
+		UPDATE ps
+		SET ps.InvoiceSymbol = cte.InvoiceSymbol,
+			ps.InvoiceNumber = cte.InvoiceNumber
+		FROM @PartySettings ps
+		INNER JOIN cte_PartyInvoiceNo cte ON ps.PartyID = cte.PartyID
+	END
+	--#EndRegion InvoiceNo
 	SELECT	r.PartyId, ps.PartyName, r.InvoiceType AS ItemType, ps.BillerId, ps.BillerName, r.InvoiceHeaderId, r.InvoiceSymbol, r.InvoiceNumber, 
 			r.InvoicePath, ps.BaseCurrencyId, ps.BaseCurrencyName, ps.ProductCodes, ps.InvoiceLanguage,
 			SUM(CASE WHEN r.InvoiceType = @InvoiceTypeRebate THEN 0 ELSE r.LicensingFee END) LicensingFee,
