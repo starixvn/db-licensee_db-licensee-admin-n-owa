@@ -446,22 +446,31 @@ BEGIN
 	END
 	--#EndRegion InvoiceNo
 	SELECT * FROM @PartySettings
-	/*
-		1. Theo BillerID
-		2. Theo IndexOrder
-		3. Skip IssuedInvoice (Có InvoiceHeaderId > 0)
-	*/
-	SELECT	r.PartyId, ps.PartyName, r.InvoiceType AS ItemType, ps.BillerId, ps.BillerName, r.InvoiceHeaderId, r.InvoiceSymbol, r.InvoiceNumber, 
-			r.InvoicePath, ps.BaseCurrencyId, ps.BaseCurrencyName, ps.ProductCodes, ps.InvoiceLanguage, ps.InvTemplateName,
+
+	SELECT	ROW_NUMBER() OVER (ORDER BY (SELECT 1)) AS RowIndex, ps.IndexNumber ,r.PartyId, ps.PartyName, r.InvoiceType AS ItemType, ps.BillerId, ps.BillerName, r.InvoiceHeaderId, ps.InvoiceSymbol, ISNULL(r.InvoiceNumber, ps.InvoiceNumber) AS InvoiceNumber, 
+			r.InvoicePath, ps.BaseCurrencyId, ps.BaseCurrencyName, ps.ProductCodes, ps.InvoiceLanguage,
 			SUM(CASE WHEN r.InvoiceType = @InvoiceTypeRebate THEN 0 ELSE r.LicensingFee END) LicensingFee,
 			SUM(ISNULL(r.Discount, 0))		Discount,
 			SUM(CASE WHEN r.InvoiceType = @InvoiceTypeRebate THEN r.LicensingFee ELSE 0 END) Rebate
 			--r.DeductMonthlyFees
+	INTO #Result
 	FROM @FinalResult r
 		 INNER JOIN @PartySettings ps ON r.PartyId = ps.PartyID
-	GROUP BY ps.IndexNumber, r.PartyId, ps.PartyName, r.InvoiceType, ps.BillerId, ps.BillerName, r.InvoiceHeaderId, r.InvoiceSymbol, r.InvoiceNumber, 
-			r.InvoicePath, ps.BaseCurrencyId, ps.BaseCurrencyName, ps.ProductCodes, ps.InvoiceLanguage, ps.InvTemplateName
+	GROUP BY ps.IndexNumber, r.PartyId, ps.PartyName, r.InvoiceType, ps.BillerId, ps.BillerName, r.InvoiceHeaderId, ps.InvoiceSymbol,ISNULL(r.InvoiceNumber, ps.InvoiceNumber), 
+			r.InvoicePath, ps.BaseCurrencyId, ps.BaseCurrencyName, ps.ProductCodes, ps.InvoiceLanguage
 	ORDER BY ps.IndexNumber
+
+	;WITH cte_rowOrder AS(
+		SELECT RowIndex, ROW_NUMBER() OVER (PARTITION BY BillerId ORDER BY BillerId) RowOrder
+		FROM #Result r
+		WHERE r.InvoiceHeaderId IS NULL
+	)
+	UPDATE #Result
+	SET InvoiceNumber = r.InvoiceNumber + o.RowOrder
+	FROM #Result r 
+	INNER JOIN cte_rowOrder o  ON r.RowIndex = o.RowIndex
+
+	SELECT * FROM #Result
 	
 	SELECT @ErrCode = 0, @ErrMsg = ''
 
@@ -484,6 +493,7 @@ BEGIN
 	--DROP TABLE #TempDataCB
 	DROP TABLE #AmountToCompany
 	DROP TABLE #credit
+	DROP TABLE #Result
 
 END
 GO
