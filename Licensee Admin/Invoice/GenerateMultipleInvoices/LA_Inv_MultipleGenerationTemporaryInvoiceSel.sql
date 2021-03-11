@@ -10,7 +10,7 @@ DECLARE	@PartyIds			VARCHAR(500),
 	@ErrCode			INT				= 0,--		OUTPUT,
 	@ErrMsg				NVARCHAR(1000)	= ''--	OUTPUT
 --AS
-SELECT @Environment='LOCAL',@PartyIds='14,15,24,74',@FromDate='2020-11-01 00:00:00',@ToDate='2020-11-30 00:00:00'
+SELECT @Environment='LOCAL',@PartyIds='14,15,74,24',@FromDate='2020-11-01 00:00:00',@ToDate='2020-11-30 00:00:00'
 --SELECT @PartyIds = '14,15,24,74', @FromDate = '2020-11-01', @ToDate = '2020-11-30', @Environment = 'LOCAL'
 /*	Header:
 	Created: 2021.03.02 - Parsons
@@ -41,10 +41,10 @@ BEGIN
 	DECLARE @ProductCodes VARCHAR(500) = 'SB' --'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG,BGG,MXG'
 
 	-- Region: Get Party Settings
-	DECLARE @PartySettings TABLE(PartyID INT, PartyName VARCHAR(100), BillerId INT, BillerName VARCHAR(100), ProductCodes VARCHAR(100), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT)
+	DECLARE @PartySettings TABLE(IndexNumber INT, PartyID INT, PartyName VARCHAR(100), BillerId INT, BillerName VARCHAR(100), ProductCodes VARCHAR(100), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT)
 
-	INSERT INTO @PartySettings(PartyID, PartyName, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage)
-	SELECT p.val, op.PartyName, ISNULL(pd.BaseCurrencyId, 6), ISNULL(e.Code, 'EUR'), pd.InvoiceLanguage
+	INSERT INTO @PartySettings(IndexNumber, PartyID, PartyName, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage)
+	SELECT p.rank, p.val, op.PartyName, ISNULL(pd.BaseCurrencyId, 6), ISNULL(e.Code, 'EUR'), pd.InvoiceLanguage
 	FROM strSplit(@PartyIds, ',') p
 	LEFT JOIN OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.val
 	LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON e.exchangeid = pd.BaseCurrencyId
@@ -447,8 +447,9 @@ BEGIN
 			--r.DeductMonthlyFees
 	FROM @FinalResult r
 		 INNER JOIN @PartySettings ps ON r.PartyId = ps.PartyID
-	GROUP BY r.PartyId, ps.PartyName, r.InvoiceType, ps.BillerId, ps.BillerName, r.InvoiceHeaderId, r.InvoiceSymbol, r.InvoiceNumber, 
+	GROUP BY ps.IndexNumber, r.PartyId, ps.PartyName, r.InvoiceType, ps.BillerId, ps.BillerName, r.InvoiceHeaderId, r.InvoiceSymbol, r.InvoiceNumber, 
 			r.InvoicePath, ps.BaseCurrencyId, ps.BaseCurrencyName, ps.ProductCodes, ps.InvoiceLanguage
+	ORDER BY ps.IndexNumber
 	
 	SELECT @ErrCode = 0, @ErrMsg = ''
 
