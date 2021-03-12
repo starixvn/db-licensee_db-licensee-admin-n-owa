@@ -145,6 +145,7 @@ BEGIN
 		e.Code					AS CurrencyName,
 		d.BaseCurrencyId		AS BaseCurrencyId,
 		d.BaseCurrencyName		AS BaseCurrencyName,
+		e.BaseCurrencyRate		AS BaseCurrencyRate,
 		SUM(d.Turnover)			AS Turnover,
 		SUM(d.BetCount)			AS Betcount,
 		SUM(d.CustomerWL)		AS MemberWinloss,
@@ -170,15 +171,14 @@ BEGIN
 	INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON d.PartyId = p.PartyID
 	INNER JOIN @ExchangeRate e ON d.CurrencyId = e.ExchangeId AND e.exchangedate = d.rptDate AND e.BaseCurrencyId = d.BaseCurrencyId
 	INNER JOIN LA_f_Products3rd(@ProductCodes) prd ON prd.ProductId = d.ProductId
-	GROUP BY d.ProductId, prd.ProductName, prd.ProductPrefix, d.PartyId, p.PartyName, d.CurrencyId, e.Code, d.BaseCurrencyId, d.BaseCurrencyName
+	GROUP BY d.ProductId, prd.ProductName, prd.ProductPrefix, d.PartyId, p.PartyName, d.CurrencyId, e.Code, d.BaseCurrencyId, d.BaseCurrencyName, e.BaseCurrencyRate
 
 	-- Get report data
 	SELECT * FROM #Result
 
 	-- Get exchange rate
-	SELECT DISTINCT r.ProductCode, r.CurrencyName, e.BaseCurrencyRate, r.BaseCurrencyName
+	SELECT r.ProductCode, r.CurrencyName, r.BaseCurrencyRate, r.BaseCurrencyName, r.PartyId
 	FROM #Result r 
-	INNER JOIN @ExchangeRate e ON r.BaseCurrencyId = e.BaseCurrencyId AND r.Currency = e.ExchangeId AND e.ExchangeDate = @ToDate
 
 	DROP TABLE #Result
 END
