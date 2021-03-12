@@ -26,10 +26,12 @@ BEGIN
 	DECLARE @Data AS TABLE(rptDate DATE, PartyId INT, ProductId INT, CurrencyId INT, Turnover MONEY, BetCount INT, CustomerWL MONEY, LicenseeWL MONEY,
 						Contribution MONEY, ServiceFee MONEY, JackpotPrize MONEY, FreeBetAmount MONEY, PromotionPrize MONEY, LicensingFee MONEY, BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
 	
-	DECLARE @LicenseeId AS TABLE (LicenseeId INT)
-	INSERT INTO @LicenseeId(LicenseeId)
-	SELECT DISTINCT ci.LicenseeID
+	DECLARE @LicenseeId AS TABLE (LicenseeId INT, PartyId INT, BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
+	INSERT INTO @LicenseeId(LicenseeId, PartyId, BaseCurrencyId, BaseCurrencyName)
+	SELECT DISTINCT ci.LicenseeID, ci.PartyID, pd.BaseCurrencyId, e.Code
 	FROM @ChargeInfo ci
+	INNER JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON ci.PartyId = pd.PartyID
+	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON e.ExchangeId = pd.BaseCurrencyId
 
 	DECLARE @TotalServiceFee MONEY
 
@@ -91,18 +93,15 @@ BEGIN
 	GROUP BY ci.PartyID, d.ProductID, d.CurrencyId, d.rptDate
 
 	UPDATE d
-	SET d.BaseCurrencyId = pd.BaseCurrencyId, d.BaseCurrencyName = e.Code
+	SET d.BaseCurrencyId = l.BaseCurrencyId, d.BaseCurrencyName = l.BaseCurrencyName
 	FROM @Data d
-	INNER JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON d.PartyId = pd.PartyID
-	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON e.ExchangeId = pd.BaseCurrencyId
+	INNER JOIN @LicenseeId l ON d.PartyId = l.PartyId
 
 	-- Get all base currency
 	DECLARE @BaseCurrencies AS TABLE(BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
 	INSERT INTO @BaseCurrencies(BaseCurrencyId, BaseCurrencyName)
-	SELECT DISTINCT pd.BaseCurrencyId, e.Code
+	SELECT DISTINCT d.BaseCurrencyId, d.BaseCurrencyName
 	FROM @Data d
-	INNER JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = d.PartyID
-	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON pd.BaseCurrencyId = e.ExchangeId
 
 	-- Get BaseCurrencyRate
 	DECLARE @ExchangeRate AS TABLE(BaseCurrencyId INT, ExchangeId INT, ExchangeDate DATETIME, BaseCurrencyRate FLOAT, Code VARCHAR(10))
@@ -111,8 +110,7 @@ BEGIN
 	
 	WHILE EXISTS (SELECT TOP 1 1 FROM @BaseCurrencies)
 	BEGIN
-		SET @tempCurrency = (SELECT TOP 1 BaseCurrencyName FROM @BaseCurrencies)
-		SET @tempCurrencyId = (SELECT TOP 1 BaseCurrencyId FROM @BaseCurrencies)
+		SELECT @tempCurrencyId = BaseCurrencyId, @tempCurrency = BaseCurrencyName FROM @BaseCurrencies
 
 		INSERT INTO @ExchangeRate(BaseCurrencyId, ExchangeId, ExchangeDate, BaseCurrencyRate, Code)
 		SELECT @tempCurrencyId, e.ExchangeId, e.exchangedate, e.BaseCurrencyRate, e.Code
