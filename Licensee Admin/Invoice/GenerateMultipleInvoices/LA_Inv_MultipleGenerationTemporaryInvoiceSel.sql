@@ -2,16 +2,14 @@
 USE [bodb_Licensee]
 GO
 
---ALTER PROCEDURE [dbo].[LA_Inv_MultipleGenerationTemporaryInvoiceSel]
-DECLARE	@PartyIds			VARCHAR(500),
+ALTER PROCEDURE [dbo].[LA_Inv_MultipleGenerationTemporaryInvoiceSel]
+	@PartyIds			VARCHAR(500),
 	@FromDate			DATE,
 	@ToDate				DATE,
 	@Environment		VARCHAR(10),
-	@ErrCode			INT				= 0,--		OUTPUT,
-	@ErrMsg				NVARCHAR(1000)	= ''--	OUTPUT
---AS
-SELECT @Environment='LOCAL',@PartyIds='14,364,15,74,24',@FromDate='2020-11-01 00:00:00',@ToDate='2020-11-30 00:00:00'
---SELECT @PartyIds = '14,15,24,74', @FromDate = '2020-11-01', @ToDate = '2020-11-30', @Environment = 'LOCAL'
+	@ErrCode			INT				= 0		OUTPUT,
+	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
+AS
 /*	Header:
 	Created: 2021.03.02 - Parsons
 	Task : Support a function to export all invoices at once: Generate Multiple Temporary Invoice
@@ -41,7 +39,7 @@ BEGIN
 	DECLARE @ProductCodes VARCHAR(500) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG,BGG,MXG'
 
 	-- Region: Get Party Settings
-	DECLARE @PartySettings TABLE(IndexNumber INT, PartyID INT, PartyName VARCHAR(100), BillerId INT, BillerName VARCHAR(100), ProductCodes VARCHAR(100), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, InvTemplateName VARCHAR(50))
+	DECLARE @PartySettings TABLE(IndexNumber INT, PartyID INT, PartyName VARCHAR(100), BillerId INT, BillerName VARCHAR(100), ProductCodes VARCHAR(200), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, InvTemplateName VARCHAR(50))
 
 	INSERT INTO @PartySettings(IndexNumber, PartyID, PartyName, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage)
 	SELECT p.rank, p.val, op.PartyName, ISNULL(pd.BaseCurrencyId, 6), ISNULL(e.Code, 'EUR'), pd.InvoiceLanguage
@@ -50,7 +48,7 @@ BEGIN
 	LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON e.exchangeid = pd.BaseCurrencyId
 	LEFT JOIN bodb_licensee.dbo.OAS_Party op WITH(NOLOCK) ON p.val = op.PartyID
 
-	DECLARE @InvoiceSettings TABLE(PartyID INT, BillerId INT,BillerName VARCHAR(100),InvTypeId Smallint, ProductCodes VARCHAR(100), InvTemplateName VARCHAR(50))
+	DECLARE @InvoiceSettings TABLE(PartyID INT, BillerId INT,BillerName VARCHAR(100),InvTypeId Smallint, ProductCodes VARCHAR(200), InvTemplateName VARCHAR(50))
 	INSERT INTO @InvoiceSettings(PartyID,BillerId,BillerName, InvTypeId, InvTemplateName, ProductCodes)
 	SELECT ivs.FromPartyId, ivs.ToPartyId AS BillerID, b.BillerName, InvTypeId, t.InvTemplateName, STUFF((SELECT ',' + CASE WHEN t2.ProductId = 0 THEN 'SB' ELSE ProductPrefix END
 																	  FROM LA_InvoiceSetting t2
@@ -445,10 +443,9 @@ BEGIN
 		INNER JOIN cte_PartyInvoiceNo cte ON ps.PartyID = cte.PartyID
 	END
 	--#EndRegion InvoiceNo
-	SELECT * FROM @PartySettings
-
 	SELECT	ROW_NUMBER() OVER (ORDER BY (SELECT 1)) AS RowIndex, ps.IndexNumber ,r.PartyId, ps.PartyName, r.InvoiceType AS ItemType, ps.BillerId, ps.BillerName, r.InvoiceHeaderId, ps.InvoiceSymbol, ISNULL(r.InvoiceNumber, ps.InvoiceNumber) AS InvoiceNumber, 
-			r.InvoicePath, ps.BaseCurrencyId, ps.BaseCurrencyName, ps.ProductCodes, ps.InvoiceLanguage,
+			r.InvoicePath, ps.BaseCurrencyId, ps.BaseCurrencyName, ps.InvoiceLanguage,
+			CASE WHEN r.InvoiceType = @InvoiceTypeSoftwareFee THEN ps.ProductCodes ELSE '' END  AS ProductCodes,
 			SUM(CASE WHEN r.InvoiceType = @InvoiceTypeRebate THEN 0 ELSE r.LicensingFee END) LicensingFee,
 			SUM(ISNULL(r.Discount, 0))		Discount,
 			SUM(CASE WHEN r.InvoiceType = @InvoiceTypeRebate THEN r.LicensingFee ELSE 0 END) Rebate
@@ -456,8 +453,9 @@ BEGIN
 	INTO #Result
 	FROM @FinalResult r
 		 INNER JOIN @PartySettings ps ON r.PartyId = ps.PartyID
-	GROUP BY ps.IndexNumber, r.PartyId, ps.PartyName, r.InvoiceType, ps.BillerId, ps.BillerName, r.InvoiceHeaderId, ps.InvoiceSymbol,ISNULL(r.InvoiceNumber, ps.InvoiceNumber), 
-			r.InvoicePath, ps.BaseCurrencyId, ps.BaseCurrencyName, ps.ProductCodes, ps.InvoiceLanguage
+	GROUP BY ps.IndexNumber ,r.PartyId, ps.PartyName, r.InvoiceType, ps.BillerId, ps.BillerName, r.InvoiceHeaderId, ps.InvoiceSymbol, ISNULL(r.InvoiceNumber, ps.InvoiceNumber), 
+			r.InvoicePath, ps.BaseCurrencyId, ps.BaseCurrencyName, ps.InvoiceLanguage,
+			CASE WHEN r.InvoiceType = @InvoiceTypeSoftwareFee THEN ps.ProductCodes ELSE '' END
 	ORDER BY ps.IndexNumber
 
 	;WITH cte_rowOrder AS(
