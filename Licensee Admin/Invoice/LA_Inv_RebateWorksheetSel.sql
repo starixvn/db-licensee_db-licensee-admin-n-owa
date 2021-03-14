@@ -26,16 +26,22 @@ AS
 	  - 20201216@Parsons: Saba.club - Offer Freebet tickets [#141423]
 	  - 20201228@Parsons: Should include SBC & CC negative amount [#141357]
 	  - 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
+	  - 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 */
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @BaseCurrency VARCHAR(10) = ISNULL((
-			SELECT TOP 1 Code 
-			FROM bodb02.dbo.Exchange e WITH(NOLOCK)
-			INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON e.exchangeid = d.BaseCurrencyId
-			WHERE d.PartyID = @PartyId
-		),6) -- default is EUR
+	DECLARE @BaseCurrency VARCHAR(10)
+
+	SELECT TOP 1 @BaseCurrency = Code
+	FROM OAS_PartyBaseCurrency p WITH(NOLOCK)
+	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON p.BaseCurrencyId = e.exchangeid
+	WHERE p.PartyID = @PartyId AND p.FromDate <= @ToDate AND p.ToDate >= @FromDate
+	
+	IF(@BaseCurrency IS NULL)
+	BEGIN
+		SET @BaseCurrency = 'EUR'
+	END
 
 	-- products
 	DECLARE @Products TABLE (ProductId INT, ProductCode VARCHAR(20))

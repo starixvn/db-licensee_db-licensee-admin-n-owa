@@ -34,6 +34,7 @@ AS
 		- 20201028@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
 		- 20201130@Parsons: Saba.club - Offer Freebet tickets [#141423]
 		- 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
+		- 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -65,10 +66,14 @@ BEGIN
 
 	-- Region: Get base Currency
 	DECLARE @BaseCurrencyId INT 
-	SET		@BaseCurrencyId = ISNULL((	SELECT TOP 1 opd.BaseCurrencyId
-										FROM dbo.OAS_PartyDetail opd WITH(NOLOCK)	
-										WHERE	opd.PartyID = @PartyId
-									), 6)-- Default is EUR
+	SELECT TOP 1 @BaseCurrencyId = BaseCurrencyId
+	FROM OAS_PartyBaseCurrency WITH(NOLOCK)
+	WHERE PartyID = @PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
+	
+	IF(@BaseCurrencyId IS NULL)
+	BEGIN
+		SET @BaseCurrencyId = 6 -- default EUR
+	END
 	
 	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(10))
 	INSERT	INTO @BaseCurrencyTable(CurrencyId, CurrencyName)

@@ -57,6 +57,7 @@ AS
 		- 20200228@Parsons: Support-HID-currency [#128856]
 		- 20200406@Parsons: Issue rebate worksheet [#131874]
 		- 20201202@Parsons: Add more condition to get only one rebate setting at the one time [#142345]
+		- 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -97,10 +98,15 @@ BEGIN
 	-- Region: Get base Currency
 	DECLARE @BaseCurrencyId INT = 12
 	DECLARE @BaseCurrencyName VARCHAR(10) = 'GBP'
-	SET		@BaseCurrencyId = ISNULL((	SELECT TOP 1 opd.BaseCurrencyId
-										FROM dbo.OAS_PartyDetail opd WITH(NOLOCK)	
-										WHERE	opd.PartyID = @PartyId
-									), 12)
+
+	SELECT TOP 1 @BaseCurrencyId = BaseCurrencyId
+	FROM OAS_PartyBaseCurrency WITH(NOLOCK)
+	WHERE PartyID = @PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
+	
+	IF(@BaseCurrencyId IS NULL)
+	BEGIN
+		SET @BaseCurrencyId = 12 -- default GBP
+	END
 	
 	DECLARE @BaseCurrencyTable AS TABLE(Id INT, Name VARCHAR(10))
 	INSERT	INTO @BaseCurrencyTable(Id,Name)

@@ -9,7 +9,7 @@
 USE bodb_Licensee 
 GO
 
-DECLARE @FromDate DATE = '2010-01-01', @ToDate DATE = '2021-02-28'
+DECLARE @FromDate DATE = '2010-01-01', @ToDate DATE = '2050-01-01'
 
 INSERT INTO OAS_PartyBaseCurrency(PartyID, BaseCurrencyId, LicenseeCode, FromDate, ToDate)
 SELECT PartyID, ISNULL(BaseCurrencyId, 6) BaseCurrencyId, ISNULL(LicenseeCode, ''),  @FromDate, @ToDate

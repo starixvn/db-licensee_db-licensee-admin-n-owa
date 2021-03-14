@@ -50,6 +50,7 @@ AS
 		- 20190123@Bruce: Save invoices - Increased security [#96660]
 		- 20190319@bruce: Apply min fee rule for discount calculation [#109997]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 */
 
 BEGIN
@@ -106,10 +107,15 @@ BEGIN
 	-- End Region
 
 	-- Region: Insert data to Invoice Header
-	DECLARE @CurrencyId INT = ISNULL((
-		SELECT TOP 1 BaseCurrencyId
-		FROM dbo.OAS_PartyDetail WITH(NOLOCK)
-		WHERE PartyID = @PartyId), 6) -- default EUR
+	DECLARE @CurrencyId INT
+	SELECT TOP 1 @CurrencyId = BaseCurrencyId
+	FROM OAS_PartyBaseCurrency WITH(NOLOCK)
+	WHERE PartyID = @PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
+	
+	IF(@CurrencyId IS NULL)
+	BEGIN
+		SET @CurrencyId = 6 -- default EUR
+	END
 
 	BEGIN TRY
 		DECLARE @CurrentDateTime DATETIME = GETDATE()
