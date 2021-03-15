@@ -159,19 +159,10 @@ BEGIN
 		SUM(d.ServiceFee * e.BaseCurrencyRate)		AS LicenseeChargeRateBase,
 		SUM(d.LicensingFee * e.BaseCurrencyRate)	AS CompanyBaseCurrency,
 		SUM(d.PromotionPrize * e.BaseCurrencyRate)	AS WinningPrizeBase
-	INTO #Result
 	FROM @Data d 
-	INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON d.PartyId = p.PartyID
+	INNER JOIN OAS_Party p WITH(NOLOCK) ON d.PartyId = p.PartyID
 	INNER JOIN @ExchangeRate e ON d.CurrencyId = e.ExchangeId AND e.exchangedate = d.rptDate AND e.BaseCurrencyId = d.BaseCurrencyId
 	INNER JOIN LA_f_Products3rd(@ProductCodes) prd ON prd.ProductId = d.ProductId
 	GROUP BY d.ProductId, prd.ProductName, prd.ProductPrefix, d.PartyId, p.PartyName, d.CurrencyId, e.Code, d.BaseCurrencyId, d.BaseCurrencyName, e.BaseCurrencyRate
 
-	-- Get report data
-	SELECT * FROM #Result
-
-	-- Get exchange rate
-	SELECT r.ProductCode, r.CurrencyName, r.BaseCurrencyRate, r.BaseCurrencyName, r.PartyId
-	FROM #Result r 
-
-	DROP TABLE #Result
 END
