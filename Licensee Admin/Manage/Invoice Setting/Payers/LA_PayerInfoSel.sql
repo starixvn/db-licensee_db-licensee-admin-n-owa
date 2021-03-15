@@ -20,6 +20,7 @@ AS
 			5: non-official payer
 		+ 20190318@Mason: Add Invoice Language in SELECT statement [#110419]
 		+ 20190829@Bruce: Adding Licensee Code [#111586]
+		+ 20210315@Happy: Change BaseCurrency Of Licensee [#151466]
 		
 	 Params:
 	 Example:
@@ -53,5 +54,15 @@ SET NOCOUNT ON
 		) i ON p.PartyID = i.FromPartyId
 	WHERE (@PayerId = 0 OR p.PartyID = @PayerId)
 		AND p.PartyType IN (1,5)
+		
+	SELECT p.PartyID
+		, p.BaseCurrencyId
+		, e.Code AS BaseCurrencyName
+		, p.LicenseeCode
+		, p.FromDate
+		, p.ToDate
+	FROM OAS_PartyBaseCurrency p WITH(NOLOCK)
+	LEFT JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON p.BaseCurrencyId = e.exchangeid
+	WHERE PartyID = @PayerId
 END
 GO
