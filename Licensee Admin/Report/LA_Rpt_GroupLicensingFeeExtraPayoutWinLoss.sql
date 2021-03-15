@@ -4,9 +4,9 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_GroupLicensingFeeExtraPayoutWinLoss]
 	@PartyIDs				VARCHAR(1000),
-	@ProductCodes			VARCHAR(1000) = 'PP,SBC,CC',
-	@FromDate				SMALLDATETIME,
-	@ToDate					SMALLDATETIME
+	@ProductCodes			VARCHAR(1000),
+	@FromDate				DATETIME,
+	@ToDate					DATETIME
 AS
 
 /*  Created: Mason.Nguyen
@@ -44,11 +44,7 @@ BEGIN
 			@SBC_Jackpot SMALLINT = 1699,
 			@FreeBetsTicketType SMALLINT = 2,
 
-			@ArcadiaGaming_Bonus SMALLINT = 1906,
-
-			@PP_ProductId SMALLINT = 32,
-			@CC_ProductId SMALLINT = 34,
-			@SBC_ProductId SMALLINT = 42
+			@ArcadiaGaming_Bonus SMALLINT = 1906
 
 	;WITH cte_Data AS(
 		SELECT b.rptDate, b.SiteID, b.ProductID, b.CurrencyId,
@@ -62,16 +58,15 @@ BEGIN
 				END) AS Turnover,
 			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR 
 						b.Bettype IN (@PP_Tournament,@PP_PromotionPrize,@PP_Contribution,@PP_JackpotPrize,@SBC_Contribution,@SBC_Jackpot,@ArcadiaGaming_Bonus) THEN 0 
-					 ELSE ISNULL(b.MemberWL, 0) 
+					 ELSE ISNULL(b.MemberWL, 0)
 				END) AS CustomerWL,
 			SUM(CASE WHEN b.Bettype = @PP_Contribution OR b.Bettype = @SBC_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END)			 AS Contribution,
 			SUM(CASE WHEN b.Bettype = @PP_JackpotPrize OR b.Bettype = @SBC_Jackpot THEN ISNULL(b.MemberWL, 0) ELSE 0 END)				 AS JackpotPrize,
 			SUM(CASE WHEN b.Bettype IN (@PP_PromotionPrize, @PP_Tournament, @ArcadiaGaming_Bonus) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS PromotionPrize,
 			SUM(CASE WHEN ISNULL(b.TicketType, 0) = @FreeBetsTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END)							 AS FreeBetAmount
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
-		INNER JOIN @LicenseBaseCurrency l ON b.SiteID = l.LicenseeID
-		WHERE b.ProductID IN (@PP_ProductId, @SBC_ProductId, @CC_ProductId)
-		AND (b.CurrencyID <> 20)
+		INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+		WHERE (b.CurrencyID <> 20)
 		AND b.StatusId NOT IN (-1, 101, 102, 103)
 		AND b.customercategory NOT IN (27, 28)
 		GROUP BY b.SiteID, b.ProductID, b.CurrencyId, b.rptDate
