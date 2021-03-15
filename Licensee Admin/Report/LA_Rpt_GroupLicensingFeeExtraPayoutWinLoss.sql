@@ -26,8 +26,8 @@ BEGIN
 	DECLARE @Data AS TABLE(rptDate DATE, PartyId INT, ProductId INT, CurrencyId INT, Turnover MONEY, BetCount INT, CustomerWL MONEY, LicenseeWL MONEY,
 						Contribution MONEY, ServiceFee MONEY, JackpotPrize MONEY, FreeBetAmount MONEY, PromotionPrize MONEY, LicensingFee MONEY, BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
 	
-	DECLARE @LicenseeId AS TABLE (LicenseeId INT, PartyId INT, BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
-	INSERT INTO @LicenseeId(LicenseeId, PartyId, BaseCurrencyId, BaseCurrencyName)
+	DECLARE @LicenseBaseCurrency AS TABLE (LicenseeId INT, PartyId INT, BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
+	INSERT INTO @LicenseBaseCurrency(LicenseeId, PartyId, BaseCurrencyId, BaseCurrencyName)
 	SELECT DISTINCT ci.LicenseeID, ci.PartyID, pd.BaseCurrencyId, e.Code
 	FROM @ChargeInfo ci
 	INNER JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON ci.PartyId = pd.PartyID
@@ -69,7 +69,7 @@ BEGIN
 			SUM(CASE WHEN b.Bettype IN (@PP_PromotionPrize, @PP_Tournament, @ArcadiaGaming_Bonus) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS PromotionPrize,
 			SUM(CASE WHEN ISNULL(b.TicketType, 0) = @FreeBetsTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END)							 AS FreeBetAmount
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
-		INNER JOIN @LicenseeId l ON b.SiteID = l.LicenseeID
+		INNER JOIN @LicenseBaseCurrency l ON b.SiteID = l.LicenseeID
 		WHERE b.ProductID IN (@PP_ProductId, @SBC_ProductId, @CC_ProductId)
 		AND (b.CurrencyID <> 20)
 		AND b.StatusId NOT IN (-1, 101, 102, 103)
@@ -89,13 +89,13 @@ BEGIN
 		SUM((-d.CustomerWL - d.Contribution) * ISNULL(cr.Rate, ci.Rate)) AS ServiceFee
 	FROM cte_Data d
 	INNER JOIN @ChargeInfo ci ON d.SiteID = ci.LicenseeID AND d.ProductID = ci.ProductID AND d.rptDate BETWEEN ci.FromDate AND ci.ToDate
-	LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
+	LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
 	GROUP BY ci.PartyID, d.ProductID, d.CurrencyId, d.rptDate
 
 	UPDATE d
 	SET d.BaseCurrencyId = l.BaseCurrencyId, d.BaseCurrencyName = l.BaseCurrencyName
 	FROM @Data d
-	INNER JOIN @LicenseeId l ON d.PartyId = l.PartyId
+	INNER JOIN @LicenseBaseCurrency l ON d.PartyId = l.PartyId
 
 	-- Get all base currency
 	DECLARE @BaseCurrencies AS TABLE(BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
