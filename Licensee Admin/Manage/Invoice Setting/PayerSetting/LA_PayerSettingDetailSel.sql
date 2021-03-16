@@ -216,7 +216,7 @@ BEGIN
 			pc.ToDate,
 			pc.PartyID,
 			e.Code AS CurrencyName,
-			CASE WHEN pc.ToDate < GETDATE() THEN 0 ELSE 1 END AS IsActive
+			CASE WHEN pc.ToDate < @CurrentDate THEN 0 ELSE 1 END AS IsActive
 	FROM OAS_PartyBaseCurrency pc
 	LEFT JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON pc.BaseCurrencyId = e.exchangeid
 	WHERE pc.PartyID = @PayerId
