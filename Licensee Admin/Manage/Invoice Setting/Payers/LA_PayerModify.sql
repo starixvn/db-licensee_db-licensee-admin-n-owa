@@ -187,7 +187,8 @@ BEGIN
 			USING @BaseCurrencySetting AS s
 			ON (t.PartyID = @PayerID AND t.BaseCurrencyId = s.BaseCurrencyId AND t.FromDate = s.FromDate)
 			WHEN MATCHED
-				THEN UPDATE SET t.ToDate = s.ToDate
+				THEN UPDATE SET t.LicenseeCode = s.LicenseeCode,
+								t.ToDate = s.ToDate
 			WHEN NOT MATCHED BY TARGET
 				THEN INSERT(PartyID, BaseCurrencyId, LicenseeCode, FromDate, ToDate)
 						VALUES(@PayerID, s.BaseCurrencyId, s.LicenseeCode, s.FromDate, s.ToDate);
