@@ -10,7 +10,6 @@ ALTER PROCEDURE [dbo].[LA_PayerNonOfficialIns]
 	, @Address1			NVARCHAR (255)	= ''
 	, @Address2			NVARCHAR (255)	= ''
 	, @PayerName		VARCHAR (50)
-	, @BaseCurrencyId	INT
 	, @IsActive			BIT				= 1
 	, @IsDeposit		BIT				= 1
 	, @PayerId			INT				= 0  OUTPUT
@@ -19,7 +18,6 @@ ALTER PROCEDURE [dbo].[LA_PayerNonOfficialIns]
 	, @ErrCode			INT				= 0  OUTPUT
 	, @ErrMsg			NVARCHAR(1000)	= '' OUTPUT
 	, @InvoiceLanguage	VARCHAR(7)
-	, @LicenseeCode		VARCHAR (50) = ''
 AS
 /*
 	Created: 20161109@bruce.bui
@@ -31,6 +29,7 @@ AS
 		- 20180318@mason: Add @InvoiceLanguage parameter [#110445]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20190905@Bruce: Adding licensee code [#111586]
+		- 20210316@Happy: Change BaseCurrency Of Licensee [#151466]
 */
 BEGIN
 
@@ -62,14 +61,11 @@ BEGIN
 		RETURN
 	END
 
-
-	SET @LicenseeCode = (CASE WHEN @LicenseeCode = '' THEN NULL ELSE @LicenseeCode END)
-
 	INSERT INTO dbo.OAS_Party(PartyName, Description, PartyType) VALUES (@PayerName, 'Non-Official', 5)
 	SET @PayerId = SCOPE_IDENTITY()
 
-	INSERT INTO dbo.OAS_PartyDetail(PartyId, BrandName, CompanyName, AttnName, Description, Address1, Address2, BaseCurrencyId, IsAllowedMemberComm, IsDeposit, StatusId, InvoiceLanguage, LicenseeCode)
-	VALUES(@PayerId, @BrandName, @CompanyName, @AttnName, @Description, @Address1, @Address2, @BaseCurrencyId, 0, @IsDeposit , @IsActive, @InvoiceLanguage, @LicenseeCode)
+	INSERT INTO dbo.OAS_PartyDetail(PartyId, BrandName, CompanyName, AttnName, Description, Address1, Address2, IsAllowedMemberComm, IsDeposit, StatusId, InvoiceLanguage)
+	VALUES(@PayerId, @BrandName, @CompanyName, @AttnName, @Description, @Address1, @Address2, 0, @IsDeposit , @IsActive, @InvoiceLanguage)
 
 	SET @xml = (
 		SELECT	p.PartyID			AS '@pid'
@@ -82,9 +78,7 @@ BEGIN
 				, pd.Description	AS '@des'
 				, pd.Address1		AS '@a1'
 				, pd.Address2		AS '@a2'
-				, pd.BaseCurrencyId	AS '@bc'
 				, pd.InvoiceLanguage AS '@il'
-				, pd.LicenseeCode	 AS '@lc'
 		FROM dbo.OAS_Party p WITH (NOLOCK)
 			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 		WHERE p.PartyID = @PayerId
