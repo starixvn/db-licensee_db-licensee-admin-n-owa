@@ -8,7 +8,7 @@ USE bodb_Licensee
 GO
 
 
-DECLARE @ChargeRate_PartyTable TABLE(PartyID INT, PartyName VARCHAR(100), BaseCurrencyId INT, DiscountGroupId INT, DiscountGroupName NVARCHAR(100), MaxDateOfProductSettings DATE, NumberOfDiscountTiers INT)
+DECLARE @ChargeRate_PartyTable TABLE(PartyID INT, PartyName VARCHAR(100), BaseCurrencyId INT, DiscountGroupId INT, DiscountGroupName NVARCHAR(100), MaxDateOfProductSettings DATE, NumberOfDiscountTiers INT, Rate MONEY)
 
 INSERT INTO @ChargeRate_PartyTable(PartyID, PartyName, BaseCurrencyId, MaxDateOfProductSettings)
 SELECT pd.PartyID, p.PartyName, pd.BaseCurrencyId, MAX(ToDate) AS MaxDateOfProductSettings
@@ -41,5 +41,12 @@ FROM cte_DiscountGroup cte
 INNER JOIN @ChargeRate_PartyTable c ON cte.PartyID = c.PartyID
 WHERE cte.DiscountGroupId IS NOT NULL
 
-SELECT PartyID, PartyName, BaseCurrencyId, DiscountGroupId, DiscountGroupName, MaxDateOfProductSettings, NumberOfDiscountTiers
-FROM @ChargeRate_PartyTable
+SELECT PartyID, PartyName, BaseCurrencyId, DiscountGroupId, DiscountGroupName, MaxDateOfProductSettings, NumberOfDiscountTiers,
+STUFF((
+		SELECT '__ ' + 'FromAmount:' + CAST(pd.FromAmount AS VARCHAR) + ' ToAmount:' + CAST(pd.ToAmount AS VARCHAR) +  ' Rate:' + CAST(pd.Rate AS VARCHAR)
+		FROM LA_DiscountGroupDetail pd WITH (NOLOCK)
+		WHERE pd.DiscountGroupId = p.DiscountGroupId
+		ORDER BY FromAmount
+		FOR XML PATH (''))
+		, 1, 2, '') AS RateList
+FROM @ChargeRate_PartyTable P
