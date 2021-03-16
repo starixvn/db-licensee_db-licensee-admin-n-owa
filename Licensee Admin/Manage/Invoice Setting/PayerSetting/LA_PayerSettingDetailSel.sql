@@ -208,5 +208,18 @@ BEGIN
 	SELECT c1.ChargeID, c1.CurrencyID, c1.Rate
 	FROM LA_ChargeRateByCurrency c1 WITH(NOLOCK)
 		INNER JOIN @ChargeInfo c2 ON c1.ChargeID = c2.ChargeId
+
+	-- Base currency setting
+	SELECT pc.BaseCurrencyId,
+			pc.LicenseeCode,
+			pc.FromDate,
+			pc.ToDate,
+			pc.PartyID,
+			e.Code AS CurrencyName,
+			CASE WHEN pc.ToDate < GETDATE() THEN 0 ELSE 1 END AS IsActive
+	FROM OAS_PartyBaseCurrency pc
+	LEFT JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON pc.BaseCurrencyId = e.exchangeid
+	WHERE pc.PartyID = @PayerId
+	ORDER BY pc.ToDate DESC
 END
 GO
