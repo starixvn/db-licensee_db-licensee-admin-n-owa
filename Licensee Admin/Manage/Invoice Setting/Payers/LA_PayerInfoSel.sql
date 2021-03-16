@@ -28,6 +28,7 @@ AS
 */
 BEGIN
 SET NOCOUNT ON
+	DECLARE @CurrentDate DATE = CONVERT(DATE, GETDATE())
 	SELECT TOP 1 p.PartyID AS PayerID
 		, p.PartyName AS PayerName
 		, pd.StatusId
@@ -61,8 +62,10 @@ SET NOCOUNT ON
 		, p.LicenseeCode
 		, p.FromDate
 		, p.ToDate
+		, CASE WHEN p.ToDate < @CurrentDate THEN 0 ELSE 1 END AS IsActive
 	FROM OAS_PartyBaseCurrency p WITH(NOLOCK)
 	LEFT JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON p.BaseCurrencyId = e.exchangeid
 	WHERE PartyID = @PayerId
+	ORDER BY p.ToDate DESC
 END
 GO
