@@ -372,26 +372,12 @@ BEGIN
 
 	-- check payer exchange & minfee exchange
 	--
-	DECLARE @PartyGroups TABLE(PartyId INT, CurrencyId INT)
-	INSERT INTO @PartyGroups(PartyId, CurrencyId)
-	(
-		SELECT d.PartyId, d.BaseCurrencyId
-		FROM dbo.LA_PartyGroup g WITH(NOLOCK)
-		INNER JOIN dbo.LA_PartyGroupAssignment a WITH(NOLOCK) ON a.PartyGroupId=g.PartyGroupId
-		INNER JOIN dbo.LA_PartyGroupAssignment b WITH(NOLOCK) ON a.PartyGroupId=b.PartyGroupId
-		INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON d.PartyID=b.PartyId
-		WHERE a.PartyId = @PartyId
-	)
-	IF NOT EXISTS (SELECT TOP 1 1 FROM @PartyGroups)
-	BEGIN
-		INSERT INTO @PartyGroups(PartyId, CurrencyId) VALUES (@PartyId, @BaseCurrencyId)
-	END
-
 	IF EXISTS (
 		SELECT TOP 1 m.PartyId
-		FROM @PartyGroups p
-		INNER JOIN dbo.LA_MinFee m WITH(NOLOCK) ON m.PartyId=p.PartyID AND m.FeeTypeId = 1 -- 1 = minfee
-		WHERE m.FromDate <=@ToDate AND m.ToDate >= @FromDate AND p.CurrencyId <> m.CurrencyId
+		FROM LA_MinFee m WITH(NOLOCK)
+		WHERE m.PartyId = @PartyId
+			AND m.FeeTypeId = 1 -- 1 = minfee
+			AND m.FromDate <= @ToDate AND m.ToDate >= @FromDate AND @BaseCurrencyId <> m.CurrencyId
 	)
 	BEGIN
 		SELECT @ErrCode = 1, @ErrMsg = 'Please check the Exchange settings of Payer''s minfee or minfee group. Exchange of minfee or minfees in group should be the same with Payer''s exchange.'
