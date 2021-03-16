@@ -37,7 +37,7 @@ AS
 		- 20210315@Happy: Change BaseCurrency Of Licensee [#151466]
 	
 	Param's Explannation: 
-		@GroupMinFeeSettingData = <Root>
+		@BaseCurrencySettingXml = <Root>
 									<BaseCurrencySetting>
 										<BaseCurrencyId>6</BaseCurrencyId>
 										<LicenseeCode>PHL-LSEE-12BET EUR</LicenseeCode>
@@ -56,7 +56,7 @@ AS
 										<FromDate>20210308</FromDate>
 										<ToDate>20500101</ToDate>
 									</BaseCurrencySetting>
-								</Root>'
+								</Root>
 */
 BEGIN
 	SET NOCOUNT ON
