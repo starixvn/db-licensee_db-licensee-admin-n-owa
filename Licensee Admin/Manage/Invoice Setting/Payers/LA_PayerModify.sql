@@ -183,15 +183,11 @@ BEGIN
 			END
 			
 			--Region Update Base Currency Settings
-			;MERGE dbo.OAS_PartyBaseCurrency WITH(ROWLOCK, UPDLOCK) AS t
-			USING @BaseCurrencySetting AS s
-			ON (t.PartyID = @PayerID AND t.BaseCurrencyId = s.BaseCurrencyId AND t.FromDate = s.FromDate)
-			WHEN MATCHED
-				THEN UPDATE SET t.LicenseeCode = s.LicenseeCode,
-								t.ToDate = s.ToDate
-			WHEN NOT MATCHED BY TARGET
-				THEN INSERT(PartyID, BaseCurrencyId, LicenseeCode, FromDate, ToDate)
-						VALUES(@PayerID, s.BaseCurrencyId, s.LicenseeCode, s.FromDate, s.ToDate);
+			DELETE FROM dbo.OAS_PartyBaseCurrency WITH (ROWLOCK, UPDLOCK) WHERE PartyID = @PayerID
+
+			INSERT INTO dbo.OAS_PartyBaseCurrency(BaseCurrencyId, FromDate, ToDate, LicenseeCode, PartyID)
+			SELECT s.BaseCurrencyId, s.FromDate, s.ToDate, s.LicenseeCode, @PayerID
+			FROM @BaseCurrencySetting s
 			--Endregion
 		END
 
