@@ -3,23 +3,22 @@ USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerModify]
-	@PayerID			INT
-	, @BrandName		VARCHAR (100)	= ''
-	, @CompanyName		NVARCHAR (100)	= ''
-	, @Description		NVARCHAR (255)	= ''
-	, @AttnName			NVARCHAR (125)	= ''
-	, @Address1			NVARCHAR (255)	= ''
-	, @Address2			NVARCHAR (255)	= ''
-	, @LicenseeCode		VARCHAR (50)	= ''
-	, @PayerName		VARCHAR (50)
-	, @BaseCurrencyId	INT
-	, @UserID			INT
-	, @IsActive			BIT				= 1
-	, @IsDeposit		BIT				= 1
-	, @LoginIP			VARCHAR (50)	= ''
-	, @ErrCode			INT				= 0  OUTPUT
-	, @ErrMsg			NVARCHAR(1000)	= '' OUTPUT
-	, @InvoiceLanguage 	VARCHAR(7)
+	@PayerID					INT
+	, @BrandName				VARCHAR (100)	= ''
+	, @CompanyName				NVARCHAR (100)	= ''
+	, @Description				NVARCHAR (255)	= ''
+	, @AttnName					NVARCHAR (125)	= ''
+	, @Address1					NVARCHAR (255)	= ''
+	, @Address2					NVARCHAR (255)	= ''
+	, @PayerName				VARCHAR (50)
+	, @UserID					INT
+	, @IsActive					BIT				= 1
+	, @IsDeposit				BIT				= 1
+	, @LoginIP					VARCHAR (50)	= ''
+	, @ErrCode					INT				= 0  OUTPUT
+	, @ErrMsg					NVARCHAR(1000)	= '' OUTPUT
+	, @InvoiceLanguage 			VARCHAR(7)		= ''
+	, @BaseCurrencySettingXml	NVARCHAR(MAX)	= ''
 AS
 /*
 	Created: 20150415@Florent
@@ -35,6 +34,29 @@ AS
 		- 20180318@mason: Add @InvoiceLanguage parameter [#110445]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20190829@Bruce: Adding Licensee Code [#111586]
+		- 20210315@Happy: Change BaseCurrency Of Licensee [#151466]
+	
+	Param's Explannation: 
+		@GroupMinFeeSettingData = <Root>
+									<BaseCurrencySetting>
+										<BaseCurrencyId>6</BaseCurrencyId>
+										<LicenseeCode>PHL-LSEE-12BET EUR</LicenseeCode>
+										<FromDate>20100101</FromDate>
+										<ToDate>20500101</ToDate>
+									</BaseCurrencySetting>
+									<BaseCurrencySetting>
+										<BaseCurrencyId>13</BaseCurrencyId>
+										<LicenseeCode>XXX</LicenseeCode>
+										<FromDate>20210301</FromDate>
+										<ToDate>20500101</ToDate>
+									</BaseCurrencySetting>
+									<BaseCurrencySetting>
+										<BaseCurrencyId>6</BaseCurrencyId>
+										<LicenseeCode>PHL-LSEE-12BET EUR</LicenseeCode>
+										<FromDate>20210308</FromDate>
+										<ToDate>20500101</ToDate>
+									</BaseCurrencySetting>
+								</Root>'
 */
 BEGIN
 	SET NOCOUNT ON
@@ -64,9 +86,7 @@ BEGIN
 					, pd.[Description]	AS '@des'
 					, Address1			AS '@a1'
 					, Address2			AS '@a2'
-					, BaseCurrencyId	AS '@bc'
 					, InvoiceLanguage	AS '@il'
-					, LicenseeCode		AS '@lc'
 			FROM dbo.OAS_Party p  WITH (NOLOCK)
 				INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 			WHERE p.PartyId = @PayerID
@@ -82,7 +102,6 @@ BEGIN
 			, Address1 = @Address1
 			, Address2 = @Address2
 			, InvoiceLanguage = @InvoiceLanguage
-			, LicenseeCode = CASE WHEN @LicenseeCode = '' THEN NULL ELSE @LicenseeCode END
 		WHERE PartyId = @PayerID
 
 		-- only non-official payer can edit payer name, status, deposit status
@@ -102,7 +121,7 @@ BEGIN
 			WHERE PartyId = @PayerID
 
 			UPDATE dbo.OAS_PartyDetail WITH (ROWLOCK, UPDLOCK)
-			SET StatusId = @IsActive, IsDeposit = @IsDeposit, BaseCurrencyId = @BaseCurrencyId
+			SET StatusId = @IsActive, IsDeposit = @IsDeposit
 			WHERE PartyId = @PayerID
 		END
 		
@@ -117,6 +136,63 @@ BEGIN
 		UPDATE dbo.OAS_PartyDetail WITH (ROWLOCK, UPDLOCK)
 		SET BrandName = @BrandName
 		WHERE PartyId = @PayerID
+		
+		-- Update base currency settings
+		IF ISNULL(@BaseCurrencySettingXml, '') <> ''
+		BEGIN
+			DECLARE @BaseCurrencySetting TABLE(Idx INT IDENTITY(1, 1)
+												, BaseCurrencyId TINYINT
+												, LicenseeCode VARCHAR(50)
+												, FromDate DATE
+												, ToDate DATE)
+			DECLARE @docHandler INT
+			
+			BEGIN TRY
+				EXEC sp_xml_preparedocument @docHandler OUTPUT, @BaseCurrencySettingXml
+				INSERT INTO @BaseCurrencySetting(BaseCurrencyId, LicenseeCode, FromDate, ToDate)
+				SELECT BaseCurrencyId, LicenseeCode, FromDate, ToDate
+				FROM OPENXML(@docHandler, 'Root/BaseCurrencySetting')
+				WITH(BaseCurrencyId TINYINT 'BaseCurrencyId',
+						LicenseeCode VARCHAR(50) 'LicenseeCode',
+						FromDate DATE 'FromDate',
+						ToDate DATE 'ToDate')
+						
+				EXEC sp_xml_removedocument @docHandler
+			END TRY
+			BEGIN CATCH
+				SELECT @ErrMsg = 'Base Currency setting data invalid. Please try again.', @ErrCode = 100
+				RETURN
+			END CATCH
+			
+			--FromDate must less than ToDate
+			IF EXISTS (SELECT TOP 1 1 FROM @BaseCurrencySetting WHERE FromDate > ToDate)
+			BEGIN
+				SELECT @ErrMsg = 'FromDate could not be later than ToDate', @ErrCode = 506
+				RETURN
+			END
+			
+			--Duplicated from date/ to date between settings
+			IF EXISTS (
+				SELECT TOP 1 1
+				FROM @BaseCurrencySetting a 
+					LEFT JOIN @BaseCurrencySetting b ON a.Idx <> b.Idx 
+				WHERE(a.FromDate <= b.ToDate AND a.ToDate >= B.FromDate))
+			BEGIN
+				SELECT @ErrMsg = 'Cannot save the setting, please check From date/To date.', @ErrCode = 506
+				RETURN
+			END
+			
+			--Region Update Base Currency Settings
+			;MERGE dbo.OAS_PartyBaseCurrency WITH(ROWLOCK, UPDLOCK) AS t
+			USING @BaseCurrencySetting AS s
+			ON (t.PartyID = @PayerID AND t.BaseCurrencyId = s.BaseCurrencyId AND t.FromDate = s.FromDate)
+			WHEN MATCHED
+				THEN UPDATE SET t.ToDate = s.ToDate
+			WHEN NOT MATCHED BY TARGET
+				THEN INSERT(PartyID, BaseCurrencyId, LicenseeCode, FromDate, ToDate)
+						VALUES(@PayerID, s.BaseCurrencyId, s.LicenseeCode, s.FromDate, s.ToDate);
+			--Endregion
+		END
 
 		SET @xml = (
 			SELECT	@PayerId			AS '@pid'
@@ -129,9 +205,7 @@ BEGIN
 					, @Description		AS '@des'
 					, @Address1			AS '@a1'
 					, @Address2			AS '@a2'
-					, @BaseCurrencyId	AS '@bc'
 					, @InvoiceLanguage	AS '@il'
-					, @LicenseeCode		AS '@lc'
 			FROM dbo.OAS_Party p WITH (NOLOCK)
 				INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 			WHERE p.PartyID = @PayerId
