@@ -11,6 +11,7 @@ GO
 
 DECLARE @ToDate DATE = '2050-01-01', @CurrentDate DATE = GETDATE()
 DECLARE @SB_ChargeInfoSettings	TABLE (PartyId INT, PartyName VARCHAR(50), Rate MONEY, FromDate DATE, ToDate DATE, Current_SB_ChargeID INT) 
+DECLARE @ChargeIdsInserted TABLE (ChargeId INT)
 
 PRINT 'Prepare new SB term settings here: 999 records'
 BEGIN
@@ -45,19 +46,13 @@ PRINT 'Step 3. Add new SB settings with a different charge rate '
 BEGIN
 	PRINT 'Step 3.1: OAS_ChargeInfo'
 	INSERT INTO dbo.OAS_ChargeInfo (ProductID, FromParty, ToParty, ParentChargeID, Rate, Remark, BasisOfBilling, ChargeType, FirstOfBilling, FromDate, ToDate, BaseCurrencyId)
+	OUTPUT INSERTED.ChargeID INTO @ChargeIdsInserted
 	SELECT ProductId, FromParty, ToParty, ParentChargeID, p.Rate, Remark, BasisOfBilling, ChargeType, FirstOfBilling, p.FromDate, p.ToDate, BaseCurrencyId
 	FROM @SB_ChargeInfoSettings p
 	INNER JOIN OAS_ChargeInfo ci WITH (NOLOCK) ON p.Current_SB_ChargeID = ci.ChargeID
 
 	PRINT 'Step 3.2: LA_ChargeInfo_SystemMapping'
 	INSERT INTO LA_ChargeInfo_SystemMapping(ChargeID, SystemID)
-	SELECT ci_2.ChargeID, 2
-	FROM @SB_ChargeInfoSettings p
-	CROSS APPLY
-	(
-		SELECT TOP 1 ci.ChargeID
-		FROM OAS_ChargeInfo ci WITH(NOLOCK)
-		WHERE ci.ToDate >= @CurrentDate AND ci.FromParty = p.PartyID AND ci.ProductID = 0 -- SB only
-		ORDER BY ToDate DESC
-	) ci_2
+	SELECT ChargeID, 2
+	FROM @ChargeIdsInserted
 END
