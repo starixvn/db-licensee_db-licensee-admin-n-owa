@@ -110,8 +110,10 @@ BEGIN
 	END
 
 	-- #Region OAS_PartyBaseCurrency
+	DECLARE @FirstDateOfMonth DATE = DATEADD(MM, DATEDIFF(MM, 0, @LaunchDate), 0)
+
 	INSERT INTO dbo.OAS_PartyBaseCurrency(PartyID, BaseCurrencyId, LicenseeCode, FromDate, ToDate)
-	VALUES(@NewPartyId, @BaseCurrencyId, ISNULL(@LicenseeCode, ''), @LaunchDate, '20500101')
+	VALUES(@NewPartyId, @BaseCurrencyId, ISNULL(@LicenseeCode, ''), @FirstDateOfMonth, '20500101')
 	-- #Endregion OAS_PartyBaseCurrency
 
 	IF @@ERROR <> 0
