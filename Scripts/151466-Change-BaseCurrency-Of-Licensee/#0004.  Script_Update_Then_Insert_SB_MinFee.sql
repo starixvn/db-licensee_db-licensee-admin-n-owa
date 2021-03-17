@@ -9,7 +9,7 @@
 USE bodb_Licensee 
 GO
 
-DECLARE @CurrentDate DATE = GETDATE(),
+DECLARE @CutOffTime DATE = '20210301',
 		@MinFeeTypeId	INT = 1,
 		@CNY_CurrencyId INT = 13
 
@@ -31,7 +31,7 @@ BEGIN
 	(
 		SELECT TOP 1 m.MinFeeId
 		FROM LA_MinFee m WITH(NOLOCK)
-		WHERE m.ToDate >= @CurrentDate AND m.PartyId = p.PartyID AND m.FeeTypeId = @MinFeeTypeId AND m.ProductID = 0 -- SB only
+		WHERE m.ToDate >= @CutOffTime AND m.PartyId = p.PartyID AND m.FeeTypeId = @MinFeeTypeId AND m.ProductID = 0 -- SB only
 		ORDER BY ToDate DESC
 	) m2
 END

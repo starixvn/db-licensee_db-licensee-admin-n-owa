@@ -9,7 +9,7 @@
 USE bodb_Licensee 
 GO
 
-DECLARE @CurrentDate DATE = GETDATE()
+DECLARE @CutOffTime DATE = '20210301'
 DECLARE @SB_ChargeInfoSettings	TABLE (PartyId INT, PartyName VARCHAR(50), Rate MONEY, FromDate DATE, ToDate DATE, Current_SB_ChargeID INT) 
 DECLARE @ChargeIdsInserted TABLE (ChargeId INT)
 
@@ -29,7 +29,7 @@ BEGIN
 	(
 		SELECT TOP 1 ci.ChargeID
 		FROM OAS_ChargeInfo ci WITH(NOLOCK)
-		WHERE ci.ToDate >= @CurrentDate AND ci.FromParty = p.PartyID AND ci.ProductID = 0 -- SB only
+		WHERE ci.ToDate >= @CutOffTime AND ci.FromParty = p.PartyID AND ci.ProductID = 0 -- SB only
 		ORDER BY ToDate DESC
 	) ci_2
 END
