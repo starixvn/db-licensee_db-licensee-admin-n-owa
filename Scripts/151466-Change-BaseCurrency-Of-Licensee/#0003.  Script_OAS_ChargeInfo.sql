@@ -10,7 +10,7 @@ USE bodb_Licensee
 GO
 
 DECLARE @ToDate DATE = '2050-01-01', @CurrentDate DATE = GETDATE()
-DECLARE @SB_ChargeInfoSettings	TABLE (PartyId INT, PartyName VARCHAR(50), Current_SB_ChargeID INT, Rate MONEY, FromDate DATE, ToDate DATE) 
+DECLARE @SB_ChargeInfoSettings	TABLE (PartyId INT, PartyName VARCHAR(50), Rate MONEY, FromDate DATE, ToDate DATE, Current_SB_ChargeID INT) 
 
 PRINT 'Prepare new SB term settings here: 999 records'
 BEGIN
