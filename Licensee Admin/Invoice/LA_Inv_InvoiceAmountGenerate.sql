@@ -380,7 +380,7 @@ BEGIN
 			AND m.FromDate <= @ToDate AND m.ToDate >= @FromDate AND @BaseCurrencyId <> m.CurrencyId
 	)
 	BEGIN
-		SELECT @ErrCode = 1, @ErrMsg = 'Please check the Exchange settings of Payer''s minfee or minfee group. Exchange of minfee or minfees in group should be the same with Payer''s exchange.'
+		SELECT @ErrCode = 1, @ErrMsg = 'Please check the Exchange settings of Payer''s minfee. Exchange of minfee should be the same with Payer''s exchange.'
 		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
 		RETURN
 	END
