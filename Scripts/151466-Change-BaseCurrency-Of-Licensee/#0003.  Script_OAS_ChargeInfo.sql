@@ -9,9 +9,8 @@
 USE bodb_Licensee 
 GO
 
-
 DECLARE @ToDate DATE = '2050-01-01', @CurrentDate DATE = GETDATE()
-DECLARE @SB_ChargeInfoSettings	TABLE (PartyId INT, PartyName VARCHAR(50), Current_ChargeID INT, Rate MONEY, Remark NVARCHAR(400), FirstOfBilling DATE, BasisOfBilling NVARCHAR(500), ChargeType INT, FromDate DATE, ToDate DATE, BaseCurrencyID INT) 
+DECLARE @SB_ChargeInfoSettings	TABLE (PartyId INT, PartyName VARCHAR(50), Current_SB_ChargeID INT, Rate MONEY, FromDate DATE, ToDate DATE) 
 
 PRINT 'Prepare new SB term settings here: 999 records'
 BEGIN
@@ -20,17 +19,14 @@ BEGIN
 		 ,(72, '9Club', 0.07, '20210301', '20500101')
 END
 
-PRINT 'Step 1. Find exactly current SB settings'
+PRINT 'Step 1. Find exactly Current_SB_ChargeID'
 BEGIN
 	UPDATE p
-	SET	p.Current_ChargeID = ci_2.ChargeID,
-		p.FirstOfBilling = ci_2.FirstOfBilling,
-		p.BasisOfBilling = ci_2.BasisOfBilling,
-		p.ChargeType = ci_2.ChargeType
+	SET	p.Current_SB_ChargeID = ci_2.ChargeID
 	FROM @SB_ChargeInfoSettings p
 	CROSS APPLY
 	(
-		SELECT TOP 1 ci.ChargeID, FirstOfBilling, BasisOfBilling, ChargeType
+		SELECT TOP 1 ci.ChargeID
 		FROM OAS_ChargeInfo ci WITH(NOLOCK)
 		WHERE ci.ToDate >= @CurrentDate AND ci.FromParty = p.PartyID AND ci.ProductID = 0 -- SB only
 		ORDER BY ToDate DESC
@@ -42,12 +38,26 @@ BEGIN
 	UPDATE ci
 	SET ci.ToDate = DATEADD(DAY, -1, p.FromDate) 
 	FROM OAS_ChargeInfo ci WITH (NOLOCK)
-	INNER JOIN @SB_ChargeInfoSettings p ON ci.FromParty = p.PartyId
+	INNER JOIN @SB_ChargeInfoSettings p ON ci.ChargeID = p.Current_SB_ChargeID
 END
 
 PRINT 'Step 3. Add new SB settings with a different charge rate '
 BEGIN
 	PRINT 'Step 3.1: OAS_ChargeInfo'
+	INSERT INTO dbo.OAS_ChargeInfo (ProductID, FromParty, ToParty, ParentChargeID, Rate, Remark, BasisOfBilling, ChargeType, FirstOfBilling, FromDate, ToDate, BaseCurrencyId)
+	SELECT ProductId, FromParty, ToParty, ParentChargeID, p.Rate, Remark, BasisOfBilling, ChargeType, FirstOfBilling, p.FromDate, p.ToDate, BaseCurrencyId
+	FROM @SB_ChargeInfoSettings p
+	INNER JOIN OAS_ChargeInfo ci WITH (NOLOCK) ON p.Current_SB_ChargeID = ci.ChargeID
 
 	PRINT 'Step 3.2: LA_ChargeInfo_SystemMapping'
+	INSERT INTO LA_ChargeInfo_SystemMapping(ChargeID, SystemID)
+	SELECT ci_2.ChargeID, 2
+	FROM @SB_ChargeInfoSettings p
+	CROSS APPLY
+	(
+		SELECT TOP 1 ci.ChargeID
+		FROM OAS_ChargeInfo ci WITH(NOLOCK)
+		WHERE ci.ToDate >= @CurrentDate AND ci.FromParty = p.PartyID AND ci.ProductID = 0 -- SB only
+		ORDER BY ToDate DESC
+	) ci_2
 END
