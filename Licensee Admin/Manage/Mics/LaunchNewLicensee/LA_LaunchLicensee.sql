@@ -104,7 +104,7 @@ BEGIN
 	END
 	
 	DECLARE @NewPartyId	INT = 0
-	EXEC dbo.LA_LaunchLicensee_PartyIns @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @LicenseeCode, @BaseCurrencyId, @NewPartyId OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT 
+	EXEC dbo.LA_LaunchLicensee_PartyIns @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @LicenseeCode, @BaseCurrencyId, @LaunchDate, @NewPartyId OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT 
 	
 	IF @ErrCode = 0
 	BEGIN
