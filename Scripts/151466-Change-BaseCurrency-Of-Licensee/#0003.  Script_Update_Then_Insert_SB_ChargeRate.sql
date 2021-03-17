@@ -4,12 +4,12 @@
 	Created: 20210317@Parsons
 	DB: DBCUST.bodb_Licensee
 	Task: Change-BaseCurrency-Of-Licensee [#FeatureID 151466]
-	Description: End Sportsbook settings & create a new one with a different charge rate
+	Description: End Sportsbook charge rate settings & create a new one with a different charge rate
 */
 USE bodb_Licensee 
 GO
 
-DECLARE @ToDate DATE = '2050-01-01', @CurrentDate DATE = GETDATE()
+DECLARE @CurrentDate DATE = GETDATE()
 DECLARE @SB_ChargeInfoSettings	TABLE (PartyId INT, PartyName VARCHAR(50), Rate MONEY, FromDate DATE, ToDate DATE, Current_SB_ChargeID INT) 
 DECLARE @ChargeIdsInserted TABLE (ChargeId INT)
 
