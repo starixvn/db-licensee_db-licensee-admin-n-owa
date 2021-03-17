@@ -9,51 +9,19 @@
 USE bodb_Licensee 
 GO
 
-DECLARE @SB_ChargeInfoSettingData VARCHAR(MAX)= '<Root>
-								<ChargeInfoSetting>
-									<PartyId>14</PartyId>
-									<PartyName>12Bet</PartyName>
-									<Rate>0.1</Rate>
-									<FromDate>20210301</FromDate>
-									<ToDate>20500101</ToDate>
-								</ChargeInfoSetting>
-								<ChargeInfoSetting>
-									<PartyId>72</PartyId>
-									<PartyName>9Club</PartyName>
-									<Rate>0.07</Rate>
-									<FromDate>20210301</FromDate>
-									<ToDate>20500101</ToDate>
-								</ChargeInfoSetting>
-							</Root>'
+
 DECLARE @ToDate DATE = '2050-01-01', @CurrentDate DATE = GETDATE()
+DECLARE @SB_ChargeInfoSettings	TABLE (PartyId INT, PartyName VARCHAR(50), Current_ChargeID INT, Rate MONEY, Remark NVARCHAR(400), FirstOfBilling DATE, BasisOfBilling NVARCHAR(500), ChargeType INT, FromDate DATE, ToDate DATE, BaseCurrencyID INT) 
 
-BEGIN -- Parse XML settings
-	DECLARE @SB_ChargeInfoSettings	TABLE (PartyId INT, PartyName VARCHAR(50), Current_ChargeID INT, Rate MONEY, Remark NVARCHAR(400), FirstOfBilling DATE, BasisOfBilling NVARCHAR(500), ChargeType INT, FromDate DATE, ToDate DATE, BaseCurrencyID INT) 
-	IF(@SB_ChargeInfoSettingData <> '')
+PRINT 'Prepare new SB term settings here: 999 records'
 BEGIN
-	DECLARE @docHandler INT
-
-	BEGIN TRY
-		EXEC sp_xml_preparedocument @docHandler OUTPUT, @SB_ChargeInfoSettingData
-		INSERT INTO @SB_ChargeInfoSettings(PartyId, PartyName, Rate, FromDate, ToDate)
-		SELECT PartyId, PartyName, Rate, FromDate, ToDate
-		FROM OPENXML(@docHandler, 'Root/ChargeInfoSetting')
-		WITH (	PartyId	INT 'PartyId',
-				PartyName VARCHAR(50) 'PartyName',
-				Rate	MONEY 'Rate', 
-				FromDate DATE 'FromDate',
-				ToDate DATE 'ToDate')
-	
-		EXEC sp_xml_removedocument @docHandler
-	END TRY
-	BEGIN CATCH
-		SELECT 'Charge info setting data invalid. Please try again.'
-		RETURN
-	END CATCH;
-END
+	INSERT INTO @SB_ChargeInfoSettings(PartyId, PartyName, Rate, FromDate, ToDate)
+	VALUES(14, '12Bet', 0.1, '20210301', '20500101')
+		 ,(72, '9Club', 0.07, '20210301', '20500101')
 END
 
-BEGIN -- Step 1. Find SB settings exactly
+PRINT 'Step 1. Find exactly current SB settings'
+BEGIN
 	UPDATE p
 	SET	p.Current_ChargeID = ci_2.ChargeID,
 		p.FirstOfBilling = ci_2.FirstOfBilling,
@@ -69,15 +37,17 @@ BEGIN -- Step 1. Find SB settings exactly
 	) ci_2
 END
 
-BEGIN -- Step 2. End settings
+PRINT 'Step 2. End current SB settings'
+BEGIN
 	UPDATE ci
 	SET ci.ToDate = DATEADD(DAY, -1, p.FromDate) 
 	FROM OAS_ChargeInfo ci WITH (NOLOCK)
 	INNER JOIN @SB_ChargeInfoSettings p ON ci.FromParty = p.PartyId
 END
 
-BEGIN -- Step 3. Add new with a different charge rate 
-	-- 3.1 OAS_ChargeInfo
-	SELECT 123
-	-- 3.2 LA_ChargeInfo_SystemMapping
+PRINT 'Step 3. Add new SB settings with a different charge rate '
+BEGIN
+	PRINT 'Step 3.1: OAS_ChargeInfo'
+
+	PRINT 'Step 3.2: LA_ChargeInfo_SystemMapping'
 END
