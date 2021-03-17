@@ -252,6 +252,39 @@ BEGIN
 		RETURN
 	END
 
+	-- check payer exchange & Group Min Fee exchange
+	--
+	DECLARE @GMFCurrencyId INT = (
+		SELECT TOP 1 d.CurrencyId
+		FROM dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK)
+		INNER JOIN dbo.LA_GroupMinFeeHeader h WITH(NOLOCK) ON a.GroupMinFeeID=h.GroupMinFeeID
+		INNER JOIN dbo.LA_GroupMinFeeDetail d WITH(NOLOCK) ON h.GroupMinFeeID=d.GroupMinFeeID
+		WHERE h.FromDate <= @ToDate
+			AND h.ToDate >= @FromDate
+			AND a.PartyID = @PartyId
+		ORDER BY h.ToDate DESC
+	)
+	
+	IF @GMFCurrencyId IS NOT NULL AND @GMFCurrencyId != @BaseCurrencyId
+	BEGIN
+		SELECT @ErrCode = 3, @ErrMsg = 'Please check the Exchange settings of Payer''s group min fee. Exchange of group min fee must be the same with Payer''s exchange.'
+		SELECT ProductId,
+			ProductCode,
+			ProductName,
+			InvoiceAmount,
+			AmountType,
+			Rate,
+			DeductMonthlyFees,
+			RemainingAmount,
+			Remark 
+		FROM @FinalResult
+		
+		DROP TABLE #Exchange
+		DROP TABLE #AmountToCompany
+
+		RETURN
+	END
+
 	-- Region: Get Amount by Product (The remaining products)
 	CREATE	TABLE #TempData (
 			LicenseeId		INT, 
