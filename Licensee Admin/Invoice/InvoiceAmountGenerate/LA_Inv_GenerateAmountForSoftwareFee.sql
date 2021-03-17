@@ -259,8 +259,8 @@ BEGIN
 		FROM dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK)
 		INNER JOIN dbo.LA_GroupMinFeeHeader h WITH(NOLOCK) ON a.GroupMinFeeID=h.GroupMinFeeID
 		INNER JOIN dbo.LA_GroupMinFeeDetail d WITH(NOLOCK) ON h.GroupMinFeeID=d.GroupMinFeeID
-		WHERE h.FromDate <= @ToDate
-			AND h.ToDate >= @FromDate
+		WHERE d.FromDate <= @ToDate
+			AND d.ToDate >= @FromDate
 			AND a.PartyID = @PartyId
 		ORDER BY h.ToDate DESC
 	)
