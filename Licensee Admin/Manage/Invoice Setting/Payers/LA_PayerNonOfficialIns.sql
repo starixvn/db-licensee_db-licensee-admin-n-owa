@@ -18,6 +18,7 @@ ALTER PROCEDURE [dbo].[LA_PayerNonOfficialIns]
 	, @ErrCode			INT				= 0  OUTPUT
 	, @ErrMsg			NVARCHAR(1000)	= '' OUTPUT
 	, @InvoiceLanguage	VARCHAR(7)
+	, @BaseCurrencySettingXml	NVARCHAR(MAX)	= ''
 AS
 /*
 	Created: 20161109@bruce.bui
@@ -61,11 +62,67 @@ BEGIN
 		RETURN
 	END
 
+	-- Get Base currency setting from xml
+	IF ISNULL(@BaseCurrencySettingXml, '') <> ''
+	BEGIN
+		DECLARE @BaseCurrencySetting TABLE(Idx INT IDENTITY(1, 1)
+											, BaseCurrencyId TINYINT
+											, LicenseeCode VARCHAR(50)
+											, FromDate DATE
+											, ToDate DATE)
+		DECLARE @docHandler INT
+			
+		BEGIN TRY
+			EXEC sp_xml_preparedocument @docHandler OUTPUT, @BaseCurrencySettingXml
+			INSERT INTO @BaseCurrencySetting(BaseCurrencyId, LicenseeCode, FromDate, ToDate)
+			SELECT BaseCurrencyId, LicenseeCode, FromDate, ToDate
+			FROM OPENXML(@docHandler, 'Root/BaseCurrencySetting')
+			WITH(BaseCurrencyId TINYINT 'BaseCurrencyId',
+					LicenseeCode VARCHAR(50) 'LicenseeCode',
+					FromDate DATE 'FromDate',
+					ToDate DATE 'ToDate')
+						
+			EXEC sp_xml_removedocument @docHandler
+		END TRY
+		BEGIN CATCH
+			SELECT @ErrMsg = 'Base Currency setting data invalid. Please try again.', @ErrCode = 100
+			RETURN
+		END CATCH
+			
+		--FromDate must less than ToDate
+		IF EXISTS (SELECT TOP 1 1 FROM @BaseCurrencySetting WHERE FromDate > ToDate)
+		BEGIN
+			SELECT @ErrMsg = 'FromDate could not be later than ToDate', @ErrCode = 506
+			RETURN
+		END
+			
+		--Duplicated from date/ to date between settings
+		IF EXISTS (
+			SELECT TOP 1 1
+			FROM @BaseCurrencySetting a 
+				LEFT JOIN @BaseCurrencySetting b ON a.Idx <> b.Idx 
+			WHERE(a.FromDate <= b.ToDate AND a.ToDate >= B.FromDate))
+		BEGIN
+			SELECT @ErrMsg = 'Cannot save the setting, please check From date/To date.', @ErrCode = 506
+			RETURN
+		END
+	END
+	ELSE
+	BEGIN
+		SELECT @ErrMsg = 'Should has at least 1 base currency setting.', @ErrCode = 506
+		RETURN
+	END
+	-- End region Get Base currency setting from xml
+
 	INSERT INTO dbo.OAS_Party(PartyName, Description, PartyType) VALUES (@PayerName, 'Non-Official', 5)
 	SET @PayerId = SCOPE_IDENTITY()
 
 	INSERT INTO dbo.OAS_PartyDetail(PartyId, BrandName, CompanyName, AttnName, Description, Address1, Address2, IsAllowedMemberComm, IsDeposit, StatusId, InvoiceLanguage)
 	VALUES(@PayerId, @BrandName, @CompanyName, @AttnName, @Description, @Address1, @Address2, 0, @IsDeposit , @IsActive, @InvoiceLanguage)
+
+	INSERT INTO dbo.OAS_PartyBaseCurrency(BaseCurrencyId, PartyID, FromDate, ToDate, LicenseeCode)
+	SELECT b.BaseCurrencyId, @PayerId, b.FromDate, b.ToDate, b.LicenseeCode
+	FROM @BaseCurrencySetting b
 
 	SET @xml = (
 		SELECT	p.PartyID			AS '@pid'
@@ -79,6 +136,7 @@ BEGIN
 				, pd.Address1		AS '@a1'
 				, pd.Address2		AS '@a2'
 				, pd.InvoiceLanguage AS '@il'
+				, @BaseCurrencySettingXml AS '@bc'
 		FROM dbo.OAS_Party p WITH (NOLOCK)
 			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 		WHERE p.PartyID = @PayerId
