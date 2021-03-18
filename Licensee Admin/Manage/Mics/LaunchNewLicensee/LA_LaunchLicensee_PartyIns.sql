@@ -110,19 +110,11 @@ BEGIN
 	END
 
 	-- #Region OAS_PartyBaseCurrency
-	DECLARE @FirstDateOfMonth DATE = DATEADD(MM, DATEDIFF(MM, 0, @LaunchDate), 0)
-	
 	IF EXISTS(SELECT TOP 1 1 FROM dbo.OAS_PartyBaseCurrency WITH(NOLOCK) WHERE PartyID = @NewPartyId AND BaseCurrencyId = @BaseCurrencyId)
 	BEGIN
 		UPDATE dbo.OAS_PartyBaseCurrency
-		SET LicenseeCode = ISNULL(@LicenseeCode, ''),
-			FromDate = @FirstDateOfMonth
+		SET LicenseeCode = ISNULL(@LicenseeCode, '')
 		WHERE PartyID = @NewPartyId
-	END
-	ELSE
-	BEGIN
-		INSERT INTO dbo.OAS_PartyBaseCurrency(PartyID, BaseCurrencyId, LicenseeCode, FromDate, ToDate)
-		VALUES(@NewPartyId, @BaseCurrencyId, ISNULL(@LicenseeCode, ''), @FirstDateOfMonth, '20500101')
 	END
 	-- #Endregion OAS_PartyBaseCurrency
 

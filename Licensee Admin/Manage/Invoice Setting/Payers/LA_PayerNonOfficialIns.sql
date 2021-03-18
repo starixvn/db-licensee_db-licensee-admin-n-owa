@@ -115,15 +115,17 @@ BEGIN
 		END
 	END
 	-- End region Get Base currency setting from xml
-
+	DECLARE @FirstDateOfMonth DATE = DATEADD(MM, DATEDIFF(MM, 0, GETDATE()), 0)
+	
 	INSERT INTO dbo.OAS_Party(PartyName, Description, PartyType) VALUES (@PayerName, 'Non-Official', 5)
 	SET @PayerId = SCOPE_IDENTITY()
 
 	INSERT INTO dbo.OAS_PartyDetail(PartyId, BrandName, CompanyName, AttnName, Description, Address1, Address2, IsAllowedMemberComm, IsDeposit, StatusId, InvoiceLanguage)
-	VALUES(@PayerId, @BrandName, @CompanyName, @AttnName, @Description, @Address1, @Address2, 0, @IsDeposit , @IsActive, @InvoiceLanguage)
+	SELECT @PayerId, @BrandName, @CompanyName, @AttnName, @Description, @Address1, @Address2, 0, @IsDeposit , @IsActive, @InvoiceLanguage
+	FROM @BaseCurrencySetting
 
 	INSERT INTO dbo.OAS_PartyBaseCurrency(BaseCurrencyId, PartyID, FromDate, ToDate, LicenseeCode)
-	SELECT b.BaseCurrencyId, @PayerId, b.FromDate, b.ToDate, b.LicenseeCode
+	SELECT b.BaseCurrencyId, @PayerId, @FirstDateOfMonth, b.ToDate, b.LicenseeCode
 	FROM @BaseCurrencySetting b
 
 	SET @xml = (
