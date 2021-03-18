@@ -30,7 +30,7 @@ BEGIN
 END
 
 ----------------------------------------------------------------------------------------------------------------------------
-PRINT 'Prepare LicenseeCode SB terms: 89 records'
+PRINT 'Prepare LicenseeCode SB terms: 88 records'
 DECLARE @NewLicenseeCodeTable TABLE(PartyID INT, PartyName VARCHAR(50), LicenseeCode VARCHAR(50), FromDate DATE, ToDate DATE)
 INSERT INTO @NewLicenseeCodeTable(PartyID, PartyName, LicenseeCode, FromDate, ToDate)
 VALUES
@@ -99,7 +99,6 @@ VALUES
 		,(516, 	'PKKing', 	'PHL-LSEE-PKKING CNY', 	@CutOffTime, 	@ToDate)			
 		,(543, 	'SDY', 	'PHL-LSEE-SDY CNY', 	@CutOffTime, 	@ToDate)
 		,(468, 	'Soon88', 	'PHL-LSEE-SOON88 CNY', 	@CutOffTime, 	@ToDate)
-		,(404, 	'Spark', 	'PHL-LSEE-SPARK CNY', 	@CutOffTime, 	@ToDate)
 		,(306, 	'TangChao', 	'PHL-LSEE-TANGCHAO CNY', 	@CutOffTime, 	@ToDate)
 		,(433, 	'TaoCai', 	'PHL-LSEE-TAOCAI CNY', 	@CutOffTime, 	@ToDate)
 		,(430, 	'TCbet', 	'PHL-LSEE-TCBET CNY', 	@CutOffTime, 	@ToDate)
