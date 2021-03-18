@@ -47,7 +47,7 @@ END
 PRINT 'Step 3. Add new SB MinFee settings with a different amount'
 BEGIN
 	INSERT INTO dbo.LA_MinFee(PartyId, ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority], CurrencyId)
-	SELECT p.PartyID, m.ProductId, FeeTypeId, p.FeeAmount, p.FromDate, p.ToDate, p.MinFeeTerm, [Priority], @CNY_CurrencyId
-	FROM @SB_MinFeeSettings p
-	INNER JOIN LA_MinFee m WITH(NOLOCK) ON p.Current_SB_MinFeeID = m.MinFeeId
+	SELECT new.PartyID, old.ProductId, FeeTypeId, new.FeeAmount, new.FromDate, new.ToDate, old.MinFeeTerm + CHAR(13) + new.MinFeeTerm, [Priority], @CNY_CurrencyId
+	FROM @SB_MinFeeSettings new
+	INNER JOIN LA_MinFee old WITH(NOLOCK) ON new.Current_SB_MinFeeID = old.MinFeeId
 END
