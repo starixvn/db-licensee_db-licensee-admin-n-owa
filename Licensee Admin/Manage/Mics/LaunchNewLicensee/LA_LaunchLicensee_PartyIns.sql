@@ -115,7 +115,7 @@ BEGIN
 	IF EXISTS(SELECT TOP 1 1 FROM dbo.OAS_PartyBaseCurrency WITH(NOLOCK) WHERE PartyID = @NewPartyId AND BaseCurrencyId = @BaseCurrencyId)
 	BEGIN
 		UPDATE dbo.OAS_PartyBaseCurrency
-		SET LicenseeCode = @LicenseeCode,
+		SET LicenseeCode = ISNULL(@LicenseeCode, ''),
 			FromDate = @FirstDateOfMonth
 		WHERE PartyID = @NewPartyId
 	END
