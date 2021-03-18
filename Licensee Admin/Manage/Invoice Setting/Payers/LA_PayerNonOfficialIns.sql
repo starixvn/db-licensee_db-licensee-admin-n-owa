@@ -88,6 +88,13 @@ BEGIN
 			SELECT @ErrMsg = 'Base Currency setting data invalid. Please try again.', @ErrCode = 100
 			RETURN
 		END CATCH
+
+		-- Should have at least 1 base currency setting
+		IF NOT EXISTS (SELECT TOP 1 1 FROM @BaseCurrencySetting)
+		BEGIN
+			SELECT @ErrMsg = 'Should have at least 1 base currency setting.', @ErrCode = 506
+			RETURN
+		END
 			
 		--FromDate must less than ToDate
 		IF EXISTS (SELECT TOP 1 1 FROM @BaseCurrencySetting WHERE FromDate > ToDate)
@@ -106,11 +113,6 @@ BEGIN
 			SELECT @ErrMsg = 'Cannot save the setting, please check From date/To date.', @ErrCode = 506
 			RETURN
 		END
-	END
-	ELSE
-	BEGIN
-		SELECT @ErrMsg = 'Should has at least 1 base currency setting.', @ErrCode = 506
-		RETURN
 	END
 	-- End region Get Base currency setting from xml
 
