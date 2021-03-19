@@ -119,13 +119,17 @@ BEGIN
 	
 	INSERT INTO dbo.OAS_Party(PartyName, Description, PartyType) VALUES (@PayerName, 'Non-Official', 5)
 	SET @PayerId = SCOPE_IDENTITY()
+	
+	UPDATE @BaseCurrencySetting
+	SET FromDate = @FirstDateOfMonth
+	WHERE Idx = (SELECT TOP 1 Idx FROM @BaseCurrencySetting ORDER BY FromDate ASC)
 
 	INSERT INTO dbo.OAS_PartyDetail(PartyId, BrandName, CompanyName, AttnName, Description, Address1, Address2, BaseCurrencyId, IsAllowedMemberComm, IsDeposit, StatusId, InvoiceLanguage, LicenseeCode)
 	SELECT TOP 1 @PayerId, @BrandName, @CompanyName, @AttnName, @Description, @Address1, @Address2, BaseCurrencyId, 0, @IsDeposit , @IsActive, @InvoiceLanguage, LicenseeCode
 	FROM @BaseCurrencySetting
 
 	INSERT INTO dbo.OAS_PartyBaseCurrency(BaseCurrencyId, PartyID, FromDate, ToDate, LicenseeCode)
-	SELECT b.BaseCurrencyId, @PayerId, @FirstDateOfMonth, b.ToDate, b.LicenseeCode
+	SELECT b.BaseCurrencyId, @PayerId, b.FromDate, b.ToDate, b.LicenseeCode
 	FROM @BaseCurrencySetting b
 
 	SET @xml = (
