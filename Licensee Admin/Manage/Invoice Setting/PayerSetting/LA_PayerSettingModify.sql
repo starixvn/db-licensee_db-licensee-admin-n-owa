@@ -83,28 +83,5 @@ BEGIN
 				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM bodb02.dbo.strSplit(@WaiveInsertedList, ','))
 			RETURN
 		END
-
-	-- update payer setting
-	DECLARE @startRun DATETIME = GETDATE()
-	
-	--build log string
-	DECLARE @logSPData VARCHAR(200) = (
-	SELECT @PayerID	AS '@fp'
-		FOR XML PATH('z'), ROOT('r')
-		)
-	DECLARE @endRun DATETIME = GETDATE()
-	DECLARE @duration INT = DATEDIFF(MILLISECOND, @startRun, @endRun) 
-
-	-- Write Log
-	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
-		@UserId			= @UserID
-		,@IP			= @LoginIP
-		,@LicenseeID	= 0
-		,@CurrencyID	= 0
-		,@SPName		= 'LA_PayerSettingModify'
-		,@CustId		= 0
-		,@Duration		= @duration
-		,@Data			= @logSPData
-		,@OldData		= ''
 END
 GO
