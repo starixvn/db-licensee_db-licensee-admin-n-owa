@@ -182,6 +182,13 @@ BEGIN
 				RETURN
 			END
 			
+			--Should have at least one base currency
+			IF NOT EXISTS (SELECT 1 FROM @BaseCurrencySetting)
+			BEGIN
+				SELECT @ErrMsg = 'Should has at least 1 base currency setting.', @ErrCode = 506
+				RETURN
+			END
+			
 			--Region Update Base Currency Settings
 			;MERGE dbo.OAS_PartyBaseCurrency WITH(ROWLOCK, UPDLOCK) AS t
 			USING @BaseCurrencySetting AS s
