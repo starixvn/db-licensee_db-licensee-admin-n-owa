@@ -120,8 +120,8 @@ BEGIN
 	INSERT INTO dbo.OAS_Party(PartyName, Description, PartyType) VALUES (@PayerName, 'Non-Official', 5)
 	SET @PayerId = SCOPE_IDENTITY()
 
-	INSERT INTO dbo.OAS_PartyDetail(PartyId, BrandName, CompanyName, AttnName, Description, Address1, Address2, IsAllowedMemberComm, IsDeposit, StatusId, InvoiceLanguage)
-	SELECT @PayerId, @BrandName, @CompanyName, @AttnName, @Description, @Address1, @Address2, 0, @IsDeposit , @IsActive, @InvoiceLanguage
+	INSERT INTO dbo.OAS_PartyDetail(PartyId, BrandName, CompanyName, AttnName, Description, Address1, Address2, BaseCurrencyId, IsAllowedMemberComm, IsDeposit, StatusId, InvoiceLanguage, LicenseeCode)
+	SELECT TOP 1 @PayerId, @BrandName, @CompanyName, @AttnName, @Description, @Address1, @Address2, BaseCurrencyId, 0, @IsDeposit , @IsActive, @InvoiceLanguage, LicenseeCode
 	FROM @BaseCurrencySetting
 
 	INSERT INTO dbo.OAS_PartyBaseCurrency(BaseCurrencyId, PartyID, FromDate, ToDate, LicenseeCode)
