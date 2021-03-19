@@ -8,7 +8,7 @@ AS
 /*
 	Created: 20210318@Happy
 	Task : Get base currency of payer
-	DB: DBCUST.bodb_Licensee
+	DB: DBLIC.bodb_Licensee
 
 	Revisions:
 		- 20210318@Happy: Initialize SP
