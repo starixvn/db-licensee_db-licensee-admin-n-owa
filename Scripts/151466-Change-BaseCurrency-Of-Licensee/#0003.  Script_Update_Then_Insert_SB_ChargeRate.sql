@@ -30,6 +30,7 @@ BEGIN
 		SELECT TOP 1 ci.ChargeID
 		FROM OAS_ChargeInfo ci WITH(NOLOCK)
 		WHERE ci.ToDate >= @CutOffTime AND ci.FromParty = p.PartyID AND ci.ProductID = 0 -- SB only
+			 AND ChargeType = 1 AND ToParty IN (1,9,11,98)
 		ORDER BY ToDate DESC
 	) ci_2
 END
