@@ -43,12 +43,6 @@ BEGIN
 			FROM @AMF_TransferAmount f
 			INNER JOIN @InvoiceHeaderInserted i ON f.PartyID = i.PartyId
 			WHERE i.IsWriteOff = 1
-	PRINT 'Step 1.2: Update MonthOfDeduction = 0'
-		UPDATE m SET MonthOfDeduction = 0
-		FROM @AMF_TransferAmount f
-		INNER JOIN dbo.LA_MinFee m WITH(NOLOCK) ON f.PartyID = m.PartyId AND m.FeeTypeId = 1 --MinFee
-												   AND m.CurrencyId = @EUR_CurrencyId
-												   AND @PreviousCutOffTime BETWEEN m.FromDate AND m.ToDate
 END
 
 PRINT 'Step 2. Initilize CNY amount'
