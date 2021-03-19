@@ -34,7 +34,7 @@ BEGIN
 	DECLARE @BaseCurrency VARCHAR(10)
 
 	SELECT TOP 1 @BaseCurrency = Code
-	FROM OAS_PartyBaseCurrency p WITH(NOLOCK)
+	FROM DBCUST.bodb_licensee.dbo.OAS_PartyBaseCurrency p WITH(NOLOCK)
 	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON p.BaseCurrencyId = e.exchangeid
 	WHERE p.PartyID = @PartyId AND p.FromDate <= @ToDate AND p.ToDate >= @FromDate
 	

@@ -100,7 +100,7 @@ BEGIN
 	DECLARE @BaseCurrencyName VARCHAR(10) = 'GBP'
 
 	SELECT TOP 1 @BaseCurrencyId = BaseCurrencyId
-	FROM OAS_PartyBaseCurrency WITH(NOLOCK)
+	FROM DBCUST.bodb_licensee.dbo.OAS_PartyBaseCurrency WITH(NOLOCK)
 	WHERE PartyID = @PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
 	
 	IF(@BaseCurrencyId IS NULL)
