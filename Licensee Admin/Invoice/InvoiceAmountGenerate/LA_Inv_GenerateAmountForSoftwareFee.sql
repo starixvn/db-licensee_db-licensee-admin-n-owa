@@ -484,25 +484,21 @@ BEGIN
 	SELECT @AGPrepayment, value
 		FROM (VALUES(25), (26), (27)) AS T3(value)
 
-	DECLARE @tblInvoiceAmounts TABLE (Income MONEY, Expense MONEY, InvItemTypeId INT)
-	SELECT @sql = 'SELECT Income, Expense, InvItemTypeId
-					FROM OPENQUERY(DBCUST, ''SELECT Income, Expense, InvItemTypeId FROM bodb_Licensee.dbo.LA_f_GetInvoiceAmount(' 
-																							+ CONVERT(VARCHAR(10), @PartyId)
-																							+ ', 0'
-																							+ ', ''''' + ISNULL(@Environment, '') + ''''''
-																							+ ')'')'
-	INSERT INTO @tblInvoiceAmounts (Income, Expense, InvItemTypeId)
-	EXEC (@sql)
+	DECLARE @CreditTable TABLE (Amount MONEY, InvItemTypeId INT, InvItemTypeKey VARCHAR(50))
 	
+	INSERT INTO @CreditTable(Amount, InvItemTypeId, InvItemTypeKey)
 	SELECT SUM(ISNULL(s.Income,0) - ISNULL(s.Expense,0)) AS Amount, s.InvItemTypeId, invT.[Key] AS InvItemTypeKey 
-	INTO #credit
-	FROM @tblInvoiceAmounts s
-		INNER JOIN @InvoiceItemTypes invT ON s.InvItemTypeId = invT.Value
+	FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
+	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
+	INNER JOIN @InvoiceItemTypes invT ON s.InvItemTypeId = invT.[Value]
+	WHERE s.RefPartyId = @PartyId AND ISNULL(h.StatusId, 0) = 0 AND h.Environment = @Environment
+		  AND (@BaseCurrencyId = h.CurrencyId OR (@BaseCurrencyId = 6/*EUR*/ AND h.CurrencyId IN (0, 6)))-- Because old data is stored 0 as EUR currency 
 	GROUP BY s.InvItemTypeId, invT.[Key]
+		
 
-	DECLARE @RemainingAmf MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeKey = @AdvanceMinFee), 0)
-	DECLARE @RemainingAG MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeKey = @AGPrepayment), 0)
-	DECLARE @Prepayment MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeKey = @PrepaymentKey), 0)
+	DECLARE @RemainingAmf MONEY = ISNULL((SELECT SUM(Amount) FROM @CreditTable WHERE InvItemTypeKey = @AdvanceMinFee), 0)
+	DECLARE @RemainingAG MONEY = ISNULL((SELECT SUM(Amount) FROM @CreditTable WHERE InvItemTypeKey = @AGPrepayment), 0)
+	DECLARE @Prepayment MONEY = ISNULL((SELECT SUM(Amount) FROM @CreditTable WHERE InvItemTypeKey = @PrepaymentKey), 0)
 
 	-- insert zero amount
 	INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, AmountType)
@@ -670,7 +666,6 @@ BEGIN
 	DROP TABLE #TempData
 	DROP TABLE #TempDataCB
 	DROP TABLE #AmountToCompany
-	DROP TABLE #credit
 
 END
 GO
