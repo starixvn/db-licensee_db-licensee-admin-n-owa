@@ -31,7 +31,7 @@ BEGIN
 		PRINT 'Step 1.1.1: Insert data into LA_InvoiceHeader'
 			INSERT INTO dbo.LA_InvoiceHeader (BillerId,PartyId,CurrencyId,InvoiceSymbol,InvoiceNumber,InvoiceDate,Amount,InvoiceType,StatusId,Note,Environment,FromDate,ToDate,DueDate,HasDeleted,HasSent,CreatedBy,CreatedDateTime)
 			OUTPUT INSERTED.InvoiceHeaderId, INSERTED.PartyId, 1 INTO @InvoiceHeaderInserted(InvoiceHeaderId, PartyId, IsWriteOff)
-			SELECT 0 AS BillerId,0 AS PartyId, @EUR_CurrencyId,'',1,@PreviousCutOffTime, FromAmount_InEUR, @InvoiceTypeId,0,'',@Environment,@PreviousCutOffTime,@PreviousCutOffTime,@PreviousCutOffTime,0,0,1,GETDATE()
+			SELECT 0 AS BillerId,PartyID, @EUR_CurrencyId,'',1,@PreviousCutOffTime, FromAmount_InEUR, @InvoiceTypeId,0,'',@Environment,@PreviousCutOffTime,@PreviousCutOffTime,@PreviousCutOffTime,0,0,1,GETDATE()
 			FROM @AMF_TransferAmount
 
 		PRINT 'Step 1.1.2: Insert data into LA_InvoiceStatement'
