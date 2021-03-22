@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+﻿/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
 USE bodb_licensee
 GO
 
@@ -8,7 +8,7 @@ AS
 /*
 	Created: 20210318@Happy
 	Task : Get base currency of payer
-	DB: DBLIC.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
 		- 20210318@Happy: Initialize SP
@@ -25,7 +25,7 @@ BEGIN
 	SELECT BaseCurrencyId AS CurrencyId,
 			e.Code AS CurrencyName
 	FROM dbo.OAS_PartyBaseCurrency p WITH(NOLOCK)
-	LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON p.BaseCurrencyId = e.exchangeid
+	LEFT JOIN DBCUST.dbo.Exchange e WITH (NOLOCK) ON p.BaseCurrencyId = e.exchangeid
 	WHERE (@PartyId = 0 OR PartyID = @PartyId)
 END
 GO
