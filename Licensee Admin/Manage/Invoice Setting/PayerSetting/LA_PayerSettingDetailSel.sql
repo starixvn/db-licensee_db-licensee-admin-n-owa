@@ -123,8 +123,8 @@ BEGIN
 	SELECT @CurrentBillingGroup = ISNULL((SELECT TOP 1 ToPartyId FROM @ChargeInfo ORDER BY FromDate DESC), 0)
 
 	SELECT TOP 1 c.PartyId		AS PayerID	
-		, mfh.GroupMinFeeID		AS GroupMinFeeID
-		, mfh.[Name]			AS GroupMinFeeName
+		, g.GroupMinFeeID		AS GroupMinFeeID
+		, g.[Name]				AS GroupMinFeeName
 		, c.ExchangeID
 		, d1.DiscountGroupId	AS DiscountGroupID
 		, d1.DiscountGroupName	AS DiscountGroupName
@@ -135,8 +135,13 @@ BEGIN
 	FROM @ChargeInfo c
 		INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID=c.PartyId
 		INNER JOIN dbo.OAS_PartyDetail pd ON pd.PartyId=c.PartyId
-		LEFT JOIN dbo.LA_GroupMinFeeAssignment mfa WITH (NOLOCK) ON  c.PartyId = mfa.PartyID
-		LEFT JOIN dbo.LA_GroupMinFeeHeader mfh WITH (NOLOCK) ON  mfa.GroupMinFeeID = mfh.GroupMinFeeID
+		LEFT JOIN (
+				SELECT TOP 1 mfa.PartyID, mfh.[Name], mfh.GroupMinFeeID
+				FROM dbo.LA_GroupMinFeeAssignment mfa WITH (NOLOCK) 
+				INNER JOIN dbo.LA_GroupMinFeeHeader mfh WITH (NOLOCK) ON  mfa.GroupMinFeeID = mfh.GroupMinFeeID
+				WHERE mfa.PartyID = @PayerId
+				ORDER BY mfh.ToDate DESC
+				) g ON c.PartyId = g.PartyID -- Group Min Fee
 		LEFT JOIN (
 				SELECT PartyId, DiscountGroupId, DiscountGroupName 
 				FROM @Discount 
