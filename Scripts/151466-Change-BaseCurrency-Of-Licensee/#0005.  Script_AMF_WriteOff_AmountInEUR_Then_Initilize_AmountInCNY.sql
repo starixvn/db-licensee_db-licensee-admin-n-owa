@@ -18,11 +18,13 @@ DECLARE @PreviousCutOffTime DATE = DATEADD(DAY, -1, @CutOffTime)
 DECLARE @AMF_TransferAmount	TABLE (PartyID INT, PartyName VARCHAR(50), FromAmount_InEUR MONEY,  ToAmount_InCNY MONEY) 
 DECLARE @InvoiceHeaderInserted TABLE (InvoiceHeaderId INT, PartyId INT, IsWriteOff BIT)
 
-PRINT 'Prepare AMF transfer amount here: 5 records'
+PRINT 'Prepare AMF transfer amount here: 4 records'
 BEGIN
 	INSERT INTO @AMF_TransferAmount(PartyId, PartyName, FromAmount_InEUR, ToAmount_InCNY)
-	VALUES(368, 'A1game', 5000, 100000)
-		 ,(72, '9Club', 40000, 80000)
+	VALUES(487, 'Baolong', 	2333.33, 	18666.64) 
+		,(482, 	'9dianyule', 	15000, 	120000) 
+		,(488, 	'Mayibet', 	10000, 	80000) 
+		,(510, 	'WGAMING', 	15000, 	120000) 
 END
 
 PRINT 'Step 1. Write off'
