@@ -2,12 +2,12 @@
 USE bodb_licensee
 GO
 
-ALTER PROCEDURE [dbo].[LA_PartyBaseCurrencySel]
+ALTER PROCEDURE [dbo].[LA_PartyBaseCurrencyIdSel]
 	@PartyId INT = 0
 AS
 /*
 	Created: 20210318@Happy
-	Task : Get base currency of payer
+	Task : Get base currency Id of payer
 	DB: DBCUST.bodb_Licensee
 
 	Revisions:
@@ -17,15 +17,13 @@ AS
 		- 0: get all
 		- <> 0: specific party
 	Example:
-		EXEC dbo.LA_PartyBaseCurrencySel
+		EXEC dbo.LA_PartyBaseCurrencyIdSelSel
 */
 BEGIN
 	SET NOCOUNT ON
 
-	SELECT BaseCurrencyId AS CurrencyId,
-			e.Code AS CurrencyName
+	SELECT BaseCurrencyId AS CurrencyId
 	FROM dbo.OAS_PartyBaseCurrency p WITH(NOLOCK)
-	LEFT JOIN DBCUST.dbo.Exchange e WITH (NOLOCK) ON p.BaseCurrencyId = e.exchangeid
 	WHERE (@PartyId = 0 OR PartyID = @PartyId)
 END
 GO
