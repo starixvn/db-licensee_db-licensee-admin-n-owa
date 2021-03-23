@@ -21,6 +21,7 @@ AS
 	Revisions:
 		- 20190312@Bruce: create SP [RedmineID: #105205]
 		- 20200821@Parsons: Add one more column into result set [#139055]
+		- 20210323@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -43,9 +44,16 @@ BEGIN
 	DECLARE @tmpPartyList AS TABLE(PartyId INT,SiteId INT, BaseCurrencyId INT)
 
 	INSERT INTO @tmpPartyList(PartyId,SiteId,BaseCurrencyId)
-	SELECT p.PartyID,p.OldRefID,d.BaseCurrencyId
+	SELECT p.PartyID, p.OldRefID, ISNULL(pbc_2.BaseCurrencyId, 6)-- Default EUR
 	FROM dbo.OAS_Party p WITH(NOLOCK)
 	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
+	OUTER APPLY
+	(
+		SELECT TOP 1 pbc.PartyID, pbc.BaseCurrencyId
+		FROM DBCUST.bodb_licensee.dbo.OAS_PartyBaseCurrency pbc WITH(NOLOCK)
+		WHERE pbc.PartyID = p.PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
+		ORDER BY ToDate DESC
+	) pbc_2
 	WHERE PartyType = @OfficialPartyType AND OldRefID IS NOT NULL AND ISNULL(d.IsDeposit,0) = 1
 
 	IF (@PartyIDs = '')
