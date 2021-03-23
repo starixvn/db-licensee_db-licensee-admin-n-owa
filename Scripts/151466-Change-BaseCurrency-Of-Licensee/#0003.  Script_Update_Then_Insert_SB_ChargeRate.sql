@@ -17,9 +17,9 @@ PRINT 'Prepare new SB charge rate settings here: 236 records'
 BEGIN
 	INSERT INTO @SB_ChargeInfoSettings(PartyId, PartyName, Rate, BasisOfBilling, FromDate, ToDate)
 	VALUES(288, '11bet', 	0.1, 	N'10% of Gross Win, effective from 01 Mar 2021', 	'20210301', 	'20500101')
-	,(14, 	'12BET', 	0.1, 	N'10% of Gross Win, effective from 01 Mar 2022', 	'20210301', 	'20500101')
-	,(342, 	'18Luck', 	0.1, 	N'10% of Gross Win, effective from 01 Mar 2022', 	'20210301', 	'20500101')
-	,(415, 	'24AVIA', 	0.08, 	N'8% of Gross Win, effective from 01 Mar 2022', 	'20210301', 	'20500101')
+	,(14, 	'12BET', 	0.1, 	N'10% of Gross Win, effective from 01 Mar 2021', 	'20210301', 	'20500101')
+	,(342, 	'18Luck', 	0.1, 	N'10% of Gross Win, effective from 01 Mar 2021', 	'20210301', 	'20500101')
+	,(415, 	'24AVIA', 	0.08, 	N'8% of Gross Win, effective from 01 Mar 2021', 	'20210301', 	'20500101')
 	,(158, 	'365online', 	0.1, 	N'授权费为: 10%, 从2021年3月1号开始', 	'20210301', 	'20500101')
 	,(56, 	'368CASH', 	0.1, 	N'10% of Gross Win, effective from 01 Mar 2021', 	'20210301', 	'20500101')
 	,(275, 	'396Club', 	0.1, 	N'10% of Gross Win, effective from 01 Mar 2021', 	'20210301', 	'20500101')
