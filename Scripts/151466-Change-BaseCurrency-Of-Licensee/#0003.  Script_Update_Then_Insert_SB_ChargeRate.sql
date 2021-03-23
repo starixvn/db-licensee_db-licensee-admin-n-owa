@@ -16,7 +16,7 @@ DECLARE @ChargeIdsInserted TABLE (ChargeId INT)
 PRINT 'Prepare new SB charge rate settings here: 236 records'
 BEGIN
 	INSERT INTO @SB_ChargeInfoSettings(PartyId, PartyName, Rate, BasisOfBilling, FromDate, ToDate)
-	VALUES(288, 	'11bet', 	0.1, 	N'10% of Gross Win, effective from 01 Mar 2021', 	'20210301', 	'20500101')
+	VALUES(288, '11bet', 	0.1, 	N'10% of Gross Win, effective from 01 Mar 2021', 	'20210301', 	'20500101')
 	,(14, 	'12BET', 	0.1, 	N'10% of Gross Win, effective from 01 Mar 2022', 	'20210301', 	'20500101')
 	,(342, 	'18Luck', 	0.1, 	N'10% of Gross Win, effective from 01 Mar 2022', 	'20210301', 	'20500101')
 	,(415, 	'24AVIA', 	0.08, 	N'8% of Gross Win, effective from 01 Mar 2022', 	'20210301', 	'20500101')
@@ -57,7 +57,7 @@ BEGIN
 	,(319, 	'BETSUN', 	0.1, 	N'授权费为: 10%, 从2021年3月1号开始', 	'20210301', 	'20500101')
 	,(220, 	'BigGaming', 	0.1, 	N'授权费为: 10%, 从2021年3月1号开始', 	'20210301', 	'20500101')
 	,(346, 	'Bobbet', 	0.05, 	N'授权费为: 5%, 从2021年3月1号开始', 	'20210301', 	'20500101')
-	,(294, 	'Bobo88', 	0.09, 	N'9% of Gross Win, effective from 01 Mar 2021', 	'20210301', 	'20500101')
+	,(294, 	'Bobo88', 	0.085, 	N'8.5% of Gross Win, effective from 01 Mar 2021', 	'20210301', 	'20500101')
 	,(412, 	'BOG22', 	0.1, 	N'10% of Gross Win, effective from 01 Mar 2021', 	'20210301', 	'20500101')
 	,(223, 	'Bolanation', 	0.1, 	N'10% of Gross Win, effective from 01 Mar 2021', 	'20210301', 	'20500101')
 	,(43, 	'BOMA365', 	0.1, 	N'10% of Gross Win, effective from 01 Mar 2021', 	'20210301', 	'20500101')
