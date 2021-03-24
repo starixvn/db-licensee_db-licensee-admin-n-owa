@@ -259,7 +259,7 @@ BEGIN
 		SELECT TOP(1) WITH TIES a.PartyID, h.[Name] AS GroupMinFeeName
 		FROM dbo.LA_GroupMinFeeHeader h WITH(NOLOCK)
 		INNER JOIN LA_GroupMinFeeAssignment a ON a.GroupMinFeeID = h.GroupMinFeeID
-		WHERE @GroupMinFee = 0 OR h.GroupMinFeeID = @GroupMinFee
+		WHERE (@GroupMinFee = 0 OR h.GroupMinFeeID = @GroupMinFee) AND h.ToDate >= @CurrentDate
 		ORDER BY ROW_NUMBER() OVER(PARTITION BY a.PartyID ORDER BY h.ToDate DESC)
     ),Result AS (
 		SELECT DISTINCT

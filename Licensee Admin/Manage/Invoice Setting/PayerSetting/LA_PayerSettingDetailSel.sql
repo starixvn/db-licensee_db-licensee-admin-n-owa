@@ -139,7 +139,7 @@ BEGIN
 				SELECT TOP 1 mfa.PartyID, mfh.[Name], mfh.GroupMinFeeID
 				FROM dbo.LA_GroupMinFeeAssignment mfa WITH (NOLOCK) 
 				INNER JOIN dbo.LA_GroupMinFeeHeader mfh WITH (NOLOCK) ON  mfa.GroupMinFeeID = mfh.GroupMinFeeID
-				WHERE mfa.PartyID = @PayerId
+				WHERE mfa.PartyID = @PayerId AND mfh.ToDate >= @CurrentDate
 				ORDER BY mfh.ToDate DESC
 				) g ON c.PartyId = g.PartyID -- Group Min Fee
 		LEFT JOIN (
