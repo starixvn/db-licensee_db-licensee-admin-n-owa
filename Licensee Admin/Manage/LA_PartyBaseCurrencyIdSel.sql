@@ -11,7 +11,7 @@ AS
 	DB: DBCUST.bodb_Licensee
 
 	Revisions:
-		- 20210318@Happy: Initialize SP
+		- 20210318@Happy: Initialize SP [#FeatureID 151466]
 
 	Params:
 		- 0: get all
