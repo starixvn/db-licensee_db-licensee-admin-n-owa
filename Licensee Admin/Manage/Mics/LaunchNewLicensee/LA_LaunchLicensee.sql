@@ -28,7 +28,8 @@ AS
 	Revisions:
 		- 20190107@Parsons: Launch new licensee
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
-		- 20190829@Bruce: Adding Licensee Code [#111586]
+		- 20190829@Bruce: Adding Licensee Code [#111586] 
+		- 20210324@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -104,7 +105,7 @@ BEGIN
 	END
 	
 	DECLARE @NewPartyId	INT = 0
-	EXEC dbo.LA_LaunchLicensee_PartyIns @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @LicenseeCode, @BaseCurrencyId, @NewPartyId OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT 
+	EXEC dbo.LA_LaunchLicensee_PartyIns @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @LicenseeCode, @BaseCurrencyId, @LaunchDate, @NewPartyId OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT 
 	
 	IF @ErrCode = 0
 	BEGIN

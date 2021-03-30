@@ -20,6 +20,7 @@ AS
 			5: non-official payer
 		+ 20190318@Mason: Add Invoice Language in SELECT statement [#110419]
 		+ 20190829@Bruce: Adding Licensee Code [#111586]
+		+ 20210315@Happy: Change BaseCurrency Of Licensee [#151466]
 		
 	 Params:
 	 Example:
@@ -27,6 +28,7 @@ AS
 */
 BEGIN
 SET NOCOUNT ON
+	DECLARE @CurrentDate DATE = CONVERT(DATE, GETDATE())
 	SELECT TOP 1 p.PartyID AS PayerID
 		, p.PartyName AS PayerName
 		, pd.StatusId
@@ -40,9 +42,7 @@ SET NOCOUNT ON
 		, ISNULL(i.ActiveAddress, 1) AS ActiveAddress
 		, p.PartyType
 		, ISNULL(p.SetupName, '') AS SetupName
-		, ISNULL(pd.BaseCurrencyId, 0) BaseCurrencyId
 		, pd.InvoiceLanguage
-		, pd.LicenseeCode
 	FROM dbo.OAS_Party p WITH (NOLOCK)
 		LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 		LEFT JOIN (
@@ -53,5 +53,17 @@ SET NOCOUNT ON
 		) i ON p.PartyID = i.FromPartyId
 	WHERE (@PayerId = 0 OR p.PartyID = @PayerId)
 		AND p.PartyType IN (1,5)
+		
+	SELECT p.PartyID
+		, p.BaseCurrencyId
+		, e.Code AS BaseCurrencyName
+		, p.LicenseeCode
+		, p.FromDate
+		, p.ToDate
+		, CASE WHEN p.ToDate < @CurrentDate THEN 0 ELSE 1 END AS IsActive
+	FROM OAS_PartyBaseCurrency p WITH(NOLOCK)
+	LEFT JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON p.BaseCurrencyId = e.exchangeid
+	WHERE PartyID = @PayerId
+	ORDER BY p.ToDate DESC
 END
 GO

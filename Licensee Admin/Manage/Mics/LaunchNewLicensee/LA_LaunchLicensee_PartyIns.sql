@@ -9,6 +9,7 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee_PartyIns]
 	@BrandName			VARCHAR(100),
 	@LicenseeCode		VARCHAR(50),
 	@BaseCurrencyId		TINYINT,
+	@LaunchDate			DATE,
 	@NewPartyId			INT				= 0		OUTPUT, 
 	@ErrCode			INT				= 0		OUTPUT, 
 	@ErrMsg				VARCHAR(4000)	= ''	OUTPUT
@@ -21,6 +22,7 @@ AS
 	Revisions:
 	- 20190107@Parsons: Launch new licensee
 	- 20190829@Bruce: Adding Licensee Code [#111586]
+	- 20210317@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 
 	Param's Explannation: 
 */
@@ -104,6 +106,28 @@ BEGIN
 	IF @@ERROR <> 0
 	BEGIN
 		SELECT @ErrMsg = 'Insert/Update OAS_PartyDetail failed. Please try again.', @ErrCode =  503
+		RETURN
+	END
+
+	-- #Region OAS_PartyBaseCurrency
+	DECLARE @FirstDateOfMonth DATE = DATEADD(MM, DATEDIFF(MM, 0, @LaunchDate), 0)
+	
+	IF EXISTS(SELECT TOP 1 1 FROM dbo.OAS_PartyBaseCurrency WITH(NOLOCK) WHERE PartyID = @NewPartyId AND BaseCurrencyId = @BaseCurrencyId)
+	BEGIN
+		UPDATE dbo.OAS_PartyBaseCurrency
+		SET LicenseeCode = ISNULL(@LicenseeCode, '')
+		WHERE PartyID = @NewPartyId
+	END
+	ELSE
+	BEGIN
+		INSERT INTO dbo.OAS_PartyBaseCurrency(PartyID, BaseCurrencyId, LicenseeCode, FromDate, ToDate)
+		VALUES(@NewPartyId, @BaseCurrencyId, ISNULL(@LicenseeCode, ''), @FirstDateOfMonth, '20500101')
+	END
+	-- #Endregion OAS_PartyBaseCurrency
+
+	IF @@ERROR <> 0
+	BEGIN
+		SELECT @ErrMsg = 'Insert OAS_PartyBaseCurrency failed. Please try again.', @ErrCode =  503
 		RETURN
 	END
 END

@@ -57,6 +57,7 @@ AS
 		- 20200228@Parsons: Support-HID-currency [#128856]
 		- 20200406@Parsons: Issue rebate worksheet [#131874]
 		- 20201202@Parsons: Add more condition to get only one rebate setting at the one time [#142345]
+		- 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -97,10 +98,15 @@ BEGIN
 	-- Region: Get base Currency
 	DECLARE @BaseCurrencyId INT = 12
 	DECLARE @BaseCurrencyName VARCHAR(10) = 'GBP'
-	SET		@BaseCurrencyId = ISNULL((	SELECT TOP 1 opd.BaseCurrencyId
-										FROM dbo.OAS_PartyDetail opd WITH(NOLOCK)	
-										WHERE	opd.PartyID = @PartyId
-									), 12)
+
+	SELECT TOP 1 @BaseCurrencyId = BaseCurrencyId
+	FROM DBCUST.bodb_licensee.dbo.OAS_PartyBaseCurrency WITH(NOLOCK)
+	WHERE PartyID = @PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
+	
+	IF(@BaseCurrencyId IS NULL)
+	BEGIN
+		SET @BaseCurrencyId = 12 -- default GBP
+	END
 	
 	DECLARE @BaseCurrencyTable AS TABLE(Id INT, Name VARCHAR(10))
 	INSERT	INTO @BaseCurrencyTable(Id,Name)
@@ -366,29 +372,15 @@ BEGIN
 
 	-- check payer exchange & minfee exchange
 	--
-	DECLARE @PartyGroups TABLE(PartyId INT, CurrencyId INT)
-	INSERT INTO @PartyGroups(PartyId, CurrencyId)
-	(
-		SELECT d.PartyId, d.BaseCurrencyId
-		FROM dbo.LA_PartyGroup g WITH(NOLOCK)
-		INNER JOIN dbo.LA_PartyGroupAssignment a WITH(NOLOCK) ON a.PartyGroupId=g.PartyGroupId
-		INNER JOIN dbo.LA_PartyGroupAssignment b WITH(NOLOCK) ON a.PartyGroupId=b.PartyGroupId
-		INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON d.PartyID=b.PartyId
-		WHERE a.PartyId = @PartyId
-	)
-	IF NOT EXISTS (SELECT TOP 1 1 FROM @PartyGroups)
-	BEGIN
-		INSERT INTO @PartyGroups(PartyId, CurrencyId) VALUES (@PartyId, @BaseCurrencyId)
-	END
-
 	IF EXISTS (
 		SELECT TOP 1 m.PartyId
-		FROM @PartyGroups p
-		INNER JOIN dbo.LA_MinFee m WITH(NOLOCK) ON m.PartyId=p.PartyID AND m.FeeTypeId = 1 -- 1 = minfee
-		WHERE m.FromDate <=@ToDate AND m.ToDate >= @FromDate AND p.CurrencyId <> m.CurrencyId
+		FROM LA_MinFee m WITH(NOLOCK)
+		WHERE m.PartyId = @PartyId
+			AND m.FeeTypeId = 1 -- 1 = minfee
+			AND m.FromDate <= @ToDate AND m.ToDate >= @FromDate AND @BaseCurrencyId <> m.CurrencyId
 	)
 	BEGIN
-		SELECT @ErrCode = 1, @ErrMsg = 'Please check the Exchange settings of Payer''s minfee or minfee group. Exchange of minfee or minfees in group should be the same with Payer''s exchange.'
+		SELECT @ErrCode = 1, @ErrMsg = 'Please check the Exchange settings of Payer''s minfee. Exchange of minfee should be the same with Payer''s exchange.'
 		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
 		RETURN
 	END
@@ -414,6 +406,26 @@ BEGIN
 	IF @DiscountCurrency IS NOT NULL AND @DiscountCurrency != @BaseCurrencyId
 	BEGIN
 		SELECT @ErrCode = 2, @ErrMsg = 'Please check the Exchange settings of Payer''s discount. Exchange of discount must be the same with Payer''s exchange.'
+		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
+		RETURN
+	END
+	
+	-- check payer exchange & group min fee exchange
+	--
+	DECLARE @GMFCurrency INT = (
+		SELECT TOP 1 d.CurrencyId
+		FROM dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK)
+		INNER JOIN dbo.LA_GroupMinFeeHeader h WITH(NOLOCK) ON a.GroupMinFeeID=h.GroupMinFeeID
+		INNER JOIN dbo.LA_GroupMinFeeDetail d WITH(NOLOCK) ON h.GroupMinFeeID=d.GroupMinFeeID
+		WHERE d.FromDate <= @ToDate
+			AND d.ToDate >= @FromDate
+			AND a.PartyID = @PartyId
+		ORDER BY h.ToDate DESC
+	)
+
+	IF @GMFCurrency IS NOT NULL AND @GMFCurrency != @BaseCurrencyId
+	BEGIN
+		SELECT @ErrCode = 3, @ErrMsg = 'Please check the Exchange settings of Payer''s group min fee. Exchange of group min fee must be the same with Payer''s exchange.'
 		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType FROM @EmptyTable
 		RETURN
 	END

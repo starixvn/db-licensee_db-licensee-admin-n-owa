@@ -7,7 +7,6 @@ ALTER PROCEDURE [dbo].[LA_PayerSettingModify]
 	, @ChargeSettingXML		NVARCHAR (MAX)
 	, @MinFeeSettingXML		NVARCHAR (MAX)
 	, @WaiveSettingXML		NVARCHAR (MAX)
-	, @ExchangeID			INT
 	, @UserID				INT
 	, @LoginIP				VARCHAR (50)	= ''
 	, @ErrCode				INT				= 0		OUTPUT
@@ -24,6 +23,7 @@ AS
 		- 20180706@bruce: enhance discount group [#94282]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20200831@Mason: Remove redundant code of @PayerGroupId [#138249]
+		- 20210318@Mason: Change Base Currency Of Licensee [#151466]
 
 	 Params:				
 */
@@ -34,8 +34,6 @@ BEGIN
 			, @MaxDate			DATE
 	
 	DECLARE @MinFeeInsertedList VARCHAR(100), @WaiveInsertedList VARCHAR(100)
-
-	IF (@ExchangeID IS NULL) SET @ExchangeID = (SELECT ISNULL(BaseCurrencyId, 0) FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE PartyID = @PayerID)
 
 	--Minfee
 	EXEC dbo.LA_MinFeeSettingModify
@@ -85,42 +83,5 @@ BEGIN
 				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM bodb02.dbo.strSplit(@WaiveInsertedList, ','))
 			RETURN
 		END
-
-	-- update payer setting
-	DECLARE @startRun DATETIME = GETDATE()
-	DECLARE @OldExchangeID INT = (SELECT ISNULL(BaseCurrencyId, 0) FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE PartyID = @PayerID)
-	IF (@ExchangeID <> ISNULL(@OldExchangeID, 0))
-	BEGIN
-		--build log string
-		DECLARE @logSPDataOld VARCHAR(200) = (
-			SELECT @PayerID			AS '@fp'
-				, @OldExchangeID	AS '@e'
-			FOR XML PATH('z'), ROOT('r')
-		)
-
-		UPDATE dbo.OAS_PartyDetail WITH(ROWLOCK, UPDLOCK)
-		SET BaseCurrencyId = @ExchangeID
-		WHERE PartyID = @PayerID
-
-		DECLARE @logSPData VARCHAR(200) = (
-			SELECT @PayerID		AS '@fp'
-				, @ExchangeID	AS '@e'
-			FOR XML PATH('z'), ROOT('r')
-		)
-		DECLARE @endRun DATETIME = GETDATE()
-		DECLARE @duration INT = DATEDIFF(MILLISECOND, @startRun, @endRun) 
-
-		-- Write Log
-		EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
-			@UserId			= @UserID
-			,@IP			= @LoginIP
-			,@LicenseeID	= 0
-			,@CurrencyID	= 0
-			,@SPName		= 'LA_PayerSettingModify'
-			,@CustId		= 0
-			,@Duration		= @duration
-			,@Data			= @logSPData
-			,@OldData		= @logSPDataOld
-	END
 END
 GO

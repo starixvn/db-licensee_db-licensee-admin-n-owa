@@ -16,6 +16,7 @@ AS
 		- 20171220@Parsons: increase length for variables [#88197]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20201202@Mason: Change request Odds Spread [#142345]
+		- 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -28,9 +29,11 @@ BEGIN
 	-- End region
 
 	-- Region: Get Base Currency for Party
-	DECLARE @BaseCurrencyId INT = ISNULL((
-		SELECT TOP 1 opd.BaseCurrencyId FROM dbo.OAS_PartyDetail opd WITH(NOLOCK) WHERE opd.PartyID = @PartyId
-	), 6) -- default is EUR
+	DECLARE @BaseCurrencyId INT = 6 -- default is EUR
+
+	SELECT TOP 1 @BaseCurrencyId = BaseCurrencyId
+	FROM DBCUST.bodb_licensee.dbo.OAS_PartyBaseCurrency WITH(NOLOCK)
+	WHERE PartyID = @PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
 
 	DECLARE @BaseCurrencyTable AS TABLE(Id INT, Name VARCHAR(10))
 	INSERT	INTO @BaseCurrencyTable(Id,Name)

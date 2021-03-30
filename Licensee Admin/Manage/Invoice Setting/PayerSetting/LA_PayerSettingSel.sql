@@ -28,6 +28,7 @@ AS
 		- 20181214@Parsons: Integrate Bidme games  [#103695]
 		- 20200206@Mason: Set billing term by currency  [#120005]
 		- 20200824@Happy: Updae from PayerGroup to GroupMinFee [#138249]
+		- 20210315@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 
 	Params:
 	+ @PayerId : 0 get all Party
@@ -91,6 +92,13 @@ BEGIN
 				ON ci.ChargeID = cs.ChargeID
 				AND cs.SystemID = 2
 
+	DECLARE @BaseCurrencyId INT, @BaseCurrencyName NVARCHAR(50)
+	SELECT TOP 1 @BaseCurrencyId = p.BaseCurrencyId, @BaseCurrencyName = e.Code
+	FROM OAS_PartyBaseCurrency p WITH(NOLOCK)
+	LEFT JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON p.BaseCurrencyId = e.exchangeid
+	WHERE PartyID = @PayerId 
+	ORDER BY ToDate DESC
+
 	INSERT INTO @ChargeDetail (ChargeID, PartyID, ProductID, BettypeRef, DI_Rate, Fromdate, Todate, ChargeType)
 		SELECT
 			ChargeID,
@@ -148,8 +156,8 @@ BEGIN
 			c.Fromdate,
 			c.Todate,
 			CASE WHEN c.ProductID IN (14,17) THEN s.FirstOfBilling ELSE ci.FirstOfBilling END,
-			pd.BaseCurrencyId,
-			ISNULL(e.Code, '') AS ExchangeName,
+			ISNULL(@BaseCurrencyId, 6),
+			ISNULL(@BaseCurrencyName, '') AS ExchangeName,
 			CASE WHEN c.ProductID IN (14,17) THEN s.ChargeType ELSE ci.ChargeType END
 		FROM #Temp_ChargeInfo c
 			INNER JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID
@@ -157,7 +165,6 @@ BEGIN
 			INNER JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 			LEFT JOIN dbo.OAS_ChargeInfoSub s WITH(NOLOCK) ON ci.ChargeID = s.ChargeIdRef
-			LEFT JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON pd.BaseCurrencyId = e.exchangeid
 		WHERE @CurrentDate <= c.Todate
 
 	-- Hard code for Bettrade BA
@@ -252,7 +259,7 @@ BEGIN
 		SELECT TOP(1) WITH TIES a.PartyID, h.[Name] AS GroupMinFeeName
 		FROM dbo.LA_GroupMinFeeHeader h WITH(NOLOCK)
 		INNER JOIN LA_GroupMinFeeAssignment a ON a.GroupMinFeeID = h.GroupMinFeeID
-		WHERE @GroupMinFee = 0 OR h.GroupMinFeeID = @GroupMinFee
+		WHERE (@GroupMinFee = 0 OR h.GroupMinFeeID = @GroupMinFee) AND h.ToDate >= @CurrentDate
 		ORDER BY ROW_NUMBER() OVER(PARTITION BY a.PartyID ORDER BY h.ToDate DESC)
     ),Result AS (
 		SELECT DISTINCT

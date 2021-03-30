@@ -26,6 +26,7 @@ AS
 		- 20180731@Mason: Integrate-Card-Club [#116096]
 		- 20191125@Parsons: Set terms by currency [#FeatureID 120005]
 		- 20200825@Happy: Updae from PayerGroup to GroupMinFee [#138249]
+		- 20210315@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 		
 	 Params:
 		+ @PayerId :specify Party
@@ -64,6 +65,13 @@ BEGIN
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
 	WHERE ci.FromParty = @PayerId
 	
+	DECLARE @BaseCurrencyId INT
+	SELECT TOP 1 @BaseCurrencyId = p.BaseCurrencyId
+	FROM OAS_PartyBaseCurrency p WITH(NOLOCK)
+	LEFT JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON p.BaseCurrencyId = e.exchangeid
+	WHERE PartyID = @PayerId 
+	ORDER BY ToDate DESC
+
 	INSERT INTO @ChargeInfo(ChargeId, PartyId, ProductId, BettypeRef, Rate, ChargeType, FromDate, ToDate, FirstBilling, BasisOfBilling, ExchangeID, ToPartyId)
 	SELECT c.ChargeID		
 		, c.PartyID
@@ -78,11 +86,10 @@ BEGIN
 		, c.Todate
 		, CASE WHEN c.ProductID IN (14,17) THEN cs.FirstOfBilling ELSE ci.FirstOfBilling END AS FirstOfBilling
 		, CASE WHEN c.ProductID IN (14,17) THEN cs.BasisOfBilling ELSE ci.BasisOfBilling END AS BasisOfBilling
-		, pd.BaseCurrencyId
+		, ISNULL(@BaseCurrencyId, 6) AS BaseCurrencyId
 		, ci.ToParty
 	FROM dbo.LA_f_ChargeInfo(@PayerId, @MinDate, @MaxDate, @ProductListAll, 'OA', 1) c
-		LEFT JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID
-		LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID				
+		LEFT JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID		
 		LEFT JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 		LEFT JOIN dbo.OAS_ChargeInfoSub cs WITH(NOLOCK) ON ci.ChargeID = cs.ChargeIdRef AND c.Bettype = cs.BettypeRef
 	
@@ -116,8 +123,8 @@ BEGIN
 	SELECT @CurrentBillingGroup = ISNULL((SELECT TOP 1 ToPartyId FROM @ChargeInfo ORDER BY FromDate DESC), 0)
 
 	SELECT TOP 1 c.PartyId		AS PayerID	
-		, mfh.GroupMinFeeID		AS GroupMinFeeID
-		, mfh.[Name]			AS GroupMinFeeName
+		, g.GroupMinFeeID		AS GroupMinFeeID
+		, g.[Name]				AS GroupMinFeeName
 		, c.ExchangeID
 		, d1.DiscountGroupId	AS DiscountGroupID
 		, d1.DiscountGroupName	AS DiscountGroupName
@@ -128,8 +135,13 @@ BEGIN
 	FROM @ChargeInfo c
 		INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID=c.PartyId
 		INNER JOIN dbo.OAS_PartyDetail pd ON pd.PartyId=c.PartyId
-		LEFT JOIN dbo.LA_GroupMinFeeAssignment mfa WITH (NOLOCK) ON  c.PartyId = mfa.PartyID
-		LEFT JOIN dbo.LA_GroupMinFeeHeader mfh WITH (NOLOCK) ON  mfa.GroupMinFeeID = mfh.GroupMinFeeID
+		LEFT JOIN (
+				SELECT TOP 1 mfa.PartyID, mfh.[Name], mfh.GroupMinFeeID
+				FROM dbo.LA_GroupMinFeeAssignment mfa WITH (NOLOCK) 
+				INNER JOIN dbo.LA_GroupMinFeeHeader mfh WITH (NOLOCK) ON  mfa.GroupMinFeeID = mfh.GroupMinFeeID
+				WHERE mfa.PartyID = @PayerId AND mfh.ToDate >= @CurrentDate
+				ORDER BY mfh.ToDate DESC
+				) g ON c.PartyId = g.PartyID -- Group Min Fee
 		LEFT JOIN (
 				SELECT PartyId, DiscountGroupId, DiscountGroupName 
 				FROM @Discount 
@@ -201,5 +213,18 @@ BEGIN
 	SELECT c1.ChargeID, c1.CurrencyID, c1.Rate
 	FROM LA_ChargeRateByCurrency c1 WITH(NOLOCK)
 		INNER JOIN @ChargeInfo c2 ON c1.ChargeID = c2.ChargeId
+
+	-- Base currency setting
+	SELECT pc.BaseCurrencyId,
+			pc.LicenseeCode,
+			pc.FromDate,
+			pc.ToDate,
+			pc.PartyID,
+			e.Code AS CurrencyName,
+			CASE WHEN pc.ToDate < @CurrentDate THEN 0 ELSE 1 END AS IsActive
+	FROM OAS_PartyBaseCurrency pc
+	LEFT JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON pc.BaseCurrencyId = e.exchangeid
+	WHERE pc.PartyID = @PayerId
+	ORDER BY pc.ToDate DESC
 END
 GO

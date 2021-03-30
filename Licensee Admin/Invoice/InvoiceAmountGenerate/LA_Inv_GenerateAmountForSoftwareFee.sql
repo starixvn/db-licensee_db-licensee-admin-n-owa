@@ -34,6 +34,7 @@ AS
 		- 20201028@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
 		- 20201130@Parsons: Saba.club - Offer Freebet tickets [#141423]
 		- 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
+		- 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -65,10 +66,14 @@ BEGIN
 
 	-- Region: Get base Currency
 	DECLARE @BaseCurrencyId INT 
-	SET		@BaseCurrencyId = ISNULL((	SELECT TOP 1 opd.BaseCurrencyId
-										FROM dbo.OAS_PartyDetail opd WITH(NOLOCK)	
-										WHERE	opd.PartyID = @PartyId
-									), 6)-- Default is EUR
+	SELECT TOP 1 @BaseCurrencyId = BaseCurrencyId
+	FROM DBCUST.bodb_licensee.dbo.OAS_PartyBaseCurrency WITH(NOLOCK)
+	WHERE PartyID = @PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
+	
+	IF(@BaseCurrencyId IS NULL)
+	BEGIN
+		SET @BaseCurrencyId = 6 -- default EUR
+	END
 	
 	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(10))
 	INSERT	INTO @BaseCurrencyTable(CurrencyId, CurrencyName)
@@ -184,29 +189,15 @@ BEGIN
 
 	-- check payer exchange & minfee exchange
 	--
-	DECLARE @PartyGroups TABLE(PartyId INT, CurrencyId INT)
-	INSERT INTO @PartyGroups(PartyId, CurrencyId)
-	(
-		SELECT d.PartyId, d.BaseCurrencyId
-		FROM dbo.LA_PartyGroup g WITH(NOLOCK)
-		INNER JOIN dbo.LA_PartyGroupAssignment a WITH(NOLOCK) ON a.PartyGroupId=g.PartyGroupId
-		INNER JOIN dbo.LA_PartyGroupAssignment b WITH(NOLOCK) ON a.PartyGroupId=b.PartyGroupId
-		INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON d.PartyID=b.PartyId
-		WHERE a.PartyId = @PartyId
-	)
-	IF NOT EXISTS (SELECT TOP 1 1 FROM @PartyGroups)
-	BEGIN
-		INSERT INTO @PartyGroups(PartyId, CurrencyId) VALUES (@PartyId, @BaseCurrencyId)
-	END
-
 	IF EXISTS (
 		SELECT TOP 1 m.PartyId
-		FROM @PartyGroups p
-		INNER JOIN dbo.LA_MinFee m WITH(NOLOCK) ON m.PartyId=p.PartyID AND m.FeeTypeId = 1 -- 1 = minfee
-		WHERE m.FromDate <=@ToDate AND m.ToDate >= @FromDate AND p.CurrencyId <> m.CurrencyId
+		FROM LA_MinFee m WITH(NOLOCK)
+		WHERE m.PartyId = @PartyId
+			AND m.FeeTypeId = 1 -- 1 = minfee
+			AND m.FromDate <= @ToDate AND m.ToDate >= @FromDate AND @BaseCurrencyId <> m.CurrencyId
 	)
 	BEGIN
-		SELECT @ErrCode = 1, @ErrMsg = 'Please check the Exchange settings of Payer''s minfee or minfee group. Exchange of minfee or minfees in group should be the same with Payer''s exchange.'
+		SELECT @ErrCode = 1, @ErrMsg = 'Please check the Exchange settings of Payer''s minfee. Exchange of minfee should be the same with Payer''s exchange.'
 		SELECT ProductId,
 			ProductCode,
 			ProductName,
@@ -217,12 +208,15 @@ BEGIN
 			RemainingAmount,
 			Remark 
 		FROM @FinalResult
+
+		DROP TABLE #Exchange
+		DROP TABLE #AmountToCompany
 		RETURN
 	END
 
 	-- check payer exchange & discount exchange
 	--
-	DECLARE @DiscountCurrency INT = (
+	DECLARE @DiscountCurrencyId INT = (
 		SELECT TOP 1 h.CurrencyId
 		FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
 		INNER JOIN dbo.LA_DiscountGroupHeader h WITH(NOLOCK) ON a.DiscountGroupId=h.DiscountGroupId
@@ -238,7 +232,7 @@ BEGIN
 		ORDER BY h.ToDate DESC
 	)
 
-	IF @DiscountCurrency IS NOT NULL AND @DiscountCurrency != @BaseCurrencyId
+	IF @DiscountCurrencyId IS NOT NULL AND @DiscountCurrencyId != @BaseCurrencyId
 	BEGIN
 		SELECT @ErrCode = 2, @ErrMsg = 'Please check the Exchange settings of Payer''s discount. Exchange of discount must be the same with Payer''s exchange.'
 		SELECT ProductId,
@@ -251,6 +245,43 @@ BEGIN
 			RemainingAmount,
 			Remark 
 		FROM @FinalResult
+
+		DROP TABLE #Exchange
+		DROP TABLE #AmountToCompany
+
+		RETURN
+	END
+
+	-- check payer exchange & Group Min Fee exchange
+	--
+	DECLARE @GMFCurrencyId INT = (
+		SELECT TOP 1 d.CurrencyId
+		FROM dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK)
+		INNER JOIN dbo.LA_GroupMinFeeHeader h WITH(NOLOCK) ON a.GroupMinFeeID=h.GroupMinFeeID
+		INNER JOIN dbo.LA_GroupMinFeeDetail d WITH(NOLOCK) ON h.GroupMinFeeID=d.GroupMinFeeID
+		WHERE d.FromDate <= @ToDate
+			AND d.ToDate >= @FromDate
+			AND a.PartyID = @PartyId
+		ORDER BY h.ToDate DESC
+	)
+	
+	IF @GMFCurrencyId IS NOT NULL AND @GMFCurrencyId != @BaseCurrencyId
+	BEGIN
+		SELECT @ErrCode = 3, @ErrMsg = 'Please check the Exchange settings of Payer''s group min fee. Exchange of group min fee must be the same with Payer''s exchange.'
+		SELECT ProductId,
+			ProductCode,
+			ProductName,
+			InvoiceAmount,
+			AmountType,
+			Rate,
+			DeductMonthlyFees,
+			RemainingAmount,
+			Remark 
+		FROM @FinalResult
+		
+		DROP TABLE #Exchange
+		DROP TABLE #AmountToCompany
+
 		RETURN
 	END
 
@@ -453,25 +484,21 @@ BEGIN
 	SELECT @AGPrepayment, value
 		FROM (VALUES(25), (26), (27)) AS T3(value)
 
-	DECLARE @tblInvoiceAmounts TABLE (Income MONEY, Expense MONEY, InvItemTypeId INT)
-	SELECT @sql = 'SELECT Income, Expense, InvItemTypeId
-					FROM OPENQUERY(DBCUST, ''SELECT Income, Expense, InvItemTypeId FROM bodb_Licensee.dbo.LA_f_GetInvoiceAmount(' 
-																							+ CONVERT(VARCHAR(10), @PartyId)
-																							+ ', 0'
-																							+ ', ''''' + ISNULL(@Environment, '') + ''''''
-																							+ ')'')'
-	INSERT INTO @tblInvoiceAmounts (Income, Expense, InvItemTypeId)
-	EXEC (@sql)
+	DECLARE @CreditTable TABLE (Amount MONEY, InvItemTypeId INT, InvItemTypeKey VARCHAR(50))
 	
+	INSERT INTO @CreditTable(Amount, InvItemTypeId, InvItemTypeKey)
 	SELECT SUM(ISNULL(s.Income,0) - ISNULL(s.Expense,0)) AS Amount, s.InvItemTypeId, invT.[Key] AS InvItemTypeKey 
-	INTO #credit
-	FROM @tblInvoiceAmounts s
-		INNER JOIN @InvoiceItemTypes invT ON s.InvItemTypeId = invT.Value
+	FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
+	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
+	INNER JOIN @InvoiceItemTypes invT ON s.InvItemTypeId = invT.[Value]
+	WHERE s.RefPartyId = @PartyId AND ISNULL(h.StatusId, 0) = 0 AND h.Environment = @Environment
+		  AND (@BaseCurrencyId = h.CurrencyId OR (@BaseCurrencyId = 6/*EUR*/ AND h.CurrencyId IN (0, 6)))-- Because old data is stored 0 as EUR currency 
 	GROUP BY s.InvItemTypeId, invT.[Key]
+		
 
-	DECLARE @RemainingAmf MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeKey = @AdvanceMinFee), 0)
-	DECLARE @RemainingAG MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeKey = @AGPrepayment), 0)
-	DECLARE @Prepayment MONEY = ISNULL((SELECT SUM(Amount) FROM #credit WHERE InvItemTypeKey = @PrepaymentKey), 0)
+	DECLARE @RemainingAmf MONEY = ISNULL((SELECT SUM(Amount) FROM @CreditTable WHERE InvItemTypeKey = @AdvanceMinFee), 0)
+	DECLARE @RemainingAG MONEY = ISNULL((SELECT SUM(Amount) FROM @CreditTable WHERE InvItemTypeKey = @AGPrepayment), 0)
+	DECLARE @Prepayment MONEY = ISNULL((SELECT SUM(Amount) FROM @CreditTable WHERE InvItemTypeKey = @PrepaymentKey), 0)
 
 	-- insert zero amount
 	INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, AmountType)
@@ -639,7 +666,6 @@ BEGIN
 	DROP TABLE #TempData
 	DROP TABLE #TempDataCB
 	DROP TABLE #AmountToCompany
-	DROP TABLE #credit
 
 END
 GO
