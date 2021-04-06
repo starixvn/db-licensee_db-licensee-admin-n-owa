@@ -46,6 +46,8 @@ BEGIN
 
 	-- Get CustId from Licensee Code
 	DECLARE @LicenseeCodes TABLE (CustId INT, LicenseeName VARCHAR(50), LicenseeCode VARCHAR(50), BaseCurrencyId INT, IsBillingCurrency BIT)
+			INNER JOIN dbo.OAS_PartyBaseCurrency bc WITH(NOLOCK) ON bc.PartyID = p.PartyID
+			AND @LastDayOfMonth BETWEEN bc.FromDate AND bc.ToDate
 
 	INSERT INTO @LicenseeCodes (CustId, LicenseeName, IsBillingCurrency)
 	SELECT DISTINCT CustId, LicenseeName, CASE WHEN ToDate >= @LastDayOfMonth THEN 1 ELSE 0 END AS IsBillingCurrency
