@@ -67,6 +67,7 @@ AS
 		- 20210203@Parsons: Integrate Saba Red Envelope [#149935]
 		- 20210308@Parsons: Integrate Habanero  Product [#150636]
 		- 20210308@Parsons: Integrate Sports Lottery Product [#150866]
+		- 20210401@Parsons: Add new bet types All In One of Cricket [#150147]
 	Param's Explanation:
 
 */
@@ -86,6 +87,7 @@ BEGIN
 		  OR typeid BETWEEN 121 AND 999
 		  OR typeid BETWEEN 9001 AND 9399
 		  OR typeid BETWEEN 1301 AND 1399
+		  OR typeid BETWEEN 9400 AND 9699
 		  OR typeid = 38 -- BetBuilder
 		)
 		AND typeid NOT IN (901, 902, 903,904, 911, 912, 913, 914) -- Bettrade bettypes 
@@ -101,6 +103,7 @@ BEGIN
 			  OR typeid BETWEEN 121 AND 999
 			  OR typeid BETWEEN 9001 AND 9399
 			  OR typeid BETWEEN 1301 AND 1399
+			  OR typeid BETWEEN 9400 AND 9699
 			  OR typeid = 38 -- BetBuilder
 			 )
 		  AND typeid NOT IN (901, 902, 903,904, 911, 912, 913, 914) -- Bettrade bettypes
