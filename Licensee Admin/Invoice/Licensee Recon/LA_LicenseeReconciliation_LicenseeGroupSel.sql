@@ -2,8 +2,8 @@
 USE [bodb_Licensee]
 GO
 
-ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_LicenseeGroupSel_UAT3]
-	@GroupId INT 
+ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_LicenseeGroupSel]
+	@GroupId INT
 AS
 /*	Header:
 	Task : Get licensee group for licensee recon

@@ -30,7 +30,6 @@ BEGIN
 
 	-- Get Licensee
 	CREATE TABLE #Licensees (CustId INT, LicenseeName VARCHAR(50), ParentId INT, PartyId INT, LicenseeCode VARCHAR(50), BaseCurrencyId INT, StartDate DATE, EndDate DATE, IsBillingCurrency BIT)
-	INNER JOIN dbo.OAS_PartyBaseCurrency bc WITH(NOLOCK) ON p.PartyID = bc.PartyID AND @BillingDate BETWEEN bc.FromDate AND bc.ToDate
 	
 	INSERT INTO #Licensees (PartyId, LicenseeName, LicenseeCode, BaseCurrencyId, ParentId, IsBillingCurrency)
 	SELECT DISTINCT p.PartyId, p.PartyName AS LicenseeName, UPPER(bc.LicenseeCode), bc.BaseCurrencyId
@@ -42,12 +41,16 @@ BEGIN
 	WHERE @LastDayOfMonth >= bc.FromDate
 		AND p.PartyType IN (1, 5)
 		AND pd.IsDeposit = 1
-	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON d.PartyID = p.PartyID
 
 	-- Get CustId from Licensee Code
 	DECLARE @LicenseeCodes TABLE (CustId INT, LicenseeName VARCHAR(50), LicenseeCode VARCHAR(50), BaseCurrencyId INT, IsBillingCurrency BIT)
-			INNER JOIN dbo.OAS_PartyBaseCurrency bc WITH(NOLOCK) ON bc.PartyID = p.PartyID
-			AND @LastDayOfMonth BETWEEN bc.FromDate AND bc.ToDate
+	WHERE @LastDayOfMonth BETWEEN FromDate AND ToDate
+	FROM @LicenseeCodes lc
+
+	UPDATE l
+	SET l.CustId = lc.CustId
+	FROM #Licensees l
+		INNER JOIN @LicenseeCodes lc ON l.LicenseeCode = lc.LicenseeCode
 
 	INSERT INTO @LicenseeCodes (CustId, LicenseeName, IsBillingCurrency)
 	SELECT DISTINCT CustId, LicenseeName, CASE WHEN ToDate >= @LastDayOfMonth THEN 1 ELSE 0 END AS IsBillingCurrency
@@ -132,6 +135,7 @@ BEGIN
 	UNION ALL
 	SELECT @UnidentifiedGroup, 0, 'Unidentified', 0, '', '', @defaultStartDate, @defaultEndDate, 0, 1 FROM @billingGroup WHERE GroupId = @UnidentifiedGroup
 
+	DROP TABLE #Licensees
 	DROP TABLE #Licensees
 END
 GO
