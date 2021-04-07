@@ -103,6 +103,7 @@ BEGIN
 			INNER JOIN dbo.LA_ChargeInfo_SystemMapping s WITH (NOLOCK) ON c.ChargeId = s.ChargeId AND s.SystemId = 2 -- LA
 		WHERE c.ToParty IN (SELECT GroupId FROM @billingGroup)
 		GROUP BY c.FromParty
+			
 	)
 	UPDATE l
 	SET l.StartDate = c.StartMonth, l.EndDate = c.EndMonth
