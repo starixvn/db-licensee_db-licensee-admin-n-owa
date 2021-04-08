@@ -17,6 +17,7 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20201202@Mason: Change request Odds Spread [#142345]
 		- 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
+		- 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -32,7 +33,7 @@ BEGIN
 	DECLARE @BaseCurrencyId INT = 6 -- default is EUR
 
 	SELECT TOP 1 @BaseCurrencyId = BaseCurrencyId
-	FROM DBCUST.bodb_licensee.dbo.OAS_PartyBaseCurrency WITH(NOLOCK)
+	FROM OAS_PartyBaseCurrency WITH(NOLOCK)
 	WHERE PartyID = @PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
 
 	DECLARE @BaseCurrencyTable AS TABLE(Id INT, Name VARCHAR(10))

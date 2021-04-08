@@ -27,6 +27,7 @@ AS
 	  - 20201228@Parsons: Should include SBC & CC negative amount [#141357]
 	  - 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
 	  - 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
+	  - 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -34,7 +35,7 @@ BEGIN
 	DECLARE @BaseCurrency VARCHAR(10)
 
 	SELECT TOP 1 @BaseCurrency = Code
-	FROM DBCUST.bodb_licensee.dbo.OAS_PartyBaseCurrency p WITH(NOLOCK)
+	FROM OAS_PartyBaseCurrency p WITH(NOLOCK)
 	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON p.BaseCurrencyId = e.exchangeid
 	WHERE p.PartyID = @PartyId AND p.FromDate <= @ToDate AND p.ToDate >= @FromDate
 	

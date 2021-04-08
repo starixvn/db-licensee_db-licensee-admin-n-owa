@@ -19,6 +19,7 @@ AS
 	Revisions:
 		- 20190312@Bruce: create SP [RedmineID: #105205]
 		- 20210323@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
+	   - 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -52,7 +53,7 @@ BEGIN
 	OUTER APPLY
 	(
 		SELECT TOP 1 pbc.PartyID, pbc.BaseCurrencyId
-		FROM DBCUST.bodb_licensee.dbo.OAS_PartyBaseCurrency pbc WITH(NOLOCK)
+		FROM OAS_PartyBaseCurrency pbc WITH(NOLOCK)
 		WHERE pbc.PartyID = p.PartyId AND @ReportDate BETWEEN FromDate AND ToDate
 		ORDER BY ToDate DESC
 	) pbc_2

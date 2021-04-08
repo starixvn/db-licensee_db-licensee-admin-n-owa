@@ -35,6 +35,7 @@ AS
 		- 20201130@Parsons: Saba.club - Offer Freebet tickets [#141423]
 		- 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
 		- 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
+		- 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -67,7 +68,7 @@ BEGIN
 	-- Region: Get base Currency
 	DECLARE @BaseCurrencyId INT 
 	SELECT TOP 1 @BaseCurrencyId = BaseCurrencyId
-	FROM DBCUST.bodb_licensee.dbo.OAS_PartyBaseCurrency WITH(NOLOCK)
+	FROM OAS_PartyBaseCurrency WITH(NOLOCK)
 	WHERE PartyID = @PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
 	
 	IF(@BaseCurrencyId IS NULL)
