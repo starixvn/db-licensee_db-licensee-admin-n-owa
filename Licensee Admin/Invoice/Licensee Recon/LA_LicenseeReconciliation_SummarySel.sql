@@ -15,6 +15,7 @@ AS
 	Revisions: 
 		- 20191017@Bruce: Create Sp [#122229]
 		- 20191210@Bruce: Include Promotion amount [#123958]
+		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -32,7 +33,8 @@ BEGIN
 		Prepayment,
 		ISNULL(Promotion,0) Promotion,
 		ClosingBalance,
-		CurrencyName
+		CurrencyName,
+		LicenseeCode
 	FROM bodb_licenseeReport.dbo.rptLicenseeReconciliation WITH(NOLOCK)
 	WHERE AccDate = @reportMonth AND Environment = @Environment AND (
 		ISNULL(@PartyIds,'') = '' OR PartyId IN (SELECT val FROM bodb02.dbo.strSplit(@PartyIds,','))
