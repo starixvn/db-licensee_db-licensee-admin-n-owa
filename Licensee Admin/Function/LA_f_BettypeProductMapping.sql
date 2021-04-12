@@ -68,6 +68,7 @@ AS
 		- 20210308@Parsons: Integrate Habanero  Product [#150636]
 		- 20210308@Parsons: Integrate Sports Lottery Product [#150866]
 		- 20210401@Parsons: Add new bet types All In One of Cricket [#150147]
+		- 20210412@Sophia: Integrate PP Live Casino [Redmine: #150971]
 	Param's Explanation:
 
 */
@@ -544,6 +545,15 @@ BEGIN
 	   SELECT typeid, 63
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
 	   WHERE typeid BETWEEN 3611 AND 3620
+		  AND (@Bettype = 0 OR typeid = @Bettype)
+	END
+	
+	IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'PPL')
+    BEGIN
+	   INSERT INTO @tbBettypeProduct
+	   SELECT typeid, 65
+	   FROM bodb02.dbo.bettype WITH (NOLOCK)
+	   WHERE typeid BETWEEN 3701 AND 3799
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
