@@ -70,6 +70,7 @@ AS
 		- 20210401@Parsons: Add new bet types All In One of Cricket [#150147]
 		- 20210412@Sophia: Integrate PP Live Casino [Redmine: #150971]
 		- 20210419@Danny: Integrate Creative Gaming [Redmine: #152139]
+		- 20210412@Sophia: Change Range of AE Casino [Redmine :#152141]
 
 	Param's Explanation:
 
@@ -393,7 +394,7 @@ BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 45
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
-	   WHERE typeid BETWEEN 3101 AND 3199
+	   WHERE typeid BETWEEN 3101 AND 3150
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
