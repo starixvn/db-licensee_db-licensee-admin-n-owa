@@ -74,14 +74,14 @@ BEGIN
 			AND h.Environment = @Environment
 			AND InvoiceType = 1
 			AND h.FromDate < @ReportDate
-			AND @LastDayOfMonth BETWEEN bc.FromDate AND bc.ToDate
+			AND @LastDayOfMonth >= bc.FromDate
     )
 	DELETE s
 	FROM #statement s
 	INNER JOIN bodb_licensee.dbo.OAS_PartyBaseCurrency bc WITH(NOLOCK) ON bc.LicenseeCode = s.LicenseeCode
 	WHERE bc.PartyID NOT IN (SELECT ow.PartyId FROM @OW_PartyList ow)
 		  AND s.CustId NOT IN (SELECT cte.CustId FROM cte_ValidCustTable cte)
-		  AND @LastDayOfMonth BETWEEN bc.FromDate AND bc.ToDate
+		  AND @LastDayOfMonth >= bc.FromDate
 
 	-- balance up day
 	--
