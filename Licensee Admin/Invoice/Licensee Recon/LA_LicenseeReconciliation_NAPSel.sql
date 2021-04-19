@@ -31,7 +31,7 @@ BEGIN
 	DECLARE @licensees TABLE (CustId INT, LicenseeCode VARCHAR(50))
 
 	INSERT INTO @licensees(CustId,LicenseeCode)
-	SELECT c.CustId, c.username
+	SELECT c.CustId, UPPER(c.username)
 	FROM dbo.Customer c WITH(NOLOCK)
 	WHERE c.CustId IN (SELECT val FROM dbo.strSplit(@CustIds,','))
 
@@ -89,7 +89,7 @@ BEGIN
 		WHERE fi.winlostdate BETWEEN @FromDate AND @_ToDate AND fi.bettype = 21003 AND ISNULL(isReversal,0) = 0
 	END
 
-	SELECT SUM(a.Amount) Amount, c.LicenseeCode, c.SuperCode AS Super
+	SELECT SUM(a.Amount) Amount, UPPER(c.LicenseeCode) AS LicenseeCode, c.SuperCode AS Super
 	FROM #transfer a
 	INNER JOIN #transfer b ON a.refno = b.refno
 	INNER JOIN @licenseeSupers c ON a.custid = c.CustId and b.custid = c.SuperId

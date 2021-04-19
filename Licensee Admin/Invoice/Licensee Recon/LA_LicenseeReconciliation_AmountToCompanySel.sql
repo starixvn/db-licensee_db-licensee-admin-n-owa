@@ -108,7 +108,7 @@ BEGIN
 	SELECT p.PartyID, p.PartyName
 		, 1 AS IsSelected
 		, -p.PartyID AS PartyGroupId
-		, CASE WHEN ISNULL(bc.LicenseeCode,'') = '' THEN CAST(p.PartyID AS VARCHAR(10)) ELSE bc.LicenseeCode END
+		, CASE WHEN ISNULL(bc.LicenseeCode,'') = '' THEN CAST(p.PartyID AS VARCHAR(10)) ELSE UPPER(bc.LicenseeCode) END
 	FROM dbo.OAS_Party p WITH(NOLOCK)
 	INNER JOIN dbo.OAS_PartyBaseCurrency bc WITH(NOLOCK) ON p.PartyID = bc.PartyID AND FromDate <= @ToDate AND ToDate >= @FromDate
 	WHERE p.PartyID IN(SELECT val FROM dbo.strSplit(@PartyIds, ','))
@@ -776,7 +776,7 @@ END
 		END
 		ELSE
 		BEGIN
-			SELECT p.LicenseeCode
+			SELECT UPPER(p.LicenseeCode) AS LicenseeCode
 				, pl.Name AS ProductName
 				, UPPER(@BaseCurrency) AS CurrencyName
 				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC) THEN 

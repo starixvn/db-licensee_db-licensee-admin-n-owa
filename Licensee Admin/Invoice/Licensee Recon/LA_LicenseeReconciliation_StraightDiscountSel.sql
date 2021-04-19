@@ -56,7 +56,7 @@ BEGIN
 		AND MAX(ToAmount) = @Unlimited
 
 	INSERT INTO @discountSettings (PartyId, Rate, CurrencyId, LicenseeCode)
-	SELECT a.PartyId, d.Rate, s.CurrencyId,bc.LicenseeCode
+	SELECT a.PartyId, d.Rate, s.CurrencyId, UPPER(bc.LicenseeCode) AS LicenseeCode
 	FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
 	INNER JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON a.DiscountGroupId=d.DiscountGroupId
 	INNER JOIN @straightDiscount s ON s.Id = a.DiscountGroupId
