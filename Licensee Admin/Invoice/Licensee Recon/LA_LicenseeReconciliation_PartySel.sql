@@ -44,13 +44,6 @@ BEGIN
 
 	-- Get CustId from Licensee Code
 	DECLARE @LicenseeCodes TABLE (CustId INT, LicenseeName VARCHAR(50), LicenseeCode VARCHAR(50), BaseCurrencyId INT, IsBillingCurrency BIT)
-	WHERE @LastDayOfMonth BETWEEN FromDate AND ToDate
-	FROM @LicenseeCodes lc
-
-	UPDATE l
-	SET l.CustId = lc.CustId
-	FROM #Licensees l
-		INNER JOIN @LicenseeCodes lc ON l.LicenseeCode = lc.LicenseeCode
 
 	INSERT INTO @LicenseeCodes (CustId, LicenseeName, IsBillingCurrency)
 	SELECT DISTINCT CustId, LicenseeName, CASE WHEN ToDate >= @LastDayOfMonth THEN 1 ELSE 0 END AS IsBillingCurrency

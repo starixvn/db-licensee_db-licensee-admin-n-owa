@@ -43,7 +43,7 @@ BEGIN
 	DECLARE @tmpCust TABLE(CustId INT,LicenseeCode VARCHAR(50))
 
 	INSERT INTO @tmpCust(CustId,LicenseeCode)
-	SELECT c.CustId, c.username
+	SELECT c.CustId, UPPER(c.username)
 	FROM dbo.Customer c WITH(NOLOCK)
 	INNER JOIN dbo.strSplit(@CustIds,',') c2 ON c.CustId = c2.val
 
@@ -52,7 +52,7 @@ BEGIN
 	-- remove duplicated code
 	--
 	INSERT INTO #statement(CustId,LicenseeCode)
-	SELECT DISTINCT CustId, LicenseeCode FROM @tmpCust
+	SELECT DISTINCT CustId, UPPER(LicenseeCode) FROM @tmpCust
 
 	-- ***Setup fee issue***
 	--
