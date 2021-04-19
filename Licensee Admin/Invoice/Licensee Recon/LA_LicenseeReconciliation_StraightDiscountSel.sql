@@ -15,6 +15,8 @@ AS
 		- 20200117@Mason: Setup billing terms by Currency  [#120005]
 		- 20200512@Parsons: Special handling for INH market [#128570]
 		- 20201209@Parsons: Licensee Reconciliation - Change Discount column if licensee has straight rebate [#146328]
+		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
+
 	Example:
 		USE bodb_licensee
 		GO
@@ -23,6 +25,8 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @LastDayOfMonth DATE = DATEADD(DAY, -1, DATEADD(MONTH, DATEDIFF(MONTH, 0, @ReportMonth) + 1, 0))
 
 	-- get base currency
 	--
@@ -52,12 +56,13 @@ BEGIN
 		AND MAX(ToAmount) = @Unlimited
 
 	INSERT INTO @discountSettings (PartyId, Rate, CurrencyId, LicenseeCode)
-	SELECT a.PartyId, d.Rate, s.CurrencyId,pd.LicenseeCode
+	SELECT a.PartyId, d.Rate, s.CurrencyId,bc.LicenseeCode
 	FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
 	INNER JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON a.DiscountGroupId=d.DiscountGroupId
 	INNER JOIN @straightDiscount s ON s.Id = a.DiscountGroupId
-	INNER JOIN dbo.OAS_PartyDetail pd ON pd.PartyID=a.PartyID
+	INNER JOIN dbo.OAS_PartyBaseCurrency bc WITH(NOLOCK) ON bc.PartyID=a.PartyID
 	WHERE a.IsApplyDiscount = 1
+		AND @LastDayOfMonth BETWEEN bc.FromDate AND bc.ToDate
 
 	-- 2. Get SB fee
 	DECLARE @partyIds VARCHAR(1000) = STUFF((SELECT ',' + CAST(PartyId AS VARCHAR(5)) FROM @discountSettings FOR XML PATH('')),1,1,'')

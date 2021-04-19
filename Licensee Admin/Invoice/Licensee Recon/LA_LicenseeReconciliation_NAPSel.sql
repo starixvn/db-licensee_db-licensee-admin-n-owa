@@ -14,9 +14,12 @@ AS
 	Revisions: 
 		- 20190801@Bruce: Create Sp [#111586]
 		- 20191007@Bruce: Filter data by custid [#120220]
+		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
 */
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @LastDayOfMonth DATE = DATEADD(DAY, -1, DATEADD(MONTH, DATEDIFF(MONTH, 0, @ReportMonth) + 1, 0))
 
 	-- Transfer amount from current month is for last month
 	-- Example: To get transfer amount of July we get data of August
@@ -38,6 +41,7 @@ BEGIN
 	INSERT INTO @licenseeTransferCode(CustId,LicenseeName)
 	SELECT tc.CustId, tc.LicenseeName
 	FROM DBCUST.bodb_licensee.dbo.LicenseeTransferCode tc WITH(NOLOCK)
+	WHERE @LastDayOfMonth BETWEEN tc.FromDate AND tc.ToDate
 
 	DECLARE @licenseeSupers TABLE(CustId INT, LicenseeCode VARCHAR(50),SuperId INT, SuperCode VARCHAR(50))
 
