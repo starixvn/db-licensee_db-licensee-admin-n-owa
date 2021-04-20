@@ -59,13 +59,16 @@ BEGIN
 
 	DECLARE @balanceUpDay DATE = (SELECT BalanceUpDay FROM @tmpBalanceUpDay)
 
+	CREATE TABLE #TransferCust (CustId INT)
+	INSERT INTO #TransferCust (CustId)
+	SELECT DISTINCT CustId FROM @licenseeSupers
+	UNION ALL SELECT DISTINCT SuperId FROM @licenseeSupers
+
 	CREATE TABLE #transfer(
 		Amount	MONEY,
 		RefNo	BIGINT,
 		CustId	INT
 	)
-
-	CREATE NONCLUSTERED INDEX Idx_transfer ON #transfer (RefNo, CustId)
 
 	DECLARE @_FromDate SMALLDATETIME, @_ToDate SMALLDATETIME
 
@@ -76,8 +79,9 @@ BEGIN
 		SELECT @_ToDate = @ToDate
 
 		INSERT INTO #transfer(Amount, RefNo, CustId)
-		SELECT winlost - actual_stake, refno, custid
+		SELECT b.winlost - b.actual_stake, b.refno, b.custid
 		FROM dbo.bettrans b WITH(NOLOCK)
+			INNER JOIN #TransferCust c ON b.custid = c.CustId
 		WHERE b.winlostdate BETWEEN @_FromDate AND @_ToDate AND b.bettype = 21003 AND b.oddsid=0
 	END
 
@@ -88,10 +92,13 @@ BEGIN
 		SELECT @_ToDate = CASE WHEN @ToDate < @balanceUpDay THEN @ToDate ELSE DATEADD(DAY, -1, @balanceUpDay) END
 
 		INSERT INTO #transfer(Amount, RefNo, CustId)
-		SELECT winlost - actual_stake, refno, custid
+		SELECT fi.winlost - fi.actual_stake, fi.refno, fi.custid
 		FROM bodb_Archive.dbo.transfer_fi fi WITH(NOLOCK)
+			INNER JOIN #TransferCust c ON fi.custid = c.CustId
 		WHERE fi.winlostdate BETWEEN @FromDate AND @_ToDate AND fi.bettype = 21003 AND ISNULL(isReversal,0) = 0
 	END
+
+	CREATE NONCLUSTERED INDEX Idx_transfer ON #transfer (RefNo, CustId)
 
 	SELECT SUM(a.Amount) Amount, UPPER(c.LicenseeCode) AS LicenseeCode, c.SuperCode AS Super
 	FROM #transfer a
@@ -101,5 +108,6 @@ BEGIN
 	HAVING SUM(a.Amount) <> 0
 
 	DROP TABLE #transfer
+	DROP TABLE #TransferCust
 END
 GO
