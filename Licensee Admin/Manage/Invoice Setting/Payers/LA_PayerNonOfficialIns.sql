@@ -30,7 +30,8 @@ AS
 		- 20180318@mason: Add @InvoiceLanguage parameter [#110445]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20190905@Bruce: Adding licensee code [#111586]
-		- 20210316@Happy: Change BaseCurrency Of Licensee [#151466]
+		- 20210316@Happy: Change BaseCurrency Of Licensee [#151466] 
+		- 20210413@Happy: Support duo base currency [RedmineID: #152089]
 */
 BEGIN
 
@@ -115,13 +116,12 @@ BEGIN
 		END
 	END
 	-- End region Get Base currency setting from xml
-	DECLARE @FirstDateOfMonth DATE = DATEADD(MM, DATEDIFF(MM, 0, GETDATE()), 0)
 	
 	INSERT INTO dbo.OAS_Party(PartyName, Description, PartyType) VALUES (@PayerName, 'Non-Official', 5)
 	SET @PayerId = SCOPE_IDENTITY()
 	
 	UPDATE @BaseCurrencySetting
-	SET FromDate = @FirstDateOfMonth
+	SET FromDate = DATEADD(MM, DATEDIFF(MM, 0, FromDate), 0)
 	WHERE Idx = (SELECT TOP 1 Idx FROM @BaseCurrencySetting ORDER BY FromDate ASC)
 
 	INSERT INTO dbo.OAS_PartyDetail(PartyId, BrandName, CompanyName, AttnName, Description, Address1, Address2, BaseCurrencyId, IsAllowedMemberComm, IsDeposit, StatusId, InvoiceLanguage, LicenseeCode)

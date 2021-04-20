@@ -9,6 +9,7 @@ ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_InvoiceSel]
 	@Environment	VARCHAR(50) = 'DEV',
 	@IsGroupByPartyId	BIT = 0
 AS
+
 /*	Header:
 	Task : Generate invoice amount for licensee
 	DB: DBLIC.bodb_Licensee
@@ -24,7 +25,8 @@ AS
 		- 20200729@Parsons: Implement PP Jackpot [RedmineID: #137306]
 		- 20201104@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
 	    - 20201218@Parsons: Saba.club - Offer Freebet tickets [#141423]
-	   - 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
+		- 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
+	   	- 20210323@Percy: Support duo base currency [RedmineID: #152089]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -37,12 +39,13 @@ BEGIN
 
 	-- get party list
 	--
-	DECLARE @partyList AS TABLE(PartyId INT,LicenseeCode VARCHAR(50))
+	DECLARE @partyList AS TABLE(PartyId INT,LicenseeCode VARCHAR(50), BaseCurrencyId INT)
 
-	INSERT INTO @partyList(PartyId, LicenseeCode)
-	SELECT d.PartyID, d.LicenseeCode
-	FROM dbo.OAS_PartyDetail d WITH(NOLOCK)
-	WHERE @IsGroupByPartyId = 1 OR d.LicenseeCode IS NOT NULL
+	INSERT INTO @partyList(PartyId, LicenseeCode, BaseCurrencyId)
+	SELECT PartyID, UPPER(LicenseeCode), BaseCurrencyId
+	FROM dbo.OAS_PartyBaseCurrency WITH(NOLOCK)
+	WHERE (@IsGroupByPartyId = 1 OR LicenseeCode IS NOT NULL)
+		AND @ToDate BETWEEN FromDate AND ToDate
 
 	IF @PartyIds <> 'All'
 	BEGIN
@@ -63,7 +66,7 @@ BEGIN
 		,SUM(CASE WHEN InvItemTypeId = 29 THEN ISNULL(Expense,0) ELSE 0 END) Promotion
 	INTO #result
 	FROM @partyList p
-	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON p.PartyId = h.PartyId
+	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON p.PartyId = h.PartyId AND h.CurrencyId = p.BaseCurrencyId
 	INNER JOIN @baseCurrencyList b ON h.CurrencyId = b.CurrencyId
 	INNER JOIN dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId
 	LEFT JOIN dbo.LA_f_Products3rd('') r ON r.ProductID = s.ProductId

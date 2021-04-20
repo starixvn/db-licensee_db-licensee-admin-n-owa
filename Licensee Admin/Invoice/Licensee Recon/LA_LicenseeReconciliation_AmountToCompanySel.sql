@@ -44,6 +44,7 @@ AS
 		- 20201231@Parsons: Integrate Big Gaming [#145342]
 		- 20210106@Happy: Integrate MaxGame [#147375]
 	    - 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
+		- 20210406@Parsons: Support duo base currency [RedmineID: #152089]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -107,10 +108,10 @@ BEGIN
 	SELECT p.PartyID, p.PartyName
 		, 1 AS IsSelected
 		, -p.PartyID AS PartyGroupId
-		, CASE WHEN ISNULL(d.LicenseeCode,'') = '' THEN CAST(p.PartyID AS VARCHAR(10)) ELSE d.LicenseeCode END
+		, CASE WHEN ISNULL(bc.LicenseeCode,'') = '' THEN CAST(p.PartyID AS VARCHAR(10)) ELSE UPPER(bc.LicenseeCode) END
 	FROM dbo.OAS_Party p WITH(NOLOCK)
-	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
-	WHERE p.PartyID IN(SELECT val FROM dbo.strSplit(@PartyIds, ',')) AND d.LicenseeCode IS NOT NULL
+	INNER JOIN dbo.OAS_PartyBaseCurrency bc WITH(NOLOCK) ON p.PartyID = bc.PartyID AND FromDate <= @ToDate AND ToDate >= @FromDate
+	WHERE p.PartyID IN(SELECT val FROM dbo.strSplit(@PartyIds, ','))
 
 	-- to calculate minfee: need to select all party in same group
 	-- get actual party group id
@@ -775,7 +776,7 @@ END
 		END
 		ELSE
 		BEGIN
-			SELECT p.LicenseeCode
+			SELECT UPPER(p.LicenseeCode) AS LicenseeCode
 				, pl.Name AS ProductName
 				, UPPER(@BaseCurrency) AS CurrencyName
 				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC) THEN 
