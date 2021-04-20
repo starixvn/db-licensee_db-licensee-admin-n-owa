@@ -736,7 +736,7 @@ END
 	WHERE h.StatusId = 0-- normal invoice
 		AND h.Environment = @Environment
 		AND h.PartyId IN (SELECT p.PartyId FROM @partyList p WHERE p.IsSelected = 1)
-		AND h.InvoiceDate BETWEEN @FromDate AND @ToDate
+		AND h.FromDate <= @FromDate AND h.ToDate >=@ToDate
 		AND s.InvItemTypeId=1 -- software data fee
 	GROUP BY h.PartyId, s.ProductId
 
