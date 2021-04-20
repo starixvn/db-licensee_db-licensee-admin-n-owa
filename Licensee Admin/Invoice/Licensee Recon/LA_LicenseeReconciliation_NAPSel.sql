@@ -67,21 +67,25 @@ BEGIN
 
 	CREATE NONCLUSTERED INDEX Idx_transfer ON #transfer (RefNo, CustId)
 
+	DECLARE @_FromDate SMALLDATETIME, @_ToDate SMALLDATETIME
+
 	-- bettrans
 	IF @ToDate >= @balanceUpDay
 	BEGIN
-		DECLARE @_FromDate DATE = (CASE WHEN @FromDate >= @balanceUpDay THEN @FromDate ELSE @balanceUpDay END)
+		SELECT @_FromDate = CASE WHEN @FromDate > @balanceUpDay THEN @FromDate ELSE @balanceUpDay END
+		SELECT @_ToDate = @ToDate
 
 		INSERT INTO #transfer(Amount, RefNo, CustId)
 		SELECT winlost - actual_stake, refno, custid
 		FROM dbo.bettrans b WITH(NOLOCK)
-		WHERE b.winlostdate BETWEEN @_FromDate AND @ToDate AND b.bettype = 21003 AND b.oddsid=0
+		WHERE b.winlostdate BETWEEN @_FromDate AND @_ToDate AND b.bettype = 21003 AND b.oddsid=0
 	END
 
 	-- transfer
 	IF @FromDate < @balanceUpDay
 	BEGIN
-		DECLARE @_ToDate DATE = (CASE WHEN @ToDate < @balanceUpDay THEN @ToDate ELSE DATEADD(day, -1, @balanceUpDay) END)
+		SELECT @_FromDate = @FromDate
+		SELECT @_ToDate = CASE WHEN @ToDate < @balanceUpDay THEN @ToDate ELSE DATEADD(DAY, -1, @balanceUpDay) END
 
 		INSERT INTO #transfer(Amount, RefNo, CustId)
 		SELECT winlost - actual_stake, refno, custid
