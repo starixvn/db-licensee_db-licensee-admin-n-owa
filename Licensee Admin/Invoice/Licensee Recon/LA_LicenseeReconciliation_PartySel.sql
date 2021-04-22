@@ -111,7 +111,7 @@ BEGIN
 		, l.LicenseeName
 		, l.BaseCurrencyId
 		, e.Code AS BaseCurrencyCode
-		, ISNULL(NULLIF(l.LicenseeCode, ''), CONVERT(VARCHAR(50), l.PartyId)) AS LicenseeCode
+		, ISNULL(NULLIF(UPPER(l.LicenseeCode), ''), CONVERT(VARCHAR(50), l.PartyId)) AS LicenseeCode
 		, ISNULL(l.StartDate, @defaultStartDate) AS StartDate
 		, ISNULL(l.EndDate, @defaultEndDate) AS EndDate
 		, l.CustId
@@ -128,7 +128,6 @@ BEGIN
 	UNION ALL
 	SELECT @UnidentifiedGroup, 0, 'Unidentified', 0, '', '', @defaultStartDate, @defaultEndDate, 0, 1 FROM @billingGroup WHERE GroupId = @UnidentifiedGroup
 
-	DROP TABLE #Licensees
 	DROP TABLE #Licensees
 END
 GO
