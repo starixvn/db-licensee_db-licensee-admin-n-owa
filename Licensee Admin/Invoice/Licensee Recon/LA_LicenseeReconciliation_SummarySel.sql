@@ -34,9 +34,10 @@ BEGIN
 		ISNULL(Promotion,0) Promotion,
 		ClosingBalance,
 		CurrencyName,
-		ISNULL(NULLIF(UPPER(LicenseeCode), ''), CONVERT(VARCHAR(50), PartyId)) AS LicenseeCode
+		UPPER(LicenseeCode) AS LicenseeCode
 	FROM bodb_licenseeReport.dbo.rptLicenseeReconciliation WITH(NOLOCK)
-	WHERE AccDate = @reportMonth AND Environment = @Environment AND 
-		PartyId IN (SELECT val FROM bodb02.dbo.strSplit(@PartyIds,','))
+	WHERE AccDate = @reportMonth AND Environment = @Environment AND (
+		ISNULL(@PartyIds,'') = '' OR PartyId IN (SELECT val FROM bodb02.dbo.strSplit(@PartyIds,','))
+	)
 END
 GO
