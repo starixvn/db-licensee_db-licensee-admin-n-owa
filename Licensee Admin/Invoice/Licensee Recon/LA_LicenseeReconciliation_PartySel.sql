@@ -43,7 +43,7 @@ BEGIN
 		AND pd.IsDeposit = 1
 
 	UPDATE l
-	SET l.StartDate = bc.FromDate, l.EndDate = bc.ToDate
+	SET l.StartDate = bc.FromDate--, l.EndDate = bc.ToDate
 	FROM #Licensees l
 		INNER JOIN (
 			SELECT PartyId, MIN(FromDate) AS FromDate, MAX(ToDate) AS ToDate
@@ -61,7 +61,7 @@ BEGIN
 	WHERE @LastDayOfMonth >= FromDate
 
 	UPDATE lc
-	SET lc.LicenseeCode = UPPER(c.UserName), lc.BaseCurrencyId = c.Currency, lc.FromDate = t.FromDate, lc.ToDate = t.ToDate
+	SET lc.LicenseeCode = UPPER(c.UserName), lc.BaseCurrencyId = c.Currency, lc.FromDate = t.FromDate--, lc.ToDate = t.ToDate
 	FROM @LicenseeCodes lc
 		INNER JOIN bodb02.dbo.Customer c WITH (NOLOCK) ON lc.CustId = c.CustId
 		INNER JOIN (
@@ -75,13 +75,20 @@ BEGIN
 	UPDATE l
 	SET l.CustId = lc.CustId
 		,l.StartDate = CASE WHEN l.StartDate < lc.FromDate THEN l.StartDate ELSE lc.FromDate END
-		,l.EndDate = CASE WHEN l.EndDate > lc.ToDate THEN l.EndDate ELSE lc.ToDate END
+		--,l.EndDate = CASE WHEN l.EndDate > lc.ToDate THEN l.EndDate ELSE lc.ToDate END
 	FROM #Licensees l
 		INNER JOIN @LicenseeCodes lc ON l.LicenseeCode = lc.LicenseeCode AND l.IsBillingCurrency = lc.IsBillingCurrency
 
+	INSERT INTO #Licensees (CustId, LicenseeName, PartyId, LicenseeCode, BaseCurrencyId, StartDate, IsBillingCurrency)
+	SELECT lc.CustId, lc.LicenseeName, bc.PartyId, lc.LicenseeCode, lc.BaseCurrencyId, lc.FromDate, lc.IsBillingCurrency
+	FROM @LicenseeCodes lc
+		INNER JOIN dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON lc.LicenseeCode = bc.LicenseeCode
+	WHERE lc.CustId NOT IN (SELECT ISNULL(l.CustId, 0) FROM #Licensees l)
+		AND lc.LicenseeName NOT IN (SELECT ISNULL(l.LicenseeName, '') FROM #Licensees l)
+
 	-- Exists Licensee Code but not have party, put in Unidentified group
-	INSERT INTO #Licensees (CustId, LicenseeName, LicenseeCode, BaseCurrencyId, ParentId, StartDate, EndDate, IsBillingCurrency)
-	SELECT CustId, LicenseeName, LicenseeCode, BaseCurrencyId, @UnIdentifiedGroup, FromDate, ToDate, IsBillingCurrency
+	INSERT INTO #Licensees (CustId, LicenseeName, LicenseeCode, BaseCurrencyId, ParentId, StartDate, IsBillingCurrency)
+	SELECT CustId, LicenseeName, LicenseeCode, BaseCurrencyId, @UnIdentifiedGroup, FromDate, IsBillingCurrency
 	FROM @LicenseeCodes lc
 	WHERE lc.CustId NOT IN (SELECT ISNULL(l.CustId, 0) FROM #Licensees l)
 		AND lc.LicenseeName NOT IN (SELECT ISNULL(l.LicenseeName, '') FROM #Licensees l)
@@ -116,7 +123,7 @@ BEGIN
 	)
 	UPDATE l
 	SET l.StartDate = CASE WHEN l.StartDate < c.StartMonth THEN l.StartDate ELSE c.StartMonth END
-		,l.EndDate = CASE WHEN l.EndDate > c.EndMonth THEN l.EndDate ELSE c.EndMonth END
+		,l.EndDate = c.EndMonth
 	FROM #Licensees l
 		INNER JOIN CTE_ChargeRate c ON l.PartyId = c.PartyId
 
@@ -130,7 +137,7 @@ BEGIN
 		, l.BaseCurrencyId
 		, e.Code AS BaseCurrencyCode
 		, ISNULL(NULLIF(UPPER(l.LicenseeCode), ''), CONVERT(VARCHAR(50), l.PartyId)) AS LicenseeCode
-		, '2021-01-01'--ISNULL(l.StartDate, @defaultStartDate) AS StartDate
+		, ISNULL(l.StartDate, @defaultStartDate) AS StartDate
 		, ISNULL(l.EndDate, @defaultEndDate) AS EndDate
 		, l.CustId
 		, l.IsBillingCurrency
@@ -145,6 +152,7 @@ BEGIN
 	SELECT @UnofficialGroup, 0, 'Non-Official Licensees', 0, '', '', @defaultStartDate, @defaultEndDate, 0, 1 FROM @billingGroup WHERE GroupId = @UnofficialGroup
 	UNION ALL
 	SELECT @UnidentifiedGroup, 0, 'Unidentified', 0, '', '', @defaultStartDate, @defaultEndDate, 0, 1 FROM @billingGroup WHERE GroupId = @UnidentifiedGroup
+	ORDER BY LicenseeName
 
 	DROP TABLE #Licensees
 END
