@@ -14,6 +14,7 @@ AS
 	Revisions: 
 		- 20191017@Bruce: Create Sp [#122229]
 		- 20191210@Bruce: Add promotion [#123958]
+		- 20210323@Percy: Add LicenseeCode column [RedmineID: #152089]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -28,6 +29,7 @@ BEGIN
 		Discount,
 		Rebate,
 		ClosingBalance,
+		LicenseeCode,
 		CurrencyName,
 		Others,
 		Prepayment,
@@ -42,6 +44,7 @@ BEGIN
 		t.Party.value('@dc', 'MONEY')	AS Discount,
 		t.Party.value('@rb', 'MONEY')	AS Rebate,
 		t.Party.value('@co', 'MONEY')	AS ClosingBalance,
+		t.Party.value('@lc', 'VARCHAR(50)')	AS LicenseeCode,
 		t.Party.value('@cn', 'VARCHAR(10)') AS CurrencyName,
 		t.Party.value('@ot', 'MONEY')	AS Others,
 		t.Party.value('@pp', 'MONEY')	AS Prepayment,
