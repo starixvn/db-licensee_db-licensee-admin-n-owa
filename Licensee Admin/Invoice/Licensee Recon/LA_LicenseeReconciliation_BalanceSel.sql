@@ -83,6 +83,14 @@ BEGIN
 		  AND s.CustId NOT IN (SELECT cte.CustId FROM cte_ValidCustTable cte)
 		  AND @LastDayOfMonth >= bc.FromDate
 
+	UPDATE s
+	SET s.LicenseeCode = s.LicenseeCode + '|' + CONVERT(VARCHAR(50), bc.PartyId)
+	FROM #statement s
+		INNER JOIN (
+			SELECT DISTINCT PartyId, LicenseeCode
+			FROM bodb_licensee.dbo.OAS_PartyBaseCurrency WITH(NOLOCK)
+		) bc ON s.LicenseeCode = bc.LicenseeCode
+
 	-- balance up day
 	--
 	DECLARE @tmpBalanceUpDay AS TABLE (BalanceUpDay DATE, MoveBetsDay DATE)

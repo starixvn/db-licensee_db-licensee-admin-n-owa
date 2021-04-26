@@ -777,7 +777,7 @@ END
 		END
 		ELSE
 		BEGIN
-			SELECT UPPER(p.LicenseeCode) AS LicenseeCode
+			SELECT ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId) AS LicenseeCode
 				, pl.Name AS ProductName
 				, UPPER(@BaseCurrency) AS CurrencyName
 				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC) THEN 
@@ -787,7 +787,7 @@ END
 			INNER JOIN @partyList p ON r.PartyID=p.PartyId
 			INNER JOIN @productList pl ON r.ProductID = pl.ProductId
 			WHERE p.IsSelected=1
-			GROUP BY pl.ProductId, p.LicenseeCode, pl.Name
+			GROUP BY pl.ProductId, ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId), pl.Name
 			ORDER BY pl.ProductId
 		END
 	END
@@ -811,7 +811,7 @@ END
 		END
 		ELSE
 		BEGIN
-			SELECT UPPER(p.LicenseeCode) AS LicenseeCode
+			SELECT ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId) AS LicenseeCode
 				,UPPER(@BaseCurrency) AS CurrencyName 
 				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC) THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
@@ -823,7 +823,7 @@ END
 			FROM #tmpResult r
 			INNER JOIN @partyList p ON p.PartyId = r.PartyID
 			WHERE p.IsSelected = 1
-			GROUP BY p.LicenseeCode
+			GROUP BY ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId)
 		END
 	END
 

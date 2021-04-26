@@ -92,12 +92,12 @@ BEGIN
 		DELETE @baseCurrencyList WHERE CurrencyName = @CurrencyName
 
 		INSERT INTO @result(LicenseeCode,Rate,Sportsbook)
-		SELECT s.LicenseeCode,s.Rate, SUM(d.AmountToCompany * e.BaseCurrencyRate)
+		SELECT ISNULL(s.LicenseeCode, '') + '|' + CONVERT(VARCHAR(50), d.PartyId), s.Rate, SUM(d.AmountToCompany * e.BaseCurrencyRate)
 		FROM #data d
 		INNER JOIN @discountSettings s ON d.PartyID=s.PartyId
 		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CurrencyName) e ON e.ExchangeId=d.CurrencyId AND e.exchangedate=d.rptDate
 		WHERE s.CurrencyId=@CurrencyId
-		GROUP BY s.LicenseeCode,s.Rate
+		GROUP BY ISNULL(s.LicenseeCode, '') + '|' + CONVERT(VARCHAR(50), d.PartyId), s.Rate
 	END
 
 	SELECT * FROM @result

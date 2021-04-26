@@ -52,6 +52,14 @@ BEGIN
 	FROM @licensees c
 	INNER JOIN @licenseeTransferCode tc ON c.CustId = tc.CustId
 	INNER JOIN dbo.Dep_CustSuper s WITH(NOLOCK) ON s.[site] = tc.LicenseeName
+	
+	UPDATE ls
+	SET ls.LicenseeCode = ls.LicenseeCode + '|' + CONVERT(VARCHAR(50), bc.PartyId)
+	FROM @licenseeSupers ls
+		INNER JOIN (
+			SELECT DISTINCT PartyId, LicenseeCode
+			FROM bodb_licensee.dbo.OAS_PartyBaseCurrency WITH(NOLOCK)
+		) bc ON ls.LicenseeCode = bc.LicenseeCode
 
 	DECLARE @tmpBalanceUpDay AS TABLE (BalanceUpDay DATE, MoveBetsDay DATE)
 	INSERT INTO @tmpBalanceUpDay(BalanceUpDay,MoveBetsDay)

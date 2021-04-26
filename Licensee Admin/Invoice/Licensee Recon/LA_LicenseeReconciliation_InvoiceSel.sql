@@ -82,7 +82,8 @@ BEGIN
 
 	IF @IsGroupByPartyId = 0
 	BEGIN
-		SELECT LicenseeCode,CurrencyName
+		SELECT ISNULL(LicenseeCode, '') + '|' + CONVERT(VARCHAR(50), PartyId) AS LicenseeCode
+			,CurrencyName
 			,0 AS PartyId
 			,SUM(LicensingFee) LicensingFee
 			,SUM(Discount) Discount
@@ -93,7 +94,7 @@ BEGIN
 			,SUM(AMF) AMF
 			,SUM(Promotion) Promotion
 		FROM #result
-		GROUP BY LicenseeCode, CurrencyName
+		GROUP BY ISNULL(LicenseeCode, '') + '|' + CONVERT(VARCHAR(50), PartyId), CurrencyName
 	END
 	ELSE
 	BEGIN
