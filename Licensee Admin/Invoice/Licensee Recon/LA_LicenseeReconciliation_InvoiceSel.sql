@@ -42,10 +42,10 @@ BEGIN
 	DECLARE @partyList AS TABLE(PartyId INT,LicenseeCode VARCHAR(50), BaseCurrencyId INT)
 
 	INSERT INTO @partyList(PartyId, LicenseeCode, BaseCurrencyId)
-	SELECT PartyID, UPPER(LicenseeCode), BaseCurrencyId
+	SELECT DISTINCT PartyID, UPPER(LicenseeCode), BaseCurrencyId
 	FROM dbo.OAS_PartyBaseCurrency WITH(NOLOCK)
 	WHERE (@IsGroupByPartyId = 1 OR LicenseeCode IS NOT NULL)
-		AND @ToDate BETWEEN FromDate AND ToDate
+		AND @ToDate >= FromDate
 
 	IF @PartyIds <> 'All'
 	BEGIN
