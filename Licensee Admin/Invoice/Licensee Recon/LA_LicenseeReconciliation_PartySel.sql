@@ -136,7 +136,7 @@ BEGIN
 		, l.LicenseeName
 		, l.BaseCurrencyId
 		, e.Code AS BaseCurrencyCode
-		, ISNULL(NULLIF(UPPER(l.LicenseeCode), ''), CONVERT(VARCHAR(50), l.PartyId)) AS LicenseeCode
+		, ISNULL(UPPER(l.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), l.PartyId) AS LicenseeCode
 		, ISNULL(l.StartDate, @defaultStartDate) AS StartDate
 		, ISNULL(l.EndDate, @defaultEndDate) AS EndDate
 		, l.CustId
