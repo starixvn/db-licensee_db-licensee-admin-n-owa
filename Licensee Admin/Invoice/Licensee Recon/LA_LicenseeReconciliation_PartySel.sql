@@ -43,7 +43,7 @@ BEGIN
 		AND pd.IsDeposit = 1
 
 	UPDATE l
-	SET l.StartDate = bc.FromDate--, l.EndDate = bc.ToDate
+	SET l.StartDate = bc.FromDate, l.EndDate = bc.ToDate
 	FROM #Licensees l
 		INNER JOIN (
 			SELECT PartyId, MIN(FromDate) AS FromDate, MAX(ToDate) AS ToDate
@@ -61,7 +61,7 @@ BEGIN
 	WHERE @LastDayOfMonth >= FromDate
 
 	UPDATE lc
-	SET lc.LicenseeCode = UPPER(c.UserName), lc.BaseCurrencyId = c.Currency, lc.FromDate = t.FromDate--, lc.ToDate = t.ToDate
+	SET lc.LicenseeCode = UPPER(c.UserName), lc.BaseCurrencyId = c.Currency, lc.FromDate = t.FromDate, lc.ToDate = t.ToDate
 	FROM @LicenseeCodes lc
 		INNER JOIN bodb02.dbo.Customer c WITH (NOLOCK) ON lc.CustId = c.CustId
 		INNER JOIN (
@@ -75,12 +75,12 @@ BEGIN
 	UPDATE l
 	SET l.CustId = lc.CustId
 		,l.StartDate = CASE WHEN l.StartDate < lc.FromDate THEN l.StartDate ELSE lc.FromDate END
-		--,l.EndDate = CASE WHEN l.EndDate > lc.ToDate THEN l.EndDate ELSE lc.ToDate END
+		,l.EndDate = CASE WHEN l.EndDate > lc.ToDate THEN l.EndDate ELSE lc.ToDate END
 	FROM #Licensees l
 		INNER JOIN @LicenseeCodes lc ON l.LicenseeCode = lc.LicenseeCode AND l.IsBillingCurrency = lc.IsBillingCurrency
 
-	INSERT INTO #Licensees (CustId, LicenseeName, PartyId, LicenseeCode, BaseCurrencyId, StartDate, IsBillingCurrency)
-	SELECT lc.CustId, lc.LicenseeName, bc.PartyId, lc.LicenseeCode, lc.BaseCurrencyId, lc.FromDate, lc.IsBillingCurrency
+	INSERT INTO #Licensees (CustId, LicenseeName, PartyId, LicenseeCode, BaseCurrencyId, StartDate, EndDate, IsBillingCurrency)
+	SELECT lc.CustId, lc.LicenseeName, bc.PartyId, lc.LicenseeCode, lc.BaseCurrencyId, lc.FromDate, lc.ToDate, lc.IsBillingCurrency
 	FROM @LicenseeCodes lc
 		INNER JOIN dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON lc.LicenseeCode = bc.LicenseeCode
 	WHERE lc.CustId NOT IN (SELECT ISNULL(l.CustId, 0) FROM #Licensees l)
