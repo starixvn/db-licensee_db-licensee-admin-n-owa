@@ -97,7 +97,7 @@ BEGIN
 	DECLARE @CC_bettype TABLE (BettypeId INT, SubProduct VARCHAR(500))
 
 	INSERT INTO @CC_bettype (BettypeId, SubProduct)
-	SELECT distinct la.Bettype as BettypeId, ma.SubProduct
+	SELECT DISTINCT la.Bettype as BettypeId, ma.SubProduct
 	FROM LA_f_BettypeProductMapping(0,'CC') la
 	LEFT JOIN bodb02.dbo.SportBettypeMatrix ma (NOLOCK) ON la.Bettype = ma.BetType 
 
