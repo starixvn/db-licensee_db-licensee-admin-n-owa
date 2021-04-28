@@ -92,23 +92,32 @@ BEGIN
 	  For Midas's tickets: Licensee WL x 3.5%
 	*/
 
-	DECLARE @TaiXiu_BettypeId INT = 1902, @XocDia_BettypeId INT = 1903, @Lotto3_BettypeId INT = 1904, @HiLo_BettypeId INT = 1905, @MarbleMini_BettypeId INT = 1907, @RPS_BettypeId INT = 1908 ,@MidasRate3rd DECIMAL(4,3) = 0.035
+	DECLARE @MidasRate3rd DECIMAL(4,3) = 0.035
+
+	DECLARE @CC_bettype TABLE (BettypeId INT, SubProduct VARCHAR(500))
+
+	INSERT INTO @CC_bettype (BettypeId, SubProduct)
+	SELECT distinct la.Bettype as BettypeId, ma.SubProduct
+	FROM LA_f_BettypeProductMapping(0,'CC') la
+	LEFT JOIN bodb02.dbo.SportBettypeMatrix ma (NOLOCK) ON la.Bettype = ma.BetType 
+
 
 	;WITH cte_Summary AS(
 		SELECT b.SiteID,
 			b.Bettype,
+			bt.SubProduct,
 			b.rptDate AS Winlostdate,
 			b.CurrencyId AS CurrencyId,
 			SUM(b.Turnover) AS Turnover,
-			SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE b.BetCount END) AS TotalTrans,
-			SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN 0 ELSE b.WinLoss END) AS CustomerWinLoss,
-			SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus THEN b.WinLoss ELSE 0 END) AS Promotion
+			SUM(CASE WHEN bt.SubProduct = 'Bonus' THEN 0 ELSE b.BetCount END) AS TotalTrans,
+			SUM(CASE WHEN bt.SubProduct = 'Bonus' THEN 0 ELSE b.WinLoss END) AS CustomerWinLoss,
+			SUM(CASE WHEN bt.SubProduct = 'Bonus' THEN b.WinLoss ELSE 0 END) AS Promotion
 		FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
 		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+		INNER JOIN @CC_bettype bt ON bt.BettypeId = b.Bettype
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate 
 			AND b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
-			AND b.Bettype in (Select Bettype FROM LA_f_BettypeProductMapping(0,'CC'))
-		GROUP BY b.rptDate, b.CurrencyId, b.SiteID, b.Bettype
+		GROUP BY b.rptDate, b.CurrencyId, b.SiteID, b.Bettype, bt.SubProduct
 	)
 	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier,Promotion)
 	SELECT ci.PartyID,
@@ -119,7 +128,7 @@ BEGIN
 		SUM(CustomerWinLoss),
 		- SUM(CustomerWinLoss) AS LicenseeWinLoss,
 		SUM(CASE WHEN ci.isDeposit = 1 THEN (-s.CustomerWinLoss  * ISNULL(cr.Rate, ci.Rate)) ELSE 0 END) AS LicensingFee,
-		SUM(-CustomerWinLoss * (CASE WHEN s.Bettype IN (@TaiXiu_BettypeId, @XocDia_BettypeId, @Lotto3_BettypeId, @HiLo_BettypeId, @MarbleMini_BettypeId, @RPS_BettypeId) THEN @MidasRate3rd ELSE ci.Rate3rd END) - s.Promotion),
+		SUM(-CustomerWinLoss * (CASE WHEN s.SubProduct = 'Mini Games' THEN @MidasRate3rd ELSE ci.Rate3rd END) - s.Promotion),
 		SUM(s.Promotion) AS Promotion
 	FROM cte_Summary s INNER JOIN #ChargeRate ci ON s.SiteID = ci.LicenseeId AND Winlostdate BETWEEN ci.FromDate AND ci.ToDate
 	LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeId = ci.ChargeId AND cr.CurrencyId = s.CurrencyId
