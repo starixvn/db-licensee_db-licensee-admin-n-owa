@@ -2,7 +2,7 @@
 USE [bodb_licensee]
 GO
 
-ALTER PROCEDURE [dbo].[LA_Rpt_SexyGamingWinLoss]
+ALTER PROCEDURE [dbo].[LA_Rpt_AESexyWinLoss]
 	@PartyIds			VARCHAR(4000),
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
@@ -11,12 +11,13 @@ ALTER PROCEDURE [dbo].[LA_Rpt_SexyGamingWinLoss]
 AS
 /*
  * Created by : [20200325@Mason.Nguyen]
- * Task  : Get SexyGaming Winloss
+ * Task  : Get AESexy Winloss
  * Revisions
 	- 20200325@Mason: Intergrate SexyGaming [#130948]
 	- 20200409@Mason: Integrate SA Gaming [#129276]
 	- 20200508@Parsons: Integrate Sexy Gaming for deposit licensees [#132665] 
 	- 20200910@Parsons: Provide timezone filter for Sexy Gaming report [#138248]
+	- 20210422@Mason: Change product name into AE Sexy
  * Param's Explanation:
  *				@Timezone: = 1: GMT-4
 						   = 2: GMT+8	
