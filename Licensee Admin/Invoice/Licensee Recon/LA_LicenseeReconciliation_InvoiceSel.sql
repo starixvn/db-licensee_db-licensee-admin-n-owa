@@ -95,6 +95,7 @@ BEGIN
 			,SUM(Promotion) Promotion
 		FROM #result
 		GROUP BY ISNULL(LicenseeCode, '') + '|' + CONVERT(VARCHAR(50), PartyId), CurrencyName
+		ORDER BY LicenseeCode
 	END
 	ELSE
 	BEGIN
