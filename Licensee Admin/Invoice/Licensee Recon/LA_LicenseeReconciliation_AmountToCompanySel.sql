@@ -46,6 +46,7 @@ AS
 	    - 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
 		- 20210406@Parsons: Support duo base currency [RedmineID: #152089]
 		- 20210407@Mason: Integrate new Sport Lottery [#150866]
+		- 20210407@Percy: Support duo base currency - Change code for Collection Summary [RedmineID: #152089]
 */
 BEGIN
 	SET NOCOUNT ON

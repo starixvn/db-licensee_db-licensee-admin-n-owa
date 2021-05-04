@@ -27,6 +27,7 @@ AS
 	    - 20201218@Parsons: Saba.club - Offer Freebet tickets [#141423]
 		- 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
 	   	- 20210323@Percy: Support duo base currency [RedmineID: #152089]
+		- 20210407@Percy: Support duo base currency - Change code for Collection Summary [RedmineID: #152089]
 */
 BEGIN
 	SET NOCOUNT ON

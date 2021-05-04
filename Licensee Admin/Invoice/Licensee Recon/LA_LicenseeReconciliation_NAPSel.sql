@@ -15,6 +15,7 @@ AS
 		- 20190801@Bruce: Create Sp [#111586]
 		- 20191007@Bruce: Filter data by custid [#120220]
 		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
+		- 20210407@Percy: Support duo base currency - Change code for Collection Summary [RedmineID: #152089]
 */
 BEGIN
 	SET NOCOUNT ON

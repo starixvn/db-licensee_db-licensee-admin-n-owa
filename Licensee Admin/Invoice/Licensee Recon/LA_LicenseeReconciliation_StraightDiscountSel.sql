@@ -16,6 +16,7 @@ AS
 		- 20200512@Parsons: Special handling for INH market [#128570]
 		- 20201209@Parsons: Licensee Reconciliation - Change Discount column if licensee has straight rebate [#146328]
 		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
+		- 20210407@Percy: Support duo base currency - Change code for Collection Summary [RedmineID: #152089]
 
 	Example:
 		USE bodb_licensee
