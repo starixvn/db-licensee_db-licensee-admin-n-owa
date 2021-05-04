@@ -767,7 +767,7 @@ END
 				, pl.Name AS ProductName
 				, pl.ProductId
 				, UPPER(@BaseCurrency) AS CurrencyName
-				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC) THEN 
+				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC) THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 			FROM #tmpResult r
@@ -781,7 +781,7 @@ END
 			SELECT ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId) AS LicenseeCode
 				, pl.Name AS ProductName
 				, UPPER(@BaseCurrency) AS CurrencyName
-				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC) THEN 
+				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC) THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 			FROM #tmpResult r
@@ -798,7 +798,7 @@ END
 		BEGIN
 			SELECT p.PartyId
 				,UPPER(@BaseCurrency) AS CurrencyName
-				,SUM(CASE WHEN r.ProductID IN (@PP, @SBC) THEN 
+				,SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC) THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					 ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 				,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) LicensingFee
@@ -814,7 +814,7 @@ END
 		BEGIN
 			SELECT ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId) AS LicenseeCode
 				,UPPER(@BaseCurrency) AS CurrencyName 
-				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC) THEN 
+				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC) THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 				,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) LicensingFee
