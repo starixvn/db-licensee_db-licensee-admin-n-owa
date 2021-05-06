@@ -601,10 +601,10 @@ BEGIN
 	INNER JOIN bodb02.dbo.Products p WITH (NOLOCK) ON t.ProductCode = p.ProductPrefix
 	INNER JOIN bodb_licensee.dbo.Product3rd d WITH(NOLOCK) ON p.ProductPrefix = d.ProductPrefix
 
-	INSERT INTO @mappingProductMatrix (ProductID, ProductID_3rd, ProductPrefix)
-	SELECT 1, 0, 'SB'
-	UNION 
-	SELECT 1, 3, 'BA'
+	--INSERT INTO @mappingProductMatrix (ProductID, ProductID_3rd, ProductPrefix)
+	--SELECT 1, 0, 'SB'
+	--UNION 
+	--SELECT 1, 3, 'BA'
 
 	INSERT INTO  @tbBettypeProduct (Bettype, ProductID)
 	SELECT DISTINCT  s.BetType, ma.ProductID_3rd
