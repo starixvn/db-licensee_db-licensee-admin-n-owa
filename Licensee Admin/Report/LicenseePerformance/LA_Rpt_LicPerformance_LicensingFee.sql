@@ -1,4 +1,4 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
 
@@ -48,6 +48,10 @@ AS
 	   - 20201231@Parsons: Integrate Big Gaming [#145342]
 	   - 20210106@Happy: Integrate MaxGame [#147375]
 	   - 20210407@Mason: Integrate new Sport Lottery [#150866]
+		- 20210506@Percy: Integrate
+			. Pragmatic Live Casino [RedmineID: #150971]
+			. Habanero [RedmineID: #150636]
+			. Creative Gaming [RedmineID: #152139]
 
 
 	Param's Explanation:  
@@ -97,7 +101,7 @@ BEGIN
 		SET @sdate = DATEADD(m, 1, @sdate)
 	END	
 
-	IF @ProductCode IN ('NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK', 'WM', 'VS3', 'GDG', 'BGG', 'MXG', 'SLT')
+	IF @ProductCode IN ('NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK', 'WM', 'VS3', 'GDG', 'BGG', 'MXG', 'SLT', 'PPL', 'HB', 'CG')
 	BEGIN		
 		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, LicensingFee)
 		SELECT tp.PartyID, d.rptDate, d.CurrencyID, - SUM(d.Winloss * ISNULL(cc.Rate, tp.Rate))
