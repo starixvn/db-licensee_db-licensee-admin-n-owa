@@ -610,7 +610,6 @@ BEGIN
 	SELECT DISTINCT  s.BetType, ma.ProductID_3rd
 	FROM @mappingProductMatrix ma
 	INNER JOIN bodb02.dbo.SportBettypeMatrix  s (NOLOCK) ON ma.ProductID = s.ProductID
-	INNER JOIN @ProductList p ON p.ProductCode = ma.ProductPrefix
 	WHERE (
 			s.BetType NOT IN (901, 902, 903,904) OR ma.ProductID <> 1
 		 ) AND (@Bettype = 0 OR s.bettype = @Bettype)
