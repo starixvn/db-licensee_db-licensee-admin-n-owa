@@ -4,7 +4,7 @@ GO
 
 ALTER FUNCTION [dbo].[LA_f_BettypeProductMapping] (
 	 @Bettype	 	INT = 0
-	,@ProductCodes VARCHAR(1000)	
+	,@ProductCodes VARCHAR(1000)= ''	
 	)
 RETURNS @tbBettypeProduct TABLE (
 	Bettype INT,ProductID INT
@@ -71,6 +71,7 @@ AS
 		- 20210412@Sophia: Integrate PP Live Casino [Redmine: #150971]
 		- 20210419@Danny: Integrate Creative Gaming [Redmine: #152139]
 		- 20210412@Sophia: Change Range of AE Casino [Redmine :#152141]
+		- 20210428@Danny: Integrate VGaming with dynamic code [Redmine: #154080]
 
 	Param's Explanation:
 
@@ -79,8 +80,24 @@ AS
 BEGIN
 	DECLARE @ProductList TABLE (ProductCode VARCHAR(10))
 
-	INSERT INTO @ProductList (ProductCode)
-	SELECT val FROM bodb02.dbo.Lrf_f_StringSplit(@ProductCodes, ',')
+
+	IF @ProductCodes = ''
+	BEGIN
+		INSERT INTO @ProductList (ProductCode)
+		SELECT p.ProductPrefix
+		FROM bodb02.dbo.Products p WITH (NOLOCK)
+		INNER JOIN bodb_licensee.dbo.Product3rd d WITH(NOLOCK) ON p.ProductPrefix = d.ProductPrefix
+
+		INSERT INTO @ProductList VALUES ('SB')
+		INSERT INTO @ProductList VALUES ('BT')
+		INSERT INTO @ProductList VALUES ('BA')
+
+	END
+	ELSE
+	BEGIN
+		INSERT INTO @ProductList (ProductCode)
+		SELECT val FROM bodb02.dbo.Lrf_f_StringSplit(@ProductCodes, ',')
+	END
 
     IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'SB')
     BEGIN
@@ -570,7 +587,41 @@ BEGIN
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 
+	--- Dynamic function
+	DECLARE @mappingProductMatrix TABLE (ProductID INT, ProductID_3rd INT, ProductPrefix VARCHAR(10))
 
+	;WITH t(ProductCode) AS
+	(
+		SELECT distinct ProductCode FROM @ProductList 
+		WHERE ProductCode NOT IN (SELECT val FROM bodb02.dbo.Lrf_f_StringSplit('SB,BA,RB,NG,LC,VS,CS,BG,KN,MGCLC,MGCRNG,GD,BT,AGC,CF,CB,VB,PP,AB,FW,NG2,CO,VS2,LT,VG,BX,BF,PG,CC,SPR,SG,VRG,SXG,TG,SAG,BBIN,I4D,IBCLC,SBC,ION,RNGW,PGS,JK,WM,VS3,GDG,BGG,MXG,HB,SLT,PPL,CG',','))
+	)
+	INSERT INTO @mappingProductMatrix (ProductID, ProductID_3rd, ProductPrefix)
+	SELECT p.ProductID , d.Productid as ProductID_3rd, p.ProductPrefix
+	FROM  t
+	INNER JOIN bodb02.dbo.Products p WITH (NOLOCK) ON t.ProductCode = p.ProductPrefix
+	INNER JOIN bodb_licensee.dbo.Product3rd d WITH(NOLOCK) ON p.ProductPrefix = d.ProductPrefix
+
+	INSERT INTO @mappingProductMatrix (ProductID, ProductID_3rd, ProductPrefix)
+	SELECT 1, 0, 'SB'
+	UNION 
+	SELECT 1, 3, 'BA'
+
+	INSERT INTO  @tbBettypeProduct (Bettype, ProductID)
+	SELECT DISTINCT  s.BetType, ma.ProductID_3rd
+	FROM @mappingProductMatrix ma
+	INNER JOIN bodb02.dbo.SportBettypeMatrix  s (NOLOCK) ON ma.ProductID = s.ProductID
+	INNER JOIN @ProductList p ON p.ProductCode = ma.ProductPrefix
+	WHERE (
+			s.BetType NOT IN (901, 902, 903,904) OR ma.ProductID <> 1
+		 ) AND (@Bettype = 0 OR s.bettype = @Bettype)
+
+
+	--INSERT INTO @tbBettypeProduct (Bettype, ProductID)
+	--SELECT typeid, 13
+	--FROM bodb02.dbo.bettype WITH (NOLOCK)
+	--WHERE typeid BETWEEN 901 AND 904
+	--	  AND (@Bettype = 0 OR typeid = @Bettype)
+	
 	RETURN
 END
 GO
