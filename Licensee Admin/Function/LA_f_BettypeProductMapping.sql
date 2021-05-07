@@ -96,7 +96,7 @@ BEGIN
 	ELSE
 	BEGIN
 		INSERT INTO @ProductList (ProductCode)
-		SELECT val FROM bodb02.dbo.Lrf_f_StringSplit(@ProductCodes, ',')
+		SELECT DISTINCT val FROM bodb02.dbo.Lrf_f_StringSplit(@ProductCodes, ',')
 	END
 
     IF EXISTS(SELECT 1 FROM @ProductList WHERE ProductCode LIKE 'SB')
@@ -590,21 +590,19 @@ BEGIN
 	--- Dynamic function
 	DECLARE @mappingProductMatrix TABLE (ProductID INT, ProductID_3rd INT, ProductPrefix VARCHAR(10))
 
-	;WITH t(ProductCode) AS
-	(
-		SELECT distinct ProductCode FROM @ProductList 
-		WHERE ProductCode NOT IN (SELECT val FROM bodb02.dbo.Lrf_f_StringSplit('SB,BA,RB,NG,LC,VS,CS,BG,KN,MGCLC,MGCRNG,GD,BT,AGC,CF,CB,VB,PP,AB,FW,NG2,CO,VS2,LT,VG,BX,BF,PG,CC,SPR,SG,VRG,SXG,TG,SAG,BBIN,I4D,IBCLC,SBC,ION,RNGW,PGS,JK,WM,VS3,GDG,BGG,MXG,HB,SLT,PPL,CG',','))
-	)
 	INSERT INTO @mappingProductMatrix (ProductID, ProductID_3rd, ProductPrefix)
 	SELECT p.ProductID , d.Productid as ProductID_3rd, p.ProductPrefix
-	FROM  t
+	FROM  @ProductList t
 	INNER JOIN bodb02.dbo.Products p WITH (NOLOCK) ON t.ProductCode = p.ProductPrefix
 	INNER JOIN bodb_licensee.dbo.Product3rd d WITH(NOLOCK) ON p.ProductPrefix = d.ProductPrefix
+	WHERE t.ProductCode NOT IN  (SELECT val FROM bodb02.dbo.Lrf_f_StringSplit('SB,BA,RB,NG,LC,VS,CS,BG,KN,MGCLC,MGCRNG,GD,BT,AGC,CF,CB,VB,PP,AB,FW,NG2,CO,VS2,LT,VG,BX,BF,PG,CC,SPR,SG,VRG,SXG,TG,SAG,BBIN,I4D,IBCLC,SBC,ION,RNGW,PGS,JK,WM,VS3,GDG,BGG,MXG,HB,SLT,PPL,CG',','))
 
-	--INSERT INTO @mappingProductMatrix (ProductID, ProductID_3rd, ProductPrefix)
-	--SELECT 1, 0, 'SB'
-	--UNION 
-	--SELECT 1, 3, 'BA'
+	--IF EXISTS (SELECT 1 FROM @ProductList WHERE ProductCode = 'SB')
+	--INSERT INTO @mappingProductMatrix (ProductID, ProductID_3rd, ProductPrefix) VALUES (1, 0, 'SB')
+	
+	--IF EXISTS (SELECT 1 FROM @ProductList WHERE ProductCode = 'BA')
+	--INSERT INTO @mappingProductMatrix (ProductID, ProductID_3rd, ProductPrefix) VALUES (1, 3, 'BA')
+	
 
 	INSERT INTO  @tbBettypeProduct (Bettype, ProductID)
 	SELECT DISTINCT  s.BetType, ma.ProductID_3rd
@@ -614,12 +612,14 @@ BEGIN
 			s.BetType NOT IN (901, 902, 903,904) OR ma.ProductID <> 1
 		 ) AND (@Bettype = 0 OR s.bettype = @Bettype)
 
-
+	--IF EXISTS (SELECT 1 FROM @ProductList WHERE ProductCode = 'BT')
+	--BEGIN
 	--INSERT INTO @tbBettypeProduct (Bettype, ProductID)
 	--SELECT typeid, 13
 	--FROM bodb02.dbo.bettype WITH (NOLOCK)
 	--WHERE typeid BETWEEN 901 AND 904
 	--	  AND (@Bettype = 0 OR typeid = @Bettype)
+	--END
 	
 	RETURN
 END
