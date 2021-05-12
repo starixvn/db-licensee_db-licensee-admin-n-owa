@@ -78,9 +78,11 @@ BEGIN
     )
 	DELETE s
 	FROM #statement s
-	INNER JOIN bodb_licensee.dbo.OAS_PartyBaseCurrency bc WITH(NOLOCK) ON bc.LicenseeCode = s.LicenseeCode
+		INNER JOIN bodb_licensee.dbo.OAS_PartyBaseCurrency bc WITH(NOLOCK) ON bc.LicenseeCode = s.LicenseeCode
+		INNER JOIN bodb_licensee.dbo.OAS_Party p WITH(NOLOCK) ON bc.PartyID = p.PartyID
 	WHERE bc.PartyID NOT IN (SELECT ow.PartyId FROM @OW_PartyList ow)
 		  AND s.CustId NOT IN (SELECT cte.CustId FROM cte_ValidCustTable cte)
+		  AND (ISNULL(bc.LicenseeCode, '') = '' OR p.PartyType <> 5) -- Non-Official
 		  AND @LastDayOfMonth >= bc.FromDate
 
 	UPDATE s
