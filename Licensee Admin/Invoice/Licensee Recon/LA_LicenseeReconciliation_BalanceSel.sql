@@ -73,7 +73,7 @@ BEGIN
 			AND h.InvoiceHeaderId NOT IN (6208, 6207) -- temporary exclude these credit notes
 			AND h.Environment = @Environment
 			AND InvoiceType = 1
-			AND h.FromDate < @ReportDate
+			AND h.FromDate <= @ReportDate
 			AND @LastDayOfMonth >= bc.FromDate
     )
 	DELETE s
