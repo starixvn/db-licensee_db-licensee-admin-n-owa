@@ -37,6 +37,7 @@ AS
 	   - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
 	   - 20201211@Happy: Saba.club - Offer Freebet tickets [#141423]
 	   - 20200106@Parsons: Fix No Draw on TurnOver issue [#148317]
+	   - 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: #154992]
 
 	Param's Explanation:
 	  + @PartyIDs : a string of list PartyID, separated by ','
@@ -206,9 +207,13 @@ BEGIN
 	INNER JOIN @tmpParty p  ON b.PartyID = p.PartyID AND b.rptDate BETWEEN p.Fromdate AND p.Todate
 	GROUP BY CONVERT(VARCHAR(6), b.rptDate, 112), b.PartyID
 	
-	UPDATE #Result
-	SET LicensingFee = 0
-	WHERE LicensingFee < 0 AND PartyID NOT IN (316, 459) -- 9wickets, 9Wsports only for SB
+	-- treat negative LicensingFee as 0, except Joint Venture Parties
+	UPDATE r
+	SET r.LicensingFee = 0
+	FROM #Result r
+		LEFT JOIN bodb_Licensee.dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
+	WHERE r.LicensingFee < 0
+		AND jvp.PartyId IS NULL
 
 	-------------------------final select -------------------------------
 	SELECT CAST((ReportType + '01') AS DATE)	AS [DateTime]

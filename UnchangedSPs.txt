@@ -1,1 +1,2 @@
-Licensee Admin/Manage/Mics/LaunchNewLicensee/LA_LaunchLicensee.sql
+Licensee Admin\Report\Analysis\LA_GEN_LicPerformanceAnalysis_Invoice.sql
+Licensee Admin\Report\Analysis\LA_GEN_LicPerformanceAnalysis_Report.sql

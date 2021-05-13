@@ -48,10 +48,11 @@ AS
 	   - 20201231@Parsons: Integrate Big Gaming [#145342]
 	   - 20210106@Happy: Integrate MaxGame [#147375]
 	   - 20210407@Mason: Integrate new Sport Lottery [#150866]
-		- 20210506@Percy: Integrate
+	   - 20210506@Percy: Integrate
 			. Pragmatic Live Casino [RedmineID: #150971]
 			. Habanero [RedmineID: #150636]
 			. Creative Gaming [RedmineID: #152139]
+	   - 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: #
 
 
 	Param's Explanation:  
@@ -203,9 +204,13 @@ BEGIN
 		INNER JOIN #Exchange ee ON t.rptDate = ee.exchangedate AND t.CurrencyID = ee.ExchangeId
 	GROUP BY p.PartyId, p.PartyName, DATENAME(YEAR, t.rptDate)  + '-' + DATENAME(MONTH, t.rptDate)
 
-	UPDATE #rptLicFee
-	SET LicensingFee = 0
-	WHERE LicensingFee < 0 AND PartyId NOT IN (316, 459) --9wickets-316, 9Wsports-459
+	-- treat negative LicensingFee as 0, except Joint Venture Parties
+	UPDATE r
+	SET r.LicensingFee = 0
+	FROM #rptLicFee r
+		LEFT JOIN bodb_Licensee.dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
+	WHERE r.LicensingFee < 0
+		AND jvp.PartyId IS NULL
 	--------------------------------- view result  -------------------------------------------
 	--SELECT @cols = STUFF((SELECT ',' + QUOTENAME(seq )
  --                   FROM 

@@ -66,6 +66,7 @@ AS
 		- 20201027@Parsons: Arcadia Gaming - Add Bonus feature [#143597]
 		- 20201209@Parsons: Saba.club - Offer Freebet tickets [#141423]
 		- 20210206@Parsons: Saba.club - Integrate Slot Game [#147977]
+		- 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: #154992]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -590,6 +591,14 @@ BEGIN
 	INNER JOIN bodb_licensee.dbo.OAS_Party (NOLOCK) op ON r.PartyId = op.PartyID
 	-- End region
 
+	-- treat negative LicensingFee as 0, except Joint Venture Parties
+	UPDATE r
+	SET r.TotalFee = CASE WHEN r.TotalFee < 0 THEN 0 ELSE r.TotalFee END,
+		r.SportsbookFee = CASE WHEN r.SportsbookFee < 0 THEN 0 ELSE r.SportsbookFee END
+	FROM #Result r
+		LEFT JOIN bodb_Licensee.dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
+	WHERE jvp.PartyId IS NULL
+
 	-- Region: Select Data
 	;WITH cte_Result AS
 	(
@@ -609,24 +618,24 @@ BEGIN
 			CASE WHEN ISNULL(rRight.BACommission,0) > 0 THEN ISNULL(rRight.BACommission,0) ELSE 0 END	AS PreviousBACommission,
 			ISNULL(rLeft.AmountToBA, 0)																	AS AmountDueToBA,		-- Keep as it is
 			ISNULL(rRight.AmountToBA, 0)																AS PreviousAmountDueToBA,
-			CASE WHEN rLeft.SportsbookFee > 0 OR rLeft.PartyId IN (316, 459) THEN rLeft.SportsbookFee ELSE 0 END				AS SportsbookFee, -- 9wickets-316, 9Wsports-459
-			CASE WHEN ISNULL(rRight.SportsbookFee,0) > 0 OR rLeft.PartyId IN (316, 459) THEN rRight.SportsbookFee ELSE 0 END	AS PreviousSportsbookFee,
-			ISNULL(rLeft.OthersFee,0) + ISNULL(rLeft.NegativeAmount,0)										AS OtherProductsFee,
-			ISNULL(rRight.OthersFee,0) + ISNULL(rRight.NegativeAmount,0)									AS PreviousOtherProductsFee,
-			CASE WHEN rLeft.SportbookDiscount > 0 THEN rLeft.SportbookDiscount ELSE 0 END					AS DiscountSportsbook,
-			CASE WHEN ISNULL(rRight.SportbookDiscount,0) > 0 THEN rRight.SportbookDiscount ELSE 0 END		AS PreviousDiscountSportsbook,
-			CASE WHEN rLeft.OthersDiscount > 0 THEN rLeft.OthersDiscount ELSE 0 END 						AS DiscountOthers,
-			CASE WHEN ISNULL(rRight.OthersDiscount,0) > 0 THEN rRight.OthersDiscount ELSE 0 END				AS PreviousDiscountOthers,
-			CASE WHEN rLeft.SportbookRebate > 0 THEN rLeft.SportbookRebate ELSE 0 END 						AS RebateSportsbook,
-			CASE WHEN ISNULL(rRight.SportbookRebate,0) > 0 THEN rRight.SportbookRebate ELSE 0 END 			AS PreviousRebateSportsbook,
-			CASE WHEN rLeft.OthersRebate > 0 THEN rLeft.OthersRebate ELSE 0 END 							AS RebateOthers,
-			CASE WHEN ISNULL(rRight.OthersRebate,0) > 0 THEN rRight.OthersRebate ELSE 0 END 				AS PreviousRebateOthers,
-			ISNULL(rLeft.PromotionSportsbook, 0)															AS PromotionSportsbook,
-			ISNULL(rRight.PromotionSportsbook, 0)															AS PreviousPromotionSportsbook,
-			ISNULL(rLeft.PromotionOthers, 0)																AS PromotionOthers,
-			ISNULL(rRight.PromotionOthers, 0)																AS PreviousPromotionOthers,
-			(CASE WHEN rLeft.TotalFee > 0 OR rLeft.PartyId IN (316, 459) THEN rLeft.TotalFee ELSE 0 END) + ISNULL(rLeft.NegativeAmount,0) - ISNULL(rLeft.PromotionSportsbook,0) - ISNULL(rLeft.PromotionOthers,0)	AS TotalLicensingFee,
-			(CASE WHEN rRight.TotalFee > 0 OR rLeft.PartyId IN (316, 459) THEN rRight.TotalFee ELSE 0 END) + ISNULL(rRight.NegativeAmount,0) - ISNULL(rRight.PromotionSportsbook,0) - ISNULL(rRight.PromotionOthers,0)	AS PreviousTotalLicensingFee
+			ISNULL(rLeft.SportsbookFee, 0)																AS SportsbookFee,
+			ISNULL(rRight.SportsbookFee, 0)																AS PreviousSportsbookFee,
+			ISNULL(rLeft.OthersFee,0) + ISNULL(rLeft.NegativeAmount,0)									AS OtherProductsFee,
+			ISNULL(rRight.OthersFee,0) + ISNULL(rRight.NegativeAmount,0)								AS PreviousOtherProductsFee,
+			CASE WHEN rLeft.SportbookDiscount > 0 THEN rLeft.SportbookDiscount ELSE 0 END				AS DiscountSportsbook,
+			CASE WHEN ISNULL(rRight.SportbookDiscount,0) > 0 THEN rRight.SportbookDiscount ELSE 0 END	AS PreviousDiscountSportsbook,
+			CASE WHEN rLeft.OthersDiscount > 0 THEN rLeft.OthersDiscount ELSE 0 END 					AS DiscountOthers,
+			CASE WHEN ISNULL(rRight.OthersDiscount,0) > 0 THEN rRight.OthersDiscount ELSE 0 END			AS PreviousDiscountOthers,
+			CASE WHEN rLeft.SportbookRebate > 0 THEN rLeft.SportbookRebate ELSE 0 END 					AS RebateSportsbook,
+			CASE WHEN ISNULL(rRight.SportbookRebate,0) > 0 THEN rRight.SportbookRebate ELSE 0 END 		AS PreviousRebateSportsbook,
+			CASE WHEN rLeft.OthersRebate > 0 THEN rLeft.OthersRebate ELSE 0 END 						AS RebateOthers,
+			CASE WHEN ISNULL(rRight.OthersRebate,0) > 0 THEN rRight.OthersRebate ELSE 0 END 			AS PreviousRebateOthers,
+			ISNULL(rLeft.PromotionSportsbook, 0)														AS PromotionSportsbook,
+			ISNULL(rRight.PromotionSportsbook, 0)														AS PreviousPromotionSportsbook,
+			ISNULL(rLeft.PromotionOthers, 0)															AS PromotionOthers,
+			ISNULL(rRight.PromotionOthers, 0)															AS PreviousPromotionOthers,
+			ISNULL(rLeft.TotalFee, 0) + ISNULL(rLeft.NegativeAmount,0) - ISNULL(rLeft.PromotionSportsbook,0) - ISNULL(rLeft.PromotionOthers,0)	AS TotalLicensingFee,
+			ISNULL(rRight.TotalFee, 0) + ISNULL(rRight.NegativeAmount,0) - ISNULL(rRight.PromotionSportsbook,0) - ISNULL(rRight.PromotionOthers,0)	AS PreviousTotalLicensingFee
 	FROM	(SELECT * FROM #Result WHERE IsCurrent = 1) rLeft
 			FULL JOIN (SELECT * FROM #Result WHERE IsCurrent = 0) rRight ON rLeft.PartyId = rRight.PartyId
 	WHERE	@LicenseePaying = 0 

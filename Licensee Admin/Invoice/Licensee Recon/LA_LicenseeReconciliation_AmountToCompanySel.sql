@@ -51,6 +51,7 @@ AS
 			. Pragmatic Live Casino [RedmineID: #150971]
 			. Habanero [RedmineID: #150636]
 			. Creative Gaming [RedmineID: #152139]
+		- 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [Redmi
 */
 BEGIN
 	SET NOCOUNT ON
@@ -457,12 +458,13 @@ BEGIN
 			,CAST(0 AS BIT) IsApplyMinfeeToDiscount
 		INTO #tmpResult
 		FROM #tmpWinlossData a  
-		GROUP BY a.PartyID, a.ProductId  
+		GROUP BY a.PartyID, a.ProductId
 
-		-- treat negative as 0  
-		-- excepts: BA, CB, CO, BX
-				--  9wickets-316, 9Wsports-459
-		UPDATE #tmpResult SET LicensingFee = CASE WHEN AmountToCompany < 0 AND ProductID NOT IN (@BA,@CB,@CO,@BX) AND PartyId NOT IN (316, 459) THEN 0 ELSE AmountToCompany END
+		-- treat negative LicensingFee as 0, except Joint Venture Parties or BA, CB, CO, BX
+		UPDATE r
+		SET r.LicensingFee = CASE WHEN r.AmountToCompany < 0 AND jvp.PartyId IS NULL AND r.ProductID NOT IN (@BA,@CB,@CO,@BX) THEN 0 ELSE r.AmountToCompany END
+		FROM #tmpResult r
+			LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
 	END
 /*-----------------
  * minfee
