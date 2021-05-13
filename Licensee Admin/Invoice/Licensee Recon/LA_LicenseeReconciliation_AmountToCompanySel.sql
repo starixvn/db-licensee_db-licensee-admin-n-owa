@@ -46,6 +46,7 @@ AS
 	    - 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
 		- 20210406@Parsons: Support duo base currency [RedmineID: #152089]
 		- 20210407@Mason: Integrate new Sport Lottery [#150866]
+		- 20210407@Percy: Support duo base currency - Change code for Collection Summary [RedmineID: #152089]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -766,7 +767,7 @@ END
 				, pl.Name AS ProductName
 				, pl.ProductId
 				, UPPER(@BaseCurrency) AS CurrencyName
-				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC) THEN 
+				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC) THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 			FROM #tmpResult r
@@ -777,17 +778,17 @@ END
 		END
 		ELSE
 		BEGIN
-			SELECT UPPER(p.LicenseeCode) AS LicenseeCode
+			SELECT ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId) AS LicenseeCode
 				, pl.Name AS ProductName
 				, UPPER(@BaseCurrency) AS CurrencyName
-				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC) THEN 
+				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC) THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 			FROM #tmpResult r
 			INNER JOIN @partyList p ON r.PartyID=p.PartyId
 			INNER JOIN @productList pl ON r.ProductID = pl.ProductId
 			WHERE p.IsSelected=1
-			GROUP BY pl.ProductId, p.LicenseeCode, pl.Name
+			GROUP BY pl.ProductId, ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId), pl.Name
 			ORDER BY pl.ProductId
 		END
 	END
@@ -797,7 +798,7 @@ END
 		BEGIN
 			SELECT p.PartyId
 				,UPPER(@BaseCurrency) AS CurrencyName
-				,SUM(CASE WHEN r.ProductID IN (@PP, @SBC) THEN 
+				,SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC) THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					 ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 				,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) LicensingFee
@@ -811,9 +812,9 @@ END
 		END
 		ELSE
 		BEGIN
-			SELECT UPPER(p.LicenseeCode) AS LicenseeCode
+			SELECT ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId) AS LicenseeCode
 				,UPPER(@BaseCurrency) AS CurrencyName 
-				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC) THEN 
+				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC) THEN 
 										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 				,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) LicensingFee
@@ -823,7 +824,7 @@ END
 			FROM #tmpResult r
 			INNER JOIN @partyList p ON p.PartyId = r.PartyID
 			WHERE p.IsSelected = 1
-			GROUP BY p.LicenseeCode
+			GROUP BY ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId)
 		END
 	END
 

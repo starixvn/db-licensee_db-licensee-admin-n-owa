@@ -16,6 +16,7 @@ AS
 		- 20200512@Parsons: Special handling for INH market [#128570]
 		- 20201209@Parsons: Licensee Reconciliation - Change Discount column if licensee has straight rebate [#146328]
 		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
+		- 20210407@Percy: Support duo base currency - Change code for Collection Summary [RedmineID: #152089]
 
 	Example:
 		USE bodb_licensee
@@ -92,12 +93,12 @@ BEGIN
 		DELETE @baseCurrencyList WHERE CurrencyName = @CurrencyName
 
 		INSERT INTO @result(LicenseeCode,Rate,Sportsbook)
-		SELECT s.LicenseeCode,s.Rate, SUM(d.AmountToCompany * e.BaseCurrencyRate)
+		SELECT ISNULL(s.LicenseeCode, '') + '|' + CONVERT(VARCHAR(50), d.PartyId), s.Rate, SUM(d.AmountToCompany * e.BaseCurrencyRate)
 		FROM #data d
 		INNER JOIN @discountSettings s ON d.PartyID=s.PartyId
 		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CurrencyName) e ON e.ExchangeId=d.CurrencyId AND e.exchangedate=d.rptDate
 		WHERE s.CurrencyId=@CurrencyId
-		GROUP BY s.LicenseeCode,s.Rate
+		GROUP BY ISNULL(s.LicenseeCode, '') + '|' + CONVERT(VARCHAR(50), d.PartyId), s.Rate
 	END
 
 	SELECT * FROM @result

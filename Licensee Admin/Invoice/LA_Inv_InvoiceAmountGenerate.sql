@@ -58,6 +58,7 @@ AS
 		- 20200406@Parsons: Issue rebate worksheet [#131874]
 		- 20201202@Parsons: Add more condition to get only one rebate setting at the one time [#142345]
 		- 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
+		- 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
 
 	USE bodb_Licensee
 	DECLARE @FromDate DATETIME = '2016-06-01'
@@ -100,7 +101,7 @@ BEGIN
 	DECLARE @BaseCurrencyName VARCHAR(10) = 'GBP'
 
 	SELECT TOP 1 @BaseCurrencyId = BaseCurrencyId
-	FROM DBCUST.bodb_licensee.dbo.OAS_PartyBaseCurrency WITH(NOLOCK)
+	FROM OAS_PartyBaseCurrency WITH(NOLOCK)
 	WHERE PartyID = @PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
 	
 	IF(@BaseCurrencyId IS NULL)

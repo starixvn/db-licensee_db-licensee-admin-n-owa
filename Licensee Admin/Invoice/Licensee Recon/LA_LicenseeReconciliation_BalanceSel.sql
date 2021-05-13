@@ -16,9 +16,12 @@ AS
 		- 20200122@Parsons: - Create Sp [#125221]
 							- Fix Setup Fee issue [#125221]
 		- 20210303@Sophia: Enhance performance [redmine: #151031]
+		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
 */
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @LastDayOfMonth DATE = DATEADD(DAY, -1, DATEADD(MONTH, DATEDIFF(MONTH, 0, @ReportDate) + 1, 0))
 
 	CREATE TABLE #statement(
 		CustId				INT,
@@ -40,7 +43,7 @@ BEGIN
 	DECLARE @tmpCust TABLE(CustId INT,LicenseeCode VARCHAR(50))
 
 	INSERT INTO @tmpCust(CustId,LicenseeCode)
-	SELECT c.CustId, c.username
+	SELECT c.CustId, UPPER(c.username)
 	FROM dbo.Customer c WITH(NOLOCK)
 	INNER JOIN dbo.strSplit(@CustIds,',') c2 ON c.CustId = c2.val
 
@@ -49,7 +52,7 @@ BEGIN
 	-- remove duplicated code
 	--
 	INSERT INTO #statement(CustId,LicenseeCode)
-	SELECT DISTINCT CustId, LicenseeCode FROM @tmpCust
+	SELECT DISTINCT CustId, UPPER(LicenseeCode) FROM @tmpCust
 
 	-- ***Setup fee issue***
 	--
@@ -64,19 +67,31 @@ BEGIN
 	;WITH cte_ValidCustTable AS
 	(   SELECT DISTINCT s.CustId
 		FROM #statement s
-			INNER JOIN bodb_licensee.dbo.OAS_PartyDetail d WITH(NOLOCK) ON d.LicenseeCode = s.LicenseeCode
-			INNER JOIN bodb_licensee.dbo.LA_InvoiceHeader h WITH(NOLOCK) ON d.PartyId = h.PartyId
+			INNER JOIN bodb_licensee.dbo.OAS_PartyBaseCurrency bc WITH(NOLOCK) ON bc.LicenseeCode = s.LicenseeCode
+			INNER JOIN bodb_licensee.dbo.LA_InvoiceHeader h WITH(NOLOCK) ON bc.PartyId = h.PartyId
 		WHERE h.StatusId = 0-- normal invoice
 			AND h.InvoiceHeaderId NOT IN (6208, 6207) -- temporary exclude these credit notes
 			AND h.Environment = @Environment
 			AND InvoiceType = 1
-			AND (h.FromDate < @ReportDate)
+			AND h.FromDate <= @ReportDate
+			AND @LastDayOfMonth >= bc.FromDate
     )
 	DELETE s
 	FROM #statement s
-	INNER JOIN bodb_licensee.dbo.OAS_PartyDetail d WITH(NOLOCK) ON d.LicenseeCode = s.LicenseeCode
-	WHERE d.PartyID NOT IN (SELECT ow.PartyId FROM @OW_PartyList ow)
-		  AND	CustId NOT IN (SELECT cte.CustId FROM cte_ValidCustTable cte)
+		INNER JOIN bodb_licensee.dbo.OAS_PartyBaseCurrency bc WITH(NOLOCK) ON bc.LicenseeCode = s.LicenseeCode
+		INNER JOIN bodb_licensee.dbo.OAS_Party p WITH(NOLOCK) ON bc.PartyID = p.PartyID
+	WHERE bc.PartyID NOT IN (SELECT ow.PartyId FROM @OW_PartyList ow)
+		  AND s.CustId NOT IN (SELECT cte.CustId FROM cte_ValidCustTable cte)
+		  AND (ISNULL(bc.LicenseeCode, '') = '' OR p.PartyType <> 5) -- Non-Official
+		  AND @LastDayOfMonth >= bc.FromDate
+
+	UPDATE s
+	SET s.LicenseeCode = s.LicenseeCode + '|' + CONVERT(VARCHAR(50), bc.PartyId)
+	FROM #statement s
+		INNER JOIN (
+			SELECT DISTINCT PartyId, LicenseeCode
+			FROM bodb_licensee.dbo.OAS_PartyBaseCurrency WITH(NOLOCK)
+		) bc ON s.LicenseeCode = bc.LicenseeCode
 
 	-- balance up day
 	--

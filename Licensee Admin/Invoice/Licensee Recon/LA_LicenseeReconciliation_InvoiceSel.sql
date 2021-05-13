@@ -27,6 +27,7 @@ AS
 	    - 20201218@Parsons: Saba.club - Offer Freebet tickets [#141423]
 		- 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
 	   	- 20210323@Percy: Support duo base currency [RedmineID: #152089]
+		- 20210407@Percy: Support duo base currency - Change code for Collection Summary [RedmineID: #152089]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -82,7 +83,8 @@ BEGIN
 
 	IF @IsGroupByPartyId = 0
 	BEGIN
-		SELECT LicenseeCode,CurrencyName
+		SELECT ISNULL(LicenseeCode, '') + '|' + CONVERT(VARCHAR(50), PartyId) AS LicenseeCode
+			,CurrencyName
 			,0 AS PartyId
 			,SUM(LicensingFee) LicensingFee
 			,SUM(Discount) Discount
@@ -93,7 +95,8 @@ BEGIN
 			,SUM(AMF) AMF
 			,SUM(Promotion) Promotion
 		FROM #result
-		GROUP BY LicenseeCode, CurrencyName
+		GROUP BY ISNULL(LicenseeCode, '') + '|' + CONVERT(VARCHAR(50), PartyId), CurrencyName
+		ORDER BY LicenseeCode
 	END
 	ELSE
 	BEGIN

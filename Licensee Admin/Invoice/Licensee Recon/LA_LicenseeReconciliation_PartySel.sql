@@ -42,29 +42,53 @@ BEGIN
 		AND p.PartyType IN (1, 5)
 		AND pd.IsDeposit = 1
 
-	-- Get CustId from Licensee Code
-	DECLARE @LicenseeCodes TABLE (CustId INT, LicenseeName VARCHAR(50), LicenseeCode VARCHAR(50), BaseCurrencyId INT, IsBillingCurrency BIT)
+	UPDATE l
+	SET l.StartDate = bc.FromDate, l.EndDate = bc.ToDate
+	FROM #Licensees l
+		INNER JOIN (
+			SELECT PartyId, MIN(FromDate) AS FromDate, MAX(ToDate) AS ToDate
+			FROM dbo.OAS_PartyBaseCurrency WITH (NOLOCK)
+			WHERE @LastDayOfMonth >= FromDate
+			GROUP BY PartyId
+		) bc ON l.PartyId = l.PartyId
 
-	INSERT INTO @LicenseeCodes (CustId, LicenseeName, IsBillingCurrency)
-	SELECT DISTINCT CustId, LicenseeName, CASE WHEN ToDate >= @LastDayOfMonth THEN 1 ELSE 0 END AS IsBillingCurrency
+	-- Get CustId from Licensee Code
+	DECLARE @LicenseeCodes TABLE (CustId INT, LicenseeName VARCHAR(50), LicenseeCode VARCHAR(50), BaseCurrencyId INT, FromDate DATE, ToDate DATE, IsBillingCurrency BIT)
+
+	INSERT INTO @LicenseeCodes (CustId, LicenseeName, FromDate, ToDate, IsBillingCurrency)
+	SELECT DISTINCT CustId, LicenseeName, FromDate, ToDate, CASE WHEN ToDate >= @LastDayOfMonth THEN 1 ELSE 0 END AS IsBillingCurrency
 	FROM DBCUST.bodb_Licensee.dbo.LicenseeTransferCode WITH (NOLOCK)
 	WHERE @LastDayOfMonth >= FromDate
 
 	UPDATE lc
-	SET lc.LicenseeCode = UPPER(c.UserName), lc.BaseCurrencyId = c.Currency
+	SET lc.LicenseeCode = UPPER(c.UserName), lc.BaseCurrencyId = c.Currency, lc.FromDate = t.FromDate, lc.ToDate = t.ToDate
 	FROM @LicenseeCodes lc
 		INNER JOIN bodb02.dbo.Customer c WITH (NOLOCK) ON lc.CustId = c.CustId
+		INNER JOIN (
+			SELECT CustId, MIN(FromDate) AS FromDate, MAX(ToDate) AS ToDate
+			FROM @LicenseeCodes
+			GROUP BY CustId
+		) t ON lc.CustId = t.CustId
 
 	DELETE @LicenseeCodes WHERE LicenseeCode IS NULL
 
 	UPDATE l
 	SET l.CustId = lc.CustId
+		,l.StartDate = CASE WHEN l.StartDate < lc.FromDate THEN l.StartDate ELSE lc.FromDate END
+		,l.EndDate = CASE WHEN l.EndDate > lc.ToDate THEN l.EndDate ELSE lc.ToDate END
 	FROM #Licensees l
 		INNER JOIN @LicenseeCodes lc ON l.LicenseeCode = lc.LicenseeCode AND l.IsBillingCurrency = lc.IsBillingCurrency
 
+	INSERT INTO #Licensees (CustId, LicenseeName, PartyId, LicenseeCode, BaseCurrencyId, StartDate, EndDate, IsBillingCurrency)
+	SELECT lc.CustId, lc.LicenseeName, bc.PartyId, lc.LicenseeCode, lc.BaseCurrencyId, lc.FromDate, lc.ToDate, lc.IsBillingCurrency
+	FROM @LicenseeCodes lc
+		INNER JOIN dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON lc.LicenseeCode = bc.LicenseeCode
+	WHERE lc.CustId NOT IN (SELECT ISNULL(l.CustId, 0) FROM #Licensees l)
+		AND lc.LicenseeName NOT IN (SELECT ISNULL(l.LicenseeName, '') FROM #Licensees l)
+
 	-- Exists Licensee Code but not have party, put in Unidentified group
-	INSERT INTO #Licensees (CustId, LicenseeName, LicenseeCode, BaseCurrencyId, ParentId, IsBillingCurrency)
-	SELECT CustId, LicenseeName, LicenseeCode, BaseCurrencyId, @UnIdentifiedGroup, IsBillingCurrency
+	INSERT INTO #Licensees (CustId, LicenseeName, LicenseeCode, BaseCurrencyId, ParentId, StartDate, IsBillingCurrency)
+	SELECT CustId, LicenseeName, LicenseeCode, BaseCurrencyId, @UnIdentifiedGroup, FromDate, IsBillingCurrency
 	FROM @LicenseeCodes lc
 	WHERE lc.CustId NOT IN (SELECT ISNULL(l.CustId, 0) FROM #Licensees l)
 		AND lc.LicenseeName NOT IN (SELECT ISNULL(l.LicenseeName, '') FROM #Licensees l)
@@ -98,7 +122,8 @@ BEGIN
 		GROUP BY c.FromParty
 	)
 	UPDATE l
-	SET l.StartDate = c.StartMonth, l.EndDate = c.EndMonth
+	SET l.StartDate = CASE WHEN l.StartDate < c.StartMonth THEN l.StartDate ELSE c.StartMonth END
+		,l.EndDate = c.EndMonth
 	FROM #Licensees l
 		INNER JOIN CTE_ChargeRate c ON l.PartyId = c.PartyId
 
@@ -111,7 +136,7 @@ BEGIN
 		, l.LicenseeName
 		, l.BaseCurrencyId
 		, e.Code AS BaseCurrencyCode
-		, ISNULL(NULLIF(l.LicenseeCode, ''), CONVERT(VARCHAR(50), l.PartyId)) AS LicenseeCode
+		, ISNULL(UPPER(l.LicenseeCode), '') + ISNULL('|' + CONVERT(VARCHAR(50), l.PartyId), '') AS LicenseeCode
 		, ISNULL(l.StartDate, @defaultStartDate) AS StartDate
 		, ISNULL(l.EndDate, @defaultEndDate) AS EndDate
 		, l.CustId
@@ -127,6 +152,7 @@ BEGIN
 	SELECT @UnofficialGroup, 0, 'Non-Official Licensees', 0, '', '', @defaultStartDate, @defaultEndDate, 0, 1 FROM @billingGroup WHERE GroupId = @UnofficialGroup
 	UNION ALL
 	SELECT @UnidentifiedGroup, 0, 'Unidentified', 0, '', '', @defaultStartDate, @defaultEndDate, 0, 1 FROM @billingGroup WHERE GroupId = @UnidentifiedGroup
+	ORDER BY LicenseeName
 
 	DROP TABLE #Licensees
 END
