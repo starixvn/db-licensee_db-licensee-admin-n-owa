@@ -41,7 +41,7 @@ BEGIN
 	CREATE TABLE #Products (ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(10))
 	INSERT INTO #Products (ProductId, ProductName, ProductCode)
 	SELECT ProductId, ProductName, ProductCode FROM (VALUES (0, 'Sportsbook', 'SB'), (-3, 'Discount', ''), (-2, 'Rebate', ''),  (-1, 'SB Promotion', ''),  (-99, 'Total', '')) t (ProductId, ProductName, ProductCode)
-	UNION ALL SELECT ProductId, ProductName, ProductPrefix FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductId NOT IN (16, 37) --AND (EndOfSupportDate IS NULL OR EndOfSupportDate >= @FromDate)
+	UNION ALL SELECT ProductId, ProductName, ProductPrefix FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductId NOT IN (16, 37) AND (EndOfSupportDate IS NULL OR EndOfSupportDate >= @FromDate) AND OfferSite IN (0, 2) -- Deposit only
 
 	-- Get Charge Rate
 	DECLARE @ProductCode VARCHAR(MAX)
@@ -378,12 +378,13 @@ BEGIN
 	-- Final Result
 	CREATE TABLE #Result (PartyId INT, ProductId INT, LicenseeFee MONEY)
 	INSERT INTO #Result (PartyId, ProductId, LicenseeFee)
-	SELECT PartyId, ProductId
-		-- Keep Nagative Amount for 9wickets, 9Wsports, 9w
-		,CASE WHEN ProductId IN (3, 25) OR PartyId IN (316, 459, 558) THEN LicenseeAmount
-			WHEN LicenseeAmount < 0 THEN 0
-			ELSE LicenseeAmount END + ExtraAmount
-	FROM @Result
+	SELECT r.PartyId, r.ProductId
+		-- Keep Nagative Amount for Joint Venture Parties
+		,CASE WHEN r.ProductId IN (3, 25) OR r.PartyId IS NOT NULL THEN r.LicenseeAmount
+			WHEN r.LicenseeAmount < 0 THEN 0
+			ELSE r.LicenseeAmount END + r.ExtraAmount
+	FROM @Result r
+		LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
 	UNION ALL SELECT PartyId, -3, -SUM(Discount) FROM @Result GROUP BY PartyId
 	UNION ALL SELECT PartyId, -2, -SUM(Rebate) FROM @Result GROUP BY PartyId
 	UNION ALL SELECT PartyId, -1, -SUM(LicenseeAmount) FROM #tmpResult WHERE ProductId = -1 GROUP BY PartyId
