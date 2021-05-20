@@ -126,6 +126,7 @@ BEGIN
 		FROM CTE_Sum s
 			INNER JOIN #3rdRate r ON s.PartyId = r.PartyId AND s.LicenseeWinloss > r.MinAmount
 		WHERE s.LicenseeWinloss BETWEEN r.MinAmount AND r.MaxAmount
+		GROUP BY s.PartyId
 	)
 	UPDATE t
 	SET t.PayToSupplier = r.PayToSupplier
