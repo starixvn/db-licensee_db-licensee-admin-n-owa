@@ -3,8 +3,8 @@ USE bodb02
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_PlatformWinlossSummary]
-	@PartyIDs		VARCHAR(4000), 
-	@Platforms		VARCHAR(500),
+	@PartyIds		VARCHAR(MAX), 
+	@Platforms		VARCHAR(MAX),
 	@FromDate		SMALLDATETIME,
 	@ToDate			SMALLDATETIME,
 	@BaseCurrency	VARCHAR(20) = 'EUR'
@@ -33,190 +33,141 @@ AS
 		- 20200706@Parsons: Add new betfrom eGame Mobile and eGamer Desktop [#136414]
 		- 20200807@Parsons: Filter data by platform : Platform WL (summary, detail) [#138249]
 		- 20201204@Happy: Changing OddsSpread for Licensee [#142345]
+		- 20210517@Percy: Using core function to group betfrom [RedmineID: #150899]
 
-	Explanation:
-		- Desktop: contain the followings:
-			Asia:		betfrom = d,g
-			China:		betfrom = a,z
-			Euro:		betfrom = e,u
-			New Asia:	betfrom = x
-			ESportsWebDesktop: 1
-			eGamer Desktop: 4
-		- Mobile: contain the followings:
-			WAP:	betfrom = m
-			Smart:	betfrom = l
-			Tablet: betfrom = r
-			App for China: o
-			Lite version: c
-			Native App: 0
-			ESportsWebMobile: 2
-			ESportsAPP: 3
-			eGameMobile: 5
-			eGameAPP: 6
-		- OddsFeed: contain the followings:
-			OddsFeed: v
-		- Other: betfrom is different from the aboves
-			=> use *
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @OddsSpreadCost_BetType SMALLINT = 999
-	-- Only support 6 months
-	IF DATEDIFF(MONTH,@FromDate,@ToDate) > 6
+
+	IF DATEDIFF(MONTH, @FromDate, @ToDate) > 6 -- Only support 6 months
 	BEGIN
-		SELECT TOP 0
+		SELECT
 			CAST('' AS NVARCHAR(1))	AS BetFrom,
 			CAST(0 AS MONEY)		AS Turnover,
-			CAST(0 AS MONEY)		AS LicenseeWinLoss
-	RETURN
+			CAST(0 AS MONEY)		AS LicenseeWinLoss,
+			CAST(0 AS FLOAT)		AS TurnoverPercent,
+			CAST(0 AS FLOAT)		AS LicenseeWinLossPercent
+		WHERE 1 = 0
+	
+		RETURN
 	END
 
-	-- supported betfrom
-	--
-	DECLARE @betfrom TABLE(betfrom CHAR(1), IsSelected BIT)
-	INSERT INTO @betfrom(betfrom, IsSelected)
-	SELECT v.val, CASE WHEN bf.val IS NOT NULL THEN 1 ELSE 0 END  
-	FROM (VALUES ('*'),('d'),('a'),('e'),('u'),('m'),('l'),('g'),('x'),('z'),('r'),('o'),('c'),('t'),('0'),('v'),('1'),('2'),('3'),('4'),('5'),('6'))v(val)
-	LEFT JOIN strSplit(@Platforms, ',') bf ON v.val = bf.val
+	DECLARE @FDate SMALLDATETIME, @TDate SMALLDATETIME
+	DECLARE @MoveBetsDay SMALLDATETIME
 
-	-- #1: get licensee/customer and currency info
-	--
-	-- Licensee customer info
-	CREATE TABLE #LicenseeCustInfo(LicenseeId INT, CustId INT, CurrencyId INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
-	DECLARE @LicenseeInfo AS TABLE (PartyId INT, LicenseeId INT, IsSelectCust BIT, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
+	DECLARE @MBBU TABLE (BalanceUpDay SMALLDATETIME, MoveBetsDay SMALLDATETIME)
+	INSERT INTO @MBBU (BalanceUpDay, MoveBetsDay)
+	EXEC dbo.Age_SelBalanceUpDay
 
-	-- notes: only support SB
-	INSERT INTO @LicenseeInfo(PartyId, LicenseeId, Fromdate, Todate)
-	SELECT DISTINCT PartyID, LicenseeID, Fromdate, Todate
-	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'SB', 'OA', 1)
+	SELECT @MoveBetsDay = MoveBetsDay FROM @MBBU
 
-	-- get cust list
-	DECLARE @KeenOceanID INT = (SELECT LicenseeID FROM bodb_licensee.dbo.Licensees WITH (NOLOCK) WHERE LicenseeName LIKE 'KeenOcean')
-	DECLARE @RMB INT = (SELECT ExchangeID FROM dbo.Exchange WITH (NOLOCK) WHERE currency = 'RMB')
-	DECLARE @YUN INT = (SELECT ExchangeID FROM dbo.Exchange WITH (NOLOCK) WHERE currency = 'YUN')
+	-- Get Licensee Customer
+	CREATE TABLE #Customer (srecommend INT, recommend INT, FromDate SMALLDATETIME, ToDate SMALLDATETIME)
+	INSERT INTO #Customer (srecommend, recommend, FromDate, ToDate)
+	SELECT c.srecommend, lc.CustId, ci.FromDate, ci.ToDate
+	FROM (
+		SELECT DISTINCT LicenseeId, FromDate, ToDate
+		FROM bodb_Licensee.dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'SB', 'OA', 1)
+	) ci
+		INNER JOIN bodb_Licensee.dbo.LicenseeCust lc WITH (NOLOCK) ON ci.LicenseeId = lc.LicenseeId
+		INNER JOIN bodb02.dbo.Customer c WITH (NOLOCK) ON lc.CustId = c.CustId
+	WHERE lc.Currency <> 20
 
-	;WITH Cust AS (
-		SELECT c.LicenseeID, c.CustID, c.Currency, l.Fromdate, l.Todate
-		FROM bodb_Licensee.dbo.LicenseeCust c WITH (NOLOCK)
-			INNER JOIN @LicenseeInfo l ON l.LicenseeId = c.LicenseeID
-		WHERE Currency <> 20
-		UNION ALL
-		SELECT c.LicenseeID, c.CustID, @RMB Currency, l.Fromdate, l.Todate
-		FROM bodb_Licensee.dbo.LicenseeCust c WITH (NOLOCK)
-			INNER JOIN @LicenseeInfo l ON l.LicenseeId = c.LicenseeID
-		WHERE l.LicenseeID = @KeenOceanID AND Currency = @YUN
-	)
-	INSERT INTO #LicenseeCustInfo (LicenseeId, CustId, CurrencyId, Fromdate, Todate)
-	SELECT DISTINCT LicenseeId, CustId, Currency, Fromdate, Todate
-	FROM Cust
+	-- Get BetFrom data
+	CREATE TABLE #Data (rptDate DATETIME, Currency INT, BetFrom NVARCHAR(1), BetCount INT, Turnover FLOAT, Winloss FLOAT)
 
-	CREATE CLUSTERED INDEX ix_LicenseeCustInfo_cl ON #LicenseeCustInfo(CustId, CurrencyId)
-
-	-- #2: get move bet info
-	--
-	DECLARE @BalanceUpDay TABLE (BalanceUpDay DATETIME, MoveBetsDay DATETIME)
-	INSERT INTO @BalanceUpDay EXEC dbo.Lrf_SelBalanceUpDay
-
-	DECLARE @MoveBetsDay DATETIME = (SELECT TOP 1 MoveBetsDay FROM @BalanceUpDay)
-
-	-- #3: if data from moveBetsDay: get data from bettrans
-	-- else get data from rptWinLoss2
-	CREATE TABLE #Data (ReportDate DATETIME, CurrencyId INT, BetFrom NVARCHAR(1), BetCount INT, Turnover DECIMAL(20,5), LicenseeWinLoss DECIMAL(20,5))
-
-	 -- get data from bettrans
+	-- bettrans
 	IF @ToDate > @MoveBetsDay
 	BEGIN
-		DECLARE @TempFromDate SMALLDATETIME = CASE WHEN @FromDate <= @MoveBetsDay THEN DATEADD(DAY,1,@MoveBetsDay) ELSE @FromDate END
+		CREATE TABLE #bettype (bettype SMALLINT)
+		INSERT INTO #bettype (bettype)
+		SELECT DISTINCT bettype FROM dbo.SportBettypeMatrix WITH (NOLOCK) WHERE ProductId = 1 AND bettype <> 999
 
-		SELECT b.transid,b.winlostdate,b.recommend,b.stake,b.betfrom,b.statusID, b.winlost, b.actual_stake,b.currency
-		INTO #tmpBettrans
+		SELECT @FDate = CASE WHEN @FromDate <= @MoveBetsDay THEN DATEADD(DAY, 1, @MoveBetsDay) ELSE @FromDate END
+				,@TDate = @ToDate
+
+		INSERT INTO #Data (rptDate, Currency, BetFrom, BetCount, Turnover, Winloss)
+		SELECT b.winlostdate, b.currency, b.betfrom, COUNT(1) AS BetCount, SUM(b.stake), SUM(b.winlost - b.actual_stake)
 		FROM dbo.bettrans b WITH (NOLOCK)
-		INNER JOIN (SELECT DISTINCT CustId FROM #LicenseeCustInfo) l ON l.CustId=b.recommend
-		INNER JOIN bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'SB') bt ON bt.Bettype = b.bettype
-		WHERE b.winlostdate BETWEEN @FromDate AND @ToDate
-			AND b.bettype <> @OddsSpreadCost_BetType
+			INNER JOIN #Customer c ON b.recommend = c.recommend AND b.winlostdate BETWEEN c.FromDate AND c.ToDate
+			INNER JOIN #bettype bt ON b.bettype = bt.bettype
+			LEFT JOIN bodb_Licensee.dbo.LicenseeBATransaction_active ba WITH (NOLOCK) ON b.transid = ba.transid
+		WHERE b.winlostdate BETWEEN @FDate AND @TDate
+			AND b.statusId IN (111, 112, 113)
+			AND ba.transid IS NULL
+		GROUP BY b.winlostdate, b.currency, b.betfrom
 
-		INSERT INTO #Data(ReportDate, CurrencyId, BetFrom, BetCount, Turnover, LicenseeWinLoss)
-		(
-			SELECT
-				b.winlostdate,
-				l.CurrencyId,
-				ISNULL(bf.betfrom,'*'),
-				COUNT(*) AS BetCount,
-				SUM(b.stake),
-				SUM(-(b.winlost - b.actual_stake))
-			FROM #tmpBettrans b
-				INNER JOIN #LicenseeCustInfo l ON l.CustId=b.recommend
-				LEFT JOIN bodb_licensee.dbo.LicenseeBATransaction_active ba WITH(NOLOCK) ON b.transid = ba.transid
-				LEFT JOIN @betfrom bf ON bf.betfrom=ISNULL(b.betfrom,'')
-			WHERE b.statusID IN (111, 112, 113)
-				AND ba.TransID IS NULL
-				AND b.currency=l.CurrencyId
-				AND b.winlostdate BETWEEN l.Fromdate AND l.Todate
-			GROUP BY b.winlostdate, l.CurrencyId,ISNULL(bf.betfrom,'*')
-		)
-
-		DROP TABLE #tmpBettrans
+		DROP TABLE #bettype
 	END
 
-	-- get data from rptWinLoss2
+	-- rptWinLoss2
 	IF @FromDate <= @MoveBetsDay
 	BEGIN
-		DECLARE @TempToDate SMALLDATETIME = CASE WHEN @ToDate >= @MoveBetsDay THEN @MoveBetsDay ELSE @ToDate END
-		INSERT INTO #Data(ReportDate, CurrencyId, BetFrom, BetCount, Turnover, LicenseeWinLoss)
-		(
-			SELECT
-				b.winlostdate,
-				l.CurrencyId,
-				ISNULL(bf.betfrom,'*'),
-				SUM(b.BetCount),
-				SUM(b.turnover),
-				SUM(-b.winlost)
-			FROM bodb_licenseereport.dbo.rptLicWinloss2 b WITH ( NOLOCK )
-			INNER JOIN #LicenseeCustInfo l ON b.CustId = l.CustId AND b.Currency = l.CurrencyId AND b.winlostdate BETWEEN l.Fromdate AND l.Todate
-			LEFT JOIN @betfrom bf ON bf.betfrom=ISNULL(b.betfrom,'')
-			WHERE b.Winlostdate BETWEEN @FromDate AND @TempToDate
-				AND b.sporttype = 0 -- jobsum SB as 0
-				AND b.roleid = 2 -- Sum on agent for better performance
-				AND b.statusID NOT IN (-1, 101, 102, 103)
-				AND b.bettype = 0 -- jobsum SB as 0
-				AND ISNULL(b.isBA,0) = 0
-			GROUP BY b.winlostdate, l.CurrencyId,ISNULL(bf.betfrom,'*')
-		)
+		SELECT @FDate = @FromDate
+				,@TDate = CASE WHEN @ToDate > @MoveBetsDay THEN @MoveBetsDay ELSE @ToDate END
+
+		INSERT INTO #Data (rptDate, Currency, BetFrom, BetCount, Turnover, Winloss)
+		SELECT r.winlostdate, r.Currency, r.betfrom, SUM(r.BetCount), SUM(r.Turnover), SUM(r.Winlost)
+		FROM bodb_LicenseeReport.dbo.rptLicWinloss2 r WITH (NOLOCK)
+			INNER JOIN #Customer c ON r.srecommend = c.srecommend AND r.CustId = c.recommend AND r.winlostdate BETWEEN c.FromDate AND c.ToDate
+		WHERE r.winlostdate BETWEEN @FDate AND @TDate
+			AND r.sporttype = 0 AND r.bettype = 0 -- SB
+			AND r.isBA = 0
+			AND r.statusId IN (111, 112, 113, 114, 115)
+		GROUP BY r.winlostdate, r.Currency, r.betfrom
 	END
 
-	-- #4: sum & exchange
-	-- Get exchange rate info
-	CREATE TABLE #Exchange (
-		ExchangeDate	DATETIME,
-		ExchangeID		INT,
-		CurrencyCode	VARCHAR(10),
-		Rate			FLOAT
-	)
+	-- Result
+	CREATE TABLE #Result (OrderDetail INT, OrderSummary INT, DetailPlatform VARCHAR(500), SummaryPlatform VARCHAR(100), BetCount INT, Turnover FLOAT, LicenseeWinloss FLOAT)
+	INSERT INTO #Result (OrderDetail, OrderSummary, DetailPlatform, SummaryPlatform, BetCount, Turnover, LicenseeWinloss)
+	SELECT ISNULL(bf.OrderDetail, 17), ISNULL(bf.OrderSummary, 4), ISNULL(bf.DetailPlatform , 'Others'), ISNULL(bf.SummaryPlatform, 'Others'), SUM(BetCount), SUM(Turnover * e.BaseCurrencyRate), -SUM(Winloss * e.BaseCurrencyRate)
+	FROM #Data d
+		INNER JOIN dbo.LA_f_ExchangeDailySel (@FromDate, @ToDate, @BaseCurrency) e ON d.rptDate = e.ExchangeDate AND d.Currency = e.ExchangeId
+		LEFT JOIN dbo.LA_f_BetFrom_Sel() bf ON d.BetFrom = bf.BetFrom
+	GROUP BY ISNULL(bf.OrderDetail, 17), ISNULL(bf.OrderSummary, 4), ISNULL(bf.DetailPlatform , 'Others'), ISNULL(bf.SummaryPlatform, 'Others')
 
-	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrency)
+	DECLARE @TurnoverTotal FLOAT, @LicenseeWinlossTotal FLOAT
+	SELECT  @TurnoverTotal = SUM(Turnover), @LicenseeWinlossTotal = SUM(LicenseeWinloss) FROM #Result
+	SELECT  @TurnoverTotal = NULLIF(@TurnoverTotal, 0), @LicenseeWinlossTotal = NULLIF(@LicenseeWinlossTotal, 0)
 
-	;WITH cte_Result AS (
-		SELECT d.BetFrom
-			, SUM(d.BetCount) BetCount
-			, SUM(d.Turnover * e.Rate) Turnover
-			, SUM(d.LicenseeWinLoss * e.Rate) LicenseeWinLoss
-		FROM #Data d
-		INNER JOIN #Exchange e ON d.CurrencyId = e.ExchangeID AND d.ReportDate = e.ExchangeDate
-		GROUP BY d.BetFrom
-	)
-	SELECT r.BetFrom
-		, BetCount AS TotalTrans
-		, CAST(Turnover AS MONEY) Turnover
-		, CAST(LicenseeWinLoss AS MONEY) LicenseeWinLoss
-	FROM cte_Result r
-	LEFT JOIN @betfrom bf ON r.BetFrom = bf.betfrom
-	WHERE ISNULL(bf.IsSelected, 0) = 1
+	INSERT INTO #Result (OrderDetail, OrderSummary, DetailPlatform, SummaryPlatform, BetCount, Turnover, LicenseeWinloss)
+	SELECT DISTINCT bf.OrderDetail, bf.OrderSummary, bf.DetailPlatform, bf.SummaryPlatform, 0, 0, 0
+	FROM dbo.LA_f_BetFrom_Sel() bf
+		LEFT JOIN #Result r ON bf.DetailPlatform = r.DetailPlatform
+	WHERE r.DetailPlatform IS NULL
 
-	DROP TABLE #Exchange
-	DROP TABLE #LicenseeCustInfo
+	DELETE #Result WHERE ',' + @Platforms + ',' NOT LIKE '%,' + DetailPlatform + ',%'
+
+	-- Return summary data
+	SELECT SummaryPlatform AS [Platform]
+		,SUM(BetCount) AS BetCount
+		,CAST(SUM(Turnover) AS MONEY) AS Turnover
+		,CAST(SUM(LicenseeWinloss) AS MONEY) AS LicenseeWinloss
+		,CAST(ISNULL(SUM(Turnover) / @TurnoverTotal, 0) AS MONEY) AS TurnoverPercent
+		,CAST(ISNULL(SUM(LicenseeWinloss) / @LicenseeWinlossTotal, 0) AS MONEY) AS LicenseeWinlossPercent
+	FROM #Result
+	GROUP BY OrderSummary, SummaryPlatform
+	ORDER BY OrderSummary
+
+	-- Return detail data
+	SELECT DetailPlatform AS [Platform]
+		,BetCount
+		,CAST(Turnover AS MONEY) AS Turnover
+		,CAST(LicenseeWinloss AS MONEY) AS LicenseeWinloss
+		,CAST(ISNULL(Turnover / @TurnoverTotal, 0) AS MONEY) AS TurnoverPercent
+		,CAST(ISNULL(LicenseeWinloss / @LicenseeWinlossTotal, 0) AS MONEY) AS LicenseeWinlossPercent
+	FROM #Result
+	ORDER BY OrderDetail
+
+	-- Return total
+	SELECT
+		SUM(BetCount) AS TotalBetCount
+		,CAST(SUM(Turnover) AS MONEY) AS TotalTurnover
+		,CAST(SUM(LicenseeWinloss) AS MONEY) AS TotalLicenseeWinloss
+	FROM #Result
+	
+	DROP TABLE #Customer
 	DROP TABLE #Data
+	DROP TABLE #Result
 END
 GO
