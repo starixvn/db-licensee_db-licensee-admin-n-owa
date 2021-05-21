@@ -41,14 +41,33 @@ BEGIN
 
 	IF DATEDIFF(MONTH, @FromDate, @ToDate) > 6 -- Only support 6 months
 	BEGIN
+		-- Return summary data
 		SELECT
-			CAST('' AS NVARCHAR(1))	AS BetFrom,
+			CAST('' AS VARCHAR(500))AS [Platform],
+			CAST(0 AS INT)			AS TotalTrans,
 			CAST(0 AS MONEY)		AS Turnover,
 			CAST(0 AS MONEY)		AS LicenseeWinLoss,
 			CAST(0 AS FLOAT)		AS TurnoverPercent,
 			CAST(0 AS FLOAT)		AS LicenseeWinLossPercent
 		WHERE 1 = 0
-	
+		
+		-- Return detail data
+		SELECT
+			CAST('' AS VARCHAR(500))AS [Platform],
+			CAST(0 AS INT)			AS TotalTrans,
+			CAST(0 AS MONEY)		AS Turnover,
+			CAST(0 AS MONEY)		AS LicenseeWinLoss,
+			CAST(0 AS FLOAT)		AS TurnoverPercent,
+			CAST(0 AS FLOAT)		AS LicenseeWinLossPercent
+		WHERE 1 = 0
+		
+		-- Return total
+		SELECT
+			CAST(0 AS INT)			AS TotalTrans,
+			CAST(0 AS MONEY)		AS Turnover,
+			CAST(0 AS MONEY)		AS LicenseeWinLoss
+		WHERE 1 = 0
+
 		RETURN
 	END
 
@@ -140,7 +159,7 @@ BEGIN
 
 	-- Return summary data
 	SELECT SummaryPlatform AS [Platform]
-		,SUM(BetCount) AS BetCount
+		,SUM(BetCount) AS TotalTrans
 		,CAST(SUM(Turnover) AS MONEY) AS Turnover
 		,CAST(SUM(LicenseeWinloss) AS MONEY) AS LicenseeWinloss
 		,CAST(ISNULL(SUM(Turnover) / @TurnoverTotal, 0) AS MONEY) AS TurnoverPercent
@@ -151,7 +170,7 @@ BEGIN
 
 	-- Return detail data
 	SELECT DetailPlatform AS [Platform]
-		,BetCount
+		,BetCount AS TotalTrans
 		,CAST(Turnover AS MONEY) AS Turnover
 		,CAST(LicenseeWinloss AS MONEY) AS LicenseeWinloss
 		,CAST(ISNULL(Turnover / @TurnoverTotal, 0) AS MONEY) AS TurnoverPercent
@@ -161,7 +180,7 @@ BEGIN
 
 	-- Return total
 	SELECT
-		SUM(BetCount) AS BetCount
+		SUM(BetCount) AS TotalTrans
 		,CAST(SUM(Turnover) AS MONEY) AS Turnover
 		,CAST(SUM(LicenseeWinloss) AS MONEY) AS LicenseeWinloss
 	FROM #Result
