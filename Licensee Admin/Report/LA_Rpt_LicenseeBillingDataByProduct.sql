@@ -22,11 +22,36 @@ BEGIN
 	SET NOCOUNT ON
 
 	-- Get Party List
-	CREATE TABLE #PartyList (PartyId INT, LicenseeId INT, PartyName VARCHAR(100), BranchName VARCHAR(100), ParentId INT, ParentName VARCHAR(100))
+	CREATE TABLE #PartyList (PartyId INT, LicenseeId INT, PartyName VARCHAR(100), BranchName VARCHAR(100), ParentId INT, ParentName VARCHAR(100), GroupMinFeeId INT, IsSelected BIT DEFAULT(0))
 	INSERT INTO #PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC dbo.LA_PartyListSel
 
-	DELETE #PartyList WHERE (PartyId = 999 OR ParentId = 999) OR (',' + @PartyIds + ',' NOT LIKE '%,' + CONVERT(VARCHAR(20), PartyId) + ',%' AND ParentId <> 0)
+	-- Remove credit licensees
+	DELETE #PartyList WHERE (PartyId = 999 OR ParentId = 999)
+	
+	-- Keep Parties who same group min fee
+	DECLARE @GroupMinFeeSetting TABLE (PartyId INT, GroupMinFeeId SMALLINT, IsPrimary BIT)
+	INSERT INTO @GroupMinFeeSetting (PartyId, GroupMinFeeId, IsPrimary)
+	SELECT PartyId, GroupMinFeeId, IsPrimary
+	FROM (
+		SELECT a.PartyId, h.GroupMinFeeId, a.IsPrimary, ROW_NUMBER() OVER(PARTITION BY a.PartyID ORDER BY h.ToDate DESC) AS RN
+		FROM bodb_Licensee.dbo.LA_GroupMinFeeAssignment a WITH (NOLOCK)
+			INNER JOIN bodb_Licensee.dbo.LA_GroupMinFeeHeader h WITH (NOLOCK) ON a.GroupMinFeeId = h.GroupMinFeeId
+		WHERE @FromDate <= h.ToDate AND @ToDate >= h.FromDate
+	) r
+	WHERE RN = 1
+
+	UPDATE p
+	SET p.GroupMinFeeId = ISNULL(g.GroupMinFeeId, -p.PartyId)
+	FROM #PartyList p
+		LEFT JOIN @GroupMinFeeSetting g ON p.PartyId = g.PartyId
+	
+	UPDATE #PartyList SET IsSelected = 1 WHERE ',' + @PartyIds + ',' LIKE '%,' + CONVERT(VARCHAR(20), PartyId) + ',%'
+
+	DELETE p
+	FROM #PartyList p
+	WHERE p.ParentId > 0
+		AND p.GroupMinFeeId NOT IN (SELECT t.GroupMinFeeId FROM #PartyList t WHERE t.IsSelected = 1)
 
 	UPDATE p
 	SET p.ParentName = REPLACE(pr.PartyName, ' Licensees', ''), p.LicenseeId = pt.OldRefId
@@ -36,6 +61,9 @@ BEGIN
 	WHERE p.ParentId <> 0
 
 	DELETE #PartyList WHERE ParentId = 0
+
+	SET @PartyIds = NULL
+	SELECT @PartyIds = COALESCE(@PartyIds + ',', '') + CONVERT(VARCHAR(20), PartyId) FROM #PartyList
 
 	-- Get Product List
 	CREATE TABLE #Products (ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(10))
@@ -172,17 +200,6 @@ BEGIN
 		DECLARE @FirstDate DATE = DATEADD(MONTH, DATEDIFF(MONTH, 0, @FromDate), 0)
 		DECLARE @LastDate DATE = DATEADD(DAY, -1, DATEADD(MONTH, 1, @FirstDate))
 		DECLARE @DaysInMonth INT = DATEDIFF(DAY, @FirstDate, @LastDate) + 1
-
-		DECLARE @GroupMinFeeSetting TABLE (PartyId INT, GroupMinFeeId SMALLINT, IsPrimary BIT)
-		INSERT INTO @GroupMinFeeSetting (PartyId, GroupMinFeeId, IsPrimary)
-		SELECT PartyId, GroupMinFeeId, IsPrimary
-		FROM (
-			SELECT a.PartyId, h.GroupMinFeeId, a.IsPrimary, ROW_NUMBER() OVER(PARTITION BY a.PartyID ORDER BY h.ToDate DESC) AS RN
-			FROM bodb_Licensee.dbo.LA_GroupMinFeeAssignment a WITH (NOLOCK)
-				INNER JOIN bodb_Licensee.dbo.LA_GroupMinFeeHeader h WITH (NOLOCK) ON a.GroupMinFeeId = h.GroupMinFeeId
-			WHERE @FromDate <= h.ToDate AND @ToDate >= h.FromDate
-		) r
-		WHERE RN = 1
 
 		DECLARE @MinFee TABLE (FeeTypeId TINYINT, GroupMinFeeId SMALLINT, PartyId INT, ProductId INT, IsPrimary BIT, FromDate DATE, ToDate DATE, IndividualMinFee MONEY, ProrateMinFee MONEY, WaivedFee MONEY, LicenseeFee MONEY, ActualFee MONEY)
 		INSERT INTO @MinFee (FeeTypeId, GroupMinFeeId, PartyId, ProductId, IsPrimary, IndividualMinFee, FromDate, ToDate)
@@ -367,7 +384,7 @@ BEGIN
 			) d
 
 		UPDATE s
-		SET s.LicenseeAmount = CASE WHEN s.Discount = 0 THEN 0 ELSE s.LicenseeAmount + (g.GroupMinFee - (g.LicenseeFee - g.Discount)) END
+		SET s.LicenseeAmount = s.LicenseeAmount + (g.GroupMinFee - (g.LicenseeFee - g.Discount))
 		FROM @Result s
 			INNER JOIN @GroupMinFee g ON s.GroupMinFeeId = g.GroupMinFeeId
 		WHERE s.GroupMinFeeId > 0
@@ -412,7 +429,7 @@ BEGIN
 	)
 	SELECT p.ParentName AS GroupName, p.PartyName AS LicenseeName, ' + @ProductList + '
 	FROM CTE_Result r
-		INNER JOIN #PartyList p ON r.PartyId = p.PartyId
+		INNER JOIN #PartyList p ON r.PartyId = p.PartyId AND p.IsSelected = 1
 	ORDER BY p.ParentName, p.PartyName'
 
 	EXEC (@SQL)
