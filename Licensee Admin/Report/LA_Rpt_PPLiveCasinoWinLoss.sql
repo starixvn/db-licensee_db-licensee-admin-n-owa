@@ -182,19 +182,18 @@ BEGIN
 	-- Update PayToSupplier base on Licensee WL
 	DECLARE @CurrencyId INT, @CurrencyName VARCHAR(100)
 	SELECT TOP 1 @CurrencyId = CurrencyId FROM #3rdRate
-	SELECT @CurrencyName = Currency FROM bodb02.dbo.Exchange WITH (NOLOCK) WHERE ExchangeId = @CurrencyId
+	SELECT @CurrencyName = Code FROM bodb02.dbo.Exchange WITH (NOLOCK) WHERE ExchangeId = @CurrencyId
 
 	-- Detail
 	;WITH CTE_Sum AS (
-		SELECT t.PartyId, t.CurrencyId, t.WinlostDate, SUM(t.LicenseeWinloss * e.BaseCurrencyRate) AS LicenseeWinloss
+		SELECT t.PartyId, t.CurrencyId, t.WinlostDate, e.BaseCurrencyRate, SUM(t.LicenseeWinloss * e.BaseCurrencyRate) AS LicenseeWinloss
 		FROM bodb02.dbo.LA_f_ExchangeDailySel (@FromDate, @ToDate, @CurrencyName) e
 			INNER JOIN #TempData t ON t.CurrencyId = e.ExchangeId AND e.ExchangeDate = t.WinlostDate
-		GROUP BY t.PartyId, t.CurrencyId, t.WinlostDate
-		HAVING SUM(t.LicenseeWinloss) > 0
+		GROUP BY t.PartyId, t.CurrencyId, t.WinlostDate, e.BaseCurrencyRate
 	), CTE_3rdRate AS (
-		SELECT s.PartyId, s.CurrencyId, s.WinlostDate, SUM(CASE WHEN s.LicenseeWinloss <= r.MaxAmount THEN s.LicenseeWinloss - r.MinAmount ELSE r.MaxAmount END * r.Rate) AS PayToSupplier
+		SELECT s.PartyId, s.CurrencyId, s.WinlostDate, SUM(CASE WHEN s.BaseCurrencyRate = 0 THEN 0 ELSE CASE WHEN s.LicenseeWinloss <= r.MaxAmount THEN s.LicenseeWinloss - r.MinAmount ELSE r.MaxAmount END * r.Rate / s.BaseCurrencyRate END) AS PayToSupplier
 		FROM CTE_Sum s
-			INNER JOIN #3rdRate r ON s.PartyId = r.PartyId AND s.LicenseeWinloss > r.MinAmount
+			INNER JOIN #3rdRate r ON s.PartyId = r.PartyId AND (s.LicenseeWinloss > r.MinAmount OR (s.LicenseeWinloss < 0 AND r.MinAmount = 0))
 		GROUP BY s.PartyId, s.CurrencyId, s.WinlostDate
 	)
 	UPDATE t
@@ -208,11 +207,10 @@ BEGIN
 		FROM bodb02.dbo.LA_f_ExchangeDailySel (@FromDate, @ToDate, @CurrencyName) e
 			INNER JOIN #TempData t ON t.CurrencyId = e.ExchangeId AND e.ExchangeDate = t.WinlostDate
 		GROUP BY t.PartyId
-		HAVING SUM(t.LicenseeWinloss) > 0
 	), CTE_3rdRate AS (
 		SELECT br.BaseCurrencyName, SUM(CASE WHEN s.LicenseeWinloss <= r.MaxAmount THEN s.LicenseeWinloss - r.MinAmount ELSE r.MaxAmount END * r.Rate * br.Rate) AS PayToSupplier
 		FROM CTE_Sum s
-			INNER JOIN #3rdRate r ON s.PartyId = r.PartyId AND s.LicenseeWinloss > r.MinAmount
+			INNER JOIN #3rdRate r ON s.PartyId = r.PartyId AND (s.LicenseeWinloss > r.MinAmount OR (s.LicenseeWinloss < 0 AND r.MinAmount = 0))
 			INNER JOIN @BaseCurrencyRate br ON br.ExchangeId = @CurrencyId AND br.ExchangeDate = @ToDate
 		GROUP BY br.BaseCurrencyName
 	)
@@ -263,7 +261,7 @@ BEGIN
 		GROUP BY Currency
 	
 		-- Total
-		SELECT 
+		SELECT
 			PartyId,
 			TotalTrans,
 			Turnover,
@@ -272,7 +270,7 @@ BEGIN
 			LicensingFee,
 			PayToSupplier,
 			LicensingFee - PayToSupplier AS CompanyIncome
-		FROM @Total t
+		FROM @Total
 		WHERE Currency = @BaseCurrencyName
 	END
 
