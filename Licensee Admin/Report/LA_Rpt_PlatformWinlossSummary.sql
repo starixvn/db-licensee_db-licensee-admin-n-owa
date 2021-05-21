@@ -161,9 +161,9 @@ BEGIN
 
 	-- Return total
 	SELECT
-		SUM(BetCount) AS TotalBetCount
-		,CAST(SUM(Turnover) AS MONEY) AS TotalTurnover
-		,CAST(SUM(LicenseeWinloss) AS MONEY) AS TotalLicenseeWinloss
+		SUM(BetCount) AS BetCount
+		,CAST(SUM(Turnover) AS MONEY) AS Turnover
+		,CAST(SUM(LicenseeWinloss) AS MONEY) AS LicenseeWinloss
 	FROM #Result
 	
 	DROP TABLE #Customer
