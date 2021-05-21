@@ -210,16 +210,16 @@ BEGIN
 		GROUP BY t.PartyId
 		HAVING SUM(t.LicenseeWinloss) > 0
 	), CTE_3rdRate AS (
-		SELECT s.PartyId, br.BaseCurrencyName, SUM(CASE WHEN s.LicenseeWinloss <= r.MaxAmount THEN s.LicenseeWinloss - r.MinAmount ELSE r.MaxAmount END * r.Rate * br.Rate) AS PayToSupplier
+		SELECT br.BaseCurrencyName, SUM(CASE WHEN s.LicenseeWinloss <= r.MaxAmount THEN s.LicenseeWinloss - r.MinAmount ELSE r.MaxAmount END * r.Rate * br.Rate) AS PayToSupplier
 		FROM CTE_Sum s
 			INNER JOIN #3rdRate r ON s.PartyId = r.PartyId AND s.LicenseeWinloss > r.MinAmount
-			INNER JOIN @BaseCurrencyRate br ON br.ExchangeId = @CurrencyId
-		GROUP BY s.PartyId, br.BaseCurrencyName
+			INNER JOIN @BaseCurrencyRate br ON br.ExchangeId = @CurrencyId AND br.ExchangeDate = @ToDate
+		GROUP BY br.BaseCurrencyName
 	)
 	UPDATE t
 	SET t.PayToSupplier = ISNULL(r.PayToSupplier, 0)
 	FROM @Total t
-		LEFT JOIN CTE_3rdRate r ON t.PartyId = r.PartyId AND t.Currency = r.BaseCurrencyName
+		LEFT JOIN CTE_3rdRate r ON t.Currency = r.BaseCurrencyName
 
 	-- Return data
 	BEGIN
