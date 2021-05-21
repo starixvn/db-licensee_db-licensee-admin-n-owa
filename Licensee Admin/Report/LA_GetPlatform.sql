@@ -17,8 +17,11 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	SELECT DISTINCT DetailPlatform, SummaryPlatform
-	FROM dbo.LA_f_BetFrom_Sel()
-	ORDER BY SummaryPlatform
+	SELECT DetailPlatform, SummaryPlatform
+	FROM (
+		SELECT DISTINCT OrderDetail, OrderSummary, DetailPlatform, SummaryPlatform
+		FROM dbo.LA_f_BetFrom_Sel()
+	) p
+	ORDER BY OrderSummary, OrderDetail
 END
 GO
