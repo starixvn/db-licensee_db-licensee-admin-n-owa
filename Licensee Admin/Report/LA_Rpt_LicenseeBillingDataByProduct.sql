@@ -397,7 +397,7 @@ BEGIN
 	INSERT INTO #Result (PartyId, ProductId, LicenseeFee)
 	SELECT r.PartyId, r.ProductId
 		-- Keep Nagative Amount for Joint Venture Parties
-		,CASE WHEN r.ProductId IN (3, 25) OR r.PartyId IS NOT NULL THEN r.LicenseeAmount
+		,CASE WHEN r.ProductId IN (3, 15, 25, 31) OR jvp.PartyId IS NOT NULL THEN r.LicenseeAmount
 			WHEN r.LicenseeAmount < 0 THEN 0
 			ELSE r.LicenseeAmount END + r.ExtraAmount
 	FROM @Result r
