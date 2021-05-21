@@ -161,11 +161,11 @@ BEGIN
 				WHEN t.ProductId = 3 THEN -(t.MemberWL + t.AgentComm)
 				WHEN (t.ProductId = 15 AND cp.LicenseeId IS NULL) OR (t.ProductId <> 15 AND p.LicenseeId IS NULL) THEN 0
 				WHEN t.ProductId = 15 THEN t.PayOut - t.CommShare * cp.CommShareRate - t.CashInShare * cp.CashInShareRate
-				ELSE (-MemberWL - Contribution) * ISNULL(cr.Rate, p.Rate) + PayOut END
+				ELSE (-MemberWL - Contribution) * ISNULL(cr.Rate, p.Rate) + PayOut + OddsSpread END
 		) * e.Rate) AS LicenseeAmount
 		,SUM(CASE
 				WHEN p.LicenseeId IS NULL THEN 0
-				ELSE (Contribution - JackpotPrize - ExtraAmount + OddsSpread - CASE WHEN t.ProductId = 31 THEN (AgentComm + MemberComm) ELSE 0 END) * e.Rate END
+				ELSE (Contribution - JackpotPrize - ExtraAmount - CASE WHEN t.ProductId = 31 THEN (AgentComm + MemberComm) ELSE 0 END) * e.Rate END
 		) AS ExtraAmount
 	FROM #TempData t
 		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND t.rptDate = e.ExchangeDate
