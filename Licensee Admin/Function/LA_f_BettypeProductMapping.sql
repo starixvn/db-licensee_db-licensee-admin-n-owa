@@ -121,7 +121,8 @@ BEGIN
 	INNER JOIN bodb02.dbo.SportBettypeMatrix  s (NOLOCK) ON ma.ProductID = s.ProductID
 	WHERE (
 			s.BetType NOT IN (901, 902, 903,904) OR ma.ProductID <> 1
-		 ) AND (@Bettype = 0 OR s.bettype = @Bettype)
+		 ) AND (@Bettype = 0 OR s.bettype = @Bettype) 
+		 AND s.BetType NOT IN (1700, 1800) -- Bettype SUM of Product IN (10, 11)
 
 	IF EXISTS (SELECT 1 FROM @ProductList WHERE ProductCode = 'BT')
 	BEGIN
@@ -131,7 +132,6 @@ BEGIN
 	WHERE typeid BETWEEN 901 AND 904
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
-
 
 	RETURN
 END
