@@ -409,15 +409,21 @@ BEGIN
 		WHERE d.ProductID IN (@PragmaticID, @SBC_ProductID, @Arcadia_Gaming_Id)
 			 AND d.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY p.PartyId, d.ProductID
+	), cte_LicensingFee AS
+	(
+		SELECT l.PartyId, l.ProductId, CASE WHEN l.LicensingFee < 0 AND jvp.PartyId IS NOT NULL THEN 0 ELSE l.LicensingFee END AS LicensingFee,
+			l.Contribution, l.JackpotPrize, l.ExtraAmount
+		FROM cte_LicensingWL l
+			LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON l.PartyId = jvp.PartyId
 	)
 	UPDATE	l
-	SET		l.PP  = CASE WHEN pp.LicensingFee < 0 THEN 0 ELSE pp.LicensingFee END + pp.Contribution - pp.JackpotPrize - pp.ExtraAmount,
-			l.SBC = CASE WHEN sbc.LicensingFee < 0 THEN 0 ELSE sbc.LicensingFee END + sbc.Contribution - sbc.JackpotPrize - sbc.ExtraAmount,
-			l.CC = CASE WHEN cc.LicensingFee < 0 THEN 0 ELSE cc.LicensingFee END - cc.ExtraAmount
+	SET		l.PP  = pp.LicensingFee + pp.Contribution - pp.JackpotPrize - pp.ExtraAmount,
+			l.SBC = sbc.LicensingFee + sbc.Contribution - sbc.JackpotPrize - sbc.ExtraAmount,
+			l.CC = cc.LicensingFee - cc.ExtraAmount
 	FROM #LicenseeAmount l
-	LEFT JOIN cte_LicensingWL pp ON l.PartyId = pp.PartyId AND pp.ProductID = @PragmaticID
-	LEFT JOIN cte_LicensingWL sbc ON l.PartyId = sbc.PartyId AND sbc.ProductID = @SBC_ProductID
-	LEFT JOIN cte_LicensingWL cc ON l.PartyId = cc.PartyId AND cc.ProductID = @Arcadia_Gaming_Id
+	LEFT JOIN cte_LicensingFee pp ON l.PartyId = pp.PartyId AND pp.ProductID = @PragmaticID
+	LEFT JOIN cte_LicensingFee sbc ON l.PartyId = sbc.PartyId AND sbc.ProductID = @SBC_ProductID
+	LEFT JOIN cte_LicensingFee cc ON l.PartyId = cc.PartyId AND cc.ProductID = @Arcadia_Gaming_Id
 	--End PP, SBC, Arcadia_Gaming
 
 	-- SportsBook

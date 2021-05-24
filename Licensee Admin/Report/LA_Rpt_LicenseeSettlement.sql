@@ -51,6 +51,7 @@ AS
 			- 20201209@Mason: Saba.club - Offer Freebet tickets [#141423]
 			- 20210108@Mason: Saba.club - Integrate Slot Game [#147977]
 			- 20210108@Parsons: Settlement report - Enhance Company column of Arcadia Gaming, Saba.Club, PP [#150629]
+			- 20210513@Percy: Keep negative licensee fee for joint venture parties [RedmineID: #154992]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -910,6 +911,12 @@ BEGIN
 		)
 	END
 	
+	-- Return result
+	DECLARE @IsKeepNegativeAmount BIT = 0
+
+	IF @ProductCode NOT IN ('BA', 'CB', 'CO', 'BX') AND EXISTS (SELECT 1 FROM bodb_Licensee.dbo.LA_f_JVPartyListSel() WHERE PartyId = @PartyId)
+		SELECT @IsKeepNegativeAmount = 1
+
 	;WITH sortedExchange AS (
 		SELECT ExchangeID, CurrencyCode, ROW_NUMBER() OVER (PARTITION BY CurrencyCode ORDER BY ExchangeId) RowNumber
 		FROM #Exchange
@@ -917,7 +924,7 @@ BEGIN
 	SELECT
 		ISNULL(d.Game, '')			AS Game
 		, @ToDate					AS WinLostDate
-		, se.ExchangeID		AS CurrencyId
+		, se.ExchangeID				AS CurrencyId
 		, se.CurrencyCode			AS CurrencyName
 		, e.Rate					AS ExchangeRate
 		, SUM(Betcount)				AS Betcount
@@ -968,7 +975,8 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.Cashout * e.Rate, 0)))					AS CashoutBase
 		, CONVERT(MONEY, SUM(ISNULL(d.PlayerComm * e.Rate, 0)))					AS MemberCommBase
 		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeWL * e.Rate, 0)))					AS LicenseeWLBase
-		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeChargeRate * e.Rate, 0)))			AS LicenseeChargeRateBase
+		, CONVERT(MONEY, CASE WHEN SUM(ISNULL(d.LicenseeChargeRate * e.Rate, 0)) > 0 OR @IsKeepNegativeAmount = 1
+			THEN SUM(ISNULL(d.LicenseeChargeRate * e.Rate, 0)) ELSE 0 END)		AS LicenseeChargeRateBase
 		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeComm * e.Rate, 0)))				AS LicenseeCommBase
 		, CONVERT(MONEY, SUM(ISNULL(d.CashInShare * e.Rate, 0)))				AS CashInShareBase
 		, CONVERT(MONEY, SUM(ISNULL(d.TipsAmount * e.Rate, 0)))					AS TipsAmountBase
