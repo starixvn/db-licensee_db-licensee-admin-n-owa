@@ -411,7 +411,7 @@ BEGIN
 		GROUP BY p.PartyId, d.ProductID
 	), cte_LicensingFee AS
 	(
-		SELECT l.PartyId, l.ProductId, CASE WHEN l.LicensingFee < 0 AND jvp.PartyId IS NOT NULL THEN 0 ELSE l.LicensingFee END AS LicensingFee,
+		SELECT l.PartyId, l.ProductId, CASE WHEN l.LicensingFee < 0 AND jvp.PartyId IS NULL THEN 0 ELSE l.LicensingFee END AS LicensingFee,
 			l.Contribution, l.JackpotPrize, l.ExtraAmount
 		FROM cte_LicensingWL l
 			LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON l.PartyId = jvp.PartyId

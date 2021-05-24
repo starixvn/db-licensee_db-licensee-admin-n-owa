@@ -179,6 +179,31 @@ BEGIN
 	FROM CTE_SumByParty
 	GROUP BY BaseCurrencyName, ParentId
 
+	-- Total by Party
+	DECLARE @TotalByParty TABLE
+	(
+		PartyId			INT,
+		PartyName		VARCHAR(100),
+		ParentId		INT,
+		TotalTrans		INT,
+		Turnover		MONEY,
+		CustomerWinLoss	MONEY,
+		LicenseeWinLoss	MONEY,
+		LicensingFee	MONEY,
+		PayToSupplier	MONEY
+	)
+
+	INSERT INTO @TotalByParty (PartyId, PartyName, ParentId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee)
+	SELECT r.PartyId, r.PartyName, r.ParentId,
+		SUM(r.TotalTrans),
+		SUM(r.Turnover * e.Rate),
+		SUM(r.CustomerWinLoss * e.Rate),
+		SUM(r.LicenseeWinLoss * e.Rate),
+		CASE WHEN SUM(r.LicensingFee * e.Rate) > 0 THEN SUM(r.LicensingFee * e.Rate) ELSE 0 END
+	FROM #Result r
+		INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeId AND r.WinLossDate = e.ExchangeDate
+	GROUP BY r.PartyId, r.PartyName, r.ParentId
+
 	-- Update PayToSupplier base on Licensee WL
 	DECLARE @CurrencyId INT, @CurrencyName VARCHAR(100)
 	SELECT TOP 1 @CurrencyId = CurrencyId FROM #3rdRate
@@ -200,6 +225,18 @@ BEGIN
 	SET t.PayToSupplier = ISNULL(r.PayToSupplier, 0)
 	FROM #Result t
 		LEFT JOIN CTE_3rdRate r ON t.PartyId = r.PartyId AND t.CurrencyId = r.CurrencyId AND t.WinLossDate = r.WinlostDate
+
+	-- TotalByParty
+	;WITH CTE_3rdRate AS (
+		SELECT s.PartyId, SUM(CASE WHEN s.LicenseeWinloss <= r.MaxAmount THEN s.LicenseeWinloss - r.MinAmount ELSE r.MaxAmount END * r.Rate) AS PayToSupplier
+		FROM @TotalByParty s
+			INNER JOIN #3rdRate r ON s.PartyId = r.PartyId AND (s.LicenseeWinloss > r.MinAmount OR (s.LicenseeWinloss < 0 AND r.MinAmount = 0))
+		GROUP BY s.PartyId
+	)
+	UPDATE t
+	SET t.PayToSupplier = ISNULL(r.PayToSupplier, 0)
+	FROM @TotalByParty t
+		LEFT JOIN CTE_3rdRate r ON t.PartyId = r.PartyId
 
 	-- Total
 	;WITH CTE_Sum AS (
@@ -259,6 +296,10 @@ BEGIN
 			,SUM(LicensingFee - PayToSupplier) AS CompanyIncome
 		FROM @Total
 		GROUP BY Currency
+
+		-- Total by Party
+		SELECT PartyId, PartyName, ParentId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, PayToSupplier, LicensingFee - PayToSupplier AS CompanyIncome
+		FROM @TotalByParty
 	
 		-- Total
 		SELECT
