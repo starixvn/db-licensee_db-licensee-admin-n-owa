@@ -21,6 +21,13 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
+	DECLARE @BaseCurrencies TABLE (CurrencyId INT, CurrencyName VARCHAR(10))
+	INSERT INTO @BaseCurrencies (CurrencyId, CurrencyName)
+	EXEC dbo.LA_SelBaseCurrency
+
+	DECLARE @BaseCurrencyId INT
+	SELECT  @BaseCurrencyId = CurrencyId FROM @BaseCurrencies WHERE CurrencyName = @BaseCurrencyName
+
 	-- Get Party List
 	CREATE TABLE #PartyList (PartyId INT, LicenseeId INT, PartyName VARCHAR(100), BranchName VARCHAR(100), ParentId INT, ParentName VARCHAR(100), GroupMinFeeId INT, IsSelected BIT DEFAULT(0))
 	INSERT INTO #PartyList (PartyId, PartyName, BranchName, ParentId)
@@ -333,15 +340,16 @@ BEGIN
 		;WITH CTE_ProductCode AS (SELECT DISTINCT ProductCode FROM @DiscountGroup)
 		SELECT @Discount_ProductCodes = COALESCE(@Discount_ProductCodes + ',', '') + ProductCode FROM CTE_ProductCode
 
-		DECLARE @DiscountData TABLE (PartyId INT, ProductId INT, Winloss MONEY, Fee MONEY, NegativeFee MONEY, MinFee MONEY, IsChargedByMinFee BIT, Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(MAX), Rebate MONEY, RebateRate MONEY, RebateRemark VARCHAR(MAX))
-		INSERT INTO @DiscountData (PartyId, ProductId, Winloss, Fee, NegativeFee, Minfee, IsChargedByMinFee, Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark)
-		EXEC dbo.LA_AmountToCompanySel
-			@FromDate		= @F_Date
-			,@ToDate		= @T_Date
-			,@PartyIds		= @Discount_PartyIds
-			,@ProductCodes	= @Discount_ProductCodes
-			,@BaseCurrency	= @BaseCurrencyName
-			,@CurrencyId	= 0
+		DECLARE @DiscountData TABLE (PartyId INT, ProductId INT, Fee MONEY, Discount MONEY, Rebate MONEY, IsChargedByMinFee BIT, IsChargedByGroupMinFee BIT)
+		INSERT INTO @DiscountData (PartyId, ProductId, Fee, Discount, Rebate, IsChargedByMinFee, IsChargedByGroupMinFee)
+		EXEC dbo.LA_AmountToCompanyByDiscountCurrencySel
+			@FromDate			= @F_Date
+			,@ToDate			= @T_Date
+			,@PartyIds			= @Discount_PartyIds
+			,@ProductCodes		= @Discount_ProductCodes
+			,@BaseCurrencyName	= @BaseCurrencyName
+			,@BaseCurrencyId	= @BaseCurrencyId
+			,@CurrencyId		= 0
 
 		DECLARE @Result TABLE (PartyId INT, ProductId INT, GroupMinFeeId INT, IsPrimary BIT DEFAULT(0), LicenseeAmount MONEY DEFAULT(0), ExtraAmount MONEY DEFAULT(0), Rebate MONEY DEFAULT(0), Discount MONEY DEFAULT(0))
 		;WITH CTE_tempResult AS (
