@@ -139,7 +139,7 @@ BEGIN
 	
 	INSERT INTO #TempData (LicenseeId, rptDate, ProductId, CurrencyId, BettypeRef, MemberWL, MemberComm, AgentWL, AgentComm, Contribution, JackpotPrize, ExtraAmount, OddsSpread, PayOut, CommShare, CashInShare)
 	SELECT r.SiteId, r.rptDate, r.ProductId, r.CurrencyId
-		,CASE WHEN r.Bettype IN (901, 1706) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
+		,CASE WHEN r.Bettype IN (901, 1706, 3007) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
 		,SUM(CASE WHEN (r.ProductId IN (32, 43, 42) AND ISNULL(r.TicketType, 0) = 2) OR r.Bettype IN (902, 903, 904, 999, 4299, 4300, 4297, 4298, 1698, 1699, 1906) THEN 0 ELSE ISNULL(r.MemberWL, 0) END) AS MemberWL
 		,SUM(ISNULL(r.CommissionP, 0)) AS MemberComm
 		,SUM(ISNULL(r.GrossWL, 0)) AS AgentWL
@@ -159,12 +159,13 @@ BEGIN
 		AND r.CurrencyId <> 20
 		AND r.ProductId <> 25 -- CO
 	GROUP BY r.SiteId, r.rptDate, r.CurrencyId, r.ProductId
-		,CASE WHEN r.Bettype IN (901, 1706) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
+		,CASE WHEN r.Bettype IN (901, 1706, 3007) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
 
 	CREATE TABLE #tmpResult (PartyId INT, ProductId INT, rptDate DATE, LicenseeAmount MONEY, ExtraAmount MONEY DEFAULT(0), IsApplyMinFee BIT DEFAULT (1))
 	INSERT INTO #tmpResult (PartyId, ProductId, rptDate, LicenseeAmount, ExtraAmount)
 	SELECT pl.PartyId, t.ProductId, t.rptDate
 		,SUM((CASE
+				WHEN t.BettypeRef IN (1706, 3007) THEN 0
 				WHEN t.ProductId = 3 THEN -(t.MemberWL + t.AgentComm)
 				WHEN (t.ProductId = 15 AND cp.LicenseeId IS NULL) OR (t.ProductId <> 15 AND p.LicenseeId IS NULL) THEN 0
 				WHEN t.ProductId = 15 THEN t.PayOut - t.CommShare * cp.CommShareRate - t.CashInShare * cp.CashInShareRate
@@ -172,6 +173,7 @@ BEGIN
 		) * e.Rate) AS LicenseeAmount
 		,SUM(CASE
 				WHEN p.LicenseeId IS NULL THEN 0
+				WHEN t.BettypeRef IN (1706, 3007) THEN -MemberWL * ISNULL(cr.Rate, p.Rate)
 				ELSE (Contribution - JackpotPrize - ExtraAmount - CASE WHEN t.ProductId = 31 THEN (AgentComm + MemberComm) ELSE 0 END) * e.Rate END
 		) AS ExtraAmount
 	FROM #TempData t
