@@ -774,11 +774,12 @@ END
 				, pl.ProductId
 				, UPPER(@BaseCurrency) AS CurrencyName
 				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC) THEN 
-										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
+										        (CASE WHEN r.AmountToCompany < 0 AND jvp.PartyId IS NULL THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 			FROM #tmpResult r
 			INNER JOIN @partyList p ON r.PartyID=p.PartyId
 			INNER JOIN @productList pl ON r.ProductID = pl.ProductId
+			LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
 			WHERE p.IsSelected=1
 			GROUP BY pl.ProductId, p.PartyId, pl.Name
 		END
@@ -788,11 +789,12 @@ END
 				, pl.Name AS ProductName
 				, UPPER(@BaseCurrency) AS CurrencyName
 				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC) THEN 
-										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
+										        (CASE WHEN r.AmountToCompany < 0 AND jvp.PartyId IS NULL THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 			FROM #tmpResult r
 			INNER JOIN @partyList p ON r.PartyID=p.PartyId
 			INNER JOIN @productList pl ON r.ProductID = pl.ProductId
+			LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
 			WHERE p.IsSelected=1
 			GROUP BY pl.ProductId, ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId), pl.Name
 			ORDER BY pl.ProductId
@@ -805,14 +807,15 @@ END
 			SELECT p.PartyId
 				,UPPER(@BaseCurrency) AS CurrencyName
 				,SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC) THEN 
-										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
+										        (CASE WHEN r.AmountToCompany < 0 AND jvp.PartyId IS NULL THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					 ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 				,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) LicensingFee
 				,SUM(r.Discount) Discount
 				,SUM(r.Rebate) Rebate
 				,SUM(r.Promotion) Promotion
 			FROM #tmpResult r
-			INNER JOIN @partyList p ON p.PartyId = r.PartyID
+				INNER JOIN @partyList p ON p.PartyId = r.PartyID
+				LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
 			WHERE p.IsSelected = 1
 			GROUP BY p.PartyId
 		END
@@ -821,7 +824,7 @@ END
 			SELECT ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId) AS LicenseeCode
 				,UPPER(@BaseCurrency) AS CurrencyName 
 				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC) THEN 
-										        (CASE WHEN r.AmountToCompany < 0 THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
+										        (CASE WHEN r.AmountToCompany < 0 AND jvp.PartyId IS NULL THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 				,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) LicensingFee
 				,SUM(r.Discount) Discount
@@ -829,6 +832,7 @@ END
 				,SUM(r.Promotion) Promotion
 			FROM #tmpResult r
 			INNER JOIN @partyList p ON p.PartyId = r.PartyID
+			LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
 			WHERE p.IsSelected = 1
 			GROUP BY ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId)
 		END
