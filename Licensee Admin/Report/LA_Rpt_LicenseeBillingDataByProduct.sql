@@ -224,6 +224,24 @@ BEGIN
 		FROM @MinFee m
 			INNER JOIN @GroupMinFeeSetting g ON m.PartyId = g.PartyId
 
+		INSERT INTO @MinFee (FeeTypeId, GroupMinFeeId, PartyId, ProductId, IsPrimary, IndividualMinFee, FromDate, ToDate)
+		SELECT 1, g.GroupMinFeeId, g.PartyId, g.ProductId, g.IsPrimary, 0, g.FromDate, g.ToDate
+		FROM (
+			SELECT r.GroupMinFeeId, r.PartyId, r.ProductId, r.IsPrimary
+				,CASE WHEN @F_Date > r.FromDate THEN @F_Date ELSE r.FromDate END AS FromDate
+				,CASE WHEN @T_Date < r.ToDate THEN @T_Date ELSE r.ToDate END AS ToDate
+			FROM (
+				SELECT a.PartyId, d.ProductId, h.GroupMinFeeId, a.IsPrimary, h.FromDate, h.ToDate, ROW_NUMBER() OVER(PARTITION BY a.PartyId, d.ProductId ORDER BY h.ToDate DESC) AS RN
+				FROM dbo.LA_GroupMinFeeAssignment a WITH (NOLOCK)
+					INNER JOIN dbo.LA_GroupMinFeeHeader h WITH (NOLOCK) ON a.GroupMinFeeId = h.GroupMinFeeId
+					INNER JOIN dbo.LA_GroupMinFeeDetail d WITH (NOLOCK) ON a.GroupMinFeeId = d.GroupMinFeeId
+				WHERE @FromDate <= h.ToDate AND @ToDate >= h.FromDate
+			) r
+			WHERE r.RN = 1
+		) g
+			LEFT JOIN @MinFee m ON g.PartyId = m.PartyId
+		WHERE m.PartyId IS NULL
+
 		UPDATE t
 		SET t.IsApplyMinFee = 0
 		FROM #tmpResult t
