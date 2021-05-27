@@ -552,9 +552,10 @@ BEGIN
 			SUM(CASE WHEN t.ProductId = @ExchangeProductId THEN t.PComm ELSE 0 END + t.WinLoss)							AS WinLoss,
 			SUM(CASE WHEN t.ProductId = @BAProductId THEN t.AComm ELSE 0 END)											AS BAComm,
 			SUM(CASE WHEN t.ProductId = @BAProductId THEN t.AmountToCompany ELSE 0 END)									AS AmountToBA,
-			SUM(CASE WHEN t.ProductId = @ExchangeProductId OR (t.ProductId IN (@PragmaticProductId, @ArcadiaGamingId, @Saba_clubProductID) AND t.AmountToCompany < 0) THEN t.AmountToCompany ELSE 0 END)	AS NegativeAmount,
-			SUM(CASE WHEN t.ProductId IN(@BAProductId, @ExchangeProductId) OR t.AmountToCompany < 0 THEN 0 ELSE t.AmountToCompany END) AS AmountToCompany
+			SUM(CASE WHEN (jvp.PartyId IS NOT NULL AND t.ProductId <> @BAProductId) OR t.ProductId = @ExchangeProductId OR (t.ProductId IN (@PragmaticProductId, @ArcadiaGamingId, @Saba_clubProductID) AND t.AmountToCompany < 0) THEN t.AmountToCompany ELSE 0 END)	AS NegativeAmount,
+			SUM(CASE WHEN jvp.PartyId IS NOT NULL OR t.ProductId IN (@BAProductId, @ExchangeProductId) OR t.AmountToCompany < 0 THEN 0 ELSE t.AmountToCompany END) AS AmountToCompany
 		FROM @SumByProducts t
+			LEFT JOIN bodb_Licensee.dbo.LA_f_JVPartyListSel() jvp ON t.PartyId = jvp.PartyId
 		WHERE t.ProductId != 0
 		GROUP BY t.IsCurrent, t.PartyId
 	)
