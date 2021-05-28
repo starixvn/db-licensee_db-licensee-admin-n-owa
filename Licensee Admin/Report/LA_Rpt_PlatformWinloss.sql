@@ -158,7 +158,7 @@ BEGIN
 				GROUP BY LicenseeName, rptDate
 			) t ON r.LicenseeName = t.LicenseeName AND r.rptDate = t.rptDate
 	), CTE_Result AS (
-		SELECT r.LicenseeName, r.rptDate, r.DetailPlatform + ''_'' + t.Figure AS Figure, t.Value
+		SELECT r.LicenseeName, r.rptDate, r.DetailPlatform + ''_'' + t.Figure AS Figure, CAST(t.Value AS MONEY) AS Value
 		FROM CTE_tempResult r
 			CROSS APPLY (
 				SELECT ''Turnover'' AS Figure, Turnover AS Value
@@ -166,7 +166,7 @@ BEGIN
 				UNION ALL SELECT ''TurnoverPercent'', TurnoverPercent
 			) t
 	)
-	SELECT rptDate, LicenseeName, ' + @OutputColumns + '
+	SELECT rptDate AS WinlostDate, LicenseeName, ' + @OutputColumns + '
 	FROM CTE_Result r
 	PIVOT (
 		MAX (Value)
