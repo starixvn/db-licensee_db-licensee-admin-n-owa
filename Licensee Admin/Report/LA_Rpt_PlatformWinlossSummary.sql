@@ -9,6 +9,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_PlatformWinlossSummary]
 	@ToDate			SMALLDATETIME,
 	@BaseCurrency	VARCHAR(20) = 'EUR'
 AS
+
 /*
 	Created: 20160725@Bravo
 	Task: Platform Win Loss (Summary) #redmind: https://nexdev.net/issues/60707
@@ -35,7 +36,10 @@ AS
 		- 20201204@Happy: Changing OddsSpread for Licensee [#142345]
 		- 20210517@Percy: Using core function to group betfrom [RedmineID: #150899]
 
+	Explanation:
+		@Platforms: DetailPlatform from LA_f_BetFrom_Sel() function
 */
+
 BEGIN
 	SET NOCOUNT ON
 
@@ -145,17 +149,17 @@ BEGIN
 		LEFT JOIN dbo.LA_f_BetFrom_Sel() bf ON d.BetFrom = bf.BetFrom
 	GROUP BY ISNULL(bf.OrderDetail, 17), ISNULL(bf.OrderSummary, 4), ISNULL(bf.DetailPlatform , 'Others'), ISNULL(bf.SummaryPlatform, 'Others')
 
-	DECLARE @TurnoverTotal FLOAT, @LicenseeWinlossTotal FLOAT
-	SELECT  @TurnoverTotal = SUM(Turnover), @LicenseeWinlossTotal = SUM(LicenseeWinloss) FROM #Result
-	SELECT  @TurnoverTotal = NULLIF(@TurnoverTotal, 0), @LicenseeWinlossTotal = NULLIF(@LicenseeWinlossTotal, 0)
-
 	INSERT INTO #Result (OrderDetail, OrderSummary, DetailPlatform, SummaryPlatform, BetCount, Turnover, LicenseeWinloss)
 	SELECT DISTINCT bf.OrderDetail, bf.OrderSummary, bf.DetailPlatform, bf.SummaryPlatform, 0, 0, 0
 	FROM dbo.LA_f_BetFrom_Sel() bf
 		LEFT JOIN #Result r ON bf.DetailPlatform = r.DetailPlatform
 	WHERE r.DetailPlatform IS NULL
-
+	
 	DELETE #Result WHERE ',' + @Platforms + ',' NOT LIKE '%,' + DetailPlatform + ',%'
+
+	DECLARE @TurnoverTotal FLOAT, @LicenseeWinlossTotal FLOAT
+	SELECT  @TurnoverTotal = SUM(Turnover), @LicenseeWinlossTotal = SUM(LicenseeWinloss) FROM #Result
+	SELECT  @TurnoverTotal = NULLIF(@TurnoverTotal, 0), @LicenseeWinlossTotal = NULLIF(@LicenseeWinlossTotal, 0)
 
 	-- Return summary data
 	SELECT SummaryPlatform AS [Platform]
