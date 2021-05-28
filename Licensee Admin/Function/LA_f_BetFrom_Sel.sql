@@ -33,6 +33,8 @@ RETURN
 			(7, 2, '7', 'Mobile Others', 'Mobile'),
 			(7, 2, '8', 'Mobile Others', 'Mobile'),
 			(7, 2, '_', 'Mobile Others', 'Mobile'),
+			(7, 2, '#', 'Mobile Others', 'Mobile'),
+			(7, 2, '$', 'Mobile Others', 'Mobile'),
 			(8, 1, '1', 'E-Sports Desktop', 'Desktop'),
 			(8, 1, '4', 'E-Sports Desktop', 'Desktop'),
 			(9, 2, '2', 'E-Sports Mobile', 'Mobile'),
