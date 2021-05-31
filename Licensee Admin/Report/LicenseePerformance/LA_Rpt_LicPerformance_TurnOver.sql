@@ -42,6 +42,10 @@ AS
 	    - 20201231@Parsons: Integrate Big Gaming [#145342]
 	    - 20210106@Happy: Integrate MaxGame [#147375]
 		- 20210407@Mason: Integrate new Sport Lottery [#150866]
+		- 20210506@Percy: Integrate
+			. Pragmatic Live Casino [RedmineID: #150971]
+			. Habanero [RedmineID: #150636]
+			. Creative Gaming [RedmineID: #152139]
 
     Param's Explanation:  
 	   + @partyIDs : a string of list PartyID, separated by ','
@@ -121,7 +125,7 @@ BEGIN
     END
 
     --exclude BA tickets
-    IF @ProductCode IN ('SB', 'RB', 'NG', 'LC', 'VS', 'CS', 'VB', 'PP', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK', 'WM', 'VS3', 'GDG', 'BGG', 'MXG', 'SLT')
+    IF @ProductCode IN ('SB', 'RB', 'NG', 'LC', 'VS', 'CS', 'VB', 'PP', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK', 'WM', 'VS3', 'GDG', 'BGG', 'MXG', 'SLT', 'PPL', 'HB', 'CG')
     BEGIN		
 	   INSERT INTO #Tmp(PartyId, rptDate, CurrencyId, TurnOver)
 	   (

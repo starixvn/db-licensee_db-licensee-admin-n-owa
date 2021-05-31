@@ -51,6 +51,7 @@ AS
 			- 20201209@Mason: Saba.club - Offer Freebet tickets [#141423]
 			- 20210108@Mason: Saba.club - Integrate Slot Game [#147977]
 			- 20210108@Parsons: Settlement report - Enhance Company column of Arcadia Gaming, Saba.Club, PP [#150629]
+			- 20210513@Percy: Keep negative licensee fee for joint venture parties [RedmineID: #154992]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -65,7 +66,12 @@ AS
 SET NOCOUNT ON
 BEGIN
 	SET @ProductCode = LTRIM(RTRIM(REPLACE(@ProductCode,',','')))
-	DECLARE @TotalLicenseeChargeRate_InBaseCurrency MONEY 
+	DECLARE @TotalLicenseeChargeRate_InBaseCurrency MONEY
+
+	DECLARE @IsKeepNegativeAmount BIT = 0
+
+	IF @ProductCode NOT IN ('BA', 'CB', 'CO', 'BX') AND EXISTS (SELECT 1 FROM bodb_Licensee.dbo.LA_f_JVPartyListSel() WHERE PartyId = @PartyId)
+		SELECT @IsKeepNegativeAmount = 1
 
 	DECLARE @LicenseeID INT,
 			@DrawFilter SMALLINT = 1
@@ -90,6 +96,7 @@ BEGIN
 		PlayerComm					MONEY,
 		LicenseeWL					MONEY,
 		LicenseeChargeRate			MONEY,
+		ActualLicenseeChargeRate	MONEY,
 		LicenseeComm				MONEY,
 		BettradeComm				MONEY,
 		CashInShare					MONEY,
@@ -744,7 +751,7 @@ BEGIN
 		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
 
 		UPDATE #Result
-		SET Company = CASE WHEN @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - WinningPrize
+		SET Company = CASE WHEN @IsKeepNegativeAmount = 1 OR @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - WinningPrize
 	END
 	ELSE IF (@ProductCode = 'CC')
 	BEGIN
@@ -782,7 +789,7 @@ BEGIN
 		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
 
 		UPDATE #Result
-		SET Company = CASE WHEN @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END - WinningPrize
+		SET Company = CASE WHEN @IsKeepNegativeAmount = 1 OR @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END - WinningPrize
 	END
 	ELSE IF(@ProductCode = 'SB') -- Sportsbook
 	BEGIN
@@ -867,7 +874,7 @@ BEGIN
 		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
 
 		UPDATE #Result
-		SET Company = CASE WHEN @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - FreeBetAmount
+		SET Company = CASE WHEN @IsKeepNegativeAmount = 1 OR @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - FreeBetAmount
 	END
 	ELSE
 	BEGIN
@@ -910,6 +917,21 @@ BEGIN
 		)
 	END
 	
+	-- Return result
+	IF @ProductCode IN ('BA', 'CB', 'CO', 'BX')
+	BEGIN
+		UPDATE #Result SET ActualLicenseeChargeRate = LicenseeChargeRate
+	END
+	IF @ProductCode NOT IN ('BA', 'CB', 'CO', 'BX')
+	BEGIN
+		SELECT @TotalLicenseeChargeRate_InBaseCurrency = SUM(LicenseeChargeRate * e.Rate)
+		FROM #Result r
+			INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
+
+		UPDATE #Result
+		SET ActualLicenseeChargeRate = CASE WHEN @IsKeepNegativeAmount = 1 OR @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END
+	END
+
 	;WITH sortedExchange AS (
 		SELECT ExchangeID, CurrencyCode, ROW_NUMBER() OVER (PARTITION BY CurrencyCode ORDER BY ExchangeId) RowNumber
 		FROM #Exchange
@@ -917,7 +939,7 @@ BEGIN
 	SELECT
 		ISNULL(d.Game, '')			AS Game
 		, @ToDate					AS WinLostDate
-		, se.ExchangeID		AS CurrencyId
+		, se.ExchangeID				AS CurrencyId
 		, se.CurrencyCode			AS CurrencyName
 		, e.Rate					AS ExchangeRate
 		, SUM(Betcount)				AS Betcount
@@ -968,12 +990,12 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.Cashout * e.Rate, 0)))					AS CashoutBase
 		, CONVERT(MONEY, SUM(ISNULL(d.PlayerComm * e.Rate, 0)))					AS MemberCommBase
 		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeWL * e.Rate, 0)))					AS LicenseeWLBase
-		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeChargeRate * e.Rate, 0)))			AS LicenseeChargeRateBase
+		, CONVERT(MONEY, SUM(ISNULL(d.ActualLicenseeChargeRate * e.Rate, 0)))	AS LicenseeChargeRateBase
 		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeComm * e.Rate, 0)))				AS LicenseeCommBase
 		, CONVERT(MONEY, SUM(ISNULL(d.CashInShare * e.Rate, 0)))				AS CashInShareBase
 		, CONVERT(MONEY, SUM(ISNULL(d.TipsAmount * e.Rate, 0)))					AS TipsAmountBase
 		, CONVERT(MONEY, SUM(ISNULL(d.TipsAmountDue * e.Rate, 0)))				AS TipsAmountDueBase
-		, CONVERT(MONEY, SUM(ISNULL(d.Company* e.Rate, 0)))						AS CompanyBase
+		, CONVERT(MONEY, SUM(ISNULL(d.Company * e.Rate, 0)))					AS CompanyBase
 		, CONVERT(MONEY, SUM(ISNULL(d.ProgressiveContribution * e.Rate, 0)))	AS ProgressiveContributionBase
 		, CONVERT(MONEY, SUM(ISNULL(d.ProgressiveFee * e.Rate, 0)))				AS ProgressiveFeeBase
 		, CONVERT(MONEY, SUM(ISNULL(d.ProgressivePayout * e.Rate, 0)))			AS ProgressivePayoutBase

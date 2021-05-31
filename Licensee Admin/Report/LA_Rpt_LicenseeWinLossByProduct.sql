@@ -59,6 +59,10 @@ AS
 		- 20210202@Happy: Saba.club - Integrate Slot Game [#147977]
 		- 20210219@Parsons: Add mini games bonus of Arcadia Gaming [#150248]
 		- 20210407@Mason: Integrate new Sport Lottery [#150866]
+		- 20210506@Percy: Integrate
+			. Pragmatic Live Casino [RedmineID: #150971]
+			. Habanero [RedmineID: #150636]
+			. Creative Gaming [RedmineID: #152139]
 */
 		
 /*	Example:
@@ -78,7 +82,7 @@ BEGIN
 	DECLARE @PragmaticID INT = 32, @SBC_ProductID INT = 42, @Arcadia_Gaming_Id INT = 34
 
 	-- Region: Get party charge rate info 
-	DECLARE @ProductCode VARCHAR(500)= 'SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX,PP,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG,BGG,MXG,SLT'
+	DECLARE @ProductCode VARCHAR(500)= 'BA,SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX,PP,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG,BGG,MXG,SLT,PPL,HB,CG'
 	
 	-- Region: Get Party ID
 	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)
@@ -221,7 +225,10 @@ BEGIN
 		GDG			MONEY,	-- GDG
 		BG			MONEY,	--Big Gaming
 		MXG			MONEY,	-- MaxGame
-		SLT			MONEY	-- Sport Lottery
+		SLT			MONEY,	-- Sport Lottery
+		PPL			MONEY,	-- Pragmatic Live Casino
+		HB			MONEY,	-- Habanero
+		CG			MONEY	-- Creative Gaming
 	)						  
 	INSERT INTO #LicenseeAmount(GroupName, GroupId, LicenseeId, PartyId,PartyName)
 	SELECT	REPLACE(p.PartyName,' Licensees','') AS PartyName,
@@ -241,6 +248,7 @@ BEGIN
 				SUM(-(MemberWL + AComm) * e.Rate) Amount
 		FROM	#TempData d
 				INNER JOIN #Exchange e ON d.rptDate = e.ExchangeDate AND d.CurrencyId = e.ExchangeID
+				INNER JOIN @PartyChargeInfo p ON d.LicenseeId = p.LicenseeId AND d.ProductId = p.ProductId AND d.rptDate BETWEEN p.FromDate AND p.ToDate
 		WHERE	d.ProductId = 3
 		GROUP	BY d.LicenseeId
 	)
@@ -401,15 +409,21 @@ BEGIN
 		WHERE d.ProductID IN (@PragmaticID, @SBC_ProductID, @Arcadia_Gaming_Id)
 			 AND d.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY p.PartyId, d.ProductID
+	), cte_LicensingFee AS
+	(
+		SELECT l.PartyId, l.ProductId, CASE WHEN l.LicensingFee < 0 AND jvp.PartyId IS NULL THEN 0 ELSE l.LicensingFee END AS LicensingFee,
+			l.Contribution, l.JackpotPrize, l.ExtraAmount
+		FROM cte_LicensingWL l
+			LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON l.PartyId = jvp.PartyId
 	)
 	UPDATE	l
-	SET		l.PP  = CASE WHEN pp.LicensingFee < 0 THEN 0 ELSE pp.LicensingFee END + pp.Contribution - pp.JackpotPrize - pp.ExtraAmount,
-			l.SBC = CASE WHEN sbc.LicensingFee < 0 THEN 0 ELSE sbc.LicensingFee END + sbc.Contribution - sbc.JackpotPrize - sbc.ExtraAmount,
-			l.CC = CASE WHEN cc.LicensingFee < 0 THEN 0 ELSE cc.LicensingFee END - cc.ExtraAmount
+	SET		l.PP  = pp.LicensingFee + pp.Contribution - pp.JackpotPrize - pp.ExtraAmount,
+			l.SBC = sbc.LicensingFee + sbc.Contribution - sbc.JackpotPrize - sbc.ExtraAmount,
+			l.CC = cc.LicensingFee - cc.ExtraAmount
 	FROM #LicenseeAmount l
-	LEFT JOIN cte_LicensingWL pp ON l.PartyId = pp.PartyId AND pp.ProductID = @PragmaticID
-	LEFT JOIN cte_LicensingWL sbc ON l.PartyId = sbc.PartyId AND sbc.ProductID = @SBC_ProductID
-	LEFT JOIN cte_LicensingWL cc ON l.PartyId = cc.PartyId AND cc.ProductID = @Arcadia_Gaming_Id
+	LEFT JOIN cte_LicensingFee pp ON l.PartyId = pp.PartyId AND pp.ProductID = @PragmaticID
+	LEFT JOIN cte_LicensingFee sbc ON l.PartyId = sbc.PartyId AND sbc.ProductID = @SBC_ProductID
+	LEFT JOIN cte_LicensingFee cc ON l.PartyId = cc.PartyId AND cc.ProductID = @Arcadia_Gaming_Id
 	--End PP, SBC, Arcadia_Gaming
 
 	-- SportsBook
@@ -438,7 +452,7 @@ BEGIN
 	-- End SportsBook
 
 	-- Calculate amount for products 
-	-- For SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, PP, SG, VRG, SAG, I4D, TG, SXG, PGS, JK, WM, VS3, GDG, BG, MXG, SLT: charge rate is affected by currency
+	-- For SB, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, PP, SG, VRG, SAG, I4D, TG, SXG, PGS, JK, WM, VS3, GDG, BG, MXG, SLT, PPL, HB, CG: charge rate is affected by currency
 	DECLARE @AmountDueByProduct AS TABLE (
 		LicenseeId INT,
 		SB MONEY,
@@ -473,10 +487,13 @@ BEGIN
 		GDG MONEY,
 		BG MONEY,
 		MXG MONEY,
-		SLT MONEY
+		SLT MONEY,
+		PPL MONEY,
+		HB MONEY,
+		CG MONEY
 	)
 	
-	INSERT INTO @AmountDueByProduct(LicenseeId, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, BRVS, LC, VG, MGCLC, MGCRNG, BX, SG, VRG, SAG, I4D, TG, SXG, PGS, JK, WM, VS3, GDG, BG, MXG, SLT)
+	INSERT INTO @AmountDueByProduct(LicenseeId, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, BRVS, LC, VG, MGCLC, MGCRNG, BX, SG, VRG, SAG, I4D, TG, SXG, PGS, JK, WM, VS3, GDG, BG, MXG, SLT, PPL, HB, CG)
 	SELECT d.LicenseeId,
 			ISNULL(SUM(CASE WHEN d.ProductId = 2  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS NG,
 			ISNULL(SUM(CASE WHEN d.ProductId = 5  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VS,
@@ -507,7 +524,10 @@ BEGIN
 			ISNULL(SUM(CASE WHEN d.ProductId = 59 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS GDG,
 			ISNULL(SUM(CASE WHEN d.ProductId = 57 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS BG,
 			ISNULL(SUM(CASE WHEN d.ProductId = 60 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS MXG,
-			ISNULL(SUM(CASE WHEN d.ProductId = 63 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS SLT
+			ISNULL(SUM(CASE WHEN d.ProductId = 63 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS SLT,
+			ISNULL(SUM(CASE WHEN d.ProductId = 65 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS PPL,
+			ISNULL(SUM(CASE WHEN d.ProductId = 61 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS HB,
+			ISNULL(SUM(CASE WHEN d.ProductId = 62 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS CG
 	FROM	#TempData d
 				INNER JOIN @PartyChargeInfo ci ON	d.LicenseeId = ci.LicenseeId
 													AND ci.ProductId = d.ProductId
@@ -548,7 +568,10 @@ BEGIN
 			GDG = a.GDG,
 			BG = a.BG,
 			MXG = a.MXG,
-			SLT = a.SLT
+			SLT = a.SLT,
+			PPL = a.PPL,
+			HB = a.HB,
+			CG = a.CG
 	FROM	#LicenseeAmount l
 			INNER JOIN @AmountDueByProduct a ON a.LicenseeId = l.LicenseeId
 	
@@ -591,9 +614,12 @@ BEGIN
 			AND BG IS NULL
 			AND MXG IS NULL
 			AND SLT IS NULL
+			AND PPL IS NULL
+			AND HB IS NULL
+			AND CG IS NULL
 
 	-- Result
-	SELECT l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP, l.CC, l.SG, l.VRG, l.SAG, l.I4D, l.TG, l.SBC, l.SXG, l.PGS, l.JK, l.WM, l.VS3, l.GDG, l.BG, l.MXG, l.SLT
+	SELECT l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP, l.CC, l.SG, l.VRG, l.SAG, l.I4D, l.TG, l.SBC, l.SXG, l.PGS, l.JK, l.WM, l.VS3, l.GDG, l.BG, l.MXG, l.SLT, l.PPL, l.HB, l.CG
 	FROM #LicenseeAmount l
 	ORDER BY l.GroupId, l.PartyId
 	-- EndRegion

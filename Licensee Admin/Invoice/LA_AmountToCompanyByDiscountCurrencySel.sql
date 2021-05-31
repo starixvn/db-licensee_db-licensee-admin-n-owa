@@ -34,6 +34,7 @@ AS
 	    - 20201118@Parsons: Changing OddsSpread for licensee [#142345] 
 		- 20201209@Parsons: Saba.club - Offer Freebet tickets [#141423]
 		- 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
+		- 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: #154992]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -400,10 +401,12 @@ BEGIN
 	FROM #tmpWinlossData a
 	GROUP BY PartyId, ProductId
 
-	-- 2.6 treat negative as 0 (Except 9wickets-316, 9Wsports-459)
-	UPDATE @FinalResult 
-			SET FeeByDiscountBaseCurrency = CASE WHEN AmountToCompanyByDiscountBaseCurrency < 0 AND PartyId NOT IN (316, 459) THEN 0 ELSE AmountToCompanyByDiscountBaseCurrency END,
-				FeeByBaseCurrency		  =	CASE WHEN AmountToCompanyByBaseCurrency < 0  AND PartyId NOT IN (316, 459)THEN 0 ELSE AmountToCompanyByBaseCurrency END
+	-- 2.6 treat negative Licensee Fee as 0, except Joint Venture Parties
+	UPDATE r
+	SET r.FeeByDiscountBaseCurrency = CASE WHEN r.AmountToCompanyByDiscountBaseCurrency < 0 AND jvp.PartyId IS NULL THEN 0 ELSE AmountToCompanyByDiscountBaseCurrency END,
+		r.FeeByBaseCurrency			= CASE WHEN r.AmountToCompanyByBaseCurrency < 0 AND jvp.PartyId IS NULL THEN 0 ELSE AmountToCompanyByBaseCurrency END
+	FROM @FinalResult r
+		LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
 /*--------------------------------------------------------------------------------------------------------------------------------
  * 3. minfee calculation
  *-------------------------------------------------------------------------------------------------------------------------------*/
