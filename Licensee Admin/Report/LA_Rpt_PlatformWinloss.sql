@@ -43,6 +43,10 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
+	;WITH CTE_DetailPlatform AS (SELECT DISTINCT DetailPlatform FROM dbo.LA_f_BetFrom_Sel() WHERE ',' + @Platforms + ',' LIKE '%,' + DetailPlatform + ',%')
+	SELECT @Platforms = (SELECT ',' + DetailPlatform FROM CTE_DetailPlatform FOR XML PATH(''))
+	SELECT @Platforms = RIGHT(@Platforms, LEN(@Platforms)-1) -- remove first comma
+	
 	DECLARE @OutputColumns VARCHAR(MAX)
 
 	IF DATEDIFF(MONTH, @FromDate, @ToDate) > 6 -- Only support 6 months
@@ -158,7 +162,7 @@ BEGIN
 				GROUP BY LicenseeName, rptDate
 			) t ON r.LicenseeName = t.LicenseeName AND r.rptDate = t.rptDate
 	), CTE_Result AS (
-		SELECT r.LicenseeName, r.rptDate, r.DetailPlatform + ''_'' + t.Figure AS Figure, CAST(t.Value AS FLOAT) AS Value
+		SELECT r.LicenseeName, r.rptDate, r.DetailPlatform + ''_'' + t.Figure AS Figure, CAST(ISNULL(t.Value, 0) AS FLOAT) AS Value
 		FROM CTE_tempResult r
 			CROSS APPLY (
 				SELECT ''Turnover'' AS Figure, Turnover AS Value
