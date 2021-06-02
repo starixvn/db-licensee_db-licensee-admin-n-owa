@@ -46,6 +46,16 @@ BEGIN
 	;WITH CTE_DetailPlatform AS (SELECT DISTINCT DetailPlatform FROM dbo.LA_f_BetFrom_Sel() WHERE ',' + @Platforms + ',' LIKE '%,' + DetailPlatform + ',%')
 	SELECT @Platforms = (SELECT ',' + DetailPlatform FROM CTE_DetailPlatform FOR XML PATH(''))
 	SELECT @Platforms = RIGHT(@Platforms, LEN(@Platforms)-1) -- remove first comma
+
+	IF ISNULL(@Platforms, '') = ''
+	BEGIN
+		SELECT
+			CAST('' AS DATETIME)		AS WinlostDate
+			,CAST('' AS VARCHAR(50))	AS LicenseeName
+		WHERE 1 = 0
+
+		RETURN
+	END
 	
 	DECLARE @OutputColumns VARCHAR(MAX)
 
