@@ -141,13 +141,17 @@ BEGIN
 	END
 
 	-- Result
+		-- betfrom does not define in LA_f_BetFrom_Sel --> add to group 'Others'
+	DECLARE @Others_OrderDetail INT, @Others_OrderSummary INT, @Others_Platform VARCHAR(100) = 'Others'
+	SELECT  @Others_OrderDetail = OrderDetail, @Others_OrderSummary = OrderSummary FROM dbo.LA_f_BetFrom_Sel() WHERE DetailPlatform = @Others_Platform AND SummaryPlatform = @Others_Platform
+
 	CREATE TABLE #Result (OrderDetail INT, OrderSummary INT, DetailPlatform VARCHAR(500), SummaryPlatform VARCHAR(100), BetCount INT, Turnover FLOAT, LicenseeWinloss FLOAT)
 	INSERT INTO #Result (OrderDetail, OrderSummary, DetailPlatform, SummaryPlatform, BetCount, Turnover, LicenseeWinloss)
-	SELECT ISNULL(bf.OrderDetail, 17), ISNULL(bf.OrderSummary, 4), ISNULL(bf.DetailPlatform , 'Others'), ISNULL(bf.SummaryPlatform, 'Others'), SUM(BetCount), SUM(Turnover * e.BaseCurrencyRate), -SUM(Winloss * e.BaseCurrencyRate)
+	SELECT ISNULL(bf.OrderDetail, @Others_OrderDetail), ISNULL(bf.OrderSummary, @Others_OrderSummary), ISNULL(bf.DetailPlatform , @Others_Platform), ISNULL(bf.SummaryPlatform, @Others_Platform), SUM(BetCount), SUM(Turnover * e.BaseCurrencyRate), -SUM(Winloss * e.BaseCurrencyRate)
 	FROM #Data d
 		INNER JOIN dbo.LA_f_ExchangeDailySel (@FromDate, @ToDate, @BaseCurrency) e ON d.rptDate = e.ExchangeDate AND d.Currency = e.ExchangeId
 		LEFT JOIN dbo.LA_f_BetFrom_Sel() bf ON d.BetFrom = bf.BetFrom
-	GROUP BY ISNULL(bf.OrderDetail, 17), ISNULL(bf.OrderSummary, 4), ISNULL(bf.DetailPlatform , 'Others'), ISNULL(bf.SummaryPlatform, 'Others')
+	GROUP BY ISNULL(bf.OrderDetail, @Others_OrderDetail), ISNULL(bf.OrderSummary, @Others_OrderSummary), ISNULL(bf.DetailPlatform , @Others_Platform), ISNULL(bf.SummaryPlatform, @Others_Platform)
 
 	INSERT INTO #Result (OrderDetail, OrderSummary, DetailPlatform, SummaryPlatform, BetCount, Turnover, LicenseeWinloss)
 	SELECT DISTINCT bf.OrderDetail, bf.OrderSummary, bf.DetailPlatform, bf.SummaryPlatform, 0, 0, 0
