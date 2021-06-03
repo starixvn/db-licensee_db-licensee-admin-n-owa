@@ -67,6 +67,7 @@ AS
 		- 20201209@Parsons: Saba.club - Offer Freebet tickets [#141423]
 		- 20210206@Parsons: Saba.club - Integrate Slot Game [#147977]
 		- 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: #154992]
+		- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -101,7 +102,8 @@ BEGIN
 			@PromotionPrize SMALLINT = 4300,
 			@ArcadiaGamingBonus SMALLINT = 1906,
 			@SBC_Contribution SMALLINT = 1698,
-			@SBC_JackpotPrize SMALLINT = 1699
+			@SBC_JackpotPrize SMALLINT = 1699,
+			@SXG_LuckyDraw SMALLINT = 3150
 
 	-- *********************************************************************************************************
 	-- *** Calculate Previous FromDate, Previous ToDate from FromDate, ToDate
