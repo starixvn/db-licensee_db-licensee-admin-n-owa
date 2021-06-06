@@ -2,14 +2,15 @@
 USE [bodb_Licensee]
 GO
 
-ALTER PROCEDURE [dbo].[LA_Inv_MultipleGenerationTemporaryInvoiceSel]
-	@PartyIds			VARCHAR(500),
+--ALTER PROCEDURE [dbo].[LA_Inv_MultipleGenerationTemporaryInvoiceSel]
+DECLARE	@PartyIds			VARCHAR(500),
 	@FromDate			DATE,
 	@ToDate				DATE,
 	@Environment		VARCHAR(10),
-	@ErrCode			INT				= 0		OUTPUT,
-	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
-AS
+	@ErrCode			INT				= 0,--		OUTPUT,
+	@ErrMsg				NVARCHAR(1000)	= ''--	OUTPUT
+--AS
+SELECT @Environment='LOCAL',@PartyIds='14',@FromDate='2021-04-01',@ToDate='2021-04-30'
 /*	Header:
 	Created: 2021.03.02 - Parsons
 	Task : Support a function to export all invoices at once: Generate Multiple Temporary Invoice
@@ -127,19 +128,7 @@ BEGIN
 	-- Region: Get amount to company,discount,rebate(only for some supported products)
 	BEGIN
 		CREATE TABLE #AmountToCompany (
-			PartyId			INT,
-			ProductId		INT,
-			Winloss			MONEY,
-			Fee				MONEY,
-			Discount		MONEY,
-			DiscountRate	MONEY,
-			DiscountRemark	NVARCHAR(4000),
-			Rebate			MONEY,
-			RebateRate		MONEY,
-			RebateRemark	NVARCHAR(4000),
-			NegativeFee		MONEY,
-			Minfee			MONEY,
-			IsChargedByMinFee BIT
+			PartyId INT, ProductId INT, Fee MONEY, Discount MONEY, Rebate MONEY, IsChargedByMinFee BIT, IsChargedByGroupMinFee BIT
 		)
 		DECLARE @Temp_PartyIds VARCHAR(500)
 		WHILE EXISTS (SELECT TOP 1 1 FROM @BaseCurrencyTable WHERE ISNULL(IsCalculationAmountToCompany, 0) = 0)
@@ -150,8 +139,8 @@ BEGIN
 			FROM @PartySettings
 			WHERE BaseCurrencyId = @tempCurrencyId
 
-			INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,NegativeFee,Minfee,IsChargedByMinFee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark)
-			EXEC dbo.LA_AmountToCompanySel @FromDate,@ToDate,@Temp_PartyIds,@ProductCodes,@tempCurrencyName
+			INSERT INTO #AmountToCompany(PartyId, ProductId, Fee, Discount, Rebate, IsChargedByMinFee, IsChargedByGroupMinFee)
+			EXEC dbo.LA_AmountToCompanyByDiscountCurrencySel @FromDate,@ToDate,@Temp_PartyIds,@ProductCodes,@tempCurrencyName,@tempCurrencyId
 
 			UPDATE @BaseCurrencyTable SET IsCalculationAmountToCompany = 1 WHERE CurrencyId = @tempCurrencyId 
 			SET @Temp_PartyIds = ''
