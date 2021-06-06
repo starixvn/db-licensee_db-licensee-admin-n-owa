@@ -43,11 +43,12 @@ BEGIN
 	DECLARE @PartySettings TABLE(IndexNumber INT, PartyID INT, PartyName VARCHAR(100), BillerId INT, BillerName VARCHAR(100), ProductCodes VARCHAR(200), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, InvTemplateName VARCHAR(50))
 
 	INSERT INTO @PartySettings(IndexNumber, PartyID, PartyName, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage)
-	SELECT p.rank, p.val, op.PartyName, ISNULL(pd.BaseCurrencyId, 6), ISNULL(e.Code, 'EUR'), pd.InvoiceLanguage
+	SELECT p.rank, p.val, op.PartyName, ISNULL(pCurrency.BaseCurrencyId, 6), ISNULL(e.Code, 'EUR'), pd.InvoiceLanguage
 	FROM strSplit(@PartyIds, ',') p
 	LEFT JOIN OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.val
-	LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON e.exchangeid = pd.BaseCurrencyId
 	LEFT JOIN bodb_licensee.dbo.OAS_Party op WITH(NOLOCK) ON p.val = op.PartyID
+	LEFT JOIN OAS_PartyBaseCurrency pCurrency WITH(NOLOCK) ON p.id = pCurrency.PartyID AND pCurrency.FromDate <= @ToDate AND pCurrency.ToDate >= @FromDate
+	LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON e.exchangeid = pCurrency.BaseCurrencyId
 
 	DECLARE @InvoiceSettings TABLE(PartyID INT, BillerId INT,BillerName VARCHAR(100),InvTypeId Smallint, ProductCodes VARCHAR(200), InvTemplateName VARCHAR(50))
 	INSERT INTO @InvoiceSettings(PartyID,BillerId,BillerName, InvTypeId, InvTemplateName, ProductCodes)
