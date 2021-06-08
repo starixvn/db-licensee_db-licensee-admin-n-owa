@@ -1,0 +1,36 @@
+/*<info serverAlias="DBCUST-bodb_Licensee"></info>*/
+/*
+	Created: 20210514@Percy
+	DB: DBCUST-bodb_Licensee
+	Task: Add Enabled, EndOfSupportDate columns to Product3rd table
+*/
+use bodb_Licensee
+go
+
+-- Add new columns
+alter table dbo.Product3rd
+	add
+		OfferSite tinyint constraint DF_Product3rd_OfferSite default (0)
+		,Enabled bit constraint DF_Product3rd_Enabled default (1)
+		,EndOfSupportDate date
+
+-- Initialize data
+declare @tblProduct3rd table (ProductId int, Enabled bit, EndOfSupportDate date)
+insert into @tblProduct3rd (ProductId, Enabled, EndOfSupportDate)
+select 1, 0, '2017-11-30' union all -- Racing
+select 4, 0, '2017-01-25' union all -- Live Casino
+select 7, 0, '2017-01-11' union all -- Bingo
+select 9, 0, '2016-01-29' union all -- Playtech Casino
+select 12, 0, '2015-08-18' union all -- Macau
+select 14, 0, '2018-08-28' union all -- Microgaming - Live Casino
+select 17, 0, '2018-08-28' union all -- Microgaming - RNG Casino
+select 30, 0, '2018-03-01' union all -- Bullfighting
+select 33, 0, '2019-04-16' union all -- Poker Games
+select 11, 0, '2020-09-06' union all -- Gold Deluxe
+select 13, 0, NULL -- BetTrade
+
+update p with (rowlock)
+set p.Enabled = isnull(t.Enabled, 1)
+	,p.EndOfSupportDate = t.EndOfSupportDate
+from dbo.Product3rd p
+	left join @tblProduct3rd t on p.ProductId = t.ProductId
