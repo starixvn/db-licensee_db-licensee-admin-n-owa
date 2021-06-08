@@ -378,7 +378,7 @@ BEGIN
 				0 PComm,
 				0 AmountToCompany,
 				SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution) THEN ISNULL(-b.GrossWL, 0)
-						 WHEN b.Bettype IN (@PPTournament,@PromotionPrize,@PP_JackpotPrize,@ArcadiaGamingBonus,@SBC_JackpotPrize) OR ISNULL(b.TicketType, 0) = 2 THEN ISNULL(-b.MemberWL, 0)
+						 WHEN b.Bettype IN (@PPTournament,@PromotionPrize,@PP_JackpotPrize,@ArcadiaGamingBonus,@SBC_JackpotPrize,@SXG_LuckyDraw) OR ISNULL(b.TicketType, 0) = 2 THEN ISNULL(-b.MemberWL, 0)
 						 ELSE 0
 					END) AS ExtraAmount
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)

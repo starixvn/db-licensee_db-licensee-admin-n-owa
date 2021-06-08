@@ -36,6 +36,7 @@ AS
 		- 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
 		- 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 		- 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
+		- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -612,6 +613,25 @@ BEGIN
 		BEGIN
 			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
 			VALUES(0,'','',33,@BonusAmount,0)
+		END
+	END
+	-- End region
+
+
+	-- Region AE Sexy: Lucky Draw amount
+	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = 45))
+	BEGIN
+		DECLARE @LuckyDrawAmount MONEY
+		SELECT @LuckyDrawAmount = SUM(p.MemberWL * e.Rate)
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct p WITH (NOLOCK) 
+			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'SXG', 'OA', 1) pc ON p.SiteID = pc.LicenseeId
+			INNER JOIN #Exchange e ON p.RptDate = e.ExchangeDate AND p.CurrencyID = e.ExchangeID
+			WHERE p.RptDate BETWEEN @FromDate AND @ToDate AND p.ProductID = 45 AND p.Bettype = 3150 -- Lucky Draw
+
+		IF(ISNULL(@LuckyDrawAmount, 0) > 0)
+		BEGIN
+			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
+			VALUES(0,'','',33,@LuckyDrawAmount,0)
 		END
 	END
 	-- End region
