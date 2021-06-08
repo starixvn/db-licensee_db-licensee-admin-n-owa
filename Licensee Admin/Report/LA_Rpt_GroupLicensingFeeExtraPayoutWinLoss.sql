@@ -25,7 +25,8 @@ BEGIN
 	FROM dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 
 	DECLARE @Data AS TABLE(rptDate DATE, PartyId INT, ProductId INT, CurrencyId INT, Turnover MONEY, BetCount INT, CustomerWL MONEY, LicenseeWL MONEY,
-						Contribution MONEY, ServiceFee MONEY, JackpotPrize MONEY, FreeBetAmount MONEY, PromotionPrize MONEY, LicensingFee MONEY, BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
+						Contribution MONEY, ServiceFee MONEY, JackpotPrize MONEY, FreeBetAmount MONEY, PromotionPrize MONEY, LicensingFee MONEY, ActualServiceFee MONEY,
+						BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
 	
 	DECLARE @LicenseBaseCurrency AS TABLE (LicenseeId INT, PartyId INT, BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
 	INSERT INTO @LicenseBaseCurrency(LicenseeId, PartyId, BaseCurrencyId, BaseCurrencyName)
@@ -123,8 +124,9 @@ BEGIN
 		GROUP BY d.ProductId, d.PartyId
 	)
 	UPDATE d
-	SET d.LicensingFee = CASE WHEN t.TotalServiceFee_InBaseCurrency_ByParty < 0 AND jvp.PartyId IS NULL
-								THEN 0 ELSE d.ServiceFee END + d.Contribution - d.JackpotPrize - d.PromotionPrize - d.FreeBetAmount
+	SET d.ActualServiceFee	= CASE WHEN t.TotalServiceFee_InBaseCurrency_ByParty < 0 AND jvp.PartyId IS NULL THEN 0 ELSE d.ServiceFee END,
+		d.LicensingFee		= CASE WHEN t.TotalServiceFee_InBaseCurrency_ByParty < 0 AND jvp.PartyId IS NULL THEN 0 ELSE d.ServiceFee END
+								+ d.Contribution - d.JackpotPrize - d.PromotionPrize - d.FreeBetAmount
 	FROM @Data d 
 	INNER JOIN cte_TotalServiceFee_BaseCurrency t ON d.ProductId = t.ProductId AND d.PartyId = t.PartyId
 	LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON d.PartyId = jvp.PartyId
@@ -158,7 +160,7 @@ BEGIN
 		SUM(d.Contribution * e.BaseCurrencyRate)	AS ContributionBase,
 		SUM(d.JackpotPrize * e.BaseCurrencyRate)	AS JackpotPrizeBase,
 		SUM(d.FreeBetAmount * e.BaseCurrencyRate)	AS FreeBetAmountBase,
-		SUM(d.ServiceFee * e.BaseCurrencyRate)		AS LicenseeChargeRateBase,
+		SUM(d.ActualServiceFee * e.BaseCurrencyRate)AS LicenseeChargeRateBase,
 		SUM(d.LicensingFee * e.BaseCurrencyRate)	AS CompanyBaseCurrency,
 		SUM(d.PromotionPrize * e.BaseCurrencyRate)	AS WinningPrizeBase
 	FROM @Data d 
