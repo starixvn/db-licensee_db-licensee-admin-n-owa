@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,bodbLicenseeNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -11,10 +11,11 @@ AS
 
 /*  Created: Mason.Nguyen
 	Date: 2021-02-23
-	DB: DB052.bodb_licensee
+	DB: DBLIC.bodb_licensee
 
 	Revisions:
-	   - 20210223@Mason: Group Licensing Fees Report - Add Jackpot Information [#148030]	
+	   - 20210223@Mason: Group Licensing Fees Report - Add Jackpot Information [#148030]
+	   - 20210608@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: #150899]
 */
 
 BEGIN
@@ -122,10 +123,11 @@ BEGIN
 		GROUP BY d.ProductId, d.PartyId
 	)
 	UPDATE d
-	SET d.LicensingFee = CASE WHEN t.TotalServiceFee_InBaseCurrency_ByParty < 0 
+	SET d.LicensingFee = CASE WHEN t.TotalServiceFee_InBaseCurrency_ByParty < 0 AND jvp.PartyId IS NULL
 								THEN 0 ELSE d.ServiceFee END + d.Contribution - d.JackpotPrize - d.PromotionPrize - d.FreeBetAmount
 	FROM @Data d 
 	INNER JOIN cte_TotalServiceFee_BaseCurrency t ON d.ProductId = t.ProductId AND d.PartyId = t.PartyId
+	LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON d.PartyId = jvp.PartyId
 	
 	SELECT 
 		-- Original
