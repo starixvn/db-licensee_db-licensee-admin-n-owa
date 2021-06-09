@@ -51,7 +51,8 @@ AS
 			. Pragmatic Live Casino [RedmineID: #150971]
 			. Habanero [RedmineID: #150636]
 			. Creative Gaming [RedmineID: #152139]
-		- 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [Redmi
+		- 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: 154992]
+		- 20210609@Danny: Support AE Sexy Promotion [RedmineID: #152089]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -78,6 +79,7 @@ BEGIN
 		,@SB_AdjustedOdds_Bettype	SMALLINT = 999
 		,@SBC_Contribution SMALLINT = 1698
 		,@SBC_JackpotPrize SMALLINT = 1699
+		,@SXG_LuckyDraw    SMALLINT = 3150
 		,@BA	SMALLINT = 3
 		,@GD	SMALLINT = 11
 		,@CB	SMALLINT = 15
@@ -87,6 +89,7 @@ BEGIN
 		,@CC	SMALLINT = 34
 		,@SPR	SMALLINT = 37
 		,@SBC	SMALLINT = 42
+		,@SXG   SMALLINT = 45
 
 /*-----------------
  * Settings
@@ -365,13 +368,13 @@ BEGIN
 			SUM(CASE WHEN b.Bettype = @SabaPromotion_Bettype THEN -b.LicWinloss * e.Rate ELSE 0 END) Promotion,
 			SUM(GrossWL * e.Rate) Contribution,
 			SUM(CASE WHEN b.Bettype IN (@PPJackpotPrize_Bettype, @SBC_JackpotPrize) THEN -b.LicWinloss * e.Rate ELSE 0 END) JackPotPrize,
-			SUM(CASE WHEN ISNULL(b.TicketType, 0) = 2 OR b.Bettype IN (@PPTournament_Bettype, @PromotionPrize_Bettype, @CC_ArcadiaBonus_Bettype) THEN -b.LicWinloss * e.Rate ELSE 0 END) PromotionPrize
+			SUM(CASE WHEN ISNULL(b.TicketType, 0) = 2 OR b.Bettype IN (@PPTournament_Bettype, @PromotionPrize_Bettype, @CC_ArcadiaBonus_Bettype, @SXG_LuckyDraw) THEN -b.LicWinloss * e.Rate ELSE 0 END) PromotionPrize
 		FROM #tmpBettingByProduct b
 		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = (CASE WHEN p.ProductID = 0 THEN @SPR ELSE p.ProductID END)
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39,42', '') eb ON b.Bettype = eb.BettypeID
+		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39,42,45', '') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN p.FromDate AND p.ToDate
-			AND (p.ProductID IN(0, @PP, @CC, @SBC) OR p.ChargeType = @GDTip_ChargeType)
+			AND (p.ProductID IN(0, @PP, @CC, @SBC, @SXG) OR p.ChargeType = @GDTip_ChargeType)
 			AND (b.Bettype = @SabaPromotion_Bettype OR eb.BettypeID IS NOT NULL OR ISNULL(b.TicketType, 0) = 2)
 		GROUP BY p.PartyID,b.rptdate,p.ProductId,b.CurrencyId
 
@@ -773,7 +776,7 @@ END
 				, pl.Name AS ProductName
 				, pl.ProductId
 				, UPPER(@BaseCurrency) AS CurrencyName
-				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC) THEN 
+				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC, @SXG) THEN 
 										        (CASE WHEN r.AmountToCompany < 0 AND jvp.PartyId IS NULL THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 			FROM #tmpResult r
@@ -788,7 +791,7 @@ END
 			SELECT ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId) AS LicenseeCode
 				, pl.Name AS ProductName
 				, UPPER(@BaseCurrency) AS CurrencyName
-				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC) THEN 
+				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC, @SXG) THEN 
 										        (CASE WHEN r.AmountToCompany < 0 AND jvp.PartyId IS NULL THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 			FROM #tmpResult r
@@ -806,7 +809,7 @@ END
 		BEGIN
 			SELECT p.PartyId
 				,UPPER(@BaseCurrency) AS CurrencyName
-				,SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC) THEN 
+				,SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC, @SXG) THEN 
 										        (CASE WHEN r.AmountToCompany < 0 AND jvp.PartyId IS NULL THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					 ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 				,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) LicensingFee
@@ -823,7 +826,7 @@ END
 		BEGIN
 			SELECT ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId) AS LicenseeCode
 				,UPPER(@BaseCurrency) AS CurrencyName 
-				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC) THEN 
+				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC, @SXG) THEN 
 										        (CASE WHEN r.AmountToCompany < 0 AND jvp.PartyId IS NULL THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
 					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
 				,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) LicensingFee
