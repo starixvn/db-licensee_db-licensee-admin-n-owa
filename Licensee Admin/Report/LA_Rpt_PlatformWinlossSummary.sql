@@ -104,7 +104,7 @@ BEGIN
 	BEGIN
 		CREATE TABLE #bettype (bettype SMALLINT)
 		INSERT INTO #bettype (bettype)
-		SELECT DISTINCT bettype FROM dbo.SportBettypeMatrix WITH (NOLOCK) WHERE ProductId = 1 AND bettype <> 999
+		SELECT DISTINCT bettype FROM dbo.SportBettypeMatrix WITH (NOLOCK) WHERE ProductId = 1 AND bettype <> 999 -- exclude Odds Spread Adjustment
 
 		SELECT @FDate = CASE WHEN @FromDate <= @MoveBetsDay THEN DATEADD(DAY, 1, @MoveBetsDay) ELSE @FromDate END
 				,@TDate = @ToDate
@@ -133,7 +133,7 @@ BEGIN
 			SELECT r.winlostdate, r.srecommend, r.recommend, r.Currency, r.betfrom, SUM(r.BetCount) AS BetCount, SUM(r.Turnover) AS Turnover, SUM(r.Winlost) AS Winlost
 			FROM bodb_LicenseeReport.dbo.rptLicWinloss2 r WITH (NOLOCK)
 			WHERE r.winlostdate BETWEEN @FDate AND @TDate
-				AND r.sporttype = 0 AND r.bettype IN (0, -29) -- SB (include GOF)
+				AND r.sporttype = 0 AND r.bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914, 999) -- exclude BT, CO, Odds Spread Adjustment
 				AND r.isBA = 0
 				AND r.statusId IN (111, 112, 113, 114, 115)
 				AND r.roleid = 2

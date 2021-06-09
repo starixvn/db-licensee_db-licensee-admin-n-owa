@@ -102,7 +102,7 @@ BEGIN
 	BEGIN
 		CREATE TABLE #bettype (bettype SMALLINT)
 		INSERT INTO #bettype (bettype)
-		SELECT DISTINCT bettype FROM dbo.SportBettypeMatrix WITH (NOLOCK) WHERE ProductId = 1 AND bettype <> 999
+		SELECT DISTINCT bettype FROM dbo.SportBettypeMatrix WITH (NOLOCK) WHERE ProductId = 1 AND bettype <> 999 -- exclude Odds Spread Adjustment
 
 		SELECT @FDate = CASE WHEN @FromDate <= @MoveBetsDay THEN DATEADD(DAY, 1, @MoveBetsDay) ELSE @FromDate END
 				,@TDate = @ToDate
@@ -131,17 +131,17 @@ BEGIN
 			SELECT r.winlostdate, r.srecommend, r.recommend, r.Currency, r.betfrom, SUM(r.Turnover) AS Turnover, SUM(r.Winlost) AS Winlost
 			FROM bodb_LicenseeReport.dbo.rptLicWinloss2 r WITH (NOLOCK)
 			WHERE r.winlostdate BETWEEN @FDate AND @TDate
-				AND r.sporttype = 0 AND r.bettype IN (0, -29) -- SB (include GOF)
+				AND r.sporttype = 0 AND r.bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914, 999) -- exclude BT, CO, Odds Spread Adjustment
 				AND r.isBA = 0
 				AND r.statusId IN (111, 112, 113, 114, 115)
 				AND r.roleid = 2
 			GROUP BY r.winlostdate, r.srecommend, r.recommend, r.Currency, r.betfrom
 		)
-		INSERT INTO #Data (rptDate, Currency, BetFrom, Turnover, Winloss)
-		SELECT d.winlostdate, d.Currency, d.betfrom, SUM(d.Turnover), SUM(d.Winlost)
+		INSERT INTO #Data (rptDate, LicenseeName, Currency, BetFrom, Turnover, Winloss)
+		SELECT d.winlostdate, c.LicenseeName, d.Currency, d.betfrom, SUM(d.Turnover), SUM(d.Winlost)
 		FROM CTE_Data d
 			INNER JOIN #Customer c ON d.srecommend = c.srecommend AND d.recommend = c.recommend AND d.winlostdate BETWEEN c.FromDate AND c.ToDate
-		GROUP BY d.winlostdate, d.Currency, d.betfrom
+		GROUP BY d.winlostdate, c.LicenseeName, d.Currency, d.betfrom
 	END
 
 	-- Result
