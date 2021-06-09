@@ -127,15 +127,21 @@ BEGIN
 		SELECT @FDate = @FromDate
 				,@TDate = CASE WHEN @ToDate > @MoveBetsDay THEN @MoveBetsDay ELSE @ToDate END
 
-		INSERT INTO #Data (rptDate, LicenseeName, Currency, BetFrom, Turnover, Winloss)
-		SELECT r.winlostdate, c.LicenseeName, r.Currency, r.betfrom, SUM(r.Turnover), SUM(r.Winlost)
-		FROM bodb_LicenseeReport.dbo.rptLicWinloss2 r WITH (NOLOCK)
-			INNER JOIN #Customer c ON r.srecommend = c.srecommend AND r.CustId = c.recommend AND r.winlostdate BETWEEN c.FromDate AND c.ToDate
-		WHERE r.winlostdate BETWEEN @FDate AND @TDate
-			AND r.sporttype = 0 AND r.bettype IN (0, -29) -- SB (include GOF)
-			AND r.isBA = 0
-			AND r.statusId IN (111, 112, 113, 114, 115)
-		GROUP BY r.winlostdate, c.LicenseeName, r.Currency, r.betfrom
+		;WITH CTE_Data AS (
+			SELECT r.winlostdate, r.srecommend, r.recommend, r.Currency, r.betfrom, SUM(r.Turnover) AS Turnover, SUM(r.Winlost) AS Winlost
+			FROM bodb_LicenseeReport.dbo.rptLicWinloss2 r WITH (NOLOCK)
+			WHERE r.winlostdate BETWEEN @FDate AND @TDate
+				AND r.sporttype = 0 AND r.bettype IN (0, -29) -- SB (include GOF)
+				AND r.isBA = 0
+				AND r.statusId IN (111, 112, 113, 114, 115)
+				AND r.roleid = 2
+			GROUP BY r.winlostdate, r.srecommend, r.recommend, r.Currency, r.betfrom
+		)
+		INSERT INTO #Data (rptDate, Currency, BetFrom, Turnover, Winloss)
+		SELECT d.winlostdate, d.Currency, d.betfrom, SUM(d.Turnover), SUM(d.Winlost)
+		FROM CTE_Data d
+			INNER JOIN #Customer c ON d.srecommend = c.srecommend AND d.recommend = c.recommend AND d.winlostdate BETWEEN c.FromDate AND c.ToDate
+		GROUP BY d.winlostdate, d.Currency, d.betfrom
 	END
 
 	-- Result
