@@ -134,7 +134,7 @@ BEGIN
 		FROM bodb_LicenseeReport.dbo.rptLicWinloss2 r WITH (NOLOCK)
 			INNER JOIN #Customer c ON r.srecommend = c.srecommend AND r.CustId = c.recommend AND r.winlostdate BETWEEN c.FromDate AND c.ToDate
 		WHERE r.winlostdate BETWEEN @FDate AND @TDate
-			AND r.sporttype = 0 AND r.bettype = 0 -- SB
+			AND r.sporttype = 0 AND r.bettype IN (0, -29) -- SB (include GOF)
 			AND r.isBA = 0
 			AND r.statusId IN (111, 112, 113, 114, 115)
 		GROUP BY r.winlostdate, r.Currency, r.betfrom
