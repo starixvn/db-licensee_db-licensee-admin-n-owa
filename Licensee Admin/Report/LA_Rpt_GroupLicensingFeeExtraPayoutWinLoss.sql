@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,bodbLicenseeNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -11,10 +11,11 @@ AS
 
 /*  Created: Mason.Nguyen
 	Date: 2021-02-23
-	DB: DB052.bodb_licensee
+	DB: DBLIC.bodb_licensee
 
 	Revisions:
-	   - 20210223@Mason: Group Licensing Fees Report - Add Jackpot Information [#148030]	
+	   - 20210223@Mason: Group Licensing Fees Report - Add Jackpot Information [#148030]
+	   - 20210608@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: #150899]
 */
 
 BEGIN
@@ -24,7 +25,8 @@ BEGIN
 	FROM dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 
 	DECLARE @Data AS TABLE(rptDate DATE, PartyId INT, ProductId INT, CurrencyId INT, Turnover MONEY, BetCount INT, CustomerWL MONEY, LicenseeWL MONEY,
-						Contribution MONEY, ServiceFee MONEY, JackpotPrize MONEY, FreeBetAmount MONEY, PromotionPrize MONEY, LicensingFee MONEY, BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
+						Contribution MONEY, ServiceFee MONEY, JackpotPrize MONEY, FreeBetAmount MONEY, PromotionPrize MONEY, LicensingFee MONEY, ActualServiceFee MONEY,
+						BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
 	
 	DECLARE @LicenseBaseCurrency AS TABLE (LicenseeId INT, PartyId INT, BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
 	INSERT INTO @LicenseBaseCurrency(LicenseeId, PartyId, BaseCurrencyId, BaseCurrencyName)
@@ -122,10 +124,12 @@ BEGIN
 		GROUP BY d.ProductId, d.PartyId
 	)
 	UPDATE d
-	SET d.LicensingFee = CASE WHEN t.TotalServiceFee_InBaseCurrency_ByParty < 0 
-								THEN 0 ELSE d.ServiceFee END + d.Contribution - d.JackpotPrize - d.PromotionPrize - d.FreeBetAmount
+	SET d.ActualServiceFee	= CASE WHEN t.TotalServiceFee_InBaseCurrency_ByParty < 0 AND jvp.PartyId IS NULL THEN 0 ELSE d.ServiceFee END,
+		d.LicensingFee		= CASE WHEN t.TotalServiceFee_InBaseCurrency_ByParty < 0 AND jvp.PartyId IS NULL THEN 0 ELSE d.ServiceFee END
+								+ d.Contribution - d.JackpotPrize - d.PromotionPrize - d.FreeBetAmount
 	FROM @Data d 
 	INNER JOIN cte_TotalServiceFee_BaseCurrency t ON d.ProductId = t.ProductId AND d.PartyId = t.PartyId
+	LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON d.PartyId = jvp.PartyId
 	
 	SELECT 
 		-- Original
@@ -156,7 +160,7 @@ BEGIN
 		SUM(d.Contribution * e.BaseCurrencyRate)	AS ContributionBase,
 		SUM(d.JackpotPrize * e.BaseCurrencyRate)	AS JackpotPrizeBase,
 		SUM(d.FreeBetAmount * e.BaseCurrencyRate)	AS FreeBetAmountBase,
-		SUM(d.ServiceFee * e.BaseCurrencyRate)		AS LicenseeChargeRateBase,
+		SUM(d.ActualServiceFee * e.BaseCurrencyRate)AS LicenseeChargeRateBase,
 		SUM(d.LicensingFee * e.BaseCurrencyRate)	AS CompanyBaseCurrency,
 		SUM(d.PromotionPrize * e.BaseCurrencyRate)	AS WinningPrizeBase
 	FROM @Data d 
