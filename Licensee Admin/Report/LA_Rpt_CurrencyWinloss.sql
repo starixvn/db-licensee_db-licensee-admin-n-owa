@@ -50,8 +50,6 @@ AS
 	   - 20201111@Happy: Changing OddsSpread for licensee [#142345]
 	   - 20201209@Mason: Saba.club - Offer Freebet tickets [#141423]
 	   - 20210108@Mason: Saba.club - Integrate Slot Game [#147977]
-	   - 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
-	   - 20210306@Danny: Integrate VGaming [#154080]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
