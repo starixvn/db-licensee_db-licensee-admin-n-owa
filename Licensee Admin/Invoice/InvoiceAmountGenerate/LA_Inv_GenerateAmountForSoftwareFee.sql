@@ -631,7 +631,7 @@ BEGIN
 		IF(ISNULL(@LuckyDrawAmount, 0) > 0)
 		BEGIN
 			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
-			VALUES(0,'','',33,@LuckyDrawAmount,0)
+			VALUES(0,'','',37,@LuckyDrawAmount,0)
 		END
 	END
 	-- End region
