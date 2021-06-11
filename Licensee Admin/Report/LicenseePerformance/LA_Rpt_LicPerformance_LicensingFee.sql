@@ -52,7 +52,8 @@ AS
 			. Pragmatic Live Casino [RedmineID: #150971]
 			. Habanero [RedmineID: #150636]
 			. Creative Gaming [RedmineID: #152139]
-	   - 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: #
+	   - 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: #154992]
+	   - 20210306@Danny: Integrate VGaming [#154080]
 
 
 	Param's Explanation:  
@@ -102,7 +103,7 @@ BEGIN
 		SET @sdate = DATEADD(m, 1, @sdate)
 	END	
 
-	IF @ProductCode IN ('NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK', 'WM', 'VS3', 'GDG', 'BGG', 'MXG', 'SLT', 'PPL', 'HB', 'CG')
+	IF @ProductCode IN ('NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK', 'WM', 'VS3', 'GDG', 'BGG', 'MXG', 'SLT', 'PPL', 'HB', 'CG', 'VGA')
 	BEGIN		
 		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, LicensingFee)
 		SELECT tp.PartyID, d.rptDate, d.CurrencyID, - SUM(d.Winloss * ISNULL(cc.Rate, tp.Rate))

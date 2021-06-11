@@ -53,6 +53,7 @@ AS
 			. Creative Gaming [RedmineID: #152139]
 		- 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: 154992]
 		- 20210609@Danny: Support AE Sexy Promotion [RedmineID: #152089]
+		- 20210306@Danny: Integrate VGaming [#154080]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -104,7 +105,7 @@ BEGIN
 
 	-- supported products
 	-- 
-	DECLARE @supportedProducts VARCHAR(500) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG,BGG,MXG,SLT,PPL,HB,CG'
+	DECLARE @supportedProducts VARCHAR(500) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG,BGG,MXG,SLT,PPL,HB,CG,VGA'
 	DECLARE @productList TABLE(ProductId INT, Code VARCHAR(10), Name VARCHAR(100))
 	INSERT INTO @productList(ProductId,Code,Name)
 	SELECT ProductID, ProductPrefix,ProductName FROM dbo.LA_f_Products3rd(@supportedProducts)
