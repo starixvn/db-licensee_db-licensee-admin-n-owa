@@ -14,5 +14,5 @@ DECLARE @AESexyLuckyDraw INT = 37
 IF NOT EXISTS (SELECT TOP 1 1 FROM dbo.LA_InvoiceItemType WITH(NOLOCK) WHERE InvItemTypeId = @AESexyLuckyDraw)
 BEGIN
 	INSERT dbo.LA_InvoiceItemType (InvItemTypeId, SignDB, GroupDB, SignSOA, GroupSOA, InvItemTypeName)
-	VALUES (@AESexyLuckyDraw, -1, 'Expense', -1, '', N'Deduct AESexy Lucky Draw')
+	VALUES (@AESexyLuckyDraw, -1, 'Expense', -1, '', N'Deduct AE Sexy Lucky Draw')
 END
