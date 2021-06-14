@@ -47,6 +47,8 @@ AS
 			. Habanero [RedmineID: #150636]
 			. Creative Gaming [RedmineID: #152139]
 		- 20210306@Danny: Integrate VGaming [#154080]
+		- 20210614@Danny: Integrate AdvantPlay [#154787]
+	    - 20210614@Danny: Integrate AdvantPlay Mini [#155207]
 
     Param's Explanation:  
 	   + @partyIDs : a string of list PartyID, separated by ','
@@ -126,7 +128,7 @@ BEGIN
     END
 
     --exclude BA tickets
-    IF @ProductCode IN ('SB', 'RB', 'NG', 'LC', 'VS', 'CS', 'VB', 'PP', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK', 'WM', 'VS3', 'GDG', 'BGG', 'MXG', 'SLT', 'PPL', 'HB', 'CG', 'VGA')
+    IF @ProductCode IN ('SB', 'RB', 'NG', 'LC', 'VS', 'CS', 'VB', 'PP', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK', 'WM', 'VS3', 'GDG', 'BGG', 'MXG', 'SLT', 'PPL', 'HB', 'CG', 'AP', 'APM')
     BEGIN		
 	   INSERT INTO #Tmp(PartyId, rptDate, CurrencyId, TurnOver)
 	   (
