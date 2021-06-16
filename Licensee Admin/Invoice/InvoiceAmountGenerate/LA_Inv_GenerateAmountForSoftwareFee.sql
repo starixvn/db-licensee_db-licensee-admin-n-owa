@@ -642,13 +642,14 @@ BEGIN
 	BEGIN
 		DECLARE @SBC_Contribution_Bettype SMALLINT = 1698,
 				@SBC_JackpotPrize_Bettype SMALLINT = 1699
+
 		;WITH cte_SabaClub_ExtraAmount AS
 		(
 			SELECT b.Bettype, ISNULL(b.TicketType, 0) TicketType, SUM(CASE WHEN b.Bettype = @SBC_Contribution_Bettype THEN -b.GrossWL ELSE b.MemberWL END * e.Rate) AS ExtraAmount
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'SBC', 'OA', 1) pc ON b.SiteID = pc.LicenseeId
+				INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'SBC', 'OA', 1) pc ON b.SiteID = pc.LicenseeId AND (b.rptDate BETWEEN pc.FromDate AND pc.ToDate)
 				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-			WHERE (ISNULL(b.TicketType, 0) = 2 OR b.Bettype IN (@SBC_Contribution_Bettype, @SBC_JackpotPrize_Bettype))
+			WHERE (b.ProductID = 42 AND ISNULL(b.TicketType, 0) = 2 OR b.Bettype IN (@SBC_Contribution_Bettype, @SBC_JackpotPrize_Bettype))
 				AND b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
 			GROUP BY b.Bettype, ISNULL(b.TicketType, 0)
