@@ -305,7 +305,7 @@ BEGIN
 		LicenseeWinLoss,
 		LicensingFee,
 		PayToSupplier,
-		CompanyIncome,
+		(LicensingFee - PayToSupplier)  CompanyIncome,
 		Promotion
 	FROM @Total t
 	WHERE Currency = @BaseCurrencyName
