@@ -375,12 +375,12 @@ BEGIN
 						INNER JOIN @InvAmount i ON s.PartyId = i.PartyId AND i.RemainingAMF > 0
 						INNER JOIN @MinFee m ON s.PartyId = m.PartyId AND m.ProrateMinFee > 0
 						CROSS APPLY (
-							SELECT s.LicensingFee AS DeductedAMF
+							SELECT s.LicensingFee - s.Discount AS DeductedAMF
 							UNION ALL SELECT i.RemainingAMF
 							UNION ALL SELECT m.ProrateMinFee
 						) t
 					WHERE s.ProductId = 0 -- SB
-						AND s.LicensingFee > 0
+						AND s.LicensingFee - s.Discount > 0
 					GROUP BY s.PartyId, ivs.BillerId
 				)
 				UPDATE f
@@ -399,11 +399,11 @@ BEGIN
 						INNER JOIN @InvoiceSettings ivs ON s.PartyId = ivs.PartyId AND ',' + ivs.ProductCodes LIKE '%,' + s.ProductCode + ',%' AND ivs.InvTypeId = 1 -- Software Fee
 						INNER JOIN @InvAmount i ON s.PartyId = i.PartyId AND i.RemainingAGPrepayment > 0
 						CROSS APPLY (
-							SELECT s.LicensingFee AS DeductedAGPrepayment
+							SELECT s.LicensingFee - s.Discount AS DeductedAGPrepayment
 							UNION ALL SELECT i.RemainingAGPrepayment
 						) t
 					WHERE s.ProductId = 10 -- AG Casino
-						AND s.LicensingFee > 0
+						AND s.LicensingFee - s.Discount > 0
 					GROUP BY s.PartyId, ivs.BillerId
 				)
 				UPDATE f
@@ -417,7 +417,7 @@ BEGIN
 			IF EXISTS (SELECT 1 FROM @InvAmount WHERE RemainingPrepayment > 0)
 			BEGIN
 				UPDATE f
-				SET f.LicensingFee = f.LicensingFee - CASE WHEN c.RemainingPrepayment < f.LicensingFee THEN c.RemainingPrepayment ELSE f.LicensingFee END
+				SET f.LicensingFee = f.LicensingFee - CASE WHEN c.RemainingPrepayment < f.LicensingFee - f.Discount THEN c.RemainingPrepayment ELSE f.LicensingFee - f.Discount END
 				FROM @FinalResult f
 					INNER JOIN @InvAmount c ON f.PartyId = c.PartyId AND c.RemainingPrepayment > 0
 				WHERE f.InvoiceType = 1 AND f.InvoiceHeaderId IS NULL
