@@ -136,10 +136,9 @@ BEGIN
 				SUM(CASE WHEN b.BetType = @LuclyDrawBettype THEN 0 ELSE b.MemberWL END) AS CustomerWinLoss,
 				SUM(CASE WHEN b.BetType = @LuclyDrawBettype THEN b.MemberWL ELSE 0 END) Promotion
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+				INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND  b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
-				AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 
-				AND b.BetType BETWEEN 3101 AND 3150
+				AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20  AND b.CustomerCategory NOT IN (27,28)
 			GROUP BY b.SiteID, b.rptDate, b.CurrencyId
 		)
 		INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier,Promotion)
