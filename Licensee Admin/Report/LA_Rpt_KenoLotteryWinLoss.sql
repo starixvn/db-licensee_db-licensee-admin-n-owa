@@ -24,15 +24,22 @@ AS
 		- 20191226@Mason: Set billing term by currency [#120005]
 		- 20200228@Parsons: Support-HID-currency [#128856] 
 		- 20200805@Parsons: Adjust royalty fee terms for Keno, Lottery, Table Games [#136891]
+		- 20210306@Danny:  Keep negative licensee fee for joint venture parties [#152141]
 		
 	 Params:
 */
 BEGIN
 	-- Region: Party List
-	DECLARE @PartyList AS TABLE (PartyId INT, PartyName	VARCHAR(100), BranchName VARCHAR(100), ParentId	INT)
+	DECLARE @PartyList AS TABLE (PartyId INT, PartyName	VARCHAR(100), BranchName VARCHAR(100), ParentId	INT, IsKeepNegativeAmount BIT DEFAULT 0)
 
 	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC LA_PartyListSel
+
+	UPDATE t 
+	SET t.IsKeepNegativeAmount = CASE WHEN u.PartyId IS NULL THEN 0 ELSE 1 END 
+	FROM @PartyList t 
+	LEFT JOIN bodb_Licensee.dbo.LA_f_JVPartyListSel() u ON u.PartyId = t.PartyId
+
 
 	DECLARE	@12BetGroupId INT = -1,
 			@OneWorksGroupId INT = 1,
@@ -144,11 +151,12 @@ BEGIN
 		CustomerWinLoss	MONEY,
 		LicenseeWinLoss	MONEY,
 		LicensingFee	MONEY,
-		PayToSupplier	MONEY
+		PayToSupplier	MONEY,
+		IsKeepNegativeAmount BIT
 	)	
 
-	INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, PayToSupplier)
-	SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.Winlostdate, td.CurrencyId, td.TotalTrans, td.Turnover, td.CustomerWinLoss, td.LicenseeWinloss, td.LicensingFee, td.PayToSupplier
+	INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, PayToSupplier, IsKeepNegativeAmount)
+	SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.Winlostdate, td.CurrencyId, td.TotalTrans, td.Turnover, td.CustomerWinLoss, td.LicenseeWinloss, td.LicensingFee, td.PayToSupplier, td.IsKeepNegativeAmount
 	FROM #TempData td
 		INNER JOIN @PartyList p ON td.PartyId = p.PartyID
 		INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId
@@ -217,7 +225,7 @@ BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)
 
 		;WITH TotalByParty AS(
-			SELECT td.ParentId,
+			SELECT td.ParentId, td.PartyId, td.IsKeepNegativeAmount,
 				SUM(td.TotalTrans) TotalTrans,
 				SUM(td.Turnover * e.BaseCurrencyRate) Turnover,
 				SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss,
@@ -226,7 +234,7 @@ BEGIN
 				SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
 			FROM #Result td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e
 			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
-			GROUP BY td.ParentId, td.PartyId
+			GROUP BY td.ParentId, td.PartyId, td.IsKeepNegativeAmount
 		)
 		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier)
 		SELECT @tempCurrency,ParentId,
@@ -234,7 +242,7 @@ BEGIN
 			SUM(Turnover),
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
-			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
+			SUM(CASE WHEN LicensingFee < 0 AND IsKeepNegativeAmount = 0 THEN 0 ELSE LicensingFee END),
 			SUM(PayToSupplier)
 		FROM TotalByParty
 		GROUP BY ParentId
