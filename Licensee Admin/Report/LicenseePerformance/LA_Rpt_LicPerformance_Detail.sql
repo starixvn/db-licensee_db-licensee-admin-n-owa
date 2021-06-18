@@ -95,7 +95,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007
-	DECLARE @BAProductId INT = 3, @ExchangeProductId INT = 31, @PragmaticProductId INT = 32, @ArcadiaGamingId INT = 34, @Saba_clubProductID INT = 42,
+	DECLARE @BAProductId INT = 3, @ExchangeProductId INT = 31, @PragmaticProductId INT = 32, @ArcadiaGamingId INT = 34, @Saba_clubProductID INT = 42, @AESexyProductId INT = 45
 			@PP_Contribution SMALLINT = 4297,
 			@PP_JackpotPrize SMALLINT = 4298,
 			@PPTournament SMALLINT = 4299,
@@ -554,7 +554,7 @@ BEGIN
 			SUM(CASE WHEN t.ProductId = @ExchangeProductId THEN t.PComm ELSE 0 END + t.WinLoss)							AS WinLoss,
 			SUM(CASE WHEN t.ProductId = @BAProductId THEN t.AComm ELSE 0 END)											AS BAComm,
 			SUM(CASE WHEN t.ProductId = @BAProductId THEN t.AmountToCompany ELSE 0 END)									AS AmountToBA,
-			SUM(CASE WHEN (jvp.PartyId IS NOT NULL AND t.ProductId <> @BAProductId) OR t.ProductId = @ExchangeProductId OR (t.ProductId IN (@PragmaticProductId, @ArcadiaGamingId, @Saba_clubProductID) AND t.AmountToCompany < 0) THEN t.AmountToCompany ELSE 0 END)	AS NegativeAmount,
+			SUM(CASE WHEN (jvp.PartyId IS NOT NULL AND t.ProductId <> @BAProductId) OR t.ProductId = @ExchangeProductId OR (t.ProductId IN (@PragmaticProductId, @ArcadiaGamingId, @Saba_clubProductID, @AESexyProductId) AND t.AmountToCompany < 0) THEN t.AmountToCompany ELSE 0 END)	AS NegativeAmount,
 			SUM(CASE WHEN jvp.PartyId IS NOT NULL OR t.ProductId IN (@BAProductId, @ExchangeProductId) OR t.AmountToCompany < 0 THEN 0 ELSE t.AmountToCompany END) AS AmountToCompany
 		FROM @SumByProducts t
 			LEFT JOIN bodb_Licensee.dbo.LA_f_JVPartyListSel() jvp ON t.PartyId = jvp.PartyId
