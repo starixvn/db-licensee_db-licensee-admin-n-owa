@@ -169,7 +169,7 @@ BEGIN
 
 	-- Region: Get party's amount who were not issued invoices
 	BEGIN
-		DECLARE @SumByProducts TABLE (PartyId INT, ProductId INT, ProductCode VARCHAR(500), LicensingFee MONEY, Discount MONEY, Rebate MONEY)
+		DECLARE @SumByProducts TABLE (PartyId INT, ProductId INT, ProductCode VARCHAR(500), LicensingFee MONEY, ExtraAmount MONEY, Discount MONEY, Rebate MONEY)
 
 		-- Region: Get amount to company, discount, rebate (only for some supported products)
 		BEGIN
@@ -340,18 +340,18 @@ BEGIN
 						GROUP BY PartyId, ProductId
 					) r ON r.PartyId = d.PartyId AND r.ProductId = d.ProductId
 			)
-			INSERT INTO @SumByProducts (PartyId, ProductId, ProductCode, LicensingFee, Discount, Rebate)
+			INSERT INTO @SumByProducts (PartyId, ProductId, ProductCode, LicensingFee, ExtraAmount, Discount, Rebate)
 			SELECT r.PartyId, r.ProductId, CASE WHEN r.ProductId = 0 THEN 'SB' ELSE p.ProductPrefix END
-				,CASE WHEN r.LicensingFee > 0 OR jvp.PartyId IS NOT NULL THEN r.LicensingFee ELSE 0 END + r.ExtraAmount
-				,Discount, Rebate
+				,CASE WHEN r.LicensingFee > 0 OR jvp.PartyId IS NOT NULL OR r.ProductId IN (3, 15, 25, 31) THEN r.LicensingFee ELSE 0 END
+				,r.ExtraAmount, r.Discount, r.Rebate
 			FROM CTE_Result r
 				LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
 				LEFT JOIN dbo.Product3rd p WITH (NOLOCK) ON r.ProductId = p.ProductId
 
 			INSERT INTO @FinalResult (PartyId, BillerId, InvoiceType, ProductCodes, LicensingFee, Discount)
-			SELECT s.PartyId, ivs.BillerId, 1, ivs.ProductCodes, SUM(s.LicensingFee), SUM(s.Discount)
+			SELECT s.PartyId, ivs.BillerId, 1, ivs.ProductCodes, SUM(s.LicensingFee + s.ExtraAmount), SUM(s.Discount)
 			FROM @SumByProducts s
-				INNER JOIN @InvoiceSettings ivs ON s.PartyId = ivs.PartyId AND ',' + ivs.ProductCodes LIKE '%,' + s.ProductCode + ',%' AND ivs.InvTypeId = 1 -- Software Fee
+				INNER JOIN @InvoiceSettings ivs ON s.PartyId = ivs.PartyId AND ',' + ivs.ProductCodes + ',' LIKE '%,' + s.ProductCode + ',%' AND ivs.InvTypeId = 1 -- Software Fee
 				LEFT JOIN @FinalResult r ON ivs.PartyId = r.PartyId AND ivs.BillerId = r.BillerId AND ivs.InvTypeId = r.InvoiceType
 			WHERE r.PartyId IS NULL
 			GROUP BY s.PartyId, ivs.BillerId, ivs.ProductCodes
@@ -375,11 +375,11 @@ BEGIN
 			FROM (VALUES (3), (5), (7), (21)) AS t (InvItemTypeId)
 			-- Prepayment
 			UNION ALL
-			SELECT InvItemTypeId, 'AGPrepayment' AS InvItemTypeName
+			SELECT InvItemTypeId, 'Prepayment' AS InvItemTypeName
 			FROM (VALUES (22), (23), (24)) AS t (InvItemTypeId)
 			-- AGPrepayment
 			UNION ALL
-			SELECT InvItemTypeId, 'Prepayment' AS InvItemTypeName
+			SELECT InvItemTypeId, 'AGPrepayment' AS InvItemTypeName
 			FROM (VALUES (25), (26), (27)) AS t (InvItemTypeId)
 
 			DECLARE @InvAmount TABLE (PartyId INT, RemainingAMF MONEY, RemainingAGPrepayment MONEY, RemainingPrepayment MONEY)
@@ -454,7 +454,7 @@ BEGIN
 				;WITH CTE_DeductedAMF AS (
 					SELECT s.PartyId, ivs.BillerId, MIN(t.DeductedAMF) AS DeductedAMF
 					FROM @SumByProducts s
-						INNER JOIN @InvoiceSettings ivs ON s.PartyId = ivs.PartyId AND ',' + ivs.ProductCodes LIKE '%,' + s.ProductCode + ',%' AND ivs.InvTypeId = 1 -- Software Fee
+						INNER JOIN @InvoiceSettings ivs ON s.PartyId = ivs.PartyId AND ',' + ivs.ProductCodes + ',' LIKE '%,' + s.ProductCode + ',%' AND ivs.InvTypeId = 1 -- Software Fee
 						INNER JOIN @InvAmount i ON s.PartyId = i.PartyId AND i.RemainingAMF > 0
 						INNER JOIN @MinFee m ON s.PartyId = m.PartyId AND m.ProrateMinFee > 0
 						CROSS APPLY (
@@ -479,7 +479,7 @@ BEGIN
 				;WITH CTE_DeductedAGPrepayment AS (
 					SELECT s.PartyId, ivs.BillerId, MIN(t.DeductedAGPrepayment) AS DeductedAGPrepayment
 					FROM @SumByProducts s
-						INNER JOIN @InvoiceSettings ivs ON s.PartyId = ivs.PartyId AND ',' + ivs.ProductCodes LIKE '%,' + s.ProductCode + ',%' AND ivs.InvTypeId = 1 -- Software Fee
+						INNER JOIN @InvoiceSettings ivs ON s.PartyId = ivs.PartyId AND ',' + ivs.ProductCodes + ',' LIKE '%,' + s.ProductCode + ',%' AND ivs.InvTypeId = 1 -- Software Fee
 						INNER JOIN @InvAmount i ON s.PartyId = i.PartyId AND i.RemainingAGPrepayment > 0
 						CROSS APPLY (
 							SELECT s.LicensingFee - s.Discount AS DeductedAGPrepayment
@@ -499,10 +499,26 @@ BEGIN
 			-- Prepayment
 			IF EXISTS (SELECT 1 FROM @InvAmount WHERE RemainingPrepayment > 0)
 			BEGIN
+				;WITH CTE_DeductedPrepayment AS (
+					SELECT s.PartyId, s.BillerId, MIN(t.DeductedPrepayment) AS DeductedPrepayment
+					FROM (
+						SELECT s.PartyId, ivs.BillerId, SUM(s.LicensingFee - s.Discount) AS LicensingFee
+						FROM @SumByProducts s
+							INNER JOIN @InvoiceSettings ivs ON s.PartyId = ivs.PartyId AND ',' + ivs.ProductCodes + ',' LIKE '%,' + s.ProductCode + ',%' AND ivs.InvTypeId = 1 -- Software Fee
+						GROUP BY s.PartyId, ivs.BillerId
+						HAVING SUM(s.LicensingFee - s.Discount) > 0
+					) s
+						INNER JOIN @InvAmount i ON s.PartyId = i.PartyId AND i.RemainingPrepayment > 0
+						CROSS APPLY (
+							SELECT s.LicensingFee AS DeductedPrepayment
+							UNION ALL SELECT i.RemainingPrepayment
+						) t
+					GROUP BY s.PartyId, s.BillerId
+				)
 				UPDATE f
-				SET f.LicensingFee = f.LicensingFee - CASE WHEN c.RemainingPrepayment < f.LicensingFee - f.Discount THEN c.RemainingPrepayment ELSE f.LicensingFee - f.Discount END
+				SET f.LicensingFee = f.LicensingFee - c.DeductedPrepayment
 				FROM @FinalResult f
-					INNER JOIN @InvAmount c ON f.PartyId = c.PartyId AND c.RemainingPrepayment > 0
+					INNER JOIN CTE_DeductedPrepayment c ON f.PartyId = c.PartyId AND f.BillerId = c.BillerId
 				WHERE f.InvoiceType = 1 AND f.InvoiceHeaderId IS NULL
 			END
 		END
@@ -552,10 +568,10 @@ BEGIN
 		SELECT
 			ROW_NUMBER() OVER(ORDER BY ps.IndexNumber) AS RowIndex
 			,ps.IndexNumber
-			,r.PartyId
+			,ps.PartyId
 			,ps.PartyName
-			,r.InvoiceType AS ItemType
-			,r.BillerId
+			,ivs.InvTypeId AS ItemType
+			,ivs.BillerId
 			,b.BillerName
 			,r.InvoiceHeaderId
 			,ps.InvoiceSymbol
@@ -564,19 +580,20 @@ BEGIN
 			,ps.BaseCurrencyId
 			,ps.BaseCurrencyName
 			,ps.InvoiceLanguage
-			,CASE WHEN r.InvoiceType = 1 THEN r.ProductCodes ELSE '' END AS ProductCodes
+			,CASE WHEN ivs.InvTypeId = 1 THEN ivs.ProductCodes ELSE '' END AS ProductCodes
 			,SUM(ISNULL(CASE WHEN r.InvoiceType = 3 THEN 0 ELSE r.LicensingFee END, 0)) AS LicensingFee
 			,SUM(ISNULL(r.Discount, 0)) AS Discount
 			,SUM(ISNULL(CASE WHEN r.InvoiceType = 3 THEN r.LicensingFee ELSE 0 END, 0)) AS Rebate
-		FROM @FinalResult r
-			INNER JOIN @PartySettings ps ON r.PartyId = ps.PartyId
-			INNER JOIN DBCUST.bodb_Licensee.dbo.LA_BillerInfo b WITH (NOLOCK) ON r.BillerId = b.PartyId
+		FROM @PartySettings ps
+			INNER JOIN @InvoiceSettings ivs ON ps.PartyId = ivs.PartyId
+			LEFT JOIN @FinalResult r ON ps.PartyId = r.PartyId AND ivs.BillerId = r.BillerId AND ivs.InvTypeId = r.InvoiceType
+			INNER JOIN DBCUST.bodb_Licensee.dbo.LA_BillerInfo b WITH (NOLOCK) ON ivs.BillerId = b.PartyId
 		GROUP BY
 			ps.IndexNumber
-			,r.PartyId
+			,ps.PartyId
 			,ps.PartyName
-			,r.InvoiceType
-			,r.BillerId
+			,ivs.InvTypeId
+			,ivs.BillerId
 			,b.BillerName
 			,r.InvoiceHeaderId
 			,ps.InvoiceSymbol
@@ -585,7 +602,7 @@ BEGIN
 			,ps.BaseCurrencyId
 			,ps.BaseCurrencyName
 			,ps.InvoiceLanguage
-			,CASE WHEN r.InvoiceType = 1 THEN r.ProductCodes ELSE '' END
+			,CASE WHEN ivs.InvTypeId = 1 THEN ivs.ProductCodes ELSE '' END
 
 		;WITH cte_rowOrder AS(
 			SELECT RowIndex, ROW_NUMBER() OVER (PARTITION BY BillerId ORDER BY BillerId) RowOrder
