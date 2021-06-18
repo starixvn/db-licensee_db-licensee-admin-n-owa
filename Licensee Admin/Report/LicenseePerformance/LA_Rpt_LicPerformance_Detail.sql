@@ -95,7 +95,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007
-	DECLARE @BAProductId INT = 3, @ExchangeProductId INT = 31, @PragmaticProductId INT = 32, @ArcadiaGamingId INT = 34, @Saba_clubProductID INT = 42, @AESexyProductId INT = 45
+	DECLARE @BAProductId INT = 3, @ExchangeProductId INT = 31, @PragmaticProductId INT = 32, @ArcadiaGamingId INT = 34, @Saba_clubProductID INT = 42, @AESexyProductId INT = 45,
 			@PP_Contribution SMALLINT = 4297,
 			@PP_JackpotPrize SMALLINT = 4298,
 			@PPTournament SMALLINT = 4299,
