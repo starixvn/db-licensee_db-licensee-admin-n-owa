@@ -4,3 +4,4 @@ Licensee Admin\Report\LA_Rpt_CurrencyWinloss.sql
 Licensee Admin\Report\LA_Rpt_CurrencyWinloss_Details.sql
 Licensee Admin\Report\LA_Rpt_GroupLicensingFeeWinLoss.sql
 Licensee Admin\Report\LA_Rpt_LicenseeWinloss_Details.sql
+Licensee Admin\Invoice\LA_AmountToCompanyByDiscountCurrencySel.sql
