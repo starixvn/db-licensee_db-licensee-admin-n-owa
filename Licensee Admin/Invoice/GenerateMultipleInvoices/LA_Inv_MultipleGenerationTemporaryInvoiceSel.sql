@@ -87,8 +87,83 @@ BEGIN
 				WHERE h.InvoiceHeaderId = s.InvoiceHeaderId AND h.InvoiceType = 1 AND s.InvItemTypeId = 4 -- Discount
 			) d
 		WHERE h.StatusId = 0 AND h.Environment = @Environment
-			AND h.InvoiceType IN (1, 3, 8) -- Software Fee, Rebate, Hosting Fee
+			AND h.InvoiceType IN (1, 3, 6) -- Software Fee, Rebate, Hosting Fee
 			AND (h.FromDate = @FromDate AND h.ToDate = @ToDate)
+
+		-- Region: Get hosting fee
+		BEGIN
+			DECLARE @HostingFee TABLE (PartyId INT, SettingType TINYINT, CurrencyId INT, NoOfDate INT, Amount MONEY, HostingFeesTypeId TINYINT, VCMFrom INT, VCMTo INT)
+			INSERT INTO @HostingFee (PartyId, SettingType, CurrencyId, NoOfDate, Amount)
+			SELECT PartyId, SettingType, CurrencyId, DATEDIFF(DAY, FromDate, ToDate) + 1, Amount
+			FROM (
+				SELECT s.FromParty AS PartyId, s.SettingType, d.Amount, d.BaseCurrencyId AS CurrencyId
+					,CASE WHEN s.FromDate < @FromDate THEN @FromDate ELSE s.FromDate END AS FromDate
+					,CASE WHEN s.ToDate > @ToDate THEN @ToDate ELSE s.ToDate END AS ToDate
+					,ROW_NUMBER() OVER(PARTITION BY s.FromParty, s.SettingType ORDER BY s.FromDate DESC) AS RN
+				FROM dbo.LA_HostingFeesSetting s WITH (NOLOCK)
+					LEFT JOIN dbo.LA_HostingFees f WITH (NOLOCK) ON s.HostingFeesId = f.HostingFeesId
+					LEFT JOIN dbo.LA_HostingFeesDetail d WITH(NOLOCK) ON f.HostingFeesId = d.HostingFeesId AND f.HostingFeesTypeId = 1 -- Fixed
+				WHERE @FromDate <= s.ToDate AND @ToDate >= s.FromDate
+			) s
+			WHERE s.RN = 1 AND DATEDIFF(DAY, FromDate, ToDate) >= 0
+
+			/*
+			-- for VCM
+			IF EXISTS (SELECT 1 FROM @HostingFee WHERE HostingFeesTypeId = 2)
+			BEGIN
+				DECLARE @PartyServers TABLE (PartyId INT, ServerId VARCHAR(20))
+				DECLARE @PeakConcurrentUsers TABLE (ServerId VARCHAR(20), LogDate DATETIME, Users INT)
+			
+				INSERT INTO @PartyServers (PartyId, ServerId)
+				SELECT p.PartyId, LEFT(CONVERT(VARCHAR(20), s.ServerId), 3)
+				FROM @PartySettings p
+					INNER JOIN dbo.view_site_list ls WITH (NOLOCK) ON p.LicenseeId = ls.SiteId
+					INNER JOIN bodb02.dbo.Site s WITH (NOLOCK) ON ls.IbcSiteId = s.SiteId
+
+				DECLARE @ServerIds VARCHAR(MAX), @SQL VARCHAR(MAX)
+				SELECT  @ServerIds = COALESCE(@ServerIds + ',' , '') + ServerId FROM @PartyServers
+			
+				SET @SQL = '
+				SELECT LogDate, ServerId, Users
+				FROM OPENQUERY(DBONUSER, ''	SELECT CONVERT(DATE, LogDate) AS LogDate, ServerId, MAX(Users) AS Users
+											FROM (
+												SELECT LogDate, LEFT(CONVERT(VARCHAR(20), ServerId), 3) AS ServerId, SUM(Users) AS Users
+												FROM ON_USER.dbo.TotalOnline WITH (NOLOCK)
+												WHERE LogDate >= ''''' + CONVERT(VARCHAR(10), @FromDate, 120) + '''''
+													AND LogDate < ''''' + CONVERT(VARCHAR(10), DATEADD(DAY, 1, @ToDate), 120) + '''''
+													AND LEFT(CONVERT(VARCHAR(20), ServerId), 3) IN (' + @ServerIds + ')
+												UNION ALL
+												SELECT LogDate, LEFT(CONVERT(VARCHAR(20), ServerId), 3) AS ServerId, SUM(Users) AS Users
+												FROM ON_USER.dbo.TotalOnline_BK WITH (NOLOCK)
+												WHERE LogDate >= ''''' + CONVERT(VARCHAR(10), @FromDate, 120) + '''''
+													AND LogDate < ''''' + CONVERT(VARCHAR(10), DATEADD(DAY, 1, @ToDate), 120) + '''''
+													AND LEFT(CONVERT(VARCHAR(20), ServerId), 3) IN (' + @ServerIds + ')
+											) t
+											GROUP BY CONVERT(DATE, LogDate), ServerId)'
+				INSERT INTO @PeakConcurrentUsers (LogDate, ServerId, Users)
+				EXEC (@SQL)
+			END
+			*/
+
+			UPDATE h1
+			SET h1.Amount = h1.Amount * ISNULL((1.0 * (h2.FeeDate - h2.WaiveDate) / h2.FeeDate), 1.0)
+			FROM @HostingFee h1
+				OUTER APPLY (
+					SELECT TOP 1 h1.NoOfDate AS FeeDate, h2.NoOfDate AS WaiveDate
+					FROM @HostingFee h2
+					WHERE h1.PartyId = h2.PartyId AND h2.SettingType = 2
+				) h2
+			WHERE h1.SettingType = 1
+
+			INSERT INTO @FinalResult (PartyId, BillerId, InvoiceType, LicensingFee)
+			SELECT h.PartyId, ivs.BillerId, 6, h.Amount * e.BaseCurrencyRate
+			FROM @HostingFee h
+				INNER JOIN @PartySettings ps ON h.PartyId = ps.PartyId
+				INNER JOIN @InvoiceSettings ivs ON h.PartyId = ivs.PartyId AND ivs.InvTypeId = 6 -- Hosting Fee
+				INNER JOIN #Exchange e ON h.CurrencyId = e.ExchangeId AND ps.BaseCurrencyId = e.BaseCurrencyId AND e.ExchangeDate = @ToDate
+			WHERE h.SettingType = 1
+		END
+		-- End Region: Get hosting fee
 	END
 	-- End Region: Get party's amount who were issued invoices
 
@@ -246,22 +321,30 @@ BEGIN
 
 		-- Region: Sum data by Product
 		BEGIN
-			INSERT INTO @SumByProducts (PartyId, ProductId, ProductCode, LicensingFee, Discount, Rebate)
-			SELECT r.PartyId, r.ProductId
-				,CASE WHEN r.ProductId = 0 THEN 'SB' ELSE p.ProductPrefix END
-				,CASE WHEN ISNULL(d.LicensingFee, r.LicensingFee) > 0 OR jvp.PartyId IS NOT NULL OR r.ProductId IN (3, 15, 25, 31) THEN ISNULL(d.LicensingFee, r.LicensingFee) ELSE 0 END + r.ExtraAmount
-				,ISNULL(d.Discount, 0)
-				,ISNULL(d.Rebate, 0)
-			FROM (
-				SELECT PartyId, ProductId, SUM(LicenseeAmount) AS LicensingFee, SUM(ExtraAmount) AS ExtraAmount
-				FROM #tmpResult
-				GROUP BY PartyId, ProductId
-			) r
-				LEFT JOIN (
+			;WITH CTE_Result AS (
+				SELECT
+					ISNULL(d.PartyId, r.PartyId) AS PartyId
+					,ISNULL(d.ProductId, r.ProductId) AS ProductId
+					,ISNULL(d.LicensingFee, r.LicensingFee) AS LicensingFee
+					,ISNULL(r.ExtraAmount, 0) AS ExtraAmount
+					,ISNULL(d.Discount, 0) AS Discount
+					,ISNULL(d.Rebate, 0) AS Rebate
+				FROM (
 					SELECT PartyId, ProductId, SUM(Fee) AS LicensingFee, SUM(Discount) AS Discount, SUM(Rebate) AS Rebate
 					FROM #AmountToCompany
 					GROUP BY PartyId, ProductId
-				) d ON r.PartyId = d.PartyId AND r.ProductId = d.ProductId
+				) d
+					FULL OUTER JOIN (
+						SELECT PartyId, ProductId, SUM(LicenseeAmount) AS LicensingFee, SUM(ExtraAmount) AS ExtraAmount
+						FROM #tmpResult
+						GROUP BY PartyId, ProductId
+					) r ON r.PartyId = d.PartyId AND r.ProductId = d.ProductId
+			)
+			INSERT INTO @SumByProducts (PartyId, ProductId, ProductCode, LicensingFee, Discount, Rebate)
+			SELECT r.PartyId, r.ProductId, CASE WHEN r.ProductId = 0 THEN 'SB' ELSE p.ProductPrefix END
+				,CASE WHEN r.LicensingFee > 0 OR jvp.PartyId IS NOT NULL THEN r.LicensingFee ELSE 0 END + r.ExtraAmount
+				,Discount, Rebate
+			FROM CTE_Result r
 				LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
 				LEFT JOIN dbo.Product3rd p WITH (NOLOCK) ON r.ProductId = p.ProductId
 
@@ -307,7 +390,7 @@ BEGIN
 				,SUM(CASE WHEN r.InvItemTypeName = 'Prepayment'		THEN r.Amount ELSE 0 END) AS RemainingPrepayment
 			FROM (
 				SELECT p.PartyId, t.InvItemTypeName, SUM(ISNULL(s.Income, 0) - ISNULL(s.Expense, 0)) AS Amount
-				FROM @PartyChargeInfo p
+				FROM @PartySettings p
 					INNER JOIN dbo.LA_InvoiceHeader h WITH (NOLOCK) ON p.PartyId = h.PartyId
 					INNER JOIN dbo.LA_InvoiceStatement s WITH (NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId
 					INNER JOIN @InvItemTypes t ON s.InvItemTypeId = t.InvItemTypeId
