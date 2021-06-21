@@ -35,10 +35,6 @@ BEGIN
 	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC LA_PartyListSel
 
-	UPDATE t 
-	SET t.IsKeepNegativeAmount = CASE WHEN u.PartyId IS NULL THEN 0 ELSE 1 END 
-	FROM @PartyList t 
-	LEFT JOIN bodb_Licensee.dbo.LA_f_JVPartyListSel() u ON u.PartyId = t.PartyId
 
 
 	DECLARE	@12BetGroupId INT = -1,
@@ -51,6 +47,11 @@ BEGIN
 
 	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
 	SELECT @12BetGroupId, PartyName, BranchName, 0 FROM @PartyList WHERE PartyId = 14
+
+	UPDATE t 
+	SET t.IsKeepNegativeAmount = CASE WHEN u.PartyId IS NULL THEN 0 ELSE 1 END 
+	FROM @PartyList t 
+	LEFT JOIN bodb_Licensee.dbo.LA_f_JVPartyListSel() u ON u.PartyId = t.PartyId
 	-- Endregion
 
 	-- Region: Charge Info
@@ -156,7 +157,7 @@ BEGIN
 	)	
 
 	INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, PayToSupplier, IsKeepNegativeAmount)
-	SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.Winlostdate, td.CurrencyId, td.TotalTrans, td.Turnover, td.CustomerWinLoss, td.LicenseeWinloss, td.LicensingFee, td.PayToSupplier, td.IsKeepNegativeAmount
+	SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.Winlostdate, td.CurrencyId, td.TotalTrans, td.Turnover, td.CustomerWinLoss, td.LicenseeWinloss, td.LicensingFee, td.PayToSupplier, p.IsKeepNegativeAmount
 	FROM #TempData td
 		INNER JOIN @PartyList p ON td.PartyId = p.PartyID
 		INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId
