@@ -25,7 +25,7 @@ BEGIN
 	SELECT  @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductPrefix FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductId NOT IN (16, 37) AND (EndOfSupportDate IS NULL OR EndOfSupportDate >= @FromDate) AND OfferSite IN (0, 2) -- Deposit only
 	SELECT  @ProductCodes = 'SB' + ISNULL(',' + @ProductCodes, '')
 
-	DECLARE @FinalResult TABLE (PartyId INT, InvoiceHeaderId BIGINT, InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, BillerId INT, InvoiceType TINYINT, InvoicePath NVARCHAR(255), ProductCodes VARCHAR(MAX), LicensingFee MONEY, Discount MONEY)
+	DECLARE @FinalResult TABLE (PartyId INT, InvoiceHeaderId BIGINT, InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, BillerId INT, InvoiceType TINYINT, InvoicePath NVARCHAR(255), ProductCodes VARCHAR(MAX), LicensingFee MONEY, Discount MONEY, ExtraAmount MONEY)
 	
 	-- Region: Get Party Settings
 	BEGIN
@@ -348,8 +348,8 @@ BEGIN
 				LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
 				LEFT JOIN dbo.Product3rd p WITH (NOLOCK) ON r.ProductId = p.ProductId
 
-			INSERT INTO @FinalResult (PartyId, BillerId, InvoiceType, ProductCodes, LicensingFee, Discount)
-			SELECT s.PartyId, ivs.BillerId, 1, ivs.ProductCodes, SUM(s.LicensingFee + s.ExtraAmount), SUM(s.Discount)
+			INSERT INTO @FinalResult (PartyId, BillerId, InvoiceType, ProductCodes, LicensingFee, Discount, ExtraAmount)
+			SELECT s.PartyId, ivs.BillerId, 1, ivs.ProductCodes, SUM(s.LicensingFee), SUM(s.Discount), SUM(s.ExtraAmount)
 			FROM @SumByProducts s
 				INNER JOIN @InvoiceSettings ivs ON s.PartyId = ivs.PartyId AND ',' + ivs.ProductCodes + ',' LIKE '%,' + s.ProductCode + ',%' AND ivs.InvTypeId = 1 -- Software Fee
 				LEFT JOIN @FinalResult r ON ivs.PartyId = r.PartyId AND ivs.BillerId = r.BillerId AND ivs.InvTypeId = r.InvoiceType
@@ -500,20 +500,16 @@ BEGIN
 			IF EXISTS (SELECT 1 FROM @InvAmount WHERE RemainingPrepayment > 0)
 			BEGIN
 				;WITH CTE_DeductedPrepayment AS (
-					SELECT s.PartyId, s.BillerId, MIN(t.DeductedPrepayment) AS DeductedPrepayment
-					FROM (
-						SELECT s.PartyId, ivs.BillerId, SUM(s.LicensingFee - s.Discount) AS LicensingFee
-						FROM @SumByProducts s
-							INNER JOIN @InvoiceSettings ivs ON s.PartyId = ivs.PartyId AND ',' + ivs.ProductCodes + ',' LIKE '%,' + s.ProductCode + ',%' AND ivs.InvTypeId = 1 -- Software Fee
-						GROUP BY s.PartyId, ivs.BillerId
-						HAVING SUM(s.LicensingFee - s.Discount) > 0
-					) s
-						INNER JOIN @InvAmount i ON s.PartyId = i.PartyId AND i.RemainingPrepayment > 0
+					SELECT f.PartyId, f.BillerId, MIN(t.DeductedPrepayment) AS DeductedPrepayment
+					FROM @FinalResult f
+						INNER JOIN @InvAmount i ON f.PartyId = i.PartyId AND i.RemainingPrepayment > 0
 						CROSS APPLY (
-							SELECT s.LicensingFee AS DeductedPrepayment
+							SELECT f.LicensingFee - f.Discount AS DeductedPrepayment
 							UNION ALL SELECT i.RemainingPrepayment
 						) t
-					GROUP BY s.PartyId, s.BillerId
+					WHERE f.InvoiceType = 1 AND f.InvoiceHeaderId IS NULL
+						AND f.LicensingFee - f.Discount > 0
+					GROUP BY f.PartyId, f.BillerId
 				)
 				UPDATE f
 				SET f.LicensingFee = f.LicensingFee - c.DeductedPrepayment
@@ -523,6 +519,8 @@ BEGIN
 			END
 		END
 		-- End Region: Get AMF, Prepayment and AGPrepayment
+
+		UPDATE @FinalResult SET LicensingFee = ISNULL(LicensingFee, 0) + ISNULL(ExtraAmount, 0) WHERE InvoiceType = 1 AND InvoiceHeaderId IS NULL
 	END
 
 	-- Region: Calc InvoiceNo
