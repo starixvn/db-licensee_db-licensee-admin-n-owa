@@ -582,7 +582,7 @@ BEGIN
 			,ps.InvoiceLanguage
 			,CASE WHEN ivs.InvTypeId = 1 THEN ivs.ProductCodes ELSE '' END AS ProductCodes
 			,SUM(ISNULL(CASE WHEN r.InvoiceType = 3 THEN 0 ELSE r.LicensingFee END, 0)) AS LicensingFee
-			,SUM(ISNULL(r.Discount, 0)) AS Discount
+			,-SUM(ISNULL(r.Discount, 0)) AS Discount
 			,SUM(ISNULL(CASE WHEN r.InvoiceType = 3 THEN r.LicensingFee ELSE 0 END, 0)) AS Rebate
 		FROM @PartySettings ps
 			INNER JOIN @InvoiceSettings ivs ON ps.PartyId = ivs.PartyId
