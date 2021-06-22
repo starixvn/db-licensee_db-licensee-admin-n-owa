@@ -161,7 +161,8 @@ BEGIN
 				INNER JOIN @PartySettings ps ON h.PartyId = ps.PartyId
 				INNER JOIN @InvoiceSettings ivs ON h.PartyId = ivs.PartyId AND ivs.InvTypeId = 6 -- Hosting Fee
 				INNER JOIN #Exchange e ON h.CurrencyId = e.ExchangeId AND ps.BaseCurrencyId = e.BaseCurrencyId AND e.ExchangeDate = @ToDate
-			WHERE h.SettingType = 1
+				LEFT JOIN @FinalResult f ON h.PartyId = f.PartyId AND ivs.BillerId = f.BillerId AND f.InvoiceType = 6
+			WHERE h.SettingType = 1 AND f.PartyId IS NULL
 		END
 		-- End Region: Get hosting fee
 	END
