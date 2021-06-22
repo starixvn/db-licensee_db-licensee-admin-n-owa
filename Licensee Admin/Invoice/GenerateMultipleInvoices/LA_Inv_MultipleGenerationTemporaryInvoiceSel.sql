@@ -29,7 +29,7 @@ BEGIN
 	
 	-- Region: Get Party Settings
 	BEGIN
-		DECLARE @PartySettings TABLE (IndexNumber INT, PartyId INT, LicenseeId INT, PartyName VARCHAR(50), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT)
+		DECLARE @PartySettings TABLE (IndexNumber INT, PartyId INT, LicenseeId INT, PartyName VARCHAR(50), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50))
 		INSERT INTO @PartySettings (IndexNumber, PartyId, LicenseeId, PartyName, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage)
 		SELECT i.[rank], p.PartyId, p.OldRefId, p.PartyName, ISNULL(bc.BaseCurrencyId, 6), ISNULL(e.Code, 'EUR'), pd.InvoiceLanguage
 		FROM dbo.strSplit(@PartyIds, ',') i
@@ -38,7 +38,7 @@ BEGIN
 			LEFT JOIN OAS_PartyBaseCurrency bc WITH (NOLOCK) ON p.PartyId = bc.PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
 			LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON e.ExchangeId = bc.BaseCurrencyId
 
-		DECLARE @InvoiceSettings TABLE (PartyId INT, BillerId INT, InvTypeId SMALLINT, ProductCodes VARCHAR(200), InvTemplateName VARCHAR(50))
+		DECLARE @InvoiceSettings TABLE (PartyId INT, BillerId INT, InvTypeId SMALLINT, ProductCodes VARCHAR(200), InvTemplateName VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT)
 		INSERT INTO @InvoiceSettings (PartyId, BillerId, InvTypeId, InvTemplateName, ProductCodes)
 		SELECT s.FromPartyId, s.ToPartyId, s.InvTypeId, t.InvTemplateName
 			, STUFF((SELECT ',' + CASE WHEN ls.ProductId = 0 THEN 'SB' ELSE ProductPrefix END
@@ -527,7 +527,7 @@ BEGIN
 	BEGIN
 		;WITH CTE_PartyInvoiceNo AS
 		(
-			SELECT ps.PartyId, iv.InvoiceSymbol, iv.InvoiceNumber
+			SELECT ps.PartyId, s.BillerId, iv.InvoiceSymbol, iv.InvoiceNumber
 			FROM @PartySettings ps
 				INNER JOIN @InvoiceSettings s ON s.PartyId = ps.PartyId
 				CROSS APPLY
@@ -535,16 +535,16 @@ BEGIN
 					SELECT TOP 1 iv.InvoiceSymbol, MAX(iv.InvoiceNumber) InvoiceNumber
 					FROM LA_InvoiceHeader iv WITH(NOLOCK)
 					WHERE iv.StatusId = 0 AND iv.Environment = @Environment
-							AND InvoiceType IN (1, 3, 8) -- Software Fee, Rebate, Hosting Fee
+							AND InvoiceType IN (1, 3, 6) -- Software Fee, Rebate, Hosting Fee
 							AND iv.BillerId = s.BillerId
 					GROUP BY iv.InvoiceSymbol, CreatedDateTime--, iv.PartyId, iv.BillerId, CreatedDateTime
 					ORDER BY CreatedDateTime DESC
 				) iv
 		)
-		UPDATE ps
-		SET ps.InvoiceSymbol = c.InvoiceSymbol, ps.InvoiceNumber = c.InvoiceNumber
-		FROM @PartySettings ps
-			INNER JOIN cte_PartyInvoiceNo c ON ps.PartyId = c.PartyId
+		UPDATE s
+		SET s.InvoiceSymbol = c.InvoiceSymbol, s.InvoiceNumber = c.InvoiceNumber
+		FROM @InvoiceSettings s
+			INNER JOIN cte_PartyInvoiceNo c ON s.PartyId = c.PartyId AND s.BillerId = c.BillerId
 	END
 	-- End Region: Calc InvoiceNo
 
@@ -572,8 +572,8 @@ BEGIN
 			,ivs.BillerId
 			,b.BillerName
 			,r.InvoiceHeaderId
-			,ps.InvoiceSymbol
-			,ISNULL(r.InvoiceNumber, ps.InvoiceNumber) AS InvoiceNumber
+			,ivs.InvoiceSymbol
+			,ISNULL(r.InvoiceNumber, ivs.InvoiceNumber) AS InvoiceNumber
 			,r.InvoicePath
 			,ps.BaseCurrencyId
 			,ps.BaseCurrencyName
@@ -594,8 +594,8 @@ BEGIN
 			,ivs.BillerId
 			,b.BillerName
 			,r.InvoiceHeaderId
-			,ps.InvoiceSymbol
-			,ISNULL(r.InvoiceNumber, ps.InvoiceNumber)
+			,ivs.InvoiceSymbol
+			,ISNULL(r.InvoiceNumber, ivs.InvoiceNumber)
 			,r.InvoicePath
 			,ps.BaseCurrencyId
 			,ps.BaseCurrencyName
@@ -603,7 +603,7 @@ BEGIN
 			,CASE WHEN ivs.InvTypeId = 1 THEN ivs.ProductCodes ELSE '' END
 
 		;WITH cte_rowOrder AS(
-			SELECT RowIndex, ROW_NUMBER() OVER (PARTITION BY BillerId ORDER BY BillerId) RowOrder
+			SELECT RowIndex, ROW_NUMBER() OVER (PARTITION BY BillerId ORDER BY IndexNumber) RowOrder
 			FROM @Result r
 			WHERE r.InvoiceHeaderId IS NULL
 		)
