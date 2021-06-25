@@ -7,7 +7,7 @@ CREATE PROCEDURE [dbo].[LA_Rpt_AdvantPlayWinLoss]
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
 	@BaseCurrencyName	VARCHAR(20),
-	@Timezone			INT
+	@Timezone			INT = 1
 AS
 /*
  * Created by : [20210615@Danny]
