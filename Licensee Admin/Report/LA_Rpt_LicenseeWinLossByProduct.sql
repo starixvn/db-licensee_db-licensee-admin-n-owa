@@ -501,7 +501,7 @@ BEGIN
 		VGA MONEY
 	)
 	
-	INSERT INTO @AmountDueByProduct(LicenseeId, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, BRVS, LC, VG, MGCLC, MGCRNG, BX, SG, VRG, SAG, I4D, TG, SXG, PGS, JK, WM, VS3, GDG, BG, MXG, SLT, PPL, HB, CG, VGA)
+	INSERT INTO @AmountDueByProduct(LicenseeId, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, BRVS, LC, VG, MGCLC, MGCRNG, BX, SG, VRG, SAG, I4D, TG, PGS, JK, WM, VS3, GDG, BG, MXG, SLT, PPL, HB, CG, VGA)
 	SELECT d.LicenseeId,
 			ISNULL(SUM(CASE WHEN d.ProductId = 2  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS NG,
 			ISNULL(SUM(CASE WHEN d.ProductId = 5  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VS,
@@ -524,7 +524,6 @@ BEGIN
 			ISNULL(SUM(CASE WHEN d.ProductId = 39 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS SAG,
 			ISNULL(SUM(CASE WHEN d.ProductId = 43 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS I4D,
 			ISNULL(SUM(CASE WHEN d.ProductId = 40 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS TG,
-			ISNULL(SUM(CASE WHEN d.ProductId = 45 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS SXG,
 			ISNULL(SUM(CASE WHEN d.ProductId = 55 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS PGS,
 			ISNULL(SUM(CASE WHEN d.ProductId = 56 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS JK,
 			ISNULL(SUM(CASE WHEN d.ProductId = 51 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS WM,
@@ -569,7 +568,6 @@ BEGIN
 			SAG = a.SAG,
 			I4D = a.I4D,
 			TG = a.TG,
-			SXG = a.SXG,
 			PGS = a.PGS,
 			JK = a.JK,
 			WM = a.WM,
