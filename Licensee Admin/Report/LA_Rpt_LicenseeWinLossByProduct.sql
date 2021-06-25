@@ -159,7 +159,7 @@ BEGIN
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON b.SiteID = p.OldRefID AND p.PartyType = 1
 				LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.Bettype = b.Bettype
-				LEFT JOIN LA_f_ExcludedBettypeListSel('','1706') eb ON b.Bettype = eb.BettypeID
+				LEFT JOIN LA_f_ExcludedBettypeListSel('','1706,3150') eb ON b.Bettype = eb.BettypeID
 		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND b.customercategory NOT IN (27, 28)
