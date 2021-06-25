@@ -6,8 +6,7 @@ CREATE PROCEDURE [dbo].[LA_Rpt_AdvantPlayMiniWinLoss]
 	@PartyIds			VARCHAR(4000),
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
-	@BaseCurrencyName	VARCHAR(20),
-	@Timezone			INT = 1
+	@BaseCurrencyName	VARCHAR(20)
 AS
 /*
  * Created by : [20210615@Danny]
@@ -15,9 +14,6 @@ AS
  * Revisions
 	- 20210615@Danny: Initialize SP [#155208]
 	
- * Param's Explanation:
- *		@Timezone: = 1: GMT-4
- *				   = 2: GMT+8	 
  */
 
 BEGIN
