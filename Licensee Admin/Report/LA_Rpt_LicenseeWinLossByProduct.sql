@@ -233,7 +233,7 @@ BEGIN
 		PPL			MONEY,	-- Pragmatic Live Casino
 		HB			MONEY,	-- Habanero
 		CG			MONEY,	-- Creative Gaming
-		VGA			MONEY	-- VGaming
+		VGA			MONEY,	-- VGaming
 		AP			MONEY,  -- AdvantPlay
 		APM			MONEY,  -- AdvantPlay mini
 	)						  
@@ -502,7 +502,7 @@ BEGIN
 		PPL MONEY,
 		HB MONEY,
 		CG MONEY,
-		VGA MONEY
+		VGA MONEY,
 		APM MONEY
 	)
 	
@@ -540,7 +540,7 @@ BEGIN
 			ISNULL(SUM(CASE WHEN d.ProductId = 65 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS PPL,
 			ISNULL(SUM(CASE WHEN d.ProductId = 61 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS HB,
 			ISNULL(SUM(CASE WHEN d.ProductId = 62 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS CG,
-			ISNULL(SUM(CASE WHEN d.ProductId = 66 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VGA
+			ISNULL(SUM(CASE WHEN d.ProductId = 66 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VGA,
 			ISNULL(SUM(CASE WHEN d.ProductId = 67 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS AP,
 			ISNULL(SUM(CASE WHEN d.ProductId = 68 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS APM
 	FROM	#TempData d
@@ -586,7 +586,7 @@ BEGIN
 			PPL = a.PPL,
 			HB = a.HB,
 			CG = a.CG,
-			VGA = a.VGA
+			VGA = a.VGA,
 			AP = a.AP,
 			APM = a.APM
 	FROM	#LicenseeAmount l
