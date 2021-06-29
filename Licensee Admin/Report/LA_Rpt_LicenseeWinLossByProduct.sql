@@ -235,7 +235,7 @@ BEGIN
 		CG			MONEY,	-- Creative Gaming
 		VGA			MONEY,	-- VGaming
 		AP			MONEY,  -- AdvantPlay
-		APM			MONEY,  -- AdvantPlay mini
+		APM			MONEY  -- AdvantPlay mini
 	)						  
 	INSERT INTO #LicenseeAmount(GroupName, GroupId, LicenseeId, PartyId,PartyName)
 	SELECT	REPLACE(p.PartyName,' Licensees','') AS PartyName,
@@ -503,6 +503,7 @@ BEGIN
 		HB MONEY,
 		CG MONEY,
 		VGA MONEY,
+		AP	MONEY,
 		APM MONEY
 	)
 	
