@@ -16,6 +16,8 @@ AS
 
 	Revisions:
 		20210510@Percy: Initialize SP [RedmineID: #150878]
+		20210618@Danny: AE Sexy - Support Lucky Draw [#152141]
+
 */
 
 BEGIN
@@ -140,13 +142,13 @@ BEGIN
 	INSERT INTO #TempData (LicenseeId, rptDate, ProductId, CurrencyId, BettypeRef, MemberWL, MemberComm, AgentWL, AgentComm, Contribution, JackpotPrize, ExtraAmount, OddsSpread, PayOut, CommShare, CashInShare)
 	SELECT r.SiteId, r.rptDate, r.ProductId, r.CurrencyId
 		,CASE WHEN r.Bettype IN (901, 1706, 3007) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
-		,SUM(CASE WHEN (r.ProductId IN (32, 43, 42) AND ISNULL(r.TicketType, 0) = 2) OR r.Bettype IN (902, 903, 904, 999, 4299, 4300, 4297, 4298, 1698, 1699, 1906) THEN 0 ELSE ISNULL(r.MemberWL, 0) END) AS MemberWL
+		,SUM(CASE WHEN (r.ProductId IN (32, 43, 42) AND ISNULL(r.TicketType, 0) = 2) OR r.Bettype IN (902, 903, 904, 999, 4299, 4300, 4297, 4298, 1698, 1699, 1906, 3150) THEN 0 ELSE ISNULL(r.MemberWL, 0) END) AS MemberWL
 		,SUM(ISNULL(r.CommissionP, 0)) AS MemberComm
 		,SUM(ISNULL(r.GrossWL, 0)) AS AgentWL
 		,SUM(ISNULL(r.CommissionA, 0)) AS AgentComm
 		,SUM(CASE WHEN r.Bettype IN (4297, 1698) THEN ISNULL(-r.GrossWL, 0) ELSE 0 END) AS Contribution
 		,SUM(CASE WHEN r.Bettype IN (4298, 1699) THEN ISNULL(r.MemberWL, 0) ELSE 0 END) AS JackpotPrize
-		,SUM(CASE WHEN r.Bettype IN (4300, 4299, 1906) OR (r.ProductId IN (32, 43, 42) AND ISNULL(r.TicketType, 0) = 2) THEN ISNULL(r.MemberWL, 0) ELSE 0 END) AS ExtraAmount
+		,SUM(CASE WHEN r.Bettype IN (4300, 4299, 1906, 3150) OR (r.ProductId IN (32, 43, 42) AND ISNULL(r.TicketType, 0) = 2) THEN ISNULL(r.MemberWL, 0) ELSE 0 END) AS ExtraAmount
 		,SUM(CASE WHEN r.Bettype = 999 THEN ISNULL(-r.GrossWL, 0) ELSE 0 END) AS OddsSpread
 		,SUM(CASE WHEN r.ProductId = 15 THEN ISNULL(r.Turnover, 0) - ISNULL(r.WinPrizeAmount, 0) - ISNULL(r.CashOutAmount, 0) ELSE 0 END) AS PayOut
 		,SUM(CASE WHEN r.ProductId = 15 THEN CASE WHEN ISNULL(r.TicketType, 0) = 0 THEN ISNULL(r.Turnover, 0) ELSE ISNULL(r.ExtraAmount, 0) END ELSE 0 END) AS CommShare

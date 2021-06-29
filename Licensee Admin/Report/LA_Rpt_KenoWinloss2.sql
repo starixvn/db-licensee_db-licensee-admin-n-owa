@@ -23,6 +23,7 @@ AS
 	- 20200219@Mason: Update RNG Keno term [#128563]
 	- 20200228@Parsons: Support-HID-currency [#128856] 
 	- 20200805@Parsons: Adjust royalty fee terms for Keno, Lottery, Table Games [#136891] 
+	- 20210306@Danny:  Keep negative licensee fee for joint venture parties [#152141]
 
  Param's Explanation:
 	- @FromDate		: From date
@@ -75,11 +76,17 @@ BEGIN
 			PartyId		INT,
 			PartyName	VARCHAR(100),
 			BranchName	VARCHAR(100),
-			ParentId	INT
+			ParentId	INT,
+			IsKeepNegativeAmount BIT DEFAULT 0
 		)
 
 		INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
 		EXEC dbo.LA_PartyListSel
+
+		UPDATE t 
+		SET t.IsKeepNegativeAmount = CASE WHEN u.PartyId IS NULL THEN 0 ELSE 1 END 
+		FROM @PartyList t 
+		LEFT JOIN bodb_Licensee.dbo.LA_f_JVPartyListSel() u ON u.PartyId = t.PartyId
 
 		-- This report has 3 group:
 		--		- 12Bet: 12Bet
@@ -114,7 +121,8 @@ BEGIN
 			CustomerWinLoss	MONEY,
 			LicenseeWinLoss	MONEY,
 			LicensingFee	MONEY,
-			PayToSupplier	MONEY
+			PayToSupplier	MONEY,
+			IsKeepNegativeAmount BIT
 		)
 
 		;WITH SumByDate AS(
@@ -136,7 +144,7 @@ BEGIN
 					 b.StatusId NOT IN (-1, 101, 102, 103)
 			GROUP BY b.rptdate, b.SiteId, p.PartyId, b.CurrencyID
 		)
-		INSERT INTO #TempData (PartyId,PartyName,ParentId,ParentName,WinLossDate,CurrencyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
+		INSERT INTO #TempData (PartyId,PartyName,ParentId,ParentName,WinLossDate,CurrencyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,IsKeepNegativeAmount)
 		SELECT	p.PartyId,p.PartyName,g.PartyId,g.PartyName,s.rptDate,s.CurrencyId,s.TotalTrans,s.Turnover,s.MemberWL,-s.MemberWL,s.LicensingFee,
 				(-s.MemberWL) * (CASE 
 						WHEN p.PartyId = @CN88PartyId THEN 0.015
@@ -144,7 +152,7 @@ BEGIN
 						WHEN @FromDate >= CAST('2020-07-01' AS DATETIME) THEN 0.036
 						WHEN g.PartyId IN (@CreditGroupId, @12BetGroupId) OR @FromDate >= CAST('2018-8-1' AS DATETIME) THEN 0.03 
 						ELSE 0.05 
-					END)
+					END), p.IsKeepNegativeAmount
 		FROM SumByDate s
 		INNER JOIN @PartyList p ON s.PartyId = p.PartyID
 		INNER JOIN @PartyList g ON p.ParentId = g.PartyId
@@ -264,6 +272,7 @@ BEGIN
 			;WITH SumByParty AS (
 				SELECT	td.PartyId,
 						td.ParentId,
+						td.IsKeepNegativeAmount,
 						SUM(td.TotalTrans) TotalTrans,
 						SUM(td.Turnover			* e.BaseCurrencyRate) Turnover,
 						SUM(td.CustomerWinLoss	* e.BaseCurrencyRate) CustomerWinLoss,
@@ -272,7 +281,7 @@ BEGIN
 						SUM(td.PayToSupplier	* e.BaseCurrencyRate) PayToSupplier
 				FROM #TempData td
 				INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @TempCurrency) e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.WinLossDate
-				GROUP BY td.ParentId,td.PartyId
+				GROUP BY td.ParentId,td.PartyId,td.IsKeepNegativeAmount
 			)
 			INSERT INTO @TotalByGroups(ParentId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier, CurrencyName)
 			SELECT	ParentId,
@@ -280,7 +289,7 @@ BEGIN
 					SUM(Turnover),
 					SUM(CustomerWinLoss),
 					SUM(LicenseeWinLoss),
-					SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END),
+					SUM(CASE WHEN LicensingFee < 0 AND IsKeepNegativeAmount = 0 THEN 0 ELSE LicensingFee END),
 					SUM(PayToSupplier),
 					@TempCurrency
 			FROM SumByParty

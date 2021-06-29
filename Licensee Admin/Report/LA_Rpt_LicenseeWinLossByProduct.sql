@@ -63,6 +63,8 @@ AS
 			. Pragmatic Live Casino [RedmineID: #150971]
 			. Habanero [RedmineID: #150636]
 			. Creative Gaming [RedmineID: #152139]
+		- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
+	    - 20210306@Danny: Integrate VGaming [#154080]
 */
 		
 /*	Example:
@@ -79,10 +81,10 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @GD_Tip SMALLINT = 1706 
-	DECLARE @PragmaticID INT = 32, @SBC_ProductID INT = 42, @Arcadia_Gaming_Id INT = 34
+	DECLARE @PragmaticID INT = 32, @SBC_ProductID INT = 42, @Arcadia_Gaming_Id INT = 34, @SXG_ID  INT = 45
 
 	-- Region: Get party charge rate info 
-	DECLARE @ProductCode VARCHAR(500)= 'BA,SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX,PP,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG,BGG,MXG,SLT,PPL,HB,CG'
+	DECLARE @ProductCode VARCHAR(500)= 'BA,SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX,PP,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG,BGG,MXG,SLT,PPL,HB,CG,VGA'
 	
 	-- Region: Get Party ID
 	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)
@@ -162,7 +164,7 @@ BEGIN
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND b.customercategory NOT IN (27, 28)
 				AND eb.BettypeID IS NULL
-				AND b.ProductID NOT IN (13,15,25,@PragmaticID,@SBC_ProductID, @Arcadia_Gaming_Id)
+				AND b.ProductID NOT IN (13,15,25,@PragmaticID,@SBC_ProductID, @Arcadia_Gaming_Id, @SXG_ID)
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, b.ProductId,
 			CASE
 				WHEN b.Bettype = @GD_Tip THEN b.Bettype
@@ -228,7 +230,8 @@ BEGIN
 		SLT			MONEY,	-- Sport Lottery
 		PPL			MONEY,	-- Pragmatic Live Casino
 		HB			MONEY,	-- Habanero
-		CG			MONEY	-- Creative Gaming
+		CG			MONEY,	-- Creative Gaming
+		VGA			MONEY	-- VGaming
 	)						  
 	INSERT INTO #LicenseeAmount(GroupName, GroupId, LicenseeId, PartyId,PartyName)
 	SELECT	REPLACE(p.PartyName,' Licensees','') AS PartyName,
@@ -372,7 +375,7 @@ BEGIN
 	FROM	#LicenseeAmount d INNER JOIN @COWinLoss a ON a.LicenseeId = d.LicenseeId
 	-- End CO
 	
-	-- PP, SBC, Arcadia_Gaming
+	-- PP, SBC, Arcadia_Gaming, SXG
 	DECLARE @PPContribution SMALLINT = 4297,
 			@PPJackpotPrize SMALLINT = 4298,
 			@PPTournament SMALLINT = 4299,
@@ -380,18 +383,20 @@ BEGIN
 			@SBC_Contribution SMALLINT = 1698,
 			@SBC_JackpotPrize SMALLINT = 1699,
 			@FreeBetTicketType TINYINT = 2, 
-			@Arcadia_Gaming_Bonus SMALLINT = 1906
+			@Arcadia_Gaming_Bonus SMALLINT = 1906,
+			@AESexy_LuclyDraw SMALLINT = 3150
+
 	;WITH cte_WinLossData AS 
 	(
 		SELECT b.SiteId, b.rptDate, b.CurrencyID, b.ProductID,
-			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType OR b.Bettype IN (@PPTournament, @PromotionPrize, @PPContribution, @PPJackpotPrize, @SBC_Contribution, @SBC_JackpotPrize, @Arcadia_Gaming_Bonus) THEN 0 
+			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType OR b.Bettype IN (@PPTournament, @PromotionPrize, @PPContribution, @PPJackpotPrize, @SBC_Contribution, @SBC_JackpotPrize, @Arcadia_Gaming_Bonus, @AESexy_LuclyDraw) THEN 0 
 				ELSE (ISNULL(-b.MemberWL, 0) * e.Rate) END) AS LicenseeWL,
 			SUM(CASE WHEN b.Bettype IN (@PPContribution, @SBC_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END * e.Rate) AS Contribution,
 			SUM(CASE WHEN b.Bettype IN (@PPJackpotPrize, @SBC_JackpotPrize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END * e.Rate) AS JackpotPrize,
-			SUM(CASE WHEN b.Bettype IN (@PromotionPrize, @PPTournament, @Arcadia_Gaming_Bonus) OR ISNULL(b.TicketType,0) = @FreeBetTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END * e.Rate) AS ExtraAmount
+			SUM(CASE WHEN b.Bettype IN (@PromotionPrize, @PPTournament, @Arcadia_Gaming_Bonus, @AESexy_LuclyDraw) OR ISNULL(b.TicketType,0) = @FreeBetTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END * e.Rate) AS ExtraAmount
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 		INNER JOIN #Exchange e ON e.ExchangeID = b.CurrencyId AND e.ExchangeDate = b.rptDate
-		WHERE b.ProductID IN (@PragmaticID, @SBC_ProductID, @Arcadia_Gaming_Id)
+		WHERE b.ProductID IN (@PragmaticID, @SBC_ProductID, @Arcadia_Gaming_Id, @SXG_ID)
 			AND b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.CustomerCategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject, Void, Refund
@@ -406,7 +411,7 @@ BEGIN
 		FROM cte_WinLossData d
 		INNER JOIN @PartyChargeInfo p ON p.LicenseeId = d.SiteId AND (d.rptDate BETWEEN p.FromDate AND p.ToDate) AND p.ProductID = d.ProductID
 		LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeID AND d.CurrencyId = cr.CurrencyID
-		WHERE d.ProductID IN (@PragmaticID, @SBC_ProductID, @Arcadia_Gaming_Id)
+		WHERE d.ProductID IN (@PragmaticID, @SBC_ProductID, @Arcadia_Gaming_Id, @SXG_ID)
 			 AND d.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY p.PartyId, d.ProductID
 	), cte_LicensingFee AS
@@ -419,11 +424,13 @@ BEGIN
 	UPDATE	l
 	SET		l.PP  = pp.LicensingFee + pp.Contribution - pp.JackpotPrize - pp.ExtraAmount,
 			l.SBC = sbc.LicensingFee + sbc.Contribution - sbc.JackpotPrize - sbc.ExtraAmount,
-			l.CC = cc.LicensingFee - cc.ExtraAmount
+			l.CC = cc.LicensingFee - cc.ExtraAmount,
+			l.SXG = sxg.LicensingFee - sxg.ExtraAmount
 	FROM #LicenseeAmount l
 	LEFT JOIN cte_LicensingFee pp ON l.PartyId = pp.PartyId AND pp.ProductID = @PragmaticID
 	LEFT JOIN cte_LicensingFee sbc ON l.PartyId = sbc.PartyId AND sbc.ProductID = @SBC_ProductID
 	LEFT JOIN cte_LicensingFee cc ON l.PartyId = cc.PartyId AND cc.ProductID = @Arcadia_Gaming_Id
+	LEFT JOIN cte_LicensingFee sxg ON l.PartyId = sxg.PartyId AND sxg.ProductID = @SXG_ID
 	--End PP, SBC, Arcadia_Gaming
 
 	-- SportsBook
@@ -490,10 +497,11 @@ BEGIN
 		SLT MONEY,
 		PPL MONEY,
 		HB MONEY,
-		CG MONEY
+		CG MONEY,
+		VGA MONEY
 	)
 	
-	INSERT INTO @AmountDueByProduct(LicenseeId, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, BRVS, LC, VG, MGCLC, MGCRNG, BX, SG, VRG, SAG, I4D, TG, SXG, PGS, JK, WM, VS3, GDG, BG, MXG, SLT, PPL, HB, CG)
+	INSERT INTO @AmountDueByProduct(LicenseeId, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, BRVS, LC, VG, MGCLC, MGCRNG, BX, SG, VRG, SAG, I4D, TG, PGS, JK, WM, VS3, GDG, BG, MXG, SLT, PPL, HB, CG, VGA)
 	SELECT d.LicenseeId,
 			ISNULL(SUM(CASE WHEN d.ProductId = 2  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS NG,
 			ISNULL(SUM(CASE WHEN d.ProductId = 5  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VS,
@@ -516,7 +524,6 @@ BEGIN
 			ISNULL(SUM(CASE WHEN d.ProductId = 39 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS SAG,
 			ISNULL(SUM(CASE WHEN d.ProductId = 43 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS I4D,
 			ISNULL(SUM(CASE WHEN d.ProductId = 40 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS TG,
-			ISNULL(SUM(CASE WHEN d.ProductId = 45 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS SXG,
 			ISNULL(SUM(CASE WHEN d.ProductId = 55 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS PGS,
 			ISNULL(SUM(CASE WHEN d.ProductId = 56 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS JK,
 			ISNULL(SUM(CASE WHEN d.ProductId = 51 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS WM,
@@ -527,7 +534,8 @@ BEGIN
 			ISNULL(SUM(CASE WHEN d.ProductId = 63 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS SLT,
 			ISNULL(SUM(CASE WHEN d.ProductId = 65 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS PPL,
 			ISNULL(SUM(CASE WHEN d.ProductId = 61 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS HB,
-			ISNULL(SUM(CASE WHEN d.ProductId = 62 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS CG
+			ISNULL(SUM(CASE WHEN d.ProductId = 62 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS CG,
+			ISNULL(SUM(CASE WHEN d.ProductId = 66 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VGA
 	FROM	#TempData d
 				INNER JOIN @PartyChargeInfo ci ON	d.LicenseeId = ci.LicenseeId
 													AND ci.ProductId = d.ProductId
@@ -560,7 +568,6 @@ BEGIN
 			SAG = a.SAG,
 			I4D = a.I4D,
 			TG = a.TG,
-			SXG = a.SXG,
 			PGS = a.PGS,
 			JK = a.JK,
 			WM = a.WM,
@@ -571,7 +578,8 @@ BEGIN
 			SLT = a.SLT,
 			PPL = a.PPL,
 			HB = a.HB,
-			CG = a.CG
+			CG = a.CG,
+			VGA = a.VGA
 	FROM	#LicenseeAmount l
 			INNER JOIN @AmountDueByProduct a ON a.LicenseeId = l.LicenseeId
 	
@@ -617,9 +625,10 @@ BEGIN
 			AND PPL IS NULL
 			AND HB IS NULL
 			AND CG IS NULL
+			AND VGA IS NULL
 
 	-- Result
-	SELECT l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP, l.CC, l.SG, l.VRG, l.SAG, l.I4D, l.TG, l.SBC, l.SXG, l.PGS, l.JK, l.WM, l.VS3, l.GDG, l.BG, l.MXG, l.SLT, l.PPL, l.HB, l.CG
+	SELECT l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP, l.CC, l.SG, l.VRG, l.SAG, l.I4D, l.TG, l.SBC, l.SXG, l.PGS, l.JK, l.WM, l.VS3, l.GDG, l.BG, l.MXG, l.SLT, l.PPL, l.HB, l.CG, l.VGA
 	FROM #LicenseeAmount l
 	ORDER BY l.GroupId, l.PartyId
 	-- EndRegion

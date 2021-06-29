@@ -36,6 +36,7 @@ AS
 		- 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
 		- 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 		- 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
+		- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -616,19 +617,39 @@ BEGIN
 	END
 	-- End region
 
+
+	-- Region AE Sexy: Lucky Draw amount
+	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = 45))
+	BEGIN
+		DECLARE @LuckyDrawAmount MONEY
+		SELECT @LuckyDrawAmount = SUM(p.MemberWL * e.Rate)
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct p WITH (NOLOCK) 
+			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'SXG', 'OA', 1) pc ON p.SiteID = pc.LicenseeId
+			INNER JOIN #Exchange e ON p.RptDate = e.ExchangeDate AND p.CurrencyID = e.ExchangeID
+			WHERE p.RptDate BETWEEN @FromDate AND @ToDate AND p.ProductID = 45 AND p.Bettype = 3150 -- Lucky Draw
+
+		IF(ISNULL(@LuckyDrawAmount, 0) > 0)
+		BEGIN
+			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
+			VALUES(0,'','',37,@LuckyDrawAmount,0)
+		END
+	END
+	-- End region
+
 	-- Region Saba.club
 	DECLARE @Saba_clubProductID INT = 42
 	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = @Saba_clubProductID))
 	BEGIN
 		DECLARE @SBC_Contribution_Bettype SMALLINT = 1698,
 				@SBC_JackpotPrize_Bettype SMALLINT = 1699
+
 		;WITH cte_SabaClub_ExtraAmount AS
 		(
 			SELECT b.Bettype, ISNULL(b.TicketType, 0) TicketType, SUM(CASE WHEN b.Bettype = @SBC_Contribution_Bettype THEN -b.GrossWL ELSE b.MemberWL END * e.Rate) AS ExtraAmount
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'SBC', 'OA', 1) pc ON b.SiteID = pc.LicenseeId
+				INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'SBC', 'OA', 1) pc ON b.SiteID = pc.LicenseeId AND (b.rptDate BETWEEN pc.FromDate AND pc.ToDate)
 				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-			WHERE (ISNULL(b.TicketType, 0) = 2 OR b.Bettype IN (@SBC_Contribution_Bettype, @SBC_JackpotPrize_Bettype))
+			WHERE (b.ProductID = 42 AND ISNULL(b.TicketType, 0) = 2 OR b.Bettype IN (@SBC_Contribution_Bettype, @SBC_JackpotPrize_Bettype))
 				AND b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
 			GROUP BY b.Bettype, ISNULL(b.TicketType, 0)
