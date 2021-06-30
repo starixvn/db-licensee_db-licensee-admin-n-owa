@@ -258,7 +258,7 @@ BEGIN
 					,SUM(ISNULL(r.CommissionA, 0)) AS AgentComm
 					,SUM(CASE WHEN r.Bettype IN (4297, 1698) THEN ISNULL(-r.GrossWL, 0) ELSE 0 END) AS Contribution
 					,SUM(CASE WHEN r.Bettype IN (4298, 1699) THEN ISNULL(r.MemberWL, 0) ELSE 0 END) AS JackpotPrize
-					,SUM(CASE WHEN r.Bettype IN (4300, 4299, 1906) OR (r.ProductId IN (32, 43, 42) AND ISNULL(r.TicketType, 0) = 2) THEN ISNULL(r.MemberWL, 0) ELSE 0 END) AS ExtraAmount
+					,SUM(CASE WHEN r.Bettype IN (4300, 4299, 1906, 3150) OR (r.ProductId IN (32, 43, 42) AND ISNULL(r.TicketType, 0) = 2) THEN ISNULL(r.MemberWL, 0) ELSE 0 END) AS ExtraAmount
 					,SUM(CASE WHEN r.Bettype = 999 THEN ISNULL(-r.GrossWL, 0) ELSE 0 END) AS OddsSpread
 					,SUM(CASE WHEN r.ProductId = 15 THEN ISNULL(r.Turnover, 0) - ISNULL(r.WinPrizeAmount, 0) - ISNULL(r.CashOutAmount, 0) ELSE 0 END) AS PayOut
 					,SUM(CASE WHEN r.ProductId = 15 THEN CASE WHEN ISNULL(r.TicketType, 0) = 0 THEN ISNULL(r.Turnover, 0) ELSE ISNULL(r.ExtraAmount, 0) END ELSE 0 END) AS CommShare
@@ -392,8 +392,8 @@ BEGIN
 			FROM (
 				SELECT p.PartyId, t.InvItemTypeName, SUM(ISNULL(s.Income, 0) - ISNULL(s.Expense, 0)) AS Amount
 				FROM @PartySettings p
-					INNER JOIN dbo.LA_InvoiceHeader h WITH (NOLOCK) ON p.PartyId = h.PartyId
-					INNER JOIN dbo.LA_InvoiceStatement s WITH (NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId
+					INNER JOIN dbo.LA_InvoiceStatement s WITH (NOLOCK) ON s.RefPartyId = p.PartyId
+					INNER JOIN dbo.LA_InvoiceHeader h WITH (NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId
 					INNER JOIN @InvItemTypes t ON s.InvItemTypeId = t.InvItemTypeId
 				WHERE ISNULL(h.StatusId, 0) = 0 AND h.Environment = @Environment
 				GROUP BY p.PartyId, t.InvItemTypeName
