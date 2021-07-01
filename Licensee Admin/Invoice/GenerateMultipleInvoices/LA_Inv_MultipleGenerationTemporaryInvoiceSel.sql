@@ -440,7 +440,7 @@ BEGIN
 								SELECT TOP 1 m2.FeeAmount
 								FROM @MinFee m2
 								WHERE m2.FeeTypeId = 1 AND m1.PartyId = m2.PartyId
-							) / (1.0 * @DaysInMonth / DATEDIFF(DAY, m1.FromDate, m1.ToDate) + 1))
+							) / (1.0 * @DaysInMonth / (DATEDIFF(DAY, m1.FromDate, m1.ToDate) + 1)))
 				FROM @MinFee m1
 				WHERE m1.FeeTypeId = 2
 
