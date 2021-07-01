@@ -25,7 +25,7 @@ BEGIN
 	SELECT  @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductPrefix FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductId NOT IN (16, 37) AND (EndOfSupportDate IS NULL OR EndOfSupportDate >= @FromDate) AND OfferSite IN (0, 2) -- Deposit only
 	SELECT  @ProductCodes = 'SB' + ISNULL(',' + @ProductCodes, '')
 
-	DECLARE @FinalResult TABLE (PartyId INT, InvoiceHeaderId BIGINT, InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, BillerId INT, InvoiceType TINYINT, InvoicePath NVARCHAR(255), ProductCodes VARCHAR(MAX), LicensingFee MONEY, Discount MONEY, ExtraAmount MONEY)
+	DECLARE @FinalResult TABLE (PartyId INT, InvoiceHeaderId BIGINT, InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, BillerId INT, InvoiceType TINYINT, InvoicePath NVARCHAR(255), ProductCodes VARCHAR(MAX), LicensingFee MONEY, Discount MONEY, ExtraAmount MONEY, AdjustmentAmount MONEY, AdjustmentNote NVARCHAR(500))
 	
 	-- Region: Get Party Settings
 	BEGIN
@@ -72,8 +72,9 @@ BEGIN
 
 	-- Region: Get party's amount who were issued invoices
 	BEGIN
-		INSERT INTO @FinalResult (PartyId, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, BillerId, InvoiceType, InvoicePath, LicensingFee, Discount, ProductCodes)
-		SELECT h.PartyId, h.InvoiceHeaderId, h.InvoiceSymbol, h.InvoiceNumber, h.BillerId, h.InvoiceType, h.InvoicePath, h.Amount - ISNULL(d.Discount, 0), ISNULL(Discount, 0)
+		INSERT INTO @FinalResult (PartyId, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, BillerId, InvoiceType, InvoicePath, LicensingFee, Discount, AdjustmentAmount, AdjustmentNote, ProductCodes)
+		SELECT h.PartyId, h.InvoiceHeaderId, h.InvoiceSymbol, h.InvoiceNumber, h.BillerId, h.InvoiceType, h.InvoicePath, h.Amount - ISNULL(d.Discount, 0) - ISNULL(d.AdjustmentAmount, 0), ISNULL(Discount, 0)
+			,ISNULL(d.AdjustmentAmount, 0), ISNULL(d.AdjustmentNote, N'')
 			,STUFF((SELECT ',' + CASE WHEN s.ProductId = 0 THEN 'SB' ELSE p.ProductPrefix END
 					FROM dbo.LA_InvoiceStatement s WITH (NOLOCK)
 						LEFT JOIN dbo.Product3rd p WITH (NOLOCK) ON s.ProductId = p.ProductId
@@ -82,9 +83,12 @@ BEGIN
 		FROM @PartySettings ps
 			INNER JOIN dbo.LA_InvoiceHeader h WITH (NOLOCK) ON ps.PartyId = h.PartyId
 			OUTER APPLY (
-				SELECT SUM(ISNULL(s.Expense, 0)) AS Discount
+				SELECT
+					SUM(CASE WHEN s.InvItemTypeId = 4 THEN ISNULL(s.Expense, 0) ELSE 0 END)		AS Discount
+					,SUM(CASE WHEN s.InvItemTypeId = 17 THEN ISNULL(s.Income, 0) ELSE 0 END)	AS AdjustmentAmount
+					,MAX(CASE WHEN s.InvItemTypeId = 17 THEN s.Description ELSE N'' END)		AS AdjustmentNote
 				FROM dbo.LA_InvoiceStatement s WITH (NOLOCK)
-				WHERE h.InvoiceHeaderId = s.InvoiceHeaderId AND h.InvoiceType = 1 AND s.InvItemTypeId = 4 -- Discount
+				WHERE h.InvoiceHeaderId = s.InvoiceHeaderId AND h.InvoiceType = 1
 			) d
 		WHERE h.StatusId = 0 AND h.Environment = @Environment
 			AND h.InvoiceType IN (1, 3, 6) -- Software Fee, Rebate, Hosting Fee
@@ -556,13 +560,13 @@ BEGIN
 			RowIndex INT, IndexNumber INT, PartyId INT, PartyName VARCHAR(50), ItemType TINYINT, BillerId INT, BillerName NVARCHAR(50)
 			,InvoiceHeaderId BIGINT, InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, InvoicePath NVARCHAR(256)
 			,BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50), ProductCodes VARCHAR(MAX)
-			,LicensingFee MONEY, Discount MONEY, Rebate MONEY
+			,LicensingFee MONEY, Discount MONEY, Rebate MONEY, AdjustmentAmount MONEY, AdjustmentNote NVARCHAR(500)
 		)
 
 		INSERT INTO @Result
 		(
 			RowIndex, IndexNumber, PartyId, PartyName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath
-			,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate
+			,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote
 		)
 		SELECT
 			ROW_NUMBER() OVER(ORDER BY ps.IndexNumber) AS RowIndex
@@ -583,6 +587,8 @@ BEGIN
 			,SUM(ISNULL(CASE WHEN r.InvoiceType = 3 THEN 0 ELSE r.LicensingFee END, 0)) AS LicensingFee
 			,-SUM(ISNULL(r.Discount, 0)) AS Discount
 			,SUM(ISNULL(CASE WHEN r.InvoiceType = 3 THEN r.LicensingFee ELSE 0 END, 0)) AS Rebate
+			,SUM(ISNULL(r.AdjustmentAmount, 0)) AS AdjustmentAmount
+			,ISNULL(r.AdjustmentNote, N'') AS AdjustmentNote
 		FROM @PartySettings ps
 			INNER JOIN @InvoiceSettings ivs ON ps.PartyId = ivs.PartyId
 			LEFT JOIN @FinalResult r ON ps.PartyId = r.PartyId AND ivs.BillerId = r.BillerId AND ivs.InvTypeId = r.InvoiceType
@@ -602,6 +608,7 @@ BEGIN
 			,ps.BaseCurrencyName
 			,ps.InvoiceLanguage
 			,CASE WHEN ivs.InvTypeId = 1 THEN ivs.ProductCodes ELSE '' END
+			,ISNULL(r.AdjustmentNote, N'')
 
 		;WITH cte_rowOrder AS(
 			SELECT RowIndex, ROW_NUMBER() OVER (PARTITION BY BillerId ORDER BY IndexNumber) RowOrder
@@ -617,7 +624,7 @@ BEGIN
 
 	-- Return data
 	SELECT RowIndex, IndexNumber, PartyId, PartyName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath
-		,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate
+		,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote
 	FROM @Result
 
 	DROP TABLE #AmountToCompany
