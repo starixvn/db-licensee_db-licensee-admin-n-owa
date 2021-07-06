@@ -362,7 +362,7 @@ BEGIN
 				LEFT JOIN dbo.Product3rd p WITH (NOLOCK) ON r.ProductId = p.ProductId
 
 			INSERT INTO @FinalResult (PartyId, BillerId, InvoiceType, ProductCodes, LicensingFee, Discount, ExtraAmount)
-			SELECT s.PartyId, ivs.BillerId, 1, ivs.ProductCodes, SUM(s.LicensingFee), SUM(s.Discount), SUM(s.ExtraAmount)
+			SELECT s.PartyId, ivs.BillerId, 1, ivs.ProductCodes, SUM(ROUND(s.LicensingFee, 2)), SUM(ROUND(s.Discount, 2)), SUM(ROUND(s.ExtraAmount, 2))
 			FROM @SumByProducts s
 				INNER JOIN @InvoiceSettings ivs ON s.PartyId = ivs.PartyId AND ',' + ivs.ProductCodes + ',' LIKE '%,' + s.ProductCode + ',%' AND ivs.InvTypeId = 1 -- Software Fee
 				LEFT JOIN @FinalResult r ON ivs.PartyId = r.PartyId AND ivs.BillerId = r.BillerId AND ivs.InvTypeId = r.InvoiceType
