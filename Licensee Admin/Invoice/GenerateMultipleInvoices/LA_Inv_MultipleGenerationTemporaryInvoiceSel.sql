@@ -51,6 +51,7 @@ BEGIN
 			INNER JOIN dbo.LA_InvoiceSetting s WITH (NOLOCK) ON s.FromPartyId = ps.PartyId
 			INNER JOIN dbo.LA_InvoiceTemplate t WITH (NOLOCK) ON s.InvTempId = t.InvTemplateId
 		WHERE s.InvTypeId IN (1, 3, 6)
+			AND (@Environment <> 'PRO' OR s.ToPartyId <> 221) -- Testing Biller
 		GROUP BY s.FromPartyId, s.ToPartyId, s.InvTypeId, t.InvTemplateName
 	END
 	-- End Region: Get Party Settings
@@ -192,7 +193,14 @@ BEGIN
 				SELECT @temp_PartyIds = COALESCE(@temp_PartyIds + ',', '') + CAST(PartyId AS VARCHAR(20)) FROM @PartySettings WHERE BaseCurrencyId = @temp_BaseCurrencyId
 
 				INSERT INTO #AmountToCompany(PartyId, ProductId, Fee, Discount, Rebate, IsChargedByMinFee, IsChargedByGroupMinFee)
-				EXEC dbo.LA_AmountToCompanyByDiscountCurrencySel @FromDate, @ToDate, @temp_PartyIds, @ProductCodes, @temp_BaseCurrencyName, @temp_BaseCurrencyId
+				EXEC dbo.LA_AmountToCompanyByDiscountCurrencySel
+					@FromDate			= @FromDate
+					,@ToDate			= @ToDate
+					,@PartyIds			= @temp_PartyIds
+					,@ProductCodes		= @ProductCodes
+					,@BaseCurrencyName	= @temp_BaseCurrencyName
+					,@BaseCurrencyId	= @temp_BaseCurrencyId
+					,@CurrencyId		= 0
 				
 				SET @RowId = @RowId + 1
 			END
