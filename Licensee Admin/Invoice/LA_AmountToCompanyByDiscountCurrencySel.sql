@@ -35,6 +35,7 @@ AS
 		- 20201209@Parsons: Saba.club - Offer Freebet tickets [#141423]
 		- 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
 		- 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: #154992]
+		- 20210705@Percy: Enhance code to improve performance [#147006]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -320,8 +321,8 @@ BEGIN
  * 2. winloss data
  *-------------------------------------------------------------------------------------------------------------------------------*/
 	-- 2.1 include general products
-	CREATE TABLE #tempData (PartyId INT, ProductId INT, CurrencyId INT, WinlossDate DATETIME, MemberWL MONEY, Amount MONEY, ExtraAmount MONEY)
-	CREATE CLUSTERED INDEX CIX_tempData ON #tempData (PartyId, ProductId, CurrencyId, WinlossDate)
+	CREATE TABLE #tempData (PartyId INT, ProductId INT, CurrencyId INT, WinlossDate DATETIME, MemberWL MONEY, Amount MONEY, ExtraAmount MONEY
+		, PRIMARY KEY (PartyId, ProductId, CurrencyId, WinlossDate))
 
 	INSERT INTO #tempData (PartyId, ProductId, CurrencyId, WinlossDate, MemberWL, Amount, ExtraAmount)
 	SELECT	p.PartyId,p.ProductId,b.CurrencyId,b.rptDate,
@@ -346,8 +347,8 @@ BEGIN
 	GROUP BY p.PartyId,p.ProductId,b.CurrencyId,b.rptDate
 
 	-- 2.2 convert to base
-	CREATE TABLE #tmpWinlossData (PartyId INT, ProductId INT, CurrencyId INT, WinlossDate DATETIME, WinlossByBaseCurrency MONEY, AmountToCompanyByBaseCurrency MONEY, ExtraAmount MONEY, WinlossByDiscountBaseCurrency MONEY, AmountToCompanyByDiscountBaseCurrency MONEY)
-	CREATE CLUSTERED INDEX CIX_tmpWinlossData ON #tmpWinlossData (PartyId, ProductId, CurrencyId, WinlossDate)
+	CREATE TABLE #tmpWinlossData (PartyId INT, ProductId INT, CurrencyId INT, WinlossDate DATETIME, WinlossByBaseCurrency MONEY, AmountToCompanyByBaseCurrency MONEY, ExtraAmount MONEY, WinlossByDiscountBaseCurrency MONEY, AmountToCompanyByDiscountBaseCurrency MONEY
+		, PRIMARY KEY (PartyId, ProductId, CurrencyId, WinlossDate))
 	
 	INSERT INTO #tmpWinlossData (PartyId, ProductId, CurrencyId, WinlossDate, WinlossByBaseCurrency, AmountToCompanyByBaseCurrency, ExtraAmount, WinlossByDiscountBaseCurrency,AmountToCompanyByDiscountBaseCurrency)
 	SELECT	t.PartyId,
@@ -383,12 +384,17 @@ BEGIN
 	LEFT JOIN cte_winlossByDiscountBaseCurrency c ON t.PartyId = c.PartyId AND t.ProductId = c.ProductId AND t.CurrencyId = c.CurrencyId AND t.WinlossDate = c.WinlossDate
 
 	-- 2.4 insert product don't have any ticket
-	INSERT INTO #tmpWinlossData (PartyId,WinlossDate,ProductId,WinlossByDiscountBaseCurrency,WinlossByBaseCurrency,AmountToCompanyByDiscountBaseCurrency,AmountToCompanyByBaseCurrency,ExtraAmount,CurrencyId)
-	SELECT DISTINCT PartyId,@ToDate,c.ProductId,0,0,0,0,0,6--EUR = 6
-	FROM @PartyList p 
-	INNER JOIN @ProductList pd ON 1=1
-	INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON c.ProductID = pd.ProductID AND p.PartyId = c.FromParty
-	WHERE c.ToDate >= @FromDate  
+	INSERT INTO #tmpWinlossData (PartyId, ProductId, CurrencyId, WinlossDate, WinlossByBaseCurrency, AmountToCompanyByBaseCurrency, ExtraAmount, WinlossByDiscountBaseCurrency, AmountToCompanyByDiscountBaseCurrency)
+	SELECT d.PartyId, d.ProductId, @BaseCurrencyId, @ToDate, 0, 0, 0, 0, 0
+	FROM (
+		SELECT DISTINCT PartyId,c.ProductId
+		FROM @PartyList p 
+		INNER JOIN @ProductList pd ON 1=1
+		INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON c.ProductID = pd.ProductID AND p.PartyId = c.FromParty
+		WHERE c.ToDate >= @FromDate
+	) d
+		LEFT JOIN #tmpWinlossData t ON d.PartyId = t.PartyId AND d.ProductId = t.ProductId AND t.CurrencyId = @BaseCurrencyId AND t.WinlossDate = @ToDate
+	WHERE t.PartyId IS NULL
 
 	-- 2.5 create result
 	DECLARE @FinalResult TABLE(PartyId INT, ProductId INT, WinlossByDiscountBaseCurrency MONEY, WinlossByBaseCurrency MONEY, AmountToCompanyByDiscountBaseCurrency MONEY, AmountToCompanyByBaseCurrency MONEY, ExtraAmount MONEY, FeeByDiscountBaseCurrency MONEY, FeeByBaseCurrency MONEY, Discount MONEY, Rebate MONEY, IsChargedByMinFee BIT, IsApplyMinfeeToDiscount BIT, MinFee MONEY, IsChargedByGroupMinFee BIT)
