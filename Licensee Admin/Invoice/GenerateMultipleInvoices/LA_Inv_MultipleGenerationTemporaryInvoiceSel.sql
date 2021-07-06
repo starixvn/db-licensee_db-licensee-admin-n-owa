@@ -74,7 +74,7 @@ BEGIN
 	-- Region: Get party's amount who were issued invoices
 	BEGIN
 		INSERT INTO @FinalResult (PartyId, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, BillerId, InvoiceType, InvoicePath, LicensingFee, Discount, AdjustmentAmount, AdjustmentNote, ProductCodes)
-		SELECT h.PartyId, h.InvoiceHeaderId, h.InvoiceSymbol, h.InvoiceNumber, h.BillerId, h.InvoiceType, h.InvoicePath, h.Amount - ISNULL(d.Discount, 0) - ISNULL(d.AdjustmentAmount, 0), ISNULL(Discount, 0)
+		SELECT h.PartyId, h.InvoiceHeaderId, h.InvoiceSymbol, h.InvoiceNumber, h.BillerId, h.InvoiceType, h.InvoicePath, h.Amount + ISNULL(d.Discount, 0) - ISNULL(d.AdjustmentAmount, 0), ISNULL(Discount, 0)
 			,ISNULL(d.AdjustmentAmount, 0), ISNULL(d.AdjustmentNote, N'')
 			,STUFF((SELECT ',' + CASE WHEN s.ProductId = 0 THEN 'SB' ELSE p.ProductPrefix END
 					FROM dbo.LA_InvoiceStatement s WITH (NOLOCK)
