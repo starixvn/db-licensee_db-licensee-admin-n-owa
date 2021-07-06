@@ -435,7 +435,7 @@ BEGIN
 				FROM dbo.LA_MinFee m WITH (NOLOCK)
 					INNER JOIN @InvAmount i ON m.PartyId = i.PartyId
 					INNER JOIN @PartySettings ps ON m.PartyId = ps.PartyId
-					INNER JOIN #Exchange e ON m.CurrencyId = e.ExchangeId AND e.BaseCurrencyId = ps.BaseCurrencyId AND e.ExchangeDate = @ToDate
+					LEFT JOIN #Exchange e ON m.CurrencyId = e.ExchangeId AND e.BaseCurrencyId = ps.BaseCurrencyId AND e.ExchangeDate = @ToDate
 					LEFT JOIN CTE_GroupMinFee gm ON m.PartyId = gm.PartyId
 				WHERE m.FeeTypeId IN (1, 2)
 					AND m.FromDate <= @LastDate AND m.ToDate >= @FirstDate
