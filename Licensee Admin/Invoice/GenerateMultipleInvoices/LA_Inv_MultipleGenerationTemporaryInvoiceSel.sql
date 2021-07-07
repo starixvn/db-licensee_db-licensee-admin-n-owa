@@ -180,7 +180,7 @@ BEGIN
 		-- Region: Get amount to company, discount, rebate (only for some supported products)
 		BEGIN
 			CREATE TABLE #AmountToCompany (PartyId INT, ProductId INT, Fee MONEY, Discount MONEY, Rebate MONEY, IsChargedByMinFee BIT, IsChargedByGroupMinFee BIT)
-			DECLARE @temp_PartyIds VARCHAR(500), @temp_BaseCurrencyId INT, @temp_BaseCurrencyName VARCHAR(10), @RowId SMALLINT = 1
+			DECLARE @temp_PartyIds VARCHAR(MAX), @temp_BaseCurrencyId INT, @temp_BaseCurrencyName VARCHAR(10), @RowId SMALLINT = 1
 
 			WHILE 1 = 1
 			BEGIN
@@ -247,7 +247,7 @@ BEGIN
 					,PayOut MONEY DEFAULT(0), CommShare MONEY DEFAULT(0), CashInShare MONEY DEFAULT(0)
 				)
 
-				CREATE TABLE #tmpResult (PartyId INT, ProductId INT, rptDate DATE, LicenseeAmount MONEY, ExtraAmount MONEY DEFAULT(0), IsApplyMinFee BIT DEFAULT (1))
+				CREATE TABLE #tmpResult (PartyId INT, ProductId INT, rptDate DATE, LicenseeAmount FLOAT, ExtraAmount FLOAT DEFAULT(0), IsApplyMinFee BIT DEFAULT (1))
 				
 				-- CO
 				DECLARE @FDate SMALLDATETIME = @FromDate, @TDate SMALLDATETIME = @ToDate
@@ -362,7 +362,7 @@ BEGIN
 				LEFT JOIN dbo.Product3rd p WITH (NOLOCK) ON r.ProductId = p.ProductId
 
 			INSERT INTO @FinalResult (PartyId, BillerId, InvoiceType, ProductCodes, LicensingFee, Discount, ExtraAmount)
-			SELECT s.PartyId, ivs.BillerId, 1, ivs.ProductCodes, SUM(ROUND(s.LicensingFee, 2)), SUM(ROUND(s.Discount, 2)), SUM(ROUND(s.ExtraAmount, 2))
+			SELECT s.PartyId, ivs.BillerId, 1, ivs.ProductCodes, SUM(ROUND(s.LicensingFee, 2)), SUM(s.Discount), SUM(s.ExtraAmount)
 			FROM @SumByProducts s
 				INNER JOIN @InvoiceSettings ivs ON s.PartyId = ivs.PartyId AND ',' + ivs.ProductCodes + ',' LIKE '%,' + s.ProductCode + ',%' AND ivs.InvTypeId = 1 -- Software Fee
 				LEFT JOIN @FinalResult r ON ivs.PartyId = r.PartyId AND ivs.BillerId = r.BillerId AND ivs.InvTypeId = r.InvoiceType
