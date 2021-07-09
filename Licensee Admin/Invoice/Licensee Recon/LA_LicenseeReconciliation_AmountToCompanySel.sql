@@ -51,10 +51,11 @@ AS
 			. Pragmatic Live Casino [RedmineID: #150971]
 			. Habanero [RedmineID: #150636]
 			. Creative Gaming [RedmineID: #152139]
-		- 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: 154992]
+		- 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: #154992]
 		- 20210609@Danny: Support AE Sexy Promotion [RedmineID: #152089]
 		- 20210306@Danny: Integrate VGaming [#154080]
 		- 20210614@Danny: Integrate AdvantPlay [#154787]
+		- 20210705@Percy: Add ContributionDiscount column [RedmineID: #157549]
 	    - 20210614@Danny: Integrate AdvantPlay Mini [#155207]
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
 */
@@ -316,40 +317,54 @@ BEGIN
  * Winloss data
  *-----------------*/
 	BEGIN
-		SELECT b.SiteID,b.rptDate,b.ProductId,b.CurrencyId,b.CommissionA,b.CommissionP
-			,b.WinPrizeAmount,b.CashOutAmount,b.BuyBackAmount,b.Turnover,b.TicketType
-			,ISNULL(-b.MemberWL, 0) LicWinloss
-			,CASE WHEN b.Bettype IN (@PPContribution_Bettype, @SB_AdjustedOdds_Bettype, @SBC_Contribution, @SPR_SabaPromotion) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END GrossWL
-			,b.Bettype
-			,CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN b.Turnover ELSE b.ExtraAmount END			TurnoverForCommision
-		INTO #tmpBettingByProduct
+		CREATE TABLE #tmpBettingByProduct (rptDate DATETIME, SiteId INT, ProductId INT, Bettype INT, CurrencyId INT, TicketType TINYINT
+			,CommissionA MONEY, CommissionP MONEY, WinPrizeAmount MONEY, CashOutAmount MONEY, BuyBackAmount MONEY
+			,Turnover MONEY, LicWinloss MONEY, GrossWL MONEY, TurnoverForCommision MONEY)
+
+		CREATE CLUSTERED INDEX IX_tmpBettingByProduct ON #tmpBettingByProduct(rptDate, SiteId, ProductId)
+
+		INSERT INTO #tmpBettingByProduct (rptDate, SiteId, ProductId, Bettype, CurrencyId, TicketType
+			,CommissionA, CommissionP, WinPrizeAmount, CashOutAmount, BuyBackAmount, Turnover, LicWinloss, GrossWL, TurnoverForCommision)
+		SELECT b.rptDate,b.SiteId,b.ProductId,b.Bettype,b.CurrencyId,ISNULL(b.TicketType, 0)
+			,SUM(ISNULL(b.CommissionA, 0))
+			,SUM(ISNULL(b.CommissionP, 0))
+			,SUM(ISNULL(b.WinPrizeAmount, 0))
+			,SUM(ISNULL(b.CashOutAmount, 0))
+			,SUM(ISNULL(b.BuyBackAmount, 0))
+			,SUM(ISNULL(b.Turnover, 0))
+			,SUM(ISNULL(-b.MemberWL, 0)) AS LicWinloss
+			,SUM(CASE WHEN b.Bettype IN (999, 1698, 4297) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS GrossWL
+			,SUM(CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN ISNULL(b.Turnover, 0) ELSE ISNULL(b.ExtraAmount, 0) END) AS TurnoverForCommision
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-		WHERE (b.rptDate BETWEEN @FromDate AND @ToDate)
+		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.SiteID IN (SELECT DISTINCT c.LicenseeID FROM #tmpChargeInfo c)
-			AND (b.ProductID = @SPR OR b.ProductID IN (SELECT p.ProductId FROM @productList p))
+			AND (b.ProductID = 37 OR b.ProductID IN (SELECT p.ProductId FROM @productList p))
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
-
-		CREATE INDEX IX_tmpBettingByProduct ON #tmpBettingByProduct(SiteId, ProductId)
+		GROUP BY b.rptDate,b.SiteId,b.ProductId,b.Bettype,b.CurrencyId,ISNULL(b.TicketType, 0)
 
 		-- calculate amount to company
 		-- excludes: golddeluxe bidme tip, PP JP & Prize, colossus bet
-		-- 
-		SELECT p.PartyID,b.rptDate,p.ProductId,b.CurrencyId,
-			CAST(0 AS MONEY) AS Promotion,
-			CAST(0 AS MONEY) AS ExtraAmount,
-			CAST(0 AS MONEY) AS Contribution,
-			CAST(0 AS MONEY) AS JackPotPrize,
-			CAST(0 AS MONEY) AS PromotionPrize,
-			SUM((b.LicWinloss + (CASE WHEN b.ProductID = @BX THEN b.CommissionA ELSE 0 END)) * e.Rate) AS Winloss,
-			SUM((((b.LicWinloss - CASE WHEN b.ProductID IN (@PP, @SBC) THEN GrossWL ELSE 0 END) * ISNULL(cr.Rate, p.Rate) - 
+		--
+		CREATE TABLE #tmpWinlossData (rptDate DATETIME, PartyId INT, ProductId INT, CurrencyId INT
+			, Winloss MONEY, AmountToCompany MONEY, Promotion MONEY, ExtraAmount MONEY, Contribution MONEY, ContributionDiscount MONEY, JackPotPrize MONEY, PromotionPrize MONEY)
+		
+		INSERT INTO #tmpWinlossData (rptDate, PartyId, ProductId, CurrencyId, Winloss, AmountToCompany, Promotion, ExtraAmount, Contribution, ContributionDiscount, JackPotPrize, PromotionPrize)
+		SELECT b.rptDate, p.PartyId, p.ProductId, b.CurrencyId
+			,SUM((b.LicWinloss + (CASE WHEN b.ProductID = 31 THEN b.CommissionA ELSE 0 END)) * e.Rate) AS Winloss
+			,SUM((((b.LicWinloss - CASE WHEN b.ProductID IN (32, 42) THEN GrossWL ELSE 0 END) * ISNULL(cr.Rate, p.Rate) - 
 				(CASE
-					WHEN b.ProductID = @BA THEN ISNULL(b.CommissionA,0)
-					WHEN b.ProductID = @BX THEN (b.CommissionA + b.CommissionP)
+					WHEN b.ProductID = 3 THEN ISNULL(b.CommissionA, 0)
+					WHEN b.ProductID = 31 THEN (b.CommissionA + b.CommissionP)
 					ELSE 0
 				END)
 				) + CASE WHEN b.ProductID = 0 THEN GrossWL ELSE 0 END) * e.Rate) AS AmountToCompany
-		INTO #tmpWinlossData
+			,0 AS Promotion
+			,0 AS ExtraAmount
+			,0 AS Contribution
+			,0 AS ContributionDiscount
+			,0 AS JackPotPrize
+			,0 AS PromotionPrize
 		FROM #tmpBettingByProduct b
 		INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID AND p.LicenseeId = b.SiteId AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
@@ -362,25 +377,28 @@ BEGIN
 				@GDTip_ChargeType
 			)
 			AND eb.BettypeID IS NULL
-			AND	ISNULL(b.TicketType, 0) <> 2 -- Free_Bets_TicketType 
-		GROUP BY p.PartyID,b.rptdate,p.ProductId,b.CurrencyId
+			AND	b.TicketType <> 2 -- Free_Bets_TicketType 
+		GROUP BY b.rptDate, p.PartyId, p.ProductId, b.CurrencyId
 		-- includes extra values: gdtip, PP JP & Prize
 		--
-		INSERT INTO #tmpWinlossData(PartyID,rptDate,ProductID,CurrencyId,Winloss,AmountToCompany,ExtraAmount,Promotion,Contribution,JackPotPrize,PromotionPrize)
-		SELECT p.PartyID,b.rptDate,p.ProductId,b.CurrencyId,0,0,
-			SUM(CASE WHEN b.Bettype IN(@GDTip_Bettype, @SAGTip_Bettype) THEN b.LicWinloss * p.Rate * e.Rate ELSE 0 END) ExtraAmount,
-			SUM(CASE WHEN b.ProductId = @SPR THEN CASE WHEN b.bettype = @SPR_SabaPromotion THEN -b.GrossWL ELSE -b.LicWinloss END * e.Rate ELSE 0 END) Promotion,
-			SUM(CASE WHEN b.ProductId <> @SPR THEN GrossWL ELSE 0 END * e.Rate) Contribution,
-			SUM(CASE WHEN b.Bettype IN (@PPJackpotPrize_Bettype, @SBC_JackpotPrize) THEN -b.LicWinloss * e.Rate ELSE 0 END) JackPotPrize,
-			SUM(CASE WHEN ISNULL(b.TicketType, 0) = 2 OR b.Bettype IN (@PPTournament_Bettype, @PromotionPrize_Bettype, @CC_ArcadiaBonus_Bettype, @SXG_LuckyDraw) THEN -b.LicWinloss * e.Rate ELSE 0 END) PromotionPrize
+		INSERT INTO #tmpWinlossData (rptDate, PartyId, ProductId, CurrencyId, Winloss, AmountToCompany, Promotion, ExtraAmount, Contribution, ContributionDiscount, JackPotPrize, PromotionPrize)
+		SELECT b.rptDate, p.PartyId, p.ProductId, b.CurrencyId
+			,0 AS Winloss
+			,0 AS AmountToCompany
+			,SUM(CASE WHEN b.Bettype IN (1706, 3007) THEN b.LicWinloss * p.Rate * e.Rate ELSE 0 END) ExtraAmount
+			,SUM(CASE WHEN b.Bettype = 17000 THEN -b.LicWinloss * e.Rate ELSE 0 END) Promotion
+			,SUM(GrossWL * e.Rate) AS Contribution
+			,SUM(GrossWL * p.Rate * e.Rate) AS ContributionDiscount
+			,SUM(CASE WHEN b.Bettype IN (4298, 1699) THEN -b.LicWinloss * e.Rate ELSE 0 END) JackPotPrize
+			,SUM(CASE WHEN b.TicketType = 2 OR b.Bettype IN (4299, 4300, 1906, 3150) THEN -b.LicWinloss * e.Rate ELSE 0 END) PromotionPrize
 		FROM #tmpBettingByProduct b
 		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = (CASE WHEN p.ProductID = 0 THEN @SPR ELSE p.ProductID END)
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39,42,45', '') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN p.FromDate AND p.ToDate
-			AND (p.ProductID IN(0, @PP, @CC, @SBC, @SXG) OR p.ChargeType = @GDTip_ChargeType)
-			AND (b.ProductId = @SPR OR eb.BettypeID IS NOT NULL OR ISNULL(b.TicketType, 0) = 2)
-		GROUP BY p.PartyID,b.rptdate,p.ProductId,b.CurrencyId
+			AND (p.ProductID IN (0, @PP, @CC, @SBC, @SXG) OR p.ChargeType = @GDTip_ChargeType)
+			AND (b.Bettype = 17000 OR eb.BettypeID IS NOT NULL OR b.TicketType = 2)
+		GROUP BY b.rptDate, p.PartyId, p.ProductId, b.CurrencyId
 
 		-- CB
 		BEGIN
@@ -455,6 +473,7 @@ BEGIN
 			,SUM(ISNULL(a.ExtraAmount,0))						ExtraAmount
 			,SUM(ISNULL(a.Promotion,0))							Promotion
 			,SUM(ISNULL(a.Contribution,0))					    Contribution
+			,SUM(ISNULL(a.ContributionDiscount,0))				ContributionDiscount
 			,SUM(ISNULL(a.JackPotPrize,0))						JackPotPrize
 			,SUM(ISNULL(a.PromotionPrize,0))					PromotionPrize
 			,CAST(SUM(ISNULL(a.Winloss,0)) AS MONEY)			Winloss
@@ -470,6 +489,7 @@ BEGIN
 		-- treat negative LicensingFee as 0, except Joint Venture Parties or BA, CB, CO, BX
 		UPDATE r
 		SET r.LicensingFee = CASE WHEN r.AmountToCompany < 0 AND jvp.PartyId IS NULL AND r.ProductID NOT IN (@BA,@CB,@CO,@BX) THEN 0 ELSE r.AmountToCompany END
+			,r.ContributionDiscount = CASE WHEN r.Winloss - r.Contribution < 0 AND jvp.PartyId IS NULL THEN 0 ELSE r.ContributionDiscount END
 		FROM #tmpResult r
 			LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
 	END
@@ -769,81 +789,62 @@ END
 
 	DROP TABLE #productFees
 END
-/*-----------------
- * aggregate
- *-----------------*/
+
+-- Final Result
+BEGIN
+	DECLARE @Result TABLE (PartyId INT, LicenseeCode VARCHAR(100), ProductId INT, LicensingFee MONEY, AmountToCompany MONEY, Discount MONEY, Rebate MONEY, Promotion MONEY, ContributionDiscount MONEY)
+	INSERT INTO @Result (PartyId, LicenseeCode, ProductId, Discount, Rebate, Promotion, ContributionDiscount, AmountToCompany)
+	SELECT r.PartyId, ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId), r.ProductId, SUM(r.Discount), SUM(r.Rebate), SUM(r.ContributionDiscount)
+		,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) AS LicensingFee
+		,SUM(CASE WHEN r.ProductId IN (32, 34, 42, 45) THEN 
+										        (CASE WHEN r.AmountToCompany < 0 AND jvp.PartyId IS NULL THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
+					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AS AmountToCompany
+	FROM #tmpResult r
+		INNER JOIN @partyList p ON r.PartyId = p.PartyId
+		LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
+	WHERE p.IsSelected = 1
+	GROUP BY r.PartyId, ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId), r.ProductId
+
 	IF @IsShowSettlementDetail = 1
 	BEGIN
 		IF @IsGroupByPartyId = 1
-		BEGIN	
-			SELECT p.PartyId
-				, pl.Name AS ProductName
-				, pl.ProductId
-				, UPPER(@BaseCurrency) AS CurrencyName
-				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC, @SXG) THEN 
-										        (CASE WHEN r.AmountToCompany < 0 AND jvp.PartyId IS NULL THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
-					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
-			FROM #tmpResult r
-			INNER JOIN @partyList p ON r.PartyID=p.PartyId
-			INNER JOIN @productList pl ON r.ProductID = pl.ProductId
-			LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
-			WHERE p.IsSelected=1
-			GROUP BY pl.ProductId, p.PartyId, pl.Name
-		END
+			SELECT r.PartyId, p.Name AS ProductName, p.ProductId, UPPER(@BaseCurrency) AS CurrencyName, SUM(r.AmountToCompany) AS AmountToCompany
+			FROM @Result r
+				INNER JOIN @ProductList p ON r.ProductId = p.ProductId
+			GROUP BY p.ProductId, p.Name, r.PartyId
 		ELSE
-		BEGIN
-			SELECT ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId) AS LicenseeCode
-				, pl.Name AS ProductName
-				, UPPER(@BaseCurrency) AS CurrencyName
-				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC, @SXG) THEN 
-										        (CASE WHEN r.AmountToCompany < 0 AND jvp.PartyId IS NULL THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
-					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
-			FROM #tmpResult r
-			INNER JOIN @partyList p ON r.PartyID=p.PartyId
-			INNER JOIN @productList pl ON r.ProductID = pl.ProductId
-			LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
-			WHERE p.IsSelected=1
-			GROUP BY pl.ProductId, ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId), pl.Name
-			ORDER BY pl.ProductId
-		END
+			SELECT r.LicenseeCode, p.Name AS ProductName, UPPER(@BaseCurrency) AS CurrencyName, SUM(r.AmountToCompany) AS AmountToCompany
+			FROM @Result r
+				INNER JOIN @ProductList p ON r.ProductId = p.ProductId
+			GROUP BY r.LicenseeCode, p.ProductId, p.Name
+			ORDER BY p.ProductId
 	END
 	ELSE
 	BEGIN
 		IF @IsGroupByPartyId = 1
-		BEGIN
-			SELECT p.PartyId
-				,UPPER(@BaseCurrency) AS CurrencyName
-				,SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC, @SXG) THEN 
-										        (CASE WHEN r.AmountToCompany < 0 AND jvp.PartyId IS NULL THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
-					 ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
-				,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) LicensingFee
-				,SUM(r.Discount) Discount
-				,SUM(r.Rebate) Rebate
-				,SUM(r.Promotion) Promotion
-			FROM #tmpResult r
-				INNER JOIN @partyList p ON p.PartyId = r.PartyID
-				LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
-			WHERE p.IsSelected = 1
-			GROUP BY p.PartyId
-		END
+			SELECT PartyId
+				,UPPER(@BaseCurrency)		AS CurrencyName
+				,SUM(AmountToCompany)		AS AmountToCompany
+				,SUM(LicensingFee)			AS LicensingFee
+				,SUM(Discount)				AS Discount
+				,SUM(Rebate)				AS Rebate
+				,SUM(Promotion)				AS Promotion
+				,SUM(ContributionDiscount)	AS ContributionDiscount
+			FROM @Result
+			GROUP BY PartyId
 		ELSE
-		BEGIN
-			SELECT ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId) AS LicenseeCode
-				,UPPER(@BaseCurrency) AS CurrencyName 
-				, SUM(CASE WHEN r.ProductID IN (@PP, @SBC, @CC, @SXG) THEN 
-										        (CASE WHEN r.AmountToCompany < 0 AND jvp.PartyId IS NULL THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
-					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AmountToCompany
-				,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) LicensingFee
-				,SUM(r.Discount) Discount
-				,SUM(r.Rebate) Rebate
-				,SUM(r.Promotion) Promotion
-			FROM #tmpResult r
-			INNER JOIN @partyList p ON p.PartyId = r.PartyID
-			LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
-			WHERE p.IsSelected = 1
-			GROUP BY ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId)
-		END
+			SELECT LicenseeCode
+				,UPPER(@BaseCurrency)		AS CurrencyName
+				,SUM(AmountToCompany)		AS AmountToCompany
+				,SUM(LicensingFee)			AS LicensingFee
+				,SUM(Discount)				AS Discount
+				,SUM(Rebate)				AS Rebate
+				,SUM(Promotion)				AS Promotion
+				,SUM(ContributionDiscount)	AS ContributionDiscount
+			FROM @Result
+			GROUP BY LicenseeCode
 	END
+END
 
 	DROP TABLE #tmpResult
 	DROP TABLE #tmpBettingByProduct
