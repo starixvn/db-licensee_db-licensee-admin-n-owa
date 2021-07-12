@@ -20,6 +20,7 @@ AS
 		- 20201023@Parsons: LA Arcadia Gaming Add Bonus [#143597]  
 		- 20210501@Parsons: Saba Club - Integrate Slot Game [#147977]  
 		- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
+		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 
 	Param's Explanation:
 		@ProductIDs: Filter by list of products 
@@ -56,6 +57,9 @@ BEGIN
 			UNION ALL
 		SELECT 45 AS ProductID, BettypeID, [Description]
 		FROM (VALUES(3150, 'Lucky Draw')) AS v(BettypeID, [Description]) -- AESexy Lucky Draw
+			UNION ALL
+		SELECT 66 AS ProductID, BettypeID, [Description]
+		FROM (VALUES(3898, 'VGA Jackpot Contribution'), (3899, 'VGA Jackpot Prize')) AS v(BettypeID, [Description]) -- VGA
 	)
 	INSERT INTO @Result (ProductID, BettypeID, [Description])
 	SELECT r.* 

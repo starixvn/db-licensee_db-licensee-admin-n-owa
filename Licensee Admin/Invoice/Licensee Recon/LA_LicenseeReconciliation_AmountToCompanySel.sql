@@ -85,6 +85,8 @@ BEGIN
 		,@SBC_JackpotPrize SMALLINT = 1699
 		,@SXG_LuckyDraw    SMALLINT = 3150
 		,@SPR_SabaPromotion SMALLINT = 17005 
+		,@VGA_Contribution SMALLINT = 3898
+		,@VGA_JackpotPrize SMALLINT = 3899
 		,@BA	SMALLINT = 3
 		,@GD	SMALLINT = 11
 		,@CB	SMALLINT = 15
@@ -95,6 +97,7 @@ BEGIN
 		,@SPR	SMALLINT = 37
 		,@SBC	SMALLINT = 42
 		,@SXG   SMALLINT = 45
+		,@VGA	SMALLINT = 66
 
 /*-----------------
  * Settings
@@ -369,7 +372,7 @@ BEGIN
 		INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID AND p.LicenseeId = b.SiteId AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 		LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
-		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39,42,45', '4297,1698') eb ON b.Bettype = eb.BettypeID
+		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39,42,45,66', '4297,1698,3898') eb ON b.Bettype = eb.BettypeID
 		WHERE p.ChargeType NOT IN (
 				@CashoutComm_ChargeType,
 				@CommissionShare_ChargeType,
@@ -395,9 +398,9 @@ BEGIN
 		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = (CASE WHEN p.ProductID = 0 THEN @SPR ELSE p.ProductID END)
 		LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39,42,45', '') eb ON b.Bettype = eb.BettypeID
+		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39,42,45,66', '') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN p.FromDate AND p.ToDate
-			AND (p.ProductID IN (0, @PP, @CC, @SBC, @SXG) OR p.ChargeType = @GDTip_ChargeType)
+			AND (p.ProductID IN(0, @PP, @CC, @SBC, @SXG, @VGA) OR p.ChargeType = @GDTip_ChargeType)
 			AND (b.ProductID = 37 OR eb.BettypeID IS NOT NULL OR b.TicketType = 2)
 		GROUP BY b.rptDate, p.PartyId, p.ProductId, b.CurrencyId
 

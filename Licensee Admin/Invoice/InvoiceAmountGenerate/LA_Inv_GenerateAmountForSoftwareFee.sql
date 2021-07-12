@@ -38,6 +38,7 @@ AS
 		- 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
 		- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
+		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -667,6 +668,40 @@ BEGIN
 		GROUP BY CASE 
 					WHEN Bettype = @SBC_Contribution_Bettype THEN 35
 					WHEN Bettype = @SBC_JackpotPrize_Bettype THEN 36
+					ELSE 34
+				 END
+		HAVING SUM(ExtraAmount) > 0
+	END
+	-- End region
+
+	-- Region Vgaming
+	DECLARE @VGAProductID INT = 66
+	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = @Saba_clubProductID))
+	BEGIN
+		DECLARE @VGA_Contribution_Bettype SMALLINT = 3898,
+				@VGA_JackpotPrize_Bettype SMALLINT = 3899
+
+		;WITH cte_VGA_ExtraAmount AS
+		(
+			SELECT b.Bettype, ISNULL(b.TicketType, 0) TicketType, SUM(CASE WHEN b.Bettype = @SBC_Contribution_Bettype THEN -b.GrossWL ELSE b.MemberWL END * e.Rate) AS ExtraAmount
+			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+				INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'VGA', 'OA', 1) pc ON b.SiteID = pc.LicenseeId AND (b.rptDate BETWEEN pc.FromDate AND pc.ToDate)
+				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
+			WHERE (b.ProductID = 42 AND ISNULL(b.TicketType, 0) = 2 OR b.Bettype IN (@VGA_Contribution_Bettype, @VGA_JackpotPrize_Bettype))
+				AND b.rptDate BETWEEN @FromDate AND @ToDate
+				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+			GROUP BY b.Bettype, ISNULL(b.TicketType, 0)
+		)
+		INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,AmountType,InvoiceAmount,RemainingAmount)
+		SELECT 0, '', '', CASE 
+								WHEN Bettype = @VGA_Contribution_Bettype THEN 35 -- new
+								WHEN Bettype = @VGA_JackpotPrize_Bettype THEN 36 -- new
+								ELSE 34
+							END, SUM(ExtraAmount), 0
+		FROM cte_VGA_ExtraAmount
+		GROUP BY CASE 
+					WHEN Bettype = @VGA_Contribution_Bettype THEN 35 -- new
+					WHEN Bettype = @VGA_JackpotPrize_Bettype THEN 36 -- new
 					ELSE 34
 				 END
 		HAVING SUM(ExtraAmount) > 0
