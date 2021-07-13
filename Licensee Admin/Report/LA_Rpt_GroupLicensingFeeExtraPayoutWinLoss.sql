@@ -17,6 +17,7 @@ AS
 	   - 20210223@Mason: Group Licensing Fees Report - Add Jackpot Information [#148030]
 	   - 20210608@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: #150899]
 	   - 20210609@Danny: Support AE Sexy Licensee Fee detail [#152141]
+	   - 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 */
 
 BEGIN
@@ -38,34 +39,36 @@ BEGIN
 
 	DECLARE @TotalServiceFee MONEY
 
-	DECLARE @PP_Contribution SMALLINT = 4297,
-			@PP_JackpotPrize SMALLINT = 4298,
-			@PP_Tournament SMALLINT = 4299,
-			@PP_PromotionPrize SMALLINT = 4300,
+	DECLARE @PP_Contribution		SMALLINT = 4297,
+			@PP_JackpotPrize		SMALLINT = 4298,
+			@PP_Tournament			SMALLINT = 4299,
+			@PP_PromotionPrize		SMALLINT = 4300,
 
-			@SBC_Contribution SMALLINT = 1698,
-			@SBC_Jackpot SMALLINT = 1699,
-			@FreeBetsTicketType SMALLINT = 2,
+			@SBC_Contribution		SMALLINT = 1698,
+			@SBC_Jackpot			SMALLINT = 1699,
+			@VGA_Contribution		SMALLINT = 3898,
+			@VGA_Jackpot			SMALLINT = 3899,
+			@FreeBetsTicketType		SMALLINT = 2,
 
-			@ArcadiaGaming_Bonus SMALLINT = 1906,
-			@SXG_LuckyDraw SMALLINT = 3150
+			@ArcadiaGaming_Bonus	SMALLINT = 1906,
+			@SXG_LuckyDraw			SMALLINT = 3150
 
 	;WITH cte_Data AS(
 		SELECT b.rptDate, b.SiteID, b.ProductID, b.CurrencyId,
 			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR 
-						b.Bettype IN (@PP_Tournament,@PP_PromotionPrize,@PP_Contribution,@PP_JackpotPrize,@SBC_Contribution,@SBC_Jackpot,@ArcadiaGaming_Bonus,@SXG_LuckyDraw) THEN 0
+						b.Bettype IN (@PP_Tournament,@PP_PromotionPrize,@PP_Contribution,@PP_JackpotPrize,@SBC_Contribution,@SBC_Jackpot,@ArcadiaGaming_Bonus,@SXG_LuckyDraw,@VGA_Contribution,@VGA_Jackpot) THEN 0
 					 ELSE ISNULL(b.BetCount, 0)  
 				END) AS BetCount,
 			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR 
-						b.Bettype IN (@PP_Tournament,@PP_PromotionPrize,@PP_Contribution,@PP_JackpotPrize,@SBC_Contribution,@SBC_Jackpot,@ArcadiaGaming_Bonus,@SXG_LuckyDraw) THEN 0 
+						b.Bettype IN (@PP_Tournament,@PP_PromotionPrize,@PP_Contribution,@PP_JackpotPrize,@SBC_Contribution,@SBC_Jackpot,@ArcadiaGaming_Bonus,@SXG_LuckyDraw,@VGA_Contribution,@VGA_Jackpot) THEN 0 
 					 ELSE ISNULL(b.Turnover, 0)
 				END) AS Turnover,
 			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR 
-						b.Bettype IN (@PP_Tournament,@PP_PromotionPrize,@PP_Contribution,@PP_JackpotPrize,@SBC_Contribution,@SBC_Jackpot,@ArcadiaGaming_Bonus,@SXG_LuckyDraw) THEN 0 
+						b.Bettype IN (@PP_Tournament,@PP_PromotionPrize,@PP_Contribution,@PP_JackpotPrize,@SBC_Contribution,@SBC_Jackpot,@ArcadiaGaming_Bonus,@SXG_LuckyDraw,@VGA_Contribution,@VGA_Jackpot) THEN 0 
 					 ELSE ISNULL(b.MemberWL, 0)
 				END) AS CustomerWL,
-			SUM(CASE WHEN b.Bettype = @PP_Contribution OR b.Bettype = @SBC_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END)			 AS Contribution,
-			SUM(CASE WHEN b.Bettype = @PP_JackpotPrize OR b.Bettype = @SBC_Jackpot THEN ISNULL(b.MemberWL, 0) ELSE 0 END)				 AS JackpotPrize,
+			SUM(CASE WHEN b.Bettype IN (@PP_Contribution,@SBC_Contribution,@VGA_Contribution)THEN ISNULL(-b.GrossWL, 0) ELSE 0 END)			 AS Contribution,
+			SUM(CASE WHEN b.Bettype IN (@PP_JackpotPrize,@SBC_Jackpot,@VGA_Jackpot) THEN ISNULL(b.MemberWL, 0) ELSE 0 END)				 AS JackpotPrize,
 			SUM(CASE WHEN b.Bettype IN (@PP_PromotionPrize, @PP_Tournament, @ArcadiaGaming_Bonus,@SXG_LuckyDraw) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS PromotionPrize,
 			SUM(CASE WHEN ISNULL(b.TicketType, 0) = @FreeBetsTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END)							 AS FreeBetAmount
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)

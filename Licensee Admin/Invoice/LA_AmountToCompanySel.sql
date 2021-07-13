@@ -34,6 +34,7 @@ AS
 	    - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
 		- 20201130@Parsons: Saba.club - Offer Freebet tickets [#141423]
 		- 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
+		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 
 	Parameters:
 		@IsApplyDiscountMinfee: apply minfee term to discount value
@@ -52,7 +53,8 @@ BEGIN
 			@PPTournament SMALLINT = 4299,
 			@PromotionPrize SMALLINT = 4300,
 			@SB_AdjustedOdds SMALLINT = 999, 
-			@SBC_Contribution SMALLINT = 1698
+			@SBC_Contribution SMALLINT = 1698,
+			@VGA_Contribution SMALLINT = 3898
 	
 	-- product to be discounted
 	DECLARE @ProductList TABLE (ProductId INT, ToBeDiscounted BIT)
@@ -298,8 +300,8 @@ BEGIN
 	;WITH cte_Data AS
 	(
 		SELECT p.PartyId, b.rptDate, p.ProductId, b.CurrencyId,
-		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @PP_Contribution,@SB_AdjustedOdds, @SBC_Contribution) THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss, 
-		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @SB_AdjustedOdds) THEN 0 ELSE (ISNULL(-b.MemberWL, 0) - CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) 
+		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @PP_Contribution,@SB_AdjustedOdds, @SBC_Contribution, @VGA_Contribution) THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss, 
+		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @SB_AdjustedOdds) THEN 0 ELSE (ISNULL(-b.MemberWL, 0) - CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @VGA_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) 
 																	* ISNULL(cr.Rate, p.Rate) * e.Rate END) AS LicencingFeeAdjustedOdds, 
 		SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN ISNULL(-b.GrossWL, 0) ELSE 0 END * e.Rate) AS OddsSpreadCost,
 		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) * e.Rate
@@ -313,7 +315,7 @@ BEGIN
 		AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)  
 		AND (p.ProductID NOT IN (11, 39) OR b.Bettype = p.Bettype)
 	LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeID AND b.CurrencyId = cr.CurrencyID
-	LEFT JOIN LA_f_ExcludedBettypeListSel('', '999,1706,3007,4297,1698') eb ON b.Bettype = eb.BettypeID
+	LEFT JOIN LA_f_ExcludedBettypeListSel('', '999,1706,3007,4297,1698,3898') eb ON b.Bettype = eb.BettypeID
 	WHERE (b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
