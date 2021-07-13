@@ -687,22 +687,22 @@ BEGIN
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'VGA', 'OA', 1) pc ON b.SiteID = pc.LicenseeId AND (b.rptDate BETWEEN pc.FromDate AND pc.ToDate)
 				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-			WHERE (b.ProductID = 42 AND ISNULL(b.TicketType, 0) = 2 OR b.Bettype IN (@VGA_Contribution_Bettype, @VGA_JackpotPrize_Bettype))
+			WHERE (b.ProductID = 66 AND ISNULL(b.TicketType, 0) = 2 OR b.Bettype IN (@VGA_Contribution_Bettype, @VGA_JackpotPrize_Bettype))
 				AND b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
 			GROUP BY b.Bettype, ISNULL(b.TicketType, 0)
 		)
 		INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,AmountType,InvoiceAmount,RemainingAmount)
 		SELECT 0, '', '', CASE 
-								WHEN Bettype = @VGA_Contribution_Bettype THEN 35 -- new
-								WHEN Bettype = @VGA_JackpotPrize_Bettype THEN 36 -- new
-								ELSE 34
+								WHEN Bettype = @VGA_Contribution_Bettype THEN 40
+								WHEN Bettype = @VGA_JackpotPrize_Bettype THEN 39
+								ELSE 38
 							END, SUM(ExtraAmount), 0
 		FROM cte_VGA_ExtraAmount
 		GROUP BY CASE 
-					WHEN Bettype = @VGA_Contribution_Bettype THEN 35 -- new
-					WHEN Bettype = @VGA_JackpotPrize_Bettype THEN 36 -- new
-					ELSE 34
+					WHEN Bettype = @VGA_Contribution_Bettype THEN 40
+					WHEN Bettype = @VGA_JackpotPrize_Bettype THEN 39
+					ELSE 38
 				 END
 		HAVING SUM(ExtraAmount) > 0
 	END
