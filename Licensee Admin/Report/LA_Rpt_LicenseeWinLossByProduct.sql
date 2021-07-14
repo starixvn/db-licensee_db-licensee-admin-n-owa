@@ -640,7 +640,7 @@ BEGIN
 			AND APM IS NULL
 
 	-- Result
-	SELECT l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP, l.CC, l.SG, l.VRG, l.SAG, l.I4D, l.TG, l.SBC, l.SXG, l.PGS, l.JK, l.WM, l.VS3, l.GDG, l.BG, l.MXG, l.SLT, l.PPL, l.HB, l.CG, l.AP, l.APM
+	SELECT l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP, l.CC, l.SG, l.VRG, l.SAG, l.I4D, l.TG, l.SBC, l.SXG, l.PGS, l.JK, l.WM, l.VS3, l.GDG, l.BG, l.MXG, l.SLT, l.PPL, l.HB, l.CG, l.VGA, l.AP, l.APM
 	FROM #LicenseeAmount l
 	ORDER BY l.GroupId, l.PartyId
 	-- EndRegion
