@@ -58,6 +58,8 @@ AS
 		- 20210614@Danny: Integrate AdvantPlay Mini [#155207]
 		- 20210705@Percy: Add ContributionDiscount column [RedmineID: #157549]
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
+		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+
 */
 BEGIN
 	SET NOCOUNT ON
@@ -73,6 +75,7 @@ BEGIN
 		,@CommissionShare_ChargeType	SMALLINT = 6
 		,@CashinShare_ChargeType		SMALLINT = 7
 		,@CashoutComm_ChargeType		SMALLINT = 5
+		,@SabaPromotion_Bettype			SMALLINT = 17000
 		,@PPContribution_Bettype		SMALLINT = 4297
 		,@PPJackpotPrize_Bettype		SMALLINT = 4298
 		,@PPTournament_Bettype		SMALLINT = 4299
