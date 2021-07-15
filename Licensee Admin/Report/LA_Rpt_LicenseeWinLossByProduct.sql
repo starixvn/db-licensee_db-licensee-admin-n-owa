@@ -511,7 +511,7 @@ BEGIN
 		APM MONEY
 	)
 	
-	INSERT INTO @AmountDueByProduct(LicenseeId, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, BRVS, LC, VG, MGCLC, MGCRNG, BX, SG, VRG, SAG, I4D, TG, PGS, JK, WM, VS3, GDG, BG, MXG, SLT, PPL, HB, CG, VGA, AP, APM)
+	INSERT INTO @AmountDueByProduct(LicenseeId, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, BRVS, LC, VG, MGCLC, MGCRNG, BX, SG, VRG, SAG, I4D, TG, PGS, JK, WM, VS3, GDG, BG, MXG, SLT, PPL, HB, CG)
 	SELECT d.LicenseeId,
 			ISNULL(SUM(CASE WHEN d.ProductId = 2  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS NG,
 			ISNULL(SUM(CASE WHEN d.ProductId = 5  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VS,
