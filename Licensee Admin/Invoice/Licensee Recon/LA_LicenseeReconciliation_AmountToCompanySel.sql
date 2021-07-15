@@ -796,9 +796,7 @@ BEGIN
 	INSERT INTO @Result (PartyId, LicenseeCode, ProductId, Discount, Rebate, Promotion, ContributionDiscount, AmountToCompany)
 	SELECT r.PartyId, ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId), r.ProductId, SUM(r.Discount), SUM(r.Rebate), SUM(r.ContributionDiscount)
 		,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) AS LicensingFee
-		,SUM(CASE WHEN r.ProductId IN (32, 34, 42, 45) THEN 
-										        (CASE WHEN r.AmountToCompany < 0 AND jvp.PartyId IS NULL THEN 0 ELSE r.AmountToCompany END) + Contribution - JackPotPrize - PromotionPrize
-					  ELSE r.AmountToCompany + r.ExtraAmount - PromotionPrize END) AS AmountToCompany
+		,SUM(r.AmountToCompany + Contribution - JackPotPrize - PromotionPrize) AS AmountToCompany
 	FROM #tmpResult r
 		INNER JOIN @partyList p ON r.PartyId = p.PartyId
 		LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
