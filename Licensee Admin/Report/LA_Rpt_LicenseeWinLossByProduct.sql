@@ -65,6 +65,8 @@ AS
 			. Creative Gaming [RedmineID: #152139]
 		- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
 	    - 20210306@Danny: Integrate VGaming [#154080]
+		- 20210614@Danny: Integrate AdvantPlay [#154787]
+		- 20210614@Danny: Integrate AdvantPlay Mini [#155207]
 */
 		
 /*	Example:
@@ -84,7 +86,7 @@ BEGIN
 	DECLARE @PragmaticID INT = 32, @SBC_ProductID INT = 42, @Arcadia_Gaming_Id INT = 34, @SXG_ID  INT = 45
 
 	-- Region: Get party charge rate info 
-	DECLARE @ProductCode VARCHAR(500)= 'BA,SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX,PP,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG,BGG,MXG,SLT,PPL,HB,CG,VGA'
+	DECLARE @ProductCode VARCHAR(500)= 'BA,SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX,PP,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG,BGG,MXG,SLT,PPL,HB,CG,VGA,AP,APM'
 	
 	-- Region: Get Party ID
 	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)
@@ -231,7 +233,9 @@ BEGIN
 		PPL			MONEY,	-- Pragmatic Live Casino
 		HB			MONEY,	-- Habanero
 		CG			MONEY,	-- Creative Gaming
-		VGA			MONEY	-- VGaming
+		VGA			MONEY,	-- VGaming
+		AP			MONEY,  -- AdvantPlay
+		APM			MONEY  -- AdvantPlay mini
 	)						  
 	INSERT INTO #LicenseeAmount(GroupName, GroupId, LicenseeId, PartyId,PartyName)
 	SELECT	REPLACE(p.PartyName,' Licensees','') AS PartyName,
@@ -498,10 +502,12 @@ BEGIN
 		PPL MONEY,
 		HB MONEY,
 		CG MONEY,
-		VGA MONEY
+		VGA MONEY,
+		AP	MONEY,
+		APM MONEY
 	)
 	
-	INSERT INTO @AmountDueByProduct(LicenseeId, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, BRVS, LC, VG, MGCLC, MGCRNG, BX, SG, VRG, SAG, I4D, TG, PGS, JK, WM, VS3, GDG, BG, MXG, SLT, PPL, HB, CG, VGA)
+	INSERT INTO @AmountDueByProduct(LicenseeId, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, BRVS, LC, VG, MGCLC, MGCRNG, BX, SG, VRG, SAG, I4D, TG, PGS, JK, WM, VS3, GDG, BG, MXG, SLT, PPL, HB, CG, VGA, AP, APM)
 	SELECT d.LicenseeId,
 			ISNULL(SUM(CASE WHEN d.ProductId = 2  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS NG,
 			ISNULL(SUM(CASE WHEN d.ProductId = 5  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VS,
@@ -535,7 +541,9 @@ BEGIN
 			ISNULL(SUM(CASE WHEN d.ProductId = 65 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS PPL,
 			ISNULL(SUM(CASE WHEN d.ProductId = 61 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS HB,
 			ISNULL(SUM(CASE WHEN d.ProductId = 62 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS CG,
-			ISNULL(SUM(CASE WHEN d.ProductId = 66 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VGA
+			ISNULL(SUM(CASE WHEN d.ProductId = 66 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VGA,
+			ISNULL(SUM(CASE WHEN d.ProductId = 67 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS AP,
+			ISNULL(SUM(CASE WHEN d.ProductId = 68 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS APM
 	FROM	#TempData d
 				INNER JOIN @PartyChargeInfo ci ON	d.LicenseeId = ci.LicenseeId
 													AND ci.ProductId = d.ProductId
@@ -579,7 +587,9 @@ BEGIN
 			PPL = a.PPL,
 			HB = a.HB,
 			CG = a.CG,
-			VGA = a.VGA
+			VGA = a.VGA,
+			AP = a.AP,
+			APM = a.APM
 	FROM	#LicenseeAmount l
 			INNER JOIN @AmountDueByProduct a ON a.LicenseeId = l.LicenseeId
 	
@@ -626,9 +636,11 @@ BEGIN
 			AND HB IS NULL
 			AND CG IS NULL
 			AND VGA IS NULL
+			AND AP IS NULL
+			AND APM IS NULL
 
 	-- Result
-	SELECT l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP, l.CC, l.SG, l.VRG, l.SAG, l.I4D, l.TG, l.SBC, l.SXG, l.PGS, l.JK, l.WM, l.VS3, l.GDG, l.BG, l.MXG, l.SLT, l.PPL, l.HB, l.CG, l.VGA
+	SELECT l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP, l.CC, l.SG, l.VRG, l.SAG, l.I4D, l.TG, l.SBC, l.SXG, l.PGS, l.JK, l.WM, l.VS3, l.GDG, l.BG, l.MXG, l.SLT, l.PPL, l.HB, l.CG, l.VGA, l.AP, l.APM
 	FROM #LicenseeAmount l
 	ORDER BY l.GroupId, l.PartyId
 	-- EndRegion

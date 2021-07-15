@@ -54,7 +54,8 @@ AS
 			. Creative Gaming [RedmineID: #152139]
 	   - 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: #154992]
 	   - 20210306@Danny: Integrate VGaming [#154080]
-
+	   - 20210614@Danny: Integrate AdvantPlay [#154787]
+	   - 20210614@Danny: Integrate AdvantPlay Mini [#155207]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -103,7 +104,7 @@ BEGIN
 		SET @sdate = DATEADD(m, 1, @sdate)
 	END	
 
-	IF @ProductCode IN ('NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK', 'WM', 'VS3', 'GDG', 'BGG', 'MXG', 'SLT', 'PPL', 'HB', 'CG', 'VGA')
+	IF @ProductCode IN ('NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK', 'WM', 'VS3', 'GDG', 'BGG', 'MXG', 'SLT', 'PPL', 'HB', 'CG', 'VGA', 'AP', 'APM')
 	BEGIN		
 		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, LicensingFee)
 		SELECT tp.PartyID, d.rptDate, d.CurrencyID, - SUM(d.Winloss * ISNULL(cc.Rate, tp.Rate))
