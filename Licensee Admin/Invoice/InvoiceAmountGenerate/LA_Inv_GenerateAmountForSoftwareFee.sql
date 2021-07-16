@@ -676,14 +676,14 @@ BEGIN
 
 	-- Region Vgaming
 	DECLARE @VGAProductID INT = 66
-	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = @Saba_clubProductID))
+	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = @VGAProductID))
 	BEGIN
 		DECLARE @VGA_Contribution_Bettype SMALLINT = 3898,
 				@VGA_JackpotPrize_Bettype SMALLINT = 3899
 
 		;WITH cte_VGA_ExtraAmount AS
 		(
-			SELECT b.Bettype, ISNULL(b.TicketType, 0) TicketType, SUM(CASE WHEN b.Bettype = @SBC_Contribution_Bettype THEN -b.GrossWL ELSE b.MemberWL END * e.Rate) AS ExtraAmount
+			SELECT b.Bettype, ISNULL(b.TicketType, 0) TicketType, SUM(CASE WHEN b.Bettype = @VGA_Contribution_Bettype THEN -b.GrossWL ELSE b.MemberWL END * e.Rate) AS ExtraAmount
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'VGA', 'OA', 1) pc ON b.SiteID = pc.LicenseeId AND (b.rptDate BETWEEN pc.FromDate AND pc.ToDate)
 				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
