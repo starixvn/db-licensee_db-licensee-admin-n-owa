@@ -55,8 +55,8 @@ AS
 		- 20210609@Danny: Support AE Sexy Promotion [RedmineID: #152089]
 		- 20210306@Danny: Integrate VGaming [#154080]
 		- 20210614@Danny: Integrate AdvantPlay [#154787]
+		- 20210614@Danny: Integrate AdvantPlay Mini [#155207]
 		- 20210705@Percy: Add ContributionDiscount column [RedmineID: #157549]
-	    - 20210614@Danny: Integrate AdvantPlay Mini [#155207]
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
 */
 BEGIN
@@ -793,8 +793,8 @@ END
 -- Final Result
 BEGIN
 	DECLARE @Result TABLE (PartyId INT, LicenseeCode VARCHAR(100), ProductId INT, LicensingFee MONEY, AmountToCompany MONEY, Discount MONEY, Rebate MONEY, Promotion MONEY, ContributionDiscount MONEY)
-	INSERT INTO @Result (PartyId, LicenseeCode, ProductId, Discount, Rebate, Promotion, ContributionDiscount, AmountToCompany)
-	SELECT r.PartyId, ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId), r.ProductId, SUM(r.Discount), SUM(r.Rebate), SUM(r.ContributionDiscount)
+	INSERT INTO @Result (PartyId, LicenseeCode, ProductId, Discount, Rebate, Promotion, ContributionDiscount, LicensingFee, AmountToCompany)
+	SELECT r.PartyId, ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId), r.ProductId, SUM(r.Discount), SUM(r.Rebate), SUM(r.Promotion), SUM(r.ContributionDiscount)
 		,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) AS LicensingFee
 		,SUM(r.AmountToCompany + Contribution - JackPotPrize - PromotionPrize) AS AmountToCompany
 	FROM #tmpResult r
