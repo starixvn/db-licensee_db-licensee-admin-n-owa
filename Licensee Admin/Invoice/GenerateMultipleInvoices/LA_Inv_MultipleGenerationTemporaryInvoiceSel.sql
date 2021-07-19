@@ -3,11 +3,12 @@ USE [bodb_Licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_MultipleGenerationTemporaryInvoiceSel]
-	@PartyIds			VARCHAR(MAX),
-	@FromDate			DATE,
-	@ToDate				DATE,
-	@Environment		VARCHAR(10)
-AS
+	@BillerId				INT,
+	@InvoiceGeneratingData	NVARCHAR(MAX),
+	@FromDate				DATE,
+	@ToDate					DATE,
+	@Environment			VARCHAR(10)
+AS	
 
 /*	Header:
 	Created: 2021.03.02 - Parsons
@@ -16,6 +17,16 @@ AS
    
 	Revisions: 
 		- 20210302@Parsons: Create new sp [#147006]
+
+	Param's Explanation:
+		@InvoiceGeneratingData:
+		'<Root>
+			<InvoiceGenerating>
+				<InvoiceNumber>123</InvoiceNumber>
+				<PartyId>1</PartyId>
+				<InvoiceTypeShorten>S</InvoiceTypeShorten>
+			</InvoiceGenerating>
+		</Root>'
 */
 
 BEGIN
@@ -29,18 +40,54 @@ BEGIN
 	
 	-- Region: Get Party Settings
 	BEGIN
-		DECLARE @PartySettings TABLE (IndexNumber INT, PartyId INT, LicenseeId INT, PartyName VARCHAR(50), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50))
-		INSERT INTO @PartySettings (IndexNumber, PartyId, LicenseeId, PartyName, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage)
-		SELECT i.[rank], p.PartyId, p.OldRefId, p.PartyName, ISNULL(bc.BaseCurrencyId, 6), ISNULL(e.Code, 'EUR'), pd.InvoiceLanguage
-		FROM dbo.strSplit(@PartyIds, ',') i
-			INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON p.PartyId = i.val
+		DECLARE @InvoiceData TABLE (IndexNumber INT IDENTITY(1, 1), InvoiceNumber INT, PartyId INT, InvoiceTypeId SMALLINT, InvoiceTypeShorten VARCHAR(10))
+		
+		BEGIN TRY
+			DECLARE @Party_XML XML = CONVERT(XML, @InvoiceGeneratingData)
+
+			INSERT INTO @InvoiceData (InvoiceNumber, PartyId, InvoiceTypeShorten, InvoiceTypeId)
+			SELECT InvoiceNumber, PartyId, InvoiceTypeShorten, CASE InvoiceTypeShorten WHEN 'S' THEN 1 WHEN 'R' THEN 3 WHEN 'H' THEN 6 END
+			FROM (
+				SELECT
+					t.c.value('(InvoiceNumber/text())[1]', 'INT') AS InvoiceNumber
+					,t.c.value('(PartyId/text())[1]', 'INT') AS PartyId
+					,t.c.value('(InvoiceTypeShorten/text())[1]', 'VARCHAR(10)') AS InvoiceTypeShorten
+				FROM @Party_XML.nodes('Root/InvoiceGenerating') t(c)
+			) a
+			OPTION (OPTIMIZE FOR (@Party_XML = NULL))
+
+			-- Remove duplicate data
+			DELETE t
+			FROM (
+				SELECT PartyId, ROW_NUMBER() OVER(PARTITION BY PartyId, InvoiceTypeId ORDER BY InvoiceNumber) AS RN
+				FROM @InvoiceData
+			) t
+			WHERE t.RN > 1
+		END TRY
+		BEGIN CATCH
+			PRINT 'Wrong format XML'
+		END CATCH
+
+		DECLARE @PartySettings TABLE (PartyId INT, LicenseeId INT, PartyName VARCHAR(50), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50))
+		INSERT INTO @PartySettings (PartyId, LicenseeId, PartyName, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage)
+		SELECT p.PartyId, p.OldRefId, p.PartyName, ISNULL(bc.BaseCurrencyId, 6), ISNULL(e.Code, 'EUR'), pd.InvoiceLanguage
+		FROM (SELECT DISTINCT PartyId FROM @InvoiceData) i
+			INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON p.PartyId = i.PartyId
 			LEFT JOIN OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyId = p.PartyId
 			LEFT JOIN OAS_PartyBaseCurrency bc WITH (NOLOCK) ON p.PartyId = bc.PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
 			LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON e.ExchangeId = bc.BaseCurrencyId
 
-		DECLARE @InvoiceSettings TABLE (PartyId INT, BillerId INT, InvTypeId SMALLINT, ProductCodes VARCHAR(200), InvTemplateName VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT)
-		INSERT INTO @InvoiceSettings (PartyId, BillerId, InvTypeId, InvTemplateName, ProductCodes)
-		SELECT s.FromPartyId, s.ToPartyId, s.InvTypeId, t.InvTemplateName
+		DECLARE @InvoiceSymbol NVARCHAR(20)
+		SELECT TOP 1 @InvoiceSymbol = InvoiceSymbol
+		FROM dbo.LA_InvoiceHeader WITH (NOLOCK)
+		WHERE StatusId = 0 AND Environment = @Environment
+			AND InvoiceType IN (1, 3, 6) -- Software Fee, Rebate, Hosting Fee
+			AND BillerId = @BillerId
+		ORDER BY CreatedDateTime DESC
+		
+		DECLARE @InvoiceSettings TABLE (IndexNumber INT, PartyId INT, BillerId INT, InvTypeId SMALLINT, ProductCodes VARCHAR(200), InvTemplateName VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT)
+		INSERT INTO @InvoiceSettings (IndexNumber, PartyId, BillerId, InvTypeId, InvTemplateName, InvoiceSymbol, InvoiceNumber, ProductCodes)
+		SELECT d.IndexNumber, s.FromPartyId, s.ToPartyId, s.InvTypeId, t.InvTemplateName, @InvoiceSymbol, d.InvoiceNumber
 			, STUFF((SELECT ',' + CASE WHEN ls.ProductId = 0 THEN 'SB' ELSE ProductPrefix END
 						FROM dbo.LA_InvoiceSetting ls WITH (NOLOCK)
 							LEFT JOIN dbo.Product3rd p WITH (NOLOCK) ON ls.ProductId = p.ProductId
@@ -48,11 +95,11 @@ BEGIN
 							AND ls.InvTypeId = 1 AND ls.ProductId IS NOT NULL
 						FOR XML PATH('')), 1, 1, '') AS ProductCodes
 		FROM @PartySettings ps
-			INNER JOIN dbo.LA_InvoiceSetting s WITH (NOLOCK) ON s.FromPartyId = ps.PartyId
+			INNER JOIN @InvoiceData d ON ps.PartyId = d.PartyId
+			INNER JOIN dbo.LA_InvoiceSetting s WITH (NOLOCK) ON s.FromPartyId = ps.PartyId AND s.InvTypeId = d.InvoiceTypeId
 			INNER JOIN dbo.LA_InvoiceTemplate t WITH (NOLOCK) ON s.InvTempId = t.InvTemplateId
-		WHERE s.InvTypeId IN (1, 3, 6)
-			AND (@Environment <> 'PRO' OR s.ToPartyId <> 221) -- Testing Biller
-		GROUP BY s.FromPartyId, s.ToPartyId, s.InvTypeId, t.InvTemplateName
+		WHERE s.InvTypeId IN (1, 3, 6) AND s.ToPartyId = @BillerId
+		GROUP BY d.IndexNumber, s.FromPartyId, s.ToPartyId, s.InvTypeId, t.InvTemplateName, d.InvoiceNumber
 	END
 	-- End Region: Get Party Settings
 
@@ -91,7 +138,9 @@ BEGIN
 				FROM dbo.LA_InvoiceStatement s WITH (NOLOCK)
 				WHERE h.InvoiceHeaderId = s.InvoiceHeaderId AND h.InvoiceType = 1
 			) d
-		WHERE h.StatusId = 0 AND h.Environment = @Environment
+		WHERE h.BillerId = @BillerId
+			AND ISNULL(h.StatusId, 0) = 0
+			AND h.Environment = @Environment
 			AND h.InvoiceType IN (1, 3, 6) -- Software Fee, Rebate, Hosting Fee
 			AND (h.FromDate = @FromDate AND h.ToDate = @ToDate)
 
@@ -211,6 +260,9 @@ BEGIN
 		BEGIN
 			-- Region: Party charge info
 			BEGIN
+				DECLARE @PartyIds VARCHAR(MAX)
+				SELECT  @PartyIds = COALESCE(@PartyIds + ',', '') + CONVERT(VARCHAR(20), PartyId) FROM @PartySettings
+
 				DECLARE @PartyChargeInfo TABLE (ChargeId INT, ChargeType INT, PartyId INT, LicenseeId INT, ProductId INT, BettypeRef INT, FromDate DATE, ToDate DATE, Rate FLOAT)
 				INSERT INTO @PartyChargeInfo (ChargeId, ChargeType, PartyId, LicenseeId, ProductId, BettypeRef, FromDate, ToDate, Rate)
 				SELECT ChargeId, ChargeType, PartyId, LicenseeId, ProductId, Bettype, FromDate, ToDate, DI_Rate
@@ -536,31 +588,6 @@ BEGIN
 		UPDATE @FinalResult SET LicensingFee = ISNULL(LicensingFee, 0) + ISNULL(ExtraAmount, 0) WHERE InvoiceType = 1 AND InvoiceHeaderId IS NULL
 	END
 
-	-- Region: Calc InvoiceNo
-	BEGIN
-		;WITH CTE_PartyInvoiceNo AS
-		(
-			SELECT ps.PartyId, s.BillerId, iv.InvoiceSymbol, iv.InvoiceNumber
-			FROM @PartySettings ps
-				INNER JOIN @InvoiceSettings s ON s.PartyId = ps.PartyId
-				CROSS APPLY
-				(
-					SELECT TOP 1 iv.InvoiceSymbol, MAX(iv.InvoiceNumber) InvoiceNumber
-					FROM LA_InvoiceHeader iv WITH(NOLOCK)
-					WHERE iv.StatusId = 0 AND iv.Environment = @Environment
-							AND InvoiceType IN (1, 3, 6) -- Software Fee, Rebate, Hosting Fee
-							AND iv.BillerId = s.BillerId
-					GROUP BY iv.InvoiceSymbol, CreatedDateTime--, iv.PartyId, iv.BillerId, CreatedDateTime
-					ORDER BY CreatedDateTime DESC
-				) iv
-		)
-		UPDATE s
-		SET s.InvoiceSymbol = c.InvoiceSymbol, s.InvoiceNumber = c.InvoiceNumber
-		FROM @InvoiceSettings s
-			INNER JOIN cte_PartyInvoiceNo c ON s.PartyId = c.PartyId AND s.BillerId = c.BillerId
-	END
-	-- End Region: Calc InvoiceNo
-
 	-- Region: Final Result
 	BEGIN
 		DECLARE @Result TABLE
@@ -577,8 +604,8 @@ BEGIN
 			,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote
 		)
 		SELECT
-			ROW_NUMBER() OVER(ORDER BY ps.IndexNumber) AS RowIndex
-			,ps.IndexNumber
+			ROW_NUMBER() OVER(ORDER BY ivs.IndexNumber) AS RowIndex
+			,ivs.IndexNumber
 			,ps.PartyId
 			,ps.PartyName
 			,ivs.InvTypeId AS ItemType
@@ -602,7 +629,7 @@ BEGIN
 			LEFT JOIN @FinalResult r ON ps.PartyId = r.PartyId AND ivs.BillerId = r.BillerId AND ivs.InvTypeId = r.InvoiceType
 			INNER JOIN DBCUST.bodb_Licensee.dbo.LA_BillerInfo b WITH (NOLOCK) ON ivs.BillerId = b.PartyId
 		GROUP BY
-			ps.IndexNumber
+			ivs.IndexNumber
 			,ps.PartyId
 			,ps.PartyName
 			,ivs.InvTypeId
@@ -617,16 +644,6 @@ BEGIN
 			,ps.InvoiceLanguage
 			,CASE WHEN ivs.InvTypeId = 1 THEN ivs.ProductCodes ELSE '' END
 			,ISNULL(r.AdjustmentNote, N'')
-
-		;WITH cte_rowOrder AS(
-			SELECT RowIndex, ROW_NUMBER() OVER (PARTITION BY BillerId ORDER BY IndexNumber) RowOrder
-			FROM @Result r
-			WHERE r.InvoiceHeaderId IS NULL
-		)
-		UPDATE r
-		SET InvoiceNumber = r.InvoiceNumber + o.RowOrder
-		FROM @Result r 
-		INNER JOIN cte_rowOrder o  ON r.RowIndex = o.RowIndex
 	END
 	-- End Region: Final Result
 
