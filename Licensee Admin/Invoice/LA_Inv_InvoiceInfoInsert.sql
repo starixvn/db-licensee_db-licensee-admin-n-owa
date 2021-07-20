@@ -51,6 +51,7 @@ AS
 		- 20190319@bruce: Apply min fee rule for discount calculation [#109997]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
+		- 20210720@Percy: Check invoice number is already used [RedmineID: #147006]
 */
 
 BEGIN
@@ -82,8 +83,7 @@ BEGIN
 		RETURN
 	END
 
-	-- Region: Check business logic: If invoice number exists, re-generate Invoice Number.
-	-- if existed then get max(invoicenumber) + 1
+	-- Region: Check invoice number
 	IF EXISTS (	SELECT	1
 				FROM dbo.LA_InvoiceHeader WITH(NOLOCK)
 				WHERE InvoiceSymbol = @InvoiceSymbol
@@ -91,19 +91,13 @@ BEGIN
 					AND Environment = @Environment
 					AND BillerId = @BillerId
 					AND PartyId = @PartyId
-					AND ISNULL(StatusId,0) <> -1 -- 0: normal, -1: void, 1: closed
+					AND ISNULL(StatusId, 0) <> -1 -- 0: normal, -1: void, 1: closed
 	)
 	BEGIN
-		SELECT @InvoiceNumber = (MAX(InvoiceNumber) + 1)
-		FROM dbo.LA_InvoiceHeader WITH(NOLOCK)
-		WHERE InvoiceSymbol = @InvoiceSymbol
-			AND Environment = @Environment
-			AND BillerId = @BillerId
-			AND PartyId = @PartyId
-			AND ISNULL(StatusId,0) <> -1
+		SET @ErrCode = 6
+		SET @ErrMsg = 'Invoice number is in use.'
+		RETURN
 	END
-
-	IF(@InvoiceNumber IS NULL) SET @InvoiceNumber = 1
 	-- End Region
 
 	-- Region: Insert data to Invoice Header
