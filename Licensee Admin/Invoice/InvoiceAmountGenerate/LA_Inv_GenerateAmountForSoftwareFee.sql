@@ -37,6 +37,7 @@ AS
 		- 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 		- 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
 		- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
+		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -551,8 +552,10 @@ BEGIN
 	-- Region insert Promotion amount
 	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = 0))
 	BEGIN
-		DECLARE @PromotionAmount MONEY
-		SELECT @PromotionAmount = SUM(p.MemberWL * e.Rate)
+		DECLARE @PromotionAmount MONEY, 
+				@SPR_SabaPromotion SMALLINT = 17005 
+				
+		SELECT @PromotionAmount = SUM(CASE WHEN p.Bettype = @SPR_SabaPromotion THEN p.GrossWL ELSE p.MemberWL END * e.Rate)
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct p WITH (NOLOCK) 
 			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'SB', 'OA', 1) pc ON p.SiteID = pc.LicenseeId
 			INNER JOIN #Exchange e ON p.RptDate = e.ExchangeDate AND p.CurrencyID = e.ExchangeID
