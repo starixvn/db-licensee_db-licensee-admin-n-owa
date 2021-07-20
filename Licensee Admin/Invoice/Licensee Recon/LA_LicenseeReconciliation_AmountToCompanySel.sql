@@ -489,7 +489,6 @@ BEGIN
 		-- treat negative LicensingFee as 0, except Joint Venture Parties or BA, CB, CO, BX
 		UPDATE r
 		SET r.LicensingFee = CASE WHEN r.AmountToCompany < 0 AND jvp.PartyId IS NULL AND r.ProductID NOT IN (@BA,@CB,@CO,@BX) THEN 0 ELSE r.AmountToCompany END
-			,r.ContributionDiscount = CASE WHEN r.Winloss - r.Contribution < 0 AND jvp.PartyId IS NULL THEN 0 ELSE r.ContributionDiscount END
 		FROM #tmpResult r
 			LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
 	END
@@ -794,7 +793,8 @@ END
 BEGIN
 	DECLARE @Result TABLE (PartyId INT, LicenseeCode VARCHAR(100), ProductId INT, LicensingFee MONEY, AmountToCompany MONEY, Discount MONEY, Rebate MONEY, Promotion MONEY, ContributionDiscount MONEY)
 	INSERT INTO @Result (PartyId, LicenseeCode, ProductId, Discount, Rebate, Promotion, ContributionDiscount, LicensingFee, AmountToCompany)
-	SELECT r.PartyId, ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId), r.ProductId, SUM(r.Discount), SUM(r.Rebate), SUM(r.Promotion), SUM(r.ContributionDiscount)
+	SELECT r.PartyId, ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId), r.ProductId, SUM(r.Discount), SUM(r.Rebate), SUM(r.Promotion)
+		,SUM(CASE WHEN r.Winloss - r.Contribution < 0 AND jvp.PartyId IS NULL THEN 0 ELSE r.ContributionDiscount END)
 		,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) AS LicensingFee
 		,SUM(r.AmountToCompany + ContributionDiscount + Contribution - JackPotPrize - PromotionPrize) AS AmountToCompany
 	FROM #tmpResult r
