@@ -22,6 +22,7 @@ AS
 		- 20171128@Bruce: use created date time instead of invoice date [#86399]
 		- 20171205@Bruce: exclude void invoice [#87723]
 		- 20190326@Bruce: Include invoice language [#102830]
+		- 20210705@Sophia: Revise, fix the MAX(InvoiceNumber) [Redmine: #158041]
 */
 /*	Example:
 	USE bodb_licensee
@@ -64,8 +65,7 @@ BEGIN
 			MAX(i.InvoiceNumber)
 	FROM	LA_InvoiceHeader i WITH(NOLOCK)
 	WHERE	i.BillerId = @BillerId AND (i.Environment IS NULL OR i.Environment = @Environment) AND ISNULL(StatusId,0) <> -1
-	GROUP BY i.BillerId,i.InvoiceType,i.InvoiceSymbol,i.CreatedDateTime
-	ORDER BY i.CreatedDateTime DESC
+	GROUP BY i.BillerId,i.InvoiceType,i.InvoiceSymbol 
 
 	DECLARE @InvoiceSymbol NVARCHAR(20) = ''
 	DECLARE @InvoiceNumber INT = 1
@@ -83,8 +83,7 @@ BEGIN
 	WHERE	i.InvoiceType IN (SELECT * FROM @SameInvoiceNoList)
 
 	SELECT	@InvoiceNumber = ISNULL(MAX(i.InvoiceNumber), 0) + 1
-	FROM	@InvoiceTmp i
-			INNER JOIN @InvoiceTmp rf ON i.InvoiceSymbol = rf.InvoiceSymbol	
+	FROM	@InvoiceTmp i		
 	WHERE	i.InvoiceSymbol = @InvoiceSymbol
 	
 	UPDATE	@InvoiceInfo
