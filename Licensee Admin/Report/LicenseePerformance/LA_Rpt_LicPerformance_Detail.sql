@@ -68,6 +68,7 @@ AS
 		- 20210206@Parsons: Saba.club - Integrate Slot Game [#147977]
 		- 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: #154992]
 		- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
+		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -103,7 +104,8 @@ BEGIN
 			@ArcadiaGamingBonus SMALLINT = 1906,
 			@SBC_Contribution SMALLINT = 1698,
 			@SBC_JackpotPrize SMALLINT = 1699,
-			@SXG_LuckyDraw SMALLINT = 3150
+			@SXG_LuckyDraw SMALLINT = 3150,
+			@SPR_SabaPromotion SMALLINT = 17005 
 
 	-- *********************************************************************************************************
 	-- *** Calculate Previous FromDate, Previous ToDate from FromDate, ToDate
@@ -525,7 +527,9 @@ BEGIN
 	IF(EXISTS(SELECT TOP 1 1 FROM #Result))
 	BEGIN
 		;WITH cte_PromotionSportsbook AS(
-			SELECT pc.PartyId, r.SiteID,(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) AND YEAR(rptDate) = YEAR(@FromDate) THEN 1 ELSE 0 END) IsCurrent, SUM(r.MemberWL * cExchange.Rate) AS Prize
+			SELECT 	pc.PartyId, r.SiteID,
+					(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) AND YEAR(rptDate) = YEAR(@FromDate) THEN 1 ELSE 0 END) IsCurrent, 
+					SUM( CASE WHEN r.Bettype = @SPR_SabaPromotion THEN r.GrossWL ELSE r.MemberWL END * cExchange.Rate) AS Prize
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
 				INNER JOIN (SELECT DISTINCT PartyId, LicenseeId FROM @PartyChargeInfo WHERE ProductID = 0) pc ON r.SiteID = pc.LicenseeId
 				INNER JOIN #Exchange cExchange ON r.RptDate = cExchange.ExchangeDate AND r.CurrencyID = cExchange.ExchangeID

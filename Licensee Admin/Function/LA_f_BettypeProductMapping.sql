@@ -72,6 +72,7 @@ AS
 		- 20210419@Danny: Integrate Creative Gaming [Redmine: #152139]
 		- 20210412@Sophia: Change Range of AE Casino [Redmine :#152141]
 		- 20210428@Danny: Integrate VGaming with dynamic code [Redmine: #154080]
+		- 20210618@Sophia: Expand Range of Saba Promotion [Redmine: #155337]
 
 	Param's Explanation:
 
@@ -384,7 +385,7 @@ BEGIN
 	   INSERT INTO @tbBettypeProduct
 	   SELECT typeid, 37
 	   FROM bodb02.dbo.bettype WITH (NOLOCK)
-	   WHERE typeid IN (17000, 17003, 17004)
+	   WHERE typeid BETWEEN 17000 AND 17030
 		  AND (@Bettype = 0 OR typeid = @Bettype)
 	END
 

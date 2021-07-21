@@ -56,6 +56,7 @@ AS
 		- 20210306@Danny: Integrate VGaming [#154080]
 		- 20210614@Danny: Integrate AdvantPlay [#154787]
 	    - 20210614@Danny: Integrate AdvantPlay Mini [#155207]
+		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -71,7 +72,6 @@ BEGIN
 		,@CommissionShare_ChargeType	SMALLINT = 6
 		,@CashinShare_ChargeType		SMALLINT = 7
 		,@CashoutComm_ChargeType		SMALLINT = 5
-		,@SabaPromotion_Bettype			SMALLINT = 17000
 		,@PPContribution_Bettype		SMALLINT = 4297
 		,@PPJackpotPrize_Bettype		SMALLINT = 4298
 		,@PPTournament_Bettype		SMALLINT = 4299
@@ -83,6 +83,7 @@ BEGIN
 		,@SBC_Contribution SMALLINT = 1698
 		,@SBC_JackpotPrize SMALLINT = 1699
 		,@SXG_LuckyDraw    SMALLINT = 3150
+		,@SPR_SabaPromotion SMALLINT = 17005 
 		,@BA	SMALLINT = 3
 		,@GD	SMALLINT = 11
 		,@CB	SMALLINT = 15
@@ -318,8 +319,8 @@ BEGIN
 		SELECT b.SiteID,b.rptDate,b.ProductId,b.CurrencyId,b.CommissionA,b.CommissionP
 			,b.WinPrizeAmount,b.CashOutAmount,b.BuyBackAmount,b.Turnover,b.TicketType
 			,ISNULL(-b.MemberWL, 0) LicWinloss
-			,CASE WHEN b.Bettype IN (@PPContribution_Bettype, @SB_AdjustedOdds_Bettype, @SBC_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END GrossWL
-			,CASE WHEN b.ProductID = @SPR THEN @SabaPromotion_Bettype ELSE b.Bettype END			Bettype
+			,CASE WHEN b.Bettype IN (@PPContribution_Bettype, @SB_AdjustedOdds_Bettype, @SBC_Contribution, @SPR_SabaPromotion) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END GrossWL
+			,b.Bettype
 			,CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN b.Turnover ELSE b.ExtraAmount END			TurnoverForCommision
 		INTO #tmpBettingByProduct
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
@@ -368,8 +369,8 @@ BEGIN
 		INSERT INTO #tmpWinlossData(PartyID,rptDate,ProductID,CurrencyId,Winloss,AmountToCompany,ExtraAmount,Promotion,Contribution,JackPotPrize,PromotionPrize)
 		SELECT p.PartyID,b.rptDate,p.ProductId,b.CurrencyId,0,0,
 			SUM(CASE WHEN b.Bettype IN(@GDTip_Bettype, @SAGTip_Bettype) THEN b.LicWinloss * p.Rate * e.Rate ELSE 0 END) ExtraAmount,
-			SUM(CASE WHEN b.Bettype = @SabaPromotion_Bettype THEN -b.LicWinloss * e.Rate ELSE 0 END) Promotion,
-			SUM(GrossWL * e.Rate) Contribution,
+			SUM(CASE WHEN b.ProductId = @SPR THEN CASE WHEN b.bettype = @SPR_SabaPromotion THEN -b.GrossWL ELSE -b.LicWinloss END * e.Rate ELSE 0 END) Promotion,
+			SUM(CASE WHEN b.ProductId <> @SPR THEN GrossWL ELSE 0 END * e.Rate) Contribution,
 			SUM(CASE WHEN b.Bettype IN (@PPJackpotPrize_Bettype, @SBC_JackpotPrize) THEN -b.LicWinloss * e.Rate ELSE 0 END) JackPotPrize,
 			SUM(CASE WHEN ISNULL(b.TicketType, 0) = 2 OR b.Bettype IN (@PPTournament_Bettype, @PromotionPrize_Bettype, @CC_ArcadiaBonus_Bettype, @SXG_LuckyDraw) THEN -b.LicWinloss * e.Rate ELSE 0 END) PromotionPrize
 		FROM #tmpBettingByProduct b
@@ -378,7 +379,7 @@ BEGIN
 		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39,42,45', '') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN p.FromDate AND p.ToDate
 			AND (p.ProductID IN(0, @PP, @CC, @SBC, @SXG) OR p.ChargeType = @GDTip_ChargeType)
-			AND (b.Bettype = @SabaPromotion_Bettype OR eb.BettypeID IS NOT NULL OR ISNULL(b.TicketType, 0) = 2)
+			AND (b.ProductId = @SPR OR eb.BettypeID IS NOT NULL OR ISNULL(b.TicketType, 0) = 2)
 		GROUP BY p.PartyID,b.rptdate,p.ProductId,b.CurrencyId
 
 		-- CB
