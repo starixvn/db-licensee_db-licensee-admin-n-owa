@@ -333,7 +333,7 @@ BEGIN
 			,SUM(ISNULL(b.BuyBackAmount, 0))
 			,SUM(ISNULL(b.Turnover, 0))
 			,SUM(ISNULL(-b.MemberWL, 0)) AS LicWinloss
-			,SUM(CASE WHEN b.Bettype IN (999, 1698, 4297) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS GrossWL
+			,SUM(CASE WHEN b.Bettype IN (999, 1698, 4297, 17005) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS GrossWL
 			,SUM(CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN ISNULL(b.Turnover, 0) ELSE ISNULL(b.ExtraAmount, 0) END) AS TurnoverForCommision
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
@@ -381,14 +381,14 @@ BEGIN
 		GROUP BY b.rptDate, p.PartyId, p.ProductId, b.CurrencyId
 		-- includes extra values: gdtip, PP JP & Prize
 		--
-		INSERT INTO #tmpWinlossData (rptDate, PartyId, ProductId, CurrencyId, Winloss, AmountToCompany, Promotion, ExtraAmount, Contribution, ContributionDiscount, JackPotPrize, PromotionPrize)
+		INSERT INTO #tmpWinlossData (rptDate, PartyId, ProductId, CurrencyId, Winloss, AmountToCompany, ExtraAmount, Promotion, Contribution, ContributionDiscount, JackPotPrize, PromotionPrize)
 		SELECT b.rptDate, p.PartyId, p.ProductId, b.CurrencyId
 			,0 AS Winloss
 			,0 AS AmountToCompany
 			,SUM(CASE WHEN b.Bettype IN (1706, 3007) THEN b.LicWinloss * p.Rate * e.Rate ELSE 0 END) ExtraAmount
-			,SUM(CASE WHEN b.Bettype = 17000 THEN -b.LicWinloss * e.Rate ELSE 0 END) Promotion
-			,SUM(GrossWL * e.Rate) AS Contribution
-			,SUM(GrossWL * p.Rate * e.Rate) AS ContributionDiscount
+			,SUM(CASE WHEN b.ProductId = 37 THEN CASE WHEN b.Bettype = 17005 THEN -b.GrossWL ELSE -b.LicWinloss END * e.Rate ELSE 0 END) Promotion
+			,SUM(CASE WHEN b.ProductId <> 37 THEN b.GrossWL ELSE 0 END * e.Rate) AS Contribution
+			,SUM(CASE WHEN b.ProductId <> 37 THEN b.GrossWL ELSE 0 END * p.Rate * e.Rate) AS ContributionDiscount
 			,SUM(CASE WHEN b.Bettype IN (4298, 1699) THEN -b.LicWinloss * e.Rate ELSE 0 END) JackPotPrize
 			,SUM(CASE WHEN b.TicketType = 2 OR b.Bettype IN (4299, 4300, 1906, 3150) THEN -b.LicWinloss * e.Rate ELSE 0 END) PromotionPrize
 		FROM #tmpBettingByProduct b
@@ -397,7 +397,7 @@ BEGIN
 		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39,42,45', '') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN p.FromDate AND p.ToDate
 			AND (p.ProductID IN (0, @PP, @CC, @SBC, @SXG) OR p.ChargeType = @GDTip_ChargeType)
-			AND (b.Bettype = 17000 OR eb.BettypeID IS NOT NULL OR b.TicketType = 2)
+			AND (b.ProductID = 37 OR eb.BettypeID IS NOT NULL OR b.TicketType = 2)
 		GROUP BY b.rptDate, p.PartyId, p.ProductId, b.CurrencyId
 
 		-- CB
