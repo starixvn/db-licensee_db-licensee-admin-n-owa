@@ -106,7 +106,7 @@ BEGIN
 			@SBC_Contribution	SMALLINT = 1698,
 			@SBC_JackpotPrize	SMALLINT = 1699,
 			@SXG_LuckyDraw SMALLINT = 3150,
-			@SPR_SabaPromotion SMALLINT = 17005 
+			@SPR_SabaPromotion SMALLINT = 17005, 
 			@VGA_Contribution	SMALLINT = 3898,
 			@VGA_JackpotPrize	SMALLINT = 3899
 
