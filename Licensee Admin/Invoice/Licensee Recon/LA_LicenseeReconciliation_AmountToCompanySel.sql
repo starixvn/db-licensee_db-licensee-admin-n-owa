@@ -385,14 +385,15 @@ BEGIN
 		SELECT b.rptDate, p.PartyId, p.ProductId, b.CurrencyId
 			,0 AS Winloss
 			,0 AS AmountToCompany
-			,SUM(CASE WHEN b.Bettype IN (1706, 3007) THEN b.LicWinloss * p.Rate * e.Rate ELSE 0 END) ExtraAmount
+			,SUM(CASE WHEN b.Bettype IN (1706, 3007) THEN b.LicWinloss * ISNULL(cr.Rate, p.Rate) * e.Rate ELSE 0 END) ExtraAmount
 			,SUM(CASE WHEN b.ProductId = 37 THEN CASE WHEN b.Bettype = 17005 THEN -b.GrossWL ELSE -b.LicWinloss END * e.Rate ELSE 0 END) Promotion
 			,SUM(CASE WHEN b.ProductId <> 37 THEN b.GrossWL ELSE 0 END * e.Rate) AS Contribution
-			,SUM(CASE WHEN b.ProductId <> 37 THEN b.GrossWL ELSE 0 END * p.Rate * e.Rate) AS ContributionDiscount
+			,SUM(CASE WHEN b.ProductId <> 37 THEN b.GrossWL ELSE 0 END * ISNULL(cr.Rate, p.Rate) * e.Rate) AS ContributionDiscount
 			,SUM(CASE WHEN b.Bettype IN (4298, 1699) THEN -b.LicWinloss * e.Rate ELSE 0 END) JackPotPrize
 			,SUM(CASE WHEN b.TicketType = 2 OR b.Bettype IN (4299, 4300, 1906, 3150) THEN -b.LicWinloss * e.Rate ELSE 0 END) PromotionPrize
 		FROM #tmpBettingByProduct b
 		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = (CASE WHEN p.ProductID = 0 THEN @SPR ELSE p.ProductID END)
+		LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39,42,45', '') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN p.FromDate AND p.ToDate
