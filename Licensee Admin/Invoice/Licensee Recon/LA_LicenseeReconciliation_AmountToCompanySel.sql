@@ -338,7 +338,7 @@ BEGIN
 			,SUM(ISNULL(b.BuyBackAmount, 0))
 			,SUM(ISNULL(b.Turnover, 0))
 			,SUM(ISNULL(-b.MemberWL, 0)) AS LicWinloss
-			,SUM(CASE WHEN b.Bettype IN (999, 1698, 4297, 17005) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS GrossWL
+			,SUM(CASE WHEN b.Bettype IN (999, 1698, 4297, 17005, 3898) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS GrossWL
 			,SUM(CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN ISNULL(b.Turnover, 0) ELSE ISNULL(b.ExtraAmount, 0) END) AS TurnoverForCommision
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
@@ -357,7 +357,7 @@ BEGIN
 		INSERT INTO #tmpWinlossData (rptDate, PartyId, ProductId, CurrencyId, Winloss, AmountToCompany, Promotion, ExtraAmount, Contribution, ContributionDiscount, JackPotPrize, PromotionPrize)
 		SELECT b.rptDate, p.PartyId, p.ProductId, b.CurrencyId
 			,SUM((b.LicWinloss + (CASE WHEN b.ProductID = 31 THEN b.CommissionA ELSE 0 END)) * e.Rate) AS Winloss
-			,SUM((((b.LicWinloss - CASE WHEN b.ProductID IN (32, 42) THEN GrossWL ELSE 0 END) * ISNULL(cr.Rate, p.Rate) - 
+			,SUM((((b.LicWinloss - CASE WHEN b.ProductID IN (32, 42, 66) THEN GrossWL ELSE 0 END) * ISNULL(cr.Rate, p.Rate) - 
 				(CASE
 					WHEN b.ProductID = 3 THEN ISNULL(b.CommissionA, 0)
 					WHEN b.ProductID = 31 THEN (b.CommissionA + b.CommissionP)
@@ -394,7 +394,7 @@ BEGIN
 			,SUM(CASE WHEN b.ProductId = 37 THEN CASE WHEN b.Bettype = 17005 THEN -b.GrossWL ELSE -b.LicWinloss END * e.Rate ELSE 0 END) Promotion
 			,SUM(CASE WHEN b.ProductId <> 37 THEN b.GrossWL ELSE 0 END * e.Rate) AS Contribution
 			,SUM(CASE WHEN b.ProductId <> 37 THEN b.GrossWL ELSE 0 END * ISNULL(cr.Rate, p.Rate) * e.Rate) AS ContributionDiscount
-			,SUM(CASE WHEN b.Bettype IN (4298, 1699) THEN -b.LicWinloss * e.Rate ELSE 0 END) JackPotPrize
+			,SUM(CASE WHEN b.Bettype IN (4298, 1699, 3899) THEN -b.LicWinloss * e.Rate ELSE 0 END) JackPotPrize
 			,SUM(CASE WHEN b.TicketType = 2 OR b.Bettype IN (4299, 4300, 1906, 3150) THEN -b.LicWinloss * e.Rate ELSE 0 END) PromotionPrize
 		FROM #tmpBettingByProduct b
 		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = (CASE WHEN p.ProductID = 0 THEN @SPR ELSE p.ProductID END)
