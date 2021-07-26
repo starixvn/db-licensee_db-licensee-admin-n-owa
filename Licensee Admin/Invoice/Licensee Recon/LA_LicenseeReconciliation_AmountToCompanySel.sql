@@ -58,8 +58,7 @@ AS
 		- 20210614@Danny: Integrate AdvantPlay Mini [#155207]
 		- 20210705@Percy: Add ContributionDiscount column [RedmineID: #157549]
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
-		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
-
+		- 20210726@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -100,7 +99,7 @@ BEGIN
 		,@SPR	SMALLINT = 37
 		,@SBC	SMALLINT = 42
 		,@SXG   SMALLINT = 45
-		,@VGA	SMALLINT = 66
+		,@VGA   SMALLINT = 66
 
 /*-----------------
  * Settings
@@ -403,7 +402,7 @@ BEGIN
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39,42,45,66', '') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN p.FromDate AND p.ToDate
-			AND (p.ProductID IN(0, @PP, @CC, @SBC, @SXG, @VGA) OR p.ChargeType = @GDTip_ChargeType)
+			AND (p.ProductID IN (0, @PP, @CC, @SBC, @SXG, @VGA) OR p.ChargeType = @GDTip_ChargeType)
 			AND (b.ProductID = 37 OR eb.BettypeID IS NOT NULL OR b.TicketType = 2)
 		GROUP BY b.rptDate, p.PartyId, p.ProductId, b.CurrencyId
 
