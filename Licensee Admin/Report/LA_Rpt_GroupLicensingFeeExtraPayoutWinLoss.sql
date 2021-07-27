@@ -34,7 +34,7 @@ BEGIN
 	INSERT INTO @LicenseBaseCurrency(LicenseeId, PartyId, BaseCurrencyId, BaseCurrencyName)
 	SELECT DISTINCT ci.LicenseeID, ci.PartyID, pd.BaseCurrencyId, e.Code
 	FROM @ChargeInfo ci
-	INNER JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON ci.PartyId = pd.PartyID
+	INNER JOIN dbo.OAS_PartyBaseCurrency pd WITH(NOLOCK) ON ci.PartyId = pd.PartyID AND pd.FromDate <= @ToDate AND pd.ToDate >= @FromDate
 	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON e.ExchangeId = pd.BaseCurrencyId
 
 	DECLARE @TotalServiceFee MONEY
