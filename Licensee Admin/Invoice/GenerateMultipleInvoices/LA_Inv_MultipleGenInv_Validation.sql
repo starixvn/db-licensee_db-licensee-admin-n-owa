@@ -32,8 +32,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @PartyList TABLE (RowId INT, InvalidCellNumber VARCHAR(20) DEFAULT (''), InvoiceNumber VARCHAR(20), PartyId INT, PartyName VARCHAR(100), BaseCurrencyId INT, InvoiceTypeId SMALLINT, InvoiceTypeShorten VARCHAR(10), InvoiceTypeName VARCHAR(100), Err
-or BIT DEFAULT(0), ContentValidation VARCHAR(2000) DEFAULT(''), SettingValidation VARCHAR(2000) DEFAULT(''))
+	DECLARE @PartyList TABLE (RowId INT, InvalidCellNumber VARCHAR(20) DEFAULT (''), InvoiceNumber VARCHAR(20), PartyId INT, PartyName VARCHAR(100), BaseCurrencyId INT, InvoiceTypeId SMALLINT, InvoiceTypeShorten VARCHAR(10), InvoiceTypeName VARCHAR(100), Error BIT DEFAULT(0), ContentValidation VARCHAR(2000) DEFAULT(''), SettingValidation VARCHAR(2000) DEFAULT(''))
 	
 	BEGIN TRY
 		DECLARE @Party_XML XML = CONVERT(XML, @InvoiceGeneratingData)
@@ -119,7 +118,7 @@ or BIT DEFAULT(0), ContentValidation VARCHAR(2000) DEFAULT(''), SettingValidatio
 	UPDATE p
 	SET p.BaseCurrencyId = bc.BaseCurrencyId
 		,p.Error = CASE WHEN bc.PartyId IS NULL OR ISNULL(bc.BaseCurrencyId, 0) = 0 THEN 1 ELSE 0 END
-		,p.ContentValidation = CASE WHEN bc.PartyId IS NULL OR ISNULL(bc.BaseCurrencyId, 0) = 0 THEN 'Missing setting base current' ELSE '' END
+		,p.ContentValidation = CASE WHEN bc.PartyId IS NULL OR ISNULL(bc.BaseCurrencyId, 0) = 0 THEN 'Missing setting base currency' ELSE '' END
 	FROM @PartyList p
 		LEFT JOIN @PartyBaseCurrency bc ON p.PartyId = bc.PartyId
 	WHERE p.Error = 0
@@ -186,9 +185,11 @@ or BIT DEFAULT(0), ContentValidation VARCHAR(2000) DEFAULT(''), SettingValidatio
 		-- Hosting Fee
 		DECLARE @HostingFee TABLE (PartyId INT, BaseCurrencyId INT)
 		INSERT INTO @HostingFee (PartyId, BaseCurrencyId)
-		SELECT DISTINCT FromParty, BaseCurrencyId
-		FROM dbo.LA_HostingFeesSetting WITH (NOLOCK)
-		WHERE FromDate <= @ToDate AND ToDate >= @FromDate
+		SELECT DISTINCT s.FromParty, d.BaseCurrencyId
+		FROM dbo.LA_HostingFeesSetting s WITH (NOLOCK)
+			INNER JOIN dbo.LA_HostingFees f WITH (NOLOCK) ON s.HostingFeesId = f.HostingFeesId
+			INNER JOIN dbo.LA_HostingFeesDetail d WITH(NOLOCK) ON f.HostingFeesId = d.HostingFeesId AND f.HostingFeesTypeId = 1
+		WHERE s.FromDate <= @ToDate AND s.ToDate >= @FromDate
 
 		UPDATE p
 		SET p.Error = 1, p.ContentValidation = 'Invalid hosting fees rate'
@@ -232,7 +233,7 @@ or BIT DEFAULT(0), ContentValidation VARCHAR(2000) DEFAULT(''), SettingValidatio
 
 		-- Check Base Currency of Hosting Fee
 		UPDATE p
-		SET p.Error = 1
+		SET p.Error = 1, p.SettingValidation = 'Mismatch setting base currency: Hosting Fees'
 		FROM @PartyList p
 			INNER JOIN @HostingFee h ON p.PartyId = h.PartyId AND p.BaseCurrencyId <> h.BaseCurrencyId
 		WHERE p.Error = 0 AND p.InvoiceTypeId = 6 -- Hosting Fee
