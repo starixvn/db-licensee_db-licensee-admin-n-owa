@@ -185,7 +185,7 @@ BEGIN
 		-- Hosting Fee
 		DECLARE @HostingFee TABLE (PartyId INT, BaseCurrencyId INT)
 		INSERT INTO @HostingFee (PartyId, BaseCurrencyId)
-		SELECT DISTINCT s.FromParty, d.BaseCurrencyId
+		SELECT DISTINCT s.FromParty, f.BaseCurrencyId
 		FROM dbo.LA_HostingFeesSetting s WITH (NOLOCK)
 			INNER JOIN dbo.LA_HostingFees f WITH (NOLOCK) ON s.HostingFeesId = f.HostingFeesId
 			INNER JOIN dbo.LA_HostingFeesDetail d WITH(NOLOCK) ON f.HostingFeesId = d.HostingFeesId AND f.HostingFeesTypeId = 1
