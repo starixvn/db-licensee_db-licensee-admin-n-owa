@@ -78,16 +78,15 @@ AS
 	Param's Explanation:
 
 */
-
 BEGIN
 	DECLARE @ProductList TABLE (ProductCode VARCHAR(10))
 
 	IF @ProductCodes = ''
 	BEGIN
 		INSERT INTO @ProductList (ProductCode)
-		SELECT p.ProductPrefix
-		FROM bodb02.dbo.Products p WITH (NOLOCK)
-		INNER JOIN bodb_licensee.dbo.Product3rd d WITH(NOLOCK) ON p.ProductPrefix = d.ProductPrefix
+		SELECT d.ProductPrefix
+		FROM bodb_licensee.dbo.Product3rd d WITH(NOLOCK) 
+		WHERE EXISTS( SELECT 1 FROM  bodb02.dbo.Products p WITH (NOLOCK) WHERE p.ProductPrefix = d.ProductPrefix)
 
 		INSERT INTO @ProductList VALUES ('SB')
 		INSERT INTO @ProductList VALUES ('BT')
