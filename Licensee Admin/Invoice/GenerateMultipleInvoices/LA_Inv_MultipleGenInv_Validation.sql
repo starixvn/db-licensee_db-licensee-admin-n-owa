@@ -224,7 +224,7 @@ BEGIN
 		UPDATE p
 		SET p.Error = 1, p.SettingValidation = 'Mismatch setting base currency: '
 												+ CASE WHEN d.PartyId IS NOT NULL THEN 'Discount' ELSE '' END
-												+ CASE WHEN m.PartyId IS NULL THEN '' ELSE CASE WHEN d.PartyId IS NOT NULL THEN ' /' ELSE '' END + CASE WHEN m.IsGroup = 0 THEN 'MinFee' ELSE 'Group Min Fee' END END
+												+ CASE WHEN m.PartyId IS NULL THEN '' ELSE CASE WHEN d.PartyId IS NOT NULL THEN ', ' ELSE '' END + CASE WHEN m.IsGroup = 0 THEN 'MinFee' ELSE 'Group Min Fee' END END
 		FROM @PartyList p
 			LEFT JOIN @Discount d ON p.PartyId = d.PartyId AND p.BaseCurrencyId <> d.BaseCurrencyId AND d.DiscountType = 1 -- discount
 			LEFT JOIN @MinFee m ON p.PartyId = m.PartyId AND p.BaseCurrencyId <> m.BaseCurrencyId
