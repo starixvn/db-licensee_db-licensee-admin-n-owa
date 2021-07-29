@@ -1,7 +1,6 @@
 Licensee Admin\Function\LA_f_BettypeProductMapping.sql
 Licensee Admin\Manage\LA_BetTypesGetAll.sql
 Licensee Admin\Report\Analysis\LA_Rpt_LicenseeAnalysis.sql
-Licensee Admin\Report\LA_Rpt_3rdPartyProductWinloss.sql
 Licensee Admin\Report\LA_Rpt_BettradeWinloss.sql
 Licensee Admin\Report\LA_Rpt_BullfightingWinLoss.sql
 Licensee Admin\Report\LA_Rpt_CardClubWinloss.sql
