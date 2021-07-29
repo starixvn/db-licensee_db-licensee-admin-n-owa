@@ -118,111 +118,83 @@ BEGIN
 	END
 	-- End Region: Get Exchange
 
-	-- Region: Get party's amount who were issued invoices
+	-- Region: Get hosting fee
 	BEGIN
-		INSERT INTO @FinalResult (PartyId, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, BillerId, InvoiceType, InvoicePath, LicensingFee, Discount, AdjustmentAmount, AdjustmentNote, ProductCodes)
-		SELECT h.PartyId, h.InvoiceHeaderId, h.InvoiceSymbol, h.InvoiceNumber, h.BillerId, h.InvoiceType, h.InvoicePath, h.Amount + ISNULL(d.Discount, 0) - ISNULL(d.AdjustmentAmount, 0), ISNULL(Discount, 0)
-			,ISNULL(d.AdjustmentAmount, 0), ISNULL(d.AdjustmentNote, N'')
-			,STUFF((SELECT ',' + CASE WHEN s.ProductId = 0 THEN 'SB' ELSE p.ProductPrefix END
-					FROM dbo.LA_InvoiceStatement s WITH (NOLOCK)
-						LEFT JOIN dbo.Product3rd p WITH (NOLOCK) ON s.ProductId = p.ProductId
-					WHERE h.InvoiceHeaderId = s.InvoiceHeaderId AND h.InvoiceType = 1 AND s.ProductId IS NOT NULL
-					FOR XML PATH('')), 1, 1, '') AS ProductCodes
-		FROM @PartySettings ps
-			INNER JOIN dbo.LA_InvoiceHeader h WITH (NOLOCK) ON ps.PartyId = h.PartyId
-			OUTER APPLY (
-				SELECT
-					SUM(CASE WHEN s.InvItemTypeId = 4 THEN ISNULL(s.Expense, 0) ELSE 0 END)		AS Discount
-					,SUM(CASE WHEN s.InvItemTypeId = 17 THEN ISNULL(s.Income, 0) ELSE 0 END)	AS AdjustmentAmount
-					,MAX(CASE WHEN s.InvItemTypeId = 17 THEN s.Description ELSE N'' END)		AS AdjustmentNote
-				FROM dbo.LA_InvoiceStatement s WITH (NOLOCK)
-				WHERE h.InvoiceHeaderId = s.InvoiceHeaderId AND h.InvoiceType = 1
-			) d
-		WHERE h.BillerId = @BillerId
-			AND ISNULL(h.StatusId, 0) = 0
-			AND h.Environment = @Environment
-			AND h.InvoiceType IN (1, 3, 6) -- Software Fee, Rebate, Hosting Fee
-			AND (h.FromDate = @FromDate AND h.ToDate = @ToDate)
+		DECLARE @HostingFee TABLE (PartyId INT, SettingType TINYINT, CurrencyId INT, NoOfDate INT, Amount MONEY, HostingFeesTypeId TINYINT, VCMFrom INT, VCMTo INT)
+		INSERT INTO @HostingFee (PartyId, SettingType, CurrencyId, NoOfDate, Amount)
+		SELECT PartyId, SettingType, CurrencyId, DATEDIFF(DAY, FromDate, ToDate) + 1, Amount
+		FROM (
+			SELECT s.FromParty AS PartyId, s.SettingType, d.Amount, d.BaseCurrencyId AS CurrencyId
+				,CASE WHEN s.FromDate < @FromDate THEN @FromDate ELSE s.FromDate END AS FromDate
+				,CASE WHEN s.ToDate > @ToDate THEN @ToDate ELSE s.ToDate END AS ToDate
+				,ROW_NUMBER() OVER(PARTITION BY s.FromParty, s.SettingType ORDER BY s.FromDate DESC) AS RN
+			FROM dbo.LA_HostingFeesSetting s WITH (NOLOCK)
+				LEFT JOIN dbo.LA_HostingFees f WITH (NOLOCK) ON s.HostingFeesId = f.HostingFeesId
+				LEFT JOIN dbo.LA_HostingFeesDetail d WITH(NOLOCK) ON f.HostingFeesId = d.HostingFeesId AND f.HostingFeesTypeId = 1 -- Fixed
+			WHERE @FromDate <= s.ToDate AND @ToDate >= s.FromDate
+		) s
+		WHERE s.RN = 1 AND DATEDIFF(DAY, FromDate, ToDate) >= 0
 
-		-- Region: Get hosting fee
+		/*
+		-- for VCM
+		IF EXISTS (SELECT 1 FROM @HostingFee WHERE HostingFeesTypeId = 2)
 		BEGIN
-			DECLARE @HostingFee TABLE (PartyId INT, SettingType TINYINT, CurrencyId INT, NoOfDate INT, Amount MONEY, HostingFeesTypeId TINYINT, VCMFrom INT, VCMTo INT)
-			INSERT INTO @HostingFee (PartyId, SettingType, CurrencyId, NoOfDate, Amount)
-			SELECT PartyId, SettingType, CurrencyId, DATEDIFF(DAY, FromDate, ToDate) + 1, Amount
-			FROM (
-				SELECT s.FromParty AS PartyId, s.SettingType, d.Amount, d.BaseCurrencyId AS CurrencyId
-					,CASE WHEN s.FromDate < @FromDate THEN @FromDate ELSE s.FromDate END AS FromDate
-					,CASE WHEN s.ToDate > @ToDate THEN @ToDate ELSE s.ToDate END AS ToDate
-					,ROW_NUMBER() OVER(PARTITION BY s.FromParty, s.SettingType ORDER BY s.FromDate DESC) AS RN
-				FROM dbo.LA_HostingFeesSetting s WITH (NOLOCK)
-					LEFT JOIN dbo.LA_HostingFees f WITH (NOLOCK) ON s.HostingFeesId = f.HostingFeesId
-					LEFT JOIN dbo.LA_HostingFeesDetail d WITH(NOLOCK) ON f.HostingFeesId = d.HostingFeesId AND f.HostingFeesTypeId = 1 -- Fixed
-				WHERE @FromDate <= s.ToDate AND @ToDate >= s.FromDate
-			) s
-			WHERE s.RN = 1 AND DATEDIFF(DAY, FromDate, ToDate) >= 0
-
-			/*
-			-- for VCM
-			IF EXISTS (SELECT 1 FROM @HostingFee WHERE HostingFeesTypeId = 2)
-			BEGIN
-				DECLARE @PartyServers TABLE (PartyId INT, ServerId VARCHAR(20))
-				DECLARE @PeakConcurrentUsers TABLE (ServerId VARCHAR(20), LogDate DATETIME, Users INT)
+			DECLARE @PartyServers TABLE (PartyId INT, ServerId VARCHAR(20))
+			DECLARE @PeakConcurrentUsers TABLE (ServerId VARCHAR(20), LogDate DATETIME, Users INT)
 			
-				INSERT INTO @PartyServers (PartyId, ServerId)
-				SELECT p.PartyId, LEFT(CONVERT(VARCHAR(20), s.ServerId), 3)
-				FROM @PartySettings p
-					INNER JOIN dbo.view_site_list ls WITH (NOLOCK) ON p.LicenseeId = ls.SiteId
-					INNER JOIN bodb02.dbo.Site s WITH (NOLOCK) ON ls.IbcSiteId = s.SiteId
+			INSERT INTO @PartyServers (PartyId, ServerId)
+			SELECT p.PartyId, LEFT(CONVERT(VARCHAR(20), s.ServerId), 3)
+			FROM @PartySettings p
+				INNER JOIN dbo.view_site_list ls WITH (NOLOCK) ON p.LicenseeId = ls.SiteId
+				INNER JOIN bodb02.dbo.Site s WITH (NOLOCK) ON ls.IbcSiteId = s.SiteId
 
-				DECLARE @ServerIds VARCHAR(MAX), @SQL VARCHAR(MAX)
-				SELECT  @ServerIds = COALESCE(@ServerIds + ',' , '') + ServerId FROM @PartyServers
+			DECLARE @ServerIds VARCHAR(MAX), @SQL VARCHAR(MAX)
+			SELECT  @ServerIds = COALESCE(@ServerIds + ',' , '') + ServerId FROM @PartyServers
 			
-				SET @SQL = '
-				SELECT LogDate, ServerId, Users
-				FROM OPENQUERY(DBONUSER, ''	SELECT CONVERT(DATE, LogDate) AS LogDate, ServerId, MAX(Users) AS Users
-											FROM (
-												SELECT LogDate, LEFT(CONVERT(VARCHAR(20), ServerId), 3) AS ServerId, SUM(Users) AS Users
-												FROM ON_USER.dbo.TotalOnline WITH (NOLOCK)
-												WHERE LogDate >= ''''' + CONVERT(VARCHAR(10), @FromDate, 120) + '''''
-													AND LogDate < ''''' + CONVERT(VARCHAR(10), DATEADD(DAY, 1, @ToDate), 120) + '''''
-													AND LEFT(CONVERT(VARCHAR(20), ServerId), 3) IN (' + @ServerIds + ')
-												UNION ALL
-												SELECT LogDate, LEFT(CONVERT(VARCHAR(20), ServerId), 3) AS ServerId, SUM(Users) AS Users
-												FROM ON_USER.dbo.TotalOnline_BK WITH (NOLOCK)
-												WHERE LogDate >= ''''' + CONVERT(VARCHAR(10), @FromDate, 120) + '''''
-													AND LogDate < ''''' + CONVERT(VARCHAR(10), DATEADD(DAY, 1, @ToDate), 120) + '''''
-													AND LEFT(CONVERT(VARCHAR(20), ServerId), 3) IN (' + @ServerIds + ')
-											) t
-											GROUP BY CONVERT(DATE, LogDate), ServerId)'
-				INSERT INTO @PeakConcurrentUsers (LogDate, ServerId, Users)
-				EXEC (@SQL)
-			END
-			*/
-
-			UPDATE h1
-			SET h1.Amount = h1.Amount * ISNULL((1.0 * (h2.FeeDate - h2.WaiveDate) / h2.FeeDate), 1.0)
-			FROM @HostingFee h1
-				OUTER APPLY (
-					SELECT TOP 1 h1.NoOfDate AS FeeDate, h2.NoOfDate AS WaiveDate
-					FROM @HostingFee h2
-					WHERE h1.PartyId = h2.PartyId AND h2.SettingType = 2
-				) h2
-			WHERE h1.SettingType = 1
-
-			INSERT INTO @FinalResult (PartyId, BillerId, InvoiceType, LicensingFee)
-			SELECT h.PartyId, ivs.BillerId, 6, h.Amount * e.BaseCurrencyRate
-			FROM @HostingFee h
-				INNER JOIN @PartySettings ps ON h.PartyId = ps.PartyId
-				INNER JOIN @InvoiceSettings ivs ON h.PartyId = ivs.PartyId AND ivs.InvTypeId = 6 -- Hosting Fee
-				INNER JOIN #Exchange e ON h.CurrencyId = e.ExchangeId AND ps.BaseCurrencyId = e.BaseCurrencyId AND e.ExchangeDate = @ToDate
-				LEFT JOIN @FinalResult f ON h.PartyId = f.PartyId AND ivs.BillerId = f.BillerId AND f.InvoiceType = 6
-			WHERE h.SettingType = 1 AND f.PartyId IS NULL
+			SET @SQL = '
+			SELECT LogDate, ServerId, Users
+			FROM OPENQUERY(DBONUSER, ''	SELECT CONVERT(DATE, LogDate) AS LogDate, ServerId, MAX(Users) AS Users
+										FROM (
+											SELECT LogDate, LEFT(CONVERT(VARCHAR(20), ServerId), 3) AS ServerId, SUM(Users) AS Users
+											FROM ON_USER.dbo.TotalOnline WITH (NOLOCK)
+											WHERE LogDate >= ''''' + CONVERT(VARCHAR(10), @FromDate, 120) + '''''
+												AND LogDate < ''''' + CONVERT(VARCHAR(10), DATEADD(DAY, 1, @ToDate), 120) + '''''
+												AND LEFT(CONVERT(VARCHAR(20), ServerId), 3) IN (' + @ServerIds + ')
+											UNION ALL
+											SELECT LogDate, LEFT(CONVERT(VARCHAR(20), ServerId), 3) AS ServerId, SUM(Users) AS Users
+											FROM ON_USER.dbo.TotalOnline_BK WITH (NOLOCK)
+											WHERE LogDate >= ''''' + CONVERT(VARCHAR(10), @FromDate, 120) + '''''
+												AND LogDate < ''''' + CONVERT(VARCHAR(10), DATEADD(DAY, 1, @ToDate), 120) + '''''
+												AND LEFT(CONVERT(VARCHAR(20), ServerId), 3) IN (' + @ServerIds + ')
+										) t
+										GROUP BY CONVERT(DATE, LogDate), ServerId)'
+			INSERT INTO @PeakConcurrentUsers (LogDate, ServerId, Users)
+			EXEC (@SQL)
 		END
-		-- End Region: Get hosting fee
-	END
-	-- End Region: Get party's amount who were issued invoices
+		*/
 
-	-- Region: Get party's amount who were not issued invoices
+		UPDATE h1
+		SET h1.Amount = h1.Amount * ISNULL((1.0 * (h2.FeeDate - h2.WaiveDate) / h2.FeeDate), 1.0)
+		FROM @HostingFee h1
+			OUTER APPLY (
+				SELECT TOP 1 h1.NoOfDate AS FeeDate, h2.NoOfDate AS WaiveDate
+				FROM @HostingFee h2
+				WHERE h1.PartyId = h2.PartyId AND h2.SettingType = 2
+			) h2
+		WHERE h1.SettingType = 1
+
+		INSERT INTO @FinalResult (PartyId, BillerId, InvoiceType, LicensingFee)
+		SELECT h.PartyId, ivs.BillerId, 6, h.Amount * e.BaseCurrencyRate
+		FROM @HostingFee h
+			INNER JOIN @PartySettings ps ON h.PartyId = ps.PartyId
+			INNER JOIN @InvoiceSettings ivs ON h.PartyId = ivs.PartyId AND ivs.InvTypeId = 6 -- Hosting Fee
+			INNER JOIN #Exchange e ON h.CurrencyId = e.ExchangeId AND ps.BaseCurrencyId = e.BaseCurrencyId AND e.ExchangeDate = @ToDate
+			LEFT JOIN @FinalResult f ON h.PartyId = f.PartyId AND ivs.BillerId = f.BillerId AND f.InvoiceType = 6
+		WHERE h.SettingType = 1 AND f.PartyId IS NULL
+	END
+	-- End Region: Get hosting fee
+
+	-- Region: Get party's amount
 	BEGIN
 		DECLARE @SumByProducts TABLE (PartyId INT, ProductId INT, ProductCode VARCHAR(500), LicensingFee MONEY, ExtraAmount MONEY, Discount MONEY, Rebate MONEY)
 
@@ -587,6 +559,7 @@ BEGIN
 
 		UPDATE @FinalResult SET LicensingFee = ISNULL(LicensingFee, 0) + ISNULL(ExtraAmount, 0) WHERE InvoiceType = 1 AND InvoiceHeaderId IS NULL
 	END
+	-- End Region: Get party's amount
 
 	-- Region: Final Result
 	BEGIN
