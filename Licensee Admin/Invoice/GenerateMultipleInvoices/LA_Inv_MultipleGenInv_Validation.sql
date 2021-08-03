@@ -61,6 +61,7 @@ BEGIN
 		SET p.PartyId = op.PartyId
 		FROM @PartyList p
 			INNER JOIN dbo.OAS_Party op WITH (NOLOCK) ON p.PartyName = LTRIM(RTRIM(op.PartyName))
+		WHERE op.PartyType IN (1, 5) -- licensees
 
 		;WITH CTE_Data AS (
 			SELECT p.RowId, t.CellNumber, CASE t.CellNumber WHEN 0 THEN 'invoice number' WHEN 1 THEN 'licensee name' WHEN 2 THEN 'invoice type' END AS ErrMsg
@@ -216,6 +217,7 @@ BEGIN
 			SELECT DISTINCT PartyId, CurrencyId
 			FROM dbo.LA_MinFee WITH (NOLOCK)
 			WHERE FromDate <= @ToDate AND ToDate >= @FromDate
+				AND FeeTypeId = 1 -- Exclude waive min fee
 		) m
 			LEFT JOIN @MinFee t ON m.PartyId = t.PartyId
 		WHERE t.PartyId IS NULL
