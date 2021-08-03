@@ -3,7 +3,7 @@ USE bodb_Licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_NAPByProductSel]
-	@PartyId			INT
+	@PartyIds			VARCHAR(MAX)
 	,@FromDate			SMALLDATETIME
 	,@ToDate			SMALLDATETIME
 	,@BaseCurrencyName	VARCHAR(10) = 'EUR'
@@ -22,18 +22,20 @@ BEGIN
 	SET NOCOUNT ON
 
 	-- Get agent list
-	DECLARE @Site VARCHAR(20)
-	SELECT  @Site = l.LicenseeName
+	DECLARE @tblSite TABLE (Site VARCHAR(100))
+	INSERT INTO @tblSite (Site)
+	SELECT l.LicenseeName
 	FROM dbo.Licensees l WITH (NOLOCK)
 		INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON l.LicenseeId = p.OldRefId AND p.PartyType IN (1, 5)
-	WHERE p.PartyId = @PartyId
+	WHERE p.PartyId IN (SELECT CONVERT(INT, val) FROM bodb02.dbo.strSplit(@PartyIds, ','))
 
 	DECLARE @recommend TABLE (recommend INT)
 	INSERT INTO @recommend (recommend)
 	SELECT c.custid
-	FROM bodb02.dbo.Customer c WITH (NOLOCK)
-		INNER JOIN bodb02.dbo.Dep_CustSuper s WITH (NOLOCK) ON c.srecommend = s.custid
-	WHERE s.site = @Site AND c.roleid = 2
+	FROM @tblSite t
+		INNER JOIN bodb02.dbo.Dep_CustSuper s WITH (NOLOCK) ON t.Site = s.Site
+		INNER JOIN bodb02.dbo.Customer c WITH (NOLOCK) ON s.custid = c.srecommend
+	WHERE c.roleid = 2
 		AND s.currency <> 20
 
 	-- Get Exchange
@@ -60,9 +62,9 @@ BEGIN
 		LEFT JOIN dbo.Product3rd p WITH (NOLOCK) ON f.ProductCode = p.ProductPrefix
 
 	-- Get AmountToCompany data
-	CREATE TABLE #tmpData (recommend INT, Currency INT, WinlostDate SMALLDATETIME, Sporttype INT, IsBA BIT, LicenseeWL MONEY, AmountToCompany MONEY)
-	INSERT INTO #tmpData (recommend, Currency, WinlostDate, Sporttype, IsBA, AmountToCompany)
-	SELECT b.recommend, b.Currency, b.WinlostDate, b.sporttype, b.isBA
+	CREATE TABLE #tmpData (WinlostDate SMALLDATETIME, Currency INT, Sporttype INT, IsBA BIT, AmountToCompany MONEY)
+	INSERT INTO #tmpData (WinlostDate, Currency, Sporttype, IsBA, AmountToCompany)
+	SELECT b.WinlostDate, b.Currency, b.sporttype, b.isBA
 		,-SUM(ISNULL(b.swinlost, 0) + ISNULL(b.mwinlost, 0) + ISNULL(b.awinlost, 0) + ISNULL(b.winlost, 0) + ISNULL(b.scomm, 0)) AS AmountToCompany
 	FROM bodb_LicenseeReport.dbo.rptLicWinloss2 b WITH (NOLOCK)
 		INNER JOIN @recommend r ON b.recommend = r.recommend
@@ -70,7 +72,7 @@ BEGIN
 		AND b.roleId = 2
 		AND b.statusId IN (111, 112, 113, 114, 115)
 		AND b.bettype NOT IN (901, 902, 911, 912)
-	GROUP BY b.recommend, b.Currency, b.WinlostDate, b.sporttype, b.isBA
+	GROUP BY b.recommend, b.WinlostDate, b.Currency, b.sporttype, b.isBA -- group by on index recommend
 
 	-- Return data
 	SELECT p.ProductId, p.ProductName, CONVERT(MONEY, SUM(t.AmountToCompany * e.Rate)) AS AmountToCompany
