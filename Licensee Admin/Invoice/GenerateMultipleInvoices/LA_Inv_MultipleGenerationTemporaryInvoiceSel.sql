@@ -287,7 +287,7 @@ BEGIN
 	
 				INSERT INTO #TempData (LicenseeId, rptDate, ProductId, CurrencyId, BettypeRef, MemberWL, MemberComm, AgentWL, AgentComm, Contribution, JackpotPrize, ExtraAmount, OddsSpread, PayOut, CommShare, CashInShare)
 				SELECT r.SiteId, r.rptDate, r.ProductId, r.CurrencyId
-					,CASE WHEN r.Bettype IN (901, 1706, 3007) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
+					,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
 					,SUM(CASE WHEN (r.ProductId IN (32, 43, 42) AND ISNULL(r.TicketType, 0) = 2) OR r.Bettype IN (902, 903, 904, 999, 4299, 4300, 4297, 4298, 1698, 1699, 1906) THEN 0 ELSE ISNULL(r.MemberWL, 0) END) AS MemberWL
 					,SUM(ISNULL(r.CommissionP, 0)) AS MemberComm
 					,SUM(ISNULL(r.GrossWL, 0)) AS AgentWL
@@ -307,7 +307,7 @@ BEGIN
 					AND r.CurrencyId <> 20
 					AND r.ProductId <> 25 -- CO
 				GROUP BY r.SiteId, r.rptDate, r.CurrencyId, r.ProductId
-					,CASE WHEN r.Bettype IN (901, 1706, 3007) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
+					,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
 
 				INSERT INTO #tmpResult (PartyId, ProductId, rptDate, LicenseeAmount, ExtraAmount)
 				SELECT ps.PartyId, t.ProductId, t.rptDate
@@ -344,7 +344,7 @@ BEGIN
 
 				-- SB Promotion
 				INSERT INTO #tmpResult (PartyId, ProductId, rptDate, ExtraAmount)
-				SELECT p.PartyId, 0, t.rptDate, -SUM(t.MemberWL * e.BaseCurrencyRate) AS ExtraAmount
+				SELECT p.PartyId, 0, t.rptDate, -SUM(CASE WHEN t.BettypeRef = 17005 THEN t.AgentWL ELSE t.MemberWL END * e.BaseCurrencyRate) AS ExtraAmount
 				FROM #TempData t
 					INNER JOIN @PartySettings ps ON t.LicenseeId = ps.LicenseeId
 					INNER JOIN @PartyChargeInfo p ON t.LicenseeId = p.LicenseeId AND t.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId = 0
