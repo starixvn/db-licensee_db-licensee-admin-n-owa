@@ -445,13 +445,7 @@ BEGIN
 
 				DECLARE @MinFee TABLE (PartyId INT, FeeTypeId TINYINT, FeeAmount MONEY, ProrateMinFee MONEY, FromDate DATETIME, ToDate DATETIME)
 
-				;WITH CTE_GroupMinFee AS (
-					SELECT a.PartyId
-					FROM bodb_Licensee.dbo.LA_GroupMinFeeAssignment a WITH (NOLOCK)
-						INNER JOIN bodb_Licensee.dbo.LA_GroupMinFeeHeader h WITH (NOLOCK) ON a.GroupMinFeeId = h.GroupMinFeeId
-					WHERE h.FromDate <= @LastDate AND h.ToDate >= @FirstDate
-					GROUP BY a.PartyId
-				)
+				-- Individual Min Fee: Base on Create Invoice function (not care exists on Group Min Fee)
 				INSERT INTO @MinFee (PartyId, FeeTypeId, FeeAmount, FromDate, ToDate)
 				SELECT m.PartyId, m.FeeTypeId, m.FeeAmount * e.BaseCurrencyRate
 					,CASE WHEN @FromDate > FromDate THEN @FromDate ELSE FromDate END AS FromDate
@@ -460,11 +454,16 @@ BEGIN
 					INNER JOIN @InvAmount i ON m.PartyId = i.PartyId
 					INNER JOIN @PartySettings ps ON m.PartyId = ps.PartyId
 					LEFT JOIN #Exchange e ON m.CurrencyId = e.ExchangeId AND e.BaseCurrencyId = ps.BaseCurrencyId AND e.ExchangeDate = @ToDate
-					LEFT JOIN CTE_GroupMinFee gm ON m.PartyId = gm.PartyId
 				WHERE m.FeeTypeId IN (1, 2)
 					AND m.FromDate <= @LastDate AND m.ToDate >= @FirstDate
 					AND m.ProductId = 0 -- SB
-					AND gm.PartyId IS NULL -- not apply group min fee
+
+				DELETE m
+				FROM (
+					SELECT PartyId, FeeTypeId, ROW_NUMBER() OVER(PARTITION BY PartyId, FeeTypeId ORDER BY FromDate DESC) AS RN
+					FROM @MinFee
+				) m
+				WHERE RN > 1
 
 				UPDATE m1
 				SET m1.ProrateMinFee = (
