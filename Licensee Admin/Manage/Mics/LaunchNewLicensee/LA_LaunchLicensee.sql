@@ -18,7 +18,8 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
 	@MinFeeSettingData	VARCHAR(MAX)	= '',
 	@UserId				INT, 
 	@ErrCode			INT				= 0		OUTPUT, 
-	@ErrMsg				VARCHAR(4000)	= ''	OUTPUT
+	@ErrMsg				VARCHAR(4000)	= ''	OUTPUT,
+	@InvoiceLanguage	VARCHAR(7)		= ''
 AS
 /*
 	Created: 20190107@Parsons
@@ -30,6 +31,7 @@ AS
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20190829@Bruce: Adding Licensee Code [#111586] 
 		- 20210324@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
+		- 20210811@Danny: Adding @InvoiceLanguage [#FeatureID 158133]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -105,7 +107,7 @@ BEGIN
 	END
 	
 	DECLARE @NewPartyId	INT = 0
-	EXEC dbo.LA_LaunchLicensee_PartyIns @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @LicenseeCode, @BaseCurrencyId, @LaunchDate, @NewPartyId OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT 
+	EXEC dbo.LA_LaunchLicensee_PartyIns @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @LicenseeCode, @BaseCurrencyId, @LaunchDate, @NewPartyId OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT, @InvoiceLanguage
 	
 	IF @ErrCode = 0
 	BEGIN
