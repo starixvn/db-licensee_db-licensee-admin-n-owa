@@ -3,6 +3,7 @@ USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeInfoSel]
+	 @PartyIds VARCHAR(1000) = ''
 AS
 /*
 	Created: 20151007@Bruce
@@ -17,6 +18,7 @@ AS
 		- 20190130@Bruce: Missing licensee group: Cozni [#108432]
 		- 20190318@Mason: Add InvoiceLanguage in SELECT statement [#110445]
 		- 20200212@Mason: Set billing term by currency [#120005]
+		- 20210811@Percy: Add input parameter: @PartyIds (list of PartyId) [RedmineID: #159629]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -62,6 +64,7 @@ BEGIN
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping s WITH (NOLOCK) ON s.ChargeID=ci.ChargeID AND s.SystemID = 2
 		LEFT JOIN dbo.LA_Minfee AS f WITH (NOLOCK) ON f.PartyId = ci.FromParty AND f.ProductId=ci.ProductId AND f.FeeTypeId = 1 -- Min fee
 		LEFT JOIN dbo.LA_Minfee AS m WITH (NOLOCK) ON m.PartyId = ci.FromParty AND m.ProductId=ci.ProductId AND m.FeeTypeId = 2 -- Waive month
+		INNER JOIN dbo.strSplit(@PartyIds, ',') p2 ON p.PartyID = p2.val 
 	WHERE g.ParentId = 0 AND p.PartyType = 1
 	ORDER BY p.PartyName, pd.BrandName, ci.FromDate, ci.ProductID
 END
