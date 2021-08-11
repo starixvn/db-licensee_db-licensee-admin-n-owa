@@ -59,6 +59,7 @@ AS
 		- 20210705@Percy: Add ContributionDiscount column [RedmineID: #157549]
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
 		- 20210726@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+		- 20210727@Percy: Return ProductId for Detail Mode [RedmineID: #155593]
 		- 20210813@Percy: Remove check negative amount of ContributionDiscount [RedmineID: #159294]
 */
 BEGIN
@@ -817,7 +818,7 @@ BEGIN
 				INNER JOIN @ProductList p ON r.ProductId = p.ProductId
 			GROUP BY p.ProductId, p.Name, r.PartyId
 		ELSE
-			SELECT r.LicenseeCode, p.Name AS ProductName, UPPER(@BaseCurrency) AS CurrencyName, SUM(r.AmountToCompany) AS AmountToCompany
+			SELECT r.LicenseeCode, p.Name AS ProductName, p.ProductId, UPPER(@BaseCurrency) AS CurrencyName, SUM(r.AmountToCompany) AS AmountToCompany
 			FROM @Result r
 				INNER JOIN @ProductList p ON r.ProductId = p.ProductId
 			GROUP BY r.LicenseeCode, p.ProductId, p.Name
