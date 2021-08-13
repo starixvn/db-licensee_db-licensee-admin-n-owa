@@ -18,7 +18,8 @@ AS
 		- 20210510@Percy: Initialize SP [RedmineID: #150878]
 		- 20210618@Danny: AE Sexy - Support Lucky Draw [#152141]
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
-		20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+		- 20210813@Percy: Always show data of selected licensees [RedmineID: #159294]
 */
 
 BEGIN
@@ -459,8 +460,9 @@ BEGIN
 		) p
 	)
 	SELECT p.ParentName AS GroupName, p.PartyName AS LicenseeName, ' + @ProductList + '
-	FROM CTE_Result r
-		INNER JOIN #PartyList p ON r.PartyId = p.PartyId AND p.IsSelected = 1
+	FROM #PartyList p
+		LEFT JOIN CTE_Result r ON p.PartyId = r.PartyId
+	WHERE p.IsSelected = 1
 	ORDER BY p.ParentName, p.PartyName'
 
 	EXEC (@SQL)
