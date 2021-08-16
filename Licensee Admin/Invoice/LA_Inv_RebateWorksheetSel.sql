@@ -30,6 +30,7 @@ AS
 	  - 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
 	  - 20210405@Parsons: Handle negative amount for CardClub product [#FeatureID 152089]
 	  - 20210306@Danny: Add AE sexy data to Extra Amount [#152141]
+	  - 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -231,18 +232,19 @@ BEGIN
 	SELECT p.ProductId, 0 FROM @Products p
 	WHERE p.ProductId NOT IN (SELECT r.ProductId FROM @Result r)
 
-	--Region Show net amount for PP,CC,SBC in summary sheet
+	--Region Show net amount for PP,CC,SBC,VGA in summary sheet
 	DECLARE @PP_Contribution_Bettype SMALLINT = 4297,
 			@CC_ArcadiaBonus_Bettype SMALLINT = 1906,
-			@SBC_Contribution_Bettype SMALLINT = 1698
+			@SBC_Contribution_Bettype SMALLINT = 1698,
+			@VGA_Contribution_Bettype SMALLINT = 3898
 
 	;WITH cte_ExtraAmountData AS 
 	(
-		SELECT pc.ProductID, SUM(CASE WHEN b.Bettype IN(@PP_Contribution_Bettype, @SBC_Contribution_Bettype) THEN -b.GrossWL ELSE -b.MemberWL END  * e.Rate) AS ExtraAmount
+		SELECT pc.ProductID, SUM(CASE WHEN b.Bettype IN(@PP_Contribution_Bettype, @SBC_Contribution_Bettype, @VGA_Contribution_Bettype) THEN -b.GrossWL ELSE -b.MemberWL END  * e.Rate) AS ExtraAmount
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'PP,CC,SBC,SXG', 'OA', 1) pc ON b.SiteID = pc.LicenseeId AND b.ProductID = pc.ProductID
+			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'PP,CC,SBC,SXG,VGA', 'OA', 1) pc ON b.SiteID = pc.LicenseeId AND b.ProductID = pc.ProductID
 			INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-			LEFT JOIN LA_f_ExcludedBettypeListSel('32,34,42,45', '') eb ON b.Bettype = eb.BettypeID
+			LEFT JOIN LA_f_ExcludedBettypeListSel('32,34,42,45,66', '') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND b.[StatusId] NOT IN (-1, 101, 102, 103)
 			AND (ISNULL(b.TicketType, 0) = 2 OR eb.BettypeID IS NOT NULL)
 		GROUP BY pc.ProductID
@@ -251,8 +253,8 @@ BEGIN
 	SET r.ExtraAmount = ISNULL(cte.ExtraAmount, 0) 
 	FROM @Result r
 	LEFT JOIN cte_ExtraAmountData cte ON r.ProductId = cte.ProductID
-	WHERE r.ProductId IN (32,34,42,45)
-	--End-Region Show net amount for PP,CC,SBC in summary sheet
+	WHERE r.ProductId IN (32,34,42,45,66)
+	--End-Region Show net amount for PP,CC,SBC,VGA in summary sheet
 
 	DECLARE @Remark NVARCHAR(4000) = (SELECT TOP 1 x.RebateRemark FROM #AmountToCompany x WHERE ISNULL(x.RebateRemark,'') <> '')
 
@@ -262,7 +264,7 @@ BEGIN
 		SUM(ISNULL(d.Rebate, 0))	AS TotalRebate,
 		SUM(
 			CASE 
-				WHEN rs.ProductId IN (11,39,32,34,42,45) THEN 
+				WHEN rs.ProductId IN (11,39,32,34,42,45,66) THEN 
 					CASE 
 						WHEN ISNULL(rs.AmountToCompany,0) < 0 THEN 0 
 						ELSE ISNULL(rs.AmountToCompany,0) 
@@ -273,7 +275,7 @@ BEGIN
 	LEFT JOIN #AmountToCompany d ON d.ProductId = rs.ProductId
 
 	SELECT r.ProductId, CASE 
-							WHEN r.ProductId IN (32, 34, 42, 45) AND ISNULL(r.AmountToCompany,0) < 0 THEN 0 
+							WHEN r.ProductId IN (32, 34, 42, 45, 66) AND ISNULL(r.AmountToCompany,0) < 0 THEN 0 
 							ELSE ISNULL(r.AmountToCompany,0) 
 						END + ISNULL(ExtraAmount, 0) AmountToCompany 
 	FROM @Result r

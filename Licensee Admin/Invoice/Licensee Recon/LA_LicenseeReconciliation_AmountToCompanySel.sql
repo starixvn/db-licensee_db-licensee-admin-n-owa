@@ -58,6 +58,7 @@ AS
 		- 20210614@Danny: Integrate AdvantPlay Mini [#155207]
 		- 20210705@Percy: Add ContributionDiscount column [RedmineID: #157549]
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
+		- 20210726@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -73,6 +74,7 @@ BEGIN
 		,@CommissionShare_ChargeType	SMALLINT = 6
 		,@CashinShare_ChargeType		SMALLINT = 7
 		,@CashoutComm_ChargeType		SMALLINT = 5
+		,@SabaPromotion_Bettype			SMALLINT = 17000
 		,@PPContribution_Bettype		SMALLINT = 4297
 		,@PPJackpotPrize_Bettype		SMALLINT = 4298
 		,@PPTournament_Bettype		SMALLINT = 4299
@@ -85,6 +87,8 @@ BEGIN
 		,@SBC_JackpotPrize SMALLINT = 1699
 		,@SXG_LuckyDraw    SMALLINT = 3150
 		,@SPR_SabaPromotion SMALLINT = 17005 
+		,@VGA_Contribution SMALLINT = 3898
+		,@VGA_JackpotPrize SMALLINT = 3899
 		,@BA	SMALLINT = 3
 		,@GD	SMALLINT = 11
 		,@CB	SMALLINT = 15
@@ -95,6 +99,7 @@ BEGIN
 		,@SPR	SMALLINT = 37
 		,@SBC	SMALLINT = 42
 		,@SXG   SMALLINT = 45
+		,@VGA   SMALLINT = 66
 
 /*-----------------
  * Settings
@@ -333,7 +338,7 @@ BEGIN
 			,SUM(ISNULL(b.BuyBackAmount, 0))
 			,SUM(ISNULL(b.Turnover, 0))
 			,SUM(ISNULL(-b.MemberWL, 0)) AS LicWinloss
-			,SUM(CASE WHEN b.Bettype IN (999, 1698, 4297, 17005) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS GrossWL
+			,SUM(CASE WHEN b.Bettype IN (999, 1698, 4297, 17005, 3898) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS GrossWL
 			,SUM(CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN ISNULL(b.Turnover, 0) ELSE ISNULL(b.ExtraAmount, 0) END) AS TurnoverForCommision
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
@@ -352,7 +357,7 @@ BEGIN
 		INSERT INTO #tmpWinlossData (rptDate, PartyId, ProductId, CurrencyId, Winloss, AmountToCompany, Promotion, ExtraAmount, Contribution, ContributionDiscount, JackPotPrize, PromotionPrize)
 		SELECT b.rptDate, p.PartyId, p.ProductId, b.CurrencyId
 			,SUM((b.LicWinloss + (CASE WHEN b.ProductID = 31 THEN b.CommissionA ELSE 0 END)) * e.Rate) AS Winloss
-			,SUM((((b.LicWinloss - CASE WHEN b.ProductID IN (32, 42) THEN GrossWL ELSE 0 END) * ISNULL(cr.Rate, p.Rate) - 
+			,SUM((((b.LicWinloss - CASE WHEN b.ProductID IN (32, 42, 66) THEN GrossWL ELSE 0 END) * ISNULL(cr.Rate, p.Rate) - 
 				(CASE
 					WHEN b.ProductID = 3 THEN ISNULL(b.CommissionA, 0)
 					WHEN b.ProductID = 31 THEN (b.CommissionA + b.CommissionP)
@@ -369,7 +374,7 @@ BEGIN
 		INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID AND p.LicenseeId = b.SiteId AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 		LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
-		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39,42,45', '4297,1698') eb ON b.Bettype = eb.BettypeID
+		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39,42,45,66', '4297,1698,3898') eb ON b.Bettype = eb.BettypeID
 		WHERE p.ChargeType NOT IN (
 				@CashoutComm_ChargeType,
 				@CommissionShare_ChargeType,
@@ -389,15 +394,15 @@ BEGIN
 			,SUM(CASE WHEN b.ProductId = 37 THEN CASE WHEN b.Bettype = 17005 THEN -b.GrossWL ELSE -b.LicWinloss END * e.Rate ELSE 0 END) Promotion
 			,SUM(CASE WHEN b.ProductId <> 37 THEN b.GrossWL ELSE 0 END * e.Rate) AS Contribution
 			,SUM(CASE WHEN b.ProductId <> 37 THEN b.GrossWL ELSE 0 END * ISNULL(cr.Rate, p.Rate) * e.Rate) AS ContributionDiscount
-			,SUM(CASE WHEN b.Bettype IN (4298, 1699) THEN -b.LicWinloss * e.Rate ELSE 0 END) JackPotPrize
+			,SUM(CASE WHEN b.Bettype IN (4298, 1699, 3899) THEN -b.LicWinloss * e.Rate ELSE 0 END) JackPotPrize
 			,SUM(CASE WHEN b.TicketType = 2 OR b.Bettype IN (4299, 4300, 1906, 3150) THEN -b.LicWinloss * e.Rate ELSE 0 END) PromotionPrize
 		FROM #tmpBettingByProduct b
 		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = (CASE WHEN p.ProductID = 0 THEN @SPR ELSE p.ProductID END)
 		LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
 		INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39,42,45', '') eb ON b.Bettype = eb.BettypeID
+		LEFT JOIN LA_f_ExcludedBettypeListSel('11,32,34,39,42,45,66', '') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN p.FromDate AND p.ToDate
-			AND (p.ProductID IN (0, @PP, @CC, @SBC, @SXG) OR p.ChargeType = @GDTip_ChargeType)
+			AND (p.ProductID IN (0, @PP, @CC, @SBC, @SXG, @VGA) OR p.ChargeType = @GDTip_ChargeType)
 			AND (b.ProductID = 37 OR eb.BettypeID IS NOT NULL OR b.TicketType = 2)
 		GROUP BY b.rptDate, p.PartyId, p.ProductId, b.CurrencyId
 

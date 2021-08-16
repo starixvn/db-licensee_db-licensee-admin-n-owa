@@ -69,6 +69,7 @@ AS
 		- 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: #154992]
 		- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
+		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -96,16 +97,18 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007
-	DECLARE @BAProductId INT = 3, @ExchangeProductId INT = 31, @PragmaticProductId INT = 32, @ArcadiaGamingId INT = 34, @Saba_clubProductID INT = 42, @AESexyProductId INT = 45,
-			@PP_Contribution SMALLINT = 4297,
-			@PP_JackpotPrize SMALLINT = 4298,
-			@PPTournament SMALLINT = 4299,
-			@PromotionPrize SMALLINT = 4300,
+	DECLARE @BAProductId INT = 3, @ExchangeProductId INT = 31, @PragmaticProductId INT = 32, @ArcadiaGamingId INT = 34, @Saba_clubProductID INT = 42, @AESexyProductId INT = 45,  @VGA_ProductID INT = 66,
+			@PP_Contribution	SMALLINT = 4297,
+			@PP_JackpotPrize	SMALLINT = 4298,
+			@PPTournament		SMALLINT = 4299,
+			@PromotionPrize		SMALLINT = 4300,
 			@ArcadiaGamingBonus SMALLINT = 1906,
-			@SBC_Contribution SMALLINT = 1698,
-			@SBC_JackpotPrize SMALLINT = 1699,
+			@SBC_Contribution	SMALLINT = 1698,
+			@SBC_JackpotPrize	SMALLINT = 1699,
 			@SXG_LuckyDraw SMALLINT = 3150,
-			@SPR_SabaPromotion SMALLINT = 17005 
+			@SPR_SabaPromotion SMALLINT = 17005, 
+			@VGA_Contribution	SMALLINT = 3898,
+			@VGA_JackpotPrize	SMALLINT = 3899
 
 	-- *********************************************************************************************************
 	-- *** Calculate Previous FromDate, Previous ToDate from FromDate, ToDate
@@ -379,8 +382,8 @@ BEGIN
 				0 AComm,
 				0 PComm,
 				0 AmountToCompany,
-				SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution) THEN ISNULL(-b.GrossWL, 0)
-						 WHEN b.Bettype IN (@PPTournament,@PromotionPrize,@PP_JackpotPrize,@ArcadiaGamingBonus,@SBC_JackpotPrize,@SXG_LuckyDraw) OR ISNULL(b.TicketType, 0) = 2 THEN ISNULL(-b.MemberWL, 0)
+				SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @VGA_Contribution) THEN ISNULL(-b.GrossWL, 0)
+						 WHEN b.Bettype IN (@PPTournament,@PromotionPrize,@PP_JackpotPrize,@ArcadiaGamingBonus,@SBC_JackpotPrize,@SXG_LuckyDraw, @VGA_JackpotPrize) OR ISNULL(b.TicketType, 0) = 2 THEN ISNULL(-b.MemberWL, 0)
 						 ELSE 0
 					END) AS ExtraAmount
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
@@ -558,7 +561,7 @@ BEGIN
 			SUM(CASE WHEN t.ProductId = @ExchangeProductId THEN t.PComm ELSE 0 END + t.WinLoss)							AS WinLoss,
 			SUM(CASE WHEN t.ProductId = @BAProductId THEN t.AComm ELSE 0 END)											AS BAComm,
 			SUM(CASE WHEN t.ProductId = @BAProductId THEN t.AmountToCompany ELSE 0 END)									AS AmountToBA,
-			SUM(CASE WHEN (jvp.PartyId IS NOT NULL AND t.ProductId <> @BAProductId) OR t.ProductId = @ExchangeProductId OR (t.ProductId IN (@PragmaticProductId, @ArcadiaGamingId, @Saba_clubProductID, @AESexyProductId) AND t.AmountToCompany < 0) THEN t.AmountToCompany ELSE 0 END)	AS NegativeAmount,
+			SUM(CASE WHEN (jvp.PartyId IS NOT NULL AND t.ProductId <> @BAProductId) OR t.ProductId = @ExchangeProductId OR (t.ProductId IN (@PragmaticProductId, @ArcadiaGamingId, @Saba_clubProductID, @AESexyProductId, @VGA_ProductID) AND t.AmountToCompany < 0) THEN t.AmountToCompany ELSE 0 END)	AS NegativeAmount,
 			SUM(CASE WHEN jvp.PartyId IS NOT NULL OR t.ProductId IN (@BAProductId, @ExchangeProductId) OR t.AmountToCompany < 0 THEN 0 ELSE t.AmountToCompany END) AS AmountToCompany
 		FROM @SumByProducts t
 			LEFT JOIN bodb_Licensee.dbo.LA_f_JVPartyListSel() jvp ON t.PartyId = jvp.PartyId

@@ -53,6 +53,7 @@ AS
 			- 20210108@Parsons: Settlement report - Enhance Company column of Arcadia Gaming, Saba.Club, PP [#150629]
 			- 20210513@Percy: Keep negative licensee fee for joint venture parties [RedmineID: #154992]
 			- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
+			- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 
 		Param's Explanation:
 			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
@@ -866,21 +867,27 @@ BEGIN
 		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY rptDate, d.CurrencyID
 	END
-	ELSE IF (@ProductCode = 'SBC')
+	ELSE IF (@ProductCode = 'SBC' OR @ProductCode = 'VGA')
 	BEGIN
-		DECLARE @FreeBetTicketType INT = 2,
-				@SBC_Contribution INT = 1698,
-				@SBC_JackpotPrize INT = 1699
+		DECLARE @FreeBetTicketType	INT = 2,
+				@SBC_Contribution	INT = 1698,
+				@SBC_JackpotPrize	INT = 1699,
+				@VGA_Contribution	INT = 3898,
+				@VGA_JackpotPrize	INT = 3899
+
+		DECLARE @Product3rdID INT 
+		SELECT @Product3rdID = CASE WHEN @ProductCode = 'SBC' THEN 42 
+									WHEN  @ProductCode = 'VGA' THEN 66 END
 
 		;WITH cte_SBC AS
 		(
 			SELECT b.SiteId, b.rptDate, b.CurrencyID
-				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType OR b.Bettype IN (@SBC_Contribution, @SBC_JackpotPrize) THEN 0 ELSE ISNULL(b.turnover, 0) END) AS Turnover
-				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType OR b.Bettype IN (@SBC_Contribution, @SBC_JackpotPrize) THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS MemberWinloss
-				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType OR b.Bettype IN (@SBC_Contribution, @SBC_JackpotPrize) THEN 0 ELSE ISNULL(b.betcount, 0) END) AS BetCount
+				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType OR b.Bettype IN (@SBC_Contribution, @SBC_JackpotPrize, @VGA_Contribution, @VGA_JackpotPrize) THEN 0 ELSE ISNULL(b.turnover, 0) END) AS Turnover
+				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType OR b.Bettype IN (@SBC_Contribution, @SBC_JackpotPrize, @VGA_Contribution, @VGA_JackpotPrize) THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS MemberWinloss
+				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType OR b.Bettype IN (@SBC_Contribution, @SBC_JackpotPrize, @VGA_Contribution, @VGA_JackpotPrize) THEN 0 ELSE ISNULL(b.betcount, 0) END) AS BetCount
 				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS FreeBetAmount
-				,SUM(CASE WHEN b.Bettype = @SBC_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Contribution
-				,SUM(CASE WHEN b.Bettype = @SBC_JackpotPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS JackpotPrize
+				,SUM(CASE WHEN b.Bettype IN (@SBC_Contribution, @VGA_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Contribution
+				,SUM(CASE WHEN b.Bettype IN (@SBC_JackpotPrize, @VGA_JackpotPrize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS JackpotPrize
 			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			WHERE
 				b.SiteID = @LicenseeID
@@ -889,7 +896,7 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND b.customercategory NOT IN (27, 28)
-				AND b.ProductID = 42
+				AND b.ProductID =  @Product3rdID
 			GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
 		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, FreeBetAmount, Betcount, Contribution, JackpotPrize)
