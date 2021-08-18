@@ -2,15 +2,14 @@
 USE bodb_Licensee
 GO
 
-ALTER PROCEDURE [dbo].[LA_AmountToCompanyByDiscountCurrencySel] (
+ALTER PROCEDURE [dbo].[LA_AmountToCompanyByDiscountCurrencySel]
 	@FromDate			DATE,
 	@ToDate				DATE,
-	@PartyIds			VARCHAR(4000) = '',
-	@ProductCodes		VARCHAR(1000) = '',
+	@PartyIds			VARCHAR(MAX) = '',
+	@ProductCodes		VARCHAR(MAX) = '',
 	@BaseCurrencyName	VARCHAR(10) = 'EUR',
 	@BaseCurrencyId		INT = 6,
 	@CurrencyId			INT = 0
-)
 AS
 /*	Created: 20180924@Parsons
 	Task : select amount to company by discount currency
@@ -37,6 +36,7 @@ AS
 		- 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: #154992]
 		- 20210705@Percy: Enhance code to improve performance [#147006]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -53,9 +53,22 @@ BEGIN
 			@VGA_Contribution	SMALLINT = 3898
 
 	-- product to be discounted
-	DECLARE @ProductList TABLE (ProductId INT, ToBeDiscounted BIT)
-	INSERT INTO @ProductList(ProductId,ToBeDiscounted)
-	SELECT ProductID, 1 FROM dbo.LA_f_Products3rd(@ProductCodes)
+	DECLARE @ProductList TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(100), ToBeDiscounted BIT)
+	INSERT INTO @ProductList (GroupProductId, ProductId, ProductCode, ToBeDiscounted)
+	SELECT 0, 0, 'SB', 1 WHERE ',' + @ProductCodes + ',' LIKE '%,SB,%'
+	UNION ALL
+	SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductPrefix, 1
+	FROM dbo.Product3rd p WITH (NOLOCK)
+		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId
+	WHERE ',' + @ProductCodes + ',' LIKE '%,' + p.ProductPrefix + ',%'
+
+	INSERT INTO @ProductList (GroupProductId, ProductId, ProductCode, ToBeDiscounted)
+	SELECT g.GroupProductId, g.ProductId, p.ProductPrefix, 1
+	FROM @ProductList pl
+		INNER JOIN dbo.LA_f_GroupProduct() g ON pl.ProductId = g.GroupProductId
+		INNER JOIN dbo.Product3rd p WITH (NOLOCK) ON g.ProductId = p.ProductId
+		LEFT JOIN @ProductList t ON g.ProductId = t.ProductId
+	WHERE t.ProductId IS NULL
 
 	-- 1.1 party list 
 	DECLARE @PartyList TABLE(PartyId INT, IsSelected BIT, GroupMinFeeId	INT)
@@ -162,11 +175,14 @@ BEGIN
 	WHERE c.DiscountGroupId IN (SELECT DISTINCT d.DiscountGroupId FROM #tmpDiscountSettings d)
 
 	-- 1.3.5 include discount calculation products
-	INSERT INTO @ProductList(ProductId,ToBeDiscounted)
-	SELECT DISTINCT ProductId,0
-	FROM #tmpDiscountSettings
-	WHERE CalculationType IN (@ToBeCalculated, @CalculateAndDiscount)
-		AND ProductId NOT IN (SELECT p.ProductId FROM @ProductList p)
+	;WITH CTE_Product AS (SELECT DISTINCT ProductId FROM #tmpDiscountSettings WHERE CalculationType IN (@ToBeCalculated, @CalculateAndDiscount))
+	INSERT INTO @ProductList (GroupProductId, ProductId, ProductCode, ToBeDiscounted)
+	SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductPrefix, 0
+	FROM CTE_Product c
+		INNER JOIN dbo.Product3rd p WITH (NOLOCK) ON c.ProductId = p.ProductId
+		LEFT JOIN dbo.LA_f_GroupProduct() g ON c.ProductId = g.ProductId
+		LEFT JOIN @ProductList t ON c.ProductId = t.ProductId
+	WHERE t.ProductId IS NULL
 
 	-- remove unsupported products
 	DELETE @ProductList WHERE ProductID IN (1,3,23,13,14,17,31,15,25) -- exclude RB,BA,NG2,bettrade,MGCLC,MGCRNG,BX,CB,CO
@@ -187,9 +203,7 @@ BEGIN
 
 	-- 1.5 update product code list
 	SET @ProductCodes = NULL
-	SELECT @ProductCodes = COALESCE((@ProductCodes + ',' + ProductPrefix), ProductPrefix)
-	FROM dbo.LA_f_Products3rd('') a
-	WHERE a.ProductID IN (SELECT DISTINCT b.ProductId FROM @ProductList b)
+	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM @ProductList
 
 	-- 1.6 update party id list
 	SET @PartyIds = NULL
@@ -327,26 +341,27 @@ BEGIN
 		, PRIMARY KEY (PartyId, ProductId, CurrencyId, WinlossDate))
 
 	INSERT INTO #tempData (PartyId, ProductId, CurrencyId, WinlossDate, MemberWL, Amount, ExtraAmount)
-	SELECT	p.PartyId,p.ProductId,b.CurrencyId,b.rptDate,
+	SELECT	p.PartyId,pl.GroupProductId,b.CurrencyId,b.rptDate,
 			SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @PP_Contribution, @SB_AdjustedOdds, @SBC_Contribution, @VGA_Contribution) THEN 0 ELSE ISNULL(-b.MemberWL, 0) END) AS MemberWL,
 			SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @SB_AdjustedOdds) THEN 0 ELSE (ISNULL(-b.MemberWL, 0) - CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @VGA_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) 
 																	* ISNULL(cr.Rate, p.Rate) END)
 			+ SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Amount,
 			SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) ELSE 0 END) AS ExtraAmount
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-		INNER JOIN #tmpChargeInfo p ON p.LicenseeId = b.SiteId 
+		INNER JOIN @ProductList pl ON b.ProductId = pl.ProductId
+		INNER JOIN #tmpChargeInfo p ON b.SiteId = p.LicenseeId
 				AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
-				AND b.ProductId = p.ProductID    
+				AND p.ProductId = pl.GroupProductId    
 				AND (p.ProductID NOT IN (11,39) OR b.Bettype = p.Bettype)
 		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
-			LEFT JOIN LA_f_ExcludedBettypeListSel('', '999,1706,3007,4297,1698,3898') eb ON b.Bettype = eb.BettypeID
+		LEFT JOIN LA_f_ExcludedBettypeListSel('', '999,1706,3007,4297,1698,3898') eb ON b.Bettype = eb.BettypeID
 	WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
 			AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
 			AND eb.BettypeID IS NULL 
 			AND	ISNULL(b.TicketType, 0) <> 2 -- Free_Bets_TicketType
-	GROUP BY p.PartyId,p.ProductId,b.CurrencyId,b.rptDate
+	GROUP BY p.PartyId,pl.GroupProductId,b.CurrencyId,b.rptDate
 
 	-- 2.2 convert to base
 	CREATE TABLE #tmpWinlossData (PartyId INT, ProductId INT, CurrencyId INT, WinlossDate DATETIME, WinlossByBaseCurrency MONEY, AmountToCompanyByBaseCurrency MONEY, ExtraAmount MONEY, WinlossByDiscountBaseCurrency MONEY, AmountToCompanyByDiscountBaseCurrency MONEY

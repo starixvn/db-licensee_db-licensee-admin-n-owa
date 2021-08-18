@@ -3,7 +3,7 @@ USE [bodb_Licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinLossByProduct]
-	@PartyIdString		VARCHAR(4000),
+	@PartyIdString		VARCHAR(MAX),
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
 	@BaseCurrencyName	VARCHAR(10)
@@ -68,6 +68,7 @@ AS
 		- 20210614@Danny: Integrate AdvantPlay [#154787]
 		- 20210614@Danny: Integrate AdvantPlay Mini [#155207]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 */
 		
 /*	Example:
@@ -86,8 +87,25 @@ BEGIN
 	DECLARE @GD_Tip SMALLINT = 1706 
 	DECLARE @PragmaticID INT = 32, @SBC_ProductID INT = 42, @Arcadia_Gaming_Id INT = 34, @SXG_ID  INT = 45, @VGA_ProductID INT = 66
 
-	-- Region: Get party charge rate info 
-	DECLARE @ProductCode VARCHAR(500)= 'BA,SB,NG,RB,VS,LC,CS,KN,AGC,GD,VG,MGCLC,MGCRNG,VB,AB,FW,BT,CB,CO,VS2,LT,BX,PP,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG,BGG,MXG,SLT,PPL,HB,CG,VGA,AP,APM'
+	-- Get Product List
+	BEGIN
+		CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductCode VARCHAR(100), ProductName VARCHAR(100))
+		INSERT INTO #Products (GroupProductId, ProductId, ProductCode, ProductName)
+		SELECT 0, 0, 'SB', 'Sportsbook'
+		UNION ALL
+		SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductPrefix, p.ProductName
+		FROM dbo.Product3rd p WITH (NOLOCK)
+			LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId
+		WHERE p.ProductId NOT IN (
+			1, 4, 7, 9, 12, 14, 17, 30, 33 -- inactive
+			,16 -- Hosting (setting only)
+			,13, 23 -- BT, NG2
+			,46, 47, 50, 52 -- don't offer
+		)
+
+		DECLARE @ProductCodes VARCHAR(MAX)
+		SELECT  @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #Products
+	END
 	
 	-- Region: Get Party ID
 	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)
@@ -116,7 +134,7 @@ BEGIN
 					WHEN ProductId = 39 AND ChargeType = 12 THEN 3007 --SAG_Tip
 				ELSE Bettype
 			END
-		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCode, 'OA', 1)
+		FROM	dbo.LA_f_ChargeInfo(@PartyIdString, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
 	)
 	-- End region
@@ -154,25 +172,26 @@ BEGIN
 				SUM(ISNULL(b.GrossWL, 0)) AS AWinLoss,
 				SUM(ISNULL(b.CommissionA, 0)) AS AComm,
 				SUM(ISNULL(b.CommissionP, 0)) AS PComm,
-				b.ProductId,
+				t.GroupProductId AS ProductId,
 				CASE
-					WHEN b.Bettype = @GD_Tip THEN b.Bettype
+					WHEN eb.BettypeID IS NOT NULL THEN eb.BettypeID
 					ELSE ISNULL(sbr.BettypeRef, -1)
-				END
+				END AS BettypeRef
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON b.SiteID = p.OldRefID AND p.PartyType = 1
+				INNER JOIN #Products t ON b.ProductId = t.ProductId
 				LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.Bettype = b.Bettype
-				LEFT JOIN LA_f_ExcludedBettypeListSel('','1706') eb ON b.Bettype = eb.BettypeID
+				LEFT JOIN LA_f_ExcludedBettypeListSel('','1706,999') eb ON b.Bettype = eb.BettypeID
 		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND b.customercategory NOT IN (27, 28)
 				AND eb.BettypeID IS NULL
 				AND b.ProductID NOT IN (13,15,25,@PragmaticID,@SBC_ProductID, @Arcadia_Gaming_Id, @SXG_ID, @VGA_ProductID)
-		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, b.ProductId,
-			CASE
-				WHEN b.Bettype = @GD_Tip THEN b.Bettype
-				ELSE ISNULL(sbr.BettypeRef, -1)
-			END
+		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, t.GroupProductId,
+				CASE
+					WHEN eb.BettypeID IS NOT NULL THEN eb.BettypeID
+					ELSE ISNULL(sbr.BettypeRef, -1)
+				END
 	)
 	-- EndRegion
 
@@ -443,26 +462,21 @@ BEGIN
 	--End PP, SBC, Arcadia_Gaming
 
 	-- SportsBook
-	DECLARE @SB_Product INT = 0, 
-			@SB_AdjustedOdds SMALLINT = 999
-	;WITH cte_SBWinLost AS 
+	;WITH cte_SBWinLost AS
 	(
 		SELECT  ci.PartyID
-		, SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN 0 ELSE ISNULL(-b.MemberWL, 0) END * ISNULL(cr.Rate, ci.Rate) * e.Rate) AS LicencingFeeAdjustedOdds
-		, SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN ISNULL(-b.GrossWL, 0) ELSE 0 END * e.Rate) AS OddsSpreadCost
-		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-		INNER JOIN @PartyChargeInfo ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+		, SUM(CASE WHEN b.BettypeRef = 999 THEN 0 ELSE ISNULL(-b.MemberWL, 0) END * ISNULL(cr.Rate, ci.Rate) * e.Rate) AS LicencingFee
+		, SUM(CASE WHEN b.BettypeRef = 999 THEN ISNULL(-b.AWinLoss, 0) ELSE 0 END * e.Rate) AS OddsSpreadCost
+		FROM #TempData b
+		INNER JOIN @PartyChargeInfo ci ON b.LicenseeId = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
 		INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
 		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND b.CurrencyId = cr.CurrencyID
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
-			AND b.ProductID = @SB_Product
-			AND b.StatusId NOT IN (- 1, 101, 102, 103)
-			AND (b.CurrencyID <> 20)
-			AND b.customercategory NOT IN (27,28)
-		GROUP BY ci.PartyID
+			AND b.ProductID = 0 -- SB
+		GROUP BY ci.PartyId
 	)
 	UPDATE	l
-	SET		l.SB = LicencingFeeAdjustedOdds + OddsSpreadCost
+	SET		l.SB = LicencingFee + OddsSpreadCost
 	FROM #LicenseeAmount l
 	INNER JOIN cte_SBWinLost cte ON l.PartyId = cte.PartyId 
 	-- End SportsBook
@@ -649,7 +663,8 @@ BEGIN
 	-- EndRegion
 
 	DROP TABLE #Exchange
-	DROP TABLE #TempData
 	DROP TABLE #LicenseeAmount
+	DROP TABLE #Products
+	DROP TABLE #TempData
 END
 GO

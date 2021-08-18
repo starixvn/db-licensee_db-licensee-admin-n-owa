@@ -60,6 +60,7 @@ AS
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
 		- 20210726@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20210727@Percy: Return ProductId for Detail Mode [RedmineID: #155593]
+		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20210813@Percy: Remove check negative amount of ContributionDiscount [RedmineID: #159294]
 */
 BEGIN
@@ -115,11 +116,22 @@ BEGIN
 	)
 
 	-- supported products
-	-- 
-	DECLARE @supportedProducts VARCHAR(500) = 'SB,NG,VS,AGC,GD,KN,CS,BA,AB,CO,CB,VS2,PP,VB,FW,LT,BX,CC,SG,VRG,SAG,I4D,TG,SBC,SXG,PGS,JK,WM,VS3,GDG,BGG,MXG,SLT,PPL,HB,CG,VGA,AP,APM'
-	DECLARE @productList TABLE(ProductId INT, Code VARCHAR(10), Name VARCHAR(100))
-	INSERT INTO @productList(ProductId,Code,Name)
-	SELECT ProductID, ProductPrefix,ProductName FROM dbo.LA_f_Products3rd(@supportedProducts)
+	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductCode VARCHAR(100), ProductName VARCHAR(100))
+	INSERT INTO #Products (GroupProductId, ProductId, ProductCode, ProductName)
+	SELECT 0, 0, 'SB', 'Sportsbook'
+	UNION ALL
+	SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductPrefix, p.ProductName
+	FROM dbo.Product3rd p WITH (NOLOCK)
+		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId
+	WHERE p.ProductId NOT IN (
+		1, 4, 7, 9, 12, 14, 17, 30, 33 -- inactive
+		,16 -- Hosting (setting only)
+		,13, 23 -- BT, NG2
+		,46, 47, 50, 52 -- don't offer
+	)
+
+	DECLARE @ProductCodes VARCHAR(MAX)
+	SELECT  @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #Products
 
 	-- get party list
 	--
@@ -177,7 +189,7 @@ BEGIN
 			FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
 			INNER JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON p.DiscountGroupId=a.DiscountGroupId
 			INNER JOIN @partyList b ON a.PartyID=b.PartyId
-			WHERE p.ProductId IN (SELECT c.ProductId FROM @productList c)
+			WHERE p.ProductId IN (SELECT c.ProductId FROM #Products c)
 				AND p.CalculationType IN (@ToBeDiscounted, @CalculateAndDiscount)
 		)
 		-- put parties in discount group to its own group
@@ -241,7 +253,7 @@ BEGIN
 	--
 	SELECT DISTINCT ci.ChargeId ,ci.PartyID, ci.LicenseeID, ci.ProductID, CAST(ci.DI_Rate AS DECIMAL(6,5)) AS Rate, ci.Fromdate, ci.ToDate,ci.ChargeType
 	INTO #tmpChargeInfo
-	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @supportedProducts, 'OA', 1) ci
+	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) ci
 	WHERE DI_Rate > 0
 
 	CREATE INDEX IX_tmpChargeInfo ON #tmpChargeInfo(LicenseeID, ProductID)
@@ -289,7 +301,7 @@ BEGIN
 			0,0
 		FROM dbo.LA_MinFee mf WITH(NOLOCK)
 		INNER JOIN @partyList p ON mf.PartyId = p.PartyId
-		INNER JOIN @productList c ON mf.ProductId=c.ProductID
+		INNER JOIN #Products c ON mf.ProductId=c.ProductID
 		WHERE mf.FeeTypeId = 1 AND @FromDate <= mf.ToDate AND mf.FromDate <= @ToDate
 
 		-- waive
@@ -332,7 +344,7 @@ BEGIN
 
 		INSERT INTO #tmpBettingByProduct (rptDate, SiteId, ProductId, Bettype, CurrencyId, TicketType
 			,CommissionA, CommissionP, WinPrizeAmount, CashOutAmount, BuyBackAmount, Turnover, LicWinloss, GrossWL, TurnoverForCommision)
-		SELECT b.rptDate,b.SiteId,b.ProductId,b.Bettype,b.CurrencyId,ISNULL(b.TicketType, 0)
+		SELECT b.rptDate,b.SiteId,p.GroupProductId,b.Bettype,b.CurrencyId,ISNULL(b.TicketType, 0)
 			,SUM(ISNULL(b.CommissionA, 0))
 			,SUM(ISNULL(b.CommissionP, 0))
 			,SUM(ISNULL(b.WinPrizeAmount, 0))
@@ -343,12 +355,12 @@ BEGIN
 			,SUM(CASE WHEN b.Bettype IN (999, 1698, 4297, 17005, 3898) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS GrossWL
 			,SUM(CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN ISNULL(b.Turnover, 0) ELSE ISNULL(b.ExtraAmount, 0) END) AS TurnoverForCommision
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			INNER JOIN #Products p ON b.ProductId = p.ProductId
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.SiteID IN (SELECT DISTINCT c.LicenseeID FROM #tmpChargeInfo c)
-			AND (b.ProductID = 37 OR b.ProductID IN (SELECT p.ProductId FROM @productList p))
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
-		GROUP BY b.rptDate,b.SiteId,b.ProductId,b.Bettype,b.CurrencyId,ISNULL(b.TicketType, 0)
+		GROUP BY b.rptDate,b.SiteId,p.GroupProductId,b.Bettype,b.CurrencyId,ISNULL(b.TicketType, 0)
 
 		-- calculate amount to company
 		-- excludes: golddeluxe bidme tip, PP JP & Prize, colossus bet
@@ -469,7 +481,7 @@ BEGIN
 			INSERT INTO #tmpWinlossData (PartyID,rptDate,ProductID,CurrencyId,Winloss,AmountToCompany,ExtraAmount)  
 			SELECT DISTINCT p.PartyId,@ToDate,c.ProductId,6, 0,0,0-- default eur = 6  
 			FROM @partyList p   
-			INNER JOIN @productList pd ON 1=1  
+			INNER JOIN #Products pd ON 1=1  
 			INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON c.ProductID = pd.ProductID AND p.PartyId = c.FromParty  
 			WHERE c.ToDate >= @FromDate  
 		END
@@ -813,15 +825,15 @@ BEGIN
 	IF @IsShowSettlementDetail = 1
 	BEGIN
 		IF @IsGroupByPartyId = 1
-			SELECT r.PartyId, p.Name AS ProductName, p.ProductId, UPPER(@BaseCurrency) AS CurrencyName, SUM(r.AmountToCompany) AS AmountToCompany
+			SELECT r.PartyId, p.ProductName, p.ProductId, UPPER(@BaseCurrency) AS CurrencyName, SUM(r.AmountToCompany) AS AmountToCompany
 			FROM @Result r
-				INNER JOIN @ProductList p ON r.ProductId = p.ProductId
-			GROUP BY p.ProductId, p.Name, r.PartyId
+				INNER JOIN #Products p ON r.ProductId = p.ProductId
+			GROUP BY p.ProductId, p.ProductName, r.PartyId
 		ELSE
-			SELECT r.LicenseeCode, p.Name AS ProductName, p.ProductId, UPPER(@BaseCurrency) AS CurrencyName, SUM(r.AmountToCompany) AS AmountToCompany
+			SELECT r.LicenseeCode, p.ProductName, p.ProductId, UPPER(@BaseCurrency) AS CurrencyName, SUM(r.AmountToCompany) AS AmountToCompany
 			FROM @Result r
-				INNER JOIN @ProductList p ON r.ProductId = p.ProductId
-			GROUP BY r.LicenseeCode, p.ProductId, p.Name
+				INNER JOIN #Products p ON r.ProductId = p.ProductId
+			GROUP BY r.LicenseeCode, p.ProductId, p.ProductName
 			ORDER BY p.ProductId
 	END
 	ELSE
@@ -851,6 +863,7 @@ BEGIN
 	END
 END
 
+	DROP TABLE #Products
 	DROP TABLE #tmpResult
 	DROP TABLE #tmpBettingByProduct
 	DROP TABLE #tmpChargeInfo

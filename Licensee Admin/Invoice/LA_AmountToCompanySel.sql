@@ -5,8 +5,8 @@ GO
 ALTER PROCEDURE [dbo].[LA_AmountToCompanySel] (
 	@FromDate		DATE,
 	@ToDate			DATE,
-	@PartyIds		VARCHAR(4000) = '',
-	@ProductCodes	VARCHAR(1000) = '',
+	@PartyIds		VARCHAR(MAX) = '',
+	@ProductCodes	VARCHAR(MAX) = '',
 	@BaseCurrency	VARCHAR(10) = 'EUR',
 	@CurrencyId		INT = 0,
 	@IsApplyDiscountMinfee BIT = 1
@@ -35,6 +35,7 @@ AS
 		- 20201130@Parsons: Saba.club - Offer Freebet tickets [#141423]
 		- 20210201@Parsons: Saba.club - Integrate Slot Game [#147977]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 
 	Parameters:
 		@IsApplyDiscountMinfee: apply minfee term to discount value
@@ -57,9 +58,22 @@ BEGIN
 			@VGA_Contribution SMALLINT = 3898
 	
 	-- product to be discounted
-	DECLARE @ProductList TABLE (ProductId INT, ToBeDiscounted BIT)
-	INSERT INTO @ProductList(ProductId,ToBeDiscounted)
-	SELECT ProductID, 1 FROM dbo.LA_f_Products3rd(@ProductCodes)
+	DECLARE @ProductList TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(100), ToBeDiscounted BIT)
+	INSERT INTO @ProductList (GroupProductId, ProductId, ProductCode, ToBeDiscounted)
+	SELECT 0, 0, 'SB', 1 WHERE ',' + @ProductCodes + ',' LIKE '%,SB,%'
+	UNION ALL
+	SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductPrefix, 1
+	FROM dbo.Product3rd p WITH (NOLOCK)
+		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId
+	WHERE ',' + @ProductCodes + ',' LIKE '%,' + p.ProductPrefix + ',%'
+
+	INSERT INTO @ProductList (GroupProductId, ProductId, ProductCode, ToBeDiscounted)
+	SELECT g.GroupProductId, g.ProductId, p.ProductPrefix, 1
+	FROM @ProductList pl
+		INNER JOIN dbo.LA_f_GroupProduct() g ON pl.ProductId = g.GroupProductId
+		INNER JOIN dbo.Product3rd p WITH (NOLOCK) ON g.ProductId = p.ProductId
+		LEFT JOIN @ProductList t ON g.ProductId = t.ProductId
+	WHERE t.ProductId IS NULL
 
 	-- 1.1 party list
 	DECLARE @PartyList TABLE(PartyId INT, IsSelected BIT, GroupMinFeeId	INT)
@@ -163,11 +177,14 @@ BEGIN
 	WHERE c.DiscountGroupId IN (SELECT DISTINCT d.DiscountGroupId FROM #tmpDiscountSettings d)
 
 	-- 1.3.5 include discount calculation products
-	INSERT INTO @ProductList(ProductId,ToBeDiscounted)
-	SELECT DISTINCT ProductId,0
-	FROM #tmpDiscountSettings
-	WHERE CalculationType IN (@ToBeCalculated, @CalculateAndDiscount)
-		AND ProductId NOT IN (SELECT p.ProductId FROM @ProductList p)
+	;WITH CTE_Product AS (SELECT DISTINCT ProductId FROM #tmpDiscountSettings WHERE CalculationType IN (@ToBeCalculated, @CalculateAndDiscount))
+	INSERT INTO @ProductList (GroupProductId, ProductId, ProductCode, ToBeDiscounted)
+	SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductPrefix, 0
+	FROM CTE_Product c
+		INNER JOIN dbo.Product3rd p WITH (NOLOCK) ON c.ProductId = p.ProductId
+		LEFT JOIN dbo.LA_f_GroupProduct() g ON c.ProductId = g.ProductId
+		LEFT JOIN @ProductList t ON c.ProductId = t.ProductId
+	WHERE t.ProductId IS NULL
 
 	-- remove unsupported products
 	DELETE @ProductList WHERE ProductID IN (1,3,23,13,14,17,15,25) -- exclude RB,BA,NG2,bettrade,MGCLC,MGCRNG,CB,CO
@@ -195,9 +212,7 @@ BEGIN
 
 	-- 1.5 update product code list
 	SET @ProductCodes = NULL
-	SELECT @ProductCodes = COALESCE((@ProductCodes + ',' + ProductPrefix), ProductPrefix)
-	FROM dbo.LA_f_Products3rd('') a
-	WHERE a.ProductID IN (SELECT DISTINCT b.ProductId FROM @ProductList b)
+	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM @ProductList
 
 	-- 1.6 update party id list
 	SET @PartyIds = NULL
@@ -299,7 +314,7 @@ BEGIN
 	-- 2.1 include general products
 	;WITH cte_Data AS
 	(
-		SELECT p.PartyId, b.rptDate, p.ProductId, b.CurrencyId,
+		SELECT p.PartyId, b.rptDate, pl.GroupProductId AS ProductId, b.CurrencyId,
 		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @PP_Contribution,@SB_AdjustedOdds, @SBC_Contribution, @VGA_Contribution) THEN 0 ELSE ISNULL(-b.MemberWL, 0) * e.Rate END) AS Winloss, 
 		SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @SB_AdjustedOdds) THEN 0 ELSE (ISNULL(-b.MemberWL, 0) - CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @VGA_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) 
 																	* ISNULL(cr.Rate, p.Rate) * e.Rate END) AS LicencingFeeAdjustedOdds, 
@@ -310,10 +325,11 @@ BEGIN
 			END) AS ExtraAmount
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 	INNER JOIN #tmpExchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-	INNER JOIN #tmpChargeInfo p ON b.ProductId = p.ProductID 
-		AND p.LicenseeId = b.SiteId
-		AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)  
-		AND (p.ProductID NOT IN (11, 39) OR b.Bettype = p.Bettype)
+	INNER JOIN @ProductList pl ON b.ProductId = pl.ProductId
+	INNER JOIN #tmpChargeInfo p ON b.SiteId = p.LicenseeId
+		AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
+		AND p.ProductId = pl.GroupProductId    
+		AND (p.ProductId NOT IN (11,39) OR b.Bettype = p.Bettype)
 	LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeID AND b.CurrencyId = cr.CurrencyID
 	LEFT JOIN LA_f_ExcludedBettypeListSel('', '999,1706,3007,4297,1698,3898') eb ON b.Bettype = eb.BettypeID
 	WHERE (b.rptDate BETWEEN @FromDate AND @ToDate)
@@ -322,7 +338,7 @@ BEGIN
 			AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
 			AND eb.BettypeID IS NULL
 			AND	ISNULL(b.TicketType, 0) <> 2 -- Free_Bets_TicketType
-	GROUP BY p.PartyId,b.rptdate,p.ProductId,b.CurrencyId
+	GROUP BY p.PartyId,b.rptdate,pl.GroupProductId,b.CurrencyId
 	)
 	INSERT INTO @TmpWinlossData(PartyId,WinlossDate,ProductId,CurrencyId,Winloss,AmountToCompany,ExtraAmount)
 	SELECT PartyId, rptDate, ProductId, CurrencyId, Winloss, LicencingFeeAdjustedOdds + OddsSpreadCost, ExtraAmount

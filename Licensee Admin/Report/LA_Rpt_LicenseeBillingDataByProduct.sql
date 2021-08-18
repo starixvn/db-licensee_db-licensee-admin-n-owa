@@ -20,6 +20,7 @@ AS
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20210823@Danny: filter licensee status from OIC [#159296]
+		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20210923@Danny: Rollback code [#162115]
 */
 
@@ -79,10 +80,14 @@ BEGIN
 	SELECT @PartyIds = COALESCE(@PartyIds + ',', '') + CONVERT(VARCHAR(20), PartyId) FROM #PartyList
 
 	-- Get Product List
-	CREATE TABLE #Products (ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(10))
-	INSERT INTO #Products (ProductId, ProductName, ProductCode)
-	SELECT ProductId, ProductName, ProductCode FROM (VALUES (0, 'Sportsbook', 'SB'), (-3, 'Discount', ''), (-2, 'Rebate', ''),  (-1, 'SB Promotion', ''),  (-99, 'Total', '')) t (ProductId, ProductName, ProductCode)
-	UNION ALL SELECT ProductId, ProductName, ProductPrefix FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductId NOT IN (16, 37) AND (EndOfSupportDate IS NULL OR EndOfSupportDate >= @FromDate) AND OfferSite IN (0, 2) -- Deposit only
+	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(10))
+	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode)
+	SELECT GroupProductId, ProductId, ProductName, ProductCode FROM (VALUES (0, 0, 'Sportsbook', 'SB'), (-3, -3, 'Discount', ''), (-2, -2, 'Rebate', ''),  (-1, -1, 'SB Promotion', ''),  (-99, -99, 'Total', '')) t (GroupProductId, ProductId, ProductName, ProductCode)
+	UNION ALL
+	SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductName, p.ProductPrefix
+	FROM dbo.Product3rd p WITH (NOLOCK)
+		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId
+	WHERE p.ProductId NOT IN (16, 37) AND (p.EndOfSupportDate IS NULL OR p.EndOfSupportDate >= @FromDate) AND p.OfferSite IN (0, 2) -- Deposit only
 
 	-- Get Charge Rate
 	DECLARE @ProductCode VARCHAR(MAX)
@@ -144,7 +149,7 @@ BEGIN
 	GROUP BY r.SiteId, CONVERT(DATE, r.WinlostDate), r.Currency
 	
 	INSERT INTO #TempData (LicenseeId, rptDate, ProductId, CurrencyId, BettypeRef, MemberWL, MemberComm, AgentWL, AgentComm, Contribution, JackpotPrize, ExtraAmount, OddsSpread, PayOut, CommShare, CashInShare)
-	SELECT r.SiteId, r.rptDate, r.ProductId, r.CurrencyId
+	SELECT r.SiteId, r.rptDate, p.GroupProductId AS ProductId, r.CurrencyId
 		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
 		,SUM(CASE WHEN (r.ProductId IN (32, 43, 42, 66) AND ISNULL(r.TicketType, 0) = 2) OR r.Bettype IN (902, 903, 904, 999, 4299, 4300, 4297, 4298, 1698, 1699, 1906, 3150, 3898, 3899) THEN 0 ELSE ISNULL(r.MemberWL, 0) END) AS MemberWL
 		,SUM(ISNULL(r.CommissionP, 0)) AS MemberComm
@@ -158,13 +163,14 @@ BEGIN
 		,SUM(CASE WHEN r.ProductId = 15 THEN CASE WHEN ISNULL(r.TicketType, 0) = 0 THEN ISNULL(r.Turnover, 0) ELSE ISNULL(r.ExtraAmount, 0) END ELSE 0 END) AS CommShare
 		,SUM(CASE WHEN r.ProductId = 15 OR r.Bettype = 901 THEN ISNULL(r.BuyBackAmount, 0) ELSE 0 END) AS CashInShare
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
+		INNER JOIN #Products p ON r.ProductId = p.ProductId
 		LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH (NOLOCK) ON sbr.Bettype = r.Bettype
 	WHERE r.rptDate BETWEEN @FromDate AND @ToDate
 		AND r.StatusId NOT IN (-1, 101, 102, 103)
 		AND r.CustomerCategory NOT IN (27, 28)
 		AND r.CurrencyId <> 20
 		AND r.ProductId <> 25 -- CO
-	GROUP BY r.SiteId, r.rptDate, r.CurrencyId, r.ProductId
+	GROUP BY r.SiteId, r.rptDate, p.GroupProductId, r.CurrencyId
 		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
 
 	CREATE TABLE #tmpResult (PartyId INT, ProductId INT, rptDate DATE, LicenseeAmount MONEY, ExtraAmount MONEY DEFAULT(0), IsApplyMinFee BIT DEFAULT (1))
@@ -177,11 +183,11 @@ BEGIN
 				WHEN t.ProductId = 15 THEN t.PayOut - t.CommShare * cp.CommShareRate - t.CashInShare * cp.CashInShareRate
 				ELSE (-MemberWL - Contribution) * ISNULL(cr.Rate, p.Rate) + PayOut + OddsSpread END
 		) * e.Rate) AS LicenseeAmount
-		,SUM(CASE
+		,SUM((CASE
 				WHEN p.LicenseeId IS NULL THEN 0
 				WHEN t.BettypeRef IN (1706, 3007) THEN -MemberWL * ISNULL(cr.Rate, p.Rate)
-				ELSE (Contribution - JackpotPrize - ExtraAmount - CASE WHEN t.ProductId = 31 THEN (AgentComm + MemberComm) ELSE 0 END) * e.Rate END
-		) AS ExtraAmount
+				ELSE Contribution - JackpotPrize - ExtraAmount - CASE WHEN t.ProductId = 31 THEN (AgentComm + MemberComm) ELSE 0 END END
+		) * e.Rate) AS ExtraAmount
 	FROM #TempData t
 		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND t.rptDate = e.ExchangeDate
 		INNER JOIN #PartyList pl ON t.LicenseeId = pl.LicenseeId
@@ -197,7 +203,7 @@ BEGIN
 	FROM #TempData t
 		INNER JOIN @PartyChargeInfo p ON t.LicenseeId = p.LicenseeId AND t.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId = 13
 		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND t.rptDate = e.ExchangeDate
-	WHERE t.ProductId IN (0, 3, 13)
+	WHERE t.ProductId IN (0, 3, 13) -- include data of SB, BA
 	GROUP BY p.PartyId, t.rptDate
 
 	-- SB Promotion

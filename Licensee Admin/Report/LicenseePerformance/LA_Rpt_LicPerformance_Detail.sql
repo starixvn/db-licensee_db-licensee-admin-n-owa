@@ -1,13 +1,13 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
 
 ALTER PROCEDURE dbo.LA_Rpt_LicPerformance_Detail
-	@PartyIDs		VARCHAR(4000) = ''
+	@PartyIds		VARCHAR(MAX) = ''
 	, @Currency		INT = 0
-	, @FromDate		SMALLDATETIME
-	, @ToDate		SMALLDATETIME
-	, @ProductCodes VARCHAR(500)
+	, @FromDate		DATETIME
+	, @ToDate		DATETIME
+	, @ProductCodes VARCHAR(MAX)
 	, @IsConvert	BIT = 0
 	, @BaseCurrency INT = 12
 	, @BaseCurrencyName VARCHAR(10) = 'GBP'
@@ -70,6 +70,7 @@ AS
 		- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20210929@Percy: Enhance performance - work around [RedmineID: #162390]
 		- 20211005@Percy: Get date only for Previous Date [RedmineID: #162753]
 
@@ -206,6 +207,28 @@ BEGIN
 	INSERT INTO @tmpPartySBLaunchDate(AffectedDate,PartyID)
 	SELECT MIN(FromDate), FromParty FROM P GROUP BY FromParty
 	-- End region
+
+	-- Get Product List
+	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20))
+
+	INSERT INTO #Products (GroupProductId, ProductId, ProductCode, ProductName)
+	SELECT 0, 0, 'SB', 'Sportsbook' WHERE ',' + @ProductCodes + ',' LIKE '%,SB,%'
+	UNION ALL
+	SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductPrefix, p.ProductName
+	FROM bodb_Licensee.dbo.Product3rd p WITH (NOLOCK)
+		LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId
+	WHERE ',' + @ProductCodes + ',' LIKE '%,' + p.ProductPrefix + ',%'
+
+	INSERT INTO #Products (GroupProductId, ProductId, ProductCode, ProductName)
+	SELECT g.GroupProductId, g.ProductId, p.ProductPrefix, p.ProductName
+	FROM #Products pl
+		INNER JOIN bodb_Licensee.dbo.LA_f_GroupProduct() g ON pl.ProductId = g.GroupProductId
+		INNER JOIN bodb_Licensee.dbo.Product3rd p WITH (NOLOCK) ON g.ProductId = p.ProductId
+		LEFT JOIN #Products t ON g.ProductId = t.ProductId
+	WHERE t.ProductId IS NULL
+
+	SET @ProductCodes = NULL
+	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #Products
 
 	-- Region: Party charge info
 	CREATE TABLE #PartyChargeInfo (
@@ -365,13 +388,15 @@ BEGIN
 					WHEN b.Bettype IN (4298, 4299, 4300, 1906, 1699, 3150, 3899) OR b.TicketType = 2 THEN ISNULL(-b.WinLoss, 0) -- Prize, Bonus, Free bets, ...
 					ELSE 0 END) AS ExtraAmount
 		FROM CTE_tmpData b
-			INNER JOIN #PartyChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = p.ProductId AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
+				INNER JOIN #Products t ON b.ProductId = t.ProductId
+				INNER JOIN @PartyChargeInfo p ON	t.GroupProductId = p.ProductId
 											AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
 			LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeId
 		GROUP BY b.rptDate, b.ProductId, b.CurrencyId, p.PartyId
 	)
 	INSERT INTO #TempData (rptDate,ProductId,CurrencyId,PartyId,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,ExtraAmount)
+		GROUP BY b.rptdate, b.SiteId, p.PartyId, b.CurrencyID, t.GroupProductId
 	(
 		SELECT b.rptDate, b.ProductId, b.CurrencyId, b.PartyId,
 				SUM(BetCount)					AS BetCount,
@@ -428,9 +453,12 @@ BEGIN
 		FROM CTE_tmpData b
 			INNER JOIN #PartyChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = p.ProductId AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
 											AND b.rptDate BETWEEN p.FromDate AND p.ToDate
+				INNER JOIN #Products t ON b.ProductId = t.ProductId
+				INNER JOIN @PartyChargeInfo p ON	t.GroupProductId = p.ProductId
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
 			LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeId
 		GROUP BY b.rptDate, b.ProductId, b.CurrencyId, p.PartyId
+		GROUP BY b.rptdate, b.SiteId, p.PartyId, b.CurrencyID, t.GroupProductId
 	)
 	INSERT INTO #TempData (rptDate,ProductId,CurrencyId,PartyId,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,ExtraAmount)
 	(
@@ -711,10 +739,11 @@ BEGIN
 	-- End region
 
 	-- Region: Drop tmp table
-	DROP TABLE #Exchange
-	DROP TABLE #TempData
-	DROP TABLE #Result
 	DROP TABLE #AmountToCompany
+	DROP TABLE #Exchange
+	DROP TABLE #Products
+	DROP TABLE #Result
+	DROP TABLE #TempData
 	DROP TABLE #PartyChargeInfo
 	-- End region
 END

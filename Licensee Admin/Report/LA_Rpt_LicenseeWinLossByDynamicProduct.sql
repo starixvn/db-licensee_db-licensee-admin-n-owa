@@ -2,8 +2,8 @@
 USE [bodb_Licensee]
 GO
 
-ALTER PROCEDURE [dbo].LA_Rpt_LicenseeWinLossByDynamicProduct
-	@ProductIdString	VARCHAR(500),
+ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinLossByDynamicProduct]
+	@ProductIdString	VARCHAR(MAX),
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
 	@BaseCurrencyName	VARCHAR(10) = 'EUR'
@@ -11,7 +11,7 @@ AS
 /*	Header:
 	Created: 2017.04.21 - Bruce
 	Task : Get winloss report by dynamic product
-	DB: DB052.bodb_Licensee
+	DB: DBLIC-bodb_Licensee
 
 	Revisions:
 		- 20170630@Bruce: include BT/CO/CB, remove LC, VG [RedmineID: #79309]
@@ -30,6 +30,7 @@ AS
 	    - 20201209@Happy: Saba.club - Offer Freebet tickets [#141423]
 	    - 20210108@Happy: Saba.club - Integrate Slot Game [#147977]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 */
 
 BEGIN
@@ -42,15 +43,15 @@ BEGIN
 
 	SELECT * INTO #Exchange FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
-	DECLARE @Products TABLE(
-		ProductId	INT,
-		ProductCode	VARCHAR(20),
-		ProductName	VARCHAR(100)
-	)
-	INSERT INTO @Products
-	SELECT ProductID, ProductPrefix, ProductName
-	FROM dbo.LA_f_Products3rd('')
-	WHERE ProductID IN (SELECT val FROM dbo.strSplit(@ProductIdString, ','))
+	DECLARE @Products TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(20), ProductName VARCHAR(100))
+	INSERT INTO @Products (GroupProductId, ProductId, ProductCode, ProductName)
+	SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductPrefix, p.ProductName
+	FROM (
+		SELECT ProductId, ProductPrefix, ProductName FROM dbo.Product3rd WITH (NOLOCK)
+		UNION ALL SELECT 0, 'SB', 'Sportsbook'
+	) p
+		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId
+	WHERE ',' + @ProductIdString + ',' LIKE '%,' + CONVERT(VARCHAR(10), ISNULL(g.GroupProductId, p.ProductId)) + ',%'
 
 	CREATE TABLE #Parties (
 		PartyId		INT,
@@ -80,7 +81,7 @@ BEGIN
 	-- insert data to temp table
 	SELECT b.rptDate														AS WinLossDate,
 		b.SiteId															AS LicenseeId,
-		b.ProductId															AS ProductId,
+		p.GroupProductId													AS ProductId,
 		CASE
 			WHEN b.Bettype = @GD_Tip THEN b.Bettype
 			ELSE ISNULL(sbr.BettypeRef, -1)
@@ -99,6 +100,7 @@ BEGIN
 		CAST(0 AS MONEY)    AS Contribution
 	INTO #Data
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
+	INNER JOIN @Products p ON b.ProductId = p.ProductId
 	INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
 	LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.Bettype = b.Bettype
 	LEFT JOIN LA_f_ExcludedBettypeListSel('','999') eb ON b.Bettype = eb.BettypeID
@@ -108,9 +110,8 @@ BEGIN
 		AND b.CustomerCategory NOT IN (27, 28)
 		AND eb.BettypeID IS NULL
 		AND b.SiteID NOT IN (SELECT c.LicenseeId FROM @CreditLicenee c)
-		AND b.ProductID IN (SELECT p.ProductId FROM @Products p)
 		AND b.ProductID NOT IN (13,15,25,32,42, 66) -- exclude BT, CB, CO, PP, SBC
-	GROUP BY b.rptdate, b.SiteId, b.ProductId, 
+	GROUP BY b.rptdate, b.SiteId, p.GroupProductId, 
 		CASE WHEN b.Bettype = @GD_Tip THEN b.Bettype
 			 ELSE ISNULL(sbr.BettypeRef, -1)
 		END
@@ -223,7 +224,7 @@ BEGIN
 	LEFT JOIN dbo.Sport_Bettype_Reference b WITH(NOLOCK) ON b.BettypeRef = c.Bettype AND IsActive = 1
 	WHERE c.DI_Rate > 0
 
-	SELECT * FROM @Products
+	SELECT ProductId, ProductCode, ProductName FROM @Products WHERE GroupProductId = ProductId -- main product
 	SELECT * FROM #Parties
 	SELECT * FROM #Chargerates
 	SELECT * FROM #Data
