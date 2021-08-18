@@ -68,7 +68,14 @@ BEGIN
 			WHEN ISNULL(pd.BrandName, '') != '' 
 				THEN pd.BrandName 
 			ELSE p1.PartyName 
-		  END, i.InvTypeId, InvTypeName, i.InvTempId, InvTemplateName, ISNULL(i.BankId, 0), i.ActiveAddress, pd.StatusId
+		  END, i.InvTypeId, InvTypeName, i.InvTempId, InvTemplateName, ISNULL(i.BankId, 0), i.ActiveAddress, pd.StatusId,
+		  CASE WHEN i.ActiveAddress = 1 THEN pd.Address1
+			   WHEN i.ActiveAddress = 2 THEN pd.Address2 END,
+		  CASE WHEN i.ActiveAddress = 1 THEN pd.AttnName
+			   WHEN i.ActiveAddress = 2 THEN pd.AttnName2 END,
+		  CASE WHEN i.ActiveAddress = 1 THEN pd.CompanyName
+			   WHEN i.ActiveAddress = 2 THEN pd.CompanyName2 END
+
 	ORDER BY BillerName , CASE 
 			WHEN ISNULL(pd.BrandName, '') != '' 
 				THEN pd.BrandName 
