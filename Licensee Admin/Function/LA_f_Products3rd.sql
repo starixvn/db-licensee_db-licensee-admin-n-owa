@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee,DBLIC-bodb_licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee,DBLIC-bodb_licensee,DBBAL-bodb_licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
 USE bodb_licensee
 GO
 
@@ -13,6 +13,7 @@ AS
 	Revisions:
 		- 20150413@Florent: Initialize function
 		- 20191211@Parsons: Non-peak hour promotion [#119538]
+		- 20210816@Sophia: add DBBAL [Redmine: #154300]
 */
 
 BEGIN   
