@@ -7,6 +7,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeBillingDataByProduct]
 	,@FromDate			DATETIME
 	,@ToDate			DATETIME
 	,@BaseCurrencyName	VARCHAR(10)
+	,@LicenseeStatus	VARCHAR(100) = ''
 AS
 
 /*
