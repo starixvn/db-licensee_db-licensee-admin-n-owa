@@ -35,7 +35,7 @@ BEGIN
 	SELECT  @BaseCurrencyId = CurrencyId FROM @BaseCurrencies WHERE CurrencyName = @BaseCurrencyName
 
 	-- Get Party List
-	CREATE TABLE #PartyList (PartyId INT, LicenseeId INT, PartyName VARCHAR(100), BranchName VARCHAR(100), ParentId INT, ParentName VARCHAR(100), GroupMinFeeId INT, IsSelected BIT DEFAULT(0), StatusId TINYINT))
+	CREATE TABLE #PartyList (PartyId INT, LicenseeId INT, PartyName VARCHAR(100), BranchName VARCHAR(100), ParentId INT, ParentName VARCHAR(100), GroupMinFeeId INT, IsSelected BIT DEFAULT(0), StatusId TINYINT)
 	INSERT INTO #PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC dbo.LA_PartyListSel
 
