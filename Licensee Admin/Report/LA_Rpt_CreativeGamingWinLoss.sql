@@ -17,6 +17,7 @@ AS
 
 	Revisions:
 		- 20210506@Percy: Initialize SP [RedmineID: #152139]
+		- 20210817@Percy: Fix Date on 3rd Rate [RedmineID: #159249] 
 
 	Param's Explanation:
 		@TimeZone:	= 1: GMT-4
@@ -106,7 +107,7 @@ BEGIN
 		FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
 			INNER JOIN #ChargeRate ci ON b.SiteId = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeId = ci.ChargeId AND cr.CurrencyId = b.CurrencyId
-			LEFT JOIN #3rdRate r ON ci.PartyId = r.PartyId AND b.rptDate BETWEEN r.FromDate AND r.ToDate
+			LEFT JOIN #3rdRate r ON ci.PartyId = r.PartyId AND b.RptDate3rd BETWEEN r.FromDate AND r.ToDate
 		WHERE b.RptDate BETWEEN @FDateGMT AND @TDateGMT
 			AND b.RptDate3rd BETWEEN @FDate AND @TDate
 			AND b.BetTypeId BETWEEN 7301 AND 7600

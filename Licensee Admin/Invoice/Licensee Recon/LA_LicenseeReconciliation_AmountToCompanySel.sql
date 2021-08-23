@@ -59,6 +59,7 @@ AS
 		- 20210705@Percy: Add ContributionDiscount column [RedmineID: #157549]
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
 		- 20210726@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+		- 20210813@Percy: Remove check negative amount of ContributionDiscount [RedmineID: #159294]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -800,12 +801,11 @@ BEGIN
 	DECLARE @Result TABLE (PartyId INT, LicenseeCode VARCHAR(100), ProductId INT, LicensingFee MONEY, AmountToCompany MONEY, Discount MONEY, Rebate MONEY, Promotion MONEY, ContributionDiscount MONEY)
 	INSERT INTO @Result (PartyId, LicenseeCode, ProductId, Discount, Rebate, Promotion, ContributionDiscount, LicensingFee, AmountToCompany)
 	SELECT r.PartyId, ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId), r.ProductId, SUM(r.Discount), SUM(r.Rebate), SUM(r.Promotion)
-		,SUM(CASE WHEN r.Winloss - r.Contribution < 0 AND jvp.PartyId IS NULL THEN 0 ELSE r.ContributionDiscount END)
+		,SUM(r.ContributionDiscount)
 		,SUM(r.LicensingFee + r.ExtraAmount + Contribution - JackPotPrize - PromotionPrize) AS LicensingFee
 		,SUM(r.AmountToCompany + ContributionDiscount + Contribution - JackPotPrize - PromotionPrize) AS AmountToCompany
 	FROM #tmpResult r
 		INNER JOIN @partyList p ON r.PartyId = p.PartyId
-		LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON r.PartyId = jvp.PartyId
 	WHERE p.IsSelected = 1
 	GROUP BY r.PartyId, ISNULL(UPPER(p.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), p.PartyId), r.ProductId
 
