@@ -19,6 +19,8 @@ AS
 		- 20210618@Danny: AE Sexy - Support Lucky Draw [#152141]
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+		- 20210823@Danny: filter licensee status from OIC [#159296]
+
 */
 
 BEGIN
@@ -32,12 +34,28 @@ BEGIN
 	SELECT  @BaseCurrencyId = CurrencyId FROM @BaseCurrencies WHERE CurrencyName = @BaseCurrencyName
 
 	-- Get Party List
-	CREATE TABLE #PartyList (PartyId INT, LicenseeId INT, PartyName VARCHAR(100), BranchName VARCHAR(100), ParentId INT, ParentName VARCHAR(100), GroupMinFeeId INT, IsSelected BIT DEFAULT(0))
+	CREATE TABLE #PartyList (PartyId INT, LicenseeId INT, PartyName VARCHAR(100), BranchName VARCHAR(100), ParentId INT, ParentName VARCHAR(100), GroupMinFeeId INT, IsSelected BIT DEFAULT(0), StatusId TINYINT))
 	INSERT INTO #PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC dbo.LA_PartyListSel
 
 	-- Remove credit licensees
 	DELETE #PartyList WHERE (PartyId = 999 OR ParentId = 999)
+
+	-- Handle Licensee status
+	DECLARE @statusTab TABLE (StatusId TINYINT)
+	INSERT INTO @statusTab (StatusId)
+	SELECT CAST (val AS TINYINT) FROM dbo.strSplit(@LicenseeStatus,',')
+
+	UPDATE p
+	SET    p.StatusId = ISNULL(oic.LicenseeStatusId,0) -- 0: Unrecognized
+	FROM  #PartyList p
+		INNER JOIN dbo.Licensees la WITH (NOLOCK) ON la.LicenseeId = p.LicenseeId
+		LEFT JOIN  bodb_OIC.dbo.licensee oic WITH (NOLOCK) ON oic.RegisteredLicenseeName = la.LicenseeName									
+	
+	DELETE p
+	FROM #PartyList p
+	WHERE p.StatusId NOT IN (SELECT x.StatusId FROM @statusTab x)	
+
 	
 	-- Keep Parties who same group min fee
 	DECLARE @GroupMinFeeSetting TABLE (PartyId INT, GroupMinFeeId SMALLINT, IsPrimary BIT)
