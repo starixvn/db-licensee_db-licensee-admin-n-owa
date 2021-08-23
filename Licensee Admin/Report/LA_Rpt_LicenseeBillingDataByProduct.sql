@@ -50,14 +50,14 @@ BEGIN
 	UPDATE p
 	SET    p.StatusId = ISNULL(oic.LicenseeStatusId,0) -- 0: Unrecognized
 	FROM  #PartyList p
-		INNER JOIN dbo.Licensees la WITH (NOLOCK) ON la.LicenseeId = p.LicenseeId
+		INNER JOIN dbo.OAS_Party op   WITH (NOLOCK) ON op.PartyID = p.PartyId
+		INNER JOIN dbo.Licensees la WITH (NOLOCK) ON op.OldRefID = la.LicenseeId
 		LEFT JOIN  bodb_OIC.dbo.licensee oic WITH (NOLOCK) ON oic.RegisteredLicenseeName = la.LicenseeName									
 	
 	DELETE p
 	FROM #PartyList p
-	WHERE p.StatusId NOT IN (SELECT x.StatusId FROM @statusTab x)	
+	WHERE p.StatusId NOT IN (SELECT x.StatusId FROM @statusTab x)AND  p.ParentId <> 0
 
-	
 	-- Keep Parties who same group min fee
 	DECLARE @GroupMinFeeSetting TABLE (PartyId INT, GroupMinFeeId SMALLINT, IsPrimary BIT)
 	INSERT INTO @GroupMinFeeSetting (PartyId, GroupMinFeeId, IsPrimary)
