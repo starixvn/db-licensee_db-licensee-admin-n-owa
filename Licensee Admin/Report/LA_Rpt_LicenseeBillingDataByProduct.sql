@@ -149,7 +149,7 @@ BEGIN
 	GROUP BY r.SiteId, CONVERT(DATE, r.WinlostDate), r.Currency
 	
 	INSERT INTO #TempData (LicenseeId, rptDate, ProductId, CurrencyId, BettypeRef, MemberWL, MemberComm, AgentWL, AgentComm, Contribution, JackpotPrize, ExtraAmount, OddsSpread, PayOut, CommShare, CashInShare)
-	SELECT r.SiteId, r.rptDate, p.GroupProductId AS ProductId, r.CurrencyId
+	SELECT r.SiteId, r.rptDate, ISNULL(p.GroupProductId, r.ProductId) AS ProductId, r.CurrencyId
 		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
 		,SUM(CASE WHEN (r.ProductId IN (32, 43, 42, 66) AND ISNULL(r.TicketType, 0) = 2) OR r.Bettype IN (902, 903, 904, 999, 4299, 4300, 4297, 4298, 1698, 1699, 1906, 3150, 3898, 3899) THEN 0 ELSE ISNULL(r.MemberWL, 0) END) AS MemberWL
 		,SUM(ISNULL(r.CommissionP, 0)) AS MemberComm
@@ -163,14 +163,14 @@ BEGIN
 		,SUM(CASE WHEN r.ProductId = 15 THEN CASE WHEN ISNULL(r.TicketType, 0) = 0 THEN ISNULL(r.Turnover, 0) ELSE ISNULL(r.ExtraAmount, 0) END ELSE 0 END) AS CommShare
 		,SUM(CASE WHEN r.ProductId = 15 OR r.Bettype = 901 THEN ISNULL(r.BuyBackAmount, 0) ELSE 0 END) AS CashInShare
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
-		INNER JOIN #Products p ON r.ProductId = p.ProductId
+		LEFT JOIN #Products p ON r.ProductId = p.ProductId
 		LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH (NOLOCK) ON sbr.Bettype = r.Bettype
 	WHERE r.rptDate BETWEEN @FromDate AND @ToDate
 		AND r.StatusId NOT IN (-1, 101, 102, 103)
 		AND r.CustomerCategory NOT IN (27, 28)
 		AND r.CurrencyId <> 20
 		AND r.ProductId <> 25 -- CO
-	GROUP BY r.SiteId, r.rptDate, p.GroupProductId, r.CurrencyId
+	GROUP BY r.SiteId, r.rptDate, ISNULL(p.GroupProductId, r.ProductId), r.CurrencyId
 		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
 
 	CREATE TABLE #tmpResult (PartyId INT, ProductId INT, rptDate DATE, LicenseeAmount MONEY, ExtraAmount MONEY DEFAULT(0), IsApplyMinFee BIT DEFAULT (1))
@@ -453,7 +453,7 @@ BEGIN
 
 	-- Return data
 	DECLARE @ProductList VARCHAR(MAX), @SQL VARCHAR(MAX)
-	SELECT  @ProductList = COALESCE(@ProductList + ', ', '') + '[' + ProductName + ']' FROM #Products ORDER BY ProductId
+	SELECT  @ProductList = COALESCE(@ProductList + ', ', '') + '[' + ProductName + ']' FROM #Products WHERE ProductId = GroupProductId ORDER BY ProductId
 
 	SELECT @SQL = '
 	;WITH CTE_Result AS (

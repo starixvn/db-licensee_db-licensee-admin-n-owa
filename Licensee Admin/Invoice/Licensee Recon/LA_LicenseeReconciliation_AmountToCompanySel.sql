@@ -481,9 +481,9 @@ BEGIN
 			INSERT INTO #tmpWinlossData (PartyID,rptDate,ProductID,CurrencyId,Winloss,AmountToCompany,ExtraAmount)  
 			SELECT DISTINCT p.PartyId,@ToDate,c.ProductId,6, 0,0,0-- default eur = 6  
 			FROM @partyList p   
-			INNER JOIN #Products pd ON 1=1  
-			INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON c.ProductID = pd.ProductID AND p.PartyId = c.FromParty  
-			WHERE c.ToDate >= @FromDate  
+				CROSS JOIN #Products pd
+				INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON c.ProductID = pd.ProductId AND p.PartyId = c.FromParty  
+			WHERE c.ToDate >= @FromDate AND pd.GroupProductId = pd.ProductId
 		END
 		 
 		-- create result table

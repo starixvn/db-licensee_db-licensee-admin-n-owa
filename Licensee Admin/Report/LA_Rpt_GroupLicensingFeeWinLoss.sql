@@ -35,22 +35,10 @@ BEGIN
 	CREATE TABLE #Data (rptDate DATE, PartyID INT, ProductID INT, Currency INT, BetTypeId INT, Winloss MONEY, AComm MONEY)
 	CREATE TABLE #Report (PartyID INT, ProductID INT, CurrencyID INT, Company MONEY)
 	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20))
-
-	INSERT INTO #Products (GroupProductId, ProductId, ProductCode, ProductName)
-	SELECT 0, 0, 'SB', 'Sportsbook' WHERE ',' + @ProductCodes + ',' LIKE '%,SB,%'
-	UNION ALL
-	SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductPrefix, p.ProductName
-	FROM bodb_Licensee.dbo.Product3rd p WITH (NOLOCK)
-		LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId
-	WHERE ',' + @ProductCodes + ',' LIKE '%,' + p.ProductPrefix + ',%'
-
-	INSERT INTO #Products (GroupProductId, ProductId, ProductCode, ProductName)
-	SELECT g.GroupProductId, g.ProductId, p.ProductPrefix, p.ProductName
-	FROM #Products pl
-		INNER JOIN bodb_Licensee.dbo.LA_f_GroupProduct() g ON pl.ProductId = g.GroupProductId
-		INNER JOIN bodb_Licensee.dbo.Product3rd p WITH (NOLOCK) ON g.ProductId = p.ProductId
-		LEFT JOIN #Products t ON g.ProductId = t.ProductId
-	WHERE t.ProductId IS NULL
+	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode)
+	SELECT ISNULL(g.GroupProductId, p.ProductId), ISNULL(g.ProductId, p.ProductId), ISNULL(g.ProductName, p.ProductName), ISNULL(g.ProductCode, p.ProductPrefix)
+	FROM bodb_Licensee.dbo.LA_f_Products3rd(@ProductCodes) p
+		LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct() g ON p.ProductId = g.GroupProductId
 
 	SET @ProductCodes = NULL
 	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #Products

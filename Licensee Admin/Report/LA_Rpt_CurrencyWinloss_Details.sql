@@ -77,22 +77,10 @@ BEGIN
 		INSERT INTO @Currency SELECT val FROM dbo.strSplit(@CurrencyIds, ',')
 
 	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20))
-
-	INSERT INTO #Products (GroupProductId, ProductId, ProductCode, ProductName)
-	SELECT 0, 0, 'SB', 'Sportsbook' WHERE ',' + @ProductCodes + ',' LIKE '%,SB,%'
-	UNION ALL
-	SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductPrefix, p.ProductName
-	FROM bodb_Licensee.dbo.Product3rd p WITH (NOLOCK)
-		LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId
-	WHERE ',' + @ProductCodes + ',' LIKE '%,' + p.ProductPrefix + ',%'
-
-	INSERT INTO #Products (GroupProductId, ProductId, ProductCode, ProductName)
-	SELECT g.GroupProductId, g.ProductId, p.ProductPrefix, p.ProductName
-	FROM #Products pl
-		INNER JOIN bodb_Licensee.dbo.LA_f_GroupProduct() g ON pl.ProductId = g.GroupProductId
-		INNER JOIN bodb_Licensee.dbo.Product3rd p WITH (NOLOCK) ON g.ProductId = p.ProductId
-		LEFT JOIN #Products t ON g.ProductId = t.ProductId
-	WHERE t.ProductId IS NULL
+	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode)
+	SELECT ISNULL(g.GroupProductId, p.ProductId), ISNULL(g.ProductId, p.ProductId), ISNULL(g.ProductName, p.ProductName), ISNULL(g.ProductCode, p.ProductPrefix)
+	FROM bodb_Licensee.dbo.LA_f_Products3rd(@ProductCodes) p
+		LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct() g ON p.ProductId = g.GroupProductId
 
 	SET @ProductCodes = NULL
 	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #Products
@@ -272,7 +260,7 @@ BEGIN
 
 		CREATE TABLE #Licensees (LicenseeId INT PRIMARY KEY)
 		INSERT INTO #Licensees (LicenseeId)
-		SELECT DISTINCT LicenseeId FROM #tmpParty
+		SELECT DISTINCT LicenseeId FROM #tmpParty WHERE LicenseeId IS NOT NULL
 
 		DELETE bt
 		FROM #Bettype bt
@@ -356,14 +344,15 @@ BEGIN
 
 		;WITH cte_Data AS
 		(
-			SELECT b.rptDate, b.LicenseeId, b.CurrencyId, b.ProductId
+			SELECT b.rptDate, b.LicenseeId, b.CurrencyId, p.GroupProductId AS ProductId
 					,SUM(b.Turnover) AS Turnover
 					,SUM(b.Winloss)	AS MemberWL
 					,SUM(b.BetCount) AS BetCount
 					,SUM(CommissionP) AS Playercomm
 					,SUM(WinlossA) AS WinlossA
 			FROM #tmpData b
-			GROUP BY b.rptDate, b.LicenseeId, b.CurrencyId, b.ProductId
+				INNER JOIN #Products p ON b.ProductId = p.ProductId
+			GROUP BY b.rptDate, b.LicenseeId, b.CurrencyId, p.GroupProductId
 		)
 		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm, OddsSpreadCost)
 		SELECT a.rptDate

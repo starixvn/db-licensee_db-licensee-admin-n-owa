@@ -11,11 +11,14 @@ AS
 	
 	Revisions:     
 		- 20190128@Bruce: include product code [redmine: #108311]
+		- 20210812@Percy: Exclude BitCoin from Product drop-down list [RedmineID: #159691]
 */
 BEGIN
 	SET NOCOUNT ON
 
-	SELECT ProductId, ProductName, ProductPrefix AS ProductCode
-	FROM dbo.LA_f_Products3rd('')
+	SELECT p.ProductId, p.ProductName, p.ProductPrefix AS ProductCode
+	FROM dbo.LA_f_Products3rd('') p
+		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId AND g.ProductId <> g.GroupProductId
+	WHERE g.ProductId IS NULL
 END
 GO

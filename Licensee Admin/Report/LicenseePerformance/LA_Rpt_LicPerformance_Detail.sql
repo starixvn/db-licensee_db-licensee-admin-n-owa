@@ -111,7 +111,7 @@ BEGIN
 	-- *** Previous month should display full month
 	-- ***		- FromDate, ToDate: 20200601, 20200630 --> PreviousFromDate, PreviousToDate: 20200501, 20200531
 	-- *********************************************************************************************************
-	-- Region: get period date
+	-- Region: get period date	
 	DECLARE @FDate DATETIME = @FromDate, @TDate DATETIME = @ToDate
 	DECLARE @PrevFromDate DATETIME = CASE WHEN @PreviousPeriodType = 1 THEN DATEADD(yy, -1,  @FromDate) ELSE DATEADD(MM, -1,  @FromDate) END 
 	DECLARE @PrevToDate DATETIME
@@ -209,23 +209,11 @@ BEGIN
 	-- End region
 
 	-- Get Product List
-	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20))
-
-	INSERT INTO #Products (GroupProductId, ProductId, ProductCode, ProductName)
-	SELECT 0, 0, 'SB', 'Sportsbook' WHERE ',' + @ProductCodes + ',' LIKE '%,SB,%'
-	UNION ALL
-	SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductPrefix, p.ProductName
-	FROM bodb_Licensee.dbo.Product3rd p WITH (NOLOCK)
-		LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId
-	WHERE ',' + @ProductCodes + ',' LIKE '%,' + p.ProductPrefix + ',%'
-
-	INSERT INTO #Products (GroupProductId, ProductId, ProductCode, ProductName)
-	SELECT g.GroupProductId, g.ProductId, p.ProductPrefix, p.ProductName
-	FROM #Products pl
-		INNER JOIN bodb_Licensee.dbo.LA_f_GroupProduct() g ON pl.ProductId = g.GroupProductId
-		INNER JOIN bodb_Licensee.dbo.Product3rd p WITH (NOLOCK) ON g.ProductId = p.ProductId
-		LEFT JOIN #Products t ON g.ProductId = t.ProductId
-	WHERE t.ProductId IS NULL
+	CREATE TABLE #Products (GroupProductId TINYINT, ProductId TINYINT, ProductName VARCHAR(50), ProductCode VARCHAR(20))
+	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode)
+	SELECT ISNULL(g.GroupProductId, p.ProductId), ISNULL(g.ProductId, p.ProductId), ISNULL(g.ProductName, p.ProductName), ISNULL(g.ProductCode, p.ProductPrefix)
+	FROM bodb_Licensee.dbo.LA_f_Products3rd(@ProductCodes) p
+		LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct() g ON p.ProductId = g.GroupProductId
 
 	SET @ProductCodes = NULL
 	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #Products
@@ -388,15 +376,14 @@ BEGIN
 					WHEN b.Bettype IN (4298, 4299, 4300, 1906, 1699, 3150, 3899) OR b.TicketType = 2 THEN ISNULL(-b.WinLoss, 0) -- Prize, Bonus, Free bets, ...
 					ELSE 0 END) AS ExtraAmount
 		FROM CTE_tmpData b
-				INNER JOIN #Products t ON b.ProductId = t.ProductId
-				INNER JOIN @PartyChargeInfo p ON	t.GroupProductId = p.ProductId
+			INNER JOIN #Products pd ON b.ProductId = pd.ProductId
+			INNER JOIN @PartyChargeInfo p ON p.LicenseeId = b.SiteId AND pd.GroupProductId = p.ProductId AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
 											AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
 			LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeId
 		GROUP BY b.rptDate, b.ProductId, b.CurrencyId, p.PartyId
 	)
 	INSERT INTO #TempData (rptDate,ProductId,CurrencyId,PartyId,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,ExtraAmount)
-		GROUP BY b.rptdate, b.SiteId, p.PartyId, b.CurrencyID, t.GroupProductId
 	(
 		SELECT b.rptDate, b.ProductId, b.CurrencyId, b.PartyId,
 				SUM(BetCount)					AS BetCount,
@@ -451,14 +438,12 @@ BEGIN
 					WHEN b.Bettype IN (4298, 4299, 4300, 1906, 1699, 3150, 3899) OR b.TicketType = 2 THEN ISNULL(-b.WinLoss, 0) -- Prize, Bonus, Free bets, ...
 					ELSE 0 END) AS ExtraAmount
 		FROM CTE_tmpData b
-			INNER JOIN #PartyChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = p.ProductId AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
+			INNER JOIN #Products pd ON b.ProductId = pd.ProductId
+			INNER JOIN @PartyChargeInfo p ON p.LicenseeId = b.SiteId AND pd.GroupProductId = p.ProductId AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
 											AND b.rptDate BETWEEN p.FromDate AND p.ToDate
-				INNER JOIN #Products t ON b.ProductId = t.ProductId
-				INNER JOIN @PartyChargeInfo p ON	t.GroupProductId = p.ProductId
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
 			LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeId
 		GROUP BY b.rptDate, b.ProductId, b.CurrencyId, p.PartyId
-		GROUP BY b.rptdate, b.SiteId, p.PartyId, b.CurrencyID, t.GroupProductId
 	)
 	INSERT INTO #TempData (rptDate,ProductId,CurrencyId,PartyId,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,ExtraAmount)
 	(

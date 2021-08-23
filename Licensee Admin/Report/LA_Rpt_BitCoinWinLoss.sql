@@ -65,13 +65,13 @@ BEGIN
 	BEGIN
 		DECLARE @3rdRate TABLE (PartyId INT, FromDate DATE, ToDate DATE, Rate FLOAT)
 		INSERT INTO @3rdRate (PartyId, FromDate, ToDate, Rate)
-		SELECT pl.PartyId, r.FromDate, r.ToDate, r.DI_Rate
+		SELECT DISTINCT pl.PartyId, r.FromDate, r.ToDate, r.DI_Rate
 		FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'BTC', 'OA') r
 			INNER JOIN #PartyList pl ON r.PartyId = pl.ParentId
 
-		DECLARE @ChargeRate TABLE (ChargeId INT, PartyId INT, LicenseeId INT, FromDate DATE, ToDate DATE, Rate FLOAT)
-		INSERT INTO @ChargeRate (ChargeId, PartyId, LicenseeId, FromDate, ToDate, Rate)
-		SELECT c.ChargeId, c.PartyId, c.LicenseeId, c.FromDate, c.ToDate, c.DI_Rate
+		DECLARE @ChargeRate TABLE (ChargeId INT, PartyId INT, FromDate DATE, ToDate DATE, Rate FLOAT)
+		INSERT INTO @ChargeRate (ChargeId, PartyId, FromDate, ToDate, Rate)
+		SELECT DISTINCT c.ChargeId, c.PartyId, c.FromDate, c.ToDate, CASE WHEN c.IsDeposit = 0 THEN 0 ELSE c.DI_Rate END
 		FROM dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'SB') c -- BTC under SB
 	END
 
@@ -165,7 +165,7 @@ BEGIN
 		,CONVERT(MONEY, r.PayToSupplier * e.Rate) AS PayToSupplier
 		,CONVERT(MONEY, (r.LicensingFee - r.PayToSupplier) * e.Rate) AS CompanyIncome
 	FROM #tmpResult r
-		INNER JOIN #PartyList p ON r.PartyId = p.PartyId
+		INNER JOIN (SELECT DISTINCT PartyId, PartyName, ParentId, ParentName FROM #PartyList) p ON r.PartyId = p.PartyId
 		INNER JOIN @Exchange e ON r.CurrencyId = e.ExchangeId AND r.rptDate = e.ExchangeDate
 
 		-- Grand Total

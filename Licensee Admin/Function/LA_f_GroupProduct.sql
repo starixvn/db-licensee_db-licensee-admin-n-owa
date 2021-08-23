@@ -17,6 +17,12 @@ AS
 
 RETURN
 	-- SB
-	SELECT CONVERT(INT, 0) AS ProductId, CONVERT(INT, 0) AS GroupProductId
-	UNION ALL SELECT 69, 0 -- Bitcoin
+	SELECT
+		CONVERT(INT, 0)						AS ProductId
+		,CONVERT(VARCHAR(50), 'Sportsbook') AS ProductName
+		,CONVERT(VARCHAR(20), 'SB')			AS ProductCode
+		,CONVERT(INT, 0)					AS GroupProductId
+		,CONVERT(VARCHAR(50), 'Sportsbook') AS GroupProductName
+		,CONVERT(VARCHAR(20), 'SB')			AS GroupProductCode
+	UNION ALL SELECT 69, 'Bitcoin', 'BTC', 0, 'Sportsbook', 'SB' -- Bitcoin
 GO
