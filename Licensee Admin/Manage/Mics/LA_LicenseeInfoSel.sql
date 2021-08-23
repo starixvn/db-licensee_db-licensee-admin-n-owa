@@ -23,6 +23,8 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
+	DECLARE @currentDate DATE = GETDATE()
+
 	DECLARE @Groups AS TABLE (PartyID INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT)
 	DECLARE @EmptyDate AS DATE = NULL
 
@@ -43,6 +45,12 @@ BEGIN
 		SELECT s.ProductId, s.FromParty, s.ToParty, s.Rate, s.FromDate, s.ToDate, s.ChargeIdRef, s.BettypeRef AS RateType
 		FROM dbo.OAS_ChargeInfoSub AS s WITH (NOLOCK)
 		WHERE s.ChargeType = 1
+	), TerminateInfo AS (
+		SELECT FromParty, MAX(ToDate) AS TerminatedDate
+		FROM dbo.OAS_ChargeInfo WITH (NOLOCK)
+		WHERE ChargeType NOT IN (2, 3) -- old type, not use
+		GROUP BY FromParty
+		HAVING MAX(ToDate) < @currentDate
 	)
 	SELECT	 CASE pd.IsDeposit	WHEN 0 THEN 'Credit' ELSE g.PartyName							END AS GroupName
 			,CASE p.PartyName	WHEN 'IBC' THEN 'FDL' WHEN '18bb'THEN 'PIH' ELSE p.PartyName	END AS LicenseeName
@@ -57,6 +65,7 @@ BEGIN
 			,pd.BrandName
 			,pd.InvoiceLanguage
 			,ci.ChargeId
+			,t.TerminatedDate
 	FROM ChargeInfo AS ci
 		INNER JOIN dbo.OAS_Party AS p WITH (NOLOCK) ON p.PartyID = ci.FromParty			-- Licensee
 		INNER JOIN @Groups AS g ON ci.ToParty = g.PartyID								-- Group
@@ -64,7 +73,8 @@ BEGIN
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping s WITH (NOLOCK) ON s.ChargeID=ci.ChargeID AND s.SystemID = 2
 		LEFT JOIN dbo.LA_Minfee AS f WITH (NOLOCK) ON f.PartyId = ci.FromParty AND f.ProductId=ci.ProductId AND f.FeeTypeId = 1 -- Min fee
 		LEFT JOIN dbo.LA_Minfee AS m WITH (NOLOCK) ON m.PartyId = ci.FromParty AND m.ProductId=ci.ProductId AND m.FeeTypeId = 2 -- Waive month
-		INNER JOIN dbo.strSplit(@PartyIds, ',') p2 ON p.PartyID = p2.val 
+		INNER JOIN dbo.strSplit(@PartyIds, ',') p2 ON p.PartyID = p2.val
+		LEFT JOIN TerminateInfo t ON p.PartyId = t.FromParty
 	WHERE g.ParentId = 0 AND p.PartyType = 1
 	ORDER BY p.PartyName, pd.BrandName, ci.FromDate, ci.ProductID
 END
