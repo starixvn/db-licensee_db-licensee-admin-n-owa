@@ -46,7 +46,7 @@ BEGIN
 	)
 	SELECT	 CASE pd.IsDeposit	WHEN 0 THEN 'Credit' ELSE g.PartyName							END AS GroupName
 			,CASE p.PartyName	WHEN 'IBC' THEN 'FDL' WHEN '18bb'THEN 'PIH' ELSE p.PartyName	END AS LicenseeName
-			,CASE ci.ToDate		WHEN '2050-01-01' THEN @EmptyDate ELSE ci.ToDate				END AS ToDate
+			,ci.ToDate
 			,DATEDIFF(m, m.FromDate, m.ToDate) AS WaiveMonth
 			,CAST(ISNULL(ci.Rate, 0) AS MONEY) AS Rate
 			,ci.FromDate
