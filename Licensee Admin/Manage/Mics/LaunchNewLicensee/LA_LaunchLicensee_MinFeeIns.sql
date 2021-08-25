@@ -5,7 +5,7 @@ GO
 ALTER PROCEDURE [dbo].[LA_LaunchLicensee_MinFeeIns]
 	@PartyId			INT,
 	@BaseCurrencyId		TINYINT,
-	@MinFeeSettingData	VARCHAR(MAX),
+	@MinFeeSettingData	NVARCHAR(MAX),
 	@ErrCode			INT				= 0		OUTPUT, 
 	@ErrMsg				VARCHAR(4000)	= ''	OUTPUT
 AS
@@ -16,6 +16,8 @@ AS
 
 	Revisions:
 	- 20190107@Parsons: Launch new licensee
+	- 20210811@Danny: Change param data Type [#FeatureID 158133]
+
 
 	Param's Explannation: 
 						@MinFeeSettingData = '<Root>

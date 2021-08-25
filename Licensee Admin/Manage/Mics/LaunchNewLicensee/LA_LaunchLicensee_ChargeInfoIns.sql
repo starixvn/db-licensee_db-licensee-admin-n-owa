@@ -5,7 +5,7 @@ GO
 ALTER PROCEDURE [dbo].[LA_LaunchLicensee_ChargeInfoIns]
 	@PartyId				INT,
 	@GroupId				INT,
-	@ChargeInfoSettingData	VARCHAR(MAX),
+	@ChargeInfoSettingData	NVARCHAR(MAX),
 	@ErrCode				INT				= 0		OUTPUT, 
 	@ErrMsg					VARCHAR(4000)	= ''	OUTPUT
 AS
@@ -17,6 +17,7 @@ AS
 	Revisions:
 	- 20190107@Parsons: Launch new licensee
 	- 20190801@Parsons: Validate billing configuration [#109600]
+	- 20210811@Danny: Change param data Type [#FeatureID 158133]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
