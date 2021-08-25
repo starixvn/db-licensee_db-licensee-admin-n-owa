@@ -43,8 +43,8 @@ BEGIN
 	DELETE #PartyList WHERE (PartyId = 999 OR ParentId = 999)
 
 	-- Handle Licensee status
-	DECLARE @statusTab TABLE (StatusId TINYINT)
-	INSERT INTO @statusTab (StatusId)
+	CREATE TABLE #statusTab  (StatusId TINYINT)
+	INSERT INTO #statusTab (StatusId)
 	SELECT CAST (val AS TINYINT) FROM dbo.strSplit(@LicenseeStatus,',')
 
 	UPDATE p
@@ -476,11 +476,12 @@ BEGIN
 	SELECT p.ParentName AS GroupName, p.PartyName AS LicenseeName, ' + @ProductList + '
 	FROM #PartyList p
 		INNER JOIN CTE_Result r ON p.PartyId = r.PartyId AND p.IsSelected = 1
-	WHERE  p.StatusId  IN (SELECT x.StatusId FROM @statusTab x) 
+	WHERE  p.StatusId  IN (SELECT x.StatusId FROM #statusTab x) 
 	ORDER BY p.ParentName, p.PartyName'
 
 	EXEC (@SQL)
 
+	DROP TABLE #statusTab
 	DROP TABLE #Exchange
 	DROP TABLE #PartyList
 	DROP TABLE #Products
