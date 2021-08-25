@@ -54,10 +54,6 @@ BEGIN
 		INNER JOIN dbo.Licensees la WITH (NOLOCK) ON op.OldRefID = la.LicenseeId
 		LEFT JOIN  bodb_OIC.dbo.licensee oic WITH (NOLOCK) ON oic.RegisteredLicenseeName = la.LicenseeName									
 	
-	DELETE p
-	FROM #PartyList p
-	WHERE p.StatusId NOT IN (SELECT x.StatusId FROM @statusTab x)AND  p.ParentId <> 0
-
 	-- Keep Parties who same group min fee
 	DECLARE @GroupMinFeeSetting TABLE (PartyId INT, GroupMinFeeId SMALLINT, IsPrimary BIT)
 	INSERT INTO @GroupMinFeeSetting (PartyId, GroupMinFeeId, IsPrimary)
@@ -480,6 +476,7 @@ BEGIN
 	SELECT p.ParentName AS GroupName, p.PartyName AS LicenseeName, ' + @ProductList + '
 	FROM #PartyList p
 		INNER JOIN CTE_Result r ON p.PartyId = r.PartyId AND p.IsSelected = 1
+	WHERE  p.StatusId  IN (SELECT x.StatusId FROM @statusTab x) 
 	ORDER BY p.ParentName, p.PartyName'
 
 	EXEC (@SQL)
