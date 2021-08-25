@@ -35,7 +35,7 @@ BEGIN
 	SELECT  @BaseCurrencyId = CurrencyId FROM @BaseCurrencies WHERE CurrencyName = @BaseCurrencyName
 
 	-- Get Party List
-	CREATE TABLE #PartyList (PartyId INT, LicenseeId INT, PartyName VARCHAR(100), BranchName VARCHAR(100), ParentId INT, ParentName VARCHAR(100), GroupMinFeeId INT, IsSelected BIT DEFAULT(0), StatusId TINYINT)
+	CREATE TABLE #PartyList (PartyId INT, LicenseeId INT, PartyName VARCHAR(100), BranchName VARCHAR(100), ParentId INT, ParentName VARCHAR(100), GroupMinFeeId INT, IsSelected BIT DEFAULT(0), StatusId SMALLINT)
 	INSERT INTO #PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC dbo.LA_PartyListSel
 
@@ -43,9 +43,17 @@ BEGIN
 	DELETE #PartyList WHERE (PartyId = 999 OR ParentId = 999)
 
 	-- Handle Licensee status
-	CREATE TABLE #statusTab  (StatusId TINYINT)
-	INSERT INTO #statusTab (StatusId)
-	SELECT CAST (val AS TINYINT) FROM dbo.strSplit(@LicenseeStatus,',')
+	CREATE TABLE #statusTab  (StatusId SMALLINT)
+	IF @LicenseeStatus = '' 
+	BEGIN
+		INSERT INTO #statusTab (StatusId)
+		SELECT -1 AS StatusId
+	END
+	ELSE
+	BEGIN
+		INSERT INTO #statusTab (StatusId)
+		SELECT CAST (val AS SMALLINT) FROM dbo.strSplit(@LicenseeStatus,',')
+	END
 
 	UPDATE p
 	SET    p.StatusId = ISNULL(oic.LicenseeStatusId,0) -- 0: Unrecognized
