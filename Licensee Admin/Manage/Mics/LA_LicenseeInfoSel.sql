@@ -3,7 +3,7 @@ USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeInfoSel]
-	 @PartyIds VARCHAR(1000) = ''
+	 @PartyIds VARCHAR(MAX) = ''
 AS
 /*
 	Created: 20151007@Bruce
