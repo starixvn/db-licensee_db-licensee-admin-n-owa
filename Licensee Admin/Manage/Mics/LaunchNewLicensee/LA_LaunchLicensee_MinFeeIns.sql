@@ -56,7 +56,7 @@ BEGIN
 		BEGIN TRY
 			EXEC sp_xml_preparedocument @docHandler OUTPUT, @MinFeeSettingData
 			INSERT INTO @MinFeeSettings(ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority], BaseCurrencyID)
-			SELECT ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority], BaseCurrencyID
+			SELECT ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority],  CASE WHEN BaseCurrencyID = 0 THEN NULL ELSE BaseCurrencyID END AS BaseCurrencyID
 			FROM OPENXML(@docHandler, 'Root/MinFeeSetting')
 			WITH (ProductId	INT 'ProductId', 
 					FeeTypeId	TINYINT 'FeeTypeId', 
