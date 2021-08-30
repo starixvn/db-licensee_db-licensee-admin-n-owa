@@ -14,6 +14,7 @@ AS
 		- 20170223@Scofield: Initialize SP
 		- 20190802@Parsons: Validate billing configuration [#109600]
 		- 20190920@Bruce: fix bug: show all terminated licensees [#118627]
+		- 20210823@Danny: filter licensee status from OIC [#159296]
 
 	Params:
 	Example:
@@ -33,17 +34,24 @@ BEGIN
 	-- new settings
 	--
 	-- 1001	: Terminated Licensees
-	
+
+
+	DECLARE @OICLicenseeTerminatedList TABLE (LicenseeName VARCHAR(50))
+	INSERT INTO @OICLicenseeTerminatedList (LicenseeName )
+	SELECT RegisteredLicenseeName
+	FROM OPENQUERY (DBLIC, 'SELECT		DISTINCT t.RegisteredLicenseeName AS RegisteredLicenseeName 
+							FROM		bodb_OIC.dbo.Licensee t WITH(NOLOCK)
+							WHERE		t.LicenseeStatusId = 4 AND t.RegisteredLicenseeName IS NOT NULL')
+
 	SELECT p.PartyID, p.PartyName, d.BrandName, 1001 AS ParentID
 	FROM dbo.OAS_Party p WITH(NOLOCK)
 	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID = d.PartyID
+	INNER JOIN dbo.Licensees l WITH(NOLOCK) ON p.OldRefID = l.LicenseeID
+	INNER JOIN @OICLicenseeTerminatedList oic ON l.LicenseeName = oic.LicenseeName
 	WHERE (@UserID = 0 OR p.PartyID IN (
 		SELECT up.PartyID FROM dbo.LA_UserParty up WITH (NOLOCK) WHERE up.UserID = @UserID
-	)) AND p.PartyID IN (
-		SELECT FromParty FROM dbo.OAS_ChargeInfo WITH(NOLOCK)
-		WHERE FromParty > 0 AND ChargeType NOT IN (2, 3) -- Old type & No longer used
-		GROUP BY FromParty HAVING MAX(ToDate) < CONVERT(DATE, GETDATE())
-	) AND p.PartyType = 1 AND d.IsDeposit = 1 AND d.StatusId = 1
+	)) 
+	AND p.PartyType = 1 AND d.IsDeposit = 1 AND d.StatusId = 1
 
 	UNION ALL
 
