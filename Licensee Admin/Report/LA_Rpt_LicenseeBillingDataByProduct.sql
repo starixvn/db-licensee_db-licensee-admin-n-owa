@@ -7,7 +7,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeBillingDataByProduct]
 	,@FromDate			DATETIME
 	,@ToDate			DATETIME
 	,@BaseCurrencyName	VARCHAR(10)
-	,@LicenseeStatus	VARCHAR(100) = ''
+	,@LicenseeStatusID	VARCHAR(100) = ''	
 AS
 
 /*
@@ -21,7 +21,6 @@ AS
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20210823@Danny: filter licensee status from OIC [#159296]
-
 */
 
 BEGIN
@@ -35,32 +34,12 @@ BEGIN
 	SELECT  @BaseCurrencyId = CurrencyId FROM @BaseCurrencies WHERE CurrencyName = @BaseCurrencyName
 
 	-- Get Party List
-	CREATE TABLE #PartyList (PartyId INT, LicenseeId INT, PartyName VARCHAR(100), BranchName VARCHAR(100), ParentId INT, ParentName VARCHAR(100), GroupMinFeeId INT, IsSelected BIT DEFAULT(0), StatusId SMALLINT)
+	CREATE TABLE #PartyList (PartyId INT, LicenseeId INT, PartyName VARCHAR(100), BranchName VARCHAR(100), ParentId INT, ParentName VARCHAR(100), GroupMinFeeId INT, IsSelected BIT DEFAULT(0), StatusID INT)
 	INSERT INTO #PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC dbo.LA_PartyListSel
 
 	-- Remove credit licensees
 	DELETE #PartyList WHERE (PartyId = 999 OR ParentId = 999)
-
-	-- Handle Licensee status
-	CREATE TABLE #statusTab  (StatusId SMALLINT)
-	IF @LicenseeStatus = '' 
-	BEGIN
-		INSERT INTO #statusTab (StatusId)
-		SELECT -1 AS StatusId
-	END
-	ELSE
-	BEGIN
-		INSERT INTO #statusTab (StatusId)
-		SELECT CAST (val AS SMALLINT) FROM dbo.strSplit(@LicenseeStatus,',')
-	END
-
-	UPDATE p
-	SET    p.StatusId = ISNULL(oic.LicenseeStatusId,0) -- 0: Unrecognized
-	FROM  #PartyList p
-		INNER JOIN dbo.OAS_Party op   WITH (NOLOCK) ON op.PartyID = p.PartyId
-		INNER JOIN dbo.Licensees la WITH (NOLOCK) ON op.OldRefID = la.LicenseeId
-		LEFT JOIN  bodb_OIC.dbo.licensee oic WITH (NOLOCK) ON oic.RegisteredLicenseeName = la.LicenseeName									
 	
 	-- Keep Parties who same group min fee
 	DECLARE @GroupMinFeeSetting TABLE (PartyId INT, GroupMinFeeId SMALLINT, IsPrimary BIT)
@@ -94,6 +73,22 @@ BEGIN
 	WHERE p.ParentId <> 0
 
 	DELETE #PartyList WHERE ParentId = 0
+
+	-- Handle statusID 
+	DECLARE @statusTab TABLE (StatusId TINYINT)
+	INSERT INTO @statusTab (StatusId)
+	SELECT CAST (val AS TINYINT) FROM dbo.strSplit(@LicenseeStatusID,',')
+
+	UPDATE p
+	SET p.StatusId = ISNULL(oic.LicenseeStatusId,0) -- 0: Unrecognized
+	FROM #PartyList p
+		INNER JOIN bodb_licensee.dbo.OAS_Party op WITH(NOLOCK) ON op.PartyID = p.PartyID
+		INNER JOIN bodb_licensee.dbo.Licensees la WITH (NOLOCK) ON la.LicenseeId = op.OldRefID
+		LEFT JOIN  bodb_OIC.dbo.licensee oic WITH (NOLOCK) ON oic.RegisteredLicenseeName = la.LicenseeName		
+	WHERE op.PartyType IN (1,5)
+
+	DELETE FROM #PartyList WHERE StatusId NOT IN (SELECT x.StatusId FROM @statusTab x)
+	-- End Handle statusID 
 
 	SET @PartyIds = NULL
 	SELECT @PartyIds = COALESCE(@PartyIds + ',', '') + CONVERT(VARCHAR(20), PartyId) FROM #PartyList
@@ -484,12 +479,10 @@ BEGIN
 	SELECT p.ParentName AS GroupName, p.PartyName AS LicenseeName, ' + @ProductList + '
 	FROM #PartyList p
 		INNER JOIN CTE_Result r ON p.PartyId = r.PartyId AND p.IsSelected = 1
-	WHERE  p.StatusId  IN (SELECT x.StatusId FROM #statusTab x) 
 	ORDER BY p.ParentName, p.PartyName'
 
 	EXEC (@SQL)
 
-	DROP TABLE #statusTab
 	DROP TABLE #Exchange
 	DROP TABLE #PartyList
 	DROP TABLE #Products
