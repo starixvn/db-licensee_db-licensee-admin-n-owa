@@ -1,7 +1,6 @@
 /*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 
 CREATE PROCEDURE [dbo].[LA_LicenseeStatusListSel]
-	@StatusID		INT	   = -1
 AS
 /*
 	Created: 20170223@danny
