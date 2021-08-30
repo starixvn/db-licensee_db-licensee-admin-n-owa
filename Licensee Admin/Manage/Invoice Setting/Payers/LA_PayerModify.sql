@@ -19,6 +19,8 @@ ALTER PROCEDURE [dbo].[LA_PayerModify]
 	, @ErrMsg					NVARCHAR(1000)	= '' OUTPUT
 	, @InvoiceLanguage 			VARCHAR(7)		= ''
 	, @BaseCurrencySettingXml	NVARCHAR(MAX)	= ''
+	, @CompanyName2				NVARCHAR (100)	= ''
+	, @AttnName2				NVARCHAR (125)	= ''
 AS
 /*
 	Created: 20150415@Florent
@@ -35,6 +37,7 @@ AS
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20190829@Bruce: Adding Licensee Code [#111586]
 		- 20210315@Happy: Change BaseCurrency Of Licensee [#151466]
+		- 20210811@Danny: Adding AttnName2, CompanyName2 into OAS_PartyDetail [#FeatureID 158133]
 	
 	Param's Explannation: 
 		@BaseCurrencySettingXml = <Root>
@@ -87,6 +90,8 @@ BEGIN
 					, Address1			AS '@a1'
 					, Address2			AS '@a2'
 					, InvoiceLanguage	AS '@il'
+					, pd.CompanyName2	AS '@cn2'
+					, pd.AttnName2		AS '@an2'
 			FROM dbo.OAS_Party p  WITH (NOLOCK)
 				INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 			WHERE p.PartyId = @PayerID
@@ -102,6 +107,8 @@ BEGIN
 			, Address1 = @Address1
 			, Address2 = @Address2
 			, InvoiceLanguage = @InvoiceLanguage
+			, CompanyName2 = @CompanyName2
+			, AttnName2 = @AttnName2
 		WHERE PartyId = @PayerID
 
 		-- only non-official payer can edit payer name, status, deposit status
@@ -216,6 +223,8 @@ BEGIN
 					, @Address1			AS '@a1'
 					, @Address2			AS '@a2'
 					, @InvoiceLanguage	AS '@il'
+					, @CompanyName2		AS '@cn2'
+					, @AttnName2		AS '@an2'
 			FROM dbo.OAS_Party p WITH (NOLOCK)
 				INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 			WHERE p.PartyID = @PayerId

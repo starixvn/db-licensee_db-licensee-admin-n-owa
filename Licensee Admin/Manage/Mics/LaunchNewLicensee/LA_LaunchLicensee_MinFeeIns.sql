@@ -5,7 +5,7 @@ GO
 ALTER PROCEDURE [dbo].[LA_LaunchLicensee_MinFeeIns]
 	@PartyId			INT,
 	@BaseCurrencyId		TINYINT,
-	@MinFeeSettingData	VARCHAR(MAX),
+	@MinFeeSettingData	NVARCHAR(MAX),
 	@ErrCode			INT				= 0		OUTPUT, 
 	@ErrMsg				VARCHAR(4000)	= ''	OUTPUT
 AS
@@ -16,6 +16,8 @@ AS
 
 	Revisions:
 	- 20190107@Parsons: Launch new licensee
+	- 20210811@Danny: Change param data Type [#FeatureID 158133]
+
 
 	Param's Explannation: 
 						@MinFeeSettingData = '<Root>
@@ -54,7 +56,7 @@ BEGIN
 		BEGIN TRY
 			EXEC sp_xml_preparedocument @docHandler OUTPUT, @MinFeeSettingData
 			INSERT INTO @MinFeeSettings(ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority], BaseCurrencyID)
-			SELECT ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority], BaseCurrencyID
+			SELECT ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority],  CASE WHEN BaseCurrencyID = 0 THEN NULL ELSE BaseCurrencyID END AS BaseCurrencyID
 			FROM OPENXML(@docHandler, 'Root/MinFeeSetting')
 			WITH (ProductId	INT 'ProductId', 
 					FeeTypeId	TINYINT 'FeeTypeId', 

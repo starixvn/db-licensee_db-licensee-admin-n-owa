@@ -14,6 +14,7 @@ AS
 	 Revisions:
 		- 20160808@Bravo: Hosting fees
 		- 20161129@Bruce: Add isactive status
+		- 20210811@Danny: return more info  AttnName, CompanyName, Address based on ActiveAddress [#FeatureID 158133]
 	 Params:
 		+ 0 get all biller
 		+ <> 0 specify a biller 
@@ -46,6 +47,13 @@ BEGIN
 			  , 1, 2, '') AS ProductList
 		, i.ActiveAddress
 		, CASE WHEN pd.StatusId=1 THEN 1 ELSE 0 END AS IsActive
+		, CASE WHEN i.ActiveAddress = 1 THEN pd.Address1
+			   WHEN i.ActiveAddress = 2 THEN pd.Address2 END AS Address
+		, CASE WHEN i.ActiveAddress = 1 THEN pd.AttnName
+			   WHEN i.ActiveAddress = 2 THEN pd.AttnName2 END AS AttnName
+		, CASE WHEN i.ActiveAddress = 1 THEN pd.CompanyName
+			   WHEN i.ActiveAddress = 2 THEN pd.CompanyName2 END AS CompanyName
+		
 	FROM dbo.OAS_Party p WITH (NOLOCK)
 		INNER JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON p.PartyID = b.PartyID		
 		INNER JOIN dbo.LA_InvoiceSetting i WITH (NOLOCK) ON i.ToPartyId = p.PartyID
@@ -60,7 +68,14 @@ BEGIN
 			WHEN ISNULL(pd.BrandName, '') != '' 
 				THEN pd.BrandName 
 			ELSE p1.PartyName 
-		  END, i.InvTypeId, InvTypeName, i.InvTempId, InvTemplateName, ISNULL(i.BankId, 0), i.ActiveAddress, pd.StatusId
+		  END, i.InvTypeId, InvTypeName, i.InvTempId, InvTemplateName, ISNULL(i.BankId, 0), i.ActiveAddress, pd.StatusId,
+		  CASE WHEN i.ActiveAddress = 1 THEN pd.Address1
+			   WHEN i.ActiveAddress = 2 THEN pd.Address2 END,
+		  CASE WHEN i.ActiveAddress = 1 THEN pd.AttnName
+			   WHEN i.ActiveAddress = 2 THEN pd.AttnName2 END,
+		  CASE WHEN i.ActiveAddress = 1 THEN pd.CompanyName
+			   WHEN i.ActiveAddress = 2 THEN pd.CompanyName2 END
+
 	ORDER BY BillerName , CASE 
 			WHEN ISNULL(pd.BrandName, '') != '' 
 				THEN pd.BrandName 

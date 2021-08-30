@@ -19,6 +19,8 @@ ALTER PROCEDURE [dbo].[LA_PayerNonOfficialIns]
 	, @ErrMsg			NVARCHAR(1000)	= '' OUTPUT
 	, @InvoiceLanguage	VARCHAR(7)
 	, @BaseCurrencySettingXml	NVARCHAR(MAX)	= ''
+	, @CompanyName2		NVARCHAR (100)	= ''
+	, @AttnName2		NVARCHAR (125)	= ''
 AS
 /*
 	Created: 20161109@bruce.bui
@@ -32,6 +34,7 @@ AS
 		- 20190905@Bruce: Adding licensee code [#111586]
 		- 20210316@Happy: Change BaseCurrency Of Licensee [#151466] 
 		- 20210413@Happy: Support duo base currency [RedmineID: #152089]
+		- 20210811@Danny: Adding AttnName2, CompanyName2 into OAS_PartyDetail [#FeatureID 158133]
 */
 BEGIN
 
@@ -124,8 +127,8 @@ BEGIN
 	SET FromDate = DATEADD(MM, DATEDIFF(MM, 0, FromDate), 0)
 	WHERE Idx = (SELECT TOP 1 Idx FROM @BaseCurrencySetting ORDER BY FromDate ASC)
 
-	INSERT INTO dbo.OAS_PartyDetail(PartyId, BrandName, CompanyName, AttnName, Description, Address1, Address2, BaseCurrencyId, IsAllowedMemberComm, IsDeposit, StatusId, InvoiceLanguage, LicenseeCode)
-	SELECT TOP 1 @PayerId, @BrandName, @CompanyName, @AttnName, @Description, @Address1, @Address2, BaseCurrencyId, 0, @IsDeposit , @IsActive, @InvoiceLanguage, LicenseeCode
+	INSERT INTO dbo.OAS_PartyDetail(PartyId, BrandName, CompanyName, AttnName, Description, Address1, Address2, BaseCurrencyId, IsAllowedMemberComm, IsDeposit, StatusId, InvoiceLanguage, LicenseeCode, CompanyName2, AttnName2)
+	SELECT TOP 1 @PayerId, @BrandName, @CompanyName, @AttnName, @Description, @Address1, @Address2, BaseCurrencyId, 0, @IsDeposit , @IsActive, @InvoiceLanguage, LicenseeCode, @CompanyName2, @AttnName2
 	FROM @BaseCurrencySetting
 
 	INSERT INTO dbo.OAS_PartyBaseCurrency(BaseCurrencyId, PartyID, FromDate, ToDate, LicenseeCode)
@@ -145,6 +148,8 @@ BEGIN
 				, pd.Address2		AS '@a2'
 				, pd.InvoiceLanguage AS '@il'
 				, @BaseCurrencySettingXml AS '@bc'
+				, pd.CompanyName2	AS '@cn2'
+				, pd.AttnName2		AS '@an2'
 		FROM dbo.OAS_Party p WITH (NOLOCK)
 			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 		WHERE p.PartyID = @PayerId

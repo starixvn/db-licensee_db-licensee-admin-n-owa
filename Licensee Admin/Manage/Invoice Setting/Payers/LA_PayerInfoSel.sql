@@ -21,6 +21,7 @@ AS
 		+ 20190318@Mason: Add Invoice Language in SELECT statement [#110419]
 		+ 20190829@Bruce: Adding Licensee Code [#111586]
 		+ 20210315@Happy: Change BaseCurrency Of Licensee [#151466]
+		- 20210811@Danny: Adding AttnName2, CompanyName2 into OAS_PartyDetail [#FeatureID 158133]
 		
 	 Params:
 	 Example:
@@ -43,6 +44,8 @@ SET NOCOUNT ON
 		, p.PartyType
 		, ISNULL(p.SetupName, '') AS SetupName
 		, pd.InvoiceLanguage
+		, pd.AttnName2
+		, pd.CompanyName2
 	FROM dbo.OAS_Party p WITH (NOLOCK)
 		LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 		LEFT JOIN (

@@ -12,7 +12,8 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee_PartyIns]
 	@LaunchDate			DATE,
 	@NewPartyId			INT				= 0		OUTPUT, 
 	@ErrCode			INT				= 0		OUTPUT, 
-	@ErrMsg				VARCHAR(4000)	= ''	OUTPUT
+	@ErrMsg				VARCHAR(4000)	= ''	OUTPUT,
+	@InvoiceLanguage	VARCHAR(7)		= ''
 AS
 /*
 	Created: 20190107@Parsons
@@ -23,6 +24,7 @@ AS
 	- 20190107@Parsons: Launch new licensee
 	- 20190829@Bruce: Adding Licensee Code [#111586]
 	- 20210317@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
+	- 20210811@Danny: Adding @InvoiceLanguage [#FeatureID 158133]
 
 	Param's Explannation: 
 */
@@ -91,13 +93,14 @@ BEGIN
 		SET BrandName = @BrandName,
 			BaseCurrencyId = @BaseCurrencyId,
 			StatusId = 1,
-			LicenseeCode = @LicenseeCode
+			LicenseeCode = @LicenseeCode,
+			InvoiceLanguage = @InvoiceLanguage
 		WHERE PartyID = @NewPartyId
 	END
 	ELSE
 	BEGIN
-		INSERT INTO dbo.OAS_PartyDetail (PartyID, IsDeposit, BrandName, CompanyName, IsAllowedMemberComm, BaseCurrencyId, StatusId, LicenseeCode)
-		SELECT @NewPartyId, IsDeposit, @BrandName, CompanyName, IsAllowedMemberComm, @BaseCurrencyId, 1, @LicenseeCode
+		INSERT INTO dbo.OAS_PartyDetail (PartyID, IsDeposit, BrandName, CompanyName, IsAllowedMemberComm, BaseCurrencyId, StatusId, LicenseeCode, InvoiceLanguage)
+		SELECT @NewPartyId, IsDeposit, @BrandName, CompanyName, IsAllowedMemberComm, @BaseCurrencyId, 1, @LicenseeCode, @InvoiceLanguage
 		FROM dbo.licensees WITH (NOLOCK)
 		WHERE LicenseeID = @LicenseeId
 	END
