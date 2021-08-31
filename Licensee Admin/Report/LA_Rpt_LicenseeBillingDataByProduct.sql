@@ -7,7 +7,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeBillingDataByProduct]
 	,@FromDate			DATETIME
 	,@ToDate			DATETIME
 	,@BaseCurrencyName	VARCHAR(10)
-	,@LicenseeStatusID	VARCHAR(100)
+	,@LicenseeStatusIds	VARCHAR(100)
 AS
 
 /*
@@ -63,7 +63,7 @@ BEGIN
 	-- Handle statusID 
 	DECLARE @statusTab TABLE (StatusId INT)
 	INSERT INTO @statusTab (StatusId)
-	SELECT CAST (val AS INT) FROM dbo.strSplit(@LicenseeStatusID,',')
+	SELECT CAST (val AS INT) FROM dbo.strSplit(@LicenseeStatusIds,',')
 
 	UPDATE p
 	SET p.StatusId = CASE WHEN oic.LicenseeStatusId IS NULL THEN 999 ELSE oic.LicenseeStatusId END -- 999: Unrecognized dummy status
