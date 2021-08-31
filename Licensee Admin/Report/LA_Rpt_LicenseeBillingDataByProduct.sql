@@ -84,10 +84,10 @@ BEGIN
 	FROM #PartyList p
 		INNER JOIN bodb_licensee.dbo.OAS_Party op WITH(NOLOCK) ON op.PartyID = p.PartyID
 		INNER JOIN bodb_licensee.dbo.Licensees la WITH (NOLOCK) ON la.LicenseeId = op.OldRefID
-		LEFT JOIN  bodb_OIC.dbo.licensee oic WITH (NOLOCK) ON oic.RegisteredLicenseeName = la.LicenseeName		
-	WHERE op.PartyType IN (1,5)
+		LEFT JOIN  bodb_OIC.dbo.licensee oic WITH (NOLOCK) ON oic.RegisteredLicenseeName = la.LicenseeName	
+	WHERE IsSelected = 1
 
-	DELETE FROM #PartyList WHERE StatusId NOT IN (SELECT x.StatusId FROM @statusTab x)
+	DELETE FROM #PartyList WHERE StatusId NOT IN (SELECT x.StatusId FROM @statusTab x) AND IsSelected = 1
 	-- End Handle statusID 
 
 	SET @PartyIds = NULL

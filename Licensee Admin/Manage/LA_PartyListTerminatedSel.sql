@@ -40,10 +40,18 @@ BEGIN
 	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID = d.PartyID
 	INNER JOIN dbo.Licensees l WITH(NOLOCK) ON p.OldRefID = l.LicenseeID
 	INNER JOIN bodb_OIC.dbo.Licensee oic WITH(NOLOCK) ON oic.RegisteredLicenseeName = l.LicenseeName
-	WHERE (@UserID = 0 OR p.PartyID IN (
-		SELECT up.PartyID FROM dbo.LA_UserParty up WITH (NOLOCK) WHERE up.UserID = @UserID
-	)) 
-	AND p.PartyType = 1 AND d.IsDeposit = 1 AND d.StatusId = 1 AND oic.LicenseeStatusId = 4
+	WHERE (	
+			@UserID = 0 
+			OR p.PartyID IN (
+				SELECT up.PartyID 
+				FROM dbo.LA_UserParty up WITH (NOLOCK) 
+				WHERE up.UserID = @UserID
+			)
+		 ) 
+		AND p.PartyType = 1 
+		AND d.IsDeposit = 1 
+		AND d.StatusId = 1 
+		AND oic.LicenseeStatusId = 4 --Terminated
 
 	UNION ALL
 
