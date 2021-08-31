@@ -61,12 +61,12 @@ BEGIN
 	UPDATE #PartyList SET IsSelected = 1 WHERE ',' + @PartyIds + ',' LIKE '%,' + CONVERT(VARCHAR(20), PartyId) + ',%'
 
 	-- Handle statusID 
-	DECLARE @statusTab TABLE (StatusId TINYINT)
+	DECLARE @statusTab TABLE (StatusId INT)
 	INSERT INTO @statusTab (StatusId)
-	SELECT CAST (val AS TINYINT) FROM dbo.strSplit(@LicenseeStatusID,',')
+	SELECT CAST (val AS INT) FROM dbo.strSplit(@LicenseeStatusID,',')
 
 	UPDATE p
-	SET p.StatusId = ISNULL(oic.LicenseeStatusId,0) -- 0: Unrecognized
+	SET p.StatusId = ISNULL(oic.LicenseeStatusId,999) -- 999: Unrecognized dummy status
 	FROM #PartyList p
 		INNER JOIN bodb_licensee.dbo.OAS_Party op WITH(NOLOCK) ON op.PartyID = p.PartyID
 		INNER JOIN bodb_licensee.dbo.Licensees la WITH (NOLOCK) ON la.LicenseeId = op.OldRefID

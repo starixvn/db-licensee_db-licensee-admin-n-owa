@@ -18,7 +18,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	
-	SELECT  0 AS LicenseeStatusId, 'Unrecognized' AS LicenseeStatusName
+	SELECT  999 AS LicenseeStatusId, 'Unrecognized' AS LicenseeStatusName
 
 	UNION ALL
 
