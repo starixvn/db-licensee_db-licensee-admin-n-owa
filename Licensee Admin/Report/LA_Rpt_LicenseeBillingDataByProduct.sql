@@ -66,7 +66,7 @@ BEGIN
 	SELECT CAST (val AS INT) FROM dbo.strSplit(@LicenseeStatusID,',')
 
 	UPDATE p
-	SET p.StatusId = ISNULL(oic.LicenseeStatusId,999) -- 999: Unrecognized dummy status
+	SET p.StatusId = CAST(ISNULL(oic.LicenseeStatusId,999) AS INT) -- 999: Unrecognized dummy status
 	FROM #PartyList p
 		INNER JOIN bodb_licensee.dbo.OAS_Party op WITH(NOLOCK) ON op.PartyID = p.PartyID
 		INNER JOIN bodb_licensee.dbo.Licensees la WITH (NOLOCK) ON la.LicenseeId = op.OldRefID
