@@ -60,20 +60,6 @@ BEGIN
 	
 	UPDATE #PartyList SET IsSelected = 1 WHERE ',' + @PartyIds + ',' LIKE '%,' + CONVERT(VARCHAR(20), PartyId) + ',%'
 
-	DELETE p
-	FROM #PartyList p
-	WHERE p.ParentId > 0
-		AND p.GroupMinFeeId NOT IN (SELECT t.GroupMinFeeId FROM #PartyList t WHERE t.IsSelected = 1)
-
-	UPDATE p
-	SET p.ParentName = REPLACE(pr.PartyName, ' Licensees', ''), p.LicenseeId = pt.OldRefId
-	FROM #PartyList p
-		INNER JOIN #PartyList pr ON p.ParentId = pr.PartyId
-		INNER JOIN dbo.OAS_Party pt WITH (NOLOCK) ON p.PartyId = pt.PartyId
-	WHERE p.ParentId <> 0
-
-	DELETE #PartyList WHERE ParentId = 0
-
 	-- Handle statusID 
 	DECLARE @statusTab TABLE (StatusId TINYINT)
 	INSERT INTO @statusTab (StatusId)
@@ -90,6 +76,21 @@ BEGIN
 	DELETE FROM #PartyList WHERE StatusId NOT IN (SELECT x.StatusId FROM @statusTab x) AND IsSelected = 1
 	-- End Handle statusID 
 
+	DELETE p
+	FROM #PartyList p
+	WHERE p.ParentId > 0
+		AND p.GroupMinFeeId NOT IN (SELECT t.GroupMinFeeId FROM #PartyList t WHERE t.IsSelected = 1)
+
+	UPDATE p
+	SET p.ParentName = REPLACE(pr.PartyName, ' Licensees', ''), p.LicenseeId = pt.OldRefId
+	FROM #PartyList p
+		INNER JOIN #PartyList pr ON p.ParentId = pr.PartyId
+		INNER JOIN dbo.OAS_Party pt WITH (NOLOCK) ON p.PartyId = pt.PartyId
+	WHERE p.ParentId <> 0
+
+	DELETE #PartyList WHERE ParentId = 0
+
+	
 	SET @PartyIds = NULL
 	SELECT @PartyIds = COALESCE(@PartyIds + ',', '') + CONVERT(VARCHAR(20), PartyId) FROM #PartyList
 
