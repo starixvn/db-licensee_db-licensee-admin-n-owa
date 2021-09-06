@@ -16,6 +16,7 @@ AS
 		- 20190927@Bruce: Include fromdate, todate of charge info [#120220]
 		- 20191015@Bruce: Get billing group by billing date [#122229]
 		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
+		- 20210901@Percy: Remove duplicate Party - Licensee Code [RedmineID: #161121]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -32,15 +33,23 @@ BEGIN
 	CREATE TABLE #Licensees (CustId INT, LicenseeName VARCHAR(50), ParentId INT, PartyId INT, LicenseeCode VARCHAR(50), BaseCurrencyId INT, StartDate DATE, EndDate DATE, IsBillingCurrency BIT)
 	
 	INSERT INTO #Licensees (PartyId, LicenseeName, LicenseeCode, BaseCurrencyId, ParentId, IsBillingCurrency)
-	SELECT DISTINCT p.PartyId, p.PartyName AS LicenseeName, UPPER(bc.LicenseeCode), bc.BaseCurrencyId
-		,CASE WHEN p.PartyType = 5 THEN @UnofficialGroup END AS ParentId
-		,CASE WHEN bc.ToDate >= @LastDayOfMonth THEN 1 ELSE 0 END AS IsBillingCurrency
-	FROM dbo.OAS_Party p WITH (NOLOCK)
-		INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyId = pd.PartyId
-		LEFT JOIN dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON p.PartyId = bc.PartyId
-	WHERE @LastDayOfMonth >= bc.FromDate
-		AND p.PartyType IN (1, 5)
-		AND pd.IsDeposit = 1
+	SELECT PartyId, LicenseeName, LicenseeCode, BaseCurrencyId, ParentId, IsBillingCurrency
+	FROM (
+		SELECT PartyId, LicenseeName, LicenseeCode, BaseCurrencyId, ParentId, IsBillingCurrency
+			,ROW_NUMBER() OVER (PARTITION BY PartyId, LicenseeCode ORDER BY IsBillingCurrency DESC) AS RN
+		FROM (
+			SELECT DISTINCT p.PartyId, p.PartyName AS LicenseeName, UPPER(bc.LicenseeCode) AS LicenseeCode, bc.BaseCurrencyId
+				,CASE WHEN p.PartyType = 5 THEN @UnofficialGroup END AS ParentId
+				,CASE WHEN bc.ToDate >= @LastDayOfMonth THEN 1 ELSE 0 END AS IsBillingCurrency
+			FROM dbo.OAS_Party p WITH (NOLOCK)
+				INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyId = pd.PartyId
+				LEFT JOIN dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON p.PartyId = bc.PartyId
+			WHERE @LastDayOfMonth >= bc.FromDate
+				AND p.PartyType IN (1, 5)
+				AND pd.IsDeposit = 1
+		) a
+	) b
+	WHERE RN = 1
 
 	UPDATE l
 	SET l.StartDate = bc.FromDate, l.EndDate = bc.ToDate
