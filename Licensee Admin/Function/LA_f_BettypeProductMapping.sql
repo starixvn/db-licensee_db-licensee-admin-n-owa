@@ -12,7 +12,7 @@ RETURNS @tbBettypeProduct TABLE (
 AS
 /*	Created: 20141111@Florent
 	Task : Get bettype product mapping
-	DB: DBLIC.bodb_Licensee
+	DB: DBLIC.bodb_Licensee,DBBAL-bodb_Licensee
 	
 	Revisions:
 		- 20150202@Patrick: Add more product: Bingo & Keno

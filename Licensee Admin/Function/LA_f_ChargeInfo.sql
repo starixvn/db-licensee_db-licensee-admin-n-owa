@@ -28,7 +28,7 @@ RETURNS @tbChargeInfo TABLE (
 AS
 /*  Created: 20141111@Florent
     Task : Get Charge Information
-    DB: DBLIC.bodb_Licensee, DBCUST.bodb_Licensee
+    DB: DBLIC.bodb_Licensee, DBCUST.bodb_Licensee, DBBAL-bodb_Licensee
     
 	Revisions:
 		- 20150710@Florent: support product MicroGaming with multi charge rate

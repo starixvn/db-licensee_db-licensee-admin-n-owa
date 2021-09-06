@@ -8,7 +8,7 @@ AS
 
 /*  Created: 20150413@Florent
     Task: Get Products Information
-    DB: DBCUST.bodb_Licensee, DBLIC.bodb_licensee
+    DB: DBCUST.bodb_Licensee, DBLIC.bodb_licensee, DBBAL-bodb_Licensee
     
 	Revisions:
 		- 20150413@Florent: Initialize function
