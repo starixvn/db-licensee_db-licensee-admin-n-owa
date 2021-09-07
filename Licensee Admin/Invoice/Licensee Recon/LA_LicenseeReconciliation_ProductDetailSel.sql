@@ -49,11 +49,17 @@ BEGIN
 	UNION ALL
 	SELECT Bettype, 2 AS TypeId FROM (VALUES (4299), (4300), (1906), (3150)) b (Bettype) -- Promotion
 	UNION ALL
-	SELECT DISTINCT Bettype, 2 AS TypeId -- Promotion (include Free bets)
-	FROM bodb02.dbo.SportBettypeMatrix WITH (NOLOCK)
-	WHERE SportType IN (150, 173)
-	UNION ALL
 	SELECT Bettype, 3 AS TypeId FROM (VALUES (4298), (1699), (3899)) b (Bettype) -- JackpotPrize
+	
+	INSERT INTO @Bettype (Bettype, TypeId)
+	SELECT s.Bettype, 2 AS TypeId -- Promotion (include Free bets)
+	FROM (
+		SELECT DISTINCT Bettype
+		FROM bodb02.dbo.SportBettypeMatrix WITH (NOLOCK)
+		WHERE SportType IN (150, 173)
+	) s
+		LEFT JOIN @Bettype b ON s.BetType = b.Bettype
+	WHERE b.Bettype IS NULL
 
 	-- I. LA
 	BEGIN
@@ -109,7 +115,7 @@ BEGIN
 		INSERT INTO #tmpNAPData (WinlostDate, Currency, Bettype, apositiontaking, LicenseeWL, AmountToCompany)
 		SELECT b.WinlostDate, b.Currency, b.Bettype, b.apositiontaking
 			,-SUM(ISNULL(b.winlost, 0)) AS LicenseeWL
-			,-SUM(ISNULL(b.swinlost, 0) + ISNULL(b.mwinlost, 0) + ISNULL(b.awinlost, 0) + ISNULL(b.winlost, 0) + ISNULL(b.scomm, 0)) AS AmountToCompany
+			,SUM(ISNULL(b.swinlost, 0) + ISNULL(b.mwinlost, 0) + ISNULL(b.awinlost, 0) + ISNULL(b.winlost, 0) + ISNULL(b.scomm, 0)) AS AmountToCompany
 		FROM bodb_LicenseeReport.dbo.rptLicWinloss2 b WITH (NOLOCK)
 			INNER JOIN @recommend r ON b.recommend = r.recommend
 			INNER JOIN (
@@ -134,7 +140,7 @@ BEGIN
 			SELECT
 				CONVERT(SMALLMONEY, ISNULL(bc.Rate, c.Rate)) AS ChargeRate
 				,CONVERT(MONEY, SUM(t.LicenseeWL * e.Rate)) AS LicenseeWL
-				,CONVERT(MONEY, SUM(t.LicenseeWL * ISNULL(bc.Rate, c.Rate) * e.Rate)) AS LicensingFee
+				,CONVERT(MONEY, SUM(-t.LicenseeWL * ISNULL(bc.Rate, c.Rate) * e.Rate)) AS LicensingFee
 				,CONVERT(MONEY, SUM(Contribution * e.Rate)) AS Contribution
 				,CONVERT(MONEY, SUM(Contribution * e.Rate * ISNULL(bc.Rate, c.Rate))) AS ContributionDiscount
 				,CONVERT(MONEY, SUM(Promotion * e.Rate)) AS Promotion
@@ -161,21 +167,21 @@ BEGIN
 				,CONVERT(SMALLMONEY, ISNULL(1.0 - t.apositiontaking, 0))
 		)
 		INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize)
-		SELECT 'NAP', d.LicenseeWL, d.HousePT, d.CompanyWL
+		SELECT 'NAP', ISNULL(d.LicenseeWL, 0), ISNULL(d.HousePT, 0), ISNULL(d.CompanyWL, 0)
 			,ISNULL(t.Contribution, 0) AS Contribution
 			,CONVERT(MONEY, 0) AS ContributionDiscount
 			,ISNULL(t.Promotion, 0) AS Promotion
 			,ISNULL(t.JackpotPrize, 0) AS JackpotPrize
 		FROM CTE_Data d
-			LEFT JOIN (
+			FULL OUTER JOIN (
 				SELECT
-					 SUM(CASE WHEN TypeId = 1 THEN CompanyWL ELSE 0 END) AS Contribution
+					 SUM(CASE WHEN TypeId = 1 THEN -CompanyWL ELSE 0 END) AS Contribution
 					,SUM(CASE WHEN TypeId = 2 THEN CompanyWL ELSE 0 END) AS Promotion
 					,SUM(CASE WHEN TypeId = 3 THEN CompanyWL ELSE 0 END) AS JackpotPrize
 				FROM CTE_Data
 				WHERE TypeId IS NOT NULL
-			) t ON 1=1
-		WHERE d.TypeId = 0
+			) t ON d.TypeId = 0
+		WHERE ISNULL(d.TypeId, 0) = 0
 	END
 
 	-- Return data

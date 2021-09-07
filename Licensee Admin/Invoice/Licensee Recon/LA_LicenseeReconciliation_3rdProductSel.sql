@@ -100,7 +100,7 @@ BEGIN
 				,@TDate = @ToDate
 		
 			INSERT INTO #tmpNAPData (winlostdate, currency, transdesc, AmountToCompany)
-			SELECT b.winlostdate, b.currency, b.transdesc, -SUM(swinlost + mwinlost + awinlost + winlost - actual_stake + scomm)
+			SELECT b.winlostdate, b.currency, b.transdesc, SUM(swinlost + mwinlost + awinlost + winlost - actual_stake + scomm)
 			FROM bodb02.dbo.bettrans b WITH (NOLOCK)
 				INNER JOIN @tblCustId c ON b.custid = c.CustId
 			WHERE b.winlostdate BETWEEN @FDate AND @TDate
@@ -116,7 +116,7 @@ BEGIN
 				,@TDate = CASE WHEN @ToDate > @MoveBetsDay THEN @MoveBetsDay ELSE @ToDate END
 
 			INSERT INTO #tmpNAPData (winlostdate, currency, transdesc, AmountToCompany)
-			SELECT b.winlostdate, b.currency, b.transdesc, -SUM(swinlost + mwinlost + awinlost + winlost - actual_stake + scomm)
+			SELECT b.winlostdate, b.currency, b.transdesc, SUM(swinlost + mwinlost + awinlost + winlost - actual_stake + scomm)
 			FROM bodb02.dbo.bettrans14 b WITH (NOLOCK)
 				INNER JOIN @tblCustId c ON b.custid = c.CustId
 			WHERE b.winlostdate BETWEEN @FDate AND @TDate
@@ -135,7 +135,7 @@ BEGIN
 
 			SELECT @CustIds = COALESCE(@CustIds + ',', '') + CONVERT(VARCHAR(20), CustId) FROM @tblCustId
 			SET @SQL = 'SELECT winlostdate, currency, transdesc, AmountToCompany
-						FROM OPENQUERY(DBARC, ''SELECT winlostdate, currency, transdesc, -SUM(swinlost + mwinlost + awinlost + winlost - actual_stake + scomm) AS AmountToCompany
+						FROM OPENQUERY(DBARC, ''SELECT winlostdate, currency, transdesc, SUM(swinlost + mwinlost + awinlost + winlost - actual_stake + scomm) AS AmountToCompany
 												FROM bodb_Archive.dbo.bettrans_bk WITH (NOLOCK)
 												WHERE winlostdate BETWEEN ''''' + CONVERT(VARCHAR(10), @FDate, 120) + ''''' AND ''''' + CONVERT(VARCHAR(10), @TDate, 120) + '''''
 													AND custid IN (' + @CustIds + ')
@@ -160,8 +160,8 @@ BEGIN
 		-- LA
 		INSERT INTO @Result (Func, Currency, [Type], ExRate, AmountToCompany, BasedAmountToCompany)
 		SELECT 'LA', e.Code, 'Actual Bet', e.Rate
-			,SUM(-d.MemberWL * ISNULL(bc.Rate, c.Rate) - d.Comm) AS AmountToCompany
-			,SUM((-d.MemberWL * ISNULL(bc.Rate, c.Rate) - d.Comm) * e.Rate) AS BasedAmountToCompany
+			,SUM(d.MemberWL * ISNULL(bc.Rate, c.Rate) + d.Comm) AS AmountToCompany
+			,SUM((d.MemberWL * ISNULL(bc.Rate, c.Rate) + d.Comm) * e.Rate) AS BasedAmountToCompany
 		FROM #tmpLAData d
 			INNER JOIN @Exchange e ON d.Currency = e.ExchangeId AND d.winlostdate = e.ExchangeDate
 			INNER JOIN @ChargeRate c ON d.winlostdate BETWEEN c.FromDate AND c.ToDate
