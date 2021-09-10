@@ -66,7 +66,9 @@ BEGIN
 	SELECT CAST (val AS INT) FROM dbo.strSplit(@LicenseeStatusIds,',')
 
 	UPDATE p
-	SET p.StatusId = CASE WHEN oic.LicenseeStatusId IS NULL THEN 999 ELSE oic.LicenseeStatusId END -- 999: Unrecognized dummy status
+	SET p.StatusId = CASE	WHEN la.IsDeposit = 0 THEN 3 -- Active (Credit)
+							WHEN la.IsDeposit = 1 AND oic.LicenseeStatusId IS NULL THEN 999 -- 999: Unrecognized dummy status
+							ELSE oic.LicenseeStatusId END 
 	FROM #PartyList p
 		INNER JOIN bodb_licensee.dbo.OAS_Party op WITH(NOLOCK) ON op.PartyID = p.PartyID
 		INNER JOIN bodb_licensee.dbo.Licensees la WITH (NOLOCK) ON la.LicenseeId = op.OldRefID
