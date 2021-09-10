@@ -3,9 +3,9 @@ USE bodb_licensee
 GO
 
 ALTER PROCEDURE dbo.LA_Inv_RebateWorksheetSel
-	@PartyId		INT
-	, @FromDate		SMALLDATETIME
-	, @ToDate		SMALLDATETIME
+	@PartyId	INT
+	,@FromDate	SMALLDATETIME
+	,@ToDate	SMALLDATETIME
 AS
 
 /*	Created: 20170417@Bruce
@@ -32,7 +32,9 @@ AS
 	  - 20210306@Danny: Add AE sexy data to Extra Amount [#152141]
 	  - 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 	  - 20210916@Percy: Return Products applied rebate setting only [RedmineID: #159580]
+	  - 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
 */
+
 BEGIN
 	SET NOCOUNT ON
 
@@ -73,36 +75,38 @@ BEGIN
 	DECLARE @ProductCodes VARCHAR(MAX), @PartyIds VARCHAR(20) = CAST(@PartyId AS VARCHAR(20))
 	SELECT  @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM @Products
 
-	CREATE TABLE #AmountToCompany
+	DECLARE @Result TABLE
 	(
-		PartyId INT, ProductId INT, Winloss MONEY, Fee MONEY, Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000)
-		,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), NegativeFee MONEY, Minfee MONEY, IsChargedByMinFee BIT
+		PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
+		,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000)
 	)
-	IF ISNULL(@ProductCodes, '') <> ''
-	BEGIN
-		INSERT INTO #AmountToCompany
-		(
-			PartyId, ProductId, Winloss, Fee, NegativeFee, Minfee, IsChargedByMinFee
-			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
-		)
-		EXEC dbo.LA_AmountToCompanySel @FromDate, @ToDate, @PartyIds, @ProductCodes, @BaseCurrency
-	END
+	INSERT INTO @Result
+	(
+		PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
+		,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+	)
+	EXEC dbo.LA_AmountToCompanyByProduct
+		@PartyIds = @PartyIds
+		,@ProductCodes = @ProductCodes
+		,@FromDate = @FromDate
+		,@ToDate = @ToDate
+		,@BaseCurrencyName = @BaseCurrency
+
+	DELETE @Result WHERE ProductId = 37
 
 	-- Total
 	DECLARE @Remark NVARCHAR(4000), @TotalRebate MONEY, @TotalAmount MONEY
-	SELECT @Remark = MAX(ISNULL(RebateRemark, N''))
-		,@TotalRebate = SUM(ISNULL(Rebate, 0))
-		,@TotalAmount = SUM(ISNULL(Fee, 0) - ISNULL(Discount, 0))
-	FROM #AmountToCompany
+	SELECT @Remark = MAX(RebateRemark)
+		,@TotalRebate = SUM(Rebate)
+		,@TotalAmount = SUM(LicensingFee + ExtraAmount - Discount)
+	FROM @Result
 
 	SELECT @Remark = ISNULL(@Remark, N''), @TotalRebate = ISNULL(@TotalRebate, 0), @TotalAmount = ISNULL(@TotalAmount, 0)
 
 	SELECT @Remark AS Remark, @ToDate AS ReportDate, @BaseCurrency AS CurrencyName, @TotalRebate AS TotalRebate, @TotalAmount AS TotalAmount
 
 	-- Detail
-	SELECT ProductId, NegativeFee - CASE WHEN NegativeFee < 0 THEN 0 ELSE Discount END AS AmountToCompany
-	FROM #AmountToCompany
-
-	DROP TABLE #AmountToCompany
+	SELECT ProductId, LicensingFee + ExtraAmount AS AmountToCompany
+	FROM @Result
 END
 GO
