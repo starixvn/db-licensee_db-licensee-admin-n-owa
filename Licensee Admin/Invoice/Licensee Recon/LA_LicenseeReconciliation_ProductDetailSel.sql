@@ -79,9 +79,9 @@ BEGIN
 		INSERT INTO #tmpLAData (WinlostDate, Currency, SiteId, Bettype, LicenseeWL, Contribution, Promotion, JackpotPrize, OddsSpread)
 		SELECT r.rptDate, r.CurrencyId, r.SiteId
 			,CASE WHEN r.Bettype IN (1706, 3007) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END AS Bettype
-			,SUM(CASE WHEN b.Bettype IS NOT NULL THEN 0 ELSE -ISNULL(r.MemberWL, 0) END) AS LicenseeWL
+			,SUM(CASE WHEN b.Bettype IS NOT NULL OR r.TicketType = 2 THEN 0 ELSE -ISNULL(r.MemberWL, 0) END) AS LicenseeWL
 			,SUM(CASE WHEN b.TypeId = 1 THEN ISNULL(-r.GrossWL, 0) ELSE 0 END) AS Contribution
-			,SUM(CASE WHEN b.TypeId = 2 THEN ISNULL(r.MemberWL, 0) ELSE 0 END) AS Promotion
+			,SUM(CASE WHEN b.TypeId = 2 OR r.TicketType = 2 THEN ISNULL(r.MemberWL, 0) ELSE 0 END) AS Promotion
 			,SUM(CASE WHEN b.TypeId = 3 THEN ISNULL(r.MemberWL, 0) ELSE 0 END) AS JackpotPrize
 			,SUM(CASE WHEN b.TypeId = 4 THEN ISNULL(-r.GrossWL, 0) ELSE 0 END) AS OddsSpread
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
@@ -153,7 +153,7 @@ BEGIN
 		) d
 
 		-- NAP
-		;WITH CTE_Data AS (
+		;WITH CTE_tmpData AS (
 			SELECT
 				CONVERT(INT, ISNULL(b.TypeId, 0)) AS TypeId
 				,CONVERT(SMALLMONEY, ISNULL(1.0 - t.apositiontaking, 0)) AS HousePT
@@ -165,6 +165,9 @@ BEGIN
 			GROUP BY
 				CONVERT(INT, ISNULL(b.TypeId, 0))
 				,CONVERT(SMALLMONEY, ISNULL(1.0 - t.apositiontaking, 0))
+		), CTE_Data AS (
+			SELECT TypeId, HousePT, LicenseeWL, CompanyWL, ROW_NUMBER() OVER(ORDER BY TypeId) AS RN
+			FROM CTE_tmpData
 		)
 		INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize)
 		SELECT 'NAP', ISNULL(d.LicenseeWL, 0), ISNULL(d.HousePT, 0), ISNULL(d.CompanyWL, 0)
@@ -180,7 +183,7 @@ BEGIN
 					,SUM(CASE WHEN TypeId = 3 THEN CompanyWL ELSE 0 END) AS JackpotPrize
 				FROM CTE_Data
 				WHERE TypeId IS NOT NULL
-			) t ON d.TypeId = 0
+			) t ON d.TypeId = 0 AND d.RN = 1
 		WHERE ISNULL(d.TypeId, 0) = 0
 	END
 
