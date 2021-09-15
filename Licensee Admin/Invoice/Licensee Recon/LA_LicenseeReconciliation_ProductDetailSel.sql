@@ -152,6 +152,10 @@ BEGIN
 			GROUP BY CONVERT(SMALLMONEY, ISNULL(bc.Rate, c.Rate))
 		) d
 
+		IF @@ROWCOUNT = 0
+			INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize)
+			SELECT 'LA', 0, 0, 0, 0, 0, 0, 0
+
 		-- NAP
 		;WITH CTE_tmpData AS (
 			SELECT
@@ -185,16 +189,20 @@ BEGIN
 				WHERE TypeId IS NOT NULL
 			) t ON d.TypeId = 0 AND d.RN = 1
 		WHERE ISNULL(d.TypeId, 0) = 0
+
+		IF @@ROWCOUNT = 0
+			INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize)
+			SELECT 'NAP', 0, 0, 0, 0, 0, 0, 0
 	END
 
 	-- Return data
 		-- LA
-	SELECT LicenseeWL, ChargeRate, LicensingFee AS ServiceFee, Contribution, ContributionDiscount, Promotion, JackpotPrize
+	SELECT LicenseeWL, ChargeRate, LicensingFee AS ServiceFee, -Contribution AS Contribution, ContributionDiscount, Promotion, JackpotPrize
 	FROM @Result
 	WHERE Func = 'LA'
 	
 		-- NAP
-	SELECT LicenseeWL, ChargeRate AS HousePT, LicensingFee AS CompanyWL, Contribution, ContributionDiscount, Promotion, JackpotPrize
+	SELECT LicenseeWL, ChargeRate AS HousePT, LicensingFee AS CompanyWL, -Contribution AS Contribution, ContributionDiscount, Promotion, JackpotPrize
 	FROM @Result
 	WHERE Func = 'NAP'
 

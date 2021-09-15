@@ -80,7 +80,7 @@ BEGIN
 		INNER JOIN @Products p ON t.Sporttype = p.Sporttype AND t.IsBA = p.IsBA
 		INNER JOIN @Exchange e ON t.Currency = e.ExchangeId AND t.WinlostDate = e.ExchangeDate
 	GROUP BY p.ProductId, p.ProductName
-	ORDER BY p.ProductId
+	ORDER BY CASE WHEN p.ProductId = 37 THEN 1 ELSE 0 END, p.ProductId
 
 	DROP TABLE #tmpData
 END
