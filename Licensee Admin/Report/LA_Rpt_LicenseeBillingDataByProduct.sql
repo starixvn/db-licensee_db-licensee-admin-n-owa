@@ -481,7 +481,7 @@ BEGIN
 	)
 	SELECT p.ParentName AS GroupName, p.PartyName AS LicenseeName, ' + @ProductList + '
 	FROM #PartyList p
-		INNER JOIN CTE_Result r ON p.PartyId = r.PartyId AND p.IsSelected = 1
+		LEFT JOIN CTE_Result r ON p.PartyId = r.PartyId AND p.IsSelected = 1
 	ORDER BY p.ParentName, p.PartyName'
 
 	EXEC (@SQL)
