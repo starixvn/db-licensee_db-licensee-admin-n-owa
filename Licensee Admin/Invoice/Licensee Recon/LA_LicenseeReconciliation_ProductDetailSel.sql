@@ -125,7 +125,8 @@ BEGIN
 		WHERE b.WinlostDate BETWEEN @FromDate AND @ToDate
 			AND b.roleId = 2
 			AND b.statusId IN (111, 112, 113, 114, 115)
-			AND b.bettype NOT IN (901, 902, 911, 912)
+			AND b.bettype NOT IN (901, 902, 911, 912, 913, 914)
+			AND b.IsBA = 0
 		GROUP BY b.recommend, b.WinlostDate, b.Currency, b.Bettype, b.apositiontaking -- group by on index recommend
 	END
 

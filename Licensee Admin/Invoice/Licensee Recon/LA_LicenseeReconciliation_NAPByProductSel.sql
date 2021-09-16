@@ -46,12 +46,13 @@ BEGIN
 
 	-- Get Product List
 	DECLARE @ProductCodes VARCHAR(MAX)
-	SELECT  @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductPrefix FROM bodb_Licensee.dbo.Product3rd WITH (NOLOCK)
+	SELECT  @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductPrefix FROM bodb_Licensee.dbo.Product3rd WITH (NOLOCK) WHERE ProductId NOT IN (3, 16, 25)
 	SELECT  @ProductCodes = 'SB,' + @ProductCodes
 
 	DECLARE @Products TABLE (ProductId INT, ProductName VARCHAR(50), Sporttype INT, IsBA BIT)
 	INSERT INTO @Products (ProductId, ProductName, Sporttype, IsBA)
-	SELECT 3, 'BA', 0, 1 WHERE ',' + @ProductCodes + ',' LIKE '%,BA,%'
+	SELECT 3, 'BA', 0, 1
+	UNION ALL SELECT 25, 'Cashout', -1, 0
 	UNION ALL
 	SELECT
 		CASE WHEN f.ProductCode = 'SB' THEN 0 ELSE p.ProductId END
@@ -64,7 +65,7 @@ BEGIN
 	-- Get AmountToCompany data
 	CREATE TABLE #tmpData (WinlostDate SMALLDATETIME, Currency INT, Sporttype INT, IsBA BIT, AmountToCompany MONEY)
 	INSERT INTO #tmpData (WinlostDate, Currency, Sporttype, IsBA, AmountToCompany)
-	SELECT b.WinlostDate, b.Currency, b.sporttype, b.isBA
+	SELECT b.WinlostDate, b.Currency, CASE WHEN b.bettype IN (911, 912, 913, 914) THEN -1 ELSE b.sporttype END, b.isBA
 		,-SUM(ISNULL(b.swinlost, 0) + ISNULL(b.mwinlost, 0) + ISNULL(b.awinlost, 0) + ISNULL(b.winlost, 0) + ISNULL(b.scomm, 0)) AS AmountToCompany
 	FROM bodb_LicenseeReport.dbo.rptLicWinloss2 b WITH (NOLOCK)
 		INNER JOIN @recommend r ON b.recommend = r.recommend
@@ -72,7 +73,7 @@ BEGIN
 		AND b.roleId = 2
 		AND b.statusId IN (111, 112, 113, 114, 115)
 		AND b.bettype NOT IN (901, 902, 911, 912)
-	GROUP BY b.recommend, b.WinlostDate, b.Currency, b.sporttype, b.isBA -- group by on index recommend
+	GROUP BY b.recommend, b.WinlostDate, b.Currency, CASE WHEN b.bettype IN (911, 912, 913, 914) THEN -1 ELSE b.sporttype END, b.isBA -- group by on index recommend
 
 	-- Return data
 		-- Note: Saba promotion treat ProductId is max, always on bottom
