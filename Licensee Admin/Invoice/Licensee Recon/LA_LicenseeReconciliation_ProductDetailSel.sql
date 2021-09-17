@@ -50,6 +50,8 @@ BEGIN
 	SELECT Bettype, 2 AS TypeId FROM (VALUES (4299), (4300), (1906), (3150)) b (Bettype) -- Promotion
 	UNION ALL
 	SELECT Bettype, 3 AS TypeId FROM (VALUES (4298), (1699), (3899)) b (Bettype) -- JackpotPrize
+	UNION ALL
+	SELECT Bettype, 4 AS TypeId FROM (VALUES (999)) b (Bettype) -- OddsSpread Adjustment
 	
 	INSERT INTO @Bettype (Bettype, TypeId)
 	SELECT s.Bettype, 2 AS TypeId -- Promotion (include Free bets)
@@ -125,27 +127,29 @@ BEGIN
 		WHERE b.WinlostDate BETWEEN @FromDate AND @ToDate
 			AND b.roleId = 2
 			AND b.statusId IN (111, 112, 113, 114, 115)
-			AND b.bettype NOT IN (901, 902, 911, 912, 913, 914)
+			AND b.bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914)
 			AND b.IsBA = 0
 		GROUP BY b.recommend, b.WinlostDate, b.Currency, b.Bettype, b.apositiontaking -- group by on index recommend
 	END
 
 	-- Final Result
 	BEGIN
-		DECLARE @Result TABLE (Func VARCHAR(10), LicenseeWL MONEY, ChargeRate SMALLMONEY, LicensingFee MONEY, Contribution MONEY, ContributionDiscount MONEY, Promotion MONEY, JackpotPrize MONEY)
+		DECLARE @Result TABLE (Func VARCHAR(10), LicenseeWL MONEY, ChargeRate SMALLMONEY, LicensingFee MONEY
+				,Contribution MONEY, ContributionDiscount MONEY, Promotion MONEY, JackpotPrize MONEY, OddsSpread MONEY)
 	
 		-- LA
-		INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize)
-		SELECT 'LA', LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize
+		INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread)
+		SELECT 'LA', LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread
 		FROM (
 			SELECT
 				CONVERT(SMALLMONEY, ISNULL(bc.Rate, c.Rate)) AS ChargeRate
 				,CONVERT(MONEY, SUM(t.LicenseeWL * e.Rate)) AS LicenseeWL
 				,CONVERT(MONEY, SUM(-t.LicenseeWL * ISNULL(bc.Rate, c.Rate) * e.Rate)) AS LicensingFee
-				,CONVERT(MONEY, SUM(Contribution * e.Rate)) AS Contribution
-				,CONVERT(MONEY, SUM(Contribution * e.Rate * ISNULL(bc.Rate, c.Rate))) AS ContributionDiscount
-				,CONVERT(MONEY, SUM(Promotion * e.Rate)) AS Promotion
-				,CONVERT(MONEY, SUM(JackpotPrize * e.Rate)) AS JackpotPrize
+				,CONVERT(MONEY, SUM(t.Contribution * e.Rate)) AS Contribution
+				,CONVERT(MONEY, SUM(t.Contribution * e.Rate * ISNULL(bc.Rate, c.Rate))) AS ContributionDiscount
+				,CONVERT(MONEY, SUM(t.Promotion * e.Rate)) AS Promotion
+				,CONVERT(MONEY, SUM(t.JackpotPrize * e.Rate)) AS JackpotPrize
+				,CONVERT(MONEY, SUM(-t.OddsSpread * e.Rate)) AS OddsSpread
 			FROM #tmpLAData t
 				INNER JOIN @Exchange e ON t.Currency = e.ExchangeId AND t.WinlostDate = e.ExchangeDate
 				INNER JOIN @ChargeInfo c ON t.SiteId = c.LicenseeId AND (t.Bettype = c.Bettype OR c.Bettype = -1) AND t.WinlostDate BETWEEN c.FromDate AND c.ToDate
@@ -154,8 +158,8 @@ BEGIN
 		) d
 
 		IF @@ROWCOUNT = 0
-			INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize)
-			SELECT 'LA', 0, 0, 0, 0, 0, 0, 0
+			INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread)
+			SELECT 'LA', 0, 0, 0, 0, 0, 0, 0, 0
 
 		-- NAP
 		;WITH CTE_tmpData AS (
@@ -174,36 +178,40 @@ BEGIN
 			SELECT TypeId, HousePT, LicenseeWL, CompanyWL, ROW_NUMBER() OVER(ORDER BY TypeId) AS RN
 			FROM CTE_tmpData
 		)
-		INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize)
+		INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread)
 		SELECT 'NAP', ISNULL(d.LicenseeWL, 0), ISNULL(d.HousePT, 0), ISNULL(d.CompanyWL, 0)
 			,ISNULL(t.Contribution, 0) AS Contribution
 			,CONVERT(MONEY, 0) AS ContributionDiscount
 			,ISNULL(t.Promotion, 0) AS Promotion
 			,ISNULL(t.JackpotPrize, 0) AS JackpotPrize
+			,ISNULL(t.OddsSpread, 0) AS OddsSpread
 		FROM CTE_Data d
 			FULL OUTER JOIN (
 				SELECT
 					 SUM(CASE WHEN TypeId = 1 THEN -CompanyWL ELSE 0 END) AS Contribution
 					,SUM(CASE WHEN TypeId = 2 THEN CompanyWL ELSE 0 END) AS Promotion
 					,SUM(CASE WHEN TypeId = 3 THEN CompanyWL ELSE 0 END) AS JackpotPrize
+					,SUM(CASE WHEN TypeId = 4 THEN CompanyWL ELSE 0 END) AS OddsSpread
 				FROM CTE_Data
 				WHERE TypeId IS NOT NULL
 			) t ON d.TypeId = 0 AND d.RN = 1
 		WHERE ISNULL(d.TypeId, 0) = 0
 
 		IF @@ROWCOUNT = 0
-			INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize)
-			SELECT 'NAP', 0, 0, 0, 0, 0, 0, 0
+			INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread)
+			SELECT 'NAP', 0, 0, 0, 0, 0, 0, 0, 0
 	END
 
 	-- Return data
 		-- LA
-	SELECT LicenseeWL, ChargeRate, LicensingFee AS ServiceFee, -Contribution AS Contribution, ContributionDiscount, Promotion, JackpotPrize
+	SELECT LicenseeWL, ChargeRate, LicensingFee AS ServiceFee
+		,-Contribution AS Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread AS OddsSpreadAdjustment
 	FROM @Result
 	WHERE Func = 'LA'
 	
 		-- NAP
-	SELECT LicenseeWL, ChargeRate AS HousePT, LicensingFee AS CompanyWL, -Contribution AS Contribution, ContributionDiscount, Promotion, JackpotPrize
+	SELECT LicenseeWL, ChargeRate AS HousePT, LicensingFee AS CompanyWL
+		,-Contribution AS Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread AS OddsSpreadAdjustment
 	FROM @Result
 	WHERE Func = 'NAP'
 
@@ -214,6 +222,7 @@ BEGIN
 		,CONVERT(MONEY, ISNULL(l.ContributionDiscount, 0) - ISNULL(n.ContributionDiscount, 0)) AS ContributionDiscount
 		,CONVERT(MONEY, ISNULL(l.Promotion, 0) - ISNULL(n.Promotion, 0)) AS Promotion
 		,CONVERT(MONEY, ISNULL(l.JackpotPrize, 0) - ISNULL(n.JackpotPrize, 0)) AS JackpotPrize
+		,CONVERT(MONEY, ISNULL(l.OddsSpread, 0) - ISNULL(n.OddsSpread, 0)) AS OddsSpreadAdjustment
 	FROM (
 		SELECT
 			SUM(LicensingFee) AS LicensingFee
@@ -221,6 +230,7 @@ BEGIN
 			,SUM(ContributionDiscount) AS ContributionDiscount
 			,SUM(Promotion) AS Promotion
 			,SUM(JackpotPrize) AS JackpotPrize
+			,SUM(OddsSpread) AS OddsSpread
 		FROM @Result
 		WHERE Func = 'LA'
 	) l
@@ -231,6 +241,7 @@ BEGIN
 				,SUM(ContributionDiscount) AS ContributionDiscount
 				,SUM(Promotion) AS Promotion
 				,SUM(JackpotPrize) AS JackpotPrize
+				,SUM(OddsSpread) AS OddsSpread
 			FROM @Result
 			WHERE Func = 'NAP'
 		) n ON 1 = 1
