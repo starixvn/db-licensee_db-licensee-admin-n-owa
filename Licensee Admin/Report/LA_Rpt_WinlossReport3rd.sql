@@ -19,90 +19,62 @@ AS
  *				@Timezone:  = 0  GMT 0 
 							= 1: GMT-4
 						    = 2: GMT+8	
+
+				@ProductCodes:  'SB'	-- MuayThai
+								'SB_38' -- BetBuilder
 	
  * Example
-	EXEC LA_Rpt_WinlossReport3rd @PartyIds = '14,15,16,17,18,19',@ProductCodes = 'NG',  @FromDate = '20190101', @ToDate = '20190808', @BaseCurrencyName = 'EUR', @Timezone = 1
-	EXEC LA_Rpt_NumberGameWinloss @PartyIds = '14,15,16,17,18,19', @FromDate = '20190101', @ToDate = '20190808', @BaseCurrencyName = 'EUR'
- */
+	- GTM-4 All Products supported
+	EXEC LA_Rpt_WinlossReport3rd @PartyIDs='14,20,148,493,70,56,275,558,316,459,307,15,142,95,58,460,43,457,526,153,76,101,97,114,383,453,530,218,448,81,555,46,676,143,38,92,271,489,146,89,354,82,210,150,91,78,83,52,533,461,93,64,253,353,491,154,260,675,47,361,39,84,77,85,477,44,48,452,86,42,170,323,475,570,571,572,573,574,575,583,584,586,151,465,19,136,312,29,175,276,348,40,171,167,194,63,470,308,33,90,466,464,455,61,462,525,415,158,59,447,334,41,72,482,124,68,67,433,471,34,387,403,117,487,24,647,74,409,429,213,346,412,217,396,207,652,35,370,331,436,367,347,332,165,398,206,419,439,531,414,168,395,449,582,664,441,62,481,127,374,71,653,169,73,246,456,166,80,36,411,417,578,446,469,534,37,490,364,66,31,360,485,162,488,605,317,418,473,88,96,604,329,333,356,476,75,410,435,397,468,404,434,619,322,576,580,607,608,609,610,611,612,613,614,615,616,617,618,623,624,625,638,639,640,626,627,628,629,630,631,632,633,634,635,636,637,641,642,643,644,645,646,585,69,432,443,55,401,325,349,431,416,369,402,764,524,545,53,392,363,421,305,602,407,606,463,445,60,65,17,450,386,26,674,304,405,100,358,49,87,79,157,16,22,422,420,388,440,451,321,190,45,54,21,389,577,620,621,622,587,588,99,27,444,23,30,385,324,25',
+								 @ProductCodes = 'SB,SB_38,NG,VS,KN,AGC,CB,AB,VB,NG2,FW,CO,VS2,LT,BX,PP,CC,SG,SAG,TG,SXG,IBCLC,BBIN,VS3,RNGW,WM,ION,PGS,JK,BGG,GDG,MXG,HB,CG,PPL,AP,APM,BTC',  
+								 @FromDate	= '20210501', 
+								 @ToDate	= '20210331', 
+								 @BaseCurrencyName = 'EUR', 
+								 @Timezone = 1
+	
+	- GTM+8 All Products supported
+	EXEC LA_Rpt_WinlossReport3rd @PartyIDs='14,20,148,493,70,56,275,558,316,459,307,15,142,95,58,460,43,457,526,153,76,101,97,114,383,453,530,218,448,81,555,46,676,143,38,92,271,489,146,89,354,82,210,150,91,78,83,52,533,461,93,64,253,353,491,154,260,675,47,361,39,84,77,85,477,44,48,452,86,42,170,323,475,570,571,572,573,574,575,583,584,586,151,465,19,136,312,29,175,276,348,40,171,167,194,63,470,308,33,90,466,464,455,61,462,525,415,158,59,447,334,41,72,482,124,68,67,433,471,34,387,403,117,487,24,647,74,409,429,213,346,412,217,396,207,652,35,370,331,436,367,347,332,165,398,206,419,439,531,414,168,395,449,582,664,441,62,481,127,374,71,653,169,73,246,456,166,80,36,411,417,578,446,469,534,37,490,364,66,31,360,485,162,488,605,317,418,473,88,96,604,329,333,356,476,75,410,435,397,468,404,434,619,322,576,580,607,608,609,610,611,612,613,614,615,616,617,618,623,624,625,638,639,640,626,627,628,629,630,631,632,633,634,635,636,637,641,642,643,644,645,646,585,69,432,443,55,401,325,349,431,416,369,402,764,524,545,53,392,363,421,305,602,407,606,463,445,60,65,17,450,386,26,674,304,405,100,358,49,87,79,157,16,22,422,420,388,440,451,321,190,45,54,21,389,577,620,621,622,587,588,99,27,444,23,30,385,324,25',
+								 @ProductCodes = 'FW,SG,SAG,SXG,WM,JK,CG',  
+								 @FromDate	= '20210501', 
+								 @ToDate	= '20210331', 
+								 @BaseCurrencyName = 'EUR', 
+								 @Timezone = 2
 
- /* 
-	Normal product
-	 2 Number Game, 5 Virtual Sports, 8	RNG Keno, 10 AG Casino, 22	Macau Games, 23	NG2, , 27	Virtual Sports 2, 28	Lottery, 31	Exchange,  34	Arcadia Gaming, 
-	 40	Table Game, 45	AE Sexy, 46	IBCBet Live Casino, 47	BBIN, 49	Virtual Sports 3, 50	RNG War, 51	WM, 52	ION, 55	PG Soft, 56	Joker, 57	BG, 59	GDG, 60	MaxGame,
-	 61	Habanero, 62	CG, 65	PP Live Casino, 67	AdvantPlay, 68	AdvantPlay Mini, 	Muay Thai, 	Bet builder,69 	Bitcoin Betting
-
-	 Special products
-	 15	Colossus Bets, 21	Allbet, 25	Cash Out
-
-	 24	Fishing World (GMT +8)
-	 36	SG (GMT +8)
-	 39	SA Gaming, 
-	 45	AE Sexy
-	 51	WM
-	 56	Joker
-	 62	CG
-
-	 32	Pragmatic (GMT 0)
-	 65	PP Live Casino
+	- GTM+0 All Products supported
+	EXEC LA_Rpt_WinlossReport3rd @PartyIDs='14,20,148,493,70,56,275,558,316,459,307,15,142,95,58,460,43,457,526,153,76,101,97,114,383,453,530,218,448,81,555,46,676,143,38,92,271,489,146,89,354,82,210,150,91,78,83,52,533,461,93,64,253,353,491,154,260,675,47,361,39,84,77,85,477,44,48,452,86,42,170,323,475,570,571,572,573,574,575,583,584,586,151,465,19,136,312,29,175,276,348,40,171,167,194,63,470,308,33,90,466,464,455,61,462,525,415,158,59,447,334,41,72,482,124,68,67,433,471,34,387,403,117,487,24,647,74,409,429,213,346,412,217,396,207,652,35,370,331,436,367,347,332,165,398,206,419,439,531,414,168,395,449,582,664,441,62,481,127,374,71,653,169,73,246,456,166,80,36,411,417,578,446,469,534,37,490,364,66,31,360,485,162,488,605,317,418,473,88,96,604,329,333,356,476,75,410,435,397,468,404,434,619,322,576,580,607,608,609,610,611,612,613,614,615,616,617,618,623,624,625,638,639,640,626,627,628,629,630,631,632,633,634,635,636,637,641,642,643,644,645,646,585,69,432,443,55,401,325,349,431,416,369,402,764,524,545,53,392,363,421,305,602,407,606,463,445,60,65,17,450,386,26,674,304,405,100,358,49,87,79,157,16,22,422,420,388,440,451,321,190,45,54,21,389,577,620,621,622,587,588,99,27,444,23,30,385,324,25',
+								 @ProductCodes = 'PP,PPL',  
+								 @FromDate	= '20210501', 
+								 @ToDate	= '20210331', 
+								 @BaseCurrencyName = 'EUR', 
+								 @Timezone = 0
  */
 
 BEGIN
 	SET NOCOUNT ON
-	-- @productDataView
-	/*
-		0 : fee * 3rdRate (setting)
-		1 : GrossWL * 3rdRate (setting)
-		2: Special fomular (dont have setting 3rd)
-	*/
-	DECLARE	@12BetGroupId INT = -1,
-			@OneWorksGroupId INT = 1,
-			@TianboPartyId INT = 432,
-			@BobbetPartyId INT = 346
 
+	-- Specical bettype
 	DECLARE @SAG_Tips INT = 3007
 	DECLARE @SXG_LuckyDraw INT = 3150
-
 	DECLARE @PP_Contribution	INT = 4297,
 			@PP_JackpotPrize	INT = 4298,
 			@PP_PPTournament	INT = 4299,
 			@PP_PromotionPrize	INT = 4300
 		
-	DECLARE	@CreditGroupId INT = 999,
-			@CN88PartyId INT = (SELECT a.PartyID FROM dbo.OAS_Party a WITH(NOLOCK) WHERE a.PartyName='CN88')
-
 	DECLARE @productDataView TABLE 
 	(
 		ProductID						INT
 		,ProductCode					VARCHAR(10) 
+		,ProductName					VARCHAR(50)
 		,isKeepNegativeFee				BIT 
 		,isKeepNegativePayToSupplier	BIT 
-		,PaytoSupplierFormular			TINYINT
 		,isRptBettingSource				TINYINT
 		,isRptBettingBySportSource		TINYINT
 		,isSupportGMT8					BIT
 		,isSupportGMT0					BIT
 	)
-	INSERT INTO @productDataView(ProductID, ProductCode,  isKeepNegativeFee, isKeepNegativePayToSupplier, PaytoSupplierFormular, isRptBettingSource, isRptBettingBySportSource, isSupportGMT8, isSupportGMT0) 
-	SELECT	ProductID, 
-			ProductPrefix,
-			CASE WHEN ProductID IN (2, 31) OR ProductPrefix = 'SB'  THEN 1 ELSE 0 END isKeepNegativeFee , 
-			CASE WHEN ProductID IN (2, 8, 10, 23, 49, 28, 31, 32, 34, 36, 40, 45, 46, 47, 50, 51, 52, 55, 56, 57, 59, 60, 61, 62, 65, 67, 68, 69, 36, 39) OR ProductPrefix IN ('SB','SB_38') THEN 1 ELSE 0 END isKeepNegativePayToSupplier,
-			CASE WHEN ProductID = 2 THEN 0 
-				 WHEN ProductID = 10 THEN 2 
-				 ELSE 1 END PaytoSupplierFormular,
-			CASE WHEN ProductID IN (22,23,34) OR ProductPrefix = 'SB_38' THEN 1 ELSE 0 END isRptBettingSource,
-			CASE WHEN ProductPrefix = 'SB' THEN 1 ELSE 0 END isRptBettingBySportSource,
-			CASE WHEN ProductID IN (24, 36, 39, 45, 51, 56, 62) THEN 1 ELSE 0 END isSupportGMT8,
-			CASE WHEN ProductID IN (32, 65) THEN 1 ELSE 0 END isSupportGMT0
-	FROM (
-			SELECT x.ProductPrefix, x.ProductID FROM dbo.Product3rd x WITH(NOLOCK)
-			UNION ALL
-			SELECT 'SB' AS ProductPrefix, 0 AS ProductID
-			UNION ALL 
-			SELECT 'SB_38' AS ProductPrefix, 0 AS ProductID
-	) x
-	WHERE ProductPrefix IN (SELECT val FROM strSplit(@ProductCodes, ','))
-
+	INSERT INTO @productDataView(ProductID, ProductCode, ProductName, isKeepNegativeFee, isKeepNegativePayToSupplier, isRptBettingSource, isRptBettingBySportSource, isSupportGMT8, isSupportGMT0) 
+	EXEC LA_Sel3rdProductByTimeZone @ProductCodes = @ProductCodes, @Timezone = @Timezone, @isShowDetail = 1
+	
 	SELECT @ProductCodes = ''
 	;WITH CTE_Product AS 
 	(
@@ -111,8 +83,16 @@ BEGIN
 	)
 	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM CTE_Product
 
-	SELECT '@productDataView',* FROM @productDataView
-	SELECT @ProductCodes as '@ProductCodes'
+
+	DECLARE @ProductCodesGMT VARCHAR(1000)
+	SELECT @ProductCodesGMT = COALESCE(@ProductCodesGMT + ',', '') + CONVERT(VARCHAR(10), ProductCode) FROM @productDataView WHERE isSupportGMT0 = 1 OR isSupportGMT8 = 1
+
+	DECLARE @bettypeExtraGMT TABLE (bettype INT, ProductID INT)
+	INSERT INTO @bettypeExtraGMT(bettype, ProductID)
+	SELECT	DISTINCT la.Bettype, la.ProductID
+	FROM	LA_f_BettypeProductMapping(0,@ProductCodesGMT) la
+
+	SELECT 'debug_@productDataView',* FROM @productDataView
 	--
 	
 	-- Get parties list
@@ -150,23 +130,38 @@ BEGIN
 	FROM (	SELECT DISTINCT r.PartyID, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r. Todate	
 			FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCodes, 'OA') r 
 			WHERE r.ChargeType = 1
-			UNION ALL	
-			SELECT	999, 5, 0.01, 0, @FromDate, @ToDate
-			UNION ALL	
-			SELECT	999, 27, 0.01, 0, @FromDate, @ToDate
-
 		 ) r
 	INNER JOIN #PartyList p on p.ParentId = r.PartyID
 
-	SELECT '@3rdRate',* FROM @3rdRate
-
 	-- Get 3rd for special products
 	-- ​Pay to Supplier: 
+	DECLARE 	@12BetGroupId INT = -1,
+				@CreditGroupId INT = 999,
+				@TianboPartyId INT = 432,
+				@BobbetPartyId INT = 346
+	DECLARE	@CN88PartyId INT = (SELECT a.PartyID FROM dbo.OAS_Party a WITH(NOLOCK) WHERE a.PartyName='CN88')
+
 	INSERT INTO #ChargeRate(ChargeID, PartyID, LicenseeID, isDeposit, ProductID, Rate, Rate3rd, Fromdate, Todate)
-	SELECT DISTINCT c.ChargeID, c.PartyID, c.LicenseeID, ISNULL(c.isDeposit,0), c.ProductID, 
+	SELECT DISTINCT c.ChargeID, 
+					c.PartyID, 
+					c.LicenseeID, 
+					ISNULL(c.isDeposit,0), 
+					c.ProductID, 
 					CASE WHEN c.ProductID = 24 AND c.isDeposit = 0 THEN 0 ELSE c.DI_Rate END AS Rate, 
-					ISNULL(r.DI_Rate,0) AS Rate3rd, c.Fromdate, c.Todate
+					CASE WHEN c.ProductID IN (5,27) THEN 0.01 
+					     WHEN c.ProductID = 2 THEN 0.5
+						 WHEN c.ProductID IN (8,28) THEN CASE WHEN c.PartyId = @CN88PartyId THEN 0.015
+															  WHEN c.PartyId IN (@TianboPartyId, @BobbetPartyId) THEN 0.02
+															  WHEN @FromDate >= CAST('2020-07-01' AS DATETIME) THEN 0.036
+															  WHEN p.ParentId IN (@CreditGroupId, @12BetGroupId) OR @FromDate >= CAST('2018-8-1' AS DATETIME) THEN 0.03 
+															  ELSE 0.05 END
+						 WHEN c.ProductID = 40 THEN CASE WHEN @FromDate >= CAST('2020-07-01' AS DATETIME) THEN CASE WHEN p.ParentId IN (@TianboPartyId, @BobbetPartyId) THEN 0.02 ELSE 0.036  END 
+														 ELSE ISNULL(r.DI_Rate,0)  END
+						 ELSE ISNULL(r.DI_Rate,0) END AS Rate3rd, 
+					c.Fromdate, 
+					c.Todate
 	FROM LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, @ProductCodes) c
+	INNER JOIN #PartyList p ON c.PartyID = p.PartyId
 	LEFT JOIN @3rdRate r ON r.PartyID = c.PartyID and r.ProductID = c.ProductID AND r.ProductID NOT IN (0, 65)
 	WHERE 
 		(
@@ -175,84 +170,6 @@ BEGIN
 			OR c.ProductID IN (0,2,23,24)
 		)  AND c.ChargeType = 1
 	
-	
-	-- Get 3rd for special products
-	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID = 2)
-	BEGIN
-		UPDATE	t
-		SET		t.Rate3rd = 0.5 
-		FROM	#ChargeRate t
-		WHERE	ProductID = 2 -- (NG)
-
-		--DECLARE @EffectiveDateForNewRate DATE = '20191201'
-
-		--INSERT INTO #ChargeRate
-		--SELECT c.ChargeId, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.Rate, c.Rate3rd, c.Fromdate, DATEADD(DAY,-1,@EffectiveDateForNewRate)
-		--FROM #ChargeRate c
-		--WHERE Fromdate < @EffectiveDateForNewRate AND @EffectiveDateForNewRate <= ToDate
-
-		--UPDATE #ChargeRate SET
-		--	Fromdate = (CASE WHEN Fromdate < @EffectiveDateForNewRate THEN @EffectiveDateForNewRate ELSE Fromdate END),
-		--	Rate3rd = 0.5
-		--WHERE @EffectiveDateForNewRate <= Todate
-	END
-
-	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID IN (8,28,40))
-	BEGIN
-	
-		UPDATE	t
-		SET		t.Rate3rd = CASE WHEN t.PartyId = @CN88PartyId THEN 0.015
-					WHEN t.PartyId IN (@TianboPartyId, @BobbetPartyId) THEN 0.02
-					WHEN @FromDate >= CAST('2020-07-01' AS DATETIME) THEN 0.036
-					WHEN p.ParentId IN (@CreditGroupId, @12BetGroupId) OR @FromDate >= CAST('2018-8-1' AS DATETIME) THEN 0.03 
-					ELSE 0.05 END
-		FROM	#ChargeRate t
-		INNER JOIN	#PartyList p ON p.PartyId = t.PartyID
-		WHERE	ProductID IN (8, 28) -- (Keno)
-
-		UPDATE	t
-		SET		t.Rate3rd = CASE WHEN @FromDate >= CAST('2020-07-01' AS DATETIME) THEN 
-										CASE WHEN p.ParentId IN (@TianboPartyId, @BobbetPartyId) THEN 0.02 ELSE 0.036  END 
-							 ELSE t.Rate3rd  END
-		FROM	#ChargeRate t
-		INNER JOIN	#PartyList p ON p.PartyId = t.PartyID
-		WHERE	ProductID = 40
-	END
-
-	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID IN (32, 65))
-	BEGIN
-
-		CREATE TABLE #3rdRatePPL (PartyId INT, FromDate DATE, ToDate DATE, CurrencyId INT, MinAmount MONEY, MaxAmount MONEY, Rate FLOAT)
-		INSERT INTO #3rdRatePPL (PartyId, FromDate, ToDate, CurrencyId, MinAmount, MaxAmount, Rate)
-		SELECT DISTINCT p.PartyId, r.FromDate, r.ToDate, c.BaseCurrencyId, c.MinAmount - CASE WHEN c.MinAmount = 0 THEN 0 ELSE 1 END, c.MaxAmount, c.Rate
-		FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'PPL', 'OA') r
-		INNER JOIN #PartyList p ON p.ParentId = r.PartyId
-		INNER JOIN dbo.OAS_ChargeInfo c WITH (NOLOCK) ON r.ChargeId = c.ChargeId
-
-		DECLARE @BaseCurrencies TABLE (ExchangeId INT, BaseCurrencyName VARCHAR(20))
-		INSERT INTO @BaseCurrencies(ExchangeId, BaseCurrencyName)
-		EXEC bodb_licensee.dbo.LA_SelBaseCurrency
-
-		DECLARE @BaseCurrencyRate TABLE (ExchangeId INT, ExchangeDate DATETIME, BaseCurrencyName VARCHAR(20), Rate FLOAT)
-		INSERT INTO @BaseCurrencyRate (ExchangeId, ExchangeDate, BaseCurrencyName, Rate)
-		SELECT e.ExchangeId, e.ExchangeDate, bc.BaseCurrencyName, e.BaseCurrencyRate
-		FROM @BaseCurrencies bc
-			CROSS APPLY bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, bc.BaseCurrencyName) e
-		
-		-- Update PayToSupplier base on Licensee WL
-		DECLARE @CurrencyId INT, @CurrencyName VARCHAR(100)
-		SELECT TOP 1 @CurrencyId = CurrencyId FROM #3rdRatePPL WHERE CurrencyId IS NOT NULL
-
-		IF @CurrencyId IS NULL
-			SELECT @CurrencyId = ExchangeId FROM @BaseCurrencies WHERE BaseCurrencyName = @BaseCurrencyName
-	
-		SELECT @CurrencyName = Code FROM bodb02.dbo.Exchange WITH (NOLOCK) WHERE ExchangeId = @CurrencyId
-
-		UPDATE #3rdRatePPL SET CurrencyId = @CurrencyId WHERE CurrencyId IS NULL
-		UPDATE #3rdRatePPL SET MinAmount = 0, MaxAmount = 10000000000000 WHERE MinAmount IS NULL OR MaxAmount IS NULL
-	END
-
-
 	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID = 39)
 	BEGIN
 		UPDATE t
@@ -301,11 +218,43 @@ BEGIN
 		WHERE t.ProductID = 59
 	END
 
-
 	DELETE #ChargeRate
 	WHERE PartyID NOT IN (SELECT CAST( val AS INT) FROM strSplit(@PartyIds,',') ) AND ProductID NOT IN (SELECT ProductID FROM @productDataView)
 	--- End Get 3rd for special products
 
+
+	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID = 65)
+	BEGIN
+
+		CREATE TABLE #3rdRatePPL (PartyId INT, FromDate DATE, ToDate DATE, CurrencyId INT, MinAmount MONEY, MaxAmount MONEY, Rate FLOAT)
+		INSERT INTO #3rdRatePPL (PartyId, FromDate, ToDate, CurrencyId, MinAmount, MaxAmount, Rate)
+		SELECT DISTINCT p.PartyId, r.FromDate, r.ToDate, c.BaseCurrencyId, c.MinAmount - CASE WHEN c.MinAmount = 0 THEN 0 ELSE 1 END, c.MaxAmount, c.Rate
+		FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'PPL', 'OA') r
+		INNER JOIN #PartyList p ON p.ParentId = r.PartyId
+		INNER JOIN dbo.OAS_ChargeInfo c WITH (NOLOCK) ON r.ChargeId = c.ChargeId
+
+		DECLARE @BaseCurrencies TABLE (ExchangeId INT, BaseCurrencyName VARCHAR(20))
+		INSERT INTO @BaseCurrencies(ExchangeId, BaseCurrencyName)
+		EXEC bodb_licensee.dbo.LA_SelBaseCurrency
+
+		DECLARE @BaseCurrencyRate TABLE (ExchangeId INT, ExchangeDate DATETIME, BaseCurrencyName VARCHAR(20), Rate FLOAT)
+		INSERT INTO @BaseCurrencyRate (ExchangeId, ExchangeDate, BaseCurrencyName, Rate)
+		SELECT e.ExchangeId, e.ExchangeDate, bc.BaseCurrencyName, e.BaseCurrencyRate
+		FROM @BaseCurrencies bc
+			CROSS APPLY bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, bc.BaseCurrencyName) e
+		
+		-- Update PayToSupplier base on Licensee WL
+		DECLARE @CurrencyId INT, @CurrencyName VARCHAR(100)
+		SELECT TOP 1 @CurrencyId = CurrencyId FROM #3rdRatePPL WHERE CurrencyId IS NOT NULL
+
+		IF @CurrencyId IS NULL
+			SELECT @CurrencyId = ExchangeId FROM @BaseCurrencies WHERE BaseCurrencyName = @BaseCurrencyName
+	
+		SELECT @CurrencyName = Code FROM bodb02.dbo.Exchange WITH (NOLOCK) WHERE ExchangeId = @CurrencyId
+
+		UPDATE #3rdRatePPL SET CurrencyId = @CurrencyId WHERE CurrencyId IS NULL
+		UPDATE #3rdRatePPL SET MinAmount = 0, MaxAmount = 10000000000000 WHERE MinAmount IS NULL OR MaxAmount IS NULL
+	END
 
 	-- Use Valid Bet Amount
 	CREATE TABLE #__ValidBetRate (
@@ -408,14 +357,6 @@ BEGIN
 	IF @Timezone = 1 -- GMT -4
 	BEGIN
 		
-		DECLARE @ProductCodesGMT VARCHAR(1000)
-		SELECT @ProductCodesGMT = COALESCE(@ProductCodesGMT + ',', '') + CONVERT(VARCHAR(10), ProductCode) FROM @productDataView WHERE isSupportGMT0 = 1 OR isSupportGMT8 = 1
-
-		DECLARE @bettypeExtraGMT_GMT4 TABLE (bettype INT, ProductID INT)
-		INSERT INTO @bettypeExtraGMT_GMT4(bettype, ProductID)
-		SELECT	DISTINCT la.Bettype, la.ProductID
-		FROM	LA_f_BettypeProductMapping(0,@ProductCodesGMT) la
-
 		;WITH cte_Summary AS(
 			SELECT
 				b.SiteID,
@@ -434,7 +375,7 @@ BEGIN
 				bt.ProductID,
 				ci.isDeposit
 			FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
-			INNER JOIN	@bettypeExtraGMT_GMT4 bt ON b.BetTypeId = bt.bettype
+			INNER JOIN	@bettypeExtraGMT bt ON b.BetTypeId = bt.bettype
 				INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND  bt.ProductID = ci.ProductID AND b.RptDate BETWEEN ci.FromDate AND ci.ToDate
 			LEFT JOIN dbo.LA_f_ExcludedBettypeListSel ('32,45,39', '')  exclude ON exclude.bettypeid = bt.bettype
 			WHERE b.RptDate BETWEEN @FromDate AND @ToDate
@@ -505,10 +446,9 @@ BEGIN
 			SUM(b.LicenseeWinloss) AS LicenseeWinloss,
 			SUM((b.LicenseeWinloss - b.ValidBetAmount * ISNULL(v.CommRate,0)) * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
 			SUM(CASE WHEN b.ProductID = 59  THEN (b.LicenseeWinloss - b.RollingComm) * CASE WHEN ci.isDeposit = 1 THEN ci.ChargeRate09 ELSE ci.ChargeRate10 END
-				ELSE (b.LicenseeWinloss - b.ValidBetAmount * ISNULL(v.CommRate,0)) * CASE WHEN p.PaytoSupplierFormular = 1  THEN 1
-																					 WHEN p.PaytoSupplierFormular = 2  THEN 0
-																					 ELSE  ISNULL(cr.Rate, ci.Rate) END 
-							* ci.Rate3rd - CASE WHEN b.ProductID = 45 THEN b.Bonus ELSE 0 END
+					 WHEN b.ProductID = 2   THEN (b.LicenseeWinloss - b.ValidBetAmount * ISNULL(v.CommRate,0)) * ISNULL(cr.Rate, ci.Rate) * ci.Rate3rd
+					 WHEN b.ProductID = 10  THEN 0
+					 ELSE (b.LicenseeWinloss - b.ValidBetAmount * ISNULL(v.CommRate,0)) * ci.Rate3rd - CASE WHEN b.ProductID = 45 THEN b.Bonus ELSE 0 END
 				END) AS PayToSupplier,
 			b.ProductID,
 			SUM(Bonus)
@@ -695,12 +635,6 @@ BEGIN
 
 	IF @Timezone IN (0,2) 
 	BEGIN
-		
-		DECLARE @bettypeExtraGMT TABLE (bettype INT, ProductID INT)
-		INSERT INTO @bettypeExtraGMT(bettype, ProductID)
-		SELECT	DISTINCT la.Bettype, la.ProductID
-		FROM	LA_f_BettypeProductMapping(0,@ProductCodes) la
-
 		;WITH cte_Summary AS(
 			SELECT
 				b.SiteID,
@@ -1114,12 +1048,13 @@ BEGIN
 		- SUM(CASE WHEN td.PayToSupplier < 0 AND p.isKeepNegativePayToSupplier = 0 THEN 0 ELSE td.PayToSupplier END)  AS CompanyIncome
 
 	FROM #Result td 
-	LEFT JOIN @productDataView p ON td.ProductID = p.ProductID
+	INNER JOIN @productDataView p ON td.ProductID = p.ProductID
 	GROUP BY td.ParentId, td.ParentName, td.ProductID
 
 	-- Final result
-	SELECT ParentId,  ParentName, ProductID, LicensingFee, PayToSupplier, CompanyIncome
-	FROM @Total
+	SELECT td.ParentId,  td.ParentName, td.ProductID, p.ProductName ,td.LicensingFee, td.PayToSupplier, td.CompanyIncome
+	FROM @Total td
+	INNER JOIN @productDataView p ON td.ProductID = p.ProductID
 	ORDER BY ProductID, ParentId
 
 	DROP TABLE	#PartyList
