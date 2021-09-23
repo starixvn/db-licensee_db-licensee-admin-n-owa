@@ -122,6 +122,7 @@ BEGIN
 		,ChargeRate11	MONEY DEFAULT 0 -- @RollingRollingCommType
 		,ChargeRate12	MONEY DEFAULT 0 -- @TipChargeType
 	)
+	CREATE CLUSTERED INDEX cix_#ChargeRate ON #ChargeRate(ProductID, LicenseeID, isDeposit, Fromdate, Todate)
 	
 	-- Get 3rd Rate
 	DECLARE @3rdRate AS TABLE(PartyID INT, ProductID INT, DI_Rate MONEY, IsDeposit INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
@@ -221,7 +222,6 @@ BEGIN
 	DELETE #ChargeRate
 	WHERE PartyID NOT IN (SELECT CAST( val AS INT) FROM strSplit(@PartyIds,',') ) AND ProductID NOT IN (SELECT ProductID FROM @productDataView)
 	--- End Get 3rd for special products
-
 
 	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID = 65)
 	BEGIN
@@ -353,6 +353,7 @@ BEGIN
 		CommissionS		MONEY DEFAULT 0,
 		CompanyTipShare MONEY DEFAULT 0
 	)
+	CREATE CLUSTERED INDEX cix_#Result ON #Result(ProductID, PartyID)
 
 	IF @Timezone = 1 -- GMT -4
 	BEGIN
@@ -925,8 +926,7 @@ BEGIN
 
 	END
 	
-	SELECT '#TempData',* FROM #TempData
-	SELECT '#Result',* FROM #Result
+	SELECT 'debug_#Result',* FROM #Result
 
 	-- Result
 	DECLARE @Total TABLE (
