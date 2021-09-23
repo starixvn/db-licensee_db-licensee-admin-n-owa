@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -8,13 +8,14 @@ AS
 /*
 	Created: 20170223@scofield.huynh
 	Task : Get list of terminated payers [#70050]
-	DB: DBLIC.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 
 	Revisions:
 		- 20170223@Scofield: Initialize SP
 		- 20190802@Parsons: Validate billing configuration [#109600]
 		- 20190920@Bruce: fix bug: show all terminated licensees [#118627]
 		- 20210823@Danny: filter licensee status from OIC AND relocated SP [#159296]
+		- 20210923@Danny: Rollback code [#162115]
 
 	Params:
 	Example:
@@ -34,24 +35,17 @@ BEGIN
 	-- new settings
 	--
 	-- 1001	: Terminated Licensees
-
+	
 	SELECT p.PartyID, p.PartyName, d.BrandName, 1001 AS ParentID
 	FROM dbo.OAS_Party p WITH(NOLOCK)
 	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID = d.PartyID
-	INNER JOIN dbo.Licensees l WITH(NOLOCK) ON p.OldRefID = l.LicenseeID
-	INNER JOIN bodb_OIC.dbo.Licensee oic WITH(NOLOCK) ON oic.RegisteredLicenseeName = l.LicenseeName
-	WHERE (	
-			@UserID = 0 
-			OR p.PartyID IN (
-				SELECT up.PartyID 
-				FROM dbo.LA_UserParty up WITH (NOLOCK) 
-				WHERE up.UserID = @UserID
-			)
-		 ) 
-		AND p.PartyType = 1 
-		AND d.IsDeposit = 1 
-		AND d.StatusId = 1 
-		AND oic.LicenseeStatusId = 4 --Terminated
+	WHERE (@UserID = 0 OR p.PartyID IN (
+		SELECT up.PartyID FROM dbo.LA_UserParty up WITH (NOLOCK) WHERE up.UserID = @UserID
+	)) AND p.PartyID IN (
+		SELECT FromParty FROM dbo.OAS_ChargeInfo WITH(NOLOCK)
+		WHERE FromParty > 0 AND ChargeType NOT IN (2, 3) -- Old type & No longer used
+		GROUP BY FromParty HAVING MAX(ToDate) < CONVERT(DATE, GETDATE())
+	) AND p.PartyType = 1 AND d.IsDeposit = 1 AND d.StatusId = 1
 
 	UNION ALL
 
