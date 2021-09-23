@@ -9,4 +9,4 @@
 USE bodb_licensee
 GO
 
-EXEC sp_rename 'dbo.DEL_LA_PartyListTerminatedSel', 'LA_PartyListTerminatedSel'; 
+DROP PROCEDURE dbo.DEL_LA_PartyListTerminatedSel
