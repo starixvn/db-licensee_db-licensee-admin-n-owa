@@ -39,8 +39,8 @@ BEGIN
 	SELECT	ProductID, 
 			ProductPrefix,
 			ProductName,
-			CASE WHEN ProductID IN (2, 31, 21) OR ProductPrefix = 'SB'  THEN 1 ELSE 0 END isKeepNegativeFee , 
-			CASE WHEN ProductID IN (2, 8, 10, 23, 49, 28, 31, 32, 34, 36, 40, 45, 46, 47, 50, 51, 52, 55, 56, 57, 59, 60, 61, 62, 65, 67, 68, 69, 36, 39, 21) OR ProductPrefix IN ('SB','SB_38') THEN 1 ELSE 0 END isKeepNegativePayToSupplier,
+			CASE WHEN ProductID IN (2, 31, 21, 25) OR ProductPrefix = 'SB'  THEN 1 ELSE 0 END isKeepNegativeFee , 
+			CASE WHEN ProductID IN (2, 8, 10, 23, 49, 28, 31, 32, 34, 36, 40, 45, 46, 47, 50, 51, 52, 55, 56, 57, 59, 60, 61, 62, 65, 67, 68, 69, 36, 39, 21, 25) OR ProductPrefix IN ('SB','SB_38') THEN 1 ELSE 0 END isKeepNegativePayToSupplier,
 			CASE WHEN ProductID IN (22,23,34) OR ProductPrefix = 'SB_38' THEN 1 ELSE 0 END isRptBettingSource,
 			CASE WHEN ProductPrefix = 'SB' THEN 1 ELSE 0 END isRptBettingBySportSource,
 			CASE WHEN ProductID IN (21, 24, 36, 39, 45, 51, 56, 62) THEN 1 ELSE 0 END isSupportGMT8,
@@ -52,7 +52,7 @@ BEGIN
 			UNION ALL 
 			SELECT 'SB_38' AS ProductPrefix, 0, 'BetBuilder' AS ProductID
 	) x
-	WHERE x.ProductPrefix IN ('SB','SB_38','NG','VS','KN','AGC','CB','AB','VB','NG2','FW','CO','VS2','LT','BX','PP','CC','SG','SAG','TG','SXG','IBCLC','BBIN','VS3','RNGW','WM','ION','PGS','JK','BGG','GDG','MXG','HB','CG','PPL','AP','APM','BTC')
+	WHERE x.ProductPrefix IN ('CO','SB','SB_38','NG','VS','KN','AGC','CB','AB','VB','NG2','FW','CO','VS2','LT','BX','PP','CC','SG','SAG','TG','SXG','IBCLC','BBIN','VS3','RNGW','WM','ION','PGS','JK','BGG','GDG','MXG','HB','CG','PPL','AP','APM','BTC')
 	
 	IF @isShowDetail = 1
 	BEGIN
