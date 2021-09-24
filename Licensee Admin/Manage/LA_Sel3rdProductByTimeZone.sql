@@ -35,16 +35,15 @@ BEGIN
 		,isSupportGMT8					BIT
 		,isSupportGMT0					BIT
 	)
-
 	INSERT INTO @tbl_All3rdProducts(ProductID, ProductCode,  ProductName,  isKeepNegativeFee, isKeepNegativePayToSupplier, isRptBettingSource, isRptBettingBySportSource, isSupportGMT8, isSupportGMT0) 
 	SELECT	ProductID, 
 			ProductPrefix,
 			ProductName,
-			CASE WHEN ProductID IN (2, 31) OR ProductPrefix = 'SB'  THEN 1 ELSE 0 END isKeepNegativeFee , 
-			CASE WHEN ProductID IN (2, 8, 10, 23, 49, 28, 31, 32, 34, 36, 40, 45, 46, 47, 50, 51, 52, 55, 56, 57, 59, 60, 61, 62, 65, 67, 68, 69, 36, 39) OR ProductPrefix IN ('SB','SB_38') THEN 1 ELSE 0 END isKeepNegativePayToSupplier,
+			CASE WHEN ProductID IN (2, 31, 21) OR ProductPrefix = 'SB'  THEN 1 ELSE 0 END isKeepNegativeFee , 
+			CASE WHEN ProductID IN (2, 8, 10, 23, 49, 28, 31, 32, 34, 36, 40, 45, 46, 47, 50, 51, 52, 55, 56, 57, 59, 60, 61, 62, 65, 67, 68, 69, 36, 39, 21) OR ProductPrefix IN ('SB','SB_38') THEN 1 ELSE 0 END isKeepNegativePayToSupplier,
 			CASE WHEN ProductID IN (22,23,34) OR ProductPrefix = 'SB_38' THEN 1 ELSE 0 END isRptBettingSource,
 			CASE WHEN ProductPrefix = 'SB' THEN 1 ELSE 0 END isRptBettingBySportSource,
-			CASE WHEN ProductID IN (24, 36, 39, 45, 51, 56, 62) THEN 1 ELSE 0 END isSupportGMT8,
+			CASE WHEN ProductID IN (21, 24, 36, 39, 45, 51, 56, 62) THEN 1 ELSE 0 END isSupportGMT8,
 			CASE WHEN ProductID IN (32, 65) THEN 1 ELSE 0 END isSupportGMT0
 	FROM (
 			SELECT x.ProductPrefix, x.ProductID, x.ProductName FROM dbo.Product3rd x WITH(NOLOCK)
