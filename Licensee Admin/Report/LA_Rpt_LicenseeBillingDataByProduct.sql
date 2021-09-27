@@ -7,7 +7,6 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeBillingDataByProduct]
 	,@FromDate			DATETIME
 	,@ToDate			DATETIME
 	,@BaseCurrencyName	VARCHAR(10)
-	,@LicenseeStatusIds	VARCHAR(100)
 AS
 
 /*
@@ -21,6 +20,7 @@ AS
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20210823@Danny: filter licensee status from OIC [#159296]
+		- 20210923@Danny: Rollback code [#162115]
 */
 
 BEGIN
@@ -34,7 +34,7 @@ BEGIN
 	SELECT  @BaseCurrencyId = CurrencyId FROM @BaseCurrencies WHERE CurrencyName = @BaseCurrencyName
 
 	-- Get Party List
-	CREATE TABLE #PartyList (PartyId INT, LicenseeId INT, PartyName VARCHAR(100), BranchName VARCHAR(100), ParentId INT, ParentName VARCHAR(100), GroupMinFeeId INT, IsSelected BIT DEFAULT(0), StatusID INT)
+	CREATE TABLE #PartyList (PartyId INT, LicenseeId INT, PartyName VARCHAR(100), BranchName VARCHAR(100), ParentId INT, ParentName VARCHAR(100), GroupMinFeeId INT, IsSelected BIT DEFAULT(0))
 	INSERT INTO #PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC dbo.LA_PartyListSel
 
@@ -59,24 +59,6 @@ BEGIN
 		LEFT JOIN @GroupMinFeeSetting g ON p.PartyId = g.PartyId
 	
 	UPDATE #PartyList SET IsSelected = 1 WHERE ',' + @PartyIds + ',' LIKE '%,' + CONVERT(VARCHAR(20), PartyId) + ',%'
-
-	-- Handle statusID 
-	DECLARE @statusTab TABLE (StatusId INT)
-	INSERT INTO @statusTab (StatusId)
-	SELECT CAST (val AS INT) FROM dbo.strSplit(@LicenseeStatusIds,',')
-
-	UPDATE p
-	SET p.StatusId = CASE	WHEN la.IsDeposit = 0 THEN 3 -- Active (Credit)
-							WHEN la.IsDeposit = 1 AND oic.LicenseeStatusId IS NULL THEN 999 -- 999: Unrecognized dummy status
-							ELSE oic.LicenseeStatusId END 
-	FROM #PartyList p
-		INNER JOIN bodb_licensee.dbo.OAS_Party op WITH(NOLOCK) ON op.PartyID = p.PartyID
-		INNER JOIN bodb_licensee.dbo.Licensees la WITH (NOLOCK) ON la.LicenseeId = op.OldRefID
-		LEFT JOIN  bodb_OIC.dbo.licensee oic WITH (NOLOCK) ON oic.RegisteredLicenseeName = la.LicenseeName	
-	WHERE IsSelected = 1
-
-	DELETE FROM #PartyList WHERE StatusId NOT IN (SELECT x.StatusId FROM @statusTab x) AND IsSelected = 1
-	-- End Handle statusID 
 
 	DELETE p
 	FROM #PartyList p
@@ -481,7 +463,7 @@ BEGIN
 	)
 	SELECT p.ParentName AS GroupName, p.PartyName AS LicenseeName, ' + @ProductList + '
 	FROM #PartyList p
-		LEFT JOIN CTE_Result r ON p.PartyId = r.PartyId AND p.IsSelected = 1
+		INNER JOIN CTE_Result r ON p.PartyId = r.PartyId AND p.IsSelected = 1
 	ORDER BY p.ParentName, p.PartyName'
 
 	EXEC (@SQL)
