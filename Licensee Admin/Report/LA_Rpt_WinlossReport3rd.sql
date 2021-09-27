@@ -1222,7 +1222,7 @@ BEGIN
 
 	END
 	SELECT 'debug_#Result',* FROM #Result ORDER BY ParentId
-	SELECT 'debug_#TempData',* FROM #TempData  WHERE PartyID = 33--ORDER BY ParentId
+	SELECT 'debug_#TempData',* FROM #TempData  WHERE PartyID = 439--ORDER BY ParentId
 
 	-- Result
 	DECLARE @Total TABLE (
