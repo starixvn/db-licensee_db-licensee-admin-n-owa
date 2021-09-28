@@ -28,7 +28,7 @@ AS
 	EXEC LA_Rpt_WinlossReport3rd @PartyIDs='14,20,148,493,70,56,275,558,316,459,307,15,142,95,58,460,43,457,526,153,76,101,97,114,383,453,530,218,448,81,555,46,676,143,38,92,271,489,146,89,354,82,210,150,91,78,83,52,533,461,93,64,253,353,491,154,260,675,47,361,39,84,77,85,477,44,48,452,86,42,170,323,475,570,571,572,573,574,575,583,584,586,151,465,19,136,312,29,175,276,348,40,171,167,194,63,470,308,33,90,466,464,455,61,462,525,415,158,59,447,334,41,72,482,124,68,67,433,471,34,387,403,117,487,24,647,74,409,429,213,346,412,217,396,207,652,35,370,331,436,367,347,332,165,398,206,419,439,531,414,168,395,449,582,664,441,62,481,127,374,71,653,169,73,246,456,166,80,36,411,417,578,446,469,534,37,490,364,66,31,360,485,162,488,605,317,418,473,88,96,604,329,333,356,476,75,410,435,397,468,404,434,619,322,576,580,607,608,609,610,611,612,613,614,615,616,617,618,623,624,625,638,639,640,626,627,628,629,630,631,632,633,634,635,636,637,641,642,643,644,645,646,585,69,432,443,55,401,325,349,431,416,369,402,764,524,545,53,392,363,421,305,602,407,606,463,445,60,65,17,450,386,26,674,304,405,100,358,49,87,79,157,16,22,422,420,388,440,451,321,190,45,54,21,389,577,620,621,622,587,588,99,27,444,23,30,385,324,25',
 								 @ProductCodes = 'SB,SB_38,NG,VS,KN,AGC,CB,AB,VB,NG2,FW,CO,VS2,LT,BX,PP,CC,SG,SAG,TG,SXG,IBCLC,BBIN,VS3,RNGW,WM,ION,PGS,JK,BGG,GDG,MXG,HB,CG,PPL,AP,APM,BTC',  
 								 @FromDate	= '20210501', 
-								 @ToDate	= '20210331', 
+								 @ToDate	= '20210531', 
 								 @BaseCurrencyName = 'EUR', 
 								 @Timezone = 1
 	
@@ -36,7 +36,7 @@ AS
 	EXEC LA_Rpt_WinlossReport3rd @PartyIDs='14,20,148,493,70,56,275,558,316,459,307,15,142,95,58,460,43,457,526,153,76,101,97,114,383,453,530,218,448,81,555,46,676,143,38,92,271,489,146,89,354,82,210,150,91,78,83,52,533,461,93,64,253,353,491,154,260,675,47,361,39,84,77,85,477,44,48,452,86,42,170,323,475,570,571,572,573,574,575,583,584,586,151,465,19,136,312,29,175,276,348,40,171,167,194,63,470,308,33,90,466,464,455,61,462,525,415,158,59,447,334,41,72,482,124,68,67,433,471,34,387,403,117,487,24,647,74,409,429,213,346,412,217,396,207,652,35,370,331,436,367,347,332,165,398,206,419,439,531,414,168,395,449,582,664,441,62,481,127,374,71,653,169,73,246,456,166,80,36,411,417,578,446,469,534,37,490,364,66,31,360,485,162,488,605,317,418,473,88,96,604,329,333,356,476,75,410,435,397,468,404,434,619,322,576,580,607,608,609,610,611,612,613,614,615,616,617,618,623,624,625,638,639,640,626,627,628,629,630,631,632,633,634,635,636,637,641,642,643,644,645,646,585,69,432,443,55,401,325,349,431,416,369,402,764,524,545,53,392,363,421,305,602,407,606,463,445,60,65,17,450,386,26,674,304,405,100,358,49,87,79,157,16,22,422,420,388,440,451,321,190,45,54,21,389,577,620,621,622,587,588,99,27,444,23,30,385,324,25',
 								 @ProductCodes = 'FW,SG,SAG,SXG,WM,JK,CG',  
 								 @FromDate	= '20210501', 
-								 @ToDate	= '20210331', 
+								 @ToDate	= '20210531', 
 								 @BaseCurrencyName = 'EUR', 
 								 @Timezone = 2
 
@@ -44,7 +44,7 @@ AS
 	EXEC LA_Rpt_WinlossReport3rd @PartyIDs='14,20,148,493,70,56,275,558,316,459,307,15,142,95,58,460,43,457,526,153,76,101,97,114,383,453,530,218,448,81,555,46,676,143,38,92,271,489,146,89,354,82,210,150,91,78,83,52,533,461,93,64,253,353,491,154,260,675,47,361,39,84,77,85,477,44,48,452,86,42,170,323,475,570,571,572,573,574,575,583,584,586,151,465,19,136,312,29,175,276,348,40,171,167,194,63,470,308,33,90,466,464,455,61,462,525,415,158,59,447,334,41,72,482,124,68,67,433,471,34,387,403,117,487,24,647,74,409,429,213,346,412,217,396,207,652,35,370,331,436,367,347,332,165,398,206,419,439,531,414,168,395,449,582,664,441,62,481,127,374,71,653,169,73,246,456,166,80,36,411,417,578,446,469,534,37,490,364,66,31,360,485,162,488,605,317,418,473,88,96,604,329,333,356,476,75,410,435,397,468,404,434,619,322,576,580,607,608,609,610,611,612,613,614,615,616,617,618,623,624,625,638,639,640,626,627,628,629,630,631,632,633,634,635,636,637,641,642,643,644,645,646,585,69,432,443,55,401,325,349,431,416,369,402,764,524,545,53,392,363,421,305,602,407,606,463,445,60,65,17,450,386,26,674,304,405,100,358,49,87,79,157,16,22,422,420,388,440,451,321,190,45,54,21,389,577,620,621,622,587,588,99,27,444,23,30,385,324,25',
 								 @ProductCodes = 'PP,PPL',  
 								 @FromDate	= '20210501', 
-								 @ToDate	= '20210331', 
+								 @ToDate	= '20210531', 
 								 @BaseCurrencyName = 'EUR', 
 								 @Timezone = 0
  */
@@ -139,6 +139,8 @@ BEGIN
 		 ) r
 	INNER JOIN #PartyList p on p.ParentId = r.PartyID
 
+	SELECT 'debug_@3rdRate',* FROM @3rdRate where ProductID = 45 ORDER BY PartyID
+
 	-- Get 3rd for special products
 	-- ​Pay to Supplier: 
 	DECLARE 	@12BetGroupId INT = -1,
@@ -148,13 +150,13 @@ BEGIN
 	DECLARE	@CN88PartyId INT = (SELECT a.PartyID FROM dbo.OAS_Party a WITH(NOLOCK) WHERE a.PartyName='CN88')
 
 	INSERT INTO #ChargeRate(ChargeID, PartyID, LicenseeID, isDeposit, ProductID, Rate, Rate3rd, Fromdate, Todate)
-	SELECT DISTINCT c.ChargeID, 
+	SELECT DISTINCT CASE WHEN (c.ProductID = 24 AND c.isDeposit = 0) OR (c.ProductID = 32 AND c.isDeposit = 0) THEN -1 ELSE c.ChargeID END, 
 					c.PartyID, 
 					c.LicenseeID, 
 					ISNULL(c.isDeposit,0), 
 					c.ProductID, 
-					CASE WHEN c.ProductID = 24 AND c.isDeposit = 0 THEN 0 ELSE c.DI_Rate END AS Rate, 
-					CASE WHEN c.ProductID IN (5,27) THEN 0.01 
+					CASE WHEN (c.ProductID = 24 AND c.isDeposit = 0) OR (c.ProductID = 32 AND c.isDeposit = 0) THEN 0 ELSE c.DI_Rate END AS Rate, 
+					CASE WHEN c.ProductID IN (5,27) AND c.isDeposit = 0 THEN 0.01 
 					     WHEN c.ProductID = 2 THEN 0.5
 						 WHEN c.ProductID IN (8,28) THEN CASE WHEN c.PartyId = @CN88PartyId THEN 0.015
 															  WHEN c.PartyId IN (@TianboPartyId, @BobbetPartyId) THEN 0.02
@@ -173,7 +175,7 @@ BEGIN
 		(
 			(c.DI_Rate = 0 AND c.isDeposit = 0) 
 			OR (c.DI_Rate > 0 and c.isDeposit = 1) 
-			OR c.ProductID IN (0,2,23,24)
+			OR c.ProductID IN (0,2,23,24,32)
 		)  AND c.ChargeType = 1
 		AND c.ProductID NOT IN (15, 21, 25)
 	
@@ -341,9 +343,9 @@ BEGIN
 	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID = 65)
 	BEGIN
 
-		CREATE TABLE #3rdRatePPL (PartyId INT, FromDate DATE, ToDate DATE, CurrencyId INT, MinAmount MONEY, MaxAmount MONEY, Rate FLOAT)
-		INSERT INTO #3rdRatePPL (PartyId, FromDate, ToDate, CurrencyId, MinAmount, MaxAmount, Rate)
-		SELECT DISTINCT p.PartyId, r.FromDate, r.ToDate, c.BaseCurrencyId, c.MinAmount - CASE WHEN c.MinAmount = 0 THEN 0 ELSE 1 END, c.MaxAmount, c.Rate
+		CREATE TABLE #3rdRatePPL (PartyId INT, ProductID INT, FromDate DATE, ToDate DATE, CurrencyId INT, MinAmount MONEY, MaxAmount MONEY, Rate FLOAT)
+		INSERT INTO #3rdRatePPL (PartyId, ProductID, FromDate, ToDate, CurrencyId, MinAmount, MaxAmount, Rate)
+		SELECT DISTINCT p.PartyId, r.ProductID, r.FromDate, r.ToDate, c.BaseCurrencyId, c.MinAmount - CASE WHEN c.MinAmount = 0 THEN 0 ELSE 1 END, c.MaxAmount, c.Rate
 		FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'PPL', 'OA') r
 		INNER JOIN #PartyList p ON p.ParentId = r.PartyId
 		INNER JOIN dbo.OAS_ChargeInfo c WITH (NOLOCK) ON r.ChargeId = c.ChargeId
@@ -386,7 +388,7 @@ BEGIN
 	--		) r ON r.PartyId = c.PartyID AND r.ProductID = c.ProductID
 
 	--SELECT '#__ValidBetRate',* FROM #__ValidBetRate
-	SELECT '#ChargeRate',* FROM #ChargeRate  WHERE PartyID IN ( 439) ORDER BY isdeposit, PartyID
+	SELECT '#Debug_ChargeRate',* FROM #ChargeRate  WHERE ProductID = 45 ORDER BY isdeposit, PartyID
 	--WHERE isDeposit = 0
 
 	CREATE TABLE #Exchange (
@@ -656,7 +658,8 @@ BEGIN
 				d.LicensingFee = d.TicketsPayout - d.BuyBackAmountTotal - d.CashoutCommission
 			FROM #TempData d
 			INNER JOIN #PartyList p ON d.PartyID = p.PartyId
-			LEFT JOIN @SharingCharge c ON p.ParentId = c.PartyId AND d.WinlostDate BETWEEN c.FromDate AND c.ToDate
+			LEFT JOIN @SharingCharge c ON p.ParentId = c.PartyId AND c.ProductID= d.ProductID AND d.WinlostDate BETWEEN c.FromDate AND c.ToDate
+			WHERE d.ProductID = 25
 			
 		END
 
@@ -794,7 +797,7 @@ BEGIN
 			GROUP BY ci.PartyID, r.Winlostdate, r.CurrencyId, r.ProductID
 
 			--SELECT * FROM #ChargeRate
-			SELECT '#TempData_rptBetting',* FROM #TempData
+			--SELECT '#TempData_rptBetting',* FROM #TempData
 		END
 
 		IF EXISTS(SELECT 1 FROM @productDataView WHERE isRptBettingBySportSource = 1)
@@ -1080,6 +1083,7 @@ BEGIN
 			FROM #TempData td
 			INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CBBaseCurrency) e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.Winlostdate
 			INNER JOIN (SELECT DISTINCT FromDate, ToDate FROM @CBShare) s ON td.Winlostdate BETWEEN s.FromDate AND s.ToDate
+			WHERE td.ProductID = 15
 			GROUP BY s.FromDate, s.ToDate
 		
 			INSERT INTO @RateByPeriod(FromDate, ToDate, CommissionRate, CashInShareRate)
@@ -1109,6 +1113,7 @@ BEGIN
 				LicensingFee = Turnover - CBPrize - CashOut - (r.TurnoverForCommision * rbp.CommissionRate) - (r.CashInAmount * rbp.CashInShareRate)
 			FROM #TempData r
 			INNER JOIN @RateByPeriod rbp ON r.Winlostdate BETWEEN rbp.FromDate AND rbp.ToDate	
+			WHERE r.ProductID = 15
 			-- End Update Commission, CashInShare, AmountDueToColossusBet for #Result
 		END
 	END
@@ -1187,7 +1192,7 @@ BEGIN
 			), CTE_3rdRate AS (
 				SELECT s.PartyId, s.CurrencyId, s.WinLostDate, SUM(CASE WHEN s.BaseCurrencyRate = 0 THEN 0 ELSE (CASE WHEN s.LicenseeWinloss <= r.MaxAmount THEN s.LicenseeWinloss ELSE r.MaxAmount END - r.MinAmount) * r.Rate / s.BaseCurrencyRate END) AS PayToSupplier, s.ProductID
 				FROM CTE_Sum s
-					INNER JOIN #3rdRatePPL r ON s.PartyId = r.PartyId AND (s.LicenseeWinloss > r.MinAmount OR (s.LicenseeWinloss < 0 AND r.MinAmount = 0))
+					INNER JOIN #3rdRatePPL r ON s.PartyId = r.PartyId AND s.ProductID = r.ProductID AND (s.LicenseeWinloss > r.MinAmount OR (s.LicenseeWinloss < 0 AND r.MinAmount = 0))
 				GROUP BY s.PartyId, s.CurrencyId, s.WinLostDate, s.ProductID
 			)
 			UPDATE t
@@ -1198,31 +1203,31 @@ BEGIN
 
 			-- TotalByParty
 			;WITH CTE_Sum AS (
-				SELECT r.PartyId, SUM(r.LicenseeWinloss * e.Rate) AS LicenseeWinloss
+				SELECT r.PartyId, r.ProductID, SUM(r.LicenseeWinloss * e.Rate) AS LicenseeWinloss
 				FROM #TempData r
 					INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeId AND r.WinLostDate = e.ExchangeDate
 				WHERE  r.ProductID = 65
-				GROUP BY r.PartyId
+				GROUP BY r.PartyId, r.ProductID
 			), CTE_3rdRate AS (
-				SELECT r.PartyId, r.MinAmount * e.Rate AS MinAmount, r.MaxAmount * e.Rate AS MaxAmount, r.Rate
+				SELECT r.PartyId, r.ProductID ,r.MinAmount * e.Rate AS MinAmount, r.MaxAmount * e.Rate AS MaxAmount, r.Rate
 				FROM #3rdRatePPL r
 					INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeId AND e.ExchangeDate = @ToDate
 			), CTE_Final AS (
-				SELECT s.PartyId, SUM((CASE WHEN s.LicenseeWinloss <= r.MaxAmount THEN s.LicenseeWinloss ELSE r.MaxAmount END - r.MinAmount) * r.Rate) AS PayToSupplier
+				SELECT s.PartyId, s.ProductID ,SUM((CASE WHEN s.LicenseeWinloss <= r.MaxAmount THEN s.LicenseeWinloss ELSE r.MaxAmount END - r.MinAmount) * r.Rate) AS PayToSupplier
 				FROM CTE_Sum s
-					INNER JOIN CTE_3rdRate r ON s.PartyId = r.PartyId AND (s.LicenseeWinloss > r.MinAmount OR (s.LicenseeWinloss < 0 AND r.MinAmount = 0))
-				GROUP BY s.PartyId
+					INNER JOIN CTE_3rdRate r ON s.PartyId = r.PartyId  AND s.ProductID = r.ProductID AND (s.LicenseeWinloss > r.MinAmount OR (s.LicenseeWinloss < 0 AND r.MinAmount = 0))
+				GROUP BY s.PartyId, s.ProductID
 			)
 			UPDATE t
 			SET t.PayToSupplier = ISNULL(f.PayToSupplier, 0)
 			FROM #Result t
-				LEFT JOIN CTE_Final f ON t.PartyId = f.PartyId
+				LEFT JOIN CTE_Final f ON t.PartyId = f.PartyId AND t.ProductID = f.ProductID
 			WHERE t.ProductID = 65
 		END
 
 	END
-	SELECT 'debug_#Result',* FROM #Result ORDER BY ParentId
-	SELECT 'debug_#TempData',* FROM #TempData  WHERE PartyID = 439--ORDER BY ParentId
+	SELECT 'debug_#Result',* FROM #Result WHERE ProductID = 45 ORDER BY ParentId
+	--SELECT 'debug_#TempData',* FROM #TempData  WHERE PartyID = 439--ORDER BY ParentId
 
 	-- Result
 	DECLARE @Total TABLE (
