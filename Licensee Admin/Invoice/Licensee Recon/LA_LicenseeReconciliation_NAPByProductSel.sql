@@ -79,7 +79,7 @@ BEGIN
 		-- Note: Saba promotion treat ProductId is max, always on bottom
 	SELECT
 		CONVERT(INT, CASE WHEN p.ProductId = 37 THEN 1000 ELSE p.ProductId END) AS ProductId
-		,p.ProductName, CONVERT(MONEY, SUM(t.AmountToCompany * e.Rate)) AS AmountToCompany
+		,p.ProductName, CONVERT(MONEY, SUM(-t.AmountToCompany * e.Rate)) AS AmountToCompany
 	FROM #tmpData t
 		INNER JOIN @Products p ON t.Sporttype = p.Sporttype AND t.IsBA = p.IsBA
 		INNER JOIN @Exchange e ON t.Currency = e.ExchangeId AND t.WinlostDate = e.ExchangeDate
