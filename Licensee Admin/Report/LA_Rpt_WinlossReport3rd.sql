@@ -92,13 +92,16 @@ BEGIN
 	SELECT	DISTINCT la.Bettype, la.ProductID
 	FROM	LA_f_BettypeProductMapping(0,@ProductCodesGMT) la
 
-	SELECT 'debug_@productDataView',* FROM @productDataView
+	--SELECT 'debug_@productDataView',* FROM @productDataView
 	--
 	
 	-- Get parties list
 	CREATE TABLE #PartyList (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT, IsKeepNegativeAmount BIT DEFAULT 0)
 	INSERT INTO #PartyList (PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel
+
+	DELETE #PartyList
+	WHERE PartyId NOT IN (SELECT CAST(val AS INT) FROM strSplit(@PartyIds,',')) AND ParentId <> 0
 
 	-- Apply for all products
 	UPDATE t 
@@ -139,7 +142,7 @@ BEGIN
 		 ) r
 	INNER JOIN #PartyList p on p.ParentId = r.PartyID
 
-	SELECT 'debug_@3rdRate',* FROM @3rdRate where ProductID = 45 ORDER BY PartyID
+	--SELECT 'debug_@3rdRate',* FROM @3rdRate where ProductID = 25 ORDER BY PartyID
 
 	-- Get 3rd for special products
 	-- ​Pay to Supplier: 
@@ -388,7 +391,7 @@ BEGIN
 	--		) r ON r.PartyId = c.PartyID AND r.ProductID = c.ProductID
 
 	--SELECT '#__ValidBetRate',* FROM #__ValidBetRate
-	SELECT '#Debug_ChargeRate',* FROM #ChargeRate  WHERE ProductID = 45 ORDER BY isdeposit, PartyID
+	--SELECT '#Debug_ChargeRate',* FROM #ChargeRate  WHERE ProductID = 25 ORDER BY isdeposit, PartyID
 	--WHERE isDeposit = 0
 
 	CREATE TABLE #Exchange (
@@ -671,7 +674,7 @@ BEGIN
 			SELECT @ProductRptbettingSource = COALESCE(@ProductRptbettingSource + ',', '') + CONVERT(VARCHAR(10), ProductCode) FROM @productDataView WHERE isRptBettingSource = 1
 			SELECT @ProductRptbettingSource = COALESCE(@ProductRptbettingSource,'') + CASE WHEN EXISTS(SELECT 1 FROM strSplit(@ProductCodes,',') WHERE val = 'NG') THEN ',NG' ELSE '' END
 
-			SELECT @ProductRptbettingSource AS ProductRptbettingSource
+			--SELECT @ProductRptbettingSource AS ProductRptbettingSource
 
 			DECLARE @bettype TABLE(Bettype INT , ProductID INT, SubProduct VARCHAR(500))
 			INSERT INTO @bettype (Bettype, ProductID, SubProduct)
@@ -685,7 +688,7 @@ BEGIN
 				SELECT 38 AS Bettype, 0 -- -1: BetBuilder
 			END
 			
-			SELECT '@bettype',* FROM @bettype
+			--SELECT '@bettype',* FROM @bettype
 
 			-- Rate by bettype And IsDeposit 
 			DECLARE @CC_MidasRate3rd  DECIMAL(4,3) = 0.035
@@ -1226,7 +1229,7 @@ BEGIN
 		END
 
 	END
-	SELECT 'debug_#Result',* FROM #Result WHERE ProductID = 45 ORDER BY ParentId
+	--SELECT 'debug_#Result',* FROM #Result WHERE ProductID = 25 ORDER BY ParentId
 	--SELECT 'debug_#TempData',* FROM #TempData  WHERE PartyID = 439--ORDER BY ParentId
 
 	-- Result
