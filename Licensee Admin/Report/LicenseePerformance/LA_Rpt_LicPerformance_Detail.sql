@@ -70,6 +70,7 @@ AS
 		- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+		- 20210929@Percy: Enhance performance - work around [RedmineID: #162390]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -97,18 +98,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @GD_Tip SMALLINT = 1706, @SAG_Tip SMALLINT = 3007
-	DECLARE @BAProductId INT = 3, @ExchangeProductId INT = 31, @PragmaticProductId INT = 32, @ArcadiaGamingId INT = 34, @Saba_clubProductID INT = 42, @AESexyProductId INT = 45,  @VGA_ProductID INT = 66,
-			@PP_Contribution	SMALLINT = 4297,
-			@PP_JackpotPrize	SMALLINT = 4298,
-			@PPTournament		SMALLINT = 4299,
-			@PromotionPrize		SMALLINT = 4300,
-			@ArcadiaGamingBonus SMALLINT = 1906,
-			@SBC_Contribution	SMALLINT = 1698,
-			@SBC_JackpotPrize	SMALLINT = 1699,
-			@SXG_LuckyDraw SMALLINT = 3150,
-			@SPR_SabaPromotion SMALLINT = 17005, 
-			@VGA_Contribution	SMALLINT = 3898,
-			@VGA_JackpotPrize	SMALLINT = 3899
+	DECLARE @BAProductId INT = 3, @ExchangeProductId INT = 31, @PragmaticProductId INT = 32, @ArcadiaGamingId INT = 34, @Saba_clubProductID INT = 42, @AESexyProductId INT = 45,  @VGA_ProductID INT = 66
 
 	-- *********************************************************************************************************
 	-- *** Calculate Previous FromDate, Previous ToDate from FromDate, ToDate
@@ -119,9 +109,10 @@ BEGIN
 	-- *** Previous month should display full month
 	-- ***		- FromDate, ToDate: 20200601, 20200630 --> PreviousFromDate, PreviousToDate: 20200501, 20200531
 	-- *********************************************************************************************************
-	-- Region: get period date	
-	DECLARE @PrevFromDate DATE = CASE WHEN @PreviousPeriodType = 1 THEN DATEADD(yy, -1,  @FromDate) ELSE DATEADD(MM, -1,  @FromDate) END 
-	DECLARE @PrevToDate DATE
+	-- Region: get period date
+	DECLARE @FDate DATETIME = @FromDate, @TDate DATETIME = @ToDate
+	DECLARE @PrevFromDate DATETIME = CASE WHEN @PreviousPeriodType = 1 THEN DATEADD(yy, -1,  @FromDate) ELSE DATEADD(MM, -1,  @FromDate) END 
+	DECLARE @PrevToDate DATETIME
 	
 	DECLARE @FirstDateNextMonth DATETIME = DATEADD(MM, DATEDIFF(MM, -1, @ToDate), 0)
 	DECLARE @LastDateInCurrentMonth DATETIME = DATEADD(SS, -1, @FirstDateNextMonth)
@@ -218,10 +209,10 @@ BEGIN
 			ChargeId	INT,
 			PartyId		INT,
 			LicenseeId	INT,
-			ProductID	INT,
-			Rate		DECIMAL(7,5),
-			FromDate	SMALLDATETIME,
-			ToDate		SMALLDATETIME,
+			ProductID	TINYINT,
+			Rate		FLOAT,
+			FromDate	DATETIME,
+			ToDate		DATETIME,
 			Bettype		INT)
 
 	-- ***********************************************************************************************
@@ -294,7 +285,7 @@ BEGIN
 	-- **********************************************************************************************
 	-- Region: Get exchange rate info
 	CREATE	TABLE #Exchange (
-			ExchangeDate	DATE,
+			ExchangeDate	DATETIME,
 			ExchangeID		INT,
 			CurrencyCode	VARCHAR(10),
 			Rate			FLOAT)
@@ -330,94 +321,115 @@ BEGIN
 			AmountToCompany MONEY,
 			IsApplyMinFee	BIT,
 			ExtraAmount		MONEY)
-
-	;WITH cte_DataSource AS
-	(
-	  SELECT	b.SiteID,
-				p.PartyId,
-				b.rptDate,
-				b.CurrencyID,
-				p.ProductId,
-				SUM(CASE WHEN (@DrawFilter = 2 AND b.StatusId = 111) THEN 0 ELSE b.BetCount END) AS BetCount,
-				SUM(b.Turnover * CASE WHEN @DrawFilter IN (2, 3) 
-										THEN CASE	WHEN b.StatusId = 111 THEN 0
-													WHEN b.StatusId IN (114, 115) THEN 0.5
-											 ELSE 1 END
-										ELSE 1 END) AS Turnover,
-				SUM(b.MemberWL) AS WinLoss,
-				SUM(ISNULL(b.CommissionA, 0)) AComm,
-				SUM(ISNULL(b.CommissionP, 0)) PComm,
-				SUM(-b.MemberWL * ISNULL(cr.Rate, p.Rate) - 
-					(CASE  WHEN b.ProductId = @BAProductId THEN ISNULL(b.CommissionA, 0)
-						   WHEN b.ProductID = @ExchangeProductId THEN ISNULL(b.CommissionA, 0) + ISNULL(b.CommissionP, 0)
-					       ELSE 0
-				     END)) AS AmountToCompany,
-				0 AS ExtraAmount
-		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN @PartyChargeInfo p ON	b.ProductId = p.ProductID 
-													AND p.LicenseeId = b.SiteId
-													AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
-													AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
-				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
-				LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeID
-		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate OR b.rptDate BETWEEN @PrevFromDate AND @PrevToDate)
-				AND (b.CurrencyID <> 20)
-				AND b.customercategory NOT IN (27, 28)
-				AND eb.BettypeID IS NULL
-				AND	ISNULL(b.TicketType, 0) <> 2 -- Free_Bets_TicketType
-				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund 
-				AND (@Currency = 0 OR b.CurrencyID = @Currency)
-		GROUP BY b.rptdate, b.SiteId, p.PartyId, b.CurrencyID, p.ProductId
-
-		UNION ALL
-
-		SELECT	b.SiteID,
-				p.PartyId,
-				b.rptDate,
-				b.CurrencyID,
-				p.ProductId,
-				0 BetCount,
-				0 Turnover,
-				0 WinLoss,
-				0 AComm,
-				0 PComm,
-				0 AmountToCompany,
-				SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @VGA_Contribution) THEN ISNULL(-b.GrossWL, 0)
-						 WHEN b.Bettype IN (@PPTournament,@PromotionPrize,@PP_JackpotPrize,@ArcadiaGamingBonus,@SBC_JackpotPrize,@SXG_LuckyDraw, @VGA_JackpotPrize) OR ISNULL(b.TicketType, 0) = 2 THEN ISNULL(-b.MemberWL, 0)
-						 ELSE 0
-					END) AS ExtraAmount
-		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN @PartyChargeInfo p ON	b.ProductId = p.ProductID 
-													AND p.LicenseeId = b.SiteId
-													AND (b.rptDate BETWEEN p.FromDate AND p.ToDate)
-													AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
-				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
-				LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeID
-		WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate OR b.rptDate BETWEEN @PrevFromDate AND @PrevToDate)
-				AND (b.CurrencyID <> 20)
-				AND b.customercategory NOT IN (27, 28)
-				AND (ISNULL(b.TicketType, 0) = 2 OR eb.BettypeID IS NOT NULL)
-				AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund 
-				AND (@Currency = 0 OR b.CurrencyID = @Currency)
-		GROUP BY b.rptdate, b.SiteId, p.PartyId, b.CurrencyID, p.ProductId
+	
+	;WITH CTE_DataSource AS (
+		SELECT b.rptDate, b.SiteId, b.ProductId, b.CurrencyId, p.PartyId
+			,SUM(b.BetCount * CASE
+								WHEN eb.BettypeID IS NOT NULL OR ISNULL(b.TicketType, 0) = 2 THEN 0
+								WHEN @DrawFilter = 2 AND b.StatusId = 111 THEN 0
+								ELSE 1 END) AS BetCount
+			,SUM(b.Turnover * CASE
+								WHEN eb.BettypeID IS NOT NULL OR ISNULL(b.TicketType, 0) = 2 THEN 0
+								WHEN @DrawFilter NOT IN (2, 3) THEN 1
+								WHEN b.StatusId = 111 THEN 0
+								WHEN b.StatusId IN (114, 115) THEN 0.5
+								ELSE 1 END) AS Turnover
+			,SUM(CASE WHEN eb.BettypeID IS NOT NULL OR ISNULL(b.TicketType, 0) = 2 THEN 0 ELSE b.MemberWL END) AS WinLoss
+			,SUM(CASE WHEN eb.BettypeID IS NOT NULL OR ISNULL(b.TicketType, 0) = 2 THEN 0 ELSE ISNULL(b.CommissionA, 0) END) AComm
+			,SUM(CASE WHEN eb.BettypeID IS NOT NULL OR ISNULL(b.TicketType, 0) = 2 THEN 0 ELSE ISNULL(b.CommissionP, 0) END) PComm
+			,SUM(CASE
+					WHEN eb.BettypeID IS NOT NULL OR ISNULL(b.TicketType, 0) = 2 THEN 0
+					ELSE -b.MemberWL * ISNULL(cr.Rate, p.Rate)
+							- CASE
+								WHEN b.ProductId = 3 THEN ISNULL(b.CommissionA, 0) -- BA
+								WHEN b.ProductId = 31 THEN ISNULL(b.CommissionA, 0) + ISNULL(b.CommissionP, 0) -- BX
+								ELSE 0 END
+					END) AS AmountToCompany
+			,SUM(CASE
+					WHEN eb.BettypeID IS NULL AND ISNULL(b.TicketType, 0) <> 2 THEN 0
+					WHEN b.Bettype IN (4297, 1698, 3898) THEN ISNULL(-b.GrossWL, 0) -- Contribution
+					WHEN b.Bettype IN (4298, 4299, 4300, 1906, 1699, 3150, 3899) OR ISNULL(b.TicketType, 0) = 2 THEN ISNULL(-b.MemberWL, 0) -- Prize, Bonus, Free bets, ...
+					ELSE 0 END) AS ExtraAmount
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			INNER JOIN @PartyChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = p.ProductId AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
+											AND b.rptDate BETWEEN p.FromDate AND p.ToDate
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
+			LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeId
+		WHERE b.rptDate BETWEEN @FDate AND @TDate
+			AND b.CurrencyId <> 20
+			AND b.customercategory NOT IN (27, 28)
+			AND b.StatusId IN (111, 112, 113, 114, 115)
+			AND (@Currency = 0 OR b.CurrencyId = @Currency)
+		GROUP BY b.rptDate, b.SiteId, b.ProductId, b.CurrencyId, p.PartyId
 	)
-
-	INSERT INTO #TempData (PartyId,rptDate,CurrencyId,BetCount,Turnover,WinLoss,AComm,PComm,ProductId,AmountToCompany,ExtraAmount)
+	INSERT INTO #TempData (rptDate,ProductId,CurrencyId,PartyId,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,ExtraAmount)
 	(
-		SELECT	b.PartyId,
-				b.rptDate,
-				b.CurrencyID,
-				SUM(BetCount)				AS BetCount,
-				SUM(b.Turnover * e.Rate)	AS Turnover,
-				SUM(WinLoss * e.Rate)		AS WinLoss,
-				SUM(b.AComm * e.Rate)		AS AComm,
-				SUM(b.PComm * e.Rate)		AS PComm,
-				b.ProductId,
+		SELECT b.rptDate, b.ProductId, b.CurrencyId, b.PartyId,
+				SUM(BetCount)					AS BetCount,
+				SUM(b.Turnover * e.Rate)		AS Turnover,
+				SUM(WinLoss * e.Rate)			AS WinLoss,
+				SUM(b.AComm * e.Rate)			AS AComm,
+				SUM(b.PComm * e.Rate)			AS PComm,
 				SUM(AmountToCompany * e.Rate)	AS AmountToCompany,
 				SUM(ExtraAmount * e.Rate)		AS ExtraAmount
-		FROM	cte_DataSource b WITH (NOLOCK)
-				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-		GROUP BY b.PartyId, b.rptdate, b.CurrencyID, b.ProductId
+		FROM CTE_DataSource b WITH (NOLOCK)
+				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeId
+		GROUP BY b.rptDate, b.ProductId, b.CurrencyId, b.PartyId
+	)
+
+	;WITH CTE_DataSource AS (
+		SELECT b.rptDate, b.SiteId, b.ProductId, b.CurrencyId, p.PartyId
+			,SUM(b.BetCount * CASE
+								WHEN eb.BettypeID IS NOT NULL OR ISNULL(b.TicketType, 0) = 2 THEN 0
+								WHEN @DrawFilter = 2 AND b.StatusId = 111 THEN 0
+								ELSE 1 END) AS BetCount
+			,SUM(b.Turnover * CASE
+								WHEN eb.BettypeID IS NOT NULL OR ISNULL(b.TicketType, 0) = 2 THEN 0
+								WHEN @DrawFilter NOT IN (2, 3) THEN 1
+								WHEN b.StatusId = 111 THEN 0
+								WHEN b.StatusId IN (114, 115) THEN 0.5
+								ELSE 1 END) AS Turnover
+			,SUM(CASE WHEN eb.BettypeID IS NOT NULL OR ISNULL(b.TicketType, 0) = 2 THEN 0 ELSE b.MemberWL END) AS WinLoss
+			,SUM(CASE WHEN eb.BettypeID IS NOT NULL OR ISNULL(b.TicketType, 0) = 2 THEN 0 ELSE ISNULL(b.CommissionA, 0) END) AComm
+			,SUM(CASE WHEN eb.BettypeID IS NOT NULL OR ISNULL(b.TicketType, 0) = 2 THEN 0 ELSE ISNULL(b.CommissionP, 0) END) PComm
+			,SUM(CASE
+					WHEN eb.BettypeID IS NOT NULL OR ISNULL(b.TicketType, 0) = 2 THEN 0
+					ELSE -b.MemberWL * ISNULL(cr.Rate, p.Rate)
+							- CASE
+								WHEN b.ProductId = 3 THEN ISNULL(b.CommissionA, 0) -- BA
+								WHEN b.ProductId = 31 THEN ISNULL(b.CommissionA, 0) + ISNULL(b.CommissionP, 0) -- BX
+								ELSE 0 END
+					END) AS AmountToCompany
+			,SUM(CASE
+					WHEN eb.BettypeID IS NULL AND ISNULL(b.TicketType, 0) <> 2 THEN 0
+					WHEN b.Bettype IN (4297, 1698, 3898) THEN ISNULL(-b.GrossWL, 0) -- Contribution
+					WHEN b.Bettype IN (4298, 4299, 4300, 1906, 1699, 3150, 3899) OR ISNULL(b.TicketType, 0) = 2 THEN ISNULL(-b.MemberWL, 0) -- Prize, Bonus, Free bets, ...
+					ELSE 0 END) AS ExtraAmount
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			INNER JOIN @PartyChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = p.ProductId AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
+											AND b.rptDate BETWEEN p.FromDate AND p.ToDate
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
+			LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeId
+		WHERE b.rptDate BETWEEN @PrevFromDate AND @PrevToDate
+			AND b.CurrencyId <> 20
+			AND b.customercategory NOT IN (27, 28)
+			AND b.StatusId IN (111, 112, 113, 114, 115)
+			AND (@Currency = 0 OR b.CurrencyId = @Currency)
+		GROUP BY b.rptDate, b.SiteId, b.ProductId, b.CurrencyId, p.PartyId
+	)
+	INSERT INTO #TempData (rptDate,ProductId,CurrencyId,PartyId,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,ExtraAmount)
+	(
+		SELECT b.rptDate, b.ProductId, b.CurrencyId, b.PartyId,
+				SUM(BetCount)					AS BetCount,
+				SUM(b.Turnover * e.Rate)		AS Turnover,
+				SUM(WinLoss * e.Rate)			AS WinLoss,
+				SUM(b.AComm * e.Rate)			AS AComm,
+				SUM(b.PComm * e.Rate)			AS PComm,
+				SUM(AmountToCompany * e.Rate)	AS AmountToCompany,
+				SUM(ExtraAmount * e.Rate)		AS ExtraAmount
+		FROM CTE_DataSource b WITH (NOLOCK)
+				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeId
+		GROUP BY b.rptDate, b.ProductId, b.CurrencyId, b.PartyId
 	)
 
 	-- insert zero winloss for case: product don't have any ticket
@@ -530,22 +542,46 @@ BEGIN
 	IF(EXISTS(SELECT TOP 1 1 FROM #Result))
 	BEGIN
 		;WITH cte_PromotionSportsbook AS(
-			SELECT 	pc.PartyId, r.SiteID,
-					(CASE WHEN MONTH(rptDate) = MONTH(@FromDate) AND YEAR(rptDate) = YEAR(@FromDate) THEN 1 ELSE 0 END) IsCurrent, 
-					SUM( CASE WHEN r.Bettype = @SPR_SabaPromotion THEN r.GrossWL ELSE r.MemberWL END * cExchange.Rate) AS Prize
+			SELECT pc.PartyId, r.SiteId,
+					SUM( CASE WHEN r.Bettype = 17005 THEN r.GrossWL ELSE r.MemberWL END * cExchange.Rate) AS Prize
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
-				INNER JOIN (SELECT DISTINCT PartyId, LicenseeId FROM @PartyChargeInfo WHERE ProductID = 0) pc ON r.SiteID = pc.LicenseeId
+				INNER JOIN (
+					SELECT DISTINCT PartyId, LicenseeId, FromDate, ToDate FROM @PartyChargeInfo WHERE ProductID = 0
+				) pc ON r.SiteID = pc.LicenseeId AND r.rptDate BETWEEN pc.FromDate AND pc.ToDate
 				INNER JOIN #Exchange cExchange ON r.RptDate = cExchange.ExchangeDate AND r.CurrencyID = cExchange.ExchangeID
-				WHERE ((r.RptDate BETWEEN @FromDate AND @ToDate) OR (r.RptDate BETWEEN @PrevFromDate AND @PrevToDate)) 
-						AND r.ProductID = 37 -- Saba promotion
-						AND (@Currency = 0 OR @Currency = r.CurrencyId)
-
-				GROUP BY pc.PartyId, r.SiteID, (CASE WHEN MONTH(rptDate) = MONTH(@FromDate) AND YEAR(rptDate) = YEAR(@FromDate) THEN 1 ELSE 0 END)
+				WHERE r.RptDate BETWEEN @FDate AND @TDate
+					AND r.ProductID = 37 -- Saba promotion
+					AND r.CurrencyId <> 20
+					AND r.StatusId IN (111, 112, 113, 114, 115)
+					AND (@Currency = 0 OR @Currency = r.CurrencyId)
+			GROUP BY pc.PartyId, r.SiteId
 		)
 		UPDATE r
 		SET PromotionSportsbook = p.Prize
 		FROM #Result r
-			INNER JOIN cte_PromotionSportsbook p ON r.PartyId = p.PartyId AND r.IsCurrent = p.IsCurrent
+			INNER JOIN cte_PromotionSportsbook p ON r.PartyId = p.PartyId
+		WHERE r.IsCurrent = 1
+
+		;WITH cte_PromotionSportsbook AS(
+			SELECT pc.PartyId, r.SiteId,
+					SUM( CASE WHEN r.Bettype = 17005 THEN r.GrossWL ELSE r.MemberWL END * cExchange.Rate) AS Prize
+			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
+				INNER JOIN (
+					SELECT DISTINCT PartyId, LicenseeId, FromDate, ToDate FROM @PartyChargeInfo WHERE ProductID = 0
+				) pc ON r.SiteID = pc.LicenseeId AND r.rptDate BETWEEN pc.FromDate AND pc.ToDate
+				INNER JOIN #Exchange cExchange ON r.RptDate = cExchange.ExchangeDate AND r.CurrencyID = cExchange.ExchangeID
+				WHERE r.RptDate BETWEEN @PrevFromDate AND @PrevToDate
+					AND r.ProductID = 37 -- Saba promotion
+					AND r.CurrencyId <> 20
+					AND r.StatusId IN (111, 112, 113, 114, 115)
+					AND (@Currency = 0 OR @Currency = r.CurrencyId)
+			GROUP BY pc.PartyId, r.SiteId
+		)
+		UPDATE r
+		SET PromotionSportsbook = p.Prize
+		FROM #Result r
+			INNER JOIN cte_PromotionSportsbook p ON r.PartyId = p.PartyId
+		WHERE r.IsCurrent = 0
 	END
 
 	-- ********************************************************
