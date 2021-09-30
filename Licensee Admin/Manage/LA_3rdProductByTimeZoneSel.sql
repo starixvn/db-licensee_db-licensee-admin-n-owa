@@ -1,5 +1,5 @@
 /*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-ALTER PROCEDURE [dbo].[LA_Sel3rdProductByTimeZone] 
+ALTER PROCEDURE [dbo].[LA_3rdProductByTimeZoneSel] 
 	 @ProductCodes		VARCHAR(4000)		= '',
 	 @Timezone			INT = 1,
 	 @isShowDetail		INT = 0
@@ -15,9 +15,9 @@ AS
 						    = 2: GMT+8	
  * Example 
 				-- Dropdown
-				EXEC LA_Sel3rdProductByTimeZone @Timezone = 1
-				EXEC LA_Sel3rdProductByTimeZone @Timezone = 2
-				EXEC LA_Sel3rdProductByTimeZone @Timezone = 0
+				EXEC LA_3rdProductByTimeZoneSel @Timezone = 1
+				EXEC LA_3rdProductByTimeZoneSel @Timezone = 2
+				EXEC LA_3rdProductByTimeZoneSel @Timezone = 0
 
 				-- 
 				EXEC LA_Sel3rdProductByTimeZone @Timezone = 0, @ProductCodes = 'PP,PPL', @isShowDetail = 1
