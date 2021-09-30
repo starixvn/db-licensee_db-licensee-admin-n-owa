@@ -8,7 +8,7 @@ AS
  * Created by : [20210915@Danny]
  * Task  : Get 3rd products ByTimeZone
  * Revisions
-	- 20210306@Danny: Init SP
+	- 20210306@Danny: Init SP [#155402]
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
 							= 1: GMT-4

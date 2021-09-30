@@ -14,7 +14,7 @@ AS
  * Created by : [20210915@Danny]
  * Task  : Get all 3rd products settlement information between OW and others parties
  * Revisions
-	- 20210306@Danny: Init SP
+	- 20210306@Danny: Init SP [#155402]
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
 							= 1: GMT-4
