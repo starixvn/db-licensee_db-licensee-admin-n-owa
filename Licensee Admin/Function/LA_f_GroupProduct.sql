@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
+/*<info serverAlias="DBCUST-bodb_Licensee,DBLIC-bodb_Licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
 USE bodb_licensee
 GO
 
@@ -8,7 +8,7 @@ AS
 
 /*
 	Created: 20210812@Percy
-	DB: DBLIC-bodbLicensee
+	DB: DBCUST-bodb_Licensee,DBLIC-bodb_Licensee
 	Task: Core function - Group Product
 
 	Revisions:
