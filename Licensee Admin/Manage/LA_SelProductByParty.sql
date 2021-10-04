@@ -20,7 +20,7 @@ Param's Explanation:
 SET NOCOUNT ON
 
 BEGIN
-	SELECT p.ProductPrefix, p.ProductName
+	SELECT p.ProductPrefix AS ProductCode, p.ProductName
 	FROM dbo.LA_f_Products3rd('') p
 		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId AND g.ProductId <> g.GroupProductId
 	WHERE EXISTS (

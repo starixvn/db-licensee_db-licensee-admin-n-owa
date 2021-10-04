@@ -174,7 +174,7 @@ BEGIN
 				SUM(ISNULL(b.CommissionP, 0)) AS PComm,
 				t.GroupProductId AS ProductId,
 				CASE
-					WHEN eb.BettypeID IS NOT NULL THEN eb.BettypeID
+					WHEN eb.BettypeID IS NULL THEN b.Bettype
 					ELSE ISNULL(sbr.BettypeRef, -1)
 				END AS BettypeRef
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
@@ -189,7 +189,7 @@ BEGIN
 				AND b.ProductID NOT IN (13,15,25,@PragmaticID,@SBC_ProductID, @Arcadia_Gaming_Id, @SXG_ID, @VGA_ProductID)
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, t.GroupProductId,
 				CASE
-					WHEN eb.BettypeID IS NOT NULL THEN eb.BettypeID
+					WHEN eb.BettypeID IS NULL THEN b.Bettype
 					ELSE ISNULL(sbr.BettypeRef, -1)
 				END
 	)
