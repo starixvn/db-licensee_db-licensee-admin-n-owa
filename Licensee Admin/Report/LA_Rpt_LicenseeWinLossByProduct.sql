@@ -173,10 +173,7 @@ BEGIN
 				SUM(ISNULL(b.CommissionA, 0)) AS AComm,
 				SUM(ISNULL(b.CommissionP, 0)) AS PComm,
 				t.GroupProductId AS ProductId,
-				CASE
-					WHEN eb.BettypeID IS NULL THEN b.Bettype
-					ELSE ISNULL(sbr.BettypeRef, -1)
-				END AS BettypeRef
+				CASE WHEN b.Bettype IN (1706,999) THEN b.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END AS BettypeRef
 		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON b.SiteID = p.OldRefID AND p.PartyType = 1
 				INNER JOIN #Products t ON b.ProductId = t.ProductId
@@ -187,11 +184,7 @@ BEGIN
 				AND b.customercategory NOT IN (27, 28)
 				AND eb.BettypeID IS NULL
 				AND b.ProductID NOT IN (13,15,25,@PragmaticID,@SBC_ProductID, @Arcadia_Gaming_Id, @SXG_ID, @VGA_ProductID)
-		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, t.GroupProductId,
-				CASE
-					WHEN eb.BettypeID IS NULL THEN b.Bettype
-					ELSE ISNULL(sbr.BettypeRef, -1)
-				END
+		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, t.GroupProductId, CASE WHEN b.Bettype IN (1706,999) THEN b.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
 	)
 	-- EndRegion
 

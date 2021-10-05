@@ -356,7 +356,7 @@ BEGIN
 			AND (@Currency = 0 OR CurrencyId = @Currency)
 		GROUP BY rptDate, SiteId, ProductId, CurrencyId, Bettype, CASE WHEN TicketType = 2 THEN TicketType ELSE 0 END
 	), CTE_DataSource AS (
-		SELECT b.rptDate, b.ProductId, b.CurrencyId, p.PartyId
+		SELECT b.rptDate, pd.GroupProductId AS ProductId, b.CurrencyId, p.PartyId
 			,SUM(b.BetCount * CASE WHEN eb.BettypeID IS NOT NULL OR b.TicketType = 2 THEN 0 ELSE 1 END) AS BetCount
 			,SUM(b.Turnover * CASE WHEN eb.BettypeID IS NOT NULL OR b.TicketType = 2 THEN 0 ELSE 1 END) AS Turnover
 			,SUM(CASE WHEN eb.BettypeID IS NOT NULL OR b.TicketType = 2 THEN 0 ELSE b.WinLoss END) AS WinLoss
@@ -377,11 +377,11 @@ BEGIN
 					ELSE 0 END) AS ExtraAmount
 		FROM CTE_tmpData b
 			INNER JOIN #Products pd ON b.ProductId = pd.ProductId
-			INNER JOIN @PartyChargeInfo p ON p.LicenseeId = b.SiteId AND pd.GroupProductId = p.ProductId AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
+			INNER JOIN #PartyChargeInfo p ON p.LicenseeId = b.SiteId AND pd.GroupProductId = p.ProductId AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
 											AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
 			LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeId
-		GROUP BY b.rptDate, b.ProductId, b.CurrencyId, p.PartyId
+		GROUP BY b.rptDate, pd.GroupProductId, b.CurrencyId, p.PartyId
 	)
 	INSERT INTO #TempData (rptDate,ProductId,CurrencyId,PartyId,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,ExtraAmount)
 	(
@@ -418,7 +418,7 @@ BEGIN
 			AND (@Currency = 0 OR CurrencyId = @Currency)
 		GROUP BY rptDate, SiteId, ProductId, CurrencyId, Bettype, CASE WHEN TicketType = 2 THEN TicketType ELSE 0 END
 	), CTE_DataSource AS (
-		SELECT b.rptDate, b.ProductId, b.CurrencyId, p.PartyId
+		SELECT b.rptDate, pd.GroupProductId AS ProductId, b.CurrencyId, p.PartyId
 			,SUM(b.BetCount * CASE WHEN eb.BettypeID IS NOT NULL OR b.TicketType = 2 THEN 0 ELSE 1 END) AS BetCount
 			,SUM(b.Turnover * CASE WHEN eb.BettypeID IS NOT NULL OR b.TicketType = 2 THEN 0 ELSE 1 END) AS Turnover
 			,SUM(CASE WHEN eb.BettypeID IS NOT NULL OR b.TicketType = 2 THEN 0 ELSE b.WinLoss END) AS WinLoss
@@ -439,11 +439,11 @@ BEGIN
 					ELSE 0 END) AS ExtraAmount
 		FROM CTE_tmpData b
 			INNER JOIN #Products pd ON b.ProductId = pd.ProductId
-			INNER JOIN @PartyChargeInfo p ON p.LicenseeId = b.SiteId AND pd.GroupProductId = p.ProductId AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
+			INNER JOIN #PartyChargeInfo p ON p.LicenseeId = b.SiteId AND pd.GroupProductId = p.ProductId AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
 											AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
 			LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeId
-		GROUP BY b.rptDate, b.ProductId, b.CurrencyId, p.PartyId
+		GROUP BY b.rptDate, pd.GroupProductId, b.CurrencyId, p.PartyId
 	)
 	INSERT INTO #TempData (rptDate,ProductId,CurrencyId,PartyId,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,ExtraAmount)
 	(
