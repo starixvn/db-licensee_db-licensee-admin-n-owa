@@ -71,6 +71,7 @@ AS
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20210929@Percy: Enhance performance - work around [RedmineID: #162390]
+		- 20211005@Percy: Get date only for Previous Date [RedmineID: #162753]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -136,6 +137,8 @@ BEGIN
 							   ELSE DATEADD(MM, - 1, @ToDate) 
 						  END
 	END
+
+	SELECT @PrevFromDate = CONVERT(DATE, @PrevFromDate), @PrevToDate = CONVERT(DATE, @PrevToDate)
 	-- End region
 
 	-- ******************************************************************* 
