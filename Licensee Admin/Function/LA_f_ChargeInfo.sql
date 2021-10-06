@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee,DBLIC-bodb_licensee" selecters="bodbAdminNet,bodbLicenseeNet" isFunction="1" isNested="1"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee,DBLIC-bodb_licensee,DBBAL-bodb_licensee" selecters="bodbAdminNet,bodbLicenseeNet" isFunction="1" isNested="1"></info>*/
 USE bodb_licensee
 GO
 
@@ -28,7 +28,7 @@ RETURNS @tbChargeInfo TABLE (
 AS
 /*  Created: 20141111@Florent
     Task : Get Charge Information
-    DB: DBLIC.bodb_Licensee, DBCUST.bodb_Licensee
+    DB: DBLIC.bodb_Licensee, DBCUST.bodb_Licensee, DBBAL-bodb_Licensee
     
 	Revisions:
 		- 20150710@Florent: support product MicroGaming with multi charge rate
@@ -42,6 +42,7 @@ AS
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20190718@Bruce: Integrate CN88 data in LA [#116859]
 		- 20191211@Parsons: Non-peak hour promotion [#119538]
+		- 20210816@Sophia: add DBBAL [Redmine: #154300]
 
 */
 

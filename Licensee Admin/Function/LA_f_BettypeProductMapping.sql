@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee,DBBAL-bodb_Licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
 USE bodb_Licensee
 GO
 
@@ -12,7 +12,7 @@ RETURNS @tbBettypeProduct TABLE (
 AS
 /*	Created: 20141111@Florent
 	Task : Get bettype product mapping
-	DB: DBLIC.bodb_Licensee
+	DB: DBLIC.bodb_Licensee,DBBAL-bodb_Licensee
 	
 	Revisions:
 		- 20150202@Patrick: Add more product: Bingo & Keno
@@ -74,6 +74,7 @@ AS
 		- 20210428@Danny: Integrate VGaming with dynamic code [Redmine: #154080]
 		- 20210618@Sophia: Expand Range of Saba Promotion [Redmine: #155337]
 		- 20210514@Danny: Get bettype from SportBettypeMatrix (All products) [Redmine: #155126]
+		- 20210816@Sophia: add DBBAL [Redmine: #154300]
 
 	Param's Explanation:
 
