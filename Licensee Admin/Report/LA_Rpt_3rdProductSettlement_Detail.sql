@@ -130,16 +130,21 @@ BEGIN
 	CREATE CLUSTERED INDEX cix_#ChargeRate ON #ChargeRate(ProductID, LicenseeID, isDeposit, Fromdate, Todate)
 	
 	-- Get 3rd Rate
-	DECLARE @3rdRate AS TABLE(PartyID INT, ProductID INT, DI_Rate MONEY, IsDeposit INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
-	INSERT INTO @3rdRate (PartyID, ProductID, DI_Rate, IsDeposit, Fromdate, Todate)
+	CREATE TABLE #3rdRate (PartyID INT, ProductID INT, DI_Rate MONEY, IsDeposit INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
+	INSERT INTO #3rdRate (PartyID, ProductID, DI_Rate, IsDeposit, Fromdate, Todate)
 	SELECT DISTINCT p.PartyId, r.ProductID, CASE WHEN ProductID = 10 OR (ProductID = 32 AND IsDeposit = 0) THEN 0 ELSE r.DI_Rate END, r.IsDeposit, r.Fromdate, r.Todate 
 	FROM (	SELECT DISTINCT r.PartyID, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r. Todate	
 			FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCodes, 'OA') r 
 			WHERE r.ChargeType = 1
 		 ) r
 	INNER JOIN #PartyList p on p.ParentId = r.PartyID 
+	CREATE CLUSTERED INDEX CIX_#3rdRate ON #3rdRate(ProductID, PartyID)
 
-	--SELECT 'debug_@3rdRate',* FROM @3rdRate where ProductID = 25 ORDER BY PartyID
+	CREATE TABLE #ChargeInfoWithCredit (PartyID INT, ProductID INT,  IsDeposit INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME, DI_Rate MONEY, ChargeType INT, LicenseeID INT, ChargeID INT)
+	INSERT INTO #ChargeInfoWithCredit (PartyID, ProductID, IsDeposit, Fromdate, Todate, DI_Rate, ChargeType, LicenseeID, ChargeID )
+	SELECT PartyID, ProductID, IsDeposit, Fromdate, Todate, DI_Rate, ChargeType, LicenseeID, ChargeID FROM LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, @ProductCodes) c
+
+	CREATE CLUSTERED INDEX cix_#ChargeInfoWithCredit ON #ChargeInfoWithCredit(ProductID, PartyID, ChargeType)
 
 	-- Get 3rd for special products
 	-- ​Pay to Supplier: 
@@ -168,9 +173,9 @@ BEGIN
 						 ELSE ISNULL(r.DI_Rate,0) END AS Rate3rd, 
 					c.Fromdate, 
 					c.Todate
-	FROM LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, @ProductCodes) c
+	FROM #ChargeInfoWithCredit c
 	INNER JOIN #PartyList p ON c.PartyID = p.PartyId
-	LEFT JOIN @3rdRate r ON r.PartyID = c.PartyID and r.ProductID = c.ProductID AND r.ProductID NOT IN (0, 65)
+	LEFT JOIN #3rdRate r ON r.PartyID = c.PartyID and r.ProductID = c.ProductID AND r.ProductID NOT IN (0, 65)
 	WHERE 
 		(
 			(c.DI_Rate = 0 AND c.isDeposit = 0) 
@@ -1358,6 +1363,8 @@ BEGIN
 	INNER JOIN @productDataView p ON td.ProductID = p.ProductID
 	ORDER BY ProductID, ParentId
 
+	DROP TABLE  #ChargeInfoWithCredit
+	DROP TABLE  #3rdRate
 	DROP TABLE	#PartyList
 	DROP TABLE	#Exchange
 	DROP TABLE	#ChargeRate
