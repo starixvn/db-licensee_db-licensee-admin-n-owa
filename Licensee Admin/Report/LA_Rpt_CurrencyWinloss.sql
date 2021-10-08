@@ -3,11 +3,11 @@ USE bodb02
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss]
-	@PartyIDs				VARCHAR(5500)	= ''
-	, @CurrencyIds			VARCHAR(4000)	= ''
+	@PartyIDs				VARCHAR(MAX)	= ''
+	, @CurrencyIds			VARCHAR(MAX)	= ''
 	, @FromDate				DATETIME
 	, @ToDate				DATETIME
-	, @ProductCodes			VARCHAR(1000)
+	, @ProductCodes			VARCHAR(MAX)
 	, @SportType			INT				= 0
 	, @Bettype				INT				= 0
 	, @ReportBy				TINYINT			= 0 
@@ -19,9 +19,8 @@ AS
 
 /*  Created: Florent.Nguyen
 	Date: 2014-09-03
-	Task : Licensee Currency Winlost Report
-	Base on: OA_Rpt_SummaryCurrencyWinloss
-	DB: DB052.bodb02
+	Task: Licensee Currency Winlost Report
+	DB: DBEXT-bodb02
 
 	Revisions:
 	   - 20141021@Florent: show credit's licensee
@@ -51,6 +50,7 @@ AS
 	   - 20201209@Mason: Saba.club - Offer Freebet tickets [#141423]
 	   - 20210108@Mason: Saba.club - Integrate Slot Game [#147977]
 	   - 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+	   - 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 	   - 20210824@Percy: Enhance performance [RedmineID: #160672]
 
 	Param's Explanation:
@@ -89,10 +89,14 @@ BEGIN
 	--
 	IF (@IsAllCurrency = 1 OR (SELECT COUNT(*) FROM @Currency) > 1) SET @IsConvert = 1
 
-	DECLARE @ProductList TABLE (ProductCode VARCHAR(20))
+	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20))
+	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode)
+	SELECT ISNULL(g.GroupProductId, p.ProductId), ISNULL(g.ProductId, p.ProductId), ISNULL(g.ProductName, p.ProductName), ISNULL(g.ProductCode, p.ProductPrefix)
+	FROM bodb_Licensee.dbo.LA_f_Products3rd(@ProductCodes) p
+		LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct() g ON p.ProductId = g.GroupProductId
 
-	INSERT INTO @ProductList
-	SELECT Val FROM dbo.strSplit(@ProductCodes, ',')
+	SET @ProductCodes = NULL
+	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #Products
 
 	CREATE TABLE #tmpWinLoss(
 		Winlostdate		DATETIME,
@@ -141,13 +145,13 @@ BEGIN
 	)
 	CREATE INDEX IX_tmpParty ON #tmpParty(LicenseeID, ProductID)
 
-	CREATE TABLE #Bettype (Bettype INT, ProductID INT)
-	INSERT INTO #Bettype(Bettype, ProductID)
-	SELECT Bettype, ProductID
-	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(@Bettype, @ProductCodes)
-	CREATE INDEX IX_Bettype ON #Bettype(Bettype, ProductID)
+	CREATE TABLE #Bettype (Bettype INT, ProductId INT, GroupProductId INT, PRIMARY KEY (Bettype, ProductId, GroupProductId))
+	INSERT INTO #Bettype (Bettype, ProductId, GroupProductId)
+	SELECT DISTINCT b.Bettype, b.ProductId, p.GroupProductId
+	FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(@Bettype, @ProductCodes) b
+		INNER JOIN #Products p ON b.ProductId = p.ProductId
 
-	IF EXISTS (SELECT 1 FROM @ProductList WHERE ProductCode='BA')
+	IF EXISTS (SELECT 1 FROM #Products WHERE ProductCode='BA')
 	BEGIN
 		--BA rpt_Betting_BA
 		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company,Betcount, Playercomm)
@@ -181,7 +185,7 @@ BEGIN
 		)
 	END
 
-	IF (EXISTS (SELECT 1 FROM @ProductList WHERE ProductCode IN ('AGC','GD','VG','BX')) AND @SportType = 0 AND @ReportBy = 0 AND @Bettype = 0)
+	IF (EXISTS (SELECT 1 FROM #Products WHERE ProductCode IN ('AGC','GD','VG','BX')) AND @SportType = 0 AND @ReportBy = 0 AND @Bettype = 0)
 	BEGIN
 		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm)
 		(
@@ -233,7 +237,7 @@ BEGIN
 		)
 	END
 
-	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode IN ('MGCLC','MGCRNG'))
+	IF EXISTS (SELECT TOP 1 1 FROM #Products WHERE ProductCode IN ('MGCLC','MGCRNG'))
 	BEGIN
 		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm)
 		(
@@ -262,7 +266,7 @@ BEGIN
 		)
 	END
 
-	IF EXISTS (SELECT TOP 1 1 FROM @ProductList WHERE ProductCode NOT IN ('BA','MGCLC','MGCRNG','AGC','GD','VG','BX', 'RB'))
+	IF EXISTS (SELECT TOP 1 1 FROM #Products WHERE ProductCode NOT IN ('BA','MGCLC','MGCRNG','AGC','GD','VG','BX', 'RB'))
 	BEGIN
 		--exclude RB,BA,MGCLC, MGCRNG,AGC,GD,VG,BX
 		DELETE #Bettype WHERE ProductID IN (1,3,14,17,10,11,12,31)
@@ -270,7 +274,7 @@ BEGIN
 
 		CREATE TABLE #Licensees (LicenseeId INT PRIMARY KEY)
 		INSERT INTO #Licensees (LicenseeId)
-		SELECT DISTINCT LicenseeId FROM #tmpParty
+		SELECT DISTINCT LicenseeId FROM #tmpParty WHERE LicenseeId IS NOT NULL
 
 		DELETE bt
 		FROM #Bettype bt
@@ -354,14 +358,15 @@ BEGIN
 
 		;WITH cte_Data AS
 		(
-			SELECT b.rptDate, b.LicenseeId, b.CurrencyId, b.ProductId
+			SELECT b.rptDate, b.LicenseeId, b.CurrencyId, p.GroupProductId AS ProductId
 					,SUM(b.Turnover) AS Turnover
 					,SUM(b.Winloss)	AS MemberWL
 					,SUM(b.BetCount) AS BetCount
 					,SUM(CommissionP) AS Playercomm
 					,SUM(WinlossA) AS WinlossA
 			FROM #tmpData b
-			GROUP BY b.rptDate, b.LicenseeId, b.CurrencyId, b.ProductId
+				INNER JOIN #Products p ON b.ProductId = p.ProductId
+			GROUP BY b.rptDate, b.LicenseeId, b.CurrencyId, p.GroupProductId
 		)
 		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm, OddsSpreadCost)
 		SELECT a.rptDate
@@ -470,10 +475,11 @@ BEGIN
 		GROUP BY CASE WHEN w.Currency = @CurrencyTest THEN e.Code ELSE t.CurrencyCode END, w.currency
 		ORDER BY CASE WHEN w.Currency = @CurrencyTest THEN e.Code ELSE t.CurrencyCode END
 	END
-
-	DROP TABLE #tmpWinLoss
+	
 	DROP TABLE #Bettype
-	DROP TABLE #tmpParty
 	DROP TABLE #DailyExchange
+	DROP TABLE #Products
+	DROP TABLE #tmpParty
+	DROP TABLE #tmpWinLoss
 END
 GO

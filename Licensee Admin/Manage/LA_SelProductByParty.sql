@@ -13,35 +13,26 @@ DB: DBCUST.bodb_licensee
 
 Revisions:
 	- 20150312@Florent: Initialize SP
+	- 20210812@Percy: Exclude BitCoin from Product drop-down list [RedmineID: #159691]
 
 Param's Explanation:
 */
 SET NOCOUNT ON
 
 BEGIN
-	--DECLARE @temp AS TABLE (ProductID INT)
-
-	BEGIN
-		--INSERT INTO @temp(ProductID)
-		SELECT CASE WHEN c.ProductID = 0 THEN 'SB'
-					 ELSE pr.ProductPrefix
-				END AS ProductCode 
-			, CASE WHEN c.ProductID = 0 THEN 'Sportsbook'
-					 ELSE pr.ProductName
-				END AS ProductName
-		FROM dbo.OAS_ChargeInfo c WITH (NOLOCK) 
-			INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON c.ChargeID = cs.ChargeID AND cs.SystemID = 2
-			INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON c.FromParty = p.PartyID
-			LEFT JOIN dbo.Product3rd pr WITH (NOLOCK) ON c.ProductID = pr.Productid	
-		WHERE (@PartyID = 0 OR p.PartyID = @PartyID)
-		GROUP BY pr.Productid
-			, CASE WHEN c.ProductID = 0 THEN 'SB'
-					 ELSE pr.ProductPrefix
-				END 
-			, CASE WHEN c.ProductID = 0 THEN 'Sportsbook'
-					 ELSE pr.ProductName
-				END
-		ORDER BY pr.Productid
-	END
+	SELECT p.ProductPrefix AS ProductCode, p.ProductName
+	FROM dbo.LA_f_Products3rd('') p
+		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId AND g.ProductId <> g.GroupProductId
+	WHERE EXISTS (
+		SELECT 1
+		FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
+			INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON c.ChargeId = cs.ChargeId AND cs.SystemId = 2
+		WHERE c.ProductId = p.ProductId
+			AND c.ToParty IN (1, 9, 11, 98) -- Licensee to House
+			AND c.ChargeType NOT IN (2, 3) -- Old Type
+			AND (@PartyId = 0 OR c.FromParty = @PartyId)
+	)
+		AND g.ProductId IS NULL
+	ORDER BY p.ProductId
 END
 GO

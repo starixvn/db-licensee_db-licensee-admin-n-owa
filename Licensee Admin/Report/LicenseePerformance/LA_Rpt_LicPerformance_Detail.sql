@@ -1,13 +1,13 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
 
 ALTER PROCEDURE dbo.LA_Rpt_LicPerformance_Detail
-	@PartyIDs		VARCHAR(4000) = ''
+	@PartyIds		VARCHAR(MAX) = ''
 	, @Currency		INT = 0
-	, @FromDate		SMALLDATETIME
-	, @ToDate		SMALLDATETIME
-	, @ProductCodes VARCHAR(500)
+	, @FromDate		DATETIME
+	, @ToDate		DATETIME
+	, @ProductCodes VARCHAR(MAX)
 	, @IsConvert	BIT = 0
 	, @BaseCurrency INT = 12
 	, @BaseCurrencyName VARCHAR(10) = 'GBP'
@@ -70,6 +70,7 @@ AS
 		- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20210929@Percy: Enhance performance - work around [RedmineID: #162390]
 		- 20211005@Percy: Get date only for Previous Date [RedmineID: #162753]
 
@@ -110,7 +111,7 @@ BEGIN
 	-- *** Previous month should display full month
 	-- ***		- FromDate, ToDate: 20200601, 20200630 --> PreviousFromDate, PreviousToDate: 20200501, 20200531
 	-- *********************************************************************************************************
-	-- Region: get period date
+	-- Region: get period date	
 	DECLARE @FDate DATETIME = @FromDate, @TDate DATETIME = @ToDate
 	DECLARE @PrevFromDate DATETIME = CASE WHEN @PreviousPeriodType = 1 THEN DATEADD(yy, -1,  @FromDate) ELSE DATEADD(MM, -1,  @FromDate) END 
 	DECLARE @PrevToDate DATETIME
@@ -206,6 +207,16 @@ BEGIN
 	INSERT INTO @tmpPartySBLaunchDate(AffectedDate,PartyID)
 	SELECT MIN(FromDate), FromParty FROM P GROUP BY FromParty
 	-- End region
+
+	-- Get Product List
+	CREATE TABLE #Products (GroupProductId TINYINT, ProductId TINYINT, ProductName VARCHAR(50), ProductCode VARCHAR(20))
+	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode)
+	SELECT ISNULL(g.GroupProductId, p.ProductId), ISNULL(g.ProductId, p.ProductId), ISNULL(g.ProductName, p.ProductName), ISNULL(g.ProductCode, p.ProductPrefix)
+	FROM bodb_Licensee.dbo.LA_f_Products3rd(@ProductCodes) p
+		LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct() g ON p.ProductId = g.GroupProductId
+
+	SET @ProductCodes = NULL
+	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #Products
 
 	-- Region: Party charge info
 	CREATE TABLE #PartyChargeInfo (
@@ -345,7 +356,7 @@ BEGIN
 			AND (@Currency = 0 OR CurrencyId = @Currency)
 		GROUP BY rptDate, SiteId, ProductId, CurrencyId, Bettype, CASE WHEN TicketType = 2 THEN TicketType ELSE 0 END
 	), CTE_DataSource AS (
-		SELECT b.rptDate, b.ProductId, b.CurrencyId, p.PartyId
+		SELECT b.rptDate, pd.GroupProductId AS ProductId, b.CurrencyId, p.PartyId
 			,SUM(b.BetCount * CASE WHEN eb.BettypeID IS NOT NULL OR b.TicketType = 2 THEN 0 ELSE 1 END) AS BetCount
 			,SUM(b.Turnover * CASE WHEN eb.BettypeID IS NOT NULL OR b.TicketType = 2 THEN 0 ELSE 1 END) AS Turnover
 			,SUM(CASE WHEN eb.BettypeID IS NOT NULL OR b.TicketType = 2 THEN 0 ELSE b.WinLoss END) AS WinLoss
@@ -365,11 +376,12 @@ BEGIN
 					WHEN b.Bettype IN (4298, 4299, 4300, 1906, 1699, 3150, 3899) OR b.TicketType = 2 THEN ISNULL(-b.WinLoss, 0) -- Prize, Bonus, Free bets, ...
 					ELSE 0 END) AS ExtraAmount
 		FROM CTE_tmpData b
-			INNER JOIN #PartyChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = p.ProductId AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
+			INNER JOIN #Products pd ON b.ProductId = pd.ProductId
+			INNER JOIN #PartyChargeInfo p ON p.LicenseeId = b.SiteId AND pd.GroupProductId = p.ProductId AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
 											AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
 			LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeId
-		GROUP BY b.rptDate, b.ProductId, b.CurrencyId, p.PartyId
+		GROUP BY b.rptDate, pd.GroupProductId, b.CurrencyId, p.PartyId
 	)
 	INSERT INTO #TempData (rptDate,ProductId,CurrencyId,PartyId,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,ExtraAmount)
 	(
@@ -406,7 +418,7 @@ BEGIN
 			AND (@Currency = 0 OR CurrencyId = @Currency)
 		GROUP BY rptDate, SiteId, ProductId, CurrencyId, Bettype, CASE WHEN TicketType = 2 THEN TicketType ELSE 0 END
 	), CTE_DataSource AS (
-		SELECT b.rptDate, b.ProductId, b.CurrencyId, p.PartyId
+		SELECT b.rptDate, pd.GroupProductId AS ProductId, b.CurrencyId, p.PartyId
 			,SUM(b.BetCount * CASE WHEN eb.BettypeID IS NOT NULL OR b.TicketType = 2 THEN 0 ELSE 1 END) AS BetCount
 			,SUM(b.Turnover * CASE WHEN eb.BettypeID IS NOT NULL OR b.TicketType = 2 THEN 0 ELSE 1 END) AS Turnover
 			,SUM(CASE WHEN eb.BettypeID IS NOT NULL OR b.TicketType = 2 THEN 0 ELSE b.WinLoss END) AS WinLoss
@@ -426,11 +438,12 @@ BEGIN
 					WHEN b.Bettype IN (4298, 4299, 4300, 1906, 1699, 3150, 3899) OR b.TicketType = 2 THEN ISNULL(-b.WinLoss, 0) -- Prize, Bonus, Free bets, ...
 					ELSE 0 END) AS ExtraAmount
 		FROM CTE_tmpData b
-			INNER JOIN #PartyChargeInfo p ON p.LicenseeId = b.SiteId AND b.ProductId = p.ProductId AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
+			INNER JOIN #Products pd ON b.ProductId = pd.ProductId
+			INNER JOIN #PartyChargeInfo p ON p.LicenseeId = b.SiteId AND pd.GroupProductId = p.ProductId AND (p.Bettype = -1 OR p.Bettype = b.Bettype)
 											AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND b.CurrencyId = cr.CurrencyId
 			LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeId
-		GROUP BY b.rptDate, b.ProductId, b.CurrencyId, p.PartyId
+		GROUP BY b.rptDate, pd.GroupProductId, b.CurrencyId, p.PartyId
 	)
 	INSERT INTO #TempData (rptDate,ProductId,CurrencyId,PartyId,BetCount,Turnover,WinLoss,AComm,PComm,AmountToCompany,ExtraAmount)
 	(
@@ -711,10 +724,11 @@ BEGIN
 	-- End region
 
 	-- Region: Drop tmp table
-	DROP TABLE #Exchange
-	DROP TABLE #TempData
-	DROP TABLE #Result
 	DROP TABLE #AmountToCompany
+	DROP TABLE #Exchange
+	DROP TABLE #Products
+	DROP TABLE #Result
+	DROP TABLE #TempData
 	DROP TABLE #PartyChargeInfo
 	-- End region
 END

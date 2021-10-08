@@ -3,70 +3,63 @@ USE [bodb02]
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeSettlement]
-	  @PartyId				INT
-	, @FromDate				DATETIME
-	, @ToDate				DATETIME
-	, @ProductCode			VARCHAR(50)
-	, @CurrencyId			INT				= 0
-	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
-WITH RECOMPILE
+	@PartyId			INT
+	,@FromDate			DATETIME
+	,@ToDate			DATETIME
+	,@ProductCode		VARCHAR(50)
+	,@CurrencyId		INT				= 0
+	,@BaseCurrencyName	VARCHAR(10)		= 'GBP'
 AS
-	/*  Created: 20150313@Florent
-		Task : Report - Licensee Settlement Report
-		Base on : IMS_Rpt_LicenseeSettlement
-		DB: DBEXT.bodb02
+/*  Created: 20150313@Florent
+	Task : Report - Licensee Settlement Report
+	Base on : IMS_Rpt_LicenseeSettlement
+	DB: DBEXT.bodb02
 		
-		Revisions:
-			- 20150407@Florent: add filter no draw for BA Settlement
-			- 20150505@Florent: Integrate Gold Deluxe and Voidbridge
-			- 20150519@Florent: Change Product Prefix from VB to VG
-			- 20150722@Florent: Implement Microgaming Casino (MGC)
-			- 20150910@Florent: Implement Bettrade
-			- 20150914@Bravo: Add 2 Column for Grand Total Row.
-			- 20160107@Bruce: Split BuyBackAmount into BuyBackAmountSB & BuyBackAmountBA
-			- 20160112@Bruce: Bettrade: LicenseeWL = 0 for BA tickets
-			- 20160316@Bruce: Bettrade: added BuyBackAmountSportsbookBase and BuyBackAmountBABase
-			- 20160428@Bruce: MGCRNG: Support Microgaming - Progressive Contribution
-			- 20160929@Scofield: Update for Colossus Bet
-			- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
-			- 20170329@Scofield: support Cashout [RedmineID :#73310]
-			- 20170404@Harper: using new sum table for Cashout Product [RedmineID: #73310]
-			- 20170511@bruce: include exchange rate [RedmineID: #76132]
-			- 20170712@bruce: include BRVS, LO [RedmineID: #79310]
-			- 20171219@Bruce: increase length for variables [#88197]
-			- 20180126@Bruce: include Exchange-BX [#87754]
-			- 20180419@Scofield: update CB for FreePlay [#93907]
-			- 20180515@Scofield: Incorporate 9wickets data [#94950]
-			- 20180716@bruce: add new group TEST for credit [#98126]
-			- 20181120@Parsons: Integrate Bidme games (GD product) [#103695]
-			- 20190312@Parsons: Integrate Promotion Prize (PP product) [#109014]
-			- 20191122@Mason: Setup billing terms by Currency  [#120005]
-			- 20191205@Parsons: PP tournament [#123958]  
-			- 20200228@Parsons: Support-HID-currency [#128856] 
-			- 20200412@Parsons: Integrate SA Gaming [#129276]
-			- 20200403@Parsons: Indo 4D Integration [#130910] 
-		    - 20200719@Parsons: Implement PP Jackpot [RedmineID: #137306]
-			- 20201022@Mason: Arcadia Gaming - Add Bonus feature [#143597]
-			- 20201111@Mason: Change request of Odds Spread [#142345]
-			- 20201209@Mason: Saba.club - Offer Freebet tickets [#141423]
-			- 20210108@Mason: Saba.club - Integrate Slot Game [#147977]
-			- 20210108@Parsons: Settlement report - Enhance Company column of Arcadia Gaming, Saba.Club, PP [#150629]
-			- 20210513@Percy: Keep negative licensee fee for joint venture parties [RedmineID: #154992]
-			- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
-			- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+	Revisions:
+		- 20150407@Florent: add filter no draw for BA Settlement
+		- 20150505@Florent: Integrate Gold Deluxe and Voidbridge
+		- 20150519@Florent: Change Product Prefix from VB to VG
+		- 20150722@Florent: Implement Microgaming Casino (MGC)
+		- 20150910@Florent: Implement Bettrade
+		- 20150914@Bravo: Add 2 Column for Grand Total Row.
+		- 20160107@Bruce: Split BuyBackAmount into BuyBackAmountSB & BuyBackAmountBA
+		- 20160112@Bruce: Bettrade: LicenseeWL = 0 for BA tickets
+		- 20160316@Bruce: Bettrade: added BuyBackAmountSportsbookBase and BuyBackAmountBABase
+		- 20160428@Bruce: MGCRNG: Support Microgaming - Progressive Contribution
+		- 20160929@Scofield: Update for Colossus Bet
+		- 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
+		- 20170329@Scofield: support Cashout [RedmineID :#73310]
+		- 20170404@Harper: using new sum table for Cashout Product [RedmineID: #73310]
+		- 20170511@bruce: include exchange rate [RedmineID: #76132]
+		- 20170712@bruce: include BRVS, LO [RedmineID: #79310]
+		- 20171219@Bruce: increase length for variables [#88197]
+		- 20180126@Bruce: include Exchange-BX [#87754]
+		- 20180419@Scofield: update CB for FreePlay [#93907]
+		- 20180515@Scofield: Incorporate 9wickets data [#94950]
+		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20181120@Parsons: Integrate Bidme games (GD product) [#103695]
+		- 20190312@Parsons: Integrate Promotion Prize (PP product) [#109014]
+		- 20191122@Mason: Setup billing terms by Currency  [#120005]
+		- 20191205@Parsons: PP tournament [#123958]  
+		- 20200228@Parsons: Support-HID-currency [#128856] 
+		- 20200412@Parsons: Integrate SA Gaming [#129276]
+		- 20200403@Parsons: Indo 4D Integration [#130910] 
+		- 20200719@Parsons: Implement PP Jackpot [RedmineID: #137306]
+		- 20201022@Mason: Arcadia Gaming - Add Bonus feature [#143597]
+		- 20201111@Mason: Change request of Odds Spread [#142345]
+		- 20201209@Mason: Saba.club - Offer Freebet tickets [#141423]
+		- 20210108@Mason: Saba.club - Integrate Slot Game [#147977]
+		- 20210108@Parsons: Settlement report - Enhance Company column of Arcadia Gaming, Saba.Club, PP [#150629]
+		- 20210513@Percy: Keep negative licensee fee for joint venture parties [RedmineID: #154992]
+		- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
+		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 
-		Param's Explanation:
-			+ @ProductCode:		'SB' -> Sportsbook				'RB' -> Racing
-								'NG' -> Number Game				'BA' -> BA
-								'LC' -> Live Casino				'VS' -> Virtual Sports
-								'CS' -> RNG Casino				'BG' -> Bingo
-								'BT' -> Bettrade				'MGCLC'->Microgaming Live Casino
-								'BX' -> Exchange				'MGCRNG'->Microgaming RNG Casino
-								'CB' -> Colossus Bets			'CO' -> Cash Out
-								'LO' -> Lottery					'BRVS' -> Betradar Virtual Sports
-	*/
-SET NOCOUNT ON
+	Param's Explanation:
+*/
 BEGIN
+	SET NOCOUNT ON
+
 	SET @ProductCode = LTRIM(RTRIM(REPLACE(@ProductCode,',','')))
 	DECLARE @TotalLicenseeChargeRate_InBaseCurrency MONEY
 
@@ -849,7 +842,7 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND b.customercategory NOT IN (27, 28)
-				AND b.ProductID = 0
+				AND b.ProductID IN (SELECT ProductId FROM bodb_Licensee.dbo.LA_f_GroupProduct() WHERE GroupProductId = 0)
 			GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
 		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, GrossCompany, Company, OddsSpreadCost, Betcount)

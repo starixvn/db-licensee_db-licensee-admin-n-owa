@@ -17,17 +17,23 @@ AS
 
 	Revisions: 
 		- 20210727@Percy: Initialize SP [RedmineID: #155593]
+		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 */
 
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @ProductCode VARCHAR(50)
-	
-	IF @ProductId = 0 -- SB
-		SET @ProductCode = 'SB'
-	ELSE
-		SELECT @ProductCode = ProductPrefix FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductId = @ProductId
+	DECLARE @Products TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(20))
+	INSERT INTO @Products (GroupProductId, ProductId, ProductCode)
+	SELECT ISNULL(g.GroupProductId, p.ProductId), ISNULL(g.ProductId, p.ProductId), ISNULL(g.ProductCode, p.ProductPrefix)
+	FROM (
+		SELECT ProductId, ProductPrefix FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductId = @ProductId
+		UNION ALL SELECT 0, 'SB' WHERE @ProductId = 0
+	) p
+		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.GroupProductId
+
+	DECLARE @ProductCode VARCHAR(MAX)
+	SELECT  @ProductCode = COALESCE(@ProductCode + ',', '') + ProductCode FROM @Products
 
 	DECLARE @tblSite TABLE (SiteId INT, Site VARCHAR(100))
 	INSERT INTO @tblSite (SiteId, Site)
@@ -91,7 +97,7 @@ BEGIN
 			LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH (NOLOCK) ON sbr.Bettype = r.Bettype
 			LEFT JOIN @Bettype b ON b.Bettype = r.Bettype
 		WHERE r.rptDate BETWEEN @FromDate AND @ToDate
-			AND r.ProductId = @ProductId
+			AND r.ProductId IN (SELECT p.ProductId FROM @Products p)
 			AND r.StatusId NOT IN (-1, 101, 102, 103)
 			AND r.CustomerCategory NOT IN (27, 28)
 			AND r.CurrencyId <> 20
@@ -121,7 +127,7 @@ BEGIN
 		FROM bodb_LicenseeReport.dbo.rptLicWinloss2 b WITH (NOLOCK)
 			INNER JOIN @recommend r ON b.recommend = r.recommend
 			INNER JOIN (
-				SELECT CONVERT(SMALLINT, SportType) AS SportType
+				SELECT DISTINCT CONVERT(SMALLINT, SportType) AS SportType
 				FROM bodb02.dbo.f_LicWinLoss_ProductSportType_Sel(@ProductCode)
 			) f ON b.sporttype = f.SportType
 		WHERE b.WinlostDate BETWEEN @FromDate AND @ToDate

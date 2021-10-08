@@ -1,12 +1,12 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,bodbLicenseeNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_GroupLicensingFeeWinLoss]
-	@PartyIDs				VARCHAR(5500)	= ''
-	, @ProductCodes			VARCHAR(5500) = ''	
-	, @FromDate				SMALLDATETIME
-	, @ToDate				SMALLDATETIME	
+	@PartyIds				VARCHAR(MAX)	= ''
+	,@ProductCodes			VARCHAR(MAX)	= ''	
+	,@FromDate				SMALLDATETIME
+	,@ToDate				SMALLDATETIME	
 AS
 /*  Created: Scofield.Huynh
 	Date: 2018-12-04
@@ -25,6 +25,7 @@ AS
 	   - 20201209@Happy: Saba.club - Offer Freebet tickets [#141423]
 	   - 20210111@Happy: Saba.club - Integrate Slot Game [#147977]
 	   - 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+	   - 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 */
 BEGIN
 	SET NOCOUNT ON	
@@ -32,7 +33,15 @@ BEGIN
 	DECLARE @GD_Product INT = 11
 	DECLARE @ChargeInfo TABLE(ChargeID INT, PartyID INT, LicenseeID INT, ProductID INT,Rate MONEY, Fromdate DATE, Todate DATE)
 	CREATE TABLE #Data (rptDate DATE, PartyID INT, ProductID INT, Currency INT, BetTypeId INT, Winloss MONEY, AComm MONEY)
-	CREATE TABLE #Report (PartyID INT, ProductID INT, CurrencyID INT, Company MONEY)						
+	CREATE TABLE #Report (PartyID INT, ProductID INT, CurrencyID INT, Company MONEY)
+	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20))
+	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode)
+	SELECT ISNULL(g.GroupProductId, p.ProductId), ISNULL(g.ProductId, p.ProductId), ISNULL(g.ProductName, p.ProductName), ISNULL(g.ProductCode, p.ProductPrefix)
+	FROM bodb_Licensee.dbo.LA_f_Products3rd(@ProductCodes) p
+		LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct() g ON p.ProductId = g.GroupProductId
+
+	SET @ProductCodes = NULL
+	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #Products
 	
 	/* ChargeInfo */
 	INSERT INTO @ChargeInfo(ChargeID, PartyID, LicenseeID, ProductID, Rate, Fromdate, Todate)
@@ -145,28 +154,28 @@ BEGIN
 		)
 	END
 
-	/* SB Product */	
-	DECLARE @SB_Product INT = 0, 
-			@SB_AdjustedOdds SMALLINT = 999
+	/* SB Product */
+	DECLARE @SB_Product INT = 0
 	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = @SB_Product) > 0
 	BEGIN
 		;WITH cte_TempData AS 
 		(
-			SELECT  ci.PartyID, b.ProductID, b.currencyID
-			, SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN 0 ELSE ISNULL(-b.MemberWL, 0) END * ISNULL(cr.Rate, ci.Rate)) AS LicencingFeeAdjustedOdds
-			, SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS OddsSpreadCost
+			SELECT ci.PartyId, p.GroupProductId AS ProductId, b.CurrencyId
+			, SUM(CASE WHEN b.Bettype = 999 THEN 0 ELSE ISNULL(-b.MemberWL, 0) END * ISNULL(cr.Rate, ci.Rate)) AS LicencingFee
+			, SUM(CASE WHEN b.Bettype = 999 THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS OddsSpreadCost
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
+			INNER JOIN #Products p ON b.ProductId = p.ProductId
+			INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND p.GroupProductId = ci.ProductID AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND b.CurrencyId = cr.CurrencyID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
-				AND b.ProductID = @SB_Product
+				AND p.GroupProductId = 0 -- SB
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (b.CurrencyID <> 20)
 				AND b.customercategory NOT IN (27,28)
-			GROUP BY ci.PartyID, b.ProductID, b.CurrencyID
+			GROUP BY ci.PartyId, p.GroupProductId, b.CurrencyId
 		)
 		INSERT INTO #Report (PartyID, ProductID, CurrencyID, Company)
-		SELECT PartyID, b.ProductID, b.CurrencyId, LicencingFeeAdjustedOdds + OddsSpreadCost
+		SELECT PartyID, b.ProductID, b.CurrencyId, LicencingFee + OddsSpreadCost
 		FROM cte_TempData b
 	END
 
@@ -291,7 +300,8 @@ BEGIN
 	GROUP BY PartyName, CurrencyName, ProductName, ProductId	
 	
 	/* Remove temp tables */
-	DROP TABLE #Report
 	DROP TABLE #Data
+	DROP TABLE #Products
+	DROP TABLE #Report
 END
 GO

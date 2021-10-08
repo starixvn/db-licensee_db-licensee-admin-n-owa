@@ -16,6 +16,7 @@ AS
 
 	Revisions: 
 		- 20210727@Percy: Initialize SP [RedmineID: #155593]
+		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 */
 
 BEGIN
@@ -49,18 +50,15 @@ BEGIN
 	SELECT  @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductPrefix FROM bodb_Licensee.dbo.Product3rd WITH (NOLOCK) WHERE ProductId NOT IN (3, 16, 25)
 	SELECT  @ProductCodes = 'SB,' + @ProductCodes
 
-	DECLARE @Products TABLE (ProductId INT, ProductName VARCHAR(50), Sporttype INT, IsBA BIT)
-	INSERT INTO @Products (ProductId, ProductName, Sporttype, IsBA)
-	SELECT 3, 'BA', 0, 1
-	UNION ALL SELECT 25, 'Cashout', -1, 0
+	DECLARE @Products TABLE (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), Sporttype INT, IsBA BIT)
+	INSERT INTO @Products (GroupProductId, ProductId, ProductName, Sporttype, IsBA)
+	SELECT 3, 3, 'BA', 0, 1
+	UNION ALL SELECT 25, 25, 'Cashout', -1, 0
 	UNION ALL
-	SELECT
-		CASE WHEN f.ProductCode = 'SB' THEN 0 ELSE p.ProductId END
-		,CASE WHEN f.ProductCode = 'SB' THEN 'Sportsbook' ELSE p.ProductName END
-		,f.SportType
-		,0 AS IsBA
+	SELECT DISTINCT ISNULL(g.GroupProductId, p.ProductId), ISNULL(g.ProductId, p.ProductId), ISNULL(g.ProductName, p.ProductName), f.SportType, 0 AS IsBA
 	FROM bodb02.dbo.f_LicWinLoss_ProductSportType_Sel(@ProductCodes) f
-		LEFT JOIN dbo.Product3rd p WITH (NOLOCK) ON f.ProductCode = p.ProductPrefix
+		CROSS APPLY dbo.LA_f_Products3rd(f.ProductCode) p
+		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId
 
 	-- Get AmountToCompany data
 	CREATE TABLE #tmpData (WinlostDate SMALLDATETIME, Currency INT, Sporttype INT, IsBA BIT, AmountToCompany MONEY)
@@ -77,13 +75,15 @@ BEGIN
 
 	-- Return data
 		-- Note: Saba promotion treat ProductId is max, always on bottom
-	SELECT
-		CONVERT(INT, CASE WHEN p.ProductId = 37 THEN 1000 ELSE p.ProductId END) AS ProductId
-		,p.ProductName, CONVERT(MONEY, SUM(-t.AmountToCompany * e.Rate)) AS AmountToCompany
-	FROM #tmpData t
-		INNER JOIN @Products p ON t.Sporttype = p.Sporttype AND t.IsBA = p.IsBA
-		INNER JOIN @Exchange e ON t.Currency = e.ExchangeId AND t.WinlostDate = e.ExchangeDate
-	GROUP BY p.ProductId, p.ProductName
+	SELECT CONVERT(INT, CASE WHEN p.ProductId = 37 THEN 1000 ELSE p.ProductId END) AS ProductId, p.ProductName, t.AmountToCompany
+	FROM (
+		SELECT p.GroupProductId, CONVERT(MONEY, SUM(-t.AmountToCompany * e.Rate)) AS AmountToCompany
+		FROM #tmpData t
+			INNER JOIN @Products p ON t.Sporttype = p.Sporttype AND t.IsBA = p.IsBA
+			INNER JOIN @Exchange e ON t.Currency = e.ExchangeId AND t.WinlostDate = e.ExchangeDate
+		GROUP BY GroupProductId
+	) t
+		INNER JOIN (SELECT DISTINCT ProductId, ProductName FROM @Products) p ON t.GroupProductId = p.ProductId
 	ORDER BY CASE WHEN p.ProductId = 37 THEN 1 ELSE 0 END, p.ProductId
 
 	DROP TABLE #tmpData
