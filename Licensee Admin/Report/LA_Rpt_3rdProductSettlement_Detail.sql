@@ -2,7 +2,7 @@
 USE [bodb_licensee]
 GO
 
-CREATE PROCEDURE [dbo].[LA_Rpt_3rdProductSettlement_Detail]
+ALTER PROCEDURE [dbo].[LA_Rpt_3rdProductSettlement_Detail]
 	@PartyIds			VARCHAR(4000),
 	@ProductCodes		VARCHAR(500),
 	@FromDate			DATETIME,
@@ -75,7 +75,7 @@ BEGIN
 	SELECT @ProductCodes = ''
 	;WITH CTE_Product AS 
 	(
-		SELECT DISTINCT CASE WHEN ProductCode IN ('SB_MuayThai','SB_BetBuilder') THEN 'SB' ELSE ProductCode END  ProductCode 
+		SELECT DISTINCT CASE WHEN ProductCode IN ('SB_MuayThai','SB_BetBuilder','BTC') THEN 'SB' ELSE ProductCode END  ProductCode 
 		FROM @productDataView
 	)
 	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM CTE_Product
@@ -83,6 +83,12 @@ BEGIN
 
 	DECLARE @ProductCodesGMT VARCHAR(1000)
 	SELECT @ProductCodesGMT = COALESCE(@ProductCodesGMT + ',', '') + CONVERT(VARCHAR(10), ProductCode) FROM @productDataView WHERE isSupportGMT0 = 1 OR isSupportGMT8 = 1
+
+	DECLARE @ProductCodes3rd VARCHAR(1000)
+	SET @ProductCodes3rd = @ProductCodes
+
+	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID = 69)
+		SELECT @ProductCodes3rd =@ProductCodes3rd + ',BTC'
 
 	DECLARE @bettypeExtraGMT TABLE (bettype INT, ProductID INT)
 	INSERT INTO @bettypeExtraGMT(bettype, ProductID)
@@ -134,7 +140,7 @@ BEGIN
 	INSERT INTO #3rdRate (PartyID, ProductID, DI_Rate, IsDeposit, Fromdate, Todate)
 	SELECT DISTINCT p.PartyId, r.ProductID, CASE WHEN ProductID = 10 OR (ProductID = 32 AND IsDeposit = 0) THEN 0 ELSE r.DI_Rate END, r.IsDeposit, r.Fromdate, r.Todate 
 	FROM (	SELECT DISTINCT r.PartyID, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r. Todate	
-			FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCodes, 'OA') r 
+			FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCodes3rd, 'OA') r 
 			WHERE r.ChargeType = 1
 		 ) r
 	INNER JOIN #PartyList p on p.ParentId = r.PartyID 
@@ -143,6 +149,23 @@ BEGIN
 	CREATE TABLE #ChargeInfoWithCredit (PartyID INT, ProductID INT,  IsDeposit INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME, DI_Rate MONEY, ChargeType INT, LicenseeID INT, ChargeID INT)
 	INSERT INTO #ChargeInfoWithCredit (PartyID, ProductID, IsDeposit, Fromdate, Todate, DI_Rate, ChargeType, LicenseeID, ChargeID )
 	SELECT PartyID, ProductID, IsDeposit, Fromdate, Todate, DI_Rate, ChargeType, LicenseeID, ChargeID FROM LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, @ProductCodes) c
+
+	IF EXISTS(SELECT 1 FROM @productDataView WHERE ProductID = 69 ) 
+	BEGIN
+		IF EXISTS(SELECT 1 FROM @productDataView WHERE ProductID = 0 )
+		BEGIN
+			INSERT INTO #ChargeInfoWithCredit (PartyID, ProductID, IsDeposit, Fromdate, Todate, DI_Rate, ChargeType, LicenseeID, ChargeID )
+			SELECT PartyID, 69 AS ProductID, IsDeposit, Fromdate, Todate, DI_Rate, ChargeType, LicenseeID, ChargeID  --Clone BTC setting 
+			FROM	#ChargeInfoWithCredit 
+			WHERE ProductID = 0
+		END
+		ELSE 
+		BEGIN
+			UPDATE #ChargeInfoWithCredit
+			SET ProductID = 69
+			WHERE ProductID = 0
+		END
+	END
 
 	CREATE CLUSTERED INDEX cix_#ChargeInfoWithCredit ON #ChargeInfoWithCredit(ProductID, PartyID, ChargeType)
 
