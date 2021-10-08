@@ -138,7 +138,6 @@ BEGIN
 			WHERE r.ChargeType = 1
 		 ) r
 	INNER JOIN #PartyList p on p.ParentId = r.PartyID 
-	WHERE p.PartyId IN (SELECT CAST(val AS INT) FROM strSplit(@PartyIds,','))
 
 	--SELECT 'debug_@3rdRate',* FROM @3rdRate where ProductID = 25 ORDER BY PartyID
 
