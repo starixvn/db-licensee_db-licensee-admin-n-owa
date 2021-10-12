@@ -36,17 +36,19 @@ BEGIN
 		,isRptBettingBySportSource		TINYINT
 		,isSupportGMT8					BIT
 		,isSupportGMT0					BIT
+		,isRptLicCashoutSummarySource	BIT
 	)
-	INSERT INTO @tbl_All3rdProducts(ProductID, ProductCode,  ProductName,  isKeepNegativeFee, isKeepNegativePayToSupplier, isRptBettingSource, isRptBettingBySportSource, isSupportGMT8, isSupportGMT0) 
+	INSERT INTO @tbl_All3rdProducts(ProductID, ProductCode,  ProductName,  isKeepNegativeFee, isKeepNegativePayToSupplier, isRptBettingSource, isRptBettingBySportSource, isSupportGMT8, isSupportGMT0, isRptLicCashoutSummarySource) 
 	SELECT	ProductID, 
 			ProductPrefix,
 			ProductName,
 			CASE WHEN ProductID IN (2, 31, 21, 25, 15) OR ProductPrefix = 'SB_MuayThai'  THEN 1 ELSE 0 END isKeepNegativeFee , 
 			CASE WHEN ProductID IN (2, 8, 10, 23, 49, 28, 31, 32, 34, 36, 40, 45, 46, 47, 50, 51, 52, 55, 56, 57, 59, 60, 61, 62, 65, 67, 68, 69, 36, 39, 21, 25, 15) OR ProductPrefix IN ('SB_MuayThai','SB_BetBuilder') THEN 1 ELSE 0 END isKeepNegativePayToSupplier,
-			CASE WHEN ProductID IN (22,23,34) OR ProductPrefix = 'SB_BetBuilder' THEN 1 ELSE 0 END isRptBettingSource,
+			CASE WHEN ProductID IN (2, 22,23,34) OR ProductPrefix = 'SB_BetBuilder' THEN 1 ELSE 0 END isRptBettingSource,
 			CASE WHEN ProductPrefix = 'SB_MuayThai' THEN 1 ELSE 0 END isRptBettingBySportSource,
 			CASE WHEN ProductID IN (21, 24, 36, 39, 45, 51, 56, 62) THEN 1 ELSE 0 END isSupportGMT8,
-			CASE WHEN ProductID IN (32, 65) THEN 1 ELSE 0 END isSupportGMT0
+			CASE WHEN ProductID IN (32, 65) THEN 1 ELSE 0 END isSupportGMT0,
+			CASE WHEN ProductID = 25 THEN 1 ELSE 0 END
 	FROM (
 			SELECT x.ProductPrefix, x.ProductID, x.ProductName FROM dbo.Product3rd x WITH(NOLOCK)
 			UNION ALL
@@ -59,7 +61,7 @@ BEGIN
 	IF @isShowDetail = 1
 	BEGIN
 
-		SELECT ProductID, ProductCode, ProductName , isKeepNegativeFee, isKeepNegativePayToSupplier, isRptBettingSource, isRptBettingBySportSource, isSupportGMT8, isSupportGMT0
+		SELECT ProductID, ProductCode, ProductName , isKeepNegativeFee, isKeepNegativePayToSupplier, isRptBettingSource, isRptBettingBySportSource, isSupportGMT8, isSupportGMT0, isRptLicCashoutSummarySource
 		FROM @tbl_All3rdProducts
 		WHERE ( ProductCode IN (SELECT val FROM strSplit(@ProductCodes, ',')) OR @ProductCodes = '') 
 			AND (
@@ -81,7 +83,5 @@ BEGIN
 		ORDER BY ProductID, ProductName
 	END
 	
-	
-
 END
 GO

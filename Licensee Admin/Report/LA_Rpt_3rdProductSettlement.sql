@@ -68,8 +68,9 @@ BEGIN
 		,isRptBettingBySportSource		TINYINT
 		,isSupportGMT8					BIT
 		,isSupportGMT0					BIT
+		,isRptLicCashoutSummarySource	BIT
 	)
-	INSERT INTO @productDataView(ProductID, ProductCode, ProductName, isKeepNegativeFee, isKeepNegativePayToSupplier, isRptBettingSource, isRptBettingBySportSource, isSupportGMT8, isSupportGMT0) 
+	INSERT INTO @productDataView(ProductID, ProductCode, ProductName, isKeepNegativeFee, isKeepNegativePayToSupplier, isRptBettingSource, isRptBettingBySportSource, isSupportGMT8, isSupportGMT0, isRptLicCashoutSummarySource) 
 	EXEC LA_3rdProductByTimeZoneSel @ProductCodes = @ProductCodes, @Timezone = @Timezone, @isShowDetail = 1
 	
 	SELECT @ProductCodes = ''
@@ -79,7 +80,6 @@ BEGIN
 		FROM @productDataView
 	)
 	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM CTE_Product
-
 
 	DECLARE @ProductCodesGMT VARCHAR(1000)
 	SELECT @ProductCodesGMT = COALESCE(@ProductCodesGMT + ',', '') + CONVERT(VARCHAR(10), ProductCode) FROM @productDataView WHERE isSupportGMT0 = 1 OR isSupportGMT8 = 1
@@ -95,9 +95,6 @@ BEGIN
 	SELECT	DISTINCT la.Bettype, la.ProductID
 	FROM	LA_f_BettypeProductMapping(0,@ProductCodesGMT) la
 
-	--SELECT 'debug_@productDataView',* FROM @productDataView
-	--
-	
 	-- Get parties list
 	CREATE TABLE #PartyList (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT, IsKeepNegativeAmount BIT DEFAULT 0)
 	INSERT INTO #PartyList (PartyId, PartyName, BrandName, ParentId)
@@ -128,10 +125,9 @@ BEGIN
 		,ChargeRate11	MONEY DEFAULT 0 -- @RollingRollingCommType
 		,ChargeRate12	MONEY DEFAULT 0 -- @TipChargeType
 
-		,CashoutCommissionRate MONEY DEFAULT 0
-		,IncomeOnBBRate MONEY DEFAULT 0
-
-		,AB_ServiceCharge MONEY DEFAULT 0
+		,CashoutCommissionRate	MONEY DEFAULT 0
+		,IncomeOnBBRate			MONEY DEFAULT 0
+		,AB_ServiceCharge		MONEY DEFAULT 0
 	)
 	CREATE CLUSTERED INDEX cix_#ChargeRate ON #ChargeRate(ProductID, LicenseeID, isDeposit, Fromdate, Todate)
 	
@@ -401,24 +397,6 @@ BEGIN
 		UPDATE #3rdRatePPL SET MinAmount = 0, MaxAmount = 10000000000000 WHERE MinAmount IS NULL OR MaxAmount IS NULL
 	END
 
-	-- Use Valid Bet Amount
-	--CREATE TABLE #__ValidBetRate (
-	--	LicenseeID INT, ProductID INT, CommRate MONEY, IsDeposit INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME
-	--)
-	
-	--INSERT INTO #__ValidBetRate (LicenseeID, ProductID, CommRate, IsDeposit, Fromdate, Todate)
-	--SELECT DISTINCT c.LicenseeID, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r.Todate 
-	--FROM LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, @ProductCodes) c
-	--INNER JOIN(	SELECT DISTINCT p.PartyID, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r. Todate	
-	--		FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCodes, 'OA') r 
-	--		INNER JOIN #PartyList p on p.ParentId = r.PartyID
-	--		WHERE r.ChargeType = 11 AND IsDeposit = 0
-	--		) r ON r.PartyId = c.PartyID AND r.ProductID = c.ProductID
-
-	--SELECT '#__ValidBetRate',* FROM #__ValidBetRate
-	--SELECT '#Debug_ChargeRate',* FROM #ChargeRate  WHERE ProductID = 25 ORDER BY isdeposit, PartyID
-	--WHERE isDeposit = 0
-
 	CREATE TABLE #Exchange (
 		ExchangeDate	DATE,
 		ExchangeID		INT,
@@ -478,9 +456,9 @@ BEGIN
 		RebateCommissionOriginal MONEY DEFAULT 0,
 		-- CB
 		TurnoverForCommision MONEY DEFAULT 0,
-		CBPrize			MONEY DEFAULT 0,
-		CashOut			MONEY DEFAULT 0,
-		CashInAmount	MONEY DEFAULT 0,
+		CBPrize				MONEY DEFAULT 0,
+		CashOut				MONEY DEFAULT 0,
+		CashInAmount		MONEY DEFAULT 0,
 		-- CO
 		BuyBackAmountTotal	MONEY DEFAULT 0, 
 		TicketsPayout		MONEY DEFAULT 0, 
@@ -593,7 +571,6 @@ BEGIN
 		FROM cte_Summary b WITH (NOLOCK)
 			INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeId AND cr.CurrencyId = b.CurrencyId
-		WHERE ci.ProductID <> 2 OR (ci.ProductID = 2 AND ci.isDeposit = 1)
 		GROUP BY b.Winlostdate, ci.PartyId, b.CurrencyId, b.ProductID, ci.isDeposit, b.PlayCurrency
 
 		-- Get data 
@@ -625,7 +602,7 @@ BEGIN
 				AND p.isRptBettingBySportSource = 0
 				AND p.isSupportGMT0 = 0 
 				AND p.isSupportGMT8 = 0
-				AND p.ProductID <> 25
+				AND p.isRptLicCashoutSummarySource = 0
 			GROUP BY b.SiteID, b.rptDate, b.CurrencyId, b.ProductID
 		)
 		INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,ExtraPT,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier,ProductID, Bonus, TurnoverForCommision, CBPrize, CashOut, CashInAmount, Turnover)
@@ -636,13 +613,10 @@ BEGIN
 			SUM(b.TotalTrans) AS TotalTrans,
 			SUM(b.CustomerWinLoss) AS CustomerWinLoss,
 			SUM(b.LicenseeWinloss) AS LicenseeWinloss,
-			--SUM((b.LicenseeWinloss - b.ValidBetAmount * ISNULL(v.CommRate,0)) * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
 			SUM(b.LicenseeWinloss  * ISNULL(cr.Rate, ci.Rate) - CASE WHEN b.ProductID = 31 THEN (b.CommissionA + b.CommissionP) ELSE 0 END) AS LicensingFee,
 			SUM(CASE WHEN b.ProductID = 59  THEN (b.LicenseeWinloss - b.RollingComm) * CASE WHEN ci.isDeposit = 1 THEN ci.ChargeRate09 ELSE ci.ChargeRate10 END
-					 WHEN b.ProductID = 2   THEN b.LicenseeWinloss  * ISNULL(cr.Rate, ci.Rate) * ci.Rate3rd
 					 WHEN b.ProductID = 10  THEN 0
 					 WHEN b.ProductID = 31  THEN b.LicenseeWinloss  * ci.Rate3rd - (b.CommissionA + b.CommissionP)
-					 --ELSE (b.LicenseeWinloss - b.ValidBetAmount * ISNULL(v.CommRate,0)) * ci.Rate3rd - CASE WHEN b.ProductID = 45 THEN b.Bonus ELSE 0 END
 					  ELSE b.LicenseeWinloss  * ci.Rate3rd - CASE WHEN b.ProductID = 45 THEN b.Bonus ELSE 0 END
 				END) AS PayToSupplier,
 			b.ProductID,
@@ -656,10 +630,6 @@ BEGIN
 			INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
 			INNER JOIN @productDataView p ON b.ProductID = p.ProductID
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeId AND cr.CurrencyId = b.CurrencyId
-			--LEFT JOIN #__ValidBetRate v ON b.SiteID = v.LicenseeId AND  b.ProductID = v.ProductID AND b.Winlostdate BETWEEN v.FromDate AND v.ToDate
-		WHERE 
-			((ci.isDeposit = 1 AND ci.ProductID = 2) OR (ci.ProductID <> 2))
-			AND p.isRptBettingSource = 0
 		GROUP BY b.Winlostdate, ci.PartyId, b.CurrencyId, b.ProductID
 
 		IF EXISTS (SELECT 1 FROM strSplit(@ProductCodes,',') WHERE val = 'CO')
@@ -691,16 +661,12 @@ BEGIN
 			
 		END
 
-		IF EXISTS(SELECT 1 FROM strSplit(@ProductCodes,',') WHERE val = 'NG') OR EXISTS(SELECT 1 FROM @productDataView WHERE isRptBettingSource = 1)
+		IF EXISTS(SELECT 1 FROM @productDataView WHERE isRptBettingSource = 1)
 		BEGIN
 			
 			DECLARE @ProductRptbettingSource VARCHAR(1000) = ''
-
 			SELECT @ProductRptbettingSource = COALESCE(@ProductRptbettingSource + ',', '') + CONVERT(VARCHAR(10), ProductCode) FROM @productDataView WHERE isRptBettingSource = 1
-			SELECT @ProductRptbettingSource = COALESCE(@ProductRptbettingSource,'') + CASE WHEN EXISTS(SELECT 1 FROM strSplit(@ProductCodes,',') WHERE val = 'NG') THEN ',NG' ELSE '' END
-
-			--SELECT @ProductRptbettingSource AS ProductRptbettingSource
-
+		
 			DECLARE @bettype TABLE(Bettype INT , ProductID INT, SubProduct VARCHAR(500))
 			INSERT INTO @bettype (Bettype, ProductID, SubProduct)
 			SELECT	DISTINCT la.Bettype, la.ProductID,  ma.SubProduct
@@ -713,8 +679,6 @@ BEGIN
 				SELECT 38 AS Bettype, 0 -- -1: BetBuilder
 			END
 			
-			--SELECT '@bettype',* FROM @bettype
-
 			-- Rate by bettype And IsDeposit 
 			DECLARE @CC_MidasRate3rd  DECIMAL(4,3) = 0.035
 			DECLARE @CC_NormalRate3rd DECIMAL(4,3) = 0.025
@@ -798,11 +762,13 @@ BEGIN
 					SUM(CASE WHEN r.ProductID = 23 THEN 0 
 							 WHEN r.ProductID = 33 AND ci.isDeposit = 1 THEN (r.LicenseeWinloss  * ISNULL(cr.Rate, ci.Rate))
 							 WHEN r.ProductID = 22 THEN r.LicenseeWinloss * ISNULL(cr.Rate, ci.Rate)
-							 WHEN r.ProductID = 2  THEN r.LicensingFee
+							 WHEN r.ProductID = 2 AND isDeposit = 0  THEN r.LicensingFee
+							 WHEN r.ProductID = 2 AND isDeposit = 1  THEN r.LicenseeWinloss  * ISNULL(cr.Rate, ci.Rate)
 							 WHEN r.ProductID = 34 AND ci.isDeposit = 1 THEN (r.LicenseeWinloss  * ISNULL(cr.Rate, ci.Rate))
 							 WHEN r.ProductID = 0 THEN r.LicensingFee
 							 ELSE 0 END) AS LicensingFee,
-					SUM(CASE WHEN r.ProductID = 2  THEN (r.LicensingFee - CASE WHEN r.SiteID IN (1487/*IBCIndo*/, 1547/*76666b*/) THEN ExtraPT ELSE 0 END) * ci.Rate3rd
+					SUM(CASE WHEN r.ProductID = 2 AND isDeposit = 0 THEN (r.LicensingFee - CASE WHEN r.SiteID IN (1487/*IBCIndo*/, 1547/*76666b*/) THEN ExtraPT ELSE 0 END) * ci.Rate3rd
+							 WHEN r.ProductID = 2 AND isDeposit = 1 THEN r.LicenseeWinloss  * ISNULL(cr.Rate, ci.Rate) * ci.Rate3rd
 							 WHEN r.ProductID = 22 THEN r.LicenseeWinloss *  CASE  WHEN ci.IsDeposit = 1 THEN (CASE WHEN r.SubProduct = 'Blueprint' THEN @VB_depositBlueprint3rd ELSE @VB_depositNotBlueprint3rd END)
 																		     ELSE CASE WHEN r.SubProduct = 'Blueprint' THEN @VB_creditBlueprint3rd ELSE @VB_creditNotBlueprint3rd END END 
 							 WHEN r.ProductID = 23 THEN r.LicensingFee * ci.Rate3rd
@@ -818,14 +784,8 @@ BEGIN
 				INNER JOIN #ChargeRate ci	ON r.SiteID = ci.LicenseeId 
 													AND r.ProductID = ci.ProductID
 													AND r.Winlostdate BETWEEN ci.FromDate AND ci.ToDate 
-													AND (
-															ci.ProductID <> 2 OR (ci.ProductID = 2 AND ci.isDeposit = 0)
-														 )
 				LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeID AND cr.CurrencyID = r.CurrencyId
 			GROUP BY ci.PartyID, r.Winlostdate, r.CurrencyId, r.ProductID
-
-			--SELECT * FROM #ChargeRate
-			--SELECT '#TempData_rptBetting',* FROM #TempData
 		END
 
 		IF EXISTS(SELECT 1 FROM @productDataView WHERE isRptBettingBySportSource = 1)
@@ -1254,8 +1214,7 @@ BEGIN
 		END
 
 	END
-	--SELECT 'debug_#Result',* FROM #Result WHERE ProductID = 25 ORDER BY ParentId
-	--SELECT 'debug_#TempData',* FROM #TempData  WHERE PartyID = 439--ORDER BY ParentId
+
 
 	-- Result
 	DECLARE @Total TABLE (
