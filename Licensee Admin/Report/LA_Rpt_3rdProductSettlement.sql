@@ -1340,7 +1340,14 @@ BEGIN
 	GROUP BY td.ParentId, td.ParentName, td.ProductID
 
 	-- Final result
-	SELECT td.ParentId AS BillingGroupId,  td.ParentName AS BillingGroupName, td.ProductID, p.ProductName ,td.LicensingFee, td.PayToSupplier, td.CompanyIncome
+	SELECT td.ParentId AS BillingGroupId,  
+			td.ParentName AS BillingGroupName, 
+			td.ProductID, 
+			p.ProductName ,
+			td.LicensingFee, 
+			CASE WHEN td.ProductID = 24 AND td.PayToSupplier < 0 THEN 0 ELSE td.PayToSupplier END PayToSupplier, 
+			CASE WHEN td.ProductID = 24 THEN td.LicensingFee - 	CASE WHEN td.PayToSupplier < 0 THEN 0 ELSE td.PayToSupplier END
+			ELSE td.CompanyIncome END  CompanyIncome
 	FROM @Total td
 	INNER JOIN @productDataView p ON td.ProductID = p.ProductID
 	ORDER BY ProductID, ParentId
