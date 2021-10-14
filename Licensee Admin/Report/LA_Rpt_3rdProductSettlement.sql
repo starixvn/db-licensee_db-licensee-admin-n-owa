@@ -294,7 +294,7 @@ BEGIN
 			CASE WHEN ci.isDeposit=1 AND ci.Todate >= dc.ToDate THEN dc.ToDate
 					WHEN ci.isDeposit=0 AND ci.Todate >= cc.ToDate THEN cc.ToDate
 					ELSE ci.ToDate END,
-			ci.DI_Rate,
+			CASE WHEN ci.isDeposit = 0 THEN 0 ELSE  ci.DI_Rate END,
 			ISNULL(ci.DI_Rate * cc.Rate, 0),
 			ISNULL(CASE WHEN ci.isDeposit=1 THEN dc.Rate ELSE ci.DI_Rate END,0)
 		FROM dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate,@ToDate,'AB','OA',1) ci
