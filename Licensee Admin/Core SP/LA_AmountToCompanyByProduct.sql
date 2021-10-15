@@ -508,12 +508,12 @@ BEGIN
 				INNER JOIN @Deductions d ON r.PartyId = d.PartyId
 				CROSS APPLY (
 					SELECT r.LicensingFee - r.Discount AS DeductedAMF
-					UNION ALL SELECT r.ProrateMinFee - r.SecondaryLicensingFee
+					UNION ALL SELECT r.ProrateMinFee - CASE WHEN r.SecondaryLicensingFee < r.ProrateMinFee THEN r.SecondaryLicensingFee ELSE 0 END
 					UNION ALL SELECT d.RemainingAMF
 				) t
 			WHERE r.ProductId = 0 -- SB
 				AND r.LicensingFee - r.Discount > 0
-				AND r.ProrateMinFee - r.SecondaryLicensingFee > 0
+				AND r.ProrateMinFee - CASE WHEN r.SecondaryLicensingFee < r.ProrateMinFee THEN r.SecondaryLicensingFee ELSE 0 END > 0
 				AND d.RemainingAMF > 0
 			GROUP BY r.PartyId
 		END

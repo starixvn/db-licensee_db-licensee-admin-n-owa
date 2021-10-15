@@ -229,11 +229,32 @@ BEGIN
 					OR (@InvoiceTypeId NOT IN (3, 10) AND r.ProductId <> -1)
 				)
 
+			-- Sum data for Rebate
+			IF EXISTS (SELECT 1 FROM @FinalResult WHERE AmountType = 6 HAVING COUNT(1) > 1)
+			BEGIN
+				INSERT INTO @FinalResult (InvoiceAmount, AmountType, Rate, Remark, ProductId, ProductCode, ProductName)
+				SELECT SUM(InvoiceAmount), 6, Rate, Remark, -1
+					,STUFF((SELECT ',' + f.ProductCode
+							FROM @FinalResult f WHERE f.AmountType = 6 AND f.Rate = r.Rate AND f.Remark = r.Remark
+							FOR XML PATH('')), 1, 1, '')
+					,STUFF((SELECT ',' + f.ProductName
+							FROM @FinalResult f WHERE f.AmountType = 6 AND f.Rate = r.Rate AND f.Remark = r.Remark
+							FOR XML PATH('')), 1, 1, '')
+				FROM @FinalResult r
+				GROUP BY Rate, Remark
+
+				DELETE @FinalResult WHERE AmountType = 6 AND ProductId >= 0
+			END
+
 			IF @InvoiceTypeId = 10 -- sum data
 				INSERT INTO @FinalResult (ProductId, AmountType, Rate, Remark, ProductCode, ProductName, InvoiceAmount)
 				SELECT -1, r.AmountType, r.Rate, r.Remark
-					,STUFF((SELECT ',' + ProductCode FROM @FinalResult f WHERE f.AmountType = r.AmountType AND f.Rate = r.Rate FOR XML PATH('')), 1, 1, 0)
-					,STUFF((SELECT ',' + ProductName FROM @FinalResult f WHERE f.AmountType = r.AmountType AND f.Rate = r.Rate FOR XML PATH('')), 1, 1, 0)
+					,STUFF((SELECT ',' + ProductCode
+							FROM @FinalResult f WHERE f.AmountType = r.AmountType AND f.Rate = r.Rate AND f.Remark = r.Remark
+							FOR XML PATH('')), 1, 1, '')
+					,STUFF((SELECT ',' + ProductName
+							FROM @FinalResult f WHERE f.AmountType = r.AmountType AND f.Rate = r.Rate AND f.Remark = r.Remark
+							FOR XML PATH('')), 1, 1, '')
 					,SUM(InvoiceAmount)
 				FROM @FinalResult r
 				WHERE r.AmountType > 1

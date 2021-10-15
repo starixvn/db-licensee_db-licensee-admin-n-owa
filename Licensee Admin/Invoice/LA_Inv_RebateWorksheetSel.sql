@@ -80,19 +80,23 @@ BEGIN
 		PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
 		,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000)
 	)
-	INSERT INTO @Result
-	(
-		PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-		,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
-	)
-	EXEC dbo.LA_AmountToCompanyByProduct
-		@PartyIds = @PartyIds
-		,@ProductCodes = @ProductCodes
-		,@FromDate = @FromDate
-		,@ToDate = @ToDate
-		,@BaseCurrencyName = @BaseCurrency
 
-	DELETE @Result WHERE ProductId = 37
+	IF ISNULL(@ProductCodes, '') <> ''
+	BEGIN
+		INSERT INTO @Result
+		(
+			PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
+			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+		)
+		EXEC dbo.LA_AmountToCompanyByProduct
+			@PartyIds = @PartyIds
+			,@ProductCodes = @ProductCodes
+			,@FromDate = @FromDate
+			,@ToDate = @ToDate
+			,@BaseCurrencyName = @BaseCurrency
+
+		DELETE @Result WHERE ProductId = 37
+	END
 
 	-- Total
 	DECLARE @Remark NVARCHAR(4000), @TotalRebate MONEY, @TotalAmount MONEY
