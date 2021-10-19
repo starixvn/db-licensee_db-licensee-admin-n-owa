@@ -1036,6 +1036,11 @@ BEGIN
 
 		IF EXISTS (SELECT 1 FROM strSplit(@ProductCodes,',') WHERE val = 'CB')
 		BEGIN
+			DECLARE @CBChargeInfo TABLE (PartyID INT, LicenseeID INT, DI_Rate MONEY, ChargeType INT, Fromdate DATETIME, ToDate	DATETIME)
+			INSERT INTO @CBChargeInfo (PartyID, LicenseeID, DI_Rate, ChargeType, Fromdate, ToDate)
+			SELECT PartyID,LicenseeID,DI_Rate,ChargeType,Fromdate,Todate
+			FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIds,@FromDate,@ToDate,'CB','OA',1)
+			
 			DECLARE @CBBaseCurrencies TABLE(
 				Id INT,
 				Name VARCHAR(20),
@@ -1090,18 +1095,21 @@ BEGIN
 	
 			-- end get commissionRate, cashinshareRate for every Period in @CBShare		
 	
-			-- Update Commission, CashInShare, AmountDueToColossusBet for #Result
-
-			--Company = Turnover - WinningPrize - Cashout - LicenseeComm - CashInShare
 			UPDATE r
 			SET
-				--Commission = r.TurnoverForCommision * rbp.CommissionRate,
-				--CashInShare = r.CashInAmount * rbp.CashInShareRate,
-				PayToSupplier = Turnover - CBPrize - CashOut - (r.TurnoverForCommision * rbp.CommissionRate) - (r.CashInAmount * rbp.CashInShareRate),
-				LicensingFee = Turnover - CBPrize - CashOut - (r.TurnoverForCommision * rbp.CommissionRate) - (r.CashInAmount * rbp.CashInShareRate)
+				PayToSupplier = Turnover - CBPrize - CashOut - (r.TurnoverForCommision * rbp.CommissionRate) - (r.CashInAmount * rbp.CashInShareRate)
+
 			FROM #TempData r
 			INNER JOIN @RateByPeriod rbp ON r.Winlostdate BETWEEN rbp.FromDate AND rbp.ToDate	
 			WHERE r.ProductID = 15
+
+			UPDATE r
+			SET LicensingFee = Turnover - CBPrize - CashOut - (r.TurnoverForCommision * cm.DI_Rate) - (r.CashInAmount * ci.DI_Rate)
+			FROM #TempData r
+			INNER JOIN @CBChargeInfo AS cm ON cm.PartyID = r.PartyID AND cm.ChargeType = 6 AND (r.Winlostdate BETWEEN cm.FromDate AND cm.ToDate)
+			INNER JOIN @CBChargeInfo AS ci ON ci.PartyID = r.PartyID AND ci.ChargeType = 7 AND (r.Winlostdate BETWEEN ci.FromDate AND ci.ToDate)
+			WHERE r.ProductID = 15
+
 			-- End Update Commission, CashInShare, AmountDueToColossusBet for #Result
 		END
 	END
