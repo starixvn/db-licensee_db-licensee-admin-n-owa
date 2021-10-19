@@ -108,9 +108,9 @@ BEGIN
 	DECLARE @PrevFDate DATETIME, @PrevTDate DATETIME
 
 	SELECT @PrevFDate = CASE WHEN @PreviousPeriodType = 1 THEN DATEADD(YEAR, -1, @FDate) ELSE DATEADD(MONTH, -1, @FDate) END
-	SELECT @PrevTDate = DATEADD(DAY, 1, DATEADD(MONTH, DATEDIFF(MONTH, 0, @PrevFDate) + 1, 0))
+	SELECT @PrevTDate = DATEADD(DAY, -1, DATEADD(MONTH, DATEDIFF(MONTH, 0, @PrevFDate) + 1, 0))
 
-	IF DAY(@PrevTDate) > DAY(@TDate)
+	IF DAY(@PrevTDate) > DAY(@TDate) AND @TDate <> DATEADD(DAY, -1, DATEADD(MONTH, DATEDIFF(MONTH, 0, @TDate) + 1, 0))
 		SELECT @PrevTDate = CONVERT(VARCHAR(8), @PrevTDate, 120) + CONVERT(VARCHAR(2), @TDate, 103)
 
 	-- Get Party List
@@ -120,7 +120,11 @@ BEGIN
 		SELECT DISTINCT val FROM dbo.StrSplit(@PartyIds, ',')
 
 		UPDATE pl
-		SET pl.PartyName = p.PartyName, pl.LaunchDate = c.LaunchDate
+		SET pl.PartyName = CASE p.PartyName
+								WHEN '18bb' THEN 'PIH'
+								WHEN 'IBC' THEN 'FDL'
+								ELSE p.PartyName END
+			,pl.LaunchDate = c.LaunchDate
 		FROM @PartyList pl
 			INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON pl.PartyId = p.PartyId AND p.PartyType = 1
 			OUTER APPLY (
@@ -346,8 +350,8 @@ BEGIN
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId = 3 THEN LicensingFee ELSE 0 END)) AS PreviousAmountDueToBA
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 AND ProductId = 0 THEN LicensingFee ELSE 0 END)) AS SportsbookFee
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId = 0 THEN LicensingFee ELSE 0 END)) AS PreviousSportsbookFee
-			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 AND ProductId NOT IN (0, 37) THEN LicensingFee ELSE 0 END)) AS OtherProductsFee
-			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId NOT IN (0, 37) THEN LicensingFee ELSE 0 END)) AS PreviousOtherProductsFee
+			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 AND ProductId NOT IN (0, 3, 37) THEN LicensingFee ELSE 0 END)) AS OtherProductsFee
+			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId NOT IN (0, 3, 37) THEN LicensingFee ELSE 0 END)) AS PreviousOtherProductsFee
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 AND ProductId = 0 THEN Discount ELSE 0 END)) AS DiscountSportsbook
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId = 0 THEN Discount ELSE 0 END)) AS PreviousDiscountSportsbook
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 AND ProductId <> 0 THEN Discount ELSE 0 END)) AS DiscountOthers

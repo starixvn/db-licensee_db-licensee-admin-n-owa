@@ -2,7 +2,7 @@
 USE bodb_licensee
 GO
 
-ALTER PROCEDURE dbo.LA_Inv_RebateWorksheetSel
+ALTER PROCEDURE [dbo].[LA_Inv_RebateWorksheetSel]
 	@PartyId	INT
 	,@FromDate	SMALLDATETIME
 	,@ToDate	SMALLDATETIME
@@ -110,7 +110,7 @@ BEGIN
 	SELECT @Remark AS Remark, @ToDate AS ReportDate, @BaseCurrency AS CurrencyName, @TotalRebate AS TotalRebate, @TotalAmount AS TotalAmount
 
 	-- Detail
-	SELECT ProductId, LicensingFee + ExtraAmount AS AmountToCompany
+	SELECT ProductId, LicensingFee + ExtraAmount - Discount AS AmountToCompany
 	FROM @Result
 END
 GO

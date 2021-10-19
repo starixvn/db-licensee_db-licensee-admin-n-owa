@@ -104,6 +104,7 @@ BEGIN
 	SELECT m.PartyId, m.ProductId, @FirstDate, @LastDate
 	FROM @IndividualMinFee m WHERE m.FeeTypeId = 0
 		AND NOT EXISTS (SELECT 1 FROM @tmpDate t WHERE m.PartyId = t.PartyId AND m.ProductId = t.ProductId)
+		AND NOT EXISTS (SELECT 1 FROM @IndividualMinFee t WHERE m.PartyId = t.PartyId AND m.ProductId = t.ProductId AND t.FeeTypeId = 2)
 	GROUP BY m.PartyId, m.ProductId
 		
 	INSERT INTO @IndividualMinFee (FeeTypeId, PartyId, ProductId, BaseCurrencyId, MinFee, RowId, GroupId, FromDate, ToDate)
@@ -164,6 +165,25 @@ BEGIN
 			ORDER BY d.ToDate DESC
 		) d
 	WHERE m.GroupMinFeeId > 0
+
+	--
+	UPDATE m
+	SET m.FromDate = CASE
+						WHEN c.FromDate IS NULL THEN '2000-01-01'
+						WHEN m.FromDate < c.FromDate THEN c.FromDate
+						ELSE m.FromDate END
+		,m.ToDate = CASE
+						WHEN c.ToDate IS NULL THEN '2000-01-01'
+						WHEN m.ToDate > c.ToDate THEN c.ToDate
+						ELSE m.ToDate END
+	FROM @MinFee m
+		OUTER APPLY (
+			SELECT MIN(c.FromDate) AS FromDate, MAX(c.ToDate) AS ToDate
+			FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
+			WHERE m.PartyId = c.FromParty AND m.ProductId = c.ProductId
+				AND c.ToParty IN (1, 9, 11, 98)
+				AND c.ChargeType NOT IN (2, 3)
+		) c
 
 	DELETE @MinFee WHERE FromDate > @ToDate OR ToDate < @FromDate
 	

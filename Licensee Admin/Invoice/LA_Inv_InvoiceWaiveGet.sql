@@ -34,14 +34,39 @@ BEGIN
 	WHERE bc.PartyId = @PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
 
 	-- Get Charge Info
-	DECLARE @ChargeInfo TABLE (FromDate DATE, ToDate DATE)
-	INSERT INTO @ChargeInfo (FromDate, ToDate)
-	SELECT DISTINCT FromDate, ToDate
+	DECLARE @FDate DATE, @TDate DATE
+	SELECT  @FDate = MIN(FromDate), @TDate = MAX(ToDate)
 	FROM dbo.LA_f_ChargeInfo (@PartyIds, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 	WHERE DI_Rate > 0
 
+	DECLARE @DaysInMonth INT = DAY(DATEADD(MONTH, DATEDIFF(MONTH, -1, @FromDate), -1))
+
+	DECLARE @FinalResult TABLE (FromDate DATE, ToDate DATE, MinFee MONEY, ProrateMinFee MONEY, IsGroupMinFee BIT, IsWaived BIT)
+	INSERT INTO @FinalResult (FromDate, ToDate, MinFee, ProrateMinFee, IsGroupMinFee, IsWaived)
+	SELECT FromDate, ToDate, MinFee, ProrateMinFee
+		,CASE WHEN GroupMinFeeId > 0 THEN 1 ELSE 0 END AS IsGroupMinFee
+		,CASE WHEN FeeTypeId = 2 THEN 1 ELSE 0 END AS IsWaived
+	FROM dbo.LA_f_GetProrateMinFee(@PartyIds, @FromDate, @ToDate)
+	WHERE ProductId = @ProductId
+
+	DELETE @FinalResult WHERE ToDate < @FDate OR FromDate > @TDate
+	
+	UPDATE @FinalResult
+	SET FromDate = CASE WHEN FromDate < @FDate THEN @FDate ELSE FromDate END
+		,ToDate = CASE WHEN ToDate > @TDate THEN @TDate ELSE ToDate END
+	WHERE FromDate < @FDate OR ToDate > @TDate
+
+	INSERT INTO @FinalResult (FromDate, ToDate, IsGroupMinFee, IsWaived)
+	SELECT @FDate, DATEADD(DAY, -1, MIN(FromDate)), 0, 1 FROM @FinalResult HAVING @FDate < MIN(FromDate)
+	UNION ALL
+	SELECT DATEADD(DAY, 1, MAX(ToDate)), @TDate, 0, 1 FROM @FinalResult HAVING @TDate > MAX(ToDate)
+
+	DELETE @FinalResult WHERE IsWaived = 0 AND DATEDIFF(DAY, FromDate, ToDate) + 1 >= @DaysInMonth
+
 	-- Get Licensing Fee
+	IF EXISTS (SELECT 1 FROM @FinalResult)
 	BEGIN
+		
 		DECLARE @Result TABLE
 		(
 			PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
@@ -58,21 +83,13 @@ BEGIN
 			,@FromDate = @FromDate
 			,@ToDate = @ToDate
 			,@BaseCurrencyName = @BaseCurrencyName
+
+		IF EXISTS (SELECT 1 FROM @Result WHERE IsChargedByGroupMinFee = 0)
+			UPDATE @FinalResult SET ProrateMinFee = 0 WHERE IsGroupMinFee = 1
+
+		IF EXISTS (SELECT 1 FROM @Result WHERE IsChargedByMinFee = 0)
+			UPDATE @FinalResult SET ProrateMinFee = 0 WHERE IsGroupMinFee = 0
 	END
-
-	-- Get Min Fee: in case Licensing Fee is charged by min fee/group min fee
-	DECLARE @FinalResult TABLE (FromDate DATE, ToDate DATE, MinFee MONEY, ProrateMinFee MONEY, IsWaived BIT)
-
-	IF EXISTS (SELECT 1 FROM @Result WHERE IsChargedByGroupMinFee = 1 OR IsChargedByMinFee = 1)
-	BEGIN
-		INSERT INTO @FinalResult (FromDate, ToDate, MinFee, ProrateMinFee, IsWaived)
-		SELECT FromDate, ToDate, MinFee, ProrateMinFee
-			,CASE WHEN FeeTypeId = 2 THEN 1 ELSE 0 END AS IsWaived
-		FROM dbo.LA_f_GetProrateMinFee (@PartyIds, @FromDate, @ToDate)
-		WHERE ProductId = @ProductId AND IsPrimary = 1
-	END
-
-	DECLARE @DaysInMonth INT = DAY(DATEADD(MONTH, DATEDIFF(MONTH, -1, @FromDate), -1))
 
 	-- Return Result
 	SELECT
@@ -84,7 +101,6 @@ BEGIN
 		,DATEDIFF(DAY, FromDate, ToDate) + 1 AS NumberOfDays
 		,@DaysInMonth AS DaysInMonth, IsWaived
 	FROM @FinalResult
-	WHERE IsWaived = 1 OR DATEDIFF(DAY, FromDate, ToDate) + 1 < @DaysInMonth
 	ORDER BY FromDate
 END
 GO

@@ -51,7 +51,7 @@ BEGIN
 		VALUES (37, 'Saba Promotion', 'SPR', 1)
 
 	-- Get Party List
-	CREATE TABLE #PartyList (PartyId INT, LicenseeId INT, IsDeposit BIT, IsSelected BIT)
+	CREATE TABLE #PartyList (PartyId INT, LicenseeId INT, BaseCurrencyId INT, IsDeposit BIT, IsSelected BIT)
 	INSERT INTO #PartyList (PartyId, IsSelected)
 	SELECT DISTINCT val, 1 FROM dbo.strSplit (@PartyIds, ',')
 
@@ -98,14 +98,20 @@ BEGIN
 	WHERE pl.PartyId IS NULL
 
 	UPDATE pl
-	SET pl.LicenseeId = p.OldRefId, pl.IsDeposit = pd.IsDeposit
+	SET pl.LicenseeId = p.OldRefId, pl.IsDeposit = pd.IsDeposit, pl.BaseCurrencyId = ISNULL(bc.BaseCurrencyId, 6)
 	FROM #PartyList pl
 		INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON pl.PartyId = p.PartyId AND p.PartyType = 1
 		INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pl.PartyId = pd.PartyId
+		OUTER APPLY (
+			SELECT TOP 1 bc.BaseCurrencyId
+			FROM dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK)
+			WHERE bc.PartyId = pl.PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
+			ORDER BY bc.ToDate DESC
+		) bc
 
 	-- Credit Licensee
-	INSERT INTO #PartyList (PartyId, LicenseeId, IsDeposit, IsSelected)
-	SELECT pl.PartyId, l.LabelId, pl.IsDeposit, pl.IsSelected
+	INSERT INTO #PartyList (PartyId, LicenseeId, BaseCurrencyId, IsDeposit, IsSelected)
+	SELECT pl.PartyId, l.LabelId, pl.BaseCurrencyId, pl.IsDeposit, pl.IsSelected
 	FROM #PartyList pl
 		INNER JOIN dbo.Labels l WITH (NOLOCK) ON pl.LicenseeId = l.LicenseeId
 	WHERE pl.IsDeposit = 0
@@ -131,7 +137,7 @@ BEGIN
 		,CASE
 			WHEN ProductId = 11 AND ChargeType = 12 THEN 1706 -- GD Tip
 			WHEN ProductId = 39 AND ChargeType = 12 THEN 3007 -- SA Tip
-			ELSE Bettype END
+			ELSE -1 END
 	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 	WHERE ProductId <> 1 AND DI_Rate > 0
 
@@ -155,10 +161,19 @@ BEGIN
 	DELETE @PartyChargeInfo WHERE ProductId = 15
 
 	-- Get Exchange Rate
-	CREATE TABLE #Exchange (ExchangeDate DATE, ExchangeId INT, Rate FLOAT)
-	INSERT INTO #Exchange (ExchangeDate, ExchangeID, Rate)
-	SELECT ExchangeDate, ExchangeId, CASE WHEN @IsConvertExRate = 1 THEN BaseCurrencyRate ELSE 1 END
+	CREATE TABLE #Exchange (BaseCurrencyId INT, ExchangeDate DATE, ExchangeId INT, Rate FLOAT)
+	INSERT INTO #Exchange (BaseCurrencyId, ExchangeDate, ExchangeID, Rate)
+	SELECT 0, ExchangeDate, ExchangeId, CASE WHEN @IsConvertExRate = 1 THEN BaseCurrencyRate ELSE 1 END
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+
+	;WITH CTE_Exchange AS (
+		SELECT DISTINCT BaseCurrencyId FROM #PartyList
+	)
+	INSERT INTO #Exchange (BaseCurrencyId, ExchangeDate, ExchangeID, Rate)
+	SELECT c.BaseCurrencyId, f.ExchangeDate, f.ExchangeId, f.BaseCurrencyRate
+	FROM CTE_Exchange c
+		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON c.BaseCurrencyId = e.ExchangeId
+		CROSS APPLY bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, e.Code) f
 
 	-- Get Win Loss Data
 	CREATE TABLE #TempData (
@@ -224,11 +239,22 @@ BEGIN
 	GROUP BY r.rptDate, r.SiteId, ISNULL(g.GroupProductId, r.ProductId), r.CurrencyId
 		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005) THEN r.Bettype ELSE -1 END
 
-	CREATE TABLE #tmpResult (rptDate DATE, PartyId INT, ProductId INT, CurrencyId INT, LicenseeAmount MONEY, ExtraAmount MONEY DEFAULT(0)
-		,Contribution MONEY, JackpotPrize MONEY, Prize MONEY, Bonus MONEY, LuckyDraw MONEY, ContributionDiscount MONEY)
-	INSERT INTO #tmpResult (rptDate, PartyId, ProductId, CurrencyId, LicenseeAmount, ExtraAmount
-		,Contribution, JackpotPrize, Prize, Bonus, LuckyDraw, ContributionDiscount)
+	CREATE TABLE #tmpResult (rptDate DATE, PartyId INT, ProductId INT, CurrencyId INT
+		,GrossLicenseeAmount MONEY, LicenseeAmount MONEY, ExtraAmount MONEY DEFAULT(0)
+		,Contribution MONEY, JackpotPrize MONEY, Prize MONEY, Bonus MONEY, LuckyDraw MONEY, ContributionDiscount MONEY
+		,BasedLicenseeAmount MONEY) -- for get exactly min fee, discount
+	INSERT INTO #tmpResult (rptDate, PartyId, ProductId, CurrencyId, GrossLicenseeAmount, LicenseeAmount, ExtraAmount
+		,Contribution, JackpotPrize, Prize, Bonus, LuckyDraw, ContributionDiscount, BasedLicenseeAmount)
 	SELECT t.rptDate, pl.PartyId, t.ProductId, t.CurrencyId
+		,SUM((CASE
+				WHEN t.BettypeRef IN (1706, 3007) THEN -t.Tips * ISNULL(cr.Rate, p.Rate)
+				WHEN t.ProductId = 3 THEN -(t.MemberWL + t.AgentComm)
+				WHEN (t.ProductId = 15 AND cp.LicenseeId IS NULL) OR (t.ProductId <> 15 AND p.LicenseeId IS NULL) THEN 0
+				WHEN t.ProductId = 15 THEN t.PayOut - t.CommShare * cp.CommShareRate - t.CashInShare * cp.CashInShareRate
+				ELSE -t.MemberWL * ISNULL(cr.Rate, p.Rate)
+					+ t.PayOut + t.OddsSpread + t.Contribution - t.JackpotPrize - t.Prize - t.Bonus - t.FreeBets END
+				- CASE WHEN t.ProductId = 31 THEN (t.AgentComm + t.MemberComm) ELSE 0 END
+		) * e.Rate) AS GrossLicenseeAmount
 		,SUM((CASE
 				WHEN t.BettypeRef IN (1706, 3007) THEN 0
 				WHEN t.ProductId = 3 THEN -(t.MemberWL + t.AgentComm)
@@ -248,8 +274,14 @@ BEGIN
 		,SUM(t.Bonus * e.Rate) AS Bonus
 		,SUM(t.LuckyDraw * e.Rate) AS LuckyDraw
 		,SUM(t.Contribution * ISNULL(cr.Rate, p.Rate) * e.Rate) AS ContributionDiscount
+		,SUM(CASE
+				WHEN t.BettypeRef IN (1706, 3007) THEN 0
+				WHEN t.ProductId = 3 THEN -(t.MemberWL + t.AgentComm)
+				WHEN (t.ProductId = 15 AND cp.LicenseeId IS NULL) OR (t.ProductId <> 15 AND p.LicenseeId IS NULL) THEN 0
+				WHEN t.ProductId = 15 THEN t.PayOut - t.CommShare * cp.CommShareRate - t.CashInShare * cp.CashInShareRate
+				ELSE (-t.MemberWL - t.Contribution) * ISNULL(cr.Rate, p.Rate) + t.PayOut + t.OddsSpread END) AS BasedLicenseeAmount
 	FROM #TempData t
-		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND t.rptDate = e.ExchangeDate
+		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND t.rptDate = e.ExchangeDate AND e.BaseCurrencyId = 0
 		INNER JOIN #PartyList pl ON t.LicenseeId = pl.LicenseeId
 		LEFT JOIN @CBChargeRate cp ON t.LicenseeId = cp.LicenseeId AND t.ProductId = 15 AND t.rptDate = cp.rptDate
 		LEFT JOIN @PartyChargeInfo p ON t.LicenseeId = p.LicenseeId AND t.ProductId = p.ProductId AND t.BettypeRef = p.BettypeRef AND t.rptDate BETWEEN p.FromDate AND p.ToDate
@@ -259,33 +291,49 @@ BEGIN
 	GROUP BY t.rptDate, pl.PartyId, t.ProductId, t.CurrencyId
 
 	-- BT
-	INSERT INTO #tmpResult (rptDate, PartyId, ProductId, CurrencyId, LicenseeAmount)
-	SELECT t.rptDate, p.PartyId, 13, t.CurrencyId, SUM((CASE WHEN t.BettypeRef = 901 THEN -t.MemberWL WHEN t.ProductId = 13 THEN 0 ELSE t.MemberWL END - t.CashInShare * p.Rate) * e.Rate) AS LicenseeAmount
+	INSERT INTO #tmpResult (rptDate, PartyId, ProductId, CurrencyId, GrossLicenseeAmount, LicenseeAmount, BasedLicenseeAmount)
+	SELECT t.rptDate, p.PartyId, 13, t.CurrencyId
+		,SUM((CASE WHEN t.BettypeRef = 901 THEN -t.MemberWL WHEN t.ProductId = 13 THEN 0 ELSE t.MemberWL END - t.CashInShare * p.Rate) * e.Rate) AS GrossLicenseeAmount
+		,SUM((CASE WHEN t.BettypeRef = 901 THEN -t.MemberWL WHEN t.ProductId = 13 THEN 0 ELSE t.MemberWL END - t.CashInShare * p.Rate) * e.Rate) AS LicenseeAmount
+		,SUM((CASE WHEN t.BettypeRef = 901 THEN -t.MemberWL WHEN t.ProductId = 13 THEN 0 ELSE t.MemberWL END - t.CashInShare * p.Rate)) AS BasedLicenseeAmount
 	FROM #TempData t
 		INNER JOIN @PartyChargeInfo p ON t.LicenseeId = p.LicenseeId AND t.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId = 13
-		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND t.rptDate = e.ExchangeDate
+		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND t.rptDate = e.ExchangeDate AND e.BaseCurrencyId = 0
 	WHERE t.ProductId IN (0, 3, 13)
 	GROUP BY t.rptDate, p.PartyId, t.CurrencyId
 
 	-- SB Promotion
-	INSERT INTO #tmpResult (rptDate, PartyId, ProductId, CurrencyId, LicenseeAmount)
-	SELECT t.rptDate, p.PartyId, 37, t.CurrencyId, SUM(CASE WHEN t.BettypeRef = 17005 THEN t.AgentWL ELSE t.MemberWL END * e.Rate) AS LicenseeAmount
+	INSERT INTO #tmpResult (rptDate, PartyId, ProductId, CurrencyId, GrossLicenseeAmount, LicenseeAmount, BasedLicenseeAmount)
+	SELECT t.rptDate, p.PartyId, 37, t.CurrencyId
+		,SUM(CASE WHEN t.BettypeRef = 17005 THEN t.AgentWL ELSE t.MemberWL END * e.Rate) AS GrossLicenseeAmount
+		,SUM(CASE WHEN t.BettypeRef = 17005 THEN t.AgentWL ELSE t.MemberWL END * e.Rate) AS LicenseeAmount
+		,SUM(CASE WHEN t.BettypeRef = 17005 THEN t.AgentWL ELSE t.MemberWL END) AS BasedLicenseeAmount
 	FROM #TempData t
 		INNER JOIN @PartyChargeInfo p ON t.LicenseeId = p.LicenseeId AND t.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId = 0
-		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND t.rptDate = e.ExchangeDate
+		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND t.rptDate = e.ExchangeDate AND e.BaseCurrencyId = 0
 	WHERE t.ProductId = 37
 	GROUP BY t.rptDate, p.PartyId, t.CurrencyId
 
 	IF ISNULL(@Currencies, '') <> ''
 		DELETE #tmpResult WHERE ',' + @Currencies + ',' NOT LIKE '%,' + CONVERT(VARCHAR(20), CurrencyId) + ',%'
 
+	UPDATE t
+	SET t.BasedLicenseeAmount = t.BasedLicenseeAmount * e.Rate
+	FROM #tmpResult t
+		INNER JOIN (SELECT DISTINCT PartyId, BaseCurrencyId FROM #PartyList) pl ON t.PartyId = pl.PartyId
+		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND t.rptDate = e.ExchangeDate AND pl.BaseCurrencyId = e.BaseCurrencyId
+
+	DELETE #Exchange WHERE BaseCurrencyId <> 0
+
 	-- Min Fee, Rebate & Discount
 	BEGIN
 		-- Min Fee
-		CREATE TABLE #tmpMinFee (PartyId INT, ProductId INT, GroupId INT, GroupMinFeeId INT, FeeTypeId TINYINT, IsPrimary BIT, FromDate DATE, ToDate DATE, ProrateMinFee MONEY)
-		INSERT INTO #tmpMinFee (PartyId, ProductId, GroupId, GroupMinFeeId, FeeTypeId, IsPrimary, FromDate, ToDate, ProrateMinFee)
-		SELECT PartyId, ProductId, GroupId, GroupMinFeeId, FeeTypeId, IsPrimary, FromDate, ToDate, ProrateMinFee
-		FROM dbo.LA_f_GetProrateMinFee(@PartyIds, @FromDate, @ToDate)
+		CREATE TABLE #tmpMinFee (PartyId INT, ProductId INT, GroupId INT, GroupMinFeeId INT, FeeTypeId TINYINT, IsPrimary BIT
+			,FromDate DATE, ToDate DATE, ProrateMinFee MONEY, BasedProrateMinFee MONEY)
+		INSERT INTO #tmpMinFee (PartyId, ProductId, GroupId, GroupMinFeeId, FeeTypeId, IsPrimary, FromDate, ToDate, ProrateMinFee, BasedProrateMinFee)
+		SELECT PartyId, ProductId, GroupId, GroupMinFeeId, FeeTypeId, IsPrimary, FromDate, ToDate, ProrateMinFee * ISNULL(e.Rate, 0), ProrateMinFee
+		FROM dbo.LA_f_GetProrateMinFee(@PartyIds, @FromDate, @ToDate) m
+			LEFT JOIN #Exchange e ON m.BaseCurrencyId = e.ExchangeId AND e.ExchangeDate = @ToDate
 
 		DECLARE @F_Date DATE = @FDate, @T_Date DATE = @TDate
 
@@ -313,7 +361,7 @@ BEGIN
 
 		DECLARE @tmpDiscount TABLE (DiscountGroupId SMALLINT, DiscountGroupType TINYINT, BaseCurrencyId INT, PartyId INT, Remark NVARCHAR(4000), IsApplyDiscount BIT, ProductId INT, CalculationType TINYINT, CurrencyId INT, LicenseeAmount MONEY, DiscountRate FLOAT DEFAULT (0))
 		INSERT INTO @tmpDiscount (DiscountGroupId, DiscountGroupType, BaseCurrencyId, PartyId, Remark, IsApplyDiscount, ProductId, CalculationType, CurrencyId, LicenseeAmount)
-		SELECT d.DiscountGroupId, d.DiscountGroupType, d.BaseCurrencyId, d.PartyId, d.Remark, d.IsApplyDiscount, d.ProductId, d.CalculationType, r.CurrencyId, SUM(r.LicenseeAmount) AS LicenseeAmount
+		SELECT d.DiscountGroupId, d.DiscountGroupType, d.BaseCurrencyId, d.PartyId, d.Remark, d.IsApplyDiscount, d.ProductId, d.CalculationType, r.CurrencyId, SUM(r.BasedLicenseeAmount) AS LicenseeAmount
 		FROM #tmpResult r
 			INNER JOIN #tmpDiscountGroup d ON r.PartyId = d.PartyId AND r.ProductId = d.ProductId
 												AND (r.CurrencyId = d.CurrencyId OR d.CurrencyId = 0)
@@ -321,32 +369,63 @@ BEGIN
 		WHERE d.DiscountGroupType <> 2 -- 2 = Rebate, Others = Discount
 		GROUP BY d.DiscountGroupId, d.DiscountGroupType, d.BaseCurrencyId, d.PartyId, d.Remark, d.IsApplyDiscount, d.ProductId, d.CalculationType, r.CurrencyId
 		
+		-- Group discount
 		UPDATE td
 		SET td.DiscountRate = dr.Rate
 		FROM @tmpDiscount td
 			INNER JOIN (
 				SELECT d.DiscountGroupId, d.Rate
 				FROM (
-					SELECT DiscountGroupId, BaseCurrencyId, SUM(LicenseeAmount) AS LicenseeAmount
+					SELECT DiscountGroupId, SUM(LicenseeAmount) AS LicenseeAmount
 					FROM @tmpDiscount
 					WHERE CalculationType IN (1, 10) -- calculation products
-					GROUP BY DiscountGroupId, BaseCurrencyId
+						AND DiscountGroupType IN (11, 13) -- group discount
+					GROUP BY DiscountGroupId
 				) t
-					INNER JOIN #Exchange e ON t.BaseCurrencyId = e.ExchangeId AND e.ExchangeDate = @T_Date
-					INNER JOIN dbo.LA_DiscountGroupDetail d WITH (NOLOCK) ON t.DiscountGroupId = d.DiscountGroupId AND FLOOR(t.LicenseeAmount) BETWEEN d.FromAmount * e.Rate AND d.ToAmount * e.Rate
+					INNER JOIN dbo.LA_DiscountGroupDetail d WITH (NOLOCK) ON t.DiscountGroupId = d.DiscountGroupId AND FLOOR(t.LicenseeAmount) BETWEEN d.FromAmount AND d.ToAmount
 			) dr ON td.DiscountGroupId = dr.DiscountGroupId
 		WHERE td.IsApplyDiscount = 1 AND td.CalculationType IN (0, 10) -- discounted products
 
-		DECLARE @tmpResult TABLE (PartyId INT, ProductId INT, GroupMinFeeId INT, GroupId INT, IsPrimary BIT, FeeTypeId TINYINT, ProrateMinFee MONEY
-			,SecondaryLicensingFee MONEY, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsWaived BIT DEFAULT(0), IsChargedByMinFee BIT DEFAULT(0)
-			,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000))
+		-- Individual discount
+		UPDATE td
+		SET td.DiscountRate = dr.Rate
+		FROM @tmpDiscount td
+			INNER JOIN (
+				SELECT d.DiscountGroupId, t.PartyId, d.Rate
+				FROM (
+					SELECT DiscountGroupId, PartyId, SUM(LicenseeAmount) AS LicenseeAmount
+					FROM @tmpDiscount
+					WHERE CalculationType IN (1, 10) -- calculation products
+						AND DiscountGroupType IN (1, 3) -- individual discount
+					GROUP BY DiscountGroupId, PartyId
+				) t
+					INNER JOIN dbo.LA_DiscountGroupDetail d WITH (NOLOCK) ON t.DiscountGroupId = d.DiscountGroupId AND FLOOR(t.LicenseeAmount) BETWEEN d.FromAmount AND d.ToAmount
+			) dr ON td.DiscountGroupId = dr.DiscountGroupId AND td.PartyId = dr.PartyId
+		WHERE td.IsApplyDiscount = 1 AND td.CalculationType IN (0, 10) -- discounted products
+
+		DECLARE @tmpResult TABLE (PartyId INT, ProductId INT, GroupMinFeeId INT, GroupId INT, IsPrimary BIT, FeeTypeId TINYINT
+			,ProrateMinFee MONEY, SecondaryLicensingFee MONEY, NonMinFee MONEY, LicensingFee MONEY, Discount MONEY
+			,BasedProrateMinFee MONEY, BasedSecondaryLicensingFee MONEY, BasedNonMinFee MONEY, BasedLicensingFee MONEY, BasedDiscount MONEY
+			,GrossLicensingFee MONEY, ExtraAmount MONEY, IsWaived BIT DEFAULT(0), IsChargedByMinFee BIT DEFAULT(0)
+			,DiscountRate MONEY, DiscountRemark NVARCHAR(4000))
 		
-		INSERT INTO @tmpResult (PartyId, ProductId, GroupMinFeeId, GroupId, IsPrimary, FeeTypeId, ProrateMinFee, SecondaryLicensingFee
-			,GrossLicensingFee, LicensingFee, ExtraAmount, Discount, DiscountRate, DiscountRemark)
+		INSERT INTO @tmpResult (PartyId, ProductId, GroupMinFeeId, GroupId, IsPrimary, FeeTypeId
+			,ProrateMinFee, SecondaryLicensingFee, NonMinFee, LicensingFee
+			,BasedProrateMinFee, BasedSecondaryLicensingFee, BasedNonMinFee, BasedLicensingFee
+			,GrossLicensingFee, ExtraAmount, Discount, BasedDiscount, DiscountRate, DiscountRemark)
 		SELECT ISNULL(r.PartyId, t.PartyId), ISNULL(r.ProductId, t.ProductId), t.GroupMinFeeId, t.GroupId, t.IsPrimary, t.FeeTypeId
-			,MAX(CASE WHEN t.FeeTypeId = 1 THEN t.ProrateMinFee ELSE 0 END) AS ProrateMinFee, 0 AS SecondaryLicensingFee
-			,SUM(ISNULL(r.LicenseeAmount, 0)) AS GrossLicensingFee, SUM(ISNULL(r.LicenseeAmount, 0)) AS LicensingFee, SUM(ISNULL(r.ExtraAmount, 0)) AS ExtraAmount
+			,MAX(CASE WHEN t.FeeTypeId = 1 THEN t.ProrateMinFee ELSE 0 END) AS ProrateMinFee
+			,0 AS SecondaryLicensingFee
+			,SUM(CASE WHEN d.PartyId IS NULL THEN r.LicenseeAmount ELSE 0 END) AS NonMinFee
+			,SUM(ISNULL(r.LicenseeAmount, 0)) AS LicensingFee
+			,MAX(CASE WHEN t.FeeTypeId = 1 THEN t.BasedProrateMinFee ELSE 0 END) AS BasedProrateMinFee
+			,0 AS BasedSecondaryLicensingFee
+			,SUM(CASE WHEN d.PartyId IS NULL THEN r.BasedLicenseeAmount ELSE 0 END) AS BasedNonMinFee
+			,SUM(ISNULL(r.BasedLicenseeAmount, 0)) AS BasedLicensingFee
+			,SUM(ISNULL(r.GrossLicenseeAmount, 0)) AS GrossLicensingFee
+			,SUM(ISNULL(r.ExtraAmount, 0)) AS ExtraAmount
 			,SUM(ISNULL(r.LicenseeAmount, 0) * ISNULL(d.DiscountRate, 0)) AS Discount
+			,SUM(ISNULL(r.BasedLicenseeAmount, 0) * ISNULL(d.DiscountRate, 0)) AS BasedDiscount
 			,MAX(ISNULL(d.DiscountRate, 0)) AS DiscountRate
 			,MAX(ISNULL(d.Remark, N'')) AS DiscountRemark
 		FROM #tmpResult r
@@ -364,12 +443,16 @@ BEGIN
 		WHERE jvp.PartyId IS NULL AND r.ProductId NOT IN (3, 15, 25, 31) AND r.LicensingFee < 0
 
 		UPDATE r
-		SET r.SecondaryLicensingFee = t.LicensingFee - r.LicensingFee
-			,r.IsChargedByMinFee = CASE WHEN t.LicensingFee < t.ProrateMinFee THEN 1 ELSE 0 END
+		SET r.SecondaryLicensingFee = (t.LicensingFee - t.Discount) - (r.LicensingFee - r.Discount)
 			,r.LicensingFee = r.LicensingFee + CASE WHEN t.LicensingFee < t.ProrateMinFee THEN (t.ProrateMinFee - t.LicensingFee) ELSE 0 END
+			,r.BasedSecondaryLicensingFee = (t.BasedLicensingFee - t.BasedDiscount) - (r.BasedLicensingFee - r.BasedDiscount)
+			,r.BasedLicensingFee = r.BasedLicensingFee + CASE WHEN t.BasedLicensingFee < t.BasedProrateMinFee THEN (t.BasedProrateMinFee - t.BasedLicensingFee) ELSE 0 END
+			,r.IsChargedByMinFee = CASE WHEN t.BasedLicensingFee < t.BasedProrateMinFee THEN 1 ELSE 0 END
 		FROM @tmpResult r
 			INNER JOIN (
-				SELECT GroupMinFeeId, GroupId, ProductId, MAX(ProrateMinFee) AS ProrateMinFee, SUM(LicensingFee) AS LicensingFee
+				SELECT GroupMinFeeId, GroupId, ProductId
+					,MAX(ProrateMinFee) AS ProrateMinFee, SUM(LicensingFee) AS LicensingFee, SUM(Discount) AS Discount
+					,MAX(BasedProrateMinFee) AS BasedProrateMinFee, SUM(BasedLicensingFee) AS BasedLicensingFee, SUM(BasedDiscount) AS BasedDiscount
 				FROM @tmpResult
 				WHERE FeeTypeId = 1
 				GROUP BY GroupMinFeeId, GroupId, ProductId
@@ -381,52 +464,120 @@ BEGIN
 	(
 		PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
 		,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000)
-		,ProrateMinFee MONEY, SecondaryLicensingFee MONEY
+		,ProrateMinFee MONEY, SecondaryLicensingFee MONEY, NonMinFee MONEY
 	)
 
 	IF EXISTS (SELECT 1 FROM dbo.strSplit(@LicensingFeeTypeIds, ',') WHERE CONVERT(INT, val) = 0) -- Normal Licensing Fee
 	BEGIN
 		INSERT INTO @Result (PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-			,Discount, DiscountRate, DiscountRemark, ProrateMinFee, SecondaryLicensingFee)
+			,Discount, DiscountRate, DiscountRemark, ProrateMinFee, SecondaryLicensingFee, NonMinFee)
 		SELECT r.PartyId, r.ProductId, 0 AS LicensingFeeTypeId, SUM(r.GrossLicensingFee), SUM(r.LicensingFee), SUM(r.ExtraAmount)
 			,MAX(CASE WHEN r.GroupMinFeeId > 0 AND r.IsChargedByMinFee = 1 THEN 1 ELSE 0 END)
 			,MAX(CASE WHEN r.GroupMinFeeId < 0 AND r.IsChargedByMinFee = 1 THEN 1 ELSE 0 END)
 			,SUM(r.Discount), MAX(r.DiscountRate), MAX(r.DiscountRemark)
-			,SUM(r.ProrateMinFee), SUM(r.SecondaryLicensingFee)
+			,SUM(r.ProrateMinFee), SUM(r.SecondaryLicensingFee), SUM(r.NonMinFee)
 		FROM @tmpResult r
-			INNER JOIN (SELECT DISTINCT PartyId FROM #PartyList WHERE IsSelected = 1) p ON r.PartyId = p.PartyId
 			INNER JOIN #Products pd ON r.ProductId = pd.ProductId AND pd.IsSelected = 1
 		GROUP BY r.PartyId, r.ProductId
-
-		-- Adjusted Discount: Group Min Fee & Individual Min Fee (No Waive)
+		
+		-- Step 1: Adjust for individual min fee (no waive)
 		;WITH CTE_Party AS (
-			SELECT DISTINCT a.PartyId, a.ProductId, a.GroupMinFeeId
+			SELECT DISTINCT a.PartyId, a.ProductId
 			FROM @tmpResult a
 			WHERE a.IsPrimary = 1 AND a.FeeTypeId = 1
-				AND NOT EXISTS (SELECT 1 FROM @tmpResult b WHERE a.PartyId = b.PartyId AND a.ProductId = b.ProductId AND b.FeeTypeId = 2)
+				AND NOT EXISTS (
+					SELECT 1 FROM @tmpResult b
+					WHERE a.PartyId = b.PartyId AND a.ProductId = b.ProductId
+						AND (b.FeeTypeId = 2 OR (b.GroupMinFeeId > 0 AND b.IsPrimary = 1))
+				)
 		), CTE_Discount AS (
-			SELECT GroupMinFeeId, ProductId, SUM(ProrateMinFee) AS ProrateMinFee, SUM(LicensingFee) AS LicensingFee, SUM(Discount) AS Discount
-			FROM (
-				SELECT GroupMinFeeId, GroupId, ProductId, MAX(ProrateMinFee) AS ProrateMinFee, SUM(LicensingFee) AS LicensingFee, SUM(Discount) AS Discount
-				FROM @tmpResult
-				WHERE FeeTypeId = 1
-				GROUP BY GroupMinFeeId, GroupId, ProductId
-			) d
-			GROUP BY GroupMinFeeId, ProductId
+			SELECT PartyId, ProductId, SUM(ProrateMinFee) AS ProrateMinFee, SUM(LicensingFee) AS LicensingFee, SUM(Discount) AS Discount
+			FROM @tmpResult
+			GROUP BY PartyId, ProductId
 		), CTE_AdjustedDiscount AS (
 			SELECT p.PartyId, p.ProductId, SUM(ProrateMinFee) AS ProrateMinFee, SUM(LicensingFee - Discount) AS LicensingFee
 			FROM CTE_Party p
-				INNER JOIN CTE_Discount d ON p.GroupMinFeeId = d.GroupMinFeeId AND p.ProductId = d.ProductId
+				INNER JOIN CTE_Discount d ON p.PartyId = d.PartyId AND p.ProductId = d.ProductId
 			GROUP BY p.PartyId, p.ProductId
 			HAVING SUM(LicensingFee - Discount) < SUM(ProrateMinFee)
 		)
 		UPDATE r
 		SET r.Discount = CASE WHEN r.Discount - (d.ProrateMinFee - d.LicensingFee) > 0 THEN r.Discount - (d.ProrateMinFee - d.LicensingFee) ELSE 0 END
 			,r.LicensingFee = CASE WHEN r.Discount - (d.ProrateMinFee - d.LicensingFee) > 0 THEN r.LicensingFee ELSE r.LicensingFee + d.ProrateMinFee - d.LicensingFee - r.Discount END
-			,r.IsChargedByMinFee = 1, r.IsChargedByGroupMinFee = 1
+			,r.IsChargedByMinFee = 1
 		FROM @Result r
 			INNER JOIN CTE_AdjustedDiscount d ON r.PartyId = d.PartyId AND r.ProductId = d.ProductId
 
+		-- Step 2: Adjust for group min fee (no waive)
+		;WITH CTE_Party AS (
+			SELECT DISTINCT a.PartyId, a.ProductId, a.GroupMinFeeId
+			FROM @tmpResult a
+			WHERE a.IsPrimary = 1 AND a.FeeTypeId = 1
+				AND NOT EXISTS (SELECT 1 FROM @tmpResult b WHERE a.PartyId = b.PartyId AND a.ProductId = b.ProductId AND b.FeeTypeId = 2)
+				AND EXISTS (SELECT 1 FROM @tmpResult c WHERE a.PartyId = c.PartyId AND a.ProductId = c.ProductId AND c.GroupMinFeeId > 0 AND c.IsPrimary = 1)
+		), CTE_LicensingFee AS (
+			SELECT GroupMinFeeId, ProductId, SUM(ProrateMinFee) AS ProrateMinFee, SUM(LicensingFee) AS LicensingFee
+			FROM @tmpResult
+			WHERE GroupMinFeeId > 0
+			GROUP BY GroupMinFeeId, ProductId
+		), CTE_Discount AS (
+			SELECT f.GroupMinFeeId, f.ProductId, SUM(s.Discount) AS Discount, SUM(s.NonMinFee) AS NonMinFee
+			FROM CTE_LicensingFee f
+				INNER JOIN @tmpResult r ON f.GroupMinFeeId = r.GroupMinFeeId AND f.ProductId = r.ProductId
+				INNER JOIN @Result s ON r.PartyId = s.PartyId AND r.ProductId = s.ProductId
+			GROUP BY f.GroupMinFeeId, f.ProductId
+		), CTE_AdjustedDiscount AS (
+			SELECT p.PartyId, p.ProductId, SUM(f.ProrateMinFee + d.NonMinFee) AS ProrateMinFee, SUM(f.LicensingFee - d.Discount) AS LicensingFee
+			FROM CTE_Party p
+				INNER JOIN CTE_LicensingFee f ON p.GroupMinFeeId = f.GroupMinFeeId AND p.ProductId = f.ProductId
+				INNER JOIN CTE_Discount d ON p.GroupMinFeeId = d.GroupMinFeeId AND p.ProductId = d.ProductId
+			GROUP BY p.PartyId, p.ProductId
+			HAVING SUM(f.LicensingFee - d.Discount) < SUM(f.ProrateMinFee + d.NonMinFee)
+		)
+		UPDATE r
+		SET r.Discount = CASE WHEN r.Discount - (d.ProrateMinFee - d.LicensingFee) > 0 THEN r.Discount - (d.ProrateMinFee - d.LicensingFee) ELSE 0 END
+			,r.LicensingFee = CASE WHEN r.Discount - (d.ProrateMinFee - d.LicensingFee) > 0 THEN r.LicensingFee ELSE r.LicensingFee + d.ProrateMinFee - d.LicensingFee - r.Discount END
+			,r.IsChargedByMinFee = ISNULL(m.IsChargedByMinFee, 0), r.IsChargedByGroupMinFee = ISNULL(m.IsChargedByGroupMinFee, 0)
+		FROM @Result r
+			INNER JOIN CTE_AdjustedDiscount d ON r.PartyId = d.PartyId AND r.ProductId = d.ProductId
+			LEFT JOIN (
+				SELECT PartyId, ProductId
+					,CONVERT(BIT, MAX(CASE WHEN GroupMinFeeId < 0 THEN 1 ELSE 0 END)) AS IsChargedByMinFee
+					,CONVERT(BIT, MAX(CASE WHEN GroupMinFeeId > 0 THEN 1 ELSE 0 END)) AS IsChargedByGroupMinFee
+				FROM #tmpMinFee WHERE FeeTypeId = 1 AND IsPrimary = 1
+				GROUP BY PartyId, ProductId
+			) m ON r.PartyId = m.PartyId AND r.ProductId = m.ProductId
+
+		-- Update Secondary Licensing Fee
+		;WITH CTE_SecondaryLicensee AS (
+			SELECT a.PartyId AS PrimaryId, b.PartyId, b.ProductId, SUM(b.LicensingFee) AS LicensingFee
+			FROM (
+				SELECT DISTINCT PartyId, ProductId, GroupMinFeeId
+				FROM @tmpResult
+				WHERE IsPrimary = 1 AND FeeTypeId = 1 AND GroupMinFeeId > 0
+				) a
+				CROSS APPLY (
+					SELECT b.PartyId, b.ProductId, b.LicensingFee
+					FROM @tmpResult b
+					WHERE a.GroupMinFeeId = b.GroupMinFeeId AND a.ProductId = b.ProductId AND b.IsPrimary = 0
+				) b
+			GROUP BY a.PartyId, b.PartyId, b.ProductId
+		), CTE_AdjustSecondaryLicensee AS (
+			SELECT c.PrimaryId AS PartyId, c.ProductId, SUM(c.LicensingFee - r.Discount) AS LicensingFee
+			FROM CTE_SecondaryLicensee c
+				INNER JOIN @Result r ON c.PartyId = r.PartyId AND c.ProductId = r.ProductId
+			GROUP BY c.PrimaryId, c.ProductId
+		)
+		UPDATE r
+		SET r.SecondaryLicensingFee = c.LicensingFee
+		FROM @Result r
+			INNER JOIN CTE_AdjustSecondaryLicensee c ON r.PartyId = c.PartyId AND r.ProductId = c.ProductId
+
+		DELETE r
+		FROM @Result r
+			LEFT JOIN (SELECT DISTINCT PartyId FROM #PartyList WHERE IsSelected = 1) p ON r.PartyId = p.PartyId
+		WHERE p.PartyId IS NULL
+		
 		-- Rebate
 		UPDATE r
 		SET r.Rebate = (r.LicensingFee - r.Discount) * ISNULL(dd.Rate, 0)
@@ -435,6 +586,20 @@ BEGIN
 		FROM @Result r
 			LEFT JOIN #tmpDiscountGroup d ON r.PartyId = d.PartyId AND r.ProductId = d.ProductId AND d.DiscountGroupType = 2 -- Rebate
 			LEFT JOIN dbo.LA_DiscountGroupDetail dd WITH (NOLOCK) ON d.DiscountGroupId = dd.DiscountGroupId
+
+		-- For no data
+		INSERT INTO @Result (
+			PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
+			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+		)
+		SELECT p.PartyId, p.ProductId, 0, 0, 0, 0, 0, 0, 0, 0, '', 0, 0, ''
+		FROM (
+			SELECT DISTINCT PartyId, ProductId FROM @PartyChargeInfo
+			UNION SELECT DISTINCT PartyId, 15 AS ProductId FROM @CBChargeRate
+		) p
+			INNER JOIN (SELECT DISTINCT PartyId FROM #PartyList WHERE IsSelected = 1) pl ON p.PartyId = pl.PartyId
+			LEFT JOIN @Result r ON p.PartyId = r.PartyId AND p.ProductId = r.ProductId
+		WHERE r.PartyId IS NULL
 	END
 
 	IF EXISTS (SELECT 1 FROM dbo.strSplit(@LicensingFeeTypeIds, ',') WHERE CONVERT(INT, val) > 0) -- special bettype
