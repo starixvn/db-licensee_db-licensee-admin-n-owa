@@ -1345,8 +1345,8 @@ BEGIN
 			td.ProductID, 
 			p.ProductName ,
 			td.LicensingFee, 
-			CASE WHEN td.ProductID = 24 AND td.PayToSupplier < 0 THEN 0 ELSE td.PayToSupplier END PayToSupplier, 
-			CASE WHEN td.ProductID = 24 THEN td.LicensingFee - 	CASE WHEN td.PayToSupplier < 0 THEN 0 ELSE td.PayToSupplier END
+			CASE WHEN td.ProductID IN (10,24) AND td.PayToSupplier < 0 THEN 0 ELSE td.PayToSupplier END PayToSupplier, 
+			CASE WHEN td.ProductID IN (10,24) THEN td.LicensingFee - 	CASE WHEN td.PayToSupplier < 0 THEN 0 ELSE td.PayToSupplier END
 			ELSE td.CompanyIncome END  CompanyIncome
 	FROM @Total td
 	INNER JOIN @productDataView p ON td.ProductID = p.ProductID
