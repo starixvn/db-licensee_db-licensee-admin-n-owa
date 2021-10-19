@@ -1169,12 +1169,12 @@ BEGIN
 			WHERE ProductID = 0 -- MuayThai
 		END 
 
-		IF EXISTS (SELECT 1 FROM strSplit(@ProductCodes,',') WHERE val = 'CO') 
-		BEGIN
-			UPDATE #Result
-			SET PayToSupplier = CASE WHEN  IncomeOnBB > IncomeOnProfitSharing THEN AmtDueToOnBB ELSE AmtDueToOnProfitSharing END
-			WHERE ProductID = 25 -- CO
-		END 
+		--IF EXISTS (SELECT 1 FROM strSplit(@ProductCodes,',') WHERE val = 'CO') 
+		--BEGIN
+		--	UPDATE #Result
+		--	SET PayToSupplier = CASE WHEN  IncomeOnBB > IncomeOnProfitSharing THEN AmtDueToOnBB ELSE AmtDueToOnProfitSharing END
+		--	WHERE ProductID = 25 -- CO
+		--END 
 
 		IF  EXISTS(SELECT 1 FROM strSplit(@ProductCodes,',') WHERE val = 'PPL') 
 		BEGIN
@@ -1236,7 +1236,11 @@ BEGIN
 		ExtraPT 		MONEY DEFAULT 0,
 		PayToSupplier	MONEY,
 		CompanyIncome	MONEY,
-		Currency		VARCHAR(20)
+		Currency		VARCHAR(20),
+		IncomeOnBB				MONEY DEFAULT 0,
+		IncomeOnProfitSharing   MONEY DEFAULT 0,
+		AmtDueToOnBB			MONEY DEFAULT 0,
+		AmtDueToOnProfitSharing MONEY DEFAULT 0
 	)
 
 
@@ -1323,7 +1327,7 @@ BEGIN
 		SELECT ParentId, ParentName, ProductID,LicensingFee,PayToSupplier,LicensingFee - PayToSupplier FROM @PPTotal 
 	END
 
-	INSERT INTO @Total (ParentId, ParentName, ProductID,TotalTrans,CustomerWinLoss,LicenseeWinLoss,LicensingFee,ExtraPT,PayToSupplier,CompanyIncome)
+	INSERT INTO @Total (ParentId, ParentName, ProductID,TotalTrans,CustomerWinLoss,LicenseeWinLoss,LicensingFee,ExtraPT,PayToSupplier,CompanyIncome,IncomeOnBB,IncomeOnProfitSharing,AmtDueToOnBB,AmtDueToOnProfitSharing)
 	SELECT 
 		td.ParentId,
 		td.ParentName,
@@ -1341,8 +1345,11 @@ BEGIN
 				 WHEN td.LicensingFee < 0 AND p.isKeepNegativeFee = 0 THEN 0 
 				 ELSE td.LicensingFee END - td.Bonus + td.CompanyTipShare)
 		- SUM(td.ExtraPT) 
-		- SUM(CASE WHEN td.PayToSupplier < 0 AND p.isKeepNegativePayToSupplier = 0 THEN 0 ELSE td.PayToSupplier END)  AS CompanyIncome
-
+		- SUM(CASE WHEN td.PayToSupplier < 0 AND p.isKeepNegativePayToSupplier = 0 THEN 0 ELSE td.PayToSupplier END)  AS CompanyIncome,
+		SUM(IncomeOnBB),
+		SUM(IncomeOnProfitSharing),
+		SUM(AmtDueToOnBB),
+		SUM(AmtDueToOnProfitSharing) 
 	FROM #Result td 
 	INNER JOIN @productDataView p ON td.ProductID = p.ProductID
 	GROUP BY td.ParentId, td.ParentName, td.ProductID
@@ -1353,7 +1360,9 @@ BEGIN
 			td.ProductID, 
 			p.ProductName ,
 			td.LicensingFee, 
-			CASE WHEN td.ProductID IN (10,24) AND td.PayToSupplier < 0 THEN 0 ELSE td.PayToSupplier END PayToSupplier, 
+			CASE WHEN td.ProductID IN (10,24) AND td.PayToSupplier < 0 THEN 0
+				 WHEN td.ProductID = 25 THEN CASE WHEN  IncomeOnBB > IncomeOnProfitSharing THEN AmtDueToOnBB ELSE AmtDueToOnProfitSharing END
+				 ELSE td.PayToSupplier END PayToSupplier, 
 			CASE WHEN td.ProductID IN (10,24) THEN td.LicensingFee - 	CASE WHEN td.PayToSupplier < 0 THEN 0 ELSE td.PayToSupplier END
 			ELSE td.CompanyIncome END  CompanyIncome
 	FROM @Total td
