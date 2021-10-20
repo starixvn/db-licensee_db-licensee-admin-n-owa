@@ -144,7 +144,7 @@ BEGIN
 
 	CREATE TABLE #ChargeInfoWithCredit (PartyID INT, ProductID INT,  IsDeposit INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME, DI_Rate MONEY, ChargeType INT, LicenseeID INT, ChargeID INT)
 	INSERT INTO #ChargeInfoWithCredit (PartyID, ProductID, IsDeposit, Fromdate, Todate, DI_Rate, ChargeType, LicenseeID, ChargeID )
-	SELECT PartyID, ProductID, IsDeposit, Fromdate, Todate, DI_Rate, ChargeType, LicenseeID, ChargeID FROM LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, @ProductCodes) c
+	SELECT PartyID, ProductID, IsDeposit, Fromdate, Todate, CASE WHEN ProductID = 22 AND isDeposit = 0 THEN 0 ELSE DI_Rate END, ChargeType, LicenseeID, ChargeID FROM LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, @ProductCodes) c
 
 	IF EXISTS(SELECT 1 FROM @productDataView WHERE ProductID = 69 ) 
 	BEGIN
