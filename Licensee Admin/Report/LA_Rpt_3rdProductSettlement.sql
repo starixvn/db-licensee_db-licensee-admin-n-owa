@@ -673,7 +673,7 @@ BEGIN
 			FROM	LA_f_BettypeProductMapping(0,@ProductRptbettingSource) la
 			LEFT JOIN bodb02.dbo.SportBettypeMatrix ma (NOLOCK) ON la.Bettype = ma.BetType 
 
-			IF EXISTS (SELECT 1 FROM @productDataView WHERE isRptBettingSource = 1 AND ProductCode = 'SB_38')
+			IF EXISTS (SELECT 1 FROM @productDataView WHERE isRptBettingSource = 1 AND ProductCode = 'SB_BetBuilder')
 			BEGIN
 				INSERT INTO @bettype(Bettype, ProductID)
 				SELECT 38 AS Bettype, 0 -- -1: BetBuilder
