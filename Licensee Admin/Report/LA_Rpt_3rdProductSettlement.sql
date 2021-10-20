@@ -151,14 +151,14 @@ BEGIN
 		IF EXISTS(SELECT 1 FROM @productDataView WHERE ProductID = 0 )
 		BEGIN
 			INSERT INTO #ChargeInfoWithCredit (PartyID, ProductID, IsDeposit, Fromdate, Todate, DI_Rate, ChargeType, LicenseeID, ChargeID )
-			SELECT PartyID, 69 AS ProductID, IsDeposit, Fromdate, Todate, DI_Rate, ChargeType, LicenseeID, ChargeID  --Clone BTC setting 
+			SELECT PartyID, 69 AS ProductID, IsDeposit, Fromdate, Todate, CASE WHEN IsDeposit = 0 THEN 0 ELSE  DI_Rate END , ChargeType, LicenseeID, ChargeID  --Clone BTC setting 
 			FROM	#ChargeInfoWithCredit 
 			WHERE ProductID = 0
 		END
 		ELSE 
 		BEGIN
 			UPDATE #ChargeInfoWithCredit
-			SET ProductID = 69
+			SET ProductID = 69, DI_Rate = CASE WHEN  IsDeposit = 0 THEN 0 ELSE  DI_Rate END 
 			WHERE ProductID = 0
 		END
 	END
