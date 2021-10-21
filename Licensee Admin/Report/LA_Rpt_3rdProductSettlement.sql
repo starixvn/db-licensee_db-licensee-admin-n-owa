@@ -1330,13 +1330,13 @@ BEGIN
 		SUM(td.TotalTrans),
 		SUM(td.CustomerWinLoss) ,
 		SUM(td.LicenseeWinLoss) ,
-		SUM(CASE WHEN td.IsKeepNegativeAmount = 1 THEN  td.LicensingFee
+		SUM(CASE WHEN td.IsKeepNegativeAmount = 1 AND td.ProductID IN (2,5,8,27,28,45,67,68) THEN  td.LicensingFee
 				 WHEN td.LicensingFee < 0 AND p.isKeepNegativeFee = 0 THEN 0 
 				 ELSE td.LicensingFee END - td.Bonus + td.CompanyTipShare) AS LicensingFee,
 		SUM(td.ExtraPT),
 		SUM(CASE WHEN td.PayToSupplier < 0 AND p.isKeepNegativePayToSupplier = 0 THEN 0 ELSE td.PayToSupplier END) AS PayToSupplier,
 		
-		SUM(CASE WHEN td.IsKeepNegativeAmount = 1 THEN  td.LicensingFee
+		SUM(CASE WHEN td.IsKeepNegativeAmount = 1 AND td.ProductID IN (2,5,8,27,28,45,67,68) THEN  td.LicensingFee
 				 WHEN td.LicensingFee < 0 AND p.isKeepNegativeFee = 0 THEN 0 
 				 ELSE td.LicensingFee END - td.Bonus + td.CompanyTipShare)
 		- SUM(td.ExtraPT) 
