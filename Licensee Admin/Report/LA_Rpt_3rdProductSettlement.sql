@@ -1362,7 +1362,7 @@ BEGIN
 				 ELSE td.PayToSupplier END PayToSupplier, 
 			CASE WHEN td.ProductID IN (10,24,27,22) THEN td.LicensingFee - CASE WHEN td.PayToSupplier < 0 THEN 0 ELSE td.PayToSupplier END
 				 WHEN td.ProductID = 25 THEN td.LicensingFee -  CASE WHEN  IncomeOnBB > IncomeOnProfitSharing THEN AmtDueToOnBB ELSE AmtDueToOnProfitSharing END
-				 WHEN td.ProductID = -1 THEN td.LicensingFee - (td.CustomerWinLossBA + CommissionA) - td.PayToSupplier
+				 WHEN td.ProductID = -1 THEN td.LicensingFee - (td.CustomerWinLossBA + CommissionA) -  CASE WHEN td.PayToSupplier < 0 THEN 0 ELSE td.PayToSupplier END
 			ELSE td.CompanyIncome END  CompanyIncome
 	FROM @Total td
 	INNER JOIN @productDataView p ON td.ProductID = p.ProductID
