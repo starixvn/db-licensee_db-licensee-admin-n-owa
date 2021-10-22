@@ -1259,8 +1259,8 @@ BEGIN
 		)
 
 		;WITH TotalByParty AS(
-			SELECT p.ParentId,
-				pa.PartyName AS ParentName,
+			SELECT CASE WHEN p.PartyId = 14 THEN 14 ELSE p.ParentId END AS ParentId,
+				CASE WHEN p.PartyId = 14 THEN '12Bet' ELSE pa.PartyName END AS ParentName,
 				td.ProductID,
 				SUM(td.TotalTrans)								TotalTrans,
 				SUM(td.WinPrizeAmount * e.BaseCurrencyRate)		WinPrizeAmount,
@@ -1276,7 +1276,7 @@ BEGIN
 			INNER JOIN #PartyList pa ON P.ParentId = pa.PartyId
 			INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName) e  ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLostDate
 			WHERE td.ProductID = 32
-			GROUP BY p.ParentId,p.PartyId,pa.PartyName,td.ProductID
+			GROUP BY CASE WHEN p.PartyId = 14 THEN 14 ELSE p.ParentId END,p.PartyId,CASE WHEN p.PartyId = 14 THEN '12Bet' ELSE pa.PartyName END,td.ProductID
 		)
 		INSERT INTO @PPTotal (ParentId,ParentName,ProductID,TotalTrans,WinPrizeAmount,Contribution,JackpotPrize,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
 		SELECT ParentId,
@@ -1324,8 +1324,8 @@ BEGIN
 
 	INSERT INTO @Total (ParentId, ParentName, ProductID,TotalTrans,CustomerWinLoss,LicenseeWinLoss,LicensingFee,ExtraPT,PayToSupplier,CompanyIncome,IncomeOnBB,IncomeOnProfitSharing,AmtDueToOnBB,AmtDueToOnProfitSharing,CustomerWinLossBA,CommissionA)
 	SELECT 
-		td.ParentId,
-		td.ParentName,
+		CASE WHEN  td.PartyId = 14 THEN 14 ELSE td.ParentId END,
+		CASE WHEN  td.PartyId = 14 THEN '12Bet' ELSE td.ParentName END,
 		td.ProductID,
 		SUM(td.TotalTrans),
 		SUM(td.CustomerWinLoss) ,
@@ -1349,7 +1349,8 @@ BEGIN
 		SUM(CommissionA)			
 	FROM #Result td 
 	INNER JOIN @productDataView p ON td.ProductID = p.ProductID
-	GROUP BY td.ParentId, td.ParentName, td.ProductID
+	GROUP BY 	CASE WHEN  td.PartyId = 14 THEN 14 ELSE td.ParentId END,
+				CASE WHEN  td.PartyId = 14 THEN '12Bet' ELSE td.ParentName END, td.ProductID
 
 	-- Final result
 	SELECT td.ParentId AS BillingGroupId,  
