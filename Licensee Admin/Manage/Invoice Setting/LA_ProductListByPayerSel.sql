@@ -25,10 +25,8 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @SLTCutoffDate DATE = '2021-10-31'
-
 	SELECT p.ProductId, p.ProductCode AS ProductPrefix , p.ProductName
-	FROM dbo.LA_f_GroupProduct('',@SLTCutoffDate,@SLTCutoffDate) p
+	FROM dbo.LA_f_GroupProduct('',NULL,NULL) p
 	WHERE EXISTS (
 		SELECT 1
 		FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)

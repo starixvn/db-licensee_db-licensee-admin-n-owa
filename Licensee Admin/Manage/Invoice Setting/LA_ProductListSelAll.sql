@@ -17,10 +17,8 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @SLTCutoffDate DATE = '2021-10-31'
-
 	SELECT p.ProductID, p.ProductName, p.ProductCode  
-	FROM dbo.LA_f_GroupProduct('',@SLTCutoffDate,@SLTCutoffDate) p
+	FROM dbo.LA_f_GroupProduct('',NULL,NULL) p
 	WHERE p.ProductId = p.GroupProductId
 
 END

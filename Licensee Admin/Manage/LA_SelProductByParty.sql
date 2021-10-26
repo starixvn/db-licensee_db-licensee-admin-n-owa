@@ -21,11 +21,8 @@ Param's Explanation:
 SET NOCOUNT ON
 
 BEGIN
-
-	DECLARE @SLTCutoffDate DATE = '2021-10-31'
-
 	SELECT p.ProductCode, p.ProductName
-	FROM dbo.LA_f_GroupProduct_danny('',@SLTCutoffDate,@SLTCutoffDate) p
+	FROM dbo.LA_f_GroupProduct('',NULL,NULL) p
 	WHERE EXISTS (
 		SELECT 1
 		FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)

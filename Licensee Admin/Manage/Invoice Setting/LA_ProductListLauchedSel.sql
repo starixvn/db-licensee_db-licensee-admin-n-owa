@@ -20,10 +20,9 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @SLTCutoffDate DATE = '2021-10-31'
 
 	SELECT p.ProductID, p.ProductCode  ProductPrefix, p.ProductName
-	FROM dbo.LA_f_GroupProduct('',@SLTCutoffDate,@SLTCutoffDate) p
+	FROM dbo.LA_f_GroupProduct('',NULL,NULL) p
 	WHERE p.ProductId NOT IN (1, 7, 9, 16) -- RB, BG, PTCS, HF
 		AND (
 			p.ProductId = 0 -- always SB

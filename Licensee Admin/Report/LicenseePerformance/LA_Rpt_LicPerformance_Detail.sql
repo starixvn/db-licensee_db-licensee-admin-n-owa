@@ -164,6 +164,10 @@ BEGIN
 		SELECT DISTINCT PartyId, LicenseeId, ProductId, FromDate, ToDate
 		FROM bodb_Licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FDate, @TDate, @ProductCodes)
 
+		DECLARE @Products TABLE (GroupProductId INT, ProductId INT, FromDate DATE, ToDate DATE)
+		INSERT INTO @Products (GroupProductId, ProductId, FromDate, ToDate)
+		SELECT GroupProductId, ProductId, FromDate, ToDate FROM dbo.LA_f_GroupProduct(@ProductCodes,@FDate,@TDate) 
+
 		;WITH CTE_PerformanceData AS (
 			SELECT r.rptDate, r.SiteId, ISNULL(gp.GroupProductId, r.ProductId) AS ProductId, r.CurrencyId
 				,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE r.BetCount END) AS BetCount
@@ -194,7 +198,7 @@ BEGIN
 				GROUP BY rptDate, SiteId, ProductId, CurrencyId, Bettype
 				UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL -- sum data first
 			) r
-				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCodes,@FDate,@TDate) gp ON r.ProductId = gp.ProductId
+				LEFT JOIN @Products gp ON r.ProductId = gp.ProductId AND r.rptDate BETWEEN gp.FromDate AND gp.ToDate
 				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupBettype() gb ON r.Bettype = gb.Bettype
 			GROUP BY r.rptDate, r.SiteId, ISNULL(gp.GroupProductId, r.ProductId), r.CurrencyId
 		)
@@ -247,6 +251,10 @@ BEGIN
 		SELECT DISTINCT PartyId, LicenseeId, ProductId, FromDate, ToDate
 		FROM bodb_Licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @PrevFDate, @PrevTDate, @ProductCodes)
 
+		DECLARE @PrevProducts TABLE (GroupProductId INT, ProductId INT, FromDate DATE, ToDate DATE)
+		INSERT INTO @PrevProducts (GroupProductId, ProductId, FromDate, ToDate)
+		SELECT GroupProductId, ProductId, FromDate, ToDate FROM dbo.LA_f_GroupProduct(@ProductCodes,@PrevFDate,@PrevTDate) 
+
 		;WITH CTE_PerformanceData AS (
 			SELECT r.rptDate, r.SiteId, ISNULL(gp.GroupProductId, r.ProductId) AS ProductId, r.CurrencyId
 				,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE r.BetCount END) AS BetCount
@@ -277,7 +285,7 @@ BEGIN
 				GROUP BY rptDate, SiteId, ProductId, CurrencyId, Bettype
 				UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL -- sum data first
 			) r
-				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCodes,@PrevFDate,@PrevTDate) gp ON r.ProductId = gp.ProductId
+				LEFT JOIN @PrevProducts gp ON r.ProductId = gp.ProductId AND r.rptDate BETWEEN gp.FromDate AND gp.ToDate
 				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupBettype() gb ON r.Bettype = gb.Bettype
 			GROUP BY r.rptDate, r.SiteId, ISNULL(gp.GroupProductId, r.ProductId), r.CurrencyId
 		)
