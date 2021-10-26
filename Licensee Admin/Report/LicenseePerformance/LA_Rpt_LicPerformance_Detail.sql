@@ -74,6 +74,7 @@ AS
 		- 20211005@Percy: Get date only for Previous Date [RedmineID: #162753]
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
+		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -193,7 +194,7 @@ BEGIN
 				GROUP BY rptDate, SiteId, ProductId, CurrencyId, Bettype
 				UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL -- sum data first
 			) r
-				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct() gp ON r.ProductId = gp.ProductId
+				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCodes,@FDate,@TDate) gp ON r.ProductId = gp.ProductId
 				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupBettype() gb ON r.Bettype = gb.Bettype
 			GROUP BY r.rptDate, r.SiteId, ISNULL(gp.GroupProductId, r.ProductId), r.CurrencyId
 		)
@@ -276,7 +277,7 @@ BEGIN
 				GROUP BY rptDate, SiteId, ProductId, CurrencyId, Bettype
 				UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL -- sum data first
 			) r
-				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct() gp ON r.ProductId = gp.ProductId
+				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCodes,@PrevFDate,@PrevTDate) gp ON r.ProductId = gp.ProductId
 				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupBettype() gb ON r.Bettype = gb.Bettype
 			GROUP BY r.rptDate, r.SiteId, ISNULL(gp.GroupProductId, r.ProductId), r.CurrencyId
 		)

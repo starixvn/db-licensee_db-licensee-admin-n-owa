@@ -23,6 +23,7 @@ AS
 		- 20210923@Danny: Rollback code: filter licensee status from OIC [#162115]
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
+		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 */
 
 BEGIN
@@ -53,7 +54,7 @@ BEGIN
 		SELECT ProductId, ProductName, ProductCode FROM (VALUES (0, 'Sportsbook', 'SB'), (-3, 'Discount', ''), (-2, 'Rebate', ''),  (-99, 'Total', '')) t (ProductId, ProductName, ProductCode)
 		UNION ALL SELECT ProductId, ProductName, ProductPrefix FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductId <> 16 AND (EndOfSupportDate IS NULL OR EndOfSupportDate >= @FromDate) AND OfferSite IN (0, 2) -- Deposit only
 	) p
-		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId AND g.ProductId <> g.GroupProductId
+		LEFT JOIN dbo.LA_f_GroupProduct('',@FromDate,@ToDate) g ON p.ProductId = g.ProductId AND g.ProductId <> g.GroupProductId
 	WHERE g.ProductId IS NULL
 
 	DECLARE @ProductCodes VARCHAR(MAX)

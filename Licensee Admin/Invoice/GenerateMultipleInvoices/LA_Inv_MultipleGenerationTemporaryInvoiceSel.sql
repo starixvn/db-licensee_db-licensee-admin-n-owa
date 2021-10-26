@@ -21,6 +21,7 @@ AS
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20211105@Percy: Fix issue missing Saba Promotion [RedmineID: #159691]
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
+		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -46,7 +47,7 @@ BEGIN
 		UNION ALL
 		SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductPrefix
 		FROM dbo.Product3rd p WITH (NOLOCK)
-			LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId
+			LEFT JOIN dbo.LA_f_GroupProduct('',@FromDate,@ToDate) g ON p.ProductId = g.ProductId
 		WHERE p.ProductId NOT IN (16)
 			AND (p.EndOfSupportDate IS NULL OR p.EndOfSupportDate >= @FromDate)
 			AND p.OfferSite IN (0, 2) -- Deposit

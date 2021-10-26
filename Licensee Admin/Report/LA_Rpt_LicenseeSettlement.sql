@@ -55,6 +55,7 @@ AS
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20211115@Percy: Return IsShowOddsSpread [RedmineID: #164411]
+		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 
 	Param's Explanation:
 */
@@ -167,6 +168,7 @@ BEGIN
 	(
 		SELECT Bettype, ProductID
 		FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, @ProductCode)
+		WHERE ProductID IN (SELECT x.ProductID FROM bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCode,@FromDate,@ToDate) x)
 	)
 	
 	SELECT @LicenseeID = LicenseeID FROM @ChargeInfo
@@ -846,7 +848,7 @@ BEGIN
 				AND (b.CurrencyID <> 20)
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND b.customercategory NOT IN (27, 28)
-				AND b.ProductID IN (SELECT ProductId FROM bodb_Licensee.dbo.LA_f_GroupProduct() WHERE GroupProductId = 0)
+				AND b.ProductID IN (SELECT ProductId FROM bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCode,@FromDate,@ToDate) WHERE GroupProductId = 0)
 			GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
 		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, GrossCompany, Company, Betcount, OddsSpreadCost, IsShowOddsSpread)

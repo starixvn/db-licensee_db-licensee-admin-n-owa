@@ -13,16 +13,17 @@ AS
 	Revisions:     	
 		- 20170301@Scofield: Update to exclude 'RB', 'BG', 'PTCS', 'HF' and inclucde 'SB' [#70050]
 		- 20210812@Percy: Exclude BitCoin from Product drop-down list [RedmineID: #159691]
+		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 	
 	Example:
 		EXEC dbo.LA_ProductListLauchedSel
 */
 BEGIN
 	SET NOCOUNT ON
+	DECLARE @SLTCutoffDate DATE = '2021-10-31'
 
-	SELECT p.ProductID, p.ProductPrefix, p.ProductName
-	FROM dbo.LA_f_Products3rd('') p
-		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId AND g.ProductId <> g.GroupProductId
+	SELECT p.ProductID, p.ProductCode  ProductPrefix, p.ProductName
+	FROM dbo.LA_f_GroupProduct('',@SLTCutoffDate,@SLTCutoffDate) p
 	WHERE p.ProductId NOT IN (1, 7, 9, 16) -- RB, BG, PTCS, HF
 		AND (
 			p.ProductId = 0 -- always SB
@@ -35,6 +36,6 @@ BEGIN
 				WHERE lp.ProductId = p.ProductId
 			)
 		)
-		AND g.ProductId IS NULL
+		AND p.ProductId = p.GroupProductId
 END
 GO

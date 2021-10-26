@@ -43,6 +43,7 @@ AS
 	- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 	- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 	- 20211115@Percy: Return IsShowOddsSpread [RedmineID: #164411]
+	- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 	
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -79,9 +80,8 @@ BEGIN
 	
 	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20))
 	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode)
-	SELECT ISNULL(g.GroupProductId, p.ProductId), ISNULL(g.ProductId, p.ProductId), ISNULL(g.ProductName, p.ProductName), ISNULL(g.ProductCode, p.ProductPrefix)
-	FROM bodb_Licensee.dbo.LA_f_Products3rd(@ProductCodes) p
-		LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct() g ON p.ProductId = g.GroupProductId
+	SELECT GroupProductId, ProductId, ProductName, ProductCode 
+	FROM bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCodes, @FromDate, @ToDate) g
 
 	SET @ProductCodes = NULL
 	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #Products

@@ -21,6 +21,7 @@ AS
 
 	Revisions:
 		- 20210909@Percy: Initialize SP [RedmineID: #157652]
+		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -238,7 +239,7 @@ BEGIN
 		,SUM(r.CommShare) AS CommShare
 		,SUM(r.CashInShare) AS CashInShare
 	FROM CTE_tempData r
-		LEFT JOIN dbo.LA_f_GroupProduct() g ON r.ProductId = g.ProductId
+		LEFT JOIN dbo.LA_f_GroupProduct(@ProductCodes,@FromDate,@ToDate) g ON r.ProductId = g.ProductId
 		LEFT JOIN dbo.LA_f_GroupBettype() b ON r.Bettype = b.Bettype
 	GROUP BY r.rptDate, r.SiteId, ISNULL(g.GroupProductId, r.ProductId), r.CurrencyId
 		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005) THEN r.Bettype ELSE -1 END
