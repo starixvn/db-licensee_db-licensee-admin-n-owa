@@ -166,7 +166,7 @@ BEGIN
 
 		DECLARE @Products TABLE (GroupProductId INT, ProductId INT, FromDate DATE, ToDate DATE)
 		INSERT INTO @Products (GroupProductId, ProductId, FromDate, ToDate)
-		SELECT GroupProductId, ProductId, FromDate, ToDate FROM dbo.LA_f_GroupProduct(@ProductCodes,@FDate,@TDate) 
+		SELECT GroupProductId, ProductId, FromDate, ToDate FROM bodb_licensee.dbo.LA_f_GroupProduct(@ProductCodes,@FDate,@TDate) 
 
 		;WITH CTE_PerformanceData AS (
 			SELECT r.rptDate, r.SiteId, ISNULL(gp.GroupProductId, r.ProductId) AS ProductId, r.CurrencyId
@@ -253,7 +253,7 @@ BEGIN
 
 		DECLARE @PrevProducts TABLE (GroupProductId INT, ProductId INT, FromDate DATE, ToDate DATE)
 		INSERT INTO @PrevProducts (GroupProductId, ProductId, FromDate, ToDate)
-		SELECT GroupProductId, ProductId, FromDate, ToDate FROM dbo.LA_f_GroupProduct(@ProductCodes,@PrevFDate,@PrevTDate) 
+		SELECT GroupProductId, ProductId, FromDate, ToDate FROM bodb_licensee.dbo.LA_f_GroupProduct(@ProductCodes,@PrevFDate,@PrevTDate) 
 
 		;WITH CTE_PerformanceData AS (
 			SELECT r.rptDate, r.SiteId, ISNULL(gp.GroupProductId, r.ProductId) AS ProductId, r.CurrencyId

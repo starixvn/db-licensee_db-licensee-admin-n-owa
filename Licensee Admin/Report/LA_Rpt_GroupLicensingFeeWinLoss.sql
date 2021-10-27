@@ -35,9 +35,9 @@ BEGIN
 	DECLARE @ChargeInfo TABLE(ChargeID INT, PartyID INT, LicenseeID INT, ProductID INT,Rate MONEY, Fromdate DATE, Todate DATE)
 	CREATE TABLE #Data (rptDate DATE, PartyID INT, ProductID INT, Currency INT, BetTypeId INT, Winloss MONEY, AComm MONEY)
 	CREATE TABLE #Report (PartyID INT, ProductID INT, CurrencyID INT, Company MONEY)
-	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20))
-	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode)
-	SELECT GroupProductId, ProductId, ProductName, ProductCode 
+	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20), FromDate DATE, ToDate DATE)
+	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode, FromDate, ToDate)
+	SELECT GroupProductId, ProductId, ProductName, ProductCode, FromDate, ToDate 
 	FROM bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCodes, @FromDate, @ToDate) g
 
 	SET @ProductCodes = NULL
@@ -164,7 +164,7 @@ BEGIN
 			, SUM(CASE WHEN b.Bettype = 999 THEN 0 ELSE ISNULL(-b.MemberWL, 0) END * ISNULL(cr.Rate, ci.Rate)) AS LicencingFee
 			, SUM(CASE WHEN b.Bettype = 999 THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS OddsSpreadCost
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN #Products p ON b.ProductId = p.ProductId
+			INNER JOIN #Products p ON b.ProductId = p.ProductId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND p.GroupProductId = ci.ProductID AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND b.CurrencyId = cr.CurrencyID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate

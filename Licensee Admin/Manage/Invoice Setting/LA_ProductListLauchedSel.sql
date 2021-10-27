@@ -21,8 +21,10 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
+	DECLARE @Today DATE = GETDATE()
+
 	SELECT p.ProductID, p.ProductCode  ProductPrefix, p.ProductName
-	FROM dbo.LA_f_GroupProduct('',NULL,NULL) p
+	FROM dbo.LA_f_GroupProduct('',@Today,@Today) p
 	WHERE p.ProductId NOT IN (1, 7, 9, 16) -- RB, BG, PTCS, HF
 		AND (
 			p.ProductId = 0 -- always SB
@@ -32,7 +34,7 @@ BEGIN
 					INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON op.PartyId = pd.PartyId
 					LEFT JOIN dbo.Labels l WITH (NOLOCK) ON op.OldRefId = l.LicenseeId
 					INNER JOIN dbo.LicenseeProduct3rd lp WITH (NOLOCK) ON lp.LicenseeId = CASE WHEN pd.IsDeposit = 0 THEN l.LabelId ELSE op.OldRefId END
-				WHERE lp.ProductId = p.ProductId
+				WHERE lp.ProductId = p.ProductId AND op.PartyID = @PayerId
 			)
 		)
 		AND p.ProductId = p.GroupProductId

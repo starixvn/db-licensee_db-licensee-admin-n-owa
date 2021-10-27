@@ -78,9 +78,9 @@ BEGIN
 	
 	CREATE TABLE #Data (rptDate DATE, PartyID INT, ProductID INT, Currency INT,BetTypeId INT, Turnover MONEY, Winloss MONEY, AWinloss MONEY, AComm MONEY, PComm MONEY, Betcount BIGINT)
 	
-	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20))
-	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode)
-	SELECT GroupProductId, ProductId, ProductName, ProductCode 
+	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20), FromDate DATE, ToDate DATE)
+	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode, FromDate, ToDate)
+	SELECT GroupProductId, ProductId, ProductName, ProductCode, FromDate, Todate 
 	FROM bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCodes, @FromDate, @ToDate) g
 
 	SET @ProductCodes = NULL
@@ -396,7 +396,7 @@ BEGIN
 			, CONVERT(TINYINT, MAX(CASE WHEN b.Bettype = @OddsSpread_BetType THEN 1 ELSE 0 END)) AS IsShowOddsSpread
 		INTO #TmpData
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN #Products p ON b.ProductId = p.ProductId
+			INNER JOIN #Products p ON b.ProductId = p.ProductId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			INNER JOIN (
 				SELECT DISTINCT PartyId, LicenseeId, ProductID 
 				FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)

@@ -78,9 +78,9 @@ BEGIN
 	ELSE
 		INSERT INTO @Currency SELECT val FROM dbo.strSplit(@CurrencyIds, ',')
 
-	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20))
-	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode)
-	SELECT GroupProductId, ProductId, ProductName, ProductCode 
+	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20), FromDate DATE, ToDate DATE)
+	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode, FromDate, ToDate)
+	SELECT GroupProductId, ProductId, ProductName, ProductCode , FromDate, ToDate
 	FROM bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCodes, @FromDate, @ToDate) g
 
 	SET @ProductCodes = NULL
@@ -356,7 +356,7 @@ BEGIN
 					,SUM(WinlossA) AS WinlossA
 					,MAX(b.IsShowOddsSpread) AS IsShowOddsSpread
 			FROM #tmpData b
-				INNER JOIN #Products p ON b.ProductId = p.ProductId
+				INNER JOIN #Products p ON b.ProductId = p.ProductId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			GROUP BY b.rptDate, b.LicenseeId, b.CurrencyId, p.GroupProductId
 		)
 		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm, OddsSpreadCost, IsShowOddsSpread)

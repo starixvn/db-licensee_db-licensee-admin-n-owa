@@ -74,11 +74,11 @@ BEGIN
 						AmtDueToBA MONEY, CommBA MONEY, Company MONEY, Betcount INT, OddsSpreadCost MONEY, IsShowOddsSpread TINYINT DEFAULT(0))
 	CREATE TABLE #Exchange (ExchangeId INT, ExchangeDate DATE, Code VARCHAR(20), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, CNY FLOAT, Base FLOAT)
 	CREATE TABLE #Data (PartyID INT, rptDate DATE,ProductID INT, Currency INT,BetTypeId INT, Turnover MONEY, Winloss MONEY, AWinloss MONEY, AComm MONEY, PComm MONEY, Betcount BIGINT)
-	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20))
+	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20), FromDate DATE, ToDate DATE)
 	CREATE TABLE #ChargeInfo (PartyID INT, LicenseeID INT, ProductID INT, BetTypeID INT, Rate MONEY, Fromdate DATE , Todate DATE, ChargeType TINYINT, ChargeID INT)
 
-	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode)
-	SELECT GroupProductId, ProductId, ProductName, ProductCode 
+	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode, FromDate, ToDate)
+	SELECT GroupProductId, ProductId, ProductName, ProductCode, FromDate, ToDate
 	FROM bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCodes, @FromDate, @ToDate) g
 
 	SET @ProductCodes = NULL
@@ -375,7 +375,7 @@ BEGIN
 			, CONVERT(TINYINT, MAX(CASE WHEN b.Bettype = @OddsSpread_BetType THEN 1 ELSE 0 END)) AS IsShowOddsSpread
 		INTO #TmpData
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN #Products p ON b.ProductId = p.ProductId
+			INNER JOIN #Products p ON b.ProductId = p.ProductId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			INNER JOIN (SELECT DISTINCT PartyID, LicenseeId, ProductID FROM #ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON b.SiteID = ci.LicenseeID AND p.GroupProductId = ci.ProductID
 			LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','999,4297,1698,3898') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
@@ -526,7 +526,7 @@ BEGIN
 		, CAST(SUM(OddsSpreadCost * e.CNY) AS MONEY) AS OddsSpreadCostCNY
 	FROM #Report b
 		INNER JOIN #Exchange e ON e.ExchangeDate = b.ReportDate AND e.ExchangeId = b.CurrencyID
-		INNER JOIN #Products p ON b.ProductID = p.ProductID
+		INNER JOIN #Products p ON b.ProductID = p.ProductID AND b.ReportDate BETWEEN p.FromDate AND p.ToDate
 		LEFT JOIN @CurrencyTable t ON b.CurrencyID = t.currency
 	GROUP BY b.CurrencyID, p.Productid, p.ProductName,
 			CASE WHEN @ReportBy = 1 THEN CONVERT(VARCHAR(8), b.ReportDate, 112)

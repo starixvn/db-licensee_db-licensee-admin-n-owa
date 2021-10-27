@@ -92,7 +92,7 @@ BEGIN
 	BEGIN
 		CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductCode VARCHAR(100), ProductName VARCHAR(100))
 		INSERT INTO #Products (GroupProductId, ProductId, ProductCode, ProductName)
-		SELECT GroupProductId, ProductId, ProductName, ProductCode 
+		SELECT GroupProductId, ProductId, ProductCode ,ProductName
 		FROM   dbo.LA_f_GroupProduct('', @FromDate, @ToDate) g
 		WHERE g.ProductId NOT IN (
 			1, 4, 7, 9, 12, 14, 17, 30, 33 -- inactive
