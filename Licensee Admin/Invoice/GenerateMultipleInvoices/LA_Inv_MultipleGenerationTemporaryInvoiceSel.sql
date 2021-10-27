@@ -202,6 +202,7 @@ BEGIN
 				,@ToDate = @ToDate
 				,@LicensingFeeTypeIds = '0,-1' -- -1: Deduction (AMF, AGPrepayment, Prepayment, ...)
 				,@BaseCurrencyName = @temp_BaseCurrencyName
+				,@Environment = @Environment
 
 			SET @RowId = @RowId + 1
 		END

@@ -164,13 +164,13 @@ BEGIN
 
 		INSERT INTO @PartyChargeInfo (PartyId, LicenseeId, ProductId, FromDate, ToDate)
 		SELECT DISTINCT PartyId, LicenseeId, ProductId, FromDate, ToDate
-		FROM bodb_Licensee.dbo.LA_f_ChargeInfo(@PartyIds, @FDate, @TDate, @ProductCodes, 'OA', 1)
+		FROM bodb_Licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FDate, @TDate, @ProductCodes)
 
 		;WITH CTE_PerformanceData AS (
 			SELECT r.rptDate, r.SiteId, ISNULL(gp.GroupProductId, r.ProductId) AS ProductId, r.CurrencyId
 				,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE r.BetCount END) AS BetCount
 				,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE r.Turnover END) AS Turnover
-				,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE r.MemberWL END) AS MemberWL
+				,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE r.MemberWL + r.CommissionP END) AS MemberWL
 				,SUM(CommissionA) AS BACommission
 			FROM (
 				SELECT rptDate, SiteId, ProductId, CurrencyId, Bettype
@@ -185,6 +185,7 @@ BEGIN
 										WHEN StatusId IN (114, 115) THEN 0.5
 										ELSE 1 END) AS Turnover
 					,SUM(CASE WHEN ISNULL(TicketType, 0) = 2 THEN 0 ELSE MemberWL END) AS MemberWL
+					,SUM(CASE WHEN ProductId = 31 THEN CommissionP ELSE 0 END) AS CommissionP
 					,SUM(CASE WHEN ProductId = 3 THEN CommissionA ELSE 0 END) AS CommissionA
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct WITH (NOLOCK)
 				WHERE rptDate BETWEEN @FDate AND @TDate
@@ -192,7 +193,7 @@ BEGIN
 					AND CustomerCategory NOT IN (27, 28)
 					AND StatusId IN (111, 112, 113, 114, 115)
 				GROUP BY rptDate, SiteId, ProductId, CurrencyId, Bettype
-				UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL -- sum data first
+				UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL -- sum data first
 			) r
 				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct() gp ON r.ProductId = gp.ProductId
 				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupBettype() gb ON r.Bettype = gb.Bettype
@@ -245,13 +246,13 @@ BEGIN
 
 		INSERT INTO @PartyChargeInfo (PartyId, LicenseeId, ProductId, FromDate, ToDate)
 		SELECT DISTINCT PartyId, LicenseeId, ProductId, FromDate, ToDate
-		FROM bodb_Licensee.dbo.LA_f_ChargeInfo(@PartyIds, @PrevFDate, @PrevTDate, @ProductCodes, 'OA', 1)
+		FROM bodb_Licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @PrevFDate, @PrevTDate, @ProductCodes)
 
 		;WITH CTE_PerformanceData AS (
 			SELECT r.rptDate, r.SiteId, ISNULL(gp.GroupProductId, r.ProductId) AS ProductId, r.CurrencyId
 				,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE r.BetCount END) AS BetCount
 				,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE r.Turnover END) AS Turnover
-				,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE r.MemberWL END) AS MemberWL
+				,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE r.MemberWL + r.CommissionP END) AS MemberWL
 				,SUM(CommissionA) AS BACommission
 			FROM (
 				SELECT rptDate, SiteId, ProductId, CurrencyId, Bettype
@@ -266,6 +267,7 @@ BEGIN
 										WHEN StatusId IN (114, 115) THEN 0.5
 										ELSE 1 END) AS Turnover
 					,SUM(CASE WHEN ISNULL(TicketType, 0) = 2 THEN 0 ELSE MemberWL END) AS MemberWL
+					,SUM(CASE WHEN ProductId = 31 THEN CommissionP ELSE 0 END) AS CommissionP
 					,SUM(CASE WHEN ProductId = 3 THEN CommissionA ELSE 0 END) AS CommissionA
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct WITH (NOLOCK)
 				WHERE rptDate BETWEEN @PrevFDate AND @PrevTDate
@@ -273,7 +275,7 @@ BEGIN
 					AND CustomerCategory NOT IN (27, 28)
 					AND StatusId IN (111, 112, 113, 114, 115)
 				GROUP BY rptDate, SiteId, ProductId, CurrencyId, Bettype
-				UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL -- sum data first
+				UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL -- sum data first
 			) r
 				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct() gp ON r.ProductId = gp.ProductId
 				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupBettype() gb ON r.Bettype = gb.Bettype
@@ -379,6 +381,10 @@ BEGIN
 		OR (@LicenseePaying = 1 AND r.IsChargedByMinFee = 0 AND r.IsChargedByGroupMinFee = 0)
 		OR (@LicenseePaying = 2 AND r.IsChargedByMinFee = 1)
 		OR (@LicenseePaying = 3 AND r.IsChargedByGroupMinFee = 1)
+	)
+	AND (
+		r.TotalTrans > 0 OR r.PreviousTotalTrans > 0
+		OR r.SportsbookFee > 0 OR r.PreviousSportsbookFee > 0
 	)
 END
 GO

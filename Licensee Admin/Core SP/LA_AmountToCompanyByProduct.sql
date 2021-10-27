@@ -39,6 +39,9 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
+	IF @ToDate > CONVERT(DATE, GETDATE())
+		SET @ToDate = CONVERT(DATE, GETDATE())
+
 	-- Get Product List
 	CREATE TABLE #Products (ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(10), IsSelected BIT)
 	INSERT INTO #Products (ProductId, ProductName, ProductCode, IsSelected)
@@ -138,8 +141,7 @@ BEGIN
 			WHEN ProductId = 11 AND ChargeType = 12 THEN 1706 -- GD Tip
 			WHEN ProductId = 39 AND ChargeType = 12 THEN 3007 -- SA Tip
 			ELSE -1 END
-	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
-	WHERE ProductId <> 1 AND DI_Rate > 0
+	FROM dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, @ProductCodes)
 
 	-- For CB Charge Rate
 	DECLARE @MinCBDate DATE, @MaxCBDate DATE
@@ -416,11 +418,11 @@ BEGIN
 		SELECT ISNULL(r.PartyId, t.PartyId), ISNULL(r.ProductId, t.ProductId), t.GroupMinFeeId, t.GroupId, t.IsPrimary, t.FeeTypeId
 			,MAX(CASE WHEN t.FeeTypeId = 1 THEN t.ProrateMinFee ELSE 0 END) AS ProrateMinFee
 			,0 AS SecondaryLicensingFee
-			,SUM(CASE WHEN d.PartyId IS NULL THEN r.LicenseeAmount ELSE 0 END) AS NonMinFee
+			,SUM(CASE WHEN t.PartyId IS NULL THEN r.LicenseeAmount ELSE 0 END) AS NonMinFee
 			,SUM(ISNULL(r.LicenseeAmount, 0)) AS LicensingFee
 			,MAX(CASE WHEN t.FeeTypeId = 1 THEN t.BasedProrateMinFee ELSE 0 END) AS BasedProrateMinFee
 			,0 AS BasedSecondaryLicensingFee
-			,SUM(CASE WHEN d.PartyId IS NULL THEN r.BasedLicenseeAmount ELSE 0 END) AS BasedNonMinFee
+			,SUM(CASE WHEN t.PartyId IS NULL THEN r.BasedLicenseeAmount ELSE 0 END) AS BasedNonMinFee
 			,SUM(ISNULL(r.BasedLicenseeAmount, 0)) AS BasedLicensingFee
 			,SUM(ISNULL(r.GrossLicenseeAmount, 0)) AS GrossLicensingFee
 			,SUM(ISNULL(r.ExtraAmount, 0)) AS ExtraAmount

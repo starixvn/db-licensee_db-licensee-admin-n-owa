@@ -122,6 +122,7 @@ BEGIN
 			,@ToDate = @ToDate
 			,@LicensingFeeTypeIds = '0,-1,1,2,3,4,5' -- Contribution, Prize, ...
 			,@BaseCurrencyName = @BaseCurrencyName
+			,@Environment = @Environment
 
 		INSERT INTO @FinalResult (ProductId, ProductCode, ProductName, InvoiceAmount, AmountType, Rate, Remark)
 		SELECT p.ProductId, p.ProductPrefix, p.ProductName, d.InvoiceAmount, d.AmountType, d.Rate, d.Remark
