@@ -89,6 +89,7 @@ BEGIN
 		UNION ALL SELECT PartyId, -3, -SUM(Discount) FROM @Result GROUP BY PartyId HAVING SUM(Discount) <> 0
 		UNION ALL SELECT PartyId, -2, -SUM(Rebate) FROM @Result GROUP BY PartyId HAVING SUM(Rebate) <> 0
 	) t
+	WHERE t.LicensingFee <> 0
 
 	INSERT INTO #tmp_Result (PartyId, ProductId, LicensingFee)
 	SELECT PartyId, -99, SUM(LicensingFee) FROM #tmp_Result GROUP BY PartyId
