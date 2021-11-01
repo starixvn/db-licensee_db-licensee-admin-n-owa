@@ -193,6 +193,7 @@ BEGIN
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN (SELECT DISTINCT PartyId, LicenseeId, ProductID FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci 
 					ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
+			INNER JOIN #Products p ON b.ProductId = p.GroupProductId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			LEFT JOIN LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)

@@ -29,11 +29,11 @@ RETURN
 						CONVERT(VARCHAR(50), 'Sportsbook')	AS GroupProductName,
 						CONVERT(VARCHAR(20), 'SB')			AS GroupProductCode,
 						CASE WHEN ProductID = 63 THEN 
-						     CASE WHEN ISNULL(@Todate,'9999-12-31') > '2021-10-31' THEN CASE WHEN  ISNULL(@FromDate,'1900-01-01') <= '2021-10-31' THEN '2021-11-01' ELSE  ISNULL(@FromDate,'1900-01-01') END  END
+						     CASE WHEN ISNULL(@Todate,'9999-12-31') > '2021-11-30' THEN CASE WHEN  ISNULL(@FromDate,'1900-01-01') <= '2021-11-30' THEN '2021-12-01' ELSE  ISNULL(@FromDate,'1900-01-01') END  END
 						ELSE  ISNULL(@FromDate,'1900-01-01') END Fromdate,
 
 						CASE WHEN ProductID = 63 THEN 
-						     CASE WHEN ISNULL(@Todate,'9999-12-31') > '2021-10-31' THEN ISNULL(@Todate,'9999-12-31') ELSE NULL END 
+						     CASE WHEN ISNULL(@Todate,'9999-12-31') > '2021-11-30' THEN ISNULL(@Todate,'9999-12-31') ELSE NULL END 
 						ELSE ISNULL(@Todate,'9999-12-31') END Todate
 			FROM	bodb_Licensee.dbo.LA_f_Products3rd('SB,BTC,SLT') -- SB and BTC are always at the same group
 
@@ -45,9 +45,9 @@ RETURN
 						ProductId		AS GroupProductId,
 						ProductName		AS GroupProductName,
 						ProductPrefix	AS GroupProductCode,
-						CASE WHEN ProductID = 63 THEN CASE WHEN  ISNULL(@FromDate,'1900-01-01') <= '2021-10-31' THEN  ISNULL(@FromDate,'1900-01-01') ELSE NULL END
+						CASE WHEN ProductID = 63 THEN CASE WHEN  ISNULL(@FromDate,'1900-01-01') <= '2021-11-30' THEN  ISNULL(@FromDate,'1900-01-01') ELSE NULL END
 						ELSE  ISNULL(@FromDate,'1900-01-01') END FromDate,
-						CASE WHEN ProductID = 63 THEN  CASE WHEN ISNULL(@Todate,'9999-12-31') > '2021-10-31' THEN '2021-10-31' ELSE ISNULL(@Todate,'9999-12-31') END
+						CASE WHEN ProductID = 63 THEN  CASE WHEN ISNULL(@Todate,'9999-12-31') > '2021-11-30' THEN '2021-11-30' ELSE ISNULL(@Todate,'9999-12-31') END
 						ELSE ISNULL(@Todate,'9999-12-31') END Todate
 			FROM	bodb_Licensee.dbo.LA_f_Products3rd(@ProductCode)
 			WHERE	ProductId NOT IN (0, 69)

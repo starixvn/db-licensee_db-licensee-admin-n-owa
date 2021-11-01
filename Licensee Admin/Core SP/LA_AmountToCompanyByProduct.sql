@@ -225,7 +225,7 @@ BEGIN
 	)
 	INSERT INTO #TempData (rptDate, LicenseeId, ProductId, CurrencyId, BettypeRef, MemberWL, MemberComm, AgentWL, AgentComm
 		,Tips, Contribution, JackpotPrize, Prize, LuckyDraw, Bonus, OddsSpread, FreeBets, PayOut, CommShare, CashInShare)
-	SELECT r.rptDate, r.SiteId, ISNULL(g.GroupProductId, r.ProductId), r.CurrencyId
+	SELECT r.rptDate, r.SiteId, g.GroupProductId, r.CurrencyId
 		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005) THEN r.Bettype ELSE -1 END
 		,SUM(CASE WHEN r.TicketType = 2 OR b.Bettype IS NOT NULL THEN 0 ELSE r.MemberWL END) AS MemberWL
 		,SUM(r.CommissionP) AS MemberComm
@@ -243,9 +243,9 @@ BEGIN
 		,SUM(r.CommShare) AS CommShare
 		,SUM(r.CashInShare) AS CashInShare
 	FROM CTE_tempData r
-		LEFT JOIN @Products g ON r.ProductId = g.ProductId AND r.rptDate BETWEEN g.FromDate AND g.ToDate
+		INNER JOIN @Products g ON r.ProductId = g.ProductId AND r.rptDate BETWEEN g.FromDate AND g.ToDate
 		LEFT JOIN dbo.LA_f_GroupBettype() b ON r.Bettype = b.Bettype
-	GROUP BY r.rptDate, r.SiteId, ISNULL(g.GroupProductId, r.ProductId), r.CurrencyId
+	GROUP BY r.rptDate, r.SiteId, g.GroupProductId, r.CurrencyId
 		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005) THEN r.Bettype ELSE -1 END
 
 	CREATE TABLE #tmpResult (rptDate DATE, PartyId INT, ProductId INT, CurrencyId INT

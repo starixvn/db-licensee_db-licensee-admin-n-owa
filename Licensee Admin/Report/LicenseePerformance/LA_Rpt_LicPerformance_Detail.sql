@@ -169,7 +169,7 @@ BEGIN
 		SELECT GroupProductId, ProductId, FromDate, ToDate FROM bodb_licensee.dbo.LA_f_GroupProduct(@ProductCodes,@FDate,@TDate) 
 
 		;WITH CTE_PerformanceData AS (
-			SELECT r.rptDate, r.SiteId, ISNULL(gp.GroupProductId, r.ProductId) AS ProductId, r.CurrencyId
+			SELECT r.rptDate, r.SiteId, gp.GroupProductId AS ProductId, r.CurrencyId
 				,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE r.BetCount END) AS BetCount
 				,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE r.Turnover END) AS Turnover
 				,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE r.MemberWL + r.CommissionP END) AS MemberWL
@@ -198,9 +198,9 @@ BEGIN
 				GROUP BY rptDate, SiteId, ProductId, CurrencyId, Bettype
 				UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL -- sum data first
 			) r
-				LEFT JOIN @Products gp ON r.ProductId = gp.ProductId AND r.rptDate BETWEEN gp.FromDate AND gp.ToDate
+				INNER JOIN @Products gp ON r.ProductId = gp.ProductId AND r.rptDate BETWEEN gp.FromDate AND gp.ToDate
 				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupBettype() gb ON r.Bettype = gb.Bettype
-			GROUP BY r.rptDate, r.SiteId, ISNULL(gp.GroupProductId, r.ProductId), r.CurrencyId
+			GROUP BY r.rptDate, r.SiteId, gp.GroupProductId, r.CurrencyId
 		)
 		INSERT INTO #PerformanceData (rptDate, LicenseeId, PartyId, ProductId, CurrencyId, BetCount, Turnover, MemberWL, BACommission)
 		SELECT d.rptDate, d.SiteId, p.PartyId, d.ProductId, d.CurrencyId, SUM(d.BetCount), SUM(d.Turnover), SUM(d.MemberWL), SUM(d.BACommission)
@@ -256,7 +256,7 @@ BEGIN
 		SELECT GroupProductId, ProductId, FromDate, ToDate FROM bodb_licensee.dbo.LA_f_GroupProduct(@ProductCodes,@PrevFDate,@PrevTDate) 
 
 		;WITH CTE_PerformanceData AS (
-			SELECT r.rptDate, r.SiteId, ISNULL(gp.GroupProductId, r.ProductId) AS ProductId, r.CurrencyId
+			SELECT r.rptDate, r.SiteId, gp.GroupProductId  AS ProductId, r.CurrencyId
 				,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE r.BetCount END) AS BetCount
 				,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE r.Turnover END) AS Turnover
 				,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE r.MemberWL + r.CommissionP END) AS MemberWL
@@ -285,9 +285,9 @@ BEGIN
 				GROUP BY rptDate, SiteId, ProductId, CurrencyId, Bettype
 				UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL -- sum data first
 			) r
-				LEFT JOIN @PrevProducts gp ON r.ProductId = gp.ProductId AND r.rptDate BETWEEN gp.FromDate AND gp.ToDate
+				INNER JOIN @PrevProducts gp ON r.ProductId = gp.ProductId AND r.rptDate BETWEEN gp.FromDate AND gp.ToDate
 				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupBettype() gb ON r.Bettype = gb.Bettype
-			GROUP BY r.rptDate, r.SiteId, ISNULL(gp.GroupProductId, r.ProductId), r.CurrencyId
+			GROUP BY r.rptDate, r.SiteId, gp.GroupProductId , r.CurrencyId
 		)
 		INSERT INTO #PerformanceData (rptDate, LicenseeId, PartyId, ProductId, CurrencyId, BetCount, Turnover, MemberWL, BACommission)
 		SELECT d.rptDate, d.SiteId, p.PartyId, d.ProductId, d.CurrencyId, SUM(d.BetCount), SUM(d.Turnover), SUM(d.MemberWL), SUM(d.BACommission)

@@ -32,7 +32,7 @@ BEGIN
 	WHERE GroupProductId = @ProductId
 
 	DECLARE @ProductCode VARCHAR(MAX)
-	SELECT  @ProductCode = COALESCE(@ProductCode + ',', '') + ProductCode FROM @Products
+	SELECT  @ProductCode = COALESCE(@ProductCode + ',', '') + ProductCode FROM @Products WHERE GroupProductId = ProductId
 
 	DECLARE @tblSite TABLE (SiteId INT, Site VARCHAR(100))
 	INSERT INTO @tblSite (SiteId, Site)

@@ -121,7 +121,7 @@ BEGIN
 		ExchangeDate			DATE,
 		ExchangeID				INT,
 		CurrencyCode			VARCHAR(10),
-		Rate					DECIMAL(6,5)
+		Rate					FLOAT
 	)
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
 	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate

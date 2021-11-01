@@ -21,10 +21,8 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @Today DATE = GETDATE()
-
 	SELECT p.ProductID, p.ProductCode  ProductPrefix, p.ProductName
-	FROM dbo.LA_f_GroupProduct('',@Today,@Today) p
+	FROM dbo.LA_f_GroupProduct('',NULL,NULL) p
 	WHERE p.ProductId NOT IN (1, 7, 9, 16) -- RB, BG, PTCS, HF
 		AND (
 			p.ProductId = 0 -- always SB
