@@ -120,7 +120,7 @@ BEGIN
 			,@ProductCodes = @ProductCodes
 			,@FromDate = @FromDate
 			,@ToDate = @ToDate
-			,@LicensingFeeTypeIds = '0,-1,1,2,3,4,5' -- Contribution, Prize, ...
+			,@LicensingFeeTypeIds = '0,-1,1,2,3,4,5,6' -- Contribution, Prize, ...
 			,@BaseCurrencyName = @BaseCurrencyName
 			,@Environment = @Environment
 
@@ -131,7 +131,7 @@ BEGIN
 			CROSS APPLY (
 				SELECT Discount AS InvoiceAmount, CONVERT(TINYINT, 4) AS AmountType, DiscountRate AS Rate, DiscountRemark AS Remark WHERE Discount > 0 -- Discount
 				--UNION ALL SELECT Rebate, 6, RebateRate, RebateRemark WHERE Rebate > 0 -- Rebate
-				UNION ALL SELECT LicensingFee + ExtraAmount, 1, NULL, NULL -- Software Fee
+				UNION ALL SELECT LicensingFee, 1, NULL, NULL -- Software Fee
 			) d
 		WHERE r.LicensingFeeTypeId = 0 AND r.ProductId <> 37 -- SB Promotion
 
@@ -146,31 +146,31 @@ BEGIN
 			,CASE
 				WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
 				WHEN ProductId = 32 AND LicensingFeeTypeId = 2 THEN 32 -- JackpotPrize
-				WHEN ProductId = 32 AND LicensingFeeTypeId = 3 THEN 30 -- Prize
+				WHEN ProductId = 32 AND LicensingFeeTypeId = 3 THEN 30 -- Prizes
 				WHEN ProductId = 42 AND LicensingFeeTypeId = 1 THEN 35 -- Contribution
 				WHEN ProductId = 42 AND LicensingFeeTypeId = 2 THEN 36 -- JackpotPrize
-				WHEN ProductId = 42 AND LicensingFeeTypeId = 3 THEN 34 -- Prize
+				WHEN ProductId = 42 AND LicensingFeeTypeId = 6 THEN 34 -- Free Bets
 				WHEN ProductId = 66 AND LicensingFeeTypeId = 1 THEN 40 -- Contribution
 				WHEN ProductId = 66 AND LicensingFeeTypeId = 2 THEN 39 -- JackpotPrize
-				WHEN ProductId = 66 AND LicensingFeeTypeId = 3 THEN 38 -- Prize
+				WHEN ProductId = 66 AND LicensingFeeTypeId = 6 THEN 38 -- Free Bets
 				WHEN ProductId = 34 AND LicensingFeeTypeId = 4 THEN 33 -- Bonus
-				WHEN ProductId = 37 AND LicensingFeeTypeId = 5 THEN 37 -- Lucky Draw
+				WHEN ProductId = 45 AND LicensingFeeTypeId = 5 THEN 37 -- Lucky Draw
 				END
 		FROM @Result
-		WHERE ProductId IN (32, 34, 37, 42, 66) AND LicensingFeeTypeId > 0
+		WHERE ProductId IN (32, 34, 42, 45, 66) AND LicensingFeeTypeId > 0
 		GROUP BY
 			CASE
 				WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
 				WHEN ProductId = 32 AND LicensingFeeTypeId = 2 THEN 32 -- JackpotPrize
-				WHEN ProductId = 32 AND LicensingFeeTypeId = 3 THEN 30 -- Prize
+				WHEN ProductId = 32 AND LicensingFeeTypeId = 3 THEN 30 -- Prizes
 				WHEN ProductId = 42 AND LicensingFeeTypeId = 1 THEN 35 -- Contribution
 				WHEN ProductId = 42 AND LicensingFeeTypeId = 2 THEN 36 -- JackpotPrize
-				WHEN ProductId = 42 AND LicensingFeeTypeId = 3 THEN 34 -- Prize
+				WHEN ProductId = 42 AND LicensingFeeTypeId = 6 THEN 34 -- Free Bets
 				WHEN ProductId = 66 AND LicensingFeeTypeId = 1 THEN 40 -- Contribution
 				WHEN ProductId = 66 AND LicensingFeeTypeId = 2 THEN 39 -- JackpotPrize
-				WHEN ProductId = 66 AND LicensingFeeTypeId = 3 THEN 38 -- Prize
+				WHEN ProductId = 66 AND LicensingFeeTypeId = 6 THEN 38 -- Free Bets
 				WHEN ProductId = 34 AND LicensingFeeTypeId = 4 THEN 33 -- Bonus
-				WHEN ProductId = 37 AND LicensingFeeTypeId = 5 THEN 37 -- Lucky Draw
+				WHEN ProductId = 45 AND LicensingFeeTypeId = 5 THEN 37 -- Lucky Draw
 				END
 
 		-- AMF, Prepayment and AGPrepayment

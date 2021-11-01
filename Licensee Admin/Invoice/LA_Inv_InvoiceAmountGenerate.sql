@@ -219,8 +219,8 @@ BEGIN
 				INNER JOIN dbo.LA_f_Products3rd('') p ON r.ProductId = p.ProductId
 				CROSS APPLY (
 					SELECT Discount AS InvoiceAmount, CONVERT(TINYINT, 4) AS AmountType, DiscountRate AS Rate, DiscountRemark AS Remark WHERE Discount > 0 -- Discount
-					UNION ALL SELECT Rebate, 6, RebateRate, RebateRemark WHERE Rebate > 0 -- Discount
-					UNION ALL SELECT LicensingFee + ExtraAmount, 1, NULL, NULL -- Software Fee
+					UNION ALL SELECT Rebate, 6, RebateRate, RebateRemark -- Rebate
+					UNION ALL SELECT LicensingFee, 1, NULL, NULL -- Software Fee
 				) d
 			WHERE r.ProductId <> 37 -- SB Promotion
 				AND (
@@ -233,15 +233,15 @@ BEGIN
 			IF EXISTS (SELECT 1 FROM @FinalResult WHERE AmountType = 6 HAVING COUNT(1) > 1)
 			BEGIN
 				INSERT INTO @FinalResult (InvoiceAmount, AmountType, Rate, Remark, ProductId, ProductCode, ProductName)
-				SELECT SUM(InvoiceAmount), 6, Rate, Remark, -1
+				SELECT SUM(InvoiceAmount), 6, MAX(Rate), MAX(Remark), -1
 					,STUFF((SELECT ',' + f.ProductCode
-							FROM @FinalResult f WHERE f.AmountType = 6 AND f.Rate = r.Rate AND f.Remark = r.Remark
+							FROM @FinalResult f WHERE f.AmountType = 6 --AND f.Rate = r.Rate AND f.Remark = r.Remark
 							FOR XML PATH('')), 1, 1, '')
 					,STUFF((SELECT ',' + f.ProductName
-							FROM @FinalResult f WHERE f.AmountType = 6 AND f.Rate = r.Rate AND f.Remark = r.Remark
+							FROM @FinalResult f WHERE f.AmountType = 6 --AND f.Rate = r.Rate AND f.Remark = r.Remark
 							FOR XML PATH('')), 1, 1, '')
 				FROM @FinalResult r
-				GROUP BY Rate, Remark
+				--GROUP BY Rate, Remark
 
 				DELETE @FinalResult WHERE AmountType = 6 AND ProductId >= 0
 			END

@@ -79,12 +79,16 @@ BEGIN
 	-- Final Result
 	CREATE TABLE #tmp_Result (PartyId INT, ProductId INT, LicensingFee MONEY)
 	INSERT INTO #tmp_Result (PartyId, ProductId, LicensingFee)
-	SELECT r.PartyId
-		,CASE WHEN r.ProductId = 37 THEN -1 ELSE r.ProductId END
-		,CASE WHEN r.ProductId = 37 THEN -r.LicensingFee ELSE r.LicensingFee + r.ExtraAmount END
-	FROM @Result r
-	UNION ALL SELECT PartyId, -3, -SUM(Discount) FROM @Result GROUP BY PartyId
-	UNION ALL SELECT PartyId, -2, -SUM(Rebate) FROM @Result GROUP BY PartyId
+	SELECT PartyId, ProductId, LicensingFee
+	FROM (
+		SELECT r.PartyId
+			,CASE WHEN r.ProductId = 37 THEN -1 ELSE r.ProductId END AS ProductId
+			,CASE WHEN r.ProductId = 37 THEN -r.LicensingFee ELSE r.LicensingFee + r.ExtraAmount END AS LicensingFee
+		FROM @Result r
+		WHERE r.GrossLicensingFee <> 0 OR r.LicensingFee <> 0
+		UNION ALL SELECT PartyId, -3, -SUM(Discount) FROM @Result GROUP BY PartyId HAVING SUM(Discount) <> 0
+		UNION ALL SELECT PartyId, -2, -SUM(Rebate) FROM @Result GROUP BY PartyId HAVING SUM(Rebate) <> 0
+	) t
 
 	INSERT INTO #tmp_Result (PartyId, ProductId, LicensingFee)
 	SELECT PartyId, -99, SUM(LicensingFee) FROM #tmp_Result GROUP BY PartyId

@@ -101,7 +101,7 @@ BEGIN
 		,@ProductCodes = @ProductCodes
 		,@FromDate = @FromDate
 		,@ToDate = @ToDate
-		,@LicensingFeeTypeIds = '0,6' -- 6 = ContributionDiscount
+		,@LicensingFeeTypeIds = '0,7' -- 7 = ContributionDiscount
 		,@BaseCurrencyName = @BaseCurrency
 
 	DECLARE @FinalResult TABLE (PartyId INT, ProductId INT, AmountToCompany MONEY, LicensingFee MONEY, Discount MONEY, Rebate MONEY, Promotion MONEY, ContributionDiscount MONEY)
@@ -111,9 +111,9 @@ BEGIN
 		LEFT JOIN (
 			SELECT PartyId, CASE WHEN ProductId = 37 THEN 0 ELSE ProductId END AS ProductId
 				,SUM(CASE WHEN ProductId = 37 THEN LicensingFee ELSE 0 END) AS Promotion
-				,SUM(CASE WHEN LicensingFeeTypeId = 6 THEN ExtraAmount ELSE 0 END) AS ContributionDiscount
+				,SUM(CASE WHEN LicensingFeeTypeId = 7 THEN ExtraAmount ELSE 0 END) AS ContributionDiscount
 			FROM @Result
-			WHERE ProductId = 37 OR LicensingFeeTypeId = 6
+			WHERE ProductId = 37 OR LicensingFeeTypeId = 7
 			GROUP BY PartyId, CASE WHEN ProductId = 37 THEN 0 ELSE ProductId END
 		) t ON r.PartyId = t.PartyId AND r.ProductId = t.ProductId
 	WHERE r.LicensingFeeTypeId = 0 AND r.ProductId <> 37

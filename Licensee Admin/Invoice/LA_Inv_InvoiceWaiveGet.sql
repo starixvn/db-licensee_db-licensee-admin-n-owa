@@ -69,7 +69,7 @@ BEGIN
 		
 		DECLARE @Result TABLE
 		(
-			PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
+			PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
 			,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000)
 		)
 		INSERT INTO @Result
@@ -84,10 +84,10 @@ BEGIN
 			,@ToDate = @ToDate
 			,@BaseCurrencyName = @BaseCurrencyName
 
-		IF EXISTS (SELECT 1 FROM @Result WHERE IsChargedByGroupMinFee = 0)
+		IF EXISTS (SELECT 1 FROM @Result WHERE IsChargedByGroupMinFee = 0 AND ProductId = @ProductId)
 			UPDATE @FinalResult SET ProrateMinFee = 0 WHERE IsGroupMinFee = 1
 
-		IF EXISTS (SELECT 1 FROM @Result WHERE IsChargedByMinFee = 0)
+		IF EXISTS (SELECT 1 FROM @Result WHERE IsChargedByMinFee = 0 AND ProductId = @ProductId)
 			UPDATE @FinalResult SET ProrateMinFee = 0 WHERE IsGroupMinFee = 0
 	END
 
