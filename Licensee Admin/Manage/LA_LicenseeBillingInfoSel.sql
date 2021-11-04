@@ -5,6 +5,8 @@ GO
 ALTER PROCEDURE [dbo].[LA_LicenseeBillingInfoSel]
 	  @PartyId		INT
 	, @ProductCode	VARCHAR(10)
+	, @FromDate Date
+	, @ToDate Date
 AS
 /*  Created: 20150318@Florent
 	Task : Report - Licensee Settlement Report
@@ -23,6 +25,7 @@ AS
 		- 20190404@Bruce: Return fistbliing date [#102830]
 		- 20200418@Parsons: Indo 4D Integration [#130910]
 		- 20200812@Happy: Get min fee terms with GMF higher priority [#134492]
+		- 20211104@Parsons: GroupMinFee: Support prorated min fee and AMF deduction [#157652]
 		
 	Param's Explanation:
 
@@ -74,16 +77,16 @@ BEGIN
 	SELECT @MinimumFees = d.MinimumFeeTerm 
 	FROM dbo.LA_GroupMinFeeDetail d WITH(NOLOCK)
 		INNER JOIN dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK) ON a.GroupMinFeeID = d.GroupMinFeeID
-	WHERE CONVERT(DATE, GETDATE()) BETWEEN d.FromDate AND d.ToDate
+	WHERE @FromDate <= d.ToDate AND d.FromDate <= @ToDate
 		AND a.PartyID = @PartyId
 		AND d.ProductID = @ProductId
-	
+
 	IF ISNULL(@MinimumFees, '') = ''
 	BEGIN
 		SELECT TOP 1
 			@MinimumFees = m.MinFeeTerm
 		FROM dbo.LA_MinFee m WITH (NOLOCK)
-		WHERE CONVERT(DATE, GETDATE()) BETWEEN m.FromDate AND m.ToDate
+		WHERE @FromDate <= m.ToDate AND m.FromDate <= @ToDate
 			AND m.FeeTypeId = 1
 			AND m.PartyId = @PartyId
 			AND m.ProductId = @ProductId
