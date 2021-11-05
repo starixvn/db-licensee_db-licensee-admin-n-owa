@@ -19,6 +19,7 @@ AS
 		- 20210302@Parsons: Create new sp [#147006]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
+		- 20211105@Percy: Fix issue missing Saba Promotion [RedmineID: #159691]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -45,7 +46,7 @@ BEGIN
 		SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductPrefix
 		FROM dbo.Product3rd p WITH (NOLOCK)
 			LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId
-		WHERE p.ProductId NOT IN (16, 37)
+		WHERE p.ProductId NOT IN (16)
 			AND (p.EndOfSupportDate IS NULL OR p.EndOfSupportDate >= @FromDate)
 			AND p.OfferSite IN (0, 2) -- Deposit
 		
