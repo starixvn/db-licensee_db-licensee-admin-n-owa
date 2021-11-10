@@ -33,6 +33,7 @@ AS
 	  - 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 	  - 20210916@Percy: Return Products applied rebate setting only [RedmineID: #159580]
 	  - 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
+	  - 20211110@Danny: show 0 instead of negative amount [RedmineID: #163800]
 */
 
 BEGIN

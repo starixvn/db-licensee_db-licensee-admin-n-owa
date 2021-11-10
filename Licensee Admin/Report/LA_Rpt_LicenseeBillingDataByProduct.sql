@@ -7,6 +7,8 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeBillingDataByProduct]
 	,@FromDate			DATETIME
 	,@ToDate			DATETIME
 	,@BaseCurrencyName	VARCHAR(10)
+	,@LicenseeStatusIds	VARCHAR(100)
+	,@isHideTerminatedAndsuspendedLicHaveNoTicket BIT = 0
 AS
 
 /*
@@ -24,13 +26,24 @@ AS
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
+		- 20211110@Danny: Filter by OIC statuses and hide Terminated/Suspended licensees who has no bet ticket [#159296]
+	
+	Parameter explanation:
+		@LicenseeStatusIds
+			1	Up Coming
+			2	Soft Launch
+			3	Active
+			4	Terminated
+			5	Cancelled
+			6	Suspended
+			999 Unrecognized
 */
 
 BEGIN
 	SET NOCOUNT ON
 
 	-- Get Party List
-	CREATE TABLE #tmp_PartyList (PartyId INT, PartyName VARCHAR(100), BranchName VARCHAR(100), ParentId INT, ParentName VARCHAR(100))
+	CREATE TABLE #tmp_PartyList (PartyId INT, PartyName VARCHAR(100), BranchName VARCHAR(100), ParentId INT, ParentName VARCHAR(100), StatusID INT)
 	INSERT INTO #tmp_PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC dbo.LA_PartyListSel
 
@@ -46,6 +59,22 @@ BEGIN
 
 	DELETE #tmp_PartyList WHERE ParentId = 0
 
+	-- Handle statusID 
+	DECLARE @statusTab TABLE (StatusId INT)
+	INSERT INTO @statusTab (StatusId)
+	SELECT CAST (val AS INT) FROM dbo.strSplit(@LicenseeStatusIds,',')
+
+	UPDATE p
+	SET p.StatusId = CASE	WHEN la.IsDeposit = 0 THEN 3 -- Active (Credit)
+							WHEN la.IsDeposit = 1 AND oic.LicenseeStatusId IS NULL THEN 999 -- 999: Unrecognized dummy status
+							ELSE oic.LicenseeStatusId END 
+	FROM #tmp_PartyList p
+		INNER JOIN bodb_licensee.dbo.OAS_Party op WITH(NOLOCK) ON op.PartyID = p.PartyID
+		INNER JOIN bodb_licensee.dbo.Licensees la WITH (NOLOCK) ON la.LicenseeId = op.OldRefID
+		LEFT JOIN  bodb_OIC.dbo.licensee oic WITH (NOLOCK) ON oic.RegisteredLicenseeName = la.LicenseeName	
+
+	DELETE FROM #tmp_PartyList WHERE StatusId NOT IN (SELECT x.StatusId FROM @statusTab x)
+
 	-- Get Product List
 	CREATE TABLE #tmp_Products (ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(10))
 	INSERT INTO #tmp_Products (ProductId, ProductName, ProductCode)
@@ -58,7 +87,7 @@ BEGIN
 	WHERE g.ProductId IS NULL
 
 	DECLARE @ProductCodes VARCHAR(MAX)
-	SELECT  @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #tmp_Products
+	SELECT  @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #tmp_Products WHERE ProductCode <> ''
 
 	DECLARE @Result TABLE
 	(
@@ -76,6 +105,24 @@ BEGIN
 		,@FromDate = @FromDate
 		,@ToDate = @ToDate
 		,@BaseCurrencyName = @BaseCurrencyName
+		,@LicensingFeeTypeIds = '0,8' --Normal Licensing Fee (0), Betcount(8)
+
+	IF @isHideTerminatedAndsuspendedLicHaveNoTicket = 1
+	BEGIN
+
+		;WITH t AS
+		(
+			SELECT x.PartyId, tp.StatusID ,SUM(CASE WHEN LicensingFeeTypeId = 8 THEN ExtraAmount ELSE 0 END) AS Betcount
+			FROM @Result x 
+			INNER JOIN #tmp_PartyList tp ON x.PartyId = tp.PartyId
+			WHERE tp.StatusID IN (4,6)  -- Terminated And suspended
+			GROUP BY x.PartyId ,tp.StatusID
+			HAVING SUM(CASE WHEN LicensingFeeTypeId = 8 THEN ExtraAmount ELSE 0 END) = 0
+		)
+
+		DELETE @Result
+		WHERE PartyId IN ( SELECT t.PartyId FROM t )
+	END
 
 	-- Final Result
 	CREATE TABLE #tmp_Result (PartyId INT, ProductId INT, LicensingFee MONEY)
@@ -86,7 +133,7 @@ BEGIN
 			,CASE WHEN r.ProductId = 37 THEN -1 ELSE r.ProductId END AS ProductId
 			,CASE WHEN r.ProductId = 37 THEN -r.LicensingFee ELSE r.LicensingFee + r.ExtraAmount END AS LicensingFee
 		FROM @Result r
-		WHERE r.GrossLicensingFee <> 0 OR r.LicensingFee <> 0
+		WHERE r.GrossLicensingFee <> 0 OR r.LicensingFee <> 0 AND r.LicensingFeeTypeId = 0
 		UNION ALL SELECT PartyId, -3, -SUM(Discount) FROM @Result GROUP BY PartyId HAVING SUM(Discount) <> 0
 		UNION ALL SELECT PartyId, -2, -SUM(Rebate) FROM @Result GROUP BY PartyId HAVING SUM(Rebate) <> 0
 	) t
