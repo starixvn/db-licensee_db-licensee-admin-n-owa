@@ -149,6 +149,17 @@ BEGIN
 	DECLARE @ProductList VARCHAR(MAX), @SQL VARCHAR(MAX)
 	SELECT  @ProductList = COALESCE(@ProductList + ', ', '') + '[' + ProductName + ']' FROM #tmp_Products ORDER BY ProductId
 
+	IF @isHideTerminatedAndsuspendedLicHaveNoTicket = 1
+	BEGIN
+		DELETE #tmp_Result
+		WHERE PartyId IN (
+							SELECT x.PartyId
+							FROM @Result x WHERE LicensingFeeTypeId = 8
+								AND ExtraAmount = 0
+						 )
+
+	END
+
 	SELECT @SQL = '
 	;WITH CTE_Result AS (
 		SELECT PartyId, ' + @ProductList + '
