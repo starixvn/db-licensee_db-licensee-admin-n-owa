@@ -4,7 +4,7 @@ CREATE PROCEDURE [dbo].[LA_LicenseeStatusListSel]
 AS
 /*
 	Created: 20170223@danny
-	Task : Get list of terminated payers [#159296]
+	Task : Get list of licensee status from OIC [#159296]
 	DB: DBLIC.bodb_Licensee
 
 	Revisions:
