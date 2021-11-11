@@ -2,7 +2,7 @@
 USE [bodb02]
 GO
 
-ALTER PROCEDURE dbo.LA_Rpt_LicPerformance_Detail
+ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_Detail]
 	@PartyIds				VARCHAR(MAX) = ''
 	,@Currency				INT = 0
 	,@FromDate				DATETIME
@@ -101,9 +101,6 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	IF ISNULL(@Currency, 0) <> 0
-		SET @IsConvert = 0
-
 	DECLARE @FDate DATETIME = @FromDate, @TDate DATETIME = @ToDate
 	DECLARE @PrevFDate DATETIME, @PrevTDate DATETIME
 
@@ -115,7 +112,7 @@ BEGIN
 
 	-- Get Party List
 	BEGIN
-		DECLARE @PartyList TABLE (PartyId INT, PartyName VARCHAR(50), LaunchDate DATETIME)
+		DECLARE @PartyList TABLE (PartyId INT, PartyName VARCHAR(50), LaunchDate DATE)
 		INSERT INTO @PartyList (PartyId)
 		SELECT DISTINCT val FROM dbo.StrSplit(@PartyIds, ',')
 
@@ -192,6 +189,7 @@ BEGIN
 					AND CurrencyId <> 20
 					AND CustomerCategory NOT IN (27, 28)
 					AND StatusId IN (111, 112, 113, 114, 115)
+					AND (@Currency = 0 OR CurrencyId = @Currency)
 				GROUP BY rptDate, SiteId, ProductId, CurrencyId, Bettype
 				UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL -- sum data first
 			) r
@@ -274,6 +272,7 @@ BEGIN
 					AND CurrencyId <> 20
 					AND CustomerCategory NOT IN (27, 28)
 					AND StatusId IN (111, 112, 113, 114, 115)
+					AND (@Currency = 0 OR CurrencyId = @Currency)
 				GROUP BY rptDate, SiteId, ProductId, CurrencyId, Bettype
 				UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL -- sum data first
 			) r

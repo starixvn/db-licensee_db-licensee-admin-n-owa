@@ -338,10 +338,14 @@ BEGIN
 		-- Min Fee
 		CREATE TABLE #tmpMinFee (PartyId INT, ProductId INT, GroupId INT, GroupMinFeeId INT, FeeTypeId TINYINT, IsPrimary BIT
 			,FromDate DATE, ToDate DATE, ProrateMinFee MONEY, BasedProrateMinFee MONEY)
-		INSERT INTO #tmpMinFee (PartyId, ProductId, GroupId, GroupMinFeeId, FeeTypeId, IsPrimary, FromDate, ToDate, ProrateMinFee, BasedProrateMinFee)
-		SELECT PartyId, ProductId, GroupId, GroupMinFeeId, FeeTypeId, IsPrimary, FromDate, ToDate, ProrateMinFee * ISNULL(e.Rate, 0), ProrateMinFee
-		FROM dbo.LA_f_GetProrateMinFee(@PartyIds, @FromDate, @ToDate) m
-			LEFT JOIN #Exchange e ON m.BaseCurrencyId = e.ExchangeId AND e.ExchangeDate = @ToDate
+		
+		IF @Currencies = '' -- just apply min fee for all selected currencies
+		BEGIN
+			INSERT INTO #tmpMinFee (PartyId, ProductId, GroupId, GroupMinFeeId, FeeTypeId, IsPrimary, FromDate, ToDate, ProrateMinFee, BasedProrateMinFee)
+			SELECT PartyId, ProductId, GroupId, GroupMinFeeId, FeeTypeId, IsPrimary, FromDate, ToDate, ProrateMinFee * ISNULL(e.Rate, 0), ProrateMinFee
+			FROM dbo.LA_f_GetProrateMinFee(@PartyIds, @FromDate, @ToDate) m
+				LEFT JOIN #Exchange e ON m.BaseCurrencyId = e.ExchangeId AND e.ExchangeDate = @ToDate
+		END
 		
 		DECLARE @tmpResult TABLE (PartyId INT, ProductId INT, GroupMinFeeId INT, GroupId INT, IsPrimary BIT, FeeTypeId TINYINT
 			,ProrateMinFee MONEY, SecondaryLicensingFee MONEY, NonMinFee MONEY, LicensingFee MONEY
