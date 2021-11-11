@@ -3,11 +3,11 @@ USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountByGrossWinIns]
-	@DiscountGroupName		NVARCHAR(50)
+	@DiscountGroupName		NVARCHAR(110)
 	,@CurrencyId			TINYINT
 	,@FromDate				DATE
 	,@ToDate				DATE
-	,@ProductIds			VARCHAR(MAX) = ''
+	,@ProductId				INT = 0
 	,@RateSettingsData		VARCHAR(MAX) = ''
 	,@PartySettingsData		NVARCHAR(MAX) = ''
 	,@CurrencySettingsData	VARCHAR(MAX) = ''
@@ -27,14 +27,11 @@ AS
 	 Params:
 		@RateSettingsData = '<Root>
 								<RateSetting>
-									<SeqNo>1</SeqNo>
 									<FromAmount>1</FromAmount>
 									<ToAmount>10000</ToAmount>
 									<Rate>0.05</Rate>
 								</RateSetting>
 								<RateSetting>
-									<SeqNo>2</SeqNo>
-									<DiscountDetailId>1</DiscountDetailId>
 									<FromAmount>10001</FromAmount>
 									<ToAmount>20000</ToAmount>
 									<Rate>0.1</Rate>
@@ -43,12 +40,12 @@ AS
 		@PartySettingsData = '<Root>
 								<PartySetting>
 									<PartyId>1</PartyId>
-									<ChargeRate>0.1<ChargeRate>
+									<ChargeRate>0.1</ChargeRate>
 									<Remark>hello1</Remark>
 								</PartySetting>
 								<PartySetting>
 									<PartyId>2</PartyId>
-									<ChargeRate>0.1<ChargeRate>
+									<ChargeRate>0.1</ChargeRate>
 									<Remark>hello2</Remark>
 								</PartySetting>
 							</Root>'
@@ -68,55 +65,33 @@ AS
 
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @CutOffDate DATE = dbo.LA_f_DiscountByGrossWin_CutOffDate()
 	
-	-- Validate input data
-	BEGIN
-		IF ISNULL(@DiscountGroupName, '') = ''
-		BEGIN
-			SELECT @ErrCode = 501, @ErrMsg = 'Please fill out group name.'
-			RETURN
-		END
-
-		IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH (NOLOCK) WHERE DiscountGroupName = @DiscountGroupName AND DiscountGroupType <> 2) -- 2: Rebate
-		BEGIN
-			SELECT @ErrCode = 502, @ErrMsg = 'Group name exists. Please try again.'
-			RETURN
-		END
-
-		IF ISNULL(@ProductIds, '') = ''
-		BEGIN
-			SELECT @ErrCode = 503, @ErrMsg = 'Please select at least 1 product.'
-			RETURN
-		END
-	END
-
-	DECLARE @ToBeCalculated TINYINT = 1
-	DECLARE @ToBeDiscounted TINYINT = 0
+	DECLARE @DiscountType_GrossWin TINYINT = 13
 	DECLARE @CalculateAndDiscount TINYINT = 10
 	DECLARE @MaxAmountValue MONEY = 10000000000000 --  10,000,000,000,000
+	DECLARE @ChargeRate MONEY
 
 	-- Prepare input data
 	DECLARE @PartyXML XML = CONVERT(XML, @PartySettingsData)
 	DECLARE @CurrencyXML XML = CONVERT(XML, @CurrencySettingsData)
 	DECLARE @TierRateSettingXML XML = CONVERT(XML, @RateSettingsData)
 
-	DECLARE @ProductList TABLE (ProductId TINYINT)
-	DECLARE @PartyList	TABLE (PartyId INT, ChargeRate FLOAT, Remark NVARCHAR(500))
+	DECLARE @PartyList	TABLE (PartyId INT, ChargeRate MONEY, Remark NVARCHAR(500))
 	DECLARE @CurrencyList TABLE (PartyId INT, CurrencyId INT, CalculationType TINYINT)
 	DECLARE @TierRateSetting TABLE (RowId INT, FromAmount MONEY, ToAmount MONEY, Rate MONEY)
 
-	BEGIN
-		INSERT INTO @ProductList (ProductId)
-		SELECT DISTINCT val FROM dbo.strSplit(@ProductIds, ',')
-
-		DELETE p
-		FROM @ProductList p
-			LEFT JOIN dbo.LA_f_Products3rd('') pd ON p.ProductId = pd.ProductId
-		WHERE pd.ProductId IS NULL
-
-		IF NOT EXISTS (SELECT 1 FROM @ProductList)
+	BEGIN TRY
+		IF @FromDate < @CutOffDate
 		BEGIN
-			SELECT @ErrCode = 504, @ErrMsg = 'Product(s) do not exist.'
+			SELECT @ErrCode = 501, @ErrMsg = 'From Date must start from ' + CONVERT(VARCHAR(11), @CutOffDate, 106) + '.'
+			RETURN
+		END
+
+		IF NOT EXISTS (SELECT 1 FROM dbo.LA_f_Products3rd('') WHERE ProductId = @ProductId)
+		BEGIN
+			SELECT @ErrCode = 502, @ErrMsg = 'Product(s) do not exist.'
 			RETURN
 		END
 
@@ -125,44 +100,144 @@ BEGIN
 			,t.c.value('(ChargeRate/text())[1]', 'FLOAT') AS ChargeRate
 			,t.c.value('(Remark/text())[1]', 'NVARCHAR(500)') AS Remark
 		FROM @PartyXML.nodes('Root/PartySetting') AS t(c)
+		OPTION (OPTIMIZE FOR (@PartyXML = NULL))
 
 		INSERT INTO @CurrencyList (PartyId, CurrencyId, CalculationType)
 		SELECT t.c.value('(PartyId/text())[1]', 'INT') AS PartyId
 			,t.c.value('(CurrencyId/text())[1]', 'INT') AS CurrencyId
 			,t.c.value('(CalculationType/text())[1]', 'TINYINT') AS CalculationType
 		FROM @CurrencyXML.nodes('Root/CurrencySetting') AS t(c)
+		OPTION (OPTIMIZE FOR (@CurrencyXML = NULL))
 
 		INSERT INTO @TierRateSetting (RowId, FromAmount, ToAmount, Rate)
-		SELECT t.c.value('(SeqNo/text())[1]', 'INT') AS RowId
-			,t.c.value('(FromAmount/text())[1]', 'FLOAT') AS FromAmount
-			,t.c.value('(ToAmount/text())[1]', 'NVARCHAR(500)') AS ToAmount
-			,t.c.value('(Rate/text())[1]', 'FLOAT') AS Rate
-		FROM @TierRateSettingXML.nodes('Root/RateSetting') AS t(c)
+		SELECT ROW_NUMBER() OVER(ORDER BY FromAmount) AS RowId
+			,FromAmount, CASE WHEN ToAmount = 'Unlimited' THEN @MaxAmountValue ELSE ToAmount END, Rate
+		FROM (
+			SELECT t.c.value('(FromAmount/text())[1]', 'FLOAT') AS FromAmount
+				,t.c.value('(ToAmount/text())[1]', 'NVARCHAR(500)') AS ToAmount
+				,t.c.value('(Rate/text())[1]', 'FLOAT') AS Rate
+			FROM @TierRateSettingXML.nodes('Root/RateSetting') AS t(c)
+		) t
+		OPTION (OPTIMIZE FOR (@TierRateSettingXML = NULL))
+	END TRY
+	BEGIN CATCH
+		SELECT @ErrCode = 503, @ErrMsg = 'Parse XML failed.'
+		RETURN
+	END CATCH
+
+	-- Validate input data
+	BEGIN
+		IF ISNULL(@DiscountGroupName, '') = ''
+		BEGIN
+			SELECT @ErrCode = 504, @ErrMsg = 'Please fill out group name.'
+			RETURN
+		END
+
+		IF EXISTS (
+			SELECT 1
+			FROM dbo.LA_DiscountGroupHeader WITH (NOLOCK)
+			WHERE DiscountGroupName = @DiscountGroupName AND DiscountGroupType <> 2 -- 2: Rebate
+		)
+		BEGIN
+			SELECT @ErrCode = 505, @ErrMsg = 'Group name exists. Please try again.'
+			RETURN
+		END
+
+		IF @FromDate IS NULL OR @ToDate IS NULL OR ISNULL(@CurrencyId, 0) = 0
+			OR NOT EXISTS (SELECT 1 FROM @TierRateSetting)
+		BEGIN
+			SELECT @ErrCode = 506, @ErrMsg = 'Please fill all required fields.'
+			RETURN
+		END
+
+		IF EXISTS (SELECT 1 FROM @TierRateSetting WHERE FromAmount < 0 OR FromAmount > ToAmount OR Rate < 0)
+		BEGIN
+			SELECT @ErrCode = 507, @ErrMsg = 'Please input valid amount.'
+			RETURN
+		END
+
+		IF EXISTS (
+			SELECT 1
+			FROM @TierRateSetting t1
+				INNER JOIN @TierRateSetting t2 ON t1.RowId +1 = t2.RowId
+			WHERE t1.ToAmount >= t2.FromAmount
+		)
+		BEGIN
+			SELECT @ErrCode = 508, @ErrMsg = 'The rank is overlapped with the other. Please input another rank.'
+			RETURN
+		END
+
+		SELECT TOP 1 @ChargeRate = ChargeRate FROM @PartyList
+		IF EXISTS (SELECT 1 FROM @TierRateSetting WHERE Rate >= @ChargeRate)
+		BEGIN
+			SELECT @ErrCode = 509, @ErrMsg = 'Charge Rate after Discount must be positive value.'
+			RETURN
+		END
+
+		IF EXISTS (SELECT 1 FROM @PartyList HAVING COUNT(DISTINCT ChargeRate) > 1)
+		BEGIN
+			SELECT @ErrCode = 510, @ErrMsg = 'Please select licensees who have same Charge Rate with others.'
+			RETURN
+		END
+
+		IF EXISTS (
+			SELECT 1
+			FROM @PartyList p
+				LEFT JOIN dbo.OAS_ChargeInfo c WITH (NOLOCK)
+					ON p.PartyId = c.FromParty AND c.ProductId = @ProductId
+						AND c.FromDate <= @ToDate AND c.ToDate >= @FromDate
+						AND c.ToParty IN (1, 9, 11, 98) AND c.ChargeType = 1
+			WHERE c.FromParty IS NULL OR p.ChargeRate <> c.Rate
+		)
+		BEGIN
+			SELECT @ErrCode = 511, @ErrMsg = 'Please select licensees who have same Charge Rate with others.'
+			RETURN
+		END
 	END
 
 	-- Insert data
 	BEGIN TRY
+		-- main table
 		INSERT INTO dbo.LA_DiscountGroupHeader (DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, Priority, ModifiedDate)
-		VALUES (@DiscountGroupName, 13, @CurrencyId, @FromDate, @ToDate, 1, GETDATE())
+		VALUES (@DiscountGroupName, @DiscountType_GrossWin, @CurrencyId, @FromDate, @ToDate, 1, GETDATE())
 
 		SET @GroupIdOut = SCOPE_IDENTITY()
 
 		IF ISNULL(@GroupIdOut, 0) = 0
 		BEGIN
-			SELECT @ErrCode =  510, @ErrMsg = 'Insert failed. Please try again.'
+			SELECT @ErrCode =  601, @ErrMsg = 'Insert failed. Please try again.'
 			RETURN
 		END
 
+		-- party
 		INSERT INTO dbo.LA_DiscountGroupAssignment (DiscountGroupId, PartyId, Remark, IsApplyDiscount, IsSpecialTreatment)
 		SELECT @GroupIdOut, PartyId, Remark, 1 AS IsApplyDiscount, 0 AS IsSpecialTreatment
 		FROM @PartyList
 
+		-- currency
 		INSERT INTO dbo.LA_DiscountGroupCurrency (DiscountGroupId, PartyId, CurrencyId, CalculationType)
 		SELECT @GroupIdOut, PartyId, CurrencyId, CalculationType
 		FROM @CurrencyList
+
+		-- product
+		INSERT INTO dbo.LA_DiscountGroupProduct (DiscountGroupId, ProductId, CalculationType)
+		VALUES (@GroupIdOut, @ProductId, @CalculateAndDiscount)
+
+		-- tier rate setting
+		INSERT INTO dbo.LA_DiscountGroupDetail (DiscountGroupId, FromAmount, ToAmount, Rate)
+		SELECT @GroupIdOut, FromAmount, ToAmount, Rate
+		FROM @TierRateSetting
+		ORDER BY RowId
 	END TRY
 	BEGIN CATCH
-		SELECT @ErrCode =  510, @ErrMsg = 'Insert failed. Please try again.'
+		-- Rollback data manually
+		DELETE dbo.LA_DiscountGroupHeader WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupAssignment WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupCurrency WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupProduct WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupDetail WHERE DiscountGroupId = @GroupIdOut
+
+		SELECT @ErrCode =  601, @ErrMsg = 'Insert failed. Please try again.'
 		RETURN
 	END CATCH
 END
