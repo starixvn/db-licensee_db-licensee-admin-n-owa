@@ -27,14 +27,14 @@ BEGIN
 		,ToDate				DATE
 		,CurrencyName		VARCHAR(10)
 		,ProductId			INT
-		,ProductName		VARCHAR(100)
+		,ProductList		VARCHAR(100)
 		,RepPartyId			INT -- Representative
 		,PayerList			VARCHAR(MAX)
 		,ChargeRate			MONEY DEFAULT (0)
 	)
 
 	-- Get gerenal info
-	INSERT INTO #DiscountGroup (DiscountGroupId, DiscountGroupName, FromDate, ToDate, CurrencyName, ProductId, ProductName, RepPartyId, PayerList)
+	INSERT INTO #DiscountGroup (DiscountGroupId, DiscountGroupName, FromDate, ToDate, CurrencyName, ProductId, ProductList, RepPartyId, PayerList)
 	SELECT h.DiscountGroupId, h.DiscountGroupName, h.FromDate, h.ToDate, ISNULL(e.Code, '') AS CurrencyName, p.ProductId, p.ProductName
 		,rp.PartyId
 		,STUFF((
@@ -66,7 +66,7 @@ BEGIN
 		AND d.FromDate <= c.ToDate AND d.ToDate >= d.FromDate
 
 	-- Return data
-	SELECT DiscountGroupId, DiscountGroupName, FromDate, ToDate, CurrencyName, ProductName, PayerList, ChargeRate
+	SELECT DiscountGroupId, DiscountGroupName, FromDate, ToDate, CurrencyName, ProductList, PayerList, ChargeRate
 	FROM #DiscountGroup
 
 	-- Tier rate settings 
@@ -74,5 +74,7 @@ BEGIN
 	FROM #DiscountGroup g
 		 INNER JOIN dbo.LA_DiscountGroupDetail d WITH (NOLOCK) ON g.DiscountGroupId = d.DiscountGroupId
 	ORDER BY d.DiscountGroupId, d.FromAmount
+
+	DROP TABLE #DiscountGroup
 END
 GO
