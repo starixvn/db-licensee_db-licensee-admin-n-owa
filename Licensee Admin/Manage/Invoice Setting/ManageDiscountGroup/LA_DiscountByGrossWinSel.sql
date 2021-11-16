@@ -69,7 +69,7 @@ BEGIN
 	SELECT DiscountGroupId, DiscountGroupName, FromDate, ToDate, CurrencyName, ProductList, PayerList, ChargeRate
 	FROM #DiscountGroup
 
-	-- Tier rate settings 
+	-- Tier rate settings
 	SELECT d.DiscountGroupId, d.FromAmount, d.ToAmount, d.Rate, g.ChargeRate - d.Rate AS ChargeRateAfterDiscount
 	FROM #DiscountGroup g
 		 INNER JOIN dbo.LA_DiscountGroupDetail d WITH (NOLOCK) ON g.DiscountGroupId = d.DiscountGroupId
