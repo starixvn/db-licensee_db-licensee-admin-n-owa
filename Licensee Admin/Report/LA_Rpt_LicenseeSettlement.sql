@@ -54,6 +54,7 @@ AS
 		- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
+		- 20211115@Percy: Return IsShowOddsSpread [RedmineID: #164411]
 
 	Param's Explanation:
 */
@@ -108,9 +109,10 @@ BEGIN
 		BuyBackAmountAndComm		MONEY,
 		TipsAmount					MONEY,
 		TipsAmountDue				MONEY,
-		OddsSpreadCost				MONEY,
 		GrossCompany				MONEY,
-		FreeBetAmount				MONEY
+		FreeBetAmount				MONEY,
+		OddsSpreadCost				MONEY,
+		IsShowOddsSpread			TINYINT DEFAULT(0)
 	)
 
 	CREATE TABLE #Exchange
@@ -175,6 +177,7 @@ BEGIN
 		,@ToDate			AS WinLostDate
 		,0					AS CurrencyId
 		,''					AS CurrencyName
+		,CAST(0 AS BIT)		AS IsShowOddsSpread
 		,CAST(0 AS MONEY)	AS Betcount
 		,CAST(0 AS MONEY)	AS Turnover
 		,CAST(0 AS MONEY)	AS ActualStake
@@ -834,6 +837,7 @@ BEGIN
 				,SUM(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN 0 ELSE ISNULL(b.MemberWL, 0) END)	AS MemberWinloss
 				,SUM(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN 0 ELSE ISNULL(b.betcount, 0) END)	AS BetCount
 				,SUM(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN ISNULL(-b.GrossWL, 0) ELSE 0 END)	AS OddsSpreadCost
+				,MAX(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN 1 ELSE 0 END)						AS IsShowOddsSpread
 			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			WHERE
 				b.SiteID = @LicenseeID
@@ -845,15 +849,16 @@ BEGIN
 				AND b.ProductID IN (SELECT ProductId FROM bodb_Licensee.dbo.LA_f_GroupProduct() WHERE GroupProductId = 0)
 			GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
-		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, GrossCompany, Company, OddsSpreadCost, Betcount)
+		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, GrossCompany, Company, Betcount, OddsSpreadCost, IsShowOddsSpread)
 		SELECT rptDate, d.CurrencyID
 			,SUM(Turnover)													AS Turnover
 			,SUM(MemberWinloss)												AS Winlost
 			,SUM(-MemberWinloss * ( 1 - ISNULL(cr.Rate, p.Rate)))			AS LicenseeWL
 			,SUM(-MemberWinloss * ISNULL(cr.Rate, p.Rate))					AS GrossCompany
 			,SUM(-MemberWinloss * ISNULL(cr.Rate, p.Rate) + OddsSpreadCost) AS Company
-			,SUM(OddsSpreadCost)											AS OddsSpreadCost
 			,SUM(BetCount)													AS BetCount
+			,SUM(OddsSpreadCost)											AS OddsSpreadCost
+			,MAX(IsShowOddsSpread)											AS IsShowOddsSpread
 		FROM cte_SB d
 			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
@@ -981,7 +986,8 @@ BEGIN
 		, se.ExchangeID				AS CurrencyId
 		, se.CurrencyCode			AS CurrencyName
 		, e.Rate					AS ExchangeRate
-		, SUM(Betcount)				AS Betcount
+		, CONVERT(BIT, MAX(d.IsShowOddsSpread)) AS IsShowOddsSpread
+		, SUM(Betcount)							AS Betcount
 		--orginal
 		, SUM(ISNULL(d.Turnover, 0))					AS Turnover
 		, SUM(ISNULL(d.ActualStake, 0))					AS ActualStake

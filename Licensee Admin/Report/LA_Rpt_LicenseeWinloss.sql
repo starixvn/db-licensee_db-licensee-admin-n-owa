@@ -42,6 +42,7 @@ AS
 	- 20210108@Happy: Saba.club - Integrate Slot Game [#147977]
 	- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 	- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
+	- 20211115@Percy: Return IsShowOddsSpread [RedmineID: #164411]
 	
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -68,7 +69,7 @@ BEGIN
 			@VGA_ProductId  TINYINT	= 66
 
 	CREATE TABLE #Report (PartyID INT, ReportDate DATE, CurrencyID INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY, 
-						AmtDueToBA MONEY, CommBA MONEY, Company MONEY, Betcount INT, OddsSpreadCost MONEY)
+						AmtDueToBA MONEY, CommBA MONEY, Company MONEY, Betcount INT, OddsSpreadCost MONEY, IsShowOddsSpread TINYINT DEFAULT(0))
 
 	CREATE TABLE #Exchange(ExchangeId INT, ExchangeDate DATE, Code VARCHAR(20), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, CNY FLOAT, Base FLOAT)
 	
@@ -392,6 +393,7 @@ BEGIN
 			, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionA ELSE 0 END) AComm
 			, SUM(b.betcount * CASE WHEN (@drawfilter = 2 AND b.StatusId = 111) OR b.Bettype IN (@PP_Contribution, @SBC_Contribution, @OddsSpread_BetType, @VGA_Contribution) THEN 0 ELSE 1 END) BetCount 
 			, SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @OddsSpread_BetType, @VGA_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AWinloss
+			, CONVERT(TINYINT, MAX(CASE WHEN b.Bettype = @OddsSpread_BetType THEN 1 ELSE 0 END)) AS IsShowOddsSpread
 		INTO #TmpData
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #Products p ON b.ProductId = p.ProductId
@@ -409,7 +411,7 @@ BEGIN
 			AND	ISNULL(b.TicketType,0) <> 2 -- Free_Bets_TicketType
 		GROUP BY b.rptDate, ci.PartyID, p.GroupProductId, b.CurrencyID
 
-		INSERT INTO #Report (PartyID, ReportDate, CurrencyID, Turnover, Winlost, LicenseeWL,Company, Betcount, OddsSpreadCost)
+		INSERT INTO #Report (PartyID, ReportDate, CurrencyID, Turnover, Winlost, LicenseeWL,Company, Betcount, OddsSpreadCost, IsShowOddsSpread)
 		SELECT ci.PartyID, rptDate, b.CurrencyId
 			, SUM(b.turnover) Turnover
 			, SUM(b.Winloss + CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS Winloss
@@ -417,6 +419,7 @@ BEGIN
 			, SUM((-b.Winloss - CASE WHEN b.ProductID IN (@PP_ProductId, @SBC_ProductId, @VGA_ProductId) THEN AWinloss ELSE 0 END) * ISNULL(cc.Rate,ci.Rate) - CASE WHEN b.ProductID=31 THEN (b.AComm + b.PComm) ELSE 0 END) AS Company
 			, SUM(b.betcount) AS betcount
 			, SUM(CASE WHEN b.ProductID = 0 THEN AWinloss ELSE 0 END) AS OddsSpreadCost
+			, MAX(IsShowOddsSpread) AS IsShowOddsSpread
 		FROM #TmpData b WITH (NOLOCK)
 			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate, ChargeId, ChargeType FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID=ci.ChargeId AND cc.CurrencyID=b.CurrencyId
@@ -468,6 +471,8 @@ BEGIN
 		 	END AS PartyName
 		, CONVERT(VARCHAR(6), b.ReportDate, 112) AS ReportDate
 		, SUM(Betcount) AS TotalTransaction
+		, CONVERT(BIT, MAX(b.IsShowOddsSpread)) AS IsShowOddsSpread
+		--Base Currency
 		, CAST(SUM(Turnover * e.Base) AS MONEY) AS Turnover
 		, CAST(SUM(Winlost * e.Base) AS MONEY) AS CustomerWinLoss
 		, CAST(SUM(LicenseeWL * e.Base) AS MONEY) AS LicenseeWinLoss
