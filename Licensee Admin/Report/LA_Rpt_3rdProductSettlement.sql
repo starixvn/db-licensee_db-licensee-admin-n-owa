@@ -236,6 +236,8 @@ BEGIN
 		,CashoutCommissionRate	MONEY DEFAULT 0
 		,IncomeOnBBRate			MONEY DEFAULT 0
 		,AB_ServiceCharge		MONEY DEFAULT 0
+		,Fromdate3rd		SMALLDATETIME
+		,Todate3rd			SMALLDATETIME
 	)
 	CREATE CLUSTERED INDEX cix_#ChargeRate ON #ChargeRate(ProductID, LicenseeID, isDeposit, Fromdate, Todate)
 
@@ -430,7 +432,7 @@ BEGIN
 	CREATE CLUSTERED INDEX cix_#ChargeInfoWithCredit ON #ChargeInfoWithCredit(ProductID, PartyID, ChargeType)
 
 	-- #ChargeInfo Details
-	INSERT INTO #ChargeRate(ChargeID, PartyID, LicenseeID, isDeposit, ProductID, Rate, Rate3rd, Fromdate, Todate)
+	INSERT INTO #ChargeRate(ChargeID, PartyID, LicenseeID, isDeposit, ProductID, Rate, Rate3rd, Fromdate, Todate, Fromdate3rd, Todate3rd)
 	SELECT DISTINCT CASE WHEN (c.ProductID = 24 AND c.isDeposit = 0) OR (c.ProductID = 32 AND c.isDeposit = 0) THEN -1 ELSE c.ChargeID END, 
 					c.PartyID, 
 					c.LicenseeID, 
@@ -448,7 +450,9 @@ BEGIN
 														 ELSE ISNULL(r.DI_Rate,0)  END
 						 ELSE ISNULL(r.DI_Rate,0) END AS Rate3rd, 
 					c.Fromdate, 
-					c.Todate
+					c.Todate,
+					r.Fromdate AS Fromdate3rd, 
+					r.Todate AS Todate3rd
 	FROM #ChargeInfoWithCredit c
 	INNER JOIN #PartyList p ON c.PartyID = p.PartyId
 	LEFT JOIN #3rdRate r ON r.PartyID = c.PartyID and r.ProductID = c.ProductID AND r.ProductID NOT IN (0, 65)
@@ -587,6 +591,33 @@ BEGIN
 		
 	END
 
+	-- Handle date3rd for NG
+	UPDATE #ChargeRate
+	SET Fromdate3rd = Fromdate,
+		Todate3rd	= ToDate
+	WHERE ProductID IN (2, 8, 28)
+
+	UPDATE #ChargeRate
+	SET Fromdate3rd = Fromdate,
+		Todate3rd	= ToDate
+	WHERE ProductID IN (5,27) AND isDeposit = 0
+
+	;WITH c AS 
+	(
+		SELECT DISTINCT PartyID, DI_Rate FROM  bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'VS', 'OA') c
+	)
+	UPDATE t
+	SET  t.Rate3rd = c.DI_Rate
+	FROM #ChargeRate t
+	INNER JOIN  c ON t.PartyID = c.PartyID
+	WHERE t.ProductID = 5
+
+	-- Muay Thai trial setting
+	INSERT INTO #ChargeRate (ChargeID, PartyID, LicenseeID, isDeposit, ProductID, Rate, Rate3rd, Fromdate, Todate)
+	SELECT ChargeID, PartyID, LicenseeID, isDeposit, ProductID, DI_Rate, 0,  Fromdate, Todate
+	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'SB', 'OA', 0)
+	WHERE ChargeID = 0
+
 	DELETE #ChargeRate
 	WHERE (	PartyID NOT IN (SELECT z.PartyId FROM @PartyIdInput z) 
 			AND ProductID NOT IN (SELECT t.ProductID FROM @productDataView t)
@@ -697,8 +728,8 @@ BEGIN
 			SUM(b.LicenseeWinloss) AS LicenseeWinloss,
 			SUM(CASE WHEN b.ProductID = 32  AND b.isDeposit = 1 THEN (b.LicenseeWinloss - b.LicenseeContribution) * ISNULL(cr.Rate, ci.Rate) + LicenseeContribution - JackpotPrize - WinPrizeAmount
 				ELSE b.LicenseeWinloss * ISNULL(cr.Rate, ci.Rate) END) AS LicensingFee,
-			SUM(CASE WHEN b.ProductID = 32 THEN (LicenseeWinloss - FullContribution) * ci.Rate3rd
-				ELSE b.LicenseeWinloss * ci.Rate3rd - CASE WHEN b.ProductID = 45 THEN b.Bonus ELSE 0 END END) AS PayToSupplier,
+			SUM(CASE WHEN b.ProductID = 32 THEN (LicenseeWinloss - FullContribution) * ISNULL(ci_3rd.Rate3rd,0)
+				ELSE b.LicenseeWinloss * ISNULL(ci_3rd.Rate3rd,0) - CASE WHEN b.ProductID = 45 THEN b.Bonus ELSE 0 END END) AS PayToSupplier,
 			b.ProductID,
 			ci.isDeposit,
 			SUM(b.ValidBetAmount * ci.ChargeRate11) AS RollingComm,
@@ -717,6 +748,7 @@ BEGIN
 			b.PlayCurrency
 		FROM cte_Summary b WITH (NOLOCK)
 			INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
+			LEFT JOIN #ChargeRate ci_3rd ON b.SiteID = ci_3rd.LicenseeId AND  b.ProductID = ci_3rd.ProductID AND b.Winlostdate BETWEEN ci_3rd.FromDate3rd AND ci_3rd.Todate3rd
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeId AND cr.CurrencyId = b.CurrencyId
 		GROUP BY b.Winlostdate, ci.PartyId, b.CurrencyId, b.ProductID, ci.isDeposit, b.PlayCurrency
 
@@ -763,8 +795,8 @@ BEGIN
 			SUM(b.LicenseeWinloss  * ISNULL(cr.Rate, ci.Rate) - CASE WHEN b.ProductID = 31 THEN (b.CommissionA + b.CommissionP) ELSE 0 END) AS LicensingFee,
 			SUM(CASE WHEN b.ProductID = 59  THEN (b.LicenseeWinloss - b.RollingComm) * CASE WHEN ci.isDeposit = 1 THEN ci.ChargeRate09 ELSE ci.ChargeRate10 END
 					 WHEN b.ProductID = 10  THEN 0
-					 WHEN b.ProductID = 31  THEN b.LicenseeWinloss  * ci.Rate3rd - (b.CommissionA + b.CommissionP)
-					  ELSE b.LicenseeWinloss  * ci.Rate3rd - CASE WHEN b.ProductID = 45 THEN b.Bonus ELSE 0 END
+					 WHEN b.ProductID = 31  THEN b.LicenseeWinloss  * ISNULL(ci_3rd.Rate3rd,0) - (b.CommissionA + b.CommissionP)
+					  ELSE b.LicenseeWinloss  * ISNULL(ci_3rd.Rate3rd,0) - CASE WHEN b.ProductID = 45 THEN b.Bonus ELSE 0 END
 				END) AS PayToSupplier,
 			b.ProductID,
 			SUM(Bonus),
@@ -775,7 +807,7 @@ BEGIN
 			SUM(Turnover)
 		FROM cte_Summary b WITH (NOLOCK)
 			INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
-			INNER JOIN @productDataView p ON b.ProductID = p.ProductID
+			LEFT JOIN #ChargeRate ci_3rd ON b.SiteID = ci_3rd.LicenseeId AND  b.ProductID = ci_3rd.ProductID AND b.Winlostdate BETWEEN ci_3rd.FromDate3rd AND ci_3rd.Todate3rd
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeId AND cr.CurrencyId = b.CurrencyId
 		GROUP BY b.Winlostdate, ci.PartyId, b.CurrencyId, b.ProductID
 
@@ -860,12 +892,11 @@ BEGIN
 						SUM(CASE WHEN ci.ProductID = 0 AND  ci.isDeposit = 1 THEN	0 ELSE b.CommissionS END) AS CommissionS,
 						SUM(CASE WHEN ci.ProductID = 0 AND  ci.isDeposit = 1 THEN (-b.WinLoss * ISNULL(cr.Rate, ci.Rate))
 						ELSE -(b.Winloss + b.WinLossA + b.WinLossM + b.WinLossS + b.CommissionS) END) LicensingFee,
-						SUM(CASE WHEN ci.ProductID = 23 THEN  -(b.WinLoss + b.WinLossS + b.WinLossM + b.WinLossA + b.CommissionS) * ci.Rate3rd ELSE 0 END) AS PaytoSupplier -- NG2 PaytoSupplier
+						SUM(CASE WHEN ci.ProductID = 23 THEN  -(b.WinLoss + b.WinLossS + b.WinLossM + b.WinLossA + b.CommissionS) * ISNULL(ci_3rd.Rate3rd,0) ELSE 0 END) AS PaytoSupplier -- NG2 PaytoSupplier
 				FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
 					INNER JOIN @bettype bt		ON b.Bettype = bt.Bettype
-					INNER JOIN #ChargeRate ci	ON b.SiteID = ci.LicenseeId 
-													AND bt.ProductID = ci.ProductID
-													AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate 
+					INNER JOIN #ChargeRate ci	ON b.SiteID = ci.LicenseeId AND bt.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate 
+					LEFT JOIN #ChargeRate ci_3rd	ON b.SiteID = ci_3rd.LicenseeId AND bt.ProductID = ci_3rd.ProductID AND b.rptDate BETWEEN ci_3rd.FromDate3rd AND ci_3rd.ToDate3rd 
 					LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeId AND cr.CurrencyId = b.CurrencyId
 												
 				WHERE b.rptDate BETWEEN @FromDate AND @ToDate
@@ -911,13 +942,13 @@ BEGIN
 					SUM(CASE WHEN r.ProductID = 23 THEN 0 
 							 WHEN r.ProductID = 33 AND ci.isDeposit = 1 THEN (r.LicenseeWinloss  * ISNULL(cr.Rate, ci.Rate))
 							 WHEN r.ProductID = 22 THEN r.LicenseeWinloss * ISNULL(cr.Rate, ci.Rate)
-							 WHEN r.ProductID = 2 AND isDeposit = 0  THEN r.LicensingFee
-							 WHEN r.ProductID = 2 AND isDeposit = 1  THEN r.LicenseeWinloss  * ISNULL(cr.Rate, ci.Rate)
+							 WHEN r.ProductID = 2 AND ci.isDeposit = 0  THEN r.LicensingFee
+							 WHEN r.ProductID = 2 AND ci.isDeposit = 1  THEN r.LicenseeWinloss  * ISNULL(cr.Rate, ci.Rate)
 							 WHEN r.ProductID = 34 AND ci.isDeposit = 1 THEN (r.LicenseeWinloss  * ISNULL(cr.Rate, ci.Rate))
 							 WHEN r.ProductID = 0 THEN r.LicensingFee
 							 ELSE 0 END) AS LicensingFee,
-					SUM(CASE WHEN r.ProductID = 2 AND isDeposit = 0 THEN (r.LicensingFee - CASE WHEN r.SiteID IN (1487/*IBCIndo*/, 1547/*76666b*/) THEN ExtraPT ELSE 0 END) * ci.Rate3rd
-							 WHEN r.ProductID = 2 AND isDeposit = 1 THEN r.LicenseeWinloss  * ISNULL(cr.Rate, ci.Rate) * ci.Rate3rd
+					SUM(CASE WHEN r.ProductID = 2 AND ci.isDeposit = 0 THEN (r.LicensingFee - CASE WHEN r.SiteID IN (1487/*IBCIndo*/, 1547/*76666b*/) THEN ExtraPT ELSE 0 END) * ISNULL(ci_3rd.Rate3rd,0)
+							 WHEN r.ProductID = 2 AND ci.isDeposit = 1 THEN r.LicenseeWinloss  * ISNULL(cr.Rate, ci.Rate) * ISNULL(ci_3rd.Rate3rd,0)
 							 WHEN r.ProductID = 22 THEN r.LicenseeWinloss *  CASE  WHEN ci.IsDeposit = 1 THEN (CASE WHEN r.SubProduct = 'Blueprint' THEN @VB_depositBlueprint3rd ELSE @VB_depositNotBlueprint3rd END)
 																		     ELSE CASE WHEN r.SubProduct = 'Blueprint' THEN @VB_creditBlueprint3rd ELSE @VB_creditNotBlueprint3rd END END 
 							 WHEN r.ProductID = 23 THEN r.PayToSupplier
@@ -930,9 +961,8 @@ BEGIN
 					SUM(CommissionA),
 					SUM(CommissionS)
 			FROM cte_Data r
-				INNER JOIN #ChargeRate ci	ON r.SiteID = ci.LicenseeId 
-													AND r.ProductID = ci.ProductID
-													AND r.Winlostdate BETWEEN ci.FromDate AND ci.ToDate 
+				INNER JOIN #ChargeRate ci	ON r.SiteID = ci.LicenseeId AND r.ProductID = ci.ProductID AND r.Winlostdate BETWEEN ci.FromDate AND ci.ToDate 
+				LEFT JOIN #ChargeRate ci_3rd ON r.SiteID = ci_3rd.LicenseeId AND r.ProductID = ci_3rd.ProductID AND r.Winlostdate BETWEEN ci_3rd.FromDate3rd AND ci_3rd.ToDate3rd 
 				LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeID AND cr.CurrencyID = r.CurrencyId
 			GROUP BY ci.PartyID, r.Winlostdate, r.CurrencyId, r.ProductID
 		END
@@ -1018,8 +1048,8 @@ BEGIN
 			SUM(b.LicenseeWinloss) AS LicenseeWinloss,
 			SUM(CASE WHEN b.ProductID = 32  AND b.isDeposit = 1 THEN (b.LicenseeWinloss - b.LicenseeContribution) * ISNULL(cr.Rate, ci.Rate) + LicenseeContribution - JackpotPrize - WinPrizeAmount
 				ELSE b.LicenseeWinloss * ISNULL(cr.Rate, ci.Rate) END) AS LicensingFee,
-			SUM(CASE WHEN b.ProductID = 32 THEN (LicenseeWinloss - FullContribution) * ci.Rate3rd
-				ELSE b.LicenseeWinloss * ci.Rate3rd - CASE WHEN b.ProductID = 45 THEN b.Bonus ELSE 0 END END) AS PayToSupplier,
+			SUM(CASE WHEN b.ProductID = 32 THEN (LicenseeWinloss - FullContribution) * ISNULL(ci_3rd.Rate3rd,0)
+				ELSE b.LicenseeWinloss * ISNULL(ci_3rd.Rate3rd,0) - CASE WHEN b.ProductID = 45 THEN b.Bonus ELSE 0 END END) AS PayToSupplier,
 			b.ProductID,
 			ci.isDeposit,
 			SUM(b.ValidBetAmount * ci.ChargeRate11) AS RollingComm,
@@ -1036,6 +1066,7 @@ BEGIN
 			PlayCurrency
 		FROM cte_Summary b WITH (NOLOCK)
 			INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
+			LEFT JOIN #ChargeRate ci_3rd ON b.SiteID = ci_3rd.LicenseeId AND b.ProductID = ci_3rd.ProductID AND b.Winlostdate BETWEEN ci_3rd.FromDate3rd AND ci_3rd.Todate3rd
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeId AND cr.CurrencyId = b.CurrencyId
 		GROUP BY b.Winlostdate, ci.PartyId, b.CurrencyId, b.ProductID, ci.isDeposit, b.PlayCurrency
 
