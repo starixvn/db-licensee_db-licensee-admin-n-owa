@@ -41,27 +41,58 @@ BEGIN
 
 	DECLARE @IndividualMinFee TABLE (RowId INT, GroupId INT, FeeTypeId TINYINT, PartyId INT, ProductId INT, BaseCurrencyId INT, FromDate DATE, ToDate DATE, MinFee MONEY)
 	DECLARE @tmpDate TABLE (PartyId INT, ProductId INT, FromDate DATE, ToDate DATE)
+	DECLARE @WrongSetting TABLE (PartyId INT, ProductId INT)
 
 	-- Group Min Fee
-	INSERT INTO @MinFee (FeeTypeId, GroupMinFeeId, PartyId, ProductId, BaseCurrencyId, IsPrimary, MinFee, FromDate, ToDate, RowId, GroupId)
-	SELECT 1, GroupMinFeeId, PartyId, ISNULL(ProductId, 0), ISNULL(CurrencyId, 6), IsPrimary, MinFee, FromDate, ToDate, RowId, RowId
+	;WITH CTE_GroupMinFee AS
+	(
+		SELECT a.PartyId, a.IsPrimary, a.GroupMinFeeId, d.ProductId, d.CurrencyId
+			,CASE WHEN a.IsPrimary = 1 THEN ISNULL(d.MinimumFee, 0) ELSE 0 END AS MinFee
+			,CASE WHEN h.FromDate < @FirstDate THEN @FirstDate ELSE h.FromDate END AS H_FromDate
+			,CASE WHEN h.ToDate > @LastDate THEN @LastDate ELSE h.ToDate END AS H_ToDate
+			,CASE WHEN d.FromDate < @FirstDate THEN @FirstDate ELSE d.FromDate END AS D_FromDate
+			,CASE WHEN d.ToDate > @LastDate THEN @LastDate ELSE d.ToDate END AS D_ToDate
+			,ROW_NUMBER() OVER(PARTITION BY a.PartyId, a.GroupMinFeeId, d.ProductId ORDER BY d.ToDate DESC) AS RN
+		FROM dbo.LA_GroupMinFeeAssignment a WITH (NOLOCK)
+			INNER JOIN dbo.LA_GroupMinFeeHeader h WITH (NOLOCK) ON a.GroupMinFeeId = h.GroupMinFeeId
+			INNER JOIN dbo.LA_GroupMinFeeDetail d WITH (NOLOCK) ON a.GroupMinFeeId = d.GroupMinFeeId
+		WHERE h.FromDate <= @LastDate AND h.ToDate >= @FirstDate
+			AND ',' + @PartyIds + ',' LIKE '%,' + CONVERT(VARCHAR(20), a.PartyId) + ',%'
+	)
+	INSERT INTO @MinFee (RowId, GroupId, FeeTypeId, GroupMinFeeId, PartyId, ProductId, BaseCurrencyId, IsPrimary, MinFee, FromDate, ToDate)
+	SELECT RowId, RowId, 1, GroupMinFeeId, PartyId, ProductId, CurrencyId, IsPrimary, MinFee
+		,CASE WHEN IsWrongSetting = 1 THEN @FirstDate ELSE FromDate END
+		,CASE WHEN IsWrongSetting = 1 THEN @LastDate ELSE ToDate END
 	FROM (
-		SELECT m.GroupMinFeeId, m.PartyId, m.ProductId, m.CurrencyId, m.IsPrimary, m.MinFee, m.FromDate, m.ToDate, ROW_NUMBER() OVER(PARTITION BY PartyId, ProductId ORDER BY FromDate) AS RowId
-		FROM (
-			SELECT a.PartyId, a.IsPrimary, a.GroupMinFeeId, d.ProductId, d.CurrencyId
-				,CASE WHEN a.IsPrimary = 1 THEN ISNULL(d.MinimumFee, 0) ELSE 0 END AS MinFee
-				,CASE WHEN h.FromDate < @FirstDate THEN @FirstDate ELSE h.FromDate END AS FromDate
-				,CASE WHEN h.ToDate > @LastDate THEN @LastDate ELSE h.ToDate END AS ToDate
-				,ROW_NUMBER() OVER(PARTITION BY a.PartyId, a.GroupMinFeeId, d.ProductId ORDER BY d.ToDate DESC) AS RN
-			FROM dbo.LA_GroupMinFeeAssignment a WITH (NOLOCK)
-				INNER JOIN dbo.LA_GroupMinFeeHeader h WITH (NOLOCK) ON a.GroupMinFeeId = h.GroupMinFeeId
-				LEFT JOIN dbo.LA_GroupMinFeeDetail d WITH (NOLOCK) ON a.GroupMinFeeId = d.GroupMinFeeId AND d.FromDate <= @LastDate AND d.ToDate >= @FirstDate
-			WHERE h.FromDate <= @LastDate AND h.ToDate >= @FirstDate
-				AND ',' + @PartyIds + ',' LIKE '%,' + CONVERT(VARCHAR(20), a.PartyId) + ',%'
-		) m
-		WHERE m.RN = 1
+		SELECT GroupMinFeeId, PartyId, ProductId, CurrencyId, IsPrimary, MinFee, H_FromDate AS FromDate, H_ToDate AS ToDate
+			,CASE WHEN D_FromDate <> H_FromDate OR D_ToDate <> H_ToDate THEN 1 ELSE 0 END AS IsWrongSetting
+			,ROW_NUMBER() OVER(PARTITION BY PartyId, ProductId ORDER BY D_FromDate) AS RowId
+		FROM CTE_GroupMinFee
+		WHERE RN = 1
 	) t
 
+	-- If wrong setting --> get latest setting for full month
+	INSERT INTO @WrongSetting (PartyId, ProductId)
+	SELECT DISTINCT g1.PartyId, g1.ProductId
+	FROM @MinFee g1
+		INNER JOIN @MinFee g2 ON g1.PartyId = g2.PartyId AND g1.ProductId = g2.ProductId AND g1.RowId = g2.RowId + 1
+	WHERE g1.FromDate <> DATEADD(DAY, 1, g2.ToDate)
+
+	IF EXISTS (SELECT 1 FROM @WrongSetting)
+	BEGIN
+		UPDATE g
+		SET g.FromDate = CASE WHEN g.RN = 1 THEN @FirstDate ELSE '2000-01-01' END
+			,g.ToDate = CASE WHEN g.RN = 1 THEN @LastDate ELSE '2000-01-01' END
+		FROM (
+			SELECT g.FromDate, g.ToDate, ROW_NUMBER() OVER(PARTITION BY g.PartyId, g.ProductId ORDER BY g.RowId DESC) AS RN
+			FROM @MinFee g
+				INNER JOIN @WrongSetting w ON g.PartyId = w.PartyId AND g.ProductId = w.ProductId
+		) g
+
+		DELETE @WrongSetting
+		DELETE @MinFee WHERE FromDate = '2000-01-01'
+	END
+	
 	-- Individual Min Fee
 	INSERT INTO @IndividualMinFee (FeeTypeId, PartyId, ProductId, BaseCurrencyId, MinFee, FromDate, ToDate, RowId, GroupId)
 	SELECT 0 AS FeeTypeId, PartyId, ProductId, CurrencyId, MinFee, FromDate, ToDate, RowId, RowId
@@ -85,6 +116,50 @@ BEGIN
 	FROM @IndividualMinFee m
 		INNER JOIN dbo.LA_MinFee w WITH (NOLOCK) ON m.PartyId = w.PartyId AND m.ProductId = w.ProductId
 	WHERE w.FeeTypeId = 2 AND m.FromDate <= w.ToDate AND m.ToDate >= w.FromDate
+
+	-- Get Waive for Group (secondary will follow primary)
+	;WITH CTE_GroupMinFee AS (
+		SELECT PartyId, ProductId, FromDate, ToDate, GroupMinFeeId, RowId, ROW_NUMBER() OVER(PARTITION BY PartyId, ProductId ORDER BY RowId DESC) AS RN
+		FROM @MinFee
+		WHERE IsPrimary = 1
+	)
+	INSERT INTO @MinFee (RowId, PartyId, ProductId, BaseCurrencyId, GroupId, GroupMinFeeId, FeeTypeId, IsPrimary, FromDate, ToDate, MinFee)
+	SELECT m.RowId, g.PartyId, g.ProductId, m.BaseCurrencyId, m.GroupId, -m.PartyId, m.FeeTypeId, g.IsPrimary, m.FromDate, m.ToDate, m.MinFee
+	FROM CTE_GroupMinFee p
+		INNER JOIN @IndividualMinFee m ON p.PartyId = m.PartyId AND p.ProductId = m.ProductId AND m.FeeTypeId = 2
+		CROSS APPLY (SELECT PartyId, ProductId, IsPrimary FROM @MinFee g WHERE g.GroupMinFeeId = p.GroupMinFeeId) g
+	WHERE
+		(
+			(p.RowId = 1 AND p.FromDate > @FirstDate AND m.FromDate = @FirstDate AND p.FromDate = DATEADD(DAY, 1, m.ToDate))
+			OR (p.RN = 1 AND p.ToDate < @LastDate AND m.ToDate = @LastDate AND p.ToDate = DATEADD(DAY, -1, m.FromDate))
+		)
+
+	-- If wrong setting --> get latest setting for full month
+	INSERT INTO @WrongSetting (PartyId, ProductId)
+	SELECT PartyId, ProductId
+	FROM @MinFee
+	GROUP BY PartyId, ProductId
+	HAVING MIN(FromDate) > @FirstDate OR MAX(ToDate) < @LastDate
+	
+	IF EXISTS (SELECT 1 FROM @WrongSetting)
+	BEGIN
+		UPDATE g
+		SET g.FromDate = CASE WHEN g.RN = 1 THEN @FirstDate ELSE '2000-01-01' END
+			,g.ToDate = CASE WHEN g.RN = 1 THEN @LastDate ELSE '2000-01-01' END
+		FROM (
+			SELECT g.FromDate, g.ToDate, ROW_NUMBER() OVER(PARTITION BY g.PartyId, g.ProductId ORDER BY CASE WHEN g.GroupMinFeeId > 0 THEN 0 ELSE 1 END, g.RowId DESC) AS RN
+			FROM @MinFee g
+				INNER JOIN @WrongSetting w ON g.PartyId = w.PartyId AND g.ProductId = w.ProductId
+		) g
+
+		DELETE @WrongSetting
+		DELETE @MinFee WHERE FromDate = '2000-01-01'
+	END
+
+	-- Insert individual min fee & waive for case no group setting
+	DELETE @IndividualMinFee
+	FROM @IndividualMinFee m
+		INNER JOIN @MinFee g ON m.PartyId = g.PartyId AND m.ProductId = g.ProductId
 
 	INSERT INTO @tmpDate (PartyId, ProductId, FromDate, ToDate)
 	SELECT t1.PartyId, t1.ProductId, t2.FromDate, t2.ToDate
@@ -116,57 +191,11 @@ BEGIN
 	WHERE m.FeeTypeId = 0
 
 	DELETE @IndividualMinFee WHERE FeeTypeId = 0
-	DELETE @tmpDate
-
-	INSERT INTO @tmpDate (PartyId, ProductId, FromDate, ToDate)
-	SELECT t1.PartyId, t1.ProductId, t2.FromDate, t2.ToDate
-	FROM (SELECT PartyId, ProductId, MIN(FromDate) AS FromDate, MAX(ToDate) AS ToDate FROM @MinFee GROUP BY PartyId, ProductId) t1
-		CROSS APPLY (
-			SELECT @FirstDate AS FromDate, DATEADD(DAY, -1, t1.FromDate) AS ToDate WHERE t1.FromDate > @FirstDate
-			UNION ALL SELECT DATEADD(DAY, 1, t1.ToDate) AS FromDate, @LastDate AS ToDate WHERE t1.ToDate < @LastDate
-		) t2
-
-	INSERT INTO @tmpDate (PartyId, ProductId, FromDate, ToDate)
-	SELECT t1.PartyId, t1.ProductId, DATEADD(DAY, 1, t1.ToDate) AS FromDate, DATEADD(DAY, -1, t2.FromDate) AS ToDate
-	FROM @MinFee t1
-		INNER JOIN @MinFee t2 ON t1.PartyId = t2.PartyId AND t1.ProductId = t2.ProductId
-	WHERE t1.RowId + 1 = t2.RowId AND t1.ToDate < DATEADD(DAY, -1, t2.FromDate)
-
-	INSERT INTO @tmpDate (PartyId, ProductId, FromDate, ToDate)
-	SELECT m.PartyId, m.ProductId, @FirstDate, @LastDate
-	FROM @IndividualMinFee m WHERE m.FeeTypeId = 1
-		AND NOT EXISTS (SELECT 1 FROM @tmpDate t WHERE m.PartyId = t.PartyId AND m.ProductId = t.ProductId)
-		AND NOT EXISTS (SELECT 1 FROM @MinFee t WHERE m.PartyId = t.PartyId AND m.ProductId = t.ProductId)
-	GROUP BY m.PartyId, m.ProductId
 
 	INSERT INTO @MinFee (FeeTypeId, GroupMinFeeId, PartyId, ProductId, BaseCurrencyId, IsPrimary, MinFee, FromDate, ToDate, RowId, GroupId)
-	SELECT m.FeeTypeId, -m.PartyId AS GroupMinFeeId, m.PartyId, m.ProductId, m.BaseCurrencyId, 1 AS IsPrimary, m.MinFee
-		,CASE WHEN m.FromDate < t.FromDate THEN t.FromDate ELSE m.FromDate END AS FromDate
-		,CASE WHEN m.ToDate > t.ToDate THEN t.ToDate ELSE m.ToDate END AS ToDate
-		,m.RowId, m.GroupId
-	FROM @IndividualMinFee m
-		INNER JOIN @tmpDate t ON m.PartyId = t.PartyId AND m.ProductId = t.ProductId AND m.FromDate <= t.ToDate AND m.ToDate >= t.FromDate
+	SELECT FeeTypeId, -PartyId, PartyId, ProductId, BaseCurrencyId, 1 AS IsPrimary, MinFee, FromDate, ToDate, RowId, GroupId
+	FROM @IndividualMinFee
 
-	UPDATE m
-	SET m.FromDate = CASE
-						WHEN d.FromDate IS NULL THEN '2000-01-01'
-						WHEN d.FromDate < @FirstDate THEN @FirstDate
-						ELSE d.FromDate END
-		,m.ToDate = CASE
-						WHEN d.ToDate IS NULL THEN '2000-01-01'
-						WHEN d.ToDate > @LastDate THEN @LastDate
-						ELSE d.ToDate END
-	FROM @MinFee m
-		OUTER APPLY (
-			SELECT TOP 1 d.FromDate, d.ToDate
-			FROM dbo.LA_GroupMinFeeDetail d WITH (NOLOCK)
-			WHERE m.GroupMinFeeId = d.GroupMinFeeId AND m.ProductId = d.ProductId
-				AND d.FromDate <= @LastDate AND d.ToDate >= @FirstDate
-			ORDER BY d.ToDate DESC
-		) d
-	WHERE m.GroupMinFeeId > 0
-
-	--
 	UPDATE m
 	SET m.FromDate = CASE
 						WHEN c.FromDate IS NULL THEN '2000-01-01'
