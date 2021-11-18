@@ -359,7 +359,7 @@ BEGIN
 				INNER JOIN #Products p ON b.ProductId = p.ProductId
 			GROUP BY b.rptDate, b.LicenseeId, b.CurrencyId, p.GroupProductId
 		)
-		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm, OddsSpreadCost)
+		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm, OddsSpreadCost, IsShowOddsSpread)
 		SELECT a.rptDate
 			   ,p.PartyID
 			   ,a.CurrencyID
@@ -372,6 +372,7 @@ BEGIN
 			   ,Betcount
 			   ,Playercomm
 			   ,CASE WHEN a.ProductID = 0 THEN WinlossA ELSE 0 END
+			   ,IsShowOddsSpread
 		FROM cte_Data a
 		INNER JOIN #tmpParty p ON p.LicenseeId = a.LicenseeId AND a.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId=a.ProductId AND p.ChargeType = 1
 		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID = p.ChargeId AND a.CurrencyId=cc.CurrencyID
