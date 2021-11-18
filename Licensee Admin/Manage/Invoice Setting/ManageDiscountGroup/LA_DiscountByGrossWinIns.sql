@@ -11,6 +11,8 @@ ALTER PROCEDURE [dbo].[LA_DiscountByGrossWinIns]
 	,@RateSettingsData		VARCHAR(MAX) = ''
 	,@PartySettingsData		NVARCHAR(MAX) = ''
 	,@CurrencySettingsData	VARCHAR(MAX) = ''
+	,@UserId				INT
+	,@LoginIP				VARCHAR(50) = ''
 	,@ErrCode				INT = 0 OUTPUT
 	,@ErrMsg				VARCHAR(4000)= '' OUTPUT
 	,@GroupIdOut			SMALLINT = 0 OUTPUT
@@ -61,15 +63,25 @@ AS
 									<CalculationType>1</CalculationType>
 								</CurrencySetting>
 							</Root>'
+					. CalculationType: Discount-Calculate (binary)
+						00 = 0 = None
+						01 = 1 = Calculate only
+						10 = 2 = Discount only
+						11 = 3 = Calculate & Discount
 */
 
 BEGIN
 	SET NOCOUNT ON
 
+	-- For log
+	DECLARE @StartRun DATETIME, @Duration INT, @LogSPData NVARCHAR(MAX)
+
+	SET @StartRun = GETDATE()
+
 	DECLARE @CutOffDate DATE = dbo.LA_f_DiscountByGrossWin_CutOffDate()
 	
 	DECLARE @DiscountType_GrossWin TINYINT = 13
-	DECLARE @CalculateAndDiscount TINYINT = 10
+	DECLARE @Product_CalculateAndDiscount TINYINT = 10
 	DECLARE @MaxAmountValue MONEY = 10000000000000 --  10,000,000,000,000
 	DECLARE @ChargeRate MONEY
 
@@ -221,7 +233,7 @@ BEGIN
 
 		-- product
 		INSERT INTO dbo.LA_DiscountGroupProduct (DiscountGroupId, ProductId, CalculationType)
-		VALUES (@GroupIdOut, @ProductId, @CalculateAndDiscount)
+		VALUES (@GroupIdOut, @ProductId, @Product_CalculateAndDiscount)
 
 		-- tier rate setting
 		INSERT INTO dbo.LA_DiscountGroupDetail (DiscountGroupId, FromAmount, ToAmount, Rate)
@@ -240,5 +252,19 @@ BEGIN
 		SELECT @ErrCode =  601, @ErrMsg = 'Insert failed. Please try again.'
 		RETURN
 	END CATCH
+
+	-- Write log
+	SET @Duration = DATEDIFF(MILLISECOND, @StartRun, GETDATE())
+
+	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+		@UserId			= @UserId
+		,@IP			= @LoginIP
+		,@LicenseeId	= 0
+		,@CurrencyId	= 0
+		,@SPName		= 'LA_DiscountByGrossWinIns'
+		,@CustId		= 0
+		,@Duration		= @Duration
+		,@Data			= @LogSPData
+		,@OldData		= NULL
 END
 GO
