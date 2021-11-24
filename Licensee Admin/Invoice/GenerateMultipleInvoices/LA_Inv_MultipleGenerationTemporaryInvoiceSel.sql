@@ -229,7 +229,7 @@ BEGIN
 
 		-- Prepayment
 		UPDATE f
-		SET f.LicensingFee = f.LicensingFee - CASE WHEN f.LicensingFee < r.LicensingFee THEN f.LicensingFee ELSE r.LicensingFee END
+		SET f.LicensingFee = f.LicensingFee - CASE WHEN f.LicensingFee - f.Discount < r.LicensingFee THEN f.LicensingFee - f.Discount ELSE r.LicensingFee END
 		FROM @FinalResult f
 			INNER JOIN @Result r ON f.PartyId = r.PartyId AND r.ProductId = -99
 		WHERE f.LicensingFee > 0 AND r.LicensingFee > 0

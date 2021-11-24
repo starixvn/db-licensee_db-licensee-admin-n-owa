@@ -709,7 +709,7 @@ BEGIN
 				INNER JOIN dbo.LA_InvoiceHeader h WITH (NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId
 				INNER JOIN CTE_InvItemTypes t ON s.InvItemTypeId = t.InvItemTypeId
 			WHERE ISNULL(h.StatusId, 0) = 0 AND h.Environment = @Environment
-				AND EXISTS (SELECT 1 FROM #PartyList p WHERE s.RefPartyId = p.PartyId)
+				AND EXISTS (SELECT 1 FROM #PartyList p WHERE s.RefPartyId = p.PartyId AND p.IsSelected = 1)
 			GROUP BY s.RefPartyId, t.InvItemTypeName
 		)
 		INSERT INTO @Deductions (PartyId, RemainingAMF, RemainingAGPrepayment, RemainingPrepayment)
@@ -728,12 +728,10 @@ BEGIN
 			FROM @Result r
 				INNER JOIN @Deductions d ON r.PartyId = d.PartyId
 				CROSS APPLY (
-					SELECT r.LicensingFee - r.Discount AS DeductedAMF
-					UNION ALL SELECT r.ProrateMinFee
+					SELECT r.ProrateMinFee AS DeductedAMF
 					UNION ALL SELECT d.RemainingAMF
 				) t
 			WHERE r.ProductId = 0 -- SB
-				AND r.LicensingFee - r.Discount > 0
 				AND r.ProrateMinFee > 0
 				AND d.RemainingAMF > 0
 			GROUP BY r.PartyId

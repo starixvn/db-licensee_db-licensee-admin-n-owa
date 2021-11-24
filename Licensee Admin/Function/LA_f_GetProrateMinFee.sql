@@ -43,6 +43,20 @@ BEGIN
 	DECLARE @tmpDate TABLE (PartyId INT, ProductId INT, FromDate DATE, ToDate DATE)
 	DECLARE @WrongSetting TABLE (PartyId INT, ProductId INT)
 
+	-- Include primary licensee if input secondary licensee
+	DECLARE @_PartyIds VARCHAR(MAX)
+	SELECT  @_PartyIds = COALESCE(@_PartyIds + ',', '') + CONVERT(VARCHAR(20), a.PartyId)
+	FROM dbo.LA_GroupMinFeeAssignment a WITH (NOLOCK)
+		INNER JOIN dbo.LA_GroupMinFeeHeader h WITH (NOLOCK) ON a.GroupMinFeeId = h.GroupMinFeeId
+	WHERE h.FromDate <= @LastDate AND h.ToDate >= @FirstDate
+		AND EXISTS (
+			SELECT 1 FROM dbo.LA_GroupMinFeeAssignment ga WITH (NOLOCK)
+			WHERE a.GroupMinFeeId = ga.GroupMinFeeId
+				AND ',' + @PartyIds + ',' LIKE '%,' + CONVERT(VARCHAR(20), ga.PartyId) + ',%'
+		)
+
+	SELECT @_PartyIds = ISNULL(@_PartyIds + ',', '') + @PartyIds
+		
 	-- Group Min Fee
 	;WITH CTE_GroupMinFee AS
 	(
@@ -57,7 +71,7 @@ BEGIN
 			INNER JOIN dbo.LA_GroupMinFeeHeader h WITH (NOLOCK) ON a.GroupMinFeeId = h.GroupMinFeeId
 			INNER JOIN dbo.LA_GroupMinFeeDetail d WITH (NOLOCK) ON a.GroupMinFeeId = d.GroupMinFeeId
 		WHERE h.FromDate <= @LastDate AND h.ToDate >= @FirstDate
-			AND ',' + @PartyIds + ',' LIKE '%,' + CONVERT(VARCHAR(20), a.PartyId) + ',%'
+			AND ',' + @_PartyIds + ',' LIKE '%,' + CONVERT(VARCHAR(20), a.PartyId) + ',%'
 	)
 	INSERT INTO @MinFee (RowId, GroupId, FeeTypeId, GroupMinFeeId, PartyId, ProductId, BaseCurrencyId, IsPrimary, MinFee, FromDate, ToDate)
 	SELECT RowId, RowId, 1, GroupMinFeeId, PartyId, ProductId, CurrencyId, IsPrimary, MinFee
@@ -103,7 +117,7 @@ BEGIN
 			,ROW_NUMBER() OVER(PARTITION BY m.PartyId, m.ProductId ORDER BY m.FromDate) AS RowId
 		FROM dbo.LA_MinFee m WITH (NOLOCK)
 		WHERE m.FeeTypeId = 1 AND m.FromDate <= @LastDate AND m.ToDate >= @FirstDate
-			AND ',' + @PartyIds + ',' LIKE '%,' + CONVERT(VARCHAR(20), m.PartyId) + ',%'
+			AND ',' + @_PartyIds + ',' LIKE '%,' + CONVERT(VARCHAR(20), m.PartyId) + ',%'
 	) t
 
 	-- Waive (under Individual Min Fee)
@@ -195,6 +209,9 @@ BEGIN
 	INSERT INTO @MinFee (FeeTypeId, GroupMinFeeId, PartyId, ProductId, BaseCurrencyId, IsPrimary, MinFee, FromDate, ToDate, RowId, GroupId)
 	SELECT FeeTypeId, -PartyId, PartyId, ProductId, BaseCurrencyId, 1 AS IsPrimary, MinFee, FromDate, ToDate, RowId, GroupId
 	FROM @IndividualMinFee
+
+	-- Keep selected licensees
+	DELETE @MinFee WHERE ',' + @PartyIds + ',' NOT LIKE '%,' + CONVERT(VARCHAR(20), PartyId) + ',%'
 
 	UPDATE m
 	SET m.FromDate = CASE

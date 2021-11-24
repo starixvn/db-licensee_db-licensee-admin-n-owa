@@ -110,7 +110,7 @@ BEGIN
 	SELECT @Remark AS Remark, @ToDate AS ReportDate, @BaseCurrency AS CurrencyName, @TotalRebate AS TotalRebate, @TotalAmount AS TotalAmount
 
 	-- Detail
-	SELECT ProductId, CASE WHEN GrossLicensingFee < 0 THEN GrossLicensingFee ELSE LicensingFee - Discount END AS AmountToCompany
+	SELECT ProductId, LicensingFee - Discount AS AmountToCompany
 	FROM @Result
 END
 GO
