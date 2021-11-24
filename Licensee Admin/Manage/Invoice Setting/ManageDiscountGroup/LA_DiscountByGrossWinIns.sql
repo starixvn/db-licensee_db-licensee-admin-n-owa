@@ -4,10 +4,12 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountByGrossWinIns]
 	@DiscountGroupName		NVARCHAR(110)
+	,@DiscountGroupType		TINYINT
 	,@CurrencyId			TINYINT
 	,@FromDate				DATE
 	,@ToDate				DATE
-	,@ProductId				INT = 0
+	,@CalculationProductIds VARCHAR(MAX) = '0'
+	,@DiscountProductIds	VARCHAR(MAX) = '0'
 	,@RateSettingsData		VARCHAR(MAX) = ''
 	,@PartySettingsData		NVARCHAR(MAX) = ''
 	,@CurrencySettingsData	VARCHAR(MAX) = ''
@@ -80,10 +82,8 @@ BEGIN
 
 	DECLARE @CutOffDate DATE = dbo.LA_f_DiscountByGrossWin_CutOffDate()
 	
-	DECLARE @DiscountType_GrossWin TINYINT = 13
-	DECLARE @Product_CalculateAndDiscount TINYINT = 10
 	DECLARE @MaxAmountValue MONEY = 10000000000000 --  10,000,000,000,000
-	DECLARE @ChargeRate MONEY
+	DECLARE @ProductId INT, @ChargeRate MONEY
 
 	-- Prepare input data
 	DECLARE @PartyXML XML = CONVERT(XML, @PartySettingsData)
@@ -93,6 +93,7 @@ BEGIN
 	DECLARE @PartyList	TABLE (PartyId INT, ChargeRate MONEY, Remark NVARCHAR(500))
 	DECLARE @CurrencyList TABLE (PartyId INT, CurrencyId INT, CalculationType TINYINT)
 	DECLARE @TierRateSetting TABLE (RowId INT, FromAmount MONEY, ToAmount MONEY, Rate MONEY)
+	DECLARE @ProductList TABLE (ProductId INT, CalculationType TINYINT)
 
 	BEGIN TRY
 		IF @FromDate < @CutOffDate
@@ -101,7 +102,29 @@ BEGIN
 			RETURN
 		END
 
-		IF NOT EXISTS (SELECT 1 FROM dbo.LA_f_Products3rd('') WHERE ProductId = @ProductId)
+		/*
+			Product CalculationType
+			 0 = discount only
+			 1 = calculate only
+			10 = discount & calculate
+		*/
+		INSERT INTO @ProductList (ProductId, CalculationType)
+		SELECT DISTINCT val, 0 FROM dbo.StrSplit(@DiscountProductIds, ',')
+
+		MERGE @ProductList AS s
+		USING (
+			SELECT DISTINCT val AS ProductId, 1 AS CalculationType
+			FROM dbo.StrSplit(@CalculationProductIds, ',')
+		) AS t ON s.ProductId = t.ProductId
+		WHEN MATCHED THEN UPDATE SET s.CalculationType = 10
+		WHEN NOT MATCHED BY TARGET THEN INSERT (ProductId, CalculationType) VALUES (ProductId, CalculationType);
+
+		IF EXISTS (
+			SELECT 1
+			FROM @ProductList pl
+				LEFT JOIN dbo.LA_f_Products3rd('') p ON pl.ProductId = p.ProductId
+			WHERE p.ProductId IS NULL
+		)
 		BEGIN
 			SELECT @ErrCode = 502, @ErrMsg = 'Product(s) do not exist.'
 			RETURN
@@ -192,6 +215,7 @@ BEGIN
 			RETURN
 		END
 
+		SELECT TOP 1 @ProductId = @ProductId FROM @ProductList
 		IF EXISTS (
 			SELECT 1
 			FROM @PartyList p
@@ -211,7 +235,7 @@ BEGIN
 	BEGIN TRY
 		-- main table
 		INSERT INTO dbo.LA_DiscountGroupHeader (DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, Priority, ModifiedDate)
-		VALUES (@DiscountGroupName, @DiscountType_GrossWin, @CurrencyId, @FromDate, @ToDate, 1, GETDATE())
+		VALUES (@DiscountGroupName, @DiscountGroupType, @CurrencyId, @FromDate, @ToDate, 1, GETDATE())
 
 		SET @GroupIdOut = SCOPE_IDENTITY()
 
@@ -233,7 +257,8 @@ BEGIN
 
 		-- product
 		INSERT INTO dbo.LA_DiscountGroupProduct (DiscountGroupId, ProductId, CalculationType)
-		VALUES (@GroupIdOut, @ProductId, @Product_CalculateAndDiscount)
+		SELECT @GroupIdOut, ProductId, CalculationType
+		FROM @ProductList
 
 		-- tier rate setting
 		INSERT INTO dbo.LA_DiscountGroupDetail (DiscountGroupId, FromAmount, ToAmount, Rate)

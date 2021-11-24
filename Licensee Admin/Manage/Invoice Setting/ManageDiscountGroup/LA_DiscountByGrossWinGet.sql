@@ -19,14 +19,13 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @RepPartyId INT -- Representative Party
-	DECLARE @ProductId INT, @ProductName VARCHAR(100)
+	DECLARE @ProductId INT
 	DECLARE @ChargeRate MONEY = 0, @FromDate DATE, @ToDate DATE
 
 	SELECT TOP 1 @RepPartyId = PartyId FROM dbo.LA_DiscountGroupAssignment WITH (NOLOCK) WHERE DiscountGroupId = @GroupId
 
-	SELECT TOP 1 @ProductId = gp.ProductId, @ProductName = p.ProductName
+	SELECT TOP 1 @ProductId = gp.ProductId
 	FROM dbo.LA_DiscountGroupProduct gp WITH (NOLOCK)
-		INNER JOIN dbo.LA_f_Products3rd('') p ON gp.ProductId = p.ProductId
 	WHERE gp.DiscountGroupId = @GroupId
 
 	SELECT TOP 1 @FromDate = FromDate, @ToDate = ToDate FROM dbo.LA_DiscountGroupHeader WITH (NOLOCK) WHERE DiscountGroupId = @GroupId
@@ -38,7 +37,7 @@ BEGIN
 
 	-- Gerenal info
 	SELECT h.DiscountGroupId, h.DiscountGroupName, h.FromDate, h.ToDate, h.ModifiedDate
-		,h.CurrencyId, e.Code AS CurrencyName, @ProductName AS ProductList
+		,h.CurrencyId, e.Code AS CurrencyName, CONVERT(VARCHAR(100), @ProductId) AS ProductList
 	FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
 		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON h.CurrencyId = e.ExchangeId
 	WHERE h.DiscountGroupId = @GroupId
