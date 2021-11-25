@@ -46,6 +46,7 @@ AS
 	   - 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 	   - 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 	   - 20210824@Percy: Enhance performance [RedmineID: #160672]
+	   - 20211115@Percy: Return IsShowOddsSpread [RedmineID: #164411]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -97,7 +98,8 @@ BEGIN
 		Company			MONEY,
 		Betcount		BIGINT,
 		Playercomm		MONEY,
-		OddsSpreadCost	MONEY
+		OddsSpreadCost	MONEY,
+		IsShowOddsSpread TINYINT DEFAULT(0)
 	)
 
 	CREATE INDEX IX_tmpWinloss ON #tmpWinLoss(PartyID, Winlostdate, Currency)
@@ -267,11 +269,11 @@ BEGIN
 			INNER JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','999,4297,1698,3898') eb ON bt.Bettype = eb.BettypeId
 
 		CREATE TABLE #tmpData (rptDate DATE, LicenseeId INT, CurrencyId INT, ProductId INT, LeagueId INT, Bettype INT
-			,BetCount INT, Turnover MONEY, Winloss MONEY, WinlossA MONEY, CommissionP MONEY)
+			,BetCount INT, Turnover MONEY, Winloss MONEY, WinlossA MONEY, CommissionP MONEY, IsShowOddsSpread TINYINT)
 
 		IF @SportType = 0 AND @Bettype = 0 AND @ReportBy = 0
 		BEGIN
-			INSERT INTO #tmpData (rptDate, LicenseeId, CurrencyId, ProductId, BetCount, Turnover, Winloss, WinlossA, CommissionP)
+			INSERT INTO #tmpData (rptDate, LicenseeId, CurrencyId, ProductId, BetCount, Turnover, Winloss, WinlossA, CommissionP, IsShowOddsSpread)
 			SELECT r.rptDate, r.SiteId, r.CurrencyId, r.ProductId
 				,SUM(r.BetCount * CASE
 									WHEN r.Bettype IN (999,4297,1698,3898) THEN 0
@@ -287,6 +289,7 @@ BEGIN
 									ELSE 1 END) AS Winloss
 				,SUM(CASE WHEN r.Bettype IN (999,4297,1698,3898) THEN ISNULL(-r.GrossWL, 0) ELSE 0 END) WinlossA
 				,SUM(CASE WHEN r.ProductId = 32 THEN 0 ELSE r.CommissionP END) AS CommissionP
+				,MAX(CASE WHEN r.Bettype = 999 THEN 1 ELSE 0 END) AS IsShowOddsSpread
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
 				LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','999,4297,1698,3898') b ON r.Bettype = b.BettypeId
 			WHERE r.rptDate BETWEEN @FromDate AND @ToDate
@@ -301,7 +304,7 @@ BEGIN
 		END
 		ELSE
 		BEGIN
-			INSERT INTO #tmpData (rptDate, LicenseeId, CurrencyId, ProductId, LeagueId, Bettype, BetCount, Turnover, Winloss, WinlossA, CommissionP)
+			INSERT INTO #tmpData (rptDate, LicenseeId, CurrencyId, ProductId, LeagueId, Bettype, BetCount, Turnover, Winloss, WinlossA, CommissionP, IsShowOddsSpread)
 			SELECT r.rptDate, r.SiteId, r.CurrencyId, bt.ProductId, r.LeagueId
 				,CASE WHEN r.Bettype NOT IN (9, 29) AND r.Bettype NOT BETWEEN 31 AND 120 THEN 1 ELSE 0 END AS Bettype
 				,SUM(r.BetCount * CASE
@@ -318,6 +321,7 @@ BEGIN
 									ELSE 1 END) AS Winloss
 				,SUM(CASE WHEN r.Bettype IN (999,4297,1698,3898) THEN ISNULL(-r.WinLossA, 0) ELSE 0 END) WinlossA
 				,SUM(CASE WHEN bt.ProductId = 32 THEN 0 ELSE r.CommissionP END) AS CommissionP
+				,MAX(CASE WHEN r.Bettype = 999 THEN 1 ELSE 0 END) AS IsShowOddsSpread
 			FROM bodb_LicenseeReport.dbo.rpt_Betting r WITH (NOLOCK)
 				INNER JOIN #Bettype bt ON r.Bettype = bt.Bettype
 			WHERE r.rptDate BETWEEN @FromDate AND @ToDate
@@ -350,11 +354,12 @@ BEGIN
 					,SUM(b.BetCount) AS BetCount
 					,SUM(CommissionP) AS Playercomm
 					,SUM(WinlossA) AS WinlossA
+					,MAX(b.IsShowOddsSpread) AS IsShowOddsSpread
 			FROM #tmpData b
 				INNER JOIN #Products p ON b.ProductId = p.ProductId
 			GROUP BY b.rptDate, b.LicenseeId, b.CurrencyId, p.GroupProductId
 		)
-		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm, OddsSpreadCost)
+		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm, OddsSpreadCost, IsShowOddsSpread)
 		SELECT a.rptDate
 			   ,p.PartyID
 			   ,a.CurrencyID
@@ -367,6 +372,7 @@ BEGIN
 			   ,Betcount
 			   ,Playercomm
 			   ,CASE WHEN a.ProductID = 0 THEN WinlossA ELSE 0 END
+			   ,IsShowOddsSpread
 		FROM cte_Data a
 		INNER JOIN #tmpParty p ON p.LicenseeId = a.LicenseeId AND a.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId=a.ProductId AND p.ChargeType = 1
 		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID = p.ChargeId AND a.CurrencyId=cc.CurrencyID
@@ -436,7 +442,8 @@ BEGIN
 			SUM(AmtDuetoBA * e.GBP) AS AmtDuetoBAGBP,
 			SUM(Company * e.GBP) AS CompanyGBP,
 			SUM(Playercomm * e.GBP) AS PlayercommGBP,
-			SUM(OddsSpreadCost * e.GBP) AS OddsSpreadCostGBP
+			SUM(OddsSpreadCost * e.GBP) AS OddsSpreadCostGBP,
+			CONVERT(BIT, MAX(w.IsShowOddsSpread)) AS IsShowOddsSpread
 	FROM #tmpWinLoss w
 		INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = w.PartyID
 		INNER JOIN #TempExchange e ON w.Winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
