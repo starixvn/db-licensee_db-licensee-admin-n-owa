@@ -225,7 +225,7 @@ BEGIN
 			RETURN
 		END
 
-		SELECT TOP 1 @ProductId = @ProductId FROM @ProductList
+		SELECT TOP 1 @ProductId = ProductId FROM @ProductList
 		IF EXISTS (
 			SELECT 1
 			FROM @PartyList p

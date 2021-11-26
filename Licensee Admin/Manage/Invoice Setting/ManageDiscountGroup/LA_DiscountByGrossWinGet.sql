@@ -37,14 +37,14 @@ BEGIN
 
 	-- Gerenal info
 	SELECT h.DiscountGroupId, h.DiscountGroupName, h.FromDate, h.ToDate, h.ModifiedDate
-		,h.CurrencyId, e.Code AS CurrencyName, CONVERT(VARCHAR(100), @ProductId) AS ProductList
+		,h.CurrencyId, e.Code AS CurrencyName, CONVERT(VARCHAR(100), @ProductId) AS ProductList, @ChargeRate AS ChargeRate
 	FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
 		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON h.CurrencyId = e.ExchangeId
 	WHERE h.DiscountGroupId = @GroupId
 
 	-- Tier rate settings
 	SELECT DiscountGroupDetailId AS DiscountDetailId, FromAmount, ToAmount, Rate
-		, @ChargeRate AS ChargeRate, @ChargeRate - Rate AS ChargeRateAfterDiscount
+		,@ChargeRate - Rate AS ChargeRateAfterDiscount
 	FROM dbo.LA_DiscountGroupDetail WITH (NOLOCK)
 	WHERE DiscountGroupId = @GroupId
 	ORDER BY FromAmount
