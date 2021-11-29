@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -7,11 +7,12 @@ ALTER PROCEDURE [dbo].[LA_PayerSettingSel]
 	,@GroupMinFee	INT = 0
 	,@DiscountGroup	INT = 0
 	,@RebateGroup	INT = 0
+	,@PayerStatusIds	VARCHAR(100) = ''
 AS
 /*
 	Created: 20150420@Florent
 	Task : Get Payer setting
-	DB: DBCUST.bodb_Licensee
+	DB: DBLIC.bodb_Licensee
 
 	Revisions:
 		- 20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
@@ -29,6 +30,7 @@ AS
 		- 20200206@Mason: Set billing term by currency  [#120005]
 		- 20200824@Happy: Updae from PayerGroup to GroupMinFee [#138249]
 		- 20210315@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
+		- 20210824@Danny: get licensee status from OIC And Relocated SP [#159296]
 
 	Params:
 	+ @PayerId : 0 get all Party
@@ -43,6 +45,21 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
+
+	CREATE TABLE #tmp_licenseeOIC (RegisteredLicenseeName NVARCHAR(50), LicenseeStatusId TINYINT)
+	INSERT INTO #tmp_licenseeOIC(RegisteredLicenseeName, LicenseeStatusId)
+	SELECT	RegisteredLicenseeName, LicenseeStatusId
+	FROM	DBOIC.bodb_OIC.dbo.licensee WITH(NOLOCK)
+
+	CREATE TABLE #tmp_licenseeOICStatus (LicenseeStatusId TINYINT, LicenseeStatusName NVARCHAR(30))
+	INSERT INTO #tmp_licenseeOICStatus(LicenseeStatusId, LicenseeStatusName)
+	SELECT	LicenseeStatusId, LicenseeStatusName
+	FROM	DBOIC.bodb_OIC.dbo.LicenseeStatus WITH(NOLOCK)
+
+	
+	DECLARE @statusTab TABLE (StatusId SMALLINT)
+	INSERT INTO @statusTab (StatusId)
+	SELECT CAST (val AS SMALLINT) FROM dbo.strSplit(@PayerStatusIds,',')
 
 	DECLARE @Rebate INT = 2
 	DECLARE @DiscountIndividualFee INT = 1
@@ -63,6 +80,7 @@ BEGIN
 	DECLARE @Minfee AS TABLE(PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, FromDate DATE, ToDate DATE)
 	DECLARE @Discount AS TABLE(PartyId INT, ProductId INT, FromDate DATE, ToDate DATE, DiscountGroupId INT, FromAmount MONEY, ToAmount MONEY, Rate MONEY, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
 	DECLARE @ChargeDetail AS TABLE(ChargeID INT, PartyID INT, ProductID INT, BettypeRef INT,DI_Rate MONEY, Fromdate DATE, Todate DATE, ChargeType TINYINT)
+	DECLARE @PartyBaseCurrency AS TABLE (PartyId INT, BaseCurrencyId INT, BaseCurrencyName NVARCHAR(50))
 
 	--Get list licensee,
 	SELECT	@ListParty = @ListParty + CAST(p.PartyID AS VARCHAR) + ','
@@ -92,12 +110,20 @@ BEGIN
 				ON ci.ChargeID = cs.ChargeID
 				AND cs.SystemID = 2
 
-	DECLARE @BaseCurrencyId INT, @BaseCurrencyName NVARCHAR(50)
-	SELECT TOP 1 @BaseCurrencyId = p.BaseCurrencyId, @BaseCurrencyName = e.Code
-	FROM OAS_PartyBaseCurrency p WITH(NOLOCK)
-	LEFT JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON p.BaseCurrencyId = e.exchangeid
-	WHERE PartyID = @PayerId 
-	ORDER BY ToDate DESC
+	;WITH t AS
+	(
+	SELECT CAST (val AS INT) PartyId FROM dbo.strSplit(@ListParty, ',')
+	) 
+	INSERT INTO @PartyBaseCurrency (PartyId, BaseCurrencyId, BaseCurrencyName)
+	SELECT t.PartyId, x.BaseCurrencyId, x.Code AS BaseCurrencyName
+	FROM t
+	CROSS APPLY (	
+				SELECT TOP 1 p.BaseCurrencyId,  e.Code
+				FROM OAS_PartyBaseCurrency p WITH(NOLOCK)
+				LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON p.BaseCurrencyId = e.exchangeid
+				WHERE p.PartyID = t.PartyId
+				ORDER BY p.ToDate DESC
+				) x
 
 	INSERT INTO @ChargeDetail (ChargeID, PartyID, ProductID, BettypeRef, DI_Rate, Fromdate, Todate, ChargeType)
 		SELECT
@@ -156,8 +182,8 @@ BEGIN
 			c.Fromdate,
 			c.Todate,
 			CASE WHEN c.ProductID IN (14,17) THEN s.FirstOfBilling ELSE ci.FirstOfBilling END,
-			ISNULL(@BaseCurrencyId, 6),
-			ISNULL(@BaseCurrencyName, '') AS ExchangeName,
+			ISNULL(x.BaseCurrencyId, 6),
+			ISNULL(x.BaseCurrencyName, '') AS ExchangeName,
 			CASE WHEN c.ProductID IN (14,17) THEN s.ChargeType ELSE ci.ChargeType END
 		FROM #Temp_ChargeInfo c
 			INNER JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID
@@ -165,6 +191,7 @@ BEGIN
 			INNER JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 			LEFT JOIN dbo.OAS_ChargeInfoSub s WITH(NOLOCK) ON ci.ChargeID = s.ChargeIdRef
+			LEFT JOIN @PartyBaseCurrency x ON c.PartyID = x.PartyID
 		WHERE @CurrentDate <= c.Todate
 
 	-- Hard code for Bettrade BA
@@ -265,7 +292,7 @@ BEGIN
 		SELECT DISTINCT
 			c.ChargeId		AS ChargeID,
 			c.PartyId		AS PayerID,
-			PartyName		AS PayerName,
+			c.PartyName		AS PayerName,
 			gmf.GroupMinFeeName		AS GroupMinFeeName,
 			c.ProductId		AS ProductId,
 			ProductName		AS ProductName,
@@ -300,8 +327,16 @@ BEGIN
 			c.Rate AS Rate,
 			c.ExchangeID AS ExchangeID,
 			c.ExchangeName AS ExchangeName,
-			c.ChargeType
+			c.ChargeType,
+			CASE WHEN l.IsDeposit = 0 THEN 'Active'
+				 ELSE ISNULL(oict.LicenseeStatusName, 'Unrecognized') END AS  PayerStatusName,
+			CASE WHEN	l.IsDeposit = 0 THEN 3
+				 WHEN	oict.LicenseeStatusId IS NULL THEN 999 ELSE oict.LicenseeStatusId END PayerStatusId
 		FROM @ChargeInfo c
+			INNER JOIN dbo.OAS_Party op WITH(NOLOCK) ON c.PartyId = op.PartyID
+			INNER JOIN dbo.Licensees l	WITH(NOLOCK) ON op.OldRefID = l.LicenseeID
+			LEFT JOIN  #tmp_licenseeOIC oic WITH(NOLOCK) ON oic.RegisteredLicenseeName = l.LicenseeName
+			LEFT JOIN  #tmp_licenseeOICStatus oict ON oic.LicenseeStatusId = oict.LicenseeStatusId
 			LEFT JOIN cte_GroupMinFeeData gmf ON c.PartyId = gmf.PartyID -- Group Min Fee
 			LEFT JOIN @Minfee m
 				ON c.PartyId = m.PartyId
@@ -351,8 +386,11 @@ BEGIN
 	SELECT Result.*
 	FROM Result
 	INNER JOIN @ProductOrder po ON po.ProductId = Result.ProductId
+	WHERE Result.PayerStatusId IN (SELECT x.StatusId  FROM @statusTab x)
 	ORDER BY Result.PayerID, po.OrderNumber
 	
 	DROP TABLE #Temp_ChargeInfo
+	DROP TABLE #tmp_licenseeOIC
+	DROP TABLE #tmp_licenseeOICStatus
 END
 GO
