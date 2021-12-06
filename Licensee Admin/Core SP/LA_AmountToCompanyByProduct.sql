@@ -165,19 +165,19 @@ BEGIN
 	DELETE @PartyChargeInfo WHERE ProductId = 15
 
 	-- Get Exchange Rate
-	CREATE TABLE #Exchange (BaseCurrencyId INT, ExchangeDate DATE, ExchangeId INT, Rate FLOAT)
-	INSERT INTO #Exchange (BaseCurrencyId, ExchangeDate, ExchangeID, Rate)
-	SELECT 0, ExchangeDate, ExchangeId, CASE WHEN @IsConvertExRate = 1 THEN BaseCurrencyRate ELSE 1 END
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+	CREATE TABLE #Exchange (BaseCurrencyId INT, ExchangeId INT, Rate FLOAT)
+	INSERT INTO #Exchange (BaseCurrencyId, ExchangeID, Rate)
+	SELECT 0, ExchangeId, CASE WHEN @IsConvertExRate = 1 THEN BaseCurrencyRate ELSE 1 END
+	FROM bodb02.dbo.LA_f_ExchangeDailySel(@ToDate, @ToDate, @BaseCurrencyName)
 
 	;WITH CTE_Exchange AS (
 		SELECT DISTINCT BaseCurrencyId FROM #PartyList
 	)
-	INSERT INTO #Exchange (BaseCurrencyId, ExchangeDate, ExchangeID, Rate)
-	SELECT c.BaseCurrencyId, f.ExchangeDate, f.ExchangeId, f.BaseCurrencyRate
+	INSERT INTO #Exchange (BaseCurrencyId, ExchangeID, Rate)
+	SELECT c.BaseCurrencyId, f.ExchangeId, f.BaseCurrencyRate
 	FROM CTE_Exchange c
 		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON c.BaseCurrencyId = e.ExchangeId
-		CROSS APPLY bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, e.Code) f
+		CROSS APPLY bodb02.dbo.LA_f_ExchangeDailySel(@ToDate, @ToDate, e.Code) f
 
 	-- Get Win Loss Data
 	CREATE TABLE #TempData (
@@ -289,7 +289,7 @@ BEGIN
 				WHEN t.ProductId = 15 THEN t.PayOut - t.CommShare * cp.CommShareRate - t.CashInShare * cp.CashInShareRate
 				ELSE (-t.MemberWL - t.Contribution) * ISNULL(cr.Rate, p.Rate) + t.PayOut + t.OddsSpread END) AS BasedLicenseeAmount
 	FROM #TempData t
-		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND t.rptDate = e.ExchangeDate AND e.BaseCurrencyId = 0
+		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND e.BaseCurrencyId = 0
 		INNER JOIN #PartyList pl ON t.LicenseeId = pl.LicenseeId
 		LEFT JOIN @CBChargeRate cp ON t.LicenseeId = cp.LicenseeId AND t.ProductId = 15 AND t.rptDate = cp.rptDate
 		LEFT JOIN @PartyChargeInfo p ON t.LicenseeId = p.LicenseeId AND t.ProductId = p.ProductId AND t.BettypeRef = p.BettypeRef AND t.rptDate BETWEEN p.FromDate AND p.ToDate
@@ -306,7 +306,7 @@ BEGIN
 		,SUM((CASE WHEN t.BettypeRef = 901 THEN -t.MemberWL WHEN t.ProductId = 13 THEN 0 ELSE t.MemberWL END - t.CashInShare * p.Rate)) AS BasedLicenseeAmount
 	FROM #TempData t
 		INNER JOIN @PartyChargeInfo p ON t.LicenseeId = p.LicenseeId AND t.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId = 13
-		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND t.rptDate = e.ExchangeDate AND e.BaseCurrencyId = 0
+		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND e.BaseCurrencyId = 0
 	WHERE t.ProductId IN (0, 3, 13)
 	GROUP BY t.rptDate, p.PartyId, t.CurrencyId
 
@@ -318,7 +318,7 @@ BEGIN
 		,SUM(CASE WHEN t.BettypeRef = 17005 THEN t.AgentWL ELSE t.MemberWL END) AS BasedLicenseeAmount
 	FROM #TempData t
 		INNER JOIN @PartyChargeInfo p ON t.LicenseeId = p.LicenseeId AND t.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId = 0
-		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND t.rptDate = e.ExchangeDate AND e.BaseCurrencyId = 0
+		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND e.BaseCurrencyId = 0
 	WHERE t.ProductId = 37
 	GROUP BY t.rptDate, p.PartyId, t.CurrencyId
 
@@ -329,7 +329,7 @@ BEGIN
 	SET t.BasedLicenseeAmount = t.BasedLicenseeAmount * e.Rate
 	FROM #tmpResult t
 		INNER JOIN (SELECT DISTINCT PartyId, BaseCurrencyId FROM #PartyList) pl ON t.PartyId = pl.PartyId
-		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND t.rptDate = e.ExchangeDate AND pl.BaseCurrencyId = e.BaseCurrencyId
+		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND pl.BaseCurrencyId = e.BaseCurrencyId
 
 	DELETE #Exchange WHERE BaseCurrencyId <> 0
 
@@ -344,7 +344,7 @@ BEGIN
 			INSERT INTO #tmpMinFee (PartyId, ProductId, GroupId, GroupMinFeeId, FeeTypeId, IsPrimary, FromDate, ToDate, ProrateMinFee, BasedProrateMinFee)
 			SELECT PartyId, ProductId, GroupId, GroupMinFeeId, FeeTypeId, IsPrimary, FromDate, ToDate, ProrateMinFee * ISNULL(e.Rate, 0), ProrateMinFee
 			FROM dbo.LA_f_GetProrateMinFee(@PartyIds, @FromDate, @ToDate) m
-				LEFT JOIN #Exchange e ON m.BaseCurrencyId = e.ExchangeId AND e.ExchangeDate = @ToDate
+				LEFT JOIN #Exchange e ON m.BaseCurrencyId = e.ExchangeId
 		END
 		
 		DECLARE @tmpResult TABLE (PartyId INT, ProductId INT, GroupMinFeeId INT, GroupId INT, IsPrimary BIT, FeeTypeId TINYINT

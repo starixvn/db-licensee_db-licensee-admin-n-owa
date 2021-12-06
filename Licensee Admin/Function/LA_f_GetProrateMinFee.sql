@@ -40,7 +40,7 @@ BEGIN
 	DECLARE @DaysInMonth INT = DATEDIFF(DAY, @FirstDate, @LastDate) + 1
 
 	DECLARE @IndividualMinFee TABLE (RowId INT, GroupId INT, FeeTypeId TINYINT, PartyId INT, ProductId INT, BaseCurrencyId INT, FromDate DATE, ToDate DATE, MinFee MONEY)
-	DECLARE @tmpDate TABLE (PartyId INT, ProductId INT, FromDate DATE, ToDate DATE)
+	DECLARE @tmpDate TABLE (PartyId INT, ProductId INT, FromDate DATE, ToDate DATE, BaseCurrencyId INT, MinFee MONEY, GroupId INT)
 	DECLARE @WrongSetting TABLE (PartyId INT, ProductId INT)
 
 	-- Include primary licensee if input secondary licensee
@@ -120,6 +120,52 @@ BEGIN
 			AND ',' + @_PartyIds + ',' LIKE '%,' + CONVERT(VARCHAR(20), m.PartyId) + ',%'
 	) t
 
+	-- Merge setting
+	;WITH CTE_Party AS (
+		SELECT DISTINCT t1.PartyId, t1.ProductId
+		FROM @IndividualMinFee t1
+			INNER JOIN @IndividualMinFee t2 ON t1.PartyId = t2.PartyId AND t1.ProductId = t2.ProductId
+		WHERE t1.RowId + 1 = t2.RowId AND DATEADD(DAY, 1, t1.ToDate) = t2.FromDate
+	)
+	INSERT INTO @tmpDate (PartyId, ProductId, FromDate, ToDate, BaseCurrencyId, MinFee)
+	SELECT m.PartyId, m.ProductId, m.FromDate, m.ToDate, m.BaseCurrencyId, m.MinFee
+	FROM CTE_Party p
+		INNER JOIN @IndividualMinFee m ON p.PartyId = m.PartyId AND p.ProductId = p.ProductId
+
+	IF EXISTS (SELECT 1 FROM @tmpDate)
+	BEGIN
+		WHILE EXISTS (
+			SELECT 1
+			FROM @tmpDate t1
+				INNER JOIN @tmpDate t2 ON t1.PartyId = t2.PartyId AND t1.ProductId = t2.ProductId
+			WHERE DATEADD(DAY, 1, t1.ToDate) = t2.FromDate
+		)
+		BEGIN
+			UPDATE t1
+			SET t1.ToDate = t2.ToDate
+			FROM @tmpDate t1
+				INNER JOIN @tmpDate t2 ON t1.PartyId = t2.PartyId AND t1.ProductId = t2.ProductId
+			WHERE DATEADD(DAY, 1, t1.ToDate) = t2.FromDate
+		END
+
+		DELETE @IndividualMinFee
+		FROM @IndividualMinFee m
+		WHERE EXISTS (SELECT 1 FROM @tmpDate t WHERE m.PartyId = t.PartyId AND m.ProductId = t.ProductId)
+
+		INSERT INTO @IndividualMinFee (FeeTypeId, PartyId, ProductId, BaseCurrencyId, MinFee, FromDate, ToDate, RowId, GroupId)
+		SELECT 0 AS FeeTypeId, PartyId, ProductId, BaseCurrencyId, MinFee, FromDate, ToDate
+			,ROW_NUMBER() OVER(PARTITION BY PartyId, ProductId ORDER BY FromDate) AS RowId
+			,ROW_NUMBER() OVER(PARTITION BY PartyId, ProductId ORDER BY FromDate) AS GroupId
+		FROM (
+			SELECT PartyId, ProductId, BaseCurrencyId, MinFee, FromDate, ToDate
+				,ROW_NUMBER() OVER(PARTITION BY PartyId, ProductId, ToDate ORDER BY FromDate) AS RN
+			FROM @tmpDate
+		) t
+		WHERE RN = 1
+
+		DELETE @tmpDate
+	END
+
 	-- Waive (under Individual Min Fee)
 	INSERT INTO @IndividualMinFee (FeeTypeId, PartyId, ProductId, FromDate, ToDate, RowId, GroupId)
 	SELECT w.FeeTypeId, w.PartyId, w.ProductId
@@ -131,6 +177,52 @@ BEGIN
 		INNER JOIN dbo.LA_MinFee w WITH (NOLOCK) ON m.PartyId = w.PartyId AND m.ProductId = w.ProductId
 	WHERE w.FeeTypeId = 2 AND m.FromDate <= w.ToDate AND m.ToDate >= w.FromDate
 
+	-- Merge setting
+	;WITH CTE_Party AS (
+		SELECT DISTINCT t1.PartyId, t1.ProductId
+		FROM @IndividualMinFee t1
+			INNER JOIN @IndividualMinFee t2 ON t1.PartyId = t2.PartyId AND t1.ProductId = t2.ProductId AND t1.FeeTypeId = t2.FeeTypeId
+		WHERE t1.RowId + 1 = t2.RowId AND DATEADD(DAY, 1, t1.ToDate) = t2.FromDate AND t1.FeeTypeId = 2
+	)
+	INSERT INTO @tmpDate (PartyId, ProductId, FromDate, ToDate, GroupId)
+	SELECT m.PartyId, m.ProductId, m.FromDate, m.ToDate, m.GroupId
+	FROM CTE_Party p
+		INNER JOIN @IndividualMinFee m ON p.PartyId = m.PartyId AND p.ProductId = p.ProductId AND m.FeeTypeId = 2
+
+	IF EXISTS (SELECT 1 FROM @tmpDate)
+	BEGIN
+		WHILE EXISTS (
+			SELECT 1
+			FROM @tmpDate t1
+				INNER JOIN @tmpDate t2 ON t1.PartyId = t2.PartyId AND t1.ProductId = t2.ProductId
+			WHERE DATEADD(DAY, 1, t1.ToDate) = t2.FromDate
+		)
+		BEGIN
+			UPDATE t1
+			SET t1.ToDate = t2.ToDate
+			FROM @tmpDate t1
+				INNER JOIN @tmpDate t2 ON t1.PartyId = t2.PartyId AND t1.ProductId = t2.ProductId
+			WHERE DATEADD(DAY, 1, t1.ToDate) = t2.FromDate
+		END
+
+		DELETE @IndividualMinFee
+		FROM @IndividualMinFee m
+		WHERE EXISTS (SELECT 1 FROM @tmpDate t WHERE m.PartyId = t.PartyId AND m.ProductId = t.ProductId)
+			AND m.FeeTypeId = 2
+
+		INSERT INTO @IndividualMinFee (FeeTypeId, PartyId, ProductId, FromDate, ToDate, GroupId, RowId)
+		SELECT 2 AS FeeTypeId, PartyId, ProductId, FromDate, ToDate, GroupId
+			,ROW_NUMBER() OVER(PARTITION BY PartyId, ProductId ORDER BY FromDate) AS RowId
+		FROM (
+			SELECT PartyId, ProductId, FromDate, ToDate, GroupId
+				,ROW_NUMBER() OVER(PARTITION BY PartyId, ProductId, ToDate ORDER BY FromDate) AS RN
+			FROM @tmpDate
+		) t
+		WHERE RN = 1
+
+		DELETE @tmpDate
+	END
+	
 	-- Get Waive for Group (secondary will follow primary)
 	;WITH CTE_GroupMinFee AS (
 		SELECT PartyId, ProductId, FromDate, ToDate, GroupMinFeeId, RowId, ROW_NUMBER() OVER(PARTITION BY PartyId, ProductId ORDER BY RowId DESC) AS RN
@@ -232,7 +324,7 @@ BEGIN
 		) c
 
 	DELETE @MinFee WHERE FromDate > @ToDate OR ToDate < @FromDate
-	
+
 	UPDATE @MinFee
 	SET FromDate = CASE WHEN FromDate < @FromDate THEN @FromDate ELSE FromDate END
 		,ToDate = CASE WHEN ToDate > @ToDate THEN @ToDate ELSE ToDate END
