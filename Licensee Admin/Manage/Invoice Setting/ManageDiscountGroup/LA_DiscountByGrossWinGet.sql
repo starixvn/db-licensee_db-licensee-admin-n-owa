@@ -22,7 +22,14 @@ BEGIN
 	DECLARE @ProductId INT
 	DECLARE @ChargeRate MONEY = 0, @FromDate DATE, @ToDate DATE
 
-	SELECT TOP 1 @RepPartyId = PartyId FROM dbo.LA_DiscountGroupAssignment WITH (NOLOCK) WHERE DiscountGroupId = @GroupId
+	DECLARE @PartyList TABLE (PartyId INT, LicenseeId INT)
+	INSERT INTO @PartyList (PartyId, LicenseeId)
+	SELECT a.PartyId, p.OldRefId
+	FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
+		INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON a.PartyId = p.PartyId
+	WHERE DiscountGroupId = @GroupId
+
+	SELECT TOP 1 @RepPartyId = PartyId FROM @PartyList
 
 	SELECT TOP 1 @ProductId = gp.ProductId
 	FROM dbo.LA_DiscountGroupProduct gp WITH (NOLOCK)
@@ -56,9 +63,15 @@ BEGIN
 	WHERE a.DiscountGroupId = @GroupId
 
 	-- Currency List
-	SELECT c.PartyId, c.CurrencyId, e.Code AS CurrencyName, c.CalculationType
-	FROM dbo.LA_DiscountGroupCurrency c WITH (NOLOCK)
-		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON c.CurrencyId = e.ExchangeId
-	WHERE c.DiscountGroupId = @GroupId
+	DECLARE @CurrencyList TABLE (LicenseeId INT, Currency INT)
+	INSERT INTO @CurrencyList (LicenseeId, Currency)
+	SELECT LicenseeId, Currency
+	FROM OPENQUERY(DBCUST, 'SELECT DISTINCT LicenseeId, Currency FROM bodb_Licensee.dbo.LA_f_SelLicenseeCust(0) WHERE Currency <> 20')
+	
+	SELECT pl.PartyId, cl.Currency AS CurrencyId, e.Code AS CurrencyName, ISNULL(c.CalculationType, 0) AS CalculationType
+	FROM @PartyList pl
+		INNER JOIN @CurrencyList cl ON pl.LicenseeId = cl.LicenseeId
+		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON cl.Currency = e.ExchangeId
+		LEFT JOIN dbo.LA_DiscountGroupCurrency c WITH (NOLOCK) ON pl.PartyId = c.PartyId AND cl.Currency = c.CurrencyId AND c.DiscountGroupId = @GroupId
 END
 GO
