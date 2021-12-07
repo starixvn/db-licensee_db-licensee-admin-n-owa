@@ -8,5 +8,4 @@
 
 USE bodb_licensee
 GO
-
 EXEC sp_rename 'dbo.LA_PartyListTerminatedSel', 'DEL_LA_PartyListTerminatedSel'; 

@@ -1,4 +1,1 @@
-Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_AmountToCompanySel.sql
-Licensee Admin\Invoice\InvoiceAmountGenerate\LA_Inv_GenerateAmountForSoftwareFee.sql
-Licensee Admin\Invoice\LA_Inv_InvoiceAmountGenerate.sql
-Licensee Admin\Invoice\LA_Inv_RebateWorksheetSel.sql
+Licensee Admin\Manage\LA_LicenseeStatusListSel.sql

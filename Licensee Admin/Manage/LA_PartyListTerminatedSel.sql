@@ -25,6 +25,11 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
+	CREATE TABLE #tmp_licenseeOIC (RegisteredLicenseeName NVARCHAR(50), LicenseeStatusId TINYINT)
+	INSERT INTO #tmp_licenseeOIC(RegisteredLicenseeName, LicenseeStatusId)
+	SELECT	RegisteredLicenseeName, LicenseeStatusId
+	FROM	DBOIC.bodb_OIC.dbo.licensee WITH(NOLOCK)
+
 	-- current settings:
 	--
 	-- 1	: ONEWorks Licensees
@@ -41,7 +46,7 @@ BEGIN
 	FROM dbo.OAS_Party p WITH(NOLOCK)
 	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID = d.PartyID
 	INNER JOIN dbo.Licensees l WITH(NOLOCK) ON p.OldRefID = l.LicenseeID
-	INNER JOIN bodb_OIC.dbo.Licensee oic WITH(NOLOCK) ON oic.RegisteredLicenseeName = l.LicenseeName
+	INNER JOIN #tmp_licenseeOIC oic WITH(NOLOCK) ON oic.RegisteredLicenseeName = l.LicenseeName
 	WHERE (	
 			@UserID = 0 
 			OR p.PartyID IN (
@@ -58,5 +63,7 @@ BEGIN
 	UNION ALL
 
 	SELECT 1001, 'Terminated Licensees', '', 0
+
+	DROP TABLE #tmp_licenseeOIC
 END
 GO

@@ -22,6 +22,7 @@ AS
 		- 20211105@Percy: Fix issue missing Saba Promotion [RedmineID: #159691]
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
+		- 20211207@Percy: Return BrandName [RedmineID: #163800]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -86,13 +87,13 @@ BEGIN
 			PRINT 'Wrong format XML'
 		END CATCH
 
-		DECLARE @PartySettings TABLE (PartyId INT, LicenseeId INT, PartyName VARCHAR(50), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50))
-		INSERT INTO @PartySettings (PartyId, LicenseeId, PartyName, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage)
-		SELECT p.PartyId, p.OldRefId, p.PartyName, ISNULL(bc.BaseCurrencyId, 6), ISNULL(e.Code, 'EUR'), pd.InvoiceLanguage
+		DECLARE @PartySettings TABLE (PartyId INT, LicenseeId INT, PartyName VARCHAR(50), BrandName VARCHAR(100), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50))
+		INSERT INTO @PartySettings (PartyId, LicenseeId, PartyName, BrandName, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage)
+		SELECT p.PartyId, p.OldRefId, p.PartyName, ISNULL(NULLIF(pd.BrandName, ''), p.PartyName), ISNULL(bc.BaseCurrencyId, 6), ISNULL(e.Code, 'EUR'), pd.InvoiceLanguage
 		FROM (SELECT DISTINCT PartyId FROM @InvoiceData) i
 			INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON p.PartyId = i.PartyId
-			LEFT JOIN OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyId = p.PartyId
-			LEFT JOIN OAS_PartyBaseCurrency bc WITH (NOLOCK) ON p.PartyId = bc.PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
+			LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyId = p.PartyId
+			LEFT JOIN dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON p.PartyId = bc.PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
 			LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON e.ExchangeId = bc.BaseCurrencyId
 
 		DECLARE @InvoiceSymbol NVARCHAR(20)
@@ -250,7 +251,7 @@ BEGIN
 	BEGIN
 		DECLARE @_Result TABLE
 		(
-			RowIndex INT, IndexNumber INT, PartyId INT, PartyName VARCHAR(50), ItemType TINYINT, BillerId INT, BillerName NVARCHAR(50)
+			RowIndex INT, IndexNumber INT, PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(100), ItemType TINYINT, BillerId INT, BillerName NVARCHAR(50)
 			,InvoiceHeaderId BIGINT, InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, InvoicePath NVARCHAR(256)
 			,BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50), ProductCodes VARCHAR(MAX)
 			,LicensingFee MONEY, Discount MONEY, Rebate MONEY, AdjustmentAmount MONEY, AdjustmentNote NVARCHAR(500)
@@ -258,7 +259,7 @@ BEGIN
 
 		INSERT INTO @_Result
 		(
-			RowIndex, IndexNumber, PartyId, PartyName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath
+			RowIndex, IndexNumber, PartyId, PartyName, BrandName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath
 			,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote
 		)
 		SELECT
@@ -266,6 +267,7 @@ BEGIN
 			,ivs.IndexNumber
 			,ps.PartyId
 			,ps.PartyName
+			,ps.BrandName
 			,ivs.InvTypeId AS ItemType
 			,ivs.BillerId
 			,b.BillerName
@@ -290,6 +292,7 @@ BEGIN
 			ivs.IndexNumber
 			,ps.PartyId
 			,ps.PartyName
+			,ps.BrandName
 			,ivs.InvTypeId
 			,ivs.BillerId
 			,b.BillerName
@@ -306,7 +309,7 @@ BEGIN
 	-- End Region: Final Result
 
 	-- Return data
-	SELECT RowIndex, IndexNumber, PartyId, PartyName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath
+	SELECT RowIndex, IndexNumber, PartyId, PartyName, BrandName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath
 		,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote
 	FROM @_Result
 END
