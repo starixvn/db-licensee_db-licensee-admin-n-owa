@@ -2,15 +2,15 @@
 USE bodb_licensee
 GO
 
-ALTER PROCEDURE [dbo].LA_GEN_LicPerformanceAnalysis_Report (
+ALTER PROCEDURE [dbo].LA_GEN_LicPerformanceAnalysis_Report
 	@FromDate		DATE,
 	@ToDate			DATE,
 	@ProductCodes	VARCHAR(500),
 	@Environment	VARCHAR(10),
 	@IsOverwrite	BIT = 0,
-	@PartyIDs		VARCHAR(4000) = ''
-)
+	@PartyIds		VARCHAR(4000) = ''
 AS
+
 /*
 	Created: BRUCE
 	Date: 20190312
@@ -23,193 +23,197 @@ AS
 		- 20200821@Parsons: Add one more column into result set [#139055]
 		- 20210323@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 	    - 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
+		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
 */
+
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @OfficialPartyType SMALLINT = 1
-	DECLARE @AdjustmentId INT = 9000
-	DECLARE @ReportDate DATE = DATEADD(MONTH, DATEDIFF(MONTH, 0, @FromDate), 0)
+	-- Get Product List
+	DECLARE @tmpProductList TABLE (ProductId INT, ProductCode VARCHAR(50))
+	INSERT INTO @tmpProductList (ProductId, ProductCode)
+	SELECT ProductId, ProductPrefix FROM dbo.LA_f_Products3rd(@ProductCodes)
 
-	-- Product list
-	--
-	DECLARE @tmpProductList TABLE(ProductId INT, ProductCode VARCHAR(10))
+	IF ',' + @ProductCodes + ',' LIKE ',ADJUST,' -- Adjustment
+		INSERT INTO @tmpProductList (ProductId, ProductCode)
+		SELECT 9000, 'ADJUST'
 
-	INSERT INTO @tmpProductList(ProductId,ProductCode)
-	SELECT ProductId, ProductCode
-	FROM dbo.LA_f_LicPerformanceAnalysisProduct()
-	WHERE ProductCode IN (SELECT val FROM dbo.strSplit(@ProductCodes, ','))
+	-- Get Party List
+	DECLARE @tmpPartyList TABLE (PartyId INT, SiteId INT, BaseCurrencyId INT)
 
-	-- Party List
-	--	
-	DECLARE @tmpPartyList AS TABLE(PartyId INT,SiteId INT, BaseCurrencyId INT)
-
-	INSERT INTO @tmpPartyList(PartyId,SiteId,BaseCurrencyId)
-	SELECT p.PartyID, p.OldRefID, ISNULL(pbc_2.BaseCurrencyId, 6)-- Default EUR
-	FROM dbo.OAS_Party p WITH(NOLOCK)
-	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
-	OUTER APPLY
-	(
-		SELECT TOP 1 pbc.PartyID, pbc.BaseCurrencyId
-		FROM OAS_PartyBaseCurrency pbc WITH(NOLOCK)
-		WHERE pbc.PartyID = p.PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
-		ORDER BY ToDate DESC
-	) pbc_2
-	WHERE PartyType = @OfficialPartyType AND OldRefID IS NOT NULL AND ISNULL(d.IsDeposit,0) = 1
-
-	IF (@PartyIDs = '')
+	IF ISNULL(@PartyIds, '') <> ''
 	BEGIN
-		SET @PartyIDs = (SELECT CAST(PartyID AS VARCHAR(5)) + ',' FROM @tmpPartyList FOR XML PATH(''))
-		SET @PartyIDs = LEFT(@PartyIDs, LEN(@PartyIDs) - 1)
+		INSERT INTO @tmpPartyList (PartyId)
+		SELECT DISTINCT val FROM dbo.strSplit(@PartyIds, ',')
+
+		UPDATE t
+		SET t.SiteId = p.OldRefId, t.BaseCurrencyId = ISNULL(c.BaseCurrencyId, 6)
+		FROM @tmpPartyList t
+			INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON t.PartyId = p.PartyId AND p.PartyType = 1
+			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyId = pd.PartyId AND pd.IsDeposit = 1
+			OUTER APPLY (
+				SELECT TOP 1 bc.BaseCurrencyId
+				FROM dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK)
+				WHERE p.PartyId = bc.PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
+				ORDER BY bc.ToDate DESC
+			) c
+
+		DELETE @tmpPartyList WHERE SiteId IS NULL
 	END
+	ELSE
+	BEGIN
+		INSERT INTO @tmpPartyList (PartyId, SiteId, BaseCurrencyId)
+		SELECT p.PartyId, p.OldRefId, ISNULL(c.BaseCurrencyId, 6)
+		FROM dbo.OAS_Party p WITH (NOLOCK)
+			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyId = pd.PartyId AND pd.IsDeposit = 1
+			OUTER APPLY (
+				SELECT TOP 1 bc.BaseCurrencyId
+				FROM dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK)
+				WHERE p.PartyId = bc.PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
+				ORDER BY bc.ToDate DESC
+			) c
+		WHERE p.PartyType = 1 AND p.OldRefId IS NOT NULL
+	END
+
+	SET @PartyIds = NULL
+	SELECT @PartyIds = COALESCE(@PartyIds + ',', '') + CONVERT(VARCHAR(20), PartyId) FROM @tmpPartyList
 
 	-- Generate adjustment values
-	--
-	IF EXISTS(SELECT * FROM @tmpProductList WHERE ProductId = @AdjustmentId)
-	EXEC dbo.LA_GEN_LicPerformanceAnalysis_Adjustment 
-		@PartyIds = @PartyIDs, 
-		@ReportDate = @ReportDate,
-		@Environment = @Environment,
-		@IsOverwrite = @IsOverwrite
+	DECLARE @ReportDate DATE = DATEADD(MONTH, DATEDIFF(MONTH, 0, @FromDate), 0)
+	IF EXISTS (SELECT 1 FROM @tmpProductList WHERE ProductId = 9000)
+		EXEC dbo.LA_GEN_LicPerformanceAnalysis_Adjustment 
+			@PartyIds = @PartyIDs, 
+			@ReportDate = @ReportDate,
+			@Environment = @Environment,
+			@IsOverwrite = @IsOverwrite
 
-	-- Charge info
-	--
-	SELECT DISTINCT LicenseeID,ProductID, Fromdate, ToDate, PartyId
-	INTO #tmpPartyChargeRates
-	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
-	WHERE DI_Rate > 0
-
-	CREATE INDEX IX_tmpPartyChargeRates ON #tmpPartyChargeRates(LicenseeID, ProductID)
-
-	-- re-filter party & product by overwrite flag
-	--
-	IF @IsOverwrite = 0
+	-- Get TO/WL data
 	BEGIN
-		DECLARE @skip TABLE(SiteID INT, ProductId INT)
-		;WITH a AS(
-			SELECT DISTINCT SiteId, ProductId
-			FROM bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis WITH(NOLOCK)
-			WHERE ReportDate = @ReportDate AND ProductId <> @AdjustmentId AND IsBillingCurrency = 1
-		),b AS(
-			SELECT DISTINCT LicenseeId, ProductId FROM #tmpPartyChargeRates
-		)
-		INSERT INTO @skip(SiteID,ProductId)
-		SELECT b.LicenseeID,b.ProductId
-		FROM b LEFT JOIN a ON a.ProductId = b.ProductId AND a.SiteId=b.LicenseeID
-		WHERE a.SiteId IS NOT NULL
+		-- Get Base Currency List
+		DECLARE @CurrencyId INT, @CurrencyName VARCHAR(10)
+			
+		DECLARE @tmpBaseCurrencyList TABLE (CurrencyId INT, Code VARCHAR(10))
+		INSERT INTO @tmpBaseCurrencyList (CurrencyId, Code)
+		EXEC dbo.LA_SelBaseCurrency
 
-		DELETE a FROM #tmpPartyChargeRates a INNER JOIN @skip s ON a.ProductId = s.ProductId AND a.LicenseeID=s.SiteId
+		DECLARE @tmpChargeInfo TABLE (PartyId INT, LicenseeId INT, ProductId INT, FromDate DATE, ToDate DATE)
+		INSERT INTO @tmpChargeInfo (PartyId, LicenseeId, ProductId, FromDate, ToDate)
+		SELECT DISTINCT PartyId, LicenseeId, ProductId, Fromdate, ToDate
+		FROM dbo.LA_f_ChargeInfo (@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
+		WHERE DI_Rate > 0
+
+		IF @IsOverwrite = 0
+		BEGIN
+			;WITH CTE_Data AS (
+				SELECT SiteId, ProductId
+				FROM bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis WITH (NOLOCK)
+				WHERE ReportDate = @ReportDate AND ProductId <> 9000 AND IsBillingCurrency = 1
+				GROUP BY SiteId, ProductId
+			)
+			DELETE c
+			FROM @tmpChargeInfo c
+				INNER JOIN CTE_Data d ON c.LicenseeId = d.SiteId AND c.ProductId = d.ProductId
+		END
+
+		DELETE @tmpPartyList WHERE PartyId NOT IN (SELECT c.PartyId FROM @tmpChargeInfo c)
+
+		IF @@ROWCOUNT > 0
+		BEGIN
+			SET @PartyIds = NULL
+			SELECT @PartyIds = COALESCE(@PartyIds + ',', '') + CONVERT(VARCHAR(20), PartyId) FROM @tmpPartyList
+		END
+
+		CREATE TABLE #tmpPerfData (rptDate DATETIME, PartyId INT, CurrencyId INT, ProductId INT, BetCount INT, Turnover MONEY, TurnoverNoDraw MONEY, Winloss MONEY)
+		INSERT INTO #tmpPerfData (rptDate, PartyId, CurrencyId, ProductId, BetCount, Turnover, TurnoverNoDraw, Winloss)
+		SELECT r.rptDate, p.PartyId, r.CurrencyId, r.ProductId
+			,SUM(r.BetCount) AS BetCount
+			,SUM(r.Turnover) AS Turnover
+			,SUM(r.Turnover * CASE
+								WHEN StatusId = 111 THEN 0.0
+								WHEN StatusId IN (114, 115) THEN 0.5
+								ELSE 1.0 END
+				) AS TurnoverNoDraw
+			,SUM(-r.MemberWL) AS Winloss
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
+			INNER JOIN @tmpChargeInfo p ON r.SiteId = p.LicenseeId AND r.ProductId = p.ProductId AND r.rptDate BETWEEN p.FromDate AND p.ToDate
+		WHERE r.rptDate BETWEEN @FromDate AND @ToDate
+			AND r.CurrencyId <> 20
+			AND r.CustomerCategory NOT IN (27, 28)
+			AND r.Bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914)
+			AND r.StatusId IN (111, 112, 113, 114, 115)
+		GROUP BY r.rptDate, p.PartyId, r.CurrencyId, r.ProductId
+
+		-- Get Licensing Fee
+		DECLARE @Result TABLE
+		(
+			PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
+			,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000)
+			,Winloss MONEY, Turnover MONEY, TurnoverNoDraw MONEY, BetCount INT, BaseCurrencyId INT
+		)
+
+		WHILE 1 = 1
+		BEGIN
+			SELECT TOP 1 @CurrencyId = CurrencyId, @CurrencyName = Code FROM @tmpBaseCurrencyList
+			DELETE @tmpBaseCurrencyList WHERE CurrencyId = @CurrencyId
+
+			IF @@ROWCOUNT = 0
+				BREAK
+
+			INSERT INTO @Result
+			(
+				PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
+				,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+			)
+			EXEC dbo.LA_AmountToCompanyByProduct
+				@PartyIds = @PartyIds
+				,@ProductCodes = @ProductCodes
+				,@FromDate = @FromDate
+				,@ToDate = @ToDate
+				,@BaseCurrencyName = @CurrencyName
+
+			UPDATE r
+			SET r.Winloss = t.Winloss
+				,r.Turnover = t.Turnover
+				,r.TurnoverNoDraw = t.TurnoverNoDraw
+				,r.BaseCurrencyId = @CurrencyId
+			FROM @Result r
+				INNER JOIN (
+					SELECT t.PartyId, t.ProductId
+						,SUM(t.Winloss * e.BaseCurrencyRate) AS Winloss
+						,SUM(t.Turnover * e.BaseCurrencyRate) AS Turnover
+						,SUM(t.TurnoverNoDraw * e.BaseCurrencyRate) AS TurnoverNoDraw
+					FROM #tmpPerfData t
+						INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CurrencyName) e ON t.CurrencyId = e.ExchangeId AND t.rptDate = e.ExchangeDate
+					GROUP BY t.PartyId, t.ProductId
+				) t ON r.PartyId = t.PartyId AND r.ProductId = t.ProductId
+			WHERE r.BaseCurrencyId IS NULL
+		END
+
+		DROP TABLE #tmpPerfData
 	END
 
-	DELETE b FROM @tmpPartyList b WHERE b.PartyId NOT IN (SELECT a.PartyId FROM #tmpPartyChargeRates a)
+	DELETE a WITH (ROWLOCK)
+	FROM bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis a
+		INNER JOIN @tmpPartyList p ON a.SiteId = p.SiteId
+		INNER JOIN @Result r ON p.PartyId = r.PartyId AND a.ProductId = r.ProductId AND a.CurrencyId = r.BaseCurrencyId
+	WHERE a.ReportDate = @ReportDate
 
-	SET @PartyIDs = (SELECT CAST(PartyID AS VARCHAR(5)) + ',' FROM @tmpPartyList FOR XML PATH(''))
-	SET @PartyIDs = LEFT(@PartyIDs, LEN(@PartyIDs) - 1)
-
-	-- Turnover, Betcount, Turnover no draw
-	--
-	SELECT b.SiteId, b.rptDate,b.CurrencyId, b.ProductId,
-		SUM(-b.MemberWL) AS Winloss, -- not support GD tip yet
-		SUM(b.BetCount) AS BetCount,
-		SUM(b.Turnover) AS Turnover,
-		SUM(b.Turnover * (CASE WHEN b.StatusId = 111 THEN 0 WHEN b.StatusId IN (114, 115) THEN 0.5 ELSE 1 END)) AS TurnoverNoDraw
-	INTO #tmpPerfData
-	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-	INNER JOIN #tmpPartyChargeRates p ON b.SiteID = p.LicenseeID AND b.ProductId = p.ProductID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
-	WHERE b.rptDate BETWEEN @FromDate AND @ToDate
-		AND b.customercategory NOT IN (27, 28)
-		AND b.Bettype NOT IN (901,902,903,904,911,912,913,914) -- exclude BT, CO
-		AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund
-	GROUP BY b.SiteId,b.rptDate,b.CurrencyId, b.ProductId
-
-	CREATE INDEX IX_tmpPerfData ON #tmpPerfData(rptDate, CurrencyId)
-
-	-- Base currency list
-	--
-	DECLARE @tmpBaseCurrencyList TABLE(CurrencyId INT, Code VARCHAR(10))
-	INSERT INTO @tmpBaseCurrencyList(CurrencyId,Code)
-	EXEC dbo.LA_SelBaseCurrency
-
-	-- Amount to company
-	--
-	CREATE TABLE #tmpPerfResult(
-		PartyId				INT,
-		ProductId			INT,
-		Fee					MONEY,
-		Discount			MONEY,
-		Rebate				MONEY,
-		IsChargedByMinFee	BIT,
-		IsChargedByGroupMinFee BIT,
-		Winloss				MONEY,
-		Turnover			MONEY,
-		TurnoverNoDraw		MONEY,
-		BetCount			INT,
-		CurrencyId			INT
+	INSERT INTO bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis
+	(
+		ReportDate, SiteId, ProductId, CurrencyId, IsBillingCurrency
+		,BetCount, Turnover, TurnoverNoDraw, LicenseeWinloss, LicensingFee, Discount, Rebate, Adjustment
 	)
-
-	CREATE INDEX IX_tmpPerfResult ON #tmpPerfResult(PartyId, ProductID)
-
-	DECLARE @tmpCurrency INT = 0
-	DECLARE @tmpCurrencyCode VARCHAR(10)
-
-	WHILE EXISTS (SELECT TOP 1 * FROM @tmpBaseCurrencyList)
-	BEGIN
-		SELECT TOP 1 @tmpCurrencyCode = Code, @tmpCurrency = CurrencyId FROM @tmpBaseCurrencyList
-		DELETE @tmpBaseCurrencyList WHERE CurrencyId = @tmpCurrency
-
-		INSERT INTO #tmpPerfResult(PartyId,ProductId,Fee,Discount,Rebate,IsChargedByMinFee,IsChargedByGroupMinFee)
-		EXEC dbo.[LA_AmountToCompanyByDiscountCurrencySel]
-			@FromDate = @FromDate,
-			@ToDate = @ToDate,
-			@PartyIDs = @PartyIDs,
-			@ProductCodes = @ProductCodes,
-			@BaseCurrencyName = @tmpCurrencyCode,
-			@BaseCurrencyId = @tmpCurrency,
-			@CurrencyId = 0
-
-		;WITH cte_Data AS(
-			SELECT b.SiteID,b.ProductId,
-				SUM(b.BetCount) AS BetCount,
-				SUM(b.Winloss * e.BaseCurrencyRate) AS Winloss,
-				SUM(b.Turnover * e.BaseCurrencyRate) AS Turnover,
-				SUM(b.TurnoverNoDraw * e.BaseCurrencyRate) AS TurnoverNoDraw
-			FROM #tmpPerfData b
-			INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate,@ToDate, @tmpCurrencyCode) e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-			GROUP BY b.SiteID,b.ProductId
-		)
-		UPDATE a SET
-			Winloss = d.Winloss,
-			Turnover = d.Turnover,
-			TurnoverNoDraw = d.TurnoverNoDraw,
-			BetCount = d.BetCount
-		FROM #tmpPerfResult a
-		INNER JOIN @tmpPartyList p ON a.PartyId=p.PartyId
-		INNER JOIN cte_Data d ON d.ProductID=a.ProductId AND d.SiteID=p.SiteId
-		WHERE a.CurrencyId IS NULL
-
-		UPDATE #tmpPerfResult SET CurrencyId = @tmpCurrency WHERE CurrencyId IS NULL
-	END
-
-	DELETE a FROM bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis a
-	INNER JOIN @tmpPartyList p ON a.SiteId=p.SiteId
-	INNER JOIN #tmpPerfResult b ON b.PartyId=p.PartyId AND a.ProductId = b.ProductId AND a.ReportDate = @ReportDate AND a.CurrencyId = b.CurrencyId
-
-	INSERT INTO bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis(ReportDate,SiteId,ProductId,CurrencyId,IsBillingCurrency,BetCount,Turnover,TurnoverNoDraw,LicenseeWinloss,LicensingFee,Discount,Rebate,Adjustment)
-	SELECT @ReportDate,p.SiteId,a.ProductId,a.CurrencyId,
-		CASE WHEN a.CurrencyId = p.BaseCurrencyId THEN 1 ELSE 0 END AS IsBillingCurrency,
-		ISNULL(a.BetCount,0)		AS BetCount,
-		ISNULL(a.Turnover,0)		AS Turnover,
-		ISNULL(a.TurnoverNoDraw,0)	AS TurnoverNoDraw,
-		ISNULL(a.Winloss,0)			AS Winloss,
-		a.Fee,
-		a.Discount,
-		a.Rebate,
-		0
-	FROM #tmpPerfResult a
-	INNER JOIN @tmpPartyList p ON a.PartyId=p.PartyId
-
-	DROP TABLE #tmpPartyChargeRates
-	DROP TABLE #tmpPerfResult
-	DROP TABLE #tmpPerfData
+	SELECT @ReportDate, p.SiteId, r.ProductId, r.BaseCurrencyId
+		,CASE WHEN r.BaseCurrencyId = p.BaseCurrencyId THEN 1 ELSE 0 END AS IsBillingCurrency
+		,ISNULL(r.BetCount, 0)			AS BetCount
+		,ISNULL(r.Turnover, 0)			AS Turnover
+		,ISNULL(r.TurnoverNoDraw, 0)	AS TurnoverNoDraw
+		,ISNULL(r.Winloss, 0)			AS LicenseeWinloss
+		,r.LicensingFee + r.ExtraAmount	AS LicensingFee
+		,r.Discount
+		,r.Rebate
+		,0 AS Adjustment
+	FROM @Result r
+		INNER JOIN @tmpPartyList p ON r.PartyId = p.PartyId
 END
 GO

@@ -3,17 +3,16 @@ USE [bodb_Licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_Inv_GenerateAmountForSoftwareFee]
-	@PartyId			INT,
-	@BillerId			INT,
-	@FromDate			DATETIME,
-	@ToDate				DATETIME,
-	@ProductCodes		VARCHAR(500),
-	@Environment		VARCHAR(50),
-	@ErrCode			INT				= 0		OUTPUT,
-	@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT,
-	@BaseCurrency		VARCHAR(10)		= 'EUR'	OUTPUT,
-	@InvoiceTemplateName VARCHAR(200)	= ''	OUTPUT
-WITH RECOMPILE
+	@PartyId		INT
+	,@BillerId		INT
+	,@FromDate		DATETIME
+	,@ToDate		DATETIME
+	,@ProductCodes	VARCHAR(MAX)
+	,@Environment	VARCHAR(50)
+	,@ErrCode				INT				= 0		OUTPUT
+	,@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
+	,@BaseCurrency			VARCHAR(10)		= 'EUR'	OUTPUT
+	,@InvoiceTemplateName	VARCHAR(200)	= ''	OUTPUT
 AS
 
 /*	Header:
@@ -39,693 +38,160 @@ AS
 		- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
 */
+
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @FDate DATE = @FromDate, @TDate DATE = @ToDate
+	SELECT  @ErrCode = 0, @ErrMsg = '', @InvoiceTemplateName = ''
+
+	DECLARE	@FinalResult TABLE (ProductId INT, ProductCode VARCHAR(100), ProductName VARCHAR(500)
+		,InvoiceAmount MONEY, AmountType TINYINT, Rate MONEY, DeductMonthlyFees MONEY, RemainingAmount MONEY, Remark NVARCHAR(4000))
+
+	-- Get Base Currency
+	DECLARE @BaseCurrencyId INT = 6, @BaseCurrencyName VARCHAR(10) = 'EUR' -- default = EUR
+	SELECT TOP 1 @BaseCurrencyId = ISNULL(BaseCurrencyId, 6)
+	FROM dbo.OAS_PartyBaseCurrency WITH (NOLOCK) WHERE PartyId = @PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
 	
-	DECLARE @AmountTypeSoftwareFee INT = 1,
-		@AmountTypeDiscount INT = 4,
-		@AmountTypeRebate INT = 6,
-		@DeductAgainstInvoice INT = 24,
-		@DeductSabaPromotion INT = 29,
-		@DeductPPPrizes INT = 30,
-		@PP_Contribution_InvItemType INT = 31,
-		@PP_JackpotPrize_InvItemType INT = 32
+	SELECT @BaseCurrencyName = Code FROM bodb02.dbo.Exchange WITH (NOLOCK) WHERE ExchangeId = @BaseCurrencyId
+	SELECT @BaseCurrency = @BaseCurrencyName
 
-	DECLARE @Month TINYINT = MONTH(@FromDate)
-	DECLARE @FirstDate DATETIME = DATEADD(mm, DATEDIFF(mm, 0, @FromDate), 0)
-	DECLARE @LastDate DATETIME = DATEADD (dd, -1, DATEADD(mm, DATEDIFF(mm, 0, @FromDate) + 1, 0))
-	DECLARE @DaysInMonth INT = DATEDIFF(day, @FirstDate, @LastDate) + 1
-
-	DECLARE	@FinalResult TABLE(
-			ProductId		INT,
-			ProductCode		VARCHAR(100),
-			ProductName		VARCHAR(500),
-			Remark			NVARCHAR(4000),
-			InvoiceAmount	MONEY,
-			AmountType		TINYINT,
-			Rate			MONEY,
-			DeductMonthlyFees	MONEY,
-			RemainingAmount	MONEY)
-
-	-- Region: Get base Currency
-	DECLARE @BaseCurrencyId INT 
-	SELECT TOP 1 @BaseCurrencyId = BaseCurrencyId
-	FROM OAS_PartyBaseCurrency WITH(NOLOCK)
-	WHERE PartyID = @PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
-	
-	IF(@BaseCurrencyId IS NULL)
+	-- Check Base Currency Setting
 	BEGIN
-		SET @BaseCurrencyId = 6 -- default EUR
-	END
-	
-	DECLARE @BaseCurrencyTable AS TABLE(CurrencyId INT, CurrencyName VARCHAR(10))
-	INSERT	INTO @BaseCurrencyTable(CurrencyId, CurrencyName)
-	EXECUTE dbo.LA_SelBaseCurrency
-	
-	SELECT	@BaseCurrency = CurrencyName
-	FROM	@BaseCurrencyTable
-	WHERE	@BaseCurrencyId = CurrencyId
-	
-	-- End Region	
-
-	-- Region: Get template
-	DECLARE @sql NVARCHAR(MAX)
-	DECLARE @tblInvoiceTemplates TABLE (InvoiceTemplateName NVARCHAR(10))
-
-	SELECT @sql = 'SELECT InvoiceTemplateName
-					FROM OPENQUERY(DBCUST, ''SELECT InvoiceTemplateName FROM bodb_Licensee.dbo.LA_f_GetInvoiceTemplate('
-																							+ CONVERT(VARCHAR(10), @PartyId)
-																							+ ', ' + CONVERT(VARCHAR(10), @BillerId)
-																							+ ', ' + CONVERT(VARCHAR(10), @AmountTypeSoftwareFee)
-																							+ ')'')'
-	INSERT INTO @tblInvoiceTemplates (InvoiceTemplateName)
-	EXEC (@sql)
-
-	SELECT @InvoiceTemplateName = InvoiceTemplateName FROM @tblInvoiceTemplates
-	-- End Region
-
-	-- Region: Get exchange rate info
-	CREATE TABLE #Exchange (
-			ExchangeDate	DATE,
-			ExchangeID		INT,
-			CurrencyCode	VARCHAR(10),
-			Rate			FLOAT
-	)
-
-	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrency)
-	
-	-- End region
-
-	-- get amount to company,discount,rebate(only for some supported products)
-	CREATE TABLE #AmountToCompany (
-		PartyId			INT,
-		ProductId		INT,
-		Winloss			MONEY,
-		Fee				MONEY,
-		Discount		MONEY,
-		DiscountRate	MONEY,
-		DiscountRemark	NVARCHAR(4000),
-		Rebate			MONEY,
-		RebateRate		MONEY,
-		RebateRemark	NVARCHAR(4000),
-		NegativeFee		MONEY,
-		Minfee			MONEY,
-		IsChargedByMinFee BIT
-	)
-	INSERT INTO #AmountToCompany(PartyId,ProductId,Winloss,Fee,NegativeFee,Minfee,IsChargedByMinFee,Discount,DiscountRate,DiscountRemark,Rebate,RebateRate,RebateRemark)
-	EXEC dbo.LA_AmountToCompanySel @FromDate,@ToDate,@PartyId,@ProductCodes,@BaseCurrency
-
-	-- Region: Get party charge rate info	
-	DECLARE @PartyChargeInfo AS TABLE (
-			PartyId		INT,
-			LicenseeId	INT,
-			ProductID	INT,
-			BettypeRef  INT,
-			Rate		MONEY,
-			TypeId		SMALLINT,
-			FromDate	SMALLDATETIME,
-			ToDate		SMALLDATETIME)
-
-	INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, BettypeRef, Rate, Fromdate, Todate)
-	(
-		SELECT	PartyID, LicenseeID, ProductID, Bettype, DI_Rate, Fromdate, Todate
-		FROM	dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
-		WHERE	DI_Rate > 0 AND ProductId NOT IN (1, 15) --exclude RB, CB
-	)
-
-	-- exclude products have calculated
-	DELETE @PartyChargeInfo WHERE ProductID IN (SELECT a.ProductId FROM #AmountToCompany a)
-
-	-- Get ChargeInfo for CB
-	DECLARE @CommChargeType INT = 6
-	DECLARE @CashInShareChargeType INT = 7
-
-	DECLARE @BAProductId INT = 3
-	DECLARE @CBProductId INT = 15
-	DECLARE @COProductId INT = 25
-	DECLARE @BXProductId INT = 31
-	DECLARE @PPProductId INT = 32
-
-	IF(CHARINDEX('CB', @ProductCodes) > 0 AND EXISTS(SELECT TOP 1 1 FROM bodb02.dbo.strSplit(@ProductCodes, ',') WHERE val = 'CB'))
-	BEGIN
-		INSERT INTO @PartyChargeInfo(PartyId, LicenseeId, ProductID, Rate, TypeId, FromDate, ToDate)
-		SELECT	ci.FromParty,
-				CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE lb.LabelID END AS LicenseeId,
-				@CBProductId,
-				ci.Rate,
-				ci.ChargeType,
-				CASE WHEN @FromDate <= ci.FromDate THEN ci.FromDate ELSE @FromDate END,
-				CASE WHEN @ToDate >= ci.ToDate THEN ci.ToDate ELSE @ToDate END
-		FROM dbo.OAS_Party p WITH(NOLOCK)
-			INNER JOIN dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.FromParty = p.PartyID
-			LEFT JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
-			LEFT JOIN dbo.Labels lb WITH (NOLOCK) ON p.OldRefID = lb.LicenseeID
-		WHERE FromParty = @PartyId
-			AND ProductID = @CBProductId
-			AND ChargeType IN (@CommChargeType,@CashInShareChargeType)
-			AND @FromDate <= ci.ToDate
-			AND ci.FromDate <= @ToDate
-	END
-	-- End Get ChargeInfo for CB
-
-	-- check payer exchange & minfee exchange
-	--
-	IF EXISTS (
-		SELECT TOP 1 m.PartyId
-		FROM LA_MinFee m WITH(NOLOCK)
-		WHERE m.PartyId = @PartyId
-			AND m.FeeTypeId = 1 -- 1 = minfee
-			AND m.FromDate <= @ToDate AND m.ToDate >= @FromDate AND @BaseCurrencyId <> m.CurrencyId
-	)
-	BEGIN
-		SELECT @ErrCode = 1, @ErrMsg = 'Please check the Exchange settings of Payer''s minfee. Exchange of minfee should be the same with Payer''s exchange.'
-		SELECT ProductId,
-			ProductCode,
-			ProductName,
-			InvoiceAmount,
-			AmountType,
-			Rate,
-			DeductMonthlyFees,
-			RemainingAmount,
-			Remark 
-		FROM @FinalResult
-
-		DROP TABLE #Exchange
-		DROP TABLE #AmountToCompany
-		RETURN
-	END
-
-	-- check payer exchange & discount exchange
-	--
-	DECLARE @DiscountCurrencyId INT = (
-		SELECT TOP 1 h.CurrencyId
-		FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
-		INNER JOIN dbo.LA_DiscountGroupHeader h WITH(NOLOCK) ON a.DiscountGroupId=h.DiscountGroupId
-		INNER JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON h.DiscountGroupId=p.DiscountGroupId
-		INNER JOIN #AmountToCompany c ON c.PartyId = a.PartyID AND c.ProductId=p.ProductId
-		WHERE h.DiscountGroupType != 2 -- rebate
-			AND h.FromDate <= @ToDate
-			AND h.ToDate >= @FromDate
-			AND a.PartyID = @PartyId
-			AND a.IsApplyDiscount = 1
-			AND ISNULL(c.DiscountRate,0) > 0
-			AND p.CalculationType IN (0,10) -- 0: discount, 10: discount & calculate
-		ORDER BY h.ToDate DESC
-	)
-
-	IF @DiscountCurrencyId IS NOT NULL AND @DiscountCurrencyId != @BaseCurrencyId
-	BEGIN
-		SELECT @ErrCode = 2, @ErrMsg = 'Please check the Exchange settings of Payer''s discount. Exchange of discount must be the same with Payer''s exchange.'
-		SELECT ProductId,
-			ProductCode,
-			ProductName,
-			InvoiceAmount,
-			AmountType,
-			Rate,
-			DeductMonthlyFees,
-			RemainingAmount,
-			Remark 
-		FROM @FinalResult
-
-		DROP TABLE #Exchange
-		DROP TABLE #AmountToCompany
-
-		RETURN
-	END
-
-	-- check payer exchange & Group Min Fee exchange
-	--
-	DECLARE @GMFCurrencyId INT = (
-		SELECT TOP 1 d.CurrencyId
-		FROM dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK)
-		INNER JOIN dbo.LA_GroupMinFeeHeader h WITH(NOLOCK) ON a.GroupMinFeeID=h.GroupMinFeeID
-		INNER JOIN dbo.LA_GroupMinFeeDetail d WITH(NOLOCK) ON h.GroupMinFeeID=d.GroupMinFeeID
-		WHERE d.FromDate <= @ToDate
-			AND d.ToDate >= @FromDate
-			AND a.PartyID = @PartyId
-		ORDER BY h.ToDate DESC
-	)
-	
-	IF @GMFCurrencyId IS NOT NULL AND @GMFCurrencyId != @BaseCurrencyId
-	BEGIN
-		SELECT @ErrCode = 3, @ErrMsg = 'Please check the Exchange settings of Payer''s group min fee. Exchange of group min fee must be the same with Payer''s exchange.'
-		SELECT ProductId,
-			ProductCode,
-			ProductName,
-			InvoiceAmount,
-			AmountType,
-			Rate,
-			DeductMonthlyFees,
-			RemainingAmount,
-			Remark 
-		FROM @FinalResult
+		-- Individual Min Fee
+		IF EXISTS (
+			SELECT 1
+			FROM dbo.LA_MinFee WITH (NOLOCK)
+			WHERE PartyId = @PartyId AND FeeTypeId = 1 AND FromDate <= @TDate AND ToDate >= @FDate
+				AND CurrencyId <> @BaseCurrencyId
+		)
+			SELECT @ErrCode = 1, @ErrMsg = 'Please check the Exchange settings of Payer''s minfee. Exchange of minfee should be the same with Payer''s exchange.'
 		
-		DROP TABLE #Exchange
-		DROP TABLE #AmountToCompany
-
-		RETURN
-	END
-
-	-- Region: Get Amount by Product (The remaining products)
-	CREATE	TABLE #TempData (
-			LicenseeId		INT, 
-			PartyId			INT, 
-			rptDate			DATETIME, 
-			CurrencyId		INT, 
-			WinLoss			MONEY, 
-			AComm			MONEY, 
-			ProductId		TINYINT,
-			BettypeRef		INT, 
-			AmountToCompany MONEY,
-			IsApplyMinFee	BIT)
-	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,WinLoss,AComm,ProductId,BettypeRef)
-	(
-		SELECT	b.SiteID,
-				p.PartyId, 
-				b.rptDate, 
-				b.CurrencyID, 
-				SUM(ISNULL(b.MemberWL, 0)) Winloss, 
-				SUM(ISNULL(b.CommissionA, 0)) AS AComm, 
-				p.ProductId,
-				r.BettypeRef
-		FROM	bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				LEFT JOIN dbo.Sport_Bettype_Reference r ON b.Bettype = r.Bettype
-				INNER JOIN @PartyChargeInfo p ON	b.ProductId = p.ProductID 
-													AND p.LicenseeId = b.SiteId
-													AND (b.Bettype = -1 OR r.BettypeRef = p.BettypeRef)
-													AND b.rptDate BETWEEN p.FromDate AND p.ToDate
-		WHERE	b.rptDate BETWEEN @FromDate AND @ToDate			
-				AND b.StatusId NOT IN (-1, 101, 102, 103)
-				AND (b.CurrencyID <> 20)
-				AND b.customercategory NOT IN (27, 28)
-				AND b.Bettype NOT IN (901,902,903,904,911,912,913,914)
-				AND b.ProductId NOT IN (@CBProductId, @COProductId)
-		GROUP BY b.rptdate, b.SiteId, p.PartyId,b.CurrencyID, p.ProductId, r.BettypeRef
-	)
-	
-	UPDATE	#TempData
-	SET		AmountToCompany =	CASE  
-									WHEN td.ProductId = @BAProductId THEN (-td.WinLoss * p.Rate - td.AComm) * e.Rate
-									WHEN td.ProductId <> @BAProductId THEN (-td.WinLoss * p.Rate) * e.Rate
-									ELSE 0 
-								END
-	FROM	#TempData td 
-			INNER JOIN @PartyChargeInfo p 
-				ON td.LicenseeId = p.LicenseeId 
-				AND ((td.ProductId = p.ProductID AND td.ProductId NOT IN (SELECT DISTINCT Productid FROM dbo.LA_Product3rdSub WITH(NOLOCK)))
-						OR 
-					(td.ProductId = p.ProductID AND td.BettypeRef = p.BettypeRef AND td.ProductId IN (SELECT DISTINCT Productid FROM dbo.LA_Product3rdSub WITH(NOLOCK))))
-				AND td.rptDate BETWEEN p.FromDate AND p.ToDate
-			INNER JOIN #Exchange e ON td.rptDate = e.ExchangeDate AND td.CurrencyId = e.ExchangeID
-	-- End region	
-	
-	-- Region: Get Amount By Product CB
-	CREATE TABLE #TempDataCB (
-		rptDate				DATETIME,
-		LicenseeId			INT,
-		PartyId				INT,
-		ProductId			INT,
-		CurrencyId			INT,
-		Turnover			MONEY,
-		TurnoverForCommision MONEY,
-		TurnoverExchanged	MONEY,
-		WinningPrize		MONEY,
-		CashOut				MONEY,
-		CommisionShare		MONEY,
-		CashInShare			MONEY,
-		CashInAmount		MONEY
-	)
+		-- Group Min Fee
+		ELSE IF EXISTS (
+			SELECT 1
+			FROM dbo.LA_GroupMinFeeAssignment a WITH (NOLOCK)
+				INNER JOIN dbo.LA_GroupMinFeeHeader h WITH (NOLOCK) ON a.GroupMinFeeId = h.GroupMinFeeId
+				INNER JOIN dbo.LA_GroupMinFeeDetail d WITH (NOLOCK) ON a.GroupMinFeeId = d.GroupMinFeeId
+			WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate
+				 AND d.CurrencyId <> @BaseCurrencyId
+		)
+			SELECT @ErrCode = 3, @ErrMsg = 'Please check the Exchange settings of Payer''s group min fee. Exchange of group min fee must be the same with Payer''s exchange.'
 		
-	INSERT INTO #TempDataCB (rptDate, LicenseeId, PartyId, ProductId, CurrencyId, Turnover, TurnoverForCommision, WinningPrize, CashOut, CashInAmount)
-	SELECT	rptDate,
-			b.SiteID,
-			cb.PartyId,
-			b.ProductId,
-			CurrencyId,
-			SUM(Turnover) Turnover,
-			SUM(CASE WHEN ISNULL(b.TicketType, 0) = 0 THEN b.Turnover ELSE b.ExtraAmount END) TurnoverForCommision,
-			SUM(ISNULL(WinPrizeAmount,0)) WinningPrize,
-			SUM(ISNULL(CashOutAmount,0)) CashOut,
-			SUM(ISNULL(BuyBackAmount,0)) CashInAmount
-	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-	JOIN @PartyChargeInfo cb ON b.SiteID = cb.LicenseeId AND b.ProductId = cb.ProductID AND b.rptDate BETWEEN cb.FromDate AND cb.ToDate
-	WHERE	b.ProductId = @CBProductId AND 
-		b.StatusId NOT IN (-1, 101, 102, 103) AND
-		CustomerCategory NOT IN (27, 28) AND 
-		CurrencyId <> 20 AND 
-		cb.TypeId = @CommChargeType -- to remove duplicate we use one of (6,7)
-	GROUP BY rptdate, CurrencyId, b.SiteID, cb.PartyId, b.ProductId
-	
-	UPDATE #TempDataCB
-	SET CommisionShare = td.TurnoverForCommision * cm.Rate, CashInShare = td.CashInAmount * ci.Rate
-	FROM #TempDataCB td
-	JOIN @PartyChargeInfo AS cm ON cm.ProductID = @CBProductId AND cm.TypeId = @CommChargeType AND (td.rptDate BETWEEN cm.FromDate AND cm.ToDate)
-	JOIN @PartyChargeInfo AS ci ON cm.ProductID = @CBProductId AND ci.TypeId = @CashInShareChargeType AND (td.rptDate BETWEEN ci.FromDate AND ci.ToDate)
-	
-	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,ProductId, AmountToCompany)
-	SELECT LicenseeId, PartyId, rptDate, CurrencyId, ProductId, (Turnover - WinningPrize - Cashout - CommisionShare - CashInShare) * e.Rate
-	FROM #TempDataCB tcb
-	INNER JOIN #Exchange e ON tcb.rptDate = e.ExchangeDate AND tcb.CurrencyId = e.ExchangeID	
-	-- End region: Get Amount By Product CB
-	
-	-- Region: Get Amount By Product CO
-	INSERT INTO #TempData (LicenseeId,PartyId,rptDate,CurrencyId,ProductId, AmountToCompany)
-	(
-		SELECT
-			d.LicenseeId,			
-			d.PartyId,
-			d.Winlostdate,
-			d.Currency,
-			@COProductId,
-			(TicketsPayout - BuyBackAmountSB - BuyBackAmountBA - CashoutCommission) * e.Rate AS AmountToCompany
-		FROM (
-			SELECT p.LicenseeId, p.PartyId, b.Winlostdate, b.Currency,
-				SUM(b.BuyBackAmt) AS BuyBackAmountSB,
-				SUM(b.BABuyBackAmt) AS BuyBackAmountBA,
-				SUM(b.TicketPayout) AS TicketsPayout,					
-				SUM(b.BuyBackAmt  * p.Rate) AS CashoutCommission	
-			FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
-				INNER JOIN @PartyChargeInfo p ON b.SiteId = p.LicenseeId AND b.ProductId = p.ProductID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate
-			WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate									
-				AND b.ProductID = 25	
-				AND b.Currency <> 20
-				AND b.RoleID = 1 -- Member Level			
-			GROUP BY p.LicenseeId, p.PartyId, b.Winlostdate, b.Currency
-		) d
-		INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.Currency = e.ExchangeID	
-	)
-	-- End region: Get Amount By Product CO
-
-	DECLARE @InvoiceData	TABLE(
-			PartyId			INT,
-			ProductId		INT, 
-			InvoiceAmount	MONEY, 
-			AmountType		TINYINT,
-			Rate			MONEY,
-			Remark			NVARCHAR(4000))
-
-	-- Region: fee
-	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType)
-	SELECT d.PartyId, d.ProductId, d.Fee, @AmountTypeSoftwareFee
-	FROM #AmountToCompany d
-	-- End Region: fee
-
-	-- product dont have minfee
-	INSERT INTO @InvoiceData(PartyId,ProductId,InvoiceAmount,AmountType)
-	(
-		SELECT	td.PartyId,
-				td.ProductId,
-				SUM(td.AmountToCompany),
-				@AmountTypeSoftwareFee
-		FROM	#TempData td 
-		WHERE	td.ProductId NOT IN (SELECT td2.ProductId FROM @InvoiceData td2)
-		GROUP	BY td.PartyId, td.ProductId
-	)
-
-	-- Region: Discount
-	INSERT INTO @InvoiceData(PartyId, ProductId, InvoiceAmount, AmountType, Rate, Remark)
-	SELECT d.PartyId, d.ProductId, d.Discount, @AmountTypeDiscount, d.DiscountRate, d.DiscountRemark
-	FROM #AmountToCompany d WHERE d.Discount > 0
-	-- End Region
-
-	-- Region: Select data	
-	INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,InvoiceAmount,AmountType,Rate,Remark)
-	(
-		SELECT	id.ProductId,
-				CASE 
-					WHEN id.ProductId = 0 THEN 'SB' 
-					ELSE p.ProductPrefix
-					END AS ProductCode,
-				CASE 
-					WHEN id.ProductId = 0 THEN 'Sportsbook' 
-					ELSE p.ProductName
-					END AS ProductName,
-				CASE
-					WHEN id.InvoiceAmount > 0 OR id.ProductId IN (@BAProductId, @CBProductId, @COProductId, @PPProductId,@BXProductId) THEN id.InvoiceAmount
-					ELSE 0
-				END AS InvoiceAmount,
-				id.AmountType,
-				id.Rate,
-				id.Remark
-		FROM	@InvoiceData id
-				LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON id.ProductId = p.Productid
-	)
-	
-	-- get AMF, AG and prepayment
-	DECLARE @InvoiceItemTypes TABLE([Key] VARCHAR(50), [Value] INT)
-	DECLARE @AdvanceMinFee VARCHAR(50) = 'AdvanceMinFee', @PrepaymentKey VARCHAR(50) = 'Prepayment', @AGPrepayment VARCHAR(50) = 'AGPrepayment'
-
-	INSERT INTO @InvoiceItemTypes ([Key], [Value])
-	SELECT @AdvanceMinFee, value
-		FROM (VALUES(3), (5), (7), (21)) AS T1(value)
-	UNION ALL
-	SELECT @PrepaymentKey, value
-		FROM (VALUES(22), (23), (24)) AS T2(value)
-	UNION ALL
-	SELECT @AGPrepayment, value
-		FROM (VALUES(25), (26), (27)) AS T3(value)
-
-	DECLARE @CreditTable TABLE (Amount MONEY, InvItemTypeId INT, InvItemTypeKey VARCHAR(50))
-	
-	INSERT INTO @CreditTable(Amount, InvItemTypeId, InvItemTypeKey)
-	SELECT SUM(ISNULL(s.Income,0) - ISNULL(s.Expense,0)) AS Amount, s.InvItemTypeId, invT.[Key] AS InvItemTypeKey 
-	FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
-	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
-	INNER JOIN @InvoiceItemTypes invT ON s.InvItemTypeId = invT.[Value]
-	WHERE s.RefPartyId = @PartyId AND ISNULL(h.StatusId, 0) = 0 AND h.Environment = @Environment
-		  AND (@BaseCurrencyId = h.CurrencyId OR (@BaseCurrencyId = 6/*EUR*/ AND h.CurrencyId IN (0, 6)))-- Because old data is stored 0 as EUR currency 
-	GROUP BY s.InvItemTypeId, invT.[Key]
-		
-
-	DECLARE @RemainingAmf MONEY = ISNULL((SELECT SUM(Amount) FROM @CreditTable WHERE InvItemTypeKey = @AdvanceMinFee), 0)
-	DECLARE @RemainingAG MONEY = ISNULL((SELECT SUM(Amount) FROM @CreditTable WHERE InvItemTypeKey = @AGPrepayment), 0)
-	DECLARE @Prepayment MONEY = ISNULL((SELECT SUM(Amount) FROM @CreditTable WHERE InvItemTypeKey = @PrepaymentKey), 0)
-
-	-- insert zero amount
-	INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, AmountType)
-	SELECT p.ProductID, p.ProductPrefix, p.ProductName, 0, @AmountTypeSoftwareFee
-	FROM (SELECT DISTINCT pci.ProductID, pd.ProductPrefix, pd.ProductName 
-		FROM @PartyChargeInfo pci
-		INNER JOIN dbo.LA_f_Products3rd('') pd ON pci.ProductID = pd.ProductID
-		LEFT JOIN @FinalResult r ON pci.ProductID = r.ProductId
-		WHERE r.ProductId IS NULL) p
-
-	-- insert amf
-	IF @RemainingAmf > 0 
-	BEGIN
-		DECLARE @ProgratedMinfee MONEY = ISNULL((SELECT TOP 1 MinFee FROM #AmountToCompany WHERE ProductId = 0),0)
-		DECLARE @SBAfterDiscount MONEY = ISNULL((
-			SELECT SUM(CASE WHEN AmountType = @AmountTypeSoftwareFee THEN InvoiceAmount ELSE -InvoiceAmount END)
-			FROM @FinalResult
-			WHERE ProductId = 0 AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount)
-		),0)
-
-		DECLARE @AmfAmount MONEY
-		SELECT @AmfAmount = CASE WHEN MIN(Amount) < 0 THEN 0 ELSE MIN(Amount) END
-		FROM (VALUES(@SBAfterDiscount), (@ProgratedMinfee),(@RemainingAmf))v(Amount)
-
-		UPDATE @FinalResult SET DeductMonthlyFees = @AmfAmount, RemainingAmount = @RemainingAmf
-		WHERE AmountType = @AmountTypeSoftwareFee AND ProductId = 0 -- SB
+		-- Discount
+		ELSE IF EXISTS (
+			SELECT TOP 1 1
+			FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
+				INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
+			WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate AND h.DiscountGroupType <> 2 -- 2 = rebate
+				AND h.CurrencyId <> @BaseCurrencyId
+			ORDER BY h.ToDate DESC -- latest discount group
+		)
+			SELECT @ErrCode = 2, @ErrMsg = 'Please check the Exchange settings of Payer''s discount. Exchange of discount must be the same with Payer''s exchange.'
+		ELSE
+			SELECT @ErrCode = 0, @ErrMsg = ''
 	END
 
-	-- insert AG setup fees
-	DECLARE @AGMonthlyFee MONEY
-	SELECT @AGMonthlyFee = SUM(CASE WHEN AmountType = @AmountTypeSoftwareFee THEN InvoiceAmount ELSE -InvoiceAmount END)
-	FROM @FinalResult 
-	WHERE ProductId = 10 AND AmountType IN (@AmountTypeSoftwareFee, @AmountTypeDiscount)
-	IF (@AGMonthlyFee > 0 AND @RemainingAG > 0)
+	IF @ErrCode = 0
 	BEGIN
-		DECLARE @AGAmount MONEY = (CASE WHEN @RemainingAG < @AGMonthlyFee THEN @RemainingAG ELSE @AGMonthlyFee END)
+		-- Get Invoice Template
+		SELECT TOP 1 @InvoiceTemplateName = t.InvTemplateName
+		FROM dbo.LA_InvoiceSetting i WITH (NOLOCK)
+			INNER JOIN dbo.LA_InvoiceTemplate t WITH (NOLOCK) ON i.InvTempId = t.InvTemplateId
+		WHERE i.FromPartyId = @PartyId AND i.ToPartyId = @BillerId
+				AND i.InvTypeId = 1 -- Software Fee
 
-		UPDATE @FinalResult SET DeductMonthlyFees = @AGAmount, RemainingAmount = @RemainingAG
-		WHERE AmountType = @AmountTypeSoftwareFee AND ProductId = 10 -- AG
-	END
+		-- Get Licensing Fee Data
+		DECLARE @PartyIds VARCHAR(MAX) = CONVERT(VARCHAR(MAX), @PartyId)
+		DECLARE @Result TABLE
+		(
+			PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
+			,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000)
+		)
+		INSERT INTO @Result
+		(
+			PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
+			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+		)
+		EXEC dbo.LA_AmountToCompanyByProduct
+			@PartyIds = @PartyIds
+			,@ProductCodes = @ProductCodes
+			,@FromDate = @FromDate
+			,@ToDate = @ToDate
+			,@LicensingFeeTypeIds = '0,-1,1,2,3,4,5,6' -- Contribution, Prize, ...
+			,@BaseCurrencyName = @BaseCurrencyName
+			,@Environment = @Environment
 
-	IF @Prepayment>0
-	BEGIN
-		INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
-		VALUES(0,'','',@DeductAgainstInvoice,0,@Prepayment)
-	END
+		INSERT INTO @FinalResult (ProductId, ProductCode, ProductName, InvoiceAmount, AmountType, Rate, Remark)
+		SELECT p.ProductId, p.ProductPrefix, p.ProductName, d.InvoiceAmount, d.AmountType, d.Rate, d.Remark
+		FROM @Result r
+			INNER JOIN dbo.LA_f_Products3rd('') p ON r.ProductId = p.ProductId
+			CROSS APPLY (
+				SELECT Discount AS InvoiceAmount, CONVERT(TINYINT, 4) AS AmountType, DiscountRate AS Rate, DiscountRemark AS Remark WHERE Discount > 0 -- Discount
+				--UNION ALL SELECT Rebate, 6, RebateRate, RebateRemark WHERE Rebate > 0 -- Rebate
+				UNION ALL SELECT LicensingFee, 1, NULL, NULL -- Software Fee
+			) d
+		WHERE r.LicensingFeeTypeId = 0 AND r.ProductId <> 37 -- SB Promotion
 
-	-- Region insert Promotion amount
-	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = 0))
-	BEGIN
-		DECLARE @PromotionAmount MONEY, 
-				@SPR_SabaPromotion SMALLINT = 17005 
-				
-		SELECT @PromotionAmount = SUM(CASE WHEN p.Bettype = @SPR_SabaPromotion THEN p.GrossWL ELSE p.MemberWL END * e.Rate)
-		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct p WITH (NOLOCK) 
-			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'SB', 'OA', 1) pc ON p.SiteID = pc.LicenseeId
-			INNER JOIN #Exchange e ON p.RptDate = e.ExchangeDate AND p.CurrencyID = e.ExchangeID
-			WHERE p.RptDate BETWEEN @FromDate AND @ToDate AND p.ProductID = 37 -- Saba promotion
-		
-		IF(ISNULL(@PromotionAmount, 0) > 0)
-		BEGIN
+		-- SB Promotion
+		IF EXISTS (SELECT 1 FROM @FinalResult WHERE AmountType = 1 AND ProductId = 0)
 			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
-			VALUES(0,'','',@DeductSabaPromotion,@PromotionAmount,0)
+			SELECT 0, '', '', 29, LicensingFee, 0 FROM @Result WHERE ProductId = 37 AND LicensingFee > 0
+
+		-- Prize, Contribution, Promotion, ...
+		INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, RemainingAmount, AmountType)
+		SELECT 0, '', '', SUM(ExtraAmount), 0
+			,CASE
+				WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
+				WHEN ProductId = 32 AND LicensingFeeTypeId = 2 THEN 32 -- JackpotPrize
+				WHEN ProductId = 32 AND LicensingFeeTypeId = 3 THEN 30 -- Prizes
+				WHEN ProductId = 42 AND LicensingFeeTypeId = 1 THEN 35 -- Contribution
+				WHEN ProductId = 42 AND LicensingFeeTypeId = 2 THEN 36 -- JackpotPrize
+				WHEN ProductId = 42 AND LicensingFeeTypeId = 6 THEN 34 -- Free Bets
+				WHEN ProductId = 66 AND LicensingFeeTypeId = 1 THEN 40 -- Contribution
+				WHEN ProductId = 66 AND LicensingFeeTypeId = 2 THEN 39 -- JackpotPrize
+				WHEN ProductId = 66 AND LicensingFeeTypeId = 6 THEN 38 -- Free Bets
+				WHEN ProductId = 34 AND LicensingFeeTypeId = 4 THEN 33 -- Bonus
+				WHEN ProductId = 45 AND LicensingFeeTypeId = 5 THEN 37 -- Lucky Draw
+				END
+		FROM @Result
+		WHERE ProductId IN (32, 34, 42, 45, 66) AND LicensingFeeTypeId > 0
+		GROUP BY
+			CASE
+				WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
+				WHEN ProductId = 32 AND LicensingFeeTypeId = 2 THEN 32 -- JackpotPrize
+				WHEN ProductId = 32 AND LicensingFeeTypeId = 3 THEN 30 -- Prizes
+				WHEN ProductId = 42 AND LicensingFeeTypeId = 1 THEN 35 -- Contribution
+				WHEN ProductId = 42 AND LicensingFeeTypeId = 2 THEN 36 -- JackpotPrize
+				WHEN ProductId = 42 AND LicensingFeeTypeId = 6 THEN 34 -- Free Bets
+				WHEN ProductId = 66 AND LicensingFeeTypeId = 1 THEN 40 -- Contribution
+				WHEN ProductId = 66 AND LicensingFeeTypeId = 2 THEN 39 -- JackpotPrize
+				WHEN ProductId = 66 AND LicensingFeeTypeId = 6 THEN 38 -- Free Bets
+				WHEN ProductId = 34 AND LicensingFeeTypeId = 4 THEN 33 -- Bonus
+				WHEN ProductId = 45 AND LicensingFeeTypeId = 5 THEN 37 -- Lucky Draw
+				END
+
+		-- AMF, Prepayment and AGPrepayment
+		BEGIN
+			-- AMF & AG Prepayment
+			UPDATE f
+			SET f.DeductMonthlyFees = r.LicensingFee, f.RemainingAmount = r.GrossLicensingFee
+			FROM @FinalResult f
+				INNER JOIN @Result r ON f.ProductId = r.ProductId
+			WHERE f.AmountType = 1 AND r.LicensingFeeTypeId = -1
+
+			-- Prepayment
+			IF EXISTS (SELECT 1 FROM @FinalResult WHERE AmountType = 1)
+				INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
+				SELECT 0, '' , '' , 24, 0, GrossLicensingFee
+				FROM @Result WHERE ProductId = -99 AND LicensingFeeTypeId = -1
 		END
 	END
-	-- End region insert Promotion amount
-	-- Region PP: Tournament Prizes, Promotion, Contribution, Jackpot Prize  
-	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = 32))
-	BEGIN
-		DECLARE @PP_Contribution_Bettype SMALLINT = 4297,
-				@PP_JackpotPrize_Bettype SMALLINT = 4298,
-				@PPTournament_Bettype SMALLINT = 4299,
-				@PromotionPrize_Bettype SMALLINT = 4300
-		;WITH cte_Pragmatic_ExtraAmount AS
-		(
-			SELECT b.Bettype, SUM(CASE WHEN b.Bettype = @PP_Contribution_Bettype THEN -b.GrossWL ELSE b.MemberWL END  * e.Rate) AS ExtraAmount
-			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'PP', 'OA', 1) pc ON b.SiteID = pc.LicenseeId
-				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-			WHERE b.Bettype IN (@PP_Contribution_Bettype, @PP_JackpotPrize_Bettype, @PPTournament_Bettype, @PromotionPrize_Bettype)
-				AND b.rptDate BETWEEN @FromDate AND @ToDate
-				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
-			GROUP BY b.Bettype
-		)
-		INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,AmountType,InvoiceAmount,RemainingAmount)
-		SELECT 0, '', '', CASE 
-								WHEN Bettype = @PP_Contribution_Bettype THEN @PP_Contribution_InvItemType
-								WHEN Bettype = @PP_JackpotPrize_Bettype THEN @PP_JackpotPrize_InvItemType
-								ELSE  @DeductPPPrizes
-							END, SUM(ExtraAmount), 0
-		FROM cte_Pragmatic_ExtraAmount
-		GROUP BY CASE 
-					WHEN Bettype = @PP_Contribution_Bettype THEN @PP_Contribution_InvItemType
-					WHEN Bettype = @PP_JackpotPrize_Bettype THEN @PP_JackpotPrize_InvItemType
-					ELSE  @DeductPPPrizes
-				 END
-		
-	END
-	-- End region Deduct promotion prizes
- 
-	-- Region Arcadia Gaming: Bonus amount
-	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = 34))
-	BEGIN
-		DECLARE @BonusAmount MONEY
-		SELECT @BonusAmount = SUM(p.MemberWL * e.Rate)
-		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct p WITH (NOLOCK) 
-			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'CC', 'OA', 1) pc ON p.SiteID = pc.LicenseeId
-			INNER JOIN #Exchange e ON p.RptDate = e.ExchangeDate AND p.CurrencyID = e.ExchangeID
-			WHERE p.RptDate BETWEEN @FromDate AND @ToDate AND p.ProductID = 34 AND p.Bettype = 1906 -- Arcadia Gaming
 
-		IF(ISNULL(@BonusAmount, 0) > 0)
-		BEGIN
-			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
-			VALUES(0,'','',33,@BonusAmount,0)
-		END
-	END
-	-- End region
-
-
-	-- Region AE Sexy: Lucky Draw amount
-	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = 45))
-	BEGIN
-		DECLARE @LuckyDrawAmount MONEY
-		SELECT @LuckyDrawAmount = SUM(p.MemberWL * e.Rate)
-		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct p WITH (NOLOCK) 
-			INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'SXG', 'OA', 1) pc ON p.SiteID = pc.LicenseeId
-			INNER JOIN #Exchange e ON p.RptDate = e.ExchangeDate AND p.CurrencyID = e.ExchangeID
-			WHERE p.RptDate BETWEEN @FromDate AND @ToDate AND p.ProductID = 45 AND p.Bettype = 3150 -- Lucky Draw
-
-		IF(ISNULL(@LuckyDrawAmount, 0) > 0)
-		BEGIN
-			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
-			VALUES(0,'','',37,@LuckyDrawAmount,0)
-		END
-	END
-	-- End region
-
-	-- Region Saba.club
-	DECLARE @Saba_clubProductID INT = 42
-	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = @Saba_clubProductID))
-	BEGIN
-		DECLARE @SBC_Contribution_Bettype SMALLINT = 1698,
-				@SBC_JackpotPrize_Bettype SMALLINT = 1699
-
-		;WITH cte_SabaClub_ExtraAmount AS
-		(
-			SELECT b.Bettype, ISNULL(b.TicketType, 0) TicketType, SUM(CASE WHEN b.Bettype = @SBC_Contribution_Bettype THEN -b.GrossWL ELSE b.MemberWL END * e.Rate) AS ExtraAmount
-			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'SBC', 'OA', 1) pc ON b.SiteID = pc.LicenseeId AND (b.rptDate BETWEEN pc.FromDate AND pc.ToDate)
-				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-			WHERE (b.ProductID = 42 AND ISNULL(b.TicketType, 0) = 2 OR b.Bettype IN (@SBC_Contribution_Bettype, @SBC_JackpotPrize_Bettype))
-				AND b.rptDate BETWEEN @FromDate AND @ToDate
-				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
-			GROUP BY b.Bettype, ISNULL(b.TicketType, 0)
-		)
-		INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,AmountType,InvoiceAmount,RemainingAmount)
-		SELECT 0, '', '', CASE 
-								WHEN Bettype = @SBC_Contribution_Bettype THEN 35
-								WHEN Bettype = @SBC_JackpotPrize_Bettype THEN 36
-								ELSE 34
-							END, SUM(ExtraAmount), 0
-		FROM cte_SabaClub_ExtraAmount
-		GROUP BY CASE 
-					WHEN Bettype = @SBC_Contribution_Bettype THEN 35
-					WHEN Bettype = @SBC_JackpotPrize_Bettype THEN 36
-					ELSE 34
-				 END
-		HAVING SUM(ExtraAmount) > 0
-	END
-	-- End region
-
-	-- Region Vgaming
-	DECLARE @VGAProductID INT = 66
-	IF(EXISTS(SELECT TOP 1 1 FROM @FinalResult WHERE ProductId = @VGAProductID))
-	BEGIN
-		DECLARE @VGA_Contribution_Bettype SMALLINT = 3898,
-				@VGA_JackpotPrize_Bettype SMALLINT = 3899
-
-		;WITH cte_VGA_ExtraAmount AS
-		(
-			SELECT b.Bettype, ISNULL(b.TicketType, 0) TicketType, SUM(CASE WHEN b.Bettype = @VGA_Contribution_Bettype THEN -b.GrossWL ELSE b.MemberWL END * e.Rate) AS ExtraAmount
-			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, 'VGA', 'OA', 1) pc ON b.SiteID = pc.LicenseeId AND (b.rptDate BETWEEN pc.FromDate AND pc.ToDate)
-				INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
-			WHERE (b.ProductID = 66 AND ISNULL(b.TicketType, 0) = 2 OR b.Bettype IN (@VGA_Contribution_Bettype, @VGA_JackpotPrize_Bettype))
-				AND b.rptDate BETWEEN @FromDate AND @ToDate
-				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
-			GROUP BY b.Bettype, ISNULL(b.TicketType, 0)
-		)
-		INSERT INTO @FinalResult(ProductId,ProductCode,ProductName,AmountType,InvoiceAmount,RemainingAmount)
-		SELECT 0, '', '', CASE 
-								WHEN Bettype = @VGA_Contribution_Bettype THEN 40
-								WHEN Bettype = @VGA_JackpotPrize_Bettype THEN 39
-								ELSE 38
-							END, SUM(ExtraAmount), 0
-		FROM cte_VGA_ExtraAmount
-		GROUP BY CASE 
-					WHEN Bettype = @VGA_Contribution_Bettype THEN 40
-					WHEN Bettype = @VGA_JackpotPrize_Bettype THEN 39
-					ELSE 38
-				 END
-		HAVING SUM(ExtraAmount) > 0
-	END
-	-- End region
-
-	SELECT	f.ProductId,
-			f.ProductCode,
-			f.ProductName,
-			f.InvoiceAmount,
-			f.AmountType,
-			f.Rate,
-			f.DeductMonthlyFees,
-			f.RemainingAmount,
-			f.Remark
-	FROM	@FinalResult f
-	ORDER BY f.AmountType, f.ProductId
-
-	SELECT @ErrCode = 0, @ErrMsg = ''
-
-	DROP TABLE #Exchange
-	DROP TABLE #TempData
-	DROP TABLE #TempDataCB
-	DROP TABLE #AmountToCompany
-
+	-- Return data
+	SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType, Rate, DeductMonthlyFees, RemainingAmount, Remark FROM @FinalResult
+	ORDER BY AmountType, ProductId
 END
 GO
