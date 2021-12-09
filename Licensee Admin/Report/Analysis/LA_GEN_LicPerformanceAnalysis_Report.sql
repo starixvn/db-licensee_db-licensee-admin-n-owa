@@ -24,6 +24,7 @@ AS
 		- 20210323@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 	    - 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
+		- 20211209@Percy: Fix Base Currency IS NULL [RedmineID: #157652]
 */
 
 BEGIN
@@ -177,7 +178,7 @@ BEGIN
 				,r.TurnoverNoDraw = t.TurnoverNoDraw
 				,r.BaseCurrencyId = @CurrencyId
 			FROM @Result r
-				INNER JOIN (
+				LEFT JOIN (
 					SELECT t.PartyId, t.ProductId
 						,SUM(t.Winloss * e.BaseCurrencyRate) AS Winloss
 						,SUM(t.Turnover * e.BaseCurrencyRate) AS Turnover

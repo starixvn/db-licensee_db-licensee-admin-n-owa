@@ -19,6 +19,7 @@ AS
 		- 20190226@Bruce: create SP [RedmineID: #105205]
 		- 20200821@Parsons: Add one more column into result set [#139055]
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
+		- 20211209@Percy: Fix Base Currency IS NULL [RedmineID: #157652]
 */
 
 BEGIN
@@ -150,7 +151,7 @@ BEGIN
 					,r.TurnoverNoDraw = t.TurnoverNoDraw
 					,r.BaseCurrencyId = @CurrencyId
 				FROM @Result r
-					INNER JOIN (
+					LEFT JOIN (
 						SELECT t.ProductId
 							,SUM(t.Winloss * e.BaseCurrencyRate) AS Winloss
 							,SUM(t.Turnover * e.BaseCurrencyRate) AS Turnover
@@ -161,8 +162,6 @@ BEGIN
 					) t ON r.ProductId = t.ProductId
 				WHERE r.BaseCurrencyId IS NULL
 			END
-
-			DROP TABLE #tmpPerfData
 
 			INSERT INTO bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis
 			(
