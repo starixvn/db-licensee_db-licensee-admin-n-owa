@@ -20,6 +20,7 @@ AS
 		- 20200821@Parsons: Add one more column into result set [#139055]
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
 		- 20211209@Percy: Fix Base Currency IS NULL [RedmineID: #157652]
+		- 20211213@Percy: Fix missing BetCount and exclude Saba Promotion [RedmineID: #161378]
 */
 
 BEGIN
@@ -145,14 +146,18 @@ BEGIN
 					,@ToDate = @ToDate
 					,@BaseCurrencyName = @CurrencyName
 
+				DELETE @Result WHERE ProductId = 37 -- Saba Promotion
+
 				UPDATE r
-				SET r.Winloss = t.Winloss
+				SET r.BetCount = t.BetCount
+					,r.Winloss = t.Winloss
 					,r.Turnover = t.Turnover
 					,r.TurnoverNoDraw = t.TurnoverNoDraw
 					,r.BaseCurrencyId = @CurrencyId
 				FROM @Result r
 					LEFT JOIN (
 						SELECT t.ProductId
+							,SUM(t.BetCount) AS BetCount
 							,SUM(t.Winloss * e.BaseCurrencyRate) AS Winloss
 							,SUM(t.Turnover * e.BaseCurrencyRate) AS Turnover
 							,SUM(t.TurnoverNoDraw * e.BaseCurrencyRate) AS TurnoverNoDraw
