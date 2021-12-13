@@ -35,6 +35,7 @@ AS
 		- 20200807@Parsons: Filter data by platform : Platform WL (summary, detail) [#138249]
 		- 20201204@Happy: Changing OddsSpread for Licensee [#142345]
 		- 20210517@Percy: Using core function to group betfrom [RedmineID: #150899]
+		- 20211223@Percy: Using core function to group product under SB [RedmineID: #165971]
 	
 	Explanation:
 		@Platforms: DetailPlatform from LA_f_BetFrom_Sel() function
@@ -100,12 +101,21 @@ BEGIN
 	-- bettrans
 	IF @ToDate > @MoveBetsDay
 	BEGIN
-		CREATE TABLE #bettype (bettype SMALLINT)
-		INSERT INTO #bettype (bettype)
-		SELECT DISTINCT bettype FROM dbo.SportBettypeMatrix WITH (NOLOCK) WHERE ProductId = 1 AND bettype <> 999 -- exclude Odds Spread Adjustment
-
 		SELECT @FDate = CASE WHEN @FromDate <= @MoveBetsDay THEN DATEADD(DAY, 1, @MoveBetsDay) ELSE @FromDate END
 				,@TDate = @ToDate
+
+		DECLARE @ProductTab TABLE (ProductID INT)
+		INSERT INTO @ProductTab (ProductID)
+		SELECT	p.ProductID 
+		FROM	bodb_Licensee.dbo.LA_f_GroupProduct('SB', @FDate, @TDate) m
+		INNER JOIN bodb02.dbo.Products p WITH(NOLOCK)  ON m.ProductCode = p.ProductPrefix
+		WHERE m.GroupProductId = 0
+
+		CREATE TABLE #bettype (bettype SMALLINT)
+		INSERT INTO #bettype (bettype)
+		SELECT DISTINCT bettype FROM dbo.SportBettypeMatrix WITH (NOLOCK) 
+		WHERE ProductId IN (SELECT x.ProductID FROM @ProductTab x) 
+			AND bettype <> 999 -- exclude Odds Spread Adjustment
 
 		INSERT INTO #Data (rptDate, LicenseeName, Currency, BetFrom, Turnover, Winloss)
 		SELECT b.winlostdate, c.LicenseeName, b.currency, b.betfrom, SUM(b.stake), SUM(b.winlost - b.actual_stake)
@@ -126,12 +136,20 @@ BEGIN
 	BEGIN
 		SELECT @FDate = @FromDate
 				,@TDate = CASE WHEN @ToDate > @MoveBetsDay THEN @MoveBetsDay ELSE @ToDate END
+		
+		DECLARE @SportTypeTab TABLE (sporttype INT)
+		INSERT INTO @SportTypeTab (sporttype)
+		SELECT	DISTINCT CASE WHEN ma.ProductID = 1 THEN 0 ELSE  ma.SportType END
+		FROM	bodb_Licensee.dbo.LA_f_GroupProduct('SB', @FDate, @TDate) m
+		INNER JOIN bodb02.dbo.Products p WITH(NOLOCK)  ON m.ProductCode = p.ProductPrefix
+		INNER JOIN dbo.SportBettypeMatrix ma WITH(NOLOCK)  ON p.ProductID = ma.ProductID
+		WHERE m.GroupProductId = 0
 
 		;WITH CTE_Data AS (
 			SELECT r.winlostdate, r.srecommend, r.recommend, r.Currency, r.betfrom, SUM(r.Turnover) AS Turnover, SUM(r.Winlost) AS Winlost
 			FROM bodb_LicenseeReport.dbo.rptLicWinloss2 r WITH (NOLOCK)
 			WHERE r.winlostdate BETWEEN @FDate AND @TDate
-				AND r.sporttype = 0 AND r.bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914, 999) -- exclude BT, CO, Odds Spread Adjustment
+				AND r.sporttype IN (SELECT x.sporttype FROM @SportTypeTab x) AND r.bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914, 999) -- exclude BT, CO, Odds Spread Adjustment
 				AND r.isBA = 0
 				AND r.statusId IN (111, 112, 113, 114, 115)
 				AND r.roleid = 2

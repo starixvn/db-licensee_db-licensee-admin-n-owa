@@ -15,6 +15,7 @@ AS
 
 	Revisions:
 		- 20210517@Percy: Initialize function [RedmineID: #150899]
+		- 20211213@Danny: Add new betfrom [RedmineID: #165971]
 */
 
 RETURN
@@ -24,16 +25,18 @@ RETURN
 			(10, 10, 'x', 'Desktop New Asia', 'Desktop'),
 			(20, 10, 'a', 'Desktop China', 'Desktop'),
 			(20, 10, 'z', 'Desktop China', 'Desktop'),
+			(20, 10, '[', 'Desktop China', 'Desktop'),
 			(30, 10, '9', 'Desktop Others', 'Desktop'),
 			(30, 10, '>', 'Desktop Others', 'Desktop'),
 			(40, 20, 'l', 'Mobile Standard', 'Mobile'),
+			(40, 20, ']', 'Mobile Standard', 'Mobile'),
 			(50, 20, '%', 'Mobile Euro', 'Mobile'),
 			(60, 20, 'c', 'Mobile Compact', 'Mobile'),
 			(60, 20, '@', 'Mobile Compact', 'Mobile'),
 			(70, 20, '7', 'Mobile Others', 'Mobile'),
 			(70, 20, '8', 'Mobile Others', 'Mobile'),
 			(70, 20, '_', 'Mobile Others', 'Mobile'),
-			(70, 20, '#', 'Mobile Others', 'Mobile'),
+			(70, 20, '.', 'Mobile Others', 'Mobile'),
 			(70, 20, '$', 'Mobile Others', 'Mobile'),
 			(80, 10, '1', 'E-Sports Desktop', 'Desktop'),
 			(80, 10, '4', 'E-Sports Desktop', 'Desktop'),
@@ -52,6 +55,6 @@ RETURN
 			(170, 40, 'g', 'Others', 'Others'),
 			(170, 40, 'e', 'Others', 'Others'),
 			(170, 40, 'u', 'Others', 'Others'),
-			(170, 40, '^', 'Others', 'Others')
+			(180, 50, '^', 'Odds Direct API', 'Odds Direct API')
 	) d (OrderDetail, OrderSummary, betfrom, DetailPlatform, SummaryPlatform)
 GO
