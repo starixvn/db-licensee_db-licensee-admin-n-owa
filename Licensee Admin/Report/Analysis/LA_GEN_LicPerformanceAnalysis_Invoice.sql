@@ -109,16 +109,19 @@ BEGIN
 									WHEN StatusId IN (114, 115) THEN 0.5
 									ELSE 1.0 END
 					) AS TurnoverNoDraw
-				,SUM(-r.MemberWL) AS Winloss
+				,SUM(-r.MemberWL - CASE WHEN r.ProductId = 31 THEN r.CommissionP ELSE 0 END) AS Winloss
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
 				INNER JOIN @tmpProductList p ON r.ProductId = p.ProductId
 				INNER JOIN @tmpChargeInfo c ON p.GroupProductId = c.ProductId AND r.rptDate BETWEEN c.FromDate AND c.ToDate
+				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupBettype() gb ON r.Bettype = gb.Bettype
 			WHERE r.rptDate BETWEEN @FromDate AND @ToDate
 				AND r.SiteId = @SiteId
 				AND r.CurrencyId <> 20
 				AND r.CustomerCategory NOT IN (27, 28)
 				AND r.Bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914)
 				AND r.StatusId IN (111, 112, 113, 114, 115)
+				AND gb.Bettype IS NULL
+				AND ISNULL(r.TicketType, 0) <> 2
 			GROUP BY r.rptDate, r.CurrencyId, p.GroupProductId
 
 			-- Get Licensing Fee
