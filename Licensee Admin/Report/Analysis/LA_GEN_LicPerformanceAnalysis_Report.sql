@@ -24,15 +24,19 @@ AS
 		- 20210323@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 	    - 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
+		- 20211209@Percy: Fix Base Currency IS NULL [RedmineID: #157652]
+		- 20211213@Percy: Fix missing BetCount and exclude Saba Promotion [RedmineID: #161378]
 */
 
 BEGIN
 	SET NOCOUNT ON
 
 	-- Get Product List
-	DECLARE @tmpProductList TABLE (ProductId INT, ProductCode VARCHAR(50))
-	INSERT INTO @tmpProductList (ProductId, ProductCode)
-	SELECT ProductId, ProductPrefix FROM dbo.LA_f_Products3rd(@ProductCodes)
+	DECLARE @tmpProductList TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(50))
+	INSERT INTO @tmpProductList (GroupProductId, ProductId, ProductCode)
+	SELECT ISNULL(g.GroupProductId, p.ProductId), ISNULL(g.ProductId, p.ProductId), ISNULL(g.ProductCode, p.ProductPrefix)
+	FROM dbo.LA_f_Products3rd(@ProductCodes) p
+		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.GroupProductId
 
 	IF ',' + @ProductCodes + ',' LIKE ',ADJUST,' -- Adjustment
 		INSERT INTO @tmpProductList (ProductId, ProductCode)
@@ -125,7 +129,7 @@ BEGIN
 
 		CREATE TABLE #tmpPerfData (rptDate DATETIME, PartyId INT, CurrencyId INT, ProductId INT, BetCount INT, Turnover MONEY, TurnoverNoDraw MONEY, Winloss MONEY)
 		INSERT INTO #tmpPerfData (rptDate, PartyId, CurrencyId, ProductId, BetCount, Turnover, TurnoverNoDraw, Winloss)
-		SELECT r.rptDate, p.PartyId, r.CurrencyId, r.ProductId
+		SELECT r.rptDate, c.PartyId, r.CurrencyId, p.GroupProductId
 			,SUM(r.BetCount) AS BetCount
 			,SUM(r.Turnover) AS Turnover
 			,SUM(r.Turnover * CASE
@@ -133,15 +137,19 @@ BEGIN
 								WHEN StatusId IN (114, 115) THEN 0.5
 								ELSE 1.0 END
 				) AS TurnoverNoDraw
-			,SUM(-r.MemberWL) AS Winloss
+			,SUM(-r.MemberWL - CASE WHEN r.ProductId = 31 THEN r.CommissionP ELSE 0 END) AS Winloss
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
-			INNER JOIN @tmpChargeInfo p ON r.SiteId = p.LicenseeId AND r.ProductId = p.ProductId AND r.rptDate BETWEEN p.FromDate AND p.ToDate
+			INNER JOIN @tmpProductList p ON r.ProductId = p.ProductId
+			INNER JOIN @tmpChargeInfo c ON r.SiteId = c.LicenseeId AND p.GroupProductId = c.ProductId AND r.rptDate BETWEEN c.FromDate AND c.ToDate
+			LEFT JOIN bodb_Licensee.dbo.LA_f_GroupBettype() gb ON r.Bettype = gb.Bettype
 		WHERE r.rptDate BETWEEN @FromDate AND @ToDate
 			AND r.CurrencyId <> 20
 			AND r.CustomerCategory NOT IN (27, 28)
 			AND r.Bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914)
 			AND r.StatusId IN (111, 112, 113, 114, 115)
-		GROUP BY r.rptDate, p.PartyId, r.CurrencyId, r.ProductId
+			AND gb.Bettype IS NULL
+			AND ISNULL(r.TicketType, 0) <> 2
+		GROUP BY r.rptDate, c.PartyId, r.CurrencyId, p.GroupProductId
 
 		-- Get Licensing Fee
 		DECLARE @Result TABLE
@@ -171,14 +179,18 @@ BEGIN
 				,@ToDate = @ToDate
 				,@BaseCurrencyName = @CurrencyName
 
+			DELETE @Result WHERE ProductId = 37 -- Saba Promotion
+
 			UPDATE r
-			SET r.Winloss = t.Winloss
+			SET r.BetCount = t.BetCount
+				,r.Winloss = t.Winloss
 				,r.Turnover = t.Turnover
 				,r.TurnoverNoDraw = t.TurnoverNoDraw
 				,r.BaseCurrencyId = @CurrencyId
 			FROM @Result r
-				INNER JOIN (
+				LEFT JOIN (
 					SELECT t.PartyId, t.ProductId
+						,SUM(t.BetCount) AS BetCount
 						,SUM(t.Winloss * e.BaseCurrencyRate) AS Winloss
 						,SUM(t.Turnover * e.BaseCurrencyRate) AS Turnover
 						,SUM(t.TurnoverNoDraw * e.BaseCurrencyRate) AS TurnoverNoDraw
