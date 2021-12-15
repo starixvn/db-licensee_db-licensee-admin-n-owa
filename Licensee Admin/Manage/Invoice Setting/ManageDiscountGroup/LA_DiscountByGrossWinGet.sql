@@ -19,7 +19,7 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @RepPartyId INT -- Representative Party
-	DECLARE @ProductId INT
+	DECLARE @ProductId INT, @ProductName VARCHAR(100)
 	DECLARE @ChargeRate MONEY = 0, @FromDate DATE, @ToDate DATE
 
 	DECLARE @PartyList TABLE (PartyId INT, LicenseeId INT)
@@ -30,11 +30,8 @@ BEGIN
 	WHERE DiscountGroupId = @GroupId
 
 	SELECT TOP 1 @RepPartyId = PartyId FROM @PartyList
-
-	SELECT TOP 1 @ProductId = gp.ProductId
-	FROM dbo.LA_DiscountGroupProduct gp WITH (NOLOCK)
-	WHERE gp.DiscountGroupId = @GroupId
-
+	SELECT TOP 1 @ProductId = gp.ProductId FROM dbo.LA_DiscountGroupProduct gp WITH (NOLOCK) WHERE gp.DiscountGroupId = @GroupId
+	SELECT TOP 1 @ProductName = ProductName FROM dbo.LA_f_Products3rd('') WHERE ProductId = @ProductId
 	SELECT TOP 1 @FromDate = FromDate, @ToDate = ToDate FROM dbo.LA_DiscountGroupHeader WITH (NOLOCK) WHERE DiscountGroupId = @GroupId
 
 	SELECT @ChargeRate = Rate FROM dbo.OAS_ChargeInfo WITH (NOLOCK)
@@ -44,7 +41,12 @@ BEGIN
 
 	-- Gerenal info
 	SELECT h.DiscountGroupId, h.DiscountGroupName, h.FromDate, h.ToDate, h.ModifiedDate
-		,h.CurrencyId, e.Code AS CurrencyName, CONVERT(VARCHAR(100), @ProductId) AS ProductList, @ChargeRate AS ChargeRate
+		,h.CurrencyId, e.Code AS CurrencyName
+		,CONVERT(VARCHAR(100), @ProductId) AS CalculationProductIds
+		,CONVERT(VARCHAR(100), @ProductId) AS DiscountProductIds
+		,@ProductName AS CalculationProductList
+		,@ProductName AS DiscountProductList
+		,@ChargeRate AS ChargeRate
 	FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
 		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON h.CurrencyId = e.ExchangeId
 	WHERE h.DiscountGroupId = @GroupId
