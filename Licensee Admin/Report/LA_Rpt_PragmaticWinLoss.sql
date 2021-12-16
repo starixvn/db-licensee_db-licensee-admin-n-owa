@@ -21,6 +21,7 @@ AS
 		- 20200723@Parsons: Implement PP Jackpot [#137306]
 		- 20200910@Parsons: Implement PP JP for Credit [#138984]
 		- 20210112@Mason: Fix bug : Pay to Supplier is incorrect with other based currency [#147375]
+		- 20211216@Danny: Get bettype from SportBettypeMaxtrix dynamically  [Redmine: #166158]
 
 	 Params:
 
@@ -31,6 +32,16 @@ BEGIN
 			 @JackpotPrize INT = 4298,
 			 @PPTournament INT = 4299,
 			 @PromotionPrize INT = 4300
+
+	DECLARE @PP_BettypeIdList TABLE (BetTypeId INT)
+	INSERT INTO @PP_BettypeIdList (BetTypeId)
+	SELECT	DISTINCT bettype
+	FROM	bodb_licensee.dbo.LA_f_BettypeProductMapping(0,'PP') la
+
+	DECLARE @f_date3rd DATE = @FromDate
+	DECLARE @t_date3rd DATE = @ToDate
+	DECLARE @f_date DATE = DATEADD(DAY, -1, @FromDate)
+	DECLARE @t_date DATE = DATEADD(DAY, 1, @ToDate)
 
 	-- Region: Charge Info	
 	DECLARE @ChargeInfos AS TABLE (
@@ -116,9 +127,10 @@ BEGIN
 		FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
 			INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
 			INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
-		WHERE b.RptDate3rd BETWEEN @FromDate AND @ToDate AND
-			b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20
-			AND b.BetTypeId BETWEEN 4101 AND 4300
+		WHERE b.RptDate BETWEEN @f_date AND @t_date
+			AND b.RptDate3rd BETWEEN @f_date3rd AND @t_date3rd 
+			AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20
+			AND b.BetTypeId IN (SELECT x.BetTypeId FROM @PP_BettypeIdList x)
 			AND ci.isDeposit = 1
 		GROUP BY b.RptDate3rd, ci.PartyId, b.CurrencyId, b.SiteId
 	)
@@ -183,9 +195,10 @@ BEGIN
 	FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
 		INNER JOIN @CreditChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
 		INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
-	WHERE b.RptDate3rd BETWEEN @FromDate AND @ToDate AND
-		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20
-		AND b.BetTypeId BETWEEN 4101 AND 4300
+	WHERE b.RptDate BETWEEN @f_date AND @t_date
+		AND b.RptDate3rd BETWEEN @f_date3rd AND @t_date3rd 
+		AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20
+		AND b.BetTypeId IN (SELECT x.BetTypeId FROM @PP_BettypeIdList x)
 		AND ci.isDeposit = 0
 	GROUP BY b.RptDate3rd, ci.PartyId, b.CurrencyId, b.SiteId
 	)
