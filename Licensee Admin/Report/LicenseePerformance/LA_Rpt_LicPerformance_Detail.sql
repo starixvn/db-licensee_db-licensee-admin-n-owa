@@ -75,6 +75,7 @@ AS
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
+		- 20211216@Percy: Enhance performance - Change table variable to temp table [RedmineID: #163181]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -142,7 +143,7 @@ BEGIN
 		DECLARE @Currencies VARCHAR(MAX) = CASE WHEN ISNULL(@Currency, 0) = 0 THEN '' ELSE CONVERT(VARCHAR(20), @Currency) END
 
 		DECLARE @Exchange TABLE (ExchangeDate DATE, ExchangeId INT, Rate FLOAT)
-		DECLARE @PartyChargeInfo TABLE (PartyId INT, LicenseeId INT, ProductId INT, FromDate DATETIME, ToDate DATETIME)
+		CREATE TABLE #_tmp_PartyChargeInfo (PartyId INT, LicenseeId INT, ProductId INT, FromDate DATETIME, ToDate DATETIME)
 		CREATE TABLE #PerformanceData
 		(
 			rptDate DATE, LicenseeId INT, PartyId INT, ProductId INT, CurrencyId INT
@@ -160,7 +161,7 @@ BEGIN
 		SELECT ExchangeDate, ExchangeId, CASE WHEN @IsConvert = 1 THEN BaseCurrencyRate ELSE 1 END
 		FROM dbo.LA_f_ExchangeDailySel(@FDate, @TDate, @BaseCurrencyName)
 
-		INSERT INTO @PartyChargeInfo (PartyId, LicenseeId, ProductId, FromDate, ToDate)
+		INSERT INTO #_tmp_PartyChargeInfo (PartyId, LicenseeId, ProductId, FromDate, ToDate)
 		SELECT DISTINCT PartyId, LicenseeId, ProductId, FromDate, ToDate
 		FROM bodb_Licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FDate, @TDate, @ProductCodes)
 
@@ -205,7 +206,7 @@ BEGIN
 		INSERT INTO #PerformanceData (rptDate, LicenseeId, PartyId, ProductId, CurrencyId, BetCount, Turnover, MemberWL, BACommission)
 		SELECT d.rptDate, d.SiteId, p.PartyId, d.ProductId, d.CurrencyId, SUM(d.BetCount), SUM(d.Turnover), SUM(d.MemberWL), SUM(d.BACommission)
 		FROM CTE_PerformanceData d
-			INNER JOIN @PartyChargeInfo p ON d.SiteId = p.LicenseeId AND d.ProductId = p.ProductId AND d.rptDate BETWEEN p.FromDate AND p.ToDate
+			INNER JOIN #_tmp_PartyChargeInfo p ON d.SiteId = p.LicenseeId AND d.ProductId = p.ProductId AND d.rptDate BETWEEN p.FromDate AND p.ToDate
 		GROUP BY d.rptDate, d.SiteId, p.PartyId, d.ProductId, d.CurrencyId
 
 		INSERT INTO @Result
@@ -240,14 +241,14 @@ BEGIN
 
 		-- Previous From/To
 		DELETE @Exchange
-		DELETE @PartyChargeInfo
+		DELETE #_tmp_PartyChargeInfo
 		DELETE #PerformanceData
 
 		INSERT INTO @Exchange (ExchangeDate, ExchangeId, Rate)
 		SELECT ExchangeDate, ExchangeId, CASE WHEN @IsConvert = 1 THEN BaseCurrencyRate ELSE 1 END
 		FROM dbo.LA_f_ExchangeDailySel(@PrevFDate, @PrevTDate, @BaseCurrencyName)
 
-		INSERT INTO @PartyChargeInfo (PartyId, LicenseeId, ProductId, FromDate, ToDate)
+		INSERT INTO #_tmp_PartyChargeInfo (PartyId, LicenseeId, ProductId, FromDate, ToDate)
 		SELECT DISTINCT PartyId, LicenseeId, ProductId, FromDate, ToDate
 		FROM bodb_Licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @PrevFDate, @PrevTDate, @ProductCodes)
 
@@ -292,7 +293,7 @@ BEGIN
 		INSERT INTO #PerformanceData (rptDate, LicenseeId, PartyId, ProductId, CurrencyId, BetCount, Turnover, MemberWL, BACommission)
 		SELECT d.rptDate, d.SiteId, p.PartyId, d.ProductId, d.CurrencyId, SUM(d.BetCount), SUM(d.Turnover), SUM(d.MemberWL), SUM(d.BACommission)
 		FROM CTE_PerformanceData d
-			INNER JOIN @PartyChargeInfo p ON d.SiteId = p.LicenseeId AND d.ProductId = p.ProductId AND d.rptDate BETWEEN p.FromDate AND p.ToDate
+			INNER JOIN #_tmp_PartyChargeInfo p ON d.SiteId = p.LicenseeId AND d.ProductId = p.ProductId AND d.rptDate BETWEEN p.FromDate AND p.ToDate
 		GROUP BY d.rptDate, d.SiteId, p.PartyId, d.ProductId, d.CurrencyId
 
 		INSERT INTO @Result
@@ -394,5 +395,7 @@ BEGIN
 		r.TotalTrans > 0 OR r.PreviousTotalTrans > 0
 		OR r.SportsbookFee > 0 OR r.PreviousSportsbookFee > 0
 	)
+
+	DROP TABLE #_tmp_PartyChargeInfo
 END
 GO
