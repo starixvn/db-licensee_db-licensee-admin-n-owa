@@ -21,6 +21,7 @@ AS
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
 		- 20211209@Percy: Fix Base Currency IS NULL [RedmineID: #157652]
 		- 20211213@Percy: Fix missing BetCount and exclude Saba Promotion [RedmineID: #161378]
+		- 20211215@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 */
 
 BEGIN
@@ -39,17 +40,19 @@ BEGIN
 	FROM dbo.LA_InvoiceHeader WITH (NOLOCK)
 	WHERE InvoiceHeaderId = @InvoiceId AND Environment = @Environment
 
+	DECLARE @FromDate DATETIME = @InvoiceDate
+	DECLARE @ToDate DATETIME = DATEADD(DAY, -1, DATEADD(MONTH, DATEDIFF(MONTH, 0, @InvoiceDate) + 1, 0))
+
+
 	IF @PartyId IS NULL
 		RETURN
 
 	SELECT @SiteId = OldRefId FROM dbo.OAS_Party WITH (NOLOCK) WHERE PartyId = @PartyId
-
 	-- Get Product List
-	DECLARE @tmpProductList TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(50))
-	INSERT INTO @tmpProductList (GroupProductId, ProductId, ProductCode)
-	SELECT ISNULL(g.GroupProductId, p.ProductId), ISNULL(g.ProductId, p.ProductId), ISNULL(g.ProductCode, p.ProductPrefix)
-	FROM dbo.LA_f_Products3rd(@ProductCodes) p
-		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.GroupProductId
+	DECLARE @tmpProductList TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(50), FromDate DATETIME, ToDate DATETIME)
+	INSERT INTO @tmpProductList (GroupProductId, ProductId, ProductCode, FromDate, ToDate)
+	SELECT	GroupProductId, ProductId, ProductCode, FromDate, ToDate
+	FROM	dbo.LA_f_GroupProduct(@ProductCodes, @FromDate, @ToDate) g 
 
 	IF ',' + @ProductCodes + ',' LIKE ',ADJUST,' -- Adjustment
 		INSERT INTO @tmpProductList (ProductId, ProductCode)
@@ -90,9 +93,7 @@ BEGIN
 
 			-- Get TO/WL data
 			DECLARE @PartyIds VARCHAR(MAX) = CONVERT(VARCHAR(MAX), @PartyId)
-			DECLARE @FromDate DATETIME = @InvoiceDate
-			DECLARE @ToDate DATETIME = DATEADD(DAY, -1, DATEADD(MONTH, DATEDIFF(MONTH, 0, @InvoiceDate) + 1, 0))
-
+		
 			DECLARE @tmpChargeInfo TABLE (ProductId INT, FromDate DATE, ToDate DATE)
 			INSERT INTO @tmpChargeInfo (ProductId, FromDate, ToDate)
 			SELECT DISTINCT ProductId, Fromdate, ToDate
@@ -111,7 +112,7 @@ BEGIN
 					) AS TurnoverNoDraw
 				,SUM(-r.MemberWL - CASE WHEN r.ProductId = 31 THEN r.CommissionP ELSE 0 END) AS Winloss
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
-				INNER JOIN @tmpProductList p ON r.ProductId = p.ProductId
+				INNER JOIN @tmpProductList p ON r.ProductId = p.ProductId AND r.rptDate BETWEEN p.FromDate AND p.ToDate
 				INNER JOIN @tmpChargeInfo c ON p.GroupProductId = c.ProductId AND r.rptDate BETWEEN c.FromDate AND c.ToDate
 				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupBettype() gb ON r.Bettype = gb.Bettype
 			WHERE r.rptDate BETWEEN @FromDate AND @ToDate

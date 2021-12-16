@@ -21,6 +21,7 @@ AS
 
 	Revisions:
 		- 20210909@Percy: Initialize SP [RedmineID: #157652]
+		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -200,6 +201,10 @@ BEGIN
 		AND r.RoleId = 1 -- Member
 	GROUP BY CONVERT(DATE, r.WinlostDate), r.SiteId, r.Currency
 
+	DECLARE @Products TABLE (GroupProductId INT, ProductId INT, FromDate DATE, ToDate DATE)
+	INSERT INTO @Products (GroupProductId, ProductId, FromDate, ToDate)
+	SELECT GroupProductId, ProductId, FromDate, ToDate FROM dbo.LA_f_GroupProduct(@ProductCodes,@FromDate,@ToDate) 
+
 	;WITH CTE_tempData AS (
 		SELECT rptDate, SiteId, ProductId, CurrencyId, Bettype, CASE WHEN ISNULL(TicketType, 0) = 2 THEN 2 ELSE 0 END AS TicketType
 			,SUM(ISNULL(MemberWL, 0)) AS MemberWL
@@ -220,7 +225,7 @@ BEGIN
 	)
 	INSERT INTO #TempData (rptDate, LicenseeId, ProductId, CurrencyId, BettypeRef, MemberWL, MemberComm, AgentWL, AgentComm
 		,Tips, Contribution, JackpotPrize, Prize, LuckyDraw, Bonus, OddsSpread, FreeBets, PayOut, CommShare, CashInShare)
-	SELECT r.rptDate, r.SiteId, ISNULL(g.GroupProductId, r.ProductId), r.CurrencyId
+	SELECT r.rptDate, r.SiteId, g.GroupProductId, r.CurrencyId
 		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005) THEN r.Bettype ELSE -1 END
 		,SUM(CASE WHEN r.TicketType = 2 OR b.Bettype IS NOT NULL THEN 0 ELSE r.MemberWL END) AS MemberWL
 		,SUM(r.CommissionP) AS MemberComm
@@ -238,9 +243,9 @@ BEGIN
 		,SUM(r.CommShare) AS CommShare
 		,SUM(r.CashInShare) AS CashInShare
 	FROM CTE_tempData r
-		LEFT JOIN dbo.LA_f_GroupProduct() g ON r.ProductId = g.ProductId
+		INNER JOIN @Products g ON r.ProductId = g.ProductId AND r.rptDate BETWEEN g.FromDate AND g.ToDate
 		LEFT JOIN dbo.LA_f_GroupBettype() b ON r.Bettype = b.Bettype
-	GROUP BY r.rptDate, r.SiteId, ISNULL(g.GroupProductId, r.ProductId), r.CurrencyId
+	GROUP BY r.rptDate, r.SiteId, g.GroupProductId, r.CurrencyId
 		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005) THEN r.Bettype ELSE -1 END
 
 	CREATE TABLE #tmpResult (rptDate DATE, PartyId INT, ProductId INT, CurrencyId INT

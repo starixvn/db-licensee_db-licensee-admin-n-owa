@@ -14,15 +14,15 @@ DB: DBCUST.bodb_licensee
 Revisions:
 	- 20150312@Florent: Initialize SP
 	- 20210812@Percy: Exclude BitCoin from Product drop-down list [RedmineID: #159691]
+	- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 
 Param's Explanation:
 */
 SET NOCOUNT ON
 
 BEGIN
-	SELECT p.ProductPrefix AS ProductCode, p.ProductName
-	FROM dbo.LA_f_Products3rd('') p
-		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId AND g.ProductId <> g.GroupProductId
+	SELECT p.ProductCode, p.ProductName
+	FROM dbo.LA_f_GroupProduct('',NULL,NULL) p
 	WHERE EXISTS (
 		SELECT 1
 		FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
@@ -32,7 +32,7 @@ BEGIN
 			AND c.ChargeType NOT IN (2, 3) -- Old Type
 			AND (@PartyId = 0 OR c.FromParty = @PartyId)
 	)
-		AND g.ProductId IS NULL
+		AND p.ProductId = p.GroupProductId
 	ORDER BY p.ProductId
 END
 GO

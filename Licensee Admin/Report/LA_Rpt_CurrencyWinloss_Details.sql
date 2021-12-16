@@ -47,6 +47,7 @@ AS
 	   - 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 	   - 20210824@Percy: Enhance performance [RedmineID: #160672]
 	   - 20211115@Percy: Return IsShowOddsSpread [RedmineID: #164411]
+	   - 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -77,11 +78,10 @@ BEGIN
 	ELSE
 		INSERT INTO @Currency SELECT val FROM dbo.strSplit(@CurrencyIds, ',')
 
-	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20))
-	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode)
-	SELECT ISNULL(g.GroupProductId, p.ProductId), ISNULL(g.ProductId, p.ProductId), ISNULL(g.ProductName, p.ProductName), ISNULL(g.ProductCode, p.ProductPrefix)
-	FROM bodb_Licensee.dbo.LA_f_Products3rd(@ProductCodes) p
-		LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct() g ON p.ProductId = g.GroupProductId
+	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20), FromDate DATE, ToDate DATE)
+	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode, FromDate, ToDate)
+	SELECT GroupProductId, ProductId, ProductName, ProductCode , FromDate, ToDate
+	FROM bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCodes, @FromDate, @ToDate) g
 
 	SET @ProductCodes = NULL
 	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #Products
@@ -356,7 +356,7 @@ BEGIN
 					,SUM(WinlossA) AS WinlossA
 					,MAX(b.IsShowOddsSpread) AS IsShowOddsSpread
 			FROM #tmpData b
-				INNER JOIN #Products p ON b.ProductId = p.ProductId
+				INNER JOIN #Products p ON b.ProductId = p.ProductId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			GROUP BY b.rptDate, b.LicenseeId, b.CurrencyId, p.GroupProductId
 		)
 		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm, OddsSpreadCost, IsShowOddsSpread)

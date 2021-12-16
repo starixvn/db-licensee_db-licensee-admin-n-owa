@@ -69,6 +69,7 @@ AS
 		- 20210614@Danny: Integrate AdvantPlay Mini [#155207]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
+		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 */
 		
 /*	Example:
@@ -91,12 +92,9 @@ BEGIN
 	BEGIN
 		CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductCode VARCHAR(100), ProductName VARCHAR(100))
 		INSERT INTO #Products (GroupProductId, ProductId, ProductCode, ProductName)
-		SELECT 0, 0, 'SB', 'Sportsbook'
-		UNION ALL
-		SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductPrefix, p.ProductName
-		FROM dbo.Product3rd p WITH (NOLOCK)
-			LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId
-		WHERE p.ProductId NOT IN (
+		SELECT GroupProductId, ProductId, ProductCode ,ProductName
+		FROM   dbo.LA_f_GroupProduct('', @FromDate, @ToDate) g
+		WHERE g.ProductId NOT IN (
 			1, 4, 7, 9, 12, 14, 17, 30, 33 -- inactive
 			,16 -- Hosting (setting only)
 			,13, 23 -- BT, NG2

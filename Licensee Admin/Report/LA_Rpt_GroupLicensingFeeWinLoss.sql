@@ -26,6 +26,7 @@ AS
 	   - 20210111@Happy: Saba.club - Integrate Slot Game [#147977]
 	   - 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 	   - 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
+	   - 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 */
 BEGIN
 	SET NOCOUNT ON	
@@ -34,11 +35,10 @@ BEGIN
 	DECLARE @ChargeInfo TABLE(ChargeID INT, PartyID INT, LicenseeID INT, ProductID INT,Rate MONEY, Fromdate DATE, Todate DATE)
 	CREATE TABLE #Data (rptDate DATE, PartyID INT, ProductID INT, Currency INT, BetTypeId INT, Winloss MONEY, AComm MONEY)
 	CREATE TABLE #Report (PartyID INT, ProductID INT, CurrencyID INT, Company MONEY)
-	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20))
-	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode)
-	SELECT ISNULL(g.GroupProductId, p.ProductId), ISNULL(g.ProductId, p.ProductId), ISNULL(g.ProductName, p.ProductName), ISNULL(g.ProductCode, p.ProductPrefix)
-	FROM bodb_Licensee.dbo.LA_f_Products3rd(@ProductCodes) p
-		LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct() g ON p.ProductId = g.GroupProductId
+	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20), FromDate DATE, ToDate DATE)
+	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode, FromDate, ToDate)
+	SELECT GroupProductId, ProductId, ProductName, ProductCode, FromDate, ToDate 
+	FROM bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCodes, @FromDate, @ToDate) g
 
 	SET @ProductCodes = NULL
 	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #Products
@@ -164,7 +164,7 @@ BEGIN
 			, SUM(CASE WHEN b.Bettype = 999 THEN 0 ELSE ISNULL(-b.MemberWL, 0) END * ISNULL(cr.Rate, ci.Rate)) AS LicencingFee
 			, SUM(CASE WHEN b.Bettype = 999 THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS OddsSpreadCost
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN #Products p ON b.ProductId = p.ProductId
+			INNER JOIN #Products p ON b.ProductId = p.ProductId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND p.GroupProductId = ci.ProductID AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND b.CurrencyId = cr.CurrencyID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
@@ -193,6 +193,7 @@ BEGIN
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN (SELECT DISTINCT PartyId, LicenseeId, ProductID FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci 
 					ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
+			INNER JOIN #Products p ON b.ProductId = p.GroupProductId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			LEFT JOIN LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeID
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)

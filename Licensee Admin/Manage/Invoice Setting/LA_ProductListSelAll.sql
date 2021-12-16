@@ -12,13 +12,14 @@ AS
 	Revisions:     
 		- 20190128@Bruce: include product code [redmine: #108311]
 		- 20210812@Percy: Exclude BitCoin from Product drop-down list [RedmineID: #159691]
+		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 */
 BEGIN
 	SET NOCOUNT ON
 
-	SELECT p.ProductId, p.ProductName, p.ProductPrefix AS ProductCode
-	FROM dbo.LA_f_Products3rd('') p
-		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId AND g.ProductId <> g.GroupProductId
-	WHERE g.ProductId IS NULL
+	SELECT p.ProductID, p.ProductName, p.ProductCode  
+	FROM dbo.LA_f_GroupProduct('',NULL,NULL) p
+	WHERE p.ProductId = p.GroupProductId
+
 END
 GO

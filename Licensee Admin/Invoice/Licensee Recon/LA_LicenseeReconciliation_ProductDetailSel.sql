@@ -19,6 +19,7 @@ AS
 		- 20210727@Percy: Initialize SP [RedmineID: #155593]
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20211115@Percy: Return IsShowOddsSpread [RedmineID: #164411]
+		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 */
 
 BEGIN
@@ -26,15 +27,12 @@ BEGIN
 
 	DECLARE @Products TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(20))
 	INSERT INTO @Products (GroupProductId, ProductId, ProductCode)
-	SELECT ISNULL(g.GroupProductId, p.ProductId), ISNULL(g.ProductId, p.ProductId), ISNULL(g.ProductCode, p.ProductPrefix)
-	FROM (
-		SELECT ProductId, ProductPrefix FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductId = @ProductId
-		UNION ALL SELECT 0, 'SB' WHERE @ProductId = 0
-	) p
-		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.GroupProductId
+	SELECT GroupProductId, ProductId, ProductCode
+	FROM dbo.LA_f_GroupProduct('',@FromDate,@ToDate)
+	WHERE GroupProductId = @ProductId
 
 	DECLARE @ProductCode VARCHAR(MAX)
-	SELECT  @ProductCode = COALESCE(@ProductCode + ',', '') + ProductCode FROM @Products
+	SELECT  @ProductCode = COALESCE(@ProductCode + ',', '') + ProductCode FROM @Products WHERE GroupProductId = ProductId
 
 	DECLARE @tblSite TABLE (SiteId INT, Site VARCHAR(100))
 	INSERT INTO @tblSite (SiteId, Site)

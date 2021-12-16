@@ -37,6 +37,7 @@ AS
 		- 20210705@Percy: Enhance code to improve performance [#147006]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
+		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -55,20 +56,9 @@ BEGIN
 	-- product to be discounted
 	DECLARE @ProductList TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(100), ToBeDiscounted BIT)
 	INSERT INTO @ProductList (GroupProductId, ProductId, ProductCode, ToBeDiscounted)
-	SELECT 0, 0, 'SB', 1 WHERE ',' + @ProductCodes + ',' LIKE '%,SB,%'
-	UNION ALL
-	SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductPrefix, 1
-	FROM dbo.Product3rd p WITH (NOLOCK)
-		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId
-	WHERE ',' + @ProductCodes + ',' LIKE '%,' + p.ProductPrefix + ',%'
+	SELECT	GroupProductId, ProductId, ProductCode, 1  
+	FROM	dbo.LA_f_GroupProduct(@ProductCodes,@FromDate,@ToDate)
 
-	INSERT INTO @ProductList (GroupProductId, ProductId, ProductCode, ToBeDiscounted)
-	SELECT g.GroupProductId, g.ProductId, p.ProductPrefix, 1
-	FROM @ProductList pl
-		INNER JOIN dbo.LA_f_GroupProduct() g ON pl.ProductId = g.GroupProductId
-		INNER JOIN dbo.Product3rd p WITH (NOLOCK) ON g.ProductId = p.ProductId
-		LEFT JOIN @ProductList t ON g.ProductId = t.ProductId
-	WHERE t.ProductId IS NULL
 
 	-- 1.1 party list 
 	DECLARE @PartyList TABLE(PartyId INT, IsSelected BIT, GroupMinFeeId	INT)
@@ -180,7 +170,7 @@ BEGIN
 	SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductPrefix, 0
 	FROM CTE_Product c
 		INNER JOIN dbo.Product3rd p WITH (NOLOCK) ON c.ProductId = p.ProductId
-		LEFT JOIN dbo.LA_f_GroupProduct() g ON c.ProductId = g.ProductId
+		LEFT JOIN dbo.LA_f_GroupProduct(@ProductCodes,@FromDate,@ToDate) g ON c.ProductId = g.ProductId
 		LEFT JOIN @ProductList t ON c.ProductId = t.ProductId
 	WHERE t.ProductId IS NULL
 

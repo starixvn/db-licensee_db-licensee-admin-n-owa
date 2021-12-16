@@ -17,6 +17,7 @@ AS
 	Revisions: 
 		- 20210727@Percy: Initialize SP [RedmineID: #155593]
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
+		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 */
 
 BEGIN
@@ -58,7 +59,7 @@ BEGIN
 	SELECT DISTINCT ISNULL(g.GroupProductId, p.ProductId), ISNULL(g.ProductId, p.ProductId), ISNULL(g.ProductName, p.ProductName), f.SportType, 0 AS IsBA
 	FROM bodb02.dbo.f_LicWinLoss_ProductSportType_Sel(@ProductCodes) f
 		CROSS APPLY dbo.LA_f_Products3rd(f.ProductCode) p
-		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId
+		LEFT JOIN dbo.LA_f_GroupProduct(@ProductCodes,@FromDate,@ToDate) g ON p.ProductId = g.ProductId
 
 	-- Get AmountToCompany data
 	CREATE TABLE #tmpData (WinlostDate SMALLDATETIME, Currency INT, Sporttype INT, IsBA BIT, AmountToCompany MONEY)

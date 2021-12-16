@@ -13,6 +13,7 @@ AS
 	Revisions:     	
 		- 20170301@Scofield: Update to exclude 'RB', 'BG', 'PTCS', 'HF' and inclucde 'SB' [#70050]
 		- 20210812@Percy: Exclude BitCoin from Product drop-down list [RedmineID: #159691]
+		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 	
 	Example:
 		EXEC dbo.LA_ProductListLauchedSel
@@ -20,9 +21,8 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	SELECT p.ProductID, p.ProductPrefix, p.ProductName
-	FROM dbo.LA_f_Products3rd('') p
-		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId AND g.ProductId <> g.GroupProductId
+	SELECT p.ProductID, p.ProductCode  ProductPrefix, p.ProductName
+	FROM dbo.LA_f_GroupProduct('',NULL,NULL) p
 	WHERE p.ProductId NOT IN (1, 7, 9, 16) -- RB, BG, PTCS, HF
 		AND (
 			p.ProductId = 0 -- always SB
@@ -32,9 +32,9 @@ BEGIN
 					INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON op.PartyId = pd.PartyId
 					LEFT JOIN dbo.Labels l WITH (NOLOCK) ON op.OldRefId = l.LicenseeId
 					INNER JOIN dbo.LicenseeProduct3rd lp WITH (NOLOCK) ON lp.LicenseeId = CASE WHEN pd.IsDeposit = 0 THEN l.LabelId ELSE op.OldRefId END
-				WHERE lp.ProductId = p.ProductId
+				WHERE lp.ProductId = p.ProductId AND op.PartyID = @PayerId
 			)
 		)
-		AND g.ProductId IS NULL
+		AND p.ProductId = p.GroupProductId
 END
 GO

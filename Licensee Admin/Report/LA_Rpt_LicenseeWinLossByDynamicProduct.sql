@@ -31,6 +31,8 @@ AS
 	    - 20210108@Happy: Saba.club - Integrate Slot Game [#147977]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
+		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
+
 */
 
 BEGIN
@@ -45,13 +47,9 @@ BEGIN
 
 	DECLARE @Products TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(20), ProductName VARCHAR(100))
 	INSERT INTO @Products (GroupProductId, ProductId, ProductCode, ProductName)
-	SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductPrefix, p.ProductName
-	FROM (
-		SELECT ProductId, ProductPrefix, ProductName FROM dbo.Product3rd WITH (NOLOCK)
-		UNION ALL SELECT 0, 'SB', 'Sportsbook'
-	) p
-		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.ProductId
-	WHERE ',' + @ProductIdString + ',' LIKE '%,' + CONVERT(VARCHAR(10), ISNULL(g.GroupProductId, p.ProductId)) + ',%'
+	SELECT	GroupProductId,ProductId,ProductCode, ProductName 
+	FROM	dbo.LA_f_GroupProduct('',@FromDate,@ToDate)
+	WHERE	GroupProductId IN (select CAST(x.val AS INT) AS ProductId FROM strSplit(@ProductIdString,',') x)
 
 	CREATE TABLE #Parties (
 		PartyId		INT,

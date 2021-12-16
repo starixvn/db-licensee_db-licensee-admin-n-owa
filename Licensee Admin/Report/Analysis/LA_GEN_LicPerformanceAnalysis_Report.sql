@@ -26,17 +26,17 @@ AS
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
 		- 20211209@Percy: Fix Base Currency IS NULL [RedmineID: #157652]
 		- 20211213@Percy: Fix missing BetCount and exclude Saba Promotion [RedmineID: #161378]
+		- 20211215@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 */
 
 BEGIN
 	SET NOCOUNT ON
 
 	-- Get Product List
-	DECLARE @tmpProductList TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(50))
-	INSERT INTO @tmpProductList (GroupProductId, ProductId, ProductCode)
-	SELECT ISNULL(g.GroupProductId, p.ProductId), ISNULL(g.ProductId, p.ProductId), ISNULL(g.ProductCode, p.ProductPrefix)
-	FROM dbo.LA_f_Products3rd(@ProductCodes) p
-		LEFT JOIN dbo.LA_f_GroupProduct() g ON p.ProductId = g.GroupProductId
+	DECLARE @tmpProductList TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(50), FromDate DATETIME, ToDate DATETIME)
+	INSERT INTO @tmpProductList (GroupProductId, ProductId, ProductCode, FromDate, ToDate)
+	SELECT GroupProductId, ProductId, ProductCode, FromDate, ToDate
+	FROM dbo.LA_f_GroupProduct(@ProductCodes, @FromDate, @ToDate) g
 
 	IF ',' + @ProductCodes + ',' LIKE ',ADJUST,' -- Adjustment
 		INSERT INTO @tmpProductList (ProductId, ProductCode)
@@ -139,7 +139,7 @@ BEGIN
 				) AS TurnoverNoDraw
 			,SUM(-r.MemberWL - CASE WHEN r.ProductId = 31 THEN r.CommissionP ELSE 0 END) AS Winloss
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
-			INNER JOIN @tmpProductList p ON r.ProductId = p.ProductId
+			INNER JOIN @tmpProductList p ON r.ProductId = p.ProductId AND r.rptDate BETWEEN p.FromDate AND p.ToDate
 			INNER JOIN @tmpChargeInfo c ON r.SiteId = c.LicenseeId AND p.GroupProductId = c.ProductId AND r.rptDate BETWEEN c.FromDate AND c.ToDate
 			LEFT JOIN bodb_Licensee.dbo.LA_f_GroupBettype() gb ON r.Bettype = gb.Bettype
 		WHERE r.rptDate BETWEEN @FromDate AND @ToDate

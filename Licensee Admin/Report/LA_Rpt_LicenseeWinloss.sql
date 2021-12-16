@@ -43,6 +43,7 @@ AS
 	- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 	- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 	- 20211115@Percy: Return IsShowOddsSpread [RedmineID: #164411]
+	- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 	
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -77,11 +78,10 @@ BEGIN
 	
 	CREATE TABLE #Data (rptDate DATE, PartyID INT, ProductID INT, Currency INT,BetTypeId INT, Turnover MONEY, Winloss MONEY, AWinloss MONEY, AComm MONEY, PComm MONEY, Betcount BIGINT)
 	
-	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20))
-	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode)
-	SELECT ISNULL(g.GroupProductId, p.ProductId), ISNULL(g.ProductId, p.ProductId), ISNULL(g.ProductName, p.ProductName), ISNULL(g.ProductCode, p.ProductPrefix)
-	FROM bodb_Licensee.dbo.LA_f_Products3rd(@ProductCodes) p
-		LEFT JOIN bodb_Licensee.dbo.LA_f_GroupProduct() g ON p.ProductId = g.GroupProductId
+	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20), FromDate DATE, ToDate DATE)
+	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode, FromDate, ToDate)
+	SELECT GroupProductId, ProductId, ProductName, ProductCode, FromDate, Todate 
+	FROM bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCodes, @FromDate, @ToDate) g
 
 	SET @ProductCodes = NULL
 	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #Products
@@ -396,7 +396,7 @@ BEGIN
 			, CONVERT(TINYINT, MAX(CASE WHEN b.Bettype = @OddsSpread_BetType THEN 1 ELSE 0 END)) AS IsShowOddsSpread
 		INTO #TmpData
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN #Products p ON b.ProductId = p.ProductId
+			INNER JOIN #Products p ON b.ProductId = p.ProductId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			INNER JOIN (
 				SELECT DISTINCT PartyId, LicenseeId, ProductID 
 				FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)
