@@ -32,6 +32,7 @@ AS
 		- 20190801@Parsons: Validate billing configuration [#109600]
 		- 20200417@Parsons: Indo 4D Integration [#130910]
 		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
+		- 20211101@Percy: Don't add new SB Rate if Licensee is belong to discount group on Lic WL [RedmineID: #162158]
 
 	 Params:
 		+ @InvoiceSettingXML: '<ChargeSettings>
@@ -165,6 +166,27 @@ BEGIN
 	BEGIN
 		-- remove original settings
 		DELETE @ChargeSetting WHERE StatusId = 0
+
+		-- Do not allow to add new Sportsbook charge rate if Licensee is belonging an active discount group on Licensee Win Loss
+		DECLARE @CutOffDate DATE = dbo.LA_f_DiscountByGrossWin_CutOffDate()
+
+		IF EXISTS (
+			SELECT 1
+			FROM @ChargeSetting s
+				INNER JOIN (
+					SELECT h.FromDate, h.ToDate
+					FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
+						INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
+					WHERE h.DiscountGroupType = 13 -- Discount group on Lic WL
+						AND h.FromDate >= @CutOffDate
+						AND a.PartyId = @PayerId
+				) d ON s.FromDate <= d.ToDate AND s.ToDate >= d.ToDate
+			WHERE s.ChargeId = 0 AND s.ProductId = 0 -- insert new SB Rate
+		)
+		BEGIN
+			SELECT @ErrMsg = 'Licensee is in a discount group, please remove them out of it before adding new Sportsbook charge rate.', @ErrCode = 704
+			RETURN
+		END
 
 		-- new product
 		UPDATE s SET s.StatusId = 2 /*new product*/
