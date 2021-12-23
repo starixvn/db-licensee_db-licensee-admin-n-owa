@@ -5,304 +5,189 @@ GO
 ALTER PROCEDURE [dbo].[LA_Rpt_GroupLicensingFeeWinLoss]
 	@PartyIds				VARCHAR(MAX)	= ''
 	,@ProductCodes			VARCHAR(MAX)	= ''	
-	,@FromDate				SMALLDATETIME
-	,@ToDate				SMALLDATETIME	
+	,@FromDate				DATETIME
+	,@ToDate				DATETIME	
 AS
 /*  Created: Scofield.Huynh
 	Date: 2018-12-04
 	DB: DB052.bodb_licensee
 
 	Revisions:
-	   - 20181204@Scofield: create	
-	   - 20190425@Parsons: Integrate-PP-Promotion-Prize [#109014] 
-	   - 20191216@Parsons: PP tournament [#123958]
-	   - 20191125@Mason: Setup billing terms by Currency [#120005]
-	   - 20200228@Parsons: Support-HID-currency [#128856]
-	   - 20200409@Parsons: Integrate SA Gaming [#129276] 
-	   - 20200820@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
-	   - 20201023@Parsons: Arcadia Gaming Add Bonus [#143597]  
-	   - 20201113@Parsons: Changing OddsSpread for licensee [#142345]
-	   - 20201209@Happy: Saba.club - Offer Freebet tickets [#141423]
-	   - 20210111@Happy: Saba.club - Integrate Slot Game [#147977]
-	   - 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
-	   - 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
-	   - 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
+		- 20181204@Scofield: create	
+		- 20190425@Parsons: Integrate-PP-Promotion-Prize [#109014] 
+		- 20191216@Parsons: PP tournament [#123958]
+		- 20191125@Mason: Setup billing terms by Currency [#120005]
+		- 20200228@Parsons: Support-HID-currency [#128856]
+		- 20200409@Parsons: Integrate SA Gaming [#129276] 
+		- 20200820@Parsons: Implement PP JP Changes In Reports Phase 2 [#139055]
+		- 20201023@Parsons: Arcadia Gaming Add Bonus [#143597]  
+		- 20201113@Parsons: Changing OddsSpread for licensee [#142345]
+		- 20201209@Happy: Saba.club - Offer Freebet tickets [#141423]
+		- 20210111@Happy: Saba.club - Integrate Slot Game [#147977]
+		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
+		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
+		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 */
 BEGIN
-	SET NOCOUNT ON	
-	
-	DECLARE @GD_Product INT = 11
-	DECLARE @ChargeInfo TABLE(ChargeID INT, PartyID INT, LicenseeID INT, ProductID INT,Rate MONEY, Fromdate DATE, Todate DATE)
-	CREATE TABLE #Data (rptDate DATE, PartyID INT, ProductID INT, Currency INT, BetTypeId INT, Winloss MONEY, AComm MONEY)
-	CREATE TABLE #Report (PartyID INT, ProductID INT, CurrencyID INT, Company MONEY)
-	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20), FromDate DATE, ToDate DATE)
-	INSERT INTO #Products (GroupProductId, ProductId, ProductName, ProductCode, FromDate, ToDate)
-	SELECT GroupProductId, ProductId, ProductName, ProductCode, FromDate, ToDate 
-	FROM bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCodes, @FromDate, @ToDate) g
+	SET NOCOUNT ON
 
-	SET @ProductCodes = NULL
-	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #Products
-	
-	/* ChargeInfo */
-	INSERT INTO @ChargeInfo(ChargeID, PartyID, LicenseeID, ProductID, Rate, Fromdate, Todate)
-	SELECT DISTINCT ChargeID, PartyID, LicenseeID, ProductID, CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END, Fromdate, Todate		
-	FROM LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
-	WHERE ChargeType <> 12 -- Exclude for GD Tips
-	
-	/* BA Product */
-	DECLARE @BA_Product INT = 3
-	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = @BA_Product) > 0
-	BEGIN
-		INSERT INTO #Report (PartyID, ProductID, CurrencyID, Company)
-		(
-			SELECT ci.PartyID, b.ProductID, b.currencyID, -SUM((b.MemberWL * ci.Rate ) + b.CommissionA) AS Company
-			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN @ChargeInfo ci 
-				ON b.SiteID = ci.LicenseeID 
-					AND b.ProductID = ci.ProductID
-					AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
-			LEFT JOIN LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeID
-			WHERE b.rptDate BETWEEN @Fromdate AND @Todate
-				AND b.ProductID = @BA_Product
-				AND b.StatusId NOT IN (- 1, 101, 102, 103)
-				AND (b.CurrencyID <> 20)
-				AND eb.BettypeID IS NULL
-			GROUP BY ci.PartyID, b.ProductID, currencyID
-		)
-	END	
+	DECLARE @FDate DATE = @FromDate, @TDate DATE = @ToDate
 
-	/* CO Product */
-	DECLARE @CO_Product INT = 25
-	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = @CO_Product) > 0
-	BEGIN		
-		INSERT INTO #Report (PartyID, ProductId, CurrencyID, Company)
-		(
-			SELECT
-				d.PartyId,
-				@CO_Product,
-				d.Currency,				
-				SUM(TicketsPayout - BuyBackAmountSB - BuyBackAmountBA - CashoutCommission) AS Company
-			FROM (
-					SELECT ci.PartyId, b.Winlostdate, b.Currency,											
-							SUM(b.BuyBackAmt) AS BuyBackAmountSB,
-							SUM(b.BABuyBackAmt) AS BuyBackAmountBA,
-							SUM(b.TicketPayout) AS TicketsPayout,					
-							SUM(b.BuyBackAmt * ci.Rate) AS CashoutCommission	
-					FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
-						INNER JOIN @ChargeInfo ci ON b.SiteId = ci.LicenseeID AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate AND b.ProductID = ci.ProductId					
-					WHERE b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate									
-						AND (b.Currency <> 20)
-						AND b.ProductID = @CO_Product
-						AND b.RoleID = 1 -- Member
-					GROUP BY ci.PartyId, b.Winlostdate, b.Currency			
-			) d
-			GROUP BY d.PartyId, d.Currency
-		)
-	END	
-	
-	/* GD Product */	
-	DECLARE @GD_Tip SMALLINT = 1706
-	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = @GD_Product) > 0
+	-- Get Product List
 	BEGIN
-		INSERT INTO #Report (PartyID, ProductId, CurrencyID, Company)
-		(
-			SELECT ci.PartyID, @GD_Product, b.CurrencyID, SUM(-b.MemberWL * ISNULL(cr.Rate,ci.Rate)) AS Company
-			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN @ChargeInfo ci 
-				ON b.SiteID = ci.LicenseeID
-				AND b.ProductID = ci.ProductID
-				AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
-			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
-			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
-				AND b.StatusId NOT IN (- 1, 101, 102, 103)
-				AND (b.CurrencyID <> 20)
-				AND b.customercategory NOT IN (27,28)
-				AND b.ProductID = @GD_Product
-				AND b.Bettype <> @GD_Tip 				
-			GROUP BY ci.PartyID, b.CurrencyID
-		)		
+		DECLARE @ProductList TABLE (GroupProductId INT, GroupProductName VARCHAR(50), ProductId INT, ProductCode VARCHAR(20), FromDate DATE, ToDate DATE)
+		INSERT INTO @ProductList (GroupProductId, GroupProductName, ProductId, ProductCode, FromDate, ToDate)
+		SELECT GroupProductId, GroupProductName, ProductId, ProductCode, FromDate, ToDate
+		FROM dbo.LA_f_GroupProduct(@ProductCodes, @FromDate, @ToDate)
+
+		SET @ProductCodes = NULL
+		SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM @ProductList
 	END
 
-	/* PP, SBC, VGA Products */	
-	DECLARE @PP_Product INT = 32, 
-			@PP_Contribution SMALLINT = 4297,
-			@SBC_Product INT = 42,
-			@SBC_Contribution SMALLINT = 1698,
-			@VGA_Product INT = 66,
-			@VGA_Contribution SMALLINT = 3898
-
-	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID IN (@PP_Product, @SBC_Product)) > 0
+	-- Get Party List / Charge Info
 	BEGIN
-	INSERT INTO #Report (PartyID, ProductId, CurrencyID, Company)
-		(
-			SELECT ci.PartyID, b.ProductID, b.CurrencyID, 
-					SUM((-b.MemberWL - CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @VGA_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END)
-						* ISNULL(cr.Rate,ci.Rate)) AS Company
-			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID 
-										 AND b.ProductID = ci.ProductID 
-										 AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
-			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
-			LEFT JOIN LA_f_ExcludedBettypeListSel('','4297,1698,3898') eb ON b.Bettype = eb.BettypeID
-			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
-				AND b.StatusId NOT IN (- 1, 101, 102, 103)
-				AND b.customercategory NOT IN (27,28)
-				AND b.ProductID IN (@PP_Product, @SBC_Product, @VGA_Product)
-				AND eb.BettypeID IS NULL
-				AND	ISNULL(b.TicketType,0) <> 2 -- Free_Bets_TicketType
-			GROUP BY ci.PartyID, b.ProductID, b.CurrencyID
-		)
+		DECLARE @PartyList TABLE (PartyId INT, PartyName VARCHAR(50), BaseCurrencyId INT, BaseCurrencyName VARCHAR(5))
+		DECLARE @ChargeInfo TABLE (ChargeId INT, PartyId INT, LicenseeId INT, ProductId INT, FromDate DATE, ToDate DATE, Rate FLOAT)
+
+		INSERT INTO @ChargeInfo (ChargeId, PartyId, LicenseeId, ProductId, FromDate, ToDate, Rate)
+		SELECT ChargeId, PartyId, LicenseeId, ProductId, FromDate, ToDate, CASE WHEN ISNULL(isDeposit, 0) = 1 THEN DI_Rate ELSE 0 END
+		FROM LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) c
+		WHERE ChargeType <> 12 -- Exclude Tips
+
+		INSERT INTO @PartyList (PartyId)
+		SELECT DISTINCT PartyId FROM @ChargeInfo
+
+		UPDATE pl
+		SET pl.BaseCurrencyId = ISNULL(bc.BaseCurrencyId, 6), pl.BaseCurrencyName = ISNULL(e.Code, 'EUR')
+			,pl.PartyName = CASE p.PartyName
+								WHEN '18bb' THEN 'PIH'
+								WHEN 'IBC'	THEN 'FDL'
+								ELSE p.PartyName END
+		FROM @PartyList pl
+			INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON pl.PartyId = p.PartyId
+			LEFT JOIN dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON p.PartyId = bc.PartyId AND bc.FromDate <= @TDate AND bc.ToDate >= @FDate
+			LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON bc.BaseCurrencyId = e.ExchangeId
 	END
 
-	/* SB Product */
-	DECLARE @SB_Product INT = 0
-	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = @SB_Product) > 0
+	-- Get Exchange Rate
 	BEGIN
-		;WITH cte_TempData AS 
-		(
-			SELECT ci.PartyId, p.GroupProductId AS ProductId, b.CurrencyId
-			, SUM(CASE WHEN b.Bettype = 999 THEN 0 ELSE ISNULL(-b.MemberWL, 0) END * ISNULL(cr.Rate, ci.Rate)) AS LicencingFee
-			, SUM(CASE WHEN b.Bettype = 999 THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS OddsSpreadCost
-			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN #Products p ON b.ProductId = p.ProductId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
-			INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND p.GroupProductId = ci.ProductID AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
-			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND b.CurrencyId = cr.CurrencyID
-			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
-				AND p.GroupProductId = 0 -- SB
-				AND b.StatusId NOT IN (- 1, 101, 102, 103)
-				AND (b.CurrencyID <> 20)
-				AND b.customercategory NOT IN (27,28)
-			GROUP BY ci.PartyId, p.GroupProductId, b.CurrencyId
-		)
-		INSERT INTO #Report (PartyID, ProductID, CurrencyID, Company)
-		SELECT PartyID, b.ProductID, b.CurrencyId, LicencingFee + OddsSpreadCost
-		FROM cte_TempData b
+		DECLARE @BaseCurrencyId INT, @BaseCurrencyName VARCHAR(5)
+		DECLARE @BaseCurrency TABLE (BaseCurrencyId INT, BaseCurrencyName VARCHAR(5))
+		DECLARE @ExchangeRate TABLE (ExchangeDate DATE, ExchangeId INT, BaseCurrencyId INT, Rate FLOAT)
+
+		INSERT INTO @BaseCurrency (BaseCurrencyId, BaseCurrencyName)
+		SELECT DISTINCT BaseCurrencyId, BaseCurrencyName FROM @PartyList
+
+		WHILE EXISTS (SELECT 1 FROM @BaseCurrency)
+		BEGIN
+			SELECT TOP 1 @BaseCurrencyId = BaseCurrencyId, @BaseCurrencyName = BaseCurrencyName FROM @BaseCurrency
+
+			INSERT INTO @ExchangeRate (ExchangeDate, ExchangeId, BaseCurrencyId, Rate)
+			SELECT ExchangeDate, ExchangeId, @BaseCurrencyId, BaseCurrencyRate
+			FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+
+			DELETE @BaseCurrency WHERE BaseCurrencyId = @BaseCurrencyId
+		END
 	END
 
-	/* Other Products */
-	DECLARE @ExcludedProductIds TABLE(ProductId INT)
-	INSERT INTO @ExcludedProductIds(ProductId) VALUES (@SB_Product), (@BA_Product), (@CO_Product), (@GD_Product), (@PP_Product), (@SBC_Product) , (@VGA_Product)
-	
-	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) > 0
+	-- Get data
 	BEGIN
-		DELETE #Data
-		
-		INSERT INTO #Data(rptDate, PartyID, ProductID, Currency, Winloss)
-		(
-			SELECT  b.rptDate, ci.PartyID, b.ProductID, b.currencyID, SUM(b.MemberWL)
-			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN (SELECT DISTINCT PartyId, LicenseeId, ProductID FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci 
-					ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
-			INNER JOIN #Products p ON b.ProductId = p.GroupProductId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
-			LEFT JOIN LA_f_ExcludedBettypeListSel('','') eb ON b.Bettype = eb.BettypeID
-			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
-				AND b.StatusId NOT IN (- 1, 101, 102, 103)
-				AND (b.CurrencyID <> 20)
-				AND b.customercategory NOT IN (27,28)
-				AND eb.BettypeID IS NULL
-			GROUP BY b.rptDate, ci.PartyID, b.ProductID, b.CurrencyID
+		CREATE TABLE #tmpData (rptDate DATE, SiteId INT, ProductId INT, CurrencyId INT, BetType INT, Winloss MONEY, AWinloss MONEY, AComm MONEY)
+		CREATE TABLE #tmpResult (PartyId INT, PartyName VARCHAR(50), ProductId INT, ProductName VARCHAR(50), CurrencyId INT, Company MONEY, OddsSpread MONEY, BasedOddsSpread MONEY)
+
+		INSERT INTO #tmpData (rptDate, SiteId, ProductId, CurrencyId, BetType, Winloss, AWinloss, AComm)
+		SELECT rptDate, SiteId, ProductId, CurrencyId, BetType, SUM(MemberWL), SUM(GrossWL), SUM(CommissionA)
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct WITH (NOLOCK)
+		WHERE rptDate BETWEEN @FromDate AND @ToDate
+			AND CustomerCategory NOT IN (27, 28)
+			AND StatusId IN (111, 112, 113, 114, 115)
+			AND ProductId <> 25 -- CO
+			AND Bettype <> 1706 -- GD Tips
+			AND	ISNULL(TicketType, 0) <> 2 -- Free Bet
+			AND CurrencyId <> 20
+		GROUP BY rptDate, SiteId, ProductId, CurrencyId, BetType
+
+		-- CO
+		DECLARE @_FDate SMALLDATETIME = @FromDate, @T_Date SMALLDATETIME = @ToDate
+		INSERT INTO #tmpData (rptDate, SiteId, ProductId, CurrencyId, BetType, Winloss, AWinloss, AComm)
+		SELECT WinlostDate, SiteId, 25 ProductId, Currency, -1, BuyBackAmt, 0 AWinloss, BuyBackAmt + BABuyBackAmt - TicketPayout
+		FROM bodb_LicenseeReport.dbo.rptLicCashoutSummary WITH (NOLOCK)
+		WHERE WinlostDate BETWEEN @_FDate AND @T_Date
+			AND RoleId = 1
+			AND Currency <> 20
+			AND ProductId = 25
+			
+		INSERT INTO #tmpResult (PartyId, PartyName, ProductId, ProductName, CurrencyId, Company, OddsSpread, BasedOddsSpread)
+		SELECT pl.PartyId, pl.PartyName, p.GroupProductId, p.GroupProductName, e.ExchangeId
+			,SUM(CASE
+					WHEN gb.TypeId = 7 THEN 0 -- OddsSpread Adjustment
+					WHEN gb.TypeId = 2 THEN -t.AWinloss -- Contribution
+					ELSE -t.Winloss END * ISNULL(cr.Rate, c.Rate)
+					- CASE WHEN c.ProductId IN (3, 25) THEN t.AComm ELSE 0 END
+				) AS Company
+			,SUM(CASE WHEN gb.TypeId = 7 THEN -t.AWinloss ELSE 0 END) AS OddsSpread
+			,SUM(CASE WHEN gb.TypeId = 7 THEN -t.AWinloss * e.Rate ELSE 0 END) AS BasedOddsSpread
+		FROM #tmpData t
+			LEFT JOIN dbo.LA_f_GroupBettype() gb ON t.BetType = gb.Bettype
+			INNER JOIN @ProductList p ON t.ProductId = p.ProductId AND t.rptDate BETWEEN p.FromDate AND p.ToDate
+			INNER JOIN @ChargeInfo c ON t.SiteId = c.LicenseeId AND p.GroupProductId = c.ProductId AND t.rptDate BETWEEN c.FromDate AND c.ToDate
+			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON c.ChargeId = cr.ChargeId AND t.CurrencyId = cr.CurrencyId
+			INNER JOIN @PartyList pl ON c.PartyId = pl.PartyId
+			INNER JOIN @ExchangeRate e ON t.rptDate = e.ExchangeDate AND t.CurrencyId = e.ExchangeId AND pl.BaseCurrencyId = e.BaseCurrencyId
+		WHERE gb.Bettype IS NULL OR gb.TypeId IN (2, 7)
+		GROUP BY pl.PartyId, pl.PartyName, p.GroupProductId, p.GroupProductName, e.ExchangeId
+
+		-- Set OddsSpread = 0 if negative value
+		;WITH CTE_OddsSpread AS (
+			SELECT PartyId, ProductId
+			FROM #tmpResult
+			WHERE OddsSpread <> 0
+			GROUP BY PartyId, ProductId
+			HAVING SUM(BasedOddsSpread) <= 0
 		)
+		UPDATE t
+		SET t.OddsSpread = 0, t.BasedOddsSpread = 0
+		FROM #tmpResult t
+			INNER JOIN CTE_OddsSpread c ON t.PartyId = c.PartyId AND t.ProductId = c.ProductId
 
-		INSERT INTO #Report (PartyID, ProductID, CurrencyID, Company)
-		SELECT ci.PartyID, b.ProductID, b.Currency, SUM(-b.Winloss * ISNULL(cr.Rate, ci.Rate)) AS Company
-		FROM #Data b WITH (NOLOCK)
-		INNER JOIN (SELECT DISTINCT ChargeID, PartyID, Fromdate, Todate, ProductID, Rate FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci 
-			ON ci.PartyID = b.PartyID 
-				AND b.ProductID = ci.ProductID				
-				AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
-		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND b.Currency = cr.CurrencyID
-		GROUP BY ci.PartyID, b.Currency, b.ProductID
-	END	
+		UPDATE #tmpResult SET Company = Company + OddsSpread WHERE OddsSpread <> 0
+	END
 	
-	/* Exchange */
-	DECLARE @Exchange AS TABLE (Currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20), OriginalCurrencyCode VARCHAR(20))
-
-	INSERT INTO @Exchange(Currency, CurrencyName, CurrencyCode, OriginalCurrencyCode)
-	SELECT e.exchangeid, e.currency, e.Code, e.Code
-	FROM bodb02.dbo.Exchange e WITH (NOLOCK)
-	WHERE e.exchangeid IN (SELECT DISTINCT CurrencyID FROM #Report)
-	
-	UPDATE @Exchange
-	SET CurrencyCode = (CASE Currency
-					WHEN 51 THEN 'INH'
-					WHEN 75 THEN 'PTU'
-					WHEN 76 THEN 'PS'
-					WHEN 77 THEN 'PTH'
-					WHEN 92 THEN 'HID' 
-					ELSE CurrencyCode
-				END)
-	WHERE Currency IN (51, 75, 76, 77, 92)
+	-- Return data
+	DECLARE @Exchange TABLE (CurrencyId INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20), OriginalCurrencyCode VARCHAR(20))
+	INSERT INTO @Exchange (CurrencyId, CurrencyName, OriginalCurrencyCode, CurrencyCode)
+	SELECT ExchangeId, Currency, Code
+		,CASE ExchangeId
+			WHEN 51 THEN 'INH'
+			WHEN 75 THEN 'PTU'
+			WHEN 76 THEN 'PS'
+			WHEN 77 THEN 'PTH'
+			WHEN 92 THEN 'HID' 
+			ELSE Code END
+	FROM bodb02.dbo.Exchange WITH (NOLOCK)
+	WHERE ExchangeId IN (SELECT CurrencyId FROM #tmpResult)
 
 	UPDATE e
-	SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'
+	SET e.CurrencyCode = e.CurrencyCode + '(' + e.CurrencyName + ')'
 	FROM @Exchange e
-	WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1)	
+		INNER JOIN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1) t ON e.CurrencyCode = t.CurrencyCode
 
-	/* Add data for products with no ticket*/
-	DECLARE @Currencies TABLE(CurrencyID INT, IsUsed BIT)
-	DECLARE @TempCurrency INT	
-	DECLARE @ChargeInfoPartyProducts TABLE(PartyId INT, ProductId INT, CurrencyID INT DEFAULT NULL)
+	-- Add data for products with no ticket
+	;WITH CTE_Currency AS (SELECT DISTINCT CurrencyId FROM #tmpResult)
+	,CTE_Product AS (SELECT DISTINCT c.PartyId, c.ProductId, p.GroupProductName AS ProductName FROM @ChargeInfo c INNER JOIN @ProductList p ON c.ProductId = p.GroupProductId)
+	,CTE_Data AS (SELECT c.CurrencyId, p.ProductId, p.ProductName, pl.PartyId, pl.PartyName FROM CTE_Currency c CROSS JOIN CTE_Product p INNER JOIN @PartyList pl ON p.PartyId = pl.PartyId)
+	INSERT INTO #tmpResult (PartyId, PartyName, ProductId, ProductName, CurrencyId, Company)
+	SELECT d.PartyId, d.PartyName, d.ProductId, d.ProductName, d.CurrencyId, 0 AS Company FROM CTE_Data d
+		LEFT JOIN #tmpResult r ON d.PartyId = r.PartyId AND d.ProductId = r.ProductId AND d.CurrencyId = r.CurrencyId
+	WHERE r.PartyId IS NULL
+	
+	SELECT t.PartyName, e.CurrencyCode AS CurrencyName, t.ProductName, t.ProductId, t.Company * CASE WHEN e.OriginalCurrencyCode IN ('VND', 'IDR') THEN 1000 ELSE 1 END AS AmountToCompany
+	FROM #tmpResult t
+		INNER JOIN @Exchange e ON t.CurrencyId = e.CurrencyId
+	ORDER BY t.PartyName, e.CurrencyCode, t.ProductName
 
-	INSERT INTO @Currencies(CurrencyID)
-	SELECT DISTINCT CurrencyID 
-	FROM #Report
-	
-	INSERT @ChargeInfoPartyProducts(PartyId, ProductId)
-	SELECT DISTINCT PartyId, ProductId
-	FROM @ChargeInfo
-	
-	WHILE EXISTS (SELECT * FROM @Currencies WHERE IsUsed IS NULL)
-	BEGIN
-	   SET @TempCurrency = (SELECT TOP 1 CurrencyID FROM @Currencies WHERE IsUsed IS NULL)
-	   
-	   INSERT INTO @ChargeInfoPartyProducts(PartyId, ProductId, CurrencyID)
-	   SELECT PartyId, ProductId, @TempCurrency
-	   FROM @ChargeInfoPartyProducts
-	   WHERE CurrencyID IS NULL
-
-	   UPDATE @Currencies SET IsUsed = 1 WHERE CurrencyID = @TempCurrency
-	END
-	
-	INSERT INTO #Report (PartyID, ProductID, CurrencyID, Company)
-    SELECT tmp.PartyId, tmp.ProductId, tmp.CurrencyID, 0
-    FROM 		 
-	(
-		SELECT c.PartyId, c.ProductId, c.CurrencyID
-		FROM (SELECT * FROM @ChargeInfoPartyProducts WHERE CurrencyID IS NOT NULL) c
-		LEFT JOIN #Report r 
-			ON c.PartyId = r.PartyId 
-				AND c.ProductId = r.ProductId
-				AND c.CurrencyID = r.CurrencyID
-		WHERE r.PartyId IS NULL		
-	) tmp	
-	
-	/* Result */
-	;WITH tmpResult AS (
-		SELECT b.PartyID
-			, CASE p.PartyName
-				WHEN '18bb' THEN 'PIH'
-				WHEN 'IBC'	THEN 'FDL'
-				ELSE p.PartyName
-				END AS PartyName
-			, b.CurrencyID
-			, ex.CurrencyCode AS CurrencyName
-			, b.ProductId
-			, prd.ProductName
-			, CASE WHEN ex.OriginalCurrencyCode IN ('VND', 'IDR') THEN Company * 1000
-					ELSE Company 
-					END AS AmountToCompany
-		FROM #Report b
-		INNER JOIN OAS_Party p WITH (NOLOCK) ON p.PartyID = b.PartyID
-			LEFT JOIN LA_f_Products3rd('') prd ON prd.ProductId = b.ProductId
-			LEFT JOIN @Exchange ex ON b.CurrencyId = ex.Currency
-	)
-	SELECT PartyName, CurrencyName, ProductName, ProductId, Sum(AmountToCompany) AS AmountToCompany
-	FROM tmpResult t
-	GROUP BY PartyName, CurrencyName, ProductName, ProductId	
-	
-	/* Remove temp tables */
-	DROP TABLE #Data
-	DROP TABLE #Products
-	DROP TABLE #Report
+	DROP TABLE #tmpData
+	DROP TABLE #tmpResult
 END
 GO

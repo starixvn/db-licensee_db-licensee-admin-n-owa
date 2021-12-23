@@ -56,11 +56,14 @@ AS
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20211115@Percy: Return IsShowOddsSpread [RedmineID: #164411]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
+		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 
 	Param's Explanation:
 */
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @FDate DATE = @FromDate, @TDate DATE = @ToDate
 
 	SET @ProductCode = LTRIM(RTRIM(REPLACE(@ProductCode,',','')))
 	DECLARE @TotalLicenseeChargeRate_InBaseCurrency MONEY
@@ -112,21 +115,36 @@ BEGIN
 		TipsAmountDue				MONEY,
 		GrossCompany				MONEY,
 		FreeBetAmount				MONEY,
-		OddsSpreadCost				MONEY,
-		IsShowOddsSpread			TINYINT DEFAULT(0)
+		OddsSpreadCost				MONEY
 	)
 
 	CREATE TABLE #Exchange
 	(
 		ExchangeDate			DATE,
-		ExchangeID				INT,
+		ExchangeId				INT,
 		CurrencyCode			VARCHAR(10),
-		Rate					FLOAT
+		Rate					FLOAT,
+		BaseExchangeRate		FLOAT
 	)
-	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)	
-							
+	INSERT INTO #Exchange(ExchangeDate, ExchangeId, CurrencyCode, Rate)
+	SELECT ExchangeDate, ExchangeId, Code, BaseCurrencyRate
+	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+
+	DECLARE @BaseCurrency VARCHAR(10) = 'EUR'
+	SELECT  @BaseCurrency = e.Code
+	FROM bodb_Licensee.dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK)
+		INNER JOIN dbo.Exchange e WITH (NOLOCK) ON bc.BaseCurrencyId = e.ExchangeId
+	WHERE bc.FromDate <= @TDate AND bc.ToDate >= @FDate
+		AND bc.PartyId = @PartyId
+
+	IF @BaseCurrency = @BaseCurrencyName
+		UPDATE #Exchange SET BaseExchangeRate = Rate
+	ELSE
+		UPDATE e
+		SET e.BaseExchangeRate = f.BaseCurrencyRate
+		FROM #Exchange e
+			INNER JOIN dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrency) f ON e.ExchangeDate = f.ExchangeDate AND e.ExchangeId = f.ExchangeId
+	
 	UPDATE #Exchange
 	SET CurrencyCode = (CASE ExchangeId
 							WHEN 75 THEN 'PTU'
@@ -839,7 +857,6 @@ BEGIN
 				,SUM(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN 0 ELSE ISNULL(b.MemberWL, 0) END)	AS MemberWinloss
 				,SUM(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN 0 ELSE ISNULL(b.betcount, 0) END)	AS BetCount
 				,SUM(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN ISNULL(-b.GrossWL, 0) ELSE 0 END)	AS OddsSpreadCost
-				,MAX(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN 1 ELSE 0 END)						AS IsShowOddsSpread
 			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			WHERE
 				b.SiteID = @LicenseeID
@@ -851,16 +868,15 @@ BEGIN
 				AND b.ProductID IN (SELECT ProductId FROM bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCode,@FromDate,@ToDate) WHERE GroupProductId = 0)
 			GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
-		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, GrossCompany, Company, Betcount, OddsSpreadCost, IsShowOddsSpread)
+		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, GrossCompany, Company, Betcount, OddsSpreadCost)
 		SELECT rptDate, d.CurrencyID
 			,SUM(Turnover)													AS Turnover
 			,SUM(MemberWinloss)												AS Winlost
 			,SUM(-MemberWinloss * ( 1 - ISNULL(cr.Rate, p.Rate)))			AS LicenseeWL
 			,SUM(-MemberWinloss * ISNULL(cr.Rate, p.Rate))					AS GrossCompany
-			,SUM(-MemberWinloss * ISNULL(cr.Rate, p.Rate) + OddsSpreadCost) AS Company
+			,SUM(-MemberWinloss * ISNULL(cr.Rate, p.Rate))					AS Company
 			,SUM(BetCount)													AS BetCount
 			,SUM(OddsSpreadCost)											AS OddsSpreadCost
-			,MAX(IsShowOddsSpread)											AS IsShowOddsSpread
 		FROM cte_SB d
 			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
@@ -978,6 +994,21 @@ BEGIN
 		SET ActualLicenseeChargeRate = CASE WHEN @IsKeepNegativeAmount = 1 OR @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END
 	END
 
+	DECLARE @IsShowOddsSpread BIT = 0
+
+	IF EXISTS (
+		SELECT 1
+		FROM #Result d
+			INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
+		HAVING SUM(ISNULL(d.OddsSpreadCost * e.BaseExchangeRate, 0)) > 0
+	)
+	BEGIN
+		SET @IsShowOddsSpread = 1
+		UPDATE #Result SET Company = Company + OddsSpreadCost
+	END
+	ELSE
+		UPDATE #Result SET OddsSpreadCost = 0
+
 	;WITH sortedExchange AS (
 		SELECT ExchangeID, CurrencyCode, ROW_NUMBER() OVER (PARTITION BY CurrencyCode ORDER BY ExchangeId) RowNumber
 		FROM #Exchange
@@ -988,7 +1019,7 @@ BEGIN
 		, se.ExchangeID				AS CurrencyId
 		, se.CurrencyCode			AS CurrencyName
 		, e.Rate					AS ExchangeRate
-		, CONVERT(BIT, MAX(d.IsShowOddsSpread)) AS IsShowOddsSpread
+		, @IsShowOddsSpread			AS IsShowOddsSpread
 		, SUM(Betcount)							AS Betcount
 		--orginal
 		, SUM(ISNULL(d.Turnover, 0))					AS Turnover
