@@ -90,7 +90,7 @@ BEGIN
 	DECLARE @CurrencyXML XML = CONVERT(XML, @CurrencySettingsData)
 	DECLARE @TierRateSettingXML XML = CONVERT(XML, @RateSettingsData)
 
-	DECLARE @PartyList	TABLE (PartyId INT, ChargeRate MONEY, Remark NVARCHAR(500))
+	DECLARE @PartyList TABLE (PartyId INT, ChargeRate MONEY, Remark NVARCHAR(500))
 	DECLARE @CurrencyList TABLE (PartyId INT, CurrencyId INT, CalculationType TINYINT)
 	DECLARE @TierRateSetting TABLE (RowId INT, FromAmount MONEY, ToAmount MONEY, Rate MONEY)
 	DECLARE @ProductList TABLE (ProductId INT, CalculationType TINYINT)
@@ -226,7 +226,18 @@ BEGIN
 			WHERE c.FromParty IS NULL OR p.ChargeRate <> c.Rate
 		)
 		BEGIN
-			SELECT @ErrCode = 511, @ErrMsg = 'Please select licensees who have same Charge Rate with others.'
+			SELECT @ErrCode = 510, @ErrMsg = 'Please select licensees who have same Charge Rate with others.'
+			RETURN
+		END
+
+		IF EXISTS (
+			SELECT 1
+			FROM @PartyList p
+				LEFT JOIN dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON p.PartyId = bc.PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
+			WHERE bc.PartyId IS NULL OR bc.BaseCurrencyId <> @CurrencyId
+		)
+		BEGIN
+			SELECT @ErrCode = 511, @ErrMsg = 'Please select licensees who have same Base Currency with discount setting.'
 			RETURN
 		END
 	END
