@@ -23,7 +23,7 @@ BEGIN
 	UNION ALL
 
 	SELECT LicenseeStatusId, LicenseeStatusName
-	FROM bodb_OIC.dbo.LicenseeStatus WITH(NOLOCK)
+	FROM DBOIC.bodb_OIC.dbo.LicenseeStatus WITH(NOLOCK)
 	ORDER BY LicenseeStatusId
 
 END
