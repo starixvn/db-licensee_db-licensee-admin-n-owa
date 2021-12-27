@@ -122,7 +122,7 @@ BEGIN
 		SELECT pl.PartyId, pl.PartyName, p.GroupProductId, p.GroupProductName, e.ExchangeId
 			,SUM(CASE
 					WHEN gb.TypeId = 7 THEN 0 -- OddsSpread Adjustment
-					WHEN gb.TypeId = 2 THEN -t.AWinloss -- Contribution
+					WHEN gb.TypeId = 2 THEN t.AWinloss -- Contribution
 					ELSE -t.Winloss END * ISNULL(cr.Rate, c.Rate)
 					- CASE WHEN c.ProductId IN (3, 25) THEN t.AComm ELSE 0 END
 				) AS Company

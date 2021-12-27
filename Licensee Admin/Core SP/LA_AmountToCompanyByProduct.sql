@@ -370,6 +370,7 @@ BEGIN
 		INNER JOIN (
 			SELECT PartyId, ProductId, SUM(BasedOddsSpread) AS BasedOddsSpread
 			FROM #tmpResult
+			WHERE BasedOddsSpread <> 0
 			GROUP BY PartyId, ProductId
 		) r ON t.PartyId = r.PartyId AND t.ProductId = r.ProductId
 
@@ -542,16 +543,16 @@ BEGIN
 	(
 		PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
 		,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000)
-		,ProrateMinFee MONEY, SecondaryLicensingFee MONEY, NonMinFee MONEY
+		,ProrateMinFee MONEY, SecondaryLicensingFee MONEY, NonMinFee MONEY, IsGroupMinFee BIT
 	)
 
 	IF EXISTS (SELECT 1 FROM dbo.strSplit(@LicensingFeeTypeIds, ',') WHERE CONVERT(INT, val) = 0) -- Normal Licensing Fee
 	BEGIN
 		INSERT INTO @Result (PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-			,Discount, DiscountRate, DiscountRemark, ProrateMinFee, SecondaryLicensingFee, NonMinFee)
+			,Discount, DiscountRate, DiscountRemark, ProrateMinFee, SecondaryLicensingFee, NonMinFee, IsGroupMinFee)
 		SELECT t.PartyId, t.ProductId, 0 AS LicensingFeeTypeId, t.GrossLicensingFee, t.LicensingFee, t.ExtraAmount, t.IsChargedByGroupMinFee, t.IsChargedByMinFee
 			,ISNULL(d.Discount, 0), ISNULL(d.DiscountRate, 0), ISNULL(d.DiscountRemark, '')
-			,t.ProrateMinFee, t.SecondaryLicensingFee, t.NonMinFee
+			,t.ProrateMinFee, t.SecondaryLicensingFee, t.NonMinFee, t.IsGroupMinFee
 		FROM (
 			SELECT r.PartyId, r.ProductId
 				,SUM(r.GrossLicensingFee) AS GrossLicensingFee
@@ -562,6 +563,7 @@ BEGIN
 				,SUM(r.ProrateMinFee) AS ProrateMinFee
 				,SUM(r.SecondaryLicensingFee) AS SecondaryLicensingFee
 				,SUM(r.NonMinFee) AS NonMinFee
+				,MAX(CASE WHEN r.GroupMinFeeId > 0 THEN 1 ELSE 0 END) AS IsGroupMinFee
 			FROM @tmpResult r
 				INNER JOIN #Products pd ON r.ProductId = pd.ProductId AND pd.IsSelected = 1
 			GROUP BY r.PartyId, r.ProductId
@@ -713,8 +715,8 @@ BEGIN
 				,SUM(ISNULL(t.LuckyDraw, 0)) AS LuckyDraw
 				,SUM(ISNULL(t.FreeBets, 0)) AS FreeBets
 				,SUM(ISNULL(t.ContributionDiscount, 0)) AS ContributionDiscount
-				,SUM(ISNULL(t.BetCount, 0)) AS BetCount
 				,SUM(ISNULL(t.OddsSpread, 0)) AS OddsSpread
+				,SUM(ISNULL(t.BetCount, 0)) AS BetCount
 			FROM #tmpResult t
 				INNER JOIN (SELECT DISTINCT PartyId FROM #PartyList WHERE IsSelected = 1) p ON t.PartyId = p.PartyId
 				INNER JOIN #Products pd ON t.ProductId = pd.ProductId AND pd.IsSelected = 1
@@ -774,11 +776,12 @@ BEGIN
 				CROSS APPLY (
 					SELECT r.ProrateMinFee AS DeductedAMF
 					UNION ALL SELECT d.RemainingAMF
+					UNION ALL SELECT r.LicensingFee - r.Discount WHERE r.IsGroupMinFee = 0 -- just Individual Min Fee
 				) t
 			WHERE r.ProductId = 0 -- SB
-				AND r.ProrateMinFee > 0
-				AND d.RemainingAMF > 0
+				AND t.DeductedAMF >= 0
 			GROUP BY r.PartyId
+			HAVING MIN(t.DeductedAMF) > 0
 		END
 
 		-- AG Prepayment: AG Casino only
@@ -793,9 +796,9 @@ BEGIN
 					UNION ALL SELECT d.RemainingAGPrepayment
 				) t
 			WHERE r.ProductId = 10 -- AG Casino
-				AND r.LicensingFee - r.Discount > 0
-				AND d.RemainingAGPrepayment > 0
+				AND t.DeductedAGPrepayment >= 0
 			GROUP BY r.PartyId
+			HAVING MIN(t.DeductedAGPrepayment) > 0
 		END
 
 		-- Prepayment
