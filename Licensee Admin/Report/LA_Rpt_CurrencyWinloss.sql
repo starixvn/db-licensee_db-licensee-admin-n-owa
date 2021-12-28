@@ -54,6 +54,7 @@ AS
 	   - 20210824@Percy: Enhance performance [RedmineID: #160672]
 	   - 20211115@Percy: Return IsShowOddsSpread [RedmineID: #164411]
 	   - 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
+	   - 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -69,6 +70,7 @@ BEGIN
 			@VGA_Contribution	SMALLINT = 3898,
 			@OddSpread_BetType	SMALLINT = 999
 	DECLARE @CurrencyTest		INT		 = 20
+	DECLARE @BaseCurrencyId		INT
 
 	DECLARE @PP_ProductId		INT		 = 32,
 			@SBC_ProductId		INT		 = 42,
@@ -111,8 +113,7 @@ BEGIN
 		Company			MONEY,
 		Betcount		BIGINT,
 		Playercomm		MONEY,
-		OddsSpreadCost	MONEY,
-		IsShowOddsSpread TINYINT DEFAULT(0)
+		OddsSpreadCost	MONEY
 	)
 
 	CREATE INDEX IX_tmpWinloss ON #tmpWinLoss(PartyID, winlostdate, Currency)
@@ -146,6 +147,20 @@ BEGIN
 					(ci.ProductID = 17 AND sbr.Bettype BETWEEN 2008 AND 2009))
 	)
 	CREATE INDEX IX_tmpParty ON #tmpParty(LicenseeID, ProductID)
+
+	CREATE TABLE #PartyList (PartyId INT, BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
+	INSERT INTO #PartyList (PartyId)
+	SELECT DISTINCT PartyId FROM #tmpParty
+
+	UPDATE p
+	SET p.BaseCurrencyId = ISNULL(bc.BaseCurrencyId, 6), p.BaseCurrencyName = ISNULL(e.Code, 'EUR')
+	FROM #PartyList p
+		LEFT JOIN bodb_licensee.dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON p.PartyId = bc.PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
+		LEFT JOIN dbo.Exchange e WITH (NOLOCK) ON bc.BaseCurrencyId = e.ExchangeId
+
+	DECLARE @BaseCurrency TABLE (BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
+	INSERT INTO @BaseCurrency (BaseCurrencyId, BaseCurrencyName)
+	SELECT DISTINCT BaseCurrencyId, BaseCurrencyName FROM #PartyList
 
 	CREATE TABLE #Bettype (Bettype INT, ProductId INT, GroupProductId INT, PRIMARY KEY (Bettype, ProductId, GroupProductId))
 	INSERT INTO #Bettype (Bettype, ProductId, GroupProductId)
@@ -283,11 +298,11 @@ BEGIN
 			INNER JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','999,4297,1698,3898') eb ON bt.Bettype = eb.BettypeId
 
 		CREATE TABLE #tmpData (rptDate DATE, LicenseeId INT, CurrencyId INT, ProductId INT, LeagueId INT, Bettype INT
-			,BetCount INT, Turnover MONEY, Winloss MONEY, WinlossA MONEY, CommissionP MONEY, IsShowOddsSpread TINYINT)
+			,BetCount INT, Turnover MONEY, Winloss MONEY, WinlossA MONEY, CommissionP MONEY)
 
 		IF @SportType = 0 AND @Bettype = 0 AND @ReportBy = 0
 		BEGIN
-			INSERT INTO #tmpData (rptDate, LicenseeId, CurrencyId, ProductId, BetCount, Turnover, Winloss, WinlossA, CommissionP, IsShowOddsSpread)
+			INSERT INTO #tmpData (rptDate, LicenseeId, CurrencyId, ProductId, BetCount, Turnover, Winloss, WinlossA, CommissionP)
 			SELECT r.rptDate, r.SiteId, r.CurrencyId, r.ProductId
 				,SUM(r.BetCount * CASE
 									WHEN r.Bettype IN (999,4297,1698,3898) THEN 0
@@ -303,7 +318,6 @@ BEGIN
 									ELSE 1 END) AS Winloss
 				,SUM(CASE WHEN r.Bettype IN (999,4297,1698,3898) THEN ISNULL(-r.GrossWL, 0) ELSE 0 END) WinlossA
 				,SUM(CASE WHEN r.ProductId = 32 THEN 0 ELSE r.CommissionP END) AS CommissionP
-				,MAX(CASE WHEN r.Bettype = 999 THEN 1 ELSE 0 END) AS IsShowOddsSpread
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
 				LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','999,4297,1698,3898') b ON r.Bettype = b.BettypeId
 			WHERE r.rptDate BETWEEN @FromDate AND @ToDate
@@ -318,7 +332,7 @@ BEGIN
 		END
 		ELSE
 		BEGIN
-			INSERT INTO #tmpData (rptDate, LicenseeId, CurrencyId, ProductId, LeagueId, Bettype, BetCount, Turnover, Winloss, WinlossA, CommissionP, IsShowOddsSpread)
+			INSERT INTO #tmpData (rptDate, LicenseeId, CurrencyId, ProductId, LeagueId, Bettype, BetCount, Turnover, Winloss, WinlossA, CommissionP)
 			SELECT r.rptDate, r.SiteId, r.CurrencyId, bt.ProductId, r.LeagueId
 				,CASE WHEN r.Bettype NOT IN (9, 29) AND r.Bettype NOT BETWEEN 31 AND 120 THEN 1 ELSE 0 END AS Bettype
 				,SUM(r.BetCount * CASE
@@ -335,7 +349,6 @@ BEGIN
 									ELSE 1 END) AS Winloss
 				,SUM(CASE WHEN r.Bettype IN (999,4297,1698,3898) THEN ISNULL(-r.WinLossA, 0) ELSE 0 END) WinlossA
 				,SUM(CASE WHEN bt.ProductId = 32 THEN 0 ELSE r.CommissionP END) AS CommissionP
-				,MAX(CASE WHEN r.Bettype = 999 THEN 1 ELSE 0 END) AS IsShowOddsSpread
 			FROM bodb_LicenseeReport.dbo.rpt_Betting r WITH (NOLOCK)
 				INNER JOIN #Bettype bt ON r.Bettype = bt.Bettype
 			WHERE r.rptDate BETWEEN @FromDate AND @ToDate
@@ -366,14 +379,13 @@ BEGIN
 					,SUM(b.Turnover) AS Turnover
 					,SUM(b.Winloss)	AS MemberWL
 					,SUM(b.BetCount) AS BetCount
-					,SUM(CommissionP) AS Playercomm
-					,SUM(WinlossA) AS WinlossA
-					,MAX(b.IsShowOddsSpread) AS IsShowOddsSpread
+					,SUM(b.CommissionP) AS Playercomm
+					,SUM(b.WinlossA) AS WinlossA
 			FROM #tmpData b
 				INNER JOIN #Products p ON b.ProductId = p.ProductId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			GROUP BY b.rptDate, b.LicenseeId, b.CurrencyId, p.GroupProductId
 		)
-		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm, OddsSpreadCost, IsShowOddsSpread)
+		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm, OddsSpreadCost)
 		SELECT a.rptDate
 			   ,p.PartyID
 			   ,a.CurrencyID
@@ -386,7 +398,6 @@ BEGIN
 			   ,Betcount
 			   ,Playercomm
 			   ,CASE WHEN a.ProductID = 0 THEN WinlossA ELSE 0 END
-			   ,IsShowOddsSpread
 		FROM cte_Data a
 		INNER JOIN #tmpParty p ON p.LicenseeId = a.LicenseeId AND a.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId=a.ProductId AND p.ChargeType = 1
 		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID = p.ChargeId AND a.CurrencyId=cc.CurrencyID
@@ -396,97 +407,123 @@ BEGIN
 	END
 
 	-- Exchange rate
-	SELECT DISTINCT ExchangeDate, ExchangeId, Code, BaseCurrencyRate AS Rate
-	INTO #DailyExchange
-	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
-
-	IF @IsConvert = 0
 	BEGIN
-		UPDATE #DailyExchange
-		SET Rate = 1
+		CREATE TABLE #ExchangeRate (BaseCurrencyId INT, ExchangeDate DATE, ExchangeId INT, Code VARCHAR(20), Rate FLOAT)
+		INSERT INTO #ExchangeRate (ExchangeDate, ExchangeId, Code, Rate)
+		SELECT ExchangeDate, ExchangeId, Code, CASE WHEN @IsConvert = 1 THEN BaseCurrencyRate ELSE 1 END
+		FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+
+		DECLARE @Exchange TABLE (Currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
+		INSERT INTO @Exchange(Currency, CurrencyName, CurrencyCode)
+		SELECT e.ExchangeId, e.Currency
+			,CASE e.ExchangeId
+				WHEN 51 THEN 'INH'
+				WHEN 75 THEN 'PTU'
+				WHEN 76 THEN 'PS'
+				WHEN 77 THEN 'PTH'
+				WHEN 92 THEN 'HID'
+				ELSE e.Code END
+		FROM Exchange e WITH (NOLOCK)
+		WHERE e.ExchangeId IN (SELECT t.Currency FROM #tmpWinLoss t)
+
+		UPDATE e
+		SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'
+		FROM @Exchange e
+		WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1)
 	END
-	DECLARE @Exchange AS TABLE (Currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
 
-	INSERT INTO @Exchange(Currency, CurrencyName, CurrencyCode)
-	SELECT e.exchangeid, e.currency, e.Code
-	FROM Exchange e WITH (NOLOCK)
-	WHERE e.exchangeid IN (SELECT DISTINCT Currency FROM #tmpWinLoss)
-	
-	UPDATE @Exchange
-	SET CurrencyCode = (CASE Currency
-							WHEN 51 THEN 'INH'
-							WHEN 75 THEN 'PTU'
-							WHEN 76 THEN 'PS'
-							WHEN 77 THEN 'PTH'
-							WHEN 92 THEN 'HID' 
-							ELSE CurrencyCode
-						END)
-	WHERE Currency IN (51, 75, 76, 77, 92)
-
-	UPDATE e
-	SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'
-	FROM @Exchange e
-	WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1)
-	
-	--Report Group By Licensee
-	IF (@GroupByType = 1)
+	-- Result
 	BEGIN
-		SELECT	w.PartyID,
-				CASE WHEN p.PartyName ='18bb' THEN 'PIH'
-					 WHEN p.PartyName ='IBC' THEN 'FDL'
-					 ELSE p.PartyName
-				END AS PartyName,
-				CASE WHEN w.Currency = @CurrencyTest THEN e.Code
-					 ELSE t.CurrencyCode 
-				END AS CurrencyName,
-				w.currency,
-				w.Winlostdate				AS ReportDate,
-				SUM(TurnOver * e.Rate)		AS Turnover,
-				SUM(Winlost * e.Rate)		AS Winlost,
-				SUM(LicenseeWL * e.Rate)	AS LicenseeWL,
-				SUM(CommBA * e.Rate)		AS CommBA,
-				SUM(AmtDuetoBA * e.Rate)	AS AmtDuetoBA,
-				SUM(Company * e.Rate)		AS Company,
-				SUM(Betcount)				AS Betcount,
-				SUM(Playercomm * e.Rate)	AS Playercomm,
-				SUM(OddsSpreadCost*e.Rate)	AS OddsSpreadCost,
-				CONVERT(BIT, MAX(w.IsShowOddsSpread)) AS IsShowOddsSpread
+		CREATE TABLE #Result (PartyId INT, PartyName VARCHAR(50), Currency INT, CurrencyName VARCHAR(20), ReportDate DATETIME
+			,BetCount INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY, CommBA MONEY, AmtDuetoBA MONEY, Company MONEY, Playercomm MONEY, OddsSpreadCost MONEY, IsShowOddsSpread TINYINT)
+
+		INSERT INTO #Result (PartyId, PartyName, Currency, CurrencyName, ReportDate
+			,BetCount, Turnover, Winlost, LicenseeWL, CommBA, AmtDuetoBA, Company, Playercomm, OddsSpreadCost)
+		SELECT w.PartyId
+			,CASE
+				WHEN p.PartyName = '18bb' THEN 'PIH'
+				WHEN p.PartyName ='IBC' THEN 'FDL'
+				ELSE p.PartyName END AS PartyName
+			,w.currency, CASE WHEN w.Currency = 20 THEN 'UUS' ELSE t.CurrencyCode END AS CurrencyName
+			,CASE WHEN @GroupByType = 2 THEN NULL ELSE w.Winlostdate END AS ReportDate
+			,SUM(Betcount)				AS Betcount
+			,SUM(TurnOver * e.Rate)		AS Turnover
+			,SUM(Winlost * e.Rate)		AS Winlost
+			,SUM(LicenseeWL * e.Rate)	AS LicenseeWL
+			,SUM(CommBA * e.Rate)		AS CommBA
+			,SUM(AmtDuetoBA * e.Rate)	AS AmtDuetoBA
+			,SUM(Company * e.Rate)		AS Company
+			,SUM(Playercomm * e.Rate)	AS Playercomm
+			,SUM(OddsSpreadCost*e.Rate)	AS OddsSpreadCost
 		FROM #tmpWinLoss w
-		INNER JOIN #DailyExchange e ON w.Winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
-		LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON w.PartyID = p.PartyID
-		LEFT JOIN @Exchange t ON w.Currency = t.Currency
-		GROUP BY w.PartyID,p.PartyName, CASE WHEN w.Currency = @CurrencyTest THEN e.Code ELSE t.CurrencyCode END, w.currency, w.Winlostdate
-		ORDER BY w.PartyID,p.PartyName, CASE WHEN w.Currency = @CurrencyTest THEN e.Code ELSE t.CurrencyCode END, w.Winlostdate
+			INNER JOIN #ExchangeRate e ON w.Winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
+			LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON w.PartyID = p.PartyID
+			LEFT JOIN @Exchange t ON w.Currency = t.Currency
+		GROUP BY
+			w.PartyId
+			,CASE
+				WHEN p.PartyName = '18bb' THEN 'PIH'
+				WHEN p.PartyName ='IBC' THEN 'FDL'
+				ELSE p.PartyName END
+			,w.currency, CASE WHEN w.Currency = 20 THEN 'UUS' ELSE t.CurrencyCode END
+			,CASE WHEN @GroupByType = 2 THEN NULL ELSE w.Winlostdate END
+		
+		-- Set OddsSpreadCost = 0 if value is negative
+		DELETE #ExchangeRate
+
+		WHILE EXISTS (SELECT 1 FROM @BaseCurrency)
+		BEGIN
+			SELECT @BaseCurrencyId = NULL, @BaseCurrencyName = NULL
+			SELECT TOP 1 @BaseCurrencyId = BaseCurrencyId, @BaseCurrencyName = BaseCurrencyName FROM @BaseCurrency
+			
+			INSERT INTO #ExchangeRate (BaseCurrencyId, ExchangeDate, ExchangeId, Rate)
+			SELECT DISTINCT @BaseCurrencyId, ExchangeDate, ExchangeId, BaseCurrencyRate
+			FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+			WHERE ExchangeId IN (SELECT currency FROM #tmpWinLoss)
+
+			DELETE @BaseCurrency WHERE BaseCurrencyId = @BaseCurrencyId
+		END
+
+		UPDATE r
+		SET r.OddsSpreadCost = CASE WHEN t.IsShowOddsSpread = 1 THEN r.OddsSpreadCost ELSE 0 END
+			,r.IsShowOddsSpread = t.IsShowOddsSpread
+		FROM #Result r
+			INNER JOIN (
+				SELECT r.PartyId, CASE WHEN SUM(r.OddsSpreadCost * e.Rate) <= 0 THEN 0 ELSE 1 END AS IsShowOddsSpread
+				FROM #tmpWinLoss r
+					INNER JOIN #PartyList p ON r.PartyId = p.PartyId
+					INNER JOIN #ExchangeRate e ON p.BaseCurrencyId = e.BaseCurrencyId AND r.currency = e.ExchangeId AND r.Winlostdate = e.ExchangeDate
+				GROUP BY r.PartyId
+			) t ON r.PartyId = t.PartyId
 	END
 
-	--Report Group By Currency
-	IF (@GroupByType = 2)
-	BEGIN
-		SELECT CASE 
-					WHEN w.Currency = @CurrencyTest THEN e.Code
-					ELSE t.CurrencyCode 
-				END AS currencyName,
-				w.currency,
-				SUM(TurnOver * e.Rate)		AS Turnover,
-				SUM(Winlost * e.Rate)		AS Winlost,
-				SUM(LicenseeWL * e.Rate)	AS LicenseeWL,
-				SUM(CommBA * e.Rate)		AS CommBA,
-				SUM(AmtDuetoBA * e.Rate)	AS AmtDuetoBA,
-				SUM(Company * e.Rate)		AS Company,
-				SUM(Betcount)				AS Betcount,
-				SUM(Playercomm * e.Rate)	AS Playercomm,
-				SUM(OddsSpreadCost*e.Rate)	AS OddsSpreadCost,
-				CONVERT(BIT, MAX(w.IsShowOddsSpread)) AS IsShowOddsSpread
-		FROM #tmpWinLoss w	
-		INNER JOIN #DailyExchange e ON w.Winlostdate = e.ExchangeDate AND w.Currency = e.ExchangeId
-		LEFT JOIN @Exchange t ON w.Currency = t.Currency
-		GROUP BY CASE WHEN w.Currency = @CurrencyTest THEN e.Code ELSE t.CurrencyCode END, w.currency
-		ORDER BY CASE WHEN w.Currency = @CurrencyTest THEN e.Code ELSE t.CurrencyCode END
-	END
-	
+	-- Return data
+	IF @GroupByType = 1 -- Group by Licensee
+		SELECT PartyId, PartyName, Currency, CurrencyName, ReportDate
+				,BetCount, Turnover, Winlost, LicenseeWL, CommBA, AmtDuetoBA, Company, Playercomm, OddsSpreadCost, CONVERT(BIT, IsShowOddsSpread) AS IsShowOddsSpread
+		FROM #Result
+		ORDER BY PartyId, PartyName, CurrencyName, ReportDate
+	ELSE IF @GroupByType = 2 -- Group by Currency
+		SELECT Currency, CurrencyName
+			,SUM(BetCount) AS BetCount
+			,SUM(Turnover) AS Turnover
+			,SUM(Winlost) AS Winlost
+			,SUM(LicenseeWL) AS LicenseeWL
+			,SUM(CommBA) AS CommBA
+			,SUM(AmtDuetoBA) AS AmtDuetoBA
+			,SUM(Company) AS Company
+			,SUM(Playercomm) AS Playercomm
+			,SUM(OddsSpreadCost) AS OddsSpreadCost
+			,CONVERT(BIT, MAX(IsShowOddsSpread)) AS IsShowOddsSpread
+		FROM #Result
+		GROUP BY Currency, CurrencyName
+		ORDER BY CurrencyName
+
 	DROP TABLE #Bettype
-	DROP TABLE #DailyExchange
+	DROP TABLE #ExchangeRate
+	DROP TABLE #PartyList
 	DROP TABLE #Products
+	DROP TABLE #Result
 	DROP TABLE #tmpParty
 	DROP TABLE #tmpWinLoss
 END

@@ -70,6 +70,7 @@ AS
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
+		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 */
 		
 /*	Example:
@@ -467,7 +468,7 @@ BEGIN
 		GROUP BY ci.PartyId
 	)
 	UPDATE	l
-	SET		l.SB = LicencingFee + OddsSpreadCost
+	SET		l.SB = cte.LicencingFee + CASE WHEN cte.OddsSpreadCost < 0 THEN 0 ELSE cte.OddsSpreadCost END
 	FROM #LicenseeAmount l
 	INNER JOIN cte_SBWinLost cte ON l.PartyId = cte.PartyId 
 	-- End SportsBook

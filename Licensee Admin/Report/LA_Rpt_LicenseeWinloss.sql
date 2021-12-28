@@ -44,6 +44,7 @@ AS
 	- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 	- 20211115@Percy: Return IsShowOddsSpread [RedmineID: #164411]
 	- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
+	- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 	
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -69,10 +70,15 @@ BEGIN
 			@SBC_ProductId  TINYINT = 42,
 			@VGA_ProductId  TINYINT	= 66
 
-	CREATE TABLE #Report (PartyID INT, ReportDate DATE, CurrencyID INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY, 
-						AmtDueToBA MONEY, CommBA MONEY, Company MONEY, Betcount INT, OddsSpreadCost MONEY, IsShowOddsSpread TINYINT DEFAULT(0))
+	DECLARE @BaseCurrencyId INT
 
-	CREATE TABLE #Exchange(ExchangeId INT, ExchangeDate DATE, Code VARCHAR(20), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, CNY FLOAT, Base FLOAT)
+	CREATE TABLE #PartyList (PartyId INT, BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
+	DECLARE @BaseCurrency TABLE (BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
+
+	CREATE TABLE #Report (PartyID INT, ReportDate DATE, CurrencyID INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY, 
+						AmtDueToBA MONEY, CommBA MONEY, Company MONEY, Betcount INT, OddsSpreadCost MONEY)
+
+	CREATE TABLE #Exchange (BaseCurrencyId INT, ExchangeId INT, ExchangeDate DATE, Code VARCHAR(20), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, CNY FLOAT, Base FLOAT)
 	
 	DECLARE @ChargeInfo TABLE(PartyID INT, LicenseeID INT, ProductID INT,BetTypeId INT ,Rate MONEY, Fromdate DATE, Todate DATE, ChargeType TINYINT, ChargeId INT)
 	
@@ -93,6 +99,18 @@ BEGIN
 			CASE WHEN ProductID IN(11, 39) THEN ChargeType ELSE 1 END, -- include Tip charge type
 			ChargeID
 	FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
+
+	INSERT INTO #PartyList (PartyId)
+	SELECT DISTINCT PartyId FROM @ChargeInfo
+
+	UPDATE p
+	SET p.BaseCurrencyId = ISNULL(bc.BaseCurrencyId, 6), p.BaseCurrencyName = ISNULL(e.Code, 'EUR')
+	FROM #PartyList p
+		LEFT JOIN bodb_licensee.dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON p.PartyId = bc.PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
+		LEFT JOIN dbo.Exchange e WITH (NOLOCK) ON bc.BaseCurrencyId = e.ExchangeId
+
+	INSERT INTO @BaseCurrency (BaseCurrencyId, BaseCurrencyName)
+	SELECT DISTINCT BaseCurrencyId, BaseCurrencyName FROM #PartyList
 	
 	/* BA Product Id = 3 */
 	IF (SELECT COUNT(*) FROM @ChargeInfo WHERE ProductID = 3) > 0
@@ -393,7 +411,6 @@ BEGIN
 			, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionA ELSE 0 END) AComm
 			, SUM(b.betcount * CASE WHEN (@drawfilter = 2 AND b.StatusId = 111) OR b.Bettype IN (@PP_Contribution, @SBC_Contribution, @OddsSpread_BetType, @VGA_Contribution) THEN 0 ELSE 1 END) BetCount 
 			, SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @OddsSpread_BetType, @VGA_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AWinloss
-			, CONVERT(TINYINT, MAX(CASE WHEN b.Bettype = @OddsSpread_BetType THEN 1 ELSE 0 END)) AS IsShowOddsSpread
 		INTO #TmpData
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #Products p ON b.ProductId = p.ProductId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
@@ -411,7 +428,7 @@ BEGIN
 			AND	ISNULL(b.TicketType,0) <> 2 -- Free_Bets_TicketType
 		GROUP BY b.rptDate, ci.PartyID, p.GroupProductId, b.CurrencyID
 
-		INSERT INTO #Report (PartyID, ReportDate, CurrencyID, Turnover, Winlost, LicenseeWL,Company, Betcount, OddsSpreadCost, IsShowOddsSpread)
+		INSERT INTO #Report (PartyID, ReportDate, CurrencyID, Turnover, Winlost, LicenseeWL,Company, Betcount, OddsSpreadCost)
 		SELECT ci.PartyID, rptDate, b.CurrencyId
 			, SUM(b.turnover) Turnover
 			, SUM(b.Winloss + CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS Winloss
@@ -419,7 +436,6 @@ BEGIN
 			, SUM((-b.Winloss - CASE WHEN b.ProductID IN (@PP_ProductId, @SBC_ProductId, @VGA_ProductId) THEN AWinloss ELSE 0 END) * ISNULL(cc.Rate,ci.Rate) - CASE WHEN b.ProductID=31 THEN (b.AComm + b.PComm) ELSE 0 END) AS Company
 			, SUM(b.betcount) AS betcount
 			, SUM(CASE WHEN b.ProductID = 0 THEN AWinloss ELSE 0 END) AS OddsSpreadCost
-			, MAX(IsShowOddsSpread) AS IsShowOddsSpread
 		FROM #TmpData b WITH (NOLOCK)
 			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate, ChargeId, ChargeType FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID=ci.ChargeId AND cc.CurrencyID=b.CurrencyId
@@ -463,72 +479,143 @@ BEGIN
 		SET Base = 1
 	END
 
-	SELECT b.PartyID
-		, CASE p.PartyName
-		 	WHEN '18bb' THEN 'PIH'
-		 	WHEN 'IBC'	THEN 'FDL'
-		 	ELSE p.PartyName
+	-- Result
+	BEGIN
+		CREATE TABLE #Result (PartyId INT, PartyName VARCHAR(50), ReportDate VARCHAR(6), TotalTransaction INT
+			,Turnover MONEY, CustomerWinLoss MONEY, LicenseeWinLoss MONEY, AmountDueToBA MONEY, BACommission MONEY, AmountCompany MONEY, OddsSpreadCost MONEY
+			,TurnoverMYR MONEY, CustomerWinLossMYR MONEY, LicenseeWinLossMYR MONEY, AmountDueToBAMYR MONEY, BACommissionMYR MONEY, AmountCompanyMYR MONEY, OddsSpreadCostMYR MONEY
+			,TurnoverUSD MONEY, CustomerWinLossUSD MONEY, LicenseeWinLossUSD MONEY, AmountDueToBAUSD MONEY, BACommissionUSD MONEY, AmountCompanyUSD MONEY, OddsSpreadCostUSD MONEY
+			,TurnoverEUR MONEY, CustomerWinLossEUR MONEY, LicenseeWinLossEUR MONEY, AmountDueToBAEUR MONEY, BACommissionEUR MONEY, AmountCompanyEUR MONEY, OddsSpreadCostEUR MONEY
+			,TurnoverGBP MONEY, CustomerWinLossGBP MONEY, LicenseeWinLossGBP MONEY, AmountDueToBAGBP MONEY, BACommissionGBP MONEY, AmountCompanyGBP MONEY, OddsSpreadCostGBP MONEY
+			,TurnoverCNY MONEY, CustomerWinLossCNY MONEY, LicenseeWinLossCNY MONEY, AmountDueToBACNY MONEY, BACommissionCNY MONEY, AmountCompanyCNY MONEY, OddsSpreadCostCNY MONEY
+			,IsShowOddsSpread BIT)
+		
+		INSERT INTO #Result (PartyId, PartyName, ReportDate, TotalTransaction
+			,Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueToBA, BACommission, AmountCompany, OddsSpreadCost
+			,TurnoverMYR, CustomerWinLossMYR, LicenseeWinLossMYR, AmountDueToBAMYR, BACommissionMYR, AmountCompanyMYR, OddsSpreadCostMYR
+			,TurnoverUSD, CustomerWinLossUSD, LicenseeWinLossUSD, AmountDueToBAUSD, BACommissionUSD, AmountCompanyUSD, OddsSpreadCostUSD
+			,TurnoverEUR, CustomerWinLossEUR, LicenseeWinLossEUR, AmountDueToBAEUR, BACommissionEUR, AmountCompanyEUR, OddsSpreadCostEUR
+			,TurnoverGBP, CustomerWinLossGBP, LicenseeWinLossGBP, AmountDueToBAGBP, BACommissionGBP, AmountCompanyGBP, OddsSpreadCostGBP
+			,TurnoverCNY, CustomerWinLossCNY, LicenseeWinLossCNY, AmountDueToBACNY, BACommissionCNY, AmountCompanyCNY, OddsSpreadCostCNY)
+		SELECT b.PartyId
+			,CASE p.PartyName
+		 		WHEN '18bb' THEN 'PIH'
+		 		WHEN 'IBC'	THEN 'FDL'
+		 		ELSE p.PartyName
 		 	END AS PartyName
-		, CONVERT(VARCHAR(6), b.ReportDate, 112) AS ReportDate
-		, SUM(Betcount) AS TotalTransaction
-		, CONVERT(BIT, MAX(b.IsShowOddsSpread)) AS IsShowOddsSpread
-		--Base Currency
-		, CAST(SUM(Turnover * e.Base) AS MONEY) AS Turnover
-		, CAST(SUM(Winlost * e.Base) AS MONEY) AS CustomerWinLoss
-		, CAST(SUM(LicenseeWL * e.Base) AS MONEY) AS LicenseeWinLoss
-		, CAST(SUM(AmtDueToBA * e.Base) AS MONEY) AS AmountDueToBA
-		, CAST(SUM(CommBA * e.Base) AS MONEY) AS BACommission
-		, CAST(SUM(Company * e.Base) AS MONEY) AS AmountCompany
-		, CAST(SUM(OddsSpreadCost * e.Base) AS MONEY) AS OddsSpreadCost
-		--MYR
-		, CAST(SUM(Turnover * e.MYR) AS MONEY) AS TurnoverMYR
-		, CAST(SUM(Winlost * e.MYR) AS MONEY) AS CustomerWinLossMYR
-		, CAST(SUM(LicenseeWL * e.MYR) AS MONEY) AS LicenseeWinLossMYR
-		, CAST(SUM(AmtDueToBA * e.MYR) AS MONEY) AS AmountDueToBAMYR
-		, CAST(SUM(CommBA * e.MYR) AS MONEY) AS BACommissionMYR
-		, CAST(SUM(Company * e.MYR) AS MONEY) AS AmountCompanyMYR
-		, CAST(SUM(OddsSpreadCost * e.MYR) AS MONEY) AS OddsSpreadCostMYR
-		--USD
-		, CAST(SUM(Turnover * e.USD) AS MONEY) AS TurnoverUSD
-		, CAST(SUM(Winlost * e.USD) AS MONEY) AS CustomerWinLossUSD
-		, CAST(SUM(LicenseeWL * e.USD) AS MONEY) AS LicenseeWinLossUSD
-		, CAST(SUM(AmtDueToBA * e.USD) AS MONEY) AS AmountDueToBAUSD
-		, CAST(SUM(CommBA * e.USD) AS MONEY) AS BACommissionUSD
-		, CAST(SUM(Company * e.USD) AS MONEY) AS AmountCompanyUSD
-		, CAST(SUM(OddsSpreadCost * e.USD) AS MONEY) AS OddsSpreadCostUSD
-		--EUR
-		, CAST(SUM(Turnover * e.EUR) AS MONEY) AS TurnoverEUR
-		, CAST(SUM(Winlost * e.EUR) AS MONEY) AS CustomerWinLossEUR
-		, CAST(SUM(LicenseeWL * e.EUR) AS MONEY) AS LicenseeWinLossEUR
-		, CAST(SUM(AmtDueToBA * e.EUR) AS MONEY) AS AmountDueToBAEUR
-		, CAST(SUM(CommBA * e.EUR) AS MONEY) AS BACommissionEUR
-		, CAST(SUM(Company * e.EUR) AS MONEY) AS AmountCompanyEUR
-		, CAST(SUM(OddsSpreadCost * e.EUR) AS MONEY) AS OddsSpreadCostEUR
-		--GBP
-		, CAST(SUM(Turnover * e.GBP) AS MONEY) AS TurnoverGBP
-		, CAST(SUM(Winlost * e.GBP) AS MONEY) AS CustomerWinLossGBP
-		, CAST(SUM(LicenseeWL * e.GBP) AS MONEY) AS LicenseeWinLossGBP
-		, CAST(SUM(AmtDueToBA * e.GBP) AS MONEY) AS AmountDueToBAGBP
-		, CAST(SUM(CommBA * e.GBP) AS MONEY) AS BACommissionGBP
-		, CAST(SUM(Company * e.GBP) AS MONEY) AS AmountCompanyGBP
-		, CAST(SUM(OddsSpreadCost * e.GBP) AS MONEY) AS OddsSpreadCostGBP
-		--CNY
-		, CAST(SUM(Turnover * e.CNY) AS MONEY) AS TurnoverCNY
-		, CAST(SUM(Winlost * e.CNY) AS MONEY) AS CustomerWinLossCNY
-		, CAST(SUM(LicenseeWL * e.CNY) AS MONEY) AS LicenseeWinLossCNY
-		, CAST(SUM(AmtDueToBA * e.CNY) AS MONEY) AS AmountDueToBACNY
-		, CAST(SUM(CommBA * e.CNY) AS MONEY) AS BACommissionCNY
-		, CAST(SUM(Company * e.CNY) AS MONEY) AS AmountCompanyCNY
-		, CAST(SUM(OddsSpreadCost * e.CNY) AS MONEY) AS OddsSpreadCostCNY
-	FROM #Report b
-		INNER JOIN #Exchange e ON e.ExchangeDate = b.ReportDate AND e.ExchangeId = b.CurrencyID
-		INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON p.PartyID = b.PartyID
-	GROUP BY b.PartyID, p.PartyName ,CONVERT(VARCHAR(6), b.ReportDate, 112)
-	ORDER BY ReportDate ASC, CASE p.PartyName WHEN '18bb' THEN 'PIH' WHEN 'IBC' THEN 'FDL' ELSE p.PartyName END
-	
+			,CONVERT(VARCHAR(6), b.ReportDate, 112) AS ReportDate
+			,SUM(Betcount) AS TotalTransaction
+			-- Base Currency
+			,SUM(Turnover * e.Base) AS Turnover
+			,SUM(Winlost * e.Base) AS CustomerWinLoss
+			,SUM(LicenseeWL * e.Base) AS LicenseeWinLoss
+			,SUM(AmtDueToBA * e.Base) AS AmountDueToBA
+			,SUM(CommBA * e.Base) AS BACommission
+			,SUM(Company * e.Base) AS AmountCompany
+			,SUM(OddsSpreadCost * e.Base) AS OddsSpreadCost
+			-- MYR
+			,SUM(Turnover * e.MYR) AS TurnoverMYR
+			,SUM(Winlost * e.MYR) AS CustomerWinLossMYR
+			,SUM(LicenseeWL * e.MYR) AS LicenseeWinLossMYR
+			,SUM(AmtDueToBA * e.MYR) AS AmountDueToBAMYR
+			,SUM(CommBA * e.MYR) AS BACommissionMYR
+			,SUM(Company * e.MYR) AS AmountCompanyMYR
+			,SUM(OddsSpreadCost * e.MYR) AS OddsSpreadCostMYR
+			-- USD
+			,SUM(Turnover * e.USD) AS TurnoverUSD
+			,SUM(Winlost * e.USD) AS CustomerWinLossUSD
+			,SUM(LicenseeWL * e.USD) AS LicenseeWinLossUSD
+			,SUM(AmtDueToBA * e.USD) AS AmountDueToBAUSD
+			,SUM(CommBA * e.USD) AS BACommissionUSD
+			,SUM(Company * e.USD) AS AmountCompanyUSD
+			,SUM(OddsSpreadCost * e.USD) AS OddsSpreadCostUSD
+			-- EUR
+			,SUM(Turnover * e.EUR) AS TurnoverEUR
+			,SUM(Winlost * e.EUR) AS CustomerWinLossEUR
+			,SUM(LicenseeWL * e.EUR) AS LicenseeWinLossEUR
+			,SUM(AmtDueToBA * e.EUR) AS AmountDueToBAEUR
+			,SUM(CommBA * e.EUR) AS BACommissionEUR
+			,SUM(Company * e.EUR) AS AmountCompanyEUR
+			,SUM(OddsSpreadCost * e.EUR) AS OddsSpreadCostEUR
+			-- GBP
+			,SUM(Turnover * e.GBP) AS TurnoverGBP
+			,SUM(Winlost * e.GBP) AS CustomerWinLossGBP
+			,SUM(LicenseeWL * e.GBP) AS LicenseeWinLossGBP
+			,SUM(AmtDueToBA * e.GBP) AS AmountDueToBAGBP
+			,SUM(CommBA * e.GBP) AS BACommissionGBP
+			,SUM(Company * e.GBP) AS AmountCompanyGBP
+			,SUM(OddsSpreadCost * e.GBP) AS OddsSpreadCostGBP
+			-- CNY
+			,SUM(Turnover * e.CNY) AS TurnoverCNY
+			,SUM(Winlost * e.CNY) AS CustomerWinLossCNY
+			,SUM(LicenseeWL * e.CNY) AS LicenseeWinLossCNY
+			,SUM(AmtDueToBA * e.CNY) AS AmountDueToBACNY
+			,SUM(CommBA * e.CNY) AS BACommissionCNY
+			,SUM(Company * e.CNY) AS AmountCompanyCNY
+			,SUM(OddsSpreadCost * e.CNY) AS OddsSpreadCostCNY
+		FROM #Report b
+			INNER JOIN #Exchange e ON e.ExchangeDate = b.ReportDate AND e.ExchangeId = b.CurrencyID
+			INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON p.PartyID = b.PartyID
+		GROUP BY
+			b.PartyId
+			,CASE p.PartyName
+		 		WHEN '18bb' THEN 'PIH'
+		 		WHEN 'IBC'	THEN 'FDL'
+		 		ELSE p.PartyName
+		 	END
+			,CONVERT(VARCHAR(6), b.ReportDate, 112)
+
+		-- Set OddsSpreadCost = 0 if value is negative
+		DELETE #Exchange
+		
+		WHILE EXISTS (SELECT 1 FROM @BaseCurrency)
+		BEGIN
+			SELECT @BaseCurrencyId = NULL, @BaseCurrencyName = NULL
+			SELECT TOP 1 @BaseCurrencyId = BaseCurrencyId, @BaseCurrencyName = BaseCurrencyName FROM @BaseCurrency
+			
+			INSERT INTO #Exchange (BaseCurrencyId, ExchangeDate, ExchangeId, Base)
+			SELECT DISTINCT @BaseCurrencyId, ExchangeDate, ExchangeId, BaseCurrencyRate
+			FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+			WHERE ExchangeId IN (SELECT CurrencyID FROM #Report)
+
+			DELETE @BaseCurrency WHERE BaseCurrencyId = @BaseCurrencyId
+		END
+
+		UPDATE r
+		SET r.OddsSpreadCost = CASE WHEN t.IsShowOddsSpread = 1 THEN r.OddsSpreadCost ELSE 0 END
+			,r.OddsSpreadCostMYR = CASE WHEN t.IsShowOddsSpread = 1 THEN r.OddsSpreadCostMYR ELSE 0 END
+			,r.OddsSpreadCostUSD = CASE WHEN t.IsShowOddsSpread = 1 THEN r.OddsSpreadCostUSD ELSE 0 END
+			,r.OddsSpreadCostEUR = CASE WHEN t.IsShowOddsSpread = 1 THEN r.OddsSpreadCostEUR ELSE 0 END
+			,r.OddsSpreadCostGBP = CASE WHEN t.IsShowOddsSpread = 1 THEN r.OddsSpreadCostGBP ELSE 0 END
+			,r.OddsSpreadCostCNY = CASE WHEN t.IsShowOddsSpread = 1 THEN r.OddsSpreadCostCNY ELSE 0 END
+			,r.IsShowOddsSpread = t.IsShowOddsSpread
+		FROM #Result r
+			INNER JOIN (
+				SELECT r.PartyId, CASE WHEN SUM(r.OddsSpreadCost * e.Base) <= 0 THEN 0 ELSE 1 END AS IsShowOddsSpread
+				FROM #Report r
+					INNER JOIN #PartyList p ON r.PartyId = p.PartyId
+					INNER JOIN #Exchange e ON p.BaseCurrencyId = e.BaseCurrencyId AND r.CurrencyId = e.ExchangeId AND r.ReportDate = e.ExchangeDate
+				GROUP BY r.PartyId
+			) t ON r.PartyId = t.PartyId
+	END
+
+	-- Return data
+	SELECT PartyId, PartyName, ReportDate, TotalTransaction
+		,Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueToBA, BACommission, AmountCompany, OddsSpreadCost
+		,TurnoverMYR, CustomerWinLossMYR, LicenseeWinLossMYR, AmountDueToBAMYR, BACommissionMYR, AmountCompanyMYR, OddsSpreadCostMYR
+		,TurnoverUSD, CustomerWinLossUSD, LicenseeWinLossUSD, AmountDueToBAUSD, BACommissionUSD, AmountCompanyUSD, OddsSpreadCostUSD
+		,TurnoverEUR, CustomerWinLossEUR, LicenseeWinLossEUR, AmountDueToBAEUR, BACommissionEUR, AmountCompanyEUR, OddsSpreadCostEUR
+		,TurnoverGBP, CustomerWinLossGBP, LicenseeWinLossGBP, AmountDueToBAGBP, BACommissionGBP, AmountCompanyGBP, OddsSpreadCostGBP
+		,TurnoverCNY, CustomerWinLossCNY, LicenseeWinLossCNY, AmountDueToBACNY, BACommissionCNY, AmountCompanyCNY, OddsSpreadCostCNY
+		,IsShowOddsSpread
+	FROM #Result
+	ORDER BY ReportDate, PartyName
+
 	DROP TABLE #Data
 	DROP TABLE #Exchange
+	DROP TABLE #PartyList
 	DROP TABLE #Products
 	DROP TABLE #Report
+	DROP TABLE #Result
 END
 GO
