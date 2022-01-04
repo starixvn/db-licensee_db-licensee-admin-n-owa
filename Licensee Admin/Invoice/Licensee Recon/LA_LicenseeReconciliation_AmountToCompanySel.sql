@@ -113,7 +113,7 @@ BEGIN
 			SELECT PartyId, CASE WHEN ProductId = 37 THEN 0 ELSE ProductId END AS ProductId
 				,SUM(CASE WHEN ProductId = 37 THEN LicensingFee ELSE 0 END) AS Promotion
 				,SUM(CASE WHEN LicensingFeeTypeId = 7 THEN ExtraAmount ELSE 0 END) AS ContributionDiscount
-				,SUM(CASE WHEN LicensingFeeTypeId = 9 THEN ExtraAmount ELSE 0 END) AS OddsSpreadAdjustment
+				,SUM(CASE WHEN LicensingFeeTypeId = 9 AND ExtraAmount < 0 THEN -ExtraAmount ELSE 0 END) AS OddsSpreadAdjustment
 			FROM @Result
 			WHERE ProductId = 37 OR LicensingFeeTypeId > 0
 			GROUP BY PartyId, CASE WHEN ProductId = 37 THEN 0 ELSE ProductId END

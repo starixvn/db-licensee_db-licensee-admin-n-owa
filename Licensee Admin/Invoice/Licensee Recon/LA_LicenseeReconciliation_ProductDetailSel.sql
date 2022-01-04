@@ -210,8 +210,8 @@ BEGIN
 		IF @@ROWCOUNT = 0
 			INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread)
 			SELECT 'NAP', 0, 0, 0, 0, 0, 0, 0, 0, 0
-		ELSE IF EXISTS (SELECT 1 FROM @Result WHERE Func = 'NAP' HAVING SUM(-OddsSpread) <= 0)  -- Set OddsSpread = 0 if value is negative (show Negative value (-))
-			UPDATE @Result SET OddsSpread = 0, IsShowOddsSpread = 0 WHERE Func = 'NAP'
+		ELSE IF NOT EXISTS (SELECT 1 FROM @Result WHERE Func = 'NAP' AND OddsSpread <> 0)
+			UPDATE @Result SET IsShowOddsSpread = 0 WHERE Func = 'NAP'
 	END
 
 	-- Return data
