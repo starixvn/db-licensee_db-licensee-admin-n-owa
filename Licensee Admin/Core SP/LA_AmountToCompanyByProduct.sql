@@ -24,6 +24,7 @@ AS
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20211110@Danny: Add @LicensingFeeTypeIds = 8 (betcount)  [#159296]
 		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
+		- 20220105@Percy: Don't check negative AMF amount [RedmineID: #167039]
 
 
 	Param's Explanation:
@@ -779,7 +780,6 @@ BEGIN
 					UNION ALL SELECT r.LicensingFee - r.Discount WHERE r.IsGroupMinFee = 0 -- just Individual Min Fee
 				) t
 			WHERE r.ProductId = 0 -- SB
-				AND t.DeductedAMF >= 0
 			GROUP BY r.PartyId
 			HAVING MIN(t.DeductedAMF) > 0
 		END
@@ -796,7 +796,6 @@ BEGIN
 					UNION ALL SELECT d.RemainingAGPrepayment
 				) t
 			WHERE r.ProductId = 10 -- AG Casino
-				AND t.DeductedAGPrepayment >= 0
 			GROUP BY r.PartyId
 			HAVING MIN(t.DeductedAGPrepayment) > 0
 		END
