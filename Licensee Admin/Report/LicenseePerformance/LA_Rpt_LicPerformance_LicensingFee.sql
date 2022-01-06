@@ -56,6 +56,7 @@ AS
 	   - 20210306@Danny: Integrate VGaming [#154080]
 	   - 20210614@Danny: Integrate AdvantPlay [#154787]
 	   - 20210614@Danny: Integrate AdvantPlay Mini [#155207]
+	   - 20220110@Danny: SG - Jackpot prize integration [#167089]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -104,7 +105,7 @@ BEGIN
 		SET @sdate = DATEADD(m, 1, @sdate)
 	END	
 
-	IF @ProductCode IN ('NG', 'LC', 'VS', 'CS', 'VB', 'SG', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK', 'WM', 'VS3', 'GDG', 'BGG', 'MXG', 'SLT', 'PPL', 'HB', 'CG', 'VGA', 'AP', 'APM')
+	IF @ProductCode IN ('NG', 'LC', 'VS', 'CS', 'VB', 'VRG', 'I4D', 'TG', 'SBC', 'SXG', 'PGS', 'JK', 'WM', 'VS3', 'GDG', 'BGG', 'MXG', 'SLT', 'PPL', 'HB', 'CG', 'VGA', 'AP', 'APM')
 	BEGIN		
 		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, LicensingFee)
 		SELECT tp.PartyID, d.rptDate, d.CurrencyID, - SUM(d.Winloss * ISNULL(cc.Rate, tp.Rate))
@@ -175,6 +176,38 @@ BEGIN
 		(
 			SELECT tp.PartyID, b.rptDate, b.CurrencyId, SUM((LicenseeWL - Contribution) * ISNULL(cc.Rate, tp.Rate))			
 			FROM cte_PPWinLossData b
+				INNER JOIN (SELECT DISTINCT PartyID, Rate, Fromdate, Todate, ChargeID FROM #tmpParty) tp ON tp.PartyID = b.PartyID
+				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON b.CurrencyID = cc.CurrencyID AND tp.ChargeID = cc.ChargeID 
+			WHERE b.rptDate BETWEEN tp.Fromdate AND tp.Todate
+			GROUP BY tp.PartyID, b.rptDate, b.CurrencyId
+		)
+
+	END	
+
+	
+	IF @ProductCode = 'SG'
+	BEGIN		
+		DECLARE @SG_Contribution SMALLINT = 4599,
+				@SG_JackpotPrize SMALLINT = 4600
+
+		;WITH cte_SGWinLossData AS(
+			SELECT tp.PartyID, b.rptDate, b.CurrencyID
+				, SUM(ISNULL(-b.MemberWL, 0)) LicenseeWL
+				, SUM(CASE WHEN b.Bettype = @SG_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) Contribution
+				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+					INNER JOIN (SELECT DISTINCT PartyID, LicenseeID FROM #tmpParty) tp ON tp.LicenseeID = b.SiteID
+				WHERE b.ProductID = 32
+					AND b.rptDate BETWEEN @FromDate AND @ToDate
+					AND (b.CurrencyID <> 20)
+					AND (@Currency = 0 OR b.CurrencyID = @Currency)  
+					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+					AND b.Bettype NOT IN (@SG_JackpotPrize)
+				GROUP BY tp.PartyID, b.rptDate, b.CurrencyID
+		)
+		INSERT INTO #Temp (PartyId, rptDate, CurrencyID, LicensingFee)
+		(
+			SELECT tp.PartyID, b.rptDate, b.CurrencyId, SUM((LicenseeWL - Contribution) * ISNULL(cc.Rate, tp.Rate))			
+			FROM cte_SGWinLossData b
 				INNER JOIN (SELECT DISTINCT PartyID, Rate, Fromdate, Todate, ChargeID FROM #tmpParty) tp ON tp.PartyID = b.PartyID
 				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON b.CurrencyID = cc.CurrencyID AND tp.ChargeID = cc.ChargeID 
 			WHERE b.rptDate BETWEEN tp.Fromdate AND tp.Todate

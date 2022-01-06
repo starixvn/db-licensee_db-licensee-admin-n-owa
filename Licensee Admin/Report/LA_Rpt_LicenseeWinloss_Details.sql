@@ -46,6 +46,7 @@ AS
 	- 20211115@Percy: Return IsShowOddsSpread [RedmineID: #164411]
 	- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 	- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
+	- 20220110@Danny: SG - Jackpot prize integration [#167089]
 
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -65,11 +66,13 @@ BEGIN
 			@PP_Contribution	SMALLINT = 4297,
 			@SBC_Contribution	SMALLINT = 1698,
 			@VGA_Contribution	SMALLINT = 3898,
-			@OddsSpread_BetType SMALLINT = 999
+			@OddsSpread_BetType SMALLINT = 999,
+			@SG_Contribution	SMALLINT = 4599
 	DECLARE @CurrencyTest INT = 20
 	DECLARE @PP_ProductId  SMALLINT = 32,
 			@SBC_ProductId SMALLINT = 42,
-			@VGA_ProductId SMALLINT	= 66
+			@VGA_ProductId SMALLINT	= 66,
+			@SG_ProductId SMALLINT	= 36
 
 	CREATE TABLE #Report (ReportDate DATE, CurrencyID INT, ProductID INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY,
 						AmtDueToBA MONEY, CommBA MONEY, Company MONEY, Betcount INT, OddsSpreadCost MONEY)
@@ -368,16 +371,16 @@ BEGIN
 							  END	
 						ELSE 1 END
 				END) Turnover
-			, SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @OddsSpread_BetType, @VGA_Contribution) THEN 0 ELSE b.MemberWL END) Winloss
+			, SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @OddsSpread_BetType, @VGA_Contribution, @SG_Contribution) THEN 0 ELSE b.MemberWL END) Winloss
 			, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END) PComm
 			, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionA ELSE 0 END) AComm
-			, SUM(b.betcount * CASE WHEN (@drawfilter = 2 AND b.StatusId = 111) OR b.Bettype IN (@PP_Contribution, @SBC_Contribution, @OddsSpread_BetType, @VGA_Contribution) THEN 0 ELSE 1 END) BetCount 
-			, SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @OddsSpread_BetType, @VGA_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AWinloss
+			, SUM(b.betcount * CASE WHEN (@drawfilter = 2 AND b.StatusId = 111) OR b.Bettype IN (@PP_Contribution, @SBC_Contribution, @OddsSpread_BetType, @VGA_Contribution, @SG_Contribution) THEN 0 ELSE 1 END) BetCount 
+			, SUM(CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @OddsSpread_BetType, @VGA_Contribution, @SG_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AWinloss
 		INTO #TmpData
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #Products p ON b.ProductId = p.ProductId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			INNER JOIN (SELECT DISTINCT PartyID, LicenseeId, ProductID FROM #ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON b.SiteID = ci.LicenseeID AND p.GroupProductId = ci.ProductID
-			LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','999,4297,1698,3898') eb ON b.Bettype = eb.BettypeID
+			LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','999,4297,1698,3898,4599') eb ON b.Bettype = eb.BettypeID
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.StatusId NOT IN (- 1, 101, 102, 103)
 			AND (@Currency = 0 OR b.CurrencyID = @Currency)
@@ -392,7 +395,7 @@ BEGIN
 			, SUM(b.turnover) Turnover
 			, SUM(b.Winloss + CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS Winloss
 			, SUM(-b.Winloss - CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS LicenseeWL
-			, SUM((-b.Winloss - CASE WHEN b.ProductID IN (@PP_ProductId, @SBC_ProductId, @VGA_ProductId) THEN AWinloss ELSE 0 END) * ISNULL(cc.Rate,ci.Rate) - CASE WHEN b.ProductID=31 THEN (b.AComm + b.PComm) ELSE 0 END) AS Company
+			, SUM((-b.Winloss - CASE WHEN b.ProductID IN (@PP_ProductId, @SBC_ProductId, @VGA_ProductId, @SG_ProductId) THEN AWinloss ELSE 0 END) * ISNULL(cc.Rate,ci.Rate) - CASE WHEN b.ProductID=31 THEN (b.AComm + b.PComm) ELSE 0 END) AS Company
 			, SUM(b.betcount) AS betcount
 			, SUM(CASE WHEN b.ProductID = 0 THEN AWinloss ELSE 0 END) AS OddsSpreadCost
 		FROM #TmpData b WITH (NOLOCK)

@@ -30,6 +30,7 @@ AS
 		- 20210407@Percy: Support duo base currency - Change code for Collection Summary [RedmineID: #152089]
 		- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
+		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -59,7 +60,7 @@ BEGIN
 	DECLARE @N_ToDate DATE = DATEADD (DAY, -1, DATEADD(MONTH, 1, @N_FromDate))
 
 	SELECT p.LicenseeCode, b.CurrencyName, r.ProductName, p.PartyId
-		,SUM(CASE WHEN InvItemTypeId IN (1,30,31,32,33,34,35,36,37,38,39,40) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) LicensingFee
+		,SUM(CASE WHEN InvItemTypeId IN (1,30,31,32,33,34,35,36,37,38,39,40,41,42) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) LicensingFee
 		,SUM(CASE WHEN InvItemTypeId = 4 THEN ISNULL(Expense,0) ELSE 0 END) Discount
 		,SUM(CASE WHEN InvItemTypeId = 6 THEN ISNULL(Expense,0) ELSE 0 END) Rebate
 		,SUM(CASE WHEN InvItemTypeId IN (5,24,26) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Prepayment

@@ -32,7 +32,7 @@ AS
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
-
+		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 */
 
 BEGIN
@@ -41,7 +41,8 @@ BEGIN
 	DECLARE @GD_Tip				SMALLINT = 1706,
 			@PP_Contribution	SMALLINT = 4297,
 			@SBC_Contribution	SMALLINT = 1698,
-			@VGA_Contribution	SMALLINT = 3898
+			@VGA_Contribution	SMALLINT = 3898,
+			@SG_Contribution	SMALLINT = 4599
 
 	SELECT * INTO #Exchange FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
@@ -108,7 +109,7 @@ BEGIN
 		AND b.CustomerCategory NOT IN (27, 28)
 		AND eb.BettypeID IS NULL
 		AND b.SiteID NOT IN (SELECT c.LicenseeId FROM @CreditLicenee c)
-		AND b.ProductID NOT IN (13,15,25,32,42, 66) -- exclude BT, CB, CO, PP, SBC
+		AND b.ProductID NOT IN (13,15,25,32,42, 66, 36) -- exclude BT, CB, CO, PP, SBC
 	GROUP BY b.rptdate, b.SiteId, p.GroupProductId, 
 		CASE WHEN b.Bettype = @GD_Tip THEN b.Bettype
 			 ELSE ISNULL(sbr.BettypeRef, -1)
@@ -172,16 +173,16 @@ BEGIN
 	END
 
 	-- PP and SBC and VGA
-	IF EXISTS (SELECT TOP 1 1 FROM @Products WHERE ProductId IN (32, 42, 66))
+	IF EXISTS (SELECT TOP 1 1 FROM @Products WHERE ProductId IN (32, 42, 66, 36))
 	BEGIN
 		INSERT INTO #Data(WinLossDate,LicenseeId,ProductId,Bettype,Winloss,Contribution)
 		SELECT b.rptDate, b.SiteId, b.ProductId, -1, 
-		CAST(SUM((CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @VGA_Contribution) THEN 0 ELSE ISNULL(b.MemberWL, 0) END) * e.BaseCurrencyRate) AS MONEY),
-		CAST(SUM((CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @VGA_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) * e.BaseCurrencyRate) AS MONEY)
+		CAST(SUM((CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @VGA_Contribution, @SG_Contribution) THEN 0 ELSE ISNULL(b.MemberWL, 0) END) * e.BaseCurrencyRate) AS MONEY),
+		CAST(SUM((CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @VGA_Contribution, @SG_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) * e.BaseCurrencyRate) AS MONEY)
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 		INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
-		LEFT JOIN LA_f_ExcludedBettypeListSel('','4297,1698,3898') eb ON b.Bettype = eb.BettypeID
-		INNER JOIN @Products p ON p.ProductId = b.ProductID AND p.ProductId IN (32, 42, 66)
+		LEFT JOIN LA_f_ExcludedBettypeListSel('','4297,1698,3898,4599') eb ON b.Bettype = eb.BettypeID
+		INNER JOIN @Products p ON p.ProductId = b.ProductID AND p.ProductId IN (32, 42, 66, 36)
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.StatusId NOT IN (-1, 101, 102, 103)
 			AND b.CurrencyID <> 20
