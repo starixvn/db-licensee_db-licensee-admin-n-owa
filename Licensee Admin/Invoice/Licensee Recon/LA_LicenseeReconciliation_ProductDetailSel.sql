@@ -20,6 +20,7 @@ AS
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20211115@Percy: Return IsShowOddsSpread [RedmineID: #164411]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
+		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 */
 
 BEGIN
@@ -82,8 +83,8 @@ BEGIN
 		WHERE DI_Rate > 0
 
 		-- Get Winloss data
-		CREATE TABLE #tmpLAData (WinlostDate SMALLDATETIME, Currency INT, SiteId INT, Bettype INT, LicenseeWL MONEY, Contribution MONEY, Promotion MONEY, JackpotPrize MONEY, OddsSpread MONEY, IsShowOddsSpread TINYINT)
-		INSERT INTO #tmpLAData (WinlostDate, Currency, SiteId, Bettype, LicenseeWL, Contribution, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread)
+		CREATE TABLE #tmpLAData (WinlostDate SMALLDATETIME, Currency INT, SiteId INT, Bettype INT, LicenseeWL MONEY, Contribution MONEY, Promotion MONEY, JackpotPrize MONEY, OddsSpread MONEY)
+		INSERT INTO #tmpLAData (WinlostDate, Currency, SiteId, Bettype, LicenseeWL, Contribution, Promotion, JackpotPrize, OddsSpread)
 		SELECT r.rptDate, r.CurrencyId, r.SiteId
 			,CASE WHEN r.Bettype IN (1706, 3007) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END AS Bettype
 			,SUM(CASE WHEN b.Bettype IS NOT NULL OR r.TicketType = 2 THEN 0 ELSE -ISNULL(r.MemberWL, 0) END) AS LicenseeWL
@@ -91,7 +92,6 @@ BEGIN
 			,SUM(CASE WHEN b.TypeId = 2 OR r.TicketType = 2 THEN ISNULL(r.MemberWL, 0) ELSE 0 END) AS Promotion
 			,SUM(CASE WHEN b.TypeId = 3 THEN ISNULL(r.MemberWL, 0) ELSE 0 END) AS JackpotPrize
 			,SUM(CASE WHEN b.TypeId = 4 THEN ISNULL(-r.GrossWL, 0) ELSE 0 END) AS OddsSpread
-			,MAX(CASE WHEN b.TypeId = 4 THEN 1 ELSE 0 END) AS IsShowOddsSpread
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
 			INNER JOIN @tblSite s ON r.SiteId = s.SiteId
 			LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH (NOLOCK) ON sbr.Bettype = r.Bettype
@@ -145,7 +145,7 @@ BEGIN
 	
 		-- LA
 		INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread)
-		SELECT 'LA', LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread
+		SELECT 'LA', LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, 1 AS IsShowOddsSpread
 		FROM (
 			SELECT
 				CONVERT(SMALLMONEY, ISNULL(bc.Rate, c.Rate)) AS ChargeRate
@@ -156,17 +156,19 @@ BEGIN
 				,CONVERT(MONEY, SUM(t.Promotion * e.Rate)) AS Promotion
 				,CONVERT(MONEY, SUM(t.JackpotPrize * e.Rate)) AS JackpotPrize
 				,CONVERT(MONEY, SUM(-t.OddsSpread * e.Rate)) AS OddsSpread
-				,CONVERT(BIT, MAX(t.IsShowOddsSpread)) AS IsShowOddsSpread
 			FROM #tmpLAData t
 				INNER JOIN @Exchange e ON t.Currency = e.ExchangeId AND t.WinlostDate = e.ExchangeDate
 				INNER JOIN @ChargeInfo c ON t.SiteId = c.LicenseeId AND (t.Bettype = c.Bettype OR c.Bettype = -1) AND t.WinlostDate BETWEEN c.FromDate AND c.ToDate
 				LEFT JOIN dbo.LA_ChargeRateByCurrency bc WITH (NOLOCK) ON c.ChargeId = bc.ChargeId AND t.Currency = bc.CurrencyId
 			GROUP BY CONVERT(SMALLMONEY, ISNULL(bc.Rate, c.Rate))
 		) d
-
+		
 		IF @@ROWCOUNT = 0
 			INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread)
 			SELECT 'LA', 0, 0, 0, 0, 0, 0, 0, 0, 0
+
+		ELSE IF EXISTS (SELECT 1 FROM @Result WHERE Func = 'LA' HAVING SUM(-OddsSpread) <= 0)  -- Set OddsSpread = 0 if value is negative (show Negative value (-))
+			UPDATE @Result SET OddsSpread = 0, IsShowOddsSpread = 0 WHERE Func = 'LA'
 
 		-- NAP
 		;WITH CTE_tmpData AS (
@@ -192,7 +194,7 @@ BEGIN
 			,ISNULL(t.Promotion, 0) AS Promotion
 			,ISNULL(t.JackpotPrize, 0) AS JackpotPrize
 			,ISNULL(t.OddsSpread, 0) AS OddsSpread
-			,ISNULL(t.IsShowOddsSpread, 0) AS IsShowOddsSpread
+			,1 AS IsShowOddsSpread
 		FROM CTE_Data d
 			FULL OUTER JOIN (
 				SELECT
@@ -200,7 +202,6 @@ BEGIN
 					,SUM(CASE WHEN TypeId = 2 THEN CompanyWL ELSE 0 END) AS Promotion
 					,SUM(CASE WHEN TypeId = 3 THEN CompanyWL ELSE 0 END) AS JackpotPrize
 					,SUM(CASE WHEN TypeId = 4 THEN CompanyWL ELSE 0 END) AS OddsSpread
-					,MAX(CASE WHEN TypeId = 4 THEN 1 ELSE 0 END) AS IsShowOddsSpread
 				FROM CTE_Data
 				WHERE TypeId IS NOT NULL
 			) t ON d.TypeId = 0 AND d.RN = 1
@@ -209,6 +210,8 @@ BEGIN
 		IF @@ROWCOUNT = 0
 			INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread)
 			SELECT 'NAP', 0, 0, 0, 0, 0, 0, 0, 0, 0
+		ELSE IF NOT EXISTS (SELECT 1 FROM @Result WHERE Func = 'NAP' AND OddsSpread <> 0)
+			UPDATE @Result SET IsShowOddsSpread = 0 WHERE Func = 'NAP'
 	END
 
 	-- Return data

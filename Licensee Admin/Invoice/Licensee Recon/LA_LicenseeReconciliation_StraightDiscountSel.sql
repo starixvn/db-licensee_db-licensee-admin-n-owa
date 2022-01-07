@@ -17,6 +17,7 @@ AS
 		- 20201209@Parsons: Licensee Reconciliation - Change Discount column if licensee has straight rebate [#146328]
 		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
 		- 20210407@Percy: Support duo base currency - Change code for Collection Summary [RedmineID: #152089]
+		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 
 	Example:
 		USE bodb_licensee
@@ -27,81 +28,81 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @LastDayOfMonth DATE = DATEADD(DAY, -1, DATEADD(MONTH, DATEDIFF(MONTH, 0, @ReportMonth) + 1, 0))
+	DECLARE @FromDate DATE = DATEADD(MONTH, DATEDIFF(MONTH, 0, @ReportMonth), 0)
+	DECLARE @ToDate DATE = DATEADD(DAY, -1, DATEADD(MONTH, 1, @FromDate))
 
-	-- get base currency
-	--
-	DECLARE @baseCurrencyList TABLE (CurrencyId INT, CurrencyName VARCHAR(5))
-	INSERT INTO @baseCurrencyList(CurrencyId,CurrencyName)
+	-- Get licensees have SB straight discount
+	DECLARE @DiscountSetting TABLE (PartyId INT, BaseCurrencyId INT, BaseCurrencyName VARCHAR(5), LicenseeCode VARCHAR(50), DiscountRate MONEY)
+	INSERT INTO @DiscountSetting (PartyId, DiscountRate)
+	SELECT a.PartyId, d.Rate
+	FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
+		INNER JOIN dbo.LA_DiscountGroupDetail d WITH (NOLOCK) ON d.DiscountGroupId = h.DiscountGroupId AND d.FromAmount = 0 AND d.ToAmount = 10000000000000 -- straight discount
+		INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON p.DiscountGroupId = h.DiscountGroupId AND p.ProductId = 0 -- SB
+		INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId AND a.IsApplyDiscount = 1
+	WHERE @ToDate BETWEEN h.FromDate AND h.ToDate
+		AND h.DiscountGroupType <> 2 -- 2 = rebate, <> 2 = discount
+		AND p.CalculationType IN (1, 10) -- 0 = calculated only, 1 = discount only, 10 = calculated & discount
 
-	SELECT CurrencyId,CurrencyName FROM OPENQUERY(DBCUST, 'EXEC CustDB.dbo.LA_BaseCurrency_Sel') 
+	UPDATE d
+	SET d.BaseCurrencyId = ISNULL(bc.BaseCurrencyId, 6), d.BaseCurrencyName = ISNULL(e.Code, 'EUR'), d.LicenseeCode = ISNULL(UPPER(bc.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), d.PartyId)
+	FROM @DiscountSetting d
+		LEFT JOIN dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON d.PartyId = bc.PartyId
+		LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON bc.BaseCurrencyId = e.ExchangeId
+	WHERE @ToDate BETWEEN bc.FromDate AND bc.ToDate
 
-	-- 1. Get licensees have straight discount
-	--
-	DECLARE @Unlimited MONEY = 10000000000000
-	DECLARE @straightDiscount TABLE(Id INT, CurrencyId INT)
-	DECLARE @discountSettings TABLE(PartyId INT, Rate MONEY, CurrencyId INT, LicenseeCode VARCHAR(50))
+	-- Get SB fee
+	DECLARE @PartyIds VARCHAR(MAX)
+	SELECT  @PartyIds = COALESCE(@PartyIds + ',', '') + CONVERT(VARCHAR(15), PartyId) FROM @DiscountSetting
 
-	INSERT INTO @straightDiscount(id, CurrencyId)
-	SELECT h.DiscountGroupId,h.CurrencyId
-	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
-	INNER JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON h.DiscountGroupId=d.DiscountGroupId
-	INNER JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON h.DiscountGroupId=p.DiscountGroupId
-	WHERE @ReportMonth BETWEEN h.FromDate AND h.ToDate
-		AND p.ProductId = 0
-		AND p.CalculationType > 0 -- 0 = just calculate, no discount
-		AND h.DiscountGroupType <> 2 -- rebate
-	GROUP BY h.DiscountGroupId,h.CurrencyId
-	HAVING COUNT(d.DiscountGroupId) = 1
-		AND MIN(FromAmount) = 0
-		AND MAX(ToAmount) = @Unlimited
+	CREATE TABLE #tmpData (rptDate DATE, PartyId INT, CurrencyId INT, LicensingFee MONEY, OddsSpreadCost MONEY)
 
-	INSERT INTO @discountSettings (PartyId, Rate, CurrencyId, LicenseeCode)
-	SELECT a.PartyId, d.Rate, s.CurrencyId, UPPER(bc.LicenseeCode) AS LicenseeCode
-	FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
-	INNER JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON a.DiscountGroupId=d.DiscountGroupId
-	INNER JOIN @straightDiscount s ON s.Id = a.DiscountGroupId
-	INNER JOIN dbo.OAS_PartyBaseCurrency bc WITH(NOLOCK) ON bc.PartyID=a.PartyID
-	WHERE a.IsApplyDiscount = 1
-		AND @LastDayOfMonth BETWEEN bc.FromDate AND bc.ToDate
+	INSERT INTO #tmpData (rptDate, PartyId, CurrencyId, LicensingFee, OddsSpreadCost)
+	SELECT b.rptDate, c.PartyId, b.CurrencyId, SUM(b.LicenseeWL * ISNULL(cr.Rate, c.DI_Rate)) AS LicensingFee, SUM(b.OddsSpreadCost) AS OddsSpreadCost
+	FROM (
+		SELECT rptDate, SiteId, ProductId, CurrencyId
+			,CONVERT(MONEY, SUM(CASE WHEN Bettype = 999 THEN 0 ELSE -MemberWL END)) AS LicenseeWL
+			,CONVERT(MONEY, SUM(CASE WHEN Bettype = 999 THEN -GrossWL ELSE 0 END)) AS OddsSpreadCost
+		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct WITH (NOLOCK)
+		WHERE rptDate BETWEEN @FromDate AND @ToDate
+			AND ProductId = 0
+			AND CustomerCategory NOT IN (27, 28)
+			AND StatusId IN (111, 112, 113, 114, 115)
+		GROUP BY rptDate, SiteId, ProductId, CurrencyId
+	) b
+		INNER JOIN dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, 'SB', 'OA', 1) c ON b.SiteId = c.LicenseeId AND b.ProductId = c.ProductId
+		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeId = c.ChargeId AND cr.CurrencyId = b.CurrencyId
+	GROUP BY b.rptDate, c.PartyId, b.CurrencyId
 
-	-- 2. Get SB fee
-	DECLARE @partyIds VARCHAR(1000) = STUFF((SELECT ',' + CAST(PartyId AS VARCHAR(5)) FROM @discountSettings FOR XML PATH('')),1,1,'')
-	DECLARE @FromDate DATE = DATEADD(MONTH,DATEDIFF(MONTH,0,@ReportMonth),0)
-	DECLARE @ToDate DATE = DATEADD(DAY,-1,DATEADD(MONTH,1,@FromDate))
+	-- Base Exchange Rate
+	DECLARE @BaseCurrencyList TABLE (ExchangeId INT, ExchangeName VARCHAR(5))
+	INSERT INTO @BaseCurrencyList (ExchangeId, ExchangeName)
+	SELECT DISTINCT BaseCurrencyId, BaseCurrencyName FROM @DiscountSetting
 
-	SELECT CASE WHEN b.Bettype = 999 THEN ISNULL(-b.GrossWL, 0) ELSE 0 END 
-	       -b.MemberWL * ISNULL(cr.Rate, c.DI_Rate) AS AmountToCompany, c.PartyID, b.CurrencyId,b.rptDate 
-	INTO #data
-	FROM bodb_licenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
-	INNER JOIN dbo.LA_f_ChargeInfo(@partyIds,@FromDate,@ToDate,'SB','OA',1) c ON b.SiteId = c.LicenseeId AND b.ProductId = c.ProductId
-	LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeId = c.ChargeId AND cr.CurrencyId = b.CurrencyId
-	WHERE b.rptDate BETWEEN c.Fromdate AND c.Todate
-		AND b.customercategory NOT IN (27, 28)
-		AND b.StatusId NOT IN (-1, 101, 102, 103)
+	DECLARE @ExchangeId INT, @ExchangeName VARCHAR(5)
 
-	-- 3. Exchange
-	DECLARE @result TABLE(LicenseeCode VARCHAR(50), Rate MONEY, Sportsbook MONEY)
+	CREATE TABLE #Result (LicenseeCode VARCHAR(50), Rate MONEY, Sportsbook MONEY)
 
-	DELETE @baseCurrencyList WHERE CurrencyId NOT IN (SELECT s.CurrencyId FROM @straightDiscount s)
-	WHILE EXISTS(SELECT TOP 1 1 FROM @baseCurrencyList)
+	WHILE EXISTS (SELECT 1 FROM @BaseCurrencyList)
 	BEGIN
-		DECLARE @CurrencyName VARCHAR(5)
-		DECLARE @CurrencyId INT
-		
-		SELECT TOP 1 @CurrencyName=CurrencyName,@CurrencyId=CurrencyId FROM @baseCurrencyList
-		DELETE @baseCurrencyList WHERE CurrencyName = @CurrencyName
+		SELECT TOP 1 @ExchangeId = ExchangeId, @ExchangeName = ExchangeName FROM @BaseCurrencyList
 
-		INSERT INTO @result(LicenseeCode,Rate,Sportsbook)
-		SELECT ISNULL(s.LicenseeCode, '') + '|' + CONVERT(VARCHAR(50), d.PartyId), s.Rate, SUM(d.AmountToCompany * e.BaseCurrencyRate)
-		FROM #data d
-		INNER JOIN @discountSettings s ON d.PartyID=s.PartyId
-		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CurrencyName) e ON e.ExchangeId=d.CurrencyId AND e.exchangedate=d.rptDate
-		WHERE s.CurrencyId=@CurrencyId
-		GROUP BY ISNULL(s.LicenseeCode, '') + '|' + CONVERT(VARCHAR(50), d.PartyId), s.Rate
+		INSERT INTO #Result (LicenseeCode, Rate, Sportsbook)
+		SELECT ds.LicenseeCode, ds.DiscountRate
+			,SUM(d.LicensingFee * e.BaseCurrencyRate) + CASE WHEN SUM(d.OddsSpreadCost * e.BaseCurrencyRate) < 0 THEN 0 ELSE SUM(d.OddsSpreadCost * e.BaseCurrencyRate) END
+		FROM #tmpData d
+			INNER JOIN @DiscountSetting ds ON ds.PartyId = d.PartyId
+			INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @ExchangeName) e ON e.ExchangeId = d.CurrencyId AND e.ExchangeDate = d.rptDate
+		WHERE ds.BaseCurrencyId = @ExchangeId
+		GROUP BY ds.LicenseeCode, ds.DiscountRate
+
+		DELETE @BaseCurrencyList WHERE ExchangeId = @ExchangeId
 	END
 
-	SELECT * FROM @result
-	DROP TABLE #data
+	-- Return data
+	SELECT LicenseeCode, Rate, Sportsbook
+	FROM #Result
+
+	DROP TABLE #Result
+	DROP TABLE #tmpData
 END
 GO

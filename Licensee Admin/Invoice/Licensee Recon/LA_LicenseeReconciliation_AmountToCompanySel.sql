@@ -63,6 +63,7 @@ AS
 		- 20210813@Percy: Remove check negative amount of ContributionDiscount [RedmineID: #159294]
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
+		- 20211212@Percy: Return OddsSpreadCost for Detail Mode [RedmineID: #165849]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -101,19 +102,20 @@ BEGIN
 		,@ProductCodes = @ProductCodes
 		,@FromDate = @FromDate
 		,@ToDate = @ToDate
-		,@LicensingFeeTypeIds = '0,7' -- 7 = ContributionDiscount
+		,@LicensingFeeTypeIds = '0,7,9' -- 7 = ContributionDiscount, 9 = OddsSpeadAdjustment
 		,@BaseCurrencyName = @BaseCurrency
 
-	DECLARE @FinalResult TABLE (PartyId INT, ProductId INT, AmountToCompany MONEY, LicensingFee MONEY, Discount MONEY, Rebate MONEY, Promotion MONEY, ContributionDiscount MONEY)
-	INSERT INTO @FinalResult (PartyId, ProductId, AmountToCompany, LicensingFee, Discount, Rebate, Promotion, ContributionDiscount)
-	SELECT r.PartyId, r.ProductId, r.GrossLicensingFee, r.LicensingFee + r.ExtraAmount, r.Discount, r.Rebate, ISNULL(t.Promotion, 0), ISNULL(t.ContributionDiscount, 0)
+	DECLARE @FinalResult TABLE (PartyId INT, ProductId INT, AmountToCompany MONEY, LicensingFee MONEY, Discount MONEY, Rebate MONEY, Promotion MONEY, ContributionDiscount MONEY, OddsSpreadCost MONEY)
+	INSERT INTO @FinalResult (PartyId, ProductId, AmountToCompany, LicensingFee, Discount, Rebate, Promotion, ContributionDiscount, OddsSpreadCost)
+	SELECT r.PartyId, r.ProductId, r.GrossLicensingFee, r.LicensingFee + r.ExtraAmount, r.Discount, r.Rebate, ISNULL(t.Promotion, 0), ISNULL(t.ContributionDiscount, 0), ISNULL(t.OddsSpreadAdjustment, 0)
 	FROM @Result r
 		LEFT JOIN (
 			SELECT PartyId, CASE WHEN ProductId = 37 THEN 0 ELSE ProductId END AS ProductId
 				,SUM(CASE WHEN ProductId = 37 THEN LicensingFee ELSE 0 END) AS Promotion
 				,SUM(CASE WHEN LicensingFeeTypeId = 7 THEN ExtraAmount ELSE 0 END) AS ContributionDiscount
+				,SUM(CASE WHEN LicensingFeeTypeId = 9 AND ExtraAmount < 0 THEN -ExtraAmount ELSE 0 END) AS OddsSpreadAdjustment
 			FROM @Result
-			WHERE ProductId = 37 OR LicensingFeeTypeId = 7
+			WHERE ProductId = 37 OR LicensingFeeTypeId > 0
 			GROUP BY PartyId, CASE WHEN ProductId = 37 THEN 0 ELSE ProductId END
 		) t ON r.PartyId = t.PartyId AND r.ProductId = t.ProductId
 	WHERE r.LicensingFeeTypeId = 0 AND r.ProductId <> 37
@@ -145,6 +147,7 @@ BEGIN
 				,SUM(r.Rebate)					AS Rebate
 				,SUM(r.Promotion)				AS Promotion
 				,SUM(r.ContributionDiscount)	AS ContributionDiscount
+				,SUM(r.OddsSpreadCost)			AS OddsSpreadCost
 			FROM @FinalResult r
 			GROUP BY r.PartyId
 		ELSE
@@ -156,6 +159,7 @@ BEGIN
 				,SUM(r.Rebate)					AS Rebate
 				,SUM(r.Promotion)				AS Promotion
 				,SUM(r.ContributionDiscount)	AS ContributionDiscount
+				,SUM(r.OddsSpreadCost)			AS OddsSpreadCost
 			FROM @FinalResult r
 				INNER JOIN @PartyList p ON r.PartyId = p.PartyId
 			GROUP BY p.LicenseeCode

@@ -362,9 +362,7 @@ BEGIN
 
 	-- Include OddsSpread into Licensing Fee if value is positive
 	UPDATE t
-	SET t.OddsSpread = CASE WHEN r.BasedOddsSpread <= 0 THEN 0 ELSE t.OddsSpread END
-		,t.BasedOddsSpread = CASE WHEN r.BasedOddsSpread <= 0 THEN 0 ELSE t.BasedOddsSpread END
-		,t.GrossLicenseeAmount = t.GrossLicenseeAmount + CASE WHEN r.BasedOddsSpread <= 0 THEN 0 ELSE t.OddsSpread END
+	SET t.GrossLicenseeAmount = t.GrossLicenseeAmount + CASE WHEN r.BasedOddsSpread <= 0 THEN 0 ELSE t.OddsSpread END
 		,t.LicenseeAmount = t.LicenseeAmount + CASE WHEN r.BasedOddsSpread <= 0 THEN 0 ELSE t.OddsSpread END
 		,t.BasedLicenseeAmount = t.BasedLicenseeAmount + CASE WHEN r.BasedOddsSpread <= 0 THEN 0 ELSE t.BasedOddsSpread END
 	FROM #tmpResult t
