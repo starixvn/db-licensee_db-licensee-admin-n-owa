@@ -11,6 +11,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss]
 	, @DrawFilter			SMALLINT		= 1
 	, @IsConvert			BIT				= 0
 	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
+	, @LicenseeStatusIds	VARCHAR(100) 
 AS
 
 /*  Created:  Forrest.Nguyen
@@ -45,6 +46,7 @@ AS
 	- 20211115@Percy: Return IsShowOddsSpread [RedmineID: #164411]
 	- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 	- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
+	- 20210824@Danny: filter licensee status from OIC [#159296]
 	
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -69,6 +71,10 @@ BEGIN
 	DECLARE @PP_ProductId   TINYINT = 32,
 			@SBC_ProductId  TINYINT = 42,
 			@VGA_ProductId  TINYINT	= 66
+
+	-- Handle Licensee status
+	SELECT @PartyIds = PartyIDs FROM bodb_Licensee.dbo.LA_f_PartyListByStatusSel(@PartyIDs, @LicenseeStatusIds)
+	-- End Handle licensee status
 
 	DECLARE @BaseCurrencyId INT
 

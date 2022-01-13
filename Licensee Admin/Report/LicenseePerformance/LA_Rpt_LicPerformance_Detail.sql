@@ -14,6 +14,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_Detail]
 	,@DrawFilter			SMALLINT = 1
 	,@LicenseePaying		INT = 0
 	,@PreviousPeriodType	INT = 1
+	,@LicenseeStatusIds	VARCHAR(100) 
 AS
 
 /*	Created: 20141209@Patrick
@@ -76,6 +77,7 @@ AS
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20211216@Percy: Enhance performance - Change table variable to temp table [RedmineID: #163181]
+		- 20210824@Danny: filter licensee status from OIC [#159296]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -112,9 +114,18 @@ BEGIN
 	IF DAY(@PrevTDate) > DAY(@TDate) AND @TDate <> DATEADD(DAY, -1, DATEADD(MONTH, DATEDIFF(MONTH, 0, @TDate) + 1, 0))
 		SELECT @PrevTDate = CONVERT(VARCHAR(8), @PrevTDate, 120) + CONVERT(VARCHAR(2), @TDate, 103)
 
+	DECLARE @statusTab TABLE (StatusId INT)
+	INSERT INTO @statusTab (StatusId)
+	SELECT CAST (val AS INT) FROM dbo.strSplit(@LicenseeStatusIds,',')
+
+	CREATE TABLE #tmp_licenseeOIC (RegisteredLicenseeName NVARCHAR(50), LicenseeStatusId TINYINT)
+	INSERT INTO #tmp_licenseeOIC(RegisteredLicenseeName, LicenseeStatusId)
+	SELECT	RegisteredLicenseeName, LicenseeStatusId
+	FROM	DBOIC.bodb_OIC.dbo.licensee WITH(NOLOCK)
+
 	-- Get Party List
 	BEGIN
-		DECLARE @PartyList TABLE (PartyId INT, PartyName VARCHAR(50), LaunchDate DATE)
+		DECLARE @PartyList TABLE (PartyId INT, PartyName VARCHAR(50), LaunchDate DATE, StatusID INT)
 		INSERT INTO @PartyList (PartyId)
 		SELECT DISTINCT val FROM dbo.StrSplit(@PartyIds, ',')
 
@@ -134,6 +145,21 @@ BEGIN
 					AND c.ToParty IN (1, 9, 11, 98) -- licensee to house
 				ORDER BY c.FromDate
 			) c
+		
+
+		UPDATE p
+		SET p.StatusId = CASE	WHEN la.IsDeposit = 0 THEN 3 -- Active (Credit)
+								WHEN la.IsDeposit = 1 AND oic.LicenseeStatusId IS NULL THEN 999 -- 999: Unrecognized dummy status
+								ELSE oic.LicenseeStatusId END 
+		FROM  @PartyList p
+			INNER JOIN bodb_licensee.dbo.OAS_Party op WITH(NOLOCK) ON op.PartyID = p.PartyID
+			INNER JOIN bodb_licensee.dbo.Licensees la WITH (NOLOCK) ON la.LicenseeId = op.OldRefID
+			LEFT JOIN  #tmp_licenseeOIC oic WITH (NOLOCK) ON oic.RegisteredLicenseeName = la.LicenseeName
+
+		DELETE  @PartyList 
+		WHERE StatusID NOT IN (SELECT x.StatusId FROM @statusTab x) 
+
+		SET @PartyIds = (SELECT CAST(PartyId AS VARCHAR(10)) + ',' FROM @PartyList FOR XML PATH(''))
 
 		DELETE @PartyList WHERE PartyName IS NULL
 	END
@@ -397,5 +423,6 @@ BEGIN
 	)
 
 	DROP TABLE #_tmp_PartyChargeInfo
+	DROP TABLE #tmp_licenseeOIC
 END
 GO

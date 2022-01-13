@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -10,7 +10,7 @@ AS
 /*
 	 Created: 20150414@Florent
 	 Task : get Payer Information by Id
-	 DB: DBCUST.bodb_Licensee
+	 DB: DBLIC.bodb_Licensee
 
 	 Revisions:
 		+ 20160808@Bravo: Hosting fees
@@ -22,6 +22,7 @@ AS
 		+ 20190829@Bruce: Adding Licensee Code [#111586]
 		+ 20210315@Happy: Change BaseCurrency Of Licensee [#151466]
 		- 20210811@Danny: Adding AttnName2, CompanyName2 into OAS_PartyDetail [#FeatureID 158133]
+		- 20210824@Danny: get licensee status from OIC And Relocated SP [#159296]
 		
 	 Params:
 	 Example:
@@ -30,6 +31,17 @@ AS
 BEGIN
 SET NOCOUNT ON
 	DECLARE @CurrentDate DATE = CONVERT(DATE, GETDATE())
+
+	CREATE TABLE #tmp_licenseeOIC (RegisteredLicenseeName NVARCHAR(50), LicenseeStatusId TINYINT)
+	INSERT INTO #tmp_licenseeOIC(RegisteredLicenseeName, LicenseeStatusId)
+	SELECT	RegisteredLicenseeName, LicenseeStatusId
+	FROM	DBOIC.bodb_OIC.dbo.licensee WITH(NOLOCK)
+
+	CREATE TABLE #tmp_licenseeOICStatus (LicenseeStatusId TINYINT, LicenseeStatusName NVARCHAR(30))
+	INSERT INTO #tmp_licenseeOICStatus(LicenseeStatusId, LicenseeStatusName)
+	SELECT	LicenseeStatusId, LicenseeStatusName
+	FROM	DBOIC.bodb_OIC.dbo.LicenseeStatus WITH(NOLOCK)
+
 	SELECT TOP 1 p.PartyID AS PayerID
 		, p.PartyName AS PayerName
 		, pd.StatusId
@@ -46,8 +58,13 @@ SET NOCOUNT ON
 		, pd.InvoiceLanguage
 		, pd.AttnName2
 		, pd.CompanyName2
+		, CASE WHEN t.IsDeposit = 0 THEN 'Active'
+				 ELSE ISNULL(us.LicenseeStatusName, 'Unrecognized') END AS PayerStatusName
 	FROM dbo.OAS_Party p WITH (NOLOCK)
-		LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
+		LEFT JOIN	dbo.Licensees t WITH(NOLOCK) ON p.OldRefID = t.LicenseeId
+		LEFT JOIN	#tmp_licenseeOIC u WITH(NOLOCK) ON t.LicenseeName = u.RegisteredLicenseeName
+		LEFT JOIN	#tmp_licenseeOICStatus us WITH(NOLOCK) ON u.LicenseeStatusId = us.LicenseeStatusId
+		LEFT JOIN	dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 		LEFT JOIN (
 			SELECT i.FromPartyId, i.ToPartyId, i.InvTypeId, ActiveAddress
 			FROM dbo.LA_InvoiceSetting i
@@ -65,8 +82,11 @@ SET NOCOUNT ON
 		, p.ToDate
 		, CASE WHEN p.ToDate < @CurrentDate THEN 0 ELSE 1 END AS IsActive
 	FROM OAS_PartyBaseCurrency p WITH(NOLOCK)
-	LEFT JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON p.BaseCurrencyId = e.exchangeid
+	LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON p.BaseCurrencyId = e.exchangeid
 	WHERE PartyID = @PayerId
 	ORDER BY p.ToDate DESC
+
+	DROP TABLE #tmp_licenseeOIC
+	DROP TABLE #tmp_licenseeOICStatus
 END
 GO

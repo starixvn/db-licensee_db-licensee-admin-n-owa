@@ -6,7 +6,8 @@ ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinLossByProduct]
 	@PartyIdString		VARCHAR(MAX),
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
-	@BaseCurrencyName	VARCHAR(10)
+	@BaseCurrencyName	VARCHAR(10),
+	@LicenseeStatusIds	VARCHAR(100)
 AS
 
 /*	Header:
@@ -71,6 +72,7 @@ AS
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
+		- 20210823@Danny: filter licensee status from OIC [#159296]
 */
 		
 /*	Example:
@@ -106,14 +108,19 @@ BEGIN
 		SELECT  @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #Products
 	END
 	
+	-- Handle Licensee status
+	SELECT @PartyIdString = PartyIDs FROM dbo.LA_f_PartyListByStatusSel(@PartyIdString, @LicenseeStatusIds)
+	-- End Handle Licensee status
+
 	-- Region: Get Party ID
-	DECLARE @PartyIdTable TABLE (Id INT NOT NULL)
+	DECLARE @PartyIdTable TABLE (Id INT NOT NULL, StatusID INT)
 	DECLARE @Delimiter CHAR(1)=','
 
 	INSERT @PartyIdTable (Id)
 	SELECT val
 	FROM dbo.strSplit(@PartyIdString, @Delimiter)
 	-- End Region
+
 	
 	DECLARE @PartyChargeInfo AS TABLE (
 			ChargeId	INT,

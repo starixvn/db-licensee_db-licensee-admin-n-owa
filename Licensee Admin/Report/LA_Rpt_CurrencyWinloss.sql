@@ -15,6 +15,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_CurrencyWinloss]
 	, @IsConvert			BIT				= 0
 	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
 	, @GroupByType			SMALLINT		= 1
+	, @LicenseeStatusIds	VARCHAR(100)	
 AS
 
 /*  Created: Florent.Nguyen
@@ -55,6 +56,7 @@ AS
 	   - 20211115@Percy: Return IsShowOddsSpread [RedmineID: #164411]
 	   - 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 	   - 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
+	   - 20210824@Danny: filter licensee status from OIC [#159296]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -100,6 +102,10 @@ BEGIN
 
 	SET @ProductCodes = NULL
 	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #Products
+
+	-- Handle licensee status
+	SELECT @PartyIds = PartyIDs FROM bodb_Licensee.dbo.LA_f_PartyListByStatusSel(@PartyIDs, @LicenseeStatusIds)
+	-- End Handle licensee status
 
 	CREATE TABLE #tmpWinLoss(
 		Winlostdate		DATETIME,
