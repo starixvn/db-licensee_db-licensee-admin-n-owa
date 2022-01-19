@@ -13,8 +13,6 @@ ALTER PROCEDURE [dbo].[LA_DiscountIns]
 	@RateSettingsData	VARCHAR(MAX) = '', 
 	@PartySettingsData	NVARCHAR(MAX) = '', 
 	@CurrencySettingsData	VARCHAR(MAX) = '',   
-	@UserId				INT, 
-	@LoginIp			VARCHAR (50)	= '', 
 	@ErrCode			INT = 0 OUTPUT, 
 	@ErrMsg				VARCHAR(4000)= '' OUTPUT, 
 	@GroupIdOut			SMALLINT = 0 OUTPUT
@@ -29,6 +27,7 @@ AS
 		- 20181023@Parsons: Configure-discount-settings-by-currency [#99694]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20200609@Parsons: Special handling for INH market [#128570]
+		- 20211101@Percy: Remove useless params [RedmineID: #162158]
 
 	 Params:
 		@RateSettingsData = '<Root>
