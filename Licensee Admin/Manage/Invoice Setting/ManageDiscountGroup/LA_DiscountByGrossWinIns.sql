@@ -132,8 +132,8 @@ BEGIN
 
 		INSERT INTO @PartyList (PartyId, ChargeRate, Remark)
 		SELECT t.c.value('(PartyId/text())[1]', 'INT') AS PartyId
-			,t.c.value('(ChargeRate/text())[1]', 'FLOAT') AS ChargeRate
-			,t.c.value('(Remark/text())[1]', 'NVARCHAR(500)') AS Remark
+			,ISNULL(t.c.value('(ChargeRate/text())[1]', 'FLOAT'), 0) AS ChargeRate
+			,ISNULL(t.c.value('(Remark/text())[1]', 'NVARCHAR(500)'), '') AS Remark
 		FROM @PartyXML.nodes('Root/PartySetting') AS t(c)
 		OPTION (OPTIMIZE FOR (@PartyXML = NULL))
 
