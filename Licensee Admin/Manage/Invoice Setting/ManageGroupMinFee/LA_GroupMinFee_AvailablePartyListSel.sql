@@ -15,8 +15,17 @@ AS
 	 Revisions:  
 		- 20200702@Mason: Implement Group Min Fee [#134492]
 		- 20210824@Danny: get licensee status from OIC And Relocated SP [#159296]
+		- 20210824@Danny: Enhance Manage Group Min Fee  [#167637]
 
 	 Explannation:
+		OIC LicenseeStatusId: 
+				1	Up Coming
+				2	Soft Launch
+				3	Active
+				4	Terminated
+				5	Cancelled
+				6	Suspended
+				999 Unrecognized
 */
 BEGIN
 	SET NOCOUNT ON
@@ -26,10 +35,11 @@ BEGIN
 	DECLARE @PartySettings TABLE(GroupMinFeeId INT, PartyId INT, ProductId INT)
 
 	
-	CREATE TABLE #tmp_licenseeOIC (RegisteredLicenseeName NVARCHAR(50), LicenseeStatusId TINYINT)
+	CREATE TABLE #tmp_licenseeOIC (RegisteredLicenseeName NVARCHAR(50), LicenseeStatusId INT)
 	INSERT INTO #tmp_licenseeOIC(RegisteredLicenseeName, LicenseeStatusId)
 	SELECT	RegisteredLicenseeName, LicenseeStatusId
-	FROM	DBOIC.bodb_OIC.dbo.licensee WITH(NOLOCK) WHERE LicenseeStatusId = 3
+	FROM	DBOIC.bodb_OIC.dbo.licensee WITH(NOLOCK) 
+	WHERE	LicenseeStatusId IN (3,4,6)
 
 	INSERT INTO @PartyList(PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel
@@ -58,7 +68,7 @@ BEGIN
 						FROM @PartySettings p1)
 		AND p.ParentId NOT IN (0, 999)
 
-	SELECT  p.PartyId, p.PartyName, p.BrandName
+	SELECT  p.PartyId, p.PartyName, p.BrandName, oic.LicenseeStatusId AS LicenseeStatusId
 	FROM		@PayerList p
 	INNER JOIN  dbo.OAS_Party op WITH(NOLOCK) ON p.PartyId = op.PartyID
 	INNER JOIN  dbo.Licensees l WITH(NOLOCK) ON l.LicenseeID = op.OldRefID
