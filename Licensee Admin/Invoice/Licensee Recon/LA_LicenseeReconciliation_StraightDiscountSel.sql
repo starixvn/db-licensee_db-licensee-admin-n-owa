@@ -85,7 +85,5 @@ BEGIN
 	SELECT d.LicenseeCode, d.DiscountRate, r.LicensingFee
 	FROM @Result r
 		INNER JOIN @DiscountSetting d ON d.PartyId = r.PartyId
-	DROP TABLE #Result
-	DROP TABLE #tmpData
 END
 GO
