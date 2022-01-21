@@ -31,21 +31,24 @@ BEGIN
 	CREATE TABLE #ChargeRate (
 		ChargeId INT, FromParty INT, ToParty INT, MinAmount MONEY, MaxAmount MONEY
 		,Remark NVARCHAR(200), BaseCurrencyId TINYINT, FirstOfBilling DATE, BasisOfBilling NVARCHAR(4000)
+		,NewToDate DATE -- for update ToDate
 	)
-	INSERT INTO #ChargeRate (ChargeId, FromParty, ToParty, MinAmount, MaxAmount, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling)
+	INSERT INTO #ChargeRate (ChargeId, FromParty, ToParty, MinAmount, MaxAmount, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling, NewToDate)
 	SELECT c.ChargeId, c.FromParty, c.ToParty, c.MinAmount, c.MaxAmount, c.Remark, c.BaseCurrencyId, c.FirstOfBilling, c.BasisOfBilling
+		,CASE WHEN c.Rate <> @ChargeRate THEN DATEADD(DAY, -1, @FromDate) ELSE @ToDate END AS NewToDate
 	FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
 		INNER JOIN #PartyList p ON c.FromParty = p.PartyId
 	WHERE c.ToParty IN (1, 9, 11, 98)
 		AND c.ProductId = @ProductId AND c.ChargeType = 1
 		AND c.FromDate <= @ToDate AND c.ToDate >= @FromDate
+		AND (c.Rate <> @ChargeRate OR c.ToDate <> @ToDate)
 
 	DECLARE @ChargeIdList TABLE (ChargeId INT)
 
 	BEGIN TRY
 		-- End current setting
 		UPDATE c WITH (ROWLOCK)
-		SET c.ToDate = DATEADD(DAY, -1, @FromDate)
+		SET c.ToDate = cr.NewToDate
 		FROM dbo.OAS_ChargeInfo c
 			INNER JOIN #ChargeRate cr ON c.ChargeId = cr.ChargeId
 
@@ -59,6 +62,7 @@ BEGIN
 			@ProductId, FromParty, ToParty, 0 AS ParentChargeId, @ChargeRate, 1 AS ChargeType, @FromDate, @ToDate
 			,MinAmount, MaxAmount, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling
 		FROM #ChargeRate cr
+		WHERE cr.NewToDate = DATEADD(DAY, -1, @FromDate)
 
 		INSERT INTO dbo.LA_ChargeInfo_SystemMapping (ChargeId, SystemId)
 		SELECT ChargeId, 2 AS SystemId FROM @ChargeIdList
