@@ -1,1 +1,1 @@
-Licensee Admin\Invoice\GenerateMultipleInvoices\LA_Inv_MultipleGenerationTemporaryInvoiceSel.sql
+Licensee Admin\Report\LA_GetPlatform.sql
