@@ -1,1 +1,1 @@
-Licensee Admin\Report\LA_GetPlatform.sql
+Licensee Admin\Manage\Mics\LaunchNewLicensee\LA_LaunchLicensee.sql

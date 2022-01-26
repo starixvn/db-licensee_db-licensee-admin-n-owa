@@ -25,6 +25,7 @@ AS
 	- 20190829@Bruce: Adding Licensee Code [#111586]
 	- 20210317@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 	- 20210811@Danny: Adding @InvoiceLanguage [#FeatureID 158133]
+	- 20220118@Percy: Add LaunchDate into OAS_PartyDetail [RedmineID: #166751]
 
 	Param's Explannation: 
 */
@@ -94,13 +95,14 @@ BEGIN
 			BaseCurrencyId = @BaseCurrencyId,
 			StatusId = 1,
 			LicenseeCode = @LicenseeCode,
-			InvoiceLanguage = @InvoiceLanguage
+			InvoiceLanguage = @InvoiceLanguage,
+			LaunchDate = @LaunchDate
 		WHERE PartyID = @NewPartyId
 	END
 	ELSE
 	BEGIN
-		INSERT INTO dbo.OAS_PartyDetail (PartyID, IsDeposit, BrandName, CompanyName, IsAllowedMemberComm, BaseCurrencyId, StatusId, LicenseeCode, InvoiceLanguage)
-		SELECT @NewPartyId, IsDeposit, @BrandName, CompanyName, IsAllowedMemberComm, @BaseCurrencyId, 1, @LicenseeCode, @InvoiceLanguage
+		INSERT INTO dbo.OAS_PartyDetail (PartyID, IsDeposit, BrandName, CompanyName, IsAllowedMemberComm, BaseCurrencyId, StatusId, LicenseeCode, InvoiceLanguage, LaunchDate)
+		SELECT @NewPartyId, IsDeposit, @BrandName, CompanyName, IsAllowedMemberComm, @BaseCurrencyId, 1, @LicenseeCode, @InvoiceLanguage, @LaunchDate
 		FROM dbo.licensees WITH (NOLOCK)
 		WHERE LicenseeID = @LicenseeId
 	END
