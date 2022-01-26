@@ -484,6 +484,7 @@ BEGIN
 				AND (d.IsSpecialTreatment = 0 OR r.CurrencyId <> 51)
 		WHERE d.DiscountGroupType <> 2 -- 2 = Rebate, Others = Discount
 			AND (d.CurrencyId <> 0 OR d.IsSpecialTreatment = 1) -- NOT all currencies
+			AND (d.DiscountGroupType IN (1, 11) OR d.CurrencyCalculationType IN (1, 3))
 		GROUP BY d.DiscountGroupId, d.DiscountGroupType, d.BaseCurrencyId, d.PartyId, d.Remark, d.IsApplyDiscount, d.ProductId, d.CalculationType
 		
 		-- Discount after min fee: discount for all currencies
@@ -571,6 +572,7 @@ BEGIN
 			AND r.IsChargedByMinFee = 0 -- if licensee is charged by min fee, discount = 0
 			AND t.PartyId IS NULL -- if primary is charged by min fee, discount of secondary = 0
 			AND r.LicenseeWL > 0 -- if licensee winloss is negative, discount = 0
+			AND r.WLToDiscount > 0
 	END
 
 	DECLARE @Result TABLE
