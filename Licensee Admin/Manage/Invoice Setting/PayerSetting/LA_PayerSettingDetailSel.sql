@@ -3,12 +3,12 @@ USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerSettingDetailSel]
-	@PayerId			INT
+	@PayerId INT
 AS
 /*  
 	 Created: 20150420@Florent
 	 Task : Get Payer setting
-	 DB: DBCUST.bodb_Licensee  
+	 DB: DBLIC.bodb_Licensee  
    
 	 Revisions:  
 		- 20150618@Florent: add column Currency to LA_Minfee   		  
@@ -28,6 +28,7 @@ AS
 		- 20200825@Happy: Updae from PayerGroup to GroupMinFee [#138249]
 		- 20210315@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 		- 20210824@Danny: get licensee status from OIC And Relocated SP [#159296]
+		- 20220118@Percy: Add Licensee Status Setting [RedmineID: #166751]
 		
 	 Params:
 		+ @PayerId :specify Party
@@ -145,6 +146,9 @@ BEGIN
 		, @CurrentBillingGroup AS CurrentBillingGroup
 		, CASE WHEN t.IsDeposit = 0 THEN 'Active'
 				 ELSE ISNULL(us.LicenseeStatusName, 'Unrecognized') END AS PayerStatusName
+		, pd.LaunchDate
+		, pd.SuspendedDate
+		, pd.TerminatedDate
 	FROM @ChargeInfo c
 		INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID=c.PartyId
 		INNER JOIN dbo.OAS_PartyDetail pd ON pd.PartyId=c.PartyId

@@ -4,6 +4,9 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_PayerSettingModify]
 	@PayerID				INT	
+	, @LaunchDate			DATE = NULL
+	, @SuspendedDate		DATE = NULL
+	, @TerminatedDate		DATE = NULL
 	, @ChargeSettingXML		NVARCHAR (MAX)
 	, @MinFeeSettingXML		NVARCHAR (MAX)
 	, @WaiveSettingXML		NVARCHAR (MAX)
@@ -24,6 +27,7 @@ AS
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20200831@Mason: Remove redundant code of @PayerGroupId [#138249]
 		- 20210318@Mason: Change Base Currency Of Licensee [#151466]
+		- 20220118@Percy: Add Licensee Status Setting [RedmineID: #166751]
 
 	 Params:				
 */
@@ -34,6 +38,22 @@ BEGIN
 			, @MaxDate			DATE
 	
 	DECLARE @MinFeeInsertedList VARCHAR(100), @WaiveInsertedList VARCHAR(100)
+
+	-- Update LaunchDate/SuspendedDate/TerminatedDate
+	DECLARE @Old_LaunchDate DATE, @Old_SuspendedDate DATE, @Old_TerminatedDate DATE
+	SELECT  @Old_LaunchDate = LaunchDate, @Old_SuspendedDate = SuspendedDate, @Old_TerminatedDate = TerminatedDate
+	FROM dbo.OAS_PartyDetail WITH (NOLOCK)
+	WHERE PartyId = @PayerId
+
+	BEGIN TRY
+		UPDATE dbo.OAS_PartyDetail WITH (ROWLOCK)
+		SET LaunchDate = @LaunchDate, SuspendedDate = @SuspendedDate, TerminatedDate = @TerminatedDate
+		WHERE PartyId = @PayerId
+	END TRY
+	BEGIN CATCH
+		SELECT @ErrCode = 101, @ErrMsg = 'Update failed. Please try again.'
+		RETURN
+	END CATCH
 
 	--Minfee
 	EXEC dbo.LA_MinFeeSettingModify
@@ -59,9 +79,14 @@ BEGIN
 		, @MinfeeInsertedList	= @WaiveInsertedList OUTPUT
 	IF @ErrCode <> 0 
 		BEGIN
+			--Rollback LaunchDate/SuspendedDate/TerminatedDate
+			UPDATE dbo.OAS_PartyDetail WITH (ROWLOCK)
+			SET LaunchDate = @Old_LaunchDate, SuspendedDate = @Old_SuspendedDate, TerminatedDate = @Old_TerminatedDate
+			WHERE PartyId = @PayerId
+
 			--Rollback Minfee
 			IF ISNULL(@MinFeeInsertedList, 0) <> 0
-				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM bodb02.dbo.strSplit(@MinFeeInsertedList, ','))
+				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM dbo.strSplit(@MinFeeInsertedList, ','))
 			RETURN
 		END
 	--Modify Chargerate Setting
@@ -75,12 +100,17 @@ BEGIN
 
 	IF @ErrCode <> 0 
 		BEGIN
+			--Rollback LaunchDate/SuspendedDate/TerminatedDate
+			UPDATE dbo.OAS_PartyDetail WITH (ROWLOCK)
+			SET LaunchDate = @Old_LaunchDate, SuspendedDate = @Old_SuspendedDate, TerminatedDate = @Old_TerminatedDate
+			WHERE PartyId = @PayerId
+
 			--Rollback Minfee
 			IF ISNULL(@MinFeeInsertedList, 0) <> 0
-				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM bodb02.dbo.strSplit(@MinFeeInsertedList, ','))
+				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM dbo.strSplit(@MinFeeInsertedList, ','))
 			--Rollback waive
 			IF ISNULL(@WaiveInsertedList, 0 ) <> 0
-				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM bodb02.dbo.strSplit(@WaiveInsertedList, ','))
+				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM dbo.strSplit(@WaiveInsertedList, ','))
 			RETURN
 		END
 END
