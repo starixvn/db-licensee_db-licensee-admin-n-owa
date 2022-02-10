@@ -749,7 +749,7 @@ BEGIN
 				SET a.tmpPartyId = t.PartyId
 					,a.RemaingAmount = CASE WHEN a.RemaingAmount + t.Discount >= 0 THEN 0 ELSE a.RemaingAmount + t.Discount END
 					,a.tmpDiscount = CASE WHEN a.RemaingAmount + t.Discount >= 0 THEN a.RemaingAmount + t.Discount ELSE 0 END
-					,a.IsAdjustDone = CASE WHEN a.RemaingAmount + t.Discount >= 0 THEN 1 ELSE 0 END
+					,a.IsAdjustDone = CASE WHEN a.RemaingAmount + t.Discount >= 0 THEN 1 ELSE a.IsAdjustDone END
 				FROM @AdjustGroupMinFee a
 					CROSS APPLY (
 						SELECT TOP 1 t.PartyId, t.Discount FROM @tmpResult t
@@ -757,12 +757,14 @@ BEGIN
 							AND (t.GroupMinFeeId > 0 OR (t.FeeTypeId = 1 AND t.GroupMinFeeId < 0))
 						ORDER BY t.Discount DESC, t.IsPrimary DESC
 					) t
+				WHERE a.IsAdjustDone = 0
 					
 				UPDATE r
 				SET r.Discount = a.tmpDiscount
 				FROM @tmpResult r
 					INNER JOIN @AdjustGroupMinFee a ON r.PartyId = a.tmpPartyId AND r.ProductId = a.ProductId AND r.GroupMinFeeId = a.GroupMinFeeId
 				WHERE r.GroupMinFeeId > 0 OR (r.FeeTypeId = 1 AND r.GroupMinFeeId < 0)
+					AND a.IsAdjustDone IS NOT NULL
 			END
 
 			IF EXISTS (SELECT 1 FROM @AdjustGroupMinFee WHERE IsAdjustDone = 1)
