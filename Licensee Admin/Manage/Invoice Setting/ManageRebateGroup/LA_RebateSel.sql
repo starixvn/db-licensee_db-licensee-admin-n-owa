@@ -11,6 +11,7 @@ AS
 
 	 Revisions:  
 		- 20180525@Parsons: Get rebate groups info [#94282]
+		- 20220210@Percy: Return RebateGroupType [RedmineID: #163495]
 
 	 Params:
 
@@ -18,13 +19,13 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @RebateGroupType INT = 2
 	
-	SELECT h.DiscountGroupId as GroupId, 
-			h.DiscountGroupName as GroupName,
+	SELECT h.DiscountGroupId AS GroupId,
+			h.DiscountGroupName AS GroupName,
 			h.FromDate,
-			h.ToDate, 
-			d.Rate, 
+			h.ToDate,
+			d.Rate,
+			h.DiscountGroupType AS RebateGroupType,
 			COUNT(DISTINCT p.ProductId) AS NumberOfProduct,
 			COUNT(DISTINCT a.PartyID) AS NumberOfPayer, 
 			STUFF((
@@ -47,7 +48,7 @@ BEGIN
 		LEFT JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON h.DiscountGroupId = d.DiscountGroupId
 		LEFT JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON h.DiscountGroupId = p.DiscountGroupId
 		LEFT JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
-	WHERE DiscountGroupType = @RebateGroupType
-	GROUP BY h.DiscountGroupId, h.DiscountGroupName, h.FromDate, h.ToDate, d.Rate
+	WHERE h.DiscountGroupType IN (2, 12) -- Rebate
+	GROUP BY h.DiscountGroupId, h.DiscountGroupName, h.FromDate, h.ToDate, d.Rate, h.DiscountGroupType
 END
 GO

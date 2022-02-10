@@ -12,6 +12,7 @@ AS
 
 	 Revisions:  
 		- 20180528@Parsons: Get rebate group [#94282]
+		- 20220210@Percy: Return RebateGroupType [RedmineID: #163495]
 
 	 Params:
 
@@ -39,12 +40,13 @@ BEGIN
 	WHERE DiscountGroupId = @GroupId
 
 	--get rebate header
-	SELECT  DiscountGroupId		AS GroupId, 
-			DiscountGroupName	AS GroupName, 
-			CurrencyId, 
-			FromDate, 
-			ToDate, 
-			Remark, 
+	SELECT  DiscountGroupId		AS GroupId,
+			DiscountGroupName	AS GroupName,
+			CurrencyId,
+			FromDate,
+			ToDate,
+			DiscountGroupType	AS RebateGroupType,
+			Remark,
 			@ProductIds		AS ProductIds,
 			@PartyIds		AS PartyIds,
 			@ProductList	AS ProductList,
