@@ -42,6 +42,7 @@ AS
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
+		- 20220222@Danny: Allbet - Promotion integration [#167510]
 */
 
 BEGIN
@@ -123,7 +124,7 @@ BEGIN
 			,@ProductCodes = @ProductCodes
 			,@FromDate = @FromDate
 			,@ToDate = @ToDate
-			,@LicensingFeeTypeIds = '0,-1,1,2,3,4,5,6' -- Contribution, Prize, ...
+			,@LicensingFeeTypeIds = '0,-1,1,2,3,4,5,6,10' -- Contribution, Prize, ...
 			,@BaseCurrencyName = @BaseCurrencyName
 			,@Environment = @Environment
 
@@ -162,9 +163,10 @@ BEGIN
 				WHEN ProductId = 45 AND LicensingFeeTypeId = 5 THEN 37 -- Lucky Draw
 				WHEN ProductId = 36 AND LicensingFeeTypeId = 1 THEN 41 -- Contribution
 				WHEN ProductId = 36 AND LicensingFeeTypeId = 2 THEN 42 -- JackpotPrize
+				WHEN ProductId = 21 AND LicensingFeeTypeId = 10 THEN 43 -- Promotion
 				END
 		FROM @Result
-		WHERE ProductId IN (32, 34, 42, 45, 66, 36) AND LicensingFeeTypeId > 0
+		WHERE ProductId IN (32, 34, 42, 45, 66, 36, 21) AND LicensingFeeTypeId > 0
 		GROUP BY
 			CASE
 				WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
@@ -180,6 +182,7 @@ BEGIN
 				WHEN ProductId = 45 AND LicensingFeeTypeId = 5 THEN 37 -- Lucky Draw
 				WHEN ProductId = 36 AND LicensingFeeTypeId = 1 THEN 41 -- Contribution
 				WHEN ProductId = 36 AND LicensingFeeTypeId = 2 THEN 42 -- JackpotPrize
+				WHEN ProductId = 21 AND LicensingFeeTypeId = 10 THEN 43 -- Promotion
 				END
 
 		-- AMF, Prepayment and AGPrepayment

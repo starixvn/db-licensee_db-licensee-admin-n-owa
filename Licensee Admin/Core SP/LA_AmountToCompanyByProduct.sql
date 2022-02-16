@@ -28,6 +28,7 @@ AS
 		- 20220105@Percy: Don't check negative AMF amount [RedmineID: #167039]
 		- 20220210@Percy: Offer Tier Rebate [RedmineID: #163495]
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
+		- 20220222@Danny: Allbet - Promotion integration [#167510]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -43,6 +44,7 @@ AS
 			7 = Contribution Discount
 			8 = Betcount
 			9 = OddsSpead Adjustment
+			10 = Promotion
 */
 
 BEGIN
@@ -193,6 +195,7 @@ BEGIN
 		,Tips MONEY DEFAULT(0), Contribution MONEY DEFAULT(0), JackpotPrize MONEY DEFAULT(0), Prize MONEY DEFAULT(0)
 		,LuckyDraw MONEY DEFAULT(0), Bonus MONEY DEFAULT(0), OddsSpread MONEY DEFAULT(0), FreeBets MONEY DEFAULT(0)
 		,PayOut MONEY DEFAULT(0), CommShare MONEY DEFAULT(0), CashInShare MONEY DEFAULT(0), Betcount INT DEFAULT(0)
+		,Promotion MONEY DEFAULT(0)
 	)
 
 	-- CO
@@ -232,7 +235,7 @@ BEGIN
 		UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL -- sum first
 	)
 	INSERT INTO #TempData (rptDate, LicenseeId, ProductId, CurrencyId, BettypeRef, MemberWL, MemberComm, AgentWL, AgentComm
-		,Tips, Contribution, JackpotPrize, Prize, LuckyDraw, Bonus, OddsSpread, FreeBets, PayOut, CommShare, CashInShare, Betcount)
+		,Tips, Contribution, JackpotPrize, Prize, LuckyDraw, Bonus, OddsSpread, FreeBets, PayOut, CommShare, CashInShare, Betcount, Promotion)
 	SELECT r.rptDate, r.SiteId, g.GroupProductId, r.CurrencyId
 		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005) THEN r.Bettype ELSE -1 END
 		,SUM(CASE WHEN r.TicketType = 2 OR b.Bettype IS NOT NULL THEN 0 ELSE r.MemberWL END) AS MemberWL
@@ -251,6 +254,7 @@ BEGIN
 		,SUM(r.CommShare) AS CommShare
 		,SUM(r.CashInShare) AS CashInShare
 		,SUM(r.BetCount) AS BetCount
+		,SUM(CASE WHEN b.TypeId = 8 THEN MemberWL ELSE 0 END) AS Promotion
 	FROM CTE_tempData r
 		INNER JOIN @Products g ON r.ProductId = g.ProductId AND r.rptDate BETWEEN g.FromDate AND g.ToDate
 		LEFT JOIN dbo.LA_f_GroupBettype() b ON r.Bettype = b.Bettype
@@ -260,9 +264,9 @@ BEGIN
 	CREATE TABLE #tmpResult (rptDate DATE, PartyId INT, ProductId INT, CurrencyId INT
 		,GrossLicenseeAmount MONEY, LicenseeWL MONEY, LicenseeAmount MONEY, ExtraAmount MONEY DEFAULT(0), OddsSpread MONEY
 		,Contribution MONEY, JackpotPrize MONEY, Prize MONEY, Bonus MONEY, LuckyDraw MONEY, FreeBets MONEY
-		,ContributionDiscount MONEY, BasedLicenseeWL MONEY, BasedLicenseeAmount MONEY, BasedOddsSpread MONEY, BetCount INT) -- Based Amount: for get exactly min fee, discount
+		,ContributionDiscount MONEY, BasedLicenseeWL MONEY, BasedLicenseeAmount MONEY, BasedOddsSpread MONEY, BetCount INT, Promotion MONEY) -- Based Amount: for get exactly min fee, discount
 	INSERT INTO #tmpResult (rptDate, PartyId, ProductId, CurrencyId, GrossLicenseeAmount, LicenseeWL, LicenseeAmount, ExtraAmount
-		,OddsSpread, Contribution, JackpotPrize, Prize, Bonus, LuckyDraw, FreeBets, ContributionDiscount, BasedLicenseeWL, BasedLicenseeAmount, BasedOddsSpread, BetCount)
+		,OddsSpread, Contribution, JackpotPrize, Prize, Bonus, LuckyDraw, FreeBets, ContributionDiscount, BasedLicenseeWL, BasedLicenseeAmount, BasedOddsSpread, BetCount, Promotion)
 	SELECT t.rptDate, pl.PartyId, t.ProductId, t.CurrencyId
 		,SUM((CASE
 				WHEN pl.IsDeposit = 0 AND t.ProductId <> 0 THEN 0
@@ -271,7 +275,7 @@ BEGIN
 				WHEN (t.ProductId = 15 AND cp.LicenseeId IS NULL) OR (t.ProductId <> 15 AND p.LicenseeId IS NULL) THEN 0
 				WHEN t.ProductId = 15 THEN t.PayOut - t.CommShare * cp.CommShareRate - t.CashInShare * cp.CashInShareRate
 				ELSE -t.MemberWL * ISNULL(cr.Rate, p.Rate)
-					+ t.PayOut + t.Contribution - t.JackpotPrize - t.Prize - t.Bonus - t.FreeBets END
+					+ t.PayOut + t.Contribution - t.JackpotPrize - t.Prize - t.Bonus - t.FreeBets - t.Promotion END
 				- CASE WHEN t.ProductId = 31 THEN (t.AgentComm + t.MemberComm) ELSE 0 END
 		) * e.Rate) AS GrossLicenseeAmount
 		,SUM(-t.MemberWL * e.Rate) AS LicenseeWL
@@ -288,7 +292,7 @@ BEGIN
 				WHEN p.LicenseeId IS NULL THEN 0
 				WHEN pl.IsDeposit = 0 AND t.ProductId <> 0 THEN 0
 				WHEN t.BettypeRef IN (1706, 3007) THEN -t.Tips * ISNULL(cr.Rate, p.Rate)
-				ELSE (t.Contribution - t.JackpotPrize - t.Prize - t.Bonus - t.FreeBets) END * e.Rate
+				ELSE (t.Contribution - t.JackpotPrize - t.Prize - t.Bonus - t.FreeBets -t.Promotion) END * e.Rate
 		) AS ExtraAmount
 		,SUM(CASE
 				WHEN p.LicenseeId IS NULL THEN 0
@@ -315,6 +319,7 @@ BEGIN
 				ELSE t.OddsSpread END
 		) AS BasedOddsSpread
 		,SUM(t.BetCount) AS BetCount
+		,SUM(t.Promotion * e.Rate) AS Promotion
 	FROM #TempData t
 		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND e.BaseCurrencyId = 0
 		INNER JOIN #PartyList pl ON t.LicenseeId = pl.LicenseeId
@@ -867,6 +872,7 @@ BEGIN
 				,SUM(ISNULL(t.ContributionDiscount, 0)) AS ContributionDiscount
 				,SUM(ISNULL(t.OddsSpread, 0)) AS OddsSpread
 				,SUM(ISNULL(t.BetCount, 0)) AS BetCount
+				,SUM(ISNULL(t.Promotion, 0)) AS Promotion
 			FROM #tmpResult t
 				INNER JOIN (SELECT DISTINCT PartyId FROM #PartyList WHERE IsSelected = 1) p ON t.PartyId = p.PartyId
 				INNER JOIN #Products pd ON t.ProductId = pd.ProductId AND pd.IsSelected = 1
@@ -882,6 +888,7 @@ BEGIN
 				UNION ALL SELECT 7, ContributionDiscount WHERE ContributionDiscount <> 0
 				UNION ALL SELECT 8, BetCount
 				UNION ALL SELECT 9, OddsSpread WHERE OddsSpread <> 0
+				UNION ALL SELECT 10, Promotion WHERE Promotion <> 0
 			) t
 		WHERE ',' + @LicensingFeeTypeIds + ',' LIKE '%,' + CONVERT(VARCHAR(10), t.LicensingFeeTypeId) + ',%'
 	END

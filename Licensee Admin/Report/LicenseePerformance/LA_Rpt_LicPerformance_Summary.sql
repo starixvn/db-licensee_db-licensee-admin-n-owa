@@ -40,6 +40,7 @@ AS
 	   - 20210513@Percy: Apply function to get Joint Venture Party List - Keep negative licensee fee [RedmineID: #154992]
 	   - 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
 	   - 20210306@Danny: Integrate VGaming [#154080]
+	   - 20220222@Danny: Allbet - Promotion integration [#167510]
 
 	Param's Explanation:
 	  + @PartyIDs : a string of list PartyID, separated by ','
@@ -184,7 +185,7 @@ BEGIN
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH ( NOLOCK )
 			INNER JOIN @tmpParty tp ON b.SiteID = tp.LicenseeID	AND b.ProductID = tp.ProductID AND b.rptDate BETWEEN tp.Fromdate AND tp.Todate
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = tp.ChargeId AND cr.CurrencyID = b.CurrencyID
-			LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('34,45','') eb ON b.Bettype = eb.BettypeID
+			LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('34,45,21','') eb ON b.Bettype = eb.BettypeID
 			WHERE  b.rptDate BETWEEN @Fromdate AND @ToDate
 			AND (@Currency = 0 OR b.CurrencyID = @Currency)
 			AND (b.CurrencyID <> @CurrencyTest)

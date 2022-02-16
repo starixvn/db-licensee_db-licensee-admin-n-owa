@@ -8,6 +8,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_AllBetWinloss]
 	,@ToDate			SMALLDATETIME
 	,@BaseCurrencyName	VARCHAR(10) = 'GBP'
 	,@IsGroupByLicensee BIT = 0
+
 AS
 /*
  Created by	: [20160907@Bruce]
@@ -20,6 +21,7 @@ AS
 	- 20171220@Parsons: increase length for variables [#88197]
 	- 20180716@bruce: add new group TEST for credit [#98126]
 	- 20200203@Mason: Suport HID currency [#128856]
+	- 20220218@Danny: Allbet - Promotion integration [#167510]
 
  Param's Explanation:
 	- @FromDate			: From date
@@ -32,8 +34,14 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @Allbet INT = (SELECT PartyID FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyName='Allbet' AND PartyType=3)
-	DECLARE @RebateCommissionType INT = 11
-	DECLARE @DepositServiceCharge INT = 9
+	DECLARE @RebateCommissionType INT	= 11
+	DECLARE @DepositServiceCharge INT	= 9
+	DECLARE @PromotionBettype SMALLINT	= 2499
+
+	DECLARE @f_date3rd DATE = @FromDate
+	DECLARE @t_date3rd DATE = @ToDate
+	DECLARE @f_date DATE = DATEADD(DAY, -1, @FromDate)
+	DECLARE @t_date DATE = DATEADD(DAY, 1, @ToDate)
 
 	-- ChargeRate
 	DECLARE @ChargeRate TABLE(
@@ -126,12 +134,13 @@ BEGIN
 			b.RptDate3rd AS rptDate,
 			b.CurrencyID,
 			ISNULL(pc.PlayCurrency, b.CurrencyID) AS PlayCurrency,
-			SUM(ISNULL(b.BetCount, 0)) AS TotalTrans,
-			SUM(ISNULL(b.Turnover, 0)) AS Turnover,
-			SUM(ISNULL(b.Winloss, 0)) AS CustomerWinLoss,
+			SUM(ISNULL(CASE WHEN BetTypeId = @PromotionBettype THEN 0 ELSE b.BetCount END, 0)) AS TotalTrans,
+			SUM(ISNULL(CASE WHEN BetTypeId = @PromotionBettype THEN 0 ELSE b.Turnover END, 0)) AS Turnover,
+			SUM(ISNULL(CASE WHEN BetTypeId = @PromotionBettype THEN 0 ELSE b.Winloss END, 0)) AS CustomerWinLoss,
 			SUM(ISNULL(b.ValidBetAmount, 0)) AS ValidBetAmount,
-			SUM(ISNULL(-b.Winloss, 0) * ci.Rate) AS ServiceChargeOriginal,
-			SUM(ISNULL(b.ValidBetAmount, 0) * ci.RebateCommission) AS RebateCommissionOriginal
+			SUM(ISNULL(CASE WHEN BetTypeId = @PromotionBettype THEN 0 ELSE -b.Winloss END, 0) * ci.Rate) AS ServiceChargeOriginal,
+			SUM(ISNULL(b.ValidBetAmount, 0) * ci.RebateCommission) AS RebateCommissionOriginal,
+			SUM(CASE WHEN BetTypeId = @PromotionBettype THEN b.Winloss ELSE 0 END) AS PromotionOriginal
 	INTO #TempData
 	FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
 		INNER JOIN @ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
@@ -142,10 +151,11 @@ BEGIN
 			b.CurrencyId = pc.MemberCurrency AND
 			b.rptDate BETWEEN pc.FromDate AND pc.ToDate
 		)
-	WHERE	(b.RptDate3rd BETWEEN @FromDate AND @ToDate) AND
-			(b.CurrencyID <> 20) AND
-			(b.BetTypeId BETWEEN 2401 AND 2499) AND
-			(b.StatusId NOT IN (-1, 101, 102, 103))
+	WHERE	b.RptDate BETWEEN @f_date AND @t_date
+			AND b.RptDate3rd BETWEEN @f_date3rd AND @t_date3rd 
+			AND b.CurrencyID <> 20 
+			AND b.BetTypeId BETWEEN 2401 AND 2499 
+			AND	b.StatusId NOT IN (-1, 101, 102, 103)
 	GROUP BY b.RptDate3rd, ci.PartyId, b.CurrencyID, ISNULL(pc.PlayCurrency, b.CurrencyID)
 
 	-- Report result
@@ -172,7 +182,11 @@ BEGIN
 		PayToSupplierOriginal		MONEY,
 		PayToSupplierBase			MONEY,
 		PayToSupplierRegistered		MONEY,
-		PayToSupplierVariance		MONEY
+		PayToSupplierVariance		MONEY,
+		PromotionOriginal			MONEY,
+		PromotionBased				MONEY,
+		PromotionRegistered			MONEY,
+		PromotionVariance			MONEY
 	)
 	
 	DECLARE @GrandTotals AS TABLE(
@@ -189,7 +203,10 @@ BEGIN
 		RebateCommissionVariance	MONEY,
 		PayToSupplierBase			MONEY,
 		PayToSupplierRegistered		MONEY,
-		PayToSupplierVariance		MONEY
+		PayToSupplierVariance		MONEY,
+		PromotionBased				MONEY,
+		PromotionRegistered			MONEY,
+		PromotionVariance			MONEY
 	)
 
 	DECLARE @TempCurrency VARCHAR(10)
@@ -220,12 +237,43 @@ BEGIN
 					t.ServiceChargeOriginal * re.Rate AS ServiceChargeRegistered,
 					t.RebateCommissionOriginal ,
 					t.RebateCommissionOriginal * oe.Rate AS RebateCommissionBased,
-					t.RebateCommissionOriginal * re.Rate AS RebateCommissionRegistered
+					t.RebateCommissionOriginal * re.Rate AS RebateCommissionRegistered,
+					t.PromotionOriginal,
+					t.PromotionOriginal * oe.Rate AS PromotionBased,
+					t.PromotionOriginal * re.Rate AS PromotionRegistered
 			FROM #TempData t
 			INNER JOIN #Exchange oe ON oe.exchangedate=t.rptDate AND oe.ExchangeId=t.CurrencyId
 			INNER JOIN #Exchange re ON re.exchangedate=t.rptDate AND re.ExchangeId=t.PlayCurrency
 		)
-		INSERT INTO #Result
+		INSERT INTO #Result (	
+				PartyId						,
+				ReportDate					,
+				OriginalCurrency			,
+				RegisteredCurrency			,
+				TotalTrans					,
+				Turnover					,
+				TurnoverBased				,
+				ValidBetAmount				,
+				ValidBetAmountBased			,
+				CustomerWinLoss				,
+				CustomerWinLossBased		,
+				ServiceChargeOriginal		,
+				ServiceChargeBased			,
+				ServiceChargeRegistered		,
+				ServiceChargeVariance		,
+				RebateCommissionOriginal	,
+				RebateCommissionBased		,
+				RebateCommissionRegistered	,
+				RebateCommissionVariance	,
+				PayToSupplierOriginal		,
+				PayToSupplierBase			,
+				PayToSupplierRegistered		,
+				PayToSupplierVariance		,
+				PromotionOriginal			,
+				PromotionBased				,
+				PromotionRegistered			,
+				PromotionVariance			
+			)
 		SELECT	PartyId,
 				rptDate,
 				OriginalCurrency,
@@ -245,10 +293,14 @@ BEGIN
 				RebateCommissionBased,
 				RebateCommissionRegistered,
 				RebateCommissionBased - RebateCommissionRegistered,
-				ServiceChargeOriginal - RebateCommissionOriginal,
-				ServiceChargeBased - RebateCommissionBased,
-				ServiceChargeRegistered - RebateCommissionRegistered,
-				(ServiceChargeBased - RebateCommissionBased) - (ServiceChargeRegistered - RebateCommissionRegistered)
+				ServiceChargeOriginal - RebateCommissionOriginal - PromotionOriginal,
+				ServiceChargeBased - RebateCommissionBased - PromotionBased,
+				ServiceChargeRegistered - RebateCommissionRegistered - PromotionRegistered,
+				(ServiceChargeBased - RebateCommissionBased - PromotionBased) - (ServiceChargeRegistered - RebateCommissionRegistered - PromotionRegistered),
+				PromotionOriginal,
+				PromotionBased,
+				PromotionRegistered	,
+				PromotionBased - PromotionRegistered			
 		FROM StagingData
 
 		IF @BaseCurrencyName=@TempCurrency
@@ -275,7 +327,11 @@ BEGIN
 						SUM(r.PayToSupplierOriginal) AS PayToSupplierOriginal,
 						SUM(r.PayToSupplierBase) AS PayToSupplierBase,
 						SUM(r.PayToSupplierRegistered) AS PayToSupplierRegistered,
-						SUM(r.PayToSupplierVariance) AS PayToSupplierVariance
+						SUM(r.PayToSupplierVariance) AS PayToSupplierVariance,
+						SUM(r.PromotionOriginal) AS PromotionOriginal,
+						SUM(r.PromotionBased) AS PromotionBased,
+						SUM(r.PromotionRegistered) AS PromotionRegistered,
+						SUM(r.PromotionVariance) AS PromotionVariance
 				FROM #Result r
 				INNER JOIN @PartyGroupList p ON r.PartyId = p.PartyId AND p.ParentId > 0
 				INNER JOIN @PartyGroupList g ON p.ParentId= g.PartyId AND g.ParentId = 0
@@ -302,7 +358,11 @@ BEGIN
 						SUM(r.PayToSupplierOriginal) AS PayToSupplierOriginal,
 						SUM(r.PayToSupplierBase) AS PayToSupplierBase,
 						SUM(r.PayToSupplierRegistered) AS PayToSupplierRegistered,
-						SUM(r.PayToSupplierVariance) AS PayToSupplierVariance
+						SUM(r.PayToSupplierVariance) AS PayToSupplierVariance,
+						SUM(r.PromotionOriginal) AS PromotionOriginal,
+						SUM(r.PromotionBased) AS PromotionBased,
+						SUM(r.PromotionRegistered) AS PromotionRegistered,
+						SUM(r.PromotionVariance) AS PromotionVariance
 				FROM #Result r
 				INNER JOIN @PartyGroupList p ON r.PartyId = p.PartyId AND p.ParentId > 0
 				INNER JOIN @PartyGroupList g ON p.ParentId= g.PartyId AND g.ParentId = 0
@@ -310,7 +370,25 @@ BEGIN
 			END
 		END
 
-		INSERT INTO @GrandTotals
+		INSERT INTO @GrandTotals (
+				RegisteredCurrency			,
+				TotalTrans					,
+				Turnover					,
+				ValidBetAmount				,
+				CustomerWinLoss				,
+				ServiceChargeBased			,
+				ServiceChargeRegistered		,
+				ServiceChargeVariance		,
+				RebateCommissionBased		,
+				RebateCommissionRegistered	,
+				RebateCommissionVariance	,
+				PayToSupplierBase			,
+				PayToSupplierRegistered		,
+				PayToSupplierVariance		,
+				PromotionBased				,
+				PromotionRegistered			,
+				PromotionVariance			
+		)
 		SELECT	@TempCurrency,
 				SUM(TotalTrans),
 				SUM(TurnoverBased),
@@ -324,7 +402,10 @@ BEGIN
 				SUM(RebateCommissionVariance),
 				SUM(PayToSupplierBase),
 				SUM(PayToSupplierRegistered),
-				SUM(PayToSupplierVariance)
+				SUM(PayToSupplierVariance),
+				SUM(PromotionBased),
+				SUM(PromotionRegistered),
+				SUM(PromotionVariance)
 		FROM #Result
 
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Code = @TempCurrency
@@ -345,7 +426,10 @@ BEGIN
 		ISNULL(RebateCommissionVariance,0)		AS RebateCommissionVariance,
 		ISNULL(PayToSupplierBase,0)				AS PayToSupplierBase,
 		ISNULL(PayToSupplierRegistered,0)		AS PayToSupplierRegistered,
-		ISNULL(PayToSupplierVariance,0)			AS PayToSupplierVariance
+		ISNULL(PayToSupplierVariance,0)			AS PayToSupplierVariance,
+		ISNULL(PromotionBased,0)				AS PromotionBased,
+		ISNULL(PromotionRegistered,0)			AS PromotionRegistered,
+		ISNULL(PromotionVariance,0)				AS PromotionVariance
 	FROM @GrandTotals
 
 	DROP TABLE #Result
