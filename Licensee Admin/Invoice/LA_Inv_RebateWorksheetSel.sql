@@ -33,6 +33,7 @@ AS
 	  - 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 	  - 20210916@Percy: Return Products applied rebate setting only [RedmineID: #159580]
 	  - 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
+	  - 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 */
 
 BEGIN
@@ -56,7 +57,7 @@ BEGIN
 			INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
 			INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
 		WHERE a.PartyId = @PartyId
-			AND h.DiscountGroupType = 2 -- rebate
+			AND h.DiscountGroupType IN (2, 12) -- rebate
 			AND h.FromDate <= @TDate AND h.ToDate >= @FDate
 			AND p.ProductId NOT IN (1, 23, 13, 14, 17, 31) -- exclude RB, bettrade, NG2, MGCLC, MGCRNG, BX
 	) r

@@ -17,6 +17,7 @@ AS
    
 	Revisions: 
 		- 20210720@Percy: Initialize SP [#147006]
+		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -157,7 +158,7 @@ BEGIN
 		-- For Discount & Rebate
 		DECLARE @Discount TABLE (PartyId INT, BaseCurrencyId INT, DiscountType TINYINT)
 		INSERT INTO @Discount (PartyId, BaseCurrencyId, DiscountType)
-		SELECT DISTINCT a.PartyId, h.CurrencyId, CASE WHEN h.DiscountGroupType <> 2 THEN 1 ELSE 2 END -- 1: discount, 2: rebate
+		SELECT DISTINCT a.PartyId, h.CurrencyId, CASE WHEN h.DiscountGroupType NOT IN (2, 12) THEN 1 ELSE 2 END -- 1: discount, 2: rebate
 		FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
 			INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
 		WHERE h.FromDate <= @ToDate AND h.ToDate >= @FromDate

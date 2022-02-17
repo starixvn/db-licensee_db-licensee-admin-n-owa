@@ -26,6 +26,7 @@ AS
 		- 20211110@Danny: Add @LicensingFeeTypeIds = 8 (betcount)  [#159296]
 		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 		- 20220105@Percy: Don't check negative AMF amount [RedmineID: #167039]
+		- 20220210@Percy: Offer Tier Rebate [RedmineID: #163495]
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 
 	Param's Explanation:
@@ -401,8 +402,8 @@ BEGIN
 			SELECT h.DiscountGroupId, h.DiscountGroupType, h.CurrencyId AS BaseCurrencyId, a.PartyId, a.IsApplyDiscount, a.IsSpecialTreatment, p.ProductId, p.CalculationType, c.CurrencyId, c.CalculationType AS CurrencyCalculationType
 				,CASE WHEN h.FromDate < @F_Date THEN @F_Date ELSE h.FromDate END AS FromDate
 				,CASE WHEN h.ToDate > @T_Date THEN @T_Date ELSE h.ToDate END AS ToDate
-				,CASE WHEN h.DiscountGroupType = 2 THEN h.Remark ELSE a.Remark END AS Remark
-				,ROW_NUMBER() OVER(PARTITION BY a.PartyId, p.ProductId, c.CurrencyId, CASE WHEN h.DiscountGroupType = 2 THEN 2 ELSE 1 END ORDER BY h.ToDate DESC) AS RN
+				,CASE WHEN h.DiscountGroupType IN (2, 12) THEN h.Remark ELSE a.Remark END AS Remark
+				,ROW_NUMBER() OVER(PARTITION BY a.PartyId, p.ProductId, c.CurrencyId, CASE WHEN h.DiscountGroupType IN (2, 12) THEN 2 ELSE 1 END ORDER BY h.ToDate DESC) AS RN
 			FROM #PartyList pl
 				INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON pl.PartyId = a.PartyId
 				INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
@@ -481,7 +482,7 @@ BEGIN
 			INNER JOIN #tmpDiscountGroup d ON r.PartyId = d.PartyId AND r.ProductId = d.ProductId
 				AND (d.CurrencyId = 0 OR r.CurrencyId = d.CurrencyId)
 				AND (d.IsSpecialTreatment = 0 OR r.CurrencyId <> 51)
-		WHERE d.DiscountGroupType <> 2 -- 2 = Rebate, Others = Discount
+		WHERE d.DiscountGroupType NOT IN (2, 12) -- 2, 12 = Rebate, Others = Discount
 			AND (d.CurrencyId <> 0 OR d.IsSpecialTreatment = 1) -- NOT all currencies
 			AND (d.DiscountGroupType IN (1, 11) OR d.CurrencyCalculationType IN (1, 3))
 		GROUP BY d.DiscountGroupId, d.DiscountGroupType, d.BaseCurrencyId, d.PartyId, d.Remark, d.IsApplyDiscount, d.ProductId, d.CalculationType
@@ -501,7 +502,7 @@ BEGIN
 			GROUP BY PartyId, ProductId
 		) r
 			INNER JOIN #tmpDiscountGroup d ON r.PartyId = d.PartyId AND r.ProductId = d.ProductId AND d.CurrencyId = 0 AND d.IsSpecialTreatment = 0 -- all currencies
-		WHERE d.DiscountGroupType <> 2 -- 2 = Rebate, Others = Discount
+		WHERE d.DiscountGroupType NOT IN (2, 12) -- 2, 12 = Rebate, Others = Discount
 		GROUP BY d.DiscountGroupId, d.DiscountGroupType, d.BaseCurrencyId, d.PartyId, d.Remark, d.IsApplyDiscount, d.ProductId, d.CalculationType
 
 		-- Group discount
@@ -781,12 +782,12 @@ BEGIN
 		-- Tier Rebate
 		IF EXISTS (SELECT 1 FROM #tmpDiscountGroup WHERE DiscountGroupType = 12)
 		BEGIN
-			INSERT INTO @tmpDiscount (DiscountGroupId, DiscountGroupType, PartyId, ProductId, LicenseeAmount, BasedLicenseeAmount)
-			SELECT d.DiscountGroupId, 12, d.PartyId, d.ProductId, SUM(r.LicenseeWL), SUM(r.BasedLicenseeWL)
+			INSERT INTO @tmpDiscount (DiscountGroupId, DiscountGroupType, PartyId, ProductId, LicenseeAmount, BasedLicenseeAmount, Remark)
+			SELECT d.DiscountGroupId, 12, d.PartyId, d.ProductId, SUM(r.LicenseeWL), SUM(r.BasedLicenseeWL), d.Remark
 			FROM #tmpDiscountGroup d
 				INNER JOIN @tmpResult r ON d.PartyId = r.PartyId AND d.ProductId = r.ProductId
 			WHERE d.DiscountGroupType = 12
-			GROUP BY d.DiscountGroupId, d.PartyId, d.ProductId
+			GROUP BY d.DiscountGroupId, d.PartyId, d.ProductId, d.Remark
 			HAVING SUM(r.LicenseeWL) >= 0 AND SUM(r.BasedLicenseeWL) >= 0
 			
 			UPDATE t
@@ -824,11 +825,13 @@ BEGIN
 		-- Update Final Rebate Rate, Amount
 		UPDATE r
 		SET r.Rebate = CASE
-						WHEN d.DiscountGroupType = 12 THEN ISNULL(d.TierDiffRebate, 0) + (r.LicensingFee - r.Discount - ISNULL(d.TierDiffRebate, 0)) * ISNULL(d.RebateRate, 0)
-						ELSE (r.LicensingFee - r.Discount) * ISNULL(dd.Rate, 0) END
+						WHEN d.DiscountGroupType = 2 THEN (r.LicensingFee - r.Discount) * ISNULL(dd.Rate, 0)
+						WHEN r.LicensingFee - r.Discount - ISNULL(t.LicensingFee, 0) - ISNULL(d.TierDiffRebate, 0) < 0 THEN ISNULL(d.TierDiffRebate, 0)
+						ELSE ISNULL(d.TierDiffRebate, 0) + (r.LicensingFee - r.Discount - ISNULL(t.LicensingFee, 0) - ISNULL(d.TierDiffRebate, 0)) * ISNULL(d.RebateRate, 0) END
 			,r.RebateRate = ISNULL(d.RebateRate, ISNULL(dd.Rate, 0))
 			,r.RebateRemark = ISNULL(d.Remark, N'')
 		FROM @Result r
+			LEFT JOIN @Result t ON r.PartyId = t.PartyId AND r.ProductId = 0 AND t.ProductId = 37
 			LEFT JOIN @tmpDiscount d ON r.PartyId = d.PartyId AND r.ProductId = d.ProductId
 			LEFT JOIN dbo.LA_DiscountGroupDetail dd WITH (NOLOCK) ON d.DiscountGroupId = dd.DiscountGroupId AND d.DiscountGroupType = 2 -- Normal Rebate
 

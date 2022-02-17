@@ -60,6 +60,7 @@ AS
 		- 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 		- 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
+		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 */
 
 BEGIN
@@ -106,7 +107,7 @@ BEGIN
 			SELECT TOP 1 1
 			FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
 				INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
-			WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate AND h.DiscountGroupType <> 2 -- 2 = rebate
+			WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate AND h.DiscountGroupType NOT IN (2, 12) -- 2, 12 = rebate
 				AND h.CurrencyId <> @BaseCurrencyId
 			ORDER BY h.ToDate DESC -- latest discount group
 		)
@@ -126,7 +127,7 @@ BEGIN
 					INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
 					LEFT JOIN dbo.Product3rd pd WITH(NOLOCK) ON p.ProductId = pd.ProductId
 				WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate
-					AND h.DiscountGroupType = 2 -- Rebate
+					AND h.DiscountGroupType IN (2, 12) -- Rebate
 			) r
 			WHERE ProductCode IS NOT NULL
 

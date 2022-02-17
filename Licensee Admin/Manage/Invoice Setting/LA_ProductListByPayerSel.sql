@@ -3,7 +3,8 @@ USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_ProductListByPayerSel]
-	 @PayerId	INT	= 0	
+	 @PayerId			INT	= 0
+	 ,@EndOfSupportDate	DATE = NULL
 AS
 /*  
 	 Created: 20150413@Florent
@@ -14,13 +15,18 @@ AS
 		- 20150413@Florent: Initialize SP
 		- 20210812@Percy: Exclude BitCoin from Product drop-down list [RedmineID: #159691]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
-
-
-	 Params:
-		+ 0 get all products
-		+ <> 0 all product by PayerID
+		- 20220210@Percy: Add @EndOfSupportDate to get active products + get products offer deposit [RedmineID: #163495]
+		
+	Params:
+		. @PayerId
+			= 0: all products
+			<> 0: all products by PayerID
+		. @EndOfSupportDate
+			NULL: all products
+			<> NULL: all products with Product3rd.EndOfSupportDate >= @EndOfSupportDate
+	 
 	 Example:
-		EXEC dbo.LA_ProductListByPayerSel 0
+		EXEC dbo.LA_ProductListByPayerSel 0, NULL
 */
 BEGIN
 	SET NOCOUNT ON
@@ -37,7 +43,8 @@ BEGIN
 			AND (@PayerId = 0 OR c.FromParty = @PayerId)
 	)
 		AND p.ProductId = p.GroupProductId
+		AND (@EndOfSupportDate IS NULL OR p.EndOfSupportDate IS NULL OR p.EndOfSupportDate >= @EndOfSupportDate)
+		AND p.OfferSite IN (0, 2) -- 0: both credit & deposit, 1: credit, 2: deposit
 	ORDER BY p.ProductId
-	
 END
 GO
