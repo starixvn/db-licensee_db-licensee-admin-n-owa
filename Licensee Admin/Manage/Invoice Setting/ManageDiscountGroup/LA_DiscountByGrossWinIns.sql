@@ -289,6 +289,47 @@ BEGIN
 		RETURN
 	END CATCH
 
+	-- Log data
+	SELECT @LogSPData = CONVERT(NVARCHAR(MAX),
+		(SELECT
+			@GroupIdOut			AS '@gid'
+			,@DiscountGroupName	AS '@gn'
+			,@DiscountGroupType AS '@gt'
+			,@CurrencyId		AS '@c'
+			,@FromDate			AS '@fd'
+			,@ToDate			AS '@td'
+			,(
+				SELECT
+					PartyId		AS '@pid'
+					,Remark		AS '@rm'
+				FROM @PartyList
+				FOR XML PATH('d'), TYPE
+			)
+			,(
+				SELECT
+					PartyId				AS '@pid'
+					,CurrencyId			AS '@c'
+					,CalculationType	AS '@ct'
+				FROM @CurrencyList
+				FOR XML PATH('d'), TYPE
+			)
+			,(
+				SELECT
+					ProductId			AS '@pid'
+					,CalculationType	AS '@ct'
+				FROM @ProductList
+				FOR XML PATH('d'), TYPE
+			)
+			,(
+				SELECT
+					FromAmount	AS '@fa'
+					,ToAmount	AS '@ta'
+					,Rate		AS '@r'
+				FROM @TierRateSetting
+				FOR XML PATH('d'), TYPE
+			)
+			FOR XML PATH('h'), TYPE))
+
 	-- Write log
 	SET @Duration = DATEDIFF(MILLISECOND, @StartRun, GETDATE())
 
