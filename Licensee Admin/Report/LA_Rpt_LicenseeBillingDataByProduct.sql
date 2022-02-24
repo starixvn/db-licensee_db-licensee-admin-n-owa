@@ -113,18 +113,20 @@ BEGIN
 		,@FromDate = @FromDate
 		,@ToDate = @ToDate
 		,@BaseCurrencyName = @BaseCurrencyName
+		,@LicensingFeeTypeIds = '0,8' -- 0 = Normal Licensing Fee, 8 = BetCount
 		
 	-- Final Result
-	CREATE TABLE #tmp_Result (PartyId INT, ProductId INT, LicensingFee MONEY)
-	INSERT INTO #tmp_Result (PartyId, ProductId, LicensingFee)
-	SELECT PartyId, ProductId, LicensingFee
+	CREATE TABLE #tmp_Result (PartyId INT, ProductId INT, LicensingFee MONEY, BetCount INT)
+	INSERT INTO #tmp_Result (PartyId, ProductId, LicensingFee, BetCount)
+	SELECT PartyId, ProductId, LicensingFee, BetCount
 	FROM (
 		SELECT r.PartyId
 			,CASE WHEN r.ProductId = 37 THEN -1 ELSE r.ProductId END AS ProductId
-			,CASE WHEN r.ProductId = 37 THEN -r.LicensingFee ELSE r.LicensingFee + r.ExtraAmount END AS LicensingFee
+			,CASE WHEN r.LicensingFeeTypeId = 8 THEN 0 WHEN r.ProductId = 37 THEN -r.LicensingFee ELSE r.LicensingFee + r.ExtraAmount END AS LicensingFee
+			,CASE WHEN r.LicensingFeeTypeId = 8 THEN ExtraAmount ELSE 0 END AS BetCount
 		FROM @Result r
-		UNION ALL SELECT PartyId, -3, -SUM(Discount) FROM @Result GROUP BY PartyId HAVING SUM(Discount) <> 0
-		UNION ALL SELECT PartyId, -2, -SUM(Rebate) FROM @Result GROUP BY PartyId HAVING SUM(Rebate) <> 0
+		UNION ALL SELECT PartyId, -3, -SUM(Discount), 0 FROM @Result GROUP BY PartyId HAVING SUM(Discount) <> 0
+		UNION ALL SELECT PartyId, -2, -SUM(Rebate), 0 FROM @Result GROUP BY PartyId HAVING SUM(Rebate) <> 0
 	) t
 
 	-- Remove suspended/terminated licensees with amount = 0
@@ -134,7 +136,7 @@ BEGIN
 	DELETE r
 	FROM #tmp_Result r
 		INNER JOIN CTE_Party p ON r.PartyId = p.PartyId
-	WHERE r.LicensingFee = 0
+	WHERE r.LicensingFee = 0 AND r.BetCount = 0
 
 	-- Sum for total
 	INSERT INTO #tmp_Result (PartyId, ProductId, LicensingFee)
