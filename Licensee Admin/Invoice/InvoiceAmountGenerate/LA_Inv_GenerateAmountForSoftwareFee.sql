@@ -39,6 +39,7 @@ AS
 		- 20210720@Sophia: Add Saba Promotion - 17005 - Promotion for Licensee [Redmine: #155388]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
+		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 */
 
 BEGIN
@@ -155,9 +156,11 @@ BEGIN
 				WHEN ProductId = 66 AND LicensingFeeTypeId = 6 THEN 38 -- Free Bets
 				WHEN ProductId = 34 AND LicensingFeeTypeId = 4 THEN 33 -- Bonus
 				WHEN ProductId = 45 AND LicensingFeeTypeId = 5 THEN 37 -- Lucky Draw
+				WHEN ProductId = 36 AND LicensingFeeTypeId = 1 THEN 41 -- Contribution
+				WHEN ProductId = 36 AND LicensingFeeTypeId = 2 THEN 42 -- JackpotPrize
 				END
 		FROM @Result
-		WHERE ProductId IN (32, 34, 42, 45, 66) AND LicensingFeeTypeId > 0
+		WHERE ProductId IN (32, 34, 42, 45, 66, 36) AND LicensingFeeTypeId > 0
 		GROUP BY
 			CASE
 				WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
@@ -171,6 +174,8 @@ BEGIN
 				WHEN ProductId = 66 AND LicensingFeeTypeId = 6 THEN 38 -- Free Bets
 				WHEN ProductId = 34 AND LicensingFeeTypeId = 4 THEN 33 -- Bonus
 				WHEN ProductId = 45 AND LicensingFeeTypeId = 5 THEN 37 -- Lucky Draw
+				WHEN ProductId = 36 AND LicensingFeeTypeId = 1 THEN 41 -- Contribution
+				WHEN ProductId = 36 AND LicensingFeeTypeId = 2 THEN 42 -- JackpotPrize
 				END
 
 		-- AMF, Prepayment and AGPrepayment

@@ -38,6 +38,7 @@ AS
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
+		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -51,14 +52,14 @@ BEGIN
 			@PP_Contribution	SMALLINT = 4297,
 			@SB_AdjustedOdds	SMALLINT = 999, 
 			@SBC_Contribution	SMALLINT = 1698,
-			@VGA_Contribution	SMALLINT = 3898
+			@VGA_Contribution	SMALLINT = 3898,
+			@SG_Contribution	SMALLINT = 3599
 
 	-- product to be discounted
 	DECLARE @ProductList TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(100), ToBeDiscounted BIT)
 	INSERT INTO @ProductList (GroupProductId, ProductId, ProductCode, ToBeDiscounted)
 	SELECT	GroupProductId, ProductId, ProductCode, 1  
 	FROM	dbo.LA_f_GroupProduct(@ProductCodes,@FromDate,@ToDate)
-
 
 	-- 1.1 party list 
 	DECLARE @PartyList TABLE(PartyId INT, IsSelected BIT, GroupMinFeeId	INT)
@@ -332,8 +333,8 @@ BEGIN
 
 	INSERT INTO #tempData (PartyId, ProductId, CurrencyId, WinlossDate, MemberWL, Amount, ExtraAmount)
 	SELECT	p.PartyId,pl.GroupProductId,b.CurrencyId,b.rptDate,
-			SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @PP_Contribution, @SB_AdjustedOdds, @SBC_Contribution, @VGA_Contribution) THEN 0 ELSE ISNULL(-b.MemberWL, 0) END) AS MemberWL,
-			SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @SB_AdjustedOdds) THEN 0 ELSE (ISNULL(-b.MemberWL, 0) - CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @VGA_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) 
+			SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @PP_Contribution, @SB_AdjustedOdds, @SBC_Contribution, @VGA_Contribution, @SG_Contribution) THEN 0 ELSE ISNULL(-b.MemberWL, 0) END) AS MemberWL,
+			SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip, @SB_AdjustedOdds) THEN 0 ELSE (ISNULL(-b.MemberWL, 0) - CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @VGA_Contribution, @SG_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) 
 																	* ISNULL(cr.Rate, p.Rate) END)
 			+ SUM(CASE WHEN b.Bettype = @SB_AdjustedOdds THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Amount,
 			SUM(CASE WHEN b.Bettype IN (@GD_Tip, @SAG_Tip) THEN ISNULL(-b.MemberWL, 0) * ISNULL(cr.Rate, p.Rate) ELSE 0 END) AS ExtraAmount
@@ -344,7 +345,7 @@ BEGIN
 				AND p.ProductId = pl.GroupProductId    
 				AND (p.ProductID NOT IN (11,39) OR b.Bettype = p.Bettype)
 		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeID = cr.ChargeID AND b.CurrencyId = cr.CurrencyID
-		LEFT JOIN LA_f_ExcludedBettypeListSel('', '999,1706,3007,4297,1698,3898') eb ON b.Bettype = eb.BettypeID
+		LEFT JOIN LA_f_ExcludedBettypeListSel('', '999,1706,3007,4297,1698,3898,3599') eb ON b.Bettype = eb.BettypeID
 	WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate)
 			AND b.customercategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject , Void, Refund

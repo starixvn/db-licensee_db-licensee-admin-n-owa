@@ -13,6 +13,7 @@ AS
 
 	Revisions:
 		- 20210909@Percy: Initialize function [RedmineID: #157652]
+		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 */
 
 RETURN
@@ -23,10 +24,13 @@ RETURN
 	UNION ALL SELECT 32, 4297, 2, 'Jackpot Contribution'
 	UNION ALL SELECT 42, 1698, 2, 'Jackpot Contribution'
 	UNION ALL SELECT 66, 3898, 2, 'Jackpot Contribution'
+	UNION ALL SELECT 36, 4599, 2, 'Jackpot Contribution'
+
 	-- 3: Jackpot Prize
 	UNION ALL SELECT 32, 4298, 3, 'Jackpot Prize'
 	UNION ALL SELECT 42, 1699, 3, 'Jackpot Prize'
 	UNION ALL SELECT 66, 3899, 3, 'Jackpot Prize'
+	UNION ALL SELECT 36, 4600, 3, 'Jackpot Prize'
 	-- 4: Prize
 	UNION ALL SELECT 32, 4299, 4, 'Prize'
 	UNION ALL SELECT 32, 4300, 4, 'Prize'

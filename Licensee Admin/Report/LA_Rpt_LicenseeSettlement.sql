@@ -57,6 +57,7 @@ AS
 		- 20211115@Percy: Return IsShowOddsSpread [RedmineID: #164411]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
+		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 
 	Param's Explanation:
 */
@@ -770,6 +771,49 @@ BEGIN
 
 		UPDATE #Result
 		SET Company = CASE WHEN @IsKeepNegativeAmount = 1 OR @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - WinningPrize
+	END
+	ELSE IF (@ProductCode = 'SG')
+	BEGIN
+		DECLARE @SG_Contribution SMALLINT = 4599,
+				@SG_JackpotPrize SMALLINT = 4600
+
+		;WITH cte_WinLossData AS(
+			SELECT b.SiteId, b.rptDate, b.CurrencyID
+				, SUM(CASE WHEN b.Bettype NOT IN(@SG_Contribution, @SG_JackpotPrize) THEN ISNULL(b.BetCount, 0) ELSE 0 END) BetCount
+				, SUM(CASE WHEN b.Bettype NOT IN(@SG_Contribution, @SG_JackpotPrize) THEN ISNULL(b.Turnover, 0) ELSE 0 END) Turnover
+				, SUM(CASE WHEN b.Bettype NOT IN(@SG_Contribution, @SG_JackpotPrize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) MemberWL
+				, SUM(CASE WHEN b.Bettype = @SG_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Contribution
+				, SUM(CASE WHEN b.Bettype = @SG_JackpotPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS JackpotPrize
+				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+				WHERE
+					b.ProductID = 36
+					AND	b.SiteID = @LicenseeID
+					AND b.rptDate BETWEEN @FromDate AND @ToDate
+					AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
+					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
+		)
+		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, Contribution, JackpotPrize)
+		SELECT rptDate, d.CurrencyID
+				, SUM(BetCount)		AS BetCount
+				, SUM(Turnover)		AS Turnover
+				, SUM(MemberWL)		AS Winlost
+				, SUM((-MemberWL - Contribution) * (1 - ISNULL(cm.Rate, p.Rate)))  AS LicenseeWL
+				, SUM((-MemberWL - Contribution) * ISNULL(cm.Rate, p.Rate))  AS LicenseeChargeRate
+				, SUM(Contribution) AS Contribution
+				, SUM(JackpotPrize) AS JackpotPrize
+		FROM cte_WinLossData d
+			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND d.CurrencyId = cm.CurrencyId 
+		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
+		GROUP BY rptDate, d.CurrencyID
+
+		SELECT @TotalLicenseeChargeRate_InBaseCurrency = SUM(LicenseeChargeRate * e.Rate)
+		FROM #Result r
+		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
+
+		UPDATE #Result
+		SET Company = CASE WHEN @IsKeepNegativeAmount = 1 OR @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize
 	END
 	ELSE IF (@ProductCode = 'CC')
 	BEGIN

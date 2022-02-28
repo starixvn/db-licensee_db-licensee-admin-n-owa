@@ -51,6 +51,7 @@ AS
 	   - 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 	   - 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 	   - 20210824@Danny: filter licensee status from OIC [#159296]
+	   - 20220110@Danny: SG - Jackpot prize integration [#167089]
 
 
 	Param's Explanation:
@@ -60,15 +61,11 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @GD_Tip				SMALLINT = 1706,
-			@PP_Contribution	SMALLINT = 4297,
-			@SBC_Contribution	SMALLINT = 1698,
-			@VGA_Contribution	SMALLINT = 3898,
-			@OddSpread_BetType	SMALLINT = 999
-
+	DECLARE @GD_Tip				SMALLINT = 1706
 	DECLARE @PP_ProductId	INT = 32,
 			@SBC_ProductId	INT = 42,
-			@VGA_ProductId	INT	= 66
+			@VGA_ProductId	INT	= 66,
+			@SG_ProductId	INT = 36
 
 	DECLARE @BaseCurrencyId INT, @BaseCurrencyName VARCHAR(10)
 	-- currency list
@@ -289,7 +286,7 @@ BEGIN
 
 		DELETE bt
 		FROM #Bettype bt
-			INNER JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','999,4297,1698,3898') eb ON bt.Bettype = eb.BettypeId
+			INNER JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','999,4297,1698,3898,4599') eb ON bt.Bettype = eb.BettypeId
 
 		CREATE TABLE #tmpData (rptDate DATE, LicenseeId INT, CurrencyId INT, ProductId INT, LeagueId INT, Bettype INT
 			,BetCount INT, Turnover MONEY, Winloss MONEY, WinlossA MONEY, CommissionP MONEY)
@@ -299,7 +296,7 @@ BEGIN
 			INSERT INTO #tmpData (rptDate, LicenseeId, CurrencyId, ProductId, BetCount, Turnover, Winloss, WinlossA, CommissionP)
 			SELECT r.rptDate, r.SiteId, r.CurrencyId, r.ProductId
 				,SUM(r.BetCount * CASE
-									WHEN r.Bettype IN (999,4297,1698,3898) THEN 0
+									WHEN r.Bettype IN (999,4297,1698,3898,4599) THEN 0
 									WHEN @drawfilter = 2 AND r.StatusId = 111 THEN 0
 									ELSE 1 END) AS BetCount
 				,SUM(r.Turnover * CASE
@@ -308,12 +305,12 @@ BEGIN
 									WHEN @drawfilter IN (2, 3) AND r.StatusId IN (114, 115) THEN 0.5
 									ELSE 1 END) AS Turnover
 				,SUM(r.MemberWL * CASE
-									WHEN r.Bettype IN (999,4297,1698,3898) THEN 0
+									WHEN r.Bettype IN (999,4297,1698,3898,4599) THEN 0
 									ELSE 1 END) AS Winloss
-				,SUM(CASE WHEN r.Bettype IN (999,4297,1698,3898) THEN ISNULL(-r.GrossWL, 0) ELSE 0 END) WinlossA
+				,SUM(CASE WHEN r.Bettype IN (999,4297,1698,3898,4599) THEN ISNULL(-r.GrossWL, 0) ELSE 0 END) WinlossA
 				,SUM(CASE WHEN r.ProductId = 32 THEN 0 ELSE r.CommissionP END) AS CommissionP
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
-				LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','999,4297,1698,3898') b ON r.Bettype = b.BettypeId
+				LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','999,4297,1698,3898,4599') b ON r.Bettype = b.BettypeId
 			WHERE r.rptDate BETWEEN @FromDate AND @ToDate
 				AND r.StatusId IN (111, 112, 113, 114, 115)
 				AND r.CustomerCategory NOT IN (27, 28)
@@ -330,7 +327,7 @@ BEGIN
 			SELECT r.rptDate, r.SiteId, r.CurrencyId, bt.ProductId, r.LeagueId
 				,CASE WHEN r.Bettype NOT IN (9, 29) AND r.Bettype NOT BETWEEN 31 AND 120 THEN 1 ELSE 0 END AS Bettype
 				,SUM(r.BetCount * CASE
-									WHEN r.Bettype IN (999,4297,1698,3898) THEN 0
+									WHEN r.Bettype IN (999,4297,1698,3898,4599) THEN 0
 									WHEN @drawfilter = 2 AND r.Status = 111 THEN 0
 									ELSE 1 END) AS BetCount
 				,SUM(r.Turnover * CASE
@@ -339,9 +336,9 @@ BEGIN
 									WHEN @drawfilter IN (2, 3) AND r.Status IN (114, 115) THEN 0.5
 									ELSE 1 END) AS Turnover
 				,SUM(r.Winloss * CASE
-									WHEN r.Bettype IN (999,4297,1698,3898) THEN 0
+									WHEN r.Bettype IN (999,4297,1698,3898,4599) THEN 0
 									ELSE 1 END) AS Winloss
-				,SUM(CASE WHEN r.Bettype IN (999,4297,1698,3898) THEN ISNULL(-r.WinLossA, 0) ELSE 0 END) WinlossA
+				,SUM(CASE WHEN r.Bettype IN (999,4297,1698,3898,4599) THEN ISNULL(-r.WinLossA, 0) ELSE 0 END) WinlossA
 				,SUM(CASE WHEN bt.ProductId = 32 THEN 0 ELSE r.CommissionP END) AS CommissionP
 			FROM bodb_LicenseeReport.dbo.rpt_Betting r WITH (NOLOCK)
 				INNER JOIN #Bettype bt ON r.Bettype = bt.Bettype
@@ -388,7 +385,7 @@ BEGIN
 			   ,-MemberWL
 			   ,0
 			   ,0
-			   ,(-MemberWL - CASE WHEN a.ProductID IN (@PP_ProductId, @SBC_ProductId, @VGA_ProductId) THEN WinlossA ELSE 0 END) * ISNULL(cc.Rate, p.Rate)
+			   ,(-MemberWL - CASE WHEN a.ProductID IN (@PP_ProductId, @SBC_ProductId, @VGA_ProductId, @SG_ProductId) THEN WinlossA ELSE 0 END) * ISNULL(cc.Rate, p.Rate)
 			   ,Betcount
 			   ,Playercomm
 			   ,CASE WHEN a.ProductID = 0 THEN WinlossA ELSE 0 END
