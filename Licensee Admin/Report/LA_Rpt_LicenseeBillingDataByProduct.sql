@@ -122,9 +122,11 @@ BEGIN
 	FROM (
 		SELECT r.PartyId
 			,CASE WHEN r.ProductId = 37 THEN -1 ELSE r.ProductId END AS ProductId
-			,CASE WHEN r.LicensingFeeTypeId = 8 THEN 0 WHEN r.ProductId = 37 THEN -r.LicensingFee ELSE r.LicensingFee + r.ExtraAmount END AS LicensingFee
-			,CASE WHEN r.LicensingFeeTypeId = 8 THEN ExtraAmount ELSE 0 END AS BetCount
+			,SUM(CASE WHEN r.LicensingFeeTypeId = 8 THEN 0 WHEN r.ProductId = 37 THEN -r.LicensingFee ELSE r.LicensingFee + r.ExtraAmount END) AS LicensingFee
+			,SUM(CASE WHEN r.LicensingFeeTypeId = 8 THEN ExtraAmount ELSE 0 END) AS BetCount
 		FROM @Result r
+		GROUP BY r.PartyId
+			,CASE WHEN r.ProductId = 37 THEN -1 ELSE r.ProductId END
 		UNION ALL SELECT PartyId, -3, -SUM(Discount), 0 FROM @Result GROUP BY PartyId HAVING SUM(Discount) <> 0
 		UNION ALL SELECT PartyId, -2, -SUM(Rebate), 0 FROM @Result GROUP BY PartyId HAVING SUM(Rebate) <> 0
 	) t
