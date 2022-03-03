@@ -59,7 +59,7 @@ BEGIN
 	--parse product rebate group
 	IF @ProductIds = ''
 	BEGIN
-		SELECT @ErrMsg = 'Please select at least 1 product!', @ErrCode = 503
+		SELECT @ErrCode = 503, @ErrMsg = 'Please select at least 1 product!'
 		RETURN	
 	END
 
@@ -67,11 +67,14 @@ BEGIN
 	SELECT val FROM dbo.Lrf_f_StringSplit(@ProductIds, ',')
 
 	--parse assigned payer to group
-	IF @PartyIds <> ''
+	IF @PartyIds = ''
 	BEGIN
-		INSERT INTO @Payers(PayerId)
-		SELECT val FROM dbo.Lrf_f_StringSplit(@PartyIds, ',')
+		SELECT @ErrCode = 503, @ErrMsg = 'Please add at least one licensee.'
+		RETURN	
 	END
+
+	INSERT INTO @Payers(PayerId)
+	SELECT val FROM dbo.Lrf_f_StringSplit(@PartyIds, ',')
 	
 	--check required fields
 	IF @FromDate IS NULL OR @ToDate IS NULL
