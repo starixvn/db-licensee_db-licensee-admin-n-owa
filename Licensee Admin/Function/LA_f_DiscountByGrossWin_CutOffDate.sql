@@ -16,7 +16,7 @@ AS
 */
 
 BEGIN
-	DECLARE @CutOffDate DATE = '2021-10-01'
+	DECLARE @CutOffDate DATE = '2022-01-01'
 	RETURN @CutOffDate
 END
 GO
