@@ -17,6 +17,7 @@ AS
 		- 20191015@Bruce: Get billing group by billing date [#122229]
 		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
 		- 20210901@Percy: Remove duplicate Party - Licensee Code [RedmineID: #161121]
+		- 20220218@Percy: Return SuspendedDate, TerminatedDate [RedmineID: #161429]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -30,15 +31,16 @@ BEGIN
 	DECLARE @UnIdentifiedGroup INT = 1002
 
 	-- Get Licensee
-	CREATE TABLE #Licensees (CustId INT, LicenseeName VARCHAR(50), ParentId INT, PartyId INT, LicenseeCode VARCHAR(50), BaseCurrencyId INT, StartDate DATE, EndDate DATE, IsBillingCurrency BIT)
+	CREATE TABLE #Licensees (CustId INT, LicenseeName VARCHAR(50), ParentId INT, PartyId INT, SuspendedDate DATE, TerminatedDate DATE
+		,LicenseeCode VARCHAR(50), BaseCurrencyId INT, StartDate DATE, EndDate DATE, IsBillingCurrency BIT)
 	
-	INSERT INTO #Licensees (PartyId, LicenseeName, LicenseeCode, BaseCurrencyId, ParentId, IsBillingCurrency)
-	SELECT PartyId, LicenseeName, LicenseeCode, BaseCurrencyId, ParentId, IsBillingCurrency
+	INSERT INTO #Licensees (PartyId, LicenseeName, LicenseeCode, BaseCurrencyId, ParentId, SuspendedDate, TerminatedDate, IsBillingCurrency)
+	SELECT PartyId, LicenseeName, LicenseeCode, BaseCurrencyId, ParentId, SuspendedDate, TerminatedDate, IsBillingCurrency
 	FROM (
-		SELECT PartyId, LicenseeName, LicenseeCode, BaseCurrencyId, ParentId, IsBillingCurrency
+		SELECT PartyId, LicenseeName, LicenseeCode, BaseCurrencyId, ParentId, SuspendedDate, TerminatedDate, IsBillingCurrency
 			,ROW_NUMBER() OVER (PARTITION BY PartyId, LicenseeCode ORDER BY IsBillingCurrency DESC) AS RN
 		FROM (
-			SELECT DISTINCT p.PartyId, p.PartyName AS LicenseeName, UPPER(bc.LicenseeCode) AS LicenseeCode, bc.BaseCurrencyId
+			SELECT DISTINCT p.PartyId, p.PartyName AS LicenseeName, UPPER(bc.LicenseeCode) AS LicenseeCode, bc.BaseCurrencyId, pd.SuspendedDate, pd.TerminatedDate
 				,CASE WHEN p.PartyType = 5 THEN @UnofficialGroup END AS ParentId
 				,CASE WHEN bc.ToDate >= @LastDayOfMonth THEN 1 ELSE 0 END AS IsBillingCurrency
 			FROM dbo.OAS_Party p WITH (NOLOCK)
@@ -150,17 +152,18 @@ BEGIN
 		, ISNULL(l.EndDate, @defaultEndDate) AS EndDate
 		, l.CustId
 		, l.IsBillingCurrency
+		, l.SuspendedDate
+		, l.TerminatedDate
 	FROM #Licensees l
 		INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON l.BaseCurrencyId = e.ExchangeId
 	WHERE (ISNULL(l.CustId, 0) > 0 OR ISNULL(l.PartyId, 0) > 0)
 	
 	UNION ALL
-	SELECT PartyId, 0, PartyName, 0, '', '', @defaultStartDate, @defaultEndDate, 0, 1 FROM @partyList
-	WHERE ParentId = 0 AND PartyId IN (SELECT GroupId FROM @billingGroup)
+	SELECT PartyId, 0, PartyName, 0, '', '', @defaultStartDate, @defaultEndDate, 0, 1, NULL, NULL FROM @partyList WHERE ParentId = 0 AND PartyId IN (SELECT GroupId FROM @billingGroup)
 	UNION ALL
-	SELECT @UnofficialGroup, 0, 'Non-Official Licensees', 0, '', '', @defaultStartDate, @defaultEndDate, 0, 1 FROM @billingGroup WHERE GroupId = @UnofficialGroup
+	SELECT @UnofficialGroup, 0, 'Non-Official Licensees', 0, '', '', @defaultStartDate, @defaultEndDate, 0, 1, NULL, NULL FROM @billingGroup WHERE GroupId = @UnofficialGroup
 	UNION ALL
-	SELECT @UnidentifiedGroup, 0, 'Unidentified', 0, '', '', @defaultStartDate, @defaultEndDate, 0, 1 FROM @billingGroup WHERE GroupId = @UnidentifiedGroup
+	SELECT @UnidentifiedGroup, 0, 'Unidentified', 0, '', '', @defaultStartDate, @defaultEndDate, 0, 1, NULL, NULL FROM @billingGroup WHERE GroupId = @UnidentifiedGroup
 	ORDER BY LicenseeName
 
 	DROP TABLE #Licensees
