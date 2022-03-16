@@ -18,6 +18,7 @@ AS
 		- 20210727@Percy: Initialize SP [RedmineID: #155593]
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
+		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 */
 
 BEGIN
@@ -62,9 +63,12 @@ BEGIN
 		LEFT JOIN dbo.LA_f_GroupProduct(@ProductCodes,@FromDate,@ToDate) g ON p.ProductId = g.ProductId
 
 	-- Get AmountToCompany data
-	CREATE TABLE #tmpData (WinlostDate SMALLDATETIME, Currency INT, Sporttype INT, IsBA BIT, AmountToCompany MONEY)
-	INSERT INTO #tmpData (WinlostDate, Currency, Sporttype, IsBA, AmountToCompany)
-	SELECT b.WinlostDate, b.Currency, CASE WHEN b.bettype IN (911, 912, 913, 914) THEN -1 ELSE b.sporttype END, b.isBA
+	CREATE TABLE #tmpData (WinlostDate SMALLDATETIME, Currency INT, Sporttype INT, Bettype INT, IsBA BIT, AmountToCompany MONEY)
+	INSERT INTO #tmpData (WinlostDate, Currency, Sporttype, Bettype, IsBA, AmountToCompany)
+	SELECT b.WinlostDate, b.Currency
+		,CASE WHEN b.bettype IN (911, 912, 913, 914) THEN -1 ELSE b.sporttype END
+		,CASE WHEN b.bettype = 17005 THEN b.bettype ELSE 0 END
+		,b.isBA
 		,-SUM(ISNULL(b.swinlost, 0) + ISNULL(b.mwinlost, 0) + ISNULL(b.awinlost, 0) + ISNULL(b.winlost, 0) + ISNULL(b.scomm, 0)) AS AmountToCompany
 	FROM bodb_LicenseeReport.dbo.rptLicWinloss2 b WITH (NOLOCK)
 		INNER JOIN @recommend r ON b.recommend = r.recommend
@@ -72,20 +76,25 @@ BEGIN
 		AND b.roleId = 2
 		AND b.statusId IN (111, 112, 113, 114, 115)
 		AND b.bettype NOT IN (901, 902, 911, 912)
-	GROUP BY b.recommend, b.WinlostDate, b.Currency, CASE WHEN b.bettype IN (911, 912, 913, 914) THEN -1 ELSE b.sporttype END, b.isBA -- group by on index recommend
+	GROUP BY b.recommend, b.WinlostDate, b.Currency
+		,CASE WHEN b.bettype IN (911, 912, 913, 914) THEN -1 ELSE b.sporttype END
+		,CASE WHEN b.bettype = 17005 THEN b.bettype ELSE 0 END
+		,b.isBA -- group by on index recommend
 
 	-- Return data
 		-- Note: Saba promotion treat ProductId is max, always on bottom
-	SELECT CONVERT(INT, CASE WHEN p.ProductId = 37 THEN 1000 ELSE p.ProductId END) AS ProductId, p.ProductName, t.AmountToCompany
+	SELECT CONVERT(INT, CASE WHEN t.Bettype = 17005 THEN 1001 WHEN p.ProductId = 37 THEN 1000 ELSE p.ProductId END) AS ProductId
+		,CONVERT(VARCHAR(50), CASE WHEN t.Bettype = 17005 THEN 'Sponsorship' ELSE p.ProductName END) AS ProductName
+		,t.AmountToCompany
 	FROM (
-		SELECT p.GroupProductId, CONVERT(MONEY, SUM(-t.AmountToCompany * e.Rate)) AS AmountToCompany
+		SELECT p.GroupProductId, t.Bettype, CONVERT(MONEY, SUM(-t.AmountToCompany * e.Rate)) AS AmountToCompany
 		FROM #tmpData t
 			INNER JOIN @Products p ON t.Sporttype = p.Sporttype AND t.IsBA = p.IsBA
 			INNER JOIN @Exchange e ON t.Currency = e.ExchangeId AND t.WinlostDate = e.ExchangeDate
-		GROUP BY GroupProductId
+		GROUP BY p.GroupProductId, t.Bettype
 	) t
 		INNER JOIN (SELECT DISTINCT ProductId, ProductName FROM @Products) p ON t.GroupProductId = p.ProductId
-	ORDER BY CASE WHEN p.ProductId = 37 THEN 1 ELSE 0 END, p.ProductId
+	ORDER BY ProductId
 
 	DROP TABLE #tmpData
 END

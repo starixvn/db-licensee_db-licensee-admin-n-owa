@@ -40,6 +40,7 @@ AS
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
+		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 */
 
 BEGIN
@@ -140,6 +141,8 @@ BEGIN
 		IF EXISTS (SELECT 1 FROM @FinalResult WHERE AmountType = 1 AND ProductId = 0)
 			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
 			SELECT 0, '', '', 29, LicensingFee, 0 FROM @Result WHERE ProductId = 37 AND LicensingFee > 0
+			UNION ALL
+			SELECT 0, '', '', 44, ExtraAmount, 0 FROM @Result WHERE ProductId = 37 AND ExtraAmount > 0
 
 		-- Prize, Contribution, Promotion, ...
 		INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, RemainingAmount, AmountType)

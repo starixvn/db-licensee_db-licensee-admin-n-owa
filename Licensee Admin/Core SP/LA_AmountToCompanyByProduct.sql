@@ -26,7 +26,7 @@ AS
 		- 20211110@Danny: Add @LicensingFeeTypeIds = 8 (betcount)  [#159296]
 		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 		- 20220105@Percy: Don't check negative AMF amount [RedmineID: #167039]
-
+		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -42,7 +42,6 @@ AS
 			7 = Contribution Discount
 			8 = Betcount
 			9 = OddsSpead Adjustment
-
 */
 
 BEGIN
@@ -340,11 +339,12 @@ BEGIN
 	GROUP BY t.rptDate, p.PartyId, t.CurrencyId
 
 	-- SB Promotion
-	INSERT INTO #tmpResult (rptDate, PartyId, ProductId, CurrencyId, GrossLicenseeAmount, LicenseeAmount, BasedLicenseeAmount, BetCount)
+	INSERT INTO #tmpResult (rptDate, PartyId, ProductId, CurrencyId, GrossLicenseeAmount, LicenseeAmount, BasedLicenseeAmount, ExtraAmount, BetCount)
 	SELECT t.rptDate, p.PartyId, 37, t.CurrencyId
 		,SUM(CASE WHEN t.BettypeRef = 17005 THEN t.AgentWL ELSE t.MemberWL END * e.Rate) AS GrossLicenseeAmount
-		,SUM(CASE WHEN t.BettypeRef = 17005 THEN t.AgentWL ELSE t.MemberWL END * e.Rate) AS LicenseeAmount
-		,SUM(CASE WHEN t.BettypeRef = 17005 THEN t.AgentWL ELSE t.MemberWL END) AS BasedLicenseeAmount
+		,SUM(CASE WHEN t.BettypeRef = 17005 THEN 0 ELSE t.MemberWL END * e.Rate) AS LicenseeAmount
+		,SUM(CASE WHEN t.BettypeRef = 17005 THEN 0 ELSE t.MemberWL END) AS BasedLicenseeAmount
+		,SUM(CASE WHEN t.BettypeRef = 17005 THEN t.AgentWL ELSE 0 END * e.Rate) AS ExtraAmount
 		,SUM(t.BetCount) AS BetCount
 	FROM #TempData t
 		INNER JOIN @PartyChargeInfo p ON t.LicenseeId = p.LicenseeId AND t.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId = 0
