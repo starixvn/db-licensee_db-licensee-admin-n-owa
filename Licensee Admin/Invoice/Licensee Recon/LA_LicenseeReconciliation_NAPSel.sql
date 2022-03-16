@@ -16,6 +16,7 @@ AS
 		- 20191007@Bruce: Filter data by custid [#120220]
 		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
 		- 20210407@Percy: Support duo base currency - Change code for Collection Summary [RedmineID: #152089]
+		- 20211223@Danny: Split transfer out of bettrans [RedmineID: #163527]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -81,7 +82,7 @@ BEGIN
 
 	DECLARE @_FromDate SMALLDATETIME, @_ToDate SMALLDATETIME
 
-	-- bettrans
+	-- transfer
 	IF @ToDate >= @balanceUpDay
 	BEGIN
 		SELECT @_FromDate = CASE WHEN @FromDate > @balanceUpDay THEN @FromDate ELSE @balanceUpDay END
@@ -89,12 +90,13 @@ BEGIN
 
 		INSERT INTO #transfer(Amount, RefNo, CustId)
 		SELECT b.winlost - b.actual_stake, b.refno, b.custid
-		FROM dbo.bettrans b WITH(NOLOCK)
+		FROM dbo.transfer b WITH(NOLOCK)
 			INNER JOIN #TransferCust c ON b.custid = c.CustId
-		WHERE b.winlostdate BETWEEN @_FromDate AND @_ToDate AND b.bettype = 21003 AND b.oddsid=0
+			LEFT JOIN dbo.transferInfo ti WITH(NOLOCK) ON b.TransId = ti.TransId
+		WHERE b.winlostdate BETWEEN @_FromDate AND @_ToDate AND b.bettype = 21003 AND ISNULL(ti.IsCollection,0)=0
 	END
 
-	-- transfer
+	-- transfer_fi bk
 	IF @FromDate < @balanceUpDay
 	BEGIN
 		SELECT @_FromDate = @FromDate
