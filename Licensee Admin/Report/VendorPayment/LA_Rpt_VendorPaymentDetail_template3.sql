@@ -1,0 +1,161 @@
+﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template3]
+	@PartyIds			VARCHAR(4000),
+	@ProductID			INT,
+	@FromDate			DATETIME,
+	@ToDate				DATETIME,
+	@SportType			INT	= 0, 
+	@BetType			INT	= 0, 
+	@drawfilter			SMALLINT	= 1, 
+	@IsConvert			BIT			= 1, 
+	@BaseCurrencyName	VARCHAR(10)	= 'EUR',
+	@TimeZoneId			INT
+AS
+/*
+ * Created by : [20220405@Danny]
+ * Task  : Vendor Payment Detail (template3 - Template for Virtual Sports product, including some specific info such as: Sport Type, Bet Type)
+ * Revisions
+	- 20210615@Danny: Initialize SP [#168387]
+ */
+
+BEGIN
+	SET NOCOUNT ON
+	DECLARE @ChargeInfos AS TABLE (
+		ChargeID		INT
+		,PartyID		INT
+		,PartyName		VARCHAR(50)
+		,ParentID		INT		
+		,LicenseeID		INT
+		,IsDeposit		INT
+		,ProductID		INT
+		,Rate			MONEY		
+		,Fromdate		SMALLDATETIME
+		,Todate			SMALLDATETIME
+		)
+		
+	DECLARE @Charge3rdInfos AS TABLE (
+		PartyID			INT	
+		,IsDeposit		INT
+		,ProductID		INT
+		,Rate			MONEY		
+		,Fromdate		SMALLDATETIME
+		,Todate			SMALLDATETIME
+		)	
+
+	-- Region: Charge Info	
+	INSERT INTO @ChargeInfos(ChargeID, PartyId, ProductID, LicenseeId, IsDeposit, Rate, Fromdate, Todate)
+	(
+		SELECT c.ChargeID, c.PartyID, c.ProductID, c.LicenseeID, c.isDeposit, c.DI_Rate, c.Fromdate, c.Todate
+		FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'VS') c 
+	)	
+	
+	DELETE @ChargeInfos
+	WHERE IsDeposit = 1 AND Rate = 0	
+	
+	DECLARE @PartyList AS TABLE (PartyId INT, PartyName	VARCHAR(100), BranchName VARCHAR(100), ParentId	INT)
+
+	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
+	EXEC bodb_licensee.dbo.LA_PartyListSel
+		
+	DELETE p
+	FROM @PartyList p
+	WHERE NOT EXISTS (SELECT 1 FROM @ChargeInfos ci WHERE ci.PartyId = p.PartyId)
+			
+	UPDATE ci
+	SET ci.PartyName = p.PartyName,
+		ci.ParentID = p.ParentId
+	FROM @ChargeInfos ci
+	INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
+	
+	-- End region
+
+	-- Region: Charge 3rd
+	INSERT INTO @Charge3rdInfos ( PartyID ,IsDeposit ,ProductID ,Rate ,Fromdate ,Todate )	
+	(
+		SELECT c.PartyID, c.isDeposit, c.ProductID, c.DI_Rate, c.Fromdate, c.Todate
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'VS', 'OA') c 
+		UNION ALL
+		SELECT 999, 0, 5, 0.01, @FromDate, @ToDate
+	)	
+
+	-- End Region: Charge 3rd
+
+	-- Region: Get Echange Rate
+	SELECT DISTINCT ExchangeDate, ExchangeId, BaseCurrencyRate AS Rate
+	INTO #TempExchange
+	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+	
+	-- End region: Get Exchange Rate
+
+	-- Region: Return Result
+	CREATE TABLE #Result (
+		PartyId			INT,
+		PartyName		VARCHAR(100),
+		WinLossDate		DATETIME,
+		SportType		SMALLINT,
+		BetType			SMALLINT,
+		BetCount		INT,
+		Turnover		MONEY,
+		GrossWinloss	MONEY,
+		PayToSupplier	MONEY,
+		OneworksIncome	MONEY,
+		NetIncome		MONEY
+	)
+
+	;WITH d AS (
+		SELECT b.rptDate, b.currencyID, c.PartyID, c.PartyName, l.sporttype, b.bettype
+			, SUM(CASE
+					WHEN @drawfilter IN (2,3) AND b.status = 111 THEN 0.0
+					WHEN @drawfilter IN (2,3) AND (b.status = 114 OR b.status = 115) THEN b.Turnover * 0.5
+				ELSE b.Turnover END) AS Turnover
+			, SUM(-b.Winloss) AS GrossWinloss
+			, SUM(-b.Winloss * c3.Rate) AS PayToSupplier
+			, SUM(-b.Winloss * ISNULL(cr.Rate, c.Rate)) AS OneworksIncome
+			, SUM(CASE WHEN @drawfilter = 2 AND b.status = 111 THEN 0 ELSE BetCount END) AS BetCount
+		FROM bodb_licenseereport.dbo.rpt_Betting b WITH ( NOLOCK)
+			INNER JOIN @ChargeInfos c ON c.LicenseeID = b.siteID AND b.rptDate BETWEEN c.Fromdate AND c.Todate
+			INNER JOIN @Charge3rdInfos c3 ON c3.PartyID = c.ParentID AND b.rptDate BETWEEN c3.Fromdate AND c3.Todate
+			LEFT JOIN bodb02.dbo.League l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeId = c.ChargeId AND cr.CurrencyId = b.CurrencyId
+		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
+			AND b.status NOT IN (-1, 101, 102, 103)
+			AND (b.CurrencyID <> 20)
+			AND b.bettype BETWEEN 1201 AND 1299
+			AND (@Sporttype = 0 OR ( @Sporttype<>0 AND l.Sporttype = @Sporttype))
+			AND (@bettype = 0 OR (b.bettype = @bettype AND @bettype <> 0))
+			AND b.customercategory NOT IN (27,28)
+		GROUP BY b.rptDate,b.currencyID,c.PartyID,c.PartyName,l.sporttype, b.bettype
+	)
+	INSERT INTO #Result(PartyId, PartyName, WinLossDate, SportType, BetType, BetCount, Turnover, GrossWinloss, PayToSupplier, OneworksIncome, NetIncome)
+	SELECT
+		d.PartyId,
+		d.PartyName,
+		d.rptDate AS WinLossDate,
+		d.SportType,
+		d.BetType,
+		SUM(d.betcount) AS BetCount,
+		SUM(d.turnover * ex.Rate)		AS Turnover,
+		SUM(d.GrossWinloss * ex.Rate)	AS GrossWinloss,
+		SUM(d.PayToSupplier * ex.Rate)	AS PayToSupplier,
+		SUM(d.OneworksIncome * ex.Rate)	AS OneworksIncome,
+		SUM((d.OneworksIncome - d.PayToSupplier) * ex.Rate) AS NetIncome
+	FROM d
+		INNER JOIN #TempExchange ex ON d.rptDate = ex.exchangedate and d.currencyID = ex.ExchangeId		
+	GROUP BY d.PartyId, d.sporttype, d.bettype, d.rptDate, d.PartyName
+	ORDER BY d.rptDate ASC, d.PartyName, d.sporttype, d.bettype
+	
+	Update r
+	SET PayToSupplier = GrossWinloss * ci_3rd.Rate,
+		NetIncome = OneworksIncome - (GrossWinloss * ci_3rd.Rate)
+	FROM #Result r
+		INNER JOIN @Charge3rdInfos ci_3rd ON r.PartyId = ci_3rd.PartyId
+
+	SELECT PartyName, WinLossDate, SportType, BetType, BetCount, Turnover, GrossWinloss, PayToSupplier, OneworksIncome, NetIncome
+	FROM #Result
+	-- End Region: Return Result
+
+	DROP TABLE  #TempExchange	
+	DROP TABLE  #Result	
+	
+END
+GO
