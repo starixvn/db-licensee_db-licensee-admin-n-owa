@@ -251,7 +251,8 @@ BEGIN
 			,@BaseCurrencyName = @BaseCurrencyName
 
 		UPDATE r
-		SET r.LicensingFee = r.LicensingFee + r.ExtraAmount, r.IsPrevious = 0
+		SET r.IsPrevious = 0
+			,r.LicensingFee = r.LicensingFee + CASE WHEN r.ProductId = 37 THEN 0 ELSE r.ExtraAmount END
 			,r.BetCount = d.BetCount, r.Turnover = d.Turnover, r.MemberWL = d.MemberWL
 			,r.BACommission = d.BACommission
 		FROM @Result r
@@ -338,7 +339,8 @@ BEGIN
 			,@BaseCurrencyName = @BaseCurrencyName
 
 		UPDATE r
-		SET r.LicensingFee = r.LicensingFee + r.ExtraAmount, r.IsPrevious = 1
+		SET r.IsPrevious = 1
+			,r.LicensingFee = r.LicensingFee + CASE WHEN r.ProductId = 37 THEN 0 ELSE r.ExtraAmount END
 			,r.BetCount = d.BetCount, r.Turnover = d.Turnover, r.MemberWL = d.MemberWL
 			,r.BACommission = d.BACommission
 		FROM @Result r
