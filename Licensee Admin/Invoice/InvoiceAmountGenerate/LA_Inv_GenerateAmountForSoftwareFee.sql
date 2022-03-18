@@ -84,8 +84,8 @@ BEGIN
 		-- Discount
 		ELSE IF EXISTS (
 			SELECT TOP 1 1
-			FROM dbo.LA_DiscountGroupAssignment_UAT a WITH (NOLOCK)
-				INNER JOIN dbo.LA_DiscountGroupHeader_UAT h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
+			FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
+				INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
 			WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate AND h.DiscountGroupType <> 2 -- 2 = rebate
 				AND h.CurrencyId <> @BaseCurrencyId
 			ORDER BY h.ToDate DESC -- latest discount group

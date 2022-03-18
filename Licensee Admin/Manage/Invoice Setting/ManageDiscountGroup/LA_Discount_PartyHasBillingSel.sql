@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -25,14 +25,14 @@ BEGIN
 	--#Region Get info of Discount 
 	-- Get Time range
 	SELECT @FromDateDiscount = FromDate, @ToDateDiscount = ToDate
-	FROM LA_DiscountGroupHeader_UAT WITH(NOLOCK)
+	FROM LA_DiscountGroupHeader WITH(NOLOCK)
 	WHERE DiscountGroupId = @DiscountGroupId
 	-- Get Party List
 	INSERT INTO @PartieSettings(PartyId, ProductId)
 	SELECT a.PartyID, p.ProductId
-	FROM LA_DiscountGroupHeader_UAT h WITH(NOLOCK) 	 
-		INNER JOIN LA_DiscountGroupAssignment_UAT a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
-		INNER JOIN LA_DiscountGroupProduct_UAT p WITH(NOLOCK) ON h.DiscountGroupId = p.DiscountGroupId
+	FROM LA_DiscountGroupHeader h WITH(NOLOCK) 	 
+		INNER JOIN LA_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
+		INNER JOIN LA_DiscountGroupProduct p WITH(NOLOCK) ON h.DiscountGroupId = p.DiscountGroupId
 	WHERE h.DiscountGroupId = @DiscountGroupId 
 	--#Endregion Get info of Discount
 

@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -165,7 +165,7 @@ BEGIN
 
 	-- Validate input data
 	BEGIN
-		IF NOT EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader_UAT WITH (NOLOCK) WHERE DiscountGroupId = @DiscountGroupId AND DiscountGroupType <> 2) -- 2: Rebate
+		IF NOT EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH (NOLOCK) WHERE DiscountGroupId = @DiscountGroupId AND DiscountGroupType <> 2) -- 2: Rebate
 		BEGIN
 			SELECT @ErrCode = 504, @ErrMsg = 'This group does not exist. Please check again.'
 			RETURN
@@ -179,7 +179,7 @@ BEGIN
 
 		IF EXISTS (
 			SELECT 1
-			FROM dbo.LA_DiscountGroupHeader_UAT WITH (NOLOCK)
+			FROM dbo.LA_DiscountGroupHeader WITH (NOLOCK)
 			WHERE DiscountGroupName = @DiscountGroupName AND DiscountGroupType <> 2 -- 2: Rebate
 				AND DiscountGroupId <> @DiscountGroupId AND DiscountGroupName NOT LIKE '%Expired%'
 		)
@@ -265,7 +265,7 @@ BEGIN
 				SELECT
 					PartyId		AS '@pid'
 					,Remark		AS '@rm'
-				FROM dbo.LA_DiscountGroupAssignment_UAT WITH (NOLOCK)
+				FROM dbo.LA_DiscountGroupAssignment WITH (NOLOCK)
 				WHERE DiscountGroupId = @DiscountGroupId
 				FOR XML PATH('d'), TYPE
 			)
@@ -274,7 +274,7 @@ BEGIN
 					PartyId				AS '@pid'
 					,CurrencyId			AS '@c'
 					,CalculationType	AS '@ct'
-				FROM dbo.LA_DiscountGroupCurrency_UAT WITH (NOLOCK)
+				FROM dbo.LA_DiscountGroupCurrency WITH (NOLOCK)
 				WHERE DiscountGroupId = @DiscountGroupId
 				FOR XML PATH('d'), TYPE
 			)
@@ -282,7 +282,7 @@ BEGIN
 				SELECT
 					ProductId			AS '@pid'
 					,CalculationType	AS '@ct'
-				FROM dbo.LA_DiscountGroupProduct_UAT WITH (NOLOCK)
+				FROM dbo.LA_DiscountGroupProduct WITH (NOLOCK)
 				WHERE DiscountGroupId = @DiscountGroupId
 				FOR XML PATH('d'), TYPE
 			)
@@ -291,11 +291,11 @@ BEGIN
 					FromAmount	AS '@fa'
 					,ToAmount	AS '@ta'
 					,Rate		AS '@r'
-				FROM dbo.LA_DiscountGroupDetail_UAT WITH (NOLOCK)
+				FROM dbo.LA_DiscountGroupDetail WITH (NOLOCK)
 				WHERE DiscountGroupId = @DiscountGroupId
 				FOR XML PATH('d'), TYPE
 			)
-		FROM dbo.LA_DiscountGroupHeader_UAT WITH (NOLOCK)
+		FROM dbo.LA_DiscountGroupHeader WITH (NOLOCK)
 		WHERE DiscountGroupId = @DiscountGroupId
 		FOR XML PATH('h'), TYPE))
 
@@ -342,7 +342,7 @@ BEGIN
 	-- Update data
 	BEGIN TRY
 		-- main table
-		UPDATE dbo.LA_DiscountGroupHeader_UAT WITH (ROWLOCK)
+		UPDATE dbo.LA_DiscountGroupHeader WITH (ROWLOCK)
 		SET DiscountGroupName = @DiscountGroupName
 			,CurrencyId = @CurrencyId
 			,FromDate = @FromDate
@@ -353,7 +353,7 @@ BEGIN
 		-- party
 		;WITH CTE_DiscountGroupAssignment AS (
 			SELECT DiscountGroupId, PartyId, Remark, IsApplyDiscount, IsSpecialTreatment
-			FROM dbo.LA_DiscountGroupAssignment_UAT WITH (NOLOCK)
+			FROM dbo.LA_DiscountGroupAssignment WITH (NOLOCK)
 			WHERE DiscountGroupId = @DiscountGroupId
 		)
 		MERGE CTE_DiscountGroupAssignment AS t
@@ -368,7 +368,7 @@ BEGIN
 		-- currency
 		;WITH CTE_DiscountGroupCurrency AS (
 			SELECT DiscountGroupId, PartyId, CurrencyId, CalculationType
-			FROM dbo.LA_DiscountGroupCurrency_UAT WITH (NOLOCK)
+			FROM dbo.LA_DiscountGroupCurrency WITH (NOLOCK)
 			WHERE DiscountGroupId = @DiscountGroupId
 		)
 		MERGE CTE_DiscountGroupCurrency AS t
@@ -383,7 +383,7 @@ BEGIN
 		-- product
 		;WITH CTE_DiscountGroupProduct AS (
 			SELECT DiscountGroupId, ProductId, CalculationType
-			FROM dbo.LA_DiscountGroupProduct_UAT WITH (NOLOCK)
+			FROM dbo.LA_DiscountGroupProduct WITH (NOLOCK)
 			WHERE DiscountGroupId = @DiscountGroupId
 		)
 		MERGE CTE_DiscountGroupProduct AS t
@@ -395,14 +395,14 @@ BEGIN
 			VALUES (@DiscountGroupId, ProductId, CalculationType)
 		WHEN NOT MATCHED BY SOURCE THEN DELETE;
 
-		UPDATE dbo.LA_DiscountGroupProduct_UAT WITH (ROWLOCK)
+		UPDATE dbo.LA_DiscountGroupProduct WITH (ROWLOCK)
 		SET ProductId = @ProductId
 		WHERE DiscountGroupId = @DiscountGroupId
 
 		-- tier rate setting
 		;WITH CTE_DiscountGroupDetail AS (
 			SELECT DiscountGroupDetailId, DiscountGroupId, FromAmount, ToAmount, Rate
-			FROM dbo.LA_DiscountGroupDetail_UAT WITH (NOLOCK)
+			FROM dbo.LA_DiscountGroupDetail WITH (NOLOCK)
 			WHERE DiscountGroupId = @DiscountGroupId
 		)
 		MERGE CTE_DiscountGroupDetail AS t
@@ -422,15 +422,15 @@ BEGIN
 	-- Write log
 	SET @Duration = DATEDIFF(MILLISECOND, @StartRun, GETDATE())
 
-	--EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
-	--	@UserId			= @UserId
-	--	,@IP			= @LoginIP
-	--	,@LicenseeId	= 0
-	--	,@CurrencyId	= 0
-	--	,@SPName		= 'LA_DiscountByGrossWinUpd'
-	--	,@CustId		= 0
-	--	,@Duration		= @Duration
-	--	,@Data			= @LogSPData
-	--	,@OldData		= @LogSPOldData
+	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+		@UserId			= @UserId
+		,@IP			= @LoginIP
+		,@LicenseeId	= 0
+		,@CurrencyId	= 0
+		,@SPName		= 'LA_DiscountByGrossWinUpd'
+		,@CustId		= 0
+		,@Duration		= @Duration
+		,@Data			= @LogSPData
+		,@OldData		= @LogSPOldData
 END
 GO

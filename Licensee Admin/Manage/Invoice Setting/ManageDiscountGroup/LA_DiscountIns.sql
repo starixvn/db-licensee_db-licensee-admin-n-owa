@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -91,7 +91,7 @@ BEGIN
 	END
 
 	--check exists
-	IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader_UAT WITH(NOLOCK) WHERE DiscountGroupName = @DiscountGroupName AND DiscountGroupType != @RebateGroupType)
+	IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupName = @DiscountGroupName AND DiscountGroupType != @RebateGroupType)
 	BEGIN
 		SELECT @ErrCode = 501, @ErrMsg = 'Group name exists. Please try again.'
 		RETURN
@@ -196,7 +196,7 @@ BEGIN
 
 	--#Region Insert
 	--insert discount group header
-	INSERT INTO dbo.LA_DiscountGroupHeader_UAT(DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, [Priority],ModifiedDate)
+	INSERT INTO dbo.LA_DiscountGroupHeader(DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, [Priority],ModifiedDate)
 	VALUES(@DiscountGroupName, @DiscountGroupType, @CurrencyId, @FromDate, @ToDate, 1,GETDATE())
 
 	IF @@ERROR <> 0
@@ -213,55 +213,55 @@ BEGIN
 	END
 
 	--insert discount group assignment
-	INSERT INTO dbo.LA_DiscountGroupAssignment_UAT(DiscountGroupId, PartyID, Remark, IsApplyDiscount, IsSpecialTreatment)
+	INSERT INTO dbo.LA_DiscountGroupAssignment(DiscountGroupId, PartyID, Remark, IsApplyDiscount, IsSpecialTreatment)
 	SELECT DISTINCT @GroupIdOut, PartyId, Remark, IsApplyDiscount, IsSpecialTreatment
 	FROM @PartySettings
 
 	IF @@ERROR <> 0
 	BEGIN
-		DELETE dbo.LA_DiscountGroupHeader_UAT WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupHeader WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
 		SELECT @ErrMsg = 'Insert failed. Please try again.', @ErrCode =  503
 		RETURN	
 	END
 
 	--insert discount group currency
-	INSERT INTO dbo.LA_DiscountGroupCurrency_UAT(DiscountGroupId, PartyID, CurrencyId)
+	INSERT INTO dbo.LA_DiscountGroupCurrency(DiscountGroupId, PartyID, CurrencyId)
 	SELECT DISTINCT @GroupIdOut, PartyId, CurrencyId
 	FROM @CurrencySettings
 
 	IF @@ERROR <> 0
 	BEGIN
-		DELETE dbo.LA_DiscountGroupHeader_UAT WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
-		DELETE dbo.LA_DiscountGroupAssignment_UAT WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupHeader WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupAssignment WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
 		SELECT @ErrMsg = 'Insert failed. Please try again.', @ErrCode =  503
 		RETURN	
 	END
 
 	--insert discount group detail
-	INSERT INTO dbo.LA_DiscountGroupDetail_UAT(DiscountGroupId, FromAmount, ToAmount, Rate)
+	INSERT INTO dbo.LA_DiscountGroupDetail(DiscountGroupId, FromAmount, ToAmount, Rate)
 	SELECT @GroupIdOut, FromAmount, ToAmount, Rate
 	FROM @RateSettings
 
 	IF @@ERROR <> 0
 	BEGIN
-		DELETE dbo.LA_DiscountGroupHeader_UAT WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
-		DELETE dbo.LA_DiscountGroupAssignment_UAT WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
-		DELETE dbo.LA_DiscountGroupCurrency_UAT WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupHeader WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupAssignment WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupCurrency WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
 		SELECT @ErrMsg = 'Insert failed. Please try again.', @ErrCode =  503
 		RETURN	
 	END
 
 	--insert discount group product
-	INSERT INTO dbo.LA_DiscountGroupProduct_UAT(DiscountGroupId, ProductId, CalculationType)
+	INSERT INTO dbo.LA_DiscountGroupProduct(DiscountGroupId, ProductId, CalculationType)
 	SELECT @GroupIdOut, ProductId, CalculationType
 	FROM @Products
 
 	IF @@ERROR <> 0
 	BEGIN
-		DELETE dbo.LA_DiscountGroupHeader_UAT WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
-		DELETE dbo.LA_DiscountGroupAssignment_UAT WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
-		DELETE dbo.LA_DiscountGroupCurrency_UAT WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
-		DELETE dbo.LA_DiscountGroupDetail_UAT WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupHeader WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupAssignment WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupCurrency WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupDetail WITH(ROWLOCK) WHERE DiscountGroupId = @GroupIdOut
 		SELECT @ErrMsg = 'Insert failed. Please try again.', @ErrCode =  503
 		RETURN	
 	END

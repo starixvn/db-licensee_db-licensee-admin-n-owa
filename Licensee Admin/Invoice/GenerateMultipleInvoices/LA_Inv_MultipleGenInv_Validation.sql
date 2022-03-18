@@ -158,8 +158,8 @@ BEGIN
 		DECLARE @Discount TABLE (PartyId INT, BaseCurrencyId INT, DiscountType TINYINT)
 		INSERT INTO @Discount (PartyId, BaseCurrencyId, DiscountType)
 		SELECT DISTINCT a.PartyId, h.CurrencyId, CASE WHEN h.DiscountGroupType <> 2 THEN 1 ELSE 2 END -- 1: discount, 2: rebate
-		FROM dbo.LA_DiscountGroupHeader_UAT h WITH (NOLOCK)
-			INNER JOIN dbo.LA_DiscountGroupAssignment_UAT a WITH (NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
+		FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
+			INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
 		WHERE h.FromDate <= @ToDate AND h.ToDate >= @FromDate
 
 		-- Charge Rate & Rebate

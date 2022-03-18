@@ -104,8 +104,8 @@ BEGIN
 		-- Discount
 		ELSE IF EXISTS (
 			SELECT TOP 1 1
-			FROM dbo.LA_DiscountGroupAssignment_UAT a WITH (NOLOCK)
-				INNER JOIN dbo.LA_DiscountGroupHeader_UAT h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
+			FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
+				INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
 			WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate AND h.DiscountGroupType <> 2 -- 2 = rebate
 				AND h.CurrencyId <> @BaseCurrencyId
 			ORDER BY h.ToDate DESC -- latest discount group
@@ -121,9 +121,9 @@ BEGIN
 			SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode
 			FROM (
 				SELECT CASE WHEN p.ProductId = 0 THEN 'SB' ELSE pd.ProductPrefix END AS ProductCode
-				FROM dbo.LA_DiscountGroupAssignment_UAT a WITH (NOLOCK)
-					INNER JOIN dbo.LA_DiscountGroupHeader_UAT h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
-					INNER JOIN dbo.LA_DiscountGroupProduct_UAT p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
+				FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
+					INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
+					INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
 					LEFT JOIN dbo.Product3rd pd WITH(NOLOCK) ON p.ProductId = pd.ProductId
 				WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate
 					AND h.DiscountGroupType = 2 -- Rebate

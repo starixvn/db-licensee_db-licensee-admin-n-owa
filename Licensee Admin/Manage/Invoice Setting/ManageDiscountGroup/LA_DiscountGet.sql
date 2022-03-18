@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -35,13 +35,13 @@ BEGIN
 
 	SELECT @CalculationProductIds = COALESCE(@CalculationProductIds + ',' + CAST(p.ProductId AS VARCHAR), CAST(p.ProductId AS VARCHAR))
 		 ,@CalculationProductList = COALESCE(@CalculationProductList + ',' + p.ProductName, p.ProductName)
-	FROM dbo.LA_DiscountGroupProduct_UAT d WITH(NOLOCK)
+	FROM dbo.LA_DiscountGroupProduct d WITH(NOLOCK)
 	INNER JOIN LA_f_Products3rd('') p ON p.ProductID = d.ProductId
 	WHERE d.DiscountGroupId = @GroupId AND d.CalculationType IN (@ToBeCalculated,@CalculateAndDiscount)
 
 	SELECT @DiscountProductIds = COALESCE(@DiscountProductIds + ',' + CAST(p.ProductId AS VARCHAR), CAST(p.ProductId AS VARCHAR))
 		 ,@DiscountProductList = COALESCE(@DiscountProductList + ',' + p.ProductName, p.ProductName)
-	FROM dbo.LA_DiscountGroupProduct_UAT d WITH(NOLOCK)
+	FROM dbo.LA_DiscountGroupProduct d WITH(NOLOCK)
 	INNER JOIN LA_f_Products3rd('') p ON p.ProductID = d.ProductId
 	WHERE d.DiscountGroupId = @GroupId AND d.CalculationType IN (@ToBeDiscounted,@CalculateAndDiscount)
 
@@ -58,8 +58,8 @@ BEGIN
 		, @CalculationProductList	AS CalculationProductList
 		, @DiscountProductList		AS DiscountProductList
 		, h.ModifiedDate
-	FROM dbo.LA_DiscountGroupHeader_UAT h WITH(NOLOCK)
-		INNER JOIN bodb02.dbo.exchange c WITH (NOLOCK) ON c.exchangeid = h.CurrencyId
+	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
+		INNER JOIN CustDB.dbo.exchange c WITH (NOLOCK) ON c.exchangeid = h.CurrencyId
 	WHERE DiscountGroupId = @GroupId
 	-- endregion
 
@@ -68,7 +68,7 @@ BEGIN
 		, FromAmount
 		, ToAmount
 		, Rate
-	FROM dbo.LA_DiscountGroupDetail_UAT WITH(NOLOCK)
+	FROM dbo.LA_DiscountGroupDetail WITH(NOLOCK)
 	WHERE DiscountGroupId = @GroupId
 	ORDER BY FromAmount
 	-- endregion
@@ -83,7 +83,7 @@ BEGIN
 			IsApplyDiscount,
 			Remark,
 			a.IsSpecialTreatment
-	FROM dbo.LA_DiscountGroupAssignment_UAT a WITH(NOLOCK)
+	FROM dbo.LA_DiscountGroupAssignment a WITH(NOLOCK)
 	INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID = a.PartyID
 	WHERE DiscountGroupId = @GroupId
 
@@ -98,10 +98,10 @@ BEGIN
 	SELECT DISTINCT p.PartyId, lc.Currency, 
 					CASE WHEN lc.Currency = 92 THEN 'HID' ELSE e.Code END AS Code, 
 					CASE WHEN lc.Currency = 51 THEN 'VND' ELSE e.currency END AS CurrencyName
-	FROM dbo.f_SelLicenseeCust(0) AS lc
+	FROM dbo.LA_f_SelLicenseeCust(0) AS lc
 	INNER JOIN dbo.OAS_Party pp WITH (NOLOCK) ON lc.LicenseeID = pp.OldRefID 
 	INNER JOIN @PartyTable p ON pp.PartyID = p.PartyId
-	INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
+	INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
 	WHERE lc.Currency <> 20 -- exclude test
 
 	UPDATE c1
@@ -116,7 +116,7 @@ BEGIN
 
 	SELECT c.PartyId, c.CurrencyId, c.CurrencyCode AS CurrencyName, CASE WHEN d.CurrencyId IS NOT NULL THEN 1 ELSE 0 END IsSelected
 	FROM @CurrenciesOfLicensee c
-	LEFT JOIN LA_DiscountGroupCurrency_UAT d WITH(NOLOCK) ON
+	LEFT JOIN LA_DiscountGroupCurrency d WITH(NOLOCK) ON
 		d.PartyID = c.PartyId AND 
 		d.DiscountGroupId = @GroupId AND
 		(d.CurrencyId = 0 OR d.CurrencyId = c.CurrencyId) -- all currency = 0

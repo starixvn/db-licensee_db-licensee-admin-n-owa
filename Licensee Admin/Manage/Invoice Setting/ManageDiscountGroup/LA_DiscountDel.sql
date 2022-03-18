@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -25,7 +25,7 @@ BEGIN
 	SET NOCOUNT ON
 
 	--remove assignment
-	DELETE dbo.LA_DiscountGroupAssignment_UAT WITH(ROWLOCK)
+	DELETE dbo.LA_DiscountGroupAssignment WITH(ROWLOCK)
 	WHERE DiscountGroupId = @DiscountGroupId
 	IF @@ERROR > 0
 	BEGIN
@@ -34,7 +34,16 @@ BEGIN
 	END
 
 	--remove product
-	DELETE dbo.LA_DiscountGroupProduct_UAT WITH(ROWLOCK)
+	DELETE dbo.LA_DiscountGroupProduct WITH(ROWLOCK)
+	WHERE DiscountGroupId = @DiscountGroupId
+	IF @@ERROR > 0
+	BEGIN
+		SELECT @ErrMsg = 'Delete failed. Please try again.', @ErrCode = 516
+		RETURN
+	END
+
+	--remove currency
+	DELETE dbo.LA_DiscountGroupCurrency WITH(ROWLOCK)
 	WHERE DiscountGroupId = @DiscountGroupId
 	IF @@ERROR > 0
 	BEGIN
@@ -43,7 +52,7 @@ BEGIN
 	END
 
 	--remove detail
-	DELETE dbo.LA_DiscountGroupDetail_UAT WITH(ROWLOCK)
+	DELETE dbo.LA_DiscountGroupDetail WITH(ROWLOCK)
 	WHERE DiscountGroupId = @DiscountGroupId
 	IF @@ERROR > 0
 	BEGIN
@@ -52,7 +61,7 @@ BEGIN
 	END
 
 	--remove header
-	DELETE dbo.LA_DiscountGroupHeader_UAT WITH(ROWLOCK)
+	DELETE dbo.LA_DiscountGroupHeader WITH(ROWLOCK)
 	WHERE DiscountGroupId = @DiscountGroupId
 	IF @@ERROR > 0
 	BEGIN

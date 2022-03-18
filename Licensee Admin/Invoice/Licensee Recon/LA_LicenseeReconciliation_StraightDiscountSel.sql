@@ -32,10 +32,10 @@ BEGIN
 	DECLARE @DiscountSetting TABLE (PartyId INT, BaseCurrencyId INT, BaseCurrencyName VARCHAR(5), LicenseeCode VARCHAR(50), DiscountRate MONEY)
 	INSERT INTO @DiscountSetting (PartyId, DiscountRate)
 	SELECT a.PartyId, d.Rate
-	FROM dbo.LA_DiscountGroupHeader_UAT h WITH (NOLOCK)
-		INNER JOIN dbo.LA_DiscountGroupDetail_UAT d WITH (NOLOCK) ON d.DiscountGroupId = h.DiscountGroupId AND d.FromAmount = 0 AND d.ToAmount = 10000000000000 -- straight discount
-		INNER JOIN dbo.LA_DiscountGroupProduct_UAT p WITH (NOLOCK) ON p.DiscountGroupId = h.DiscountGroupId AND p.ProductId = 0 -- SB
-		INNER JOIN dbo.LA_DiscountGroupAssignment_UAT a WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId AND a.IsApplyDiscount = 1
+	FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
+		INNER JOIN dbo.LA_DiscountGroupDetail d WITH (NOLOCK) ON d.DiscountGroupId = h.DiscountGroupId AND d.FromAmount = 0 AND d.ToAmount = 10000000000000 -- straight discount
+		INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON p.DiscountGroupId = h.DiscountGroupId AND p.ProductId = 0 -- SB
+		INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId AND a.IsApplyDiscount = 1
 	WHERE @ToDate BETWEEN h.FromDate AND h.ToDate
 		AND h.DiscountGroupType <> 2 -- 2 = rebate, <> 2 = discount
 		AND p.CalculationType IN (1, 10) -- 0 = calculated only, 1 = discount only, 10 = calculated & discount

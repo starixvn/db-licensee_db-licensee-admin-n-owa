@@ -25,14 +25,14 @@ BEGIN
 	DECLARE @PartyList TABLE (PartyId INT, LicenseeId INT)
 	INSERT INTO @PartyList (PartyId, LicenseeId)
 	SELECT a.PartyId, p.OldRefId
-	FROM dbo.LA_DiscountGroupAssignment_UAT a WITH (NOLOCK)
+	FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
 		INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON a.PartyId = p.PartyId
 	WHERE DiscountGroupId = @GroupId
 
 	SELECT TOP 1 @RepPartyId = PartyId FROM @PartyList
-	SELECT TOP 1 @ProductId = gp.ProductId FROM dbo.LA_DiscountGroupProduct_UAT gp WITH (NOLOCK) WHERE gp.DiscountGroupId = @GroupId
+	SELECT TOP 1 @ProductId = gp.ProductId FROM dbo.LA_DiscountGroupProduct gp WITH (NOLOCK) WHERE gp.DiscountGroupId = @GroupId
 	SELECT TOP 1 @ProductName = ProductName FROM dbo.LA_f_Products3rd('') WHERE ProductId = @ProductId
-	SELECT TOP 1 @FromDate = FromDate, @ToDate = ToDate FROM dbo.LA_DiscountGroupHeader_UAT WITH (NOLOCK) WHERE DiscountGroupId = @GroupId
+	SELECT TOP 1 @FromDate = FromDate, @ToDate = ToDate FROM dbo.LA_DiscountGroupHeader WITH (NOLOCK) WHERE DiscountGroupId = @GroupId
 
 	SELECT @ChargeRate = Rate FROM dbo.OAS_ChargeInfo WITH (NOLOCK)
 	WHERE FromParty = @RepPartyId AND ToParty IN (1, 9, 11, 98)
@@ -47,20 +47,20 @@ BEGIN
 		,@ProductName AS CalculationProductList
 		,@ProductName AS DiscountProductList
 		,@ChargeRate AS ChargeRate
-	FROM dbo.LA_DiscountGroupHeader_UAT h WITH (NOLOCK)
+	FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
 		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON h.CurrencyId = e.ExchangeId
 	WHERE h.DiscountGroupId = @GroupId
 
 	-- Tier rate settings
 	SELECT DiscountGroupDetailId AS DiscountDetailId, FromAmount, ToAmount, Rate
 		,@ChargeRate - Rate AS ChargeRateAfterDiscount
-	FROM dbo.LA_DiscountGroupDetail_UAT WITH (NOLOCK)
+	FROM dbo.LA_DiscountGroupDetail WITH (NOLOCK)
 	WHERE DiscountGroupId = @GroupId
 	ORDER BY FromAmount
 
 	-- Party List
 	SELECT a.DiscountGroupId, a.PartyId, p.PartyName, a.Remark
-	FROM dbo.LA_DiscountGroupAssignment_UAT a WITH (NOLOCK)
+	FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
 		INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON a.PartyId = p.PartyId
 	WHERE a.DiscountGroupId = @GroupId
 
@@ -74,6 +74,6 @@ BEGIN
 	FROM @PartyList pl
 		INNER JOIN @CurrencyList cl ON pl.LicenseeId = cl.LicenseeId
 		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON cl.Currency = e.ExchangeId
-		LEFT JOIN dbo.LA_DiscountGroupCurrency_UAT c WITH (NOLOCK) ON pl.PartyId = c.PartyId AND cl.Currency = c.CurrencyId AND c.DiscountGroupId = @GroupId
+		LEFT JOIN dbo.LA_DiscountGroupCurrency c WITH (NOLOCK) ON pl.PartyId = c.PartyId AND cl.Currency = c.CurrencyId AND c.DiscountGroupId = @GroupId
 END
 GO
