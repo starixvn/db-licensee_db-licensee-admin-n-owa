@@ -42,6 +42,15 @@ BEGIN
 		RETURN
 	END
 
+	--remove currency
+	DELETE dbo.LA_DiscountGroupCurrency WITH(ROWLOCK)
+	WHERE DiscountGroupId = @DiscountGroupId
+	IF @@ERROR > 0
+	BEGIN
+		SELECT @ErrMsg = 'Delete failed. Please try again.', @ErrCode = 516
+		RETURN
+	END
+
 	--remove detail
 	DELETE dbo.LA_DiscountGroupDetail WITH(ROWLOCK)
 	WHERE DiscountGroupId = @DiscountGroupId
