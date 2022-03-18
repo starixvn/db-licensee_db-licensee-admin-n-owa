@@ -1,9 +1,5 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountSettingInfoSel]
@@ -34,12 +30,12 @@ BEGIN
 		   , dgd.DiscountGroupDetailId
 		   , dga.IsApplyDiscount
 	FROM OAS_Party p WITH(NOLOCK) 
-		LEFT JOIN LA_DiscountGroupAssignment dga WITH(NOLOCK) ON p.PartyID = dga.PartyId
-		LEFT JOIN LA_DiscountGroupHeader dg WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
-		LEFT JOIN LA_DiscountGroupProduct dgp WITH(NOLOCK) ON dga.DiscountGroupId = dgp.DiscountGroupId
-		LEFT JOIN LA_DiscountGroupDetail dgd WITH(NOLOCK) ON dga.DiscountGroupId = dgd.DiscountGroupId
+		LEFT JOIN LA_DiscountGroupAssignment_UAT dga WITH(NOLOCK) ON p.PartyID = dga.PartyId
+		LEFT JOIN LA_DiscountGroupHeader_UAT dg WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
+		LEFT JOIN LA_DiscountGroupProduct_UAT dgp WITH(NOLOCK) ON dga.DiscountGroupId = dgp.DiscountGroupId
+		LEFT JOIN LA_DiscountGroupDetail_UAT dgd WITH(NOLOCK) ON dga.DiscountGroupId = dgd.DiscountGroupId
 	WHERE p.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
-			AND p.PartyID NOT IN (SELECT bg.PartyID FROM LA_f_BillingGroupSel() bg)
+			AND p.PartyID NOT IN (1, 9, 11, 98)
 			AND p.PartyID NOT IN (SELECT cl.PartyId FROM @CreditLicensees cl)
 			AND (dg.DiscountGroupType IS NULL OR dg.DiscountGroupType != 2) -- Rebate
 END

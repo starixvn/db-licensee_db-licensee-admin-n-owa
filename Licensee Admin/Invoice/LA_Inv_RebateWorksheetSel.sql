@@ -52,9 +52,9 @@ BEGIN
 	SELECT p.ProductId, p.ProductPrefix
 	FROM (
 		SELECT p.ProductId, ROW_NUMBER() OVER(PARTITION BY p.ProductId ORDER BY h.ToDate DESC) AS RN
-		FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
-			INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
-			INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
+		FROM dbo.LA_DiscountGroupAssignment_UAT a WITH (NOLOCK)
+			INNER JOIN dbo.LA_DiscountGroupHeader_UAT h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
+			INNER JOIN dbo.LA_DiscountGroupProduct_UAT p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
 		WHERE a.PartyId = @PartyId
 			AND h.DiscountGroupType = 2 -- rebate
 			AND h.FromDate <= @TDate AND h.ToDate >= @FDate

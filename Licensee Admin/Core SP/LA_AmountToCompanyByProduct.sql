@@ -89,14 +89,14 @@ BEGIN
 	DECLARE @DiscountGroup TABLE (PartyId INT, ProductId INT)
 	INSERT INTO @DiscountGroup (PartyId, ProductId)
 	SELECT DISTINCT a.PartyId, p.ProductId
-	FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
-		INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
+	FROM dbo.LA_DiscountGroupAssignment_UAT a WITH (NOLOCK)
+		INNER JOIN dbo.LA_DiscountGroupProduct_UAT p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
 	WHERE EXISTS (
 		SELECT 1
 		FROM #PartyList pl
-			INNER JOIN dbo.LA_DiscountGroupAssignment da WITH (NOLOCK) ON pl.PartyId = da.PartyId
-			INNER JOIN dbo.LA_DiscountGroupHeader dh WITH (NOLOCK) ON da.DiscountGroupId = dh.DiscountGroupId
-			INNER JOIN dbo.LA_DiscountGroupProduct dp WITH (NOLOCK) ON da.DiscountGroupId = dp.DiscountGroupId
+			INNER JOIN dbo.LA_DiscountGroupAssignment_UAT da WITH (NOLOCK) ON pl.PartyId = da.PartyId
+			INNER JOIN dbo.LA_DiscountGroupHeader_UAT dh WITH (NOLOCK) ON da.DiscountGroupId = dh.DiscountGroupId
+			INNER JOIN dbo.LA_DiscountGroupProduct_UAT dp WITH (NOLOCK) ON da.DiscountGroupId = dp.DiscountGroupId
 			INNER JOIN #Products pd ON dp.ProductId = pd.ProductId
 		WHERE dh.FromDate <= @ToDate AND dh.ToDate >= @FromDate
 			AND dh.DiscountGroupType <> 2 -- 2 = Rebate
@@ -405,10 +405,10 @@ BEGIN
 				,CASE WHEN h.DiscountGroupType = 2 THEN h.Remark ELSE a.Remark END AS Remark
 				,ROW_NUMBER() OVER(PARTITION BY a.PartyId, p.ProductId, c.CurrencyId, CASE WHEN h.DiscountGroupType = 2 THEN 2 ELSE 1 END ORDER BY h.ToDate DESC) AS RN
 			FROM #PartyList pl
-				INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON pl.PartyId = a.PartyId
-				INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
-				INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
-				LEFT JOIN dbo.LA_DiscountGroupCurrency c WITH (NOLOCK) ON a.DiscountGroupId = c.DiscountGroupId AND a.PartyId = c.PartyId
+				INNER JOIN dbo.LA_DiscountGroupAssignment_UAT a WITH (NOLOCK) ON pl.PartyId = a.PartyId
+				INNER JOIN dbo.LA_DiscountGroupHeader_UAT h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
+				INNER JOIN dbo.LA_DiscountGroupProduct_UAT p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
+				LEFT JOIN dbo.LA_DiscountGroupCurrency_UAT c WITH (NOLOCK) ON a.DiscountGroupId = c.DiscountGroupId AND a.PartyId = c.PartyId
 			WHERE h.FromDate < @T_Date AND h.ToDate >= @F_Date
 				AND (h.DiscountGroupType = 2 OR c.DiscountGroupId IS NOT NULL)
 				AND p.ProductId <> 37
@@ -519,7 +519,7 @@ BEGIN
 						AND BasedLicenseeAmount > 0
 					GROUP BY DiscountGroupId
 				) t
-					INNER JOIN dbo.LA_DiscountGroupDetail d WITH (NOLOCK) ON t.DiscountGroupId = d.DiscountGroupId AND FLOOR(t.LicenseeAmount) BETWEEN d.FromAmount AND d.ToAmount
+					INNER JOIN dbo.LA_DiscountGroupDetail_UAT d WITH (NOLOCK) ON t.DiscountGroupId = d.DiscountGroupId AND FLOOR(t.LicenseeAmount) BETWEEN d.FromAmount AND d.ToAmount
 			) dr ON td.DiscountGroupId = dr.DiscountGroupId
 		WHERE td.IsApplyDiscount = 1 AND td.CalculationType IN (0, 10) -- discounted products
 
@@ -537,7 +537,7 @@ BEGIN
 						AND BasedLicenseeAmount > 0
 					GROUP BY DiscountGroupId, PartyId
 				) t
-					INNER JOIN dbo.LA_DiscountGroupDetail d WITH (NOLOCK) ON t.DiscountGroupId = d.DiscountGroupId AND FLOOR(t.LicenseeAmount) BETWEEN d.FromAmount AND d.ToAmount
+					INNER JOIN dbo.LA_DiscountGroupDetail_UAT d WITH (NOLOCK) ON t.DiscountGroupId = d.DiscountGroupId AND FLOOR(t.LicenseeAmount) BETWEEN d.FromAmount AND d.ToAmount
 			) dr ON td.DiscountGroupId = dr.DiscountGroupId AND td.PartyId = dr.PartyId
 		WHERE td.IsApplyDiscount = 1 AND td.CalculationType IN (0, 10) -- discounted products
 
@@ -792,7 +792,7 @@ BEGIN
 			,r.RebateRemark = ISNULL(d.Remark, N'')
 		FROM @Result r
 			LEFT JOIN #tmpDiscountGroup d ON r.PartyId = d.PartyId AND r.ProductId = d.ProductId AND d.DiscountGroupType = 2 -- Rebate
-			LEFT JOIN dbo.LA_DiscountGroupDetail dd WITH (NOLOCK) ON d.DiscountGroupId = dd.DiscountGroupId
+			LEFT JOIN dbo.LA_DiscountGroupDetail_UAT dd WITH (NOLOCK) ON d.DiscountGroupId = dd.DiscountGroupId
 
 		-- For no data
 		INSERT INTO @Result (

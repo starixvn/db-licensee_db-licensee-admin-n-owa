@@ -39,19 +39,19 @@ BEGIN
 		,rp.PartyId
 		,STUFF((
 			SELECT ', ' + ISNULL(NULLIF(pd.BrandName, ''), p.PartyName)
-			FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
+			FROM dbo.LA_DiscountGroupAssignment_UAT a WITH (NOLOCK)
 				INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON a.PartyId = p.PartyId
 				LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON a.PartyId = pd.PartyId
 			WHERE a.DiscountGroupId = h.DiscountGroupId
 			FOR XML PATH (''), ROOT('str'), TYPE ).value('/str[1]','VARCHAR(MAX)') 
 			, 1, 2, '') AS PayerList
-	FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
-		INNER JOIN dbo.LA_DiscountGroupProduct gp WITH (NOLOCK) ON h.DiscountGroupId = gp.DiscountGroupId
+	FROM dbo.LA_DiscountGroupHeader_UAT h WITH (NOLOCK)
+		INNER JOIN dbo.LA_DiscountGroupProduct_UAT gp WITH (NOLOCK) ON h.DiscountGroupId = gp.DiscountGroupId
 		INNER JOIN dbo.LA_f_Products3rd('') p ON gp.ProductId = p.ProductId
 		LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON h.CurrencyId = e.ExchangeId
 		CROSS APPLY (
 			SELECT TOP 1 a.PartyId
-			FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
+			FROM dbo.LA_DiscountGroupAssignment_UAT a WITH (NOLOCK)
 			WHERE a.DiscountGroupId = h.DiscountGroupId
 		) rp
 	WHERE h.DiscountGroupType = 13 -- Discount group by gross win
@@ -72,7 +72,7 @@ BEGIN
 	-- Tier rate settings
 	SELECT d.DiscountGroupId, d.FromAmount, d.ToAmount, d.Rate, g.ChargeRate - d.Rate AS ChargeRateAfterDiscount
 	FROM #DiscountGroup g
-		 INNER JOIN dbo.LA_DiscountGroupDetail d WITH (NOLOCK) ON g.DiscountGroupId = d.DiscountGroupId
+		 INNER JOIN dbo.LA_DiscountGroupDetail_UAT d WITH (NOLOCK) ON g.DiscountGroupId = d.DiscountGroupId
 	ORDER BY d.DiscountGroupId, d.FromAmount
 
 	DROP TABLE #DiscountGroup

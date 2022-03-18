@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -29,9 +29,9 @@ BEGIN
 
 	INSERT INTO @PartySettings(DiscountGroupId, PartyId, ProductId)
 	SELECT DISTINCT h.DiscountGroupId, a.PartyId, dp.ProductId
-	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
-		INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
-		INNER JOIN dbo.LA_DiscountGroupProduct dp WITH(NOLOCK) ON dp.DiscountGroupId = h.DiscountGroupId
+	FROM dbo.LA_DiscountGroupHeader_UAT h WITH(NOLOCK)
+		INNER JOIN dbo.LA_DiscountGroupAssignment_UAT a WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
+		INNER JOIN dbo.LA_DiscountGroupProduct_UAT dp WITH(NOLOCK) ON dp.DiscountGroupId = h.DiscountGroupId
 	WHERE h.DiscountGroupType IN (1,3,11,13)
 		AND (@FromDate IS NULL OR @FromDate <= h.ToDate)
 		AND (@ToDate IS NULL OR @ToDate >= h.FromDate)

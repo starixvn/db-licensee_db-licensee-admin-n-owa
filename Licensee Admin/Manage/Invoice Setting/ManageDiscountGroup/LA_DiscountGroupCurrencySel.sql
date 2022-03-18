@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -28,9 +28,9 @@ BEGIN
 	SELECT DISTINCT p.PartyId, lc.Currency, 
 					CASE WHEN lc.Currency = 92 THEN 'HID' ELSE e.Code END AS Code, 
 					CASE WHEN lc.Currency = 51 THEN 'VND' ELSE e.currency END AS CurrencyName
-	FROM dbo.LA_f_SelLicenseeCust(0) AS lc
+	FROM dbo.f_SelLicenseeCust(0) AS lc
 	INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON lc.LicenseeID = p.OldRefID 
-	INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
+	INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
 	WHERE lc.Currency <> 20 -- exclude test
 			AND p.PartyID = @PartyId
 	
@@ -46,7 +46,7 @@ BEGIN
 
 	SELECT c.PartyId, c.CurrencyId, c.CurrencyCode AS CurrencyName, CASE WHEN d.CurrencyId IS NOT NULL THEN 1 ELSE 0 END IsSelected
 	FROM @CurrenciesOfLicensee c
-	LEFT JOIN LA_DiscountGroupCurrency d WITH(NOLOCK) ON
+	LEFT JOIN LA_DiscountGroupCurrency_UAT d WITH(NOLOCK) ON
 		d.PartyID = c.PartyId AND 
 		d.DiscountGroupId = @DiscountGroupId AND
 		(d.CurrencyId = 0 OR d.CurrencyId = c.CurrencyId) -- all currency = 0

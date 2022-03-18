@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -30,9 +30,9 @@ BEGIN
 	SELECT DISTINCT lc.Currency, 
 					CASE WHEN lc.Currency = 92 THEN 'HID' ELSE e.Code END AS Code, 
 					CASE WHEN lc.Currency = 51 THEN 'VND' ELSE e.currency END AS CurrencyName
-	FROM dbo.LA_f_SelLicenseeCust(0) AS lc
+	FROM dbo.f_SelLicenseeCust(0) AS lc
 	INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON lc.LicenseeID = p.OldRefID 
-	INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
+	INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
 	WHERE lc.Currency <> 20 -- exclude test
 			AND p.PartyID = @PartyId
 	
@@ -50,9 +50,9 @@ BEGIN
 	-- Region: select discounted currency of party
 	;WITH CTE_DiscountSetting AS( 
 		SELECT p.ProductId, MAX(a.DiscountGroupId) AS DiscountGroupId
-		FROM LA_DiscountGroupAssignment a WITH(NOLOCK)
-		INNER JOIN LA_DiscountGroupHeader h WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId AND h.DiscountGroupType IN (1, 3, 11, 13) 
-		INNER JOIN LA_DiscountGroupProduct p WITH(NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId 
+		FROM LA_DiscountGroupAssignment_UAT a WITH(NOLOCK)
+		INNER JOIN LA_DiscountGroupHeader_UAT h WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId AND h.DiscountGroupType IN (1, 3, 11, 13) 
+		INNER JOIN LA_DiscountGroupProduct_UAT p WITH(NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId 
 																AND p.ProductId IN (SELECT val FROM dbo.strSplit(@ProductIds, ','))
 		WHERE a.PartyID = @PartyId
 		GROUP BY p.ProductId )
@@ -60,8 +60,8 @@ BEGIN
 	SELECT CONVERT(INT, s.val) AS ProductId, STUFF((
 				SELECT ', ' + ISNULL(CurrencyCode, '')
 				FROM CTE_DiscountSetting ds
-					INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON ds.DiscountGroupId = h.DiscountGroupId
-					INNER JOIN dbo.LA_DiscountGroupCurrency c WITH (NOLOCK) ON h.DiscountGroupId = c.DiscountGroupId AND c.PartyID = @PartyId AND (h.DiscountGroupType IN (1, 11) OR c.CalculationType IN (2, 3))
+					INNER JOIN dbo.LA_DiscountGroupHeader_UAT h WITH (NOLOCK) ON ds.DiscountGroupId = h.DiscountGroupId
+					INNER JOIN dbo.LA_DiscountGroupCurrency_UAT c WITH (NOLOCK) ON h.DiscountGroupId = c.DiscountGroupId AND c.PartyID = @PartyId AND (h.DiscountGroupType IN (1, 11) OR c.CalculationType IN (2, 3))
 					INNER JOIN @CurrenciesOfLicensee tc ON (c.CurrencyId = 0 OR c.CurrencyId = tc.CurrencyId)
 				FOR XML PATH (''))
 			  , 1, 2, '') AS CurrencyNames

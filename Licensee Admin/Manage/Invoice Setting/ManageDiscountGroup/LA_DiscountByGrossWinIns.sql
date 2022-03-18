@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -170,7 +170,7 @@ BEGIN
 
 		IF EXISTS (
 			SELECT 1
-			FROM dbo.LA_DiscountGroupHeader WITH (NOLOCK)
+			FROM dbo.LA_DiscountGroupHeader_UAT WITH (NOLOCK)
 			WHERE DiscountGroupName = @DiscountGroupName AND DiscountGroupType <> 2 -- 2: Rebate
 		)
 		BEGIN
@@ -245,7 +245,7 @@ BEGIN
 	-- Insert data
 	BEGIN TRY
 		-- main table
-		INSERT INTO dbo.LA_DiscountGroupHeader (DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, Priority, ModifiedDate)
+		INSERT INTO dbo.LA_DiscountGroupHeader_UAT (DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, Priority, ModifiedDate)
 		VALUES (@DiscountGroupName, @DiscountGroupType, @CurrencyId, @FromDate, @ToDate, 1, GETDATE())
 
 		SET @GroupIdOut = SCOPE_IDENTITY()
@@ -257,33 +257,33 @@ BEGIN
 		END
 
 		-- party
-		INSERT INTO dbo.LA_DiscountGroupAssignment (DiscountGroupId, PartyId, Remark, IsApplyDiscount, IsSpecialTreatment)
+		INSERT INTO dbo.LA_DiscountGroupAssignment_UAT (DiscountGroupId, PartyId, Remark, IsApplyDiscount, IsSpecialTreatment)
 		SELECT @GroupIdOut, PartyId, Remark, 1 AS IsApplyDiscount, 0 AS IsSpecialTreatment
 		FROM @PartyList
 
 		-- currency
-		INSERT INTO dbo.LA_DiscountGroupCurrency (DiscountGroupId, PartyId, CurrencyId, CalculationType)
+		INSERT INTO dbo.LA_DiscountGroupCurrency_UAT (DiscountGroupId, PartyId, CurrencyId, CalculationType)
 		SELECT @GroupIdOut, PartyId, CurrencyId, CalculationType
 		FROM @CurrencyList
 
 		-- product
-		INSERT INTO dbo.LA_DiscountGroupProduct (DiscountGroupId, ProductId, CalculationType)
+		INSERT INTO dbo.LA_DiscountGroupProduct_UAT (DiscountGroupId, ProductId, CalculationType)
 		SELECT @GroupIdOut, ProductId, CalculationType
 		FROM @ProductList
 
 		-- tier rate setting
-		INSERT INTO dbo.LA_DiscountGroupDetail (DiscountGroupId, FromAmount, ToAmount, Rate)
+		INSERT INTO dbo.LA_DiscountGroupDetail_UAT (DiscountGroupId, FromAmount, ToAmount, Rate)
 		SELECT @GroupIdOut, FromAmount, ToAmount, Rate
 		FROM @TierRateSetting
 		ORDER BY RowId
 	END TRY
 	BEGIN CATCH
 		-- Rollback data manually
-		DELETE dbo.LA_DiscountGroupHeader WHERE DiscountGroupId = @GroupIdOut
-		DELETE dbo.LA_DiscountGroupAssignment WHERE DiscountGroupId = @GroupIdOut
-		DELETE dbo.LA_DiscountGroupCurrency WHERE DiscountGroupId = @GroupIdOut
-		DELETE dbo.LA_DiscountGroupProduct WHERE DiscountGroupId = @GroupIdOut
-		DELETE dbo.LA_DiscountGroupDetail WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupHeader_UAT WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupAssignment_UAT WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupCurrency_UAT WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupProduct_UAT WHERE DiscountGroupId = @GroupIdOut
+		DELETE dbo.LA_DiscountGroupDetail_UAT WHERE DiscountGroupId = @GroupIdOut
 
 		SELECT @ErrCode =  601, @ErrMsg = 'Insert failed. Please try again.'
 		RETURN
@@ -333,15 +333,15 @@ BEGIN
 	-- Write log
 	SET @Duration = DATEDIFF(MILLISECOND, @StartRun, GETDATE())
 
-	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
-		@UserId			= @UserId
-		,@IP			= @LoginIP
-		,@LicenseeId	= 0
-		,@CurrencyId	= 0
-		,@SPName		= 'LA_DiscountByGrossWinIns'
-		,@CustId		= 0
-		,@Duration		= @Duration
-		,@Data			= @LogSPData
-		,@OldData		= NULL
+	--EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+	--	@UserId			= @UserId
+	--	,@IP			= @LoginIP
+	--	,@LicenseeId	= 0
+	--	,@CurrencyId	= 0
+	--	,@SPName		= 'LA_DiscountByGrossWinIns'
+	--	,@CustId		= 0
+	--	,@Duration		= @Duration
+	--	,@Data			= @LogSPData
+	--	,@OldData		= NULL
 END
 GO

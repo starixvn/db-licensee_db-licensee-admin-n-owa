@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -93,7 +93,7 @@ BEGIN
 	END
 
 	--check exists
-	IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) 
+	IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader_UAT WITH(NOLOCK) 
 				WHERE DiscountGroupName = @DiscountGroupName 
 						AND DiscountGroupType != @RebateGroupType 
 						AND DiscountGroupId <> @DiscountGroupId 
@@ -209,7 +209,7 @@ BEGIN
 	END
 
 	--update discount group assingment
-	;MERGE dbo.LA_DiscountGroupAssignment WITH(ROWLOCK, UPDLOCK) AS t
+	;MERGE dbo.LA_DiscountGroupAssignment_UAT WITH(ROWLOCK, UPDLOCK) AS t
 	USING @PartySettings AS s
 	ON (t.DiscountGroupId = @DiscountGroupId AND t.PartyId = s.PartyId)
 	WHEN NOT MATCHED BY TARGET
@@ -227,7 +227,7 @@ BEGIN
 	END
 
 	--update discount group currency
-	;MERGE dbo.LA_DiscountGroupCurrency WITH(ROWLOCK) AS t
+	;MERGE dbo.LA_DiscountGroupCurrency_UAT WITH(ROWLOCK) AS t
 	USING @CurrencySettings AS s
 	ON (t.DiscountGroupId = @DiscountGroupId AND t.PartyId = s.PartyId AND t.CurrencyId = s.CurrencyId)
 	WHEN NOT MATCHED BY TARGET
@@ -243,7 +243,7 @@ BEGIN
 	END
 
 	--update discount group product
-	;MERGE dbo.LA_DiscountGroupProduct WITH(ROWLOCK, UPDLOCK) AS t
+	;MERGE dbo.LA_DiscountGroupProduct_UAT WITH(ROWLOCK, UPDLOCK) AS t
 	USING @Products AS s
 	ON (t.DiscountGroupId = @DiscountGroupId AND t.ProductId = s.ProductId)
 	WHEN MATCHED THEN UPDATE SET CalculationType = s.CalculationType
@@ -260,7 +260,7 @@ BEGIN
 	END
 
 	--update discouunt group detail
-	;MERGE dbo.LA_DiscountGroupDetail WITH(ROWLOCK, UPDLOCK) AS t
+	;MERGE dbo.LA_DiscountGroupDetail_UAT WITH(ROWLOCK, UPDLOCK) AS t
 	USING @RateSettings AS s
 	ON (t.DiscountGroupDetailId = s.DiscountDetailId AND t.DiscountGroupId = @DiscountGroupId)
 	WHEN NOT MATCHED BY TARGET
@@ -278,7 +278,7 @@ BEGIN
 	END
 
 	--update discount group header
-	UPDATE dbo.LA_DiscountGroupHeader WITH(ROWLOCK, UPDLOCK)
+	UPDATE dbo.LA_DiscountGroupHeader_UAT WITH(ROWLOCK, UPDLOCK)
 	SET DiscountGroupName = @DiscountGroupName, 
 		CurrencyId = @CurrencyId, 
 		FromDate = @FromDate, 
