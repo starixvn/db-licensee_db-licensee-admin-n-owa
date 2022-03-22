@@ -27,6 +27,7 @@ AS
 	 
 	 Revisions:
 		- 20211101@Percy: Initialize SP [RedmineID: #162158]
+		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 	 
 	 Params:
 		@RateSettingsData = '<Root>
@@ -165,7 +166,7 @@ BEGIN
 
 	-- Validate input data
 	BEGIN
-		IF NOT EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH (NOLOCK) WHERE DiscountGroupId = @DiscountGroupId AND DiscountGroupType <> 2) -- 2: Rebate
+		IF NOT EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH (NOLOCK) WHERE DiscountGroupId = @DiscountGroupId AND DiscountGroupType IN (1, 3, 11, 13))
 		BEGIN
 			SELECT @ErrCode = 504, @ErrMsg = 'This group does not exist. Please check again.'
 			RETURN
@@ -180,7 +181,7 @@ BEGIN
 		IF EXISTS (
 			SELECT 1
 			FROM dbo.LA_DiscountGroupHeader WITH (NOLOCK)
-			WHERE DiscountGroupName = @DiscountGroupName AND DiscountGroupType <> 2 -- 2: Rebate
+			WHERE DiscountGroupName = @DiscountGroupName AND DiscountGroupType IN (1, 3, 11, 13)
 				AND DiscountGroupId <> @DiscountGroupId AND DiscountGroupName NOT LIKE '%Expired%'
 		)
 		BEGIN
