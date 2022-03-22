@@ -4,8 +4,6 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_DiscountDel] 
 	@DiscountGroupId INT, 
-	@UserId INT, 
-	@LoginIp VARCHAR (50)	= '', 
 	@ErrCode INT = 0 OUTPUT, 
 	@ErrMsg VARCHAR(4000) = '' OUTPUT
 AS
@@ -16,6 +14,7 @@ AS
 
 	 Revisions:  
 		- 20180705@Parsons: Delete discount groups [#94282]
+		- 20211101@Percy: Remove useless params [RedmineID: #162158]
 	 
 	 Params:
 
@@ -36,6 +35,15 @@ BEGIN
 
 	--remove product
 	DELETE dbo.LA_DiscountGroupProduct WITH(ROWLOCK)
+	WHERE DiscountGroupId = @DiscountGroupId
+	IF @@ERROR > 0
+	BEGIN
+		SELECT @ErrMsg = 'Delete failed. Please try again.', @ErrCode = 516
+		RETURN
+	END
+
+	--remove currency
+	DELETE dbo.LA_DiscountGroupCurrency WITH(ROWLOCK)
 	WHERE DiscountGroupId = @DiscountGroupId
 	IF @@ERROR > 0
 	BEGIN

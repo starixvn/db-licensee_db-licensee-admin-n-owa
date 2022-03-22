@@ -14,6 +14,7 @@ AS
 	 Revisions:  
 		- 20181116@Parsons: Configure discount settings by currency [#99694]
 		- 20200225@Parsons: Support-HID-currency [#128856]
+		- 20211101@Percy: Return applied currencies [RedmineID: #162158]
 
 	 Params:
 
@@ -47,7 +48,7 @@ BEGIN
 	-- End Region: Get all currencies of party 
 
 	-- Region: select discounted currency of party
-	;WITH cte_DiscountSetting AS( 
+	;WITH CTE_DiscountSetting AS( 
 		SELECT p.ProductId, MAX(a.DiscountGroupId) AS DiscountGroupId
 		FROM LA_DiscountGroupAssignment a WITH(NOLOCK)
 		INNER JOIN LA_DiscountGroupHeader h WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId AND h.DiscountGroupType IN (1, 3, 11, 13) 
@@ -56,16 +57,15 @@ BEGIN
 		WHERE a.PartyID = @PartyId
 		GROUP BY p.ProductId )
 
-	SELECT CONVERT(INT, val) AS ProductId, STUFF((
-				SELECT ', ' + ISNULL(CAST(c.CurrencyCode AS VARCHAR), '')
-					FROM @CurrenciesOfLicensee c
-					INNER JOIN LA_DiscountGroupCurrency dc WITH(NOLOCK) ON 
-							dc.PartyID = @PartyId AND
-							(dc.CurrencyId = 0 OR dc.CurrencyId = c.CurrencyId) -- all currency = 0
-					INNER JOIN cte_DiscountSetting ds ON ds.DiscountGroupId = dc.DiscountGroupId AND ds.ProductId = val
+	SELECT CONVERT(INT, s.val) AS ProductId, STUFF((
+				SELECT ', ' + ISNULL(CurrencyCode, '')
+				FROM CTE_DiscountSetting ds
+					INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON ds.DiscountGroupId = h.DiscountGroupId
+					INNER JOIN dbo.LA_DiscountGroupCurrency c WITH (NOLOCK) ON h.DiscountGroupId = c.DiscountGroupId AND c.PartyID = @PartyId AND (h.DiscountGroupType IN (1, 11) OR c.CalculationType IN (2, 3))
+					INNER JOIN @CurrenciesOfLicensee tc ON (c.CurrencyId = 0 OR c.CurrencyId = tc.CurrencyId)
 				FOR XML PATH (''))
 			  , 1, 2, '') AS CurrencyNames
-	FROM dbo.strSplit(@ProductIds, ',')
+	FROM dbo.strSplit(@ProductIds, ',') s
 	-- End Region: select discounted currency of party
 END
 GO

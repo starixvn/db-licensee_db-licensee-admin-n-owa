@@ -14,8 +14,6 @@ ALTER PROCEDURE [dbo].[LA_DiscountUpd]
 	@RateSettingsData	VARCHAR(MAX) = '', 
 	@PartySettingsData	NVARCHAR(MAX) = '', 
 	@CurrencySettingsData	VARCHAR(MAX) = '', 
-	@UserId				INT, 
-	@LoginIp			VARCHAR (50)	= '', 
 	@ErrCode			INT = 0 OUTPUT, 
 	@ErrMsg				VARCHAR(4000)= '' OUTPUT
 AS
@@ -29,6 +27,7 @@ AS
 		- 20181023@Parsons: Configure-discount-settings-by-currency [#99694]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20200609@Parsons: Special handling for INH market [#128570]
+		- 20211101@Percy: Support Discount on Lic WL - Do not allow extend ToDate of Discount Group on Lic Fee [RedmineID: #162158]
 
 	 Params:
 		@RateSettingsData = '<Root>
@@ -78,6 +77,13 @@ BEGIN
 	DECLARE @ToBeDiscounted TINYINT = 0
 	DECLARE @CalculateAndDiscount TINYINT = 10
 	DECLARE @RebateGroupType TINYINT = 2
+
+	DECLARE @CutOffDate DATE = dbo.LA_f_DiscountByGrossWin_CutOffDate()
+	IF @ToDate >= @CutOffDate
+	BEGIN
+		SELECT @ErrCode = 501, @ErrMsg = 'To Date must less than ' + CONVERT(VARCHAR(11), @CutOffDate, 106) + '.'
+		RETURN
+	END
 
 	--check empty
 	IF ISNULL(@DiscountGroupName, '') = ''
