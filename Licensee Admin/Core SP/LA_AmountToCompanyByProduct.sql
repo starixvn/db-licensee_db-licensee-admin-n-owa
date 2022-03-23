@@ -1,4 +1,4 @@
---/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
 USE [bodb_Licensee]
 GO
 
@@ -782,13 +782,15 @@ BEGIN
 		-- Tier Rebate
 		IF EXISTS (SELECT 1 FROM #tmpDiscountGroup WHERE DiscountGroupType = 12)
 		BEGIN
-			INSERT INTO @tmpDiscount (DiscountGroupId, DiscountGroupType, PartyId, ProductId, LicenseeAmount, BasedLicenseeAmount, Remark)
-			SELECT d.DiscountGroupId, 12, d.PartyId, d.ProductId, SUM(r.LicenseeWL), SUM(r.BasedLicenseeWL), d.Remark
-			FROM #tmpDiscountGroup d
-				INNER JOIN @tmpResult r ON d.PartyId = r.PartyId AND d.ProductId = r.ProductId
-			WHERE d.DiscountGroupType = 12
-			GROUP BY d.DiscountGroupId, d.PartyId, d.ProductId, d.Remark
-			HAVING SUM(r.LicenseeWL) >= 0 AND SUM(r.BasedLicenseeWL) >= 0
+			INSERT INTO @tmpDiscount (DiscountGroupId, DiscountGroupType, PartyId, ProductId, Remark, LicenseeAmount, BasedLicenseeAmount)
+			SELECT DiscountGroupId, 12, PartyId, ProductId, Remark, CASE WHEN LicenseeWL < 0 THEN 0 ELSE LicenseeWL END, CASE WHEN BasedLicenseeWL < 0 THEN 0 ELSE BasedLicenseeWL END
+			FROM (
+				SELECT d.DiscountGroupId, d.PartyId, d.ProductId, d.Remark, SUM(r.LicenseeWL) AS LicenseeWL, SUM(r.BasedLicenseeWL) AS BasedLicenseeWL
+				FROM #tmpDiscountGroup d
+					INNER JOIN @tmpResult r ON d.PartyId = r.PartyId AND d.ProductId = r.ProductId
+				WHERE d.DiscountGroupType = 12
+				GROUP BY d.DiscountGroupId, d.PartyId, d.ProductId, d.Remark
+			) t
 			
 			UPDATE t
 			SET t.TierDiffRebate = CASE
