@@ -85,6 +85,27 @@ BEGIN
 		RETURN
 	END
 
+	-- if group is tier rebate, check base currency all payers
+	DECLARE @BaseCurrency TABLE (BaseCurrencyId INT)
+	DECLARE @BaseCurrencyId INT = 0
+
+	IF @RebateGroupType = 12
+	BEGIN
+		INSERT INTO @BaseCurrency (BaseCurrencyId)
+		SELECT DISTINCT BaseCurrencyId
+		FROM @Payers p
+			INNER JOIN dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON p.PayerId = bc.PartyId
+		WHERE bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
+
+		IF @@ROWCOUNT <> 1
+		BEGIN
+			SELECT @ErrCode = 503, @ErrMsg = 'Licensees billing currency must be the same.'
+			RETURN
+		END
+
+		SELECT @BaseCurrencyId = BaseCurrencyId FROM @BaseCurrency
+	END
+
 	-- #Region Update 
 	IF ISNULL(@GroupId, 0) = 0
 	BEGIN
@@ -100,6 +121,7 @@ BEGIN
 				, FromDate AS '@fd'
 				, ToDate AS '@td'
 				, DiscountGroupType AS '@dt'
+				, CurrencyId AS '@bc'
 				, [Priority] AS '@pr'
 				, Remark AS '@rm'
 				, (SELECT DiscountGroupId AS '@dg'
@@ -175,6 +197,7 @@ BEGIN
 		, Remark = @Remark
 		, ModifiedDate = GETDATE()
 		, DiscountGroupType = @RebateGroupType
+		, CurrencyId = @BaseCurrencyId
 	WHERE DiscountGroupId = @GroupId
 
 	IF @@ERROR <> 0
@@ -195,6 +218,7 @@ BEGIN
 				, @FromDate AS '@fd'
 				, @ToDate AS '@td'
 				, @RebateGroupType AS '@dt'
+				, @BaseCurrencyId AS '@bc'
 				, 2 AS '@pr'
 				, (SELECT @GroupId AS '@gd'
 					, @Rate AS '@r'

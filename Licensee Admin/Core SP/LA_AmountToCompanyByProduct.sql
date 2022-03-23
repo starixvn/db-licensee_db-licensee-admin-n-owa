@@ -782,14 +782,14 @@ BEGIN
 		-- Tier Rebate
 		IF EXISTS (SELECT 1 FROM #tmpDiscountGroup WHERE DiscountGroupType = 12)
 		BEGIN
-			INSERT INTO @tmpDiscount (DiscountGroupId, DiscountGroupType, PartyId, ProductId, Remark, LicenseeAmount, BasedLicenseeAmount)
-			SELECT DiscountGroupId, 12, PartyId, ProductId, Remark, CASE WHEN LicenseeWL < 0 THEN 0 ELSE LicenseeWL END, CASE WHEN BasedLicenseeWL < 0 THEN 0 ELSE BasedLicenseeWL END
+			INSERT INTO @tmpDiscount (DiscountGroupId, DiscountGroupType, BaseCurrencyId, PartyId, ProductId, Remark, LicenseeAmount, BasedLicenseeAmount)
+			SELECT DiscountGroupId, 12, BaseCurrencyId, PartyId, ProductId, Remark, CASE WHEN LicenseeWL < 0 THEN 0 ELSE LicenseeWL END, CASE WHEN BasedLicenseeWL < 0 THEN 0 ELSE BasedLicenseeWL END
 			FROM (
-				SELECT d.DiscountGroupId, d.PartyId, d.ProductId, d.Remark, SUM(r.LicenseeWL) AS LicenseeWL, SUM(r.BasedLicenseeWL) AS BasedLicenseeWL
+				SELECT d.DiscountGroupId, d.BaseCurrencyId, d.PartyId, d.ProductId, d.Remark, SUM(r.LicenseeWL) AS LicenseeWL, SUM(r.BasedLicenseeWL) AS BasedLicenseeWL
 				FROM #tmpDiscountGroup d
 					INNER JOIN @tmpResult r ON d.PartyId = r.PartyId AND d.ProductId = r.ProductId
 				WHERE d.DiscountGroupType = 12
-				GROUP BY d.DiscountGroupId, d.PartyId, d.ProductId, d.Remark
+				GROUP BY d.DiscountGroupId, d.BaseCurrencyId, d.PartyId, d.ProductId, d.Remark
 			) t
 			
 			UPDATE t
@@ -805,7 +805,7 @@ BEGIN
 					WHERE DiscountGroupType = 12
 					GROUP BY DiscountGroupId, ProductId
 				) a ON t.DiscountGroupId = a.DiscountGroupId AND t.ProductId = a.ProductId
-				INNER JOIN dbo.LA_f_TierRebateSetting() s ON a.LicenseeWL BETWEEN s.FromAmount AND s.ToAmount
+				INNER JOIN dbo.LA_f_TierRebateSetting() s ON t.BaseCurrencyId = s.BaseCurrencyId AND a.LicenseeWL BETWEEN s.FromAmount AND s.ToAmount
 				INNER JOIN dbo.LA_DiscountGroupDetail dd WITH (NOLOCK) ON t.DiscountGroupId = dd.DiscountGroupId
 				INNER JOIN @PartyChargeInfo p ON t.PartyId = p.PartyId AND t.ProductId = p.ProductId AND p.BettypeRef = -1
 				LEFT JOIN @tmpDiscount d ON d.PartyId = t.PartyId AND d.ProductId = t.ProductId AND d.DiscountGroupType NOT IN (2, 12)

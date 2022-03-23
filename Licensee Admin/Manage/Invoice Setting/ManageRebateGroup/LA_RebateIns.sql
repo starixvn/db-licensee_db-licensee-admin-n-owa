@@ -85,11 +85,32 @@ BEGIN
 		RETURN
 	END
 
+	-- if group is tier rebate, check base currency all payers
+	DECLARE @BaseCurrency TABLE (BaseCurrencyId INT)
+	DECLARE @BaseCurrencyId INT = 0
+
+	IF @RebateGroupType = 12
+	BEGIN
+		INSERT INTO @BaseCurrency (BaseCurrencyId)
+		SELECT DISTINCT BaseCurrencyId
+		FROM @Payers p
+			INNER JOIN dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON p.PayerId = bc.PartyId
+		WHERE bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
+
+		IF @@ROWCOUNT <> 1
+		BEGIN
+			SELECT @ErrCode = 503, @ErrMsg = 'Licensees billing currency must be the same.'
+			RETURN
+		END
+
+		SELECT @BaseCurrencyId = BaseCurrencyId FROM @BaseCurrency
+	END
+
 	-- #Region Insert 
 
 	--insert rebate group header
 	INSERT INTO dbo.LA_DiscountGroupHeader(DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, Remark, [Priority], ModifiedDate)
-	VALUES(@GroupName, @RebateGroupType, 0, @FromDate, @ToDate, @Remark, 2, GETDATE())
+	VALUES(@GroupName, @RebateGroupType, @BaseCurrencyId, @FromDate, @ToDate, @Remark, 2, GETDATE())
 
 	IF @@ERROR <> 0
 	BEGIN
@@ -153,6 +174,7 @@ BEGIN
 				, @FromDate AS '@fd'
 				, @ToDate AS '@td'
 				, @RebateGroupType AS '@dt'
+				, @BaseCurrencyId AS '@bc'
 				, 2 AS '@pr'
 				, (SELECT @GroupIdOut AS '@gd'
 					, @Rate AS '@r'
