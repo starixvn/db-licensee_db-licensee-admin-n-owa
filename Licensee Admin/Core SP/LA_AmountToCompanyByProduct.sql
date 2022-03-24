@@ -783,14 +783,12 @@ BEGIN
 		IF EXISTS (SELECT 1 FROM #tmpDiscountGroup WHERE DiscountGroupType = 12)
 		BEGIN
 			INSERT INTO @tmpDiscount (DiscountGroupId, DiscountGroupType, BaseCurrencyId, PartyId, ProductId, Remark, LicenseeAmount, BasedLicenseeAmount)
-			SELECT DiscountGroupId, 12, BaseCurrencyId, PartyId, ProductId, Remark, CASE WHEN LicenseeWL < 0 THEN 0 ELSE LicenseeWL END, CASE WHEN BasedLicenseeWL < 0 THEN 0 ELSE BasedLicenseeWL END
-			FROM (
-				SELECT d.DiscountGroupId, d.BaseCurrencyId, d.PartyId, d.ProductId, d.Remark, SUM(r.LicenseeWL) AS LicenseeWL, SUM(r.BasedLicenseeWL) AS BasedLicenseeWL
-				FROM #tmpDiscountGroup d
-					INNER JOIN @tmpResult r ON d.PartyId = r.PartyId AND d.ProductId = r.ProductId
-				WHERE d.DiscountGroupType = 12
-				GROUP BY d.DiscountGroupId, d.BaseCurrencyId, d.PartyId, d.ProductId, d.Remark
-			) t
+			SELECT d.DiscountGroupId, 12, d.BaseCurrencyId, d.PartyId, d.ProductId, d.Remark, SUM(r.LicenseeWL) AS LicenseeWL, SUM(r.BasedLicenseeWL) AS BasedLicenseeWL
+			FROM #tmpDiscountGroup d
+				INNER JOIN @tmpResult r ON d.PartyId = r.PartyId AND d.ProductId = r.ProductId
+			WHERE d.DiscountGroupType = 12
+			GROUP BY d.DiscountGroupId, d.BaseCurrencyId, d.PartyId, d.ProductId, d.Remark
+			HAVING SUM(r.LicenseeWL) > 0 AND SUM(r.BasedLicenseeWL) > 0
 			
 			UPDATE t
 			SET t.TierDiffRebate = CASE
@@ -828,8 +826,9 @@ BEGIN
 		UPDATE r
 		SET r.Rebate = CASE
 						WHEN d.DiscountGroupType = 2 THEN (r.LicensingFee - r.Discount) * ISNULL(dd.Rate, 0)
-						WHEN r.LicensingFee - r.Discount - ISNULL(t.LicensingFee, 0) - ISNULL(d.TierDiffRebate, 0) < 0 THEN ISNULL(d.TierDiffRebate, 0)
-						ELSE ISNULL(d.TierDiffRebate, 0) + (r.LicensingFee - r.Discount - ISNULL(t.LicensingFee, 0) - ISNULL(d.TierDiffRebate, 0)) * ISNULL(d.RebateRate, 0) END
+						WHEN r.GrossLicensingFee < 0 THEN 0
+						WHEN r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - ISNULL(d.TierDiffRebate, 0) < 0 THEN ISNULL(d.TierDiffRebate, 0)
+						ELSE ISNULL(d.TierDiffRebate, 0) + (r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - ISNULL(d.TierDiffRebate, 0)) * ISNULL(d.RebateRate, 0) END
 			,r.RebateRate = ISNULL(d.RebateRate, ISNULL(dd.Rate, 0))
 			,r.RebateRemark = ISNULL(d.Remark, N'')
 		FROM @Result r
