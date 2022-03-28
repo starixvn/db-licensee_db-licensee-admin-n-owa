@@ -19,6 +19,7 @@ AS
 	- 20220110@Danny: SG - Jackpot prize integration [#167089]
 	- 20220218@Danny: Allbet - Promotion integration [#167510]
 	- 20220407@Percy: Calculate Licensee Fee base on LicenseeContribution [RedmineID: #171190]
+	- 20220328@Danny: Intergrate Guaranteed Gaming [#167626]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
@@ -480,6 +481,26 @@ BEGIN
 		)  AND c.ChargeType = 1
 		AND c.ProductID NOT IN (15, 21, 25)
 	
+	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID = 70)
+	BEGIN
+		;WITH cte AS
+		(
+			SELECT DISTINCT p.PartyId, r.ProductID, r.DI_Rate, r.ChargeType
+			FROM (	SELECT DISTINCT r.PartyID, r.ProductID, r.DI_Rate, r.ChargeType
+				FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'FGGL', 'OA') r 
+				WHERE r.ChargeType = 11
+			 ) r
+			INNER JOIN #PartyList p on p.ParentId = r.PartyID
+		)
+		UPDATE t
+		SET		t.ChargeRate11 = ISNULL(u1.DI_Rate,0)
+		FROM	#ChargeRate t
+	
+		LEFT JOIN cte u1 ON t.PartyID = u1.PartyID AND t.ProductID = u1.ProductID AND u1.ChargeType = 11
+		WHERE t.ProductID = 70
+	END
+
+
 	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID = 15)
 	BEGIN
 		INSERT INTO #ChargeRate(ChargeID,PartyID, LicenseeID,isDeposit, ProductID, Fromdate, Todate)
@@ -694,7 +715,6 @@ BEGIN
 	CREATE CLUSTERED INDEX cix_#AllbetPlayCurrency ON #AllbetPlayCurrency(SiteId)
 	---- End 
 	
-	
 	IF @Timezone = 1 -- GMT -4
 	BEGIN
 		;WITH cte_Summary AS(
@@ -729,6 +749,7 @@ BEGIN
 			SUM(CASE WHEN (bt.ProductID = 32  AND ci.isDeposit = 1) OR (bt.ProductID = 36) THEN (b.LicenseeWinloss - b.LicenseeContribution) * ISNULL(cr.Rate, ci.Rate) + LicenseeContribution - JackpotPrize - WinPrizeAmount
 				ELSE b.LicenseeWinloss * ISNULL(cr.Rate, ci.Rate) END) AS LicensingFee,
 			SUM(CASE WHEN bt.ProductID IN (32,36) THEN (LicenseeWinloss - FullContribution) * ISNULL(ci_3rd.Rate3rd,0)
+					 WHEN bt.ProductID = 70 THEN (LicenseeWinloss - (b.ValidBetAmount * ci.ChargeRate11)) * ISNULL(ci_3rd.Rate3rd,0)
 				ELSE b.LicenseeWinloss * ISNULL(ci_3rd.Rate3rd,0) - CASE WHEN bt.ProductID = 45 THEN b.Bonus 
 																		 WHEN bt.ProductID = 21 THEN b.Promotion
 																		 ELSE 0 END END
@@ -1043,6 +1064,7 @@ BEGIN
 			SUM(CASE WHEN (bt.ProductID = 32 AND ci.isDeposit = 1) OR bt.ProductID = 36 THEN (b.LicenseeWinloss - b.LicenseeContribution) * ISNULL(cr.Rate, ci.Rate) + LicenseeContribution - JackpotPrize - WinPrizeAmount
 				ELSE b.LicenseeWinloss * ISNULL(cr.Rate, ci.Rate) END) AS LicensingFee,
 			SUM(CASE WHEN bt.ProductID IN (32, 36) THEN (LicenseeWinloss - FullContribution) * ISNULL(ci_3rd.Rate3rd,0)
+					WHEN bt.ProductID = 70 THEN (LicenseeWinloss - (b.ValidBetAmount * ci.ChargeRate11)) * ISNULL(ci_3rd.Rate3rd,0)
 				ELSE b.LicenseeWinloss * ISNULL(ci_3rd.Rate3rd,0) - CASE WHEN bt.ProductID = 45 THEN b.Bonus 
 																		 WHEN bt.ProductID = 21 THEN b.Promotion 
 																		 ELSE 0 END END
