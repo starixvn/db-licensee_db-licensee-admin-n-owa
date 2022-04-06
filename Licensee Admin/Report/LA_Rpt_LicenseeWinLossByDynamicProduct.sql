@@ -213,6 +213,8 @@ BEGIN
 	)
 	DELETE #Parties WHERE LicenseeId IN (SELECT p.LicenseeId FROM #Parties p WHERE p.PartyId = -1) AND PartyId > 0
 
+	DELETE #Data WHERE LicenseeId NOT IN (SELECT p.LicenseeId FROM #Parties p)
+
 	-- parties: charge rates
 	DECLARE @ProductCodes VARCHAR(500) = (SELECT ProductCode + ',' FROM @Products FOR XML PATH (''))
 	SELECT c.ProductId			AS ProductId,
