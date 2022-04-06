@@ -200,7 +200,7 @@ BEGIN
 	FROM CTE_Licensees d
 		INNER JOIN dbo.Licensees l WITH (NOLOCK) ON d.LicenseeId = l.LicenseeId
 		LEFT JOIN #Parties p ON d.LicenseeId = p.LicenseeId
-	WHERE p.LicenseeId IS NULL
+	WHERE l.LicenseeName <> 'Saba789' AND p.LicenseeId IS NULL
 
 	-- remove duplicate
 	INSERT #Parties
