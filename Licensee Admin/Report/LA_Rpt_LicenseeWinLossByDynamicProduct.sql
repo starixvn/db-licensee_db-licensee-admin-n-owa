@@ -33,6 +33,7 @@ AS
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
+		- 20220406@Percy: Change licensee name format of Unknown licensees [RedmineID: #171150]
 */
 
 BEGIN
@@ -193,10 +194,13 @@ BEGIN
 	END
 
 	-- get unknown parties
-	INSERT INTO #Parties(PartyId, PartyName, LicenseeId)
-	SELECT DISTINCT 0, 'Unknown-' + CAST(d.LicenseeId AS VARCHAR(10)), d.LicenseeId
-	FROM #Data d
-	WHERE d.LicenseeId NOT IN (SELECT LicenseeId FROM #Parties)
+	;WITH CTE_Licensees AS (SELECT DISTINCT LicenseeId FROM #Data)
+	INSERT INTO #Parties (PartyId, PartyName, LicenseeId)
+	SELECT 0, l.LicenseeName + '-' + CAST(l.LicenseeId AS VARCHAR(10)), l.LicenseeId
+	FROM CTE_Licensees d
+		INNER JOIN dbo.Licensees l WITH (NOLOCK) ON d.LicenseeId = l.LicenseeId
+		LEFT JOIN #Parties p ON d.LicenseeId = p.LicenseeId
+	WHERE l.LicenseeName <> 'Saba789' AND p.LicenseeId IS NULL
 
 	-- remove duplicate
 	INSERT #Parties
@@ -208,6 +212,8 @@ BEGIN
 		GROUP BY p2.LicenseeId HAVING COUNT(p2.LicenseeId)>1
 	)
 	DELETE #Parties WHERE LicenseeId IN (SELECT p.LicenseeId FROM #Parties p WHERE p.PartyId = -1) AND PartyId > 0
+
+	DELETE #Data WHERE LicenseeId NOT IN (SELECT p.LicenseeId FROM #Parties p)
 
 	-- parties: charge rates
 	DECLARE @ProductCodes VARCHAR(500) = (SELECT ProductCode + ',' FROM @Products FOR XML PATH (''))
