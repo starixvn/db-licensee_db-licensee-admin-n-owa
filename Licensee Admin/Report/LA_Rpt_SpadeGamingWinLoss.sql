@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -16,6 +16,7 @@ AS
 	- 20200409@Mason: Integrate SA Gaming [#129276]
 	- 20200508@Parsons: Integrate Sexy Gaming for deposit licensees [#132665]
 	- 20220110@Danny: SG - Jackpot prize integration [#167089]
+	- 20220407@Percy: Return LicenseeContribution & FullContribution [RedmineID: #171190]
  * Param's Explanation:
  *
  */
@@ -183,8 +184,9 @@ BEGIN
 		PayToSupplier	MONEY,
 		CompanyIncome	MONEY,
 		Currency		VARCHAR(20),
-		Contribution	MONEY,
-		JackpotPrize	MONEY
+		JackpotPrize	MONEY,
+		LicenseeContribution	MONEY,
+		FullContribution		MONEY
 	)
 
 	-- Region: Calculate Grand Total
@@ -205,8 +207,9 @@ BEGIN
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY,
 		CompanyIncome	MONEY,
-		Contribution	MONEY,
-		JackpotPrize	MONEY
+		JackpotPrize	MONEY,
+		LicenseeContribution	MONEY,
+		FullContribution		MONEY
 	)
 	
 	WHILE EXISTS (SELECT TOP 1 1 FROM @BaseCurrencies)
@@ -229,7 +232,7 @@ BEGIN
 			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
 			GROUP BY td.ParentId, td.PartyId, td.IsDeposit
 		)
-		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,CompanyIncome, Contribution, JackpotPrize)
+		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,CompanyIncome,JackpotPrize,LicenseeContribution,FullContribution)
 		SELECT @tempCurrency,ParentId,
 			SUM(TotalTrans),
 			SUM(Turnover),
@@ -242,12 +245,13 @@ BEGIN
 			SUM(CASE WHEN  IsDeposit = 0 THEN 0 
 					 ELSE  CASE WHEN LicenseeChargeRate < 0 THEN 0 
 								ELSE LicenseeChargeRate END + LicenseeContribution - JackpotPrize END - PayToSupplier),
+			SUM(JackpotPrize),
 			SUM(LicenseeContribution),
-			SUM(JackpotPrize)
+			SUM(FullContribution)
 		FROM TotalByParty
 		GROUP BY ParentId
 		
-		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome, Contribution, JackpotPrize)
+		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,CompanyIncome,JackpotPrize,LicenseeContribution,FullContribution)
 		SELECT Currency,
 			SUM(TotalTrans),
 			SUM(Turnover),
@@ -256,8 +260,9 @@ BEGIN
 			SUM(LicensingFee),
 			SUM(PayToSupplier),
 			SUM(LicensingFee - PayToSupplier),
-			SUM(Contribution),
-			SUM(JackpotPrize)
+			SUM(JackpotPrize),
+			SUM(LicenseeContribution),
+			SUM(FullContribution)
 		FROM @Total
 		WHERE Currency = @tempCurrency
 		GROUP BY Currency
@@ -281,8 +286,9 @@ BEGIN
 		CAST((r.LicensingFee) AS MONEY) AS LicensingFeeOriginal,
 		CAST((r.PayToSupplier) AS MONEY) AS PayToSupplierOriginal,
 		r.LicensingFee - r.PayToSupplier AS CompanyIncomeOriginal,
-		r.FullContribution AS ContributionOriginal,
 		r.JackpotPrize AS JackpotPrizeOriginal,
+		r.LicenseeContribution AS LicenseeContributionOriginal,
+		r.FullContribution AS FullContributionOriginal,
 		-- Select by base currency
 		r.Turnover * e.Rate AS Turnover,
 		CAST((r.CustomerWinLoss * e.Rate) AS MONEY) AS CustomerWinLoss,
@@ -290,8 +296,9 @@ BEGIN
 		CAST((r.LicensingFee * e.Rate) AS MONEY) AS LicensingFee,
 		CAST((r.PayToSupplier * e.Rate)AS MONEY) AS PayToSupplier,
 		CAST((r.LicensingFee - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome,
-		CAST((r.LicenseeContribution * e.Rate) AS MONEY) AS Contribution,
-		CAST((r.JackpotPrize * e.Rate) AS MONEY) AS JackpotPrize
+		CAST((r.JackpotPrize * e.Rate) AS MONEY) AS JackpotPrize,
+		CAST((r.LicenseeContribution * e.Rate) AS MONEY) AS LicenseeContribution,
+		CAST((r.FullContribution * e.Rate) AS MONEY) AS FullContribution
 	FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.WinLossDate = e.ExchangeDate
 	
 	-- Select Grand Total
@@ -307,8 +314,9 @@ BEGIN
 		LicensingFee,
 		PayToSupplier,
 		CompanyIncome,
-		Contribution,
-		JackpotPrize
+		JackpotPrize,
+		LicenseeContribution,
+		FullContribution
 	FROM @Total t
 	WHERE Currency = @BaseCurrencyName
 	-- End Region
