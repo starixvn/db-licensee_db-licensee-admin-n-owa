@@ -16,6 +16,7 @@ AS
 		- 20191017@Bruce: Create Sp [#122229]
 		- 20191210@Bruce: Include Promotion amount [#123958]
 		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
+		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -32,6 +33,7 @@ BEGIN
 		Others,
 		Prepayment,
 		ISNULL(Promotion,0) Promotion,
+		ISNULL(Sponsorship,0) Sponsorship,
 		ClosingBalance,
 		CurrencyName,
 		ISNULL(UPPER(LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), PartyId) AS LicenseeCode

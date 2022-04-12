@@ -31,6 +31,7 @@ AS
 		- 20210306@Danny: AE Sexy - Support Lucky Draw [#152141]
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
+		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -68,6 +69,7 @@ BEGIN
 		,SUM(CASE WHEN InvItemTypeId IN (3,25) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) AMF
 		,SUM(CASE WHEN InvItemTypeId = 2 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) SetupFee
 		,SUM(CASE WHEN InvItemTypeId = 29 THEN ISNULL(Expense,0) ELSE 0 END) Promotion
+		,SUM(CASE WHEN InvItemTypeId = 44 THEN ISNULL(Expense,0) ELSE 0 END) Sponsorship
 	INTO #result
 	FROM @partyList p
 	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON p.PartyId = h.PartyId AND h.CurrencyId = p.BaseCurrencyId
@@ -97,6 +99,7 @@ BEGIN
 			,SUM(SetupFee) SetupFee
 			,SUM(AMF) AMF
 			,SUM(Promotion) Promotion
+			,SUM(Sponsorship) Sponsorship
 		FROM #result
 		GROUP BY ISNULL(LicenseeCode, '') + '|' + CONVERT(VARCHAR(50), PartyId), CurrencyName
 		ORDER BY LicenseeCode
@@ -113,6 +116,7 @@ BEGIN
 			,SUM(SetupFee) SetupFee
 			,SUM(AMF) AMF
 			,SUM(Promotion) Promotion
+			,SUM(Sponsorship) Sponsorship
 		FROM #result
 		GROUP BY PartyId, CurrencyName
 	END

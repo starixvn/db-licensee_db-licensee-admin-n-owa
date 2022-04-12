@@ -23,6 +23,7 @@ AS
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20211207@Percy: Return BrandName [RedmineID: #163800]
+		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -210,7 +211,7 @@ BEGIN
 		END
 
 		UPDATE sb
-		SET sb.ExtraAmount = sb.ExtraAmount - p.LicensingFee -- Saba Promotion Deducted
+		SET sb.ExtraAmount = sb.ExtraAmount - (p.LicensingFee + p.ExtraAmount) -- Saba Promotion Deducted
 		FROM @Result sb
 			INNER JOIN @Result p ON sb.PartyId = p.PartyId AND p.ProductId = 37
 		WHERE sb.ProductId = 0 AND sb.LicensingFeeTypeId = 0

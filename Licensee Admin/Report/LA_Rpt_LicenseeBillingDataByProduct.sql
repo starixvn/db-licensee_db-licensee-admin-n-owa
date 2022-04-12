@@ -27,6 +27,7 @@ AS
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20211110@Danny: Filter by OIC statuses and hide Terminated/Suspended licensees who has no bet ticket [#159296]
 		- 20220218@Percy: Hide terminated/suspended licensees with amount = 0 [RedmineID: #161429]
+		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 	
 	Parameter explanation:
 		@LicenseeStatusIds
@@ -88,7 +89,7 @@ BEGIN
 	INSERT INTO #tmp_Products (ProductId, ProductName, ProductCode)
 	SELECT p.ProductId, p.ProductName, p.ProductCode
 	FROM (
-		SELECT ProductId, ProductName, ProductCode FROM (VALUES (0, 'Sportsbook', 'SB'), (-3, 'Discount', ''), (-2, 'Rebate', ''),  (-99, 'Total', '')) t (ProductId, ProductName, ProductCode)
+		SELECT ProductId, ProductName, ProductCode FROM (VALUES (0, 'Sportsbook', 'SB'), (-102, 'Discount', ''), (-101, 'Rebate', ''),  (-999, 'Total', '')) t (ProductId, ProductName, ProductCode)
 		UNION ALL SELECT ProductId, ProductName, ProductPrefix FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductId <> 16 AND (EndOfSupportDate IS NULL OR EndOfSupportDate >= @FromDate) AND OfferSite IN (0, 2) -- Deposit only
 	) p
 		LEFT JOIN dbo.LA_f_GroupProduct('',@FromDate,@ToDate) g ON p.ProductId = g.ProductId AND g.ProductId <> g.GroupProductId
@@ -117,19 +118,27 @@ BEGIN
 		
 	-- Final Result
 	CREATE TABLE #tmp_Result (PartyId INT, ProductId INT, LicensingFee MONEY, BetCount INT)
+
 	INSERT INTO #tmp_Result (PartyId, ProductId, LicensingFee, BetCount)
 	SELECT PartyId, ProductId, LicensingFee, BetCount
 	FROM (
-		SELECT r.PartyId
-			,CASE WHEN r.ProductId = 37 THEN -1 ELSE r.ProductId END AS ProductId
-			,SUM(CASE WHEN r.LicensingFeeTypeId = 8 THEN 0 WHEN r.ProductId = 37 THEN -r.LicensingFee ELSE r.LicensingFee + r.ExtraAmount END) AS LicensingFee
+		SELECT r.PartyId, r.ProductId
+			,SUM(CASE WHEN r.LicensingFeeTypeId = 8 THEN 0 ELSE r.LicensingFee + r.ExtraAmount END) AS LicensingFee
 			,SUM(CASE WHEN r.LicensingFeeTypeId = 8 THEN ExtraAmount ELSE 0 END) AS BetCount
 		FROM @Result r
-		GROUP BY r.PartyId
-			,CASE WHEN r.ProductId = 37 THEN -1 ELSE r.ProductId END
-		UNION ALL SELECT PartyId, -3, -SUM(Discount), 0 FROM @Result GROUP BY PartyId HAVING SUM(Discount) <> 0
-		UNION ALL SELECT PartyId, -2, -SUM(Rebate), 0 FROM @Result GROUP BY PartyId HAVING SUM(Rebate) <> 0
+		WHERE r.ProductId <> 37
+		GROUP BY r.PartyId, r.ProductId
+		UNION ALL SELECT PartyId, -102, -SUM(Discount), 0 FROM @Result GROUP BY PartyId HAVING SUM(Discount) <> 0
+		UNION ALL SELECT PartyId, -101, -SUM(Rebate), 0 FROM @Result GROUP BY PartyId HAVING SUM(Rebate) <> 0
 	) t
+
+	INSERT INTO #tmp_Result (PartyId, ProductId, LicensingFee, BetCount)
+	SELECT r.PartyId, t.ProductId, t.LicensingFee, 0
+	FROM (SELECT PartyId, LicensingFee, ExtraAmount FROM @Result WHERE ProductId = 37 AND LicensingFeeTypeId = 0) r
+		CROSS APPLY (
+			SELECT -2 AS ProductId, -LicensingFee AS LicensingFee -- SB Promotion
+			UNION ALL SELECT -1, -ExtraAmount -- Sponsorship
+		) t
 
 	-- Remove suspended/terminated licensees with amount = 0
 	;WITH CTE_Party AS (
@@ -142,10 +151,13 @@ BEGIN
 
 	-- Sum for total
 	INSERT INTO #tmp_Result (PartyId, ProductId, LicensingFee)
-	SELECT PartyId, -99, SUM(LicensingFee) FROM #tmp_Result GROUP BY PartyId
+	SELECT PartyId, -999, SUM(LicensingFee) FROM #tmp_Result GROUP BY PartyId
 	
 	-- Return data
-	UPDATE #tmp_Products SET ProductId = -1, ProductName = 'SB Promotion', ProductCode = '' WHERE ProductId = 37
+	UPDATE #tmp_Products SET ProductId = -2, ProductName = 'SB Promotion', ProductCode = '' WHERE ProductId = 37
+	
+	INSERT INTO #tmp_Products (ProductId, ProductName, ProductCode)
+	VALUES (-1, 'Sponsorship', '')
 
 	DECLARE @ProductList VARCHAR(MAX), @SQL VARCHAR(MAX)
 	SELECT  @ProductList = COALESCE(@ProductList + ', ', '') + '[' + ProductName + ']' FROM #tmp_Products ORDER BY ProductId
