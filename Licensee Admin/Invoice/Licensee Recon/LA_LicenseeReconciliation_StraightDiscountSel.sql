@@ -20,6 +20,7 @@ AS
 		- 20210407@Percy: Support duo base currency - Change code for Collection Summary [RedmineID: #152089]
 		- 20211101@Percy: Apply core SP to get Licensing Fee [RedmineID: #162158]
 		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
+		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 */
 
 BEGIN
@@ -37,7 +38,7 @@ BEGIN
 		INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON p.DiscountGroupId = h.DiscountGroupId AND p.ProductId = 0 -- SB
 		INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId AND a.IsApplyDiscount = 1
 	WHERE @ToDate BETWEEN h.FromDate AND h.ToDate
-		AND h.DiscountGroupType <> 2 -- 2 = rebate, <> 2 = discount
+		AND h.DiscountGroupType NOT IN (2, 12) -- 2, 12 = rebate, else = discount
 		AND p.CalculationType IN (1, 10) -- 0 = calculated only, 1 = discount only, 10 = calculated & discount
 
 	UPDATE d

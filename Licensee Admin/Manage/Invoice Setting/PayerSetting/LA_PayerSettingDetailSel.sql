@@ -29,6 +29,7 @@ AS
 		- 20210315@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 		- 20210824@Danny: get licensee status from OIC And Relocated SP [#159296]
 		- 20220118@Percy: Add Licensee Status Setting [RedmineID: #166751]
+		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		
 	 Params:
 		+ @PayerId :specify Party
@@ -48,12 +49,6 @@ BEGIN
 	INSERT INTO #tmp_licenseeOICStatus(LicenseeStatusId, LicenseeStatusName)
 	SELECT	LicenseeStatusId, LicenseeStatusName
 	FROM	DBOIC.bodb_OIC.dbo.LicenseeStatus WITH(NOLOCK)
-
-	DECLARE @Rebate INT = 2
-	DECLARE @DiscountIndividualFee INT = 1
-	DECLARE @DiscountIndividualGrosswin INT = 3
-	DECLARE @DiscountByGroupFee INT = 11
-	DECLARE @DiscountByGroupGrosswin INT = 13
 
 	DECLARE @ProductListAll		VARCHAR(500) = ''		
 		, @MinDate				DATE 
@@ -165,13 +160,13 @@ BEGIN
 		LEFT JOIN (
 				SELECT PartyId, DiscountGroupId, DiscountGroupName 
 				FROM @Discount 
-				WHERE DiscountGroupType IN (@DiscountIndividualFee, @DiscountIndividualGrosswin, @DiscountByGroupFee, @DiscountByGroupGrosswin)
+				WHERE DiscountGroupType IN (1, 11, 3, 13)
 					AND @CurrentDate BETWEEN FromDate AND ToDate
 				) d1 ON c.PartyId = d1.PartyId --discount
 		LEFT JOIN (
 				SELECT PartyId, DiscountGroupId, DiscountGroupName 
 				FROM @Discount 
-				WHERE DiscountGroupType = @Rebate
+				WHERE DiscountGroupType IN (2, 12)
 					AND @CurrentDate BETWEEN FromDate AND ToDate
 				) d2 ON c.PartyId = d2.PartyId --Rebate
 

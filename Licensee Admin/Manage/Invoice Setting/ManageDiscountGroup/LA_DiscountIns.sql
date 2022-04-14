@@ -28,6 +28,7 @@ AS
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20200609@Parsons: Special handling for INH market [#128570]
 		- 20211101@Percy: Support Discount on Lic WL - Do not alow add Discount Group on Lic Fee [RedmineID: #162158]
+		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 
 	 Params:
 		@RateSettingsData = '<Root>
@@ -74,7 +75,6 @@ BEGIN
 	DECLARE @ToBeCalculated TINYINT = 1
 	DECLARE @ToBeDiscounted TINYINT = 0
 	DECLARE @CalculateAndDiscount TINYINT = 10
-	DECLARE @RebateGroupType TINYINT = 2
 
 	DECLARE @CutOffDate DATE = dbo.LA_f_DiscountByGrossWin_CutOffDate()
 	IF @ToDate >= @CutOffDate
@@ -91,7 +91,7 @@ BEGIN
 	END
 
 	--check exists
-	IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupName = @DiscountGroupName AND DiscountGroupType != @RebateGroupType)
+	IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupName = @DiscountGroupName AND DiscountGroupType IN (1, 3, 11, 13))
 	BEGIN
 		SELECT @ErrCode = 501, @ErrMsg = 'Group name exists. Please try again.'
 		RETURN

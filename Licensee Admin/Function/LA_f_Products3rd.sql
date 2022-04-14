@@ -3,7 +3,7 @@ USE bodb_licensee
 GO
 
 ALTER FUNCTION [dbo].[LA_f_Products3rd] (@Products VARCHAR(1000))
-RETURNS @tbProducts TABLE (ProductID INT, ProductPrefix VARCHAR(10), ProductName VARCHAR(100))
+RETURNS @tbProducts TABLE (ProductID INT, ProductPrefix VARCHAR(10), ProductName VARCHAR(100), OfferSite TINYINT, EndOfSupportDate DATE)
 AS
 
 /*  Created: 20150413@Florent
@@ -14,18 +14,19 @@ AS
 		- 20150413@Florent: Initialize function
 		- 20191211@Parsons: Non-peak hour promotion [#119538]
 		- 20210816@Sophia: add DBBAL [Redmine: #154300]
+		- 20220210@Percy: Return OfferSite, EndOfSupportDate [RedmineID: #163495]
 */
 
 BEGIN   
 	IF ISNULL(@Products,'') = ''
 	BEGIN
-		INSERT INTO @tbProducts(ProductID, ProductPrefix, ProductName)
-		SELECT ProductID, ProductPrefix, ProductName 
+		INSERT INTO @tbProducts(ProductID, ProductPrefix, ProductName, OfferSite, EndOfSupportDate)
+		SELECT ProductID, ProductPrefix, ProductName, OfferSite, EndOfSupportDate
 		FROM dbo.Product3rd WITH (NOLOCK)
 		
 		UNION
 		
-		SELECT 0, 'SB', 'Sportsbook'
+		SELECT 0, 'SB', 'Sportsbook', 0, NULL
 
 	END
 	ELSE
@@ -36,15 +37,15 @@ BEGIN
 
 		IF EXISTS(SELECT TOP 1 1 FROM @ProductCodes WHERE ProductCode = 'SB')
 		BEGIN
-			INSERT INTO @tbProducts(ProductID, ProductPrefix, ProductName)
-			SELECT 0, 'SB', 'Sportsbook'				
+			INSERT INTO @tbProducts(ProductID, ProductPrefix, ProductName, OfferSite, EndOfSupportDate)
+			SELECT 0, 'SB', 'Sportsbook', 0, NULL
 		END
 
-		INSERT INTO @tbProducts(ProductID, ProductPrefix, ProductName)
-		SELECT ProductID, ProductPrefix, ProductName 
-		FROM dbo.Product3rd WITH (NOLOCK)
-			INNER JOIN @ProductCodes ON ProductCode = ProductPrefix
-		WHERE ProductId <> 0
+		INSERT INTO @tbProducts(ProductID, ProductPrefix, ProductName, OfferSite, EndOfSupportDate)
+		SELECT p.ProductId, p.ProductPrefix, p.ProductName, p.OfferSite, p.EndOfSupportDate
+		FROM dbo.Product3rd p WITH (NOLOCK)
+			INNER JOIN @ProductCodes pc ON pc.ProductCode = p.ProductPrefix
+		WHERE p.ProductId <> 0
 	END
 	
 	DELETE @tbProducts WHERE ProductID IS NULL

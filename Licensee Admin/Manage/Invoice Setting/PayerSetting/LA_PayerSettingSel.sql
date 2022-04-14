@@ -31,6 +31,7 @@ AS
 		- 20200824@Happy: Updae from PayerGroup to GroupMinFee [#138249]
 		- 20210315@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 		- 20210824@Danny: get licensee status from OIC And Relocated SP [#159296]
+		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 
 	Params:
 	+ @PayerId : 0 get all Party
@@ -60,12 +61,6 @@ BEGIN
 	DECLARE @statusTab TABLE (StatusId SMALLINT)
 	INSERT INTO @statusTab (StatusId)
 	SELECT CAST (val AS SMALLINT) FROM dbo.strSplit(@PayerStatusIds,',')
-
-	DECLARE @Rebate INT = 2
-	DECLARE @DiscountIndividualFee INT = 1
-	DECLARE @DiscountIndividualGrosswin INT = 3
-	DECLARE @DiscountByGroupFee INT = 11
-	DECLARE @DiscountByGroupGrosswin INT = 13
 
 	DECLARE @ProductListAll VARCHAR(500) = '',
 			@ListParty VARCHAR(8000) = '',
@@ -364,7 +359,7 @@ BEGIN
 				OR d.FromDate BETWEEN c.FromDate AND c.ToDate
 				OR d.ToDate BETWEEN c.FromDate AND c.ToDate
 				)
-				AND d.DiscountGroupType IN (@DiscountIndividualFee, @DiscountIndividualGrosswin, @DiscountByGroupFee, @DiscountByGroupGrosswin) -- discount
+				AND d.DiscountGroupType IN (1, 11, 3, 13) -- discount
 			LEFT JOIN @Discount r
 				ON r.PartyId = c.PartyId
 				AND r.ProductId = c.ProductId
@@ -373,15 +368,17 @@ BEGIN
 				OR r.FromDate BETWEEN c.FromDate AND c.ToDate
 				OR r.ToDate BETWEEN c.FromDate AND c.ToDate
 				)
-				AND r.DiscountGroupType = @Rebate
-		WHERE ((@DiscountGroup = 0)
-			OR (@DiscountGroup <> 0
-			AND d.DiscountGroupId = @DiscountGroup
-			AND d.DiscountGroupType IN (@DiscountIndividualFee, @DiscountIndividualGrosswin, @DiscountByGroupFee, @DiscountByGroupGrosswin)))
-			AND ((@RebateGroup = 0)
-			OR (@RebateGroup <> 0
-			AND r.DiscountGroupId = @RebateGroup
-			AND r.DiscountGroupType = @Rebate))
+				AND r.DiscountGroupType IN (2, 12) -- rebate
+		WHERE
+			(
+				@DiscountGroup = 0
+				OR (d.DiscountGroupId = @DiscountGroup AND d.DiscountGroupType IN (1, 11, 3, 13))
+			)
+			AND
+			(
+				@RebateGroup = 0
+				OR (r.DiscountGroupId = @RebateGroup AND r.DiscountGroupType IN (2, 12))
+			)
 	)
 	SELECT Result.*
 	FROM Result

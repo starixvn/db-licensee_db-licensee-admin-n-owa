@@ -40,6 +40,7 @@ AS
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
+		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 */
 
@@ -87,7 +88,7 @@ BEGIN
 			SELECT TOP 1 1
 			FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
 				INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
-			WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate AND h.DiscountGroupType <> 2 -- 2 = rebate
+			WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate AND h.DiscountGroupType NOT IN (2, 12) -- 2, 12 = rebate
 				AND h.CurrencyId <> @BaseCurrencyId
 			ORDER BY h.ToDate DESC -- latest discount group
 		)

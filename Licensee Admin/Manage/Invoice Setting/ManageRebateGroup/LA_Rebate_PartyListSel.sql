@@ -14,6 +14,7 @@ AS
 
 	 Revisions:  
 		- 20180529@Parsons: Get list payer list [#94282]
+		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 
 	 Params:
 		 + UserID : 
@@ -26,7 +27,6 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @PartyList TABLE(PartyId INT, PartyName VARCHAR(100), BrandName VARCHAR(100), ParentId INT)
-	DECLARE	@RebateGroupType INT = 2
 	
 	INSERT INTO @PartyList(PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel
@@ -36,7 +36,7 @@ BEGIN
 	SELECT DISTINCT a.PartyId, a.DiscountGroupId
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
 		INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId			
-	WHERE h.DiscountGroupType = @RebateGroupType
+	WHERE h.DiscountGroupType IN (2, 12) -- Rebate
 		AND (@FromDate IS NULL OR @FromDate <= h.ToDate)
 		AND (@ToDate IS NULL OR @ToDate >= h.FromDate)			
 

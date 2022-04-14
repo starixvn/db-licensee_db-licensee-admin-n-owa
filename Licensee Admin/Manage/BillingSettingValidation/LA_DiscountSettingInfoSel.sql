@@ -2,21 +2,20 @@
 USE [bodb_licensee]
 GO
 
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 ALTER PROCEDURE [dbo].[LA_DiscountSettingInfoSel]
-@PartyIds			VARCHAR(4000)
+	@PartyIds VARCHAR(4000)
 AS
+
 /*
 	Created: 20190711@Parsons
 	Task : Validate billing configuration
 	DB: DBCUST.bodb_Licensee
 
 	Revisions:
-	- 20190711@Parsons: Validate billing configuration [#109600]
+		- 20190711@Parsons: Validate billing configuration [#109600]
+		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 */
+
 BEGIN
 	SET NOCOUNT ON
 	
@@ -41,6 +40,6 @@ BEGIN
 	WHERE p.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
 			AND p.PartyID NOT IN (SELECT bg.PartyID FROM LA_f_BillingGroupSel() bg)
 			AND p.PartyID NOT IN (SELECT cl.PartyId FROM @CreditLicensees cl)
-			AND (dg.DiscountGroupType IS NULL OR dg.DiscountGroupType != 2) -- Rebate
+			AND (dg.DiscountGroupType IS NULL OR dg.DiscountGroupType NOT IN (2, 12)) -- Rebate
 END
 GO

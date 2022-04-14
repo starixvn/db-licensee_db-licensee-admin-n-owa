@@ -3,18 +3,19 @@ USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_RebateIns] 
-	@GroupName	NVARCHAR(50), 
-	@FromDate	DATE, 
-	@ToDate		DATE, 
-	@ProductIds VARCHAR(512) = '', 
-	@PartyIds	VARCHAR(4000) = '', 
-	@Rate		DECIMAL(9, 8), 
-	@UserId		INT, 
-	@Remark		NVARCHAR(4000) = '', 
-	@LoginIp	VARCHAR (50)	= '', 
-	@ErrCode	INT = 0 OUTPUT, 
-	@ErrMsg		VARCHAR(4000)= '' OUTPUT, 
-	@GroupIdOut INT = 0 OUTPUT
+	@GroupName			NVARCHAR(50),
+	@FromDate			DATE,
+	@ToDate				DATE,
+	@ProductIds			VARCHAR(512) = '',
+	@PartyIds			VARCHAR(4000) = '',
+	@Rate				DECIMAL(9, 8),
+	@RebateGroupType	TINYINT,
+	@UserId				INT,
+	@Remark				NVARCHAR(4000) = '',
+	@LoginIp			VARCHAR (50)	= '',
+	@ErrCode			INT = 0 OUTPUT,
+	@ErrMsg				VARCHAR(4000)= '' OUTPUT,
+	@GroupIdOut			INT = 0 OUTPUT
 AS
 /*  
 	 Created: 20180528@Parsons [#94282]
@@ -24,6 +25,7 @@ AS
 	 Revisions:  
 		- 20180528@Parsons: Create rebate group [#94282]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20220210@Percy: Add param @RebateGroupType to offer Tier Rebate [RedmineID: #163495]
 
 	 Params:
 
@@ -33,8 +35,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @startRun DATETIME, @endRun DATETIME, @duration INT, @logSPData NVARCHAR(MAX), 
-			@logSPDataOld	NVARCHAR(MAX), @xml XML,
-			@RebateGroupType INT = 2
+			@logSPDataOld	NVARCHAR(MAX), @xml XML
 
 	SET @startRun = GETDATE()
 
@@ -46,7 +47,7 @@ BEGIN
 	END
 
 	--check exists
-	IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupName = @GroupName AND DiscountGroupType = @RebateGroupType)
+	IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupName = @GroupName AND DiscountGroupType IN (2, 12))
 	BEGIN
 		SELECT @ErrCode = 502, @ErrMsg = 'Group name exists. Please try again.'
 		RETURN
@@ -58,7 +59,7 @@ BEGIN
 	--parse product rebate group
 	IF @ProductIds = ''
 	BEGIN
-		SELECT @ErrMsg = 'Please select at least 1 product!', @ErrCode = 503
+		SELECT @ErrCode = 503, @ErrMsg = 'Please select at least 1 product!'
 		RETURN	
 	END
 
@@ -66,11 +67,14 @@ BEGIN
 	SELECT val FROM dbo.Lrf_f_StringSplit(@ProductIds, ',')
 
 	--parse assigned payer to group
-	IF @PartyIds <> ''
+	IF @PartyIds = ''
 	BEGIN
-		INSERT INTO @Payers(PayerId)
-		SELECT val FROM dbo.Lrf_f_StringSplit(@PartyIds, ',')
+		SELECT @ErrCode = 503, @ErrMsg = 'Please add at least one licensee.'
+		RETURN	
 	END
+
+	INSERT INTO @Payers(PayerId)
+	SELECT val FROM dbo.Lrf_f_StringSplit(@PartyIds, ',')
 	
 	--check required fields
 	IF @FromDate IS NULL OR @ToDate IS NULL
@@ -81,11 +85,32 @@ BEGIN
 		RETURN
 	END
 
+	-- if group is tier rebate, check base currency all payers
+	DECLARE @BaseCurrency TABLE (BaseCurrencyId INT)
+	DECLARE @BaseCurrencyId INT = 0
+
+	IF @RebateGroupType = 12
+	BEGIN
+		INSERT INTO @BaseCurrency (BaseCurrencyId)
+		SELECT DISTINCT BaseCurrencyId
+		FROM @Payers p
+			INNER JOIN dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON p.PayerId = bc.PartyId
+		WHERE bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
+
+		IF @@ROWCOUNT <> 1
+		BEGIN
+			SELECT @ErrCode = 503, @ErrMsg = 'Licensees billing currency must be the same.'
+			RETURN
+		END
+
+		SELECT @BaseCurrencyId = BaseCurrencyId FROM @BaseCurrency
+	END
+
 	-- #Region Insert 
 
 	--insert rebate group header
 	INSERT INTO dbo.LA_DiscountGroupHeader(DiscountGroupName, DiscountGroupType, CurrencyId, FromDate, ToDate, Remark, [Priority], ModifiedDate)
-	VALUES(@GroupName, @RebateGroupType, 0, @FromDate, @ToDate, @Remark, 2, GETDATE())
+	VALUES(@GroupName, @RebateGroupType, @BaseCurrencyId, @FromDate, @ToDate, @Remark, 2, GETDATE())
 
 	IF @@ERROR <> 0
 	BEGIN
@@ -149,6 +174,7 @@ BEGIN
 				, @FromDate AS '@fd'
 				, @ToDate AS '@td'
 				, @RebateGroupType AS '@dt'
+				, @BaseCurrencyId AS '@bc'
 				, 2 AS '@pr'
 				, (SELECT @GroupIdOut AS '@gd'
 					, @Rate AS '@r'
