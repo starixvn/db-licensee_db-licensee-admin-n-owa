@@ -742,8 +742,8 @@ BEGIN
 			SUM(Bonus),
 			SUM(WinPrizeAmount),
 			SUM(JackpotPrize),
-			SUM(FullContribution),
 			SUM(LicenseeContribution),
+			SUM(FullContribution),
 			SUM((LicenseeWinloss - LicenseeContribution) * ISNULL(cr.Rate, ci.Rate)) AS LicenseeChargeRate,
 			SUM(b.LicenseeWinloss * ci.AB_ServiceCharge) AS ServiceChargeOriginal,
 			SUM(b.ValidBetAmount * ci.ChargeRate11) AS RebateCommissionOriginal,
@@ -1183,9 +1183,9 @@ BEGIN
 			;WITH SumByPropressiveAmount AS(
 				SELECT  r.PartyId,CurrencyId,Winlostdate,
 						SUM(CASE 
-							WHEN ((r.LicenseeWinloss - FullContribution) * e.BaseCurrencyRate) > MaxAmount THEN MaxAmount 
-							WHEN ((r.LicenseeWinloss - FullContribution) * e.BaseCurrencyRate  - MinAmount) > 0 THEN ((r.LicenseeWinloss - FullContribution) * e.BaseCurrencyRate - MinAmount)
-							WHEN (r.LicenseeWinloss - FullContribution) * e.BaseCurrencyRate < 0 AND roc.RowIndex % @NumberOfTiers = 0 THEN (r.LicenseeWinloss - FullContribution) * e.BaseCurrencyRate 
+							WHEN ((r.LicenseeWinloss - r.FullContribution) * e.BaseCurrencyRate) > MaxAmount THEN MaxAmount 
+							WHEN ((r.LicenseeWinloss - r.FullContribution) * e.BaseCurrencyRate  - MinAmount) > 0 THEN ((r.LicenseeWinloss - r.FullContribution) * e.BaseCurrencyRate - MinAmount)
+							WHEN (r.LicenseeWinloss - r.FullContribution) * e.BaseCurrencyRate < 0 AND roc.RowIndex % @NumberOfTiers = 0 THEN (r.LicenseeWinloss - r.FullContribution) * e.BaseCurrencyRate 
 							ELSE 0 END  * roc.Rate / e.BaseCurrencyRate)  AS ProgressiveAmount
 				FROM #TempData r 
 				INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CreditBaseCurrencyName) e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.Winlostdate

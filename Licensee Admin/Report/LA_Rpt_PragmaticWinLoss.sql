@@ -318,9 +318,9 @@ BEGIN
 	;WITH SumByPropressiveAmount AS(
 		SELECT  r.PartyId,CurrencyId,Winlossdate,
 				SUM(CASE 
-					WHEN ((r.LicenseeWinloss - LicenseeContribution) * e.BaseCurrencyRate) > MaxAmount THEN MaxAmount 
-					WHEN ((r.LicenseeWinloss - LicenseeContribution) * e.BaseCurrencyRate  - MinAmount) > 0 THEN ((r.LicenseeWinloss - r.LicenseeContribution) * e.BaseCurrencyRate - MinAmount)
-					WHEN (r.LicenseeWinloss - LicenseeContribution) * e.BaseCurrencyRate < 0 AND roc.RowIndex % @NumberOfTiers = 0 THEN (r.LicenseeWinloss - r.LicenseeContribution) * e.BaseCurrencyRate 
+					WHEN ((r.LicenseeWinloss - r.FullContribution) * e.BaseCurrencyRate) > MaxAmount THEN MaxAmount 
+					WHEN ((r.LicenseeWinloss - r.FullContribution) * e.BaseCurrencyRate  - MinAmount) > 0 THEN ((r.LicenseeWinloss - r.FullContribution) * e.BaseCurrencyRate - MinAmount)
+					WHEN (r.LicenseeWinloss - r.FullContribution) * e.BaseCurrencyRate < 0 AND roc.RowIndex % @NumberOfTiers = 0 THEN (r.LicenseeWinloss - r.FullContribution) * e.BaseCurrencyRate 
 					ELSE 0 END  * roc.Rate / e.BaseCurrencyRate)  AS ProgressiveAmount
 		FROM #Result r 
 		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CreditBaseCurrencyName) e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.Winlossdate
