@@ -17,191 +17,157 @@ AS
 		- 20180326@Harper: Change the way to get Waive month [RedmineID: #87039]
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20190821@Parsons: Improve the ability to maintain systems [#118627]
+		- 20220418@Percy: Add Credit note for AMF [RedmineID: #164139]
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @AMF INT = 3
-	DECLARE @PREPAYMENT INT = 22
 
-	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT)
-	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
-	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionKey=@FunctionKey
+	-- Get Party List
+	BEGIN
+		DECLARE @PartyList TABLE (PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT)
+
+		-- Official Licensees
+		INSERT INTO @PartyList (PartyId, PartyName, BrandName, ParentId)
+		EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionKey = @FunctionKey
+
+		-- Non-Official Licensees
+		INSERT INTO @PartyList (PartyId, PartyName, BrandName, ParentId)
+		EXEC dbo.LA_PartyListNonOfficialSel
+	END
+
+	-- Get AMF, Prepayment & Credit note for Fees
+	BEGIN
+		CREATE TABLE #tmpData (PartyId INT, InvoiceType SMALLINT, OfficialInvoiceNo NVARCHAR(50), CreatedDateTime DATETIME, RefNo NVARCHAR(50)
+			,RefInvItemTypeId SMALLINT, InvItemTypeId SMALLINT, Amount MONEY, Description NVARCHAR(500))
+
+		;WITH CTE_CreditNote AS (
+			SELECT s.RefPartyId, h.OfficialInvoiceNo
+			FROM dbo.LA_InvoiceHeader h WITH (NOLOCK)
+				INNER JOIN dbo.LA_InvoiceStatement s WITH (NOLOCK) ON s.InvoiceHeaderId = h.InvoiceHeaderId
+			WHERE h.StatusId = 0 -- normal invoice
+				AND h.Environment = @Environment
+				AND s.InvItemTypeId = 2 -- Setup Fees
+			GROUP BY s.RefPartyId, h.OfficialInvoiceNo
+		)
+		
+		INSERT INTO #tmpData (PartyId, InvoiceType, OfficialInvoiceNo,CreatedDateTime, RefNo, InvItemTypeId, Amount, Description, RefInvItemTypeId)
+		SELECT s.RefPartyId, h.InvoiceType, h.OfficialInvoiceNo, h.CreatedDateTime, s.RefNo, s.InvItemTypeId, ISNULL(s.Income, 0) - ISNULL(s.Expense, 0), s.Description
+			,CASE
+				WHEN InvItemTypeId IN (3, 5, 7, 12, 21) THEN 3 -- AMF & Credit note for Setup Fees
+				WHEN InvItemTypeId IN (22, 23, 24) THEN 22 -- Prepayment
+				END AS RefInvItemTypeId
+		FROM dbo.LA_InvoiceHeader h WITH (NOLOCK)
+			INNER JOIN dbo.LA_InvoiceStatement s WITH (NOLOCK) ON s.InvoiceHeaderId = h.InvoiceHeaderId
+			LEFT JOIN CTE_CreditNote c ON c.RefPartyId = s.RefPartyId AND c.OfficialInvoiceNo = s.RefNo
+		WHERE h.StatusId = 0 -- normal invoice
+			AND h.Environment = @Environment
+			AND s.InvItemTypeId IN (
+				3, 5, 7, 21 -- AMF
+				,22, 23, 24 -- Prepayment
+				,12 -- Credit note for Fees
+			)
+			AND (s.InvItemTypeId <> 12 OR c.RefPartyId IS NOT NULL) -- Just get Credit note for Setup Fees
+
+		-- Remove invalid data
+		DELETE t
+		FROM #tmpData t
+			LEFT JOIN @PartyList pl ON t.PartyId = pl.PartyId AND pl.ParentId <> 0
+		WHERE pl.PartyId IS NULL
+
+		DELETE t
+		FROM #tmpData t
+			INNER JOIN (
+				SELECT PartyId, RefInvItemTypeId
+				FROM #tmpData
+				GROUP BY PartyId, RefInvItemTypeId
+				HAVING MIN(InvItemTypeId) <> RefInvItemTypeId
+			) w ON t.PartyId = w.PartyId AND t.RefInvItemTypeId = w.RefInvItemTypeId
+		
+	END
+
+	CREATE TABLE #Result (PartyId INT, PartyName VARCHAR(50), ParentId INT, ParentName VARCHAR(50), PartyType TINYINT, LaunchingDate DATE, WaiverPeriod INT, MonthCount INT, RefInvItemTypeId SMALLINT, InitAmount MONEY, Balance MONEY, Remark NVARCHAR(500))
+
+	INSERT INTO #Result (PartyId, RefInvItemTypeId, InitAmount, Balance)
+	SELECT t.PartyId, t.RefInvItemTypeId, SUM(CASE WHEN t.InvItemTypeId IN (3, 22) THEN t.Amount ELSE 0 END) AS InitAmount, SUM(t.Amount) AS Balance
+	FROM #tmpData t
+	GROUP BY t.PartyId, t.RefInvItemTypeId
+
+	-- #Result: Update Remark
+	UPDATE r
+	SET r.Remark = t.Remark
+	FROM #Result r
+		INNER JOIN (
+			SELECT t1.PartyId, t1.RefInvItemTypeId, CASE WHEN t1.InvoiceType = 7 THEN N'' ELSE t1.Description END AS Remark
+				,ROW_NUMBER() OVER (PARTITION BY t1.PartyId, t1.RefInvItemTypeId ORDER BY t1.CreatedDateTime DESC) AS RowNum
+			FROM #tmpData t1
+				LEFT JOIN #tmpData t2 ON t1.OfficialInvoiceNo = t2.RefNo AND t2.InvItemTypeId = 7 -- Setup Fees
+			WHERE t1.InvItemTypeId IN (3, 21, 22, 23) AND t2.RefNo IS NULL
+		) t ON r.PartyId = t.PartyId AND r.RefInvItemTypeId = t.RefInvItemTypeId
+	WHERE t.RowNum = 1
+
+	-- #Result: Update Party Info
+	UPDATE r
+	SET r.PartyName = pl.PartyName, r.ParentId = pl.ParentId, r.ParentName = REPLACE(pr.PartyName, ' Licensees', ''), r.PartyType = p.PartyType, r.LaunchingDate = c.LaunchingDate
+	FROM #Result r
+		INNER JOIN @PartyList pl ON r.PartyId = pl.PartyId
+		INNER JOIN @PartyList pr ON pl.ParentId = pr.PartyId
+		INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON r.PartyId = p.PartyId
+		OUTER APPLY (
+			SELECT MIN(c.FromDate) AS LaunchingDate
+			FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
+			WHERE c.FromParty = r.PartyId
+				AND c.ToParty IN (1, 9, 11, 98)
+				AND c.ChargeType NOT IN (2, 3) -- old type
+		) c
+
+	-- #Result: Update Waiver period
+	UPDATE r
+	SET r.WaiverPeriod = w.WaiverPeriod, r.MonthCount = 0
+	FROM #Result r
+		CROSS APPLY (
+			SELECT SUM(DATEDIFF(MONTH, w.FromDate, DATEADD(DAY, 1, w.ToDate)) + CASE WHEN DAY(w.FromDate) > DAY(DATEADD(DAY, 1, w.ToDate)) THEN -1 ELSE 0 END) AS WaiverPeriod
+			FROM dbo.LA_MinFee m WITH (NOLOCK)
+				INNER JOIN dbo.LA_MinFee w WITH (NOLOCK) ON m.PartyId = w.PartyId AND m.ProductId = w.ProductId
+			WHERE m.PartyId = r.PartyId AND m.FeeTypeId = 1 AND w.FeeTypeId = 2 AND w.FromDate >= m.FromDate AND w.ToDate <= m.ToDate
+		) w
+	WHERE r.RefInvItemTypeId = 3
+
+	-- #Result: Update MonthCount
+	UPDATE r
+	SET r.MonthCount = MonthOfDeduction
+	FROM #Result r
+		CROSS APPLY (
+			SELECT TOP 1 m.MonthOfDeduction
+			FROM dbo.LA_MinFee m WITH (NOLOCK)
+			WHERE m.PartyId = r.PartyId AND m.FeeTypeId = 1
+			ORDER BY m.ToDate DESC
+		) w
+	WHERE r.RefInvItemTypeId = 3
 	
-	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
-	EXEC dbo.LA_PartyListNonOfficialSel
+	-- Return data
+	SELECT ParentName AS GroupName, PartyId, PartyName, InitAmount AS Prepayment, LaunchingDate, ISNULL(WaiverPeriod, 0) AS WaiverPeriod, ISNULL(MonthCount, 0) AS MonthCount
+		,Balance, ISNULL(Remark, '') AS Remark, ISNULL(PartyType, 5) AS PartyType, RefInvItemTypeId AS RowType
+	FROM #Result
+	ORDER BY PartyId, RefInvItemTypeId
 
-	-- licensees have amf/prepayment
-	-- 3-amf
-	-- 22-prepayment
-	DECLARE @AmfParties TABLE(
-		PartyId INT,
-		Balance MONEY,
-		WaiverPeriod INT,
-		MonthCount INT,
-		InitialAmount MONEY,
-		Remark VARCHAR(100),
-		PartyName VARCHAR(50),
-		ParentId INT,
-		RowType INT
-	)
-	INSERT INTO @AmfParties(PartyId, InitialAmount, PartyName, ParentId, RowType)
-	(
-		SELECT p.PartyId, SUM(s.Income), p.PartyName, p.ParentId,s.InvItemTypeId
-		FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
-		INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) on h.InvoiceHeaderId=s.InvoiceHeaderId
-		INNER JOIN @Parties p ON p.PartyId = s.RefPartyId
-		WHERE s.InvItemTypeId IN(@AMF,@PREPAYMENT) AND p.ParentId > 0
-			AND h.StatusId = 0 -- 0: normal invoice
-			AND h.Environment=@Environment
-		GROUP BY p.PartyId, p.PartyName, p.ParentId,s.InvItemTypeId
-	)
+	-- Deducted amount detail
+	SELECT d.PartyId, d.RefNo AS InvoiceNo, d.Amount - ISNULL(t.Amount, 0) AS Amount, d.RefInvItemTypeId AS RowType
+	FROM (
+		SELECT PartyId, RefInvItemTypeId, CASE WHEN InvoiceType = 10 THEN RefNo ELSE OfficialInvoiceNo END AS RefNo, -SUM(Amount) AS Amount
+		FROM #tmpData t1
+		WHERE InvItemTypeId IN (5, 12, 24) -- Deducted amount
+		GROUP BY PartyId, RefInvItemTypeId, CASE WHEN InvoiceType = 10 THEN RefNo ELSE OfficialInvoiceNo END
+	) d
+		LEFT JOIN (
+			SELECT PartyId, RefNo, SUM(Amount) AS Amount
+			FROM #tmpData
+			WHERE InvItemTypeId = 7
+			GROUP BY PartyId, RefNo
+		) t ON d.PartyId = d.PartyId AND d.RefNo = t.RefNo AND d.RefInvItemTypeId = 3
+	WHERE d.Amount - ISNULL(t.Amount, 0) <> 0
+	ORDER BY d.PartyId, d.RefNo, d.RefInvItemTypeId
 
-	-- statement
-	-- 3,5,7,21: amf
-	-- 22: prepayment
-	SELECT s.[Description],s.Expense,s.Income,s.InvItemTypeId,s.RefNo,s.RefPartyId, h.CreatedDateTime, h.OfficialInvoiceNo, h.InvoiceType,
-		CASE WHEN s.InvItemTypeId IN (3,5,7,21) THEN @AMF ELSE @PREPAYMENT END RowType
-	INTO #Statement
-	FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
-	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
-	WHERE h.Environment = @Environment
-		AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
-		AND s.InvItemTypeId IN (3,5,7,21,22,23,24)
-		AND s.RefPartyId IN (SELECT a.PartyId FROM @AmfParties a)
-
-	-- get balance
-	;WITH b AS (
-		SELECT RefPartyId, RowType, SUM(ISNULL(Income,0)-ISNULL(Expense,0)) AS Balance
-		FROM #Statement
-		GROUP BY RefPartyId, RowType
-	)
-	UPDATE af SET Balance = b.Balance
-	FROM @AmfParties af
-	INNER JOIN b ON b.RefPartyId = af.PartyId AND b.RowType=af.RowType
-
-	-- remark
-	-- invoice type: 7-setupfee
-	-- item type: 3,21,22,23
-	;WITH r AS (
-		SELECT s1.RefPartyId, s1.RowType
-			, CASE WHEN s1.InvoiceType=7 THEN '' ELSE s1.[Description] END AS [Description]
-			, ROW_NUMBER() OVER (PARTITION BY s1.RefPartyId,s1.RowType ORDER BY s1.CreatedDateTime DESC) AS RowNum
-		FROM #Statement s1
-		LEFT JOIN #Statement s2 ON s1.OfficialInvoiceNo=s2.RefNo AND s2.InvItemTypeId = 7
-		WHERE s1.InvItemTypeId IN(3,21,22,23) AND s2.RefNo IS NULL
-	)
-	UPDATE af SET Remark = r.[Description]
-	FROM @AmfParties af
-	INNER JOIN r ON r.RefPartyId = af.PartyId AND r.RowType=af.RowType AND r.RowNum = 1
-
-	-- launching date
-	-- 1-party
-	-- 5-un-official party
-	DECLARE @LaunchingDate TABLE(LaunchingDate DATE, PartyId INT, PartyType INT)
-	;WITH P AS (
-		SELECT ci.FromDate, p.PartyID, p.PartyType
-		FROM dbo.OAS_Party p WITH (NOLOCK)
-		INNER JOIN @AmfParties af ON af.PartyId=p.PartyID
-		INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
-		INNER JOIN dbo.LA_ChargeInfo_SystemMapping map WITH(NOLOCK) ON map.ChargeID = ci.ChargeID and map.SystemID = 2
-		WHERE ci.ProductId NOT IN (SELECT DISTINCT ProductId FROM dbo.LA_Product3rdSub WITH(NOLOCK)) AND p.PartyType IN (1,5)
-		UNION ALL
-		SELECT s.FromDate, p.PartyID, p.PartyType
-		FROM dbo.OAS_Party p WITH (NOLOCK)
-		INNER JOIN @AmfParties af ON af.PartyId=p.PartyID
-		INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
-		INNER JOIN dbo.LA_ChargeInfo_SystemMapping map WITH(NOLOCK) ON map.ChargeID = ci.ChargeID and map.SystemID = 2
-		INNER JOIN dbo.OAS_ChargeInfoSub s WITH (NOLOCK) ON s.ChargeIDRef = ci.ChargeID AND s.FromParty = ci.FromParty
-		WHERE p.PartyType IN (1,5)
-	)
-	INSERT INTO @LaunchingDate(LaunchingDate, PartyId, PartyType)
-	SELECT MIN(FromDate), PartyID, PartyType FROM P GROUP BY PartyID, PartyType
-
-	-- waiver period
-	-- 1 minfee
-	-- 2 waive
-	-- 3 amf
-	;WITH wp AS (
-		SELECT w.PartyId, w.FromDate, DATEADD(DAY, 1, w.ToDate) AS ToDate
-		FROM dbo.LA_MinFee w WITH(NOLOCK)
-		INNER JOIN dbo.LA_MinFee m WITH(NOLOCK) ON m.PartyId=w.PartyId AND m.ProductId=w.ProductId
-		INNER JOIN @AmfParties af ON af.PartyId=w.PartyId AND af.RowType=@AMF
-		WHERE w.FeeTypeId = 2 AND m.FeeTypeId=1 AND w.FromDate >= m.FromDate AND w.ToDate<=m.ToDate		
-	)
-	, waive AS (
-		SELECT wp.PartyId,
-				SUM(    CASE
-						WHEN DATEADD(Month, DATEDIFF(Month, wp.FromDate, wp.ToDate) +1, wp.FromDate) <= wp.ToDate Then DATEDIFF(Month, wp.FromDate, wp.ToDate) +1
-						WHEN DATEADD(Month, DATEDIFF(Month, wp.FromDate, wp.ToDate) , wp.FromDate) <= wp.ToDate Then DATEDIFF(Month, wp.FromDate, wp.ToDate) 
-						WHEN DATEADD(Month, DATEDIFF(Month, wp.FromDate, wp.ToDate) -1, wp.FromDate) <= wp.ToDate Then DATEDIFF(Month, wp.FromDate, wp.ToDate) -1
-						END ) WaiverPeriod
-		FROM wp
-		GROUP BY wp.PartyId
-	)
-	UPDATE p SET p.WaiverPeriod = ISNULL(waive.WaiverPeriod, 0)
-	FROM @AmfParties p
-	LEFT JOIN waive ON waive.PartyId=p.PartyId
-	WHERE p.RowType=@AMF
-
-	-- month of deduction
-	-- 1 minfee
-	;WITH md AS (
-		SELECT m.PartyId, m.MonthOfDeduction, ROW_NUMBER() OVER (PARTITION BY m.PartyId ORDER BY m.ToDate DESC) AS RowNum
-		FROM dbo.LA_MinFee m WITH(NOLOCK)
-		INNER JOIN @AmfParties p ON p.PartyId = m.PartyId AND p.RowType=@AMF
-		WHERE m.FeeTypeId=1
-	)
-	UPDATE p SET p.MonthCount = md.MonthOfDeduction
-	FROM @AmfParties p
-	INNER JOIN md ON p.PartyId=md.PartyId AND md.RowNum=1
-	WHERE p.RowType=@AMF
-
-	SELECT REPLACE(pp.PartyName, ' Licensees', '') AS GroupName
-		, af.PartyId
-		, af.PartyName
-		, af.InitialAmount				AS Prepayment
-		, l.LaunchingDate
-		, ISNULL(af.WaiverPeriod,0)		AS WaiverPeriod
-		, ISNULL(af.MonthCount,0)		AS MonthCount
-		, af.Balance
-		, ISNULL(af.Remark,'')			AS Remark
-		, ISNULL(l.PartyType,5)			AS PartyType-- un-official party
-		, af.RowType
-	FROM @AmfParties af
-	LEFT JOIN @LaunchingDate l ON l.PartyId=af.PartyId
-	INNER JOIN @Parties pp ON pp.PartyId=af.ParentId AND pp.ParentId=0
-
-	-- get deduct amount detail
-	-- 5-deduct AMF
-	-- 24-deduct against invoice
-	DECLARE @Deduct TABLE(PartyId INT, InvoiceNo VARCHAR(50), Amount MONEY, RowType INT)
-	INSERT INTO @Deduct(PartyId, RowType, Amount, InvoiceNo)
-	(
-		SELECT RefPartyId, InvItemTypeId,
-			SUM(ISNULL(Expense,0)) AS Amount,
-			CASE WHEN InvoiceType = 10 THEN RefNo ELSE OfficialInvoiceNo END
-		FROM #Statement
-		WHERE InvItemTypeId IN (5,24) --Debit Note (for return AMF)
-		GROUP BY RefPartyId,InvItemTypeId, CASE WHEN InvoiceType = 10 THEN RefNo ELSE OfficialInvoiceNo END
-	)
-
-	--10   Debit Note (for return AMF)
-	--7    Return amf
-	--24   Deduct against invoice
-	;WITH r AS (
-		SELECT RefPartyId,RefNo, SUM(ISNULL(Income,0)) AS Amount
-		FROM #Statement
-		WHERE InvItemTypeId = 7
-		GROUP BY RefPartyId,RefNo
-	)
-	SELECT d.PartyId, d.InvoiceNo
-		, (d.Amount - ISNULL(r.Amount,0)) AS Amount
-		, CASE WHEN d.RowType=5 THEN @AMF ELSE @PREPAYMENT END AS RowType
-	FROM @Deduct d
-	LEFT JOIN r ON d.InvoiceNo = r.RefNo AND d.RowType = 5 --deduct AMF
-	WHERE (d.Amount - ISNULL(r.Amount,0)) <> 0
-	ORDER BY d.PartyId, d.InvoiceNo
-
-	DROP TABLE #Statement
+	DROP TABLE #Result
+	DROP TABLE #tmpData
 END
 GO
