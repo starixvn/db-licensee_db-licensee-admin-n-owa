@@ -74,6 +74,7 @@ AS
 		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 		- 20210823@Danny: filter licensee status from OIC [#159296]
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
+		- 20220228@Danny: Allbet - Promotion integration [#167510]
 */
 		
 /*	Example:
@@ -90,7 +91,7 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @GD_Tip SMALLINT = 1706 
-	DECLARE @PragmaticID INT = 32, @SBC_ProductID INT = 42, @Arcadia_Gaming_Id INT = 34, @SXG_ID  INT = 45, @VGA_ProductID INT = 66, @SG_ProductID  INT = 36
+	DECLARE @PragmaticID INT = 32, @SBC_ProductID INT = 42, @Arcadia_Gaming_Id INT = 34, @SXG_ID  INT = 45, @VGA_ProductID INT = 66, @SG_ProductID  INT = 36, @AB_ID INT = 21
 
 	-- Get Product List
 	BEGIN
@@ -190,7 +191,7 @@ BEGIN
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND b.customercategory NOT IN (27, 28)
 				AND eb.BettypeID IS NULL
-				AND b.ProductID NOT IN (13,15,25,@PragmaticID,@SBC_ProductID, @Arcadia_Gaming_Id, @SXG_ID, @VGA_ProductID, @SG_ProductID)
+				AND b.ProductID NOT IN (13,15,25,@PragmaticID,@SBC_ProductID, @Arcadia_Gaming_Id, @SXG_ID, @VGA_ProductID, @SG_ProductID, @AB_ID)
 		GROUP BY b.rptdate, b.SiteId, b.CurrencyID, t.GroupProductId, CASE WHEN b.Bettype IN (1706,999) THEN b.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
 	)
 	-- EndRegion
@@ -412,19 +413,20 @@ BEGIN
 			@VGA_Contribution	SMALLINT = 3898,
 			@VGA_JackpotPrize	SMALLINT = 3899,
 			@SG_JackpotPrize	SMALLINT = 4600,
-			@SG_Contribution	SMALLINT = 4599
+			@SG_Contribution	SMALLINT = 4599,
+			@AB_Promotion		SMALLINT = 2499
 
 	;WITH cte_WinLossData AS 
 	(
 		SELECT b.SiteId, b.rptDate, b.CurrencyID, b.ProductID,
-			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType OR b.Bettype IN (@PPTournament, @PromotionPrize, @PPContribution, @PPJackpotPrize, @SBC_Contribution, @SBC_JackpotPrize, @Arcadia_Gaming_Bonus, @AESexy_LuclyDraw, @VGA_Contribution, @VGA_JackpotPrize, @SG_Contribution, @SG_JackpotPrize) THEN 0 
+			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType OR b.Bettype IN (@PPTournament, @PromotionPrize, @PPContribution, @PPJackpotPrize, @SBC_Contribution, @SBC_JackpotPrize, @Arcadia_Gaming_Bonus, @AESexy_LuclyDraw, @VGA_Contribution, @VGA_JackpotPrize, @SG_Contribution, @SG_JackpotPrize, @AB_Promotion) THEN 0 
 				ELSE (ISNULL(-b.MemberWL, 0) * e.Rate) END) AS LicenseeWL,
 			SUM(CASE WHEN b.Bettype IN (@PPContribution, @SBC_Contribution, @VGA_Contribution, @SG_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END * e.Rate) AS Contribution,
 			SUM(CASE WHEN b.Bettype IN (@PPJackpotPrize, @SBC_JackpotPrize, @VGA_JackpotPrize, @SG_JackpotPrize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END * e.Rate) AS JackpotPrize,
-			SUM(CASE WHEN b.Bettype IN (@PromotionPrize, @PPTournament, @Arcadia_Gaming_Bonus, @AESexy_LuclyDraw) OR ISNULL(b.TicketType,0) = @FreeBetTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END * e.Rate) AS ExtraAmount
+			SUM(CASE WHEN b.Bettype IN (@PromotionPrize, @PPTournament, @Arcadia_Gaming_Bonus, @AESexy_LuclyDraw, @AB_Promotion) OR ISNULL(b.TicketType,0) = @FreeBetTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END * e.Rate) AS ExtraAmount
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 		INNER JOIN #Exchange e ON e.ExchangeID = b.CurrencyId AND e.ExchangeDate = b.rptDate
-		WHERE b.ProductID IN (@PragmaticID, @SBC_ProductID, @Arcadia_Gaming_Id, @SXG_ID, @VGA_ProductID, @SG_ProductID)
+		WHERE b.ProductID IN (@PragmaticID, @SBC_ProductID, @Arcadia_Gaming_Id, @SXG_ID, @VGA_ProductID, @SG_ProductID, @AB_ID)
 			AND b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.CustomerCategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103) -- Exclude Reject, Void, Refund
@@ -439,7 +441,7 @@ BEGIN
 		FROM cte_WinLossData d
 		INNER JOIN @PartyChargeInfo p ON p.LicenseeId = d.SiteId AND (d.rptDate BETWEEN p.FromDate AND p.ToDate) AND p.ProductID = d.ProductID
 		LEFT JOIN LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeID AND d.CurrencyId = cr.CurrencyID
-		WHERE d.ProductID IN (@PragmaticID, @SBC_ProductID, @Arcadia_Gaming_Id, @SXG_ID, @VGA_ProductID, @SG_ProductID)
+		WHERE d.ProductID IN (@PragmaticID, @SBC_ProductID, @Arcadia_Gaming_Id, @SXG_ID, @VGA_ProductID, @SG_ProductID, @AB_ID)
 			 AND d.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY p.PartyId, d.ProductID
 	), cte_LicensingFee AS
@@ -455,7 +457,8 @@ BEGIN
 			l.CC = cc.LicensingFee - cc.ExtraAmount,
 			l.SXG = sxg.LicensingFee - sxg.ExtraAmount,
 			l.VGA = vga.LicensingFee + vga.Contribution - vga.JackpotPrize - vga.ExtraAmount,
-			l.SG = sg.LicensingFee + sg.Contribution - sg.JackpotPrize
+			l.SG = sg.LicensingFee + sg.Contribution - sg.JackpotPrize,
+			l.AB = ab.LicensingFee - ab.ExtraAmount
 	FROM #LicenseeAmount l
 	LEFT JOIN cte_LicensingFee pp ON l.PartyId = pp.PartyId AND pp.ProductID = @PragmaticID
 	LEFT JOIN cte_LicensingFee sbc ON l.PartyId = sbc.PartyId AND sbc.ProductID = @SBC_ProductID
@@ -463,6 +466,7 @@ BEGIN
 	LEFT JOIN cte_LicensingFee sxg ON l.PartyId = sxg.PartyId AND sxg.ProductID = @SXG_ID
 	LEFT JOIN cte_LicensingFee vga ON l.PartyId = vga.PartyId AND vga.ProductID = @VGA_ProductID
 	LEFT JOIN cte_LicensingFee sg ON l.PartyId = sg.PartyId AND sg.ProductID = @SG_ProductID
+	LEFT JOIN cte_LicensingFee ab ON l.PartyId = ab.PartyId AND ab.ProductID = @AB_ID
 	--End PP, SBC, Arcadia_Gaming
 
 	-- SportsBook
@@ -530,7 +534,7 @@ BEGIN
 		APM MONEY
 	)
 	
-	INSERT INTO @AmountDueByProduct(LicenseeId, NG, VS, CS, KN, AGC, GD, VB, AB, FW, LT, BRVS, LC, VG, MGCLC, MGCRNG, BX, VRG, SAG, I4D, TG, PGS, JK, WM, VS3, GDG, BG, MXG, SLT, PPL, HB, CG, AP, APM)
+	INSERT INTO @AmountDueByProduct(LicenseeId, NG, VS, CS, KN, AGC, GD, VB, FW, LT, BRVS, LC, VG, MGCLC, MGCRNG, BX, VRG, SAG, I4D, TG, PGS, JK, WM, VS3, GDG, BG, MXG, SLT, PPL, HB, CG, AP, APM)
 	SELECT d.LicenseeId,
 			ISNULL(SUM(CASE WHEN d.ProductId = 2  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS NG,
 			ISNULL(SUM(CASE WHEN d.ProductId = 5  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VS,
@@ -539,7 +543,6 @@ BEGIN
 			ISNULL(SUM(CASE WHEN d.ProductId = 10 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS AGC,
 			ISNULL(SUM(CASE WHEN d.ProductId = 11 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS GD,
 			ISNULL(SUM(CASE WHEN d.ProductId = 22 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VB,
-			ISNULL(SUM(CASE WHEN d.ProductId = 21 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS AB,
 			ISNULL(SUM(CASE WHEN d.ProductId = 24 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS FW,
 			ISNULL(SUM(CASE WHEN d.ProductId = 28 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS LT,
 			ISNULL(SUM(CASE WHEN d.ProductId = 27 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS BRVS,
@@ -583,7 +586,6 @@ BEGIN
 			AGC = a.AGC,
 			GD = a.GD,
 			VB = a.VB,
-			AB = a.AB,
 			FW = a.FW,
 			LT = a.LT,
 			LC = a.LC,

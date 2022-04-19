@@ -58,6 +58,7 @@ AS
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
+		- 20220218@Danny: Allbet - Promotion integration [#167510]
 
 	Param's Explanation:
 */
@@ -856,7 +857,7 @@ BEGIN
 	ELSE IF (@ProductCode = 'SXG')
 	BEGIN
 		DECLARE @SXG_LuckyDraw SMALLINT = 3150
-		;WITH cte_ArcadiaData AS
+		;WITH cte_SXG_Data AS
 		(
 			SELECT b.SiteId, b.rptDate, b.CurrencyId
 				,SUM(CASE WHEN b.Bettype = @SXG_LuckyDraw THEN 0 ELSE ISNULL(b.BetCount, 0) END) AS BetCount
@@ -878,7 +879,45 @@ BEGIN
 			,SUM(-MemberWL * (1 - ISNULL(cm.Rate, p.Rate)))				AS LicenseeWL
 			,SUM(-MemberWL * ISNULL(cm.Rate, p.Rate))					AS LicenseeChargeRate
 			,SUM(WinningPrize) 
-		FROM cte_ArcadiaData b
+		FROM cte_SXG_Data b
+		INNER JOIN @ChargeInfo p ON b.SiteId = p.LicenseeID
+		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND b.CurrencyId = cm.CurrencyId
+		WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate
+		GROUP BY rptDate, b.CurrencyID
+
+		SELECT @TotalLicenseeChargeRate_InBaseCurrency = SUM(LicenseeChargeRate * e.Rate)
+		FROM #Result r
+		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
+
+		UPDATE #Result
+		SET Company = CASE WHEN @IsKeepNegativeAmount = 1 OR @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END - WinningPrize
+	END
+	ELSE IF (@ProductCode = 'AB')
+	BEGIN
+		DECLARE @AB_Promotion SMALLINT = 2499
+		;WITH cte_AB_Data AS
+		(
+			SELECT b.SiteId, b.rptDate, b.CurrencyId
+				,SUM(CASE WHEN b.Bettype = @AB_Promotion THEN 0 ELSE ISNULL(b.BetCount, 0) END) AS BetCount
+				,SUM(ISNULL(b.Turnover, 0)) AS Turnover
+				,SUM(CASE WHEN b.Bettype = @AB_Promotion THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS MemberWL
+				,SUM(CASE WHEN b.Bettype = @AB_Promotion THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
+			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+			WHERE b.ProductID = 21
+				AND b.rptDate BETWEEN @FromDate AND @ToDate
+				AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
+				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
+			GROUP BY b.SiteId, rptDate, b.CurrencyID
+		)
+		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, WinningPrize)
+		SELECT b.rptDate, b.CurrencyId
+			,SUM(Betcount) 
+			,SUM(Turnover) 
+			,SUM(MemberWL) 
+			,SUM(-MemberWL * (1 - ISNULL(cm.Rate, p.Rate)))				AS LicenseeWL
+			,SUM(-MemberWL * ISNULL(cm.Rate, p.Rate))					AS LicenseeChargeRate
+			,SUM(WinningPrize) 
+		FROM cte_AB_Data b
 		INNER JOIN @ChargeInfo p ON b.SiteId = p.LicenseeID
 		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND b.CurrencyId = cm.CurrencyId
 		WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate

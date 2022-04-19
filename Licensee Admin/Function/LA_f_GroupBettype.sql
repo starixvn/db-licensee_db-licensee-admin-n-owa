@@ -2,7 +2,7 @@
 USE [bodb_Licensee]
 GO
 
-ALTER FUNCTION [dbo].[LA_f_GroupBettype]()
+CREATE FUNCTION [dbo].[LA_f_GroupBettype]()
 RETURNS TABLE
 AS
 
@@ -14,6 +14,7 @@ AS
 	Revisions:
 		- 20210909@Percy: Initialize function [RedmineID: #157652]
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
+		- 20220222@Danny: Allbet - Promotion integration [#167510]
 */
 
 RETURN
@@ -40,4 +41,6 @@ RETURN
 	UNION ALL SELECT 34, 1906, 6, 'Bonus'
 	-- 7: OddsSpread Adjustment
 	UNION ALL SELECT 0, 999, 7, 'OddsSpread Adjustment'
+	-- 8: Promotion
+	UNION ALL SELECT 21, 2499, 8, 'Promotion'
 GO

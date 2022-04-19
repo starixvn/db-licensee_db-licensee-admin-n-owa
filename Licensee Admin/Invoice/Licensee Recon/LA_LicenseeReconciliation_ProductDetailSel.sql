@@ -22,6 +22,7 @@ AS
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
+		- 20220222@Danny: Allbet - Promotion integration [#167510]
 */
 
 BEGIN
@@ -54,7 +55,7 @@ BEGIN
 	INSERT INTO @Bettype (Bettype, TypeId)
 	SELECT Bettype, 1 AS TypeId FROM (VALUES (4297), (1698), (3898), (4599)) b (Bettype) -- Contribution
 	UNION ALL
-	SELECT Bettype, 2 AS TypeId FROM (VALUES (4299), (4300), (1906), (3150)) b (Bettype) -- Promotion
+	SELECT Bettype, 2 AS TypeId FROM (VALUES (4299), (4300), (1906), (3150), (2499)) b (Bettype) -- Promotion
 	UNION ALL
 	SELECT Bettype, 3 AS TypeId FROM (VALUES (4298), (1699), (3899), (4600)) b (Bettype) -- JackpotPrize
 	UNION ALL
