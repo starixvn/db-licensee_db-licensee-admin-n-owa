@@ -307,7 +307,7 @@ BEGIN
 
 		-- Region: @TotalAmount_BasedOn_CreditBaseCurrencyName
 	DECLARE @TotalAmount_BasedOn_CreditBaseCurrencyName MONEY, @TotalAmountWinLossBase MONEY
-	SELECT @TotalAmount_BasedOn_CreditBaseCurrencyName = SUM((-r.CustomerWinLoss - r.LicenseeContribution) * e.BaseCurrencyRate)
+	SELECT @TotalAmount_BasedOn_CreditBaseCurrencyName = SUM((-r.CustomerWinLoss - r.FullContribution) * e.BaseCurrencyRate)
 	FROM #Result r
 	INNER JOIN (SELECT DISTINCT PartyId FROM @RateOfCredit) roc ON r.PartyID = roc.PartyId
 	INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CreditBaseCurrencyName) e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.Winlossdate
@@ -377,8 +377,8 @@ BEGIN
 				SELECT  r.PartyId,
 						SUM(CASE 
 							WHEN @TotalAmount_BasedOn_CreditBaseCurrencyName > MaxAmount THEN MaxAmount * e.BaseCurrencyRate 
-							WHEN @TotalAmount_BasedOn_CreditBaseCurrencyName  - MinAmount > 0 THEN (r.LicenseeWinloss - r.LicenseeContribution) - (MinAmount * e.BaseCurrencyRate)
-							WHEN @TotalAmount_BasedOn_CreditBaseCurrencyName < 0 AND roc.RowIndex % @NumberOfTiers = 0 THEN r.LicenseeWinloss - r.LicenseeContribution
+							WHEN @TotalAmount_BasedOn_CreditBaseCurrencyName  - MinAmount > 0 THEN (r.LicenseeWinloss - r.FullContribution) - (MinAmount * e.BaseCurrencyRate)
+							WHEN @TotalAmount_BasedOn_CreditBaseCurrencyName < 0 AND roc.RowIndex % @NumberOfTiers = 0 THEN r.LicenseeWinloss - r.FullContribution
 							ELSE 0 END  * roc.Rate)  AS ProgressiveAmount
 				FROM @Total r 
 				INNER JOIN @RateOfCredit roc ON RowIndex <= @NumberOfTiers
@@ -462,7 +462,7 @@ BEGIN
 		-- Total By Party
 		;WITH cte_TotalAmountByParty_BasedOn_CreditCurrency AS
 		(
-			SELECT r.PartyId, SUM((r.LicenseeWinloss - r.LicenseeContribution) * e.BaseCurrencyRate) AS TotalAmount_BasedOn_CreditCurrency
+			SELECT r.PartyId, SUM((r.LicenseeWinloss - r.FullContribution) * e.BaseCurrencyRate) AS TotalAmount_BasedOn_CreditCurrency
 			FROM #Result r
 			INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CreditBaseCurrencyName) e ON r.CurrencyId = e.ExchangeID AND r.Winlossdate = e.exchangedate
 			GROUP BY r.PartyId
@@ -491,8 +491,8 @@ BEGIN
 				, CASE WHEN PartyID IN(25,30)
 						THEN (SELECT TOP 1 SUM(CASE
 							WHEN r3.TotalAmount_BasedOn_CreditCurrency > MaxAmount THEN MaxAmount * e.BaseCurrencyRate 
-							WHEN r3.TotalAmount_BasedOn_CreditCurrency - MinAmount > 0 THEN (r2.LicenseeWinLoss - r2.LicenseeContribution) - (MinAmount * e.BaseCurrencyRate)
-							WHEN r3.TotalAmount_BasedOn_CreditCurrency < 0 AND roc.RowIndex % @NumberOfTiers = 0 THEN r2.LicenseeWinLoss - r2.LicenseeContribution
+							WHEN r3.TotalAmount_BasedOn_CreditCurrency - MinAmount > 0 THEN (r2.LicenseeWinLoss - r2.FullContribution) - (MinAmount * e.BaseCurrencyRate)
+							WHEN r3.TotalAmount_BasedOn_CreditCurrency < 0 AND roc.RowIndex % @NumberOfTiers = 0 THEN r2.LicenseeWinLoss - r2.FullContribution
 							ELSE 0 END  * roc.Rate)
 							FROM @RateOfCredit roc
 								INNER JOIN cte_TempData r2 ON r2.PartyID = roc.PartyId
