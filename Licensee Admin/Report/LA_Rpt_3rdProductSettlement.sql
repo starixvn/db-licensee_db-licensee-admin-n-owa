@@ -18,6 +18,7 @@ AS
 	- 20211122@Percy: Enhance code get data from rpt_ThirdPartyWL_ExtraGMT table [RedmineID: #155402]
 	- 20220110@Danny: SG - Jackpot prize integration [#167089]
 	- 20220218@Danny: Allbet - Promotion integration [#167510]
+	- 20220407@Percy: Calculate Licensee Fee base on LicenseeContribution [RedmineID: #171190]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
@@ -176,8 +177,9 @@ BEGIN
 			TotalTrans		INT,
 			Turnover		MONEY,
 			WinPrizeAmount	MONEY,
-			Contribution	MONEY,
 			JackpotPrize	MONEY,
+			LicenseeContribution	MONEY,
+			FullContribution		MONEY,
 			CustomerWinLoss	MONEY,
 			LicenseeWinLoss	MONEY,
 			LicensingFee	MONEY,
@@ -306,8 +308,9 @@ BEGIN
 		RoyaltyFee		MONEY DEFAULT 0,
 		-- PP,SG colum
 		WinPrizeAmount	MONEY DEFAULT 0,
-		Contribution	MONEY DEFAULT 0,
 		JackpotPrize	MONEY DEFAULT 0,
+		LicenseeContribution	MONEY DEFAULT 0,
+		FullContribution		MONEY DEFAULT 0,
 		LicenseeChargeRate	MONEY DEFAULT 0,
 		-- Allbet	
 		Playcurrency		INT,
@@ -358,8 +361,9 @@ BEGIN
 		AmtDueToOnBB			MONEY DEFAULT 0,
 		AmtDueToOnProfitSharing	MONEY DEFAULT 0,
 		LicenseeChargeRate		MONEY DEFAULT 0,
-		Contribution			MONEY DEFAULT 0,
 		JackpotPrize			MONEY DEFAULT 0,
+		LicenseeContribution	MONEY DEFAULT 0,
+		FullContribution		MONEY DEFAULT 0,
 		IsDeposit				BIT,
 		Promotion				MONEY DEFAULT 0
 	)
@@ -714,7 +718,7 @@ BEGIN
 			GROUP BY b.RptDate, b.RptDate3rd, b.SiteId, b.BetTypeId, b.CurrencyId
 			UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 		)
-		INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,ExtraPT,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier,ProductID,isDeposit,RollingComm,NetWinLoss,CompanyTipShare,RoyaltyFee,Bonus, WinPrizeAmount,Contribution,JackpotPrize,LicenseeChargeRate,ServiceChargeOriginal,RebateCommissionOriginal, Playcurrency, Promotion)
+		INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,ExtraPT,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier,ProductID,isDeposit,RollingComm,NetWinLoss,CompanyTipShare,RoyaltyFee,Bonus, WinPrizeAmount,JackpotPrize,LicenseeContribution,FullContribution,LicenseeChargeRate,ServiceChargeOriginal,RebateCommissionOriginal, Playcurrency, Promotion)
 		SELECT ci.PartyId,
 			b.RptDate as Winlostdate,
 			b.CurrencyId,
@@ -737,8 +741,9 @@ BEGIN
 			SUM((b.LicenseeWinloss - b.ValidBetAmount * ci.ChargeRate11) * ci.ChargeRate10) AS RoyaltyFee,
 			SUM(Bonus),
 			SUM(WinPrizeAmount),
-			SUM(FullContribution),
 			SUM(JackpotPrize),
+			SUM(LicenseeContribution),
+			SUM(FullContribution),
 			SUM((LicenseeWinloss - LicenseeContribution) * ISNULL(cr.Rate, ci.Rate)) AS LicenseeChargeRate,
 			SUM(b.LicenseeWinloss * ci.AB_ServiceCharge) AS ServiceChargeOriginal,
 			SUM(b.ValidBetAmount * ci.ChargeRate11) AS RebateCommissionOriginal,
@@ -1027,7 +1032,7 @@ BEGIN
 			GROUP BY b.RptDate, b.RptDate3rd, b.SiteId, b.BetTypeId, b.CurrencyId
 			UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 		)
-		INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,ExtraPT,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier,ProductID,isDeposit,RollingComm,NetWinLoss,CompanyTipShare,RoyaltyFee,Bonus, WinPrizeAmount,Contribution,JackpotPrize,LicenseeChargeRate,ServiceChargeOriginal,RebateCommissionOriginal, Playcurrency, Promotion)
+		INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,ExtraPT,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier,ProductID,isDeposit,RollingComm,NetWinLoss,CompanyTipShare,RoyaltyFee,Bonus, WinPrizeAmount,JackpotPrize,LicenseeContribution,FullContribution,LicenseeChargeRate,ServiceChargeOriginal,RebateCommissionOriginal, Playcurrency, Promotion)
 		SELECT ci.PartyId,
 			b.RptDate3rd as Winlostdate,
 			b.CurrencyId,
@@ -1050,8 +1055,9 @@ BEGIN
 			SUM((b.LicenseeWinloss - b.ValidBetAmount * ci.ChargeRate11) * ci.ChargeRate10) AS RoyaltyFee,
 			SUM(Bonus),
 			SUM(WinPrizeAmount),
-			SUM(FullContribution),
 			SUM(JackpotPrize),
+			SUM(LicenseeContribution),
+			SUM(FullContribution),
 			SUM((LicenseeWinloss - LicenseeContribution) * ISNULL(cr.Rate, ci.Rate)) AS LicenseeChargeRate,
 			SUM(b.LicenseeWinloss * ci.AB_ServiceCharge) AS ServiceChargeOriginal,
 			SUM(b.ValidBetAmount * ci.ChargeRate11) AS RebateCommissionOriginal,
@@ -1165,7 +1171,7 @@ BEGIN
 			SELECT TOP 1 @CreditBaseCurrencyName = [Name], @CreditBaseCurrencyId = BaseCurrencyId FROM @PP_BaseCurrencies b INNER JOIN @RateOfCredit c ON c.BaseCurrencyId=b.Id
 
 			-- Region: @TotalAmount_BasedOn_CreditBaseCurrencyName
-			SELECT @TotalAmount_BasedOn_CreditBaseCurrencyName = SUM((-r.CustomerWinLoss - Contribution) * e.BaseCurrencyRate)
+			SELECT @TotalAmount_BasedOn_CreditBaseCurrencyName = SUM((-r.CustomerWinLoss - FullContribution) * e.BaseCurrencyRate)
 			FROM #TempData r
 			INNER JOIN (SELECT DISTINCT PartyId, ProductID FROM @RateOfCredit) roc ON r.PartyID = roc.PartyId AND r.ProductID = roc.ProductID
 			INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CreditBaseCurrencyName) e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.Winlostdate
@@ -1177,9 +1183,9 @@ BEGIN
 			;WITH SumByPropressiveAmount AS(
 				SELECT  r.PartyId,CurrencyId,Winlostdate,
 						SUM(CASE 
-							WHEN ((r.LicenseeWinloss - Contribution) * e.BaseCurrencyRate) > MaxAmount THEN MaxAmount 
-							WHEN ((r.LicenseeWinloss - Contribution) * e.BaseCurrencyRate  - MinAmount) > 0 THEN ((r.LicenseeWinloss - Contribution) * e.BaseCurrencyRate - MinAmount)
-							WHEN (r.LicenseeWinloss - Contribution) * e.BaseCurrencyRate < 0 AND roc.RowIndex % @NumberOfTiers = 0 THEN (r.LicenseeWinloss - Contribution) * e.BaseCurrencyRate 
+							WHEN ((r.LicenseeWinloss - r.FullContribution) * e.BaseCurrencyRate) > MaxAmount THEN MaxAmount 
+							WHEN ((r.LicenseeWinloss - r.FullContribution) * e.BaseCurrencyRate  - MinAmount) > 0 THEN ((r.LicenseeWinloss - r.FullContribution) * e.BaseCurrencyRate - MinAmount)
+							WHEN (r.LicenseeWinloss - r.FullContribution) * e.BaseCurrencyRate < 0 AND roc.RowIndex % @NumberOfTiers = 0 THEN (r.LicenseeWinloss - r.FullContribution) * e.BaseCurrencyRate 
 							ELSE 0 END  * roc.Rate / e.BaseCurrencyRate)  AS ProgressiveAmount
 				FROM #TempData r 
 				INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @CreditBaseCurrencyName) e ON r.CurrencyId = e.ExchangeID AND e.ExchangeDate = r.Winlostdate
@@ -1254,7 +1260,7 @@ BEGIN
 	INSERT INTO #Result (ParentId, ParentName, PartyId, ProductID,TotalTrans,CustomerWinLoss,LicenseeWinLoss,
 							LicensingFee,ExtraPT,PayToSupplier,IsKeepNegativeAmount,
 							Bonus,WLShare,LicComm, CommShare,CustomerWinLossSB,CustomerWinLossBA,CommissionA,CommissionS,CompanyTipShare,
-							IncomeOnBB,IncomeOnProfitSharing,AmtDueToOnBB,AmtDueToOnProfitSharing, LicenseeChargeRate, Contribution, JackpotPrize, IsDeposit, Promotion
+							IncomeOnBB,IncomeOnProfitSharing,AmtDueToOnBB,AmtDueToOnProfitSharing,LicenseeChargeRate,JackpotPrize,LicenseeContribution,FullContribution,IsDeposit,Promotion
 							)
 	SELECT 
 		pa.PartyId AS ParentId,
@@ -1283,8 +1289,9 @@ BEGIN
 		SUM(AmtDueToOnBB * e.Rate),
 		SUM(AmtDueToOnProfitSharing * e.Rate),
 		SUM(LicenseeChargeRate * e.Rate),
-		SUM(Contribution * e.Rate),
 		SUM(JackpotPrize * e.Rate),
+		SUM(LicenseeContribution * e.Rate),
+		SUM(FullContribution * e.Rate),
 		td.isDeposit,
 		SUM(Promotion* e.Rate )
 	
@@ -1369,8 +1376,9 @@ BEGIN
 				td.ProductID,
 				SUM(td.TotalTrans)								TotalTrans,
 				SUM(td.WinPrizeAmount * e.BaseCurrencyRate)		WinPrizeAmount,
-				SUM(ISNULL(td.Contribution, 0) * e.BaseCurrencyRate)		Contribution,
-				SUM(ISNULL(td.JackpotPrize, 0) * e.BaseCurrencyRate)		JackpotPrize,
+				SUM(ISNULL(td.JackpotPrize, 0) * e.BaseCurrencyRate)			JackpotPrize,
+				SUM(ISNULL(td.LicenseeContribution, 0) * e.BaseCurrencyRate)	LicenseeContribution,
+				SUM(ISNULL(td.FullContribution, 0) * e.BaseCurrencyRate)		FullContribution,
 				SUM(td.CustomerWinLoss * e.BaseCurrencyRate)	CustomerWinLoss, 
 				SUM(td.LicenseeWinLoss * e.BaseCurrencyRate)	LicenseeWinLoss, 
 				SUM(td.LicensingFee * e.BaseCurrencyRate)		LicensingFee,
@@ -1383,18 +1391,19 @@ BEGIN
 			WHERE td.ProductID = 32
 			GROUP BY CASE WHEN p.PartyId = 14 THEN 14 ELSE p.ParentId END,p.PartyId,CASE WHEN p.PartyId = 14 THEN '12Bet' ELSE pa.PartyName END,td.ProductID
 		)
-		INSERT INTO @PPTotal (ParentId,ParentName,ProductID,TotalTrans,WinPrizeAmount,Contribution,JackpotPrize,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
+		INSERT INTO @PPTotal (ParentId,ParentName,ProductID,TotalTrans,WinPrizeAmount,JackpotPrize,LicenseeContribution,FullContribution,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier)
 		SELECT ParentId,
 			ParentName,
 			ProductID,
 			SUM(TotalTrans),
 			SUM(WinPrizeAmount),
-			SUM(Contribution),
 			SUM(JackpotPrize),
+			SUM(LicenseeContribution),
+			SUM(FullContribution),
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
 			SUM(CASE WHEN ParentId = 999 THEN 0 -- Credit Licensee: always is 0
-						ELSE CASE WHEN LicenseeChargeRate < 0 THEN 0 ELSE LicenseeChargeRate END + Contribution - JackpotPrize - WinPrizeAmount
+						ELSE CASE WHEN LicenseeChargeRate < 0 THEN 0 ELSE LicenseeChargeRate END + LicenseeContribution - JackpotPrize - WinPrizeAmount
 				END),
 			SUM(PayToSupplier)
 		FROM TotalByParty
@@ -1405,8 +1414,8 @@ BEGIN
 				SELECT  r.ParentId,
 						SUM(CASE 
 							WHEN @TotalAmount_BasedOn_CreditBaseCurrencyName > MaxAmount THEN MaxAmount * e.BaseCurrencyRate 
-							WHEN @TotalAmount_BasedOn_CreditBaseCurrencyName  - MinAmount > 0 THEN (r.LicenseeWinloss - Contribution) - (MinAmount * e.BaseCurrencyRate)
-							WHEN @TotalAmount_BasedOn_CreditBaseCurrencyName < 0 AND roc.RowIndex % @NumberOfTiers = 0 THEN r.LicenseeWinloss - Contribution
+							WHEN @TotalAmount_BasedOn_CreditBaseCurrencyName  - MinAmount > 0 THEN (r.LicenseeWinloss - FullContribution) - (MinAmount * e.BaseCurrencyRate)
+							WHEN @TotalAmount_BasedOn_CreditBaseCurrencyName < 0 AND roc.RowIndex % @NumberOfTiers = 0 THEN r.LicenseeWinloss - FullContribution
 							ELSE 0 END  * roc.Rate)  AS ProgressiveAmount
 				FROM @PPTotal r 
 				INNER JOIN @RateOfCredit roc ON RowIndex <= @NumberOfTiers
@@ -1438,7 +1447,7 @@ BEGIN
 		SUM(td.CustomerWinLoss) ,
 		SUM(td.LicenseeWinLoss) ,
 		SUM(CASE WHEN td.IsKeepNegativeAmount = 1 AND td.ProductID IN (2,5,8,27,28,45,67,68) THEN  td.LicensingFee
-				 WHEN td.ProductID = 36 THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE  CASE WHEN td.LicenseeChargeRate  < 0 THEN 0 ELSE td.LicenseeChargeRate END + td.Contribution - td.JackpotPrize END
+				 WHEN td.ProductID = 36 THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE  CASE WHEN td.LicenseeChargeRate  < 0 THEN 0 ELSE td.LicenseeChargeRate END + td.LicenseeContribution - td.JackpotPrize END
 				 WHEN td.LicensingFee < 0 AND p.isKeepNegativeFee = 0 THEN 0 
 				 WHEN td.ProductID = 21 THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicensingFee < 0 THEN 0 ELSE td.LicensingFee END - td.Promotion  END
 				 ELSE td.LicensingFee END - td.Bonus + td.CompanyTipShare) AS LicensingFee,
@@ -1447,7 +1456,7 @@ BEGIN
 		
 		SUM(CASE WHEN td.ProductID = 23 THEN td.LicenseeWinLoss
 		         WHEN td.IsKeepNegativeAmount = 1 AND td.ProductID IN (2,5,8,27,28,45,67,68) THEN  td.LicensingFee
-				 WHEN td.ProductID = 36 THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE  CASE WHEN td.LicenseeChargeRate  < 0 THEN 0 ELSE td.LicenseeChargeRate END + td.Contribution - td.JackpotPrize END
+				 WHEN td.ProductID = 36 THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE  CASE WHEN td.LicenseeChargeRate  < 0 THEN 0 ELSE td.LicenseeChargeRate END + td.LicenseeContribution - td.JackpotPrize END
 				 WHEN td.LicensingFee < 0 AND p.isKeepNegativeFee = 0 THEN 0 
 				  WHEN td.ProductID = 21 THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicensingFee < 0 THEN 0 ELSE td.LicensingFee END - td.Promotion  END
 				 ELSE td.LicensingFee END - td.Bonus + td.CompanyTipShare)
