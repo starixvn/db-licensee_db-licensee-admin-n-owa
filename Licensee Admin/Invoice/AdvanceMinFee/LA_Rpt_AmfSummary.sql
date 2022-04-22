@@ -40,33 +40,20 @@ BEGIN
 		CREATE TABLE #tmpData (PartyId INT, InvoiceType SMALLINT, OfficialInvoiceNo NVARCHAR(50), CreatedDateTime DATETIME, RefNo NVARCHAR(50)
 			,RefInvItemTypeId SMALLINT, InvItemTypeId SMALLINT, Amount MONEY, Description NVARCHAR(500))
 
-		;WITH CTE_CreditNote AS (
-			SELECT s.RefPartyId, h.OfficialInvoiceNo
-			FROM dbo.LA_InvoiceHeader h WITH (NOLOCK)
-				INNER JOIN dbo.LA_InvoiceStatement s WITH (NOLOCK) ON s.InvoiceHeaderId = h.InvoiceHeaderId
-			WHERE h.StatusId = 0 -- normal invoice
-				AND h.Environment = @Environment
-				AND s.InvItemTypeId = 2 -- Setup Fees
-			GROUP BY s.RefPartyId, h.OfficialInvoiceNo
-		)
-		
 		INSERT INTO #tmpData (PartyId, InvoiceType, OfficialInvoiceNo,CreatedDateTime, RefNo, InvItemTypeId, Amount, Description, RefInvItemTypeId)
 		SELECT s.RefPartyId, h.InvoiceType, h.OfficialInvoiceNo, h.CreatedDateTime, s.RefNo, s.InvItemTypeId, ISNULL(s.Income, 0) - ISNULL(s.Expense, 0), s.Description
 			,CASE
-				WHEN InvItemTypeId IN (3, 5, 7, 12, 21) THEN 3 -- AMF & Credit note for Setup Fees
+				WHEN InvItemTypeId IN (3, 5, 7, 21, 46) THEN 3 -- AMF
 				WHEN InvItemTypeId IN (22, 23, 24) THEN 22 -- Prepayment
 				END AS RefInvItemTypeId
 		FROM dbo.LA_InvoiceHeader h WITH (NOLOCK)
 			INNER JOIN dbo.LA_InvoiceStatement s WITH (NOLOCK) ON s.InvoiceHeaderId = h.InvoiceHeaderId
-			LEFT JOIN CTE_CreditNote c ON c.RefPartyId = s.RefPartyId AND c.OfficialInvoiceNo = s.RefNo
 		WHERE h.StatusId = 0 -- normal invoice
 			AND h.Environment = @Environment
 			AND s.InvItemTypeId IN (
-				3, 5, 7, 21 -- AMF
+				3, 5, 7, 21, 46 -- AMF
 				,22, 23, 24 -- Prepayment
-				,12 -- Credit note for Fees
 			)
-			AND (s.InvItemTypeId <> 12 OR c.RefPartyId IS NOT NULL) -- Just get Credit note for Setup Fees
 
 		-- Remove invalid data
 		DELETE t
@@ -82,7 +69,6 @@ BEGIN
 				GROUP BY PartyId, RefInvItemTypeId
 				HAVING MIN(InvItemTypeId) <> RefInvItemTypeId
 			) w ON t.PartyId = w.PartyId AND t.RefInvItemTypeId = w.RefInvItemTypeId
-		
 	END
 
 	CREATE TABLE #Result (PartyId INT, PartyName VARCHAR(50), ParentId INT, ParentName VARCHAR(50), PartyType TINYINT, LaunchingDate DATE, WaiverPeriod INT, MonthCount INT, RefInvItemTypeId SMALLINT, InitAmount MONEY, Balance MONEY, Remark NVARCHAR(500))
@@ -155,7 +141,7 @@ BEGIN
 	FROM (
 		SELECT PartyId, RefInvItemTypeId, CASE WHEN InvoiceType = 10 THEN RefNo ELSE OfficialInvoiceNo END AS RefNo, -SUM(Amount) AS Amount
 		FROM #tmpData t1
-		WHERE InvItemTypeId IN (5, 12, 24) -- Deducted amount
+		WHERE InvItemTypeId IN (5, 24, 46) -- Deducted amount
 		GROUP BY PartyId, RefInvItemTypeId, CASE WHEN InvoiceType = 10 THEN RefNo ELSE OfficialInvoiceNo END
 	) d
 		LEFT JOIN (
