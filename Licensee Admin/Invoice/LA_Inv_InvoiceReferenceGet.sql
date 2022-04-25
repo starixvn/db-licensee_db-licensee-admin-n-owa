@@ -41,7 +41,7 @@ BEGIN
 				SELECT N',{'
 					+ N'"InvItemTypeId":' + CONVERT(NVARCHAR(10), s2.InvItemTypeId)
 					+ N', "Description":"' + s2.Description + '"'
-					+ N', "Amount":"' + CONVERT(NVARCHAR(20), s2.Amount)
+					+ N', "Amount":' + CONVERT(NVARCHAR(20), s2.Amount)
 					+ N'}'
 				FROM @InvoiceStatement s2
 				WHERE s2.InvoiceHeaderId = s1.InvoiceHeaderId
