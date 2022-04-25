@@ -13,14 +13,14 @@ AS
 
 	Revisions:
 		- 20180131@Bruce: support credit note for setup fee [#90274]
-		- 20220418@Percy: Return InvoiceItemType, Description & Amount [RedmineID: #164139]
+		- 20220418@Percy: Return InvoiceItemType & Amount [RedmineID: #164139]
 */
 BEGIN
-	DECLARE @InvoiceStatement TABLE (InvoiceHeaderId BIGINT, InvItemTypeId SMALLINT, Description NVARCHAR(500), Amount MONEY)
-	INSERT INTO @InvoiceStatement (InvoiceHeaderId, InvItemTypeId, Description, Amount)
-	SELECT InvoiceHeaderId, InvItemTypeId, Description, Amount
+	DECLARE @InvoiceStatement TABLE (InvoiceHeaderId BIGINT, InvItemTypeId SMALLINT, Amount MONEY)
+	INSERT INTO @InvoiceStatement (InvoiceHeaderId, InvItemTypeId, Amount)
+	SELECT InvoiceHeaderId, InvItemTypeId, Amount
 	FROM (
-		SELECT InvoiceHeaderId, Description
+		SELECT InvoiceHeaderId
 			,CASE InvItemTypeId
 				WHEN 1 THEN 12 -- Software Fee
 				WHEN 2 THEN 45 -- Setup Fee
@@ -40,7 +40,6 @@ BEGIN
 			,STUFF((
 				SELECT N',{'
 					+ N'"InvItemTypeId":' + CONVERT(NVARCHAR(10), s2.InvItemTypeId)
-					+ N', "Description":"' + s2.Description + '"'
 					+ N', "Amount":' + CONVERT(NVARCHAR(20), s2.Amount)
 					+ N'}'
 				FROM @InvoiceStatement s2
