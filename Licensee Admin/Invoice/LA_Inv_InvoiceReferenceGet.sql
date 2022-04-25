@@ -16,29 +16,39 @@ AS
 		- 20220418@Percy: Return InvoiceItemType & Amount [RedmineID: #164139]
 */
 BEGIN
-	DECLARE @InvoiceStatement TABLE (InvoiceHeaderId BIGINT, InvItemTypeId SMALLINT, Amount MONEY)
-	INSERT INTO @InvoiceStatement (InvoiceHeaderId, InvItemTypeId, Amount)
-	SELECT InvoiceHeaderId, InvItemTypeId, Amount
+	DECLARE @InvoiceStatement TABLE (InvoiceHeaderId BIGINT, InvTypeId SMALLINT, InvItemTypeId SMALLINT, Amount MONEY)
+	INSERT INTO @InvoiceStatement (InvoiceHeaderId, InvTypeId, InvItemTypeId, Amount)
+	SELECT s.InvoiceHeaderId, t.InvTypeId, t.InvItemTypeId, s.Amount
 	FROM (
-		SELECT InvoiceHeaderId
-			,CASE InvItemTypeId
-				WHEN 1 THEN 12 -- Software Fee
-				WHEN 2 THEN 45 -- Setup Fee
-				WHEN 3 THEN 46 -- AMF
-				WHEN 6 THEN 14 -- Rebate
-				ELSE 0 END AS InvItemTypeId
-			,CASE WHEN InvItemTypeId IN (2, 3) THEN ISNULL(Income, 0) - ISNULL(Expense, 0) ELSE 0 END AS Amount
+		SELECT InvoiceHeaderId, InvItemTypeId, CASE WHEN InvItemTypeId IN (2, 3) THEN ISNULL(Income, 0) - ISNULL(Expense, 0) ELSE 0 END AS Amount
 			,ROW_NUMBER() OVER(PARTITION BY InvoiceHeaderId, InvItemTypeId ORDER BY InvoiceStatementId) AS RN
 		FROM dbo.LA_InvoiceStatement WITH (NOLOCK)
 		WHERE RefPartyId = @PayerId
 			AND InvItemTypeId IN (1, 2, 3, 6) -- Software Fee, Setup Fee, AMF, Rebate
 	) s
-	WHERE RN = 1
+		CROSS APPLY (
+			SELECT 4 AS InvTypeId -- Credit Note
+				,CASE s.InvItemTypeId
+					WHEN 1 THEN 12 -- Software Fee
+					WHEN 2 THEN 45 -- Setup Fee
+					WHEN 3 THEN 46 -- AMF
+					WHEN 6 THEN 14 -- Rebate
+					ELSE 0 END AS InvItemTypeId
+			UNION ALL
+			SELECT 5 AS InvTypeId -- Debit Note
+				,CASE s.InvItemTypeId
+					WHEN 1 THEN 11 -- Software Fee
+					WHEN 6 THEN 13 -- Rebate
+					ELSE 0 END AS InvItemTypeId
+			WHERE s.InvItemTypeId IN (1, 6)
+		) t
+	WHERE s.RN = 1
 
 	;WITH CTE_InvoiceStatement AS (
 		SELECT s1.InvoiceHeaderId
 			,STUFF((
 				SELECT N',{'
+					+ N'"InvTypeId":' + CONVERT(NVARCHAR(10), s2.InvItemTypeId)
 					+ N'"InvItemTypeId":' + CONVERT(NVARCHAR(10), s2.InvItemTypeId)
 					+ N', "Amount":' + CONVERT(NVARCHAR(20), s2.Amount)
 					+ N'}'
