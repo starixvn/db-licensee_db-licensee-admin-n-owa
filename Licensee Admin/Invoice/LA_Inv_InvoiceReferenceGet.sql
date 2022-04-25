@@ -20,8 +20,14 @@ BEGIN
 	INSERT INTO @InvoiceStatement (InvoiceHeaderId, InvItemTypeId, Description, Amount)
 	SELECT InvoiceHeaderId, InvItemTypeId, Description, Amount
 	FROM (
-		SELECT InvoiceHeaderId, InvItemTypeId, Description
-			, CASE WHEN InvItemTypeId IN (2, 3) THEN ISNULL(Income, 0) - ISNULL(Expense, 0) ELSE 0 END AS Amount
+		SELECT InvoiceHeaderId, Description
+			,CASE InvItemTypeId
+				WHEN 1 THEN 12 -- Software Fee
+				WHEN 2 THEN 45 -- Setup Fee
+				WHEN 3 THEN 46 -- AMF
+				WHEN 6 THEN 14 -- Rebate
+				ELSE 0 END AS InvItemTypeId
+			,CASE WHEN InvItemTypeId IN (2, 3) THEN ISNULL(Income, 0) - ISNULL(Expense, 0) ELSE 0 END AS Amount
 			,ROW_NUMBER() OVER(PARTITION BY InvoiceHeaderId, InvItemTypeId ORDER BY InvoiceStatementId) AS RN
 		FROM dbo.LA_InvoiceStatement WITH (NOLOCK)
 		WHERE RefPartyId = @PayerId
