@@ -48,7 +48,7 @@ BEGIN
 		SELECT s1.InvoiceHeaderId
 			,STUFF((
 				SELECT N',{'
-					+ N'"InvTypeId":' + CONVERT(NVARCHAR(10), s2.InvItemTypeId)
+					+ N'"InvTypeId":' + CONVERT(NVARCHAR(10), s2.InvTypeId)
 					+ N'"InvItemTypeId":' + CONVERT(NVARCHAR(10), s2.InvItemTypeId)
 					+ N', "Amount":' + CONVERT(NVARCHAR(20), s2.Amount)
 					+ N'}'
