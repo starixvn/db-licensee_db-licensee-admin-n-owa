@@ -52,6 +52,7 @@ AS
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 		- 20210720@Percy: Check invoice number is already used [RedmineID: #147006]
+		- 20220418@Percy: Remove code update InvItemTypeId [RedmineID: #164139]
 */
 
 BEGIN
@@ -225,21 +226,6 @@ BEGIN
 				SELECT	@ErrCode = 4, @ErrMsg = 'Unknown Invoice No. ' + @WrongInvoiceNo
 				RETURN
 			END
-
-			-- update itemtype
-			-- invoice type: data fee: 1      -  rebate: 3   - Setupfee: 7       - creditnote: 4
-			-- item type:    data fee: debit(11),credit(12)  -  rebate: debit(13),credit(14)
-			--
-			UPDATE s SET s.ItemType = (CASE WHEN sh.InvoiceType = 1 THEN
-						CASE WHEN @InvoiceTypeId = 4 THEN 12 ELSE 11 END
-					WHEN sh.InvoiceType = 3 THEN
-						CASE WHEN @InvoiceTypeId = 4 THEN 14 ELSE 13 END
-					WHEN sh.InvoiceType = 7 AND @InvoiceTypeId = 4 THEN 12 -- credit note for setup fee
-					ELSE NULL
-				END)
-			FROM #StatementsHeader sh
-			INNER JOIN @Settlements s ON s.Id = sh.Id
-			WHERE @InvoiceTypeId <> 10
 
 			-- wrong item type
 			--
