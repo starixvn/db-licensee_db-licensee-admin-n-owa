@@ -48,6 +48,7 @@ BEGIN
 					+ N'}'
 				FROM @InvoiceStatement s2
 				WHERE s2.InvoiceHeaderId = s1.InvoiceHeaderId
+				ORDER BY s2.InvItemTypeId
 				FOR XML PATH('')), 1, 1, '') AS StatementJson
 		FROM @InvoiceStatement s1
 		GROUP BY s1.InvoiceHeaderId
