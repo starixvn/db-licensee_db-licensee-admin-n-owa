@@ -17,8 +17,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @ProductCode_ChargeRate VARCHAR(50),
-			@ProductCode_3rdRate VARCHAR(50)
+	DECLARE @ProductCode VARCHAR(50)
 	DECLARE @BettypeIdList TABLE (BetTypeId INT)
 	DECLARE @3rdRate TABLE(PartyID INT, ProductID INT, DI_Rate MONEY, IsDeposit INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME, MinAmount MONEY DEFAULT 0, MaxAmount MONEY DEFAULT 0, CurrencyId INT)
 	
@@ -63,17 +62,13 @@ BEGIN
 
 	 -- Exchange
 	INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-	SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
+	SELECT ExchangeDate, ExchangeID, CASE WHEN ExchangeID = 51 THEN 'INH' 
+										  WHEN ExchangeID = 92 THEN 'HID'  
+										  ELSE Code END, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	
-	UPDATE #Exchange SET CurrencyCode = CASE WHEN ExchangeID = 51 THEN 'INH' 
-											 WHEN ExchangeID = 92 THEN 'HID' END
-	WHERE ExchangeID IN (51,92)
-
 	-- ProductCode
-	SELECT @ProductCode_ChargeRate = CASE WHEN ProductPrefix = 'BTC' THEN 'SB' ELSE ProductPrefix END, 
-		   @ProductCode_3rdRate =  ProductPrefix 
-	FROM dbo.Product3rd WITH(NOLOCK) WHERE Productid = @ProductID
+	SELECT @ProductCode = ProductPrefix FROM dbo.Product3rd WITH(NOLOCK) WHERE Productid = @ProductID
 
 	-- Party list
 	INSERT INTO #PartyList (PartyId, PartyName, BrandName, ParentId)
@@ -89,7 +84,7 @@ BEGIN
 	-- Bettype List
 	INSERT INTO @BettypeIdList (BetTypeId)
 	SELECT	DISTINCT bettype
-	FROM	bodb_licensee.dbo.LA_f_BettypeProductMapping(0,@ProductCode_3rdRate) la
+	FROM	bodb_licensee.dbo.LA_f_BettypeProductMapping(0,@ProductCode) la
 
 	-- Handle chargeRate
 	BEGIN
@@ -98,7 +93,7 @@ BEGIN
 			INSERT INTO #ChargeRate(ChargeId, PartyId, LicenseeId, ProductID, Rate, Fromdate, Todate)
 			(
 				SELECT	ChargeId, PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate
-				FROM	dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCode_ChargeRate, 'OA', 1)
+				FROM	dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 				WHERE	DI_Rate > 0
 			)
 		END
@@ -107,7 +102,7 @@ BEGIN
 			INSERT INTO #ChargeRate(ChargeId, PartyId, LicenseeId,ProductID, Rate, Fromdate, Todate, isDeposit)
 			(
 				SELECT ChargeId, PartyID, LicenseeID, ProductID, DI_Rate, Fromdate, Todate, isDeposit
-				FROM dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode_ChargeRate, 'OA', 1)
+				FROM dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', 1)
 			
 				UNION
 			
@@ -135,7 +130,7 @@ BEGIN
 				SELECT c.ChargeID, c.PartyID, c.ProductID, c.LicenseeID, 
 					CASE WHEN ISNULL(c.IsDeposit,0)=0 THEN 0 ELSE c.DI_Rate END,
 					c.Fromdate, c.Todate, ISNULL(c.IsDeposit,0)
-				FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode_ChargeRate, 'OA', 1) c		
+				FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', 1) c		
 			)		
 		END
 		ELSE IF @ProductID = 23
@@ -143,7 +138,7 @@ BEGIN
 			INSERT INTO #ChargeRate (PartyId, LicenseeId, Rate3rd, ProductId, FromDate, ToDate, isDeposit)
 			(
 				SELECT PartyID, LicenseeID, DI_Rate, ProductID, Fromdate, Todate, isDeposit
-				FROM dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,@ProductCode_ChargeRate,'OA',1)
+				FROM dbo.LA_f_ChargeInfo(@PartyIDs,@FromDate,@ToDate,@ProductCode,'OA',1)
 			)
 		END
 		ELSE IF @ProductID = 24
@@ -154,7 +149,7 @@ BEGIN
 					CASE WHEN a.isDeposit = 0 THEN 0 ELSE DI_Rate END, 
 					CASE WHEN a.isDeposit = 0 THEN a.DI_Rate ELSE b.Rate END AS Rate3rd, 
 					a.Fromdate, a.Todate, a.IsDeposit
-				FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode_ChargeRate, 'OA', 1) a
+				FROM bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', 1) a
 					LEFT JOIN #PartyList p ON a.PartyID = p.PartyId
 					LEFT JOIN #PartyList g ON p.ParentID = g.PartyID
 					LEFT JOIN bodb_licensee.dbo.OAS_ChargeInfo b WITH (NOLOCK) ON p.ParentId = b.FromParty AND a.ProductID = b.ProductID 
@@ -232,7 +227,7 @@ BEGIN
 		BEGIN
 			INSERT INTO @3rdRate (PartyID, ProductID, DI_Rate, IsDeposit, Fromdate, Todate)
 			SELECT DISTINCT p.PartyId, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r.Todate
-			FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCode_3rdRate, 'OA') r
+			FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCode, 'OA') r
 			INNER JOIN #PartyList p on p.ParentId = r.PartyID
 
 			INSERT INTO #ChargeRate (ChargeID, PartyID, LicenseeID, isDeposit, ProductID, Rate, Rate3rd, Fromdate, Todate)
@@ -242,7 +237,7 @@ BEGIN
 									 ELSE r.DI_Rate 
 								END  AS Rate3rd, 
 								c.Fromdate, c.Todate
-			FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, @ProductCode_ChargeRate) c
+			FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, @ProductCode) c
 			INNER JOIN @3rdRate r ON r.PartyID = c.PartyID and r.ProductID = c.ProductID
 			WHERE (c.DI_Rate = 0 AND c.isDeposit = 0) OR (c.DI_Rate > 0 and c.isDeposit = 1)
 		END
@@ -250,14 +245,29 @@ BEGIN
 		BEGIN
 			INSERT INTO @3rdRate (PartyId, FromDate, ToDate, CurrencyId, MinAmount, MaxAmount, DI_Rate)
 			SELECT DISTINCT p.PartyId, r.FromDate, r.ToDate, c.BaseCurrencyId, c.MinAmount - CASE WHEN c.MinAmount = 0 THEN 0 ELSE 1 END, c.MaxAmount, c.Rate
-			FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCode_3rdRate, 'OA') r
+			FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCode, 'OA') r
 				INNER JOIN #PartyList p ON p.ParentId = r.PartyId
 				INNER JOIN dbo.OAS_ChargeInfo c WITH (NOLOCK) ON r.ChargeId = c.ChargeId
 
 			INSERT INTO #ChargeRate (ChargeId, PartyId, LicenseeId, IsDeposit, Rate, FromDate, ToDate)
 			SELECT DISTINCT c.ChargeId, c.PartyId, c.LicenseeId, c.IsDeposit, c.DI_Rate, c.FromDate, c.ToDate
-			FROM dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, @ProductCode_3rdRate) c
+			FROM dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, @ProductCode) c
 			WHERE (c.IsDeposit = 0 AND c.DI_Rate = 0) OR (c.IsDeposit = 1 AND c.DI_Rate > 0)
+
+		END
+		ELSE IF @ProductID = 69
+		BEGIN
+			INSERT INTO @3rdRate (PartyId, FromDate, ToDate, DI_Rate)
+			SELECT DISTINCT pl.PartyId, r.FromDate, r.ToDate, r.DI_Rate
+			FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'BTC', 'OA') r
+				INNER JOIN #PartyList pl ON r.PartyId = pl.ParentId
+
+			-- ​#ChargeRate
+			INSERT INTO #ChargeRate (ChargeID, PartyID, LicenseeID, isDeposit, ProductID, Rate, Rate3rd, Fromdate, Todate)
+			SELECT DISTINCT c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate
+			FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate,'SB') c
+			LEFT JOIN @3rdRate r ON r.PartyID = c.PartyID and CASE WHEN r.ProductID = 69 THEN 0 ELSE  r.ProductID END = c.ProductID
+			WHERE (c.DI_Rate = 0 AND c.isDeposit = 0) OR (c.DI_Rate > 0 and c.isDeposit = 1)
 
 		END
 		ELSE
@@ -265,20 +275,17 @@ BEGIN
 			-- Get 3rd Rate
 			INSERT INTO @3rdRate (PartyID, ProductID, DI_Rate, IsDeposit, Fromdate, Todate)
 			SELECT DISTINCT p.PartyId, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r.Todate 
-			FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCode_3rdRate, 'OA') r 
+			FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCode, 'OA') r 
 			INNER JOIN #PartyList p on p.ParentId = r.PartyID
 	
 			-- ​#ChargeRate
 			INSERT INTO #ChargeRate (ChargeID, PartyID, LicenseeID, isDeposit, ProductID, Rate, Rate3rd, Fromdate, Todate)
 			SELECT DISTINCT c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate
-			FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate,@ProductCode_ChargeRate) c
+			FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate,@ProductCode) c
 			INNER JOIN @3rdRate r ON r.PartyID = c.PartyID and CASE WHEN r.ProductID = 69 THEN 0 ELSE  r.ProductID END = c.ProductID
 			WHERE (c.DI_Rate = 0 AND c.isDeposit = 0) OR (c.DI_Rate > 0 and c.isDeposit = 1)
 		END
 	END
-	
-
-	SELECT 'debug_chargeRate',* FROM #ChargeRate
 	
 	-- Region: TempData 
 	IF @TimeZoneId = 1 --GMT -4
@@ -306,7 +313,7 @@ BEGIN
 				LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeID AND cr.CurrencyID = b.CurrencyId
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 				b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
-				AND b.Bettype in (Select Bettype FROM LA_f_BettypeProductMapping(0,@ProductCode_3rdRate))
+				AND b.Bettype in (Select Bettype FROM LA_f_BettypeProductMapping(0,@ProductCode))
 			GROUP BY b.rptDate, ci.PartyId, b.CurrencyId, ci.isDeposit
 		END
 		ELSE IF @ProductID = 23
@@ -323,7 +330,7 @@ BEGIN
 				FROM bodb_licenseereport.dbo.rpt_Betting b WITH (NOLOCK) 
 				INNER JOIN #ChargeRate r ON b.SiteID = r.LicenseeId AND b.rptDate BETWEEN r.FromDate AND r.ToDate
 				WHERE b.Status NOT IN (-1, 101, 102, 103)
-					AND b.Bettype in (Select Bettype FROM LA_f_BettypeProductMapping(0,@ProductCode_3rdRate))
+					AND b.Bettype in (Select Bettype FROM LA_f_BettypeProductMapping(0,@ProductCode))
 					AND b.CustomerCategory NOT IN (27, 28)
 					AND b.CurrencyId <> 20
 					AND b.rptDate BETWEEN @FromDate AND @ToDate
@@ -382,7 +389,7 @@ BEGIN
 			WHERE b.RptDate BETWEEN DATEADD(DAY, -1, @FromDate) AND DATEADD(DAY, 1, @ToDate)
 					AND b.rptDate3rd BETWEEN @FromDate AND @ToDate 
 					AND b.StatusID NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 
-					AND b.BettypeID in (Select Bettype FROM LA_f_BettypeProductMapping(0,@ProductCode_3rdRate))
+					AND b.BettypeID in (Select Bettype FROM LA_f_BettypeProductMapping(0,@ProductCode))
 			GROUP BY b.rptDate3rd, ci.PartyId, b.CurrencyId, ci.isDeposit
 		END
 		ELSE 
@@ -522,104 +529,297 @@ BEGIN
 		CompanyIncome	MONEY
 	)
 	
-	WHILE EXISTS (SELECT TOP 1 1 FROM @BaseCurrencies)
+	IF @ProductID <> 65
 	BEGIN
-		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies)
+		WHILE EXISTS (SELECT TOP 1 1 FROM @BaseCurrencies)
+		BEGIN
+			SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies)
 
-		;WITH TotalByParty AS(
-			SELECT  CASE WHEN  td.PartyId = 14 THEN 14 ELSE td.ParentId END ParentId, 
-					td.PartyId, 
-					td.IsKeepNegativeAmount,
-					SUM(td.TotalTrans) TotalTrans,
-					SUM(td.Turnover * e.BaseCurrencyRate) Turnover,
-					SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss,
-					SUM(td.LicenseeWinLoss * e.BaseCurrencyRate) LicenseeWinLoss,
-					SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
-					SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
-			FROM #Result td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e
-			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
-			GROUP BY CASE WHEN  td.PartyId = 14 THEN 14 ELSE td.ParentId END, td.PartyId, td.IsKeepNegativeAmount
-		)
-		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,CompanyIncome)
-		SELECT @tempCurrency,ParentId,
-			SUM(TotalTrans),
-			SUM(Turnover),
-			SUM(CustomerWinLoss),
-			SUM(LicenseeWinLoss),
-			SUM(CASE WHEN LicensingFee < 0 AND  IsKeepNegativeAmount = 0 THEN 0 ELSE LicensingFee END),
-			SUM(PayToSupplier),
-			SUM( CASE WHEN @ProductID = 23 THEN LicenseeWinLoss - PayToSupplier
-					ELSE CASE WHEN LicensingFee < 0 AND  IsKeepNegativeAmount = 0 THEN 0 ELSE LicensingFee END - PayToSupplier END)
-		FROM TotalByParty
-		GROUP BY ParentId
+			;WITH TotalByParty AS(
+				SELECT  CASE WHEN  td.PartyId = 14 THEN 14 ELSE td.ParentId END ParentId, 
+						td.PartyId, 
+						td.IsKeepNegativeAmount,
+						SUM(td.TotalTrans) TotalTrans,
+						SUM(td.Turnover * e.BaseCurrencyRate) Turnover,
+						SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss,
+						SUM(td.LicenseeWinLoss * e.BaseCurrencyRate) LicenseeWinLoss,
+						SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
+						SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
+				FROM #Result td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e
+				ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
+				GROUP BY CASE WHEN  td.PartyId = 14 THEN 14 ELSE td.ParentId END, td.PartyId, td.IsKeepNegativeAmount
+			)
+			INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,CompanyIncome)
+			SELECT @tempCurrency,ParentId,
+				SUM(TotalTrans),
+				SUM(Turnover),
+				SUM(CustomerWinLoss),
+				SUM(LicenseeWinLoss),
+				SUM(CASE WHEN LicensingFee < 0 AND  IsKeepNegativeAmount = 0 THEN 0 ELSE LicensingFee END),
+				SUM(PayToSupplier),
+				SUM( CASE WHEN @ProductID = 23 THEN LicenseeWinLoss - PayToSupplier
+						ELSE CASE WHEN LicensingFee < 0 AND  IsKeepNegativeAmount = 0 THEN 0 ELSE LicensingFee END - PayToSupplier END)
+			FROM TotalByParty
+			GROUP BY ParentId
+
+			IF @ProductID = 27
+			BEGIN
+				UPDATE @Total
+				SET PayToSupplier = 0
+				WHERE PayToSupplier < 0
+			END
 		
-		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
-		SELECT Currency,
+			INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
+			SELECT Currency,
+				SUM(TotalTrans),
+				SUM(Turnover),
+				SUM(CustomerWinLoss),
+				SUM(LicenseeWinLoss),
+				SUM(LicensingFee),
+				SUM(PayToSupplier),
+				SUM( CASE WHEN @ProductID = 23 THEN LicenseeWinLoss - PayToSupplier ELSE LicensingFee - PayToSupplier END)
+			FROM @Total
+			WHERE Currency = @tempCurrency
+			GROUP BY Currency
+
+			DELETE @BaseCurrencies WHERE [Name] = @tempCurrency
+		END
+		-- Select data by Parties
+		SELECT 
+			r.PartyId,
+			r.PartyName,
+			CASE WHEN r.PartyId = 14 THEN 14 ELSE r.ParentId END ParentId,
+			CASE WHEN r.PartyId = 14 THEN '12Bet' ELSE r.ParentName END ParentName,
+			r.WinLossDate,
+			e.CurrencyCode AS CurrencyName,
+			-- Select by origin currency
+			r.TotalTrans,
+			r.Turnover AS TurnoverOriginal,
+			CAST((r.CustomerWinLoss) AS MONEY) AS CustomerWinLossOriginal,
+			CAST((r.LicenseeWinLoss) AS MONEY) AS LicenseeWinLossOriginal,
+			CAST((r.LicensingFee) AS MONEY) AS LicensingFeeOriginal,
+			CAST((r.PayToSupplier) AS MONEY) AS PayToSupplierOriginal,
+			r.LicensingFee - r.PayToSupplier AS CompanyIncomeOriginal,
+			-- Select by base currency
+			r.Turnover * e.Rate AS Turnover,
+			CAST((r.CustomerWinLoss * e.Rate) AS MONEY) AS CustomerWinLoss,
+			CAST((r.LicenseeWinLoss * e.Rate) AS MONEY) AS LicenseeWinLoss,
+			CAST((r.LicensingFee * e.Rate) AS MONEY) AS LicensingFee,
+			CAST((r.PayToSupplier * e.Rate)AS MONEY) AS PayToSupplier,
+			CASE WHEN @ProductID =23 THEN CAST(((r.LicenseeWinLoss - r.PayToSupplier) * e.Rate)AS MONEY)
+				 ELSE CAST(((r.LicensingFee - r.PayToSupplier) * e.Rate)AS MONEY) END AS CompanyIncome
+		FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.WinLossDate = e.ExchangeDate
+	
+		-- Select Grand Total
+		SELECT 	CurrencyName,
+				TotalTrans		,
+				Turnover		,
+				CustomerWinLoss	,
+				LicenseeWinLoss	,
+				LicensingFee	,
+				PayToSupplier	,
+				CompanyIncome	 
+		FROM @GrandTotal
+	
+		-- Total
+		SELECT 
+			PartyId,
+			TotalTrans,
+			Turnover,
+			CustomerWinLoss,
+			LicenseeWinLoss,
+			LicensingFee,
+			PayToSupplier,
+			CompanyIncome
+		FROM @Total t
+		WHERE Currency = @BaseCurrencyName
+	-- End Region
+	END
+	ELSE
+	BEGIN
+		DECLARE @BaseCurrencyRate TABLE (ExchangeId INT, ExchangeDate DATETIME, BaseCurrencyName VARCHAR(20), Rate FLOAT)
+		INSERT INTO @BaseCurrencyRate (ExchangeId, ExchangeDate, BaseCurrencyName, Rate)
+		SELECT e.ExchangeId, e.ExchangeDate, bc.Name, e.BaseCurrencyRate
+		FROM @BaseCurrencies bc
+			CROSS APPLY bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, bc.Name) e
+
+		;WITH CTE_SumByParty AS (
+			SELECT CASE WHEN  r.PartyId = 14 THEN 14 ELSE r.ParentId END ParentId, e.BaseCurrencyName,
+				SUM(r.TotalTrans)				AS TotalTrans,
+				SUM(r.Turnover * e.Rate)		AS Turnover,
+				SUM(r.CustomerWinLoss * e.Rate) AS CustomerWinLoss,
+				SUM(r.LicenseeWinLoss * e.Rate) AS LicenseeWinLoss,
+				SUM(r.LicensingFee * e.Rate)	AS LicensingFee
+			FROM #Result r
+				INNER JOIN @BaseCurrencyRate e ON e.ExchangeId = r.CurrencyId AND e.ExchangeDate = r.WinLossDate
+			GROUP BY CASE WHEN  r.PartyId = 14 THEN 14 ELSE r.ParentId END, r.PartyId, e.BaseCurrencyName
+		)
+		INSERT INTO @Total (Currency, PartyId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee)
+		SELECT BaseCurrencyName, ParentId,
 			SUM(TotalTrans),
 			SUM(Turnover),
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
-			SUM(LicensingFee),
-			SUM(PayToSupplier),
-			SUM( CASE WHEN @ProductID = 23 THEN LicenseeWinLoss - PayToSupplier ELSE LicensingFee - PayToSupplier END)
-		FROM @Total
-		WHERE Currency = @tempCurrency
-		GROUP BY Currency
+			SUM(CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END)
+		FROM CTE_SumByParty
+		GROUP BY BaseCurrencyName, ParentId
 
-		DELETE @BaseCurrencies WHERE [Name] = @tempCurrency
+		-- Total by Party
+		DECLARE @TotalByParty TABLE
+		(
+			PartyId			INT,
+			PartyName		VARCHAR(100),
+			ParentId		INT,
+			TotalTrans		INT,
+			Turnover		MONEY,
+			CustomerWinLoss	MONEY,
+			LicenseeWinLoss	MONEY,
+			LicensingFee	MONEY,
+			PayToSupplier	MONEY
+		)
+		INSERT INTO @TotalByParty (PartyId, PartyName, ParentId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee)
+		SELECT r.PartyId, r.PartyName, r.ParentId,
+			SUM(r.TotalTrans),
+			SUM(r.Turnover * e.Rate),
+			SUM(r.CustomerWinLoss * e.Rate),
+			SUM(r.LicenseeWinLoss * e.Rate),
+			CASE WHEN SUM(r.LicensingFee * e.Rate) > 0 THEN SUM(r.LicensingFee * e.Rate) ELSE 0 END
+		FROM #Result r
+			INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeId AND r.WinLossDate = e.ExchangeDate
+		GROUP BY r.PartyId, r.PartyName, r.ParentId
+
+		-- Update PayToSupplier base on Licensee WL
+		DECLARE @CurrencyId INT, @CurrencyName VARCHAR(100)
+		SELECT TOP 1 @CurrencyId = CurrencyId FROM @3rdRate WHERE CurrencyId IS NOT NULL
+
+		IF @CurrencyId IS NULL
+			SELECT @CurrencyId = ID FROM @BaseCurrencies WHERE Name = @BaseCurrencyName
+	
+		SELECT @CurrencyName = Code FROM bodb02.dbo.Exchange WITH (NOLOCK) WHERE ExchangeId = @CurrencyId
+
+		UPDATE @3rdRate SET CurrencyId = @CurrencyId WHERE CurrencyId IS NULL
+		UPDATE @3rdRate SET MinAmount = 0, MaxAmount = 10000000000000 WHERE MinAmount IS NULL OR MaxAmount IS NULL
+
+		-- Detail
+		;WITH CTE_Sum AS (
+			SELECT t.PartyId, t.CurrencyId, t.WinLossDate, e.BaseCurrencyRate, SUM(t.LicenseeWinloss * e.BaseCurrencyRate) AS LicenseeWinloss
+			FROM bodb02.dbo.LA_f_ExchangeDailySel (@FromDate, @ToDate, @CurrencyName) e
+				INNER JOIN #Result t ON t.CurrencyId = e.ExchangeId AND e.ExchangeDate = t.WinLossDate
+			GROUP BY t.PartyId, t.CurrencyId, t.WinLossDate, e.BaseCurrencyRate
+		), CTE_3rdRate AS (
+			SELECT s.PartyId, s.CurrencyId, s.WinLossDate, SUM(CASE WHEN s.BaseCurrencyRate = 0 THEN 0 ELSE (CASE WHEN s.LicenseeWinloss <= r.MaxAmount THEN s.LicenseeWinloss ELSE r.MaxAmount END - r.MinAmount) * r.DI_Rate / s.BaseCurrencyRate END) AS PayToSupplier
+			FROM CTE_Sum s
+				INNER JOIN @3rdRate r ON s.PartyId = r.PartyId AND (s.LicenseeWinloss > r.MinAmount OR (s.LicenseeWinloss < 0 AND r.MinAmount = 0))
+			GROUP BY s.PartyId, s.CurrencyId, s.WinLossDate
+		)
+		UPDATE t
+		SET t.PayToSupplier = ISNULL(r.PayToSupplier, 0)
+		FROM #Result t
+			LEFT JOIN CTE_3rdRate r ON t.PartyId = r.PartyId AND t.CurrencyId = r.CurrencyId AND t.WinLossDate = r.WinLossDate
+
+		-- TotalByParty
+		;WITH CTE_Sum AS (
+			SELECT r.PartyId, SUM(r.LicenseeWinloss * e.Rate) AS LicenseeWinloss
+			FROM #Result r
+				INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeId AND r.WinLossDate = e.ExchangeDate
+			GROUP BY r.PartyId
+		), CTE_3rdRate AS (
+			SELECT r.PartyId, r.MinAmount * e.Rate AS MinAmount, r.MaxAmount * e.Rate AS MaxAmount, r.DI_Rate
+			FROM @3rdRate r
+				INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeId AND e.ExchangeDate = @ToDate
+		), CTE_Final AS (
+			SELECT s.PartyId, SUM((CASE WHEN s.LicenseeWinloss <= r.MaxAmount THEN s.LicenseeWinloss ELSE r.MaxAmount END - r.MinAmount) * r.DI_Rate) AS PayToSupplier
+			FROM CTE_Sum s
+				INNER JOIN CTE_3rdRate r ON s.PartyId = r.PartyId AND (s.LicenseeWinloss > r.MinAmount OR (s.LicenseeWinloss < 0 AND r.MinAmount = 0))
+			GROUP BY s.PartyId
+		)
+		UPDATE t
+		SET t.PayToSupplier = ISNULL(f.PayToSupplier, 0)
+		FROM @TotalByParty t
+			LEFT JOIN CTE_Final f ON t.PartyId = f.PartyId
+
+		-- Total
+		;WITH CTE_Sum AS (
+			SELECT r.PartyId, CASE WHEN r.PartyId = 14 THEN 14 ELSE r.ParentId END ParentId, br.BaseCurrencyName, SUM(r.LicenseeWinloss * br.Rate) AS LicenseeWinloss
+			FROM #Result r
+				INNER JOIN @BaseCurrencyRate br ON r.CurrencyId = br.ExchangeId AND r.WinLossDate = br.ExchangeDate
+			GROUP BY r.PartyId, CASE WHEN r.PartyId = 14 THEN 14 ELSE r.ParentId END, br.BaseCurrencyName
+		), CTE_3rdRate AS (
+			SELECT r.PartyId, br.BaseCurrencyName, r.MinAmount * br.Rate AS MinAmount, r.MaxAmount * br.Rate AS MaxAmount, r.DI_Rate
+			FROM @3rdRate r
+				INNER JOIN @BaseCurrencyRate br ON r.CurrencyId = br.ExchangeId AND br.ExchangeDate = @ToDate
+		), CTE_Final AS (
+			SELECT s.ParentId, s.BaseCurrencyName, SUM((CASE WHEN s.LicenseeWinloss <= r.MaxAmount THEN s.LicenseeWinloss ELSE r.MaxAmount END - r.MinAmount) * r.DI_Rate) AS PayToSupplier
+			FROM CTE_Sum s
+				INNER JOIN CTE_3rdRate r ON s.PartyId = r.PartyId AND s.BaseCurrencyName = r.BaseCurrencyName AND (s.LicenseeWinloss > r.MinAmount OR (s.LicenseeWinloss < 0 AND r.MinAmount = 0))
+			GROUP BY s.ParentId, s.BaseCurrencyName
+		)
+		UPDATE t
+		SET t.PayToSupplier = ISNULL(f.PayToSupplier, 0)
+		FROM @Total t
+			LEFT JOIN CTE_Final f ON t.PartyId = f.ParentId AND t.Currency = f.BaseCurrencyName
+
+		-- Return data
+		BEGIN
+			-- Detail by Parties
+			SELECT 
+				r.PartyId,
+				r.PartyName,
+				CASE WHEN r.PartyId = 14 THEN 14 ELSE r.ParentId END ParentId,
+				CASE WHEN r.PartyId = 14 THEN '12Bet' ELSE r.ParentName END ParentName,
+				r.WinLossDate,
+				e.CurrencyCode AS CurrencyName,
+				r.TotalTrans,
+				-- Original Currency
+				r.Turnover			AS TurnoverOriginal,
+				r.CustomerWinLoss	AS CustomerWinLossOriginal,
+				r.LicenseeWinLoss	AS LicenseeWinLossOriginal,
+				r.LicensingFee		AS LicensingFeeOriginal,
+				r.PayToSupplier		AS PayToSupplierOriginal,
+				r.LicensingFee - r.PayToSupplier AS CompanyIncomeOriginal,
+				-- Base Currency
+				CONVERT(MONEY, r.Turnover * e.Rate)			AS Turnover,
+				CONVERT(MONEY, r.CustomerWinLoss * e.Rate)	AS CustomerWinLoss,
+				CONVERT(MONEY, r.LicenseeWinLoss * e.Rate)	AS LicenseeWinLoss,
+				CONVERT(MONEY, r.LicensingFee * e.Rate)		AS LicensingFee,
+				CONVERT(MONEY, r.PayToSupplier * e.Rate)	AS PayToSupplier,
+				CONVERT(MONEY, (r.LicensingFee - r.PayToSupplier) * e.Rate) AS CompanyIncome
+			FROM #Result r
+				INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeId AND r.WinLossDate = e.ExchangeDate
+	
+			-- Grand Total
+			SELECT
+				Currency				AS CurrencyName
+				,SUM(TotalTrans)		AS TotalTrans
+				,SUM(Turnover)			AS Turnover
+				,SUM(CustomerWinLoss)	AS CustomerWinLoss
+				,SUM(LicenseeWinLoss)	AS LicenseeWinLoss
+				,SUM(LicensingFee)		AS LicensingFee
+				,SUM(PayToSupplier)		AS PayToSupplier
+				,SUM(LicensingFee - PayToSupplier) AS CompanyIncome
+			FROM @Total
+			GROUP BY Currency
+
+			-- Total by Party
+			SELECT PartyId, PartyName, CASE WHEN PartyId = 14 THEN 14 ELSE ParentId END ParentId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, PayToSupplier, LicensingFee - PayToSupplier AS CompanyIncome
+			FROM @TotalByParty
+	
+			-- Total
+			SELECT
+				PartyId,
+				TotalTrans,
+				Turnover,
+				CustomerWinLoss,
+				LicenseeWinLoss,
+				LicensingFee,
+				PayToSupplier,
+				LicensingFee - PayToSupplier AS CompanyIncome
+			FROM @Total
+			WHERE Currency = @BaseCurrencyName
+		END
+
 	END
-	
-	-- Select data by Parties
-	SELECT 
-		r.PartyId,
-		r.PartyName,
-		CASE WHEN r.PartyId = 14 THEN 14 ELSE r.ParentId END ParentId,
-		CASE WHEN r.PartyId = 14 THEN '12Bet' ELSE r.ParentName END ParentName,
-		r.WinLossDate,
-		e.CurrencyCode AS CurrencyName,
-		-- Select by origin currency
-		r.TotalTrans,
-		r.Turnover AS TurnoverOriginal,
-		CAST((r.CustomerWinLoss) AS MONEY) AS CustomerWinLossOriginal,
-		CAST((r.LicenseeWinLoss) AS MONEY) AS LicenseeWinLossOriginal,
-		CAST((r.LicensingFee) AS MONEY) AS LicensingFeeOriginal,
-		CAST((r.PayToSupplier) AS MONEY) AS PayToSupplierOriginal,
-		r.LicensingFee - r.PayToSupplier AS CompanyIncomeOriginal,
-		-- Select by base currency
-		r.Turnover * e.Rate AS Turnover,
-		CAST((r.CustomerWinLoss * e.Rate) AS MONEY) AS CustomerWinLoss,
-		CAST((r.LicenseeWinLoss * e.Rate) AS MONEY) AS LicenseeWinLoss,
-		CAST((r.LicensingFee * e.Rate) AS MONEY) AS LicensingFee,
-		CAST((r.PayToSupplier * e.Rate)AS MONEY) AS PayToSupplier,
-		CASE WHEN @ProductID =23 THEN CAST(((r.LicenseeWinLoss - r.PayToSupplier) * e.Rate)AS MONEY)
-			 ELSE CAST(((r.LicensingFee - r.PayToSupplier) * e.Rate)AS MONEY) END AS CompanyIncome
-	FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.WinLossDate = e.ExchangeDate
-	
-	-- Select Grand Total
-	SELECT 	CurrencyName,
-			TotalTrans		,
-			Turnover		,
-			CustomerWinLoss	,
-			LicenseeWinLoss	,
-			LicensingFee	,
-			PayToSupplier	,
-			CompanyIncome	 
-	FROM @GrandTotal
-	
-	-- Total
-	SELECT 
-		PartyId,
-		TotalTrans,
-		Turnover,
-		CustomerWinLoss,
-		LicenseeWinLoss,
-		LicensingFee,
-		PayToSupplier,
-		CompanyIncome
-	FROM @Total t
-	WHERE Currency = @BaseCurrencyName
-	-- End Region
-	
+
 	DROP TABLE	#PartyList
 	DROP TABLE	#Exchange
 	DROP TABLE	#ChargeRate

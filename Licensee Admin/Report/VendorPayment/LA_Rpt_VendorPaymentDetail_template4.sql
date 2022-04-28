@@ -1,5 +1,5 @@
 ﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
-CREATE PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template4]
+ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template4]
 	@PartyIds			VARCHAR(4000),
 	@ProductID			INT,
 	@FromDate			DATETIME,
@@ -17,6 +17,9 @@ AS
 BEGIN
 	SET NOCOUNT ON
 -- Region: Charge Info	
+	DECLARE @ProductCode VARCHAR(50)
+	SELECT @ProductCode = ProductPrefix FROM dbo.Product3rd WITH(NOLOCK) WHERE Productid = @ProductID
+
 	DECLARE @ChargeInfos AS TABLE (
 		PartyId		INT,
 		PartyName	VARCHAR(100),
@@ -49,7 +52,7 @@ BEGIN
 	INSERT INTO @ChargeInfos(PartyId, LicenseeId, ParentID, Rate, Fromdate, Todate, ProductID, PartyName, ParentName)
 	(
 		SELECT	ci.PartyID, ci.LicenseeID, p.ParentID, ci.DI_Rate, ci.Fromdate, ci.ToDate, ci.ProductID, p.PartyName, p.ParentName
-		FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, 'BX', 'OA', 1) ci	
+		FROM	bodb_licensee.dbo.LA_f_ChargeInfo(@PartyIDs, @FromDate, @ToDate, @ProductCode, 'OA', 1) ci	
 			INNER JOIN @PartyList p ON ci.PartyID = p.PartyID	
 		WHERE	DI_Rate > 0 AND ci.ChargeType = 1 -- get PT
 	)
@@ -58,7 +61,7 @@ BEGIN
 	INSERT INTO @PartyCharge3rdInfo( LicenseeId, Rate, FromDate, ToDate, ProductID )	
 	(
 		SELECT DISTINCT p.LicenseeID, ci.DI_Rate, ci.Fromdate, ci.ToDate, ci.ProductID
-		FROM	bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'BX', 'OA') ci	
+		FROM	bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCode, 'OA') ci	
 			INNER JOIN @ChargeInfos p ON ci.IsParent = 0 AND p.PartyID = ci.PartyId		
 		WHERE ci.ChargeType = 1 AND ci.IsDeposit = 1
 	)
@@ -66,7 +69,7 @@ BEGIN
 	INSERT INTO @PartyCharge3rdInfo( LicenseeId, Rate, FromDate, ToDate, ProductID )	
 	(
 		SELECT DISTINCT p.LicenseeID, ci.DI_Rate, ci.Fromdate, ci.ToDate, ci.ProductID
-		FROM	bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'BX', 'OA') ci	
+		FROM	bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCode, 'OA') ci	
 			INNER JOIN @ChargeInfos p ON ci.IsParent = 1 AND p.ParentID = ci.PartyId		
 		WHERE ci.ChargeType = 1 AND ci.IsDeposit = 1
 			AND NOT EXISTS (SELECT 1 FROM @PartyCharge3rdInfo ci WHERE ci.LicenseeId = p.LicenseeId)
@@ -109,13 +112,11 @@ BEGIN
 			SUM((-b.MemberWL * ci.Rate) - (b.CommissionA + b.CommissionP)) AS LicensingFee,
 			SUM((-b.MemberWL * rd.Rate) - (b.CommissionA + b.CommissionP)) AS PayToSupplier
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId 
-										AND b.ProductID = ci.ProductID 
-										AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+			INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 			INNER JOIN @PartyCharge3rdInfo rd ON b.ProductID = rd.ProductID
 														AND b.SiteID = rd.LicenseeID
 														AND (b.rptDate BETWEEN rd.FromDate AND rd.ToDate)	
-		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
+		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND  b.ProductID = @ProductID  AND
 			b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
 		GROUP BY b.rptDate, ci.PartyId, PartyName, ParentId, ParentName, b.CurrencyId
 	END
@@ -142,7 +143,7 @@ BEGIN
 		WHERE b.RptDate BETWEEN DATEADD(DAY,-1,@FromDate) AND DATEADD(DAY,1,@ToDate)
 			AND b.RptDate3rd BETWEEN @FromDate AND @ToDate 
 			AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20
-			AND b.BettypeID in (Select Bettype FROM LA_f_BettypeProductMapping(0,'BX'))
+			AND b.BettypeID in (Select Bettype FROM LA_f_BettypeProductMapping(0,@ProductCode))
 		GROUP BY b.rptDate, ci.PartyId, PartyName, ParentId, ParentName, b.CurrencyId
 	END
 	-- EndRegion
@@ -205,7 +206,7 @@ BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)
 		
 		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,CustomerComm,LicenseeComm,LicenseeWinLoss,LicensingFee,PayToSupplier)
-		SELECT @tempCurrency, td.ParentId,
+		SELECT @tempCurrency, CASE WHEN td.PartyID = 14 THEN 14 ELSE td.ParentId END ParentId,
 			SUM(td.TotalTrans) TotalTrans,
 			SUM(td.Turnover * e.BaseCurrencyRate) Turnover, 
 			SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss, 
@@ -216,7 +217,7 @@ BEGIN
 			SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
 		FROM #Result td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e 
 		ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.Winlossdate
-		GROUP BY td.ParentId
+		GROUP BY CASE WHEN td.PartyID = 14 THEN 14 ELSE td.ParentId END 
 
 		INSERT INTO @GrandTotal (CurrencyName, TotalTrans, Turnover, CustomerWinLoss, CustomerComm, LicenseeComm, CustomerTotal, LicenseeWinLoss, LicensingFee, PayToSupplier, CompanyIncome)
 		SELECT Currency,

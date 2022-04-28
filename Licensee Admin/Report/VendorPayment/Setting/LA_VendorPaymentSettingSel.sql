@@ -2,7 +2,7 @@
 USE bodb_licensee
 GO
 
-CREATE PROCEDURE dbo.LA_VendorPaymentSettingSel
+ALTER PROCEDURE dbo.LA_VendorPaymentSettingSel
 	@ProductIDs VARCHAR(1000)
 AS
 /*  
@@ -16,20 +16,32 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @tmpProducts TABLE (ProductID INT, ProductName VARCHAR(50)) 
+	
+	DECLARE @tmpProducts TABLE (ProductID INT, ProductName VARCHAR(50), OrderNo INT) 
 	INSERT INTO @tmpProducts (ProductID)
 	SELECT DISTINCT value FROM STRING_SPLIT(@ProductIDs, ',')
 
 	UPDATE		t
 	SET			t.ProductName = CASE WHEN t.ProductID = 1000 THEN 'Bet Builder'
-									 WHEN t.ProductID = 1001 THEN 'Muay Thai' ELSE p.ProductName END
+									 WHEN t.ProductID = 1001 THEN 'Muay Thai' ELSE p.ProductName END,
+				t.OrderNo	  = CASE WHEN t.ProductID = 1000 THEN -1
+									 WHEN t.ProductID = 1001 THEN -2 ELSE  t.ProductID END
 	FROM		@tmpProducts t
 	LEFT JOIN	dbo.Product3rd p ON p.ProductId = t.ProductID
 	
-	SELECT		la.ProductId, tmp.ProductName, la.ReportFunctionKey, la.TemplateID, la.TimezoneIDs, la.IsConvertNegativeFeeToZero, la.IsConvertNegativePaytoSupplierToZero, la.IsActive
-	FROM		dbo.LA_VendorPaymentSetting la WITH(NOLOCK)
-	INNER JOIN	@tmpProducts tmp ON la.ProductId = tmp.ProductID
-	ORDER BY	la.ProductID
+	SELECT		tmp.ProductId, 
+				tmp.ProductName, 
+				ISNULL(la.ReportFunctionKey, '') ReportFunctionKey, 
+				ISNULL(fc.FunctionName, '') ReportFunctionName, 
+				ISNULL(la.TemplateID,'') TemplateID, 
+				ISNULL(la.TimezoneIDs,'') TimezoneIDs, 
+				ISNULL(la.IsConvertNegativeFeeToZero,'') IsConvertNegativeFeeToZero, 
+				ISNULL(la.IsConvertNegativePaytoSupplierToZero,'') IsConvertNegativePaytoSupplierToZero, 
+				ISNULL(la.IsActive,0) AS IsActive
+	FROM		@tmpProducts tmp  
+	LEFT JOIN	dbo.LA_VendorPaymentSetting la WITH(NOLOCK) ON la.ProductId = tmp.ProductID
+	LEFT JOIN	dbo.LA_Function fc WITH(NOLOCK) ON fc.FunctionKey = la.ReportFunctionKey
+	ORDER BY	tmp.OrderNo DESC
 
 END
 GO

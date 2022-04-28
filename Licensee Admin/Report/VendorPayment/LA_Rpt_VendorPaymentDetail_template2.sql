@@ -17,6 +17,9 @@ AS
 BEGIN
 
 SET NOCOUNT ON
+	
+	DECLARE @ProductCode VARCHAR(50)
+	SELECT @ProductCode = ProductPrefix FROM dbo.Product3rd WITH(NOLOCK) WHERE Productid = @ProductID
 
 	CREATE TABLE #PartyList (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
 	INSERT INTO #PartyList EXEC LA_PartyListSel
@@ -36,7 +39,7 @@ SET NOCOUNT ON
 	-- Except CN88 = 1.5%
 	INSERT INTO #ChargeRate
 	SELECT c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, 0.4, c.Fromdate, c.Todate
-	FROM LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'NG') c
+	FROM LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, @ProductCode) c
 
 	-- From 01 Dec 2019, pay to supplier = 50%
 	BEGIN
@@ -117,7 +120,7 @@ SET NOCOUNT ON
 		FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 			b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
-			AND b.Bettype in (Select Bettype FROM LA_f_BettypeProductMapping(0,'NG'))
+			AND b.Bettype in (Select Bettype FROM LA_f_BettypeProductMapping(0,@ProductCode))
 		GROUP BY b.SiteID, b.rptDate, b.CurrencyId
 	)
 	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,ExtraPT,Turnover,HouseTurnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
@@ -155,7 +158,7 @@ SET NOCOUNT ON
 	WHERE PartyID IN (SELECT p.PartyID FROM OAS_Party p WITH(NOLOCK) WHERE p.PartyName = 'CN88')
 	
 	DECLARE @Total TABLE (
-		ParentId		INT,
+		PartyId		INT,
 		TotalTrans		INT,
 		Turnover		MONEY,
 		HouseTurnover	MONEY,
@@ -191,9 +194,9 @@ SET NOCOUNT ON
 	BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies)
 
-		INSERT INTO @Total (ParentId, Currency,TotalTrans,Turnover,HouseTurnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,ExtraPT,PayToSupplier,CompanyIncome)
+		INSERT INTO @Total (PartyId, Currency,TotalTrans,Turnover,HouseTurnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,ExtraPT,PayToSupplier,CompanyIncome)
 		SELECT 
-			ParentId,
+			CASE WHEN  td.PartyID = 14 THEN 14 ELSE  ParentId END ParentId,
 			@tempCurrency AS Currency,
 			SUM(td.TotalTrans),
 			SUM(td.Turnover * e.BaseCurrencyRate),
@@ -206,7 +209,7 @@ SET NOCOUNT ON
 			SUM((LicensingFee - ExtraPT - PayToSupplier) * e.BaseCurrencyRate) AS CompanyIncome
 			FROM #TempData td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e
 			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.Winlostdate
-			GROUP BY td.ParentId
+			GROUP BY CASE WHEN  td.PartyID = 14 THEN 14 ELSE  ParentId END
 
 		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,HouseTurnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,ExtraPT,PayToSupplier,CompanyIncome)
 		SELECT Currency,
@@ -230,8 +233,8 @@ SET NOCOUNT ON
 	SELECT 
 		r.PartyId,
 		r.PartyName,
-		r.ParentId,
-		r.ParentName,
+		CASE WHEN r.PartyId = 14 THEN 14 ELSE r.ParentId END ParentId,
+		CASE WHEN r.PartyId = 14 THEN '12Bet' ELSE r.ParentName END ParentName,
 		r.Winlostdate				AS WinLossDate,
 		e.CurrencyCode				AS CurrencyName,
 		-- Select by origin currency
@@ -256,7 +259,17 @@ SET NOCOUNT ON
 	FROM #TempData r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.Winlostdate = e.ExchangeDate
 	
 	-- Select Grand Total
-	SELECT * FROM @GrandTotal
+	SELECT 	CurrencyName	,
+			TotalTrans		,
+			Turnover		,
+			HouseTurnover	,
+			CustomerWinLoss	,
+			LicenseeWinLoss	,
+			LicensingFee	,
+			ExtraPT 		,
+			PayToSupplier	,
+			CompanyIncome	 
+	FROM @GrandTotal
 	
 	-- Total
 	SELECT * FROM @Total WHERE Currency = @BaseCurrencyName

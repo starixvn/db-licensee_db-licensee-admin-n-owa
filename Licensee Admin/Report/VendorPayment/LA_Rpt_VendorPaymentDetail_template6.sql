@@ -1,5 +1,5 @@
 ﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
-CREATE PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template6]
+ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template6]
 	@PartyIds			VARCHAR(4000),
 	@ProductID			INT,
 	@FromDate			DATETIME,
@@ -184,9 +184,9 @@ BEGIN
 					b.rptDate  AS Winlostdate,
 					b.CurrencyId,
 					SUM(b.Turnover) AS Turnover,
-					SUM(CASE WHEN b.BetType IS NOT NULL THEN 0 ELSE b.BetCount END) AS TotalTrans,
-					SUM(CASE WHEN b.BetType IS NOT NULL THEN 0 ELSE b.MemberWL END) AS CustomerWinLoss,
-					SUM(CASE WHEN b.BetType IS NOT NULL THEN b.MemberWL ELSE 0 END) Promotion
+					SUM(CASE WHEN bt.bettype IS NOT NULL THEN 0 ELSE b.BetCount END) AS TotalTrans,
+					SUM(CASE WHEN bt.bettype IS NOT NULL THEN 0 ELSE b.MemberWL END) AS CustomerWinLoss,
+					SUM(CASE WHEN bt.bettype IS NOT NULL THEN b.MemberWL ELSE 0 END) Promotion
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 					LEFT JOIN @BonusBettype bt ON bt.bettype = b.Bettype
 					INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND  b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
@@ -219,9 +219,9 @@ BEGIN
 					b.RptDate3rd  AS Winlostdate,
 					b.CurrencyId,
 					SUM(b.Turnover) AS Turnover,
-					SUM(CASE WHEN b.BetTypeId IS NOT NULL THEN 0 ELSE b.BetCount END) AS TotalTrans,
-					SUM(CASE WHEN b.BetTypeId IS NOT NULL THEN 0 ELSE b.Winloss END) AS CustomerWinLoss,
-					SUM(CASE WHEN b.BetTypeId IS NOT NULL THEN b.Winloss ELSE 0 END) Promotion
+					SUM(CASE WHEN bt.bettype IS NOT NULL THEN 0 ELSE b.BetCount END) AS TotalTrans,
+					SUM(CASE WHEN bt.bettype IS NOT NULL THEN 0 ELSE b.Winloss END) AS CustomerWinLoss,
+					SUM(CASE WHEN bt.bettype IS NOT NULL THEN b.Winloss ELSE 0 END) Promotion
 				FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
 				LEFT JOIN @BonusBettype bt ON bt.bettype = b.BetTypeId
 					INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate

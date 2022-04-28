@@ -17,8 +17,6 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	--SELECT * FROM Product3rd WITH(NOLOCK) WHERE ProductPrefix IN ('GDG','FGGL')
-
 	DECLARE @ProductCode	VARCHAR(50)
 	DECLARE @BettypeIdList	TABLE (BetTypeId INT)
 	DECLARE @3rdRate TABLE(PartyID INT, ProductID INT, DI_Rate MONEY, IsDeposit INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME, MinAmount MONEY DEFAULT 0, MaxAmount MONEY DEFAULT 0, CurrencyId INT, ChargeType INT)

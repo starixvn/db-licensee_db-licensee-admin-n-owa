@@ -1,5 +1,6 @@
 /*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 CREATE PROCEDURE dbo.LA_VendorPaymentFunctionKeySel
+	@FunctionKey  NVARCHAR(50) = 'VendorPaymentDetails'
 AS
 /*  
 	Created: 20220324@Danny
@@ -14,7 +15,7 @@ BEGIN
 	SET NOCOUNT ON
 	DECLARE @ParentID INT
 	SELECT @ParentID = FunctionID FROM LA_Function WITH(NOLOCK)
-	WHERE FunctionName = 'Vendor Payment Details'
+	WHERE FunctionKey = @FunctionKey
 
 
 	SELECT FunctionName, FunctionKey FROM LA_Function WITH(NOLOCK)

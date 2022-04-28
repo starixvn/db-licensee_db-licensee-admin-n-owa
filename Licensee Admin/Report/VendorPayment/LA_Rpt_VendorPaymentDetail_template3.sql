@@ -20,6 +20,10 @@ AS
 
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @ProductCode VARCHAR(50)
+	SELECT @ProductCode = ProductPrefix FROM dbo.Product3rd WITH(NOLOCK) WHERE Productid = @ProductID
+
 	DECLARE @ChargeInfos AS TABLE (
 		ChargeID		INT
 		,PartyID		INT
@@ -46,7 +50,7 @@ BEGIN
 	INSERT INTO @ChargeInfos(ChargeID, PartyId, ProductID, LicenseeId, IsDeposit, Rate, Fromdate, Todate)
 	(
 		SELECT c.ChargeID, c.PartyID, c.ProductID, c.LicenseeID, c.isDeposit, c.DI_Rate, c.Fromdate, c.Todate
-		FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, 'VS') c 
+		FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, @ProductCode) c 
 	)	
 	
 	DELETE @ChargeInfos
@@ -73,9 +77,9 @@ BEGIN
 	INSERT INTO @Charge3rdInfos ( PartyID ,IsDeposit ,ProductID ,Rate ,Fromdate ,Todate )	
 	(
 		SELECT c.PartyID, c.isDeposit, c.ProductID, c.DI_Rate, c.Fromdate, c.Todate
-		FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'VS', 'OA') c 
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCode, 'OA') c 
 		UNION ALL
-		SELECT 999, 0, 5, 0.01, @FromDate, @ToDate
+		SELECT 999, 0, @ProductID, 0.01, @FromDate, @ToDate
 	)	
 
 	-- End Region: Charge 3rd
@@ -83,7 +87,7 @@ BEGIN
 	-- Region: Get Echange Rate
 	SELECT DISTINCT ExchangeDate, ExchangeId, BaseCurrencyRate AS Rate
 	INTO #TempExchange
-	FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 	
 	-- End region: Get Exchange Rate
 
@@ -120,7 +124,7 @@ BEGIN
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.status NOT IN (-1, 101, 102, 103)
 			AND (b.CurrencyID <> 20)
-			AND b.bettype BETWEEN 1201 AND 1299
+			AND b.bettype IN (SELECT bettype FROM dbo.LA_f_BettypeProductMapping(0,@ProductCode))
 			AND (@Sporttype = 0 OR ( @Sporttype<>0 AND l.Sporttype = @Sporttype))
 			AND (@bettype = 0 OR (b.bettype = @bettype AND @bettype <> 0))
 			AND b.customercategory NOT IN (27,28)

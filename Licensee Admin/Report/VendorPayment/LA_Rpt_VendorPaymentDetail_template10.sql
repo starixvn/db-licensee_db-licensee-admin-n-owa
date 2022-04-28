@@ -1,5 +1,5 @@
 ﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
-CREATE PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template10]
+ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template10]
 	@PartyIds			VARCHAR(4000),
 	@ProductID			INT,
 	@FromDate			DATETIME,
@@ -26,7 +26,7 @@ BEGIN
 	DECLARE @BettypeIdList TABLE (BetTypeId INT)
 	DECLARE @3rdRate TABLE(PartyID INT, ProductID INT, DI_Rate MONEY, IsDeposit INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME, MinAmount MONEY DEFAULT 0, MaxAmount MONEY DEFAULT 0, CurrencyId INT)
 	
-	CREATE TABLE #PartyList (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT, IsKeepNegativeAmount BIT DEFAULT 0)
+	CREATE TABLE #PartyList (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT, IsKeepNegativeAmount BIT DEFAULT 0, IsSelected BIT)
 	
 	CREATE TABLE #ChargeRate (
 		ChargeID		INT
@@ -94,6 +94,16 @@ BEGIN
 	FROM #PartyList t 
 	LEFT JOIN bodb_Licensee.dbo.LA_f_JVPartyListSel() u ON u.PartyId = t.PartyId
 
+	UPDATE p1
+	SET IsSelected = 1
+	FROM #PartyList p1
+	INNER JOIN bodb02.dbo.strSplit(@PartyIds, ',') p2 ON p1.PartyId = p2.val
+
+	SET @PartyIds = '';
+	SELECT @PartyIds = COALESCE(@PartyIds + ', ', '') + CAST(PartyId AS VARCHAR(4)) 
+	FROM #PartyList
+	WHERE ParentId <> 0
+
 	-- Bettype List
 	INSERT INTO @BettypeIdList (BetTypeId)
 	SELECT	DISTINCT bettype
@@ -108,6 +118,13 @@ BEGIN
 				SELECT DISTINCT ChargeId, PartyID, LicenseeId, ProductId, CASE WHEN IsDeposit=1 THEN DI_Rate ELSE 0 END, IsDeposit, Fromdate, Todate, 0, ChargeType
 				FROM dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, 'SAG')
 			)
+
+			UPDATE p
+			SET p.ParentId = ci.ToParty
+			FROM #PartyList p
+			INNER JOIN #ChargeRate c ON p.PartyId = c.PartyId
+			INNER JOIN OAS_ChargeInfo ci WITH(NOLOCK) ON c.ChargeId = ci.ChargeID
+			WHERE p.ParentId IN (1,9,11,98)
 
 			INSERT INTO #ChargeRate(PartyId, LicenseeId, ProductId, Rate, IsDeposit, ChargeType, IsPayToSupplier, Fromdate, Todate)
 			SELECT DISTINCT CI3rd.PartyID, LicenseeID, CI3rd.ProductID, CI3rd.DI_Rate, 0, CI3rd.ChargeType, 1,
@@ -215,6 +232,50 @@ BEGIN
 		GROUP BY b.RptDate3rd, ci.PartyID, b.CurrencyID, ci.IsDeposit
 	END
 
+	IF @ProductID = 39
+	BEGIN
+		--Region Update deposit's pay to supplier
+		/*  To specific, 5% If Σ OneWorks Licensee Gross WL >= 10M CNY
+			To specific, 5% If Σ [Boping & Zelianta] Licensee Gross WL >= 10M CNY */
+		DECLARE @OneWorks INT = 1, @Boping INT = 11, @Zelianta INT = 98, @BopingAndZelianta INT = 99
+		DECLARE @ApplyRange TABLE (ParentId INT, SumApplyValue MONEY, ApplyRate MONEY)
+	
+		INSERT INTO @ApplyRange (ParentId, SumApplyValue)
+		SELECT CASE p.ParentId WHEN @OneWorks THEN @OneWorks ELSE @BopingAndZelianta END, SUM(-d.CustomerWL * ec.BaseCurrencyRate)
+		FROM #TempData d
+		INNER JOIN #PartyList p ON d.PartyId = p.PartyId
+		INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, 'CNY') ec ON d.CurrencyId = ec.ExchangeID AND ec.ExchangeDate = d.ReportDate
+		WHERE ISNULL(d.IsDeposit, 0) = 1
+		GROUP BY CASE p.ParentId WHEN @OneWorks THEN @OneWorks ELSE @BopingAndZelianta END
+
+		UPDATE @ApplyRange
+		SET ApplyRate = CASE WHEN (ParentId = @OneWorks AND SumApplyValue >= 10000000)
+									OR (ParentId = @BopingAndZelianta AND SumApplyValue >= 10000000)
+									THEN 0.05
+									ELSE 0.06 
+						END
+
+		;WITH cte_SelectedDepositSettings AS(
+			SELECT CASE p.ParentId WHEN @OneWorks THEN @OneWorks ELSE @BopingAndZelianta END AS ParentId,
+						d.PartyId
+			FROM #TempData d
+			INNER JOIN #PartyList p ON d.PartyId = p.PartyId
+			WHERE ISNULL(d.IsDeposit, 0) = 1 AND ISNULL(p.IsSelected, 0) = 1
+		)
+		UPDATE d
+		SET d.RoyaltyFee = a.ApplyRate * (d.NetWinLoss)
+		FROM #TempData d
+		INNER JOIN cte_SelectedDepositSettings d2 ON d.PartyId = d2.PartyId
+		INNER JOIN @ApplyRange a ON d2.ParentId = a.ParentId
+
+		-- Delete list of licensee which is not selected
+		DELETE d
+		FROM #TempData d
+		INNER JOIN #PartyList p ON d.PartyId = p.PartyId
+		WHERE ISNULL(p.IsSelected, 0) = 0
+		--End-Region Update deposit's pay to supplier
+	END
+
 	-- Region: Calculate result
 	CREATE TABLE #Result (
 		PartyId			INT,
@@ -288,7 +349,7 @@ BEGIN
 		DECLARE @Currency VARCHAR(10) = (SELECT TOP 1 Name FROM @BaseCurrencies)
 		
 		;WITH TotalByParty AS(
-			SELECT td.ParentId,
+			SELECT CASE WHEN td.PartyId = 14 THEN 14 ELSE td.ParentId END ParentId,
 				SUM(td.TotalTrans) TotalTrans,
 				SUM(td.Turnover * e.BaseCurrencyRate) Turnover,
 				SUM(td.ValidBetAmount * e.BaseCurrencyRate) ValidBetAmount,
@@ -301,7 +362,7 @@ BEGIN
 				SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
 			FROM #Result td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @Currency) e
 			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
-			GROUP BY td.ParentId, td.PartyId
+			GROUP BY CASE WHEN td.PartyId = 14 THEN 14 ELSE td.ParentId END, td.PartyId
 		)
 		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,ValidBetAmount,TipAmount,CustomerWinLoss,LicensingFee,RollingComm,NetWinLoss,CompanyTipShare,PayToSupplier,CompanyIncome)
 		SELECT @Currency,ParentId,

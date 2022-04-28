@@ -1,5 +1,5 @@
 ﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
-CREATE PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template9]
+ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template9]
 	@PartyIds			VARCHAR(4000),
 	@ProductID			INT,
 	@FromDate			DATETIME,
@@ -156,9 +156,9 @@ BEGIN
 				SUM(ISNULL(CASE WHEN p.Bettype IS NOT NULL THEN 0 ELSE b.Turnover END, 0)) AS Turnover,
 				SUM(ISNULL(CASE WHEN p.Bettype IS NOT NULL THEN 0 ELSE b.MemberWL END, 0)) AS CustomerWinLoss,
 				SUM(ISNULL(b.ValidBetAmount, 0)) AS ValidBetAmount,
-				SUM(ISNULL(CASE WHEN p.Bettype IS NULL THEN 0 ELSE -b.MemberWL END, 0) * ci.Rate) AS ServiceChargeOriginal,
+				SUM(ISNULL(CASE WHEN p.Bettype IS NOT NULL THEN 0 ELSE -b.MemberWL END, 0) * ci.Rate) AS ServiceChargeOriginal,
 				SUM(ISNULL(b.ValidBetAmount, 0) * ci.RebateCommission) AS RebateCommissionOriginal,
-				SUM(CASE WHEN p.Bettype IS NULL THEN b.MemberWL ELSE 0 END) AS PromotionOriginal
+				SUM(CASE WHEN p.Bettype IS NOT NULL THEN b.MemberWL ELSE 0 END) AS PromotionOriginal
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.RptDate BETWEEN ci.FromDate AND ci.ToDate
 			INNER JOIN dbo.view_site_list s WITH(NOLOCK) ON b.SiteId = s.SiteID
@@ -186,9 +186,9 @@ BEGIN
 				SUM(ISNULL(CASE WHEN p.Bettype IS NOT NULL THEN 0 ELSE b.Turnover END, 0)) AS Turnover,
 				SUM(ISNULL(CASE WHEN p.Bettype IS NOT NULL THEN 0 ELSE b.Winloss END, 0)) AS CustomerWinLoss,
 				SUM(ISNULL(b.ValidBetAmount, 0)) AS ValidBetAmount,
-				SUM(ISNULL(CASE WHEN BetTypeId IS NULL THEN 0 ELSE -b.Winloss END, 0) * ci.Rate) AS ServiceChargeOriginal,
+				SUM(ISNULL(CASE WHEN p.Bettype IS NOT NULL THEN 0 ELSE -b.Winloss END, 0) * ci.Rate) AS ServiceChargeOriginal,
 				SUM(ISNULL(b.ValidBetAmount, 0) * ci.RebateCommission) AS RebateCommissionOriginal,
-				SUM(CASE WHEN p.Bettype IS NULL THEN b.Winloss ELSE 0 END) AS PromotionOriginal
+				SUM(CASE WHEN p.Bettype IS NOT NULL THEN b.Winloss ELSE 0 END) AS PromotionOriginal
 		FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
 			INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
 			INNER JOIN dbo.view_site_list s WITH(NOLOCK) ON b.SiteId = s.SiteID
