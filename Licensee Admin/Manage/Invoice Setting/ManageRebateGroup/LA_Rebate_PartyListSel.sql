@@ -15,6 +15,7 @@ AS
 	 Revisions:  
 		- 20180529@Parsons: Get list payer list [#94282]
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
+		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
 
 	 Params:
 		 + UserID : 
@@ -36,7 +37,7 @@ BEGIN
 	SELECT DISTINCT a.PartyId, a.DiscountGroupId
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
 		INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId			
-	WHERE h.DiscountGroupType IN (2, 12) -- Rebate
+	WHERE h.DiscountGroupType IN (2, 12, 22) -- Rebate
 		AND (@FromDate IS NULL OR @FromDate <= h.ToDate)
 		AND (@ToDate IS NULL OR @ToDate >= h.FromDate)			
 

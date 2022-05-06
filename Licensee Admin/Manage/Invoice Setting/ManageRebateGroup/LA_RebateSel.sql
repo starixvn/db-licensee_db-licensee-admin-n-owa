@@ -12,10 +12,7 @@ AS
 	 Revisions:  
 		- 20180525@Parsons: Get rebate groups info [#94282]
 		- 20220210@Percy: Return RebateGroupType [RedmineID: #163495]
-
-	 Params:
-
-	 Explannation: EXEC LA_RebateSel
+		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -48,7 +45,7 @@ BEGIN
 		LEFT JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON h.DiscountGroupId = d.DiscountGroupId
 		LEFT JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON h.DiscountGroupId = p.DiscountGroupId
 		LEFT JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
-	WHERE h.DiscountGroupType IN (2, 12) -- Rebate
+	WHERE h.DiscountGroupType IN (2, 12, 22) -- Rebate
 	GROUP BY h.DiscountGroupId, h.DiscountGroupName, h.FromDate, h.ToDate, d.Rate, h.DiscountGroupType
 END
 GO

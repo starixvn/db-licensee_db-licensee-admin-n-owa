@@ -14,6 +14,7 @@ AS
 	Revisions:
 		- 20190626@Parsons: Validate billing configuration [#109600]
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
+		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
 */
 
 BEGIN
@@ -31,6 +32,6 @@ BEGIN
 	WHERE p.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
 			AND p.PartyID NOT IN (SELECT bg.PartyID FROM LA_f_BillingGroupSel() bg)
 			AND p.PartyID NOT IN (SELECT cl.PartyId FROM @CreditLicensees cl)
-			AND (dg.DiscountGroupType IS NULL OR dg.DiscountGroupType IN (2, 12)) -- Rebate
+			AND (dg.DiscountGroupType IS NULL OR dg.DiscountGroupType IN (2, 12, 22)) -- Rebate
 END
 GO
