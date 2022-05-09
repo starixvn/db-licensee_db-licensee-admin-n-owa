@@ -18,6 +18,7 @@ AS
 	
 	Revisions:
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 */
 SET NOCOUNT ON
 DECLARE @startRun datetime  
@@ -74,16 +75,16 @@ BEGIN
     --check case when user choice only 1 function, must be add parentID for him
     IF EXISTS( SELECT DISTINCT ParentID 
 				FROM LA_Function 
-				WHERE FunctionID IN( SELECT val FROM dbo.strSplit (@FunctionIDs,','))
-				AND ParentID NOT IN (SELECT val FROM dbo.strSplit (@FunctionIDs,','))
+				WHERE FunctionID IN( SELECT value FROM STRING_SPLIT (@FunctionIDs,','))
+				AND ParentID NOT IN (SELECT value FROM STRING_SPLIT (@FunctionIDs,','))
 		  )
     BEGIN
 	    SELECT @FunctionIDs = @FunctionIDs + ',' +CONVERT(varchar(10),A.ParentID) FROM
 		  (
 			 SELECT DISTINCT ParentID 
 				FROM LA_Function 
-				WHERE FunctionID IN( SELECT val FROM dbo.strSplit (@FunctionIDs,','))
-				AND ParentID NOT IN (SELECT val FROM dbo.strSplit (@FunctionIDs,','))
+				WHERE FunctionID IN( SELECT value FROM STRING_SPLIT (@FunctionIDs,','))
+				AND ParentID NOT IN (SELECT value FROM STRING_SPLIT (@FunctionIDs,','))
 		  ) A
     END   
     
@@ -95,11 +96,11 @@ BEGIN
 	StatusID )
     SELECT
 	    @UserID,
-	    val AS FunctionID,
+	    value AS FunctionID,
 	    getdate(),
 	    @Creator,
 	    1 -- default enable
-    FROM dbo.strSplit (@FunctionIDs,',')
+    FROM STRING_SPLIT (@FunctionIDs,',')
 
     IF @@Error>0
     BEGIN

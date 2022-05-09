@@ -12,6 +12,7 @@ AS
 
 	Revisions:
 	- 20200708@Mason: Implement Group Min Fee [#134492]
+	- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -36,7 +37,7 @@ BEGIN
 		LEFT JOIN dbo.LA_GroupMinFeeAssignment a ON p.PartyID = a.PartyID
 		LEFT JOIN dbo.LA_GroupMinFeeHeader h ON a.GroupMinFeeID = h.GroupMinFeeID
 		LEFT JOIN dbo.LA_GroupMinFeeDetail d ON a.GroupMinFeeID = d.GroupMinFeeID
-	WHERE p.PartyID IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
+	WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIds,','))
 			AND p.PartyID NOT IN (SELECT bg.PartyID FROM LA_f_BillingGroupSel() bg)
 			AND p.PartyID NOT IN (SELECT cl.PartyId FROM @CreditLicensees cl)
 END

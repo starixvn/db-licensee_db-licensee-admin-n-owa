@@ -27,6 +27,7 @@ AS
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20220210@Percy: Add param @RebateGroupType to offer Tier Rebate [RedmineID: #163495]
 		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 */
 
 BEGIN
@@ -61,7 +62,7 @@ BEGIN
 	END
 
 	INSERT INTO @Products(ProductId)
-	SELECT val FROM dbo.Lrf_f_StringSplit(@ProductIds, ',')
+	SELECT value FROM STRING_SPLIT(@ProductIds, ',')
 
 	--parse assigned payer to group
 	IF @PartyIds = ''
@@ -71,7 +72,7 @@ BEGIN
 	END
 
 	INSERT INTO @Payers(PayerId)
-	SELECT val FROM dbo.Lrf_f_StringSplit(@PartyIds, ',')
+	SELECT value FROM STRING_SPLIT(@PartyIds, ',')
 	
 	--check required fields
 	IF @FromDate IS NULL OR @ToDate IS NULL

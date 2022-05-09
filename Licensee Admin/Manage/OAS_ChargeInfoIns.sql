@@ -41,6 +41,7 @@ AS
 		- 20170912@Harper: Clear code [RedmineID: #82673] 
 		- 20171012@Harper: Add more Basic Of Billing Info [#84772]
 		- 20180122@Harper: Add code for insert Month of deduction for LA_MinFee [RedmineID: #87039]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 
 	Param's Explanation:
 */
@@ -253,7 +254,7 @@ BEGIN
 		INSERT INTO dbo.LA_ChargeInfo_SystemMapping (ChargeID, SystemID)
 		SELECT @ChargeId, s.id
 		FROM dbo.Systems s WITH (NOLOCK)
-		WHERE s.SystemName IN (SELECT val FROM dbo.strSplit(@System, ','))
+		WHERE s.SystemName IN (SELECT value FROM STRING_SPLIT(@System, ','))
 
 	END
 	ELSE

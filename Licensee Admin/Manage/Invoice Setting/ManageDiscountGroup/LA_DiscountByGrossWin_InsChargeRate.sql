@@ -19,6 +19,7 @@ AS
 	 
 	 Revisions:
 		- 20211101@Percy: Initialize SP [RedmineID: #162158]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 */
 
 BEGIN
@@ -26,7 +27,7 @@ BEGIN
 
 	CREATE TABLE #PartyList (PartyId INT PRIMARY KEY)
 	INSERT INTO #PartyList (PartyId)
-	SELECT DISTINCT val FROM dbo.strSplit(@PartyIds, ',')
+	SELECT DISTINCT value FROM STRING_SPLIT(@PartyIds, ',')
 
 	CREATE TABLE #ChargeRate (
 		ChargeId INT, FromParty INT, ToParty INT, MinAmount MONEY, MaxAmount MONEY

@@ -29,6 +29,7 @@ AS
 		- 20170518@Bruce: include remark [#76133]
 		- 20171219@Bruce: increase length for variables [#88197]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 	 
 	 Params:
 		@RateSettingsData = '<Root>
@@ -83,13 +84,13 @@ BEGIN
 	END
 
 	INSERT INTO @Products(ProductId)
-	SELECT val FROM dbo.Lrf_f_StringSplit(@ProductIds, ',')
+	SELECT value FROM STRING_SPLIT(@ProductIds, ',')
 
 	--parse assigned payer to group
 	IF @AssignedPartyIds <> ''
 	BEGIN
 		INSERT INTO @Payers(PayerId)
-		SELECT val FROM dbo.Lrf_f_StringSplit(@AssignedPartyIds, ',')
+		SELECT value FROM STRING_SPLIT(@AssignedPartyIds, ',')
 	END
 	--parse setting rate
 	IF @RateSettingsData <> ''

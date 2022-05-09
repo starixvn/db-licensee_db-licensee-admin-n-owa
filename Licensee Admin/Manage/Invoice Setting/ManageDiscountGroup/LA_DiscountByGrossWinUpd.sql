@@ -28,6 +28,7 @@ AS
 	 Revisions:
 		- 20211101@Percy: Initialize SP [RedmineID: #162158]
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 	 
 	 Params:
 		@RateSettingsData = '<Root>
@@ -112,12 +113,12 @@ BEGIN
 			10 = discount & calculate
 		*/
 		INSERT INTO @ProductList (ProductId, CalculationType)
-		SELECT DISTINCT val, 0 FROM dbo.StrSplit(@DiscountProductIds, ',')
+		SELECT DISTINCT value, 0 FROM STRING_SPLIT(@DiscountProductIds, ',')
 
 		MERGE @ProductList AS s
 		USING (
-			SELECT DISTINCT val AS ProductId, 1 AS CalculationType
-			FROM dbo.StrSplit(@CalculationProductIds, ',')
+			SELECT DISTINCT value AS ProductId, 1 AS CalculationType
+			FROM STRING_SPLIT(@CalculationProductIds, ',')
 		) AS t ON s.ProductId = t.ProductId
 		WHEN MATCHED THEN UPDATE SET s.CalculationType = 10
 		WHEN NOT MATCHED BY TARGET THEN INSERT (ProductId, CalculationType) VALUES (ProductId, CalculationType);

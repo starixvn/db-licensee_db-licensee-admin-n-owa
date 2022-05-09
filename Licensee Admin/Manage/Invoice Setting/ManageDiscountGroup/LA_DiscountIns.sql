@@ -29,6 +29,7 @@ AS
 		- 20200609@Parsons: Special handling for INH market [#128570]
 		- 20211101@Percy: Support Discount on Lic WL - Do not alow add Discount Group on Lic Fee [RedmineID: #162158]
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 
 	 Params:
 		@RateSettingsData = '<Root>
@@ -113,12 +114,12 @@ BEGIN
 
 
 	INSERT INTO @Products(ProductId, CalculationType)
-	SELECT val, @ToBeCalculated FROM dbo.strSplit(@CalculationProductIds, ',')
+	SELECT value, @ToBeCalculated FROM STRING_SPLIT(@CalculationProductIds, ',')
 	
 	;MERGE @Products AS t 
-	USING dbo.strSplit(@DiscountProductIds, ',') AS s ON t.ProductId = s.val
+	USING STRING_SPLIT(@DiscountProductIds, ',') AS s ON t.ProductId = s.value
 		WHEN MATCHED THEN UPDATE SET CalculationType = @CalculateAndDiscount
-		WHEN NOT MATCHED THEN INSERT (ProductId, CalculationType) VALUES(s.val, @ToBeDiscounted);
+		WHEN NOT MATCHED THEN INSERT (ProductId, CalculationType) VALUES(s.value, @ToBeDiscounted);
 
 	--parse assigned payer to group
 	IF @PartySettingsData <> ''

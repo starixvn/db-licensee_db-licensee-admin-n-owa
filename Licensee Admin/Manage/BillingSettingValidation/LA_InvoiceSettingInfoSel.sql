@@ -16,6 +16,7 @@ AS
 
 	Revisions:
 	- 20190624@Parsons: Validate billing configuration [#109600]
+	- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -48,7 +49,7 @@ BEGIN
 	LEFT JOIN LA_BillerInfo b WITH(NOLOCK) ON ivs.ToPartyId = b.PartyId
 	LEFT JOIN @PartyList pList ON P.PartyID = pList.PartyId
 	LEFT JOIN @PartyHasProductBA pBA ON p.PartyID = pBA.PartyId
-	WHERE p.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
+	WHERE p.PartyId IN (SELECT value FROM STRING_SPLIT(@PartyIds,','))
 			AND p.PartyID NOT IN (SELECT bg.PartyID FROM LA_f_BillingGroupSel() bg)
 			AND p.PartyID NOT IN (SELECT cl.PartyId FROM @CreditLicensees cl)
 END

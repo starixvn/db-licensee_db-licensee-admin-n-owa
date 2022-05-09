@@ -15,6 +15,7 @@ AS
 
 	 Revisions:  
 		- 20180702@Parsons: Get payer list [#94282]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 
 	 Explannation:
 */
@@ -41,7 +42,7 @@ BEGIN
 	FROM @PartyList p
 	WHERE p.PartyId NOT IN (SELECT PartyId 
 							FROM @PartySettings
-							WHERE ProductId IN (SELECT val FROM dbo.strSplit(@ProductIds, ',') WHERE val != ''))
+							WHERE ProductId IN (SELECT value FROM STRING_SPLIT(@ProductIds, ',') WHERE value != ''))
 			AND p.ParentId NOT IN (999, 0)
 
 	UNION
@@ -55,6 +56,6 @@ BEGIN
 						AND NOT EXISTS (SELECT p2.PartyId 
 									FROM @PartySettings p2 
 									WHERE p2.PartyId = p1.PartyId AND DiscountGroupId != @GroupId 
-									AND ProductId IN (SELECT val FROM dbo.strSplit(@ProductIds, ',') WHERE val != '')))
+									AND ProductId IN (SELECT value FROM STRING_SPLIT(@ProductIds, ',') WHERE value != '')))
 END
 GO
