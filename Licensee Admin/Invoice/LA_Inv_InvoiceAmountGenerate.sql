@@ -214,6 +214,7 @@ BEGIN
 				,@FromDate = @FromDate
 				,@ToDate = @ToDate
 				,@BaseCurrencyName = @BaseCurrency
+				,@IncludeTierRebate = 0
 
 			INSERT INTO @FinalResult (ProductId, ProductCode, ProductName, InvoiceAmount, AmountType, Rate, Remark)
 			SELECT p.ProductId, p.ProductPrefix, p.ProductName, d.InvoiceAmount, d.AmountType, d.Rate, d.Remark

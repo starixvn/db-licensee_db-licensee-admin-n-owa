@@ -96,6 +96,7 @@ BEGIN
 			,@FromDate = @FromDate
 			,@ToDate = @ToDate
 			,@BaseCurrencyName = @BaseCurrency
+			,@IncludeTierRebate = 0
 
 		DELETE @Result WHERE ProductId = 37
 	END
