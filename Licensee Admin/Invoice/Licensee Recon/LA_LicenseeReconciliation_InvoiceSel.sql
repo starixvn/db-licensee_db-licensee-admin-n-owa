@@ -81,11 +81,12 @@ BEGIN
 	WHERE h.StatusId = 0-- normal invoice
 		AND h.InvoiceHeaderId NOT IN (6208, 6207) -- temporary exclude these credit notes
 		AND h.Environment = @Environment
-		AND (
-			(h.FromDate BETWEEN @FromDate AND @ToDate AND h.InvoiceType IN (1,3)) OR
-			(h.InvoiceDate BETWEEN @FromDate AND @ToDate AND h.InvoiceType = 7) OR
-			(h.InvoiceDate BETWEEN @N_FromDate AND @N_ToDate AND h.InvoiceType IN (4,5))
-		)
+		AND 1 = CASE
+					WHEN h.InvoiceType IN (1, 3) AND h.FromDate BETWEEN @FromDate AND @ToDate THEN 1
+					WHEN h.InvoiceType = 7 AND h.InvoiceDate BETWEEN @FromDate AND @ToDate THEN 1
+					WHEN h.InvoiceType = 4 AND s.InvItemTypeId = 45 AND h.InvoiceDate BETWEEN @FromDate AND @ToDate THEN 1
+					WHEN h.InvoiceType IN (4, 5) AND s.InvItemTypeId <> 45 AND h.InvoiceDate BETWEEN @N_FromDate AND @N_ToDate THEN 1
+					ELSE 0 END
 	GROUP BY p.LicenseeCode, b.CurrencyName, r.ProductName, p.PartyId
 
 	IF @IsGroupByPartyId = 0
