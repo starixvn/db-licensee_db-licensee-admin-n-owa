@@ -28,32 +28,31 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @PartyList TABLE(PartyId INT, PartyName VARCHAR(100), BrandName VARCHAR(100), ParentId INT)
-	
 	INSERT INTO @PartyList(PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel
 
-	DECLARE @PartiesInAnyGroup TABLE (PartyId INT, DiscountId SMALLINT)
-	INSERT INTO @PartiesInAnyGroup(PartyId, DiscountId)
-	SELECT DISTINCT a.PartyId, a.DiscountGroupId
-	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
-		INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId			
-	WHERE h.DiscountGroupType IN (2, 12, 22) -- Rebate
-		AND (@FromDate IS NULL OR @FromDate <= h.ToDate)
-		AND (@ToDate IS NULL OR @ToDate >= h.FromDate)			
+	DECLARE @DiscountGroupType TINYINT = 0
+	SELECT  @DiscountGroupType = DiscountGroupType FROM dbo.LA_DiscountGroupHeader WITH (NOLOCK) WHERE DiscountGroupId = @GroupId
 
-	--list of payers not in group
-	SELECT p.PartyId, PartyName, BrandName
-	FROM @PartyList p
-	WHERE p.ParentId NOT IN (999, 0)
-		AND p.PartyId NOT IN (999)
-		AND p.PartyId NOT IN (SELECT PartyId FROM @PartiesInAnyGroup)		
-	UNION	
-	--list of payer in group
-	SELECT a.PartyId, pp.PartyName, ppp.BrandName
-	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
-		INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
-		INNER JOIN dbo.OAS_Party pp WITH(NOLOCK) ON a.PartyId = pp.PartyID
-		INNER JOIN dbo.OAS_PartyDetail ppp WITH(NOLOCK) ON a.PartyId = ppp.PartyID
-	WHERE h.DiscountGroupId = @GroupId
+	IF @GroupId <> 0 AND @DiscountGroupType IN (2, 22) AND @FromDate IS NOT NULL AND @ToDate IS NOT NULL
+	BEGIN
+		DECLARE @ExistPartyList TABLE (PartyId INT)
+		INSERT INTO @ExistPartyList (PartyId)
+		SELECT DISTINCT a.PartyId
+		FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
+			INNER JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId			
+		WHERE h.DiscountGroupType IN (2, 22) -- Rebate on Lic Fee/WL
+			AND h.DiscountGroupType <> @DiscountGroupType
+			AND h.FromDate <= @ToDate AND h.ToDate >= @FromDate
+
+		DELETE p
+		FROM @PartyList p
+			INNER JOIN @ExistPartyList ep ON p.PartyId = ep.PartyId
+	END
+
+	-- Return party list
+	SELECT PartyId, PartyName, BrandName
+	FROM @PartyList
+	WHERE ParentId IN (1, 9, 11, 98) -- Deposit
 END
 GO

@@ -75,11 +75,34 @@ BEGIN
 	
 	--check required fields
 	IF @FromDate IS NULL OR @ToDate IS NULL
-		OR (NOT EXISTS (SELECT 1 FROM @Products))
 		OR @Rate < 0
 	BEGIN
 		SELECT @ErrMsg = 'Please fill all required field.', @ErrCode = 503
 		RETURN
+	END
+
+	-- if group is Rebate on Lic WL or Lic Fee, check exists setting
+	IF @RebateGroupType IN (2, 22)
+	BEGIN
+		SELECT @ErrMsg = ''
+
+		SELECT TOP 1 @ErrMsg = CASE
+								WHEN h.DiscountGroupType <> @RebateGroupType THEN 'Licensee is in another Rebate on Lic ' + CASE WHEN h.DiscountGroupType = 2 THEN 'Fee' ELSE 'WL' END + ' group.'
+								WHEN pt.ProductId IS NOT NULL THEN 'Duplicated product with current group.'
+								END
+		FROM @Payers t
+			INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON t.PayerId = a.PartyId
+			INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
+			INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON p.DiscountGroupId = a.DiscountGroupId
+			LEFT JOIN @Products pt ON pt.ProductId = p.ProductId
+		WHERE h.DiscountGroupType IN (2, 22)
+			AND h.FromDate <= @ToDate AND h.ToDate >= @FromDate
+
+		IF @ErrMsg <> ''
+		BEGIN
+			SELECT @ErrCode = 503
+			RETURN
+		END
 	END
 
 	-- if group is tier rebate, check base currency all payers
