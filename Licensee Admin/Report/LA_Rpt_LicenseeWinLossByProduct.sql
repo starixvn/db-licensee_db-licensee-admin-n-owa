@@ -75,6 +75,7 @@ AS
 		- 20210823@Danny: filter licensee status from OIC [#159296]
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 		- 20220228@Danny: Allbet - Promotion integration [#167510]
+		- 20220329@Danny: Intergrate Guaranteed Gaming [#167626]
 */
 		
 /*	Example:
@@ -256,7 +257,8 @@ BEGIN
 		CG			MONEY,	-- Creative Gaming
 		VGA			MONEY,	-- VGaming
 		AP			MONEY,  -- AdvantPlay
-		APM			MONEY  -- AdvantPlay mini
+		APM			MONEY,  -- AdvantPlay mini
+		FGGL		MONEY	-- Guaranteed Gaming
 	)						  
 	INSERT INTO #LicenseeAmount(GroupName, GroupId, LicenseeId, PartyId,PartyName)
 	SELECT	REPLACE(p.PartyName,' Licensees','') AS PartyName,
@@ -531,10 +533,11 @@ BEGIN
 		CG MONEY,
 		VGA MONEY,
 		AP	MONEY,
-		APM MONEY
+		APM MONEY,
+		FGGL MONEY
 	)
 	
-	INSERT INTO @AmountDueByProduct(LicenseeId, NG, VS, CS, KN, AGC, GD, VB, FW, LT, BRVS, LC, VG, MGCLC, MGCRNG, BX, VRG, SAG, I4D, TG, PGS, JK, WM, VS3, GDG, BG, MXG, SLT, PPL, HB, CG, AP, APM)
+	INSERT INTO @AmountDueByProduct(LicenseeId, NG, VS, CS, KN, AGC, GD, VB, FW, LT, BRVS, LC, VG, MGCLC, MGCRNG, BX, VRG, SAG, I4D, TG, PGS, JK, WM, VS3, GDG, BG, MXG, SLT, PPL, HB, CG, AP, APM, FGGL)
 	SELECT d.LicenseeId,
 			ISNULL(SUM(CASE WHEN d.ProductId = 2  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS NG,
 			ISNULL(SUM(CASE WHEN d.ProductId = 5  THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS VS,
@@ -567,7 +570,8 @@ BEGIN
 			ISNULL(SUM(CASE WHEN d.ProductId = 61 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS HB,
 			ISNULL(SUM(CASE WHEN d.ProductId = 62 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS CG,
 			ISNULL(SUM(CASE WHEN d.ProductId = 67 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS AP,
-			ISNULL(SUM(CASE WHEN d.ProductId = 68 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS APM
+			ISNULL(SUM(CASE WHEN d.ProductId = 68 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS APM,
+			ISNULL(SUM(CASE WHEN d.ProductId = 70 THEN -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate ELSE 0 END),0) AS FGGL
 	FROM	#TempData d
 				INNER JOIN @PartyChargeInfo ci ON	d.LicenseeId = ci.LicenseeId
 													AND ci.ProductId = d.ProductId
@@ -610,7 +614,8 @@ BEGIN
 			HB = a.HB,
 			CG = a.CG,
 			AP = a.AP,
-			APM = a.APM
+			APM = a.APM,
+			FGGL = a.FGGL
 	FROM	#LicenseeAmount l
 			INNER JOIN @AmountDueByProduct a ON a.LicenseeId = l.LicenseeId
 	
@@ -659,9 +664,10 @@ BEGIN
 			AND VGA IS NULL
 			AND AP IS NULL
 			AND APM IS NULL
+			AND FGGL IS NULL
 
 	-- Result
-	SELECT l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP, l.CC, l.SG, l.VRG, l.SAG, l.I4D, l.TG, l.SBC, l.SXG, l.PGS, l.JK, l.WM, l.VS3, l.GDG, l.BG, l.MXG, l.SLT, l.PPL, l.HB, l.CG, l.VGA, l.AP, l.APM
+	SELECT l.GroupName,l.PartyName,l.SB,l.RB,l.NG,l.BA,l.LC,l.VS,l.CS, l.KN,l.AGC,l.GD,l.VG,l.MGCLC,l.MGCRNG,l.VB, l.AB, l.FW, l.BT, l.CB, l.CO, l.BRVS, l.LT, l.BX, l.PP, l.CC, l.SG, l.VRG, l.SAG, l.I4D, l.TG, l.SBC, l.SXG, l.PGS, l.JK, l.WM, l.VS3, l.GDG, l.BG, l.MXG, l.SLT, l.PPL, l.HB, l.CG, l.VGA, l.AP, l.APM, l.FGGL
 	FROM #LicenseeAmount l
 	ORDER BY l.GroupId, l.PartyId
 	-- EndRegion
