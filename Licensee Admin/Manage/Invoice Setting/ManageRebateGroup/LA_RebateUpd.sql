@@ -98,6 +98,7 @@ BEGIN
 			LEFT JOIN @Products pt ON pt.ProductId = p.ProductId
 		WHERE h.DiscountGroupType IN (2, 22)
 			AND h.FromDate <= @ToDate AND h.ToDate >= @FromDate
+			AND h.DiscountGroupId <> @GroupId
 
 		IF @ErrMsg <> ''
 		BEGIN
