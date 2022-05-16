@@ -81,21 +81,22 @@ BEGIN
 		RETURN
 	END
 
-	-- if group is Rebate on Lic WL or Lic Fee, check exists setting
-	IF @RebateGroupType IN (2, 22)
+	-- check exists setting
 	BEGIN
 		SELECT @ErrMsg = ''
 
-		SELECT TOP 1 @ErrMsg = CASE
-								WHEN h.DiscountGroupType <> @RebateGroupType THEN 'Licensee is in another Rebate on Lic ' + CASE WHEN h.DiscountGroupType = 2 THEN 'Fee' ELSE 'WL' END + ' group.'
-								WHEN pt.ProductId IS NOT NULL THEN 'Duplicated product with current group.'
-								END
+		SELECT @ErrMsg = MAX (CASE
+								WHEN @RebateGroupType = 12 AND h.DiscountGroupType = 12 THEN 'Licensee is in another Tier Rebate group.'
+								WHEN @RebateGroupType = 2 AND h.DiscountGroupType = 22 THEN 'Licensee is in another Rebate on Lic WL group.'
+								WHEN @RebateGroupType = 22 AND h.DiscountGroupType = 2 THEN 'Licensee is in another Rebate on Lic Fee group.'
+								WHEN @RebateGroupType IN (2, 22) AND h.DiscountGroupType = @RebateGroupType AND pt.ProductId IS NOT NULL THEN 'Duplicated product with current group.'
+								ELSE '' END)
 		FROM @Payers t
 			INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON t.PayerId = a.PartyId
 			INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
 			INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON p.DiscountGroupId = a.DiscountGroupId
 			LEFT JOIN @Products pt ON pt.ProductId = p.ProductId
-		WHERE h.DiscountGroupType IN (2, 22)
+		WHERE h.DiscountGroupType IN (2, 12, 22)
 			AND h.FromDate <= @ToDate AND h.ToDate >= @FromDate
 
 		IF @ErrMsg <> ''

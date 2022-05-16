@@ -47,6 +47,7 @@ AS
 			8 = Betcount
 			9 = OddsSpead Adjustment
 			10 = Promotion
+			11 = Licensee Winloss
 */
 
 BEGIN
@@ -586,7 +587,7 @@ BEGIN
 	(
 		PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, LicenseeWL MONEY, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
 		,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), DiscountType TINYINT
-		,TierRebate MONEY, TierRebateRate MONEY, Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000)
+		,TierRebate MONEY, TierRebateRate MONEY, WLRebate MONEY, WLRebateRate MONEY, FeeRebate MONEY, FeeRebateRate MONEY, TotalRebate MONEY, RebateRemark NVARCHAR(4000)
 		,ProrateMinFee MONEY, SecondaryLicensingFee MONEY, NonMinFee MONEY, IsGroupMinFee BIT
 	)
 	/*
@@ -835,26 +836,19 @@ BEGIN
 		
 		-- Update Final Rebate Rate, Amount
 		UPDATE r
-		SET r.TierRebate = CASE
-							WHEN r.GrossLicensingFee < 0 THEN 0
-							WHEN r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - ISNULL(d.TierDiffRebate, 0) < 0 THEN ISNULL(d.TierDiffRebate, 0)
-							ELSE ISNULL(d.TierDiffRebate, 0) + (r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - ISNULL(d.TierDiffRebate, 0) - r.LicenseeWL * ISNULL(d.RebateWLRate, 0)) * ISNULL(d.TierRebateRate, 0) END
-			,r.TierRebateRate = ISNULL(r.TierRebateRate, 0)
-			,r.Rebate = (r.LicensingFee - r.Discount) * ISNULL(d.RebateFeeRate, 0) + r.LicenseeWL * ISNULL(d.RebateWLRate, 0)
-						+ CASE
-							WHEN @IncludeTierRebate = 0 THEN 0
-							WHEN r.GrossLicensingFee < 0 THEN 0
-							WHEN r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - ISNULL(d.TierDiffRebate, 0) < 0 THEN ISNULL(d.TierDiffRebate, 0)
-							ELSE ISNULL(d.TierDiffRebate, 0) + (r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - ISNULL(d.TierDiffRebate, 0) - r.LicenseeWL * ISNULL(d.RebateWLRate, 0)) * ISNULL(d.TierRebateRate, 0) END
-			,r.RebateRate = ISNULL(ISNULL(NULLIF(d.RebateFeeRate, 0), NULLIF(d.RebateWLRate, 0)), 0)
+		SET r.TierRebate = CASE WHEN ISNULL(d.TierDiffRebate, 0) < 0 THEN 0 ELSE ISNULL(d.TierDiffRebate, 0) END
+			,r.TierRebateRate = ISNULL(d.TierRebateRate, 0)
+			,r.WLRebate = CASE WHEN r.LicenseeWL < 0 THEN 0 ELSE r.LicenseeWL * ISNULL(d.WLRebateRate, 0) END
+			,r.WLRebateRate = ISNULL(d.WLRebateRate, 0)
+			,r.FeeRebate = (r.LicensingFee - r.Discount) * ISNULL(d.FeeRebateRate, 0)
+			,r.FeeRebateRate = ISNULL(d.FeeRebateRate, 0)
 			,r.RebateRemark = d.RebateRemark
 		FROM @Result r
-			LEFT JOIN @Result t ON r.PartyId = t.PartyId AND r.ProductId = 0 AND t.ProductId = 37
 			OUTER APPLY (
 				SELECT
-					SUM(CASE WHEN d.DiscountGroupType = 2 THEN ISNULL(dd.Rate, 0) ELSE 0 END) AS RebateFeeRate
+					SUM(CASE WHEN d.DiscountGroupType = 2 THEN ISNULL(dd.Rate, 0) ELSE 0 END) AS FeeRebateRate
 					,SUM(CASE WHEN d.DiscountGroupType = 12 THEN ISNULL(dd.Rate, 0) ELSE 0 END) AS TierRebateRate
-					,SUM(CASE WHEN d.DiscountGroupType = 22 THEN ISNULL(dd.Rate, 0) ELSE 0 END) AS RebateWLRate
+					,SUM(CASE WHEN d.DiscountGroupType = 22 THEN ISNULL(dd.Rate, 0) ELSE 0 END) AS WLRebateRate
 					,SUM(ISNULL(d.TierDiffRebate, 0)) AS TierDiffRebate
 					,MAX(ISNULL(d.Remark, N'')) AS RebateRemark
 				FROM @tmpDiscount d
@@ -862,12 +856,32 @@ BEGIN
 				WHERE r.PartyId = d.PartyId AND r.ProductId = d.ProductId
 			) d
 
+		UPDATE r
+		SET r.TierRebate = r.TierRebate
+							+ CASE
+								WHEN r.GrossLicensingFee < 0 THEN 0
+								WHEN r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate < 0 THEN 0
+								ELSE r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate
+								END * r.TierRebateRate
+			,r.TotalRebate = r.WLRebate + r.FeeRebate
+							+ CASE
+								WHEN @IncludeTierRebate = 0 THEN 0
+								ELSE r.TierRebate
+									+ CASE
+										WHEN r.GrossLicensingFee < 0 THEN 0
+										WHEN r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate < 0 THEN 0
+										ELSE r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate
+										END * r.TierRebateRate
+								END
+		FROM @Result r
+			LEFT JOIN @Result t ON r.PartyId = t.PartyId AND r.ProductId = 0 AND t.ProductId = 37
+		
 		-- For no data
 		INSERT INTO @Result (
 			PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+			,Discount, DiscountRate, DiscountRemark, WLRebate, WLRebateRate, FeeRebate, FeeRebateRate, TotalRebate, RebateRemark
 		)
-		SELECT p.PartyId, p.ProductId, 0, 0, 0, 0, 0, 0, 0, 0, '', 0, 0, ''
+		SELECT p.PartyId, p.ProductId, 0, 0, 0, 0, 0, 0, 0, 0, '', 0, 0, 0, 0, 0, ''
 		FROM (
 			SELECT DISTINCT PartyId, ProductId FROM @PartyChargeInfo
 			UNION SELECT DISTINCT PartyId, 15 AS ProductId FROM @CBChargeRate
@@ -894,6 +908,7 @@ BEGIN
 				,SUM(ISNULL(t.OddsSpread, 0)) AS OddsSpread
 				,SUM(ISNULL(t.BetCount, 0)) AS BetCount
 				,SUM(ISNULL(t.Promotion, 0)) AS Promotion
+				,SUM(ISNULL(t.LicenseeWL, 0)) AS LicenseeWL
 			FROM #tmpResult t
 				INNER JOIN (SELECT DISTINCT PartyId FROM #PartyList WHERE IsSelected = 1) p ON t.PartyId = p.PartyId
 				INNER JOIN #Products pd ON t.ProductId = pd.ProductId AND pd.IsSelected = 1
@@ -910,6 +925,7 @@ BEGIN
 				UNION ALL SELECT 8, BetCount
 				UNION ALL SELECT 9, OddsSpread WHERE OddsSpread <> 0
 				UNION ALL SELECT 10, Promotion WHERE Promotion <> 0
+				UNION ALL SELECT 11, LicenseeWL
 			) t
 		WHERE ',' + @LicensingFeeTypeIds + ',' LIKE '%,' + CONVERT(VARCHAR(10), t.LicensingFeeTypeId) + ',%'
 	END
@@ -987,7 +1003,7 @@ BEGIN
 
 	SELECT
 		PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-		,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+		,Discount, DiscountRate, DiscountRemark, TotalRebate AS Rebate, ISNULL(ISNULL(NULLIF(WLRebateRate, 0), NULLIF(FeeRebateRate, 0)), 0) AS RebateRate, RebateRemark
 	FROM @Result
 
 	DROP TABLE #Exchange

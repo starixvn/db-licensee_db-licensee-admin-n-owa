@@ -49,16 +49,16 @@ BEGIN
 	ORDER BY p.ToDate DESC
 	
 	-- products
-	DECLARE @Products TABLE (ProductId INT, ProductCode VARCHAR(20))
-	INSERT @Products (ProductId, ProductCode)
-	SELECT p.ProductId, p.ProductPrefix
+	DECLARE @Products TABLE (ProductId INT, ProductCode VARCHAR(20), RebateType TINYINT)
+	INSERT @Products (ProductId, ProductCode, RebateType)
+	SELECT p.ProductId, p.ProductPrefix, r.DiscountGroupType
 	FROM (
-		SELECT p.ProductId, ROW_NUMBER() OVER(PARTITION BY p.ProductId ORDER BY h.ToDate DESC) AS RN
+		SELECT p.ProductId, h.DiscountGroupType, ROW_NUMBER() OVER(PARTITION BY p.ProductId, h.DiscountGroupType ORDER BY h.ToDate DESC) AS RN
 		FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
 			INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
 			INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
 		WHERE a.PartyId = @PartyId
-			AND h.DiscountGroupType IN (2, 12, 22) -- rebate
+			AND h.DiscountGroupType IN (2, 22) -- rebate on WL & Fee
 			AND h.FromDate <= @TDate AND h.ToDate >= @FDate
 			AND p.ProductId NOT IN (1, 23, 13, 14, 17, 31) -- exclude RB, bettrade, NG2, MGCLC, MGCRNG, BX
 	) r
@@ -75,11 +75,13 @@ BEGIN
 
 	-- Get Licensing Fee/Rebate data
 	DECLARE @ProductCodes VARCHAR(MAX), @PartyIds VARCHAR(20) = CAST(@PartyId AS VARCHAR(20))
-	SELECT  @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM @Products
+	
+	;WITH CTE_Product AS (SELECT DISTINCT ProductCode FROM @Products)
+	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM CTE_Product
 
 	DECLARE @Result TABLE
 	(
-		PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
+		PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, LicenseeWL MONEY, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
 		,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000)
 	)
 
@@ -97,23 +99,34 @@ BEGIN
 			,@ToDate = @ToDate
 			,@BaseCurrencyName = @BaseCurrency
 			,@IncludeTierRebate = 0
+			,@LicensingFeeTypeIds = '0,11' -- 11 = Licensee WL
 
 		DELETE @Result WHERE ProductId = 37
+
+		UPDATE r
+		SET r.LicenseeWL = CASE WHEN t.ExtraAmount < 0 THEN 0 ELSE t.ExtraAmount END
+		FROM @Result r
+			INNER JOIN @Result t ON r.PartyId = t.PartyId AND r.ProductId = t.ProductId
+		WHERE r.LicensingFeeTypeId = 0 AND t.LicensingFeeTypeId = 11
+
+		DELETE @Result WHERE LicensingFeeTypeId = 11
 	END
 
 	-- Total
 	DECLARE @Remark NVARCHAR(4000), @TotalRebate MONEY, @TotalAmount MONEY
-	SELECT @Remark = MAX(RebateRemark)
-		,@TotalRebate = SUM(Rebate)
-		,@TotalAmount = SUM(LicensingFee + ExtraAmount - Discount)
-	FROM @Result
+	SELECT @Remark = MAX(r.RebateRemark)
+		,@TotalRebate = SUM(r.Rebate)
+		,@TotalAmount = SUM(CASE WHEN p.RebateType = 2 THEN r.LicensingFee + r.ExtraAmount - r.Discount ELSE r.LicenseeWL END)
+	FROM @Result r
+		INNER JOIN @Products p ON r.ProductId = p.ProductId
 
 	SELECT @Remark = ISNULL(@Remark, N''), @TotalRebate = ISNULL(@TotalRebate, 0), @TotalAmount = ISNULL(@TotalAmount, 0)
 
 	SELECT @Remark AS Remark, @ToDate AS ReportDate, @BaseCurrency AS CurrencyName, @TotalRebate AS TotalRebate, @TotalAmount AS TotalAmount
 
 	-- Detail
-	SELECT ProductId, LicensingFee - Discount AS AmountToCompany
-	FROM @Result
+	SELECT r.ProductId, CASE WHEN p.RebateType = 2 THEN r.LicensingFee - r.Discount ELSE r.LicenseeWL END AS AmountToCompany
+	FROM @Result r
+		INNER JOIN @Products p ON r.ProductId = p.ProductId
 END
 GO
