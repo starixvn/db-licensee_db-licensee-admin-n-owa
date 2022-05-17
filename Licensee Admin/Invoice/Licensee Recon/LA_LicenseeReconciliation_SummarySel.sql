@@ -17,6 +17,7 @@ AS
 		- 20191210@Bruce: Include Promotion amount [#123958]
 		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
+		- 20220418@Percy: Add Credit for Setup Fees [RedmineID: #164139
 */
 BEGIN
 	SET NOCOUNT ON
@@ -31,6 +32,7 @@ BEGIN
 		Discount,
 		Rebate,
 		Others,
+		ISNULL(Others2,0) Others2,
 		Prepayment,
 		ISNULL(Promotion,0) Promotion,
 		ISNULL(Sponsorship,0) Sponsorship,

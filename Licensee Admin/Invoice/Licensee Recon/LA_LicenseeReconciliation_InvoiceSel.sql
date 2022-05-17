@@ -67,7 +67,8 @@ BEGIN
 		,SUM(CASE WHEN InvItemTypeId = 4 THEN ISNULL(Expense,0) ELSE 0 END) Discount
 		,SUM(CASE WHEN InvItemTypeId = 6 THEN ISNULL(Expense,0) ELSE 0 END) Rebate
 		,SUM(CASE WHEN InvItemTypeId IN (5,24,26) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Prepayment
-		,SUM(CASE WHEN InvItemTypeId IN (11,12,13,14,17,20,45) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Others
+		,SUM(CASE WHEN InvItemTypeId IN (11,12,13,14,17,20) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Others
+		,SUM(CASE WHEN InvItemTypeId = 45 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Others2
 		,SUM(CASE WHEN InvItemTypeId IN (3,25) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) AMF
 		,SUM(CASE WHEN InvItemTypeId = 2 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) SetupFee
 		,SUM(CASE WHEN InvItemTypeId = 29 THEN ISNULL(Expense,0) ELSE 0 END) Promotion
@@ -99,6 +100,7 @@ BEGIN
 			,SUM(Rebate) Rebate
 			,SUM(Prepayment) Prepayment
 			,SUM(Others) Others
+			,SUM(Others2) Others2
 			,SUM(SetupFee) SetupFee
 			,SUM(AMF) AMF
 			,SUM(Promotion) Promotion
@@ -116,6 +118,7 @@ BEGIN
 			,SUM(Rebate) Rebate
 			,SUM(Prepayment) Prepayment
 			,SUM(Others) Others
+			,SUM(Others2) Others2
 			,SUM(SetupFee) SetupFee
 			,SUM(AMF) AMF
 			,SUM(Promotion) Promotion
