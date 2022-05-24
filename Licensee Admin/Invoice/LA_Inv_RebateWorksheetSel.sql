@@ -40,7 +40,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @FDate DATE = @FromDate, @TDate DATE = @ToDate, @BaseCurrency VARCHAR(10) = 'EUR' -- default
+	DECLARE @FDate DATE = @FromDate, @TDate DATE = @ToDate, @BaseCurrency VARCHAR(10)
 
 	SELECT TOP 1 @BaseCurrency = Code
 	FROM dbo.OAS_PartyBaseCurrency p WITH (NOLOCK)
@@ -120,7 +120,7 @@ BEGIN
 	FROM @Result r
 		INNER JOIN @Products p ON r.ProductId = p.ProductId
 
-	SELECT @Remark = ISNULL(@Remark, N''), @TotalRebate = ISNULL(@TotalRebate, 0), @TotalAmount = ISNULL(@TotalAmount, 0)
+	SELECT @Remark = ISNULL(@Remark, N''), @BaseCurrency = ISNULL(@BaseCurrency, ''), @TotalRebate = ISNULL(@TotalRebate, 0), @TotalAmount = ISNULL(@TotalAmount, 0)
 
 	SELECT @Remark AS Remark, @ToDate AS ReportDate, @BaseCurrency AS CurrencyName, @TotalRebate AS TotalRebate, @TotalAmount AS TotalAmount
 
