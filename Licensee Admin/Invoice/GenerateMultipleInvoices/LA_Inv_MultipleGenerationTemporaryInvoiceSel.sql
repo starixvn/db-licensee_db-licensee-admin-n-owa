@@ -24,6 +24,7 @@ AS
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20211207@Percy: Return BrandName [RedmineID: #163800]
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
+		- 20220506@Percy: Exclude Tier Rebate from Invoice [RedmineID: #1732342]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -203,6 +204,7 @@ BEGIN
 				,@ProductCodes = @ProductCodes
 				,@FromDate = @FromDate
 				,@ToDate = @ToDate
+				,@IncludeTierRebate = 0
 				,@LicensingFeeTypeIds = '0,-1' -- -1: Deduction (AMF, AGPrepayment, Prepayment, ...)
 				,@BaseCurrencyName = @temp_BaseCurrencyName
 				,@Environment = @Environment

@@ -61,6 +61,7 @@ AS
 		- 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
+		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
 */
 
 BEGIN
@@ -107,7 +108,7 @@ BEGIN
 			SELECT TOP 1 1
 			FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
 				INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
-			WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate AND h.DiscountGroupType NOT IN (2, 12) -- 2, 12 = rebate
+			WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate AND h.DiscountGroupType IN (1, 3, 11, 13) -- discount
 				AND h.CurrencyId <> @BaseCurrencyId
 			ORDER BY h.ToDate DESC -- latest discount group
 		)
@@ -127,7 +128,7 @@ BEGIN
 					INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
 					LEFT JOIN dbo.Product3rd pd WITH(NOLOCK) ON p.ProductId = pd.ProductId
 				WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate
-					AND h.DiscountGroupType IN (2, 12) -- Rebate
+					AND h.DiscountGroupType IN (2, 12, 22) -- Rebate
 			) r
 			WHERE ProductCode IS NOT NULL
 
@@ -213,6 +214,7 @@ BEGIN
 				,@FromDate = @FromDate
 				,@ToDate = @ToDate
 				,@BaseCurrencyName = @BaseCurrency
+				,@IncludeTierRebate = 0
 
 			INSERT INTO @FinalResult (ProductId, ProductCode, ProductName, InvoiceAmount, AmountType, Rate, Remark)
 			SELECT p.ProductId, p.ProductPrefix, p.ProductName, d.InvoiceAmount, d.AmountType, d.Rate, d.Remark

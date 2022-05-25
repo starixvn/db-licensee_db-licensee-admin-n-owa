@@ -43,6 +43,7 @@ AS
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 		- 20220222@Danny: Allbet - Promotion integration [#167510]
+		- 20220506@Percy: Change way get discount group type [RedmineID: #1732342]
 */
 
 BEGIN
@@ -89,7 +90,7 @@ BEGIN
 			SELECT TOP 1 1
 			FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
 				INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
-			WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate AND h.DiscountGroupType NOT IN (2, 12) -- 2, 12 = rebate
+			WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate AND h.DiscountGroupType IN (1, 3, 11, 13) -- discount
 				AND h.CurrencyId <> @BaseCurrencyId
 			ORDER BY h.ToDate DESC -- latest discount group
 		)

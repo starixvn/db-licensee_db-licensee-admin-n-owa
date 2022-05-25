@@ -26,10 +26,7 @@ AS
 		- 20180528@Parsons: Update rebate group [#94282]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20220210@Percy: Add param @RebateGroupType to offer Tier Rebate [RedmineID: #163495]
-
-	 Params:
-
-	 Explannation: 
+		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
 */
 
 BEGIN
@@ -47,7 +44,7 @@ BEGIN
 	END
 
 	--check exists
-	IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupName = @GroupName AND DiscountGroupType IN (2, 12) AND DiscountGroupId <> @GroupId)
+	IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupName = @GroupName AND DiscountGroupType IN (2, 12, 22) AND DiscountGroupId <> @GroupId)
 	BEGIN
 		SELECT @ErrCode = 502, @ErrMsg = 'Group name exists. Please try again.'
 		RETURN
@@ -83,6 +80,32 @@ BEGIN
 	BEGIN
 		SELECT @ErrMsg = 'Please fill all required field.', @ErrCode = 503
 		RETURN
+	END
+
+	-- check exists setting
+	BEGIN
+		SELECT @ErrMsg = ''
+
+		SELECT @ErrMsg = MAX (CASE
+								WHEN @RebateGroupType = 12 AND h.DiscountGroupType = 12 THEN 'Licensee is in another Tier Rebate group.'
+								WHEN @RebateGroupType = 2 AND h.DiscountGroupType = 22 THEN 'Licensee is in another Rebate on Lic WL group.'
+								WHEN @RebateGroupType = 22 AND h.DiscountGroupType = 2 THEN 'Licensee is in another Rebate on Lic Fee group.'
+								WHEN @RebateGroupType IN (2, 22) AND h.DiscountGroupType = @RebateGroupType AND pt.ProductId IS NOT NULL THEN 'Duplicated product with current group.'
+								ELSE '' END)
+		FROM @Payers t
+			INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON t.PayerId = a.PartyId
+			INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
+			INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON p.DiscountGroupId = a.DiscountGroupId
+			LEFT JOIN @Products pt ON pt.ProductId = p.ProductId
+		WHERE h.DiscountGroupType IN (2, 12, 22)
+			AND h.FromDate <= @ToDate AND h.ToDate >= @FromDate
+			AND h.DiscountGroupId <> @GroupId
+
+		IF @ErrMsg <> ''
+		BEGIN
+			SELECT @ErrCode = 503
+			RETURN
+		END
 	END
 
 	-- if group is tier rebate, check base currency all payers

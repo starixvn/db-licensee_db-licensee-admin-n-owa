@@ -32,6 +32,7 @@ AS
 		- 20210315@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 		- 20210824@Danny: get licensee status from OIC And Relocated SP [#159296]
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
+		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
 
 	Params:
 	+ @PayerId : 0 get all Party
@@ -368,7 +369,7 @@ BEGIN
 				OR r.FromDate BETWEEN c.FromDate AND c.ToDate
 				OR r.ToDate BETWEEN c.FromDate AND c.ToDate
 				)
-				AND r.DiscountGroupType IN (2, 12) -- rebate
+				AND r.DiscountGroupType IN (2, 12, 22) -- rebate
 		WHERE
 			(
 				@DiscountGroup = 0
@@ -377,7 +378,7 @@ BEGIN
 			AND
 			(
 				@RebateGroup = 0
-				OR (r.DiscountGroupId = @RebateGroup AND r.DiscountGroupType IN (2, 12))
+				OR (r.DiscountGroupId = @RebateGroup AND r.DiscountGroupType IN (2, 12, 22))
 			)
 	)
 	SELECT Result.*
