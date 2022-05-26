@@ -95,7 +95,7 @@ BEGIN
 	UPDATE #result
 	SET AMF = AMF + AMF2
 	WHERE
-		(SetupFee <> 0 OR Prepayment <> 0)
+		(SetupFee <> 0 OR AMF <> 0)
 		AND (AMF2 <> 0)
 
 	IF @IsGroupByPartyId = 0
