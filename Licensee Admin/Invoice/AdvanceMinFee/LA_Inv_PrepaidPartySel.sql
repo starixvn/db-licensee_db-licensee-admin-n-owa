@@ -17,6 +17,7 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20190122@Parsons: Improve AG prepayment and discount setting [#104620]
 		- 20190821@Parsons: Improve the ability to maintain systems [#118627]
+		- 20220418@Percy: Add Credit note for AMF [RedmineID: #164139]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -33,7 +34,7 @@ BEGIN
 
 	INSERT INTO @InvoiceItemTypes ([Key], [Value])
 	SELECT @AdvanceMinFee, value
-		FROM (VALUES(3), (5), (7), (21)) AS T1(value)
+		FROM (VALUES(3), (5), (7), (21), (46)) AS T1(value)
 	UNION ALL
 	SELECT @Prepayment, value
 		FROM (VALUES(22), (23), (24)) AS T2(value)

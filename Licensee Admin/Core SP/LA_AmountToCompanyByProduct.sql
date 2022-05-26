@@ -31,6 +31,7 @@ AS
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 		- 20220222@Danny: Allbet - Promotion integration [#167510]
 		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
+		- 20220418@Percy: Add Credit note for AMF [RedmineID: #164139]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -936,7 +937,7 @@ BEGIN
 
 		;WITH CTE_InvItemTypes AS (
 			SELECT CONVERT(SMALLINT, InvItemTypeId) AS InvItemTypeId, CONVERT(VARCHAR(50), 'AdvanceMinFee') AS InvItemTypeName
-			FROM (VALUES (3), (5), (7), (21)) AS t (InvItemTypeId) -- AdvanceMinFee (AMF)
+			FROM (VALUES (3), (5), (7), (21), (46)) AS t (InvItemTypeId) -- AdvanceMinFee (AMF)
 			UNION
 			SELECT InvItemTypeId, 'Prepayment'
 			FROM (VALUES (22), (23), (24)) AS t (InvItemTypeId) -- Prepayment

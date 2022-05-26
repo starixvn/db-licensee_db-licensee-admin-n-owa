@@ -70,6 +70,7 @@ BEGIN
 		,SUM(CASE WHEN InvItemTypeId IN (11,12,13,14,17,20) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Others
 		,SUM(CASE WHEN InvItemTypeId = 45 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Others2
 		,SUM(CASE WHEN InvItemTypeId IN (3,25) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) AMF
+		,SUM(CASE WHEN InvItemTypeId = 46 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) AMF2
 		,SUM(CASE WHEN InvItemTypeId = 2 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) SetupFee
 		,SUM(CASE WHEN InvItemTypeId = 29 THEN ISNULL(Expense,0) ELSE 0 END) Promotion
 		,SUM(CASE WHEN InvItemTypeId = 44 THEN ISNULL(Expense,0) ELSE 0 END) Sponsorship
@@ -85,10 +86,17 @@ BEGIN
 		AND 1 = CASE
 					WHEN h.InvoiceType IN (1, 3) AND h.FromDate BETWEEN @FromDate AND @ToDate THEN 1
 					WHEN h.InvoiceType = 7 AND h.InvoiceDate BETWEEN @FromDate AND @ToDate THEN 1
-					WHEN h.InvoiceType = 4 AND s.InvItemTypeId = 45 AND h.InvoiceDate BETWEEN @FromDate AND @ToDate THEN 1
-					WHEN h.InvoiceType IN (4, 5) AND s.InvItemTypeId <> 45 AND h.InvoiceDate BETWEEN @N_FromDate AND @N_ToDate THEN 1
+					WHEN h.InvoiceType = 4 AND s.InvItemTypeId IN (45, 46) AND h.InvoiceDate BETWEEN @FromDate AND @ToDate THEN 1
+					WHEN h.InvoiceType IN (4, 5) AND s.InvItemTypeId NOT IN (45, 46) AND h.InvoiceDate BETWEEN @N_FromDate AND @N_ToDate THEN 1
 					ELSE 0 END
 	GROUP BY p.LicenseeCode, b.CurrencyName, r.ProductName, p.PartyId
+
+	-- Deduct prepayment if Setup Fee & Credit Note for Setup Fee same month
+	UPDATE #result
+	SET AMF = AMF + AMF2
+	WHERE
+		(SetupFee <> 0 OR Prepayment <> 0)
+		AND (AMF2 <> 0)
 
 	IF @IsGroupByPartyId = 0
 	BEGIN
