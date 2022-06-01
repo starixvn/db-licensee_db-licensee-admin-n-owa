@@ -69,6 +69,8 @@ BEGIN
 	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC LA_PartyListSel
 
+	UPDATE @PartyList SET PartyName = REPLACE(PartyName,' Licensees','') WHERE ParentId = 0
+
 	UPDATE p
 	SET p.ParentName = pa.PartyName
 	FROM @PartyList p
@@ -272,8 +274,8 @@ BEGIN
 	-- Result
 	SELECT r.PartyId,
 		r.PartyName,
-		r.ParentId,
-		r.ParentName,
+		CASE WHEN r.PartyID =14 THEN 14 ELSE r.ParentId END ParentId,
+		CASE WHEN r.PartyID =14 THEN '12Bet' ELSE r.ParentName END ParentName,
 		r.WinLossDate,
 		r.CurrencyId,			 
 		e.CurrencyCode AS CurrencyName,
@@ -302,6 +304,35 @@ BEGIN
 	INNER JOIN #Exchange e 
 	ON r.CurrencyId = e.ExchangeID 
 		AND e.ExchangeDate = r.WinLossDate
+
+	;WITH TotalByParty AS(
+		SELECT td.ParentId, td.PartyID, td.PartyName,
+			SUM(td.TotalTrans) TotalTrans,
+			SUM(td.Turnover * e.Rate) Turnover, 
+			SUM(td.CustomerWinLossSB * e.Rate) CustomerWinLossSB, 
+			SUM(td.CustomerWinLossBA * e.Rate) CustomerWinLossBA, 
+			SUM(td.LicenseeWinLoss * e.Rate) LicenseeWinLoss, 
+			SUM(td.CommissionA * e.Rate) CommissionA, 
+			SUM(td.CommissionS * e.Rate) CommissionS, 
+			SUM(td.LicensingFee * e.Rate) LicensingFee,
+			SUM(td.PayToSupplier * e.Rate) PayToSupplier
+		FROM #Result td INNER JOIN #Exchange e  ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.WinLossDate
+		GROUP BY td.ParentId, td.PartyID, td.PartyName
+	)
+	SELECT CASE WHEN PartyID =14 THEN 14 ELSE ParentId END ParentId,
+		PartyID,
+		PartyName,
+		TotalTrans,
+		Turnover,
+		CustomerWinLossSB,
+		CustomerWinLossBA,
+		LicenseeWinLoss,
+		CommissionA,
+		CommissionS,
+		CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END LicensingFee,
+		PayToSupplier,
+		CASE WHEN LicensingFee < 0 THEN 0 ELSE LicensingFee END - (CustomerWinLossBA + CommissionA) - CASE WHEN PayToSupplier < 0 THEN 0 ELSE PayToSupplier END  AS CompanyIncome
+	FROM TotalByParty
 
 	-- Grand Total
 	SELECT * FROM @GrandTotal

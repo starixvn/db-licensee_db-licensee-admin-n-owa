@@ -21,8 +21,18 @@ SET NOCOUNT ON
 	DECLARE @ProductCode VARCHAR(50)
 	SELECT @ProductCode = ProductPrefix FROM dbo.Product3rd WITH(NOLOCK) WHERE Productid = @ProductID
 
-	CREATE TABLE #PartyList (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT)
-	INSERT INTO #PartyList EXEC LA_PartyListSel
+	DECLARE @IsConvertNegativeFeeToZero BIT, @IsConvertNegativePaytoSupplierToZero BIT
+	SELECT @IsConvertNegativeFeeToZero = IsConvertNegativeFeeToZero, @IsConvertNegativePaytoSupplierToZero = IsConvertNegativePaytoSupplierToZero  FROM LA_VendorPaymentSetting WITH(NOLOCK) WHERE ProductId = @ProductID
+
+	CREATE TABLE #PartyList (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT, IsKeepNegativeAmount BIT DEFAULT 0)
+	INSERT INTO #PartyList (PartyId, PartyName, BrandName, ParentId) EXEC LA_PartyListSel
+
+	UPDATE #PartyList SET PartyName = REPLACE(PartyName,' Licensees','') WHERE ParentId = 0
+
+	UPDATE t 
+	SET t.IsKeepNegativeAmount = CASE WHEN u.PartyId IS NULL THEN 0 ELSE 1 END 
+	FROM #PartyList t 
+	LEFT JOIN bodb_Licensee.dbo.LA_f_JVPartyListSel() u ON u.PartyId = t.PartyId
 
 	CREATE TABLE #ChargeRate (
 		ChargeId		INT
@@ -37,7 +47,7 @@ SET NOCOUNT ON
 	)
 	-- ​Pay to Supplier: equals 40%(0.4) of [Licensing Fee]
 	-- Except CN88 = 1.5%
-	INSERT INTO #ChargeRate
+	INSERT INTO #ChargeRate(ChargeID, PartyID, LicenseeID, isDeposit, ProductID, Rate, Rate3rd, Fromdate, Todate)
 	SELECT c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate, 0.4, c.Fromdate, c.Todate
 	FROM LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, @ProductCode) c
 
@@ -45,7 +55,7 @@ SET NOCOUNT ON
 	BEGIN
 		DECLARE @EffectiveDateForNewRate DATE = '20191201'
 
-		INSERT INTO #ChargeRate
+		INSERT INTO #ChargeRate(ChargeID, PartyID, LicenseeID, isDeposit, ProductID, Rate, Rate3rd, Fromdate, Todate)
 		SELECT c.ChargeId, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.Rate, c.Rate3rd, c.Fromdate, DATEADD(DAY,-1,@EffectiveDateForNewRate)
 		FROM #ChargeRate c
 		WHERE Fromdate < @EffectiveDateForNewRate AND @EffectiveDateForNewRate <= ToDate
@@ -84,7 +94,9 @@ SET NOCOUNT ON
 		LicenseeWinloss MONEY,
 		LicensingFee	MONEY,
 		ExtraPT 		MONEY,
-		PayToSupplier	MONEY)
+		PayToSupplier	MONEY,
+		IsKeepNegativeAmount BIT
+		)
 
 	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,ExtraPT,Turnover,HouseTurnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
 	SELECT ci.PartyId,
@@ -146,10 +158,11 @@ SET NOCOUNT ON
 	UPDATE td SET
 		PartyName = p.PartyName,
 		ParentId = pa.PartyId,
-		ParentName = pa.PartyName
+		ParentName = pa.PartyName,
+		IsKeepNegativeAmount = p.IsKeepNegativeAmount
 	FROM #TempData td
 		INNER JOIN #PartyList p ON td.PartyID = p.PartyId
-		INNER JOIN #PartyList pa ON P.ParentId = PA.PartyId
+		INNER JOIN #PartyList pa ON P.ParentId = pa.PartyId
 		
 	--Region Update PayToSupplier = 0.015 * Licensee WL for CN88
 	UPDATE td SET
@@ -194,22 +207,39 @@ SET NOCOUNT ON
 	BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies)
 
-		INSERT INTO @Total (PartyId, Currency,TotalTrans,Turnover,HouseTurnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,ExtraPT,PayToSupplier,CompanyIncome)
-		SELECT 
-			CASE WHEN  td.PartyID = 14 THEN 14 ELSE  ParentId END ParentId,
-			@tempCurrency AS Currency,
-			SUM(td.TotalTrans),
-			SUM(td.Turnover * e.BaseCurrencyRate),
-			SUM(td.HouseTurnover * e.BaseCurrencyRate),
-			SUM(td.CustomerWinLoss * e.BaseCurrencyRate),
-			SUM(td.LicenseeWinLoss * e.BaseCurrencyRate),
-			SUM(td.LicensingFee * e.BaseCurrencyRate),
-			SUM(td.ExtraPT * e.BaseCurrencyRate),
-			SUM(td.PayToSupplier * e.BaseCurrencyRate),
-			SUM((LicensingFee - ExtraPT - PayToSupplier) * e.BaseCurrencyRate) AS CompanyIncome
+		;WITH t AS
+		(
+			SELECT 
+				CASE WHEN  td.PartyID = 14 THEN 14 ELSE  td.ParentId END ParentId,
+				td.PartyId,
+				td.IsKeepNegativeAmount,
+				@tempCurrency AS Currency,
+				SUM(td.TotalTrans) AS TotalTrans,
+				SUM(td.Turnover * e.BaseCurrencyRate) Turnover,
+				SUM(td.HouseTurnover * e.BaseCurrencyRate) HouseTurnover,
+				SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss,
+				SUM(td.LicenseeWinLoss * e.BaseCurrencyRate) LicenseeWinLoss, 
+				SUM(td.LicensingFee * e.BaseCurrencyRate) LicensingFee,
+				SUM(td.ExtraPT * e.BaseCurrencyRate) ExtraPT,
+				SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier,
+				SUM((LicensingFee - ExtraPT - PayToSupplier) * e.BaseCurrencyRate) AS CompanyIncome
 			FROM #TempData td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e
 			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.Winlostdate
-			GROUP BY CASE WHEN  td.PartyID = 14 THEN 14 ELSE  ParentId END
+			GROUP BY CASE WHEN  td.PartyId = 14 THEN 14 ELSE td.ParentId END, td.PartyId, td.IsKeepNegativeAmount
+		)
+		INSERT INTO @Total (PartyId, Currency,TotalTrans,Turnover,HouseTurnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,ExtraPT,PayToSupplier,CompanyIncome)
+		SELECT	ParentId, @tempCurrency, 
+				SUM(TotalTrans),
+				SUM(Turnover),
+				SUM(HouseTurnover),
+				SUM(CustomerWinLoss),
+				SUM(LicenseeWinLoss),
+				SUM(CASE WHEN LicensingFee < 0 AND  @IsConvertNegativeFeeToZero = 1 AND  IsKeepNegativeAmount = 0 THEN 0 ELSE LicensingFee END),
+				SUM(ExtraPT),
+				SUM(CASE WHEN PayToSupplier < 0 AND @IsConvertNegativePaytoSupplierToZero = 1 THEN 0 ELSE PayToSupplier END),
+				SUM(CASE WHEN LicensingFee < 0 AND  @IsConvertNegativeFeeToZero = 1 AND  IsKeepNegativeAmount = 0 THEN 0 ELSE LicensingFee END - ExtraPT - CASE WHEN PayToSupplier < 0 AND @IsConvertNegativePaytoSupplierToZero = 1 THEN 0 ELSE PayToSupplier END)
+		FROM t	
+		GROUP BY ParentId
 
 		INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,HouseTurnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,ExtraPT,PayToSupplier,CompanyIncome)
 		SELECT Currency,
@@ -258,6 +288,36 @@ SET NOCOUNT ON
 		CAST((r.LicensingFee - ExtraPT - r.PayToSupplier) * e.Rate AS MONEY) AS CompanyIncome
 	FROM #TempData r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.Winlostdate = e.ExchangeDate
 	
+	;WITH totalByParty AS
+		(
+		SELECT r.PartyId, r.PartyName, r.ParentId,
+			SUM(r.TotalTrans) AS TotalTrans,
+			SUM(r.Turnover * e.Rate) Turnover,
+			SUM(r.HouseTurnover * e.Rate) HouseTurnover,
+			SUM(r.CustomerWinLoss * e.Rate) CustomerWinLoss,
+			SUM(r.LicenseeWinLoss * e.Rate) LicenseeWinLoss,
+			SUM(r.LicensingFee * e.Rate) LicensingFee,
+			SUM(r.ExtraPT * e.Rate) ExtraPT,
+			SUM(r.PayToSupplier * e.Rate) PayToSupplier,
+			r.IsKeepNegativeAmount
+		FROM #TempData r
+			INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeId AND r.WinLostDate = e.ExchangeDate
+		GROUP BY r.PartyId, r.PartyName, r.ParentId, r.IsKeepNegativeAmount
+		)
+		SELECT	PartyId, 
+				PartyName, 
+				CASE WHEN PartyId = 14 THEN 14 ELSE ParentId END ParentId, 
+				TotalTrans, 
+				Turnover, 
+				HouseTurnover,
+				CustomerWinLoss, 
+				LicenseeWinLoss, 
+				CASE WHEN LicensingFee < 0 AND IsKeepNegativeAmount = 0 AND @IsConvertNegativeFeeToZero = 1 THEN 0 ELSE  LicensingFee END LicensingFee, 
+				ExtraPT,
+				CASE WHEN PayToSupplier <0 AND @IsConvertNegativePaytoSupplierToZero = 1 THEN 0 ELSE PayToSupplier END PayToSupplier, 
+				CASE WHEN LicensingFee < 0 AND IsKeepNegativeAmount = 0 AND @IsConvertNegativeFeeToZero = 1 THEN 0 ELSE  LicensingFee END - ExtraPT - CASE WHEN PayToSupplier <0 AND @IsConvertNegativePaytoSupplierToZero = 1 THEN 0 ELSE PayToSupplier END  AS CompanyIncome
+		FROM totalByParty
+
 	-- Select Grand Total
 	SELECT 	CurrencyName	,
 			TotalTrans		,
@@ -272,7 +332,18 @@ SET NOCOUNT ON
 	FROM @GrandTotal
 	
 	-- Total
-	SELECT * FROM @Total WHERE Currency = @BaseCurrencyName
+	SELECT	PartyId			,
+			TotalTrans		,
+			Turnover		,
+			HouseTurnover	,
+			CustomerWinLoss	,
+			LicenseeWinLoss	,
+			LicensingFee	,
+			ExtraPT 		,
+			PayToSupplier	,
+			CompanyIncome	,
+			Currency		
+		FROM @Total WHERE Currency = @BaseCurrencyName
 	
 	-- End Region
 	

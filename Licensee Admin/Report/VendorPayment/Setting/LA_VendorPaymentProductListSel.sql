@@ -47,11 +47,12 @@ BEGIN
 		),
 		permission_list AS
 		(
-			SELECT REPLACE(f.FunctionKey,'vendorpayment_','') ProductPrefix
+			SELECT REPLACE(f.FunctionKey,'VendorPaymentInDetails_','') ProductPrefix
 			FROM dbo.LA_UserFunction u WITH(NOLOCK)
 			INNER JOIN func_list f ON u.FunctionID = f.FunctionID
 			WHERE  UserID =  @UserID AND u.StatusID = 1
-		)
+		), result AS
+		(
 		SELECT		CASE WHEN t.ProductPrefix = 'BetBuilder' THEN 1000
 						 WHEN t.ProductPrefix = 'MuayThai'	 THEN 1001
 						 ELSE p.Productid END AS ProductID,
@@ -61,6 +62,12 @@ BEGIN
 					t.ProductPrefix AS ProductCode
 		FROM		permission_list t
 		LEFT JOIN	dbo.Product3rd p WITH(NOLOCK) ON t.ProductPrefix = p.ProductPrefix
+		)
+		SELECT r.ProductID, r.ProductName, r.ProductCode
+		FROM result r
+		INNER JOIN LA_VendorPaymentSetting lv WITH(NOLOCK) ON r.ProductID = lv.ProductId
+		WHERE lv.IsActive = 1
+		ORDER BY r.ProductID
 	END 
 
 END

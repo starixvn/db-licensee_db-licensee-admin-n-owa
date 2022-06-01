@@ -6,7 +6,7 @@ ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template9]
 	@ToDate				DATETIME,
 	@BaseCurrencyName	VARCHAR(20),
 	@TimeZoneId			INT,
-	@IsGroupByLicensee BIT = 0
+	@GroupByLicensee BIT = 0
 AS
 /*
  * Created by : [20220405@Danny]
@@ -377,7 +377,7 @@ BEGIN
 
 		IF @BaseCurrencyName=@TempCurrency
 		BEGIN
-			IF @IsGroupByLicensee=1 BEGIN
+			IF @GroupByLicensee=1 BEGIN
 				SELECT	CASE WHEN r.PartyId = 14 THEN '12Bet' ELSE g.PartyName END AS GroupName,
 						p.PartyName,
 						r.PartyId,

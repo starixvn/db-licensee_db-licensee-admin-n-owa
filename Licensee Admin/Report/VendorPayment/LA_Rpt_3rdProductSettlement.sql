@@ -20,6 +20,7 @@ AS
 	- 20220218@Danny: Allbet - Promotion integration [#167510]
 	- 20220407@Percy: Calculate Licensee Fee base on LicenseeContribution [RedmineID: #171190]
 	- 20220328@Danny: Intergrate Guaranteed Gaming [#167626]
+	- 20210623@Danny: Fix PaytoSuplier PPL issue [#168387]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
@@ -417,13 +418,22 @@ BEGIN
 	LEFT JOIN bodb_Licensee.dbo.LA_f_JVPartyListSel() u ON u.PartyId = t.PartyId
 	
 	-- Get 3rd Rate
-	INSERT INTO #3rdRate (PartyID, ProductID, DI_Rate, IsDeposit, Fromdate, Todate)
-	SELECT DISTINCT p.PartyId, r.ProductID, CASE WHEN ProductID = 10 OR (ProductID = 32 AND IsDeposit = 0) THEN 0 ELSE r.DI_Rate END, r.IsDeposit, r.Fromdate, r.Todate 
-	FROM (	SELECT DISTINCT r.PartyID, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r. Todate	
+	;WITH r AS(	SELECT DISTINCT r.PartyID, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r. Todate, r.IsParent	
 			FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCodes3rd, 'OA') r 
 			WHERE r.ChargeType = 1
-		 ) r
-	INNER JOIN #PartyList p on p.ParentId = r.PartyID 
+		 ) 
+	INSERT INTO #3rdRate (PartyID, ProductID, DI_Rate, IsDeposit, Fromdate, Todate)
+	SELECT DISTINCT p.PartyId, r.ProductID, CASE WHEN ProductID = 10 OR (ProductID = 32 AND IsDeposit = 0) THEN 0 ELSE r.DI_Rate END, r.IsDeposit, r.Fromdate, r.Todate 
+	FROM r
+	INNER JOIN #PartyList p ON ( 
+									(p.ParentId = r.PartyID AND r.ProductID <> 31) 
+									OR 
+									(
+										(p.ParentId = r.PartyID AND r.ProductID = 31 AND r.IsParent = 1 AND p.PartyId NOT IN (Select r.PartyID FROM r WHERE r.IsParent = 0)) 
+										OR
+										(p.PartyId = r.PartyID AND r.ProductID = 31 AND r.IsParent = 0)
+									)
+								)
 	CREATE CLUSTERED INDEX CIX_#3rdRate ON #3rdRate(ProductID, PartyID)
 
 	INSERT INTO #ChargeInfoWithCredit (PartyID, ProductID, IsDeposit, Fromdate, Todate, DI_Rate, ChargeType, LicenseeID, ChargeID )
@@ -463,7 +473,7 @@ BEGIN
 															  WHEN @FromDate >= CAST('2020-07-01' AS DATETIME) THEN 0.036
 															  WHEN p.ParentId IN (@CreditGroupId, @12BetGroupId) OR @FromDate >= CAST('2018-8-1' AS DATETIME) THEN 0.03 
 															  ELSE 0.05 END
-						 WHEN c.ProductID = 40 THEN CASE WHEN @FromDate >= CAST('2020-07-01' AS DATETIME) THEN CASE WHEN p.ParentId IN (@TianboPartyId, @BobbetPartyId) THEN 0.02 ELSE 0.036  END 
+						 WHEN c.ProductID = 40 THEN CASE WHEN @FromDate >= CAST('2020-07-01' AS DATETIME) THEN CASE WHEN p.PartyId IN (@TianboPartyId, @BobbetPartyId) THEN 0.02 ELSE 0.036  END 
 														 ELSE ISNULL(r.DI_Rate,0)  END
 						 ELSE ISNULL(r.DI_Rate,0) END AS Rate3rd, 
 					c.Fromdate, 
@@ -1458,8 +1468,6 @@ BEGIN
 		SELECT ParentId, ParentName, ProductID,LicensingFee,PayToSupplier,LicensingFee - PayToSupplier FROM @PPTotal 
 	END
 
-
-
 	INSERT INTO @Total (ParentId, ParentName, ProductID,TotalTrans,CustomerWinLoss,LicenseeWinLoss,LicensingFee,ExtraPT,PayToSupplier,CompanyIncome,IncomeOnBB,IncomeOnProfitSharing,AmtDueToOnBB,AmtDueToOnProfitSharing,CustomerWinLossBA,CommissionA)
 	SELECT 
 		CASE WHEN  td.PartyId = 14 THEN 14 ELSE td.ParentId END,
@@ -1495,16 +1503,52 @@ BEGIN
 	GROUP BY 	CASE WHEN  td.PartyId = 14 THEN 14 ELSE td.ParentId END,
 				CASE WHEN  td.PartyId = 14 THEN '12Bet' ELSE td.ParentName END, td.ProductID
 
+
+	IF EXISTS(SELECT 1 FROM strSplit(@ProductCodes,',') WHERE val = 'PPL') 
+	BEGIN
+		-- Total
+		;WITH CTE_Sum AS (
+			SELECT CASE WHEN r.PartyId = 14 THEN 14 ELSE p.ParentId END ParentId, br.BaseCurrencyName, SUM(r.LicenseeWinloss * br.Rate) AS LicenseeWinloss
+			FROM #TempData r
+				INNER JOIN #PartyList p ON p.PartyId = r.PartyId
+				INNER JOIN @BaseCurrencyRate br ON r.CurrencyId = br.ExchangeId AND r.WinLostDate = br.ExchangeDate
+			WHERE r.ProductID = 65
+			GROUP BY CASE WHEN r.PartyId = 14 THEN 14 ELSE p.ParentId END, br.BaseCurrencyName
+		), CTE_3rdRate AS (
+			SELECT DISTINCT p.ParentId, br.BaseCurrencyName, r.MinAmount * br.Rate AS MinAmount, r.MaxAmount * br.Rate AS MaxAmount, r.Rate
+			FROM #3rdRatePPL r
+				INNER JOIN #PartyList p ON p.PartyId = r.PartyId
+				INNER JOIN @BaseCurrencyRate br ON r.CurrencyId = br.ExchangeId AND br.ExchangeDate = @ToDate
+		), CTE_Final AS (
+			SELECT s.ParentId, s.BaseCurrencyName, SUM(CASE WHEN 
+														(CASE WHEN s.LicenseeWinloss <= r.MaxAmount THEN s.LicenseeWinloss ELSE r.MaxAmount END - r.MinAmount) * r.Rate < 0  THEN 0
+														ELSE (CASE WHEN s.LicenseeWinloss <= r.MaxAmount THEN s.LicenseeWinloss ELSE r.MaxAmount END - r.MinAmount) * r.Rate END
+													  ) AS PayToSupplier
+			FROM CTE_Sum s
+				INNER JOIN CTE_3rdRate r ON s.ParentId = r.ParentId AND s.BaseCurrencyName = r.BaseCurrencyName AND (s.LicenseeWinloss > r.MinAmount OR (s.LicenseeWinloss < 0 AND r.MinAmount = 0))
+			GROUP BY s.ParentId, s.BaseCurrencyName
+		)
+		UPDATE t
+		SET t.PayToSupplier = ISNULL(f.PayToSupplier, 0)
+		FROM @Total t
+			LEFT JOIN CTE_Final f ON t.ParentId = f.ParentId AND f.BaseCurrencyName = @BaseCurrencyName
+		WHERE t.ProductID = 65
+
+		UPDATE t
+		SET t.CompanyIncome = t.LicensingFee - t.PayToSupplier
+		FROM @Total t
+		WHERE t.ProductID = 65
+	END
+
 	-- Final result
 	SELECT td.ParentId AS BillingGroupId,  
 			td.ParentName AS BillingGroupName, 
 			td.ProductID, 
 			p.ProductName ,
 			td.LicensingFee, 
-			CASE WHEN td.ProductID IN (10,24,27,22) AND td.PayToSupplier < 0 THEN 0
-				 WHEN td.ProductID = 25 THEN CASE WHEN  IncomeOnBB > IncomeOnProfitSharing THEN AmtDueToOnBB ELSE AmtDueToOnProfitSharing END
+			CASE WHEN td.ProductID = 25 THEN CASE WHEN  IncomeOnBB > IncomeOnProfitSharing THEN AmtDueToOnBB ELSE AmtDueToOnProfitSharing END
 				 ELSE td.PayToSupplier END PayToSupplier, 
-			CASE WHEN td.ProductID IN (10,24,27,22) THEN td.LicensingFee - CASE WHEN td.PayToSupplier < 0 THEN 0 ELSE td.PayToSupplier END
+			CASE WHEN td.ProductID IN (10) THEN td.LicensingFee - td.PayToSupplier
 				 WHEN td.ProductID = 25 THEN td.LicensingFee -  CASE WHEN  IncomeOnBB > IncomeOnProfitSharing THEN AmtDueToOnBB ELSE AmtDueToOnProfitSharing END
 				 WHEN td.ProductID = -1 THEN td.LicensingFee - (td.CustomerWinLossBA + CommissionA) -  CASE WHEN td.PayToSupplier < 0 THEN 0 ELSE td.PayToSupplier END
 			ELSE td.CompanyIncome END  CompanyIncome
@@ -1522,7 +1566,4 @@ BEGIN
 	DROP TABLE  #Result
 	DROP TABLE  #AllbetPlayCurrency
 END
-
-
-
 GO

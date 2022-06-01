@@ -1,5 +1,5 @@
 ﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
-CREATE PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template12]
+ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template12]
 	@PartyIds			VARCHAR(4000),
 	@ProductID			INT,
 	@FromDate			DATETIME,
@@ -16,6 +16,7 @@ AS
  */
 
 BEGIN
+	SET NOCOUNT ON
 	-- Region: Charge Info
 	DECLARE @PartyChargeInfo AS TABLE (
 		ChargeId	INT,
@@ -47,6 +48,8 @@ BEGIN
 
 	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC LA_PartyListSel
+
+	UPDATE @PartyList SET PartyName = REPLACE(PartyName,' Licensees','') WHERE ParentId = 0
 
 	-- Endregion
 
@@ -169,42 +172,41 @@ BEGIN
 		ParentId			INT,
 		ParentName			VARCHAR(100),
 		WinLossDate			DATETIME,
-		CurrencyName		VARCHAR(20),
+		CurrencyId			INT,
 		TotalTrans			INT,
 		Turnover			MONEY,
 		CustomerWinLoss		MONEY,
 		WinLossShare		MONEY,
 		LicenseeComm		MONEY,
 		CommissionShare		MONEY,
-		AmountDueLicensee	MONEY,
-		AmountDueMuayThai	MONEY,
-		AmountDueCompany	MONEY
+		LicensingFee	MONEY,
+		PayToSupplier	MONEY,
+		CompanyIncome	MONEY
 	)
-
-	INSERT INTO #Result (PartyId, PartyName, WinLossDate, CurrencyName, ParentId, ParentName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, CommissionShare, AmountDueLicensee)
-	SELECT p.PartyId, p.PartyName, td.rptDate, e.CurrencyCode
-		, td.IsDeposit
-		, CASE WHEN td.IsDeposit = 1 THEN 'Deposit' ELSE 'Credit' END
-		, SUM(td.TotalTrans)
-		, SUM(td.Turnover*e.Rate)
-		, SUM(td.MemberWL*e.Rate)
-		, SUM(td.WLShare*e.Rate)
-		, SUM(td.LicComm*e.Rate)
-		, SUM(td.CommShare*e.Rate)
-		, SUM(td.AmtLicensee*e.Rate)
+	INSERT INTO #Result (PartyId, PartyName, WinLossDate, CurrencyId, ParentId, ParentName, TotalTrans, Turnover, CustomerWinLoss, WinLossShare, LicenseeComm, CommissionShare, LicensingFee)
+	SELECT	p.PartyId, 
+			p.PartyName, 
+			td.rptDate, 
+			td.CurrencyId,
+			pa.PartyId, 
+			pa.PartyName, 
+			SUM(td.TotalTrans),
+			SUM(td.Turnover),
+			SUM(td.MemberWL),
+			SUM(td.WLShare),
+			SUM(td.LicComm),
+			SUM(td.CommShare),
+			SUM(td.AmtLicensee)
 	FROM #TempData td
-		INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
 		INNER JOIN @PartyList p ON td.PartyId = p.PartyID
-	GROUP BY p.PartyId, p.PartyName, td.rptDate, e.CurrencyCode
-		, td.IsDeposit
-		, CASE WHEN td.IsDeposit = 1 THEN 'Deposit' ELSE 'Credit' END
-
+		INNER JOIN @PartyList pa ON p.ParentId = pa.PartyId	
+	GROUP BY p.PartyId, p.PartyName, td.rptDate, td.CurrencyId,pa.PartyId, pa.PartyName
 
 	UPDATE #Result
-	SET AmountDueMuayThai = WinLossShare + CommissionShare
+	SET PayToSupplier = WinLossShare + CommissionShare
 
 	UPDATE #Result
-	SET AmountDueCompany = AmountDueLicensee - AmountDueMuayThai
+	SET CompanyIncome = LicensingFee - PayToSupplier
 	-- EndRegion
 
 	-- Region: Grand total data
@@ -220,6 +222,20 @@ BEGIN
 	-- support THB
 	INSERT INTO @BaseCurrencies(Id, Name)VALUES(4,'THB')
 
+	CREATE TABLE #Total (
+		PartyId			INT,
+		Currency		VARCHAR(20),
+		TotalTrans		INT,
+		Turnover		MONEY,
+		CustomerWinLoss		MONEY,
+		WinLossShare		MONEY,
+		LicenseeComm		MONEY,
+		CommissionShare		MONEY,
+		LicensingFee	MONEY,
+		PayToSupplier	MONEY,
+		CompanyIncome	MONEY
+	)
+
 	CREATE TABLE #GrandTotal (
 		CurrencyName	VARCHAR(20),
 		TotalTrans		INT,
@@ -228,47 +244,126 @@ BEGIN
 		WinLossShare		MONEY,
 		LicenseeComm		MONEY,
 		CommissionShare		MONEY,
-		AmountDueLicensee	MONEY,
-		AmountDueMuayThai	MONEY,
-		AmountDueCompany	MONEY
+		LicensingFee	MONEY,
+		PayToSupplier	MONEY,
+		CompanyIncome	MONEY
 	)
 
 	WHILE EXISTS (SELECT * FROM @BaseCurrencies WHERE IsApply IS NULL)
 	BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies WHERE IsApply IS NULL)
-		DELETE FROM #Exchange
-		INSERT INTO #Exchange(ExchangeDate, ExchangeID, CurrencyCode, Rate)
-		SELECT ExchangeDate, ExchangeID, Code, BaseCurrencyRate
-		FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency)
 
-		INSERT INTO #GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,WinLossShare,LicenseeComm,CommissionShare,AmountDueLicensee)
-		SELECT	@tempCurrency,
-				SUM(td.TotalTrans),
-				SUM(td.Turnover*e.Rate),
-				SUM(td.MemberWL*e.Rate),
-				SUM(td.WLShare*e.Rate),
-				SUM(td.LicComm*e.Rate),
-				SUM(td.CommShare*e.Rate),
-				SUM(td.AmtLicensee*e.Rate)
-		FROM #TempData td
-			INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND e.ExchangeDate = td.rptDate
+		;WITH TotalByParty AS(
+			SELECT CASE WHEN td.PartyID = 14 THEN 14 ELSE td.ParentId END ParentId, td.PartyId,
+				SUM(td.TotalTrans) TotalTrans,
+				SUM(td.Turnover*e.BaseCurrencyRate) Turnover,
+				SUM(td.CustomerWinLoss*e.BaseCurrencyRate) CustomerWinLoss,
+				SUM(td.WinLossShare*e.BaseCurrencyRate) WinLossShare,
+				SUM(td.LicenseeComm*e.BaseCurrencyRate) LicenseeComm,
+				SUM(td.CommissionShare*e.BaseCurrencyRate) CommissionShare,
+				SUM(td.LicensingFee*e.BaseCurrencyRate) LicensingFee
+			FROM #Result td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e
+			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
+			GROUP BY CASE WHEN td.PartyID = 14 THEN 14 ELSE td.ParentId END, td.PartyId
+		)
+		INSERT INTO #Total (PartyId,Currency,TotalTrans,Turnover,CustomerWinLoss,WinLossShare,LicenseeComm,CommissionShare,LicensingFee, PayToSupplier, CompanyIncome)
+		SELECT ParentId, @tempCurrency,
+			SUM(TotalTrans),
+			SUM(Turnover),
+			SUM(CustomerWinLoss),
+			SUM(WinLossShare),
+			SUM(LicenseeComm),
+			SUM(CommissionShare),
+			SUM(LicensingFee),
+			SUM(WinLossShare + CommissionShare),
+			SUM(LicensingFee - WinLossShare - CommissionShare)
+		FROM TotalByParty
+		GROUP BY ParentId
+
+		INSERT INTO #GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,WinLossShare,LicenseeComm,CommissionShare,LicensingFee, PayToSupplier, CompanyIncome)
+		SELECT @tempCurrency,
+			SUM(TotalTrans),
+			SUM(Turnover),
+			SUM(CustomerWinLoss),
+			SUM(WinLossShare),
+			SUM(LicenseeComm),
+			SUM(CommissionShare),
+			SUM(LicensingFee),
+			SUM(PayToSupplier),
+			SUM(CompanyIncome)
+		FROM #Total
+		WHERE Currency = @tempCurrency
+		GROUP BY Currency
 
 		UPDATE @BaseCurrencies SET IsApply = 1 WHERE Name = @tempCurrency
 	END
-
-	UPDATE #GrandTotal
-	SET AmountDueMuayThai = WinLossShare + CommissionShare
-
-	UPDATE #GrandTotal
-	SET AmountDueCompany = AmountDueLicensee - AmountDueMuayThai
 	--EndRegion
 
-	SELECT * FROM #Result
+	SELECT 
+		r.PartyId,
+		r.PartyName,
+		CASE WHEN r.PartyId = 14 THEN 14 ELSE r.ParentId END ParentId,
+		CASE WHEN r.PartyId = 14 THEN '12Bet' ELSE r.ParentName END ParentName,
+		r.WinLossDate,
+		e.CurrencyCode AS CurrencyName,
+		-- Select by origin currency
+		r.TotalTrans,
+		r.Turnover AS TurnoverOriginal,
+		CAST((r.CustomerWinLoss) AS MONEY) AS CustomerWinLossOriginal,
+		CAST((r.WinLossShare) AS MONEY) AS WinLossShareOriginal,
+		CAST((r.LicenseeComm) AS MONEY) AS LicenseeCommOriginal,
+		CAST((r.CommissionShare) AS MONEY) AS CommissionShareOriginal,
+		CAST((r.LicensingFee) AS MONEY) AS LicensingFeeOriginal,
+		CAST((r.PayToSupplier) AS MONEY) AS PayToSupplierOriginal,
+		CAST((r.CompanyIncome) AS MONEY) AS  CompanyIncomeOriginal,
+		-- Select by base currency
+		r.Turnover * e.Rate  AS Turnover,
+		CAST((r.CustomerWinLoss * e.Rate) AS MONEY) AS CustomerWinLoss,
+		CAST((r.WinLossShare * e.Rate) AS MONEY) AS WinLossShare,
+		CAST((r.LicenseeComm * e.Rate) AS MONEY) AS LicenseeComm,
+		CAST((r.CommissionShare * e.Rate) AS MONEY) AS CommissionShare,
+		CAST((r.LicensingFee * e.Rate) AS MONEY) AS LicensingFee,
+		CAST((r.PayToSupplier * e.Rate)  AS MONEY) AS PayToSupplier,
+		CAST((r.CompanyIncome * e.Rate)  AS MONEY)  AS  CompanyIncome
+	FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.WinLossDate = e.ExchangeDate
+
+	;WITH TotalByParty AS(
+			SELECT ParentId, td.PartyId, td.PartyName,
+				SUM(td.TotalTrans) TotalTrans,
+				SUM(td.Turnover * e.Rate) Turnover,
+				SUM(td.CustomerWinLoss * e.Rate) CustomerWinLoss,
+				SUM(td.WinLossShare * e.Rate) WinLossShare,
+				SUM(td.LicenseeComm * e.Rate) LicenseeComm,
+				SUM(td.CommissionShare * e.Rate) CommissionShare,
+				SUM(td.LicensingFee * e.Rate) LicensingFee,
+				SUM(td.PayToSupplier * e.Rate) PayToSupplier,
+				SUM(td.CompanyIncome * e.Rate) CompanyIncome
+			FROM #Result td INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND td.WinLossDate = e.ExchangeDate
+			GROUP BY td.ParentId, td.PartyId, td.PartyName
+		)
+
+	SELECT CASE WHEN PartyId = 14 THEN 14 ELSE ParentId END ParentId,
+		PartyId,
+		PartyName,
+		TotalTrans,
+		Turnover,
+		CustomerWinLoss,
+		WinLossShare,
+		LicenseeComm,
+		CommissionShare,
+		LicensingFee,
+		PayToSupplier,
+		CompanyIncome
+	FROM TotalByParty
+
 	SELECT * FROM #GrandTotal
+
+	SELECT * FROM #Total WHERE Currency = @BaseCurrencyName
 
 	DROP TABLE #TempData
 	DROP TABLE #Exchange
 	DROP TABLE #Result
 	DROP TABLE #GrandTotal
+	DROP TABLE #Total
 END
 GO

@@ -7,7 +7,6 @@ ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template3]
 	@SportType			INT	= 0, 
 	@BetType			INT	= 0, 
 	@drawfilter			SMALLINT	= 1, 
-	@IsConvert			BIT			= 1, 
 	@BaseCurrencyName	VARCHAR(10)	= 'EUR',
 	@TimeZoneId			INT
 AS
@@ -60,6 +59,8 @@ BEGIN
 
 	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC bodb_licensee.dbo.LA_PartyListSel
+
+	UPDATE @PartyList SET PartyName = REPLACE(PartyName,' Licensees','') WHERE ParentId = 0
 		
 	DELETE p
 	FROM @PartyList p
@@ -125,7 +126,9 @@ BEGIN
 			AND b.status NOT IN (-1, 101, 102, 103)
 			AND (b.CurrencyID <> 20)
 			AND b.bettype IN (SELECT bettype FROM dbo.LA_f_BettypeProductMapping(0,@ProductCode))
-			AND (@Sporttype = 0 OR ( @Sporttype<>0 AND l.Sporttype = @Sporttype))
+			AND (	( @Sporttype = 0 AND l.sporttype IN (SELECT DISTINCT SportType FROM bodb02.dbo.SportBettypeMatrix x WITH(NOLOCK) WHERE x.ProductID = @ProductID))
+					OR ( @Sporttype<>0 AND l.Sporttype = @Sporttype)
+				)
 			AND (@bettype = 0 OR (b.bettype = @bettype AND @bettype <> 0))
 			AND b.customercategory NOT IN (27,28)
 		GROUP BY b.rptDate,b.currencyID,c.PartyID,c.PartyName,l.sporttype, b.bettype
@@ -146,7 +149,7 @@ BEGIN
 	FROM d
 		INNER JOIN #TempExchange ex ON d.rptDate = ex.exchangedate and d.currencyID = ex.ExchangeId		
 	GROUP BY d.PartyId, d.sporttype, d.bettype, d.rptDate, d.PartyName
-	ORDER BY d.rptDate ASC, d.PartyName, d.sporttype, d.bettype
+	
 	
 	Update r
 	SET PayToSupplier = GrossWinloss * ci_3rd.Rate,
@@ -154,8 +157,29 @@ BEGIN
 	FROM #Result r
 		INNER JOIN @Charge3rdInfos ci_3rd ON r.PartyId = ci_3rd.PartyId
 
-	SELECT PartyName, WinLossDate, SportType, BetType, BetCount, Turnover, GrossWinloss, PayToSupplier, OneworksIncome, NetIncome
-	FROM #Result
+	SELECT	r.PartyName, 
+			FORMAT (r.WinLossDate, 'MMMM yyyy') WinLossDate, 
+			r.SportType, 
+			ISNULL(sp.SportName,r.SportType) SportTypeName,
+			r.BetType,
+			CASE WHEN typeid BETWEEN 81 AND 120 THEN 'NG - ' + b.typenamee
+			 WHEN typeid BETWEEN 1201 AND 1299 THEN 'VS - ' + b.typenamee +
+				CASE WHEN b.typeid = 1204 THEN ' (Soccer)'
+					 WHEN b.typeid = 1235 THEN ' (Tennis)'
+					 ELSE ''
+				END
+			 ELSE ISNULL(b.typenamee, r.BetType)
+			END BetTypeName,
+			r.BetCount AS TotalTransaction, 
+			r.Turnover, 
+			r.GrossWinloss AS GrossWin, 
+			r.PayToSupplier, 
+			r.OneworksIncome AS AmountCompany, 
+			r.NetIncome
+	FROM #Result r
+	LEFT JOIN bodb02.dbo.Sports sp WITH(NOLOCK) ON sp.SportType = r.SportType
+	LEFT JOIN bodb02.dbo.bettype b WITH(NOLOCK) ON b.typeid = r.BetType
+	ORDER BY r.PartyName, r.WinLossDate ASC,  r.sporttype, r.bettype
 	-- End Region: Return Result
 
 	DROP TABLE  #TempExchange	
