@@ -52,293 +52,219 @@ AS
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 		- 20210720@Percy: Check invoice number is already used [RedmineID: #147006]
+		- 20220418@Percy: Remove code update InvItemTypeId [RedmineID: #164139]
 */
 
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @GrossDiscount SMALLINT = 28
+	DECLARE @CurrentTime DATETIME = GETDATE(), @NewInvoiceHeaderId INT
 
-	DECLARE 
-		@startRun		DATETIME, 
-		@endRun			DATETIME, 
-		@duration		INT, 
-		@logSPData		NVARCHAR(MAX) 
+	-- For Log
+	DECLARE @startTime DATETIME, @duration INT, @logSPData NVARCHAR(MAX)
+	SET @startTime = @CurrentTime
 
-	SET @startRun = GETDATE()
+	-- Parse XML
+	DECLARE @Statement TABLE (ItemType SMALLINT, Amount MONEY, Description NVARCHAR(500), Reference NVARCHAR(100), ProductId INT)
+	DECLARE @Statement_XML XML
 
-	IF ISNULL(@BillerId, 0) = 0
-		OR ISNULL(@PartyId,0) = 0
-		OR ISNULL(@InvoiceSymbol, '') = ''
-		OR ISNULL(@InvoiceNumber, 0) <= 0
-		OR ISNULL(@DueDate, '') = ''
-		OR ISNULL(@StatementXml, '') = ''
-		OR @Amount IS NULL
-		OR ISNULL(@InvoiceTypeId, 0) <= 0
-		OR ISNULL(@UserID, 0) = 0
-		OR ISNULL(@Environment,'') = ''
+	IF ISNULL(@StatementXml, '') <> ''
 	BEGIN
-		SET @ErrCode = 1
-		SET @ErrMsg = 'Invalid invoice header inputs.'
-		RETURN
-	END
+		SELECT @Statement_XML = CONVERT(XML, @StatementXml)
 
-	-- Region: Check invoice number
-	IF EXISTS (	SELECT	1
-				FROM dbo.LA_InvoiceHeader WITH(NOLOCK)
-				WHERE InvoiceSymbol = @InvoiceSymbol
-					AND InvoiceNumber = @InvoiceNumber
-					AND Environment = @Environment
-					AND BillerId = @BillerId
-					AND PartyId = @PartyId
-					AND ISNULL(StatusId, 0) <> -1 -- 0: normal, -1: void, 1: closed
-	)
-	BEGIN
-		SET @ErrCode = 6
-		SET @ErrMsg = 'Invoice number is in use.'
-		RETURN
+		INSERT INTO @Statement (ItemType, Amount, Description, Reference, ProductId)
+		SELECT s.ItemType, s.Amount, s.Description, s.Reference, ISNULL(p.ProductId, -1)
+		FROM (
+			SELECT
+				t.c.value('(ItemType/text())[1]', 'SMALLINT') AS ItemType
+				,t.c.value('(Amount/text())[1]', 'MONEY') AS Amount
+				,t.c.value('(Description/text())[1]', 'NVARCHAR(500)') AS Description
+				,t.c.value('(Reference/text())[1]', 'NVARCHAR(100)') AS Reference
+				,t.c.value('(ProductCode/text())[1]', 'VARCHAR(50)') AS ProductCode
+			FROM @Statement_XML.nodes('Statements/Statement') t(c)
+		) s
+			LEFT JOIN dbo.LA_f_Products3rd('') p ON s.ProductCode = p.ProductPrefix
+		OPTION (OPTIMIZE FOR (@Statement_XML = NULL))
 	END
-	-- End Region
-
-	-- Region: Insert data to Invoice Header
-	DECLARE @CurrencyId INT
-	SELECT TOP 1 @CurrencyId = BaseCurrencyId
-	FROM OAS_PartyBaseCurrency WITH(NOLOCK)
-	WHERE PartyID = @PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
 	
-	IF(@CurrencyId IS NULL)
+	-- Validate input data
 	BEGIN
-		SET @CurrencyId = 6 -- default EUR
-	END
-
-	BEGIN TRY
-		DECLARE @CurrentDateTime DATETIME = GETDATE()
-
-		-- generate Invoice No.
-		DECLARE @InvoiceNo VARCHAR(50) =  CAST(@InvoiceNumber AS VARCHAR(10))
-		SET @InvoiceNo = @InvoiceSymbol + (CASE WHEN @InvoiceNumber < 100 THEN RIGHT('000' + @InvoiceNo, 3) ELSE @InvoiceNo END)
-
-		-- generate filename
-		DECLARE @PartyName VARCHAR(50) = (SELECT REPLACE(CASE WHEN ISNULL(d.BrandName,'') = '' THEN p.PartyName ELSE d.BrandName END,' ', '-')
-			FROM dbo.OAS_Party p WITH(NOLOCK)
-			INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
-			WHERE p.PartyID = @PartyId
-		)
-
-		SET @InvoiceFileName = (SELECT REPLACE(b.BillerName,' ','-') + '-INV-' + @InvoiceNo + '-for-' + @PartyName + '.pdf'
-			FROM dbo.LA_BillerInfo b WITH(NOLOCK)
-			WHERE b.PartyId = @BillerId
-		)
-
-		INSERT INTO dbo.LA_InvoiceHeader (BillerId, PartyId, CurrencyId, InvoiceSymbol, InvoiceNumber, FromDate, ToDate, InvoiceDate, DueDate, Amount, InvoiceType, StatusId, Note, HasSent, HasDeleted, CreatedBy, CreatedDateTime, IsSeparateProduct, MaxPCU, RateAmount, IsWaived, InvoicePath, Environment, OfficialInvoiceNo)
-		VALUES
-		(
-				@BillerId,
-				@PartyId,
-				@CurrencyId,
-				@InvoiceSymbol,
-				@InvoiceNumber,
-				@FromDate,
-				@ToDate,
-				@InvoiceDate,
-				@DueDate,
-				@Amount,
-				@InvoiceTypeId,
-				0,
-				@Note,
-				0,
-				0,
-				@UserID,
-				@CurrentDateTime,
-				@IsSeparateProduct,
-				@HostingFeeMaxPCU,
-				@HostingFeeRateAmount,
-				@HostingFeeIsWaived,
-				@InvoiceFileName,
-				@Environment,
-				@InvoiceNo
-		)
-	END TRY
-	BEGIN CATCH
-		IF(@@ERROR <> 0)
+		IF ISNULL(@BillerId, 0) = 0
+			OR ISNULL(@PartyId, 0) = 0
+			OR ISNULL(@InvoiceSymbol, '') = ''
+			OR ISNULL(@InvoiceNumber, 0) <= 0
+			OR ISNULL(@DueDate, '') = ''
+			OR ISNULL(@StatementXml, '') = ''
+			OR ISNULL(@InvoiceTypeId, 0) <= 0
+			OR ISNULL(@UserID, 0) = 0
+			OR ISNULL(@Environment, '') = ''
+			OR @Amount IS NULL
 		BEGIN
-			SELECT @ErrCode = 3, @ErrMsg = 'Insert invoice failed.' -- System error
+			SELECT @ErrCode = 1, @ErrMsg = 'Invalid invoice header inputs.'
 			RETURN
 		END
-	END CATCH
-	DECLARE @CurrentInvoiceHeaderId BIGINT = SCOPE_IDENTITY()
-	-- End Region
 
-	-- Region: Insert data to Invoice Detail
-	DECLARE @Settlements AS TABLE(
-		[Description]	NVARCHAR(500),
-		Amount			MONEY,
-		ItemType		TINYINT,
-		Reference		NVARCHAR(100),
-		ProductId		INT,
-		Id				INT IDENTITY(1,1) NOT NULL
-	)
-	BEGIN TRY
-		DECLARE @idoc AS INT						
-		EXEC	sp_xml_preparedocument @idoc OUTPUT, @StatementXml			
-		INSERT INTO @Settlements([Description],Amount,ItemType,Reference,ProductId)
-		SELECT 
-			[Description],
-			CAST(Amount		AS MONEY),
-			CAST(ItemType	AS TINYINT),
-			Reference,
-			ISNULL(p.ProductID, -1)
-		FROM OPENXML(@idoc, 'Statements/Statement')
-		WITH (
-			[Description]	NVARCHAR(500)	'Description',
-			Amount			VARCHAR(20)		'Amount',
-			ItemType		VARCHAR(10)		'ItemType',
-			Reference		VARCHAR(100)	'Reference',
-			ProductCode		VARCHAR(10)		'ProductCode'
-		) s
-		LEFT JOIN dbo.LA_f_Products3rd('') p ON s.ProductCode = p.ProductPrefix
-		EXEC sp_xml_removedocument @idoc
-		
-		-- credit note = 4
-		-- debit note  = 5
-		-- debit note for return AMF = 10
-		IF @InvoiceTypeId IN (4,5,10)
+		-- Check invoice number
+		IF EXISTS (
+			SELECT 1
+			FROM dbo.LA_InvoiceHeader WITH (NOLOCK)
+			WHERE BillerId = @BillerId AND PartyId = @PartyId
+				AND InvoiceSymbol = @InvoiceSymbol AND InvoiceNumber = @InvoiceNumber
+				AND Environment = @Environment AND ISNULL(StatusId, 0) <> -1 -- 0: normal, -1: void, 1: closed
+		)
 		BEGIN
-			-- verify statements
-			SELECT s.*, h.InvoiceType INTO #StatementsHeader
-			FROM @Settlements s
-			LEFT JOIN dbo.LA_InvoiceHeader h on s.Reference = h.OfficialInvoiceNo 
-				AND h.StatusId <> -1 -- void
-				AND h.PartyId = @PartyId
-				AND h.BillerId = @BillerId
-
-			-- wrong invoice no
-			DECLARE @WrongInvoiceNo NVARCHAR(200) = STUFF((
-				SELECT ',', '''' + s.Reference + ''''
-				FROM #StatementsHeader s WHERE s.InvoiceType IS NULL
-				FOR XML PATH('')
-			),1,1,'')
-
-			IF @WrongInvoiceNo IS NOT NULL
-			BEGIN
-				DELETE dbo.LA_InvoiceHeader WHERE InvoiceHeaderId=@CurrentInvoiceHeaderId
-				SELECT	@ErrCode = 4, @ErrMsg = 'Unknown Invoice No. ' + @WrongInvoiceNo
-				RETURN
-			END
-
-			-- update itemtype
-			-- invoice type: data fee: 1      -  rebate: 3   - Setupfee: 7       - creditnote: 4
-			-- item type:    data fee: debit(11),credit(12)  -  rebate: debit(13),credit(14)
-			--
-			UPDATE s SET s.ItemType = (CASE WHEN sh.InvoiceType = 1 THEN
-						CASE WHEN @InvoiceTypeId = 4 THEN 12 ELSE 11 END
-					WHEN sh.InvoiceType = 3 THEN
-						CASE WHEN @InvoiceTypeId = 4 THEN 14 ELSE 13 END
-					WHEN sh.InvoiceType = 7 AND @InvoiceTypeId = 4 THEN 12 -- credit note for setup fee
-					ELSE NULL
-				END)
-			FROM #StatementsHeader sh
-			INNER JOIN @Settlements s ON s.Id = sh.Id
-			WHERE @InvoiceTypeId <> 10
-
-			-- wrong item type
-			--
-			SET @WrongInvoiceNo = STUFF((
-				SELECT ',', '''' + s.Reference + ''''
-				FROM @Settlements s
-				LEFT JOIN dbo.LA_InvoiceTypeMapping m WITH(NOLOCK) ON m.InvItemTypeId = s.ItemType AND m.InvTypeId = @InvoiceTypeId
-				WHERE m.InvItemTypeId IS NULL OR s.ItemType IS NULL
-				FOR XML PATH('')
-			),1,1,'')
-
-			IF @WrongInvoiceNo IS NOT NULL
-			BEGIN
-				DELETE dbo.LA_InvoiceHeader WHERE InvoiceHeaderId=@CurrentInvoiceHeaderId
-				SELECT	@ErrCode = 5, @ErrMsg = 'Wrong Invoice No. ' + @WrongInvoiceNo + ' for this item type.'
-				RETURN
-			END
-
-			DROP TABLE #StatementsHeader
+			SELECT @ErrCode = 6, @ErrMsg = 'Invoice number is in use.'
+			RETURN
 		END
 
-		INSERT INTO dbo.LA_InvoiceStatement(InvoiceHeaderId, InvItemTypeId, [Description], RefNo, RefPartyId, ProductId, Income, Expense)
-		SELECT @CurrentInvoiceHeaderId, d.ItemType, d.[Description], d.Reference, @PartyId,
-			ISNULL(ProductId, -1),
-			CASE WHEN it.GroupDB = 'Income' THEN d.Amount * it.SignDB ELSE NULL END AS Income,
-			CASE WHEN it.GroupDB = 'Expense' THEN d.Amount * it.SignDB ELSE NULL END AS Expense
-		FROM @Settlements d
-		INNER JOIN LA_InvoiceItemType it ON d.ItemType = it.InvItemTypeId				
-		
-		UPDATE dbo.LA_InvoiceHeader WITH(ROWLOCK,UPDLOCK)
-		SET Amount = (SELECT (SUM(ISNULL(s.Income, 0))- SUM(ISNULL(s.Expense, 0))) 
-						FROM  dbo.LA_InvoiceStatement s WITH(NOLOCK)
-						WHERE s.InvoiceHeaderId = @CurrentInvoiceHeaderId AND s.InvItemTypeId <> @GrossDiscount)
-		WHERE InvoiceHeaderId = @CurrentInvoiceHeaderId
+		-- Check Reference
+		DECLARE @WrongInvoiceNo NVARCHAR(200)
 
-		-- month of deduction
-		-- setup fee=7
-		-- amf = 3
-		DECLARE @AMF MONEY = (SELECT SUM(Amount) FROM @Settlements WHERE ItemType=3)
-		IF @InvoiceTypeId = 7 AND ISNULL(@AMF, 0) > 0 AND @Environment IN ('PRO','LOCAL','DEV')
+		IF @InvoiceTypeId IN (4, 5, 10)
 		BEGIN
-			-- find active minfee
-			-- minfee=1
+			-- 4 = Credit Note
+			-- 5 = Debit Note
+			-- 10 = Debit Note for return AMF
+
+			-- Wrong Reference Refno
+			;WITH CTE_WrongReference AS (
+				SELECT DISTINCT s.Reference
+				FROM @Statement s
+					LEFT JOIN dbo.LA_InvoiceHeader h WITH (NOLOCK)
+						ON s.Reference = h.OfficialInvoiceNo
+							AND ISNULL(h.StatusId, 0) <> -1 -- void
+							AND h.PartyId = @PartyId
+							AND h.BillerId = @BillerId
+				WHERE h.OfficialInvoiceNo IS NULL
+			)
+			SELECT @WrongInvoiceNo = STUFF((SELECT ',', '''' + Reference + '''' FROM CTE_WrongReference FOR XML PATH('')), 1, 1, '')
+
+			IF @WrongInvoiceNo IS NOT NULL
+			BEGIN
+				SELECT @ErrCode = 4, @ErrMsg = 'Unknown Invoice No. ' + @WrongInvoiceNo
+				RETURN
+			END
+
+			-- Wrong InvItemType
+			;WITH CTE_WrongReference AS (
+				SELECT DISTINCT s.Reference
+				FROM @Statement s
+					LEFT JOIN dbo.LA_InvoiceTypeMapping m WITH (NOLOCK) ON m.InvItemTypeId = s.ItemType AND m.InvTypeId = @InvoiceTypeId
+				WHERE m.InvItemTypeId IS NULL
+			)
+			SELECT @WrongInvoiceNo = STUFF((SELECT ',', '''' + Reference + '''' FROM CTE_WrongReference FOR XML PATH('')), 1, 1, '')
+
+			IF @WrongInvoiceNo IS NOT NULL
+			BEGIN
+				SELECT @ErrCode = 5, @ErrMsg = 'Wrong Invoice No. ' + @WrongInvoiceNo + ' for this item type.'
+				RETURN
+			END
+		END
+	END
+
+	-- Insert invoice
+	BEGIN TRY
+		DECLARE @BaseCurrencyId INT = 6 -- default: EUR
+		SELECT  @BaseCurrencyId = ISNULL(BaseCurrencyId, 6)
+		FROM dbo.OAS_PartyBaseCurrency WITH (NOLOCK)
+		WHERE PartyID = @PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
+
+		DECLARE @InvoiceNo NVARCHAR(50) = CONVERT(NVARCHAR(15), @InvoiceNumber)
+		SELECT  @InvoiceNo = @InvoiceSymbol + CASE WHEN @InvoiceNumber < 100 THEN RIGHT('00' + @InvoiceNo, 3) ELSE @InvoiceNo END
+
+		DECLARE @PartyName VARCHAR(50)
+		SELECT  @PartyName = REPLACE(ISNULL(NULLIF(d.BrandName, ''), p.PartyName), ' ', '-')
+		FROM dbo.OAS_Party p WITH (NOLOCK)
+			INNER JOIN dbo.OAS_PartyDetail d WITH (NOLOCK) ON p.PartyId = d.PartyId
+		WHERE p.PartyId = @PartyId
+
+		SELECT @InvoiceFileName = REPLACE(BillerName, ' ', '-') + '-INV-' + @InvoiceNo + '-for-' + @PartyName + '.pdf'
+		FROM dbo.LA_BillerInfo WITH (NOLOCK)
+		WHERE PartyId = @BillerId
+
+		IF EXISTS (SELECT 1 FROM @Statement WHERE ItemType <> 28) -- 28 = Gross Discount
+			SELECT @Amount = SUM(
+								ISNULL(CASE WHEN t.GroupDB = 'Income' THEN s.Amount * t.SignDB END, 0)
+								- ISNULL(CASE WHEN t.GroupDB = 'Expense' THEN s.Amount * t.SignDB END, 0)
+							)
+			FROM @Statement s
+				INNER JOIN dbo.LA_InvoiceItemType t WITH (NOLOCK) ON s.ItemType = t.InvItemTypeId
+			WHERE s.ItemType <> 28
+
+		INSERT INTO dbo.LA_InvoiceHeader (BillerId, PartyId, CurrencyId, InvoiceSymbol, InvoiceNumber, FromDate, ToDate, InvoiceDate, DueDate, Amount, InvoiceType, StatusId, Note, HasSent, HasDeleted, CreatedBy, CreatedDateTime, IsSeparateProduct, MaxPCU, RateAmount, IsWaived, InvoicePath, Environment, OfficialInvoiceNo)
+		VALUES (@BillerId, @PartyId, @BaseCurrencyId, @InvoiceSymbol, @InvoiceNumber, @FromDate, @ToDate, @InvoiceDate, @DueDate, @Amount, @InvoiceTypeId, 0, @Note, 0, 0, @UserID, @CurrentTime, @IsSeparateProduct, @HostingFeeMaxPCU, @HostingFeeRateAmount, @HostingFeeIsWaived, @InvoiceFileName, @Environment, @InvoiceNo)
+
+		SELECT @NewInvoiceHeaderId = SCOPE_IDENTITY()
+
+		INSERT INTO dbo.LA_InvoiceStatement (InvoiceHeaderId, InvItemTypeId, Description, RefNo, RefPartyId, ProductId, Income, Expense)
+		SELECT @NewInvoiceHeaderId, s.ItemType, s.Description, s.Reference, @PartyId, s.ProductId
+			,CASE WHEN t.GroupDB = 'Income' THEN s.Amount * t.SignDB ELSE NULL END AS Income
+			,CASE WHEN t.GroupDB = 'Expense' THEN s.Amount * t.SignDB ELSE NULL END AS Expense
+		FROM @Statement s
+			INNER JOIN dbo.LA_InvoiceItemType t WITH (NOLOCK) ON s.ItemType = t.InvItemTypeId
+
+		-- Update month of deduction
+		DECLARE @AMF MONEY
+		SELECT  @AMF = SUM(Amount) FROM @Statement WHERE ItemType = 3 -- AMF
+
+		IF @InvoiceTypeId = 7 AND ISNULL(@AMF, 0) > 0 AND @Environment IN ('PRO', 'LOCAL', 'DEV')
+		BEGIN
 			UPDATE m SET MonthOfDeduction = CEILING(@AMF / m.FeeAmount)
 			FROM dbo.LA_MinFee m WITH(NOLOCK)
 			WHERE m.FeeTypeId=1
 				AND m.PartyId = @PartyId
-				AND m.CurrencyId = @CurrencyId
+				AND m.CurrencyId = @BaseCurrencyId
 				AND @InvoiceDate BETWEEN m.FromDate AND m.ToDate
 		END
 	END TRY
 	BEGIN CATCH
-		DELETE dbo.LA_InvoiceHeader WHERE InvoiceHeaderId = @CurrentInvoiceHeaderId
-		DELETE dbo.LA_InvoiceStatement WHERE InvoiceHeaderId = @CurrentInvoiceHeaderId
-		SELECT	@ErrCode = 2, @ErrMsg = 'Invalid invoice detail inputs: ' + ERROR_MESSAGE()
+		DELETE dbo.LA_InvoiceHeader WHERE InvoiceHeaderId = @NewInvoiceHeaderId
+		DELETE dbo.LA_InvoiceStatement WHERE InvoiceHeaderId = @NewInvoiceHeaderId
+
+		SELECT @ErrCode = 3, @ErrMsg = 'Insert invoice failed.' -- System error
 		RETURN
 	END CATCH
-	-- End Region
 
-	SELECT @ErrCode = 0, @ErrMsg = 'Invoice saved successfully.', @NewInvoiceNumber = @InvoiceNumber, @NewInvoiceId = @CurrentInvoiceHeaderId
-
-	-- Region: Write Log
-	SET @endRun = GETDATE()
-	SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun)
-	DECLARE @xml XML = (
-		SELECT @CurrentInvoiceHeaderId AS '@hid'
-			, @BillerId			AS '@b'
-			, @PartyId			AS '@p'
-			, @CurrencyId		AS '@c'
-			, @InvoiceSymbol	AS '@is'
-			, @InvoiceNumber	AS '@in'
-			, @InvoiceDate		AS '@ivd'
-			, @DueDate			AS '@dd'
-			, @Amount			AS '@amt'
-			, @InvoiceTypeId	AS '@ivt'
-			, 0					AS '@stt'
-			, @Note				AS '@n'
-			, 0					AS '@hs'
-			, 0					AS '@hd'
-			, @UserID			AS '@cb'
-			, @CurrentDateTime	AS '@crd'
-			, @CurrentDateTime	AS '@upd'
-			, @InvoiceFileName	AS '@fn'
-			, @IsSeparateProduct	AS '@sp'
-			, @HostingFeeIsWaived	AS '@hfw'
-			, @HostingFeeMaxPCU		AS '@hfpcu'
-			, @HostingFeeRateAmount	AS '@hfam'
-			, (SELECT 
-				@CurrentInvoiceHeaderId AS '@hid'
-				, [Description]			AS '@d'
-				, Amount				AS '@amt'
-				, ItemType				AS '@at'
-				, Reference				AS '@rn'
-			FROM @Settlements
-			FOR XML PATH('d'), TYPE)
-		FOR XML PATH('h'), TYPE)
-	SET @logSPData = CAST(@xml AS NVARCHAR(MAX))
+	-- Insert successfully
+	SELECT @ErrCode = 0, @ErrMsg = 'Invoice saved successfully.', @NewInvoiceNumber = @InvoiceNumber, @NewInvoiceId = @NewInvoiceHeaderId
 
 	-- Write Log
+	SET @duration = DATEDIFF(MILLISECOND, @startTime, GETDATE())
+	DECLARE @xml XML = (
+		SELECT @NewInvoiceId	AS '@hid'
+			,@BillerId			AS '@b'
+			,@PartyId			AS '@p'
+			,@BaseCurrencyId	AS '@c'
+			,@InvoiceSymbol		AS '@is'
+			,@InvoiceNumber		AS '@in'
+			,@InvoiceDate		AS '@ivd'
+			,@DueDate			AS '@dd'
+			,@Amount			AS '@amt'
+			,@InvoiceTypeId		AS '@ivt'
+			,0					AS '@stt'
+			,@Note				AS '@n'
+			,0					AS '@hs'
+			,0					AS '@hd'
+			,@UserID			AS '@cb'
+			,@CurrentTime		AS '@crd'
+			,@CurrentTime		AS '@upd'
+			,@InvoiceFileName	AS '@fn'
+			,@IsSeparateProduct	AS '@sp'
+			,@HostingFeeIsWaived	AS '@hfw'
+			,@HostingFeeMaxPCU		AS '@hfpcu'
+			,@HostingFeeRateAmount	AS '@hfam'
+			,(SELECT 
+				@NewInvoiceId	AS '@hid'
+				,Description	AS '@d'
+				,Amount			AS '@amt'
+				,ItemType		AS '@at'
+				,Reference		AS '@rn'
+			FROM @Statement
+			FOR XML PATH('d'), TYPE)
+		FOR XML PATH('h'), TYPE)
+	
+	SET @logSPData = CAST(@xml AS NVARCHAR(MAX))
+
 	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
 		@UserId			= @UserID
 		,@IP			= @LoginIP
@@ -349,6 +275,5 @@ BEGIN
 		,@Duration		= @duration
 		,@Data			= @logSPData
 		,@OldData		= ''
-	-- End Region
 END
 GO

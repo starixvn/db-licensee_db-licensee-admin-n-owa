@@ -16,6 +16,7 @@ AS
 		- 20191210@Bruce: Add promotion [#123958]
 		- 20210323@Percy: Add LicenseeCode column [RedmineID: #152089]
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
+		- 20220418@Percy: Add Credit for Setup Fees [RedmineID: #164139
 */
 BEGIN
 	SET NOCOUNT ON
@@ -33,6 +34,7 @@ BEGIN
 		LicenseeCode,
 		CurrencyName,
 		Others,
+		Others2,
 		Prepayment,
 		Promotion,
 		Sponsorship,
@@ -49,6 +51,7 @@ BEGIN
 		t.Party.value('@lc', 'VARCHAR(50)')	AS LicenseeCode,
 		t.Party.value('@cn', 'VARCHAR(10)') AS CurrencyName,
 		t.Party.value('@ot', 'MONEY')	AS Others,
+		t.Party.value('@ot2', 'MONEY')	AS Others2,
 		t.Party.value('@pp', 'MONEY')	AS Prepayment,
 		t.Party.value('@pm', 'MONEY')	AS Promotion,
 		t.Party.value('@ss', 'MONEY')	AS Sponsorship,

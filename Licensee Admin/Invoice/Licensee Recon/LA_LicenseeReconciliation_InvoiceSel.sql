@@ -33,6 +33,7 @@ AS
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 		- 20220222@Danny: Allbet - Promotion integration [#167510]
+		- 20220418@Percy: Add Credit for Setup Fees [RedmineID: #164139]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -67,7 +68,9 @@ BEGIN
 		,SUM(CASE WHEN InvItemTypeId = 6 THEN ISNULL(Expense,0) ELSE 0 END) Rebate
 		,SUM(CASE WHEN InvItemTypeId IN (5,24,26) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Prepayment
 		,SUM(CASE WHEN InvItemTypeId IN (11,12,13,14,17,20) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Others
+		,SUM(CASE WHEN InvItemTypeId = 45 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Others2
 		,SUM(CASE WHEN InvItemTypeId IN (3,25) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) AMF
+		,SUM(CASE WHEN InvItemTypeId = 46 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) AMF2
 		,SUM(CASE WHEN InvItemTypeId = 2 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) SetupFee
 		,SUM(CASE WHEN InvItemTypeId = 29 THEN ISNULL(Expense,0) ELSE 0 END) Promotion
 		,SUM(CASE WHEN InvItemTypeId = 44 THEN ISNULL(Expense,0) ELSE 0 END) Sponsorship
@@ -80,12 +83,20 @@ BEGIN
 	WHERE h.StatusId = 0-- normal invoice
 		AND h.InvoiceHeaderId NOT IN (6208, 6207) -- temporary exclude these credit notes
 		AND h.Environment = @Environment
-		AND (
-			(h.FromDate BETWEEN @FromDate AND @ToDate AND h.InvoiceType IN (1,3)) OR
-			(h.InvoiceDate BETWEEN @FromDate AND @ToDate AND h.InvoiceType = 7) OR
-			(h.InvoiceDate BETWEEN @N_FromDate AND @N_ToDate AND h.InvoiceType IN (4,5))
-		)
+		AND 1 = CASE
+					WHEN h.InvoiceType IN (1, 3) AND h.FromDate BETWEEN @FromDate AND @ToDate THEN 1
+					WHEN h.InvoiceType = 7 AND h.InvoiceDate BETWEEN @FromDate AND @ToDate THEN 1
+					WHEN h.InvoiceType = 4 AND s.InvItemTypeId IN (45, 46) AND h.InvoiceDate BETWEEN @FromDate AND @ToDate THEN 1
+					WHEN h.InvoiceType IN (4, 5) AND s.InvItemTypeId NOT IN (45, 46) AND h.InvoiceDate BETWEEN @N_FromDate AND @N_ToDate THEN 1
+					ELSE 0 END
 	GROUP BY p.LicenseeCode, b.CurrencyName, r.ProductName, p.PartyId
+
+	-- Deduct prepayment if Setup Fee & Credit Note for Setup Fee same month
+	UPDATE #result
+	SET AMF = AMF + AMF2
+	WHERE
+		(SetupFee <> 0 OR AMF <> 0)
+		AND (AMF2 <> 0)
 
 	IF @IsGroupByPartyId = 0
 	BEGIN
@@ -97,6 +108,7 @@ BEGIN
 			,SUM(Rebate) Rebate
 			,SUM(Prepayment) Prepayment
 			,SUM(Others) Others
+			,SUM(Others2) Others2
 			,SUM(SetupFee) SetupFee
 			,SUM(AMF) AMF
 			,SUM(Promotion) Promotion
@@ -114,6 +126,7 @@ BEGIN
 			,SUM(Rebate) Rebate
 			,SUM(Prepayment) Prepayment
 			,SUM(Others) Others
+			,SUM(Others2) Others2
 			,SUM(SetupFee) SetupFee
 			,SUM(AMF) AMF
 			,SUM(Promotion) Promotion
