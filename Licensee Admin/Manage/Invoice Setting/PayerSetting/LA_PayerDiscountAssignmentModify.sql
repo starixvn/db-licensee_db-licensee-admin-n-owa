@@ -19,6 +19,7 @@ AS
 	 Revisions:
 	 	- 20171219@Bruce: increase length for variables [#88197]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 	 
 	 Params:
 	 Example:
@@ -47,8 +48,8 @@ SET NOCOUNT ON
 	SELECT @DiscountTypeId = h.DiscountGroupType FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK) WHERE h.DiscountGroupId = @DiscountGroupId
 	DECLARE @PayerDiscountList AS TABLE (DiscountGroupId INT, PartyID INT)
 	INSERT INTO @PayerDiscountList(DiscountGroupId, PartyID)
-	SELECT @DiscountGroupId, val
-	FROM dbo.strSplit(@PayerList, ',')
+	SELECT @DiscountGroupId, value
+	FROM STRING_SPLIT(@PayerList, ',')
 
 	-- check still valid payer discount group
 	IF EXISTS( SELECT 1 FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)

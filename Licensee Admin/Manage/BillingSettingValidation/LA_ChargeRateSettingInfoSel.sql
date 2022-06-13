@@ -16,6 +16,7 @@ AS
 
 	Revisions:
 	- 20190625@Parsons: Validate billing configuration [#109600]
+	- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -39,7 +40,7 @@ BEGIN
 	FROM dbo.OAS_Party p WITH(NOLOCK) 
 	LEFT JOIN dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON p.PartyID = ci.FromParty
 	LEFT JOIN LA_ChargeInfo_SystemMapping cs WITH(NOLOCK) ON ci.ChargeID = cs.ChargeID
-	WHERE p.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
+	WHERE p.PartyId IN (SELECT value FROM STRING_SPLIT(@PartyIds,','))
 		AND p.PartyType IN (1,5) -- 1-official, 5-non-offcial
 		AND (cs.SystemID IS NULL OR cs.SystemID = 2)
 		AND (ci.ChargeType IS NULL OR ci.ChargeType NOT IN (2, 3)) -- odd type & type no longer use

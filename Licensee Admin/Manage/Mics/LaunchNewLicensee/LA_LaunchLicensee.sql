@@ -32,6 +32,7 @@ AS
 		- 20190829@Bruce: Adding Licensee Code [#111586] 
 		- 20210324@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 		- 20210811@Danny: Adding @InvoiceLanguage [#FeatureID 158133]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -92,7 +93,7 @@ BEGIN
 	DECLARE @Products TABLE (ProductId INT)
 	
 	INSERT INTO @Products(ProductId)
-	SELECT val FROM dbo.strSplit(@ProductIds, ',')
+	SELECT value FROM STRING_SPLIT(@ProductIds, ',')
 
 	-- #Region LicenseeProduct3rd
 	UPDATE dbo.LicenseeProduct3rd
@@ -124,7 +125,7 @@ BEGIN
 		INSERT INTO LA_UserParty (UserID, PartyID, Modifydate, Modifier, StatusID)
 		SELECT UserID, @NewPartyId, GETDATE(), @UserID, 1
 		FROM dbo.LA_User WITH (NOLOCK) 
-		WHERE Username IN (SELECT val FROM dbo.strSplit(@UserNames, ','))
+		WHERE Username IN (SELECT value FROM STRING_SPLIT(@UserNames, ','))
 
 		IF @@ERROR <> 0
 		BEGIN
@@ -137,7 +138,7 @@ BEGIN
 		INSERT INTO dbo.LA_FunctionParty (FunctionID, PartyID)
 		SELECT FunctionID, @NewPartyId
 		FROM dbo.LA_Function WITH (NOLOCK) 
-		WHERE FunctionKey IN (SELECT val FROM dbo.strSplit(@FunctionKeys, ','))
+		WHERE FunctionKey IN (SELECT value FROM STRING_SPLIT(@FunctionKeys, ','))
 
 		IF @@ERROR <> 0
 		BEGIN

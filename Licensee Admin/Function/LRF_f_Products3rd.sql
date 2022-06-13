@@ -14,6 +14,7 @@ AS
 	Revisions:
 		- 20160915@Jim: hard-code for testing Colossus Bets on UAT
 		- 20190702@Amanda: Remove wrong hard-code [RedmineID: #116107]
+		- 20220510@Danny: Use String_split built-in function [RemineID: #171831]
 */
 
 BEGIN     
@@ -30,8 +31,8 @@ BEGIN
 	BEGIN
 		INSERT INTO @tbProducts(ProductID, ProductPrefix, ProductName)
 		SELECT p.Productid, p.ProductPrefix, p.ProductName
-		FROM dbo.strSplit(@Products,',') s
-			LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON s.val = p.ProductPrefix
+		FROM STRING_SPLIT(@Products,',') s
+			LEFT JOIN dbo.Product3rd p WITH(NOLOCK) ON s.value = p.ProductPrefix
 	END
 
 	UPDATE @tbProducts

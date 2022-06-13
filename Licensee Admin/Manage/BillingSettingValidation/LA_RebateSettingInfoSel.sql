@@ -15,6 +15,7 @@ AS
 		- 20190626@Parsons: Validate billing configuration [#109600]
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 */
 
 BEGIN
@@ -29,7 +30,7 @@ BEGIN
 		LEFT JOIN LA_DiscountGroupHeader dg WITH(NOLOCK) ON dga.DiscountGroupId = dg.DiscountGroupId
 		LEFT JOIN LA_DiscountGroupProduct dgp WITH(NOLOCK) ON dga.DiscountGroupId = dgp.DiscountGroupId
 		LEFT JOIN LA_DiscountGroupDetail dgd WITH(NOLOCK) ON dga.DiscountGroupId = dgd.DiscountGroupId
-	WHERE p.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
+	WHERE p.PartyId IN (SELECT value FROM STRING_SPLIT(@PartyIds,','))
 			AND p.PartyID NOT IN (SELECT bg.PartyID FROM LA_f_BillingGroupSel() bg)
 			AND p.PartyID NOT IN (SELECT cl.PartyId FROM @CreditLicensees cl)
 			AND (dg.DiscountGroupType IS NULL OR dg.DiscountGroupType IN (2, 12, 22)) -- Rebate

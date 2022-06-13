@@ -16,6 +16,7 @@ AS
 
 	Revisions:
 	- 20190626@Parsons: Validate billing configuration [#109600]
+	- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -31,7 +32,7 @@ BEGIN
 		LEFT JOIN LA_MinFee mf WITH(NOLOCK) ON p.PartyID = mf.PartyId
 		LEFT JOIN LA_PartyGroupAssignment pga WITH(NOLOCK) ON p.PartyID = pga.PartyId
 		LEFT JOIN LA_PartyGroup pg WITH(NOLOCK) ON pg.PartyGroupId = pga.PartyGroupId
-	WHERE p.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
+	WHERE p.PartyId IN (SELECT value FROM STRING_SPLIT(@PartyIds,','))
 		  AND p.PartyID NOT IN (SELECT bg.PartyID FROM LA_f_BillingGroupSel() bg)
 		  AND pd.IsDeposit = 1
 END

@@ -28,6 +28,7 @@ AS
 		- 20200831@Mason: Remove redundant code of @PayerGroupId [#138249]
 		- 20210318@Mason: Change Base Currency Of Licensee [#151466]
 		- 20220118@Percy: Add Licensee Status Setting [RedmineID: #166751]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 
 	 Params:				
 */
@@ -86,7 +87,7 @@ BEGIN
 
 			--Rollback Minfee
 			IF ISNULL(@MinFeeInsertedList, 0) <> 0
-				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM dbo.strSplit(@MinFeeInsertedList, ','))
+				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT value FROM STRING_SPLIT(@MinFeeInsertedList, ','))
 			RETURN
 		END
 	--Modify Chargerate Setting
@@ -107,10 +108,10 @@ BEGIN
 
 			--Rollback Minfee
 			IF ISNULL(@MinFeeInsertedList, 0) <> 0
-				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM dbo.strSplit(@MinFeeInsertedList, ','))
+				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT value FROM STRING_SPLIT(@MinFeeInsertedList, ','))
 			--Rollback waive
 			IF ISNULL(@WaiveInsertedList, 0 ) <> 0
-				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT val FROM dbo.strSplit(@WaiveInsertedList, ','))
+				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT value FROM STRING_SPLIT(@WaiveInsertedList, ','))
 			RETURN
 		END
 END

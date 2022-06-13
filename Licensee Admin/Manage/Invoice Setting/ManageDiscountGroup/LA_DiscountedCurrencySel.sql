@@ -15,6 +15,7 @@ AS
 		- 20181116@Parsons: Configure discount settings by currency [#99694]
 		- 20200225@Parsons: Support-HID-currency [#128856]
 		- 20211101@Percy: Return applied currencies [RedmineID: #162158]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 
 	 Params:
 
@@ -57,7 +58,7 @@ BEGIN
 		WHERE a.PartyID = @PartyId
 		GROUP BY p.ProductId )
 
-	SELECT CONVERT(INT, s.val) AS ProductId, STUFF((
+	SELECT CONVERT(INT, s.value) AS ProductId, STUFF((
 				SELECT ', ' + ISNULL(CurrencyCode, '')
 				FROM CTE_DiscountSetting ds
 					INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON ds.DiscountGroupId = h.DiscountGroupId
@@ -65,7 +66,7 @@ BEGIN
 					INNER JOIN @CurrenciesOfLicensee tc ON (c.CurrencyId = 0 OR c.CurrencyId = tc.CurrencyId)
 				FOR XML PATH (''))
 			  , 1, 2, '') AS CurrencyNames
-	FROM dbo.strSplit(@ProductIds, ',') s
+	FROM STRING_SPLIT(@ProductIds, ',') s
 	-- End Region: select discounted currency of party
 END
 GO

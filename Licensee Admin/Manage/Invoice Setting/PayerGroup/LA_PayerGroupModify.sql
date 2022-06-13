@@ -20,6 +20,7 @@ AS
 	 Revisions:
 	 	- 20171219@Bruce: increase length for variables [#88197]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 	 
 	 Params:		
 	 Example:
@@ -46,8 +47,8 @@ SET NOCOUNT ON
 		SET @IsEdit = 1
 	
 	INSERT INTO @PayerGroupList(PayerGroupId, PartyID)
-	SELECT @PayerGroupId, val 
-	FROM dbo.strSplit(@PayerList, ',')
+	SELECT @PayerGroupId, value 
+	FROM STRING_SPLIT(@PayerList, ',')
 
 	--check case insert
 	IF EXISTS (SELECT 1 FROM dbo.LA_PartyGroup WITH (NOLOCK) WHERE PartyGroupName = @PayerGroupName AND @IsEdit = 0)

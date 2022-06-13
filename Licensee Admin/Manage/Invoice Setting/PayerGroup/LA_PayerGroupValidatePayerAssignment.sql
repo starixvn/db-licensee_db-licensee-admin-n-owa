@@ -16,7 +16,7 @@ AS
 	 
 	 Revisions:
 		- 20150423@Florent: Initialize SP
-		
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 	 Params:
 		+ @Mode : 
 			- R: Remove, A: Add
@@ -32,7 +32,7 @@ BEGIN
 	IF @Mode = 'A'
 	BEGIN
 		-- check exists
-		IF EXISTS (SELECT 1 FROM dbo.LA_PartyGroupAssignment a WITH (NOLOCK) WHERE a.PartyId IN (SELECT val FROM strSplit(@PayerIdList, ',')))
+		IF EXISTS (SELECT 1 FROM dbo.LA_PartyGroupAssignment a WITH (NOLOCK) WHERE a.PartyId IN (SELECT value FROM STRING_SPLIT(@PayerIdList, ',')))
 			BEGIN
 				SELECT @PayerNameList = COALESCE(@PayerNameList + ',' + '''' + CASE WHEN ISNULL(pp.BrandName, '') = '' THEN ISNULL(p.PartyName, '') ELSE ISNULL(pp.BrandName, '') END + ''''
 						, '''' + CASE WHEN ISNULL(pp.BrandName, '') = '' THEN ISNULL(p.PartyName, '') ELSE ISNULL(pp.BrandName, '') END + '''')
@@ -40,7 +40,7 @@ BEGIN
 					INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON a.PartyID = p.PartyID
 					INNER JOIN dbo.OAS_PartyDetail pp WITH(NOLOCK) ON a.PartyID = pp.PartyID
 					--INNER JOIN dbo.LA_InvoiceHeader inv WITH(NOLOCK) ON p.PartyId = inv.PartyId  --> todo
-				WHERE a.PartyId IN (SELECT val FROM strSplit(@PayerIdList, ','))
+				WHERE a.PartyId IN (SELECT value FROM STRING_SPLIT(@PayerIdList, ','))
 
 				SELECT @ErrMsg = 'Payer ' + @PayerNameList + ' cannot be add to the payer group, it is being applied!' , @ErrCode = 205					
 				RETURN
@@ -59,7 +59,7 @@ BEGIN
 			INNER JOIN dbo.OAS_PartyDetail pp WITH(NOLOCK) ON a.PartyID = pp.PartyID
 			--INNER JOIN dbo.LA_InvoiceHeader inv WITH(NOLOCK) ON p.PartyId = inv.PartyId  --> todo
 		WHERE h.PartyGroupId = @PayerGroupId
-			AND a.PartyId IN (SELECT val FROM strSplit(@PayerIdList, ','))
+			AND a.PartyId IN (SELECT value FROM STRING_SPLIT(@PayerIdList, ','))
 		IF ISNULL(@PayerNameList , '') = ''
 		BEGIN
 			SELECT @ErrMsg = 'Payer ' + @PayerNameList + ' cannot be removed out of the payer group, it is being applied!' , @ErrCode = 204

@@ -27,6 +27,7 @@ AS
 	 Revisions:     
 		- 20150904@Bravo: add default function permission
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 */
 SET NOCOUNT ON
 DECLARE
@@ -63,8 +64,8 @@ BEGIN
 		
 		--Add to Group Function
 		INSERT INTO dbo.LA_GroupFunction WITH (ROWLOCK) (GroupID,FunctionID)
-		SELECT val,@FunctionID
-		FROM dbo.strSplit(@GroupIDs,',')
+		SELECT value,@FunctionID
+		FROM STRING_SPLIT(@GroupIDs,',')
 		
 		-- Add to User Function
 		INSERT INTO dbo.LA_UserFunction

@@ -17,6 +17,7 @@ AS
 	Revisions:
 	- 20190620@Parsons: Validate billing configuration [#109600]
 	- 20190905@Bruce: Validate unofficial licensee code [#111586]
+	- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -28,7 +29,7 @@ BEGIN
 	SELECT c.LicenseeID,COUNT(c.Currency)
 	FROM dbo.LicenseeCust c WITH(NOLOCK)
 		INNER JOIN OAS_Party p WITH(NOLOCK) ON p.OldRefID = c.LicenseeID
-	WHERE p.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
+	WHERE p.PartyId IN (SELECT value FROM STRING_SPLIT(@PartyIds,','))
 		  AND c.Currency <> 20 -- test currency
 	GROUP BY c.LicenseeID
 
@@ -41,7 +42,7 @@ BEGIN
 	FROM OAS_Party p WITH(NOLOCK)
 	INNER JOIN OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID = d.PartyID
 	LEFT JOIN @tblLicenseeCurrency c ON c.LicenseeId = p.OldRefID
-	WHERE p.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
+	WHERE p.PartyId IN (SELECT value FROM STRING_SPLIT(@PartyIds,','))
 		AND p.PartyType NOT IN (2,3,4)
 		AND d.IsDeposit = 1
 	--(1, 'Payer'),

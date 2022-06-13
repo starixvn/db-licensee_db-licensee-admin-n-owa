@@ -43,6 +43,7 @@ AS
 		- 20190718@Bruce: Integrate CN88 data in LA [#116859]
 		- 20191211@Parsons: Non-peak hour promotion [#119538]
 		- 20210816@Sophia: add DBBAL [Redmine: #154300]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 
 */
 
@@ -58,13 +59,13 @@ BEGIN
 
 	INSERT INTO @ProductTable (ProductID, ProductPrefix)
 	SELECT CASE
-			WHEN s.val = 'SB'
+			WHEN s.value = 'SB'
 				THEN 0
 			ELSE p3.Productid
 			END
-			, s.val
-	FROM dbo.strSplit(@ProductCodes, ',') s
-		LEFT JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.val = p3.ProductPrefix
+			, s.value
+	FROM STRING_SPLIT(@ProductCodes, ',') s
+		LEFT JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.value = p3.ProductPrefix
 
 	INSERT INTO @Bettype(ProductId, BetTypeRef, Bettype)
 	SELECT pt.ProductID, sbr.BettypeRef, p.BetType
@@ -87,7 +88,7 @@ BEGIN
 	    FROM dbo.OAS_Party p WITH (NOLOCK)
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
 	    WHERE ChargeType != 2
-		  AND p.PartyID IN (SELECT VAL FROM strSplit(@PartyIDs, ','))
+		  AND p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIDs, ','))
 		  AND ci.ProductID NOT IN (SELECT Productid FROM dbo.LA_Product3rdSub WITH (NOLOCK))		  
 	    GROUP BY FromParty, ci.ProductID
 	)
@@ -126,8 +127,8 @@ BEGIN
 		LEFT JOIN @Cte_AffectDate cte ON cte.PartyID = p.PartyID
 			AND DI.ProductID = cte.ProductID
 	WHERE p.PartyID IN (
-			SELECT VAL
-			FROM strSplit(@PartyIDs, ',')
+			SELECT value
+			FROM STRING_SPLIT(@PartyIDs, ',')
 			)		
 		AND (
 			@FromDate BETWEEN DI.FromDate AND DI.ToDate
@@ -154,7 +155,7 @@ BEGIN
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
 			INNER JOIN dbo.OAS_ChargeInfoSub s WITH (NOLOCK) ON s.ChargeIDRef = ci.ChargeID AND s.FromParty = ci.FromParty
 	    WHERE ci.ChargeType != 2
-		  AND p.PartyID IN (SELECT VAL FROM strSplit(@PartyIDs, ','))		
+		  AND p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIDs, ','))		
 		  AND ci.ProductID IN (SELECT Productid FROM dbo.LA_Product3rdSub WITH (NOLOCK))	  
 	    GROUP BY ci.FromParty, ci.ProductID
 	)
@@ -195,8 +196,8 @@ BEGIN
 		LEFT JOIN @Cte_AffectDate cte ON cte.PartyID = p.PartyID
 			AND DI.ProductID = cte.ProductID
 	WHERE p.PartyID IN (
-			SELECT VAL
-			FROM strSplit(@PartyIDs, ',')
+			SELECT value
+			FROM STRING_SPLIT(@PartyIDs, ',')
 			)		
 		AND (
 			@FromDate BETWEEN sub.FromDate AND sub.ToDate
@@ -241,19 +242,19 @@ BEGIN
 			INNER JOIN dbo.Licensees l(NOLOCK) ON p.OldRefID = l.LicenseeID AND p.PartyType = 1	
 			INNER JOIN (
 					SELECT CASE 
-							WHEN s.val = 'SB'
+							WHEN s.value = 'SB'
 								THEN 0
 							ELSE p3.Productid
 							END AS Productid
 						 ,p3.ProductPrefix
-					FROM dbo.strSplit(@ProductCodes, ',') s
-					LEFT JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.val = p3.ProductPrefix
+					FROM STRING_SPLIT(@ProductCodes, ',') s
+					LEFT JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.value = p3.ProductPrefix
 					) pr ON pr.ProductPrefix = 'RB'
 			LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
 			LEFT JOIN dbo.labels lb(NOLOCK) ON l.LicenseeID = lb.LicenseeID
 		WHERE p.PartyID IN (
-				SELECT VAL
-				FROM strSplit(@PartyIDs, ',')
+				SELECT value
+				FROM STRING_SPLIT(@PartyIDs, ',')
 				)
 			AND (
 				l.AffectedDate IS NOT NULL
@@ -267,7 +268,7 @@ BEGIN
 	   INSERT INTO @tbChargeInfo (ChargeID, PartyID, LicenseeID, isDeposit, AffectedDate, ProductID, Bettype, DI_Rate, OW_Rate, PNR_Rate, Fromdate, Todate, ChargeType)
 	   (
 			SELECT DISTINCT 0 AS ChargeID
-				, f1.Val PartyId
+				, f1.value PartyId
 				, CASE 
 					WHEN ISNULL(pd.IsDeposit, 0) = 1
 						THEN p.OldRefID
@@ -288,8 +289,8 @@ BEGIN
 					ELSE @ToDate
 					END
 				, 1 AS ChargeType
-			FROM strSplit(@PartyIDs, ',') f1
-				INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON f1.Val = p.PartyID
+			FROM STRING_SPLIT(@PartyIDs, ',') f1
+				INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON f1.value = p.PartyID
 				LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
 				LEFT JOIN dbo.labels lb(NOLOCK) ON p.OldRefID = lb.LicenseeID
 				LEFT JOIN @Cte_AffectDate cte ON p.PartyID = cte.PartyID
@@ -304,7 +305,7 @@ BEGIN
 			UNION ALL
 
 			SELECT DISTINCT 0 AS ChargeID
-				, f1.Val PartyId
+				, f1.value PartyId
 				, CASE 
 					WHEN ISNULL(pd.IsDeposit, 0) = 1
 						THEN p.OldRefID
@@ -325,8 +326,8 @@ BEGIN
 					ELSE @ToDate
 					END
 				, 1 AS ChargeType
-			FROM strSplit(@PartyIDs, ',') f1
-				INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON f1.Val = p.PartyID
+			FROM STRING_SPLIT(@PartyIDs, ',') f1
+				INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON f1.value = p.PartyID
 				LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyID = p.PartyID
 				LEFT JOIN dbo.labels lb(NOLOCK) ON p.OldRefID = lb.LicenseeID
 				LEFT JOIN @Cte_AffectDate cte ON p.PartyID = cte.PartyID

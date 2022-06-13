@@ -16,6 +16,7 @@ AS
 
 	Revisions:
 	- 20190618@Parsons: Validate billing configuration [#109600]
+	- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -25,6 +26,6 @@ BEGIN
 			ISNULL(p.PartyType, 0) AS PartyType
 	FROM LA_BillerInfo b WITH(NOLOCK)
 	LEFT JOIN OAS_Party p WITH(NOLOCK) ON b.PartyId = p.PartyID
-	WHERE b.PartyId IN (SELECT val FROM dbo.strSplit(@PartyIds,','))
+	WHERE b.PartyId IN (SELECT value FROM STRING_SPLIT(@PartyIds,','))
 END
 GO

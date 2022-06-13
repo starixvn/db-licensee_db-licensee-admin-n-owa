@@ -19,6 +19,7 @@ AS
 	 Revisions:
 	 	- 20171219@Bruce: increase length for variables [#88197]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 	 
 	 Params:
 	 Example:
@@ -40,8 +41,8 @@ SET NOCOUNT ON
 	DECLARE @PayerGroupList AS TABLE (PayerGroupId INT, PartyID INT)
 
 	INSERT INTO @PayerGroupList(PayerGroupId, PartyID)
-	SELECT @PayerGroupId, val 
-	FROM dbo.strSplit(@PayerList, ',')
+	SELECT @PayerGroupId, value 
+	FROM STRING_SPLIT(@PayerList, ',')
 	--validate 
 	EXEC dbo.LA_PayerGroupValidatePayerAssignment
 		@PayerGroupId	= @PayerGroupId

@@ -18,6 +18,7 @@ AS
 		- 20210812@Percy: Initialize function [RedmineID: #159691]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20220210@Percy: Return OfferSite, EndOfSupportDate [RedmineID: #163495]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 */
 
 RETURN
@@ -67,4 +68,4 @@ RETURN
 	WHERE FromDate IS NOT NULL AND ToDate IS NOT NULL
 	) SELECT ProductId,ProductName,ProductCode,GroupProductId,GroupProductName,GroupProductCode, FromDate, ToDate, OfferSite, EndOfSupportDate
 	FROM cte
-	WHERE ( GroupProductCode IN (SELECT val FROM strSplit(@ProductCode,',')) OR @ProductCode = '')
+	WHERE ( GroupProductCode IN (SELECT value FROM STRING_SPLIT(@ProductCode,',')) OR @ProductCode = '')

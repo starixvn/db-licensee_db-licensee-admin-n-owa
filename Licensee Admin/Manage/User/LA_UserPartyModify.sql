@@ -18,6 +18,7 @@ AS
 	
 	Revisions:
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 */
 BEGIN
 SET NOCOUNT ON
@@ -82,9 +83,9 @@ SELECT
 	@UserID,
 	getdate(),
 	@creator,
-	val AS PartyID,
+	value AS PartyID,
 	1 --default statusID = 1
-FROM dbo.strSplit (@PartyIDs,',')
+FROM STRING_SPLIT (@PartyIDs,',')
 
 IF @@Error>0
 BEGIN

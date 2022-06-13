@@ -15,6 +15,7 @@ AS
 		- 20191211@Parsons: Non-peak hour promotion [#119538]
 		- 20210816@Sophia: add DBBAL [Redmine: #154300]
 		- 20220210@Percy: Return OfferSite, EndOfSupportDate [RedmineID: #163495]
+		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 */
 
 BEGIN   
@@ -33,7 +34,7 @@ BEGIN
 	BEGIN
 		DECLARE @ProductCodes TABLE (ProductCode VARCHAR(10))
 		INSERT INTO @ProductCodes(ProductCode)
-		SELECT val FROM dbo.strSplit(@Products, ',')
+		SELECT value FROM STRING_SPLIT(@Products, ',')
 
 		IF EXISTS(SELECT TOP 1 1 FROM @ProductCodes WHERE ProductCode = 'SB')
 		BEGIN
