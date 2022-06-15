@@ -23,6 +23,7 @@ AS
 		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 		- 20220222@Danny: Allbet - Promotion integration [#167510]
+		- 20220615@Percy: Fix issue can't get BTC & SLT under SB [RedmineID: #172584]
 */
 
 BEGIN
@@ -35,7 +36,7 @@ BEGIN
 	WHERE GroupProductId = @ProductId
 
 	DECLARE @ProductCode VARCHAR(MAX)
-	SELECT  @ProductCode = COALESCE(@ProductCode + ',', '') + ProductCode FROM @Products WHERE GroupProductId = ProductId
+	SELECT  @ProductCode = COALESCE(@ProductCode + ',', '') + ProductCode FROM @Products
 
 	DECLARE @tblSite TABLE (SiteId INT, Site VARCHAR(100))
 	INSERT INTO @tblSite (SiteId, Site)
