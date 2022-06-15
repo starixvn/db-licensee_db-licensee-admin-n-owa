@@ -10,25 +10,10 @@ AS
 
 	Revisions:
 		- 20171107@Bruce: create SP [RedmineID: #78294]
-		- 20220614@Danny: Use explicit temporary table  [RemineID: #171831]
 */
 BEGIN
 	SET NOCOUNT ON
 
-	CREATE TABLE #Files
-	(
-		[Filename]		VARCHAR(200),
-		PartyIds		VARCHAR(4000),
-		ProductCodes	VARCHAR(200),
-		FromDate		DATETIME,
-		ToDate			DATETIME,
-		IsSkinView		BIT,
-		BaseCurrency	VARCHAR(10),
-		[Status]		TINYINT,
-		IsMatched		BIT
-	)
-
-	INSERT INTO #Files ([Filename], PartyIds, ProductCodes, FromDate, ToDate, IsSkinView, BaseCurrency, [Status])
 	SELECT 
 		t.c.value('@name',		'varchar(200)')		AS [Filename], 
 		t.c.value('@partyids',	'varchar(4000)')	AS PartyIds,
@@ -39,6 +24,7 @@ BEGIN
 		t.c.value('@currency',	'varchar(10)')		AS BaseCurrency,
 		t.c.value('@status',	'tinyint')			AS [Status],
 		CAST(0 AS BIT) IsMatched
+	INTO #Files
 	FROM @files.nodes('files/file') t(c)
 
 	UPDATE fs SET [Status] = f.[Status], [FileName] = f.[FileName], IsMatched=1

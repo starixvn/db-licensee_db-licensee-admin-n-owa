@@ -21,7 +21,7 @@ AS
 		- 20190801@Parsons: Validate billing configuration [#109600]
 		- 20200113@Parsons: Billing term by currency [#120005]
 		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
-		- 20220614@Danny: Use explicit temporary table  [RemineID: #171831]
+		- 20220614@Danny: Use explicit temporary table  [RemineID: #174035]
 
 	Params:
 	Example:
@@ -45,7 +45,7 @@ BEGIN
 		FirstOfBilling	DATE,
 		BasisOfBilling	NVARCHAR(4000),
 		[Status]		INT,
-		IsInserted		TINYINT
+		IsInserted		BIT
 	)
 
 	DECLARE		@StartRun		DATETIME,
