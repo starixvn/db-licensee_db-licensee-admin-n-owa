@@ -22,6 +22,7 @@ AS
 		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220506@Percy: Change way get discount group type [RedmineID: #1732342]
+		- 20220616@Percy: Remove paryers with invalid base currency setting [RedmineID: #172584]
 */
 
 BEGIN
@@ -43,11 +44,12 @@ BEGIN
 		AND p.CalculationType IN (1, 10) -- 0 = calculated only, 1 = discount only, 10 = calculated & discount
 
 	UPDATE d
-	SET d.BaseCurrencyId = ISNULL(bc.BaseCurrencyId, 6), d.BaseCurrencyName = ISNULL(e.Code, 'EUR'), d.LicenseeCode = ISNULL(UPPER(bc.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), d.PartyId)
+	SET d.BaseCurrencyId = bc.BaseCurrencyId, d.BaseCurrencyName = e.Code, d.LicenseeCode = ISNULL(UPPER(bc.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), d.PartyId)
 	FROM @DiscountSetting d
-		LEFT JOIN dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON d.PartyId = bc.PartyId
+		LEFT JOIN dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON d.PartyId = bc.PartyId AND @ToDate BETWEEN bc.FromDate AND bc.ToDate
 		LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON bc.BaseCurrencyId = e.ExchangeId
-	WHERE @ToDate BETWEEN bc.FromDate AND bc.ToDate
+
+	DELETE @DiscountSetting WHERE BaseCurrencyId IS NULL
 
 	-- Base Exchange Rate
 	DECLARE @BaseCurrencyList TABLE (ExchangeId INT, ExchangeName VARCHAR(5))
@@ -55,6 +57,8 @@ BEGIN
 	SELECT DISTINCT BaseCurrencyId, BaseCurrencyName FROM @DiscountSetting
 
 	-- Get SB fee
+	DECLARE @tmpFDate DATETIME = @FromDate, @tmpTDate DATETIME = @ToDate
+	
 	DECLARE @Result TABLE
 	(
 		PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
@@ -76,8 +80,8 @@ BEGIN
 		EXEC dbo.LA_AmountToCompanyByProduct
 			@PartyIds = @PartyIds
 			,@ProductCodes = 'SB'
-			,@FromDate = @FromDate
-			,@ToDate = @ToDate
+			,@FromDate = @tmpFDate
+			,@ToDate = @tmpTDate
 			,@BaseCurrencyName = @BaseCurrencyName
 			
 		DELETE @BaseCurrencyList WHERE ExchangeId = @BaseCurrencyId
