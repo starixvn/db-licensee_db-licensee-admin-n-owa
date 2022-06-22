@@ -19,6 +19,7 @@ AS
 		- 20180403@Harper: Add more Cozni as parent license [RedmineID: #85681]
 		- 20180713@bruce: Add new group TEST for credit side [#98126]
 		- 20190821@Parsons: Improve the ability to maintain systems [#118627]
+		- 20220614@Danny: Use explicit temporary table  [RemineID: #174035]
 
 	Params:
 		+ UserID:
@@ -34,6 +35,8 @@ DECLARE @tmpCompany	AS TABLE (PartyID INT)
 DECLARE @tmpLicensee AS TABLE (Fromdate DATETIME,PartyID INT,PartyGroupID INT)
 DECLARE @CreditLicensee	AS TABLE (PartyID INT)
 
+CREATE TABLE #ListParty (FromDate DATE, FromParty INT)
+
 INSERT INTO @CreditLicensee
 SELECT PartyID FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE ISNULL(IsDeposit,0) = 0
 
@@ -42,8 +45,8 @@ SELECT PartyID
 FROM dbo.OAS_Party WITH (NOLOCK)
 WHERE PartyName IN ('ONEWorks','Boping', 'Zelianta', 'Cozni')
 
+INSERT INTO #ListParty(FromDate, FromParty)
 SELECT MAX(ci.FromDate) FromDate, ci.FromParty
-INTO #ListParty
 FROM OAS_ChargeInfo ci WITH (NOLOCK)
 	INNER JOIN
 		(
@@ -133,8 +136,10 @@ BEGIN
 
 	IF (@USERID > 0 AND @FunctionID > 0 ) --get Party List By User and Function
 	BEGIN
+		CREATE TABLE #userFunctionParty (PartyID INT, UserID INT, FunctionID INT, StatusID TINYINT)
+
+		INSERT INTO #userFunctionParty(PartyID, UserID, FunctionID, StatusID)
 		SELECT up.PartyID, Up.UserID, fp.FunctionID, Up.StatusID
-		INTO #userFunctionParty
 		FROM dbo.LA_UserParty Up WITH (NOLOCK)
 		    INNER JOIN dbo.LA_UserFunction UF WITH (NOLOCK) ON up.UserID = uf.UserID --permission of user
 		    INNER JOIN dbo.LA_FunctionParty FP WITH (NOLOCK) ON up.PartyID = fp.PartyID

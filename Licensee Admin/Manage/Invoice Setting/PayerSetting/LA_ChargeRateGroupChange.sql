@@ -21,12 +21,32 @@ AS
 		- 20190801@Parsons: Validate billing configuration [#109600]
 		- 20200113@Parsons: Billing term by currency [#120005]
 		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
+		- 20220614@Danny: Use explicit temporary table  [RemineID: #174035]
 
 	Params:
 	Example:
 */
 BEGIN
 	SET NOCOUNT ON
+
+	CREATE TABLE #ChangeRateTable
+	(
+		ChargeID		INT,
+		ProductID		INT,
+		FromParty		INT,
+		ToParty			INT,
+		ParentChargeID	INT,
+		Rate			MONEY,
+		ChargeType		TINYINT,
+		FromDate		DATE,
+		ToDate			DATE,
+		Remark			NVARCHAR(200),
+		BaseCurrencyId	TINYINT,
+		FirstOfBilling	DATE,
+		BasisOfBilling	NVARCHAR(4000),
+		[Status]		INT,
+		IsInserted		BIT
+	)
 
 	DECLARE		@StartRun		DATETIME,
 				@EndRun			DATETIME,
@@ -48,6 +68,7 @@ BEGIN
 	INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
 	WHERE ci.FromParty = @PartyId
 
+	INSERT INTO #ChangeRateTable (ChargeID, ProductID, FromParty, ToParty, ParentChargeID, Rate, ChargeType, FromDate, ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling, [Status], IsInserted)
 	SELECT DISTINCT c1.ChargeID, c1.ProductID, FromParty, ToParty, ParentChargeID, Rate, c1.ChargeType, c1.FromDate, c1.ToDate, Remark, BaseCurrencyId, FirstOfBilling, BasisOfBilling,
 			CASE
 				WHEN c1.FromDate < @EffectiveDate AND c1.ToDate >= @EffectiveDate THEN @IsActived
@@ -55,7 +76,6 @@ BEGIN
 				ELSE @IsExpired
 			END AS [Status],
 			0 AS IsInserted
-	INTO #ChangeRateTable
 	FROM OAS_ChargeInfo c1 WITH(NOLOCK)
 	INNER JOIN dbo.LA_f_ChargeInfo(@PartyId, @MinDate, @MaxDate, @ProductListAll, 'OA', 1) c2 ON c1.ChargeID = c2.ChargeID
 
