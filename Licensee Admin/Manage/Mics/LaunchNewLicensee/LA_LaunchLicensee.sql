@@ -3,23 +3,21 @@ USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
-	@NonOfficialPartyId	INT,
-	@LicenseeId			INT,
-	@LicenseeName		VARCHAR(50),
-	@BrandName			VARCHAR(100)	= '',
-	@LicenseeCode		VARCHAR(50)		= '',
-	@BaseCurrencyId		TINYINT,
-	@LaunchDate			DATE, 
-	@GroupId			INT,
-	@ProductIds			VARCHAR(1000)	= '', 
-	@UserNames			VARCHAR(4000)	= '', 
-	@FunctionKeys		VARCHAR(4000)	= '', 
+	@NonOfficialPartyId		INT,
+	@LicenseeId				INT,
+	@LicenseeName			VARCHAR(50),
+	@BrandName				VARCHAR(100)	= '',
+	@LicenseeCode			VARCHAR(50)		= '',
+	@BaseCurrencyId			TINYINT,
+	@LaunchDate				DATE, 
+	@GroupId				INT,
+	@ProductIds				VARCHAR(1000)	= '', 
 	@ChargeInfoSettingData	NVARCHAR(MAX),
-	@MinFeeSettingData	NVARCHAR(MAX)	= '',
-	@UserId				INT, 
-	@ErrCode			INT				= 0		OUTPUT, 
-	@ErrMsg				VARCHAR(4000)	= ''	OUTPUT,
-	@InvoiceLanguage	VARCHAR(7)		= ''
+	@MinFeeSettingData		NVARCHAR(MAX)	= '',
+	@UserId					INT, 
+	@ErrCode				INT				= 0		OUTPUT, 
+	@ErrMsg					VARCHAR(4000)	= ''	OUTPUT,
+	@InvoiceLanguage		VARCHAR(7)		= ''
 AS
 /*
 	Created: 20190107@Parsons
@@ -33,6 +31,7 @@ AS
 		- 20210324@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 		- 20210811@Danny: Adding @InvoiceLanguage [#FeatureID 158133]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
+		- 20220623@Percy: Remove dropdown function & user [RedmineID: #166504]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -96,7 +95,7 @@ BEGIN
 	SELECT value FROM STRING_SPLIT(@ProductIds, ',')
 
 	-- #Region LicenseeProduct3rd
-	UPDATE dbo.LicenseeProduct3rd
+	UPDATE dbo.LicenseeProduct3rd WITH(ROWLOCK)
 	SET EffectiveDate = @LaunchDate
 	WHERE LicenseeId = @LicenseeId
 	-- #Endregion LicenseeProduct3rd
@@ -106,6 +105,8 @@ BEGIN
 		SELECT @ErrMsg = 'Insert/Update LicenseeProduct3rd failed. Please try again.', @ErrCode =  503
 		RETURN
 	END
+
+	SET @ErrCode = 0
 	
 	DECLARE @NewPartyId	INT = 0
 	EXEC dbo.LA_LaunchLicensee_PartyIns @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @LicenseeCode, @BaseCurrencyId, @LaunchDate, @NewPartyId OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT, @InvoiceLanguage
@@ -119,13 +120,55 @@ BEGIN
 	BEGIN
 		EXEC dbo.LA_LaunchLicensee_MinFeeIns @NewPartyId, @BaseCurrencyId, @MinFeeSettingData, @ErrCode OUTPUT, @ErrMsg OUTPUT
 	END
+
+	IF @ErrCode = 0
+	BEGIN
+		DECLARE @InvoiceSettingData VARCHAR(MAX)
+
+		DECLARE @GroupName NVARCHAR(50)
+		SELECT  @GroupName = CASE BillerName WHEN 'Zelianta Limited' THEN 'Zelianta' ELSE 'Boping' END
+		FROM dbo.LA_BillerInfo WITH (NOLOCK)
+		WHERE BillerName IN ('Boping', 'Zelianta Limited')
+			AND PartyId = @GroupId
+
+		IF ISNULL(@GroupName, '') <> ''
+		BEGIN
+			SELECT @InvoiceSettingData = CONVERT(VARCHAR(MAX),
+				(SELECT
+					p.ProductId			AS '@ProductId'
+					,ivt.InvTypeId		AS '@InvTempId'
+					,ivt.InvTemplateId	AS '@InvTypeId'
+					,0					AS '@BankId'
+					,1					AS '@ActiveAddress'
+				FROM (
+					SELECT InvTemplateId, InvTemplateName
+						,CASE InvTemplateName
+							WHEN @GroupName THEN 1 -- Software Data & Licensing Fees
+							WHEN 'Credit' THEN 4 -- Credit Note
+							ELSE 5 -- Debit Note
+							END AS InvTypeId
+					FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
+					WHERE 1 = CASE InvTemplateName
+								WHEN @GroupName THEN 1
+								WHEN 'Credit' THEN 1
+								WHEN 'Debit' + CASE WHEN @GroupName = 'Zelianta' THEN '-Zelianta' ELSE '' END THEN 1
+								ELSE 0 END
+				) ivt
+					OUTER APPLY (
+						SELECT p.ProductId FROM @Products p WHERE ivt.InvTemplateName IN (('Boping', 'Zelianta')
+					) p
+				FOR XML PATH('row'), ROOT('root')))
+
+			EXEC dbo.LA_LaunchLicensee_InvoiceSettingIns @NewPartyId, @GroupId, @InvoiceSettingData, @ErrCode OUTPUT, @ErrMsg OUTPUT
+		END
+	END
 	
 	IF @ErrCode = 0
 	BEGIN
 		INSERT INTO LA_UserParty (UserID, PartyID, Modifydate, Modifier, StatusID)
 		SELECT UserID, @NewPartyId, GETDATE(), @UserID, 1
 		FROM dbo.LA_User WITH (NOLOCK) 
-		WHERE Username IN (SELECT value FROM STRING_SPLIT(@UserNames, ','))
+		WHERE StatusID = 1 -- Active users
 
 		IF @@ERROR <> 0
 		BEGIN
@@ -138,7 +181,7 @@ BEGIN
 		INSERT INTO dbo.LA_FunctionParty (FunctionID, PartyID)
 		SELECT FunctionID, @NewPartyId
 		FROM dbo.LA_Function WITH (NOLOCK) 
-		WHERE FunctionKey IN (SELECT value FROM STRING_SPLIT(@FunctionKeys, ','))
+		WHERE StatusID = 1 -- Active functions
 
 		IF @@ERROR <> 0
 		BEGIN
@@ -165,8 +208,6 @@ BEGIN
 						@LaunchDate			AS LaunchDate, 
 						@GroupId			AS GroupId,
 						@ProductIds			AS ProductIds, 
-						@UserNames			AS UserNames, 
-						@FunctionKeys		AS FunctionKeys, 
 						@ChargeInfoSettingData	AS ChargeInfoSettingData,
 						@MinFeeSettingData	AS MinFeeSettingData
 						FOR XML PATH('')) 
@@ -186,3 +227,4 @@ BEGIN
 	-- #Endregion: Write Log
 END
 GO
+
