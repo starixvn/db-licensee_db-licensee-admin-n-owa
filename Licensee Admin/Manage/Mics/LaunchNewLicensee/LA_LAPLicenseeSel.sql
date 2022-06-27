@@ -2,7 +2,7 @@
 USE [bodb_licensee]
 GO
 
-CREATE PROCEDURE [dbo].[LA_LAPLicenseeSel]
+ALTER PROCEDURE [dbo].[LA_LAPLicenseeSel]
 AS
 /*
 	Created: 20190102@Parsons
@@ -31,13 +31,15 @@ BEGIN
 		l.LicenseeID			AS PartyId
 		,l.LicenseeName			AS PartyName
 		,l.BrandName
-		,olt.LicenseeTypeName	AS BillerName
+		,b.PartyId				AS BillingGroupId
+		,b.PartyName			AS BillingGroupName
 		,ol.InvoiceLanguage
 		,bc.CurrencyId			AS BaseCurrency
 	FROM dbo.Licensees l WITH(NOLOCK)
-		LEFT JOIN dbo.OAS_Party p WITH(NOLOCK) ON l.LicenseeID = p.OldRefID
+		LEFT JOIN dbo.OAS_Party p WITH(NOLOCK) ON l.LicenseeID = p.OldRefID AND p.PartyType IN (1, 5) -- Licensee
 		LEFT JOIN bodb_OIC.dbo.Licensee ol WITH(NOLOCK) ON l.LicenseeName = ol.RegisteredLicenseeName
-		LEFT JOIN bodb_OIC.dbo.LicenseeType olt WITH(NOLOCK) ON ol.LicenseeTypeId = olt.LicenseeTypeId
+		LEFT JOIN bodb_OIC.dbo.LicenseeTypes olt WITH(NOLOCK) ON ol.TypeId = olt.TypeId
+		LEFT JOIN dbo.OAS_Party b WITH(NOLOCK) ON olt.TypeName = b.PartyName AND b.PartyType IN (2, 3) -- Billing Group
 		LEFT JOIN @BaseCurrencyList bc ON ol.InvoiceBaseCurrency = bc.CurrencyName
 	WHERE p.PartyID IS NULL
 END
