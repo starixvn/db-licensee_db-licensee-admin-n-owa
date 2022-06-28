@@ -5,19 +5,19 @@ GO
 ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
 	@NonOfficialPartyId		INT,
 	@LicenseeId				INT,
-	@LicenseeName			VARCHAR(50),
+	@PayerName				VARCHAR(50),
 	@BrandName				VARCHAR(100)	= '',
 	@LicenseeCode			VARCHAR(50)		= '',
 	@BaseCurrencyId			TINYINT,
 	@LaunchDate				DATE, 
-	@GroupId				INT,
-	@ProductIds				VARCHAR(1000)	= '', 
+	@BillingGroupId			INT,
+	@ProductIds				VARCHAR(1000)	= '',
+	@InvoiceLanguage		VARCHAR(7)		= '',
 	@ChargeInfoSettingData	NVARCHAR(MAX),
 	@MinFeeSettingData		NVARCHAR(MAX)	= '',
-	@UserId					INT, 
-	@ErrCode				INT				= 0		OUTPUT, 
-	@ErrMsg					VARCHAR(4000)	= ''	OUTPUT,
-	@InvoiceLanguage		VARCHAR(7)		= ''
+	@UserId					INT,
+	@ErrCode				INT				= 0		OUTPUT,
+	@ErrMsg					VARCHAR(4000)	= ''	OUTPUT
 AS
 /*
 	Created: 20190107@Parsons
@@ -82,131 +82,264 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE 
-		@StartRun		DATETIME, 
+		@StartRun		DATETIME = CURRENT_TIMESTAMP, 
 		@EndRun			DATETIME, 
 		@Duration		INT, 
 		@Doing			NVARCHAR(MAX)
 
-	SET @StartRun = GETDATE()
+	SELECT @ErrCode = 0, @ErrMsg = ''
 
+	-- Prepare input params
 	DECLARE @Products TABLE (ProductId INT)
+	DECLARE @ChargeInfoSettings	TABLE (ProductId INT, Rate MONEY, Remark NVARCHAR(400), BasisOfBilling NVARCHAR(500), ChargeType INT, FromDate DATE, ToDate DATE)
+	DECLARE @MinFeeSettings	TABLE (ProductId TINYINT, FeeTypeId TINYINT, FeeAmount MONEY, FromDate DATE, ToDate DATE, MinFeeTerm NVARCHAR(1000), [Priority] TINYINT, MonthOfDeduction TINYINT)
+	DECLARE @ChargeInfo TABLE (ChargeId INT, ProductId INT, SystemId INT)
+	DECLARE @AMF MONEY, @GroupName NVARCHAR(50), @BillerId INT, @FirstDateOfMonth DATE
+	DECLARE @NewPartyId INT
 	
-	INSERT INTO @Products(ProductId)
-	SELECT value FROM STRING_SPLIT(@ProductIds, ',')
+	-- Charge Rate, Min Fee
+	BEGIN TRY
+		DECLARE @ChargeInfoSettingXML XML = CONVERT(XML, @ChargeInfoSettingData)
+		DECLARE @MinFeeSettingXML XML = CONVERT(XML, @MinFeeSettingData)
+		
+		INSERT INTO @ChargeInfoSettings (ProductId, Rate, Remark, BasisOfBilling, ChargeType, FromDate, ToDate)
+		SELECT
+			t.c.value('(ProductId/text())[1]', 'INT')					AS ProductId
+			,t.c.value('(Rate/text())[1]', 'MONEY')						AS Rate
+			,t.c.value('(Remark/text())[1]', 'NVARCHAR(400)')			AS Remark
+			,t.c.value('(BasisOfBilling/text())[1]', 'NVARCHAR(500)')	AS BasisOfBilling
+			,t.c.value('(ChargeType/text())[1]', 'INT')					AS ChargeType
+			,t.c.value('(FromDate/text())[1]', 'DATE')					AS FromDate
+			,t.c.value('(ToDate/text())[1]', 'DATE')					AS ToDate
+		FROM @ChargeInfoSettingXML.nodes('Root/ChargeInfoSetting') t(c)
+		OPTION (OPTIMIZE FOR (@ChargeInfoSettingXML = NULL))
 
-	-- #Region LicenseeProduct3rd
-	UPDATE dbo.LicenseeProduct3rd WITH(ROWLOCK)
-	SET EffectiveDate = @LaunchDate
-	WHERE LicenseeId = @LicenseeId
-	-- #Endregion LicenseeProduct3rd
-	
-	IF @@ERROR <> 0
-	BEGIN
-		SELECT @ErrMsg = 'Insert/Update LicenseeProduct3rd failed. Please try again.', @ErrCode =  503
+		INSERT INTO @MinFeeSettings (ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority])
+		SELECT
+			t.c.value('(ProductId/text())[1]', 'INT')					AS ProductId
+			,t.c.value('(FeeTypeId/text())[1]', 'TINYINT')				AS FeeTypeId
+			,t.c.value('(FeeAmount/text())[1]', 'MONEY')				AS FeeAmount
+			,t.c.value('(FromDate/text())[1]', 'DATE')					AS FromDate
+			,t.c.value('(ToDate/text())[1]', 'DATE')					AS ToDate
+			,t.c.value('(MinFeeTerm/text())[1]', 'NVARCHAR(1000)')		AS MinFeeTerm
+			,t.c.value('(Priority/text())[1]', 'TINYINT')				AS [Priority]
+		FROM @MinFeeSettingXML.nodes('Root/MinFeeSetting') t(c)
+		OPTION (OPTIMIZE FOR (@MinFeeSettingXML = NULL))
+	END TRY
+	BEGIN CATCH
+		SELECT @ErrMsg = 'Charge info/Min fee setting data invalid. Please try again.', @ErrCode =  501
 		RETURN
-	END
+	END CATCH
 
-	SET @ErrCode = 0
-	
-	DECLARE @NewPartyId	INT = 0
-	EXEC dbo.LA_LaunchLicensee_PartyIns @NonOfficialPartyId, @LicenseeId, @LicenseeName, @BrandName, @LicenseeCode, @BaseCurrencyId, @LaunchDate, @NewPartyId OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT, @InvoiceLanguage
-	
-	IF @ErrCode = 0
+	-- Validate input params
 	BEGIN
-		EXEC dbo.LA_LaunchLicensee_ChargeInfoIns @NewPartyId, @GroupId, @ChargeInfoSettingData, @ErrCode OUTPUT, @ErrMsg OUTPUT  
-	END
-	
-	IF @ErrCode = 0
-	BEGIN
-		EXEC dbo.LA_LaunchLicensee_MinFeeIns @NewPartyId, @BaseCurrencyId, @MinFeeSettingData, @ErrCode OUTPUT, @ErrMsg OUTPUT
-	END
-
-	IF @ErrCode = 0
-	BEGIN
-		DECLARE @InvoiceSettingData VARCHAR(MAX)
-
-		DECLARE @GroupName NVARCHAR(50)
-		SELECT  @GroupName = CASE BillerName WHEN 'Zelianta Limited' THEN 'Zelianta' ELSE 'Boping' END
-		FROM dbo.LA_BillerInfo WITH (NOLOCK)
-		WHERE BillerName IN ('Boping', 'Zelianta Limited')
-			AND PartyId = @GroupId
-
-		IF ISNULL(@GroupName, '') <> ''
+		IF @NonOfficialPartyId > 0 AND NOT EXISTS (SELECT 1 FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyID = @NonOfficialPartyId) 
 		BEGIN
-			SELECT @InvoiceSettingData = CONVERT(VARCHAR(MAX),
-				(SELECT
-					p.ProductId			AS '@ProductId'
-					,ivt.InvTypeId		AS '@InvTempId'
-					,ivt.InvTemplateId	AS '@InvTypeId'
-					,0					AS '@BankId'
-					,1					AS '@ActiveAddress'
-				FROM (
-					SELECT InvTemplateId, InvTemplateName
-						,CASE InvTemplateName
-							WHEN @GroupName THEN 1 -- Software Data & Licensing Fees
-							WHEN 'Credit' THEN 4 -- Credit Note
-							ELSE 5 -- Debit Note
-							END AS InvTypeId
-					FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
-					WHERE 1 = CASE InvTemplateName
-								WHEN @GroupName THEN 1
-								WHEN 'Credit' THEN 1
-								WHEN 'Debit' + CASE WHEN @GroupName = 'Zelianta' THEN '-Zelianta' ELSE '' END THEN 1
-								ELSE 0 END
-				) ivt
-					OUTER APPLY (
-						SELECT p.ProductId FROM @Products p WHERE ivt.InvTemplateName IN (('Boping', 'Zelianta')
-					) p
-				FOR XML PATH('row'), ROOT('root')))
+			SELECT @ErrMsg = 'Party not found. Please try again.', @ErrCode =  505
+			RETURN
+		END
 
-			EXEC dbo.LA_LaunchLicensee_InvoiceSettingIns @NewPartyId, @GroupId, @InvoiceSettingData, @ErrCode OUTPUT, @ErrMsg OUTPUT
+		IF EXISTS (SELECT 1 FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyID <> @NonOfficialPartyId AND PartyName = @PayerName) 
+		BEGIN
+			SELECT @ErrMsg = 'Party name has already been existed. Please try again.', @ErrCode =  506
+			RETURN
+		END
+
+		IF EXISTS (SELECT 1 FROM dbo.OAS_Party WITH(NOLOCK) WHERE OldRefID = @LicenseeId AND PartyType = 1) 
+		BEGIN
+			SELECT @ErrMsg = 'Party has already been launched.', @ErrCode =  507
+			RETURN
 		END
 	END
-	
-	IF @ErrCode = 0
-	BEGIN
-		INSERT INTO LA_UserParty (UserID, PartyID, Modifydate, Modifier, StatusID)
+
+	INSERT INTO @Products (ProductId)
+	SELECT value FROM STRING_SPLIT(@ProductIds, ',')
+
+	SELECT @FirstDateOfMonth = DATEADD(MONTH, DATEDIFF(MONTH, 0, @LaunchDate), 0)
+
+	SELECT @GroupName = PartyName
+	FROM dbo.OAS_Party WITH(NOLOCK)
+	WHERE PartyId = @BillingGroupId
+
+	SELECT @BillerId = PartyId
+	FROM dbo.LA_BillerInfo WITH(NOLOCK)
+	WHERE BillerName = CASE @GroupName
+						WHEN 'Boping' THEN @GroupName
+						WHEN 'Zelianta' THEN @GroupName + ' Limited'
+						ELSE '' END
+
+	SELECT @AMF = SUM(ISNULL(d.Income, 0))
+	FROM dbo.LA_InvoiceHeader h WITH(NOLOCK)
+		INNER JOIN dbo.LA_InvoiceStatement d WITH(NOLOCK) ON h.InvoiceHeaderId = d.InvoiceHeaderId
+	WHERE h.InvoiceType = 7 AND d.InvItemTypeId = 3 -- AMF in Setup fee
+		AND h.StatusId = 0 AND h.Environment = 'PRO'					
+		AND h.PartyId = @NewPartyId
+		AND h.CurrencyId = @BaseCurrencyId
+
+	-- Launch licensee
+	BEGIN TRY
+		-- LicenseeProduct3rd
+		UPDATE dbo.LicenseeProduct3rd WITH(ROWLOCK)
+		SET EffectiveDate = @LaunchDate
+		WHERE LicenseeId = @LicenseeId
+
+		-- OAS_Party
+		IF @NonOfficialPartyId > 0
+		BEGIN
+			UPDATE dbo.OAS_Party WITH(ROWLOCK)
+			SET OldRefID   = @LicenseeId
+				,SetupName = PartyName
+				,PartyType = 1
+				,PartyName = @PayerName
+			WHERE PartyID = @NonOfficialPartyId
+
+			SET @NewPartyId = @NonOfficialPartyId
+		END
+		ELSE
+		BEGIN
+			INSERT INTO dbo.OAS_Party (PartyName, PartyType, OldRefID)
+			VALUES (@PayerName, 1, @LicenseeId)
+
+			SET @NewPartyId = SCOPE_IDENTITY()
+		END
+
+		-- OAS_PartyDetail
+		IF EXISTS (SELECT 1 FROM dbo.OAS_PartyDetail WITH(NOLOCK) WHERE PartyID = @NewPartyId)
+			UPDATE dbo.OAS_PartyDetail WITH(ROWLOCK)
+			SET BrandName = @BrandName
+				,BaseCurrencyId = @BaseCurrencyId
+				,StatusId = 1
+				,LicenseeCode = @LicenseeCode
+				,InvoiceLanguage = @InvoiceLanguage
+				,LaunchDate = @LaunchDate
+			WHERE PartyID = @NewPartyId
+		ELSE
+			INSERT INTO dbo.OAS_PartyDetail (PartyID, IsDeposit, BrandName, CompanyName, IsAllowedMemberComm, BaseCurrencyId, StatusId, LicenseeCode, InvoiceLanguage, LaunchDate)
+			SELECT @NewPartyId, IsDeposit, @BrandName, CompanyName, IsAllowedMemberComm, @BaseCurrencyId, 1, @LicenseeCode, @InvoiceLanguage, @LaunchDate
+			FROM dbo.Licensees WITH(NOLOCK)
+			WHERE LicenseeID = @LicenseeId
+
+		-- OAS_PartyBaseCurrency
+		IF EXISTS (SELECT 1 FROM dbo.OAS_PartyBaseCurrency WITH(NOLOCK) WHERE PartyID = @NewPartyId)
+			DELETE dbo.OAS_PartyBaseCurrency WITH(ROWLOCK) WHERE PartyID = @NewPartyId
+			
+		INSERT INTO dbo.OAS_PartyBaseCurrency (PartyID, BaseCurrencyId, LicenseeCode, FromDate, ToDate)
+		VALUES (@NewPartyId, @BaseCurrencyId, ISNULL(@LicenseeCode, ''), @FirstDateOfMonth, '2050-01-01')
+
+		-- OAS_ChargeInfo
+		INSERT INTO dbo.OAS_ChargeInfo (ProductID, FromParty, ToParty, ParentChargeID, Rate, Remark, BasisOfBilling, ChargeType, FirstOfBilling, FromDate, ToDate, BaseCurrencyId)
+			OUTPUT INSERTED.ChargeID, INSERTED.ProductID, 2 INTO @ChargeInfo (ChargeID, ProductId, SystemId)
+		SELECT ProductId, @NewPartyId, @BillingGroupId, 0, Rate, Remark, BasisOfBilling, ChargeType, FromDate, FromDate, ToDate, @BaseCurrencyId
+		FROM @ChargeInfoSettings
+
+		IF @BillingGroupId = 1 -- OW
+			INSERT INTO @ChargeInfo (ChargeId, ProductId, SystemId)
+			SELECT ChargeId, ProductId, 4
+			FROM @ChargeInfo
+			WHERE ProductId IN (0, 2, 3, 4, 5, 10, 11, 12) -- SB,NG,BA,LC,VS,AGC,GD,VG
+		
+		-- LA_ChargeInfo_SystemMapping
+		INSERT INTO dbo.LA_ChargeInfo_SystemMapping (ChargeID, SystemID)
+		SELECT ChargeId, SystemID FROM @ChargeInfo
+
+		IF ISNULL(@AMF, 0) > 0
+			UPDATE @MinFeeSettings
+			SET MonthOfDeduction = CEILING(@AMF / NULLIF(FeeAmount, 0))
+			WHERE FeeTypeId = 1 AND ProductId = 0
+		
+		-- LA_MinFee
+		INSERT INTO dbo.LA_MinFee (PartyId, ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority], CurrencyId)
+		SELECT @NewPartyId, ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority], @BaseCurrencyId  
+		FROM @MinFeeSettings
+
+		-- LA_InvoiceSetting
+		IF ISNULL(@BillerId, 0) <> 0
+			INSERT INTO dbo.LA_InvoiceSetting (FromPartyId, ToPartyId, ProductId, InvTypeId, InvTempId, BankId, ActiveAddress)
+			SELECT @NewPartyId, @BillerId, ProductId, InvTypeId, InvTemplateId, 0 AS BankId, 1 AS ActiveAddress
+			FROM (
+				SELECT InvTemplateId, InvTemplateName
+					,CASE InvTemplateName
+						WHEN @GroupName THEN 1 -- Software Data & Licensing Fees
+						WHEN 'Credit' THEN 4 -- Credit Note
+						ELSE 5 -- Debit Note
+						END AS InvTypeId
+				FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
+				WHERE 1 = CASE InvTemplateName
+							WHEN @GroupName THEN 1
+							WHEN 'Credit' THEN 1
+							WHEN 'Debit' + CASE WHEN @GroupName = 'Zelianta' THEN '-Zelianta' ELSE '' END THEN 1
+							ELSE 0 END
+			) ivt
+				OUTER APPLY (
+					SELECT p.ProductId
+					FROM @Products p
+						INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON p.ProductId = c.ProductId
+					WHERE c.FromParty = @NewPartyId AND c.ToParty = @BillingGroupId
+						AND c.FromDate = @LaunchDate
+						AND ivt.InvTemplateName IN ('Boping', 'Zelianta')
+				) p
+
+		-- LA_UserParty
+		INSERT INTO dbo.LA_UserParty (UserID, PartyID, Modifydate, Modifier, StatusID)
 		SELECT UserID, @NewPartyId, GETDATE(), @UserID, 1
 		FROM dbo.LA_User WITH (NOLOCK) 
 		WHERE StatusID = 1 -- Active users
 
-		IF @@ERROR <> 0
-		BEGIN
-			SELECT @ErrMsg = 'Insert LA_UserParty failed. Please try again.', @ErrCode =  503
-		END
-	END
-
-	IF @ErrCode = 0
-	BEGIN
+		-- LA_FunctionParty
 		INSERT INTO dbo.LA_FunctionParty (FunctionID, PartyID)
 		SELECT FunctionID, @NewPartyId
 		FROM dbo.LA_Function WITH (NOLOCK) 
 		WHERE StatusID = 1 -- Active functions
-
-		IF @@ERROR <> 0
+	END TRY
+	BEGIN CATCH
+		-- Rollback
+		IF @NonOfficialPartyId > 0
 		BEGIN
-			SELECT @ErrMsg = 'Insert LA_FunctionParty failed. Please try again.', @ErrCode =  503
+			UPDATE dbo.OAS_Party
+			SET OldRefID   = NULL
+				,SetupName = NULL
+				,PartyType = 5
+				,PartyName = ISNULL(SetupName, PartyName)
+			WHERE PartyId = @NonOfficialPartyId
+
+			UPDATE dbo.OAS_PartyDetail
+			SET StatusId = 0
+			WHERE PartyId = @NonOfficialPartyId
 		END
-	END
+		ELSE
+		BEGIN
+			DELETE dbo.OAS_Party WHERE PartyId = @NewPartyId
+			DELETE dbo.OAS_PartyDetail WHERE PartyId = @NewPartyId
+		END
 
-	IF @ErrCode <> 0
-	BEGIN
-		EXEC dbo.LA_LaunchLicensee_Rollback @NewPartyId, @GroupId
+		DELETE l
+		FROM dbo.LA_ChargeInfo_SystemMapping l
+			INNER JOIN dbo.OAS_ChargeInfo c WITH (NOLOCK) ON l.ChargeID = c.ChargeID
+		WHERE c.FromParty = @NewPartyId
+
+		DELETE dbo.OAS_PartyBaseCurrency WHERE PartyId = @NewPartyId
+		DELETE dbo.OAS_ChargeInfo WHERE FromParty = @NewPartyId
+		DELETE dbo.LA_MinFee WHERE PartyID = @NewPartyId
+		DELETE dbo.LA_InvoiceSetting WHERE FromPartyId = @NewPartyId
+		DELETE dbo.LA_UserParty WHERE PartyId = @NewPartyId
+		DELETE dbo.LA_FunctionParty WHERE PartyId = @NewPartyId
+
+		SELECT @ErrMsg = 'Launch licensee failed. Please try again.', @ErrCode =  503
 		RETURN
-	END
-
-	-- #Region: Write Log
+	END CATCH
+	
+	-- Write log
 	SET @EndRun = GETDATE()
 	SET @Duration = DATEDIFF(MILLISECOND, @StartRun, @EndRun)
 
 	SET @Doing =(SELECT	@NonOfficialPartyId	AS NonOfficialPartyId,
 						@LicenseeId			AS LicenseeId,
-						@LicenseeName		AS LicenseeName,
+						@PayerName			AS PayerName,
 						@LicenseeCode		AS LicenseeCode,
 						@BrandName			AS BrandName,
 						@BaseCurrencyId		AS BaseCurrencyId,
 						@LaunchDate			AS LaunchDate, 
-						@GroupId			AS GroupId,
+						@BillingGroupId		AS BillingGroupId,
 						@ProductIds			AS ProductIds, 
 						@ChargeInfoSettingData	AS ChargeInfoSettingData,
 						@MinFeeSettingData	AS MinFeeSettingData
@@ -219,12 +352,5 @@ BEGIN
 		@TypeID		= 0,
 		@ActionID	= 5535,
 		@Duration	= @Duration
-
-	IF @@ERROR <> 0
-	BEGIN
-		SELECT @ErrMsg = ERROR_MESSAGE() , @ErrCode = 503
-	END
-	-- #Endregion: Write Log
 END
 GO
-
