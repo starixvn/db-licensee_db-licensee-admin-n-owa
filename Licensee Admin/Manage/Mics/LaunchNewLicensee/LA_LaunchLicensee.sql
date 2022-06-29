@@ -95,7 +95,7 @@ BEGIN
 	DECLARE @ChargeInfoSettings	TABLE (ProductId INT, Rate MONEY, Remark NVARCHAR(400), BasisOfBilling NVARCHAR(500), ChargeType INT, FromDate DATE, ToDate DATE)
 	DECLARE @MinFeeSettings	TABLE (ProductId TINYINT, FeeTypeId TINYINT, FeeAmount MONEY, FromDate DATE, ToDate DATE, MinFeeTerm NVARCHAR(1000), [Priority] TINYINT, MonthOfDeduction TINYINT)
 	DECLARE @ChargeInfo TABLE (ChargeId INT, ProductId INT, SystemId INT)
-	DECLARE @AMF MONEY, @GroupName NVARCHAR(50), @BillerId INT, @FirstDateOfMonth DATE
+	DECLARE @AMF MONEY, @BillingGroupName NVARCHAR(50), @BillerId INT, @FirstDateOfMonth DATE
 	
 	-- Charge Rate, Min Fee
 	BEGIN TRY
@@ -157,22 +157,22 @@ BEGIN
 
 	SELECT @FirstDateOfMonth = DATEADD(MONTH, DATEDIFF(MONTH, 0, @LaunchDate), 0)
 
-	SELECT @GroupName = PartyName
+	SELECT @BillingGroupName = PartyName
 	FROM dbo.OAS_Party WITH(NOLOCK)
 	WHERE PartyId = @BillingGroupId
 
 	SELECT @BillerId = PartyId
 	FROM dbo.LA_BillerInfo WITH(NOLOCK)
-	WHERE BillerName = CASE @GroupName
-						WHEN 'Boping' THEN @GroupName
-						WHEN 'Zelianta' THEN @GroupName + ' Limited'
+	WHERE BillerName = CASE @BillingGroupName
+						WHEN 'Boping' THEN @BillingGroupName
+						WHEN 'Zelianta' THEN @BillingGroupName + ' Limited'
 						ELSE '' END
 
 	SELECT @AMF = SUM(ISNULL(d.Income, 0))
 	FROM dbo.LA_InvoiceHeader h WITH(NOLOCK)
 		INNER JOIN dbo.LA_InvoiceStatement d WITH(NOLOCK) ON h.InvoiceHeaderId = d.InvoiceHeaderId
 	WHERE h.InvoiceType = 7 AND d.InvItemTypeId = 3 -- AMF in Setup fee
-		AND h.StatusId = 0 AND h.Environment = 'PRO'					
+		AND h.StatusId = 0 AND h.Environment = 'LOCAL'					
 		AND h.PartyId = @NewPartyId
 		AND h.CurrencyId = @BaseCurrencyId
 
@@ -248,8 +248,8 @@ BEGIN
 			WHERE FeeTypeId = 1 AND ProductId = 0
 		
 		-- LA_MinFee
-		INSERT INTO dbo.LA_MinFee (PartyId, ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority], CurrencyId)
-		SELECT @NewPartyId, ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority], @BaseCurrencyId  
+		INSERT INTO dbo.LA_MinFee (PartyId, ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority], CurrencyId, MonthOfDeduction)
+		SELECT @NewPartyId, ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority], @BaseCurrencyId, MonthOfDeduction 
 		FROM @MinFeeSettings
 
 		-- LA_InvoiceSetting
@@ -259,15 +259,15 @@ BEGIN
 			FROM (
 				SELECT InvTemplateId, InvTemplateName
 					,CASE InvTemplateName
-						WHEN @GroupName THEN 1 -- Software Data & Licensing Fees
+						WHEN @BillingGroupName THEN 1 -- Software Data & Licensing Fees
 						WHEN 'Credit' THEN 4 -- Credit Note
 						ELSE 5 -- Debit Note
 						END AS InvTypeId
 				FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
 				WHERE 1 = CASE InvTemplateName
-							WHEN @GroupName THEN 1
+							WHEN @BillingGroupName THEN 1
 							WHEN 'Credit' THEN 1
-							WHEN 'Debit' + CASE WHEN @GroupName = 'Zelianta' THEN '-Zelianta' ELSE '' END THEN 1
+							WHEN 'Debit' + CASE WHEN @BillingGroupName = 'Zelianta' THEN '-Zelianta' ELSE '' END THEN 1
 							ELSE 0 END
 			) ivt
 				OUTER APPLY (
@@ -280,10 +280,35 @@ BEGIN
 				) p
 
 		-- LA_UserParty
+		DECLARE @ExcludeUsers TABLE (UserName VARCHAR(50))
+		DECLARE @ExcludeUsersJson VARCHAR(4000)
+		
+		SELECT @ExcludeUsersJson = a.[Value]
+		FROM dbo.LA_SystemSettings s WITH (NOLOCK)
+			CROSS APPLY (SELECT t.[Value] FROM OPENJSON(s.[Value]) t) a
+		WHERE s.[Key] = 'LaunchLicensee_ExcludeUser'
+		
+		;WITH CTE_ExcludeUsers AS (
+			SELECT [Name], Users
+			FROM OPENJSON(@ExcludeUsersJson) WITH (
+				[Name] VARCHAR(100) '$.Name',
+				Users NVARCHAR(MAX) '$.Users' AS JSON
+			)
+		)
+		INSERT INTO @ExcludeUsers (UserName)
+		SELECT b.[Value]
+		FROM CTE_ExcludeUsers u
+			CROSS APPLY (
+				SELECT a.[Value] FROM OPENJSON(u.Users) a
+			) b
+		WHERE u.[Name] = @BillingGroupName
+
 		INSERT INTO dbo.LA_UserParty (UserID, PartyID, Modifydate, Modifier, StatusID)
 		SELECT UserID, @NewPartyId, GETDATE(), @UserID, 1
-		FROM dbo.LA_User WITH (NOLOCK) 
+		FROM dbo.LA_User u WITH (NOLOCK)
+			LEFT JOIN @ExcludeUsers eu ON u.Username = eu.UserName
 		WHERE StatusID = 1 -- Active users
+			AND eu.UserName IS NULL
 
 		-- LA_FunctionParty
 		INSERT INTO dbo.LA_FunctionParty (FunctionID, PartyID)
