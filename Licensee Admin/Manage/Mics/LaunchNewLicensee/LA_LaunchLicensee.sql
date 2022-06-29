@@ -16,6 +16,7 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
 	@ChargeInfoSettingData	NVARCHAR(MAX),
 	@MinFeeSettingData		NVARCHAR(MAX)	= '',
 	@UserId					INT,
+	@NewPartyId				INT				= 0		OUTPUT,
 	@ErrCode				INT				= 0		OUTPUT,
 	@ErrMsg					VARCHAR(4000)	= ''	OUTPUT
 AS
@@ -95,7 +96,6 @@ BEGIN
 	DECLARE @MinFeeSettings	TABLE (ProductId TINYINT, FeeTypeId TINYINT, FeeAmount MONEY, FromDate DATE, ToDate DATE, MinFeeTerm NVARCHAR(1000), [Priority] TINYINT, MonthOfDeduction TINYINT)
 	DECLARE @ChargeInfo TABLE (ChargeId INT, ProductId INT, SystemId INT)
 	DECLARE @AMF MONEY, @GroupName NVARCHAR(50), @BillerId INT, @FirstDateOfMonth DATE
-	DECLARE @NewPartyId INT
 	
 	-- Charge Rate, Min Fee
 	BEGIN TRY
