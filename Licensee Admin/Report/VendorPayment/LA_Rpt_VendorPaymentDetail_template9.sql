@@ -30,9 +30,9 @@ BEGIN
 		,LicenseeID		INT
 		,isDeposit		INT
 		,ProductID		INT
-		,Rate				MONEY	DEFAULT 0
+		,Rate				DECIMAL(10,8)	DEFAULT 0
 		,Rate3rd			MONEY	DEFAULT 0
-		,RebateCommission	MONEY	DEFAULT 0
+		,RebateCommission	DECIMAL(10,8)	DEFAULT 0
 		,Fromdate		SMALLDATETIME
 		,Todate			SMALLDATETIME
 	)
@@ -60,8 +60,8 @@ BEGIN
 		PayToSupplier	MONEY	DEFAULT 0,
 		isDeposit		BIT,
 		ValidBetAmount	MONEY	DEFAULT 0, 
-		ServiceChargeOriginal MONEY	DEFAULT 0, 
-		RebateCommissionOriginal MONEY	DEFAULT 0, 
+		ServiceChargeOriginal DECIMAL(20,12)	DEFAULT 0, 
+		RebateCommissionOriginal DECIMAL(20,12)	DEFAULT 0, 
 		PromotionOriginal MONEY	DEFAULT 0
 	)
 

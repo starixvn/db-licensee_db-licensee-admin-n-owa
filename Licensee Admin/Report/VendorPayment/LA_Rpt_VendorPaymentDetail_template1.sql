@@ -18,7 +18,7 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @IsConvertNegativeFeeToZero BIT, @IsConvertNegativePaytoSupplierToZero BIT
-	SELECT @IsConvertNegativeFeeToZero = IsConvertNegativeFeeToZero, @IsConvertNegativePaytoSupplierToZero = IsConvertNegativePaytoSupplierToZero  FROM LA_VendorPaymentSetting WITH(NOLOCK) WHERE ProductId = @ProductID
+	SELECT @IsConvertNegativeFeeToZero = IsConvertNegativeFeeToZero, @IsConvertNegativePaytoSupplierToZero = IsConvertNegativePaytoSupplierToZero  FROM DBCUST.bodb_licensee.dbo.LA_VendorPaymentSetting WITH(NOLOCK) WHERE ProductId = @ProductID
 
 	DECLARE @ProductCode VARCHAR(50), @3rdProductCode VARCHAR(50)
 	DECLARE @BettypeIdList TABLE (BetTypeId INT)
@@ -36,6 +36,9 @@ BEGIN
 		,Rate3rd		MONEY	DEFAULT 0
 		,Fromdate		SMALLDATETIME
 		,Todate			SMALLDATETIME
+		--BTC only
+		,Fromdate3rd		SMALLDATETIME
+		,Todate3rd			SMALLDATETIME
 	)
 
 	CREATE TABLE #Exchange (
@@ -102,7 +105,7 @@ BEGIN
 		INNER JOIN #PartyList p on p.ParentId = r.PartyID
 	
 		-- ​#ChargeRate
-		INSERT INTO #ChargeRate (ChargeID, PartyID, LicenseeID, isDeposit, ProductID, Rate, Rate3rd, Fromdate, Todate)
+		INSERT INTO #ChargeRate (ChargeID, PartyID, LicenseeID, isDeposit, ProductID, Rate, Rate3rd, Fromdate, Todate, Fromdate3rd, Todate3rd)
 		SELECT DISTINCT c.ChargeID, 
 						c.PartyID, 
 						c.LicenseeID, 
@@ -127,7 +130,9 @@ BEGIN
 															END		
 							ELSE ISNULL(r.DI_Rate,0) END AS Rate3rd, 
 						c.Fromdate, 
-						c.Todate
+						c.Todate,
+						CASE WHEN r.ProductID = 69 THEN r.Fromdate END,
+						CASE WHEN r.ProductID = 69 THEN r.ToDate END
 		FROM bodb_licensee.dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate,@ProductCode) c
 		LEFT JOIN @3rdRate r ON r.PartyID = c.PartyID AND (r.ProductID = c.ProductID OR @ProductCode <> @3rdProductCode)
 		WHERE (c.isDeposit = 0 AND (c.DI_Rate = 0 OR c.ProductID IN (24,0))) OR (c.DI_Rate > 0 and c.isDeposit = 1)
@@ -146,10 +151,11 @@ BEGIN
 			SUM(b.MemberWL)	  AS CustomerWinLoss,
 			SUM(-b.MemberWL)  AS LicenseeWinloss,
 			SUM(-b.MemberWL * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
-			SUM(-b.MemberWL * ISNULL(ci.Rate3rd, 0))	AS PayToSupplier,
+			SUM(-b.MemberWL * CASE WHEN ci.ProductID = 0 THEN ISNULL(ci_3rd.Rate3rd, 0) ELSE  ISNULL(ci.Rate3rd, 0) END) AS PayToSupplier,
 			ci.isDeposit
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+			LEFT JOIN #ChargeRate ci_3rd ON b.SiteID = ci_3rd.LicenseeId AND b.rptDate BETWEEN ci_3rd.Fromdate3rd AND ci_3rd.Todate3rd AND ci_3rd.ProductID = 0
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND cr.CurrencyID = b.CurrencyId
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate 
 			AND b.StatusId NOT IN (-1, 101, 102, 103) 
@@ -171,10 +177,11 @@ BEGIN
 			SUM(b.Winloss)	  AS CustomerWinLoss,
 			SUM(-b.Winloss)  AS LicenseeWinloss,
 			SUM(-b.Winloss * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
-			SUM(-b.Winloss * ISNULL(ci.Rate3rd, 0))	AS PayToSupplier,
+			SUM(-b.Winloss * CASE WHEN ci.ProductID = 0 THEN ISNULL(ci_3rd.Rate3rd, 0) ELSE  ISNULL(ci.Rate3rd, 0) END)	AS PayToSupplier,
 			ci.isDeposit
 		FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
 			INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.rptDate3rd BETWEEN ci.FromDate AND ci.ToDate
+			LEFT JOIN #ChargeRate ci_3rd ON b.SiteID = ci_3rd.LicenseeId AND b.rptDate3rd BETWEEN ci_3rd.Fromdate3rd AND ci_3rd.Todate3rd AND ci_3rd.ProductID = 0
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND cr.CurrencyID = b.CurrencyId
 		WHERE b.RptDate BETWEEN DATEADD(DAY, -1, @FromDate) AND DATEADD(DAY, 1, @ToDate)
 			AND b.rptDate3rd BETWEEN @FromDate AND @ToDate 

@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -8,7 +8,7 @@ AS
 /*  
 	Created: 20220324@Danny
 	Task : Get all vendor payment settings
-	DB: DBLIC.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 	
 	Revisions:     
 		- 20220324@Danny: Create SP [RedmineID: #168387]
@@ -41,7 +41,7 @@ BEGIN
 	FROM		@tmpProducts tmp  
 	LEFT JOIN	dbo.LA_VendorPaymentSetting la WITH(NOLOCK) ON la.ProductId = tmp.ProductID
 	LEFT JOIN	dbo.LA_Function fc WITH(NOLOCK) ON fc.FunctionKey = la.ReportFunctionKey
-	ORDER BY	tmp.OrderNo DESC
+	ORDER BY	tmp.ProductID
 
 END
 GO

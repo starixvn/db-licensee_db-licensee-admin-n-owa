@@ -1,8 +1,8 @@
-/*<info serverAlias="DBLIC-bodb_licensee"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee"></info>*/
 
 /*
 	Created: 20220316@Danny
-	DB: DBLIC.bodb_licensee
+	DB: DBCUST.bodb_licensee
 	Description: Create table structure And Initialize data
 */
 GO

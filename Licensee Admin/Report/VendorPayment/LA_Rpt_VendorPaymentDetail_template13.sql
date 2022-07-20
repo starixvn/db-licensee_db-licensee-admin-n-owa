@@ -18,7 +18,7 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @IsConvertNegativeFeeToZero BIT, @IsConvertNegativePaytoSupplierToZero BIT
-	SELECT @IsConvertNegativeFeeToZero = IsConvertNegativeFeeToZero, @IsConvertNegativePaytoSupplierToZero = IsConvertNegativePaytoSupplierToZero  FROM LA_VendorPaymentSetting WITH(NOLOCK) WHERE ProductId = @ProductID
+	SELECT @IsConvertNegativeFeeToZero = IsConvertNegativeFeeToZero, @IsConvertNegativePaytoSupplierToZero = IsConvertNegativePaytoSupplierToZero  FROM DBCUST.bodb_licensee.dbo.LA_VendorPaymentSetting WITH(NOLOCK) WHERE ProductId = @ProductID
 
 	DECLARE @ProductCode VARCHAR(50)
 	DECLARE @BettypeIdList TABLE (BetTypeId INT)

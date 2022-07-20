@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -16,7 +16,7 @@ AS
 /*  
 	Created: 20220324@Danny
 	Task : Modify vendor payment settings
-	DB: DBLIC.bodb_Licensee
+	DB: DBCUST.bodb_Licensee
 	
 	Revisions:     
 		- 20220324@Danny: Create SP [RedmineID: #168387]
