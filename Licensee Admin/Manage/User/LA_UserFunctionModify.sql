@@ -19,6 +19,8 @@ AS
 	Revisions:
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
+		- 20220504@Danny: Edit code to handle duplicate PK [RedmineID: #168387]
+
 */
 SET NOCOUNT ON
 DECLARE @startRun datetime  
@@ -95,6 +97,7 @@ BEGIN
 	Modifier,
 	StatusID )
     SELECT
+		DISTINCT
 	    @UserID,
 	    value AS FunctionID,
 	    getdate(),
