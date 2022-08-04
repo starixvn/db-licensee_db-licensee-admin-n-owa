@@ -173,7 +173,7 @@ BEGIN
 		INNER JOIN dbo.LA_InvoiceStatement d WITH(NOLOCK) ON h.InvoiceHeaderId = d.InvoiceHeaderId
 	WHERE h.InvoiceType = 7 AND d.InvItemTypeId = 3 -- AMF in Setup fee
 		AND h.StatusId = 0 AND h.Environment = 'LOCAL'					
-		AND h.PartyId = @NewPartyId
+		AND h.PartyId = @NonOfficialPartyId
 		AND h.CurrencyId = @BaseCurrencyId
 
 	-- Launch licensee
