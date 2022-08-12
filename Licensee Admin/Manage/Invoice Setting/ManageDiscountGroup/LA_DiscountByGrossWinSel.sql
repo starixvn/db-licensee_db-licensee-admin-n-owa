@@ -12,6 +12,7 @@ AS
 	 
 	 Revisions:
 		- 20211101@Percy: Initialize SP [RedmineID: #162158]
+		- 20220812@Danny: Fix issue get wrong chargerate [RedmineID: #166504]
 */
 
 BEGIN
@@ -63,7 +64,7 @@ BEGIN
 	FROM #DiscountGroup d
 		INNER JOIN dbo.OAS_ChargeInfo c WITH (NOLOCK) ON d.RepPartyId = c.FromParty AND d.ProductId = c.ProductId
 	WHERE c.ToParty IN (1, 9, 11, 98) AND c.ChargeType = 1
-		AND d.FromDate <= c.ToDate AND d.ToDate >= d.FromDate
+		AND d.FromDate <= c.ToDate AND d.ToDate >= c.FromDate
 
 	-- Return data
 	SELECT DiscountGroupId, DiscountGroupName, FromDate, ToDate, CurrencyName, ProductList, PayerList, ChargeRate
