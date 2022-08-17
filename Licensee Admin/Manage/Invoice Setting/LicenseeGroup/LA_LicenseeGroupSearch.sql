@@ -1,48 +1,60 @@
 ﻿/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-USE bodb_Licensee
-GO
-
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_NULLS ON;
-GO
-
 CREATE PROCEDURE [dbo].[LA_LicenseeGroupSearch]
-	@Username VARCHAR(100)
-	,@IsActive BIT = 0
+	@Username VARCHAR(100) = ''
 AS
 /*  
-	 Created: 20190514@Bruce[#111587]
-	 Task : Manage licensee group
+	 Created: 20220817@Malcolm
+	 Task : LA - Invoice - Manage Licensee Group - Search [RedminId : #176437]
 	 DB: DBCUST.bodb_licensee   
 
 	 Revisions:  
-		- 20190514@Bruce: Create SP
+		- 20220817@Malcolm: Initialize SPs
 */
 
 BEGIN
 	SET NOCOUNT ON
 	
-	SELECT @IsActive = ISNULL(@IsActive, 0), @Username = ISNULL(@Username, '')
+	SELECT @Username = ISNULL(@Username, '')
 
-	DECLARE @PartyInfo TABLE (PartyId INT,PartyName VARCHAR(50), GroupId INT)
+	CREATE TABLE #Group (GroupId INT PRIMARY KEY, GroupName NVARCHAR(30), ParentId INT, PartyNames VARCHAR(MAX), IsDeleted BIT DEFAULT(1))
 
-	INSERT INTO @PartyInfo (PartyId, PartyName, GroupId)
-	SELECT 
-		p.PartyId
-		,p.PartyName
-		,ISNULL(a.GroupId, 0) AS GroupId
-	FROM dbo.OAS_Party p WITH(NOLOCK)
-		INNER JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON p.PartyID=pd.PartyID
-		LEFT JOIN dbo.LA_CombinedGroupAssignment a WITH(NOLOCK) ON p.PartyId = a.PartyId
-	WHERE p.PartyType = 1 AND pd.IsDeposit = 1 AND pd.StatusId = 1
-	AND (@IsActive = 0 OR @IsActive = 1 AND pd.SuspendedDate IS NULL AND pd.TerminatedDate IS NULL)
-	AND (p.PartyName LIKE '%' + @Username + '%' OR @Username = '')
-
+	INSERT INTO #Group (GroupId, GroupName, ParentId)
 	SELECT c.GroupId, c.GroupName, ISNULL(p.GroupId, 0) AS ParentId
 	FROM dbo.LA_CombinedGroup c WITH(NOLOCK)
-	LEFT JOIN dbo.LA_CombinedGroup p WITH(NOLOCK) ON c.PathCode LIKE ('%/' + CAST(p.GroupId AS VARCHAR(5)) + '/')
+		LEFT JOIN dbo.LA_CombinedGroup p WITH(NOLOCK) ON c.PathCode LIKE ('%/' + CAST(p.GroupId AS VARCHAR(5)) + '/')
 	WHERE (c.PathCode = '/'	OR p.GroupId IS NOT NULL)
-		AND c.GroupName LIKE ''
 
+	;WITH CTE AS (
+		SELECT DISTINCT 
+			ISNULL(g.GroupId, 0) AS GroupId
+			,p.PartyName
+			,CASE WHEN p.PartyName LIKE '%'+ @Username +'%' THEN 0 ELSE 1 END AS IsDeleted
+		FROM dbo.OAS_Party p WITH(NOLOCK)
+			INNER JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON p.PartyID=pd.PartyID
+			LEFT JOIN dbo.LA_CombinedGroupAssignment g WITH(NOLOCK) ON g.PartyId = p.PartyID
+		WHERE p.PartyType = 1 AND pd.IsDeposit = 1 AND pd.StatusId = 1
+	),
+	GroupParty AS (
+		SELECT GroupId, STRING_AGG(LTRIM(RTRIM(PartyName)), ',') AS PartyNames, MIN(IsDeleted) AS IsDeleted
+		FROM CTE e
+		GROUP BY GroupId
+	)
+	UPDATE g
+		SET g.PartyNames = p.PartyNames, g.IsDeleted = p.IsDeleted
+	FROM #Group g
+		INNER JOIN GroupParty p ON p.GroupId = g.GroupId
+
+	IF @Username <> ''
+	BEGIN
+		DELETE g
+		FROM #Group g
+		WHERE g.GroupName NOT LIKE '%' + @Username + '%' AND g.IsDeleted = 1
+	END
+
+	SELECT GroupId, GroupName, ParentId, PartyNames 
+	FROM #Group
+	ORDER BY GroupName ASC
+	
+	DROP TABLE #Group
 END
 GO

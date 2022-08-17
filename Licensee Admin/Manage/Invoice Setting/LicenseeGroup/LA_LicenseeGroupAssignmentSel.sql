@@ -1,7 +1,7 @@
 ﻿/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_LicenseeGroupAssignmentSel]
-	@PartyIds NVARCHAR(MAX) = ''
-	,@IsActive BIT 
+	@GroupIds VARCHAR(MAX) = ''
+	,@IsOnlyActiveLicensee	BIT = 0
 AS
 /*  
 	 Created: 20190514@Bruce[#111587]
@@ -15,13 +15,13 @@ AS
 BEGIN
 	SET NOCOUNT ON;
 
-	SELECT @IsActive = ISNULL(@IsActive, 0), @PartyIds = ISNULL(@PartyIds, '')
+	SELECT @IsOnlyActiveLicensee = ISNULL(@IsOnlyActiveLicensee, 0), @GroupIds = ISNULL(@GroupIds, '')
 
-	DECLARE @Party TABLE (PartyId INT PRIMARY KEY)
+	DECLARE @Group TABLE (GroupId INT PRIMARY KEY)
 
-	INSERT INTO @Party (PartyId)
+	INSERT INTO @Group (GroupId)
 	SELECT DISTINCT f.value
-	FROM STRING_SPLIT(@PartyIds, ',') f
+	FROM STRING_SPLIT(@GroupIds, ',') f
 	
 	SELECT 
 		p.PartyId
@@ -36,7 +36,7 @@ BEGIN
 		INNER JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON p.PartyID=pd.PartyID
 		LEFT JOIN dbo.LA_CombinedGroupAssignment a WITH(NOLOCK) ON p.PartyId = a.PartyId
 	WHERE p.PartyType = 1 AND pd.IsDeposit = 1 AND pd.StatusId = 1
-		AND (@PartyIds = '' OR p.PartyId IN (SELECT PartyId FROM @Party))
-		AND (@IsActive = 0 OR @IsActive = 1 AND pd.SuspendedDate IS NULL AND pd.TerminatedDate IS NULL)
+		AND (@GroupIds = '' OR a.GroupId IN (SELECT GroupId FROM @Group))
+		AND (@IsOnlyActiveLicensee = 0 OR @IsOnlyActiveLicensee = 1 AND pd.SuspendedDate IS NULL AND pd.TerminatedDate IS NULL)
 END
 GO
