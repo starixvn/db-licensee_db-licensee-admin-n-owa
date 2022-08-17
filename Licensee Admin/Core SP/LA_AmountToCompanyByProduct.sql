@@ -32,6 +32,7 @@ AS
 		- 20220222@Danny: Allbet - Promotion integration [#167510]
 		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
 		- 20220418@Percy: Add Credit note for AMF [RedmineID: #164139]
+		- 20220817@Danny: hardcode for N8B, N8G (charge Rate And Discount rate are same) [RedmineID: #175153]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -57,6 +58,11 @@ BEGIN
 	IF @ToDate > CONVERT(DATE, GETDATE())
 		SET @ToDate = CONVERT(DATE, GETDATE())
 
+	-- Licensee : N8B, N8G 
+	DECLARE @ExcludeCompareDiscountAndFee_PartyList TABLE (PartyId INT)
+	INSERT INTO @ExcludeCompareDiscountAndFee_PartyList(PartyId)
+	SELECT PartyId FROM dbo.OAS_Party WITH (NOLOCK) WHERE PartyName IN ('Bwing (N8B)','Goal123 (N8G)')
+	
 	-- Get Product List
 	CREATE TABLE #Products (ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(10), IsSelected BIT)
 	INSERT INTO #Products (ProductId, ProductName, ProductCode, IsSelected)
@@ -633,7 +639,9 @@ BEGIN
 				GROUP BY PartyId, ProductId, DiscountGroupType
 			) d ON t.PartyId = d.PartyId AND t.ProductId = d.ProductId
 
-		UPDATE @Result SET Discount = 0, DiscountRate = 0, DiscountRemark = '', DiscountType = 0 WHERE Discount > LicensingFee
+		UPDATE @Result SET Discount = 0, DiscountRate = 0, DiscountRemark = '', DiscountType = 0 
+		WHERE	Discount > LicensingFee 
+				AND PartyId NOT IN (SELECT x.PartyId FROM @ExcludeCompareDiscountAndFee_PartyList x) -- Exclude  N8B, N8G 
 
 		-- Adjust discount for discount by licensing fee
 		BEGIN
