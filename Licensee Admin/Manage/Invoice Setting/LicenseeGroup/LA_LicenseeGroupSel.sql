@@ -15,12 +15,13 @@ AS
 
 	 Revisions:  
 		- 20190514@Bruce: Create SP
+		- 20220817@Malcolm: Add PathCode [RedmineId : #176437]
 */
 
 BEGIN
 	SET NOCOUNT ON
 	
-	SELECT c.GroupId, c.GroupName, ISNULL(p.GroupId, 0) AS ParentId
+	SELECT c.GroupId, c.GroupName, ISNULL(p.GroupId, 0) AS ParentId, c.PathCode
 	FROM dbo.LA_CombinedGroup c WITH(NOLOCK)
 	LEFT JOIN dbo.LA_CombinedGroup p WITH(NOLOCK) ON c.PathCode LIKE ('%/' + CAST(p.GroupId AS VARCHAR(5)) + '/')
 	WHERE c.PathCode = '/'			-- top level
