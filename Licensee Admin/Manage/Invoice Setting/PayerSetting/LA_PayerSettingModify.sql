@@ -29,6 +29,7 @@ AS
 		- 20210318@Mason: Change Base Currency Of Licensee [#151466]
 		- 20220118@Percy: Add Licensee Status Setting [RedmineID: #166751]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
+		- 20220831@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
 
 	 Params:				
 */
@@ -114,5 +115,49 @@ BEGIN
 				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT value FROM STRING_SPLIT(@WaiveInsertedList, ','))
 			RETURN
 		END
+
+	DECLARE @SiteName VARCHAR(20) ='', @InputPT VARCHAR(MAX), @ChargeRateXML XML
+
+	SELECT @ChargeRateXML = CONVERT(XML, @ChargeSettingXML)
+	
+	DECLARE @ChargeRate TABLE (ProductId INT, Rate DECIMAL(19,4))
+
+	SELECT @SiteName = l.LicenseeName
+	FROM dbo.OAS_Party p WITH(NOLOCK)
+		INNER JOIN dbo.Licensees l WITH(NOLOCK) ON p.OldRefID = l.LicenseeID
+	WHERE l.IsDeposit = 1 AND p.PartyID = @PayerID
+
+	INSERT INTO @ChargeRate (ProductId, Rate)
+	SELECT
+		t.c.value('(ProductId/text())[1]', 'INT') AS ProductId,	
+		t.c.value('(Rate/text())[1]', 'DECIMAL(19,4)') AS Rate
+	FROM @ChargeRateXML.nodes('ChargeSettings/ChargeSetting') AS t(c)
+	OPTION (OPTIMIZE FOR (@ChargeRateXML = NULL))
+
+	UPDATE c
+		SET c.ProductId = CASE WHEN c.ProductId = 0 THEN 1 ELSE p.ProductId END
+	FROM @ChargeRate c
+		LEFT JOIN dbo.Product3rd pr WITH(NOLOCK) ON pr.Productid = c.ProductId
+		LEFT JOIN DBPRO.bodb02.dbo.Products p WITH (NOLOCK) ON p.ProductPrefix = pr.ProductPrefix
+
+	SELECT @InputPT = CONVERT(VARCHAR(MAX), 
+	(
+		SELECT ProductId AS '@PID', 0 AS '@CID',1 - Rate AS '@PT' 
+		FROM @ChargeRate FOR XML PATH ('PT'), ROOT('ROOT')
+	))
+
+	EXEC CustDB.dbo.Acc_Dep_LicenseeSetting_PTSettingUpd
+		@Site = @SiteName
+		,@InputPT = @InputPT
+		,@UserID = @UserID
+		,@IP = @LoginIP
+		,@ErrCode = @ErrCode OUTPUT
+		,@ErrMsg = @ErrMsg OUTPUT	
+
+	IF @ErrCode  <> 0
+	BEGIN
+		RETURN
+	END
+
 END
 GO
