@@ -3,13 +3,14 @@ USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_ChargeRateSettingModify]
-	@PayerID				INT
-	, @ChargeSettingXML		NVARCHAR (MAX)
-	, @UserID				INT
-	, @LoginIP				VARCHAR (50)	= ''
-	, @ErrCode				INT				= 0		OUTPUT
-	, @ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
-	, @ErrorPair			NVARCHAR(1000)	= ''	OUTPUT
+	@PayerID						INT
+	, @ChargeSettingXML				NVARCHAR (MAX)
+	, @UserID						INT
+	, @LoginIP						VARCHAR (50)	= ''
+	, @ErrCode						INT				= 0		OUTPUT
+	, @ErrMsg						NVARCHAR(1000)	= ''	OUTPUT
+	, @ErrorPair					NVARCHAR(1000)	= ''	OUTPUT
+	, @ChargeSettingXMLOUT			XML = NULL OUTPUT
 AS
 /*
 	 Created: 20150423@Florent
@@ -33,9 +34,10 @@ AS
 		- 20200417@Parsons: Indo 4D Integration [#130910]
 		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 		- 20211101@Percy: Don't add new SB Rate if Licensee is belong to discount group on Lic WL [RedmineID: #162158]
+		- 20220831@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
 
 	 Params:
-		+ @InvoiceSettingXML: '<ChargeSettings>
+		+ @ChargeSettingXML: '<ChargeSettings>
 								  <ChargeSetting>
 									<ChargeId>1</ChargeId>
 									<ProductId>1</ProductId>
@@ -46,6 +48,16 @@ AS
 									<ChargeType>1</ChargeType>
 									<FromDate>1</FromDate>
 									<ToDate>1</ToDate>
+									<ChargeSettingsDetails>
+										<ChargeSettingsDetail>
+											<CurrencyId>1</CurrencyId>
+											<Rate>0.2</Rate>
+										</ChargeSettingsDetail>
+										<ChargeSettingsDetail>
+											<CurrencyId>2</CurrencyId>
+											<Rate>0.3</Rate>
+										</ChargeSettingsDetail>
+									<ChargeSettingsDetails>
 								  </ChargeSetting>
 								  <ChargeSetting>
 									<ChargeId>1</ChargeId>
@@ -57,12 +69,23 @@ AS
 									<ChargeType>1</ChargeType>
 									<FromDate>1</FromDate>
 									<ToDate>1</ToDate>
+									<ChargeSettingsDetails>
+										<ChargeSettingsDetail>
+											<CurrencyId>1</CurrencyId>
+											<Rate>0.2</Rate>
+										</ChargeSettingsDetail>
+										<ChargeSettingsDetail>
+											<CurrencyId>2</CurrencyId>
+											<Rate>0.3</Rate>
+										</ChargeSettingsDetail>
+									<ChargeSettingsDetails>
 								  </ChargeSetting>
 								</ChargeSettings>'
+								
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX),	@xml XML
+	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX),	@xml XML, @ChargeSettingsXML XML
 	DECLARE @ProductListAll		VARCHAR(500) = ''
 			, @MinDate			DATE
 			, @MaxDate			DATE
@@ -70,7 +93,10 @@ BEGIN
 
 	IF ISNULL(@ChargeSettingXML, '') = '' RETURN
 
-	DECLARE @ChargeSetting AS TABLE (
+	SELECT @ChargeSettingsXML = CONVERT(XML, @ChargeSettingXML)
+
+	DECLARE @ChargeSetting AS TABLE 
+	(
 		Idx				INT IDENTITY(1,1),
 		ChargeID		INT,
 		ProductId		INT,
@@ -81,41 +107,40 @@ BEGIN
 		ChargeType		INT,
 		FromDate		DATE,
 		ToDate			DATE,
-		StatusId		TINYINT)
+		StatusId		TINYINT
+	)
 
-	DECLARE @ChargeRate AS TABLE (
-		ChargeID	INT,
-		ProductId	INT,
-		BettypeRef	INT,
-		FromDate	DATE,
-		ToDate		DATE)
+	DECLARE @ChargeRate AS TABLE (ChargeID INT, ProductId INT, BettypeRef INT, FromDate DATE, ToDate DATE)
 
-	DECLARE @idoc AS INT
-	EXEC sp_xml_preparedocument @idoc OUTPUT, @ChargeSettingXML
-	BEGIN TRY
-		INSERT INTO @ChargeSetting(ChargeId, ProductId, FirstBilling, BasisBilling, BettypeRef, Rate, ChargeType, FromDate, ToDate, StatusId)
-		SELECT ISNULL(ChargeID, 0), ProductId, CASE WHEN FirstBilling='1900-01-01' THEN NULL ELSE FirstBilling END, BasisBilling, BettypeRef, Rate, ChargeType, FromDate, ToDate, 1/*new settings*/
-		FROM OPENXML(@idoc, 'ChargeSettings/ChargeSetting')
-		WITH (
-			 ChargeId		INT				'ChargeId'
-			, ProductId		INT				'ProductId'
-			, FirstBilling	DATE			'FirstBilling'
-			, BasisBilling	NVARCHAR(MAX)	'BasisBilling'
-			, BettypeRef	INT				'BettypeRef'
-			, Rate			MONEY			'Rate'
-			, ChargeType	INT				'ChargeType'
-			, FromDate		DATE			'FromDate'
-			, ToDate		DATE			'ToDate'
-		)
-	END TRY
-	BEGIN CATCH
-		SELECT @ErrMsg = 'There''s something wrong with Charge rate settings, update failed. Please try again.', @ErrCode = 701
-		RETURN
-	END CATCH
-	EXEC sp_xml_removedocument @idoc
+	DECLARE @ChargeSettingsDetails TABLE (ChargeId INT, ProductId INT, FromDate DATETIME, ToDate DATETIME, CurrencyId INT, Rate MONEY)
+
+	INSERT INTO @ChargeSetting (ChargeID ,ProductId ,FirstBilling, BasisBilling, BettypeRef, Rate, ChargeType, FromDate, ToDate, StatusId)
+	SELECT	t.c.value('(ChargeID/text())[1]', 'INT') AS ChargeID,
+			t.c.value('(ProductId/text())[1]', 'INT') AS ProductId,
+			t.c.value('(FirstBilling/text())[1]', 'DATE') AS FirstBilling,
+			t.c.value('(BasisBilling/text())[1]', 'NVARCHAR(MAX)') AS BasisBilling,
+			t.c.value('(BettypeRef/text())[1]', 'INT') AS BettypeRef,
+			t.c.value('(Rate/text())[1]', 'MONEY') AS Rate,			
+			t.c.value('(ChargeType/text())[1]', 'INT') AS ChargeType,		
+			t.c.value('(FromDate/text())[1]', 'DATE') AS FromDate,		
+			t.c.value('(ToDate/text())[1]', 'DATE') AS ToDate,	
+			t.c.value('(StatusId/text())[1]', 'TINYINT') AS StatusId
+	FROM @ChargeSettingsXML.nodes('ChargeSettings/ChargeSetting') AS t(c)
+	OPTION (OPTIMIZE FOR (@ChargeSettingsXML = NULL)) 
+
+	INSERT INTO @ChargeSettingsDetails (ChargeId, ProductId, FromDate, ToDate, CurrencyId, Rate)
+	SELECT	t.c.value('(ChargeId/text())[1]', 'INT') AS ChargeID,
+			t.c.value('(ProductId/text())[1]', 'INT') AS ProductId,	
+			t.c.value('(FromDate/text())[1]', 'DATE') AS FromDate,		
+			t.c.value('(ToDate/text())[1]', 'DATE') AS ToDate,	
+			t1.c.value('(CurrencyId/text())[1]', 'INT') AS CurrencyId,
+			t1.c.value('(Rate/text())[1]', 'MONEY') AS Rate
+	FROM @ChargeSettingsXML.nodes('ChargeSettings/ChargeSetting') AS t(c)
+	CROSS APPLY t.c.nodes('ChargeSettingsDetails/ChargeSettingsDetail') t1(c)
+	OPTION (OPTIMIZE FOR (@ChargeSettingsXML = NULL)) 
 
 	-- check  0 < rate < 1
-	IF EXISTS (SELECT 1 FROM @ChargeSetting WHERE Rate < 0 OR Rate > 1)
+	IF EXISTS (SELECT 1 FROM @ChargeSetting WHERE Rate < 0 OR Rate > 1) OR EXISTS (SELECT 1 FROM @ChargeSettingsDetails WHERE Rate < 0 OR  Rate > 1)
 	BEGIN
 		SELECT 	@ErrMsg = 'Charge rate should bewteen 0% and 100%, update failed. Please try again.', @ErrCode = 702
 		RETURN
@@ -292,6 +317,52 @@ BEGIN
 			SELECT 	@ErrMsg = 'Update failed. Please try again.', @ErrCode = 701
 			RETURN
 		END
+
+		--Update ChargeId
+		IF EXISTS (SELECT 1 FROM @ChargeSettingsDetails)
+		BEGIN
+			UPDATE d
+				SET d.ChargeId = c.ChargeID
+			FROM @ChargeSettingsDetails d
+				INNER JOIN @ChargeSetting c ON c.ProductID = d.ProductId AND c.FromDate = d.FromDate AND c.ToDate = d.ToDate 
+		
+			-- Insert charge rate by currency
+			INSERT INTO dbo.LA_ChargeRateByCurrency (ChargeID, CurrencyID, Rate)
+			SELECT ChargeId, CurrencyId, Rate 
+			FROM @ChargeSettingsDetails c
+			WHERE NOT EXISTS (
+				SELECT 1 FROM dbo.LA_ChargeRateByCurrency l WITH(NOLOCK) 
+				WHERE l.ChargeID = c.ChargeId AND l.CurrencyID = c.CurrencyId
+			)
+
+			--Delete charge rate by currency
+			DELETE l
+			FROM dbo.LA_ChargeRateByCurrency l WITH(ROWLOCK, UPDLOCK)
+			WHERE EXISTS (SELECT 1 FROM @ChargeSetting d WHERE d.ChargeID = l.ChargeID)
+				AND NOT EXISTS (SELECT 1 FROM @ChargeSettingsDetails cd WHERE cd.ChargeId = l.ChargeID AND cd.CurrencyId = l.CurrencyID)
+		END
+
+		SELECT @ChargeSettingXMLOUT = 
+		(
+				SELECT 
+					ChargeID
+					,ProductId
+					,FirstBilling
+					,BasisBilling
+					,BettypeRef
+					,Rate
+					,ChargeType
+					,FromDate
+					,ToDate
+					,(
+						SELECT CurrencyId, Rate
+						FROM @ChargeSettingsDetails d
+						WHERE d.ChargeId = c.ChargeID
+						FOR XML PATH('ChargeSettingsDetail'), ROOT('ChargeSettingsDetails'), TYPE
+					)
+				FROM @ChargeSetting	c	
+				FOR XML PATH ('ChargeSetting'), ROOT('ChargeSettings')
+		)
 
 		-- update system mapping
 		INSERT INTO LA_ChargeInfo_SystemMapping (ChargeID, SystemID)

@@ -16,6 +16,7 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
 	@ChargeInfoSettingData	NVARCHAR(MAX),
 	@MinFeeSettingData		NVARCHAR(MAX)	= '',
 	@UserId					INT,
+	@LoginIP				VARCHAR (50)	= '',
 	@NewPartyId				INT				= 0		OUTPUT,
 	@ErrCode				INT				= 0		OUTPUT,
 	@ErrMsg					VARCHAR(4000)	= ''	OUTPUT
@@ -33,6 +34,7 @@ AS
 		- 20210811@Danny: Adding @InvoiceLanguage [#FeatureID 158133]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 		- 20220623@Percy: Remove dropdown function & user [RedmineID: #166504]
+		- 20220831@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -92,10 +94,23 @@ BEGIN
 
 	-- Prepare input params
 	DECLARE @Products TABLE (ProductId INT)
-	DECLARE @ChargeInfoSettings	TABLE (ProductId INT, Rate MONEY, Remark NVARCHAR(400), BasisOfBilling NVARCHAR(500), ChargeType INT, FromDate DATE, ToDate DATE)
 	DECLARE @MinFeeSettings	TABLE (ProductId TINYINT, FeeTypeId TINYINT, FeeAmount MONEY, FromDate DATE, ToDate DATE, MinFeeTerm NVARCHAR(1000), [Priority] TINYINT, MonthOfDeduction TINYINT)
 	DECLARE @ChargeInfo TABLE (ChargeId INT, ProductId INT, SystemId INT)
-	DECLARE @AMF MONEY, @BillingGroupName NVARCHAR(50), @BillerId INT, @FirstDateOfMonth DATE
+	DECLARE @ChargeInfoSettings	TABLE 
+	(
+		ProductId		 INT
+		,Rate			 MONEY
+		,Remark			 NVARCHAR(400)
+		,BasisOfBilling  NVARCHAR(500)
+		,ChargeType		 INT
+		,FromDate		 DATE
+		,ToDate			 DATE
+		,MainProductId   INT
+		,ProductName	 VARCHAR(50)
+		,IsValid		 BIT DEFAULT(1)
+	)
+
+	DECLARE @AMF MONEY, @BillingGroupName NVARCHAR(50), @BillerId INT, @FirstDateOfMonth DATE, @SiteName VARCHAR(20) ='', @InputPT VARCHAR(MAX) = ''
 	
 	-- Charge Rate, Min Fee
 	BEGIN TRY
@@ -352,7 +367,65 @@ BEGIN
 		SELECT @ErrMsg = 'Launch licensee failed. Please try again.', @ErrCode =  503
 		RETURN
 	END CATCH
+
+	-- Update PT on NAP
+
+	DELETE FROM @ChargeInfoSettings WHERE ProductId IN (14, 17)
+
+	SELECT @SiteName = l.LicenseeName
+	FROM dbo.Licensees l WITH(NOLOCK) 
+	WHERE l.IsDeposit = 1 AND l.LicenseeID = @LicenseeId
+
+	UPDATE c
+		SET c.MainProductId = CASE WHEN c.ProductId = 0 THEN 1 ELSE p.ProductId END, c.ProductName = CASE WHEN c.ProductId = 0 THEN 'Sportsbook' ELSE pr.ProductName END
+	FROM @ChargeInfoSettings c
+		LEFT JOIN dbo.Product3rd pr WITH(NOLOCK) ON pr.Productid = c.ProductId
+		LEFT JOIN DBPRO.bodb02.dbo.Products p WITH (NOLOCK) ON p.ProductPrefix = pr.ProductPrefix
 	
+	UPDATE @ChargeInfoSettings
+		SET IsValid = 0
+	WHERE GETDATE() NOT BETWEEN FromDate AND ToDate
+
+	SELECT @InputPT = CONVERT(VARCHAR(MAX), 
+	(
+		SELECT 
+			MainProductId AS '@PID'
+			,0 AS '@CID'
+			,1 - Rate AS '@PT' 
+		FROM @ChargeInfoSettings 
+		WHERE IsValid = 1
+		FOR XML PATH ('PT'), ROOT('ROOT')
+	))
+
+	IF @SiteName <> '' AND @InputPT <> ''
+	BEGIN
+		EXEC CustDB.dbo.Acc_Dep_LicenseeSetting_PTSettingUpd
+			@Site = @SiteName
+			,@InputPT = @InputPT
+			,@UserID = @UserID
+			,@IP = @LoginIP
+			,@ErrCode = @ErrCode OUTPUT
+			,@ErrMsg = @ErrMsg OUTPUT
+	END
+
+	IF (@ErrCode  <> 0 OR EXISTS (SELECT 1 FROM @ChargeInfoSettings WHERE IsValid = 0)) AND @SiteName <> ''
+	BEGIN
+		IF @ErrCode <> 0
+		BEGIN 
+			GOTO WriteLog
+		END
+		
+		SELECT 
+			@ErrCode = 101
+			,@ErrMsg =  ISNULL(@ErrMsg, '') + ProductName + ': NAP PT update failed for charge rate value ' + CONVERT(VARCHAR(30), Rate * 100) + '% due to it''s not current charge rate' + '\n'
+		FROM @ChargeInfoSettings
+		WHERE IsValid = 0
+
+		GOTO WriteLog
+	END
+
+	WriteLog:
+
 	-- Write log
 	SET @EndRun = GETDATE()
 	SET @Duration = DATEDIFF(MILLISECOND, @StartRun, @EndRun)
