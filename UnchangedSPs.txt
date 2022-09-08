@@ -1,90 +1,12 @@
-Licensee Admin\Invoice\LA_Inv_ChargeRateInfoGet.sql
-Licensee Admin\Invoice\LA_Inv_InvoiceDetailInfoGet.sql
-Licensee Admin\Invoice\LA_Inv_InvoiceWaiveGet.sql
-Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_3rdProductSel.sql
-Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_ProductDetailSel.sql
-Licensee Admin\Manage\Invoice Setting\PayerSetting\LA_ChargeRateGroupChange.sql
-Licensee Admin\Manage\Invoice Setting\PayerSetting\LA_ChargeRateSettingDel.sql
-Licensee Admin\Manage\Invoice Setting\PayerSetting\LA_ChargeRateSettingModify.sql
-Licensee Admin\Manage\Invoice Setting\PayerSetting\LA_ChargeRateValidate.sql
-Licensee Admin\Manage\Invoice Setting\PayerSetting\LA_PayerSettingDel.sql
-Licensee Admin\Manage\Invoice Setting\PayerSetting\LA_PayerSettingDetailSel.sql
-Licensee Admin\Manage\Invoice Setting\PayerSetting\LA_PayerSettingSel.sql
-Licensee Admin\Report\Analysis\LA_GEN_LicPerformanceAnalysis_Invoice.sql
-Licensee Admin\Report\Analysis\LA_GEN_LicPerformanceAnalysis_Report.sql
-Licensee Admin\Report\Analysis\LA_Rpt_LicenseeAnalysis.sql
-Licensee Admin\Report\LA_Rpt_3rdProductSettlement.sql
-Licensee Admin\Report\LA_Rpt_AGCasinoWinLoss.sql
-Licensee Admin\Report\LA_Rpt_AllBetWinloss.sql
-Licensee Admin\Report\LA_Rpt_BetRadarVirtualSportWinLoss.sql
-Licensee Admin\Report\LA_Rpt_BettradeWinloss.sql
-Licensee Admin\Report\LA_Rpt_CashoutWinloss.sql
-Licensee Admin\Report\LA_Rpt_CockFightingWinLoss.sql
-Licensee Admin\Report\LA_Rpt_ColossusBetWinloss.sql
-Licensee Admin\Report\LA_Rpt_ExchangeWinLoss.sql
-Licensee Admin\Report\LA_Rpt_FishingWorldWinloss.sql
-Licensee Admin\Report\LA_Rpt_GoldDeluxeWinloss.sql
-Licensee Admin\Report\LA_Rpt_GroupLicensingFeeExtraPayoutWinLoss.sql
-Licensee Admin\Report\LA_Rpt_GroupLicensingFeeWinLoss.sql
-Licensee Admin\Report\LA_Rpt_KenoLotteryWinLoss.sql
-Licensee Admin\Report\LA_Rpt_KenoWinloss2.sql
-Licensee Admin\Report\LA_Rpt_LicenseeSettlement.sql
-Licensee Admin\Report\LA_Rpt_LicenseeWinloss.sql
-Licensee Admin\Report\LA_Rpt_LicenseeWinLossByDynamicProduct.sql
-Licensee Admin\Report\LA_Rpt_LicenseeWinLossByProduct.sql
-Licensee Admin\Report\LA_Rpt_LicenseeWinloss_Details.sql
-Licensee Admin\Report\LA_Rpt_LiveCasinoWinloss.sql
-Licensee Admin\Report\LA_Rpt_MacauGamesWinLoss.sql
-Licensee Admin\Report\LA_Rpt_MacauWinloss.sql
-Licensee Admin\Report\LA_Rpt_MaxGameWinLoss.sql
-Licensee Admin\Report\LA_Rpt_MicrogamingWinloss.sql
-Licensee Admin\Report\LA_Rpt_MicrogamingWinlossGMT0.sql
-Licensee Admin\Report\LA_Rpt_MuayThaiWinLoss.sql
-Licensee Admin\Report\LA_Rpt_NumberGame2Winloss.sql
-Licensee Admin\Report\LA_Rpt_PGSoftWinLoss.sql
-Licensee Admin\Report\LA_Rpt_PlatformWinloss.sql
-Licensee Admin\Report\LA_Rpt_PlatformWinlossSummary.sql
-Licensee Admin\Report\LA_Rpt_PokerGamesWinLoss.sql
-Licensee Admin\Report\LA_Rpt_PragmaticWinLoss.sql
-Licensee Admin\Report\LA_Rpt_SabaPromotion.sql
-Licensee Admin\Report\LA_Rpt_SuperliveWinLoss.sql
-Licensee Admin\Report\LA_Rpt_TableGameWinLoss.sql
-Licensee Admin\Report\LA_Rpt_VirtualSportWinloss.sql
-Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_Alert.sql
-Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_LicensingFee.sql
-Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_LicensingMargin.sql
-Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_Summary.sql
-Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_TurnOver.sql
-Licensee Admin\Report\Obsolete\LA_Rpt_3rdPartyProductWinloss.sql
 Licensee Admin\Core SP\LA_AmountToCompanyByProduct.sql
 Licensee Admin\Invoice\GenerateMultipleInvoices\LA_Inv_MultipleGenerationTemporaryInvoiceSel.sql
-Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_NAPByProductSel.sql
-Licensee Admin\Manage\Invoice Setting\LA_ProductListByPayerSel.sql
-Licensee Admin\Manage\Invoice Setting\LA_ProductListLauchedSel.sql
-Licensee Admin\Manage\Invoice Setting\LA_ProductListSelAll.sql
-Licensee Admin\Manage\LA_SelProductByParty.sql
-Licensee Admin\Report\LA_Rpt_LicenseeBillingDataByProduct.sql
-Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_Detail.sql
 Licensee Admin\Invoice\InvoiceAmountGenerate\LA_Inv_GenerateAmountForSoftwareFee.sql
 Licensee Admin\Invoice\LA_Inv_InvoiceAmountGenerate.sql
-Licensee Admin\Invoice\LA_Inv_InvoiceInfoInsert.sql
-Licensee Admin\Invoice\LA_Inv_InvoiceTypeInfoGet.sql
+Licensee Admin\Invoice\LA_Inv_InvoiceWaiveGet.sql
 Licensee Admin\Invoice\LA_Inv_RebateWorksheetSel.sql
-Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_InvoiceSel.sql
-Licensee Admin\Manage\Function\LA_FunctionPartiesPermission.sql
-Licensee Admin\Manage\Invoice Setting\Discount_Rebate\LA_DiscountGroupInfoSel.sql
-Licensee Admin\Manage\Invoice Setting\HostingFees\LA_HostingFeesChargeRateSel.sql
-Licensee Admin\Manage\Invoice Setting\HostingFees\LA_HostingFeesPayerSettingsSel.sql
-Licensee Admin\Manage\Invoice Setting\LA_InvoiceSettingSel.sql
-Licensee Admin\Manage\Invoice Setting\ManageDiscountGroup\LA_DiscountByGrossWinGet.sql
-Licensee Admin\Manage\Invoice Setting\ManageDiscountGroup\LA_DiscountByGrossWinIns.sql
-Licensee Admin\Manage\Invoice Setting\ManageDiscountGroup\LA_DiscountByGrossWinSel.sql
-Licensee Admin\Manage\Invoice Setting\ManageDiscountGroup\LA_DiscountByGrossWinUpd.sql
-Licensee Admin\Manage\Invoice Setting\ManageDiscountGroup\LA_DiscountGet.sql
-Licensee Admin\Manage\Invoice Setting\ManageDiscountGroup\LA_DiscountSel.sql
-Licensee Admin\Manage\Invoice Setting\ManageGroupMinFee\LA_GroupMinFeeGet.sql
-Licensee Admin\Manage\Invoice Setting\ManageRebateGroup\LA_RebateGet.sql
-Licensee Admin\Manage\Invoice Setting\ManageRebateGroup\LA_RebateSel.sql
-Licensee Admin\Manage\LA_LicenseeBillingInfoSel.sql
-Licensee Admin\Manage\Mics\LaunchNewLicensee\LA_LaunchLicensee_ChargeInfoIns.sql
-Licensee Admin\Manage\Invoice Setting\PayerSetting\LA_ChargeRateGroupChange.sql
+Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_AmountToCompanySel.sql
+Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_StraightDiscountSel.sql
+Licensee Admin\Report\Analysis\LA_GEN_LicPerformanceAnalysis_Invoice.sql
+Licensee Admin\Report\Analysis\LA_GEN_LicPerformanceAnalysis_Report.sql
+Licensee Admin\Report\LA_Rpt_LicenseeBillingDataByProduct.sql
+Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_Detail.sql
