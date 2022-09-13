@@ -22,7 +22,7 @@ BEGIN
 	SELECT CurrencyId, CurrencyName
 	FROM (
 			SELECT e.exchangeid AS CurrencyId
-				, e.Code AS CurrencyName
+				, CASE WHEN e.exchangeid = 142 THEN 'USDT' ELSE e.Code END AS CurrencyName
 				, CASE e.Code WHEN @BaseCurrencyDefault THEN 1 ELSE 0 END AS [Default]
 			FROM bodb02.dbo.Exchange e WITH (NOLOCK)
 			WHERE e.Code IN 
@@ -32,6 +32,7 @@ BEGIN
 								, 'GBP' -- ExchangeID = 12
 								, 'USD' -- ExchangeID = 3	
 								, 'MYR'	-- ExchangeID = 2	
+								, 'UST' -- ExchangeID = 142	
 							)
 								AND e.exchangeid IN
 							(
@@ -40,6 +41,7 @@ BEGIN
 								, 6
 								, 12
 								, 13
+								, 142
 							)						
 		) c
 	ORDER BY [Default] DESC

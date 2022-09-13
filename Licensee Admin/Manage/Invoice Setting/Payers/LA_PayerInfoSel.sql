@@ -76,7 +76,7 @@ SET NOCOUNT ON
 		
 	SELECT p.PartyID
 		, p.BaseCurrencyId
-		, e.Code AS BaseCurrencyName
+		, CASE WHEN p.BaseCurrencyId = 142 THEN 'USDT' ELSE e.Code END AS BaseCurrencyName
 		, p.LicenseeCode
 		, p.FromDate
 		, p.ToDate
