@@ -14,7 +14,7 @@ AS
 		- 20150703@Florent: add currency MYR
 		- 20171220@Parsons: increase length for variables [#88197]
 		- 20190408@Bruce: grant permission for dwrs2 [#105205]
-
+		- 20201003@Danny: Support USDT as base currency [RedmineID: #177718]
 */
 BEGIN
 	SET NOCOUNT ON

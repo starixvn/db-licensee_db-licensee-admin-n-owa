@@ -14,7 +14,8 @@ ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
 		- 20160413@Francis: Support THB Base Currency
 		- 20160920@Harper : Support HKD Base Currency
 		- 20170712@Harper: Support IDR Base Currency [RedmineID: #79309]
-		- 20180301@Harper: Support SGD as base currency [RedmineID: #91339]  
+		- 20180301@Harper: Support SGD as base currency [RedmineID: #91339] 
+		- 20201003@Danny: Support USDT as base currency [RedmineID: #177718]  
 
 	Param's Explanation:				
 */
@@ -49,20 +50,22 @@ BEGIN
 		WHILE (@tmpDate <= @tmpToDate AND @tmpDate <= @todate)
 		BEGIN
 			INSERT INTO @tempDate (exchangedate, ExchangeId, Code, BaseCurrencyRate)--, MYR, USD, EUR, CNY, GBP, actualrate)
-			SELECT @tmpDate, ExchangeId, Code
-				, CASE WHEN @BaseCurrency = 'MYR' THEN MYR
-					WHEN @BaseCurrency = 'USD' THEN USD
-					WHEN @BaseCurrency = 'EUR' THEN EUR
-					WHEN @BaseCurrency = 'CNY' THEN CNY
-					WHEN @BaseCurrency = 'GBP' THEN GBP
-					WHEN @BaseCurrency = 'THB' THEN THB
-					WHEN @BaseCurrency = 'HKD' THEN HKD
-					WHEN @BaseCurrency = 'IDR' THEN IDR
-					WHEN @BaseCurrency = 'SGD' THEN SGD  
+			SELECT @tmpDate, t.ExchangeId, t.Code
+				, CASE WHEN @BaseCurrency = 'MYR' THEN t.MYR
+					WHEN @BaseCurrency = 'USD' THEN t.USD
+					WHEN @BaseCurrency = 'EUR' THEN t.EUR
+					WHEN @BaseCurrency = 'CNY' THEN t.CNY
+					WHEN @BaseCurrency = 'GBP' THEN t.GBP
+					WHEN @BaseCurrency = 'THB' THEN t.THB
+					WHEN @BaseCurrency = 'HKD' THEN t.HKD
+					WHEN @BaseCurrency = 'IDR' THEN t.IDR
+					WHEN @BaseCurrency = 'SGD' THEN t.SGD 
+					WHEN @BaseCurrency = 'USDT' THEN u.USDT  
 					ELSE 1 END BaseCurrencyRate
 				--, MYR, USD, EUR, CNY, GBP, actualrate
-			FROM dbo.ExchangeDailyOanda WITH (NOLOCK)
-			WHERE ExchangeDate = @tmpToDate
+			FROM dbo.ExchangeDailyOanda t WITH (NOLOCK)
+			LEFT JOIN bodb02.dbo.ExchangeDaily_Crypto u WITH(NOLOCK) ON t.ExchangeDate = u.ExchangeDate AND t.ExchangeId = u.ExchangeId
+			WHERE t.ExchangeDate = @tmpToDate
 	
 			SET @tmpDate = DATEADD(dd,1,@tmpDate)
 		END

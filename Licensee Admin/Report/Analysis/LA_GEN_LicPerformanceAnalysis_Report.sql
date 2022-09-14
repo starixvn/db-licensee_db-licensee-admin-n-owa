@@ -27,6 +27,8 @@ AS
 		- 20211209@Percy: Fix Base Currency IS NULL [RedmineID: #157652]
 		- 20211213@Percy: Fix missing BetCount and exclude Saba Promotion [RedmineID: #161378]
 		- 20211215@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
+		- 20201003@Danny: Exclude Licensees that offer cryptocurrency [#FeatureID 177718]
+
 */
 
 BEGIN
@@ -38,6 +40,10 @@ BEGIN
 	SELECT GroupProductId, ProductId, ProductCode, FromDate, ToDate
 	FROM dbo.LA_f_GroupProduct(@ProductCodes, @FromDate, @ToDate) g
 
+	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT)
+	INSERT INTO @tmpPartyOfferCrypto(PartyId)
+	SELECT  PartyID FROM LA_f_CryptoPartyListSel()
+
 	IF ',' + @ProductCodes + ',' LIKE ',ADJUST,' -- Adjustment
 		INSERT INTO @tmpProductList (ProductId, ProductCode)
 		SELECT 9000, 'ADJUST'
@@ -48,7 +54,7 @@ BEGIN
 	IF ISNULL(@PartyIds, '') <> ''
 	BEGIN
 		INSERT INTO @tmpPartyList (PartyId)
-		SELECT DISTINCT val FROM dbo.strSplit(@PartyIds, ',')
+		SELECT DISTINCT value FROM STRING_SPLIT(@PartyIds, ',')
 
 		UPDATE t
 		SET t.SiteId = p.OldRefId, t.BaseCurrencyId = ISNULL(c.BaseCurrencyId, 6)
@@ -80,7 +86,8 @@ BEGIN
 	END
 
 	SET @PartyIds = NULL
-	SELECT @PartyIds = COALESCE(@PartyIds + ',', '') + CONVERT(VARCHAR(20), PartyId) FROM @tmpPartyList
+	SELECT @PartyIds = COALESCE(@PartyIds + ',', '') + CONVERT(VARCHAR(20), t.PartyId) FROM @tmpPartyList t
+	WHERE t.PartyId NOT IN (SELECT x.PartyId FROM @tmpPartyOfferCrypto x)
 
 	-- Generate adjustment values
 	DECLARE @ReportDate DATE = DATEADD(MONTH, DATEDIFF(MONTH, 0, @FromDate), 0)

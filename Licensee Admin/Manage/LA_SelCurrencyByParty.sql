@@ -17,6 +17,7 @@ Revisions:
 	- 20150105@Florent: use f_SelLicenseeCust
 	- 20150312@Florent: add systemmode to use on report settlement
 	- 20200225@Parsons: Support-HID-currency [#128856]
+	- 20201003@Danny: Support USDT as base currency [RedmineID: #177718]
 
 Param's Explanation:
 */
@@ -55,9 +56,9 @@ BEGIN
 	    FROM CustDB.dbo.Exchange WITH (NOLOCK)
 	    WHERE exchangeid NOT IN (SELECT Currency FROM @temp)
 	END
-	DECLARE @temp1 AS TABLE (currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
-	INSERT INTO @temp1(currency, CurrencyName, CurrencyCode)
-	SELECT t.currency, e.currency, e.Code
+	DECLARE @temp1 AS TABLE (currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20), CurrencyType TINYINT)
+	INSERT INTO @temp1(currency, CurrencyName, CurrencyCode, CurrencyType)
+	SELECT t.currency, e.currency, e.Code, e.CurrencyType
 	FROM @temp t
 	INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON t.currency = e.exchangeid
 
@@ -72,15 +73,14 @@ BEGIN
 	) t2 ON t1.CurrencyCode = t2.CurrencyCode
 
 	SELECT t.currency
-		,CASE t.currency
-			WHEN 20
-				THEN 'UUS'
-			WHEN 51 
-				THEN CASE WHEN @SystemMode = 'LA' THEN 'INH'
-						  WHEN @SystemMode = 'INV' THEN 'VND'
-					 END
-			WHEN 92
-				THEN 'HID'
+		,CASE 
+			WHEN t.currency = 20 THEN 'UUS'
+			WHEN t.currency = 51 THEN CASE  WHEN @SystemMode = 'LA' THEN 'INH'
+											WHEN @SystemMode = 'INV' THEN 'VND'
+											END
+			WHEN t.currency = 92 THEN 'HID'
+			WHEN t.currency = 142 THEN 'USDT'
+			WHEN t.CurrencyType = 1 THEN t.CurrencyName
 			ELSE CurrencyCode
 			END AS CurrencyName
 	FROM @temp1 t

@@ -22,6 +22,8 @@ AS
 		- 20211209@Percy: Fix Base Currency IS NULL [RedmineID: #157652]
 		- 20211213@Percy: Fix missing BetCount and exclude Saba Promotion [RedmineID: #161378]
 		- 20211215@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
+		- 20220928@Danny: Exclude Licensees that offer cryptocurrency [#FeatureID 177627]
+
 */
 
 BEGIN
@@ -31,6 +33,10 @@ BEGIN
 	DECLARE @AdjustmentId INT = 9000
 	DECLARE @BaseCurrencyId INT = 6 -- default
 	DECLARE @InvoiceStatus_Normal SMALLINT = 0
+
+	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT)
+	INSERT INTO @tmpPartyOfferCrypto(PartyId)
+	SELECT  PartyID FROM LA_f_CryptoPartyListSel()
 
 	SELECT
 		@PartyId			= PartyId
@@ -43,8 +49,7 @@ BEGIN
 	DECLARE @FromDate DATETIME = @InvoiceDate
 	DECLARE @ToDate DATETIME = DATEADD(DAY, -1, DATEADD(MONTH, DATEDIFF(MONTH, 0, @InvoiceDate) + 1, 0))
 
-
-	IF @PartyId IS NULL
+	IF (@PartyId IS NULL OR EXISTS (SELECT TOP 1 1 FROM @tmpPartyOfferCrypto WHERE PartyId = @PartyId))
 		RETURN
 
 	SELECT @SiteId = OldRefId FROM dbo.OAS_Party WITH (NOLOCK) WHERE PartyId = @PartyId

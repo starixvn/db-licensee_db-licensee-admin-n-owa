@@ -23,6 +23,7 @@ AS
 		+ 20210315@Happy: Change BaseCurrency Of Licensee [#151466]
 		- 20210811@Danny: Adding AttnName2, CompanyName2 into OAS_PartyDetail [#FeatureID 158133]
 		- 20210824@Danny: get licensee status from OIC And Relocated SP [#159296]
+		- 20201003@Danny: Support USDT as base currency [RedmineID: #177718]
 		
 	 Params:
 	 Example:
