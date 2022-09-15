@@ -4,16 +4,17 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_PayerSettingModify]
 	@PayerID				INT	
-	, @LaunchDate			DATE = NULL
-	, @SuspendedDate		DATE = NULL
-	, @TerminatedDate		DATE = NULL
-	, @ChargeSettingXML		NVARCHAR (MAX)
-	, @MinFeeSettingXML		NVARCHAR (MAX)
-	, @WaiveSettingXML		NVARCHAR (MAX)
-	, @UserID				INT
-	, @LoginIP				VARCHAR (50)	= ''
-	, @ErrCode				INT				= 0		OUTPUT
-	, @ErrMsg				NVARCHAR(1000)	= ''	OUTPUT	
+	,@LaunchDate			DATE = NULL
+	,@SuspendedDate			DATE = NULL
+	,@TerminatedDate		DATE = NULL
+	,@ChargeSettingXML		NVARCHAR (MAX)
+	,@MinFeeSettingXML		NVARCHAR (MAX)
+	,@WaiveSettingXML		NVARCHAR (MAX)
+	,@BillingGroupId		INT = 0
+	,@UserID				INT
+	,@LoginIP				VARCHAR (50)	= ''
+	,@ErrCode				INT				= 0		OUTPUT
+	,@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT	
 AS
 /*  
 	 Created: 2015042$@Florent
@@ -44,23 +45,25 @@ AS
 							ChargeType>1</ChargeType>
 							<FromDate>20180801</FromDate>
 							<ToDate>20250531</ToDate>
-							<ChargeSettingsDetails>
-										<ChargeSettingsDetail>
-											<CurrencyId>1</CurrencyId>
-											<Rate>0.2</Rate>
-										</ChargeSettingsDetail>
-										<ChargeSettingsDetail>
-											<CurrencyId>2</CurrencyId>
-											<Rate>0.3</Rate>
-										</ChargeSettingsDetail>
-									<ChargeSettingsDetails>
+							<ChargeSettingByCurrencys>
+								<ChargeSettingByCurrency>
+									<CurrencyId>1</CurrencyId>
+									<Rate>0.2</Rate>
+								</ChargeSettingByCurrency>
+								<ChargeSettingByCurrency>
+									<CurrencyId>2</CurrencyId>
+									<Rate>0.3</Rate>
+								</ChargeSettingByCurrency>
+							</ChargeSettingByCurrencys>
 						</ChargeSetting>
 					</ChargeSettings>
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @ProductListAll VARCHAR(100) = '', @MinDate DATE, @MaxDate DATE, @SiteName VARCHAR(20) ='', @InputPT VARCHAR(MAX) = '', @ChargeRateXML XML, @ChargeSettingXMLOUT XML
+	DECLARE @ProductListAll VARCHAR(100) = '', @MinDate DATE, @MaxDate DATE, @SiteName VARCHAR(20) ='', @InputPT VARCHAR(MAX) = '', @ChargeRateXML XML, @ChargeSettingXMLOUT XML, @Username VARCHAR(50)
 	
+	SELECT @Username = Username FROM LA_User WITH(NOLOCK) WHERE UserID = @UserID 
+
 	DECLARE @MinFeeInsertedList VARCHAR(100), @WaiveInsertedList VARCHAR(100)
 
 	-- Update LaunchDate/SuspendedDate/TerminatedDate
@@ -117,12 +120,13 @@ BEGIN
 	--Modify Chargerate Setting
 	EXEC dbo.LA_ChargeRateSettingModify
 		@PayerID				= @PayerID
-		, @ChargeSettingXML		= @ChargeSettingXML
-		, @UserID				= @UserID
-		, @LoginIP				= @LoginIP
-		, @ErrCode				= @ErrCode OUTPUT
-		, @ErrMsg				= @ErrMsg OUTPUT		
-		, @ChargeSettingXMLOUT  = @ChargeSettingXMLOUT OUTPUT
+		,@ChargeSettingXML		= @ChargeSettingXML
+		,@BillingGroupId        = @BillingGroupId
+		,@UserID				= @UserID
+		,@LoginIP				= @LoginIP
+		,@ErrCode				= @ErrCode OUTPUT
+		,@ErrMsg				= @ErrMsg OUTPUT		
+		,@ChargeSettingXMLOUT   = @ChargeSettingXMLOUT OUTPUT
 
 	IF @ErrCode <> 0 
 		BEGIN
@@ -141,37 +145,35 @@ BEGIN
 		END
 
 	-- Update on NAP
-	DECLARE @ChargeRate TABLE (ChargeID INT, ProductId INT, ProductName VARCHAR(50), Rate MONEY, FromDate DATETIME, ToDate DATETIME, IsValid BIT DEFAULT(1))
+	DECLARE @ChargeRate TABLE (ChargeID INT, ProductId INT, ProductName VARCHAR(50), Rate MONEY, CurrencyId INT, FromDate DATETIME, ToDate DATETIME, IsValid BIT DEFAULT(1), IsChangedRate BIT)
 
-	DECLARE @ChargeRateDetail TABLE (ChargeID INT, CurrencyId INT, Rate MONEY)
+	DECLARE @ChargeRateDetail TABLE (ChargeID INT, CurrencyId INT, Rate MONEY, IsChangedRate BIT)
 
-	INSERT INTO @ChargeRate (ChargeId, FromDate, ToDate, ProductId, Rate)
+	INSERT INTO @ChargeRate (ChargeId, FromDate, ToDate, ProductId, Rate, IsChangedRate, CurrencyId)
 	SELECT
 		t.c.value('(ChargeId/text())[1]', 'INT') AS ChargeId
 		,t.c.value('(FromDate/text())[1]', 'DATETIME') AS FromDate
 		,t.c.value('(ToDate/text())[1]', 'DATETIME') AS ToDate
 		,t.c.value('(ProductId/text())[1]', 'INT') AS ProductId
 		,t.c.value('(Rate/text())[1]', 'MONEY') AS Rate
+		,t.c.value('(IsChangedRate/text())[1]', 'BIT') AS IsChangedRate
+		,0 AS CurrencyId
 	FROM @ChargeSettingXMLOUT.nodes('ChargeSettings/ChargeSetting') AS t(c)
 	OPTION (OPTIMIZE FOR (@ChargeSettingXMLOUT = NULL))
 
-	INSERT INTO @ChargeRateDetail (ChargeId, CurrencyId, Rate)
+	INSERT INTO @ChargeRateDetail (ChargeId, CurrencyId, Rate, IsChangedRate)
 	SELECT
 		t.c.value('(ChargeId/text())[1]', 'INT') AS ChargeId
 		,t1.c.value('(CurrencyId/text())[1]', 'INT') AS CurrencyId
 		,t1.c.value('(Rate/text())[1]', 'MONEY') AS Rate
+		,t1.c.value('(IsChangedRate/text())[1]', 'BIT') AS IsChangedRate
 	FROM @ChargeSettingXMLOUT.nodes('ChargeSettings/ChargeSetting') AS t(c)
-	CROSS APPLY t.c.nodes('ChargeSettingsDetails/ChargeSettingsDetail') t1(c)
+	CROSS APPLY t.c.nodes('ChargeSettingByCurrencys/ChargeSettingByCurrency') t1(c)
 	OPTION (OPTIMIZE FOR (@ChargeSettingXMLOUT = NULL))
 
 	UPDATE @ChargeRate
 		SET IsValid = 0
 	WHERE GETDATE() NOT BETWEEN FromDate AND ToDate
-
-	DELETE r 
-	FROM @ChargeRate r
-		INNER JOIN OAS_ChargeInfo c WITH(NOLOCK) ON r.ChargeID = c.ChargeID
-	WHERE r.Rate = c.Rate AND r.IsValid = 1
 
 	DELETE FROM @ChargeRate WHERE ProductId IN (14, 17)
 
@@ -189,34 +191,61 @@ BEGIN
 	;WITH CTE_ChargeId AS 
 	(
 		SELECT DISTINCT ChargeID, ProductId, ProductName FROM @ChargeRate WHERE IsValid = 1
-	),CTE_Currency AS
+	),CTE_ExistingCurrency AS
 	(
-		SELECT cr.ChargeID, cr.CurrencyID, c.ProductId, c.ProductName
+		SELECT cr.ChargeID, cr.CurrencyID, c.ProductId, c.ProductName, -1 AS Rate
 		FROM dbo.LA_ChargeRateByCurrency cr WITH(NOLOCK)
 			INNER JOIN CTE_ChargeId c ON c.ChargeID = cr.ChargeID
-				LEFT JOIN @ChargeRateDetail d ON d.ChargeID = cr.ChargeID AND d.CurrencyId = cr.CurrencyID AND d.Rate = cr.Rate
+		WHERE NOT EXISTS (SELECT 1 FROM @ChargeRateDetail d WHERE d.ChargeID = c.ChargeID)
+		UNION ALL
+		SELECT d.ChargeID, d.CurrencyId, r.ProductId, r.ProductName, CASE WHEN  d.IsChangedRate = 1 THEN d.Rate ELSE -1 END AS Rate
+		FROM @ChargeRateDetail d
+			INNER JOIN @ChargeRate r ON r.ChargeID = d.ChargeID
 	)
 	INSERT INTO @ChargeRate (ChargeID, ProductId, ProductName, CurrencyId, Rate, IsValid)
-	SELECT ChargeID, ProductId, ProductName, CurrencyID, 2, 1 -- 2 : not update
-	FROM CTE_Currency
+	SELECT ChargeID, ProductId, ProductName, CurrencyID, Rate, 1 
+	FROM CTE_ExistingCurrency
 
+	UPDATE c
+		SET c.Rate = CASE WHEN c.IsChangedRate = 1 THEN c.Rate ELSE -1 END
+	FROM @ChargeRate c	
+	WHERE c.CurrencyId = 0
+
+	/*Delete prevent updating unexpected NAP PT value*/
+	/*1.new charge rate is same as same charge rate*/
+	DELETE c
+	FROM @ChargeRate C
+	WHERE NOT EXISTS (SELECT 1 FROM @ChargeRate r WHERE r.ChargeID = c.ChargeID AND r.Rate <> -1)
+		AND c.IsValid = 1
+		
+	/*2.Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0%*/
+	DELETE c
+	FROM @ChargeRate c
+	WHERE EXISTS (
+		SELECT 1 FROM @ChargeRate r 
+		WHERE r.ChargeID = c.ChargeID 
+			AND ((r.Rate > 0.12 AND @SiteName <> '9wickets') OR r.Rate = 0)
+			AND c.ProductId = 0
+		)
+	
 	SELECT @InputPT = CONVERT(VARCHAR(MAX), 
 	(
 		SELECT 
 			ProductId AS '@PID'
 			,CurrencyId AS '@CID'
-			,1 - Rate AS '@PT' -- [-1] : not update
+			,CASE WHEN Rate = -1 THEN -1 ELSE 100 * (1 - Rate) END AS '@PT' -- [-1] : not update
 		FROM @ChargeRate 
 		WHERE IsValid = 1
 		FOR XML PATH ('PT'), ROOT('ROOT')
 	))
 
-	IF @SiteName <> '' AND @InputPT <> ''
+	IF @SiteName <> '' AND ISNULL(@InputPT, '') <> ''
 	BEGIN
 		EXEC CustDB.dbo.Acc_Dep_LicenseeSetting_PTSettingUpd
 			@Site = @SiteName
 			,@InputPT = @InputPT
 			,@UserID = @UserID
+			,@Username = @Username
 			,@IP = @LoginIP
 			,@ErrCode = @ErrCode OUTPUT
 			,@ErrMsg = @ErrMsg OUTPUT
@@ -225,13 +254,18 @@ BEGIN
 	IF (@ErrCode  <> 0 OR EXISTS (SELECT 1 FROM @ChargeRate WHERE IsValid = 0)) AND @SiteName <> ''
 	BEGIN
 		IF @ErrCode <> 0
-			RETURN
-		
-		SELECT 
-			@ErrCode = 101
-			,@ErrMsg =  ISNULL(@ErrMsg, '') + ProductName + ': NAP PT update failed for charge rate value ' + CONVERT(VARCHAR(30), Rate * 100) + '% due to it''s not current charge rate' + CHAR(13)
+		BEGIN
+			SELECT 	@ErrMsg = STUFF((SELECT ',' + ProductName
+					FROM @ChargeRate 
+					WHERE IsValid = 1
+					FOR XML PATH('')), 1, 1, '') + ': '+ @ErrMsg + CHAR(13)
+		END
+
+		SELECT @ErrMsg =  ISNULL(@ErrMsg, '') + ProductName + ': NAP PT update failed for charge rate value ' + CONVERT(VARCHAR(30), Rate * 100) + '% due to it''s not current charge rate' + CHAR(13)
 		FROM @ChargeRate
 		WHERE IsValid = 0
+
+		SET @ErrCode = 101
 		RETURN
 	END
 

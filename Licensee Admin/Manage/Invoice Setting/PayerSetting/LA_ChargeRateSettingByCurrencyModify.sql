@@ -57,21 +57,20 @@ BEGIN
 	END CATCH
 	EXEC sp_xml_removedocument @idoc
 
+	DECLARE @UserName VARCHAR(50) = ''
+
+	SELECT @UserName = Username FROM dbo.LA_User WITH(NOLOCK) WHERE UserID = @UserID
 	-- Get Charge Rate to update 
 	INSERT INTO @ChargRateUpd (ChargeID, CurrencyId, Rate)
-	SELECT ChargeID, 0, CASE WHEN @MasterRate = Rate THEN 2 ELSE @MasterRate END -- Rate = 2 => not update
-	FROM OAS_ChargeInfo WITH(NOLOCK)
+	SELECT ChargeID, 0, CASE WHEN @MasterRate = Rate THEN -1 ELSE @MasterRate END -- Rate = -1 => not update
+	FROM dbo.OAS_ChargeInfo WITH(NOLOCK)
 	WHERE ChargeID = @ChargeID 
 
 	INSERT INTO @ChargRateUpd (ChargeID, CurrencyId, Rate)
-	SELECT c.ChargeID, c.CurrencyId, CASE WHEN ISNULL(cr.Rate, c.Rate - 1) = c.Rate THEN 2 ELSE c.Rate END
+	SELECT c.ChargeID, c.CurrencyId, CASE WHEN ISNULL(cr.Rate, c.Rate - 1) = c.Rate THEN -1 ELSE c.Rate END
 	FROM @ChargeSettings c	
 		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH(NOLOCK) ON cr.CurrencyID = c.CurrencyId
 	WHERE cr.ChargeID = @ChargeID
-
-	DELETE c
-	FROM @ChargRateUpd c
-	WHERE NOT EXISTS (SELECT 1 FROM @ChargRateUpd WHERE Rate <> 2)
 	 
 	-- Update master rate
 	UPDATE OAS_ChargeInfo WITH(ROWLOCK)
@@ -104,19 +103,37 @@ BEGIN
 		INNER JOIN dbo.OAS_Party p  WITH(NOLOCK) ON p.PartyID = ci.FromParty
 		INNER JOIN dbo.Licensees l WITH(NOLOCK) ON l.LicenseeID = p.OldRefID
 	WHERE ChargeID IN (SELECT TOP 1 ChargeID FROM @ChargeSettings) AND l.IsDeposit = 1
+	
+	/*Delete prevent updating unexpected NAP PT value*/
+	/*1.new charge rate is same as same charge rate*/
+	DELETE c
+	FROM @ChargRateUpd c
+	WHERE NOT EXISTS (SELECT 1 FROM @ChargRateUpd WHERE Rate <> -1)
+	/*2.Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0*/
+	DELETE c
+	FROM @ChargRateUpd c
+	WHERE EXISTS (
+		SELECT 1 FROM @ChargRateUpd r 
+		WHERE r.ChargeID = c.ChargeID 
+			AND ((r.Rate > 0.12 AND @SiteName <> '9wickets') OR r.Rate = 0)
+			AND @ProductId = 0
+		)
 
 	SELECT @InputPT = CONVERT(VARCHAR(MAX),
 	(
-		SELECT @ProductId AS '@PID', CurrencyId AS '@CID', 1 - Rate AS '@PT' -- -1 : not update
+		SELECT 
+			@ProductId AS '@PID'
+			,CurrencyId AS '@CID'
+			,CASE WHEN Rate = -1 THEN -1 ELSE 100* (1 - Rate) END AS '@PT' -- -1 : not update
 		FROM @ChargRateUpd 
 		FOR XML PATH('PT'), ROOT('ROOT')
 	))
 	
-	IF @SiteName <> '' AND @InputPT <> '' 
+	IF @SiteName <> '' AND ISNULL(@InputPT, '') <> '' 
 	BEGIN
 		IF EXISTS (SELECT 1 FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE ChargeID = @ChargeID AND GETDATE() NOT BETWEEN FromDate AND ToDate)
 		BEGIN
-			SELECT @ErrCode = 101, @ErrMsg =  @ProductName + ': NAP PT update failed due to it''s not current charge rate'
+			SELECT @ErrCode = 101, @ErrMsg =  @ProductName + ': NAP PT update failed due to it''s not current charge rate.'
 			RETURN
 		END
 
@@ -124,12 +141,16 @@ BEGIN
 			@Site = @SiteName
 			,@InputPT = @InputPT
 			,@UserID = @UserID
+			,@UserName = @UserName
 			,@IP = @LoginIP
 			,@ErrCode = @ErrCode
 			,@ErrMsg = @ErrMsg
 
 		IF @ErrCode <> 0
+		BEGIN
+			SELECT @ErrMsg = @ProductName + ': ' + @ErrMsg
 			RETURN
+		END
 	END
  
 END

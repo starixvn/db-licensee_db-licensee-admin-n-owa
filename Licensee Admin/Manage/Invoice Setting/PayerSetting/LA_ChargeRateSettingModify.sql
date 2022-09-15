@@ -1,16 +1,14 @@
 /*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
-USE [bodb_licensee]
-GO
-
 ALTER PROCEDURE [dbo].[LA_ChargeRateSettingModify]
-	@PayerID						INT
-	, @ChargeSettingXML				NVARCHAR (MAX)
-	, @UserID						INT
-	, @LoginIP						VARCHAR (50)	= ''
-	, @ErrCode						INT				= 0		OUTPUT
-	, @ErrMsg						NVARCHAR(1000)	= ''	OUTPUT
-	, @ErrorPair					NVARCHAR(1000)	= ''	OUTPUT
-	, @ChargeSettingXMLOUT			XML = NULL OUTPUT
+	@PayerID				INT
+	,@BillingGroupId		INT = 0
+	,@ChargeSettingXML		NVARCHAR (MAX)
+	,@UserID				INT
+	,@LoginIP				VARCHAR (50)	= ''
+	,@ErrCode				INT				= 0	 OUTPUT
+	,@ErrMsg				NVARCHAR(1000)	= '' OUTPUT
+	,@ErrorPair			    NVARCHAR(1000)	= '' OUTPUT
+	,@ChargeSettingXMLOUT	XML = NULL OUTPUT
 AS
 /*
 	 Created: 20150423@Florent
@@ -48,16 +46,16 @@ AS
 									<ChargeType>1</ChargeType>
 									<FromDate>1</FromDate>
 									<ToDate>1</ToDate>
-									<ChargeSettingsDetails>
-										<ChargeSettingsDetail>
+									<ChargeSettingByCurrencys>
+										<ChargeSettingByCurrency>
 											<CurrencyId>1</CurrencyId>
 											<Rate>0.2</Rate>
-										</ChargeSettingsDetail>
-										<ChargeSettingsDetail>
+										</ChargeSettingByCurrency>
+										<ChargeSettingByCurrency>
 											<CurrencyId>2</CurrencyId>
 											<Rate>0.3</Rate>
-										</ChargeSettingsDetail>
-									<ChargeSettingsDetails>
+										</ChargeSettingByCurrency>
+									</ChargeSettingByCurrencys>
 								  </ChargeSetting>
 								  <ChargeSetting>
 									<ChargeId>1</ChargeId>
@@ -69,16 +67,16 @@ AS
 									<ChargeType>1</ChargeType>
 									<FromDate>1</FromDate>
 									<ToDate>1</ToDate>
-									<ChargeSettingsDetails>
-										<ChargeSettingsDetail>
+									<ChargeSettingByCurrencys>
+										<ChargeSettingByCurrency>
 											<CurrencyId>1</CurrencyId>
 											<Rate>0.2</Rate>
-										</ChargeSettingsDetail>
-										<ChargeSettingsDetail>
+										</ChargeSettingByCurrency>
+										<ChargeSettingByCurrency>
 											<CurrencyId>2</CurrencyId>
 											<Rate>0.3</Rate>
-										</ChargeSettingsDetail>
-									<ChargeSettingsDetails>
+										</ChargeSettingByCurrency>
+									</ChargeSettingByCurrencys>
 								  </ChargeSetting>
 								</ChargeSettings>'
 								
@@ -92,6 +90,8 @@ BEGIN
 	SET @startRun = GETDATE()
 
 	IF ISNULL(@ChargeSettingXML, '') = '' RETURN
+
+	SELECT @BillingGroupId = ISNULL(@BillingGroupId, 0)
 
 	SELECT @ChargeSettingsXML = CONVERT(XML, @ChargeSettingXML)
 
@@ -107,15 +107,17 @@ BEGIN
 		ChargeType		INT,
 		FromDate		DATE,
 		ToDate			DATE,
-		StatusId		TINYINT
+		StatusId		TINYINT,
+		IsChangedRate	BIT DEFAULT(1)
+		,IsImported		BIT 
 	)
 
 	DECLARE @ChargeRate AS TABLE (ChargeID INT, ProductId INT, BettypeRef INT, FromDate DATE, ToDate DATE)
 
-	DECLARE @ChargeSettingsDetails TABLE (ChargeId INT, ProductId INT, FromDate DATETIME, ToDate DATETIME, CurrencyId INT, Rate MONEY)
+	DECLARE @ChargeSettingsDetails TABLE (ChargeId INT, ProductId INT, FromDate DATETIME, ToDate DATETIME, CurrencyId INT, Rate MONEY, IsChangedRate BIT DEFAULT(1))
 
 	INSERT INTO @ChargeSetting (ChargeID ,ProductId ,FirstBilling, BasisBilling, BettypeRef, Rate, ChargeType, FromDate, ToDate, StatusId)
-	SELECT	t.c.value('(ChargeID/text())[1]', 'INT') AS ChargeID,
+	SELECT	t.c.value('(ChargeId/text())[1]', 'INT') AS ChargeID,
 			t.c.value('(ProductId/text())[1]', 'INT') AS ProductId,
 			t.c.value('(FirstBilling/text())[1]', 'DATE') AS FirstBilling,
 			t.c.value('(BasisBilling/text())[1]', 'NVARCHAR(MAX)') AS BasisBilling,
@@ -124,7 +126,7 @@ BEGIN
 			t.c.value('(ChargeType/text())[1]', 'INT') AS ChargeType,		
 			t.c.value('(FromDate/text())[1]', 'DATE') AS FromDate,		
 			t.c.value('(ToDate/text())[1]', 'DATE') AS ToDate,	
-			t.c.value('(StatusId/text())[1]', 'TINYINT') AS StatusId
+			1 AS StatusId
 	FROM @ChargeSettingsXML.nodes('ChargeSettings/ChargeSetting') AS t(c)
 	OPTION (OPTIMIZE FOR (@ChargeSettingsXML = NULL)) 
 
@@ -136,8 +138,18 @@ BEGIN
 			t1.c.value('(CurrencyId/text())[1]', 'INT') AS CurrencyId,
 			t1.c.value('(Rate/text())[1]', 'MONEY') AS Rate
 	FROM @ChargeSettingsXML.nodes('ChargeSettings/ChargeSetting') AS t(c)
-	CROSS APPLY t.c.nodes('ChargeSettingsDetails/ChargeSettingsDetail') t1(c)
+	CROSS APPLY t.c.nodes('ChargeSettingByCurrencys/ChargeSettingByCurrency') t1(c)
 	OPTION (OPTIMIZE FOR (@ChargeSettingsXML = NULL)) 
+
+	UPDATE c
+		SET c.IsChangedRate = CASE WHEN c.Rate = ci.Rate THEN 0 ELSE 1 END
+	FROM @ChargeSetting c
+		INNER JOIN dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.ChargeID = c.ChargeID
+
+	UPDATE c	
+		SET c.IsChangedRate = CASE WHEN c.Rate = r.Rate THEN 0 ELSE 1 END
+	FROM @ChargeSettingsDetails c 
+		INNER JOIN dbo.LA_ChargeRateByCurrency r WITH(NOLOCK) ON r.ChargeID = c.ChargeId AND r.CurrencyID = c.CurrencyId
 
 	-- check  0 < rate < 1
 	IF EXISTS (SELECT 1 FROM @ChargeSetting WHERE Rate < 0 OR Rate > 1) OR EXISTS (SELECT 1 FROM @ChargeSettingsDetails WHERE Rate < 0 OR  Rate > 1)
@@ -230,6 +242,12 @@ BEGIN
 					, ci.ChargeType			AS '@ct'
 					, ci.FromDate			AS '@fd'
 					, ci.ToDate				AS '@td'
+					,(
+						SELECT CurrencyId, Rate
+						FROM dbo.LA_ChargeRateByCurrency d
+						WHERE d.ChargeId = cs.ChargeID
+						FOR XML PATH('ChargeSettingByCurrency'), ROOT('ChargeSettingByCurrencys'), TYPE
+					)
 			FROM @ChargeSetting  cs
 				INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID
 			FOR XML PATH('z'), ROOT('r')
@@ -238,12 +256,19 @@ BEGIN
 
 		DECLARE @MergeResult TABLE(ChargeId INT, ProductId INT, [$action] VARCHAR(20))
 		DECLARE @ToParty INT, @ParentChargeID INT, @Remark VARCHAR(200) = ''
-
-		SELECT TOP 1 @ToParty = c.ToParty, @ParentChargeID = c.ParentChargeID
-		FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
-			INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON c.ChargeID = cs.ChargeID AND cs.SystemID = 2
-		WHERE FromParty = @PayerID AND c.ToParty IN (1, 9, 11, 98)
-		ORDER BY FromDate DESC
+		
+		IF @BillingGroupId <> 0 
+		BEGIN
+			SELECT @ToParty = @BillingGroupId, @ParentChargeID = 0
+		END
+		ELSE
+		BEGIN
+			SELECT TOP 1 @ToParty = c.ToParty, @ParentChargeID = c.ParentChargeID
+			FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
+				INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON c.ChargeID = cs.ChargeID AND cs.SystemID = 2
+			WHERE FromParty = @PayerID AND c.ToParty IN (1, 9, 11, 98)
+			ORDER BY FromDate DESC
+		END
 
 		SET @Remark = @Remark + 'created date: ' + CONVERT(VARCHAR(20), GETDATE(), 101)
 
@@ -318,6 +343,53 @@ BEGIN
 			RETURN
 		END
 
+		/*Insert Invoice Setting*/
+		DECLARE @BillingGroupName NVARCHAR(50), @BillerId INT
+		SELECT @BillingGroupName = PartyName
+		FROM dbo.OAS_Party WITH(NOLOCK)
+		WHERE PartyId = @ToParty 
+		
+		SELECT @BillerId = PartyId
+		FROM dbo.LA_BillerInfo WITH(NOLOCK)
+		WHERE BillerName = CASE @BillingGroupName
+							WHEN 'Boping' THEN @BillingGroupName
+							WHEN 'Zelianta' THEN @BillingGroupName + ' Limited'
+							ELSE '' END
+
+		IF ISNULL(@BillerId, 0) <> 0
+			INSERT INTO dbo.LA_InvoiceSetting (FromPartyId, ToPartyId, ProductId, InvTypeId, InvTempId, BankId, ActiveAddress)
+			SELECT @PayerID, @BillerId, ProductId, InvTypeId, InvTemplateId, 0 AS BankId, 1 AS ActiveAddress
+			FROM (
+				SELECT InvTemplateId, InvTemplateName
+					,CASE InvTemplateName
+						WHEN @BillingGroupName THEN 1 -- Software Data & Licensing Fees
+						WHEN 'Credit' THEN 4 -- Credit Note
+						ELSE 5 -- Debit Note
+						END AS InvTypeId
+				FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
+				WHERE 1 = CASE InvTemplateName
+							WHEN @BillingGroupName THEN 1
+							WHEN 'Credit' THEN 1
+							WHEN 'Debit' + CASE WHEN @BillingGroupName = 'Zelianta' THEN '-Zelianta' ELSE '' END THEN 1
+							ELSE 0 END
+			) ivt
+				OUTER APPLY (
+					SELECT p.ProductId
+					FROM @ChargeSetting p
+						INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON p.ProductId = c.ProductId AND p.FromDate = c.FromDate
+					WHERE c.FromParty = @PayerID AND c.ToParty = @ToParty
+						AND ivt.InvTemplateName IN ('Boping', 'Zelianta')
+						AND p.StatusId > 0
+				) p
+			WHERE ((@BillingGroupId <> 0 AND p.ProductId IS NOT NULL) OR @BillingGroupId = 0) -- @BillingGroupId <> 0 for when lauching licensees
+				AND NOT EXISTS (
+					SELECT 1 FROM dbo.LA_InvoiceSetting l WITH(NOLOCK) 
+					WHERE l.FromPartyId = @PayerID 
+						AND l.ToPartyId = @BillerId 
+						AND (l.ProductId  = p.ProductId  OR (l.ProductId IS NULL AND p.ProductId IS NULL)) 
+						AND l.InvTypeId = ivt.InvTypeId
+				)
+
 		--Update ChargeId
 		IF EXISTS (SELECT 1 FROM @ChargeSettingsDetails)
 		BEGIN
@@ -338,14 +410,14 @@ BEGIN
 			--Delete charge rate by currency
 			DELETE l
 			FROM dbo.LA_ChargeRateByCurrency l WITH(ROWLOCK, UPDLOCK)
-			WHERE EXISTS (SELECT 1 FROM @ChargeSetting d WHERE d.ChargeID = l.ChargeID)
+			WHERE EXISTS (SELECT 1 FROM @ChargeSetting d WHERE d.ChargeID = l.ChargeID AND d.StatusId > 0)
 				AND NOT EXISTS (SELECT 1 FROM @ChargeSettingsDetails cd WHERE cd.ChargeId = l.ChargeID AND cd.CurrencyId = l.CurrencyID)
 		END
-
+		
 		SELECT @ChargeSettingXMLOUT = 
 		(
 				SELECT 
-					ChargeID
+					ChargeId
 					,ProductId
 					,FirstBilling
 					,BasisBilling
@@ -355,13 +427,14 @@ BEGIN
 					,FromDate
 					,ToDate
 					,(
-						SELECT CurrencyId, Rate
+						SELECT CurrencyId, Rate, IsChangedRate
 						FROM @ChargeSettingsDetails d
 						WHERE d.ChargeId = c.ChargeID
-						FOR XML PATH('ChargeSettingsDetail'), ROOT('ChargeSettingsDetails'), TYPE
+						FOR XML PATH('ChargeSettingByCurrency'), ROOT('ChargeSettingByCurrencys'), TYPE
 					)
+					,IsChangedRate
 				FROM @ChargeSetting	c	
-				FOR XML PATH ('ChargeSetting'), ROOT('ChargeSettings')
+				FOR XML PATH ('ChargeSetting'), ROOT('ChargeSettings'), TYPE
 		)
 
 		-- update system mapping
@@ -405,6 +478,12 @@ BEGIN
 					, cs.ChargeType			AS '@ct'
 					, cs.FromDate			AS '@fd'
 					, cs.ToDate				AS '@td'
+					,(
+						SELECT CurrencyId, Rate
+						FROM @ChargeSettingsDetails d
+						WHERE d.ChargeId = cs.ChargeID
+						FOR XML PATH('ChargeSettingByCurrency'), ROOT('ChargeSettingByCurrencys'), TYPE
+					)
 			FROM @ChargeSetting  cs
 				LEFT JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID
 			FOR XML PATH('z'), ROOT('r')
