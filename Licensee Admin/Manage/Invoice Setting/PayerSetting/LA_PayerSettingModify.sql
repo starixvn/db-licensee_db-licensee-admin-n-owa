@@ -218,14 +218,13 @@ BEGIN
 	WHERE NOT EXISTS (SELECT 1 FROM @ChargeRate r WHERE r.ChargeID = c.ChargeID AND r.Rate <> -1)
 		AND c.IsValid = 1
 		
-	/*2.Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0%*/
+	/*2.Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0 or CandyA18 licensee%*/
 	DELETE c
 	FROM @ChargeRate c
 	WHERE EXISTS (
 		SELECT 1 FROM @ChargeRate r 
 		WHERE r.ChargeID = c.ChargeID 
-			AND ((r.Rate > 0.12 AND @SiteName <> '9wickets') OR r.Rate = 0)
-			AND c.ProductId = 0
+			AND ((((r.Rate > 0.12 AND @SiteName <> '9wickets') OR r.Rate = 0) AND c.ProductId = 1) OR @SiteName = 'CandyA18')
 		)
 	
 	SELECT @InputPT = CONVERT(VARCHAR(MAX), 

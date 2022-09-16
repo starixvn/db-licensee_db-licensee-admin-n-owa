@@ -69,8 +69,15 @@ BEGIN
 	INSERT INTO @ChargRateUpd (ChargeID, CurrencyId, Rate)
 	SELECT c.ChargeID, c.CurrencyId, CASE WHEN ISNULL(cr.Rate, c.Rate - 1) = c.Rate THEN -1 ELSE c.Rate END
 	FROM @ChargeSettings c	
-		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH(NOLOCK) ON cr.CurrencyID = c.CurrencyId
-	WHERE cr.ChargeID = @ChargeID
+		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH(NOLOCK) ON cr.CurrencyID = c.CurrencyId AND cr.ChargeID = @ChargeID
+
+	IF NOT EXISTS (SELECT 1FROM @ChargRateUpd c WHERE Rate <> -1)
+	BEGIN
+		IF (SELECT COUNT(1) FROM @ChargeSettings) < (SELECT COUNT(1) FROM dbo.LA_ChargeRateByCurrency WITH(NOLOCK) WHERE ChargeID = @ChargeID)
+			UPDATE @ChargRateUpd
+				SET Rate = @MasterRate
+			WHERE CurrencyId = 0
+	END
 	 
 	-- Update master rate
 	UPDATE OAS_ChargeInfo WITH(ROWLOCK)
@@ -102,21 +109,20 @@ BEGIN
 	FROM OAS_ChargeInfo ci WITH(NOLOCK) 
 		INNER JOIN dbo.OAS_Party p  WITH(NOLOCK) ON p.PartyID = ci.FromParty
 		INNER JOIN dbo.Licensees l WITH(NOLOCK) ON l.LicenseeID = p.OldRefID
-	WHERE ChargeID IN (SELECT TOP 1 ChargeID FROM @ChargeSettings) AND l.IsDeposit = 1
+	WHERE ChargeID IN (SELECT TOP 1 ChargeID FROM @ChargRateUpd) AND l.IsDeposit = 1
 	
 	/*Delete prevent updating unexpected NAP PT value*/
 	/*1.new charge rate is same as same charge rate*/
 	DELETE c
 	FROM @ChargRateUpd c
 	WHERE NOT EXISTS (SELECT 1 FROM @ChargRateUpd WHERE Rate <> -1)
-	/*2.Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0*/
+	/*2.Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0 or CandyA18 licensees*/
 	DELETE c
 	FROM @ChargRateUpd c
 	WHERE EXISTS (
 		SELECT 1 FROM @ChargRateUpd r 
 		WHERE r.ChargeID = c.ChargeID 
-			AND ((r.Rate > 0.12 AND @SiteName <> '9wickets') OR r.Rate = 0)
-			AND @ProductId = 0
+			AND ((((r.Rate > 0.12 AND @SiteName <> '9wickets') OR r.Rate = 0) AND @ProductId = 1) OR @SiteName = 'CandyA18')
 		)
 
 	SELECT @InputPT = CONVERT(VARCHAR(MAX),
@@ -143,8 +149,8 @@ BEGIN
 			,@UserID = @UserID
 			,@UserName = @UserName
 			,@IP = @LoginIP
-			,@ErrCode = @ErrCode
-			,@ErrMsg = @ErrMsg
+			,@ErrCode = @ErrCode OUTPUT
+			,@ErrMsg = @ErrMsg OUTPUT
 
 		IF @ErrCode <> 0
 		BEGIN

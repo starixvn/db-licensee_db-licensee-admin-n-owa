@@ -10,6 +10,7 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
 	@LicenseeCode			VARCHAR(50)		= '',
 	@BaseCurrencyId			TINYINT,
 	@LaunchDate				DATE, 
+	@BillingGroupId			INT,
 	@ProductIds				VARCHAR(1000)	= '',
 	@InvoiceLanguage		VARCHAR(7)		= '',
 	@MinFeeSettingData		NVARCHAR(MAX)	= '',
@@ -142,6 +143,17 @@ BEGIN
 	SELECT value FROM STRING_SPLIT(@ProductIds, ',')
 
 	SELECT @FirstDateOfMonth = DATEADD(MONTH, DATEDIFF(MONTH, 0, @LaunchDate), 0)
+
+	SELECT @BillingGroupName = PartyName
+	FROM dbo.OAS_Party WITH(NOLOCK)
+	WHERE PartyId = @BillingGroupId
+
+	SELECT @BillerId = PartyId
+	FROM dbo.LA_BillerInfo WITH(NOLOCK)
+	WHERE BillerName = CASE @BillingGroupName
+						WHEN 'Boping' THEN @BillingGroupName
+						WHEN 'Zelianta' THEN @BillingGroupName + ' Limited'
+						ELSE '' END
 
 	SELECT @AMF = SUM(ISNULL(d.Income, 0))
 	FROM dbo.LA_InvoiceHeader h WITH(NOLOCK)
@@ -289,6 +301,7 @@ BEGIN
 						@BrandName			AS BrandName,
 						@BaseCurrencyId		AS BaseCurrencyId,
 						@LaunchDate			AS LaunchDate, 
+						@BillingGroupId		AS BillingGroupId,
 						@ProductIds			AS ProductIds, 
 						@MinFeeSettingData	AS MinFeeSettingData
 						FOR XML PATH('')) 
