@@ -35,28 +35,7 @@ AS
 		- 20220831@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
 
 	Param's Explannation: 
-						@ChargeInfoSettingData = '<Root>
-								<ChargeInfoSetting>
-									<ProductId>0</ProductId>
-									<Rate>0.15</Rate>
-									<Remark>create date 2019-01-08</Remark>
-									<BasisOfBilling>15% of Gross Win Launched on 2019-01-08</BasisOfBilling>
-									<ChargeType>1</ChargeType>
-									<FromDate>20190108</FromDate>
-									<ToDate>20500101</ToDate>
-								</ChargeInfoSetting>
-								<ChargeInfoSetting>
-									<ProductId>1</ProductId>
-									<Rate>0.1</Rate>
-									<Remark>create date 2019-01-08</Remark>
-									<BasisOfBilling>10% of Gross Win Launched on 2019-01-08</BasisOfBilling>
-									<ChargeType>1</ChargeType>
-									<FromDate>20190108</FromDate>
-									<ToDate>20500101</ToDate>
-								</ChargeInfoSetting>
-							</Root>'
-
-							@MinFeeSettingData = '<Root>
+						@MinFeeSettingData = '<Root>
 								<MinFeeSetting>
 									<ProductId>0</ProductId>
 									<FeeTypeId>1</FeeTypeId>

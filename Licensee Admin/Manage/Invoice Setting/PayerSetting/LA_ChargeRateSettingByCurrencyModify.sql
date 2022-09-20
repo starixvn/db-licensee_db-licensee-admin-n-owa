@@ -57,7 +57,7 @@ BEGIN
 	END CATCH
 	EXEC sp_xml_removedocument @idoc
 
-	DECLARE @UserName VARCHAR(50) = ''
+	DECLARE @UserName VARCHAR(50) = '', @CurrentDate DATE = CONVERT(DATE, GETDATE())
 
 	SELECT @UserName = Username FROM dbo.LA_User WITH(NOLOCK) WHERE UserID = @UserID
 	-- Get Charge Rate to update 
@@ -123,7 +123,7 @@ BEGIN
 		SELECT 1 FROM @ChargRateUpd r 
 		WHERE r.ChargeID = c.ChargeID 
 			AND ((((r.Rate > 0.12 AND @SiteName <> '9wickets') OR r.Rate = 0) AND @ProductId = 1) OR @SiteName = 'CandyA18')
-		)
+		) 
 
 	SELECT @InputPT = CONVERT(VARCHAR(MAX),
 	(
@@ -134,10 +134,15 @@ BEGIN
 		FROM @ChargRateUpd 
 		FOR XML PATH('PT'), ROOT('ROOT')
 	))
+
+	IF EXISTS (SELECT 1 FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE ChargeID = @ChargeID AND @CurrentDate > ToDate)
+	BEGIN
+		SET @InputPT = ''
+	END
 	
 	IF @SiteName <> '' AND ISNULL(@InputPT, '') <> '' 
 	BEGIN
-		IF EXISTS (SELECT 1 FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE ChargeID = @ChargeID AND GETDATE() NOT BETWEEN FromDate AND ToDate)
+		IF EXISTS (SELECT 1 FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE ChargeID = @ChargeID AND @CurrentDate NOT BETWEEN FromDate AND ToDate)
 		BEGIN
 			SELECT @ErrCode = 101, @ErrMsg =  @ProductName + ': NAP PT update failed due to it''s not current charge rate.'
 			RETURN

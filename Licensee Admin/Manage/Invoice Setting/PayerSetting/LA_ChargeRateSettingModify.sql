@@ -46,7 +46,7 @@ AS
 									<ChargeType>1</ChargeType>
 									<FromDate>1</FromDate>
 									<ToDate>1</ToDate>
-									<ChargeSettingByCurrencys>
+									<ChargeSettingByCurrencies>
 										<ChargeSettingByCurrency>
 											<CurrencyId>1</CurrencyId>
 											<Rate>0.2</Rate>
@@ -55,7 +55,7 @@ AS
 											<CurrencyId>2</CurrencyId>
 											<Rate>0.3</Rate>
 										</ChargeSettingByCurrency>
-									</ChargeSettingByCurrencys>
+									</ChargeSettingByCurrencies>
 								  </ChargeSetting>
 								  <ChargeSetting>
 									<ChargeId>1</ChargeId>
@@ -67,7 +67,7 @@ AS
 									<ChargeType>1</ChargeType>
 									<FromDate>1</FromDate>
 									<ToDate>1</ToDate>
-									<ChargeSettingByCurrencys>
+									<ChargeSettingByCurrencies>
 										<ChargeSettingByCurrency>
 											<CurrencyId>1</CurrencyId>
 											<Rate>0.2</Rate>
@@ -76,7 +76,7 @@ AS
 											<CurrencyId>2</CurrencyId>
 											<Rate>0.3</Rate>
 										</ChargeSettingByCurrency>
-									</ChargeSettingByCurrencys>
+									</ChargeSettingByCurrencies>
 								  </ChargeSetting>
 								</ChargeSettings>'
 								
@@ -138,7 +138,7 @@ BEGIN
 			t1.c.value('(CurrencyId/text())[1]', 'INT') AS CurrencyId,
 			t1.c.value('(Rate/text())[1]', 'MONEY') AS Rate
 	FROM @ChargeSettingsXML.nodes('ChargeSettings/ChargeSetting') AS t(c)
-	CROSS APPLY t.c.nodes('ChargeSettingByCurrencys/ChargeSettingByCurrency') t1(c)
+	CROSS APPLY t.c.nodes('ChargeSettingByCurrencies/ChargeSettingByCurrency') t1(c)
 	OPTION (OPTIMIZE FOR (@ChargeSettingsXML = NULL)) 
 
 	UPDATE c
@@ -246,7 +246,7 @@ BEGIN
 						SELECT CurrencyId, Rate
 						FROM dbo.LA_ChargeRateByCurrency d
 						WHERE d.ChargeId = cs.ChargeID
-						FOR XML PATH('ChargeSettingByCurrency'), ROOT('ChargeSettingByCurrencys'), TYPE
+						FOR XML PATH('ChargeSettingByCurrency'), ROOT('ChargeSettingByCurrencies'), TYPE
 					)
 			FROM @ChargeSetting  cs
 				INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID
@@ -430,7 +430,7 @@ BEGIN
 						SELECT CurrencyId, Rate, IsChangedRate
 						FROM @ChargeSettingsDetails d
 						WHERE d.ChargeId = c.ChargeID
-						FOR XML PATH('ChargeSettingByCurrency'), ROOT('ChargeSettingByCurrencys'), TYPE
+						FOR XML PATH('ChargeSettingByCurrency'), ROOT('ChargeSettingByCurrencies'), TYPE
 					)
 					,IsChangedRate
 				FROM @ChargeSetting	c	
@@ -482,7 +482,7 @@ BEGIN
 						SELECT CurrencyId, Rate
 						FROM @ChargeSettingsDetails d
 						WHERE d.ChargeId = cs.ChargeID
-						FOR XML PATH('ChargeSettingByCurrency'), ROOT('ChargeSettingByCurrencys'), TYPE
+						FOR XML PATH('ChargeSettingByCurrency'), ROOT('ChargeSettingByCurrencies'), TYPE
 					)
 			FROM @ChargeSetting  cs
 				LEFT JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID

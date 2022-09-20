@@ -45,7 +45,7 @@ AS
 							ChargeType>1</ChargeType>
 							<FromDate>20180801</FromDate>
 							<ToDate>20250531</ToDate>
-							<ChargeSettingByCurrencys>
+							<ChargeSettingByCurrencies>
 								<ChargeSettingByCurrency>
 									<CurrencyId>1</CurrencyId>
 									<Rate>0.2</Rate>
@@ -54,13 +54,14 @@ AS
 									<CurrencyId>2</CurrencyId>
 									<Rate>0.3</Rate>
 								</ChargeSettingByCurrency>
-							</ChargeSettingByCurrencys>
+							</ChargeSettingByCurrencies>
 						</ChargeSetting>
 					</ChargeSettings>
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @ProductListAll VARCHAR(100) = '', @MinDate DATE, @MaxDate DATE, @SiteName VARCHAR(20) ='', @InputPT VARCHAR(MAX) = '', @ChargeRateXML XML, @ChargeSettingXMLOUT XML, @Username VARCHAR(50)
+	DECLARE @ProductListAll VARCHAR(100) = '', @MinDate DATE, @MaxDate DATE, @SiteName VARCHAR(20) ='', @InputPT VARCHAR(MAX) = '', @ChargeRateXML XML, @ChargeSettingXMLOUT XML
+		,@Username VARCHAR(50), @CurrentDate DATE
 	
 	SELECT @Username = Username FROM LA_User WITH(NOLOCK) WHERE UserID = @UserID 
 
@@ -168,14 +169,16 @@ BEGIN
 		,t1.c.value('(Rate/text())[1]', 'MONEY') AS Rate
 		,t1.c.value('(IsChangedRate/text())[1]', 'BIT') AS IsChangedRate
 	FROM @ChargeSettingXMLOUT.nodes('ChargeSettings/ChargeSetting') AS t(c)
-	CROSS APPLY t.c.nodes('ChargeSettingByCurrencys/ChargeSettingByCurrency') t1(c)
+	CROSS APPLY t.c.nodes('ChargeSettingByCurrencies/ChargeSettingByCurrency') t1(c)
 	OPTION (OPTIMIZE FOR (@ChargeSettingXMLOUT = NULL))
+
+	SELECT @CurrentDate = CONVERT(DATE, GETDATE())
 
 	UPDATE @ChargeRate
 		SET IsValid = 0
-	WHERE GETDATE() NOT BETWEEN FromDate AND ToDate
+	WHERE @CurrentDate NOT BETWEEN FromDate AND ToDate
 
-	DELETE FROM @ChargeRate WHERE ProductId IN (14, 17)
+	DELETE FROM @ChargeRate WHERE ProductId IN (14, 17) OR  ToDate < @CurrentDate
 
 	SELECT @SiteName = l.LicenseeName
 	FROM dbo.OAS_Party p WITH(NOLOCK)
@@ -260,7 +263,7 @@ BEGIN
 					FOR XML PATH('')), 1, 1, '') + ': '+ @ErrMsg + CHAR(13)
 		END
 
-		SELECT @ErrMsg =  ISNULL(@ErrMsg, '') + ProductName + ': NAP PT update failed for charge rate value ' + CONVERT(VARCHAR(30), Rate * 100) + '% due to it''s not current charge rate' + CHAR(13)
+		SELECT @ErrMsg =  ISNULL(@ErrMsg, '') + ProductName + ': NAP PT update failed due to it''s not current charge rate' + CHAR(13)
 		FROM @ChargeRate
 		WHERE IsValid = 0
 
