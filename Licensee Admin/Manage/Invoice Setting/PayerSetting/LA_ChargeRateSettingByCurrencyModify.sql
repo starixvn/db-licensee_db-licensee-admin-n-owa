@@ -71,12 +71,17 @@ BEGIN
 	FROM @ChargeSettings c	
 		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH(NOLOCK) ON cr.CurrencyID = c.CurrencyId AND cr.ChargeID = @ChargeID
 
-	IF NOT EXISTS (SELECT 1FROM @ChargRateUpd c WHERE Rate <> -1)
+	IF NOT EXISTS (SELECT 1 FROM @ChargRateUpd c WHERE Rate <> -1) 	
+	   AND EXISTS (
+			SELECT 1 
+			FROM dbo.LA_ChargeRateByCurrency lc WITH(NOLOCK) 
+				LEFT JOIN @ChargeSettings s ON s.CurrencyId = lc.CurrencyID
+			WHERE lc.ChargeID = @ChargeID AND s.ChargeID IS NULL
+		)
 	BEGIN
-		IF (SELECT COUNT(1) FROM @ChargeSettings) < (SELECT COUNT(1) FROM dbo.LA_ChargeRateByCurrency WITH(NOLOCK) WHERE ChargeID = @ChargeID)
-			UPDATE @ChargRateUpd
-				SET Rate = @MasterRate
-			WHERE CurrencyId = 0
+		UPDATE @ChargRateUpd
+			SET Rate = @MasterRate
+		WHERE CurrencyId = 0
 	END
 	 
 	-- Update master rate
@@ -100,30 +105,27 @@ BEGIN
 	DECLARE @SiteName VARCHAR(20) = '', @ProductId INT, @ProductName VARCHAR(50), @InputPT VARCHAR(MAX) = ''
 
 	SELECT @ProductId = CASE WHEN ci.ProductID = 0  THEN 1 ELSE p.ProductID END, @ProductName = CASE WHEN ci.ProductId = 0 THEN 'Sportsbook' ELSE pr.ProductName END
-	FROM OAS_ChargeInfo ci WITH(NOLOCK)
+	FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
 		LEFT JOIN dbo.Product3rd pr WITH(NOLOCK) ON pr.Productid = ci.ProductID
 		LEFT JOIN DBPRO.bodb02.dbo.Products p WITH (NOLOCK) ON p.ProductPrefix = pr.ProductPrefix
-	WHERE ChargeID = @ChargeID
+	WHERE ci.ChargeID = @ChargeID
 
 	SELECT @SiteName = l.LicenseeName 
-	FROM OAS_ChargeInfo ci WITH(NOLOCK) 
+	FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK) 
 		INNER JOIN dbo.OAS_Party p  WITH(NOLOCK) ON p.PartyID = ci.FromParty
 		INNER JOIN dbo.Licensees l WITH(NOLOCK) ON l.LicenseeID = p.OldRefID
-	WHERE ChargeID IN (SELECT TOP 1 ChargeID FROM @ChargRateUpd) AND l.IsDeposit = 1
+	WHERE ci.ChargeID = @ChargeID AND l.IsDeposit = 1
 	
 	/*Delete prevent updating unexpected NAP PT value*/
-	/*1.new charge rate is same as same charge rate*/
+	/*1.Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0 or CandyA18 licensees*/
+	UPDATE c
+		SET c.Rate = -1
+	FROM @ChargRateUpd c
+	WHERE @ProductId = 1 AND (c.Rate > 0.12 AND @SiteName <> '9wickets') OR @SiteName = 'CandyA18'
+	/*2.new charge rate is same as same charge rate*/
 	DELETE c
 	FROM @ChargRateUpd c
 	WHERE NOT EXISTS (SELECT 1 FROM @ChargRateUpd WHERE Rate <> -1)
-	/*2.Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0 or CandyA18 licensees*/
-	DELETE c
-	FROM @ChargRateUpd c
-	WHERE EXISTS (
-		SELECT 1 FROM @ChargRateUpd r 
-		WHERE r.ChargeID = c.ChargeID 
-			AND ((((r.Rate > 0.12 AND @SiteName <> '9wickets') OR r.Rate = 0) AND @ProductId = 1) OR @SiteName = 'CandyA18')
-		) 
 
 	SELECT @InputPT = CONVERT(VARCHAR(MAX),
 	(
@@ -140,7 +142,7 @@ BEGIN
 		SET @InputPT = ''
 	END
 	
-	IF @SiteName <> '' AND ISNULL(@InputPT, '') <> '' 
+	IF @SiteName NOT IN ('', 'CandyA18') AND ISNULL(@InputPT, '') <> '' 
 	BEGIN
 		IF EXISTS (SELECT 1 FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE ChargeID = @ChargeID AND @CurrentDate NOT BETWEEN FromDate AND ToDate)
 		BEGIN

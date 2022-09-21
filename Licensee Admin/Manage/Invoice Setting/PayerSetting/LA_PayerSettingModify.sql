@@ -209,13 +209,30 @@ BEGIN
 	SELECT ChargeID, ProductId, ProductName, CurrencyID, Rate, 1 
 	FROM CTE_ExistingCurrency
 
+	--Not update PT for SA Gaming Tips Amt Due	
+	IF EXISTS (SELECT 1 FROM @ChargeRate WHERE ProductId = 39)
+	BEGIN
+		DELETE c
+		FROM @ChargeRate c
+		WHERE EXISTS (
+			SELECT 1 FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
+			WHERE ci.ChargeID = c.ChargeID AND ci.ChargeType = 12 --  Tips Amt Due
+		) AND c.ProductId = 39
+	END
+
 	UPDATE c
 		SET c.Rate = CASE WHEN c.IsChangedRate = 1 THEN c.Rate ELSE -1 END
 	FROM @ChargeRate c	
 	WHERE c.CurrencyId = 0
 
 	/*Delete prevent updating unexpected NAP PT value*/
-	/*1.new charge rate is same as same charge rate*/
+	/*Sportsbook charge rate > 12% (exclude 9wickets licensee) or CandyA18 licensee*/
+	UPDATE c
+		SET c.Rate = -1
+	FROM @ChargeRate c 
+	WHERE c.ProductId = 1 AND (c.Rate > 0.12 AND @SiteName <> '9wickets') OR @SiteName = 'CandyA18'
+
+	/*2.new charge rate is same as same charge rate*/
 	DELETE c
 	FROM @ChargeRate C
 	WHERE NOT EXISTS (SELECT 1 FROM @ChargeRate r WHERE r.ChargeID = c.ChargeID AND r.Rate <> -1)
@@ -241,7 +258,7 @@ BEGIN
 		FOR XML PATH ('PT'), ROOT('ROOT')
 	))
 
-	IF @SiteName <> '' AND ISNULL(@InputPT, '') <> ''
+	IF @SiteName NOT IN ('', 'CandyA18') AND ISNULL(@InputPT, '') <> ''
 	BEGIN
 		EXEC CustDB.dbo.Acc_Dep_LicenseeSetting_PTSettingUpd
 			@Site = @SiteName
@@ -253,7 +270,7 @@ BEGIN
 			,@ErrMsg = @ErrMsg OUTPUT
 	END
 
-	IF (@ErrCode  <> 0 OR EXISTS (SELECT 1 FROM @ChargeRate WHERE IsValid = 0)) AND @SiteName <> ''
+	IF (@ErrCode  <> 0 OR EXISTS (SELECT 1 FROM @ChargeRate WHERE IsValid = 0)) AND @SiteName NOT IN  ('', 'CandyA18')
 	BEGIN
 		IF @ErrCode <> 0
 		BEGIN
