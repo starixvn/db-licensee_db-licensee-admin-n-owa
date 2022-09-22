@@ -17,7 +17,7 @@ AS
 		- 20220919@Malcolm: Launch new Product [RedmineID: #175860]
 		
 	Param's Explannation: 
-		+ @ChargeSettingXML: '<ChargeSettings>
+		+ @ChargeSettingsXML: '<ChargeSettings>
 								  <ChargeSetting>
 									<PartyId>100</PartyId>
 									<Rate>1</Rate>
@@ -31,8 +31,12 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
+	DECLARE @StartRun DATETIME = CURRENT_TIMESTAMP, @EndRun DATETIME, @Duration	INT, @Doing NVARCHAR(MAX)
+
 	DECLARE @ChargeSettingXML XML, @ProductId INT, @Product3rdId TINYINT, @LicenseeId INT, @BillerId INT, @PartyId INT, @GroupName VARCHAR(50), @GroupId INT, @FromDate DATETIME, @ToDate DATETIME
-			,@SiteName VARCHAR(20) = '', @InputPT VARCHAR(MAX) = '', @Rate MONEY, @UserName VARCHAR(50) = '', @PartyName VARCHAR(50)
+			,@SiteName VARCHAR(20) = '', @InputPT VARCHAR(MAX) = '', @Rate MONEY, @UserName VARCHAR(50) = '', @PartyName VARCHAR(50), @PreLaunchDate DATETIME, @ChargeID INT
+
+	DECLARE @Tmp TABLE (InvSettingId INT)
 
 	SELECT @UserName = Username FROM dbo.LA_User WITH(NOLOCK) WHERE UserID = @UserID
 
@@ -82,7 +86,8 @@ BEGIN
 		CROSS APPLY (
 			SELECT TOP(1) ci.ToParty
 			FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
-			WHERE ci.FromParty = c.PartyId AND @CurrentDate BETWEEN ci.FromDate AND ci.ToDate
+			WHERE ci.FromParty = c.PartyId 
+			ORDER BY ci.ToDate DESC
 		) AS n
 	)
 	UPDATE c
@@ -92,7 +97,7 @@ BEGIN
 
 	UPDATE c
 		SET c.PartyName = p.PartyName
-		    ,c.LicenseeId = CASE WHEN ISNULL(pd.IsDeposit, 0) = 1 THEN p.OldRefID ELSE NULL END
+		    ,c.LicenseeId = p.OldRefID
 			,c.GroupName = pt.PartyName
 			,c.BaseCurrencyId = pc.BaseCurrencyId
 	FROM #ChargeSetting c
@@ -100,6 +105,7 @@ BEGIN
 		INNER JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON p.PartyID = pd.PartyID
 		LEFT JOIN dbo.OAS_PartyBaseCurrency pc WITH(NOLOCK) ON p.PartyID = c.PartyId AND @CurrentDate BETWEEN pc.FromDate AND pc.ToDate
 		LEFT JOIN dbo.OAS_Party pt WITH(NOLOCK) ON pt.PartyID = c.GroupId
+	WHERE ISNULL(pd.IsDeposit, 0) = 1
 
 	UPDATE c
 		SET c.BillerId = n.PartyId
@@ -135,7 +141,12 @@ BEGIN
 			INSERT INTO @ErrorMessage (PartyId, PartyName, ErrCode, ErrMsg)
 			VALUES (@PartyId, @PartyName, 101, 'already launched the selected product')
 		END
-		ELSE IF NOT EXISTS (SELECT 1 FROM dbo.OAS_Party p WITH(NOLOCK) WHERE p.PartyType = 1 AND p.PartyID = @PartyId)
+		ELSE IF NOT EXISTS (
+			SELECT 1 
+			FROM dbo.OAS_Party p WITH(NOLOCK)
+				INNER JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = p.PartyID
+			WHERE p.PartyType = 1 AND p.PartyID = @PartyId AND pd.StatusId = 1 AND pd.TerminatedDate IS NULL AND pd.SuspendedDate IS NULL
+		)
 		BEGIN
 			INSERT INTO @ErrorMessage (PartyId, PartyName, ErrCode, ErrMsg)
 			VALUES (@PartyId, @PartyName, 101, 'not active payer')
@@ -147,70 +158,92 @@ BEGIN
 		END
 		ELSE 
 		BEGIN
-			UPDATE dbo.LicenseeProduct3rd WITH(ROWLOCK)
-			SET EffectiveDate = @LaunchDate
-			WHERE LicenseeId = @LicenseeId
+			BEGIN TRY	
+				UPDATE dbo.LicenseeProduct3rd WITH(ROWLOCK)
+				SET EffectiveDate = @LaunchDate, @PreLaunchDate = EffectiveDate
+				WHERE LicenseeId = @LicenseeId
 
-			--Insert charge info
-			INSERT INTO dbo.OAS_ChargeInfo 
-			(
-				ProductID
-				,FromParty
-				,ToParty
-				,ParentChargeID
-				,Rate
-				,BasisOfBilling
-				,ChargeType
-				,FromDate
-				,ToDate
-				,BaseCurrencyId
-			)
-			SELECT 
-				@Product3rdId
-				,PartyId
-				,GroupId
-				,0
-				,Rate
-				,BasisBilling
-				,ChargeType
-				,FromDate
-				,ToDate
-				,BaseCurrencyId
-			FROM #ChargeSetting
-			WHERE ID = @ID
-
-			-- Insert 
-			IF ISNULL(@BillerId, 0) <> 0
-			BEGIN
-				INSERT INTO dbo.LA_InvoiceSetting (FromPartyId, ToPartyId, ProductId, InvTypeId, InvTempId, BankId, ActiveAddress)
+				--Insert charge info
+				INSERT INTO dbo.OAS_ChargeInfo 
+				(
+					ProductID
+					,FromParty
+					,ToParty
+					,ParentChargeID
+					,Rate
+					,BasisOfBilling
+					,ChargeType
+					,FromDate
+					,ToDate
+					,BaseCurrencyId
+				)
 				SELECT 
-					@PartyId
-					,@BillerId
-					,@Product3rdId 
-					,InvTypeId
-					,InvTemplateId
-					,0 AS BankId
-					,1 AS ActiveAddress
-				FROM (
-					SELECT InvTemplateId, InvTemplateName
-						,CASE InvTemplateName
-							WHEN @GroupName THEN 1 -- Software Data & Licensing Fees
-							WHEN 'Credit' THEN 4 -- Credit Note
-							ELSE 5 -- Debit Note
-							END AS InvTypeId
-					FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
-					WHERE 1 = CASE InvTemplateName
-								WHEN @GroupName THEN 1
-								WHEN 'Credit' THEN 1
-								WHEN 'Debit' + CASE WHEN @GroupName = 'Zelianta' THEN '-Zelianta' ELSE '' END THEN 1
-								ELSE 0 END
-				) ivt	
-			   WHERE ivt.InvTemplateName IN ('Boping', 'Zelianta')
-					AND NOT EXISTS (
-						SELECT 1 FROM dbo.LA_InvoiceSetting l WITH(NOLOCK) 
-						WHERE l.FromPartyId = @PartyId AND ToPartyId = @BillerId AND l.InvTypeId = ivt.InvTypeId AND l.ProductId = @Product3rdId
-					)
-			END
+					@Product3rdId
+					,PartyId
+					,GroupId
+					,0
+					,Rate
+					,BasisBilling
+					,ChargeType
+					,FromDate
+					,ToDate
+					,BaseCurrencyId
+				FROM #ChargeSetting
+				WHERE ID = @ID
+
+				SET @ChargeID = SCOPE_IDENTITY()
+
+				-- Insert 
+				IF ISNULL(@BillerId, 0) <> 0
+				BEGIN
+					INSERT INTO dbo.LA_InvoiceSetting (FromPartyId, ToPartyId, ProductId, InvTypeId, InvTempId, BankId, ActiveAddress)
+					OUTPUT inserted.InvSettingId INTO @Tmp (InvSettingId)
+					SELECT 
+						@PartyId
+						,@BillerId
+						,@Product3rdId 
+						,InvTypeId
+						,InvTemplateId
+						,0 AS BankId
+						,1 AS ActiveAddress
+					FROM (
+						SELECT InvTemplateId, InvTemplateName
+							,CASE InvTemplateName
+								WHEN @GroupName THEN 1 -- Software Data & Licensing Fees
+								WHEN 'Credit' THEN 4 -- Credit Note
+								ELSE 5 -- Debit Note
+								END AS InvTypeId
+						FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
+						WHERE 1 = CASE InvTemplateName
+									WHEN @GroupName THEN 1
+									WHEN 'Credit' THEN 1
+									WHEN 'Debit' + CASE WHEN @GroupName = 'Zelianta' THEN '-Zelianta' ELSE '' END THEN 1
+									ELSE 0 END
+					) ivt	
+				   WHERE ivt.InvTemplateName IN ('Boping', 'Zelianta')
+						AND NOT EXISTS (
+							SELECT 1 FROM dbo.LA_InvoiceSetting l WITH(NOLOCK) 
+							WHERE l.FromPartyId = @PartyId AND ToPartyId = @BillerId AND l.InvTypeId = ivt.InvTypeId AND l.ProductId = @Product3rdId
+						)
+				END 
+			END TRY
+			BEGIN CATCH
+				--Rollback
+				INSERT INTO @ErrorMessage (PartyId, PartyName, ErrCode, ErrMsg)
+				VALUES (@PartyId, @PartyName, ERROR_NUMBER(), ERROR_MESSAGE())
+
+				UPDATE dbo.LicenseeProduct3rd WITH(ROWLOCK)
+				SET EffectiveDate = @PreLaunchDate
+				WHERE LicenseeId = @LicenseeId
+
+				DELETE dbo.OAS_ChargeInfo WITH(ROWLOCK, UPDLOCK) WHERE ChargeID = @ChargeID
+				
+				DELETE i 
+				FROM dbo.LA_InvoiceSetting i WITH(ROWLOCK, UPDLOCK) 
+				WHERE i.InvSettingId IN (SELECT t.InvSettingId FROM @Tmp t)
+
+				GOTO GetValue
+			END CATCH
 
 			--Update PT on NAP
 			SELECT @ProductId = p.ProductId FROM DBPRO.bodb02.dbo.Products p WITH(NOLOCK) WHERE p.ProductPrefix = @ProductCode
@@ -256,15 +289,48 @@ BEGIN
 			END
 		END
 
-		SET @ID += 1
+		GetValue: 
+			SET @ID += 1
 	END
 
 	IF EXISTS (SELECT 1 FROM @ErrorMessage)
 	BEGIN
-		SELECT @ErrCode = 101
-		SELECT @ErrMsg = ISNULL(@ErrMsg, '') + PartyName + ': ' + ErrMsg + CHAR(13)
+		SELECT @ErrMsg = ISNULL(@ErrMsg, '') + PartyName + ': ' + ErrMsg + '|'
 		FROM @ErrorMessage
+
+		SELECT @ErrMsg = STUFF(@ErrMsg, LEN(@ErrMsg), 1, ''),  @ErrCode = 101
 	END
+
+	-- Write log
+	SET @EndRun = GETDATE()
+	SET @Duration = DATEDIFF(MILLISECOND, @StartRun, @EndRun)
+
+	SELECT @Doing = CONVERT(NVARCHAR(MAX),
+					(
+						SELECT 
+							PartyId AS '@PartyId'
+							,PartyName AS '@PartyName'
+							,Rate AS '@Rate'
+							,ChargeType AS '@ChargeType'
+							,FromDate AS '@FromDate'
+							,ToDate AS '@ToDate'
+							,BasisBilling AS '@BasisBilling'
+							,BaseCurrencyId AS '@BaseCurrencyId'
+							,GroupId AS '@GroupId'
+							,GroupName AS '@GroupName'
+							,BillerId AS '@BillerId'
+							,LicenseeId AS '@LicenseeId'
+						FROM #ChargeSetting 
+						FOR XML PATH ('r'), ROOT('root')
+					))
+
+	EXEC CustDB.dbo.WriteLog_UserLog_UserControl_Wrapper
+		@CustID		= 0,
+		@Doing		= @Doing,
+		@UserID		= @UserID,
+		@TypeID		= 0,
+		@ActionID	= 5573,
+		@Duration	= @Duration
 
 	DROP TABLE #ChargeSetting
 END
