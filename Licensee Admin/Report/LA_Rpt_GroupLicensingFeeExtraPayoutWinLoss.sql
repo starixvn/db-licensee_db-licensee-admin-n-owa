@@ -20,6 +20,7 @@ AS
 	   - 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 	   - 20220110@Danny: SG - Jackpot prize integration [#167089]
 	   - 20220222@Danny: Allbet - Promotion integration [#167510]
+	   - 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
 */
 
 BEGIN
@@ -40,44 +41,31 @@ BEGIN
 	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON e.ExchangeId = pd.BaseCurrencyId
 
 	DECLARE @TotalServiceFee MONEY
+	DECLARE @GroupBettype TABLE (ProductId INT, Bettype INT, TypeId SMALLINT, TypeName VARCHAR(100))
+	INSERT INTO @GroupBettype(ProductId, Bettype, TypeId, TypeName)
+	SELECT ProductId, Bettype, TypeId, TypeName FROM dbo.LA_f_GroupBettype()
 
-	DECLARE @PP_Contribution		SMALLINT = 4297,
-			@PP_JackpotPrize		SMALLINT = 4298,
-			@PP_Tournament			SMALLINT = 4299,
-			@PP_PromotionPrize		SMALLINT = 4300,
+	DECLARE @FreeBetsTicketType		SMALLINT = 2
 
-			@SBC_Contribution		SMALLINT = 1698,
-			@SBC_Jackpot			SMALLINT = 1699,
-			@VGA_Contribution		SMALLINT = 3898,
-			@VGA_Jackpot			SMALLINT = 3899,
-			@FreeBetsTicketType		SMALLINT = 2,
-
-			@ArcadiaGaming_Bonus	SMALLINT = 1906,
-			@SXG_LuckyDraw			SMALLINT = 3150,
-			@AB_Promotion			SMALLINT = 2499,
-			@SG_JackpotPrize		SMALLINT = 4600,
-			@SG_Contribution		SMALLINT = 4599
 
 	;WITH cte_Data AS(
 		SELECT b.rptDate, b.SiteID, b.ProductID, b.CurrencyId,
-			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR 
-						b.Bettype IN (@PP_Tournament,@PP_PromotionPrize,@PP_Contribution,@PP_JackpotPrize,@SBC_Contribution,@SBC_Jackpot,@ArcadiaGaming_Bonus,@SXG_LuckyDraw,@VGA_Contribution,@VGA_Jackpot,@SG_JackpotPrize,@SG_Contribution,@AB_Promotion) THEN 0
+			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR g.TypeId IN (2,3,4,5,6,8) THEN 0
 					 ELSE ISNULL(b.BetCount, 0)  
 				END) AS BetCount,
-			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR 
-						b.Bettype IN (@PP_Tournament,@PP_PromotionPrize,@PP_Contribution,@PP_JackpotPrize,@SBC_Contribution,@SBC_Jackpot,@ArcadiaGaming_Bonus,@SXG_LuckyDraw,@VGA_Contribution,@VGA_Jackpot,@SG_JackpotPrize,@SG_Contribution,@AB_Promotion) THEN 0 
+			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR g.TypeId IN (2,3,4,5,6,8) THEN 0 
 					 ELSE ISNULL(b.Turnover, 0)
 				END) AS Turnover,
-			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR 
-						b.Bettype IN (@PP_Tournament,@PP_PromotionPrize,@PP_Contribution,@PP_JackpotPrize,@SBC_Contribution,@SBC_Jackpot,@ArcadiaGaming_Bonus,@SXG_LuckyDraw,@VGA_Contribution,@VGA_Jackpot,@SG_JackpotPrize,@SG_Contribution,@AB_Promotion) THEN 0 
+			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR g.TypeId IN (2,3,4,5,6,8) THEN 0 
 					 ELSE ISNULL(b.MemberWL, 0)
 				END) AS CustomerWL,
-			SUM(CASE WHEN b.Bettype IN (@PP_Contribution,@SBC_Contribution,@VGA_Contribution,@SG_Contribution)THEN ISNULL(-b.GrossWL, 0) ELSE 0 END)			 AS Contribution,
-			SUM(CASE WHEN b.Bettype IN (@PP_JackpotPrize,@SBC_Jackpot,@VGA_Jackpot,@SG_JackpotPrize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END)				 AS JackpotPrize,
-			SUM(CASE WHEN b.Bettype IN (@PP_PromotionPrize,@PP_Tournament,@ArcadiaGaming_Bonus,@SXG_LuckyDraw,@AB_Promotion) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS PromotionPrize,
-			SUM(CASE WHEN ISNULL(b.TicketType, 0) = @FreeBetsTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END)							 AS FreeBetAmount
+			SUM(CASE WHEN g.TypeId =2 THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Contribution,
+			SUM(CASE WHEN g.TypeId =3 THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS JackpotPrize,
+			SUM(CASE WHEN g.TypeId IN (4,5,6,8) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS PromotionPrize,
+			SUM(CASE WHEN ISNULL(b.TicketType, 0) = @FreeBetsTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END)	AS FreeBetAmount
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 		INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+		LEFT JOIN @GroupBettype g ON b.Bettype = g.Bettype
 		WHERE (b.CurrencyID <> 20)
 		AND b.StatusId NOT IN (-1, 101, 102, 103)
 		AND b.customercategory NOT IN (27, 28)

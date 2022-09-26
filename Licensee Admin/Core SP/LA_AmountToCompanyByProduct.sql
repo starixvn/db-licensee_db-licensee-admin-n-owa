@@ -34,6 +34,7 @@ AS
 		- 20220418@Percy: Add Credit note for AMF [RedmineID: #164139]
 		- 20220817@Danny: hardcode for N8B, N8G (charge Rate And Discount rate are same) [RedmineID: #175153]
 		- 20221115@Danny: get tier rebate rate by FromDate input [RedmineID: #180445]
+		- 20221024@Danny: MG-RNG - Tournament Prize [#176986]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -286,7 +287,7 @@ BEGIN
 				WHEN (t.ProductId = 15 AND cp.LicenseeId IS NULL) OR (t.ProductId <> 15 AND p.LicenseeId IS NULL) THEN 0
 				WHEN t.ProductId = 15 THEN t.PayOut - t.CommShare * cp.CommShareRate - t.CashInShare * cp.CashInShareRate
 				ELSE -t.MemberWL * ISNULL(cr.Rate, p.Rate)
-					+ t.PayOut + t.Contribution - t.JackpotPrize - t.Prize - t.Bonus - t.FreeBets - t.Promotion END
+					+ t.PayOut + t.Contribution - t.JackpotPrize - t.Prize - t.Bonus - t.FreeBets - t.Promotion -LuckyDraw END
 				- CASE WHEN t.ProductId = 31 THEN (t.AgentComm + t.MemberComm) ELSE 0 END
 		) * e.Rate) AS GrossLicenseeAmount
 		,SUM(-t.MemberWL * e.Rate) AS LicenseeWL
@@ -303,7 +304,7 @@ BEGIN
 				WHEN p.LicenseeId IS NULL THEN 0
 				WHEN pl.IsDeposit = 0 AND t.ProductId <> 0 THEN 0
 				WHEN t.BettypeRef IN (1706, 3007) THEN -t.Tips * ISNULL(cr.Rate, p.Rate)
-				ELSE (t.Contribution - t.JackpotPrize - t.Prize - t.Bonus - t.FreeBets -t.Promotion) END * e.Rate
+				ELSE (t.Contribution - t.JackpotPrize - t.Prize - t.Bonus - t.FreeBets -t.Promotion - LuckyDraw) END * e.Rate
 		) AS ExtraAmount
 		,SUM(CASE
 				WHEN p.LicenseeId IS NULL THEN 0

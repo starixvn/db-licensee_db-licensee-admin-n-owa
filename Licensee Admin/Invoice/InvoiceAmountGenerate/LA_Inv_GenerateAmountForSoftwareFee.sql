@@ -45,6 +45,7 @@ AS
 		- 20220222@Danny: Allbet - Promotion integration [#167510]
 		- 20220506@Percy: Change way get discount group type [RedmineID: #1732342]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
+		- 20221028@Danny: MG-RNG offer tournament prize [RedmineID: #176986]
 */
 
 BEGIN
@@ -166,9 +167,10 @@ BEGIN
 				WHEN ProductId = 36 AND LicensingFeeTypeId = 1 THEN 41 -- Contribution
 				WHEN ProductId = 36 AND LicensingFeeTypeId = 2 THEN 42 -- JackpotPrize
 				WHEN ProductId = 21 AND LicensingFeeTypeId = 10 THEN 43 -- Promotion
+				WHEN ProductId = 73 AND LicensingFeeTypeId = 3 THEN 47 -- Prizes
 				END
 		FROM @Result
-		WHERE ProductId IN (32, 34, 42, 45, 66, 36, 21) AND LicensingFeeTypeId > 0
+		WHERE ProductId IN (32, 34, 42, 45, 66, 36, 21, 73) AND LicensingFeeTypeId > 0
 		GROUP BY
 			CASE
 				WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
@@ -185,6 +187,7 @@ BEGIN
 				WHEN ProductId = 36 AND LicensingFeeTypeId = 1 THEN 41 -- Contribution
 				WHEN ProductId = 36 AND LicensingFeeTypeId = 2 THEN 42 -- JackpotPrize
 				WHEN ProductId = 21 AND LicensingFeeTypeId = 10 THEN 43 -- Promotion
+				WHEN ProductId = 73 AND LicensingFeeTypeId = 3 THEN 47 -- Prizes
 				END
 
 		-- AMF, Prepayment and AGPrepayment

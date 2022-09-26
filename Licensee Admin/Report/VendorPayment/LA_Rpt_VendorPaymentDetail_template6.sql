@@ -12,6 +12,7 @@ AS
  * Task  : Vendor Payment Detail (template6 - for AE Sexy)
  * Revisions
 	- 20210615@Danny: Initialize SP [#168387]
+	- 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
  */
 
 BEGIN
@@ -24,7 +25,7 @@ BEGIN
 	DECLARE @BonusBettype TABLE (bettype INT, ProductID INT)
 	INSERT INTO @BonusBettype (bettype, ProductID)
 	SELECT Bettype, ProductId FROM LA_f_GroupBettype()
-	WHERE TypeID IN (5, 6) -- Lucky Draw, Bonus
+	WHERE TypeID IN (4, 5, 6) AND ProductId = @ProductID -- Lucky Draw, Bonus
 
 	DECLARE @bettypeList TABLE (BettypeId INT, SubProduct VARCHAR(500))
 
@@ -150,7 +151,7 @@ BEGIN
 				WHERE b.RptDate3rd BETWEEN @FromDate AND @ToDate
 					AND b.RptDate BETWEEN DATEADD(DAY, -1, @FromDate) AND DATEADD(DAY, 1, @ToDate)
 					AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 
-					AND b.BetTypeId BETWEEN 3101 AND 3150
+					AND b.BetTypeId IN (SELECT x.BetTypeId FROM @bettypeList x)
 				GROUP BY b.SiteID, b.RptDate3rd, b.CurrencyId
 			)
 			INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier,Promotion)

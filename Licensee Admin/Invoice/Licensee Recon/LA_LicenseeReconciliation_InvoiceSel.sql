@@ -34,6 +34,7 @@ AS
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 		- 20220222@Danny: Allbet - Promotion integration [#167510]
 		- 20220418@Percy: Add Credit for Setup Fees [RedmineID: #164139]
+		- 20221028@Danny: MG-RNG offer tournament prize [RedmineID: #176986]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -63,7 +64,7 @@ BEGIN
 	DECLARE @N_ToDate DATE = DATEADD (DAY, -1, DATEADD(MONTH, 1, @N_FromDate))
 
 	SELECT p.LicenseeCode, b.CurrencyName, r.ProductName, p.PartyId
-		,SUM(CASE WHEN InvItemTypeId IN (1,30,31,32,33,34,35,36,37,38,39,40,41,42,43) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) LicensingFee
+		,SUM(CASE WHEN InvItemTypeId IN (1,30,31,32,33,34,35,36,37,38,39,40,41,42,43,47) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) LicensingFee
 		,SUM(CASE WHEN InvItemTypeId = 4 THEN ISNULL(Expense,0) ELSE 0 END) Discount
 		,SUM(CASE WHEN InvItemTypeId = 6 THEN ISNULL(Expense,0) ELSE 0 END) Rebate
 		,SUM(CASE WHEN InvItemTypeId IN (5,24,26) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Prepayment

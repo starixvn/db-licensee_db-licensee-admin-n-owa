@@ -24,6 +24,7 @@ AS
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 		- 20220222@Danny: Allbet - Promotion integration [#167510]
 		- 20220615@Percy: Fix issue can't get BTC & SLT under SB [RedmineID: #172584]
+		- 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
 */
 
 BEGIN
@@ -56,7 +57,7 @@ BEGIN
 	INSERT INTO @Bettype (Bettype, TypeId)
 	SELECT Bettype, 1 AS TypeId FROM (VALUES (4297), (1698), (3898), (4599)) b (Bettype) -- Contribution
 	UNION ALL
-	SELECT Bettype, 2 AS TypeId FROM (VALUES (4299), (4300), (1906), (3150), (2499)) b (Bettype) -- Promotion
+	SELECT Bettype, 2 AS TypeId FROM (VALUES (4299), (4300), (1906), (3150), (2499), (8695)) b (Bettype) -- Promotion
 	UNION ALL
 	SELECT Bettype, 3 AS TypeId FROM (VALUES (4298), (1699), (3899), (4600)) b (Bettype) -- JackpotPrize
 	UNION ALL

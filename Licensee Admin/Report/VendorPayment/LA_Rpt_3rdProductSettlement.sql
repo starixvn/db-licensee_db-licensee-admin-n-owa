@@ -21,6 +21,7 @@ AS
 	- 20220407@Percy: Calculate Licensee Fee base on LicenseeContribution [RedmineID: #171190]
 	- 20220328@Danny: Intergrate Guaranteed Gaming [#167626]
 	- 20210623@Danny: Fix PaytoSuplier PPL issue [#168387]
+	- 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
@@ -83,7 +84,8 @@ BEGIN
 			@BetBuilderBetTypeId INT = 38,
 			@SG_Contribution	INT = 4599,
 			@SG_JackpotPrize	INT = 4600,
-			@AB_Promotion		INT = 2499
+			@AB_Promotion		INT = 2499,
+			@MGRNG_Prize		INT = 8695
 
 	-- PPL param
 	DECLARE @BaseCurrencies		TABLE (ExchangeId INT, BaseCurrencyName VARCHAR(20))
@@ -729,9 +731,9 @@ BEGIN
 	BEGIN
 		;WITH cte_Summary AS(
 			SELECT b.RptDate, b.RptDate3rd, b.SiteId, b.BetTypeId, b.CurrencyId,
-				SUM(CASE WHEN b.BetTypeId IN (@SAG_Tips, @SXG_LuckyDraw, @PP_Contribution, @PP_JackpotPrize, @PP_PPTournament, @PP_PromotionPrize, @SG_Contribution, @SG_JackpotPrize, @AB_Promotion) THEN 0 ELSE b.BetCount END) AS TotalTrans,
-				-SUM(CASE WHEN b.BetTypeId IN (@SAG_Tips, @SXG_LuckyDraw, @PP_Contribution, @PP_JackpotPrize, @PP_PPTournament, @PP_PromotionPrize, @SG_Contribution, @SG_JackpotPrize, @AB_Promotion) THEN 0 ELSE b.Winloss END) AS LicenseeWinloss,
-				SUM(CASE WHEN b.BetTypeId IN (@SAG_Tips, @SXG_LuckyDraw, @PP_Contribution, @PP_JackpotPrize, @PP_PPTournament, @PP_PromotionPrize, @SG_Contribution, @SG_JackpotPrize, @AB_Promotion) THEN 0 ELSE b.Winloss END) AS CustomerWinLoss,
+				SUM(CASE WHEN b.BetTypeId IN (@SAG_Tips, @SXG_LuckyDraw, @PP_Contribution, @PP_JackpotPrize, @PP_PPTournament, @PP_PromotionPrize, @SG_Contribution, @SG_JackpotPrize, @AB_Promotion, @MGRNG_Prize) THEN 0 ELSE b.BetCount END) AS TotalTrans,
+				-SUM(CASE WHEN b.BetTypeId IN (@SAG_Tips, @SXG_LuckyDraw, @PP_Contribution, @PP_JackpotPrize, @PP_PPTournament, @PP_PromotionPrize, @SG_Contribution, @SG_JackpotPrize, @AB_Promotion, @MGRNG_Prize) THEN 0 ELSE b.Winloss END) AS LicenseeWinloss,
+				SUM(CASE WHEN b.BetTypeId IN (@SAG_Tips, @SXG_LuckyDraw, @PP_Contribution, @PP_JackpotPrize, @PP_PPTournament, @PP_PromotionPrize, @SG_Contribution, @SG_JackpotPrize, @AB_Promotion, @MGRNG_Prize) THEN 0 ELSE b.Winloss END) AS CustomerWinLoss,
 				SUM(b.ValidBetAmount) AS ValidBetAmount,
 				SUM(CASE WHEN b.BetTypeId = @SAG_Tips THEN -b.Winloss ELSE 0 END) AS CompanyTipShare,
 				SUM(CASE WHEN b.BetTypeId = @SXG_LuckyDraw THEN b.Winloss ELSE 0 END) Bonus,
@@ -739,7 +741,7 @@ BEGIN
 				SUM(CASE WHEN b.BetTypeId IN (@PP_Contribution, @SG_Contribution) THEN ProgressiveContribution ELSE 0 END)  AS FullContribution,
 				SUM(CASE WHEN b.BetTypeId IN (@PP_PromotionPrize,@PP_PPTournament) THEN b.Winloss ELSE 0 END) AS WinPrizeAmount,
 				SUM(CASE WHEN b.BetTypeId IN (@PP_Contribution, @SG_Contribution) THEN -b.AWinloss ELSE 0 END) AS LicenseeContribution,
-				SUM(CASE WHEN b.BetTypeId = @AB_Promotion THEN b.Winloss ELSE 0 END) Promotion
+				SUM(CASE WHEN b.BetTypeId IN (@AB_Promotion,@MGRNG_Prize) THEN b.Winloss ELSE 0 END) Promotion
 			FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
 			WHERE b.RptDate BETWEEN @FDATE AND @TDATE
 				AND b.RptDate3rd BETWEEN @FDATE_GMT AND @TDATE_GMT
@@ -761,7 +763,7 @@ BEGIN
 			SUM(CASE WHEN bt.ProductID IN (32,36) THEN (LicenseeWinloss - FullContribution) * ISNULL(ci_3rd.Rate3rd,0)
 					 WHEN bt.ProductID = 70 THEN (LicenseeWinloss - (b.ValidBetAmount * ci.ChargeRate11)) * ISNULL(ci_3rd.Rate3rd,0)
 				ELSE b.LicenseeWinloss * ISNULL(ci_3rd.Rate3rd,0) - CASE WHEN bt.ProductID = 45 THEN b.Bonus 
-																		 WHEN bt.ProductID = 21 THEN b.Promotion
+																		 WHEN bt.ProductID IN (21, 73) THEN b.Promotion
 																		 ELSE 0 END END
 				) AS PayToSupplier,
 			bt.ProductID,
@@ -1044,9 +1046,9 @@ BEGIN
 	BEGIN
 		;WITH cte_Summary AS(
 			SELECT b.RptDate, b.RptDate3rd, b.SiteId, b.BetTypeId, b.CurrencyId,
-				SUM(CASE WHEN b.BetTypeId IN (@SAG_Tips, @SXG_LuckyDraw, @PP_Contribution, @PP_JackpotPrize, @PP_PPTournament, @PP_PromotionPrize, @SG_Contribution, @SG_JackpotPrize, @AB_Promotion) THEN 0 ELSE b.BetCount END) AS TotalTrans,
-				-SUM(CASE WHEN b.BetTypeId IN (@SAG_Tips, @SXG_LuckyDraw, @PP_Contribution, @PP_JackpotPrize, @PP_PPTournament, @PP_PromotionPrize, @SG_Contribution, @SG_JackpotPrize, @AB_Promotion) THEN 0 ELSE b.Winloss END) AS LicenseeWinloss,
-				SUM(CASE WHEN b.BetTypeId IN (@SAG_Tips, @SXG_LuckyDraw, @PP_Contribution, @PP_JackpotPrize, @PP_PPTournament, @PP_PromotionPrize, @SG_Contribution, @SG_JackpotPrize, @AB_Promotion) THEN 0 ELSE b.Winloss END) AS CustomerWinLoss,
+				SUM(CASE WHEN b.BetTypeId IN (@SAG_Tips, @SXG_LuckyDraw, @PP_Contribution, @PP_JackpotPrize, @PP_PPTournament, @PP_PromotionPrize, @SG_Contribution, @SG_JackpotPrize, @AB_Promotion, @MGRNG_Prize) THEN 0 ELSE b.BetCount END) AS TotalTrans,
+				-SUM(CASE WHEN b.BetTypeId IN (@SAG_Tips, @SXG_LuckyDraw, @PP_Contribution, @PP_JackpotPrize, @PP_PPTournament, @PP_PromotionPrize, @SG_Contribution, @SG_JackpotPrize, @AB_Promotion, @MGRNG_Prize) THEN 0 ELSE b.Winloss END) AS LicenseeWinloss,
+				SUM(CASE WHEN b.BetTypeId IN (@SAG_Tips, @SXG_LuckyDraw, @PP_Contribution, @PP_JackpotPrize, @PP_PPTournament, @PP_PromotionPrize, @SG_Contribution, @SG_JackpotPrize, @AB_Promotion, @MGRNG_Prize) THEN 0 ELSE b.Winloss END) AS CustomerWinLoss,
 				SUM(b.ValidBetAmount) AS ValidBetAmount,
 				SUM(CASE WHEN b.BetTypeId = @SAG_Tips THEN -b.Winloss ELSE 0 END) AS CompanyTipShare,
 				SUM(CASE WHEN b.BetTypeId = @SXG_LuckyDraw THEN b.Winloss ELSE 0 END) Bonus,
@@ -1054,7 +1056,7 @@ BEGIN
 				SUM(CASE WHEN b.BetTypeId IN (@PP_Contribution, @SG_Contribution) THEN ProgressiveContribution ELSE 0 END)  AS FullContribution,
 				SUM(CASE WHEN b.BetTypeId IN (@PP_PromotionPrize,@PP_PPTournament) THEN b.Winloss ELSE 0 END) AS WinPrizeAmount,
 				SUM(CASE WHEN b.BetTypeId IN (@PP_Contribution, @SG_Contribution) THEN -b.AWinloss ELSE 0 END) AS LicenseeContribution,
-				SUM(CASE WHEN b.BetTypeId = @AB_Promotion THEN b.Winloss ELSE 0 END) Promotion
+				SUM(CASE WHEN b.BetTypeId IN (@AB_Promotion, @MGRNG_Prize) THEN b.Winloss ELSE 0 END) Promotion
 			FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
 			WHERE  b.RptDate BETWEEN @FDATE_GMT AND @TDATE_GMT
 				AND b.RptDate3rd BETWEEN @FDATE AND @TDATE
@@ -1076,7 +1078,7 @@ BEGIN
 			SUM(CASE WHEN bt.ProductID IN (32, 36) THEN (LicenseeWinloss - FullContribution) * ISNULL(ci_3rd.Rate3rd,0)
 					WHEN bt.ProductID = 70 THEN (LicenseeWinloss - (b.ValidBetAmount * ci.ChargeRate11)) * ISNULL(ci_3rd.Rate3rd,0)
 				ELSE b.LicenseeWinloss * ISNULL(ci_3rd.Rate3rd,0) - CASE WHEN bt.ProductID = 45 THEN b.Bonus 
-																		 WHEN bt.ProductID = 21 THEN b.Promotion 
+																		 WHEN bt.ProductID IN (21, 73) THEN b.Promotion 
 																		 ELSE 0 END END
 				) AS PayToSupplier,
 			bt.ProductID,
@@ -1478,8 +1480,8 @@ BEGIN
 		SUM(td.LicenseeWinLoss) ,
 		SUM(CASE WHEN td.IsKeepNegativeAmount = 1 AND td.ProductID IN (2,5,8,27,28,45,67,68) THEN  td.LicensingFee
 				 WHEN td.ProductID = 36 THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE  CASE WHEN td.LicenseeChargeRate  < 0 THEN 0 ELSE td.LicenseeChargeRate END + td.LicenseeContribution - td.JackpotPrize END
+				 WHEN td.ProductID IN (21, 73) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicensingFee < 0 THEN 0 ELSE td.LicensingFee END END  - td.Promotion 
 				 WHEN td.LicensingFee < 0 AND p.isKeepNegativeFee = 0 THEN 0 
-				 WHEN td.ProductID = 21 THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicensingFee < 0 THEN 0 ELSE td.LicensingFee END - td.Promotion  END
 				 ELSE td.LicensingFee END - td.Bonus + td.CompanyTipShare) AS LicensingFee,
 		SUM(td.ExtraPT),
 		SUM(CASE WHEN td.PayToSupplier < 0 AND p.isKeepNegativePayToSupplier = 0 THEN 0 ELSE td.PayToSupplier END) AS PayToSupplier,
@@ -1487,8 +1489,8 @@ BEGIN
 		SUM(CASE WHEN td.ProductID = 23 THEN td.LicenseeWinLoss
 		         WHEN td.IsKeepNegativeAmount = 1 AND td.ProductID IN (2,5,8,27,28,45,67,68) THEN  td.LicensingFee
 				 WHEN td.ProductID = 36 THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE  CASE WHEN td.LicenseeChargeRate  < 0 THEN 0 ELSE td.LicenseeChargeRate END + td.LicenseeContribution - td.JackpotPrize END
-				 WHEN td.LicensingFee < 0 AND p.isKeepNegativeFee = 0 THEN 0 
-				  WHEN td.ProductID = 21 THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicensingFee < 0 THEN 0 ELSE td.LicensingFee END - td.Promotion  END
+				  WHEN td.ProductID IN (21, 73) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicensingFee < 0 THEN 0 ELSE td.LicensingFee END  END - td.Promotion
+				  WHEN td.LicensingFee < 0 AND p.isKeepNegativeFee = 0 THEN 0 
 				 ELSE td.LicensingFee END - td.Bonus + td.CompanyTipShare)
 		- SUM(CASE WHEN td.ProductID = 2 THEN td.ExtraPT ELSE 0 END) 
 		- SUM(CASE WHEN td.PayToSupplier < 0 AND p.isKeepNegativePayToSupplier = 0 THEN 0 ELSE td.PayToSupplier END)  AS CompanyIncome,
