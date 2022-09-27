@@ -108,8 +108,8 @@ BEGIN
 		FromDate		DATE,
 		ToDate			DATE,
 		StatusId		TINYINT,
-		IsChangedRate	BIT DEFAULT(1)
-		,IsImported		BIT 
+		IsChangedRate	BIT DEFAULT(1),
+		IsChangedDate	BIT DEFAULT(0)
 	)
 
 	DECLARE @ChargeRate AS TABLE (ChargeID INT, ProductId INT, BettypeRef INT, FromDate DATE, ToDate DATE)
@@ -143,6 +143,7 @@ BEGIN
 
 	UPDATE c
 		SET c.IsChangedRate = CASE WHEN c.Rate = ci.Rate THEN 0 ELSE 1 END
+			,c.IsChangedDate = CASE WHEN ci.FromDate <> c.FromDate OR ci.ToDate <> c.ToDate THEN 1 ELSE 0 END
 	FROM @ChargeSetting c
 		INNER JOIN dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.ChargeID = c.ChargeID
 
@@ -433,6 +434,7 @@ BEGIN
 						FOR XML PATH('ChargeSettingByCurrency'), ROOT('ChargeSettingByCurrencies'), TYPE
 					)
 					,IsChangedRate
+					,IsChangedDate
 				FROM @ChargeSetting	c	
 				FOR XML PATH ('ChargeSetting'), ROOT('ChargeSettings'), TYPE
 		)

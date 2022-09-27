@@ -146,11 +146,11 @@ BEGIN
 		END
 
 	-- Update on NAP
-	DECLARE @ChargeRate TABLE (ChargeID INT, ProductId INT, ProductName VARCHAR(50), Rate MONEY, CurrencyId INT, FromDate DATETIME, ToDate DATETIME, IsValid BIT DEFAULT(1), IsChangedRate BIT)
+	DECLARE @ChargeRate TABLE (ChargeID INT, ProductId INT, ProductName VARCHAR(50), Rate MONEY, CurrencyId INT, FromDate DATETIME, ToDate DATETIME, IsValid BIT DEFAULT(1), IsChangedRate BIT, IsChangedDate BIT)
 
-	DECLARE @ChargeRateDetail TABLE (ChargeID INT, CurrencyId INT, Rate MONEY, IsChangedRate BIT)
+	DECLARE @ChargeRateDetail TABLE (ChargeID INT, CurrencyId INT, Rate MONEY, IsChangedRate BIT, IsChangedDate BIT)
 
-	INSERT INTO @ChargeRate (ChargeId, FromDate, ToDate, ProductId, Rate, IsChangedRate, CurrencyId)
+	INSERT INTO @ChargeRate (ChargeId, FromDate, ToDate, ProductId, Rate, IsChangedRate, IsChangedDate, CurrencyId)
 	SELECT
 		t.c.value('(ChargeId/text())[1]', 'INT') AS ChargeId
 		,t.c.value('(FromDate/text())[1]', 'DATETIME') AS FromDate
@@ -158,16 +158,18 @@ BEGIN
 		,t.c.value('(ProductId/text())[1]', 'INT') AS ProductId
 		,t.c.value('(Rate/text())[1]', 'MONEY') AS Rate
 		,t.c.value('(IsChangedRate/text())[1]', 'BIT') AS IsChangedRate
+		,t.c.value('(IsChangedDate/text())[1]', 'BIT') AS IsChangedDate
 		,0 AS CurrencyId
 	FROM @ChargeSettingXMLOUT.nodes('ChargeSettings/ChargeSetting') AS t(c)
 	OPTION (OPTIMIZE FOR (@ChargeSettingXMLOUT = NULL))
 
-	INSERT INTO @ChargeRateDetail (ChargeId, CurrencyId, Rate, IsChangedRate)
+	INSERT INTO @ChargeRateDetail (ChargeId, CurrencyId, Rate, IsChangedRate, IsChangedDate)
 	SELECT
 		t.c.value('(ChargeId/text())[1]', 'INT') AS ChargeId
 		,t1.c.value('(CurrencyId/text())[1]', 'INT') AS CurrencyId
 		,t1.c.value('(Rate/text())[1]', 'MONEY') AS Rate
 		,t1.c.value('(IsChangedRate/text())[1]', 'BIT') AS IsChangedRate
+		,t.c.value('(IsChangedDate/text())[1]', 'BIT') AS IsChangedDate
 	FROM @ChargeSettingXMLOUT.nodes('ChargeSettings/ChargeSetting') AS t(c)
 	CROSS APPLY t.c.nodes('ChargeSettingByCurrencies/ChargeSettingByCurrency') t1(c)
 	OPTION (OPTIMIZE FOR (@ChargeSettingXMLOUT = NULL))
@@ -193,15 +195,15 @@ BEGIN
 
 	;WITH CTE_ChargeId AS 
 	(
-		SELECT DISTINCT ChargeID, ProductId, ProductName FROM @ChargeRate WHERE IsValid = 1
+		SELECT DISTINCT ChargeID, ProductId, ProductName, IsChangedDate FROM @ChargeRate WHERE IsValid = 1
 	),CTE_ExistingCurrency AS
 	(
-		SELECT cr.ChargeID, cr.CurrencyID, c.ProductId, c.ProductName, -1 AS Rate
+		SELECT cr.ChargeID, cr.CurrencyID, c.ProductId, c.ProductName, CASE WHEN c.IsChangedDate = 1 THEN cr.Rate ELSE -1 END AS Rate
 		FROM dbo.LA_ChargeRateByCurrency cr WITH(NOLOCK)
 			INNER JOIN CTE_ChargeId c ON c.ChargeID = cr.ChargeID
 		WHERE NOT EXISTS (SELECT 1 FROM @ChargeRateDetail d WHERE d.ChargeID = c.ChargeID)
 		UNION ALL
-		SELECT d.ChargeID, d.CurrencyId, r.ProductId, r.ProductName, CASE WHEN  d.IsChangedRate = 1 THEN d.Rate ELSE -1 END AS Rate
+		SELECT d.ChargeID, d.CurrencyId, r.ProductId, r.ProductName, CASE WHEN  d.IsChangedRate = 1 OR d.IsChangedDate = 1 THEN d.Rate ELSE -1 END AS Rate
 		FROM @ChargeRateDetail d
 			INNER JOIN @ChargeRate r ON r.ChargeID = d.ChargeID
 	)
@@ -221,7 +223,7 @@ BEGIN
 	END
 
 	UPDATE c
-		SET c.Rate = CASE WHEN c.IsChangedRate = 1 THEN c.Rate ELSE -1 END
+		SET c.Rate = CASE WHEN c.IsChangedRate = 1 OR c.IsChangedDate = 1 THEN c.Rate ELSE -1 END
 	FROM @ChargeRate c	
 	WHERE c.CurrencyId = 0
 
