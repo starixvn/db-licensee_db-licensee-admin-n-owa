@@ -130,6 +130,7 @@ BEGIN
 			,@Rate      = Rate
 			,@PartyName = PartyName
 			,@GroupName = GroupName
+			,@Groupid   = GroupId
 		FROM #ChargeSetting c 
 		WHERE ID = @ID
 
@@ -139,7 +140,7 @@ BEGIN
 		IF EXISTS (SELECT 1 FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE FromParty = @PartyId AND ProductID = @Product3rdId)
 		BEGIN
 			INSERT INTO @ErrorMessage (PartyId, PartyName, ErrCode, ErrMsg)
-			VALUES (@PartyId, @PartyName, 101, 'already launched the selected product')
+			VALUES (@PartyId, @PartyName, 101, 'Already launched the selected product')
 		END
 		ELSE IF NOT EXISTS (
 			SELECT 1 
@@ -149,12 +150,12 @@ BEGIN
 		)
 		BEGIN
 			INSERT INTO @ErrorMessage (PartyId, PartyName, ErrCode, ErrMsg)
-			VALUES (@PartyId, @PartyName, 101, 'not active payer')
+			VALUES (@PartyId, @PartyName, 101, 'Not active payer')
 		END
 		ELSE IF NOT EXISTS (SELECT 1 FROM dbo.LicenseeProduct3rd l WITH(NOLOCK) WHERE l.LicenseeID = @LicenseeId AND l.ProductID = @Product3rdId)
 		BEGIN
 			INSERT INTO @ErrorMessage (PartyId, PartyName, ErrCode, ErrMsg)
-			VALUES (@PartyId, @PartyName, 101, 'not offered selected product yet')
+			VALUES (@PartyId, @PartyName, 101, 'Not offered selected product yet')
 		END
 		ELSE 
 		BEGIN
@@ -176,6 +177,7 @@ BEGIN
 					,FromDate
 					,ToDate
 					,BaseCurrencyId
+					,FirstOfBilling
 				)
 				SELECT 
 					@Product3rdId
@@ -188,10 +190,17 @@ BEGIN
 					,FromDate
 					,ToDate
 					,BaseCurrencyId
+					,FromDate
 				FROM #ChargeSetting
 				WHERE ID = @ID
 
 				SET @ChargeID = SCOPE_IDENTITY()
+
+				INSERT INTO dbo.LA_ChargeInfo_SystemMapping (ChargeID, SystemID)
+				SELECT @ChargeID, 2
+				UNION 
+				SELECT @ChargeID, 4
+				WHERE @Product3rdId IN (0, 2, 3, 4, 5, 10, 11, 12) AND @Groupid = 1
 
 				-- Insert 
 				IF ISNULL(@BillerId, 0) <> 0
@@ -237,6 +246,8 @@ BEGIN
 				WHERE LicenseeId = @LicenseeId
 
 				DELETE dbo.OAS_ChargeInfo WITH(ROWLOCK, UPDLOCK) WHERE ChargeID = @ChargeID
+
+				DELETE dbo.LA_ChargeInfo_SystemMapping WITH(ROWLOCK, UPDLOCK) WHERE ChargeID = @ChargeID
 				
 				DELETE i 
 				FROM dbo.LA_InvoiceSetting i WITH(ROWLOCK, UPDLOCK) 
@@ -257,12 +268,12 @@ BEGIN
 			))
 		
 			/*Delete prevent updating unexpected NAP PT value*/
-			IF ((@Rate > 0.12 AND @SiteName <> '9wickets' OR @Rate = 0) AND @ProductId = 1) OR @SiteName = 'CandyA18'
+			IF ((@Rate > 0.12 AND @SiteName <> '9wickets' OR @Rate = 0) AND @ProductId = 1) OR @SiteName IN ('CandyA18', 'HX9Candy') OR @Product3rdId IN (14, 17, 3, 31, 10, 13, 16) OR @ToDate < GETDATE() 
 			BEGIN
 				SET @InputPT = ''
 			END
 
-			IF @SiteName NOT IN ('', 'CandyA18') AND ISNULL(@InputPT, '') <> ''
+			IF @SiteName NOT IN ('', 'CandyA18', 'HX9Candy') AND ISNULL(@InputPT, '') <> ''
 			BEGIN
 				IF @CurrentDate NOT BETWEEN @FromDate AND @ToDate
 				BEGIN
@@ -295,7 +306,7 @@ BEGIN
 
 	IF EXISTS (SELECT 1 FROM @ErrorMessage)
 	BEGIN
-		SELECT @ErrMsg = ISNULL(@ErrMsg, '') + PartyName + ': ' + ErrMsg + '|'
+		SELECT @ErrMsg = ISNULL(@ErrMsg, '') + PartyName + ': ' + ErrMsg + '<br>'
 		FROM @ErrorMessage
 
 		SELECT @ErrMsg = STUFF(@ErrMsg, LEN(@ErrMsg), 1, ''),  @ErrCode = 101
@@ -320,6 +331,7 @@ BEGIN
 							,GroupName AS '@GroupName'
 							,BillerId AS '@BillerId'
 							,LicenseeId AS '@LicenseeId'
+							,@ProductCode AS '@ProductCode'
 						FROM #ChargeSetting 
 						FOR XML PATH ('r'), ROOT('root')
 					))

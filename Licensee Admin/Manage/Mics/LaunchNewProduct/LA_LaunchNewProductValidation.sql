@@ -41,7 +41,7 @@ BEGIN
 							   WHEN ISNULL(n.IsLaunched, 0) = 1 THEN 4 -- Already launch the selected product
 						  ELSE NULL END -- Invalid
 	FROM @Party p
-		LEFT JOIN dbo.OAS_Party op WITH(NOLOCK) ON op.PartyName = p.PartyName
+		LEFT JOIN dbo.OAS_Party op WITH(NOLOCK) ON op.PartyName = p.PartyName AND op.PartyType IN (1, 5)
 		LEFT JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON pd.PartyID = op.PartyID AND ISNULL(pd.IsDeposit, 0) = 1
 		LEFT JOIN dbo.LicenseeProduct3rd lp WITH(NOLOCK) ON lp.LicenseeID = op.OldRefID AND lp.ProductID = @ProductId
 		OUTER APPLY (
@@ -59,17 +59,17 @@ BEGIN
 			FROM @Party
 			GROUP BY ErrCode
 		)
-		SELECT @ErrMsg = ISNULL(@ErrMsg, '') + n.ErrMsg + ': ' + e.PartyNameList + '|'
+		SELECT @ErrMsg = ISNULL(@ErrMsg, '') + n.ErrMsg + ': ' + e.PartyNameList + '<br>'
 		FROM CTE e
 			INNER JOIN (
 				VALUES (1, 'Invalid payer name')
 					,(2, 'Not Active payer')
 					,(3, 'Not offered selected product yet')
-					,(4, 'Already launch the selected product')
+					,(4, 'Already launched the selected product')
 			) AS n(ErrCode, ErrMsg) ON n.ErrCode = e.ErrCode
 		ORDER BY n.ErrCode ASC
 
-		SELECT @ErrMsg = STUFF(@ErrMsg, LEN(@ErrMsg), 1, ''),  @ErrCode = 101
+		SELECT @ErrMsg = STUFF(@ErrMsg, LEN(@ErrMsg) - 3, 4, ''),  @ErrCode = 101
 	END
 
 END
