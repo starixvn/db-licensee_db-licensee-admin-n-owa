@@ -34,6 +34,8 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
+	DECLARE @StartRun DATETIME = CURRENT_TIMESTAMP, @EndRun DATETIME, @Duration	INT, @Doing NVARCHAR(MAX)
+
 	DECLARE @ChargeSettings AS TABLE (ChargeID INT, CurrencyId INT, Rate MONEY)
 
 	DECLARE @ChargRateUpd AS TABLE (ChargeID INT, CurrencyId INT, Rate MONEY)
@@ -162,9 +164,32 @@ BEGIN
 		IF @ErrCode <> 0
 		BEGIN
 			SELECT @ErrMsg = @ProductName + ': ' + @ErrMsg
-			RETURN
 		END
 	END
  
+	-- Write log
+	SET @EndRun = GETDATE()
+	SET @Duration = DATEDIFF(MILLISECOND, @StartRun, @EndRun)
+
+	SELECT @Doing = CONVERT(NVARCHAR(MAX),
+					(
+						SELECT 
+							@ChargeID AS '@ChargeID'
+							,@MasterRate AS '@MasterRate'
+							,(
+								SELECT CurrencyId, Rate
+								FROM @ChargeSettings
+								FOR XML PATH ('ChargeSetting'), ROOT('ChargeSettings'), TYPE
+							)
+						FOR XML PATH ('r'), ROOT('root')
+					))
+
+	EXEC CustDB.dbo.WriteLog_UserLog_UserControl_Wrapper
+		@CustID		= 0,
+		@Doing		= @Doing,
+		@UserID		= @UserID,
+		@TypeID		= 0,
+		@ActionID	= 5568,
+		@Duration	= @Duration
 END
 GO
