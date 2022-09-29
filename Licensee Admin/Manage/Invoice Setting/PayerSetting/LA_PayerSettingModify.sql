@@ -286,7 +286,7 @@ BEGIN
 		FROM @ChargeRate
 		WHERE IsValid = 0
 
-		SET @ErrCode = 101
+		SET @ErrCode = 0
 		RETURN
 	END
 

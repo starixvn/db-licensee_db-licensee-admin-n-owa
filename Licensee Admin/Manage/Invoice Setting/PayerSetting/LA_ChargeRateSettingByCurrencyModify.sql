@@ -57,7 +57,9 @@ BEGIN
 	END CATCH
 	EXEC sp_xml_removedocument @idoc
 
-	DECLARE @UserName VARCHAR(50) = '', @CurrentDate DATE = CONVERT(DATE, GETDATE())
+	DECLARE @UserName VARCHAR(50) = '', @CurrentDate DATE = CONVERT(DATE, GETDATE()), @OldMasterRate MONEY
+
+	SELECT @OldMasterRate = Rate FROM OAS_ChargeInfo WITH(NOLOCK) WHERE ChargeID = @ChargeID
 
 	SELECT @UserName = Username FROM dbo.LA_User WITH(NOLOCK) WHERE UserID = @UserID
 	-- Get Charge Rate to update 
@@ -84,22 +86,33 @@ BEGIN
 		WHERE CurrencyId = 0
 	END
 	 
-	-- Update master rate
-	UPDATE OAS_ChargeInfo WITH(ROWLOCK)
-	SET Rate = @MasterRate
-	WHERE ChargeID = @ChargeID
+	BEGIN TRY
+		-- Update master rate
+		UPDATE OAS_ChargeInfo WITH(ROWLOCK)
+		SET Rate = @MasterRate
+		WHERE ChargeID = @ChargeID
 
-	-- Insert charge rate by currency
-	;MERGE [dbo].[LA_ChargeRateByCurrency] WITH(ROWLOCK, UPDLOCK) AS t
-	USING @ChargeSettings AS s
-	ON (t.ChargeId = s.ChargeID AND t.CurrencyID = s.CurrencyID)
-	WHEN NOT MATCHED BY TARGET
-		THEN INSERT(ChargeId, CurrencyID, Rate)
-				VALUES(s.ChargeId, s.CurrencyID, s.Rate)
-	WHEN MATCHED
-		THEN UPDATE SET Rate = s.Rate
-	WHEN NOT MATCHED BY SOURCE AND t.ChargeId = @ChargeId
-		THEN DELETE;
+		-- Insert charge rate by currency
+		;MERGE [dbo].[LA_ChargeRateByCurrency] WITH(ROWLOCK, UPDLOCK) AS t
+		USING @ChargeSettings AS s
+		ON (t.ChargeId = s.ChargeID AND t.CurrencyID = s.CurrencyID)
+		WHEN NOT MATCHED BY TARGET
+			THEN INSERT(ChargeId, CurrencyID, Rate)
+					VALUES(s.ChargeId, s.CurrencyID, s.Rate)
+		WHEN MATCHED
+			THEN UPDATE SET Rate = s.Rate
+		WHEN NOT MATCHED BY SOURCE AND t.ChargeId = @ChargeId
+			THEN DELETE;
+	END TRY
+	BEGIN CATCH 
+		SELECT @ErrCode = ERROR_NUMBER(), @ErrMsg = ERROR_MESSAGE()
+		
+		UPDATE OAS_ChargeInfo WITH(ROWLOCK)
+			SET Rate = @OldMasterRate
+		WHERE ChargeID = @ChargeID
+		
+		RETURN
+	END CATCH
 
 	-- Update PT on NAP
 	DECLARE @SiteName VARCHAR(20) = '', @ProductId INT, @ProductName VARCHAR(50), @InputPT VARCHAR(MAX) = ''
@@ -146,7 +159,7 @@ BEGIN
 	BEGIN
 		IF EXISTS (SELECT 1 FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE ChargeID = @ChargeID AND @CurrentDate NOT BETWEEN FromDate AND ToDate)
 		BEGIN
-			SELECT @ErrCode = 101, @ErrMsg =  @ProductName + ': NAP PT update failed due to it''s not current charge rate.'
+			SELECT @ErrCode = 0, @ErrMsg =  @ProductName + ': NAP PT update failed due to it''s not current charge rate.'
 			RETURN
 		END
 
@@ -161,7 +174,7 @@ BEGIN
 
 		IF @ErrCode <> 0
 		BEGIN
-			SELECT @ErrMsg = @ProductName + ': ' + @ErrMsg
+			SELECT @ErrCode = 0, @ErrMsg = @ProductName + ': ' + @ErrMsg
 			RETURN
 		END
 	END
