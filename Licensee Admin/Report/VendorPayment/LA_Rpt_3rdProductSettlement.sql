@@ -3,12 +3,13 @@ USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_3rdProductSettlement]
-	@PartyIds			VARCHAR(4000),
-	@ProductCodes		VARCHAR(500),
-	@FromDate			DATETIME,
-	@ToDate				DATETIME,
-	@BaseCurrencyName	VARCHAR(20),
-	@Timezone			INT
+	@PartyIds			VARCHAR(4000)
+	,@ProductCodes		VARCHAR(500)
+	,@FromDate			DATETIME
+	,@ToDate			DATETIME
+	,@BaseCurrencyName	VARCHAR(20)
+	,@Timezone			INT
+	,@PlatformId		TINYINT = 0
 AS
 /*
  * Created by : [20210915@Danny]
@@ -22,6 +23,7 @@ AS
 	- 20220328@Danny: Intergrate Guaranteed Gaming [#167626]
 	- 20210623@Danny: Fix PaytoSuplier PPL issue [#168387]
 	- 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
+	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
@@ -378,6 +380,14 @@ BEGIN
 	SELECT @Allbet  =  PartyID FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyName='Allbet' AND PartyType=3
 
 	-- Insert @PartyIds param input
+	IF ISNULL(@PlatformId, 0) <> 0
+	BEGIN
+		SELECT @PartyIds = ISNULL(STRING_AGG(CONVERT(VARCHAR(50), p.PartyID), ','), '')
+		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+			INNER JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = p.PartyName AND l.PlatformId = @PlatformId
+		WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIds, ',')) 
+	END
+
 	INSERT INTO @PartyIdInput(PartyId) SELECT CAST(val AS INT) FROM strSplit(@PartyIds,',')
 	
 	-- Insert product detail by source (rptBetting, rptBettingByProduct, rpt_ThirdPartyWL_ExtraGMT, ....)

@@ -1,11 +1,12 @@
 ﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template2]
-	@PartyIds			VARCHAR(4000),
-	@ProductID			INT,
-	@FromDate			DATETIME,
-	@ToDate				DATETIME,
-	@BaseCurrencyName	VARCHAR(20),
-	@TimeZoneId			INT
+	@PartyIds			VARCHAR(4000)
+	,@ProductID			INT
+	,@FromDate			DATETIME
+	,@ToDate			DATETIME
+	,@BaseCurrencyName	VARCHAR(20)
+	,@TimeZoneId		INT
+	,@PlatformId		TINYINT = 0
 AS
 /*
  * Created by : [20220418@Danny]
@@ -13,6 +14,7 @@ AS
  * Revisions
 	- 20220418@Danny: Initialize SP [#168387]
 	- 20220927@Danny: Remove DBLink [#176986] 
+	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
  */
 
 BEGIN
@@ -24,6 +26,14 @@ SET NOCOUNT ON
 
 	DECLARE @IsConvertNegativeFeeToZero BIT, @IsConvertNegativePaytoSupplierToZero BIT
 	SELECT @IsConvertNegativeFeeToZero = IsConvertNegativeFeeToZero, @IsConvertNegativePaytoSupplierToZero = IsConvertNegativePaytoSupplierToZero  FROM dbo.LA_VendorPaymentSetting WITH(NOLOCK) WHERE ProductId = @ProductID
+
+	IF ISNULL(@PlatformId, 0) <> 0
+	BEGIN
+		SELECT @PartyIds = ISNULL(STRING_AGG(CONVERT(VARCHAR(50), p.PartyID), ','), '')
+		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+			INNER JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = p.PartyName AND l.PlatformId = @PlatformId
+		WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIds, ',')) 
+	END
 
 	CREATE TABLE #PartyList (PartyId INT,PartyName VARCHAR(100),BrandName VARCHAR(100),ParentId INT, IsKeepNegativeAmount BIT DEFAULT 0)
 	INSERT INTO #PartyList (PartyId, PartyName, BrandName, ParentId) EXEC LA_PartyListSel

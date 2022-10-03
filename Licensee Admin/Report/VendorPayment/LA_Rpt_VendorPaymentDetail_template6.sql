@@ -1,11 +1,12 @@
 ﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template6]
-	@PartyIds			VARCHAR(4000),
-	@ProductID			INT,
-	@FromDate			DATETIME,
-	@ToDate				DATETIME,
-	@BaseCurrencyName	VARCHAR(20),
-	@TimeZoneId			INT
+	@PartyIds			VARCHAR(4000)
+	,@ProductID			INT
+	,@FromDate			DATETIME
+	,@ToDate			DATETIME
+	,@BaseCurrencyName	VARCHAR(20)
+	,@TimeZoneId		INT
+	,@PlatformId		TINYINT = 0
 AS
 /*
  * Created by : [20220405@Danny]
@@ -13,6 +14,7 @@ AS
  * Revisions
 	- 20210615@Danny: Initialize SP [#168387]
 	- 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
+	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
  */
 
 BEGIN
@@ -21,6 +23,14 @@ BEGIN
 	DECLARE @ProductCode VARCHAR(50)
 	SELECT @ProductCode = ProductPrefix
 	FROM dbo.Product3rd WITH(NOLOCK) WHERE Productid = @ProductID
+
+	IF ISNULL(@PlatformId, 0) <> 0
+	BEGIN
+		SELECT @PartyIds = ISNULL(STRING_AGG(CONVERT(VARCHAR(50), p.PartyID), ','), '')
+		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+			INNER JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = p.PartyName AND l.PlatformId = @PlatformId
+		WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIds, ',')) 
+	END
 
 	DECLARE @BonusBettype TABLE (bettype INT, ProductID INT)
 	INSERT INTO @BonusBettype (bettype, ProductID)

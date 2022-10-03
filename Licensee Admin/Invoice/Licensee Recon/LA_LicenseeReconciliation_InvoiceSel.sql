@@ -3,11 +3,12 @@ USE [bodb_Licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_InvoiceSel]
-	@PartyIds		VARCHAR(4000),
-	@FromDate		DATE,
-	@ToDate			DATE,
-	@Environment	VARCHAR(50) = 'DEV',
-	@IsGroupByPartyId	BIT = 0
+	@PartyIds			VARCHAR(4000)
+	,@FromDate			DATE
+	,@ToDate			DATE
+	,@Environment		VARCHAR(50) = 'DEV'
+	,@IsGroupByPartyId	BIT = 0
+	,@PlatformId		TINYINT = 0
 AS
 
 /*	Header:
@@ -36,6 +37,7 @@ AS
 		- 20220418@Percy: Add Credit for Setup Fees [RedmineID: #164139]
 		- 20221028@Danny: MG-RNG offer tournament prize [RedmineID: #176986]
 		- 20221226@Danny: Integrate Player tips [#180703]
+		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -47,7 +49,7 @@ BEGIN
 	SELECT CurrencyId,CurrencyName FROM OPENQUERY(DBCUST, 'EXEC CustDB.dbo.LA_BaseCurrency_Sel') 
 
 	-- get party list
-	--
+
 	DECLARE @partyList AS TABLE(PartyId INT,LicenseeCode VARCHAR(50), BaseCurrencyId INT)
 
 	INSERT INTO @partyList(PartyId, LicenseeCode, BaseCurrencyId)
@@ -59,6 +61,15 @@ BEGIN
 	IF @PartyIds <> 'All'
 	BEGIN
 		DELETE @partyList WHERE PartyID NOT IN (SELECT val FROM dbo.strSplit(@PartyIds, ','))
+	END
+
+	IF ISNULL(@PlatformId, 0) <> 0
+	BEGIN
+		DELETE p
+		FROM @partyList p
+			INNER JOIN dbo.OAS_Party pt WITH(NOLOCK) ON pt.PartyID = p.PartyId
+			LEFT JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = pt.PartyName AND l.PlatformId = @PlatformId
+		WHERE l.LicenseeId IS NULL
 	END
 
 	DECLARE @N_FromDate DATE = DATEADD(MONTH, DATEDIFF(MONTH, 0, @FromDate) + 1, 0)

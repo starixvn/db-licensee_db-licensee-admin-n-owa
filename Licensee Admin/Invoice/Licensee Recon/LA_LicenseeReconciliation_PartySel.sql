@@ -3,8 +3,9 @@ USE [bodb_Licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_PartySel](
-	@BillingDate DATE = NULL,
-	@IncludeAll BIT = 0
+	@BillingDate DATE = NULL
+	,@IncludeAll BIT = 0
+	,@PlatformId TINYINT = 0
 )
 AS
 /*	Header:
@@ -19,6 +20,7 @@ AS
 		- 20210901@Percy: Remove duplicate Party - Licensee Code [RedmineID: #161121]
 		- 20220218@Percy: Return SuspendedDate, TerminatedDate [RedmineID: #161429]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
+		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -118,6 +120,15 @@ BEGIN
 	FROM #Licensees l
 		LEFT JOIN @partyList pl ON l.PartyId = pl.PartyId AND pl.ParentId > 0
 	WHERE l.ParentId IS NULL
+
+	IF ISNULL(@PlatformId, 0) <> 0
+	BEGIN
+		DELETE li
+		FROM #Licensees li
+			LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH(NOLOCK) ON li.PartyId = p.PartyID
+			LEFT JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = p.PartyName AND l.PlatformId = @PlatformId
+		WHERE l.LicenseeId IS NULL
+	END
 
 	DECLARE @billingGroup TABLE (GroupId INT)
 	INSERT INTO @billingGroup (GroupId)

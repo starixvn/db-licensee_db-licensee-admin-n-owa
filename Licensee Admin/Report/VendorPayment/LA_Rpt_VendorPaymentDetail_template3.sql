@@ -1,20 +1,22 @@
 ﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template3]
-	@PartyIds			VARCHAR(4000),
-	@ProductID			INT,
-	@FromDate			DATETIME,
-	@ToDate				DATETIME,
-	@SportType			INT	= 0, 
-	@BetType			INT	= 0, 
-	@drawfilter			SMALLINT	= 1, 
-	@BaseCurrencyName	VARCHAR(10)	= 'EUR',
-	@TimeZoneId			INT
+	@PartyIds			VARCHAR(4000)
+	,@ProductID			INT
+	,@FromDate			DATETIME
+	,@ToDate			DATETIME
+	,@SportType			INT	= 0 
+	,@BetType			INT	= 0 
+	,@drawfilter		SMALLINT	= 1 
+	,@BaseCurrencyName	VARCHAR(10)	= 'EUR'
+	,@TimeZoneId		INT
+	,@PlatformId		TINYINT = 0
 AS
 /*
  * Created by : [20220405@Danny]
  * Task  : Vendor Payment Detail (template3 - Template for Virtual Sports product, including some specific info such as: Sport Type, Bet Type)
  * Revisions
 	- 20210615@Danny: Initialize SP [#168387]
+	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
  */
 
 BEGIN
@@ -22,6 +24,14 @@ BEGIN
 
 	DECLARE @ProductCode VARCHAR(50)
 	SELECT @ProductCode = ProductPrefix FROM dbo.Product3rd WITH(NOLOCK) WHERE Productid = @ProductID
+
+	IF ISNULL(@PlatformId, 0) <> 0
+	BEGIN
+		SELECT @PartyIds = ISNULL(STRING_AGG(CONVERT(VARCHAR(50), p.PartyID), ','), '')
+		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+			INNER JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = p.PartyName AND l.PlatformId = @PlatformId
+		WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIds, ',')) 
+	END
 
 	DECLARE @ChargeInfos AS TABLE (
 		ChargeID		INT

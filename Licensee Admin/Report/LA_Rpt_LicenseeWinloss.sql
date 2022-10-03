@@ -3,15 +3,16 @@ USE [bodb02]
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinloss]
-	  @PartyIDs				VARCHAR(MAX)	= ''
-	, @Currency				INT				= 0
-	, @FromDate				DATETIME
-	, @ToDate				DATETIME
-	, @ProductCodes			VARCHAR(MAX)
-	, @DrawFilter			SMALLINT		= 1
-	, @IsConvert			BIT				= 0
-	, @BaseCurrencyName		VARCHAR(10)		= 'GBP'
-	, @LicenseeStatusIds	VARCHAR(100) 
+	 @PartyIDs			 VARCHAR(MAX) = ''
+	,@Currency			 INT = 0
+	,@FromDate			 DATETIME
+	,@ToDate			 DATETIME
+	,@ProductCodes		 VARCHAR(MAX)
+	,@DrawFilter		 SMALLINT = 1
+	,@IsConvert			 BIT = 0
+	,@BaseCurrencyName	 VARCHAR(10) = 'GBP'
+	,@LicenseeStatusIds	 VARCHAR(100) 
+	,@PlatformId		 TINYINT = 0
 AS
 
 /*  Created:  Forrest.Nguyen
@@ -51,6 +52,7 @@ AS
 	- 20201003@Danny: Support USDT as base currency [RedmineID: #177718]
 	- 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]	
 	- 20221226@Danny: Fiat currency Base to USDT = 0 [RedmineID: #180703]
+	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -74,6 +76,14 @@ BEGIN
 	-- Handle Licensee status
 	SELECT @PartyIds = PartyIDs FROM bodb_Licensee.dbo.LA_f_PartyListByStatusSel(@PartyIDs, @LicenseeStatusIds)
 	-- End Handle licensee status
+
+	IF ISNULL(@PlatformId, 0) <> 0
+	BEGIN
+		SELECT @PartyIds = STRING_AGG(CONVERT(VARCHAR(50), p.PartyID), ',')
+		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+			INNER JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = p.PartyName AND l.PlatformId = @PlatformId
+		WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIds, ',')) 
+	END
 
 	DECLARE @BaseCurrencyId INT
 
