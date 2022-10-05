@@ -130,11 +130,11 @@ BEGIN
 	WHERE ci.ChargeID = @ChargeID AND l.IsDeposit = 1
 	
 	/*Delete prevent updating unexpected NAP PT value*/
-	/*1.Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0 or CandyA18 licensees*/
+	/*1.Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0 or CandyA18, HX9Candy licensees*/
 	UPDATE c
 		SET c.Rate = -1
 	FROM @ChargRateUpd c
-	WHERE @ProductId = 1 AND (c.Rate > 0.12 AND @SiteName <> '9wickets') OR @SiteName = 'CandyA18'
+	WHERE @ProductId = 1 AND (c.Rate > 0.12 AND @SiteName <> '9wickets') OR @SiteName IN ('CandyA18', 'HX9Candy')
 	/*2.new charge rate is same as same charge rate*/
 	DELETE c
 	FROM @ChargRateUpd c
@@ -155,7 +155,7 @@ BEGIN
 		SET @InputPT = ''
 	END
 	
-	IF @SiteName NOT IN ('', 'CandyA18') AND ISNULL(@InputPT, '') <> '' 
+	IF @SiteName NOT IN ('', 'CandyA18', 'HX9Candy') AND ISNULL(@InputPT, '') <> '' 
 	BEGIN
 		IF EXISTS (SELECT 1 FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE ChargeID = @ChargeID AND @CurrentDate NOT BETWEEN FromDate AND ToDate)
 		BEGIN

@@ -228,11 +228,11 @@ BEGIN
 	WHERE c.CurrencyId = 0
 
 	/*Delete prevent updating unexpected NAP PT value*/
-	/*Sportsbook charge rate > 12% (exclude 9wickets licensee) or CandyA18 licensee*/
+	/*Sportsbook charge rate > 12% (exclude 9wickets licensee) or CandyA18, HX9Candy licensee*/
 	UPDATE c
 		SET c.Rate = -1
 	FROM @ChargeRate c 
-	WHERE c.ProductId = 1 AND (c.Rate > 0.12 AND @SiteName <> '9wickets') OR @SiteName = 'CandyA18'
+	WHERE c.ProductId = 1 AND (c.Rate > 0.12 AND @SiteName <> '9wickets') OR @SiteName IN ('CandyA18', 'HX9Candy')
 
 	/*2.new charge rate is same as same charge rate*/
 	DELETE c
@@ -240,13 +240,13 @@ BEGIN
 	WHERE NOT EXISTS (SELECT 1 FROM @ChargeRate r WHERE r.ChargeID = c.ChargeID AND r.Rate <> -1)
 		AND c.IsValid = 1
 		
-	/*2.Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0 or CandyA18 licensee%*/
+	/*2.Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0 or CandyA18, HX9Candy licensee%*/
 	DELETE c
 	FROM @ChargeRate c
 	WHERE EXISTS (
 		SELECT 1 FROM @ChargeRate r 
 		WHERE r.ChargeID = c.ChargeID 
-			AND ((((r.Rate > 0.12 AND @SiteName <> '9wickets') OR r.Rate = 0) AND c.ProductId = 1) OR @SiteName = 'CandyA18')
+			AND ((((r.Rate > 0.12 AND @SiteName <> '9wickets') OR r.Rate = 0) AND c.ProductId = 1) OR @SiteName IN ('CandyA18', 'HX9Candy'))
 		)
 	
 	SELECT @InputPT = CONVERT(VARCHAR(MAX), 
@@ -260,7 +260,7 @@ BEGIN
 		FOR XML PATH ('PT'), ROOT('ROOT')
 	))
 
-	IF @SiteName NOT IN ('', 'CandyA18') AND ISNULL(@InputPT, '') <> ''
+	IF @SiteName NOT IN ('', 'CandyA18', 'HX9Candy') AND ISNULL(@InputPT, '') <> ''
 	BEGIN
 		EXEC CustDB.dbo.Acc_Dep_LicenseeSetting_PTSettingUpd
 			@Site = @SiteName
@@ -272,7 +272,7 @@ BEGIN
 			,@ErrMsg = @ErrMsg OUTPUT
 	END
 
-	IF (@ErrCode  <> 0 OR EXISTS (SELECT 1 FROM @ChargeRate WHERE IsValid = 0)) AND @SiteName NOT IN  ('', 'CandyA18')
+	IF (@ErrCode  <> 0 OR EXISTS (SELECT 1 FROM @ChargeRate WHERE IsValid = 0)) AND @SiteName NOT IN  ('', 'CandyA18', 'HX9Candy')
 	BEGIN
 		IF @ErrCode <> 0
 		BEGIN
