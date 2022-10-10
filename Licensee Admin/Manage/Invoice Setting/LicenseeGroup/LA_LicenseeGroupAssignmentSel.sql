@@ -16,11 +16,15 @@ AS
 
 	 Revisions:  
 		- 20190514@Bruce: Create SP
+		- 20220817@Malcolm: LA - Enhance Manage Licensee Group [RedmineId : #176437]
 */
 BEGIN
 	SET NOCOUNT ON;
 	
 	SELECT p.PartyId, p.PartyName, pd.BrandName, ISNULL(a.GroupId, 0) AS GroupId, ISNULL(a.GroupType, 0) AS GroupType
+		,CASE WHEN pd.TerminatedDate IS NOT NULL THEN 'Terminated'
+			  WHEN pd.SuspendedDate IS NOT NULL THEN 'Suspended'
+		 ELSE 'Active' END AS [Status]
 	FROM dbo.OAS_Party p WITH(NOLOCK)
 		INNER JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON p.PartyID=pd.PartyID
 		LEFT JOIN dbo.LA_CombinedGroupAssignment a WITH(NOLOCK) ON p.PartyId = a.PartyId
