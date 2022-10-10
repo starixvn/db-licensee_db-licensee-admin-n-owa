@@ -122,7 +122,6 @@ BEGIN
 	EXEC dbo.LA_ChargeRateSettingModify
 		@PayerID				= @PayerID
 		,@ChargeSettingXML		= @ChargeSettingXML
-		,@BillingGroupId        = @BillingGroupId
 		,@UserID				= @UserID
 		,@LoginIP				= @LoginIP
 		,@ErrCode				= @ErrCode OUTPUT

@@ -1,7 +1,6 @@
 /*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
 ALTER PROCEDURE [dbo].[LA_ChargeRateSettingModify]
 	@PayerID				INT
-	,@BillingGroupId		INT = 0
 	,@ChargeSettingXML		NVARCHAR (MAX)
 	,@UserID				INT
 	,@LoginIP				VARCHAR (50)	= ''
@@ -90,8 +89,6 @@ BEGIN
 	SET @startRun = GETDATE()
 
 	IF ISNULL(@ChargeSettingXML, '') = '' RETURN
-
-	SELECT @BillingGroupId = ISNULL(@BillingGroupId, 0)
 
 	SELECT @ChargeSettingsXML = CONVERT(XML, @ChargeSettingXML)
 
@@ -258,19 +255,12 @@ BEGIN
 		DECLARE @MergeResult TABLE(ChargeId INT, ProductId INT, [$action] VARCHAR(20))
 		DECLARE @ToParty INT, @ParentChargeID INT, @Remark VARCHAR(200) = ''
 		
-		IF @BillingGroupId <> 0 
-		BEGIN
-			SELECT @ToParty = @BillingGroupId, @ParentChargeID = 0
-		END
-		ELSE
-		BEGIN
-			SELECT TOP 1 @ToParty = c.ToParty, @ParentChargeID = c.ParentChargeID
-			FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
-				INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON c.ChargeID = cs.ChargeID AND cs.SystemID = 2
-			WHERE FromParty = @PayerID AND c.ToParty IN (1, 9, 11, 98)
-			ORDER BY FromDate DESC
-		END
-
+		SELECT TOP 1 @ToParty = c.ToParty, @ParentChargeID = c.ParentChargeID
+		FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
+			INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON c.ChargeID = cs.ChargeID AND cs.SystemID = 2
+		WHERE FromParty = @PayerID AND c.ToParty IN (1, 9, 11, 98)
+		ORDER BY FromDate DESC
+		
 		SET @Remark = @Remark + 'created date: ' + CONVERT(VARCHAR(20), GETDATE(), 101)
 
 		-- update charege info (product without bettype ref)
@@ -382,7 +372,7 @@ BEGIN
 						AND ivt.InvTemplateName IN ('Boping', 'Zelianta')
 						AND p.StatusId > 0
 				) p
-			WHERE ((@BillingGroupId <> 0 AND p.ProductId IS NOT NULL) OR @BillingGroupId = 0) -- @BillingGroupId <> 0 for when lauching licensees
+			WHERE p.ProductId IS NOT NULL -- @BillingGroupId <> 0 for when lauching licensees
 				AND NOT EXISTS (
 					SELECT 1 FROM dbo.LA_InvoiceSetting l WITH(NOLOCK) 
 					WHERE l.FromPartyId = @PayerID 
