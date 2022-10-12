@@ -3,6 +3,7 @@ USE bodb_licensee
 GO
 
 ALTER PROCEDURE dbo.LA_ProductListSelAll
+	@IsProductExclude BIT = 0
 AS
 /*  
 	Created: 20150422@Patrick
@@ -13,13 +14,18 @@ AS
 		- 20190128@Bruce: include product code [redmine: #108311]
 		- 20210812@Percy: Exclude BitCoin from Product drop-down list [RedmineID: #159691]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
+		- 20221018@Malcolm: Exclude products which support Credit site only,  obsolete products, Saba Promotio [RedmineId : #171705]
 */
 BEGIN
 	SET NOCOUNT ON
 
 	SELECT p.ProductID, p.ProductName, p.ProductCode  
 	FROM dbo.LA_f_GroupProduct('',NULL,NULL) p
-	WHERE p.ProductId = p.GroupProductId
+		LEFT JOIN dbo.Product3rd pr WITH(NOLOCK) ON p.ProductId = pr.Productid
+	WHERE p.ProductId = p.GroupProductId 
+		AND (@IsProductExclude = 0 OR NOT (ISNULL(pr.OfferSite, '') = 1 OR pr.EndOfSupportDate IS NOT NULL OR p.ProductName = 'Saba Promotion'))
 
 END
 GO
+
+SELECT * FROM Product3rd

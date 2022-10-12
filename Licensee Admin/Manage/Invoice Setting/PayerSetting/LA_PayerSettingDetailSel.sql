@@ -31,7 +31,6 @@ AS
 		- 20220118@Percy: Add Licensee Status Setting [RedmineID: #166751]
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
-		- 20220921@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
 		
 	 Params:
 		+ @PayerId :specify Party
@@ -131,14 +130,14 @@ BEGIN
 	DECLARE @CurrentBillingGroup INT
 	SELECT @CurrentBillingGroup = ISNULL((SELECT TOP 1 ToPartyId FROM @ChargeInfo ORDER BY FromDate DESC), 0)
 
-	SELECT p.PartyId				 AS PayerID	
-		, g.GroupMinFeeID			 AS GroupMinFeeID
-		, g.[Name]					 AS GroupMinFeeName
-		, ISNULL(@BaseCurrencyId, 6) AS ExchangeID
-		, d1.DiscountGroupId		 AS DiscountGroupID
-		, d1.DiscountGroupName		 AS DiscountGroupName
-		, d2.DiscountGroupId		 AS RebateGroupID
-		, d2.DiscountGroupName		 AS RebateGroupName
+	SELECT TOP 1 c.PartyId		AS PayerID	
+		, g.GroupMinFeeID		AS GroupMinFeeID
+		, g.[Name]				AS GroupMinFeeName
+		, c.ExchangeID
+		, d1.DiscountGroupId	AS DiscountGroupID
+		, d1.DiscountGroupName	AS DiscountGroupName
+		, d2.DiscountGroupId	AS RebateGroupID
+		, d2.DiscountGroupName	AS RebateGroupName
 		, CASE WHEN ISNULL(pd.BrandName,'')<>'' THEN pd.BrandName + ' (' +p.PartyName+')' ELSE p.PartyName END PayerName
 		, @CurrentBillingGroup AS CurrentBillingGroup
 		, CASE WHEN t.IsDeposit = 0 THEN 'Active'
@@ -146,8 +145,9 @@ BEGIN
 		, pd.LaunchDate
 		, pd.SuspendedDate
 		, pd.TerminatedDate
-	FROM dbo.OAS_Party p WITH(NOLOCK) 
-		INNER JOIN dbo.OAS_PartyDetail pd ON pd.PartyId= p.PartyId
+	FROM @ChargeInfo c
+		INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID=c.PartyId
+		INNER JOIN dbo.OAS_PartyDetail pd ON pd.PartyId=c.PartyId
 		INNER JOIN	dbo.Licensees t WITH(NOLOCK) ON p.OldRefID = t.LicenseeId
 		LEFT JOIN	#tmp_licenseeOIC u WITH(NOLOCK) ON t.LicenseeName = u.RegisteredLicenseeName
 		LEFT JOIN	#tmp_licenseeOICStatus us WITH(NOLOCK) ON u.LicenseeStatusId = us.LicenseeStatusId
@@ -157,20 +157,19 @@ BEGIN
 				INNER JOIN dbo.LA_GroupMinFeeHeader mfh WITH (NOLOCK) ON  mfa.GroupMinFeeID = mfh.GroupMinFeeID
 				WHERE mfa.PartyID = @PayerId AND mfh.ToDate >= @CurrentDate
 				ORDER BY mfh.ToDate DESC
-				) g ON p.PartyId = g.PartyID -- Group Min Fee
+				) g ON c.PartyId = g.PartyID -- Group Min Fee
 		LEFT JOIN (
 				SELECT PartyId, DiscountGroupId, DiscountGroupName 
 				FROM @Discount 
 				WHERE DiscountGroupType IN (1, 11, 3, 13)
 					AND @CurrentDate BETWEEN FromDate AND ToDate
-				) d1 ON p.PartyId = d1.PartyId --discount
+				) d1 ON c.PartyId = d1.PartyId --discount
 		LEFT JOIN (
 				SELECT PartyId, DiscountGroupId, DiscountGroupName 
 				FROM @Discount 
 				WHERE DiscountGroupType IN (2, 12, 22)
 					AND @CurrentDate BETWEEN FromDate AND ToDate
-				) d2 ON p.PartyId = d2.PartyId --Rebate
-	WHERE p.PartyID = @PayerId
+				) d2 ON c.PartyId = d2.PartyId --Rebate
 
 	-- charge rate setting
 	;WITH Rate AS(

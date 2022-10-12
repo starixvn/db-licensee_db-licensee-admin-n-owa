@@ -10,7 +10,6 @@ ALTER PROCEDURE [dbo].[LA_PayerSettingModify]
 	,@ChargeSettingXML		NVARCHAR (MAX)
 	,@MinFeeSettingXML		NVARCHAR (MAX)
 	,@WaiveSettingXML		NVARCHAR (MAX)
-	,@BillingGroupId		INT = 0
 	,@UserID				INT
 	,@LoginIP				VARCHAR (50)	= ''
 	,@ErrCode				INT				= 0		OUTPUT
@@ -147,8 +146,6 @@ BEGIN
 	-- Update on NAP
 	DECLARE @ChargeRate TABLE (ChargeID INT, ProductId INT, ProductName VARCHAR(50), Rate MONEY, CurrencyId INT, FromDate DATETIME, ToDate DATETIME, IsValid BIT DEFAULT(1), IsChangedRate BIT, IsChangedDate BIT)
 
-	DECLARE @ChargeRateDetail TABLE (ChargeID INT, CurrencyId INT, Rate MONEY, IsChangedRate BIT, IsChangedDate BIT)
-
 	INSERT INTO @ChargeRate (ChargeId, FromDate, ToDate, ProductId, Rate, IsChangedRate, IsChangedDate, CurrencyId)
 	SELECT
 		t.c.value('(ChargeId/text())[1]', 'INT') AS ChargeId
@@ -162,29 +159,18 @@ BEGIN
 	FROM @ChargeSettingXMLOUT.nodes('ChargeSettings/ChargeSetting') AS t(c)
 	OPTION (OPTIMIZE FOR (@ChargeSettingXMLOUT = NULL))
 
-	INSERT INTO @ChargeRateDetail (ChargeId, CurrencyId, Rate, IsChangedRate, IsChangedDate)
-	SELECT
-		t.c.value('(ChargeId/text())[1]', 'INT') AS ChargeId
-		,t1.c.value('(CurrencyId/text())[1]', 'INT') AS CurrencyId
-		,t1.c.value('(Rate/text())[1]', 'MONEY') AS Rate
-		,t1.c.value('(IsChangedRate/text())[1]', 'BIT') AS IsChangedRate
-		,t.c.value('(IsChangedDate/text())[1]', 'BIT') AS IsChangedDate
-	FROM @ChargeSettingXMLOUT.nodes('ChargeSettings/ChargeSetting') AS t(c)
-	CROSS APPLY t.c.nodes('ChargeSettingByCurrencies/ChargeSettingByCurrency') t1(c)
-	OPTION (OPTIMIZE FOR (@ChargeSettingXMLOUT = NULL))
-
 	SELECT @CurrentDate = CONVERT(DATE, GETDATE())
 
 	UPDATE @ChargeRate
 		SET IsValid = 0
 	WHERE @CurrentDate NOT BETWEEN FromDate AND ToDate
 
-	DELETE FROM @ChargeRate WHERE ProductId IN (14, 17) OR  ToDate < @CurrentDate
-
 	SELECT @SiteName = l.LicenseeName
 	FROM dbo.OAS_Party p WITH(NOLOCK)
 		INNER JOIN dbo.Licensees l WITH(NOLOCK) ON p.OldRefID = l.LicenseeID
 	WHERE l.IsDeposit = 1 AND p.PartyID = @PayerID
+
+	DELETE FROM @ChargeRate WHERE ProductId IN (14, 17) OR  ToDate < @CurrentDate OR @SiteName IN ('CandyA18', 'HX9Candy')
 
 	UPDATE c
 		SET c.ProductId = CASE WHEN c.ProductId = 0 THEN 1 ELSE p.ProductId END, c.ProductName = CASE WHEN c.ProductId = 0 THEN 'Sportsbook' ELSE pr.ProductName END
@@ -200,53 +186,24 @@ BEGIN
 		SELECT cr.ChargeID, cr.CurrencyID, c.ProductId, c.ProductName, CASE WHEN c.IsChangedDate = 1 THEN cr.Rate ELSE -1 END AS Rate
 		FROM dbo.LA_ChargeRateByCurrency cr WITH(NOLOCK)
 			INNER JOIN CTE_ChargeId c ON c.ChargeID = cr.ChargeID
-		WHERE NOT EXISTS (SELECT 1 FROM @ChargeRateDetail d WHERE d.ChargeID = c.ChargeID)
-		UNION ALL
-		SELECT d.ChargeID, d.CurrencyId, r.ProductId, r.ProductName, CASE WHEN  d.IsChangedRate = 1 OR d.IsChangedDate = 1 THEN d.Rate ELSE -1 END AS Rate
-		FROM @ChargeRateDetail d
-			INNER JOIN @ChargeRate r ON r.ChargeID = d.ChargeID
 	)
 	INSERT INTO @ChargeRate (ChargeID, ProductId, ProductName, CurrencyId, Rate, IsValid)
 	SELECT ChargeID, ProductId, ProductName, CurrencyID, Rate, 1 
 	FROM CTE_ExistingCurrency
 
-	--Not update PT for SA Gaming Tips Amt Due	
-	IF EXISTS (SELECT 1 FROM @ChargeRate WHERE ProductId = 39)
-	BEGIN
-		DELETE c
-		FROM @ChargeRate c
-		WHERE EXISTS (
-			SELECT 1 FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
-			WHERE ci.ChargeID = c.ChargeID AND ci.ChargeType = 12 --  Tips Amt Due
-		) AND c.ProductId = 39
-	END
-
+	/*1.Sportsbook charge rate > 12% (exclude 9wickets licensee) licensee*/
 	UPDATE c
-		SET c.Rate = CASE WHEN c.IsChangedRate = 1 OR c.IsChangedDate = 1 THEN c.Rate ELSE -1 END
-	FROM @ChargeRate c	
-	WHERE c.CurrencyId = 0
-
-	/*Delete prevent updating unexpected NAP PT value*/
-	/*Sportsbook charge rate > 12% (exclude 9wickets licensee) or CandyA18, HX9Candy licensee*/
-	UPDATE c
-		SET c.Rate = -1
+		SET c.Rate = CASE WHEN c.ProductId = 1 AND (c.Rate > 0.12 AND @SiteName <> '9wickets') THEN -1 
+		                  WHEN c.CurrencyId = 0 THEN CASE WHEN c.IsChangedRate = 1 OR c.IsChangedDate = 1 THEN c.Rate ELSE -1 END 
+					 ELSE c.Rate END  
 	FROM @ChargeRate c 
-	WHERE c.ProductId = 1 AND (c.Rate > 0.12 AND @SiteName <> '9wickets') OR @SiteName IN ('CandyA18', 'HX9Candy')
 
 	/*2.new charge rate is same as same charge rate*/
-	DELETE c
-	FROM @ChargeRate C
-	WHERE NOT EXISTS (SELECT 1 FROM @ChargeRate r WHERE r.ChargeID = c.ChargeID AND r.Rate <> -1)
-		AND c.IsValid = 1
-		
-	/*2.Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0 or CandyA18, HX9Candy licensee%*/
+	/*Delete prevent updating unexpected NAP PT value*/
 	DELETE c
 	FROM @ChargeRate c
-	WHERE EXISTS (
-		SELECT 1 FROM @ChargeRate r 
-		WHERE r.ChargeID = c.ChargeID 
-			AND ((((r.Rate > 0.12 AND @SiteName <> '9wickets') OR r.Rate = 0) AND c.ProductId = 1) OR @SiteName IN ('CandyA18', 'HX9Candy'))
-		)
+		LEFT JOIN dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.ChargeID = c.ChargeID AND c.ProductId = 39 AND ci.ChargeType = 12 --  Tips Amt Due
+	WHERE (NOT EXISTS (SELECT 1 FROM @ChargeRate r WHERE r.ChargeID = c.ChargeID AND r.Rate <> -1) AND c.IsValid = 1) OR ci.ChargeID IS NOT NULL
 	
 	SELECT @InputPT = CONVERT(VARCHAR(MAX), 
 	(
@@ -259,7 +216,7 @@ BEGIN
 		FOR XML PATH ('PT'), ROOT('ROOT')
 	))
 
-	IF @SiteName NOT IN ('', 'CandyA18', 'HX9Candy') AND ISNULL(@InputPT, '') <> ''
+	IF ISNULL(@SiteName, '') <> '' AND ISNULL(@InputPT, '') <> ''
 	BEGIN
 		EXEC CustDB.dbo.Acc_Dep_LicenseeSetting_PTSettingUpd
 			@Site = @SiteName
@@ -271,17 +228,17 @@ BEGIN
 			,@ErrMsg = @ErrMsg OUTPUT
 	END
 
-	IF (@ErrCode  <> 0 OR EXISTS (SELECT 1 FROM @ChargeRate WHERE IsValid = 0)) AND @SiteName NOT IN  ('', 'CandyA18', 'HX9Candy')
+	IF (@ErrCode  <> 0 OR EXISTS (SELECT 1 FROM @ChargeRate WHERE IsValid = 0)) AND ISNULL(@SiteName, '') <> ''
 	BEGIN
 		IF @ErrCode <> 0
 		BEGIN
 			SELECT 	@ErrMsg = STUFF((SELECT ',' + ProductName
 					FROM @ChargeRate 
 					WHERE IsValid = 1
-					FOR XML PATH('')), 1, 1, '') + ': '+ @ErrMsg + CHAR(13)
+					FOR XML PATH('')), 1, 1, '') + ': '+ @ErrMsg + '<br>'
 		END
 
-		SELECT @ErrMsg =  ISNULL(@ErrMsg, '') + ProductName + ': NAP PT update failed due to it''s not current charge rate' + CHAR(13)
+		SELECT @ErrMsg =  ISNULL(@ErrMsg, '') + ProductName + ': NAP PT update failed due to it''s not current charge rate' + '<br>'
 		FROM @ChargeRate
 		WHERE IsValid = 0
 

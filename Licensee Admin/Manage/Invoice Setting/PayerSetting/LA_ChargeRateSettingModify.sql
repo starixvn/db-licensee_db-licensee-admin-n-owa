@@ -45,16 +45,6 @@ AS
 									<ChargeType>1</ChargeType>
 									<FromDate>1</FromDate>
 									<ToDate>1</ToDate>
-									<ChargeSettingByCurrencies>
-										<ChargeSettingByCurrency>
-											<CurrencyId>1</CurrencyId>
-											<Rate>0.2</Rate>
-										</ChargeSettingByCurrency>
-										<ChargeSettingByCurrency>
-											<CurrencyId>2</CurrencyId>
-											<Rate>0.3</Rate>
-										</ChargeSettingByCurrency>
-									</ChargeSettingByCurrencies>
 								  </ChargeSetting>
 								  <ChargeSetting>
 									<ChargeId>1</ChargeId>
@@ -66,16 +56,6 @@ AS
 									<ChargeType>1</ChargeType>
 									<FromDate>1</FromDate>
 									<ToDate>1</ToDate>
-									<ChargeSettingByCurrencies>
-										<ChargeSettingByCurrency>
-											<CurrencyId>1</CurrencyId>
-											<Rate>0.2</Rate>
-										</ChargeSettingByCurrency>
-										<ChargeSettingByCurrency>
-											<CurrencyId>2</CurrencyId>
-											<Rate>0.3</Rate>
-										</ChargeSettingByCurrency>
-									</ChargeSettingByCurrencies>
 								  </ChargeSetting>
 								</ChargeSettings>'
 								
@@ -111,8 +91,6 @@ BEGIN
 
 	DECLARE @ChargeRate AS TABLE (ChargeID INT, ProductId INT, BettypeRef INT, FromDate DATE, ToDate DATE)
 
-	DECLARE @ChargeSettingsDetails TABLE (ChargeId INT, ProductId INT, FromDate DATETIME, ToDate DATETIME, CurrencyId INT, Rate MONEY, IsChangedRate BIT DEFAULT(1))
-
 	INSERT INTO @ChargeSetting (ChargeID ,ProductId ,FirstBilling, BasisBilling, BettypeRef, Rate, ChargeType, FromDate, ToDate, StatusId)
 	SELECT	t.c.value('(ChargeId/text())[1]', 'INT') AS ChargeID,
 			t.c.value('(ProductId/text())[1]', 'INT') AS ProductId,
@@ -127,30 +105,14 @@ BEGIN
 	FROM @ChargeSettingsXML.nodes('ChargeSettings/ChargeSetting') AS t(c)
 	OPTION (OPTIMIZE FOR (@ChargeSettingsXML = NULL)) 
 
-	INSERT INTO @ChargeSettingsDetails (ChargeId, ProductId, FromDate, ToDate, CurrencyId, Rate)
-	SELECT	t.c.value('(ChargeId/text())[1]', 'INT') AS ChargeID,
-			t.c.value('(ProductId/text())[1]', 'INT') AS ProductId,	
-			t.c.value('(FromDate/text())[1]', 'DATE') AS FromDate,		
-			t.c.value('(ToDate/text())[1]', 'DATE') AS ToDate,	
-			t1.c.value('(CurrencyId/text())[1]', 'INT') AS CurrencyId,
-			t1.c.value('(Rate/text())[1]', 'MONEY') AS Rate
-	FROM @ChargeSettingsXML.nodes('ChargeSettings/ChargeSetting') AS t(c)
-	CROSS APPLY t.c.nodes('ChargeSettingByCurrencies/ChargeSettingByCurrency') t1(c)
-	OPTION (OPTIMIZE FOR (@ChargeSettingsXML = NULL)) 
-
 	UPDATE c
 		SET c.IsChangedRate = CASE WHEN c.Rate = ci.Rate THEN 0 ELSE 1 END
 			,c.IsChangedDate = CASE WHEN ci.FromDate <> c.FromDate OR ci.ToDate <> c.ToDate THEN 1 ELSE 0 END
 	FROM @ChargeSetting c
 		INNER JOIN dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.ChargeID = c.ChargeID
 
-	UPDATE c	
-		SET c.IsChangedRate = CASE WHEN c.Rate = r.Rate THEN 0 ELSE 1 END
-	FROM @ChargeSettingsDetails c 
-		INNER JOIN dbo.LA_ChargeRateByCurrency r WITH(NOLOCK) ON r.ChargeID = c.ChargeId AND r.CurrencyID = c.CurrencyId
-
 	-- check  0 < rate < 1
-	IF EXISTS (SELECT 1 FROM @ChargeSetting WHERE Rate < 0 OR Rate > 1) OR EXISTS (SELECT 1 FROM @ChargeSettingsDetails WHERE Rate < 0 OR  Rate > 1)
+	IF EXISTS (SELECT 1 FROM @ChargeSetting WHERE Rate < 0 OR Rate > 1)
 	BEGIN
 		SELECT 	@ErrMsg = 'Charge rate should bewteen 0% and 100%, update failed. Please try again.', @ErrCode = 702
 		RETURN
@@ -240,12 +202,6 @@ BEGIN
 					, ci.ChargeType			AS '@ct'
 					, ci.FromDate			AS '@fd'
 					, ci.ToDate				AS '@td'
-					,(
-						SELECT CurrencyId, Rate
-						FROM dbo.LA_ChargeRateByCurrency d
-						WHERE d.ChargeId = cs.ChargeID
-						FOR XML PATH('ChargeSettingByCurrency'), ROOT('ChargeSettingByCurrencies'), TYPE
-					)
 			FROM @ChargeSetting  cs
 				INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID
 			FOR XML PATH('z'), ROOT('r')
@@ -380,30 +336,6 @@ BEGIN
 						AND (l.ProductId  = p.ProductId  OR (l.ProductId IS NULL AND p.ProductId IS NULL)) 
 						AND l.InvTypeId = ivt.InvTypeId
 				)
-
-		--Update ChargeId
-		IF EXISTS (SELECT 1 FROM @ChargeSettingsDetails)
-		BEGIN
-			UPDATE d
-				SET d.ChargeId = c.ChargeID
-			FROM @ChargeSettingsDetails d
-				INNER JOIN @ChargeSetting c ON c.ProductID = d.ProductId AND c.FromDate = d.FromDate AND c.ToDate = d.ToDate 
-		
-			-- Insert charge rate by currency
-			INSERT INTO dbo.LA_ChargeRateByCurrency (ChargeID, CurrencyID, Rate)
-			SELECT ChargeId, CurrencyId, Rate 
-			FROM @ChargeSettingsDetails c
-			WHERE NOT EXISTS (
-				SELECT 1 FROM dbo.LA_ChargeRateByCurrency l WITH(NOLOCK) 
-				WHERE l.ChargeID = c.ChargeId AND l.CurrencyID = c.CurrencyId
-			)
-
-			--Delete charge rate by currency
-			DELETE l
-			FROM dbo.LA_ChargeRateByCurrency l WITH(ROWLOCK, UPDLOCK)
-			WHERE EXISTS (SELECT 1 FROM @ChargeSetting d WHERE d.ChargeID = l.ChargeID AND d.StatusId > 0)
-				AND NOT EXISTS (SELECT 1 FROM @ChargeSettingsDetails cd WHERE cd.ChargeId = l.ChargeID AND cd.CurrencyId = l.CurrencyID)
-		END
 		
 		SELECT @ChargeSettingXMLOUT = 
 		(
@@ -417,12 +349,6 @@ BEGIN
 					,ChargeType
 					,FromDate
 					,ToDate
-					,(
-						SELECT CurrencyId, Rate, IsChangedRate
-						FROM @ChargeSettingsDetails d
-						WHERE d.ChargeId = c.ChargeID
-						FOR XML PATH('ChargeSettingByCurrency'), ROOT('ChargeSettingByCurrencies'), TYPE
-					)
 					,IsChangedRate
 					,IsChangedDate
 				FROM @ChargeSetting	c	
@@ -470,12 +396,6 @@ BEGIN
 					, cs.ChargeType			AS '@ct'
 					, cs.FromDate			AS '@fd'
 					, cs.ToDate				AS '@td'
-					,(
-						SELECT CurrencyId, Rate
-						FROM @ChargeSettingsDetails d
-						WHERE d.ChargeId = cs.ChargeID
-						FOR XML PATH('ChargeSettingByCurrency'), ROOT('ChargeSettingByCurrencies'), TYPE
-					)
 			FROM @ChargeSetting  cs
 				LEFT JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID
 			FOR XML PATH('z'), ROOT('r')

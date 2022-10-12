@@ -1,4 +1,7 @@
 /*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+USE [bodb_licensee]
+GO
+
 ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
 	@NonOfficialPartyId		INT,
 	@LicenseeId				INT,
@@ -11,6 +14,7 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
 	@ProductIds				VARCHAR(1000)	= '',
 	@InvoiceLanguage		VARCHAR(7)		= '',
 	@ChargeInfoSettingData	NVARCHAR(MAX),
+	@MinFeeSettingData		NVARCHAR(MAX)	= '',
 	@UserId					INT,
 	@LoginIP				VARCHAR (50)	= '',
 	@NewPartyId				INT				= 0		OUTPUT,
@@ -53,6 +57,29 @@ AS
 									<ToDate>20500101</ToDate>
 								</ChargeInfoSetting>
 							</Root>'
+
+							@MinFeeSettingData = '<Root>
+								<MinFeeSetting>
+									<ProductId>0</ProductId>
+									<FeeTypeId>1</FeeTypeId>
+									<FeeAmount>5000</FeeAmount>
+									<BaseCurrencyID>6</BaseCurrencyID>
+									<FromDate>20190108</FromDate>
+									<ToDate>20500101</ToDate>
+									<MinFeeTerm>EUR 5,000 (Waived for the first 3 months after launched)</MinFeeTerm>
+									<Priority>1</Priority>
+								</MinFeeSetting>
+								<MinFeeSetting>
+									<ProductId>0</ProductId>
+									<FeeTypeId>2</FeeTypeId>
+									<FeeAmount></FeeAmount>
+									<BaseCurrencyID>6</BaseCurrencyID>
+									<FromDate>20190108</FromDate>
+									<ToDate>20190407</ToDate>
+									<MinFeeTerm></MinFeeTerm>
+									<Priority>2</Priority>
+								</MinFeeSetting>
+							</Root>'
 */
 BEGIN
 	SET NOCOUNT ON
@@ -70,11 +97,12 @@ BEGIN
 	DECLARE @ChargeInfoSettings	TABLE (ProductId INT, Rate MONEY, Remark NVARCHAR(400), BasisOfBilling NVARCHAR(500), ChargeType INT, FromDate DATE, ToDate DATE)
 	DECLARE @MinFeeSettings	TABLE (ProductId TINYINT, FeeTypeId TINYINT, FeeAmount MONEY, FromDate DATE, ToDate DATE, MinFeeTerm NVARCHAR(1000), [Priority] TINYINT, MonthOfDeduction TINYINT)
 	DECLARE @ChargeInfo TABLE (ChargeId INT, ProductId INT, ProductName VARCHAR(50), Rate MONEY, ChargeType INT, FromDate DATE, ToDate DATE, CurrencyId INT, SystemId INT, IsValid BIT DEFAULT(1))
-	DECLARE @AMF MONEY, @BillingGroupName NVARCHAR(50), @BillerId INT, @FirstDateOfMonth DATE, @SiteName VARCHAR(20) ='', @InputPT VARCHAR(MAX) = '', @ChargeRateXML XML, @Username VARCHAR(50)
+	DECLARE @AMF MONEY, @BillingGroupName NVARCHAR(50), @BillerId INT, @FirstDateOfMonth DATE
 	
 	-- Charge Rate, Min Fee
 	BEGIN TRY
 		DECLARE @ChargeInfoSettingXML XML = CONVERT(XML, @ChargeInfoSettingData)
+		DECLARE @MinFeeSettingXML XML = CONVERT(XML, @MinFeeSettingData)
 		
 		INSERT INTO @ChargeInfoSettings (ProductId, Rate, Remark, BasisOfBilling, ChargeType, FromDate, ToDate)
 		SELECT
@@ -87,9 +115,21 @@ BEGIN
 			,t.c.value('(ToDate/text())[1]', 'DATE')					AS ToDate
 		FROM @ChargeInfoSettingXML.nodes('Root/ChargeInfoSetting') t(c)
 		OPTION (OPTIMIZE FOR (@ChargeInfoSettingXML = NULL))
+
+		INSERT INTO @MinFeeSettings (ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority])
+		SELECT
+			t.c.value('(ProductId/text())[1]', 'INT')					AS ProductId
+			,t.c.value('(FeeTypeId/text())[1]', 'TINYINT')				AS FeeTypeId
+			,t.c.value('(FeeAmount/text())[1]', 'MONEY')				AS FeeAmount
+			,t.c.value('(FromDate/text())[1]', 'DATE')					AS FromDate
+			,t.c.value('(ToDate/text())[1]', 'DATE')					AS ToDate
+			,t.c.value('(MinFeeTerm/text())[1]', 'NVARCHAR(1000)')		AS MinFeeTerm
+			,t.c.value('(Priority/text())[1]', 'TINYINT')				AS [Priority]
+		FROM @MinFeeSettingXML.nodes('Root/MinFeeSetting') t(c)
+		OPTION (OPTIMIZE FOR (@MinFeeSettingXML = NULL))
 	END TRY
 	BEGIN CATCH
-		SELECT @ErrMsg = 'Charge info setting data invalid. Please try again.', @ErrCode =  501
+		SELECT @ErrMsg = 'Charge info/Min fee setting data invalid. Please try again.', @ErrCode =  501
 		RETURN
 	END CATCH
 
@@ -116,8 +156,6 @@ BEGIN
 
 	INSERT INTO @Products (ProductId)
 	SELECT value FROM STRING_SPLIT(@ProductIds, ',')
-
-	SELECT @Username = Username FROM LA_User WITH(NOLOCK) WHERE UserID = @UserID 
 
 	SELECT @FirstDateOfMonth = DATEADD(MONTH, DATEDIFF(MONTH, 0, @LaunchDate), 0)
 
@@ -192,8 +230,8 @@ BEGIN
 
 		-- OAS_ChargeInfo
 		INSERT INTO dbo.OAS_ChargeInfo (ProductID, FromParty, ToParty, ParentChargeID, Rate, Remark, BasisOfBilling, ChargeType, FirstOfBilling, FromDate, ToDate, BaseCurrencyId)
-			OUTPUT INSERTED.ChargeID, INSERTED.ProductID, inserted.Rate, inserted.ChargeType, inserted.FromDate, inserted.ToDate, 2, 0
-				INTO @ChargeInfo (ChargeID, ProductId, Rate, ChargeType, FromDate, ToDate, SystemId, CurrencyId)
+		OUTPUT INSERTED.ChargeID, INSERTED.ProductID, inserted.Rate, inserted.ChargeType, inserted.FromDate, inserted.ToDate, 2, 0 
+			INTO @ChargeInfo (ChargeID, ProductId, Rate, ChargeType, FromDate, ToDate, SystemId, CurrencyId)
 		SELECT ProductId, @NewPartyId, @BillingGroupId, 0, Rate, Remark, BasisOfBilling, ChargeType, FromDate, FromDate, ToDate, @BaseCurrencyId
 		FROM @ChargeInfoSettings
 
@@ -309,6 +347,7 @@ BEGIN
 
 		DELETE dbo.OAS_PartyBaseCurrency WHERE PartyId = @NewPartyId
 		DELETE dbo.OAS_ChargeInfo WHERE FromParty = @NewPartyId
+		DELETE dbo.LA_MinFee WHERE PartyID = @NewPartyId
 		DELETE dbo.LA_InvoiceSetting WHERE FromPartyId = @NewPartyId
 		DELETE dbo.LA_UserParty WHERE PartyId = @NewPartyId
 		DELETE dbo.LA_FunctionParty WHERE PartyId = @NewPartyId
@@ -317,19 +356,23 @@ BEGIN
 		RETURN
 	END CATCH
 
-	--Update NAP PT
-	DECLARE @CurrentDate DATE = CONVERT(DATE, GETDATE())
+	--Update PT
+	DECLARE @CurrentDate DATE = CONVERT(DATE, GETDATE()), @SiteName VARCHAR(20) ='', @InputPT VARCHAR(MAX) = '', @Username VARCHAR(50)
+
+	DELETE @ChargeInfo WHERE SystemId = 4
+
+	SELECT @Username = Username FROM dbo.LA_User WITH(NOLOCK) WHERE UserID = @UserID 
 
 	UPDATE @ChargeInfo
 		SET IsValid = 0
 	WHERE @CurrentDate NOT BETWEEN FromDate AND ToDate
-
-	DELETE FROM @ChargeInfo WHERE ProductId IN (14, 17) OR  ToDate < @CurrentDate
 	
 	SELECT @SiteName = l.LicenseeName
 	FROM dbo.OAS_Party p WITH(NOLOCK)
 		INNER JOIN dbo.Licensees l WITH(NOLOCK) ON p.OldRefID = l.LicenseeID
 	WHERE l.IsDeposit = 1 AND p.PartyID = @NewPartyId
+
+	DELETE FROM @ChargeInfo WHERE ProductId IN (14, 17) OR  ToDate < @CurrentDate OR @SiteName IN ('CandyA18', 'HX9Candy')
 
 	UPDATE c
 		SET c.ProductId = CASE WHEN c.ProductId = 0 THEN 1 ELSE p.ProductId END, c.ProductName = CASE WHEN c.ProductId = 0 THEN 'Sportsbook' ELSE pr.ProductName END
@@ -337,38 +380,17 @@ BEGIN
 		LEFT JOIN dbo.Product3rd pr WITH(NOLOCK) ON pr.Productid = c.ProductId
 		LEFT JOIN DBPRO.bodb02.dbo.Products p WITH (NOLOCK) ON p.ProductPrefix = pr.ProductPrefix
 
-	--Not update PT for SA Gaming Tips Amt Due	
-	IF EXISTS (SELECT 1 FROM @ChargeInfo WHERE ProductId = 39)
-	BEGIN
-		DELETE c
-		FROM @ChargeInfo c
-		WHERE EXISTS (
-			SELECT 1 FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
-			WHERE ci.ChargeID = c.ChargeID AND ci.ChargeType = 12 --  Tips Amt Due
-		) AND c.ProductId = 39
-	END
-
-	/*Delete prevent updating unexpected NAP PT value*/
-	/*Sportsbook charge rate > 12% (exclude 9wickets licensee) or CandyA18, HX9Candy licensee*/
 	UPDATE c
 		SET c.Rate = -1
 	FROM @ChargeInfo c 
-	WHERE c.ProductId = 1 AND (c.Rate > 0.12 AND @SiteName <> '9wickets') OR @SiteName IN ('CandyA18', 'HX9Candy')
+	WHERE c.ProductId = 1 AND (c.Rate > 0.12 AND @SiteName <> '9wickets')
 
-	/*2.new charge rate is same as same charge rate*/
-	DELETE c
-	FROM @ChargeInfo C
-	WHERE NOT EXISTS (SELECT 1 FROM @ChargeInfo r WHERE r.ChargeID = c.ChargeID AND r.Rate <> -1)
-		AND c.IsValid = 1
-		
-	/*2.Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0 or CandyA18, HX9Candy licensee%*/
+	/*Delete prevent updating unexpected NAP PT value*/
+	/*.new charge rate is same as same charge rate*/
 	DELETE c
 	FROM @ChargeInfo c
-	WHERE EXISTS (
-		SELECT 1 FROM @ChargeInfo r 
-		WHERE r.ChargeID = c.ChargeID 
-			AND ((((r.Rate > 0.12 AND @SiteName <> '9wickets') OR r.Rate = 0) AND c.ProductId = 1) OR @SiteName IN ('CandyA18', 'HX9Candy'))
-		)
+		LEFT JOIN dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.ChargeID = c.ChargeId AND c.ProductId = 39 AND ci.ChargeType = 12 --  Tips Amt Due
+	WHERE (NOT EXISTS (SELECT 1 FROM @ChargeInfo r WHERE r.ChargeID = c.ChargeID AND r.Rate <> -1) AND c.IsValid = 1) OR ci.ChargeID IS NOT NULL
 
 	SELECT @InputPT = CONVERT(VARCHAR(MAX), 
 	(
@@ -381,7 +403,7 @@ BEGIN
 		FOR XML PATH ('PT'), ROOT('ROOT')
 	))
 
-	IF @SiteName NOT IN ('', 'CandyA18', 'HX9Candy') AND ISNULL(@InputPT, '') <> ''
+	IF ISNULL(@SiteName, '') <> '' AND ISNULL(@InputPT, '') <> ''
 	BEGIN
 		EXEC CustDB.dbo.Acc_Dep_LicenseeSetting_PTSettingUpd
 			@Site = @SiteName
@@ -393,22 +415,23 @@ BEGIN
 			,@ErrMsg = @ErrMsg OUTPUT
 	END
 
-	IF (@ErrCode  <> 0 OR EXISTS (SELECT 1 FROM @ChargeInfo WHERE IsValid = 0)) AND @SiteName NOT IN  ('', 'CandyA18', 'HX9Candy')
+	IF (@ErrCode  <> 0 OR EXISTS (SELECT 1 FROM @ChargeInfo WHERE IsValid = 0)) AND ISNULL(@SiteName, '') <> '' 
 	BEGIN
 		IF @ErrCode <> 0
 		BEGIN
 			SELECT 	@ErrMsg = STUFF((SELECT ',' + ProductName
 					FROM @ChargeInfo 
 					WHERE IsValid = 1
-					FOR XML PATH('')), 1, 1, '') + ': '+ @ErrMsg + CHAR(13)
+					FOR XML PATH('')), 1, 1, '') + ': '+ @ErrMsg + '<br>'
 		END
 
-		SELECT @ErrMsg =  ISNULL(@ErrMsg, '') + ProductName + ': NAP PT update failed due to it''s not current charge rate' + CHAR(13)
+		SELECT @ErrMsg =  ISNULL(@ErrMsg, '') + ProductName + ': NAP PT update failed due to it''s not current charge rate' + '<br>'
 		FROM @ChargeInfo
 		WHERE IsValid = 0
 
 		SET @ErrCode = 0
 	END
+
 	-- Write log
 	SET @EndRun = GETDATE()
 	SET @Duration = DATEDIFF(MILLISECOND, @StartRun, @EndRun)
@@ -422,7 +445,8 @@ BEGIN
 						@LaunchDate			AS LaunchDate, 
 						@BillingGroupId		AS BillingGroupId,
 						@ProductIds			AS ProductIds, 
-						@ChargeInfoSettingData	AS ChargeInfoSettingData
+						@ChargeInfoSettingData	AS ChargeInfoSettingData,
+						@MinFeeSettingData	AS MinFeeSettingData
 						FOR XML PATH('')) 
 
 	EXEC CustDB.dbo.WriteLog_UserLog_UserControl_Wrapper

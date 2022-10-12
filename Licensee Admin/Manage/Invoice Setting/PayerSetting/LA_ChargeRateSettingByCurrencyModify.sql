@@ -155,7 +155,7 @@ BEGIN
 		SET @InputPT = ''
 	END
 	
-	IF @SiteName NOT IN ('', 'CandyA18', 'HX9Candy') AND ISNULL(@InputPT, '') <> '' 
+	IF ISNULL(@SiteName, '') <> '' AND ISNULL(@InputPT, '') <> '' 
 	BEGIN
 		IF EXISTS (SELECT 1 FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE ChargeID = @ChargeID AND @CurrentDate NOT BETWEEN FromDate AND ToDate)
 		BEGIN
