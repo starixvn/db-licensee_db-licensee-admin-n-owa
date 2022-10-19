@@ -27,5 +27,3 @@ BEGIN
 
 END
 GO
-
-SELECT * FROM Product3rd

@@ -170,7 +170,14 @@ BEGIN
 		INNER JOIN dbo.Licensees l WITH(NOLOCK) ON p.OldRefID = l.LicenseeID
 	WHERE l.IsDeposit = 1 AND p.PartyID = @PayerID
 
-	DELETE FROM @ChargeRate WHERE ProductId IN (14, 17) OR  ToDate < @CurrentDate OR @SiteName IN ('CandyA18', 'HX9Candy')
+	DELETE cr
+	FROM @ChargeRate cr
+	WHERE cr.ProductId IN (14, 17, 3, 31, 10, 13, 16) OR  cr.ToDate < @CurrentDate OR @SiteName IN ('CandyA18', 'HX9Candy') 
+		OR EXISTS (
+			SELECT 1 
+			FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
+			WHERE ci.ChargeID = cr.ChargeID AND cr.ProductId = 39 AND ci.ChargeType = 12
+		)
 
 	UPDATE c
 		SET c.ProductId = CASE WHEN c.ProductId = 0 THEN 1 ELSE p.ProductId END, c.ProductName = CASE WHEN c.ProductId = 0 THEN 'Sportsbook' ELSE pr.ProductName END
@@ -198,12 +205,10 @@ BEGIN
 					 ELSE c.Rate END  
 	FROM @ChargeRate c 
 
-	/*2.new charge rate is same as same charge rate*/
 	/*Delete prevent updating unexpected NAP PT value*/
 	DELETE c
 	FROM @ChargeRate c
-		LEFT JOIN dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.ChargeID = c.ChargeID AND c.ProductId = 39 AND ci.ChargeType = 12 --  Tips Amt Due
-	WHERE (NOT EXISTS (SELECT 1 FROM @ChargeRate r WHERE r.ChargeID = c.ChargeID AND r.Rate <> -1) AND c.IsValid = 1) OR ci.ChargeID IS NOT NULL
+	WHERE NOT EXISTS (SELECT 1 FROM @ChargeRate r WHERE r.ChargeID = c.ChargeID AND r.Rate <> -1)
 	
 	SELECT @InputPT = CONVERT(VARCHAR(MAX), 
 	(

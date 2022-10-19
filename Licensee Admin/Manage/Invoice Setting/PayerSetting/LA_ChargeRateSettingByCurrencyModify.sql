@@ -57,7 +57,7 @@ BEGIN
 	END CATCH
 	EXEC sp_xml_removedocument @idoc
 
-	DECLARE @UserName VARCHAR(50) = '', @CurrentDate DATE = CONVERT(DATE, GETDATE()), @OldMasterRate MONEY
+	DECLARE @UserName VARCHAR(50) = '', @CurrentDate DATE = CONVERT(DATE, GETDATE()), @OldMasterRate MONEY, @ToDate DATETIME
 
 	SELECT @OldMasterRate = Rate FROM OAS_ChargeInfo WITH(NOLOCK) WHERE ChargeID = @ChargeID
 
@@ -115,9 +115,13 @@ BEGIN
 	END CATCH
 
 	-- Update PT on NAP
-	DECLARE @SiteName VARCHAR(20) = '', @ProductId INT, @ProductName VARCHAR(50), @InputPT VARCHAR(MAX) = ''
+	DECLARE @SiteName VARCHAR(20) = '', @ProductId INT, @Product3rdId INT, @ProductName VARCHAR(50), @InputPT VARCHAR(MAX) = ''
 
-	SELECT @ProductId = CASE WHEN ci.ProductID = 0  THEN 1 ELSE p.ProductID END, @ProductName = CASE WHEN ci.ProductId = 0 THEN 'Sportsbook' ELSE pr.ProductName END
+	SELECT 
+		@ProductId = CASE WHEN ci.ProductID = 0  THEN 1 ELSE p.ProductID END
+		,@ProductName = CASE WHEN ci.ProductId = 0 THEN 'Sportsbook' ELSE pr.ProductName END
+		,@Product3rdId = ci.ProductID
+		,@ToDate = ci.ToDate
 	FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
 		LEFT JOIN dbo.Product3rd pr WITH(NOLOCK) ON pr.Productid = ci.ProductID
 		LEFT JOIN DBPRO.bodb02.dbo.Products p WITH (NOLOCK) ON p.ProductPrefix = pr.ProductPrefix
@@ -130,12 +134,23 @@ BEGIN
 	WHERE ci.ChargeID = @ChargeID AND l.IsDeposit = 1
 	
 	/*Delete prevent updating unexpected NAP PT value*/
-	/*1.Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0 or CandyA18, HX9Candy licensees*/
+	DELETE c
+	FROM @ChargRateUpd c
+	WHERE @Product3rdId IN (14, 17, 3, 31, 10, 13, 16) OR @SiteName IN ('CandyA18', 'HX9Candy')
+		OR EXISTS (
+				SELECT 1 
+				FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
+				WHERE ci.ChargeID = c.ChargeID AND @Product3rdId = 39 AND ci.ChargeType = 12
+			)
+		OR @ToDate < @CurrentDate
+
+	/*not update Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0 or CandyA18, HX9Candy licensees*/
 	UPDATE c
 		SET c.Rate = -1
 	FROM @ChargRateUpd c
-	WHERE @ProductId = 1 AND (c.Rate > 0.12 AND @SiteName <> '9wickets') OR @SiteName IN ('CandyA18', 'HX9Candy')
-	/*2.new charge rate is same as same charge rate*/
+	WHERE @ProductId = 1 AND (c.Rate > 0.12 AND @SiteName <> '9wickets')
+		
+	/*delete new charge rate is same as same charge rate*/
 	DELETE c
 	FROM @ChargRateUpd c
 	WHERE NOT EXISTS (SELECT 1 FROM @ChargRateUpd WHERE Rate <> -1)
@@ -149,11 +164,6 @@ BEGIN
 		FROM @ChargRateUpd 
 		FOR XML PATH('PT'), ROOT('ROOT')
 	))
-
-	IF EXISTS (SELECT 1 FROM dbo.OAS_ChargeInfo WITH(NOLOCK) WHERE ChargeID = @ChargeID AND @CurrentDate > ToDate)
-	BEGIN
-		SET @InputPT = ''
-	END
 	
 	IF ISNULL(@SiteName, '') <> '' AND ISNULL(@InputPT, '') <> '' 
 	BEGIN

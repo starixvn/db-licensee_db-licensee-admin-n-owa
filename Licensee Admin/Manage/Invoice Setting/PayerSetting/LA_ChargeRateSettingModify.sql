@@ -240,7 +240,7 @@ BEGIN
 		UPDATE c SET c.ChargeID = ci.ChargeID
 		FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
 		INNER JOIN @MergeResult m ON m.ChargeId = ci.ChargeID
-		INNER JOIN @ChargeSetting c ON ci.ProductID = c.ProductId AND c.FromDate = ci.FromDate
+		INNER JOIN @ChargeSetting c ON ci.ProductID = c.ProductId AND c.FromDate = ci.FromDate AND c.ChargeType = ci.ChargeType 
 		WHERE m.[$action]='INSERT'
 		
 		-- update effective date for LicenseeProduct3rd
