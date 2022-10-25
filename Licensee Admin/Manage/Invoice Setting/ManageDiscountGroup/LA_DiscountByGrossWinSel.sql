@@ -13,6 +13,7 @@ AS
 	 Revisions:
 		- 20211101@Percy: Initialize SP [RedmineID: #162158]
 		- 20220812@Danny: Fix issue get wrong chargerate [RedmineID: #166504]
+		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 */
 
 BEGIN
@@ -36,7 +37,7 @@ BEGIN
 
 	-- Get gerenal info
 	INSERT INTO #DiscountGroup (DiscountGroupId, DiscountGroupName, FromDate, ToDate, CurrencyName, ProductId, ProductList, RepPartyId, PayerList)
-	SELECT h.DiscountGroupId, h.DiscountGroupName, h.FromDate, h.ToDate, ISNULL(e.Code, '') AS CurrencyName, p.ProductId, p.ProductName
+	SELECT h.DiscountGroupId, h.DiscountGroupName, h.FromDate, h.ToDate, ISNULL(CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END, '') AS CurrencyName, p.ProductId, p.ProductName
 		,rp.PartyId
 		,STUFF((
 			SELECT ', ' + ISNULL(NULLIF(pd.BrandName, ''), p.PartyName)

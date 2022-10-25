@@ -35,6 +35,7 @@ AS
 	  - 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
 	  - 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 	  - 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
+	  - 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 */
 
 BEGIN
@@ -42,7 +43,7 @@ BEGIN
 
 	DECLARE @FDate DATE = @FromDate, @TDate DATE = @ToDate, @BaseCurrency VARCHAR(10)
 
-	SELECT TOP 1 @BaseCurrency = Code
+	SELECT TOP 1 @BaseCurrency = CASE WHEN Code = 'UST' THEN 'USDT' ELSE Code END
 	FROM dbo.OAS_PartyBaseCurrency p WITH (NOLOCK)
 		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON p.BaseCurrencyId = e.exchangeid
 	WHERE p.PartyID = @PartyId AND p.FromDate <= @TDate AND p.ToDate >= @FDate

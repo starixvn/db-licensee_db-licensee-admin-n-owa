@@ -44,6 +44,7 @@ AS
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 		- 20220222@Danny: Allbet - Promotion integration [#167510]
 		- 20220506@Percy: Change way get discount group type [RedmineID: #1732342]
+		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 */
 
 BEGIN
@@ -60,7 +61,7 @@ BEGIN
 	SELECT TOP 1 @BaseCurrencyId = ISNULL(BaseCurrencyId, 6)
 	FROM dbo.OAS_PartyBaseCurrency WITH (NOLOCK) WHERE PartyId = @PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
 	
-	SELECT @BaseCurrencyName = Code FROM bodb02.dbo.Exchange WITH (NOLOCK) WHERE ExchangeId = @BaseCurrencyId
+	SELECT @BaseCurrencyName = CASE WHEN Code = 'UST' THEN 'USDT' ELSE Code END  FROM bodb02.dbo.Exchange WITH (NOLOCK) WHERE ExchangeId = @BaseCurrencyId
 	SELECT @BaseCurrency = @BaseCurrencyName
 
 	-- Check Base Currency Setting

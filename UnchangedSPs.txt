@@ -97,3 +97,8 @@ Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_Summary.sql
 Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_TurnOver.sql
 Licensee Admin\Report\Obsolete\LA_Rpt_3rdPartyProductWinloss.sql
 Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template3.sql
+Licensee Admin\Report\LA_Rpt_LicenseeBillingDataByProduct.sql
+Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_AmountToCompanySel.sql
+Licensee Admin\Invoice\LA_Inv_InvoiceListGet.sql
+Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_InvoiceSel.sql
+ 

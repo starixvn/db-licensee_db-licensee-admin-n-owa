@@ -409,7 +409,7 @@ BEGIN
 	END
 
 	INSERT INTO #Exchange(ExchangeDate, ExchangeId, Code, USD, EUR, MYR, GBP, CNY, USDT)
-	SELECT DISTINCT ExchangeDate, ExchangeId, Code, USD, EUR, MYR, GBP, CNY, USDT
+	SELECT DISTINCT ExchangeDate, ExchangeId, CASE WHEN ExchangeId = 142 THEN 'USDT' ELSE Code END Code, USD, EUR, MYR, GBP, CNY, USDT
 	FROM dbo.Lrf_f_GetExchangeDaily(@FromDate, @Todate)
 	WHERE ExchangeId IN (SELECT CurrencyID FROM #Report)
 
@@ -446,7 +446,7 @@ BEGIN
 	--Update Currency Name
 	DECLARE @CurrencyTable AS TABLE (currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
 	INSERT INTO @CurrencyTable(currency, CurrencyName, CurrencyCode)
-	SELECT t.CurrencyID, e.currency, e.Code
+	SELECT t.CurrencyID, e.currency, CASE WHEN t.CurrencyID = 142 THEN 'USDT' ELSE e.Code END Code
 	FROM (SELECT DISTINCT CurrencyID FROM #Report) t
 	INNER JOIN dbo.Exchange e WITH (NOLOCK) ON t.CurrencyID = e.exchangeid
 	
@@ -555,7 +555,7 @@ BEGIN
 			,SUM(AmtDueToBA * e.USDT) AS AmountDueToBAUSDT
 			,SUM(CommBA * e.USDT) AS BACommissionUSDT
 			,SUM(Company * e.USDT) AS AmountCompanyUSDT
-			,SUM(OddsSpreadCost * e.CNY) AS OddsSpreadCostUSDT
+			,SUM(OddsSpreadCost * e.USDT) AS OddsSpreadCostUSDT
 		FROM #Report b
 			INNER JOIN #Exchange e ON e.ExchangeDate = b.ReportDate AND e.ExchangeId = b.CurrencyID
 			INNER JOIN #Products p ON b.ProductID = p.ProductID AND b.ReportDate BETWEEN p.FromDate AND p.ToDate

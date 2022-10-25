@@ -25,6 +25,7 @@ AS
 		- 20211207@Percy: Return BrandName [RedmineID: #163800]
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 		- 20220506@Percy: Exclude Tier Rebate from Invoice [RedmineID: #1732342]
+		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -91,7 +92,7 @@ BEGIN
 
 		DECLARE @PartySettings TABLE (PartyId INT, LicenseeId INT, PartyName VARCHAR(50), BrandName VARCHAR(100), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50))
 		INSERT INTO @PartySettings (PartyId, LicenseeId, PartyName, BrandName, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage)
-		SELECT p.PartyId, p.OldRefId, p.PartyName, ISNULL(NULLIF(pd.BrandName, ''), p.PartyName), ISNULL(bc.BaseCurrencyId, 6), ISNULL(e.Code, 'EUR'), pd.InvoiceLanguage
+		SELECT p.PartyId, p.OldRefId, p.PartyName, ISNULL(NULLIF(pd.BrandName, ''), p.PartyName), ISNULL(bc.BaseCurrencyId, 6), ISNULL(CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END, 'EUR'), pd.InvoiceLanguage
 		FROM (SELECT DISTINCT PartyId FROM @InvoiceData) i
 			INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON p.PartyId = i.PartyId
 			LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyId = p.PartyId

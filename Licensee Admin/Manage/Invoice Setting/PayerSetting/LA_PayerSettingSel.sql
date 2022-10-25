@@ -33,6 +33,7 @@ AS
 		- 20210824@Danny: get licensee status from OIC And Relocated SP [#159296]
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
+		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 
 	Params:
 	+ @PayerId : 0 get all Party
@@ -114,7 +115,7 @@ BEGIN
 	SELECT t.PartyId, x.BaseCurrencyId, x.Code AS BaseCurrencyName
 	FROM t
 	CROSS APPLY (	
-				SELECT TOP 1 p.BaseCurrencyId,  e.Code
+				SELECT TOP 1 p.BaseCurrencyId,  CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END  Code
 				FROM OAS_PartyBaseCurrency p WITH(NOLOCK)
 				LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON p.BaseCurrencyId = e.exchangeid
 				WHERE p.PartyID = t.PartyId

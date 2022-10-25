@@ -15,6 +15,7 @@ AS
 		- 20181022@Parsons: Configure discount settings by currency [#99694]
 		- 20200225@Parsons: Support-HID-currency [#128856]
 		- 20200609@Mason: Special handling for INH market [#128570]
+		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 
 	 Params:
 
@@ -50,7 +51,7 @@ BEGIN
 		, h.DiscountGroupType
 		, h.DiscountGroupName
 		, c.exchangeid				AS CurrencyId
-		, c.Code					AS CurrencyName
+		, CASE WHEN c.Code = 'UST' THEN 'USDT' ELSE c.Code END AS CurrencyName
 		, h.FromDate
 		, h.ToDate
 		, @CalculationProductIds	AS CalculationProductIds
@@ -96,7 +97,9 @@ BEGIN
 	
 	INSERT INTO @CurrenciesOfLicensee(PartyId, CurrencyId, CurrencyCode, CurrencyName)
 	SELECT DISTINCT p.PartyId, lc.Currency, 
-					CASE WHEN lc.Currency = 92 THEN 'HID' ELSE e.Code END AS Code, 
+					CASE WHEN lc.Currency = 92 THEN 'HID' 
+					     WHEN lc.Currency = 142 THEN 'USDT'
+						ELSE e.Code END AS Code, 
 					CASE WHEN lc.Currency = 51 THEN 'VND' ELSE e.currency END AS CurrencyName
 	FROM dbo.LA_f_SelLicenseeCust(0) AS lc
 	INNER JOIN dbo.OAS_Party pp WITH (NOLOCK) ON lc.LicenseeID = pp.OldRefID 

@@ -13,6 +13,7 @@ AS
 	 
 	 Revisions:
 		- 20211101@Percy: Initialize SP [RedmineID: #162158]
+		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 */
 
 BEGIN
@@ -41,7 +42,7 @@ BEGIN
 
 	-- Gerenal info
 	SELECT h.DiscountGroupId, h.DiscountGroupName, h.FromDate, h.ToDate, h.ModifiedDate
-		,h.CurrencyId, e.Code AS CurrencyName
+		,h.CurrencyId, CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END AS CurrencyName
 		,CONVERT(VARCHAR(100), @ProductId) AS CalculationProductIds
 		,CONVERT(VARCHAR(100), @ProductId) AS DiscountProductIds
 		,@ProductName AS CalculationProductList
@@ -70,7 +71,7 @@ BEGIN
 	SELECT LicenseeId, Currency
 	FROM OPENQUERY(DBCUST, 'SELECT DISTINCT LicenseeId, Currency FROM bodb_Licensee.dbo.LA_f_SelLicenseeCust(0) WHERE Currency <> 20')
 	
-	SELECT pl.PartyId, cl.Currency AS CurrencyId, e.Code AS CurrencyName, ISNULL(c.CalculationType, 0) AS CalculationType
+	SELECT pl.PartyId, cl.Currency AS CurrencyId, CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END AS CurrencyName, ISNULL(c.CalculationType, 0) AS CalculationType
 	FROM @PartyList pl
 		INNER JOIN @CurrencyList cl ON pl.LicenseeId = cl.LicenseeId
 		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON cl.Currency = e.ExchangeId

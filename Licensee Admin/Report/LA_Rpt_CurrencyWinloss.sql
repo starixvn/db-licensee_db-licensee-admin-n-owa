@@ -58,6 +58,7 @@ AS
 	   - 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 	   - 20210824@Danny: filter licensee status from OIC [#159296]
 	   - 20220110@Danny: SG - Jackpot prize integration [#167089]
+	   - 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -157,7 +158,7 @@ BEGIN
 	SELECT DISTINCT PartyId FROM #tmpParty
 
 	UPDATE p
-	SET p.BaseCurrencyId = ISNULL(bc.BaseCurrencyId, 6), p.BaseCurrencyName = ISNULL(e.Code, 'EUR')
+	SET p.BaseCurrencyId = ISNULL(bc.BaseCurrencyId, 6), p.BaseCurrencyName = ISNULL(CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END, 'EUR')
 	FROM #PartyList p
 		LEFT JOIN bodb_licensee.dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON p.PartyId = bc.PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
 		LEFT JOIN dbo.Exchange e WITH (NOLOCK) ON bc.BaseCurrencyId = e.ExchangeId
@@ -426,6 +427,7 @@ BEGIN
 				WHEN 76 THEN 'PS'
 				WHEN 77 THEN 'PTH'
 				WHEN 92 THEN 'HID'
+				WHEN 142 THEN 'USDT'
 				ELSE e.Code END
 		FROM Exchange e WITH (NOLOCK)
 		WHERE e.ExchangeId IN (SELECT t.Currency FROM #tmpWinLoss t)

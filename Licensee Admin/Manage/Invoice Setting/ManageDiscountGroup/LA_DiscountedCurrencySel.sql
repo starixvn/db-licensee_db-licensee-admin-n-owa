@@ -16,6 +16,7 @@ AS
 		- 20200225@Parsons: Support-HID-currency [#128856]
 		- 20211101@Percy: Return applied currencies [RedmineID: #162158]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
+		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 
 	 Params:
 
@@ -29,7 +30,9 @@ BEGIN
 	
 	INSERT INTO @CurrenciesOfLicensee(CurrencyId, CurrencyCode, CurrencyName)
 	SELECT DISTINCT lc.Currency, 
-					CASE WHEN lc.Currency = 92 THEN 'HID' ELSE e.Code END AS Code, 
+					CASE WHEN lc.Currency = 92 THEN 'HID' 
+						 WHEN lc.Currency = 142 THEN 'USDT' 
+							ELSE e.Code END AS Code, 
 					CASE WHEN lc.Currency = 51 THEN 'VND' ELSE e.currency END AS CurrencyName
 	FROM dbo.LA_f_SelLicenseeCust(0) AS lc
 	INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON lc.LicenseeID = p.OldRefID 

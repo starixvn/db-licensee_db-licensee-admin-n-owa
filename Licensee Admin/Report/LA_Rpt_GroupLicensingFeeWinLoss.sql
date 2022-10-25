@@ -28,6 +28,7 @@ AS
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
+		- 20201003@Danny: Support USDT as base currency [RedmineID: #177718]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -59,7 +60,7 @@ BEGIN
 		SELECT DISTINCT PartyId FROM @ChargeInfo
 
 		UPDATE pl
-		SET pl.BaseCurrencyId = ISNULL(bc.BaseCurrencyId, 6), pl.BaseCurrencyName = ISNULL(e.Code, 'EUR')
+		SET pl.BaseCurrencyId = ISNULL(bc.BaseCurrencyId, 6), pl.BaseCurrencyName = ISNULL(CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END , 'EUR')
 			,pl.PartyName = CASE p.PartyName
 								WHEN '18bb' THEN 'PIH'
 								WHEN 'IBC'	THEN 'FDL'
@@ -157,13 +158,14 @@ BEGIN
 	-- Return data
 	DECLARE @Exchange TABLE (CurrencyId INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20), OriginalCurrencyCode VARCHAR(20))
 	INSERT INTO @Exchange (CurrencyId, CurrencyName, OriginalCurrencyCode, CurrencyCode)
-	SELECT ExchangeId, Currency, Code
+	SELECT ExchangeId, Currency, CASE WHEN Code = 'UST' THEN 'USDT' ELSE Code END
 		,CASE ExchangeId
 			WHEN 51 THEN 'INH'
 			WHEN 75 THEN 'PTU'
 			WHEN 76 THEN 'PS'
 			WHEN 77 THEN 'PTH'
 			WHEN 92 THEN 'HID' 
+			WHEN 142 THEN 'USDT' 
 			ELSE Code END
 	FROM bodb02.dbo.Exchange WITH (NOLOCK)
 	WHERE ExchangeId IN (SELECT CurrencyId FROM #tmpResult)

@@ -50,7 +50,7 @@ BEGIN
 		WHILE (@tmpDate <= @tmpToDate AND @tmpDate <= @todate)
 		BEGIN
 			INSERT INTO @tempDate (exchangedate, ExchangeId, Code, BaseCurrencyRate)--, MYR, USD, EUR, CNY, GBP, actualrate)
-			SELECT @tmpDate, t.ExchangeId, t.Code
+			SELECT @tmpDate, t.ExchangeId, CASE WHEN t.ExchangeId = 142 THEN 'USDT' ELSE t.Code END 
 				, CASE WHEN @BaseCurrency = 'MYR' THEN t.MYR
 					WHEN @BaseCurrency = 'USD' THEN t.USD
 					WHEN @BaseCurrency = 'EUR' THEN t.EUR
@@ -64,7 +64,7 @@ BEGIN
 					ELSE 1 END BaseCurrencyRate
 				--, MYR, USD, EUR, CNY, GBP, actualrate
 			FROM dbo.ExchangeDailyOanda t WITH (NOLOCK)
-			LEFT JOIN bodb02.dbo.ExchangeDaily_Crypto u WITH(NOLOCK) ON t.ExchangeDate = u.ExchangeDate AND t.ExchangeId = u.ExchangeId
+			LEFT JOIN dbo.ExchangeDaily_Crypto u WITH(NOLOCK) ON t.ExchangeDate = u.ExchangeDate AND t.ExchangeId = u.ExchangeId
 			WHERE t.ExchangeDate = @tmpToDate
 	
 			SET @tmpDate = DATEADD(dd,1,@tmpDate)

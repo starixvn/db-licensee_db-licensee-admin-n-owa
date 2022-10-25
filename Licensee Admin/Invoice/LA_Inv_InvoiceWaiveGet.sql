@@ -20,6 +20,7 @@ AS
 		- 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 		- 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
+		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 */
 
 BEGIN
@@ -28,7 +29,7 @@ BEGIN
 	DECLARE @PartyIds VARCHAR(20), @ProductId INT, @BaseCurrencyName VARCHAR(20) = 'EUR'
 	SELECT  @PartyIds = CONVERT(VARCHAR(20), @PartyId), @ProductId = ProductId FROM dbo.LA_f_Products3rd(@ProductCode)
 
-	SELECT @BaseCurrencyName = e.Code
+	SELECT @BaseCurrencyName = CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END
 	FROM dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK)
 		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON bc.BaseCurrencyId = e.ExchangeId
 	WHERE bc.PartyId = @PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
