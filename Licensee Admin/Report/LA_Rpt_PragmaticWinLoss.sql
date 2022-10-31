@@ -23,6 +23,7 @@ AS
 		- 20210112@Mason: Fix bug : Pay to Supplier is incorrect with other based currency [#147375]
 		- 20211216@Danny: Get bettype from SportBettypeMaxtrix dynamically  [Redmine: #166158]
 		- 20220407@Percy: Return LicenseeContribution & FullContribution [RedmineID: #171190]
+		- 20221031@Danny: PP Tournament for Credit licensee [RedmineID: #178619]
 
 	 Params:
 
@@ -498,7 +499,7 @@ BEGIN
 								INNER JOIN cte_TempData r2 ON r2.PartyID = roc.PartyId
 								INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@ToDate, @ToDate, @BaseCurrencyName) e ON @CreditBaseCurrencyId = e.ExchangeID 
 								INNER JOIN cte_TotalAmountByParty_BasedOn_CreditCurrency r3 ON r3.PartyID = r2.PartyID
-							WHERE r1.PartyID = r2.PartyID)
+							WHERE r1.PartyID = r2.PartyID) - WinPrizeAmount
 						ELSE  PayToSupplier
 				  END AS PayToSupplier
 			FROM cte_TempData r1
