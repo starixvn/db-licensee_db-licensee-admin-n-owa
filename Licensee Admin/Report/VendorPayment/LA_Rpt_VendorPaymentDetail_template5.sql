@@ -12,6 +12,7 @@ AS
  * Task  : Vendor Payment Detail (template5 - Template for PP including some specific info such as: Promotion, Jackpot)
  * Revisions
 	- 20210615@Danny: Initialize SP [#168387]
+	- 20221031@Danny: PP Tournament for Credit licensee [RedmineID: #178619]
  */
 
 BEGIN
@@ -617,7 +618,7 @@ BEGIN
 								INNER JOIN cte_TempData r2 ON r2.PartyID = roc.PartyId
 								INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@ToDate, @ToDate, @BaseCurrencyName) e ON @CreditBaseCurrencyId = e.ExchangeID 
 								INNER JOIN cte_TotalAmountByParty_BasedOn_CreditCurrency r3 ON r3.PartyID = r2.PartyID
-							WHERE r1.PartyID = r2.PartyID)
+							WHERE r1.PartyID = r2.PartyID) - WinPrizeAmount
 						ELSE  PayToSupplier
 					END AS PayToSupplier
 			FROM cte_TempData r1
