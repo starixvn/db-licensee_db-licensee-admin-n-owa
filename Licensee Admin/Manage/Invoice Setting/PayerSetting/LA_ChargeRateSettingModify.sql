@@ -1,15 +1,13 @@
 /*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
-USE [bodb_licensee]
-GO
-
 ALTER PROCEDURE [dbo].[LA_ChargeRateSettingModify]
 	@PayerID				INT
-	, @ChargeSettingXML		NVARCHAR (MAX)
-	, @UserID				INT
-	, @LoginIP				VARCHAR (50)	= ''
-	, @ErrCode				INT				= 0		OUTPUT
-	, @ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
-	, @ErrorPair			NVARCHAR(1000)	= ''	OUTPUT
+	,@ChargeSettingXML		NVARCHAR (MAX)
+	,@UserID				INT
+	,@LoginIP				VARCHAR (50)	= ''
+	,@ErrCode				INT				= 0	 OUTPUT
+	,@ErrMsg				NVARCHAR(1000)	= '' OUTPUT
+	,@ErrorPair			    NVARCHAR(1000)	= '' OUTPUT
+	,@ChargeSettingXMLOUT	XML = NULL OUTPUT
 AS
 /*
 	 Created: 20150423@Florent
@@ -33,9 +31,10 @@ AS
 		- 20200417@Parsons: Indo 4D Integration [#130910]
 		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 		- 20211101@Percy: Don't add new SB Rate if Licensee is belong to discount group on Lic WL [RedmineID: #162158]
+		- 20220831@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
 
 	 Params:
-		+ @InvoiceSettingXML: '<ChargeSettings>
+		+ @ChargeSettingXML: '<ChargeSettings>
 								  <ChargeSetting>
 									<ChargeId>1</ChargeId>
 									<ProductId>1</ProductId>
@@ -59,10 +58,11 @@ AS
 									<ToDate>1</ToDate>
 								  </ChargeSetting>
 								</ChargeSettings>'
+								
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX),	@xml XML
+	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX),	@xml XML, @ChargeSettingsXML XML
 	DECLARE @ProductListAll		VARCHAR(500) = ''
 			, @MinDate			DATE
 			, @MaxDate			DATE
@@ -70,7 +70,10 @@ BEGIN
 
 	IF ISNULL(@ChargeSettingXML, '') = '' RETURN
 
-	DECLARE @ChargeSetting AS TABLE (
+	SELECT @ChargeSettingsXML = CONVERT(XML, @ChargeSettingXML)
+
+	DECLARE @ChargeSetting AS TABLE 
+	(
 		Idx				INT IDENTITY(1,1),
 		ChargeID		INT,
 		ProductId		INT,
@@ -81,38 +84,32 @@ BEGIN
 		ChargeType		INT,
 		FromDate		DATE,
 		ToDate			DATE,
-		StatusId		TINYINT)
+		StatusId		TINYINT,
+		IsChangedRate	BIT DEFAULT(1),
+		IsChangedDate	BIT DEFAULT(0)
+	)
 
-	DECLARE @ChargeRate AS TABLE (
-		ChargeID	INT,
-		ProductId	INT,
-		BettypeRef	INT,
-		FromDate	DATE,
-		ToDate		DATE)
+	DECLARE @ChargeRate AS TABLE (ChargeID INT, ProductId INT, BettypeRef INT, FromDate DATE, ToDate DATE)
 
-	DECLARE @idoc AS INT
-	EXEC sp_xml_preparedocument @idoc OUTPUT, @ChargeSettingXML
-	BEGIN TRY
-		INSERT INTO @ChargeSetting(ChargeId, ProductId, FirstBilling, BasisBilling, BettypeRef, Rate, ChargeType, FromDate, ToDate, StatusId)
-		SELECT ISNULL(ChargeID, 0), ProductId, CASE WHEN FirstBilling='1900-01-01' THEN NULL ELSE FirstBilling END, BasisBilling, BettypeRef, Rate, ChargeType, FromDate, ToDate, 1/*new settings*/
-		FROM OPENXML(@idoc, 'ChargeSettings/ChargeSetting')
-		WITH (
-			 ChargeId		INT				'ChargeId'
-			, ProductId		INT				'ProductId'
-			, FirstBilling	DATE			'FirstBilling'
-			, BasisBilling	NVARCHAR(MAX)	'BasisBilling'
-			, BettypeRef	INT				'BettypeRef'
-			, Rate			MONEY			'Rate'
-			, ChargeType	INT				'ChargeType'
-			, FromDate		DATE			'FromDate'
-			, ToDate		DATE			'ToDate'
-		)
-	END TRY
-	BEGIN CATCH
-		SELECT @ErrMsg = 'There''s something wrong with Charge rate settings, update failed. Please try again.', @ErrCode = 701
-		RETURN
-	END CATCH
-	EXEC sp_xml_removedocument @idoc
+	INSERT INTO @ChargeSetting (ChargeID ,ProductId ,FirstBilling, BasisBilling, BettypeRef, Rate, ChargeType, FromDate, ToDate, StatusId)
+	SELECT	t.c.value('(ChargeId/text())[1]', 'INT') AS ChargeID,
+			t.c.value('(ProductId/text())[1]', 'INT') AS ProductId,
+			t.c.value('(FirstBilling/text())[1]', 'DATE') AS FirstBilling,
+			t.c.value('(BasisBilling/text())[1]', 'NVARCHAR(MAX)') AS BasisBilling,
+			t.c.value('(BettypeRef/text())[1]', 'INT') AS BettypeRef,
+			t.c.value('(Rate/text())[1]', 'MONEY') AS Rate,			
+			t.c.value('(ChargeType/text())[1]', 'INT') AS ChargeType,		
+			t.c.value('(FromDate/text())[1]', 'DATE') AS FromDate,		
+			t.c.value('(ToDate/text())[1]', 'DATE') AS ToDate,	
+			1 AS StatusId
+	FROM @ChargeSettingsXML.nodes('ChargeSettings/ChargeSetting') AS t(c)
+	OPTION (OPTIMIZE FOR (@ChargeSettingsXML = NULL)) 
+
+	UPDATE c
+		SET c.IsChangedRate = CASE WHEN c.Rate = ci.Rate THEN 0 ELSE 1 END
+			,c.IsChangedDate = CASE WHEN ci.FromDate <> c.FromDate OR ci.ToDate <> c.ToDate THEN 1 ELSE 0 END
+	FROM @ChargeSetting c
+		INNER JOIN dbo.OAS_ChargeInfo ci WITH(NOLOCK) ON ci.ChargeID = c.ChargeID
 
 	-- check  0 < rate < 1
 	IF EXISTS (SELECT 1 FROM @ChargeSetting WHERE Rate < 0 OR Rate > 1)
@@ -213,13 +210,13 @@ BEGIN
 
 		DECLARE @MergeResult TABLE(ChargeId INT, ProductId INT, [$action] VARCHAR(20))
 		DECLARE @ToParty INT, @ParentChargeID INT, @Remark VARCHAR(200) = ''
-
+		
 		SELECT TOP 1 @ToParty = c.ToParty, @ParentChargeID = c.ParentChargeID
 		FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
 			INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON c.ChargeID = cs.ChargeID AND cs.SystemID = 2
 		WHERE FromParty = @PayerID AND c.ToParty IN (1, 9, 11, 98)
 		ORDER BY FromDate DESC
-
+		
 		SET @Remark = @Remark + 'created date: ' + CONVERT(VARCHAR(20), GETDATE(), 101)
 
 		-- update charege info (product without bettype ref)
@@ -243,7 +240,7 @@ BEGIN
 		UPDATE c SET c.ChargeID = ci.ChargeID
 		FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
 		INNER JOIN @MergeResult m ON m.ChargeId = ci.ChargeID
-		INNER JOIN @ChargeSetting c ON ci.ProductID = c.ProductId AND c.FromDate = ci.FromDate
+		INNER JOIN @ChargeSetting c ON ci.ProductID = c.ProductId AND c.FromDate = ci.FromDate AND c.ChargeType = ci.ChargeType 
 		WHERE m.[$action]='INSERT'
 		
 		-- update effective date for LicenseeProduct3rd
@@ -292,6 +289,71 @@ BEGIN
 			SELECT 	@ErrMsg = 'Update failed. Please try again.', @ErrCode = 701
 			RETURN
 		END
+
+		/*Insert Invoice Setting*/
+		DECLARE @BillingGroupName NVARCHAR(50), @BillerId INT
+		SELECT @BillingGroupName = PartyName
+		FROM dbo.OAS_Party WITH(NOLOCK)
+		WHERE PartyId = @ToParty 
+		
+		SELECT @BillerId = PartyId
+		FROM dbo.LA_BillerInfo WITH(NOLOCK)
+		WHERE BillerName = CASE @BillingGroupName
+							WHEN 'Boping' THEN @BillingGroupName
+							WHEN 'Zelianta' THEN @BillingGroupName + ' Limited'
+							ELSE '' END
+
+		IF ISNULL(@BillerId, 0) <> 0
+			INSERT INTO dbo.LA_InvoiceSetting (FromPartyId, ToPartyId, ProductId, InvTypeId, InvTempId, BankId, ActiveAddress)
+			SELECT @PayerID, @BillerId, ProductId, InvTypeId, InvTemplateId, 0 AS BankId, 1 AS ActiveAddress
+			FROM (
+				SELECT InvTemplateId, InvTemplateName
+					,CASE InvTemplateName
+						WHEN @BillingGroupName THEN 1 -- Software Data & Licensing Fees
+						WHEN 'Credit' THEN 4 -- Credit Note
+						ELSE 5 -- Debit Note
+						END AS InvTypeId
+				FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
+				WHERE 1 = CASE InvTemplateName
+							WHEN @BillingGroupName THEN 1
+							WHEN 'Credit' THEN 1
+							WHEN 'Debit' + CASE WHEN @BillingGroupName = 'Zelianta' THEN '-Zelianta' ELSE '' END THEN 1
+							ELSE 0 END
+			) ivt
+				OUTER APPLY (
+					SELECT p.ProductId
+					FROM @ChargeSetting p
+						INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON p.ProductId = c.ProductId AND p.FromDate = c.FromDate
+					WHERE c.FromParty = @PayerID AND c.ToParty = @ToParty
+						AND ivt.InvTemplateName IN ('Boping', 'Zelianta')
+						AND p.StatusId > 0
+				) p
+			WHERE p.ProductId IS NOT NULL -- @BillingGroupId <> 0 for when lauching licensees
+				AND NOT EXISTS (
+					SELECT 1 FROM dbo.LA_InvoiceSetting l WITH(NOLOCK) 
+					WHERE l.FromPartyId = @PayerID 
+						AND l.ToPartyId = @BillerId 
+						AND (l.ProductId  = p.ProductId  OR (l.ProductId IS NULL AND p.ProductId IS NULL)) 
+						AND l.InvTypeId = ivt.InvTypeId
+				)
+		
+		SELECT @ChargeSettingXMLOUT = 
+		(
+				SELECT 
+					ChargeId
+					,ProductId
+					,FirstBilling
+					,BasisBilling
+					,BettypeRef
+					,Rate
+					,ChargeType
+					,FromDate
+					,ToDate
+					,IsChangedRate
+					,IsChangedDate
+				FROM @ChargeSetting	c	
+				FOR XML PATH ('ChargeSetting'), ROOT('ChargeSettings'), TYPE
+		)
 
 		-- update system mapping
 		INSERT INTO LA_ChargeInfo_SystemMapping (ChargeID, SystemID)
