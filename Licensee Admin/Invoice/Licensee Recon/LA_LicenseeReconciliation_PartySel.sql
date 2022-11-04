@@ -18,6 +18,7 @@ AS
 		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
 		- 20210901@Percy: Remove duplicate Party - Licensee Code [RedmineID: #161121]
 		- 20220218@Percy: Return SuspendedDate, TerminatedDate [RedmineID: #161429]
+		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -146,7 +147,7 @@ BEGIN
 		, l.ParentId
 		, l.LicenseeName
 		, l.BaseCurrencyId
-		, e.Code AS BaseCurrencyCode
+		, CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END AS BaseCurrencyCode
 		, ISNULL(UPPER(l.LicenseeCode), '') + ISNULL('|' + CONVERT(VARCHAR(50), l.PartyId), '') AS LicenseeCode
 		, ISNULL(l.StartDate, @defaultStartDate) AS StartDate
 		, ISNULL(l.EndDate, @defaultEndDate) AS EndDate

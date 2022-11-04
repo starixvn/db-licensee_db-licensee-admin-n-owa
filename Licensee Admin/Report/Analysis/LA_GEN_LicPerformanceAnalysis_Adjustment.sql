@@ -19,7 +19,9 @@ AS
 	Revisions:
 		- 20190312@Bruce: create SP [RedmineID: #105205]
 		- 20210323@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
-	   - 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
+	    - 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
+		- 20201003@Danny: Exclude Licensees that offer cryptocurrency [#FeatureID 177718]
+
 */
 BEGIN
 	SET NOCOUNT ON
@@ -34,7 +36,7 @@ BEGIN
 	DECLARE @InvItemType_SoftwareFee SMALLINT = 1
 	DECLARE @AdjustmentItemTypes TABLE(Id SMALLINT)
 	INSERT INTO @AdjustmentItemTypes(Id)
-	SELECT val FROM dbo.strSplit('10,11,12,13,14,17,20',',')
+	SELECT value FROM STRING_SPLIT('10,11,12,13,14,17,20',',')
 
 	-- base currency list
 	--
@@ -44,6 +46,10 @@ BEGIN
 
 	-- party list
 	--
+	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT)
+	INSERT INTO @tmpPartyOfferCrypto(PartyId)
+	SELECT  PartyID FROM LA_f_CryptoPartyListSel()
+
 	DECLARE @tmpPartyList TABLE(PartyId INT, SiteId INT, BaseCurrencyId INT)
 	INSERT INTO @tmpPartyList(PartyId,SiteId,BaseCurrencyId)
 	SELECT p.PartyID, p.OldRefID, ISNULL(pbc_2.BaseCurrencyId, 6)-- Default EUR
@@ -57,7 +63,7 @@ BEGIN
 		WHERE pbc.PartyID = p.PartyId AND @ReportDate BETWEEN FromDate AND ToDate
 		ORDER BY ToDate DESC
 	) pbc_2
-	WHERE p.PartyType = 1
+	WHERE p.PartyType = 1 AND p.PartyID NOT IN (SELECT x.PartyId FROM @tmpPartyOfferCrypto x)
 	-- if not overwrite old values then skip
 	--
 	DECLARE @Skip TABLE(SiteId INT)

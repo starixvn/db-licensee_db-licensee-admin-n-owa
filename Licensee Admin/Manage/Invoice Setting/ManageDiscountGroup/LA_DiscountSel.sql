@@ -12,6 +12,7 @@ AS
 	 Revisions:  
 		- 20180627@Parsons: Get discount groups info [#94282]
 		- 20211101@Percy: Support Discount on Lic WL - Do not show discount group from CutOffDate [RedmineID: #162158]
+		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 
 	 Params:
 
@@ -24,7 +25,7 @@ BEGIN
 
 	SELECT  h.DiscountGroupId, 
 			h.DiscountGroupName,
-			ISNULL(ex.Code, '') AS CurrencyName,
+			ISNULL(CASE WHEN ex.Code = 'UST' THEN 'USDT' ELSE ex.Code END, '') AS CurrencyName,
 			h.FromDate,
 			h.ToDate,
 			h.DiscountGroupType, 
@@ -59,7 +60,7 @@ BEGIN
 		AND h.ToDate < @CutOffDate
 	GROUP BY h.DiscountGroupId, 
 			h.DiscountGroupName,
-			ISNULL(ex.Code, ''),
+			ISNULL(CASE WHEN ex.Code = 'UST' THEN 'USDT' ELSE ex.Code END, ''),
 			h.FromDate,
 			h.ToDate,
 			h.DiscountGroupType

@@ -23,6 +23,7 @@ AS
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220506@Percy: Change way get discount group type [RedmineID: #1732342]
 		- 20220616@Percy: Remove paryers with invalid base currency setting [RedmineID: #172584]
+		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 */
 
 BEGIN
@@ -44,7 +45,7 @@ BEGIN
 		AND p.CalculationType IN (1, 10) -- 0 = calculated only, 1 = discount only, 10 = calculated & discount
 
 	UPDATE d
-	SET d.BaseCurrencyId = bc.BaseCurrencyId, d.BaseCurrencyName = e.Code, d.LicenseeCode = ISNULL(UPPER(bc.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), d.PartyId)
+	SET d.BaseCurrencyId = bc.BaseCurrencyId, d.BaseCurrencyName = CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END , d.LicenseeCode = ISNULL(UPPER(bc.LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), d.PartyId)
 	FROM @DiscountSetting d
 		LEFT JOIN dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON d.PartyId = bc.PartyId AND @ToDate BETWEEN bc.FromDate AND bc.ToDate
 		LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON bc.BaseCurrencyId = e.ExchangeId

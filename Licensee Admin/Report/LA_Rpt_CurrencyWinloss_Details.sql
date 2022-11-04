@@ -52,6 +52,7 @@ AS
 	   - 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 	   - 20210824@Danny: filter licensee status from OIC [#159296]
 	   - 20220110@Danny: SG - Jackpot prize integration [#167089]
+	   - 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 
 
 	Param's Explanation:
@@ -145,7 +146,7 @@ BEGIN
 	SELECT DISTINCT PartyId FROM #tmpParty
 
 	UPDATE p
-	SET p.BaseCurrencyId = ISNULL(bc.BaseCurrencyId, 6), p.BaseCurrencyName = ISNULL(e.Code, 'EUR')
+	SET p.BaseCurrencyId = ISNULL(bc.BaseCurrencyId, 6), p.BaseCurrencyName = ISNULL(CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END, 'EUR')
 	FROM #PartyList p
 		LEFT JOIN bodb_licensee.dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON p.PartyId = bc.PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
 		LEFT JOIN dbo.Exchange e WITH (NOLOCK) ON bc.BaseCurrencyId = e.ExchangeId
@@ -399,15 +400,16 @@ BEGIN
 
 	-- Exchange rate
 	BEGIN
-		CREATE TABLE #ExchangeRate (BaseCurrencyId INT, ExchangeDate DATETIME, ExchangeId INT, Code VARCHAR(20), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, Rate FLOAT)
-		INSERT INTO #ExchangeRate (ExchangeDate, ExchangeId, USD, EUR, MYR, GBP, Code)
-		SELECT ExchangeDate, ExchangeId, USD, EUR, MYR, GBP
+		CREATE TABLE #ExchangeRate (BaseCurrencyId INT, ExchangeDate DATETIME, ExchangeId INT, Code VARCHAR(20), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, USDT FLOAT, Rate FLOAT)
+		INSERT INTO #ExchangeRate (ExchangeDate, ExchangeId, USD, EUR, MYR, GBP, USDT, Code)
+		SELECT ExchangeDate, ExchangeId, USD, EUR, MYR, GBP, USDT
 			,CASE ExchangeId
 				WHEN 51 THEN 'INH'
 				WHEN 75 THEN 'PTU'
 				WHEN 76 THEN 'PS'
 				WHEN 77 THEN 'PTH'
 				WHEN 92 THEN 'HID'
+				WHEN 142 THEN 'USDT'
 				ELSE Code END
 		FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
 	END
@@ -420,6 +422,7 @@ BEGIN
 			,TurnoverUSD MONEY, WinlostUSD MONEY, LicenseeWLUSD MONEY, CommBAUSD MONEY, AmtDuetoBAUSD MONEY, CompanyUSD MONEY, PlayercommUSD MONEY, OddsSpreadCostUSD MONEY
 			,TurnoverEUR MONEY, WinlostEUR MONEY, LicenseeWLEUR MONEY, CommBAEUR MONEY, AmtDuetoBAEUR MONEY, CompanyEUR MONEY, PlayercommEUR MONEY, OddsSpreadCostEUR MONEY
 			,TurnoverGBP MONEY, WinlostGBP MONEY, LicenseeWLGBP MONEY, CommBAGBP MONEY, AmtDuetoBAGBP MONEY, CompanyGBP MONEY, PlayercommGBP MONEY, OddsSpreadCostGBP MONEY
+			,TurnoverUSDT MONEY, WinlostUSDT MONEY, LicenseeWLUSDT MONEY, CommBAUSDT MONEY, AmtDuetoBAUSDT MONEY, CompanyUSDT MONEY, PlayercommUSDT MONEY, OddsSpreadCostUSDT MONEY
 			,IsShowOddsSpread BIT
 			)
 
@@ -428,14 +431,15 @@ BEGIN
 			,TurnoverMYR, WinlostMYR, LicenseeWLMYR, CommBAMYR, AmtDuetoBAMYR, CompanyMYR, PlayercommMYR, OddsSpreadCostMYR
 			,TurnoverUSD, WinlostUSD, LicenseeWLUSD, CommBAUSD, AmtDuetoBAUSD, CompanyUSD, PlayercommUSD, OddsSpreadCostUSD
 			,TurnoverEUR, WinlostEUR, LicenseeWLEUR, CommBAEUR, AmtDuetoBAEUR, CompanyEUR, PlayercommEUR, OddsSpreadCostEUR
-			,TurnoverGBP, WinlostGBP, LicenseeWLGBP, CommBAGBP, AmtDuetoBAGBP, CompanyGBP, PlayercommGBP, OddsSpreadCostGBP)
+			,TurnoverGBP, WinlostGBP, LicenseeWLGBP, CommBAGBP, AmtDuetoBAGBP, CompanyGBP, PlayercommGBP, OddsSpreadCostGBP
+			,TurnoverUSDT, WinlostUSDT, LicenseeWLUSDT, CommBAUSDT, AmtDuetoBAUSDT, CompanyUSDT, PlayercommUSDT, OddsSpreadCostUSDT)
 		SELECT w.PartyId
 			,CASE
 				WHEN p.PartyName ='18bb' THEN 'PIH'
 				WHEN p.PartyName ='IBC' THEN 'FDL'
 				ELSE p.PartyName
 			END AS PartyName
-			,e.Code AS currencyName
+			,CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END AS currencyName
 			,SUM(w.Betcount) AS Betcount
 			-- Original
 			,SUM(w.TurnOver) AS Turnover
@@ -482,6 +486,15 @@ BEGIN
 			,SUM(w.Company * e.GBP) AS CompanyGBP
 			,SUM(w.Playercomm * e.GBP) AS PlayercommGBP
 			,SUM(w.OddsSpreadCost * e.GBP) AS OddsSpreadCostGBP
+			-- USDT
+			,SUM(w.TurnOver * e.USDT) AS TurnoverUSDT
+			,SUM(w.Winlost * e.USDT) AS WinlostUSDT
+			,SUM(w.LicenseeWL * e.USDT) AS LicenseeWLUSDT
+			,SUM(w.CommBA * e.USDT) AS CommBAUSDT
+			,SUM(w.AmtDuetoBA * e.USDT) AS AmtDuetoBAUSDT
+			,SUM(w.Company * e.USDT) AS CompanyUSDT
+			,SUM(w.Playercomm * e.USDT) AS PlayercommUSDT
+			,SUM(w.OddsSpreadCost * e.USDT) AS OddsSpreadCostUSDT
 		FROM #tmpWinLoss w
 			INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON p.PartyId = w.PartyId
 			INNER JOIN #ExchangeRate e ON w.Winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
@@ -515,6 +528,7 @@ BEGIN
 			,r.OddsSpreadCostUSD = CASE WHEN t.IsShowOddsSpread = 1 THEN r.OddsSpreadCostUSD ELSE 0 END
 			,r.OddsSpreadCostEUR = CASE WHEN t.IsShowOddsSpread = 1 THEN r.OddsSpreadCostEUR ELSE 0 END
 			,r.OddsSpreadCostGBP = CASE WHEN t.IsShowOddsSpread = 1 THEN r.OddsSpreadCostGBP ELSE 0 END
+			,r.OddsSpreadCostUSDT = CASE WHEN t.IsShowOddsSpread = 1 THEN r.OddsSpreadCostUSDT ELSE 0 END
 			,r.IsShowOddsSpread = t.IsShowOddsSpread
 		FROM #Result r
 			INNER JOIN (
@@ -533,6 +547,7 @@ BEGIN
 		,TurnoverUSD, WinlostUSD, LicenseeWLUSD, CommBAUSD, AmtDuetoBAUSD, CompanyUSD, PlayercommUSD, OddsSpreadCostUSD
 		,TurnoverEUR, WinlostEUR, LicenseeWLEUR, CommBAEUR, AmtDuetoBAEUR, CompanyEUR, PlayercommEUR, OddsSpreadCostEUR
 		,TurnoverGBP, WinlostGBP, LicenseeWLGBP, CommBAGBP, AmtDuetoBAGBP, CompanyGBP, PlayercommGBP, OddsSpreadCostGBP
+		,TurnoverUSDT, WinlostUSDT, LicenseeWLUSDT, CommBAUSDT, AmtDuetoBAUSDT, CompanyUSDT, PlayercommUSDT, OddsSpreadCostUSDT
 		,IsShowOddsSpread
 	FROM #Result
 	ORDER BY PartyId

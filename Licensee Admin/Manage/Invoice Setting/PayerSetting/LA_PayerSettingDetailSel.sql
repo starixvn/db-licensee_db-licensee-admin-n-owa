@@ -31,6 +31,7 @@ AS
 		- 20220118@Percy: Add Licensee Status Setting [RedmineID: #166751]
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
+		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 		
 	 Params:
 		+ @PayerId :specify Party
@@ -201,7 +202,7 @@ BEGIN
 		, pr.ProductName	AS ProductName
 		, FeeAmount
 		, CurrencyId
-		, e.Code			AS CurrencyName
+		, CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END AS CurrencyName
 		, REPLACE(MinFeeTerm,'&amp;','&') MinFeeTerm
 		, FromDate
 		, ToDate
@@ -236,7 +237,7 @@ BEGIN
 			pc.FromDate,
 			pc.ToDate,
 			pc.PartyID,
-			e.Code AS CurrencyName,
+			CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END AS CurrencyName,
 			CASE WHEN pc.ToDate < @CurrentDate THEN 0 ELSE 1 END AS IsActive
 	FROM OAS_PartyBaseCurrency pc
 	LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON pc.BaseCurrencyId = e.exchangeid

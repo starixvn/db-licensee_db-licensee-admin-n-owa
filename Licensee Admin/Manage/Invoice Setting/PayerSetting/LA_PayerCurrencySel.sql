@@ -13,6 +13,7 @@ AS
 	Revisions:
 		- 20191121@Parsons: Set terms by currency [#FeatureID 120005]
 		- 20200302@Parsons: Support-HID-currency [#128856]
+		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 
 	Params:
 	Example: EXEC [LA_PayerCurrencySel] 15
@@ -25,7 +26,9 @@ BEGIN
 	
 	INSERT INTO @Result(CurrencyId, CurrencyCode, CurrencyName)
 	SELECT DISTINCT lc.Currency,
-								CASE WHEN lc.Currency = 92 THEN 'HID' ELSE e.Code END AS Code, 
+								CASE WHEN lc.Currency = 92 THEN 'HID'
+									 WHEN lc.Currency = 142 THEN 'USDT'
+									ELSE e.Code END AS Code, 
 								CASE WHEN lc.Currency = 51 THEN 'VND' ELSE e.currency END AS CurrencyName
 	FROM dbo.f_SelLicenseeCust(@LicenseeID) AS lc
 	INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
