@@ -11,6 +11,7 @@ AS
 
 	Revisions:
 		- 20161109@Bruce: Initialize SP
+		- 20221109@Malcolm: add LicenseeCode, BaseCurrencyId [RedmineID : 175860]
 
 	Params:
 	Example:
@@ -30,13 +31,19 @@ BEGIN
 	--
 	-- 1000	: Non-Official Licensees
 
-	SELECT p.PartyID, p.PartyName, d.BrandName, 1000 AS ParentID
+	SELECT p.PartyID, p.PartyName, d.BrandName, 1000 AS ParentID, n.LicenseeCode, n.BaseCurrencyId AS BaseCurrency
 	FROM dbo.OAS_Party p WITH(NOLOCK)
-	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID = d.PartyID
+		INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID = d.PartyID
+		OUTER APPLY (
+			SELECT TOP(1) o.BaseCurrencyId, o.LicenseeCode
+			FROM dbo.OAS_PartyBaseCurrency o WITH(NOLOCK)
+			WHERE o.PartyID = p.PartyID
+			ORDER BY o.ToDate DESC
+		) AS n
 	WHERE p.PartyType = 5 -- 5: non-official licensee
 	
 	UNION ALL
 
-	SELECT 1000, 'Non-Official Licensees', '', 0
+	SELECT 1000, 'Non-Official Licensees', '', 0, '', 0
 END
 GO

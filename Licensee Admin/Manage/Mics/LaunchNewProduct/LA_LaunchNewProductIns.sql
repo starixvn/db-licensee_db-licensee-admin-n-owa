@@ -309,7 +309,7 @@ BEGIN
 		SELECT @ErrMsg = ISNULL(@ErrMsg, '') + PartyName + ': ' + ErrMsg + '<br>'
 		FROM @ErrorMessage
 
-		SELECT @ErrMsg = STUFF(@ErrMsg, LEN(@ErrMsg), 1, ''),  @ErrCode = 101
+		SELECT @ErrMsg = STUFF(@ErrMsg, LEN(@ErrMsg) - 3, 4, ''),  @ErrCode = 101
 	END
 
 	-- Write log

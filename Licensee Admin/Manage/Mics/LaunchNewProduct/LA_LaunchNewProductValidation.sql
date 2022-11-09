@@ -1,7 +1,7 @@
 /*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_LaunchNewProductValidation]
 	@ProductCode	 VARCHAR(10)
-	,@PlayerNameList NVARCHAR(MAX) 
+	,@PayerNameList NVARCHAR(MAX) 
 	,@ErrCode		 INT = 0 OUTPUT
 	,@ErrMsg		 NVARCHAR(1000) = '' OUTPUT
 AS
@@ -21,7 +21,7 @@ BEGIN
 	
 	DECLARE @ProductId INT
 	
-	SELECT @PlayerNameList = ISNULL(@PlayerNameList, '')
+	SELECT @PayerNameList = ISNULL(@PayerNameList, '')
 
 	SELECT @ProductId = p.ProductID
 	FROM dbo.LA_f_GroupProduct('',NULL,NULL) p
@@ -30,7 +30,7 @@ BEGIN
 	DECLARE @Party TABLE (PartyID INT, PartyName VARCHAR(100), InvoiceLanguage VARCHAR(7), ErrCode INT)
 
 	INSERT INTO @Party (PartyName)
-	SELECT DISTINCT RTRIM(LTRIM(value)) FROM STRING_SPLIT(@PlayerNameList, ',')
+	SELECT DISTINCT RTRIM(LTRIM(value)) FROM STRING_SPLIT(@PayerNameList, ',')
 
 	UPDATE p
 		 SET p.PartyID = op.PartyID
