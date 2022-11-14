@@ -33,6 +33,7 @@ AS
 		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
 		- 20220418@Percy: Add Credit note for AMF [RedmineID: #164139]
 		- 20220817@Danny: hardcode for N8B, N8G (charge Rate And Discount rate are same) [RedmineID: #175153]
+		- 20221115@Danny: get tier rebate rate by FromDate input [RedmineID: #180445]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -826,7 +827,7 @@ BEGIN
 					WHERE DiscountGroupType = 12
 					GROUP BY DiscountGroupId, ProductId
 				) a ON t.DiscountGroupId = a.DiscountGroupId AND t.ProductId = a.ProductId
-				INNER JOIN dbo.LA_f_TierRebateSetting() s ON t.BaseCurrencyId = s.BaseCurrencyId AND a.LicenseeWL BETWEEN s.FromAmount AND s.ToAmount
+				INNER JOIN dbo.LA_f_TierRebateSetting(@FromDate) s ON t.BaseCurrencyId = s.BaseCurrencyId AND a.LicenseeWL BETWEEN s.FromAmount AND s.ToAmount
 				INNER JOIN dbo.LA_DiscountGroupDetail dd WITH (NOLOCK) ON t.DiscountGroupId = dd.DiscountGroupId
 				INNER JOIN @PartyChargeInfo p ON t.PartyId = p.PartyId AND t.ProductId = p.ProductId AND p.BettypeRef = -1
 				LEFT JOIN @tmpDiscount d ON t.PartyId = d.PartyId AND t.ProductId = d.ProductId AND d.DiscountGroupType IN (1, 3, 11, 13)
