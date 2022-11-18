@@ -16,16 +16,17 @@ AS
 		- 20181003@Parsons: Integrate AG setup fee into invoices [RedmineID: #98485]
 		- 20190122@Parsons: Improve AG prepayment and discount setting [#104620] 
 		- 20190821@Parsons: Improve the ability to maintain systems [#118627]
+		- 20221109@Malcolm: add LicenseeCode, BaseCurrencyId [RedmineID : 175860]
 */
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @AGP INT = 25, @DeductAGP INT = 26, @WriteOff INT = 27
 
-	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT)
+	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, LicenseeCode VARCHAR(50), BaseCurrencyId TINYINT)
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionKey=@FunctionKey
 
-	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
+	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId, LicenseeCode, BaseCurrencyId)
 	EXEC dbo.LA_PartyListNonOfficialSel
 
 	-- Step 1: Get all invoiceStatement which has invItemTypeId in (25, 26)

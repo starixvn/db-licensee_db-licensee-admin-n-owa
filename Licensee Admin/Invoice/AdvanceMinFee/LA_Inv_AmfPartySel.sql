@@ -17,15 +17,17 @@ AS
 		- 20171226: create SP
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20190821@Parsons: Improve the ability to maintain systems [#118627]
+		- 20221109@Malcolm: add LicenseeCode, BaseCurrencyId [RedmineID : 175860]
+
 */
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, HasAmf BIT)
+	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, HasAmf BIT,LicenseeCode VARCHAR(50), BaseCurrencyId TINYINT)
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionKey=@FunctionKey
 
-	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
+	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId, LicenseeCode , BaseCurrencyId)
 	EXEC dbo.LA_PartyListNonOfficialSel
 
 	UPDATE p SET HasAmf = 1

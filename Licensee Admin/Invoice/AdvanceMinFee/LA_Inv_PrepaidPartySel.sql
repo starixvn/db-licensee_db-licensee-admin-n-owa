@@ -18,6 +18,7 @@ AS
 		- 20190122@Parsons: Improve AG prepayment and discount setting [#104620]
 		- 20190821@Parsons: Improve the ability to maintain systems [#118627]
 		- 20220418@Percy: Add Credit note for AMF [RedmineID: #164139]
+		- 20221109@Malcolm: add LicenseeCode, BaseCurrencyId [RedmineID : 175860]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -25,11 +26,11 @@ BEGIN
 	DECLARE @InvoiceItemTypes TABLE([Key] VARCHAR(50), [Value] INT)
 	DECLARE @AdvanceMinFee VARCHAR(50) = 'AdvanceMinFee', @Prepayment VARCHAR(50) = 'Prepayment', @AGPrepayment VARCHAR(50) = 'AGPrepayment'
 
-	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT)
+	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, LicenseeCode VARCHAR(50), BaseCurrencyId TINYINT)
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionKey=@FunctionKey
 
-	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
+	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId, LicenseeCode , BaseCurrencyId)
 	EXEC dbo.LA_PartyListNonOfficialSel
 
 	INSERT INTO @InvoiceItemTypes ([Key], [Value])
