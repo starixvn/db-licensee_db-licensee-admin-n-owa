@@ -18,20 +18,21 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20190821@Parsons: Improve the ability to maintain systems [#118627]
 		- 20220418@Percy: Add Credit note for AMF [RedmineID: #164139]
+		- 20221109@Malcolm: add LicenseeCode, BaseCurrencyId [RedmineID : 175860]
 */
 BEGIN
 	SET NOCOUNT ON
 
 	-- Get Party List
 	BEGIN
-		DECLARE @PartyList TABLE (PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT)
+		DECLARE @PartyList TABLE (PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, LicenseeCode VARCHAR(50), BaseCurrencyId TINYINT)
 
 		-- Official Licensees
 		INSERT INTO @PartyList (PartyId, PartyName, BrandName, ParentId)
 		EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionKey = @FunctionKey
 
 		-- Non-Official Licensees
-		INSERT INTO @PartyList (PartyId, PartyName, BrandName, ParentId)
+		INSERT INTO @PartyList (PartyId, PartyName, BrandName, ParentId, LicenseeCode, BaseCurrencyId)
 		EXEC dbo.LA_PartyListNonOfficialSel
 	END
 
