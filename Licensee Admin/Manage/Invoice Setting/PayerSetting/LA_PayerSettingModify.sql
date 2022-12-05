@@ -30,6 +30,7 @@ AS
 		- 20220118@Percy: Add Licensee Status Setting [RedmineID: #166751]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 		- 20220831@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
+		- 20221205@Danny: Remove Hx9candy From Crypto Licensee List [RedmineID: #181279]
 
 	 Params:	
 		+ @ChargeSettingXML:
@@ -165,6 +166,10 @@ BEGIN
 		SET IsValid = 0
 	WHERE @CurrentDate NOT BETWEEN FromDate AND ToDate
 
+	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT)
+	INSERT INTO @tmpPartyOfferCrypto(PartyId)
+	SELECT  PartyID FROM LA_f_CryptoPartyListSel()
+
 	SELECT @SiteName = l.LicenseeName
 	FROM dbo.OAS_Party p WITH(NOLOCK)
 		INNER JOIN dbo.Licensees l WITH(NOLOCK) ON p.OldRefID = l.LicenseeID
@@ -172,7 +177,7 @@ BEGIN
 
 	DELETE cr
 	FROM @ChargeRate cr
-	WHERE cr.ProductId IN (14, 17, 3, 31, 10, 13, 16) OR  cr.ToDate < @CurrentDate OR @SiteName IN ('CandyA18', 'HX9Candy') 
+	WHERE cr.ProductId IN (14, 17, 3, 31, 10, 13, 16) OR  cr.ToDate < @CurrentDate OR @PayerID IN (SELECT x.PartyId FROM @tmpPartyOfferCrypto x) 
 		OR EXISTS (
 			SELECT 1 
 			FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)

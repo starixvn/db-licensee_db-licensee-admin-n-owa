@@ -16,6 +16,7 @@ AS
 	 Revisions:
 		- 20191202@Parsons: Setup billing terms by Currency  [#120005]
 		- 20220831@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
+		- 20221205@Danny Remove Hx9candy From Crypto Licensee List [RedmineID: #181279]
 
 	 Params:
 		+ @DetailChargeRateSettingXml: '<ChargeSettings>
@@ -115,7 +116,11 @@ BEGIN
 	END CATCH
 
 	-- Update PT on NAP
-	DECLARE @SiteName VARCHAR(20) = '', @ProductId INT, @Product3rdId INT, @ProductName VARCHAR(50), @InputPT VARCHAR(MAX) = ''
+	DECLARE @SiteName VARCHAR(20) = '', @ProductId INT, @Product3rdId INT, @ProductName VARCHAR(50), @InputPT VARCHAR(MAX) = '', @PartyID INT
+	
+	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT)
+	INSERT INTO @tmpPartyOfferCrypto(PartyId)
+	SELECT  PartyID FROM LA_f_CryptoPartyListSel()
 
 	SELECT 
 		@ProductId = CASE WHEN ci.ProductID = 0  THEN 1 ELSE p.ProductID END
@@ -127,16 +132,16 @@ BEGIN
 		LEFT JOIN DBPRO.bodb02.dbo.Products p WITH (NOLOCK) ON p.ProductPrefix = pr.ProductPrefix
 	WHERE ci.ChargeID = @ChargeID
 
-	SELECT @SiteName = l.LicenseeName 
+	SELECT @SiteName = l.LicenseeName , @PartyID = p.PartyID
 	FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK) 
 		INNER JOIN dbo.OAS_Party p  WITH(NOLOCK) ON p.PartyID = ci.FromParty
 		INNER JOIN dbo.Licensees l WITH(NOLOCK) ON l.LicenseeID = p.OldRefID
 	WHERE ci.ChargeID = @ChargeID AND l.IsDeposit = 1
-	
+
 	/*Delete prevent updating unexpected NAP PT value*/
 	DELETE c
 	FROM @ChargRateUpd c
-	WHERE @Product3rdId IN (14, 17, 3, 31, 10, 13, 16) OR @SiteName IN ('CandyA18', 'HX9Candy')
+	WHERE @Product3rdId IN (14, 17, 3, 31, 10, 13, 16) OR @PartyID IN (SELECT x.PartyId FROM @tmpPartyOfferCrypto x)
 		OR EXISTS (
 				SELECT 1 
 				FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
@@ -144,7 +149,7 @@ BEGIN
 			)
 		OR @ToDate < @CurrentDate
 
-	/*not update Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0 or CandyA18, HX9Candy licensees*/
+	/*not update Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0 or CandyA18 licensees*/
 	UPDATE c
 		SET c.Rate = -1
 	FROM @ChargRateUpd c

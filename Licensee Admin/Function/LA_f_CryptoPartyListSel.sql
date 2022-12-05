@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee,DBCUST-bodb_Licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
 CREATE FUNCTION [dbo].[LA_f_CryptoPartyListSel]
 (
 )
@@ -7,7 +7,7 @@ AS
 
 /*
 	Created: 20221004@Danny
-	DB: DBLIC-bodb_Licensee
+	DB: DBLIC-bodb_Licensee, DBCUST-bodb_Licensee
 	Task: LA - Get Party List that support crypto currency
 
 	Revisions:
