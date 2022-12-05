@@ -11,10 +11,11 @@ AS
 	Task: LA - Get Party List that support crypto currency
 
 	Revisions:
-		20221004@Danny Initialize function [RedmineID: #177718]
+		- 20221004@Danny Initialize function [RedmineID: #177718]
+		- 20221205@Danny Remove Hx9candy From Crypto Licensee List [RedmineID: #181279]
 */
 RETURN
 	SELECT PartyId
 	FROM dbo.OAS_Party WITH (NOLOCK)
-	WHERE PartyName IN ('CandyA18','HX9Candy')
+	WHERE PartyName IN ('CandyA18')
 GO
