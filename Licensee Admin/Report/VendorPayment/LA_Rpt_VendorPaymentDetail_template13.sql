@@ -5,14 +5,27 @@ ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template13]
 	@FromDate			DATETIME,
 	@ToDate				DATETIME,
 	@BaseCurrencyName	VARCHAR(20),
+	@GameType			TINYINT,
+	@GroupBy			TINYINT,
 	@TimeZoneId			INT
 AS
 /*
- * Created by : [20220405@Danny]
- * Task  : Vendor Payment Detail (template13 - MacauGame)
- * Revisions
-	- 20210615@Danny: Initialize SP [#168387]
-	- 20220927@Danny: Remove DBLink [#176986] 
+	Created by : [20220405@Danny]
+	Task  : Vendor Payment Detail (template13 - MacauGame)
+	Revisions
+		- 20210615@Danny: Initialize SP [#168387]
+	        - 20220927@Danny: Remove DBLink [#176986] 
+		- 20221206@Malcolm: Separate data of Blueprint and Normal games for Macau Games product [RedmineId: #179006]
+	Param's Explanation:
+		+ @GroupBy :
+			- 0 : Licensee
+			- 1 : GameType
+			- 2 : Date 
+
+		+ @GameType :
+		  - 0 : all
+		  - 1 : Blueprint
+		  - 2 : NormalGame
  */
 
 BEGIN
@@ -58,7 +71,8 @@ BEGIN
 		LicenseeWinloss MONEY	DEFAULT 0,
 		LicensingFee	MONEY	DEFAULT 0,
 		PayToSupplier	MONEY	DEFAULT 0,
-		isDeposit		BIT
+		isDeposit		BIT,
+		GameType		TINYINT
 	)
 
 	 -- Exchange
@@ -100,10 +114,11 @@ BEGIN
 
 	-- Region: TempData 
 	BEGIN
-		INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee, PayToSupplier, isDeposit)
+		INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,GameType,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee, PayToSupplier, isDeposit)
 		SELECT	ci.PartyId,
 				b.rptDate,
 				b.CurrencyId,
+				CASE WHEN bp.BetType IS NOT NULL THEN 1 ELSE 2 END AS GameType,
 				SUM(b.Turnover) AS Turnover,
 				SUM(b.BetCount) AS TotalTrans,
 				SUM(b.WinLoss) AS CustomerWinLoss,
@@ -122,9 +137,9 @@ BEGIN
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 			b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
 			AND b.Bettype in (Select Bettype FROM LA_f_BettypeProductMapping(0,@ProductCode))
-		GROUP BY b.rptDate, ci.PartyId, b.CurrencyId, ci.isDeposit
-		
-		
+			AND (@GameType = 0 OR bp.Bettype IS NOT NULL AND @GameType = 1 OR bp.Bettype IS NULL AND @GameType = 2)
+		GROUP BY b.rptDate, ci.PartyId, b.CurrencyId, ci.isDeposit, CASE WHEN bp.BetType IS NOT NULL THEN 1 ELSE 2 END 
+
 	END
 	-- Region: Calculate result
 	CREATE TABLE #Result (
@@ -134,17 +149,18 @@ BEGIN
 		ParentName		VARCHAR(100),
 		WinLossDate		DATETIME,
 		CurrencyId		INT,
+		GameType		TINYINT,
 		TotalTrans		INT,
 		Turnover		MONEY,
 		CustomerWinLoss	MONEY,
 		LicenseeWinLoss	MONEY,
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY,
-		IsKeepNegativeAmount BIT
+		IsKeepNegativeAmount BIT	
 	)
 	
-	INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, PayToSupplier, IsKeepNegativeAmount)
-	SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.Winlostdate, td.CurrencyId, td.TotalTrans, td.Turnover, td.CustomerWinLoss, td.LicenseeWinloss, td.LicensingFee, td.PayToSupplier, p.IsKeepNegativeAmount
+	INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, GameType, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, PayToSupplier, IsKeepNegativeAmount)
+	SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.Winlostdate, td.CurrencyId, td.GameType, td.TotalTrans, td.Turnover, td.CustomerWinLoss, td.LicenseeWinloss, td.LicensingFee, td.PayToSupplier, p.IsKeepNegativeAmount
 	FROM #TempData td
 		INNER JOIN #PartyList p ON td.PartyId = p.PartyID
 		INNER JOIN #PartyList pa ON p.ParentId = pa.PartyId	
@@ -158,7 +174,8 @@ BEGIN
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY,
 		CompanyIncome	MONEY,
-		Currency		VARCHAR(20)
+		Currency		VARCHAR(20),
+		GameType		TINYINT
 	)
 
 	-- Region: Calculate Grand Total
@@ -190,6 +207,7 @@ BEGIN
 				SELECT  CASE WHEN  td.PartyId = 14 THEN 14 ELSE td.ParentId END ParentId, 
 						td.PartyId, 
 						td.IsKeepNegativeAmount,
+						td.GameType,
 						SUM(td.TotalTrans) TotalTrans,
 						SUM(td.Turnover * e.BaseCurrencyRate) Turnover,
 						SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss,
@@ -198,19 +216,18 @@ BEGIN
 						SUM(td.PayToSupplier * e.BaseCurrencyRate) PayToSupplier
 				FROM #Result td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e
 				ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
-				GROUP BY CASE WHEN  td.PartyId = 14 THEN 14 ELSE td.ParentId END, td.PartyId, td.IsKeepNegativeAmount
+				GROUP BY CASE WHEN  td.PartyId = 14 THEN 14 ELSE td.ParentId END, td.PartyId, td.IsKeepNegativeAmount, td.GameType
 			)
-			INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,CompanyIncome)
-			SELECT @tempCurrency,ParentId,
-				SUM(TotalTrans),
-				SUM(Turnover),
-				SUM(CustomerWinLoss),
-				SUM(LicenseeWinLoss),
-				SUM(CASE WHEN LicensingFee < 0 AND  @IsConvertNegativeFeeToZero = 1 AND  IsKeepNegativeAmount = 0 THEN 0 ELSE LicensingFee END),
-				SUM(CASE WHEN PayToSupplier < 0 AND @IsConvertNegativePaytoSupplierToZero = 1 THEN 0 ELSE PayToSupplier END),
-				SUM(CASE WHEN LicensingFee < 0 AND @IsConvertNegativeFeeToZero = 1 AND  IsKeepNegativeAmount = 0 THEN 0 ELSE LicensingFee END - CASE WHEN PayToSupplier < 0 AND @IsConvertNegativePaytoSupplierToZero = 1 THEN 0 ELSE PayToSupplier END)
+			INSERT INTO @Total (Currency,PartyId,GameType,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,CompanyIncome)
+			SELECT @tempCurrency,ParentId, GameType,
+				TotalTrans,
+				Turnover,
+				CustomerWinLoss,
+				LicenseeWinLoss,
+				CASE WHEN LicensingFee < 0 AND  @IsConvertNegativeFeeToZero = 1 AND  IsKeepNegativeAmount = 0 THEN 0 ELSE LicensingFee END,
+				CASE WHEN PayToSupplier < 0 AND @IsConvertNegativePaytoSupplierToZero = 1 THEN 0 ELSE PayToSupplier END,
+				CASE WHEN LicensingFee < 0 AND @IsConvertNegativeFeeToZero = 1 AND  IsKeepNegativeAmount = 0 THEN 0 ELSE LicensingFee END - CASE WHEN PayToSupplier < 0 AND @IsConvertNegativePaytoSupplierToZero = 1 THEN 0 ELSE PayToSupplier END
 			FROM TotalByParty
-			GROUP BY ParentId
 
 			INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome)
 			SELECT Currency,
@@ -235,22 +252,31 @@ BEGIN
 			CASE WHEN r.PartyId = 14 THEN '12Bet' ELSE r.ParentName END ParentName,
 			r.WinLossDate,
 			e.CurrencyCode AS CurrencyName,
+			CASE WHEN @GroupBy = 1 THEN r.GameType ELSE 0 END AS GameType,
 			-- Select by origin currency
-			r.TotalTrans,
-			r.Turnover AS TurnoverOriginal,
-			CAST((r.CustomerWinLoss) AS MONEY) AS CustomerWinLossOriginal,
-			CAST((r.LicenseeWinLoss) AS MONEY) AS LicenseeWinLossOriginal,
-			CAST((r.LicensingFee) AS MONEY) AS LicensingFeeOriginal,
-			CAST((r.PayToSupplier) AS MONEY) AS PayToSupplierOriginal,
-			r.LicensingFee - r.PayToSupplier AS CompanyIncomeOriginal,
+			SUM(r.TotalTrans) AS TotalTrans,
+			SUM(r.Turnover) AS TurnoverOriginal,
+			SUM(CAST((r.CustomerWinLoss) AS MONEY)) AS CustomerWinLossOriginal,
+			SUM(CAST((r.LicenseeWinLoss) AS MONEY)) AS LicenseeWinLossOriginal,
+			SUM(CAST((r.LicensingFee) AS MONEY)) AS LicensingFeeOriginal,
+			SUM(CAST((r.PayToSupplier) AS MONEY)) AS PayToSupplierOriginal,
+			SUM(r.LicensingFee - r.PayToSupplier) AS CompanyIncomeOriginal,
 			-- Select by base currency
-			r.Turnover * e.Rate AS Turnover,
-			CAST((r.CustomerWinLoss * e.Rate) AS MONEY) AS CustomerWinLoss,
-			CAST((r.LicenseeWinLoss * e.Rate) AS MONEY) AS LicenseeWinLoss,
-			CAST((r.LicensingFee * e.Rate) AS MONEY) AS LicensingFee,
-			CAST((r.PayToSupplier * e.Rate)AS MONEY) AS PayToSupplier,
-			CAST(((r.LicensingFee - r.PayToSupplier) * e.Rate)AS MONEY)  AS CompanyIncome
+			SUM(r.Turnover * e.Rate) AS Turnover,
+			SUM(CAST((r.CustomerWinLoss * e.Rate) AS MONEY)) AS CustomerWinLoss,
+			SUM(CAST((r.LicenseeWinLoss * e.Rate) AS MONEY)) AS LicenseeWinLoss,
+			SUM(CAST((r.LicensingFee * e.Rate) AS MONEY)) AS LicensingFee,
+			SUM(CAST((r.PayToSupplier * e.Rate)AS MONEY)) AS PayToSupplier,
+			SUM(CAST(((r.LicensingFee - r.PayToSupplier) * e.Rate)AS MONEY))  AS CompanyIncome
 		FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.WinLossDate = e.ExchangeDate
+		GROUP BY 
+			r.PartyId,
+			r.PartyName,
+			CASE WHEN r.PartyId = 14 THEN 14 ELSE r.ParentId END,
+			CASE WHEN r.PartyId = 14 THEN '12Bet' ELSE r.ParentName END,
+			r.WinLossDate,
+			e.CurrencyCode,
+			CASE WHEN @GroupBy = 1 THEN r.GameType ELSE 0 END 
 
 		;WITH totalByParty AS
 		(
@@ -292,15 +318,32 @@ BEGIN
 		-- Total
 		SELECT 
 			PartyId,
-			TotalTrans,
-			Turnover,
-			CustomerWinLoss,
-			LicenseeWinLoss,
-			LicensingFee,
-			PayToSupplier,
-			CompanyIncome
+			GameType,
+			SUM(TotalTrans)			AS TotalTrans,
+			SUM(Turnover)			AS Turnover,
+			SUM(CustomerWinLoss)	AS CustomerWinLoss,
+			SUM(LicenseeWinLoss)	AS LicenseeWinLoss,
+			SUM(LicensingFee)		AS LicensingFee,
+			SUM(PayToSupplier)		AS PayToSupplier,
+			SUM(CompanyIncome)		AS CompanyIncome
 		FROM @Total t
-		WHERE Currency = @BaseCurrencyName
+		WHERE Currency = @BaseCurrencyName AND @GroupBy = 1
+		GROUP BY PartyId, GameType
+		UNION ALL
+		SELECT 
+			PartyId,
+			0 AS GameType,
+			SUM(TotalTrans)			AS TotalTrans,
+			SUM(Turnover)			AS Turnover,
+			SUM(CustomerWinLoss)	AS CustomerWinLoss,
+			SUM(LicenseeWinLoss)	AS LicenseeWinLoss,
+			SUM(LicensingFee)		AS LicensingFee,
+			SUM(PayToSupplier)		AS PayToSupplier,
+			SUM(CompanyIncome)		AS CompanyIncome
+		FROM @Total t
+		WHERE Currency = @BaseCurrencyName 
+		GROUP BY PartyId
+		ORDER BY PartyId, GameType
 	-- End Region
 	END
 
