@@ -15,6 +15,7 @@ AS
 
 	Revisions:
 		- 20220919@Malcolm: Launch new Product [RedmineID: #175860]
+		- 20221205@Danny: Remove Hx9candy From Crypto Licensee List [RedmineID: #181279]
 		
 	Param's Explannation: 
 		+ @ChargeSettingsXML: '<ChargeSettings>
@@ -268,12 +269,12 @@ BEGIN
 			))
 		
 			/*Delete prevent updating unexpected NAP PT value*/
-			IF ((@Rate > 0.12 AND @SiteName <> '9wickets' OR @Rate = 0) AND @ProductId = 1) OR @SiteName IN ('CandyA18', 'HX9Candy') OR @Product3rdId IN (14, 17, 3, 31, 10, 13, 16) OR @ToDate < GETDATE() 
+			IF ((@Rate > 0.12 AND @SiteName <> '9wickets' OR @Rate = 0) AND @ProductId = 1) OR @SiteName IN ('CandyA18') OR @Product3rdId IN (14, 17, 3, 31, 10, 13, 16) OR @ToDate < GETDATE() 
 			BEGIN
 				SET @InputPT = ''
 			END
 
-			IF @SiteName NOT IN ('', 'CandyA18', 'HX9Candy') AND ISNULL(@InputPT, '') <> ''
+			IF @SiteName NOT IN ('', 'CandyA18') AND ISNULL(@InputPT, '') <> ''
 			BEGIN
 				IF @CurrentDate NOT BETWEEN @FromDate AND @ToDate
 				BEGIN
