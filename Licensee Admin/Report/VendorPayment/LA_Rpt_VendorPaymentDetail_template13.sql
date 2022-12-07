@@ -14,7 +14,7 @@ AS
 	Task  : Vendor Payment Detail (template13 - MacauGame)
 	Revisions
 		- 20210615@Danny: Initialize SP [#168387]
-	        - 20220927@Danny: Remove DBLink [#176986] 
+	    - 20220927@Danny: Remove DBLink [#176986] 
 		- 20221206@Malcolm: Separate data of Blueprint and Normal games for Macau Games product [RedmineId: #179006]
 	Param's Explanation:
 		+ @GroupBy :
@@ -331,7 +331,12 @@ BEGIN
 			,ParentName					
 			,CASE WHEN @GroupBy = 1 THEN @ToDate ELSE WinLossDate END AS WinLossDate				
 			,CASE WHEN @GroupBy = 1 THEN '' ELSE CurrencyName END AS CurrencyName				
-			,CASE WHEN @GroupBy = 1 THEN GameType ELSE 0 END AS GameType					
+			,CASE WHEN @GroupBy = 1 THEN GameType ELSE 0 END AS GameType	
+			,CASE CASE WHEN @GroupBy = 1 THEN GameType ELSE 0 END 
+				WHEN 0 THEN 'Total'
+				WHEN 1 THEN 'Blueprint'
+				WHEN 2 THEN 'Normal Games'
+			END AS GameTypeName										
 			,SUM(TotalTrans) AS	TotalTrans			
 			,SUM(TurnoverOriginal) AS TurnoverOriginal		
 			,SUM(CustomerWinLossOriginal) AS CustomerWinLossOriginal	
@@ -394,33 +399,30 @@ BEGIN
 	
 		-- Total
 		SELECT 
-			ParentId AS PartyId,
-			GameType,
-			SUM(TotalTrans)			AS TotalTrans,
-			SUM(Turnover)			AS Turnover,
-			SUM(CustomerWinLoss)	AS CustomerWinLoss,
-			SUM(LicenseeWinLoss)	AS LicenseeWinLoss,
-			SUM(LicensingFee)		AS LicensingFee,
-			SUM(PayToSupplier)		AS PayToSupplier,
-			SUM(CompanyIncome)		AS CompanyIncome
-		FROM @result t
-		WHERE @GroupBy = 1
-		GROUP BY ParentId, GameType
-		UNION ALL
-		SELECT 
-			PartyId,
-			0 AS GameType,
-			SUM(TotalTrans)			AS TotalTrans,
-			SUM(Turnover)			AS Turnover,
-			SUM(CustomerWinLoss)	AS CustomerWinLoss,
-			SUM(LicenseeWinLoss)	AS LicenseeWinLoss,
-			SUM(LicensingFee)		AS LicensingFee,
-			SUM(PayToSupplier)		AS PayToSupplier,
-			SUM(CompanyIncome)		AS CompanyIncome
-		FROM @Total t
-		WHERE Currency = @BaseCurrencyName 
-		GROUP BY PartyId
-		ORDER BY PartyId, GameType
+			PartyId
+			,GameType
+			,CASE GameType WHEN 1 THEN 'Blueprint'
+			               WHEN 2 THEN 'Normal Games' 
+						   WHEN 0 THEN 'Total'
+			 END AS GameTypeName
+			,SUM(TotalTrans) AS TotalTrans
+			,SUM(Turnover) AS Turnover
+			,SUM(CustomerWinLoss) AS CustomerWinLoss
+			,SUM(LicenseeWinLoss) AS LicenseeWinLoss
+			,SUM(LicensingFee) AS LicensingFee
+			,SUM(PayToSupplier) AS PayToSupplier
+			,SUM(CompanyIncome) AS CompanyIncome
+		FROM (
+			SELECT ParentId AS PartyId, GameType, TotalTrans, Turnover, CustomerWinLoss,LicenseeWinLoss, LicensingFee, PayToSupplier, CompanyIncome
+			FROM @result t
+			WHERE @GroupBy = 1
+			UNION ALL
+			SELECT PartyId, 0 AS GameType, TotalTrans,Turnover, CustomerWinLoss,LicenseeWinLoss, LicensingFee, PayToSupplier, CompanyIncome
+			FROM @Total t
+			WHERE Currency = @BaseCurrencyName 
+		) AS r
+		GROUP BY PartyId, GameType
+		ORDER BY PartyId, CASE WHEN r.GameType = 0 THEN 1000 ELSE r.GameType END ASC
 	-- End Region
 	END
 
