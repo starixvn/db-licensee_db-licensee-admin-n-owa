@@ -329,24 +329,31 @@ BEGIN
 			,PartyName					
 			,ParentId					
 			,ParentName					
-			,WinLossDate				
-			,CurrencyName				
-			,GameType					
-			,TotalTrans					
-			,TurnoverOriginal			
-			,CustomerWinLossOriginal	
-			,LicenseeWinLossOriginal	
-			,LicensingFeeOriginal		
-			,PayToSupplierOriginal		
-			,CompanyIncomeOriginal		
-			,Turnover					
-			,CustomerWinLoss			
-			,LicenseeWinLoss			
-			,LicensingFee				
-			,PayToSupplier				
-			,CompanyIncome		
+			,CASE WHEN @GroupBy = 1 THEN @ToDate ELSE WinLossDate END AS WinLossDate				
+			,CASE WHEN @GroupBy = 1 THEN '' ELSE CurrencyName END AS CurrencyName				
+			,CASE WHEN @GroupBy = 1 THEN GameType ELSE 0 END AS GameType					
+			,SUM(TotalTrans) AS	TotalTrans			
+			,SUM(TurnoverOriginal) AS TurnoverOriginal		
+			,SUM(CustomerWinLossOriginal) AS CustomerWinLossOriginal	
+			,SUM(LicenseeWinLossOriginal) AS LicenseeWinLossOriginal	
+			,SUM(LicensingFeeOriginal) AS LicensingFeeOriginal		
+			,SUM(PayToSupplierOriginal) AS PayToSupplierOriginal	
+			,SUM(CompanyIncomeOriginal) AS CompanyIncomeOriginal	
+			,SUM(Turnover) AS Turnover				
+			,SUM(CustomerWinLoss) AS CustomerWinLoss			
+			,SUM(LicenseeWinLoss) AS LicenseeWinLoss			
+			,SUM(LicensingFee) AS LicensingFee			
+			,SUM(PayToSupplier) AS PayToSupplier			
+			,SUM(CompanyIncome) AS CompanyIncome	
 		FROM @result
-		ORDER BY PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyName, GameType
+		GROUP BY PartyId, PartyName, ParentId, ParentName		
+			,CASE WHEN @GroupBy = 1 THEN @ToDate ELSE WinLossDate END
+			,CASE WHEN @GroupBy = 1 THEN '' ELSE CurrencyName END
+			,CASE WHEN @GroupBy = 1 THEN GameType ELSE 0 END		
+		ORDER BY PartyId, PartyName, ParentId, ParentName
+			,CASE WHEN @GroupBy = 1 THEN @ToDate ELSE WinLossDate END
+			,CASE WHEN @GroupBy = 1 THEN '' ELSE CurrencyName END
+			,CASE WHEN @GroupBy = 1 THEN GameType ELSE 0 END	
 
 		;WITH totalByParty AS
 		(
