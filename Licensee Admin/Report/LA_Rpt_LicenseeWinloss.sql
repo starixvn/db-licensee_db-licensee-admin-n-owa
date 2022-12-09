@@ -48,7 +48,8 @@ AS
 	- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 	- 20210824@Danny: filter licensee status from OIC [#159296]
 	- 20220110@Danny: SG - Jackpot prize integration [#167089]
-	- 20201003@Danny: Support USDT as base currency [RedmineID: #177718]
+	- 20201003@Danny: Support USDT as base currency [RedmineID: #177718
+	- 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]]
 	
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -481,6 +482,12 @@ BEGIN
 						WHEN 'USDT' THEN USDT
 						ELSE 1 
 					 END)
+		-- Fiat to Crypto
+		UPDATE e
+		SET USDT = 0
+		FROM #Exchange e 
+		INNER JOIN bodb02.dbo.Exchange ex ON e.ExchangeId = ex.ExchangeId AND ex.CurrencyType = 0
+
 	END
 	ELSE IF @IsConvert = 0 AND @Currency <> 0
 	BEGIN

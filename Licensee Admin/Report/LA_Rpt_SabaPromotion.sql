@@ -14,6 +14,7 @@ AS
  * Task  : Get Saba Promotion report
  * Revisions
 	- 20191017@Mason: Saba Promotion [#119538]
+	- 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]
 
  * Param's Explanation:
 	* PartyIds: a string of list PartyID, separate by ','
@@ -64,7 +65,7 @@ BEGIN
 	-- ** Offer Currency
 	DECLARE @OfferedCurrency AS TABLE (CurrencyId INT)
 	INSERT INTO @OfferedCurrency (CurrencyId)
-	SELECT e.ExchangeID FROM #Exchange e WHERE e.CurrencyCode IN ('CNY', 'THB', 'IDR', 'INH', 'MYR')
+	SELECT e.ExchangeID FROM #Exchange e WHERE e.CurrencyCode IN ('CNY', 'THB', 'IDR', 'INH', 'MYR', 'USD', 'USD (USDT)')
 	
 	-- ** Region: TempData
 	CREATE TABLE #TempData (
@@ -79,7 +80,7 @@ BEGIN
 		PromoDayTurnoverOrigin	MONEY,
 		PrizeRedeemed			MONEY,
 		PrizeRedeemedOrigin		MONEY,
-		CurrencyCode			VARCHAR(3))
+		CurrencyCode			VARCHAR(10))
 
 	-- Calculate for desposit
 	INSERT INTO #TempData (PartyID,PartyName,WinLossDate,NumberOfCoupon,NumberOfRedemption,NonPeakHourTrans,PromoDayTrans,PromoDayTurnover,PrizeRedeemed,PromoDayTurnoverOrigin,

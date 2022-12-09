@@ -53,6 +53,7 @@ AS
 	   - 20210824@Danny: filter licensee status from OIC [#159296]
 	   - 20220110@Danny: SG - Jackpot prize integration [#167089]
 	   - 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
+	   - 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]
 
 
 	Param's Explanation:
@@ -410,6 +411,7 @@ BEGIN
 				WHEN 77 THEN 'PTH'
 				WHEN 92 THEN 'HID'
 				WHEN 142 THEN 'USDT'
+				WHEN 96 THEN 'USD (USDT)'
 				ELSE Code END
 		FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
 	END

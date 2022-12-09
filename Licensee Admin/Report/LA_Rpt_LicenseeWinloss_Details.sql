@@ -48,6 +48,7 @@ AS
 	- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 	- 20220110@Danny: SG - Jackpot prize integration [#167089]
 	- 20201003@Danny: Support USDT as base currency [RedmineID: #177718]
+	- 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]
 
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -409,7 +410,11 @@ BEGIN
 	END
 
 	INSERT INTO #Exchange(ExchangeDate, ExchangeId, Code, USD, EUR, MYR, GBP, CNY, USDT)
-	SELECT DISTINCT ExchangeDate, ExchangeId, CASE WHEN ExchangeId = 142 THEN 'USDT' ELSE Code END Code, USD, EUR, MYR, GBP, CNY, USDT
+	SELECT DISTINCT ExchangeDate, ExchangeId, 
+			CASE WHEN ExchangeId = 142 THEN 'USDT'
+				WHEN ExchangeId = 96 THEN 'USD (USDT)'
+			ELSE Code END Code, 
+			USD, EUR, MYR, GBP, CNY, USDT
 	FROM dbo.Lrf_f_GetExchangeDaily(@FromDate, @Todate)
 	WHERE ExchangeId IN (SELECT CurrencyID FROM #Report)
 
@@ -436,7 +441,13 @@ BEGIN
 						WHEN 'USDT' THEN USDT
 						ELSE 1 
 					 END)
-	END
+
+		-- Fiat to Crypto
+		UPDATE e
+		SET USDT = 0
+		FROM #Exchange e 
+		INNER JOIN bodb02.dbo.Exchange ex ON e.ExchangeId = ex.ExchangeId AND ex.CurrencyType = 0
+		END
 	ELSE IF @IsConvert = 0
 	BEGIN
 		UPDATE #Exchange

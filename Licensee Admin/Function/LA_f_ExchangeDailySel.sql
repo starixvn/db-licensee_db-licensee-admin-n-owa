@@ -15,11 +15,12 @@ ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
 		- 20160920@Harper : Support HKD Base Currency
 		- 20170712@Harper: Support IDR Base Currency [RedmineID: #79309]
 		- 20180301@Harper: Support SGD as base currency [RedmineID: #91339] 
-		- 20201003@Danny: Support USDT as base currency [RedmineID: #177718]  
+		- 20221003@Danny: Support USDT as base currency [RedmineID: #177718]
+		- 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]
 
 	Param's Explanation:				
 */
-RETURNS @tempDate TABLE (exchangedate DATETIME, ExchangeId INT, Code VARCHAR(5)
+RETURNS @tempDate TABLE (exchangedate DATETIME, ExchangeId INT, Code VARCHAR(10)
 		, BaseCurrencyRate FLOAT
 		--, MYR FLOAT, USD FLOAT, EUR FLOAT, CNY FLOAT, GBP FLOAT, actualrate FLOAT
 		, UNIQUE CLUSTERED(exchangedate, exchangeid))
@@ -50,8 +51,11 @@ BEGIN
 		WHILE (@tmpDate <= @tmpToDate AND @tmpDate <= @todate)
 		BEGIN
 			INSERT INTO @tempDate (exchangedate, ExchangeId, Code, BaseCurrencyRate)--, MYR, USD, EUR, CNY, GBP, actualrate)
-			SELECT @tmpDate, t.ExchangeId, CASE WHEN t.ExchangeId = 142 THEN 'USDT' ELSE t.Code END 
-				, CASE WHEN @BaseCurrency = 'MYR' THEN t.MYR
+			SELECT @tmpDate, t.ExchangeId
+				,CASE WHEN t.ExchangeId = 142 THEN 'USDT'
+					WHEN t.ExchangeId = 96 THEN 'USD (USDT)'
+					ELSE t.Code END 
+				,CASE WHEN @BaseCurrency = 'MYR' THEN t.MYR
 					WHEN @BaseCurrency = 'USD' THEN t.USD
 					WHEN @BaseCurrency = 'EUR' THEN t.EUR
 					WHEN @BaseCurrency = 'CNY' THEN t.CNY
