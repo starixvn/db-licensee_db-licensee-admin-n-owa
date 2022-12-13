@@ -36,6 +36,7 @@ AS
 	  - 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 	  - 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
 	  - 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
+	  - 20221213@Danny: Change fomular Calculate rebate base on Licensee Fee [RedmineID: #181546]
 */
 
 BEGIN
@@ -86,6 +87,12 @@ BEGIN
 		,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000)
 	)
 
+	DECLARE @Result_37 TABLE --ProductID = 37
+	(
+		PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, LicenseeWL MONEY, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
+		,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000)
+	)
+
 	IF ISNULL(@ProductCodes, '') <> ''
 	BEGIN
 		INSERT INTO @Result
@@ -102,6 +109,15 @@ BEGIN
 			,@IncludeTierRebate = 0
 			,@LicensingFeeTypeIds = '0,11' -- 11 = Licensee WL
 
+		INSERT INTO @Result_37
+		(
+			PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
+			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+		)
+		SELECT PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
+			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+		FROM @Result  WHERE ProductId = 37
+
 		DELETE @Result WHERE ProductId = 37
 
 		UPDATE r
@@ -117,17 +133,19 @@ BEGIN
 	DECLARE @Remark NVARCHAR(4000), @TotalRebate MONEY, @TotalAmount MONEY
 	SELECT @Remark = MAX(r.RebateRemark)
 		,@TotalRebate = SUM(r.Rebate)
-		,@TotalAmount = SUM(CASE WHEN p.RebateType = 2 THEN r.LicensingFee + r.ExtraAmount - r.Discount ELSE r.LicenseeWL END)
+		,@TotalAmount = SUM(CASE WHEN p.RebateType = 2 THEN r.LicensingFee + r.ExtraAmount - r.Discount - ISNULL(r_37.GrossLicensingFee,0) ELSE r.LicenseeWL END)
 	FROM @Result r
 		INNER JOIN @Products p ON r.ProductId = p.ProductId
+		LEFT JOIN @Result_37 r_37 ON r.PartyId = r_37.PartyId AND r.ProductId = 0  AND r_37.LicensingFeeTypeId = 0 AND r.LicensingFeeTypeId = 0
 
 	SELECT @Remark = ISNULL(@Remark, N''), @BaseCurrency = ISNULL(@BaseCurrency, ''), @TotalRebate = ISNULL(@TotalRebate, 0), @TotalAmount = ISNULL(@TotalAmount, 0)
 
 	SELECT @Remark AS Remark, @ToDate AS ReportDate, @BaseCurrency AS CurrencyName, @TotalRebate AS TotalRebate, @TotalAmount AS TotalAmount
 
 	-- Detail
-	SELECT r.ProductId, CASE WHEN p.RebateType = 2 THEN r.LicensingFee - r.Discount ELSE r.LicenseeWL END AS AmountToCompany
+	SELECT r.ProductId, CASE WHEN p.RebateType = 2 THEN r.LicensingFee - r.Discount - ISNULL(r_37.GrossLicensingFee,0) ELSE r.LicenseeWL END AS AmountToCompany
 	FROM @Result r
 		INNER JOIN @Products p ON r.ProductId = p.ProductId
+		LEFT JOIN @Result_37 r_37 ON r.PartyId = r_37.PartyId AND r.ProductId = 0  AND r_37.LicensingFeeTypeId = 0 AND r.LicensingFeeTypeId = 0
 END
 GO
