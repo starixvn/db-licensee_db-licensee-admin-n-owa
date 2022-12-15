@@ -35,7 +35,7 @@ AS
 				<InvoiceNumber>123</InvoiceNumber>
 				<PartyId>1</PartyId>
 				<InvoiceTypeShorten>S</InvoiceTypeShorten>
-				<HideRebateWorksheet>Y</HideRebateWorksheet>
+				<HideRebateWorkSheet>Y</HideRebateWorkSheet>
 			</InvoiceGenerating>
 		</Root>'
 */
@@ -64,19 +64,19 @@ BEGIN
 
 	-- Region: Get Party Settings
 	BEGIN
-		DECLARE @InvoiceData TABLE (IndexNumber INT IDENTITY(1, 1), InvoiceNumber INT, PartyId INT, InvoiceTypeId SMALLINT, InvoiceTypeShorten VARCHAR(10), HideRebateWorksheet VARCHAR(3))
+		DECLARE @InvoiceData TABLE (IndexNumber INT IDENTITY(1, 1), InvoiceNumber INT, PartyId INT, InvoiceTypeId SMALLINT, InvoiceTypeShorten VARCHAR(10), IsHideRebateWorkSheet BIT)
 		
 		BEGIN TRY
 			DECLARE @Party_XML XML = CONVERT(XML, @InvoiceGeneratingData)
 
-			INSERT INTO @InvoiceData (InvoiceNumber, PartyId, InvoiceTypeShorten, InvoiceTypeId, HideRebateWorksheet)
-			SELECT InvoiceNumber, PartyId, InvoiceTypeShorten, CASE InvoiceTypeShorten WHEN 'S' THEN 1 WHEN 'R' THEN 3 WHEN 'H' THEN 6 END, HideRebateWorksheet
+			INSERT INTO @InvoiceData (InvoiceNumber, PartyId, InvoiceTypeShorten, InvoiceTypeId, IsHideRebateWorkSheet)
+			SELECT InvoiceNumber, PartyId, InvoiceTypeShorten, CASE InvoiceTypeShorten WHEN 'S' THEN 1 WHEN 'R' THEN 3 WHEN 'H' THEN 6 END, CASE HideRebateWorksheet WHEN 'Y' THEN 1 ELSE 0 END
 			FROM (
 				SELECT
 					t.c.value('(InvoiceNumber/text())[1]', 'INT') AS InvoiceNumber
 					,t.c.value('(PartyId/text())[1]', 'INT') AS PartyId
 					,t.c.value('(InvoiceTypeShorten/text())[1]', 'VARCHAR(10)') AS InvoiceTypeShorten
-					,t.c.value('(HideRebateWorksheet/text())[1]', 'VARCHAR(3)') AS HideRebateWorksheet
+					,t.c.value('(HideRebateWorkSheet/text())[1]', 'VARCHAR(10)') AS HideRebateWorkSheet
 				FROM @Party_XML.nodes('Root/InvoiceGenerating') t(c)
 			) a
 			OPTION (OPTIMIZE FOR (@Party_XML = NULL))
@@ -109,8 +109,8 @@ BEGIN
 			AND InvoiceType IN (1, 3, 6) -- Software Fee, Rebate, Hosting Fee
 		ORDER BY CreatedDateTime DESC
 		
-		DECLARE @InvoiceSettings TABLE (IndexNumber INT, PartyId INT, BillerId INT, InvTypeId SMALLINT, ProductCodes VARCHAR(200), InvTemplateName VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, HideRebateWorksheet VARCHAR(1))
-		INSERT INTO @InvoiceSettings (IndexNumber, PartyId, BillerId, InvTypeId, InvTemplateName, InvoiceSymbol, InvoiceNumber, ProductCodes, HideRebateWorksheet)
+		DECLARE @InvoiceSettings TABLE (IndexNumber INT, PartyId INT, BillerId INT, InvTypeId SMALLINT, ProductCodes VARCHAR(200), InvTemplateName VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, IsHideRebateWorkSheet BIT)
+		INSERT INTO @InvoiceSettings (IndexNumber, PartyId, BillerId, InvTypeId, InvTemplateName, InvoiceSymbol, InvoiceNumber, ProductCodes, IsHideRebateWorkSheet)
 		SELECT d.IndexNumber, s.FromPartyId, s.ToPartyId, s.InvTypeId, t.InvTemplateName, @InvoiceSymbol, d.InvoiceNumber
 			, STUFF((SELECT ',' + CASE WHEN ls.ProductId = 0 THEN 'SB' ELSE ProductPrefix END
 						FROM dbo.LA_InvoiceSetting ls WITH (NOLOCK)
@@ -118,13 +118,13 @@ BEGIN
 						WHERE s.InvTypeId = ls.InvTypeId AND s.FromPartyId = ls.FromPartyId AND s.ToPartyId = ls.ToPartyId
 							AND ls.InvTypeId = 1 AND ls.ProductId IS NOT NULL
 						FOR XML PATH('')), 1, 1, '') AS ProductCodes
-			, d.HideRebateWorksheet
+			, d.IsHideRebateWorkSheet
 		FROM @PartySettings ps
 			INNER JOIN @InvoiceData d ON ps.PartyId = d.PartyId
 			INNER JOIN dbo.LA_InvoiceSetting s WITH (NOLOCK) ON s.FromPartyId = ps.PartyId AND s.InvTypeId = d.InvoiceTypeId
 			INNER JOIN dbo.LA_InvoiceTemplate t WITH (NOLOCK) ON s.InvTempId = t.InvTemplateId
 		WHERE s.InvTypeId IN (1, 3, 6) AND s.ToPartyId = @BillerId
-		GROUP BY d.IndexNumber, s.FromPartyId, s.ToPartyId, s.InvTypeId, t.InvTemplateName, d.InvoiceNumber, d.HideRebateWorksheet
+		GROUP BY d.IndexNumber, s.FromPartyId, s.ToPartyId, s.InvTypeId, t.InvTemplateName, d.InvoiceNumber, d.IsHideRebateWorkSheet
 	END
 	-- End Region: Get Party Settings
 
@@ -262,13 +262,13 @@ BEGIN
 			RowIndex INT, IndexNumber INT, PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(100), ItemType TINYINT, BillerId INT, BillerName NVARCHAR(50)
 			,InvoiceHeaderId BIGINT, InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, InvoicePath NVARCHAR(256)
 			,BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50), ProductCodes VARCHAR(MAX)
-			,LicensingFee MONEY, Discount MONEY, Rebate MONEY, AdjustmentAmount MONEY, AdjustmentNote NVARCHAR(500), HideRebateWorksheet VARCHAR(1)
+			,LicensingFee MONEY, Discount MONEY, Rebate MONEY, AdjustmentAmount MONEY, AdjustmentNote NVARCHAR(500), IsHideRebateWorkSheet BIT
 		)
 
 		INSERT INTO @_Result
 		(
 			RowIndex, IndexNumber, PartyId, PartyName, BrandName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath
-			,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, HideRebateWorksheet
+			,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsHideRebateWorkSheet
 		)
 		SELECT
 			ROW_NUMBER() OVER(ORDER BY ivs.IndexNumber) AS RowIndex
@@ -292,7 +292,7 @@ BEGIN
 			,SUM(ISNULL(CASE WHEN r.InvoiceType = 3 THEN r.LicensingFee ELSE 0 END, 0)) AS Rebate
 			,SUM(ISNULL(r.AdjustmentAmount, 0)) AS AdjustmentAmount
 			,ISNULL(r.AdjustmentNote, N'') AS AdjustmentNote
-			,ISNULL(ivs.HideRebateWorksheet,'N') HideRebateWorksheet
+			,ivs.IsHideRebateWorkSheet
 		FROM @PartySettings ps
 			INNER JOIN @InvoiceSettings ivs ON ps.PartyId = ivs.PartyId
 			LEFT JOIN @FinalResult r ON ps.PartyId = r.PartyId AND ivs.BillerId = r.BillerId AND ivs.InvTypeId = r.InvoiceType
@@ -314,13 +314,13 @@ BEGIN
 			,ps.InvoiceLanguage
 			,CASE WHEN ivs.InvTypeId = 1 THEN ivs.ProductCodes ELSE '' END
 			,ISNULL(r.AdjustmentNote, N'')
-			,ISNULL(ivs.HideRebateWorksheet,'N')
+			,ivs.IsHideRebateWorkSheet
 	END
 	-- End Region: Final Result
 
 	-- Return data
 	SELECT RowIndex, IndexNumber, PartyId, PartyName, BrandName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath
-		,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, HideRebateWorksheet
+		,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsHideRebateWorkSheet
 	FROM @_Result
 END
 GO
