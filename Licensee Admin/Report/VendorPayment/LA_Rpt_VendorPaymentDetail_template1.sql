@@ -12,13 +12,14 @@ AS
  * Task  : Vendor Payment Detail (template1 - normal)
  * Revisions
 	- 20210615@Danny: Initialize SP [#168387]
+	- 20220927@Danny: Remove DBLink [#176986] 
  */
 
 BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @IsConvertNegativeFeeToZero BIT, @IsConvertNegativePaytoSupplierToZero BIT
-	SELECT @IsConvertNegativeFeeToZero = IsConvertNegativeFeeToZero, @IsConvertNegativePaytoSupplierToZero = IsConvertNegativePaytoSupplierToZero  FROM DBCUST.bodb_licensee.dbo.LA_VendorPaymentSetting WITH(NOLOCK) WHERE ProductId = @ProductID
+	SELECT @IsConvertNegativeFeeToZero = IsConvertNegativeFeeToZero, @IsConvertNegativePaytoSupplierToZero = IsConvertNegativePaytoSupplierToZero  FROM dbo.LA_VendorPaymentSetting WITH(NOLOCK) WHERE ProductId = @ProductID
 
 	DECLARE @ProductCode VARCHAR(50), @3rdProductCode VARCHAR(50)
 	DECLARE @BettypeIdList TABLE (BetTypeId INT)

@@ -23,6 +23,7 @@ AS
 		- 20210712@Danny: Vgaming - Free bets and Jackpot prize integration [#156185]
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 		- 20220218@Danny: Allbet - Promotion integration [#167510]
+		- 20221024@Danny: MG-RNG - Tournament Prize [#176986]
 
 	Param's Explanation:
 		@ProductIDs: Filter by list of products 
@@ -68,14 +69,17 @@ BEGIN
 			UNION ALL
 		SELECT 21 AS ProductID, BettypeID, [Description]
 		FROM (VALUES(2499, 'Promotion')) AS v(BettypeID, [Description]) -- Allbet
+				UNION ALL
+		SELECT 73 AS ProductID, BettypeID, [Description]
+		FROM (VALUES(8695, 'Tournament Prize')) AS v(BettypeID, [Description]) -- MG-RNG
 	)
 	INSERT INTO @Result (ProductID, BettypeID, [Description])
 	SELECT r.* 
 	FROM cte_Data r
-	LEFT JOIN bodb02.dbo.strSplit(@ProductIDs, ',') p ON r.ProductID = p.val 
-	LEFT JOIN bodb02.dbo.strSplit(@ExceptedBettypeIDs, ',') b ON r.BettypeID = b.val
-	WHERE (@ProductIDs = '' OR p.val IS NOT NULL) AND 
-		  (@ExceptedBettypeIDs = '' OR b.val IS NULL)
+	LEFT JOIN STRING_SPLIT(@ProductIDs, ',') p ON r.ProductID = p.value 
+	LEFT JOIN STRING_SPLIT(@ExceptedBettypeIDs, ',') b ON r.BettypeID = b.value
+	WHERE (@ProductIDs = '' OR p.value IS NOT NULL) AND 
+		  (@ExceptedBettypeIDs = '' OR b.value IS NULL)
 
 	RETURN
 END

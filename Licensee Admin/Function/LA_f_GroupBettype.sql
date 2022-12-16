@@ -15,6 +15,7 @@ AS
 		- 20210909@Percy: Initialize function [RedmineID: #157652]
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 		- 20220222@Danny: Allbet - Promotion integration [#167510]
+		- 20221024@Danny: MG-RNG - Tournament Prize [#176986]
 */
 
 RETURN
@@ -35,6 +36,7 @@ RETURN
 	-- 4: Prize
 	UNION ALL SELECT 32, 4299, 4, 'Prize'
 	UNION ALL SELECT 32, 4300, 4, 'Prize'
+	UNION ALL SELECT 73, 8695, 4, 'Prize'
 	-- 5: Lucky Draw
 	UNION ALL SELECT 45, 3150, 5, 'Lucky Draw'
 	-- 6: Bonus

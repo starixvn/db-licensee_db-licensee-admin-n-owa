@@ -12,6 +12,7 @@ AS
  * Task  : Vendor Payment Detail (template5 - Template for PP, SG product, including some specific info such as: Promotion, Jackpot)
  * Revisions
 	- 20210615@Danny: Initialize SP [#168387]
+	- 20220927@Danny: Remove DBLink [#176986] 
  */
 BEGIN
 	SET NOCOUNT ON 
@@ -19,7 +20,7 @@ BEGIN
 	SELECT @ProductCode = ProductPrefix FROM dbo.Product3rd WITH(NOLOCK) WHERE Productid = @ProductID
 
 	DECLARE @IsConvertNegativeFeeToZero BIT, @IsConvertNegativePaytoSupplierToZero BIT
-	SELECT @IsConvertNegativeFeeToZero = IsConvertNegativeFeeToZero, @IsConvertNegativePaytoSupplierToZero = IsConvertNegativePaytoSupplierToZero  FROM DBCUST.bodb_licensee.dbo.LA_VendorPaymentSetting WITH(NOLOCK) WHERE ProductId = @ProductID
+	SELECT @IsConvertNegativeFeeToZero = IsConvertNegativeFeeToZero, @IsConvertNegativePaytoSupplierToZero = IsConvertNegativePaytoSupplierToZero  FROM dbo.LA_VendorPaymentSetting WITH(NOLOCK) WHERE ProductId = @ProductID
 
 	DECLARE		@Contribution INT,
 				@JackpotPrize INT

@@ -13,6 +13,7 @@ AS
  * Revisions
 	- 20210615@Danny: Initialize SP [#168387]
 	- 20221031@Danny: PP Tournament for Credit licensee [RedmineID: #178619]
+	- 20220927@Danny: Fix issue BetCount and Licensing Fee PP GMT-4 are incorrect [#176775]
  */
 
 BEGIN
@@ -188,7 +189,7 @@ BEGIN
 					SUM(CASE WHEN b.BetTypeId IN (@Contribution,@JackpotPrize) OR pb.bettype IS NOT NULL  THEN 0 ELSE b.Winloss END) AS CustomerWinLoss,
 					SUM(CASE WHEN b.BetTypeId IN (@Contribution,@JackpotPrize) OR pb.bettype IS NOT NULL  THEN 0 ELSE -b.Winloss END) AS LicenseeWinloss
 				FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
-					INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
+					INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.RptDate BETWEEN ci.FromDate AND ci.ToDate
 					INNER JOIN @PartyList p ON ci.PartyId = p.PartyId 
 					LEFT JOIN @PrizeBettype pb ON b.BetTypeId = pb.bettype
 				WHERE b.RptDate BETWEEN @f_date3rd AND @t_date3rd

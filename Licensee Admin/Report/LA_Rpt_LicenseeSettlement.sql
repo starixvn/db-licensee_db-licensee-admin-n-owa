@@ -59,6 +59,7 @@ AS
 		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 		- 20220218@Danny: Allbet - Promotion integration [#167510]
+		- 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
 
 	Param's Explanation:
 */
@@ -79,6 +80,7 @@ BEGIN
 			@DrawFilter SMALLINT = 1
 	DECLARE @GD_Tip SMALLINT = 1706,
 			@SAG_Tip SMALLINT = 3007
+	DECLARE @Product3rdID INT 
 
 	CREATE TABLE #Result
 	(
@@ -854,18 +856,23 @@ BEGIN
 		UPDATE #Result
 		SET Company = CASE WHEN @IsKeepNegativeAmount = 1 OR @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END - WinningPrize
 	END
-	ELSE IF (@ProductCode = 'SXG')
+	ELSE IF (@ProductCode IN ('SXG','MGRNG'))
 	BEGIN
 		DECLARE @SXG_LuckyDraw SMALLINT = 3150
+		DECLARE @MGRNG_Prize SMALLINT = 8695
+
+		SELECT @Product3rdID = CASE WHEN @ProductCode = 'SXG' THEN 45
+									WHEN @ProductCode = 'MGRNG' THEN 73 END
+
 		;WITH cte_SXG_Data AS
 		(
 			SELECT b.SiteId, b.rptDate, b.CurrencyId
-				,SUM(CASE WHEN b.Bettype = @SXG_LuckyDraw THEN 0 ELSE ISNULL(b.BetCount, 0) END) AS BetCount
+				,SUM(CASE WHEN b.Bettype IN (@SXG_LuckyDraw,@MGRNG_Prize) THEN 0 ELSE ISNULL(b.BetCount, 0) END) AS BetCount
 				,SUM(ISNULL(b.Turnover, 0)) AS Turnover
-				,SUM(CASE WHEN b.Bettype = @SXG_LuckyDraw THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS MemberWL
-				,SUM(CASE WHEN b.Bettype = @SXG_LuckyDraw THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
+				,SUM(CASE WHEN b.Bettype IN (@SXG_LuckyDraw,@MGRNG_Prize) THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS MemberWL
+				,SUM(CASE WHEN b.Bettype IN (@SXG_LuckyDraw,@MGRNG_Prize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			WHERE b.ProductID = 45
+			WHERE b.ProductID = @Product3rdID
 				AND b.rptDate BETWEEN @FromDate AND @ToDate
 				AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
 				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
@@ -974,7 +981,7 @@ BEGIN
 				@VGA_Contribution	INT = 3898,
 				@VGA_JackpotPrize	INT = 3899
 
-		DECLARE @Product3rdID INT 
+		
 		SELECT @Product3rdID = CASE WHEN @ProductCode = 'SBC' THEN 42 
 									WHEN  @ProductCode = 'VGA' THEN 66 END
 

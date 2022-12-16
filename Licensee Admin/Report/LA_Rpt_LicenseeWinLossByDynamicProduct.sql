@@ -34,51 +34,54 @@ AS
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 		- 20220406@Percy: Change licensee name format of Unknown licensees [RedmineID: #171150]
+		- 20220926@Danny: Intergrate MG-RNG [#176986]
 */
 
 BEGIN
 	SET NOCOUNT ON
 	
-	DECLARE @GD_Tip				SMALLINT = 1706,
-			@PP_Contribution	SMALLINT = 4297,
-			@SBC_Contribution	SMALLINT = 1698,
-			@VGA_Contribution	SMALLINT = 3898,
-			@SG_Contribution	SMALLINT = 4599
-
-	SELECT * INTO #Exchange FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
-
+	DECLARE @GD_Tip			SMALLINT = 1706,
+			@PartyIds		VARCHAR(4000), 
+			@ProductCodes	VARCHAR(500)
+	DECLARE @ProductSupportContrib	TABLE (ProductID INT)
 	DECLARE @Products TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(20), ProductName VARCHAR(100))
+	DECLARE @CreditLicenee TABLE(LicenseeId INT)
+	CREATE TABLE #Exchange(exchangedate DATETIME, ExchangeId INT, Code VARCHAR(5),BaseCurrencyRate FLOAT)
+	CREATE TABLE #Parties (PartyId INT,PartyName VARCHAR(100),LicenseeId INT)
+	CREATE TABLE #Data(WinLossDate DATETIME, LicenseeId INT, ProductId INT, Bettype INT, Winloss MONEY, GrossWinLoss MONEY, Commission MONEY, CommissionP MONEY, 
+		ActualStake MONEY, BuyBackAmount MONEY, Turnover MONEY, CashOut MONEY, WinningPrize MONEY, BuyBackAmountBA MONEY, TicketsPayout MONEY, Contribution MONEY
+	)
+	CREATE TABLE #ChargeRates(ProductId INT,LicenseeId INT, Bettype INT, Rate MONEY,FromDate SMALLDATETIME,ToDate SMALLDATETIME, ChargeType TINYINT)
+
+	INSERT INTO #Exchange (exchangedate, ExchangeId, Code, BaseCurrencyRate)
+	SELECT exchangedate,ExchangeId, Code, BaseCurrencyRate FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
+
 	INSERT INTO @Products (GroupProductId, ProductId, ProductCode, ProductName)
 	SELECT	GroupProductId,ProductId,ProductCode, ProductName 
 	FROM	dbo.LA_f_GroupProduct('',@FromDate,@ToDate)
-	WHERE	GroupProductId IN (select CAST(x.val AS INT) AS ProductId FROM strSplit(@ProductIdString,',') x)
+	WHERE	GroupProductId IN (select CAST(x.value AS INT) AS ProductId FROM STRING_SPLIT(@ProductIdString,',') x)
 
-	CREATE TABLE #Parties (
-		PartyId		INT,
-		PartyName	VARCHAR(100),
-		LicenseeId	INT
-	)
+	INSERT INTO @ProductSupportContrib(ProductID)
+	SELECT ProductId FROM @Products 
+	WHERE ProductId IN (SELECT ProductId FROM LA_f_GroupBettype() z WHERE z.TypeId = 2)
+
 	INSERT INTO #Parties(PartyId,PartyName,LicenseeId)
-	(
-		SELECT p.PartyId, p.PartyName, p.OldRefID
-		FROM dbo.OAS_Party p WITH(NOLOCK)
-		INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID = d.PartyID
-		WHERE d.IsDeposit = 1 AND p.PartyType = 1 AND p.OldRefID IS NOT NULL
-	)
+	SELECT p.PartyId, p.PartyName, p.OldRefID
+	FROM dbo.OAS_Party p WITH(NOLOCK)
+	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID = d.PartyID
+	WHERE d.IsDeposit = 1 AND p.PartyType = 1 AND p.OldRefID IS NOT NULL
 
-	DECLARE @PartyIds VARCHAR(4000) = (SELECT CAST(PartyId AS VARCHAR(10)) + ',' FROM #Parties FOR XML PATH (''))
+	SELECT @PartyIds = (SELECT CAST(PartyId AS VARCHAR(10)) + ',' FROM #Parties FOR XML PATH (''))
 	
-	DECLARE @CreditLicenee TABLE(LicenseeId INT)
 	INSERT INTO @CreditLicenee(LicenseeId)
-	(
-		SELECT LabelID
-		FROM dbo.OAS_Party p WITH(NOLOCK)
-		INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
-		INNER JOIN dbo.Labels l WITH(NOLOCK) ON l.LicenseeID=p.OldRefID
-		WHERE ISNULL(d.IsDeposit,0)=0 AND OldRefID IS NOT NULL
-	)
-
+	SELECT LabelID
+	FROM dbo.OAS_Party p WITH(NOLOCK)
+	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON p.PartyID=d.PartyID
+	INNER JOIN dbo.Labels l WITH(NOLOCK) ON l.LicenseeID=p.OldRefID
+	WHERE ISNULL(d.IsDeposit,0)=0 AND OldRefID IS NOT NULL
+	
 	-- insert data to temp table
+	INSERT INTO #Data(WinLossDate,LicenseeId,ProductId, Bettype,Winloss,GrossWinLoss,Commission,CommissionP,ActualStake,BuyBackAmount,Turnover,CashOut,WinningPrize,BuyBackAmountBA,TicketsPayout,Contribution)
 	SELECT b.rptDate														AS WinLossDate,
 		b.SiteId															AS LicenseeId,
 		p.GroupProductId													AS ProductId,
@@ -98,7 +101,6 @@ BEGIN
 		CAST(0 AS MONEY)	AS BuyBackAmountBA,
 		CAST(0 AS MONEY)	AS TicketsPayout,
 		CAST(0 AS MONEY)    AS Contribution
-	INTO #Data
 	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 	INNER JOIN @Products p ON b.ProductId = p.ProductId
 	INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
@@ -174,16 +176,21 @@ BEGIN
 	END
 
 	-- PP and SBC and VGA
-	IF EXISTS (SELECT TOP 1 1 FROM @Products WHERE ProductId IN (32, 42, 66, 36))
+	IF EXISTS (SELECT TOP 1 1 FROM @ProductSupportContrib)
 	BEGIN
 		INSERT INTO #Data(WinLossDate,LicenseeId,ProductId,Bettype,Winloss,Contribution)
 		SELECT b.rptDate, b.SiteId, b.ProductId, -1, 
-		CAST(SUM((CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @VGA_Contribution, @SG_Contribution) THEN 0 ELSE ISNULL(b.MemberWL, 0) END) * e.BaseCurrencyRate) AS MONEY),
-		CAST(SUM((CASE WHEN b.Bettype IN (@PP_Contribution, @SBC_Contribution, @VGA_Contribution, @SG_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) * e.BaseCurrencyRate) AS MONEY)
+		CAST(SUM((CASE WHEN bt.TypeId = 2 THEN 0 ELSE ISNULL(b.MemberWL, 0) END) * e.BaseCurrencyRate) AS MONEY),
+		CAST(SUM((CASE WHEN bt.TypeId = 2 THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) * e.BaseCurrencyRate) AS MONEY)
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 		INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
-		LEFT JOIN LA_f_ExcludedBettypeListSel('','4297,1698,3898,4599') eb ON b.Bettype = eb.BettypeID
-		INNER JOIN @Products p ON p.ProductId = b.ProductID AND p.ProductId IN (32, 42, 66, 36)
+		LEFT JOIN (
+			SELECT x.BettypeID 
+			FROM LA_f_ExcludedBettypeListSel('','') x
+			WHERE x.BettypeID NOT IN (SELECT z.Bettype FROM LA_f_GroupBettype() z WHERE z.TypeId = 2)
+		) eb ON b.Bettype = eb.BettypeID
+		LEFT JOIN LA_f_GroupBettype() bt ON bt.Bettype = b.Bettype
+		INNER JOIN @ProductSupportContrib p ON p.ProductId = b.ProductID
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.StatusId NOT IN (-1, 101, 102, 103)
 			AND b.CurrencyID <> 20
@@ -203,7 +210,7 @@ BEGIN
 	WHERE l.LicenseeName <> 'Saba789' AND p.LicenseeId IS NULL
 
 	-- remove duplicate
-	INSERT #Parties
+	INSERT #Parties(PartyId, PartyName, LicenseeId)
 	SELECT DISTINCT -1, STUFF((SELECT '-' + p3.PartyName FROM #Parties p3 WHERE p3.LicenseeId=p1.LicenseeId FOR XML PATH('')), 1, 1, '') AS PartyName, p1.LicenseeId
 	FROM #Parties p1
 	WHERE p1.LicenseeId IN (
@@ -216,7 +223,9 @@ BEGIN
 	DELETE #Data WHERE LicenseeId NOT IN (SELECT p.LicenseeId FROM #Parties p)
 
 	-- parties: charge rates
-	DECLARE @ProductCodes VARCHAR(500) = (SELECT ProductCode + ',' FROM @Products FOR XML PATH (''))
+	SELECT @ProductCodes = (SELECT ProductCode + ',' FROM @Products FOR XML PATH (''))
+
+	INSERT INTO #ChargeRates(ProductId ,LicenseeId,Bettype,Rate,FromDate,ToDate,ChargeType)
 	SELECT c.ProductId			AS ProductId,
 		c.LicenseeId			AS LicenseeId,
 		CASE WHEN c.ProductId = 11 AND ChargeType = 12 THEN @GD_Tip ELSE ISNULL(b.Bettype, -1) END AS Bettype,
@@ -224,7 +233,6 @@ BEGIN
 		c.FromDate				AS FromDate,
 		c.ToDate				AS ToDate,
 		CASE WHEN c.ProductID =15 THEN ChargeType ELSE 1 END AS ChargeType
-	INTO #ChargeRates
 	FROM dbo.LA_f_ChargeInfo(@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1) c
 	LEFT JOIN dbo.Sport_Bettype_Reference b WITH(NOLOCK) ON b.BettypeRef = c.Bettype AND IsActive = 1
 	WHERE c.DI_Rate > 0

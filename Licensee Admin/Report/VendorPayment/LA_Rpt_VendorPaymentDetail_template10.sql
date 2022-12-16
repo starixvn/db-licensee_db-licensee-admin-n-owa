@@ -12,12 +12,13 @@ AS
  * Task  : Vendor Payment Detail (template10 - Template for SA Gaming product, including some specific info such as: Valid Bet Amount, Tip Sharing, Rolling Comm...)
  * Revisions
 	- 20220426@Danny: Initialize SP [#168387]
+	- 20220927@Danny: Remove DBLink [#176986] 
  */
 
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @IsConvertNegativeFeeToZero BIT, @IsConvertNegativePaytoSupplierToZero BIT
-	SELECT @IsConvertNegativeFeeToZero = IsConvertNegativeFeeToZero, @IsConvertNegativePaytoSupplierToZero = IsConvertNegativePaytoSupplierToZero  FROM DBCUST.bodb_licensee.dbo.LA_VendorPaymentSetting WITH(NOLOCK) WHERE ProductId = @ProductID
+	SELECT @IsConvertNegativeFeeToZero = IsConvertNegativeFeeToZero, @IsConvertNegativePaytoSupplierToZero = IsConvertNegativePaytoSupplierToZero  FROM dbo.LA_VendorPaymentSetting WITH(NOLOCK) WHERE ProductId = @ProductID
 
 	-- charge type
 	DECLARE @GrossWin				INT = 1,
