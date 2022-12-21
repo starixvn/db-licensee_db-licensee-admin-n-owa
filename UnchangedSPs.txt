@@ -1,18 +1,3 @@
-Licensee Admin\Report\LA_Rpt_CurrencyWinloss.sql
-Licensee Admin\Report\LA_Rpt_CurrencyWinloss_Details.sql
-Licensee Admin\Report\LA_Rpt_LicenseeWinloss.sql
-Licensee Admin\Report\LA_Rpt_LicenseeWinloss_Details.sql
-Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_Summary.sql
-Licensee Admin\Core SP\LA_AmountToCompanyByProduct.sql
-Licensee Admin\Report\Analysis\LA_GEN_LicPerformanceAnalysis_Invoice.sql
-Licensee Admin\Report\Analysis\LA_GEN_LicPerformanceAnalysis_Report.sql
-Licensee Admin\Report\LA_Rpt_GroupLicensingFeeExtraPayoutWinLoss.sql
-Licensee Admin\Report\LA_Rpt_GroupLicensingFeeWinLoss.sql
-Licensee Admin\Report\LA_Rpt_LicenseeWinLossByDynamicProduct.sql
-Licensee Admin\Report\LA_Rpt_LicenseeWinLossByProduct.sql
-Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_Detail.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template8.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template9.sql
 Licensee Admin\Invoice\GenerateMultipleInvoices\LA_Inv_MultipleGenerationTemporaryInvoiceSel.sql
 Licensee Admin\Invoice\InvoiceAmountGenerate\LA_Inv_GenerateAmountForSoftwareFee.sql
 Licensee Admin\Invoice\LA_Inv_InvoiceAmountGenerate.sql
@@ -20,4 +5,7 @@ Licensee Admin\Invoice\LA_Inv_InvoiceWaiveGet.sql
 Licensee Admin\Invoice\LA_Inv_RebateWorksheetSel.sql
 Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_AmountToCompanySel.sql
 Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_StraightDiscountSel.sql
+Licensee Admin\Report\Analysis\LA_GEN_LicPerformanceAnalysis_Invoice.sql
+Licensee Admin\Report\Analysis\LA_GEN_LicPerformanceAnalysis_Report.sql
 Licensee Admin\Report\LA_Rpt_LicenseeBillingDataByProduct.sql
+Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_Detail.sql

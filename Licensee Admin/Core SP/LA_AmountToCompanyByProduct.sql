@@ -35,6 +35,7 @@ AS
 		- 20220817@Danny: hardcode for N8B, N8G (charge Rate And Discount rate are same) [RedmineID: #175153]
 		- 20221115@Danny: get tier rebate rate by FromDate input [RedmineID: #180445]
 		- 20221024@Danny: MG-RNG - Tournament Prize [#176986]
+		- 20221213@Danny: Change fomular Calculate rebate base on Licensee Fee [RedmineID: #181546]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -64,6 +65,8 @@ BEGIN
 	DECLARE @ExcludeCompareDiscountAndFee_PartyList TABLE (PartyId INT)
 	INSERT INTO @ExcludeCompareDiscountAndFee_PartyList(PartyId)
 	SELECT PartyId FROM dbo.OAS_Party WITH (NOLOCK) WHERE PartyName IN ('Bwing (N8B)','Goal123 (N8G)')
+
+	DECLARE @CutOff_RebateOnLicfee  DATETIME = '2022-11-01'
 	
 	-- Get Product List
 	CREATE TABLE #Products (ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(10), IsSelected BIT)
@@ -79,7 +82,7 @@ BEGIN
 	-- Get Party List
 	CREATE TABLE #PartyList (PartyId INT, LicenseeId INT, BaseCurrencyId INT, IsDeposit BIT, IsSelected BIT)
 	INSERT INTO #PartyList (PartyId, IsSelected)
-	SELECT DISTINCT val, 1 FROM dbo.strSplit (@PartyIds, ',')
+	SELECT DISTINCT value, 1 FROM STRING_SPLIT (@PartyIds, ',')
 
 	-- Insert parties with same min fee group
 	INSERT INTO #PartyList (PartyId, IsSelected)
@@ -603,7 +606,7 @@ BEGIN
 		DiscountType: 0 = no discount, 1 = discount by licensing fee, 2 = discount by licensee winloss
 	*/
 
-	IF EXISTS (SELECT 1 FROM dbo.strSplit(@LicensingFeeTypeIds, ',') WHERE CONVERT(INT, val) = 0) -- Normal Licensing Fee
+	IF EXISTS (SELECT 1 FROM STRING_SPLIT(@LicensingFeeTypeIds, ',') WHERE CONVERT(INT, value) = 0) -- Normal Licensing Fee
 	BEGIN
 		INSERT INTO @Result (PartyId, ProductId, LicensingFeeTypeId, LicenseeWL, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
 			,Discount, DiscountRate, DiscountRemark, DiscountType, ProrateMinFee, SecondaryLicensingFee, NonMinFee, IsGroupMinFee)
@@ -851,7 +854,7 @@ BEGIN
 			,r.TierRebateRate = ISNULL(d.TierRebateRate, 0)
 			,r.WLRebate = CASE WHEN r.LicenseeWL < 0 THEN 0 ELSE r.LicenseeWL * ISNULL(d.WLRebateRate, 0) END
 			,r.WLRebateRate = ISNULL(d.WLRebateRate, 0)
-			,r.FeeRebate = (r.LicensingFee - r.Discount) * ISNULL(d.FeeRebateRate, 0)
+			,r.FeeRebate =  (r.LicensingFee - r.Discount) * ISNULL(d.FeeRebateRate, 0)
 			,r.FeeRebateRate = ISNULL(d.FeeRebateRate, 0)
 			,r.RebateRemark = d.RebateRemark
 		FROM @Result r
@@ -868,13 +871,19 @@ BEGIN
 			) d
 
 		UPDATE r
-		SET r.TierRebate = r.TierRebate
+		SET r.FeeRebate = CASE WHEN @FromDate >= @CutOff_RebateOnLicfee THEN CASE WHEN r.LicensingFee - r.Discount -  ISNULL(t.GrossLicensingFee, 0) < 0
+																   THEN 0 ELSE (r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0)) * ISNULL(r.FeeRebateRate, 0) END
+								ELSE r.FeeRebate END
+			,r.TierRebate = r.TierRebate
 							+ CASE
 								WHEN r.GrossLicensingFee < 0 THEN 0
 								WHEN r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate < 0 THEN 0
 								ELSE r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate
 								END * r.TierRebateRate
-			,r.TotalRebate = r.WLRebate + r.FeeRebate
+			,r.TotalRebate = r.WLRebate
+							+ CASE WHEN @FromDate >= @CutOff_RebateOnLicfee THEN CASE WHEN r.LicensingFee - r.Discount -  ISNULL(t.GrossLicensingFee, 0) < 0
+																   THEN 0 ELSE (r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0)) * ISNULL(r.FeeRebateRate, 0) END
+								ELSE r.FeeRebate END
 							+ CASE
 								WHEN @IncludeTierRebate = 0 THEN 0
 								ELSE r.TierRebate
@@ -903,7 +912,7 @@ BEGIN
 		WHERE r.PartyId IS NULL
 	END
 
-	IF EXISTS (SELECT 1 FROM dbo.strSplit(@LicensingFeeTypeIds, ',') WHERE CONVERT(INT, val) > 0) -- special bettype
+	IF EXISTS (SELECT 1 FROM STRING_SPLIT(@LicensingFeeTypeIds, ',') WHERE CONVERT(INT, value) > 0) -- special bettype
 	BEGIN
 		INSERT INTO @Result (PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount)
 		SELECT r.PartyId, r.ProductId, t.LicensingFeeTypeId, 0 AS GrossLicensingFee, 0 AS LicensingFee, t.ExtraAmount
@@ -941,7 +950,7 @@ BEGIN
 		WHERE ',' + @LicensingFeeTypeIds + ',' LIKE '%,' + CONVERT(VARCHAR(10), t.LicensingFeeTypeId) + ',%'
 	END
 
-	IF EXISTS (SELECT 1 FROM dbo.strSplit(@LicensingFeeTypeIds, ',') WHERE CONVERT(INT, val) < 0) -- deduction
+	IF EXISTS (SELECT 1 FROM STRING_SPLIT(@LicensingFeeTypeIds, ',') WHERE CONVERT(INT, value) < 0) -- deduction
 	BEGIN
 		DECLARE @Deductions TABLE (PartyId INT, RemainingAMF MONEY, RemainingAGPrepayment MONEY, RemainingPrepayment MONEY)
 

@@ -19,6 +19,7 @@ AS
 		- 20210720@Percy: Initialize SP [#147006]
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220506@Percy: Change way get discount group type [RedmineID: #1732342]
+		- 20221213@Danny: Import HideRebateWorksheet Info from Excel template [RedmineID: #181546]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -27,6 +28,7 @@ AS
 				<InvoiceNumber>123</InvoiceNumber>
 				<PartyName>12BET</PartyName>
 				<InvoiceTypeShorten>S</InvoiceTypeShorten>
+				<HideRebateWorkSheet>Y</HideRebateWorksheet>
 			</InvoiceGenerating>
 		</Root>'
 */
@@ -34,20 +36,36 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @PartyList TABLE (RowId INT, InvalidCellNumber VARCHAR(20) DEFAULT (''), InvoiceNumber VARCHAR(20), PartyId INT, PartyName VARCHAR(100), BaseCurrencyId INT, InvoiceTypeId SMALLINT, InvoiceTypeShorten VARCHAR(10), InvoiceTypeName VARCHAR(100), Error BIT DEFAULT(0), ContentValidation VARCHAR(2000) DEFAULT(''), SettingValidation VARCHAR(2000) DEFAULT(''))
+	DECLARE @PartyList TABLE (
+		RowId INT, 
+		InvalidCellNumber VARCHAR(20) DEFAULT (''), 
+		InvoiceNumber VARCHAR(20), 
+		PartyId INT, 
+		PartyName VARCHAR(100), 
+		BaseCurrencyId INT, 
+		InvoiceTypeId SMALLINT, 
+		InvoiceTypeShorten VARCHAR(10), 
+		InvoiceTypeName VARCHAR(100), 
+		Error BIT DEFAULT(0), 
+		ContentValidation VARCHAR(2000) DEFAULT(''), 
+		SettingValidation VARCHAR(2000) DEFAULT(''),
+		IsHideRebateWorkSheet BIT
+		)
 	
 	BEGIN TRY
 		DECLARE @Party_XML XML = CONVERT(XML, @InvoiceGeneratingData)
 
-		INSERT INTO @PartyList (RowId, InvoiceNumber, PartyName, InvoiceTypeShorten, InvoiceTypeId, InvoiceTypeName)
+		INSERT INTO @PartyList (RowId, InvoiceNumber, PartyName, InvoiceTypeShorten, InvoiceTypeId, InvoiceTypeName, IsHideRebateWorkSheet)
 		SELECT 1000 * ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS RowId, InvoiceNumber, PartyName, InvoiceTypeShorten
 			,CASE InvoiceTypeShorten WHEN 'S' THEN 1 WHEN 'R' THEN 3 WHEN 'H' THEN 6 END
 			,CASE InvoiceTypeShorten WHEN 'S' THEN 'Software Data & Licensing Fees' WHEN 'R' THEN 'Rebate' WHEN 'H' THEN 'Hosting Fees' END
+			,CASE HideRebateWorksheet WHEN 'Y' THEN 1 ELSE 0 END
 		FROM (
 			SELECT
 				LTRIM(RTRIM(t.c.value('(InvoiceNumber/text())[1]', 'VARCHAR(20)'))) AS InvoiceNumber
 				,LTRIM(RTRIM(t.c.value('(PartyName/text())[1]', 'VARCHAR(100)'))) AS PartyName
 				,LTRIM(RTRIM(t.c.value('(InvoiceTypeShorten/text())[1]', 'VARCHAR(10)'))) AS InvoiceTypeShorten
+				,LTRIM(RTRIM(t.c.value('(HideRebateWorkSheet/text())[1]', 'VARCHAR(10)'))) AS HideRebateWorksheet
 			FROM @Party_XML.nodes('Root/InvoiceGenerating') t(c)
 		) a
 		OPTION (OPTIMIZE FOR (@Party_XML = NULL))
@@ -244,7 +262,7 @@ BEGIN
 	END
 
 	-- Return data
-	SELECT InvalidCellNumber, InvoiceNumber, PartyId, PartyName, InvoiceTypeId, InvoiceTypeShorten, InvoiceTypeName, ContentValidation, SettingValidation
+	SELECT InvalidCellNumber, InvoiceNumber, PartyId, PartyName, InvoiceTypeId, InvoiceTypeShorten, InvoiceTypeName, ContentValidation, SettingValidation, IsHideRebateWorkSheet
 	FROM @PartyList
 	ORDER BY RowId
 END
