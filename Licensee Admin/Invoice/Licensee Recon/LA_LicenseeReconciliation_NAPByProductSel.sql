@@ -19,6 +19,7 @@ AS
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
+		- 20221226@Danny: Integrate Player tips [#180703]
 */
 
 BEGIN
@@ -30,7 +31,7 @@ BEGIN
 	SELECT l.LicenseeName
 	FROM dbo.Licensees l WITH (NOLOCK)
 		INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON l.LicenseeId = p.OldRefId AND p.PartyType IN (1, 5)
-	WHERE p.PartyId IN (SELECT CONVERT(INT, val) FROM bodb02.dbo.strSplit(@PartyIds, ','))
+	WHERE p.PartyId IN (SELECT CONVERT(INT, value) FROM STRING_SPLIT(@PartyIds, ','))
 
 	DECLARE @recommend TABLE (recommend INT)
 	INSERT INTO @recommend (recommend)
@@ -83,7 +84,7 @@ BEGIN
 
 	-- Return data
 		-- Note: Saba promotion treat ProductId is max, always on bottom
-	SELECT CONVERT(INT, CASE WHEN t.Bettype = 17005 THEN 1001 WHEN p.ProductId = 37 THEN 1000 ELSE p.ProductId END) AS ProductId
+	SELECT CONVERT(INT, CASE WHEN t.Bettype = 17005 THEN 1001 WHEN p.ProductId = 37 THEN 1000 WHEN p.ProductId = 74 THEN 1002 ELSE p.ProductId END) AS ProductId
 		,CONVERT(VARCHAR(50), CASE WHEN t.Bettype = 17005 THEN 'Sponsorship' ELSE p.ProductName END) AS ProductName
 		,t.AmountToCompany
 	FROM (
