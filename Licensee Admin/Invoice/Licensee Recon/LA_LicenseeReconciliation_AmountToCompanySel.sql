@@ -120,7 +120,7 @@ BEGIN
 				,SUM(CASE WHEN LicensingFeeTypeId = 7 THEN ExtraAmount ELSE 0 END) AS ContributionDiscount
 				,SUM(CASE WHEN LicensingFeeTypeId = 8 THEN ExtraAmount ELSE 0 END) AS BetCount
 				,SUM(CASE WHEN LicensingFeeTypeId = 9 AND ExtraAmount < 0 THEN -ExtraAmount ELSE 0 END) AS OddsSpreadAdjustment
-				,SUM(CASE WHEN ProductId = 74 AND LicensingFeeTypeId = 0 THEN ExtraAmount ELSE 0 END) AS PlayerTips
+				,SUM(CASE WHEN ProductId = 74 AND LicensingFeeTypeId = 0 THEN -ExtraAmount ELSE 0 END) AS PlayerTips -- Recon Show Negative value
 			FROM @Result
 			WHERE ProductId IN (37,74) OR LicensingFeeTypeId > 0
 			GROUP BY PartyId,CASE WHEN ProductId IN (37, 74) THEN 0 ELSE ProductId END

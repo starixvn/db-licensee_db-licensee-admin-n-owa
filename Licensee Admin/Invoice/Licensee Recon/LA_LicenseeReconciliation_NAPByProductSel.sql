@@ -62,6 +62,8 @@ BEGIN
 	FROM bodb02.dbo.f_LicWinLoss_ProductSportType_Sel(@ProductCodes) f
 		CROSS APPLY dbo.LA_f_Products3rd(f.ProductCode) p
 		LEFT JOIN dbo.LA_f_GroupProduct(@ProductCodes,@FromDate,@ToDate) g ON p.ProductId = g.ProductId
+	UNION  
+	SELECT 74, 74, 'Player Tips', 157 , 0
 
 	-- Get AmountToCompany data
 	CREATE TABLE #tmpData (WinlostDate SMALLDATETIME, Currency INT, Sporttype INT, Bettype INT, IsBA BIT, AmountToCompany MONEY)

@@ -76,7 +76,7 @@ BEGIN
 		,SUM(CASE WHEN InvItemTypeId = 2 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) SetupFee
 		,SUM(CASE WHEN InvItemTypeId = 29 THEN ISNULL(Expense,0) ELSE 0 END) Promotion
 		,SUM(CASE WHEN InvItemTypeId = 44 THEN ISNULL(Expense,0) ELSE 0 END) Sponsorship
-		,SUM(CASE WHEN InvItemTypeId = 48 THEN ISNULL(Income,0) ELSE 0 END) PlayerTips
+		,SUM(CASE WHEN InvItemTypeId = 48 THEN ISNULL(-Income,0) ELSE 0 END) PlayerTips -- Recon show negative value
 	INTO #result
 	FROM @partyList p
 	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON p.PartyId = h.PartyId AND h.CurrencyId = p.BaseCurrencyId
