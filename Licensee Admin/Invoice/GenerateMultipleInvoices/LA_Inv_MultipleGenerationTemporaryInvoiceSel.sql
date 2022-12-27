@@ -27,6 +27,7 @@ AS
 		- 20220506@Percy: Exclude Tier Rebate from Invoice [RedmineID: #1732342]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 		- 20221213@Danny: Import HideRebateWorksheet Info from Excel template [RedmineID: #181546]
+		- 20221226@Danny: Integrate Player tips [#180703]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -218,12 +219,13 @@ BEGIN
 		END
 
 		UPDATE sb
-		SET sb.ExtraAmount = sb.ExtraAmount - (p.LicensingFee + p.ExtraAmount) -- Saba Promotion Deducted
+		SET sb.ExtraAmount = sb.ExtraAmount - (ISNULL(p.LicensingFee,0) + ISNULL(p.ExtraAmount,0)) + ISNULL(p1.ExtraAmount,0) -- Saba Promotion Deducted, Add Tips
 		FROM @Result sb
-			INNER JOIN @Result p ON sb.PartyId = p.PartyId AND p.ProductId = 37
+			LEFT JOIN @Result p ON sb.PartyId = p.PartyId AND p.ProductId = 37
+			LEFT JOIN @Result p1 ON sb.PartyId = p1.PartyId AND p1.ProductId = 74
 		WHERE sb.ProductId = 0 AND sb.LicensingFeeTypeId = 0
 
-		DELETE @Result WHERE ProductId = 37
+		DELETE @Result WHERE ProductId IN (37, 74)
 
 		UPDATE r
 		SET r.ProductCode = p.ProductPrefix

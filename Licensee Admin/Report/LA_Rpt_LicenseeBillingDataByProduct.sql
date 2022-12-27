@@ -28,6 +28,7 @@ AS
 		- 20211110@Danny: Filter by OIC statuses and hide Terminated/Suspended licensees who has no bet ticket [#159296]
 		- 20220218@Percy: Hide terminated/suspended licensees with amount = 0 [RedmineID: #161429]
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
+		- 20221226@Danny: Integrate Player tips [#180703]
 	
 	Parameter explanation:
 		@LicenseeStatusIds
@@ -90,7 +91,7 @@ BEGIN
 	SELECT p.ProductId, p.ProductName, p.ProductCode
 	FROM (
 		SELECT ProductId, ProductName, ProductCode FROM (VALUES (0, 'Sportsbook', 'SB'), (-102, 'Discount', ''), (-101, 'Rebate', ''),  (-999, 'Total', '')) t (ProductId, ProductName, ProductCode)
-		UNION ALL SELECT ProductId, ProductName, ProductPrefix FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductId <> 16 AND (EndOfSupportDate IS NULL OR EndOfSupportDate >= @FromDate) AND OfferSite IN (0, 2) -- Deposit only
+		UNION ALL SELECT ProductId, ProductName, ProductPrefix FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductId NOT IN (16,74) AND (EndOfSupportDate IS NULL OR EndOfSupportDate >= @FromDate) AND OfferSite IN (0, 2) -- Deposit only
 	) p
 		LEFT JOIN dbo.LA_f_GroupProduct('',@FromDate,@ToDate) g ON p.ProductId = g.ProductId AND g.ProductId <> g.GroupProductId
 	WHERE g.ProductId IS NULL
