@@ -1,7 +1,4 @@
 /*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
-USE bodb_licensee
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_GroupLicensingFeeWinLoss]
 	@PartyIds				VARCHAR(MAX)	= ''
 	,@ProductCodes			VARCHAR(MAX)	= ''	
@@ -28,7 +25,7 @@ AS
 		- 20210812@Percy: Integrate Bitcoin - apply core function GroupProduct [RedmineID: #159691]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
-		- 20201003@Danny: Support USDT as base currency [RedmineID: #177718]
+		- 20201003@Danny: Support USDT as base currency [RedmineID: #180313]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -171,9 +168,15 @@ BEGIN
 	WHERE ExchangeId IN (SELECT CurrencyId FROM #tmpResult)
 
 	UPDATE e
-	SET e.CurrencyCode = e.CurrencyCode + '(' + e.CurrencyName + ')'
+	SET e.CurrencyCode = e.CurrencyCode + ' (' + e.CurrencyName + ')'
 	FROM @Exchange e
 		INNER JOIN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1) t ON e.CurrencyCode = t.CurrencyCode
+		
+	--- Update USDT
+	UPDATE e
+	SET e.CurrencyCode = e.CurrencyCode + ' (' + e.CurrencyName + ')' 
+	FROM @Exchange e
+	WHERE e.CurrencyName = 'USDT' AND e.CurrencyCode = 'USD'
 
 	-- Add data for products with no ticket
 	;WITH CTE_Currency AS (SELECT DISTINCT CurrencyId FROM #tmpResult)

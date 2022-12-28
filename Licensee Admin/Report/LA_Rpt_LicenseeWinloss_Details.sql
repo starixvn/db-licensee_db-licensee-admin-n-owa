@@ -481,6 +481,12 @@ BEGIN
 		GROUP BY CurrencyCode
 		HAVING COUNT(1) > 1
 	) t2 ON t1.CurrencyCode = t2.CurrencyCode
+	
+	--- Update USDT
+	UPDATE e
+	SET e.CurrencyCode = e.CurrencyCode + ' (' + e.CurrencyName + ')' 
+	FROM @CurrencyTable e
+	WHERE e.CurrencyName = 'USDT' AND e.CurrencyCode = 'USD'
 
 	-- Result
 	BEGIN
