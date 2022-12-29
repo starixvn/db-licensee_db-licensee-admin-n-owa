@@ -54,6 +54,7 @@ AS
 	   - 20220110@Danny: SG - Jackpot prize integration [#167089]
 	   - 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 	   - 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]
+	   - 20221226@Danny: Fiat currency Base to USDT = 0 [RedmineID: #180703]
 
 
 	Param's Explanation:
@@ -415,6 +416,13 @@ BEGIN
 				ELSE Code END
 		FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
 	END
+	
+	-- Fiat to Crypto
+		UPDATE e
+		SET USDT = 0
+		FROM #ExchangeRate e 
+		INNER JOIN bodb02.dbo.Exchange ex WITH (NOLOCK) ON e.ExchangeId = ex.ExchangeId AND ex.CurrencyType = 0
+
 
 	-- Result
 	BEGIN
