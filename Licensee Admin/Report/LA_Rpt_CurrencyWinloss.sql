@@ -59,6 +59,7 @@ AS
 	   - 20210824@Danny: filter licensee status from OIC [#159296]
 	   - 20220110@Danny: SG - Jackpot prize integration [#167089]
 	   - 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
+	   - 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -433,9 +434,9 @@ BEGIN
 		WHERE e.ExchangeId IN (SELECT t.Currency FROM #tmpWinLoss t)
 
 		UPDATE e
-		SET CurrencyCode = e.CurrencyCode + '(' + CurrencyName + ')'
+		SET CurrencyCode = e.CurrencyCode + ' (' + CurrencyName + ')'
 		FROM @Exchange e
-		WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1)
+		WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1) OR e.Currency = 96
 	END
 
 	-- Result

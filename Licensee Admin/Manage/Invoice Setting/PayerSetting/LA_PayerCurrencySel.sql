@@ -14,6 +14,7 @@ AS
 		- 20191121@Parsons: Set terms by currency [#FeatureID 120005]
 		- 20200302@Parsons: Support-HID-currency [#128856]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
+		- 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]
 
 	Params:
 	Example: EXEC [LA_PayerCurrencySel] 15
@@ -43,6 +44,12 @@ BEGIN
 	    GROUP BY CurrencyCode
 	    HAVING COUNT(1) > 1
 	) c2 ON c1.CurrencyCode = c2.CurrencyCode
+
+	--- Update USDT
+	UPDATE e
+	SET e.CurrencyCode = e.CurrencyCode + ' (' + e.CurrencyName + ')' 
+	FROM @Result e
+	WHERE e.CurrencyName = 'USDT' AND e.CurrencyCode = 'USD'
 
 	SELECT CurrencyId, CurrencyCode, CurrencyName
 	FROM @Result
