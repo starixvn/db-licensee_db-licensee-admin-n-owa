@@ -35,6 +35,7 @@ AS
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 		- 20220406@Percy: Change licensee name format of Unknown licensees [RedmineID: #171150]
 		- 20220926@Danny: Intergrate MG-RNG [#176986]
+		- 20221209@Danny: Support USD(USDT) [RedmineID: #180313]
 */
 
 BEGIN
@@ -46,7 +47,7 @@ BEGIN
 	DECLARE @ProductSupportContrib	TABLE (ProductID INT)
 	DECLARE @Products TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(20), ProductName VARCHAR(100))
 	DECLARE @CreditLicenee TABLE(LicenseeId INT)
-	CREATE TABLE #Exchange(exchangedate DATETIME, ExchangeId INT, Code VARCHAR(5),BaseCurrencyRate FLOAT)
+	CREATE TABLE #Exchange(exchangedate DATETIME, ExchangeId INT, Code VARCHAR(50),BaseCurrencyRate FLOAT)
 	CREATE TABLE #Parties (PartyId INT,PartyName VARCHAR(100),LicenseeId INT)
 	CREATE TABLE #Data(WinLossDate DATETIME, LicenseeId INT, ProductId INT, Bettype INT, Winloss MONEY, GrossWinLoss MONEY, Commission MONEY, CommissionP MONEY, 
 		ActualStake MONEY, BuyBackAmount MONEY, Turnover MONEY, CashOut MONEY, WinningPrize MONEY, BuyBackAmountBA MONEY, TicketsPayout MONEY, Contribution MONEY

@@ -116,6 +116,8 @@ BEGIN
 		,@ToDate = @ToDate
 		,@BaseCurrencyName = @BaseCurrencyName
 		,@LicensingFeeTypeIds = '0,8' -- 0 = Normal Licensing Fee, 8 = BetCount
+	
+	DELETE @Result WHERE ProductID = 74
 		
 	-- Final Result
 	CREATE TABLE #tmp_Result (PartyId INT, ProductId INT, LicensingFee MONEY, BetCount INT)
