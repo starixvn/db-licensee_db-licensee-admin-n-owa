@@ -36,6 +36,7 @@ AS
 		- 20221115@Danny: get tier rebate rate by FromDate input [RedmineID: #180445]
 		- 20221024@Danny: MG-RNG - Tournament Prize [#176986]
 		- 20221213@Danny: Change fomular Calculate rebate base on Licensee Fee [RedmineID: #181546]
+		- 20221226@Danny: Integrate Player tips [#180703]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -73,11 +74,11 @@ BEGIN
 	INSERT INTO #Products (ProductId, ProductName, ProductCode, IsSelected)
 	SELECT ProductId, ProductName, ProductPrefix, 1
 	FROM dbo.LA_f_Products3rd(@ProductCodes)
-	WHERE ProductId NOT IN (16, 37)
+	WHERE ProductId NOT IN (16, 37, 74)
 
 	IF EXISTS (SELECT 1 FROM #Products WHERE ProductId = 0)
 		INSERT INTO #Products (ProductId, ProductName, ProductCode, IsSelected)
-		VALUES (37, 'Saba Promotion', 'SPR', 1)
+		VALUES (37, 'Saba Promotion', 'SPR', 1), (74, 'Player Tips', 'TIP', 1)
 
 	-- Get Party List
 	CREATE TABLE #PartyList (PartyId INT, LicenseeId INT, BaseCurrencyId INT, IsDeposit BIT, IsSelected BIT)
@@ -341,7 +342,7 @@ BEGIN
 		LEFT JOIN @CBChargeRate cp ON t.LicenseeId = cp.LicenseeId AND t.ProductId = 15 AND t.rptDate = cp.rptDate
 		LEFT JOIN @PartyChargeInfo p ON t.LicenseeId = p.LicenseeId AND t.ProductId = p.ProductId AND t.BettypeRef = p.BettypeRef AND t.rptDate BETWEEN p.FromDate AND p.ToDate
 		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeId = p.ChargeId AND t.CurrencyId = cr.CurrencyId
-	WHERE t.ProductId NOT IN (13, 37)
+	WHERE t.ProductId NOT IN (13, 37, 74)
 		AND (cp.LicenseeId IS NOT NULL OR p.LicenseeId IS NOT NULL)
 	GROUP BY t.rptDate, pl.PartyId, t.ProductId, t.CurrencyId
 	
@@ -370,6 +371,20 @@ BEGIN
 		INNER JOIN @PartyChargeInfo p ON t.LicenseeId = p.LicenseeId AND t.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId = 0
 		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND e.BaseCurrencyId = 0
 	WHERE t.ProductId = 37
+	GROUP BY t.rptDate, p.PartyId, t.CurrencyId
+
+	-- Player tips (share between House And Licensee) ExtraAmount => Tips sharing (house)
+	INSERT INTO #tmpResult (rptDate, PartyId, ProductId, CurrencyId, GrossLicenseeAmount, LicenseeAmount, BasedLicenseeAmount, ExtraAmount, BetCount)
+	SELECT t.rptDate, p.PartyId, 74, t.CurrencyId
+		,SUM(t.AgentWL  * e.Rate) AS GrossLicenseeAmount
+		,SUM(t.AgentWL  * e.Rate) AS LicenseeAmount
+		,SUM(t.AgentWL) AS BasedLicenseeAmount
+		,SUM((-t.MemberWL - t.AgentWL) * e.Rate) AS ExtraAmount
+		,SUM(t.BetCount) AS BetCount
+	FROM #TempData t
+		INNER JOIN @PartyChargeInfo p ON t.LicenseeId = p.LicenseeId AND t.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId = 0
+		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND e.BaseCurrencyId = 0
+	WHERE t.ProductId = 74
 	GROUP BY t.rptDate, p.PartyId, t.CurrencyId
 
 	IF ISNULL(@Currencies, '') <> ''
@@ -431,7 +446,7 @@ BEGIN
 				LEFT JOIN dbo.LA_DiscountGroupCurrency c WITH (NOLOCK) ON a.DiscountGroupId = c.DiscountGroupId AND a.PartyId = c.PartyId
 			WHERE h.FromDate < @T_Date AND h.ToDate >= @F_Date
 				AND (h.DiscountGroupType IN (2, 12, 22) OR c.DiscountGroupId IS NOT NULL)
-				AND p.ProductId <> 37
+				AND p.ProductId NOT IN (37, 74)
 		) t
 		WHERE RN = 1
 		

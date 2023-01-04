@@ -46,6 +46,7 @@ AS
 		- 20220506@Percy: Change way get discount group type [RedmineID: #1732342]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 		- 20221028@Danny: MG-RNG offer tournament prize [RedmineID: #176986]
+		- 20221226@Danny: Integrate Player tips [#180703]
 */
 
 BEGIN
@@ -140,7 +141,7 @@ BEGIN
 				--UNION ALL SELECT Rebate, 6, RebateRate, RebateRemark WHERE Rebate > 0 -- Rebate
 				UNION ALL SELECT LicensingFee, 1, NULL, NULL -- Software Fee
 			) d
-		WHERE r.LicensingFeeTypeId = 0 AND r.ProductId <> 37 -- SB Promotion
+		WHERE r.LicensingFeeTypeId = 0 AND r.ProductId NOT IN (37, 74) -- SB Promotion, Player Tips
 
 		-- SB Promotion
 		IF EXISTS (SELECT 1 FROM @FinalResult WHERE AmountType = 1 AND ProductId = 0)
@@ -148,6 +149,8 @@ BEGIN
 			SELECT 0, '', '', 29, LicensingFee, 0 FROM @Result WHERE ProductId = 37 AND LicensingFee > 0
 			UNION ALL
 			SELECT 0, '', '', 44, ExtraAmount, 0 FROM @Result WHERE ProductId = 37 AND ExtraAmount > 0
+			UNION ALL
+			SELECT 0, '', '', 48, ExtraAmount, 0 FROM @Result WHERE ProductId = 74 AND ExtraAmount > 0
 
 		-- Prize, Contribution, Promotion, ...
 		INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, RemainingAmount, AmountType)
