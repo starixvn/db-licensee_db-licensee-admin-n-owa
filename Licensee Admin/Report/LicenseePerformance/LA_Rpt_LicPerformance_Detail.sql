@@ -79,6 +79,7 @@ AS
 		- 20211216@Percy: Enhance performance - Change table variable to temp table [RedmineID: #163181]
 		- 20210824@Danny: filter licensee status from OIC [#159296]
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
+		- 20221226@Danny: Integrate Player tips [#180703]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -370,7 +371,7 @@ BEGIN
 		,r.SportsbookFee, r.PreviousSportsbookFee, r.OtherProductsFee, r.PreviousOtherProductsFee
 		,r.DiscountSportsbook, r.PreviousDiscountSportsbook, r.DiscountOthers, r.PreviousDiscountOthers
 		,r.RebateSportsbook, r.PreviousRebateSportsbook, r.RebateOthers, r.PreviousRebateOthers
-		,r.PromotionSportsbook, r.PreviousPromotionSportsbook, r.SponsorshipSportsbook, r.PreviousSponsorshipSportsbook
+		,r.PromotionSportsbook, r.PreviousPromotionSportsbook,  r.PlayerTipsSportsbook, r.PreviousPlayerTipsSportsbook, r.SponsorshipSportsbook, r.PreviousSponsorshipSportsbook
 		,CONVERT(MONEY, 0) AS PromotionOthers, CONVERT(MONEY, 0) AS PreviousPromotionOthers
 		,r.TotalLicensingFee, r.PreviousTotalLicensingFee
 		,r.PartyId, CONVERT(BIT, 1) AS IsSelected -- Old format
@@ -390,8 +391,8 @@ BEGIN
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId = 3 THEN LicensingFee ELSE 0 END)) AS PreviousAmountDueToBA
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 AND ProductId = 0 THEN LicensingFee ELSE 0 END)) AS SportsbookFee
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId = 0 THEN LicensingFee ELSE 0 END)) AS PreviousSportsbookFee
-			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 AND ProductId NOT IN (0, 3, 37) THEN LicensingFee ELSE 0 END)) AS OtherProductsFee
-			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId NOT IN (0, 3, 37) THEN LicensingFee ELSE 0 END)) AS PreviousOtherProductsFee
+			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 AND ProductId NOT IN (0, 3, 37, 74) THEN LicensingFee ELSE 0 END)) AS OtherProductsFee
+			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId NOT IN (0, 3, 37, 74) THEN LicensingFee ELSE 0 END)) AS PreviousOtherProductsFee
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 AND ProductId = 0 THEN Discount ELSE 0 END)) AS DiscountSportsbook
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId = 0 THEN Discount ELSE 0 END)) AS PreviousDiscountSportsbook
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 AND ProductId <> 0 THEN Discount ELSE 0 END)) AS DiscountOthers
@@ -402,15 +403,19 @@ BEGIN
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId <> 0 THEN Rebate ELSE 0 END)) AS PreviousRebateOthers
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 AND ProductId = 37 THEN LicensingFee ELSE 0 END)) AS PromotionSportsbook
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId = 37 THEN LicensingFee ELSE 0 END)) AS PreviousPromotionSportsbook
+			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 AND ProductId = 74 THEN ExtraAmount ELSE 0 END)) AS PlayerTipsSportsbook
+			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId = 74 THEN ExtraAmount ELSE 0 END)) AS PreviousPlayerTipsSportsbook
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 AND ProductId = 37 THEN ExtraAmount ELSE 0 END)) AS SponsorshipSportsbook
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId = 37 THEN ExtraAmount ELSE 0 END)) AS PreviousSponsorshipSportsbook
 			,CONVERT(MONEY, SUM(CASE
 									WHEN IsPrevious = 1 OR ProductId = 3 THEN 0
 									WHEN ProductId = 37 THEN - LicensingFee - ExtraAmount
+									WHEN ProductId = 74 THEN ExtraAmount
 									ELSE LicensingFee - Discount - Rebate END)) AS TotalLicensingFee
 			,CONVERT(MONEY, SUM(CASE
 									WHEN IsPrevious = 0 OR ProductId = 3 THEN 0
 									WHEN ProductId = 37 THEN - LicensingFee - ExtraAmount
+									WHEN ProductId = 74 THEN ExtraAmount
 									ELSE LicensingFee - Discount - Rebate END)) AS PreviousTotalLicensingFee
 		FROM @Result
 		GROUP BY PartyId
