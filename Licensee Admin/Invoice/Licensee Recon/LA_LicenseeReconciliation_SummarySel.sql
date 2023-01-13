@@ -17,8 +17,7 @@ AS
 		- 20191210@Bruce: Include Promotion amount [#123958]
 		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
-		- 20220418@Percy: Add Credit for Setup Fees [RedmineID: #164139]
-		- 20221226@Danny: Integrate Player tips [#180703]
+		- 20220418@Percy: Add Credit for Setup Fees [RedmineID: #164139
 */
 BEGIN
 	SET NOCOUNT ON
@@ -39,8 +38,7 @@ BEGIN
 		ISNULL(Sponsorship,0) Sponsorship,
 		ClosingBalance,
 		CurrencyName,
-		ISNULL(UPPER(LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), PartyId) AS LicenseeCode,
-		ISNULL(PlayerTips,0) PlayerTips
+		ISNULL(UPPER(LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), PartyId) AS LicenseeCode
 	FROM bodb_licenseeReport.dbo.rptLicenseeReconciliation WITH(NOLOCK)
 	WHERE AccDate = @reportMonth AND Environment = @Environment AND (
 		ISNULL(@PartyIds,'') = '' OR PartyId IN (SELECT val FROM bodb02.dbo.strSplit(@PartyIds,','))

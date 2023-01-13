@@ -16,8 +16,7 @@ AS
 		- 20191210@Bruce: Add promotion [#123958]
 		- 20210323@Percy: Add LicenseeCode column [RedmineID: #152089]
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
-		- 20220418@Percy: Add Credit for Setup Fees [RedmineID: #164139]
-		- 20221226@Danny: Integrate Player tips [#180703]
+		- 20220418@Percy: Add Credit for Setup Fees [RedmineID: #164139
 */
 BEGIN
 	SET NOCOUNT ON
@@ -39,8 +38,7 @@ BEGIN
 		Prepayment,
 		Promotion,
 		Sponsorship,
-		SettlementDetails,
-		PlayerTips)
+		SettlementDetails)
 	SELECT @Environment,
 		t.Party.value('@ad', 'DATE')	AS AccDate,
 		t.Party.value('@pi', 'INT')		AS PartyId,
@@ -57,8 +55,7 @@ BEGIN
 		t.Party.value('@pp', 'MONEY')	AS Prepayment,
 		t.Party.value('@pm', 'MONEY')	AS Promotion,
 		t.Party.value('@ss', 'MONEY')	AS Sponsorship,
-		t.Party.value('text()[1]', 'VARCHAR(4000)')	AS SettlementDetails,
-		t.Party.value('@pt', 'MONEY')	AS PlayerTips
+		t.Party.value('text()[1]', 'VARCHAR(4000)')	AS SettlementDetails
 	FROM @XmlData.nodes('/root/r') t(Party)
 
 END
