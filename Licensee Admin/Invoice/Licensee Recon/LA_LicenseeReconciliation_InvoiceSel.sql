@@ -35,6 +35,7 @@ AS
 		- 20220222@Danny: Allbet - Promotion integration [#167510]
 		- 20220418@Percy: Add Credit for Setup Fees [RedmineID: #164139]
 		- 20221028@Danny: MG-RNG offer tournament prize [RedmineID: #176986]
+		- 20221226@Danny: Integrate Player tips [#180703]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -75,6 +76,7 @@ BEGIN
 		,SUM(CASE WHEN InvItemTypeId = 2 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) SetupFee
 		,SUM(CASE WHEN InvItemTypeId = 29 THEN ISNULL(Expense,0) ELSE 0 END) Promotion
 		,SUM(CASE WHEN InvItemTypeId = 44 THEN ISNULL(Expense,0) ELSE 0 END) Sponsorship
+		,SUM(CASE WHEN InvItemTypeId = 48 THEN ISNULL(-Income,0) ELSE 0 END) PlayerTips -- Recon show negative value
 	INTO #result
 	FROM @partyList p
 	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON p.PartyId = h.PartyId AND h.CurrencyId = p.BaseCurrencyId
@@ -114,6 +116,7 @@ BEGIN
 			,SUM(AMF) AMF
 			,SUM(Promotion) Promotion
 			,SUM(Sponsorship) Sponsorship
+			,SUM(PlayerTips) PlayerTips
 		FROM #result
 		GROUP BY ISNULL(LicenseeCode, '') + '|' + CONVERT(VARCHAR(50), PartyId), CurrencyName
 		ORDER BY LicenseeCode
@@ -132,6 +135,7 @@ BEGIN
 			,SUM(AMF) AMF
 			,SUM(Promotion) Promotion
 			,SUM(Sponsorship) Sponsorship
+			,SUM(PlayerTips) PlayerTips
 		FROM #result
 		GROUP BY PartyId, CurrencyName
 	END
