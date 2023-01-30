@@ -68,7 +68,8 @@ BEGIN
 		DELETE p
 		FROM @partyList p
 			INNER JOIN dbo.OAS_Party pt WITH(NOLOCK) ON pt.PartyID = p.PartyId
-			LEFT JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = pt.PartyName AND l.PlatformId = @PlatformId
+			INNER JOIN dbo.Licensees la WITH(NOLOCK) ON la.LicenseeID = pt.OldRefID
+			LEFT JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = la.LicenseeName AND l.PlatformId = @PlatformId
 		WHERE l.LicenseeId IS NULL
 	END
 

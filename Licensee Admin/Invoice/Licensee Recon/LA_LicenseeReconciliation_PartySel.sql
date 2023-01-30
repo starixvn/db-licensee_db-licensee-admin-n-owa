@@ -126,7 +126,8 @@ BEGIN
 		DELETE li
 		FROM #Licensees li
 			LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH(NOLOCK) ON li.PartyId = p.PartyID
-			LEFT JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = p.PartyName AND l.PlatformId = @PlatformId
+			LEFT JOIN bodb_licensee.dbo.Licensees la WITH(NOLOCK) ON la.LicenseeID = p.OldRefID
+			LEFT JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = la.LicenseeName AND l.PlatformId = @PlatformId
 		WHERE l.LicenseeId IS NULL
 	END
 
