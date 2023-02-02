@@ -11,6 +11,7 @@ ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_AmountToCompanySel]
 	,@IsShowSettlementDetail	BIT = 0
 	,@IsSyncProductWithInvoice	BIT = 0
 	,@IsGroupByPartyId			BIT = 0
+	,@PlatformId				TINYINT = 0
 AS
 /*	Header:
 	Task : Generate invoice amount for licensee
@@ -67,12 +68,22 @@ AS
 		- 20220218@Percy: Return BetCount [RedmineID: #161429]
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 		- 20221226@Danny: Integrate Player tips [#180703]
+		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 
 */
 BEGIN
 	SET NOCOUNT ON
 	
 	-- Get Party List
+	IF ISNULL(@PlatformId, 0) <> 0
+	BEGIN
+		SELECT @PartyIds = ISNULL(STRING_AGG(CONVERT(VARCHAR(50), p.PartyID), ','), '')
+		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+			INNER JOIN bodb_licensee.dbo.Licensees la WITH(NOLOCK) ON p.OldRefID = la.LicenseeID
+		    INNER JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = la.LicenseeName AND l.PlatformId = @PlatformId
+		WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIds, ',')) 
+	END
+
 	DECLARE @PartyList TABLE (PartyId INT, LicenseeCode VARCHAR(100))
 	INSERT INTO @PartyList (PartyId)
 	SELECT value FROM STRING_SPLIT(@PartyIds, ',')

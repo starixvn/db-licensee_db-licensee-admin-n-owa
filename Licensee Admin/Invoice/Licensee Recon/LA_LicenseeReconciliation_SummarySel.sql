@@ -3,9 +3,10 @@ USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_SummarySel]
-	@Month	DATE,
-	@Environment VARCHAR(10),
-	@PartyIds VARCHAR(4000) = ''
+	@Month		  DATE
+	,@Environment VARCHAR(10)
+	,@PartyIds	  VARCHAR(4000) = ''
+	,@PlatformId  TINYINT = 0
 AS
 /*	Header:
 	Created: 20191017@Bruce
@@ -19,10 +20,20 @@ AS
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 		- 20220418@Percy: Add Credit for Setup Fees [RedmineID: #164139
 		- 20221226@Danny: Integrate Player tips [#180703]
+		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 */
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @reportMonth DATE = DATEADD(MONTH,DATEDIFF(MONTH,0,@Month),0)
+
+	IF ISNULL(@PlatformId, 0) <> 0
+	BEGIN
+		SELECT @PartyIds = ISNULL(STRING_AGG(CONVERT(VARCHAR(50), p.PartyID), ','), '')
+		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+			INNER JOIN bodb_licensee.dbo.Licensees la WITH(NOLOCK) ON p.OldRefID = la.LicenseeID
+		    INNER JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = la.LicenseeName AND l.PlatformId = @PlatformId
+		WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIds, ',')) 
+	END
 
 	SELECT 
 		AccDate,

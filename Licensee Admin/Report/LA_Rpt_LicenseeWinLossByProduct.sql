@@ -3,11 +3,12 @@ USE [bodb_Licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinLossByProduct]
-	@PartyIdString		VARCHAR(MAX),
-	@FromDate			DATETIME,
-	@ToDate				DATETIME,
-	@BaseCurrencyName	VARCHAR(10),
-	@LicenseeStatusIds	VARCHAR(100)
+	@PartyIdString		VARCHAR(MAX)
+	,@FromDate			DATETIME
+	,@ToDate			DATETIME
+	,@BaseCurrencyName	VARCHAR(10)
+	,@LicenseeStatusIds	VARCHAR(100)
+	,@PlatformId		TINYINT = 0
 AS
 
 /*	Header:
@@ -77,6 +78,7 @@ AS
 		- 20220228@Danny: Allbet - Promotion integration [#167510]
 		- 20220329@Danny: Intergrate Guaranteed Gaming [#167626]
 		- 20220926@Danny: Intergrate MG-RNG [#176986]
+		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 */
 		
 /*	Example:
@@ -137,6 +139,15 @@ BEGIN
 	-- Handle Licensee status
 	SELECT @PartyIdString = PartyIDs FROM dbo.LA_f_PartyListByStatusSel(@PartyIdString, @LicenseeStatusIds)
 	-- End Handle Licensee status
+
+	IF ISNULL(@PlatformId, 0) <> 0
+	BEGIN
+		SELECT @PartyIdString = ISNULL(STRING_AGG(CONVERT(VARCHAR(50), p.PartyID), ','), '')
+		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+			INNER JOIN bodb_licensee.dbo.Licensees la WITH(NOLOCK) ON p.OldRefID = la.LicenseeID
+		    INNER JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = la.LicenseeName AND l.PlatformId = @PlatformId
+		WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIdString, ',')) 
+	END
 
 	-- Region: Get Party ID
 	INSERT #PartyIdTable (Id)

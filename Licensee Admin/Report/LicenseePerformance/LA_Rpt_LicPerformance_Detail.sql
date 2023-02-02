@@ -1,20 +1,18 @@
 /*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-USE [bodb02]
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_LicPerformance_Detail]
-	@PartyIds				VARCHAR(MAX) = ''
-	,@Currency				INT = 0
-	,@FromDate				DATETIME
-	,@ToDate				DATETIME
-	,@ProductCodes			VARCHAR(MAX)
-	,@IsConvert				BIT = 1
-	,@BaseCurrency			INT = 6
-	,@BaseCurrencyName		VARCHAR(10) = 'EUR'
-	,@DrawFilter			SMALLINT = 1
-	,@LicenseePaying		INT = 0
-	,@PreviousPeriodType	INT = 1
-	,@LicenseeStatusIds	VARCHAR(100) 
+	@PartyIds			 VARCHAR(MAX) = ''
+	,@Currency			 INT = 0
+	,@FromDate			 DATETIME
+	,@ToDate			 DATETIME
+	,@ProductCodes		 VARCHAR(MAX)
+	,@IsConvert			 BIT = 1
+	,@BaseCurrency		 INT = 6
+	,@BaseCurrencyName	 VARCHAR(10) = 'EUR'
+	,@DrawFilter		 SMALLINT = 1
+	,@LicenseePaying	 INT = 0
+	,@PreviousPeriodType INT = 1
+	,@LicenseeStatusIds	 VARCHAR(100) 
+	,@PlatformId		 TINYINT = 0
 AS
 
 /*	Created: 20141209@Patrick
@@ -80,6 +78,7 @@ AS
 		- 20210824@Danny: filter licensee status from OIC [#159296]
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 		- 20221226@Danny: Integrate Player tips [#180703]
+		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -127,6 +126,15 @@ BEGIN
 
 	-- Get Party List
 	BEGIN
+		IF ISNULL(@PlatformId, 0) <> 0
+		BEGIN
+			SELECT @PartyIds = ISNULL(STRING_AGG(CONVERT(VARCHAR(50), p.PartyID), ','), '')
+			FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+				INNER JOIN bodb_licensee.dbo.Licensees la WITH(NOLOCK) ON p.OldRefID = la.LicenseeID
+		    INNER JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = la.LicenseeName AND l.PlatformId = @PlatformId
+			WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIds, ',')) 
+		END
+
 		DECLARE @PartyList TABLE (PartyId INT, PartyName VARCHAR(50), LaunchDate DATE, StatusID INT)
 		INSERT INTO @PartyList (PartyId)
 		SELECT DISTINCT val FROM dbo.StrSplit(@PartyIds, ',')

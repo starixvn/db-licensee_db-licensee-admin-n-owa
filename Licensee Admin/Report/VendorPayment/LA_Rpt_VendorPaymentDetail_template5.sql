@@ -1,11 +1,12 @@
 ﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template5]
-	@PartyIds			VARCHAR(4000),
-	@ProductID			INT,
-	@FromDate			DATETIME,
-	@ToDate				DATETIME,
-	@BaseCurrencyName	VARCHAR(20),
-	@TimeZoneId			INT
+	@PartyIds			VARCHAR(4000)
+	,@ProductID			INT
+	,@FromDate			DATETIME
+	,@ToDate			DATETIME
+	,@BaseCurrencyName	VARCHAR(20)
+	,@TimeZoneId		INT
+	,@PlatformId		TINYINT = 0
 AS
 /*
  * Created by : [20220405@Danny]
@@ -14,12 +15,22 @@ AS
 	- 20210615@Danny: Initialize SP [#168387]
 	- 20221031@Danny: PP Tournament for Credit licensee [RedmineID: #178619]
 	- 20220927@Danny: Fix issue BetCount and Licensing Fee PP GMT-4 are incorrect [#176775]
+	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
  */
 
 BEGIN
 	SET NOCOUNT ON 
 	DECLARE @ProductCode VARCHAR(50)
 	SELECT @ProductCode = ProductPrefix FROM dbo.Product3rd WITH(NOLOCK) WHERE Productid = @ProductID
+
+	IF ISNULL(@PlatformId, 0) <> 0
+	BEGIN
+		SELECT @PartyIds = ISNULL(STRING_AGG(CONVERT(VARCHAR(50), p.PartyID), ','), '')
+		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+			INNER JOIN bodb_licensee.dbo.Licensees la WITH(NOLOCK) ON p.OldRefID = la.LicenseeID
+		    INNER JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = la.LicenseeName AND l.PlatformId = @PlatformId
+		WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIds, ',')) 
+	END
 
 	DECLARE		@Contribution INT,
 				@JackpotPrize INT

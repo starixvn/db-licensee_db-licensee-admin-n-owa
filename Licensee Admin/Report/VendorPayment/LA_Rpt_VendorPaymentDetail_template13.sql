@@ -1,21 +1,24 @@
 ﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template13]
-	@PartyIds			VARCHAR(4000),
-	@ProductID			INT,
-	@FromDate			DATETIME,
-	@ToDate				DATETIME,
-	@BaseCurrencyName	VARCHAR(20),
-	@GameType			TINYINT,
-	@GroupBy			TINYINT,
-	@TimeZoneId			INT
+	@PartyIds			VARCHAR(4000)
+	,@ProductID			INT
+	,@FromDate			DATETIME
+	,@ToDate			DATETIME
+	,@BaseCurrencyName	VARCHAR(20)
+	,@GameType			TINYINT
+	,@GroupBy			TINYINT
+	,@TimeZoneId		INT = 1
+	,@PlatformId		TINYINT = 0
 AS
 /*
 	Created by : [20220405@Danny]
 	Task  : Vendor Payment Detail (template13 - MacauGame)
 	Revisions
 		- 20210615@Danny: Initialize SP [#168387]
-	    - 20220927@Danny: Remove DBLink [#176986] 
+		- 20220927@Danny: Remove DBLink [#176986]
 		- 20221206@Malcolm: Separate data of Blueprint and Normal games for Macau Games product [RedmineId: #179006]
+		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
+
 	Param's Explanation:
 		+ @GroupBy :
 			- 0 : Licensee
@@ -33,6 +36,15 @@ BEGIN
 
 	DECLARE @IsConvertNegativeFeeToZero BIT, @IsConvertNegativePaytoSupplierToZero BIT
 	SELECT @IsConvertNegativeFeeToZero = IsConvertNegativeFeeToZero, @IsConvertNegativePaytoSupplierToZero = IsConvertNegativePaytoSupplierToZero  FROM dbo.LA_VendorPaymentSetting WITH(NOLOCK) WHERE ProductId = @ProductID
+
+	IF ISNULL(@PlatformId, 0) <> 0
+	BEGIN
+		SELECT @PartyIds = ISNULL(STRING_AGG(CONVERT(VARCHAR(50), p.PartyID), ','), '')
+		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+			INNER JOIN bodb_licensee.dbo.Licensees la WITH(NOLOCK) ON p.OldRefID = la.LicenseeID
+		    INNER JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = la.LicenseeName AND l.PlatformId = @PlatformId
+		WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIds, ',')) 
+	END
 
 	DECLARE @ProductCode VARCHAR(50)
 	DECLARE @BettypeIdList TABLE (BetTypeId INT)
