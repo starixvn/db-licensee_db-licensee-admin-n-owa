@@ -17,6 +17,7 @@ ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
 		- 20180301@Harper: Support SGD as base currency [RedmineID: #91339] 
 		- 20221003@Danny: Support USDT as base currency [RedmineID: #177718]
 		- 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]
+		- 20220216@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 
 	Param's Explanation:				
 */
