@@ -36,6 +36,7 @@ AS
 		- 20220623@Percy: Remove dropdown function & user [RedmineID: #166504]
 		- 20220831@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
 		- 20221205@Danny: Remove Hx9candy From Crypto Licensee List [RedmineID: #181279]
+		- 20230213@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -259,7 +260,7 @@ BEGIN
 		-- LA_InvoiceSetting
 		IF ISNULL(@BillerId, 0) <> 0
 			INSERT INTO dbo.LA_InvoiceSetting (FromPartyId, ToPartyId, ProductId, InvTypeId, InvTempId, BankId, ActiveAddress)
-			SELECT @NewPartyId, @BillerId, ProductId, InvTypeId, InvTemplateId, 0 AS BankId, 1 AS ActiveAddress
+			SELECT DISTINCT @NewPartyId, @BillerId, ProductId, InvTypeId, InvTemplateId, 0 AS BankId, 1 AS ActiveAddress
 			FROM (
 				SELECT InvTemplateId, InvTemplateName
 					,CASE InvTemplateName
