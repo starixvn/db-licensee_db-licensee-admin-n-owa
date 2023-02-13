@@ -1,1 +1,1 @@
-Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_Detail.sql
+Licensee Admin\Manage\Invoice Setting\PayerSetting\LA_PayerSettingModify.sql

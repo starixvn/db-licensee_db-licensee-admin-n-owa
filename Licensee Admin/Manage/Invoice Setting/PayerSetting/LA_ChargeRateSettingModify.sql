@@ -32,7 +32,7 @@ AS
 		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 		- 20211101@Percy: Don't add new SB Rate if Licensee is belong to discount group on Lic WL [RedmineID: #162158]
 		- 20220831@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
-		- 20230213@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
+		- 20230213@Malcolm: Fix duplicate data error [RemineID: #171705]
 
 	 Params:
 		+ @ChargeSettingXML: '<ChargeSettings>
