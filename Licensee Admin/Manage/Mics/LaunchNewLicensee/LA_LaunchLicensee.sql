@@ -36,7 +36,7 @@ AS
 		- 20220623@Percy: Remove dropdown function & user [RedmineID: #166504]
 		- 20220831@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
 		- 20221205@Danny: Remove Hx9candy From Crypto Licensee List [RedmineID: #181279]
-		- 20230213@Malcolm: Fix duplicate data error [RemineID: #171705]
+		- 20230213@Malcolm: Fix duplicate data error [RemineID: #183774]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
