@@ -12,6 +12,7 @@ AS
 	- 20220405@Danny: Intergrate Guaranteed Gaming [#167626]
 	- 20221123@Danny: Intergrate MG-RNG [#176986]
 	- 20230224@Danny: Intergrate Jili [#183766]
+	- 20230222@Danny: Remove hard-code bettype And ProductID [#183739]
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
 							= 1: GMT-4
@@ -46,27 +47,33 @@ BEGIN
 			ProductPrefix,
 			ProductName,
 			CASE WHEN ProductID IN (2, 31, 21, 25, 15) OR ProductPrefix = 'SB_MuayThai'  THEN 1 ELSE 0 END isKeepNegativeFee , 
-			CASE WHEN ProductID IN (2, 8, 10, 23, 49, 28, 31, 32, 34, 36, 40, 45, 46, 47, 50, 51, 52, 55, 56, 57, 59, 60, 61, 62, 65, 67, 68, 69, 36, 39, 21, 25, 15, 24, 27, 22, 70, 73, 75) OR ProductPrefix IN ('SB_MuayThai','SB_BetBuilder') THEN 1 ELSE 0 END isKeepNegativePayToSupplier,
+			CASE WHEN ProductID = 5 THEN 0 ELSE 1 END isKeepNegativePayToSupplier,
 			CASE WHEN ProductID IN (2, 22,23,34) OR ProductPrefix = 'SB_BetBuilder' THEN 1 ELSE 0 END isRptBettingSource,
 			CASE WHEN ProductPrefix = 'SB_MuayThai' THEN 1 ELSE 0 END isRptBettingBySportSource,
-			CASE WHEN ProductID IN (21, 24, 36, 39, 45, 51, 56, 62, 70, 75) THEN 1 ELSE 0 END isSupportGMT8,
-			CASE WHEN ProductID IN (32, 65, 73) THEN 1 ELSE 0 END isSupportGMT0,
-			CASE WHEN ProductID = 25 THEN 1 ELSE 0 END
+			CASE WHEN TimezoneIDs LIKE '%2%' THEN 1 ELSE 0 END isSupportGMT8,
+			CASE WHEN TimezoneIDs LIKE '%0%' THEN 1 ELSE 0 END isSupportGMT0,
+			CASE WHEN ProductID = 25 THEN 1 ELSE 0 END isRptLicCashoutSummarySource
 	FROM (
-			SELECT x.ProductPrefix, x.ProductID, x.ProductName FROM dbo.Product3rd x WITH(NOLOCK)
+			SELECT	CASE WHEN z.ProductID = 1000 THEN 'SB_BetBuilder'
+						WHEN z.ProductID = 1001 THEN 'SB_MuayThai'
+						ELSE x.ProductPrefix END ProductPrefix, 
+					CASE WHEN z.ProductID IN (1000, 1001) THEN 0 ELSE z.ProductID END ProductID, 
+					CASE WHEN z.ProductID = 1000 THEN 'BetBuilder' 
+						 WHEN z.ProductID = 1001 THEN 'Muay Thai' ELSE x.ProductName END ProductName , 
+					z.TimezoneIDs 
+			FROM LA_VendorPaymentSetting z WITH(NOLOCK) 
+			LEFT  JOIN dbo.Product3rd x WITH(NOLOCK) ON x.Productid = z.ProductId
+			WHERE  z.IsActive = 1
 			UNION ALL
-			SELECT 'SB_MuayThai' AS ProductPrefix, 0, 'Muay Thai' AS ProductID
-			UNION ALL 
-			SELECT 'SB_BetBuilder' AS ProductPrefix, 0, 'BetBuilder' AS ProductID
+			SELECT ProductPrefix, ProductID, ProductName, '1' FROM dbo.Product3rd x WITH(NOLOCK) WHERE Productid = 23 --NG2
 	) x
-	WHERE x.ProductPrefix IN ('CO','SB_BetBuilder','SB_MuayThai','NG','VS','KN','AGC','CB','AB','VB','NG2','FW','CO','VS2','LT','BX','PP','CC','SG','SAG','TG','SXG','IBCLC','BBIN','VS3','RNGW','WM','ION','PGS','JK','BGG','GDG','MXG','HB','CG','PPL','AP','APM','BTC','FGGL','MGRNG','JIG')
 	
 	IF @isShowDetail = 1
 	BEGIN
 
 		SELECT ProductID, ProductCode, ProductName , isKeepNegativeFee, isKeepNegativePayToSupplier, isRptBettingSource, isRptBettingBySportSource, isSupportGMT8, isSupportGMT0, isRptLicCashoutSummarySource
 		FROM @tbl_All3rdProducts
-		WHERE ( ProductCode IN (SELECT val FROM strSplit(@ProductCodes, ',')) OR @ProductCodes = '') 
+		WHERE ( ProductCode IN (SELECT value FROM STRING_SPLIT(@ProductCodes, ',')) OR @ProductCodes = '') 
 			AND (
 					 (isSupportGMT8 = CASE WHEN @Timezone = 2 THEN 1 ELSE 0 END AND isSupportGMT0 = CASE WHEN @Timezone = 0 THEN 1 ELSE 0 END)
 					 OR @Timezone = 1
@@ -77,7 +84,7 @@ BEGIN
 	BEGIN
 		SELECT ProductCode, ProductName
 		FROM @tbl_All3rdProducts
-		WHERE ( ProductCode IN (SELECT val FROM strSplit(@ProductCodes, ',')) OR @ProductCodes = '') 
+		WHERE ( ProductCode IN (SELECT value FROM STRING_SPLIT(@ProductCodes, ',')) OR @ProductCodes = '') 
 			AND (
 					 (isSupportGMT8 = CASE WHEN @Timezone = 2 THEN 1 ELSE 0 END AND isSupportGMT0 = CASE WHEN @Timezone = 0 THEN 1 ELSE 0 END)
 					 OR @Timezone = 1

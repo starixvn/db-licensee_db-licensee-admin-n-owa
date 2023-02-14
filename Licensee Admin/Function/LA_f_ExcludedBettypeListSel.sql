@@ -24,6 +24,7 @@ AS
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 		- 20220218@Danny: Allbet - Promotion integration [#167510]
 		- 20221024@Danny: MG-RNG - Tournament Prize [#176986]
+		- 20230217@Danny: SG - Promotion prize integration [#183739]
 
 	Param's Explanation:
 		@ProductIDs: Filter by list of products 
@@ -65,7 +66,7 @@ BEGIN
 		FROM (VALUES(3898, 'VGA Jackpot Contribution'), (3899, 'VGA Jackpot Prize')) AS v(BettypeID, [Description]) -- VGA
 			UNION ALL
 		SELECT 36 AS ProductID, BettypeID, [Description]
-		FROM (VALUES(4599, 'SG Jackpot Contribution'), (4600, 'SG Jackpot Prize')) AS v(BettypeID, [Description]) -- SG
+		FROM (VALUES(4599, 'SG Jackpot Contribution'), (4600, 'SG Jackpot Prize'), (4598, 'SG Promotion Prize')) AS v(BettypeID, [Description]) -- SG
 			UNION ALL
 		SELECT 21 AS ProductID, BettypeID, [Description]
 		FROM (VALUES(2499, 'Promotion')) AS v(BettypeID, [Description]) -- Allbet

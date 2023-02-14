@@ -80,6 +80,7 @@ AS
 		- 20220926@Danny: Intergrate MG-RNG [#176986]
 		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 		- 20220314@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+		- 20230217@Danny: Remove hard-code bettype And ProductID [#183739]
 */
 		
 /*	Example:
@@ -206,16 +207,17 @@ BEGIN
 			SUM(ISNULL(b.CommissionA, 0)) AS AComm,
 			SUM(ISNULL(b.CommissionP, 0)) AS PComm,
 			t.GroupProductId AS ProductId,
-			CASE WHEN b.Bettype IN (1706,999) THEN b.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END AS BettypeRef
+			CASE WHEN eb.TypeId IN (1,7) THEN b.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END AS BettypeRef
 	FROM	#rpt_bettingByProduct b
 			INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON b.SiteID = p.OldRefID AND p.PartyType = 1
 			INNER JOIN #Products t ON b.ProductId = t.ProductId
 			LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.Bettype = b.Bettype
-			LEFT JOIN LA_f_ExcludedBettypeListSel('','1706,999') eb ON b.Bettype = eb.BettypeID
+			LEFT JOIN dbo.LA_f_GroupBettype() eb ON b.Bettype = eb.Bettype 
+
 	WHERE	( b.ProductID NOT IN (15,25)
 			OR b.ProductId NOT IN (SELECT x.ProductID FROM @ProductHaveExtraAmtList x)
-			) AND eb.BettypeID IS NULL
-	GROUP BY b.rptdate, b.SiteId, b.CurrencyID, t.GroupProductId, CASE WHEN b.Bettype IN (1706,999) THEN b.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
+			) AND (eb.Bettype IS NULL OR eb.TypeId IN (1, 7)) --1:Tips ,7:OddsSpread Adjustment
+	GROUP BY b.rptdate, b.SiteId, b.CurrencyID, t.GroupProductId, CASE WHEN eb.TypeId IN (1,7) THEN b.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
 	CREATE CLUSTERED INDEX #TempData ON #TempData(ProductId, LicenseeId)
 	-- EndRegion
 

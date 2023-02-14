@@ -47,6 +47,7 @@ AS
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 		- 20221028@Danny: MG-RNG offer tournament prize [RedmineID: #176986]
 		- 20221226@Danny: Integrate Player tips [#180703]
+		- 20230217@Danny: SG - Promotion prize integration [#183739]
 */
 
 BEGIN
@@ -169,6 +170,7 @@ BEGIN
 				WHEN ProductId = 45 AND LicensingFeeTypeId = 5 THEN 37 -- Lucky Draw
 				WHEN ProductId = 36 AND LicensingFeeTypeId = 1 THEN 41 -- Contribution
 				WHEN ProductId = 36 AND LicensingFeeTypeId = 2 THEN 42 -- JackpotPrize
+				WHEN ProductId = 36 AND LicensingFeeTypeId = 3 THEN 49 -- Promotion
 				WHEN ProductId = 21 AND LicensingFeeTypeId = 10 THEN 43 -- Promotion
 				WHEN ProductId = 73 AND LicensingFeeTypeId = 3 THEN 47 -- Prizes
 				END
@@ -189,6 +191,7 @@ BEGIN
 				WHEN ProductId = 45 AND LicensingFeeTypeId = 5 THEN 37 -- Lucky Draw
 				WHEN ProductId = 36 AND LicensingFeeTypeId = 1 THEN 41 -- Contribution
 				WHEN ProductId = 36 AND LicensingFeeTypeId = 2 THEN 42 -- JackpotPrize
+				WHEN ProductId = 36 AND LicensingFeeTypeId = 3 THEN 49 -- Promotion
 				WHEN ProductId = 21 AND LicensingFeeTypeId = 10 THEN 43 -- Promotion
 				WHEN ProductId = 73 AND LicensingFeeTypeId = 3 THEN 47 -- Prizes
 				END
