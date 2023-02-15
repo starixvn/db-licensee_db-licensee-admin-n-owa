@@ -32,6 +32,7 @@ AS
 		- 20200619@Happy: Increase the length of @ProductCode params [#128570]
 		- 20211101@Percy: Don't add new SB Rate if Licensee is belong to discount group on Lic WL [RedmineID: #162158]
 		- 20220831@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
+		- 20230213@Malcolm: Fix duplicate data error [RemineID: #183774]
 
 	 Params:
 		+ @ChargeSettingXML: '<ChargeSettings>
@@ -305,7 +306,7 @@ BEGIN
 
 		IF ISNULL(@BillerId, 0) <> 0
 			INSERT INTO dbo.LA_InvoiceSetting (FromPartyId, ToPartyId, ProductId, InvTypeId, InvTempId, BankId, ActiveAddress)
-			SELECT @PayerID, @BillerId, ProductId, InvTypeId, InvTemplateId, 0 AS BankId, 1 AS ActiveAddress
+			SELECT DISTINCT @PayerID, @BillerId, ProductId, InvTypeId, InvTemplateId, 0 AS BankId, 1 AS ActiveAddress
 			FROM (
 				SELECT InvTemplateId, InvTemplateName
 					,CASE InvTemplateName
