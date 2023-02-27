@@ -15,6 +15,7 @@ AS
 		- 20200302@Parsons: Support-HID-currency [#128856]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 		- 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]
+		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 
 	Params:
 	Example: EXEC [LA_PayerCurrencySel] 15
@@ -23,7 +24,7 @@ BEGIN
 	SET NOCOUNT ON
 	
 	DECLARE @LicenseeID INT = (SELECT TOP 1 p.OldRefID FROM dbo.OAS_Party p WITH (NOLOCK) WHERE p.PartyID = @PayerId)
-	DECLARE @Result TABLE (CurrencyId INT, CurrencyCode VARCHAR(20), CurrencyName VARCHAR(20))
+	DECLARE @Result TABLE (CurrencyId INT, CurrencyCode VARCHAR(65), CurrencyName VARCHAR(20))
 	
 	INSERT INTO @Result(CurrencyId, CurrencyCode, CurrencyName)
 	SELECT DISTINCT lc.Currency,
@@ -49,7 +50,7 @@ BEGIN
 	UPDATE e
 	SET e.CurrencyCode = e.CurrencyCode + ' (' + e.CurrencyName + ')' 
 	FROM @Result e
-	WHERE e.CurrencyName = 'USDT' AND e.CurrencyCode = 'USD'
+	WHERE e.CurrencyName IN ('USDT','USDTJP') AND e.CurrencyCode = 'USD'
 
 	SELECT CurrencyId, CurrencyCode, CurrencyName
 	FROM @Result

@@ -17,6 +17,7 @@ AS
 
 	Revisions: 
 		- 20210727@Percy: Initialize SP [RedmineID: #155593]
+		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 */
 
 BEGIN
@@ -46,7 +47,7 @@ BEGIN
 	WHERE p.PartyId IN (SELECT CONVERT(INT, val) FROM bodb02.dbo.strSplit(@PartyIds, ','))
 
 	-- Get Exchange
-	DECLARE @Exchange TABLE (ExchangeId INT, ExchangeDate SMALLDATETIME, Code VARCHAR(10), Rate FLOAT)
+	DECLARE @Exchange TABLE (ExchangeId INT, ExchangeDate SMALLDATETIME, Code VARCHAR(65), Rate FLOAT)
 	INSERT INTO @Exchange (ExchangeId, ExchangeDate, Code, Rate)
 	SELECT ExchangeId, ExchangeDate, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel (@FromDate, @ToDate, @BaseCurrencyName)

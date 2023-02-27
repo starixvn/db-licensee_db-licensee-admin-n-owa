@@ -24,6 +24,7 @@ AS
 	- 20210623@Danny: Fix PaytoSuplier PPL issue [#168387]
 	- 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
+	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
@@ -264,7 +265,7 @@ BEGIN
 	CREATE TABLE #Exchange (
 		ExchangeDate	DATE,
 		ExchangeID		INT,
-		CurrencyCode	VARCHAR(10),
+		CurrencyCode	VARCHAR(65),
 		Rate			FLOAT
 	)
 

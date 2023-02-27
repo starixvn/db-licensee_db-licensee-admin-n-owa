@@ -21,6 +21,7 @@ AS
 	   - 20220110@Danny: SG - Jackpot prize integration [#167089]
 	   - 20220222@Danny: Allbet - Promotion integration [#167510]
 	   - 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
+	   - 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 */
 
 BEGIN
@@ -99,7 +100,7 @@ BEGIN
 	FROM @Data d
 
 	-- Get BaseCurrencyRate
-	DECLARE @ExchangeRate AS TABLE(BaseCurrencyId INT, ExchangeId INT, ExchangeDate DATETIME, BaseCurrencyRate FLOAT, Code VARCHAR(10))
+	DECLARE @ExchangeRate AS TABLE(BaseCurrencyId INT, ExchangeId INT, ExchangeDate DATETIME, BaseCurrencyRate FLOAT, Code VARCHAR(65))
 	DECLARE @tempCurrency VARCHAR(10)
 	DECLARE @tempCurrencyId INT
 	

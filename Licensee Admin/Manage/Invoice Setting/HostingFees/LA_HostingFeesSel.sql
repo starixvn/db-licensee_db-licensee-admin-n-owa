@@ -12,7 +12,7 @@ AS
    
 	 Revisions:
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
-	 
+		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 	 Params:
 		
 	 Example:
@@ -21,7 +21,7 @@ AS
 BEGIN	
 	SET NOCOUNT ON
 	DECLARE @Currency TABLE(
-		Id INT, Name VARCHAR(10)
+		Id INT, Name VARCHAR(65)
 	)
 
 	DECLARE @FirstDate DATETIME = DATEADD(mm, DATEDIFF(mm, 0, GETDATE()), 0)

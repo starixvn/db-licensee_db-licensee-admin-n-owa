@@ -17,11 +17,11 @@ ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
 		- 20180301@Harper: Support SGD as base currency [RedmineID: #91339] 
 		- 20221003@Danny: Support USDT as base currency [RedmineID: #177718]
 		- 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]
-		- 20220216@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 
 	Param's Explanation:				
 */
-RETURNS @tempDate TABLE (exchangedate DATETIME, ExchangeId INT, Code VARCHAR(10)
+RETURNS @tempDate TABLE (exchangedate DATETIME, ExchangeId INT, Code VARCHAR(65)
 		, BaseCurrencyRate FLOAT
 		--, MYR FLOAT, USD FLOAT, EUR FLOAT, CNY FLOAT, GBP FLOAT, actualrate FLOAT
 		, UNIQUE CLUSTERED(exchangedate, exchangeid))
@@ -55,6 +55,7 @@ BEGIN
 			SELECT @tmpDate, t.ExchangeId
 				,CASE WHEN t.ExchangeId = 142 THEN 'USDT'
 					WHEN t.ExchangeId = 96 THEN 'USD (USDT)'
+					WHEN t.ExchangeId = 202 THEN 'USD (USDTJP)'
 					ELSE t.Code END 
 				,CASE WHEN @BaseCurrency = 'MYR' THEN t.MYR
 					WHEN @BaseCurrency = 'USD' THEN t.USD

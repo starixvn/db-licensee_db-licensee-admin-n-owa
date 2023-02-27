@@ -63,6 +63,7 @@ AS
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
+		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 */
 
 BEGIN
@@ -149,7 +150,7 @@ BEGIN
 
 		IF @InvoiceTypeId = 6 -- Hosting Fees
 		BEGIN
-			DECLARE @Exchange TABLE (ExchangeId INT, Code VARCHAR(20), Rate FLOAT)
+			DECLARE @Exchange TABLE (ExchangeId INT, Code VARCHAR(65), Rate FLOAT)
 			INSERT INTO @Exchange (ExchangeId, Code, Rate)
 			SELECT ExchangeId, Code, BaseCurrencyRate FROM bodb02.dbo.LA_f_ExchangeDailySel(@ToDate, @ToDate, @BaseCurrency)
 			

@@ -15,6 +15,7 @@ AS
  * Revisions
 	- 20191017@Mason: Saba Promotion [#119538]
 	- 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]
+	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 
  * Param's Explanation:
 	* PartyIds: a string of list PartyID, separate by ','
@@ -50,7 +51,7 @@ BEGIN
 	CREATE TABLE #Exchange (
 		ExchangeDate	DATE,
 		ExchangeID		INT,
-		CurrencyCode	VARCHAR(10),
+		CurrencyCode	VARCHAR(65),
 		Rate			FLOAT
 	)
 	
@@ -65,7 +66,7 @@ BEGIN
 	-- ** Offer Currency
 	DECLARE @OfferedCurrency AS TABLE (CurrencyId INT)
 	INSERT INTO @OfferedCurrency (CurrencyId)
-	SELECT e.ExchangeID FROM #Exchange e WHERE e.CurrencyCode IN ('CNY', 'THB', 'IDR', 'INH', 'MYR', 'USD', 'USD (USDT)')
+	SELECT e.ExchangeID FROM #Exchange e WHERE e.CurrencyCode IN ('CNY', 'THB', 'IDR', 'INH', 'MYR', 'USD', 'USD (USDT)', 'USD (USDTJP)')
 	
 	-- ** Region: TempData
 	CREATE TABLE #TempData (

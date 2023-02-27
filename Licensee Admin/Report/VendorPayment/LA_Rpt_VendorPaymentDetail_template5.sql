@@ -16,6 +16,7 @@ AS
 	- 20221031@Danny: PP Tournament for Credit licensee [RedmineID: #178619]
 	- 20220927@Danny: Fix issue BetCount and Licensing Fee PP GMT-4 are incorrect [#176775]
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
+	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
  */
 
 BEGIN
@@ -74,7 +75,7 @@ BEGIN
 	CREATE TABLE #Exchange (
 		ExchangeDate	DATE,
 		ExchangeID		INT,
-		CurrencyCode	VARCHAR(10),
+		CurrencyCode	VARCHAR(65),
 		Rate			FLOAT
 	)	
 	

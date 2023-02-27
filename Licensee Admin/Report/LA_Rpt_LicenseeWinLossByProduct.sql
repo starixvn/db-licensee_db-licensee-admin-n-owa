@@ -79,6 +79,7 @@ AS
 		- 20220329@Danny: Intergrate Guaranteed Gaming [#167626]
 		- 20220926@Danny: Intergrate MG-RNG [#176986]
 		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
+		- 20220314@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 */
 		
 /*	Example:
@@ -107,7 +108,7 @@ BEGIN
 	DECLARE @ProductHaveExtraAmtList TABLE (ProductID INT)	
 
 	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductCode VARCHAR(100), ProductName VARCHAR(100))
-	CREATE TABLE #Exchange (ExchangeDate DATE,ExchangeID INT,CurrencyCode VARCHAR(10),Rate FLOAT)
+	CREATE TABLE #Exchange (ExchangeDate DATE,ExchangeID INT,CurrencyCode VARCHAR(65),Rate FLOAT)
 	CREATE TABLE #rpt_bettingByProduct (SiteID INT,rptDate DATETIME,CurrencyId INT,MemberWL MONEY,GrossWL MONEY,CommissionA MONEY,CommissionP MONEY,ProductId TINYINT, Bettype INT,
 	Turnover MONEY, BuyBackAmount MONEY, WinPrizeAmount MONEY, ValidBetAmount MONEY, TicketType TINYINT, ExtraAmount MONEY, CashOutAmount MONEY)
 	CREATE TABLE #TempData (LicenseeId	INT,rptDate	DATETIME,CurrencyId	INT,MemberWL MONEY,AWinLoss	MONEY,AComm	MONEY,PComm	MONEY,ProductId	TINYINT,BettypeRef INT)

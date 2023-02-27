@@ -126,7 +126,7 @@ BEGIN
 	(
 		ExchangeDate			DATE,
 		ExchangeId				INT,
-		CurrencyCode			VARCHAR(10),
+		CurrencyCode			VARCHAR(65),
 		Rate					FLOAT,
 		BaseExchangeRate		FLOAT
 	)
