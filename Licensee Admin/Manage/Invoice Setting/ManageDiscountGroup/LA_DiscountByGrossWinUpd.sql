@@ -30,7 +30,7 @@ AS
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 		- 20221201@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
-	 
+		- 20230331@Danny: Insert new log with more information [#FeatureID 175125]
 	 Params:
 		@RateSettingsData = '<Root>
 								<RateSetting>
@@ -79,7 +79,7 @@ BEGIN
 	SET NOCOUNT ON
 
 	-- For log
-	DECLARE @StartRun DATETIME, @Duration INT, @LogSPData NVARCHAR(MAX), @LogSPOldData NVARCHAR(MAX)
+	DECLARE @StartRun DATETIME, @Duration INT, @LogSPData NVARCHAR(MAX), @LogSPOldData NVARCHAR(MAX), @logDiscountActionID INT
 
 	SET @StartRun = GETDATE()
 
@@ -97,7 +97,7 @@ BEGIN
 	DECLARE @CurrencyList TABLE (PartyId INT, CurrencyId INT, CalculationType TINYINT)
 	DECLARE @TierRateSetting TABLE (DiscountGroupDetailId INT, RowId INT, FromAmount MONEY, ToAmount MONEY, ChargeRateAfterDiscount MONEY)
 	DECLARE @ProductList TABLE (ProductId INT, CalculationType TINYINT)
-
+	
 	BEGIN TRY
 		IF @FromDate < @CutOffDate
 		BEGIN
@@ -227,91 +227,56 @@ BEGIN
 	END
 
 	-- Log data
-	SELECT @LogSPOldData = CONVERT(NVARCHAR(MAX),
-		(SELECT
-			DiscountGroupId		AS '@gid'
-			,DiscountGroupName	AS '@gn'
-			,DiscountGroupType	AS '@gt'
-			,CurrencyId			AS '@c'
-			,FromDate			AS '@fd'
-			,ToDate				AS '@td'
-			,(
-				SELECT
-					PartyId		AS '@pid'
-					,Remark		AS '@rm'
-				FROM dbo.LA_DiscountGroupAssignment WITH (NOLOCK)
-				WHERE DiscountGroupId = @DiscountGroupId
-				FOR XML PATH('d'), TYPE
-			)
-			,(
-				SELECT
-					PartyId				AS '@pid'
-					,CurrencyId			AS '@c'
-					,CalculationType	AS '@ct'
-				FROM dbo.LA_DiscountGroupCurrency WITH (NOLOCK)
-				WHERE DiscountGroupId = @DiscountGroupId
-				FOR XML PATH('d'), TYPE
-			)
-			,(
-				SELECT
-					ProductId			AS '@pid'
-					,CalculationType	AS '@ct'
-				FROM dbo.LA_DiscountGroupProduct WITH (NOLOCK)
-				WHERE DiscountGroupId = @DiscountGroupId
-				FOR XML PATH('d'), TYPE
-			)
-			,(
-				SELECT
-					FromAmount	AS '@fa'
-					,ToAmount	AS '@ta'
-					,ChargeRateAfterDiscount AS '@r'
-				FROM dbo.LA_DiscountGroupDetail WITH (NOLOCK)
-				WHERE DiscountGroupId = @DiscountGroupId
-				FOR XML PATH('d'), TYPE
-			)
-		FROM dbo.LA_DiscountGroupHeader WITH (NOLOCK)
-		WHERE DiscountGroupId = @DiscountGroupId
-		FOR XML PATH('h'), TYPE))
+	-- Log data
+	SELECT @LogSPOldData = (
+		SELECT ld.DiscountGroupName 'gr.gn', 
+			  e.Code AS  'gr.e', 
+			  ld.FromDate AS 'gr.af', 
+			  ld.ToDate AS 'gr.at', 
+			  STRING_AGG(CASE WHEN ldp.ProductId = 0 THEN 'Sportsbook' ELSE p3.ProductName END  ,',') 'gr.p',
+			  l.l AS 'll',
+			  ds.s AS 'ds'
+		FROM LA_DiscountGroupHeader ld with(nolock) 
+		INNER JOIN CUSTDB.dbo.Exchange e  with(nolock) ON ld.CurrencyId = e.ExchangeId
+		INNER JOIN LA_DiscountGroupProduct ldp WITH(NOLOCK) ON ld.DiscountGroupId = ldp.DiscountGroupId 
+		LEFT JOIN Product3rd p3 WITH(NOLOCK) ON ldp.ProductId = p3.Productid
 
-	SELECT @LogSPData = CONVERT(NVARCHAR(MAX),
-		(SELECT
-			@DiscountGroupId	AS '@gid'
-			,@DiscountGroupName	AS '@gn'
-			,@DiscountGroupType AS '@gt'
-			,@CurrencyId		AS '@c'
-			,@FromDate			AS '@fd'
-			,@ToDate			AS '@td'
-			,(
-				SELECT
-					PartyId		AS '@pid'
-					,Remark		AS '@rm'
-				FROM @PartyList
-				FOR XML PATH('d'), TYPE
-			)
-			,(
-				SELECT
-					PartyId				AS '@pid'
-					,CurrencyId			AS '@c'
-					,CalculationType	AS '@ct'
-				FROM @CurrencyList
-				FOR XML PATH('d'), TYPE
-			)
-			,(
-				SELECT
-					ProductId			AS '@pid'
-					,CalculationType	AS '@ct'
-				FROM @ProductList
-				FOR XML PATH('d'), TYPE
-			)
-			,(
-				SELECT
-					FromAmount	AS '@fa'
-					,ToAmount	AS '@ta'
-					,ChargeRateAfterDiscount AS '@r'
-				FROM @TierRateSetting
-				FOR XML PATH('d'), TYPE
-			)
-		FOR XML PATH('h'), TYPE))
+		OUTER APPLY 
+		(
+			SELECT (
+				SELECT  PartyID AS 'l.pi',LicenseeName 'l.ln', Remark 'l.rm', 
+				STRING_AGG(CASE WHEN CountInPer = 1 THEN Curr ELSE '' END  ,',') 'l.cip',
+				STRING_AGG(CASE WHEN AppliedDiscount = 1 THEN Curr ELSE '' END  ,',')'l.ap'
+				FROM 
+					(
+						select  op.PartyID as PartyID ,op.PartyName AS LicenseeName, CASE WHEN lgc.CurrencyId = 142 THEN 'USDT' 
+											 WHEN lgc.CurrencyId IN (96, 202) THEN e.Code + ' ('+ e.currency+ ')'
+											 ELSE e.Code END AS Curr,
+	  
+								CASE WHEN lgc.CalculationType IN (1,3) THEN 1 ELSE 0 END CountInPer,
+								CASE WHEN lgc.CalculationType IN (2,3) THEN 1 ELSE 0 END AppliedDiscount,
+								lga.Remark
+						FROM LA_DiscountGroupAssignment lga WITH(NOLOCK)
+						INNER JOIN LA_DiscountGroupCurrency  lgc WITH(NOLOCK) ON lga.PartyID = lgc.PartyID AND lga.DiscountGroupId = lgc.DiscountGroupId
+						INNER JOIN OAS_Party op WITH(NOLOCK) ON lga.PartyID = op.PartyID
+						INNER JOIN CUSTDB.dbo.Exchange e  with(nolock) ON lgc.CurrencyId = e.ExchangeId
+						WHERE lga.DiscountGroupId = ld.DiscountGroupId
+					) x  GROUP BY PartyID, LicenseeName, Remark FOR JSON PATH
+			 )l
+		) l
+		OUTER APPLY 
+		(	
+			SELECT 
+			(
+				SELECT FromAmount 'st.wlf', ToAmount 'st.wlt', ChargeRateAfterDiscount 'st.cr'
+				FROM LA_DiscountGroupDetail  ldg WITH(NOLOCK) 
+				WHERE ldg.DiscountGroupId = ld.DiscountGroupId FOR JSON PATH
+			) s
+		) ds
+		WHERE ld.DiscountGroupID = @DiscountGroupID
+		GROUP BY ld.DiscountGroupName, e.Code, ld.FromDate, ld.ToDate, l.l, ds.s
+		 FOR JSON PATH,  WITHOUT_ARRAY_WRAPPER 
+		 )
 
 	-- Update data
 	BEGIN TRY
@@ -387,6 +352,57 @@ BEGIN
 			(DiscountGroupId, FromAmount, ToAmount, ChargeRateAfterDiscount)
 			VALUES (@DiscountGroupId, FromAmount, ToAmount, ChargeRateAfterDiscount)
 		WHEN NOT MATCHED BY SOURCE THEN DELETE;
+
+
+		SELECT @LogSPData = (
+		SELECT ld.DiscountGroupName 'gr.gn', 
+			  e.Code AS  'gr.e', 
+			  ld.FromDate AS 'gr.af', 
+			  ld.ToDate AS 'gr.at', 
+			  STRING_AGG(CASE WHEN ldp.ProductId = 0 THEN 'Sportsbook' ELSE p3.ProductName END  ,',') 'gr.p',
+			  l.l AS 'll',
+			  ds.s AS 'ds'
+		FROM LA_DiscountGroupHeader ld with(nolock) 
+		INNER JOIN CUSTDB.dbo.Exchange e  with(nolock) ON ld.CurrencyId = e.ExchangeId
+		INNER JOIN LA_DiscountGroupProduct ldp WITH(NOLOCK) ON ld.DiscountGroupId = ldp.DiscountGroupId 
+		LEFT JOIN Product3rd p3 WITH(NOLOCK) ON ldp.ProductId = p3.Productid
+
+		OUTER APPLY 
+		(
+			SELECT (
+				SELECT  PartyID AS 'l.pi',LicenseeName 'l.ln', Remark 'l.rm', 
+				STRING_AGG(CASE WHEN CountInPer = 1 THEN Curr ELSE '' END  ,',') 'l.cip',
+				STRING_AGG(CASE WHEN AppliedDiscount = 1 THEN Curr ELSE '' END  ,',')'l.ap'
+				FROM 
+					(
+						select  op.PartyID as PartyID ,op.PartyName AS LicenseeName, CASE WHEN lgc.CurrencyId = 142 THEN 'USDT' 
+											 WHEN lgc.CurrencyId IN (96, 202) THEN e.Code + ' ('+ e.currency+ ')'
+											 ELSE e.Code END AS Curr,
+	  
+								CASE WHEN lgc.CalculationType IN (1,3) THEN 1 ELSE 0 END CountInPer,
+								CASE WHEN lgc.CalculationType IN (2,3) THEN 1 ELSE 0 END AppliedDiscount,
+								lga.Remark
+						FROM LA_DiscountGroupAssignment lga WITH(NOLOCK)
+						INNER JOIN LA_DiscountGroupCurrency  lgc WITH(NOLOCK) ON lga.PartyID = lgc.PartyID AND lga.DiscountGroupId = lgc.DiscountGroupId
+						INNER JOIN OAS_Party op WITH(NOLOCK) ON lga.PartyID = op.PartyID
+						INNER JOIN CUSTDB.dbo.Exchange e  with(nolock) ON lgc.CurrencyId = e.ExchangeId
+						WHERE lga.DiscountGroupId = ld.DiscountGroupId
+					) x  GROUP BY PartyID, LicenseeName, Remark FOR JSON PATH
+			 )l
+		) l
+		OUTER APPLY 
+		(	
+			SELECT 
+			(
+				SELECT FromAmount 'st.wlf', ToAmount 'st.wlt', ChargeRateAfterDiscount 'st.cr'
+				FROM LA_DiscountGroupDetail  ldg WITH(NOLOCK) 
+				WHERE ldg.DiscountGroupId = ld.DiscountGroupId FOR JSON PATH
+			) s
+		) ds
+		WHERE ld.DiscountGroupID = @DiscountGroupID
+		GROUP BY ld.DiscountGroupName, e.Code, ld.FromDate, ld.ToDate, l.l, ds.s
+		 FOR JSON PATH,  WITHOUT_ARRAY_WRAPPER 
+		 )
 	END TRY
 	BEGIN CATCH
 		SELECT @ErrCode =  601, @ErrMsg = 'Insert failed. Please try again.'
@@ -396,15 +412,15 @@ BEGIN
 	-- Write log
 	SET @Duration = DATEDIFF(MILLISECOND, @StartRun, GETDATE())
 
-	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
-		@UserId			= @UserId
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+		@UserId			= @UserID
 		,@IP			= @LoginIP
-		,@LicenseeId	= 0
-		,@CurrencyId	= 0
 		,@SPName		= 'LA_DiscountByGrossWinUpd'
-		,@CustId		= 0
-		,@Duration		= @Duration
-		,@Data			= @LogSPData
-		,@OldData		= @LogSPOldData
+		,@CustId		= @DiscountGroupID
+		,@Duration		= @duration
+		,@TrackingValue2 = @LogSPData
+		,@TrackingValue = @LogSPOldData
+		,@ActionID		 = 1601
+
 END
 GO

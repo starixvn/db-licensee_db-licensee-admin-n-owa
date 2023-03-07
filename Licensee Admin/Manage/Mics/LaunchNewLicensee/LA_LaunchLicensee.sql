@@ -37,6 +37,7 @@ AS
 		- 20220831@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
 		- 20221205@Danny: Remove Hx9candy From Crypto Licensee List [RedmineID: #181279]
 		- 20230213@Malcolm: Fix duplicate data error [RemineID: #183774]
+		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -90,7 +91,8 @@ BEGIN
 		@StartRun		DATETIME = CURRENT_TIMESTAMP, 
 		@EndRun			DATETIME, 
 		@Duration		INT, 
-		@Doing			NVARCHAR(MAX)
+		@Doing			NVARCHAR(MAX),
+		@IsAddNew		BIT = 0
 
 	SELECT @ErrCode = 0, @ErrMsg = ''
 
@@ -100,6 +102,13 @@ BEGIN
 	DECLARE @MinFeeSettings	TABLE (ProductId TINYINT, FeeTypeId TINYINT, FeeAmount MONEY, FromDate DATE, ToDate DATE, MinFeeTerm NVARCHAR(1000), [Priority] TINYINT, MonthOfDeduction TINYINT)
 	DECLARE @ChargeInfo TABLE (ChargeId INT, ProductId INT, ProductName VARCHAR(50), Rate MONEY, ChargeType INT, FromDate DATE, ToDate DATE, CurrencyId INT, SystemId INT, IsValid BIT DEFAULT(1))
 	DECLARE @AMF MONEY, @BillingGroupName NVARCHAR(50), @BillerId INT, @FirstDateOfMonth DATE
+
+	-- Log
+	DECLARE @logPayerSettingOld NVARCHAR(MAX), @logPayerSetting NVARCHAR(MAX), @logPayerSettingActionID INT
+	DECLARE @logWaiveSettingOld NVARCHAR(MAX), @logWaiveSetting NVARCHAR(MAX), @logWaiveSettingActionID INT
+	DECLARE @logMinFeeSettingOld NVARCHAR(MAX), @logMinFeeSetting NVARCHAR(MAX), @logMinFeeSettingActionID INT
+	DECLARE @logBillerOld NVARCHAR(MAX), @logBiller NVARCHAR(MAX), @logBllerActionID INT
+	DECLARE @logChargeRateOld NVARCHAR(MAX), @logChargeRate NVARCHAR(MAX), @logChargeRateActionID INT
 	
 	-- Charge Rate, Min Fee
 	BEGIN TRY
@@ -190,6 +199,45 @@ BEGIN
 		-- OAS_Party
 		IF @NonOfficialPartyId > 0
 		BEGIN
+			SELECT @logPayerSettingOld = (
+				SELECT	 Op2.PartyName							AS 'pi.pn'
+						,CASE WHEN x.ToParty = 1 THEN 'ONEWorks'
+							  WHEN x.ToParty = 9 THEN 'Cozni'
+							  WHEN x.ToParty = 11 THEN 'Boping'	
+							  WHEN x.ToParty = 98 THEN 'Zelianta'	
+						 END									AS 'pi.bg' 
+						,od.BrandName							AS 'pi.bn'
+						,od.Description							AS 'pi.dc'
+						,od.InvoiceLanguage						AS 'pi.iv'
+						,od.LaunchDate							AS 'pi.ld'
+						,od.SuspendedDate						AS 'pi.sd'
+						,od.TerminatedDate						AS 'pi.tmd'
+
+						,od.CompanyName		AS 'a1.cn1'
+						,od.AttnName		AS 'a1.an1'
+						,od.Address1		AS 'a1.ad1'
+						,od.CompanyName2	AS 'a2.cn2'
+						,od.AttnName2		AS 'a2.an2'
+						,od.Address2		AS 'a2.ad2'
+						,ci.baseCurrInfo    AS 'bcs'
+				FROM OAS_PartyDetail od WITH(NOLOCK)
+				INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
+				OUTER APPLY (SELECT TOP 1 ToParty FROM OAS_ChargeInfo oc WITH(NOLOCK) WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
+				OUTER APPLY (
+								SELECT
+								(
+								SELECT CASE WHEN op.BaseCurrencyId = 142 THEN 'USDT' ELSE e.Code END  'c', 
+										op.LicenseeCode 'lc', 
+										op.FromDate 'fd', 
+										op.ToDate  'td'
+								FROM OAS_PartyBaseCurrency op WITH(NOLOCK) 
+								INNER JOIN CustDB.dbo.exchange e WITh(NOLOCK) ON op.BaseCurrencyId = e.ExchangeId
+								WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
+								) AS  baseCurrInfo
+							) ci
+				WHERE od.PartyID = @NonOfficialPartyId FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
+			)
+
 			UPDATE dbo.OAS_Party WITH(ROWLOCK)
 			SET OldRefID   = @LicenseeId
 				,SetupName = PartyName
@@ -198,6 +246,8 @@ BEGIN
 			WHERE PartyID = @NonOfficialPartyId
 
 			SET @NewPartyId = @NonOfficialPartyId
+			SELECT @IsAddNew = 0, @logPayerSettingActionID = 1001
+
 		END
 		ELSE
 		BEGIN
@@ -205,6 +255,7 @@ BEGIN
 			VALUES (@PayerName, 1, @LicenseeId)
 
 			SET @NewPartyId = SCOPE_IDENTITY()
+			SELECT @IsAddNew = 1, @logPayerSettingActionID = 1000
 		END
 
 		-- OAS_PartyDetail
@@ -320,6 +371,213 @@ BEGIN
 		SELECT FunctionID, @NewPartyId
 		FROM dbo.LA_Function WITH (NOLOCK) 
 		WHERE StatusID = 1 -- Active functions
+
+		SELECT @logPayerSetting = (
+				SELECT	 Op2.PartyName							AS 'pi.pn'
+						,CASE WHEN x.ToParty = 1 THEN 'ONEWorks'
+							  WHEN x.ToParty = 9 THEN 'Cozni'
+							  WHEN x.ToParty = 11 THEN 'Boping'	
+							  WHEN x.ToParty = 98 THEN 'Zelianta'	
+						 END									AS 'pi.bg' 
+						,od.BrandName							AS 'pi.bn'
+						,od.Description							AS 'pi.dc'
+						,od.InvoiceLanguage						AS 'pi.iv'
+						,od.LaunchDate							AS 'pi.ld'
+						,od.SuspendedDate						AS 'pi.sd'
+						,od.TerminatedDate						AS 'pi.tmd'
+
+						,od.CompanyName		AS 'a1.cn1'
+						,od.AttnName		AS 'a1.an1'
+						,od.Address1		AS 'a1.ad1'
+						,od.CompanyName2	AS 'a2.cn2'
+						,od.AttnName2		AS 'a2.an2'
+						,od.Address2		AS 'a2.ad2'
+						,ci.baseCurrInfo    AS 'bcs'
+				FROM OAS_PartyDetail od WITH(NOLOCK)
+				INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
+				OUTER APPLY (SELECT TOP 1 ToParty FROM OAS_ChargeInfo oc WITH(NOLOCK) WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
+				OUTER APPLY (
+								SELECT
+								(
+								SELECT CASE WHEN op.BaseCurrencyId = 142 THEN 'USDT' ELSE e.Code END  'c', 
+										op.LicenseeCode 'lc', 
+										op.FromDate 'fd', 
+										op.ToDate  'td'
+								FROM OAS_PartyBaseCurrency op WITH(NOLOCK) 
+								INNER JOIN CustDB.dbo.exchange e WITh(NOLOCK) ON op.BaseCurrencyId = e.ExchangeId
+								WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
+								) AS  baseCurrInfo
+							) ci
+				WHERE od.PartyID = @NewPartyId FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
+			)
+
+		-- Log chargeRate
+		;WITH t AS
+		(
+			SELECT		op.PartyName,
+						od.BrandName,
+						CASE WHEN oc.ProductID = 0 THEN 'Sportsbook' ELSE p3.ProductName END Product,
+						oc.FromDate,
+						oc.ToDate,
+						oc.FirstOfBilling,
+						oc.BasisOfBilling,
+						(CAST (ISNULL(lcr.Rate, oc.Rate) * 100  AS VARCHAR(50) ) + '%') Rate,
+						STRING_AGG(x.Code,',') Currs,
+						CASE WHEN lcr.Rate IS NOT NULL THEN 0 ELSE 1 END isMasterRate
+			FROM OAS_Party op WITH(NOLOCK)
+			INNER JOIN OAS_PartyDetail od WITH(NOLOCK) ON op.PartyID = od.PartyID
+			INNER JOIN Licensees l WITH(NOLOCK) ON op.OldRefID = l.LicenseeID
+			INNER JOIN OAS_ChargeInfo oc WITH(NOLOCK) ON op.PartyID = oc.FromParty AND oc.ProductID IN ( 0,2) and oc.FromDate <=GETDATE() AND GETDATE() <= oc.ToDate 
+			CROSS APPLY (
+				SELECT DISTINCT lc.Currency, CASE WHEN e.ExchangeId IN (96,202) THEN e.Code + ' (' + e.currency + ')' ELSE e.Code END Code
+				FROM LicenseeCust lc  WITH(NOLOCK) 
+				INNER JOIN  CustDB.dbo.exchange e with(nolock) on lc.Currency = e.ExchangeId
+				WHERE lc.LicenseeID = l.LicenseeID and lc.roleID = 2 and e.ExchangeId <> 20
+			) x
+			LEFT JOIN  LA_ChargeRateByCurrency lcr WITH(NOLOCK) ON oc.ChargeID = lcr.ChargeID AND x.Currency = lcr.CurrencyID
+			LEFT JOIN  Product3rd p3 WITH(NOLOCK) ON oc.ProductID = p3.Productid
+			WHERE op.PartyID = @NewPartyId AND oc.ChargeID IN (SELECT z.ChargeId FROM @ChargeInfo z)
+			GROUP BY op.PartyName,
+						od.BrandName,
+						CASE WHEN oc.ProductID = 0 THEN 'Sportsbook' ELSE p3.ProductName END,
+						oc.FromDate,
+						oc.ToDate,
+						oc.FirstOfBilling,
+						oc.BasisOfBilling,
+						CAST (ISNULL(lcr.Rate, oc.Rate) * 100  AS VARCHAR(50) ) + '%',
+						CASE WHEN lcr.Rate IS NOT NULL THEN 0 ELSE 1 END
+		) 
+		, t1 AS
+		(
+			SELECT t.PartyName,t.BrandName,t.Product,t.FromDate,t.ToDate,t.FirstOfBilling,t.BasisOfBilling,STRING_AGG(cr.r, CHAR(13)) AS r
+			FROM t
+			CROSS APPLY (
+					SELECT CASE WHEN t.isMasterRate = 1 AND EXISTS (SELECT TOP 1 1 FROM t t2 WHERE t2.isMasterRate = 0 AND t2.Product = t.Product and t2.PartyName = t.PartyName) THEN 'Others ' 
+								WHEN t.isMasterRate = 1 AND NOT EXISTS (SELECT TOP 1 1 FROM t t2 WHERE t2.isMasterRate = 0 AND t2.Product = t.Product and t2.PartyName = t.PartyName) THEN 'All ' 
+								ELSE '' END + '('+ t.Currs + ') - ' + Rate AS r
+			) cr
+			GROUP BY t.PartyName,t.BrandName,t.Product,t.FromDate,t.ToDate,t.FirstOfBilling,t.BasisOfBilling
+		) SELECT @logChargeRate = 
+				(
+				SELECT t.PartyName as 'pi.pn', t.BrandName AS 'pi.bn', crs.crs AS 'crs'
+				FROM t1 t 
+				CROSS APPLY 
+				(
+					SELECT 
+					(
+						SELECT  u.Product p ,  u.FromDate fd, u.ToDate td , u.FirstOfBilling fb, u.BasisOfBilling bb , u.r
+						FROM t1 u  WHERE u.PartyName = t.PartyName AND u.BrandName = t.BrandName FOR JSON PATH
+					) crs
+				) crs  
+				GROUP BY t.PartyName, t.BrandName, crs.crs
+				FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+		)
+	
+		SELECT @logWaiveSetting = 
+		(
+			SELECT	op.PartyName AS 'pi.pn' ,
+					od.BrandName AS 'pi.bn',
+					lm.lm AS 's'
+			FROM OAS_Party op with(nolock)
+			INNER JOIN OAS_PartyDetail od with(nolock) ON od.PartyId = op.PartyID
+			CROSS APPLY (
+				SElECT 
+				(
+					SELECT CASE WHEN lm.Productid = 0 THEN 'Sportsbook' ELSE  p.ProductName END AS pdn, 
+								lm.FromDate AS fd,
+								lm.Todate AS td
+					FROM  LA_MinFee lm WITH(NOLOCK)
+					LEFT JOIN Product3rd p with(nolock) ON lm.ProductId = p.Productid
+					WHERE lm.PartyId = op.PartyID and lm.FeeTypeId =2  FOR JSON PATH
+				) as lm
+			) lm
+			WHERE op.PartyId = @NewPartyId
+			FOR JSON PATH, WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES
+		)
+
+		SELECT @logMinFeeSetting = 
+		(
+			SELECT	op.PartyName AS 'pi.pn' ,
+					od.BrandName AS 'pi.bn',
+					lm.lm AS 's'
+			FROM OAS_Party op with(nolock)
+			INNER JOIN OAS_PartyDetail od with(nolock) ON od.PartyId = op.PartyID
+			CROSS APPLY (
+				SElECT 
+				(
+					SELECT CASE WHEN lm.Productid = 0 THEN 'Sportbook' ELSE  p.ProductName END AS pdn, 
+								lm.FromDate AS fd,
+								lm.Todate AS td,
+								lm.FeeAmount as fa,
+								e.Code AS c,
+								lm.MinFeeTerm AS mt
+					FROM  LA_MinFee lm WITH(NOLOCK)
+					LEFT JOIN Product3rd p with(nolock) ON lm.ProductId = p.Productid
+					INNER JOIN CustDB.dbo.Exchange e WITH(NOLOCK) ON lm.CurrencyId = e.ExchangeId
+					WHERE lm.PartyId = op.PartyID and lm.FeeTypeId =1  FOR JSON PATH
+				) AS lm
+			) lm
+			WHERE op.PartyId = @NewPartyId
+			FOR JSON PATH, WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES
+		)
+
+		--write biller log
+		; WITH Items AS 
+			(
+				SELECT		op.PartyName
+							,od.BrandName
+							,b.BillerName
+							,lt.InvTypeName
+							,CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END Bank
+							,temp.InvTemplateName
+							, CASE WHEN li.ActiveAddress = 1 THEN od.Address1
+									WHEN li.ActiveAddress = 2 THEN od.Address2 END ActiveAddress
+							,STRING_AGG(CASE WHEN li.ProductID = 0 THEN 'Sportsbook' ELSE p.ProductName END,',') ProductIDs
+				FROM  LA_InvoiceSetting li with(nolock) 
+				INNER JOIN LA_InvoiceType lt with(nolock) ON li.InvTypeID  = lt.InvTypeID
+				INNER JOIN OAS_Party op WITH(NOLOCK) ON li.FromPartyId = op.PartyID
+				INNER JOIN OAS_PartyDetail od WITH(NOLOCK) ON od.PartyID = op.PartyID
+				INNER JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON li.ToPartyId = b.PartyId
+				LEFT JOIN dbo.LA_InvoiceTemplate temp WITH (NOLOCK) ON li.InvTempId = temp.InvTemplateId
+				LEFT JOIN Product3rd p WITH (NOLOCK) ON li.ProductId = p.Productid
+				WHERE li.FromPartyID =@NewPartyId AND li.ToPartyId = @BillerID
+				GROUP BY op.PartyName, od.BrandName, b.BillerName, lt.InvTypeName, CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END
+						, temp.InvTemplateName ,li.ActiveAddress
+						,CASE WHEN li.ActiveAddress = 1 THEN od.Address1
+							WHEN li.ActiveAddress = 2 THEN od.Address2 END
+			), ItemsDetail AS
+			(
+				SELECT t.PartyName,t.BrandName, t.BillerName, t.Bank, x.iv
+				FROM Items t
+				CROSS APPLY (
+					SELECT 
+					(
+						SELECT InvTypeName AS it,  InvTemplateName AS itn , ActiveAddress AS ad,  ProductIDs  AS p
+						FROM Items u
+						WHERE  t.PartyName = u.PartyName AND t.BrandName = u.BrandName AND t.BillerName = u.BillerName AND  t.Bank = u.Bank
+						FOR JSON PATH
+					) AS iv
+				) x
+				GROUP BY  t.PartyName,t.BrandName, t.BillerName, t.Bank, x.iv
+			) SELECT @logBiller = 
+				(   
+					SELECT t.PartyName as 'pi.pn', t.BrandName AS 'pi.bn' , x.x AS 'bl'
+					FROM ItemsDetail t
+					CROSS APPLY 
+					(
+						SELECT
+						(
+							SELECT u.BillerName AS bln, u.Bank AS b, JSON_QUERY(u.iv) iv
+							FROM ItemsDetail u 
+							WHERE u.PartyName = t.PartyName AND u.BrandName = t.BrandName
+							FOR JSON PATH
+						) x
+					) x
+					GROUP BY t.PartyName, t.BrandName, x.x 
+					FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+				)
+
+
 	END TRY
 	BEGIN CATCH
 		-- Rollback
@@ -442,25 +700,61 @@ BEGIN
 	SET @EndRun = GETDATE()
 	SET @Duration = DATEDIFF(MILLISECOND, @StartRun, @EndRun)
 
-	SET @Doing =(SELECT	@NonOfficialPartyId	AS NonOfficialPartyId,
-						@LicenseeId			AS LicenseeId,
-						@PayerName			AS PayerName,
-						@LicenseeCode		AS LicenseeCode,
-						@BrandName			AS BrandName,
-						@BaseCurrencyId		AS BaseCurrencyId,
-						@LaunchDate			AS LaunchDate, 
-						@BillingGroupId		AS BillingGroupId,
-						@ProductIds			AS ProductIds, 
-						@ChargeInfoSettingData	AS ChargeInfoSettingData,
-						@MinFeeSettingData	AS MinFeeSettingData
-						FOR XML PATH('')) 
+	-- Write Log Payer Setting
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+		@UserId			= @UserID
+		,@IP			= @LoginIP
+		,@SPName		= 'LA_LaunchLicensee'
+		,@CustId		= @NewPartyId
+		,@Duration		= @duration
+		,@TrackingValue2 = @logPayerSetting
+		,@TrackingValue = @logPayerSettingOld
+		,@ActionID		 = @logPayerSettingActionID
 
-	EXEC CustDB.dbo.WriteLog_UserLog_UserControl_Wrapper
-		@CustID		= 0,
-		@Doing		= @Doing,
-		@UserID		= @UserID,
-		@TypeID		= 0,
-		@ActionID	= 5535,
-		@Duration	= @Duration
+	--  Write Log ChargeRate Setting
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+		@UserId			= @UserID
+		,@IP			= @LoginIP
+		,@SPName		= 'LA_LaunchLicensee'
+		,@CustId		= @NewPartyId
+		,@Duration		= @duration
+		,@TrackingValue2 = @logChargeRate
+		,@TrackingValue = @logChargeRateOld
+		,@ActionID		 = 1200
+
+	-- Write Log Waive Setting
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+		@UserId			= @UserID
+		,@IP			= @LoginIP
+		,@SPName		= 'LA_LaunchLicensee'
+		,@CustId		= @NewPartyId
+		,@Duration		= @duration
+		,@TrackingValue2 = @logWaiveSetting
+		,@TrackingValue = @logWaiveSettingOld
+		,@ActionID		 = 1400
+
+	-- Write Min fee Setting
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+		@UserId			= @UserID
+		,@IP			= @LoginIP
+		,@SPName		= 'LA_LaunchLicensee'
+		,@CustId		= @NewPartyId
+		,@Duration		= @duration
+		,@TrackingValue2 = @logMinFeeSetting
+		,@TrackingValue = @logMinFeeSettingOld
+		,@ActionID		 = 1300
+
+	-- Write Biller Setting
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+		@UserId			= @UserID
+		,@IP			= @LoginIP
+		,@SPName		= 'LA_LaunchLicensee'
+		,@CustId		= @NewPartyId
+		,@Duration		= @duration
+		,@TrackingValue2 = @logBiller
+		,@TrackingValue = @logBillerOld
+		,@ActionID		 = 1002
+
+	
 END
 GO

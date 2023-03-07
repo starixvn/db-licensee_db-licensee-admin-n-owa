@@ -17,6 +17,7 @@ AS
    
 	 Revisions:
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
 
 	 Params:
 		+ @InvoiceSettingXML: '<InvoiceSettings>
@@ -50,9 +51,8 @@ BEGIN
 		@startRun		DATETIME,
 		@endRun			DATETIME,
 		@duration		INT,
-		@logSPData		VARCHAR(5000),
-		@logSPDataOld	VARCHAR(5000),
-		@xml			XML
+		@logSPData		NVARCHAR(MAX),
+		@logSPDataOld	NVARCHAR(MAX)
 
 	-- Time start
 	SET @startRun = GETDATE()	
@@ -61,19 +61,61 @@ BEGIN
 					FROM dbo.LA_InvoiceSetting i WITH (NOLOCK) 						
 					WHERE i.FromPartyId = @PayerID AND i.ToPartyId = @BillerID)	
 	BEGIN		
-		SET @xml = (
-				SELECT	FromPartyId		AS '@f'
-						, ToPartyId		AS '@t'
-						, ProductId		AS '@p'
-						, InvTypeId		AS '@itp'
-						, InvTempId		AS '@itm'		
-						, BankId		AS '@b'			
-				FROM dbo.LA_InvoiceSetting WITH (NOLOCK)
-				WHERE FromPartyId = @PayerID
-					AND ToPartyId = @BillerID
-				FOR XML PATH('z'), ROOT('r')			
+		--write log
+		; WITH Items AS 
+			(
+				SELECT		op.PartyName
+							,od.BrandName
+							,b.BillerName
+							,lt.InvTypeName
+							,CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END Bank
+							,temp.InvTemplateName
+							, CASE WHEN li.ActiveAddress = 1 THEN od.Address1
+									WHEN li.ActiveAddress = 2 THEN od.Address2 END ActiveAddress
+							,STRING_AGG(CASE WHEN li.ProductID = 0 THEN 'Sportsbook' ELSE p.ProductName END,',') ProductIDs
+				FROM  OAS_Party op WITH(NOLOCK)
+				INNER JOIN OAS_PartyDetail od WITH(NOLOCK) ON od.PartyID = op.PartyID
+				LEFT JOIN  LA_InvoiceSetting li with(nolock)  ON li.FromPartyId = op.PartyID AND li.FromPartyID =@PayerID AND li.ToPartyId = @BillerID
+				LEFT JOIN LA_InvoiceType lt with(nolock) ON li.InvTypeID  = lt.InvTypeID
+				LEFT JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON li.ToPartyId = b.PartyId
+				LEFT JOIN dbo.LA_InvoiceTemplate temp WITH (NOLOCK) ON li.InvTempId = temp.InvTemplateId
+				LEFT JOIN Product3rd p WITH (NOLOCK) ON li.ProductId = p.Productid
+				WHERE op.PartyID =@PayerID 
+				GROUP BY op.PartyName, od.BrandName, b.BillerName, lt.InvTypeName, CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END
+						, temp.InvTemplateName ,li.ActiveAddress
+						,CASE WHEN li.ActiveAddress = 1 THEN od.Address1
+							WHEN li.ActiveAddress = 2 THEN od.Address2 END
+			), ItemsDetail AS
+			(
+				SELECT t.PartyName,t.BrandName, t.BillerName, t.Bank, x.iv
+				FROM Items t
+				OUTER APPLY (
+					SELECT 
+					(
+						SELECT InvTypeName AS it,  InvTemplateName AS itn , ActiveAddress AS ad,  ProductIDs  AS p
+						FROM Items u
+						WHERE  t.PartyName = u.PartyName AND t.BrandName = u.BrandName AND t.BillerName = u.BillerName AND  t.Bank = u.Bank
+						FOR JSON PATH, INCLUDE_NULL_VALUES 
+					) AS iv
+				) x
+				GROUP BY  t.PartyName,t.BrandName, t.BillerName, t.Bank, x.iv
+			) SELECT @logSPDataOld = 
+				(   
+					SELECT t.PartyName as 'pi.pn', t.BrandName AS 'pi.bn' , x.x AS 'bl'
+					FROM ItemsDetail t
+					OUTER APPLY 
+					(
+						SELECT
+						(
+							SELECT u.BillerName AS bln, u.Bank AS b, JSON_QUERY(u.iv) iv
+							FROM ItemsDetail u 
+							WHERE u.PartyName = t.PartyName AND u.BrandName = t.BrandName
+							FOR JSON PATH, INCLUDE_NULL_VALUES 
+						) x
+					) x
+					GROUP BY t.PartyName, t.BrandName, x.x 
+					FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES 
 				)
-		SET @logSPDataOld = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"')
 
 		--delete statement
 		DELETE FROM dbo.LA_InvoiceSetting WITH (ROWLOCK, UPDLOCK)				
@@ -86,20 +128,74 @@ BEGIN
 			RETURN
 		END
 
+		; WITH Items AS 
+		(
+			SELECT		op.PartyName
+						,od.BrandName
+						,b.BillerName
+						,lt.InvTypeName
+						,CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END Bank
+						,temp.InvTemplateName
+						, CASE WHEN li.ActiveAddress = 1 THEN od.Address1
+								WHEN li.ActiveAddress = 2 THEN od.Address2 END ActiveAddress
+						,STRING_AGG(CASE WHEN li.ProductID = 0 THEN 'Sportsbook' ELSE p.ProductName END,',') ProductIDs
+			FROM  OAS_Party op WITH(NOLOCK)
+			INNER JOIN OAS_PartyDetail od WITH(NOLOCK) ON od.PartyID = op.PartyID
+			LEFT JOIN  LA_InvoiceSetting li with(nolock)  ON li.FromPartyId = op.PartyID AND li.FromPartyID =@PayerID AND li.ToPartyId = @BillerID
+			LEFT JOIN LA_InvoiceType lt with(nolock) ON li.InvTypeID  = lt.InvTypeID
+			LEFT JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON li.ToPartyId = b.PartyId
+			LEFT JOIN dbo.LA_InvoiceTemplate temp WITH (NOLOCK) ON li.InvTempId = temp.InvTemplateId
+			LEFT JOIN Product3rd p WITH (NOLOCK) ON li.ProductId = p.Productid
+			WHERE op.PartyID =@PayerID 
+			GROUP BY op.PartyName, od.BrandName, b.BillerName, lt.InvTypeName, CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END
+					, temp.InvTemplateName ,li.ActiveAddress
+					,CASE WHEN li.ActiveAddress = 1 THEN od.Address1
+						WHEN li.ActiveAddress = 2 THEN od.Address2 END
+		), ItemsDetail AS
+		(
+			SELECT t.PartyName,t.BrandName, t.BillerName, t.Bank, x.iv
+			FROM Items t
+			OUTER APPLY (
+				SELECT 
+				(
+					SELECT InvTypeName AS it,  InvTemplateName AS itn , ActiveAddress AS ad,  ProductIDs  AS p
+					FROM Items u
+					WHERE  t.PartyName = u.PartyName AND t.BrandName = u.BrandName AND t.BillerName = u.BillerName AND  t.Bank = u.Bank
+					FOR JSON PATH, INCLUDE_NULL_VALUES 
+				) AS iv
+			) x
+			GROUP BY  t.PartyName,t.BrandName, t.BillerName, t.Bank, x.iv
+		) SELECT @logSPData = 
+			(   
+				SELECT t.PartyName as 'pi.pn', t.BrandName AS 'pi.bn' , x.x AS 'bl'
+				FROM ItemsDetail t
+				OUTER APPLY 
+				(
+					SELECT
+					(
+						SELECT u.BillerName AS bln, u.Bank AS b, JSON_QUERY(u.iv) iv
+						FROM ItemsDetail u 
+						WHERE u.PartyName = t.PartyName AND u.BrandName = t.BrandName
+						FOR JSON PATH, INCLUDE_NULL_VALUES 
+					) x
+				) x
+				GROUP BY t.PartyName, t.BrandName, x.x 
+				FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES 
+			)
+
 		SET @endRun = GETDATE()
 		SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
 	END
 
 	-- Write Log
-	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
 		@UserId			= @UserID
 		,@IP			= @LoginIP
-		,@LicenseeID	= 0
-		,@CurrencyID	= 0
 		,@SPName		= 'LA_InvoiceSettingDel'
-		,@CustId		= 0
+		,@CustId		= @PayerID
 		,@Duration		= @duration
-		,@Data			= @logSPData
-		,@OldData		= @logSPDataOld
+		,@TrackingValue2 = @logSPData
+		,@TrackingValue =  @logSPDataOld
+		,@ActionID		= 1004
 END
 GO

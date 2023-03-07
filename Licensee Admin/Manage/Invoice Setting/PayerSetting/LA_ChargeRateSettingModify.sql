@@ -33,6 +33,7 @@ AS
 		- 20211101@Percy: Don't add new SB Rate if Licensee is belong to discount group on Lic WL [RedmineID: #162158]
 		- 20220831@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
 		- 20230213@Malcolm: Fix duplicate data error [RemineID: #183774]
+		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
 
 	 Params:
 		+ @ChargeSettingXML: '<ChargeSettings>
@@ -63,10 +64,11 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX),	@xml XML, @ChargeSettingsXML XML
+	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX),	@xml XML, @ChargeSettingsXML XML, @LicenseeID INT
 	DECLARE @ProductListAll		VARCHAR(500) = ''
 			, @MinDate			DATE
 			, @MaxDate			DATE
+
 	SET @startRun = GETDATE()
 
 	IF ISNULL(@ChargeSettingXML, '') = '' RETURN
@@ -192,22 +194,67 @@ BEGIN
 		WHERE s.ProductID NOT IN (SELECT ProductId FROM @ChargeRate)
 
 		-- write log
-		-- build log string
-		SET @xml = (
-			SELECT	ci.ChargeId				AS '@c'
-					, ci.FromParty			AS '@fp'
-					, ci.ProductId			AS '@tp'
-					, ci.FirstOfBilling		AS '@fb'
-					, ci.BasisOfBilling		AS '@bb'
-					, ci.Rate				AS '@r'
-					, ci.ChargeType			AS '@ct'
-					, ci.FromDate			AS '@fd'
-					, ci.ToDate				AS '@td'
-			FROM @ChargeSetting  cs
-				INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID
-			FOR XML PATH('z'), ROOT('r')
-		)
-		SET @logSPDataOld = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"');
+		-- Old data
+		;WITH t AS
+		(
+			SELECT		op.PartyName,
+						od.BrandName,
+					   CASE WHEN oc.ProductID = 0 THEN 'Sportsbook' ELSE p3.ProductName END Product,
+					   oc.FromDate,
+					   oc.ToDate,
+					   oc.FirstOfBilling,
+					   oc.BasisOfBilling,
+					   (CAST (ISNULL(lcr.Rate, oc.Rate) * 100  AS VARCHAR(50) ) + '%') Rate,
+					   STRING_AGG(x.Code,',') Currs,
+					   CASE WHEN lcr.Rate IS NOT NULL THEN 0 ELSE 1 END isMasterRate
+			FROM OAS_Party op WITH(NOLOCK)
+			INNER JOIN OAS_PartyDetail od WITH(NOLOCK) ON op.PartyID = od.PartyID
+			INNER JOIN Licensees l WITH(NOLOCK) ON op.OldRefID = l.LicenseeID
+			INNER JOIN OAS_ChargeInfo oc WITH(NOLOCK) ON op.PartyID = oc.FromParty AND oc.ProductID IN ( 0,2) and oc.FromDate <=GETDATE() AND GETDATE() <= oc.ToDate 
+			CROSS APPLY (
+				SELECT DISTINCT lc.Currency, CASE WHEN e.ExchangeId IN (96,202) THEN e.Code + ' (' + e.currency + ')' ELSE e.Code END Code
+				FROM LicenseeCust lc  WITH(NOLOCK) 
+				INNER JOIN  CustDB.dbo.exchange e with(nolock) on lc.Currency = e.ExchangeId
+				WHERE lc.LicenseeID = l.LicenseeID and lc.roleID = 2 and e.ExchangeId <> 20
+			) x
+			LEFT JOIN  LA_ChargeRateByCurrency lcr WITH(NOLOCK) ON oc.ChargeID = lcr.ChargeID AND x.Currency = lcr.CurrencyID
+			LEFT JOIN  Product3rd p3 WITH(NOLOCK) ON oc.ProductID = p3.Productid
+			WHERE op.PartyID = @PayerID AND oc.ChargeID IN (select z.ChargeID FROM @ChargeSetting z)
+			GROUP BY op.PartyName,
+						od.BrandName,
+						CASE WHEN oc.ProductID = 0 THEN 'Sportsbook' ELSE p3.ProductName END,
+						oc.FromDate,
+						oc.ToDate,
+						oc.FirstOfBilling,
+						oc.BasisOfBilling,
+						CAST (ISNULL(lcr.Rate, oc.Rate) * 100  AS VARCHAR(50) ) + '%',
+						CASE WHEN lcr.Rate IS NOT NULL THEN 0 ELSE 1 END
+		) 
+		, t1 AS
+		(
+			SELECT t.PartyName,t.BrandName,t.Product,t.FromDate,t.ToDate,t.FirstOfBilling,t.BasisOfBilling,STRING_AGG(cr.r, CHAR(13)) AS r
+			FROM t
+			CROSS APPLY (
+					SELECT CASE WHEN t.isMasterRate = 1 AND EXISTS (SELECT TOP 1 1 FROM t t2 WHERE t2.isMasterRate = 0 AND t2.Product = t.Product and t2.PartyName = t.PartyName) THEN 'Others ' 
+								WHEN t.isMasterRate = 1 AND NOT EXISTS (SELECT TOP 1 1 FROM t t2 WHERE t2.isMasterRate = 0 AND t2.Product = t.Product and t2.PartyName = t.PartyName) THEN 'All ' 
+								ELSE '' END + '('+ t.Currs + ') - ' + Rate AS r
+			) cr
+			GROUP BY t.PartyName,t.BrandName,t.Product,t.FromDate,t.ToDate,t.FirstOfBilling,t.BasisOfBilling
+		) SELECT @logSPDataOld = 
+			 (
+				SELECT t.PartyName as 'pi.pn', t.BrandName AS 'pi.bn', crs.crs AS 'crs'
+				FROM t1 t 
+				CROSS APPLY 
+				(
+					SELECT 
+					(
+						SELECT  u.Product p ,  u.FromDate fd, u.ToDate td , u.FirstOfBilling fb, u.BasisOfBilling bb , u.r
+						FROM t1 u  WHERE u.PartyName = t.PartyName AND u.BrandName = t.BrandName FOR JSON PATH
+					) crs
+				) crs  
+				GROUP BY t.PartyName, t.BrandName, crs.crs
+				FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+			)
 
 		DECLARE @MergeResult TABLE(ChargeId INT, ProductId INT, [$action] VARCHAR(20))
 		DECLARE @ToParty INT, @ParentChargeID INT, @Remark VARCHAR(200) = ''
@@ -387,34 +434,80 @@ BEGIN
 			RETURN
 		END
 
-		SET @logSPData = (
-			SELECT	ci.ChargeId				AS '@c'
-					, ci.FromParty			AS '@fp'
-					, cs.ProductId			AS '@tp'
-					, cs.FirstBilling		AS '@fb'
-					, cs.BasisBilling		AS '@bb'
-					, cs.Rate				AS '@r'
-					, cs.ChargeType			AS '@ct'
-					, cs.FromDate			AS '@fd'
-					, cs.ToDate				AS '@td'
-			FROM @ChargeSetting  cs
-				LEFT JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON cs.ChargeID = ci.ChargeID
-			FOR XML PATH('z'), ROOT('r')
-		)
+		-- New log
+		;WITH t AS
+		(
+			SELECT		op.PartyName,
+						od.BrandName,
+					   CASE WHEN oc.ProductID = 0 THEN 'Sportsbook' ELSE p3.ProductName END Product,
+					   oc.FromDate,
+					   oc.ToDate,
+					   oc.FirstOfBilling,
+					   oc.BasisOfBilling,
+					   (CAST (ISNULL(lcr.Rate, oc.Rate) * 100  AS VARCHAR(50) ) + '%') Rate,
+					   STRING_AGG(x.Code,',') Currs,
+					   CASE WHEN lcr.Rate IS NOT NULL THEN 0 ELSE 1 END isMasterRate
+			FROM OAS_Party op WITH(NOLOCK)
+			INNER JOIN OAS_PartyDetail od WITH(NOLOCK) ON op.PartyID = od.PartyID
+			INNER JOIN Licensees l WITH(NOLOCK) ON op.OldRefID = l.LicenseeID
+			INNER JOIN OAS_ChargeInfo oc WITH(NOLOCK) ON op.PartyID = oc.FromParty AND oc.ProductID IN ( 0,2) and oc.FromDate <=GETDATE() AND GETDATE() <= oc.ToDate 
+			CROSS APPLY (
+				SELECT DISTINCT lc.Currency, CASE WHEN e.ExchangeId IN (96,202) THEN e.Code + ' (' + e.currency + ')' ELSE e.Code END Code
+				FROM LicenseeCust lc  WITH(NOLOCK) 
+				INNER JOIN  CustDB.dbo.exchange e with(nolock) on lc.Currency = e.ExchangeId
+				WHERE lc.LicenseeID = l.LicenseeID and lc.roleID = 2 and e.ExchangeId <> 20
+			) x
+			LEFT JOIN  LA_ChargeRateByCurrency lcr WITH(NOLOCK) ON oc.ChargeID = lcr.ChargeID AND x.Currency = lcr.CurrencyID
+			LEFT JOIN  Product3rd p3 WITH(NOLOCK) ON oc.ProductID = p3.Productid
+			WHERE op.PartyID = @PayerID AND oc.ChargeID IN (select z.ChargeID FROM @ChargeSetting z)
+			GROUP BY op.PartyName,
+						od.BrandName,
+						CASE WHEN oc.ProductID = 0 THEN 'Sportsbook' ELSE p3.ProductName END,
+						oc.FromDate,
+						oc.ToDate,
+						oc.FirstOfBilling,
+						oc.BasisOfBilling,
+						CAST (ISNULL(lcr.Rate, oc.Rate) * 100  AS VARCHAR(50) ) + '%',
+						CASE WHEN lcr.Rate IS NOT NULL THEN 0 ELSE 1 END
+		) 
+		, t1 AS
+		(
+			SELECT t.PartyName,t.BrandName,t.Product,t.FromDate,t.ToDate,t.FirstOfBilling,t.BasisOfBilling,STRING_AGG(cr.r, CHAR(13)) AS r
+			FROM t
+			CROSS APPLY (
+					SELECT CASE WHEN t.isMasterRate = 1 AND EXISTS (SELECT TOP 1 1 FROM t t2 WHERE t2.isMasterRate = 0 AND t2.Product = t.Product and t2.PartyName = t.PartyName) THEN 'Others ' 
+								WHEN t.isMasterRate = 1 AND NOT EXISTS (SELECT TOP 1 1 FROM t t2 WHERE t2.isMasterRate = 0 AND t2.Product = t.Product and t2.PartyName = t.PartyName) THEN 'All ' 
+								ELSE '' END + '('+ t.Currs + ') - ' + Rate AS r
+			) cr
+			GROUP BY t.PartyName,t.BrandName,t.Product,t.FromDate,t.ToDate,t.FirstOfBilling,t.BasisOfBilling
+		) SELECT @logSPData = 
+			 (
+				SELECT t.PartyName as 'pi.pn', t.BrandName AS 'pi.bn', crs.crs AS 'crs'
+				FROM t1 t 
+				CROSS APPLY 
+				(
+					SELECT 
+					(
+						SELECT  u.Product p ,  u.FromDate fd, u.ToDate td , u.FirstOfBilling fb, u.BasisOfBilling bb , u.r
+						FROM t1 u  WHERE u.PartyName = t.PartyName AND u.BrandName = t.BrandName FOR JSON PATH
+					) crs
+				) crs  
+				GROUP BY t.PartyName, t.BrandName, crs.crs
+				FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+			)
 		SET @endRun = GETDATE()
 		SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun)
 
 		-- Write Log
-		EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+		EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
 			@UserId			= @UserID
 			,@IP			= @LoginIP
-			,@LicenseeID	= 0
-			,@CurrencyID	= 0
 			,@SPName		= 'LA_ChargeRateSettingModify'
-			,@CustId		= 0
+			,@CustId		= @PayerID
 			,@Duration		= @duration
-			,@Data			= @logSPData
-			,@OldData		= @logSPDataOld
+			,@TrackingValue2 = @logSPData
+			,@@TrackingValue = @logSPDataOld
+			,@ActionID		 = 1201
 	END
 	ELSE
 	BEGIN

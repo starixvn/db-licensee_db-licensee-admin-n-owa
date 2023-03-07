@@ -38,6 +38,7 @@ AS
 		- 20190829@Bruce: Adding Licensee Code [#111586]
 		- 20210315@Happy: Change BaseCurrency Of Licensee [#151466]
 		- 20210811@Danny: Adding AttnName2, CompanyName2 into OAS_PartyDetail [#FeatureID 158133]
+		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
 	
 	Param's Explannation: 
 		@BaseCurrencySettingXml = <Root>
@@ -70,7 +71,6 @@ BEGIN
 		, @duration		INT
 		, @logSPData	NVARCHAR(MAX)
 		, @logSPDataOld NVARCHAR(MAX)
-		, @xml			XML
 
 	-- Time start
 	SET @startRun = GETDATE()
@@ -78,27 +78,44 @@ BEGIN
 	IF EXISTS (SELECT 1 FROM dbo.OAS_Party p WITH (NOLOCK) WHERE p.PartyID = @PayerID)
 	BEGIN
 		--write log old
-		SET @xml = (
-			SELECT	p.PartyId			AS '@pid'
-					, p.PartyName		AS '@pn'
-					, StatusId			AS '@s'
-					, isDeposit			AS '@isd'
-					, BrandName			AS '@bn'
-					, CompanyName		AS '@cn'
-					, pd.AttnName		AS '@an'
-					, pd.[Description]	AS '@des'
-					, Address1			AS '@a1'
-					, Address2			AS '@a2'
-					, InvoiceLanguage	AS '@il'
-					, pd.CompanyName2	AS '@cn2'
-					, pd.AttnName2		AS '@an2'
-			FROM dbo.OAS_Party p  WITH (NOLOCK)
-				INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
-			WHERE p.PartyId = @PayerID
-			FOR XML PATH('z'), ROOT('r')
-		)
+		SELECT @logSPDataOld = (
+			SELECT	 Op2.PartyName							AS 'pi.pn'
+					,CASE WHEN x.ToParty = 1 THEN 'ONEWorks'
+						  WHEN x.ToParty = 9 THEN 'Cozni'
+						  WHEN x.ToParty = 11 THEN 'Boping'	
+						  WHEN x.ToParty = 98 THEN 'Zelianta'	
+					 END									AS 'pi.bg' 
+					,od.BrandName							AS 'pi.bn'
+					,od.Description							AS 'pi.dc'
+					,od.InvoiceLanguage						AS 'pi.iv'
+					,od.LaunchDate							AS 'pi.ld'
+					,od.SuspendedDate						AS 'pi.sd'
+					,od.TerminatedDate						AS 'pi.tmd'
 
-		SET @logSPDataOld = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"')
+					,od.CompanyName		AS 'a1.cn1'
+					,od.AttnName		AS 'a1.an1'
+					,od.Address1		AS 'a1.ad1'
+					,od.CompanyName2	AS 'a2.cn2'
+					,od.AttnName2		AS 'a2.an2'
+					,od.Address2		AS 'a2.ad2'
+					,ci.baseCurrInfo    AS 'bcs'
+			FROM OAS_PartyDetail od WITH(NOLOCK)
+			INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
+			OUTER APPLY (SELECT TOP 1 ToParty FROM OAS_ChargeInfo oc WITH(NOLOCK) WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
+			OUTER APPLY (
+							SELECT
+							(
+							SELECT CASE WHEN op.BaseCurrencyId = 142 THEN 'USDT' ELSE e.Code END  'c', 
+									op.LicenseeCode 'lc', 
+									op.FromDate 'fd', 
+									op.ToDate  'td'
+							FROM OAS_PartyBaseCurrency op WITH(NOLOCK) 
+							INNER JOIN CustDB.dbo.exchange e WITh(NOLOCK) ON op.BaseCurrencyId = e.ExchangeId
+							WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
+							) AS  baseCurrInfo
+						) ci
+			WHERE od.PartyID = @PayerID FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
+		)
 
 		UPDATE dbo.OAS_PartyDetail WITH (ROWLOCK, UPDLOCK)
 		SET CompanyName = @CompanyName
@@ -211,26 +228,44 @@ BEGIN
 			--Endregion
 		END
 
-		SET @xml = (
-			SELECT	@PayerId			AS '@pid'
-					, p.PartyName		AS '@pn'
-					, pd.StatusId		AS '@s'
-					, pd.IsDeposit		AS '@isd'
-					, @BrandName		AS '@bn'
-					, @CompanyName		AS '@cn'
-					, @AttnName			AS '@an'
-					, @Description		AS '@des'
-					, @Address1			AS '@a1'
-					, @Address2			AS '@a2'
-					, @InvoiceLanguage	AS '@il'
-					, @CompanyName2		AS '@cn2'
-					, @AttnName2		AS '@an2'
-			FROM dbo.OAS_Party p WITH (NOLOCK)
-				INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
-			WHERE p.PartyID = @PayerId
-			FOR XML PATH('z'), ROOT('r')
-			)
-		SET @logSpData = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"')
+		SELECT @logSPData = (
+			SELECT	 Op2.PartyName							AS 'pi.pn'
+					,CASE WHEN x.ToParty = 1 THEN 'ONEWorks'
+						  WHEN x.ToParty = 9 THEN 'Cozni'
+						  WHEN x.ToParty = 11 THEN 'Boping'	
+						  WHEN x.ToParty = 98 THEN 'Zelianta'	
+					 END									AS 'pi.bg' 
+					,od.BrandName							AS 'pi.bn'
+					,od.Description							AS 'pi.dc'
+					,od.InvoiceLanguage						AS 'pi.iv'
+					,od.LaunchDate							AS 'pi.ld'
+					,od.SuspendedDate						AS 'pi.sd'
+					,od.TerminatedDate						AS 'pi.tmd'
+
+					,od.CompanyName		AS 'a1.cn1'
+					,od.AttnName		AS 'a1.an1'
+					,od.Address1		AS 'a1.ad1'
+					,od.CompanyName2	AS 'a2.cn2'
+					,od.AttnName2		AS 'a2.an2'
+					,od.Address2		AS 'a2.ad2'
+					,ci.baseCurrInfo    AS 'bcs'
+			FROM OAS_PartyDetail od WITH(NOLOCK)
+			INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
+			OUTER APPLY (SELECT TOP 1 ToParty FROM OAS_ChargeInfo oc WITH(NOLOCK) WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
+			OUTER APPLY (
+							SELECT
+							(
+							SELECT CASE WHEN op.BaseCurrencyId = 142 THEN 'USDT' ELSE e.Code END  'c', 
+									op.LicenseeCode 'lc', 
+									op.FromDate 'fd', 
+									op.ToDate  'td'
+							FROM OAS_PartyBaseCurrency op WITH(NOLOCK) 
+							INNER JOIN CustDB.dbo.exchange e WITh(NOLOCK) ON op.BaseCurrencyId = e.ExchangeId
+							WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
+							) AS  baseCurrInfo
+						) ci
+			WHERE od.PartyID = @PayerID FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
+		)
 
 		SET @endRun = GETDATE()
 		SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun)
@@ -244,15 +279,14 @@ BEGIN
 	END
 
 	-- Write Log
-	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
 		@UserId			= @UserID
 		,@IP			= @LoginIP
-		,@LicenseeID	= 0
-		,@CurrencyID	= 0
 		,@SPName		= 'LA_PayerModify'
-		,@CustId		= 0
+		,@CustId		= @PayerID
 		,@Duration		= @duration
-		,@Data			= @logSPData
-		,@OldData		= @logSPDataOld
+		,@TrackingValue2 = @logSPData
+		,@TrackingValue = @logSPDataOld
+		,@ActionID		= 1001
 END
 GO
