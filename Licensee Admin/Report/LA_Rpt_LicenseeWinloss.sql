@@ -53,6 +53,7 @@ AS
 	- 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]	
 	- 20221226@Danny: Fiat currency Base to USDT = 0 [RedmineID: #180703]
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
+	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 	
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -94,7 +95,7 @@ BEGIN
 	CREATE TABLE #Report (PartyID INT, ReportDate DATE, CurrencyID INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY, 
 						AmtDueToBA MONEY, CommBA MONEY, Company MONEY, Betcount INT, OddsSpreadCost MONEY)
 
-	CREATE TABLE #Exchange (BaseCurrencyId INT, ExchangeId INT, ExchangeDate DATE, Code VARCHAR(20), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, CNY FLOAT, Base FLOAT, USDT FLOAT)
+	CREATE TABLE #Exchange (BaseCurrencyId INT, ExchangeId INT, ExchangeDate DATE, Code VARCHAR(65), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, CNY FLOAT, Base FLOAT, USDT FLOAT)
 	
 	DECLARE @ChargeInfo TABLE(PartyID INT, LicenseeID INT, ProductID INT,BetTypeId INT ,Rate MONEY, Fromdate DATE, Todate DATE, ChargeType TINYINT, ChargeId INT)
 	

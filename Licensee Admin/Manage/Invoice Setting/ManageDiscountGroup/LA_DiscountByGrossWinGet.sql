@@ -15,6 +15,7 @@ AS
 		- 20211101@Percy: Initialize SP [RedmineID: #162158]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 		- 20201003@Danny: Support USDT as base currency [RedmineID: #180313]
+		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 */
 
 BEGIN
@@ -75,7 +76,8 @@ BEGIN
 	SELECT  pl.PartyId, cl.Currency AS CurrencyId, 
 			CASE WHEN e.Code = 'UST' THEN 'USDT'   
 			ELSE
-				CASE WHEN e.Code = 'USD' AND e.Currency = 'USDT' THEN 'USD (USDT)'  				
+				CASE WHEN e.Code = 'USD' AND e.Currency = 'USDT' THEN 'USD (USDT)'  
+					 WHEN e.Code = 'USD' AND e.Currency = 'USDTJP' THEN 'USD (USDTJP)'  
 				ELSE e.Code 
 				END 
 			END

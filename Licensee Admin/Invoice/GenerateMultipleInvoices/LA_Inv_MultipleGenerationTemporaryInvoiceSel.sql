@@ -28,6 +28,7 @@ AS
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 		- 20221213@Danny: Import HideRebateWorksheet Info from Excel template [RedmineID: #181546]
 		- 20221226@Danny: Integrate Player tips [#180703]
+		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -132,7 +133,7 @@ BEGIN
 	-- Region: Get Exchange
 	BEGIN
 		DECLARE @BaseCurrencies TABLE (RowId SMALLINT IDENTITY(1, 1), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
-		DECLARE @Exchange TABLE (ExchangeDate DATE, ExchangeId INT, CurrencyCode VARCHAR(10), BaseCurrencyId INT, BaseCurrencyRate FLOAT)
+		DECLARE @Exchange TABLE (ExchangeDate DATE, ExchangeId INT, CurrencyCode VARCHAR(65), BaseCurrencyId INT, BaseCurrencyRate FLOAT)
 		
 		INSERT INTO @BaseCurrencies (BaseCurrencyId, BaseCurrencyName)
 		SELECT DISTINCT BaseCurrencyId, BaseCurrencyName FROM @PartySettings

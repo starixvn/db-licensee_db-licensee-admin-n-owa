@@ -26,6 +26,7 @@ AS
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20211212@Percy: Set OddsSpread = 0 if negative value [RedmineID: #165849]
 		- 20201003@Danny: Support USDT as base currency [RedmineID: #180313]
+		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -153,7 +154,7 @@ BEGIN
 	END
 	
 	-- Return data
-	DECLARE @Exchange TABLE (CurrencyId INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20), OriginalCurrencyCode VARCHAR(20))
+	DECLARE @Exchange TABLE (CurrencyId INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(65), OriginalCurrencyCode VARCHAR(20))
 	INSERT INTO @Exchange (CurrencyId, CurrencyName, OriginalCurrencyCode, CurrencyCode)
 	SELECT ExchangeId, Currency, CASE WHEN Code = 'UST' THEN 'USDT' ELSE Code END
 		,CASE ExchangeId
@@ -176,7 +177,7 @@ BEGIN
 	UPDATE e
 	SET e.CurrencyCode = e.CurrencyCode + ' (' + e.CurrencyName + ')' 
 	FROM @Exchange e
-	WHERE e.CurrencyName = 'USDT' AND e.CurrencyCode = 'USD'
+	WHERE e.CurrencyName IN ('USDT','USDTJP') AND e.CurrencyCode = 'USD'
 
 	-- Add data for products with no ticket
 	;WITH CTE_Currency AS (SELECT DISTINCT CurrencyId FROM #tmpResult)

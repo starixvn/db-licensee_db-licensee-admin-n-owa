@@ -15,6 +15,7 @@ AS
  * Revisions
 	- 20220426@Danny: Initialize SP [#168387]
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
+	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
  */
 
 BEGIN
@@ -42,7 +43,7 @@ BEGIN
 	CREATE TABLE #Exchange (
 		ExchangeDate	DATETIME,
 		ExchangeId		INT,
-		Code			VARCHAR(10),
+		Code			VARCHAR(65),
 		Rate			FLOAT
 	)
 
@@ -221,8 +222,8 @@ BEGIN
 	CREATE TABLE #Result (
 		PartyId						INT,
 		ReportDate					DATETIME,
-		OriginalCurrency			VARCHAR(10),
-		RegisteredCurrency			VARCHAR(10),
+		OriginalCurrency			VARCHAR(65),
+		RegisteredCurrency			VARCHAR(65),
 		TotalTrans					INT,
 		Turnover					MONEY,
 		TurnoverBased				MONEY,

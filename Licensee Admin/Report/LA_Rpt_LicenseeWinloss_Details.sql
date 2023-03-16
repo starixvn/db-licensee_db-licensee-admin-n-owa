@@ -74,7 +74,7 @@ BEGIN
 
 	CREATE TABLE #Report (ReportDate DATE, CurrencyID INT, ProductID INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY,
 						AmtDueToBA MONEY, CommBA MONEY, Company MONEY, Betcount INT, OddsSpreadCost MONEY)
-	CREATE TABLE #Exchange (ExchangeId INT, ExchangeDate DATE, Code VARCHAR(20), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, CNY FLOAT, Base FLOAT, USDT FLOAT)
+	CREATE TABLE #Exchange (ExchangeId INT, ExchangeDate DATE, Code VARCHAR(65), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, CNY FLOAT, Base FLOAT, USDT FLOAT)
 	CREATE TABLE #Data (PartyID INT, rptDate DATE,ProductID INT, Currency INT,BetTypeId INT, Turnover MONEY, Winloss MONEY, AWinloss MONEY, AComm MONEY, PComm MONEY, Betcount BIGINT)
 	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20), FromDate DATE, ToDate DATE)
 	CREATE TABLE #ChargeInfo (PartyID INT, LicenseeID INT, ProductID INT, BetTypeID INT, Rate MONEY, Fromdate DATE , Todate DATE, ChargeType TINYINT, ChargeID INT)
@@ -414,6 +414,7 @@ BEGIN
 	SELECT DISTINCT ExchangeDate, ExchangeId, 
 			CASE WHEN ExchangeId = 142 THEN 'USDT'
 				WHEN ExchangeId = 96 THEN 'USD (USDT)'
+				WHEN ExchangeId = 202 THEN 'USD (USDTJP)'
 			ELSE Code END Code, 
 			USD, EUR, MYR, GBP, CNY, USDT
 	FROM dbo.Lrf_f_GetExchangeDaily(@FromDate, @Todate)
@@ -487,7 +488,7 @@ BEGIN
 	UPDATE e
 	SET e.CurrencyCode = e.CurrencyCode + ' (' + e.CurrencyName + ')' 
 	FROM @CurrencyTable e
-	WHERE e.CurrencyName = 'USDT' AND e.CurrencyCode = 'USD'
+	WHERE e.CurrencyName IN ('USDT','USDTJP') AND e.CurrencyCode = 'USD'
 
 	-- Result
 	BEGIN

@@ -62,6 +62,7 @@ AS
 	   - 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 	   - 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]
 	   - 20221003@Malcolm: Add platform filter [RedmineID: #165707]
+	   - 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -425,7 +426,7 @@ BEGIN
 
 	-- Exchange rate
 	BEGIN
-		CREATE TABLE #ExchangeRate (BaseCurrencyId INT, ExchangeDate DATE, ExchangeId INT, Code VARCHAR(20), Rate FLOAT)
+		CREATE TABLE #ExchangeRate (BaseCurrencyId INT, ExchangeDate DATE, ExchangeId INT, Code VARCHAR(65), Rate FLOAT)
 		INSERT INTO #ExchangeRate (ExchangeDate, ExchangeId, Code, Rate)
 		SELECT ExchangeDate, ExchangeId, Code, CASE WHEN @IsConvert = 1 THEN BaseCurrencyRate ELSE 1 END
 		FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
@@ -447,7 +448,7 @@ BEGIN
 		UPDATE e
 		SET CurrencyCode = e.CurrencyCode + ' (' + CurrencyName + ')'
 		FROM @Exchange e
-		WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1) OR e.Currency = 96
+		WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1) OR e.Currency IN (96, 202)
 	END
 
 	-- Result

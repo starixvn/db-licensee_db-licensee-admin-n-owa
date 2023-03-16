@@ -14,6 +14,7 @@ AS
  * Revisions
 	- 20210622@Danny: Initialize SP [#168387]
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
+	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
  */
 
 BEGIN
@@ -82,7 +83,7 @@ BEGIN
 	CREATE TABLE #Exchange (
 		ExchangeDate	DATE,
 		ExchangeID		INT,
-		CurrencyCode	VARCHAR(10),
+		CurrencyCode	VARCHAR(65),
 		Rate			FLOAT
 	)
 	

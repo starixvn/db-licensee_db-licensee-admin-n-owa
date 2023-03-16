@@ -57,6 +57,7 @@ AS
 	   - 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]
 	   - 20221226@Danny: Fiat currency Base to USDT = 0 [RedmineID: #180703]
 	   - 20221003@Malcolm: Add platform filter [RedmineID: #165707]
+	   - 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -412,7 +413,7 @@ BEGIN
 
 	-- Exchange rate
 	BEGIN
-		CREATE TABLE #ExchangeRate (BaseCurrencyId INT, ExchangeDate DATETIME, ExchangeId INT, Code VARCHAR(20), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, USDT FLOAT, Rate FLOAT)
+		CREATE TABLE #ExchangeRate (BaseCurrencyId INT, ExchangeDate DATETIME, ExchangeId INT, Code VARCHAR(65), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, USDT FLOAT, Rate FLOAT)
 		INSERT INTO #ExchangeRate (ExchangeDate, ExchangeId, USD, EUR, MYR, GBP, USDT, Code)
 		SELECT ExchangeDate, ExchangeId, USD, EUR, MYR, GBP, USDT
 			,CASE ExchangeId
@@ -423,6 +424,7 @@ BEGIN
 				WHEN 92 THEN 'HID'
 				WHEN 142 THEN 'USDT'
 				WHEN 96 THEN 'USD (USDT)'
+				WHEN 202 THEN 'USD (USDTJP)'
 				ELSE Code END
 		FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
 	END

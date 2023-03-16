@@ -18,6 +18,7 @@ AS
 		- 20220927@Danny: Remove DBLink [#176986]
 		- 20221206@Malcolm: Separate data of Blueprint and Normal games for Macau Games product [RedmineId: #179006]
 		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
+		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 
 	Param's Explanation:
 		+ @GroupBy :
@@ -66,7 +67,7 @@ BEGIN
 	CREATE TABLE #Exchange (
 		ExchangeDate	DATE,
 		ExchangeID		INT,
-		CurrencyCode	VARCHAR(10),
+		CurrencyCode	VARCHAR(65),
 		Rate			FLOAT
 	)
 
@@ -199,7 +200,7 @@ BEGIN
 	EXEC bodb_licensee.dbo.LA_SelBaseCurrency
 
 	DECLARE @GrandTotal TABLE (
-		CurrencyName	VARCHAR(20),
+		CurrencyName	VARCHAR(65),
 		TotalTrans		INT,
 		Turnover		MONEY,
 		CustomerWinLoss	MONEY,
@@ -263,7 +264,7 @@ BEGIN
 			,ParentId					INT
 			,ParentName					VARCHAR(100)
 			,WinLossDate				DATETIME
-			,CurrencyName				VARCHAR(10)
+			,CurrencyName				VARCHAR(65)
 			,GameType					INT
 			,TotalTrans					INT
 			,TurnoverOriginal			MONEY
