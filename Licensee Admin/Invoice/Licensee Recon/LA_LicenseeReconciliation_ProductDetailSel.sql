@@ -25,6 +25,7 @@ AS
 		- 20220222@Danny: Allbet - Promotion integration [#167510]
 		- 20220615@Percy: Fix issue can't get BTC & SLT under SB [RedmineID: #172584]
 		- 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
+		- 20230323@Danny: SG - Promotion prize integration [#183739]
 */
 
 BEGIN
@@ -44,7 +45,7 @@ BEGIN
 	SELECT l.LicenseeId, l.LicenseeName
 	FROM dbo.Licensees l WITH (NOLOCK)
 		INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON l.LicenseeId = p.OldRefId AND p.PartyType IN (1, 5)
-	WHERE p.PartyId IN (SELECT CONVERT(INT, val) FROM bodb02.dbo.strSplit(@PartyIds, ','))
+	WHERE p.PartyId IN (SELECT CONVERT(INT, value) FROM STRING_SPLIT(@PartyIds, ','))
 
 	-- Get Exchange
 	DECLARE @Exchange TABLE (ExchangeId INT, ExchangeDate SMALLDATETIME, Rate FLOAT)
@@ -55,14 +56,14 @@ BEGIN
 	-- Get bettype group: Contribution, Promotion, Prize, ...
 	DECLARE @Bettype TABLE (Bettype INT, TypeId TINYINT)
 	INSERT INTO @Bettype (Bettype, TypeId)
-	SELECT Bettype, 1 AS TypeId FROM (VALUES (4297), (1698), (3898), (4599)) b (Bettype) -- Contribution
-	UNION ALL
-	SELECT Bettype, 2 AS TypeId FROM (VALUES (4299), (4300), (1906), (3150), (2499), (8695)) b (Bettype) -- Promotion
-	UNION ALL
-	SELECT Bettype, 3 AS TypeId FROM (VALUES (4298), (1699), (3899), (4600)) b (Bettype) -- JackpotPrize
-	UNION ALL
-	SELECT Bettype, 4 AS TypeId FROM (VALUES (999)) b (Bettype) -- OddsSpread Adjustment
-	
+	SELECT DiSTINCT x.bettype, 
+					CASE WHEN x.SubProduct IN ('Jackpot Contribution') THEN 1
+						 WHEN x.SubProduct IN ('Prize','Lucky Draw','Bonus','Promotion') THEN 2
+						 WHEN x.SubProduct IN ('Jackpot Prize') THEN 3
+						 WHEN x.SubProduct IN ('Odds Spread Adjustment') THEN 4 END  TypeId
+	FROM bodb02.dbo.SportBettypeMatrix x WITH(NOLOCK)
+	WHERE x.SubProduct IN ('Jackpot Contribution','Jackpot Prize','Prize','Lucky Draw','Bonus','Odds Spread Adjustment','Promotion')
+
 	INSERT INTO @Bettype (Bettype, TypeId)
 	SELECT s.Bettype, 2 AS TypeId -- Promotion (include Free bets)
 	FROM (

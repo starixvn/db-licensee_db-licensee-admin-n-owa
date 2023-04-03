@@ -60,7 +60,7 @@ AS
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 		- 20220218@Danny: Allbet - Promotion integration [#167510]
 		- 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
-
+		- 20230217@Danny: SG - Promotion prize integration [#183739]
 	Param's Explanation:
 */
 BEGIN
@@ -81,6 +81,18 @@ BEGIN
 	DECLARE @GD_Tip SMALLINT = 1706,
 			@SAG_Tip SMALLINT = 3007
 	DECLARE @Product3rdID INT 
+
+	DECLARE @ExtraAmtProducts TABLE (ProductID INT, ProductCode VARCHAR(50))
+	INSERT INTO @ExtraAmtProducts
+	SELECT  Productid, ProductPrefix
+	FROM	bodb_licensee.dbo.Product3rd WITH(NOLOCK)
+	WHERE Productid IN 
+	(
+	SELECT  x.ProductID 
+	FROM bodb_licensee.dbo.LA_f_GroupBettype() x
+	WHERE x.TypeId IN (2,3,4,5,6,8) 
+	)
+
 
 	CREATE TABLE #Result
 	(
@@ -728,31 +740,28 @@ BEGIN
 			GROUP BY b.rptDate, b.CurrencyId
 		)
 	END
-	ELSE IF (@ProductCode = 'PP')
+	ELSE IF EXISTS(SELECT TOP 1 1 FROM @ExtraAmtProducts WHERE ProductCode = @ProductCode) -- Product support Jackpot, Contrib Or Any Promotions
 	BEGIN
-		DECLARE @PP_Contribution SMALLINT = 4297,
-				@PP_JackpotPrize SMALLINT = 4298,
-				@PPTournament SMALLINT = 4299,   
-				@PromotionPrize SMALLINT = 4300 
-
-		;WITH cte_WinLossData AS(
+	;WITH cte_WinLossData AS(
 			SELECT b.SiteId, b.rptDate, b.CurrencyID
-				, SUM(CASE WHEN b.Bettype NOT IN(@PPTournament, @PromotionPrize, @PP_Contribution, @PP_JackpotPrize) THEN ISNULL(b.BetCount, 0) ELSE 0 END) BetCount
-				, SUM(CASE WHEN b.Bettype NOT IN(@PPTournament, @PromotionPrize, @PP_Contribution, @PP_JackpotPrize) THEN ISNULL(b.Turnover, 0) ELSE 0 END) Turnover
-				, SUM(CASE WHEN b.Bettype NOT IN(@PPTournament, @PromotionPrize, @PP_Contribution, @PP_JackpotPrize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) MemberWL
-				, SUM(CASE WHEN b.Bettype IN(@PPTournament, @PromotionPrize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
-				, SUM(CASE WHEN b.Bettype = @PP_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Contribution
-				, SUM(CASE WHEN b.Bettype = @PP_JackpotPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS JackpotPrize
+				, SUM(CASE WHEN ISNULL(b.TicketType,0) = 2 OR bt.Bettype IS NULL THEN ISNULL(b.BetCount, 0) ELSE 0 END) BetCount
+				, SUM(CASE WHEN ISNULL(b.TicketType,0) = 2 OR bt.Bettype IS NULL THEN ISNULL(b.Turnover, 0) ELSE 0 END) Turnover
+				, SUM(CASE WHEN ISNULL(b.TicketType,0) = 2 OR bt.Bettype IS NULL THEN ISNULL(b.MemberWL, 0) ELSE 0 END) MemberWL
+				, SUM(CASE WHEN ISNULL(b.TicketType,0) = 2 THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS FreeBetAmount
+				, SUM(CASE WHEN bt.TypeId IN(4,5,6,8) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
+				, SUM(CASE WHEN bt.TypeId = 2 THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Contribution
+				, SUM(CASE WHEN bt.TypeId = 3 THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS JackpotPrize
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+				LEFT JOIN bodb_licensee.dbo.LA_f_GroupBettype() bt ON b.Bettype = bt.Bettype
 				WHERE
-					b.ProductID = 32
+					b.ProductID IN (SELECT z.ProductID FROM @ExtraAmtProducts z WHERE z.ProductCode = @ProductCode)
 					AND	b.SiteID = @LicenseeID
 					AND b.rptDate BETWEEN @FromDate AND @ToDate
 					AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
 					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
 				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
-		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, WinningPrize, Contribution, JackpotPrize)
+		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, WinningPrize, Contribution, JackpotPrize, FreeBetAmount)
 		SELECT rptDate, d.CurrencyID
 				, SUM(BetCount)		AS BetCount
 				, SUM(Turnover)		AS Turnover
@@ -762,6 +771,7 @@ BEGIN
 				, SUM(WinningPrize) AS WinningPrize
 				, SUM(Contribution) AS Contribution
 				, SUM(JackpotPrize) AS JackpotPrize
+				, SUM(FreeBetAmount) AS FreeBetAmount
 		FROM cte_WinLossData d
 			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND d.CurrencyId = cm.CurrencyId 
@@ -773,169 +783,8 @@ BEGIN
 		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
 
 		UPDATE #Result
-		SET Company = CASE WHEN @IsKeepNegativeAmount = 1 OR @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - WinningPrize
-	END
-	ELSE IF (@ProductCode = 'SG')
-	BEGIN
-		DECLARE @SG_Contribution SMALLINT = 4599,
-				@SG_JackpotPrize SMALLINT = 4600
-
-		;WITH cte_WinLossData AS(
-			SELECT b.SiteId, b.rptDate, b.CurrencyID
-				, SUM(CASE WHEN b.Bettype NOT IN(@SG_Contribution, @SG_JackpotPrize) THEN ISNULL(b.BetCount, 0) ELSE 0 END) BetCount
-				, SUM(CASE WHEN b.Bettype NOT IN(@SG_Contribution, @SG_JackpotPrize) THEN ISNULL(b.Turnover, 0) ELSE 0 END) Turnover
-				, SUM(CASE WHEN b.Bettype NOT IN(@SG_Contribution, @SG_JackpotPrize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) MemberWL
-				, SUM(CASE WHEN b.Bettype = @SG_Contribution THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Contribution
-				, SUM(CASE WHEN b.Bettype = @SG_JackpotPrize THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS JackpotPrize
-				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-				WHERE
-					b.ProductID = 36
-					AND	b.SiteID = @LicenseeID
-					AND b.rptDate BETWEEN @FromDate AND @ToDate
-					AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
-					AND b.[StatusId] NOT IN (-1, 101, 102, 103)
-				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
-		)
-		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, Contribution, JackpotPrize)
-		SELECT rptDate, d.CurrencyID
-				, SUM(BetCount)		AS BetCount
-				, SUM(Turnover)		AS Turnover
-				, SUM(MemberWL)		AS Winlost
-				, SUM((-MemberWL - Contribution) * (1 - ISNULL(cm.Rate, p.Rate)))  AS LicenseeWL
-				, SUM((-MemberWL - Contribution) * ISNULL(cm.Rate, p.Rate))  AS LicenseeChargeRate
-				, SUM(Contribution) AS Contribution
-				, SUM(JackpotPrize) AS JackpotPrize
-		FROM cte_WinLossData d
-			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
-			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND d.CurrencyId = cm.CurrencyId 
-		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
-		GROUP BY rptDate, d.CurrencyID
-
-		SELECT @TotalLicenseeChargeRate_InBaseCurrency = SUM(LicenseeChargeRate * e.Rate)
-		FROM #Result r
-		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
-
-		UPDATE #Result
-		SET Company = CASE WHEN @IsKeepNegativeAmount = 1 OR @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize
-	END
-	ELSE IF (@ProductCode = 'CC')
-	BEGIN
-		DECLARE @ArcadiaGaming_Bonus_BettypeID SMALLINT = 1906
-		;WITH cte_ArcadiaData AS
-		(
-			SELECT b.SiteId, b.rptDate, b.CurrencyId
-				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus_BettypeID THEN 0 ELSE ISNULL(b.BetCount, 0) END) AS BetCount
-				,SUM(ISNULL(b.Turnover, 0)) AS Turnover
-				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus_BettypeID THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS MemberWL
-				,SUM(CASE WHEN b.Bettype = @ArcadiaGaming_Bonus_BettypeID THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
-			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			WHERE b.ProductID = 34
-				AND b.rptDate BETWEEN @FromDate AND @ToDate
-				AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
-				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
-			GROUP BY b.SiteId, rptDate, b.CurrencyID
-		)
-		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, WinningPrize)
-		SELECT b.rptDate, b.CurrencyId
-			,SUM(Betcount) 
-			,SUM(Turnover) 
-			,SUM(MemberWL) 
-			,SUM(-MemberWL * (1 - ISNULL(cm.Rate, p.Rate)))				AS LicenseeWL
-			,SUM(-MemberWL * ISNULL(cm.Rate, p.Rate))					AS LicenseeChargeRate
-			,SUM(WinningPrize) 
-		FROM cte_ArcadiaData b
-		INNER JOIN @ChargeInfo p ON b.SiteId = p.LicenseeID
-		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND b.CurrencyId = cm.CurrencyId
-		WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate
-		GROUP BY rptDate, b.CurrencyID
-
-		SELECT @TotalLicenseeChargeRate_InBaseCurrency = SUM(LicenseeChargeRate * e.Rate)
-		FROM #Result r
-		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
-
-		UPDATE #Result
-		SET Company = CASE WHEN @IsKeepNegativeAmount = 1 OR @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END - WinningPrize
-	END
-	ELSE IF (@ProductCode IN ('SXG','MGRNG'))
-	BEGIN
-		DECLARE @SXG_LuckyDraw SMALLINT = 3150
-		DECLARE @MGRNG_Prize SMALLINT = 8695
-
-		SELECT @Product3rdID = CASE WHEN @ProductCode = 'SXG' THEN 45
-									WHEN @ProductCode = 'MGRNG' THEN 73 END
-
-		;WITH cte_SXG_Data AS
-		(
-			SELECT b.SiteId, b.rptDate, b.CurrencyId
-				,SUM(CASE WHEN b.Bettype IN (@SXG_LuckyDraw,@MGRNG_Prize) THEN 0 ELSE ISNULL(b.BetCount, 0) END) AS BetCount
-				,SUM(ISNULL(b.Turnover, 0)) AS Turnover
-				,SUM(CASE WHEN b.Bettype IN (@SXG_LuckyDraw,@MGRNG_Prize) THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS MemberWL
-				,SUM(CASE WHEN b.Bettype IN (@SXG_LuckyDraw,@MGRNG_Prize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
-			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			WHERE b.ProductID = @Product3rdID
-				AND b.rptDate BETWEEN @FromDate AND @ToDate
-				AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
-				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
-			GROUP BY b.SiteId, rptDate, b.CurrencyID
-		)
-		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, WinningPrize)
-		SELECT b.rptDate, b.CurrencyId
-			,SUM(Betcount) 
-			,SUM(Turnover) 
-			,SUM(MemberWL) 
-			,SUM(-MemberWL * (1 - ISNULL(cm.Rate, p.Rate)))				AS LicenseeWL
-			,SUM(-MemberWL * ISNULL(cm.Rate, p.Rate))					AS LicenseeChargeRate
-			,SUM(WinningPrize) 
-		FROM cte_SXG_Data b
-		INNER JOIN @ChargeInfo p ON b.SiteId = p.LicenseeID
-		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND b.CurrencyId = cm.CurrencyId
-		WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate
-		GROUP BY rptDate, b.CurrencyID
-
-		SELECT @TotalLicenseeChargeRate_InBaseCurrency = SUM(LicenseeChargeRate * e.Rate)
-		FROM #Result r
-		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
-
-		UPDATE #Result
-		SET Company = CASE WHEN @IsKeepNegativeAmount = 1 OR @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END - WinningPrize
-	END
-	ELSE IF (@ProductCode = 'AB')
-	BEGIN
-		DECLARE @AB_Promotion SMALLINT = 2499
-		;WITH cte_AB_Data AS
-		(
-			SELECT b.SiteId, b.rptDate, b.CurrencyId
-				,SUM(CASE WHEN b.Bettype = @AB_Promotion THEN 0 ELSE ISNULL(b.BetCount, 0) END) AS BetCount
-				,SUM(ISNULL(b.Turnover, 0)) AS Turnover
-				,SUM(CASE WHEN b.Bettype = @AB_Promotion THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS MemberWL
-				,SUM(CASE WHEN b.Bettype = @AB_Promotion THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS WinningPrize
-			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			WHERE b.ProductID = 21
-				AND b.rptDate BETWEEN @FromDate AND @ToDate
-				AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
-				AND b.[StatusId] NOT IN (-1, 101, 102, 103)
-			GROUP BY b.SiteId, rptDate, b.CurrencyID
-		)
-		INSERT INTO #Result(Winlostdate, CurrencyId, Betcount, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, WinningPrize)
-		SELECT b.rptDate, b.CurrencyId
-			,SUM(Betcount) 
-			,SUM(Turnover) 
-			,SUM(MemberWL) 
-			,SUM(-MemberWL * (1 - ISNULL(cm.Rate, p.Rate)))				AS LicenseeWL
-			,SUM(-MemberWL * ISNULL(cm.Rate, p.Rate))					AS LicenseeChargeRate
-			,SUM(WinningPrize) 
-		FROM cte_AB_Data b
-		INNER JOIN @ChargeInfo p ON b.SiteId = p.LicenseeID
-		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND b.CurrencyId = cm.CurrencyId
-		WHERE b.rptDate BETWEEN p.Fromdate AND p.Todate
-		GROUP BY rptDate, b.CurrencyID
-
-		SELECT @TotalLicenseeChargeRate_InBaseCurrency = SUM(LicenseeChargeRate * e.Rate)
-		FROM #Result r
-		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
-
-		UPDATE #Result
-		SET Company = CASE WHEN @IsKeepNegativeAmount = 1 OR @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END - WinningPrize
+		SET Company = CASE WHEN @IsKeepNegativeAmount = 1 OR @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - WinningPrize - FreeBetAmount
+		
 	END
 	ELSE IF(@ProductCode = 'SB') -- Sportsbook
 	BEGIN
@@ -972,61 +821,6 @@ BEGIN
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
 		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
 		GROUP BY rptDate, d.CurrencyID
-	END
-	ELSE IF (@ProductCode = 'SBC' OR @ProductCode = 'VGA')
-	BEGIN
-		DECLARE @FreeBetTicketType	INT = 2,
-				@SBC_Contribution	INT = 1698,
-				@SBC_JackpotPrize	INT = 1699,
-				@VGA_Contribution	INT = 3898,
-				@VGA_JackpotPrize	INT = 3899
-
-		
-		SELECT @Product3rdID = CASE WHEN @ProductCode = 'SBC' THEN 42 
-									WHEN  @ProductCode = 'VGA' THEN 66 END
-
-		;WITH cte_SBC AS
-		(
-			SELECT b.SiteId, b.rptDate, b.CurrencyID
-				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType OR b.Bettype IN (@SBC_Contribution, @SBC_JackpotPrize, @VGA_Contribution, @VGA_JackpotPrize) THEN 0 ELSE ISNULL(b.turnover, 0) END) AS Turnover
-				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType OR b.Bettype IN (@SBC_Contribution, @SBC_JackpotPrize, @VGA_Contribution, @VGA_JackpotPrize) THEN 0 ELSE ISNULL(b.MemberWL, 0) END) AS MemberWinloss
-				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType OR b.Bettype IN (@SBC_Contribution, @SBC_JackpotPrize, @VGA_Contribution, @VGA_JackpotPrize) THEN 0 ELSE ISNULL(b.betcount, 0) END) AS BetCount
-				,SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS FreeBetAmount
-				,SUM(CASE WHEN b.Bettype IN (@SBC_Contribution, @VGA_Contribution) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Contribution
-				,SUM(CASE WHEN b.Bettype IN (@SBC_JackpotPrize, @VGA_JackpotPrize) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS JackpotPrize
-			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-			WHERE
-				b.SiteID = @LicenseeID
-				AND b.rptDate BETWEEN @FromDate AND @ToDate
-				AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
-				AND (b.CurrencyID <> 20)
-				AND b.StatusId NOT IN (-1, 101, 102, 103)
-				AND b.customercategory NOT IN (27, 28)
-				AND b.ProductID =  @Product3rdID
-			GROUP BY b.rptdate, b.SiteId, b.CurrencyID
-		)
-		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, LicenseeChargeRate, FreeBetAmount, Betcount, Contribution, JackpotPrize)
-		SELECT rptDate, d.CurrencyID
-			,SUM(Turnover)		AS Turnover
-			,SUM(MemberWinloss) AS Winlost
-			,SUM((-MemberWinloss - Contribution) * ( 1 - ISNULL(cr.Rate, p.Rate)))	AS LicenseeWL
-			,SUM((-MemberWinloss - Contribution) * ISNULL(cr.Rate, p.Rate))			AS LicenseeChargeRate
-			,SUM(FreeBetAmount)	AS FreeBetAmount
-			,SUM(BetCount)		AS BetCount
-			,SUM(Contribution)	AS Contribution
-			,SUM(JackpotPrize)	AS JackpotPrize	
-		FROM cte_SBC d
-			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
-			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
-		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
-		GROUP BY rptDate, d.CurrencyID
-
-		SELECT @TotalLicenseeChargeRate_InBaseCurrency = SUM(LicenseeChargeRate * e.Rate)
-		FROM #Result r
-		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
-
-		UPDATE #Result
-		SET Company = CASE WHEN @IsKeepNegativeAmount = 1 OR @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN LicenseeChargeRate ELSE 0 END + Contribution - JackpotPrize - FreeBetAmount
 	END
 	ELSE
 	BEGIN

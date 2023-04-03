@@ -54,6 +54,7 @@ AS
 	- 20221226@Danny: Fiat currency Base to USDT = 0 [RedmineID: #180703]
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+	- 20230217@Danny: Remove hard-code bettype And ProductID [#183739]
 	
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -147,13 +148,11 @@ BEGIN
 				, SUM(b.BetCount * CASE WHEN @drawfilter = 2 AND b.StatusId = 111 THEN 0 ELSE 1 END) BetCount
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID
-				LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('13,25','') eb ON b.Bettype = eb.BettypeID
 			WHERE b.rptDate BETWEEN @Fromdate AND @Todate
 				AND b.ProductID = 3
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR b.CurrencyID = @Currency)
 				AND (b.CurrencyID <> @CurrencyTest)
-				AND eb.BettypeID IS NULL
 			GROUP BY ci.PartyID, b.rptDate, b.ProductID, currencyID
 		)
 		
@@ -435,17 +434,14 @@ BEGIN
 				SELECT DISTINCT PartyId, LicenseeId, ProductID 
 				FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)
 			) ci ON b.SiteID = ci.LicenseeID AND p.GroupProductId = ci.ProductID
-			OUTER APPLY (
-				SELECT eb.BettypeID FROM bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','') eb WHERE b.Bettype = eb.BettypeID
-					AND eb.BettypeID NOT IN (SELECT z.Bettype FROM bodb_licensee.dbo.LA_f_GroupBettype() z WHERE z.TypeId IN (2,7))
-				) eb 
-			LEFT JOIN bodb_licensee.dbo.LA_f_GroupBettype() g ON b.Bettype = g.Bettype
+			LEFT JOIN bodb_licensee.dbo.LA_f_GroupBettype() eb ON b.Bettype = eb.Bettype AND eb.TypeID NOT IN (7,2) -- 7:OddsSpread Adjustment, 2:Jackpot Contribution
+			LEFT JOIN bodb_licensee.dbo.LA_f_GroupBettype() g ON b.Bettype = g.Bettype  AND g.TypeID  IN (7,2)
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.StatusId NOT IN (- 1, 101, 102, 103)
 			AND (@Currency = 0 OR b.CurrencyID = @Currency)
 			AND (b.CurrencyID <> @CurrencyTest)
 			AND b.customercategory NOT IN (27,28)
-			AND eb.BettypeID IS NULL
+			AND eb.Bettype IS NULL
 			AND	ISNULL(b.TicketType,0) <> 2 -- Free_Bets_TicketType
 		GROUP BY b.rptDate, ci.PartyID, p.GroupProductId, b.CurrencyID
 

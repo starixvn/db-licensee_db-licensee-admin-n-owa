@@ -18,6 +18,7 @@ AS
  	- 20171220@Parsons: increase length for variables [#88197]
 	- 20180716@bruce: add new group TEST for credit [#98126]
 	- 20200303@Mason: Support HID currency [#128856]
+	- 20230329@Danny: Support USD(USDTJP) currency [#183739]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -59,7 +60,7 @@ BEGIN
 	-- Base currencies
 	DECLARE @BaseCurrencies TABLE(
 		CurrencyId	INT,
-		Code		VARCHAR(10),
+		Code		VARCHAR(65),
 		IsApply		BIT
 	)
 	INSERT INTO @BaseCurrencies(CurrencyId, Code)
@@ -112,7 +113,7 @@ BEGIN
 		PartyName		VARCHAR(100),
 		GroupName		VARCHAR(100),
 		ReportDate		DATETIME,
-		CurrencyName	VARCHAR(10),
+		CurrencyName	VARCHAR(65),
 		TotalTrans		INT,
 		Turnover		MONEY,
 		CustomerWinLoss	MONEY,
@@ -124,7 +125,7 @@ BEGIN
 	)
 
 	CREATE TABLE #GrandTotals (
-		 CurrencyName		VARCHAR(10),
+		 CurrencyName		VARCHAR(65),
 		 TotalTrans			INT,
 		 Turnover			MONEY,
 		 CustomerWinLoss	MONEY,

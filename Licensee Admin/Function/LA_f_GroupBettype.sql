@@ -16,33 +16,31 @@ AS
 		- 20220110@Danny: SG - Jackpot prize integration [#167089]
 		- 20220222@Danny: Allbet - Promotion integration [#167510]
 		- 20221024@Danny: MG-RNG - Tournament Prize [#176986]
+		- 20230223@Danny: SG - Promotion prize integration And Use SportBettypeMatrix  [#183739]
 */
 
 RETURN
-	-- 1: Tips
-	SELECT CONVERT(INT, 11) AS ProductId, CONVERT(INT, 1706) AS Bettype, CONVERT(SMALLINT, 1) AS TypeId, CONVERT(VARCHAR(100), 'Tips') AS TypeName -- GD Tips
-	UNION ALL SELECT 39, 3007, 1, 'Tips' -- SAG Tips
-	-- 2: Jackpot Contribution
-	UNION ALL SELECT 32, 4297, 2, 'Jackpot Contribution'
-	UNION ALL SELECT 42, 1698, 2, 'Jackpot Contribution'
-	UNION ALL SELECT 66, 3898, 2, 'Jackpot Contribution'
-	UNION ALL SELECT 36, 4599, 2, 'Jackpot Contribution'
+	WITH t AS
+	(
+		SELECT DISTINCT x.BetType, x.SubProduct, p.ProductID, p3.Productid AS ProductID_3rd
+		FROM bodb02.dbo.SportBettypeMatrix x WITH(NOLOCK)
+		INNER JOIN bodb02.dbo.Products p WITH(NOLOCK) ON x.ProductID = p.ProductID
+		LEFT JOIN Product3rd p3 WITH(NOLOCK) ON p.ProductPrefix = p3.ProductPrefix
+		WHERE x.SubProduct IN ('Tips','Jackpot Contribution','Jackpot Prize','Prize','Lucky Draw','Bonus','Odds Spread Adjustment','Promotion')
+	)
+	SELECT	CONVERT(INT, CASE WHEN ProductID = 1 THEN 0 ELSE ProductID_3rd END) AS ProductId
+			, CONVERT(INT, Bettype) AS Bettype
+			, CONVERT(SMALLINT,CASE WHEN SubProduct = 'Tips' THEN 1 
+									WHEN SubProduct = 'Jackpot Contribution' THEN 2
+									WHEN SubProduct = 'Jackpot Prize' THEN 3
+									WHEN SubProduct = 'Prize' THEN 4
+									WHEN SubProduct = 'Lucky Draw' THEN 5
+									WHEN SubProduct = 'Bonus' THEN 6
+									WHEN SubProduct = 'Odds Spread Adjustment' THEN 7
+									WHEN SubProduct = 'Promotion' THEN 8
+									END
+					 ) AS TypeId
+			,CONVERT(VARCHAR(100), SubProduct) AS TypeName
+	FROM t
 
-	-- 3: Jackpot Prize
-	UNION ALL SELECT 32, 4298, 3, 'Jackpot Prize'
-	UNION ALL SELECT 42, 1699, 3, 'Jackpot Prize'
-	UNION ALL SELECT 66, 3899, 3, 'Jackpot Prize'
-	UNION ALL SELECT 36, 4600, 3, 'Jackpot Prize'
-	-- 4: Prize
-	UNION ALL SELECT 32, 4299, 4, 'Prize'
-	UNION ALL SELECT 32, 4300, 4, 'Prize'
-	UNION ALL SELECT 73, 8695, 4, 'Prize'
-	-- 5: Lucky Draw
-	UNION ALL SELECT 45, 3150, 5, 'Lucky Draw'
-	-- 6: Bonus
-	UNION ALL SELECT 34, 1906, 6, 'Bonus'
-	-- 7: OddsSpread Adjustment
-	UNION ALL SELECT 0, 999, 7, 'OddsSpread Adjustment'
-	-- 8: Promotion
-	UNION ALL SELECT 21, 2499, 8, 'Promotion'
 GO

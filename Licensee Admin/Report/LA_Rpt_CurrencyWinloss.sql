@@ -63,6 +63,7 @@ AS
 	   - 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]
 	   - 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	   - 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+	   - 20230217@Danny: Remove hard-code bettype And ProductID [#183739]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -76,10 +77,10 @@ BEGIN
 	DECLARE @CurrencyTest		INT		 = 20
 	DECLARE @BaseCurrencyId		INT
 
-	DECLARE @PP_ProductId		INT		 = 32,
-			@SBC_ProductId		INT		 = 42,
-			@VGA_ProductId		INT		 = 66,
-			@SG_ProductId		INT		 = 36
+	DECLARE @JPContrib_ProductList TABLE(ProductID INT)
+	INSERT INTO @JPContrib_ProductList
+	SELECT DISTINCT ProductId
+	FROM bodb_licensee.dbo.LA_f_GroupBettype() where TypeID = 2
 	
 	-- currency list
 	--
@@ -92,7 +93,7 @@ BEGIN
 	IF @CurrencyIds = ''
 		SET @IsAllCurrency = 1
 	ELSE
-		INSERT INTO @Currency SELECT val FROM dbo.strSplit(@CurrencyIds, ',')
+		INSERT INTO @Currency SELECT value FROM STRING_SPLIT(@CurrencyIds, ',')
 
 	-- convert to base
 	--
@@ -313,7 +314,7 @@ BEGIN
 
 		DELETE bt
 		FROM #Bettype bt
-			INNER JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','999,4297,1698,3898,4599') eb ON bt.Bettype = eb.BettypeId
+			INNER JOIN bodb_licensee.dbo.LA_f_GroupBettype() eb ON bt.Bettype = eb.Bettype AND eb.TypeID NOT IN (7,2) -- 7:OddsSpread Adjustment, 2:Jackpot Contribution
 
 		CREATE TABLE #tmpData (rptDate DATE, LicenseeId INT, CurrencyId INT, ProductId INT, LeagueId INT, Bettype INT
 			,BetCount INT, Turnover MONEY, Winloss MONEY, WinlossA MONEY, CommissionP MONEY)
@@ -323,21 +324,21 @@ BEGIN
 			INSERT INTO #tmpData (rptDate, LicenseeId, CurrencyId, ProductId, BetCount, Turnover, Winloss, WinlossA, CommissionP)
 			SELECT r.rptDate, r.SiteId, r.CurrencyId, r.ProductId
 				,SUM(r.BetCount * CASE
-									WHEN r.Bettype IN (999,4297,1698,3898,4599) THEN 0
+									WHEN b.TypeID IN (7,2) THEN 0
 									WHEN @drawfilter = 2 AND r.StatusId = 111 THEN 0
 									ELSE 1 END) AS BetCount
 				,SUM(r.Turnover * CASE
-									WHEN r.Bettype = 999 THEN 0
+									WHEN b.TypeID = 7 THEN 0
 									WHEN @drawfilter IN (2, 3) AND r.StatusId = 111 THEN 0
 									WHEN @drawfilter IN (2, 3) AND r.StatusId IN (114, 115) THEN 0.5
 									ELSE 1 END) AS Turnover
 				,SUM(r.MemberWL * CASE
-									WHEN r.Bettype IN (999,4297,1698,3898,4599) THEN 0
+									WHEN b.TypeID IN (7,2) THEN 0
 									ELSE 1 END) AS Winloss
-				,SUM(CASE WHEN r.Bettype IN (999,4297,1698,3898,4599) THEN ISNULL(-r.GrossWL, 0) ELSE 0 END) WinlossA
+				,SUM(CASE WHEN  b.TypeID IN (7,2) THEN ISNULL(-r.GrossWL, 0) ELSE 0 END) WinlossA
 				,SUM(CASE WHEN r.ProductId = 32 THEN 0 ELSE r.CommissionP END) AS CommissionP
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
-				LEFT JOIN bodb_licensee.dbo.LA_f_ExcludedBettypeListSel('','999,4297,1698,3898,4599') b ON r.Bettype = b.BettypeId
+				LEFT JOIN bodb_licensee.dbo.LA_f_GroupBettype() b ON r.Bettype = b.Bettype 
 			WHERE r.rptDate BETWEEN @FromDate AND @ToDate
 				AND r.StatusId IN (111, 112, 113, 114, 115)
 				AND r.CustomerCategory NOT IN (27, 28)
@@ -345,7 +346,7 @@ BEGIN
 				AND EXISTS (SELECT 1 FROM #Licensees p WHERE r.SiteId = p.LicenseeId)
 				AND (@CurrencyIds = '' OR ',' + @CurrencyIds + ',' LIKE '%,' + CONVERT(VARCHAR(20), r.CurrencyId) + ',%')
 				AND ISNULL(r.TicketType, 0) <> 2
-				AND b.BettypeId IS NULL
+				AND (b.Bettype IS NULL OR b.TypeID IN (7,2)) -- 7:OddsSpread Adjustment, 2:Jackpot Contribution
 			GROUP BY r.rptDate, r.SiteId, r.CurrencyId, r.ProductId
 		END
 		ELSE
@@ -354,21 +355,22 @@ BEGIN
 			SELECT r.rptDate, r.SiteId, r.CurrencyId, bt.ProductId, r.LeagueId
 				,CASE WHEN r.Bettype NOT IN (9, 29) AND r.Bettype NOT BETWEEN 31 AND 120 THEN 1 ELSE 0 END AS Bettype
 				,SUM(r.BetCount * CASE
-									WHEN r.Bettype IN (999,4297,1698,3898,4599) THEN 0
+									WHEN t.TypeID IN (7,2) THEN 0
 									WHEN @drawfilter = 2 AND r.Status = 111 THEN 0
 									ELSE 1 END) AS BetCount
 				,SUM(r.Turnover * CASE
-									WHEN r.Bettype = 999 THEN 0
+									WHEN t.TypeID = 7 THEN 0
 									WHEN @drawfilter IN (2, 3) AND r.Status = 111 THEN 0
 									WHEN @drawfilter IN (2, 3) AND r.Status IN (114, 115) THEN 0.5
 									ELSE 1 END) AS Turnover
 				,SUM(r.Winloss * CASE
-									WHEN r.Bettype IN (999,4297,1698,3898,4599) THEN 0
+									WHEN t.TypeID IN (7,2) THEN 0
 									ELSE 1 END) AS Winloss
-				,SUM(CASE WHEN r.Bettype IN (999,4297,1698,3898,4599) THEN ISNULL(-r.WinLossA, 0) ELSE 0 END) WinlossA
+				,SUM(CASE WHEN t.TypeID IN (7,2) THEN ISNULL(-r.WinLossA, 0) ELSE 0 END) WinlossA
 				,SUM(CASE WHEN bt.ProductId = 32 THEN 0 ELSE r.CommissionP END) AS CommissionP
 			FROM bodb_LicenseeReport.dbo.rpt_Betting r WITH (NOLOCK)
 				INNER JOIN #Bettype bt ON r.Bettype = bt.Bettype
+				LEFT JOIN bodb_licensee.dbo.LA_f_GroupBettype() t ON r.Bettype = t.Bettype AND t.TypeID IN (7,2) -- 7:OddsSpread Adjustment, 2:Jackpot Contribution
 			WHERE r.rptDate BETWEEN @FromDate AND @ToDate
 				AND r.Status IN (111, 112, 113, 114, 115)
 				AND r.CustomerCategory NOT IN (27, 28)
@@ -412,13 +414,14 @@ BEGIN
 			   ,-MemberWL
 			   ,0
 			   ,0
-			   ,(-MemberWL - CASE WHEN a.ProductID IN (@PP_ProductId, @SBC_ProductId, @VGA_ProductId, @SG_ProductId) THEN WinlossA ELSE 0 END) * ISNULL(cc.Rate, p.Rate)
+			   ,(-MemberWL - CASE WHEN jp.ProductID IS NOT NULL THEN WinlossA ELSE 0 END) * ISNULL(cc.Rate, p.Rate)
 			   ,Betcount
 			   ,Playercomm
 			   ,CASE WHEN a.ProductID = 0 THEN WinlossA ELSE 0 END
 		FROM cte_Data a
 		INNER JOIN #tmpParty p ON p.LicenseeId = a.LicenseeId AND a.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId=a.ProductId AND p.ChargeType = 1
 		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID = p.ChargeId AND a.CurrencyId=cc.CurrencyID
+		LEFT JOIN @JPContrib_ProductList jp ON jp.ProductID = a.ProductID
 
 		DROP TABLE #tmpData
 		DROP TABLE #Licensees

@@ -36,6 +36,7 @@ AS
 		- 20220406@Percy: Change licensee name format of Unknown licensees [RedmineID: #171150]
 		- 20220926@Danny: Intergrate MG-RNG [#176986]
 		- 20221209@Danny: Support USD(USDT) [RedmineID: #180313]
+		- 20230217@Danny: SG - Promotion prize integration [#183739]
 */
 
 BEGIN
@@ -106,12 +107,12 @@ BEGIN
 	INNER JOIN @Products p ON b.ProductId = p.ProductId
 	INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
 	LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH(NOLOCK) ON sbr.Bettype = b.Bettype
-	LEFT JOIN LA_f_ExcludedBettypeListSel('','999') eb ON b.Bettype = eb.BettypeID
+	LEFT JOIN dbo.LA_f_GroupBettype() eb ON b.Bettype = eb.Bettype
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 		AND b.StatusId NOT IN (-1, 101, 102, 103)
 		AND b.CurrencyID <> 20
 		AND b.CustomerCategory NOT IN (27, 28)
-		AND eb.BettypeID IS NULL
+		AND ( eb.Bettype IS NULL OR eb.TypeId = 7) --OddsSpread Adjustment
 		AND b.SiteID NOT IN (SELECT c.LicenseeId FROM @CreditLicenee c)
 		AND b.ProductID NOT IN (13,15,25,32,42, 66, 36) -- exclude BT, CB, CO, PP, SBC
 	GROUP BY b.rptdate, b.SiteId, p.GroupProductId, 
@@ -181,22 +182,17 @@ BEGIN
 	BEGIN
 		INSERT INTO #Data(WinLossDate,LicenseeId,ProductId,Bettype,Winloss,Contribution)
 		SELECT b.rptDate, b.SiteId, b.ProductId, -1, 
-		CAST(SUM((CASE WHEN bt.TypeId = 2 THEN 0 ELSE ISNULL(b.MemberWL, 0) END) * e.BaseCurrencyRate) AS MONEY),
-		CAST(SUM((CASE WHEN bt.TypeId = 2 THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) * e.BaseCurrencyRate) AS MONEY)
+		CAST(SUM((CASE WHEN eb.TypeId = 2 THEN 0 ELSE ISNULL(b.MemberWL, 0) END) * e.BaseCurrencyRate) AS MONEY),
+		CAST(SUM((CASE WHEN eb.TypeId = 2 THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) * e.BaseCurrencyRate) AS MONEY)
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 		INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
-		LEFT JOIN (
-			SELECT x.BettypeID 
-			FROM LA_f_ExcludedBettypeListSel('','') x
-			WHERE x.BettypeID NOT IN (SELECT z.Bettype FROM LA_f_GroupBettype() z WHERE z.TypeId = 2)
-		) eb ON b.Bettype = eb.BettypeID
-		LEFT JOIN LA_f_GroupBettype() bt ON bt.Bettype = b.Bettype
+		LEFT JOIN dbo.LA_f_GroupBettype() eb ON  b.Bettype = eb.Bettype
 		INNER JOIN @ProductSupportContrib p ON p.ProductId = b.ProductID
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.StatusId NOT IN (-1, 101, 102, 103)
 			AND b.CurrencyID <> 20
 			AND b.CustomerCategory NOT IN (27, 28)
-			AND eb.BettypeID IS NULL
+			AND ( eb.Bettype IS NULL OR eb.TypeId = 2)
 			AND ISNULL(b.TicketType, 0) <> 2 --Free_Bets_TicketType
 		GROUP BY b.rptDate, b.SiteId, b.ProductId
 	END
