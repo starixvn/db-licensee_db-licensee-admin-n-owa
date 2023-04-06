@@ -23,6 +23,7 @@ AS
 		- 20150917@Victor: Support Chinese on Settings
 		- 20170220@bruce: refactor sp [#70050]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20230331@Danny: Insert new log with more information [#FeatureID 175125]
 
 	 Params:
 		+ @InvoiceSettingXML: '<MinFeeSettings>
@@ -50,7 +51,7 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX),	@xml XML
+	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX),	@xml XML, @LogActionID INT
 	DECLARE @ProductListAll		VARCHAR(100) = ''
 			, @MinDate			DATE 
 			, @MaxDate			DATE
@@ -93,6 +94,12 @@ BEGIN
 
 	EXEC sp_xml_removedocument @idoc
 
+	DECLARE @cnt INT
+	SELECT @cnt = COUNT(1) FROM @MinFeeSetting
+
+	IF @cnt = 0 
+		RETURN
+
 	-- fromdate must less than todate
 	IF EXISTS (SELECT TOP 1 1 FROM @MinFeeSetting WHERE FromDate > ToDate)
 	BEGIN
@@ -132,25 +139,68 @@ BEGIN
 
 	DELETE @MinFeeSetting WHERE IsEdit = 0
 
+	-- Detect logAction
+	IF EXISTS ( SELECT TOP 1 1 FROM @MinFeeSetting WHERE MinFeeId > 0) 
+	BEGIN
+		SELECT @LogActionID = CASE WHEN EXISTS (SELECT TOP 1 1 FROM @MinFeeSetting WHERE FeeTypeId = 1) THEN 1301 ELSE 1401 END
+	END
+	ELSE 
+	BEGIN
+		SELECT @LogActionID = CASE WHEN EXISTS (SELECT TOP 1 1 FROM @MinFeeSetting WHERE FeeTypeId = 1) THEN 1300 ELSE 1400 END
+	END
+
 	-- write log
-	-- build log string
-	SET @xml = (
-		SELECT	mf.MinFeeId		AS '@m'
-			, mf.PartyId		AS '@p'
-			, mf.ProductId		AS '@pr'
-			, mf.FeeAmount		AS '@fa'
-			, mf.CurrencyId		AS '@c'
-			, mf.MinFeeTerm		AS '@mft'
-			, mf.FromDate		AS '@fd'
-			, mf.ToDate			AS '@td'
-			, mf.[Priority]		AS '@pri'
-		FROM dbo.LA_MinFee mf
-		WHERE mf.PartyId = @PayerID AND mf.FeeTypeId IN (
-			SELECT cs.FeeTypeId FROM @MinFeeSetting cs
-		)
-		FOR XML PATH('z'), ROOT('r')
-	)
-	SET @logSPDataOld = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"')
+	-- build old log string
+	IF @LogActionID IN (1301, 1401)
+	BEGIN
+		IF @LogActionID = 1301
+			SELECT @logSPDataOld = (
+				SELECT	op.PartyName AS 'pi.pn' ,
+						od.BrandName AS 'pi.bn',
+						lm.lm AS 's'
+				FROM OAS_Party op WITH(NOLOCK)
+				INNER JOIN OAS_PartyDetail od with(nolock) ON od.PartyId = op.PartyID
+				CROSS APPLY (
+					SElECT 
+					(
+						SELECT CASE WHEN lm.Productid = 0 THEN 'Sportbooks' ELSE  p.ProductName END AS pdn, 
+								FORMAT (lm.FromDate,'MMM dd, yyyy')  AS fd,
+								FORMAT (lm.Todate,'MMM dd, yyyy') AS td,
+								FORMAT(lm.FeeAmount,'N','en-us') as fa,
+								e.Code AS c,
+								lm.MinFeeTerm AS mt,
+								lm.MinFeeId AS FakeID
+						FROM  LA_MinFee lm WITH(NOLOCK)
+						LEFT JOIN Product3rd p with(nolock) ON lm.ProductId = p.Productid
+						INNER JOIN CustDB.dbo.Exchange e WITH(NOLOCK) ON lm.CurrencyId = e.ExchangeId
+						WHERE lm.PartyId = op.PartyID and lm.FeeTypeId =1  AND lm.MinFeeId IN (SELECT x.MinFeeId FROM @MinFeeSetting x) FOR JSON PATH
+					) as lm
+				) lm
+				where op.PartyId = @PayerID  
+				FOR JSON PATH, WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES 
+			)
+		ELSE 
+			SELECT @logSPDataOld = (
+				SELECT	op.PartyName AS 'pi.pn' ,
+						od.BrandName AS 'pi.bn',
+						lm.lm AS 's'
+				FROM OAS_Party op WITH(NOLOCK)
+				INNER JOIN OAS_PartyDetail od WITH(NOLOCK) ON od.PartyId = op.PartyID
+				CROSS APPLY (
+					SElECT 
+					(
+						SELECT CASE WHEN lm.Productid = 0 THEN 'Sportbooks' ELSE  p.ProductName END AS pdn, 
+									FORMAT (lm.FromDate,'MMM dd, yyyy')  AS fd,
+									FORMAT (lm.Todate,'MMM dd, yyyy') AS td,
+									lm.MinFeeId AS FakeID
+						FROM  LA_MinFee lm WITH(NOLOCK)
+						LEFT JOIN Product3rd p with(nolock) ON lm.ProductId = p.Productid
+						WHERE lm.PartyId = op.PartyID and lm.FeeTypeId =2 AND lm.MinFeeId IN (SELECT x.MinFeeId FROM @MinFeeSetting x)  FOR JSON PATH
+					) AS lm
+				) lm
+				WHERE op.PartyId = @PayerID
+				FOR JSON PATH, WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    )
+	END
 
 	DECLARE @MergeOutput AS TABLE (MinFeeId INT, [$action] VARCHAR(20))
 
@@ -175,36 +225,70 @@ BEGIN
 	SELECT @MinfeeInsertedList = COALESCE(@MinfeeInsertedList + ',' + CAST(MinFeeId AS VARCHAR), CAST(MinFeeId AS VARCHAR))
 	FROM @MergeOutput WHERE [$action]='INSERT'
 
-	SET @xml = (
-		SELECT	mf.MinFeeId		AS '@m'
-			, mf.PartyId		AS '@p'
-			, mf.ProductId		AS '@pr'
-			, mf.FeeAmount		AS '@fa'
-			, mf.CurrencyId		AS '@c'
-			, mf.MinFeeTerm		AS '@mft'
-			, mf.FromDate		AS '@fd'
-			, mf.ToDate			AS '@td'
-			, mf.[Priority]		AS '@pri'
-		FROM dbo.LA_MinFee mf
-		WHERE mf.PartyId = @PayerID AND mf.FeeTypeId IN (
-			SELECT cs.FeeTypeId FROM @MinFeeSetting cs
-		)
-		FOR XML PATH('z'), ROOT('r')
-	)
-	SET @logSPData = REPLACE(CONVERT(NVARCHAR(MAX), @xml), '" />', '"/"')
+	IF EXISTS (SELECT TOP 1 1 FROM @MinFeeSetting WHERE FeeTypeId = 1)
+		SELECT @logSPData = (
+				SELECT	op.PartyName AS 'pi.pn' ,
+						od.BrandName AS 'pi.bn',
+						lm.lm AS 's'
+				FROM OAS_Party op WITH(NOLOCK)
+				INNER JOIN OAS_PartyDetail od with(nolock) ON od.PartyId = op.PartyID
+				CROSS APPLY (
+					SElECT 
+					(
+						SELECT CASE WHEN lm.Productid = 0 THEN 'Sportbooks' ELSE  p.ProductName END AS pdn, 
+									FORMAT (lm.FromDate,'MMM dd, yyyy')  AS fd,
+									FORMAT (lm.Todate,'MMM dd, yyyy') AS td,
+									FORMAT(lm.FeeAmount,'N','en-us') as fa,
+									e.Code AS c,
+									lm.MinFeeTerm AS mt,
+									lm.MinFeeId AS FakeID
+						FROM  LA_MinFee lm WITH(NOLOCK)
+						LEFT JOIN Product3rd p with(nolock) ON lm.ProductId = p.Productid
+						INNER JOIN CustDB.dbo.Exchange e WITH(NOLOCK) ON lm.CurrencyId = e.ExchangeId
+						WHERE lm.PartyId = op.PartyID and lm.FeeTypeId =1  
+							AND  (lm.MinFeeId IN (SELECT  x.MinFeeId FROM @MergeOutput x)  OR lm.MinFeeId IN (SELECT x.MinFeeId FROM @MinFeeSetting x))
+						FOR JSON PATH
+					) as lm
+				) lm
+				where op.PartyId = @PayerID  
+				FOR JSON PATH, WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES 
+			)
+		ELSE 
+			SELECT @logSPData = (
+				SELECT	op.PartyName AS 'pi.pn' ,
+						od.BrandName AS 'pi.bn',
+						lm.lm AS 's'
+				FROM OAS_Party op WITH(NOLOCK)
+				INNER JOIN OAS_PartyDetail od WITH(NOLOCK) ON od.PartyId = op.PartyID
+				CROSS APPLY (
+					SElECT 
+					(
+						SELECT CASE WHEN lm.Productid = 0 THEN 'Sportbooks' ELSE  p.ProductName END AS pdn, 
+									FORMAT (lm.FromDate,'MMM dd, yyyy')  AS fd,
+									FORMAT (lm.Todate,'MMM dd, yyyy') AS td,
+									lm.MinFeeId AS FakeID
+						FROM  LA_MinFee lm WITH(NOLOCK)
+						LEFT JOIN Product3rd p with(nolock) ON lm.ProductId = p.Productid
+						WHERE lm.PartyId = op.PartyID and lm.FeeTypeId =2 
+							AND  (lm.MinFeeId IN (SELECT  x.MinFeeId FROM @MergeOutput x)  OR lm.MinFeeId IN (SELECT x.MinFeeId FROM @MinFeeSetting x))
+						FOR JSON PATH
+					) AS lm
+				) lm
+				WHERE op.PartyId = @PayerID
+				FOR JSON PATH, WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES)
+
 	SET @endRun = GETDATE()
 	SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
 
 	-- Write Log
-	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
 		@UserId			= @UserID
 		,@IP			= @LoginIP
-		,@LicenseeID	= 0
-		,@CurrencyID	= 0
 		,@SPName		= 'LA_MinFeeSettingModify'
-		,@CustId		= 0
+		,@CustId		= @PayerId
 		,@Duration		= @duration
-		,@Data			= @logSPData
-		,@OldData		= @logSPDataOld
+		,@TrackingValue2 = @logSPData
+		,@TrackingValue = @logSPDataOld
+		,@ActionID		 = @logActionID
 END
 GO

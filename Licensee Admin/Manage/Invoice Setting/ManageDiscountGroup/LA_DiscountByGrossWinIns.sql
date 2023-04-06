@@ -265,11 +265,11 @@ BEGIN
 		SELECT @LogSPData = (
 			SELECT ld.DiscountGroupName 'gr.gn', 
 					e.Code AS  'gr.e', 
-					ld.FromDate AS 'gr.af', 
-					ld.ToDate AS 'gr.at', 
-					STRING_AGG(CASE WHEN ldp.ProductId = 0 THEN 'Sportsbook' ELSE p3.ProductName END  ,',') 'gr.p',
-					l.l AS 'll',
-					ds.s AS 'ds'
+					FORMAT (ld.FromDate,'MMM dd, yyyy') 'gr.af', 
+					FORMAT (ld.ToDate,'MMM dd, yyyy') 'gr.at',
+					STRING_AGG(CASE WHEN ldp.ProductId = 0 THEN 'Sportsbook' ELSE p3.ProductName END  ,', ') 'gr.p',
+					l.l AS 'l',
+					ds.s AS 'st'
 			FROM LA_DiscountGroupHeader ld with(nolock) 
 			INNER JOIN CUSTDB.dbo.Exchange e  with(nolock) ON ld.CurrencyId = e.ExchangeId
 			INNER JOIN LA_DiscountGroupProduct ldp WITH(NOLOCK) ON ld.DiscountGroupId = ldp.DiscountGroupId 
@@ -277,22 +277,25 @@ BEGIN
 
 			OUTER APPLY 
 			(
-				SELECT (
-					SELECT  PartyID AS 'l.pi',LicenseeName 'l.ln', Remark 'l.rm', 
-					STRING_AGG(CASE WHEN CountInPer = 1 THEN Curr ELSE '' END  ,',') 'l.cip',
-					STRING_AGG(CASE WHEN AppliedDiscount = 1 THEN Curr ELSE '' END  ,',')'l.ap'
+				SELECT 
+				(
+					SELECT  PartyID AS FakeID ,PartyID AS pi,LicenseeName ln, Remark rm, 
+					CASE WHEN SUM(NotCountInPert) = 0 THEN 'All (' ELSE '' END +STRING_AGG(CASE WHEN CountInPer = 1 THEN Curr END  ,', ') + CASE WHEN SUM(NotCountInPert) = 0 THEN ')' ELSE ''  END  cip,
+					CASE WHEN SUM(NotAppliedDiscount) = 0 THEN 'All (' ELSE '' END +STRING_AGG(CASE WHEN AppliedDiscount = 1 THEN Curr END  ,', ') + CASE WHEN SUM(NotAppliedDiscount) = 0 THEN ')' ELSE '' END ap
 					FROM 
 						(
-							select  op.PartyID as PartyID ,op.PartyName AS LicenseeName, CASE WHEN lgc.CurrencyId = 142 THEN 'USDT' 
+							SELECT  op.PartyID as PartyID ,op.PartyName AS LicenseeName, CASE WHEN lgc.CurrencyId = 142 THEN 'USDT' 
 													WHEN lgc.CurrencyId IN (96, 202) THEN e.Code + ' ('+ e.currency+ ')'
 													ELSE e.Code END AS Curr,
 	  
 									CASE WHEN lgc.CalculationType IN (1,3) THEN 1 ELSE 0 END CountInPer,
 									CASE WHEN lgc.CalculationType IN (2,3) THEN 1 ELSE 0 END AppliedDiscount,
+									CASE WHEN lgc.CalculationType IN (0,1)  THEN 1 ELSE 0 END NotAppliedDiscount,
+									CASE WHEN lgc.CalculationType IN (0,2)  THEN 1 ELSE 0 END NotCountInPert,
 									lga.Remark
 							FROM LA_DiscountGroupAssignment lga WITH(NOLOCK)
-							INNER JOIN LA_DiscountGroupCurrency  lgc WITH(NOLOCK) ON lga.PartyID = lgc.PartyID AND lga.DiscountGroupId = lgc.DiscountGroupId
 							INNER JOIN OAS_Party op WITH(NOLOCK) ON lga.PartyID = op.PartyID
+							INNER JOIN LA_DiscountGroupCurrency  lgc WITH(NOLOCK) ON lga.PartyID = lgc.PartyID AND lga.DiscountGroupId = lgc.DiscountGroupId
 							INNER JOIN CUSTDB.dbo.Exchange e  with(nolock) ON lgc.CurrencyId = e.ExchangeId
 							WHERE lga.DiscountGroupId = ld.DiscountGroupId
 						) x  GROUP BY PartyID,LicenseeName, Remark FOR JSON PATH
@@ -302,17 +305,15 @@ BEGIN
 			(	
 				SELECT 
 				(
-					SELECT FromAmount 'st.wlf', ToAmount 'st.wlt', ChargeRateAfterDiscount 'st.cr'
+					SELECT FORMAT(FromAmount,'N','en-us') wlf, CASE WHEN ToAmount = 10000000000000.00 THEN 'Unlimited' ELSE FORMAT(ToAmount,'N','en-us') END wlt,  CAST (ChargeRateAfterDiscount * 100 AS VARCHAR(50)) + ' %' cr, ldg.DiscountGroupDetailId AS FakeID
 					FROM LA_DiscountGroupDetail  ldg WITH(NOLOCK) 
 					WHERE ldg.DiscountGroupId = ld.DiscountGroupId FOR JSON PATH
 				) s
 			) ds
 			WHERE ld.DiscountGroupID = @GroupIdOut
-			GROUP BY ld.DiscountGroupName, e.Code, ld.FromDate, ld.ToDate, l.l, ds.s
-				FOR JSON PATH,  WITHOUT_ARRAY_WRAPPER 
-				)
-
-					-- Write log
+			GROUP BY ld.DiscountGroupName, e.Code, FORMAT (ld.FromDate,'MMM dd, yyyy'), FORMAT (ld.ToDate,'MMM dd, yyyy'), l.l, ds.s
+			FOR JSON PATH,  WITHOUT_ARRAY_WRAPPER 
+		 )
 		
 	END TRY
 	BEGIN CATCH

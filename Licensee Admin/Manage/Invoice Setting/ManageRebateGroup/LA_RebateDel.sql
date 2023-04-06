@@ -17,6 +17,7 @@ AS
 	 Revisions:  
 		- 20180525@Parsons: Delete rebate group [#94282]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20230417@Danny: Insert new log with more information [#FeatureID 175125]
 
 	 Params:
 
@@ -25,37 +26,42 @@ AS
 
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @startRun DATETIME, @endRun DATETIME, @duration INT, @logSPData VARCHAR(MAX)
-		, @logSPDataOld	VARCHAR(MAX), @xml XML
+	DECLARE @startRun DATETIME, @endRun DATETIME, @duration INT, @logSPData NVARCHAR(MAX)
+		, @logSPDataOld	NVARCHAR(MAX), @actionID INT = 1702
 	SET @startRun = GETDATE()
 
 	--get old data for write log
-	SET @xml = (
-			SELECT DiscountGroupId AS '@gd'
-				, DiscountGroupName AS '@gn'
-				, CurrencyId AS '@c'
-				, FromDate AS '@fd'
-				, ToDate AS '@td'
-				, DiscountGroupType AS '@dt'
-				, Priority AS '@pr'
-				, (SELECT DiscountGroupId AS '@dg'
-					, FromAmount AS '@fam'
-					, ToAmount AS '@tam'
-					, Rate AS '@r'
-				FROM dbo.LA_DiscountGroupDetail WITH(NOLOCK) WHERE DiscountGroupId = @GroupId
-				FOR XML PATH('x'), TYPE)
-				, (SELECT DiscountGroupId AS '@gd'
-					, ProductId AS '@p'
-				FROM dbo.LA_DiscountGroupProduct WHERE DiscountGroupId = @GroupId
-				FOR XML PATH('y'), TYPE)
-				, (SELECT DiscountGroupId AS '@gd'
-					, PartyID AS '@pa'
-				FROM dbo.LA_DiscountGroupAssignment WHERE DiscountGroupId = @GroupId
-				FOR XML PATH('z'), TYPE)
-			FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupId = @GroupId
-			FOR XML PATH('r'), TYPE)
-
-	SET @logSPDataOld = REPLACE(CONVERT(VARCHAR(MAX), @xml), '" />', '"/"')
+	SELECT @logSPDataOld = (
+		SELECT  ld.DiscountGroupName 'gs.gn', 
+				FORMAT (ld.FromDate,'MMM dd, yyyy') 'gs.af', 
+				FORMAT (ld.ToDate,'MMM dd, yyyy') 'gs.at',
+				CAST (ldg.Rate * 100 AS VARCHAR(50)) + ' %' 'gs.r' ,
+				CASE WHEN ld.DiscountGroupType = 2 THEN 'Rebate on Licensing Fee'
+					 WHEN ld.DiscountGroupType = 12 THEN 'Tier Rebate'
+					 WHEN ld.DiscountGroupType = 22 THEN 'Rebate on Licensing WL'
+				END 'gs.rt',
+				ld.Remark 'gs.rm',
+				pig.val AS 'gs.pig',
+				pig.pid AS 'gs.pid',
+				pa.val AS 'gs.pa'
+		FROM LA_DiscountGroupHeader ld WITH(NOLOCK) 
+		INNER JOIN LA_DiscountGroupDetail ldg WITH(NOLOCK) ON ld.DiscountGroupId = ldg.DiscountGroupId
+		CROSS APPLY (
+			SELECT  STRING_AGG(op.PartyName,', ') AS val, STRING_AGG(CAST(lda.PartyID AS VARCHAR(50)),',') AS pid
+			FROM	LA_DiscountGroupAssignment lda
+			INNER JOIN	OAS_Party op WITH(NOLOCK) ON   lda.PartyID = op.PartyID
+			WHERE ld.DiscountGroupId = lda.DiscountGroupId
+		) pig
+		CROSS APPLY 
+		(
+			SELECT STRING_AGG(CASE WHEN  ldp.ProductId = 0 THEN 'Sportsbook' ELSE p3.ProductName END,', ') AS val
+			FROM  LA_DiscountGroupProduct ldp WITH(NOLOCK)
+			LEFT JOIN Product3rd p3 WITH(NOLOCK) ON ldp.ProductId = p3.Productid
+			WHERE ld.DiscountGroupId = ldp.DiscountGroupId
+		) pa
+		WHERE ld.DiscountGroupId = @GroupId
+		FOR JSON PATH, WITHOUT_ARRAY_WRAPPER 
+	)
 
 	--validate this rebate has applied to Invoice yet
 	DECLARE @HasBilling BIT = 0
@@ -108,15 +114,14 @@ BEGIN
 	SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun)
 
 	-- Write Log
-	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
 		@UserId			= @UserID
-		,@IP			= @LoginIP
-		,@LicenseeID	= 0
-		,@CurrencyID	= 0
+		,@IP			= @LoginIp
 		,@SPName		= 'LA_RebateDel'
-		,@CustId		= 0
+		,@CustId		= @GroupId
 		,@Duration		= @duration
-		,@Data			= @logSPData
-		,@OldData		= @logSPDataOld
+		,@TrackingValue2 = @LogSPData
+		,@TrackingValue = @LogSPDataOld
+		,@ActionID		 = @actionID
 END
 GO

@@ -88,9 +88,9 @@ BEGIN
 					,od.BrandName							AS 'pi.bn'
 					,od.Description							AS 'pi.dc'
 					,od.InvoiceLanguage						AS 'pi.iv'
-					,od.LaunchDate							AS 'pi.ld'
-					,od.SuspendedDate						AS 'pi.sd'
-					,od.TerminatedDate						AS 'pi.tmd'
+					,FORMAT (od.LaunchDate,'MMM dd, yyyy') 	AS 'pi.ld'
+					,FORMAT (od.SuspendedDate,'MMM dd, yyyy')	AS 'pi.sd'
+					,FORMAT (od.TerminatedDate,'MMM dd, yyyy') AS 'pi.tmd'
 
 					,od.CompanyName		AS 'a1.cn1'
 					,od.AttnName		AS 'a1.an1'
@@ -108,7 +108,8 @@ BEGIN
 							SELECT CASE WHEN op.BaseCurrencyId = 142 THEN 'USDT' ELSE e.Code END  'c', 
 									op.LicenseeCode 'lc', 
 									op.FromDate 'fd', 
-									op.ToDate  'td'
+									op.ToDate  'td',
+									CONVERT(VARCHAR(10),op.PartyID) +CONVERT(VARCHAR(10), op.BaseCurrencyId) + Convert(CHAR(8),op.FromDate,112) AS FakeID
 							FROM OAS_PartyBaseCurrency op WITH(NOLOCK) 
 							INNER JOIN CustDB.dbo.exchange e WITh(NOLOCK) ON op.BaseCurrencyId = e.ExchangeId
 							WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
@@ -238,9 +239,9 @@ BEGIN
 					,od.BrandName							AS 'pi.bn'
 					,od.Description							AS 'pi.dc'
 					,od.InvoiceLanguage						AS 'pi.iv'
-					,od.LaunchDate							AS 'pi.ld'
-					,od.SuspendedDate						AS 'pi.sd'
-					,od.TerminatedDate						AS 'pi.tmd'
+					,FORMAT (od.LaunchDate,'MMM dd, yyyy') 	AS 'pi.ld'
+					,FORMAT (od.SuspendedDate,'MMM dd, yyyy')	AS 'pi.sd'
+					,FORMAT (od.TerminatedDate,'MMM dd, yyyy') AS 'pi.tmd'
 
 					,od.CompanyName		AS 'a1.cn1'
 					,od.AttnName		AS 'a1.an1'
@@ -258,7 +259,8 @@ BEGIN
 							SELECT CASE WHEN op.BaseCurrencyId = 142 THEN 'USDT' ELSE e.Code END  'c', 
 									op.LicenseeCode 'lc', 
 									op.FromDate 'fd', 
-									op.ToDate  'td'
+									op.ToDate  'td',
+									CONVERT(VARCHAR(10),op.PartyID) +CONVERT(VARCHAR(10), op.BaseCurrencyId) + Convert(CHAR(8),op.FromDate,112) AS FakeID
 							FROM OAS_PartyBaseCurrency op WITH(NOLOCK) 
 							INNER JOIN CustDB.dbo.exchange e WITh(NOLOCK) ON op.BaseCurrencyId = e.ExchangeId
 							WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    

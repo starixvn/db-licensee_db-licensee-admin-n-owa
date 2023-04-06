@@ -19,6 +19,7 @@ AS
    
 	 Revisions:
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20230524@Danny: Insert new log with more information [#FeatureID 175125]
 
 	 Params:
 		+ @XmlChargeRates: '<ChargeRates>
@@ -65,8 +66,9 @@ BEGIN
 		@startRun	DATETIME = GETDATE(),
 		@endRun		DATETIME,
 		@duration	INT,
-		@logData	NVARCHAR(4000),
-		@logDataOld	NVARCHAR(4000)
+		@logData	NVARCHAR(MAX),
+		@logDataOld	NVARCHAR(MAX),
+		@actionID	INT = 1800
 
 	-- Region: Insert hosting fees details
 	DECLARE @ChargeRates AS TABLE (
@@ -89,6 +91,56 @@ BEGIN
 
 	DECLARE @idoc2 AS INT
 	EXEC sp_xml_preparedocument @idoc2 OUTPUT, @XmlWaives
+
+	IF EXISTS (SELECT TOP 1 1 FROM dbo.LA_HostingFeesSetting c  WITH(NOLOCK) WHERE FromParty = @PayerId)
+	BEGIN
+		SELECT @actionID = 1801
+
+		SELECT @logDataOld = 
+		(
+
+			SELECT op.PartyName 'gs.pn' , crs.crs 'crs', ws.ws 'ws'
+			FROM   OAS_party op WITH(NOLOCK)
+			OUTER APPLY (
+				SELECT 
+				(
+					SELECT
+						s.ChargeId FakeID,
+						s.ProductName p,
+						FORMAT(s.FirstBilling,'MMM dd, yyyy') fb,
+						s.BasisOfBilling bb, 
+						f.HostingFeesName cr,
+						t.HostingFeesTypeName ct,
+						FORMAT(s.FromDate,'MMM dd, yyyy') fd,
+						FORMAT(s.ToDate,'MMM dd, yyyy') td
+					FROM dbo.LA_HostingFeesSetting s WITH (NOLOCK)
+						LEFT JOIN dbo.LA_f_Products3rd('') pr ON s.BasedMinimunFees = pr.ProductID
+						LEFT JOIN dbo.LA_HostingFees f WITH (NOLOCK) ON s.HostingFeesId = f.HostingFeesId
+						LEFT JOIN dbo.LA_HostingFeesTypes t WITH (NOLOCK) ON f.HostingFeesTypeId = t.HostingFeesTypeId
+					WHERE s.FromParty = op.PartyID AND s.SettingType = 1  FOR JSON PATH
+				) crs
+			) crs
+
+			OUTER APPLY (
+				SELECT 
+				(
+					SELECT
+						s.ChargeId FakeID,
+						s.ProductName wp,
+						FORMAT(s.FromDate,'MMM dd, yyyy') wfd,
+						FORMAT(s.ToDate,'MMM dd, yyyy') wtd,
+						pr.ProductName AS bm
+					FROM dbo.LA_HostingFeesSetting s WITH (NOLOCK)
+						LEFT JOIN dbo.LA_f_Products3rd('') pr ON s.BasedMinimunFees = pr.ProductID
+						LEFT JOIN dbo.LA_HostingFees f WITH (NOLOCK) ON s.HostingFeesId = f.HostingFeesId
+						LEFT JOIN dbo.LA_HostingFeesTypes t WITH (NOLOCK) ON f.HostingFeesTypeId = t.HostingFeesTypeId
+					WHERE s.FromParty = op.PartyID AND s.SettingType = 2  FOR JSON PATH
+				) ws
+			) ws
+			WHERE  op.PartyID = @PayerId  FOR JSON PATH,  WITHOUT_ARRAY_WRAPPER 
+		)
+	END
+
 
 	BEGIN TRY
 		INSERT INTO @ChargeRates(ChargeId, FromDate, ToDate, FirstBilling, BasisOfBilling, HostingFeesId)
@@ -113,71 +165,6 @@ BEGIN
 			BasedMinimunFees INT			'BasedMinimunFees'
 		)
 
-		SET @logDataOld = CAST((SELECT
-				c.ChargeId			AS '@ci',
-				c.SettingType 		AS '@st',
-				c.ParentId 			AS '@pi',
-				c.FromParty 		AS '@fp',
-				c.ToParty 			AS '@tp',
-				c.FromDate 			AS '@fd',
-				c.ToDate 			AS '@td',
-				c.ProductName 		AS '@pn',
-				c.FirstBilling 		AS '@fb',
-				c.BasisOfBilling 	AS '@bb',
-				c.BaseCurrencyId 	AS '@bc',
-				c.HostingFeesId 	AS '@hi',
-				c.BasedMinimunFees 	AS '@bf',
-				c.Remark 			AS '@rm'
-			FROM dbo.LA_HostingFeesSetting c WHERE FromParty = @PayerId
-			FOR XML PATH('z'), ROOT('r')
-		) AS NVARCHAR(4000))
-
-		SET @logData = CAST((SELECT
-				c.ChargeId			AS '@ci',
-				c.SettingType 		AS '@st',
-				c.ParentId 			AS '@pi',
-				c.FromParty 		AS '@fp',
-				c.ToParty 			AS '@tp',
-				c.FromDate 			AS '@fd',
-				c.ToDate 			AS '@td',
-				c.ProductName 		AS '@pn',
-				c.FirstBilling 		AS '@fb',
-				c.BasisOfBilling 	AS '@bb',
-				c.BaseCurrencyId 	AS '@bc',
-				c.HostingFeesId 	AS '@hi',
-				c.BasedMinimunFees 	AS '@bf',
-				c.Remark 			AS '@rm'
-			FROM ( SELECT ChargeId,
-					1 SettingType,
-					0 ParentId,
-					@PayerId FromParty,
-					0 ToParty,
-					FromDate,
-					ToDate,
-					'Hosting' ProductName,
-					FirstBilling,
-					BasisOfBilling,
-					@BaseCurrencyId BaseCurrencyId,
-					HostingFeesId,
-					NULL BasedMinimunFees,
-					'' Remark FROM @ChargeRates
-				UNION ALL SELECT ChargeId,
-					2 SettingType,
-					0 ParentId,
-					@PayerId FromParty,
-					0 ToParty,
-					FromDate,
-					ToDate,
-					'Hosting' ProductName,
-					NULL FirstBilling,
-					NULL BasisOfBilling,
-					@BaseCurrencyId BaseCurrencyId,
-					NULL HostingFeesId,
-					BasedMinimunFees,
-					'' Remark FROM @Waives
-			) c FOR XML PATH('z'), ROOT('r')
-		) AS NVARCHAR(4000))
-				
 		-- validate charge rate settings
 		IF EXISTS (
 			SELECT 1 FROM @ChargeRates c1 INNER JOIN @ChargeRates c2 ON (
@@ -243,16 +230,59 @@ BEGIN
 	SET @endRun = GETDATE()
 	SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
 
-	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+	SELECT @logData = 
+		(
+
+			SELECT op.PartyName 'gs.pn' , crs.crs 'crs', ws.ws 'ws'
+			FROM   OAS_party op WITH(NOLOCK)
+			OUTER APPLY (
+				SELECT 
+				(
+					SELECT
+						s.ChargeId FakeID,
+						s.ProductName p,
+						FORMAT(s.FirstBilling,'MMM dd, yyyy') fb,
+						s.BasisOfBilling bb, 
+						f.HostingFeesName cr,
+						t.HostingFeesTypeName ct,
+						FORMAT(s.FromDate,'MMM dd, yyyy') fd,
+						FORMAT(s.ToDate,'MMM dd, yyyy') td
+					FROM dbo.LA_HostingFeesSetting s WITH (NOLOCK)
+						LEFT JOIN dbo.LA_f_Products3rd('') pr ON s.BasedMinimunFees = pr.ProductID
+						LEFT JOIN dbo.LA_HostingFees f WITH (NOLOCK) ON s.HostingFeesId = f.HostingFeesId
+						LEFT JOIN dbo.LA_HostingFeesTypes t WITH (NOLOCK) ON f.HostingFeesTypeId = t.HostingFeesTypeId
+					WHERE s.FromParty = op.PartyID AND s.SettingType = 1  FOR JSON PATH
+				) crs
+			) crs
+
+			OUTER APPLY (
+				SELECT 
+				(
+					SELECT
+						s.ChargeId FakeID,
+						s.ProductName wp,
+						FORMAT(s.FromDate,'MMM dd, yyyy') wfd,
+						FORMAT(s.ToDate,'MMM dd, yyyy') wtd,
+						pr.ProductName AS bm
+					FROM dbo.LA_HostingFeesSetting s WITH (NOLOCK)
+						LEFT JOIN dbo.LA_f_Products3rd('') pr ON s.BasedMinimunFees = pr.ProductID
+						LEFT JOIN dbo.LA_HostingFees f WITH (NOLOCK) ON s.HostingFeesId = f.HostingFeesId
+						LEFT JOIN dbo.LA_HostingFeesTypes t WITH (NOLOCK) ON f.HostingFeesTypeId = t.HostingFeesTypeId
+					WHERE s.FromParty = op.PartyID AND s.SettingType = 2  FOR JSON PATH
+				) ws
+			) ws
+			WHERE  op.PartyID = @PayerId  FOR JSON PATH,  WITHOUT_ARRAY_WRAPPER 
+		)
+
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
 		@UserId			= @UserID
 		,@IP			= @LoginIP
-		,@LicenseeID	= 0
-		,@CurrencyID	= 0
 		,@SPName		= 'LA_HostingFeesChargeRateIns'
-		,@CustId		= 0
+		,@CustId		= @PayerId
 		,@Duration		= @duration
-		,@Data			= @logData
-		,@OldData		= @logDataOld
+		,@TrackingValue2 = @LogData
+		,@TrackingValue = @LogDataOld
+		,@ActionID		 = @actionID
 	-- EndRegion
 END
 GO
