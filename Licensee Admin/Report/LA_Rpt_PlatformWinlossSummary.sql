@@ -36,6 +36,7 @@ AS
 		- 20201204@Happy: Changing OddsSpread for Licensee [#142345]
 		- 20210517@Percy: Using core function to group betfrom [RedmineID: #150899]
 		- 20211223@Danny: Using core function to group product under SB [RedmineID: #165971]
+		- 20230407@Danny: Extend betfrom data length [#178060]
 
 	Explanation:
 		@Platforms: DetailPlatform from LA_f_BetFrom_Sel() function
@@ -98,7 +99,7 @@ BEGIN
 	WHERE lc.Currency <> 20
 
 	-- Get BetFrom data
-	CREATE TABLE #Data (rptDate DATETIME, Currency INT, BetFrom NVARCHAR(1), BetCount INT, Turnover FLOAT, Winloss FLOAT)
+	CREATE TABLE #Data (rptDate DATETIME, Currency INT, BetFrom NVARCHAR(4), BetCount INT, Turnover FLOAT, Winloss FLOAT)
 
 	-- bettrans
 	IF @ToDate > @MoveBetsDay
