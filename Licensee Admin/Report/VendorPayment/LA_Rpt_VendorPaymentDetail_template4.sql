@@ -16,12 +16,13 @@ AS
 	- 20220927@Danny: Remove DBLink [#176986] 
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+	- 20230410@Danny: Change PayToSupplier fomular [RedmineID: #186543]
  */
 
 BEGIN
 	SET NOCOUNT ON
 	-- Region: Charge Info	
-	DECLARE @ProductCode VARCHAR(50)
+	DECLARE @ProductCode VARCHAR(50), @ExchangeCutoffDate DATE = '2023-05-01'
 	SELECT @ProductCode = ProductPrefix FROM dbo.Product3rd WITH(NOLOCK) WHERE Productid = @ProductID
 
 	IF ISNULL(@PlatformId, 0) <> 0
@@ -136,7 +137,7 @@ BEGIN
 			SUM(b.CommissionA) AS LicenseeComm,
 			SUM(-(b.MemberWL + b.CommissionP)) AS LicenseeWinloss,
 			SUM((-b.MemberWL * ci.Rate) - (b.CommissionA + b.CommissionP)) AS LicensingFee,
-			SUM((-b.MemberWL * rd.Rate) - (b.CommissionA + b.CommissionP)) AS PayToSupplier
+			SUM(CASE WHEN @FromDate < @ExchangeCutoffDate THEN (-b.MemberWL * rd.Rate) - (b.CommissionA + b.CommissionP) ELSE -(b.MemberWL + b.CommissionP) * rd.Rate END) PayToSupplier
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 			INNER JOIN @PartyCharge3rdInfo rd ON b.ProductID = rd.ProductID
@@ -162,7 +163,7 @@ BEGIN
 			SUM(b.AComm) AS LicenseeComm,
 			SUM(-(b.Winloss + b.PComm)) AS LicenseeWinloss,
 			SUM((-b.Winloss * ci.Rate) - (b.AComm + b.PComm)) AS LicensingFee,
-			SUM((-b.Winloss * rd.Rate) - (b.AComm + b.PComm)) AS PayToSupplier
+			SUM(CASE WHEN @FromDate < @ExchangeCutoffDate THEN (-b.Winloss * rd.Rate) - (b.AComm + b.PComm) ELSE -(b.Winloss + b.PComm) * rd.Rate END) PayToSupplier
 		FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
 			INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
 			INNER JOIN @PartyCharge3rdInfo rd ON b.SiteID = rd.LicenseeID AND b.RptDate3rd BETWEEN rd.FromDate AND rd.ToDate
