@@ -16,6 +16,7 @@ AS
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 		- 20201003@Danny: Support USDT as base currency [RedmineID: #180313]
 		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+		- 20220206@Danny: Return more party detail (SuspendedDate, TerminatedDate) [RedmineID: #169160]
 */
 
 BEGIN
@@ -30,6 +31,7 @@ BEGIN
 	SELECT a.PartyId, p.OldRefId
 	FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
 		INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON a.PartyId = p.PartyId
+		
 	WHERE DiscountGroupId = @GroupId
 
 	SELECT TOP 1 @RepPartyId = PartyId FROM @PartyList
@@ -56,15 +58,16 @@ BEGIN
 
 	-- Tier rate settings
 	SELECT DiscountGroupDetailId AS DiscountDetailId, FromAmount, ToAmount, Rate
-		,@ChargeRate - Rate AS ChargeRateAfterDiscount
+		,ChargeRateAfterDiscount
 	FROM dbo.LA_DiscountGroupDetail WITH (NOLOCK)
 	WHERE DiscountGroupId = @GroupId
 	ORDER BY FromAmount
 
 	-- Party List
-	SELECT a.DiscountGroupId, a.PartyId, p.PartyName, a.Remark
+	SELECT a.DiscountGroupId, a.PartyId, p.PartyName, a.Remark, op.SuspendedDate,op.TerminatedDate
 	FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
 		INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON a.PartyId = p.PartyId
+		INNER JOIN dbo.OAS_partydetail op WITH(NOLOCK) ON p.PartyId = op.PartyId
 	WHERE a.DiscountGroupId = @GroupId
 
 	-- Currency List
@@ -83,6 +86,7 @@ BEGIN
 			END
 			AS CurrencyName, 
 			ISNULL(c.CalculationType, 0) AS CalculationType
+		
 	FROM @PartyList pl
 		INNER JOIN @CurrencyList cl ON pl.LicenseeId = cl.LicenseeId
 		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON cl.Currency = e.ExchangeId

@@ -18,6 +18,7 @@ AS
 	 
 	 Revisions:
 		- 20221103@Danny: Initialize SP [RedmineID: #179367]
+		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 	 
 	 Relation SP: Dot_Dep_CreateCurrencyLicensee
 */
@@ -78,21 +79,21 @@ BEGIN
 		RETURN
 	END
 
-	-- Charge rate of the new currency = charge rate of currencies which are applied discount
-	BEGIN
-		-- charge rate of currencies which are applied discount
-		DECLARE @CurrentChargeRate SMALLMONEY = 0
+	---- Charge rate of the new currency = charge rate of currencies which are applied discount
+	--BEGIN
+	--	-- charge rate of currencies which are applied discount
+	--	DECLARE @CurrentChargeRate SMALLMONEY = 0
 
-		SELECT TOP 1 @CurrentChargeRate = Rate
-		FROM OAS_ChargeInfo WITH(NOLOCK)
-		WHERE FromParty = @PartyID AND ProductID = 0 AND FromDate <= GETDATE() AND ToDate >=  GETDATE()
+	--	SELECT TOP 1 @CurrentChargeRate = Rate
+	--	FROM OAS_ChargeInfo WITH(NOLOCK)
+	--	WHERE FromParty = @PartyID AND ProductID = 0 AND FromDate <= GETDATE() AND ToDate >=  GETDATE()
 
-		IF @CurrentChargeRate <> @ChargeRate
-		BEGIN
-			SELECT @ErrMsg = 'Charge rate of the currency is different from other currencies.', @ErrCode = 103
-			RETURN
-		END
-	END
+	--	IF @CurrentChargeRate <> @ChargeRate
+	--	BEGIN
+	--		SELECT @ErrMsg = 'Charge rate of the currency is different from other currencies.', @ErrCode = 103
+	--		RETURN
+	--	END
+	--END
 
 	BEGIN TRY
 		-- Insert data

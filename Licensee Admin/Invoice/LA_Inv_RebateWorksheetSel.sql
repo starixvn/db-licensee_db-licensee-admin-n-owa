@@ -37,6 +37,7 @@ AS
 	  - 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
 	  - 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 	  - 20221213@Danny: Change fomular Calculate rebate base on Licensee Fee [RedmineID: #181546]
+	  - 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 */
 
 BEGIN
@@ -86,13 +87,13 @@ BEGIN
 	DECLARE @Result TABLE
 	(
 		PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, LicenseeWL MONEY, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
-		,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000)
+		,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), ExtraInfo NVARCHAR(4000)
 	)
 
 	DECLARE @Result_37 TABLE --ProductID = 37
 	(
 		PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, LicenseeWL MONEY, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
-		,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000)
+		,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), ExtraInfo NVARCHAR(4000)
 	)
 
 	IF ISNULL(@ProductCodes, '') <> ''
@@ -100,7 +101,7 @@ BEGIN
 		INSERT INTO @Result
 		(
 			PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
 		)
 		EXEC dbo.LA_AmountToCompanyByProduct
 			@PartyIds = @PartyIds
@@ -114,10 +115,10 @@ BEGIN
 		INSERT INTO @Result_37
 		(
 			PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
 		)
 		SELECT PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
 		FROM @Result  WHERE ProductId = 37
 
 		DELETE @Result WHERE ProductId = 37

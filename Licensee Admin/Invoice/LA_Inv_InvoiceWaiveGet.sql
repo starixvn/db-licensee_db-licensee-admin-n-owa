@@ -21,6 +21,7 @@ AS
 		- 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
 		- 20210909@Percy: Support Prorate min fee of Group Min Fee: apply core SP [RedmineID: #157652]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
+		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 */
 
 BEGIN
@@ -71,12 +72,12 @@ BEGIN
 		DECLARE @Result TABLE
 		(
 			PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
-			,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000)
+			,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), ExtraInfo NVARCHAR(4000)
 		)
 		INSERT INTO @Result
 		(
 			PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
 		)
 		EXEC dbo.LA_AmountToCompanyByProduct
 			@PartyIds = @PartyIds

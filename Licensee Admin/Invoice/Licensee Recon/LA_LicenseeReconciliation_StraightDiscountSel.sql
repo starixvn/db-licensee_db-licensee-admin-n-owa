@@ -24,6 +24,7 @@ AS
 		- 20220506@Percy: Change way get discount group type [RedmineID: #1732342]
 		- 20220616@Percy: Remove paryers with invalid base currency setting [RedmineID: #172584]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
+		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 */
 
 BEGIN
@@ -63,7 +64,7 @@ BEGIN
 	DECLARE @Result TABLE
 	(
 		PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
-		,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000)
+		,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), ExtraInfo NVARCHAR(4000)
 	)
 	DECLARE @BaseCurrencyId INT, @BaseCurrencyName VARCHAR(5), @PartyIds VARCHAR(MAX)
 
@@ -76,7 +77,7 @@ BEGIN
 		INSERT INTO @Result
 		(
 			PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
 		)
 		EXEC dbo.LA_AmountToCompanyByProduct
 			@PartyIds = @PartyIds

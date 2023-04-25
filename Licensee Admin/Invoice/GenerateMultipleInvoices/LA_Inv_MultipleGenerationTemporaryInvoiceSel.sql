@@ -29,6 +29,7 @@ AS
 		- 20221213@Danny: Import HideRebateWorksheet Info from Excel template [RedmineID: #181546]
 		- 20221226@Danny: Integrate Player tips [#180703]
 		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -189,7 +190,7 @@ BEGIN
 		DECLARE @Result TABLE
 		(
 			PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
-			,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000)
+			,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000),ExtraInfo NVARCHAR(4000)
 		)
 		
 		WHILE 1 = 1
@@ -204,7 +205,7 @@ BEGIN
 			INSERT INTO @Result
 			(
 				PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-				,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+				,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
 			)
 			EXEC dbo.LA_AmountToCompanyByProduct
 				@PartyIds = @temp_PartyIds

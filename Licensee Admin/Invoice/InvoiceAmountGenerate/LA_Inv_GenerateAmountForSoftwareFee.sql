@@ -48,6 +48,7 @@ AS
 		- 20221028@Danny: MG-RNG offer tournament prize [RedmineID: #176986]
 		- 20221226@Danny: Integrate Player tips [#180703]
 		- 20230217@Danny: SG - Promotion prize integration [#183739]
+		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 */
 
 BEGIN
@@ -57,7 +58,7 @@ BEGIN
 	SELECT  @ErrCode = 0, @ErrMsg = '', @InvoiceTemplateName = ''
 
 	DECLARE	@FinalResult TABLE (ProductId INT, ProductCode VARCHAR(100), ProductName VARCHAR(500)
-		,InvoiceAmount MONEY, AmountType TINYINT, Rate MONEY, DeductMonthlyFees MONEY, RemainingAmount MONEY, Remark NVARCHAR(4000))
+		,InvoiceAmount MONEY, AmountType TINYINT, Rate MONEY, DeductMonthlyFees MONEY, RemainingAmount MONEY, Remark NVARCHAR(4000), ExtraInfo NVARCHAR(400))
 
 	-- Get Base Currency
 	DECLARE @BaseCurrencyId INT = 6, @BaseCurrencyName VARCHAR(10) = 'EUR' -- default = EUR
@@ -117,12 +118,12 @@ BEGIN
 		DECLARE @Result TABLE
 		(
 			PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
-			,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000)
+			,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), ExtraInfo NVARCHAR(4000)
 		)
 		INSERT INTO @Result
 		(
 			PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
 		)
 		EXEC dbo.LA_AmountToCompanyByProduct
 			@PartyIds = @PartyIds
@@ -133,14 +134,14 @@ BEGIN
 			,@BaseCurrencyName = @BaseCurrencyName
 			,@Environment = @Environment
 
-		INSERT INTO @FinalResult (ProductId, ProductCode, ProductName, InvoiceAmount, AmountType, Rate, Remark)
-		SELECT p.ProductId, p.ProductPrefix, p.ProductName, d.InvoiceAmount, d.AmountType, d.Rate, d.Remark
+		INSERT INTO @FinalResult (ProductId, ProductCode, ProductName, InvoiceAmount, AmountType, Rate, Remark, ExtraInfo)
+		SELECT p.ProductId, p.ProductPrefix, p.ProductName, d.InvoiceAmount, d.AmountType, d.Rate, d.Remark, d.ExtraInfo
 		FROM @Result r
 			INNER JOIN dbo.LA_f_Products3rd('') p ON r.ProductId = p.ProductId
 			CROSS APPLY (
-				SELECT Discount AS InvoiceAmount, CONVERT(TINYINT, 4) AS AmountType, DiscountRate AS Rate, DiscountRemark AS Remark WHERE Discount > 0 -- Discount
+				SELECT Discount AS InvoiceAmount, CONVERT(TINYINT, 4) AS AmountType, DiscountRate AS Rate, DiscountRemark AS Remark, ExtraInfo WHERE Discount > 0 -- Discount
 				--UNION ALL SELECT Rebate, 6, RebateRate, RebateRemark WHERE Rebate > 0 -- Rebate
-				UNION ALL SELECT LicensingFee, 1, NULL, NULL -- Software Fee
+				UNION ALL SELECT LicensingFee, 1, NULL, NULL, NULL -- Software Fee
 			) d
 		WHERE r.LicensingFeeTypeId = 0 AND r.ProductId NOT IN (37, 74) -- SB Promotion, Player Tips
 
@@ -214,7 +215,7 @@ BEGIN
 	END
 
 	-- Return data
-	SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType, Rate, DeductMonthlyFees, RemainingAmount, Remark FROM @FinalResult
+	SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType, Rate, DeductMonthlyFees, RemainingAmount, Remark, ExtraInfo FROM @FinalResult
 	ORDER BY AmountType, ProductId
 END
 GO

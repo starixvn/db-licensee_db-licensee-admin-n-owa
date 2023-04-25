@@ -31,6 +31,7 @@ AS
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 		- 20221226@Danny: Integrate Player tips [#180703]
 		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
+		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 	
 	Parameter explanation:
 		@LicenseeStatusIds
@@ -80,7 +81,7 @@ BEGIN
 	-- Handle statusID 
 	DECLARE @statusTab TABLE (StatusId INT)
 	INSERT INTO @statusTab (StatusId)
-	SELECT CAST (val AS INT) FROM dbo.strSplit(@LicenseeStatusIds,',')
+	SELECT CAST (value AS INT) FROM STRING_SPLIT(@LicenseeStatusIds,',')
 
 	UPDATE t
 	SET t.StatusId = CASE	WHEN la.IsDeposit = 0 THEN 3 -- Active (Credit)
@@ -113,12 +114,12 @@ BEGIN
 	DECLARE @Result TABLE
 	(
 		PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
-		,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000)
+		,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), ExtraInfo NVARCHAR(4000)
 	)
 	INSERT INTO @Result
 	(
 		PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-		,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+		,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
 	)
 	EXEC dbo.LA_AmountToCompanyByProduct
 		@PartyIds = @PartyIds
