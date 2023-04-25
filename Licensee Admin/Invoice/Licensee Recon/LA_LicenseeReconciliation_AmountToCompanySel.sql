@@ -69,6 +69,7 @@ AS
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 		- 20221226@Danny: Integrate Player tips [#180703]
 		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
+		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 
 */
 BEGIN
@@ -105,12 +106,12 @@ BEGIN
 	DECLARE @Result TABLE
 	(
 		PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
-		,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000)
+		,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), ExtraInfo NVARCHAR(4000)
 	)
 	INSERT INTO @Result
 	(
 		PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-		,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+		,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
 	)
 	EXEC dbo.LA_AmountToCompanyByProduct
 		@PartyIds = @PartyIds

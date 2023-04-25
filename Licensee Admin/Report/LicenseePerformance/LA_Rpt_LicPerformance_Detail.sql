@@ -79,6 +79,7 @@ AS
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 		- 20221226@Danny: Integrate Player tips [#180703]
 		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
+		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -189,7 +190,7 @@ BEGIN
 		(
 			PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
 			,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000)
-			,BetCount INT, Turnover MONEY, MemberWL MONEY, BACommission MONEY, IsPrevious BIT
+			,BetCount INT, Turnover MONEY, MemberWL MONEY, BACommission MONEY, IsPrevious BIT, ExtraInfo NVARCHAR(4000)
 		)
 
 		-- From/To
@@ -248,7 +249,7 @@ BEGIN
 		INSERT INTO @Result
 		(
 			PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
 		)
 		EXEC bodb_Licensee.dbo.LA_AmountToCompanyByProduct
 			@PartyIds = @PartyIds
@@ -336,7 +337,7 @@ BEGIN
 		INSERT INTO @Result
 		(
 			PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
 		)
 		EXEC bodb_Licensee.dbo.LA_AmountToCompanyByProduct
 			@PartyIds = @PartyIds

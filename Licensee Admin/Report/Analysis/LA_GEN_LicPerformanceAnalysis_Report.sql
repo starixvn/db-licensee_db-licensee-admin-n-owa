@@ -28,6 +28,7 @@ AS
 		- 20211213@Percy: Fix missing BetCount and exclude Saba Promotion [RedmineID: #161378]
 		- 20211215@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20201003@Danny: Exclude Licensees that offer cryptocurrency [#FeatureID 177718]
+		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 
 */
 
@@ -163,7 +164,7 @@ BEGIN
 		(
 			PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
 			,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000)
-			,Winloss MONEY, Turnover MONEY, TurnoverNoDraw MONEY, BetCount INT, BaseCurrencyId INT
+			,Winloss MONEY, Turnover MONEY, TurnoverNoDraw MONEY, BetCount INT, BaseCurrencyId INT, ExtraInfo NVARCHAR(4000)
 		)
 
 		WHILE 1 = 1
@@ -177,7 +178,7 @@ BEGIN
 			INSERT INTO @Result
 			(
 				PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-				,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark
+				,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
 			)
 			EXEC dbo.LA_AmountToCompanyByProduct
 				@PartyIds = @PartyIds

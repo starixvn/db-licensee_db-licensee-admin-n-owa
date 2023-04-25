@@ -16,17 +16,24 @@ AS
 	 Revisions:  
 		- 20180702@Parsons: Get payer list [#94282]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
+		- 20220206@Danny: Return more party detail (SuspendedDate, TerminatedDate) [RedmineID: #169160]
 
 	 Explannation:
 */
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @PartyList TABLE(PartyId INT, PartyName VARCHAR(100), BrandName VARCHAR(100), ParentId INT)
+	DECLARE @PartyList TABLE(PartyId INT, PartyName VARCHAR(100), BrandName VARCHAR(100), ParentId INT, SuspendedDate DATE, TerminatedDate DATE)
 	DECLARE @PartySettings TABLE(DiscountGroupId INT, PartyId INT, ProductId INT)
 
 	INSERT INTO @PartyList(PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel
+
+	UPDATE p
+	SET p.SuspendedDate = op.SuspendedDate,
+		p.TerminatedDate = op.TerminatedDate
+	FROM @PartyList p
+	INNER JOIN dbo.OAS_partydetail op WITH(NOLOCK) ON p.PartyId = op.PartyId
 
 	INSERT INTO @PartySettings(DiscountGroupId, PartyId, ProductId)
 	SELECT DISTINCT h.DiscountGroupId, a.PartyId, dp.ProductId
@@ -38,7 +45,7 @@ BEGIN
 		AND (@ToDate IS NULL OR @ToDate >= h.FromDate)
 		
 	--list of payer not in group
-	SELECT p.PartyId, PartyName, BrandName
+	SELECT p.PartyId, PartyName, BrandName, SuspendedDate, TerminatedDate
 	FROM @PartyList p
 	WHERE p.PartyId NOT IN (SELECT PartyId 
 							FROM @PartySettings
@@ -48,7 +55,7 @@ BEGIN
 	UNION
 
 	--list of payer in group
-	SELECT p.PartyId, PartyName, BrandName
+	SELECT p.PartyId, PartyName, BrandName, SuspendedDate, TerminatedDate
 	FROM @PartyList p
 	WHERE p.PartyId IN (SELECT PartyId 
 						FROM @PartySettings p1

@@ -29,6 +29,7 @@ AS
 		- 20211101@Percy: Initialize SP [RedmineID: #162158]
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
+		- 20221201@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 	 
 	 Params:
 		@RateSettingsData = '<Root>
@@ -36,24 +37,22 @@ AS
 									<DiscountDetailId>1</DiscountDetailId>
 									<FromAmount>1</FromAmount>
 									<ToAmount>10000</ToAmount>
-									<Rate>0.05</Rate>
+									<ChargeRateAfterDiscount>0.05</ChargeRateAfterDiscount>
 								</RateSetting>
 								<RateSetting>
 									<DiscountDetailId>2</DiscountDetailId>
 									<FromAmount>10001</FromAmount>
 									<ToAmount>20000</ToAmount>
-									<Rate>0.1</Rate>
+									<ChargeRateAfterDiscount>0.1</ChargeRateAfterDiscount>
 								</RateSetting>
 							</Root>'
 		@PartySettingsData = '<Root>
 								<PartySetting>
 									<PartyId>1</PartyId>
-									<ChargeRate>0.1</ChargeRate>
 									<Remark>hello1</Remark>
 								</PartySetting>
 								<PartySetting>
 									<PartyId>2</PartyId>
-									<ChargeRate>0.1</ChargeRate>
 									<Remark>hello2</Remark>
 								</PartySetting>
 							</Root>'
@@ -94,9 +93,9 @@ BEGIN
 	DECLARE @CurrencyXML XML = CONVERT(XML, @CurrencySettingsData)
 	DECLARE @TierRateSettingXML XML = CONVERT(XML, @RateSettingsData)
 
-	DECLARE @PartyList TABLE (PartyId INT, ChargeRate MONEY, Remark NVARCHAR(500))
+	DECLARE @PartyList TABLE (PartyId INT, Remark NVARCHAR(500))
 	DECLARE @CurrencyList TABLE (PartyId INT, CurrencyId INT, CalculationType TINYINT)
-	DECLARE @TierRateSetting TABLE (DiscountGroupDetailId INT, RowId INT, FromAmount MONEY, ToAmount MONEY, Rate MONEY)
+	DECLARE @TierRateSetting TABLE (DiscountGroupDetailId INT, RowId INT, FromAmount MONEY, ToAmount MONEY, ChargeRateAfterDiscount MONEY)
 	DECLARE @ProductList TABLE (ProductId INT, CalculationType TINYINT)
 
 	BEGIN TRY
@@ -134,9 +133,8 @@ BEGIN
 			RETURN
 		END
 
-		INSERT INTO @PartyList (PartyId, ChargeRate, Remark)
+		INSERT INTO @PartyList (PartyId, Remark)
 		SELECT t.c.value('(PartyId/text())[1]', 'INT') AS PartyId
-			,ISNULL(t.c.value('(ChargeRate/text())[1]', 'FLOAT'), 0) AS ChargeRate
 			,ISNULL(t.c.value('(Remark/text())[1]', 'NVARCHAR(500)'), '') AS Remark
 		FROM @PartyXML.nodes('Root/PartySetting') AS t(c)
 		OPTION (OPTIMIZE FOR (@PartyXML = NULL))
@@ -148,14 +146,14 @@ BEGIN
 		FROM @CurrencyXML.nodes('Root/CurrencySetting') AS t(c)
 		OPTION (OPTIMIZE FOR (@CurrencyXML = NULL))
 
-		INSERT INTO @TierRateSetting (DiscountGroupDetailId, RowId, FromAmount, ToAmount, Rate)
+		INSERT INTO @TierRateSetting (DiscountGroupDetailId, RowId, FromAmount, ToAmount, ChargeRateAfterDiscount)
 		SELECT DiscountGroupDetailId, ROW_NUMBER() OVER(ORDER BY FromAmount) AS RowId
 			,FromAmount, CASE WHEN ToAmount = 'Unlimited' THEN @MaxAmountValue ELSE ToAmount END, Rate
 		FROM (
 			SELECT t.c.value('(DiscountDetailId/text())[1]', 'INT') AS DiscountGroupDetailId
 				,t.c.value('(FromAmount/text())[1]', 'FLOAT') AS FromAmount
 				,t.c.value('(ToAmount/text())[1]', 'NVARCHAR(500)') AS ToAmount
-				,t.c.value('(Rate/text())[1]', 'FLOAT') AS Rate
+				,t.c.value('(ChargeRateAfterDiscount/text())[1]', 'FLOAT') AS Rate
 			FROM @TierRateSettingXML.nodes('Root/RateSetting') AS t(c)
 		) t
 		OPTION (OPTIMIZE FOR (@TierRateSettingXML = NULL))
@@ -197,7 +195,7 @@ BEGIN
 			RETURN
 		END
 
-		IF EXISTS (SELECT 1 FROM @TierRateSetting WHERE FromAmount < 0 OR FromAmount > ToAmount OR Rate < 0)
+		IF EXISTS (SELECT 1 FROM @TierRateSetting WHERE FromAmount < 0 OR FromAmount > ToAmount OR ChargeRateAfterDiscount < 0)
 		BEGIN
 			SELECT @ErrCode = 508, @ErrMsg = 'Please input valid amount.'
 			RETURN
@@ -214,34 +212,6 @@ BEGIN
 			RETURN
 		END
 
-		SELECT TOP 1 @ChargeRate = ChargeRate FROM @PartyList
-		IF EXISTS (SELECT 1 FROM @TierRateSetting WHERE Rate >= @ChargeRate)
-		BEGIN
-			SELECT @ErrCode = 510, @ErrMsg = 'Charge Rate after Discount must be positive value.'
-			RETURN
-		END
-
-		IF EXISTS (SELECT 1 FROM @PartyList HAVING COUNT(DISTINCT ChargeRate) > 1)
-		BEGIN
-			SELECT @ErrCode = 511, @ErrMsg = 'Please select licensees who have same Charge Rate with others.'
-			RETURN
-		END
-
-		SELECT TOP 1 @ProductId = ProductId FROM @ProductList
-		IF EXISTS (
-			SELECT 1
-			FROM @PartyList p
-				LEFT JOIN dbo.OAS_ChargeInfo c WITH (NOLOCK)
-					ON p.PartyId = c.FromParty AND c.ProductId = @ProductId
-						AND c.FromDate <= @ToDate AND c.ToDate >= @FromDate
-						AND c.ToParty IN (1, 9, 11, 98) AND c.ChargeType = 1
-			WHERE c.FromParty IS NULL OR p.ChargeRate <> c.Rate
-		)
-		BEGIN
-			SELECT @ErrCode = 511, @ErrMsg = 'Please select licensees who have same Charge Rate with others.'
-			RETURN
-		END
-
 		IF EXISTS (
 			SELECT 1
 			FROM @PartyList p
@@ -252,6 +222,8 @@ BEGIN
 			SELECT @ErrCode = 512, @ErrMsg = 'Please select licensees who have same Base Currency with discount setting.'
 			RETURN
 		END
+
+		SELECT TOP 1 @ProductId = ProductId FROM @ProductList
 	END
 
 	-- Log data
@@ -292,7 +264,7 @@ BEGIN
 				SELECT
 					FromAmount	AS '@fa'
 					,ToAmount	AS '@ta'
-					,Rate		AS '@r'
+					,ChargeRateAfterDiscount AS '@r'
 				FROM dbo.LA_DiscountGroupDetail WITH (NOLOCK)
 				WHERE DiscountGroupId = @DiscountGroupId
 				FOR XML PATH('d'), TYPE
@@ -335,7 +307,7 @@ BEGIN
 				SELECT
 					FromAmount	AS '@fa'
 					,ToAmount	AS '@ta'
-					,Rate		AS '@r'
+					,ChargeRateAfterDiscount AS '@r'
 				FROM @TierRateSetting
 				FOR XML PATH('d'), TYPE
 			)
@@ -403,17 +375,17 @@ BEGIN
 
 		-- tier rate setting
 		;WITH CTE_DiscountGroupDetail AS (
-			SELECT DiscountGroupDetailId, DiscountGroupId, FromAmount, ToAmount, Rate
+			SELECT DiscountGroupDetailId, DiscountGroupId, FromAmount, ToAmount, ChargeRateAfterDiscount
 			FROM dbo.LA_DiscountGroupDetail WITH (NOLOCK)
 			WHERE DiscountGroupId = @DiscountGroupId
 		)
 		MERGE CTE_DiscountGroupDetail AS t
 		USING @TierRateSetting AS s ON t.DiscountGroupDetailId = s.DiscountGroupDetailId
 		WHEN MATCHED THEN UPDATE
-			SET t.FromAmount = s.FromAmount, t.ToAmount = s.ToAmount, t.Rate = s.Rate
+			SET t.FromAmount = s.FromAmount, t.ToAmount = s.ToAmount, t.ChargeRateAfterDiscount = s.ChargeRateAfterDiscount
 		WHEN NOT MATCHED BY TARGET THEN INSERT
-			(DiscountGroupId, FromAmount, ToAmount, Rate)
-			VALUES (@DiscountGroupId, FromAmount, ToAmount, Rate)
+			(DiscountGroupId, FromAmount, ToAmount, ChargeRateAfterDiscount)
+			VALUES (@DiscountGroupId, FromAmount, ToAmount, ChargeRateAfterDiscount)
 		WHEN NOT MATCHED BY SOURCE THEN DELETE;
 	END TRY
 	BEGIN CATCH

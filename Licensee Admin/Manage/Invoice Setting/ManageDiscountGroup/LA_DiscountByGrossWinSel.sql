@@ -14,6 +14,7 @@ AS
 		- 20211101@Percy: Initialize SP [RedmineID: #162158]
 		- 20220812@Danny: Fix issue get wrong chargerate [RedmineID: #166504]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
+		- 20221201@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 */
 
 BEGIN
@@ -68,11 +69,14 @@ BEGIN
 		AND d.FromDate <= c.ToDate AND d.ToDate >= c.FromDate
 
 	-- Return data
-	SELECT DiscountGroupId, DiscountGroupName, FromDate, ToDate, CurrencyName, ProductList, PayerList, ChargeRate
+	SELECT DiscountGroupId, DiscountGroupName, FromDate, ToDate, CurrencyName, ProductList, PayerList--, ChargeRate
 	FROM #DiscountGroup
 
 	-- Tier rate settings
-	SELECT d.DiscountGroupId, d.FromAmount, d.ToAmount, d.Rate, g.ChargeRate - d.Rate AS ChargeRateAfterDiscount
+	SELECT	d.DiscountGroupId, 
+			d.FromAmount, 
+			d.ToAmount, 
+			d.ChargeRateAfterDiscount AS ChargeRateAfterDiscount
 	FROM #DiscountGroup g
 		 INNER JOIN dbo.LA_DiscountGroupDetail d WITH (NOLOCK) ON g.DiscountGroupId = d.DiscountGroupId
 	ORDER BY d.DiscountGroupId, d.FromAmount
