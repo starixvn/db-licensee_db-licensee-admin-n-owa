@@ -26,6 +26,7 @@ AS
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 	- 20230222@Danny: Remove hard-code bettype And ProductID [#183739]
+	- 20230410@Danny: Change PayToSupplier fomular [RedmineID: #186543]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
@@ -79,7 +80,8 @@ BEGIN
 			@ProductRptbettingSource VARCHAR(1000) = '',
 			@ShareRate			MONEY = 0.03,
 			@BetBuilderRate3rd  MONEY = 0.04, 
-			@BetBuilderBetTypeId INT = 38
+			@BetBuilderBetTypeId INT = 38,
+			@ExchangeCutoffDate DATE = '2023-05-01'
 
 	-- PPL param
 	DECLARE @BaseCurrencies		TABLE (ExchangeId INT, BaseCurrencyName VARCHAR(20))
@@ -839,7 +841,7 @@ BEGIN
 			SUM(b.LicenseeWinloss  * ISNULL(cr.Rate, ci.Rate) - CASE WHEN b.ProductID = 31 THEN (b.CommissionA + b.CommissionP) ELSE 0 END) AS LicensingFee,
 			SUM(CASE WHEN b.ProductID = 59  THEN (b.LicenseeWinloss - b.RollingComm) * CASE WHEN ci.isDeposit = 1 THEN ci.ChargeRate09 ELSE ci.ChargeRate10 END
 					 WHEN b.ProductID = 10  THEN 0
-					 WHEN b.ProductID = 31  THEN b.LicenseeWinloss  * ISNULL(ci_3rd.Rate3rd,0) - (b.CommissionA + b.CommissionP)
+					 WHEN b.ProductID = 31  THEN  CASE WHEN @FromDate < @ExchangeCutoffDate THEN  b.LicenseeWinloss  * ISNULL(ci_3rd.Rate3rd,0) - (b.CommissionA + b.CommissionP) ELSE -(b.CustomerWinLoss + b.CommissionP)  * ISNULL(ci_3rd.Rate3rd,0) END
 					  ELSE b.LicenseeWinloss  * ISNULL(ci_3rd.Rate3rd,0)
 				END) AS PayToSupplier,
 			b.ProductID,
