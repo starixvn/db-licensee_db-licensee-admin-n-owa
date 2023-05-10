@@ -22,7 +22,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	-- Region: Charge Info	
-	DECLARE @ProductCode VARCHAR(50), @ExchangeCutoffDate DATE = '2023-05-01'
+	DECLARE @ProductCode VARCHAR(50), @ExchangeCutoffDate SMALLDATETIME
 	SELECT @ProductCode = ProductPrefix FROM dbo.Product3rd WITH(NOLOCK) WHERE Productid = @ProductID
 
 	IF ISNULL(@PlatformId, 0) <> 0
@@ -36,6 +36,8 @@ BEGIN
 
 	DECLARE @IsConvertNegativeFeeToZero BIT, @IsConvertNegativePaytoSupplierToZero BIT
 	SELECT @IsConvertNegativeFeeToZero = IsConvertNegativeFeeToZero, @IsConvertNegativePaytoSupplierToZero = IsConvertNegativePaytoSupplierToZero  FROM dbo.LA_VendorPaymentSetting WITH(NOLOCK) WHERE ProductId = @ProductID
+
+	SELECT @ExchangeCutoffDate = f.CutoffDate FROM dbo.LA_f_GetCutOffDate() f WHERE f.TypeName = 'ExchangeTerms'
 
 	DECLARE @ChargeInfos AS TABLE (
 		PartyId		INT,
@@ -136,7 +138,7 @@ BEGIN
 			SUM(b.CommissionP) AS CustomerComm,
 			SUM(b.CommissionA) AS LicenseeComm,
 			SUM(-(b.MemberWL + b.CommissionP)) AS LicenseeWinloss,
-			SUM((-b.MemberWL * ci.Rate) - (b.CommissionA + b.CommissionP)) AS LicensingFee,
+			SUM(CASE WHEN @FromDate < @ExchangeCutoffDate THEN (-b.MemberWL * ci.Rate) - (b.CommissionA + b.CommissionP) ELSE -(b.MemberWL + b.CommissionP) * ci.Rate END) AS LicensingFee,
 			SUM(CASE WHEN @FromDate < @ExchangeCutoffDate THEN (-b.MemberWL * rd.Rate) - (b.CommissionA + b.CommissionP) ELSE -(b.MemberWL + b.CommissionP) * rd.Rate END) PayToSupplier
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
@@ -162,7 +164,7 @@ BEGIN
 			SUM(b.PComm) AS CustomerComm,
 			SUM(b.AComm) AS LicenseeComm,
 			SUM(-(b.Winloss + b.PComm)) AS LicenseeWinloss,
-			SUM((-b.Winloss * ci.Rate) - (b.AComm + b.PComm)) AS LicensingFee,
+			SUM(CASE WHEN @FromDate < @ExchangeCutoffDate THEN (-b.Winloss * ci.Rate) - (b.AComm + b.PComm) ELSE -(b.Winloss + b.PComm) * ci.Rate END) AS LicensingFee,
 			SUM(CASE WHEN @FromDate < @ExchangeCutoffDate THEN (-b.Winloss * rd.Rate) - (b.AComm + b.PComm) ELSE -(b.Winloss + b.PComm) * rd.Rate END) PayToSupplier
 		FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
 			INNER JOIN @ChargeInfos ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate

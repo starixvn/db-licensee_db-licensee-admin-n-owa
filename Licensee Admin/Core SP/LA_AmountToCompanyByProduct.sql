@@ -38,6 +38,7 @@ AS
 		- 20221213@Danny: Change fomular Calculate rebate base on Licensee Fee [RedmineID: #181546]
 		- 20221226@Danny: Integrate Player tips [#180703]
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
+		- 20230519@Danny: New commercial terms for 12B [RedmineID: #186543]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -69,6 +70,9 @@ BEGIN
 	SELECT PartyId FROM dbo.OAS_Party WITH (NOLOCK) WHERE PartyName IN ('Bwing (N8B)','Goal123 (N8G)')
 
 	DECLARE @CutOff_RebateOnLicfee  DATETIME = '2022-11-01'
+
+	DECLARE @ExchangeTerm_CutOffDate	SMALLDATETIME
+	SELECT @ExchangeTerm_CutOffDate = f.CutoffDate FROM dbo.LA_f_GetCutOffDate() f WHERE f.TypeName = 'ExchangeTerms'
 	
 	-- Get Product List
 	CREATE TABLE #Products (ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(10), IsSelected BIT)
@@ -291,9 +295,9 @@ BEGIN
 				WHEN t.ProductId = 3 THEN -(t.MemberWL + t.AgentComm)
 				WHEN (t.ProductId = 15 AND cp.LicenseeId IS NULL) OR (t.ProductId <> 15 AND p.LicenseeId IS NULL) THEN 0
 				WHEN t.ProductId = 15 THEN t.PayOut - t.CommShare * cp.CommShareRate - t.CashInShare * cp.CashInShareRate
+				WHEN t.ProductId = 31 THEN  CASE WHEN @FromDate < @ExchangeTerm_CutOffDate THEN -t.MemberWL * ISNULL(cr.Rate, p.Rate) - (t.AgentComm + t.MemberComm) ELSE  -(t.MemberWL+t.MemberComm) * ISNULL(cr.Rate, p.Rate) END
 				ELSE -t.MemberWL * ISNULL(cr.Rate, p.Rate)
 					+ t.PayOut + t.Contribution - t.JackpotPrize - t.Prize - t.Bonus - t.FreeBets - t.Promotion -LuckyDraw END
-				- CASE WHEN t.ProductId = 31 THEN (t.AgentComm + t.MemberComm) ELSE 0 END
 		) * e.Rate) AS GrossLicenseeAmount
 		,SUM(-t.MemberWL * e.Rate) AS LicenseeWL
 		,SUM((CASE
@@ -302,8 +306,8 @@ BEGIN
 				WHEN t.ProductId = 3 THEN -(t.MemberWL + t.AgentComm)
 				WHEN (t.ProductId = 15 AND cp.LicenseeId IS NULL) OR (t.ProductId <> 15 AND p.LicenseeId IS NULL) THEN 0
 				WHEN t.ProductId = 15 THEN t.PayOut - t.CommShare * cp.CommShareRate - t.CashInShare * cp.CashInShareRate
-				ELSE (-t.MemberWL - t.Contribution) * ISNULL(cr.Rate, p.Rate) + t.PayOut END
-				- CASE WHEN t.ProductId = 31 THEN (t.AgentComm + t.MemberComm) ELSE 0 END
+				WHEN t.ProductId = 31 THEN  CASE WHEN @FromDate < @ExchangeTerm_CutOffDate THEN -t.MemberWL * ISNULL(cr.Rate, p.Rate) - (t.AgentComm + t.MemberComm) ELSE  -(t.MemberWL+t.MemberComm) * ISNULL(cr.Rate, p.Rate) END
+				ELSE (-t.MemberWL - t.Contribution) * ISNULL(cr.Rate, p.Rate) + t.PayOut END		
 		) * e.Rate) AS LicenseeAmount
 		,SUM(CASE
 				WHEN p.LicenseeId IS NULL THEN 0
