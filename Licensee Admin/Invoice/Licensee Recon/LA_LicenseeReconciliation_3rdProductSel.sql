@@ -18,19 +18,22 @@ AS
 	Revisions: 
 		- 20210727@Percy: Initialize SP [RedmineID: #155593]
 		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+		- 20230523@Danny: New commercial terms for 12B [RedmineID: #186543]
 */
 
 BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @FDate SMALLDATETIME, @TDate SMALLDATETIME
-	DECLARE @BalanceUpDay SMALLDATETIME, @MoveBetsDay SMALLDATETIME
+	DECLARE @BalanceUpDay SMALLDATETIME, @MoveBetsDay SMALLDATETIME, @ExchangeTerm_CutOffDate SMALLDATETIME
 
 	DECLARE @MBBU TABLE (BalanceUpDay SMALLDATETIME, MoveBetsDay SMALLDATETIME)
 	INSERT INTO @MBBU (BalanceUpDay, MoveBetsDay)
 	EXEC bodb02.dbo.Age_SelBalanceUpDay
 
 	SELECT @BalanceUpDay = BalanceUpDay, @MoveBetsDay = MoveBetsDay FROM @MBBU
+
+	SELECT @ExchangeTerm_CutOffDate = f.CutoffDate FROM dbo.LA_f_GetCutOffDate() f WHERE f.TypeName = 'ExchangeTerms'
 
 	DECLARE @ProductCode VARCHAR(10), @Bettype SMALLINT
 	
@@ -44,7 +47,7 @@ BEGIN
 	SELECT l.LicenseeId, l.LicenseeName
 	FROM bodb_Licensee.dbo.Licensees l WITH (NOLOCK)
 		INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON l.LicenseeId = p.OldRefId AND p.PartyType IN (1, 5)
-	WHERE p.PartyId IN (SELECT CONVERT(INT, val) FROM bodb02.dbo.strSplit(@PartyIds, ','))
+	WHERE p.PartyId IN (SELECT CONVERT(INT, value) FROM STRING_SPLIT(@PartyIds, ','))
 
 	-- Get Exchange
 	DECLARE @Exchange TABLE (ExchangeId INT, ExchangeDate SMALLDATETIME, Code VARCHAR(65), Rate FLOAT)
@@ -65,11 +68,12 @@ BEGIN
 		FROM dbo.LA_ChargeRateByCurrency bc WITH (NOLOCK)
 			INNER JOIN @ChargeRate c ON bc.ChargeId = c.ChargeId
 
-		CREATE TABLE #tmpLAData (winlostdate SMALLDATETIME, Currency INT, MemberWL MONEY, Comm MONEY)
-		INSERT INTO #tmpLAData (winlostdate, Currency, MemberWL, Comm)
+		CREATE TABLE #tmpLAData (winlostdate SMALLDATETIME, Currency INT, MemberWL MONEY, Comm MONEY, Pcomm MONEY)
+		INSERT INTO #tmpLAData (winlostdate, Currency, MemberWL, Comm, Pcomm)
 		SELECT r.rptDate, r.CurrencyId
 			,SUM(r.MemberWL) AS MemberWL
 			,SUM(r.CommissionA + r.CommissionP) AS Comm
+			,SUM(r.CommissionP)  Pcomm
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
 			INNER JOIN @tblSite s ON r.SiteId = s.SiteId
 		WHERE r.rptDate BETWEEN @FromDate AND @ToDate
@@ -161,8 +165,8 @@ BEGIN
 		-- LA
 		INSERT INTO @Result (Func, Currency, [Type], ExRate, AmountToCompany, BasedAmountToCompany)
 		SELECT 'LA', e.Code, 'Actual Bet', e.Rate
-			,SUM(d.MemberWL * ISNULL(bc.Rate, c.Rate) + d.Comm) AS AmountToCompany
-			,SUM((d.MemberWL * ISNULL(bc.Rate, c.Rate) + d.Comm) * e.Rate) AS BasedAmountToCompany
+			,SUM(CASE WHEN @ProductId = 31 AND @FromDate >= @ExchangeTerm_CutOffDate THEN (d.MemberWL + d.Pcomm) * ISNULL(bc.Rate, c.Rate)  ELSE d.MemberWL * ISNULL(bc.Rate, c.Rate) + d.Comm END) AS AmountToCompany
+			,SUM(CASE WHEN @ProductId = 31 AND @FromDate >= @ExchangeTerm_CutOffDate THEN (d.MemberWL + d.Pcomm) * ISNULL(bc.Rate, c.Rate) ELSE (d.MemberWL * ISNULL(bc.Rate, c.Rate) + d.Comm) END  * e.Rate) AS BasedAmountToCompany
 		FROM #tmpLAData d
 			INNER JOIN @Exchange e ON d.Currency = e.ExchangeId AND d.winlostdate = e.ExchangeDate
 			INNER JOIN @ChargeRate c ON d.winlostdate BETWEEN c.FromDate AND c.ToDate

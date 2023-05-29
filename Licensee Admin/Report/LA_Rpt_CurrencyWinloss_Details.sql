@@ -59,6 +59,7 @@ AS
 	   - 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	   - 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 	   - 20230217@Danny: Remove hard-code bettype And ProductID [#183739]
+	   - 20230510@Danny: New commercial terms for 12B [RedmineID: #186543]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -67,7 +68,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @GD_Tip	SMALLINT = 1706
+	DECLARE @GD_Tip	SMALLINT = 1706, @ExchangeTerm_CutOffDate	SMALLDATETIME
 
 	DECLARE @JPContrib_ProductList TABLE(ProductID INT)
 	INSERT INTO @JPContrib_ProductList
@@ -108,6 +109,8 @@ BEGIN
 
 	SELECT @PartyIds = PartyIDs FROM bodb_Licensee.dbo.LA_f_PartyListByStatusSel(@PartyIDs, @LicenseeStatusIds)
 	-- End Handle licensee status
+
+	SELECT @ExchangeTerm_CutOffDate = f.CutoffDate FROM bodb_licensee.dbo.LA_f_GetCutOffDate() f WHERE f.TypeName = 'ExchangeTerms'
 
 	CREATE TABLE #tmpWinLoss (
 		Winlostdate		DATETIME,
@@ -223,7 +226,11 @@ BEGIN
 					,SUM(-b.MemberWL - CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END)
 					,0 AS AmtDueToBA
 					,0 AS CommBA
-					,SUM(-b.MemberWL * ISNULL(cc.rate,p.Rate) - CASE WHEN b.ProductID=31 THEN (b.CommissionA + b.CommissionP) ELSE 0 END) AS Company
+					, SUM(
+						CASE WHEN b.ProductID=31 THEN CASE WHEN b.rptDate < @ExchangeTerm_CutOffDate THEN -b.MemberWL * ISNULL(cc.Rate,p.Rate) - (b.CommissionA + b.CommissionP)
+													  ELSE  -(b.MemberWL +  b.CommissionP) * ISNULL(cc.Rate,p.Rate) END
+						ELSE -b.MemberWL * ISNULL(cc.rate,p.Rate) END
+					 ) Company
 					,SUM(b.Betcount * (CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END))
 					,SUM(b.commissionP)
 			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)

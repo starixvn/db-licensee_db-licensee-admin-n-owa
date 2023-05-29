@@ -81,7 +81,9 @@ BEGIN
 			@ShareRate			MONEY = 0.03,
 			@BetBuilderRate3rd  MONEY = 0.04, 
 			@BetBuilderBetTypeId INT = 38,
-			@ExchangeCutoffDate DATE = '2023-05-01'
+			@ExchangeCutoffDate SMALLDATETIME 
+
+	SELECT @ExchangeCutoffDate = f.CutoffDate FROM dbo.LA_f_GetCutOffDate() f WHERE f.TypeName = 'ExchangeTerms'
 
 	-- PPL param
 	DECLARE @BaseCurrencies		TABLE (ExchangeId INT, BaseCurrencyName VARCHAR(20))
@@ -838,7 +840,9 @@ BEGIN
 			SUM(b.TotalTrans) AS TotalTrans,
 			SUM(b.CustomerWinLoss) AS CustomerWinLoss,
 			SUM(b.LicenseeWinloss) AS LicenseeWinloss,
-			SUM(b.LicenseeWinloss  * ISNULL(cr.Rate, ci.Rate) - CASE WHEN b.ProductID = 31 THEN (b.CommissionA + b.CommissionP) ELSE 0 END) AS LicensingFee,
+			SUM(CASE WHEN b.ProductID = 31 THEN CASE WHEN @FromDate < @ExchangeCutoffDate THEN b.LicenseeWinloss  * ISNULL(cr.Rate, ci.Rate) - (b.CommissionA + b.CommissionP) ELSE -(b.CustomerWinLoss + b.CommissionP) * ISNULL(cr.Rate, ci.Rate) END
+				 ELSE b.LicenseeWinloss  * ISNULL(cr.Rate, ci.Rate) 
+				END) AS LicensingFee,
 			SUM(CASE WHEN b.ProductID = 59  THEN (b.LicenseeWinloss - b.RollingComm) * CASE WHEN ci.isDeposit = 1 THEN ci.ChargeRate09 ELSE ci.ChargeRate10 END
 					 WHEN b.ProductID = 10  THEN 0
 					 WHEN b.ProductID = 31  THEN  CASE WHEN @FromDate < @ExchangeCutoffDate THEN  b.LicenseeWinloss  * ISNULL(ci_3rd.Rate3rd,0) - (b.CommissionA + b.CommissionP) ELSE -(b.CustomerWinLoss + b.CommissionP)  * ISNULL(ci_3rd.Rate3rd,0) END

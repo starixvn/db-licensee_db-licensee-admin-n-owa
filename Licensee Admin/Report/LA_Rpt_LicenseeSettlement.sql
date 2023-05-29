@@ -61,6 +61,8 @@ AS
 		- 20220218@Danny: Allbet - Promotion integration [#167510]
 		- 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
 		- 20230217@Danny: SG - Promotion prize integration [#183739]
+		- 20230510@Danny: New commercial terms for 12B [RedmineID: #186543]
+
 	Param's Explanation:
 */
 BEGIN
@@ -718,6 +720,8 @@ BEGIN
 	ELSE IF (@ProductCode = 'BX')
 	BEGIN
 		DECLARE @ExchangeProductId INT = (SELECT Productid FROM bodb_licensee.dbo.Product3rd WHERE ProductPrefix = 'BX')
+		DECLARE @ExchangeTerm_CutOffDate	SMALLDATETIME
+		SELECT @ExchangeTerm_CutOffDate = f.CutoffDate FROM bodb_licensee.dbo.LA_f_GetCutOffDate() f WHERE f.TypeName = 'ExchangeTerms'
 
 		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
 		(
@@ -726,9 +730,9 @@ BEGIN
 				, SUM(b.turnover)
 				, SUM(b.MemberWL + b.CommissionP) winloss
 				, 0
-				, SUM(-b.MemberWL * (1 - p.Rate) + b.CommissionA)
+				, SUM(CASE WHEN @FromDate < @ExchangeTerm_CutOffDate THEN -b.MemberWL * (1 - p.Rate) + b.CommissionA ELSE - (b.MemberWL + b.CommissionP) * (1 - p.Rate) END )
 				, 0
-				, SUM(-b.MemberWL * p.Rate - (b.CommissionA + b.CommissionP))
+				, SUM(CASE WHEN @FromDate < @ExchangeTerm_CutOffDate THEN -b.MemberWL * p.Rate - (b.CommissionA + b.CommissionP) ELSE - (b.MemberWL + b.CommissionP) * p.Rate END)
 				, SUM(b.BetCount)
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN @ChargeInfo p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate

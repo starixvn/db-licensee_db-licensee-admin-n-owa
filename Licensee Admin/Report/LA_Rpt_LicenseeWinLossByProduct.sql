@@ -81,6 +81,7 @@ AS
 		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 		- 20220314@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 		- 20230217@Danny: Remove hard-code bettype And ProductID [#183739]
+		- 20230510@Danny: New commercial terms for 12B [RedmineID: #186543]
 */
 		
 /*	Example:
@@ -102,7 +103,8 @@ BEGIN
 			@SQL					VARCHAR(MAX),	
 			@Delimiter				CHAR(1)=',',
 			@CommChargeType			INT = 6,
-	        @CashInShareChargeType	INT = 7
+	        @CashInShareChargeType	INT = 7,
+			@ExchangeTerm_CutOffDate SMALLDATETIME
 	
 	DECLARE @PartyChargeInfo TABLE (ChargeId INT,PartyId INT,LicenseeId	INT,ProductID INT,BettypeRef INT,Rate MONEY,FromDate SMALLDATETIME,ToDate SMALLDATETIME)
 	DECLARE @CBChargeRates TABLE (PartyId INT,LicenseeId INT,Rate MONEY,TypeId SMALLINT,FromDate DATETIME,ToDate DATETIME)
@@ -141,6 +143,8 @@ BEGIN
 	-- Handle Licensee status
 	SELECT @PartyIdString = PartyIDs FROM dbo.LA_f_PartyListByStatusSel(@PartyIdString, @LicenseeStatusIds)
 	-- End Handle Licensee status
+
+	SELECT @ExchangeTerm_CutOffDate = f.CutoffDate FROM bodb_licensee.dbo.LA_f_GetCutOffDate() f WHERE f.TypeName = 'ExchangeTerms'
 
 	IF ISNULL(@PlatformId, 0) <> 0
 	BEGIN
@@ -348,7 +352,8 @@ BEGIN
 	-- Calculate amount for other products 
 	INSERT INTO #Result(PartyId, ProductID, Amount)
 	SELECT ci.PartyId, d.ProductId, 
-			SUM(CASE WHEN d.ProductID = 31 THEN  (-MemberWL * ci.Rate - (AComm + PComm)) * e.Rate
+			SUM(CASE WHEN d.ProductID = 31 THEN   CASE WHEN  @FromDate < @ExchangeTerm_CutOffDate THEN (-MemberWL * ci.Rate - (AComm + PComm)) 
+													  ELSE -(MemberWL + PComm) * ci.Rate END  * e.Rate
 					ELSE -MemberWL * ISNULL(cm.Rate, ci.Rate) * e.Rate END)
 	FROM	#TempData d
 	INNER JOIN @PartyChargeInfo ci ON	d.LicenseeId = ci.LicenseeId

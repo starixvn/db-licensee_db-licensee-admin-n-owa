@@ -55,6 +55,7 @@ AS
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 	- 20230217@Danny: Remove hard-code bettype And ProductID [#183739]
+	- 20230510@Danny: New commercial terms for 12B [RedmineID: #186543]
 	
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -70,7 +71,9 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @GD_Tip			SMALLINT	= 1706,
-			@CurrencyTest	INT			= 20
+			@CurrencyTest	INT			= 20,
+			@ExchangeTerm_CutOffDate SMALLDATETIME
+
 	DECLARE @ProductOfferContribList TABLE (ProductID INT)
 	INSERT INTO @ProductOfferContribList(ProductID)
 	SELECT DISTINCT ProductID FROM bodb_licensee.dbo.LA_f_GroupBettype() WHERE TypeId = 2
@@ -78,6 +81,8 @@ BEGIN
 	-- Handle Licensee status
 	SELECT @PartyIds = PartyIDs FROM bodb_Licensee.dbo.LA_f_PartyListByStatusSel(@PartyIDs, @LicenseeStatusIds)
 	-- End Handle licensee status
+
+	SELECT @ExchangeTerm_CutOffDate = f.CutoffDate FROM bodb_licensee.dbo.LA_f_GetCutOffDate() f WHERE f.TypeName = 'ExchangeTerms'
 
 	IF ISNULL(@PlatformId, 0) <> 0
 	BEGIN
@@ -450,7 +455,11 @@ BEGIN
 			, SUM(b.turnover) Turnover
 			, SUM(b.Winloss + CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS Winloss
 			, SUM(-b.Winloss - CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS LicenseeWL
-			, SUM((-b.Winloss - CASE WHEN p.ProductID IS NOT NULL THEN AWinloss ELSE 0 END) * ISNULL(cc.Rate,ci.Rate) - CASE WHEN b.ProductID=31 THEN (b.AComm + b.PComm) ELSE 0 END) AS Company
+			, SUM(
+					CASE WHEN b.ProductID=31 THEN CASE WHEN b.rptDate < @ExchangeTerm_CutOffDate THEN -b.Winloss * ISNULL(cc.Rate,ci.Rate) - (b.AComm + b.PComm)
+												  ELSE  -(b.Winloss + PComm) * ISNULL(cc.Rate,ci.Rate) END
+					ELSE (-b.Winloss - CASE WHEN p.ProductID IS NOT NULL THEN AWinloss ELSE 0 END) * ISNULL(cc.Rate,ci.Rate) END
+				 ) Company
 			, SUM(b.betcount) AS betcount
 			, SUM(CASE WHEN b.ProductID = 0 THEN AWinloss ELSE 0 END) AS OddsSpreadCost
 		FROM #TmpData b WITH (NOLOCK)
