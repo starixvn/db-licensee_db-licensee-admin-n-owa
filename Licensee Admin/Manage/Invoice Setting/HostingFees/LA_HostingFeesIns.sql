@@ -21,6 +21,7 @@ AS
 	Revisions:
 		- 20160624@Bruce: Check duplicate charge rage name
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20230530@Danny: Insert new log with more information [#FeatureID 175125]
 	
 	Params:
 		+ @InvoiceSettingXML: '<HostingFees>
@@ -47,8 +48,9 @@ BEGIN
 		@startRun	DATETIME = GETDATE(),
 		@endRun		DATETIME,
 		@duration	INT,
-		@logData	NVARCHAR(4000)
-
+		@logData	NVARCHAR(MAX),
+		@logDataOld	NVARCHAR(MAX),
+		@actionID	INT = 2000
 	DECLARE @HostingFeeId INT
 
 	-- Region: Insert hosting fees
@@ -57,15 +59,6 @@ BEGIN
 		SELECT @ErrCode = 1, @ErrMsg = 'Charge Rate Name exists please try again!'
 		RETURN
 	END
-
-	SET @logData = CAST((SELECT
-			@BaseCurrencyId		AS '@bc',
-			@Description		AS '@ds',
-			@HostingFeesName	AS '@hn',
-			@HostingFeesTypeId	AS '@ht',
-			CAST(@XmlDetails AS VARCHAR(2000)) AS '@dt'
-		FOR XML PATH('z'), ROOT('r')
-	) AS NVARCHAR(4000))
 
 	INSERT INTO dbo.LA_HostingFees(HostingFeesName, HostingFeesTypeId, BaseCurrencyId, [Description])
 	VALUES (@HostingFeesName, @HostingFeesTypeId, @BaseCurrencyId, @Description)
@@ -107,23 +100,48 @@ BEGIN
 		RETURN
 	END CATCH
 	EXEC sp_xml_removedocument @idoc
-
 	-- EndRegion
+
+	SELECT @logData = 
+	(
+		SELECT	   
+				f.HostingFeesName 'gs.crn', 
+				CASE WHEN e.ExchangeId = 142 THEN 'USDT' ELSE e.Code END 'gs.e',
+				rs.rs 'rs'
+		
+		FROM dbo.LA_HostingFees f WITH(NOLOCK)
+			INNER JOIN CustDB.dbo.exchange e WITH(NOLOCK) ON e.ExchangeId = f.BaseCurrencyId
+			CROSS APPLY (
+				SELECT 
+				(
+					SELECT 	d.HostingFeesDetailId FakeID,
+							t.HostingFeesTypeName + ' - ' + CASE WHEN e1.ExchangeId = 142 THEN 'USDT' ELSE e1.Code END t, 
+							CASE WHEN f.HostingFeesTypeId = 2 THEN FORMAT(d.VCMFrom,'N','en-us') ELSE 'N/A'  END amf,
+							CASE WHEN f.HostingFeesTypeId = 2 THEN CASE WHEN d.VCMTo = 1000000000 THEN 'Unlimited' ELSE FORMAT(d.VCMTo,'N','en-us') END ELSE 'N/A' END amt,
+							FORMAT(d.Amount,'N','en-us') am
+					FROM dbo.LA_HostingFeesDetail d WITH(NOLOCK)
+					INNER JOIN dbo.LA_HostingFeesTypes t WITH(NOLOCK) ON f.HostingFeesTypeId = t.HostingFeesTypeId
+					INNER JOIN CustDB.dbo.exchange e1 WITH(NOLOCK) ON e1.ExchangeId = d.BaseCurrencyId
+					WHERE d.HostingFeesId = f.HostingFeesId FOR JSON PATH
+				) rs
+			) rs
+		WHERE f.HostingFeesId = @HostingFeeId  FOR JSON PATH,  WITHOUT_ARRAY_WRAPPER 
+	)
 
 	-- Region: Write Log
 	SET @endRun = GETDATE()
 	SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
 
-	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+	-- Write Log
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
 		@UserId			= @UserID
-		,@IP			= @LoginIP
-		,@LicenseeID	= 0
-		,@CurrencyID	= 0
+		,@IP			= @LoginIp
 		,@SPName		= 'LA_HostingFeesIns'
-		,@CustId		= 0
+		,@CustId		= @HostingFeeId
 		,@Duration		= @duration
-		,@Data			= @logData
-		,@OldData		= ''
+		,@TrackingValue2 = @logData
+		,@TrackingValue  = @logDataOld
+		,@ActionID		 = @actionID
 	-- EndRegion
 END
 GO
