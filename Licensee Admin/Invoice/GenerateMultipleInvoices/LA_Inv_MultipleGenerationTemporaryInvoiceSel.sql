@@ -30,6 +30,7 @@ AS
 		- 20221226@Danny: Integrate Player tips [#180703]
 		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
+		- 20230605@Danny: Invoice No should be listed in ascending order by number [RedmineID: #189284]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -275,7 +276,7 @@ BEGIN
 			,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsHideRebateWorkSheet
 		)
 		SELECT
-			ROW_NUMBER() OVER(ORDER BY ivs.IndexNumber) AS RowIndex
+			ROW_NUMBER() OVER(ORDER BY ISNULL(r.InvoiceNumber, ivs.InvoiceNumber)) AS RowIndex
 			,ivs.IndexNumber
 			,ps.PartyId
 			,ps.PartyName
@@ -326,5 +327,6 @@ BEGIN
 	SELECT RowIndex, IndexNumber, PartyId, PartyName, BrandName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath
 		,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsHideRebateWorkSheet
 	FROM @_Result
+	ORDER BY InvoiceNumber
 END
 GO
