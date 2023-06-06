@@ -16,6 +16,7 @@ AS
 	Revisions:
 		- 20210517@Percy: Initialize function [RedmineID: #150899]
 		- 20211213@Danny: Add new betfrom [RedmineID: #165971]
+		- 20230606@Danny: Add new betfrom #, A000 [RedmineID: #188861]
 */
 
 RETURN
@@ -37,7 +38,9 @@ RETURN
 			(70, 20, '8', 'Mobile Others', 'Mobile'),
 			(70, 20, '_', 'Mobile Others', 'Mobile'),
 			(70, 20, '.', 'Mobile Others', 'Mobile'),
+			(70, 20, '#', 'Mobile Others', 'Mobile'),
 			(70, 20, '$', 'Mobile Others', 'Mobile'),
+			(70, 20, '}', 'Mobile Others', 'Mobile'),
 			(80, 10, '1', 'E-Sports Desktop', 'Desktop'),
 			(80, 10, '4', 'E-Sports Desktop', 'Desktop'),
 			(90, 20, '2', 'E-Sports Mobile', 'Mobile'),
@@ -55,6 +58,7 @@ RETURN
 			(170, 40, 'g', 'Others', 'Others'),
 			(170, 40, 'e', 'Others', 'Others'),
 			(170, 40, 'u', 'Others', 'Others'),
-			(180, 50, '^', 'Odds Direct API', 'Odds Direct API')
+			(180, 50, '^', 'Odds Direct API', 'Odds Direct API'),
+			(180, 50, 'A000', 'Odds Direct API', 'Odds Direct API')
 	) d (OrderDetail, OrderSummary, betfrom, DetailPlatform, SummaryPlatform)
 GO
