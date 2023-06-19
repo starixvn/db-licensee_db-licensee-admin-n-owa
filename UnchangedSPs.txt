@@ -1,1 +1,3 @@
-Licensee Admin\Manage\Invoice Setting\PayerSetting\LA_PayerSettingModify.sql
+Licensee Admin\Report\LA_GetPlatform.sql
+Licensee Admin\Report\LA_Rpt_PlatformWinloss.sql
+Licensee Admin\Report\LA_Rpt_PlatformWinlossSummary.sql
