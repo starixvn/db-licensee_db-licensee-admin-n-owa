@@ -22,6 +22,7 @@ AS
 	Revisions:
 		- 20160628@Bruce: Fix duplicate charge rate name
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20230530@Danny: Insert new log with more information [#FeatureID 175125]
 
 	Params:
 		+ @InvoiceSettingXML: '<HostingFees>
@@ -30,6 +31,7 @@ AS
 									<VCMFrom>1</VCMFrom>
 									<VCMTo>1</VCMTo>
 									<Amount>1</Amount>
+									<HostingFeesDetailId>616</HostingFeesDetailId>
 								  </HostingFee>
 
 								  <HostingFee>
@@ -37,6 +39,7 @@ AS
 									<VCMFrom>1</VCMFrom>
 									<VCMTo>1</VCMTo>
 									<Amount>1</Amount>
+									<HostingFeesDetailId>616</HostingFeesDetailId>
 								  </HostingFee>
 								</HostingFees>'
 */
@@ -48,8 +51,9 @@ BEGIN
 		@startRun	DATETIME = GETDATE(),
 		@endRun		DATETIME,
 		@duration	INT,
-		@logData	NVARCHAR(4000),
-		@logDataOld	NVARCHAR(4000)
+		@logData	NVARCHAR(MAX),
+		@logDataOld	NVARCHAR(MAX),
+		@ActionID	INT = 2001
 
 	IF EXISTS (SELECT 1 FROM dbo.LA_HostingFees WITH(NOLOCK) WHERE HostingFeesName = @HostingFeesName AND HostingFeesId != @HostingFeesId)
 	BEGIN
@@ -57,30 +61,31 @@ BEGIN
 		RETURN
 	END
 
-	SET @logDataOld = CAST((SELECT
-			c.BaseCurrencyId	AS '@bc',
-			c.[Description]		AS '@ds',
-			c.HostingFeesId		AS '@hi',
-			c.HostingFeesName	AS '@hn',
-			c.HostingFeesTypeId	AS '@ht',
-			(
-				SELECT dt.* FROM dbo.LA_HostingFeesDetail dt WITH(NOLOCK)
-				WHERE dt.HostingFeesId = @HostingFeesId
-				FOR XML PATH('item')
-			) AS '@dt'
-		FROM dbo.LA_HostingFees c WITH(NOLOCK) WHERE c.HostingFeesId = @HostingFeesId
-		FOR XML PATH('z'), ROOT('r')
-	) AS NVARCHAR(4000))
-
-	SET @logData = CAST((SELECT
-			@BaseCurrencyId		AS '@bc',
-			@Description		AS '@ds',
-			@HostingFeesName	AS '@hn',
-			@HostingFeesTypeId	AS '@ht',
-			@HostingFeesId		AS '@hi',
-			CAST(@XmlDetails AS VARCHAR(2000)) AS '@dt'
-		FOR XML PATH('z'), ROOT('r')
-	) AS NVARCHAR(4000))
+	SELECT @logDataOld = 
+	(
+		SELECT	   
+				f.HostingFeesName 'gs.crn', 
+				CASE WHEN e.ExchangeId = 142 THEN 'USDT' ELSE e.Code END 'gs.e',
+				rs.rs 'rs'
+		
+		FROM dbo.LA_HostingFees f WITH(NOLOCK)
+			INNER JOIN CustDB.dbo.exchange e WITH(NOLOCK) ON e.ExchangeId = f.BaseCurrencyId
+			CROSS APPLY (
+				SELECT 
+				(
+					SELECT 	d.HostingFeesDetailId FakeID,
+							t.HostingFeesTypeName + ' - ' + CASE WHEN e1.ExchangeId = 142 THEN 'USDT' ELSE e1.Code END t, 
+							CASE WHEN f.HostingFeesTypeId = 2 THEN FORMAT(d.VCMFrom,'N','en-us') ELSE 'N/A'  END amf,
+							CASE WHEN f.HostingFeesTypeId = 2 THEN CASE WHEN d.VCMTo = 1000000000 THEN 'Unlimited' ELSE FORMAT(d.VCMTo,'N','en-us') END ELSE 'N/A' END amt,
+							FORMAT(d.Amount,'N','en-us') am
+					FROM dbo.LA_HostingFeesDetail d WITH(NOLOCK)
+					INNER JOIN dbo.LA_HostingFeesTypes t WITH(NOLOCK) ON f.HostingFeesTypeId = t.HostingFeesTypeId
+					INNER JOIN CustDB.dbo.exchange e1 WITH(NOLOCK) ON e1.ExchangeId = d.BaseCurrencyId
+					WHERE d.HostingFeesId = f.HostingFeesId FOR JSON PATH
+				) rs
+			) rs
+		WHERE f.HostingFeesId = @HostingFeesId  FOR JSON PATH,  WITHOUT_ARRAY_WRAPPER 
+	)
 
 	-- Region: Backup
 	DECLARE @BackupHostingFees TABLE(
@@ -96,6 +101,43 @@ BEGIN
 	FROM dbo.LA_HostingFees f WITH(NOLOCK)
 	WHERE f.HostingFeesId = @HostingFeesId
 
+	DECLARE @BackupFeesDetails AS TABLE (
+		HostingFeesId	INT,
+		BaseCurrencyId	INT	,
+		VCMFrom			INT	,
+		VCMTo			INT	,
+		Amount			MONEY,
+		HostingFeesDetailId INT
+		)
+
+	INSERT INTO @BackupFeesDetails (HostingFeesId, BaseCurrencyId, VCMFrom, VCMTo, Amount, HostingFeesDetailId)
+	SELECT d.HostingFeesId, d.BaseCurrencyId, d.VCMFrom, d.VCMTo, d.Amount, d.HostingFeesDetailId
+	FROM dbo.LA_HostingFeesDetail d WITH(NOLOCK)
+	WHERE d.HostingFeesId = @HostingFeesId
+	-- EndRegion
+
+	DECLARE @FeesDetails AS TABLE (
+		BaseCurrencyId	INT,
+		VCMFrom			INT,
+		VCMTo			INT,
+		Amount			MONEY,
+		HostingFeesDetailId INT
+		)
+		
+	DECLARE @idoc AS INT
+	EXEC sp_xml_preparedocument @idoc OUTPUT, @XmlDetails
+
+	INSERT INTO @FeesDetails(BaseCurrencyId, VCMFrom, VCMTo, Amount, HostingFeesDetailId)
+	SELECT BaseCurrencyId, VCMFrom, VCMTo, Amount, HostingFeesDetailId
+	FROM OPENXML(@idoc, 'HostingFees/HostingFee')
+	WITH (
+		BaseCurrencyId	INT		'BaseCurrencyId',
+		VCMFrom			INT		'VCMFrom',
+		VCMTo			INT		'VCMTo',
+		Amount			MONEY	'Amount',
+		HostingFeesDetailId INT 'HostingFeesDetailId'
+	)
+
 	-- Region: update hosting fees
 	UPDATE dbo.LA_HostingFees
 	SET HostingFeesName = @HostingFeesName,
@@ -105,60 +147,27 @@ BEGIN
 	WHERE HostingFeesId = @HostingFeesId
 	-- EndRegion
 
-	DECLARE @BackupFeesDetails AS TABLE (
-		HostingFeesId	INT,
-		BaseCurrencyId	INT	,
-		VCMFrom			INT	,
-		VCMTo			INT	,
-		Amount			MONEY)
+	IF @@ERROR <> 0
+	BEGIN
+		SELECT @ErrMsg = 'Update failed. Please try again.', @ErrCode = 4
+		RETURN
+	END
 
-	INSERT INTO @BackupFeesDetails (HostingFeesId, BaseCurrencyId, VCMFrom, VCMTo, Amount)
-	SELECT d.HostingFeesId, d.BaseCurrencyId, d.VCMFrom, d.VCMTo, d.Amount
-	FROM dbo.LA_HostingFeesDetail d WITH(NOLOCK)
-	WHERE d.HostingFeesId = @HostingFeesId
-	-- EndRegion
+	;MERGE dbo.LA_HostingFeesDetail WITH (ROWLOCK, UPDLOCK) AS t
+	USING @FeesDetails s ON t.HostingFeesDetailId = s.HostingFeesDetailId AND t.HostingFeesId = @HostingFeesId
+	WHEN MATCHED THEN
+		UPDATE SET t.HostingFeesId = @HostingFeesId
+			, t.BaseCurrencyId = s.BaseCurrencyId
+			, t.VCMFrom = s.VCMFrom
+			, t.VCMTo = s.VCMTo
+			, t.Amount = s.Amount
+	WHEN NOT MATCHED BY TARGET THEN
+		INSERT(HostingFeesId, BaseCurrencyId, VCMFrom, VCMTo, Amount)
+		VALUES(@HostingFeesId, BaseCurrencyId, VCMFrom, VCMTo,Amount)
+	WHEN NOT MATCHED BY SOURCE AND t.HostingFeesId = @HostingFeesId THEN DELETE;
 
-	DECLARE @FeesDetails AS TABLE (
-		BaseCurrencyId	INT,
-		VCMFrom			INT,
-		VCMTo			INT,
-		Amount			MONEY)
-		
-	DECLARE @idoc AS INT
-	EXEC sp_xml_preparedocument @idoc OUTPUT, @XmlDetails
-	BEGIN TRY
-		INSERT INTO @FeesDetails(BaseCurrencyId, VCMFrom, VCMTo, Amount)
-		SELECT BaseCurrencyId, VCMFrom, VCMTo, Amount
-		FROM OPENXML(@idoc, 'HostingFees/HostingFee')
-		WITH (
-			BaseCurrencyId	INT		'BaseCurrencyId',
-			VCMFrom			INT		'VCMFrom',
-			VCMTo			INT		'VCMTo',
-			Amount			MONEY	'Amount'
-		)
-
-		DELETE FROM dbo.LA_HostingFeesDetail WHERE HostingFeesId = @HostingFeesId
-
-		INSERT INTO dbo.LA_HostingFeesDetail(HostingFeesId, BaseCurrencyId, VCMFrom, VCMTo, Amount)
-		SELECT @HostingFeesId, f.BaseCurrencyId, f.VCMFrom, f.VCMTo, f.Amount
-		FROM @FeesDetails f
-
-		-- write log
-		SET @endRun = GETDATE()
-		SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun)
-
-		EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
-			@UserId			= @UserID
-			,@IP			= @LoginIP
-			,@LicenseeID	= 0
-			,@CurrencyID	= 0
-			,@SPName		= 'LA_HostingFeesUpd'
-			,@CustId		= 0
-			,@Duration		= @duration
-			,@Data			= @logData
-			,@OldData		= @logDataOld
-	END TRY
-	BEGIN CATCH 
+	IF @@ERROR <> 0
+	BEGIN
 		-- Rollback
 		UPDATE f
 		SET f.HostingFeesName	= b.HostingFeesName,
@@ -167,16 +176,52 @@ BEGIN
 			f.[Description]		= b.[Description]
 		FROM dbo.LA_HostingFees f
 			INNER JOIN @BackupHostingFees b ON f.HostingFeesId = b.HostingFeesId
-
-		DELETE FROM dbo.LA_HostingFeesDetail WHERE HostingFeesId = @HostingFeesId
-
-		INSERT INTO dbo.LA_HostingFeesDetail(HostingFeesId, BaseCurrencyId, VCMFrom, VCMTo, Amount)
-		SELECT @HostingFeesId, f.BaseCurrencyId, f.VCMFrom, f.VCMTo, f.Amount
-		FROM @BackupFeesDetails f
-
+		
 		SELECT @ErrMsg = 'Update failed. Please try again.', @ErrCode = 4
 		RETURN
-	END CATCH
+	
+	END
+
+	-- write log
+	SET @endRun = GETDATE()
+	SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun)
+
+	SELECT @logData = 
+	(
+		SELECT	   
+				f.HostingFeesName 'gs.crn', 
+				CASE WHEN e.ExchangeId = 142 THEN 'USDT' ELSE e.Code END 'gs.e',
+				rs.rs 'rs'
+		
+		FROM dbo.LA_HostingFees f WITH(NOLOCK)
+			INNER JOIN CustDB.dbo.exchange e WITH(NOLOCK) ON e.ExchangeId = f.BaseCurrencyId
+			CROSS APPLY (
+				SELECT 
+				(
+					SELECT 	d.HostingFeesDetailId FakeID,
+							t.HostingFeesTypeName + ' - ' + CASE WHEN e1.ExchangeId = 142 THEN 'USDT' ELSE e1.Code END t, 
+							CASE WHEN f.HostingFeesTypeId = 2 THEN FORMAT(d.VCMFrom,'N','en-us') ELSE 'N/A'  END amf,
+							CASE WHEN f.HostingFeesTypeId = 2 THEN CASE WHEN d.VCMTo = 1000000000 THEN 'Unlimited' ELSE FORMAT(d.VCMTo,'N','en-us') END ELSE 'N/A' END amt,
+							FORMAT(d.Amount,'N','en-us') am
+					FROM dbo.LA_HostingFeesDetail d WITH(NOLOCK)
+					INNER JOIN dbo.LA_HostingFeesTypes t WITH(NOLOCK) ON f.HostingFeesTypeId = t.HostingFeesTypeId
+					INNER JOIN CustDB.dbo.exchange e1 WITH(NOLOCK) ON e1.ExchangeId = d.BaseCurrencyId
+					WHERE d.HostingFeesId = f.HostingFeesId FOR JSON PATH
+				) rs
+			) rs
+		WHERE f.HostingFeesId = @HostingFeesId  FOR JSON PATH,  WITHOUT_ARRAY_WRAPPER 
+	)
+
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+		@UserId			= @UserID
+		,@IP			= @LoginIp
+		,@SPName		= 'LA_HostingFeesUpd'
+		,@CustId		= @HostingFeesId
+		,@Duration		= @duration
+		,@TrackingValue2 = @logData
+		,@TrackingValue  = @logDataOld
+		,@ActionID		 = @actionID
+
 	EXEC sp_xml_removedocument @idoc
 
 END

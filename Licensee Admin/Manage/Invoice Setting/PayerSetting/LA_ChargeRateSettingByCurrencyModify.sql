@@ -17,38 +17,53 @@ AS
 		- 20191202@Parsons: Setup billing terms by Currency  [#120005]
 		- 20220831@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
 		- 20221205@Danny Remove Hx9candy From Crypto Licensee List [RedmineID: #181279]
-
+		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
 	 Params:
 		+ @DetailChargeRateSettingXml: '<ChargeSettings>
 								  <ChargeSetting>
 									<ChargeId>1994</ChargeId>
 									<CurrencyId>1</CurrencyId>
+									<ChargeTypeName>Licensing Fee</ChargeTypeName>
 									<Rate>0.2</Rate>
 								  </ChargeSetting>
 								  <ChargeSetting>
 									<ChargeId>1994</ChargeId>
 									<CurrencyId>1</CurrencyId>
+									<ChargeTypeName>Licensing Fee</ChargeTypeName>
 									<Rate>0.3</Rate>
 								  </ChargeSetting>
 								</ChargeSettings>'
 */
 BEGIN
 	SET NOCOUNT ON
-
-	DECLARE @ChargeSettings AS TABLE (ChargeID INT, CurrencyId INT, Rate MONEY)
-
+	DECLARE @logChargeRateOld NVARCHAR(MAX), @logChargeRate NVARCHAR(MAX), @logChargeRateActionID INT
+	DECLARE @ChargeSettings AS TABLE (ChargeID INT, CurrencyId INT, Rate MONEY, ChargeTypeName NVARCHAR(100))
 	DECLARE @ChargRateUpd AS TABLE (ChargeID INT, CurrencyId INT, Rate MONEY)
+	DECLARE @StartRun		DATETIME = CURRENT_TIMESTAMP, 
+			@EndRun			DATETIME, 
+			@Duration		INT
+	DECLARE @SiteName VARCHAR(20) = '', @ProductId INT, @Product3rdId INT, @ProductName VARCHAR(50), @InputPT VARCHAR(MAX) = '', @PartyID INT, @LicenseeID INT
+	SELECT @SiteName = l.LicenseeName , @PartyID = p.PartyID, @LicenseeID = l.LicenseeID
+	FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK) 
+		INNER JOIN dbo.OAS_Party p  WITH(NOLOCK) ON p.PartyID = ci.FromParty
+		INNER JOIN dbo.Licensees l WITH(NOLOCK) ON l.LicenseeID = p.OldRefID
+	WHERE ci.ChargeID = @ChargeID AND l.IsDeposit = 1
+
+	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT)
+	INSERT INTO @tmpPartyOfferCrypto(PartyId)
+	SELECT  PartyID FROM LA_f_CryptoPartyListSel()
 
 	DECLARE @idoc AS INT
 	EXEC sp_xml_preparedocument @idoc OUTPUT, @DetailChargeRateSettingXml
 	BEGIN TRY
-		INSERT INTO @ChargeSettings(ChargeId, CurrencyId, Rate)
-		SELECT ChargeID, CurrencyId, Rate
+		INSERT INTO @ChargeSettings(ChargeId, CurrencyId, ChargeTypeName, Rate)
+		SELECT ChargeID, CurrencyId, ChargeTypeName, Rate
 		FROM OPENXML(@idoc, 'ChargeSettings/ChargeSetting')
 		WITH 
 		(
 			 ChargeId		INT   'ChargeId'
 			,CurrencyId	    INT   'CurrencyId'
+			,ChargeTypeName NVARCHAR(100) 'ChargeTypeName'
 			,Rate			MONEY 'Rate'
 		)
 	END TRY
@@ -58,11 +73,13 @@ BEGIN
 	END CATCH
 	EXEC sp_xml_removedocument @idoc
 
-	DECLARE @UserName VARCHAR(50) = '', @CurrentDate DATE = CONVERT(DATE, GETDATE()), @OldMasterRate MONEY, @ToDate DATETIME
+	DECLARE @UserName VARCHAR(50) = '', @CurrentDate DATE = CONVERT(DATE, GETDATE()), @OldMasterRate MONEY, @ToDate DATETIME, @ChargeTypeName NVARCHAR(100)
 
 	SELECT @OldMasterRate = Rate FROM OAS_ChargeInfo WITH(NOLOCK) WHERE ChargeID = @ChargeID
 
 	SELECT @UserName = Username FROM dbo.LA_User WITH(NOLOCK) WHERE UserID = @UserID
+
+	SELECT TOP 1 @ChargeTypeName = ChargeTypeName FROM @ChargeSettings  -- ChargeID have only 1 ChargeTypeName
 	-- Get Charge Rate to update 
 	INSERT INTO @ChargRateUpd (ChargeID, CurrencyId, Rate)
 	SELECT ChargeID, 0, CASE WHEN @MasterRate = Rate THEN -1 ELSE @MasterRate END -- Rate = -1 => not update
@@ -88,6 +105,71 @@ BEGIN
 	END
 	 
 	BEGIN TRY
+	-- Old data
+
+		;WITH t AS
+		(
+			SELECT		op.PartyName,
+						od.BrandName,
+						CASE WHEN oc.ProductID = 0 THEN 'Sportsbook' ELSE p3.ProductName END Product,
+						FORMAT (oc.FromDate,'MMM dd, yyyy') FromDate,
+					    FORMAT (oc.ToDate,'MMM dd, yyyy') ToDate,
+					    FORMAT (oc.FirstOfBilling,'MMM dd, yyyy') FirstOfBilling,
+						oc.BasisOfBilling,
+						CASE WHEN oc.ProductID = 3 THEN '0.25 %' ELSE (CAST (ISNULL(lcr.Rate, oc.Rate) * 100  AS VARCHAR(50) ) + ' %') END Rate,
+						STRING_AGG(x.Code,', ') Currs,
+						CASE WHEN lcr.Rate IS NOT NULL THEN 0 ELSE 1 END isMasterRate,
+						oc.ChargeID AS FakeID
+			FROM OAS_Party op WITH(NOLOCK)
+			INNER JOIN OAS_PartyDetail od WITH(NOLOCK) ON op.PartyID = od.PartyID
+			INNER JOIN Licensees l WITH(NOLOCK) ON op.OldRefID = l.LicenseeID
+			INNER JOIN OAS_ChargeInfo oc WITH(NOLOCK) ON op.PartyID = oc.FromParty AND oc.ChargeID = @ChargeID
+			CROSS APPLY (
+				SELECT DISTINCT lc.Currency, CASE WHEN e.ExchangeId IN (96,202) THEN e.Code + ' (' + e.currency + ')' ELSE e.Code END Code
+				FROM LicenseeCust lc  WITH(NOLOCK) 
+				INNER JOIN  CustDB.dbo.exchange e with(nolock) on lc.Currency = e.ExchangeId
+				WHERE lc.LicenseeID = l.LicenseeID and lc.roleID = 2 and e.ExchangeId <> 20
+			) x
+			LEFT JOIN  LA_ChargeRateByCurrency lcr WITH(NOLOCK) ON oc.ChargeID = lcr.ChargeID AND x.Currency = lcr.CurrencyID
+			LEFT JOIN  Product3rd p3 WITH(NOLOCK) ON oc.ProductID = p3.Productid
+			WHERE op.PartyID = @PartyID 
+			GROUP BY op.PartyName,
+						od.BrandName,
+						CASE WHEN oc.ProductID = 0 THEN 'Sportsbook' ELSE p3.ProductName END,
+						FORMAT (oc.FromDate,'MMM dd, yyyy'),
+					    FORMAT (oc.ToDate,'MMM dd, yyyy'),
+					    FORMAT (oc.FirstOfBilling,'MMM dd, yyyy'),
+						oc.BasisOfBilling,
+						CASE WHEN oc.ProductID = 3 THEN '0.25 %' ELSE (CAST (ISNULL(lcr.Rate, oc.Rate) * 100  AS VARCHAR(50) ) + ' %') END,
+						CASE WHEN lcr.Rate IS NOT NULL THEN 0 ELSE 1 END,
+						oc.ChargeID
+		) 
+		, t1 AS
+		(
+			SELECT t.FakeID,t.PartyName,t.BrandName,t.Product,t.FromDate,t.ToDate,t.FirstOfBilling,t.BasisOfBilling,STRING_AGG(cr.r, CHAR(13)) AS r
+			FROM t
+			CROSS APPLY (
+					SELECT CASE WHEN t.isMasterRate = 1 AND EXISTS (SELECT TOP 1 1 FROM t t2 WHERE t2.isMasterRate = 0 AND t2.Product = t.Product and t2.PartyName = t.PartyName) THEN 'Others ' 
+								WHEN t.isMasterRate = 1 AND NOT EXISTS (SELECT TOP 1 1 FROM t t2 WHERE t2.isMasterRate = 0 AND t2.Product = t.Product and t2.PartyName = t.PartyName) THEN 'All ' 
+								ELSE '' END + '('+ t.Currs + ') - ' + Rate AS r
+			) cr
+			GROUP BY t.FakeID,t.PartyName,t.BrandName,t.Product,t.FromDate,t.ToDate,t.FirstOfBilling,t.BasisOfBilling
+		) SELECT @logChargeRateOld = 
+				(
+				SELECT t.PartyName as 'pi.pn', t.BrandName AS 'pi.bn', crs.crs AS 'crs'
+				FROM t1 t 
+				CROSS APPLY 
+				(
+					SELECT 
+					(
+						SELECT  u.FakeID, u.Product p ,  u.FromDate fd, u.ToDate td , u.FirstOfBilling fb, u.BasisOfBilling bb , u.r, @ChargeTypeName AS t
+						FROM t1 u  WHERE u.PartyName = t.PartyName AND u.BrandName = t.BrandName FOR JSON PATH
+					) crs
+				) crs  
+				GROUP BY t.PartyName, t.BrandName, crs.crs
+				FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+		)
+
 		-- Update master rate
 		UPDATE OAS_ChargeInfo WITH(ROWLOCK)
 		SET Rate = @MasterRate
@@ -104,6 +186,83 @@ BEGIN
 			THEN UPDATE SET Rate = s.Rate
 		WHEN NOT MATCHED BY SOURCE AND t.ChargeId = @ChargeId
 			THEN DELETE;
+
+		;WITH t AS
+		(
+			SELECT		op.PartyName,
+						od.BrandName,
+						CASE WHEN oc.ProductID = 0 THEN 'Sportsbook' ELSE p3.ProductName END Product,
+						FORMAT (oc.FromDate,'MMM dd, yyyy') FromDate,
+					    FORMAT (oc.ToDate,'MMM dd, yyyy') ToDate,
+					    FORMAT (oc.FirstOfBilling,'MMM dd, yyyy') FirstOfBilling,
+						oc.BasisOfBilling,
+						CASE WHEN oc.ProductID = 3 THEN '0.25 %' ELSE (CAST (ISNULL(lcr.Rate, oc.Rate) * 100  AS VARCHAR(50) ) + ' %') END Rate,
+						STRING_AGG(x.Code,', ') Currs,
+						CASE WHEN lcr.Rate IS NOT NULL THEN 0 ELSE 1 END isMasterRate,
+						oc.ChargeID AS FakeID
+			FROM OAS_Party op WITH(NOLOCK)
+			INNER JOIN OAS_PartyDetail od WITH(NOLOCK) ON op.PartyID = od.PartyID
+			INNER JOIN Licensees l WITH(NOLOCK) ON op.OldRefID = l.LicenseeID
+			INNER JOIN OAS_ChargeInfo oc WITH(NOLOCK) ON op.PartyID = oc.FromParty AND oc.ChargeID = @ChargeID
+			CROSS APPLY (
+				SELECT DISTINCT lc.Currency, CASE WHEN e.ExchangeId IN (96,202) THEN e.Code + ' (' + e.currency + ')' ELSE e.Code END Code
+				FROM LicenseeCust lc  WITH(NOLOCK) 
+				INNER JOIN  CustDB.dbo.exchange e with(nolock) on lc.Currency = e.ExchangeId
+				WHERE lc.LicenseeID = l.LicenseeID and lc.roleID = 2 and e.ExchangeId <> 20
+			) x
+			LEFT JOIN  LA_ChargeRateByCurrency lcr WITH(NOLOCK) ON oc.ChargeID = lcr.ChargeID AND x.Currency = lcr.CurrencyID
+			LEFT JOIN  Product3rd p3 WITH(NOLOCK) ON oc.ProductID = p3.Productid
+			WHERE op.PartyID = @PartyID 
+			GROUP BY op.PartyName,
+						od.BrandName,
+						CASE WHEN oc.ProductID = 0 THEN 'Sportsbook' ELSE p3.ProductName END,
+						FORMAT (oc.FromDate,'MMM dd, yyyy'),
+					    FORMAT (oc.ToDate,'MMM dd, yyyy'),
+					    FORMAT (oc.FirstOfBilling,'MMM dd, yyyy'),
+						oc.BasisOfBilling,
+						CASE WHEN oc.ProductID = 3 THEN '0.25 %' ELSE (CAST (ISNULL(lcr.Rate, oc.Rate) * 100  AS VARCHAR(50) ) + ' %') END,
+						CASE WHEN lcr.Rate IS NOT NULL THEN 0 ELSE 1 END,
+						oc.ChargeID
+		) 
+		, t1 AS
+		(
+			SELECT t.FakeID,t.PartyName,t.BrandName,t.Product,t.FromDate,t.ToDate,t.FirstOfBilling,t.BasisOfBilling,STRING_AGG(cr.r, CHAR(13)) AS r
+			FROM t
+			CROSS APPLY (
+					SELECT CASE WHEN t.isMasterRate = 1 AND EXISTS (SELECT TOP 1 1 FROM t t2 WHERE t2.isMasterRate = 0 AND t2.Product = t.Product and t2.PartyName = t.PartyName) THEN 'Others ' 
+								WHEN t.isMasterRate = 1 AND NOT EXISTS (SELECT TOP 1 1 FROM t t2 WHERE t2.isMasterRate = 0 AND t2.Product = t.Product and t2.PartyName = t.PartyName) THEN 'All ' 
+								ELSE '' END + '('+ t.Currs + ') - ' + Rate AS r
+			) cr
+			GROUP BY t.FakeID, t.PartyName,t.BrandName,t.Product,t.FromDate,t.ToDate,t.FirstOfBilling,t.BasisOfBilling
+		) SELECT @logChargeRate = 
+				(
+				SELECT t.PartyName as 'pi.pn', t.BrandName AS 'pi.bn', crs.crs AS 'crs'
+				FROM t1 t 
+				CROSS APPLY 
+				(
+					SELECT 
+					(
+						SELECT  u.FakeID ,u.Product p ,  u.FromDate fd, u.ToDate td , u.FirstOfBilling fb, u.BasisOfBilling bb , u.r, @ChargeTypeName AS t
+						FROM t1 u  WHERE u.PartyName = t.PartyName AND u.BrandName = t.BrandName FOR JSON PATH
+					) crs
+				) crs  
+				GROUP BY t.PartyName, t.BrandName, crs.crs
+				FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+		)
+
+		SET @EndRun = GETDATE()
+		SET @Duration = DATEDIFF(MILLISECOND, @StartRun, @EndRun)
+
+		--  Write Log ChargeRate Setting
+		EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+			@UserId			= @UserID
+			,@IP			= @LoginIP
+			,@SPName		= 'LA_ChargeRateSettingByCurrencyModify'
+			,@CustId		= @PartyID
+			,@Duration		= @duration
+			,@TrackingValue2 = @logChargeRate
+			,@TrackingValue = @logChargeRateOld
+			,@ActionID		 = 1201
 	END TRY
 	BEGIN CATCH 
 		SELECT @ErrCode = ERROR_NUMBER(), @ErrMsg = ERROR_MESSAGE()
@@ -116,12 +275,6 @@ BEGIN
 	END CATCH
 
 	-- Update PT on NAP
-	DECLARE @SiteName VARCHAR(20) = '', @ProductId INT, @Product3rdId INT, @ProductName VARCHAR(50), @InputPT VARCHAR(MAX) = '', @PartyID INT
-	
-	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT)
-	INSERT INTO @tmpPartyOfferCrypto(PartyId)
-	SELECT  PartyID FROM LA_f_CryptoPartyListSel()
-
 	SELECT 
 		@ProductId = CASE WHEN ci.ProductID = 0  THEN 1 ELSE p.ProductID END
 		,@ProductName = CASE WHEN ci.ProductId = 0 THEN 'Sportsbook' ELSE pr.ProductName END
@@ -131,12 +284,6 @@ BEGIN
 		LEFT JOIN dbo.Product3rd pr WITH(NOLOCK) ON pr.Productid = ci.ProductID
 		LEFT JOIN DBPRO.bodb02.dbo.Products p WITH (NOLOCK) ON p.ProductPrefix = pr.ProductPrefix
 	WHERE ci.ChargeID = @ChargeID
-
-	SELECT @SiteName = l.LicenseeName , @PartyID = p.PartyID
-	FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK) 
-		INNER JOIN dbo.OAS_Party p  WITH(NOLOCK) ON p.PartyID = ci.FromParty
-		INNER JOIN dbo.Licensees l WITH(NOLOCK) ON l.LicenseeID = p.OldRefID
-	WHERE ci.ChargeID = @ChargeID AND l.IsDeposit = 1
 
 	/*Delete prevent updating unexpected NAP PT value*/
 	DELETE c
@@ -193,6 +340,6 @@ BEGIN
 			RETURN
 		END
 	END
- 
+
 END
 GO

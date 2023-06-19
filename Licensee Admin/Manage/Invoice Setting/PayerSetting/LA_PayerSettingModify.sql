@@ -61,8 +61,10 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @ProductListAll VARCHAR(100) = '', @MinDate DATE, @MaxDate DATE, @SiteName VARCHAR(20) ='', @InputPT VARCHAR(MAX) = '', @ChargeRateXML XML, @ChargeSettingXMLOUT XML
-		,@Username VARCHAR(50), @CurrentDate DATE
-	
+		,@Username VARCHAR(50), @CurrentDate DATE, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX), @LogActionID	INT	= 1001, @startRun DATETIME, @endRun DATETIME,@duration INT
+		,@IsWriteLogPayer BIT
+	-- Time start
+	SET @startRun = GETDATE()
 	SELECT @Username = Username FROM LA_User WITH(NOLOCK) WHERE UserID = @UserID 
 
 	DECLARE @MinFeeInsertedList VARCHAR(100), @WaiveInsertedList VARCHAR(100)
@@ -72,6 +74,53 @@ BEGIN
 	SELECT  @Old_LaunchDate = LaunchDate, @Old_SuspendedDate = SuspendedDate, @Old_TerminatedDate = TerminatedDate
 	FROM dbo.OAS_PartyDetail WITH (NOLOCK)
 	WHERE PartyId = @PayerId
+
+	IF (ISNULL(@Old_LaunchDate,'') <> ISNULL(@LaunchDate,'') OR ISNULL(@Old_SuspendedDate,'') <> ISNULL(@SuspendedDate,'') OR ISNULL(@Old_TerminatedDate,'') <> ISNULL(@TerminatedDate,''))
+		SELECT @IsWriteLogPayer = 1
+	
+	IF @IsWriteLogPayer = 1
+	BEGIN
+		--write log old
+		SELECT @logSPDataOld = (
+			SELECT	 Op2.PartyName							AS 'pi.pn'
+					,CASE WHEN x.ToParty = 1 THEN 'ONEWorks'
+							WHEN x.ToParty = 9 THEN 'Cozni'
+							WHEN x.ToParty = 11 THEN 'Boping'	
+							WHEN x.ToParty = 98 THEN 'Zelianta'	
+						END									AS 'pi.bg' 
+					,od.BrandName							AS 'pi.bn'
+					,od.Description							AS 'pi.dc'
+					,od.InvoiceLanguage						AS 'pi.iv'
+					,FORMAT (od.LaunchDate,'MMM dd, yyyy') 	AS 'pi.ld'
+					,FORMAT (od.SuspendedDate,'MMM dd, yyyy')	AS 'pi.sd'
+					,FORMAT (od.TerminatedDate,'MMM dd, yyyy') AS 'pi.tmd'
+
+					,od.CompanyName		AS 'a1.cn1'
+					,od.AttnName		AS 'a1.an1'
+					,od.Address1		AS 'a1.ad1'
+					,od.CompanyName2	AS 'a2.cn2'
+					,od.AttnName2		AS 'a2.an2'
+					,od.Address2		AS 'a2.ad2'
+					,ci.baseCurrInfo    AS 'bcs'
+			FROM OAS_PartyDetail od WITH(NOLOCK)
+			INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
+			OUTER APPLY (SELECT TOP 1 ToParty FROM OAS_ChargeInfo oc WITH(NOLOCK) WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
+			OUTER APPLY (
+							SELECT
+							(
+							SELECT CASE WHEN op.BaseCurrencyId = 142 THEN 'USDT' ELSE e.Code END  'c', 
+									op.LicenseeCode 'lc', 
+									op.FromDate 'fd', 
+									op.ToDate  'td',
+									CONVERT(VARCHAR(10),op.PartyID) +CONVERT(VARCHAR(10), op.BaseCurrencyId) + Convert(CHAR(8),op.FromDate,112) AS FakeID
+							FROM OAS_PartyBaseCurrency op WITH(NOLOCK) 
+							INNER JOIN CustDB.dbo.exchange e WITh(NOLOCK) ON op.BaseCurrencyId = e.ExchangeId
+							WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
+							) AS  baseCurrInfo
+						) ci
+			WHERE od.PartyID = @PayerID FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
+		)
+	END
 
 	BEGIN TRY
 		UPDATE dbo.OAS_PartyDetail WITH (ROWLOCK)
@@ -143,6 +192,63 @@ BEGIN
 				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT value FROM STRING_SPLIT(@WaiveInsertedList, ','))
 			RETURN
 		END
+
+	IF @IsWriteLogPayer = 1
+	BEGIN
+		SELECT @logSPData = (
+			SELECT	 Op2.PartyName							AS 'pi.pn'
+					,CASE WHEN x.ToParty = 1 THEN 'ONEWorks'
+							WHEN x.ToParty = 9 THEN 'Cozni'
+							WHEN x.ToParty = 11 THEN 'Boping'	
+							WHEN x.ToParty = 98 THEN 'Zelianta'	
+						END									AS 'pi.bg' 
+					,od.BrandName							AS 'pi.bn'
+					,od.Description							AS 'pi.dc'
+					,od.InvoiceLanguage						AS 'pi.iv'
+					,FORMAT (od.LaunchDate,'MMM dd, yyyy') 	AS 'pi.ld'
+					,FORMAT (od.SuspendedDate,'MMM dd, yyyy')	AS 'pi.sd'
+					,FORMAT (od.TerminatedDate,'MMM dd, yyyy') AS 'pi.tmd'
+
+					,od.CompanyName		AS 'a1.cn1'
+					,od.AttnName		AS 'a1.an1'
+					,od.Address1		AS 'a1.ad1'
+					,od.CompanyName2	AS 'a2.cn2'
+					,od.AttnName2		AS 'a2.an2'
+					,od.Address2		AS 'a2.ad2'
+					,ci.baseCurrInfo    AS 'bcs'
+			FROM OAS_PartyDetail od WITH(NOLOCK)
+			INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
+			OUTER APPLY (SELECT TOP 1 ToParty FROM OAS_ChargeInfo oc WITH(NOLOCK) WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
+			OUTER APPLY (
+							SELECT
+							(
+							SELECT CASE WHEN op.BaseCurrencyId = 142 THEN 'USDT' ELSE e.Code END  'c', 
+									op.LicenseeCode 'lc', 
+									op.FromDate 'fd', 
+									op.ToDate  'td',
+									CONVERT(VARCHAR(10),op.PartyID) +CONVERT(VARCHAR(10), op.BaseCurrencyId) + Convert(CHAR(8),op.FromDate,112) AS FakeID
+							FROM OAS_PartyBaseCurrency op WITH(NOLOCK) 
+							INNER JOIN CustDB.dbo.exchange e WITh(NOLOCK) ON op.BaseCurrencyId = e.ExchangeId
+							WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
+							) AS  baseCurrInfo
+						) ci
+			WHERE od.PartyID = @PayerID FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
+		)
+
+		SET @endRun = GETDATE()
+		SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun)
+
+		-- Write Log
+		EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+			@UserId			= @UserID
+			,@IP			= @LoginIP
+			,@SPName		= 'LA_PayerSettingModify'
+			,@CustId		= @PayerID
+			,@Duration		= @duration
+			,@TrackingValue2 = @logSPData
+			,@TrackingValue = @logSPDataOld
+			,@ActionID		= @LogActionID
+	END
 
 	-- Update on NAP
 	DECLARE @ChargeRate TABLE (ChargeID INT, ProductId INT, ProductName VARCHAR(50), Rate MONEY, CurrencyId INT, FromDate DATETIME, ToDate DATETIME, IsValid BIT DEFAULT(1), IsChangedRate BIT, IsChangedDate BIT)

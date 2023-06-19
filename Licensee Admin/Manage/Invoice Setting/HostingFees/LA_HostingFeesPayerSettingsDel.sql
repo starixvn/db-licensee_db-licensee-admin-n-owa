@@ -17,6 +17,7 @@ AS
 	Revisions:
 		- 20160708@Bruce: create
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20230524@Danny: Insert new log with more information [#FeatureID 175125]
 	
 	Params:
 
@@ -31,26 +32,52 @@ BEGIN
 		@startRun	DATETIME = GETDATE(),
 		@endRun		DATETIME,
 		@duration	INT,
-		@logData	NVARCHAR(4000)
+		@logData	NVARCHAR(MAX),
+		@logDataOld	NVARCHAR(MAX)
 
-	SET @logData = CAST((SELECT
-			c.ChargeId			AS '@ci',
-			c.SettingType 		AS '@st',
-			c.ParentId 			AS '@pi',
-			c.FromParty 		AS '@fp',
-			c.ToParty 			AS '@tp',
-			c.FromDate 			AS '@fd',
-			c.ToDate 			AS '@td',
-			c.ProductName 		AS '@pn',
-			c.FirstBilling 		AS '@fb',
-			c.BasisOfBilling 	AS '@bb',
-			c.BaseCurrencyId 	AS '@bc',
-			c.HostingFeesId 	AS '@hi',
-			c.BasedMinimunFees 	AS '@bf',
-			c.Remark 			AS '@rm'
-		FROM dbo.LA_HostingFeesSetting c WITH(NOLOCK) WHERE FromParty = @PayerId
-		FOR XML PATH('z'), ROOT('r')
-	) AS NVARCHAR(4000))
+	SELECT @logDataOld = 
+		(
+
+			SELECT op.PartyName 'gs.pn' , crs.crs 'crs', ws.ws 'ws'
+			FROM   OAS_party op WITH(NOLOCK)
+			OUTER APPLY (
+				SELECT 
+				(
+					SELECT
+						s.ChargeId FakeID,
+						s.ProductName p,
+						FORMAT(s.FirstBilling,'MMM dd, yyyy') fb,
+						s.BasisOfBilling bb, 
+						f.HostingFeesName cr,
+						t.HostingFeesTypeName ct,
+						FORMAT(s.FromDate,'MMM dd, yyyy') fd,
+						FORMAT(s.ToDate,'MMM dd, yyyy') td
+					FROM dbo.LA_HostingFeesSetting s WITH (NOLOCK)
+						LEFT JOIN dbo.LA_f_Products3rd('') pr ON s.BasedMinimunFees = pr.ProductID
+						LEFT JOIN dbo.LA_HostingFees f WITH (NOLOCK) ON s.HostingFeesId = f.HostingFeesId
+						LEFT JOIN dbo.LA_HostingFeesTypes t WITH (NOLOCK) ON f.HostingFeesTypeId = t.HostingFeesTypeId
+					WHERE s.FromParty = op.PartyID AND s.SettingType = 1  FOR JSON PATH
+				) crs
+			) crs
+
+			OUTER APPLY (
+				SELECT 
+				(
+					SELECT
+						s.ChargeId FakeID,
+						s.ProductName wp,
+						FORMAT(s.FromDate,'MMM dd, yyyy') wfd,
+						FORMAT(s.ToDate,'MMM dd, yyyy') wtd,
+						pr.ProductName AS bm
+					FROM dbo.LA_HostingFeesSetting s WITH (NOLOCK)
+						LEFT JOIN dbo.LA_f_Products3rd('') pr ON s.BasedMinimunFees = pr.ProductID
+						LEFT JOIN dbo.LA_HostingFees f WITH (NOLOCK) ON s.HostingFeesId = f.HostingFeesId
+						LEFT JOIN dbo.LA_HostingFeesTypes t WITH (NOLOCK) ON f.HostingFeesTypeId = t.HostingFeesTypeId
+					WHERE s.FromParty = op.PartyID AND s.SettingType = 2  FOR JSON PATH
+				) ws
+			) ws
+			WHERE  op.PartyID = @PayerId  FOR JSON PATH,  WITHOUT_ARRAY_WRAPPER 
+		)
 
 	DELETE FROM dbo.LA_HostingFeesSetting WHERE FromParty = @PayerId
 
@@ -58,15 +85,14 @@ BEGIN
 	SET @endRun = GETDATE()
 	SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun)
 
-	EXEC CustDB.dbo.NAP_SpecialCustSetting_WriteLog_Wrapper
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
 		@UserId			= @UserID
 		,@IP			= @LoginIP
-		,@LicenseeID	= 0
-		,@CurrencyID	= 0
 		,@SPName		= 'LA_HostingFeesPayerSettingsDel'
-		,@CustId		= 0
+		,@CustId		= @PayerId
 		,@Duration		= @duration
-		,@Data			= ''
-		,@OldData		= @logData
+		,@TrackingValue2 = @LogData
+		,@TrackingValue = @LogDataOld
+		,@ActionID		 = 1802
 END
 GO

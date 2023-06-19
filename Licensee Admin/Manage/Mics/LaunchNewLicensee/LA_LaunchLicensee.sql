@@ -37,6 +37,7 @@ AS
 		- 20220831@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
 		- 20221205@Danny: Remove Hx9candy From Crypto Licensee List [RedmineID: #181279]
 		- 20230213@Malcolm: Fix duplicate data error [RemineID: #183774]
+		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -46,6 +47,7 @@ AS
 									<Remark>create date 2019-01-08</Remark>
 									<BasisOfBilling>15% of Gross Win Launched on 2019-01-08</BasisOfBilling>
 									<ChargeType>1</ChargeType>
+									<ChargeTypeName>Licensing Fee</ChargeTypeName>
 									<FromDate>20190108</FromDate>
 									<ToDate>20500101</ToDate>
 								</ChargeInfoSetting>
@@ -55,6 +57,7 @@ AS
 									<Remark>create date 2019-01-08</Remark>
 									<BasisOfBilling>10% of Gross Win Launched on 2019-01-08</BasisOfBilling>
 									<ChargeType>1</ChargeType>
+									<ChargeTypeName>Licensing Fee</ChargeTypeName>
 									<FromDate>20190108</FromDate>
 									<ToDate>20500101</ToDate>
 								</ChargeInfoSetting>
@@ -90,29 +93,38 @@ BEGIN
 		@StartRun		DATETIME = CURRENT_TIMESTAMP, 
 		@EndRun			DATETIME, 
 		@Duration		INT, 
-		@Doing			NVARCHAR(MAX)
+		@Doing			NVARCHAR(MAX),
+		@IsAddNew		BIT = 0
 
 	SELECT @ErrCode = 0, @ErrMsg = ''
 
 	-- Prepare input params
 	DECLARE @Products TABLE (ProductId INT)
-	DECLARE @ChargeInfoSettings	TABLE (ProductId INT, Rate MONEY, Remark NVARCHAR(400), BasisOfBilling NVARCHAR(500), ChargeType INT, FromDate DATE, ToDate DATE)
+	DECLARE @ChargeInfoSettings	TABLE (ProductId INT, Rate MONEY, Remark NVARCHAR(400), BasisOfBilling NVARCHAR(500), ChargeType INT, ChargeTypeName NVARCHAR(100), FromDate DATE, ToDate DATE)
 	DECLARE @MinFeeSettings	TABLE (ProductId TINYINT, FeeTypeId TINYINT, FeeAmount MONEY, FromDate DATE, ToDate DATE, MinFeeTerm NVARCHAR(1000), [Priority] TINYINT, MonthOfDeduction TINYINT)
-	DECLARE @ChargeInfo TABLE (ChargeId INT, ProductId INT, ProductName VARCHAR(50), Rate MONEY, ChargeType INT, FromDate DATE, ToDate DATE, CurrencyId INT, SystemId INT, IsValid BIT DEFAULT(1))
+	DECLARE @ChargeInfo TABLE (ChargeId INT, ProductId INT, ProductName VARCHAR(50), Rate MONEY, ChargeType INT, FromDate DATE, ToDate DATE, CurrencyId INT, SystemId INT, IsValid BIT DEFAULT(1),  ChargeTypeName NVARCHAR(100))
 	DECLARE @AMF MONEY, @BillingGroupName NVARCHAR(50), @BillerId INT, @FirstDateOfMonth DATE
+
+	-- Log
+	DECLARE @logPayerSettingOld NVARCHAR(MAX), @logPayerSetting NVARCHAR(MAX), @logPayerSettingActionID INT
+	DECLARE @logWaiveSettingOld NVARCHAR(MAX), @logWaiveSetting NVARCHAR(MAX), @logWaiveSettingActionID INT
+	DECLARE @logMinFeeSettingOld NVARCHAR(MAX), @logMinFeeSetting NVARCHAR(MAX), @logMinFeeSettingActionID INT
+	DECLARE @logBillerOld NVARCHAR(MAX), @logBiller NVARCHAR(MAX), @logBllerActionID INT
+	DECLARE @logChargeRateOld NVARCHAR(MAX), @logChargeRate NVARCHAR(MAX), @logChargeRateActionID INT
 	
 	-- Charge Rate, Min Fee
 	BEGIN TRY
 		DECLARE @ChargeInfoSettingXML XML = CONVERT(XML, @ChargeInfoSettingData)
 		DECLARE @MinFeeSettingXML XML = CONVERT(XML, @MinFeeSettingData)
 		
-		INSERT INTO @ChargeInfoSettings (ProductId, Rate, Remark, BasisOfBilling, ChargeType, FromDate, ToDate)
+		INSERT INTO @ChargeInfoSettings (ProductId, Rate, Remark, BasisOfBilling, ChargeType, ChargeTypeName, FromDate, ToDate)
 		SELECT
 			t.c.value('(ProductId/text())[1]', 'INT')					AS ProductId
 			,t.c.value('(Rate/text())[1]', 'MONEY')						AS Rate
 			,t.c.value('(Remark/text())[1]', 'NVARCHAR(400)')			AS Remark
 			,t.c.value('(BasisOfBilling/text())[1]', 'NVARCHAR(500)')	AS BasisOfBilling
 			,t.c.value('(ChargeType/text())[1]', 'INT')					AS ChargeType
+			,t.c.value('(ChargeTypeName/text())[1]', 'NVARCHAR(100)')	AS ChargeTypeName
 			,t.c.value('(FromDate/text())[1]', 'DATE')					AS FromDate
 			,t.c.value('(ToDate/text())[1]', 'DATE')					AS ToDate
 		FROM @ChargeInfoSettingXML.nodes('Root/ChargeInfoSetting') t(c)
@@ -190,6 +202,47 @@ BEGIN
 		-- OAS_Party
 		IF @NonOfficialPartyId > 0
 		BEGIN
+			SELECT @logPayerSettingOld = (
+				SELECT	 Op2.PartyName							AS 'pi.pn'
+						,CASE WHEN x.ToParty = 1 THEN 'ONEWorks'
+							  WHEN x.ToParty = 9 THEN 'Cozni'
+							  WHEN x.ToParty = 11 THEN 'Boping'	
+							  WHEN x.ToParty = 98 THEN 'Zelianta'	
+						 END									AS 'pi.bg' 
+						,od.BrandName							AS 'pi.bn'
+						,od.Description							AS 'pi.dc'
+						,od.InvoiceLanguage						AS 'pi.iv'
+						,FORMAT (od.LaunchDate,'MMM dd, yyyy') 	AS 'pi.ld'
+					    ,FORMAT (od.SuspendedDate,'MMM dd, yyyy')	AS 'pi.sd'
+					    ,FORMAT (od.TerminatedDate,'MMM dd, yyyy') AS 'pi.tmd'
+
+						,od.CompanyName		AS 'a1.cn1'
+						,od.AttnName		AS 'a1.an1'
+						,od.Address1		AS 'a1.ad1'
+						,od.CompanyName2	AS 'a2.cn2'
+						,od.AttnName2		AS 'a2.an2'
+						,od.Address2		AS 'a2.ad2'
+						,ci.baseCurrInfo    AS 'bcs'
+				FROM OAS_PartyDetail od WITH(NOLOCK)
+				INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
+				OUTER APPLY (SELECT TOP 1 ToParty FROM OAS_ChargeInfo oc WITH(NOLOCK) WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
+				OUTER APPLY (
+								SELECT
+								(
+								SELECT CASE WHEN op.BaseCurrencyId = 142 THEN 'USDT' ELSE e.Code END  'c', 
+										op.LicenseeCode 'lc', 
+										op.FromDate 'fd', 
+										op.ToDate  'td',
+										CONVERT(VARCHAR(10),op.PartyID) +CONVERT(VARCHAR(10), op.BaseCurrencyId) + Convert(CHAR(8),op.FromDate,112) AS FakeID
+								FROM OAS_PartyBaseCurrency op WITH(NOLOCK) 
+								INNER JOIN CustDB.dbo.exchange e WITh(NOLOCK) ON op.BaseCurrencyId = e.ExchangeId
+								WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
+								) AS  baseCurrInfo
+							) ci
+				WHERE od.PartyID = @NonOfficialPartyId FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
+			)
+			
+
 			UPDATE dbo.OAS_Party WITH(ROWLOCK)
 			SET OldRefID   = @LicenseeId
 				,SetupName = PartyName
@@ -198,6 +251,8 @@ BEGIN
 			WHERE PartyID = @NonOfficialPartyId
 
 			SET @NewPartyId = @NonOfficialPartyId
+			SELECT @IsAddNew = 0, @logPayerSettingActionID = 1001
+
 		END
 		ELSE
 		BEGIN
@@ -205,6 +260,7 @@ BEGIN
 			VALUES (@PayerName, 1, @LicenseeId)
 
 			SET @NewPartyId = SCOPE_IDENTITY()
+			SELECT @IsAddNew = 1, @logPayerSettingActionID = 1000
 		END
 
 		-- OAS_PartyDetail
@@ -242,6 +298,11 @@ BEGIN
 			SELECT ChargeId, ProductId, 4
 			FROM @ChargeInfo
 			WHERE ProductId IN (0, 2, 3, 4, 5, 10, 11, 12) -- SB,NG,BA,LC,VS,AGC,GD,VG
+
+		UPDATE c
+		SET c.ChargeTypeName = cs.ChargeTypeName
+		FROM	@ChargeInfo c
+		INNER JOIN @ChargeInfoSettings cs ON c.ProductId = cs.ProductId AND c.ChargeType = cs.ChargeType AND c.FromDate = cs.FromDate
 		
 		-- LA_ChargeInfo_SystemMapping
 		INSERT INTO dbo.LA_ChargeInfo_SystemMapping (ChargeID, SystemID)
@@ -259,6 +320,91 @@ BEGIN
 
 		-- LA_InvoiceSetting
 		IF ISNULL(@BillerId, 0) <> 0
+		BEGIN
+			; WITH items AS
+				(
+				SELECT  op.PartyName,od.BrandName,iv.BillerName,iv.bank,iv.InvTypeName,iv.InvTemplateName,iv.ActiveAddress,iv.ProductIDs,iv.InvTypeId, iv.FakeID
+				FROM	OAS_Party op WITH(NOLOCK)
+				INNER JOIN OAS_PartyDetail od WITH(NOLOCK) ON od.PartyID = op.PartyID
+				OUTER APPLY (
+					SELECT b.BillerName
+							,lt.InvTypeName
+							,temp.InvTemplateName
+							,CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END Bank
+								,CASE WHEN li.ActiveAddress = 1 THEN od.Address1
+									WHEN li.ActiveAddress = 2 THEN od.Address2 END ActiveAddress
+							,STRING_AGG(CASE WHEN li.ProductID = 0 THEN 'Sportsbook' ELSE p.ProductName END,', ') ProductIDs
+							,lt.InvTypeId
+							,li.ToPartyId FakeID
+					FROM LA_InvoiceSetting li WITH(NOLOCK) 
+					LEFT JOIN LA_InvoiceType lt with(nolock) ON li.InvTypeID  = lt.InvTypeID
+					LEFT JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON li.ToPartyId = b.PartyId
+					LEFT JOIN dbo.LA_InvoiceTemplate temp WITH (NOLOCK) ON li.InvTempId = temp.InvTemplateId
+					LEFT JOIN Product3rd p WITH (NOLOCK) ON li.ProductId = p.Productid
+					WHERE li.FromPartyId = op.PartyID AND li.ToPartyId = @BillerID
+					GROUP BY b.BillerName, lt.InvTypeName, CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END
+						, temp.InvTemplateName ,li.ActiveAddress
+						,CASE WHEN li.ActiveAddress = 1 THEN od.Address1
+							WHEN li.ActiveAddress = 2 THEN od.Address2 END, lt.InvTypeId
+						,li.ToPartyId
+				) iv
+				WHERE op.PartyID =@NewPartyId 
+			), i AS
+			(
+				SELECT i.PartyName, i.BrandName, i.BillerName, i.Bank, i.FakeID
+				FROM items i
+				GROUP BY i.PartyName, i.BrandName, i.BillerName, i.Bank, i.FakeID
+			),log_detail AS
+			(
+			SELECT i.FakeID, i.PartyName, i.BrandName, i.BillerName, i.Bank 
+					,i1.InvTypeName it1, i1.InvTemplateName itn1, i1.ActiveAddress ad1, i1.ProductIDs p1
+					,i3.InvTypeName it3, i3.InvTemplateName itn3, i3.ActiveAddress ad3
+					,i4.InvTypeName it4, i4.InvTemplateName itn4, i4.ActiveAddress ad4
+					,i5.InvTypeName it5, i5.InvTemplateName itn5, i5.ActiveAddress ad5
+					,i6.InvTypeName it6, i6.InvTemplateName itn6, i6.ActiveAddress ad6
+					,i7.InvTypeName it7, i7.InvTemplateName itn7, i7.ActiveAddress ad7
+					,i10.InvTypeName it10, i10.InvTemplateName itn10, i10.ActiveAddress ad10
+					,i11.InvTypeName it11, i11.InvTemplateName itn11, i11.ActiveAddress ad11
+					,i12.InvTypeName it12, i12.InvTemplateName itn12, i12.ActiveAddress ad12
+					, ISNULL(i1.InvTypeId,0) + ISNULL(i3.InvTypeId,0) + ISNULL(i4.InvTypeId,0) + ISNULL(i5.InvTypeId,0) + ISNULL(i6 .InvTypeId,0) + ISNULL(i7.InvTypeId,0)
+					+ ISNULL(i11.InvTypeId,0) + ISNULL(i12.InvTypeId,0) AS istotal
+
+			FROM  i
+			LEFT JOIN items i1 ON i1.PartyName = i.PartyName AND ISNULL(i1.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i1.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i1.Bank,'') = ISNULL(i.Bank,'') AND i1.InvTypeId = 1 
+			LEFT JOIN items i3 ON i3.PartyName = i.PartyName AND ISNULL(i3.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i3.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i3.Bank,'') = ISNULL(i.Bank,'') AND i3.InvTypeId = 3 
+			LEFT JOIN items i4 ON i4.PartyName = i.PartyName AND ISNULL(i4.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i4.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i4.Bank,'') = ISNULL(i.Bank,'') AND i4.InvTypeId = 4 
+			LEFT JOIN items i5 ON i5.PartyName = i.PartyName AND ISNULL(i5.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i5.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i5.Bank,'') = ISNULL(i.Bank,'') AND i5.InvTypeId = 5 
+			LEFT JOIN items i6 ON i6.PartyName = i.PartyName AND ISNULL(i6.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i6.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i6.Bank,'') = ISNULL(i.Bank,'') AND i6.InvTypeId = 6 
+			LEFT JOIN items i7 ON i7.PartyName = i.PartyName AND ISNULL(i7.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i7.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i7.Bank,'') = ISNULL(i.Bank,'') AND i7.InvTypeId = 7
+			LEFT JOIN items i10 ON i10.PartyName = i.PartyName AND ISNULL(i10.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i10.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i10.Bank,'') = ISNULL(i.Bank,'') AND i10.InvTypeId = 10 
+			LEFT JOIN items i11 ON i11.PartyName = i.PartyName AND ISNULL(i11.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i11.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i11.Bank,'') = ISNULL(i.Bank,'') AND i11.InvTypeId = 11 
+			LEFT JOIN items i12 ON i12.PartyName = i.PartyName AND ISNULL(i12.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i12.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i12.Bank,'') = ISNULL(i.Bank,'') AND i12.InvTypeId = 12 
+			)SELECT @logBillerOld = 
+			(
+				SELECT  l.PartyName as 'pi.pn', l.BrandName AS 'pi.bn' , x.x AS 'bl'
+				FROM log_detail l
+				OUTER APPLY 
+				(
+					SELECT 
+					( 
+						SELECT u.FakeID ,u.BillerName AS bln, u.Bank AS b, 
+							u.it1, u.itn1, u.ad1, u.p1
+							,u.it3, u.itn3, u.ad3
+							,u.it4, u.itn4, u.ad4
+							,u.it5, u.itn5, u.ad5
+							,u.it6, u.itn6, u.ad6
+							,u.it7, u.itn7, u.ad7
+							,u.it10, u.itn10, u.ad10
+							,u.it11, u.itn11, u.ad11
+							,u.it12, u.itn12, u.ad12
+						FROM log_detail u 
+						WHERE u.PartyName = l.PartyName AND ISNULL(u.BrandName,'') = ISNULL(l.BrandName,'') AND l.istotal > 0
+						FOR JSON PATH
+					)x
+				) x
+				GROUP BY l.PartyName, l.BrandName , x.x FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES
+			)
+
 			INSERT INTO dbo.LA_InvoiceSetting (FromPartyId, ToPartyId, ProductId, InvTypeId, InvTempId, BankId, ActiveAddress)
 			SELECT DISTINCT @NewPartyId, @BillerId, ProductId, InvTypeId, InvTemplateId, 0 AS BankId, 1 AS ActiveAddress
 			FROM (
@@ -283,6 +429,93 @@ BEGIN
 						AND c.FromDate = @LaunchDate
 						AND ivt.InvTemplateName IN ('Boping', 'Zelianta')
 				) p
+
+
+			--write biller log
+			; WITH items AS
+			(
+				SELECT  op.PartyName,od.BrandName,iv.BillerName,iv.bank,iv.InvTypeName,iv.InvTemplateName,iv.ActiveAddress,iv.ProductIDs,iv.InvTypeId, iv.FakeID
+				FROM	OAS_Party op WITH(NOLOCK)
+				INNER JOIN OAS_PartyDetail od WITH(NOLOCK) ON od.PartyID = op.PartyID
+				OUTER APPLY (
+					SELECT b.BillerName
+							,lt.InvTypeName
+							,temp.InvTemplateName
+							,CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END Bank
+								,CASE WHEN li.ActiveAddress = 1 THEN od.Address1
+									WHEN li.ActiveAddress = 2 THEN od.Address2 END ActiveAddress
+							,STRING_AGG(CASE WHEN li.ProductID = 0 THEN 'Sportsbook' ELSE p.ProductName END,', ') ProductIDs
+							,lt.InvTypeId
+							,li.ToPartyId FakeID
+					FROM LA_InvoiceSetting li WITH(NOLOCK) 
+					LEFT JOIN LA_InvoiceType lt with(nolock) ON li.InvTypeID  = lt.InvTypeID
+					LEFT JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON li.ToPartyId = b.PartyId
+					LEFT JOIN dbo.LA_InvoiceTemplate temp WITH (NOLOCK) ON li.InvTempId = temp.InvTemplateId
+					LEFT JOIN Product3rd p WITH (NOLOCK) ON li.ProductId = p.Productid
+					WHERE li.FromPartyId = op.PartyID AND li.ToPartyId = @BillerID
+					GROUP BY b.BillerName, lt.InvTypeName, CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END
+						, temp.InvTemplateName ,li.ActiveAddress
+						,CASE WHEN li.ActiveAddress = 1 THEN od.Address1
+							WHEN li.ActiveAddress = 2 THEN od.Address2 END, lt.InvTypeId
+						,li.ToPartyId
+				) iv
+				WHERE op.PartyID =@NewPartyId 
+			), i AS
+			(
+				SELECT i.PartyName, i.BrandName, i.BillerName, i.Bank, i.FakeID
+				FROM items i
+				GROUP BY i.PartyName, i.BrandName, i.BillerName, i.Bank, i.FakeID
+			),log_detail AS
+			(
+			SELECT i.FakeID, i.PartyName, i.BrandName, i.BillerName, i.Bank 
+					,i1.InvTypeName it1, i1.InvTemplateName itn1, i1.ActiveAddress ad1, i1.ProductIDs p1
+					,i3.InvTypeName it3, i3.InvTemplateName itn3, i3.ActiveAddress ad3
+					,i4.InvTypeName it4, i4.InvTemplateName itn4, i4.ActiveAddress ad4
+					,i5.InvTypeName it5, i5.InvTemplateName itn5, i5.ActiveAddress ad5
+					,i6.InvTypeName it6, i6.InvTemplateName itn6, i6.ActiveAddress ad6
+					,i7.InvTypeName it7, i7.InvTemplateName itn7, i7.ActiveAddress ad7
+					,i10.InvTypeName it10, i10.InvTemplateName itn10, i10.ActiveAddress ad10
+					,i11.InvTypeName it11, i11.InvTemplateName itn11, i11.ActiveAddress ad11
+					,i12.InvTypeName it12, i12.InvTemplateName itn12, i12.ActiveAddress ad12
+					, ISNULL(i1.InvTypeId,0) + ISNULL(i3.InvTypeId,0) + ISNULL(i4.InvTypeId,0) + ISNULL(i5.InvTypeId,0) + ISNULL(i6 .InvTypeId,0) + ISNULL(i7.InvTypeId,0)
+					+ ISNULL(i11.InvTypeId,0) + ISNULL(i12.InvTypeId,0) AS istotal
+
+			FROM  i
+			LEFT JOIN items i1 ON i1.PartyName = i.PartyName AND ISNULL(i1.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i1.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i1.Bank,'') = ISNULL(i.Bank,'') AND i1.InvTypeId = 1 
+			LEFT JOIN items i3 ON i3.PartyName = i.PartyName AND ISNULL(i3.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i3.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i3.Bank,'') = ISNULL(i.Bank,'') AND i3.InvTypeId = 3 
+			LEFT JOIN items i4 ON i4.PartyName = i.PartyName AND ISNULL(i4.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i4.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i4.Bank,'') = ISNULL(i.Bank,'') AND i4.InvTypeId = 4 
+			LEFT JOIN items i5 ON i5.PartyName = i.PartyName AND ISNULL(i5.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i5.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i5.Bank,'') = ISNULL(i.Bank,'') AND i5.InvTypeId = 5 
+			LEFT JOIN items i6 ON i6.PartyName = i.PartyName AND ISNULL(i6.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i6.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i6.Bank,'') = ISNULL(i.Bank,'') AND i6.InvTypeId = 6 
+			LEFT JOIN items i7 ON i7.PartyName = i.PartyName AND ISNULL(i7.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i7.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i7.Bank,'') = ISNULL(i.Bank,'') AND i7.InvTypeId = 7
+			LEFT JOIN items i10 ON i10.PartyName = i.PartyName AND ISNULL(i10.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i10.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i10.Bank,'') = ISNULL(i.Bank,'') AND i10.InvTypeId = 10 
+			LEFT JOIN items i11 ON i11.PartyName = i.PartyName AND ISNULL(i11.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i11.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i11.Bank,'') = ISNULL(i.Bank,'') AND i11.InvTypeId = 11 
+			LEFT JOIN items i12 ON i12.PartyName = i.PartyName AND ISNULL(i12.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i12.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i12.Bank,'') = ISNULL(i.Bank,'') AND i12.InvTypeId = 12 
+			)SELECT @logBiller = 
+			(
+				SELECT  l.PartyName as 'pi.pn', l.BrandName AS 'pi.bn' , x.x AS 'bl'
+				FROM log_detail l
+				OUTER APPLY 
+				(
+					SELECT 
+					( 
+						SELECT u.FakeID ,u.BillerName AS bln, u.Bank AS b, 
+							u.it1, u.itn1, u.ad1, u.p1
+							,u.it3, u.itn3, u.ad3
+							,u.it4, u.itn4, u.ad4
+							,u.it5, u.itn5, u.ad5
+							,u.it6, u.itn6, u.ad6
+							,u.it7, u.itn7, u.ad7
+							,u.it10, u.itn10, u.ad10
+							,u.it11, u.itn11, u.ad11
+							,u.it12, u.itn12, u.ad12
+						FROM log_detail u 
+						WHERE u.PartyName = l.PartyName AND ISNULL(u.BrandName,'') = ISNULL(l.BrandName,'') AND l.istotal > 0
+						FOR JSON PATH
+					)x
+				) x
+				GROUP BY l.PartyName, l.BrandName , x.x FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES
+			)
+		END
 
 		-- LA_UserParty
 		DECLARE @ExcludeUsers TABLE (UserName VARCHAR(50))
@@ -320,6 +553,166 @@ BEGIN
 		SELECT FunctionID, @NewPartyId
 		FROM dbo.LA_Function WITH (NOLOCK) 
 		WHERE StatusID = 1 -- Active functions
+
+		SELECT @logPayerSetting = (
+				SELECT	 Op2.PartyName							AS 'pi.pn'
+						,CASE WHEN x.ToParty = 1 THEN 'ONEWorks'
+							  WHEN x.ToParty = 9 THEN 'Cozni'
+							  WHEN x.ToParty = 11 THEN 'Boping'	
+							  WHEN x.ToParty = 98 THEN 'Zelianta'	
+						 END									AS 'pi.bg' 
+						,od.BrandName							AS 'pi.bn'
+						,od.Description							AS 'pi.dc'
+						,od.InvoiceLanguage						AS 'pi.iv'
+						,FORMAT (od.LaunchDate,'MMM dd, yyyy') 	AS 'pi.ld'
+					    ,FORMAT (od.SuspendedDate,'MMM dd, yyyy')	AS 'pi.sd'
+					    ,FORMAT (od.TerminatedDate,'MMM dd, yyyy') AS 'pi.tmd'
+
+						,od.CompanyName		AS 'a1.cn1'
+						,od.AttnName		AS 'a1.an1'
+						,od.Address1		AS 'a1.ad1'
+						,od.CompanyName2	AS 'a2.cn2'
+						,od.AttnName2		AS 'a2.an2'
+						,od.Address2		AS 'a2.ad2'
+						,ci.baseCurrInfo    AS 'bcs'
+				FROM OAS_PartyDetail od WITH(NOLOCK)
+				INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
+				OUTER APPLY (SELECT TOP 1 ToParty FROM OAS_ChargeInfo oc WITH(NOLOCK) WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
+				OUTER APPLY (
+								SELECT
+								(
+								SELECT CASE WHEN op.BaseCurrencyId = 142 THEN 'USDT' ELSE e.Code END  'c', 
+										op.LicenseeCode 'lc', 
+										op.FromDate 'fd', 
+										op.ToDate  'td',
+										CONVERT(VARCHAR(10),op.PartyID) +CONVERT(VARCHAR(10), op.BaseCurrencyId) + Convert(CHAR(8),op.FromDate,112) AS FakeID
+								FROM OAS_PartyBaseCurrency op WITH(NOLOCK) 
+								INNER JOIN CustDB.dbo.exchange e WITh(NOLOCK) ON op.BaseCurrencyId = e.ExchangeId
+								WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
+								) AS  baseCurrInfo
+							) ci
+				WHERE od.PartyID = @NewPartyId FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
+			)
+
+		-- Log chargeRate
+		;WITH t AS
+		(
+			SELECT		op.PartyName,
+						od.BrandName,
+						CASE WHEN oc.ProductID = 0 THEN 'Sportsbook' ELSE p3.ProductName END Product,
+						FORMAT (oc.FromDate,'MMM dd, yyyy') FromDate,
+					    FORMAT (oc.ToDate,'MMM dd, yyyy') ToDate,
+					    FORMAT (oc.FirstOfBilling,'MMM dd, yyyy') FirstOfBilling,
+						oc.BasisOfBilling,
+						CASE WHEN oc.ProductID = 3 THEN '0.25 %' ELSE (CAST (ISNULL(lcr.Rate, oc.Rate) * 100  AS VARCHAR(50) ) + ' %') END Rate,
+						STRING_AGG(x.Code,', ') Currs,
+						CASE WHEN lcr.Rate IS NOT NULL THEN 0 ELSE 1 END isMasterRate,
+						oc.ChargeID AS FakeID,
+						z.ChargeTypeName
+			FROM OAS_Party op WITH(NOLOCK)
+			INNER JOIN OAS_PartyDetail od WITH(NOLOCK) ON op.PartyID = od.PartyID
+			INNER JOIN Licensees l WITH(NOLOCK) ON op.OldRefID = l.LicenseeID
+			INNER JOIN OAS_ChargeInfo oc WITH(NOLOCK) ON op.PartyID = oc.FromParty
+			CROSS APPLY (
+				SELECT DISTINCT lc.Currency, CASE WHEN e.ExchangeId IN (96,202) THEN e.Code + ' (' + e.currency + ')' ELSE e.Code END Code
+				FROM LicenseeCust lc  WITH(NOLOCK) 
+				INNER JOIN  CustDB.dbo.exchange e with(nolock) on lc.Currency = e.ExchangeId
+				WHERE lc.LicenseeID = l.LicenseeID and lc.roleID = 2 and e.ExchangeId <> 20
+			) x
+			INNER JOIN @ChargeInfo z ON z.ChargeId = oc.ChargeID AND z.ChargeTypeName IS NOT NULL
+			LEFT JOIN  LA_ChargeRateByCurrency lcr WITH(NOLOCK) ON oc.ChargeID = lcr.ChargeID AND x.Currency = lcr.CurrencyID
+			LEFT JOIN  Product3rd p3 WITH(NOLOCK) ON oc.ProductID = p3.Productid
+			WHERE op.PartyID = @NewPartyId
+			GROUP BY op.PartyName,
+						od.BrandName,
+						CASE WHEN oc.ProductID = 0 THEN 'Sportsbook' ELSE p3.ProductName END,
+						FORMAT (oc.FromDate,'MMM dd, yyyy'),
+					    FORMAT (oc.ToDate,'MMM dd, yyyy'),
+					    FORMAT (oc.FirstOfBilling,'MMM dd, yyyy'),
+						oc.BasisOfBilling,
+						CASE WHEN oc.ProductID = 3 THEN '0.25 %' ELSE (CAST (ISNULL(lcr.Rate, oc.Rate) * 100  AS VARCHAR(50) ) + ' %') END,
+						CASE WHEN lcr.Rate IS NOT NULL THEN 0 ELSE 1 END,
+						oc.ChargeID,
+						z.ChargeTypeName
+		) 
+		, t1 AS
+		(
+			SELECT t.FakeID, t.PartyName,t.BrandName,t.Product,t.FromDate,t.ToDate,t.FirstOfBilling,t.BasisOfBilling,t.ChargeTypeName,STRING_AGG(cr.r, CHAR(13)) AS r
+			FROM t
+			CROSS APPLY (
+					SELECT CASE WHEN t.isMasterRate = 1 AND EXISTS (SELECT TOP 1 1 FROM t t2 WHERE t2.isMasterRate = 0 AND t2.Product = t.Product and t2.PartyName = t.PartyName) THEN 'Others ' 
+								WHEN t.isMasterRate = 1 AND NOT EXISTS (SELECT TOP 1 1 FROM t t2 WHERE t2.isMasterRate = 0 AND t2.Product = t.Product and t2.PartyName = t.PartyName) THEN 'All ' 
+								ELSE '' END + '('+ t.Currs + ') - ' + Rate AS r
+			) cr
+			GROUP BY t.FakeID, t.PartyName,t.BrandName,t.Product,t.FromDate,t.ToDate,t.FirstOfBilling,t.BasisOfBilling,t.ChargeTypeName
+		) SELECT @logChargeRate = 
+			(
+			SELECT t.PartyName as 'pi.pn', t.BrandName AS 'pi.bn', crs.crs AS 'crs'
+			FROM t1 t 
+			CROSS APPLY 
+			(
+				SELECT 
+				(
+					SELECT  u.FakeID ,u.Product p ,  u.FromDate fd, u.ToDate td , u.FirstOfBilling fb, u.BasisOfBilling bb , u.r, u.ChargeTypeName t
+					FROM t1 u  WHERE u.PartyName = t.PartyName AND u.BrandName = t.BrandName FOR JSON PATH
+				) crs
+			) crs  
+			GROUP BY t.PartyName, t.BrandName, crs.crs
+			FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+		)
+
+		IF EXISTS  (SELECT TOP 1 1 FROM @MinFeeSettings WHERE FeeTypeId = 2)
+			SELECT @logWaiveSetting = (
+				SELECT	op.PartyName AS 'pi.pn' ,
+						od.BrandName AS 'pi.bn',
+						lm.lm AS 's'
+				FROM OAS_Party op WITH(NOLOCK)
+				INNER JOIN OAS_PartyDetail od WITH(NOLOCK) ON od.PartyId = op.PartyID
+				CROSS APPLY (
+					SElECT 
+					(
+						SELECT CASE WHEN lm.Productid = 0 THEN 'Sportbook' ELSE  p.ProductName END AS pdn, 
+									FORMAT (lm.FromDate,'MMM dd, yyyy')  AS fd,
+									FORMAT (lm.Todate,'MMM dd, yyyy') AS td,
+									lm.MinFeeId AS FakeID
+						FROM  LA_MinFee lm WITH(NOLOCK)
+						LEFT JOIN Product3rd p with(nolock) ON lm.ProductId = p.Productid
+						WHERE lm.PartyId = op.PartyID and lm.FeeTypeId =2 
+						FOR JSON PATH
+					) AS lm
+				) lm
+				WHERE op.PartyId = @NewPartyId
+				FOR JSON PATH, WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES)
+		
+		IF EXISTS  (SELECT TOP 1 1 FROM @MinFeeSettings WHERE FeeTypeId = 1)
+		SELECT @logMinFeeSetting = (
+			SELECT	op.PartyName AS 'pi.pn' ,
+					od.BrandName AS 'pi.bn',
+					lm.lm AS 's'
+			FROM OAS_Party op WITH(NOLOCK)
+			INNER JOIN OAS_PartyDetail od with(nolock) ON od.PartyId = op.PartyID
+			CROSS APPLY (
+				SElECT 
+				(
+					SELECT CASE WHEN lm.Productid = 0 THEN 'Sportbook' ELSE  p.ProductName END AS pdn, 
+								FORMAT (lm.FromDate,'MMM dd, yyyy') AS fd,
+								FORMAT (lm.Todate,'MMM dd, yyyy') AS td,
+								FORMAT(lm.FeeAmount,'N','en-us') as fa,
+								e.Code AS c,
+								lm.MinFeeTerm AS mt,
+								lm.MinFeeId AS FakeID
+					FROM  LA_MinFee lm WITH(NOLOCK)
+					LEFT JOIN Product3rd p with(nolock) ON lm.ProductId = p.Productid
+					INNER JOIN CustDB.dbo.Exchange e WITH(NOLOCK) ON lm.CurrencyId = e.ExchangeId
+					WHERE lm.PartyId = op.PartyID and lm.FeeTypeId =1  
+					FOR JSON PATH
+				) as lm
+			) lm
+			where op.PartyId = @NewPartyId  
+			FOR JSON PATH, WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES 
+		)
+		
+		
 	END TRY
 	BEGIN CATCH
 		-- Rollback
@@ -442,25 +835,65 @@ BEGIN
 	SET @EndRun = GETDATE()
 	SET @Duration = DATEDIFF(MILLISECOND, @StartRun, @EndRun)
 
-	SET @Doing =(SELECT	@NonOfficialPartyId	AS NonOfficialPartyId,
-						@LicenseeId			AS LicenseeId,
-						@PayerName			AS PayerName,
-						@LicenseeCode		AS LicenseeCode,
-						@BrandName			AS BrandName,
-						@BaseCurrencyId		AS BaseCurrencyId,
-						@LaunchDate			AS LaunchDate, 
-						@BillingGroupId		AS BillingGroupId,
-						@ProductIds			AS ProductIds, 
-						@ChargeInfoSettingData	AS ChargeInfoSettingData,
-						@MinFeeSettingData	AS MinFeeSettingData
-						FOR XML PATH('')) 
+	-- Write Log Payer Setting
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+		@UserId			= @UserID
+		,@IP			= @LoginIP
+		,@SPName		= 'LA_LaunchLicensee'
+		,@CustId		= @NewPartyId
+		,@Duration		= @duration
+		,@TrackingValue2 = @logPayerSetting
+		,@TrackingValue = @logPayerSettingOld
+		,@ActionID		 = @logPayerSettingActionID
 
-	EXEC CustDB.dbo.WriteLog_UserLog_UserControl_Wrapper
-		@CustID		= 0,
-		@Doing		= @Doing,
-		@UserID		= @UserID,
-		@TypeID		= 0,
-		@ActionID	= 5535,
-		@Duration	= @Duration
+	--  Write Log ChargeRate Setting
+	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+		@UserId			= @UserID
+		,@IP			= @LoginIP
+		,@SPName		= 'LA_LaunchLicensee'
+		,@CustId		= @NewPartyId
+		,@Duration		= @duration
+		,@TrackingValue2 = @logChargeRate
+		,@TrackingValue = @logChargeRateOld
+		,@ActionID		 = 1200
+
+	-- Write Log Waive Setting
+	IF EXISTS  (SELECT TOP 1 1 FROM @MinFeeSettings WHERE FeeTypeId = 2)
+		EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+			@UserId			= @UserID
+			,@IP			= @LoginIP
+			,@SPName		= 'LA_LaunchLicensee'
+			,@CustId		= @NewPartyId
+			,@Duration		= @duration
+			,@TrackingValue2 = @logWaiveSetting
+			,@TrackingValue = @logWaiveSettingOld
+			,@ActionID		 = 1400
+
+	-- Write Min fee Setting
+	IF EXISTS  (SELECT TOP 1 1 FROM @MinFeeSettings WHERE FeeTypeId = 1)
+		EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+			@UserId			= @UserID
+			,@IP			= @LoginIP
+			,@SPName		= 'LA_LaunchLicensee'
+			,@CustId		= @NewPartyId
+			,@Duration		= @duration
+			,@TrackingValue2 = @logMinFeeSetting
+			,@TrackingValue = @logMinFeeSettingOld
+			,@ActionID		 = 1300
+	
+	IF ISNULL(@BillerId, 0) <> 0
+	BEGIN
+		-- Write Biller Setting
+		EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+			@UserId			= @UserID
+			,@IP			= @LoginIP
+			,@SPName		= 'LA_LaunchLicensee'
+			,@CustId		= @NewPartyId
+			,@Duration		= @duration
+			,@TrackingValue2 = @logBiller
+			,@TrackingValue = @logBillerOld
+			,@ActionID		 = 1002
+	END
+	
 END
 GO

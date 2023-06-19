@@ -3,10 +3,11 @@ ALTER PROCEDURE [dbo].[LA_WriteLog_UserLog_RunSP]
 	@UserID				INT
 	,@CustID			INT
 	,@ActionID			INT
-	,@Doing				NVARCHAR(MAX) = NULL
 	,@TrackingValue		NVARCHAR(MAX) = NULL
 	,@TrackingValue2	NVARCHAR(MAX) = NULL
 	,@Duration			INT
+	,@SPName			VARCHAR(1000) = NULL
+	,@IP				VARCHAR(45) = NULL
 AS
 
 /*
@@ -16,6 +17,7 @@ AS
 
 	Revisions:
 		- 20190510@Percy: Initialize SP [RedmineID: #103658]
+		- 20230307@Danny: Store SPName info into SPname column [RedmineID: #175125]
 */
 
 BEGIN
@@ -26,20 +28,22 @@ BEGIN
 		UserID
 		,CustID
 		,ActionID
-		,Doing
 		,TrackingValue
-		,TrackingValue2,
-		Duration
+		,TrackingValue2
+		,Duration
+		,SPName
+		,IP
 	)
 	VALUES
 	(
 		@UserID
 		,@CustID
 		,@ActionID
-		,@Doing
 		,@TrackingValue
-		,@TrackingValue2,
-		@Duration
+		,@TrackingValue2
+		,@Duration
+		,@SPName
+		,@IP
 	)
 END
 GO

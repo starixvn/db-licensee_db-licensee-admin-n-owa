@@ -13,6 +13,7 @@ AS
 	 Revisions:
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+		- 20230530@Danny: return HostingFeesDetailID [RedmineID: #175125]
 	 Params:
 		
 	 Example:
@@ -40,7 +41,8 @@ BEGIN
 			d.VCMTo,
 			d.Amount,
 			d.BaseCurrencyId AS RateCurrencyId,
-			c1.Name AS RateCurrencyName
+			c1.Name AS RateCurrencyName,
+			d.HostingFeesDetailId
 	FROM dbo.LA_HostingFees f WITH(NOLOCK)
 			INNER JOIN dbo.LA_HostingFeesDetail d WITH(NOLOCK) ON f.HostingFeesId = d.HostingFeesId
 			INNER JOIN dbo.LA_HostingFeesTypes t WITH(NOLOCK) ON f.HostingFeesTypeId = t.HostingFeesTypeId
