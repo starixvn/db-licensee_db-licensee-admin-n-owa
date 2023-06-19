@@ -24,6 +24,7 @@ AS
 		- 20211215@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20220928@Danny: Exclude Licensees that offer cryptocurrency [#FeatureID 177627]
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
+		- 20230619@Danny: Get data Promotion And Sponsorship (ProductID = 37) [RedmineID: #189659]
 
 */
 
@@ -159,7 +160,6 @@ BEGIN
 					,@ToDate = @ToDate
 					,@BaseCurrencyName = @CurrencyName
 
-				DELETE @Result WHERE ProductId = 37 -- Saba Promotion
 
 				UPDATE r
 				SET r.BetCount = t.BetCount
@@ -193,7 +193,7 @@ BEGIN
 				,ISNULL(Turnover, 0)		AS Turnover
 				,ISNULL(TurnoverNoDraw, 0)	AS TurnoverNoDraw
 				,ISNULL(Winloss, 0)			AS LicenseeWinloss
-				,LicensingFee + ExtraAmount	AS LicensingFee
+				,CASE WHEN ProductId = 74 THEN ExtraAmount ELSE LicensingFee + ExtraAmount END AS LicensingFee
 				,Discount
 				,Rebate
 				,0 AS Adjustment
