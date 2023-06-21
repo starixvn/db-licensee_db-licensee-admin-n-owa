@@ -27,6 +27,7 @@ AS
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 	- 20230222@Danny: Remove hard-code bettype And ProductID [#183739]
 	- 20230410@Danny: Change PayToSupplier fomular [RedmineID: #186543]
+	- 20230518@Danny: Integrate YeeBet [RedmineID: #187948]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
@@ -517,6 +518,24 @@ BEGIN
 		WHERE t.ProductID = 70
 	END
 
+	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID = 76)
+	BEGIN
+		;WITH cte AS
+		(
+			SELECT DISTINCT p.PartyId, r.ProductID, r.DI_Rate, r.ChargeType
+			FROM (	SELECT DISTINCT r.PartyID, r.ProductID, r.DI_Rate, r.ChargeType
+				FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'YB', 'OA') r 
+				WHERE r.ChargeType = 11
+			 ) r
+			INNER JOIN #PartyList p on p.ParentId = r.PartyID
+		)
+		UPDATE t
+		SET		t.ChargeRate11 = ISNULL(u1.DI_Rate,0)
+		FROM	#ChargeRate t
+	
+		LEFT JOIN cte u1 ON t.PartyID = u1.PartyID AND t.ProductID = u1.ProductID AND u1.ChargeType = 11
+		WHERE t.ProductID = 76
+	END
 
 	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID = 15)
 	BEGIN
@@ -770,7 +789,7 @@ BEGIN
 			SUM(b.CustomerWinLoss) AS CustomerWinLoss,
 			SUM(b.LicenseeWinloss) AS LicenseeWinloss,
 			SUM((b.LicenseeWinloss - b.LicenseeContribution) * ISNULL(cr.Rate, ci.Rate) + LicenseeContribution - JackpotPrize - Promotion) AS LicensingFee,
-			SUM(CASE WHEN bt.ProductID = 70 THEN (LicenseeWinloss - (b.ValidBetAmount * ci.ChargeRate11)) * ISNULL(ci_3rd.Rate3rd,0)
+			SUM(CASE WHEN bt.ProductID IN (70, 76) THEN (LicenseeWinloss - (b.ValidBetAmount * ci.ChargeRate11)) * ISNULL(ci_3rd.Rate3rd,0)
 					 WHEN bt.ProductID = 32 THEN (b.LicenseeWinloss - b.FullContribution) * ISNULL(ci_3rd.Rate3rd,0)
 				ELSE (b.LicenseeWinloss - b.FullContribution) * ISNULL(ci_3rd.Rate3rd,0) - b.Promotion END
 				) AS PayToSupplier,
@@ -1089,7 +1108,7 @@ BEGIN
 			SUM(b.CustomerWinLoss) AS CustomerWinLoss,
 			SUM(b.LicenseeWinloss) AS LicenseeWinloss,
 			SUM((b.LicenseeWinloss - b.LicenseeContribution) * ISNULL(cr.Rate, ci.Rate) + LicenseeContribution - JackpotPrize - Promotion) AS LicensingFee,
-			SUM(CASE WHEN bt.ProductID = 70 THEN (LicenseeWinloss - (b.ValidBetAmount * ci.ChargeRate11)) * ISNULL(ci_3rd.Rate3rd,0)
+			SUM(CASE WHEN bt.ProductID IN (70,76) THEN (LicenseeWinloss - (b.ValidBetAmount * ci.ChargeRate11)) * ISNULL(ci_3rd.Rate3rd,0)
 					WHEN bt.ProductID = 32 THEN (b.LicenseeWinloss - b.FullContribution) * ISNULL(ci_3rd.Rate3rd,0)
 				ELSE (b.LicenseeWinloss - b.FullContribution) * ISNULL(ci_3rd.Rate3rd,0) - b.Promotion END
 				) AS PayToSupplier,
