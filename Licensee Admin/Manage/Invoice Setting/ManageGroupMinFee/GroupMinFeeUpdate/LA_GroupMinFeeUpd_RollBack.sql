@@ -17,6 +17,7 @@ AS
 
 	Revisions:
 		- 20200703@Happy: Implement Group Min Fee [#134492]
+		- 20230613@Danny: validation on currency when adding new payer [#188014]
 
 	Param's Explannation:
 		@GroupMinFeeHeaderOldData = '<Root>
@@ -131,8 +132,8 @@ BEGIN
 			INSERT INTO @GroupMinFeeSettingTable(ProductID, CurrencyId, FromDate, ToDate, MinimumFee, MinimumFeeTerm)
 			SELECT ProductID, CurrencyId, FromDate, ToDate, MinimumFee, MinimumFeeTerm
 			FROM OPENXML(@docHandler, 'Root/GroupMinFeeSetting')
-			WITH(ProductID INT 'ProductId', 
-					CurrencyId INT 'CurrencyId', 
+			WITH(ProductID INT 'ProductID', 
+					CurrencyId INT 'CurrencyID', 
 					FromDate DATE 'FromDate', 
 					ToDate DATE 'ToDate', 
 					MinimumFee MONEY 'MinimumFee', 

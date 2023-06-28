@@ -22,6 +22,7 @@ AS
 	Revisions:
 		- 20200703@Happy: Implement Group Min Fee [#134492]
 		- 20230417@Danny: Insert new log with more information [#FeatureID 175125]
+		- 20230613@Danny: validation on currency when adding new payer [#188014]
 
 	Param's Explannation:
 		@GroupMinFeeHeaderOldData = '<Root>
@@ -113,6 +114,12 @@ BEGIN
 	--#Region update LA_GroupMinFeeHeader
 	EXEC dbo.LA_GroupMinFeeHeaderUpd @GroupMinFeeID, @GroupName, @FromDate, @ToDate, @HeaderOldData OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT
 	--#Endregion
+
+		--#Region update LA_GroupMinFeeDetail
+	IF ISNULL(@ErrCode, 0) = 0
+	BEGIN
+		EXEC dbo.LA_GroupMinFeeDetailUpd @GroupMinFeeID, @GroupMinFeeSettingData, @DetailOldData OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT  
+	END
 	
 	--#Region update LA_GroupMinFeeAssignment
 	IF ISNULL(@ErrCode, 0) = 0
@@ -120,12 +127,7 @@ BEGIN
 		EXEC dbo.LA_GroupMinFeeAssignmentUpd @GroupMinFeeID, @LicenseeSettingData, @AssignmentOldData OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT  
 	END
 	--#Endregion
-	
-	--#Region update LA_GroupMinFeeDetail
-	IF ISNULL(@ErrCode, 0) = 0
-	BEGIN
-		EXEC dbo.LA_GroupMinFeeDetailUpd @GroupMinFeeID, @GroupMinFeeSettingData, @DetailOldData OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT  
-	END
+
 	--#Endregion
 	
 	IF @ErrCode <> 0

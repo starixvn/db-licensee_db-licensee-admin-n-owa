@@ -38,6 +38,7 @@ AS
 		- 20221205@Danny: Remove Hx9candy From Crypto Licensee List [RedmineID: #181279]
 		- 20230213@Malcolm: Fix duplicate data error [RemineID: #183774]
 		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
+		- 20230614@Danny: Enhance launch licensee function [#188014]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -315,7 +316,7 @@ BEGIN
 		
 		-- LA_MinFee
 		INSERT INTO dbo.LA_MinFee (PartyId, ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority], CurrencyId, MonthOfDeduction)
-		SELECT @NewPartyId, ProductId, FeeTypeId, FeeAmount, FromDate, ToDate, MinFeeTerm, [Priority], @BaseCurrencyId, MonthOfDeduction 
+		SELECT @NewPartyId, ProductId, FeeTypeId, FeeAmount, FromDate, CASE WHEN FeeTypeId = 2 THEN EOMONTH(ToDate) ELSE ToDate END, MinFeeTerm, [Priority], @BaseCurrencyId, MonthOfDeduction 
 		FROM @MinFeeSettings
 
 		-- LA_InvoiceSetting

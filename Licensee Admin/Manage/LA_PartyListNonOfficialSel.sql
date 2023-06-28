@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee,DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
 USE bodb_licensee
 GO
 
@@ -12,6 +12,7 @@ AS
 	Revisions:
 		- 20161109@Bruce: Initialize SP
 		- 20221109@Malcolm: add LicenseeCode, BaseCurrencyId [RedmineID : 175860]
+		- 20230623@Danny: Deploy SP on DBLIC [RedmineID : 187219]
 
 	Params:
 	Example:

@@ -22,6 +22,7 @@ AS
 	Revisions:
 		- 20200630@Happy: Implement Group Min Fee [#134492]
 		- 20230417@Danny: Insert new log with more information [#FeatureID 175125]
+		- 20230517@Danny: validation on currency when adding new payer [#188014]
 
 	Param's Explannation: 
 						@LicenseeSettingData = '<Root>
@@ -64,14 +65,14 @@ BEGIN
 	
 	IF @ErrCode = 0
 	BEGIN
-		EXEC dbo.LA_GroupMinFeeAssignmentIns @NewGroupMinFeeId, @LicenseeSettingData, @ErrCode OUTPUT, @ErrMsg OUTPUT
-	END
-	
-	IF @ErrCode = 0
-	BEGIN
 		EXEC dbo.LA_GroupMinFeeDetailIns @NewGroupMinFeeId, @GroupMinFeeSettingData, @ErrCode OUTPUT, @ErrMsg OUTPUT
 	END
-	
+
+	IF @ErrCode = 0
+	BEGIN
+		EXEC dbo.LA_GroupMinFeeAssignmentIns @NewGroupMinFeeId, @LicenseeSettingData, @ErrCode OUTPUT, @ErrMsg OUTPUT
+	END
+
 	IF @ErrCode <> 0
 	BEGIN
 		EXEC dbo.LA_GroupMinFeeIns_RollBack @NewGroupMinFeeId

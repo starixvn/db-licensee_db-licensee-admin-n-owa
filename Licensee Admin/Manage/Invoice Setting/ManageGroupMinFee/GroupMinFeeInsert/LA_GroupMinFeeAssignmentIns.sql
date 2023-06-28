@@ -15,6 +15,7 @@ AS
 
 	Revisions:
 		- 20200630@Happy: Implement Group Min Fee [#134492]
+		- 20230517@Danny: validation on currency when adding new payer [#188014]
 
 	Param's Explannation: 
 						@LicenseeSettingData = '<Root>
@@ -31,7 +32,11 @@ AS
 BEGIN
 	SET NOCOUNT ON;
 	
-	DECLARE @LicenseeSettings TABLE (PartyID INT, IsPrimary BIT)
+	DECLARE @LicenseeSettings TABLE (PartyID INT, IsPrimary BIT, BaseCurrencyID INT, GroupMinFeeCurr INT, PartyName VARCHAR(50))
+	DECLARE @GroupMinFeeCurr INT
+
+	SELECT @GroupMinFeeCurr = CurrencyId
+	FROM LA_GroupMinFeeDetail WITH(NOLOCK) WHERE GroupMinFeeID = @GroupMinFeeID
 	
 	IF(@LicenseeSettingData <> '')
 	BEGIN
@@ -39,11 +44,12 @@ BEGIN
 		
 		BEGIN TRY
 			EXEC sp_xml_preparedocument @docHandler OUTPUT, @LicenseeSettingData
-			INSERT INTO @LicenseeSettings(PartyID, IsPrimary)
-			SELECT PartyID, IsPrimary
+			INSERT INTO @LicenseeSettings(PartyID, IsPrimary, PartyName)
+			SELECT PartyID, IsPrimary, PartyName
 			FROM OPENXML(@docHandler, 'Root/LicenseeSetting')
 			WITH(PartyID INT 'PartyID',
-					IsPrimary BIT 'IsPrimary')
+					IsPrimary BIT 'IsPrimary',
+					PartyName VARCHAR(50) 'PartyName')
 				
 			EXEC sp_xml_removedocument @docHandler
 		END TRY
@@ -52,6 +58,13 @@ BEGIN
 			RETURN
 		END CATCH;
 	END
+
+	-- Get Base Currency Info
+	UPDATE t
+	SET	 t.BaseCurrencyID = u.BaseCurrencyId,
+		 t.GroupMinFeeCurr = @GroupMinFeeCurr
+	FROM @LicenseeSettings t
+	INNER JOIN OAS_PartyBaseCurrency u WITH(NOLOCK) ON t.PartyID = u.PartyID AND u.FromDate <= GETDATE() AND u.ToDate >= GETDATE()
 	
 	--A licensee belongs to only 1 group min fee
 	DECLARE @HeaderFromDate DATE,
@@ -83,6 +96,19 @@ BEGIN
 	IF EXISTS (SELECT 1 FROM @LicenseeSettings HAVING COUNT(CASE IsPrimary WHEN 1 THEN 1 ELSE NULL END) <> 1)
 	BEGIN
 		SELECT @ErrMsg = 'Please assign the primary licensee.', @ErrCode = 506
+		RETURN
+	END
+
+	-- validation on currency when adding new payer
+	IF EXISTS (SELECT 1 
+				FROM @LicenseeSettings
+				WHERE BaseCurrencyID <> GroupMinFeeCurr)
+	BEGIN
+		DECLARE @LicenseeList VARCHAR(4000) = ''
+		SELECT @LicenseeList = '('+STRING_AGG(PartyName,', ')+')'
+		FROM @LicenseeSettings  WHERE BaseCurrencyID <> GroupMinFeeCurr
+
+		SELECT @ErrMsg = 'Cannot save the setting, currency of payers ' + @LicenseeList + ' and group should be the same!' , @ErrCode = 506
 		RETURN
 	END
 	

@@ -1,11 +1,12 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_AmfSummary]
 	@Environment		VARCHAR(50),
 	@UserId				INT,
-	@FunctionKey		NVARCHAR(100)
+	@FunctionKey		NVARCHAR(100),
+	@LicenseeStatusIds	VARCHAR(100) = ''
 AS
 /*	Header:
 	Created: 20171226 - Bruce.Bui
@@ -19,13 +20,22 @@ AS
 		- 20190821@Parsons: Improve the ability to maintain systems [#118627]
 		- 20220418@Percy: Add Credit note for AMF [RedmineID: #164139]
 		- 20221109@Malcolm: add LicenseeCode, BaseCurrencyId [RedmineID : 175860]
+		- 20230516@Danny: Filter by OIC Licensee status [RedmineID : 187219]
+
+	+ @LicenseeStatusIds:	1	Up Coming
+						2	Soft Launch
+						3	Active
+						4	Terminated
+						5	Cancelled
+						6	Suspended
+						999	Unrecognized
 */
 BEGIN
 	SET NOCOUNT ON
 
 	-- Get Party List
 	BEGIN
-		DECLARE @PartyList TABLE (PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, LicenseeCode VARCHAR(50), BaseCurrencyId TINYINT)
+		DECLARE @PartyList TABLE (PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, LicenseeCode VARCHAR(50), BaseCurrencyId TINYINT, LicenseeStatusId INT)
 
 		-- Official Licensees
 		INSERT INTO @PartyList (PartyId, PartyName, BrandName, ParentId)
@@ -34,6 +44,24 @@ BEGIN
 		-- Non-Official Licensees
 		INSERT INTO @PartyList (PartyId, PartyName, BrandName, ParentId, LicenseeCode, BaseCurrencyId)
 		EXEC dbo.LA_PartyListNonOfficialSel
+
+		-- Filter by OIC status
+		DECLARE @statusTab TABLE (StatusId SMALLINT)
+		INSERT INTO @statusTab (StatusId)
+		SELECT CAST (value AS SMALLINT) FROM STRING_SPLIT(@LicenseeStatusIds,',')
+
+		UPDATE p
+		SET p.LicenseeStatusId = CASE WHEN oic.LicenseeStatusId IS NULL THEN 999 ELSE oic.LicenseeStatusId END
+		FROM @PartyList p
+		INNER JOIN dbo.OAS_Party op WITH(NOLOCK) ON op.PartyID = p.PartyId
+		LEFT JOIN dbo.Licensees l	WITH(NOLOCK) ON op.OldRefID = l.LicenseeID
+		LEFT JOIN  bodb_OIC.dbo.licensee oic WITH(NOLOCK) ON oic.RegisteredLicenseeName = l.LicenseeName
+		WHERE p.ParentId <> 0
+		
+		DELETE p
+		FROM @PartyList p
+		WHERE p.LicenseeStatusId NOT IN (SELECT z.StatusId FROM @statusTab z) AND p.ParentId <> 0
+
 	END
 
 	-- Get AMF, Prepayment & Credit note for Fees
