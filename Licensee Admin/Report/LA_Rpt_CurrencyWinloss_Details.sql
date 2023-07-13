@@ -435,6 +435,7 @@ BEGIN
 				WHEN 92 THEN 'HID'
 				WHEN 142 THEN 'USDT'
 				WHEN 96 THEN 'USD (USDT)'
+				WHEN 206 THEN 'USD (USDT)'
 				WHEN 202 THEN 'USD (USDTJP)'
 				ELSE Code END
 		FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)

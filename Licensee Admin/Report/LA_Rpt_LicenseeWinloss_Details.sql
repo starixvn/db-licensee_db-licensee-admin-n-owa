@@ -52,6 +52,7 @@ AS
 	- 20221226@Danny: Fiat currency Base to USDT = 0 [RedmineID: #180703]
 	- 20230217@Danny: Remove hard-code bettype And ProductID [#183739]
 	- 20230510@Danny: New commercial terms for 12B [RedmineID: #186543]
+	- 20230713@Danny: Incorporate USDT2 currency [RedmineID: #191165]
 
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -479,7 +480,7 @@ BEGIN
 	WHERE currency IN (51, 75, 76, 77, 92)	
 
 	UPDATE t1
-	SET CurrencyCode = t1.CurrencyCode + ' (' + CurrencyName + ')'
+	SET CurrencyCode = CASE WHEN currency = 206 THEN 'USD (USDT)' ELSE t1.CurrencyCode + ' (' + CurrencyName + ')' END
 	FROM @CurrencyTable t1
 	INNER JOIN (
 	   SELECT CurrencyCode
@@ -490,7 +491,7 @@ BEGIN
 	
 	--- Update USDT
 	UPDATE e
-	SET e.CurrencyCode = e.CurrencyCode + ' (' + e.CurrencyName + ')' 
+	SET e.CurrencyCode = e.CurrencyCode + ' (' + e.CurrencyName + ')'
 	FROM @CurrencyTable e
 	WHERE e.CurrencyName IN ('USDT','USDTJP') AND e.CurrencyCode = 'USD'
 

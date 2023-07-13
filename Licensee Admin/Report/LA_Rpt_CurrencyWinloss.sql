@@ -65,6 +65,7 @@ AS
 	   - 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 	   - 20230217@Danny: Remove hard-code bettype And ProductID [#183739]
 	   - 20230510@Danny: New commercial terms for 12B [RedmineID: #186543]
+	   - 20230713@Danny: Incorporate USDT2 currency [RedmineID: #191165]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -443,8 +444,8 @@ BEGIN
 		FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
 		DECLARE @Exchange TABLE (Currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
-		INSERT INTO @Exchange(Currency, CurrencyName, CurrencyCode)
-		SELECT e.ExchangeId, e.Currency
+		INSERT INTO @Exchange(Currency, CurrencyName , CurrencyCode)
+		SELECT e.ExchangeId, CASE WHEN e.ExchangeId = 206 THEN 'USDT' ELSE e.currency END
 			,CASE e.ExchangeId
 				WHEN 51 THEN 'INH'
 				WHEN 75 THEN 'PTU'
@@ -459,7 +460,7 @@ BEGIN
 		UPDATE e
 		SET CurrencyCode = e.CurrencyCode + ' (' + CurrencyName + ')'
 		FROM @Exchange e
-		WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1) OR e.Currency IN (96, 202)
+		WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1) OR e.Currency IN (96, 202, 206)
 	END
 
 	-- Result
