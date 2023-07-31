@@ -17,6 +17,7 @@ AS
 		- 20201003@Danny: Support USDT as base currency [RedmineID: #180313]
 		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 		- 20220206@Danny: Return more party detail (SuspendedDate, TerminatedDate) [RedmineID: #169160]
+		- 20230731@Danny: Incorporate USDT2 currency [RedmineID: #191165]
 */
 
 BEGIN
@@ -71,25 +72,37 @@ BEGIN
 	WHERE a.DiscountGroupId = @GroupId
 
 	-- Currency List
-	DECLARE @CurrencyList TABLE (LicenseeId INT, Currency INT)
-	INSERT INTO @CurrencyList (LicenseeId, Currency)
-	SELECT LicenseeId, Currency
-	FROM OPENQUERY(DBCUST, 'SELECT DISTINCT LicenseeId, Currency FROM bodb_Licensee.dbo.LA_f_SelLicenseeCust(0) WHERE Currency <> 20')
+	DECLARE @CurrencyList TABLE (LicenseeId INT, Currency INT, CurrencyCode VARCHAR(20), CurrencyName VARCHAR(50))
+	INSERT INTO @CurrencyList (LicenseeId, Currency, CurrencyCode, CurrencyName)
+	SELECT LicenseeId, Currency, CurrencyCode, CurrencyName
+	FROM OPENQUERY(DBCUST, 'SELECT DISTINCT lc.LicenseeId, lc.Currency ,
+									CASE WHEN lc.Currency = 92 THEN ''HID'' 
+										WHEN lc.Currency = 142 THEN ''USDT''
+										ELSE e.Code END AS CurrencyCode, 
+									CASE WHEN lc.Currency = 51 THEN ''VND'' 
+										 WHEN lc.Currency = 142 THEN ''USDT'' 
+										ELSE e.currency END AS CurrencyName
+							FROM bodb_Licensee.dbo.LA_f_SelLicenseeCust(0) lc
+							INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
+							WHERE lc.Currency <> 20')
+
+
+	UPDATE c1
+	SET c1.CurrencyCode = c1.CurrencyCode + ' (' + c1.CurrencyName + ')'
+	FROM @CurrencyList c1
+	INNER JOIN (
+		SELECT LicenseeId, CurrencyCode
+	    FROM @CurrencyList
+	    GROUP BY LicenseeId, CurrencyCode
+	    HAVING COUNT(1) > 1
+	) c2 ON c1.LicenseeId = c2.LicenseeId AND c1.CurrencyCode = c2.CurrencyCode
 	
 	SELECT  pl.PartyId, cl.Currency AS CurrencyId, 
-			CASE WHEN e.Code = 'UST' THEN 'USDT'   
-			ELSE
-				CASE WHEN e.Code = 'USD' AND e.Currency = 'USDT' THEN 'USD (USDT)'  
-					 WHEN e.Code = 'USD' AND e.Currency = 'USDTJP' THEN 'USD (USDTJP)'  
-				ELSE e.Code 
-				END 
-			END
-			AS CurrencyName, 
+			cl.CurrencyCode CurrencyName, 
 			ISNULL(c.CalculationType, 0) AS CalculationType
 		
 	FROM @PartyList pl
 		INNER JOIN @CurrencyList cl ON pl.LicenseeId = cl.LicenseeId
-		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON cl.Currency = e.ExchangeId
 		LEFT JOIN dbo.LA_DiscountGroupCurrency c WITH (NOLOCK) ON pl.PartyId = c.PartyId AND cl.Currency = c.CurrencyId AND c.DiscountGroupId = @GroupId
 END
 GO
