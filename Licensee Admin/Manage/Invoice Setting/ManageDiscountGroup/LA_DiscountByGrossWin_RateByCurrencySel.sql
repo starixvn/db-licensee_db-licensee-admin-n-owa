@@ -14,8 +14,10 @@ AS
 	 DB: DBLIC.bodb_licensee
 	 Task: Manage Discount Group - Discount By Gross Win - PopUp Discount rate information
 	 
+	 
 	 Revisions:
 		- 20221201@Danny: Initialize SP [RedmineID: #169160]
+		- 20230801@Danny: Incorporate USDT2 currency [RedmineID: #191165]
 	 Params:
 	 @CurrencySettingsData = '<Root>
 								<CurrencySetting>
@@ -35,7 +37,7 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @CurrencyXML XML = CONVERT(XML, @CurrencySettingsData)
-	DECLARE @CurrencyList TABLE (PartyId INT, CurrencyId INT)
+	DECLARE @CurrencyList TABLE (PartyId INT, CurrencyId INT, CurrencyCode VARCHAR(20), CurrencyName VARCHAR(50))
 
 	INSERT INTO @CurrencyList (PartyId, CurrencyId)
 	SELECT x.PartyId, y.CurrencyId
@@ -52,13 +54,28 @@ BEGIN
 	) y
 	OPTION (OPTIMIZE FOR (@CurrencyXML = NULL))
 
+	UPDATE c
+	SET c.CurrencyCode = e.Code,
+		c.CurrencyName = e.currency
+	FROM @CurrencyList c 
+	INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON c.CurrencyId = e.ExchangeId
+
+	UPDATE c1
+	SET c1.CurrencyCode = c1.CurrencyCode + ' (' + c1.CurrencyName + ')'
+	FROM @CurrencyList c1
+	INNER JOIN (
+		SELECT PartyId, CurrencyCode
+	    FROM @CurrencyList
+	    GROUP BY PartyId, CurrencyCode
+	    HAVING COUNT(1) > 1
+	) c2 ON c1.PartyId = c2.PartyId AND c1.CurrencyCode = c2.CurrencyCode
 
 	IF (@DiscountGroupId IS NULL OR  @DiscountGroupId = 0)-- Get current chargeRate
 	BEGIN
 		; WITH t AS
 		(
 		SELECT  op.PartyName, 
-				CASE WHEN c.CurrencyId IN (96, 202) THEN e.Code + ' (' + e.currency+ ')'  ELSE  e.Code END AS CurrencyName,  
+				c.CurrencyCode AS CurrencyName,  
 				e.ExchangeID AS CurrencyID,
 				CASE WHEN lc.Rate IS NOT NULL THEN lc.Rate ELSE oc.Rate END ChargeRateByCurrency
 				,@ChargeRateAfterDiscount AS ChargeRateAfterDiscount
@@ -92,7 +109,7 @@ BEGIN
 		; WITH t AS
 		(
 		SELECT  op.PartyName, 
-				CASE WHEN c.CurrencyId IN (96, 202) THEN e.Code + ' (' + e.currency+ ')'  ELSE  e.Code END AS CurrencyName,  
+				c.CurrencyCode AS CurrencyName,  
 				e.ExchangeID AS CurrencyID,
 				CASE WHEN lc.Rate IS NOT NULL THEN lc.Rate ELSE oc.Rate END ChargeRateByCurrency
 				,@ChargeRateAfterDiscount AS ChargeRateAfterDiscount
