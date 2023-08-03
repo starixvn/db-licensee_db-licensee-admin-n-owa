@@ -88,6 +88,60 @@ BEGIN
 	SELECT 74, 74, 'Player Tips', 157 , 0
 
 	-- Get AmountToCompany data
+
+	--#tmpNAPData_PT (WinlostDate, Currency, Bettype, apositiontaking, LicenseeWL, AmountToCompany, PartyID, BaseCurrencyID, ProductID)
+	CREATE TABLE #tmpData_rptLicWinloss2 (
+		WinlostDate		SMALLDATETIME, 
+		Currency		INT, 
+		Bettype			INT, 
+		apositiontaking FLOAT, 
+		winlost			MONEY,
+		swinlost		MONEY,
+		mwinlost		MONEY,
+		awinlost		MONEY,
+		scomm			MONEY,
+		recommend		INT,
+		IsBA			BIT,
+		Sporttype		INT,
+		PartyID INT, 
+		BaseCurrencyID INT, 
+		BaseCurrencuName VARCHAR(12)
+	)
+
+	CREATE CLUSTERED INDEX cix_#tmpData_rptLicWinloss2 ON #tmpData_rptLicWinloss2(recommend, WinlostDate, Currency)
+
+	INSERT INTO #tmpData_rptLicWinloss2 (WinlostDate, Currency, Bettype, apositiontaking, winlost, swinlost,mwinlost,awinlost,scomm,recommend, IsBA, Sporttype, PartyID, BaseCurrencyID, BaseCurrencuName)
+		SELECT b.WinlostDate, 
+			   b.Currency,
+			   b.bettype,
+			   b.apositiontaking,
+			   SUM(ISNULL(winlost,0)) winlost,
+			   SUM(ISNULL(swinlost,0)) swinlost,
+			   SUM(ISNULL(mwinlost,0)) mwinlost,
+			   SUM(ISNULL(awinlost,0)) awinlost,
+			   SUM(ISNULL(scomm,0)) scomm,
+			   b.recommend,
+			   b.isBA,
+			   b.sporttype,
+			   r.PartyID,
+			   r.BaseCurrencyID,
+			   r.BaseCurrency
+	FROM bodb_LicenseeReport.dbo.rptLicWinloss2 b WITH (NOLOCK)
+		INNER JOIN @recommend r ON b.recommend = r.recommend
+	WHERE b.WinlostDate BETWEEN @FromDate AND @ToDate
+		AND b.roleId = 2
+		AND b.statusId IN (111, 112, 113, 114, 115)
+	GROUP BY b.WinlostDate, 
+			b.Currency,
+			b.bettype,
+			b.recommend,
+			b.apositiontaking,
+			 b.isBA,
+			 b.sporttype,
+			 r.PartyID,
+			 r.BaseCurrencyID,
+			 r.BaseCurrency
+
 	CREATE TABLE #tmpData (WinlostDate SMALLDATETIME, Currency INT, Sporttype INT, Bettype INT, IsBA BIT, AmountToCompany MONEY, PartyID INT, BaseCurrencyID INT, BaseCurrencuName VARCHAR(12))
 	INSERT INTO #tmpData (WinlostDate, Currency, Sporttype, Bettype, IsBA, AmountToCompany, PartyID, BaseCurrencyID, BaseCurrencuName)
 	SELECT b.WinlostDate, b.Currency
@@ -95,22 +149,18 @@ BEGIN
 		,CASE WHEN b.bettype = 17005 THEN b.bettype ELSE 0 END
 		,b.isBA
 		,-SUM(ISNULL(b.swinlost, 0) + ISNULL(b.mwinlost, 0) + ISNULL(b.awinlost, 0) + ISNULL(b.winlost, 0) + ISNULL(b.scomm, 0)) AS AmountToCompany
-		,r.PartyID
-		,r.BaseCurrencyID
-		,r.BaseCurrency
-	FROM bodb_LicenseeReport.dbo.rptLicWinloss2 b WITH (NOLOCK)
-		INNER JOIN @recommend r ON b.recommend = r.recommend
-	WHERE b.WinlostDate BETWEEN @FromDate AND @ToDate
-		AND b.roleId = 2
-		AND b.statusId IN (111, 112, 113, 114, 115)
-		AND b.bettype NOT IN (901, 902, 911, 912)
+		,b.PartyID
+		,b.BaseCurrencyID
+		,b.BaseCurrencuName
+	FROM #tmpData_rptLicWinloss2 b
+	WHERE b.bettype NOT IN (901, 902, 911, 912)
 	GROUP BY b.recommend, b.WinlostDate, b.Currency
 		,CASE WHEN b.bettype IN (911, 912, 913, 914) THEN -1 ELSE b.sporttype END
 		,CASE WHEN b.bettype = 17005 THEN b.bettype ELSE 0 END
-		,b.isBA -- group by on index recommend
-		,r.PartyID
-		,r.BaseCurrencyID
-		,r.BaseCurrency
+		,b.isBA 
+		,b.PartyID
+		,b.BaseCurrencyID
+		,b.BaseCurrencuName
 
 	-- Return data
 	-- Note: Saba promotion treat ProductId is max, always on bottom
@@ -459,9 +509,12 @@ BEGIN
 			FROM @Result_adj t
 			CROSS APPLY (
 				SELECT STRING_AGG(CHAR(9) + CHAR(9) + FORMAT(u.winlostdate,'MMM dd, yyyy') + ': Adjustment for transaction on ' + FORMAT(u.actual_winlostdate,'MMM dd, yyyy'), CHAR(13)) Remark
-				FROM #tmpNAPData u
-				WHERE t.PartyID = u.PartyID AND t.ProductID = u.ProductID AND t.BaseCurrencyID = u.BaseCurrencyID
-				AND u.actual_winlostdate NOT BETWEEN @FromDate AND @ToDate
+				FROM (		
+							SELECT DISTINCT  u.winlostdate, u.actual_winlostdate
+							FROM	#tmpNAPData u
+							WHERE t.PartyID = u.PartyID AND t.ProductID = u.ProductID AND t.BaseCurrencyID = u.BaseCurrencyID
+							AND u.actual_winlostdate NOT BETWEEN @FromDate AND @ToDate
+					)u
 			) u
 			WHERE t.[Type] = 'Adjustment without this month'
 
@@ -605,7 +658,7 @@ BEGIN
 				,-SUM(ISNULL(b.winlost, 0)) AS LicenseeWL
 				,SUM(ISNULL(b.swinlost, 0) + ISNULL(b.mwinlost, 0) + ISNULL(b.awinlost, 0) + ISNULL(b.winlost, 0) + ISNULL(b.scomm, 0)) AS AmountToCompany
 				, r.PartyID, r.BaseCurrencyID, f.ProductID
-			FROM bodb_LicenseeReport.dbo.rptLicWinloss2 b WITH (NOLOCK)
+			FROM #tmpData_rptLicWinloss2 b WITH (NOLOCK)
 				INNER JOIN @recommend_PT r ON b.recommend = r.recommend
 				INNER JOIN (
 					SELECT DISTINCT CONVERT(SMALLINT, t.SportType) AS SportType, CASE WHEN t.ProductID = 1THEN 0 ELSE p3d.Productid END Productid
@@ -613,11 +666,9 @@ BEGIN
 					LEFT JOIN dbo.Product3rd p3d WITH(NOLOCK) ON t.ProductCode = p3d.ProductPrefix
 				) f ON b.sporttype = f.SportType
 			WHERE b.WinlostDate BETWEEN @FromDate AND @ToDate
-				AND b.roleId = 2
-				AND b.statusId IN (111, 112, 113, 114, 115)
 				AND b.bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914)
 				AND b.IsBA = 0
-			GROUP BY b.recommend, b.WinlostDate, b.Currency, b.Bettype, b.apositiontaking, r.PartyID, r.BaseCurrencyID, f.ProductID -- group by on index recommend
+			GROUP BY b.recommend, b.WinlostDate, b.Currency, b.Bettype, b.apositiontaking, r.PartyID, r.BaseCurrencyID, f.ProductID 
 	
 		END
 
@@ -635,7 +686,8 @@ BEGIN
 			PartyID					INT,
 			BaseCurrencyID			INT,
 			ProductID				INT,
-			firstday_PT				DATETIME
+			firstday_PT				DATETIME,
+			isSamePT				BIT DEFAULT 0
 		)
 
 		-- LA
@@ -725,10 +777,33 @@ BEGIN
 		DECLARE  @Remark_ChargeRate TABLE (PartyID INT, ProductID INT, BaseCurrencyID INT, Remark VARCHAR(4000) )
 		DECLARE  @Remark_Adj TABLE (PartyID INT, ProductID INT, BaseCurrencyID INT, Remark VARCHAR(4000) )
 
+		;WITH t AS
+		(
+			SELECT Func, PartyID, ProductID, BaseCurrencyID, COUNT(DISTINCT ChargeRate) cnt, MIN(ChargeRate) minc, MAX(ChargeRate) maxc, MIN(firstday_PT) firstday_PT
+			FROM @Result_PT
+			GROUP BY Func, PartyID, ProductID, BaseCurrencyID
+		), u AS
+		(
+			SELECT	ISNULL(t1.ProductID, t2.ProductID) ProductID, 
+					ISNULL(t1.PartyID, t2.PartyID) PartyID, 
+					ISNULL(t1.BaseCurrencyID, t2.BaseCurrencyID) BaseCurrencyID, 
+					CASE WHEN t1.cnt <> t2.cnt THEN 0
+					     WHEN t1.cnt = t2.cnt AND t1.maxc = t2.maxc AND t1.minc = t2.minc  AND t1.firstday_PT <= t2.firstday_PT THEN 1
+						 ELSE 0 END IsSamePT
+			FROM  t t1  FULL JOIN t t2 ON t2.Func = 'NAP' AND t1.ProductID = t2.ProductID AND t1.PartyID = t2.PartyID AND t1.BaseCurrencyID = t2.BaseCurrencyID
+			WHERE t1.Func = 'LA'
+		)
+		UPDATE pt
+		SET		pt.isSamePT = u.IsSamePT
+		FROM    @Result_PT pt
+		INNER JOIN u ON pt.ProductID = u.ProductID AND pt.PartyID = u.PartyID AND u.IsSamePT = 1 AND pt.BaseCurrencyID = u.BaseCurrencyID
+		WHERE pt.ProductID NOT IN (0, 31, 10)
+
 		; WITH  u_chargeRate AS
 		(
 			SELECT  Func, PartyID, ProductID, STRING_AGG(CAST(ChargeRate * 100 AS VARCHAR(10)) + '%', ', ') ChargeRate, firstday_PT, BaseCurrencyID
 			FROM	@Result_PT
+			WHERE   isSamePT = 0
 			GROUP BY  Func,PartyID, ProductID, firstday_PT, BaseCurrencyID
 		), z AS 
 		(
@@ -741,6 +816,13 @@ BEGIN
 		INSERT INTO @Remark_ChargeRate (PartyID, ProductID, BaseCurrencyID, Remark)
 		SELECT PartyID, ProductID, BaseCurrencyID, 'Due to the differences on product charge rate' + CHAR(13) + STRING_AGG(Remark, CHAR(13)) Remark
 		FROM	z 
+		WHERE ProductID NOT IN (10, 31)
+		GROUP BY PartyID, ProductID, BaseCurrencyID
+
+		INSERT INTO @Remark_ChargeRate (PartyID, ProductID, BaseCurrencyID, Remark)
+		SELECT PartyID, ProductID, BaseCurrencyID, 'Please contact StarixIT for support' Remark
+		FROM	@Result_PT
+		WHERE	isSamePT = 1
 		GROUP BY PartyID, ProductID, BaseCurrencyID
 
 
@@ -748,7 +830,10 @@ BEGIN
 		(
 			SELECt PartyID, Func ,ProductID, BaseCurrencyID,  CASE WHEN Type = 'Actual Bet' THEN CHAR(9) + '- Actual bet this month: ' + FORMAT(BasedAmountToCompany,'N','en-us')
 														ELSE CHAR(9) + '- Adjustment without this month: ' + FORMAT(BasedAmountToCompany,'N','en-us') + Char(13) + Remark  END Remark
-			FROM @Result_adj
+			FROM (
+					SELECT   PartyID, Func ,ProductID, BaseCurrencyID, Remark, SUM(BasedAmountToCompany) BasedAmountToCompany, Type from @Result_adj
+					GROUP BY PartyID, Func ,ProductID, BaseCurrencyID, Remark, Type
+			) t
 		), u AS
 		(
 		SELECT PartyID, ProductID, BaseCurrencyID, CASE WHEN Func = 'NAP' THEN 'NAP:' + CHAR(13) ELSE 'LA:' + ChAR(13) END +  STRING_AGG(Remark, CHAR(13))  Remark
@@ -792,7 +877,8 @@ BEGIN
 			SELECT ISNULL(ra.PartyID, rc.PartyID) PartyID, 
 				   ISNULL(ra.ProductID, rc.ProductID) ProductID,
 				   ISNULL(ra.BaseCurrencyID, rc.BaseCurrencyID)  BaseCurrencyID,
-				  CASE WHEN ra.Remark IS NULL THEN ISNULL(rc.Remark,'') ELSE CONCAT(ra.Remark, CHAR(13) + CHAR(13), ISNULL(rc.Remark,''))  END Remark
+				  CASE WHEN ra.Remark IS NULL THEN ISNULL(rc.Remark,'') ELSE 
+					CASE WHEN rc.Remark IS NULL THEN  ISNULL(ra.Remark,'') ELSE CONCAT(ra.Remark, CHAR(13) + CHAR(13), ISNULL(rc.Remark,'')) END  END Remark
 			FROM @Remark_Adj ra 
 			FULL JOIN @Remark_ChargeRate rc ON ra.PartyID = rc.PartyID AND ra.ProductID = rc.ProductID AND ra.BaseCurrencyID = rc.BaseCurrencyID
 		)
@@ -814,7 +900,7 @@ BEGIN
 
 
 	END
-	
+	DROP TABLE #tmpData_rptLicWinloss2
 	DROP TABLE #LA_Data
 	DROP TABLE #NAP_Data
 	DROP TABLE #tmpData
