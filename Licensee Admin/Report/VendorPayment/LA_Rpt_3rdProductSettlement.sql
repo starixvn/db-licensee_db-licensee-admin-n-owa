@@ -29,6 +29,7 @@ AS
 	- 20230410@Danny: Change PayToSupplier fomular [RedmineID: #186543]
 	- 20230518@Danny: Integrate YeeBet [RedmineID: #187948]
 	- 20230608@Danny: Integrate Promotion Prize - PG Soft [RedmineID: #188997]
+	- 20230807@Danny: Handle JV group formula (all products) [RedmineID: #190901]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
@@ -1513,19 +1514,18 @@ BEGIN
 		SUM(td.CustomerWinLoss) ,
 		SUM(td.LicenseeWinLoss) ,
 		SUM(CASE
-				WHEN td.IsKeepNegativeAmount = 1 AND td.ProductID IN (2,5,8,27,28,45,67,68) THEN  td.LicensingFee
-				 WHEN e.ProductID IS NOT NULL THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 THEN 0 ELSE td.LicenseeChargeRate END + td.LicenseeContribution - td.JackpotPrize - td.Promotion END 
-				  WHEN td.ProductID IN (21, 73, 34, 45, 55) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 THEN 0 ELSE td.LicenseeChargeRate END  END - td.Promotion
-				 WHEN td.LicensingFee < 0 AND p.isKeepNegativeFee = 0 THEN 0 
+				
+				 WHEN e.ProductID IS NOT NULL THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END + td.LicenseeContribution - td.JackpotPrize - td.Promotion END 
+				  WHEN td.ProductID IN (21, 73, 34, 45, 55) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  END - td.Promotion 
+				 WHEN td.LicensingFee < 0 AND p.isKeepNegativeFee = 0 AND td.IsKeepNegativeAmount = 0  THEN 0 
 				 ELSE td.LicensingFee END + td.CompanyTipShare) AS LicensingFee,
 		SUM(td.ExtraPT),
 		SUM(CASE WHEN td.PayToSupplier < 0 AND p.isKeepNegativePayToSupplier = 0 THEN 0 ELSE td.PayToSupplier END) AS PayToSupplier,
 		
 		SUM(CASE WHEN td.ProductID = 23 THEN td.LicenseeWinLoss
-		         WHEN td.IsKeepNegativeAmount = 1 AND td.ProductID IN (2,5,8,27,28,45,67,68) THEN  td.LicensingFee
-				 WHEN e.ProductID IS NOT NULL THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 THEN 0 ELSE td.LicenseeChargeRate END  + td.LicenseeContribution - td.JackpotPrize - td.Promotion END  
-				  WHEN td.ProductID IN (21, 73, 34, 45, 55) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 THEN 0 ELSE td.LicenseeChargeRate END  END - td.Promotion
-				  WHEN td.LicensingFee < 0 AND p.isKeepNegativeFee = 0 THEN 0 
+				 WHEN e.ProductID IS NOT NULL THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  + td.LicenseeContribution - td.JackpotPrize - td.Promotion END  
+				  WHEN td.ProductID IN (21, 73, 34, 45, 55) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  END - td.Promotion
+				  WHEN td.LicensingFee < 0 AND p.isKeepNegativeFee = 0 AND td.IsKeepNegativeAmount = 0 THEN 0 
 				 ELSE td.LicensingFee END + td.CompanyTipShare)
 		- SUM(CASE WHEN td.ProductID = 2 THEN td.ExtraPT ELSE 0 END) 
 		- SUM(CASE WHEN td.PayToSupplier < 0 AND p.isKeepNegativePayToSupplier = 0 THEN 0 ELSE td.PayToSupplier END)  AS CompanyIncome,
