@@ -36,6 +36,7 @@ AS
 		- 20241201@Danny: Enhance rule regen data [RedmineID: #199448]
 		- 20240312@Danny: Fix issue when exec SP with @IsOverwrite = 0 [RedmineID: #202151]
 		- 20240401@Danny: Change meta data [#203267]
+		- 20231003@Danny: Integrate boost bonus for mix parlay ticket [#191662]
 
 */
 
@@ -195,7 +196,7 @@ BEGIN
 		(
 			PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
 			,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000)
-			,Winloss MONEY, Turnover MONEY, TurnoverNoDraw MONEY, BetCount INT, BaseCurrencyId INT, ExtraInfo NVARCHAR(4000)
+			,Winloss MONEY, Turnover MONEY, TurnoverNoDraw MONEY, BetCount INT, BaseCurrencyId INT, ExtraInfo NVARCHAR(4000), HouseParlayBoostBonus MONEY
 		)
 
 		WHILE 1 = 1
@@ -217,16 +218,29 @@ BEGIN
 				,@FromDate = @FromDate
 				,@ToDate = @ToDate
 				,@BaseCurrencyName = @CurrencyName
-				,@LicensingFeeTypeIds= '0,13'
+				,@LicensingFeeTypeIds= '0,12,13'
 
-			IF @isRecalRebate =1 AND @FromDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
+			IF EXISTS (SELECT TOP 1 1 FROM @Result WHERE LicensingFeeTypeId = 12)
 			BEGIN
+				UPDATE r
+				SET r.HouseParlayBoostBonus = ISNULL(r12.ExtraAmount,0) - ISNULL(r12.LicensingFee,0)
+				FROM @Result r
+				INNER JOIN @Result r12 ON r12.PartyId = r.PartyId AND r12.ProductId = r.ProductId AND r12.LicensingFeeTypeId = 12
+				WHERE r.ProductId = 0 AND r.LicensingFeeTypeId = 0
+
+				DELETE FROM @Result WHERE LicensingFeeTypeId = 12
+			END
+			
+			IF @isRecalRebate =1 AND @FromDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
+			BEGIN	
 				DECLARE @Result_OldSetting TABLE
 				(
 					PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
 					,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000)
 					,BetCount INT, Turnover MONEY, MemberWL MONEY, BACommission MONEY, IsPrevious BIT, ExtraInfo NVARCHAR(4000)
 				)
+
+
 				INSERT INTO @Result_OldSetting
 				(
 					PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
@@ -287,7 +301,7 @@ BEGIN
 	INSERT INTO dbo.rptLicPerformanceAnalysis
 	(
 		ReportDate, SiteId, ProductId, CurrencyId, IsBillingCurrency
-		,BetCount, Turnover, TurnoverNoDraw, LicenseeWinloss, LicensingFee, Discount, Rebate, Adjustment
+		,BetCount, Turnover, TurnoverNoDraw, LicenseeWinloss, LicensingFee, Discount, Rebate, Adjustment, HouseParlayBoostBonus
 	)
 	SELECT @ReportDate, p.SiteId, r.ProductId, r.BaseCurrencyId
 		,CASE WHEN r.BaseCurrencyId = p.BaseCurrencyId THEN 1 ELSE 0 END AS IsBillingCurrency
@@ -299,6 +313,7 @@ BEGIN
 		,r.Discount
 		,r.Rebate
 		,0 AS Adjustment
+		,r.HouseParlayBoostBonus
 	FROM @Result r
 		INNER JOIN @tmpPartyList p ON r.PartyId = p.PartyId
 END

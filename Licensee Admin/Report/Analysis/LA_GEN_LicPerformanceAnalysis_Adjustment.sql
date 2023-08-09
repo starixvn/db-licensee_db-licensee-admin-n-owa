@@ -24,6 +24,7 @@ AS
 		- 20230815@Danny: Handle crypto licensee billing with fiat currency [RedmineID: #192378]
 		- 20240401@Danny: Change meta data [#203267]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
+		- 20231003@Danny: Integrate boost bonus for mix parlay ticket [#191662]
 
 */
 BEGIN
@@ -119,7 +120,7 @@ BEGIN
 		SELECT TOP 1 @Code=Code, @CurrencyId = CurrencyId FROM @tmpBaseCurrencyList
 		DELETE @tmpBaseCurrencyList WHERE @Code = Code
 
-		INSERT INTO dbo.rptLicPerformanceAnalysis(ReportDate,SiteId,ProductId,CurrencyId,BetCount,Turnover,TurnoverNoDraw,LicenseeWinloss,LicensingFee,Discount,Rebate,IsBillingCurrency,Adjustment)
+		INSERT INTO dbo.rptLicPerformanceAnalysis(ReportDate,SiteId,ProductId,CurrencyId,BetCount,Turnover,TurnoverNoDraw,LicenseeWinloss,LicensingFee,Discount,Rebate,IsBillingCurrency,Adjustment,HouseParlayBoostBonus)
 		SELECT @ReportDate,SiteId,@AdjustmentId,@CurrencyId,0,0,0,0,0,0,0,
 			CASE WHEN @CurrencyId = BaseCurrencyId THEN 1 ELSE 0 END AS IsBillingCurrency,
 			SUM(CASE
@@ -128,7 +129,7 @@ BEGIN
 				WHEN @Code = 'MYR' THEN MYR
 				WHEN @Code = 'GBP' THEN GBP
 				ELSE EUR
-			END)
+			END), 0
 		FROM @tmpAmounts
 		GROUP BY SiteId, CASE WHEN @CurrencyId = BaseCurrencyId THEN 1 ELSE 0 END
 	END

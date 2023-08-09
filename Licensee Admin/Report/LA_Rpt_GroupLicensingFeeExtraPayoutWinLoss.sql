@@ -22,6 +22,7 @@ AS
 	   - 20220222@Danny: Allbet - Promotion integration [#167510]
 	   - 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
 	   - 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+	   - 20231010@Danny: Integrate boost bonus for mix parlay ticket [#191662]
 */
 
 BEGIN
@@ -32,7 +33,7 @@ BEGIN
 
 	DECLARE @Data AS TABLE(rptDate DATE, PartyId INT, ProductId INT, CurrencyId INT, Turnover MONEY, BetCount INT, CustomerWL MONEY, LicenseeWL MONEY,
 						Contribution MONEY, ServiceFee MONEY, JackpotPrize MONEY, FreeBetAmount MONEY, PromotionPrize MONEY, LicensingFee MONEY, ActualServiceFee MONEY,
-						BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
+						BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), FullParlayBoostBonus MONEY, HouseParlayBoostBonus MONEY,OddsSpreadCost MONEY)
 	
 	DECLARE @LicenseBaseCurrency AS TABLE (LicenseeId INT, PartyId INT, BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
 	INSERT INTO @LicenseBaseCurrency(LicenseeId, PartyId, BaseCurrencyId, BaseCurrencyName)
@@ -51,19 +52,22 @@ BEGIN
 
 	;WITH cte_Data AS(
 		SELECT b.rptDate, b.SiteID, b.ProductID, b.CurrencyId,
-			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR g.TypeId IN (2,3,4,5,6,8) THEN 0
+			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR g.TypeId IN (2,3,4,5,6,7,8,9) THEN 0
 					 ELSE ISNULL(b.BetCount, 0)  
 				END) AS BetCount,
-			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR g.TypeId IN (2,3,4,5,6,8) THEN 0 
+			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR g.TypeId IN (2,3,4,5,6,7,8) THEN 0 
 					 ELSE ISNULL(b.Turnover, 0)
 				END) AS Turnover,
-			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR g.TypeId IN (2,3,4,5,6,8) THEN 0 
+			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR g.TypeId IN (2,3,4,5,6,7,8) THEN 0 
 					 ELSE ISNULL(b.MemberWL, 0)
 				END) AS CustomerWL,
 			SUM(CASE WHEN g.TypeId =2 THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS Contribution,
 			SUM(CASE WHEN g.TypeId =3 THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS JackpotPrize,
 			SUM(CASE WHEN g.TypeId IN (4,5,6,8) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS PromotionPrize,
-			SUM(CASE WHEN ISNULL(b.TicketType, 0) = @FreeBetsTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END)	AS FreeBetAmount
+			SUM(CASE WHEN ISNULL(b.TicketType, 0) = @FreeBetsTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END)	AS FreeBetAmount,
+			SUM(CASE WHEN g.TypeId = 7 THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AS OddsSpreadCost,
+			SUM(CASE WHEN g.TypeId = 9 THEN ISNULL(-b.ValidBetAmount, 0) ELSE 0 END) AS FullParlayBoostBonus,
+			SUM(CASE WHEN g.TypeId = 9 THEN ISNULL(b.ValidBetAmount, 0) - ISNULL(b.ExtraAmount, 0) ELSE 0 END) AS HouseParlayBoostBonus
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 		INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 		LEFT JOIN @GroupBettype g ON b.Bettype = g.Bettype
@@ -72,7 +76,7 @@ BEGIN
 		AND b.customercategory NOT IN (27, 28)
 		GROUP BY b.SiteID, b.ProductID, b.CurrencyId, b.rptDate
 	)
-	INSERT INTO @Data(rptDate, ProductId, PartyId, CurrencyId, Turnover, BetCount, CustomerWL, LicenseeWL, Contribution, JackpotPrize, PromotionPrize, FreeBetAmount, ServiceFee)
+	INSERT INTO @Data(rptDate, ProductId, PartyId, CurrencyId, Turnover, BetCount, CustomerWL, LicenseeWL, Contribution, JackpotPrize, PromotionPrize, FreeBetAmount, ServiceFee, FullParlayBoostBonus, HouseParlayBoostBonus, OddsSpreadCost)
 	SELECT d.rptDate, d.ProductID,ci.PartyID, d.CurrencyId,
 		SUM(d.Turnover) AS Turnover,
 		SUM(d.BetCount)	AS BetCount,
@@ -82,7 +86,10 @@ BEGIN
 		SUM(d.JackpotPrize)	AS JackpotPrize,
 		SUM(d.PromotionPrize) AS PromotionPrize,
 		SUM(d.FreeBetAmount) AS FreeBetAmount,
-		SUM((-d.CustomerWL - d.Contribution) * ISNULL(cr.Rate, ci.Rate)) AS ServiceFee
+		SUM((-d.CustomerWL - d.Contribution - d.FullParlayBoostBonus) * ISNULL(cr.Rate, ci.Rate)) AS ServiceFee,
+		SUM(d.FullParlayBoostBonus) AS FullParlayBoostBonus,
+		SUM(d.HouseParlayBoostBonus) AS HouseParlayBoostBonus,
+		SUM(d.OddsSpreadCost) AS HouseParlayBoostBonus
 	FROM cte_Data d
 	INNER JOIN @ChargeInfo ci ON d.SiteID = ci.LicenseeID AND d.ProductID = ci.ProductID AND d.rptDate BETWEEN ci.FromDate AND ci.ToDate
 	LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
@@ -125,13 +132,14 @@ BEGIN
 	UPDATE d
 	SET d.ActualServiceFee	= CASE WHEN t.TotalServiceFee_InBaseCurrency_ByParty < 0 AND jvp.PartyId IS NULL THEN 0 ELSE d.ServiceFee END,
 		d.LicensingFee		= CASE WHEN t.TotalServiceFee_InBaseCurrency_ByParty < 0 AND jvp.PartyId IS NULL THEN 0 ELSE d.ServiceFee END
-								+ d.Contribution - d.JackpotPrize - d.PromotionPrize - d.FreeBetAmount
+								+ d.Contribution - d.JackpotPrize - d.PromotionPrize - d.FreeBetAmount - d.HouseParlayBoostBonus
 	FROM @Data d 
 	INNER JOIN cte_TotalServiceFee_BaseCurrency t ON d.ProductId = t.ProductId AND d.PartyId = t.PartyId
 	LEFT JOIN dbo.LA_f_JVPartyListSel() jvp ON d.PartyId = jvp.PartyId
 	
 	SELECT 
 		-- Original
+		@ToDate				AS WinLostDate,
 		d.ProductId				AS ProductId,
 		prd.ProductName			AS ProductName,
 		prd.ProductPrefix		AS ProductCode,
@@ -152,6 +160,9 @@ BEGIN
 		SUM(d.ServiceFee)		AS LicenseeChargeRate,
 		SUM(d.LicensingFee)		AS Company,
 		SUM(d.PromotionPrize)	AS WinningPrize,
+		SUM(d.FullParlayBoostBonus)		AS FullParlayBoostBonus,
+		SUM(d.HouseParlayBoostBonus)	AS HouseParlayBoostBonus,
+		SUM(d.OddsSpreadCost)	AS OddsSpreadCost,
 		-- Base on EUR
 		SUM(d.Turnover * e.BaseCurrencyRate)		AS TurnoverBase,
 		SUM(d.CustomerWL * e.BaseCurrencyRate)		AS MemberWinlossBase,
@@ -161,7 +172,10 @@ BEGIN
 		SUM(d.FreeBetAmount * e.BaseCurrencyRate)	AS FreeBetAmountBase,
 		SUM(d.ActualServiceFee * e.BaseCurrencyRate)AS LicenseeChargeRateBase,
 		SUM(d.LicensingFee * e.BaseCurrencyRate)	AS CompanyBaseCurrency,
-		SUM(d.PromotionPrize * e.BaseCurrencyRate)	AS WinningPrizeBase
+		SUM(d.PromotionPrize * e.BaseCurrencyRate)	AS WinningPrizeBase,
+		SUM(d.FullParlayBoostBonus * e.BaseCurrencyRate)	AS FullParlayBoostBonusBase,
+		SUM(d.HouseParlayBoostBonus * e.BaseCurrencyRate)	AS HouseParlayBoostBonusBase,
+		SUM(d.OddsSpreadCost * e.BaseCurrencyRate)	AS OddsSpreadCostBase
 	FROM @Data d 
 	INNER JOIN OAS_Party p WITH(NOLOCK) ON d.PartyId = p.PartyID
 	INNER JOIN @ExchangeRate e ON d.CurrencyId = e.ExchangeId AND e.exchangedate = d.rptDate AND e.BaseCurrencyId = d.BaseCurrencyId

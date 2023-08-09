@@ -54,6 +54,7 @@ AS
 		- 20231218@Danny: Integrate Promotion Prize - Live22 [RedmineID: #197267]
 		- 20240201@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
 		- 20240710@Danny: Integrate Fast spin product[RedmineID: #206246]
+		- 20231003@Danny: Integrate boost bonus for mix parlay ticket [#191662]
 */
 
 BEGIN
@@ -135,7 +136,7 @@ BEGIN
 			,@ProductCodes = @ProductCodes
 			,@FromDate = @FromDate
 			,@ToDate = @ToDate
-			,@LicensingFeeTypeIds = '0,-1,1,2,3,4,5,6,10,13' -- Contribution, Prize, ...
+			,@LicensingFeeTypeIds = '0,-1,1,2,3,4,5,6,10,12,13' -- Contribution, Prize, ...
 			,@BaseCurrencyName = @BaseCurrencyName
 			,@Environment = @Environment
 
@@ -165,7 +166,7 @@ BEGIN
 
 		-- Prize, Contribution, Promotion, ...
 		INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, RemainingAmount, AmountType)
-		SELECT 0, '', '', SUM(ExtraAmount), 0
+		SELECT 0, '', '', SUM(CASE WHEN ProductId = 0 AND LicensingFeeTypeId = 12 THEN ISNULL(LicensingFee,0) - ISNULL(ExtraAmount,0) ELSE ExtraAmount END), 0
 			,CASE
 				WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
 				WHEN ProductId = 32 AND LicensingFeeTypeId = 2 THEN 32 -- JackpotPrize
@@ -187,13 +188,14 @@ BEGIN
 				WHEN ProductId = 55 AND LicensingFeeTypeId = 3 THEN 50 -- Prizes
 				WHEN ProductId = -37 AND LicensingFeeTypeId = 13 THEN 52 -- Casino promotion
 				WHEN ProductId = 79 AND LicensingFeeTypeId = 3 THEN 53 -- Prizes
+				WHEN ProductId = 0 AND LicensingFeeTypeId = 12 THEN 51 -- Parlay Boost Bonus
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 1 THEN 55 -- Contribution
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 2 THEN 56 -- JackpotPrize
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 3 THEN 54 -- Prizes
 				WHEN ProductId = 87 AND LicensingFeeTypeId = 3 THEN 57 -- Prizes
 				END
 		FROM @Result
-		WHERE ProductId IN (10, 32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79, 87) AND LicensingFeeTypeId > 0
+		WHERE ProductId IN (10, 32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79, 0, 87) AND LicensingFeeTypeId > 0
 		GROUP BY
 			CASE
 				WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
@@ -216,6 +218,7 @@ BEGIN
 				WHEN ProductId = 55 AND LicensingFeeTypeId = 3 THEN 50 -- Prizes
 				WHEN ProductId = -37 AND LicensingFeeTypeId = 13 THEN 52 -- Casino promotion
 				WHEN ProductId = 79 AND LicensingFeeTypeId = 3 THEN 53 -- Prizes
+				WHEN ProductId = 0 AND LicensingFeeTypeId = 12 THEN 51 -- Parlay Boost Bonus
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 1 THEN 55 -- Contribution
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 2 THEN 56 -- JackpotPrize
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 3 THEN 54 -- Prizes

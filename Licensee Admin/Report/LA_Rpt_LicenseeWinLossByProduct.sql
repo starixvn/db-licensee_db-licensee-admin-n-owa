@@ -82,6 +82,7 @@ AS
 		- 20220314@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 		- 20230217@Danny: Remove hard-code bettype And ProductID [#183739]
 		- 20230510@Danny: New commercial terms for 12B [RedmineID: #186543]
+		- 20231003@Danny: Integrate boost bonus for mix parlay ticket [#191662]
 */
 		
 /*	Example:
@@ -114,7 +115,7 @@ BEGIN
 	CREATE TABLE #Exchange (ExchangeDate DATE,ExchangeID INT,CurrencyCode VARCHAR(65),Rate FLOAT)
 	CREATE TABLE #rpt_bettingByProduct (SiteID INT,rptDate DATETIME,CurrencyId INT,MemberWL MONEY,GrossWL MONEY,CommissionA MONEY,CommissionP MONEY,ProductId TINYINT, Bettype INT,
 	Turnover MONEY, BuyBackAmount MONEY, WinPrizeAmount MONEY, ValidBetAmount MONEY, TicketType TINYINT, ExtraAmount MONEY, CashOutAmount MONEY)
-	CREATE TABLE #TempData (LicenseeId	INT,rptDate	DATETIME,CurrencyId	INT,MemberWL MONEY,AWinLoss	MONEY,AComm	MONEY,PComm	MONEY,ProductId	TINYINT,BettypeRef INT)
+	CREATE TABLE #TempData (LicenseeId	INT,rptDate	DATETIME,CurrencyId	INT,MemberWL MONEY,AWinLoss	MONEY,AComm	MONEY,PComm	MONEY,ProductId	TINYINT,BettypeRef INT,  ValidBetAmount MONEY, ExtraAmount MONEY)
 	CREATE TABLE #Result(PartyID INT,ProductID INT,Amount MONEY)
 	CREATE TABLE #PartyIdTable (Id INT NOT NULL, StatusID INT)
 	CREATE TABLE #TempPartyList (PartyId INT,PartyName VARCHAR(200),BranchName	VARCHAR(200),ParentId INT)
@@ -137,7 +138,7 @@ BEGIN
 		ORDER BY ProductId
 
 		INSERT INTO @ProductHaveExtraAmtList(ProductID)
-		SELECT DISTiNCT ProductId FROM LA_f_GroupBettype() WHERE TypeId NOT IN (1,7)
+		SELECT DISTiNCT ProductId FROM LA_f_GroupBettype() WHERE TypeId NOT IN (1,7,9)
 	END
 	
 	-- Handle Licensee status
@@ -202,7 +203,7 @@ BEGIN
 	GROUP BY b.rptdate, b.SiteId, b.CurrencyID, t.GroupProductId, b.Bettype, b.TicketType
 	CREATE CLUSTERED INDEX CIX_#rpt_bettingByProduct ON #rpt_bettingByProduct(ProductId, SiteID)
 
-	INSERT INTO #TempData (LicenseeId,rptDate,CurrencyId,MemberWL,AWinLoss,AComm,PComm,ProductId,BettypeRef)
+	INSERT INTO #TempData (LicenseeId,rptDate,CurrencyId,MemberWL,AWinLoss,AComm,PComm,ProductId,BettypeRef, ValidBetAmount, ExtraAmount)
 	SELECT	b.SiteID,
 			b.rptDate,
 			b.CurrencyID,
@@ -211,7 +212,9 @@ BEGIN
 			SUM(ISNULL(b.CommissionA, 0)) AS AComm,
 			SUM(ISNULL(b.CommissionP, 0)) AS PComm,
 			t.GroupProductId AS ProductId,
-			CASE WHEN eb.TypeId IN (1,7) THEN b.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END AS BettypeRef
+			CASE WHEN eb.TypeId IN (1,7,9) THEN b.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END AS BettypeRef,
+			SUM(ISNULL(b.ValidBetAmount, 0)) AS ValidBetAmount,
+			SUM(ISNULL(b.ExtraAmount, 0)) AS ExtraAmount
 	FROM	#rpt_bettingByProduct b
 			INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON b.SiteID = p.OldRefID AND p.PartyType = 1
 			INNER JOIN #Products t ON b.ProductId = t.ProductId
@@ -220,8 +223,8 @@ BEGIN
 
 	WHERE	( b.ProductID NOT IN (15,25)
 			OR b.ProductId NOT IN (SELECT x.ProductID FROM @ProductHaveExtraAmtList x)
-			) AND (eb.Bettype IS NULL OR eb.TypeId IN (1, 7)) --1:Tips ,7:OddsSpread Adjustment
-	GROUP BY b.rptdate, b.SiteId, b.CurrencyID, t.GroupProductId, CASE WHEN eb.TypeId IN (1,7) THEN b.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
+			) AND (eb.Bettype IS NULL OR eb.TypeId IN (1, 7, 9)) --1:Tips ,7:OddsSpread Adjustment, 9:Parlay Boost Adjustment
+	GROUP BY b.rptdate, b.SiteId, b.CurrencyID, t.GroupProductId, CASE WHEN eb.TypeId IN (1,7,9) THEN b.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
 	CREATE CLUSTERED INDEX #TempData ON #TempData(ProductId, LicenseeId)
 	-- EndRegion
 
@@ -334,8 +337,9 @@ BEGIN
 	;WITH cte_SBWinLost AS
 	(
 		SELECT  ci.PartyID
-		, SUM(CASE WHEN b.BettypeRef = 999 THEN 0 ELSE ISNULL(-b.MemberWL, 0) END * ISNULL(cr.Rate, ci.Rate) * e.Rate) AS LicencingFee
+		, SUM(CASE WHEN b.BettypeRef = 999 THEN 0 ELSE ISNULL(-b.MemberWL, 0) + ISNULL(b.ValidBetAmount,0) END * ISNULL(cr.Rate, ci.Rate) * e.Rate) AS LicensingFee
 		, SUM(CASE WHEN b.BettypeRef = 999 THEN ISNULL(-b.AWinLoss, 0) ELSE 0 END * e.Rate) AS OddsSpreadCost
+		, SUM(CASE WHEN b.BettypeRef = 998 THEN ISNULL(b.ValidBetAmount,0) - ISNULL(b.ExtraAmount,0) ELSE 0 END * e.Rate) AS HouseParlayBoostBonus
 		FROM #TempData b
 		INNER JOIN @PartyChargeInfo ci ON b.LicenseeId = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
 		INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
@@ -345,7 +349,7 @@ BEGIN
 		GROUP BY ci.PartyId
 	)
 	INSERT INTO #Result(PartyId, ProductID, Amount)
-	SELECT PartyId, 0, cte.LicencingFee + CASE WHEN cte.OddsSpreadCost < 0 THEN 0 ELSE cte.OddsSpreadCost END
+	SELECT PartyId, 0, cte.LicencingFee + CASE WHEN cte.OddsSpreadCost < 0 THEN 0 ELSE cte.OddsSpreadCost END - cte.HouseParlayBoostBonus 
 	FROM cte_SBWinLost cte
 	-- End SportsBook
 

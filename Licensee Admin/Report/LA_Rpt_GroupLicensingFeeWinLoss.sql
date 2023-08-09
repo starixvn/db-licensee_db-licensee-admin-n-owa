@@ -30,6 +30,7 @@ AS
 		- 20230713@Danny: Incorporate USDT2 currency [RedmineID: #191165]
 		- 20230823@Danny: Incorporate US$KH currency [RedmineID: #192544]
 		- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
+		- 20231003@Danny: Integrate boost bonus for mix parlay ticket [#191662]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -95,11 +96,11 @@ BEGIN
 
 	-- Get data
 	BEGIN
-		CREATE TABLE #tmpData (rptDate DATE, SiteId INT, ProductId INT, CurrencyId INT, BetType INT, Winloss MONEY, AWinloss MONEY, AComm MONEY)
+		CREATE TABLE #tmpData (rptDate DATE, SiteId INT, ProductId INT, CurrencyId INT, BetType INT, Winloss MONEY, AWinloss MONEY, AComm MONEY, FullParlayBoostBonus MONEY DEFAULT 0)
 		CREATE TABLE #tmpResult (PartyId INT, PartyName VARCHAR(50), ProductId INT, ProductName VARCHAR(50), CurrencyId INT, Company MONEY, OddsSpread MONEY, BasedOddsSpread MONEY)
 
-		INSERT INTO #tmpData (rptDate, SiteId, ProductId, CurrencyId, BetType, Winloss, AWinloss, AComm)
-		SELECT rptDate, SiteId, ProductId, CurrencyId, BetType, SUM(MemberWL), SUM(GrossWL), SUM(CommissionA)
+		INSERT INTO #tmpData (rptDate, SiteId, ProductId, CurrencyId, BetType, Winloss, AWinloss, AComm, FullParlayBoostBonus)
+		SELECT rptDate, SiteId, ProductId, CurrencyId, BetType, SUM(MemberWL), SUM(GrossWL), SUM(CommissionA), SUM(ValidBetAmount)
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct WITH (NOLOCK)
 		WHERE rptDate BETWEEN @FromDate AND @ToDate
 			AND CustomerCategory NOT IN (27, 28)
@@ -125,7 +126,7 @@ BEGIN
 			,SUM(CASE
 					WHEN gb.TypeId = 7 THEN 0 -- OddsSpread Adjustment
 					WHEN gb.TypeId = 2 THEN t.AWinloss -- Contribution
-					ELSE -t.Winloss END * ISNULL(cr.Rate, c.Rate)
+					ELSE -t.Winloss + t.FullParlayBoostBonus END * ISNULL(cr.Rate, c.Rate)
 					- CASE WHEN c.ProductId IN (3, 25) THEN t.AComm ELSE 0 END
 				) AS Company
 			,SUM(CASE WHEN gb.TypeId = 7 THEN -t.AWinloss ELSE 0 END) AS OddsSpread
@@ -137,7 +138,7 @@ BEGIN
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON c.ChargeId = cr.ChargeId AND t.CurrencyId = cr.CurrencyId
 			INNER JOIN @PartyList pl ON c.PartyId = pl.PartyId
 			INNER JOIN @ExchangeRate e ON t.rptDate = e.ExchangeDate AND t.CurrencyId = e.ExchangeId AND pl.BaseCurrencyId = e.BaseCurrencyId
-		WHERE gb.Bettype IS NULL OR gb.TypeId IN (2, 7)
+		WHERE gb.Bettype IS NULL OR gb.TypeId IN (2, 7, 9)
 		GROUP BY pl.PartyId, pl.PartyName, p.GroupProductId, p.GroupProductName, e.ExchangeId
 
 		-- Set OddsSpread = 0 if negative value

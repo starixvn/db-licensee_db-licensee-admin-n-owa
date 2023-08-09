@@ -55,7 +55,7 @@ AS
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 	- 20230217@Danny: Remove hard-code bettype And ProductID [#183739]
-	- 20230510@Danny: New commercial terms for 12B [RedmineID: #186543]
+	- 20231003@Danny: Integrate boost bonus for mix parlay ticket [#191662]
 	
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -99,7 +99,8 @@ BEGIN
 	DECLARE @BaseCurrency TABLE (BaseCurrencyId INT, BaseCurrencyName VARCHAR(10))
 
 	CREATE TABLE #Report (PartyID INT, ReportDate DATE, CurrencyID INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY, 
-						AmtDueToBA MONEY, CommBA MONEY, Company MONEY, Betcount INT, OddsSpreadCost MONEY)
+						AmtDueToBA MONEY, CommBA MONEY, Company MONEY, Betcount INT, OddsSpreadCost MONEY, FullParlayBoostBonus MONEY, LicenseeParlayBoostBonus MONEY)
+
 
 	CREATE TABLE #Exchange (BaseCurrencyId INT, ExchangeId INT, ExchangeDate DATE, Code VARCHAR(65), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, CNY FLOAT, Base FLOAT, USDT FLOAT)
 	
@@ -430,8 +431,10 @@ BEGIN
 			, SUM(CASE WHEN g.TypeId IN (2,7) THEN 0 ELSE b.MemberWL END) Winloss
 			, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END) PComm
 			, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionA ELSE 0 END) AComm
-			, SUM(b.betcount * CASE WHEN (@drawfilter = 2 AND b.StatusId = 111) OR g.TypeId IN (2,7) THEN 0 ELSE 1 END) BetCount 
+			, SUM(b.betcount * CASE WHEN (@drawfilter = 2 AND b.StatusId = 111) OR g.TypeId IN (2,7,9) THEN 0 ELSE 1 END) BetCount 
 			, SUM(CASE WHEN g.TypeId IN (2,7) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AWinloss
+			, SUM(CASE WHEN g.TypeId = 9 THEN ISNULL(-b.ValidBetAmount,0) ELSE 0 END) FullParlayBoostBonus
+			, SUM(CASE WHEN g.TypeId = 9 THEN ISNULL(-b.ExtraAmount,0) ELSE 0 END) LicenseeParlayBoostBonus
 		INTO #TmpData
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #Products p ON b.ProductId = p.ProductId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
@@ -439,8 +442,8 @@ BEGIN
 				SELECT DISTINCT PartyId, LicenseeId, ProductID 
 				FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)
 			) ci ON b.SiteID = ci.LicenseeID AND p.GroupProductId = ci.ProductID
-			LEFT JOIN bodb_licensee.dbo.LA_f_GroupBettype() eb ON b.Bettype = eb.Bettype AND eb.TypeID NOT IN (7,2) -- 7:OddsSpread Adjustment, 2:Jackpot Contribution
-			LEFT JOIN bodb_licensee.dbo.LA_f_GroupBettype() g ON b.Bettype = g.Bettype  AND g.TypeID  IN (7,2)
+			LEFT JOIN bodb_licensee.dbo.LA_f_GroupBettype() eb ON b.Bettype = eb.Bettype AND eb.TypeID NOT IN (7,2,9) -- 7:OddsSpread Adjustment, 2:Jackpot Contribution, 9:Parlay Boost Adjustment
+			LEFT JOIN bodb_licensee.dbo.LA_f_GroupBettype() g ON b.Bettype = g.Bettype  AND g.TypeID  IN (7,2,9)
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.StatusId NOT IN (- 1, 101, 102, 103)
 			AND (@Currency = 0 OR b.CurrencyID = @Currency)
@@ -450,7 +453,7 @@ BEGIN
 			AND	ISNULL(b.TicketType,0) <> 2 -- Free_Bets_TicketType
 		GROUP BY b.rptDate, ci.PartyID, p.GroupProductId, b.CurrencyID
 
-		INSERT INTO #Report (PartyID, ReportDate, CurrencyID, Turnover, Winlost, LicenseeWL,Company, Betcount, OddsSpreadCost)
+		INSERT INTO #Report (PartyID, ReportDate, CurrencyID, Turnover, Winlost, LicenseeWL,Company, Betcount, OddsSpreadCost, FullParlayBoostBonus, LicenseeParlayBoostBonus)
 		SELECT ci.PartyID, rptDate, b.CurrencyId
 			, SUM(b.turnover) Turnover
 			, SUM(b.Winloss + CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS Winloss
@@ -458,10 +461,12 @@ BEGIN
 			, SUM(
 					CASE WHEN b.ProductID=31 THEN CASE WHEN b.rptDate < @ExchangeTerm_CutOffDate THEN -b.Winloss * ISNULL(cc.Rate,ci.Rate) - (b.AComm + b.PComm)
 												  ELSE  -(b.Winloss + PComm) * ISNULL(cc.Rate,ci.Rate) END
-					ELSE (-b.Winloss - CASE WHEN p.ProductID IS NOT NULL THEN AWinloss ELSE 0 END) * ISNULL(cc.Rate,ci.Rate) END
+					ELSE (-b.Winloss - CASE WHEN p.ProductID IS NOT NULL THEN AWinloss ELSE 0 END - b.FullParlayBoostBonus) * ISNULL(cc.Rate,ci.Rate) END
 				 ) Company
 			, SUM(b.betcount) AS betcount
 			, SUM(CASE WHEN b.ProductID = 0 THEN AWinloss ELSE 0 END) AS OddsSpreadCost
+			, SUM(b.FullParlayBoostBonus) FullParlayBoostBonus
+			, SUM(b.LicenseeParlayBoostBonus) LicenseeParlayBoostBonus
 		FROM #TmpData b WITH (NOLOCK)
 			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate, ChargeId, ChargeType FROM @ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID=ci.ChargeId AND cc.CurrencyID=b.CurrencyId
@@ -516,23 +521,23 @@ BEGIN
 	-- Result
 	BEGIN
 		CREATE TABLE #Result (PartyId INT, PartyName VARCHAR(50), ReportDate VARCHAR(6), TotalTransaction INT
-			,Turnover MONEY, CustomerWinLoss MONEY, LicenseeWinLoss MONEY, AmountDueToBA MONEY, BACommission MONEY, AmountCompany MONEY, OddsSpreadCost MONEY
-			,TurnoverMYR MONEY, CustomerWinLossMYR MONEY, LicenseeWinLossMYR MONEY, AmountDueToBAMYR MONEY, BACommissionMYR MONEY, AmountCompanyMYR MONEY, OddsSpreadCostMYR MONEY
-			,TurnoverUSD MONEY, CustomerWinLossUSD MONEY, LicenseeWinLossUSD MONEY, AmountDueToBAUSD MONEY, BACommissionUSD MONEY, AmountCompanyUSD MONEY, OddsSpreadCostUSD MONEY
-			,TurnoverEUR MONEY, CustomerWinLossEUR MONEY, LicenseeWinLossEUR MONEY, AmountDueToBAEUR MONEY, BACommissionEUR MONEY, AmountCompanyEUR MONEY, OddsSpreadCostEUR MONEY
-			,TurnoverGBP MONEY, CustomerWinLossGBP MONEY, LicenseeWinLossGBP MONEY, AmountDueToBAGBP MONEY, BACommissionGBP MONEY, AmountCompanyGBP MONEY, OddsSpreadCostGBP MONEY
-			,TurnoverCNY MONEY, CustomerWinLossCNY MONEY, LicenseeWinLossCNY MONEY, AmountDueToBACNY MONEY, BACommissionCNY MONEY, AmountCompanyCNY MONEY, OddsSpreadCostCNY MONEY
-			,TurnoverUSDT MONEY, CustomerWinLossUSDT MONEY, LicenseeWinLossUSDT MONEY, AmountDueToBAUSDT MONEY, BACommissionUSDT MONEY, AmountCompanyUSDT MONEY, OddsSpreadCostUSDT MONEY
+			,Turnover MONEY, CustomerWinLoss MONEY, LicenseeWinLoss MONEY, AmountDueToBA MONEY, BACommission MONEY, AmountCompany MONEY, OddsSpreadCost MONEY, FullParlayBoostBonus MONEY, LicenseeParlayBoostBonus MONEY
+			,TurnoverMYR MONEY, CustomerWinLossMYR MONEY, LicenseeWinLossMYR MONEY, AmountDueToBAMYR MONEY, BACommissionMYR MONEY, AmountCompanyMYR MONEY, OddsSpreadCostMYR MONEY, FullParlayBoostBonusMYR MONEY, LicenseeParlayBoostBonusMYR MONEY
+			,TurnoverUSD MONEY, CustomerWinLossUSD MONEY, LicenseeWinLossUSD MONEY, AmountDueToBAUSD MONEY, BACommissionUSD MONEY, AmountCompanyUSD MONEY, OddsSpreadCostUSD MONEY, FullParlayBoostBonusUSD MONEY, LicenseeParlayBoostBonusUSD MONEY
+			,TurnoverEUR MONEY, CustomerWinLossEUR MONEY, LicenseeWinLossEUR MONEY, AmountDueToBAEUR MONEY, BACommissionEUR MONEY, AmountCompanyEUR MONEY, OddsSpreadCostEUR MONEY, FullParlayBoostBonusEUR MONEY, LicenseeParlayBoostBonusEUR  MONEY
+			,TurnoverGBP MONEY, CustomerWinLossGBP MONEY, LicenseeWinLossGBP MONEY, AmountDueToBAGBP MONEY, BACommissionGBP MONEY, AmountCompanyGBP MONEY, OddsSpreadCostGBP MONEY, FullParlayBoostBonusGBP MONEY, LicenseeParlayBoostBonusGBP MONEY
+			,TurnoverCNY MONEY, CustomerWinLossCNY MONEY, LicenseeWinLossCNY MONEY, AmountDueToBACNY MONEY, BACommissionCNY MONEY, AmountCompanyCNY MONEY, OddsSpreadCostCNY MONEY, FullParlayBoostBonusCNY MONEY, LicenseeParlayBoostBonusCNY MONEY
+			,TurnoverUSDT MONEY, CustomerWinLossUSDT MONEY, LicenseeWinLossUSDT MONEY, AmountDueToBAUSDT MONEY, BACommissionUSDT MONEY, AmountCompanyUSDT MONEY, OddsSpreadCostUSDT MONEY, FullParlayBoostBonusUSDT MONEY, LicenseeParlayBoostBonusUSDT MONEY
 			,IsShowOddsSpread BIT)
 		
 		INSERT INTO #Result (PartyId, PartyName, ReportDate, TotalTransaction
-			,Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueToBA, BACommission, AmountCompany, OddsSpreadCost
-			,TurnoverMYR, CustomerWinLossMYR, LicenseeWinLossMYR, AmountDueToBAMYR, BACommissionMYR, AmountCompanyMYR, OddsSpreadCostMYR
-			,TurnoverUSD, CustomerWinLossUSD, LicenseeWinLossUSD, AmountDueToBAUSD, BACommissionUSD, AmountCompanyUSD, OddsSpreadCostUSD
-			,TurnoverEUR, CustomerWinLossEUR, LicenseeWinLossEUR, AmountDueToBAEUR, BACommissionEUR, AmountCompanyEUR, OddsSpreadCostEUR
-			,TurnoverGBP, CustomerWinLossGBP, LicenseeWinLossGBP, AmountDueToBAGBP, BACommissionGBP, AmountCompanyGBP, OddsSpreadCostGBP
-			,TurnoverCNY, CustomerWinLossCNY, LicenseeWinLossCNY, AmountDueToBACNY, BACommissionCNY, AmountCompanyCNY, OddsSpreadCostCNY
-			,TurnoverUSDT, CustomerWinLossUSDT, LicenseeWinLossUSDT, AmountDueToBAUSDT, BACommissionUSDT, AmountCompanyUSDT, OddsSpreadCostUSDT)
+			,Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueToBA, BACommission, AmountCompany, OddsSpreadCost, FullParlayBoostBonus, LicenseeParlayBoostBonus
+			,TurnoverMYR, CustomerWinLossMYR, LicenseeWinLossMYR, AmountDueToBAMYR, BACommissionMYR, AmountCompanyMYR, OddsSpreadCostMYR, FullParlayBoostBonusMYR, LicenseeParlayBoostBonusMYR
+			,TurnoverUSD, CustomerWinLossUSD, LicenseeWinLossUSD, AmountDueToBAUSD, BACommissionUSD, AmountCompanyUSD, OddsSpreadCostUSD, FullParlayBoostBonusUSD, LicenseeParlayBoostBonusUSD
+			,TurnoverEUR, CustomerWinLossEUR, LicenseeWinLossEUR, AmountDueToBAEUR, BACommissionEUR, AmountCompanyEUR, OddsSpreadCostEUR, FullParlayBoostBonusEUR, LicenseeParlayBoostBonusEUR
+			,TurnoverGBP, CustomerWinLossGBP, LicenseeWinLossGBP, AmountDueToBAGBP, BACommissionGBP, AmountCompanyGBP, OddsSpreadCostGBP, FullParlayBoostBonusGBP, LicenseeParlayBoostBonusGBP
+			,TurnoverCNY, CustomerWinLossCNY, LicenseeWinLossCNY, AmountDueToBACNY, BACommissionCNY, AmountCompanyCNY, OddsSpreadCostCNY, FullParlayBoostBonusCNY, LicenseeParlayBoostBonusCNY
+			,TurnoverUSDT, CustomerWinLossUSDT, LicenseeWinLossUSDT, AmountDueToBAUSDT, BACommissionUSDT, AmountCompanyUSDT, OddsSpreadCostUSDT, FullParlayBoostBonusUSDT, LicenseeParlayBoostBonusUSDT)
 		SELECT b.PartyId
 			,CASE p.PartyName
 		 		WHEN '18bb' THEN 'PIH'
@@ -549,6 +554,8 @@ BEGIN
 			,SUM(CommBA * e.Base) AS BACommission
 			,SUM(Company * e.Base) AS AmountCompany
 			,SUM(OddsSpreadCost * e.Base) AS OddsSpreadCost
+			,SUM(FullParlayBoostBonus * e.Base) AS FullParlayBoostBonus
+			,SUM(LicenseeParlayBoostBonus * e.Base) AS OddsSpreadCost
 			-- MYR
 			,SUM(Turnover * e.MYR) AS TurnoverMYR
 			,SUM(Winlost * e.MYR) AS CustomerWinLossMYR
@@ -557,6 +564,8 @@ BEGIN
 			,SUM(CommBA * e.MYR) AS BACommissionMYR
 			,SUM(Company * e.MYR) AS AmountCompanyMYR
 			,SUM(OddsSpreadCost * e.MYR) AS OddsSpreadCostMYR
+			,SUM(FullParlayBoostBonus * e.MYR) AS FullParlayBoostBonusMYR
+			,SUM(LicenseeParlayBoostBonus * e.MYR) AS OddsSpreadCostMYR
 			-- USD
 			,SUM(Turnover * e.USD) AS TurnoverUSD
 			,SUM(Winlost * e.USD) AS CustomerWinLossUSD
@@ -565,6 +574,8 @@ BEGIN
 			,SUM(CommBA * e.USD) AS BACommissionUSD
 			,SUM(Company * e.USD) AS AmountCompanyUSD
 			,SUM(OddsSpreadCost * e.USD) AS OddsSpreadCostUSD
+			,SUM(FullParlayBoostBonus * e.USD) AS FullParlayBoostBonusUSD
+			,SUM(LicenseeParlayBoostBonus * e.USD) AS OddsSpreadCostUSD
 			-- EUR
 			,SUM(Turnover * e.EUR) AS TurnoverEUR
 			,SUM(Winlost * e.EUR) AS CustomerWinLossEUR
@@ -573,6 +584,8 @@ BEGIN
 			,SUM(CommBA * e.EUR) AS BACommissionEUR
 			,SUM(Company * e.EUR) AS AmountCompanyEUR
 			,SUM(OddsSpreadCost * e.EUR) AS OddsSpreadCostEUR
+			,SUM(FullParlayBoostBonus * e.EUR) AS FullParlayBoostBonusEUR
+			,SUM(LicenseeParlayBoostBonus * e.EUR) AS OddsSpreadCostEUR
 			-- GBP
 			,SUM(Turnover * e.GBP) AS TurnoverGBP
 			,SUM(Winlost * e.GBP) AS CustomerWinLossGBP
@@ -581,6 +594,8 @@ BEGIN
 			,SUM(CommBA * e.GBP) AS BACommissionGBP
 			,SUM(Company * e.GBP) AS AmountCompanyGBP
 			,SUM(OddsSpreadCost * e.GBP) AS OddsSpreadCostGBP
+			,SUM(FullParlayBoostBonus * e.GBP) AS FullParlayBoostBonusGBP
+			,SUM(LicenseeParlayBoostBonus * e.GBP) AS OddsSpreadCostGBP
 			-- CNY
 			,SUM(Turnover * e.CNY) AS TurnoverCNY
 			,SUM(Winlost * e.CNY) AS CustomerWinLossCNY
@@ -589,6 +604,8 @@ BEGIN
 			,SUM(CommBA * e.CNY) AS BACommissionCNY
 			,SUM(Company * e.CNY) AS AmountCompanyCNY
 			,SUM(OddsSpreadCost * e.CNY) AS OddsSpreadCostCNY
+			,SUM(FullParlayBoostBonus * e.CNY) AS FullParlayBoostBonusCNY
+			,SUM(LicenseeParlayBoostBonus * e.CNY) AS OddsSpreadCostCNY
 
 			-- USDT
 			,SUM(Turnover * e.USDT) AS TurnoverUSDT
@@ -598,6 +615,8 @@ BEGIN
 			,SUM(CommBA * e.USDT) AS BACommissionUSDT
 			,SUM(Company * e.USDT) AS AmountCompanyUSDT
 			,SUM(OddsSpreadCost * e.USDT) AS OddsSpreadCostUSDT
+			,SUM(FullParlayBoostBonus * e.USDT) AS FullParlayBoostBonusUSDT
+			,SUM(LicenseeParlayBoostBonus * e.USDT) AS OddsSpreadCostUSDT
 		FROM #Report b
 			INNER JOIN #Exchange e ON e.ExchangeDate = b.ReportDate AND e.ExchangeId = b.CurrencyID
 			INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON p.PartyID = b.PartyID
@@ -647,13 +666,13 @@ BEGIN
 
 	-- Return data
 	SELECT PartyId, PartyName, ReportDate, TotalTransaction
-		,Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueToBA, BACommission, AmountCompany, OddsSpreadCost
-		,TurnoverMYR, CustomerWinLossMYR, LicenseeWinLossMYR, AmountDueToBAMYR, BACommissionMYR, AmountCompanyMYR, OddsSpreadCostMYR
-		,TurnoverUSD, CustomerWinLossUSD, LicenseeWinLossUSD, AmountDueToBAUSD, BACommissionUSD, AmountCompanyUSD, OddsSpreadCostUSD
-		,TurnoverEUR, CustomerWinLossEUR, LicenseeWinLossEUR, AmountDueToBAEUR, BACommissionEUR, AmountCompanyEUR, OddsSpreadCostEUR
-		,TurnoverGBP, CustomerWinLossGBP, LicenseeWinLossGBP, AmountDueToBAGBP, BACommissionGBP, AmountCompanyGBP, OddsSpreadCostGBP
-		,TurnoverCNY, CustomerWinLossCNY, LicenseeWinLossCNY, AmountDueToBACNY, BACommissionCNY, AmountCompanyCNY, OddsSpreadCostCNY
-		,TurnoverUSDT, CustomerWinLossUSDT, LicenseeWinLossUSDT, AmountDueToBAUSDT, BACommissionUSDT, AmountCompanyUSDT, OddsSpreadCostUSDT
+		,Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueToBA, BACommission, AmountCompany, OddsSpreadCost, FullParlayBoostBonus, LicenseeParlayBoostBonus
+		,TurnoverMYR, CustomerWinLossMYR, LicenseeWinLossMYR, AmountDueToBAMYR, BACommissionMYR, AmountCompanyMYR, OddsSpreadCostMYR, FullParlayBoostBonusMYR, LicenseeParlayBoostBonusMYR
+		,TurnoverUSD, CustomerWinLossUSD, LicenseeWinLossUSD, AmountDueToBAUSD, BACommissionUSD, AmountCompanyUSD, OddsSpreadCostUSD, FullParlayBoostBonusUSD, LicenseeParlayBoostBonusUSD
+		,TurnoverEUR, CustomerWinLossEUR, LicenseeWinLossEUR, AmountDueToBAEUR, BACommissionEUR, AmountCompanyEUR, OddsSpreadCostEUR, FullParlayBoostBonusEUR, LicenseeParlayBoostBonusEUR
+		,TurnoverGBP, CustomerWinLossGBP, LicenseeWinLossGBP, AmountDueToBAGBP, BACommissionGBP, AmountCompanyGBP, OddsSpreadCostGBP, FullParlayBoostBonusGBP, LicenseeParlayBoostBonusGBP
+		,TurnoverCNY, CustomerWinLossCNY, LicenseeWinLossCNY, AmountDueToBACNY, BACommissionCNY, AmountCompanyCNY, OddsSpreadCostCNY, FullParlayBoostBonusCNY, LicenseeParlayBoostBonusCNY
+		,TurnoverUSDT, CustomerWinLossUSDT, LicenseeWinLossUSDT, AmountDueToBAUSDT, BACommissionUSDT, AmountCompanyUSDT, OddsSpreadCostUSDT, FullParlayBoostBonusUSDT, LicenseeParlayBoostBonusUSDT
 		,IsShowOddsSpread
 	FROM #Result
 	ORDER BY ReportDate, PartyName

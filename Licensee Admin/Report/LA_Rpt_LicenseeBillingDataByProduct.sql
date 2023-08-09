@@ -36,6 +36,8 @@ AS
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 		- 20230223@Danny: Integrate Casino promotion [#194808]
 		- 20240419@Danny: Remove Saba Coin [RedmineID: #203331]
+		- 20231003@Danny: Integrate boost bonus for mix parlay ticket [#191662]
+
 	
 	Parameter explanation:
 		@LicenseeStatusIds
@@ -149,7 +151,7 @@ BEGIN
 		,@FromDate = @FromDate
 		,@ToDate = @ToDate
 		,@BaseCurrencyName = @BaseCurrencyName
-		,@LicensingFeeTypeIds = '0,8,13' -- 0 = Normal Licensing Fee, 8 = BetCount
+		,@LicensingFeeTypeIds = '0,8,12,13' -- 0 = Normal Licensing Fee, 8 = BetCount, 12 = Parlay Boost bonus
 
 	IF @isRecalRebate =1 AND @FromDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
 		BEGIN
@@ -192,7 +194,10 @@ BEGIN
 	SELECT PartyId, ProductId, LicensingFee, BetCount
 	FROM (
 		SELECT r.PartyId, r.ProductId
-			,SUM(CASE WHEN r.LicensingFeeTypeId = 8 THEN 0 ELSE r.LicensingFee + r.ExtraAmount END) AS LicensingFee
+			,SUM(CASE WHEN r.LicensingFeeTypeId = 8 THEN 0 
+					  WHEN r.LicensingFeeTypeId = 12 THEN - (r.ExtraAmount - r.LicensingFee) -- 100% ParlayBoostBonus - LicenseeBoostBonus
+					ELSE r.LicensingFee + r.ExtraAmount END
+				) AS LicensingFee
 			,SUM(CASE WHEN r.LicensingFeeTypeId = 8 THEN ExtraAmount ELSE 0 END) AS BetCount
 		FROM @Result r
 		WHERE r.ProductId NOT IN (37, 74, -37)
