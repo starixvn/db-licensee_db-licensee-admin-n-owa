@@ -17,6 +17,8 @@ AS
 		- 20220919@Malcolm: Launch new Product [RedmineID: #175860]
 		- 20221205@Danny: Remove Hx9candy From Crypto Licensee List [RedmineID: #181279]
 		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
+		- 20230815@Danny: Handle crypto licensee billing with fiat currency [RedmineID: #192378]
+
 		
 	Param's Explannation: 
 		+ @ChargeSettingsXML: '<ChargeSettings>
@@ -51,6 +53,10 @@ BEGIN
 	WHERE p.ProductId = p.GroupProductId AND p.GroupProductCode = @ProductCode
 	
 	DECLARE @ErrorMessage TABLE (PartyId INT, PartyName VARCHAR(50), ErrCode INT, ErrMsg NVARCHAR(MAX))
+
+	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT,PartyName VARCHAR(50))
+	INSERT INTO @tmpPartyOfferCrypto(PartyId,PartyName)
+	SELECT  PartyID, PartyName FROM LA_f_CryptoPartyListSel()
 
 	CREATE TABLE #ChargeSetting 
 	(
@@ -541,12 +547,12 @@ BEGIN
 			))
 		
 			/*Delete prevent updating unexpected NAP PT value*/
-			IF ((@Rate > 0.12 AND @SiteName <> '9wickets' OR @Rate = 0) AND @ProductId = 1) OR @SiteName IN ('CandyA18') OR @Product3rdId IN (14, 17, 3, 31, 10, 13, 16) OR @ToDate < GETDATE() 
+			IF ((@Rate > 0.12 AND @SiteName <> '9wickets' OR @Rate = 0) AND @ProductId = 1) OR @PartyId IN (SELECT z.PartyId FROM @tmpPartyOfferCrypto z) OR @Product3rdId IN (14, 17, 3, 31, 10, 13, 16) OR @ToDate < GETDATE() 
 			BEGIN
 				SET @InputPT = ''
 			END
 
-			IF @SiteName NOT IN ('', 'CandyA18') AND ISNULL(@InputPT, '') <> ''
+			IF @SiteName <> '' AND @SiteName NOT IN (SELECT z.PartyName FROM @tmpPartyOfferCrypto z) AND ISNULL(@InputPT, '') <> ''
 			BEGIN
 				IF @CurrentDate NOT BETWEEN @FromDate AND @ToDate
 				BEGIN

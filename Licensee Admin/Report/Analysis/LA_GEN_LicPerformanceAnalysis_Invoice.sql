@@ -25,6 +25,7 @@ AS
 		- 20220928@Danny: Exclude Licensees that offer cryptocurrency [#FeatureID 177627]
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 		- 20230619@Danny: Get data Promotion And Sponsorship (ProductID = 37) [RedmineID: #189659]
+		- 20230815@Danny: Handle crypto licensee billing with fiat currency [RedmineID: #192378]
 
 */
 
@@ -38,7 +39,7 @@ BEGIN
 
 	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT)
 	INSERT INTO @tmpPartyOfferCrypto(PartyId)
-	SELECT  PartyID FROM LA_f_CryptoPartyListSel()
+	SELECT  PartyID FROM LA_f_CryptoPartyListSel() WHERE IsBillingCryptoCurrency = 1
 
 	SELECT
 		@PartyId			= PartyId

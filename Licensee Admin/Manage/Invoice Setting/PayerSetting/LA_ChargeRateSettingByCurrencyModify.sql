@@ -296,7 +296,7 @@ BEGIN
 			)
 		OR @ToDate < @CurrentDate
 
-	/*not update Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0 or CandyA18 licensees*/
+	/*not update Sportsbook charge rate > 12% (exclude 9wickets licensee) or Sportsbook charge rate = 0 or Crypto licensees*/
 	UPDATE c
 		SET c.Rate = -1
 	FROM @ChargRateUpd c

@@ -21,6 +21,7 @@ AS
 		- 20210323@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 	    - 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
 		- 20201003@Danny: Exclude Licensees that offer cryptocurrency [#FeatureID 177718]
+		- 20230815@Danny: Handle crypto licensee billing with fiat currency [RedmineID: #192378]
 
 */
 BEGIN
@@ -48,7 +49,7 @@ BEGIN
 	--
 	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT)
 	INSERT INTO @tmpPartyOfferCrypto(PartyId)
-	SELECT  PartyID FROM LA_f_CryptoPartyListSel()
+	SELECT  PartyID FROM LA_f_CryptoPartyListSel() WHERE IsBillingCryptoCurrency = 1
 
 	DECLARE @tmpPartyList TABLE(PartyId INT, SiteId INT, BaseCurrencyId INT)
 	INSERT INTO @tmpPartyList(PartyId,SiteId,BaseCurrencyId)

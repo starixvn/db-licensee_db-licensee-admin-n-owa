@@ -39,6 +39,7 @@ AS
 		- 20230213@Malcolm: Fix duplicate data error [RemineID: #183774]
 		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
 		- 20230614@Danny: Enhance launch licensee function [#188014]
+		- 20230815@Danny: Handle crypto licensee billing with fiat currency [RedmineID: #192378]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -770,7 +771,7 @@ BEGIN
 
 	DELETE cr
 	FROM @ChargeInfo cr
-	WHERE cr.ProductId IN (14, 17, 3, 31, 10, 13, 16) OR  cr.ToDate < @CurrentDate OR @SiteName IN ('CandyA18') 
+	WHERE cr.ProductId IN (14, 17, 3, 31, 10, 13, 16) OR  cr.ToDate < @CurrentDate OR @SiteName IN ('CandyA18','Crypto88') 
 		OR EXISTS (
 			SELECT 1 
 			FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)

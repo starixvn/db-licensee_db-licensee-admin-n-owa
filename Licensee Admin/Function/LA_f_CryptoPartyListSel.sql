@@ -13,9 +13,10 @@ AS
 	Revisions:
 		- 20221004@Danny Initialize function [RedmineID: #177718]
 		- 20221205@Danny Remove Hx9candy From Crypto Licensee List [RedmineID: #181279]
+		- 20230814@Danny Add Crypto88 To Crypto Licensee List [RedmineID: #192378]
 */
 RETURN
-	SELECT PartyId
+	SELECT PartyId, CASE WHEN PartyName = 'CandyA18' THEN 1 ELSE 0 END IsBillingCryptoCurrency, PartyName
 	FROM dbo.OAS_Party WITH (NOLOCK)
-	WHERE PartyName IN ('CandyA18')
+	WHERE PartyName IN ('CandyA18','Crypto88')
 GO
