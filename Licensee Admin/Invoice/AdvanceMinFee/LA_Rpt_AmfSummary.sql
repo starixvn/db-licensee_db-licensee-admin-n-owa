@@ -21,6 +21,7 @@ AS
 		- 20220418@Percy: Add Credit note for AMF [RedmineID: #164139]
 		- 20221109@Malcolm: add LicenseeCode, BaseCurrencyId [RedmineID : 175860]
 		- 20230516@Danny: Filter by OIC Licensee status [RedmineID : 187219]
+		- 20230816@Danny: Use DBOIC Dblinked [RedmineID : 192776]
 
 	+ @LicenseeStatusIds:	1	Up Coming
 						2	Soft Launch
@@ -55,7 +56,7 @@ BEGIN
 		FROM @PartyList p
 		INNER JOIN dbo.OAS_Party op WITH(NOLOCK) ON op.PartyID = p.PartyId
 		LEFT JOIN dbo.Licensees l	WITH(NOLOCK) ON op.OldRefID = l.LicenseeID
-		LEFT JOIN  bodb_OIC.dbo.licensee oic WITH(NOLOCK) ON oic.RegisteredLicenseeName = l.LicenseeName
+		LEFT JOIN  DBOIC.bodb_OIC.dbo.licensee oic WITH(NOLOCK) ON oic.RegisteredLicenseeName = l.LicenseeName
 		WHERE p.ParentId <> 0
 		
 		DELETE p
