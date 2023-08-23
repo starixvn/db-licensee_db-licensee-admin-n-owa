@@ -19,7 +19,7 @@ ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
 		- 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]
 		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 		- 20230713@Danny: Incorporate USDT2 currency [RedmineID: #191165]
-		- 20230713@Danny: Incorporate USDT2 currency [RedmineID: #192544]
+		- 20230823@Danny: Incorporate US$KH currency [RedmineID: #192544]
 
 	Param's Explanation:				
 */

@@ -28,6 +28,7 @@ AS
 		- 20201003@Danny: Support USDT as base currency [RedmineID: #180313]
 		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 		- 20230713@Danny: Incorporate USDT2 currency [RedmineID: #191165]
+		- 20230823@Danny: Incorporate US$KH currency [RedmineID: #192544]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -178,7 +179,7 @@ BEGIN
 	UPDATE e
 	SET e.CurrencyCode = e.CurrencyCode + ' (' + e.CurrencyName + ')' 
 	FROM @Exchange e
-	WHERE e.CurrencyName IN ('USDT','USDTJP','USDT2') AND e.CurrencyCode = 'USD'
+	WHERE e.CurrencyName IN ('USDT','USDTJP','USDT2','US$KH') AND e.CurrencyCode = 'USD'
 
 	-- Add data for products with no ticket
 	;WITH CTE_Currency AS (SELECT DISTINCT CurrencyId FROM #tmpResult)
