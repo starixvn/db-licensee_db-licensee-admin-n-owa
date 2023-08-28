@@ -21,6 +21,7 @@ AS
 		- 20210811@Percy: Add input parameter: @PartyIds (list of PartyId) [RedmineID: #159629]
 		- 20220118@Percy: Add Licensee Status Setting [RedmineID: #166751]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
+		- 20230828@Danny: Enhance Licensee Information report [RemineID: #191248]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -42,16 +43,16 @@ BEGIN
 	;WITH ChargeInfo AS(
 		SELECT ci.ProductId, ci.FromParty, ci.ToParty, ci.Rate, ci.FromDate, ci.ToDate, ci.ChargeID, ci.ChargeType AS RateType
 		FROM dbo.OAS_ChargeInfo AS ci WITH (NOLOCK)
-		WHERE ProductId NOT IN (14, 17)
+		WHERE ProductId NOT IN (14, 17) AND   ci.FromDate <= GETDATE() AND ci.ToDate >= GETDATE()
 		UNION ALL
 		SELECT s.ProductId, s.FromParty, s.ToParty, s.Rate, s.FromDate, s.ToDate, s.ChargeIdRef, s.BettypeRef AS RateType
-		FROM dbo.OAS_ChargeInfoSub AS s WITH (NOLOCK)
-		WHERE s.ChargeType = 1
+		FROM dbo.OAS_ChargeInfoSub AS s WITH (NOLOCK) 
+		WHERE s.ChargeType = 1 AND   s.FromDate <= GETDATE() AND s.ToDate >= GETDATE()
 	)
 	SELECT	 CASE pd.IsDeposit	WHEN 0 THEN 'Credit' ELSE g.PartyName							END AS GroupName
 			,CASE p.PartyName	WHEN 'IBC' THEN 'FDL' WHEN '18bb'THEN 'PIH' ELSE p.PartyName	END AS LicenseeName
 			,ci.ToDate
-			,DATEDIFF(m, m.FromDate, m.ToDate) AS WaiveMonth
+			,w.WaiveMonth AS WaiveMonth
 			,CAST(ISNULL(ci.Rate, 0) AS MONEY) AS Rate
 			,ci.FromDate
 			,f.FeeAmount
@@ -69,8 +70,20 @@ BEGIN
 		INNER JOIN @Groups AS g ON ci.ToParty = g.PartyID								-- Group
 		INNER JOIN dbo.OAS_PartyDetail AS pd WITH (NOLOCK) ON pd.PartyID = p.PartyID	-- Credit
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping s WITH (NOLOCK) ON s.ChargeID=ci.ChargeID AND s.SystemID = 2
-		LEFT JOIN dbo.LA_Minfee AS f WITH (NOLOCK) ON f.PartyId = ci.FromParty AND f.ProductId=ci.ProductId AND f.FeeTypeId = 1 -- Min fee
-		LEFT JOIN dbo.LA_Minfee AS m WITH (NOLOCK) ON m.PartyId = ci.FromParty AND m.ProductId=ci.ProductId AND m.FeeTypeId = 2 -- Waive month
+		OUTER APPLY 
+		(
+			SELECT TOP 1 f.FeeAmount
+			FROM dbo.LA_Minfee f WITH (NOLOCK) 
+			WHERE f.PartyId = ci.FromParty AND f.ProductId=ci.ProductId AND f.FeeTypeId = 1 -- Min fee
+			ORDER BY f.FromDate DESC
+		) f 
+		OUTER APPLY (
+			SELECT SUM(DATEDIFF(MONTH, w.FromDate, DATEADD(DAY, 1, w.ToDate)) + CASE WHEN DAY(w.FromDate) > DAY(DATEADD(DAY, 1, w.ToDate)) THEN -1 ELSE 0 END) AS WaiveMonth
+			FROM dbo.LA_MinFee m WITH (NOLOCK)
+				INNER JOIN dbo.LA_MinFee w WITH (NOLOCK) ON m.PartyId = w.PartyId AND m.ProductId = w.ProductId
+			WHERE m.PartyId = p.PartyId AND m.FeeTypeId = 1 AND w.FeeTypeId = 2 AND w.FromDate >= m.FromDate AND w.ToDate <= m.ToDate
+		) w
+			
 		INNER JOIN STRING_SPLIT(@PartyIds, ',') p2 ON p.PartyID = p2.value
 	WHERE g.ParentId = 0 AND p.PartyType = 1
 	ORDER BY p.PartyName, pd.BrandName, ci.FromDate, ci.ProductID
