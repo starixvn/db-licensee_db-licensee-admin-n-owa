@@ -485,7 +485,7 @@ BEGIN
 				,SUM(CASE WHEN d.ProductId = 31 AND @FromDate >= @ExchangeTerm_CutOffDate THEN (d.MemberWL + d.Pcomm) * ISNULL(bc.Rate, c.Rate) ELSE (d.MemberWL * ISNULL(bc.Rate, c.Rate) + d.Comm) END  * e.Rate) AS BasedAmountToCompany
 			FROM #tmpLAData d
 				INNER JOIN @Exchange e ON d.Currency = e.ExchangeId AND d.winlostdate = e.ExchangeDate AND e.BaseCurrencyID = d.BaseCurrencyID
-				INNER JOIN @ChargeRate c ON d.winlostdate BETWEEN c.FromDate AND c.ToDate
+				INNER JOIN @ChargeRate c ON d.winlostdate BETWEEN c.FromDate AND c.ToDate AND d.ProductID = c.ProductID AND c.PartyID = d.PartyID
 				LEFT JOIN @ChargeRateByCurrency bc ON c.ChargeId = bc.ChargeId AND d.Currency = bc.Currency
 			GROUP BY e.Code, e.Rate, d.PartyID, d.ProductID, d.BaseCurrencyID
 
@@ -772,6 +772,8 @@ BEGIN
 
 	END
 
+
+
 	-- Final resut
 	BEGIN
 		DECLARE  @Remark_ChargeRate TABLE (PartyID INT, ProductID INT, BaseCurrencyID INT, Remark VARCHAR(4000) )
@@ -797,7 +799,7 @@ BEGIN
 		SET		pt.isSamePT = u.IsSamePT
 		FROM    @Result_PT pt
 		INNER JOIN u ON pt.ProductID = u.ProductID AND pt.PartyID = u.PartyID AND u.IsSamePT = 1 AND pt.BaseCurrencyID = u.BaseCurrencyID
-		WHERE pt.ProductID NOT IN (0, 31, 10)
+		WHERE pt.ProductID NOT IN (0)
 
 		; WITH  u_chargeRate AS
 		(
@@ -816,13 +818,12 @@ BEGIN
 		INSERT INTO @Remark_ChargeRate (PartyID, ProductID, BaseCurrencyID, Remark)
 		SELECT PartyID, ProductID, BaseCurrencyID, 'Due to the differences on product charge rate' + CHAR(13) + STRING_AGG(Remark, CHAR(13)) Remark
 		FROM	z 
-		WHERE ProductID NOT IN (10, 31)
 		GROUP BY PartyID, ProductID, BaseCurrencyID
 
 		INSERT INTO @Remark_ChargeRate (PartyID, ProductID, BaseCurrencyID, Remark)
 		SELECT PartyID, ProductID, BaseCurrencyID, 'Please contact StarixIT for support' Remark
 		FROM	@Result_PT
-		WHERE	isSamePT = 1
+		WHERE	isSamePT = 1 AND ProductID NOT IN (31,10)
 		GROUP BY PartyID, ProductID, BaseCurrencyID
 
 
@@ -841,9 +842,20 @@ BEGIN
 		GROUP BY PartyID, ProductID, BaseCurrencyID, Func
 		)
 		INSERT INTO @Remark_Adj (PartyID, ProductID, BaseCurrencyID, Remark)
-		SELECT PartyID, ProductID, BaseCurrencyID , 'Due to adjustment' + CHAR(13) + STRING_AGG(Remark,CHAR(13)) Remark
+		SELECT PartyID, ProductID, BaseCurrencyID ,  
+				 CASE WHEN ISNULL(la.BasedAmountToCompany,0) <> ISNULL(nap.BasedAmountToCompany,0) AND adj_cnt > 0  THEN  'Due to adjustment, an adjustment might be added for next month.' 
+					  WHEN  adj_cnt = 0  THEN  'Due to adjustment, an adjustment might be added for next month.' 
+					  WHEN ISNULL(la.BasedAmountToCompany,0) = ISNULL(nap.BasedAmountToCompany,0) AND adj_cnt > 0  THEN  'Due to adjustment for previous month.' 
+					ELSE  'Due to adjustment' END
+					+ CHAR(13) + STRING_AGG(Remark,CHAR(13)) Remark
 		FROM u
-		GROUP BY PartyID, ProductID, BaseCurrencyID
+		OUTER APPLY (SELECT la.BasedAmountToCompany 
+					 FROM @Result_adj la WHERE la.Func = 'LA' AND la.PartyID = u.PartyID AND la.ProductID = u.ProductID AND la.BaseCurrencyID = u.BaseCurrencyID AND la.Type = 'Actual Bet') la
+		OUTER APPLY (SELECT nap.BasedAmountToCompany 
+					 FROM @Result_adj nap WHERE nap.Func = 'NAP' AND nap.PartyID = u.PartyID AND nap.ProductID = u.ProductID AND nap.BaseCurrencyID = u.BaseCurrencyID AND nap.Type = 'Actual Bet') nap
+			OUTER APPLY (SELECT COUNT(1) AS adj_cnt
+					 FROM @Result_adj adj WHERE adj.Func = 'NAP' AND adj.PartyID = u.PartyID AND adj.ProductID = u.ProductID AND adj.BaseCurrencyID = u.BaseCurrencyID AND adj.Type = 'Adjustment without this month') adj
+		GROUP BY PartyID, ProductID, BaseCurrencyID, la.BasedAmountToCompany, nap.BasedAmountToCompany, adj_cnt
 
 		-- Final result
 		; WITH TotalDiffAmt AS
