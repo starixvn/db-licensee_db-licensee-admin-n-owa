@@ -12,6 +12,7 @@ AS
    
 	 Revisions:
 		- 20200629@Happy: Implement Group Min Fee [#134492]
+		- 20230828@Danny: Extend data type [#193265]
 		
 	 Params:
 		- @GroupMinFeeID:
@@ -24,7 +25,7 @@ BEGIN
 	SET NOCOUNT ON;
 	
 	DECLARE @MinFeeType TINYINT = 1
-	DECLARE @Result AS TABLE (GroupMinFeeID SMALLINT, GroupName NVARCHAR(110), NumberOfPayers INT, PayerList VARCHAR(1000), FromDate DATE, ToDate DATE, GroupMinFee MONEY, PrimaryLicensee VARCHAR(50))
+	DECLARE @Result AS TABLE (GroupMinFeeID SMALLINT, GroupName NVARCHAR(110), NumberOfPayers INT, PayerList VARCHAR(MAX), FromDate DATE, ToDate DATE, GroupMinFee MONEY, PrimaryLicensee VARCHAR(50))
 
 	INSERT INTO @Result(GroupMinFeeID , GroupName, NumberOfPayers, FromDate, ToDate)
 	SELECT h.GroupMinFeeID AS GroupMinFeeID
