@@ -53,6 +53,7 @@ AS
 	- 20230217@Danny: Remove hard-code bettype And ProductID [#183739]
 	- 20230510@Danny: New commercial terms for 12B [RedmineID: #186543]
 	- 20230713@Danny: Incorporate USDT2 currency [RedmineID: #191165]
+	- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
 
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -418,8 +419,9 @@ BEGIN
 	INSERT INTO #Exchange(ExchangeDate, ExchangeId, Code, USD, EUR, MYR, GBP, CNY, USDT)
 	SELECT DISTINCT ExchangeDate, ExchangeId, 
 			CASE WHEN ExchangeId = 142 THEN 'USDT'
-				WHEN ExchangeId = 96 THEN 'USD (USDT)'
+				WHEN ExchangeId IN (96,206) THEN 'USD (USDT)'
 				WHEN ExchangeId = 202 THEN 'USD (USDTJP)'
+				WHEN ExchangeId = 209 THEN 'MP'
 			ELSE Code END Code, 
 			USD, EUR, MYR, GBP, CNY, USDT
 	FROM dbo.Lrf_f_GetExchangeDaily(@FromDate, @Todate)
@@ -475,9 +477,10 @@ BEGIN
 					WHEN 76 THEN 'PS'
 					WHEN 77 THEN 'PTH'
 					WHEN 92 THEN 'HID'
+					WHEN 209 THEN 'MP'
 					ELSE CurrencyCode
 				END)
-	WHERE currency IN (51, 75, 76, 77, 92)	
+	WHERE currency IN (51, 75, 76, 77, 92, 209)	
 
 	UPDATE t1
 	SET CurrencyCode = CASE WHEN currency = 206 THEN 'USD (USDT)' ELSE t1.CurrencyCode + ' (' + CurrencyName + ')' END
@@ -491,9 +494,9 @@ BEGIN
 	
 	--- Update USDT
 	UPDATE e
-	SET e.CurrencyCode = e.CurrencyCode + ' (' + e.CurrencyName + ')'
+	SET e.CurrencyCode = CASE WHEN currency = 206 THEN 'USD (USDT)' ELSE e.CurrencyCode + ' (' + e.CurrencyName + ')' END
 	FROM @CurrencyTable e
-	WHERE e.CurrencyName IN ('USDT','USDTJP') AND e.CurrencyCode = 'USD'
+	WHERE e.CurrencyName IN ('USDT','USDTJP','USDT2','US$KH') AND e.CurrencyCode = 'USD'
 
 	-- Result
 	BEGIN

@@ -1,5 +1,4 @@
 Licensee Admin\Core SP\LA_AmountToCompanyByProduct.sql
-Licensee Admin\Function\LA_f_ExchangeDailySel.sql
 Licensee Admin\Invoice\GenerateMultipleInvoices\LA_Inv_MultipleGenerationTemporaryInvoiceSel.sql
 Licensee Admin\Invoice\LA_Inv_InvoiceAmountGenerate.sql
 Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_3rdProductSel.sql
@@ -18,8 +17,6 @@ Licensee Admin\Report\LA_Rpt_LicenseeSettlement.sql
 Licensee Admin\Report\LA_Rpt_LicenseeWinloss.sql
 Licensee Admin\Report\LA_Rpt_LicenseeWinLossByDynamicProduct.sql
 Licensee Admin\Report\LA_Rpt_LicenseeWinLossByProduct.sql
-Licensee Admin\Report\LA_Rpt_LicenseeWinloss_Details.sql
-Licensee Admin\Report\LA_Rpt_NumberGame2Winloss.sql
 Licensee Admin\Report\LA_Rpt_PlatformWinloss.sql
 Licensee Admin\Report\LA_Rpt_PlatformWinlossSummary.sql
 Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_Alert.sql
@@ -28,7 +25,6 @@ Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_LicensingFee.sql
 Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_LicensingMargin.sql
 Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_Summary.sql
 Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_TurnOver.sql
-Licensee Admin\Report\Obsolete\LA_Rpt_3rdPartyProductWinloss.sql
 Licensee Admin\Report\VendorPayment\LA_Rpt_3rdProductSettlement.sql
 Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template1.sql
 Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template10.sql

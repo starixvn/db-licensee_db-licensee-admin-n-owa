@@ -67,6 +67,7 @@ AS
 	   - 20230510@Danny: New commercial terms for 12B [RedmineID: #186543]
 	   - 20230713@Danny: Incorporate USDT2 currency [RedmineID: #191165]
 	   - 20230823@Danny: Incorporate US$KH currency [RedmineID: #192544]
+	   - 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -459,9 +460,9 @@ BEGIN
 		WHERE e.ExchangeId IN (SELECT t.Currency FROM #tmpWinLoss t)
 
 		UPDATE e
-		SET CurrencyCode = e.CurrencyCode + ' (' + CurrencyName + ')'
+		SET CurrencyCode = CASE WHEN e.Currency = 209 THEN 'MP' ELSE e.CurrencyCode + ' (' + CurrencyName + ')' END
 		FROM @Exchange e
-		WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1) OR e.Currency IN (96, 202, 206, 208)
+		WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1) OR e.Currency IN (96, 202, 206, 208, 209)
 	END
 
 	-- Result

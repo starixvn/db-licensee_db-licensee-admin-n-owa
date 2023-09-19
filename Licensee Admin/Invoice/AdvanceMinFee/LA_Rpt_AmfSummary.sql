@@ -22,6 +22,7 @@ AS
 		- 20221109@Malcolm: add LicenseeCode, BaseCurrencyId [RedmineID : 175860]
 		- 20230516@Danny: Filter by OIC Licensee status [RedmineID : 187219]
 		- 20230816@Danny: Use DBOIC Dblinked [RedmineID : 192776]
+		- 20230920@Danny: show Licensee Status Infomation [RedmineID : 187219]
 
 	+ @LicenseeStatusIds:	1	Up Coming
 						2	Soft Launch
@@ -36,7 +37,7 @@ BEGIN
 
 	-- Get Party List
 	BEGIN
-		DECLARE @PartyList TABLE (PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, LicenseeCode VARCHAR(50), BaseCurrencyId TINYINT, LicenseeStatusId INT)
+		DECLARE @PartyList TABLE (PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, LicenseeCode VARCHAR(50), BaseCurrencyId TINYINT, LicenseeStatusId INT, LicenseeStatus VARCHAR(30))
 
 		-- Official Licensees
 		INSERT INTO @PartyList (PartyId, PartyName, BrandName, ParentId)
@@ -52,11 +53,13 @@ BEGIN
 		SELECT CAST (value AS SMALLINT) FROM STRING_SPLIT(@LicenseeStatusIds,',')
 
 		UPDATE p
-		SET p.LicenseeStatusId = CASE WHEN oic.LicenseeStatusId IS NULL THEN 999 ELSE oic.LicenseeStatusId END
+		SET p.LicenseeStatusId = CASE WHEN oic.LicenseeStatusId IS NULL THEN 999 ELSE oic.LicenseeStatusId END,
+			p.LicenseeStatus =  CASE WHEN oic.LicenseeStatusId IS NULL THEN 'Unrecognized' ELSE ls.LicenseeStatusName END
 		FROM @PartyList p
 		INNER JOIN dbo.OAS_Party op WITH(NOLOCK) ON op.PartyID = p.PartyId
 		LEFT JOIN dbo.Licensees l	WITH(NOLOCK) ON op.OldRefID = l.LicenseeID
 		LEFT JOIN  DBOIC.bodb_OIC.dbo.licensee oic WITH(NOLOCK) ON oic.RegisteredLicenseeName = l.LicenseeName
+		LEFT JOIN   DBOIC.bodb_OIC.dbo.LicenseeStatus ls WITH(NOLOCK) ON oic.LicenseeStatusId = ls.LicenseeStatusId
 		WHERE p.ParentId <> 0
 		
 		DELETE p
@@ -161,9 +164,10 @@ BEGIN
 	WHERE r.RefInvItemTypeId = 3
 	
 	-- Return data
-	SELECT ParentName AS GroupName, PartyId, PartyName, InitAmount AS Prepayment, LaunchingDate, ISNULL(WaiverPeriod, 0) AS WaiverPeriod, ISNULL(MonthCount, 0) AS MonthCount
+	SELECT ParentName AS GroupName, r.PartyId, r.PartyName, InitAmount AS Prepayment,  p.LicenseeStatus,  LaunchingDate, ISNULL(WaiverPeriod, 0) AS WaiverPeriod, ISNULL(MonthCount, 0) AS MonthCount
 		,Balance, ISNULL(Remark, '') AS Remark, ISNULL(PartyType, 5) AS PartyType, RefInvItemTypeId AS RowType
-	FROM #Result
+	FROM #Result r
+	INNER JOIN @PartyList p ON r.PartyId = p.PartyId
 	ORDER BY PartyId, RefInvItemTypeId
 
 	-- Deducted amount detail

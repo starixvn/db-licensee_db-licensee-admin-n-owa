@@ -61,6 +61,7 @@ AS
 	   - 20230217@Danny: Remove hard-code bettype And ProductID [#183739]
 	   - 20230510@Danny: New commercial terms for 12B [RedmineID: #186543]
 	   - 20230823@Danny: Incorporate US$KH currency [RedmineID: #192544]
+	   - 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -439,6 +440,7 @@ BEGIN
 				WHEN 206 THEN 'USD (USDT)'
 				WHEN 202 THEN 'USD (USDTJP)'
 				WHEN 208 THEN 'USD (US$KH)'
+				WHEN 209 THEN 'MP'
 				ELSE Code END
 		FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
 	END

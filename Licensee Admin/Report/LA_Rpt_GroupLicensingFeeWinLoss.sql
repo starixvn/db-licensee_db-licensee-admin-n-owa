@@ -29,6 +29,7 @@ AS
 		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 		- 20230713@Danny: Incorporate USDT2 currency [RedmineID: #191165]
 		- 20230823@Danny: Incorporate US$KH currency [RedmineID: #192544]
+		- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -177,9 +178,10 @@ BEGIN
 		
 	--- Update USDT
 	UPDATE e
-	SET e.CurrencyCode = e.CurrencyCode + ' (' + e.CurrencyName + ')' 
+	SET e.CurrencyCode = CASE WHEN e.CurrencyCode = 'PHP' THEN 'MP' ELSE e.CurrencyCode + ' (' + e.CurrencyName + ')'  END 
 	FROM @Exchange e
-	WHERE e.CurrencyName IN ('USDT','USDTJP','USDT2','US$KH') AND e.CurrencyCode = 'USD'
+	WHERE (e.CurrencyName IN ('USDT','USDTJP','USDT2','US$KH') AND e.CurrencyCode = 'USD') OR (e.CurrencyName = 'PE4' AND e.CurrencyCode = 'PHP')
+
 
 	-- Add data for products with no ticket
 	;WITH CTE_Currency AS (SELECT DISTINCT CurrencyId FROM #tmpResult)
