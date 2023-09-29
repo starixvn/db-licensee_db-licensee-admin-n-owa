@@ -445,24 +445,37 @@ BEGIN
 		SELECT ExchangeDate, ExchangeId, Code, CASE WHEN @IsConvert = 1 THEN BaseCurrencyRate ELSE 1 END
 		FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
-		DECLARE @Exchange TABLE (Currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
+		DECLARE @SpeicialCurrrency TABLE (ExchangeId INT, CurrencyCode VARCHAR(65))
+		INSERT INTO @SpeicialCurrrency (ExchangeId, CurrencyCode)
+		SELECT DISTINCT ExchangeId, Code
+		FROM #ExchangeRate
+		WHERE ExchangeId IN (142,96,206,202,208,209)
+
+		DECLARE @Exchange TABLE (Currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(65))
 		INSERT INTO @Exchange(Currency, CurrencyName , CurrencyCode)
-		SELECT e.ExchangeId, CASE WHEN e.ExchangeId = 206 THEN 'USDT' ELSE e.currency END
-			,CASE e.ExchangeId
-				WHEN 51 THEN 'INH'
-				WHEN 75 THEN 'PTU'
-				WHEN 76 THEN 'PS'
-				WHEN 77 THEN 'PTH'
-				WHEN 92 THEN 'HID'
-				WHEN 142 THEN 'USDT'
+		SELECT e.ExchangeId, e.currency
+			,CASE WHEN  e.ExchangeId = 51 THEN 'INH'
+				WHEN  e.ExchangeId =75 THEN 'PTU'
+				WHEN  e.ExchangeId =76 THEN 'PS'
+				WHEN  e.ExchangeId =77 THEN 'PTH'
+				WHEN  e.ExchangeId =92 THEN 'HID'
+				WHEN  e.ExchangeId =142 THEN 'USDT'
+				WHEN  s.ExchangeId IS NOT NULL THEN s.CurrencyCode
 				ELSE e.Code END
 		FROM Exchange e WITH (NOLOCK)
+		LEFT JOIN @SpeicialCurrrency s ON e.ExchangeId = s.ExchangeId
 		WHERE e.ExchangeId IN (SELECT t.Currency FROM #tmpWinLoss t)
 
 		UPDATE e
-		SET CurrencyCode = CASE WHEN e.Currency = 209 THEN 'MP' ELSE e.CurrencyCode + ' (' + CurrencyName + ')' END
+		SET CurrencyCode = e.CurrencyCode + ' (' + CurrencyName + ')' 
 		FROM @Exchange e
-		WHERE e.CurrencyCode IN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1) OR e.Currency IN (96, 202, 206, 208, 209)
+		WHERE e.CurrencyCode IN (	SELECT x.CurrencyCode 
+									FROM @Exchange x
+									WHERE x.Currency NOT IN (SELECT t.ExchangeId FROM @SpeicialCurrrency t)
+										AND x.Currency NOT IN (51,75,76,77,92)
+									GROUP BY x.CurrencyCode 
+									HAVING COUNT(1) > 1
+								) 
 	END
 
 	-- Result

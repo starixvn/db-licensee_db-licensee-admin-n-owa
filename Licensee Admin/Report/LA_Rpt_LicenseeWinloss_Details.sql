@@ -464,9 +464,9 @@ BEGIN
 	END
 
 	--Update Currency Name
-	DECLARE @CurrencyTable AS TABLE (currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(20))
+	DECLARE @CurrencyTable AS TABLE (currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(65))
 	INSERT INTO @CurrencyTable(currency, CurrencyName, CurrencyCode)
-	SELECT t.CurrencyID, e.currency, CASE WHEN t.CurrencyID = 142 THEN 'USDT' ELSE e.Code END Code
+	SELECT t.CurrencyID, e.currency, e.Code Code
 	FROM (SELECT DISTINCT CurrencyID FROM #Report) t
 	INNER JOIN dbo.Exchange e WITH (NOLOCK) ON t.CurrencyID = e.exchangeid
 	
@@ -477,26 +477,27 @@ BEGIN
 					WHEN 76 THEN 'PS'
 					WHEN 77 THEN 'PTH'
 					WHEN 92 THEN 'HID'
+					WHEN 142 THEN 'USDT'
+					WHEN 96 THEN 'USD (USDT)'
+					WHEN 206 THEN 'USD (USDT)'
+					WHEN 208 THEN 'USD (US$KH)'
 					WHEN 209 THEN 'MP'
 					ELSE CurrencyCode
 				END)
-	WHERE currency IN (51, 75, 76, 77, 92, 209)	
+	WHERE currency IN (51, 75, 76, 77, 92, 209, 142, 96, 206, 208)	
 
 	UPDATE t1
-	SET CurrencyCode = CASE WHEN currency = 206 THEN 'USD (USDT)' ELSE t1.CurrencyCode + ' (' + CurrencyName + ')' END
+	SET CurrencyCode = t1.CurrencyCode + ' (' + CurrencyName + ')' 
 	FROM @CurrencyTable t1
 	INNER JOIN (
 	   SELECT CurrencyCode
 		FROM @CurrencyTable
+		WHERE currency NOT IN (51, 75, 76, 77, 92, 209, 142, 96, 206, 208)
 		GROUP BY CurrencyCode
 		HAVING COUNT(1) > 1
 	) t2 ON t1.CurrencyCode = t2.CurrencyCode
+	WHERE t1.currency NOT IN (51, 75, 76, 77, 92, 209, 142, 96, 206, 208)
 	
-	--- Update USDT
-	UPDATE e
-	SET e.CurrencyCode = CASE WHEN currency = 206 THEN 'USD (USDT)' ELSE e.CurrencyCode + ' (' + e.CurrencyName + ')' END
-	FROM @CurrencyTable e
-	WHERE e.CurrencyName IN ('USDT','USDTJP','USDT2','US$KH') AND e.CurrencyCode = 'USD'
 
 	-- Result
 	BEGIN

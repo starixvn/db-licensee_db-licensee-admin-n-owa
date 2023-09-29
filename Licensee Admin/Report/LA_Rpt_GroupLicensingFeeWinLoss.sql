@@ -167,6 +167,10 @@ BEGIN
 			WHEN 77 THEN 'PTH'
 			WHEN 92 THEN 'HID' 
 			WHEN 142 THEN 'USDT' 
+			WHEN 96 THEN 'USD (USDT)'
+			WHEN 206 THEN 'USD (USDT)'
+			WHEN 208 THEN 'USD (US$KH)'
+			WHEN 209 THEN 'MP'
 			ELSE Code END
 	FROM bodb02.dbo.Exchange WITH (NOLOCK)
 	WHERE ExchangeId IN (SELECT CurrencyId FROM #tmpResult)
@@ -177,10 +181,10 @@ BEGIN
 		INNER JOIN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1) t ON e.CurrencyCode = t.CurrencyCode
 		
 	--- Update USDT
-	UPDATE e
-	SET e.CurrencyCode = CASE WHEN e.CurrencyCode = 'PHP' THEN 'MP' ELSE e.CurrencyCode + ' (' + e.CurrencyName + ')'  END 
-	FROM @Exchange e
-	WHERE (e.CurrencyName IN ('USDT','USDTJP','USDT2','US$KH') AND e.CurrencyCode = 'USD') OR (e.CurrencyName = 'PE4' AND e.CurrencyCode = 'PHP')
+	--UPDATE e
+	--SET e.CurrencyCode = CASE WHEN e.CurrencyName = 'PE4' THEN 'MP' ELSE e.CurrencyCode + ' (' + e.CurrencyName + ')'  END 
+	--FROM @Exchange e
+	--WHERE (e.CurrencyName IN ('USDT','USDTJP','USDT2','US$KH') AND e.CurrencyCode = 'USD') OR (e.CurrencyName = 'PE4' AND e.CurrencyCode = 'PHP')
 
 
 	-- Add data for products with no ticket

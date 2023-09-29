@@ -430,11 +430,6 @@ BEGIN
 		INSERT INTO #ExchangeRate (ExchangeDate, ExchangeId, USD, EUR, MYR, GBP, USDT, Code)
 		SELECT ExchangeDate, ExchangeId, USD, EUR, MYR, GBP, USDT
 			,CASE ExchangeId
-				WHEN 51 THEN 'INH'
-				WHEN 75 THEN 'PTU'
-				WHEN 76 THEN 'PS'
-				WHEN 77 THEN 'PTH'
-				WHEN 92 THEN 'HID'
 				WHEN 142 THEN 'USDT'
 				WHEN 96 THEN 'USD (USDT)'
 				WHEN 206 THEN 'USD (USDT)'
@@ -443,6 +438,38 @@ BEGIN
 				WHEN 209 THEN 'MP'
 				ELSE Code END
 		FROM Lrf_f_GetExchangeDaily(@FromDate, @ToDate)
+
+		DECLARE @SpeicialCurrrency TABLE (ExchangeId INT, CurrencyCode VARCHAR(65))
+		INSERT INTO @SpeicialCurrrency (ExchangeId, CurrencyCode)
+		SELECT DISTINCT ExchangeId, Code
+		FROM #ExchangeRate
+		WHERE ExchangeId IN (142,96,206,202,208,209)
+
+		DECLARE @Exchange TABLE (Currency INT, CurrencyName VARCHAR(20), CurrencyCode VARCHAR(65))
+		INSERT INTO @Exchange(Currency, CurrencyName , CurrencyCode)
+		SELECT e.ExchangeId, e.currency, 
+				CASE WHEN  e.ExchangeId = 51 THEN 'INH'
+					WHEN  e.ExchangeId =75 THEN 'PTU'
+					WHEN  e.ExchangeId =76 THEN 'PS'
+					WHEN  e.ExchangeId =77 THEN 'PTH'
+					WHEN  e.ExchangeId =92 THEN 'HID'
+					WHEN  s.ExchangeId IS NOT NULL THEN s.CurrencyCode
+				ELSE e.Code END
+		FROM Exchange e WITH (NOLOCK)
+		LEFT JOIN @SpeicialCurrrency s ON e.ExchangeId = s.ExchangeId
+		WHERE e.ExchangeId IN (SELECT t.Currency FROM #tmpWinLoss t)
+
+		UPDATE e
+		SET CurrencyCode = e.CurrencyCode + ' (' + CurrencyName + ')' 
+		FROM @Exchange e
+		WHERE e.CurrencyCode IN (	SELECT x.CurrencyCode 
+									FROM @Exchange x
+									WHERE x.Currency NOT IN (SELECT t.ExchangeId FROM @SpeicialCurrrency t)
+										AND x.Currency NOT IN (51,75,76,77,92)
+									GROUP BY x.CurrencyCode 
+									HAVING COUNT(1) > 1
+								) 
+
 	END
 	
 	-- Fiat to Crypto
@@ -477,7 +504,7 @@ BEGIN
 				WHEN p.PartyName ='IBC' THEN 'FDL'
 				ELSE p.PartyName
 			END AS PartyName
-			,CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END AS currencyName
+			,eg.CurrencyCode AS currencyName
 			,SUM(w.Betcount) AS Betcount
 			-- Original
 			,SUM(w.TurnOver) AS Turnover
@@ -536,13 +563,14 @@ BEGIN
 		FROM #tmpWinLoss w
 			INNER JOIN bodb_Licensee.dbo.OAS_Party p WITH (NOLOCK) ON p.PartyId = w.PartyId
 			INNER JOIN #ExchangeRate e ON w.Winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
+			INNER JOIN @Exchange eg ON e.ExchangeId = eg.Currency
 		GROUP BY w.PartyId
 			,CASE
 				WHEN p.PartyName ='18bb' THEN 'PIH'
 				WHEN p.PartyName ='IBC' THEN 'FDL'
 				ELSE p.PartyName
 			END
-			,e.Code
+			,eg.CurrencyCode
 		
 		-- Set OddsSpreadCost = 0 if value is negative
 		DELETE #ExchangeRate
