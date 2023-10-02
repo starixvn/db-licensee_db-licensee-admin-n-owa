@@ -15,6 +15,7 @@ AS
 		- 20181022@Parsons: Configure discount settings by currency [#99694]
 		- 20200225@Parsons: Support-HID-currency [#128856]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
+		- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
 
 	 Params:
 
@@ -23,12 +24,13 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @CurrenciesOfLicensee TABLE (PartyId INT, CurrencyId INT, CurrencyCode VARCHAR(20), CurrencyName VARCHAR(20))
+	DECLARE @CurrenciesOfLicensee TABLE (PartyId INT, CurrencyId INT, CurrencyCode VARCHAR(65), CurrencyName VARCHAR(20))
 	
 	INSERT INTO @CurrenciesOfLicensee(PartyId, CurrencyId, CurrencyCode, CurrencyName)
 	SELECT DISTINCT p.PartyId, lc.Currency, 
 					CASE WHEN lc.Currency = 92 THEN 'HID' 
 						 WHEN lc.Currency = 142 THEN 'USDT'
+						 WHEN lc.Currency IN (96, 202, 206, 208, 209) THEN e.Code + ' (' + e.Currency + ')' 
 					ELSE e.Code END AS Code, 
 					CASE WHEN lc.Currency = 51 THEN 'VND' ELSE e.currency END AS CurrencyName
 	FROM dbo.LA_f_SelLicenseeCust(0) AS lc

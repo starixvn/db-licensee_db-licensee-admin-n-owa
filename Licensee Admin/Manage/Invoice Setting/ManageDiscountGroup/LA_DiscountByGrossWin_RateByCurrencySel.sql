@@ -18,6 +18,7 @@ AS
 	 Revisions:
 		- 20221201@Danny: Initialize SP [RedmineID: #169160]
 		- 20230801@Danny: Incorporate USDT2 currency [RedmineID: #191165]
+		- 20231002@Danny: Support Jollysport licensees [#FeatureID 193214]
 	 Params:
 	 @CurrencySettingsData = '<Root>
 								<CurrencySetting>
@@ -37,7 +38,7 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @CurrencyXML XML = CONVERT(XML, @CurrencySettingsData)
-	DECLARE @CurrencyList TABLE (PartyId INT, CurrencyId INT, CurrencyCode VARCHAR(20), CurrencyName VARCHAR(50))
+	DECLARE @CurrencyList TABLE (PartyId INT, CurrencyId INT, CurrencyCode VARCHAR(65), CurrencyName VARCHAR(50))
 
 	INSERT INTO @CurrencyList (PartyId, CurrencyId)
 	SELECT x.PartyId, y.CurrencyId
@@ -55,7 +56,7 @@ BEGIN
 	OPTION (OPTIMIZE FOR (@CurrencyXML = NULL))
 
 	UPDATE c
-	SET c.CurrencyCode = e.Code,
+	SET c.CurrencyCode = CASE WHEN c.CurrencyId = 142 THEN 'USDT' WHEN c.CurrencyId IN (96,202, 206, 208, 209) THEN e.Code + ' (' + e.currency + ')' ELSE e.Code END,
 		c.CurrencyName = e.currency
 	FROM @CurrencyList c 
 	INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON c.CurrencyId = e.ExchangeId

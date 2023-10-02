@@ -168,7 +168,8 @@ BEGIN
 			WHEN 92 THEN 'HID' 
 			WHEN 142 THEN 'USDT' 
 			WHEN 96 THEN 'USD (USDT)'
-			WHEN 206 THEN 'USD (USDT)'
+			WHEN 206 THEN 'USD (USDT2)'
+			WHEN 202 THEN 'USD (USDTJP)'
 			WHEN 208 THEN 'USD (US$KH)'
 			WHEN 209 THEN 'MP'
 			ELSE Code END
@@ -180,12 +181,6 @@ BEGIN
 	FROM @Exchange e
 		INNER JOIN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1) t ON e.CurrencyCode = t.CurrencyCode
 		
-	--- Update USDT
-	--UPDATE e
-	--SET e.CurrencyCode = CASE WHEN e.CurrencyName = 'PE4' THEN 'MP' ELSE e.CurrencyCode + ' (' + e.CurrencyName + ')'  END 
-	--FROM @Exchange e
-	--WHERE (e.CurrencyName IN ('USDT','USDTJP','USDT2','US$KH') AND e.CurrencyCode = 'USD') OR (e.CurrencyName = 'PE4' AND e.CurrencyCode = 'PHP')
-
 
 	-- Add data for products with no ticket
 	;WITH CTE_Currency AS (SELECT DISTINCT CurrencyId FROM #tmpResult)

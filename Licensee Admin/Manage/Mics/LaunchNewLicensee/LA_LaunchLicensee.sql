@@ -40,6 +40,7 @@ AS
 		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
 		- 20230614@Danny: Enhance launch licensee function [#188014]
 		- 20230815@Danny: Handle crypto licensee billing with fiat currency [RedmineID: #192378]
+		- 20231002@Danny: logging currency information with new format [#FeatureID 193214]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -616,7 +617,7 @@ BEGIN
 			INNER JOIN Licensees l WITH(NOLOCK) ON op.OldRefID = l.LicenseeID
 			INNER JOIN OAS_ChargeInfo oc WITH(NOLOCK) ON op.PartyID = oc.FromParty
 			CROSS APPLY (
-				SELECT DISTINCT lc.Currency, CASE WHEN e.ExchangeId IN (96,202) THEN e.Code + ' (' + e.currency + ')' ELSE e.Code END Code
+				SELECT DISTINCT lc.Currency, CASE WHEN e.ExchangeId = 142 THEN 'USDT' WHEN e.ExchangeId IN (96,202,206,208,209) THEN  e.Code + ' (' + e.currency + ')'  ELSE e.Code END Code
 				FROM LicenseeCust lc  WITH(NOLOCK) 
 				INNER JOIN  CustDB.dbo.exchange e with(nolock) on lc.Currency = e.ExchangeId
 				WHERE lc.LicenseeID = l.LicenseeID and lc.roleID = 2 and e.ExchangeId <> 20

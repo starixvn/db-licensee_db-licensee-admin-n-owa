@@ -97,6 +97,7 @@ BEGIN
 											WHEN @SystemMode = 'INV' THEN 'VND'
 											END
 			WHEN t.currency = 92 THEN 'HID'
+			WHEN t.currency = 142 THEN 'USDT'
 			WHEN t.CurrencyType = 1 THEN t.CurrencyName
 			ELSE CurrencyCode
 			END AS CurrencyName

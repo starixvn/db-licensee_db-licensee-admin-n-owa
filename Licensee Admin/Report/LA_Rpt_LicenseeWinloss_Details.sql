@@ -479,12 +479,13 @@ BEGIN
 					WHEN 92 THEN 'HID'
 					WHEN 142 THEN 'USDT'
 					WHEN 96 THEN 'USD (USDT)'
+					WHEN 202 THEN 'USD (USDTJP)'
 					WHEN 206 THEN 'USD (USDT)'
 					WHEN 208 THEN 'USD (US$KH)'
 					WHEN 209 THEN 'MP'
 					ELSE CurrencyCode
 				END)
-	WHERE currency IN (51, 75, 76, 77, 92, 209, 142, 96, 206, 208)	
+	WHERE currency IN (51, 75, 76, 77, 92, 202, 209, 142, 96, 206, 208)	
 
 	UPDATE t1
 	SET CurrencyCode = t1.CurrencyCode + ' (' + CurrencyName + ')' 
@@ -492,11 +493,11 @@ BEGIN
 	INNER JOIN (
 	   SELECT CurrencyCode
 		FROM @CurrencyTable
-		WHERE currency NOT IN (51, 75, 76, 77, 92, 209, 142, 96, 206, 208)
+		WHERE currency NOT IN (51, 75, 76, 77, 92, 202, 209, 142, 96, 206, 208)
 		GROUP BY CurrencyCode
 		HAVING COUNT(1) > 1
 	) t2 ON t1.CurrencyCode = t2.CurrencyCode
-	WHERE t1.currency NOT IN (51, 75, 76, 77, 92, 209, 142, 96, 206, 208)
+	WHERE t1.currency NOT IN (51, 75, 76, 77, 92,202, 209, 142, 96, 206, 208)
 	
 
 	-- Result

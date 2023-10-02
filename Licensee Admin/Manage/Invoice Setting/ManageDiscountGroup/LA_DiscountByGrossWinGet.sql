@@ -18,6 +18,7 @@ AS
 		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 		- 20220206@Danny: Return more party detail (SuspendedDate, TerminatedDate) [RedmineID: #169160]
 		- 20230731@Danny: Incorporate USDT2 currency [RedmineID: #191165]
+		- 20231002@Danny: Support Jollysport licensees [#FeatureID 193214]
 */
 
 BEGIN
@@ -72,12 +73,13 @@ BEGIN
 	WHERE a.DiscountGroupId = @GroupId
 
 	-- Currency List
-	DECLARE @CurrencyList TABLE (LicenseeId INT, Currency INT, CurrencyCode VARCHAR(20), CurrencyName VARCHAR(50))
+	DECLARE @CurrencyList TABLE (LicenseeId INT, Currency INT, CurrencyCode VARCHAR(65), CurrencyName VARCHAR(50))
 	INSERT INTO @CurrencyList (LicenseeId, Currency, CurrencyCode, CurrencyName)
 	SELECT LicenseeId, Currency, CurrencyCode, CurrencyName
 	FROM OPENQUERY(DBCUST, 'SELECT DISTINCT lc.LicenseeId, lc.Currency ,
 									CASE WHEN lc.Currency = 92 THEN ''HID'' 
 										WHEN lc.Currency = 142 THEN ''USDT''
+										WHEN lc.Currency IN (96,202, 206, 208, 209) THEN e.Code + '' ('' + e.currency + '')''
 										ELSE e.Code END AS CurrencyCode, 
 									CASE WHEN lc.Currency = 51 THEN ''VND'' 
 										 WHEN lc.Currency = 142 THEN ''USDT'' 
