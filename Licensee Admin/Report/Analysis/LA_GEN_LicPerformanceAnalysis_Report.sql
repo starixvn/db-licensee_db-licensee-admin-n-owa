@@ -8,7 +8,7 @@ ALTER PROCEDURE [dbo].LA_GEN_LicPerformanceAnalysis_Report
 	@ProductCodes	VARCHAR(500),
 	@Environment	VARCHAR(10),
 	@IsOverwrite	BIT = 0,
-	@PartyIds		VARCHAR(4000) = ''
+	@PartyIds		VARCHAR(MAX) = ''
 AS
 
 /*
@@ -31,6 +31,7 @@ AS
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 		- 20230619@Danny: Get data Promotion And Sponsorship (ProductID = 37) [RedmineID: #189659]
 		- 20230815@Danny: Handle crypto licensee billing with fiat currency [RedmineID: #192378]
+		- 20231005@Danny: Change charge rate and tier rebate for Alek group from Oct 2023 [RedmineID: #194561]
 
 */
 
@@ -91,6 +92,22 @@ BEGIN
 	SET @PartyIds = NULL
 	SELECT @PartyIds = COALESCE(@PartyIds + ',', '') + CONVERT(VARCHAR(20), t.PartyId) FROM @tmpPartyList t
 	WHERE t.PartyId NOT IN (SELECT x.PartyId FROM @tmpPartyOfferCrypto x)
+
+
+	DECLARE @PartyIds_AlekGroup VARCHAR(200), @isRecalRebate BIT = 0, @RecalRebateEffectiveFrom DATETIME , @RecalRebateEffectiveTo DATETIME
+
+	SELECT @PartyIds_AlekGroup = STRING_AGG(CONVERT(VARCHAR(50), op.PartyID), ',')
+	FROM bodb_licensee.dbo.OAS_Party op WITH(NOLOCK)
+	INNER JOIN (
+		SELECT CAST(value AS INT ) AS PartyID FROM STRING_SPLIT(@PartyIds, ',')
+	) x ON op.PartyID = x.PartyID
+	WHERE op.PartyName IN ('BigGaming','HuangMa','BGCV','VNS888')
+
+	IF @PartyIds_AlekGroup IS NOT NULL
+		SELECT @isRecalRebate = 1
+
+	IF @isRecalRebate = 1
+		SELECT @RecalRebateEffectiveFrom = '2023-08-01', @RecalRebateEffectiveTo = '2024-08-01'
 
 	-- Generate adjustment values
 	DECLARE @ReportDate DATE = DATEADD(MONTH, DATEDIFF(MONTH, 0, @FromDate), 0)
@@ -189,6 +206,41 @@ BEGIN
 				,@ToDate = @ToDate
 				,@BaseCurrencyName = @CurrencyName
 
+			IF @isRecalRebate =1 AND @FromDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
+			BEGIN
+				DECLARE @Result_OldSetting TABLE
+				(
+					PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
+					,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000)
+					,BetCount INT, Turnover MONEY, MemberWL MONEY, BACommission MONEY, IsPrevious BIT, ExtraInfo NVARCHAR(4000)
+				)
+				INSERT INTO @Result_OldSetting
+				(
+					PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
+					,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
+				)
+				EXEC bodb_Licensee.dbo.LA_AmountToCompanyByProduct
+					@PartyIds = @PartyIds_AlekGroup
+					,@ProductCodes = 'SB'
+					,@FromDate = @FromDate
+					,@ToDate = @ToDate
+					,@BaseCurrencyName = @CurrencyName
+					,@IsUsePreviousSetting = 1
+
+				IF EXISTS (SELECT TOP 1 1 FROM @Result_OldSetting) 
+				BEGIN
+					UPDATE r
+					SET r.Rebate = ri.Rebate
+					FROM @Result r
+					INNER JOIN @Result_OldSetting ri ON r.PartyId = ri.PartyId AND r.ProductId = ri.ProductId AND ri.LicensingFeeTypeId = 0
+					WHERE r.LicensingFeeTypeId = 0 AND r.PartyId IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(@PartyIds_AlekGroup,','))
+					AND r.BaseCurrencyId IS NULL
+				END
+
+				DELETE FROM @Result_OldSetting
+
+				
+			END
 
 			UPDATE r
 			SET r.BetCount = t.BetCount

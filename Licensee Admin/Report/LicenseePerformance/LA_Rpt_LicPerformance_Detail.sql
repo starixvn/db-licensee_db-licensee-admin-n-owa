@@ -80,6 +80,7 @@ AS
 		- 20221226@Danny: Integrate Player tips [#180703]
 		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
+		- 20231005@Danny: Change charge rate and tier rebate for Alek group from Oct 2023 [RedmineID: #194561]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -118,12 +119,28 @@ BEGIN
 
 	DECLARE @statusTab TABLE (StatusId INT)
 	INSERT INTO @statusTab (StatusId)
-	SELECT CAST (val AS INT) FROM dbo.strSplit(@LicenseeStatusIds,',')
+	SELECT CAST (value AS INT) FROM STRING_SPLIT(@LicenseeStatusIds,',')
 
 	CREATE TABLE #tmp_licenseeOIC (RegisteredLicenseeName NVARCHAR(50), LicenseeStatusId TINYINT)
 	INSERT INTO #tmp_licenseeOIC(RegisteredLicenseeName, LicenseeStatusId)
 	SELECT	RegisteredLicenseeName, LicenseeStatusId
 	FROM	DBOIC.bodb_OIC.dbo.licensee WITH(NOLOCK)
+
+	DECLARE @PartyIds_AlekGroup VARCHAR(200), @isRecalRebate BIT = 0, @RecalRebateEffectiveFrom DATETIME , @RecalRebateEffectiveTo DATETIME
+
+	SELECT @PartyIds_AlekGroup = STRING_AGG(CONVERT(VARCHAR(50), op.PartyID), ',')
+	FROM bodb_licensee.dbo.OAS_Party op WITH(NOLOCK)
+	INNER JOIN (
+		SELECT CAST(value AS INT ) AS PartyID FROM STRING_SPLIT(@PartyIds, ',')
+	) x ON op.PartyID = x.PartyID
+	WHERE op.PartyName IN ('BigGaming','HuangMa','BGCV','VNS888')
+
+	IF @PartyIds_AlekGroup IS NOT NULL
+		SELECT @isRecalRebate = 1
+
+	IF @isRecalRebate = 1
+		SELECT @RecalRebateEffectiveFrom = '2023-08-01', @RecalRebateEffectiveTo = '2024-08-01'
+
 
 	-- Get Party List
 	BEGIN
@@ -138,7 +155,7 @@ BEGIN
 
 		DECLARE @PartyList TABLE (PartyId INT, PartyName VARCHAR(50), LaunchDate DATE, StatusID INT)
 		INSERT INTO @PartyList (PartyId)
-		SELECT DISTINCT val FROM dbo.StrSplit(@PartyIds, ',')
+		SELECT DISTINCT value FROM STRING_SPLIT(@PartyIds, ',')
 
 		UPDATE pl
 		SET pl.PartyName = CASE p.PartyName
@@ -260,6 +277,42 @@ BEGIN
 			,@IsConvertExRate = @IsConvert
 			,@BaseCurrencyName = @BaseCurrencyName
 
+		IF @isRecalRebate =1 AND @FDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
+		BEGIN
+			DECLARE @Result_InMonth TABLE
+			(
+				PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
+				,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000)
+				,BetCount INT, Turnover MONEY, MemberWL MONEY, BACommission MONEY, IsPrevious BIT, ExtraInfo NVARCHAR(4000)
+			)
+			INSERT INTO @Result_InMonth
+			(
+				PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
+				,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
+			)
+			EXEC bodb_Licensee.dbo.LA_AmountToCompanyByProduct
+				@PartyIds = @PartyIds_AlekGroup
+				,@ProductCodes = 'SB'
+				,@Currencies = @Currencies
+				,@FromDate = @FDate
+				,@ToDate = @TDate
+				,@IsConvertExRate = @IsConvert
+				,@BaseCurrencyName = @BaseCurrencyName
+				,@IsUsePreviousSetting = 1
+
+
+			IF EXISTS (SELECT TOP 1 1 FROM @Result_InMonth) 
+			BEGIN
+				UPDATE r
+				SET r.Rebate = ri.Rebate
+				FROM @Result r
+				INNER JOIN @Result_InMonth ri ON r.PartyId = ri.PartyId AND r.ProductId = ri.ProductId AND ri.LicensingFeeTypeId = 0
+				WHERE r.LicensingFeeTypeId = 0 AND r.PartyId IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(@PartyIds_AlekGroup,','))
+				 
+				DELETE FROM @Result_InMonth
+			END
+		END
+
 		UPDATE r
 		SET r.IsPrevious = 0
 			,r.LicensingFee = r.LicensingFee + CASE WHEN r.ProductId = 37 THEN 0 ELSE r.ExtraAmount END
@@ -347,6 +400,43 @@ BEGIN
 			,@ToDate = @PrevTDate
 			,@IsConvertExRate = @IsConvert
 			,@BaseCurrencyName = @BaseCurrencyName
+
+		IF @isRecalRebate =1 AND @PrevFDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
+		BEGIN
+			DECLARE @Result_LastMonth TABLE
+			(
+				PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
+				,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000)
+				,BetCount INT, Turnover MONEY, MemberWL MONEY, BACommission MONEY, IsPrevious BIT, ExtraInfo NVARCHAR(4000)
+			)
+			INSERT INTO @Result_LastMonth
+			(
+				PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
+				,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
+			)
+			EXEC bodb_Licensee.dbo.LA_AmountToCompanyByProduct
+				@PartyIds = @PartyIds_AlekGroup
+				,@ProductCodes = 'SB'
+				,@Currencies = @Currencies
+				,@FromDate = @PrevFDate
+				,@ToDate = @PrevTDate
+				,@IsConvertExRate = @IsConvert
+				,@BaseCurrencyName = @BaseCurrencyName
+				,@IsUsePreviousSetting = 1
+
+
+			IF EXISTS (SELECT TOP 1 1 FROM @Result_LastMonth) 
+			BEGIN
+				UPDATE r
+				SET r.Rebate = rl.Rebate
+				FROM @Result r
+				INNER JOIN @Result_LastMonth rl ON r.PartyId = rl.PartyId AND r.ProductId = rl.ProductId AND rl.LicensingFeeTypeId = 0
+				WHERE r.LicensingFeeTypeId = 0 AND r.PartyId IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(@PartyIds_AlekGroup,','))
+				AND r.IsPrevious IS NULL
+				 
+				DELETE FROM @Result_LastMonth
+			END
+		END
 
 		UPDATE r
 		SET r.IsPrevious = 1
