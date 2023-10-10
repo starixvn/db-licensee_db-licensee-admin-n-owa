@@ -18,6 +18,7 @@ AS
 		- 20180705@Parsons: Delete discount groups [#94282]
 		- 20211101@Percy: Remove useless params [RedmineID: #162158]
 		- 20230403@Danny: Insert new log with more information [#FeatureID 175125]
+		- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
 	 
 	 Params:
 
@@ -56,7 +57,7 @@ BEGIN
 						FROM 
 							(
 								SELECT  op.PartyID as PartyID ,op.PartyName AS LicenseeName, CASE WHEN lgc.CurrencyId = 142 THEN 'USDT' 
-														WHEN lgc.CurrencyId IN (96, 202) THEN e.Code + ' ('+ e.currency+ ')'
+														WHEN lgc.CurrencyId IN (96, 202, 206, 208,209) THEN e.Code + ' ('+ e.currency+ ')'
 														ELSE e.Code END AS Curr,
 	  
 										CASE WHEN lgc.CalculationType IN (1,3) THEN 1 ELSE 0 END CountInPer,

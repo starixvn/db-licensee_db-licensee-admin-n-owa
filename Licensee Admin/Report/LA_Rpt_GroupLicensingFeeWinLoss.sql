@@ -29,6 +29,7 @@ AS
 		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 		- 20230713@Danny: Incorporate USDT2 currency [RedmineID: #191165]
 		- 20230823@Danny: Incorporate US$KH currency [RedmineID: #192544]
+		- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -166,6 +167,11 @@ BEGIN
 			WHEN 77 THEN 'PTH'
 			WHEN 92 THEN 'HID' 
 			WHEN 142 THEN 'USDT' 
+			WHEN 96 THEN 'USD (USDT)'
+			WHEN 206 THEN 'USD (USDT2)'
+			WHEN 202 THEN 'USD (USDTJP)'
+			WHEN 208 THEN 'USD (US$KH)'
+			WHEN 209 THEN 'MP'
 			ELSE Code END
 	FROM bodb02.dbo.Exchange WITH (NOLOCK)
 	WHERE ExchangeId IN (SELECT CurrencyId FROM #tmpResult)
@@ -175,11 +181,6 @@ BEGIN
 	FROM @Exchange e
 		INNER JOIN (SELECT CurrencyCode FROM @Exchange GROUP BY CurrencyCode HAVING COUNT(1) > 1) t ON e.CurrencyCode = t.CurrencyCode
 		
-	--- Update USDT
-	UPDATE e
-	SET e.CurrencyCode = e.CurrencyCode + ' (' + e.CurrencyName + ')' 
-	FROM @Exchange e
-	WHERE e.CurrencyName IN ('USDT','USDTJP','USDT2','US$KH') AND e.CurrencyCode = 'USD'
 
 	-- Add data for products with no ticket
 	;WITH CTE_Currency AS (SELECT DISTINCT CurrencyId FROM #tmpResult)

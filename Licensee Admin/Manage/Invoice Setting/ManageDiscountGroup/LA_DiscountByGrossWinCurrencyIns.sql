@@ -20,6 +20,7 @@ AS
 		- 20221103@Danny: Initialize SP [RedmineID: #179367]
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 		- 20230331@Danny: Insert new log with more information [#FeatureID 175125]
+		- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
 	 
 	 Relation SP: Dot_Dep_CreateCurrencyLicensee
 */
@@ -131,7 +132,7 @@ BEGIN
 							FROM 
 								(
 									SELECT  op.PartyID as PartyID ,op.PartyName AS LicenseeName, CASE WHEN lgc.CurrencyId = 142 THEN 'USDT' 
-															WHEN lgc.CurrencyId IN (96, 202) THEN e.Code + ' ('+ e.currency+ ')'
+															WHEN lgc.CurrencyId IN (96, 202, 206, 208,209) THEN e.Code + ' ('+ e.currency+ ')'
 															ELSE e.Code END AS Curr,
 	  
 											CASE WHEN lgc.CalculationType IN (1,3) THEN 1 ELSE 0 END CountInPer,
@@ -188,7 +189,7 @@ BEGIN
 							FROM 
 								(
 									SELECT  op.PartyID as PartyID ,op.PartyName AS LicenseeName, CASE WHEN lgc.CurrencyId = 142 THEN 'USDT' 
-															WHEN lgc.CurrencyId IN (96, 202) THEN e.Code + ' ('+ e.currency+ ')'
+															WHEN lgc.CurrencyId IN (96, 202, 206, 208,209) THEN e.Code + ' ('+ e.currency+ ')'
 															ELSE e.Code END AS Curr,
 	  
 											CASE WHEN lgc.CalculationType IN (1,3) THEN 1 ELSE 0 END CountInPer,

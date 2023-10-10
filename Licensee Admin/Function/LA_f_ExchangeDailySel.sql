@@ -20,6 +20,7 @@ ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
 		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 		- 20230713@Danny: Incorporate USDT2 currency [RedmineID: #191165]
 		- 20230823@Danny: Incorporate US$KH currency [RedmineID: #192544]
+		- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
 
 	Param's Explanation:				
 */
@@ -59,6 +60,7 @@ BEGIN
 					WHEN t.ExchangeId IN (96,206) THEN 'USD (USDT)'
 					WHEN t.ExchangeId = 202 THEN 'USD (USDTJP)'
 					WHEN t.ExchangeId = 208 THEN 'USD (US$KH)'
+					WHEN t.ExchangeId = 209 THEN 'MP'
 					ELSE t.Code END 
 				,CASE WHEN @BaseCurrency = 'MYR' THEN t.MYR
 					WHEN @BaseCurrency = 'USD' THEN t.USD
