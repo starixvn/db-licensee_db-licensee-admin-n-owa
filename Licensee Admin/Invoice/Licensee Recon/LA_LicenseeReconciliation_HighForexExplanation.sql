@@ -275,7 +275,7 @@ BEGIN
 	FROM #LA_Data l
 	FULL JOIN #NAP_Data n ON l.PartyID = n.PartyID AND l.ProductID = n.ProductID 
 	WHERE --ISNULL(l.AmountToCompany,0) <> ISNULL(n.AmountToCompany,0) 
-			ABS(ISNULL(-l.AmountToCompany,0) - ISNULL(n.AmountToCompany,0)) <> 1.
+			ABS(ISNULL(-l.AmountToCompany,0) - ISNULL(n.AmountToCompany,0)) > 1.
 	ORDER BY ISNULL(l.PartyID, n.PartyID), ISNULL(l.ProductID,n.ProductID)
 
 	-- Diff by Adjustment
@@ -687,8 +687,7 @@ BEGIN
 			BaseCurrencyID			INT,
 			ProductID				INT,
 			firstday_PT				DATETIME,
-			isSamePT				BIT DEFAULT 0,
-			isBeforeLaunchDate		BIT DEFAULT 0
+			isSamePT				BIT DEFAULT 0
 		)
 
 		-- LA
@@ -800,129 +799,46 @@ BEGIN
 		INNER JOIN u ON pt.ProductID = u.ProductID AND pt.PartyID = u.PartyID AND u.IsSamePT = 1 AND pt.BaseCurrencyID = u.BaseCurrencyID
 		WHERE pt.ProductID NOT IN (0)
 
-		-- detect before LaunchDate rule
-		UPDATE  nap
-		SET		nap.isBeforeLaunchDate = CASE WHEN nap.firstday_PT < la.firstday_PT THEN 1 ELSE 0 END
-		FROM	@Result_PT nap
-		CROSS APPLY (
-			SELECT MIN(la.firstday_PT) firstday_PT FROM @Result_PT la 
-			WHERE la.ProductID = nap.ProductID AND la.PartyID = nap.PartyID AND la.BaseCurrencyID = nap.BaseCurrencyID
-			AND la.Func = 'LA'
-		) la
-		WHERE nap.Func = 'NAP'
-
-		IF EXISTS (SELECT TOP 1 1 FROM @Result_PT WHERE isBeforeLaunchDate = 1 AND func = 'NAP')
-		BEGIN
-			INSERT INTO @Result_PT (
-				PartyID, BaseCurrencyID, ProductID,Func, LicenseeWL, ChargeRate, LicensingFee, 
-				Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread, firstday_PT, isSamePT, isBeforeLaunchDate)
-			SELECT PartyID, BaseCurrencyID, ProductID,Func, LicenseeWL, ChargeRate, LicensingFee, 
-				 Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread, firstday_PT, isSamePT, 1 AS isBeforeLaunchDate
-			FROM	@Result_PT x
-			WHERE x.Func = 'LA' AND EXISTS (SELECT TOP 1 1 FROM @Result_PT z WHERE z.isBeforeLaunchDate = 1 
-												AND z.func = 'NAP' 
-												AND z.PartyID = x.PartyID
-												AND z.ProductID = x.ProductID
-												AND z.BaseCurrencyID = x.BaseCurrencyID
-											)
-
-
-		END
-
-		-- Remove unused data
-		DELETE x
-		FROM @Result_PT x
-		WHERE x.Func = 'LA' AND NOT EXISTS (SELECT TOP 1 1 FROM @Result_PT z WHERE z.isBeforeLaunchDate = x.isBeforeLaunchDate
-												AND z.func = 'NAP' 
-												AND z.PartyID = x.PartyID
-												AND z.ProductID = x.ProductID
-												AND z.BaseCurrencyID = x.BaseCurrencyID
-											)
-		
-
-		;WITH t AS
-		(
-			SELECT DISTINCT x.PartyID, x.ProductID, x.BaseCurrencyID, x.isBeforeLaunchDate
-			FROM @Result_PT x
-			WHERE x.Func = 'LA' AND x.isBeforeLaunchDate = 0 AND  NOT EXISTS (SELECT TOP 1 1 FROM @Result_PT z WHERE z.isBeforeLaunchDate = x.isBeforeLaunchDate
-																					AND z.func = 'NAP' 
-																					AND z.PartyID = x.PartyID
-																					AND z.ProductID = x.ProductID
-																					AND z.BaseCurrencyID = x.BaseCurrencyID
-																					AND z.ChargeRate <>  x.ChargeRate
-																				)
-		)DELETE p
-		FROM @Result_PT p
-		INNER JOIN t ON p.PartyID = t.PartyID AND p.ProductID = t.ProductID AND p.BaseCurrencyID = t.BaseCurrencyID AND p.isBeforeLaunchDate = t.isBeforeLaunchDate
-
-
+	
 		; WITH  u_chargeRate AS
 		(
-			SELECT  Func, PartyID, ProductID, STRING_AGG(CAST(ChargeRate * 100 AS VARCHAR(10)) + '%', ', ') ChargeRate, firstday_PT, BaseCurrencyID, isBeforeLaunchDate
+			SELECT  Func, PartyID, ProductID, STRING_AGG(CAST(ChargeRate * 100 AS VARCHAR(10)) + '%', ', ') ChargeRate, firstday_PT, BaseCurrencyID
 			FROM	@Result_PT
 			WHERE   isSamePT = 0
-			GROUP BY  Func,PartyID, ProductID, firstday_PT, BaseCurrencyID, isBeforeLaunchDate
+			GROUP BY  Func,PartyID, ProductID, firstday_PT, BaseCurrencyID
 		), z AS 
 		(
-			SELECT  uc.Func, uc.PartyID, uc.ProductID, uc.BaseCurrencyID,   isBeforeLaunchDate,
+			SELECT  uc.Func, uc.PartyID, uc.ProductID, uc.BaseCurrencyID,
 						CASE WHEN uc.Func = 'NAP' THEN 'NAP:' + CHAR(13) ELSE 'LA:' + CHAR(13) END + STRING_AGG ( CASE WHEN uc.Func = 'NAP' THEN CHAR(9) + '- Having bet tickets with charge rate ' + ChargeRate + ' From ' + FORMAT(firstday_PT,'MMM dd, yyyy') 
 						ELSE CHAR(9) +  '- Charge rate setting ' + ChargeRate + ' From ' + FORMAT(firstday_PT,'MMM dd, yyyy') END, CHAR(13)) AS Remark
 			FROM	u_chargeRate uc
-			GROUP BY  PartyID, ProductID, BaseCurrencyID, Func, isBeforeLaunchDate
+			GROUP BY  PartyID, ProductID, BaseCurrencyID, Func
 		)
 		INSERT INTO @Remark_ChargeRate (PartyID, ProductID, BaseCurrencyID, Remark)
 		SELECT  d.PartyID, d.ProductID, d.BaseCurrencyID, STRING_AGG(Remark, CHAR(13)+CHAR(13))
 		FROM 
 		(
-			SELECT PartyID, ProductID, BaseCurrencyID, CASE WHEN isBeforeLaunchDate = 0 THEN 'Due to the differences on product charge rate' ELSE 'Due to having tickets before launched date' END + CHAR(13) + STRING_AGG(Remark, CHAR(13)) Remark
+			SELECT PartyID, ProductID, BaseCurrencyID, 'Due to the differences on product charge rate or having tickets before launched date' + CHAR(13) + STRING_AGG(Remark, CHAR(13)) Remark
 			FROM	z 
-			GROUP BY PartyID, ProductID, BaseCurrencyID, isBeforeLaunchDate
+			GROUP BY PartyID, ProductID, BaseCurrencyID
 		) d
 		GROUP BY d.PartyID, d.ProductID, d.BaseCurrencyID
-
-		INSERT INTO @Remark_ChargeRate (PartyID, ProductID, BaseCurrencyID, Remark)
-		SELECT PartyID, ProductID, BaseCurrencyID, 'Please contact StarixIT for support' Remark
-		FROM	@Result_PT
-		WHERE	isSamePT = 1 AND ProductID NOT IN (31,10)
-		GROUP BY PartyID, ProductID, BaseCurrencyID
 
 		; WITH t AS
 		(
 			SELECt PartyID, Func ,ProductID, BaseCurrencyID,  CASE WHEN Type = 'Actual Bet' THEN CHAR(9) + '- Actual bet this month: ' + FORMAT(BasedAmountToCompany,'N','en-us')
 														ELSE CHAR(9) + '- Adjustment without this month: ' + FORMAT(BasedAmountToCompany,'N','en-us') + Char(13) + Remark  END Remark
-			FROM (
-					SELECT   PartyID, Func ,ProductID, BaseCurrencyID, Remark, SUM(BasedAmountToCompany) BasedAmountToCompany, Type from @Result_adj
-					GROUP BY PartyID, Func ,ProductID, BaseCurrencyID, Remark, Type
-			) t
+			FROM @Result_adj
 		), u AS
 		(
-			SELECT PartyID, ProductID, BaseCurrencyID, CASE WHEN Func = 'NAP' THEN 'NAP:' + CHAR(13) ELSE 'LA:' + ChAR(13) END +  STRING_AGG(Remark, CHAR(13))  Remark
-			FROM t 
-			GROUP BY PartyID, ProductID, BaseCurrencyID, Func
+		SELECT PartyID, ProductID, BaseCurrencyID, CASE WHEN Func = 'NAP' THEN 'NAP:' + CHAR(13) ELSE 'LA:' + ChAR(13) END +  STRING_AGG(Remark, CHAR(13))  Remark
+		FROM t 
+		GROUP BY PartyID, ProductID, BaseCurrencyID, Func
 		)
-		INSERT INTO @Remark_Adj (PartyID, ProductID, BaseCurrencyID, Remark, IsDiffActualBet, IsHaveAdj)
-		SELECT PartyID, ProductID, BaseCurrencyID ,  
-				 CASE WHEN ISNULL(la.BasedAmountToCompany,0) <> ISNULL(nap.BasedAmountToCompany,0) AND adj_cnt > 0  THEN  'Due to adjustment, an adjustment might be added for next month.' 
-					  WHEN  adj_cnt = 0  THEN  'Due to adjustment, an adjustment might be added for next month.' 
-					  WHEN ISNULL(la.BasedAmountToCompany,0) = ISNULL(nap.BasedAmountToCompany,0) AND adj_cnt > 0  THEN  'Due to adjustment for previous month.' 
-					ELSE  'Due to adjustment' END
-					+ CHAR(13) + STRING_AGG(Remark,CHAR(13)) Remark,
-					CASE WHEN ISNULL(la.BasedAmountToCompany,0) <> ISNULL(nap.BasedAmountToCompany,0) THEN 1 ELSE 0 END IsDiffActualBet,
-					CASE WHEN  ISNULL(adj_cnt,0) > 0 THEN 1 ELSE 0 END IsHaveAdj
+		INSERT INTO @Remark_Adj (PartyID, ProductID, BaseCurrencyID, Remark)
+		SELECT PartyID, ProductID, BaseCurrencyID , 'Due to adjustment' + CHAR(13) + STRING_AGG(Remark,CHAR(13)) Remark
 		FROM u
-		OUTER APPLY (SELECT la.BasedAmountToCompany 
-					 FROM @Result_adj la WHERE la.Func = 'LA' AND la.PartyID = u.PartyID AND la.ProductID = u.ProductID AND la.BaseCurrencyID = u.BaseCurrencyID AND la.Type = 'Actual Bet') la
-		OUTER APPLY (SELECT nap.BasedAmountToCompany 
-					 FROM @Result_adj nap WHERE nap.Func = 'NAP' AND nap.PartyID = u.PartyID AND nap.ProductID = u.ProductID AND nap.BaseCurrencyID = u.BaseCurrencyID AND nap.Type = 'Actual Bet') nap
-		OUTER APPLY (SELECT COUNT(1) AS adj_cnt
-					 FROM @Result_adj adj WHERE adj.Func = 'NAP' AND adj.PartyID = u.PartyID AND adj.ProductID = u.ProductID AND adj.BaseCurrencyID = u.BaseCurrencyID AND adj.Type = 'Adjustment without this month') adj
-		GROUP BY PartyID, ProductID, BaseCurrencyID, la.BasedAmountToCompany, nap.BasedAmountToCompany, adj_cnt
-
-		-- Remove Adjustment reason In case of different PT setting
-		DELETE ra
-		FROM @Remark_Adj ra
-		INNER JOIN @Remark_ChargeRate rc ON ra.PartyID = rc.PartyID AND ra.ProductID = rc.ProductID AND ra.BaseCurrencyID = rc.BaseCurrencyID
-		WHERE ra.IsDiffActualBet = 1 AND ra.IsHaveAdj = 0
+		GROUP BY PartyID, ProductID, BaseCurrencyID
 
 		-- Final result
 		; WITH TotalDiffAmt AS
