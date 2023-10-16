@@ -71,6 +71,7 @@ AS
 		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 		- 20231005@Danny: Change charge rate and tier rebate for Alek group from Oct 2023 [RedmineID: #194561]
++		- 20230223@Danny: Integrate Casino promotion [#194808]
 
 */
 BEGIN
@@ -104,6 +105,8 @@ BEGIN
 	DECLARE @ProductCodes VARCHAR(MAX)
 	SELECT  @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM @ProductList
 
+	SELECT @ProductCodes = @ProductCodes +',SPR(CS)'
+
 	DECLARE @PartyIds_AlekGroup VARCHAR(200), @isRecalRebate BIT = 0, @RecalRebateEffectiveFrom DATETIME , @RecalRebateEffectiveTo DATETIME
 
 	SELECT @PartyIds_AlekGroup = STRING_AGG(CONVERT(VARCHAR(50), op.PartyID), ',')
@@ -134,7 +137,7 @@ BEGIN
 		,@ProductCodes = @ProductCodes
 		,@FromDate = @FromDate
 		,@ToDate = @ToDate
-		,@LicensingFeeTypeIds = '0,7,8,9' -- 7 = ContributionDiscount, 8 = BetCount, 9 = OddsSpeadAdjustment
+		,@LicensingFeeTypeIds = '0,7,8,9,13' -- 7 = ContributionDiscount, 8 = BetCount, 9 = OddsSpeadAdjustment
 		,@BaseCurrencyName = @BaseCurrency
 
 	IF @isRecalRebate =1 AND @FromDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
@@ -172,21 +175,23 @@ BEGIN
 
 	DECLARE @FinalResult TABLE (PartyId INT, ProductId INT, AmountToCompany MONEY, LicensingFee MONEY, Discount MONEY, Rebate MONEY, Promotion MONEY, Sponsorship MONEY, ContributionDiscount MONEY, BetCount INT, OddsSpreadCost MONEY, PlayerTips MONEY)
 	INSERT INTO @FinalResult (PartyId, ProductId, AmountToCompany, LicensingFee, Discount, Rebate, Promotion, Sponsorship, ContributionDiscount, BetCount, OddsSpreadCost, PlayerTips)
-	SELECT r.PartyId, r.ProductId, r.GrossLicensingFee, r.LicensingFee + r.ExtraAmount, r.Discount, r.Rebate, ISNULL(t.Promotion, 0), ISNULL(t.Sponsorship, 0), ISNULL(t.ContributionDiscount, 0), ISNULL(t.BetCount, 0), ISNULL(t.OddsSpreadAdjustment, 0), ISNULL(t.PlayerTips,0)
+	SELECT r.PartyId, r.ProductId, r.GrossLicensingFee, r.LicensingFee + r.ExtraAmount, r.Discount, r.Rebate + t.CasinoPromotionRebate, ISNULL(t.Promotion, 0), ISNULL(t.Sponsorship, 0), ISNULL(t.ContributionDiscount, 0), ISNULL(t.BetCount, 0), ISNULL(t.OddsSpreadAdjustment, 0), ISNULL(t.PlayerTips,0)
 	FROM @Result r
 		LEFT JOIN (
-			SELECT PartyId, CASE WHEN ProductId IN (37, 74) THEN 0 ELSE ProductId END AS ProductId
-				,SUM(CASE WHEN ProductId = 37 AND LicensingFeeTypeId = 0 THEN LicensingFee ELSE 0 END) AS Promotion
+			SELECT PartyId, CASE WHEN ProductId IN (37, 74, -37) THEN 0 ELSE ProductId END AS ProductId
+				,SUM(CASE WHEN ProductId = 37 AND LicensingFeeTypeId = 0 THEN LicensingFee 
+						  WHEN LicensingFeeTypeId = 13 THEN ExtraAmount ELSE 0 END) AS Promotion
 				,SUM(CASE WHEN ProductId = 37 AND LicensingFeeTypeId = 0 THEN ExtraAmount ELSE 0 END) AS Sponsorship
 				,SUM(CASE WHEN LicensingFeeTypeId = 7 THEN ExtraAmount ELSE 0 END) AS ContributionDiscount
 				,SUM(CASE WHEN LicensingFeeTypeId = 8 THEN ExtraAmount ELSE 0 END) AS BetCount
 				,SUM(CASE WHEN LicensingFeeTypeId = 9 AND ExtraAmount < 0 THEN -ExtraAmount ELSE 0 END) AS OddsSpreadAdjustment
 				,SUM(CASE WHEN ProductId = 74 AND LicensingFeeTypeId = 0 THEN -ExtraAmount ELSE 0 END) AS PlayerTips -- Recon Show Negative value
+				,SUM(CASE WHEN ProductId = -37 AND LicensingFeeTypeId = 13 THEN Rebate ELSE 0 END) AS CasinoPromotionRebate
 			FROM @Result
 			WHERE ProductId IN (37,74) OR LicensingFeeTypeId > 0
-			GROUP BY PartyId,CASE WHEN ProductId IN (37, 74) THEN 0 ELSE ProductId END
+			GROUP BY PartyId,CASE WHEN ProductId IN (37, 74, -37) THEN 0 ELSE ProductId END
 		) t ON r.PartyId = t.PartyId AND r.ProductId = t.ProductId
-	WHERE r.LicensingFeeTypeId = 0 AND r.ProductId NOT IN (37, 74)
+	WHERE r.LicensingFeeTypeId = 0 AND r.ProductId NOT IN (37, 74, -37)
 
 	-- Return data
 	IF @IsShowSettlementDetail = 1

@@ -38,6 +38,7 @@ AS
 	  - 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 	  - 20221213@Danny: Change fomular Calculate rebate base on Licensee Fee [RedmineID: #181546]
 	  - 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
+	  - 20230223@Danny: Integrate Casino promotion [#194808]
 */
 
 BEGIN
@@ -84,6 +85,9 @@ BEGIN
 	;WITH CTE_Product AS (SELECT DISTINCT ProductCode FROM @Products)
 	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM CTE_Product
 
+	SELECT @ProductCodes = @ProductCodes +',SPR(CS)'
+	WHERE EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value <> 'SB')
+
 	DECLARE @Result TABLE
 	(
 		PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, LicenseeWL MONEY, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
@@ -110,7 +114,7 @@ BEGIN
 			,@ToDate = @ToDate
 			,@BaseCurrencyName = @BaseCurrency
 			,@IncludeTierRebate = 0
-			,@LicensingFeeTypeIds = '0,11' -- 11 = Licensee WL
+			,@LicensingFeeTypeIds = '0,11,13' -- 11 = Licensee WL
 
 		INSERT INTO @Result_37
 		(
@@ -133,11 +137,15 @@ BEGIN
 	END
 
 	-- Total
+	IF EXISTS (SELECT TOP 1 1 FROM @Result WHERE ProductId = -37)
+		INSERT INTO @Products(ProductId, ProductCode, RebateType) VALUES (-37, 'SPR(CS)', 2) --rebate on LicFee
+
 	DECLARE @Remark NVARCHAR(4000), @TotalRebate MONEY, @TotalAmount MONEY
 	SELECT @Remark = MAX(r.RebateRemark)
 		,@TotalRebate = SUM(r.Rebate)
-		,@TotalAmount = SUM(CASE WHEN p.RebateType = 2 THEN CASE WHEN (r.LicensingFee + r.ExtraAmount - r.Discount - CASE WHEN @FDate >= @CutOff_RebateOnLicfee THEN ISNULL(r_37.GrossLicensingFee,0) ELSE 0 END) < 0 THEN 0 ELSE r.LicensingFee + r.ExtraAmount - r.Discount - CASE WHEN @FDate >= @CutOff_RebateOnLicfee THEN ISNULL(r_37.GrossLicensingFee,0) ELSE 0 END END 
-						ELSE r.LicenseeWL END)
+		,@TotalAmount = SUM(CASE WHEN r.LicensingFeeTypeId = 13 THEN -r.ExtraAmount
+								 WHEN p.RebateType = 2 THEN CASE WHEN (r.LicensingFee + r.ExtraAmount - r.Discount - CASE WHEN @FDate >= @CutOff_RebateOnLicfee THEN ISNULL(r_37.GrossLicensingFee,0) ELSE 0 END) < 0 THEN 0 ELSE r.LicensingFee + r.ExtraAmount - r.Discount - CASE WHEN @FDate >= @CutOff_RebateOnLicfee THEN ISNULL(r_37.GrossLicensingFee,0) ELSE 0 END END 
+						    ELSE r.LicenseeWL END)
 	FROM @Result r
 		INNER JOIN @Products p ON r.ProductId = p.ProductId
 		LEFT JOIN @Result_37 r_37 ON r.PartyId = r_37.PartyId AND r.ProductId = 0  AND r_37.LicensingFeeTypeId = 0 AND r.LicensingFeeTypeId = 0
@@ -147,8 +155,12 @@ BEGIN
 	SELECT @Remark AS Remark, @ToDate AS ReportDate, @BaseCurrency AS CurrencyName, @TotalRebate AS TotalRebate, @TotalAmount AS TotalAmount
 
 	-- Detail
-	SELECT r.ProductId, CASE WHEN p.RebateType = 2 THEN CASE WHEN (r.LicensingFee + r.ExtraAmount - r.Discount - CASE WHEN @FDate >= @CutOff_RebateOnLicfee THEN ISNULL(r_37.GrossLicensingFee,0) ELSE 0 END) < 0 THEN 0 ELSE r.LicensingFee + r.ExtraAmount - r.Discount - CASE WHEN @FDate >= @CutOff_RebateOnLicfee THEN ISNULL(r_37.GrossLicensingFee,0) ELSE 0 END END 
-		ELSE r.LicenseeWL END AS AmountToCompany
+	SELECT r.ProductId, CASE	WHEN r.LicensingFeeTypeId = 13 THEN -r.ExtraAmount
+								WHEN p.RebateType = 2 THEN 
+								CASE WHEN (r.LicensingFee + r.ExtraAmount - r.Discount - CASE WHEN @FDate >= @CutOff_RebateOnLicfee THEN ISNULL(r_37.GrossLicensingFee,0) ELSE 0 END) < 0 THEN 0 
+									ELSE r.LicensingFee + r.ExtraAmount - r.Discount - CASE WHEN @FDate >= @CutOff_RebateOnLicfee THEN ISNULL(r_37.GrossLicensingFee,0) ELSE 0 END 
+								END 
+						ELSE r.LicenseeWL END AS AmountToCompany
 	FROM @Result r
 		INNER JOIN @Products p ON r.ProductId = p.ProductId
 		LEFT JOIN @Result_37 r_37 ON r.PartyId = r_37.PartyId AND r.ProductId = 0  AND r_37.LicensingFeeTypeId = 0 AND r.LicensingFeeTypeId = 0

@@ -42,6 +42,7 @@ AS
 		- 20230519@Danny: New commercial terms for 12B [RedmineID: #186543]
 		- 20231005@Danny: Change charge rate and tier rebate for Alek group from Oct 2023 [RedmineID: #194561]
 		- 20231110@Danny: Adjust fomular tier rebate [RedmineID: #196685]
+		- 20230223@Danny: Integrate Casino promotion [#194808]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -59,6 +60,7 @@ AS
 			9 = OddsSpead Adjustment
 			10 = Promotion
 			11 = Licensee Winloss
+			13 = Casino promotion
 */
 
 BEGIN
@@ -66,6 +68,9 @@ BEGIN
 
 	DECLARE @FromDate_Setting	DATETIME
 	DECLARE @ToDate_Setting		DATETIME
+	DECLARE @ProductCodes_org   VARCHAR(MAX)
+
+	SELECT @ProductCodes_org = @ProductCodes
 
 	IF @ToDate > CONVERT(DATE, GETDATE())
 		SET @ToDate = CONVERT(DATE, GETDATE())
@@ -100,9 +105,14 @@ BEGIN
 	FROM dbo.LA_f_Products3rd(@ProductCodes)
 	WHERE ProductId NOT IN (16, 37, 74)
 
+	IF EXISTS (SELECT 1 FROM #Products WHERE ProductId = 0) OR EXISTS (SELECT 1 FROM STRING_SPLIT(@ProductCodes_org,',') WHERE value = 'SPR(CS)')
+		INSERT INTO #Products (ProductId, ProductName, ProductCode, IsSelected)
+		VALUES (37, 'Saba Promotion', 'SPR', 1)
+
 	IF EXISTS (SELECT 1 FROM #Products WHERE ProductId = 0)
 		INSERT INTO #Products (ProductId, ProductName, ProductCode, IsSelected)
-		VALUES (37, 'Saba Promotion', 'SPR', 1), (74, 'Player Tips', 'TIP', 1)
+		VALUES (74, 'Player Tips', 'TIP', 1)
+
 
 	-- Get Party List
 	CREATE TABLE #PartyList (PartyId INT, LicenseeId INT, BaseCurrencyId INT, IsDeposit BIT, IsSelected BIT)
@@ -271,7 +281,7 @@ BEGIN
 		,Tips MONEY DEFAULT(0), Contribution MONEY DEFAULT(0), JackpotPrize MONEY DEFAULT(0), Prize MONEY DEFAULT(0)
 		,LuckyDraw MONEY DEFAULT(0), Bonus MONEY DEFAULT(0), OddsSpread MONEY DEFAULT(0), FreeBets MONEY DEFAULT(0)
 		,PayOut MONEY DEFAULT(0), CommShare MONEY DEFAULT(0), CashInShare MONEY DEFAULT(0), Betcount INT DEFAULT(0)
-		,Promotion MONEY DEFAULT(0)
+		,Promotion MONEY DEFAULT(0), CasinoPromotion MONEY DEFAULT(0)
 	)
 
 	-- CO
@@ -311,9 +321,9 @@ BEGIN
 		UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL -- sum first
 	)
 	INSERT INTO #TempData (rptDate, LicenseeId, ProductId, CurrencyId, BettypeRef, MemberWL, MemberComm, AgentWL, AgentComm
-		,Tips, Contribution, JackpotPrize, Prize, LuckyDraw, Bonus, OddsSpread, FreeBets, PayOut, CommShare, CashInShare, Betcount, Promotion)
+		,Tips, Contribution, JackpotPrize, Prize, LuckyDraw, Bonus, OddsSpread, FreeBets, PayOut, CommShare, CashInShare, Betcount, Promotion, CasinoPromotion)
 	SELECT r.rptDate, r.SiteId, g.GroupProductId, r.CurrencyId
-		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005) THEN r.Bettype ELSE -1 END
+		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005, 17006) THEN r.Bettype ELSE -1 END
 		,SUM(CASE WHEN r.TicketType = 2 OR b.Bettype IS NOT NULL THEN 0 ELSE r.MemberWL END) AS MemberWL
 		,SUM(r.CommissionP) AS MemberComm
 		,SUM(r.GrossWL) AS AgentWL
@@ -331,11 +341,12 @@ BEGIN
 		,SUM(r.CashInShare) AS CashInShare
 		,SUM(r.BetCount) AS BetCount
 		,SUM(CASE WHEN b.TypeId = 8 THEN MemberWL ELSE 0 END) AS Promotion
+		,SUM(CASE WHEN b.TypeId = 10 THEN MemberWL ELSE 0 END) AS CasinoPromotion
 	FROM CTE_tempData r
 		INNER JOIN @Products g ON r.ProductId = g.ProductId AND r.rptDate BETWEEN g.FromDate AND g.ToDate
 		LEFT JOIN dbo.LA_f_GroupBettype() b ON r.Bettype = b.Bettype
 	GROUP BY r.rptDate, r.SiteId, g.GroupProductId, r.CurrencyId
-		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005) THEN r.Bettype ELSE -1 END
+		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005, 17006) THEN r.Bettype ELSE -1 END
 
 	CREATE TABLE #tmpResult (rptDate DATE, PartyId INT, ProductId INT, CurrencyId INT
 		,GrossLicenseeAmount MONEY, LicenseeWL MONEY, LicenseeAmount MONEY, ExtraAmount MONEY DEFAULT(0), OddsSpread MONEY
@@ -420,18 +431,37 @@ BEGIN
 	GROUP BY t.rptDate, p.PartyId, t.CurrencyId
 
 	-- SB Promotion
-	INSERT INTO #tmpResult (rptDate, PartyId, ProductId, CurrencyId, GrossLicenseeAmount, LicenseeAmount, BasedLicenseeAmount, ExtraAmount, BetCount)
-	SELECT t.rptDate, p.PartyId, 37, t.CurrencyId
-		,SUM(CASE WHEN t.BettypeRef = 17005 THEN t.AgentWL ELSE t.MemberWL END * e.Rate) AS GrossLicenseeAmount
-		,SUM(CASE WHEN t.BettypeRef = 17005 THEN 0 ELSE t.MemberWL END * e.Rate) AS LicenseeAmount
-		,SUM(CASE WHEN t.BettypeRef = 17005 THEN 0 ELSE t.MemberWL END) AS BasedLicenseeAmount
-		,SUM(CASE WHEN t.BettypeRef = 17005 THEN t.AgentWL ELSE 0 END * e.Rate) AS ExtraAmount
-		,SUM(t.BetCount) AS BetCount
-	FROM #TempData t
-		INNER JOIN @PartyChargeInfo p ON t.LicenseeId = p.LicenseeId AND t.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId = 0
-		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND e.BaseCurrencyId = 0
-	WHERE t.ProductId = 37
-	GROUP BY t.rptDate, p.PartyId, t.CurrencyId
+	IF EXISTS (SELECT TOP 1 1 FROM #Products WHERE ProductId = 37) 
+	BEGIN
+		IF EXISTS (SELECT 1 FROM STRING_SPLIT(@ProductCodes_org,',') WHERE value = 'SB')
+			INSERT INTO #tmpResult (rptDate, PartyId, ProductId, CurrencyId, GrossLicenseeAmount, LicenseeAmount, BasedLicenseeAmount, ExtraAmount, BetCount)
+			SELECT t.rptDate, p.PartyId, 37, t.CurrencyId
+				,SUM(CASE WHEN t.BettypeRef = 17005 THEN t.AgentWL ELSE t.MemberWL END * e.Rate) AS GrossLicenseeAmount
+				,SUM(CASE WHEN t.BettypeRef = 17005 THEN 0 ELSE t.MemberWL END * e.Rate) AS LicenseeAmount
+				,SUM(CASE WHEN t.BettypeRef = 17005 THEN 0 ELSE t.MemberWL END) AS BasedLicenseeAmount
+				,SUM(CASE WHEN t.BettypeRef = 17005 THEN t.AgentWL ELSE 0 END * e.Rate) AS ExtraAmount
+				,SUM(t.BetCount) AS BetCount
+			FROM #TempData t
+				INNER JOIN @PartyChargeInfo p ON t.LicenseeId = p.LicenseeId AND t.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId = 0
+				INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND e.BaseCurrencyId = 0
+			WHERE t.ProductId = 37 AND t.BettypeRef <> 17006
+			GROUP BY t.rptDate, p.PartyId, t.CurrencyId
+
+		-- Casino Promotion -- -37
+		IF EXISTS (SELECT 1 FROM STRING_SPLIT(@ProductCodes_org,',') WHERE value = 'SPR(CS)')
+			INSERT INTO #tmpResult (rptDate, PartyId, ProductId, CurrencyId, GrossLicenseeAmount, LicenseeAmount, BasedLicenseeAmount, ExtraAmount, BetCount)
+			SELECT t.rptDate, p.PartyId, -37, t.CurrencyId
+				,SUM(CASE WHEN t.BettypeRef = 17006 THEN t.AgentWL ELSE t.MemberWL END * e.Rate) AS GrossLicenseeAmount
+				,SUM(CASE WHEN t.BettypeRef = 17006 THEN 0 ELSE t.MemberWL END * e.Rate) AS LicenseeAmount
+				,SUM(CASE WHEN t.BettypeRef = 17006 THEN 0 ELSE t.MemberWL END) AS BasedLicenseeAmount
+				,SUM(CASE WHEN t.BettypeRef = 17006 THEN t.CasinoPromotion ELSE 0 END * e.Rate) AS ExtraAmount
+				,SUM(t.BetCount) AS BetCount
+			FROM #TempData t
+				INNER JOIN #PartyList p ON t.LicenseeId = p.LicenseeId -- AND t.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId = 0
+				INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND e.BaseCurrencyId = 0
+			WHERE t.ProductId = 37 AND t.BettypeRef = 17006
+			GROUP BY t.rptDate, p.PartyId, t.CurrencyId
+	END
 
 	-- Player tips (share between House And Licensee) ExtraAmount => Tips sharing (house)
 	INSERT INTO #tmpResult (rptDate, PartyId, ProductId, CurrencyId, GrossLicenseeAmount, LicenseeAmount, BasedLicenseeAmount, ExtraAmount, BetCount)
@@ -582,7 +612,6 @@ BEGIN
 											AND d.DiscountGroupType IN (3, 13)
 											AND d.CurrencyCalculationType IN (2, 3) -- apply discount
 		GROUP BY ISNULL(r.PartyId, t.PartyId), ISNULL(r.ProductId, t.ProductId), t.GroupMinFeeId, t.GroupId, t.IsPrimary, t.FeeTypeId, t.FromDate, t.ToDate
-
 
 		DECLARE @tmpWLToDiscountByCurrency TABLE (
 			PartyId INT, 
@@ -1100,7 +1129,7 @@ BEGIN
 								END
 		FROM @Result r
 			LEFT JOIN @Result t ON r.PartyId = t.PartyId AND r.ProductId = 0 AND t.ProductId = 37
-		
+
 		-- For no data
 		INSERT INTO @Result (
 			PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
@@ -1119,6 +1148,11 @@ BEGIN
 
 	IF EXISTS (SELECT 1 FROM STRING_SPLIT(@LicensingFeeTypeIds, ',') WHERE CONVERT(INT, value) > 0) -- special bettype
 	BEGIN
+		IF EXISTS (SELECT TOP 1 1 FROM #Products WHERE ProductId = 37) AND EXISTS (SELECT 1 FROM STRING_SPLIT(@ProductCodes_org,',') WHERE value = 'SPR(CS)')
+			INSERT INTO #Products (ProductId, ProductName, ProductCode, IsSelected)
+			SELECT -37, 'Casino Promotion', 'SPR(CS)', 1
+	
+
 		INSERT INTO @Result (PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount)
 		SELECT r.PartyId, r.ProductId, t.LicensingFeeTypeId, 0 AS GrossLicensingFee, 0 AS LicensingFee, t.ExtraAmount
 		FROM (
@@ -1134,6 +1168,7 @@ BEGIN
 				,SUM(ISNULL(t.BetCount, 0)) AS BetCount
 				,SUM(ISNULL(t.Promotion, 0)) AS Promotion
 				,SUM(ISNULL(t.LicenseeWL, 0)) AS LicenseeWL
+				,SUM(ISNULL(CASE WHEN t.ProductId = -37 THEN t.ExtraAmount ELSE 0 END , 0)) AS CasinoPromotion
 			FROM #tmpResult t
 				INNER JOIN (SELECT DISTINCT PartyId FROM #PartyList WHERE IsSelected = 1) p ON t.PartyId = p.PartyId
 				INNER JOIN #Products pd ON t.ProductId = pd.ProductId AND pd.IsSelected = 1
@@ -1151,6 +1186,7 @@ BEGIN
 				UNION ALL SELECT 9, OddsSpread WHERE OddsSpread <> 0
 				UNION ALL SELECT 10, Promotion WHERE Promotion <> 0
 				UNION ALL SELECT 11, LicenseeWL
+				UNION ALL SELECT 13, CasinoPromotion WHERE CasinoPromotion <> 0
 			) t
 		WHERE ',' + @LicensingFeeTypeIds + ',' LIKE '%,' + CONVERT(VARCHAR(10), t.LicensingFeeTypeId) + ',%'
 	END
@@ -1226,6 +1262,54 @@ BEGIN
 		END
 	END
 
+	-- Recalculate fee rebate and total rebate base on Casino promotion value ( Just apply for Product <> 'SB')
+	IF EXISTS (SELECT TOP 1 1 FROM @tmpResult WHERE ProductId = -37)
+	BEGIN
+		DECLARE @RecalFeeRebate TABLE (DiscountGroupId INT, PartyId INT, IsConvertRebateToZero BIT, ProductID INT, FeeRebateRate MONEY)
+		
+		; WITH u AS
+		(
+			SELECT td.DiscountGroupId, td.PartyId, td.ProductId , r.FeeRebate, r.TotalRebate, r.GrossLicensingFee, r.FeeRebateRate
+			FROM @tmpDiscount td
+			INNER JOIN @Result r ON td.PartyId = r.PartyId AND td.ProductId = r.ProductId AND r.LicensingFeeTypeId = 0
+			WHERE td.DiscountGroupType = 2 AND td.ProductId <> 0
+		), u_Sum AS
+		(
+			SELECT DiscountGroupId, PartyId, SUM(GrossLicensingFee) AS GrossLicensingFee_NonSport, MAX(FeeRebateRate) FeeRebateRate
+			FROM u
+			GROUP BY DiscountGroupId, PartyId
+		), x AS
+		(
+			SELECT	u.DiscountGroupId, 
+					u.PartyId, 
+					u.GrossLicensingFee_NonSport, 
+					tr.ExtraAmount AS CasinoPromotion, 
+					CASE WHEN u.GrossLicensingFee_NonSport <= ISNULL(tr.ExtraAmount,0) THEN 1 ELSE 0 END IsConvertRebateToZero
+			FROM u_Sum u LEFT JOIN @tmpResult tr ON u.PartyId = tr.PartyId AND tr.ProductId = -37
+		)
+		INSERT INTO @RecalFeeRebate (DiscountGroupId, PartyId, IsConvertRebateToZero, ProductID, FeeRebateRate)
+		SELECT	x.DiscountGroupId, x.PartyId, x.IsConvertRebateToZero , u.ProductId, u.FeeRebateRate
+		FROM	x
+		INNER JOIN  u ON x.DiscountGroupId = u.DiscountGroupId AND x.PartyId = u.PartyId
+
+		UPDATE r
+		SET r.FeeRebate = 0, r.TotalRebate = r.TotalRebate - r.FeeRebate
+		FROM @Result r
+		INNER JOIN @RecalFeeRebate f ON r.PartyId = f.PartyId AND r.ProductId = f.ProductID
+		WHERE f.IsConvertRebateToZero = 1 AND r.LicensingFeeTypeId = 0
+
+		UPDATE r
+		SET r.FeeRebate = -r.ExtraAmount * f.FeeRebateRate,  r.TotalRebate = -r.ExtraAmount * f.FeeRebateRate, r.FeeRebateRate = f.FeeRebateRate
+		FROM @Result r
+		CROSS APPLY (
+			SELECT MAX(f.FeeRebateRate)  FeeRebateRate FROM @RecalFeeRebate f
+			WHERE f.PartyId = r.PartyId AND f.IsConvertRebateToZero = 0 
+			) f
+
+		WHERE r.LicensingFeeTypeId = 13 AND r.ProductId = -37
+		
+	END
+
 	-- Single value discount
 	; WITH t AS (
 		SELECT x.ProductId ,x.PartyId ,COUNT (DISTINCT DiscountRate) AS rn
@@ -1260,9 +1344,10 @@ BEGIN
 	) ex
 	WHERE r.LicensingFeeTypeId = 0 AND r.Discount > 0 
 
+
 	SELECT
 		r.PartyId, r.ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-		,r.Discount, r.DiscountRate, DiscountRemark, TotalRebate AS Rebate, ISNULL(ISNULL(NULLIF(WLRebateRate, 0), NULLIF(FeeRebateRate, 0)), 0) AS RebateRate, RebateRemark
+		,r.Discount, r.DiscountRate, DiscountRemark, ISNULL(TotalRebate,0) AS Rebate, ISNULL(ISNULL(NULLIF(WLRebateRate, 0), NULLIF(FeeRebateRate, 0)), 0) AS RebateRate, RebateRemark
 		,r.ExtraInfo
 	FROM @Result r
 	

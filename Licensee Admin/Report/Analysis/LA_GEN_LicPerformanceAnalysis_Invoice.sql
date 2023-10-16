@@ -71,6 +71,8 @@ BEGIN
 	SELECT  @ProductCodes = STRING_AGG(ProductCode,',')
 	FROM @tmpProductList g
 	WHERE GroupProductId = ProductId 
+	
+	SELECT @ProductCodes = @ProductCodes + ',SPR(CS)'
 
 	-- Get Invoice
 	DECLARE @StatementItemList TABLE (InvItemTypeId SMALLINT, ProductId INT)
@@ -250,7 +252,7 @@ BEGIN
 				,ISNULL(Turnover, 0)		AS Turnover
 				,ISNULL(TurnoverNoDraw, 0)	AS TurnoverNoDraw
 				,ISNULL(Winloss, 0)			AS LicenseeWinloss
-				,CASE WHEN ProductId = 74 THEN ExtraAmount ELSE LicensingFee + ExtraAmount END AS LicensingFee
+				,CASE WHEN ProductId IN (-37, 74 ) THEN ExtraAmount ELSE LicensingFee + ExtraAmount END AS LicensingFee
 				,Discount
 				,Rebate
 				,0 AS Adjustment

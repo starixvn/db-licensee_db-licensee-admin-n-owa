@@ -55,6 +55,8 @@ BEGIN
 		INSERT INTO @Products (GroupProductId, ProductId, ProductCode)
 		SELECT 0, 0, 'SB'
 		UNION ALL
+		SELECT -37, -37, 'SPR(CS)'
+		UNION ALL
 		SELECT ISNULL(g.GroupProductId, p.ProductId), p.ProductId, p.ProductPrefix
 		FROM dbo.Product3rd p WITH (NOLOCK)
 			LEFT JOIN dbo.LA_f_GroupProduct('',@FromDate,@ToDate) g ON p.ProductId = g.ProductId
@@ -129,6 +131,11 @@ BEGIN
 			INNER JOIN dbo.LA_InvoiceTemplate t WITH (NOLOCK) ON s.InvTempId = t.InvTemplateId
 		WHERE s.InvTypeId IN (1, 3, 6) AND s.ToPartyId = @BillerId
 		GROUP BY d.IndexNumber, s.FromPartyId, s.ToPartyId, s.InvTypeId, t.InvTemplateName, d.InvoiceNumber, d.IsHideRebateWorkSheet
+
+		-- Handle (Casino Promotion invoice setting)
+		UPDATE @InvoiceSettings
+		SET  ProductCodes = ProductCodes +',SPR(CS)'
+		WHERE InvTypeId = 1 AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(ProductCodes,',') WHERE value <> 'SB')
 	END
 	-- End Region: Get Party Settings
 
@@ -214,7 +221,7 @@ BEGIN
 				,@FromDate = @FromDate
 				,@ToDate = @ToDate
 				,@IncludeTierRebate = 0
-				,@LicensingFeeTypeIds = '0,-1' -- -1: Deduction (AMF, AGPrepayment, Prepayment, ...)
+				,@LicensingFeeTypeIds = '0,-1,13' -- -1: Deduction (AMF, AGPrepayment, Prepayment, ...) 13: Deduct casino promotion
 				,@BaseCurrencyName = @temp_BaseCurrencyName
 				,@Environment = @Environment
 
@@ -234,13 +241,23 @@ BEGIN
 		SET r.ProductCode = p.ProductPrefix
 		FROM @Result r
 			INNER JOIN dbo.LA_f_Products3rd('') p ON r.ProductId = p.ProductId
+
+		UPDATE @Result SET ProductCode = 'SPR(CS)' WHERE ProductId = -37
 		
 		INSERT INTO @FinalResult (PartyId, BillerId, InvoiceType, ProductCodes, Discount, ExtraAmount, LicensingFee)
 		SELECT t.PartyId, s.BillerId, 1, s.ProductCodes, SUM(ISNULL(t.Discount, 0)), SUM(t.ExtraAmount)
 			,SUM(CASE WHEN t.LicensingFeeTypeId = 0 THEN ROUND(t.LicensingFee, 2) ELSE -t.LicensingFee END)
 		FROM @Result t
 			INNER JOIN @InvoiceSettings s ON t.PartyId = s.PartyId AND ',' + s.ProductCodes + ',' LIKE '%,' + t.ProductCode + ',%' AND s.InvTypeId = 1 -- Software Fee
+		WHERE t.ProductId <> -37
 		GROUP BY t.PartyId, s.BillerId, s.ProductCodes
+
+		-- deduct casino promotion
+		UPDATE f
+		SET f.LicensingFee = f.LicensingFee - r.ExtraAmount
+		FROM @FinalResult f
+		INNER JOIN @Result r ON f.PartyId = r.PartyId AND r.LicensingFeeTypeId = 13
+		WHERE f.InvoiceType = 1
 
 		-- Prepayment
 		UPDATE f
@@ -253,8 +270,10 @@ BEGIN
 		SELECT t.PartyId, r.BillerId, 3, -SUM(ISNULL(t.Rebate, 0))
 		FROM @Result t
 			INNER JOIN @InvoiceSettings r ON t.PartyId = r.PartyId AND r.InvTypeId = 3 -- Rebate
-		WHERE t.Rebate > 0
+		WHERE t.Rebate <> 0
 		GROUP BY t.PartyId, r.BillerId
+
+		DELETE @Result WHERE ProductId = - 37
 
 		UPDATE @FinalResult SET LicensingFee = ISNULL(LicensingFee, 0) + ISNULL(ExtraAmount, 0) WHERE InvoiceType = 1 AND InvoiceHeaderId IS NULL
 	END

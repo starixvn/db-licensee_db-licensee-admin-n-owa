@@ -50,6 +50,7 @@ AS
 		- 20230217@Danny: SG - Promotion prize integration [#183739]
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 		- 20230608@Danny: Integrate Promotion Prize - PG Soft [RedmineID: #188997]
+		- 20230223@Danny: Integrate Casino promotion [#194808]
 */
 
 BEGIN
@@ -131,7 +132,7 @@ BEGIN
 			,@ProductCodes = @ProductCodes
 			,@FromDate = @FromDate
 			,@ToDate = @ToDate
-			,@LicensingFeeTypeIds = '0,-1,1,2,3,4,5,6,10' -- Contribution, Prize, ...
+			,@LicensingFeeTypeIds = '0,-1,1,2,3,4,5,6,10,13' -- Contribution, Prize, ...
 			,@BaseCurrencyName = @BaseCurrencyName
 			,@Environment = @Environment
 
@@ -155,6 +156,10 @@ BEGIN
 			UNION ALL
 			SELECT 0, '', '', 48, ExtraAmount, 0 FROM @Result WHERE ProductId = 74 AND ExtraAmount > 0
 
+
+		DELETE FROM @Result
+		WHERE ProductId = -37 AND NOT EXISTS (SELECT 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE Value = 'SPR(CS)')
+
 		-- Prize, Contribution, Promotion, ...
 		INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, RemainingAmount, AmountType)
 		SELECT 0, '', '', SUM(ExtraAmount), 0
@@ -176,9 +181,10 @@ BEGIN
 				WHEN ProductId = 21 AND LicensingFeeTypeId = 10 THEN 43 -- Promotion
 				WHEN ProductId = 73 AND LicensingFeeTypeId = 3 THEN 47 -- Prizes
 				WHEN ProductId = 55 AND LicensingFeeTypeId = 3 THEN 50 -- Prizes
+				WHEN ProductId = -37 AND LicensingFeeTypeId = 13 THEN 52 -- Casino promotion
 				END
 		FROM @Result
-		WHERE ProductId IN (32, 34, 42, 45, 66, 36, 21, 73, 55) AND LicensingFeeTypeId > 0
+		WHERE ProductId IN (32, 34, 42, 45, 66, 36, 21, 73, 55, -37) AND LicensingFeeTypeId > 0
 		GROUP BY
 			CASE
 				WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
@@ -198,6 +204,7 @@ BEGIN
 				WHEN ProductId = 21 AND LicensingFeeTypeId = 10 THEN 43 -- Promotion
 				WHEN ProductId = 73 AND LicensingFeeTypeId = 3 THEN 47 -- Prizes
 				WHEN ProductId = 55 AND LicensingFeeTypeId = 3 THEN 50 -- Prizes
+				WHEN ProductId = -37 AND LicensingFeeTypeId = 13 THEN 52 -- Casino promotion
 				END
 
 		-- AMF, Prepayment and AGPrepayment

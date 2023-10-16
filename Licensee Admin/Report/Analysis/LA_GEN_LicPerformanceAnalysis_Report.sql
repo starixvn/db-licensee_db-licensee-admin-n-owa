@@ -56,7 +56,9 @@ BEGIN
 	SELECT  @ProductCodes = STRING_AGG(ProductCode,',')
 	FROM @tmpProductList g
 	WHERE GroupProductId = ProductId 
-
+	
+	SELECT @ProductCodes = @ProductCodes + ',SPR(CS)'
+	
 	-- Get Party List
 	DECLARE @tmpPartyList TABLE (PartyId INT, SiteId INT, BaseCurrencyId INT)
 
@@ -210,6 +212,7 @@ BEGIN
 				,@FromDate = @FromDate
 				,@ToDate = @ToDate
 				,@BaseCurrencyName = @CurrencyName
+				,@LicensingFeeTypeIds= '0,13'
 
 			IF @isRecalRebate =1 AND @FromDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
 			BEGIN
@@ -287,7 +290,7 @@ BEGIN
 		,ISNULL(r.Turnover, 0)			AS Turnover
 		,ISNULL(r.TurnoverNoDraw, 0)	AS TurnoverNoDraw
 		,ISNULL(r.Winloss, 0)			AS LicenseeWinloss
-		,CASE WHEN ProductId = 74 THEN r.ExtraAmount ELSE r.LicensingFee + r.ExtraAmount END AS LicensingFee
+		,CASE WHEN ProductId IN (-37, 74 ) THEN r.ExtraAmount ELSE r.LicensingFee + r.ExtraAmount END AS LicensingFee
 		,r.Discount
 		,r.Rebate
 		,0 AS Adjustment
