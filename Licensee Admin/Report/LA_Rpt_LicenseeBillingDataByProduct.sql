@@ -113,7 +113,7 @@ BEGIN
 		SELECT @isRecalRebate = 1
 
 	IF @isRecalRebate = 1
-		SELECT @RecalRebateEffectiveFrom = '2023-08-01', @RecalRebateEffectiveTo = '2024-08-01'
+		SELECT @RecalRebateEffectiveFrom = '2023-10-01', @RecalRebateEffectiveTo = '2024-09-01'
 
 	-- Get Product List
 	CREATE TABLE #tmp_Products (ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(10))

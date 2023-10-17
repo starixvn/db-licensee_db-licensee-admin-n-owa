@@ -69,10 +69,10 @@ BEGIN
 	IF @ToDate > CONVERT(DATE, GETDATE())
 		SET @ToDate = CONVERT(DATE, GETDATE())
 
-	IF @IsUsePreviousSetting = 1 -- Hard code to get 07-2023 setting (Alek group)
+	IF @IsUsePreviousSetting = 1 -- Hard code to get 09-2023 setting (Alek group)
 	BEGIN
-		SELECT @FromDate_Setting = '2023-07-01'
-		SELECT @ToDate_Setting = '2023-07-31'
+		SELECT @FromDate_Setting = '2023-09-01'
+		SELECT @ToDate_Setting = '2023-09-30'
 	END
 
 	ELSE 
