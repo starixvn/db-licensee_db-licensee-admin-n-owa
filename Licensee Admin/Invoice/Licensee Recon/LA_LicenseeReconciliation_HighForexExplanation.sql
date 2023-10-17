@@ -43,6 +43,21 @@ BEGIN
 		LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON e.ExchangeId = op.BaseCurrencyId 
 	WHERE p.PartyId IN (SELECT CONVERT(INT, value) FROM STRING_SPLIT(@PartyIds, ','))
 
+	IF EXISTS (SELECT TOP 1 1 FROM @tblSite WHERE  BaseCurrencyID IS NULL)
+	BEGIN
+		UPDATE t
+		SET t.BaseCurrencyID = c.currency,
+			t.BaseCurrency = CASE WHEN e.ExchangeId = 142 THEN 'USDT' ELSE e.Code END
+
+		FROM @tblSite t
+		INNER JOIN  DBCUST.bodb_licensee.dbo.LicenseeTransferCode l WITH(NOLOCK) ON t.Site = l.LicenseeName
+		INNER JOIN bodb02.dbo.Customer c WITH(NOLOCK) ON l.CustID = c.CustID
+		LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON e.ExchangeId = c.currency
+		WHERE l.FromDate <= @FromDate AND l.ToDate >= @ToDate
+		 
+		DELETE FROM @tblSite WHERE BaseCurrencyID IS NULL
+	END
+
 	DECLARE @recommend TABLE (recommend INT, PartyID INT, BaseCurrency VARCHAR(12), BaseCurrencyID INT)
 	INSERT INTO @recommend (recommend, PartyID, BaseCurrency, BaseCurrencyID)
 	SELECT c.custid, t.PartyID, t.BaseCurrency, t.BaseCurrencyID
@@ -197,7 +212,7 @@ BEGIN
 	)
 
 	DECLARE @FinalResult TABLE (PartyId INT, ProductId INT, AmountToCompany MONEY, LicensingFee MONEY, Discount MONEY, Rebate MONEY, Promotion MONEY, Sponsorship MONEY, ContributionDiscount MONEY, BetCount INT, OddsSpreadCost MONEY, PlayerTips MONEY)
-	CREATE TABLE #LA_Data (PartyID INT, ProductName VARCHAR(200), ProductID INT, CurrencyName VARCHAR(12), AmountToCompany MONEY , BaseCurrencyID INT)
+	CREATE TABLE #LA_Data (PartyID INT, ProductName VARCHAR(200), ProductID INT, CurrencyName VARCHAR(12), AmountToCompany MONEY , BaseCurrencyID INT, OddsSpreadCost MONEY)
 
 	-- refill data
 	INSERT INTO @LA_BaseCurrency(CurrencyId, CurrencyName)
@@ -242,8 +257,8 @@ BEGIN
 			) t ON r.PartyId = t.PartyId AND r.ProductId = t.ProductId
 		WHERE r.LicensingFeeTypeId = 0 AND r.ProductId NOT IN (37, 74)
 
-		INSERT INTO #LA_Data (PartyID, ProductName, ProductID, CurrencyName, AmountToCompany, BaseCurrencyID)
-		SELECT r.PartyId, p.ProductName, p.ProductId, UPPER(@bcurr) AS CurrencyName, SUM(r.AmountToCompany) AS AmountToCompany, @bcID
+		INSERT INTO #LA_Data (PartyID, ProductName, ProductID, CurrencyName, AmountToCompany, BaseCurrencyID, OddsSpreadCost)
+		SELECT r.PartyId, p.ProductName, p.ProductId, UPPER(@bcurr) AS CurrencyName, SUM(r.AmountToCompany) AS AmountToCompany, @bcID, SUM(r.OddsSpreadCost)
 		FROM @FinalResult r
 			INNER JOIN @ProductList p ON r.ProductId = p.ProductId
 		GROUP BY r.PartyId, p.ProductName, p.ProductId
@@ -270,12 +285,11 @@ BEGIN
 			ISNULL(l.CurrencyName, n.CurrencyName) CurrencyName,
 			ISNULL(l.AmountToCompany,0) AS  LA_Amt,
 			ISNULL(n.AmountToCompany,0) AS NAP_Amt,
-			ISNULL(-l.AmountToCompany,0) - ISNULL(n.AmountToCompany,0) AS Diff_amt,
+			- (ISNULL(l.AmountToCompany,0)- ISNULL(l.OddsSpreadCost,0)) - ISNULL(n.AmountToCompany,0) AS Diff_amt,
 			ISNULL(l.BaseCurrencyID, n.BaseCurrencyID) BaseCurrencyID
 	FROM #LA_Data l
 	FULL JOIN #NAP_Data n ON l.PartyID = n.PartyID AND l.ProductID = n.ProductID 
-	WHERE --ISNULL(l.AmountToCompany,0) <> ISNULL(n.AmountToCompany,0) 
-			ABS(ISNULL(-l.AmountToCompany,0) - ISNULL(n.AmountToCompany,0)) > 1.
+	WHERE ABS(- (ISNULL(l.AmountToCompany,0)- ISNULL(l.OddsSpreadCost,0)) - ISNULL(n.AmountToCompany,0)) > 1.
 	ORDER BY ISNULL(l.PartyID, n.PartyID), ISNULL(l.ProductID,n.ProductID)
 
 	-- Diff by Adjustment
@@ -480,28 +494,28 @@ BEGIN
 				)
 			-- LA
 			INSERT INTO @Result_adj (PartyID, ProductID, BaseCurrencyID, Func, Currency, [Type], ExRate, AmountToCompany, BasedAmountToCompany)
-			SELECT d.PartyID, d.ProductID, d.BaseCurrencyID, 'LA', e.Code, 'Actual Bet', e.Rate
+			SELECT d.PartyID, d.ProductID, d.BaseCurrencyID, 'LA', NULL Currency, 'Actual Bet', NULL ExRate
 				,SUM(CASE WHEN d.ProductId = 31 AND @FromDate >= @ExchangeTerm_CutOffDate THEN (d.MemberWL + d.Pcomm) * ISNULL(bc.Rate, c.Rate)  ELSE d.MemberWL * ISNULL(bc.Rate, c.Rate) + d.Comm END) AS AmountToCompany
 				,SUM(CASE WHEN d.ProductId = 31 AND @FromDate >= @ExchangeTerm_CutOffDate THEN (d.MemberWL + d.Pcomm) * ISNULL(bc.Rate, c.Rate) ELSE (d.MemberWL * ISNULL(bc.Rate, c.Rate) + d.Comm) END  * e.Rate) AS BasedAmountToCompany
 			FROM #tmpLAData d
 				INNER JOIN @Exchange e ON d.Currency = e.ExchangeId AND d.winlostdate = e.ExchangeDate AND e.BaseCurrencyID = d.BaseCurrencyID
 				INNER JOIN @ChargeRate c ON d.winlostdate BETWEEN c.FromDate AND c.ToDate AND d.ProductID = c.ProductID AND c.PartyID = d.PartyID
 				LEFT JOIN @ChargeRateByCurrency bc ON c.ChargeId = bc.ChargeId AND d.Currency = bc.Currency
-			GROUP BY e.Code, e.Rate, d.PartyID, d.ProductID, d.BaseCurrencyID
+			GROUP BY d.PartyID, d.ProductID, d.BaseCurrencyID
 
 			-- NAP
 			INSERT INTO @Result_adj (PartyID, ProductID, BaseCurrencyID, Func, Currency, [Type], ExRate, AmountToCompany, BasedAmountToCompany)
-			SELECT d.PartyID, d.ProductID, d.BaseCurrencyID, 'NAP', e.Code
+			SELECT d.PartyID, d.ProductID, d.BaseCurrencyID, 'NAP', NULL Currency
 				,CASE WHEN actual_winlostdate BETWEEN @FromDate AND @ToDate THEN 'Actual Bet' ELSE 'Adjustment without this month' END AS [Type]
-				,e.Rate AS ExRate
+				,NULL AS ExRate
 				,SUM(d.AmountToCompany) AS AmountToCompany
 				,SUM(d.AmountToCompany * e.Rate) AS BasedAmountToCompany
 			FROM #tmpNAPData d
 				INNER JOIN @Exchange e ON d.Currency = e.ExchangeId AND d.winlostdate = e.ExchangeDate AND e.BaseCurrencyID = d.BaseCurrencyID
 			GROUP BY
-				e.Code
-				,CASE WHEN actual_winlostdate BETWEEN @FromDate AND @ToDate THEN 'Actual Bet' ELSE 'Adjustment without this month' END
-				,e.Rate
+				--e.Code
+				CASE WHEN actual_winlostdate BETWEEN @FromDate AND @ToDate THEN 'Actual Bet' ELSE 'Adjustment without this month' END
+				--,e.Rate
 				,d.PartyID, d.ProductID, d.BaseCurrencyID
 
 			UPDATE t
@@ -845,6 +859,7 @@ BEGIN
 		(
 			SELECT PartyID, BaseCurrencyID ,SUM(Diff_amt) Diff_amt
 			FROM	#diff_summary 
+			WHERE ProductID NOT IN ( 1000,1001,1002)
 			GROUP BY PartyID, BaseCurrencyID
 		)
 		, TotalDiffAmt_Filter AS
