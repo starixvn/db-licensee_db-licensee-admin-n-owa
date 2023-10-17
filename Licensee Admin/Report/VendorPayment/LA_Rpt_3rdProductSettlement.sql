@@ -30,6 +30,7 @@ AS
 	- 20230518@Danny: Integrate YeeBet [RedmineID: #187948]
 	- 20230608@Danny: Integrate Promotion Prize - PG Soft [RedmineID: #188997]
 	- 20230807@Danny: Handle JV group formula (all products) [RedmineID: #190901]
+	- 20231017@Danny: Change AGC 3rd billing term [RedmineID: #195338]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
@@ -1170,10 +1171,13 @@ BEGIN
 			GROUP BY ParentId
 
 			UPDATE @ApplyRange
-			SET ApplyRate = CASE WHEN ParentId = 1 -- Oneworks
-				THEN CASE WHEN SumApplyValue <= 15000000 THEN 0.08 ELSE 0.07 END
-				ELSE CASE WHEN SumApplyValue <= 2500000 THEN 0.08 ELSE 0.07 END
-			END
+			SET ApplyRate = CASE WHEN @FromDate >= '2023-10-01' THEN 0.07 -- Apply for all groups
+							ELSE
+									CASE WHEN ParentId = 1 -- Oneworks
+									THEN CASE WHEN SumApplyValue <= 15000000 THEN 0.08 ELSE 0.07 END
+									ELSE CASE WHEN SumApplyValue <= 2500000 THEN 0.08 ELSE 0.07 END 
+									END
+							END
 
 			UPDATE r
 			SET r.PayToSupplier = a.ApplyRate * r.LicenseeWinLoss
