@@ -43,11 +43,11 @@ BEGIN
 	;WITH ChargeInfo AS(
 		SELECT ci.ProductId, ci.FromParty, ci.ToParty, ci.Rate, ci.FromDate, ci.ToDate, ci.ChargeID, ci.ChargeType AS RateType
 		FROM dbo.OAS_ChargeInfo AS ci WITH (NOLOCK)
-		WHERE ProductId NOT IN (14, 17) AND   ci.FromDate <= GETDATE() AND ci.ToDate >= GETDATE()
+		WHERE ProductId NOT IN (14, 17)
 		UNION ALL
 		SELECT s.ProductId, s.FromParty, s.ToParty, s.Rate, s.FromDate, s.ToDate, s.ChargeIdRef, s.BettypeRef AS RateType
 		FROM dbo.OAS_ChargeInfoSub AS s WITH (NOLOCK) 
-		WHERE s.ChargeType = 1 AND   s.FromDate <= GETDATE() AND s.ToDate >= GETDATE()
+		WHERE s.ChargeType = 1
 	)
 	SELECT	 CASE pd.IsDeposit	WHEN 0 THEN 'Credit' ELSE g.PartyName							END AS GroupName
 			,CASE p.PartyName	WHEN 'IBC' THEN 'FDL' WHEN '18bb'THEN 'PIH' ELSE p.PartyName	END AS LicenseeName
