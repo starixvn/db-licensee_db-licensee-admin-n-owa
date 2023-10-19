@@ -13,6 +13,7 @@ ALTER PROCEDURE [dbo].[LA_AmountToCompanyByProduct]
 	,@LicensingFeeTypeIds	VARCHAR(1000) = '0'
 	,@BaseCurrencyName		VARCHAR(10) = 'EUR'
 	,@Environment			VARCHAR(50) = 'LOCAL'
+	,@IsUsePreviousSetting	BIT = 0
 AS
 
 /*
@@ -39,6 +40,7 @@ AS
 		- 20221226@Danny: Integrate Player tips [#180703]
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 		- 20230519@Danny: New commercial terms for 12B [RedmineID: #186543]
+		- 20231005@Danny: Change charge rate and tier rebate for Alek group from Oct 2023 [RedmineID: #194561]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -61,8 +63,23 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
+	DECLARE @FromDate_Setting	DATETIME
+	DECLARE @ToDate_Setting		DATETIME
+
 	IF @ToDate > CONVERT(DATE, GETDATE())
 		SET @ToDate = CONVERT(DATE, GETDATE())
+
+	IF @IsUsePreviousSetting = 1 -- Hard code to get 09-2023 setting (Alek group)
+	BEGIN
+		SELECT @FromDate_Setting = '2023-09-01'
+		SELECT @ToDate_Setting = '2023-09-30'
+	END
+
+	ELSE 
+	BEGIN
+		SELECT @FromDate_Setting =  @FromDate
+		SELECT @ToDate_Setting = @ToDate
+	END
 
 	-- Licensee : N8B, N8G 
 	DECLARE @ExcludeCompareDiscountAndFee_PartyList TABLE (PartyId INT)
@@ -110,20 +127,41 @@ BEGIN
 
 	-- Insert parties/products with same discount/tier rebate group
 	DECLARE @DiscountGroup TABLE (PartyId INT, ProductId INT)
-	INSERT INTO @DiscountGroup (PartyId, ProductId)
-	SELECT DISTINCT a.PartyId, p.ProductId
-	FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
-		INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
-	WHERE EXISTS (
-		SELECT 1
-		FROM #PartyList pl
-			INNER JOIN dbo.LA_DiscountGroupAssignment da WITH (NOLOCK) ON pl.PartyId = da.PartyId
-			INNER JOIN dbo.LA_DiscountGroupHeader dh WITH (NOLOCK) ON da.DiscountGroupId = dh.DiscountGroupId
-			INNER JOIN dbo.LA_DiscountGroupProduct dp WITH (NOLOCK) ON da.DiscountGroupId = dp.DiscountGroupId
-			INNER JOIN #Products pd ON dp.ProductId = pd.ProductId
-		WHERE dh.FromDate <= @ToDate AND dh.ToDate >= @FromDate
-			AND a.DiscountGroupId = da.DiscountGroupId
-	)
+	IF @IsUsePreviousSetting = 0
+	BEGIN
+		INSERT INTO @DiscountGroup (PartyId, ProductId)
+		SELECT DISTINCT a.PartyId, p.ProductId
+		FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
+			INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
+		WHERE EXISTS (
+			SELECT 1
+			FROM #PartyList pl
+				INNER JOIN dbo.LA_DiscountGroupAssignment da WITH (NOLOCK) ON pl.PartyId = da.PartyId
+				INNER JOIN dbo.LA_DiscountGroupHeader dh WITH (NOLOCK) ON da.DiscountGroupId = dh.DiscountGroupId
+				INNER JOIN dbo.LA_DiscountGroupProduct dp WITH (NOLOCK) ON da.DiscountGroupId = dp.DiscountGroupId
+				INNER JOIN #Products pd ON dp.ProductId = pd.ProductId
+			WHERE dh.FromDate <= @ToDate AND dh.ToDate >= @FromDate
+				
+				AND a.DiscountGroupId = da.DiscountGroupId
+		)
+	END
+	ELSE
+	BEGIN
+		INSERT INTO @DiscountGroup (PartyId, ProductId)
+		SELECT DISTINCT a.PartyId, p.ProductId
+		FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
+			INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
+		WHERE EXISTS (
+			SELECT 1
+			FROM #PartyList pl
+				INNER JOIN dbo.LA_DiscountGroupAssignment da WITH (NOLOCK) ON pl.PartyId = da.PartyId
+				INNER JOIN dbo.LA_DiscountGroupHeader dh WITH (NOLOCK) ON da.DiscountGroupId = dh.DiscountGroupId
+				INNER JOIN dbo.LA_DiscountGroupProduct dp WITH (NOLOCK) ON da.DiscountGroupId = dp.DiscountGroupId
+				INNER JOIN #Products pd ON dp.ProductId = pd.ProductId
+			WHERE dh.FromDate <= @ToDate_Setting AND dh.ToDate >= @FromDate_Setting
+				AND a.DiscountGroupId = da.DiscountGroupId 
+				)
+	END
 
 	INSERT INTO #PartyList (PartyId, IsSelected)
 	SELECT t.PartyId, 0
@@ -166,14 +204,29 @@ BEGIN
 
 	-- Get Charge Rate
 	DECLARE @PartyChargeInfo TABLE (ChargeId INT, PartyId INT, LicenseeId INT, ProductId INT, BettypeRef INT, Rate FLOAT, FromDate DATE, ToDate DATE, ChargeType TINYINT)
-	INSERT INTO @PartyChargeInfo (ChargeId, PartyId, LicenseeId, ProductId, FromDate, ToDate, ChargeType, BettypeRef, Rate)
-	SELECT ChargeId, PartyId, LicenseeId, ProductId, FromDate, ToDate, ChargeType
-		,CASE
-			WHEN ProductId = 11 AND ChargeType = 12 THEN 1706 -- GD Tip
-			WHEN ProductId = 39 AND ChargeType = 12 THEN 3007 -- SA Tip
-			ELSE -1 END
-		,CASE WHEN IsDeposit = 1 OR ProductId = 0 THEN DI_Rate ELSE 0 END -- Credit Rate/Fee = 0 (Exclude SB)
-	FROM dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, @ProductCodes)
+
+	IF @IsUsePreviousSetting = 0
+	BEGIN
+		INSERT INTO @PartyChargeInfo (ChargeId, PartyId, LicenseeId, ProductId, FromDate, ToDate, ChargeType, BettypeRef, Rate)
+		SELECT ChargeId, PartyId, LicenseeId, ProductId, FromDate, ToDate, ChargeType
+			,CASE
+				WHEN ProductId = 11 AND ChargeType = 12 THEN 1706 -- GD Tip
+				WHEN ProductId = 39 AND ChargeType = 12 THEN 3007 -- SA Tip
+				ELSE -1 END
+			,CASE WHEN IsDeposit = 1 OR ProductId = 0 THEN DI_Rate ELSE 0 END -- Credit Rate/Fee = 0 (Exclude SB)
+		FROM dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, @ProductCodes)
+	END
+	ELSE -- Cheat Alek group from to.....
+	BEGIN
+		INSERT INTO @PartyChargeInfo (ChargeId, PartyId, LicenseeId, ProductId, FromDate, ToDate, ChargeType, BettypeRef, Rate)
+		SELECT ChargeId, PartyId, LicenseeId, ProductId, @FromDate, @ToDate, ChargeType -- Cheat get old setting 
+			,CASE
+				WHEN ProductId = 11 AND ChargeType = 12 THEN 1706 -- GD Tip
+				WHEN ProductId = 39 AND ChargeType = 12 THEN 3007 -- SA Tip
+				ELSE -1 END
+			,CASE WHEN IsDeposit = 1 OR ProductId = 0 THEN DI_Rate ELSE 0 END -- Credit Rate/Fee = 0 (Exclude SB)
+		FROM dbo.LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate_Setting, @ToDate_Setting, @ProductCodes)
+	END
 
 	-- For CB Charge Rate
 	DECLARE @MinCBDate DATE, @MaxCBDate DATE
@@ -449,24 +502,51 @@ BEGIN
 			,CurrencyCalculationType TINYINT
 			,DiscountRate		FLOAT DEFAULT (0)
 			,ChargeRateByCurrency  FLOAT DEFAULT (0))
-		INSERT INTO #tmpDiscountGroup (DiscountGroupId, DiscountGroupType, BaseCurrencyId, PartyId, Remark, IsApplyDiscount, IsSpecialTreatment, ProductId, CalculationType, CurrencyId, CurrencyCalculationType)
-		SELECT DiscountGroupId, DiscountGroupType, BaseCurrencyId, PartyId, Remark, IsApplyDiscount, IsSpecialTreatment, ProductId, CalculationType, CurrencyId, CurrencyCalculationType
-		FROM (
-			SELECT h.DiscountGroupId, h.DiscountGroupType, h.CurrencyId AS BaseCurrencyId, a.PartyId, a.IsApplyDiscount, a.IsSpecialTreatment, p.ProductId, p.CalculationType, c.CurrencyId, c.CalculationType AS CurrencyCalculationType
-				,CASE WHEN h.FromDate < @F_Date THEN @F_Date ELSE h.FromDate END AS FromDate
-				,CASE WHEN h.ToDate > @T_Date THEN @T_Date ELSE h.ToDate END AS ToDate
-				,CASE WHEN h.DiscountGroupType IN (2, 12, 22) THEN h.Remark ELSE a.Remark END AS Remark
-				,ROW_NUMBER() OVER(PARTITION BY a.PartyId, p.ProductId, c.CurrencyId, CASE WHEN h.DiscountGroupType IN (2, 12, 22) THEN h.DiscountGroupType ELSE 1 END ORDER BY h.ToDate DESC) AS RN
-			FROM #PartyList pl
-				INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON pl.PartyId = a.PartyId
-				INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
-				INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
-				LEFT JOIN dbo.LA_DiscountGroupCurrency c WITH (NOLOCK) ON a.DiscountGroupId = c.DiscountGroupId AND a.PartyId = c.PartyId
-			WHERE h.FromDate < @T_Date AND h.ToDate >= @F_Date
-				AND (h.DiscountGroupType IN (2, 12, 22) OR c.DiscountGroupId IS NOT NULL)
-				AND p.ProductId NOT IN (37, 74)
-		) t
-		WHERE RN = 1
+
+		IF @IsUsePreviousSetting = 0
+		BEGIN
+			INSERT INTO #tmpDiscountGroup (DiscountGroupId, DiscountGroupType, BaseCurrencyId, PartyId, Remark, IsApplyDiscount, IsSpecialTreatment, ProductId, CalculationType, CurrencyId, CurrencyCalculationType)
+			SELECT DiscountGroupId, DiscountGroupType, BaseCurrencyId, PartyId, Remark, IsApplyDiscount, IsSpecialTreatment, ProductId, CalculationType, CurrencyId, CurrencyCalculationType
+			FROM (
+				SELECT h.DiscountGroupId, h.DiscountGroupType, h.CurrencyId AS BaseCurrencyId, a.PartyId, a.IsApplyDiscount, a.IsSpecialTreatment, p.ProductId, p.CalculationType, c.CurrencyId, c.CalculationType AS CurrencyCalculationType
+					,CASE WHEN h.FromDate < @F_Date THEN @F_Date ELSE h.FromDate END AS FromDate
+					,CASE WHEN h.ToDate > @T_Date THEN @T_Date ELSE h.ToDate END AS ToDate
+					,CASE WHEN h.DiscountGroupType IN (2, 12, 22) THEN h.Remark ELSE a.Remark END AS Remark
+					,ROW_NUMBER() OVER(PARTITION BY a.PartyId, p.ProductId, c.CurrencyId, CASE WHEN h.DiscountGroupType IN (2, 12, 22) THEN h.DiscountGroupType ELSE 1 END ORDER BY h.ToDate DESC) AS RN
+				FROM #PartyList pl
+					INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON pl.PartyId = a.PartyId
+					INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
+					INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
+					LEFT JOIN dbo.LA_DiscountGroupCurrency c WITH (NOLOCK) ON a.DiscountGroupId = c.DiscountGroupId AND a.PartyId = c.PartyId
+				WHERE h.FromDate < @T_Date AND h.ToDate >= @F_Date
+					AND (h.DiscountGroupType IN (2, 12, 22) OR c.DiscountGroupId IS NOT NULL)
+					AND p.ProductId NOT IN (37, 74)
+			) t
+			WHERE RN = 1
+		END
+		ELSE -- Cheat Alek group from to.....
+		BEGIN
+			DECLARE @F_Date_setting DATE = @FromDate_Setting, @T_Date_setting DATE = @ToDate_Setting
+
+			INSERT INTO #tmpDiscountGroup (DiscountGroupId, DiscountGroupType, BaseCurrencyId, PartyId, Remark, IsApplyDiscount, IsSpecialTreatment, ProductId, CalculationType, CurrencyId, CurrencyCalculationType)
+			SELECT DiscountGroupId, DiscountGroupType, BaseCurrencyId, PartyId, Remark, IsApplyDiscount, IsSpecialTreatment, ProductId, CalculationType, CurrencyId, CurrencyCalculationType
+			FROM (
+				SELECT h.DiscountGroupId, h.DiscountGroupType, h.CurrencyId AS BaseCurrencyId, a.PartyId, a.IsApplyDiscount, a.IsSpecialTreatment, p.ProductId, p.CalculationType, c.CurrencyId, c.CalculationType AS CurrencyCalculationType
+					,CASE WHEN h.FromDate < @F_Date THEN @F_Date ELSE h.FromDate END AS FromDate
+					,CASE WHEN h.ToDate > @T_Date THEN @T_Date ELSE h.ToDate END AS ToDate
+					,CASE WHEN h.DiscountGroupType IN (2, 12, 22) THEN h.Remark ELSE a.Remark END AS Remark
+					,ROW_NUMBER() OVER(PARTITION BY a.PartyId, p.ProductId, c.CurrencyId, CASE WHEN h.DiscountGroupType IN (2, 12, 22) THEN h.DiscountGroupType ELSE 1 END ORDER BY h.ToDate DESC) AS RN
+				FROM #PartyList pl
+					INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON pl.PartyId = a.PartyId
+					INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
+					INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
+					LEFT JOIN dbo.LA_DiscountGroupCurrency c WITH (NOLOCK) ON a.DiscountGroupId = c.DiscountGroupId AND a.PartyId = c.PartyId
+				WHERE h.FromDate < @T_Date_setting AND h.ToDate >= @F_Date_setting
+					AND (h.DiscountGroupType IN (2, 12, 22) OR c.DiscountGroupId IS NOT NULL)
+					AND p.ProductId NOT IN (37, 74)
+			) t
+			WHERE RN = 1
+		END
 		
 		DECLARE @tmpResult TABLE (PartyId INT, ProductId INT, GroupMinFeeId INT, GroupId INT, IsPrimary BIT, FeeTypeId TINYINT
 			,ProrateMinFee MONEY, SecondaryLicensingFee MONEY, NonMinFee MONEY, LicensingFee MONEY, LicenseeWL MONEY
