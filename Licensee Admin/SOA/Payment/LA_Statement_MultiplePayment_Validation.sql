@@ -357,18 +357,24 @@ BEGIN
 						 
 					AND  MultipliedBy <> 1 THEN 'Different system actual rate ('+FORMAT(CAST(CurrentExRate AS MONEY),'F4','en-us')+')' + CHAR(13) +
 							'Transaction with exchange rate having "Multiplied by" (Currency '+CurrencyName+', Multiplied by = '+CAST(MultipliedBy AS VARCHAR(20))+')'		    
-					WHEN (
 							(FromCurrCode = 'MYR' AND ToCurrCode <> 'MYR') 
 							OR (ToCurrCode = 'MYR' AND FromCurrCode <> 'MYR')
 							OR (FromCurrCode = ToCurrCode)
 						 ) AND  ActualRate  NOT BETWEEN CurrentExRate - MinActualrate * CurrentExRate AND CurrentExRate + MinActualrate * CurrentExRate
 					THEN 'Exceed limit range ('+ FORMAT(CurrentExRate - MinActualrate * CurrentExRate ,'F4','en-us')+' - '+FORMAT(CurrentExRate + MinActualrate * CurrentExRate,'F4','en-us' )+')'
 					WHEN FromCurrCode = ToCurrCode AND FromCurrName <> ToCurrName AND  CAST(CurrentExRate AS MONEY) <> CAST( ActualRate AS MONEY) THEN 'Different system actual rate ('+FORMAT(CAST(CurrentExRate AS MONEY),'F4','en-us')+')'
+							'Transaction with exchange rate having "Multiplied by" (Currency '+CurrencyName+', Multiplied by = '+CAST(MultipliedBy AS VARCHAR(20))+')'		    
+					WHEN FromCurrCode = ToCurrCode AND FromCurrName <> ToCurrName AND  CurrentExRate <> CAST( ActualRate AS FLOAT) THEN 'Different system actual rate ('+CAST(CurrentExRate AS VARCHAR(20))+')'
 					 WHEN (
 							(FromCurrCode = 'MYR' AND ToCurrCode <> 'MYR') 
 							OR (ToCurrCode = 'MYR' AND FromCurrCode <> 'MYR')
 						 ) AND  CAST(CurrentExRate AS MONEY)  <> CAST( ActualRate AS MONEY)
 					THEN 'Different system actual rate ('+FORMAT(CAST(CurrentExRate AS MONEY),'F4','en-us')+')'
+					 WHEN (
+							(FromCurrCode = 'MYR' AND ToCurrCode <> 'MYR') 
+							OR (ToCurrCode = 'MYR' AND FromCurrCode <> 'MYR')
+						 ) AND  CAST(CurrentExRate AS MONEY)  <> CAST( ActualRate AS MONEY)
+					THEN 'Different system actual rate ('+CAST(CAST(CurrentExRate AS MONEY) AS VARCHAR(20))+')'
 					WHEN MultipliedBy <> 1 THEN 'Transaction with exchange rate having "Multiplied by" (Currency '+CurrencyName+', Multiplied by = '+CAST(MultipliedBy AS VARCHAR(20))+')'
 					END Remark, FromCustID, ToCustID
 		FROM @tblSucc
