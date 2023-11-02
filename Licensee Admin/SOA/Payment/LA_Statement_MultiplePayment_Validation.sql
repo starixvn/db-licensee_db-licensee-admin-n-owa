@@ -322,7 +322,6 @@ BEGIN
 						ToPayerID IS NOT NULL 
 					)
 				
-
 			
 		-- Invalid
 		INSERT INTO @tblFail(RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,ErrorMessage)

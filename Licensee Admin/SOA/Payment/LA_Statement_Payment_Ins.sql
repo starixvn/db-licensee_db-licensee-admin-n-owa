@@ -124,8 +124,6 @@ BEGIN
 			END TRY
 			BEGIN CATCH
 				SELECT @ErrCode = 105, @ErrMsg = 'Add new sub payment failed.'
-				RETURN
-			END CATCH
 		END
 
 	END TRY
