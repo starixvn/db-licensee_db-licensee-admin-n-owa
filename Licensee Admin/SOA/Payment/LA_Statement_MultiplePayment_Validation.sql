@@ -364,7 +364,7 @@ BEGIN
 						 ) AND  ActualRate  NOT BETWEEN CurrentExRate - MinActualrate * CurrentExRate AND CurrentExRate + MinActualrate * CurrentExRate
 					THEN 'Exceed limit range ('+ FORMAT(CurrentExRate - MinActualrate * CurrentExRate ,'F4','en-us')+' - '+FORMAT(CurrentExRate + MinActualrate * CurrentExRate,'F4','en-us' )+')'
 					WHEN FromCurrCode = ToCurrCode AND FromCurrName <> ToCurrName AND  CAST(CurrentExRate AS MONEY) <> CAST( ActualRate AS MONEY) THEN 'Different system actual rate ('+FORMAT(CAST(CurrentExRate AS MONEY),'F4','en-us')+')'
-					WHEN (
+					 WHEN (
 							(FromCurrCode = 'MYR' AND ToCurrCode <> 'MYR') 
 							OR (ToCurrCode = 'MYR' AND FromCurrCode <> 'MYR')
 						 ) AND  CAST(CurrentExRate AS MONEY)  <> CAST( ActualRate AS MONEY)
