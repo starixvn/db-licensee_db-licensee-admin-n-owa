@@ -20,16 +20,22 @@ Items =
 '{"Items": [
 {"Alias": "gi", "Item": "General Info"},
 {"Alias": "p", "Item": "Payer"},
+{"Alias": "r", "Item": "RefNo"},
 {"Alias": "pi", "Item": "Payment Info"},
 {"Alias": "pn", "Item": "Payment No"},
 {"Alias": "rd", "Item": "Received Date (mm/dd/yyyy)"},
 {"Alias": "fc", "Item": "From Customer"},
+{"Alias": "tc", "Item": "To Customer"},
+{"Alias": "a", "Item":  "Amount"},
 {"Alias": "fa", "Item": "From Amount"},
 {"Alias": "ta", "Item": "To Amount"},
+{"Alias": "ar", "Item": "Actual Rate"},
 {"Alias": "rp", "Item": "Rebate Payment (Y/N)"},
-{"Alias": "d" "Item": "Remark"}]}
+{"Alias": "d" ,"Item": "Description"}]}
 '
 WHERE ACtionID = 2101
+
+
 
 
 

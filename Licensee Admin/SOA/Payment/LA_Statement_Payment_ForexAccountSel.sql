@@ -19,7 +19,7 @@ BEGIN
 
 	SELECT CustID, UserName
 	FROM bodb02.dbo.Customer WITH(NOLOCK)
-	WHERE Username IN ('MYS-Forex G/(L)','PHL-Forex G/(L)','VNM-Forex G/(L)','KHM-Forex G/(L)')
+	WHERE Username IN ('PHL-Forex G/(L)','MYS-Forex G/(L)','VNM-Forex G/(L)','KHM-Forex G/(L)')
 
 
 END

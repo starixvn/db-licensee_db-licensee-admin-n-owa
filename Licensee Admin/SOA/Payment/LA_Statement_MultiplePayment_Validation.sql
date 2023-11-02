@@ -158,36 +158,12 @@ BEGIN
 
 	-- Check input data
 	BEGIN
-	--Duplicated rows ( row #<row no1>, row #<row no2>...)
-	DECLARE @tblDuplicatedRow TABLE(	
-		RowId			INT,
-		ErrorMessage	NVARCHAR(500)
-	)
 
 	--New Payment No is duplicated (row #<row no1>, row #<row no2>...)
 	DECLARE @tblDuplicatedPaymentNo TABLE(	
 		RowId			INT,
 		ErrorMessage	NVARCHAR(500)
 	)
-
-	
-	--INSERT INTO @tblDuplicatedRow (RowId, ErrorMessage)
-	; WITH t AS 
-	(
-		SELECT DISTINCT
-			   STRING_AGG(CAST(RowId AS VARCHAR(10)),',') WITHIN GROUP (ORDER BY RowId)  AS RowIds,
-			   'Duplicated rows ( '+ STRING_AGG('row #'+ CAST(RowId AS VARCHAR(10)),',') WITHIN GROUP (ORDER BY RowId) + ')' AS ErrorMessage
-		FROM @PaymentList
-		GROUP BY 	PaymentNo, ReceivedDate, FromCustomer, ToCustomer, Amount, ToAmount, ActualRate, RebatePayment, Description		
-		HAVING  COUNT(1) > 1
-	)
-	INSERT INTO @tblDuplicatedRow (RowId ,ErrorMessage)
-	SELECT p.RowId, d.ErrorMessage
-	FROM @PaymentList p
-	INNER JOIN  (
-		SELECT x.RowId, t.ErrorMessage FROM t 
-		CROSS APPLY (SELECT CAST (value AS INT) RowId  FROM STRING_SPLIT(t.RowIds,',')) x
-	) d ON p.RowId = d.RowId
 
 	DECLARE @tblInfo TABLE (
 		RowId			INT, 
@@ -217,8 +193,9 @@ BEGIN
 		CurrentExRate   FLOAT,
 		MultipliedBy	INT,
 		CurrencyName	VARCHAR(50),
-		SystemExRate MONEY,
-		TransExrate	MONEY
+		SystemExRate	MONEY,
+		TransExrate		MONEY,
+		isFinanceAcc	BIT
 	)
 
 	DECLARE @tblSucc TABLE (
@@ -266,7 +243,7 @@ BEGIN
 
 	INSERT INTO @tblInfo(RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,FromCurrName,ToCurrName,
 			FromCurrCode,ToCurrCode,FromActualRate,ToActualRate,FromPayerID, ToPayerID,FromCurrencyID,ToCurrencyID,MinActualrate,MaxActualrate,FromCustID,ToCustID, 
-			CurrentExRate,MultipliedBy, CurrencyName, SystemExRate, TransExrate)
+			CurrentExRate,MultipliedBy, CurrencyName, SystemExRate, TransExrate, isFinanceAcc)
 	SELECT	t.RowId			 
 			,t.PaymentNo		
 			,t.ReceivedDate	
@@ -303,6 +280,7 @@ BEGIN
 				 ELSE e1.currency END
 			,e1.actualrate / e2.actualrate AS SystemExRate
 			,CONVERT(MONEY,t.ToAmount) / CONVERT(MONEY,t.Amount) AS TransExrate	
+			, CASE WHEN r1.cnt +  r2.cnt + r3.cnt + r4.cnt = 0 THEN 0 ElSE 1 END isFinanceAcc
 	FROM	@PaymentList  t
 	LEFT JOIN CustDB.dbo.custinfo c1 WITH (NOLOCK) on t.FromCustomer = c1.Username
 	LEFT JOIN CustDB.dbo.custinfo c2 WITH (NOLOCK) ON t.ToCustomer = c2.Username
@@ -311,6 +289,10 @@ BEGIN
 	LEFT JOIN DBTXN.bodb02.dbo.Acc_ExchangeRate er WITH (NOLOCK) ON er.FromExchangeID = e1.exchangeid and er.ToExchangeID = e2.exchangeid
 	OUTER APPLY ( SELECT TOP 1 PartyID FROM OAS_PartyBaseCurrency op WITH (NOLOCK) WHERE op.LicenseeCode = t.FromCustomer) p1
 	OUTER APPLY ( SELECT TOP 1 PartyID FROM OAS_PartyBaseCurrency op WITH (NOLOCK) WHERE op.LicenseeCode = t.ToCustomer ) p2
+	OUTER APPLY ( SELECT COUNT(1) AS cnt  FROM  CustDB.dbo.custAgent a (NOLOCK) WHERE c2.recommend = a.custid AND c2.roleid = 1 AND a.isInternal = 1 ) r1
+	OUTER APPLY ( SELECT COUNT(1) AS cnt  FROM  CustDB.dbo.custAgent a (NOLOCK) WHERE c2.custid = a.custid AND a.isInternal = 1 ) r2
+	OUTER APPLY ( SELECT COUNT(1) AS cnt  FROM  CustDB.dbo.CustMaster a (NOLOCK) WHERE c2.custid = a.custid AND a.isInternal = 1 ) r3
+	OUTER APPLY ( SELECT COUNT(1) AS cnt  FROM  CustDB.dbo.CustSuper a (NOLOCK) WHERE c2.custid = a.custid AND a.isInternal = 1 ) r4
 
 	; WITH t AS
 	(
@@ -348,7 +330,7 @@ BEGIN
 				AND (LEN(SUBSTRING(t.Amount, CHARINDEX('.',t.Amount ) + 1, LEN(t.Amount))) <= 2  OR CHARINDEX('.',t.Amount ) = 0) -- Amount has less than 2 decimal digits
 				AND LEN(t.Description) <= 200
 				AND (
-						(t.RebatePayment = 'Y' AND CAST(t.Amount AS FLOAT) < 0)
+						(t.RebatePayment = 'Y' AND CAST(t.Amount AS FLOAT) < 0 AND ToPayerID IS NULL)
 						OR 
 						( (t.RebatePayment IS NULL OR t.RebatePayment <> 'Y') AND CAST(t.Amount AS FLOAT) <> 0 )
 						)
@@ -360,53 +342,22 @@ BEGIN
 					)
 				AND FromPayerID IS NOT NULL
 				AND (
-						(ToPayerID IS NULL AND NOT EXISTS (SELECT 1 FROM LA_Payment p WITH(NOLOCK) WHERE p.PaymentNo = t.PaymentNo AND p.Type = 0))
+						(ToPayerID IS NULL AND NOT EXISTS (SELECT 1 FROM LA_Payment p WITH(NOLOCK) WHERE p.PaymentNo = t.PaymentNo AND p.Type IN (0,2)) AND isFinanceAcc = 1)
 						OR
-						(
-							ToPayerID IS NOT NULL AND EXISTS (
-																SELECT 1 FROM LA_Payment p WITH(NOLOCK) 
-																WHERE p.PaymentNo = t.PaymentNo AND p.Type = 0 AND p.PartyID = t.ToPayerID
-															  )
-						)
+						ToPayerID IS NOT NULL 
 					)
-				AND NOT EXISTS (SELECT 1 FROM @tblDuplicatedRow dupRow WHERE dupRow.RowId = t.RowId) 
+				AND NOT EXISTS (SELECT 1 FROM @tblDuplicatedPaymentNo dupRow WHERE dupRow.RowId = t.RowId) 
+
 			
-		DECLARE @tblMainTosubPayment TABLE (PaymentNo	VARCHAR(50),ToPayerID INT,Total_Amt MONEY, Remaining_Amt MONEY, ToCustomer VARCHAR(30))
-
-		INSERT INTO @tblMainTosubPayment (PaymentNo, ToPayerID, Total_Amt, Remaining_Amt, ToCustomer)
-		SELECT c.PaymentNo, t.ToPayerID, ROUND(SUM( CAST(t.Amount AS MONEY) * CAST(t.ActualRate AS FLOAT)),2), p.RemainingAmount, t.ToCustomer
-		FROM @tblInfo t
-		INNER JOIN @tblSucc c ON t.RowId = c.RowId
-		CROSS APPLY (
-			SELECT p.RemainingAmount FROM LA_Payment p WITH(NOLOCK) 
-			WHERE p.PaymentNo = t.PaymentNo AND p.Type = 0 AND p.PartyID = t.ToPayerID
-		) p
-		WHERE t.FromPayerID IS NOT NULL 
-			AND t.ToPayerID IS NOT NULL 
-		GROUP BY c.PaymentNo, t.ToPayerID, p.RemainingAmount, t.ToCustomer
-
-		-- payment is insufficient for the transfer.
-		
-		DECLARE @tblInsufficientAmt TABLE (RowID INT )
-		INSERT INTO @tblInsufficientAmt
-		SELECT s.RowId 
-		FROM @tblSucc s
-		INNER JOIN @tblMainTosubPayment t ON s.PaymentNo = t.PaymentNo AND s.ToCustomer = t.ToCustomer
-		WHERE t.Remaining_Amt < t.Total_Amt
-
-		DELETE s
-		FROM @tblSucc s
-		INNER JOIN @tblInsufficientAmt t ON t.RowID = s.RowId
-
 		-- Invalid
 		INSERT INTO @tblFail(RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,ErrorMessage)
-		SELECT	temp.RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,
-				CASE  
-					 WHEN dupRow.RowId IS NOT NULL THEN dupRow.ErrorMessage
-					 WHEN ISNUMERIC(Amount)=0 OR ISNUMERIC(ActualRate)=0 OR CAST(ActualRate AS FLOAT) <= 0 OR CAST(Amount AS FLOAT) = 0 THEN 'Invalid Amount or Actual Rate.'
-					 WHEN LEN(SUBSTRING(Amount, CHARINDEX('.',Amount ) + 1, LEN(Amount))) > 2 AND CHARINDEX('.',Amount) > 0 THEN 'Invalid Amount. Amount have 2 decimal digits only.'
-					 WHEN ISDATE(ReceivedDate) = 0 THEN 'Invalid Received Date.' 
-					 WHEN RebatePayment = 'Y' AND CAST(Amount AS MONEY) > 0 THEN 'Invalid Rebate Payment. Amount has to less than 0.'
+		SELECT	temp.RowId,temp.PaymentNo,temp.ReceivedDate,FromCustomer,ToCustomer,temp.Amount,ToAmount,ActualRate,RebatePayment,Description,
+				CASE  WHEN dupRow.RowId IS NOT NULL THEN dupRow.ErrorMessage
+					 WHEN ISNUMERIC(temp.Amount)=0 OR ISNUMERIC(ActualRate)=0 OR CAST(ActualRate AS FLOAT) <= 0 OR CAST(temp.Amount AS FLOAT) = 0 THEN 'Invalid Amount or Actual Rate.'
+					 WHEN LEN(SUBSTRING(temp.Amount, CHARINDEX('.',temp.Amount ) + 1, LEN(temp.Amount))) > 2 AND CHARINDEX('.',temp.Amount) > 0 THEN 'Invalid Amount. Amount have 2 decimal digits only.'
+					 WHEN ISDATE(temp.ReceivedDate) = 0 THEN 'Invalid Received Date.' 
+					 WHEN RebatePayment = 'Y' AND CAST(temp.Amount AS MONEY) > 0 THEN 'Invalid Rebate Payment. Amount has to less than 0.'
+					 WHEN RebatePayment = 'Y' AND FromPayerID IS NOT NULL AND ToPayerID IS NOT NULL THEN 'Rebate Payment could not be a transfer overpayment.'
 					 --WHEN (RebatePayment <> 'Y' OR RebatePayment IS NULL) AND CAST(Amount AS MONEY) < 0 THEN 'Invalid Payment. Amount has to greater than 0.'
 					 WHEN ISNULL(FromCustomer,'') ='' and ISNULL(ToCustomer,'') ='' THEN 'Username cannot be blank.' 
 					 WHEN FromCustomer = ToCustomer THEN 'From Cust must different To Cust.' 
@@ -414,34 +365,36 @@ BEGIN
 					 WHEN FromCurrName = ToCurrName AND CAST(ActualRate AS FLOAT) <> 1 THEN 'Same currency name, but actual rate is different 1.'
 					 WHEN FromCurrCode <> ToCurrCode AND FromCurrCode <> 'MYR' AND ToCurrCode <> 'MYR' THEN 'From Cust and To Cust must belong same currency code.'
 					 WHEN FromPayerID IS NULL THEN 'Invalid From Cust.'
-					 WHEN FromPayerID IS NOT NULL AND EXISTS (SELECT 1 FROM LA_Payment p WITH(NOLOCK) WHERE p.PaymentNo = PaymentNo AND p.Type = 0) THEN 'Invalid Payment No.'
-					 WHEN FromPayerID IS NOT NULL AND ToPayerID IS NOT NULL AND NOT EXISTS (
-																SELECT 1 FROM LA_Payment p WITH(NOLOCK) 
-																WHERE p.PaymentNo = temp.PaymentNo AND p.Type = 0 AND p.PartyID = temp.ToPayerID
-															  ) THEN 'Invalid Transfer. Payment No doesn''t exist.'
-					 WHEN ia.RowID IS NOT NULL THEN 'The payment is insufficient for the transfer.'
+					 WHEN FromPayerID IS NOT NULL AND ToPayerID IS NULL AND EXISTS (SELECT 1 FROM LA_Payment p WITH(NOLOCK) WHERE p.PaymentNo = temp.PaymentNo AND p.Type IN (0,2)) THEN 'Payment No exists in the system.'
+					 WHEN FromPayerID IS NOT NULL AND ToPayerID IS NULL	AND isFinanceAcc = 0 THEN 'Invalid To Cust'
+	
 					 ELSE 'Invalid From Cust or To Cust.' END AS Reason
 
-					 /*
-						New reason here
-					 */
 		FROM (SELECT *  FROM @tblInfo WHERE RowId not in (SELECT RowId FROM @tblSucc)) AS temp
-		LEFT JOIN @tblDuplicatedRow dupRow ON dupRow.RowId = temp.RowId
-		LEFT JOIN @tblInsufficientAmt ia ON ia.RowID = temp.RowId
+		LEFT JOIN @tblDuplicatedPaymentNo dupRow ON dupRow.RowId = temp.RowId
 
 		-- Valid 
 		SELECT RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ActualRate,RebatePayment,Description,
-			   CASE WHEN FromCurrCode = ToCurrCode AND FromCurrName <> ToCurrName AND  CurrentExRate <> CAST( ActualRate AS FLOAT) THEN 'Different system actual rate ('+CAST(CurrentExRate AS VARCHAR(20))+')'
+			   CASE WHEN (
+							(FromCurrCode = 'MYR' AND ToCurrCode <> 'MYR') 
+							OR (ToCurrCode = 'MYR' AND FromCurrCode <> 'MYR')
+							OR (FromCurrCode = ToCurrCode)
+						 ) AND CAST(CurrentExRate AS MONEY) <> CAST( ActualRate AS MONEY)
+						 
+					AND  MultipliedBy <> 1 THEN 'Different system actual rate ('+FORMAT(CAST(CurrentExRate AS MONEY),'F4','en-us')+')' + CHAR(13) +
+							'Transaction with exchange rate having "Multiplied by" (Currency '+CurrencyName+', Multiplied by = '+CAST(MultipliedBy AS VARCHAR(20))+')'		    
 					WHEN (
 							(FromCurrCode = 'MYR' AND ToCurrCode <> 'MYR') 
 							OR (ToCurrCode = 'MYR' AND FromCurrCode <> 'MYR')
-						 ) AND  CurrentExRate <> CAST( ActualRate AS FLOAT)
-					THEN 'Different system actual rate ('+CAST(CurrentExRate AS VARCHAR(20))+')'
+							OR (FromCurrCode = ToCurrCode)
+						 ) AND  ActualRate  NOT BETWEEN CurrentExRate - MinActualrate * CurrentExRate AND CurrentExRate + MinActualrate * CurrentExRate
+					THEN 'Exceed limit range ('+ FORMAT(CurrentExRate - MinActualrate * CurrentExRate ,'F4','en-us')+' - '+FORMAT(CurrentExRate + MinActualrate * CurrentExRate,'F4','en-us' )+')'
+					WHEN FromCurrCode = ToCurrCode AND FromCurrName <> ToCurrName AND  CAST(CurrentExRate AS MONEY) <> CAST( ActualRate AS MONEY) THEN 'Different system actual rate ('+FORMAT(CAST(CurrentExRate AS MONEY),'F4','en-us')+')'
 					WHEN (
 							(FromCurrCode = 'MYR' AND ToCurrCode <> 'MYR') 
 							OR (ToCurrCode = 'MYR' AND FromCurrCode <> 'MYR')
-						 ) AND  CurrentExRate  NOT BETWEEN MinActualrate AND MaxActualrate
-					 THEN 'Exceed limit range ('+ CAST(MinActualrate AS VARCHAR(20))+' - '+CAST(MaxActualrate AS VARCHAR(20))+')'
+						 ) AND  CAST(CurrentExRate AS MONEY)  <> CAST( ActualRate AS MONEY)
+					THEN 'Different system actual rate ('+FORMAT(CAST(CurrentExRate AS MONEY),'F4','en-us')+')'
 					WHEN MultipliedBy <> 1 THEN 'Transaction with exchange rate having "Multiplied by" (Currency '+CurrencyName+', Multiplied by = '+CAST(MultipliedBy AS VARCHAR(20))+')'
 					END Remark, FromCustID, ToCustID
 		FROM @tblSucc
@@ -477,7 +430,7 @@ BEGIN
 				AND (LEN(SUBSTRING(t.ToAmount, CHARINDEX('.',t.ToAmount ) + 1, LEN(t.ToAmount))) <= 2  OR CHARINDEX('.',t.ToAmount ) = 0) -- Amount has less than 2 decimal digits
 				AND LEN(t.Description) <= 200
 				AND (
-					(t.RebatePayment = 'Y' AND CAST(t.Amount AS FLOAT) < 0 AND CAST(t.ToAmount AS FLOAT) < 0)
+					(t.RebatePayment = 'Y' AND CAST(t.Amount AS FLOAT) < 0 AND CAST(t.ToAmount AS FLOAT) < 0 AND t.ToPayerID IS NULL)
 						OR 
 					( (t.RebatePayment IS NULL OR t.RebatePayment <> 'Y') AND CAST(t.Amount AS FLOAT) <> 0 AND CAST(t.ToAmount AS FLOAT) <> 0 )
 					)
@@ -485,71 +438,35 @@ BEGIN
 				AND t.FromCurrencyID <> t.ToCurrencyID
 				AND FromPayerID IS NOT NULL
 				AND (
-						(ToPayerID IS NULL AND NOT EXISTS (SELECT 1 FROM LA_Payment p WITH(NOLOCK) WHERE p.PaymentNo = t.PaymentNo AND p.Type = 0))
-						OR
-						(
-							ToPayerID IS NOT NULL AND EXISTS (
-																SELECT 1 FROM LA_Payment p WITH(NOLOCK) 
-																WHERE p.PaymentNo = t.PaymentNo AND p.Type = 0 AND p.PartyID = t.ToPayerID 
-															  )
-						)
+						(ToPayerID IS NULL AND NOT EXISTS (SELECT 1 FROM LA_Payment p WITH(NOLOCK) WHERE p.PaymentNo = t.PaymentNo AND p.Type IN (0,2))  AND isFinanceAcc = 1)
+						OR ToPayerID IS NOT NULL 
+						
 					)
-				AND NOT EXISTS (SELECT 1 FROM @tblDuplicatedRow dupRow WHERE dupRow.RowId = t.RowId) 
+				AND NOT EXISTS (SELECT 1 FROM @tblDuplicatedPaymentNo dupRow WHERE dupRow.RowId = t.RowId)
 
-		DECLARE @tblMainTosubPayment_CrossTransfer TABLE (PaymentNo	VARCHAR(50),ToPayerID INT,Total_Amt MONEY, Remaining_Amt MONEY, ToCustomer VARCHAR(30))
-
-		INSERT INTO @tblMainTosubPayment_CrossTransfer (PaymentNo, ToPayerID, Total_Amt, Remaining_Amt, ToCustomer)
-		SELECT c.PaymentNo, t.ToPayerID, ROUND(SUM( CAST(t.ToAmount AS MONEY)),2), p.RemainingAmount, t.ToCustomer
-		FROM @tblInfo t
-		INNER JOIN @tblSucc c ON t.RowId = c.RowId
-		CROSS APPLY (
-			SELECT p.RemainingAmount FROM LA_Payment p WITH(NOLOCK) 
-			WHERE p.PaymentNo = t.PaymentNo AND p.Type = 0 AND p.PartyID = t.ToPayerID
-		) p
-		WHERE t.FromPayerID IS NOT NULL 
-			AND t.ToPayerID IS NOT NULL 
-		GROUP BY c.PaymentNo, t.ToPayerID, p.RemainingAmount,t.ToCustomer
-
-		-- payment is insufficient for the transfer.
-		DECLARE @tblInsufficientAmt_CrossTransfer TABLE (RowID INT )
-		INSERT INTO @tblInsufficientAmt_CrossTransfer
-		SELECT s.RowId 
-		FROM @tblSucc s
-		INNER JOIN @tblMainTosubPayment_CrossTransfer t ON s.PaymentNo = t.PaymentNo AND s.ToCustomer = t.ToCustomer
-		WHERE t.Remaining_Amt < t.Total_Amt
-
-		DELETE s
-		FROM @tblSucc s
-		INNER JOIN @tblInsufficientAmt_CrossTransfer t ON t.RowID = s.RowId
 
 		INSERT INTO @tblFail(RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,ErrorMessage)
-		SELECT	temp.RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,
+		SELECT	temp.RowId,temp.PaymentNo,temp.ReceivedDate,FromCustomer,ToCustomer,temp.Amount,ToAmount,ActualRate,RebatePayment,Description,
 				CASE WHEN dupRow.RowId IS NOT NULL THEN dupRow.ErrorMessage
-					 WHEN ISNUMERIC(Amount)=0 OR ISNUMERIC(ToAmount)= 0 OR CONVERT(MONEY,Amount) = 0 OR CONVERT(MONEY,ToAmount) = 0 THEN 'Invalid Amount. From Amount and To Amount should not be equal to 0.' 
-					 WHEN (CONVERT(MONEY,Amount) > 0 AND CONVERT(MONEY,ToAmount) < 0) OR (CONVERT(MONEY,Amount) < 0 AND CONVERT(MONEY,ToAmount) > 0) THEN 'Invalid Amount. From Amount and To Amount have to be the same sign.'
-					 WHEN (LEN(SUBSTRING(Amount, CHARINDEX('.',Amount ) + 1, LEN(Amount))) > 2 AND CHARINDEX('.',Amount) > 0)   OR
+					 WHEN ISNUMERIC(temp.Amount)=0 OR ISNUMERIC(ToAmount)= 0 OR CONVERT(MONEY,temp.Amount) = 0 OR CONVERT(MONEY,ToAmount) = 0 THEN 'Invalid Amount. From Amount and To Amount should not be equal to 0.' 
+					 WHEN (CONVERT(MONEY,temp.Amount) > 0 AND CONVERT(MONEY,ToAmount) < 0) OR (CONVERT(MONEY,temp.Amount) < 0 AND CONVERT(MONEY,ToAmount) > 0) THEN 'Invalid Amount. From Amount and To Amount have to be the same sign.'
+					 WHEN (LEN(SUBSTRING(temp.Amount, CHARINDEX('.',temp.Amount ) + 1, LEN(temp.Amount))) > 2 AND CHARINDEX('.',temp.Amount) > 0)   OR
 						  (LEN(SUBSTRING(ToAmount, CHARINDEX('.',ToAmount ) + 1, LEN(ToAmount))) > 2  AND CHARINDEX('.',ToAmount) > 0 ) THEN 'Invalid Amount. From Amount and To Amount have 2 decimal digits only.'
-					 WHEN ISDATE(ReceivedDate) = 0 THEN 'Invalid Received Date.' 
-					 WHEN RebatePayment = 'Y' AND ( CAST(Amount AS MONEY) > 0 OR CAST(ToAmount AS MONEY) > 0 )  THEN 'Invalid Rebate Payment. From Amount and To Amount have to less than 0.'
-					 --WHEN (RebatePayment <> 'Y' OR RebatePayment IS NULL) AND (CAST(Amount AS MONEY) < 0 OR CAST(ToAmount AS MONEY) < 0 ) THEN 'Invalid Payment. From Amount and To Amount have to greater than 0.'
+					 WHEN ISDATE(temp.ReceivedDate) = 0 THEN 'Invalid Received Date.' 
+					 WHEN RebatePayment = 'Y' AND ( CAST(temp.Amount AS MONEY) > 0 OR CAST(ToAmount AS MONEY) > 0 )  THEN 'Invalid Rebate Payment. From Amount and To Amount have to less than 0.'
+					 WHEN RebatePayment = 'Y' AND FromPayerID IS NOT NULL AND ToPayerID IS NOT NULL THEN 'Rebate Payment could not be a transfer overpayment.'
 					 WHEN ISNULL(FromCustomer,'') = ''  OR ISNULL(ToCustomer,'') = '' THEN 'Username cannot be blanked.' 
 					 WHEN FromCustomer = ToCustomer THEN 'From Cust and To Cust must be different.' 
 					 WHEN LEN(Description) > 200 THEN 'Maximum length of Description is 200 characters' 
 					 WHEN FromCurrencyID = ToCurrencyID THEN 'From Cust and To Cust must be different currency.' 
 					 WHEN FromActualRate = 0 OR ToActualRate = 0 THEN 'Invalid Exchange Rate.'
 					 WHEN FromPayerID IS NULL THEN 'Invalid From Cust.'
-					 WHEN FromPayerID IS NOT NULL AND EXISTS (SELECT 1 FROM LA_Payment p WITH(NOLOCK) WHERE p.PaymentNo = PaymentNo AND p.Type = 0) THEN 'Invalid Payment No.'
-					 WHEN FromPayerID IS NOT NULL AND ToPayerID IS NOT NULL AND NOT EXISTS (
-																SELECT 1 FROM LA_Payment p WITH(NOLOCK) 
-																WHERE p.PaymentNo = temp.PaymentNo AND p.Type = 0 AND p.PartyID = temp.ToPayerID
-															  ) THEN 'Invalid Transfer. Payment No doesn''t exist.'
-					 WHEN ia.RowID IS NOT NULL THEN 'The payment is insufficient for the transfer.'
+					 WHEN FromPayerID IS NOT NULL AND ToPayerID IS NULL AND EXISTS (SELECT 1 FROM LA_Payment p WITH(NOLOCK) WHERE p.PaymentNo = temp.PaymentNo AND p.Type IN (0,2)) THEN 'Payment No exists in the system.'
+					 WHEN FromPayerID IS NOT NULL AND ToPayerID IS NULL	AND isFinanceAcc = 0 THEN 'Invalid To Cust'
 					 ELSE 'Invalid From Cust or To Cust.' END AS Reason
 						 
-
 		FROM  (SELECT * FROM @tblInfo WHERE RowId NOT IN (SELECT RowId FROM @tblSucc) ) AS temp 
-		LEFT JOIN @tblDuplicatedRow dupRow ON dupRow.RowId = temp.RowId
-		LEFT JOIN @tblInsufficientAmt_CrossTransfer ia ON ia.RowID = temp.RowId
+		LEFT JOIN @tblDuplicatedPaymentNo dupRow ON dupRow.RowId = temp.RowId
 
 		-- Valid
 		SELECT RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount AS FromAmount,ToAmount,RebatePayment,Description,SystemExRate,TransExrate,FromCustID, ToCustID

@@ -33,9 +33,8 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	-- Validation
-	DECLARE @FromPayerID INT, @ToPayerID INT, @PaymentType TINYINT = 0, @FromCurrencyID INT , @ToCurrencyID INT, @PaymentId INT
-	DECLARE @FromTransInfo TABLE (PayerID INT, RemainingAmount MONEY)
-	DECLARE @ToTransInfo TABLE (PayerID INT, RemainingAmount MONEY)
+	DECLARE @FromPayerID INT, @ToPayerID INT, @PaymentType TINYINT = 0, @FromCurrencyID INT , @ToCurrencyID INT, @PaymentId INT, @Remark NVARCHAR(500)
+			,@FromLicenseeName VARCHAR(50), @ToLicenseeName VARCHAR(50)
 
 	-- log
 	DECLARE @startRun		DATETIME
@@ -43,13 +42,22 @@ BEGIN
 			,@duration		INT
 			,@logSPData		NVARCHAR(MAX)
 			,@logSPDataOld	NVARCHAR(MAX)
+			,@logSPData_Tocust	NVARCHAR(MAX)
+			,@logSPDataOld_Tocust	NVARCHAR(MAX)
 			,@actionID		INT = 2101 -- Insert new payment
 
 	-- Time start
 	SET @startRun = GETDATE()
 
-	SELECT TOP 1 @FromPayerID = PartyID FROM OAS_PartyBaseCurrency op WITH (NOLOCK) WHERE op.LicenseeCode = @FromCustomer
-	SELECT TOP 1 @ToPayerID = PartyID FROM OAS_PartyBaseCurrency op WITH (NOLOCK) WHERE op.LicenseeCode = @ToCustomer
+	SELECT TOP 1 @FromPayerID = op.PartyID , @FromLicenseeName = p.PartyName
+	FROM OAS_PartyBaseCurrency op WITH (NOLOCK)
+	INNER JOIN OAS_Party p WITH (NOLOCK) ON op.PartyID = p.PartyID
+	WHERE op.LicenseeCode = @FromCustomer
+
+	SELECT TOP 1 @ToPayerID = op.PartyID ,@ToLicenseeName = p.PartyName
+	FROM OAS_PartyBaseCurrency op WITH (NOLOCK)
+	INNER JOIN OAS_Party p WITH (NOLOCK) ON op.PartyID = p.PartyID
+	WHERE op.LicenseeCode = @ToCustomer
 
 	IF  @FromPayerID IS NULL
 	BEGIN
@@ -64,24 +72,9 @@ BEGIN
 		SELECT @PaymentType = 2 -- Rebate payment
 		
 	IF @PaymentType IN (0,2) 
-			AND EXISTS (SELECT TOP 1 1 FROM LA_Payment WITH(NOLOCK) WHERE PaymentNo = @PaymentNo)
+			AND EXISTS (SELECT TOP 1 1 FROM LA_Payment WITH(NOLOCK) WHERE PaymentNo = @PaymentNo AND Type IN (0,2))
 	BEGIN
 		SELECT @ErrCode = 101, @ErrMsg = 'Payment No exists in the system.'
-		RETURN
-
-	END
-
-	IF @PaymentType = 1
-			AND NOT EXISTS (
-							SELECT TOP 1 1 FROM LA_Payment WITH(NOLOCK) 
-							WHERE PaymentNo = @PaymentNo 
-								AND PartyID = @ToPayerID 
-								AND RemainingAmount >= CASE WHEN @Template = 1 THEN @Amount * @ActualRate
-								                            WHEN @Template = 0 THEN @ToAmount END
-								AND Type = 0
-								)
-	BEGIN
-		SELECT @ErrCode = 101, @ErrMsg = 'Payment No doesn''t exist or the payment is insufficient for the transfer.'
 		RETURN
 
 	END
@@ -101,93 +94,46 @@ BEGIN
 
 	BEGIN TRY
 		-- Insert 
-		DECLARE @PaymentCurrencyID INT
+		DECLARE @FromPaymentCurrencyID INT, @ToPaymentCurrencyID INT
 
-		SELECT @PaymentCurrencyID = c.currency FROM CustDB.dbo.CustInfo c WITH(NOLOCK) WHERE c.username = @FromCustomer
+		SELECT @FromPaymentCurrencyID = c.currency FROM CustDB.dbo.CustInfo c WITH(NOLOCK) WHERE c.username = @FromCustomer
+		SELECT @ToPaymentCurrencyID = c.currency FROM CustDB.dbo.CustInfo c WITH(NOLOCK) WHERE c.username = @ToCustomer
 
 		IF @PaymentType IN (0,2)
 		BEGIN
-			INSERT INTO LA_Payment ([PaymentNo],[ReceivedDate],[Type],[PartyID],[CurrencyId],[Amount],[RemainingAmount],
-				[TransferRefno],[StatusId],[Environment],[OriginalTransId],[CreatedDate],[CreatedBy],[ModifyDate],[ModifiedBy])
-			VALUES (@PaymentNo, @ReceivedDate, @PaymentType, @FromPayerID, @PaymentCurrencyID, @Amount, @Amount, 
-					@Refno,0 ,@Environment, NULL, GETDATE(), @UserID, GETDATE(), @UserID  )
 
-			SET @PaymentId = SCOPE_IDENTITY()
+
+			SELECT @Remark = CASE WHEN  @PaymentType = 0 AND @Amount > 0 THEN  'Payment received'
+								  WHEN  @PaymentType = 0 AND @Amount < 0 THEN  'Payment made'
+								  WHEN  @PaymentType = 2 THEN 'Rebate payment'
+							 END
+			INSERT INTO LA_Payment ([PaymentNo],[ReceivedDate],[Type],[PartyID],[CurrencyId],[Amount],[RemainingAmount],
+				[TransferRefno],[StatusId],[Environment],[CreatedDate],[CreatedBy],[ModifyDate],[ModifiedBy], [Remark])
+			VALUES (@PaymentNo, @ReceivedDate, @PaymentType, @FromPayerID, @FromPaymentCurrencyID, @Amount, @Amount, 
+					@Refno,0 ,@Environment, GETDATE(), @UserID, GETDATE(), @UserID, @Remark )
+
 		END
 
 		IF @PaymentType = 1
 		BEGIN
-			DECLARE @OriginalTransId INT -- Main payment
-			SELECT @OriginalTransId = PaymentId FROM LA_Payment WITH(NOLOCK) WHERE PaymentNo = @PaymentNo AND PartyID = @ToPayerID AND Type = 0
-
-			-- Update old payemnt (main-licensee)
-			BEGIN TRY
-				UPDATE LA_Payment WITH(ROWLOCK, UPDLOCK)
-				SET		RemainingAmount = ROUND(RemainingAmount - CASE WHEN @Template = 1 THEN @Amount * @ActualRate
-																 WHEN @Template = 0 THEN @ToAmount END,2)
-				OUTPUT INSERTED.PaymentId ,INSERTED.RemainingAmount INTO @FromTransInfo
-				WHERE PaymentNo = @PaymentNo AND PartyID = @ToPayerID AND Type = 0
-			END TRY
-			BEGIN CATCH
-				SELECT @ErrCode = 104, @ErrMsg = 'Update remaining amount of main payment failed'
-				RETURN
-			END CATCH
 
 			BEGIN TRY
 				-- New payment (sub-lincensee)
 				INSERT INTO LA_Payment ([PaymentNo],[ReceivedDate],[Type],[PartyID],[CurrencyId],[Amount],[RemainingAmount],
-					[TransferRefno],[StatusId],[Environment],[OriginalTransId],[CreatedDate],[CreatedBy],[ModifyDate],[ModifiedBy])
-				OUTPUT INSERTED.PaymentId ,INSERTED.RemainingAmount INTO @ToTransInfo
-				VALUES (@PaymentNo, @ReceivedDate, @PaymentType, @FromPayerID, @PaymentCurrencyID, @Amount, @Amount, 
-						@Refno, 0 ,@Environment, @OriginalTransId, GETDATE(), @UserID, GETDATE(), @UserID)
+					[TransferRefno],[StatusId],[Environment],[CreatedDate],[CreatedBy],[ModifyDate],[ModifiedBy], Remark)
+				VALUES (@PaymentNo, @ReceivedDate, @PaymentType, @FromPayerID, @FromPaymentCurrencyID, @Amount, @Amount, 
+						@Refno, 0 ,@Environment, GETDATE(), @UserID, GETDATE(), @UserID, 'Transfer from ' + @ToLicenseeName)
 
-				SET @PaymentId = SCOPE_IDENTITY()
+				INSERT INTO LA_Payment ([PaymentNo],[ReceivedDate],[Type],[PartyID],[CurrencyId],[Amount],[RemainingAmount],
+					[TransferRefno],[StatusId],[Environment],[CreatedDate],[CreatedBy],[ModifyDate],[ModifiedBy], Remark)
+				VALUES (@PaymentNo, @ReceivedDate, @PaymentType, @ToPayerID, @ToPaymentCurrencyID, CASE WHEN @Template = 0 THEN -@ToAmount ELSE -@Amount END, CASE WHEN  @Template = 0 THEN -@ToAmount ELSE -@Amount END, 
+						@Refno, 0 ,@Environment, GETDATE(), @UserID, GETDATE(), @UserID,  'Transfer to ' + @FromLicenseeName)
 
 			END TRY
 			BEGIN CATCH
 				SELECT @ErrCode = 105, @ErrMsg = 'Add new sub payment failed.'
-
-				-- Rollback remaining amount Main-payment
-				UPDATE LA_Payment WITH(ROWLOCK, UPDLOCK)
-				SET		RemainingAmount = ROUND(RemainingAmount + CASE WHEN @Template = 1 THEN @Amount * @ActualRate
-																 WHEN @Template = 0 THEN @ToAmount END,2)
-				WHERE PaymentNo = @PaymentNo AND PartyID = @ToPayerID AND Type = 0
-
 				RETURN
 			END CATCH
-
-			-- Allocate payment to payment: Type = 3
-			BEGIN TRY
-
-				DECLARE @FromRemainingAmount MONEY, @ToRemainingAmount MONEY
-				SELECT @FromRemainingAmount = RemainingAmount FROM @FromTransInfo
-				SELECT @ToRemainingAmount = RemainingAmount FROM @FromTransInfo
-
-				INSERT INTO LA_Allocation (FromTransId,ToTransId,Type,AppliedAmount,FromRemainingAmount,ToRemainingAmount,StatusId,
-											CreatedDate,CreatedBy,UpdatedDate,UpdatedBy)
-				SELECT  @OriginalTransId, @PaymentId, 3, CASE WHEN @Template = 1 THEN ROUND(@Amount * @ActualRate,2)
-														      WHEN @Template = 0 THEN @ToAmount END, 
-						@FromRemainingAmount, @ToRemainingAmount, 0,  GETDATE(), @UserID, GETDATE(), @UserID 
-				
-			END TRY
-
-			BEGIN CATCH
-				-- Remove sub payment 
-				DELETE FROM LA_Payment WITH(ROWLOCK, UPDLOCK) WHERE PaymentId = @PaymentId
-
-				-- Rollback remaining amount Main-payment
-				UPDATE LA_Payment WITH(ROWLOCK, UPDLOCK)
-				SET		RemainingAmount = ROUND(RemainingAmount + CASE WHEN @Template = 1 THEN @Amount * @ActualRate
-																 WHEN @Template = 0 THEN @ToAmount END,2)
-				WHERE PaymentNo = @PaymentNo AND PartyID = @ToPayerID AND Type = 0
-
-
-				SELECT @ErrCode = 106, @ErrMsg = 'Add new sub payment failed.'
-
-				RETURN
-				
-			END CATCH
-
 		END
 
 	END TRY
@@ -198,9 +144,10 @@ BEGIN
 
 	-- Write log
 	IF @Template = 0
+	BEGIN
 		SELECT @logSPData = (
 				SELECT	 Op.PartyName	AS 'gi.p'
-						 ,t.Refno		AS 'gi.r'
+						 ,CAST( t.Refno AS VARCHAR(100)) AS 'gi.r'
 						 ,t.PaymentNo   AS 'pi.pn'
 						 ,t.ReceivedDate AS 'pi.rd'
 						 ,t.FromCustomer AS 'pi.fc'
@@ -218,17 +165,39 @@ BEGIN
 				FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
 			)
 
+			IF @PaymentType = 1
+				SELECT @logSPData_Tocust = (
+					SELECT	 Op.PartyName	AS 'gi.p'
+							 ,CAST( t.Refno AS VARCHAR(100)) AS 'gi.r'
+							 ,t.PaymentNo   AS 'pi.pn'
+							 ,t.ReceivedDate AS 'pi.rd'
+							 ,t.FromCustomer AS 'pi.fc'
+							 ,t.ToCustomer AS 'pi.tc'
+							 ,FORMAT(t.FromAmount,'N','en-us') AS 'pi.fa'
+							 ,FORMAT(t.ToAmount,'N','en-us') AS 'pi.ta'
+							 ,t.RebatePayment AS 'pi.rp'
+							 ,t.Description AS 'pi.d'
+					FROM (
+						SELECT @ToPayerID AS PartyID, @Refno AS Refno, @PaymentNo AS PaymentNo,  CONVERT(VARCHAR, @ReceivedDate, 101) ReceivedDate, 
+							   @FromCustomer AS FromCustomer, @ToCustomer AS ToCustomer, @Amount AS FromAmount, @ToAmount AS ToAmount, @RebatePayment RebatePayment,
+							   @Description AS Description
+					) t
+					INNER JOIN OAS_Party op WITH(NOLOCK)  ON t.PartyID = op.PartyID
+					FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
+				)
+	END
 
 	IF @Template = 1
+	BEGIN
 		SELECT @logSPData = (
 				SELECT	 Op.PartyName	AS 'gi.p'
-						 ,t.Refno		AS 'gi.r'
+						 ,CAST( t.Refno AS VARCHAR(100)) AS 'gi.r'
 						 ,t.PaymentNo   AS 'pi.pn'
 						 ,t.ReceivedDate AS 'pi.rd'
 						 ,t.FromCustomer AS 'pi.fc'
 						 ,t.ToCustomer AS 'pi.tc'
-						 ,FORMAT(t.FromAmount,'N','en-us') AS 'pi.fa'
-						 ,FORMAT(t.ActualRate,'N','en-us') AS 'pi.ar'
+						 ,FORMAT(t.FromAmount,'N','en-us') AS 'pi.a'
+						 ,FORMAT(t.ActualRate,'G5','en-us') AS 'pi.ar'
 						 ,t.RebatePayment AS 'pi.rp'
 						 ,t.Description AS 'pi.d'
 				FROM (
@@ -239,6 +208,28 @@ BEGIN
 				INNER JOIN OAS_Party op WITH(NOLOCK)  ON t.PartyID = op.PartyID
 				FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
 			)
+
+			IF @PaymentType = 1
+				SELECT @logSPData_Tocust = (
+					SELECT	 Op.PartyName	AS 'gi.p'
+							 ,CAST( t.Refno AS VARCHAR(100)) AS 'gi.r'
+							 ,t.PaymentNo   AS 'pi.pn'
+							 ,t.ReceivedDate AS 'pi.rd'
+							 ,t.FromCustomer AS 'pi.fc'
+							 ,t.ToCustomer AS 'pi.tc'
+							 ,FORMAT(t.FromAmount,'N','en-us') AS 'pi.a'
+							 ,FORMAT(t.ActualRate,'G5','en-us') AS 'pi.ar'
+							 ,t.RebatePayment AS 'pi.rp'
+							 ,t.Description AS 'pi.d'
+					FROM (
+						SELECT @ToPayerID AS PartyID, @Refno AS Refno, @PaymentNo AS PaymentNo,  CONVERT(VARCHAR, @ReceivedDate, 101) ReceivedDate, 
+							   @FromCustomer AS FromCustomer, @ToCustomer AS ToCustomer, @Amount AS FromAmount, @ActualRate AS ActualRate, @RebatePayment RebatePayment,
+							   @Description AS Description
+					) t
+					INNER JOIN OAS_Party op WITH(NOLOCK)  ON t.PartyID = op.PartyID
+					FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
+				)
+		END
 
 	SET @endRun = GETDATE()
 	SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun)
@@ -255,6 +246,16 @@ BEGIN
 		,@TrackingValue  = @LogSPDataOld
 		,@ActionID		 = @actionID
 
-	
+	IF @PaymentType = 1
+		EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+			@UserId			 = @UserID
+			,@IP			 = @IP
+			,@SPName		 = 'LA_Statement_Payment_Ins'
+			,@CustId		 = @ToPayerID
+			,@Duration		 = @duration
+			,@TrackingValue2 = @logSPData_Tocust
+			,@TrackingValue  = @logSPDataOld_Tocust
+			,@ActionID		 = @actionID
+
 END
 GO
