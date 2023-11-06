@@ -3,6 +3,7 @@ USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeSel] 
+	@Environment VARCHAR(50) = 'LOCAL'
 AS
 /*  
 	 Created: 20180727@Parsons [#94282]
@@ -23,7 +24,9 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @MaxInvoiceDate DATE
-	SELECT  @MaxInvoiceDate = MAX(InvoiceDate) FROM LA_InvoiceHeader WITH(NOLOCK) WHERE InvoiceType = 1
+	SELECT  @MaxInvoiceDate = MAX(InvoiceDate) 
+	FROM LA_InvoiceHeader WITH(NOLOCK) 
+	WHERE InvoiceType = 1 AND StatusId = 0 AND Environment = @Environment
 
 	; WITH t AS
 	(

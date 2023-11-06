@@ -12,7 +12,8 @@ ALTER PROCEDURE [dbo].[LA_GroupMinFeeUpd]
 	@ErrCode				INT				= 0		OUTPUT, 
 	@ErrMsg					VARCHAR(4000)	= ''	OUTPUT,
 	@UserId					INT, 
-	@LoginIp				VARCHAR (50)	= ''
+	@LoginIp				VARCHAR (50)	= '',
+	@Environment			VARCHAR(50)     = 'LOCAL'
 AS
 /*
 	Created: 20200703@Happy
@@ -112,7 +113,7 @@ BEGIN
 
 
 	--#Region update LA_GroupMinFeeHeader
-	EXEC dbo.LA_GroupMinFeeHeaderUpd @GroupMinFeeID, @GroupName, @FromDate, @ToDate, @HeaderOldData OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT
+	EXEC dbo.LA_GroupMinFeeHeaderUpd @GroupMinFeeID, @GroupName, @FromDate, @ToDate, @HeaderOldData OUTPUT, @ErrCode OUTPUT, @ErrMsg OUTPUT, @Environment = @Environment
 	--#Endregion
 
 		--#Region update LA_GroupMinFeeDetail

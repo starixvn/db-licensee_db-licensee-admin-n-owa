@@ -9,7 +9,8 @@ ALTER PROCEDURE [dbo].[LA_GroupMinFeeHeaderUpd]
 	@ToDate			DATE,
 	@OldData		XML				= ''	OUTPUT,
 	@ErrCode		INT				= 0		OUTPUT,
-	@ErrMsg			NVARCHAR(4000)	= ''	OUTPUT
+	@ErrMsg			NVARCHAR(4000)	= ''	OUTPUT,
+	@Environment			VARCHAR(50)     = 'LOCAL'
 AS
 /*  
 	 Created: 20200701@Happy
@@ -18,16 +19,29 @@ AS
 	 
 	 Revisions:
 		- 20200701@Happy: Implement Group Min Fee [#134492]
+		- 20231108@Danny: return LaunchedDate and the last day of previous billing cycle [#194890]
 	 
 	 Params's Explanation:
 	
 */
 BEGIN
 	SET NOCOUNT ON;
+
+	DECLARE @MaxInvoiceDate DATE
+
+	SELECT  @MaxInvoiceDate = MAX(InvoiceDate) 
+	FROM LA_InvoiceHeader WITH(NOLOCK) 
+	WHERE InvoiceType = 1 AND StatusId = 0 AND Environment = @Environment
 	
 	IF EXISTS (SELECT TOP 1 1 FROM dbo.LA_GroupMinFeeHeader WITH(NOLOCK) WHERE ([Name] = @GroupName AND GroupMinFeeID <> @GroupMinFeeID))
 	BEGIN
 		SELECT @ErrMsg = 'Group name exists please try again.', @ErrCode = 506
+		RETURN
+	END
+
+	IF @FromDate <= @MaxInvoiceDate
+	BEGIN
+		SELECT @ErrMsg = 'Information have changed will affect to current system!', @ErrCode = 507
 		RETURN
 	END
 
