@@ -133,6 +133,24 @@ BEGIN
 								,[BasisOfBilling])
 	SELECT @WEProductId, b.PartyID, @3rdPartyId, 0, 0.05, 1, '2023-11-01', '2050-01-01', null, null, null, null, null, null
 	FROM @BillingGroups b
+
+
+	INSERT INTO OAS_ChargeInfo([ProductID]
+						,[FromParty]
+						,[ToParty]
+						,[ParentChargeID]
+						,[Rate]
+						,[ChargeType]
+						,[FromDate]
+						,[ToDate]
+						,[MinAmount]
+						,[MaxAmount]
+						,[Remark]
+						,[BaseCurrencyId]
+						,[FirstOfBilling]
+						,[BasisOfBilling])
+	SELECT @WEProductId, b.PartyID, @3rdPartyId, 0, 0.000, 11, '2023-11-06', '2050-01-01', null, null, null, null, null, null
+	FROM @BillingGroups b
 	
 	SET @HasInsertSetting = 1
 END
