@@ -41,6 +41,7 @@ AS
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 		- 20230519@Danny: New commercial terms for 12B [RedmineID: #186543]
 		- 20231005@Danny: Change charge rate and tier rebate for Alek group from Oct 2023 [RedmineID: #194561]
+		- 20231110@Danny: Adjust fomular tier rebate [RedmineID: #196685]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -87,6 +88,7 @@ BEGIN
 	SELECT PartyId FROM dbo.OAS_Party WITH (NOLOCK) WHERE PartyName IN ('Bwing (N8B)','Goal123 (N8G)')
 
 	DECLARE @CutOff_RebateOnLicfee  DATETIME = '2022-11-01'
+	DECLARE @CutOff_TierRebate  DATETIME = '2023-10-01'
 
 	DECLARE @ExchangeTerm_CutOffDate	SMALLDATETIME
 	SELECT @ExchangeTerm_CutOffDate = f.CutoffDate FROM dbo.LA_f_GetCutOffDate() f WHERE f.TypeName = 'ExchangeTerms'
@@ -992,7 +994,8 @@ BEGIN
 				INNER JOIN @tmpResult r ON d.PartyId = r.PartyId AND d.ProductId = r.ProductId
 			WHERE d.DiscountGroupType = 12
 			GROUP BY d.DiscountGroupId, d.BaseCurrencyId, d.PartyId, d.ProductId
-			HAVING SUM(r.LicenseeWL) > 0 AND SUM(r.BasedLicenseeWL) > 0
+			HAVING (SUM(r.LicenseeWL) > 0 AND SUM(r.BasedLicenseeWL) > 0 AND @FromDate <  @CutOff_TierRebate )
+					OR (SUM(r.LicensingFee) > 0 AND @FromDate >=  @CutOff_TierRebate)
 
 			BEGIN
 				; WITH t AS
@@ -1016,7 +1019,7 @@ BEGIN
 					LEFT JOIN @tmpDiscount r ON t.PartyId = r.PartyId AND t.ProductId = r.ProductId AND r.DiscountGroupType = 22
 					LEFT JOIN dbo.LA_DiscountGroupDetail rd WITH (NOLOCK) ON r.DiscountGroupId = rd.DiscountGroupId
 					LEFT JOIN @tmpWLToDiscountByCurrency twl ON t.PartyId = twl.PartyId AND twl.ProductId = t.ProductId
-				WHERE t.DiscountGroupType = 12
+				WHERE t.DiscountGroupType = 12 AND t.LicenseeAmount > 0 AND t.BasedLicenseeAmount > 0
 				GROUP BY t.DiscountGroupId, t.ProductId, t.PartyId
 				)
 				UPDATE  td
@@ -1063,11 +1066,18 @@ BEGIN
 																   THEN 0 ELSE (r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0)) * ISNULL(r.FeeRebateRate, 0) END
 								ELSE r.FeeRebate END
 			,r.TierRebate = r.TierRebate
-							+ CASE
-								WHEN r.GrossLicensingFee < 0 THEN 0
-								WHEN r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate < 0 THEN 0
-								ELSE r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate
-								END * r.TierRebateRate
+							+ CASE WHEN @FromDate < @CutOff_TierRebate THEN
+									CASE
+										WHEN r.GrossLicensingFee < 0 THEN 0
+										WHEN r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate < 0 THEN 0
+										ELSE r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate
+									END 
+							  ELSE 
+									CASE
+										WHEN r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate < 0 THEN 0
+										ELSE r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate
+									END  
+							  END* r.TierRebateRate
 			,r.TotalRebate = r.WLRebate
 							+ CASE WHEN @FromDate >= @CutOff_RebateOnLicfee THEN CASE WHEN r.LicensingFee - r.Discount -  ISNULL(t.GrossLicensingFee, 0) < 0
 																   THEN 0 ELSE (r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0)) * ISNULL(r.FeeRebateRate, 0) END
@@ -1075,11 +1085,18 @@ BEGIN
 							+ CASE
 								WHEN @IncludeTierRebate = 0 THEN 0
 								ELSE r.TierRebate
-									+ CASE
-										WHEN r.GrossLicensingFee < 0 THEN 0
-										WHEN r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate < 0 THEN 0
-										ELSE r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate
-										END * r.TierRebateRate
+									+ CASE WHEN @FromDate < @CutOff_TierRebate THEN
+										CASE
+											WHEN r.GrossLicensingFee < 0 THEN 0
+											WHEN r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate < 0 THEN 0
+											ELSE r.GrossLicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate
+										END 
+									  ELSE 
+										CASE
+											WHEN r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate < 0 THEN 0
+											ELSE r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate
+										END  
+									  END* r.TierRebateRate
 								END
 		FROM @Result r
 			LEFT JOIN @Result t ON r.PartyId = t.PartyId AND r.ProductId = 0 AND t.ProductId = 37
