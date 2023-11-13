@@ -46,10 +46,10 @@ BEGIN
 								,[BaseCurrencyId]
 								,[FirstOfBilling]
 								,[BasisOfBilling])
-	VALUES (@WEProductId, 25, @3rdPartyId, 0, 0.05, 1, '2023-11-01', '2050-01-01', null, null, null, null, null, null),
-		   (@WEProductId, 30, @3rdPartyId, 0, 0.05, 1, '2023-11-01', '2050-01-01', null, null, null, null, null, null),
-		   (@WEProductId, 25, @3rdPartyId, 0, 0.004, 11, '2023-11-01', '2050-01-01', null, null, null, null, null, null), -- RollingComm Rate
-		   (@WEProductId, 30, @3rdPartyId, 0, 0.004, 11, '2023-11-01', '2050-01-01', null, null, null, null, null, null)  -- RollingComm Rate
+	VALUES (@WEProductId, 25, @3rdPartyId, 0, 0.05, 1, '2023-12-14', '2050-01-01', null, null, null, null, null, null),
+		   (@WEProductId, 30, @3rdPartyId, 0, 0.05, 1, '2023-12-14', '2050-01-01', null, null, null, null, null, null),
+		   (@WEProductId, 25, @3rdPartyId, 0, 0.004, 11, '2023-12-14', '2050-01-01', null, null, null, null, null, null), -- RollingComm Rate
+		   (@WEProductId, 30, @3rdPartyId, 0, 0.004, 11, '2023-12-14', '2050-01-01', null, null, null, null, null, null)  -- RollingComm Rate
 	SET @HasInsertSetting = 1
 END
 
@@ -88,8 +88,8 @@ BEGIN
 								,[BaseCurrencyId]
 								,[FirstOfBilling]
 								,[BasisOfBilling])
-	VALUES(@WEProductId, 25, 1, 0, 0, 1, '2023-11-01', '2050-01-01', null, null, null, null, null, null),
-		  (@WEProductId, 30, 1, 0, 0, 1, '2023-11-01', '2050-01-01', null, null, null, null, null, null)
+	VALUES(@WEProductId, 25, 1, 0, 0, 1, '2023-12-14', '2050-01-01', null, null, null, null, null, null),
+		  (@WEProductId, 30, 1, 0, 0, 1, '2023-12-14', '2050-01-01', null, null, null, null, null, null)
 	
 	SET @HasInsertSetting = 1
 END
@@ -131,27 +131,9 @@ BEGIN
 								,[BaseCurrencyId]
 								,[FirstOfBilling]
 								,[BasisOfBilling])
-	SELECT @WEProductId, b.PartyID, @3rdPartyId, 0, 0.05, 1, '2023-11-01', '2050-01-01', null, null, null, null, null, null
+	SELECT @WEProductId, b.PartyID, @3rdPartyId, 0, 0.05, 1, '2023-12-14', '2050-01-01', null, null, null, null, null, null
 	FROM @BillingGroups b
 
-
-	INSERT INTO OAS_ChargeInfo([ProductID]
-						,[FromParty]
-						,[ToParty]
-						,[ParentChargeID]
-						,[Rate]
-						,[ChargeType]
-						,[FromDate]
-						,[ToDate]
-						,[MinAmount]
-						,[MaxAmount]
-						,[Remark]
-						,[BaseCurrencyId]
-						,[FirstOfBilling]
-						,[BasisOfBilling])
-	SELECT @WEProductId, b.PartyID, @3rdPartyId, 0, 0.000, 11, '2023-11-06', '2050-01-01', null, null, null, null, null, null
-	FROM @BillingGroups b
-	
 	SET @HasInsertSetting = 1
 END
 

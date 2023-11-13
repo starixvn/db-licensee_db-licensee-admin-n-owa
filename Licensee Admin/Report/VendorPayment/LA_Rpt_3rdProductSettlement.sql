@@ -890,7 +890,8 @@ BEGIN
 			SUM(CASE WHEN b.ProductID = 59  THEN (b.LicenseeWinloss - b.RollingComm) * CASE WHEN ci.isDeposit = 1 THEN ci.ChargeRate09 ELSE ci.ChargeRate10 END
 					 WHEN b.ProductID = 10  THEN 0
 					 WHEN b.ProductID = 31  THEN  CASE WHEN @FromDate < @ExchangeCutoffDate THEN  b.LicenseeWinloss  * ISNULL(ci_3rd.Rate3rd,0) - (b.CommissionA + b.CommissionP) ELSE -(b.CustomerWinLoss + b.CommissionP)  * ISNULL(ci_3rd.Rate3rd,0) END
-					  ELSE b.LicenseeWinloss  * ISNULL(ci_3rd.Rate3rd,0) - b.Promotion
+					 WHEN b.ProductID = 80 THEN (LicenseeWinloss - (b.ValidBetAmount * ci.ChargeRate11)) * ISNULL(ci_3rd.Rate3rd,0)
+					 ELSE b.LicenseeWinloss  * ISNULL(ci_3rd.Rate3rd,0) - b.Promotion
 				END) AS PayToSupplier,
 			b.ProductID,
 			SUM(TurnoverForCommision), 
