@@ -31,6 +31,7 @@ AS
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 		- 20220831@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
 		- 20221205@Danny: Remove Hx9candy From Crypto Licensee List [RedmineID: #181279]
+		- 20231113@Danny: Support to remove up-coming waive period [RedmineID: #194868]
 
 	 Params:	
 		+ @ChargeSettingXML:
@@ -141,6 +142,7 @@ BEGIN
 		, @ErrCode				= @ErrCode		OUTPUT
 		, @ErrMsg				= @ErrMsg		OUTPUT
 		, @MinfeeInsertedList	= @MinFeeInsertedList  OUTPUT
+		, @FeeTypeId			= 1		
 	IF @ErrCode <> 0 
 		BEGIN
 			RETURN
@@ -154,6 +156,7 @@ BEGIN
 		, @ErrCode				= @ErrCode		OUTPUT
 		, @ErrMsg				= @ErrMsg		OUTPUT
 		, @MinfeeInsertedList	= @WaiveInsertedList OUTPUT
+		, @FeeTypeId			= 2
 	IF @ErrCode <> 0 
 		BEGIN
 			--Rollback LaunchDate/SuspendedDate/TerminatedDate
