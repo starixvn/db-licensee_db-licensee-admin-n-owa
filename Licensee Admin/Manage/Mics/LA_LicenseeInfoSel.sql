@@ -79,9 +79,8 @@ BEGIN
 		) f 
 		OUTER APPLY (
 			SELECT SUM(DATEDIFF(MONTH, w.FromDate, DATEADD(DAY, 1, w.ToDate)) + CASE WHEN DAY(w.FromDate) > DAY(DATEADD(DAY, 1, w.ToDate)) THEN -1 ELSE 0 END) AS WaiveMonth
-			FROM dbo.LA_MinFee m WITH (NOLOCK)
-				INNER JOIN dbo.LA_MinFee w WITH (NOLOCK) ON m.PartyId = w.PartyId AND m.ProductId = w.ProductId
-			WHERE m.PartyId = p.PartyId AND m.FeeTypeId = 1 AND w.FeeTypeId = 2 AND w.FromDate >= m.FromDate AND w.ToDate <= m.ToDate
+			FROM dbo.LA_MinFee w WITH (NOLOCK)
+			WHERE w.PartyId = p.PartyId AND w.FeeTypeId = 2
 		) w
 			
 		INNER JOIN STRING_SPLIT(@PartyIds, ',') p2 ON p.PartyID = p2.value
