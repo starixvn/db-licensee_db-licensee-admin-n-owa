@@ -701,7 +701,8 @@ BEGIN
 			BaseCurrencyID			INT,
 			ProductID				INT,
 			firstday_PT				DATETIME,
-			isSamePT				BIT DEFAULT 0
+			isSamePT				BIT DEFAULT 0,
+			IsInconsistent			BIT DEFAULT 0
 		)
 
 		-- LA
@@ -813,17 +814,32 @@ BEGIN
 		INNER JOIN u ON pt.ProductID = u.ProductID AND pt.PartyID = u.PartyID AND u.IsSamePT = 1 AND pt.BaseCurrencyID = u.BaseCurrencyID
 		WHERE pt.ProductID NOT IN (0)
 
+
+		UPDATE	nap
+		SET		IsInconsistent = 1
+		FROM	@Result_PT nap
+		WHERE	NOT EXISTS (SELECT TOP 1 1 FROM @Result_PT la 
+							WHERE la.PartyID = nap.PartyID 
+								AND la.ProductID = nap.ProductID 
+								AND la.BaseCurrencyID = nap.BaseCurrencyID
+								AND la.Func = 'LA'
+								AND nap.ChargeRate =la.ChargeRate
+								)
+		AND		nap.Func = 'NAP'
+
 	
 		; WITH  u_chargeRate AS
 		(
-			SELECT  Func, PartyID, ProductID, STRING_AGG(CAST(ChargeRate * 100 AS VARCHAR(10)) + '%', ', ') ChargeRate, firstday_PT, BaseCurrencyID
+			SELECT  Func, PartyID, ProductID, STRING_AGG(CAST(ChargeRate * 100 AS VARCHAR(10)) + '%', ', ') ChargeRate, firstday_PT, BaseCurrencyID, IsInconsistent
 			FROM	@Result_PT
 			WHERE   isSamePT = 0
-			GROUP BY  Func,PartyID, ProductID, firstday_PT, BaseCurrencyID
+			GROUP BY  Func,PartyID, ProductID, firstday_PT, BaseCurrencyID, IsInconsistent
 		), z AS 
 		(
 			SELECT  uc.Func, uc.PartyID, uc.ProductID, uc.BaseCurrencyID,
-						CASE WHEN uc.Func = 'NAP' THEN 'NAP:' + CHAR(13) ELSE 'LA:' + CHAR(13) END + STRING_AGG ( CASE WHEN uc.Func = 'NAP' THEN CHAR(9) + '- Having bet tickets with charge rate ' + ChargeRate + ' From ' + FORMAT(firstday_PT,'MMM dd, yyyy') 
+						CASE WHEN uc.Func = 'NAP' THEN 'NAP:' + CHAR(13) ELSE 'LA:' + CHAR(13) END + STRING_AGG ( CASE WHEN uc.Func = 'NAP' THEN CHAR(9) 
+															  + CASE WHEN IsInconsistent = 0 THEN  '- Having bet tickets with charge rate ' ELSE '- Having inconsistent bet tickets with charge rate ' END  
+															  + ChargeRate + ' From ' + FORMAT(firstday_PT,'MMM dd, yyyy') 
 						ELSE CHAR(9) +  '- Charge rate setting ' + ChargeRate + ' From ' + FORMAT(firstday_PT,'MMM dd, yyyy') END, CHAR(13)) AS Remark
 			FROM	u_chargeRate uc
 			GROUP BY  PartyID, ProductID, BaseCurrencyID, Func
