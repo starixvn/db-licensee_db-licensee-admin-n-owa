@@ -3,6 +3,7 @@ USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeSel] 
+	@Environment VARCHAR(50) = 'LOCAL'
 AS
 /*  
 	 Created: 20180727@Parsons [#94282]
@@ -12,7 +13,8 @@ AS
 	 Revisions:  
 		- 20180727@Parsons: get licensee info [#94282]
 		- 20201104@Parsons: Group Min Fee & Discount Group - Enhance to check the launch date of Licensee [#144502]
-	 
+		- 20231011@Danny: return LaunchedDate and the last day of previous billing cycle [#194890]
+
 	 Params:
 
 	 Explannation: EXEC LA_LicenseeSel
@@ -20,9 +22,20 @@ AS
 
 BEGIN
 	SET NOCOUNT ON
-	
-	SELECT FromParty AS PartyID, MIN(FromDate) AS AffectedDate
-	FROM OAS_ChargeInfo ci WITH(NOLOCK)
-	GROUP BY FromParty
+
+	DECLARE @MaxInvoiceDate DATE
+	SELECT  @MaxInvoiceDate = MAX(InvoiceDate) 
+	FROM LA_InvoiceHeader WITH(NOLOCK) 
+	WHERE InvoiceType = 1 AND StatusId = 0 AND Environment = @Environment
+
+	; WITH t AS
+	(
+		SELECT FromParty AS PartyID, MIN(FromDate) AS AffectedDate
+		FROM OAS_ChargeInfo ci WITH(NOLOCK)
+		GROUP BY FromParty
+	)
+	SELECT  t.PartyID, t.AffectedDate, op.LaunchDate, @MaxInvoiceDate MaxInvoiceDate
+	FROM t 
+	LEFT JOIN OAS_PartyDetail op WITH(NOLOCK) ON t.PartyID = op.PartyID
 END
 GO
