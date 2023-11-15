@@ -5,7 +5,7 @@ GO
 ALTER PROCEDURE [dbo].LA_GEN_LicPerformanceAnalysis_Report
 	@FromDate		DATE,
 	@ToDate			DATE,
-	@ProductCodes	VARCHAR(500),
+	@ProductCodes	VARCHAR(MAX),
 	@Environment	VARCHAR(10),
 	@IsOverwrite	BIT = 0,
 	@PartyIds		VARCHAR(MAX) = ''
@@ -32,6 +32,7 @@ AS
 		- 20230619@Danny: Get data Promotion And Sponsorship (ProductID = 37) [RedmineID: #189659]
 		- 20230815@Danny: Handle crypto licensee billing with fiat currency [RedmineID: #192378]
 		- 20231005@Danny: Change charge rate and tier rebate for Alek group from Oct 2023 [RedmineID: #194561]
+		- 20231115@Danny: Final licensing fee for 3rd products [RedmineID: #191813]
 
 */
 
