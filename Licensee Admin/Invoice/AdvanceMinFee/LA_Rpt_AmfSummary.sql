@@ -23,6 +23,7 @@ AS
 		- 20230516@Danny: Filter by OIC Licensee status [RedmineID : 187219]
 		- 20230816@Danny: Use DBOIC Dblinked [RedmineID : 192776]
 		- 20230920@Danny: show Licensee Status Infomation [RedmineID : 187219]
+		- 20231114@Danny: Change waive month count fomular [RemineID: #191248]
 
 	+ @LicenseeStatusIds:	1	Up Coming
 						2	Soft Launch
@@ -145,9 +146,8 @@ BEGIN
 	FROM #Result r
 		CROSS APPLY (
 			SELECT SUM(DATEDIFF(MONTH, w.FromDate, DATEADD(DAY, 1, w.ToDate)) + CASE WHEN DAY(w.FromDate) > DAY(DATEADD(DAY, 1, w.ToDate)) THEN -1 ELSE 0 END) AS WaiverPeriod
-			FROM dbo.LA_MinFee m WITH (NOLOCK)
-				INNER JOIN dbo.LA_MinFee w WITH (NOLOCK) ON m.PartyId = w.PartyId AND m.ProductId = w.ProductId
-			WHERE m.PartyId = r.PartyId AND m.FeeTypeId = 1 AND w.FeeTypeId = 2 AND w.FromDate >= m.FromDate AND w.ToDate <= m.ToDate
+			FROM dbo.LA_MinFee w WITH (NOLOCK)
+			WHERE w.PartyId = r.PartyId AND w.FeeTypeId = 2
 		) w
 	WHERE r.RefInvItemTypeId = 3
 
