@@ -9,14 +9,14 @@ USE bodb_Licensee
 GO
 
 SET NOCOUNT ON 
-SET ANSI_WARNINGS OFF
+--SET ANSI_WARNINGS OFF
 
 -- remove old data 
-TRUNCATE TABLE bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis_regen_UAT
+--TRUNCATE TABLE bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis_regen_UAT
 
 
 DECLARE 
-	@FromDate		DATE = '2023-01-01'
+	@FromDate		DATE = '2022-01-01'
 
 DECLARE
 	@ToDate			DATE =  EOMONTH(@FromDate),
@@ -47,7 +47,7 @@ DECLARE @Result TABLE
 	,Winloss MONEY, Turnover MONEY, TurnoverNoDraw MONEY, BetCount INT, BaseCurrencyId INT, ExtraInfo NVARCHAR(4000)
 )
 
-WHILE @ToDate <= '2023-10-31'
+WHILE @ToDate <= '2022-12-31'
 BEGIN
 	--select @FromDate, @ToDate
 	-- Get Product List
@@ -65,7 +65,7 @@ BEGIN
 
 	SELECT  @ProductCodes = STRING_AGG(ProductCode,',')
 	FROM dbo.LA_f_GroupProduct('', @FromDate, @ToDate) g
-	WHERE GroupProductId = ProductId AND ProductCode <> 'SB' 
+	WHERE GroupProductId = ProductId --AND ProductCode <> 'SB' 
 
 	-- Get Party List
 	IF ISNULL(@PartyIds, '') <> ''

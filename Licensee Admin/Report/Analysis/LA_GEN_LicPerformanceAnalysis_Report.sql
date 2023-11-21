@@ -5,7 +5,7 @@ GO
 ALTER PROCEDURE [dbo].LA_GEN_LicPerformanceAnalysis_Report
 	@FromDate		DATE,
 	@ToDate			DATE,
-	@ProductCodes	VARCHAR(MAX),
+	@ProductCodes	VARCHAR(MAX) = '',
 	@Environment	VARCHAR(10),
 	@IsOverwrite	BIT = 0,
 	@PartyIds		VARCHAR(MAX) = ''
@@ -43,7 +43,7 @@ BEGIN
 	DECLARE @tmpProductList TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(50), FromDate DATETIME, ToDate DATETIME)
 	INSERT INTO @tmpProductList (GroupProductId, ProductId, ProductCode, FromDate, ToDate)
 	SELECT GroupProductId, ProductId, ProductCode, FromDate, ToDate
-	FROM dbo.LA_f_GroupProduct(@ProductCodes, @FromDate, @ToDate) g
+	FROM dbo.LA_f_GroupProduct('', @FromDate, @ToDate) g   -- get all products
 
 	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT)
 	INSERT INTO @tmpPartyOfferCrypto(PartyId)
@@ -52,6 +52,10 @@ BEGIN
 	IF ',' + @ProductCodes + ',' LIKE ',ADJUST,' -- Adjustment
 		INSERT INTO @tmpProductList (ProductId, ProductCode)
 		SELECT 9000, 'ADJUST'
+
+	SELECT  @ProductCodes = STRING_AGG(ProductCode,',')
+	FROM @tmpProductList g
+	WHERE GroupProductId = ProductId 
 
 	-- Get Party List
 	DECLARE @tmpPartyList TABLE (PartyId INT, SiteId INT, BaseCurrencyId INT)
@@ -132,7 +136,7 @@ BEGIN
 		INSERT INTO @tmpChargeInfo (PartyId, LicenseeId, ProductId, FromDate, ToDate)
 		SELECT DISTINCT PartyId, LicenseeId, ProductId, Fromdate, ToDate
 		FROM dbo.LA_f_ChargeInfo (@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
-		WHERE DI_Rate > 0
+		WHERE DI_Rate > 0 AND ChargeType = 1
 
 		IF @IsOverwrite = 0
 		BEGIN
