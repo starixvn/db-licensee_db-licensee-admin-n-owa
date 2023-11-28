@@ -3,7 +3,8 @@ USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerSettingDetailSel]
-	@PayerId INT
+	@PayerId	 INT,
+	@Environment VARCHAR(50) = 'LOCAL'
 AS
 /*  
 	 Created: 20150420@Florent
@@ -32,6 +33,7 @@ AS
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
+		- 20231113@Danny: Support to remove up-coming waive period [RedmineID: #194868]
 		
 	 Params:
 		+ @PayerId :specify Party
@@ -61,6 +63,11 @@ BEGIN
 	DECLARE @ChargeInfo AS TABLE (ChargeId INT, PartyId INT, ProductId INT, BettypeRef INT, Rate MONEY, ChargeType SMALLINT, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), BasisOfBilling NVARCHAR(MAX), ExchangeID INT, ToPartyId INT)	
 	DECLARE @Minfee AS TABLE(FeeId INT, PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, CurrencyId INT, MinFeeTerm NVARCHAR(MAX), FromDate DATE, ToDate DATE)
 	DECLARE @Discount AS TABLE(PartyId INT, ProductId INT, FromDate DATE, ToDate DATE,DiscountGroupId INT, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
+
+	DECLARE @MaxInvoiceDate DATE
+	SELECT  @MaxInvoiceDate = MAX(InvoiceDate) 
+	FROM LA_InvoiceHeader WITH(NOLOCK) 
+	WHERE InvoiceType = 1 AND StatusId = 0 AND Environment = @Environment
 
 	--get list Product
 	SELECT @ProductListAll = @ProductListAll + ProductPrefix + ','
@@ -206,6 +213,7 @@ BEGIN
 		, REPLACE(MinFeeTerm,'&amp;','&') MinFeeTerm
 		, FromDate
 		, ToDate
+		, CASE WHEN FromDate > @MaxInvoiceDate THEN 1 ELSE 0 END IsRemovable
 	FROM @Minfee m
 		INNER JOIN dbo.LA_f_Products3rd('') pr ON m.ProductID = pr.ProductID
 		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON m.CurrencyId = e.exchangeid
@@ -220,6 +228,7 @@ BEGIN
 		, pr.ProductName	AS ProductName
 		, FromDate
 		, ToDate
+		, CASE WHEN FromDate > @MaxInvoiceDate THEN 1 ELSE 0 END IsRemovable
 	FROM @Minfee w
 		INNER JOIN dbo.LA_f_Products3rd('') pr ON w.ProductID = pr.ProductID
 		INNER JOIN @ProductOrder po ON pr.ProductID = po.ProductId
