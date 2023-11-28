@@ -114,16 +114,18 @@ BEGIN
 				INSERT INTO LA_Payment ([PaymentNo],[ReceivedDate],[Type],[PartyID],[CurrencyId],[Amount],[RemainingAmount],
 					[TransferRefno],[StatusId],[Environment],[CreatedDate],[CreatedBy],[ModifyDate],[ModifiedBy], Remark)
 				VALUES (@PaymentNo, @ReceivedDate, @PaymentType, @FromPayerID, @FromPaymentCurrencyID, @Amount, @Amount, 
-						@Refno, 0 ,@Environment, GETDATE(), @UserID, GETDATE(), @UserID, 'Transfer from ' + @FromLicenseeName)
+						@Refno, 0 ,@Environment, GETDATE(), @UserID, GETDATE(), @UserID, 'Transfer from ' + @ToLicenseeName)
 
 				INSERT INTO LA_Payment ([PaymentNo],[ReceivedDate],[Type],[PartyID],[CurrencyId],[Amount],[RemainingAmount],
 					[TransferRefno],[StatusId],[Environment],[CreatedDate],[CreatedBy],[ModifyDate],[ModifiedBy], Remark)
 				VALUES (@PaymentNo, @ReceivedDate, @PaymentType, @ToPayerID, @ToPaymentCurrencyID, CASE WHEN @Template = 0 THEN -@ToAmount ELSE -@Amount END, CASE WHEN  @Template = 0 THEN -@ToAmount ELSE -@Amount END, 
-						@Refno, 0 ,@Environment, GETDATE(), @UserID, GETDATE(), @UserID,  'Transfer to ' + @ToLicenseeName)
+						@Refno, 0 ,@Environment, GETDATE(), @UserID, GETDATE(), @UserID,  'Transfer to ' + @FromLicenseeName)
 
 			END TRY
 			BEGIN CATCH
 				SELECT @ErrCode = 105, @ErrMsg = 'Add new sub payment failed.'
+				RETURN
+			END CATCH
 		END
 
 	END TRY

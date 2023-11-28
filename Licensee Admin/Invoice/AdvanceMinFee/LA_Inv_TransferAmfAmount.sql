@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_Licensee
 GO
 
@@ -22,6 +22,7 @@ AS
 		- 20171226: create SP
 		- 20190122@Parsons: Improve AG prepayment and discount setting [#104620]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
+		- 20240103@Danny: store invoice amount with 2 decimal digits [RedmineID: #197260]
 	
 	Explanation:
 		@Option: 0-Amf Prepayment Write off, 1-deduct as AMF, 2-deduct against invoice, 3-AG Prepayment write off
@@ -193,8 +194,12 @@ BEGIN
 		INSERT INTO @Transfer(ItemTypeId, RefPartyId, Amount, [Description]) VALUES(CASE WHEN @Option=1 THEN 3 ELSE 22 END, @ToPartyId, @Amount, @Description)
 	END
 
-	INSERT INTO dbo.LA_InvoiceHeader (BillerId,PartyId,CurrencyId,InvoiceSymbol,InvoiceNumber,InvoiceDate,Amount,InvoiceType,StatusId,Note,Environment,FromDate,ToDate,DueDate,HasDeleted,HasSent,CreatedBy,CreatedDateTime)
-		VALUES(@BillerId, @ToPartyId, 0, '', 1, GETDATE(), @Amount, @InvoiceTypeId, 0, '', @Environment,GETDATE(),GETDATE(),GETDATE(),0,0,@UserId,GETDATE())
+	DECLARE @StatusId SMALLINT = 0
+
+	SELECT @StatusId = CASE WHEN  ROUND(@Amount,2) = 0 THEN 1 ELSE 0 END
+
+	INSERT INTO dbo.LA_InvoiceHeader (BillerId,PartyId,CurrencyId,InvoiceSymbol,InvoiceNumber,InvoiceDate,Amount,InvoiceType,StatusId,Note,Environment,FromDate,ToDate,DueDate,HasDeleted,HasSent,CreatedBy,CreatedDateTime, RemainingAmount)
+		VALUES(@BillerId, @ToPartyId, 0, '', 1, GETDATE(), ROUND(@Amount,2), @InvoiceTypeId, @StatusId, '', @Environment,GETDATE(),GETDATE(),GETDATE(),0,0,@UserId,GETDATE(),ROUND(@Amount,2))
 
 	DECLARE @HeaderId INT = SCOPE_IDENTITY()
 
