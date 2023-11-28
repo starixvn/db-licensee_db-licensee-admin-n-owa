@@ -18,6 +18,7 @@ AS
 		- 20211213@Danny: Add new betfrom [RedmineID: #165971]
 		- 20230606@Danny: Add new betfrom #, A000 [RedmineID: #188861]
 		- 20230814@Danny: Add new betfrom W001, W002 [RedmineID: #191842]
+		- 20230814@Danny: Add new betfrom A0001, A002 [RedmineID: #191842]
 */
 
 RETURN
@@ -32,7 +33,7 @@ RETURN
 			(30, 10, '>', 'Desktop Others', 'Desktop'),
 			(40, 20, 'l', 'Mobile Standard', 'Mobile'),
 			(40, 20, ']', 'Mobile Standard', 'Mobile'),
-			(50, 20, '%', 'Mobile Galaxy', 'Mobile'),
+			(50, 20, '%', 'Mobile Euro', 'Mobile'),
 			(50, 20, 'W002', 'Mobile Galaxy', 'Mobile'),
 			(60, 20, 'c', 'Mobile Compact', 'Mobile'),
 			(60, 20, '@', 'Mobile Compact', 'Mobile'),
@@ -62,6 +63,8 @@ RETURN
 			(170, 40, 'e', 'Others', 'Others'),
 			(170, 40, 'u', 'Others', 'Others'),
 			(180, 50, '^', 'Odds Direct API', 'Odds Direct API'),
-			(180, 50, 'A000', 'Odds Direct API', 'Odds Direct API')	
+			(180, 50, 'A000', 'Odds Direct API', 'Odds Direct API'),	
+			(180, 50, 'A001', 'Odds Direct API', 'Odds Direct API'),
+			(180, 50, 'A002', 'Odds Direct API', 'Odds Direct API')	
 	) d (OrderDetail, OrderSummary, betfrom, DetailPlatform, SummaryPlatform)
 GO
