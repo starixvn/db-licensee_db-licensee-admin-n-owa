@@ -51,6 +51,7 @@ AS
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 		- 20230608@Danny: Integrate Promotion Prize - PG Soft [RedmineID: #188997]
 		- 20230223@Danny: Integrate Casino promotion [#194808]
+		- 20231218@Danny: Integrate Promotion Prize - Live22 [RedmineID: #197267]
 */
 
 BEGIN
@@ -182,9 +183,10 @@ BEGIN
 				WHEN ProductId = 73 AND LicensingFeeTypeId = 3 THEN 47 -- Prizes
 				WHEN ProductId = 55 AND LicensingFeeTypeId = 3 THEN 50 -- Prizes
 				WHEN ProductId = -37 AND LicensingFeeTypeId = 13 THEN 52 -- Casino promotion
+				WHEN ProductId = 79 AND LicensingFeeTypeId = 3 THEN 53 -- Prizes
 				END
 		FROM @Result
-		WHERE ProductId IN (32, 34, 42, 45, 66, 36, 21, 73, 55, -37) AND LicensingFeeTypeId > 0
+		WHERE ProductId IN (32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79) AND LicensingFeeTypeId > 0
 		GROUP BY
 			CASE
 				WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
@@ -205,6 +207,7 @@ BEGIN
 				WHEN ProductId = 73 AND LicensingFeeTypeId = 3 THEN 47 -- Prizes
 				WHEN ProductId = 55 AND LicensingFeeTypeId = 3 THEN 50 -- Prizes
 				WHEN ProductId = -37 AND LicensingFeeTypeId = 13 THEN 52 -- Casino promotion
+				WHEN ProductId = 79 AND LicensingFeeTypeId = 3 THEN 53 -- Prizes
 				END
 
 		-- AMF, Prepayment and AGPrepayment

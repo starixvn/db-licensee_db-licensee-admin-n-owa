@@ -16,6 +16,7 @@ AS
 	- 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+	- 20240123@Danny: Change Credit licensing fee fomular [RedmineID: #197267]
  */
 
 BEGIN
@@ -108,7 +109,8 @@ BEGIN
 		LicenseeWinloss MONEY,
 		LicensingFee MONEY,
 		PayToSupplier MONEY,
-		Promotion MONEY)
+		Promotion MONEY,
+		isDeposit BIT)
 
 	BEGIN
 		IF @TimeZoneId = 1
@@ -129,7 +131,7 @@ BEGIN
 					AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20  AND b.CustomerCategory NOT IN (27,28)
 				GROUP BY b.SiteID, b.rptDate, b.CurrencyId
 			)
-			INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier,Promotion)
+			INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier,Promotion, isDeposit)
 			SELECT ci.PartyId,
 				b.Winlostdate,
 				b.CurrencyId,
@@ -139,11 +141,12 @@ BEGIN
 				-SUM(b.CustomerWinLoss) AS LicenseeWinloss,
 				SUM(-b.CustomerWinLoss  * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
 				SUM((-b.CustomerWinLoss * ISNULL(ci.Rate3rd, 0)) -  b.Promotion) AS PayToSupplier,
-				SUM(b.Promotion) Promotion
+				SUM(b.Promotion) Promotion,
+				ci.isDeposit
 			FROM cte_Summary b WITH (NOLOCK)
 				INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
 				LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND cr.CurrencyID = b.CurrencyId
-			GROUP BY b.Winlostdate, ci.PartyId, b.CurrencyId
+			GROUP BY b.Winlostdate, ci.PartyId, b.CurrencyId, ci.isDeposit
 
 		END
 		ELSE
@@ -166,7 +169,7 @@ BEGIN
 					AND b.BetTypeId IN (SELECT x.BetTypeId FROM @bettypeList x)
 				GROUP BY b.SiteID, b.RptDate3rd, b.CurrencyId
 			)
-			INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier,Promotion)
+			INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier,Promotion,isDeposit)
 			SELECT ci.PartyId,
 				b.Winlostdate,
 				b.CurrencyId,
@@ -176,11 +179,12 @@ BEGIN
 				-SUM(b.CustomerWinLoss) AS LicenseeWinloss,
 				SUM(-b.CustomerWinLoss  * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
 				SUM((-b.CustomerWinLoss * ISNULL(ci.Rate3rd, 0)) -  b.Promotion) AS PayToSupplier,
-				SUM(b.Promotion) Promotion
+				SUM(b.Promotion) Promotion,
+				ci.isDeposit
 			FROM cte_Summary b WITH (NOLOCK)
 				INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
 				LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND cr.CurrencyID = b.CurrencyId
-			GROUP BY b.Winlostdate, ci.PartyId, b.CurrencyId
+			GROUP BY b.Winlostdate, ci.PartyId, b.CurrencyId,ci.isDeposit
 		END
 	END
 	-- EndRegion
@@ -200,11 +204,12 @@ BEGIN
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY,
 		Promotion		MONEY,
-		IsKeepNegativeAmount BIT
+		IsKeepNegativeAmount BIT,
+		isDeposit		BIT
 	)
 	
-	INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, PayToSupplier, Promotion, IsKeepNegativeAmount)
-	SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.Winlostdate, td.CurrencyId, td.TotalTrans, td.Turnover, td.CustomerWinLoss, td.LicenseeWinloss, td.LicensingFee, td.PayToSupplier, td.Promotion, p.IsKeepNegativeAmount
+	INSERT INTO #Result (PartyId, PartyName, ParentId, ParentName, WinLossDate, CurrencyId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, PayToSupplier, Promotion, IsKeepNegativeAmount, isDeposit)
+	SELECT td.PartyId, p.PartyName, pa.PartyId, pa.PartyName, td.Winlostdate, td.CurrencyId, td.TotalTrans, td.Turnover, td.CustomerWinLoss, td.LicenseeWinloss, td.LicensingFee, td.PayToSupplier, td.Promotion, p.IsKeepNegativeAmount, td.isDeposit
 	FROM #TempData td
 		INNER JOIN #PartyList p ON td.PartyId = p.PartyID
 		INNER JOIN #PartyList pa ON p.ParentId = pa.PartyId	
@@ -248,7 +253,7 @@ BEGIN
 		SET @tempCurrency = (SELECT TOP 1 Name FROM @BaseCurrencies)
 
 		;WITH TotalByParty AS(
-			SELECT CASE WHEN td.PartyID = 14 THEN 14 ELSE td.ParentId END ParentId, td.IsKeepNegativeAmount,
+			SELECT CASE WHEN td.PartyID = 14 THEN 14 ELSE td.ParentId END ParentId, td.IsKeepNegativeAmount, td.IsDeposit,
 				SUM(td.TotalTrans) TotalTrans,
 				SUM(td.Turnover * e.BaseCurrencyRate) Turnover,
 				SUM(td.CustomerWinLoss * e.BaseCurrencyRate) CustomerWinLoss,
@@ -258,7 +263,7 @@ BEGIN
 				SUM(td.Promotion * e.BaseCurrencyRate) Promotion
 			FROM #Result td INNER JOIN bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @tempCurrency) e
 			ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
-			GROUP BY CASE WHEN td.PartyID = 14 THEN 14 ELSE td.ParentId END , td.PartyId, td.IsKeepNegativeAmount
+			GROUP BY CASE WHEN td.PartyID = 14 THEN 14 ELSE td.ParentId END , td.PartyId, td.IsKeepNegativeAmount, td.IsDeposit
 		)
 		INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,Promotion)
 		SELECT @tempCurrency,ParentId,
@@ -266,7 +271,7 @@ BEGIN
 			SUM(Turnover),
 			SUM(CustomerWinLoss),
 			SUM(LicenseeWinLoss),
-			SUM(CASE WHEN LicensingFee < 0 AND IsKeepNegativeAmount = 0 THEN 0 ELSE LicensingFee END - Promotion),
+			SUM(CASE WHEN isDeposit = 0 THEN 0 ELSE  CASE WHEN LicensingFee < 0 AND IsKeepNegativeAmount = 0 THEN 0 ELSE LicensingFee END - Promotion END),
 			SUM(PayToSupplier),
 			SUM(Promotion)
 		FROM TotalByParty
@@ -316,7 +321,7 @@ BEGIN
 	
 
 	;WITH TotalByParty AS(
-			SELECT td.ParentId , td.PartyId, td.PartyName, td.IsKeepNegativeAmount,
+			SELECT td.ParentId , td.PartyId, td.PartyName, td.IsKeepNegativeAmount,td.IsDeposit,
 				SUM(td.TotalTrans) TotalTrans,
 				SUM(td.Turnover * e.Rate) Turnover,
 				SUM(td.CustomerWinLoss * e.Rate) CustomerWinLoss,
@@ -325,7 +330,7 @@ BEGIN
 				SUM(td.PayToSupplier * e.Rate) PayToSupplier,
 				SUM(td.Promotion * e.Rate) Promotion
 			FROM #Result td INNER JOIN #Exchange e ON td.CurrencyId = e.ExchangeID AND td.WinLossDate = e.ExchangeDate
-			GROUP BY td.ParentId , td.PartyId, td.PartyName, td.IsKeepNegativeAmount
+			GROUP BY td.ParentId , td.PartyId, td.PartyName, td.IsKeepNegativeAmount, td.IsDeposit
 		)
 	SELECT CASE WHEN PartyId = 14 THEN 14 ELSE ParentId END ParentId,
 		PartyId,
@@ -334,9 +339,9 @@ BEGIN
 		Turnover,
 		CustomerWinLoss,
 		LicenseeWinLoss,
-		CASE WHEN LicensingFee < 0 AND IsKeepNegativeAmount = 0 THEN 0 ELSE LicensingFee END - Promotion AS  LicensingFee,
+		CASE WHEN IsDeposit = 0 THEN 0 ELSE  CASE WHEN LicensingFee < 0 AND IsKeepNegativeAmount = 0 THEN 0 ELSE LicensingFee END - Promotion END AS  LicensingFee,
 		PayToSupplier,
-		CASE WHEN LicensingFee < 0 AND IsKeepNegativeAmount = 0 THEN 0 ELSE LicensingFee END - Promotion - PayToSupplier AS CompanyIncome,
+		CASE WHEN IsDeposit = 0 THEN 0 ELSE  CASE WHEN LicensingFee < 0 AND IsKeepNegativeAmount = 0 THEN 0 ELSE LicensingFee END - Promotion END - PayToSupplier AS CompanyIncome,
 		Promotion
 	FROM TotalByParty
 
