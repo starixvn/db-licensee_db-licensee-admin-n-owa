@@ -9,7 +9,7 @@ GO
 ALTER PROCEDURE [dbo].[LA_LicenseeGroupUpd]
 	@GroupName	VARCHAR(50),
 	@ParentId	INT,
-	@PartyData	VARCHAR(4000),
+	@PartyData	VARCHAR(MAX),
 	@GroupId	INT,
 	@ErrMsg		VARCHAR(200) = '' OUTPUT,
 	@ErrCode	int = 0 OUTPUT,
@@ -24,6 +24,7 @@ AS
 	 Revisions:  
 		- 20190515@Mason: Create SP
 		- 20230524@Danny: Insert new log with more information [#FeatureID 175125]
+		- 20231215@Danny: extend param data length [RedmineID: #191813]
 */
 
 BEGIN

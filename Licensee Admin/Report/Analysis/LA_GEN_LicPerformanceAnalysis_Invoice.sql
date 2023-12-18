@@ -4,7 +4,7 @@ GO
 
 ALTER PROCEDURE [dbo].[LA_GEN_LicPerformanceAnalysis_Invoice]
 	@InvoiceID		INT,
-	@ProductCodes	VARCHAR(MAX),
+	@ProductCodes	VARCHAR(MAX) = '',
 	@Environment	VARCHAR(10)
 AS
 
@@ -27,6 +27,7 @@ AS
 		- 20230619@Danny: Get data Promotion And Sponsorship (ProductID = 37) [RedmineID: #189659]
 		- 20230815@Danny: Handle crypto licensee billing with fiat currency [RedmineID: #192378]
 		- 20231005@Danny: Change charge rate and tier rebate for Alek group from Oct 2023 [RedmineID: #194561]
+		- 20231115@Danny: Final licensing fee for 3rd products [RedmineID: #191813]
 
 */
 
@@ -61,11 +62,15 @@ BEGIN
 	DECLARE @tmpProductList TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(50), FromDate DATETIME, ToDate DATETIME)
 	INSERT INTO @tmpProductList (GroupProductId, ProductId, ProductCode, FromDate, ToDate)
 	SELECT	GroupProductId, ProductId, ProductCode, FromDate, ToDate
-	FROM	dbo.LA_f_GroupProduct(@ProductCodes, @FromDate, @ToDate) g 
+	FROM	dbo.LA_f_GroupProduct('', @FromDate, @ToDate) g  -- Get all products
 
 	IF ',' + @ProductCodes + ',' LIKE ',ADJUST,' -- Adjustment
 		INSERT INTO @tmpProductList (ProductId, ProductCode)
 		SELECT 9000, 'ADJUST'
+
+	SELECT  @ProductCodes = STRING_AGG(ProductCode,',')
+	FROM @tmpProductList g
+	WHERE GroupProductId = ProductId 
 
 	-- Get Invoice
 	DECLARE @StatementItemList TABLE (InvItemTypeId SMALLINT, ProductId INT)
@@ -107,7 +112,7 @@ BEGIN
 			INSERT INTO @tmpChargeInfo (ProductId, FromDate, ToDate)
 			SELECT DISTINCT ProductId, Fromdate, ToDate
 			FROM dbo.LA_f_ChargeInfo (@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
-			WHERE DI_Rate > 0
+			WHERE DI_Rate > 0 AND ChargeType = 1
 
 			DECLARE @PartyIds_AlekGroup VARCHAR(200), @isRecalRebate BIT = 0, @RecalRebateEffectiveFrom DATETIME , @RecalRebateEffectiveTo DATETIME
 
