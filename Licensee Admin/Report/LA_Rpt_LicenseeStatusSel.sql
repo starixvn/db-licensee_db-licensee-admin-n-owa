@@ -86,9 +86,13 @@ BEGIN
 				opd.LaunchDate,
 				opd.SuspendedDate,
 				opd.TerminatedDate,
-				CASE WHEN opd.SuspendedDate IS NULL AND opd.TerminatedDate IS NULL AND opd.LaunchDate < @FromDate THEN 1
-					 WHEN opd.LaunchDate < @FromDate  AND opd.SuspendedDate > @ToDate AND opd.TerminatedDate > @ToDate THEN 1
-					 ELSE 0 END IsActive,
+				CASE WHEN opd.LaunchDate <= @Todate AND 
+					(
+						(opd.SuspendedDate IS NULL AND opd.TerminatedDate IS NULL)
+						OR ( opd.SuspendedDate > @ToDate AND opd.TerminatedDate IS NULL)
+						OR ( opd.TerminatedDate > @ToDate AND opd.SuspendedDate IS NULL)
+						OR ( opd.SuspendedDate > @ToDate AND opd.TerminatedDate > @ToDate AND opd.TerminatedDate IS NOT NULL AND opd.SuspendedDate IS NOT NULL)
+					) THEN 1 ELSE 0 END IsActive,
 
 				CASE WHEN opd.LaunchDate BETWEEN @FromDate AND @ToDate THEN 1 ELSE 0 END IsNewLaunched,
 				CASE WHEN opd.SuspendedDate BETWEEN @FromDate AND @ToDate THEN 1 ELSE 0 END IsSuspened,
@@ -129,7 +133,7 @@ BEGIN
 
 	SELECT GroupName, LicenseeName, LaunchDate, SuspendedDate, TerminatedDate, AccountManager, StatusName 
 	FROM #result
-	ORDER BY StatusID, ParentID, LicenseeName
+	ORDER BY StatusID, ParentID, LaunchDate DESC
 
 	DROP TABLE #PartyID
 	DROP TABLE #data
