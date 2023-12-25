@@ -15,6 +15,7 @@ Revisions:
 	- 20150312@Florent: Initialize SP
 	- 20210812@Percy: Exclude BitCoin from Product drop-down list [RedmineID: #159691]
 	- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
+	- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 
 Param's Explanation:
 */
@@ -28,7 +29,7 @@ BEGIN
 		FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
 			INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON c.ChargeId = cs.ChargeId AND cs.SystemId = 2
 		WHERE c.ProductId = p.ProductId
-			AND c.ToParty IN (1, 9, 11, 98) -- Licensee to House
+			AND c.ToParty IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z ) -- Licensee to House
 			AND c.ChargeType NOT IN (2, 3) -- Old Type
 			AND (@PartyId = 0 OR c.FromParty = @PartyId)
 	)

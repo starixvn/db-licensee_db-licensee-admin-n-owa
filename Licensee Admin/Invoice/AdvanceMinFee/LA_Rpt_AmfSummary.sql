@@ -24,6 +24,7 @@ AS
 		- 20230816@Danny: Use DBOIC Dblinked [RedmineID : 192776]
 		- 20230920@Danny: show Licensee Status Infomation [RedmineID : 187219]
 		- 20231114@Danny: Change waive month count fomular [RemineID: #191248]
+		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 
 	+ @LicenseeStatusIds:	1	Up Coming
 						2	Soft Launch
@@ -136,7 +137,7 @@ BEGIN
 			SELECT MIN(c.FromDate) AS LaunchingDate
 			FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
 			WHERE c.FromParty = r.PartyId
-				AND c.ToParty IN (1, 9, 11, 98)
+				AND c.ToParty IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z)
 				AND c.ChargeType NOT IN (2, 3) -- old type
 		) c
 

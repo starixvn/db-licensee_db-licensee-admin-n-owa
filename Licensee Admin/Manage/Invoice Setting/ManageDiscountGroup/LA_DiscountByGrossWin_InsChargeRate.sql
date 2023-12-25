@@ -21,6 +21,7 @@ AS
 		- 20211101@Percy: Initialize SP [RedmineID: #162158]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 		- 20220812@Danny: Add checking fresh-new licensee step  [RedmineID: #166504]
+		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 */
 
 BEGIN
@@ -45,7 +46,7 @@ BEGIN
 		INNER JOIN #PartyList p ON c.FromParty = p.PartyId
 		LEFT JOIN dbo.OAS_PartyDetail op WITH (NOLOCK) ON p.PartyId = op.PartyID
 		OUTER APPLY (SELECT TOP 1 BillerId FROM dbo.LA_InvoiceHeader  li WITH (NOLOCK) WHERE li.BillerId = p.PartyId) li
-	WHERE c.ToParty IN (1, 9, 11, 98)
+	WHERE c.ToParty IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z )
 		AND c.ProductId = @ProductId AND c.ChargeType = 1
 		AND c.FromDate <= @ToDate AND c.ToDate >= @FromDate
 		AND (c.Rate <> @ChargeRate OR c.ToDate <> @ToDate)

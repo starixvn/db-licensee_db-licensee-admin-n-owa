@@ -36,6 +36,7 @@ AS
 		- 20210413@Happy: Support duo base currency [RedmineID: #152089]
 		- 20210811@Danny: Adding AttnName2, CompanyName2 into OAS_PartyDetail [#FeatureID 158133]
 		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
+		- 20231228@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 */
 BEGIN
 
@@ -137,11 +138,7 @@ BEGIN
 
 	SELECT @LogData = (
 			SELECT	 Op2.PartyName							AS 'pi.pn'
-					,CASE WHEN x.ToParty = 1 THEN 'ONEWorks'
-						  WHEN x.ToParty = 9 THEN 'Cozni'
-						  WHEN x.ToParty = 11 THEN 'Boping'	
-						  WHEN x.ToParty = 98 THEN 'Zelianta'	
-					 END									AS 'pi.bg' 
+					,x.GroupName							AS 'pi.bg' 
 					,od.BrandName							AS 'pi.bn'
 					,od.Description							AS 'pi.dc'
 					,od.InvoiceLanguage						AS 'pi.iv'
@@ -158,7 +155,10 @@ BEGIN
 					,ci.baseCurrInfo    AS 'bcs'
 			FROM OAS_PartyDetail od WITH(NOLOCK)
 			INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
-			OUTER APPLY (SELECT TOP 1 ToParty FROM OAS_ChargeInfo oc WITH(NOLOCK) WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
+			OUTER APPLY (SELECT TOP 1 oc.ToParty , pg.GroupName
+						 FROM OAS_ChargeInfo oc WITH(NOLOCK) 
+						 INNER JOIN dbo.LA_f_BillingGroupSel() pg ON pg.PartyId = oc.ToParty
+						 WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
 			OUTER APPLY (
 							SELECT
 							(

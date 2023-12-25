@@ -39,6 +39,7 @@ AS
 	  - 20221213@Danny: Change fomular Calculate rebate base on Licensee Fee [RedmineID: #181546]
 	  - 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 	  - 20230223@Danny: Integrate Casino promotion [#194808]
+	  - 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 */
 
 BEGIN
@@ -75,7 +76,7 @@ BEGIN
 			FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
 			WHERE c.FromParty = @PartyId AND c.ProductId = p.ProductId
 				AND c.FromDate <= @TDate AND c.ToDate >= @FDate
-				AND c.ToParty IN (1, 9, 11, 98) -- Licensee to house
+				AND c.ToParty IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z ) -- Licensee to house
 				AND c.ChargeType NOT IN (2, 3) -- old charge type
 		)
 

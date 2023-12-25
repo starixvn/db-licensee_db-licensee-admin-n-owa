@@ -26,6 +26,8 @@ AS
 		- 20200418@Parsons: Indo 4D Integration [#130910]
 		- 20200812@Happy: Get min fee terms with GMF higher priority [#134492]
 		- 20211104@Parsons: GroupMinFee: Support prorated min fee and AMF deduction [#157652]
+		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
+
 		
 	Param's Explanation:
 
@@ -62,7 +64,7 @@ BEGIN
 		INSERT INTO @ChargeInfo
 		SELECT ProductID,FromParty,ChargeType,FirstOfBilling,FromDate,BasisOfBilling,ChargeID,ChargeId
 		FROM dbo.OAS_ChargeInfo ci WITH (NOLOCK)
-		WHERE FromParty = @PartyId AND ChargeType != 2 AND ToParty IN (1,9,11,98)
+		WHERE FromParty = @PartyId AND ChargeType != 2 AND ToParty IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z )
 	END
 
 	SELECT TOP 1

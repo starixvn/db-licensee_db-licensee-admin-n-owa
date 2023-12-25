@@ -18,7 +18,7 @@ AS
 		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 		- 20220206@Danny: Return more party detail (SuspendedDate, TerminatedDate) [RedmineID: #169160]
 		- 20230731@Danny: Incorporate USDT2 currency [RedmineID: #191165]
-		- 20231002@Danny: Support Jollysport licensees [#FeatureID 193214]
+		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 */
 
 BEGIN
@@ -42,7 +42,7 @@ BEGIN
 	SELECT TOP 1 @FromDate = FromDate, @ToDate = ToDate FROM dbo.LA_DiscountGroupHeader WITH (NOLOCK) WHERE DiscountGroupId = @GroupId
 
 	SELECT @ChargeRate = Rate FROM dbo.OAS_ChargeInfo WITH (NOLOCK)
-	WHERE FromParty = @RepPartyId AND ToParty IN (1, 9, 11, 98)
+	WHERE FromParty = @RepPartyId AND ToParty IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z )
 		AND ProductId = @ProductId AND ChargeType = 1
 		AND FromDate <= @ToDate AND ToDate >= @FromDate
 

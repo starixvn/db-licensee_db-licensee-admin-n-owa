@@ -32,6 +32,7 @@ AS
 
 	Revisions:
 		- 20210909@Percy: Initialize SP [RedmineID: #157652]
+		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 */
 
 BEGIN
@@ -319,7 +320,7 @@ BEGIN
 			SELECT MIN(c.FromDate) AS FromDate, MAX(c.ToDate) AS ToDate
 			FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
 			WHERE m.PartyId = c.FromParty AND m.ProductId = c.ProductId
-				AND c.ToParty IN (1, 9, 11, 98)
+				AND c.ToParty IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z)
 				AND c.ChargeType NOT IN (2, 3)
 		) c
 

@@ -16,6 +16,7 @@ AS
 		- 20180529@Parsons: Get list payer list [#94282]
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
+		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 
 	 Params:
 		 + UserID : 
@@ -53,6 +54,6 @@ BEGIN
 	-- Return party list
 	SELECT PartyId, PartyName, BrandName
 	FROM @PartyList
-	WHERE ParentId IN (1, 9, 11, 98) -- Deposit
+	WHERE ParentId IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z )  -- Deposit
 END
 GO

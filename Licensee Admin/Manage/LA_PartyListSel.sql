@@ -20,6 +20,7 @@ AS
 		- 20180713@bruce: Add new group TEST for credit side [#98126]
 		- 20190821@Parsons: Improve the ability to maintain systems [#118627]
 		- 20220614@Danny: Use explicit temporary table  [RemineID: #174035]
+		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 
 	Params:
 		+ UserID:
@@ -42,8 +43,8 @@ SELECT PartyID FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE ISNULL(IsDeposit,0) 
 
 INSERT INTO @tmpCompany
 SELECT PartyID 
-FROM dbo.OAS_Party WITH (NOLOCK)
-WHERE PartyName IN ('ONEWorks','Boping', 'Zelianta', 'Cozni')
+FROM dbo.OAS_Party op WITH (NOLOCK)
+WHERE op.PartyID IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z )
 
 INSERT INTO #ListParty(FromDate, FromParty)
 SELECT MAX(ci.FromDate) FromDate, ci.FromParty
