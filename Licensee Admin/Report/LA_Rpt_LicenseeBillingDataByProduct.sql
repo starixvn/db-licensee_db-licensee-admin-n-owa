@@ -34,6 +34,7 @@ AS
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 		- 20231005@Danny: Change charge rate and tier rebate for Alek group from Oct 2023 [RedmineID: #194561]
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
+		- 20230223@Danny: Integrate Casino promotion [#194808]
 	
 	Parameter explanation:
 		@LicenseeStatusIds
@@ -129,6 +130,8 @@ BEGIN
 	DECLARE @ProductCodes VARCHAR(MAX)
 	SELECT  @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM #tmp_Products WHERE ProductCode <> ''
 
+	SELECT @ProductCodes = @ProductCodes +',SPR(CS)'
+
 	DECLARE @Result TABLE
 	(
 		PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
@@ -145,7 +148,7 @@ BEGIN
 		,@FromDate = @FromDate
 		,@ToDate = @ToDate
 		,@BaseCurrencyName = @BaseCurrencyName
-		,@LicensingFeeTypeIds = '0,8' -- 0 = Normal Licensing Fee, 8 = BetCount
+		,@LicensingFeeTypeIds = '0,8,13' -- 0 = Normal Licensing Fee, 8 = BetCount
 
 	IF @isRecalRebate =1 AND @FromDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
 		BEGIN
@@ -191,7 +194,7 @@ BEGIN
 			,SUM(CASE WHEN r.LicensingFeeTypeId = 8 THEN 0 ELSE r.LicensingFee + r.ExtraAmount END) AS LicensingFee
 			,SUM(CASE WHEN r.LicensingFeeTypeId = 8 THEN ExtraAmount ELSE 0 END) AS BetCount
 		FROM @Result r
-		WHERE r.ProductId NOT IN (37, 74)
+		WHERE r.ProductId NOT IN (37, 74, -37)
 		GROUP BY r.PartyId, r.ProductId
 		UNION ALL SELECT PartyId, -102, -SUM(Discount), 0 FROM @Result GROUP BY PartyId HAVING SUM(Discount) <> 0
 		UNION ALL SELECT PartyId, -101, -SUM(Rebate), 0 FROM @Result GROUP BY PartyId HAVING SUM(Rebate) <> 0
@@ -210,6 +213,13 @@ BEGIN
 	FROM (SELECT PartyId, LicensingFee, ExtraAmount FROM @Result WHERE ProductId = 74 AND LicensingFeeTypeId = 0) r
 		CROSS APPLY (
 			 SELECT -10 AS ProductId , ExtraAmount AS LicensingFee -- Tips
+		) t
+
+	INSERT INTO #tmp_Result (PartyId, ProductId, LicensingFee, BetCount)
+	SELECT r.PartyId, t.ProductId, t.LicensingFee, 0
+	FROM (SELECT PartyId, LicensingFee, ExtraAmount FROM @Result WHERE ProductId = -37 AND LicensingFeeTypeId = 13) r
+		CROSS APPLY (
+			 SELECT -25 AS ProductId , -ExtraAmount AS LicensingFee -- Casino promotion
 		) t
 
 	-- Remove suspended/terminated licensees with amount = 0
@@ -231,6 +241,9 @@ BEGIN
 	
 	INSERT INTO #tmp_Products (ProductId, ProductName, ProductCode)
 	VALUES (-20, 'Sponsorship', '')
+
+	INSERT INTO #tmp_Products (ProductId, ProductName, ProductCode)
+	VALUES (-25, 'Casino Promotion', '')
 
 	DECLARE @ProductList VARCHAR(MAX), @SQL VARCHAR(MAX)
 	SELECT  @ProductList = COALESCE(@ProductList + ', ', '') + '[' + ProductName + ']' FROM #tmp_Products ORDER BY ProductId

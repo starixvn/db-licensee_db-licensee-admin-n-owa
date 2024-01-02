@@ -65,6 +65,7 @@ AS
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
+		- 20230223@Danny: Integrate Casino promotion [#194808]
 */
 
 BEGIN
@@ -134,6 +135,9 @@ BEGIN
 					AND h.DiscountGroupType IN (2, 12, 22) -- Rebate
 			) r
 			WHERE ProductCode IS NOT NULL
+
+			SELECT @ProductCodes = @ProductCodes +',SPR(CS)'
+			WHERE EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value <> 'SB')
 
 			IF ISNULL(@ProductCodes, '') = ''
 				SELECT @ErrCode = 1, @ErrMsg = 'There is no setting for Rebate in the Rebate Group. Please set it before proceeding further.'
@@ -218,11 +222,18 @@ BEGIN
 				,@ToDate = @ToDate
 				,@BaseCurrencyName = @BaseCurrency
 				,@IncludeTierRebate = 0
+				,@LicensingFeeTypeIds= '0,13'
 
 			INSERT INTO @FinalResult (ProductId, ProductCode, ProductName, InvoiceAmount, AmountType, Rate, Remark)
 			SELECT p.ProductId, p.ProductPrefix, p.ProductName, d.InvoiceAmount, d.AmountType, d.Rate, d.Remark
 			FROM @Result r
-				INNER JOIN dbo.LA_f_Products3rd('') p ON r.ProductId = p.ProductId
+				INNER  JOIN 
+				(	
+					SELECT p.ProductId, p.ProductPrefix, p.ProductName FROM dbo.LA_f_Products3rd('') p
+					UNION ALL
+					SELECT -37 ProductId, 'SPR(CS)'ProductPrefix, 'Casino Promotion' ProductName 
+					-- Hard code setting Casino Promotion
+				) p ON r.ProductId = p.ProductId
 				CROSS APPLY (
 					SELECT Discount AS InvoiceAmount, CONVERT(TINYINT, 4) AS AmountType, DiscountRate AS Rate, DiscountRemark AS Remark WHERE Discount > 0 -- Discount
 					UNION ALL SELECT Rebate, 6, RebateRate, RebateRemark -- Rebate
@@ -249,7 +260,7 @@ BEGIN
 				FROM @FinalResult r
 				--GROUP BY Rate, Remark
 
-				DELETE @FinalResult WHERE AmountType = 6 AND ProductId >= 0
+				DELETE @FinalResult WHERE AmountType = 6 AND ProductId <> -1
 			END
 
 			IF @InvoiceTypeId = 10 -- sum data

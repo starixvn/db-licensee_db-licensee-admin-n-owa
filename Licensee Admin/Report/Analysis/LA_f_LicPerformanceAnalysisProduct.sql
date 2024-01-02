@@ -26,6 +26,8 @@ BEGIN
 		WHERE Productid <> 16 -- Hosting fee is not supported
 		UNION ALL
 		SELECT 9000, 'ADJUST', 'Adjustment'
+		UNION ALL
+		SELECT -37, 'SPR(CS)', 'Casino promotion'
 	)
 	RETURN;
 END

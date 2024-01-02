@@ -15,12 +15,19 @@ AS
 		- 20210812@Percy: Exclude BitCoin from Product drop-down list [RedmineID: #159691]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20221018@Malcolm: Exclude products which support Credit site only,  obsolete products, Saba Promotio [RedmineId : #171705]
+		- 20231106@Malcolm: Hard code to show Casino promotion product [RedmineId : #194808]
 */
 BEGIN
 	SET NOCOUNT ON
 
 	SELECT p.ProductID, p.ProductName, p.ProductCode  
-	FROM dbo.LA_f_GroupProduct('',NULL,NULL) p
+	FROM 
+		(	
+			SELECT ProductID, ProductName, ProductCode ,GroupProductId
+			FROM dbo.LA_f_GroupProduct('',NULL,NULL) 
+			UNION ALL
+			SELECT -37, 'Casino Promotion', 'SPR(CS)', -37
+		)p
 		LEFT JOIN dbo.Product3rd pr WITH(NOLOCK) ON p.ProductId = pr.Productid
 	WHERE p.ProductId = p.GroupProductId 
 		AND (@IsProductExclude = 0 OR NOT (ISNULL(pr.OfferSite, '') = 1 OR pr.EndOfSupportDate IS NOT NULL OR p.ProductName = 'Saba Promotion'))
