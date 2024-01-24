@@ -20,6 +20,7 @@ AS
 	Revisions: 
 		- 20230704@Danny: Create Sp [#179232]
 		- 20240318@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
+		- 20240301@Danny: Merge virtual sports product [RemineID: #199478]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -634,13 +635,13 @@ BEGIN
 				,SUM(CASE WHEN b.TypeId = 4 THEN ISNULL(-r.GrossWL, 0) ELSE 0 END) AS OddsSpread
 				,s.PartyID
 				,s.BaseCurrencyID
-				,r.ProductID
+				,p.GroupProductId  ProductID
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
 				INNER JOIN @tblSite_PT s ON r.SiteId = s.SiteId
+				INNER JOIN @Products p ON r.ProductId = p.ProductId
 				LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH (NOLOCK) ON sbr.Bettype = r.Bettype
 				LEFT JOIN @Bettype b ON b.Bettype = r.Bettype
 			WHERE r.rptDate BETWEEN @FromDate AND @ToDate
-				AND r.ProductId IN (SELECT p.ProductId FROM @Products p)
 				AND r.StatusId NOT IN (-1, 101, 102, 103)
 				AND r.CustomerCategory NOT IN (27, 28)
 				AND r.CurrencyId <> 20
@@ -649,7 +650,7 @@ BEGIN
 				,CASE WHEN r.Bettype IN (1706, 3007) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
 				,s.PartyID
 				,s.BaseCurrencyid
-				,r.ProductID
+				,p.GroupProductId
 
 		END
 
@@ -681,7 +682,7 @@ BEGIN
 			SELECT b.WinlostDate, b.Currency, b.Bettype, b.apositiontaking
 				,-SUM(ISNULL(b.winlost, 0)) AS LicenseeWL
 				,SUM(ISNULL(b.swinlost, 0) + ISNULL(b.mwinlost, 0) + ISNULL(b.awinlost, 0) + ISNULL(b.winlost, 0) + ISNULL(b.scomm, 0)) AS AmountToCompany
-				, r.PartyID, r.BaseCurrencyID, f.ProductID
+				, r.PartyID, r.BaseCurrencyID, p.GroupProductId  ProductID
 			FROM #tmpData_rptLicWinloss2 b WITH (NOLOCK)
 				INNER JOIN @recommend_PT r ON b.recommend = r.recommend
 				INNER JOIN (
@@ -689,10 +690,11 @@ BEGIN
 					FROM bodb02.dbo.f_LicWinLoss_ProductSportType_Sel(@ProductCode_PT) t
 					LEFT JOIN dbo.Product3rd p3d WITH(NOLOCK) ON t.ProductCode = p3d.ProductPrefix
 				) f ON b.sporttype = f.SportType
+				INNER JOIN @Products  p ON f.Productid = p.ProductId
 			WHERE b.WinlostDate BETWEEN @FromDate AND @ToDate
 				AND b.bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914)
 				AND b.IsBA = 0
-			GROUP BY b.recommend, b.WinlostDate, b.Currency, b.Bettype, b.apositiontaking, r.PartyID, r.BaseCurrencyID, f.ProductID 
+			GROUP BY b.recommend, b.WinlostDate, b.Currency, b.Bettype, b.apositiontaking, r.PartyID, r.BaseCurrencyID, p.GroupProductId
 	
 		END
 

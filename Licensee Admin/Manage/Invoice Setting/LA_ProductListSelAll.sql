@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -16,6 +16,7 @@ AS
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20221018@Malcolm: Exclude products which support Credit site only,  obsolete products, Saba Promotio [RedmineId : #171705]
 		- 20231106@Malcolm: Hard code to show Casino promotion product [RedmineId : #194808]
+		- 20240312@Danny: Not show VS4 on dropdown [RemineID: #199478]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -30,6 +31,7 @@ BEGIN
 		)p
 		LEFT JOIN dbo.Product3rd pr WITH(NOLOCK) ON p.ProductId = pr.Productid
 	WHERE p.ProductId = p.GroupProductId 
+		AND p.ProductCode <> 'VS4'
 		AND (@IsProductExclude = 0 OR NOT (ISNULL(pr.OfferSite, '') = 1 OR pr.EndOfSupportDate IS NOT NULL OR p.ProductName = 'Saba Promotion'))
 
 END

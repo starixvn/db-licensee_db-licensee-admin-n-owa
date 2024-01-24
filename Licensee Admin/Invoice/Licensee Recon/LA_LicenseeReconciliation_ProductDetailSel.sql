@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_Licensee
 GO
 
@@ -26,19 +26,23 @@ AS
 		- 20220615@Percy: Fix issue can't get BTC & SLT under SB [RedmineID: #172584]
 		- 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
 		- 20230323@Danny: SG - Promotion prize integration [#183739]
+		- 20240301@Danny: Merge virtual sports product [RemineID: #199478]
 */
 
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @Products TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(20))
-	INSERT INTO @Products (GroupProductId, ProductId, ProductCode)
-	SELECT GroupProductId, ProductId, ProductCode
+	DECLARE @Products TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(20), GroupProductCode VARCHAR(20))
+	INSERT INTO @Products (GroupProductId, ProductId, ProductCode, GroupProductCode)
+	SELECT GroupProductId, ProductId, ProductCode, GroupProductCode
 	FROM dbo.LA_f_GroupProduct('',@FromDate,@ToDate)
 	WHERE GroupProductId = @ProductId
 
-	DECLARE @ProductCode VARCHAR(MAX)
+	DECLARE @ProductCode VARCHAR(MAX),  @ProductCodeNAP VARCHAR(MAX)
 	SELECT  @ProductCode = COALESCE(@ProductCode + ',', '') + ProductCode FROM @Products
+
+	SELECT  @ProductCode = COALESCE( @ProductCode + ',', '') + GroupProductCode FROM @Products
+	SELECT  @ProductCodeNAP = COALESCE( @ProductCodeNAP + ',', '') + ProductCode FROM @Products
 
 	DECLARE @tblSite TABLE (SiteId INT, Site VARCHAR(100))
 	INSERT INTO @tblSite (SiteId, Site)
@@ -133,7 +137,7 @@ BEGIN
 			INNER JOIN @recommend r ON b.recommend = r.recommend
 			INNER JOIN (
 				SELECT DISTINCT CONVERT(SMALLINT, SportType) AS SportType
-				FROM bodb02.dbo.f_LicWinLoss_ProductSportType_Sel(@ProductCode)
+				FROM bodb02.dbo.f_LicWinLoss_ProductSportType_Sel(@ProductCodeNAP)
 			) f ON b.sporttype = f.SportType
 		WHERE b.WinlostDate BETWEEN @FromDate AND @ToDate
 			AND b.roleId = 2

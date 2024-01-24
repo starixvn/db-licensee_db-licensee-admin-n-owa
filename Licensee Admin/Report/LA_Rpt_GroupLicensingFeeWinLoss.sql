@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap,wsv_lap" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_GroupLicensingFeeWinLoss]
 	@PartyIds				VARCHAR(MAX)	= ''
 	,@ProductCodes			VARCHAR(MAX)	= ''	

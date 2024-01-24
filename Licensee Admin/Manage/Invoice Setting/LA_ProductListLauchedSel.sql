@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -14,6 +14,7 @@ AS
 		- 20170301@Scofield: Update to exclude 'RB', 'BG', 'PTCS', 'HF' and inclucde 'SB' [#70050]
 		- 20210812@Percy: Exclude BitCoin from Product drop-down list [RedmineID: #159691]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
+		- 20240306@Danny: Merge virtual sports product [RemineID: #199478]
 	
 	Example:
 		EXEC dbo.LA_ProductListLauchedSel
@@ -23,7 +24,7 @@ BEGIN
 
 	SELECT p.ProductID, p.ProductCode  ProductPrefix, p.ProductName
 	FROM dbo.LA_f_GroupProduct('',NULL,NULL) p
-	WHERE p.ProductId NOT IN (1, 7, 9, 16) -- RB, BG, PTCS, HF
+	WHERE p.ProductId NOT IN (1, 7, 9, 16, 27, 49, 77, 83) -- RB, BG, PTCS, HF, VS2, VS3, LG, VS4
 		AND (
 			p.ProductId = 0 -- always SB
 			OR EXISTS (

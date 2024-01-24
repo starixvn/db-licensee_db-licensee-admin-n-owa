@@ -35,6 +35,7 @@ AS
 	- 20231218@Danny: Integrate Promotion Prize - Live22 [RedmineID: #197267]
 	- 20240222@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
 	- 20240123@Danny: Change Credit licensing fee fomular [RedmineID: #197267]
+	- 20240301@Danny: Merge virtual sports product [RemineID: #199478]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
@@ -89,7 +90,8 @@ BEGIN
 			@ShareRate			MONEY = 0.03,
 			@BetBuilderRate3rd  MONEY = 0.04, 
 			@BetBuilderBetTypeId INT = 38,
-			@ExchangeCutoffDate SMALLDATETIME 
+			@ExchangeCutoffDate SMALLDATETIME,
+			@MergeVSCutoffDate	SMALLDATETIME = '2024-03-01'
 
 	SELECT @ExchangeCutoffDate = f.CutoffDate FROM dbo.LA_f_GetCutOffDate() f WHERE f.TypeName = 'ExchangeTerms'
 
@@ -396,6 +398,9 @@ BEGIN
 	-- Insert product detail by source (rptBetting, rptBettingByProduct, rpt_ThirdPartyWL_ExtraGMT, ....)
 	INSERT INTO @productDataView(ProductID, ProductCode, ProductName, isKeepNegativeFee, isKeepNegativePayToSupplier, isRptBettingSource, isRptBettingBySportSource, isSupportGMT8, isSupportGMT0, isRptLicCashoutSummarySource) 
 	EXEC LA_3rdProductByTimeZoneSel @ProductCodes = @ProductCodes, @Timezone = @Timezone, @isShowDetail = 1
+
+	IF @FromDate >= @MergeVSCutoffDate
+		UPDATE @productDataView SET isKeepNegativeFee = 1 WHERE ProductID = 5
 	
 	-- Handle @ProductCodes (MuayThai And BetBuilder have same ProductCode)
 	SELECT @ProductCodes = ''
@@ -413,6 +418,13 @@ BEGIN
 	SET @ProductCodes3rd = @ProductCodes
 	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID = 69)
 		SELECT @ProductCodes3rd =@ProductCodes3rd + ',BTC'
+
+	IF @FromDate >= @MergeVSCutoffDate 
+		AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value IN ('VS2','LG','VS4'))
+		AND NOT EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value IN ('VS'))
+	BEGIN
+		SELECT @ProductCodes = @ProductCodes + ',VS'
+	END
 
 	-- Bettype List of Products that support GMT billing
 	INSERT INTO @bettypeExtraGMT(bettype, ProductID)
@@ -469,6 +481,24 @@ BEGIN
 			SET ProductID = 69, DI_Rate = CASE WHEN  IsDeposit = 0 THEN 0 ELSE  DI_Rate END 
 			WHERE ProductID = 0
 		END
+	END
+
+	IF @FromDate >= @MergeVSCutoffDate 
+		--AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value IN ('VS2','LG','VS4'))
+		--AND NOT EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value IN ('VS'))
+	BEGIN
+		DELETE FROM #ChargeInfoWithCredit WHERE ProductID IN (27, 77, 83) 
+
+		INSERT INTO #ChargeInfoWithCredit (PartyID, ProductID, IsDeposit, Fromdate, Todate, DI_Rate, ChargeType, LicenseeID, ChargeID )
+		SELECT PartyID, x.ProductID AS ProductID, IsDeposit, Fromdate, Todate, CASE WHEN IsDeposit = 0 THEN 0 ELSE  DI_Rate END , ChargeType, LicenseeID, ChargeID  --Clone VS setting 
+		FROM	#ChargeInfoWithCredit t
+		CROSS APPLY (
+			SELECT 27 AS ProductID --VS2
+			UNION ALL SELECT 77 --VS3
+			UNION ALL SELECT 83	--VS4
+		) x
+		WHERE t.ProductID = 5
+
 	END
 
 	CREATE CLUSTERED INDEX cix_#ChargeInfoWithCredit ON #ChargeInfoWithCredit(ProductID, PartyID, ChargeType)
