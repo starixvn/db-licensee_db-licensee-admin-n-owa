@@ -1,4 +1,4 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="1"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="wsv_nap,wsv_lap" isFunction="0" isNested="1"></info>*/
 USE [bodb02]
 GO
 
@@ -62,7 +62,7 @@ AS
 		- 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
 		- 20230217@Danny: SG - Promotion prize integration [#183739]
 		- 20230510@Danny: New commercial terms for 12B [RedmineID: #186543]
-
+		- 20240221@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
 	Param's Explanation:
 */
 BEGIN
@@ -282,58 +282,7 @@ BEGIN
 		CurrencyId INT
 	)
 
-	IF (@ProductCode = 'AGC') -- AG Casino
-	BEGIN
-		--get licensee recommend
-		INSERT INTO @TempAG(LicenseeeID, CustId, CurrencyId)
-		SELECT DISTINCT LicenseeID, CustID, Currency
-		FROM bodb_licensee.dbo.f_SelLicenseeCust(@LicenseeID)
-		WHERE (@CurrencyId = 0 OR Currency = @CurrencyId) AND Currency <> 20
-
-		SELECT @Recommend = @Recommend + CAST(CustID AS VARCHAR) + ','
-		FROM @TempAG
-
-		--truncate last comma
-		SET @Recommend = SUBSTRING(@Recommend, 0, LEN(@Recommend))
-
-		SELECT @sql = 'SELECT Recommend, Winlostdate, SportType, Currency, Turnover, TotalTrans, Winloss
-						FROM OPENQUERY(DBACC,''EXEC bodb02.dbo.LA_Rpt_3rdProductWinloss
-												@ProductCodes		= ''''@ProductCodes_''''
-											, @Recommend		= ''''@Recommend_''''
-											, @Currency 		= @Currency_
-											, @FromDate 		= ''''@FromDate_''''
-											, @ToDate 			= ''''@ToDate_''''
-											'')'
-		SET @SQL = REPLACE(@SQL, '@ProductCodes_', @ProductCode)
-		SET @SQL = REPLACE(@SQL, '@Recommend_', @Recommend)
-		SET @SQL = REPLACE(@SQL, '@Currency_', @CurrencyId)
-		SET @SQL = REPLACE(@SQL, '@FromDate_', CONVERT( VARCHAR(10),@FromDate, 120))
-		SET @SQL = REPLACE(@SQL, '@ToDate_', CONVERT( VARCHAR(10),@ToDate, 120))
-
-		INSERT INTO #DataWinloss3rd(Recommend, Winlostdate, SportType, Currency, Turnover, TotalTrans, Winloss)
-		EXECUTE (@SQL)
-
-		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, PlayerComm, LicenseeWL, LicenseeComm, Company, Betcount)
-		(
-			SELECT
-				b.Winlostdate
-				, ag.CurrencyID
-				, SUM(Turnover) AS Turnover
-				, SUM(WinLoss) AS Winlost
-				, 0 AS PlayerComm
-				, - SUM(Winloss * ( 1 - ISNULL(cm.Rate, p.Rate))) AS LicenseeWL
-				, 0 AS LicenseeComm
-				, - SUM(WinLoss * ISNULL(cm.Rate, p.Rate)) AS Company
-				, SUM(b.TotalTrans) AS BetCount
-			FROM #DataWinloss3rd b WITH (NOLOCK)
-				INNER JOIN @TempAG ag ON b.Recommend = ag.CustId AND b.Currency = ag.CurrencyId
-				INNER JOIN @ChargeInfo p ON ag.LicenseeeID = p.LicenseeId
-				LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cm WITH (NOLOCK) ON p.ChargeId = cm.ChargeId AND b.Currency = cm.CurrencyId
-			WHERE b.Winlostdate BETWEEN p.Fromdate AND p.Todate
-			GROUP BY b.Winlostdate, ag.CurrencyID
-		)
-	END
-	ELSE IF (@ProductCode = 'VG') -- VG
+	IF (@ProductCode = 'VG') -- VG
 	BEGIN
 		--get licensee recommend
 		INSERT INTO @TempAG(LicenseeeID, CustId, CurrencyId)
