@@ -16,6 +16,7 @@ AS
 	 
 	 Revisions:
 		- 20211101@Percy: Initialize SP [RedmineID: #162158]
+		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 */
 
 BEGIN
@@ -23,7 +24,7 @@ BEGIN
 	
 	SELECT TOP 1 Rate AS ChargeRate
 	FROM dbo.OAS_ChargeInfo WITH (NOLOCK)
-	WHERE FromParty = @PartyId AND ToParty IN (1, 9, 11, 98) -- to OW
+	WHERE FromParty = @PartyId AND ToParty IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z ) -- to OW
 		AND ProductId = @ProductId AND ChargeType = 1
 		AND FromDate <= @ToDate AND ToDate >= @FromDate
 END

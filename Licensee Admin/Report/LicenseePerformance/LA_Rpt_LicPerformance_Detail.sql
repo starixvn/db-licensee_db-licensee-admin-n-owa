@@ -82,6 +82,7 @@ AS
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 		- 20231005@Danny: Change charge rate and tier rebate for Alek group from Oct 2023 [RedmineID: #194561]
 		- 20230223@Danny: Integrate Casino promotion [#194808]
+		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -171,7 +172,7 @@ BEGIN
 				FROM bodb_Licensee.dbo.OAS_ChargeInfo c WITH (NOLOCK)
 				WHERE pl.PartyId = c.FromParty
 					AND c.ChargeType NOT IN (2, 3) -- old type
-					AND c.ToParty IN (1, 9, 11, 98) -- licensee to house
+					AND c.ToParty IN (SELECT z.PartyID FROM bodb_licensee.dbo.LA_f_BillingGroupSel() z ) -- licensee to house
 				ORDER BY c.FromDate
 			) c
 		

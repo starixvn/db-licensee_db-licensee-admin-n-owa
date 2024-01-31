@@ -19,7 +19,7 @@ AS
 		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
 		- 20230815@Danny: Handle crypto licensee billing with fiat currency [RedmineID: #192378]
 		- 20231002@Danny: logging currency information with new format [#FeatureID 193214]
-
+		- 20231228@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 		
 	Param's Explannation: 
 		+ @ChargeSettingsXML: '<ChargeSettings>
@@ -128,6 +128,7 @@ BEGIN
 		SELECT TOP(1) PartyId
 		FROM dbo.LA_BillerInfo WITH(NOLOCK)
 		WHERE BillerName = CASE c.GroupName WHEN 'Boping' THEN c.GroupName
+											WHEN 'JollySports' THEN c.GroupName
 							                WHEN 'Zelianta' THEN c.GroupName + ' Limited'
 						   ELSE '' END
 	) AS n
@@ -413,7 +414,7 @@ BEGIN
 									WHEN 'Debit' + CASE WHEN @GroupName = 'Zelianta' THEN '-Zelianta' ELSE '' END THEN 1
 									ELSE 0 END
 					) ivt	
-				   WHERE ivt.InvTemplateName IN ('Boping', 'Zelianta')
+				   WHERE ivt.InvTemplateName IN ('Boping', 'Zelianta', 'JollySports')
 						AND NOT EXISTS (
 							SELECT 1 FROM dbo.LA_InvoiceSetting l WITH(NOLOCK) 
 							WHERE l.FromPartyId = @PartyId AND ToPartyId = @BillerId AND l.InvTypeId = ivt.InvTypeId AND l.ProductId = @Product3rdId

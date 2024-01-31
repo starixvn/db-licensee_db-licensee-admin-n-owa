@@ -20,6 +20,7 @@ AS
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220506@Percy: Change way get discount group type [RedmineID: #1732342]
 		- 20221213@Danny: Import HideRebateWorksheet Info from Excel template [RedmineID: #181546]
+		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -196,7 +197,7 @@ BEGIN
 				SELECT DISTINCT FromParty AS PartyId
 				FROM dbo.OAS_ChargeInfo WITH (NOLOCK)
 				WHERE FromDate <= @ToDate AND ToDate >= @FromDate
-					AND ToParty IN (1, 9, 11, 98)
+					AND ToParty IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z )
 					AND ChargeType NOT IN (2, 3) -- old type, no use
 			) c ON p.PartyId = c.PartyId
 			LEFT JOIN @Discount d ON p.PartyId = d.PartyId AND p.InvoiceTypeId = 3 AND d.DiscountType = 2 -- Rebate

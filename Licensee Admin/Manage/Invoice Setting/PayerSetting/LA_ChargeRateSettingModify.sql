@@ -35,6 +35,7 @@ AS
 		- 20230213@Malcolm: Fix duplicate data error [RemineID: #183774]
 		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
 		- 20231002@Danny: logging currency information with new format [#FeatureID 193214]
+		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 
 	 Params:
 		+ @ChargeSettingXML: '<ChargeSettings>
@@ -284,7 +285,7 @@ BEGIN
 		SELECT TOP 1 @ToParty = c.ToParty, @ParentChargeID = c.ParentChargeID
 		FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
 			INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON c.ChargeID = cs.ChargeID AND cs.SystemID = 2
-		WHERE FromParty = @PayerID AND c.ToParty IN (1, 9, 11, 98)
+		WHERE FromParty = @PayerID AND c.ToParty IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z )
 		ORDER BY FromDate DESC
 		
 		SET @Remark = @Remark + 'created date: ' + CONVERT(VARCHAR(20), GETDATE(), 101)
@@ -370,6 +371,7 @@ BEGIN
 		FROM dbo.LA_BillerInfo WITH(NOLOCK)
 		WHERE BillerName = CASE @BillingGroupName
 							WHEN 'Boping' THEN @BillingGroupName
+							WHEN 'JollySports' THEN @BillingGroupName
 							WHEN 'Zelianta' THEN @BillingGroupName + ' Limited'
 							ELSE '' END
 
@@ -395,7 +397,7 @@ BEGIN
 					FROM @ChargeSetting p
 						INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON p.ProductId = c.ProductId AND p.FromDate = c.FromDate
 					WHERE c.FromParty = @PayerID AND c.ToParty = @ToParty
-						AND ivt.InvTemplateName IN ('Boping', 'Zelianta')
+						AND ivt.InvTemplateName IN ('Boping', 'Zelianta','JollySports')
 						AND p.StatusId > 0
 				) p
 			WHERE p.ProductId IS NOT NULL -- @BillingGroupId <> 0 for when lauching licensees

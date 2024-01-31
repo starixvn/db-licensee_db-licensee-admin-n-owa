@@ -15,6 +15,7 @@ AS
 		- 20220812@Danny: Fix issue get wrong chargerate [RedmineID: #166504]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 		- 20221201@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
+		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 */
 
 BEGIN
@@ -65,7 +66,8 @@ BEGIN
 	SET d.ChargeRate = c.Rate
 	FROM #DiscountGroup d
 		INNER JOIN dbo.OAS_ChargeInfo c WITH (NOLOCK) ON d.RepPartyId = c.FromParty AND d.ProductId = c.ProductId
-	WHERE c.ToParty IN (1, 9, 11, 98) AND c.ChargeType = 1
+	WHERE c.ToParty IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z ) 
+		AND c.ChargeType = 1
 		AND d.FromDate <= c.ToDate AND d.ToDate >= c.FromDate
 
 	-- Return data

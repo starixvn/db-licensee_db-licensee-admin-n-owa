@@ -16,6 +16,7 @@ AS
 		- 20210812@Percy: Exclude BitCoin from Product drop-down list [RedmineID: #159691]
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20220210@Percy: Add @EndOfSupportDate to get active products + get products offer deposit [RedmineID: #163495]
+		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 		
 	Params:
 		. @PayerId
@@ -38,7 +39,7 @@ BEGIN
 		FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
 			INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON c.ChargeId = cs.ChargeId AND cs.SystemId = 2
 		WHERE c.ProductId = p.ProductId
-			AND c.ToParty IN (1, 9, 11, 98) -- Licensee to House
+			AND c.ToParty IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z ) -- Licensee to House
 			AND c.ChargeType NOT IN (2, 3) -- Old Type
 			AND (@PayerId = 0 OR c.FromParty = @PayerId)
 	)

@@ -28,6 +28,7 @@ AS
 		- 20230815@Danny: Handle crypto licensee billing with fiat currency [RedmineID: #192378]
 		- 20231005@Danny: Change charge rate and tier rebate for Alek group from Oct 2023 [RedmineID: #194561]
 		- 20231115@Danny: Final licensing fee for 3rd products [RedmineID: #191813]
+		- 20240109@Danny: Enhance rule regen data when invoice is voided [RedmineID: #199448]
 
 */
 
@@ -95,7 +96,7 @@ BEGIN
 		DELETE bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis WITH (ROWLOCK)
 		WHERE SiteId = @SiteId 
 			AND ReportDate = @InvoiceDate 
-			AND ProductId IN (SELECT s.ProductId FROM @StatementItemList s WHERE s.InvItemTypeId = 1)
+			--AND ProductId IN (SELECT s.ProductId FROM @StatementItemList s WHERE s.InvItemTypeId = 1)
 			AND ProductId <> 9000 -- Adjustment
 
 		IF @InvoiceStatus = 0 -- Normal

@@ -33,6 +33,7 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20190718@Bruce: Integrate CN88 data in LA [#116859]
 		- 20200529@Percy: Add condition by productID for get all deposit setting [RedmineID: #134867]
+		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 
     Param's Explanation: 
 */  
@@ -51,16 +52,16 @@ BEGIN
      
     INSERT  INTO @ProductTable( ProductID, ProductPrefix)
     SELECT  CASE 
-				WHEN s.val = 'SB' THEN 0
+				WHEN s.value = 'SB' THEN 0
                 ELSE p3.Productid
             END ,
-            s.val
-    FROM    bodb02.dbo.strSplit(@ProductCodes, ',') s
-            LEFT JOIN dbo.Product3rd p3 WITH ( NOLOCK ) ON s.val = p3.ProductPrefix	
+            s.value
+    FROM    STRING_SPLIT(@ProductCodes, ',') s
+            LEFT JOIN dbo.Product3rd p3 WITH ( NOLOCK ) ON s.value = p3.ProductPrefix	
 
     INSERT  INTO @tbChargeInfo(ChargeID, PartyID, ProductID, DI_Rate, ChargeType, IsDeposit, Fromdate, Todate, IsParent)
     SELECT  DI.ChargeID ,
-            CASE WHEN Di.FromParty IN (1, 11, 98, 9) THEN DI.FromParty 
+            CASE WHEN Di.FromParty IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z ) THEN DI.FromParty 
 				 WHEN cl.PartyID IS NOT NULL THEN 999 
 				 ELSE Di.FromParty END,
             DI.ProductID ,
@@ -75,7 +76,7 @@ BEGIN
 					THEN DI.ToDate
                     ELSE @ToDate
             END,
-			CASE WHEN DI.FromParty IN (1, 11, 98, 9) OR cl.PartyID IS NOT NULL THEN 1 ELSE 0 END
+			CASE WHEN DI.FromParty IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z ) OR cl.PartyID IS NOT NULL THEN 1 ELSE 0 END
     FROM    dbo.OAS_ChargeInfo DI (NOLOCK)
             INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs (NOLOCK) ON DI.ChargeID = cs.ChargeID
                                                     AND cs.SystemID = @SystemID
@@ -98,7 +99,7 @@ BEGIN
 			SELECT PartyID, ProductID
 			FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)
 				CROSS JOIN @ProductTable pro
-			WHERE PartyName IN ('ONEWorks', 'Boping', 'Zelianta', 'Cozni')
+			WHERE p.PartyID IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z )
 				AND NOT EXISTS (SELECT 1 FROM @tbChargeInfo c WHERE c.PartyID = p.PartyID AND c.ProductID = pro.ProductID)
 		)
 		INSERT INTO @tbChargeInfo(ChargeID, PartyID, ProductID, DI_Rate, ChargeType, IsDeposit, Fromdate, Todate, IsParent)

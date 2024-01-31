@@ -11,7 +11,8 @@ AS
 	DB: DBLIC.bodb_Licensee
    
 	Revisions:
-		-  20200214@Sophia: initial [redmine: #128471]
+		- 20200214@Sophia: initial [redmine: #128471]
+		- 20231228@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 	
 	Copy from : LA_PartyListSel , remember to maintain together with this SP, (mode userID = 0, FunctionKey = '')
 	Params:
@@ -30,7 +31,7 @@ SELECT PartyID FROM dbo.OAS_PartyDetail WITH (NOLOCK) WHERE ISNULL(IsDeposit,0) 
 INSERT INTO @tmpCompany
 SELECT PartyID 
 FROM dbo.OAS_Party WITH (NOLOCK)
-WHERE PartyName IN ('ONEWorks','Boping', 'Zelianta', 'Cozni')
+WHERE PartyID IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z )
 
 DECLARE @ListParty AS TABLE (FromDate DATETIME, FromParty  INT)  
 INSERT INTO @ListParty (FromDate,FromParty ) 

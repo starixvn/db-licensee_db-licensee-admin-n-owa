@@ -16,6 +16,8 @@ AS
 	- 20220927@Danny: Remove DBLink [#176986] 
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+	- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
+
  */
 
 BEGIN
@@ -111,7 +113,7 @@ BEGIN
 	UPDATE p1
 	SET IsSelected = 1
 	FROM #PartyList p1
-	INNER JOIN bodb02.dbo.strSplit(@PartyIds, ',') p2 ON p1.PartyId = p2.val
+	INNER JOIN STRING_SPLIT(@PartyIds, ',') p2 ON p1.PartyId = p2.value
 
 	SET @PartyIds = '';
 	SELECT @PartyIds = COALESCE(@PartyIds + ', ', '') + CAST(PartyId AS VARCHAR(4)) 
@@ -136,7 +138,7 @@ BEGIN
 			FROM #PartyList p
 			INNER JOIN #ChargeRate c ON p.PartyId = c.PartyId
 			INNER JOIN OAS_ChargeInfo ci WITH(NOLOCK) ON c.ChargeId = ci.ChargeID
-			WHERE p.ParentId IN (1,9,11,98)
+			WHERE p.ParentId IN (SELECT z.PartyID FROM dbo.LA_f_BillingGroupSel() z )
 
 			INSERT INTO #ChargeRate(PartyId, LicenseeId, ProductId, Rate, IsDeposit, ChargeType, IsPayToSupplier, Fromdate, Todate)
 			SELECT DISTINCT CI3rd.PartyID, LicenseeID, CI3rd.ProductID, CI3rd.DI_Rate, 0, CI3rd.ChargeType, 1,

@@ -41,6 +41,7 @@ AS
 		- 20230614@Danny: Enhance launch licensee function [#188014]
 		- 20230815@Danny: Handle crypto licensee billing with fiat currency [RedmineID: #192378]
 		- 20231002@Danny: logging currency information with new format [#FeatureID 193214]
+		- 20231228@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -184,6 +185,7 @@ BEGIN
 	FROM dbo.LA_BillerInfo WITH(NOLOCK)
 	WHERE BillerName = CASE @BillingGroupName
 						WHEN 'Boping' THEN @BillingGroupName
+						WHEN 'JollySports' THEN @BillingGroupName
 						WHEN 'Zelianta' THEN @BillingGroupName + ' Limited'
 						ELSE '' END
 
@@ -207,11 +209,7 @@ BEGIN
 		BEGIN
 			SELECT @logPayerSettingOld = (
 				SELECT	 Op2.PartyName							AS 'pi.pn'
-						,CASE WHEN x.ToParty = 1 THEN 'ONEWorks'
-							  WHEN x.ToParty = 9 THEN 'Cozni'
-							  WHEN x.ToParty = 11 THEN 'Boping'	
-							  WHEN x.ToParty = 98 THEN 'Zelianta'	
-						 END									AS 'pi.bg' 
+						,x.GroupName							AS 'pi.bg' 
 						,od.BrandName							AS 'pi.bn'
 						,od.Description							AS 'pi.dc'
 						,od.InvoiceLanguage						AS 'pi.iv'
@@ -228,7 +226,11 @@ BEGIN
 						,ci.baseCurrInfo    AS 'bcs'
 				FROM OAS_PartyDetail od WITH(NOLOCK)
 				INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
-				OUTER APPLY (SELECT TOP 1 ToParty FROM OAS_ChargeInfo oc WITH(NOLOCK) WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
+				OUTER APPLY (SELECT TOP 1 oc.ToParty , pg.GroupName
+							 FROM OAS_ChargeInfo oc WITH(NOLOCK) 
+							 INNER JOIN dbo.LA_f_BillingGroupSel() pg ON pg.PartyId = oc.ToParty
+							 WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 
+						 ) x
 				OUTER APPLY (
 								SELECT
 								(
@@ -414,14 +416,16 @@ BEGIN
 				SELECT InvTemplateId, InvTemplateName
 					,CASE InvTemplateName
 						WHEN @BillingGroupName THEN 1 -- Software Data & Licensing Fees
-						WHEN 'Credit' THEN 4 -- Credit Note
+						WHEN 'Credit' + CASE WHEN @BillingGroupName = 'JollySports' THEN '-JollySports' ELSE '' END THEN 4 -- Credit Note
 						ELSE 5 -- Debit Note
 						END AS InvTypeId
 				FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
 				WHERE 1 = CASE InvTemplateName
 							WHEN @BillingGroupName THEN 1
-							WHEN 'Credit' THEN 1
-							WHEN 'Debit' + CASE WHEN @BillingGroupName = 'Zelianta' THEN '-Zelianta' ELSE '' END THEN 1
+							WHEN 'Credit'+ CASE WHEN @BillingGroupName = 'JollySports' THEN '-JollySports' ELSE '' END THEN 1
+							WHEN 'Debit' + CASE WHEN @BillingGroupName = 'Zelianta' THEN '-Zelianta' 
+												WHEN @BillingGroupName = 'JollySports' THEN '-JollySports'
+											ELSE '' END THEN 1
 							ELSE 0 END
 			) ivt
 				OUTER APPLY (
@@ -430,7 +434,7 @@ BEGIN
 						INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON p.ProductId = c.ProductId
 					WHERE c.FromParty = @NewPartyId AND c.ToParty = @BillingGroupId
 						AND c.FromDate = @LaunchDate
-						AND ivt.InvTemplateName IN ('Boping', 'Zelianta')
+						AND ivt.InvTemplateName IN ('Boping', 'Zelianta', 'JollySports')
 				) p
 
 
@@ -559,11 +563,7 @@ BEGIN
 
 		SELECT @logPayerSetting = (
 				SELECT	 Op2.PartyName							AS 'pi.pn'
-						,CASE WHEN x.ToParty = 1 THEN 'ONEWorks'
-							  WHEN x.ToParty = 9 THEN 'Cozni'
-							  WHEN x.ToParty = 11 THEN 'Boping'	
-							  WHEN x.ToParty = 98 THEN 'Zelianta'	
-						 END									AS 'pi.bg' 
+						,x.GroupName							AS 'pi.bg' 
 						,od.BrandName							AS 'pi.bn'
 						,od.Description							AS 'pi.dc'
 						,od.InvoiceLanguage						AS 'pi.iv'
@@ -580,7 +580,12 @@ BEGIN
 						,ci.baseCurrInfo    AS 'bcs'
 				FROM OAS_PartyDetail od WITH(NOLOCK)
 				INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
-				OUTER APPLY (SELECT TOP 1 ToParty FROM OAS_ChargeInfo oc WITH(NOLOCK) WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
+				OUTER APPLY (
+							 SELECT TOP 1 oc.ToParty , pg.GroupName
+							 FROM OAS_ChargeInfo oc WITH(NOLOCK) 
+							 INNER JOIN dbo.LA_f_BillingGroupSel() pg ON pg.PartyId = oc.ToParty
+							 WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 
+							 ) x
 				OUTER APPLY (
 								SELECT
 								(

@@ -84,11 +84,7 @@ BEGIN
 		--write log old
 		SELECT @logSPDataOld = (
 			SELECT	 Op2.PartyName							AS 'pi.pn'
-					,CASE WHEN x.ToParty = 1 THEN 'ONEWorks'
-							WHEN x.ToParty = 9 THEN 'Cozni'
-							WHEN x.ToParty = 11 THEN 'Boping'	
-							WHEN x.ToParty = 98 THEN 'Zelianta'	
-						END									AS 'pi.bg' 
+					, x.GroupName							AS 'pi.bg' 
 					,od.BrandName							AS 'pi.bn'
 					,od.Description							AS 'pi.dc'
 					,od.InvoiceLanguage						AS 'pi.iv'
@@ -105,7 +101,10 @@ BEGIN
 					,ci.baseCurrInfo    AS 'bcs'
 			FROM OAS_PartyDetail od WITH(NOLOCK)
 			INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
-			OUTER APPLY (SELECT TOP 1 ToParty FROM OAS_ChargeInfo oc WITH(NOLOCK) WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
+			OUTER APPLY (SELECT TOP 1 oc.ToParty , pg.GroupName
+						 FROM OAS_ChargeInfo oc WITH(NOLOCK) 
+						 INNER JOIN dbo.LA_f_BillingGroupSel() pg ON pg.PartyId = oc.ToParty
+						 WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
 			OUTER APPLY (
 							SELECT
 							(
@@ -200,11 +199,7 @@ BEGIN
 	BEGIN
 		SELECT @logSPData = (
 			SELECT	 Op2.PartyName							AS 'pi.pn'
-					,CASE WHEN x.ToParty = 1 THEN 'ONEWorks'
-							WHEN x.ToParty = 9 THEN 'Cozni'
-							WHEN x.ToParty = 11 THEN 'Boping'	
-							WHEN x.ToParty = 98 THEN 'Zelianta'	
-						END									AS 'pi.bg' 
+					,x.GroupName							AS 'pi.bg' 
 					,od.BrandName							AS 'pi.bn'
 					,od.Description							AS 'pi.dc'
 					,od.InvoiceLanguage						AS 'pi.iv'
@@ -221,7 +216,10 @@ BEGIN
 					,ci.baseCurrInfo    AS 'bcs'
 			FROM OAS_PartyDetail od WITH(NOLOCK)
 			INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
-			OUTER APPLY (SELECT TOP 1 ToParty FROM OAS_ChargeInfo oc WITH(NOLOCK) WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
+			OUTER APPLY (SELECT TOP 1 oc.ToParty , pg.GroupName
+						 FROM OAS_ChargeInfo oc WITH(NOLOCK) 
+						 INNER JOIN dbo.LA_f_BillingGroupSel() pg ON pg.PartyId = oc.ToParty
+						 WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
 			OUTER APPLY (
 							SELECT
 							(
