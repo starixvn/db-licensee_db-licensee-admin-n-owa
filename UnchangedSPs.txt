@@ -1,39 +1,3 @@
-Licensee Admin\Function\LA_f_PartyListSel.sql
-Licensee Admin\Invoice\AdvanceMinFee\LA_Inv_AmfPartySel.sql
-Licensee Admin\Invoice\AdvanceMinFee\LA_Inv_PrepaidPartySel.sql
-Licensee Admin\Invoice\AdvanceMinFee\LA_Rpt_AGPrepaymentSummary.sql
-Licensee Admin\Invoice\AdvanceMinFee\LA_Rpt_AmfSummary.sql
-Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_BalanceSel.sql
-Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_PartySel.sql
-Licensee Admin\Manage\BillingSettingValidation\LA_InvoiceSettingInfoSel.sql
-Licensee Admin\Manage\Invoice Setting\ManageDiscountGroup\LA_Discount_AvailablePartyListSel.sql
-Licensee Admin\Manage\Invoice Setting\ManageDiscountGroup\LA_LicenseeDiscountSel.sql
-Licensee Admin\Manage\Invoice Setting\ManageGroupMinFee\LA_GroupMinFee_AvailablePartyListSel.sql
-Licensee Admin\Manage\Invoice Setting\ManageRebateGroup\LA_Rebate_PartyListSel.sql
-Licensee Admin\Manage\Invoice Setting\PayerGroup\LA_PayerGroupPartyListSel.sql
-Licensee Admin\Manage\Mics\LA_LicenseeInfoSel.sql
-Licensee Admin\Report\Analysis\LA_Rpt_LicenseeAnalysis.sql
-Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_Alert.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_3rdProductSettlement.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template1.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template2.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template3.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template4.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template5.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template6.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template7.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template8.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template9.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template10.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template11.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template12.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template13.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template14.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template15.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template16.sql
-Licensee Admin\Report\LA_Rpt_LicenseeBillingDataByProduct.sql
-Licensee Admin\Report\LA_Rpt_LicenseeWinLossByProduct.sql
-Licensee Admin\Report\LA_Rpt_NumberGame2Winloss.sql
 Licensee Admin\Core SP\LA_AmountToCompanyByProduct.sql
 Licensee Admin\Invoice\GenerateMultipleInvoices\LA_Inv_MultipleGenerationTemporaryInvoiceSel.sql
 Licensee Admin\Invoice\InvoiceAmountGenerate\LA_Inv_GenerateAmountForSoftwareFee.sql
@@ -47,10 +11,6 @@ Licensee Admin\Report\Analysis\LA_GEN_LicPerformanceAnalysis_Invoice.sql
 Licensee Admin\Report\Analysis\LA_GEN_LicPerformanceAnalysis_Report.sql
 Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_Detail.sql
 Licensee Admin\Report\LA_Rpt_LicenseeBillingDataByProduct.sql
-Licensee Admin\Manage\BillingSettingValidation\LA_GroupMinFeeSettingInfoSel.sql
-Licensee Admin\Manage\BillingSettingValidation\LA_DiscountSettingInfoSel.sql
-Licensee Admin\Manage\BillingSettingValidation\LA_ChargeRateSettingInfoSel.sql
-Licensee Admin\Manage\BillingSettingValidation\LA_InvoiceSettingInfoSel.sql
-Licensee Admin\Manage\BillingSettingValidation\LA_MinfeeSettingInfoSel.sql
-Licensee Admin\Manage\BillingSettingValidation\LA_RebateSettingInfoSel.sql
-Licensee Admin\Report\LA_Rpt_LicenseeStatusSel.sql
+
+
+

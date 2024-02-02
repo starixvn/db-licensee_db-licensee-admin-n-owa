@@ -573,9 +573,16 @@ BEGIN
 					INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
 					INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
 					LEFT JOIN dbo.LA_DiscountGroupCurrency c WITH (NOLOCK) ON a.DiscountGroupId = c.DiscountGroupId AND a.PartyId = c.PartyId
-				WHERE h.FromDate < @T_Date_setting AND h.ToDate >= @F_Date_setting
-					AND (h.DiscountGroupType IN (2, 12, 22) OR c.DiscountGroupId IS NOT NULL)
+				WHERE
+				    ( h.FromDate < @T_Date_setting AND h.ToDate >= @F_Date_setting
+					AND (h.DiscountGroupType IN (2, 22) OR c.DiscountGroupId IS NOT NULL)
 					AND p.ProductId NOT IN (37, 74)
+					) OR
+					(
+						 h.FromDate < @T_Date AND h.ToDate >= @F_Date
+					AND (h.DiscountGroupType = 12 OR c.DiscountGroupId IS NOT NULL)
+					AND p.ProductId NOT IN (37, 74)
+					)
 			) t
 			WHERE RN = 1
 		END
