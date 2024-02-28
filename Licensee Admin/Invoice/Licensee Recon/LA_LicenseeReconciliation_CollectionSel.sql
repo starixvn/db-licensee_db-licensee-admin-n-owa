@@ -3,7 +3,7 @@ USE bodb02
 GO
 
 ALTER PROCEDURE [dbo].LA_LicenseeReconciliation_CollectionSel
-	@CustIds	VARCHAR(8000),
+	@CustIds	VARCHAR(MAX),
 	@FromDate	DATETIME,
 	@ToDate		DATETIME
 AS
@@ -16,6 +16,7 @@ AS
 		- 20190820@Bruce: Create Sp [#111586]
 		- 20190927@Bruce: Update OpeningBalance, ClosingBalance [#120220]
 		- 20191017@Bruce: Filter by custid [#122229]
+		- 20240227@Danny: Extend data type param input [RedmineID: #197267]
 */
 BEGIN
 	SET NOCOUNT ON

@@ -3,7 +3,7 @@ USE bodb02
 GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_BalanceSel]
-	@CustIds		VARCHAR(8000),
+	@CustIds		VARCHAR(MAX),
 	@ReportDate		DATE,
 	@Environment	VARCHAR(50) = 'DEV'
 AS
@@ -17,6 +17,7 @@ AS
 							- Fix Setup Fee issue [#125221]
 		- 20210303@Sophia: Enhance performance [redmine: #151031]
 		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
+		- 20240227@Danny: Extend data type param input [RedmineID: #197267]
 */
 BEGIN
 	SET NOCOUNT ON

@@ -3,7 +3,7 @@ USE bodb02
 GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_NAPSel]
-	@CustIds		VARCHAR(8000),
+	@CustIds		VARCHAR(MAX),
 	@ReportMonth	DATETIME
 AS
 /*	Header:
@@ -17,6 +17,7 @@ AS
 		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
 		- 20210407@Percy: Support duo base currency - Change code for Collection Summary [RedmineID: #152089]
 		- 20211223@Danny: Split transfer out of bettrans [RedmineID: #163527]
+		- 20240227@Danny: Extend data type param input [RedmineID: #197267]
 */
 BEGIN
 	SET NOCOUNT ON

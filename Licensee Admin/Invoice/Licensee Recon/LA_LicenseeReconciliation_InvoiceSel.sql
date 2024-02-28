@@ -3,7 +3,7 @@ USE [bodb_Licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_InvoiceSel]
-	@PartyIds			VARCHAR(4000)
+	@PartyIds			VARCHAR(MAX)
 	,@FromDate			DATE
 	,@ToDate			DATE
 	,@Environment		VARCHAR(50) = 'DEV'
@@ -39,6 +39,7 @@ AS
 		- 20221226@Danny: Integrate Player tips [#180703]
 		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 		- 20230217@Danny: SG - Promotion prize integration [#183739]
+		- 20240227@Danny: Extend data type param input [RedmineID: #197267]
 */
 BEGIN
 	SET NOCOUNT ON
