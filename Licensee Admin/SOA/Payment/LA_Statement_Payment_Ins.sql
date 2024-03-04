@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Statement_Payment_Ins]
 	@PaymentNo      VARCHAR(50), 
     @ReceivedDate   SMALLDATETIME, 
@@ -71,13 +71,6 @@ BEGIN
 	IF  @FromPayerID IS NOT NULL AND @ToPayerID IS NULL AND @RebatePayment = 'Y' 
 		SELECT @PaymentType = 2 -- Rebate payment
 		
-	IF @PaymentType IN (0,2) 
-			AND EXISTS (SELECT TOP 1 1 FROM LA_Payment WITH(NOLOCK) WHERE PaymentNo = @PaymentNo AND Type IN (0,2))
-	BEGIN
-		SELECT @ErrCode = 101, @ErrMsg = 'Payment No exists in the system.'
-		RETURN
-
-	END
 
 	IF @Refno IS NULL
 	BEGIN
@@ -103,9 +96,8 @@ BEGIN
 		BEGIN
 
 
-			SELECT @Remark = CASE WHEN  @PaymentType = 0 AND @Amount > 0 THEN  'Payment received'
-								  WHEN  @PaymentType = 0 AND @Amount < 0 THEN  'Payment made'
-								  WHEN  @PaymentType = 2 THEN 'Rebate payment'
+			SELECT @Remark = CASE WHEN  @PaymentType IN (0,2) AND @Amount > 0 THEN  'Payment received'
+								  WHEN  @PaymentType IN (0,2) AND @Amount < 0 THEN  'Payment made'
 							 END
 			INSERT INTO LA_Payment ([PaymentNo],[ReceivedDate],[Type],[PartyID],[CurrencyId],[Amount],[RemainingAmount],
 				[TransferRefno],[StatusId],[Environment],[CreatedDate],[CreatedBy],[ModifyDate],[ModifiedBy], [Remark])

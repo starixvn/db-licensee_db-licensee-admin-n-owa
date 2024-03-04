@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Statement_MultiplePayment_Validation]
 	@PaymentData	NVARCHAR(MAX),
 	@Environment    VARCHAR(10),
@@ -159,12 +159,6 @@ BEGIN
 	-- Check input data
 	BEGIN
 
-	--New Payment No is duplicated (row #<row no1>, row #<row no2>...)
-	DECLARE @tblDuplicatedPaymentNo TABLE(	
-		RowId			INT,
-		ErrorMessage	NVARCHAR(500)
-	)
-
 	DECLARE @tblInfo TABLE (
 		RowId			INT, 
 		PaymentNo		VARCHAR(50), 
@@ -294,25 +288,6 @@ BEGIN
 	OUTER APPLY ( SELECT COUNT(1) AS cnt  FROM  CustDB.dbo.CustMaster a (NOLOCK) WHERE c2.custid = a.custid AND a.isInternal = 1 ) r3
 	OUTER APPLY ( SELECT COUNT(1) AS cnt  FROM  CustDB.dbo.CustSuper a (NOLOCK) WHERE c2.custid = a.custid AND a.isInternal = 1 ) r4
 
-	; WITH t AS
-	(
-		SELECT DISTINCT
-			   STRING_AGG(CAST(RowId AS VARCHAR(10)),',') WITHIN GROUP (ORDER BY RowId)  AS RowIds,
-			   'Payment No is duplicated ( '+ STRING_AGG('row #'+ CAST(RowId AS VARCHAR(10)),',') WITHIN GROUP (ORDER BY RowId) + ')' AS ErrorMessage
-		FROM @tblInfo
-		WHERE FromPayerID IS NOT NULL AND ToPayerID IS NULL
-		GROUP BY PaymentNo
-		HAVING COUNT(1) > 1
-	)
-	INSERT INTO @tblDuplicatedPaymentNo (RowId,ErrorMessage)
-	SELECT p.RowId, d.ErrorMessage
-	FROM @PaymentList p
-	INNER JOIN  (
-		SELECT x.RowId, t.ErrorMessage FROM t 
-		CROSS APPLY (SELECT CAST (value AS INT) RowId  FROM STRING_SPLIT(t.RowIds,',')) x
-	) d ON p.RowId = d.RowId
-
-
 	IF @Template = 1 --Automate transfer
 	BEGIN
 		--  valid 
@@ -342,17 +317,17 @@ BEGIN
 					)
 				AND FromPayerID IS NOT NULL
 				AND (
-						(ToPayerID IS NULL AND NOT EXISTS (SELECT 1 FROM LA_Payment p WITH(NOLOCK) WHERE p.PaymentNo = t.PaymentNo AND p.Type IN (0,2)) AND isFinanceAcc = 1)
+						(ToPayerID IS NULL AND isFinanceAcc = 1)
 						OR
 						ToPayerID IS NOT NULL 
 					)
-				AND NOT EXISTS (SELECT 1 FROM @tblDuplicatedPaymentNo dupRow WHERE dupRow.RowId = t.RowId) 
+				
 
 			
 		-- Invalid
 		INSERT INTO @tblFail(RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,ErrorMessage)
 		SELECT	temp.RowId,temp.PaymentNo,temp.ReceivedDate,FromCustomer,ToCustomer,temp.Amount,ToAmount,ActualRate,RebatePayment,Description,
-				CASE  WHEN dupRow.RowId IS NOT NULL THEN dupRow.ErrorMessage
+				CASE  
 					 WHEN ISNUMERIC(temp.Amount)=0 OR ISNUMERIC(ActualRate)=0 OR CAST(ActualRate AS FLOAT) <= 0 OR CAST(temp.Amount AS FLOAT) = 0 THEN 'Invalid Amount or Actual Rate.'
 					 WHEN LEN(SUBSTRING(temp.Amount, CHARINDEX('.',temp.Amount ) + 1, LEN(temp.Amount))) > 2 AND CHARINDEX('.',temp.Amount) > 0 THEN 'Invalid Amount. Amount have 2 decimal digits only.'
 					 WHEN ISDATE(temp.ReceivedDate) = 0 THEN 'Invalid Received Date.' 
@@ -366,12 +341,11 @@ BEGIN
 					 WHEN FromCurrCode <> ToCurrCode AND FromCurrCode <> 'MYR' AND ToCurrCode <> 'MYR' THEN 'From Cust and To Cust must belong same currency code.'
 					 WHEN FromPayerID IS NULL THEN 'Invalid From Cust.'
 					 WHEN FromPayerID IS NOT NULL AND ToPayerID IS NULL AND EXISTS (SELECT 1 FROM LA_Payment p WITH(NOLOCK) WHERE p.PaymentNo = temp.PaymentNo AND p.Type IN (0,2)) THEN 'Payment No exists in the system.'
-					 WHEN FromPayerID IS NOT NULL AND ToPayerID IS NULL	AND isFinanceAcc = 0 THEN 'Invalid To Cust'
+					 WHEN FromPayerID IS NOT NULL AND ToPayerID IS NULL	AND isFinanceAcc = 0 THEN 'Invalid To Cust.'
 	
 					 ELSE 'Invalid From Cust or To Cust.' END AS Reason
 
 		FROM (SELECT *  FROM @tblInfo WHERE RowId not in (SELECT RowId FROM @tblSucc)) AS temp
-		LEFT JOIN @tblDuplicatedPaymentNo dupRow ON dupRow.RowId = temp.RowId
 
 		-- Valid 
 		SELECT RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ActualRate,RebatePayment,Description,
@@ -438,16 +412,16 @@ BEGIN
 				AND t.FromCurrencyID <> t.ToCurrencyID
 				AND FromPayerID IS NOT NULL
 				AND (
-						(ToPayerID IS NULL AND NOT EXISTS (SELECT 1 FROM LA_Payment p WITH(NOLOCK) WHERE p.PaymentNo = t.PaymentNo AND p.Type IN (0,2))  AND isFinanceAcc = 1)
+						(ToPayerID IS NULL AND isFinanceAcc = 1)
 						OR ToPayerID IS NOT NULL 
 						
 					)
-				AND NOT EXISTS (SELECT 1 FROM @tblDuplicatedPaymentNo dupRow WHERE dupRow.RowId = t.RowId)
+			
 
 
 		INSERT INTO @tblFail(RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,ErrorMessage)
 		SELECT	temp.RowId,temp.PaymentNo,temp.ReceivedDate,FromCustomer,ToCustomer,temp.Amount,ToAmount,ActualRate,RebatePayment,Description,
-				CASE WHEN dupRow.RowId IS NOT NULL THEN dupRow.ErrorMessage
+				CASE 
 					 WHEN ISNUMERIC(temp.Amount)=0 OR ISNUMERIC(ToAmount)= 0 OR CONVERT(MONEY,temp.Amount) = 0 OR CONVERT(MONEY,ToAmount) = 0 THEN 'Invalid Amount. From Amount and To Amount should not be equal to 0.' 
 					 WHEN (CONVERT(MONEY,temp.Amount) > 0 AND CONVERT(MONEY,ToAmount) < 0) OR (CONVERT(MONEY,temp.Amount) < 0 AND CONVERT(MONEY,ToAmount) > 0) THEN 'Invalid Amount. From Amount and To Amount have to be the same sign.'
 					 WHEN (LEN(SUBSTRING(temp.Amount, CHARINDEX('.',temp.Amount ) + 1, LEN(temp.Amount))) > 2 AND CHARINDEX('.',temp.Amount) > 0)   OR
@@ -462,11 +436,10 @@ BEGIN
 					 WHEN FromActualRate = 0 OR ToActualRate = 0 THEN 'Invalid Exchange Rate.'
 					 WHEN FromPayerID IS NULL THEN 'Invalid From Cust.'
 					 WHEN FromPayerID IS NOT NULL AND ToPayerID IS NULL AND EXISTS (SELECT 1 FROM LA_Payment p WITH(NOLOCK) WHERE p.PaymentNo = temp.PaymentNo AND p.Type IN (0,2)) THEN 'Payment No exists in the system.'
-					 WHEN FromPayerID IS NOT NULL AND ToPayerID IS NULL	AND isFinanceAcc = 0 THEN 'Invalid To Cust'
+					 WHEN FromPayerID IS NOT NULL AND ToPayerID IS NULL	AND isFinanceAcc = 0 THEN 'Invalid To Cust.'
 					 ELSE 'Invalid From Cust or To Cust.' END AS Reason
 						 
 		FROM  (SELECT * FROM @tblInfo WHERE RowId NOT IN (SELECT RowId FROM @tblSucc) ) AS temp 
-		LEFT JOIN @tblDuplicatedPaymentNo dupRow ON dupRow.RowId = temp.RowId
 
 		-- Valid
 		SELECT RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount AS FromAmount,ToAmount,RebatePayment,Description,SystemExRate,TransExrate,FromCustID, ToCustID
