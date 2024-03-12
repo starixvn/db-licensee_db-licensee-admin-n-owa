@@ -34,6 +34,7 @@ AS
 		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 		- 20231113@Danny: Support to remove up-coming waive period [RedmineID: #194868]
+		- 20240306@Danny: get last day of previous billing cycle by Param input [#201935]
 		
 	 Params:
 		+ @PayerId :specify Party
@@ -67,7 +68,7 @@ BEGIN
 	DECLARE @MaxInvoiceDate DATE
 	SELECT  @MaxInvoiceDate = MAX(InvoiceDate) 
 	FROM LA_InvoiceHeader WITH(NOLOCK) 
-	WHERE InvoiceType = 1 AND StatusId = 0 AND Environment = @Environment
+	WHERE InvoiceType = 1 AND StatusId = 0 AND Environment = @Environment AND PartyId = @PayerId
 
 	--get list Product
 	SELECT @ProductListAll = @ProductListAll + ProductPrefix + ','
@@ -114,6 +115,12 @@ BEGIN
 	SELECT MinFeeId , PartyId, ProductId, FeeTypeId, FeeAmount, CurrencyId, MinFeeTerm, FromDate, ToDate 
 	FROM dbo.LA_MinFee WITH (NOLOCK)
 	WHERE PartyId = @PayerId
+
+	DECLARE @Max_MF_FromDate DATE, @Max_Waive_FromDate DATE
+
+	SELECT @Max_MF_FromDate = MAX(CASE WHEN FeeTypeId = 1 THEN FromDate ELSE NULL END),
+		   @Max_Waive_FromDate = MAX(CASE WHEN FeeTypeId = 2 THEN FromDate ELSE NULL END)
+	FROM @Minfee
 
 	--======Discount/ Rebate ===---
 	INSERT INTO @Discount (PartyId, ProductId, FromDate, ToDate, DiscountGroupId, DiscountGroupName, DiscountGroupType)
@@ -213,7 +220,7 @@ BEGIN
 		, REPLACE(MinFeeTerm,'&amp;','&') MinFeeTerm
 		, FromDate
 		, ToDate
-		, CASE WHEN FromDate > @MaxInvoiceDate THEN 1 ELSE 0 END IsRemovable
+		, CASE WHEN (FromDate = @Max_MF_FromDate AND @MaxInvoiceDate IS NULL) OR (FromDate > @MaxInvoiceDate AND @MaxInvoiceDate IS NOT NULL) THEN 1 ELSE 0 END IsRemovable
 	FROM @Minfee m
 		INNER JOIN dbo.LA_f_Products3rd('') pr ON m.ProductID = pr.ProductID
 		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON m.CurrencyId = e.exchangeid
@@ -228,7 +235,7 @@ BEGIN
 		, pr.ProductName	AS ProductName
 		, FromDate
 		, ToDate
-		, CASE WHEN FromDate > @MaxInvoiceDate THEN 1 ELSE 0 END IsRemovable
+		, CASE WHEN (FromDate = @Max_Waive_FromDate AND @MaxInvoiceDate IS NULL) OR (FromDate > @MaxInvoiceDate AND @MaxInvoiceDate IS NOT NULL)  THEN 1 ELSE 0 END IsRemovable
 	FROM @Minfee w
 		INNER JOIN dbo.LA_f_Products3rd('') pr ON w.ProductID = pr.ProductID
 		INNER JOIN @ProductOrder po ON pr.ProductID = po.ProductId
