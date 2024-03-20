@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_HighForexExplanation]
 	@PartyIds					VARCHAR(MAX)
 	,@FromDate					DATE
@@ -19,6 +19,7 @@ AS
 
 	Revisions: 
 		- 20230704@Danny: Create Sp [#179232]
+		- 20240318@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -319,7 +320,7 @@ BEGIN
 
 			IF EXISTS( SELECT TOP 1 1 FROM #diff_summary WHERE ProductID = 10)
 			BEGIN
-				INSERT INTO @BettypeList_Adj VALUES (1800)
+				INSERT INTO @BettypeList_Adj VALUES (1800), (1801), (1802), (1803)
 				INSERT INTO @ProductCodeList_Adj VALUES ('AGC')
 			END
 			IF EXISTS( SELECT TOP 1 1 FROM #diff_summary WHERE ProductID = 31)
@@ -354,17 +355,22 @@ BEGIN
 				FROM dbo.LA_ChargeRateByCurrency bc WITH (NOLOCK)
 					INNER JOIN @ChargeRate c ON bc.ChargeId = c.ChargeId
 
-				CREATE TABLE #tmpLAData (winlostdate SMALLDATETIME, Currency INT, MemberWL MONEY, Comm MONEY, Pcomm MONEY, PartyID INT, ProductID INT, BaseCurrencyID INT)
-				INSERT INTO #tmpLAData (winlostdate, Currency, MemberWL, Comm, Pcomm, PartyID, ProductID, BaseCurrencyID)
+				CREATE TABLE #tmpLAData (winlostdate SMALLDATETIME, Currency INT, MemberWL MONEY, Comm MONEY, Pcomm MONEY, PartyID INT, ProductID INT, BaseCurrencyID INT,
+										 LicenseeContribution MONEY, JackpotPize MONEY, Promotion MONEY)
+				INSERT INTO #tmpLAData (winlostdate, Currency, MemberWL, Comm, Pcomm, PartyID, ProductID, BaseCurrencyID, LicenseeContribution, JackpotPize, Promotion)
 				SELECT r.rptDate, r.CurrencyId
-					,SUM(r.MemberWL) AS MemberWL
+					,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE r.MemberWL END) AS MemberWL
 					,SUM(r.CommissionA + r.CommissionP) AS Comm
 					,SUM(r.CommissionP)  Pcomm
 					,s.PartyID
 					,r.ProductID
 					,s.BaseCurrrencyID
+					,SUM(CASE WHEN gb.TypeId = 2 THEN -GrossWL ELSE 0 END) AS LicenseeContribution
+					,SUM(CASE WHEN gb.TypeId = 3 THEN r.MemberWL ELSE 0 END)  AS JackpotPrize
+					,SUM(CASE WHEN gb.TypeId IN (4,5,6,8) THEN r.MemberWL ELSE 0 END) Promotion
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
 					INNER JOIN @tblSite_adj s ON r.SiteId = s.SiteId
+					LEFT JOIN bodb_licensee.dbo.LA_f_GroupBettype() gb ON r.Bettype = gb.Bettype 
 				WHERE r.rptDate BETWEEN @FromDate AND @ToDate
 					AND r.ProductId IN (10,31)
 					AND r.StatusId NOT IN (-1, 101, 102, 103)
@@ -415,14 +421,14 @@ BEGIN
 		
 					INSERT INTO #tmpNAPData (winlostdate, currency, transdesc, AmountToCompany, ProductID, PartyID, BaseCurrencyID)
 					SELECT b.winlostdate, b.currency, b.transdesc, SUM(swinlost + mwinlost + awinlost + winlost - actual_stake + scomm),
-						  CASE WHEN b.bettype = 1800 THEN 10 ELSE 31 END ProductID, c.PartyID, c.BaseCurrencyID
+						  CASE WHEN b.bettype = 8000 THEN 31 ELSE 10 END ProductID, c.PartyID, c.BaseCurrencyID
 					FROM bodb02.dbo.bettrans b WITH (NOLOCK)
 						INNER JOIN @tblCustId c ON b.custid = c.CustId
 					WHERE b.winlostdate BETWEEN @FDate AND @TDate
 						AND b.currency <> 20
 						AND b.statusId IN (111, 112, 113)
 						AND b.bettype IN (SELECT z.bettype FROM @BettypeList_Adj z)
-					GROUP BY b.winlostdate, b.currency, b.transdesc, CASE WHEN b.bettype = 1800 THEN 10 ELSE 31 END, c.PartyID, c.BaseCurrencyID
+					GROUP BY b.winlostdate, b.currency, b.transdesc,  CASE WHEN b.bettype = 8000 THEN 31 ELSE 10 END, c.PartyID, c.BaseCurrencyID
 				END
 
 				IF @FromDate <= @MoveBetsDay AND @ToDate >= @BalanceUpDay
@@ -432,14 +438,14 @@ BEGIN
 
 					INSERT INTO #tmpNAPData (winlostdate, currency, transdesc, AmountToCompany, ProductID, PartyID, BaseCurrencyID)
 					SELECT b.winlostdate, b.currency, b.transdesc, SUM(swinlost + mwinlost + awinlost + winlost - actual_stake + scomm),
-							CASE WHEN b.bettype = 1800 THEN 10 ELSE 31 END ProductID, c.PartyID, c.BaseCurrencyID
+							CASE WHEN b.bettype = 8000 THEN 31 ELSE 10 END ProductID, c.PartyID, c.BaseCurrencyID
 					FROM bodb02.dbo.bettrans14 b WITH (NOLOCK)
 						INNER JOIN @tblCustId c ON b.custid = c.CustId
 					WHERE b.winlostdate BETWEEN @FDate AND @TDate
 						AND b.currency <> 20
 						AND b.statusId IN (111, 112, 113)
 						AND b.bettype IN (SELECT z.bettype FROM @BettypeList_Adj z)
-					GROUP BY b.winlostdate, b.currency, b.transdesc, CASE WHEN b.bettype = 1800 THEN 10 ELSE 31 END, c.PartyID, c.BaseCurrencyID
+					GROUP BY b.winlostdate, b.currency, b.transdesc, CASE WHEN b.bettype = 8000 THEN 31 ELSE 10 END, c.PartyID, c.BaseCurrencyID
 				END
 
 				IF @FromDate < @BalanceUpDay
@@ -454,14 +460,14 @@ BEGIN
 					SELECT @CustIds = COALESCE(@CustIds + ',', '') + CONVERT(VARCHAR(20), CustId) FROM @tblCustId
 					SET @SQL = 'SELECT winlostdate, currency, transdesc, AmountToCompany, ProductID, CustID
 								FROM OPENQUERY(DBARC, ''SELECT winlostdate, currency, transdesc, SUM(swinlost + mwinlost + awinlost + winlost - actual_stake + scomm) AS AmountToCompany, CustID,
-															   CASE WHEN bettype = 1800 THEN 10 ELSE 31 END ProductID
+															   CASE WHEN bettype = 8000 THEN 31 ELSE 10 END ProductID
 														FROM bodb_Archive.dbo.bettrans_bk WITH (NOLOCK)
 														WHERE winlostdate BETWEEN ''''' + CONVERT(VARCHAR(10), @FDate, 120) + ''''' AND ''''' + CONVERT(VARCHAR(10), @TDate, 120) + '''''
 															AND custid IN (' + @CustIds + ')
 															AND currency <> 20
 															AND statusId IN (111, 112, 113)
 															AND bettype IN (' + @Bettype_Adjs + ')
-														GROUP BY winlostdate, currency, transdesc, CustID, CASE WHEN bettype = 1800 THEN 10 ELSE 31 END, CustID'')'
+														GROUP BY winlostdate, currency, transdesc, CustID, CASE WHEN bettype = 8000 THEN 31 ELSE 10 END, CustID'')'
 
 					INSERT INTO #tmpNAPData_bk (winlostdate, currency, transdesc, AmountToCompany, ProductID, CustID)
 					EXEC (@SQL)
@@ -495,8 +501,12 @@ BEGIN
 			-- LA
 			INSERT INTO @Result_adj (PartyID, ProductID, BaseCurrencyID, Func, Currency, [Type], ExRate, AmountToCompany, BasedAmountToCompany)
 			SELECT d.PartyID, d.ProductID, d.BaseCurrencyID, 'LA', NULL Currency, 'Actual Bet', NULL ExRate
-				,SUM(CASE WHEN d.ProductId = 31 AND @FromDate >= @ExchangeTerm_CutOffDate THEN (d.MemberWL + d.Pcomm) * ISNULL(bc.Rate, c.Rate)  ELSE d.MemberWL * ISNULL(bc.Rate, c.Rate) + d.Comm END) AS AmountToCompany
-				,SUM(CASE WHEN d.ProductId = 31 AND @FromDate >= @ExchangeTerm_CutOffDate THEN (d.MemberWL + d.Pcomm) * ISNULL(bc.Rate, c.Rate) ELSE (d.MemberWL * ISNULL(bc.Rate, c.Rate) + d.Comm) END  * e.Rate) AS BasedAmountToCompany
+				,SUM(CASE WHEN d.ProductId = 31 AND @FromDate >= @ExchangeTerm_CutOffDate THEN (d.MemberWL + d.Pcomm) * ISNULL(bc.Rate, c.Rate)  
+						  WHEN d.ProductID = 10 THEN -((-d.MemberWL) * ISNULL(bc.Rate, c.Rate) + d.LicenseeContribution - d.JackpotPize -d.Promotion)
+				     ELSE d.MemberWL * ISNULL(bc.Rate, c.Rate) + d.Comm END) AS AmountToCompany
+				,SUM(CASE WHEN d.ProductId = 31 AND @FromDate >= @ExchangeTerm_CutOffDate THEN (d.MemberWL + d.Pcomm) * ISNULL(bc.Rate, c.Rate) 
+					      WHEN d.ProductID = 10 THEN -((-d.MemberWL) * ISNULL(bc.Rate, c.Rate) + d.LicenseeContribution - d.JackpotPize -d.Promotion)
+				     ELSE (d.MemberWL * ISNULL(bc.Rate, c.Rate) + d.Comm) END  * e.Rate) AS BasedAmountToCompany
 			FROM #tmpLAData d
 				INNER JOIN @Exchange e ON d.Currency = e.ExchangeId AND d.winlostdate = e.ExchangeDate AND e.BaseCurrencyID = d.BaseCurrencyID
 				INNER JOIN @ChargeRate c ON d.winlostdate BETWEEN c.FromDate AND c.ToDate AND d.ProductID = c.ProductID AND c.PartyID = d.PartyID

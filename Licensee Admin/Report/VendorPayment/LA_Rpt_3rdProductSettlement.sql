@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -33,6 +33,7 @@ AS
 	- 20231017@Danny: Change AGC 3rd billing term [RedmineID: #195338]
 	- 20231109@Danny: Intergrate World Entertainment Live Casino [#194603]
 	- 20231218@Danny: Integrate Promotion Prize - Live22 [RedmineID: #197267]
+	- 20240222@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
 	- 20240123@Danny: Change Credit licensing fee fomular [RedmineID: #197267]
 
  * Param's Explanation:
@@ -864,7 +865,10 @@ BEGIN
 				SUM(ISNULL(b.Turnover,0)) Turnover,
 				SUM(ISNULL(b.CommissionA,0)) CommissionA,
 				SUM(ISNULL(b.CommissionP,0)) CommissionP,
-				SUM(CASE WHEN e.TypeID IN (4,5,6,8) THEN b.MemberWL ELSE 0 END) Promotion
+				SUM(CASE WHEN e.TypeID IN (4,5,6,8) THEN b.MemberWL ELSE 0 END) Promotion,
+				SUM(CASE WHEN e.TypeID = 3 THEN b.MemberWL ELSE 0 END)  AS JackpotPrize,
+				SUM(CASE WHEN e.TypeID = 2 THEN b.ExtraAmount ELSE 0 END)  AS FullContribution,
+				SUM(CASE WHEN e.TypeID = 2 THEN -b.GrossWL ELSE 0 END) AS LicenseeContribution
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND  b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 				INNER JOIN @productDataView p ON b.ProductID = p.ProductID
@@ -878,7 +882,7 @@ BEGIN
 				AND p.isRptLicCashoutSummarySource = 0
 			GROUP BY b.SiteID, b.rptDate, b.CurrencyId, b.ProductID
 		)
-		INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,ExtraPT,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier,ProductID, TurnoverForCommision, CBPrize, CashOut, CashInAmount, Turnover, Promotion, LicenseeChargeRate, isDeposit)
+		INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,ExtraPT,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier,ProductID, TurnoverForCommision, CBPrize, CashOut, CashInAmount, Turnover, Promotion, LicenseeChargeRate, isDeposit, JackpotPrize, FullContribution, LicenseeContribution)
 		SELECT ci.PartyId,
 			b.Winlostdate as Winlostdate,
 			b.CurrencyId,
@@ -902,8 +906,11 @@ BEGIN
 			SUM(CashInAmount),
 			SUM(Turnover),
 			SUM(Promotion),
-			SUM((LicenseeWinloss) * ISNULL(cr.Rate, ci.Rate)) AS LicenseeChargeRate,
-			ci.isDeposit
+			SUM((LicenseeWinloss- LicenseeContribution) * ISNULL(cr.Rate, ci.Rate)) AS LicenseeChargeRate,
+			ci.isDeposit,
+			SUM(b.JackpotPrize),
+			SUM(b.FullContribution),
+			SUM(b.LicenseeContribution)
 		FROM cte_Summary b WITH (NOLOCK)
 			INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
 			LEFT JOIN #ChargeRate ci_3rd ON b.SiteID = ci_3rd.LicenseeId AND  b.ProductID = ci_3rd.ProductID AND b.Winlostdate BETWEEN ci_3rd.FromDate3rd AND ci_3rd.Todate3rd
@@ -1203,7 +1210,7 @@ BEGIN
 							END
 
 			UPDATE r
-			SET r.PayToSupplier = a.ApplyRate * r.LicenseeWinLoss
+			SET r.PayToSupplier = a.ApplyRate * r.LicenseeWinLoss + r.FullContribution - r.JackpotPrize - r.Promotion
 			FROM #TempData r INNER JOIN @ApplyRange a ON r.ParentId = a.ParentId
 			WHERE r.ProductID = 10
 		END

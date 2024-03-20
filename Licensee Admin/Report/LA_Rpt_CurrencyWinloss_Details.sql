@@ -1,4 +1,4 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="wsv_nap,wsv_lap" isFunction="0" isNested="0"></info>*/
 USE bodb02
 GO
 
@@ -62,6 +62,7 @@ AS
 	   - 20230510@Danny: New commercial terms for 12B [RedmineID: #186543]
 	   - 20230823@Danny: Incorporate US$KH currency [RedmineID: #192544]
 	   - 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
+	   - 20240314@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -216,28 +217,29 @@ BEGIN
 
 	IF (EXISTS (SELECT 1 FROM #Products WHERE ProductCode IN ('AGC','GD','VG','BX')) AND @SportType = 0 AND @ReportBy = 0 AND @Bettype = 0)
 	BEGIN
-		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm)
+		; WITH b AS
 		(
-			SELECT b.rptDate,p.PartyID,b.CurrencyId
-					,SUM(b.Turnover * 
+			SELECT b.rptDate,
+					p.PartyID,
+					b.CurrencyId Currency
+					,b.ProductID
+					,SUM( CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE b.Turnover END * 
 									(CASE	WHEN @drawfilter IN (2, 3) AND b.[StatusId] = 111  THEN 0
 											WHEN @drawfilter IN (2, 3) AND b.[StatusId] IN (114,115) THEN 0.5
 											ELSE 1 
-									 END))
-					,SUM(b.MemberWL + CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END)
-					,SUM(-b.MemberWL - CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END)
+									 END))  TurnOver
+					,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE b.MemberWL + CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END END) Winlost
+					,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE-b.MemberWL - CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END END) LicenseeWL
 					,0 AS AmtDueToBA
 					,0 AS CommBA
-					, SUM(
-						CASE WHEN b.ProductID=31 THEN CASE WHEN b.rptDate < @ExchangeTerm_CutOffDate THEN -b.MemberWL * ISNULL(cc.Rate,p.Rate) - (b.CommissionA + b.CommissionP)
-													  ELSE  -(b.MemberWL +  b.CommissionP) * ISNULL(cc.Rate,p.Rate) END
-						ELSE -b.MemberWL * ISNULL(cc.rate,p.Rate) END
-					 ) Company
-					,SUM(b.Betcount * (CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END))
-					,SUM(b.commissionP)
+					,SUM(CASE WHEN gb.Bettype IS NOT NULL THEN 0 ELSE b.Betcount END * (CASE WHEN @drawfilter = 2 AND b.[StatusId] = 111 THEN 0 ELSE 1 END)) Betcount
+					,SUM(b.commissionP)  Playercomm
+					,SUM(b.CommissionA) Acomm
+					,SUM(CASE WHEN gb.TypeId = 2 THEN -GrossWL ELSE 0 END) AS LicenseeContrib
 			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #tmpParty p ON b.SiteID = p.LicenseeID AND p.ProductID=b.ProductID AND b.rptDate BETWEEN p.Fromdate AND p.Todate
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID = p.ChargeId AND b.CurrencyId=cc.CurrencyID
+			LEFT JOIN bodb_licensee.dbo.LA_f_GroupBettype() gb ON b.Bettype = gb.Bettype 
 			WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate) AND
 					 b.StatusId NOT IN (-1, 101, 102, 103) AND
 					(@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c)) AND
@@ -245,10 +247,36 @@ BEGIN
 					b.CustomerCategory NOT IN (27,28) AND
 					p.ProductID IN (10,11,12,31) AND
 					p.ChargeType = 1 AND -- gross win
-					b.bettype <> @GD_Tip
+					b.bettype <> @GD_Tip 
+
 			GROUP BY b.rptDate
 					,p.PartyID
 					,b.CurrencyID
+					,b.ProductID
+		)
+
+		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm)
+		(
+			SELECT b.rptDate,p.PartyID,b.Currency
+					,SUM(b.Turnover)
+					,SUM(b.Winlost)
+					,SUM(b.LicenseeWL)
+					,0 AS AmtDueToBA
+					,0 AS CommBA
+					, SUM(
+						CASE WHEN b.ProductID=31 THEN CASE WHEN b.rptDate < @ExchangeTerm_CutOffDate THEN -b.Winlost * ISNULL(cc.Rate,p.Rate) - (b.Acomm + b.Playercomm)
+													  ELSE  -(b.Winlost +  b.Playercomm) * ISNULL(cc.Rate,p.Rate) END
+							 WHEN b.ProductID = 10 THEN (-b.Winlost - b.LicenseeContrib)  * ISNULL(cc.Rate,p.Rate)
+						ELSE -b.Winlost * ISNULL(cc.rate,p.Rate) END
+					 ) Company
+					,SUM(b.Betcount)
+					,SUM(b.Playercomm)
+			FROM  b WITH (NOLOCK)
+			INNER JOIN #tmpParty p ON b.PartyID = p.PartyID AND p.ProductID=b.ProductID AND b.rptDate BETWEEN p.Fromdate AND p.Todate
+			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID = p.ChargeId AND b.Currency=cc.CurrencyID
+			GROUP BY b.rptDate
+					,p.PartyID
+					,b.Currency
 
 			UNION ALL
 			-- GD tip
