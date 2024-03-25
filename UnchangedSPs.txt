@@ -1,16 +1,2 @@
-Licensee Admin\Core SP\LA_AmountToCompanyByProduct.sql
-Licensee Admin\Invoice\GenerateMultipleInvoices\LA_Inv_MultipleGenerationTemporaryInvoiceSel.sql
 Licensee Admin\Invoice\InvoiceAmountGenerate\LA_Inv_GenerateAmountForSoftwareFee.sql
-Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_AmountToCompanySel.sql
-Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_HighForexExplanation.sql
-Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_StraightDiscountSel.sql
-Licensee Admin\Invoice\LA_Inv_InvoiceAmountGenerate.sql
-Licensee Admin\Invoice\LA_Inv_InvoiceWaiveGet.sql
-Licensee Admin\Invoice\LA_Inv_RebateWorksheetSel.sql
-Licensee Admin\Report\Analysis\LA_GEN_LicPerformanceAnalysis_Invoice.sql
-Licensee Admin\Report\Analysis\LA_GEN_LicPerformanceAnalysis_Report.sql
-Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_Detail.sql
-Licensee Admin\Report\LA_Rpt_LicenseeBillingDataByProduct.sql
-
-
 

@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="1"></info>*/
 USE [bodb_Licensee]
 GO
 
@@ -43,6 +43,7 @@ AS
 		- 20231005@Danny: Change charge rate and tier rebate for Alek group from Oct 2023 [RedmineID: #194561]
 		- 20231110@Danny: Adjust fomular tier rebate [RedmineID: #196685]
 		- 20230223@Danny: Integrate Casino promotion [#194808]
+		- 20240321@Danny: Change fomular AGC Deduct prepayment [#197268]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -1252,11 +1253,14 @@ BEGIN
 			SELECT r.PartyId, 10, -1, MAX(d.RemainingAGPrepayment), MIN(t.DeductedAGPrepayment) AS DeductedAGPrepayment, 0
 			FROM @Result r
 				INNER JOIN @Deductions d ON r.PartyId = d.PartyId
+				LEFT JOIN @Result r1 ON r1.PartyId = r.PartyId AND r1.ProductId = r.ProductId AND r1.LicensingFeeTypeId = 1
+				LEFT JOIN @Result r2 ON r2.PartyId = r.PartyId AND r2.ProductId = r.ProductId AND r2.LicensingFeeTypeId = 2
+				LEFT JOIN @Result r3 ON r3.PartyId = r.PartyId AND r3.ProductId = r.ProductId AND r3.LicensingFeeTypeId = 3
 				CROSS APPLY (
-					SELECT r.LicensingFee - r.Discount AS DeductedAGPrepayment
+					SELECT r.LicensingFee - r.Discount + ISNULL(r1.ExtraAmount,0) - ISNULL(r2.ExtraAmount,0) - ISNULL(r3.ExtraAmount,0) AS DeductedAGPrepayment
 					UNION ALL SELECT d.RemainingAGPrepayment
 				) t
-			WHERE r.ProductId = 10 -- AG Casino
+			WHERE r.ProductId = 10 AND r.LicensingFeeTypeId = 0 -- AG Casino
 			GROUP BY r.PartyId
 			HAVING MIN(t.DeductedAGPrepayment) > 0
 		END
