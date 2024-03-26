@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -23,6 +23,7 @@ AS
 		- 20171205@Bruce: exclude void invoice [#87723]
 		- 20190326@Bruce: Include invoice language [#102830]
 		- 20210705@Sophia: Revise, fix the MAX(InvoiceNumber) [Redmine: #158041]
+		- 20240410@Danny: Return biller CompanyName & Address1  [Redmine: #194604]
 */
 /*	Example:
 	USE bodb_licensee
@@ -70,6 +71,12 @@ BEGIN
 	DECLARE @InvoiceSymbol NVARCHAR(20) = ''
 	DECLARE @InvoiceNumber INT = 1
 	DECLARE @SameInvoiceNoList TABLE (InvoiceType INT)
+	DECLARE @CompanyName NVARCHAR(100)
+	DECLARE @BillerAddress1 NVARCHAR(255)
+
+	SELECT @CompanyName = CompanyName , @BillerAddress1 = Address1
+	FROM LA_BillerInfo WITH(NOLOCK)
+	WHERE PartyId = @BillerId
 
 	-- 1: software fee, 6: hosting fee
 	IF @InvoiceType IN (1,6) INSERT INTO @SameInvoiceNoList VALUES(1),(6)
@@ -104,6 +111,8 @@ BEGIN
 		, ii.InvoiceTemplatePath
 		, ISNULL(ii.IsSeparateProduct,0) AS IsSeparateProduct
 		, ISNULL(ii.InvoiceLanguage, 'en-US') AS InvoiceLanguage
+		, @CompanyName  AS CompanyName
+		, @BillerAddress1 AS BillerAddress1
 	FROM @InvoiceInfo ii
 
 END

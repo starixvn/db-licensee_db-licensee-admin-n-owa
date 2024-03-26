@@ -32,6 +32,7 @@ AS
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 		- 20230605@Danny: Invoice No should be listed in ascending order by number [RedmineID: #189284]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
+		- 20240410@Danny: Return biller CompanyName & Address1  [Redmine: #194604]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -288,12 +289,14 @@ BEGIN
 			,InvoiceHeaderId BIGINT, InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, InvoicePath NVARCHAR(256)
 			,BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50), ProductCodes VARCHAR(MAX)
 			,LicensingFee MONEY, Discount MONEY, Rebate MONEY, AdjustmentAmount MONEY, AdjustmentNote NVARCHAR(500), IsHideRebateWorkSheet BIT
+			,CompanyName NVARCHAR(100), BillerAddress1 NVARCHAR(255)
 		)
 
 		INSERT INTO @_Result
 		(
 			RowIndex, IndexNumber, PartyId, PartyName, BrandName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath
 			,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsHideRebateWorkSheet
+			,CompanyName, BillerAddress1
 		)
 		SELECT
 			ROW_NUMBER() OVER(ORDER BY ISNULL(r.InvoiceNumber, ivs.InvoiceNumber)) AS RowIndex
@@ -318,6 +321,8 @@ BEGIN
 			,SUM(ISNULL(r.AdjustmentAmount, 0)) AS AdjustmentAmount
 			,ISNULL(r.AdjustmentNote, N'') AS AdjustmentNote
 			,ivs.IsHideRebateWorkSheet
+			,b.CompanyName
+			,b.Address1
 		FROM @PartySettings ps
 			INNER JOIN @InvoiceSettings ivs ON ps.PartyId = ivs.PartyId
 			LEFT JOIN @FinalResult r ON ps.PartyId = r.PartyId AND ivs.BillerId = r.BillerId AND ivs.InvTypeId = r.InvoiceType
@@ -340,12 +345,15 @@ BEGIN
 			,CASE WHEN ivs.InvTypeId = 1 THEN ivs.ProductCodes ELSE '' END
 			,ISNULL(r.AdjustmentNote, N'')
 			,ivs.IsHideRebateWorkSheet
+			,b.CompanyName
+			,b.Address1
 	END
 	-- End Region: Final Result
 
 	-- Return data
 	SELECT RowIndex, IndexNumber, PartyId, PartyName, BrandName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath
 		,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsHideRebateWorkSheet
+		,CompanyName, BillerAddress1
 	FROM @_Result
 	ORDER BY InvoiceNumber
 END
