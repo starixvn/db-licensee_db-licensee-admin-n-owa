@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -17,6 +17,7 @@ AS
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20220210@Percy: Add @EndOfSupportDate to get active products + get products offer deposit [RedmineID: #163495]
 		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
+		- 20240306@Danny: Merge virtual sports product [RemineID: #199478]
 		
 	Params:
 		. @PayerId
@@ -44,6 +45,7 @@ BEGIN
 			AND (@PayerId = 0 OR c.FromParty = @PayerId)
 	)
 		AND p.ProductId = p.GroupProductId
+		AND p.ProductId NOT IN ( 27, 49, 77, 83)
 		AND (@EndOfSupportDate IS NULL OR p.EndOfSupportDate IS NULL OR p.EndOfSupportDate >= @EndOfSupportDate)
 		AND p.OfferSite IN (0, 2) -- 0: both credit & deposit, 1: credit, 2: deposit
 	ORDER BY p.ProductId

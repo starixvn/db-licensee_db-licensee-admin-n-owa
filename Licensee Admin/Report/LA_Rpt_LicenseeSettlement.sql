@@ -200,13 +200,14 @@ BEGIN
 		Bettype		INT,
 		ProductId	INT
 	)
-	INSERT INTO @Bettype (Bettype, ProductId)
-	(
-		SELECT Bettype, ProductID
-		FROM bodb_licensee.dbo.LA_f_BettypeProductMapping(0, @ProductCode)
-		WHERE ProductID IN (SELECT x.ProductID FROM bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCode,@FromDate,@ToDate) x)
-	)
 	
+	; with t as 
+	(
+		SELECT STRING_AGG(ProductCode,',') ProductCodes  FROM bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCode,@FromDate,@ToDate) x
+	)INSERT INTO @Bettype (Bettype, ProductId)
+	SELECT x.Bettype, x.ProductID FROM t 
+	CROSS APPLY ( SELECT Bettype, ProductID FROM  bodb_licensee.dbo.LA_f_BettypeProductMapping(0, t.ProductCodes) x )x
+
 	SELECT @LicenseeID = LicenseeID FROM @ChargeInfo
 	IF @LicenseeID IS NULL
 	BEGIN

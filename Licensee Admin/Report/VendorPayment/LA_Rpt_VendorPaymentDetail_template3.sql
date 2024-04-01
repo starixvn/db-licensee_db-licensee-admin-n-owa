@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template3]
 	@PartyIds			VARCHAR(4000)
 	,@ProductID			INT
@@ -17,13 +17,17 @@ AS
  * Revisions
 	- 20210615@Danny: Initialize SP [#168387]
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
+	- 20240301@Danny: LicensingFee And PaytoSupplier figure based on setting [RemineID: #199478]
  */
 
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @ProductCode VARCHAR(50)
+	DECLARE @ProductCode VARCHAR(50), @CutoffDate_BaseOnSetting DATETIME = '2024-03-01'
 	SELECT @ProductCode = ProductPrefix FROM dbo.Product3rd WITH(NOLOCK) WHERE Productid = @ProductID
+
+	DECLARE @IsConvertNegativeFeeToZero BIT, @IsConvertNegativePaytoSupplierToZero BIT
+	SELECT @IsConvertNegativeFeeToZero = IsConvertNegativeFeeToZero, @IsConvertNegativePaytoSupplierToZero = IsConvertNegativePaytoSupplierToZero  FROM dbo.LA_VendorPaymentSetting WITH(NOLOCK) WHERE ProductId = @ProductID
 
 	IF ISNULL(@PlatformId, 0) <> 0
 	BEGIN
@@ -66,12 +70,17 @@ BEGIN
 	DELETE @ChargeInfos
 	WHERE IsDeposit = 1 AND Rate = 0	
 	
-	DECLARE @PartyList AS TABLE (PartyId INT, PartyName	VARCHAR(100), BranchName VARCHAR(100), ParentId	INT)
+	DECLARE @PartyList AS TABLE (PartyId INT, PartyName	VARCHAR(100), BranchName VARCHAR(100), ParentId	INT, IsKeepNegativeAmount BIT DEFAULT 0)
 
 	INSERT INTO @PartyList (PartyId, PartyName, BranchName, ParentId)
 	EXEC bodb_licensee.dbo.LA_PartyListSel
 
 	UPDATE @PartyList SET PartyName = REPLACE(PartyName,' Licensees','') WHERE ParentId = 0
+
+	UPDATE t 
+	SET t.IsKeepNegativeAmount = CASE WHEN u.PartyId IS NULL THEN 0 ELSE 1 END 
+	FROM @PartyList t 
+	LEFT JOIN bodb_Licensee.dbo.LA_f_JVPartyListSel() u ON u.PartyId = t.PartyId
 		
 	DELETE p
 	FROM @PartyList p
@@ -168,6 +177,22 @@ BEGIN
 	FROM #Result r
 		INNER JOIN @Charge3rdInfos ci_3rd ON r.PartyId = ci_3rd.PartyId
 
+	DECLARE @TotalByParty TABLE 
+	(	
+		PartyId					INT,
+		Total_PayToSupplier		MONEY,
+		Total_OneworksIncome	MONEY,
+		IsKeepNegativeAmount	BIT
+	)
+
+	INSERT INTO @TotalByParty (PartyId, Total_PayToSupplier, Total_OneworksIncome, IsKeepNegativeAmount)
+	SELECT	r.PartyId, SUM(PayToSupplier), SUM(OneworksIncome), p.IsKeepNegativeAmount
+	FROM	#Result r
+	INNER JOIN @PartyList p ON r.PartyId = p.PartyId
+	GROUP BY r.PartyId, p.IsKeepNegativeAmount
+
+
+
 	SELECT	r.PartyName, 
 			FORMAT (r.WinLossDate, 'MMMM yyyy') WinLossDate, 
 			r.SportType, 
@@ -184,10 +209,23 @@ BEGIN
 			r.BetCount AS TotalTransaction, 
 			r.Turnover, 
 			r.GrossWinloss AS GrossWin, 
-			r.PayToSupplier, 
-			r.OneworksIncome AS AmountCompany, 
-			r.NetIncome
+			
+			CASE WHEN @FromDate < @CutoffDate_BaseOnSetting THEN CASE WHEN tp.Total_PayToSupplier < 0 THEN 0 ELSE r.PayToSupplier END
+				 WHEN  @FromDate >= @CutoffDate_BaseOnSetting THEN CASE WHEN tp.Total_PayToSupplier < 0 AND @IsConvertNegativePaytoSupplierToZero = 1 THEN 0 ELSE r.PayToSupplier END
+				 END PayToSupplier, 
+			CASE WHEN  @FromDate < @CutoffDate_BaseOnSetting THEN  CASE WHEN tp.Total_OneworksIncome < 0 AND tp.IsKeepNegativeAmount = 0 THEN 0 ELSE r.OneworksIncome END
+			     WHEN  @FromDate >= @CutoffDate_BaseOnSetting THEN CASE WHEN tp.Total_OneworksIncome < 0 AND @IsConvertNegativeFeeToZero = 1 AND IsKeepNegativeAmount = 0 THEN 0 ELSE r.OneworksIncome END
+			END AS AmountCompany, 
+
+			CASE WHEN  @FromDate < @CutoffDate_BaseOnSetting THEN  CASE WHEN tp.Total_OneworksIncome < 0 AND tp.IsKeepNegativeAmount = 0 THEN 0 ELSE r.OneworksIncome END
+			     WHEN  @FromDate >= @CutoffDate_BaseOnSetting THEN CASE WHEN tp.Total_OneworksIncome < 0 AND @IsConvertNegativeFeeToZero = 1 AND IsKeepNegativeAmount = 0 THEN 0 ELSE r.OneworksIncome END
+			END
+			- 
+			CASE WHEN @FromDate < @CutoffDate_BaseOnSetting THEN CASE WHEN tp.Total_PayToSupplier < 0 THEN 0 ELSE r.PayToSupplier END
+				 WHEN  @FromDate >= @CutoffDate_BaseOnSetting THEN CASE WHEN tp.Total_PayToSupplier < 0 AND @IsConvertNegativePaytoSupplierToZero = 1 THEN 0 ELSE r.PayToSupplier END
+			END NetIncome
 	FROM #Result r
+	INNER JOIN @TotalByParty tp ON r.PartyId = tp.PartyId
 	LEFT JOIN bodb02.dbo.Sports sp WITH(NOLOCK) ON sp.SportType = r.SportType
 	LEFT JOIN bodb02.dbo.bettype b WITH(NOLOCK) ON b.typeid = r.BetType
 	ORDER BY r.PartyName, r.WinLossDate ASC,  r.sporttype, r.bettype

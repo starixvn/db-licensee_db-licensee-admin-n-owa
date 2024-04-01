@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template1]
 	@PartyIds			VARCHAR(4000)
 	,@ProductID			INT
@@ -127,7 +127,7 @@ BEGIN
 						c.ProductID, 
 						CASE WHEN c.IsDeposit = 0 THEN 0 ELSE c.DI_Rate END AS Rate, 
 						-- Rate3rd
-						CASE WHEN c.ProductID = 27 AND c.isDeposit = 0 THEN 0.01
+						CASE WHEN @ProductID = 27 AND c.isDeposit = 0 THEN 0.01
 							 WHEN c.ProductID = 40 THEN CASE WHEN @FromDate >= CAST('2020-07-01' AS DATETIME) THEN  CASE WHEN c.PartyID IN (@TianboPartyId, @BobbetPartyId) THEN 0.02 ELSE 0.036  END ELSE ISNULL(r.DI_Rate,0) END
 							 WHEN c.ProductID = 8 THEN CASE 
 															WHEN c.PartyId = @CN88PartyId THEN 0.015

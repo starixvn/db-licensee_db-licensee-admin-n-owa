@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -34,11 +34,14 @@ AS
 		- 20231005@Danny: Change charge rate and tier rebate for Alek group from Oct 2023 [RedmineID: #194561]
 		- 20231115@Danny: Final licensing fee for 3rd products [RedmineID: #191813]
 		- 20241201@Danny: Enhance rule regen data [RedmineID: #199448]
+		- 20240312@Danny: Fix issue when exec SP with @IsOverwrite = 0 [RedmineID: #202151]
 
 */
 
 BEGIN
 	SET NOCOUNT ON
+
+	SELECT @IsOverwrite = 1
 
 	-- Get Product List
 	DECLARE @tmpProductList TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(50), FromDate DATETIME, ToDate DATETIME)
@@ -151,7 +154,7 @@ BEGIN
 			)
 			DELETE c
 			FROM @tmpChargeInfo c
-				INNER JOIN CTE_Data d ON c.LicenseeId = d.SiteId AND c.ProductId = d.ProductId
+				INNER JOIN CTE_Data d ON c.LicenseeId = d.SiteId
 		END
 
 		DELETE @tmpPartyList WHERE PartyId NOT IN (SELECT c.PartyId FROM @tmpChargeInfo c)

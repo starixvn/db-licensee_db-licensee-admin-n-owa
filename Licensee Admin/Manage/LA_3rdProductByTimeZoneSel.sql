@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_3rdProductByTimeZoneSel] 
 	 @ProductCodes		VARCHAR(4000)		= '',
 	 @Timezone			INT = 1,
@@ -13,6 +13,7 @@ AS
 	- 20221123@Danny: Intergrate MG-RNG [#176986]
 	- 20230224@Danny: Intergrate Jili [#183766]
 	- 20230222@Danny: Remove hard-code bettype And ProductID [#183739]
+	- 20240301@Danny: Merge virtual sports product [RemineID: #199478]
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
 							= 1: GMT-4
@@ -46,7 +47,7 @@ BEGIN
 	SELECT	ProductID, 
 			ProductPrefix,
 			ProductName,
-			CASE WHEN ProductID IN (2, 31, 21, 25, 15) OR ProductPrefix = 'SB_MuayThai'  THEN 1 ELSE 0 END isKeepNegativeFee , 
+			CASE WHEN ProductID IN (2, 31, 21, 25, 15, 27, 49, 77, 83) OR ProductPrefix = 'SB_MuayThai'  THEN 1 ELSE 0 END isKeepNegativeFee , 
 			CASE WHEN ProductID = 5 THEN 0 ELSE 1 END isKeepNegativePayToSupplier,
 			CASE WHEN ProductID IN (2, 22,23,34) OR ProductPrefix = 'SB_BetBuilder' THEN 1 ELSE 0 END isRptBettingSource,
 			CASE WHEN ProductPrefix = 'SB_MuayThai' THEN 1 ELSE 0 END isRptBettingBySportSource,
