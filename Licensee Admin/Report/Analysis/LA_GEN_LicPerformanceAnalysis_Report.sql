@@ -1,5 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
-USE bodb_licensee
+/*<info serverAlias="DBLIC-bodb_licenseeReport" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
+USE bodb_licenseeReport
 GO
 
 ALTER PROCEDURE [dbo].LA_GEN_LicPerformanceAnalysis_Report
@@ -15,7 +15,7 @@ AS
 	Created: BRUCE
 	Date: 20190312
 	Task: Licensee Performance Analysis (PowerBI)
-	DB: bodb_licensee
+	DB: bodb_licenseeReport
 	Remark: generate licensee performance analysis report
 
 	Revisions:
@@ -35,6 +35,7 @@ AS
 		- 20231115@Danny: Final licensing fee for 3rd products [RedmineID: #191813]
 		- 20241201@Danny: Enhance rule regen data [RedmineID: #199448]
 		- 20240312@Danny: Fix issue when exec SP with @IsOverwrite = 0 [RedmineID: #202151]
+		- 20240401@Danny: Change meta data [#203267]
 
 */
 
@@ -47,11 +48,11 @@ BEGIN
 	DECLARE @tmpProductList TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(50), FromDate DATETIME, ToDate DATETIME)
 	INSERT INTO @tmpProductList (GroupProductId, ProductId, ProductCode, FromDate, ToDate)
 	SELECT GroupProductId, ProductId, ProductCode, FromDate, ToDate
-	FROM dbo.LA_f_GroupProduct('', @FromDate, @ToDate) g   -- get all products
+	FROM bodb_licensee.dbo.LA_f_GroupProduct('', @FromDate, @ToDate) g   -- get all products
 
 	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT)
 	INSERT INTO @tmpPartyOfferCrypto(PartyId)
-	SELECT  PartyID FROM LA_f_CryptoPartyListSel() WHERE IsBillingCryptoCurrency = 1
+	SELECT  PartyID FROM bodb_licensee.dbo.LA_f_CryptoPartyListSel() WHERE IsBillingCryptoCurrency = 1
 
 	IF ',' + @ProductCodes + ',' LIKE ',ADJUST,' -- Adjustment
 		INSERT INTO @tmpProductList (ProductId, ProductCode)
@@ -74,11 +75,11 @@ BEGIN
 		UPDATE t
 		SET t.SiteId = p.OldRefId, t.BaseCurrencyId = ISNULL(c.BaseCurrencyId, 6)
 		FROM @tmpPartyList t
-			INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON t.PartyId = p.PartyId AND p.PartyType = 1
-			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyId = pd.PartyId AND pd.IsDeposit = 1
+			INNER JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON t.PartyId = p.PartyId AND p.PartyType = 1
+			INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyId = pd.PartyId AND pd.IsDeposit = 1
 			OUTER APPLY (
 				SELECT TOP 1 bc.BaseCurrencyId
-				FROM dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK)
+				FROM bodb_licensee.dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK)
 				WHERE p.PartyId = bc.PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
 				ORDER BY bc.ToDate DESC
 			) c
@@ -89,11 +90,11 @@ BEGIN
 	BEGIN
 		INSERT INTO @tmpPartyList (PartyId, SiteId, BaseCurrencyId)
 		SELECT p.PartyId, p.OldRefId, ISNULL(c.BaseCurrencyId, 6)
-		FROM dbo.OAS_Party p WITH (NOLOCK)
-			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyId = pd.PartyId AND pd.IsDeposit = 1
+		FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)
+			INNER JOIN bodb_licensee.dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyId = pd.PartyId AND pd.IsDeposit = 1
 			OUTER APPLY (
 				SELECT TOP 1 bc.BaseCurrencyId
-				FROM dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK)
+				FROM bodb_licensee.dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK)
 				WHERE p.PartyId = bc.PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
 				ORDER BY bc.ToDate DESC
 			) c
@@ -136,19 +137,19 @@ BEGIN
 			
 		DECLARE @tmpBaseCurrencyList TABLE (CurrencyId INT, Code VARCHAR(10))
 		INSERT INTO @tmpBaseCurrencyList (CurrencyId, Code)
-		EXEC dbo.LA_SelBaseCurrency
+		EXEC bodb_licensee.dbo.LA_SelBaseCurrency
 
 		DECLARE @tmpChargeInfo TABLE (PartyId INT, LicenseeId INT, ProductId INT, FromDate DATE, ToDate DATE)
 		INSERT INTO @tmpChargeInfo (PartyId, LicenseeId, ProductId, FromDate, ToDate)
 		SELECT DISTINCT PartyId, LicenseeId, ProductId, Fromdate, ToDate
-		FROM dbo.LA_f_ChargeInfo (@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo (@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 		WHERE DI_Rate > 0 AND ChargeType = 1
 
 		IF @IsOverwrite = 0
 		BEGIN
 			;WITH CTE_Data AS (
 				SELECT SiteId, ProductId
-				FROM bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis WITH (NOLOCK)
+				FROM dbo.rptLicPerformanceAnalysis WITH (NOLOCK)
 				WHERE ReportDate = @ReportDate AND ProductId <> 9000 AND IsBillingCurrency = 1
 				GROUP BY SiteId, ProductId
 			)
@@ -176,7 +177,7 @@ BEGIN
 								ELSE 1.0 END
 				) AS TurnoverNoDraw
 			,SUM(-r.MemberWL - CASE WHEN r.ProductId = 31 THEN r.CommissionP ELSE 0 END) AS Winloss
-		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
+		FROM dbo.rpt_BettingByProduct r WITH (NOLOCK)
 			INNER JOIN @tmpProductList p ON r.ProductId = p.ProductId AND r.rptDate BETWEEN p.FromDate AND p.ToDate
 			INNER JOIN @tmpChargeInfo c ON r.SiteId = c.LicenseeId AND p.GroupProductId = c.ProductId AND r.rptDate BETWEEN c.FromDate AND c.ToDate
 			LEFT JOIN bodb_Licensee.dbo.LA_f_GroupBettype() gb ON r.Bettype = gb.Bettype
@@ -210,7 +211,7 @@ BEGIN
 				PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
 				,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
 			)
-			EXEC dbo.LA_AmountToCompanyByProduct
+			EXEC bodb_licensee.dbo.LA_AmountToCompanyByProduct
 				@PartyIds = @PartyIds
 				,@ProductCodes = @ProductCodes
 				,@FromDate = @FromDate
@@ -278,12 +279,12 @@ BEGIN
 	END
 
 	DELETE a WITH (ROWLOCK)
-	FROM bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis a
+	FROM dbo.rptLicPerformanceAnalysis a
 		INNER JOIN @tmpPartyList p ON a.SiteId = p.SiteId
 		INNER JOIN @Result r ON p.PartyId = r.PartyId AND a.ProductId = r.ProductId AND a.CurrencyId = r.BaseCurrencyId
 	WHERE a.ReportDate = @ReportDate
 
-	INSERT INTO bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis
+	INSERT INTO dbo.rptLicPerformanceAnalysis
 	(
 		ReportDate, SiteId, ProductId, CurrencyId, IsBillingCurrency
 		,BetCount, Turnover, TurnoverNoDraw, LicenseeWinloss, LicensingFee, Discount, Rebate, Adjustment

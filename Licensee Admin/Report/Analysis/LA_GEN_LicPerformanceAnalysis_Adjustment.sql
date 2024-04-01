@@ -1,5 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
-USE bodb_Licensee
+/*<info serverAlias="DBLIC-bodb_licenseeReport" executers="wsv_nap" isFunction="0" isNested="1"></info>*/
+USE bodb_licenseeReport
 GO
 
 ALTER PROCEDURE [dbo].LA_GEN_LicPerformanceAnalysis_Adjustment (
@@ -13,7 +13,7 @@ AS
 	Created: BRUCE
 	Date: 20190312
 	Task: Licensee Performance Analysis (PowerBI)
-	DB: DBLIC.bodb_licensee
+	DB: DBLIC.bodb_licenseeReport
 	Remark: generate licensee performance analysis report: adjustment values
 
 	Revisions:
@@ -22,6 +22,7 @@ AS
 	    - 20210408@Parsons: Remove redundant linked server [#FeatureID 152089]
 		- 20201003@Danny: Exclude Licensees that offer cryptocurrency [#FeatureID 177718]
 		- 20230815@Danny: Handle crypto licensee billing with fiat currency [RedmineID: #192378]
+		- 20240401@Danny: Change meta data [#203267]
 
 */
 BEGIN
@@ -43,24 +44,24 @@ BEGIN
 	--
 	DECLARE @tmpBaseCurrencyList TABLE(CurrencyId INT, Code VARCHAR(10))
 	INSERT INTO @tmpBaseCurrencyList(CurrencyId,Code)
-	EXEC dbo.LA_SelBaseCurrency
+	EXEC bodb_licensee.dbo.LA_SelBaseCurrency
 
 	-- party list
 	--
 	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT)
 	INSERT INTO @tmpPartyOfferCrypto(PartyId)
-	SELECT  PartyID FROM LA_f_CryptoPartyListSel() WHERE IsBillingCryptoCurrency = 1
+	SELECT  PartyID FROM bodb_licensee.dbo.LA_f_CryptoPartyListSel() WHERE IsBillingCryptoCurrency = 1
 
 	DECLARE @tmpPartyList TABLE(PartyId INT, SiteId INT, BaseCurrencyId INT)
 	INSERT INTO @tmpPartyList(PartyId,SiteId,BaseCurrencyId)
 	SELECT p.PartyID, p.OldRefID, ISNULL(pbc_2.BaseCurrencyId, 6)-- Default EUR
-	FROM dbo.OAS_Party p WITH(NOLOCK)
-	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON d.PartyID=p.PartyID
-	INNER JOIN dbo.strSplit(@PartyIds,',') v ON p.PartyID = v.val
+	FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+	INNER JOIN bodb_licensee.dbo.OAS_PartyDetail d WITH(NOLOCK) ON d.PartyID=p.PartyID
+	INNER JOIN STRING_SPLIT(@PartyIds,',') v ON p.PartyID = v.value
 	OUTER APPLY
 	(
 		SELECT TOP 1 pbc.PartyID, pbc.BaseCurrencyId
-		FROM OAS_PartyBaseCurrency pbc WITH(NOLOCK)
+		FROM bodb_licensee.dbo.OAS_PartyBaseCurrency pbc WITH(NOLOCK)
 		WHERE pbc.PartyID = p.PartyId AND @ReportDate BETWEEN FromDate AND ToDate
 		ORDER BY ToDate DESC
 	) pbc_2
@@ -71,7 +72,7 @@ BEGIN
 	IF @IsOverwrite = 0 INSERT INTO @Skip(SiteId)
 	(
 		SELECT DISTINCT a.SiteId
-		FROM bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis a WITH(NOLOCK)
+		FROM dbo.rptLicPerformanceAnalysis a WITH(NOLOCK)
 		WHERE a.ReportDate = @ReportDate AND ProductId = @AdjustmentId
 	)
 
@@ -82,8 +83,8 @@ BEGIN
 	;WITH cte_Adjustment AS
 	(
 		SELECT CAST(InvoiceDate AS DATE)AS StatementDate, (ISNULL(s.Income,0) -ISNULL(s.Expense,0)) AS Amount, h.CurrencyId, p.SiteId, p.BaseCurrencyId
-		FROM dbo.LA_InvoiceHeader h WITH (NOLOCK)
-		INNER JOIN dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId=s.InvoiceHeaderId
+		FROM bodb_licensee.dbo.LA_InvoiceHeader h WITH (NOLOCK)
+		INNER JOIN bodb_licensee.dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId=s.InvoiceHeaderId
 		INNER JOIN @AdjustmentItemTypes r ON r.Id = s.InvItemTypeId
 		INNER JOIN @tmpPartyList p ON p.PartyID=h.PartyId
 		WHERE h.Environment = @Environment
@@ -103,7 +104,7 @@ BEGIN
 
 	-- Remove old values
 	--
-	DELETE bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis
+	DELETE dbo.rptLicPerformanceAnalysis
 	WHERE ReportDate = @ReportDate AND ProductId = @AdjustmentId 
 		AND SiteId IN (SELECT a.SiteId FROM @tmpPartyList a)
 		AND SiteId NOT IN (SELECT b.SiteId FROM @Skip b)
@@ -117,7 +118,7 @@ BEGIN
 		SELECT TOP 1 @Code=Code, @CurrencyId = CurrencyId FROM @tmpBaseCurrencyList
 		DELETE @tmpBaseCurrencyList WHERE @Code = Code
 
-		INSERT INTO bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis(ReportDate,SiteId,ProductId,CurrencyId,BetCount,Turnover,TurnoverNoDraw,LicenseeWinloss,LicensingFee,Discount,Rebate,IsBillingCurrency,Adjustment)
+		INSERT INTO dbo.rptLicPerformanceAnalysis(ReportDate,SiteId,ProductId,CurrencyId,BetCount,Turnover,TurnoverNoDraw,LicenseeWinloss,LicensingFee,Discount,Rebate,IsBillingCurrency,Adjustment)
 		SELECT @ReportDate,SiteId,@AdjustmentId,@CurrencyId,0,0,0,0,0,0,0,
 			CASE WHEN @CurrencyId = BaseCurrencyId THEN 1 ELSE 0 END AS IsBillingCurrency,
 			SUM(CASE

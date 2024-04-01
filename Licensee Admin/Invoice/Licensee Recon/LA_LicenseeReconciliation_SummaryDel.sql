@@ -1,5 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-USE bodb_licensee
+/*<info serverAlias="DBLIC-bodb_licenseeReport" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
+USE bodb_licenseeReport
 GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_SummaryDel]
@@ -10,15 +10,16 @@ AS
 /*	Header:
 	Created: 20191017@Bruce
 	Task : Clear data before regenerate licensee reconciliation summary
-	DB: DBLIC.bodb_licensee
+	DB: DBLIC.bodb_licenseeReport
 
 	Revisions: 
 		- 20191017@Bruce: Create Sp [#122229]
+		- 20240401@Danny: Change meta data [#203267]
 */
 BEGIN
 	SET NOCOUNT ON
 
-	DELETE bodb_licenseeReport.dbo.rptLicenseeReconciliation
+	DELETE dbo.rptLicenseeReconciliation
 	WHERE Environment=@Environment
 		AND AccDate = @AccDate
 		AND (@ForceDelete = 1 OR @Environment <> 'PRO' OR @AccDate > '20190930')
