@@ -47,7 +47,7 @@ BEGIN
 	SELECT	ProductID, 
 			ProductPrefix,
 			ProductName,
-			CASE WHEN ProductID IN (2, 31, 21, 25, 15, 27, 49, 77, 83) OR ProductPrefix = 'SB_MuayThai'  THEN 1 ELSE 0 END isKeepNegativeFee , 
+			CASE WHEN ProductID IN (2,84, 31, 21, 25, 15, 27, 49, 77, 83) OR ProductPrefix = 'SB_MuayThai'  THEN 1 ELSE 0 END isKeepNegativeFee , 
 			CASE WHEN ProductID = 5 THEN 0 ELSE 1 END isKeepNegativePayToSupplier,
 			CASE WHEN ProductID IN (2, 22,23,34) OR ProductPrefix = 'SB_BetBuilder' THEN 1 ELSE 0 END isRptBettingSource,
 			CASE WHEN ProductPrefix = 'SB_MuayThai' THEN 1 ELSE 0 END isRptBettingBySportSource,

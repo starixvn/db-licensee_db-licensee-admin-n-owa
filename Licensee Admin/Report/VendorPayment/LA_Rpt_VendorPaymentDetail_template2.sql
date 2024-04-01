@@ -16,6 +16,7 @@ AS
 	- 20220927@Danny: Remove DBLink [#176986] 
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+	- 20240403@Danny: Incorporate Yolo (#199200)
  */
 
 BEGIN
@@ -65,13 +66,14 @@ SET NOCOUNT ON
 	FROM LA_f_ChargeInfoWithCredit(@PartyIDs, @FromDate, @ToDate, @ProductCode) c
 
 	-- From 01 Dec 2019, pay to supplier = 50%
+	IF @ProductID = 2
 	BEGIN
 		DECLARE @EffectiveDateForNewRate DATE = '20191201'
 
 		INSERT INTO #ChargeRate(ChargeID, PartyID, LicenseeID, isDeposit, ProductID, Rate, Rate3rd, Fromdate, Todate)
 		SELECT c.ChargeId, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.Rate, c.Rate3rd, c.Fromdate, DATEADD(DAY,-1,@EffectiveDateForNewRate)
 		FROM #ChargeRate c
-		WHERE Fromdate < @EffectiveDateForNewRate AND @EffectiveDateForNewRate <= ToDate
+		WHERE Fromdate < @EffectiveDateForNewRate AND @EffectiveDateForNewRate <= ToDate 
 
 		UPDATE #ChargeRate SET
 			Fromdate = (CASE WHEN Fromdate < @EffectiveDateForNewRate THEN @EffectiveDateForNewRate ELSE Fromdate END),
@@ -110,61 +112,135 @@ SET NOCOUNT ON
 		PayToSupplier	MONEY,
 		IsKeepNegativeAmount BIT
 		)
-
-	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,ExtraPT,Turnover,HouseTurnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
-	SELECT ci.PartyId,
-		b.rptDate as Winlostdate,
-		b.CurrencyId,
-		0,
-		SUM(b.Turnover) AS Turnover,
-		SUM(b.ExtraAmount) AS HouseTurnover,
-		SUM(b.BetCount) AS TotalTrans,
-		SUM(b.MemberWL) AS CustomerWinLoss,
-		SUM(-b.MemberWL) AS LicenseeWinloss,
-		SUM(-b.MemberWL * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
-		SUM(-b.MemberWL * ISNULL(cr.Rate, ci.Rate) * ci.Rate3rd) AS PayToSupplier
-	FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
-		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
-		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeId AND cr.CurrencyId = b.CurrencyId
-	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
-		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
-		AND ci.isDeposit = 1
-	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
 	
-	-- Calculate for credit
-	;WITH cte_CreditData AS 
-	(
-		SELECT b.SiteID, b.rptDate as Winlostdate, b.CurrencyId,
-		SUM(ISNULL(b.WinLossE, 0) +  ISNULL(b.CommissionE, 0)) AS ExtraPT,
-		SUM(b.Turnover)		AS Turnover,
-		SUM(b.ExtraAmount)	AS HouseTurnover,
-		SUM(b.BetCount)		AS TotalTrans,
-		SUM(b.WinLoss)		AS CustomerWinLoss,
-		SUM(-b.WinLoss)		AS LicenseeWinloss,
-		- SUM(b.WinLoss + b.WinLossA + WinLossM + WinLossS + b.CommissionS)		AS LicensingFee
-		FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
-		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
-			b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
-			AND b.Bettype in (Select Bettype FROM LA_f_BettypeProductMapping(0,@ProductCode))
-		GROUP BY b.SiteID, b.rptDate, b.CurrencyId
-	)
-	INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,ExtraPT,Turnover,HouseTurnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
-	SELECT ci.PartyID, r.Winlostdate, r.CurrencyID,
-			SUM(r.ExtraPT),
-			SUM(r.Turnover), 
-			SUM(r.HouseTurnover), 
-			SUM(r.TotalTrans), 
-			SUM(r.CustomerWinLoss), 
-			SUM(r.LicenseeWinloss), 
-			SUM(r.LicensingFee),
-			SUM((r.LicensingFee - CASE
-									WHEN r.SiteID IN (1487/*IBCIndo*/, 1547/*76666b*/) THEN ExtraPT
-									ELSE 0
-								  END) * ci.Rate3rd) AS PayToSupplier
-	FROM cte_CreditData r
-	INNER JOIN #ChargeRate ci ON r.SiteID = ci.LicenseeId AND r.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
-	WHERE ci.isDeposit = 0
-	GROUP BY ci.PartyID, r.Winlostdate, r.CurrencyId
+	IF @TimeZoneId =1 
+	BEGIN
+		IF @ProductID =2 
+		BEGIN
+			INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,ExtraPT,Turnover,HouseTurnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
+			SELECT ci.PartyId,
+				b.rptDate as Winlostdate,
+				b.CurrencyId,
+				0,
+				SUM(b.Turnover) AS Turnover,
+				SUM(b.ExtraAmount) AS HouseTurnover,
+				SUM(b.BetCount) AS TotalTrans,
+				SUM(b.MemberWL) AS CustomerWinLoss,
+				SUM(-b.MemberWL) AS LicenseeWinloss,
+				SUM(-b.MemberWL * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
+				SUM(-b.MemberWL * ISNULL(cr.Rate, ci.Rate) * ci.Rate3rd) AS PayToSupplier
+			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+				INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+				LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeId AND cr.CurrencyId = b.CurrencyId
+			WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
+				b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
+				AND ci.isDeposit = 1
+			GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
+	
+			-- Calculate for credit
+			;WITH cte_CreditData AS 
+			(
+				SELECT b.SiteID, b.rptDate as Winlostdate, b.CurrencyId,
+				SUM(ISNULL(b.WinLossE, 0) +  ISNULL(b.CommissionE, 0)) AS ExtraPT,
+				SUM(b.Turnover)		AS Turnover,
+				SUM(b.ExtraAmount)	AS HouseTurnover,
+				SUM(b.BetCount)		AS TotalTrans,
+				SUM(b.WinLoss)		AS CustomerWinLoss,
+				SUM(-b.WinLoss)		AS LicenseeWinloss,
+				- SUM(b.WinLoss + b.WinLossA + WinLossM + WinLossS + b.CommissionS)		AS LicensingFee
+				FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
+				WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
+					b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
+					AND b.Bettype in (Select Bettype FROM LA_f_BettypeProductMapping(0,@ProductCode))
+				GROUP BY b.SiteID, b.rptDate, b.CurrencyId
+			)
+			INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,ExtraPT,Turnover,HouseTurnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
+			SELECT ci.PartyID, r.Winlostdate, r.CurrencyID,
+					SUM(r.ExtraPT),
+					SUM(r.Turnover), 
+					SUM(r.HouseTurnover), 
+					SUM(r.TotalTrans), 
+					SUM(r.CustomerWinLoss), 
+					SUM(r.LicenseeWinloss), 
+					SUM(r.LicensingFee),
+					SUM((r.LicensingFee - CASE
+											WHEN r.SiteID IN (1487/*IBCIndo*/, 1547/*76666b*/) THEN ExtraPT
+											ELSE 0
+										  END) * ci.Rate3rd) AS PayToSupplier
+			FROM cte_CreditData r
+			INNER JOIN #ChargeRate ci ON r.SiteID = ci.LicenseeId AND r.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
+			WHERE ci.isDeposit = 0
+			GROUP BY ci.PartyID, r.Winlostdate, r.CurrencyId
+		END
+		ELSE
+		BEGIN
+			;WITH cte_Data AS 
+			(
+				SELECT b.SiteID, b.rptDate as Winlostdate, b.CurrencyId,
+				SUM(ISNULL(b.EWinLoss, 0) +  ISNULL(b.EComm, 0)) AS ExtraPT,
+				SUM(b.Turnover)		AS Turnover,
+				SUM(b.HouseTurnover)	AS HouseTurnover,
+				SUM(b.BetCount)		AS TotalTrans,
+				SUM(b.WinLoss)		AS CustomerWinLoss,
+				SUM(-b.WinLoss)		AS LicenseeWinloss,
+				- SUM(b.WinLoss + b.AWinLoss + b.MWinLoss + b.SWinLoss + b.SComm)		AS HouseWL
+				FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
+				WHERE b.rptDate BETWEEN @FromDate AND @ToDate 
+					AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 
+					AND b.BettypeID in (Select Bettype FROM LA_f_BettypeProductMapping(0,@ProductCode))
+				GROUP BY b.SiteID, b.rptDate, b.CurrencyId
+			)
+			INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,ExtraPT,Turnover,HouseTurnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
+			SELECT ci.PartyID, r.Winlostdate, r.CurrencyID,
+					SUM(r.ExtraPT),
+					SUM(r.Turnover), 
+					SUM(r.HouseTurnover), 
+					SUM(r.TotalTrans), 
+					SUM(r.CustomerWinLoss), 
+					SUM(r.LicenseeWinloss), 
+					SUM(CASE WHEN ci.isDeposit = 1 THEN  -r.CustomerWinLoss * ISNULL(cr.Rate, ci.Rate) ELSE r.HouseWL END) LicensingFee,
+					SUM(CASE WHEN ci.isDeposit = 1 THEN  -r.CustomerWinLoss * ISNULL(cr.Rate, ci.Rate) ELSE r.HouseWL END  * ci.Rate3rd) AS PayToSupplier
+			FROM cte_Data r
+			INNER JOIN #ChargeRate ci ON r.SiteID = ci.LicenseeId AND r.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
+			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeId AND cr.CurrencyId = r.CurrencyId
+			GROUP BY ci.PartyID, r.Winlostdate, r.CurrencyId
+			
+		END
+	END
+	ELSE
+	BEGIN
+			;WITH cte_Data AS 
+			(
+				SELECT b.SiteID, b.rptDate3rd as Winlostdate, b.CurrencyId,
+				SUM(ISNULL(b.EWinLoss, 0) +  ISNULL(b.EComm, 0)) AS ExtraPT,
+				SUM(b.Turnover)		AS Turnover,
+				SUM(b.HouseTurnover)	AS HouseTurnover,
+				SUM(b.BetCount)		AS TotalTrans,
+				SUM(b.WinLoss)		AS CustomerWinLoss,
+				SUM(-b.WinLoss)		AS LicenseeWinloss,
+				- SUM(b.WinLoss + b.AWinLoss + b.MWinLoss + b.SWinLoss + b.SComm)		AS HouseWL
+				FROM bodb_LicenseeReport.dbo.rpt_ThirdPartyWL_ExtraGMT b WITH (NOLOCK)
+				WHERE b.RptDate BETWEEN DATEADD(DAY, -1, @FromDate) AND DATEADD(DAY, 1, @ToDate)
+					AND b.rptDate3rd BETWEEN @FromDate AND @ToDate 
+					AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 
+					AND b.BettypeID in (Select Bettype FROM LA_f_BettypeProductMapping(0,@ProductCode))
+				GROUP BY b.SiteID, b.rptDate3rd, b.CurrencyId
+			)
+			INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,ExtraPT,Turnover,HouseTurnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier)
+			SELECT ci.PartyID, r.Winlostdate, r.CurrencyID,
+					SUM(r.ExtraPT),
+					SUM(r.Turnover), 
+					SUM(r.HouseTurnover), 
+					SUM(r.TotalTrans), 
+					SUM(r.CustomerWinLoss), 
+					SUM(r.LicenseeWinloss), 
+					SUM(CASE WHEN ci.isDeposit = 1 THEN  -r.CustomerWinLoss * ISNULL(cr.Rate, ci.Rate) ELSE r.HouseWL END) LicensingFee,
+					SUM(CASE WHEN ci.isDeposit = 1 THEN  -r.CustomerWinLoss * ISNULL(cr.Rate, ci.Rate) ELSE r.HouseWL END  * ci.Rate3rd) AS PayToSupplier
+			FROM cte_Data r
+			INNER JOIN #ChargeRate ci ON r.SiteID = ci.LicenseeId AND r.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
+			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeId AND cr.CurrencyId = r.CurrencyId
+			GROUP BY ci.PartyID, r.Winlostdate, r.CurrencyId
+	END
 
 	-- EndRegion
 	
