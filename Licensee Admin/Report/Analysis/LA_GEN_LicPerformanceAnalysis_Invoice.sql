@@ -1,5 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
-USE bodb_Licensee
+/*<info serverAlias="DBLIC-bodb_licenseeReport" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
+USE bodb_licenseeReport
 GO
 
 ALTER PROCEDURE [dbo].[LA_GEN_LicPerformanceAnalysis_Invoice]
@@ -12,7 +12,7 @@ AS
 	Created: BRUCE
 	Date: 20190226
 	Task: Licensee Performance Analysis (PowerBI)
-	DB: bodb_licensee
+	DB: bodb_licenseeReport
 	Remark: generate licensee performance analysis report
 
 	Revisions:
@@ -29,6 +29,7 @@ AS
 		- 20231005@Danny: Change charge rate and tier rebate for Alek group from Oct 2023 [RedmineID: #194561]
 		- 20231115@Danny: Final licensing fee for 3rd products [RedmineID: #191813]
 		- 20240109@Danny: Enhance rule regen data when invoice is voided [RedmineID: #199448]
+		- 20240401@Danny: Change meta data [#203267]
 
 */
 
@@ -42,14 +43,14 @@ BEGIN
 
 	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT)
 	INSERT INTO @tmpPartyOfferCrypto(PartyId)
-	SELECT  PartyID FROM LA_f_CryptoPartyListSel() WHERE IsBillingCryptoCurrency = 1
+	SELECT  PartyID FROM bodb_licensee.dbo.LA_f_CryptoPartyListSel() WHERE IsBillingCryptoCurrency = 1
 
 	SELECT
 		@PartyId			= PartyId
 		,@InvoiceStatus		= StatusId
 		,@InvoiceDate		= DATEADD(MONTH, DATEDIFF(MONTH, 0, InvoiceDate), 0)
 		,@BaseCurrencyId	= CurrencyId
-	FROM dbo.LA_InvoiceHeader WITH (NOLOCK)
+	FROM bodb_licensee.dbo.LA_InvoiceHeader WITH (NOLOCK)
 	WHERE InvoiceHeaderId = @InvoiceId AND Environment = @Environment
 
 	DECLARE @FromDate DATETIME = @InvoiceDate
@@ -58,12 +59,12 @@ BEGIN
 	IF (@PartyId IS NULL OR EXISTS (SELECT TOP 1 1 FROM @tmpPartyOfferCrypto WHERE PartyId = @PartyId))
 		RETURN
 
-	SELECT @SiteId = OldRefId FROM dbo.OAS_Party WITH (NOLOCK) WHERE PartyId = @PartyId
+	SELECT @SiteId = OldRefId FROM bodb_licensee.dbo.OAS_Party WITH (NOLOCK) WHERE PartyId = @PartyId
 	-- Get Product List
 	DECLARE @tmpProductList TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(50), FromDate DATETIME, ToDate DATETIME)
 	INSERT INTO @tmpProductList (GroupProductId, ProductId, ProductCode, FromDate, ToDate)
 	SELECT	GroupProductId, ProductId, ProductCode, FromDate, ToDate
-	FROM	dbo.LA_f_GroupProduct('', @FromDate, @ToDate) g  -- Get all products
+	FROM	bodb_licensee.dbo.LA_f_GroupProduct('', @FromDate, @ToDate) g  -- Get all products
 
 	IF ',' + @ProductCodes + ',' LIKE ',ADJUST,' -- Adjustment
 		INSERT INTO @tmpProductList (ProductId, ProductCode)
@@ -79,8 +80,8 @@ BEGIN
 	DECLARE @StatementItemList TABLE (InvItemTypeId SMALLINT, ProductId INT)
 	INSERT INTO @StatementItemList (InvItemTypeId, ProductId)
 	SELECT s.InvItemTypeId, s.ProductId
-	FROM dbo.LA_InvoiceHeader h WITH (NOLOCK)
-		INNER JOIN dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId
+	FROM bodb_licensee.dbo.LA_InvoiceHeader h WITH (NOLOCK)
+		INNER JOIN bodb_licensee.dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId
 		LEFT JOIN @tmpProductList p ON s.ProductId = p.ProductId AND s.InvItemTypeId = 1
 	WHERE h.InvoiceHeaderId = @InvoiceId
 		AND s.InvItemTypeId IN (1, 10, 11, 12, 13, 14, 17, 20)
@@ -93,7 +94,7 @@ BEGIN
 		FROM @tmpProductList p
 		WHERE p.ProductId IN (SELECT s.ProductId FROM @StatementItemList s WHERE s.InvItemTypeId = 1)
 
-		DELETE bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis WITH (ROWLOCK)
+		DELETE dbo.rptLicPerformanceAnalysis WITH (ROWLOCK)
 		WHERE SiteId = @SiteId 
 			AND ReportDate = @InvoiceDate 
 			--AND ProductId IN (SELECT s.ProductId FROM @StatementItemList s WHERE s.InvItemTypeId = 1)
@@ -106,7 +107,7 @@ BEGIN
 			
 			DECLARE @tmpBaseCurrencyList TABLE (CurrencyId INT, Code VARCHAR(10))
 			INSERT INTO @tmpBaseCurrencyList (CurrencyId, Code)
-			EXEC dbo.LA_SelBaseCurrency
+			EXEC bodb_licensee.dbo.LA_SelBaseCurrency
 
 			-- Get TO/WL data
 			DECLARE @PartyIds VARCHAR(MAX) = CONVERT(VARCHAR(MAX), @PartyId)
@@ -114,7 +115,7 @@ BEGIN
 			DECLARE @tmpChargeInfo TABLE (ProductId INT, FromDate DATE, ToDate DATE)
 			INSERT INTO @tmpChargeInfo (ProductId, FromDate, ToDate)
 			SELECT DISTINCT ProductId, Fromdate, ToDate
-			FROM dbo.LA_f_ChargeInfo (@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
+			FROM bodb_licensee.dbo.LA_f_ChargeInfo (@PartyIds, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
 			WHERE DI_Rate > 0 AND ChargeType = 1
 
 			DECLARE @PartyIds_AlekGroup VARCHAR(200), @isRecalRebate BIT = 0, @RecalRebateEffectiveFrom DATETIME , @RecalRebateEffectiveTo DATETIME
@@ -143,7 +144,7 @@ BEGIN
 									ELSE 1.0 END
 					) AS TurnoverNoDraw
 				,SUM(-r.MemberWL - CASE WHEN r.ProductId = 31 THEN r.CommissionP ELSE 0 END) AS Winloss
-			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
+			FROM dbo.rpt_BettingByProduct r WITH (NOLOCK)
 				INNER JOIN @tmpProductList p ON r.ProductId = p.ProductId AND r.rptDate BETWEEN p.FromDate AND p.ToDate
 				INNER JOIN @tmpChargeInfo c ON p.GroupProductId = c.ProductId AND r.rptDate BETWEEN c.FromDate AND c.ToDate
 				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupBettype() gb ON r.Bettype = gb.Bettype
@@ -178,7 +179,7 @@ BEGIN
 					PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
 					,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
 				)
-				EXEC dbo.LA_AmountToCompanyByProduct
+				EXEC bodb_Licensee.dbo.LA_AmountToCompanyByProduct
 					@PartyIds = @PartyIds
 					,@ProductCodes = @ProductCodes
 					,@FromDate = @FromDate
@@ -241,7 +242,7 @@ BEGIN
 				WHERE r.BaseCurrencyId IS NULL
 			END
 
-			INSERT INTO bodb_LicenseeReport.dbo.rptLicPerformanceAnalysis
+			INSERT INTO dbo.rptLicPerformanceAnalysis
 			(
 				ReportDate, SiteId, ProductId, CurrencyId, IsBillingCurrency
 				,BetCount, Turnover, TurnoverNoDraw, LicenseeWinloss, LicensingFee, Discount, Rebate, Adjustment

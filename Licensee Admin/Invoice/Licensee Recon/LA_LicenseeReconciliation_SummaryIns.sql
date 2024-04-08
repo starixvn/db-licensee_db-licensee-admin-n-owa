@@ -1,5 +1,5 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-USE bodb_licensee
+/*<info serverAlias="DBLIC-bodb_licenseeReport" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
+USE bodb_licenseeReport
 GO
  
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_SummaryIns]
@@ -9,7 +9,7 @@ AS
 /*	Header:
 	Created: 20191017@Bruce
 	Task : Insert licensee reconciliation summary data
-	DB: DBLIC.bodb_licensee
+	DB: DBLIC.bodb_licenseeReport
 
 	Revisions: 
 		- 20191017@Bruce: Create Sp [#122229]
@@ -18,11 +18,12 @@ AS
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 		- 20220418@Percy: Add Credit for Setup Fees [RedmineID: #164139]
 		- 20221226@Danny: Integrate Player tips [#180703]
+		- 20240401@Danny: Change meta data [#203267]
 */
 BEGIN
 	SET NOCOUNT ON
 
-	INSERT INTO bodb_licenseeReport.dbo.rptLicenseeReconciliation(
+	INSERT INTO dbo.rptLicenseeReconciliation(
 		Environment,
 		AccDate,
 		PartyId,
