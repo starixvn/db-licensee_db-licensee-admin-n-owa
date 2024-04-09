@@ -36,6 +36,7 @@ AS
 	- 20240222@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
 	- 20240123@Danny: Change Credit licensing fee fomular [RedmineID: #197267]
 	- 20240301@Danny: Merge virtual sports product [RemineID: #199478]
+	- 20240521@Danny: support Inhouse Product [RemineID: #200955]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
@@ -406,7 +407,7 @@ BEGIN
 	SELECT @ProductCodes = ''
 	;WITH CTE_Product AS 
 	(
-		SELECT DISTINCT CASE WHEN ProductCode IN ('SB_MuayThai','SB_BetBuilder','BTC') THEN 'SB' ELSE ProductCode END  ProductCode 
+		SELECT DISTINCT CASE WHEN ProductCode IN ('SB_MuayThai','SB_BetBuilder','BTC','SLT') THEN 'SB' ELSE ProductCode END  ProductCode 
 		FROM @productDataView
 	)
 	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM CTE_Product
@@ -418,6 +419,9 @@ BEGIN
 	SET @ProductCodes3rd = @ProductCodes
 	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID = 69)
 		SELECT @ProductCodes3rd =@ProductCodes3rd + ',BTC'
+
+	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID = 63)
+		SELECT @ProductCodes3rd =@ProductCodes3rd + ',SLT'
 
 	IF @FromDate >= @MergeVSCutoffDate 
 		AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value IN ('VS2','LG','VS4'))
@@ -466,26 +470,24 @@ BEGIN
 	INSERT INTO #ChargeInfoWithCredit (PartyID, ProductID, IsDeposit, Fromdate, Todate, DI_Rate, ChargeType, LicenseeID, ChargeID )
 	SELECT PartyID, ProductID, IsDeposit, Fromdate, Todate, CASE WHEN ProductID = 22 AND isDeposit = 0 THEN 0 ELSE DI_Rate END, ChargeType, LicenseeID, ChargeID FROM LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate, @ProductCodes) c
 
-	IF EXISTS(SELECT 1 FROM @productDataView WHERE ProductID = 69 ) 
+	IF EXISTS(SELECT 1 FROM @productDataView WHERE ProductID IN (69 ,63)) 
 	BEGIN
-		IF EXISTS(SELECT 1 FROM @productDataView WHERE ProductID = 0 )
+		INSERT INTO #ChargeInfoWithCredit (PartyID, ProductID, IsDeposit, Fromdate, Todate, DI_Rate, ChargeType, LicenseeID, ChargeID )
+		SELECT PartyID, 69 AS ProductID, IsDeposit, Fromdate, Todate, CASE WHEN IsDeposit = 0 THEN 0 ELSE  DI_Rate END , ChargeType, LicenseeID, ChargeID  --Clone BTC setting 
+		FROM	#ChargeInfoWithCredit 
+		WHERE ProductID = 0 AND EXISTS(SELECT 1 FROM @productDataView WHERE ProductID = 69 )
+		UNION ALL 
+		SELECT PartyID, 63 AS ProductID, IsDeposit, Fromdate, Todate, CASE WHEN IsDeposit = 0 THEN 0 ELSE  DI_Rate END , ChargeType, LicenseeID, ChargeID  --Clone SLT setting 
+		FROM	#ChargeInfoWithCredit 
+		WHERE ProductID = 0 AND EXISTS(SELECT 1 FROM @productDataView WHERE ProductID = 63 )
+
+		IF NOT EXISTS(SELECT 1 FROM @productDataView WHERE ProductID = 0 )
 		BEGIN
-			INSERT INTO #ChargeInfoWithCredit (PartyID, ProductID, IsDeposit, Fromdate, Todate, DI_Rate, ChargeType, LicenseeID, ChargeID )
-			SELECT PartyID, 69 AS ProductID, IsDeposit, Fromdate, Todate, CASE WHEN IsDeposit = 0 THEN 0 ELSE  DI_Rate END , ChargeType, LicenseeID, ChargeID  --Clone BTC setting 
-			FROM	#ChargeInfoWithCredit 
-			WHERE ProductID = 0
-		END
-		ELSE 
-		BEGIN
-			UPDATE #ChargeInfoWithCredit
-			SET ProductID = 69, DI_Rate = CASE WHEN  IsDeposit = 0 THEN 0 ELSE  DI_Rate END 
-			WHERE ProductID = 0
+			DELETE FROM  #ChargeInfoWithCredit WHERE ProductID = 0
 		END
 	END
 
 	IF @FromDate >= @MergeVSCutoffDate 
-		--AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value IN ('VS2','LG','VS4'))
-		--AND NOT EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value IN ('VS'))
 	BEGIN
 		DELETE FROM #ChargeInfoWithCredit WHERE ProductID IN (27, 77, 83) 
 
