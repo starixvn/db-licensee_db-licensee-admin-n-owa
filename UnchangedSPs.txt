@@ -1,7 +1,2 @@
-Licensee Admin\Core SP\LA_AmountToCompanyByProduct.sql
-Licensee Admin\Report\LA_Rpt_CurrencyWinloss_Details.sql
-Licensee Admin\Report\LA_Rpt_CurrencyWinloss.sql
-Licensee Admin\Invoice\InvoiceAmountGenerate\LA_Inv_GenerateAmountForSoftwareFee.sql
-
-
-
+Licensee Admin\Report\LA_Rpt_PlatformWinloss.sql
+Licensee Admin\Report\LA_Rpt_PlatformWinlossSummary.sql
