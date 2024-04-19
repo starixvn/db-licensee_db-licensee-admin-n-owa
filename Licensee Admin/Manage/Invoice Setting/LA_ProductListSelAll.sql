@@ -17,6 +17,7 @@ AS
 		- 20221018@Malcolm: Exclude products which support Credit site only,  obsolete products, Saba Promotio [RedmineId : #171705]
 		- 20231106@Malcolm: Hard code to show Casino promotion product [RedmineId : #194808]
 		- 20240312@Danny: Not show VS4 on dropdown [RemineID: #199478]
+		- 20240419@Danny: Remove Saba Coin [RedmineID: #203331]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -31,7 +32,7 @@ BEGIN
 		)p
 		LEFT JOIN dbo.Product3rd pr WITH(NOLOCK) ON p.ProductId = pr.Productid
 	WHERE p.ProductId = p.GroupProductId 
-		AND p.ProductCode <> 'VS4'
+		AND p.ProductCode NOT IN ('VS4','SAC')
 		AND (@IsProductExclude = 0 OR NOT (ISNULL(pr.OfferSite, '') = 1 OR pr.EndOfSupportDate IS NOT NULL OR p.ProductName = 'Saba Promotion'))
 
 END

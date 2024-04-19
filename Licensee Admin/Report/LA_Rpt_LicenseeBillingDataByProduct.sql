@@ -35,6 +35,7 @@ AS
 		- 20231005@Danny: Change charge rate and tier rebate for Alek group from Oct 2023 [RedmineID: #194561]
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 		- 20230223@Danny: Integrate Casino promotion [#194808]
+		- 20240419@Danny: Remove Saba Coin [RedmineID: #203331]
 	
 	Parameter explanation:
 		@LicenseeStatusIds
@@ -122,7 +123,7 @@ BEGIN
 	SELECT p.ProductId, p.ProductName, p.ProductCode
 	FROM (
 		SELECT ProductId, ProductName, ProductCode FROM (VALUES (0, 'Sportsbook', 'SB'), (-102, 'Discount', ''), (-101, 'Rebate', ''),  (-999, 'Total', '')) t (ProductId, ProductName, ProductCode)
-		UNION ALL SELECT ProductId, ProductName, ProductPrefix FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductId NOT IN (16) AND (EndOfSupportDate IS NULL OR EndOfSupportDate >= @FromDate) AND OfferSite IN (0, 2) -- Deposit only
+		UNION ALL SELECT ProductId, ProductName, ProductPrefix FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductId NOT IN (16, 81) AND (EndOfSupportDate IS NULL OR EndOfSupportDate >= @FromDate) AND OfferSite IN (0, 2) -- Deposit only
 	) p
 		LEFT JOIN dbo.LA_f_GroupProduct('',@FromDate,@ToDate) g ON p.ProductId = g.ProductId AND g.ProductId <> g.GroupProductId
 	WHERE g.ProductId IS NULL
