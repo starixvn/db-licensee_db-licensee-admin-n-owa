@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -13,6 +13,7 @@ AS
 	
 	Revisions:     
 		- 20220324@Danny: Create SP [RedmineID: #168387]
+		- 20240419@Danny: Remove Saba Coin [RedmineID: #203331]
 
 */
 BEGIN
@@ -22,7 +23,7 @@ BEGIN
 	BEGIN
 		SELECT	p.ProductID AS ProductID, p.ProductName AS ProductName
 		FROM	dbo.Product3rd p WITH(NOLOCK)
-		WHERE	p.Enabled = 1 
+		WHERE	p.Enabled = 1  AND p.ProductPrefix <> 'SAC'
 
 		UNION ALL
 		SELECT 1000 AS ProductID, 'Bet Builder' AS ProductName
