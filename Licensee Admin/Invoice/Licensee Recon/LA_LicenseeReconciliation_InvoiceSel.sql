@@ -41,6 +41,7 @@ AS
 		- 20230217@Danny: SG - Promotion prize integration [#183739]
 		- 20240227@Danny: Extend data type param input [RedmineID: #197267]
 		- 20240503@Danny: including AG Casino Contribution item [RedmineID: #204716]
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -98,7 +99,7 @@ BEGIN
 	INNER JOIN @baseCurrencyList b ON h.CurrencyId = b.CurrencyId
 	INNER JOIN dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId
 	LEFT JOIN dbo.LA_f_Products3rd('') r ON r.ProductID = s.ProductId
-	WHERE h.StatusId = 0-- normal invoice
+	WHERE h.StatusId <> -1 -- void
 		AND h.InvoiceHeaderId NOT IN (6208, 6207) -- temporary exclude these credit notes
 		AND h.Environment = @Environment
 		AND 1 = CASE

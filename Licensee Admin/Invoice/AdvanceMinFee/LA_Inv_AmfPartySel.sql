@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -18,6 +18,7 @@ AS
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20190821@Parsons: Improve the ability to maintain systems [#118627]
 		- 20221109@Malcolm: add LicenseeCode, BaseCurrencyId [RedmineID : 175860]
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 
 */
 BEGIN
@@ -35,7 +36,7 @@ BEGIN
 	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON h.InvoiceHeaderId=s.InvoiceHeaderId
 	INNER JOIN @Parties p ON p.PartyId = s.RefPartyId
 	WHERE s.InvItemTypeId = 3 AND p.ParentId > 0
-		AND h.StatusId = 0 -- 0: normal invoice
+		AND h.StatusId <> -1 -- void
 		AND h.Environment=@Environment
 
 	;WITH p AS (

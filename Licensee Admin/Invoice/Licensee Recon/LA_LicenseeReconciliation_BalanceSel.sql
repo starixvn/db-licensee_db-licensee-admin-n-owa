@@ -1,4 +1,4 @@
-/*<info serverAlias="DBACC-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBACC-bodb02" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb02
 GO
 
@@ -18,6 +18,7 @@ AS
 		- 20210303@Sophia: Enhance performance [redmine: #151031]
 		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
 		- 20240227@Danny: Extend data type param input [RedmineID: #197267]
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -70,7 +71,7 @@ BEGIN
 		FROM #statement s
 			INNER JOIN bodb_licensee.dbo.OAS_PartyBaseCurrency bc WITH(NOLOCK) ON bc.LicenseeCode = s.LicenseeCode
 			INNER JOIN bodb_licensee.dbo.LA_InvoiceHeader h WITH(NOLOCK) ON bc.PartyId = h.PartyId
-		WHERE h.StatusId = 0-- normal invoice
+		WHERE h.StatusId <> -1 -- void
 			AND h.InvoiceHeaderId NOT IN (6208, 6207) -- temporary exclude these credit notes
 			AND h.Environment = @Environment
 			AND InvoiceType = 1

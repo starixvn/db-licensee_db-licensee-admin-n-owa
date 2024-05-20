@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -12,6 +12,7 @@ AS
 
 	 Revisions:  
 		- 20180702@Parsons: Select party list has billing [#94282]
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 
 	 Params:
 
@@ -42,6 +43,6 @@ BEGIN
 		INNER JOIN @PartieSettings p ON ih.PartyId = p.PartyId AND id.ProductId = p.ProductId	
 	WHERE ih.ToDate >= @FromDateDiscount AND ih.ToDate <= @ToDateDiscount
 			AND ih.InvoiceType = @InvoiceTypeDiscount 
-			AND ih.StatusId = 0 -- normal invoice
+			AND ih.StatusId <> -1 -- void
 END
 GO

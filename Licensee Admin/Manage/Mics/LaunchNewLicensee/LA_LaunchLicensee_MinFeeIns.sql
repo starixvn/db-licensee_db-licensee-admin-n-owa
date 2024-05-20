@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="1"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -17,6 +17,7 @@ AS
 	Revisions:
 	- 20190107@Parsons: Launch new licensee
 	- 20210811@Danny: Change param data Type [#FeatureID 158133]
+	- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 
 
 	Param's Explannation: 
@@ -90,7 +91,7 @@ BEGIN
 	SELECT @AMF = SUM(ISNULL(d.Income, 0))
 	FROM dbo.LA_InvoiceHeader h WITH (NOLOCK)
 		INNER JOIN dbo.LA_InvoiceStatement d WITH (NOLOCK) ON h.InvoiceHeaderId = d.InvoiceHeaderId
-	WHERE h.InvoiceType = 7 AND d.InvItemTypeId = 3 AND h.StatusId = 0 AND h.Environment = 'PRO'					
+	WHERE h.InvoiceType = 7 AND d.InvItemTypeId = 3 AND h.StatusId <> -1 AND h.Environment = 'PRO'					
 	AND h.PartyId = @PartyId
 	AND h.CurrencyId = @BaseCurrencyId
 

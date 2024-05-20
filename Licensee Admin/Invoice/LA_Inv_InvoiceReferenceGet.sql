@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -15,6 +15,7 @@ AS
 	Revisions:
 		- 20180131@Bruce: support credit note for setup fee [#90274]
 		- 20220418@Percy: Return InvoiceItemType & Amount [RedmineID: #164139]
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 */
 BEGIN
 	DECLARE @InvoiceStatement TABLE (InvoiceHeaderId BIGINT, InvItemTypeId SMALLINT, Amount MONEY)
@@ -61,7 +62,7 @@ BEGIN
 	FROM dbo.LA_InvoiceHeader h WITH(NOLOCK)
 		INNER JOIN CTE_InvoiceStatement s ON h.InvoiceHeaderId = s.InvoiceHeaderId
 	WHERE h.InvoiceType IN (1, 3, 7) -- Software Fee, Rebate, Setup Fee
-		AND h.StatusId = 0 -- normal
+		AND h.StatusId <> -1 -- void
 		AND h.PartyId = @PayerId 
 		AND h.BillerId = @BillerId
 		AND h.Environment = @Environment

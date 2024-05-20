@@ -23,13 +23,14 @@ AS
 		- 20201003@Danny: Exclude Licensees that offer cryptocurrency [#FeatureID 177718]
 		- 20230815@Danny: Handle crypto licensee billing with fiat currency [RedmineID: #192378]
 		- 20240401@Danny: Change meta data [#203267]
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 
 */
 BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @AdjustmentId INT = 9000
-	DECLARE @InvoiceStatus_Normal SMALLINT = 0
+	DECLARE @InvoiceStatus_void SMALLINT = -1
 	
 	SET @ReportDate = DATEADD(MONTH, DATEDIFF(MONTH, 0, @ReportDate), 0)
 
@@ -88,7 +89,7 @@ BEGIN
 		INNER JOIN @AdjustmentItemTypes r ON r.Id = s.InvItemTypeId
 		INNER JOIN @tmpPartyList p ON p.PartyID=h.PartyId
 		WHERE h.Environment = @Environment
-			AND h.StatusId = @InvoiceStatus_Normal
+			AND h.StatusId <> @InvoiceStatus_void
 			AND @ReportDate  = DATEADD(MONTH, DATEDIFF(MONTH, 0, InvoiceDate), 0)
 			AND p.SiteId NOT IN (SELECT s.SiteId FROM @Skip s)
 	)

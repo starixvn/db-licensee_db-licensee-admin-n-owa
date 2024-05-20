@@ -140,10 +140,14 @@ BEGIN
 		INNER JOIN LA_InvoiceHeader i WITH(NOLOCK) ON t.DocumentID = i.InvoiceHeaderId AND i.PartyId = @PartyID
 		INNER JOIN LA_InvoiceType li WITH(NOLOCK) ON i.InvoiceType = li.InvTypeId
 		OUTER APPLY (
-			SELECT  ' for ' +  STRING_AGG(d.OfficialInvoiceNo,', ') AS InvoiceList
-			FROM  LA_InvoiceStatement st WITH(NOLOCK) 
-			INNER JOIN LA_InvoiceHeader d WITH(NOLOCK) ON st.RefNo = d.OfficialInvoiceNo AND d.InvoiceType IN (1,3,6,7) AND d.StatusId <> -1
-			WHERE  t.DocumentID = st.InvoiceHeaderId AND i.InvoiceType IN (4,5)
+			SELECT  ' for ' +  STRING_AGG(x.OfficialInvoiceNo,', ') AS InvoiceList
+			FROM
+			(
+				SELECT DISTINCT d.OfficialInvoiceNo  OfficialInvoiceNo
+				FROM  LA_InvoiceStatement st WITH(NOLOCK) 
+				INNER JOIN LA_InvoiceHeader d WITH(NOLOCK) ON st.RefNo = d.OfficialInvoiceNo AND d.InvoiceType IN (1,3,6,7) AND d.StatusId <> -1
+				WHERE  t.DocumentID = st.InvoiceHeaderId AND i.InvoiceType IN (4,5)
+			)x
 		) d
 		WHERE DocumentTypeID = 0
 
@@ -193,7 +197,7 @@ BEGIN
 		(
 			SELECT SettlementType, DocumentTypeID, DocumentDetailTypeID, AppliedAmount, DocumentID
 			FROM @AllocationItemList t 
-			WHERE (DocumentTypeID = 0 AND DocumentDetailTypeID IN (1,5) AND AppliedAmount > 0 AND SettlementType = 'Invoice Settlement')
+			WHERE (DocumentTypeID = 0 AND DocumentDetailTypeID IN (1,5,6) AND AppliedAmount > 0 AND SettlementType = 'Invoice Settlement')
 			OR (DocumentTypeID = 0 AND DocumentDetailTypeID IN (3) AND AppliedAmount < 0 AND SettlementType = 'Rebate Settlement')
 		)
 		SELECT  @IsAllowMixSettlementAllocate = 1

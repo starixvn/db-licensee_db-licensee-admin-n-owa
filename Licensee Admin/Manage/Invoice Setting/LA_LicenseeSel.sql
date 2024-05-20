@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -16,6 +16,7 @@ AS
 		- 20201104@Parsons: Group Min Fee & Discount Group - Enhance to check the launch date of Licensee [#144502]
 		- 20231011@Danny: return LaunchedDate and the last day of previous billing cycle [#194890]
 		- 20240306@Danny: get last day of previous billing cycle by Param input [#201935]
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 
 	 Params:
 
@@ -28,7 +29,7 @@ BEGIN
 	DECLARE @MaxInvoiceDate DATE
 	SELECT  @MaxInvoiceDate = MAX(InvoiceDate) 
 	FROM LA_InvoiceHeader WITH(NOLOCK) 
-	WHERE InvoiceType = 1 AND StatusId = 0 AND Environment = @Environment
+	WHERE InvoiceType = 1 AND StatusId <> -1 AND Environment = @Environment
 	AND ( 
 			@PartyIds = ''
 			OR

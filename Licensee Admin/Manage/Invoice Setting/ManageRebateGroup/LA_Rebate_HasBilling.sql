@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="1"></info>*/
 USE bodb_licensee
 GO
 
@@ -13,6 +13,7 @@ AS
 
 	 Revisions:  
 		- 20180529@Parsons: Check this rebate has not belong to any a invoice yet [#94282]
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 
 	 Params:
 
@@ -44,7 +45,7 @@ BEGIN
 		WHERE ih.FromDate >= @FromDateRebate AND ih.ToDate <= @ToDateRebate
 			  AND ih.InvoiceType = @InvoiceTypeRebate
 			  AND id.InvItemTypeId = @InvoiceItemTypeRebate
-			  AND ih.StatusId = 0 -- normal invoice
+			  AND ih.StatusId <> -1 -- void
 	))
 	BEGIN
 		SELECT @HasBilling = 1

@@ -22,7 +22,7 @@ AS
 		- 20171226: create SP
 		- 20190122@Parsons: Improve AG prepayment and discount setting [#104620]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
-		- 20240103@Danny: store invoice amount with 2 decimal digits [RedmineID: #197260]
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 	
 	Explanation:
 		@Option: 0-Amf Prepayment Write off, 1-deduct as AMF, 2-deduct against invoice, 3-AG Prepayment write off
@@ -85,7 +85,7 @@ BEGIN
 		FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
 		INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
 		WHERE h.Environment = @Environment
-			AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
+			AND ISNULL(h.StatusId, 0) <> -1 -- void
 			AND @FromPartyId > 0
 			AND s.RefPartyId = @FromPartyId
 			AND s.InvItemTypeId IN (3,5,7,21)
@@ -94,7 +94,7 @@ BEGIN
 		FROM dbo.LA_InvoiceStatement s WITH(NOLOCK)
 		INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON s.InvoiceHeaderId=h.InvoiceHeaderId
 		WHERE h.Environment = @Environment
-			AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
+			AND ISNULL(h.StatusId, 0) <> -1 -- void
 			AND @FromPartyId > 0
 			AND s.RefPartyId = @FromPartyId
 			AND s.InvItemTypeId IN (22,23,24)

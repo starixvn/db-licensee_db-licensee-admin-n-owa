@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
 GO
 
@@ -25,7 +25,7 @@ AS
 		- 20230920@Danny: show Licensee Status Infomation [RedmineID : 187219]
 		- 20231114@Danny: Change waive month count fomular [RemineID: #191248]
 		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
-
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 	+ @LicenseeStatusIds:	1	Up Coming
 						2	Soft Launch
 						3	Active
@@ -83,7 +83,7 @@ BEGIN
 				END AS RefInvItemTypeId
 		FROM dbo.LA_InvoiceHeader h WITH (NOLOCK)
 			INNER JOIN dbo.LA_InvoiceStatement s WITH (NOLOCK) ON s.InvoiceHeaderId = h.InvoiceHeaderId
-		WHERE h.StatusId = 0 -- normal invoice
+		WHERE h.StatusId <> -1 -- void
 			AND h.Environment = @Environment
 			AND s.InvItemTypeId IN (
 				3, 5, 7, 21, 46 -- AMF

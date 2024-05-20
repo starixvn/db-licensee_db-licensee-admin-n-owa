@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -12,6 +12,7 @@ AS
 
 	 Revisions:  
 		- 20200706@Mason: Implement Group Min Fee [#134492]
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 
 	 Params:
 
@@ -44,6 +45,6 @@ BEGIN
 		INNER JOIN @PartiesSettings p ON ih.PartyId = p.PartyId AND id.ProductId = p.ProductId
 	WHERE ih.ToDate >= @GroupFromDate AND ih.ToDate <= @GroupToDate
 			AND ih.InvoiceType = @SoftwareDataFee 
-			AND ih.StatusId = 0 -- normal invoice
+			AND ih.StatusId <> -1 -- normal invoice
 END
 GO

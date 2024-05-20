@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -42,6 +42,7 @@ AS
 		- 20230815@Danny: Handle crypto licensee billing with fiat currency [RedmineID: #192378]
 		- 20231002@Danny: logging currency information with new format [#FeatureID 193214]
 		- 20231228@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -193,7 +194,7 @@ BEGIN
 	FROM dbo.LA_InvoiceHeader h WITH(NOLOCK)
 		INNER JOIN dbo.LA_InvoiceStatement d WITH(NOLOCK) ON h.InvoiceHeaderId = d.InvoiceHeaderId
 	WHERE h.InvoiceType = 7 AND d.InvItemTypeId = 3 -- AMF in Setup fee
-		AND h.StatusId = 0 AND h.Environment = 'LOCAL'					
+		AND h.StatusId <> -1 AND h.Environment = 'LOCAL'					
 		AND h.PartyId = @NonOfficialPartyId
 		AND h.CurrencyId = @BaseCurrencyId
 
