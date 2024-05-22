@@ -137,7 +137,7 @@ BEGIN
 
 	DECLARE @InvoiceHeaderID BIGINT
 
-	SELECT @InvoiceHeaderID = InvoiceHeaderID FROM LA_InvoiceHeader WITH(NOLOCK) WHERE OfficialInvoiceNo = @InvoiceNo AND PartyId = @PartyId AND BillerId = @BillerId
+	SELECT @InvoiceHeaderID = InvoiceHeaderID FROM LA_InvoiceHeader WITH(NOLOCK) WHERE OfficialInvoiceNo = @InvoiceNo AND PartyId = @PartyId AND BillerId = @BillerId  AND StatusId <> -1
 
 	--SELECT @InvoiceHeaderID = 40610 -- Testing
 
@@ -308,7 +308,7 @@ BEGIN
 
 				/* (ItemType, Amount, Description, Reference) */
 				INSERT INTO #D_C_Inv_Detail( DocumentID, DocumentDate, Refno, RefAmount, RefStatusID, RefInvDate, RefInvType)
-				SELECT	0, @InvoiceDate, Reference AS Refno, CASE WHEN @InvoiceTypeId = 4 THEN - s.Amount ELSE s.Amount END, li.StatusId, li.InvoiceDate, li.InvoiceType
+				SELECT	0, @InvoiceDate, Reference AS Refno, s.Amount, li.StatusId, li.InvoiceDate, li.InvoiceType
 				FROM	@Statement s
 				INNER JOIN LA_InvoiceHeader li WITH(NOLOCK) ON s.Reference = li.OfficialInvoiceNo AND li.StatusId <> -1
 				
@@ -398,7 +398,7 @@ BEGIN
 			SELECT *, ROW_NUMBER() OVER (ORDER BY  DocumentDate, DocumentTypeID) as _No FROM #SOA_Doc_List WHERE DocumentDate >= @FirstDateOfYear
 		), u AS
 		(
-			SELECT DocumentID, DocumentNo, DocumentTypeID, DocumentDetailTypeID ,DocumentDate, Description, Amount, Payment, Balance, _No FROM t WHERE _No = 1
+			SELECT DocumentID, DocumentNo, DocumentTypeID, DocumentDetailTypeID ,DocumentDate, Description, Amount, Payment, ISNULL(Balance,0) Balance, _No FROM t WHERE _No = 1
 			UNION ALL 
 			SELECT t.DocumentID, t.DocumentNo, t.DocumentTypeID, t.DocumentDetailTypeID, t.DocumentDate, t.Description, t.Amount, t.Payment, u.Balance - ISNULL(t.Payment,0) + ISNULL(t.Amount,0), t._No  FROM t 
 			INNER JOIN u ON  u._No = t._No - 1

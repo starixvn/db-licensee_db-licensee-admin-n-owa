@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -139,13 +139,16 @@ BEGIN
 			ISNULL(u.Username, '') AS UpdatedBy,
 			i.InvoiceSymbol + CASE WHEN i.InvoiceNumber < 100 
 				THEN RIGHT('000' + CONVERT(VARCHAR(5), i.InvoiceNumber), 3) 
-				ELSE CONVERT(VARCHAR(20), i.InvoiceNumber) END AS InvoiceNo
+				ELSE CONVERT(VARCHAR(20), i.InvoiceNumber) END AS InvoiceNo,
+			sf.FileName   StatementFileName,
+			sf.SOAId
 		FROM dbo.LA_InvoiceHeader i WITH(NOLOCK)
 			INNER JOIN dbo.LA_BillerInfo b WITH(NOLOCK) ON i.BillerId = b.PartyId
 			INNER JOIN dbo.OAS_Party p  WITH(NOLOCK) ON i.PartyId = p.PartyID
 			INNER JOIN dbo.LA_InvoiceType it WITH(NOLOCK) ON i.InvoiceType = it.InvTypeId
 			INNER JOIN @BaseCurrencyTable bct ON i.CurrencyId = bct.CurrencyId
 			LEFT JOIN dbo.LA_User u WITH(NOLOCK) ON u.UserID = i.UpdatedBy
+			LEFT JOIN dbo.LA_SOAFile sf WITH(NOLOCK) ON i.InvoiceHeaderId = sf.InvoiceHeaderID
 		WHERE i.BillerId IN (SELECT Id FROM @BillerTable)
 			AND i.PartyId IN (SELECT Id FROM @PayerTable)
 			AND i.InvoiceType IN (SELECT Id FROM @InvoiceTypeTable)
