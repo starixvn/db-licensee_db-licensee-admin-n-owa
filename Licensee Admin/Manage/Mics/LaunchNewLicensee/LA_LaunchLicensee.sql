@@ -43,6 +43,7 @@ AS
 		- 20231002@Danny: logging currency information with new format [#FeatureID 193214]
 		- 20231228@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
+		- 20240527@Danny: Automate the PT adjustment when the Exchange charge rate is changed [RemineID: #201477]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -745,23 +746,24 @@ BEGIN
 		END
 
 		DELETE l
-		FROM dbo.LA_ChargeInfo_SystemMapping l
+		FROM dbo.LA_ChargeInfo_SystemMapping l WITH(ROWLOCK, UPDLOCK)
 			INNER JOIN dbo.OAS_ChargeInfo c WITH (NOLOCK) ON l.ChargeID = c.ChargeID
 		WHERE c.FromParty = @NewPartyId
 
-		DELETE dbo.OAS_PartyBaseCurrency WHERE PartyId = @NewPartyId
-		DELETE dbo.OAS_ChargeInfo WHERE FromParty = @NewPartyId
-		DELETE dbo.LA_MinFee WHERE PartyID = @NewPartyId
-		DELETE dbo.LA_InvoiceSetting WHERE FromPartyId = @NewPartyId
-		DELETE dbo.LA_UserParty WHERE PartyId = @NewPartyId
-		DELETE dbo.LA_FunctionParty WHERE PartyId = @NewPartyId
+		DELETE dbo.OAS_PartyBaseCurrency WITH(ROWLOCK, UPDLOCK) WHERE PartyId = @NewPartyId
+		DELETE dbo.OAS_ChargeInfo WITH(ROWLOCK, UPDLOCK) WHERE FromParty = @NewPartyId
+		DELETE dbo.LA_MinFee WITH(ROWLOCK, UPDLOCK) WHERE PartyID = @NewPartyId
+		DELETE dbo.LA_InvoiceSetting WITH(ROWLOCK, UPDLOCK) WHERE FromPartyId = @NewPartyId
+		DELETE dbo.LA_UserParty WITH(ROWLOCK, UPDLOCK) WHERE PartyId = @NewPartyId
+		DELETE dbo.LA_FunctionParty WITH(ROWLOCK, UPDLOCK) WHERE PartyId = @NewPartyId
 
 		SELECT @ErrMsg = 'Launch licensee failed. Please try again.', @ErrCode =  503
 		RETURN
 	END CATCH
 
 	--Update PT
-	DECLARE @CurrentDate DATE = CONVERT(DATE, GETDATE()), @SiteName VARCHAR(20) ='', @InputPT VARCHAR(MAX) = '', @Username VARCHAR(50)
+	DECLARE @CurrentDate DATE = CONVERT(DATE, GETDATE()), @SiteName VARCHAR(20) ='', @InputPT VARCHAR(MAX) = '', @Username VARCHAR(50), @InputPTExchange VARCHAR(MAX) = '', 
+		@ErrCodeExchange INT, @ErrMsgExchange	VARCHAR(4000)
 
 	DELETE @ChargeInfo WHERE SystemId = 4
 
@@ -778,7 +780,7 @@ BEGIN
 
 	DELETE cr
 	FROM @ChargeInfo cr
-	WHERE cr.ProductId IN (14, 17, 3, 31, 10, 13, 16) OR  cr.ToDate < @CurrentDate OR @SiteName IN ('CandyA18','Crypto88') 
+	WHERE cr.ProductId IN (14, 17, 3, 10, 13, 16) OR  cr.ToDate < @CurrentDate OR @SiteName IN ('CandyA18','Crypto88') 
 		OR EXISTS (
 			SELECT 1 
 			FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
@@ -807,30 +809,60 @@ BEGIN
 			,CurrencyId AS '@CID'
 			,CASE WHEN Rate = -1 THEN -1 ELSE 100 * (1 - Rate) END AS '@PT' -- [-1] : not update
 		FROM @ChargeInfo 
-		WHERE IsValid = 1
+		WHERE IsValid = 1 AND ProductId <> 31
 		FOR XML PATH ('PT'), ROOT('ROOT')
 	))
 
-	IF ISNULL(@SiteName, '') <> '' AND ISNULL(@InputPT, '') <> ''
+	SELECT @InputPTExchange = CONVERT(VARCHAR(MAX), 
+	(
+		SELECT 
+			ProductId AS '@PID'
+			,CurrencyId AS '@CID'
+			,CASE WHEN Rate = -1 THEN -1 ELSE 100 * (1 - Rate) END AS '@PT' -- [-1] : not update
+		FROM @ChargeInfo 
+		WHERE IsValid = 1 AND ProductId = 31
+		FOR XML PATH ('PT'), ROOT('ROOT')
+	))
+
+	IF ISNULL(@SiteName, '') <> '' AND ( ISNULL(@InputPT, '') <> '' OR  ISNULL(@InputPTExchange, '') <> '' )
 	BEGIN
-		EXEC CustDB.dbo.Acc_Dep_LicenseeSetting_PTSettingUpd
-			@Site = @SiteName
-			,@InputPT = @InputPT
-			,@UserID = @UserID
-			,@Username = @Username
-			,@IP = @LoginIP
-			,@ErrCode = @ErrCode OUTPUT
-			,@ErrMsg = @ErrMsg OUTPUT
+		IF ISNULL(@InputPT, '') <> ''
+			EXEC CustDB.dbo.Acc_Dep_LicenseeSetting_PTSettingUpd
+				@Site = @SiteName
+				,@InputPT = @InputPT
+				,@UserID = @UserID
+				,@Username = @Username
+				,@IP = @LoginIP
+				,@ErrCode = @ErrCode OUTPUT
+				,@ErrMsg = @ErrMsg OUTPUT
+
+		IF ISNULL(@InputPTExchange, '') <> ''
+			EXEC CustDB.dbo.Acc_Dep_LicenseeSetting_ChargePTUpd
+				@Site = @SiteName
+				,@InputPT = @InputPTExchange
+				,@UserID = @UserID
+				,@Username = @Username
+				,@IP = @LoginIP
+				,@ErrCode = @ErrCodeExchange OUTPUT
+				,@ErrMsg = @ErrMsgExchange OUTPUT
+
 	END
 
-	IF (@ErrCode  <> 0 OR EXISTS (SELECT 1 FROM @ChargeInfo WHERE IsValid = 0)) AND ISNULL(@SiteName, '') <> '' 
+	IF (@ErrCode  <> 0 OR @ErrCodeExchange <> 0  OR EXISTS (SELECT 1 FROM @ChargeInfo WHERE IsValid = 0)) AND ISNULL(@SiteName, '') <> '' 
 	BEGIN
-		IF @ErrCode <> 0
+		IF @ErrCode <> 0 OR @ErrCodeExchange <> 0
 		BEGIN
-			SELECT 	@ErrMsg = STUFF((SELECT ',' + ProductName
-					FROM @ChargeInfo 
-					WHERE IsValid = 1
-					FOR XML PATH('')), 1, 1, '') + ': '+ @ErrMsg + '<br>'
+			IF @ErrCode <> 0
+				SELECT 	@ErrMsg = STUFF((SELECT ',' + ProductName
+				FROM @ChargeInfo 
+				WHERE IsValid = 1 AND ProductId <> 31
+				FOR XML PATH('')), 1, 1, '') + ': '+ @ErrMsg + '<br>'
+
+			IF @ErrCodeExchange <> 0
+				SELECT 	@ErrMsg = ISNULL(@ErrMsg, '') + STUFF((SELECT ',' + ProductName
+				FROM @ChargeInfo 
+				WHERE IsValid = 1 AND ProductId = 31
+				FOR XML PATH('')), 1, 1, '') + ': '+ @ErrMsgExchange + '<br>'
 		END
 
 		SELECT @ErrMsg =  ISNULL(@ErrMsg, '') + ProductName + ': NAP PT update failed due to it''s not current charge rate' + '<br>'
