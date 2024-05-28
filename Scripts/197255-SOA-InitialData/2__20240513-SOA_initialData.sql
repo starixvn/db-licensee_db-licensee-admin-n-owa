@@ -12,7 +12,7 @@ UPDATE t
 SET		t.StatusId = 1, -- Close
 		t.RemainingAmount = 0
 FROM LA_Payment t WITH(ROWLOCK, UPDLOCK)
-WHERE t.StatusId = 0 AND Environment = 'LOCAL'
+WHERE t.StatusId = 0 AND Environment = 'PRO'
 
 
 
@@ -27,10 +27,9 @@ CREATE TABLE #tmp_Payment
 )
 
 -- Insert data here
-INSERT INTO #tmp_Payment (LicenseeCode, PaymentNo, Refno, Amount, RemainingAmount) VALUES ('PHL-LSEE-Gamingsoft EUR','BCH OR 132',13065205958049792,-100.84,-100.84)
-INSERT INTO #tmp_Payment (LicenseeCode, PaymentNo, Refno, Amount, RemainingAmount) VALUES ('PHL-LSEE-Gamingsoft EUR','BCH OR 111',12835008595361792,-9.73,-9.73)
-INSERT INTO #tmp_Payment (LicenseeCode, PaymentNo, Refno, Amount, RemainingAmount) VALUES ('PHL-LSEE-Gamingsoft EUR','BCH OR 113',12899325194272768,100.58,50.99)
-INSERT INTO #tmp_Payment (LicenseeCode, PaymentNo, Refno, Amount, RemainingAmount) VALUES ('PHL-LSEE-12BET EUR','BCH OR 113',12899325194272768,-100.58,-60.99)
+INSERT INTO #tmp_Payment (LicenseeCode, PaymentNo, Refno, Amount, RemainingAmount) VALUES ('PHL-LSEE-365ONLINE CNY','BHC OR-9595',16075483037564940,88033.82,88033.82)
+INSERT INTO #tmp_Payment (LicenseeCode, PaymentNo, Refno, Amount, RemainingAmount) VALUES ('PHL-LSEE-WANBO CNY','BHC OR-9577',16075482232258574,14190.4,14190.4)
+INSERT INTO #tmp_Payment (LicenseeCode, PaymentNo, Refno, Amount, RemainingAmount) VALUES ('PHL-LSEE-LEGENDWIN EUR','BHC OR-9516',15753895213793293,500.46,500.46)
 
 -- Update PartyID from LicenseeCode
 UPDATE  t
@@ -44,7 +43,7 @@ OUTER APPLY (
 SELECT t.*
 INTO #tmp_Payment_invalid
 FROM #tmp_Payment t
-LEFT JOIN LA_Payment li WITH(NOLOCK) ON li.PaymentNo = t.PaymentNo AND li.TransferRefno = t.Refno AND li.PartyID = t.PartyID 
+LEFT JOIN LA_Payment li WITH(NOLOCK) ON li.PaymentNo = t.PaymentNo AND li.TransferRefno = t.Refno AND li.PartyID = t.PartyID  AND li.Environment = 'PRO'
 WHERE t.PartyID IS NULL OR li.PartyID IS NULL OR ROUND(ABS(t.RemainingAmount),2) > ROUND(ABS(li.Amount),2)
 
 
@@ -60,7 +59,7 @@ BEGIN
 		li.StatusID = 0
 	FROM LA_Payment li WITH(ROWLOCK, UPDLOCK)
 	INNER JOIN #tmp_Payment t ON li.PaymentNo = t.PaymentNo AND li.TransferRefno = t.Refno AND li.PartyID = t.PartyID
-	WHERE li.StatusID = 1
+	WHERE li.StatusID = 1 AND li.Environment = 'PRO'
 END
 
 

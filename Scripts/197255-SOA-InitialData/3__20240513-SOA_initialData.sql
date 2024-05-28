@@ -26,8 +26,8 @@ CREATE TABLE #tmp_Payment
 )
 
 -- Insert data here
-INSERT INTO #tmp_Payment (LicenseeCode,PaymentNo,TransferRefno,ReceivedDate,RebatePayment,Amount,RemainingAmount,WinlostDate) VALUES ('PHL-LSEE-MACAOBET EUR','ZL OR-3000',15894484257341440,'2024-05-16','N',200,200,'2024-05-16')
-INSERT INTO #tmp_Payment (LicenseeCode,PaymentNo,TransferRefno,ReceivedDate,RebatePayment,Amount,RemainingAmount,WinlostDate) VALUES ('PHL-LSEE-Mirabet EUR','ZL OR-3000',15894484257341440,'2024-05-16','N',300,300,'2024-05-16')
+INSERT INTO #tmp_Payment (LicenseeCode,PaymentNo,TransferRefno,ReceivedDate,RebatePayment,Amount,RemainingAmount,WinlostDate) VALUES ('PHL-LSEE-OCMS EUR','BHC OR-9060',14733381456363523,'2024-03-22','N',20548.09,3222.29,'2024-03-27')
+INSERT INTO #tmp_Payment (LicenseeCode,PaymentNo,TransferRefno,ReceivedDate,RebatePayment,Amount,RemainingAmount,WinlostDate)VALUES ('PHL-LSEE-BELEGEND EUR','BHC OR-8411',8932042158899217,'2023-07-17','N',873.43,736.02,'2023-07-20')
 
 -- Update some info
 UPDATE  t
@@ -52,7 +52,6 @@ WHERE CustID IS NULL
 	OR PartyID IS NULL 
 	OR CurrencyId IS NULL
 	OR TransferRefno IS NULL
-	--OR Amount <> RemainingAmount
 
 -- Check input data
 IF EXISTS (	SELECT TOP 1 1 FROM
@@ -92,7 +91,7 @@ BEGIN
 		[RemainingAmount],
 		[TransferRefno],
 		0,
-		'LOCAL',
+		'PRO',
 		GETDATE(),
 		@UserID,
 		GETDATE(),
