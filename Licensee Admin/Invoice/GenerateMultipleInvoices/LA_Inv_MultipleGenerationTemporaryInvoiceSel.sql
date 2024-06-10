@@ -31,6 +31,7 @@ AS
 		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 		- 20230605@Danny: Invoice No should be listed in ascending order by number [RedmineID: #189284]
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -111,7 +112,7 @@ BEGIN
 		DECLARE @InvoiceSymbol NVARCHAR(20)
 		SELECT TOP 1 @InvoiceSymbol = InvoiceSymbol
 		FROM dbo.LA_InvoiceHeader WITH (NOLOCK)
-		WHERE StatusId = 0 AND Environment = @Environment AND BillerId = @BillerId
+		WHERE StatusId <> -1 AND Environment = @Environment AND BillerId = @BillerId
 			AND InvoiceType IN (1, 3, 6) -- Software Fee, Rebate, Hosting Fee
 		ORDER BY CreatedDateTime DESC
 		

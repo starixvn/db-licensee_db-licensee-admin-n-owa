@@ -30,6 +30,7 @@ AS
 		- 20231115@Danny: Final licensing fee for 3rd products [RedmineID: #191813]
 		- 20240109@Danny: Enhance rule regen data when invoice is voided [RedmineID: #199448]
 		- 20240401@Danny: Change meta data [#203267]
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 
 */
 
@@ -39,7 +40,6 @@ BEGIN
 	DECLARE @PartyId INT, @SiteId INT, @InvoiceStatus SMALLINT, @InvoiceDate DATE
 	DECLARE @AdjustmentId INT = 9000
 	DECLARE @BaseCurrencyId INT = 6 -- default
-	DECLARE @InvoiceStatus_Normal SMALLINT = 0
 
 	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT)
 	INSERT INTO @tmpPartyOfferCrypto(PartyId)
@@ -100,7 +100,7 @@ BEGIN
 			--AND ProductId IN (SELECT s.ProductId FROM @StatementItemList s WHERE s.InvItemTypeId = 1)
 			AND ProductId <> 9000 -- Adjustment
 
-		IF @InvoiceStatus = 0 -- Normal
+		IF @InvoiceStatus <> -1
 		BEGIN
 			-- Get Base Currency List
 			DECLARE @CurrencyId INT, @CurrencyName VARCHAR(10)

@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_Licensee]
 GO
 
@@ -17,6 +17,7 @@ AS
 		- 20190122@Parsons: Improve AG prepayment and discount setting [#104620] 
 		- 20190821@Parsons: Improve the ability to maintain systems [#118627]
 		- 20221109@Malcolm: add LicenseeCode, BaseCurrencyId [RedmineID : 175860]
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -50,7 +51,7 @@ BEGIN
 		INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) on h.InvoiceHeaderId=s.InvoiceHeaderId
 		INNER JOIN @Parties p ON p.PartyId = s.RefPartyId
 		WHERE s.InvItemTypeId IN(@AGP, @DeductAGP, @WriteOff) AND p.ParentId > 0
-			AND h.StatusId = 0 -- 0: normal invoice
+			AND h.StatusId <> -1 -- 0: normal invoice, 1: Closed
 			AND h.Environment=@Environment
 		GROUP BY p.ParentId, p.PartyId, p.PartyName, h.OfficialInvoiceNo, s.InvItemTypeId, s.InvoiceStatementId, s.Description
 	)

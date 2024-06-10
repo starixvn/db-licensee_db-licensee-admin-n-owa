@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -35,6 +35,7 @@ AS
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 		- 20231113@Danny: Support to remove up-coming waive period [RedmineID: #194868]
 		- 20240306@Danny: get last day of previous billing cycle by Param input [#201935]
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 		
 	 Params:
 		+ @PayerId :specify Party
@@ -68,7 +69,7 @@ BEGIN
 	DECLARE @MaxInvoiceDate DATE
 	SELECT  @MaxInvoiceDate = MAX(InvoiceDate) 
 	FROM LA_InvoiceHeader WITH(NOLOCK) 
-	WHERE InvoiceType = 1 AND StatusId = 0 AND Environment = @Environment AND PartyId = @PayerId
+	WHERE InvoiceType = 1 AND StatusId <> -1 AND Environment = @Environment AND PartyId = @PayerId
 
 	--get list Product
 	SELECT @ProductListAll = @ProductListAll + ProductPrefix + ','

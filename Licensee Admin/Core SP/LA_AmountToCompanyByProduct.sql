@@ -44,6 +44,7 @@ AS
 		- 20231110@Danny: Adjust fomular tier rebate [RedmineID: #196685]
 		- 20230223@Danny: Integrate Casino promotion [#194808]
 		- 20240321@Danny: Change fomular AGC Deduct prepayment [#197268]
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -1217,7 +1218,7 @@ BEGIN
 			FROM dbo.LA_InvoiceStatement s WITH (NOLOCK)
 				INNER JOIN dbo.LA_InvoiceHeader h WITH (NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId
 				INNER JOIN CTE_InvItemTypes t ON s.InvItemTypeId = t.InvItemTypeId
-			WHERE ISNULL(h.StatusId, 0) = 0 AND h.Environment = @Environment
+			WHERE ISNULL(h.StatusId, 0) <> -1 AND h.Environment = @Environment
 				AND EXISTS (SELECT 1 FROM #PartyList p WHERE s.RefPartyId = p.PartyId AND p.IsSelected = 1)
 			GROUP BY s.RefPartyId, t.InvItemTypeName
 		)

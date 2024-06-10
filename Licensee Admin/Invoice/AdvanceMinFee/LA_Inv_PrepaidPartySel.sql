@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -19,6 +19,7 @@ AS
 		- 20190821@Parsons: Improve the ability to maintain systems [#118627]
 		- 20220418@Percy: Add Credit note for AMF [RedmineID: #164139]
 		- 20221109@Malcolm: add LicenseeCode, BaseCurrencyId [RedmineID : 175860]
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -53,7 +54,7 @@ BEGIN
 		INNER JOIN @Parties p ON p.PartyId = s.RefPartyId
 		INNER JOIN @InvoiceItemTypes invT ON s.InvItemTypeId = invT.Value
 		WHERE h.Environment = @Environment
-			AND ISNULL(h.StatusId, 0) = 0 -- 0: normal invoice
+			AND ISNULL(h.StatusId, 0) <> -1 -- 0: normal invoice. 1: Closed
 		GROUP BY p.PartyId, p.PartyName, p.BrandName, p.ParentId
 	)
 	SELECT DISTINCT p.PartyId, p.PartyName, p.BrandName, p.ParentId,CAST(0 AS MONEY) AS AdvanceMinFee,CAST(0 AS MONEY) AS Prepayment, CAST(0 AS MONEY) AS AGBalance

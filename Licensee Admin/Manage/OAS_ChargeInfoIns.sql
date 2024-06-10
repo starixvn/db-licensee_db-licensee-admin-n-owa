@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="wsv_lap" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[OAS_ChargeInfoIns] 
 	@ProductName			NVARCHAR(10)
 	, @FromPartyName		NVARCHAR(50)
@@ -42,6 +42,7 @@ AS
 		- 20171012@Harper: Add more Basic Of Billing Info [#84772]
 		- 20180122@Harper: Add code for insert Month of deduction for LA_MinFee [RedmineID: #87039]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
+		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 
 	Param's Explanation:
 */
@@ -228,7 +229,7 @@ BEGIN
 					SELECT @AMF = SUM(ISNULL(d.Income, 0))
 					FROM dbo.LA_InvoiceHeader h WITH (NOLOCK)
 						INNER JOIN dbo.LA_InvoiceStatement d WITH (NOLOCK) ON h.InvoiceHeaderId = d.InvoiceHeaderId
-					 WHERE h.InvoiceType = 7 AND d.InvItemTypeId = 3 AND h.StatusId = 0 AND h.Environment = 'PRO'					
+					 WHERE h.InvoiceType = 7 AND d.InvItemTypeId = 3 AND h.StatusId <> -1 AND h.Environment = 'PRO'					
 						AND h.PartyId = @FromPartyId
 						AND h.CurrencyId = @BaseCurrencyId
 

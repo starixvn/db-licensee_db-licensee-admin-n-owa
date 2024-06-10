@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -53,6 +53,7 @@ AS
 		- 20210314@Parsons: Change BaseCurrency Of Licensee [#FeatureID 151466]
 		- 20210720@Percy: Check invoice number is already used [RedmineID: #147006]
 		- 20220418@Percy: Remove code update InvItemTypeId [RedmineID: #164139]
+		- 20240103@Danny: store invoice amount with 2 decimal digits [RedmineID: #197260]
 */
 
 BEGIN
@@ -191,8 +192,12 @@ BEGIN
 				INNER JOIN dbo.LA_InvoiceItemType t WITH (NOLOCK) ON s.ItemType = t.InvItemTypeId
 			WHERE s.ItemType <> 28
 
-		INSERT INTO dbo.LA_InvoiceHeader (BillerId, PartyId, CurrencyId, InvoiceSymbol, InvoiceNumber, FromDate, ToDate, InvoiceDate, DueDate, Amount, InvoiceType, StatusId, Note, HasSent, HasDeleted, CreatedBy, CreatedDateTime, IsSeparateProduct, MaxPCU, RateAmount, IsWaived, InvoicePath, Environment, OfficialInvoiceNo)
-		VALUES (@BillerId, @PartyId, @BaseCurrencyId, @InvoiceSymbol, @InvoiceNumber, @FromDate, @ToDate, @InvoiceDate, @DueDate, @Amount, @InvoiceTypeId, 0, @Note, 0, 0, @UserID, @CurrentTime, @IsSeparateProduct, @HostingFeeMaxPCU, @HostingFeeRateAmount, @HostingFeeIsWaived, @InvoiceFileName, @Environment, @InvoiceNo)
+		DECLARE @StatusId SMALLINT = 0
+
+		SELECT @StatusId = CASE WHEN  ROUND(@Amount,2) = 0 THEN 1 ELSE 0 END
+
+		INSERT INTO dbo.LA_InvoiceHeader (BillerId, PartyId, CurrencyId, InvoiceSymbol, InvoiceNumber, FromDate, ToDate, InvoiceDate, DueDate, Amount, InvoiceType, StatusId, Note, HasSent, HasDeleted, CreatedBy, CreatedDateTime, IsSeparateProduct, MaxPCU, RateAmount, IsWaived, InvoicePath, Environment, OfficialInvoiceNo, RemainingAmount)
+		VALUES (@BillerId, @PartyId, @BaseCurrencyId, @InvoiceSymbol, @InvoiceNumber, @FromDate, @ToDate, @InvoiceDate, @DueDate, ROUND(@Amount,2), @InvoiceTypeId, @StatusId, @Note, 0, 0, @UserID, @CurrentTime, @IsSeparateProduct, @HostingFeeMaxPCU, @HostingFeeRateAmount, @HostingFeeIsWaived, @InvoiceFileName, @Environment, @InvoiceNo, ROUND(@Amount,2))
 
 		SELECT @NewInvoiceHeaderId = SCOPE_IDENTITY()
 
