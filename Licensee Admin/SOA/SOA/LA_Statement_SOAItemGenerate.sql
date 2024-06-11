@@ -137,7 +137,7 @@ BEGIN
 
 	DECLARE @InvoiceHeaderID BIGINT
 
-	SELECT @InvoiceHeaderID = InvoiceHeaderID FROM DBCUST.bodb_licensee.dbo.LA_InvoiceHeader WITH(NOLOCK) WHERE OfficialInvoiceNo = @InvoiceNo AND PartyId = @PartyId AND BillerId = @BillerId  AND StatusId <> -1
+	SELECT @InvoiceHeaderID = InvoiceHeaderID FROM dbo.LA_InvoiceHeader WITH(NOLOCK) WHERE OfficialInvoiceNo = @InvoiceNo AND PartyId = @PartyId AND BillerId = @BillerId  AND StatusId <> -1
 
 	--SELECT @InvoiceHeaderID = 40610 -- Testing
 
@@ -147,10 +147,10 @@ BEGIN
 		DECLARE @ReferenceInv NVARCHAR(50)
 
 		SELECT	@InvoiceTypeID = d.InvoiceType,  @ReferenceInv = x.RefNo, @InvoiceDate = InvoiceDate, @CurrencyID = d.CurrencyId, @PartyId = PartyId, @StatementDate = InvoiceDate
-		FROM	DBCUST.bodb_licensee.dbo.LA_InvoiceHeader d WITH(NOLOCK)
+		FROM	dbo.LA_InvoiceHeader d WITH(NOLOCK)
 		OUTER APPLY (
 				SELECT TOP 1 st.RefNo
-				FROM DBCUST.bodb_licensee.dbo.LA_InvoiceStatement st WITH(NOLOCK)  
+				FROM dbo.LA_InvoiceStatement st WITH(NOLOCK)  
 				WHERE st.InvoiceHeaderId = d.InvoiceHeaderId AND d.InvoiceType IN (4,5)
 				) x
 		WHERE	d.InvoiceHeaderId = @InvoiceHeaderID
@@ -158,7 +158,7 @@ BEGIN
 		IF @ReferenceInv IS NOT NULL 
 		BEGIN
 				SELECT	@RefInvoiceTypeID = d.InvoiceType
-				FROM	DBCUST.bodb_licensee.dbo.LA_InvoiceHeader d WITH(NOLOCK)
+				FROM	dbo.LA_InvoiceHeader d WITH(NOLOCK)
 				WHERE   OfficialInvoiceNo = @ReferenceInv
 		END
 
@@ -193,7 +193,7 @@ BEGIN
 			END
 
 			SELECT	TOP 1 @RefInvoiceTypeID = d.InvoiceType
-			FROM	DBCUST.bodb_licensee.dbo.LA_InvoiceHeader d WITH(NOLOCK)
+			FROM	dbo.LA_InvoiceHeader d WITH(NOLOCK)
 			WHERE EXISTS (
 						SELECT TOP 1 1
 						FROM @Statement st
@@ -279,7 +279,7 @@ BEGIN
 				ROUND(ISNULL(li.RemainingAmount,li.Amount),2) RemainingAmount,
 				li.StatusId,
 				CASE  WHEN li.InvoiceType = 3 THEN 1  ELSE 0 END SOAType
-		FROM	DBCUST.bodb_licensee.dbo.LA_InvoiceHeader li WITH(NOLOCK)
+		FROM	dbo.LA_InvoiceHeader li WITH(NOLOCK)
 		WHERE	li.PartyId = @PartyId AND li.Environment = @Environment  AND li.CurrencyId = @CurrencyID  AND li.InvoiceDate <= @StatementDate
 				AND StatusId <> -1
 		UNION ALL
@@ -296,7 +296,7 @@ BEGIN
 				CASE WHEN lp.Type IN (0,1) THEN 0
 				     WHEN lp.Type = 2 THEN 1
 					 ELSE NULL END SOAType
-		FROM	DBCUST.bodb_licensee.dbo.LA_Payment lp WITH(NOLOCK)
+		FROM	dbo.LA_Payment lp WITH(NOLOCK)
 		WHERE	lp.PartyId = @PartyId AND lp.Environment = @Environment  AND lp.CurrencyId = @CurrencyID AND lp.ReceivedDate <= @StatementDate
 				AND lp.StatusId = 0
 
@@ -310,14 +310,14 @@ BEGIN
 				INSERT INTO #D_C_Inv_Detail( DocumentID, DocumentDate, Refno, RefAmount, RefStatusID, RefInvDate, RefInvType)
 				SELECT	0, @InvoiceDate, Reference AS Refno, s.Amount, li.StatusId, li.InvoiceDate, li.InvoiceType
 				FROM	@Statement s
-				INNER JOIN DBCUST.bodb_licensee.dbo.LA_InvoiceHeader li WITH(NOLOCK) ON s.Reference = li.OfficialInvoiceNo AND li.StatusId <> -1
+				INNER JOIN dbo.LA_InvoiceHeader li WITH(NOLOCK) ON s.Reference = li.OfficialInvoiceNo AND li.StatusId <> -1
 				
 			END
 
 			INSERT INTO #D_C_Inv_Detail( DocumentID, DocumentDate, Refno, RefAmount, RefStatusID, RefInvDate, RefInvType)
 			SELECT t.DocumentID, t.DocumentDate, st.RefNo, ISNULL(st.Income,0) -  ISNULL(st.Expense,0), m.StatusID, m.DocumentDate, m.DocumentDetailTypeID
 			FROM  #All_Doc_By_Party t
-			INNER JOIN DBCUST.bodb_licensee.dbo.LA_InvoiceStatement st WITH(NOLOCK) ON t.DocumentID = st.InvoiceHeaderId
+			INNER JOIN dbo.LA_InvoiceStatement st WITH(NOLOCK) ON t.DocumentID = st.InvoiceHeaderId
 			INNER JOIN #All_Doc_By_Party m ON st.RefNo = m.DocumentNo AND m.StatusID = 0
 			WHERE t.DocumentTypeID = 0 AND t.DocumentDetailTypeID IN (4,5) AND t.StatusID = 0 AND t.SOAType = @SOAType
 
