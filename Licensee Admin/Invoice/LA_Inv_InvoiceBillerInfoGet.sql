@@ -42,16 +42,19 @@ BEGIN
 		InvoiceTemplateName	VARCHAR(50),
 		InvoiceTemplatePath	VARCHAR(255),
 		IsSeparateProduct	BIT,
-		InvoiceLanguage		VARCHAR(50)
+		InvoiceLanguage		VARCHAR(50),
+		ActiveAddress		TINYINT,
+		CompanyName			NVARCHAR(100), 
+		BillerAddress1		NVARCHAR(255)
 	)
-	INSERT INTO @InvoiceInfo(InvoiceTemplateId,InvoiceTemplateName,InvoiceTemplatePath)
+	INSERT INTO @InvoiceInfo(InvoiceTemplateId,InvoiceTemplateName,InvoiceTemplatePath,ActiveAddress)
 	(
-		SELECT	ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath
+		SELECT	ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath, ivs.ActiveAddress
 		FROM	dbo.LA_InvoiceSetting ivs WITH(NOLOCK) 
 				INNER JOIN dbo.LA_InvoiceTemplate itpl WITH(NOLOCK) ON ivs.InvTempId = itpl.InvTemplateId
 		WHERE	ivs.FromPartyId = @PayerId
 				AND ivs.ToPartyId = @BillerId
-		GROUP	BY ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath
+		GROUP	BY ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath, ivs.ActiveAddress
 	)
 
 	DECLARE @InvoiceTmp TABLE(
@@ -71,12 +74,6 @@ BEGIN
 	DECLARE @InvoiceSymbol NVARCHAR(20) = ''
 	DECLARE @InvoiceNumber INT = 1
 	DECLARE @SameInvoiceNoList TABLE (InvoiceType INT)
-	DECLARE @CompanyName NVARCHAR(100)
-	DECLARE @BillerAddress1 NVARCHAR(255)
-
-	SELECT @CompanyName = CompanyName , @BillerAddress1 = Address1
-	FROM LA_BillerInfo WITH(NOLOCK)
-	WHERE PartyId = @BillerId
 
 	-- 1: software fee, 6: hosting fee
 	IF @InvoiceType IN (1,6) INSERT INTO @SameInvoiceNoList VALUES(1),(6)
@@ -92,11 +89,22 @@ BEGIN
 	SELECT	@InvoiceNumber = ISNULL(MAX(i.InvoiceNumber), 0) + 1
 	FROM	@InvoiceTmp i		
 	WHERE	i.InvoiceSymbol = @InvoiceSymbol
-	
-	UPDATE	@InvoiceInfo
-	SET		InvoiceSymbol = @InvoiceSymbol,
-			InvoiceNumber = @InvoiceNumber,
-			InvoiceLanguage = (SELECT TOP 1 d.InvoiceLanguage FROM dbo.OAS_PartyDetail d WHERE d.PartyID=@PayerId)
+
+	UPDATE	t
+	SET		t.InvoiceSymbol = @InvoiceSymbol,
+			t.InvoiceNumber = @InvoiceNumber,
+			t.InvoiceLanguage = u.InvoiceLanguage,
+			t.CompanyName		= u.CompanyName,
+			t.BillerAddress1	= u.BillerAddress1
+	FROM @InvoiceInfo t
+	OUTER APPLY (
+		SELECT TOP 1 d.InvoiceLanguage,
+			   CASE WHEN t.ActiveAddress = 1 THEN d.CompanyName
+					WHEN t.ActiveAddress = 2 THEN d.CompanyName2  END CompanyName, 
+				CASE WHEN t.ActiveAddress = 1 THEN d.Address1
+					WHEN t.ActiveAddress = 2 THEN d.Address2  END BillerAddress1
+		FROM dbo.OAS_PartyDetail d WHERE d.PartyID=@PayerId
+	) u
 	
 	UPDATE	@InvoiceInfo
 	SET		IsSeparateProduct = (SELECT TOP 1 i.IsSeparateProduct
@@ -111,8 +119,8 @@ BEGIN
 		, ii.InvoiceTemplatePath
 		, ISNULL(ii.IsSeparateProduct,0) AS IsSeparateProduct
 		, ISNULL(ii.InvoiceLanguage, 'en-US') AS InvoiceLanguage
-		, @CompanyName  AS CompanyName
-		, @BillerAddress1 AS BillerAddress1
+		, ii.CompanyName  AS CompanyName
+		, ii.BillerAddress1 AS BillerAddress1
 	FROM @InvoiceInfo ii
 
 END

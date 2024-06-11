@@ -135,39 +135,6 @@ BEGIN
 	DECLARE @InvoiceNo NVARCHAR(50) = CONVERT(NVARCHAR(15), @InvoiceNumber)
 	SELECT  @InvoiceNo = @InvoiceSymbol + CASE WHEN @InvoiceNumber < 100 THEN RIGHT('00' + @InvoiceNo, 3) ELSE @InvoiceNo END
 
-	DECLARE @InvoiceHeaderID BIGINT
-
-	SELECT @InvoiceHeaderID = InvoiceHeaderID FROM dbo.LA_InvoiceHeader WITH(NOLOCK) WHERE OfficialInvoiceNo = @InvoiceNo AND PartyId = @PartyId AND BillerId = @BillerId  AND StatusId <> -1
-
-	--SELECT @InvoiceHeaderID = 40610 -- Testing
-
-	IF @InvoiceHeaderID > 0 --  Export SOA when Invoice stored already
-	BEGIN
-		-- Detect SOA Type
-		DECLARE @ReferenceInv NVARCHAR(50)
-
-		SELECT	@InvoiceTypeID = d.InvoiceType,  @ReferenceInv = x.RefNo, @InvoiceDate = InvoiceDate, @CurrencyID = d.CurrencyId, @PartyId = PartyId, @StatementDate = InvoiceDate
-		FROM	dbo.LA_InvoiceHeader d WITH(NOLOCK)
-		OUTER APPLY (
-				SELECT TOP 1 st.RefNo
-				FROM dbo.LA_InvoiceStatement st WITH(NOLOCK)  
-				WHERE st.InvoiceHeaderId = d.InvoiceHeaderId AND d.InvoiceType IN (4,5)
-				) x
-		WHERE	d.InvoiceHeaderId = @InvoiceHeaderID
-
-		IF @ReferenceInv IS NOT NULL 
-		BEGIN
-				SELECT	@RefInvoiceTypeID = d.InvoiceType
-				FROM	dbo.LA_InvoiceHeader d WITH(NOLOCK)
-				WHERE   OfficialInvoiceNo = @ReferenceInv
-		END
-
-		SELECT @SOAType = CASE WHEN @RefInvoiceTypeID IN (1,6,7) OR @InvoiceTypeID IN (1,6,7) THEN 0
-							   WHEN @RefInvoiceTypeID  = 3 OR @InvoiceTypeID = 3 THEN 1
-							   ELSE -1
-						 END
-	END
-	ELSE -- Preview mode
 	BEGIN 
 		-- Detect SOA Type
 		IF @InvoiceTypeId IN (4,5)
@@ -211,45 +178,42 @@ BEGIN
 		EXEC dbo.LA_SelBaseCurrency
 
 		SELECT @CurrencyID = CurrencyId FROM @tmpBaseCurrencyList WHERE Code = @BaseCurrency
-
 	END
 
 	IF @SOAType NOT IN (0,1) RETURN
 
 	-- Get all documents
 	BEGIN
-		IF @InvoiceHeaderID IS NULL
-		BEGIN
-			INSERT INTO #All_Doc_By_Party 
-			(
-				DocumentID			,
-				DocumentNo			,
-				DocumentTypeID		,  -- 0: Inv, 1: Payment
-				DocumentDetailTypeID,  -- InvTypeID, PaymentTypeID
-				DocumentDate		,
-				Description			,
-				OrgAmount			,
-				RemainingAmount		, 
-				StatusID			,
-				SOAType		
-			)
-			SELECT 0 AS DocumentID, -- Fake DocumentID
-					@InvoiceNo AS DocumentNo,
-					0 AS DocumentTypeID,
-					@InvoiceTypeId AS DocumentDetailTypeID,
-					@InvoiceDate AS DocumentDate,
-					CASE WHEN @InvoiceTypeId = 1 THEN @InvoiceNo + ' Software & data licensing & data transmission fees for ' + FORMAT (@InvoiceDate, 'yyyy-MM-dd') -- Software Data & Licensing Fees
-					 WHEN @InvoiceTypeId = 3 THEN @InvoiceNo + ' Rebates on Access Fees for ' + FORMAT (@InvoiceDate, 'yyyy-MM-dd') -- Rebate
-					 WHEN @InvoiceTypeId = 7 THEN @InvoiceNo + ' Setup Fee invoice' -- Setup Fees
-					 WHEN @InvoiceTypeId = 6 THEN @InvoiceNo + ' Rack hosting fee for ' + FORMAT (@InvoiceDate, 'yyyy-MM-dd') -- Hosting Fees
-					 ELSE ''
-					END Description,
-					@Amount OrgAmount,
-					@Amount RemainingAmount,
-					0 AS StatusID,
-					@SOAType
 
-		END
+		INSERT INTO #All_Doc_By_Party 
+		(
+			DocumentID			,
+			DocumentNo			,
+			DocumentTypeID		,  -- 0: Inv, 1: Payment
+			DocumentDetailTypeID,  -- InvTypeID, PaymentTypeID
+			DocumentDate		,
+			Description			,
+			OrgAmount			,
+			RemainingAmount		, 
+			StatusID			,
+			SOAType		
+		)
+		SELECT 0 AS DocumentID, -- Fake DocumentID
+				@InvoiceNo AS DocumentNo,
+				0 AS DocumentTypeID,
+				@InvoiceTypeId AS DocumentDetailTypeID,
+				@InvoiceDate AS DocumentDate,
+				CASE WHEN @InvoiceTypeId = 1 THEN @InvoiceNo + ' Software & data licensing & data transmission fees for ' + FORMAT (@InvoiceDate, 'yyyy-MM-dd') -- Software Data & Licensing Fees
+					WHEN @InvoiceTypeId = 3 THEN @InvoiceNo + ' Rebates on Access Fees for ' + FORMAT (@InvoiceDate, 'yyyy-MM-dd') -- Rebate
+					WHEN @InvoiceTypeId = 7 THEN @InvoiceNo + ' Setup Fee invoice' -- Setup Fees
+					WHEN @InvoiceTypeId = 6 THEN @InvoiceNo + ' Rack hosting fee for ' + FORMAT (@InvoiceDate, 'yyyy-MM-dd') -- Hosting Fees
+					ELSE ''
+				END Description,
+				@Amount OrgAmount,
+				@Amount RemainingAmount,
+				0 AS StatusID,
+				@SOAType
+
 		
 		INSERT INTO #All_Doc_By_Party 
 		(
@@ -282,6 +246,7 @@ BEGIN
 		FROM	dbo.LA_InvoiceHeader li WITH(NOLOCK)
 		WHERE	li.PartyId = @PartyId AND li.Environment = @Environment  AND li.CurrencyId = @CurrencyID  AND li.InvoiceDate <= @StatementDate
 				AND StatusId <> -1
+				AND li.OfficialInvoiceNo <> @InvoiceNo
 		UNION ALL
 
 		SELECT  lp.PaymentId, 
@@ -303,15 +268,13 @@ BEGIN
 		IF EXISTS (SELECT TOP 1 1 FROM #All_Doc_By_Party WHERE DocumentTypeID = 0 AND DocumentDetailTypeID IN (4,5) AND StatusID = 0 AND SOAType = @SOAType)
 		BEGIN
 
-			IF @InvoiceHeaderID IS NULL AND @InvoiceTypeId IN (4,5)
+			IF @InvoiceTypeId IN (4,5)
 			BEGIN
-
 				/* (ItemType, Amount, Description, Reference) */
 				INSERT INTO #D_C_Inv_Detail( DocumentID, DocumentDate, Refno, RefAmount, RefStatusID, RefInvDate, RefInvType)
-				SELECT	0, @InvoiceDate, Reference AS Refno, s.Amount, li.StatusId, li.InvoiceDate, li.InvoiceType
+				SELECT	0, @InvoiceDate, Reference AS Refno,  CASE WHEN @InvoiceTypeId = 4 THEN -1 ELSE 1 END *  s.Amount, li.StatusId, li.InvoiceDate, li.InvoiceType
 				FROM	@Statement s
-				INNER JOIN dbo.LA_InvoiceHeader li WITH(NOLOCK) ON s.Reference = li.OfficialInvoiceNo AND li.StatusId <> -1
-				
+				INNER JOIN dbo.LA_InvoiceHeader li WITH(NOLOCK) ON s.Reference = li.OfficialInvoiceNo AND li.StatusId <> -1	
 			END
 
 			INSERT INTO #D_C_Inv_Detail( DocumentID, DocumentDate, Refno, RefAmount, RefStatusID, RefInvDate, RefInvType)
