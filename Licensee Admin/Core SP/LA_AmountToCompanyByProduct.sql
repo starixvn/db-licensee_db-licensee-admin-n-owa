@@ -45,6 +45,7 @@ AS
 		- 20230223@Danny: Integrate Casino promotion [#194808]
 		- 20240321@Danny: Change fomular AGC Deduct prepayment [#197268]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
+		- 20240612@Danny: return figures with 2 decimal digits [RedmineID: #206415]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -1358,9 +1359,17 @@ BEGIN
 
 
 	SELECT
-		r.PartyId, r.ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-		,r.Discount, r.DiscountRate, DiscountRemark, ISNULL(TotalRebate,0) AS Rebate, ISNULL(ISNULL(NULLIF(WLRebateRate, 0), NULLIF(FeeRebateRate, 0)), 0) AS RebateRate, RebateRemark
-		,r.ExtraInfo
+		r.PartyId, 
+		r.ProductId, 
+		LicensingFeeTypeId, 
+		ROUND(GrossLicensingFee,2) GrossLicensingFee, 
+		ROUND(LicensingFee,2) LicensingFee, 
+		ROUND(ExtraAmount,2) ExtraAmount , IsChargedByGroupMinFee, IsChargedByMinFee,
+		ROUND(r.Discount,2) Discount, r.DiscountRate, DiscountRemark, 
+		ROUND(ISNULL(TotalRebate,0),2) AS Rebate, 
+		ISNULL(ISNULL(NULLIF(WLRebateRate, 0), NULLIF(FeeRebateRate, 0)), 0) AS RebateRate, 
+		RebateRemark,
+		r.ExtraInfo
 	FROM @Result r
 	
 
