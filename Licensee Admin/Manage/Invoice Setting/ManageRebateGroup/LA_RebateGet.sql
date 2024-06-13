@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -13,6 +13,7 @@ AS
 	 Revisions:  
 		- 20180528@Parsons: Get rebate group [#94282]
 		- 20220210@Percy: Return RebateGroupType [RedmineID: #163495]
+		- 20240613@Danny: Rebate on specific currencies [#FeatureID 206143]
 
 	 Params:
 
@@ -20,7 +21,8 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @ProductIds VARCHAR(200), @ProductList VARCHAR(4000), @PartyIds VARCHAR(200), @PartyList VARCHAR(4000), @Rate DECIMAL(9, 8)
+	DECLARE @ProductIds VARCHAR(200), @ProductList VARCHAR(4000), @PartyIds VARCHAR(200), @PartyList VARCHAR(4000), @Rate DECIMAL(9, 8),
+	@CurrencyIds		VARCHAR(4000)
 
 	SELECT @ProductIds = COALESCE(@ProductIds + ',' + CAST(p.ProductId AS VARCHAR), CAST(p.ProductId AS VARCHAR)),
 		@ProductList = COALESCE(@ProductList + ',' + CAST(ProductName AS VARCHAR), CAST(ProductName AS VARCHAR))
@@ -39,6 +41,11 @@ BEGIN
 	FROM dbo.LA_DiscountGroupDetail WITH(NOLOCK)
 	WHERE DiscountGroupId = @GroupId
 
+
+	SELECT @CurrencyIds = COALESCE(@CurrencyIds + ',' + CAST(p.CurrencyId AS VARCHAR), CAST(p.CurrencyId AS VARCHAR))
+	FROM dbo.LA_DiscountGroupCurrency p WITH(NOLOCK)
+	WHERE DiscountGroupId = @GroupId
+
 	--get rebate header
 	SELECT  DiscountGroupId		AS GroupId,
 			DiscountGroupName	AS GroupName,
@@ -52,7 +59,8 @@ BEGIN
 			@ProductList	AS ProductList,
 			@PartyList		AS PartyList,
 			@Rate			AS Rate,
-			ModifiedDate
+			ModifiedDate,
+			@CurrencyIds	AS CurrencyIds
 	FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK)
 	WHERE DiscountGroupId = @GroupId
 END

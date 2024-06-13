@@ -37,8 +37,8 @@ AS
 		- 20240306@Danny: get last day of previous billing cycle by Param input [#201935]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 		- 20240703@Danny: Show chargerate setting = 0 [RedmineID: #206117]
+		- 20241126@Danny: Rebate on specific currencies [#FeatureID 206143]
 
-		
 	 Params:
 		+ @PayerId :specify Party
 		
@@ -186,7 +186,7 @@ BEGIN
 		LEFT JOIN (
 				SELECT PartyId, DiscountGroupId, DiscountGroupName 
 				FROM @Discount 
-				WHERE DiscountGroupType IN (2, 12, 22)
+				WHERE DiscountGroupType IN (2, 12, 22, 32)
 					AND @CurrentDate BETWEEN FromDate AND ToDate
 				) d2 ON c.PartyId = d2.PartyId --Rebate
 
