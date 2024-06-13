@@ -54,6 +54,7 @@ BEGIN
 				INNER JOIN dbo.LA_InvoiceTemplate itpl WITH(NOLOCK) ON ivs.InvTempId = itpl.InvTemplateId
 		WHERE	ivs.FromPartyId = @PayerId
 				AND ivs.ToPartyId = @BillerId
+				AND ivs.InvTypeId = @InvoiceType
 		GROUP	BY ivs.InvTempId, itpl.InvTemplateName, itpl.TemplatePath, ivs.ActiveAddress
 	)
 

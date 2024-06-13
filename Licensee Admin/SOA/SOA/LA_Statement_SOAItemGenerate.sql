@@ -87,6 +87,24 @@ BEGIN
 	SELECT @End_AgingMore_Than_90 =	DATEADD(DAY,-1,@Start_Aging_61_to_90)
 	SELECT @Start_AgingMore_Than_90 = DATEADD(DAY,1,EOMONTH(@End_AgingMore_Than_90,-1))
 
+	DECLARE @ItemResult TABLE (
+		DocumentDate			DATE ,
+		DocumentTypeID			SMALLINT,
+		DocumentDetailTypeID	SMALLINT,
+		Description				NVARCHAR(500), 
+		DocumentNo				VARCHAR(50),
+		Amount					MONEY , 
+		Payment					MONEY, 
+		Balance					MONEY, 
+		Type					TINYINT,
+		InvoiceNo				VARCHAR(50),
+		PaymentNo				VARCHAR(50),
+		InvoiceDate				VARCHAR(1000),
+		ReferenceInvoiceDate	VARCHAR(1000),
+		PayerName				VARCHAR(50),
+		Rn INT
+	)
+
 	IF @BaseCurrency IS NULL
 	BEGIN
 		-- Get current billing currency of licensee
@@ -106,7 +124,8 @@ BEGIN
 		OrgAmount				MONEY,
 		RemainingAmount			MONEY, 
 		StatusID				SMALLINT,
-		SOAType					BIT 
+		SOAType					BIT ,
+		ReferenceInvoiceDate	VARCHAR(1000)
 	)
 	CREATE TABLE #D_C_Inv_Detail 
 	( 
@@ -129,7 +148,8 @@ BEGIN
 		Amount					MONEY, --Inv Amt
 		Payment					MONEY, --Payment Amt
 		Balance					MONEY,
-		OrgAmount				MONEY
+		OrgAmount				MONEY,
+		ReferenceInvoiceDate	VARCHAR(1000)
 	)
 
 	DECLARE @InvoiceNo NVARCHAR(50) = CONVERT(NVARCHAR(15), @InvoiceNumber)
@@ -165,7 +185,7 @@ BEGIN
 						SELECT TOP 1 1
 						FROM @Statement st
 						WHERE st.Reference = d.OfficialInvoiceNo 
-					) 
+					) AND d.StatusId <> -1
 		END
 
 		SELECT @SOAType = CASE  WHEN @RefInvoiceTypeID IN (1,6,7) OR @InvoiceTypeId IN (1,6,7) THEN 0
@@ -180,7 +200,20 @@ BEGIN
 		SELECT @CurrencyID = CurrencyId FROM @tmpBaseCurrencyList WHERE Code = @BaseCurrency
 	END
 
-	IF @SOAType NOT IN (0,1) RETURN
+	IF @SOAType NOT IN (0,1) 
+	BEGIN
+		SELECT  DocumentDate, Amount, Payment, Balance, Type, InvoiceNo,PaymentNo,InvoiceDate,ReferenceInvoiceDate,PayerName FROM	@ItemResult WHERE 1 = 0
+
+		SELECT NULL AS TotalDue, 
+			 NULL AS Amount, 
+			NULL AS Amount_0_to_30_Days, 
+			NULL AS  Amount_31_to_60_Days, 
+			NULL AS  Amount_61_to_90_Days, 
+			NULL AS  Amount_More_Than_90_Days
+		WHERE 1= 0
+
+		RETURN
+	END
 
 	-- Get all documents
 	BEGIN
@@ -203,12 +236,7 @@ BEGIN
 				0 AS DocumentTypeID,
 				@InvoiceTypeId AS DocumentDetailTypeID,
 				@InvoiceDate AS DocumentDate,
-				CASE WHEN @InvoiceTypeId = 1 THEN @InvoiceNo + ' Software & data licensing & data transmission fees for ' + FORMAT (@InvoiceDate, 'yyyy-MM-dd') -- Software Data & Licensing Fees
-					WHEN @InvoiceTypeId = 3 THEN @InvoiceNo + ' Rebates on Access Fees for ' + FORMAT (@InvoiceDate, 'yyyy-MM-dd') -- Rebate
-					WHEN @InvoiceTypeId = 7 THEN @InvoiceNo + ' Setup Fee invoice' -- Setup Fees
-					WHEN @InvoiceTypeId = 6 THEN @InvoiceNo + ' Rack hosting fee for ' + FORMAT (@InvoiceDate, 'yyyy-MM-dd') -- Hosting Fees
-					ELSE ''
-				END Description,
+				'' Description,
 				@Amount OrgAmount,
 				@Amount RemainingAmount,
 				0 AS StatusID,
@@ -233,12 +261,7 @@ BEGIN
 				0 AS DocumentTypeID,
 				li.InvoiceType AS DocumentDetailTypeID,
 				li.InvoiceDate,
-				CASE WHEN li.InvoiceType = 1 THEN li.OfficialInvoiceNo + ' Software & data licensing & data transmission fees for ' + FORMAT (li.InvoiceDate, 'yyyy-MM-dd') -- Software Data & Licensing Fees
-					 WHEN li.InvoiceType = 3 THEN li.OfficialInvoiceNo + ' Rebates on Access Fees for ' + FORMAT (li.InvoiceDate, 'yyyy-MM-dd') -- Rebate
-					 WHEN li.InvoiceType = 7 THEN li.OfficialInvoiceNo + ' Setup Fee invoice' -- Setup Fees
-					 WHEN li.InvoiceType = 6 THEN li.OfficialInvoiceNo + ' Rack hosting fee for ' + FORMAT (li.InvoiceDate, 'yyyy-MM-dd') -- Hosting Fees
-					 ELSE ''
-				END Description,
+				'' Description,
 				ROUND(li.Amount,2) AS OrgAmount,
 				ROUND(ISNULL(li.RemainingAmount,li.Amount),2) RemainingAmount,
 				li.StatusId,
@@ -265,7 +288,7 @@ BEGIN
 		WHERE	lp.PartyId = @PartyId AND lp.Environment = @Environment  AND lp.CurrencyId = @CurrencyID AND lp.ReceivedDate <= @StatementDate
 				AND lp.StatusId = 0
 
-		IF EXISTS (SELECT TOP 1 1 FROM #All_Doc_By_Party WHERE DocumentTypeID = 0 AND DocumentDetailTypeID IN (4,5) AND StatusID = 0 AND SOAType = @SOAType)
+		IF EXISTS (SELECT TOP 1 1 FROM #All_Doc_By_Party WHERE DocumentTypeID = 0 AND DocumentDetailTypeID IN (4,5) AND StatusID = 0)
 		BEGIN
 
 			IF @InvoiceTypeId IN (4,5)
@@ -281,23 +304,26 @@ BEGIN
 			SELECT t.DocumentID, t.DocumentDate, st.RefNo, ISNULL(st.Income,0) -  ISNULL(st.Expense,0), m.StatusID, m.DocumentDate, m.DocumentDetailTypeID
 			FROM  #All_Doc_By_Party t
 			INNER JOIN dbo.LA_InvoiceStatement st WITH(NOLOCK) ON t.DocumentID = st.InvoiceHeaderId
-			INNER JOIN #All_Doc_By_Party m ON st.RefNo = m.DocumentNo AND m.StatusID = 0
-			WHERE t.DocumentTypeID = 0 AND t.DocumentDetailTypeID IN (4,5) AND t.StatusID = 0 AND t.SOAType = @SOAType
+			INNER JOIN #All_Doc_By_Party m ON st.RefNo = m.DocumentNo AND m.StatusID <> -1
+			WHERE t.DocumentTypeID = 0 AND t.DocumentDetailTypeID IN (4,5) AND t.StatusID <> -1
 
 			UPDATE t
-			SET  t.Description =  CASE WHEN x.SOAType = 0 THEN t.DocumentNo +  ' Software & data licensing & data transmission fees for ' + x.Desc_
-									   ELSE t.DocumentNo + ' Rebates on Access Fees for ' + FORMAT (t.DocumentDate, 'yyyy-MM-dd') END,
+			SET  t.ReferenceInvoiceDate =   x.Desc_,
 				 t.SOAType =  x.SOAType
 			FROM #All_Doc_By_Party t
 			CROSS APPLY (
-				SELECT STRING_AGG(FORMAT(u.RefInvDate, 'yyyy-MM-dd'),', ') AS Desc_,
-					   MAX(CASE WHEN u.RefInvType IN (1,6,7) THEN 0
-								WHEN u.RefInvType = 3 THEN 1
-								ELSE NULL END)  SOAType
-				FROM #D_C_Inv_Detail u
-				WHERE u.DocumentID = t.DocumentID 
+				SELECT	STRING_AGG(FORMAT(x1.RefInvDate, 'yyyy-MM-dd'),', ') AS Desc_,
+						   MAX(CASE WHEN x1.RefInvType IN (1,6,7) THEN 0
+									WHEN x1.RefInvType = 3 THEN 1
+									ELSE NULL END)  SOAType
+				FROM 
+				(
+					SELECT DISTINCT RefInvDate, RefInvType
+					FROM #D_C_Inv_Detail u
+					WHERE u.DocumentID = t.DocumentID 
+				) x1
 			) x
-			WHERE t.DocumentTypeID = 0 AND t.DocumentDetailTypeID IN (4,5) AND t.StatusID = 0 AND t.SOAType = @SOAType
+			WHERE t.DocumentTypeID = 0 AND t.DocumentDetailTypeID IN (4,5) AND t.StatusID = 0
 		END
 
 	END
@@ -318,7 +344,8 @@ BEGIN
 			Description		,
 			Amount			, 
 			Payment			,
-			OrgAmount		
+			OrgAmount		,
+			ReferenceInvoiceDate
 		)
 		SELECT a.DocumentID, 
 			   a.DocumentNo, 
@@ -328,42 +355,25 @@ BEGIN
 			   a.Description,
 			   CASE WHEN a.DocumentTypeID = 0 THEN a.RemainingAmount ELSE NULL END Amount,
 			   CASE WHEN a.DocumentTypeID = 1 THEN a.RemainingAmount ELSE NULL END Payment,
-			   a.OrgAmount
+			   a.OrgAmount,
+			   a.ReferenceInvoiceDate
 		FROM  #All_Doc_By_Party a
 		WHERE   SOAType = @SOAType AND a.StatusID = 0
 
 		INSERT INTO #SOA_Doc_List (DocumentID, DocumentNo, DocumentTypeID, DocumentDate, Description, Amount, Payment, Balance)
-		SELECT -10000,'BBF' ,-1, @FirstDateOfYear, 'Balance brought forward', ROUND(SUM(ISNULL(Amount,0) - ISNULL(Payment,0)),2), NULL, ROUND(SUM(ISNULL(Amount,0) - ISNULL(Payment,0)),2)
+		SELECT -10000,'BBF' ,-1, @FirstDateOfYear, '', ROUND(SUM(ISNULL(Amount,0) - ISNULL(Payment,0)),2), NULL, ROUND(SUM(ISNULL(Amount,0) - ISNULL(Payment,0)),2)
 		FROM #SOA_Doc_List
-		WHERE DocumentDate < @FirstDateOfYear
-
-
-		DECLARE @ItemResult TABLE (
-			DocumentDate			DATE ,
-			DocumentTypeID			SMALLINT,
-			DocumentDetailTypeID	SMALLINT,
-			Description				NVARCHAR(500), 
-			DocumentNo				VARCHAR(50),
-			Amount					MONEY , 
-			Payment					MONEY, 
-			Balance					MONEY, 
-			Type					TINYINT,
-			InvoiceNo				VARCHAR(50),
-			PaymentNo				VARCHAR(50),
-			InvoiceDate				VARCHAR(1000),
-			ReferenceInvoiceDate	VARCHAR(1000),
-			PayerName				VARCHAR(50),
-			Rn INT
-		)
+		WHERE DocumentDate < @FirstDateOfYear 
+		HAVING  ROUND(SUM(ISNULL(Amount,0) - ISNULL(Payment,0)),2) <> 0
 
 		; WITH t AS
 		(
 			SELECT *, ROW_NUMBER() OVER (ORDER BY  DocumentDate, DocumentTypeID) as _No FROM #SOA_Doc_List WHERE DocumentDate >= @FirstDateOfYear
 		), u AS
 		(
-			SELECT DocumentID, DocumentNo, DocumentTypeID, DocumentDetailTypeID ,DocumentDate, Description, Amount, Payment, ISNULL(Balance,0) Balance, _No FROM t WHERE _No = 1
+			SELECT DocumentID, DocumentNo, DocumentTypeID, DocumentDetailTypeID ,DocumentDate, Description, Amount, Payment, ISNULL(Amount,0) -  ISNULL(Payment,0) Balance,ReferenceInvoiceDate, _No FROM t WHERE _No = 1
 			UNION ALL 
-			SELECT t.DocumentID, t.DocumentNo, t.DocumentTypeID, t.DocumentDetailTypeID, t.DocumentDate, t.Description, t.Amount, t.Payment, u.Balance - ISNULL(t.Payment,0) + ISNULL(t.Amount,0), t._No  FROM t 
+			SELECT t.DocumentID, t.DocumentNo, t.DocumentTypeID, t.DocumentDetailTypeID, t.DocumentDate, t.Description, t.Amount, t.Payment, u.Balance - ISNULL(t.Payment,0) + ISNULL(t.Amount,0), t.ReferenceInvoiceDate ,t._No  FROM t 
 			INNER JOIN u ON  u._No = t._No - 1
 
 		)  INSERT INTO @ItemResult (DocumentDate, DocumentTypeID, DocumentDetailTypeID, Description, DocumentNo, Amount, Payment, Balance, Type,
@@ -386,7 +396,7 @@ BEGIN
 				CASE WHEN  DocumentTypeID = 0 THEN DocumentNo ELSE NULL END InvoiceNo, 
 				CASE WHEN  DocumentTypeID = 1 THEN DocumentNo ELSE NULL END PaymentNo, 
 				CASE WHEN DocumentTypeID = 0 AND DocumentDetailTypeID NOT IN (4,5) THEN DocumentDate ELSE NULL END AS InvoiceDate,
-				CASE WHEN DocumentTypeID = 0 AND DocumentDetailTypeID IN (4,5) THEN SUBSTRING(Description, CHARINDEX('for', Description) + 4, LEN(Description)) ELSE NULL END AS ReferenceInvoiceDate,
+				CASE WHEN DocumentTypeID = 0 AND DocumentDetailTypeID IN (4,5) THEN ReferenceInvoiceDate ELSE NULL END AS ReferenceInvoiceDate,
 				CASE WHEN DocumentTypeID = 1 AND DocumentDetailTypeID = 1 THEN CASE WHEN CHARINDEX('Transfer to', Description) > 0 THEN SUBSTRING(Description, CHARINDEX('Transfer to', Description) + 12, LEN(Description))
 																					WHEN CHARINDEX('Transfer from', Description) > 0 THEN SUBSTRING(Description, CHARINDEX('Transfer from', Description) + 14, LEN(Description))
 																					ELSE NULL END 
@@ -430,14 +440,30 @@ BEGIN
 				  )
 		BEGIN
 			SELECT  
-				@Amount_0_to_30_Days	= ISNULL(@Amount_0_to_30_Days,0) + SUM (CASE WHEN t.RefInvDate BETWEEN @Start_Aging_0_to_30 AND @End_Aging_0_to_30 THEN t.RefAmount ELSE 0 END),
-				@Cnt_0_to_30_Days		= ISNULL(@Cnt_0_to_30_Days,0) + SUM (CASE WHEN  t.RefInvDate BETWEEN @Start_Aging_0_to_30 AND @End_Aging_0_to_30 THEN 1 ELSE 0 END),
-				@Amount_31_to_60_Days	=  ISNULL(@Amount_31_to_60_Days,0) + SUM (CASE WHEN  RefInvDate BETWEEN @Start_Aging_31_to_60 AND @End_Aging_31_to_60 THEN t.RefAmount ELSE 0 END),
-				@Cnt_31_to_60_Days		= ISNULL(@Cnt_31_to_60_Days,0) + SUM (CASE WHEN  t.RefInvDate BETWEEN @Start_Aging_31_to_60 AND @End_Aging_31_to_60 THEN 1 ELSE 0 END),
-				@Amount_61_to_90_Days	=  ISNULL(@Amount_61_to_90_Days,0) +SUM (CASE WHEN  RefInvDate BETWEEN @Start_Aging_61_to_90 AND @End_Aging_61_to_90 THEN t.RefAmount ELSE 0 END),
-				@Cnt_61_to_90_Days		= ISNULL(@Cnt_61_to_90_Days,0) + SUM (CASE WHEN  t.RefInvDate BETWEEN @Start_Aging_61_to_90 AND @End_Aging_61_to_90 THEN 1 ELSE 0 END),
-				@Amount_More_Than_90_Days = ISNULL(@Amount_More_Than_90_Days,0) + SUM (CASE WHEN  RefInvDate < @End_AgingMore_Than_90 THEN t.RefAmount ELSE 0 END),
-				@Cnt_More_Than_90_Days	= ISNULL(@Cnt_More_Than_90_Days,0) + SUM (CASE WHEN  t.RefInvDate < @End_AgingMore_Than_90 THEN 1 ELSE 0 END)
+				@Amount_0_to_30_Days	= ISNULL(@Amount_0_to_30_Days,0) + SUM (CASE WHEN (t.RefInvDate BETWEEN @Start_Aging_0_to_30 AND @End_Aging_0_to_30 AND t.RefStatusID = 0 )
+																					OR (t.DocumentDate BETWEEN @Start_Aging_0_to_30 AND @End_Aging_0_to_30 AND t.RefStatusID = 1)
+																				 THEN t.RefAmount ELSE 0 END),
+				@Cnt_0_to_30_Days		= ISNULL(@Cnt_0_to_30_Days,0) + SUM (CASE WHEN ( t.RefInvDate BETWEEN @Start_Aging_0_to_30 AND @End_Aging_0_to_30 AND t.RefStatusID = 0 )
+																					OR (t.DocumentDate BETWEEN @Start_Aging_0_to_30 AND @End_Aging_0_to_30 AND t.RefStatusID = 1 )
+																			 THEN 1 ELSE 0 END),
+				@Amount_31_to_60_Days	=  ISNULL(@Amount_31_to_60_Days,0) + SUM (CASE WHEN (t.RefInvDate BETWEEN @Start_Aging_31_to_60 AND @End_Aging_31_to_60 AND t.RefStatusID = 0 )
+																					OR (t.DocumentDate BETWEEN @Start_Aging_31_to_60 AND @End_Aging_31_to_60 AND t.RefStatusID = 1 )
+																				THEN t.RefAmount ELSE 0 END),
+				@Cnt_31_to_60_Days		= ISNULL(@Cnt_31_to_60_Days,0) + SUM (CASE WHEN  (t.RefInvDate BETWEEN @Start_Aging_31_to_60 AND @End_Aging_31_to_60 AND t.RefStatusID = 0 )
+																					OR (t.DocumentDate BETWEEN @Start_Aging_31_to_60 AND @End_Aging_31_to_60 AND t.RefStatusID = 1 )
+																				THEN 1 ELSE 0 END),
+				@Amount_61_to_90_Days	=  ISNULL(@Amount_61_to_90_Days,0) +SUM (CASE WHEN  (t.RefInvDate BETWEEN @Start_Aging_61_to_90 AND @End_Aging_61_to_90 AND t.RefStatusID = 0)
+																					OR (t.DocumentDate BETWEEN @Start_Aging_61_to_90 AND @End_Aging_61_to_90 AND t.RefStatusID = 1)
+																				 THEN t.RefAmount ELSE 0 END),
+				@Cnt_61_to_90_Days		= ISNULL(@Cnt_61_to_90_Days,0) + SUM (CASE WHEN ( t.RefInvDate BETWEEN @Start_Aging_61_to_90 AND @End_Aging_61_to_90 AND t.RefStatusID = 0 )
+																					OR (t.DocumentDate BETWEEN @Start_Aging_61_to_90 AND @End_Aging_61_to_90 AND t.RefStatusID = 1)
+																				THEN 1 ELSE 0 END),
+				@Amount_More_Than_90_Days = ISNULL(@Amount_More_Than_90_Days,0) + SUM (CASE WHEN  (t.RefInvDate <= @End_AgingMore_Than_90 AND t.RefStatusID = 0)
+																					OR (t.DocumentDate <= @End_AgingMore_Than_90 AND t.RefStatusID = 1)
+																				THEN t.RefAmount ELSE 0 END),
+				@Cnt_More_Than_90_Days	= ISNULL(@Cnt_More_Than_90_Days,0) + SUM (CASE WHEN  (t.RefInvDate <= @End_AgingMore_Than_90 AND t.RefStatusID = 0)
+																					OR (t.DocumentDate <= @End_AgingMore_Than_90 AND t.RefStatusID = 1)
+																				THEN 1 ELSE 0 END)
 			FROM #D_C_Inv_Detail t
 			WHERE EXISTS (
 				SELECT	TOP 1 1 
