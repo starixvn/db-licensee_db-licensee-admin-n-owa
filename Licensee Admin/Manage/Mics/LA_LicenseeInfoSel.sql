@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -22,6 +22,7 @@ AS
 		- 20220118@Percy: Add Licensee Status Setting [RedmineID: #166751]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 		- 20230828@Danny: Enhance Licensee Information report [RemineID: #191248]
+		- 20240717@Danny: Return Master Currency Codes [RedmineID: #206117]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -30,6 +31,39 @@ BEGIN
 
 	DECLARE @Groups AS TABLE (PartyID INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT)
 	DECLARE @EmptyDate AS DATE = NULL
+
+	CREATE TABLE #PartyIdTab (ID INT identity (1,1), PartyID INT)
+	INSERT INTO #PartyIdTab (PartyID)
+	SELECT CAST(value AS INT) FROM STRING_SPLIT(@PartyIds, ',')
+
+	CREATE TABLE  #tmp_CurrencyInfo (PartyID INT, CurrencyId INT, CurrencyCode VARCHAR(65), CurrencyName VARCHAR(20))
+
+	INSERT INTO #tmp_CurrencyInfo (PartyID, CurrencyId, CurrencyCode, CurrencyName)
+
+	SELECT  pt.PartyID, lc.Currency, lc.Code, lc.CurrencyName
+	FROM	#PartyIdTab pt
+	INNER JOIN OAS_Party op WITH(NOLOCK) ON pt.PartyID = op.PartyID
+	CROSS APPLY (
+		SELECT DISTINCT lc.Currency,
+						CASE WHEN lc.Currency = 92 THEN 'HID'
+								WHEN lc.Currency = 142 THEN 'USDT'
+								WHEN lc.Currency IN (96, 202, 206, 208, 209) THEN e.Code + ' (' + e.Currency + ')' 
+							ELSE e.Code END AS Code, 
+						CASE WHEN lc.Currency = 51 THEN 'VND' ELSE e.currency END AS CurrencyName
+		FROM dbo.LA_f_SelLicenseeCust(op.OldRefID) AS lc
+		INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
+		WHERE lc.Currency <> 20 -- exclude test
+	) lc
+
+	UPDATE c1
+	SET c1.CurrencyCode = c1.CurrencyCode + ' (' + c1.CurrencyName + ')'
+	FROM #tmp_CurrencyInfo c1
+	INNER JOIN (
+		SELECT CurrencyCode, PartyID
+	    FROM #tmp_CurrencyInfo
+	    GROUP BY CurrencyCode, PartyID
+	    HAVING COUNT(1) > 1
+	) c2 ON c1.CurrencyCode = c2.CurrencyCode AND c1.PartyID = c2.PartyID
 
 	-- Group: 'ONEWorks','Boping', 'Zelianta', 'Price Feed'
 	INSERT INTO @Groups(PartyID,PartyName,BrandName,ParentId)
@@ -43,10 +77,12 @@ BEGIN
 	;WITH ChargeInfo AS(
 		SELECT ci.ProductId, ci.FromParty, ci.ToParty, ci.Rate, ci.FromDate, ci.ToDate, ci.ChargeID, ci.ChargeType AS RateType
 		FROM dbo.OAS_ChargeInfo AS ci WITH (NOLOCK)
+		INNER JOIN #PartyIdTab p2 ON ci.FromParty = p2.PartyID
 		WHERE ProductId NOT IN (14, 17)
 		UNION ALL
 		SELECT s.ProductId, s.FromParty, s.ToParty, s.Rate, s.FromDate, s.ToDate, s.ChargeIdRef, s.BettypeRef AS RateType
 		FROM dbo.OAS_ChargeInfoSub AS s WITH (NOLOCK) 
+		INNER JOIN #PartyIdTab p2 ON s.FromParty = p2.PartyID
 		WHERE s.ChargeType = 1
 	)
 	SELECT	 CASE pd.IsDeposit	WHEN 0 THEN 'Credit' ELSE g.PartyName							END AS GroupName
@@ -65,6 +101,7 @@ BEGIN
 			,pd.LaunchDate
 			,pd.SuspendedDate
 			,pd.TerminatedDate
+			,mc.MasterCurrencyCodes
 	FROM ChargeInfo AS ci
 		INNER JOIN dbo.OAS_Party AS p WITH (NOLOCK) ON p.PartyID = ci.FromParty			-- Licensee
 		INNER JOIN @Groups AS g ON ci.ToParty = g.PartyID								-- Group
@@ -82,9 +119,18 @@ BEGIN
 			FROM dbo.LA_MinFee w WITH (NOLOCK)
 			WHERE w.PartyId = p.PartyId AND w.FeeTypeId = 2
 		) w
+
+		OUTER APPLY (
+			SELECT STRING_AGG(tc.CurrencyCode,',') MasterCurrencyCodes 
+			FROM #tmp_CurrencyInfo tc
+			LEFT JOIN LA_ChargeRateByCurrency lc WITH(NOLOCK) ON lc.ChargeID = ci.ChargeId AND tc.CurrencyId = lc.CurrencyID 
+			WHERE lc.CurrencyID IS NULL AND tc.PartyID = ci.FromParty
+		) mc
 			
-		INNER JOIN STRING_SPLIT(@PartyIds, ',') p2 ON p.PartyID = p2.value
 	WHERE g.ParentId = 0 AND p.PartyType = 1
 	ORDER BY p.PartyName, pd.BrandName, ci.FromDate, ci.ProductID
+
+	DROP TABLE #tmp_CurrencyInfo
+	DROP TABLE #PartyIdTab
 END
 GO

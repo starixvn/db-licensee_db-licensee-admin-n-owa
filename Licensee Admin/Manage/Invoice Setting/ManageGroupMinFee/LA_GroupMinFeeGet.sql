@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+﻿/*<info serverAlias="DBLIC-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="1"></info>*/
 USE bodb_licensee
 GO
 
@@ -13,6 +13,7 @@ AS
 	Revisions:
 		- 20200701@Happy: Implement Group Min Fee [#134492]
 		- 20210824@Danny: get licensee status from OIC And Relocate SP  [#167637]
+		- 20240625@Danny: Return InvoiceLanguage [RedmineID: #206117]
 
 	Param's Explannation: 
 		OIC LicenseeStatusId: 
@@ -43,9 +44,11 @@ BEGIN
 			p.PartyID, 
 			p.PartyName, 
 			a.IsPrimary,
-			oic.LicenseeStatusId
+			oic.LicenseeStatusId,
+			pd.InvoiceLanguage
 	FROM dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK)
 		INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON a.PartyID = p.PartyID
+		INNER JOIN dbo.OAS_PartyDetail pd WITH(NOLOCK) ON a.PartyID = pd.PartyID
 		INNER JOIN  dbo.Licensees l WITH(NOLOCK) ON l.LicenseeID = p.OldRefID
 		INNER JOIN	#tmp_licenseeOIC oic WITH(NOLOCK) ON oic.RegisteredLicenseeName = l.LicenseeName
 	WHERE GroupMinFeeID = @GroupMinFeeID

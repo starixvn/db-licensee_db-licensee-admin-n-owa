@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -68,9 +68,10 @@ BEGIN
 						FROM @PartySettings p1)
 		AND p.ParentId NOT IN (0, 999)
 
-	SELECT  p.PartyId, p.PartyName, p.BrandName, oic.LicenseeStatusId AS LicenseeStatusId
+	SELECT  p.PartyId, p.PartyName, p.BrandName, oic.LicenseeStatusId AS LicenseeStatusId, pd.InvoiceLanguage
 	FROM		@PayerList p
 	INNER JOIN  dbo.OAS_Party op WITH(NOLOCK) ON p.PartyId = op.PartyID
+	INNER JOIN  dbo.OAS_PartyDetail pd WITH(NOLOCK) ON p.PartyId = pd.PartyID
 	INNER JOIN  dbo.Licensees l WITH(NOLOCK) ON l.LicenseeID = op.OldRefID
 	INNER JOIN	#tmp_licenseeOIC oic WITH(NOLOCK) ON oic.RegisteredLicenseeName = l.LicenseeName
 

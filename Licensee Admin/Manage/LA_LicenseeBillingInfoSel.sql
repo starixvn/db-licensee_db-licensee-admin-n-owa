@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -27,6 +27,7 @@ AS
 		- 20200812@Happy: Get min fee terms with GMF higher priority [#134492]
 		- 20211104@Parsons: GroupMinFee: Support prorated min fee and AMF deduction [#157652]
 		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
+		- 20240625@Danny: chaneg Minimum Fee Term description [RedmineID: #206117]
 
 		
 	Param's Explanation:
@@ -76,9 +77,10 @@ BEGIN
 	ORDER BY ci.FromDate DESC
 	
 	--Get fee term
-	SELECT @MinimumFees = d.MinimumFeeTerm 
+	SELECT @MinimumFees = REPLACE(REPLACE(d.MinimumFeeTerm,'#Currency#',e.Code),'#MinimumFee#',FORMAT(d.MinimumFee,'###,###,###.##','en-us'))
 	FROM dbo.LA_GroupMinFeeDetail d WITH(NOLOCK)
 		INNER JOIN dbo.LA_GroupMinFeeAssignment a WITH(NOLOCK) ON a.GroupMinFeeID = d.GroupMinFeeID
+		INNER JOIN CustDB.dbo.Exchange e WITH(NOLOCK) ON e.ExchangeID = d.CurrencyId
 	WHERE @FromDate <= d.ToDate AND d.FromDate <= @ToDate
 		AND a.PartyID = @PartyId
 		AND d.ProductID = @ProductId

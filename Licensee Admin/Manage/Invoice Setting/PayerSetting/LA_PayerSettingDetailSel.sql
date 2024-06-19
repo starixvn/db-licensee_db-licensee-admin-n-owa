@@ -36,6 +36,8 @@ AS
 		- 20231113@Danny: Support to remove up-coming waive period [RedmineID: #194868]
 		- 20240306@Danny: get last day of previous billing cycle by Param input [#201935]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
+		- 20240703@Danny: Show chargerate setting = 0 [RedmineID: #206117]
+
 		
 	 Params:
 		+ @PayerId :specify Party
@@ -106,10 +108,11 @@ BEGIN
 		, CASE WHEN c.ProductID IN (14,17) THEN cs.BasisOfBilling ELSE ci.BasisOfBilling END AS BasisOfBilling
 		, ISNULL(@BaseCurrencyId, 6) AS BaseCurrencyId
 		, ci.ToParty
-	FROM dbo.LA_f_ChargeInfo(@PayerId, @MinDate, @MaxDate, @ProductListAll, 'OA', 1) c
+	FROM dbo.LA_f_ChargeInfo(@PayerId, @MinDate, @MaxDate, @ProductListAll, 'OA', 0) c
 		LEFT JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID		
 		LEFT JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 		LEFT JOIN dbo.OAS_ChargeInfoSub cs WITH(NOLOCK) ON ci.ChargeID = cs.ChargeIdRef AND c.Bettype = cs.BettypeRef
+	WHERE c.ChargeID <> 0
 	
 	--======Min fee Area ===---
 	INSERT INTO @Minfee(FeeId, PartyId, ProductId, FeeTypeId, FeeAmount, CurrencyId, MinFeeTerm, FromDate, ToDate)
