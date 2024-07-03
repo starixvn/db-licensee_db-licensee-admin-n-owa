@@ -20,6 +20,7 @@ AS
 		- 20230814@Danny: Add new betfrom W001, W002 [RedmineID: #191842]
 		- 20230814@Danny: Add new betfrom A0001, A002 [RedmineID: #191842]
 		- 20240422@Danny: Add new betfrom I001, W003, W004, A003 [RedmineID: #199197]
+		- 20240626@Danny: Rename betfrom W003, W004 [RedmineID: #206220]
 */
 
 RETURN
@@ -36,7 +37,7 @@ RETURN
 			(40, 20, ']', 'Mobile Standard', 'Mobile'),
 			(50, 20, '%', 'Mobile Euro', 'Mobile'),
 			(50, 20, 'W002', 'Mobile Galaxy', 'Mobile'),
-			(50, 20, 'W004', 'Mobile Galaxy', 'Mobile'),
+			(60, 20, 'W004', 'Mobile Compact', 'Mobile'),
 			(60, 20, 'c', 'Mobile Compact', 'Mobile'),
 			(60, 20, '@', 'Mobile Compact', 'Mobile'),
 			(70, 20, '7', 'Mobile Others', 'Mobile'),
@@ -49,7 +50,7 @@ RETURN
 			(80, 10, '1', 'E-Sports Desktop', 'Desktop'),
 			(80, 10, '4', 'E-Sports Desktop', 'Desktop'),
 			(80, 10, 'W001', 'Desktop Galaxy', 'Desktop'),
-			(80, 10, 'W003', 'Desktop Galaxy', 'Desktop'),
+			(80, 10, 'W003', 'Desktop Compact', 'Desktop'),
 			(90, 20, '2', 'E-Sports Mobile', 'Mobile'),
 			(90, 20, '5', 'E-Sports Mobile', 'Mobile'),
 			(100, 20, '3', 'E-Sports APP', 'Mobile'),
