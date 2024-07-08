@@ -24,6 +24,7 @@ AS
 		- 20170927@Bruce: increase PayerIds size to 4000 [#79905]
 		- 20171030@Bruce: filter invoice date [#85256]
 		- 20171220@Parsons: increase length for variables [#88197]
+		- 20240722@Danny:  support SOA files [#194603]
 */
 /*	Example:
 	USE bodb_licensee
@@ -132,7 +133,7 @@ BEGIN
 			i.InvoiceDate,
 			bct.CurrencyName,
 			i.Amount,
-			i.InvoicePath,
+			REPLACE(i.InvoicePath, '.pdf', '-Invoice.pdf') AS InvoicePath,
 			i.Environment,
 			i.StatusId,
 			i.UpdatedDateTime AS UpdatedTime,
@@ -140,7 +141,7 @@ BEGIN
 			i.InvoiceSymbol + CASE WHEN i.InvoiceNumber < 100 
 				THEN RIGHT('000' + CONVERT(VARCHAR(5), i.InvoiceNumber), 3) 
 				ELSE CONVERT(VARCHAR(20), i.InvoiceNumber) END AS InvoiceNo,
-			sf.FileName   StatementFileName,
+			REPLACE(i.InvoicePath, '.pdf', '-Statement.pdf') StatementFileName,
 			sf.SOAId
 		FROM dbo.LA_InvoiceHeader i WITH(NOLOCK)
 			INNER JOIN dbo.LA_BillerInfo b WITH(NOLOCK) ON i.BillerId = b.PartyId

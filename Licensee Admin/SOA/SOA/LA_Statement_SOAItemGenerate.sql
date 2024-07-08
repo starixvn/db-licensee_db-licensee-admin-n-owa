@@ -1,5 +1,5 @@
-﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
-ALTER PROCEDURE [dbo].[LA_Statement_SOAItemGenerate]
+﻿/*<info serverAlias="DBCUST-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
+CREATE PROCEDURE [dbo].[LA_Statement_SOAItemGenerate]
 	@BaseCurrency		VARCHAR(10) = 'EUR',
 	@InvoiceSymbol		NVARCHAR(20) = '',
 	@InvoiceNumber		INT = 0,
@@ -88,6 +88,7 @@ BEGIN
 	SELECT @Start_AgingMore_Than_90 = DATEADD(DAY,1,EOMONTH(@End_AgingMore_Than_90,-1))
 
 	DECLARE @ItemResult TABLE (
+		DocumentID				INT,
 		DocumentDate			DATE ,
 		DocumentTypeID			SMALLINT,
 		DocumentDetailTypeID	SMALLINT,
@@ -185,7 +186,7 @@ BEGIN
 						SELECT TOP 1 1
 						FROM @Statement st
 						WHERE st.Reference = d.OfficialInvoiceNo 
-					) AND d.StatusId <> -1
+					) AND d.StatusId <> -1 AND d.Environment = @Environment
 		END
 
 		SELECT @SOAType = CASE  WHEN @RefInvoiceTypeID IN (1,6,7) OR @InvoiceTypeId IN (1,6,7) THEN 0
@@ -195,7 +196,7 @@ BEGIN
 						
 		DECLARE @tmpBaseCurrencyList TABLE (CurrencyId INT, Code VARCHAR(10))
 		INSERT INTO @tmpBaseCurrencyList (CurrencyId, Code)
-		EXEC dbo.LA_SelBaseCurrency
+		EXEC CustDB.dbo.LA_BaseCurrency_Sel
 
 		SELECT @CurrencyID = CurrencyId FROM @tmpBaseCurrencyList WHERE Code = @BaseCurrency
 	END
@@ -210,7 +211,6 @@ BEGIN
 			NULL AS  Amount_31_to_60_Days, 
 			NULL AS  Amount_61_to_90_Days, 
 			NULL AS  Amount_More_Than_90_Days
-		WHERE 1= 0
 
 		RETURN
 	END
@@ -297,7 +297,7 @@ BEGIN
 				INSERT INTO #D_C_Inv_Detail( DocumentID, DocumentDate, Refno, RefAmount, RefStatusID, RefInvDate, RefInvType)
 				SELECT	0, @InvoiceDate, Reference AS Refno,  CASE WHEN @InvoiceTypeId = 4 THEN -1 ELSE 1 END *  s.Amount, li.StatusId, li.InvoiceDate, li.InvoiceType
 				FROM	@Statement s
-				INNER JOIN dbo.LA_InvoiceHeader li WITH(NOLOCK) ON s.Reference = li.OfficialInvoiceNo AND li.StatusId <> -1	
+				INNER JOIN dbo.LA_InvoiceHeader li WITH(NOLOCK) ON s.Reference = li.OfficialInvoiceNo AND li.StatusId <> -1	 AND li.Environment = @Environment
 			END
 
 			INSERT INTO #D_C_Inv_Detail( DocumentID, DocumentDate, Refno, RefAmount, RefStatusID, RefInvDate, RefInvType)
@@ -368,7 +368,7 @@ BEGIN
 
 		; WITH t AS
 		(
-			SELECT *, ROW_NUMBER() OVER (ORDER BY  DocumentDate, DocumentTypeID) as _No FROM #SOA_Doc_List WHERE DocumentDate >= @FirstDateOfYear
+			SELECT *, ROW_NUMBER() OVER (ORDER BY  DocumentDate, DocumentNo, DocumentTypeID) as _No FROM #SOA_Doc_List WHERE DocumentDate >= @FirstDateOfYear
 		), u AS
 		(
 			SELECT DocumentID, DocumentNo, DocumentTypeID, DocumentDetailTypeID ,DocumentDate, Description, Amount, Payment, ISNULL(Amount,0) -  ISNULL(Payment,0) Balance,ReferenceInvoiceDate, _No FROM t WHERE _No = 1
@@ -376,9 +376,9 @@ BEGIN
 			SELECT t.DocumentID, t.DocumentNo, t.DocumentTypeID, t.DocumentDetailTypeID, t.DocumentDate, t.Description, t.Amount, t.Payment, u.Balance - ISNULL(t.Payment,0) + ISNULL(t.Amount,0), t.ReferenceInvoiceDate ,t._No  FROM t 
 			INNER JOIN u ON  u._No = t._No - 1
 
-		)  INSERT INTO @ItemResult (DocumentDate, DocumentTypeID, DocumentDetailTypeID, Description, DocumentNo, Amount, Payment, Balance, Type,
+		)  INSERT INTO @ItemResult (DocumentID, DocumentDate, DocumentTypeID, DocumentDetailTypeID, Description, DocumentNo, Amount, Payment, Balance, Type,
 			InvoiceNo,PaymentNo,InvoiceDate,ReferenceInvoiceDate,PayerName,Rn)
-		 SELECT DocumentDate,DocumentTypeID, DocumentDetailTypeID, Description, DocumentNo, Amount, Payment, Balance, 
+		 SELECT DocumentID, DocumentDate,DocumentTypeID, DocumentDetailTypeID, Description, DocumentNo, Amount, Payment, Balance, 
 				CASE WHEN DocumentTypeID = -1 THEN 0
 					 WHEN DocumentTypeID = 0 AND DocumentDetailTypeID = 1 AND @SOAType = 0 THEN 1
 					 WHEN DocumentTypeID = 0 AND DocumentDetailTypeID = 4 AND @SOAType = 0 THEN 9
@@ -403,6 +403,21 @@ BEGIN
 																		  ELSE NULL END PayerName,
 				_No FROM u
 		 OPTION (MAXRECURSION 0)
+
+		 -- Update Description  Setup Fee Inv 
+		 IF EXISTS (SELECT TOP 1 1 FROM @ItemResult WHERE DocumentDetailTypeID = 7)
+		 BEGIN
+
+			UPDATE t
+			SET t.Type = CASE WHEN li2.InvoiceHeaderId IS NOT NULL AND li3.InvoiceHeaderId IS NOT NULL THEN 14
+							  WHEN li3.InvoiceHeaderId IS NOT NULL AND li2.InvoiceHeaderId IS  NULL THEN 13
+							  ELSE 4 END
+			FROM @ItemResult t 
+			LEFT JOIN LA_InvoiceStatement li2 ON t.DocumentID = li2.InvoiceHeaderId AND li2.InvItemTypeId = 2
+			LEFT JOIN LA_InvoiceStatement li3 ON t.DocumentID = li3.InvoiceHeaderId AND li3.InvItemTypeId = 3
+			WHERE t.DocumentDetailTypeID = 7
+
+		 END
 
 
 		 SELECT  DocumentDate, Amount, Payment, Balance, Type,
@@ -478,10 +493,10 @@ BEGIN
 		
 		SELECT @TotalDue AS TotalDue, 
 				@TotalDue AS Amount, 
-				CASE WHEN @Amount_0_to_30_Days = 0 AND @Cnt_0_to_30_Days = 0 THEN  NULL ELSE @Amount_0_to_30_Days END Amount_0_to_30_Days, 
-				CASE WHEN @Amount_31_to_60_Days = 0 AND @Cnt_31_to_60_Days = 0 THEN  NULL ELSE @Amount_31_to_60_Days END  Amount_31_to_60_Days, 
-				CASE WHEN @Amount_61_to_90_Days = 0 AND @cnt_61_to_90_Days = 0 THEN  NULL ELSE @Amount_61_to_90_Days  END Amount_61_to_90_Days, 
-				CASE WHEN @Amount_More_Than_90_Days = 0AND @Cnt_More_Than_90_Days = 0 THEN  NULL ELSE @Amount_More_Than_90_Days END Amount_More_Than_90_Days
+				CASE WHEN @Amount_0_to_30_Days = 0 AND @Cnt_0_to_30_Days = 0 THEN  0 ELSE @Amount_0_to_30_Days END Amount_0_to_30_Days, 
+				CASE WHEN @Amount_31_to_60_Days = 0 AND @Cnt_31_to_60_Days = 0 THEN  0 ELSE @Amount_31_to_60_Days END  Amount_31_to_60_Days, 
+				CASE WHEN @Amount_61_to_90_Days = 0 AND @cnt_61_to_90_Days = 0 THEN  0 ELSE @Amount_61_to_90_Days  END Amount_61_to_90_Days, 
+				CASE WHEN @Amount_More_Than_90_Days = 0AND @Cnt_More_Than_90_Days = 0 THEN  0 ELSE @Amount_More_Than_90_Days END Amount_More_Than_90_Days
 		
 	END
 
