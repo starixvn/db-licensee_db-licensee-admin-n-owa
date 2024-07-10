@@ -53,6 +53,7 @@ AS
 		- 20230223@Danny: Integrate Casino promotion [#194808]
 		- 20231218@Danny: Integrate Promotion Prize - Live22 [RedmineID: #197267]
 		- 20240201@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
+		- 20240710@Danny: Integrate Fast spin product[RedmineID: #206246]
 */
 
 BEGIN
@@ -175,6 +176,7 @@ BEGIN
 				WHEN ProductId = 66 AND LicensingFeeTypeId = 1 THEN 40 -- Contribution
 				WHEN ProductId = 66 AND LicensingFeeTypeId = 2 THEN 39 -- JackpotPrize
 				WHEN ProductId = 66 AND LicensingFeeTypeId = 6 THEN 38 -- Free Bets
+				WHEN ProductId = 66 AND LicensingFeeTypeId = 3 THEN 58 -- Prizes
 				WHEN ProductId = 34 AND LicensingFeeTypeId = 4 THEN 33 -- Bonus
 				WHEN ProductId = 45 AND LicensingFeeTypeId = 5 THEN 37 -- Lucky Draw
 				WHEN ProductId = 36 AND LicensingFeeTypeId = 1 THEN 41 -- Contribution
@@ -188,9 +190,10 @@ BEGIN
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 1 THEN 55 -- Contribution
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 2 THEN 56 -- JackpotPrize
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 3 THEN 54 -- Prizes
+				WHEN ProductId = 87 AND LicensingFeeTypeId = 3 THEN 57 -- Prizes
 				END
 		FROM @Result
-		WHERE ProductId IN (10, 32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79) AND LicensingFeeTypeId > 0
+		WHERE ProductId IN (10, 32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79, 87) AND LicensingFeeTypeId > 0
 		GROUP BY
 			CASE
 				WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
@@ -202,6 +205,7 @@ BEGIN
 				WHEN ProductId = 66 AND LicensingFeeTypeId = 1 THEN 40 -- Contribution
 				WHEN ProductId = 66 AND LicensingFeeTypeId = 2 THEN 39 -- JackpotPrize
 				WHEN ProductId = 66 AND LicensingFeeTypeId = 6 THEN 38 -- Free Bets
+				WHEN ProductId = 66 AND LicensingFeeTypeId = 3 THEN 58 -- Prizes
 				WHEN ProductId = 34 AND LicensingFeeTypeId = 4 THEN 33 -- Bonus
 				WHEN ProductId = 45 AND LicensingFeeTypeId = 5 THEN 37 -- Lucky Draw
 				WHEN ProductId = 36 AND LicensingFeeTypeId = 1 THEN 41 -- Contribution
@@ -215,6 +219,7 @@ BEGIN
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 1 THEN 55 -- Contribution
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 2 THEN 56 -- JackpotPrize
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 3 THEN 54 -- Prizes
+				WHEN ProductId = 87 AND LicensingFeeTypeId = 3 THEN 57 -- Prizes
 				END
 
 		-- AMF, Prepayment and AGPrepayment
