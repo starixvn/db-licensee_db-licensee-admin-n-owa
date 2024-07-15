@@ -10,16 +10,26 @@ DECLARE  @Environment VARCHAR(50) = 'PRO'
 UPDATE t
 SET t.RemainingAmount = 0,
 	t.StatusId = 1 -- Close
-FROM LA_Payment t WITH(ROWLOCK, UPDLOCK) 
-WHERE PaymentId IN (571, 573) AND Environment = @Environment
-
-UPDATE t
-SET t.RemainingAmount = 0,
-	t.StatusId = 1 -- Close
 FROM LA_InvoiceHeader t WITH(ROWLOCK, UPDLOCK) 
-WHERE InvoiceHeaderId = 26548 AND Environment = @Environment
-
-
-
+WHERE InvoiceHeaderId IN 
+(
+17877,
+19142,
+18165,
+18820,
+19144,
+19148,
+19668,
+20033,
+20443,
+20929,
+23564,
+22705,
+17860,
+12868,
+11802,
+13788,
+15075
+)AND Environment = @Environment
 
 GO
