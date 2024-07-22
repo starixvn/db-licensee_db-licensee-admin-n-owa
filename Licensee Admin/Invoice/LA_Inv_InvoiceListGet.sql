@@ -133,7 +133,7 @@ BEGIN
 			i.InvoiceDate,
 			bct.CurrencyName,
 			i.Amount,
-			REPLACE(i.InvoicePath, '.pdf', '-Invoice.pdf') AS InvoicePath,
+			i.InvoicePath AS InvoicePath,
 			i.Environment,
 			i.StatusId,
 			i.UpdatedDateTime AS UpdatedTime,
@@ -141,7 +141,7 @@ BEGIN
 			i.InvoiceSymbol + CASE WHEN i.InvoiceNumber < 100 
 				THEN RIGHT('000' + CONVERT(VARCHAR(5), i.InvoiceNumber), 3) 
 				ELSE CONVERT(VARCHAR(20), i.InvoiceNumber) END AS InvoiceNo,
-			REPLACE(i.InvoicePath, '.pdf', '-Statement.pdf') StatementFileName,
+			sf.FileName StatementFileName,
 			sf.SOAId
 		FROM dbo.LA_InvoiceHeader i WITH(NOLOCK)
 			INNER JOIN dbo.LA_BillerInfo b WITH(NOLOCK) ON i.BillerId = b.PartyId

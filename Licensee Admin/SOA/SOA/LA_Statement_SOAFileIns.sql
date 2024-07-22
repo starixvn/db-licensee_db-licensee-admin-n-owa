@@ -32,6 +32,7 @@ BEGIN
 
 	SELECT @ErrCode = 0, @ErrMsg = ''
 	DECLARE @LicenseeName VARCHAR(50)
+	DECLARE @InvoiceNo NVARCHAR(50) 
 
 	IF EXISTS (SELECT TOP 1 1 FROM dbo.LA_SOAFile WHERE InvoiceHeaderId = @InvoiceId)
 	BEGIN
@@ -39,7 +40,16 @@ BEGIN
 	END
 	ELSE
 	BEGIN
-		SELECT @LicenseeName = PartyName FROM OAS_Party WITH(NOLOCK) WHERE PartyID = @PartyID
+
+		SELECT @InvoiceNo = OfficialInvoiceNo FROM  LA_InvoiceHeader WITH(NOLOCK)
+		WHERE InvoiceHeaderId = @InvoiceId
+
+
+		SELECT  @LicenseeName = REPLACE(ISNULL(NULLIF(d.BrandName, ''), p.PartyName), ' ', '-')
+		FROM dbo.OAS_Party p WITH (NOLOCK)
+			INNER JOIN dbo.OAS_PartyDetail d WITH (NOLOCK) ON p.PartyId = d.PartyId
+		WHERE p.PartyId = @PartyId
+
 		
 		IF @InvoiceId IS NOT NULL
 		BEGIN
@@ -59,7 +69,10 @@ BEGIN
 			) x
 			WHERE u.InvoiceHeaderId = @InvoiceId
 
-			SELECT @StatementFileName = 'Statement.re.'+ @LicenseeName + '.'+ FORMAT(@StatementDate,'yyyy.MM.dd') + CASE WHEN @SOAType = 0 THEN '' ELSE '.Rebates' END + '.pdf'
+			SELECT @StatementFileName =  REPLACE(BillerName, ' ', '-') +  '-' + REPLACE(@InvoiceNo,' ', '-') + '-for-' + @LicenseeName + '-Statement.pdf'
+			FROM dbo.LA_BillerInfo WITH (NOLOCK)
+			WHERE PartyId = @BillerId
+
  
 		END
 
