@@ -63,6 +63,7 @@ AS
 		- 20230217@Danny: SG - Promotion prize integration [#183739]
 		- 20230510@Danny: New commercial terms for 12B [RedmineID: #186543]
 		- 20240221@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
+		- 20240730@Danny: Player Tips worksheet [#207863]
 	Param's Explanation:
 */
 BEGIN
@@ -209,7 +210,15 @@ BEGIN
 	CROSS APPLY ( SELECT Bettype, ProductID FROM  bodb_licensee.dbo.LA_f_BettypeProductMapping(0, t.ProductCodes) x )x
 
 	SELECT @LicenseeID = LicenseeID FROM @ChargeInfo
-	IF @LicenseeID IS NULL
+
+	IF @ProductCode IN ('TIP')
+	BEGIN
+		SELECT @LicenseeID = OldRefID
+		FROM bodb_licensee.dbo.OAS_Party WITH(NOLOCK) WHERE PartyID = @PartyId AND PartyType = 1
+	END
+
+
+	IF @LicenseeID IS NULL 
 	BEGIN
 		SELECT TOP 0
 		''					AS Game
@@ -546,6 +555,29 @@ BEGIN
 			GROUP BY
 				b.rptDate, b.CurrencyID
 		)
+	END
+	ELSE IF (@ProductCode = 'TIP')
+	BEGIN
+
+		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, LicenseeComm, Company, Betcount)
+		SELECT
+			b.rptDate
+			, b.CurrencyID
+			, SUM(b.turnover) AS turnover
+			, SUM(b.MemberWL) AS Winlost
+			, -SUM(b.MemberWL) * 0.3 AS LicenseeWL
+			, 0 AS LicenseeComm
+			, -SUM(b.MemberWL) * 0.7  AS Company
+			, SUM(betcount) AS BetCount
+		FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
+			AND b.SiteID = @LicenseeID
+			AND b.ProductID = 74
+			AND b.StatusID NOT IN (-1, 101, 102, 103)
+			AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
+			AND b.CurrencyID <> 20
+		GROUP BY b.rptDate, b.CurrencyID
+		
 	END
 	ELSE IF (@ProductCode = 'CB')
 	BEGIN

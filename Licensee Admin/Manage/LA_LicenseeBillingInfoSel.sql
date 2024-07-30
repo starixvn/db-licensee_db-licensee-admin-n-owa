@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -28,6 +28,7 @@ AS
 		- 20211104@Parsons: GroupMinFee: Support prorated min fee and AMF deduction [#157652]
 		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 		- 20240625@Danny: chaneg Minimum Fee Term description [RedmineID: #206117]
+		- 20240814@Danny: Hard Player Tips Basis Of Billing info [#207863]
 
 		
 	Param's Explanation:
@@ -40,7 +41,10 @@ BEGIN
 		@FirstBilling DATE,
 		@BasisOfBilling NVARCHAR(4000),
 		@MinimumFees NVARCHAR(4000),
-		@ProductId INT = (SELECT TOP 1 ProductId FROM dbo.LA_f_Products3rd(@ProductCode))
+		@ProductId INT = (SELECT TOP 1 ProductId FROM dbo.LA_f_Products3rd(@ProductCode)),
+		@InvoiceLanguage VARCHAR(7)
+
+	SELECT @InvoiceLanguage = InvoiceLanguage FROM OAS_PartyDetail WITH(NOLOCK) WHERE PartyID = @PartyId
 
 	DECLARE @ChargeInfo TABLE (
 		ProductID		INT,
@@ -95,9 +99,14 @@ BEGIN
 			AND m.PartyId = @PartyId
 			AND m.ProductId = @ProductId
 	END
+
+	IF @ProductId = 74
+	BEGIN
+		SELECT @BasisOfBilling = CASE WHEN @InvoiceLanguage = 'zh-CN' THEN N'授权费为: 70%' ELSE N'70% of Gross Win' END
+	END
 	
 	SELECT ISNULL(@FirstBilling, CAST('19000101' AS DATE)) AS FirstBilling
-		, ISNULL(@BasisOfBilling, '') AS BasisOfBilling
+		,  ISNULL(@BasisOfBilling, '') AS BasisOfBilling
 		, ISNULL(@MinimumFees, '') AS MinimumFees
 END
 GO
