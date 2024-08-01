@@ -13,6 +13,7 @@ AS
    
 	Revisions: 
 		- 20230908@Danny: Initialize SP [#194603]
+		- 20240719@Danny: Handle dulicate Invoice No. [#194604]
 
 	Param's Explanation:
 
@@ -125,7 +126,7 @@ BEGIN
 				FROM (
 					SELECT DISTINCT InvoiceType, OfficialInvoiceNo
 					FROM  LA_InvoiceStatement st WITH(NOLOCK) 
-					INNER JOIN LA_InvoiceHeader d WITH(NOLOCK) ON st.RefNo = d.OfficialInvoiceNo AND d.InvoiceType IN (1,3,6,7) AND d.StatusId <> -1
+					INNER JOIN LA_InvoiceHeader d WITH(NOLOCK) ON st.RefNo = d.OfficialInvoiceNo AND d.InvoiceType IN (1,3,6,7) AND d.StatusId <> -1 AND d.Environment = @Environment
 					WHERE  li.InvoiceHeaderId = st.InvoiceHeaderId
 				) d
 			) d

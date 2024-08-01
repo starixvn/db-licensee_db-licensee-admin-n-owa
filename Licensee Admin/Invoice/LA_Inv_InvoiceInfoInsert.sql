@@ -54,6 +54,7 @@ AS
 		- 20210720@Percy: Check invoice number is already used [RedmineID: #147006]
 		- 20220418@Percy: Remove code update InvItemTypeId [RedmineID: #164139]
 		- 20240103@Danny: store invoice amount with 2 decimal digits [RedmineID: #197260]
+		- 20240722@Danny:  Change Invoice File Name [#194603]
 */
 
 BEGIN
@@ -179,7 +180,7 @@ BEGIN
 			INNER JOIN dbo.OAS_PartyDetail d WITH (NOLOCK) ON p.PartyId = d.PartyId
 		WHERE p.PartyId = @PartyId
 
-		SELECT @InvoiceFileName = REPLACE(BillerName, ' ', '-') + '-INV-' + @InvoiceNo + '-for-' + @PartyName + '.pdf'
+		SELECT @InvoiceFileName = REPLACE(BillerName, ' ', '-') + '-' + REPLACE(@InvoiceNo,' ', '-') + '-for-' + @PartyName + '-Invoice.pdf'
 		FROM dbo.LA_BillerInfo WITH (NOLOCK)
 		WHERE PartyId = @BillerId
 
