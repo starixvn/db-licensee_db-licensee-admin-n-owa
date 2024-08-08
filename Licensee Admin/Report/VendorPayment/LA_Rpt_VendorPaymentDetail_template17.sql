@@ -140,7 +140,7 @@ AS
 				SUM(CASE WHEN lf.TypeId = 2 THEN -b.GrossWL ELSE 0 END) AS LicenseeContribution,
 				SUM(CASE WHEN lf.TypeId = 3 THEN b.MemberWL ELSE 0 END) AS JackpotPrize,
 				SUM(CASE WHEN lf.TypeId IN (4,8) THEN b.MemberWL ELSE 0 END) AS Promotion,
-				SUM(ExtraAmount) AS HouseTurnover
+				SUM(CASE WHEN @FromDate >= '2024-09-01' THEN ExtraAmount ELSE 0 END) AS HouseTurnover
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.RptDate BETWEEN ci.FromDate AND ci.ToDate
 				LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND cr.CurrencyID = b.CurrencyId
@@ -214,7 +214,8 @@ AS
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY,
 		CompanyIncome	MONEY,
-		Currency		VARCHAR(20)
+		Currency		VARCHAR(20),
+		Promotion		MONEY
 	)
 
 	-- Region: Calculate Grand Total
@@ -237,7 +238,8 @@ AS
 		LicenseeContribution MONEY,
 		LicensingFee	MONEY,
 		PayToSupplier	MONEY,
-		CompanyIncome	MONEY
+		CompanyIncome	MONEY,
+		Promotion		MONEY
 	)
 	
 	BEGIN
@@ -265,7 +267,7 @@ AS
 				ON e.ExchangeID = td.CurrencyId AND e.ExchangeDate = td.WinLossDate
 				GROUP BY CASE WHEN  td.PartyId = 14 THEN 14 ELSE td.ParentId END, td.PartyId, td.IsKeepNegativeAmount, td.IsDeposit
 			)
-			INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,CompanyIncome, LicenseeContribution, JackpotPrize, HouseTurnover)
+			INSERT INTO @Total (Currency,PartyId,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee,PayToSupplier,CompanyIncome, LicenseeContribution, JackpotPrize, HouseTurnover, Promotion)
 			SELECT @tempCurrency,ParentId,
 				SUM(TotalTrans),
 				SUM(Turnover),
@@ -278,11 +280,12 @@ AS
 					ELSE CASE WHEN LicenseeChargeRate < 0 AND  @IsConvertNegativeFeeToZero = 1 AND  IsKeepNegativeAmount = 0 THEN 0 ELSE LicenseeChargeRate END + LicenseeContribution - JackpotPrize - Promotion END),
 				SUM(LicenseeContribution),
 				SUM(JackpotPrize),
-				SUM(HouseTurnover)
+				SUM(HouseTurnover),
+				SUM(Promotion)
 			FROM TotalByParty
 			GROUP BY ParentId
 
-			INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome, LicenseeContribution, JackpotPrize, HouseTurnover)
+			INSERT INTO @GrandTotal (CurrencyName,TotalTrans,Turnover,CustomerWinLoss,LicenseeWinLoss,LicensingFee, PayToSupplier, CompanyIncome, LicenseeContribution, JackpotPrize, HouseTurnover, Promotion)
 			SELECT Currency,
 				SUM(TotalTrans),
 				SUM(Turnover),
@@ -293,7 +296,8 @@ AS
 				SUM(LicensingFee - PayToSupplier),
 				SUM(LicenseeContribution),
 				SUM(JackpotPrize),
-				SUM(HouseTurnover)
+				SUM(HouseTurnover),
+				SUM(Promotion)
 			FROM @Total
 			WHERE Currency = @tempCurrency
 			GROUP BY Currency
@@ -318,6 +322,7 @@ AS
 			CAST((r.LicenseeContribution) AS MONEY) AS LicenseeContributionOriginal,
 			CAST((r.LicensingFee) AS MONEY) AS LicensingFeeOriginal,
 			CAST((r.PayToSupplier) AS MONEY) AS PayToSupplierOriginal,
+			CAST((r.Promotion) AS MONEY) AS PromotionOriginal,
 			r.LicensingFee - r.PayToSupplier AS CompanyIncomeOriginal,
 			-- Select by base currency
 			r.Turnover * e.Rate AS Turnover,
@@ -328,6 +333,7 @@ AS
 			CAST((r.LicenseeContribution * e.Rate) AS MONEY) AS LicenseeContribution,
 			CAST((r.LicensingFee * e.Rate) AS MONEY) AS LicensingFee,
 			CAST((r.PayToSupplier * e.Rate)AS MONEY) AS PayToSupplier,
+			CAST((r.Promotion * e.Rate) AS MONEY) AS Promotion,
 			CAST(((r.LicensingFee - r.PayToSupplier) * e.Rate)AS MONEY)  AS CompanyIncome
 		FROM #Result r INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeID AND r.WinLossDate = e.ExchangeDate
 
@@ -361,6 +367,7 @@ AS
 				HouseTurnover,
 				JackpotPrize,
 				LicenseeContribution,
+				Promotion,
 				CASE WHEN  IsDeposit = 0 THEN 0  ELSE CASE WHEN LicenseeChargeRate < 0 AND IsKeepNegativeAmount = 0 AND @IsConvertNegativeFeeToZero = 1 THEN 0 ELSE  LicenseeChargeRate  END + LicenseeContribution - JackpotPrize - Promotion END AS  LicensingFee, 
 				0 PayToSupplier, 
 				CASE WHEN  IsDeposit = 0 THEN 0  ELSE  CASE WHEN LicenseeChargeRate < 0 AND IsKeepNegativeAmount = 0 AND @IsConvertNegativeFeeToZero = 1 THEN 0 ELSE  LicenseeChargeRate  END + LicenseeContribution - JackpotPrize - Promotion END  AS CompanyIncome
@@ -375,6 +382,7 @@ AS
 				HouseTurnover,
 				JackpotPrize,
 				LicenseeContribution,
+				Promotion,
 				LicensingFee	,
 				PayToSupplier	,
 				CompanyIncome	 
@@ -390,6 +398,7 @@ AS
 			HouseTurnover,
 			JackpotPrize,
 			LicenseeContribution,
+			Promotion,
 			LicensingFee,
 			PayToSupplier,
 			CompanyIncome

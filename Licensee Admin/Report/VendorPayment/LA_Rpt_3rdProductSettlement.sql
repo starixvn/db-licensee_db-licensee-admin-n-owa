@@ -929,6 +929,7 @@ BEGIN
 					 WHEN b.ProductID = 10  THEN 0
 					 WHEN b.ProductID = 31  THEN  CASE WHEN @FromDate < @ExchangeCutoffDate THEN  b.LicenseeWinloss  * ISNULL(ci_3rd.Rate3rd,0) - (b.CommissionA + b.CommissionP) ELSE -(b.CustomerWinLoss + b.CommissionP)  * ISNULL(ci_3rd.Rate3rd,0) END
 					 WHEN b.ProductID = 80 THEN (LicenseeWinloss - (b.ValidBetAmount * ci.ChargeRate11)) * ISNULL(ci_3rd.Rate3rd,0)
+					 WHEN b.ProductID IN (3, 6, 38, 66, 63, 72) THEN 0 -- Inhouse products
 					 ELSE b.LicenseeWinloss  * ISNULL(ci_3rd.Rate3rd,0) - b.Promotion
 				END) AS PayToSupplier,
 			b.ProductID,
