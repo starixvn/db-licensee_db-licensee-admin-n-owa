@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -34,6 +34,7 @@ AS
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
+		- 20240625@Danny: Return Master Currency Codes [RedmineID: #206117]
 
 	Params:
 	+ @PayerId : 0 get all Party
@@ -62,7 +63,7 @@ BEGIN
 	
 	DECLARE @statusTab TABLE (StatusId SMALLINT)
 	INSERT INTO @statusTab (StatusId)
-	SELECT CAST (val AS SMALLINT) FROM dbo.strSplit(@PayerStatusIds,',')
+	SELECT CAST (value AS SMALLINT) FROM STRING_SPLIT(@PayerStatusIds,',')
 
 	DECLARE @ProductListAll VARCHAR(500) = '',
 			@ListParty VARCHAR(8000) = '',
@@ -71,13 +72,17 @@ BEGIN
 			@CurrentDate DATE
 	SET @CurrentDate = CONVERT(DATE, GETDATE())
 	DECLARE @ChargeInfo AS TABLE(ChargeId INT, PartyId INT, PartyName VARCHAR(100), ProductId INT, ProductName VARCHAR(100),
-			BettypeRef INT,Rate MONEY, FromDate DATE, ToDate DATE, FirstBilling DATE, ExchangeID INT, ExchangeName VARCHAR(50), ChargeType TINYINT)
+			BettypeRef INT,Rate MONEY, FromDate DATE, ToDate DATE, FirstBilling DATE, ExchangeID INT, ExchangeName VARCHAR(50), ChargeType TINYINT, MasterCurrencyCodes VARCHAR(4000))
 	CREATE TABLE #Temp_ChargeInfo(ChargeId INT, PartyID INT, ProductID INT, BettypeRef INT,Rate MONEY, Fromdate DATE, Todate DATE, ChargeType TINYINT)
 
 	DECLARE @Minfee AS TABLE(PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, FromDate DATE, ToDate DATE)
 	DECLARE @Discount AS TABLE(PartyId INT, ProductId INT, FromDate DATE, ToDate DATE, DiscountGroupId INT, FromAmount MONEY, ToAmount MONEY, Rate MONEY, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
 	DECLARE @ChargeDetail AS TABLE(ChargeID INT, PartyID INT, ProductID INT, BettypeRef INT,DI_Rate MONEY, Fromdate DATE, Todate DATE, ChargeType TINYINT)
 	DECLARE @PartyBaseCurrency AS TABLE (PartyId INT, BaseCurrencyId INT, BaseCurrencyName NVARCHAR(50))
+
+	DECLARE @CurrencyInfo AS TABLE (CurrencyId INT, CurrencyCode VARCHAR(65), CurrencyName VARCHAR(20))
+	INSERT INTO @CurrencyInfo(CurrencyId, CurrencyCode, CurrencyName)
+	EXEC dbo.LA_PayerCurrencySel @PayerId = @PayerId
 
 	--Get list licensee,
 	SELECT	@ListParty = @ListParty + CAST(p.PartyID AS VARCHAR) + ','
@@ -109,7 +114,7 @@ BEGIN
 
 	;WITH t AS
 	(
-	SELECT CAST (val AS INT) PartyId FROM dbo.strSplit(@ListParty, ',')
+	SELECT CAST (value AS INT) PartyId FROM STRING_SPLIT(@ListParty, ',')
 	) 
 	INSERT INTO @PartyBaseCurrency (PartyId, BaseCurrencyId, BaseCurrencyName)
 	SELECT t.PartyId, x.BaseCurrencyId, x.Code AS BaseCurrencyName
@@ -135,7 +140,7 @@ BEGIN
 			Fromdate,
 			Todate, 
 			ChargeType
-		FROM dbo.LA_f_ChargeInfo(@ListParty, @MinDate, @MaxDate, @ProductListAll, 'OA', 1)
+		FROM dbo.LA_f_ChargeInfo(@ListParty, @MinDate, @MaxDate, @ProductListAll, 'OA', 0)
 
 	INSERT INTO #Temp_ChargeInfo (ChargeID, PartyID, ProductID, BettypeRef, Rate, Fromdate, Todate, ChargeType)
 		SELECT 
@@ -164,7 +169,7 @@ BEGIN
 			AND a.Fromdate = b.Fromdate
 			AND a.Todate = b.Todate
 
-	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)
+	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType, MasterCurrencyCodes)
 		SELECT 
 			c.ChargeID,
 			c.PartyID,
@@ -181,7 +186,8 @@ BEGIN
 			CASE WHEN c.ProductID IN (14,17) THEN s.FirstOfBilling ELSE ci.FirstOfBilling END,
 			ISNULL(x.BaseCurrencyId, 6),
 			ISNULL(x.BaseCurrencyName, '') AS ExchangeName,
-			CASE WHEN c.ProductID IN (14,17) THEN s.ChargeType ELSE ci.ChargeType END
+			CASE WHEN c.ProductID IN (14,17) THEN s.ChargeType ELSE ci.ChargeType END,
+			mc.MasterCurrencyCodes
 		FROM #Temp_ChargeInfo c
 			INNER JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID
 			INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
@@ -189,6 +195,12 @@ BEGIN
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 			LEFT JOIN dbo.OAS_ChargeInfoSub s WITH(NOLOCK) ON ci.ChargeID = s.ChargeIdRef
 			LEFT JOIN @PartyBaseCurrency x ON c.PartyID = x.PartyID
+			OUTER APPLY (
+				SELECT STRING_AGG(ci.CurrencyCode,',') MasterCurrencyCodes 
+				FROM @CurrencyInfo ci
+				LEFT JOIN LA_ChargeRateByCurrency lc WITH(NOLOCK) ON lc.ChargeID = c.ChargeId AND ci.CurrencyId = lc.CurrencyID
+				WHERE lc.CurrencyID IS NULL
+			) mc
 		WHERE @CurrentDate <= c.Todate
 
 	-- Hard code for Bettrade BA
@@ -207,9 +219,9 @@ BEGIN
 			ToDate
 		FROM dbo.LA_MinFee WITH (NOLOCK)
 		WHERE EXISTS (SELECT
-				val
-			FROM dbo.strSplit(@ListParty, ',')
-			WHERE PartyID = val)
+				value
+			FROM STRING_SPLIT(@ListParty, ',')
+			WHERE PartyID = value)
 				AND @CurrentDate BETWEEN FromDate AND ToDate
 
 	INSERT INTO @Discount (PartyId, ProductId, FromDate, ToDate, FromAmount, ToAmount, Rate, DiscountGroupId, DiscountGroupName, DiscountGroupType)
@@ -231,9 +243,9 @@ BEGIN
 				ON d.DiscountGroupId = h.DiscountGroupId
 			INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK)
 				ON a.DiscountGroupId = p.DiscountGroupId
-		WHERE EXISTS (	SELECT val
-						FROM dbo.strSplit(@ListParty, ',')
-						WHERE a.PartyID = val)
+		WHERE EXISTS (	SELECT value
+						FROM STRING_SPLIT(@ListParty, ',')
+						WHERE a.PartyID = value)
 			AND @CurrentDate BETWEEN h.FromDate AND h.ToDate
 		GROUP BY	a.PartyID,
 					p.ProductId,
@@ -328,7 +340,8 @@ BEGIN
 			CASE WHEN l.IsDeposit = 0 THEN 'Active'
 				 ELSE ISNULL(oict.LicenseeStatusName, 'Unrecognized') END AS  PayerStatusName,
 			CASE WHEN	l.IsDeposit = 0 THEN 3
-				 WHEN	oict.LicenseeStatusId IS NULL THEN 999 ELSE oict.LicenseeStatusId END PayerStatusId
+				 WHEN	oict.LicenseeStatusId IS NULL THEN 999 ELSE oict.LicenseeStatusId END PayerStatusId,
+			c.MasterCurrencyCodes
 		FROM @ChargeInfo c
 			INNER JOIN dbo.OAS_Party op WITH(NOLOCK) ON c.PartyId = op.PartyID
 			INNER JOIN dbo.Licensees l	WITH(NOLOCK) ON op.OldRefID = l.LicenseeID

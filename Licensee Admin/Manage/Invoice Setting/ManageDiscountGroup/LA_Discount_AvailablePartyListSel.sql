@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -17,13 +17,14 @@ AS
 		- 20180702@Parsons: Get payer list [#94282]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 		- 20220206@Danny: Return more party detail (SuspendedDate, TerminatedDate) [RedmineID: #169160]
+		- 20240625@Danny: Return InvoiceLanguage [RedmineID: #206117]
 
 	 Explannation:
 */
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @PartyList TABLE(PartyId INT, PartyName VARCHAR(100), BrandName VARCHAR(100), ParentId INT, SuspendedDate DATE, TerminatedDate DATE)
+	DECLARE @PartyList TABLE(PartyId INT, PartyName VARCHAR(100), BrandName VARCHAR(100), ParentId INT, SuspendedDate DATE, TerminatedDate DATE, InvoiceLanguage VARCHAR(7))
 	DECLARE @PartySettings TABLE(DiscountGroupId INT, PartyId INT, ProductId INT)
 
 	INSERT INTO @PartyList(PartyId, PartyName, BrandName, ParentId)
@@ -31,7 +32,8 @@ BEGIN
 
 	UPDATE p
 	SET p.SuspendedDate = op.SuspendedDate,
-		p.TerminatedDate = op.TerminatedDate
+		p.TerminatedDate = op.TerminatedDate,
+		p.InvoiceLanguage = op.InvoiceLanguage
 	FROM @PartyList p
 	INNER JOIN dbo.OAS_partydetail op WITH(NOLOCK) ON p.PartyId = op.PartyId
 
@@ -45,7 +47,7 @@ BEGIN
 		AND (@ToDate IS NULL OR @ToDate >= h.FromDate)
 		
 	--list of payer not in group
-	SELECT p.PartyId, PartyName, BrandName, SuspendedDate, TerminatedDate
+	SELECT p.PartyId, PartyName, BrandName, SuspendedDate, TerminatedDate, InvoiceLanguage
 	FROM @PartyList p
 	WHERE p.PartyId NOT IN (SELECT PartyId 
 							FROM @PartySettings
@@ -55,7 +57,7 @@ BEGIN
 	UNION
 
 	--list of payer in group
-	SELECT p.PartyId, PartyName, BrandName, SuspendedDate, TerminatedDate
+	SELECT p.PartyId, PartyName, BrandName, SuspendedDate, TerminatedDate, InvoiceLanguage
 	FROM @PartyList p
 	WHERE p.PartyId IN (SELECT PartyId 
 						FROM @PartySettings p1
