@@ -19,6 +19,7 @@ AS
    
 	Revisions: 
 		- 20230908@Danny: Initialize SP [#194603]
+		- 20240812@Danny: Add Biller info [#209161]
 
 	Param's Explanation:
 	DECLARE 
@@ -186,7 +187,7 @@ BEGIN
 						SELECT TOP 1 1
 						FROM @Statement st
 						WHERE st.Reference = d.OfficialInvoiceNo 
-					) AND d.StatusId <> -1 AND d.Environment = @Environment
+					) AND d.StatusId <> -1 AND d.Environment = @Environment AND d.BillerId = @BillerId
 		END
 
 		SELECT @SOAType = CASE  WHEN @RefInvoiceTypeID IN (1,6,7) OR @InvoiceTypeId IN (1,6,7) THEN 0
@@ -270,6 +271,7 @@ BEGIN
 		WHERE	li.PartyId = @PartyId AND li.Environment = @Environment  AND li.CurrencyId = @CurrencyID  AND li.InvoiceDate <= @StatementDate
 				AND StatusId <> -1
 				AND li.OfficialInvoiceNo <> @InvoiceNo
+				AND li.BillerId = @BillerId
 		UNION ALL
 
 		SELECT  lp.PaymentId, 
@@ -287,6 +289,7 @@ BEGIN
 		FROM	dbo.LA_Payment lp WITH(NOLOCK)
 		WHERE	lp.PartyId = @PartyId AND lp.Environment = @Environment  AND lp.CurrencyId = @CurrencyID AND lp.ReceivedDate <= @StatementDate
 				AND lp.StatusId = 0
+				AND lp.BillerId = @BillerId
 
 		IF EXISTS (SELECT TOP 1 1 FROM #All_Doc_By_Party WHERE DocumentTypeID = 0 AND DocumentDetailTypeID IN (4,5) AND StatusID = 0)
 		BEGIN
@@ -297,7 +300,7 @@ BEGIN
 				INSERT INTO #D_C_Inv_Detail( DocumentID, DocumentDate, Refno, RefAmount, RefStatusID, RefInvDate, RefInvType)
 				SELECT	0, @InvoiceDate, Reference AS Refno,  CASE WHEN @InvoiceTypeId = 4 THEN -1 ELSE 1 END *  s.Amount, li.StatusId, li.InvoiceDate, li.InvoiceType
 				FROM	@Statement s
-				INNER JOIN dbo.LA_InvoiceHeader li WITH(NOLOCK) ON s.Reference = li.OfficialInvoiceNo AND li.StatusId <> -1	 AND li.Environment = @Environment
+				INNER JOIN dbo.LA_InvoiceHeader li WITH(NOLOCK) ON s.Reference = li.OfficialInvoiceNo AND li.StatusId <> -1	 AND li.Environment = @Environment AND li.BillerId = @BillerId
 			END
 
 			INSERT INTO #D_C_Inv_Detail( DocumentID, DocumentDate, Refno, RefAmount, RefStatusID, RefInvDate, RefInvType)
@@ -499,6 +502,10 @@ BEGIN
 				CASE WHEN @Amount_More_Than_90_Days = 0AND @Cnt_More_Than_90_Days = 0 THEN  0 ELSE @Amount_More_Than_90_Days END Amount_More_Than_90_Days
 		
 	END
+
+	DROP TABLE #All_Doc_By_Party
+	DROP TABLE #D_C_Inv_Detail
+	DROP TABLE #SOA_Doc_List
 
 END
 GO
