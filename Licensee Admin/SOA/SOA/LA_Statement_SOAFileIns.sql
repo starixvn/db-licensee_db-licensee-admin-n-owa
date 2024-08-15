@@ -25,6 +25,7 @@ AS
 
 	Revisions:
 		- 20240409@Danny: Save SOA file
+		- 20240815@Danny:  Change SOA File Name [#209325]
 */
 
 BEGIN
@@ -32,7 +33,7 @@ BEGIN
 
 	SELECT @ErrCode = 0, @ErrMsg = ''
 	DECLARE @LicenseeName VARCHAR(50)
-	DECLARE @InvoiceNo NVARCHAR(50) 
+	DECLARE @InvoiceNo NVARCHAR(50) , @InvoiceType SMALLINT
 
 	IF EXISTS (SELECT TOP 1 1 FROM dbo.LA_SOAFile WHERE InvoiceHeaderId = @InvoiceId)
 	BEGIN
@@ -41,7 +42,7 @@ BEGIN
 	ELSE
 	BEGIN
 
-		SELECT @InvoiceNo = OfficialInvoiceNo FROM  LA_InvoiceHeader WITH(NOLOCK)
+		SELECT @InvoiceNo = OfficialInvoiceNo, @InvoiceType = InvoiceType FROM  LA_InvoiceHeader WITH(NOLOCK)
 		WHERE InvoiceHeaderId = @InvoiceId
 
 
@@ -56,10 +57,7 @@ BEGIN
 			SELECT  @BillerId = u.BillerId,
 					@CurrencyId = u.CurrencyId,
 					@StatementDate = u.InvoiceDate,
-					@SOAType =  CASE-- WHEN u.InvoiceType IN (1,6,7) OR x.InvoiceType IN (1,6,7) THEN 0
-									 WHEN u.InvoiceType  = 3 OR x.InvoiceType = 3 THEN 1
-									 ELSE 0
-									END
+					@SOAType =  CASE WHEN u.InvoiceType  = 3 OR x.InvoiceType = 3 THEN 1 ELSE 0 END
 			FROM LA_InvoiceHeader u WITH(NOLOCK) 
 			OUTER APPLY (
 				SELECT TOP 1  h.InvoiceType
@@ -69,11 +67,14 @@ BEGIN
 			) x
 			WHERE u.InvoiceHeaderId = @InvoiceId
 
-			SELECT @StatementFileName =  REPLACE(BillerName, ' ', '-') +  '-' + REPLACE(@InvoiceNo,' ', '-') + '-for-' + @LicenseeName + '-Statement.pdf'
-			FROM dbo.LA_BillerInfo WITH (NOLOCK)
-			WHERE PartyId = @BillerId
+			SELECT @StatementFileName = 'Statement re ' + @LicenseeName + ' '+ FORMAT (@StatementDate, 'yyyy MM dd') 
+									     + CASE WHEN @InvoiceType = 3 THEN ' Rebates.pdf'  
+										        WHEN @InvoiceType = 4 THEN ' CN.pdf' 
+												WHEN @InvoiceType = 5 THEN ' DN.pdf'  
+												WHEN @InvoiceType = 6 THEN ' Hosting Fees.pdf'  
+												WHEN @InvoiceType = 7 THEN ' Setup Fees.pdf'  
+										   ELSE '.pdf' END 
 
- 
 		END
 
 		INSERT INTO dbo.LA_SOAFile(InvoiceHeaderId, PartyID,  FileData, CreatedDate, CreatedBy, Environment, FileName, BillerId, CurrencyId, StatementDate, SOAType) 
