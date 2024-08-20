@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -21,6 +21,7 @@ AS
 		+ 20180716@bruce: add new group TEST for credit [#98126]
 		+ 20190102@bruce: include charge type [#107363]
 		+ 20200619@Happy: Increase the length of @ProductCode params [#128570]
+		+ 20240802@Danny: Player Tips worksheet [#207863]
 */
 /*	Example:
 	USE bodb_licensee
@@ -38,7 +39,7 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	
+
 	-- Region: Get party charge rate info	
 	DECLARE @PartyChargeInfo AS TABLE (
 		PartyId		INT,
@@ -46,17 +47,22 @@ BEGIN
 		Rate		MONEY,
 		FromDate	SMALLDATETIME,
 		ToDate		SMALLDATETIME,
-		RowNumber	INT,
 		ChargeType	INT)
 
-	INSERT INTO @PartyChargeInfo(PartyId, ProductID, Rate, Fromdate, Todate, RowNumber, ChargeType)
-	(
-		SELECT	PartyID, ProductID, MAX(DI_Rate), Fromdate, Todate, ROW_NUMBER() OVER (ORDER BY ProductId, Todate), ChargeType
-		FROM	dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
-		WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
-		GROUP BY PartyID,ProductID,Fromdate,Todate,ChargeType
-	)		
-	
+	INSERT INTO @PartyChargeInfo(PartyId, ProductID, Rate, Fromdate, Todate, ChargeType)
+	SELECT	PartyID, ProductID, MAX(DI_Rate), Fromdate, Todate, ChargeType
+	FROM	dbo.LA_f_ChargeInfo(@PartyId, @FromDate, @ToDate, @ProductCodes, 'OA', 1)
+	WHERE	DI_Rate > 0 AND ProductId <> 1 --exclude RB
+	GROUP BY PartyID,ProductID,Fromdate,Todate,ChargeType
+
+	IF EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE Value = 'TIP')
+	BEGIN
+			INSERT INTO @PartyChargeInfo(PartyId, ProductID, Rate, Fromdate, Todate, ChargeType)
+			SELECT TOP 1 PartyId, 74 ProductID, 0.7 Rate, Fromdate, Todate, ChargeType -- Hard charge Rate
+			FROM	@PartyChargeInfo WHERE ProductID = 0
+	END
+
+
 	-- End Region
 	
 	-- Region: Product Code
@@ -85,11 +91,11 @@ BEGIN
 		, c.Rate
 		, c.FromDate
 		, c.ToDate
-		, c.RowNumber
+		, ROW_NUMBER() OVER (ORDER BY c.ProductId, c.Todate) RowNumber
 		, p.ProductCode
 		, p.ProductName
 		, c.ChargeType
 	FROM @PartyChargeInfo c INNER JOIN @Products p ON c.ProductID = p.ProductId
-	ORDER BY c.RowNumber
+	ORDER BY  ROW_NUMBER() OVER (ORDER BY c.ProductId, c.Todate)
 END
 GO

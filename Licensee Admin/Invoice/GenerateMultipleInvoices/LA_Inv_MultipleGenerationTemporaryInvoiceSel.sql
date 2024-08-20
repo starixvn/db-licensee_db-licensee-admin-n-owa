@@ -33,6 +33,7 @@ AS
 		- 20230605@Danny: Invoice No should be listed in ascending order by number [RedmineID: #189284]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 		- 20240410@Danny: Return biller CompanyName & Address1  [Redmine: #194604]
+		- 20240730@Danny: Player Tips worksheet [#207863]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -41,7 +42,8 @@ AS
 				<InvoiceNumber>123</InvoiceNumber>
 				<PartyId>1</PartyId>
 				<InvoiceTypeShorten>S</InvoiceTypeShorten>
-				<HideRebateWorkSheet>Y</HideRebateWorkSheet>
+				<IsIncludeRebateWorkSheet>Y</IsIncludeRebateWorkSheet>
+				<IsIncludePlayerTipsWorkSheet>N</IsIncludePlayerTipsWorkSheet>
 			</InvoiceGenerating>
 		</Root>'
 */
@@ -72,19 +74,33 @@ BEGIN
 
 	-- Region: Get Party Settings
 	BEGIN
-		DECLARE @InvoiceData TABLE (IndexNumber INT IDENTITY(1, 1), InvoiceNumber INT, PartyId INT, InvoiceTypeId SMALLINT, InvoiceTypeShorten VARCHAR(10), IsHideRebateWorkSheet BIT)
+		DECLARE @InvoiceData TABLE (
+			IndexNumber						INT IDENTITY(1, 1), 
+			InvoiceNumber					INT, 
+			PartyId							INT, 
+			InvoiceTypeId					SMALLINT, 
+			InvoiceTypeShorten				VARCHAR(10), 
+			IsIncludeRebateWorkSheet		BIT,
+			IsIncludePlayerTipsWorkSheet	BIT
+		)
 		
 		BEGIN TRY
 			DECLARE @Party_XML XML = CONVERT(XML, @InvoiceGeneratingData)
 
-			INSERT INTO @InvoiceData (InvoiceNumber, PartyId, InvoiceTypeShorten, InvoiceTypeId, IsHideRebateWorkSheet)
-			SELECT InvoiceNumber, PartyId, InvoiceTypeShorten, CASE InvoiceTypeShorten WHEN 'S' THEN 1 WHEN 'R' THEN 3 WHEN 'H' THEN 6 END, CASE HideRebateWorksheet WHEN 'Y' THEN 1 ELSE 0 END
+			INSERT INTO @InvoiceData (InvoiceNumber, PartyId, InvoiceTypeShorten, InvoiceTypeId, IsIncludeRebateWorkSheet, IsIncludePlayerTipsWorkSheet)
+			SELECT	InvoiceNumber, 
+					PartyId, 
+					InvoiceTypeShorten, 
+					CASE InvoiceTypeShorten WHEN 'S' THEN 1 WHEN 'R' THEN 3 WHEN 'H' THEN 6 END, 
+					CASE IncludeRebateWorkSheet WHEN 'Y' THEN 1 ELSE 0 END,
+					CASE IncludePlayerTipsWorkSheet WHEN 'Y' THEN 1 ELSE 0 END
 			FROM (
 				SELECT
 					t.c.value('(InvoiceNumber/text())[1]', 'INT') AS InvoiceNumber
 					,t.c.value('(PartyId/text())[1]', 'INT') AS PartyId
 					,t.c.value('(InvoiceTypeShorten/text())[1]', 'VARCHAR(10)') AS InvoiceTypeShorten
-					,t.c.value('(HideRebateWorkSheet/text())[1]', 'VARCHAR(10)') AS HideRebateWorkSheet
+					,t.c.value('(IsIncludeRebateWorkSheet/text())[1]', 'VARCHAR(10)') AS IncludeRebateWorkSheet
+					,t.c.value('(IsIncludePlayerTipsWorkSheet/text())[1]', 'VARCHAR(10)') AS IncludePlayerTipsWorkSheet
 				FROM @Party_XML.nodes('Root/InvoiceGenerating') t(c)
 			) a
 			OPTION (OPTIMIZE FOR (@Party_XML = NULL))
@@ -140,8 +156,8 @@ BEGIN
 			AND InvoiceType IN (1, 3, 6) -- Software Fee, Rebate, Hosting Fee
 		ORDER BY CreatedDateTime DESC
 		
-		DECLARE @InvoiceSettings TABLE (IndexNumber INT, PartyId INT, BillerId INT, InvTypeId SMALLINT, ProductCodes VARCHAR(200), InvTemplateName VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, IsHideRebateWorkSheet BIT,CompanyName NVARCHAR(100), BillerAddress1 NVARCHAR(255))
-		INSERT INTO @InvoiceSettings (IndexNumber, PartyId, BillerId, InvTypeId, InvTemplateName, InvoiceSymbol, InvoiceNumber, ProductCodes, IsHideRebateWorkSheet, CompanyName, BillerAddress1)
+		DECLARE @InvoiceSettings TABLE (IndexNumber INT, PartyId INT, BillerId INT, InvTypeId SMALLINT, ProductCodes VARCHAR(200), InvTemplateName VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, IsIncludeRebateWorkSheet BIT, IsIncludePlayerTipsWorkSheet BIT, CompanyName	NVARCHAR(100), BillerAddress1 NVARCHAR(255))
+		INSERT INTO @InvoiceSettings (IndexNumber, PartyId, BillerId, InvTypeId, InvTemplateName, InvoiceSymbol, InvoiceNumber, ProductCodes, CompanyName, BillerAddress1, IsIncludeRebateWorkSheet, IsIncludePlayerTipsWorkSheet)
 		SELECT d.IndexNumber, s.FromPartyId, s.ToPartyId, s.InvTypeId, t.InvTemplateName, @InvoiceSymbol, d.InvoiceNumber
 			, STUFF((SELECT ',' + CASE WHEN ls.ProductId = 0 THEN 'SB' ELSE ProductPrefix END
 						FROM dbo.LA_InvoiceSetting ls WITH (NOLOCK)
@@ -149,17 +165,21 @@ BEGIN
 						WHERE s.InvTypeId = ls.InvTypeId AND s.FromPartyId = ls.FromPartyId AND s.ToPartyId = ls.ToPartyId
 							AND ls.InvTypeId = 1 AND ls.ProductId IS NOT NULL
 						FOR XML PATH('')), 1, 1, '') AS ProductCodes
-			, d.IsHideRebateWorkSheet
-			,   CASE WHEN s.ActiveAddress = 1 THEN ps.CompanyName
-					WHEN s.ActiveAddress = 2 THEN ps.CompanyName2  END CompanyName, 
-				CASE WHEN s.ActiveAddress = 1 THEN ps.Address1
+			, CASE WHEN s.ActiveAddress = 1 THEN ps.CompanyName
+			       WHEN s.ActiveAddress = 2 THEN ps.CompanyName2  END CompanyName
+			, CASE WHEN s.ActiveAddress = 1 THEN ps.Address1
 					WHEN s.ActiveAddress = 2 THEN ps.Address2  END BillerAddress1
+
+			, d.IsIncludeRebateWorkSheet
+            , d.IsIncludePlayerTipsWorkSheet
+				 
+			
 		FROM @PartySettings ps
 			INNER JOIN @InvoiceData d ON ps.PartyId = d.PartyId
 			INNER JOIN dbo.LA_InvoiceSetting s WITH (NOLOCK) ON s.FromPartyId = ps.PartyId AND s.InvTypeId = d.InvoiceTypeId
 			INNER JOIN dbo.LA_InvoiceTemplate t WITH (NOLOCK) ON s.InvTempId = t.InvTemplateId
 		WHERE s.InvTypeId IN (1, 3, 6) AND s.ToPartyId = @BillerId
-		GROUP BY d.IndexNumber, s.FromPartyId, s.ToPartyId, s.InvTypeId, t.InvTemplateName, d.InvoiceNumber, d.IsHideRebateWorkSheet,
+		GROUP BY d.IndexNumber, s.FromPartyId, s.ToPartyId, s.InvTypeId, t.InvTemplateName, d.InvoiceNumber, d.IsIncludeRebateWorkSheet, d.IsIncludePlayerTipsWorkSheet,
 			CASE WHEN s.ActiveAddress = 1 THEN ps.CompanyName
 				 WHEN s.ActiveAddress = 2 THEN ps.CompanyName2  END,
 			CASE WHEN s.ActiveAddress = 1 THEN ps.Address1
@@ -169,6 +189,10 @@ BEGIN
 		UPDATE @InvoiceSettings
 		SET  ProductCodes = ProductCodes +',SPR(CS)'
 		WHERE InvTypeId = 1 AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(ProductCodes,',') WHERE value <> 'SB')
+
+		UPDATE @InvoiceSettings
+		SET  ProductCodes = ProductCodes +',TIP'
+		WHERE InvTypeId = 1 AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(ProductCodes,',') WHERE value = 'SB')
 	END
 	-- End Region: Get Party Settings
 
@@ -319,14 +343,14 @@ BEGIN
 			RowIndex INT, IndexNumber INT, PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(100), ItemType TINYINT, BillerId INT, BillerName NVARCHAR(50)
 			,InvoiceHeaderId BIGINT, InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, InvoicePath NVARCHAR(256)
 			,BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50), ProductCodes VARCHAR(MAX)
-			,LicensingFee MONEY, Discount MONEY, Rebate MONEY, AdjustmentAmount MONEY, AdjustmentNote NVARCHAR(500), IsHideRebateWorkSheet BIT
+			,LicensingFee MONEY, Discount MONEY, Rebate MONEY, AdjustmentAmount MONEY, AdjustmentNote NVARCHAR(500), IsIncludeRebateWorkSheet BIT, IsIncludePlayerTipsWorkSheet BIT
 			,CompanyName NVARCHAR(100), BillerAddress1 NVARCHAR(255)
 		)
 
 		INSERT INTO @_Result
 		(
 			RowIndex, IndexNumber, PartyId, PartyName, BrandName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath
-			,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsHideRebateWorkSheet
+			,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsIncludeRebateWorkSheet, IsIncludePlayerTipsWorkSheet
 			,CompanyName, BillerAddress1
 		)
 		SELECT
@@ -351,7 +375,8 @@ BEGIN
 			,SUM(ISNULL(CASE WHEN r.InvoiceType = 3 THEN r.LicensingFee ELSE 0 END, 0)) AS Rebate
 			,SUM(ISNULL(r.AdjustmentAmount, 0)) AS AdjustmentAmount
 			,ISNULL(r.AdjustmentNote, N'') AS AdjustmentNote
-			,ivs.IsHideRebateWorkSheet
+			,ivs.IsIncludeRebateWorkSheet
+			,ivs.IsIncludePlayerTipsWorkSheet
 			,ivs.CompanyName
 			,ivs.BillerAddress1
 		FROM @PartySettings ps
@@ -375,15 +400,16 @@ BEGIN
 			,ps.InvoiceLanguage
 			,CASE WHEN ivs.InvTypeId = 1 THEN ivs.ProductCodes ELSE '' END
 			,ISNULL(r.AdjustmentNote, N'')
-			,ivs.IsHideRebateWorkSheet
+			,ivs.IsIncludeRebateWorkSheet
 			,ivs.CompanyName
+			,ivs.IsIncludePlayerTipsWorkSheet
 			,ivs.BillerAddress1
 	END
 	-- End Region: Final Result
 
 	-- Return data
 	SELECT RowIndex, IndexNumber, PartyId, PartyName, BrandName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath
-		,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsHideRebateWorkSheet
+		,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsIncludeRebateWorkSheet, IsIncludePlayerTipsWorkSheet
 		,CompanyName, BillerAddress1
 	FROM @_Result
 	ORDER BY InvoiceNumber
