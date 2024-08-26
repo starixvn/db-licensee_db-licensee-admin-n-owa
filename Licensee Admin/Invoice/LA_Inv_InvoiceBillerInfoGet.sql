@@ -24,6 +24,7 @@ AS
 		- 20190326@Bruce: Include invoice language [#102830]
 		- 20210705@Sophia: Revise, fix the MAX(InvoiceNumber) [Redmine: #158041]
 		- 20240410@Danny: Return biller CompanyName & Address1  [Redmine: #194604]
+		- 20240819@Danny:  get lastest invoice number and symbol by created datetime [#209325]
 */
 /*	Example:
 	USE bodb_licensee
@@ -62,22 +63,25 @@ BEGIN
 			BillerId		INT,
 			InvoiceType		INT,
 			InvoiceSymbol	NVARCHAR(20),
-			InvoiceNumber	INT)
+			InvoiceNumber	INT,
+			CreatedDateTime  DATETIME)
+
 	INSERT	INTO @InvoiceTmp
 	SELECT	i.BillerId,
 			i.InvoiceType,
 			i.InvoiceSymbol,
-			MAX(i.InvoiceNumber)
+			MAX(i.InvoiceNumber),
+			i.CreatedDateTime
 	FROM	LA_InvoiceHeader i WITH(NOLOCK)
 	WHERE	i.BillerId = @BillerId AND (i.Environment IS NULL OR i.Environment = @Environment) AND ISNULL(StatusId,0) <> -1
-	GROUP BY i.BillerId,i.InvoiceType,i.InvoiceSymbol 
+	GROUP BY i.BillerId,i.InvoiceType,i.InvoiceSymbol , i.CreatedDateTime
 
 	DECLARE @InvoiceSymbol NVARCHAR(20) = ''
 	DECLARE @InvoiceNumber INT = 1
 	DECLARE @SameInvoiceNoList TABLE (InvoiceType INT)
 
 	-- 1: software fee, 6: hosting fee
-	IF @InvoiceType IN (1,6) INSERT INTO @SameInvoiceNoList VALUES(1),(6)
+	IF @InvoiceType IN (1,6,3,7) INSERT INTO @SameInvoiceNoList VALUES(1),(6),(3),(7)
 	-- 5: debit note, 10: debit note for return AMF
 	ELSE IF @InvoiceType IN (5,10) INSERT INTO @SameInvoiceNoList VALUES(5),(10)
 	-- others
@@ -85,7 +89,7 @@ BEGIN
 
 	SELECT	TOP 1 @InvoiceSymbol = i.InvoiceSymbol
 	FROM	@InvoiceTmp i
-	WHERE	i.InvoiceType IN (SELECT * FROM @SameInvoiceNoList)
+	WHERE	i.InvoiceType IN (SELECT * FROM @SameInvoiceNoList)  order by CreatedDateTime desc
 
 	SELECT	@InvoiceNumber = ISNULL(MAX(i.InvoiceNumber), 0) + 1
 	FROM	@InvoiceTmp i		

@@ -55,6 +55,7 @@ AS
 		- 20220418@Percy: Remove code update InvItemTypeId [RedmineID: #164139]
 		- 20240103@Danny: store invoice amount with 2 decimal digits [RedmineID: #197260]
 		- 20240722@Danny:  Change Invoice File Name [#194603]
+		- 20240815@Danny:  Change Invoice File Name [#209325]
 */
 
 BEGIN
@@ -180,9 +181,7 @@ BEGIN
 			INNER JOIN dbo.OAS_PartyDetail d WITH (NOLOCK) ON p.PartyId = d.PartyId
 		WHERE p.PartyId = @PartyId
 
-		SELECT @InvoiceFileName = REPLACE(BillerName, ' ', '-') + '-' + REPLACE(@InvoiceNo,' ', '-') + '-for-' + @PartyName + '-Invoice.pdf'
-		FROM dbo.LA_BillerInfo WITH (NOLOCK)
-		WHERE PartyId = @BillerId
+		SELECT @InvoiceFileName = @InvoiceNo + ' ' + @PartyName + CASE WHEN @InvoiceTypeId = 3 THEN ' Rebates.pdf' ELSE '.pdf' END
 
 		IF EXISTS (SELECT 1 FROM @Statement WHERE ItemType <> 28) -- 28 = Gross Discount
 			SELECT @Amount = SUM(
