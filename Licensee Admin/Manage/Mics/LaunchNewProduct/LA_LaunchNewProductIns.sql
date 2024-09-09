@@ -20,6 +20,7 @@ AS
 		- 20230815@Danny: Handle crypto licensee billing with fiat currency [RedmineID: #192378]
 		- 20231002@Danny: logging currency information with new format [#FeatureID 193214]
 		- 20231228@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
+		- 20240527@Danny: Automate the PT adjustment when the Exchange charge rate is changed [RemineID: #201477]
 		
 	Param's Explannation: 
 		+ @ChargeSettingsXML: '<ChargeSettings>
@@ -42,7 +43,7 @@ BEGIN
 
 	DECLARE @ChargeSettingXML XML, @ProductId INT, @Product3rdId TINYINT, @LicenseeId INT, @BillerId INT, @PartyId INT, @GroupName VARCHAR(50), @GroupId INT, @FromDate DATETIME, @ToDate DATETIME, @BankID INT
 			,@SiteName VARCHAR(20) = '', @InputPT VARCHAR(MAX) = '', @Rate MONEY, @UserName VARCHAR(50) = '', @PartyName VARCHAR(50), @PreLaunchDate DATETIME, @ChargeID INT
-
+			,@InputPTExchange VARCHAR(MAX) = '', @ErrCodeExchange INT = 0, @ErrMsgExchange NVARCHAR(1000)  = ''
 	DECLARE @Tmp TABLE (InvSettingId INT)
 
 	SELECT @UserName = Username FROM dbo.LA_User WITH(NOLOCK) WHERE UserID = @UserID
@@ -547,6 +548,14 @@ BEGIN
 				SELECT @ProductId AS '@PID', 0 AS '@CID', 100 * (1 - @Rate) AS '@PT'
 				FOR XML PATH('PT'), ROOT('ROOT')
 			))
+
+			SELECT @InputPTExchange = CONVERT(VARCHAR(MAX), 
+			(
+				SELECT @ProductId AS '@PID', 0 AS '@CID', 100 * (1 - @Rate) AS '@PT'
+				WHERE @ProductId = 31
+				FOR XML PATH('PT'), ROOT('ROOT')
+
+			))
 		
 			/*Delete prevent updating unexpected NAP PT value*/
 			IF ((@Rate > 0.12 AND @SiteName <> '9wickets' OR @Rate = 0) AND @ProductId = 1) OR @PartyId IN (SELECT z.PartyId FROM @tmpPartyOfferCrypto z) OR @Product3rdId IN (14, 17, 3, 31, 10, 13, 16) OR @ToDate < GETDATE() 
@@ -554,7 +563,12 @@ BEGIN
 				SET @InputPT = ''
 			END
 
-			IF @SiteName <> '' AND @SiteName NOT IN (SELECT z.PartyName FROM @tmpPartyOfferCrypto z) AND ISNULL(@InputPT, '') <> ''
+			IF (@PartyId IN (SELECT z.PartyId FROM @tmpPartyOfferCrypto z) OR @Product3rdId NOT IN (31) OR @ToDate < GETDATE() )
+			BEGIN
+				SET @InputPTExchange = ''
+			END
+
+			IF @SiteName <> '' AND @SiteName NOT IN (SELECT z.PartyName FROM @tmpPartyOfferCrypto z) AND (ISNULL(@InputPT, '') <> '' OR  ISNULL(@InputPTExchange, '') <> '')
 			BEGIN
 				IF @CurrentDate NOT BETWEEN @FromDate AND @ToDate
 				BEGIN
@@ -563,19 +577,40 @@ BEGIN
 				END
 				ELSE
 				BEGIN
-					EXEC CustDB.dbo.Acc_Dep_LicenseeSetting_PTSettingUpd 
-						@Site		= @SiteName
-						,@InputPT	= @InputPT
-						,@UserID	= @UserID
-						,@UserName	= @UserName
-						,@IP		= @LoginIP
-						,@ErrCode	= @ErrCode OUTPUT
-						,@ErrMsg	= @ErrMsg OUTPUT
-
-					IF @ErrCode <> 0
+					IF ISNULL(@InputPT, '') <> ''
 					BEGIN
-						INSERT INTO @ErrorMessage (PartyId, PartyName, ErrCode, ErrMsg)
-						VALUES (@PartyId, @PartyName, @ErrCode, @ErrMsg)
+						EXEC CustDB.dbo.Acc_Dep_LicenseeSetting_PTSettingUpd 
+							@Site		= @SiteName
+							,@InputPT	= @InputPT
+							,@UserID	= @UserID
+							,@UserName	= @UserName
+							,@IP		= @LoginIP
+							,@ErrCode	= @ErrCode OUTPUT
+							,@ErrMsg	= @ErrMsg OUTPUT
+
+						IF @ErrCode <> 0
+						BEGIN
+							INSERT INTO @ErrorMessage (PartyId, PartyName, ErrCode, ErrMsg)
+							VALUES (@PartyId, @PartyName, @ErrCode, @ErrMsg)
+						END
+					END
+
+					IF ISNULL(@InputPTExchange, '') <> ''
+					BEGIN
+						EXEC CustDB.dbo.Acc_Dep_LicenseeSetting_ChargePTUpd 
+							@Site		= @SiteName
+							,@InputPT	= @InputPTExchange
+							,@UserID	= @UserID
+							,@UserName	= @UserName
+							,@IP		= @LoginIP
+							,@ErrCode	= @ErrCode OUTPUT
+							,@ErrMsg	= @ErrMsg OUTPUT
+
+						IF @ErrCode <> 0
+						BEGIN
+							INSERT INTO @ErrorMessage (PartyId, PartyName, ErrCode, ErrMsg)
+							VALUES (@PartyId, @PartyName, @ErrCode, @ErrMsg)
+						END
 					END
 				END
 			END

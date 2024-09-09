@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -32,6 +32,7 @@ AS
 		- 20220831@Malcolm: Automate the PT adjustment when the charge rate is changed [RemineID: #171705]
 		- 20221205@Danny: Remove Hx9candy From Crypto Licensee List [RedmineID: #181279]
 		- 20231113@Danny: Support to remove up-coming waive period [RedmineID: #194868]
+		- 20240527@Danny: Automate the PT adjustment when the Exchange charge rate is changed [RemineID: #201477]
 
 	 Params:	
 		+ @ChargeSettingXML:
@@ -63,7 +64,7 @@ BEGIN
 	SET NOCOUNT ON
 	DECLARE @ProductListAll VARCHAR(100) = '', @MinDate DATE, @MaxDate DATE, @SiteName VARCHAR(20) ='', @InputPT VARCHAR(MAX) = '', @ChargeRateXML XML, @ChargeSettingXMLOUT XML
 		,@Username VARCHAR(50), @CurrentDate DATE, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX), @LogActionID	INT	= 1001, @startRun DATETIME, @endRun DATETIME,@duration INT
-		,@IsWriteLogPayer BIT
+		,@IsWriteLogPayer BIT, @InputPTExchange VARCHAR(MAX) = '', @ErrCodeExchange INT = 0, @ErrMsgExchange NVARCHAR(1000)	= ''
 	-- Time start
 	SET @startRun = GETDATE()
 	SELECT @Username = Username FROM LA_User WITH(NOLOCK) WHERE UserID = @UserID 
@@ -282,9 +283,10 @@ BEGIN
 		INNER JOIN dbo.Licensees l WITH(NOLOCK) ON p.OldRefID = l.LicenseeID
 	WHERE l.IsDeposit = 1 AND p.PartyID = @PayerID
 
+
 	DELETE cr
 	FROM @ChargeRate cr
-	WHERE cr.ProductId IN (14, 17, 3, 31, 10, 13, 16) OR  cr.ToDate < @CurrentDate OR @PayerID IN (SELECT x.PartyId FROM @tmpPartyOfferCrypto x) 
+	WHERE cr.ProductId IN (14, 17, 3, 10, 13, 16) OR  cr.ToDate < @CurrentDate OR @PayerID IN (SELECT x.PartyId FROM @tmpPartyOfferCrypto x) 
 		OR EXISTS (
 			SELECT 1 
 			FROM dbo.OAS_ChargeInfo ci WITH(NOLOCK)
@@ -329,39 +331,68 @@ BEGIN
 			,CurrencyId AS '@CID'
 			,CASE WHEN Rate = -1 THEN -1 ELSE 100 * (1 - Rate) END AS '@PT' -- [-1] : not update
 		FROM @ChargeRate 
-		WHERE IsValid = 1
+		WHERE IsValid = 1 AND ProductId <> 31
 		FOR XML PATH ('PT'), ROOT('ROOT')
 	))
 
-	IF ISNULL(@SiteName, '') <> '' AND ISNULL(@InputPT, '') <> ''
+	SELECT @InputPTExchange = CONVERT(VARCHAR(MAX), 
+	(
+		SELECT 
+			ProductId AS '@PID'
+			,CurrencyId AS '@CID'
+			,CASE WHEN Rate = -1 THEN -1 ELSE 100 * (1 - Rate) END AS '@PT' -- [-1] : not update
+		FROM @ChargeRate 
+		WHERE IsValid = 1 AND ProductId = 31 
+		FOR XML PATH ('PT'), ROOT('ROOT')
+	))
+
+	IF ISNULL(@SiteName, '') <> '' AND ( ISNULL(@InputPT, '') <> '' OR  ISNULL(@InputPTExchange, '') <> '' )
 	BEGIN
-		EXEC CustDB.dbo.Acc_Dep_LicenseeSetting_PTSettingUpd
-			@Site = @SiteName
-			,@InputPT = @InputPT
-			,@UserID = @UserID
-			,@Username = @Username
-			,@IP = @LoginIP
-			,@ErrCode = @ErrCode OUTPUT
-			,@ErrMsg = @ErrMsg OUTPUT
+		IF ISNULL(@InputPT, '') <> ''
+			EXEC CustDB.dbo.Acc_Dep_LicenseeSetting_PTSettingUpd
+				@Site = @SiteName
+				,@InputPT = @InputPT
+				,@UserID = @UserID
+				,@Username = @Username
+				,@IP = @LoginIP
+				,@ErrCode = @ErrCode OUTPUT
+				,@ErrMsg = @ErrMsg OUTPUT
+
+		IF ISNULL(@InputPTExchange, '') <> ''
+			EXEC CustDB.dbo.Acc_Dep_LicenseeSetting_ChargePTUpd
+				@Site = @SiteName
+				,@InputPT = @InputPTExchange
+				,@UserID = @UserID
+				,@Username = @Username
+				,@IP = @LoginIP
+				,@ErrCode = @ErrCodeExchange OUTPUT
+				,@ErrMsg = @ErrMsgExchange  OUTPUT
 	END
 
-	IF (@ErrCode  <> 0 OR EXISTS (SELECT 1 FROM @ChargeRate WHERE IsValid = 0)) AND ISNULL(@SiteName, '') <> ''
+	IF (@ErrCode  <> 0 OR @ErrCodeExchange <> 0 OR EXISTS (SELECT 1 FROM @ChargeRate WHERE IsValid = 0)) AND ISNULL(@SiteName, '') <> ''
 	BEGIN
-		IF @ErrCode <> 0
+		IF @ErrCode <> 0 OR @ErrCodeExchange <> 0
 		BEGIN
-			SELECT 	@ErrMsg = STUFF((SELECT ',' + ProductName
-					FROM @ChargeRate 
-					WHERE IsValid = 1
-					FOR XML PATH('')), 1, 1, '') + ': '+ @ErrMsg + '<br>'
+			IF @ErrCode <> 0
+				SELECT 	@ErrMsg = ISNULL(@ErrMsg, '') + STUFF((SELECT ',' + ProductName
+						FROM @ChargeRate 
+						WHERE IsValid = 1 AND ProductId <> 31
+						FOR XML PATH('')), 1, 1, '') + ': '+ @ErrMsg + '<br>'
+			IF @ErrCodeExchange <> 0
+				SELECT 	@ErrMsg = ISNULL(@ErrMsg, '') + STUFF((SELECT ',' + ProductName
+						FROM @ChargeRate 
+						WHERE IsValid = 1 AND ProductId = 31
+						FOR XML PATH('')), 1, 1, '') + ': '+ @ErrMsgExchange + '<br>'
 		END
 
 		SELECT @ErrMsg =  ISNULL(@ErrMsg, '') + ProductName + ': NAP PT update failed due to it''s not current charge rate' + '<br>'
 		FROM @ChargeRate
-		WHERE IsValid = 0
+		WHERE IsValid = 0 
 
 		SET @ErrCode = 0
 		RETURN
 	END
+
 
 END
 GO
