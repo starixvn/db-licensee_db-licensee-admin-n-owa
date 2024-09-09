@@ -37,6 +37,7 @@ AS
 	- 20240123@Danny: Change Credit licensing fee fomular [RedmineID: #197267]
 	- 20240301@Danny: Merge virtual sports product [RemineID: #199478]
 	- 20240521@Danny: support Inhouse Product [RemineID: #200955]
+	- 20240814@Danny: Integrate Fast spin product[RedmineID: #206246]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
@@ -1584,7 +1585,7 @@ BEGIN
 				
 				 WHEN e.ProductID IS NOT NULL THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END + td.LicenseeContribution - td.JackpotPrize - td.Promotion END 
 				   WHEN td.ProductID IN (21, 34, 55) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  END - td.Promotion
-				  WHEN td.ProductID IN (73, 45, 79) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  - td.Promotion  END
+				  WHEN td.ProductID IN (73, 45, 79, 87) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  - td.Promotion  END
 				 WHEN td.LicensingFee < 0 AND p.isKeepNegativeFee = 0 AND td.IsKeepNegativeAmount = 0  THEN 0 
 				 ELSE td.LicensingFee END + td.CompanyTipShare) AS LicensingFee,
 		SUM(td.ExtraPT),
@@ -1593,7 +1594,7 @@ BEGIN
 		SUM(CASE WHEN td.ProductID = 23 THEN td.LicenseeWinLoss
 				 WHEN e.ProductID IS NOT NULL THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  + td.LicenseeContribution - td.JackpotPrize - td.Promotion END  
 				  WHEN td.ProductID IN (21, 34, 55) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  END - td.Promotion
-				  WHEN td.ProductID IN (73, 45, 79) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  - td.Promotion  END
+				  WHEN td.ProductID IN (73, 45, 79, 87) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  - td.Promotion  END
 				  WHEN td.LicensingFee < 0 AND p.isKeepNegativeFee = 0 AND td.IsKeepNegativeAmount = 0 THEN 0 
 				 ELSE td.LicensingFee END + td.CompanyTipShare)
 		- SUM(CASE WHEN td.ProductID = 2 THEN td.ExtraPT ELSE 0 END) 
