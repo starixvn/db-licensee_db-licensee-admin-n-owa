@@ -38,6 +38,7 @@ AS
 	- 20240301@Danny: Merge virtual sports product [RemineID: #199478]
 	- 20240521@Danny: support Inhouse Product [RemineID: #200955]
 	- 20240814@Danny: Integrate Fast spin product[RedmineID: #206246]
+	- 20240918@Danny: Integrate VS5 [RedmineID: #209929]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
@@ -425,7 +426,7 @@ BEGIN
 		SELECT @ProductCodes3rd =@ProductCodes3rd + ',SLT'
 
 	IF @FromDate >= @MergeVSCutoffDate 
-		AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value IN ('VS2','LG','VS4'))
+		AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value IN ('VS2','LG','VS4','VS5'))
 		AND NOT EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value IN ('VS'))
 	BEGIN
 		SELECT @ProductCodes = @ProductCodes + ',VS'
@@ -490,7 +491,7 @@ BEGIN
 
 	IF @FromDate >= @MergeVSCutoffDate 
 	BEGIN
-		DELETE FROM #ChargeInfoWithCredit WHERE ProductID IN (27, 77, 83) 
+		DELETE FROM #ChargeInfoWithCredit WHERE ProductID IN (27, 77, 83, 88) 
 
 		INSERT INTO #ChargeInfoWithCredit (PartyID, ProductID, IsDeposit, Fromdate, Todate, DI_Rate, ChargeType, LicenseeID, ChargeID )
 		SELECT PartyID, x.ProductID AS ProductID, IsDeposit, Fromdate, Todate, CASE WHEN IsDeposit = 0 THEN 0 ELSE  DI_Rate END , ChargeType, LicenseeID, ChargeID  --Clone VS setting 
@@ -499,6 +500,7 @@ BEGIN
 			SELECT 27 AS ProductID --VS2
 			UNION ALL SELECT 77 --VS3
 			UNION ALL SELECT 83	--VS4
+			UNION ALL SELECT 88	--VS5
 		) x
 		WHERE t.ProductID = 5
 
@@ -1585,7 +1587,7 @@ BEGIN
 				
 				 WHEN e.ProductID IS NOT NULL THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END + td.LicenseeContribution - td.JackpotPrize - td.Promotion END 
 				   WHEN td.ProductID IN (21, 34, 55) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  END - td.Promotion
-				  WHEN td.ProductID IN (73, 45, 79, 87) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  - td.Promotion  END
+				  WHEN td.ProductID IN (73, 45, 79, 87, 89) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  - td.Promotion  END
 				 WHEN td.LicensingFee < 0 AND p.isKeepNegativeFee = 0 AND td.IsKeepNegativeAmount = 0  THEN 0 
 				 ELSE td.LicensingFee END + td.CompanyTipShare) AS LicensingFee,
 		SUM(td.ExtraPT),
@@ -1594,7 +1596,7 @@ BEGIN
 		SUM(CASE WHEN td.ProductID = 23 THEN td.LicenseeWinLoss
 				 WHEN e.ProductID IS NOT NULL THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  + td.LicenseeContribution - td.JackpotPrize - td.Promotion END  
 				  WHEN td.ProductID IN (21, 34, 55) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  END - td.Promotion
-				  WHEN td.ProductID IN (73, 45, 79, 87) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  - td.Promotion  END
+				  WHEN td.ProductID IN (73, 45, 79, 87, 89) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  - td.Promotion  END
 				  WHEN td.LicensingFee < 0 AND p.isKeepNegativeFee = 0 AND td.IsKeepNegativeAmount = 0 THEN 0 
 				 ELSE td.LicensingFee END + td.CompanyTipShare)
 		- SUM(CASE WHEN td.ProductID = 2 THEN td.ExtraPT ELSE 0 END) 

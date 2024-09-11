@@ -20,6 +20,7 @@ AS
 		- 20220210@Percy: Return OfferSite, EndOfSupportDate [RedmineID: #163495]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 		- 20240301@Danny: Merge virtual sports product [RemineID: #199478]
+		- 20240911@Danny: Integrate VS5 [RemineID: #209929]
 */
 
 RETURN
@@ -34,6 +35,7 @@ RETURN
 		 UNION ALL SELECT 77 AS GroupProductId, 77 AS ProductID, '1900-01-01' FromDate, '2024-02-29' Todate, 'Virtual Sports 3' GroupProductName, 'LG' AS GroupProductCode
 		 UNION ALL SELECT 5 AS GroupProductId, 83 AS ProductID, '2024-03-01' FromDate, '9999-12-31' Todate, 'Virtual Sports' GroupProductName, 'VS' AS GroupProductCode
 		 UNION ALL SELECT 83 AS GroupProductId, 83 AS ProductID, '1900-01-01' FromDate, '2024-02-29' Todate, 'Virtual Sports 4' GroupProductName, 'VS4' AS GroupProductCode
+		 UNION ALL SELECT 5 AS GroupProductId, 88 AS ProductID, '1900-01-01' FromDate, '9999-12-31' Todate, 'Virtual Sports' GroupProductName, 'VS' AS GroupProductCode
 	), ProductInput AS
 	(
 		SELECT		l.ProductId, 
