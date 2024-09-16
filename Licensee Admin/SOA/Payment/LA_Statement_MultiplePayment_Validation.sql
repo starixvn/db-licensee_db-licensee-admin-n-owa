@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Statement_MultiplePayment_Validation]
 	@PaymentData	NVARCHAR(MAX),
 	@Environment    VARCHAR(10),
@@ -14,6 +14,7 @@ AS
    
 	Revisions: 
 		- 20230908@Danny: Initialize SP [#193656]
+		- 20240812@Danny: Add Biller info [#209161]
 
 	Param's Explanation:
 	Received Date format is mm/dd/yyyy
@@ -25,6 +26,7 @@ AS
 			<RowId>2</RowId>
 			<PaymentNo>ZL OR-111</PaymentNo>
 			<ReceivedDate>02/10/2023</ReceivedDate>
+			<Biller>ZL</Biller>
 			<FromCustomer>PHL-LSEE-12BET EUR</FromCustomer>
 			<ToCustomer>VNM-HENRY CASH CNY</ToCustomer>
 			<FromAmount>200.00</FromAmount>
@@ -36,6 +38,7 @@ AS
 			<RowId>3</RowId>
 			<PaymentNo>ZL OR-109</PaymentNo>
 			<ReceivedDate>02/10/2023</ReceivedDate>
+			<Biller>ZL</Biller>
 			<FromCustomer>PHL-LSEE-12BET EUR</FromCustomer>
 			<ToCustomer>VNM-HENRY CASH CNY</ToCustomer>
 			<FromAmount>200.00</FromAmount>
@@ -52,6 +55,7 @@ AS
 				<RowId>2</RowId>
 				<PaymentNo>ZL OR-111</PaymentNo>
 				<ReceivedDate>02/10/2023</ReceivedDate>
+				<Biller>ZL</Biller>
 				<FromCustomer>PHL-LSEE-12BET EUR</FromCustomer>
 				<ToCustomer>PHL-MNL-CASH EUR</ToCustomer>
 				<Amount>200.00</Amount>
@@ -63,6 +67,7 @@ AS
 				<RowId>3</RowId>
 				<PaymentNo>ZL OR-109</PaymentNo>
 				<ReceivedDate>02/10/2023</ReceivedDate>
+				<Biller>ZL</Biller>
 				<FromCustomer>PHL-LSEE-12BET EUR</FromCustomer>
 				<ToCustomer>PHL-MNL-CASH EUR</ToCustomer>
 				<Amount>200.00</Amount>
@@ -81,6 +86,7 @@ BEGIN
 		RowId			INT, 
 		PaymentNo		VARCHAR(50), 
 		ReceivedDate	VARCHAR(10), 
+		Biller			NVARCHAR(10), 
 		FromCustomer	VARCHAR(30), 
 		ToCustomer		VARCHAR(30), 
 		Amount			VARCHAR(20), 
@@ -95,10 +101,11 @@ BEGIN
 
 		IF @Template = 1
 		BEGIN
-			INSERT INTO @PaymentList (RowId, PaymentNo, ReceivedDate, FromCustomer, ToCustomer, Amount, ActualRate, RebatePayment, Description)
+			INSERT INTO @PaymentList (RowId, PaymentNo, ReceivedDate, Biller, FromCustomer, ToCustomer, Amount, ActualRate, RebatePayment, Description)
 			SELECT CAST (RowId AS INT)  RowId
 				,PaymentNo
 				,ReceivedDate
+				,Biller
 				,FromCustomer
 				,ToCustomer
 				,Amount
@@ -110,6 +117,7 @@ BEGIN
 					LTRIM(RTRIM(t.c.value('(RowId/text())[1]', 'VARCHAR(20)'))) AS RowId
 					,LTRIM(RTRIM(t.c.value('(PaymentNo/text())[1]', 'VARCHAR(50)'))) AS PaymentNo
 					,LTRIM(RTRIM(t.c.value('(ReceivedDate/text())[1]', 'VARCHAR(20)'))) AS ReceivedDate
+					,LTRIM(RTRIM(t.c.value('(Biller/text())[1]', 'NVARCHAR(10)'))) AS Biller
 					,LTRIM(RTRIM(t.c.value('(FromCustomer/text())[1]', 'VARCHAR(30)'))) AS FromCustomer
 					,LTRIM(RTRIM(t.c.value('(ToCustomer/text())[1]', 'VARCHAR(30)'))) AS ToCustomer
 					,LTRIM(RTRIM(t.c.value('(Amount/text())[1]', 'VARCHAR(20)'))) AS Amount
@@ -125,10 +133,11 @@ BEGIN
 		IF @Template = 0
 		BEGIN
 			
-			INSERT INTO @PaymentList (RowId, PaymentNo, ReceivedDate, FromCustomer, ToCustomer, Amount, ToAmount, RebatePayment, Description)
+			INSERT INTO @PaymentList (RowId, PaymentNo, ReceivedDate,Biller, FromCustomer, ToCustomer, Amount, ToAmount, RebatePayment, Description)
 			SELECT CAST (RowId AS INT)  RowId
 				,PaymentNo
 				,ReceivedDate
+				,Biller
 				,FromCustomer
 				,ToCustomer
 				,Amount
@@ -140,6 +149,7 @@ BEGIN
 					LTRIM(RTRIM(t.c.value('(RowId/text())[1]', 'VARCHAR(20)'))) AS RowId
 					,LTRIM(RTRIM(t.c.value('(PaymentNo/text())[1]', 'VARCHAR(50)'))) AS PaymentNo
 					,LTRIM(RTRIM(t.c.value('(ReceivedDate/text())[1]', 'VARCHAR(10)'))) AS ReceivedDate
+					,LTRIM(RTRIM(t.c.value('(Biller/text())[1]', 'NVARCHAR(10)'))) AS Biller
 					,LTRIM(RTRIM(t.c.value('(FromCustomer/text())[1]', 'VARCHAR(30)'))) AS FromCustomer
 					,LTRIM(RTRIM(t.c.value('(ToCustomer/text())[1]', 'VARCHAR(30)'))) AS ToCustomer
 					,LTRIM(RTRIM(t.c.value('(FromAmount/text())[1]', 'VARCHAR(20)'))) AS Amount
@@ -163,6 +173,7 @@ BEGIN
 		RowId			INT, 
 		PaymentNo		VARCHAR(50), 
 		ReceivedDate	VARCHAR(10), 
+		Biller			NVARCHAR(10),
 		FromCustomer	VARCHAR(30), 
 		ToCustomer		VARCHAR(30), 
 		Amount			VARCHAR(20), 
@@ -189,13 +200,14 @@ BEGIN
 		CurrencyName	VARCHAR(50),
 		SystemExRate	MONEY,
 		TransExrate		MONEY,
-		isFinanceAcc	BIT
+		isFinanceAcc	BIT	
 	)
 
 	DECLARE @tblSucc TABLE (
 		RowId			INT, 
 		PaymentNo		VARCHAR(50), 
-		ReceivedDate	VARCHAR(10), 
+		ReceivedDate	VARCHAR(10),
+		Biller			NVARCHAR(10),
 		FromCustomer	VARCHAR(30), 
 		ToCustomer		VARCHAR(30), 
 		Amount			VARCHAR(20), 
@@ -224,7 +236,8 @@ BEGIN
 	DECLARE @tblFail TABLE (
 		RowId			INT, 
 		PaymentNo		VARCHAR(50), 
-		ReceivedDate	VARCHAR(10), 
+		ReceivedDate	VARCHAR(10),
+		Biller			NVARCHAR(10),
 		FromCustomer	VARCHAR(30), 
 		ToCustomer		VARCHAR(30), 
 		Amount			VARCHAR(20), 
@@ -235,12 +248,13 @@ BEGIN
 		ErrorMessage	NVARCHAR(500)
 	)
 
-	INSERT INTO @tblInfo(RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,FromCurrName,ToCurrName,
+	INSERT INTO @tblInfo(RowId,PaymentNo,ReceivedDate,Biller,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,FromCurrName,ToCurrName,
 			FromCurrCode,ToCurrCode,FromActualRate,ToActualRate,FromPayerID, ToPayerID,FromCurrencyID,ToCurrencyID,MinActualrate,MaxActualrate,FromCustID,ToCustID, 
 			CurrentExRate,MultipliedBy, CurrencyName, SystemExRate, TransExrate, isFinanceAcc)
 	SELECT	t.RowId			 
 			,t.PaymentNo		
 			,t.ReceivedDate	
+			,t.Biller
 			,t.FromCustomer	
 			,t.ToCustomer	
 			,t.Amount		 
@@ -274,26 +288,26 @@ BEGIN
 				 ELSE e1.currency END
 			,e1.actualrate / e2.actualrate AS SystemExRate
 			,CONVERT(MONEY,t.ToAmount) / CONVERT(MONEY,t.Amount) AS TransExrate	
-			, CASE WHEN r1.cnt +  r2.cnt + r3.cnt + r4.cnt = 0 THEN 0 ElSE 1 END isFinanceAcc
+			,CASE WHEN r1.cnt +  r2.cnt + r3.cnt + r4.cnt = 0 THEN 0 ElSE 1 END isFinanceAcc
 	FROM	@PaymentList  t
-	LEFT JOIN CustDB.dbo.custinfo c1 WITH (NOLOCK) on t.FromCustomer = c1.Username
-	LEFT JOIN CustDB.dbo.custinfo c2 WITH (NOLOCK) ON t.ToCustomer = c2.Username
-	LEFT JOIN CustDB.dbo.Exchange e1 WITH (NOLOCK) ON c1.currency = e1.exchangeid
-	LEFT JOIN CustDB.dbo.Exchange e2 WITH (NOLOCK) ON c2.currency = e2.exchangeid
+	LEFT JOIN bodb02.dbo.custinfo c1 WITH (NOLOCK) on t.FromCustomer = c1.Username
+	LEFT JOIN bodb02.dbo.custinfo c2 WITH (NOLOCK) ON t.ToCustomer = c2.Username
+	LEFT JOIN bodb02.dbo.Exchange e1 WITH (NOLOCK) ON c1.currency = e1.exchangeid
+	LEFT JOIN bodb02.dbo.Exchange e2 WITH (NOLOCK) ON c2.currency = e2.exchangeid
 	LEFT JOIN DBTXN.bodb02.dbo.Acc_ExchangeRate er WITH (NOLOCK) ON er.FromExchangeID = e1.exchangeid and er.ToExchangeID = e2.exchangeid
 	OUTER APPLY ( SELECT TOP 1 PartyID FROM OAS_PartyBaseCurrency op WITH (NOLOCK) WHERE op.LicenseeCode = t.FromCustomer) p1
 	OUTER APPLY ( SELECT TOP 1 PartyID FROM OAS_PartyBaseCurrency op WITH (NOLOCK) WHERE op.LicenseeCode = t.ToCustomer ) p2
-	OUTER APPLY ( SELECT COUNT(1) AS cnt  FROM  CustDB.dbo.custAgent a (NOLOCK) WHERE c2.recommend = a.custid AND c2.roleid = 1 AND a.isInternal = 1 ) r1
-	OUTER APPLY ( SELECT COUNT(1) AS cnt  FROM  CustDB.dbo.custAgent a (NOLOCK) WHERE c2.custid = a.custid AND a.isInternal = 1 ) r2
-	OUTER APPLY ( SELECT COUNT(1) AS cnt  FROM  CustDB.dbo.CustMaster a (NOLOCK) WHERE c2.custid = a.custid AND a.isInternal = 1 ) r3
-	OUTER APPLY ( SELECT COUNT(1) AS cnt  FROM  CustDB.dbo.CustSuper a (NOLOCK) WHERE c2.custid = a.custid AND a.isInternal = 1 ) r4
+	OUTER APPLY ( SELECT COUNT(1) AS cnt  FROM  bodb02.dbo.custAgent a (NOLOCK) WHERE c2.recommend = a.custid AND c2.roleid = 1 AND a.isInternal = 1 ) r1
+	OUTER APPLY ( SELECT COUNT(1) AS cnt  FROM  bodb02.dbo.custAgent a (NOLOCK) WHERE c2.custid = a.custid AND a.isInternal = 1 ) r2
+	OUTER APPLY ( SELECT COUNT(1) AS cnt  FROM  bodb02.dbo.CustMaster a (NOLOCK) WHERE c2.custid = a.custid AND a.isInternal = 1 ) r3
+	OUTER APPLY ( SELECT COUNT(1) AS cnt  FROM  bodb02.dbo.CustSuper a (NOLOCK) WHERE c2.custid = a.custid AND a.isInternal = 1 ) r4
 
 	IF @Template = 1 --Automate transfer
 	BEGIN
 		--  valid 
-		INSERT INTO @tblSucc(RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,
+		INSERT INTO @tblSucc(RowId,PaymentNo,ReceivedDate,Biller,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,
 			MinActualrate, MaxActualrate,MultipliedBy,CurrencyName,FromCurrName,ToCurrName,FromCurrCode,ToCurrCode,SystemExRate,TransExrate,CurrentExRate, FromCustID, ToCustID)
-		SELECT	RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,
+		SELECT	RowId,PaymentNo,ReceivedDate,Biller,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,
 			 MinActualrate, MaxActualrate,MultipliedBy,CurrencyName,FromCurrName,ToCurrName,FromCurrCode,ToCurrCode,SystemExRate,TransExrate, CurrentExRate, FromCustID, ToCustID
 		FROM	@tblInfo as t
 		WHERE ISNUMERIC(t.Amount)=1 AND ISNUMERIC(t.ActualRate)=1 AND ISDATE(ReceivedDate) = 1
@@ -321,19 +335,19 @@ BEGIN
 						OR
 						ToPayerID IS NOT NULL 
 					)
-				
+				AND Biller IN ('BHC','ZL','JS')
 
 			
 		-- Invalid
-		INSERT INTO @tblFail(RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,ErrorMessage)
-		SELECT	temp.RowId,temp.PaymentNo,temp.ReceivedDate,FromCustomer,ToCustomer,temp.Amount,ToAmount,ActualRate,RebatePayment,Description,
+		INSERT INTO @tblFail(RowId,PaymentNo,ReceivedDate,Biller,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,ErrorMessage)
+		SELECT	temp.RowId,temp.PaymentNo,temp.ReceivedDate,Biller,FromCustomer,ToCustomer,temp.Amount,ToAmount,ActualRate,RebatePayment,Description,
 				CASE  
 					 WHEN ISNUMERIC(temp.Amount)=0 OR ISNUMERIC(ActualRate)=0 OR CAST(ActualRate AS FLOAT) <= 0 OR CAST(temp.Amount AS FLOAT) = 0 THEN 'Invalid Amount or Actual Rate.'
 					 WHEN LEN(SUBSTRING(temp.Amount, CHARINDEX('.',temp.Amount ) + 1, LEN(temp.Amount))) > 2 AND CHARINDEX('.',temp.Amount) > 0 THEN 'Invalid Amount. Amount have 2 decimal digits only.'
 					 WHEN ISDATE(temp.ReceivedDate) = 0 THEN 'Invalid Received Date.' 
 					 WHEN RebatePayment = 'Y' AND CAST(temp.Amount AS MONEY) > 0 THEN 'Invalid Rebate Payment. Amount has to less than 0.'
 					 WHEN RebatePayment = 'Y' AND FromPayerID IS NOT NULL AND ToPayerID IS NOT NULL THEN 'Rebate Payment could not be a transfer overpayment.'
-					 --WHEN (RebatePayment <> 'Y' OR RebatePayment IS NULL) AND CAST(Amount AS MONEY) < 0 THEN 'Invalid Payment. Amount has to greater than 0.'
+					 WHEN  Biller NOT IN ('BHC','ZL','JS') OR Biller IS NULL  THEN 'Invalid Biller entered. Please ensure the Biller is in (BHC, ZL, JS).'
 					 WHEN ISNULL(FromCustomer,'') ='' and ISNULL(ToCustomer,'') ='' THEN 'Username cannot be blank.' 
 					 WHEN FromCustomer = ToCustomer THEN 'From Cust must different To Cust.' 
 					 WHEN LEN(Description) > 200 THEN 'Maximum length of Description is 200 characters.' 	
@@ -348,7 +362,7 @@ BEGIN
 		FROM (SELECT *  FROM @tblInfo WHERE RowId not in (SELECT RowId FROM @tblSucc)) AS temp
 
 		-- Valid 
-		SELECT RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ActualRate,RebatePayment,Description,
+		SELECT RowId,PaymentNo,ReceivedDate,Biller,FromCustomer,ToCustomer,Amount,ActualRate,RebatePayment,Description,
 			   CASE WHEN (
 							(FromCurrCode = 'MYR' AND ToCurrCode <> 'MYR') 
 							OR (ToCurrCode = 'MYR' AND FromCurrCode <> 'MYR')
@@ -375,7 +389,7 @@ BEGIN
 		ORDER BY RowId
 
 		-- Invalid
-		SELECT RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ActualRate,RebatePayment,Description,ErrorMessage
+		SELECT RowId,PaymentNo,ReceivedDate,Biller,FromCustomer,ToCustomer,Amount,ActualRate,RebatePayment,Description,ErrorMessage
 		FROM @tblFail
 		ORDER BY RowId
 
@@ -384,9 +398,9 @@ BEGIN
 	IF @Template = 0 --Cross transfer
 	BEGIN
 		-- Check valid 
-		INSERT INTO @tblSucc(RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,
+		INSERT INTO @tblSucc(RowId,PaymentNo,ReceivedDate,Biller,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,
 				MinActualrate, MaxActualrate,MultipliedBy,CurrencyName,FromCurrName,ToCurrName,FromCurrCode,ToCurrCode,SystemExRate,TransExrate, FromCustID, ToCustID)
-		SELECT	RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,
+		SELECT	RowId,PaymentNo,ReceivedDate,Biller,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,
 				MinActualrate, MaxActualrate,MultipliedBy,CurrencyName,FromCurrName,ToCurrName,FromCurrCode,ToCurrCode,SystemExRate,TransExrate, FromCustID, ToCustID
 		FROM	@tblInfo as t
 		WHERE	ISNUMERIC(t.Amount)=1  AND ISDATE(ReceivedDate) = 1
@@ -416,17 +430,19 @@ BEGIN
 						OR ToPayerID IS NOT NULL 
 						
 					)
+				AND Biller IN ('BHC','ZL','JS')
 			
 
 
-		INSERT INTO @tblFail(RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,ErrorMessage)
-		SELECT	temp.RowId,temp.PaymentNo,temp.ReceivedDate,FromCustomer,ToCustomer,temp.Amount,ToAmount,ActualRate,RebatePayment,Description,
+		INSERT INTO @tblFail(RowId,PaymentNo,ReceivedDate,Biller,FromCustomer,ToCustomer,Amount,ToAmount,ActualRate,RebatePayment,Description,ErrorMessage)
+		SELECT	temp.RowId,temp.PaymentNo,temp.ReceivedDate,Biller,FromCustomer,ToCustomer,temp.Amount,ToAmount,ActualRate,RebatePayment,Description,
 				CASE 
 					 WHEN ISNUMERIC(temp.Amount)=0 OR ISNUMERIC(ToAmount)= 0 OR CONVERT(MONEY,temp.Amount) = 0 OR CONVERT(MONEY,ToAmount) = 0 THEN 'Invalid Amount. From Amount and To Amount should not be equal to 0.' 
 					 WHEN (CONVERT(MONEY,temp.Amount) > 0 AND CONVERT(MONEY,ToAmount) < 0) OR (CONVERT(MONEY,temp.Amount) < 0 AND CONVERT(MONEY,ToAmount) > 0) THEN 'Invalid Amount. From Amount and To Amount have to be the same sign.'
 					 WHEN (LEN(SUBSTRING(temp.Amount, CHARINDEX('.',temp.Amount ) + 1, LEN(temp.Amount))) > 2 AND CHARINDEX('.',temp.Amount) > 0)   OR
 						  (LEN(SUBSTRING(ToAmount, CHARINDEX('.',ToAmount ) + 1, LEN(ToAmount))) > 2  AND CHARINDEX('.',ToAmount) > 0 ) THEN 'Invalid Amount. From Amount and To Amount have 2 decimal digits only.'
 					 WHEN ISDATE(temp.ReceivedDate) = 0 THEN 'Invalid Received Date.' 
+					 WHEN  Biller NOT IN ('BHC','ZL','JS') OR Biller IS NULL THEN 'Invalid Biller entered. Please ensure the Biller is in (BHC, ZL, JS).'
 					 WHEN RebatePayment = 'Y' AND ( CAST(temp.Amount AS MONEY) > 0 OR CAST(ToAmount AS MONEY) > 0 )  THEN 'Invalid Rebate Payment. From Amount and To Amount have to less than 0.'
 					 WHEN RebatePayment = 'Y' AND FromPayerID IS NOT NULL AND ToPayerID IS NOT NULL THEN 'Rebate Payment could not be a transfer overpayment.'
 					 WHEN ISNULL(FromCustomer,'') = ''  OR ISNULL(ToCustomer,'') = '' THEN 'Username cannot be blanked.' 
@@ -442,12 +458,12 @@ BEGIN
 		FROM  (SELECT * FROM @tblInfo WHERE RowId NOT IN (SELECT RowId FROM @tblSucc) ) AS temp 
 
 		-- Valid
-		SELECT RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount AS FromAmount,ToAmount,RebatePayment,Description,SystemExRate,TransExrate,FromCustID, ToCustID
+		SELECT RowId,PaymentNo,ReceivedDate,Biller,FromCustomer,ToCustomer,Amount AS FromAmount,ToAmount,RebatePayment,Description,SystemExRate,TransExrate,FromCustID, ToCustID
 		FROM @tblSucc
 		ORDER BY RowId
 
 		-- Invalid
-		SELECT RowId,PaymentNo,ReceivedDate,FromCustomer,ToCustomer,Amount AS FromAmount,ToAmount,RebatePayment,Description,ErrorMessage
+		SELECT RowId,PaymentNo,ReceivedDate,Biller,FromCustomer,ToCustomer,Amount AS FromAmount,ToAmount,RebatePayment,Description,ErrorMessage
 		FROM @tblFail
 		ORDER BY RowId
 
