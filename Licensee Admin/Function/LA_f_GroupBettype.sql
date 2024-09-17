@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" selecters="wsv_nap" isFunction="1" isNested="1"></info>*/
 USE [bodb_Licensee]
 GO
 
@@ -18,6 +18,7 @@ AS
 		- 20221024@Danny: MG-RNG - Tournament Prize [#176986]
 		- 20230223@Danny: SG - Promotion prize integration And Use SportBettypeMatrix  [#183739]
 		- 20230223@Danny: Integrate Casino promotion [#194808]
+		- 20240911@Sally: Support Odds Boost Voucher [#209884]
 */
 
 RETURN
@@ -27,7 +28,7 @@ RETURN
 		FROM bodb02.dbo.SportBettypeMatrix x WITH(NOLOCK)
 		INNER JOIN bodb02.dbo.Products p WITH(NOLOCK) ON x.ProductID = p.ProductID
 		LEFT JOIN Product3rd p3 WITH(NOLOCK) ON p.ProductPrefix = p3.ProductPrefix
-		WHERE x.SubProduct IN ('Tips','Jackpot Contribution','Jackpot Prize','Prize','Lucky Draw','Bonus','Odds Spread Adjustment','Promotion','Casino Promotion')
+		WHERE x.SubProduct IN ('Tips','Jackpot Contribution','Jackpot Prize','Prize','Lucky Draw','Bonus','Odds Spread Adjustment','Promotion','Casino Promotion','Odds Boost Adjustment' )
 	)
 	SELECT	CONVERT(INT, CASE WHEN ProductID = 1 THEN 0 ELSE ProductID_3rd END) AS ProductId
 			, CONVERT(INT, Bettype) AS Bettype
@@ -40,6 +41,7 @@ RETURN
 									WHEN SubProduct = 'Odds Spread Adjustment' THEN 7
 									WHEN SubProduct = 'Promotion' THEN 8
 									WHEN SubProduct = 'Casino Promotion' THEN 10
+									WHEN SubProduct = 'Odds Boost Adjustment' THEN 11
 									END
 					 ) AS TypeId
 			,CONVERT(VARCHAR(100), SubProduct) AS TypeName

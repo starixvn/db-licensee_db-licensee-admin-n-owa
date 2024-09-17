@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" selecters="wsv_nap" isFunction="1" isNested="1"></info>*/
 USE bodb_Licensee
 GO
 
@@ -25,6 +25,7 @@ AS
 		- 20220218@Danny: Allbet - Promotion integration [#167510]
 		- 20221024@Danny: MG-RNG - Tournament Prize [#176986]
 		- 20230217@Danny: SG - Promotion prize integration [#183739]
+		- 20240911@Sally: Support Odds Boost Voucher [#209884]
 
 	Param's Explanation:
 		@ProductIDs: Filter by list of products 
@@ -37,6 +38,9 @@ BEGIN
 	(
 		SELECT 0 AS ProductID, BettypeID, [Description]
 		FROM (VALUES(999, 'SB - Adjusted Odds')) AS v(BettypeID, [Description]) --SB
+			UNION ALL
+		SELECT 0 AS ProductID, BettypeID, [Description]
+		FROM (VALUES(997, 'SB - Boosted Odds')) AS v(BettypeID, [Description]) --SB
 			UNION ALL
 		SELECT 11 AS ProductID, BettypeID, [Description]
 		FROM (VALUES(1706, 'GD Tips')) AS v(BettypeID, [Description]) -- GD
