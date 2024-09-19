@@ -84,6 +84,7 @@ AS
 		- 20230223@Danny: Integrate Casino promotion [#194808]
 		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+		- 20240920@Sally: Support Odds Boost Voucher [#199292]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -210,7 +211,7 @@ BEGIN
 		(
 			PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
 			,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000)
-			,BetCount INT, Turnover MONEY, MemberWL MONEY, BACommission MONEY, IsPrevious BIT, ExtraInfo NVARCHAR(4000)
+			,BetCount INT, Turnover MONEY, MemberWL MONEY, BACommission MONEY, IsPrevious BIT, ExtraInfo NVARCHAR(4000), OddsBoostBonus MONEY
 		)
 
 		-- From/To
@@ -319,9 +320,10 @@ BEGIN
 
 		UPDATE r
 		SET r.IsPrevious = 0
-			,r.LicensingFee = r.LicensingFee + CASE WHEN r.ProductId = 37 THEN 0 ELSE r.ExtraAmount END
+			,r.LicensingFee = r.LicensingFee + CASE WHEN r.ProductId = 37 OR r.ProductId = 0 THEN 0 ELSE r.ExtraAmount END
 			,r.BetCount = d.BetCount, r.Turnover = d.Turnover, r.MemberWL = d.MemberWL
 			,r.BACommission = d.BACommission
+			,r.OddsBoostBonus = CASE WHEN r.ProductId = 0 THEN r.ExtraAmount ELSE 0 END
 		FROM @Result r
 			LEFT JOIN (
 				SELECT p.PartyId, p.ProductId
@@ -445,9 +447,10 @@ BEGIN
 
 		UPDATE r
 		SET r.IsPrevious = 1
-			,r.LicensingFee = r.LicensingFee + CASE WHEN r.ProductId = 37 THEN 0 ELSE r.ExtraAmount END
+			,r.LicensingFee = r.LicensingFee + CASE WHEN r.ProductId = 37 OR r.ProductId = 0 THEN 0 ELSE r.ExtraAmount END
 			,r.BetCount = d.BetCount, r.Turnover = d.Turnover, r.MemberWL = d.MemberWL
 			,r.BACommission = d.BACommission
+			,r.OddsBoostBonus = CASE WHEN r.ProductId = 0 THEN r.ExtraAmount ELSE 0 END
 		FROM @Result r
 			LEFT JOIN (
 				SELECT p.PartyId, p.ProductId
@@ -480,6 +483,7 @@ BEGIN
 		,r.RebateSportsbook, r.PreviousRebateSportsbook, r.RebateOthers, r.PreviousRebateOthers
 		,r.PromotionSportsbook, r.PreviousPromotionSportsbook,  r.PlayerTipsSportsbook, r.PreviousPlayerTipsSportsbook, r.SponsorshipSportsbook, r.PreviousSponsorshipSportsbook
 		,r.PromotionOthers AS PromotionOthers, r.PreviousPromotionOthers AS PreviousPromotionOthers
+		,r.OddsBoostBonusSportsbook, r.PreviousOddsBoostBonusSportsbook
 		,r.TotalLicensingFee, r.PreviousTotalLicensingFee
 		,r.PartyId, CONVERT(BIT, 1) AS IsSelected -- Old format
 	FROM (
@@ -516,18 +520,20 @@ BEGIN
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId = 37 THEN ExtraAmount ELSE 0 END)) AS PreviousSponsorshipSportsbook
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 AND ProductId = -37 THEN ExtraAmount ELSE 0 END)) AS PromotionOthers
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId = -37 THEN ExtraAmount ELSE 0 END)) AS PreviousPromotionOthers
+			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 THEN OddsBoostBonus ELSE 0 END)) AS OddsBoostBonusSportsbook
+			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 THEN OddsBoostBonus ELSE 0 END)) AS PreviousOddsBoostBonusSportsbook
 			,CONVERT(MONEY, SUM(CASE
 									WHEN IsPrevious = 1 OR ProductId = 3 THEN 0
 									WHEN ProductId = 37 THEN - LicensingFee - ExtraAmount
 									WHEN ProductId = 74 THEN ExtraAmount
 									WHEN ProductId = -37 THEN -ExtraAmount - Rebate
-									ELSE LicensingFee - Discount - Rebate END)) AS TotalLicensingFee
+									ELSE LicensingFee - Discount - Rebate - OddsBoostBonus END)) AS TotalLicensingFee
 			,CONVERT(MONEY, SUM(CASE
 									WHEN IsPrevious = 0 OR ProductId = 3 THEN 0
 									WHEN ProductId = 37 THEN - LicensingFee - ExtraAmount
 									WHEN ProductId = 74 THEN ExtraAmount
 									WHEN ProductId = -37 THEN -ExtraAmount - Rebate
-									ELSE LicensingFee - Discount - Rebate END)) AS PreviousTotalLicensingFee
+									ELSE LicensingFee - Discount - Rebate - OddsBoostBonus END)) AS PreviousTotalLicensingFee
 		FROM @Result
 		GROUP BY PartyId
 	) r

@@ -36,6 +36,7 @@ AS
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 		- 20230223@Danny: Integrate Casino promotion [#194808]
 		- 20240419@Danny: Remove Saba Coin [RedmineID: #203331]
+		- 20240920@Sally: Support Odds Boost Voucher [#199292]
 	
 	Parameter explanation:
 		@LicenseeStatusIds
@@ -192,7 +193,10 @@ BEGIN
 	SELECT PartyId, ProductId, LicensingFee, BetCount
 	FROM (
 		SELECT r.PartyId, r.ProductId
-			,SUM(CASE WHEN r.LicensingFeeTypeId = 8 THEN 0 ELSE r.LicensingFee + r.ExtraAmount END) AS LicensingFee
+			,SUM(CASE WHEN r.LicensingFeeTypeId = 8 THEN 0 
+					  WHEN r.ProductId = 0 THEN r.LicensingFee - r.ExtraAmount  -- SB Licensing Fee (Original Odds) - Odds Boost Bonus
+				ELSE r.LicensingFee + r.ExtraAmount END
+			) AS LicensingFee
 			,SUM(CASE WHEN r.LicensingFeeTypeId = 8 THEN ExtraAmount ELSE 0 END) AS BetCount
 		FROM @Result r
 		WHERE r.ProductId NOT IN (37, 74, -37)

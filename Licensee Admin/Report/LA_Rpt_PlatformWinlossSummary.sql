@@ -38,6 +38,7 @@ AS
 		- 20211223@Danny: Using core function to group product under SB [RedmineID: #165971]
 		- 20230407@Danny: Extend betfrom data length [#178060]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+		- 20240923@Sally: Support Odds Boost Voucher [#209884]
 
 	Explanation:
 		@Platforms: DetailPlatform from LA_f_BetFrom_Sel() function
@@ -120,8 +121,9 @@ BEGIN
 		INSERT INTO #bettype (bettype)
 		SELECT DISTINCT bettype FROM dbo.SportBettypeMatrix WITH (NOLOCK) 
 		WHERE ProductId IN (SELECT x.ProductID FROM @ProductTab x) 
-			AND bettype <> 999 -- exclude Odds Spread Adjustment
-
+			AND (bettype <> 999 -- exclude Odds Spread Adjustment
+				OR bettype <> 997 -- exclude Odds Boost Adjustment
+			)
 		INSERT INTO #Data (rptDate, Currency, BetFrom, BetCount, Turnover, Winloss)
 		SELECT b.winlostdate, b.currency, b.betfrom, COUNT(1) AS BetCount, SUM(b.stake), SUM(b.winlost - b.actual_stake)
 		FROM dbo.bettrans b WITH (NOLOCK)
