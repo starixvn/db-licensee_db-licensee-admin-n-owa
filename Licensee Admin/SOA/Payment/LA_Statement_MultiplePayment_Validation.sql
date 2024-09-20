@@ -15,6 +15,7 @@ AS
 	Revisions: 
 		- 20230908@Danny: Initialize SP [#193656]
 		- 20240812@Danny: Add Biller info [#209161]
+		- 20240920@Danny: Change to use Customer table Instead of CustInfo [#211108]
 
 	Param's Explanation:
 	Received Date format is mm/dd/yyyy
@@ -290,8 +291,8 @@ BEGIN
 			,CONVERT(MONEY,t.ToAmount) / CONVERT(MONEY,t.Amount) AS TransExrate	
 			,CASE WHEN r1.cnt +  r2.cnt + r3.cnt + r4.cnt = 0 THEN 0 ElSE 1 END isFinanceAcc
 	FROM	@PaymentList  t
-	LEFT JOIN bodb02.dbo.custinfo c1 WITH (NOLOCK) on t.FromCustomer = c1.Username
-	LEFT JOIN bodb02.dbo.custinfo c2 WITH (NOLOCK) ON t.ToCustomer = c2.Username
+	LEFT JOIN bodb02.dbo.Customer c1 WITH (NOLOCK) on t.FromCustomer = c1.Username
+	LEFT JOIN bodb02.dbo.Customer c2 WITH (NOLOCK) ON t.ToCustomer = c2.Username
 	LEFT JOIN bodb02.dbo.Exchange e1 WITH (NOLOCK) ON c1.currency = e1.exchangeid
 	LEFT JOIN bodb02.dbo.Exchange e2 WITH (NOLOCK) ON c2.currency = e2.exchangeid
 	LEFT JOIN DBTXN.bodb02.dbo.Acc_ExchangeRate er WITH (NOLOCK) ON er.FromExchangeID = e1.exchangeid and er.ToExchangeID = e2.exchangeid
