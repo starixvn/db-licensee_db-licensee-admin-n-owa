@@ -54,6 +54,7 @@ AS
 		- 20231218@Danny: Integrate Promotion Prize - Live22 [RedmineID: #197267]
 		- 20240201@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
 		- 20240710@Danny: Integrate Fast spin product[RedmineID: #206246]
+		- 20240710@Danny: Integrate FA CHAI promotion[RedmineID: #209902]
 */
 
 BEGIN
@@ -191,9 +192,11 @@ BEGIN
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 2 THEN 56 -- JackpotPrize
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 3 THEN 54 -- Prizes
 				WHEN ProductId = 87 AND LicensingFeeTypeId = 3 THEN 57 -- Prizes
+				WHEN ProductId = 89 AND LicensingFeeTypeId = 3 THEN 59 -- Prizes
+
 				END
 		FROM @Result
-		WHERE ProductId IN (10, 32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79, 87) AND LicensingFeeTypeId > 0
+		WHERE ProductId IN (10, 32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79, 87, 89) AND LicensingFeeTypeId > 0
 		GROUP BY
 			CASE
 				WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
@@ -220,6 +223,7 @@ BEGIN
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 2 THEN 56 -- JackpotPrize
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 3 THEN 54 -- Prizes
 				WHEN ProductId = 87 AND LicensingFeeTypeId = 3 THEN 57 -- Prizes
+				WHEN ProductId = 89 AND LicensingFeeTypeId = 3 THEN 59 -- Prizes
 				END
 
 		-- AMF, Prepayment and AGPrepayment
