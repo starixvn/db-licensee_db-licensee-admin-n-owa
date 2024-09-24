@@ -18,6 +18,7 @@ AS
 	- 20210615@Danny: Initialize SP [#168387]
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20240301@Danny: LicensingFee And PaytoSupplier figure based on setting [RemineID: #199478]
+	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
  */
 
 BEGIN
@@ -144,7 +145,7 @@ BEGIN
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeId = c.ChargeId AND cr.CurrencyId = b.CurrencyId
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.status NOT IN (-1, 101, 102, 103)
-			AND (b.CurrencyID <> 20)
+			AND b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			AND b.bettype IN (SELECT bettype FROM dbo.LA_f_BettypeProductMapping(0,@ProductCode))
 			AND (	( @Sporttype = 0 AND l.sporttype IN (SELECT DISTINCT SportType FROM bodb02.dbo.SportBettypeMatrix x WITH(NOLOCK) WHERE x.ProductID = @ProductID))
 					OR ( @Sporttype<>0 AND l.Sporttype = @Sporttype)

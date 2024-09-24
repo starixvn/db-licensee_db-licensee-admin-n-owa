@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template14]
 	@PartyIds			VARCHAR(4000)
 	,@ProductID			INT
@@ -15,6 +15,7 @@ AS
 	- 20210620@Danny: Initialize SP [#168387]
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
  */
 
 BEGIN
@@ -126,7 +127,7 @@ BEGIN
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND cr.CurrencyID = b.CurrencyId
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate 
 			AND b.StatusId NOT IN (-1, 101, 102, 103) 
-			AND b.CurrencyId <> 20 
+			AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			AND b.CustomerCategory NOT IN (27,28)
 			AND b.ProductID = @ProductID
 		GROUP BY b.rptDate, ci.PartyId, b.CurrencyId, ci.isDeposit
@@ -150,7 +151,7 @@ BEGIN
 		WHERE b.RptDate BETWEEN DATEADD(DAY, -1, @FromDate) AND DATEADD(DAY, 1, @ToDate)
 			AND b.rptDate3rd BETWEEN @FromDate AND @ToDate 
 			AND b.StatusId NOT IN (-1, 101, 102, 103) 
-			AND b.CurrencyId <> 20 
+			AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			AND b.BetTypeId IN (SELECT x.BetTypeId FROM @BettypeIdList x)
 		GROUP BY b.rptDate3rd, ci.PartyId, b.CurrencyId, ci.isDeposit
 	END

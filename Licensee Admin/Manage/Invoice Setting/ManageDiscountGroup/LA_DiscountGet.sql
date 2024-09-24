@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -16,6 +16,7 @@ AS
 		- 20200225@Parsons: Support-HID-currency [#128856]
 		- 20200609@Mason: Special handling for INH market [#128570]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 
 	 Params:
 
@@ -105,7 +106,7 @@ BEGIN
 	INNER JOIN dbo.OAS_Party pp WITH (NOLOCK) ON lc.LicenseeID = pp.OldRefID 
 	INNER JOIN @PartyTable p ON pp.PartyID = p.PartyId
 	INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
-	WHERE lc.Currency <> 20 -- exclude test
+	WHERE lc.Currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x) -- exclude test
 
 	UPDATE c1
 	SET c1.CurrencyCode = c1.CurrencyCode + ' (' + c1.CurrencyName + ')'

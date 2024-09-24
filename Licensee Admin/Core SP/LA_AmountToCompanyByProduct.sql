@@ -46,6 +46,7 @@ AS
 		- 20240321@Danny: Change fomular AGC Deduct prepayment [#197268]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 		- 20240612@Danny: return figures with 2 decimal digits [RedmineID: #206415]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -296,7 +297,7 @@ BEGIN
 		,SUM(r.NumOfCashoutTrans) AS Betcount
 	FROM bodb_LicenseeReport.dbo.rptLicCashoutSummary r WITH (NOLOCK)
 	WHERE r.WinlostDate BETWEEN @FDate AND @TDate								
-		AND r.Currency <> 20
+		AND r.Currency NOT IN (SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 		AND r.RoleId = 1 -- Member
 	GROUP BY CONVERT(DATE, r.WinlostDate), r.SiteId, r.Currency
 
@@ -318,7 +319,7 @@ BEGIN
 		WHERE rptDate BETWEEN @FromDate AND @ToDate
 			AND StatusId NOT IN (-1, 101, 102, 103)
 			AND CustomerCategory NOT IN (27, 28)
-			AND CurrencyId <> 20
+			AND CurrencyId NOT IN (SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			AND ProductId <> 25 -- CO
 		GROUP BY rptDate, SiteId, ProductId, CurrencyId, Bettype, CASE WHEN ISNULL(TicketType, 0) = 2 THEN 2 ELSE 0 END
 		UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL -- sum first

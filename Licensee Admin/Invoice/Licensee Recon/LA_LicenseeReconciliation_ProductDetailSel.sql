@@ -27,6 +27,7 @@ AS
 		- 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
 		- 20230323@Danny: SG - Promotion prize integration [#183739]
 		- 20240301@Danny: Merge virtual sports product [RemineID: #199478]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 */
 
 BEGIN
@@ -109,7 +110,7 @@ BEGIN
 			AND r.ProductId IN (SELECT p.ProductId FROM @Products p)
 			AND r.StatusId NOT IN (-1, 101, 102, 103)
 			AND r.CustomerCategory NOT IN (27, 28)
-			AND r.CurrencyId <> 20
+			AND r.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			AND r.ProductId <> 25 -- CO
 		GROUP BY r.rptDate, r.CurrencyId, r.SiteId
 			,CASE WHEN r.Bettype IN (1706, 3007) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
@@ -125,7 +126,7 @@ BEGIN
 			INNER JOIN bodb02.dbo.Dep_CustSuper s WITH (NOLOCK) ON t.Site = s.Site
 			INNER JOIN bodb02.dbo.Customer c WITH (NOLOCK) ON s.custid = c.srecommend
 		WHERE c.roleid = 2
-			AND s.currency <> 20
+			AND s.currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 
 		-- Get AmountToCompany data
 		CREATE TABLE #tmpNAPData (WinlostDate SMALLDATETIME, Currency INT, Bettype INT, apositiontaking FLOAT, LicenseeWL MONEY, AmountToCompany MONEY)

@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template4]
 	@PartyIds			VARCHAR(4000)
 	,@ProductID			INT
@@ -17,6 +17,7 @@ AS
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 	- 20230410@Danny: Change PayToSupplier fomular [RedmineID: #186543]
+	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
  */
 
 BEGIN
@@ -146,7 +147,8 @@ BEGIN
 														AND b.SiteID = rd.LicenseeID
 														AND (b.rptDate BETWEEN rd.FromDate AND rd.ToDate)	
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND  b.ProductID = @ProductID  AND
-			b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
+			b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
+			AND b.CustomerCategory NOT IN (27,28)
 		GROUP BY b.rptDate, ci.PartyId, PartyName, ParentId, ParentName, b.CurrencyId
 	END
 	ELSE
@@ -171,7 +173,7 @@ BEGIN
 			INNER JOIN @PartyCharge3rdInfo rd ON b.SiteID = rd.LicenseeID AND b.RptDate3rd BETWEEN rd.FromDate AND rd.ToDate
 		WHERE b.RptDate BETWEEN DATEADD(DAY,-1,@FromDate) AND DATEADD(DAY,1,@ToDate)
 			AND b.RptDate3rd BETWEEN @FromDate AND @ToDate 
-			AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20
+			AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			AND b.BettypeID in (Select Bettype FROM LA_f_BettypeProductMapping(0,@ProductCode))
 		GROUP BY b.rptDate, ci.PartyId, PartyName, ParentId, ParentName, b.CurrencyId
 	END

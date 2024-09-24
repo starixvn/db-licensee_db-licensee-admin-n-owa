@@ -83,6 +83,7 @@ AS
 		- 20231005@Danny: Change charge rate and tier rebate for Alek group from Oct 2023 [RedmineID: #194561]
 		- 20230223@Danny: Integrate Casino promotion [#194808]
 		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -248,7 +249,7 @@ BEGIN
 					,SUM(CASE WHEN ProductId = 3 THEN CommissionA ELSE 0 END) AS CommissionA
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct WITH (NOLOCK)
 				WHERE rptDate BETWEEN @FDate AND @TDate
-					AND CurrencyId <> 20
+					AND CurrencyId NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)
 					AND CustomerCategory NOT IN (27, 28)
 					AND StatusId IN (111, 112, 113, 114, 115)
 					AND (@Currency = 0 OR CurrencyId = @Currency)
@@ -373,7 +374,7 @@ BEGIN
 					,SUM(CASE WHEN ProductId = 3 THEN CommissionA ELSE 0 END) AS CommissionA
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct WITH (NOLOCK)
 				WHERE rptDate BETWEEN @PrevFDate AND @PrevTDate
-					AND CurrencyId <> 20
+					AND CurrencyId NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)
 					AND CustomerCategory NOT IN (27, 28)
 					AND StatusId IN (111, 112, 113, 114, 115)
 					AND (@Currency = 0 OR CurrencyId = @Currency)

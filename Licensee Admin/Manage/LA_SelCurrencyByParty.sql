@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="1"></info>*/
 USE bodb_licensee
 GO
 
@@ -19,6 +19,7 @@ Revisions:
 	- 20200225@Parsons: Support-HID-currency [#128856]
 	- 20201003@Danny: Support USDT as base currency [RedmineID: #177718]
 	- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
+	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 
 Param's Explanation:
 */
@@ -40,7 +41,7 @@ BEGIN
 				@excludeTest = 0
 				OR (
 					@excludeTest = 1
-					AND Currency <> 20
+					AND Currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 					)
 				)
 	END

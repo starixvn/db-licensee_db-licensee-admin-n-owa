@@ -69,6 +69,7 @@ AS
 	   - 20230823@Danny: Incorporate US$KH currency [RedmineID: #192544]
 	   - 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
 	   - 20240314@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
+	   - 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -79,7 +80,6 @@ AS
 BEGIN
 	SET NOCOUNT ON 
 	DECLARE @GD_Tip						SMALLINT = 1706
-			,@CurrencyTest				INT		 = 20
 			,@BaseCurrencyId			INT
 			,@ExchangeTerm_CutOffDate	SMALLDATETIME
 
@@ -220,7 +220,7 @@ BEGIN
 			WHERE	(b.rptDate BETWEEN tp.Fromdate AND tp.ToDate) AND
 					 b.[Status] NOT IN (-1, 101, 102, 103) AND
 					(@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c)) AND
-					(b.CurrencyID <> @CurrencyTest) AND
+					(b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)) AND
 					(@SportType = 0 OR (b.bettype NOT IN (9,29) AND l.Sporttype = @SportType)) AND
 					((@ReportBy = 0) OR
 					 (@ReportBy = 1 AND b.IsLive=1 AND b.bettype NOT IN (9,29,10)) OR
@@ -258,7 +258,7 @@ BEGIN
 			WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate) AND
 						 b.StatusId NOT IN (-1, 101, 102, 103) AND
 						(@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c)) AND
-						(b.CurrencyID <> @CurrencyTest) AND
+						(b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)) AND
 						b.CustomerCategory NOT IN (27,28) AND
 						p.ProductID IN (10,11,12,31) AND
 						p.ChargeType = 1 AND -- gross win
@@ -302,7 +302,7 @@ BEGIN
 			INNER JOIN #tmpParty p ON b.SiteID = p.LicenseeID AND p.ProductID=b.ProductID AND b.rptDate BETWEEN p.Fromdate AND p.Todate
 			WHERE	(b.rptDate BETWEEN @FromDate AND @ToDate) AND
 					(@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c)) AND
-					(b.CurrencyID <> @CurrencyTest) AND
+					(b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)) AND
 					p.ProductID = 11 AND
 					b.Bettype = @GD_Tip AND 
 					p.ChargeType = 12 -- GD tip sharing
@@ -331,7 +331,7 @@ BEGIN
 			INNER JOIN #tmpParty p ON p.LicenseeId=b.SiteId AND p.Bettype = b.Bettype
 			LEFT JOIN dbo.League l WITH (NOLOCK) ON b.LeagueID = l.LeagueID
 			WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
-				AND (b.CurrencyID<>20)
+				AND (b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x))
 				AND b.Status NOT IN (-1, 101, 102, 103)
 				AND (@IsAllCurrency = 1 OR b.CurrencyID IN (SELECT c.CurrencyId FROM @Currency c))
 				AND (@SportType = 0 OR l.Sporttype = @SportType)
@@ -381,7 +381,7 @@ BEGIN
 			WHERE r.rptDate BETWEEN @FromDate AND @ToDate
 				AND r.StatusId IN (111, 112, 113, 114, 115)
 				AND r.CustomerCategory NOT IN (27, 28)
-				AND r.CurrencyId <> 20
+				AND r.CurrencyId NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)
 				AND EXISTS (SELECT 1 FROM #Licensees p WHERE r.SiteId = p.LicenseeId)
 				AND (@CurrencyIds = '' OR ',' + @CurrencyIds + ',' LIKE '%,' + CONVERT(VARCHAR(20), r.CurrencyId) + ',%')
 				AND ISNULL(r.TicketType, 0) <> 2
@@ -413,7 +413,7 @@ BEGIN
 			WHERE r.rptDate BETWEEN @FromDate AND @ToDate
 				AND r.Status IN (111, 112, 113, 114, 115)
 				AND r.CustomerCategory NOT IN (27, 28)
-				AND r.CurrencyId <> 20
+				AND r.CurrencyId NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)
 				AND EXISTS (SELECT 1 FROM #Licensees p WHERE r.SiteId = p.LicenseeId)
 				AND (@CurrencyIds = '' OR ',' + @CurrencyIds + ',' LIKE '%,' + CONVERT(VARCHAR(20), r.CurrencyId) + ',%')
 				AND ISNULL(r.TicketType, 0) <> 2

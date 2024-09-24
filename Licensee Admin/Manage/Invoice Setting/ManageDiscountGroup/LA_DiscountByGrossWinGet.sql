@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -19,6 +19,7 @@ AS
 		- 20220206@Danny: Return more party detail (SuspendedDate, TerminatedDate) [RedmineID: #169160]
 		- 20230731@Danny: Incorporate USDT2 currency [RedmineID: #191165]
 		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 */
 
 BEGIN
@@ -86,7 +87,7 @@ BEGIN
 										ELSE e.currency END AS CurrencyName
 							FROM bodb_Licensee.dbo.LA_f_SelLicenseeCust(0) lc
 							INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
-							WHERE lc.Currency <> 20')
+							WHERE lc.Currency NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)')
 
 
 	UPDATE c1

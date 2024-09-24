@@ -1,7 +1,4 @@
 /*<info serverAlias="DBEXT-bodb02" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
-USE bodb02
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_PlatformWinloss]
 	@PartyIds		VARCHAR(MAX), 
 	@Platforms		VARCHAR(MAX),
@@ -37,6 +34,7 @@ AS
 		- 20210517@Percy: Using core function to group betfrom [RedmineID: #150899]
 		- 20211223@Percy: Using core function to group product under SB [RedmineID: #165971]
 		- 20230407@Danny: Extend betfrom data length [#178060]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 	
 	Explanation:
 		@Platforms: DetailPlatform from LA_f_BetFrom_Sel() function
@@ -94,7 +92,7 @@ BEGIN
 		INNER JOIN bodb_Licensee.dbo.LicenseeCust lc WITH (NOLOCK) ON ci.LicenseeId = lc.LicenseeId
 		INNER JOIN bodb_Licensee.dbo.Licensees l WITH (NOLOCK) ON lc.LicenseeId = l.LicenseeId
 		INNER JOIN bodb02.dbo.Customer c WITH (NOLOCK) ON lc.CustId = c.CustId
-	WHERE lc.Currency <> 20
+	WHERE lc.Currency NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)
 
 	-- Get BetFrom data
 	CREATE TABLE #Data (rptDate DATETIME, LicenseeName VARCHAR(50), Currency INT, BetFrom NVARCHAR(4), Turnover FLOAT, Winloss FLOAT)

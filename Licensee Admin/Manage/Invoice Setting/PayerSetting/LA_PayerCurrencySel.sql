@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -17,6 +17,7 @@ AS
 		- 20221209@Danny: Show USD (USDT) instead of USD only [RedmineID: #180313]
 		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 		- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 
 	Params:
 	Example: EXEC [LA_PayerCurrencySel] 15
@@ -36,7 +37,7 @@ BEGIN
 								CASE WHEN lc.Currency = 51 THEN 'VND' ELSE e.currency END AS CurrencyName
 	FROM dbo.f_SelLicenseeCust(@LicenseeID) AS lc
 	INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
-	WHERE lc.Currency <> 20 -- exclude test
+	WHERE lc.Currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x) -- exclude test
 	
 	UPDATE c1
 	SET c1.CurrencyCode = c1.CurrencyCode + ' (' + c1.CurrencyName + ')'

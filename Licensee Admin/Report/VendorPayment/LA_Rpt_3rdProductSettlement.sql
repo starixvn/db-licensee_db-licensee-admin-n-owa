@@ -39,6 +39,7 @@ AS
 	- 20240521@Danny: support Inhouse Product [RemineID: #200955]
 	- 20240814@Danny: Integrate Fast spin product[RedmineID: #206246]
 	- 20240918@Danny: Integrate VS5 [RedmineID: #209929]
+	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
@@ -837,7 +838,7 @@ BEGIN
 			WHERE b.RptDate BETWEEN @FDATE AND @TDATE
 				AND b.RptDate3rd BETWEEN @FDATE_GMT AND @TDATE_GMT
 				AND b.SiteId BETWEEN @MinSite AND @MaxSite -- Seek condition
-				AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20  
+				AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			GROUP BY b.RptDate, b.RptDate3rd, b.SiteId, b.BetTypeId, b.CurrencyId
 			UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 		)
@@ -909,7 +910,8 @@ BEGIN
 				INNER JOIN @productDataView p ON b.ProductID = p.ProductID
 				LEFT JOIN @ExtraAmtGroupBettype e ON b.BetType = e.Bettype
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
-				AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20  AND b.CustomerCategory NOT IN (27,28)
+				AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
+				AND b.CustomerCategory NOT IN (27,28)
 				AND p.isRptBettingSource = 0 
 				AND p.isRptBettingBySportSource = 0
 				AND p.isSupportGMT0 = 0 
@@ -965,7 +967,7 @@ BEGIN
 			FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
 				INNER JOIN #ChargeRate p ON b.SiteId = p.LicenseeID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate AND p.ProductID = 25
 			WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate
-				AND b.Currency <> 20
+				AND b.Currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 				AND b.ProductID = 25
 				AND b.RoleID = 1
 			GROUP BY p.PartyId,b.ProductID, b.Winlostdate, b.Currency
@@ -1045,7 +1047,7 @@ BEGIN
 						AND b.SiteID BETWEEN @MinSite_rpt_Betting AND @MaxSite_rpt_Betting
 						AND b.Bettype BETWEEN @MinBettype_rpt_Betting AND @MaxBettype_rpt_Betting
 						AND b.Status NOT IN (-1, 101, 102, 103) 
-						AND b.CurrencyId <> 20 
+						AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 						AND b.CustomerCategory NOT IN (27,28)
 				GROUP BY b.SiteID, b.rptDate, b.CurrencyId, bt.ProductID, bt.SubProduct
 
@@ -1071,7 +1073,7 @@ BEGIN
 						AND b.SiteID BETWEEN @MinSite_rpt_Betting AND @MaxSite_rpt_Betting
 						AND b.Bettype = @BetBuilderBetTypeId
 						AND b.Status NOT IN (-1, 101, 102, 103) 
-						AND b.CurrencyId <> 20 
+						AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 						AND b.CustomerCategory NOT IN (27,28)
 				GROUP BY b.SiteID, b.rptDate, b.CurrencyId
 			)
@@ -1142,7 +1144,7 @@ BEGIN
 													AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 					LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeID AND cr.CurrencyID = b.CurrencyId
 			WHERE	b.rptDate BETWEEN @FromDate AND @ToDate
-					AND (b.CurrencyID <> 20)
+					AND b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 					AND b.StatusId BETWEEN 111 AND 113
 					AND b.customercategory NOT IN (27, 28)
 					AND b.SportType = 44 -- MuayThai
@@ -1169,7 +1171,7 @@ BEGIN
 			WHERE  b.RptDate BETWEEN @FDATE_GMT AND @TDATE_GMT
 				AND b.RptDate3rd BETWEEN @FDATE AND @TDATE
 				AND b.SiteId BETWEEN @MinSite AND @MaxSite -- Seek condition
-				AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20  
+				AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			GROUP BY b.RptDate, b.RptDate3rd, b.SiteId, b.BetTypeId, b.CurrencyId
 			UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 		)

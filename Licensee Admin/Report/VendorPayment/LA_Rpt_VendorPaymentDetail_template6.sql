@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template6]
 	@PartyIds			VARCHAR(4000)
 	,@ProductID			INT
@@ -17,6 +17,7 @@ AS
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 	- 20240123@Danny: Change Credit licensing fee fomular [RedmineID: #197267]
+	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
  */
 
 BEGIN
@@ -128,7 +129,8 @@ BEGIN
 					LEFT JOIN @BonusBettype bt ON bt.bettype = b.Bettype
 					INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND  b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 				WHERE b.rptDate BETWEEN @FromDate AND @ToDate
-					AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20  AND b.CustomerCategory NOT IN (27,28)
+					AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x) 
+					AND b.CustomerCategory NOT IN (27,28)
 				GROUP BY b.SiteID, b.rptDate, b.CurrencyId
 			)
 			INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier,Promotion, isDeposit)
@@ -165,7 +167,7 @@ BEGIN
 					INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
 				WHERE b.RptDate3rd BETWEEN @FromDate AND @ToDate
 					AND b.RptDate BETWEEN DATEADD(DAY, -1, @FromDate) AND DATEADD(DAY, 1, @ToDate)
-					AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 
+					AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 					AND b.BetTypeId IN (SELECT x.BetTypeId FROM @bettypeList x)
 				GROUP BY b.SiteID, b.RptDate3rd, b.CurrencyId
 			)

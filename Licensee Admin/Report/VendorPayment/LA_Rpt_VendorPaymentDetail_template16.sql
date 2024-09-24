@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template16]
 	@PartyIds			VARCHAR(4000)
 	,@ProductID			INT
@@ -17,6 +17,7 @@ AS
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 	- 20230217@Danny: SG - Promotion prize integration [#183739]
+	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
  */
 BEGIN
 	SET NOCOUNT ON 
@@ -206,7 +207,7 @@ BEGIN
 				LEFT JOIN dbo.LA_f_GroupBettype() lf ON b.BetTypeId = lf.Bettype
 			WHERE b.RptDate BETWEEN @f_date3rd AND @t_date3rd
 				AND b.RptDate3rd BETWEEN @f_date AND @t_date
-				AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20
+				AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 				AND b.BetTypeId IN (SELECT x.BetTypeId FROM @BettypeIdList x)
 			GROUP BY b.RptDate, b.CurrencyId, b.SiteId
 			)
@@ -253,7 +254,7 @@ BEGIN
 				LEFT JOIN dbo.LA_f_GroupBettype() lf ON b.BetTypeId = lf.Bettype
 			WHERE b.RptDate BETWEEN @f_date AND @t_date
 				AND b.RptDate3rd BETWEEN @f_date3rd AND @t_date3rd
-				AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20
+				AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 				AND b.BetTypeId IN (SELECT x.BetTypeId FROM @BettypeIdList x)
 			GROUP BY b.RptDate3rd, b.CurrencyId, b.SiteId
 			)

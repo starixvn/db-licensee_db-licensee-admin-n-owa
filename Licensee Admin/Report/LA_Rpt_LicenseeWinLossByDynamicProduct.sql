@@ -37,6 +37,7 @@ AS
 		- 20220926@Danny: Intergrate MG-RNG [#176986]
 		- 20221209@Danny: Support USD(USDT) [RedmineID: #180313]
 		- 20230217@Danny: SG - Promotion prize integration [#183739]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 */
 
 BEGIN
@@ -110,7 +111,7 @@ BEGIN
 	LEFT JOIN dbo.LA_f_GroupBettype() eb ON b.Bettype = eb.Bettype
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 		AND b.StatusId NOT IN (-1, 101, 102, 103)
-		AND b.CurrencyID <> 20
+		AND b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 		AND b.CustomerCategory NOT IN (27, 28)
 		AND ( eb.Bettype IS NULL OR eb.TypeId = 7) --OddsSpread Adjustment
 		AND b.SiteID NOT IN (SELECT c.LicenseeId FROM @CreditLicenee c)
@@ -132,7 +133,7 @@ BEGIN
 		FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 		INNER JOIN #Exchange e ON e.ExchangeId = b.CurrencyId and e.exchangedate = b.rptDate
 		WHERE b.RptDate BETWEEN @FromDate AND @ToDate
-			AND b.CurrencyID <> 20
+			AND b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			AND b.StatusId NOT IN (-1, 101, 102, 103)
 			AND b.CustomerCategory IN (1001, 1002)
 			AND b.ProductID IN (0, 3, 13) -- include original and Bettrade tickets
@@ -155,7 +156,7 @@ BEGIN
 		WHERE b.ProductID = 15
 			AND b.CustomerCategory NOT IN (27, 28)
 			AND b.StatusId NOT IN (-1, 101, 102, 103)
-			AND b.CurrencyId <> 20
+			AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			AND b.SiteID NOT IN (SELECT c.LicenseeId FROM @CreditLicenee c)
 		GROUP BY b.rptDate, b.SiteId
 	END
@@ -171,7 +172,7 @@ BEGIN
 		FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
 			INNER JOIN #Exchange e ON e.ExchangeID=b.Currency AND e.ExchangeDate = b.Winlostdate
 		WHERE b.Winlostdate BETWEEN @FromDate AND @ToDate									
-			AND b.Currency <> 20
+			AND b.Currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			AND b.RoleID = 1 -- Member
 			AND b.SiteID NOT IN (SELECT c.LicenseeId FROM @CreditLicenee c) 
 		GROUP BY b.Winlostdate,b.SiteId
@@ -190,7 +191,7 @@ BEGIN
 		INNER JOIN @ProductSupportContrib p ON p.ProductId = b.ProductID
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.StatusId NOT IN (-1, 101, 102, 103)
-			AND b.CurrencyID <> 20
+			AND b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			AND b.CustomerCategory NOT IN (27, 28)
 			AND ( eb.Bettype IS NULL OR eb.TypeId = 2)
 			AND ISNULL(b.TicketType, 0) <> 2 --Free_Bets_TicketType

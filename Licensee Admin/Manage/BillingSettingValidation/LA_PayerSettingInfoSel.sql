@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -18,6 +18,7 @@ AS
 	- 20190620@Parsons: Validate billing configuration [#109600]
 	- 20190905@Bruce: Validate unofficial licensee code [#111586]
 	- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
+	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -30,7 +31,7 @@ BEGIN
 	FROM dbo.LicenseeCust c WITH(NOLOCK)
 		INNER JOIN OAS_Party p WITH(NOLOCK) ON p.OldRefID = c.LicenseeID
 	WHERE p.PartyId IN (SELECT value FROM STRING_SPLIT(@PartyIds,','))
-		  AND c.Currency <> 20 -- test currency
+		  AND c.Currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x) -- test currency
 	GROUP BY c.LicenseeID
 
 	SELECT P.PartyID, p.PartyName, p.PartyType,

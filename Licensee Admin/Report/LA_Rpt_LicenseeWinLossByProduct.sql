@@ -1,7 +1,4 @@
 /*<info serverAlias="DBLIC-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
-USE [bodb_Licensee]
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeWinLossByProduct]
 	@PartyIdString		VARCHAR(MAX)
 	,@FromDate			DATETIME
@@ -82,6 +79,7 @@ AS
 		- 20220314@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 		- 20230217@Danny: Remove hard-code bettype And ProductID [#183739]
 		- 20230510@Danny: New commercial terms for 12B [RedmineID: #186543]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 */
 		
 /*	Example:
@@ -280,7 +278,7 @@ BEGIN
 			INNER JOIN @PartyChargeInfo p ON b.SiteId = p.LicenseeID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate AND p.ProductID = b.ProductID
 			INNER JOIN #Exchange e ON e.ExchangeID = b.Currency AND e.ExchangeDate = b.Winlostdate
 		WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate									
-			AND b.Currency <> 20
+			AND b.Currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			AND b.RoleID = 1 -- Member
 		GROUP BY p.PartyId
 	)

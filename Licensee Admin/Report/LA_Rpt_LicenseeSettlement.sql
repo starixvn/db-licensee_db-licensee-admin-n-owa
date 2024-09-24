@@ -1,7 +1,4 @@
 /*<info serverAlias="DBEXT-bodb02" executers="wsv_nap,wsv_lap" isFunction="0" isNested="1"></info>*/
-USE [bodb02]
-GO
-
 ALTER PROCEDURE [dbo].[LA_Rpt_LicenseeSettlement]
 	@PartyId			INT
 	,@FromDate			DATETIME
@@ -64,6 +61,7 @@ AS
 		- 20230510@Danny: New commercial terms for 12B [RedmineID: #186543]
 		- 20240221@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
 		- 20240730@Danny: Player Tips worksheet [#207863]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 	Param's Explanation:
 */
 BEGIN
@@ -299,7 +297,7 @@ BEGIN
 		SELECT DISTINCT LicenseeID, CustID, Currency
 		FROM bodb_licensee.dbo.f_SelLicenseeCust(@LicenseeID)
 		WHERE (@CurrencyId = 0 OR (@CurrencyId <> 0 AND Currency = @CurrencyId))
-			AND Currency <> 20
+			AND Currency NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)
 
 		SELECT @Recommend = @Recommend + CAST(CustID AS VARCHAR) + ','
 		FROM @TempAG
@@ -431,7 +429,7 @@ BEGIN
 			WHERE b.SiteID = @LicenseeID
 				AND b.rptDate BETWEEN @FromDate AND @ToDate
 				AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
-				AND (b.CurrencyID <> 20)
+				AND b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 			GROUP BY b.rptDate, b.SiteId, b.CurrencyID, s.Bettype
 		)
@@ -493,7 +491,7 @@ BEGIN
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN (0, 13)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
 					AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
-					AND b.CurrencyID <> 20
+					AND b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)
 					AND b.Status NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory IN (1001, 1002)
 				GROUP BY b.RptDate, b.CurrencyId
@@ -513,7 +511,7 @@ BEGIN
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (3)
 				WHERE b.RptDate BETWEEN p.FromDate AND p.ToDate
 					AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
-					AND b.CurrencyID <> 20
+					AND b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)
 					AND b.Status NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory = 1002 -- for BT BA
 				GROUP BY b.RptDate, b.CurrencyId
@@ -551,7 +549,7 @@ BEGIN
 				AND b.Bettype IN (SELECT Bettype FROM @Bettype)
 				AND b.Status NOT IN (-1, 101, 102, 103)
 				AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
-				AND b.CurrencyID <> 20
+				AND b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)
 			GROUP BY
 				b.rptDate, b.CurrencyID
 		)
@@ -575,7 +573,7 @@ BEGIN
 			AND b.ProductID = 74
 			AND b.StatusID NOT IN (-1, 101, 102, 103)
 			AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.CurrencyID = @CurrencyId))
-			AND b.CurrencyID <> 20
+			AND b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)
 		GROUP BY b.rptDate, b.CurrencyID
 		
 	END
@@ -630,7 +628,7 @@ BEGIN
 		WHERE	ProductID = @ProductId AND
 				CustomerCategory NOT IN (27, 28) AND
 				b.StatusId NOT IN (-1, 101, 102, 103) AND
-				CurrencyId <> 20 AND
+				CurrencyId NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x) AND
 				(@CurrencyId = 0 OR (@CurrencyId <> 0 AND CurrencyId = @CurrencyId)) AND
 				cb.TypeId = @CommChargeType -- to remove duplicate we use one of (6,7)
 		GROUP BY rptdate, CurrencyId
@@ -690,7 +688,7 @@ BEGIN
 					FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
 						INNER JOIN @ChargeInfo p ON b.SiteId = p.LicenseeID AND b.Winlostdate BETWEEN p.FromDate AND p.ToDate
 					WHERE b.Winlostdate BETWEEN p.FromDate AND p.ToDate
-						AND b.Currency <> 20
+						AND b.Currency NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)
 						AND (@CurrencyId = 0 OR (@CurrencyId <> 0 AND b.Currency = @CurrencyId))
 						AND b.ProductID = 25
 						AND b.RoleID = 1 -- Member
@@ -718,7 +716,7 @@ BEGIN
 				, SUM(b.BetCount)
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				INNER JOIN @ChargeInfo p ON b.SiteId = p.LicenseeID AND b.rptDate BETWEEN p.FromDate AND p.ToDate
-			WHERE b.CurrencyId <> 20
+			WHERE b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)
 				AND (@CurrencyId = 0 OR b.CurrencyId = @CurrencyId)
 				AND b.ProductID = @ExchangeProductId
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
@@ -787,7 +785,7 @@ BEGIN
 				b.SiteID = @LicenseeID
 				AND b.rptDate BETWEEN @FromDate AND @ToDate
 				AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
-				AND (b.CurrencyID <> 20)
+				AND b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)
 				AND b.StatusId NOT IN (-1, 101, 102, 103)
 				AND b.customercategory NOT IN (27, 28)
 				AND b.ProductID IN (SELECT ProductId FROM bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCode,@FromDate,@ToDate) WHERE GroupProductId = 0)
@@ -837,7 +835,7 @@ BEGIN
 					b.SiteID = @LicenseeID
 					AND b.rptDate BETWEEN @FromDate AND @ToDate
 					AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
-					AND (b.CurrencyID <> 20)
+					AND b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)
 					AND b.[Status] NOT IN (-1, 101, 102, 103)
 					AND b.customercategory NOT IN (27, 28)
 				GROUP BY b.rptdate, b.SiteId, b.CurrencyID
