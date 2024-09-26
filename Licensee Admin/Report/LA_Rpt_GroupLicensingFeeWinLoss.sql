@@ -98,7 +98,7 @@ BEGIN
 	-- Get data
 	BEGIN
 		CREATE TABLE #tmpData (rptDate DATE, SiteId INT, ProductId INT, CurrencyId INT, BetType INT, Winloss MONEY, AWinloss MONEY, AComm MONEY, ValidBetAmount MONEY)
-		CREATE TABLE #tmpResult (PartyId INT, PartyName VARCHAR(50), ProductId INT, ProductName VARCHAR(50), CurrencyId INT, Company MONEY, OddsSpread MONEY, BasedOddsSpread MONEY)
+		CREATE TABLE #tmpResult (PartyId INT, PartyName VARCHAR(50), ProductId INT, ProductName VARCHAR(50), CurrencyId INT, Company MONEY, OddsSpread MONEY, BasedOddsSpread MONEY, OddsBoostBonus MONEY, BasedOddsBoostBonus MONEY, IsExistOddsSpread BIT, IsExistOddsBoostBonus BIT)
 
 		INSERT INTO #tmpData (rptDate, SiteId, ProductId, CurrencyId, BetType, Winloss, AWinloss, AComm, ValidBetAmount)
 		SELECT rptDate, SiteId, ProductId, CurrencyId, BetType, SUM(MemberWL), SUM(GrossWL), SUM(CommissionA), SUM(ValidBetAmount) AS ValidBetAmount
@@ -122,19 +122,22 @@ BEGIN
 			AND Currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			AND ProductId = 25
 			
-		INSERT INTO #tmpResult (PartyId, PartyName, ProductId, ProductName, CurrencyId, Company, OddsSpread, BasedOddsSpread)
+		INSERT INTO #tmpResult (PartyId, PartyName, ProductId, ProductName, CurrencyId, Company, OddsSpread, BasedOddsSpread, OddsBoostBonus, BasedOddsBoostBonus)
 		SELECT pl.PartyId, pl.PartyName, p.GroupProductId, p.GroupProductName, e.ExchangeId
 			,SUM(CASE
 					WHEN gb.TypeId = 7 THEN 0 -- OddsSpread Adjustment
 					WHEN gb.TypeId = 11 THEN 0 -- Odds Boost Adjustment
 					WHEN gb.TypeId = 2 THEN t.AWinloss -- Contribution
-					ELSE (-t.Winloss + CASE WHEN gb.TypeId = 11 AND t.ProductId = 0 THEN t.ValidBetAmount ELSE 0 END)* ISNULL(cr.Rate, c.Rate)
+					ELSE (-t.Winloss 
+							+ CASE WHEN gb.TypeId = 11 AND t.ProductId = 0 THEN t.ValidBetAmount ELSE 0 END -- OddsBoostBonus
+						 )* ISNULL(cr.Rate, c.Rate)
 						- CASE WHEN c.ProductId IN (3, 25) THEN t.AComm ELSE 0 END
-						- CASE WHEN gb.TypeId = 11 AND t.ProductId = 0 THEN t.ValidBetAmount ELSE 0 END  -- Odds Boost Adjustment
 				END
 			) AS Company
 			,SUM(CASE WHEN gb.TypeId = 7 THEN -t.AWinloss ELSE 0 END) AS OddsSpread
 			,SUM(CASE WHEN gb.TypeId = 7 THEN -t.AWinloss * e.Rate ELSE 0 END) AS BasedOddsSpread
+			,SUM(CASE WHEN gb.TypeId = 11 THEN t.ValidBetAmount ELSE 0 END) AS OddsBoostBonus
+			,SUM(CASE WHEN gb.TypeId = 11 THEN t.ValidBetAmount * e.Rate ELSE 0 END) AS BasedOddsBoostBonus
 		FROM #tmpData t
 			LEFT JOIN dbo.LA_f_GroupBettype() gb ON t.BetType = gb.Bettype
 			INNER JOIN @ProductList p ON t.ProductId = p.ProductId AND t.rptDate BETWEEN p.FromDate AND p.ToDate
@@ -146,19 +149,24 @@ BEGIN
 		GROUP BY pl.PartyId, pl.PartyName, p.GroupProductId, p.GroupProductName, e.ExchangeId
 
 		-- Set OddsSpread = 0 if negative value
-		;WITH CTE_OddsSpread AS (
+		;WITH CTE_OddsAdjustment AS (
 			SELECT PartyId, ProductId
+				,CASE WHEN SUM(BasedOddsSpread)		<= 0 THEN 0 ELSE 1 END AS IsExistOddsSpread
+				,CASE WHEN SUM(BasedOddsBoostBonus)  = 0 THEN 0 ELSE 1 END AS IsExistOddsBoostBonus
 			FROM #tmpResult
-			WHERE OddsSpread <> 0
 			GROUP BY PartyId, ProductId
-			HAVING SUM(BasedOddsSpread) <= 0
 		)
 		UPDATE t
-		SET t.OddsSpread = 0, t.BasedOddsSpread = 0
+		SET t.OddsSpread				= CASE WHEN c.IsExistOddsSpread = 0 THEN 0 ELSE t.OddsSpread END 
+			,t.BasedOddsSpread			= CASE WHEN c.IsExistOddsSpread = 0 THEN 0 ELSE t.BasedOddsSpread END  
+			,t.IsExistOddsSpread		= c.IsExistOddsSpread   
+			,t.IsExistOddsBoostBonus	= c.IsExistOddsBoostBonus 
 		FROM #tmpResult t
-			INNER JOIN CTE_OddsSpread c ON t.PartyId = c.PartyId AND t.ProductId = c.ProductId
-
-		UPDATE #tmpResult SET Company = Company + OddsSpread WHERE OddsSpread <> 0
+			INNER JOIN CTE_OddsAdjustment c ON t.PartyId = c.PartyId AND t.ProductId = c.ProductId
+		
+		UPDATE #tmpResult 
+		SET Company = CASE WHEN (Company + OddsSpread < 0) AND IsExistOddsBoostBonus = 1 THEN 0 ELSE Company + OddsSpread END
+						- OddsBoostBonus
 	END
 	
 	-- Return data

@@ -588,7 +588,7 @@ BEGIN
 			,SUM(AmtDueToBA * e.GBP) AS AmountDueToBAGBP
 			,SUM(CommBA * e.GBP) AS BACommissionGBP
 			,SUM(Company * e.GBP) AS AmountCompanyGBP
-			,SUM(OddsSpreadCost * e.EUR) AS OddsSpreadCostGBP
+			,SUM(OddsSpreadCost * e.GBP) AS OddsSpreadCostGBP
 			,SUM(OddsBoostBonus * e.GBP) AS OddsBoostBonusGBP
 			-- CNY
 			,SUM(Turnover * e.CNY) AS TurnoverCNY

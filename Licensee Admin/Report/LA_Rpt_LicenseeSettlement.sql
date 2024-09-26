@@ -821,8 +821,7 @@ BEGIN
 		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
 
 		UPDATE #Result
-		SET Company = CASE WHEN @IsKeepNegativeAmount = 1 OR @TotalLicenseeChargeRate_InBaseCurrency > 0 THEN GrossCompany ELSE 0 END
-			,GrossCompany = CASE WHEN @IsKeepNegativeAmount = 1 OR (@TotalLicenseeChargeRate_InBaseCurrency <= 0 AND GrossCompany < 0) OR (GrossCompany > 0) THEN GrossCompany ELSE 0 END
+		SET GrossCompany = CASE WHEN @IsKeepNegativeAmount = 1 OR (@TotalLicenseeChargeRate_InBaseCurrency <= 0 AND GrossCompany < 0) OR (GrossCompany > 0) THEN GrossCompany ELSE 0 END
 	END
 	ELSE
 	BEGIN
@@ -888,19 +887,15 @@ BEGIN
 	FROM #Result d
 		INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
 
-	IF (@IsShowOddsSpread = 1)
-	BEGIN
-		UPDATE #Result 
-		SET Company	= Company 
-						+ CASE WHEN (Company + OddsSpreadCost < 0 AND @IsShowOddsBoostBonus = 1)  THEN 0 ELSE OddsSpreadCost END -- case apply only oods Adjust show orig Company 
-						- OddsBoostBonus
-	END
-	ELSE IF (@IsShowOddsSpread = 0)
+	 IF (@IsShowOddsSpread = 0)
 	BEGIN
 		UPDATE #Result 
 		SET OddsSpreadCost = 0
-			,Company	   = Company - OddsBoostBonus
 	END
+
+	UPDATE #Result 
+	SET Company	= CASE WHEN (Company + OddsSpreadCost < 0 AND @IsShowOddsBoostBonus = 1) OR @IsKeepNegativeAmount = 0 THEN 0 ELSE Company + OddsSpreadCost END -- case apply only oods Adjust show orig Company 
+					- OddsBoostBonus
 
 	;WITH sortedExchange AS (
 		SELECT ExchangeID, CurrencyCode, ROW_NUMBER() OVER (PARTITION BY CurrencyCode ORDER BY ExchangeId) RowNumber
