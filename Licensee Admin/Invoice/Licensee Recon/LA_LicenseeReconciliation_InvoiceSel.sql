@@ -43,6 +43,7 @@ AS
 		- 20240503@Danny: including AG Casino Contribution item [RedmineID: #204716]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 		- 20241010@Danny: exclude some debit note [RedmineID: #212037]
+		- 20241015@Danny: Include saba promotion into promotion column [RedmineID: #210956]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -91,7 +92,7 @@ BEGIN
 		,SUM(CASE WHEN InvItemTypeId IN (3,25) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) AMF
 		,SUM(CASE WHEN InvItemTypeId = 46 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) AMF2
 		,SUM(CASE WHEN InvItemTypeId = 2 THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) SetupFee
-		,SUM(CASE WHEN InvItemTypeId = 29 THEN ISNULL(Expense,0) ELSE 0 END) Promotion
+		,SUM(CASE WHEN InvItemTypeId IN (29,52) THEN ISNULL(Expense,0) ELSE 0 END) Promotion
 		,SUM(CASE WHEN InvItemTypeId = 44 THEN ISNULL(Expense,0) ELSE 0 END) Sponsorship
 		,SUM(CASE WHEN InvItemTypeId = 48 THEN ISNULL(-Income,0) ELSE 0 END) PlayerTips -- Recon show negative value
 	INTO #result
