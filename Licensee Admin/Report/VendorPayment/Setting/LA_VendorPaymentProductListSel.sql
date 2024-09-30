@@ -14,6 +14,7 @@ AS
 	Revisions:     
 		- 20220324@Danny: Create SP [RedmineID: #168387]
 		- 20240419@Danny: Remove Saba Coin [RedmineID: #203331]
+		- 20240930@Danny: Enhance vendor payment report permission [RedmineID: #211387]
 
 */
 BEGIN
@@ -48,7 +49,7 @@ BEGIN
 		),
 		permission_list AS
 		(
-			SELECT REPLACE(f.FunctionKey,'VendorPaymentInDetails_','') ProductPrefix
+			SELECT REPLACE(f.FunctionKey,'VendorPaymentProductList_','') ProductPrefix
 			FROM dbo.LA_UserFunction u WITH(NOLOCK)
 			INNER JOIN func_list f ON u.FunctionID = f.FunctionID
 			WHERE  UserID =  @UserID AND u.StatusID = 1
@@ -64,7 +65,7 @@ BEGIN
 		FROM		permission_list t
 		LEFT JOIN	dbo.Product3rd p WITH(NOLOCK) ON t.ProductPrefix = p.ProductPrefix
 		)
-		SELECT r.ProductID, r.ProductName, r.ProductCode
+		SELECT r.ProductID, r.ProductName, r.ProductCode, lv.TimezoneIDs
 		FROM result r
 		INNER JOIN LA_VendorPaymentSetting lv WITH(NOLOCK) ON r.ProductID = lv.ProductId
 		WHERE lv.IsActive = 1
