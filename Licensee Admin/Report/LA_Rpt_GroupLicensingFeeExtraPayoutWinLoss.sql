@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap,wsv_lap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -22,6 +22,7 @@ AS
 	   - 20220222@Danny: Allbet - Promotion integration [#167510]
 	   - 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
 	   - 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+	   - 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 */
 
 BEGIN
@@ -67,7 +68,7 @@ BEGIN
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
 		INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 		LEFT JOIN @GroupBettype g ON b.Bettype = g.Bettype
-		WHERE (b.CurrencyID <> 20)
+		WHERE b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 		AND b.StatusId NOT IN (-1, 101, 102, 103)
 		AND b.customercategory NOT IN (27, 28)
 		GROUP BY b.SiteID, b.ProductID, b.CurrencyId, b.rptDate

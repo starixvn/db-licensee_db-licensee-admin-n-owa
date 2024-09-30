@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -17,6 +17,7 @@ AS
 		- 20211101@Percy: Return applied currencies [RedmineID: #162158]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 
 	 Params:
 
@@ -37,7 +38,7 @@ BEGIN
 	FROM dbo.LA_f_SelLicenseeCust(0) AS lc
 	INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON lc.LicenseeID = p.OldRefID 
 	INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
-	WHERE lc.Currency <> 20 -- exclude test
+	WHERE lc.Currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x) -- exclude test
 			AND p.PartyID = @PartyId
 	
 	UPDATE c1

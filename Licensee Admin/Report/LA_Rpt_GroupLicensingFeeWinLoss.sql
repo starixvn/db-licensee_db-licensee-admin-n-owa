@@ -30,6 +30,7 @@ AS
 		- 20230713@Danny: Incorporate USDT2 currency [RedmineID: #191165]
 		- 20230823@Danny: Incorporate US$KH currency [RedmineID: #192544]
 		- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -107,7 +108,7 @@ BEGIN
 			AND ProductId <> 25 -- CO
 			AND Bettype <> 1706 -- GD Tips
 			AND	ISNULL(TicketType, 0) <> 2 -- Free Bet
-			AND CurrencyId <> 20
+			AND CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 		GROUP BY rptDate, SiteId, ProductId, CurrencyId, BetType
 
 		-- CO
@@ -117,7 +118,7 @@ BEGIN
 		FROM bodb_LicenseeReport.dbo.rptLicCashoutSummary WITH (NOLOCK)
 		WHERE WinlostDate BETWEEN @_FDate AND @T_Date
 			AND RoleId = 1
-			AND Currency <> 20
+			AND Currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			AND ProductId = 25
 			
 		INSERT INTO #tmpResult (PartyId, PartyName, ProductId, ProductName, CurrencyId, Company, OddsSpread, BasedOddsSpread)

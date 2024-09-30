@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,bodbLicenseeNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap,wsv_lap" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_GetExchangeRateOANDA]
 	@Fromdate	DATETIME=NULL,
 	@ToDate		DATETIME=NULL 
@@ -52,7 +52,7 @@ AS
 		WHERE 
 			edo.ExchangeDate>=@fromdate AND edo.ExchangeDate<=@todate 
 			AND edo.exchangeid in (select distinct currency   FROM  dbo.f_SelLicenseeCust(0) lc )
-			AND exchangeid <> 20
+			AND exchangeid NOT IN (SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			AND edo.ExchangeId NOT IN (43, 66) -- old THB and KeenOcean's HKD
 		ORDER BY edo.ExchangeDate,edo.Code ASC 
 	END

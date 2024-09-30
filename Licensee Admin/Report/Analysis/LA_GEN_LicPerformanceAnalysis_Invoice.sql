@@ -31,6 +31,7 @@ AS
 		- 20240109@Danny: Enhance rule regen data when invoice is voided [RedmineID: #199448]
 		- 20240401@Danny: Change meta data [#203267]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 
 */
 
@@ -150,7 +151,7 @@ BEGIN
 				LEFT JOIN bodb_Licensee.dbo.LA_f_GroupBettype() gb ON r.Bettype = gb.Bettype
 			WHERE r.rptDate BETWEEN @FromDate AND @ToDate
 				AND r.SiteId = @SiteId
-				AND r.CurrencyId <> 20
+				AND r.CurrencyId NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)
 				AND r.CustomerCategory NOT IN (27, 28)
 				AND r.Bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914)
 				AND r.StatusId IN (111, 112, 113, 114, 115)

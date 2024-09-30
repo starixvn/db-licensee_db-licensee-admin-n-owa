@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template10]
 	@PartyIds			VARCHAR(4000)
 	,@ProductID			INT
@@ -17,6 +17,7 @@ AS
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 	- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
+	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 
  */
 
@@ -187,7 +188,7 @@ BEGIN
 			  b.RptDate BETWEEN @FromDate AND @ToDate AND
 			  b.StatusId NOT IN (- 1, 101, 102, 103) AND
 			  b.ProductID = @ProductID AND
-			  b.CurrencyId <> 20 -- UUS - Currency testing
+			  b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x) -- Currency testing
 		GROUP BY b.RptDate, ci.PartyID, b.CurrencyID, ci.IsDeposit
 	END
 	ELSE -- Another timezone
@@ -226,7 +227,7 @@ BEGIN
 			  b.RptDate3rd BETWEEN @FromDate AND @ToDate AND
 			  b.StatusId NOT IN (- 1, 101, 102, 103) AND
 			  b.BetTypeId IN (SELECT x.BetTypeId FROM @BettypeIdList x) AND
-			  b.CurrencyId <> 20 -- UUS - Currency testing
+			  b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x) -- Currency testing
 		GROUP BY b.RptDate3rd, ci.PartyID, b.CurrencyID, ci.IsDeposit
 	END
 

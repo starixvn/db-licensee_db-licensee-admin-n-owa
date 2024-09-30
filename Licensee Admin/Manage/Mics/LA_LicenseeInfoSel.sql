@@ -23,6 +23,7 @@ AS
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 		- 20230828@Danny: Enhance Licensee Information report [RemineID: #191248]
 		- 20240717@Danny: Return Master Currency Codes [RedmineID: #206117]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -52,7 +53,7 @@ BEGIN
 						CASE WHEN lc.Currency = 51 THEN 'VND' ELSE e.currency END AS CurrencyName
 		FROM dbo.LA_f_SelLicenseeCust(op.OldRefID) AS lc
 		INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON lc.currency = e.exchangeid
-		WHERE lc.Currency <> 20 -- exclude test
+		WHERE lc.Currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x) -- exclude test
 	) lc
 
 	UPDATE c1

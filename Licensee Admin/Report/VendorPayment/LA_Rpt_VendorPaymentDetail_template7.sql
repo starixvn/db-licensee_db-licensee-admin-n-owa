@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template7]
 	@PartyIds			VARCHAR(4000)
 	,@ProductID			INT
@@ -16,6 +16,7 @@ AS
 	- 20220927@Danny: Remove DBLink [#176986] 
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
  */
 
 BEGIN
@@ -174,7 +175,7 @@ BEGIN
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
 				  b.StatusId NOT IN (- 1, 101, 102, 103) AND
 				  b.ProductID = 59 AND
-				  b.CurrencyId <> 20 -- UUS - Currency testing
+				  b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x) -- UUS - Currency testing
 			GROUP BY b.rptDate, ci.PartyID, b.CurrencyID, ci.IsDeposit
 		END
 		ELSE
@@ -191,7 +192,7 @@ BEGIN
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 					INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.RptDate BETWEEN ci.FromDate AND ci.ToDate
 				WHERE b.RptDate BETWEEN @FromDate AND @ToDate
-					AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 
+					AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 					AND b.ProductId = @ProductID
 					AND b.CustomerCategory NOT IN (27, 28)
 				GROUP BY b.SiteID, b.RptDate, b.CurrencyId
@@ -246,7 +247,7 @@ BEGIN
 						b.RptDate BETWEEN DATEADD(DAY, -1, @FromDate) AND DATEADD(DAY, 1, @ToDate) AND
 						b.StatusId NOT IN (- 1, 101, 102, 103) AND
 						b.BetTypeId IN (SELECT x.BetTypeId FROM @BettypeIdList x) AND
-						b.CurrencyId <> 20 -- UUS - Currency testing
+						b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x) -- UUS - Currency testing
 				GROUP BY b.rptDate, ci.PartyID, b.CurrencyID, ci.IsDeposit
 		END
 		ELSE
@@ -264,8 +265,9 @@ BEGIN
 					INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.RptDate3rd BETWEEN ci.FromDate AND ci.ToDate
 				WHERE 	b.RptDate3rd BETWEEN @FromDate AND @ToDate AND
 						b.RptDate BETWEEN DATEADD(DAY, -1, @FromDate) AND DATEADD(DAY, 1, @ToDate) AND
-						b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND
-						b.BetTypeId IN (SELECT x.BetTypeId FROM @BettypeIdList x) 
+						b.StatusId NOT IN (-1, 101, 102, 103) 
+						AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
+						AND b.BetTypeId IN (SELECT x.BetTypeId FROM @BettypeIdList x) 
 				GROUP BY b.SiteID, b.RptDate3rd, b.CurrencyId
 			)
 			INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,ValidBetAmount,TotalTrans,CustomerWinLoss,LicensingFee,RollingComm,NetWinloss,PayToSupplier)

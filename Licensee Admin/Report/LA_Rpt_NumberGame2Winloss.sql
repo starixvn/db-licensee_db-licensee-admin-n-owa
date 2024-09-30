@@ -1,7 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-USE [bodb_licensee]
-GO
-
+/*<info serverAlias="DBLIC-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_NumberGame2Winloss]
 	 @PartyIDs				VARCHAR(5500)
 	, @FromDate				SMALLDATETIME
@@ -19,6 +16,7 @@ AS
 	- 20180716@bruce: add new group TEST for credit [#98126]
 	- 20200303@Mason: Support HID currency [#128856]
 	- 20230329@Danny: Support USD(USDTJP) currency [#183739]
+	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -100,7 +98,7 @@ BEGIN
 		WHERE b.Status NOT IN (-1, 101, 102, 103)
 			AND b.Bettype BETWEEN 2501 AND 2699
 			AND b.CustomerCategory NOT IN (27, 28)
-			AND b.CurrencyId <> 20
+			AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			AND b.rptDate BETWEEN @FromDate AND @ToDate
 	)
 	INSERT INTO #TempData (PartyId, RptDate, CurrencyId, TotalTrans, Turnover, CustomerWinLoss, LicenseeWinLoss, LicensingFee, PayToSupplier, CompanyIncome)

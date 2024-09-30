@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template13]
 	@PartyIds			VARCHAR(4000)
 	,@ProductID			INT
@@ -19,6 +19,7 @@ AS
 		- 20221206@Malcolm: Separate data of Blueprint and Normal games for Macau Games product [RedmineId: #179006]
 		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 
 	Param's Explanation:
 		+ @GroupBy :
@@ -148,7 +149,8 @@ BEGIN
 			LEFT JOIN bodb02.dbo.SportBettypeMatrix  bp WITH(NOLOCK) ON b.Bettype = bp.Bettype AND bp.ProductID = @ProductID AND bp.SubProduct = 'Blueprint'
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeID AND cr.CurrencyID = b.CurrencyId
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
-			b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
+			b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x) 
+			AND b.CustomerCategory NOT IN (27,28)
 			AND b.Bettype in (Select Bettype FROM LA_f_BettypeProductMapping(0,@ProductCode))
 			AND (@GameType = 0 OR bp.Bettype IS NOT NULL AND @GameType = 1 OR bp.Bettype IS NULL AND @GameType = 2)
 		GROUP BY b.rptDate, ci.PartyId, b.CurrencyId, ci.isDeposit, CASE WHEN bp.BetType IS NOT NULL THEN 1 ELSE 2 END 

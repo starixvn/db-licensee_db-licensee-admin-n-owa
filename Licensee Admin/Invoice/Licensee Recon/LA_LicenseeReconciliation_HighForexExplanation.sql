@@ -21,6 +21,7 @@ AS
 		- 20230704@Danny: Create Sp [#179232]
 		- 20240318@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
 		- 20240301@Danny: Merge virtual sports product [RemineID: #199478]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -67,7 +68,7 @@ BEGIN
 		INNER JOIN bodb02.dbo.Dep_CustSuper s WITH (NOLOCK) ON t.Site = s.Site
 		INNER JOIN bodb02.dbo.Customer c WITH (NOLOCK) ON s.custid = c.srecommend
 	WHERE c.roleid = 2
-		AND s.currency <> 20
+		AND s.currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 
 	-- Get Exchange
 	DEClARE @LA_BaseCurrency TABLE (CurrencyId INT, CurrencyName VARCHAR(12))
@@ -376,7 +377,7 @@ BEGIN
 					AND r.ProductId IN (10,31)
 					AND r.StatusId NOT IN (-1, 101, 102, 103)
 					AND r.CustomerCategory NOT IN (27, 28)
-					AND r.CurrencyId <> 20
+					AND r.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 				GROUP BY r.rptDate, r.CurrencyId, r.ProductID, s.PartyID, s.BaseCurrrencyID
 			END
 
@@ -391,7 +392,7 @@ BEGIN
 					INNER JOIN bodb02.dbo.customer c WITH (NOLOCK) ON m.custid = c.mrecommend AND c.roleid = 1
 				WHERE m.username LIKE '%Acc%'
 					AND c.username LIKE '%Dummy3rd%'
-					AND m.currency <> 20
+					AND m.currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 
 				-- Get data
 				CREATE TABLE #tmpNAPData (
@@ -426,7 +427,7 @@ BEGIN
 					FROM bodb02.dbo.bettrans b WITH (NOLOCK)
 						INNER JOIN @tblCustId c ON b.custid = c.CustId
 					WHERE b.winlostdate BETWEEN @FDate AND @TDate
-						AND b.currency <> 20
+						AND b.currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 						AND b.statusId IN (111, 112, 113)
 						AND b.bettype IN (SELECT z.bettype FROM @BettypeList_Adj z)
 					GROUP BY b.winlostdate, b.currency, b.transdesc,  CASE WHEN b.bettype = 8000 THEN 31 ELSE 10 END, c.PartyID, c.BaseCurrencyID
@@ -443,7 +444,7 @@ BEGIN
 					FROM bodb02.dbo.bettrans14 b WITH (NOLOCK)
 						INNER JOIN @tblCustId c ON b.custid = c.CustId
 					WHERE b.winlostdate BETWEEN @FDate AND @TDate
-						AND b.currency <> 20
+						AND b.currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 						AND b.statusId IN (111, 112, 113)
 						AND b.bettype IN (SELECT z.bettype FROM @BettypeList_Adj z)
 					GROUP BY b.winlostdate, b.currency, b.transdesc, CASE WHEN b.bettype = 8000 THEN 31 ELSE 10 END, c.PartyID, c.BaseCurrencyID
@@ -465,7 +466,7 @@ BEGIN
 														FROM bodb_Archive.dbo.bettrans_bk WITH (NOLOCK)
 														WHERE winlostdate BETWEEN ''''' + CONVERT(VARCHAR(10), @FDate, 120) + ''''' AND ''''' + CONVERT(VARCHAR(10), @TDate, 120) + '''''
 															AND custid IN (' + @CustIds + ')
-															AND currency <> 20
+															AND currency NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)
 															AND statusId IN (111, 112, 113)
 															AND bettype IN (' + @Bettype_Adjs + ')
 														GROUP BY winlostdate, currency, transdesc, CustID, CASE WHEN bettype = 8000 THEN 31 ELSE 10 END, CustID'')'
@@ -644,7 +645,7 @@ BEGIN
 			WHERE r.rptDate BETWEEN @FromDate AND @ToDate
 				AND r.StatusId NOT IN (-1, 101, 102, 103)
 				AND r.CustomerCategory NOT IN (27, 28)
-				AND r.CurrencyId <> 20
+				AND r.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 				AND r.ProductId <> 25 -- CO
 			GROUP BY r.rptDate, r.CurrencyId, r.SiteId
 				,CASE WHEN r.Bettype IN (1706, 3007) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
@@ -664,7 +665,7 @@ BEGIN
 				INNER JOIN bodb02.dbo.Dep_CustSuper s WITH (NOLOCK) ON t.Site = s.Site
 				INNER JOIN bodb02.dbo.Customer c WITH (NOLOCK) ON s.custid = c.srecommend
 			WHERE c.roleid = 2
-				AND s.currency <> 20
+				AND s.currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 
 			-- Get AmountToCompany data
 			CREATE TABLE #tmpNAPData_PT (

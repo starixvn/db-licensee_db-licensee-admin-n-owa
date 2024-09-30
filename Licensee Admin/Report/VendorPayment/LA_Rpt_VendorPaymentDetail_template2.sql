@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template2]
 	@PartyIds			VARCHAR(4000)
 	,@ProductID			INT
@@ -16,6 +16,7 @@ AS
 	- 20220927@Danny: Remove DBLink [#176986] 
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
  */
 
 BEGIN
@@ -127,7 +128,8 @@ SET NOCOUNT ON
 		INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 		LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeId AND cr.CurrencyId = b.CurrencyId
 	WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
-		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
+		b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
+		AND b.CustomerCategory NOT IN (27,28)
 		AND ci.isDeposit = 1
 	GROUP BY b.rptDate, ci.PartyId, b.CurrencyId
 	
@@ -144,7 +146,8 @@ SET NOCOUNT ON
 		- SUM(b.WinLoss + b.WinLossA + WinLossM + WinLossS + b.CommissionS)		AS LicensingFee
 		FROM bodb_LicenseeReport.dbo.rpt_Betting b WITH (NOLOCK)
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate AND
-			b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20 AND b.CustomerCategory NOT IN (27,28)
+			b.Status NOT IN (-1, 101, 102, 103) AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
+			AND b.CustomerCategory NOT IN (27,28)
 			AND b.Bettype in (Select Bettype FROM LA_f_BettypeProductMapping(0,@ProductCode))
 		GROUP BY b.SiteID, b.rptDate, b.CurrencyId
 	)

@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_Licensee
 GO
 
@@ -19,6 +19,7 @@ AS
 		- 20210727@Percy: Initialize SP [RedmineID: #155593]
 		- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 		- 20230523@Danny: New commercial terms for 12B [RedmineID: #186543]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 */
 
 BEGIN
@@ -80,7 +81,7 @@ BEGIN
 			AND r.ProductId = @ProductId
 			AND r.StatusId NOT IN (-1, 101, 102, 103)
 			AND r.CustomerCategory NOT IN (27, 28)
-			AND r.CurrencyId <> 20
+			AND r.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 		GROUP BY r.rptDate, r.CurrencyId
 	END
 
@@ -95,7 +96,7 @@ BEGIN
 			INNER JOIN bodb02.dbo.customer c WITH (NOLOCK) ON m.custid = c.mrecommend AND c.roleid = 1
 		WHERE m.username LIKE '%Acc%'
 			AND c.username LIKE '%Dummy3rd%'
-			AND m.currency <> 20
+			AND m.currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 
 		-- Get data
 		CREATE TABLE #tmpNAPData (winlostdate SMALLDATETIME, actual_winlostdate SMALLDATETIME, currency INT, transdesc NVARCHAR(1000), AmountToCompany MONEY)
@@ -109,7 +110,7 @@ BEGIN
 			FROM bodb02.dbo.bettrans b WITH (NOLOCK)
 				INNER JOIN @tblCustId c ON b.custid = c.CustId
 			WHERE b.winlostdate BETWEEN @FDate AND @TDate
-				AND b.currency <> 20
+				AND b.currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 				AND b.statusId IN (111, 112, 113)
 				AND b.bettype = @Bettype
 			GROUP BY b.winlostdate, b.currency, b.transdesc
@@ -125,7 +126,7 @@ BEGIN
 			FROM bodb02.dbo.bettrans14 b WITH (NOLOCK)
 				INNER JOIN @tblCustId c ON b.custid = c.CustId
 			WHERE b.winlostdate BETWEEN @FDate AND @TDate
-				AND b.currency <> 20
+				AND b.currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 				AND b.statusId IN (111, 112, 113)
 				AND b.bettype = @Bettype
 			GROUP BY b.winlostdate, b.currency, b.transdesc
@@ -144,7 +145,7 @@ BEGIN
 												FROM bodb_Archive.dbo.bettrans_bk WITH (NOLOCK)
 												WHERE winlostdate BETWEEN ''''' + CONVERT(VARCHAR(10), @FDate, 120) + ''''' AND ''''' + CONVERT(VARCHAR(10), @TDate, 120) + '''''
 													AND custid IN (' + @CustIds + ')
-													AND currency <> 20
+													AND currency NOT IN (SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)
 													AND statusId IN (111, 112, 113)
 													AND bettype = ' + CONVERT(VARCHAR(20), @Bettype) + '
 												GROUP BY winlostdate, currency, transdesc'')'

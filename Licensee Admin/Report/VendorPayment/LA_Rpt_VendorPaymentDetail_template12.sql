@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template12]
 	@PartyIds			VARCHAR(4000)
 	,@ProductID			INT
@@ -16,6 +16,7 @@ AS
 	- 20210615@Danny: Initialize SP [#168387]
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
+	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
  */
 
 BEGIN
@@ -130,7 +131,7 @@ BEGIN
 													AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 					LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeID AND cr.CurrencyID = b.CurrencyId
 			WHERE	b.rptDate BETWEEN @TmpFromDate AND @ToDate
-					AND (b.CurrencyID <> 20)
+					AND b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 					AND b.StatusId BETWEEN 111 AND 113
 					AND b.customercategory NOT IN (27, 28)
 					AND b.SportType = 44 -- MuayThai
@@ -167,7 +168,7 @@ BEGIN
 													AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 					LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = p.ChargeId AND cr.CurrencyID = b.CurrencyId
 			WHERE	b.rptDate BETWEEN @FromDate AND @TmpToDate
-					AND (b.CurrencyID <> 20)
+					AND b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 					AND b.StatusId BETWEEN 111 AND 113
 					AND b.customercategory NOT IN (27, 28)
 					AND b.SportType = 44 -- Muay Thai

@@ -20,6 +20,7 @@ AS
 		- 20211026@Danny: Treat SLT as a part of SB based on cutoff date [RedmineID: #163181]
 		- 20220315@Percy: Separate Sponsorship from Saba Promotion [RedmineID: #167121]
 		- 20221226@Danny: Integrate Player tips [#180703]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 */
 
 BEGIN
@@ -40,7 +41,7 @@ BEGIN
 		INNER JOIN bodb02.dbo.Dep_CustSuper s WITH (NOLOCK) ON t.Site = s.Site
 		INNER JOIN bodb02.dbo.Customer c WITH (NOLOCK) ON s.custid = c.srecommend
 	WHERE c.roleid = 2
-		AND s.currency <> 20
+		AND s.currency NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 
 	-- Get Exchange
 	DECLARE @Exchange TABLE (ExchangeId INT, ExchangeDate SMALLDATETIME, Rate FLOAT)

@@ -13,6 +13,7 @@ AS
  * Task  : Vendor Payment Detail (template17 - Template for Inhouse Product)
  * Revisions
 	- 20240409@Danny: Initialize SP [#200955]
+	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 	
  */
  BEGIN
@@ -146,7 +147,7 @@ AS
 				LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND cr.CurrencyID = b.CurrencyId
 				LEFT JOIN dbo.LA_f_GroupBettype() lf ON b.BetType = lf.Bettype
 			WHERE b.RptDate BETWEEN @FromDate AND @ToDate 
-				AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId <> 20
+				AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 				AND b.ProductID = @ProductID
 			GROUP BY b.RptDate, b.CurrencyId, b.SiteId
 			)

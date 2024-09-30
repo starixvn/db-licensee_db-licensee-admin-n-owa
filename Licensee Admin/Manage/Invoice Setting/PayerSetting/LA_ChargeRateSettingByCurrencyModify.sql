@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="1"></info>*/
 ALTER PROCEDURE [dbo].[LA_ChargeRateSettingByCurrencyModify]
 	 @ChargeID						INT
 	,@MasterRate					MONEY
@@ -19,6 +19,7 @@ AS
 		- 20221205@Danny Remove Hx9candy From Crypto Licensee List [RedmineID: #181279]
 		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
 		- 20231002@Danny: logging currency information with new format [#FeatureID 193214]
+		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 	 Params:
 		+ @DetailChargeRateSettingXml: '<ChargeSettings>
 								  <ChargeSetting>
@@ -129,7 +130,7 @@ BEGIN
 				SELECT DISTINCT lc.Currency, CASE WHEN e.ExchangeId = 142 THEN 'USDT' WHEN e.ExchangeId IN (96,202,206,208,209) THEN  e.Code + ' (' + e.currency + ')'  ELSE e.Code END Code
 				FROM LicenseeCust lc  WITH(NOLOCK) 
 				INNER JOIN  CustDB.dbo.exchange e with(nolock) on lc.Currency = e.ExchangeId
-				WHERE lc.LicenseeID = l.LicenseeID and lc.roleID = 2 and e.ExchangeId <> 20
+				WHERE lc.LicenseeID = l.LicenseeID and lc.roleID = 2 and e.ExchangeId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			) x
 			LEFT JOIN  LA_ChargeRateByCurrency lcr WITH(NOLOCK) ON oc.ChargeID = lcr.ChargeID AND x.Currency = lcr.CurrencyID
 			LEFT JOIN  Product3rd p3 WITH(NOLOCK) ON oc.ProductID = p3.Productid
@@ -209,7 +210,7 @@ BEGIN
 				SELECT DISTINCT lc.Currency, CASE WHEN e.ExchangeId = 142 THEN 'USDT' WHEN e.ExchangeId IN (96,202,206,208,209) THEN  e.Code + ' (' + e.currency + ')'  ELSE e.Code END Code
 				FROM LicenseeCust lc  WITH(NOLOCK) 
 				INNER JOIN  CustDB.dbo.exchange e with(nolock) on lc.Currency = e.ExchangeId
-				WHERE lc.LicenseeID = l.LicenseeID and lc.roleID = 2 and e.ExchangeId <> 20
+				WHERE lc.LicenseeID = l.LicenseeID and lc.roleID = 2 and e.ExchangeId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			) x
 			LEFT JOIN  LA_ChargeRateByCurrency lcr WITH(NOLOCK) ON oc.ChargeID = lcr.ChargeID AND x.Currency = lcr.CurrencyID
 			LEFT JOIN  Product3rd p3 WITH(NOLOCK) ON oc.ProductID = p3.Productid
