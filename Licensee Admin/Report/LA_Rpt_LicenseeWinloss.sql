@@ -72,7 +72,6 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @GD_Tip			SMALLINT	= 1706,
-			@CurrencyTest	INT			= 20,
 			@ExchangeTerm_CutOffDate SMALLDATETIME
 
 	DECLARE @ProductOfferContribList TABLE (ProductID INT)
@@ -158,7 +157,7 @@ BEGIN
 				AND b.ProductID = 3
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR b.CurrencyID = @Currency)
-				AND (b.CurrencyID <> @CurrencyTest)
+				AND (b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x))
 			GROUP BY ci.PartyID, b.rptDate, b.ProductID, currencyID
 		)
 		
@@ -223,7 +222,7 @@ BEGIN
 		WHERE	ProductID = @CBProductId AND
 				CustomerCategory NOT IN (27, 28) AND
 				b.StatusId NOT IN (-1, 101, 102, 103) AND
-				(b.CurrencyID <> @CurrencyTest) AND
+				(b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)) AND
 				(@Currency = 0 OR (@Currency <> 0 AND CurrencyId = @Currency)) AND
 				cb.TypeId = @CommChargeType -- to remove duplicate we use one of (6,7)
 		GROUP BY cb.PartyId, rptdate, CurrencyId
@@ -268,7 +267,7 @@ BEGIN
 					FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
 						INNER JOIN @ChargeInfo ci ON b.SiteId = ci.LicenseeID AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate AND b.ProductID = ci.ProductId					
 					WHERE b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate									
-						AND (b.Currency <> @CurrencyTest)
+						AND (b.Currency NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x))
 						AND(@Currency = 0 OR (@Currency <> 0 AND b.Currency = @Currency))
 						AND b.ProductID = @COProductId
 						AND b.RoleID = 1 -- Member
@@ -321,7 +320,7 @@ BEGIN
 					INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
 				WHERE b.RptDate BETWEEN ci.FromDate AND ci.ToDate
 					AND (@Currency = 0 OR b.CurrencyID = @Currency)
-					AND (b.CurrencyID <> @CurrencyTest)
+					AND (b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x))
 					AND b.Status NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory IN (1001, 1002)					
 					AND bt.ProductId IN (0, @BTProductId)
@@ -340,7 +339,7 @@ BEGIN
 					INNER JOIN #Bettype bt ON b.Bettype = bt.Bettype
 				WHERE b.RptDate BETWEEN ci.FromDate AND ci.ToDate 					
 					AND (@Currency = 0 OR b.CurrencyID = @Currency)
-					AND (b.CurrencyID <> @CurrencyTest)
+					AND (b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x))
 					AND b.Status NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory = 1002 -- for BT BA	
 					AND bt.ProductId = 3				
@@ -373,7 +372,7 @@ BEGIN
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR b.CurrencyID = @Currency)
-				AND (b.CurrencyID <> @CurrencyTest)
+				AND (b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x))
 				AND b.customercategory NOT IN (27,28)
 				AND b.ProductID = 11
 				AND b.SiteID IN (SELECT DISTINCT o.LicenseeID FROM @ChargeInfo o WHERE o.ProductID=11)
@@ -446,7 +445,7 @@ BEGIN
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.StatusId NOT IN (- 1, 101, 102, 103)
 			AND (@Currency = 0 OR b.CurrencyID = @Currency)
-			AND (b.CurrencyID <> @CurrencyTest)
+			AND (b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x))
 			AND b.customercategory NOT IN (27,28)
 			AND eb.Bettype IS NULL
 			AND	ISNULL(b.TicketType,0) <> 2 -- Free_Bets_TicketType

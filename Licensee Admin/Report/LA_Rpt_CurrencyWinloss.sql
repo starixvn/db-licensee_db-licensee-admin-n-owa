@@ -27,7 +27,7 @@ AS
 	Revisions:
 	   - 20141021@Florent: show credit's licensee
 	   - 20141111@Florent: using new OAS_ChargeInfo structure and use unique formula
-	   - 20150703@Florent: add GBPho
+	   - 20150703@Florent: add GBP
 	   - 20160504@Bruce: Remove dynamic sql
 	   - 20161022@Jim:move table to bodb_licenseereport [RedmineID :#60449]
 	   - 20170801@Kenny: Filter data for Microgaming [RedmineID: #79311]

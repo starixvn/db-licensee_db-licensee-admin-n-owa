@@ -121,9 +121,8 @@ BEGIN
 		INSERT INTO #bettype (bettype)
 		SELECT DISTINCT bettype FROM dbo.SportBettypeMatrix WITH (NOLOCK) 
 		WHERE ProductId IN (SELECT x.ProductID FROM @ProductTab x) 
-			AND (bettype <> 999 -- exclude Odds Spread Adjustment
-				OR bettype <> 997 -- exclude Odds Boost Adjustment
-			)
+			AND bettype NOT IN (999, 997) -- 999: exclude Odds Spread Adjustment, 997: exclude Odds Boost Adjustment
+			
 		INSERT INTO #Data (rptDate, Currency, BetFrom, BetCount, Turnover, Winloss)
 		SELECT b.winlostdate, b.currency, b.betfrom, COUNT(1) AS BetCount, SUM(b.stake), SUM(b.winlost - b.actual_stake)
 		FROM dbo.bettrans b WITH (NOLOCK)

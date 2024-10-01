@@ -55,6 +55,7 @@ AS
 		- 20240201@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
 		- 20240710@Danny: Integrate Fast spin product[RedmineID: #206246]
 		- 20240710@Danny: Integrate FA CHAI promotion[RedmineID: #209902]
+		- 20241001@Sally: Support Odds Boost Voucher [#209884]
 */
 
 BEGIN
@@ -147,7 +148,8 @@ BEGIN
 			CROSS APPLY (
 				SELECT Discount AS InvoiceAmount, CONVERT(TINYINT, 4) AS AmountType, DiscountRate AS Rate, DiscountRemark AS Remark, ExtraInfo WHERE Discount > 0 -- Discount
 				--UNION ALL SELECT Rebate, 6, RebateRate, RebateRemark WHERE Rebate > 0 -- Rebate
-				UNION ALL SELECT LicensingFee, 1, NULL, NULL, NULL -- Software Fee
+				UNION ALL 
+				SELECT LicensingFee - CASE WHEN r.ProductId = 0 THEN r.ExtraAmount ELSE 0 END , 1, NULL, NULL, NULL -- Software Fee
 			) d
 		WHERE r.LicensingFeeTypeId = 0 AND r.ProductId NOT IN (37, 74) -- SB Promotion, Player Tips
 
