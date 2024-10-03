@@ -334,9 +334,8 @@ BEGIN
 	;WITH cte_SBWinLost AS
 	(
 		SELECT  ci.PartyID
-		, SUM((CASE WHEN b.BettypeRef = 999 THEN 0 ELSE ISNULL(-b.MemberWL, 0) END + b.OddsBoostBonus) * ISNULL(cr.Rate, ci.Rate) * e.Rate) AS LicencingFee -- Licensing Fee (Before Boost Odds) = (Licensee W/L + Odds Boost Bonus) * SB charge rate
+		, SUM((CASE WHEN b.BettypeRef IN (999, 997) THEN 0 ELSE ISNULL(-b.MemberWL, 0) END + b.OddsBoostBonus) * ISNULL(cr.Rate, ci.Rate) * e.Rate) AS LicencingFee -- Licensing Fee (Before Boost Odds) = (Licensee W/L + Odds Boost Bonus) * SB charge rate
 		, SUM(CASE WHEN b.BettypeRef = 999 THEN ISNULL(-b.AWinLoss, 0) ELSE 0 END * e.Rate) AS OddsSpreadCost
-		, SUM(CASE WHEN b.BettypeRef = 997 THEN b.OddsBoostBonus ELSE 0 END * e.Rate) AS OddsBoostBonus
 		FROM #TempData b
 		INNER JOIN @PartyChargeInfo ci ON b.LicenseeId = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.Fromdate AND ci.Todate
 		INNER JOIN #Exchange e ON b.rptDate = e.ExchangeDate AND b.CurrencyId = e.ExchangeID
@@ -346,7 +345,7 @@ BEGIN
 		GROUP BY ci.PartyId
 	)
 	INSERT INTO #Result(PartyId, ProductID, Amount)
-	SELECT PartyId, 0, cte.LicencingFee + CASE WHEN cte.OddsSpreadCost < 0 THEN 0 ELSE cte.OddsSpreadCost END - cte.OddsBoostBonus -- LicencingFee + OddsSpreadCost - OddsBoostBonus
+	SELECT PartyId, 0, cte.LicencingFee + CASE WHEN cte.OddsSpreadCost < 0 THEN 0 ELSE cte.OddsSpreadCost END -- LicencingFee + OddsSpreadCost 
 	FROM cte_SBWinLost cte
 	-- End SportsBook
 

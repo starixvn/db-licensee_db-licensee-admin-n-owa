@@ -137,7 +137,7 @@ BEGIN
 			,@ProductCodes = @ProductCodes
 			,@FromDate = @FromDate
 			,@ToDate = @ToDate
-			,@LicensingFeeTypeIds = '0,-1,1,2,3,4,5,6,10,13' -- Contribution, Prize, ...
+			,@LicensingFeeTypeIds = '0,-1,1,2,3,4,5,6,10,13,14' -- Contribution, Prize, ...
 			,@BaseCurrencyName = @BaseCurrencyName
 			,@Environment = @Environment
 
@@ -148,8 +148,7 @@ BEGIN
 			CROSS APPLY (
 				SELECT Discount AS InvoiceAmount, CONVERT(TINYINT, 4) AS AmountType, DiscountRate AS Rate, DiscountRemark AS Remark, ExtraInfo WHERE Discount > 0 -- Discount
 				--UNION ALL SELECT Rebate, 6, RebateRate, RebateRemark WHERE Rebate > 0 -- Rebate
-				UNION ALL 
-				SELECT LicensingFee - CASE WHEN r.ProductId = 0 THEN r.ExtraAmount ELSE 0 END , 1, NULL, NULL, NULL -- Software Fee
+				UNION ALL SELECT LicensingFee, 1, NULL, NULL, NULL -- Software Fee
 			) d
 		WHERE r.LicensingFeeTypeId = 0 AND r.ProductId NOT IN (37, 74) -- SB Promotion, Player Tips
 
@@ -195,10 +194,10 @@ BEGIN
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 3 THEN 54 -- Prizes
 				WHEN ProductId = 87 AND LicensingFeeTypeId = 3 THEN 57 -- Prizes
 				WHEN ProductId = 89 AND LicensingFeeTypeId = 3 THEN 59 -- Prizes
-
+				WHEN ProductId = 0  AND LicensingFeeTypeId = 14 THEN 61 -- Odds BoostBonus
 				END
 		FROM @Result
-		WHERE ProductId IN (10, 32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79, 87, 89) AND LicensingFeeTypeId > 0
+		WHERE ProductId IN (10, 32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79, 87, 89, 0) AND LicensingFeeTypeId > 0
 		GROUP BY
 			CASE
 				WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
@@ -226,6 +225,7 @@ BEGIN
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 3 THEN 54 -- Prizes
 				WHEN ProductId = 87 AND LicensingFeeTypeId = 3 THEN 57 -- Prizes
 				WHEN ProductId = 89 AND LicensingFeeTypeId = 3 THEN 59 -- Prizes
+				WHEN ProductId = 0 AND LicensingFeeTypeId = 14 THEN 61 -- Odds BoostBonus
 				END
 
 		-- AMF, Prepayment and AGPrepayment

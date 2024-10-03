@@ -123,7 +123,7 @@ BEGIN
 	INSERT INTO #tmp_Products (ProductId, ProductName, ProductCode)
 	SELECT p.ProductId, p.ProductName, p.ProductCode
 	FROM (
-		SELECT ProductId, ProductName, ProductCode FROM (VALUES (0, 'Sportsbook', 'SB'), (-102, 'Discount', ''), (-101, 'Rebate', ''),  (-999, 'Total', '')) t (ProductId, ProductName, ProductCode)
+		SELECT ProductId, ProductName, ProductCode FROM (VALUES (0, 'Sportsbook', 'SB'), (-102, 'Discount', ''), (-101, 'Rebate', ''), (-999, 'Total', '')) t (ProductId, ProductName, ProductCode)
 		UNION ALL SELECT ProductId, ProductName, ProductPrefix FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductId NOT IN (16, 81) AND (EndOfSupportDate IS NULL OR EndOfSupportDate >= @FromDate) AND OfferSite IN (0, 2) -- Deposit only
 	) p
 		LEFT JOIN dbo.LA_f_GroupProduct('',@FromDate,@ToDate) g ON p.ProductId = g.ProductId AND g.ProductId <> g.GroupProductId
@@ -194,7 +194,7 @@ BEGIN
 	FROM (
 		SELECT r.PartyId, r.ProductId
 			,SUM(CASE WHEN r.LicensingFeeTypeId = 8 THEN 0 
-					  WHEN r.ProductId = 0 THEN r.LicensingFee - r.ExtraAmount  -- SB Licensing Fee (Original Odds) - Odds Boost Bonus
+					  WHEN r.ProductId = 0 THEN r.LicensingFee -- SB Licensing Fee without - OddsBoostBonus
 				ELSE r.LicensingFee + r.ExtraAmount END
 			) AS LicensingFee
 			,SUM(CASE WHEN r.LicensingFeeTypeId = 8 THEN ExtraAmount ELSE 0 END) AS BetCount
@@ -227,6 +227,15 @@ BEGIN
 			 SELECT -25 AS ProductId , -ExtraAmount AS LicensingFee -- Casino promotion
 		) t
 
+	INSERT INTO #tmp_Result (PartyId, ProductId, LicensingFee, BetCount)
+	SELECT r.PartyId, t.ProductId, t.LicensingFee, 0
+	FROM (SELECT PartyId, LicensingFee, ExtraAmount FROM @Result WHERE ProductId = 0 AND LicensingFeeTypeId = 0) r
+		CROSS APPLY (
+			 SELECT -5 AS ProductId , -ExtraAmount AS LicensingFee -- Odds Boost Bonus
+			 UNION ALL
+			 SELECT -998 AS ProductId , CASE WHEN ExtraAmount <> 0 THEN 1 ELSE 0 END AS LicensingFee -- IsShowOddsBoostBonus
+		) t
+
 	-- Remove suspended/terminated licensees with amount = 0
 	;WITH CTE_Party AS (
 		SELECT PartyId FROM #tmp_PartyList WHERE TerminatedDate < @FromDate OR SuspendedDate < @FromDate
@@ -245,10 +254,11 @@ BEGIN
 	UPDATE #tmp_Products SET ProductId = -10, ProductName = 'Player Tips', ProductCode = '' WHERE ProductId = 74
 	
 	INSERT INTO #tmp_Products (ProductId, ProductName, ProductCode)
-	VALUES (-20, 'Sponsorship', '')
-
-	INSERT INTO #tmp_Products (ProductId, ProductName, ProductCode)
-	VALUES (-25, 'Casino Promotion', '')
+	VALUES	
+		(-20, 'Sponsorship', ''),
+		(-25, 'Casino Promotion', ''),
+		(-5,  'Odds Boost Bonus', ''),
+		(-998, 'IsShowOddsBoostBonus', '')
 
 	DECLARE @ProductList VARCHAR(MAX), @SQL VARCHAR(MAX)
 	SELECT  @ProductList = COALESCE(@ProductList + ', ', '') + '[' + ProductName + ']' FROM #tmp_Products ORDER BY ProductId

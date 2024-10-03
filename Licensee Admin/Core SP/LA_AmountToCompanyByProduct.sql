@@ -365,11 +365,11 @@ BEGIN
 		,GrossLicenseeAmount MONEY, LicenseeWL MONEY, LicenseeAmount MONEY, ExtraAmount MONEY DEFAULT(0), OddsSpread MONEY
 		,Contribution MONEY, JackpotPrize MONEY, Prize MONEY, Bonus MONEY, LuckyDraw MONEY, FreeBets MONEY
 		,ContributionDiscount MONEY, BasedLicenseeWL MONEY, BasedLicenseeAmount MONEY, BasedOddsSpread MONEY, BetCount INT, Promotion MONEY
-		,OddsBoostBonus MONEY) -- Based Amount: for get exactly min fee, discount
+		,FullOddsSpreadAmount MONEY, BasedFullOddsSpreadAmount MONEY, OddsBoostBonus MONEY) -- Based Amount: for get exactly min fee, discount
 
 	INSERT INTO #tmpResult (rptDate, PartyId, ProductId, CurrencyId, GrossLicenseeAmount, LicenseeWL, LicenseeAmount, ExtraAmount
-		,OddsSpread, Contribution, JackpotPrize, Prize, Bonus, LuckyDraw, FreeBets, ContributionDiscount, BasedLicenseeWL, BasedLicenseeAmount, BasedOddsSpread, BetCount, Promotion
-		,OddsBoostBonus)
+		,OddsSpread, Contribution, JackpotPrize, Prize, Bonus, LuckyDraw, FreeBets, ContributionDiscount, BasedLicenseeWL, BasedLicenseeAmount, BasedOddsSpread, BetCount, Promotion	
+		,FullOddsSpreadAmount, BasedFullOddsSpreadAmount, OddsBoostBonus)
 	SELECT t.rptDate, pl.PartyId, t.ProductId, t.CurrencyId
 		,SUM((CASE
 				WHEN pl.IsDeposit = 0 AND t.ProductId <> 0 THEN 0
@@ -387,17 +387,13 @@ BEGIN
 				+ t.PayOut + t.Contribution - t.JackpotPrize - t.Prize - t.Bonus - t.FreeBets - t.Promotion -LuckyDraw END
 			) * e.Rate
 		) AS GrossLicenseeAmount
-		,SUM((-t.MemberWL 
-				 + (CASE WHEN p.LicenseeId IS NULL THEN 0
-						 WHEN pl.IsDeposit = 0 AND t.ProductId <> 0 THEN 0
-					ELSE t.FullOddsSpreadAmount END
-				 )								
+		,SUM((-t.MemberWL 							
 				 + (CASE WHEN p.LicenseeId IS NULL THEN 0
 						 WHEN pl.IsDeposit = 0 AND t.ProductId <> 0 THEN 0
 					ELSE t.OddsBoostBonus END
 				 )
 			)* e.Rate
-		) AS LicenseeWL -- LicenseeWL Orig (Before Boost Odds) = [LicenseeWL After Odds Booost + FullOddsSpreadAmount + Full OddsBoostBonus]
+		) AS LicenseeWL 
 		,SUM((CASE
 				WHEN pl.IsDeposit = 0 AND t.ProductId <> 0 THEN 0
 				WHEN t.BettypeRef IN (1706, 3007) THEN 0
@@ -431,11 +427,7 @@ BEGIN
 		,SUM(t.LuckyDraw * e.Rate) AS LuckyDraw
 		,SUM(t.FreeBets * e.Rate) AS FreeBets
 		,SUM(t.Contribution * ISNULL(cr.Rate, p.Rate) * e.Rate) AS ContributionDiscount
-		,SUM(-t.MemberWL 
-				 + (CASE WHEN p.LicenseeId IS NULL THEN 0
-						 WHEN pl.IsDeposit = 0 AND t.ProductId <> 0 THEN 0
-					ELSE t.FullOddsSpreadAmount END
-				 )								
+		,SUM(-t.MemberWL 							
 				 + (CASE WHEN p.LicenseeId IS NULL THEN 0
 						 WHEN pl.IsDeposit = 0 AND t.ProductId <> 0 THEN 0
 					ELSE t.OddsBoostBonus END
@@ -460,6 +452,14 @@ BEGIN
 		) AS BasedOddsSpread
 		,SUM(t.BetCount) AS BetCount
 		,SUM(t.Promotion * e.Rate) AS Promotion
+		,SUM(CASE WHEN p.LicenseeId IS NULL THEN 0
+						 WHEN pl.IsDeposit = 0 AND t.ProductId <> 0 THEN 0
+					ELSE t.FullOddsSpreadAmount END * e.Rate
+		) AS FullOddsSpreadAmount 
+		,SUM(CASE WHEN p.LicenseeId IS NULL THEN 0
+						 WHEN pl.IsDeposit = 0 AND t.ProductId <> 0 THEN 0
+					ELSE t.FullOddsSpreadAmount END 
+		) AS BasedFullOddsSpreadAmount
 		,SUM(CASE
 				WHEN p.LicenseeId IS NULL THEN 0
 				WHEN pl.IsDeposit = 0 AND t.ProductId <> 0 THEN 0
@@ -542,6 +542,7 @@ BEGIN
 	SET t.BasedLicenseeWL = t.BasedLicenseeWL * e.Rate
 		,t.BasedOddsSpread = t.BasedOddsSpread * e.Rate
 		,t.BasedLicenseeAmount = t.BasedLicenseeAmount * e.Rate
+		,t.BasedFullOddsSpreadAmount = t.BasedFullOddsSpreadAmount * e.Rate
 	FROM #tmpResult t
 		INNER JOIN (SELECT DISTINCT PartyId, BaseCurrencyId FROM #PartyList) pl ON t.PartyId = pl.PartyId
 		INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND pl.BaseCurrencyId = e.BaseCurrencyId
@@ -550,9 +551,11 @@ BEGIN
 
 	-- Include OddsSpread into Licensing Fee if value is positive
 	UPDATE t
-	SET t.GrossLicenseeAmount = t.GrossLicenseeAmount + CASE WHEN r.BasedOddsSpread <= 0 THEN 0 ELSE t.OddsSpread END
-		,t.LicenseeAmount = t.LicenseeAmount + CASE WHEN r.BasedOddsSpread <= 0 THEN 0 ELSE t.OddsSpread END
-		,t.BasedLicenseeAmount = t.BasedLicenseeAmount + CASE WHEN r.BasedOddsSpread <= 0 THEN 0 ELSE t.BasedOddsSpread END
+	SET t.GrossLicenseeAmount	= t.GrossLicenseeAmount + CASE WHEN r.BasedOddsSpread <= 0 THEN 0 ELSE t.OddsSpread END
+		,t.LicenseeAmount		= t.LicenseeAmount		+ CASE WHEN r.BasedOddsSpread <= 0 THEN 0 ELSE t.OddsSpread END
+		,t.BasedLicenseeAmount	= t.BasedLicenseeAmount + CASE WHEN r.BasedOddsSpread <= 0 THEN 0 ELSE t.BasedOddsSpread END
+		,t.LicenseeWL			= t.LicenseeWL			+ CASE WHEN r.BasedOddsSpread <= 0 THEN 0 ELSE t.FullOddsSpreadAmount END
+		,t.BasedLicenseeWL		= t.BasedLicenseeWL		+ CASE WHEN r.BasedOddsSpread <= 0 THEN 0 ELSE t.BasedFullOddsSpreadAmount END -- LicenseeWL Orig (Before Boost Odds) = [LicenseeWL After Odds Booost + FullOddsSpreadAmount + Full OddsBoostBonus]
 	FROM #tmpResult t
 		INNER JOIN (
 			SELECT PartyId, ProductId, SUM(BasedOddsSpread) AS BasedOddsSpread
@@ -1156,8 +1159,8 @@ BEGIN
 			) d
 
 		UPDATE r
-		SET r.FeeRebate = CASE WHEN @FromDate >= @CutOff_RebateOnLicfee THEN CASE WHEN r.LicensingFee - r.Discount -  ISNULL(t.GrossLicensingFee, 0) < 0
-																   THEN 0 ELSE (r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0)) * ISNULL(r.FeeRebateRate, 0) END
+		SET r.FeeRebate = CASE WHEN @FromDate >= @CutOff_RebateOnLicfee THEN CASE WHEN r.LicensingFee - r.Discount -  ISNULL(t.GrossLicensingFee, 0) - r.ExtraAmount < 0
+																   THEN 0 ELSE (r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.ExtraAmount) * ISNULL(r.FeeRebateRate, 0) END  -- SB ServiceFee - Discount - SB Promotion - OddsBoostBonus 
 								ELSE r.FeeRebate END
 			,r.TierRebate = r.TierRebate
 							+ CASE WHEN @FromDate < @CutOff_TierRebate THEN
@@ -1168,13 +1171,13 @@ BEGIN
 									END 
 							  ELSE 
 									CASE
-										WHEN r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate < 0 THEN 0
-										ELSE r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate
-									END  
+										WHEN r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate - r.ExtraAmount < 0 THEN 0
+										ELSE r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate - r.ExtraAmount
+									END  -- SB ServiceFee - Discount - SB Promotion - OddsBoostBonus 
 							  END* r.TierRebateRate
 			,r.TotalRebate = r.WLRebate
-							+ CASE WHEN @FromDate >= @CutOff_RebateOnLicfee THEN CASE WHEN r.LicensingFee - r.Discount -  ISNULL(t.GrossLicensingFee, 0) < 0
-																   THEN 0 ELSE (r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0)) * ISNULL(r.FeeRebateRate, 0) END
+							+ CASE WHEN @FromDate >= @CutOff_RebateOnLicfee THEN CASE WHEN r.LicensingFee - r.Discount -  ISNULL(t.GrossLicensingFee, 0) - r.ExtraAmount < 0
+																   THEN 0 ELSE (r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.ExtraAmount) * ISNULL(r.FeeRebateRate, 0) END
 								ELSE r.FeeRebate END
 							+ CASE
 								WHEN @IncludeTierRebate = 0 THEN 0
@@ -1187,14 +1190,14 @@ BEGIN
 										END 
 									  ELSE 
 										CASE
-											WHEN r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate < 0 THEN 0
-											ELSE r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate
-										END  
-									  END* r.TierRebateRate
-								END
+											WHEN r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate - r.ExtraAmount < 0 THEN 0
+											ELSE r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate - r.ExtraAmount 
+										END   
+									  END* r.TierRebateRate 
+								END -- TotalRebate = WLRebate + FeeRebatee + TierRebate
 		FROM @Result r
 			LEFT JOIN @Result t ON r.PartyId = t.PartyId AND r.ProductId = 0 AND t.ProductId = 37
-
+	
 		-- For no data
 		INSERT INTO @Result (
 			PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
