@@ -1192,9 +1192,9 @@ BEGIN
 										CASE
 											WHEN r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate - r.ExtraAmount < 0 THEN 0
 											ELSE r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate - r.ExtraAmount 
-										END   
+										END  -- WLRebate + FeeRebatee + TierRebate
 									  END* r.TierRebateRate 
-								END -- TotalRebate = WLRebate + FeeRebatee + TierRebate
+								END 
 		FROM @Result r
 			LEFT JOIN @Result t ON r.PartyId = t.PartyId AND r.ProductId = 0 AND t.ProductId = 37
 	

@@ -232,8 +232,6 @@ BEGIN
 	FROM (SELECT PartyId, LicensingFee, ExtraAmount FROM @Result WHERE ProductId = 0 AND LicensingFeeTypeId = 0) r
 		CROSS APPLY (
 			 SELECT -5 AS ProductId , -ExtraAmount AS LicensingFee -- Odds Boost Bonus
-			 UNION ALL
-			 SELECT -998 AS ProductId , CASE WHEN ExtraAmount <> 0 THEN 1 ELSE 0 END AS LicensingFee -- IsShowOddsBoostBonus
 		) t
 
 	-- Remove suspended/terminated licensees with amount = 0
@@ -257,8 +255,7 @@ BEGIN
 	VALUES	
 		(-20, 'Sponsorship', ''),
 		(-25, 'Casino Promotion', ''),
-		(-5,  'Odds Boost Bonus', ''),
-		(-998, 'IsShowOddsBoostBonus', '')
+		(-5,  'Odds Boost Bonus', '')
 
 	DECLARE @ProductList VARCHAR(MAX), @SQL VARCHAR(MAX)
 	SELECT  @ProductList = COALESCE(@ProductList + ', ', '') + '[' + ProductName + ']' FROM #tmp_Products ORDER BY ProductId
