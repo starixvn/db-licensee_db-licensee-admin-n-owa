@@ -320,7 +320,7 @@ BEGIN
 
 		UPDATE r
 		SET r.IsPrevious = 0
-			,r.LicensingFee = r.LicensingFee + CASE WHEN r.ProductId = 37 OR r.ProductId = 0 THEN 0 ELSE r.ExtraAmount END
+			,r.LicensingFee = r.LicensingFee + CASE WHEN r.ProductId IN (0, 37) THEN 0 ELSE r.ExtraAmount END
 			,r.BetCount = d.BetCount, r.Turnover = d.Turnover, r.MemberWL = d.MemberWL
 			,r.BACommission = d.BACommission
 			,r.OddsBoostBonus = CASE WHEN r.ProductId = 0 THEN r.ExtraAmount ELSE 0 END
@@ -447,7 +447,7 @@ BEGIN
 
 		UPDATE r
 		SET r.IsPrevious = 1
-			,r.LicensingFee = r.LicensingFee + CASE WHEN r.ProductId = 37 OR r.ProductId = 0 THEN 0 ELSE r.ExtraAmount END
+			,r.LicensingFee = r.LicensingFee + CASE WHEN r.ProductId IN (0, 37) THEN 0 ELSE r.ExtraAmount END
 			,r.BetCount = d.BetCount, r.Turnover = d.Turnover, r.MemberWL = d.MemberWL
 			,r.BACommission = d.BACommission
 			,r.OddsBoostBonus = CASE WHEN r.ProductId = 0 THEN r.ExtraAmount ELSE 0 END

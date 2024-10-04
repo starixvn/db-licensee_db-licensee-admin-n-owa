@@ -226,19 +226,26 @@ BEGIN
 		,@ToDate			AS WinLostDate
 		,0					AS CurrencyId
 		,''					AS CurrencyName
+		,CAST(0 AS FLOAT)	AS ExchangeRate
 		,CAST(0 AS BIT)		AS IsShowOddsSpread
+		,CAST(0 AS BIT)		AS IsShowOddsBoostBonus
 		,CAST(0 AS MONEY)	AS Betcount
 		,CAST(0 AS MONEY)	AS Turnover
 		,CAST(0 AS MONEY)	AS ActualStake
 		,CAST(0 AS MONEY)	AS BuyBackAmount
+		,CAST(0 AS MONEY)	AS BuyBackAmountSportsbook
+		,CAST(0 AS MONEY)	AS BuyBackAmountBA
 		,CAST(0 AS MONEY)	AS MemberWinLoss
 		,CAST(0 AS MONEY)	AS WinningPrize
 		,CAST(0 AS MONEY)	AS Contribution
 		,CAST(0 AS MONEY)	AS JackpotPrize
+		,CAST(0 AS MONEY)	AS Cashout
 		,CAST(0 AS MONEY)	AS MemberComm
 		,CAST(0 AS MONEY)	AS BettradeComm
 		,CAST(0 AS MONEY)	AS LicenseeWL
+		,CAST(0 AS MONEY)	AS LicenseeChargeRate
 		,CAST(0 AS MONEY)	AS LicenseeComm
+		,CAST(0 AS MONEY)	AS CashInShare
 		,CAST(0 AS MONEY)	AS Company
 		,CAST(0 AS MONEY)	AS TurnoverBase
 		,CAST(0 AS MONEY)	AS ActualStakeBase
@@ -259,6 +266,12 @@ BEGIN
 		,CAST(0 AS MONEY)	AS ProgressivePayoutBase
 		,CAST(0 AS MONEY)	AS ProgressivePayout
 		,CAST(0 AS MONEY)	AS ProgressiveFee
+		,CAST(0 AS MONEY)	AS CashoutTimes
+		,CAST(0 AS MONEY)	AS CashoutTickets
+		,CAST(0 AS MONEY)	AS CashoutValue
+		,CAST(0 AS MONEY)	AS TicketsPayout
+		,CAST(0 AS MONEY)	AS CashoutCommission
+		,CAST(0 AS MONEY)	AS BuyBackAmountAndComm		
 		,CAST(0 AS MONEY)	AS ProgressiveFeeBase
 		,CAST(0 AS MONEY)	AS TipsAmount
 		,CAST(0 AS MONEY)	AS TipsAmountBase
@@ -269,6 +282,21 @@ BEGIN
 		,CAST(0 AS MONEY)	AS GrossCompany
 		,CAST(0 AS MONEY)	AS GrossCompanyBase
 		,CAST(0 AS MONEY)	AS FreeBetAmount
+		,CAST(0 AS MONEY)	AS GrossWL
+		,CAST(0 AS MONEY)	AS OddsBoostBonus
+		,CAST(0 AS MONEY)	AS BuyBackAmountSportsbookBase
+		,CAST(0 AS MONEY)	AS BuyBackAmountBABase
+		,CAST(0 AS MONEY)	AS CashoutBase
+		,CAST(0 AS MONEY)	AS LicenseeChargeRateBase
+		,CAST(0 AS MONEY)	AS CashInShareBase
+		,CAST(0 AS MONEY)	AS CashoutTimesBase
+		,CAST(0 AS MONEY)	AS CashoutTicketsBase
+		,CAST(0 AS MONEY)	AS CashoutValueBase
+		,CAST(0 AS MONEY)	AS TicketsPayoutBase
+		,CAST(0 AS MONEY)	AS CashoutCommissionBase
+		,CAST(0 AS MONEY)	AS BuyBackAmountAndCommBase
+		,CAST(0 AS MONEY)	AS GrossWLBase
+		,CAST(0 AS MONEY)	AS OddsBoostBonusBase
 		,CAST(0 AS MONEY)	AS FreeBetAmountBase
 		RETURN
 	END
@@ -795,12 +823,13 @@ BEGIN
 				AND b.ProductID IN (SELECT ProductId FROM bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCode,@FromDate,@ToDate) WHERE GroupProductId = 0)
 			GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
-		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, GrossWL, LicenseeWL, GrossCompany, Company, Betcount, OddsSpreadCost, OddsBoostBonus)
+		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, GrossWL, LicenseeWL, LicenseeChargeRate, GrossCompany, Company, Betcount, OddsSpreadCost, OddsBoostBonus)
 		SELECT rptDate, d.CurrencyID
 			,SUM(Turnover)													AS Turnover
 			,SUM(MemberWinloss)												AS Winlost
 			,SUM(MemberWinloss - OddsBoostBonus)							AS GrossWL
 			,SUM((-MemberWinloss + OddsBoostBonus) * ( 1 - ISNULL(cr.Rate, p.Rate)))	AS LicenseeWL
+			,SUM((-MemberWinloss + OddsBoostBonus) * ISNULL(cr.Rate, p.Rate))			AS LicenseeChargeRate
 			,SUM((-MemberWinloss + OddsBoostBonus) * ISNULL(cr.Rate, p.Rate))			AS GrossCompany
 			,SUM((-MemberWinloss + OddsBoostBonus) * ISNULL(cr.Rate, p.Rate))			AS Company
 			,SUM(BetCount)													AS BetCount
@@ -810,11 +839,7 @@ BEGIN
 			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
 		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
-		GROUP BY rptDate, d.CurrencyID
-		
-		SELECT @TotalLicenseeChargeRate_InBaseCurrency = SUM(GrossCompany * e.Rate)
-		FROM #Result r
-		INNER JOIN #Exchange e ON r.Winlostdate = e.ExchangeDate AND r.CurrencyId = e.ExchangeId
+		GROUP BY rptDate, d.CurrencyID	
 
 	END
 	ELSE
@@ -859,7 +884,7 @@ BEGIN
 	END
 	
 	-- Return result
-	IF @ProductCode IN ('BA', 'CB', 'CO', 'BX')
+	IF @ProductCode IN ('BA', 'CB', 'CO', 'BX', 'SB')
 	BEGIN
 		UPDATE #Result SET ActualLicenseeChargeRate = LicenseeChargeRate
 	END

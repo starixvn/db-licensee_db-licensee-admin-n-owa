@@ -12,7 +12,8 @@ AS
 		
 	Revisions:
 		- 20240506@Danny: Create Sp  [#204167]
-	
+		- 20241004@Sally: Support Odds Boost Voucher [#209884]
+
 	Param's Explanation:
 
 	DECLARE @BaseCurrency	VARCHAR(10) ,@LicenseeName	VARCHAR(50)
@@ -54,6 +55,7 @@ BEGIN
 	UNION ALL SELECT 'Date', 'WinLostDate'
 	UNION ALL SELECT 'Company (Gross)',	'GrossCompany'
 	UNION ALL SELECT 'Tips Amount Due',	'TipsAmountDue'
+	UNION ALL SELECT 'Odds Boost Bonus','OddsBoostBonus'
 
 	-- Get Licensee Name And Base Currency
 

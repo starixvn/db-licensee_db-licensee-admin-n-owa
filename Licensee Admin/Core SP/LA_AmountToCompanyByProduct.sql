@@ -1159,8 +1159,8 @@ BEGIN
 			) d
 
 		UPDATE r
-		SET r.FeeRebate = CASE WHEN @FromDate >= @CutOff_RebateOnLicfee THEN CASE WHEN r.LicensingFee - r.Discount -  ISNULL(t.GrossLicensingFee, 0) - r.ExtraAmount < 0
-																   THEN 0 ELSE (r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.ExtraAmount) * ISNULL(r.FeeRebateRate, 0) END  -- SB ServiceFee - Discount - SB Promotion - OddsBoostBonus 
+		SET r.FeeRebate = CASE WHEN @FromDate >= @CutOff_RebateOnLicfee THEN CASE WHEN r.LicensingFee - r.Discount -  ISNULL(t.GrossLicensingFee, 0) - CASE WHEN r.ProductId= 0 THEN r.ExtraAmount ELSE 0 END < 0
+																   THEN 0 ELSE (r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.ExtraAmount) * ISNULL(r.FeeRebateRate, 0) END  -- ServiceFee - Discount - SB Promotion - OddsBoostBonus 
 								ELSE r.FeeRebate END
 			,r.TierRebate = r.TierRebate
 							+ CASE WHEN @FromDate < @CutOff_TierRebate THEN
@@ -1171,13 +1171,13 @@ BEGIN
 									END 
 							  ELSE 
 									CASE
-										WHEN r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate - r.ExtraAmount < 0 THEN 0
-										ELSE r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate - r.ExtraAmount
-									END  -- SB ServiceFee - Discount - SB Promotion - OddsBoostBonus 
+										WHEN r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate - CASE WHEN r.ProductId= 0 THEN r.ExtraAmount ELSE 0 END < 0 THEN 0
+										ELSE r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate - CASE WHEN r.ProductId= 0 THEN r.ExtraAmount ELSE 0 END
+									END  -- ServiceFee - Discount - SB Promotion - OddsBoostBonus 
 							  END* r.TierRebateRate
 			,r.TotalRebate = r.WLRebate
-							+ CASE WHEN @FromDate >= @CutOff_RebateOnLicfee THEN CASE WHEN r.LicensingFee - r.Discount -  ISNULL(t.GrossLicensingFee, 0) - r.ExtraAmount < 0
-																   THEN 0 ELSE (r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.ExtraAmount) * ISNULL(r.FeeRebateRate, 0) END
+							+ CASE WHEN @FromDate >= @CutOff_RebateOnLicfee THEN CASE WHEN r.LicensingFee - r.Discount -  ISNULL(t.GrossLicensingFee, 0) - CASE WHEN r.ProductId= 0 THEN r.ExtraAmount ELSE 0 END < 0
+																   THEN 0 ELSE (r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - CASE WHEN r.ProductId= 0 THEN r.ExtraAmount ELSE 0 END) * ISNULL(r.FeeRebateRate, 0) END
 								ELSE r.FeeRebate END
 							+ CASE
 								WHEN @IncludeTierRebate = 0 THEN 0
@@ -1190,8 +1190,8 @@ BEGIN
 										END 
 									  ELSE 
 										CASE
-											WHEN r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate - r.ExtraAmount < 0 THEN 0
-											ELSE r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate - r.ExtraAmount 
+											WHEN r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate - CASE WHEN r.ProductId= 0 THEN r.ExtraAmount ELSE 0 END < 0 THEN 0
+											ELSE r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.TierRebate - r.WLRebate - CASE WHEN r.ProductId= 0 THEN r.ExtraAmount ELSE 0 END 
 										END  -- WLRebate + FeeRebatee + TierRebate
 									  END* r.TierRebateRate 
 								END 
