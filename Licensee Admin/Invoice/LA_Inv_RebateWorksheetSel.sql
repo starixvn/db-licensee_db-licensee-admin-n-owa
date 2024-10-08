@@ -40,7 +40,7 @@ AS
 	  - 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 	  - 20230223@Danny: Integrate Casino promotion [#194808]
 	  - 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
-	  - 20241007@Sally: Support Odds Boost Voucher [#199292]
+	  - 20241007@Sally: Support Odds Boost Voucher [#209884]
 */
 
 BEGIN
@@ -95,7 +95,7 @@ BEGIN
 	DECLARE @TempResult TABLE
 	(
 		PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, LicenseeWL MONEY, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
-		,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), ExtraInfo NVARCHAR(4000), lessAdjustment MONEY
+		,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), ExtraInfo NVARCHAR(4000), OddsBoostBonus MONEY, lessAdjustment MONEY
 	)
 
 	DECLARE @Result_37 TABLE --ProductID = 37
@@ -118,7 +118,7 @@ BEGIN
 			,@ToDate = @ToDate
 			,@BaseCurrencyName = @BaseCurrency
 			,@IncludeTierRebate = 0
-			,@LicensingFeeTypeIds = '0,11,13' -- 11 = Licensee WL
+			,@LicensingFeeTypeIds = '0,11,13,14' -- 11 = Licensee WL
 
 		INSERT INTO @Result_37
 		(
@@ -131,6 +131,19 @@ BEGIN
 
 		DELETE @TempResult WHERE ProductId = 37
 
+		IF EXISTS (SELECT TOP 1 1 FROM @TempResult WHERE LicensingFeeTypeId = 14)
+		BEGIN
+			UPDATE r
+			SET r.OddsBoostBonus = ISNULL(r14.ExtraAmount,0)
+			FROM @TempResult r
+				INNER JOIN @TempResult r14 ON r14.PartyId = r.PartyId 
+										AND r14.ProductId = r.ProductId 
+										AND r14.LicensingFeeTypeId = 14
+			WHERE r.ProductId = 0 AND r.LicensingFeeTypeId = 0
+
+			DELETE FROM @TempResult WHERE LicensingFeeTypeId = 14
+		END
+
 		UPDATE r
 		SET r.LicenseeWL = CASE WHEN t.ExtraAmount < 0 THEN 0 ELSE t.ExtraAmount END
 		FROM @TempResult r
@@ -140,17 +153,14 @@ BEGIN
 		DELETE @TempResult WHERE LicensingFeeTypeId = 11
 
 		UPDATE r
-		SET r.lessAdjustment = CASE WHEN r.ProductId = 0 AND r.LicensingFeeTypeId = 0 THEN r.ExtraAmount ELSE 0 END -- Odds Boost Bonus
-								+ r.Discount 
-								+ CASE WHEN @FDate >= @CutOff_RebateOnLicfee THEN ISNULL(r_37.GrossLicensingFee,0) ELSE 0 
-							END -- Adjustment, including values of any discount/promotions/sponsorship/OBB
+		SET r.lessAdjustment = OddsBoostBonus + r.Discount + CASE WHEN @FDate >= @CutOff_RebateOnLicfee THEN ISNULL(r_37.GrossLicensingFee,0) ELSE 0 END -- Adjustment, including values of any discount/promotions/sponsorship/OBB
 		FROM @TempResult r
 			LEFT JOIN @Result_37 r_37 ON r.PartyId = r_37.PartyId AND r_37.LicensingFeeTypeId = 0 AND r.ProductId = 0 AND r.LicensingFeeTypeId = 0
 		
 	END
 
 	-- Total
-	IF EXISTS (SELECT TOP 1 1 FROM @TempResult WHERE ProductId = -37 OR ProductId = 0)
+	IF EXISTS (SELECT TOP 1 1 FROM @TempResult WHERE ProductId = -37)
 	BEGIN
 		INSERT INTO @Products(ProductId, ProductCode, RebateType) VALUES (-37, 'SPR(CS)', 2) --rebate on LicFee
 	END
@@ -158,19 +168,13 @@ BEGIN
 	INSERT INTO @Result(ProductId, AmountToCompany, AmountToCompanyForTotal, lessAdjustment, Rebate, RebateRemark) 
 	SELECT r.ProductId
 		,CASE WHEN r.LicensingFeeTypeId = 13 THEN -r.ExtraAmount
-			   WHEN p.RebateType = 2 THEN r.LicensingFee + CASE WHEN r.ProductId = 0 AND r.LicensingFeeTypeId = 0 THEN 0 ELSE r.ExtraAmount END						 
+			   WHEN p.RebateType = 2 THEN r.LicensingFee + r.ExtraAmount						 
 				ELSE r.LicenseeWL
 		END AS AmountToCompany
 		,CASE WHEN r.LicensingFeeTypeId = 13 THEN -r.ExtraAmount
 			   WHEN p.RebateType = 2 THEN 
-					CASE WHEN (r.LicensingFee 
-									+ CASE WHEN r.ProductId = 0 AND r.LicensingFeeTypeId = 0 THEN 0 ELSE r.ExtraAmount END 
-							 		- lessAdjustment
-								) < 0 THEN 0 
-					ELSE r.LicensingFee 
-							 + CASE WHEN r.ProductId = 0 AND r.LicensingFeeTypeId = 0 THEN 0 ELSE r.ExtraAmount END 
-							 - lessAdjustment  
-					END 
+					CASE WHEN (r.LicensingFee  + r.ExtraAmount - ISNULL(lessAdjustment,0)) < 0 THEN 0 
+					ELSE r.LicensingFee + r.ExtraAmount - ISNULL(lessAdjustment,0) END 
 				ELSE r.LicenseeWL 
 		END AS AmountToCompanyForTotal
 		,lessAdjustment

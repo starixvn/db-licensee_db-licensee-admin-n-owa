@@ -649,8 +649,8 @@ BEGIN
 		FROM #Result r
 			INNER JOIN (
 				SELECT r.PartyId
-					,CASE WHEN SUM(r.OddsSpreadCost * e.Rate) <= 0 THEN 0 ELSE 1 END AS IsShowOddsSpread
-					,CASE WHEN SUM(r.OddsBoostBonus * e.Rate) = 0 THEN 0 ELSE 1 END AS IsShowOddsBoostBonus
+					,CASE WHEN SUM(ISNULL(r.OddsSpreadCost, 0) * e.Rate) <= 0 THEN 0 ELSE 1 END AS IsShowOddsSpread
+					,CASE WHEN SUM(ISNULL(r.OddsBoostBonus, 0) * e.Rate) = 0 THEN 0 ELSE 1 END AS IsShowOddsBoostBonus
 				FROM #tmpWinLoss r
 					INNER JOIN #PartyList p ON r.PartyId = p.PartyId
 					INNER JOIN #ExchangeRate e ON p.BaseCurrencyId = e.BaseCurrencyId AND r.currency = e.ExchangeId AND r.Winlostdate = e.ExchangeDate

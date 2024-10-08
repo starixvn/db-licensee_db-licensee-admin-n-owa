@@ -537,8 +537,8 @@ BEGIN
 			,SUM(AmtDuetoBA * e.Rate)	AS AmtDuetoBA
 			,SUM(Company * e.Rate)		AS Company
 			,SUM(Playercomm * e.Rate)	AS Playercomm
-			,SUM(OddsSpreadCost *e.Rate)AS OddsSpreadCost
-			,SUM(OddsBoostBonus *e.Rate)AS OddsBoostBonus
+			,SUM(ISNULL(OddsSpreadCost, 0) *e.Rate)AS OddsSpreadCost
+			,SUM(ISNULL(OddsBoostBonus, 0) *e.Rate)AS OddsBoostBonus
 		FROM #tmpWinLoss w
 			INNER JOIN #ExchangeRate e ON w.Winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
 			LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON w.PartyID = p.PartyID
@@ -577,8 +577,8 @@ BEGIN
 		FROM #Result r
 			INNER JOIN (
 				SELECT r.PartyId
-					,CASE WHEN SUM(r.OddsSpreadCost * e.Rate) <= 0 THEN 0 ELSE 1 END AS IsShowOddsSpread
-					,CASE WHEN SUM(r.OddsBoostBonus * e.Rate) = 0 THEN 0 ELSE 1 END AS IsShowOddsBoostBonus
+					,CASE WHEN SUM(ISNULL(r.OddsSpreadCost,0) * e.Rate) <= 0 THEN 0 ELSE 1 END AS IsShowOddsSpread
+					,CASE WHEN SUM(ISNULL(r.OddsBoostBonus,0) * e.Rate) = 0 THEN 0 ELSE 1 END AS IsShowOddsBoostBonus
 				FROM #tmpWinLoss r
 					INNER JOIN #PartyList p ON r.PartyId = p.PartyId
 					INNER JOIN #ExchangeRate e ON p.BaseCurrencyId = e.BaseCurrencyId AND r.currency = e.ExchangeId AND r.Winlostdate = e.ExchangeDate

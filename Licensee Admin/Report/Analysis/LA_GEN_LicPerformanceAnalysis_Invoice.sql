@@ -32,6 +32,7 @@ AS
 		- 20240401@Danny: Change meta data [#203267]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+		- 20241008@Sally: Support Odds Boost Voucher [#209884]
 
 */
 
@@ -164,7 +165,7 @@ BEGIN
 			(
 				PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
 				,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000)
-				,Winloss MONEY, Turnover MONEY, TurnoverNoDraw MONEY, BetCount INT, BaseCurrencyId INT, ExtraInfo NVARCHAR(4000)
+				,Winloss MONEY, Turnover MONEY, TurnoverNoDraw MONEY, BetCount INT, BaseCurrencyId INT, ExtraInfo NVARCHAR(4000), OddsBoostBonus MONEY
 			)
 
 			WHILE 1 = 1
@@ -186,6 +187,20 @@ BEGIN
 					,@FromDate = @FromDate
 					,@ToDate = @ToDate
 					,@BaseCurrencyName = @CurrencyName
+					,@LicensingFeeTypeIds = '0,14'				
+				
+				IF EXISTS (SELECT TOP 1 1 FROM @Result WHERE LicensingFeeTypeId = 14)
+				BEGIN
+					UPDATE r
+					SET r.OddsBoostBonus = ISNULL(r14.ExtraAmount,0)
+					FROM @Result r
+						INNER JOIN @Result r14 ON r14.PartyId = r.PartyId 
+												AND r14.ProductId = r.ProductId 
+												AND r14.LicensingFeeTypeId = 14
+					WHERE r.ProductId = 0 AND r.LicensingFeeTypeId = 0
+
+					DELETE FROM @Result WHERE LicensingFeeTypeId = 14
+				END
 
 				IF @isRecalRebate =1 AND @FromDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
 				BEGIN
@@ -246,7 +261,7 @@ BEGIN
 			INSERT INTO dbo.rptLicPerformanceAnalysis
 			(
 				ReportDate, SiteId, ProductId, CurrencyId, IsBillingCurrency
-				,BetCount, Turnover, TurnoverNoDraw, LicenseeWinloss, LicensingFee, Discount, Rebate, Adjustment
+				,BetCount, Turnover, TurnoverNoDraw, LicenseeWinloss, LicensingFee, Discount, Rebate, Adjustment, OddsBoostBonus
 			)
 			SELECT
 				@InvoiceDate, @SiteId, ProductId, BaseCurrencyId
@@ -259,6 +274,7 @@ BEGIN
 				,Discount
 				,Rebate
 				,0 AS Adjustment
+				,ISNULL(OddsBoostBonus, 0) AS OddsBoostBonus
 			FROM @Result
 
 			DROP TABLE #tmpPerfData

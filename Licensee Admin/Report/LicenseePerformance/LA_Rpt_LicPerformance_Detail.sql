@@ -280,7 +280,20 @@ BEGIN
 			,@ToDate = @TDate
 			,@IsConvertExRate = @IsConvert
 			,@BaseCurrencyName = @BaseCurrencyName
-			,@LicensingFeeTypeIds = '0,13'
+			,@LicensingFeeTypeIds = '0,13,14' --14 = Odds Boost Adjustment
+
+		IF EXISTS (SELECT TOP 1 1 FROM @Result WHERE LicensingFeeTypeId = 14)
+		BEGIN
+			UPDATE r
+			SET r.OddsBoostBonus = ISNULL(r14.ExtraAmount,0)
+			FROM @Result r
+				INNER JOIN @Result r14 ON r14.PartyId = r.PartyId 
+										AND r14.ProductId = r.ProductId 
+										AND r14.LicensingFeeTypeId = 14
+			WHERE r.ProductId = 0 AND r.LicensingFeeTypeId = 0
+
+			DELETE FROM @Result WHERE LicensingFeeTypeId = 14
+		END
 
 		IF @isRecalRebate =1 AND @FDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
 		BEGIN
@@ -320,10 +333,9 @@ BEGIN
 
 		UPDATE r
 		SET r.IsPrevious = 0
-			,r.LicensingFee = r.LicensingFee + CASE WHEN r.ProductId IN (0, 37) THEN 0 ELSE r.ExtraAmount END
+			,r.LicensingFee = r.LicensingFee + CASE WHEN r.ProductId = 37 THEN 0 ELSE r.ExtraAmount END
 			,r.BetCount = d.BetCount, r.Turnover = d.Turnover, r.MemberWL = d.MemberWL
 			,r.BACommission = d.BACommission
-			,r.OddsBoostBonus = CASE WHEN r.ProductId = 0 THEN r.ExtraAmount ELSE 0 END
 		FROM @Result r
 			LEFT JOIN (
 				SELECT p.PartyId, p.ProductId
@@ -406,7 +418,20 @@ BEGIN
 			,@ToDate = @PrevTDate
 			,@IsConvertExRate = @IsConvert
 			,@BaseCurrencyName = @BaseCurrencyName
-			,@LicensingFeeTypeIds = '0,13'
+			,@LicensingFeeTypeIds = '0,13,14'
+		
+		IF EXISTS (SELECT TOP 1 1 FROM @Result WHERE LicensingFeeTypeId = 14)
+		BEGIN
+			UPDATE r
+			SET r.OddsBoostBonus = ISNULL(r14.ExtraAmount,0)
+			FROM @Result r
+				INNER JOIN @Result r14 ON r14.PartyId = r.PartyId 
+										AND r14.ProductId = r.ProductId 
+										AND r14.LicensingFeeTypeId = 14
+			WHERE r.ProductId = 0 AND r.LicensingFeeTypeId = 0
+
+			DELETE FROM @Result WHERE LicensingFeeTypeId = 14
+		END
 
 		IF @isRecalRebate =1 AND @PrevFDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
 		BEGIN
@@ -447,10 +472,9 @@ BEGIN
 
 		UPDATE r
 		SET r.IsPrevious = 1
-			,r.LicensingFee = r.LicensingFee + CASE WHEN r.ProductId IN (0, 37) THEN 0 ELSE r.ExtraAmount END
+			,r.LicensingFee = r.LicensingFee + CASE WHEN r.ProductId = 37 THEN 0 ELSE r.ExtraAmount END
 			,r.BetCount = d.BetCount, r.Turnover = d.Turnover, r.MemberWL = d.MemberWL
 			,r.BACommission = d.BACommission
-			,r.OddsBoostBonus = CASE WHEN r.ProductId = 0 THEN r.ExtraAmount ELSE 0 END
 		FROM @Result r
 			LEFT JOIN (
 				SELECT p.PartyId, p.ProductId
