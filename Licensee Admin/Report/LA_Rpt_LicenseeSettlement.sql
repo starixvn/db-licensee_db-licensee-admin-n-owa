@@ -62,6 +62,7 @@ AS
 		- 20240221@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
 		- 20240730@Danny: Player Tips worksheet [#207863]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+		- 20241008@Danny: return figures with 2 decimal digits  [RedmineID: #211925]
 	Param's Explanation:
 */
 BEGIN
@@ -890,70 +891,70 @@ BEGIN
 		, @IsShowOddsSpread			AS IsShowOddsSpread
 		, SUM(Betcount)							AS Betcount
 		--orginal
-		, SUM(ISNULL(d.Turnover, 0))					AS Turnover
-		, SUM(ISNULL(d.ActualStake, 0))					AS ActualStake
-		, SUM(ISNULL(d.BuyBackAmount, 0))				AS BuyBackAmount
-		, SUM(ISNULL(d.BuyBackAmountSB, 0))				AS BuyBackAmountSportsbook
-		, SUM(ISNULL(d.BuyBackAmountBA, 0))				AS BuyBackAmountBA
-		, SUM(ISNULL(d.Winlost, 0))						AS MemberWinLoss
-		, SUM(ISNULL(d.WinningPrize, 0))				AS WinningPrize
-		, SUM(ISNULL(d.Contribution, 0))				AS Contribution
-		, SUM(ISNULL(d.JackpotPrize, 0))				AS JackpotPrize
-		, SUM(ISNULL(d.Cashout, 0))						AS Cashout
-		, SUM(ISNULL(d.PlayerComm, 0))					AS MemberComm
-		, SUM(ISNULL(d.BettradeComm, 0))				AS BettradeComm
-		, SUM(ISNULL(d.LicenseeWL, 0))					AS LicenseeWL
-		, SUM(ISNULL(d.LicenseeChargeRate, 0))			AS LicenseeChargeRate
-		, SUM(ISNULL(d.LicenseeComm, 0))				AS LicenseeComm
-		, SUM(ISNULL(d.CashInShare, 0))					AS CashInShare
-		, SUM(ISNULL(d.TipsAmount, 0))					AS TipsAmount
-		, SUM(ISNULL(d.TipsAmountDue, 0))				AS TipsAmountDue
-		, SUM(ISNULL(d.Company, 0))						AS Company
-		, SUM(ISNULL(d.ProgressiveContribution, 0))		AS ProgressiveContribution
-		, SUM(ISNULL(d.ProgressivePayout, 0))			AS ProgressivePayout
-		, SUM(ISNULL(d.ProgressiveFee, 0))				AS ProgressiveFee
-		, SUM(ISNULL(d.CashoutTimes, 0))				AS CashoutTimes
-		, SUM(ISNULL(d.CashoutTickets, 0))				AS CashoutTickets
-		, SUM(ISNULL(d.CashoutValue, 0))				AS CashoutValue
-		, SUM(ISNULL(d.TicketsPayout, 0))				AS TicketsPayout
-		, SUM(ISNULL(d.CashoutCommission, 0))			AS CashoutCommission
-		, SUM(ISNULL(d.BuyBackAmountAndComm, 0))		AS BuyBackAmountAndComm
-		, SUM(ISNULL(d.GrossCompany, 0))				AS GrossCompany
-		, SUM(ISNULL(d.OddsSpreadCost, 0))				AS OddsSpreadCost
-		, SUM(ISNULL(d.FreeBetAmount, 0))				AS FreeBetAmount
+		, ROUND(SUM(ISNULL(d.Turnover, 0)),2)					AS Turnover
+		, ROUND(SUM(ISNULL(d.ActualStake, 0)),2)				AS ActualStake
+		, ROUND(SUM(ISNULL(d.BuyBackAmount, 0)),2)				AS BuyBackAmount
+		, ROUND(SUM(ISNULL(d.BuyBackAmountSB, 0)),2)			AS BuyBackAmountSportsbook
+		, ROUND(SUM(ISNULL(d.BuyBackAmountBA, 0)),2)			AS BuyBackAmountBA
+		, ROUND(SUM(ISNULL(d.Winlost, 0)),2)					AS MemberWinLoss
+		, ROUND(SUM(ISNULL(d.WinningPrize, 0)),2)				AS WinningPrize
+		, ROUND(SUM(ISNULL(d.Contribution, 0)),2)				AS Contribution
+		, ROUND(SUM(ISNULL(d.JackpotPrize, 0)),2)				AS JackpotPrize
+		, ROUND(SUM(ISNULL(d.Cashout, 0)),2)					AS Cashout
+		, ROUND(SUM(ISNULL(d.PlayerComm, 0)),2)					AS MemberComm
+		, ROUND(SUM(ISNULL(d.BettradeComm, 0)),2)				AS BettradeComm
+		, ROUND(SUM(ISNULL(d.LicenseeWL, 0)),2)					AS LicenseeWL
+		, ROUND(SUM(ISNULL(d.LicenseeChargeRate, 0)),2)			AS LicenseeChargeRate
+		, ROUND(SUM(ISNULL(d.LicenseeComm, 0)),2)				AS LicenseeComm
+		, ROUND(SUM(ISNULL(d.CashInShare, 0)),2)				AS CashInShare
+		, ROUND(SUM(ISNULL(d.TipsAmount, 0)),2)					AS TipsAmount
+		, ROUND(SUM(ISNULL(d.TipsAmountDue, 0)),2)				AS TipsAmountDue
+		, ROUND(SUM(ISNULL(d.Company, 0)),2)					AS Company
+		, ROUND(SUM(ISNULL(d.ProgressiveContribution, 0)),2)	AS ProgressiveContribution
+		, ROUND(SUM(ISNULL(d.ProgressivePayout, 0)),2)			AS ProgressivePayout
+		, ROUND(SUM(ISNULL(d.ProgressiveFee, 0)),2)				AS ProgressiveFee
+		, ROUND(SUM(ISNULL(d.CashoutTimes, 0)),2)				AS CashoutTimes
+		, ROUND(SUM(ISNULL(d.CashoutTickets, 0)),2)				AS CashoutTickets
+		, ROUND(SUM(ISNULL(d.CashoutValue, 0)),2)				AS CashoutValue
+		, ROUND(SUM(ISNULL(d.TicketsPayout, 0)),2)				AS TicketsPayout
+		, ROUND(SUM(ISNULL(d.CashoutCommission, 0)),2)			AS CashoutCommission
+		, ROUND(SUM(ISNULL(d.BuyBackAmountAndComm, 0)),2)		AS BuyBackAmountAndComm
+		, ROUND(SUM(ISNULL(d.GrossCompany, 0)),2)				AS GrossCompany
+		, ROUND(SUM(ISNULL(d.OddsSpreadCost, 0)),2)				AS OddsSpreadCost
+		, ROUND(SUM(ISNULL(d.FreeBetAmount, 0)),2)				AS FreeBetAmount
 
 		--Base on currency
-		, CONVERT(MONEY, SUM(ISNULL(d.Turnover * e.Rate, 0)))					AS TurnoverBase
-		, CONVERT(MONEY, SUM(ISNULL(d.ActualStake * e.Rate, 0)))				AS ActualStakeBase
-		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmount * e.Rate, 0)))				AS BuyBackAmountBase
-		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountSB * e.Rate, 0)))			AS BuyBackAmountSportsbookBase
-		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountBA * e.Rate, 0)))			AS BuyBackAmountBABase
-		, CONVERT(MONEY, SUM(ISNULL(d.BettradeComm * e.Rate, 0)))				AS BettradeCommBase
-		, CONVERT(MONEY, SUM(ISNULL(d.Winlost * e.Rate, 0)))					AS MemberWinLossBase
-		, CONVERT(MONEY, SUM(ISNULL(d.WinningPrize * e.Rate, 0)))				AS WinningPrizeBase
-		, CONVERT(MONEY, SUM(ISNULL(d.Contribution * e.Rate, 0)))				AS ContributionBase
-		, CONVERT(MONEY, SUM(ISNULL(d.JackpotPrize* e.Rate, 0)))				AS JackpotPrizeBase
-		, CONVERT(MONEY, SUM(ISNULL(d.Cashout * e.Rate, 0)))					AS CashoutBase
-		, CONVERT(MONEY, SUM(ISNULL(d.PlayerComm * e.Rate, 0)))					AS MemberCommBase
-		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeWL * e.Rate, 0)))					AS LicenseeWLBase
-		, CONVERT(MONEY, SUM(ISNULL(d.ActualLicenseeChargeRate * e.Rate, 0)))	AS LicenseeChargeRateBase
-		, CONVERT(MONEY, SUM(ISNULL(d.LicenseeComm * e.Rate, 0)))				AS LicenseeCommBase
-		, CONVERT(MONEY, SUM(ISNULL(d.CashInShare * e.Rate, 0)))				AS CashInShareBase
-		, CONVERT(MONEY, SUM(ISNULL(d.TipsAmount * e.Rate, 0)))					AS TipsAmountBase
-		, CONVERT(MONEY, SUM(ISNULL(d.TipsAmountDue * e.Rate, 0)))				AS TipsAmountDueBase
-		, CONVERT(MONEY, SUM(ISNULL(d.Company * e.Rate, 0)))					AS CompanyBase
-		, CONVERT(MONEY, SUM(ISNULL(d.ProgressiveContribution * e.Rate, 0)))	AS ProgressiveContributionBase
-		, CONVERT(MONEY, SUM(ISNULL(d.ProgressiveFee * e.Rate, 0)))				AS ProgressiveFeeBase
-		, CONVERT(MONEY, SUM(ISNULL(d.ProgressivePayout * e.Rate, 0)))			AS ProgressivePayoutBase
-		, CONVERT(MONEY, SUM(ISNULL(d.CashoutTimes * e.Rate, 0)))				AS CashoutTimesBase
-		, CONVERT(MONEY, SUM(ISNULL(d.CashoutTickets * e.Rate, 0)))				AS CashoutTicketsBase
-		, CONVERT(MONEY, SUM(ISNULL(d.CashoutValue * e.Rate, 0)))				AS CashoutValueBase
-		, CONVERT(MONEY, SUM(ISNULL(d.TicketsPayout * e.Rate, 0)))				AS TicketsPayoutBase
-		, CONVERT(MONEY, SUM(ISNULL(d.CashoutCommission * e.Rate, 0)))			AS CashoutCommissionBase
-		, CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountAndComm * e.Rate, 0)))		AS BuyBackAmountAndCommBase
-		, CONVERT(MONEY, SUM(ISNULL(d.GrossCompany * e.Rate, 0)))				AS GrossCompanyBase
-		, CONVERT(MONEY, SUM(ISNULL(d.OddsSpreadCost * e.Rate, 0)))				AS OddsSpreadCostBase
-		, CONVERT(MONEY, SUM(ISNULL(d.FreeBetAmount * e.Rate, 0)))				AS FreeBetAmountBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.Turnover * e.Rate, 0))),2)					AS TurnoverBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.ActualStake * e.Rate, 0))),2)				AS ActualStakeBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmount * e.Rate, 0))),2)				AS BuyBackAmountBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountSB * e.Rate, 0))),2)			AS BuyBackAmountSportsbookBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountBA * e.Rate, 0))),2)			AS BuyBackAmountBABase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.BettradeComm * e.Rate, 0))),2)				AS BettradeCommBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.Winlost * e.Rate, 0))),2)					AS MemberWinLossBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.WinningPrize * e.Rate, 0))),2)				AS WinningPrizeBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.Contribution * e.Rate, 0))),2)				AS ContributionBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.JackpotPrize* e.Rate, 0))),2)				AS JackpotPrizeBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.Cashout * e.Rate, 0))),2)					AS CashoutBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.PlayerComm * e.Rate, 0))),2)				AS MemberCommBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.LicenseeWL * e.Rate, 0))),2)				AS LicenseeWLBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.ActualLicenseeChargeRate * e.Rate, 0))),2)	AS LicenseeChargeRateBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.LicenseeComm * e.Rate, 0))),2)				AS LicenseeCommBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.CashInShare * e.Rate, 0))),2)				AS CashInShareBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.TipsAmount * e.Rate, 0))),2)				AS TipsAmountBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.TipsAmountDue * e.Rate, 0))),2)				AS TipsAmountDueBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.Company * e.Rate, 0))),2)					AS CompanyBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.ProgressiveContribution * e.Rate, 0))),2)	AS ProgressiveContributionBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.ProgressiveFee * e.Rate, 0))),2)			AS ProgressiveFeeBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.ProgressivePayout * e.Rate, 0))),2)			AS ProgressivePayoutBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.CashoutTimes * e.Rate, 0))),2)				AS CashoutTimesBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.CashoutTickets * e.Rate, 0))),2)			AS CashoutTicketsBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.CashoutValue * e.Rate, 0))),2)				AS CashoutValueBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.TicketsPayout * e.Rate, 0))),2)				AS TicketsPayoutBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.CashoutCommission * e.Rate, 0))),2)			AS CashoutCommissionBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.BuyBackAmountAndComm * e.Rate, 0))),2)		AS BuyBackAmountAndCommBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.GrossCompany * e.Rate, 0))),2)				AS GrossCompanyBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.OddsSpreadCost * e.Rate, 0))),2)			AS OddsSpreadCostBase
+		, ROUND(CONVERT(MONEY, SUM(ISNULL(d.FreeBetAmount * e.Rate, 0))),2)				AS FreeBetAmountBase
 	FROM #Result d
 	INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
 	INNER JOIN sortedExchange se ON se.CurrencyCode = e.CurrencyCode
