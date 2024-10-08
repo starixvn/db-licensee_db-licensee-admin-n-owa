@@ -47,6 +47,7 @@ AS
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 		- 20240612@Danny: return figures with 2 decimal digits [RedmineID: #206415]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+		- 20241008@Danny: return extra amount figures with 4 decimal digits  [RedmineID: #211925]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -1365,7 +1366,7 @@ BEGIN
 		LicensingFeeTypeId, 
 		ROUND(GrossLicensingFee,2) GrossLicensingFee, 
 		ROUND(LicensingFee,2) LicensingFee, 
-		ROUND(ExtraAmount,2) ExtraAmount , IsChargedByGroupMinFee, IsChargedByMinFee,
+		ExtraAmount ExtraAmount , IsChargedByGroupMinFee, IsChargedByMinFee,
 		ROUND(r.Discount,2) Discount, r.DiscountRate, DiscountRemark, 
 		ROUND(ISNULL(TotalRebate,0),2) AS Rebate, 
 		ISNULL(ISNULL(NULLIF(WLRebateRate, 0), NULLIF(FeeRebateRate, 0)), 0) AS RebateRate, 
