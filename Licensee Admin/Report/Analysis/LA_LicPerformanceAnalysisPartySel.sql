@@ -1,4 +1,4 @@
-﻿/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+﻿/*<info serverAlias="DBCUST-bodb_Licensee,DBLIC-bodb_Licensee,DBACC-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_Licensee
 GO
 
@@ -13,6 +13,7 @@ AS
 	Revisions:
 		- 20190306@Bruce: Create SP
 		- 20190930@Bruce: Change licensee's launch date in Licensees Performance Analysis [#121129]
+		- 20241008@Danny: Deploy SP in DBLIC, DBACC [#207727]
 */
 BEGIN
 	;WITH cte_Group AS (
