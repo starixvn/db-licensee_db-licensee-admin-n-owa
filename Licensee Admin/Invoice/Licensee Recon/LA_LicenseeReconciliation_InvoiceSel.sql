@@ -42,6 +42,7 @@ AS
 		- 20240227@Danny: Extend data type param input [RedmineID: #197267]
 		- 20240503@Danny: including AG Casino Contribution item [RedmineID: #204716]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
+		- 20241010@Danny: exclude some debit note [RedmineID: #212037]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -100,7 +101,7 @@ BEGIN
 	INNER JOIN dbo.LA_InvoiceStatement s WITH(NOLOCK) ON h.InvoiceHeaderId = s.InvoiceHeaderId
 	LEFT JOIN dbo.LA_f_Products3rd('') r ON r.ProductID = s.ProductId
 	WHERE h.StatusId <> -1 -- void
-		AND h.InvoiceHeaderId NOT IN (6208, 6207) -- temporary exclude these credit notes
+		AND h.InvoiceHeaderId NOT IN (6208, 6207, 30302) -- temporary exclude these credit notes
 		AND h.Environment = @Environment
 		AND 1 = CASE
 					WHEN h.InvoiceType IN (1, 3) AND h.FromDate BETWEEN @FromDate AND @ToDate THEN 1
