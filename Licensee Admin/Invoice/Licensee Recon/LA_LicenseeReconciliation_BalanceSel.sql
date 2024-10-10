@@ -19,6 +19,7 @@ AS
 		- 20210323@Percy: Support duo base currency [RedmineID: #152089]
 		- 20240227@Danny: Extend data type param input [RedmineID: #197267]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
+		- 20241010@Danny: exclude some debit note [RedmineID: #212037]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -72,7 +73,7 @@ BEGIN
 			INNER JOIN bodb_licensee.dbo.OAS_PartyBaseCurrency bc WITH(NOLOCK) ON bc.LicenseeCode = s.LicenseeCode
 			INNER JOIN bodb_licensee.dbo.LA_InvoiceHeader h WITH(NOLOCK) ON bc.PartyId = h.PartyId
 		WHERE h.StatusId <> -1 -- void
-			AND h.InvoiceHeaderId NOT IN (6208, 6207) -- temporary exclude these credit notes
+			AND h.InvoiceHeaderId NOT IN (6208, 6207, 30302) -- temporary exclude these credit notes
 			AND h.Environment = @Environment
 			AND InvoiceType = 1
 			AND h.FromDate <= @ReportDate
