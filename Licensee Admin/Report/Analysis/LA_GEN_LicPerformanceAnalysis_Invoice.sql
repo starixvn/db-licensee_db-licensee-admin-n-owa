@@ -40,7 +40,8 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @PartyId INT, @SiteId INT, @InvoiceStatus SMALLINT, @InvoiceDate DATE
-	DECLARE @AdjustmentId INT = 9000
+	DECLARE @AdjustmentId	INT = 9000
+		,@OddsBoostBonusId  INT = 9002  
 	DECLARE @BaseCurrencyId INT = 6 -- default
 
 	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT)
@@ -165,7 +166,7 @@ BEGIN
 			(
 				PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
 				,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000)
-				,Winloss MONEY, Turnover MONEY, TurnoverNoDraw MONEY, BetCount INT, BaseCurrencyId INT, ExtraInfo NVARCHAR(4000), OddsBoostBonus MONEY
+				,Winloss MONEY, Turnover MONEY, TurnoverNoDraw MONEY, BetCount INT, BaseCurrencyId INT, ExtraInfo NVARCHAR(4000)
 			)
 
 			WHILE 1 = 1
@@ -187,20 +188,7 @@ BEGIN
 					,@FromDate = @FromDate
 					,@ToDate = @ToDate
 					,@BaseCurrencyName = @CurrencyName
-					,@LicensingFeeTypeIds = '0,14'				
-				
-				IF EXISTS (SELECT TOP 1 1 FROM @Result WHERE LicensingFeeTypeId = 14)
-				BEGIN
-					UPDATE r
-					SET r.OddsBoostBonus = ISNULL(r14.ExtraAmount,0)
-					FROM @Result r
-						INNER JOIN @Result r14 ON r14.PartyId = r.PartyId 
-												AND r14.ProductId = r.ProductId 
-												AND r14.LicensingFeeTypeId = 14
-					WHERE r.ProductId = 0 AND r.LicensingFeeTypeId = 0
-
-					DELETE FROM @Result WHERE LicensingFeeTypeId = 14
-				END
+					,@LicensingFeeTypeIds = '0,14'								
 
 				IF @isRecalRebate =1 AND @FromDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
 				BEGIN
@@ -258,10 +246,37 @@ BEGIN
 				WHERE r.BaseCurrencyId IS NULL
 			END
 
+				-- Insert data Odds Boost Bonus 
+			IF EXISTS (SELECT TOP 1 1 FROM @Result WHERE LicensingFeeTypeId = 14)
+			BEGIN
+				INSERT INTO dbo.rptLicPerformanceAnalysis(
+					ReportDate, SiteId, ProductId, CurrencyId, IsBillingCurrency
+					,BetCount, Turnover, TurnoverNoDraw, LicenseeWinloss, LicensingFee, Discount, Rebate, Adjustment
+				)
+				SELECT @InvoiceDate
+					,@SiteId
+					,@OddsBoostBonusId AS ProductId
+					,r.BaseCurrencyId
+					,CASE WHEN BaseCurrencyId = @BaseCurrencyId THEN 1 ELSE 0 END AS IsBillingCurrency
+					,0 AS BetCount
+					,0 AS Turnover
+					,0 AS TurnoverNoDraw
+					,0 AS LicenseeWinloss
+					,r.ExtraAmount AS LicensingFee
+					,0 AS Discount
+					,0 AS Rebate
+					,0 AS Adjustment
+				FROM @Result r
+				WHERE r.ProductId = 0
+					AND r.LicensingFeeTypeId = 14
+
+				DELETE FROM @Result WHERE LicensingFeeTypeId = 14
+			END
+
 			INSERT INTO dbo.rptLicPerformanceAnalysis
 			(
 				ReportDate, SiteId, ProductId, CurrencyId, IsBillingCurrency
-				,BetCount, Turnover, TurnoverNoDraw, LicenseeWinloss, LicensingFee, Discount, Rebate, Adjustment, OddsBoostBonus
+				,BetCount, Turnover, TurnoverNoDraw, LicenseeWinloss, LicensingFee, Discount, Rebate, Adjustment
 			)
 			SELECT
 				@InvoiceDate, @SiteId, ProductId, BaseCurrencyId
@@ -274,7 +289,6 @@ BEGIN
 				,Discount
 				,Rebate
 				,0 AS Adjustment
-				,ISNULL(OddsBoostBonus, 0) AS OddsBoostBonus
 			FROM @Result
 
 			DROP TABLE #tmpPerfData
