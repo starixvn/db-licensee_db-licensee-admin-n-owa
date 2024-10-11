@@ -159,17 +159,16 @@ BEGIN
 	SELECT @Remark = MAX(r.RebateRemark)
 		,@TotalRebate = SUM(r.Rebate)
 		,@TotalAmount = SUM(CASE WHEN r.LicensingFeeTypeId = 13 THEN -r.ExtraAmount
-										 WHEN p.RebateType = 2 THEN 
-											CASE WHEN (r.LicensingFee + r.ExtraAmount - r.Discount 
-														- CASE WHEN @FDate >= @CutOff_RebateOnLicfee THEN ISNULL(r_37.GrossLicensingFee,0) ELSE 0 END
-														- ISNULL(r.OddsBoostBonus, 0)
-														) < 0 THEN 0 
-												ELSE r.LicensingFee + r.ExtraAmount - r.Discount 
-														- CASE WHEN @FDate >= @CutOff_RebateOnLicfee THEN ISNULL(r_37.GrossLicensingFee,0) ELSE 0 
-														- ISNULL(r.OddsBoostBonus, 0)
-												END 
-										END 
-									ELSE r.LicenseeWL END)
+								 WHEN p.RebateType = 2 THEN 
+									CASE WHEN (r.LicensingFee + r.ExtraAmount - r.Discount 
+												- CASE WHEN @FDate >= @CutOff_RebateOnLicfee THEN ISNULL(r_37.GrossLicensingFee,0) ELSE 0 END
+												- ISNULL(r.OddsBoostBonus, 0)
+												) < 0 THEN 0 
+										ELSE r.LicensingFee + r.ExtraAmount - r.Discount 
+												- CASE WHEN @FDate >= @CutOff_RebateOnLicfee THEN ISNULL(r_37.GrossLicensingFee,0) ELSE 0 END
+												- ISNULL(r.OddsBoostBonus, 0)												 
+								  END 
+							ELSE r.LicenseeWL END)
 	FROM @Result r
 		INNER JOIN @Products p ON r.ProductId = p.ProductId
 		LEFT JOIN @Result_37 r_37 ON r.PartyId = r_37.PartyId AND r.ProductId = 0  AND r_37.LicensingFeeTypeId = 0 AND r.LicensingFeeTypeId = 0
@@ -185,8 +184,8 @@ BEGIN
 											- CASE WHEN @FDate >= @CutOff_RebateOnLicfee THEN ISNULL(r_37.GrossLicensingFee,0) ELSE 0 END
 											- ISNULL(r.OddsBoostBonus, 0)) < 0 THEN 0 
 									ELSE r.LicensingFee + r.ExtraAmount - r.Discount 
-											- CASE WHEN @FDate >= @CutOff_RebateOnLicfee THEN ISNULL(r_37.GrossLicensingFee,0) ELSE 0 
-											- ISNULL(r.OddsBoostBonus, 0)END 
+											- CASE WHEN @FDate >= @CutOff_RebateOnLicfee THEN ISNULL(r_37.GrossLicensingFee,0) ELSE 0 END
+											- ISNULL(r.OddsBoostBonus, 0) 
 								END 
 						ELSE r.LicenseeWL END AS AmountToCompany
 	FROM @Result r
