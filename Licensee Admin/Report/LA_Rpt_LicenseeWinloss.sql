@@ -656,13 +656,16 @@ BEGIN
 			,r.IsShowOddsBoostBonus = t.IsShowOddsBoostBonus
 		FROM #Result r
 			INNER JOIN (
-				SELECT r.PartyId, CASE WHEN SUM(r.OddsSpreadCost * e.Base) <= 0 THEN 0 ELSE 1 END AS IsShowOddsSpread
+				SELECT r.PartyId
+					,CONVERT(VARCHAR(6), r.ReportDate, 112) AS ReportDate
+					,CASE WHEN SUM(r.OddsSpreadCost * e.Base) <= 0 THEN 0 ELSE 1 END AS IsShowOddsSpread
 					,CASE WHEN SUM(r.OddsBoostBonus * e.Base) = 0 THEN 0 ELSE 1 END AS IsShowOddsBoostBonus
 				FROM #Report r
 					INNER JOIN #PartyList p ON r.PartyId = p.PartyId
 					INNER JOIN #Exchange e ON p.BaseCurrencyId = e.BaseCurrencyId AND r.CurrencyId = e.ExchangeId AND r.ReportDate = e.ExchangeDate
 				GROUP BY r.PartyId
-			) t ON r.PartyId = t.PartyId
+					,CONVERT(VARCHAR(6), r.ReportDate, 112)
+			) t ON r.PartyId = t.PartyId AND r.ReportDate = t.ReportDate 
 	END
 
 	-- Return data
