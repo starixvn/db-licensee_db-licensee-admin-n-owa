@@ -28,6 +28,7 @@ AS
 		- 20230323@Danny: SG - Promotion prize integration [#183739]
 		- 20240301@Danny: Merge virtual sports product [RemineID: #199478]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+		- 20241014@Sally: Support Odds Boost Voucher [#209884]
 */
 
 BEGIN
@@ -40,9 +41,8 @@ BEGIN
 	WHERE GroupProductId = @ProductId
 
 	DECLARE @ProductCode VARCHAR(MAX),  @ProductCodeNAP VARCHAR(MAX)
-	SELECT  @ProductCode = COALESCE(@ProductCode + ',', '') + ProductCode FROM @Products
 
-	SELECT  @ProductCode = COALESCE( @ProductCode + ',', '') + GroupProductCode FROM @Products
+	SELECT  @ProductCode = COALESCE( @ProductCode + ',', '') + GroupProductCode FROM (SELECT DISTINCT GroupProductCode FROM @Products)p
 	SELECT  @ProductCodeNAP = COALESCE( @ProductCodeNAP + ',', '') + ProductCode FROM @Products
 
 	DECLARE @tblSite TABLE (SiteId INT, Site VARCHAR(100))
@@ -65,9 +65,10 @@ BEGIN
 					CASE WHEN x.SubProduct IN ('Jackpot Contribution') THEN 1
 						 WHEN x.SubProduct IN ('Prize','Lucky Draw','Bonus','Promotion') THEN 2
 						 WHEN x.SubProduct IN ('Jackpot Prize') THEN 3
-						 WHEN x.SubProduct IN ('Odds Spread Adjustment') THEN 4 END  TypeId
+						 WHEN x.SubProduct IN ('Odds Spread Adjustment') THEN 4
+						 WHEN x.SubProduct IN ('Odds Boost Adjustment') THEN 5 END  TypeId
 	FROM bodb02.dbo.SportBettypeMatrix x WITH(NOLOCK)
-	WHERE x.SubProduct IN ('Jackpot Contribution','Jackpot Prize','Prize','Lucky Draw','Bonus','Odds Spread Adjustment','Promotion')
+	WHERE x.SubProduct IN ('Jackpot Contribution','Jackpot Prize','Prize','Lucky Draw','Bonus','Odds Spread Adjustment','Promotion','Odds Boost Adjustment')
 
 	INSERT INTO @Bettype (Bettype, TypeId)
 	SELECT s.Bettype, 2 AS TypeId -- Promotion (include Free bets)
@@ -93,8 +94,8 @@ BEGIN
 		WHERE DI_Rate > 0
 
 		-- Get Winloss data
-		CREATE TABLE #tmpLAData (WinlostDate SMALLDATETIME, Currency INT, SiteId INT, Bettype INT, LicenseeWL MONEY, Contribution MONEY, Promotion MONEY, JackpotPrize MONEY, OddsSpread MONEY)
-		INSERT INTO #tmpLAData (WinlostDate, Currency, SiteId, Bettype, LicenseeWL, Contribution, Promotion, JackpotPrize, OddsSpread)
+		CREATE TABLE #tmpLAData (WinlostDate SMALLDATETIME, Currency INT, SiteId INT, Bettype INT, LicenseeWL MONEY, Contribution MONEY, Promotion MONEY, JackpotPrize MONEY, OddsSpread MONEY, OddsBoostBonus MONEY)
+		INSERT INTO #tmpLAData (WinlostDate, Currency, SiteId, Bettype, LicenseeWL, Contribution, Promotion, JackpotPrize, OddsSpread, OddsBoostBonus)
 		SELECT r.rptDate, r.CurrencyId, r.SiteId
 			,CASE WHEN r.Bettype IN (1706, 3007) THEN r.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END AS Bettype
 			,SUM(CASE WHEN b.Bettype IS NOT NULL OR r.TicketType = 2 THEN 0 ELSE -ISNULL(r.MemberWL, 0) END) AS LicenseeWL
@@ -102,6 +103,7 @@ BEGIN
 			,SUM(CASE WHEN b.TypeId = 2 OR r.TicketType = 2 THEN ISNULL(r.MemberWL, 0) ELSE 0 END) AS Promotion
 			,SUM(CASE WHEN b.TypeId = 3 THEN ISNULL(r.MemberWL, 0) ELSE 0 END) AS JackpotPrize
 			,SUM(CASE WHEN b.TypeId = 4 THEN ISNULL(-r.GrossWL, 0) ELSE 0 END) AS OddsSpread
+			,SUM(CASE WHEN b.TypeId = 5 THEN ISNULL(r.ValidBetAmount, 0) ELSE 0 END) AS OddsBoostBonus
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
 			INNER JOIN @tblSite s ON r.SiteId = s.SiteId
 			LEFT JOIN dbo.Sport_Bettype_Reference sbr WITH (NOLOCK) ON sbr.Bettype = r.Bettype
@@ -151,21 +153,23 @@ BEGIN
 	-- Final Result
 	BEGIN
 		DECLARE @Result TABLE (Func VARCHAR(10), LicenseeWL MONEY, ChargeRate SMALLMONEY, LicensingFee MONEY
-				,Contribution MONEY, ContributionDiscount MONEY, Promotion MONEY, JackpotPrize MONEY, OddsSpread MONEY, IsShowOddsSpread TINYINT)
+				,Contribution MONEY, ContributionDiscount MONEY, Promotion MONEY, JackpotPrize MONEY, OddsSpread MONEY, IsShowOddsSpread TINYINT
+				,OddsBoostBonus MONEY, IsShowOddsBoostBonus TINYINT)
 	
 		-- LA
-		INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread)
-		SELECT 'LA', LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, 1 AS IsShowOddsSpread
+		INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread, OddsBoostBonus, IsShowOddsBoostBonus)
+		SELECT 'LA', LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, 1 AS IsShowOddsSpread, OddsBoostBonus, 1 AS IsShowOddsBoostBonus
 		FROM (
 			SELECT
 				CONVERT(SMALLMONEY, ISNULL(bc.Rate, c.Rate)) AS ChargeRate
 				,CONVERT(MONEY, SUM(t.LicenseeWL * e.Rate)) AS LicenseeWL
-				,CONVERT(MONEY, SUM(-t.LicenseeWL * ISNULL(bc.Rate, c.Rate) * e.Rate)) AS LicensingFee
+				,CONVERT(MONEY, SUM(-(t.LicenseeWL + ISNULL(t.OddsBoostBonus, 0))* ISNULL(bc.Rate, c.Rate) * e.Rate))  AS LicensingFee
 				,CONVERT(MONEY, SUM(t.Contribution * e.Rate)) AS Contribution
 				,CONVERT(MONEY, SUM(t.Contribution * e.Rate * ISNULL(bc.Rate, c.Rate))) AS ContributionDiscount
 				,CONVERT(MONEY, SUM(t.Promotion * e.Rate)) AS Promotion
 				,CONVERT(MONEY, SUM(t.JackpotPrize * e.Rate)) AS JackpotPrize
 				,CONVERT(MONEY, SUM(-t.OddsSpread * e.Rate)) AS OddsSpread
+				,CONVERT(MONEY, SUM(t.OddsBoostBonus * e.Rate)) AS OddsBoostBonus
 			FROM #tmpLAData t
 				INNER JOIN @Exchange e ON t.Currency = e.ExchangeId AND t.WinlostDate = e.ExchangeDate
 				INNER JOIN @ChargeInfo c ON t.SiteId = c.LicenseeId AND (t.Bettype = c.Bettype OR c.Bettype = -1) AND t.WinlostDate BETWEEN c.FromDate AND c.ToDate
@@ -174,11 +178,14 @@ BEGIN
 		) d
 		
 		IF @@ROWCOUNT = 0
-			INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread)
-			SELECT 'LA', 0, 0, 0, 0, 0, 0, 0, 0, 0
+			INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread, OddsBoostBonus, IsShowOddsBoostBonus)
+			SELECT 'LA', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
 		ELSE IF EXISTS (SELECT 1 FROM @Result WHERE Func = 'LA' HAVING SUM(-OddsSpread) <= 0)  -- Set OddsSpread = 0 if value is negative (show Negative value (-))
 			UPDATE @Result SET OddsSpread = 0, IsShowOddsSpread = 0 WHERE Func = 'LA'
+		
+		IF EXISTS (SELECT 1 FROM @Result WHERE Func = 'LA' HAVING SUM(ISNULL(OddsBoostBonus,0)) = 0)  -- Set OddsBoostBonus = 0 if value = 0
+			UPDATE @Result SET OddsBoostBonus = 0, IsShowOddsBoostBonus = 0 WHERE Func = 'LA'
 
 		-- NAP
 		;WITH CTE_tmpData AS (
@@ -197,7 +204,7 @@ BEGIN
 			SELECT TypeId, HousePT, LicenseeWL, CompanyWL, ROW_NUMBER() OVER(ORDER BY TypeId) AS RN
 			FROM CTE_tmpData
 		)
-		INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread)
+		INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread, OddsBoostBonus, IsShowOddsBoostBonus)
 		SELECT 'NAP', ISNULL(d.LicenseeWL, 0), ISNULL(d.HousePT, 0), ISNULL(d.CompanyWL, 0)
 			,ISNULL(t.Contribution, 0) AS Contribution
 			,CONVERT(MONEY, 0) AS ContributionDiscount
@@ -205,6 +212,8 @@ BEGIN
 			,ISNULL(t.JackpotPrize, 0) AS JackpotPrize
 			,ISNULL(t.OddsSpread, 0) AS OddsSpread
 			,1 AS IsShowOddsSpread
+			,NULL AS OddsBoostBonus
+			,0 AS IsShowOddsBoostBonus
 		FROM CTE_Data d
 			FULL OUTER JOIN (
 				SELECT
@@ -218,32 +227,34 @@ BEGIN
 		WHERE ISNULL(d.TypeId, 0) = 0
 
 		IF @@ROWCOUNT = 0
-			INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread)
-			SELECT 'NAP', 0, 0, 0, 0, 0, 0, 0, 0, 0
+			INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread, OddsBoostBonus, IsShowOddsBoostBonus)
+			SELECT 'NAP', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 		ELSE IF NOT EXISTS (SELECT 1 FROM @Result WHERE Func = 'NAP' AND OddsSpread <> 0)
 			UPDATE @Result SET IsShowOddsSpread = 0 WHERE Func = 'NAP'
 	END
 
 	-- Return data
-	DECLARE @IsShowOddsSpread BIT
-	SELECT  @IsShowOddsSpread = MAX(IsShowOddsSpread) FROM @Result
-	SELECT  @IsShowOddsSpread = ISNULL(@IsShowOddsSpread, 0)
+	DECLARE @IsShowOddsSpread BIT, @IsShowOddsBoostBonus BIT
+	SELECT  @IsShowOddsSpread = MAX(IsShowOddsSpread) 
+		,@IsShowOddsBoostBonus = MAX(IsShowOddsBoostBonus)
+	FROM @Result
+	SELECT  @IsShowOddsSpread = ISNULL(@IsShowOddsSpread, 0), @IsShowOddsBoostBonus = ISNULL(@IsShowOddsBoostBonus, 0)
 
 		-- LA
 	SELECT LicenseeWL, ChargeRate, LicensingFee AS ServiceFee
-		,-Contribution AS Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread AS OddsSpreadAdjustment, @IsShowOddsSpread AS IsShowOddsSpread
+		,-Contribution AS Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread AS OddsSpreadAdjustment, @IsShowOddsSpread AS IsShowOddsSpread, OddsBoostBonus, @IsShowOddsBoostBonus AS IsShowOddsBoostBonus
 	FROM @Result
 	WHERE Func = 'LA'
 	
 		-- NAP
 	SELECT LicenseeWL, ChargeRate AS HousePT, LicensingFee AS CompanyWL
-		,-Contribution AS Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread AS OddsSpreadAdjustment, @IsShowOddsSpread AS IsShowOddsSpread
+		,-Contribution AS Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread AS OddsSpreadAdjustment, @IsShowOddsSpread AS IsShowOddsSpread, OddsBoostBonus, @IsShowOddsBoostBonus AS IsShowOddsBoostBonus
 	FROM @Result
 	WHERE Func = 'NAP'
 
 		-- Variance
 	SELECT
-		CONVERT(MONEY, ISNULL(l.LicensingFee, 0) - ISNULL(n.LicensingFee, 0)) AS CompanyWL
+		CONVERT(MONEY, ISNULL(l.LicensingFee, 0) + ISNULL(l.OddsBoostBonus, 0)- ISNULL(n.LicensingFee, 0)) AS CompanyWL
 		,CONVERT(MONEY, ISNULL(l.Contribution, 0) - ISNULL(n.Contribution, 0)) AS Contribution
 		,CONVERT(MONEY, ISNULL(l.ContributionDiscount, 0) - ISNULL(n.ContributionDiscount, 0)) AS ContributionDiscount
 		,CONVERT(MONEY, ISNULL(l.Promotion, 0) - ISNULL(n.Promotion, 0)) AS Promotion
@@ -257,6 +268,7 @@ BEGIN
 			,SUM(Promotion) AS Promotion
 			,SUM(JackpotPrize) AS JackpotPrize
 			,SUM(OddsSpread) AS OddsSpread
+			,SUM(OddsBoostBonus) AS OddsBoostBonus
 		FROM @Result
 		WHERE Func = 'LA'
 	) l

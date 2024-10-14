@@ -126,7 +126,6 @@ BEGIN
 		SELECT pl.PartyId, pl.PartyName, p.GroupProductId, p.GroupProductName, e.ExchangeId
 			,SUM(CASE
 					WHEN gb.TypeId = 7 THEN 0 -- OddsSpread Adjustment
-					WHEN gb.TypeId = 11 THEN 0 -- Odds Boost Adjustment
 					WHEN gb.TypeId = 2 THEN t.AWinloss -- Contribution
 					ELSE (-t.Winloss 
 							+ CASE WHEN gb.TypeId = 11 AND t.ProductId = 0 THEN t.ValidBetAmount ELSE 0 END -- OddsBoostBonus

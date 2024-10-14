@@ -10,3 +10,5 @@ Licensee Admin\Report\LA_Rpt_GroupLicensingFeeExtraPayoutWinLoss.sql
 Licensee Admin\Invoice\LA_Inv_InvoiceAmountGenerate.sql
 Licensee Admin\Invoice\LA_Inv_InvoiceWaiveGet.sql
 Licensee Admin\Invoice\GenerateMultipleInvoices\LA_Inv_MultipleGenerationTemporaryInvoiceSel.sql
+Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_StraightDiscountSel.sql
+Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_HighForexExplanation.sql

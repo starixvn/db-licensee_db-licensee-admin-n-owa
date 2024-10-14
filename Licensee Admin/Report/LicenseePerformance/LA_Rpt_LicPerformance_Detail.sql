@@ -428,7 +428,8 @@ BEGIN
 				INNER JOIN @Result r14 ON r14.PartyId = r.PartyId 
 										AND r14.ProductId = r.ProductId 
 										AND r14.LicensingFeeTypeId = 14
-			WHERE r.ProductId = 0 AND r.LicensingFeeTypeId = 0
+										AND r14.IsPrevious IS NULL
+			WHERE r.ProductId = 0 AND r.LicensingFeeTypeId = 0 AND r.IsPrevious IS NULL
 
 			DELETE FROM @Result WHERE LicensingFeeTypeId = 14
 		END
@@ -544,20 +545,20 @@ BEGIN
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId = 37 THEN ExtraAmount ELSE 0 END)) AS PreviousSponsorshipSportsbook
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 AND ProductId = -37 THEN ExtraAmount ELSE 0 END)) AS PromotionOthers
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId = -37 THEN ExtraAmount ELSE 0 END)) AS PreviousPromotionOthers
-			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 THEN OddsBoostBonus ELSE 0 END)) AS OddsBoostBonusSportsbook
-			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 THEN OddsBoostBonus ELSE 0 END)) AS PreviousOddsBoostBonusSportsbook
+			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 THEN ISNULL(OddsBoostBonus, 0) ELSE 0 END)) AS OddsBoostBonusSportsbook
+			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 THEN ISNULL(OddsBoostBonus, 0) ELSE 0 END)) AS PreviousOddsBoostBonusSportsbook
 			,CONVERT(MONEY, SUM(CASE
 									WHEN IsPrevious = 1 OR ProductId = 3 THEN 0
 									WHEN ProductId = 37 THEN - LicensingFee - ExtraAmount
 									WHEN ProductId = 74 THEN ExtraAmount
 									WHEN ProductId = -37 THEN -ExtraAmount - Rebate
-									ELSE LicensingFee - Discount - Rebate - OddsBoostBonus END)) AS TotalLicensingFee
+									ELSE LicensingFee - Discount - Rebate - ISNULL(OddsBoostBonus, 0) END)) AS TotalLicensingFee
 			,CONVERT(MONEY, SUM(CASE
 									WHEN IsPrevious = 0 OR ProductId = 3 THEN 0
 									WHEN ProductId = 37 THEN - LicensingFee - ExtraAmount
 									WHEN ProductId = 74 THEN ExtraAmount
 									WHEN ProductId = -37 THEN -ExtraAmount - Rebate
-									ELSE LicensingFee - Discount - Rebate - OddsBoostBonus END)) AS PreviousTotalLicensingFee
+									ELSE LicensingFee - Discount - Rebate - ISNULL(OddsBoostBonus, 0) END)) AS PreviousTotalLicensingFee
 		FROM @Result
 		GROUP BY PartyId
 	) r

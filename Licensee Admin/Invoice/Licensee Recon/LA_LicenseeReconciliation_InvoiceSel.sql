@@ -44,6 +44,7 @@ AS
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 		- 20241010@Danny: exclude some debit note [RedmineID: #212037]
 		- 20241015@Danny: Include saba promotion into promotion column [RedmineID: #210956]
+		- 20241014@Sally: Support Odds Boost Voucher [#209884]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -95,6 +96,7 @@ BEGIN
 		,SUM(CASE WHEN InvItemTypeId IN (29,52) THEN ISNULL(Expense,0) ELSE 0 END) Promotion
 		,SUM(CASE WHEN InvItemTypeId = 44 THEN ISNULL(Expense,0) ELSE 0 END) Sponsorship
 		,SUM(CASE WHEN InvItemTypeId = 48 THEN ISNULL(-Income,0) ELSE 0 END) PlayerTips -- Recon show negative value
+		,SUM(CASE WHEN InvItemTypeId = 61 THEN ISNULL(s.Expense,0) ELSE 0 END) OddsBoostBonus
 	INTO #result
 	FROM @partyList p
 	INNER JOIN dbo.LA_InvoiceHeader h WITH(NOLOCK) ON p.PartyId = h.PartyId AND h.CurrencyId = p.BaseCurrencyId
@@ -135,6 +137,7 @@ BEGIN
 			,SUM(Promotion) Promotion
 			,SUM(Sponsorship) Sponsorship
 			,SUM(PlayerTips) PlayerTips
+			,SUM(OddsBoostBonus) OddsBoostBonus
 		FROM #result
 		GROUP BY ISNULL(LicenseeCode, '') + '|' + CONVERT(VARCHAR(50), PartyId), CurrencyName
 		ORDER BY LicenseeCode
@@ -154,6 +157,7 @@ BEGIN
 			,SUM(Promotion) Promotion
 			,SUM(Sponsorship) Sponsorship
 			,SUM(PlayerTips) PlayerTips
+			,SUM(OddsBoostBonus) OddsBoostBonus
 		FROM #result
 		GROUP BY PartyId, CurrencyName
 	END
