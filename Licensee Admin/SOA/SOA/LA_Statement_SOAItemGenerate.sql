@@ -1,15 +1,16 @@
 ﻿/*<info serverAlias="DBCUST-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
-CREATE PROCEDURE [dbo].[LA_Statement_SOAItemGenerate]
-	@BaseCurrency		VARCHAR(10) = 'EUR',
-	@InvoiceSymbol		NVARCHAR(20) = '',
-	@InvoiceNumber		INT = 0,
-	@InvoiceDate		DATETIME = NULL,
-	@InvoiceTypeId		SMALLINT = NULL,
-	@Amount				MONEY = NULL,
-	@StatementXml		NVARCHAR(MAX) = NULL, 
-	@BillerId			INT = NULL,
-	@PartyId			INT = NULL,
-	@Environment		VARCHAR(10)		= 'LOCAL'
+ALTER PROCEDURE [dbo].[LA_Statement_SOAItemGenerate]
+	@BaseCurrency		VARCHAR(10)		= 'EUR',
+	@InvoiceSymbol		NVARCHAR(20)	= '',
+	@InvoiceNumber		INT				= 0,
+	@InvoiceDate		DATETIME		= NULL,
+	@InvoiceTypeId		SMALLINT		= NULL,
+	@Amount				MONEY			= NULL,
+	@StatementXml		NVARCHAR(MAX)	= NULL, 
+	@BillerId			INT				= NULL,
+	@PartyId			INT				= NULL,
+	@Environment		VARCHAR(10)		= 'LOCAL',
+	@InvoiceDataMonth   DATETIME	    = NULL
 AS
 
 /*
@@ -43,7 +44,7 @@ AS
 		</Statements>'
 
 	EXEC LA_Statement_SOAItemGenerate
-		@BaseCurrency	 = 'EUR',
+		@BaseCurrency	     = 'EUR',
 		@InvoiceSymbol		 = N'CR',
 		@InvoiceNumber		 = 16,
 		@InvoiceDate		 = '2024-04-02',
@@ -52,7 +53,8 @@ AS
 		@StatementXml		 = @StatementXml, 
 		@BillerId			 = 833,
 		@PartyId			 = 14,
-		@Environment		  = 'LOCAL'
+		@Environment		 = 'LOCAL',
+		@InvoiceDataMonth	 = '2024-03-31'
 
 */
 
@@ -128,7 +130,8 @@ BEGIN
 		RemainingAmount			MONEY, 
 		StatusID				SMALLINT,
 		SOAType					BIT ,
-		ReferenceInvoiceDate	VARCHAR(1000)
+		ReferenceInvoiceDate	VARCHAR(1000),
+		InvoiceDataMonth		DATE
 	)
 	CREATE TABLE #D_C_Inv_Detail 
 	( 
@@ -138,7 +141,8 @@ BEGIN
 		RefAmount		MONEY, 
 		RefStatusID		SMALLINT, 
 		RefInvDate	    DATE,
-		RefInvType		SMALLINT
+		RefInvType		SMALLINT,
+		RefInvoiceDataMonth DATE
 	)
 
 	CREATE TABLE #SOA_Doc_List(
@@ -152,7 +156,8 @@ BEGIN
 		Payment					MONEY, --Payment Amt
 		Balance					MONEY,
 		OrgAmount				MONEY,
-		ReferenceInvoiceDate	VARCHAR(1000)
+		ReferenceInvoiceDate	VARCHAR(1000),
+		InvoiceDataMonth		DATE
 	)
 
 	DECLARE @InvoiceNo NVARCHAR(50) = CONVERT(NVARCHAR(15), @InvoiceNumber)
@@ -231,7 +236,8 @@ BEGIN
 			OrgAmount			,
 			RemainingAmount		, 
 			StatusID			,
-			SOAType		
+			SOAType				,
+			InvoiceDataMonth
 		)
 		SELECT 0 AS DocumentID, -- Fake DocumentID
 				@InvoiceNo AS DocumentNo,
@@ -242,7 +248,8 @@ BEGIN
 				@Amount OrgAmount,
 				@Amount RemainingAmount,
 				0 AS StatusID,
-				@SOAType
+				@SOAType,
+				@InvoiceDataMonth
 
 		
 		INSERT INTO #All_Doc_By_Party 
@@ -256,7 +263,8 @@ BEGIN
 			OrgAmount			,
 			RemainingAmount		, 
 			StatusID			,
-			SOAType		
+			SOAType				,
+			InvoiceDataMonth
 		)
 		SELECT  li.InvoiceHeaderId, 
 				li.OfficialInvoiceNo,
@@ -267,7 +275,8 @@ BEGIN
 				ROUND(li.Amount,2) AS OrgAmount,
 				ROUND(ISNULL(li.RemainingAmount,li.Amount),2) RemainingAmount,
 				li.StatusId,
-				CASE  WHEN li.InvoiceType = 3 THEN 1  ELSE 0 END SOAType
+				CASE  WHEN li.InvoiceType = 3 THEN 1  ELSE 0 END SOAType,
+				li.ToDate
 		FROM	dbo.LA_InvoiceHeader li WITH(NOLOCK)
 		WHERE	li.PartyId = @PartyId AND li.Environment = @Environment  AND li.CurrencyId = @CurrencyID  AND li.InvoiceDate <= @StatementDate
 				AND StatusId <> -1
@@ -286,7 +295,8 @@ BEGIN
 				lp.StatusId,
 				CASE WHEN lp.Type IN (0,1) THEN 0
 				     WHEN lp.Type = 2 THEN 1
-					 ELSE NULL END SOAType
+					 ELSE NULL END SOAType,
+				NULL
 		FROM	dbo.LA_Payment lp WITH(NOLOCK)
 		WHERE	lp.PartyId = @PartyId AND lp.Environment = @Environment  AND lp.CurrencyId = @CurrencyID AND lp.ReceivedDate <= @StatementDate
 				AND lp.StatusId = 0
@@ -298,14 +308,14 @@ BEGIN
 			IF @InvoiceTypeId IN (4,5)
 			BEGIN
 				/* (ItemType, Amount, Description, Reference) */
-				INSERT INTO #D_C_Inv_Detail( DocumentID, DocumentDate, Refno, RefAmount, RefStatusID, RefInvDate, RefInvType)
-				SELECT	0, @InvoiceDate, Reference AS Refno,  CASE WHEN @InvoiceTypeId = 4 THEN -1 ELSE 1 END *  s.Amount, li.StatusId, li.InvoiceDate, li.InvoiceType
+				INSERT INTO #D_C_Inv_Detail( DocumentID, DocumentDate, Refno, RefAmount, RefStatusID, RefInvDate, RefInvType, RefInvoiceDataMonth)
+				SELECT	0, @InvoiceDate, Reference AS Refno,  CASE WHEN @InvoiceTypeId = 4 THEN -1 ELSE 1 END *  s.Amount, li.StatusId, li.InvoiceDate, li.InvoiceType, li.ToDate
 				FROM	@Statement s
 				INNER JOIN dbo.LA_InvoiceHeader li WITH(NOLOCK) ON s.Reference = li.OfficialInvoiceNo AND li.StatusId <> -1	 AND li.Environment = @Environment AND li.BillerId = @BillerId
 			END
 
-			INSERT INTO #D_C_Inv_Detail( DocumentID, DocumentDate, Refno, RefAmount, RefStatusID, RefInvDate, RefInvType)
-			SELECT t.DocumentID, t.DocumentDate, st.RefNo, ISNULL(st.Income,0) -  ISNULL(st.Expense,0), m.StatusID, m.DocumentDate, m.DocumentDetailTypeID
+			INSERT INTO #D_C_Inv_Detail( DocumentID, DocumentDate, Refno, RefAmount, RefStatusID, RefInvDate, RefInvType, RefInvoiceDataMonth)
+			SELECT t.DocumentID, t.DocumentDate, st.RefNo, ISNULL(st.Income,0) -  ISNULL(st.Expense,0), m.StatusID, m.DocumentDate, m.DocumentDetailTypeID, m.InvoiceDataMonth
 			FROM  #All_Doc_By_Party t
 			INNER JOIN dbo.LA_InvoiceStatement st WITH(NOLOCK) ON t.DocumentID = st.InvoiceHeaderId
 			INNER JOIN #All_Doc_By_Party m ON st.RefNo = m.DocumentNo AND m.StatusID <> -1
@@ -316,13 +326,13 @@ BEGIN
 				 t.SOAType =  x.SOAType
 			FROM #All_Doc_By_Party t
 			CROSS APPLY (
-				SELECT	STRING_AGG(FORMAT(x1.RefInvDate, 'yyyy-MM-dd'),', ') AS Desc_,
+				SELECT	STRING_AGG(FORMAT(x1.RefInvoiceDataMonth, 'yyyy-MM-dd'),', ') AS Desc_,
 						   MAX(CASE WHEN x1.RefInvType IN (1,6,7) THEN 0
 									WHEN x1.RefInvType = 3 THEN 1
 									ELSE NULL END)  SOAType
 				FROM 
 				(
-					SELECT DISTINCT RefInvDate, RefInvType
+					SELECT DISTINCT RefInvoiceDataMonth, RefInvType
 					FROM #D_C_Inv_Detail u
 					WHERE u.DocumentID = t.DocumentID 
 				) x1
@@ -349,7 +359,8 @@ BEGIN
 			Amount			, 
 			Payment			,
 			OrgAmount		,
-			ReferenceInvoiceDate
+			ReferenceInvoiceDate,
+			InvoiceDataMonth
 		)
 		SELECT a.DocumentID, 
 			   a.DocumentNo, 
@@ -360,7 +371,8 @@ BEGIN
 			   CASE WHEN a.DocumentTypeID = 0 THEN a.RemainingAmount ELSE NULL END Amount,
 			   CASE WHEN a.DocumentTypeID = 1 THEN a.RemainingAmount ELSE NULL END Payment,
 			   a.OrgAmount,
-			   a.ReferenceInvoiceDate
+			   a.ReferenceInvoiceDate,
+			   a.InvoiceDataMonth
 		FROM  #All_Doc_By_Party a
 		WHERE   SOAType = @SOAType AND a.StatusID = 0
 
@@ -375,9 +387,9 @@ BEGIN
 			SELECT *, ROW_NUMBER() OVER (ORDER BY  DocumentDate, DocumentNo, DocumentTypeID) as _No FROM #SOA_Doc_List WHERE DocumentDate >= @FirstDateOfYear
 		), u AS
 		(
-			SELECT DocumentID, DocumentNo, DocumentTypeID, DocumentDetailTypeID ,DocumentDate, Description, Amount, Payment, ISNULL(Amount,0) -  ISNULL(Payment,0) Balance,ReferenceInvoiceDate, _No FROM t WHERE _No = 1
+			SELECT DocumentID, DocumentNo, DocumentTypeID, DocumentDetailTypeID ,DocumentDate, Description, Amount, Payment, ISNULL(Amount,0) -  ISNULL(Payment,0) Balance,ReferenceInvoiceDate, InvoiceDataMonth ,_No FROM t WHERE _No = 1
 			UNION ALL 
-			SELECT t.DocumentID, t.DocumentNo, t.DocumentTypeID, t.DocumentDetailTypeID, t.DocumentDate, t.Description, t.Amount, t.Payment, u.Balance - ISNULL(t.Payment,0) + ISNULL(t.Amount,0), t.ReferenceInvoiceDate ,t._No  FROM t 
+			SELECT t.DocumentID, t.DocumentNo, t.DocumentTypeID, t.DocumentDetailTypeID, t.DocumentDate, t.Description, t.Amount, t.Payment, u.Balance - ISNULL(t.Payment,0) + ISNULL(t.Amount,0), t.ReferenceInvoiceDate , t.InvoiceDataMonth ,t._No  FROM t 
 			INNER JOIN u ON  u._No = t._No - 1
 
 		)  INSERT INTO @ItemResult (DocumentID, DocumentDate, DocumentTypeID, DocumentDetailTypeID, Description, DocumentNo, Amount, Payment, Balance, Type,
@@ -399,7 +411,7 @@ BEGIN
 				END Type,
 				CASE WHEN  DocumentTypeID = 0 THEN DocumentNo ELSE NULL END InvoiceNo, 
 				CASE WHEN  DocumentTypeID = 1 THEN DocumentNo ELSE NULL END PaymentNo, 
-				CASE WHEN DocumentTypeID = 0 AND DocumentDetailTypeID NOT IN (4,5) THEN DocumentDate ELSE NULL END AS InvoiceDate,
+				CASE WHEN DocumentTypeID = 0 AND DocumentDetailTypeID NOT IN (4,5) THEN InvoiceDataMonth ELSE NULL END AS InvoiceDate,
 				CASE WHEN DocumentTypeID = 0 AND DocumentDetailTypeID IN (4,5) THEN ReferenceInvoiceDate ELSE NULL END AS ReferenceInvoiceDate,
 				CASE WHEN DocumentTypeID = 1 AND DocumentDetailTypeID = 1 THEN CASE WHEN CHARINDEX('Transfer to', Description) > 0 THEN SUBSTRING(Description, CHARINDEX('Transfer to', Description) + 12, LEN(Description))
 																					WHEN CHARINDEX('Transfer from', Description) > 0 THEN SUBSTRING(Description, CHARINDEX('Transfer from', Description) + 14, LEN(Description))
