@@ -20,6 +20,7 @@ AS
 	Revisions: 
 		- 20230908@Danny: Initialize SP [#194603]
 		- 20240812@Danny: Add Biller info [#209161]
+		- 20241024@Danny: Change SOA Item description fomular [#211811]
 
 	Param's Explanation:
 	DECLARE 
