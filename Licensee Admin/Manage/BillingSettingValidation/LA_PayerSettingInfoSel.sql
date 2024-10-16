@@ -7,7 +7,7 @@ SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerSettingInfoSel]
-@PartyIds			VARCHAR(4000)
+@PartyIds			VARCHAR(MAX)
 AS
 /*
 	Created: 20190620@Parsons
@@ -19,6 +19,8 @@ AS
 	- 20190905@Bruce: Validate unofficial licensee code [#111586]
 	- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+	- 20241016@Danny: Extend parameter data length [RemineID: #212252]
+
 */
 BEGIN
 	SET NOCOUNT ON

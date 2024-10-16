@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -158,10 +158,4 @@ BEGIN
 			, @duration = @duration
 	END CATCH
 END
-GO
-
-GRANT VIEW DEFINITION ON [dbo].[LA_ChargeRateSettingDel] TO [vnteam] 
-GO
-
-GRANT EXECUTE ON [dbo].[LA_ChargeRateSettingDel] TO bodbAdminNet
 GO

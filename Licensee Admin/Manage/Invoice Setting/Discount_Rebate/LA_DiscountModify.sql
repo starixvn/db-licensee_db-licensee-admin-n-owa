@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -11,7 +11,7 @@ ALTER PROCEDURE [dbo].[LA_DiscountModify]
 	, @ToDate DATE
 	, @IsEdit BIT
 	, @ProductIds VARCHAR(512) = ''
-	, @AssignedPartyIds VARCHAR(4000) = ''
+	, @AssignedPartyIds VARCHAR(MAX) = ''
 	, @RateSettingsData VARCHAR(MAX) = ''
 	, @UserId INT
 	, @Remark NVARCHAR(4000)
@@ -30,6 +30,7 @@ AS
 		- 20171219@Bruce: increase length for variables [#88197]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
+		- 20241016@Danny: Extend parameter data length [RemineID: #212252]
 	 
 	 Params:
 		@RateSettingsData = '<Root>

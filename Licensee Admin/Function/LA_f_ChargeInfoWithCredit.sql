@@ -1,9 +1,9 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" selecters="wsv_nap" isFunction="1" isNested="1"></info>*/
 USE [bodb_licensee]
 GO
 
 ALTER FUNCTION [dbo].[LA_f_ChargeInfoWithCredit] (
-	@PartyIDs			VARCHAR(4000)
+	@PartyIDs			VARCHAR(MAX)
 	, @FromDate			DATETIME
 	, @ToDate			DATETIME
 	, @ProductCodes		VARCHAR(1000)
@@ -31,6 +31,7 @@ AS
 	Revisions:
 		- 20180815@Scofield: Get charge rate for Credits	
 		- 20190718@Bruce: Integrate CN88 data in LA [#116859]
+		- 20241016@Danny: Extend parameter data length [RemineID: #212252]
 */
 
 BEGIN

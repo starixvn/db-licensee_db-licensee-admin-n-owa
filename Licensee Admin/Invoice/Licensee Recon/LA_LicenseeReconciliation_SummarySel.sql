@@ -1,11 +1,11 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_SummarySel]
 	@Month		  DATE
 	,@Environment VARCHAR(10)
-	,@PartyIds	  VARCHAR(4000) = ''
+	,@PartyIds	  VARCHAR(MAX) = ''
 	,@PlatformId  TINYINT = 0
 AS
 /*	Header:
@@ -21,6 +21,7 @@ AS
 		- 20220418@Percy: Add Credit for Setup Fees [RedmineID: #164139
 		- 20221226@Danny: Integrate Player tips [#180703]
 		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
+		- 20241016@Danny: Extend parameter data length [RemineID: #212252]
 */
 BEGIN
 	SET NOCOUNT ON

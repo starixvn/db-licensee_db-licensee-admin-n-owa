@@ -1,9 +1,9 @@
-/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="1"></info>*/
 USE bodb_Licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerGroupAssignmentModify]
-	@PayerList				VARCHAR(4000)
+	@PayerList				VARCHAR(MAX)
 	, @PayerGroupId			INT
 	, @UserID				INT
 	, @Mode					VARCHAR(10)		= ''
@@ -20,6 +20,7 @@ AS
 	 	- 20171219@Bruce: increase length for variables [#88197]
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
+		- 20241016@Danny: Extend parameter data length [RemineID: #212252]
 	 
 	 Params:
 	 Example:

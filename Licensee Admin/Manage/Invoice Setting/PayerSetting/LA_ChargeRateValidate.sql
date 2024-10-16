@@ -1,10 +1,10 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_ChargeRateValidate] 
 	@ChargeId		INT					= 0
-	, @PayerIdList	VARCHAR(4000)		= ''
+	, @PayerIdList	VARCHAR(MAX)		= ''
 	, @Mode			VARCHAR(10)			= 'R'
 	, @ErrCode		INT					= 0 OUTPUT
 	, @ErrMsg		VARCHAR(4000)		= '' OUTPUT
@@ -15,6 +15,7 @@ AS
 	 DB: DB052.bodb_Licensee
 	 Revisions:     
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20241016@Danny: Extend parameter data length [RemineID: #212252]
 	 Params:
 		+ @ChargeId : = 0 check all charge infor of Party
 		+ @Mode : 
@@ -75,7 +76,4 @@ BEGIN
 	
 END
 
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_ChargeRateValidate] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_ChargeRateValidate] TO bodbAdminNet
 GO

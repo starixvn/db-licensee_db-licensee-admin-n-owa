@@ -38,13 +38,14 @@ AS
 		- 20221209@Danny: Support USD(USDT) [RedmineID: #180313]
 		- 20230217@Danny: SG - Promotion prize integration [#183739]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+		- 20241016@Danny: Extend parameter data length [RemineID: #212252]
 */
 
 BEGIN
 	SET NOCOUNT ON
 	
 	DECLARE @GD_Tip			SMALLINT = 1706,
-			@PartyIds		VARCHAR(4000), 
+			@PartyIds		VARCHAR(MAX), 
 			@ProductCodes	VARCHAR(500)
 	DECLARE @ProductSupportContrib	TABLE (ProductID INT)
 	DECLARE @Products TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(20), ProductName VARCHAR(100))

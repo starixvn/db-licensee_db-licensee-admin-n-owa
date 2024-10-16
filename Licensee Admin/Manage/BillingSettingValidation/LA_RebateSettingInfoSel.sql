@@ -1,9 +1,9 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_RebateSettingInfoSel]
-	@PartyIds VARCHAR(4000)
+	@PartyIds VARCHAR(MAX)
 AS
 
 /*
@@ -16,6 +16,7 @@ AS
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
+		- 20241016@Danny: Extend parameter data length [RemineID: #212252]
 */
 
 BEGIN

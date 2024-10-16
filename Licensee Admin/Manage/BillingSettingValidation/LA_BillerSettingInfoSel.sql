@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -7,7 +7,7 @@ SET ANSI_NULLS ON;
 GO
 
 ALTER PROCEDURE [dbo].[LA_BillerSettingInfoSel]
-@PartyIds			VARCHAR(4000)
+@PartyIds			VARCHAR(MAX)
 AS
 /*
 	Created: 20190618@Parsons
@@ -17,6 +17,7 @@ AS
 	Revisions:
 	- 20190618@Parsons: Validate billing configuration [#109600]
 	- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
+	- 20241016@Danny: Extend parameter data length [RemineID: #212252]
 */
 BEGIN
 	SET NOCOUNT ON

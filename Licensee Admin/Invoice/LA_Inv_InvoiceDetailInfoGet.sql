@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -156,5 +156,3 @@ BEGIN
 END		
 GO
 
-GRANT EXECUTE ON [dbo].[LA_Inv_InvoiceDetailInfoGet] TO bodbAdminNet
-GO

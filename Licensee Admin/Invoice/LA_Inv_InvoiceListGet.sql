@@ -6,7 +6,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceListGet]
 	@InvoiceNo		NVARCHAR(50)= '',
 	@InvoiceTypes	VARCHAR(100)= '',
 	@BillerIds		VARCHAR(500)= '',
-	@PayerIds		VARCHAR(4000)= '',
+	@PayerIds		VARCHAR(MAX)= '',
 	@IssueFromDate	DATE,
 	@IssueToDate	DATE
 
@@ -25,6 +25,7 @@ AS
 		- 20171030@Bruce: filter invoice date [#85256]
 		- 20171220@Parsons: increase length for variables [#88197]
 		- 20240722@Danny:  support SOA files [#194603]
+		- 20241016@Danny: Extend parameter data length [RemineID: #212252]
 */
 /*	Example:
 	USE bodb_licensee
@@ -43,76 +44,21 @@ BEGIN
 	DECLARE @InvoiceTypeTable TABLE (Id INT NOT NULL)
 	DECLARE @Delimiter CHAR(1)=','
 
-	;WITH SeparatedTable (STARTVAL, STOPVAL)
-	AS
-	(
-		SELECT
-			STARTVAL = CAST(1 AS INT),
-			STOPVAL = CHARINDEX(@Delimiter, @InvoiceTypes + @Delimiter)
-		UNION ALL SELECT
-			STARTVAL = STOPVAL + 1,
-			STOPVAL = CHARINDEX(@Delimiter, @InvoiceTypes + @Delimiter, STOPVAL + 1)
-		FROM SeparatedTable
-		WHERE STOPVAL > 0
-	)
-	INSERT @InvoiceTypeTable (Id)
-	SELECT LTRIM(RTRIM(SUBSTRING(@InvoiceTypes, STARTVAL,	CASE
-																WHEN STOPVAL > 0 THEN STOPVAL - STARTVAL
-																ELSE 0
-															END)))
-	FROM SeparatedTable
-	WHERE STOPVAL > 0
-	OPTION (MAXRECURSION 0)
+	INSERT INTO  @InvoiceTypeTable (Id)
+	SELECT CAST(value AS INT) FROM STRING_SPLIT(@InvoiceTypes, ',')
 	-- End Region
 
 	-- Region: Get Biller ID
 	DECLARE @BillerTable TABLE (Id INT NOT NULL)
-
-	;WITH SeparatedTable (STARTVAL, STOPVAL)
-	AS
-	(
-		SELECT
-			STARTVAL = CAST(1 AS INT),
-			STOPVAL = CHARINDEX(@Delimiter, @BillerIds + @Delimiter)
-		UNION ALL SELECT
-			STARTVAL = STOPVAL + 1,
-			STOPVAL = CHARINDEX(@Delimiter, @BillerIds + @Delimiter, STOPVAL + 1)
-		FROM SeparatedTable
-		WHERE STOPVAL > 0
-	)
 	INSERT @BillerTable (Id)
-	SELECT LTRIM(RTRIM(SUBSTRING(@BillerIds, STARTVAL,	CASE
-															WHEN STOPVAL > 0 THEN STOPVAL - STARTVAL
-															ELSE 0
-														END)))
-	FROM SeparatedTable
-	WHERE STOPVAL > 0
-	OPTION (MAXRECURSION 0)
+	SELECT CAST(value AS INT) FROM STRING_SPLIT(@BillerIds, ',')
 	-- End Region
 
 	-- Region: Get Payers ID
 	DECLARE @PayerTable TABLE (Id INT NOT NULL)
-
-	;WITH SeparatedTable (STARTVAL, STOPVAL)
-	AS
-	(
-		SELECT
-			STARTVAL = CAST(1 AS INT),
-			STOPVAL = CHARINDEX(@Delimiter, @PayerIds + @Delimiter)
-		UNION ALL SELECT
-			STARTVAL = STOPVAL + 1,
-			STOPVAL = CHARINDEX(@Delimiter, @PayerIds + @Delimiter, STOPVAL + 1)
-		FROM SeparatedTable
-		WHERE STOPVAL > 0
-	)
 	INSERT @PayerTable (Id)
-	SELECT LTRIM(RTRIM(SUBSTRING(@PayerIds, STARTVAL,	CASE
-															WHEN STOPVAL > 0 THEN STOPVAL - STARTVAL
-															ELSE 0
-														END)))
-	FROM SeparatedTable
-	WHERE STOPVAL > 0
-	OPTION (MAXRECURSION 0)
+	SELECT CAST(value AS INT) FROM STRING_SPLIT(@PayerIds, ',')
+
 	-- End Region
 
 	-- Region: Base currency

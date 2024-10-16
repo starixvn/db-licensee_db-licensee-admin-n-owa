@@ -3,7 +3,7 @@ USE bodb_licenseeReport
 GO
 
 ALTER PROCEDURE [dbo].LA_GEN_LicPerformanceAnalysis_Adjustment (
-	@PartyIds		VARCHAR(4000),
+	@PartyIds		VARCHAR(MAX),
 	@ReportDate		DATE,
 	@Environment	VARCHAR(10),
 	@IsOverwrite	BIT = 0
@@ -24,6 +24,7 @@ AS
 		- 20230815@Danny: Handle crypto licensee billing with fiat currency [RedmineID: #192378]
 		- 20240401@Danny: Change meta data [#203267]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
+		- 20241016@Danny: Extend parameter data length [RemineID: #212252]
 
 */
 BEGIN

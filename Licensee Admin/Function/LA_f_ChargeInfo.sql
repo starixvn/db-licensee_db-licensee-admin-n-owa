@@ -1,9 +1,9 @@
-/*<info serverAlias="DBCUST-bodb_licensee,DBLIC-bodb_licensee,DBBAL-bodb_licensee" selecters="bodbAdminNet,bodbLicenseeNet" isFunction="1" isNested="1"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee,DBLIC-bodb_licensee" selecters="wsv_nap,wsv_lap" isFunction="1" isNested="1"></info>*/
 USE bodb_licensee
 GO
 
 ALTER FUNCTION [dbo].[LA_f_ChargeInfo] (
-	@PartyIDs			VARCHAR(4000)
+	@PartyIDs			VARCHAR(MAX)
 	, @FromDate			DATETIME
 	, @ToDate			DATETIME
 	, @ProductCodes		VARCHAR(1000)
@@ -44,6 +44,7 @@ AS
 		- 20191211@Parsons: Non-peak hour promotion [#119538]
 		- 20210816@Sophia: add DBBAL [Redmine: #154300]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
+		- 20241016@Danny: Extend parameter data length [RemineID: #212252]
 
 */
 

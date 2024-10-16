@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" viewers="vnteam" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -183,7 +183,4 @@ BEGIN
 		SET @i = @i + 1 
 	END	
 END			 	
-GO
-GRANT VIEW DEFINITION ON [dbo].[LA_PayerSettingDel] TO [vnteam] 
-GRANT EXECUTE ON [dbo].[LA_PayerSettingDel] TO bodbAdminNet
 GO
