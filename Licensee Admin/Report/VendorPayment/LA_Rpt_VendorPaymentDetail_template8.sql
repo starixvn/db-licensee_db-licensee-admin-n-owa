@@ -1,6 +1,6 @@
 /*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 CREATE PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template8]
-	@PartyIds			VARCHAR(4000)
+	@PartyIds			VARCHAR(MAX)
 	,@ProductID			INT
 	,@FromDate			DATETIME
 	,@ToDate			DATETIME
@@ -16,6 +16,7 @@ AS
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+	- 20241016@Danny: Extend parameter data length [RemineID: #212252]
  */
 
 BEGIN

@@ -1,6 +1,6 @@
 ﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template3]
-	@PartyIds			VARCHAR(4000)
+	@PartyIds			VARCHAR(MAX)
 	,@ProductID			INT
 	,@FromDate			DATETIME
 	,@ToDate			DATETIME
@@ -19,6 +19,7 @@ AS
 	- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 	- 20240301@Danny: LicensingFee And PaytoSupplier figure based on setting [RemineID: #199478]
 	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+	- 20241016@Danny: Extend parameter data length [RemineID: #212252]
  */
 
 BEGIN

@@ -1,6 +1,6 @@
 ﻿/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_Rpt_VendorPaymentDetail_template6]
-	@PartyIds			VARCHAR(4000)
+	@PartyIds			VARCHAR(MAX)
 	,@ProductID			INT
 	,@FromDate			DATETIME
 	,@ToDate			DATETIME
@@ -18,6 +18,7 @@ AS
 	- 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 	- 20240123@Danny: Change Credit licensing fee fomular [RedmineID: #197267]
 	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+	- 20241016@Danny: Extend parameter data length [RemineID: #212252]
  */
 
 BEGIN

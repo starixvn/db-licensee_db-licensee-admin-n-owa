@@ -1,10 +1,10 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="1"></info>*/
 USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerGroupValidatePayerAssignment] 
 	@PayerGroupId		INT
-	, @PayerIdList		VARCHAR(4000)	= ''
+	, @PayerIdList		VARCHAR(MAX)	= ''
 	, @Mode				VARCHAR(10)		= 'R'
 	, @ErrCode			INT				= 0		OUTPUT
 	, @ErrMsg			VARCHAR(4000)	= ''	OUTPUT
@@ -17,6 +17,7 @@ AS
 	 Revisions:
 		- 20150423@Florent: Initialize SP
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
+		- 20241016@Danny: Extend parameter data length [RemineID: #212252]
 	 Params:
 		+ @Mode : 
 			- R: Remove, A: Add
@@ -27,7 +28,7 @@ BEGIN
 	IF ISNULL(@PayerIdList , '') = '' OR ISNULL(@PayerGroupId, 0) = 0
 		RETURN
 
-	DECLARE @PayerNameList VARCHAR(4000), @DiscountType TINYINT
+	DECLARE @PayerNameList VARCHAR(MAX), @DiscountType TINYINT
 	
 	IF @Mode = 'A'
 	BEGIN

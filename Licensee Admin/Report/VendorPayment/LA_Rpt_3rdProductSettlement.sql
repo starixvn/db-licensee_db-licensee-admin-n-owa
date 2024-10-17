@@ -3,7 +3,7 @@ USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE [dbo].[LA_Rpt_3rdProductSettlement]
-	@PartyIds			VARCHAR(4000)
+	@PartyIds			VARCHAR(MAX)
 	,@ProductCodes		VARCHAR(500)
 	,@FromDate			DATETIME
 	,@ToDate			DATETIME
@@ -40,6 +40,7 @@ AS
 	- 20240814@Danny: Integrate Fast spin product[RedmineID: #206246]
 	- 20240918@Danny: Integrate VS5 [RedmineID: #209929]
 	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+	- 20241016@Danny: Extend parameter data length [RemineID: #212252]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
