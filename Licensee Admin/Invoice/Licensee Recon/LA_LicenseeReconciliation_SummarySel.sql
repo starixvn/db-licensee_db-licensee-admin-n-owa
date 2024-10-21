@@ -22,6 +22,7 @@ AS
 		- 20221226@Danny: Integrate Player tips [#180703]
 		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 		- 20241016@Danny: Extend parameter data length [RemineID: #212252]
+		- 20241021@Sally: Support Odds Boost Voucher [#209884]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -52,7 +53,8 @@ BEGIN
 		ClosingBalance,
 		CurrencyName,
 		ISNULL(UPPER(LicenseeCode), '') + '|' + CONVERT(VARCHAR(50), PartyId) AS LicenseeCode,
-		ISNULL(PlayerTips,0) PlayerTips
+		ISNULL(PlayerTips,0) PlayerTips,
+		ISNULL(OddsBoostBonus,0) OddsBoostBonus
 	FROM bodb_licenseeReport.dbo.rptLicenseeReconciliation WITH(NOLOCK)
 	WHERE AccDate = @reportMonth AND Environment = @Environment AND (
 		ISNULL(@PartyIds,'') = '' OR PartyId IN (SELECT val FROM bodb02.dbo.strSplit(@PartyIds,','))

@@ -441,7 +441,7 @@ BEGIN
 				ELSE (-t.MemberWL 
 							+ (CASE WHEN p.LicenseeId IS NULL THEN 0
 									WHEN pl.IsDeposit = 0 AND t.ProductId <> 0 THEN 0
-								ELSE t.OddsSpread END)
+								ELSE t.OddsBoostBonus END)
 							- t.Contribution 
 			) * ISNULL(cr.Rate, p.Rate) + t.PayOut END
 		) AS BasedLicenseeAmount

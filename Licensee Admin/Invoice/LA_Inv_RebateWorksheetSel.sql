@@ -188,6 +188,7 @@ BEGIN
 											- ISNULL(r.OddsBoostBonus, 0) 
 								END 
 						ELSE r.LicenseeWL END AS AmountToCompany
+		, p.RebateType
 	FROM @Result r
 		INNER JOIN @Products p ON r.ProductId = p.ProductId
 		LEFT JOIN @Result_37 r_37 ON r.PartyId = r_37.PartyId AND r.ProductId = 0  AND r_37.LicensingFeeTypeId = 0 AND r.LicensingFeeTypeId = 0
