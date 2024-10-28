@@ -224,7 +224,7 @@ BEGIN
 				FROM CTE_Data
 				WHERE TypeId IS NOT NULL
 			) t ON d.TypeId = 0 AND d.RN = 1
-		WHERE ISNULL(d.TypeId, 0) = 0
+		WHERE ISNULL(d.TypeId, 0) = 0 OR d.TypeId = 5
 
 		IF @@ROWCOUNT = 0
 			INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread, OddsBoostBonus, IsShowOddsBoostBonus)

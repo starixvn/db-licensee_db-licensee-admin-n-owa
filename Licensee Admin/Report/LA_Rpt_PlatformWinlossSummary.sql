@@ -155,7 +155,7 @@ BEGIN
 			SELECT r.winlostdate, r.srecommend, r.recommend, r.Currency, r.betfrom, SUM(r.BetCount) AS BetCount, SUM(r.Turnover) AS Turnover, SUM(r.Winlost) AS Winlost
 			FROM bodb_LicenseeReport.dbo.rptLicWinloss2 r WITH (NOLOCK)
 			WHERE r.winlostdate BETWEEN @FDate AND @TDate
-				AND r.sporttype IN (SELECT x.sporttype FROM @SportTypeTab x) AND r.bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914, 999) -- exclude BT, CO, Odds Spread Adjustment
+				AND r.sporttype IN (SELECT x.sporttype FROM @SportTypeTab x) AND r.bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914, 999, 997) -- exclude BT, CO, Odds Spread Adjustment, Odds Boost Adjustment
 				AND r.isBA = 0
 				AND r.statusId IN (111, 112, 113, 114, 115)
 				AND r.roleid = 2
