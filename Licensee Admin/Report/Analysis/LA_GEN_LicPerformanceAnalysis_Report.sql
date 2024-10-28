@@ -37,13 +37,11 @@ AS
 		- 20240312@Danny: Fix issue when exec SP with @IsOverwrite = 0 [RedmineID: #202151]
 		- 20240401@Danny: Change meta data [#203267]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
-		- 20241008@Sally: Support Odds Boost Voucher [#209884]
 */
 
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @OddsBoostBonusId INT = 9002  -- 9002: Odds Boost Bonus LA_f_LicPerformanceAnalysisProduct()
 	SELECT @IsOverwrite = 1
 
 	-- Get Product List
@@ -59,7 +57,7 @@ BEGIN
 	IF ',' + @ProductCodes + ',' LIKE ',ADJUST,' -- Adjustment
 		INSERT INTO @tmpProductList (ProductId, ProductCode)
 		SELECT 9000, 'ADJUST'
-	
+
 	SELECT  @ProductCodes = STRING_AGG(ProductCode,',')
 	FROM @tmpProductList g
 	WHERE GroupProductId = ProductId 
@@ -219,7 +217,7 @@ BEGIN
 				,@FromDate = @FromDate
 				,@ToDate = @ToDate
 				,@BaseCurrencyName = @CurrencyName
-				,@LicensingFeeTypeIds= '0,13,14'-- 13 = Casino promotion, 14: Odds Boost Adjustment						
+				,@LicensingFeeTypeIds= '0,13'
 
 			IF @isRecalRebate =1 AND @FromDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
 			BEGIN
@@ -285,34 +283,6 @@ BEGIN
 		INNER JOIN @tmpPartyList p ON a.SiteId = p.SiteId
 		INNER JOIN @Result r ON p.PartyId = r.PartyId AND a.ProductId = r.ProductId AND a.CurrencyId = r.BaseCurrencyId
 	WHERE a.ReportDate = @ReportDate
-
-	-- Insert data Odds Boost Bonus 
-	IF EXISTS (SELECT TOP 1 1 FROM @Result WHERE LicensingFeeTypeId = 14)
-	BEGIN
-		INSERT INTO dbo.rptLicPerformanceAnalysis(
-			ReportDate, SiteId, ProductId, CurrencyId, IsBillingCurrency
-			,BetCount, Turnover, TurnoverNoDraw, LicenseeWinloss, LicensingFee, Discount, Rebate, Adjustment
-		)
-		SELECT @ReportDate
-			,p.SiteId
-			,@OddsBoostBonusId AS ProductId
-			,r.BaseCurrencyId
-			,CASE WHEN r.BaseCurrencyId = p.BaseCurrencyId THEN 1 ELSE 0 END AS IsBillingCurrency
-			,0 AS BetCount
-			,0 AS Turnover
-			,0 AS TurnoverNoDraw
-			,0 AS LicenseeWinloss
-			,r.ExtraAmount AS LicensingFee
-			,0 AS Discount
-			,0 AS Rebate
-			,0 AS Adjustment
-		FROM @Result r
-			INNER JOIN @tmpPartyList p ON r.PartyId = p.PartyId
-		WHERE r.ProductId = 0
-			AND r.LicensingFeeTypeId = 14
-
-		DELETE FROM @Result WHERE LicensingFeeTypeId = 14
-	END
 
 	INSERT INTO dbo.rptLicPerformanceAnalysis
 	(

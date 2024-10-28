@@ -32,7 +32,6 @@ AS
 		- 20240401@Danny: Change meta data [#203267]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
-		- 20241008@Sally: Support Odds Boost Voucher [#209884]
 
 */
 
@@ -40,8 +39,7 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @PartyId INT, @SiteId INT, @InvoiceStatus SMALLINT, @InvoiceDate DATE
-	DECLARE @AdjustmentId	INT = 9000
-		,@OddsBoostBonusId  INT = 9002  
+	DECLARE @AdjustmentId INT = 9000
 	DECLARE @BaseCurrencyId INT = 6 -- default
 
 	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT)
@@ -188,7 +186,6 @@ BEGIN
 					,@FromDate = @FromDate
 					,@ToDate = @ToDate
 					,@BaseCurrencyName = @CurrencyName
-					,@LicensingFeeTypeIds = '0,14'								
 
 				IF @isRecalRebate =1 AND @FromDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
 				BEGIN
@@ -244,33 +241,6 @@ BEGIN
 						GROUP BY t.ProductId
 					) t ON r.ProductId = t.ProductId
 				WHERE r.BaseCurrencyId IS NULL
-			END
-
-				-- Insert data Odds Boost Bonus 
-			IF EXISTS (SELECT TOP 1 1 FROM @Result WHERE LicensingFeeTypeId = 14)
-			BEGIN
-				INSERT INTO dbo.rptLicPerformanceAnalysis(
-					ReportDate, SiteId, ProductId, CurrencyId, IsBillingCurrency
-					,BetCount, Turnover, TurnoverNoDraw, LicenseeWinloss, LicensingFee, Discount, Rebate, Adjustment
-				)
-				SELECT @InvoiceDate
-					,@SiteId
-					,@OddsBoostBonusId AS ProductId
-					,r.BaseCurrencyId
-					,CASE WHEN BaseCurrencyId = @BaseCurrencyId THEN 1 ELSE 0 END AS IsBillingCurrency
-					,0 AS BetCount
-					,0 AS Turnover
-					,0 AS TurnoverNoDraw
-					,0 AS LicenseeWinloss
-					,r.ExtraAmount AS LicensingFee
-					,0 AS Discount
-					,0 AS Rebate
-					,0 AS Adjustment
-				FROM @Result r
-				WHERE r.ProductId = 0
-					AND r.LicensingFeeTypeId = 14
-
-				DELETE FROM @Result WHERE LicensingFeeTypeId = 14
 			END
 
 			INSERT INTO dbo.rptLicPerformanceAnalysis

@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" selecters="wsv_nap,dwrs2" isFunction="1" isNested="1"></info>*/
+﻿/*<info serverAlias="DBLIC-bodb_Licensee" selecters="bodbAdminNet,dwrs2" isFunction="1" isNested="1"></info>*/
 USE bodb_Licensee
 GO
 
@@ -15,7 +15,6 @@ AS
 	
 	Revisions:
 		- 20190220@Bruce: Create function		
-		- 20241010@Sally: Support Odds Boost Voucher [#209884]
 */
 BEGIN
 	INSERT INTO @tblProduct (Productid, ProductCode, ProductName)
@@ -29,8 +28,6 @@ BEGIN
 		SELECT 9000, 'ADJUST', 'Adjustment'
 		UNION ALL
 		SELECT -37, 'SPR(CS)', 'Casino promotion'
-		UNION ALL
-		SELECT 9002, 'OddsBoost', 'Odds Boost Bonus'
 	)
 	RETURN;
 END
