@@ -54,6 +54,7 @@ AS
 	- 20230510@Danny: New commercial terms for 12B [RedmineID: #186543]
 	- 20230713@Danny: Incorporate USDT2 currency [RedmineID: #191165]
 	- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
+	- 20240912@Sally: Support Odds Boost Voucher [#209884]
 
 	Param's Explanation:  
 		+ @PartyIDs	: a string of list PartyID, separate by ','
@@ -70,8 +71,9 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	DECLARE @GD_Tip			SMALLINT	= 1706,	
-			@CurrencyTest	INT			= 20,
-			@ExchangeTerm_CutOffDate SMALLDATETIME
+			@ExchangeTerm_CutOffDate SMALLDATETIME,
+			@IsShowOddsSpread BIT,
+			@IsShowOddsBoostBonus BIT
 
 	DECLARE @ProductOfferContribList TABLE (ProductID INT)
 	INSERT INTO @ProductOfferContribList(ProductID)
@@ -80,7 +82,7 @@ BEGIN
 	SELECT @ExchangeTerm_CutOffDate = f.CutoffDate FROM bodb_licensee.dbo.LA_f_GetCutOffDate() f WHERE f.TypeName = 'ExchangeTerms'
 
 	CREATE TABLE #Report (ReportDate DATE, CurrencyID INT, ProductID INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY,
-						AmtDueToBA MONEY, CommBA MONEY, Company MONEY, Betcount INT, OddsSpreadCost MONEY)
+						AmtDueToBA MONEY, CommBA MONEY, Company MONEY, Betcount INT, OddsSpreadCost MONEY, OddsBoostBonus MONEY)
 	CREATE TABLE #Exchange (ExchangeId INT, ExchangeDate DATE, Code VARCHAR(65), USD FLOAT, EUR FLOAT, MYR FLOAT, GBP FLOAT, CNY FLOAT, Base FLOAT, USDT FLOAT)
 	CREATE TABLE #Data (PartyID INT, rptDate DATE,ProductID INT, Currency INT,BetTypeId INT, Turnover MONEY, Winloss MONEY, AWinloss MONEY, AComm MONEY, PComm MONEY, Betcount BIGINT)
 	CREATE TABLE #Products (GroupProductId INT, ProductId INT, ProductName VARCHAR(50), ProductCode VARCHAR(20), FromDate DATE, ToDate DATE)
@@ -123,7 +125,7 @@ BEGIN
 				AND b.ProductID = 3
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR b.CurrencyID = @Currency)
-				AND (b.CurrencyID <> @CurrencyTest)
+				AND (b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x))
 			GROUP BY b.rptDate, b.ProductID, currencyID
 		)
 		
@@ -186,7 +188,7 @@ BEGIN
 		WHERE	ProductID = @CBProductId AND
 				CustomerCategory NOT IN (27, 28) AND
 				b.StatusId NOT IN (-1, 101, 102, 103) AND
-				(b.CurrencyID <> @CurrencyTest) AND
+				(b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x)) AND
 				(@Currency = 0 OR CurrencyId = @Currency) AND
 				cb.TypeId = @CommChargeType -- to remove duplicate we use one of (6,7)
 		GROUP BY rptdate, CurrencyId
@@ -231,7 +233,7 @@ BEGIN
 					FROM bodb_licenseereport.dbo.rptLicCashoutSummary b WITH (NOLOCK)
 						INNER JOIN #ChargeInfo ci ON b.SiteId = ci.LicenseeID AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate AND b.ProductID = ci.ProductId					
 					WHERE b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate									
-						AND (b.Currency <> @CurrencyTest)
+						AND (b.Currency NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x))
 						AND(@Currency = 0 OR b.Currency = @Currency)
 						AND b.ProductID = @COProductId
 						AND b.RoleID = 1 -- Member
@@ -270,7 +272,7 @@ BEGIN
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductId IN (0, @BTProductId)
 				WHERE b.RptDate BETWEEN ci.FromDate AND ci.ToDate
 					AND (@Currency = 0 OR b.CurrencyID = @Currency)
-					AND (b.CurrencyID <> @CurrencyTest)
+					AND (b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x))
 					AND b.Status NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory IN (1001, 1002)
 				GROUP BY b.RptDate, b.CurrencyId
@@ -288,7 +290,7 @@ BEGIN
 					INNER JOIN @Bettype bt ON b.Bettype = bt.Bettype AND bt.ProductID IN (3)
 				WHERE b.RptDate BETWEEN ci.FromDate AND ci.ToDate
 					AND (@Currency = 0 OR b.CurrencyID = @Currency)
-					AND (b.CurrencyID <> @CurrencyTest)
+					AND (b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x))
 					AND b.Status NOT IN (-1, 101, 102, 103)
 					AND b.CustomerCategory = 1002 -- for BT BA
 				GROUP BY b.RptDate, b.CurrencyId
@@ -318,7 +320,7 @@ BEGIN
 			WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 				AND b.StatusId NOT IN (- 1, 101, 102, 103)
 				AND (@Currency = 0 OR b.CurrencyID = @Currency)
-				AND (b.CurrencyID <> @CurrencyTest)
+				AND (b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x))
 				AND b.customercategory NOT IN (27,28)
 				AND b.ProductID = 11
 				AND b.SiteID IN (SELECT TOP 1 o.LicenseeID FROM #ChargeInfo o)
@@ -365,7 +367,7 @@ BEGIN
 		DELETE #Data
 		
 		SELECT ci.PartyID, b.rptDate, p.GroupProductId AS ProductId, b.CurrencyId
-			, SUM(CASE WHEN eb.TypeId = 7 THEN 0 ELSE b.turnover * 
+			, SUM(CASE WHEN eb.TypeId IN (7, 11) THEN 0 ELSE b.turnover * 
 				CASE WHEN b.bettype = 33 AND b.StatusId IN (114, 115) THEN 0.5 ELSE 1 END * 
 				CASE WHEN @drawfilter IN (2, 3)	
 						THEN CASE WHEN b.StatusId = 111 THEN 0 
@@ -374,11 +376,12 @@ BEGIN
 							  END	
 						ELSE 1 END
 				END) Turnover
-			, SUM(CASE WHEN eb.TypeId IN (2,7) THEN 0 ELSE b.MemberWL END) Winloss
+			, SUM(CASE WHEN eb.TypeId IN (2,7,11) THEN 0 ELSE b.MemberWL END) Winloss
 			, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionP ELSE 0 END) PComm
 			, SUM(CASE WHEN b.ProductID=31 THEN b.CommissionA ELSE 0 END) AComm
-			, SUM(b.betcount * CASE WHEN (@drawfilter = 2 AND b.StatusId = 111) OR eb.TypeId IN (2,7) THEN 0 ELSE 1 END) BetCount 
+			, SUM(b.betcount * CASE WHEN (@drawfilter = 2 AND b.StatusId = 111) OR eb.TypeId IN (2,7,11) THEN 0 ELSE 1 END) BetCount 
 			, SUM(CASE WHEN eb.TypeId IN (2,7) THEN ISNULL(-b.GrossWL, 0) ELSE 0 END) AWinloss
+			, SUM(CASE WHEN eb.TypeId = 11 THEN ISNULL(b.ValidBetAmount, 0) ELSE 0 END) OddsBoostBonus
 		INTO #TmpData
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 			INNER JOIN #Products p ON b.ProductId = p.ProductId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
@@ -388,13 +391,13 @@ BEGIN
 		WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 			AND b.StatusId NOT IN (- 1, 101, 102, 103)
 			AND (@Currency = 0 OR b.CurrencyID = @Currency)
-			AND (b.CurrencyID <> @CurrencyTest)
+			AND (b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM bodb_licensee.dbo.LA_f_ExcludedCurrencyListSel() x))
 			AND b.customercategory NOT IN (27,28)
-			AND (eb.Bettype IS NULL OR eb.TypeId IN (7,2)) -- 7:OddsSpread Adjustment, 2:Jackpot Contribution
+			AND (eb.Bettype IS NULL OR eb.TypeId IN (7,2,11)) -- 7:OddsSpread Adjustment, 2:Jackpot Contribution, 11:Odds Boost Adjustment
 			AND	ISNULL(b.TicketType,0) <> 2 -- Free_Bets_TicketType
 		GROUP BY ci.PartyID, b.rptDate, p.GroupProductId, b.CurrencyID
 
-		INSERT INTO #Report (ReportDate, CurrencyID, ProductID, Turnover, Winlost, LicenseeWL, Company, Betcount, OddsSpreadCost)
+		INSERT INTO #Report (ReportDate, CurrencyID, ProductID, Turnover, Winlost, LicenseeWL, Company, Betcount, OddsSpreadCost, OddsBoostBonus)
 		SELECT rptDate, b.CurrencyId, b.ProductID
 			, SUM(b.turnover) Turnover
 			, SUM(b.Winloss + CASE WHEN b.ProductID=31 THEN b.PComm ELSE 0 END) AS Winloss
@@ -402,10 +405,11 @@ BEGIN
 			, SUM(
 					CASE WHEN b.ProductID=31 THEN CASE WHEN b.rptDate < @ExchangeTerm_CutOffDate THEN -b.Winloss * ISNULL(cc.Rate,ci.Rate) - (b.AComm + b.PComm)
 												  ELSE  -(b.Winloss + PComm) * ISNULL(cc.Rate,ci.Rate) END
-					ELSE (-b.Winloss - CASE WHEN p.ProductID IS NOT NULL THEN AWinloss ELSE 0 END) * ISNULL(cc.Rate,ci.Rate) END
+					ELSE (-b.Winloss - CASE WHEN p.ProductID IS NOT NULL THEN AWinloss ELSE 0 END + OddsBoostBonus) * ISNULL(cc.Rate,ci.Rate) END --(Licensee WL + Odds Boost Bonus) * SB charge rate
 				 ) Company
 			, SUM(b.betcount) AS betcount
 			, SUM(CASE WHEN b.ProductID = 0 THEN AWinloss ELSE 0 END) AS OddsSpreadCost
+			, SUM(CASE WHEN b.ProductID = 0 THEN OddsBoostBonus ELSE 0 END) OddsBoostBonus
 		FROM #TmpData b WITH (NOLOCK)
 			INNER JOIN (SELECT DISTINCT PartyID, Fromdate, Todate, ProductID, Rate, ChargeID, ChargeType FROM #ChargeInfo WHERE ProductID NOT IN (SELECT ProductId From @ExcludedProductIds)) ci ON ci.PartyID = b.PartyID AND b.ProductID = ci.ProductID				
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID=ci.ChargeId AND b.CurrencyId=cc.CurrencyID
@@ -503,23 +507,23 @@ BEGIN
 	-- Result
 	BEGIN
 		CREATE TABLE #Result (ProductId INT, ProductName VARCHAR(50), ReportDate VARCHAR(8), CurrencyId INT, CurrencyName VARCHAR(20), TotalTransaction INT
-			,Turnover MONEY, CustomerWinLoss MONEY, LicenseeWinLoss MONEY, AmountDueToBA MONEY, BACommission MONEY, AmountCompany MONEY, OddsSpreadCost MONEY
-			,TurnoverMYR MONEY, CustomerWinLossMYR MONEY, LicenseeWinLossMYR MONEY, AmountDueToBAMYR MONEY, BACommissionMYR MONEY, AmountCompanyMYR MONEY, OddsSpreadCostMYR MONEY
-			,TurnoverUSD MONEY, CustomerWinLossUSD MONEY, LicenseeWinLossUSD MONEY, AmountDueToBAUSD MONEY, BACommissionUSD MONEY, AmountCompanyUSD MONEY, OddsSpreadCostUSD MONEY
-			,TurnoverEUR MONEY, CustomerWinLossEUR MONEY, LicenseeWinLossEUR MONEY, AmountDueToBAEUR MONEY, BACommissionEUR MONEY, AmountCompanyEUR MONEY, OddsSpreadCostEUR MONEY
-			,TurnoverGBP MONEY, CustomerWinLossGBP MONEY, LicenseeWinLossGBP MONEY, AmountDueToBAGBP MONEY, BACommissionGBP MONEY, AmountCompanyGBP MONEY, OddsSpreadCostGBP MONEY
-			,TurnoverCNY MONEY, CustomerWinLossCNY MONEY, LicenseeWinLossCNY MONEY, AmountDueToBACNY MONEY, BACommissionCNY MONEY, AmountCompanyCNY MONEY, OddsSpreadCostCNY MONEY
-			,TurnoverUSDT MONEY, CustomerWinLossUSDT MONEY, LicenseeWinLossUSDT MONEY, AmountDueToBAUSDT MONEY, BACommissionUSDT MONEY, AmountCompanyUSDT MONEY, OddsSpreadCostUSDT MONEY
-			,IsShowOddsSpread BIT)
+			,Turnover MONEY, CustomerWinLoss MONEY, LicenseeWinLoss MONEY, AmountDueToBA MONEY, BACommission MONEY, AmountCompany MONEY, OddsSpreadCost MONEY, OddsBoostBonus MONEY
+			,TurnoverMYR MONEY, CustomerWinLossMYR MONEY, LicenseeWinLossMYR MONEY, AmountDueToBAMYR MONEY, BACommissionMYR MONEY, AmountCompanyMYR MONEY, OddsSpreadCostMYR MONEY, OddsBoostBonusMYR MONEY
+			,TurnoverUSD MONEY, CustomerWinLossUSD MONEY, LicenseeWinLossUSD MONEY, AmountDueToBAUSD MONEY, BACommissionUSD MONEY, AmountCompanyUSD MONEY, OddsSpreadCostUSD MONEY, OddsBoostBonusUSD MONEY
+			,TurnoverEUR MONEY, CustomerWinLossEUR MONEY, LicenseeWinLossEUR MONEY, AmountDueToBAEUR MONEY, BACommissionEUR MONEY, AmountCompanyEUR MONEY, OddsSpreadCostEUR MONEY, OddsBoostBonusEUR MONEY
+			,TurnoverGBP MONEY, CustomerWinLossGBP MONEY, LicenseeWinLossGBP MONEY, AmountDueToBAGBP MONEY, BACommissionGBP MONEY, AmountCompanyGBP MONEY, OddsSpreadCostGBP MONEY, OddsBoostBonusGBP MONEY
+			,TurnoverCNY MONEY, CustomerWinLossCNY MONEY, LicenseeWinLossCNY MONEY, AmountDueToBACNY MONEY, BACommissionCNY MONEY, AmountCompanyCNY MONEY, OddsSpreadCostCNY MONEY, OddsBoostBonusCNY MONEY
+			,TurnoverUSDT MONEY, CustomerWinLossUSDT MONEY, LicenseeWinLossUSDT MONEY, AmountDueToBAUSDT MONEY, BACommissionUSDT MONEY, AmountCompanyUSDT MONEY, OddsSpreadCostUSDT MONEY, OddsBoostBonusUSDT MONEY
+		)
 
 		INSERT INTO #Result (ProductId, ProductName, ReportDate, CurrencyId, CurrencyName, TotalTransaction
-			,Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueToBA, BACommission, AmountCompany, OddsSpreadCost
-			,TurnoverMYR, CustomerWinLossMYR, LicenseeWinLossMYR, AmountDueToBAMYR, BACommissionMYR, AmountCompanyMYR, OddsSpreadCostMYR
-			,TurnoverUSD, CustomerWinLossUSD, LicenseeWinLossUSD, AmountDueToBAUSD, BACommissionUSD, AmountCompanyUSD, OddsSpreadCostUSD
-			,TurnoverEUR, CustomerWinLossEUR, LicenseeWinLossEUR, AmountDueToBAEUR, BACommissionEUR, AmountCompanyEUR, OddsSpreadCostEUR
-			,TurnoverGBP, CustomerWinLossGBP, LicenseeWinLossGBP, AmountDueToBAGBP, BACommissionGBP, AmountCompanyGBP, OddsSpreadCostGBP
-			,TurnoverCNY, CustomerWinLossCNY, LicenseeWinLossCNY, AmountDueToBACNY, BACommissionCNY, AmountCompanyCNY, OddsSpreadCostCNY
-			,TurnoverUSDT, CustomerWinLossUSDT, LicenseeWinLossUSDT, AmountDueToBAUSDT, BACommissionUSDT, AmountCompanyUSDT, OddsSpreadCostUSDT)
+			,Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueToBA, BACommission, AmountCompany, OddsSpreadCost, OddsBoostBonus
+			,TurnoverMYR, CustomerWinLossMYR, LicenseeWinLossMYR, AmountDueToBAMYR, BACommissionMYR, AmountCompanyMYR, OddsSpreadCostMYR, OddsBoostBonusMYR
+			,TurnoverUSD, CustomerWinLossUSD, LicenseeWinLossUSD, AmountDueToBAUSD, BACommissionUSD, AmountCompanyUSD, OddsSpreadCostUSD, OddsBoostBonusUSD
+			,TurnoverEUR, CustomerWinLossEUR, LicenseeWinLossEUR, AmountDueToBAEUR, BACommissionEUR, AmountCompanyEUR, OddsSpreadCostEUR, OddsBoostBonusEUR
+			,TurnoverGBP, CustomerWinLossGBP, LicenseeWinLossGBP, AmountDueToBAGBP, BACommissionGBP, AmountCompanyGBP, OddsSpreadCostGBP, OddsBoostBonusGBP
+			,TurnoverCNY, CustomerWinLossCNY, LicenseeWinLossCNY, AmountDueToBACNY, BACommissionCNY, AmountCompanyCNY, OddsSpreadCostCNY, OddsBoostBonusCNY
+			,TurnoverUSDT, CustomerWinLossUSDT, LicenseeWinLossUSDT, AmountDueToBAUSDT, BACommissionUSDT, AmountCompanyUSDT, OddsSpreadCostUSDT, OddsBoostBonusUSDT)
 		SELECT p.ProductId, p.ProductName
 			,CASE
 				WHEN @ReportBy = 1 THEN CONVERT(VARCHAR(8), b.ReportDate, 112)
@@ -537,6 +541,7 @@ BEGIN
 			,SUM(CommBA * e.Base) AS BACommission
 			,SUM(Company * e.Base) AS AmountCompany
 			,SUM(OddsSpreadCost * e.Base) AS OddsSpreadCost
+			,SUM(OddsBoostBonus * e.Base) AS OddsBoostBonus
 			-- MYR
 			,SUM(Turnover * e.MYR) AS TurnoverMYR
 			,SUM(Winlost * e.MYR) AS CustomerWinLossMYR
@@ -545,6 +550,7 @@ BEGIN
 			,SUM(CommBA * e.MYR) AS BACommissionMYR
 			,SUM(Company * e.MYR) AS AmountCompanyMYR
 			,SUM(OddsSpreadCost * e.MYR) AS OddsSpreadCostMYR
+			,SUM(OddsBoostBonus * e.MYR) AS OddsBoostBonusMYR
 			-- USD
 			,SUM(Turnover * e.USD) AS TurnoverUSD
 			,SUM(Winlost * e.USD) AS CustomerWinLossUSD
@@ -553,6 +559,7 @@ BEGIN
 			,SUM(CommBA * e.USD) AS BACommissionUSD
 			,SUM(Company * e.USD) AS AmountCompanyUSD
 			,SUM(OddsSpreadCost * e.USD) AS OddsSpreadCostUSD
+			,SUM(OddsBoostBonus * e.USD) AS OddsBoostBonusUSD
 			-- EUR
 			,SUM(Turnover * e.EUR) AS TurnoverEUR
 			,SUM(Winlost * e.EUR) AS CustomerWinLossEUR
@@ -561,6 +568,7 @@ BEGIN
 			,SUM(CommBA * e.EUR) AS BACommissionEUR
 			,SUM(Company * e.EUR) AS AmountCompanyEUR
 			,SUM(OddsSpreadCost * e.EUR) AS OddsSpreadCostEUR
+			,SUM(OddsBoostBonus * e.EUR) AS OddsBoostBonusEUR
 			-- GBP
 			,SUM(Turnover * e.GBP) AS TurnoverGBP
 			,SUM(Winlost * e.GBP) AS CustomerWinLossGBP
@@ -569,6 +577,7 @@ BEGIN
 			,SUM(CommBA * e.GBP) AS BACommissionGBP
 			,SUM(Company * e.GBP) AS AmountCompanyGBP
 			,SUM(OddsSpreadCost * e.GBP) AS OddsSpreadCostGBP
+			,SUM(OddsBoostBonus * e.GBP) AS OddsBoostBonusGBP
 			-- CNY
 			,SUM(Turnover * e.CNY) AS TurnoverCNY
 			,SUM(Winlost * e.CNY) AS CustomerWinLossCNY
@@ -577,7 +586,8 @@ BEGIN
 			,SUM(CommBA * e.CNY) AS BACommissionCNY
 			,SUM(Company * e.CNY) AS AmountCompanyCNY
 			,SUM(OddsSpreadCost * e.CNY) AS OddsSpreadCostCNY
-				-- USDT
+			,SUM(OddsBoostBonus * e.CNY) AS OddsBoostBonusCNY
+			-- USDT
 			,SUM(Turnover * e.USDT) AS TurnoverUSDT
 			,SUM(Winlost * e.USDT) AS CustomerWinLossUSDT
 			,SUM(LicenseeWL * e.USDT) AS LicenseeWinLossUSDT
@@ -585,6 +595,7 @@ BEGIN
 			,SUM(CommBA * e.USDT) AS BACommissionUSDT
 			,SUM(Company * e.USDT) AS AmountCompanyUSDT
 			,SUM(OddsSpreadCost * e.USDT) AS OddsSpreadCostUSDT
+			,SUM(OddsBoostBonus * e.USDT) AS OddsBoostBonusUSDT
 		FROM #Report b
 			INNER JOIN #Exchange e ON e.ExchangeDate = b.ReportDate AND e.ExchangeId = b.CurrencyID
 			INNER JOIN #Products p ON b.ProductID = p.ProductID AND b.ReportDate BETWEEN p.FromDate AND p.ToDate
@@ -613,42 +624,51 @@ BEGIN
 		FROM dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 		WHERE ExchangeId IN (SELECT CurrencyID FROM #Report)
 		
-		IF EXISTS (
-			SELECT 1
-			FROM (
-				SELECT CASE WHEN SUM(r.OddsSpreadCost * e.Base) <= 0 THEN 0 ELSE 1 END AS IsShowOddsSpread
-				FROM #Report r
-					INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeId AND r.ReportDate = e.ExchangeDate
-			) t
-			WHERE IsShowOddsSpread = 1
-		)
-		BEGIN
-			UPDATE #Result SET IsShowOddsSpread = 1
-		END
-		ELSE
+	   ---Get @IsShowOddsSpread, @IsShowOddsBoostBonus info
+		SELECT @IsShowOddsSpread   = CASE WHEN SUM(r.OddsSpreadCost * e.Base) <= 0 THEN 0 ELSE 1 END 
+			,@IsShowOddsBoostBonus = CASE WHEN SUM(r.OddsBoostBonus * e.Base) = 0 THEN 0 ELSE 1 END
+		FROM #Report r
+			INNER JOIN #Exchange e ON r.CurrencyId = e.ExchangeId AND r.ReportDate = e.ExchangeDate
+	
+		IF(@IsShowOddsSpread =  0)
 		BEGIN
 			UPDATE #Result
-			SET IsShowOddsSpread = 0
-				,OddsSpreadCost = 0
-				,OddsSpreadCostMYR = 0
-				,OddsSpreadCostUSD = 0
-				,OddsSpreadCostEUR = 0
-				,OddsSpreadCostGBP = 0
-				,OddsSpreadCostCNY = 0
-				,OddsSpreadCostUSDT = 0
+			SET -- OddsSpreadCost update
+				OddsSpreadCost 	    = 0
+				,OddsSpreadCostMYR  = 0
+				,OddsSpreadCostUSD  = 0
+				,OddsSpreadCostEUR  = 0
+				,OddsSpreadCostGBP  = 0
+				,OddsSpreadCostCNY  = 0
+				,OddsSpreadCostUSDT = 0 
+		END
+
+		IF( @IsShowOddsBoostBonus = 0)
+		BEGIN
+			UPDATE #Result
+			SET -- OddsBoostBonus update
+				OddsBoostBonus		= 0
+				,OddsBoostBonusMYR  = 0
+				,OddsBoostBonusUSD  = 0
+				,OddsBoostBonusEUR  = 0
+				,OddsBoostBonusGBP  = 0
+				,OddsBoostBonusCNY  = 0
+				,OddsBoostBonusUSDT = 0
+			
 		END
 	END
 
 	-- Return data
 	SELECT ProductId, ProductName, ReportDate, CurrencyId, CurrencyName, TotalTransaction
-		,Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueToBA, BACommission, AmountCompany, OddsSpreadCost
-		,TurnoverMYR, CustomerWinLossMYR, LicenseeWinLossMYR, AmountDueToBAMYR, BACommissionMYR, AmountCompanyMYR, OddsSpreadCostMYR
-		,TurnoverUSD, CustomerWinLossUSD, LicenseeWinLossUSD, AmountDueToBAUSD, BACommissionUSD, AmountCompanyUSD, OddsSpreadCostUSD
-		,TurnoverEUR, CustomerWinLossEUR, LicenseeWinLossEUR, AmountDueToBAEUR, BACommissionEUR, AmountCompanyEUR, OddsSpreadCostEUR
-		,TurnoverGBP, CustomerWinLossGBP, LicenseeWinLossGBP, AmountDueToBAGBP, BACommissionGBP, AmountCompanyGBP, OddsSpreadCostGBP
-		,TurnoverCNY, CustomerWinLossCNY, LicenseeWinLossCNY, AmountDueToBACNY, BACommissionCNY, AmountCompanyCNY, OddsSpreadCostCNY
-		,TurnoverUSDT, CustomerWinLossUSDT, LicenseeWinLossUSDT, AmountDueToBAUSDT, BACommissionUSDT, AmountCompanyUSDT, OddsSpreadCostUSDT
-		,IsShowOddsSpread
+		,Turnover, CustomerWinLoss, LicenseeWinLoss, AmountDueToBA, BACommission, AmountCompany, OddsSpreadCost, OddsBoostBonus
+		,TurnoverMYR, CustomerWinLossMYR, LicenseeWinLossMYR, AmountDueToBAMYR, BACommissionMYR, AmountCompanyMYR, OddsSpreadCostMYR, OddsBoostBonusMYR
+		,TurnoverUSD, CustomerWinLossUSD, LicenseeWinLossUSD, AmountDueToBAUSD, BACommissionUSD, AmountCompanyUSD, OddsSpreadCostUSD, OddsBoostBonusUSD
+		,TurnoverEUR, CustomerWinLossEUR, LicenseeWinLossEUR, AmountDueToBAEUR, BACommissionEUR, AmountCompanyEUR, OddsSpreadCostEUR, OddsBoostBonusEUR
+		,TurnoverGBP, CustomerWinLossGBP, LicenseeWinLossGBP, AmountDueToBAGBP, BACommissionGBP, AmountCompanyGBP, OddsSpreadCostGBP, OddsBoostBonusGBP
+		,TurnoverCNY, CustomerWinLossCNY, LicenseeWinLossCNY, AmountDueToBACNY, BACommissionCNY, AmountCompanyCNY, OddsSpreadCostCNY, OddsBoostBonusCNY
+		,TurnoverUSDT, CustomerWinLossUSDT, LicenseeWinLossUSDT, AmountDueToBAUSDT, BACommissionUSDT, AmountCompanyUSDT, OddsSpreadCostUSDT, OddsBoostBonusUSDT
+		,@IsShowOddsSpread AS IsShowOddsSpread
+		,@IsShowOddsBoostBonus  AS IsShowOddsBoostBonus 
 	FROM #Result
 	ORDER BY ReportDate
 

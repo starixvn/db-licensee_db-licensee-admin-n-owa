@@ -55,6 +55,7 @@ AS
 		- 20240201@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
 		- 20240710@Danny: Integrate Fast spin product[RedmineID: #206246]
 		- 20240710@Danny: Integrate FA CHAI promotion[RedmineID: #209902]
+		- 20241001@Sally: Support Odds Boost Voucher [#209884]
 */
 
 BEGIN
@@ -136,7 +137,7 @@ BEGIN
 			,@ProductCodes = @ProductCodes
 			,@FromDate = @FromDate
 			,@ToDate = @ToDate
-			,@LicensingFeeTypeIds = '0,-1,1,2,3,4,5,6,10,13' -- Contribution, Prize, ...
+			,@LicensingFeeTypeIds = '0,-1,1,2,3,4,5,6,10,13,14' -- Contribution, Prize, ...
 			,@BaseCurrencyName = @BaseCurrencyName
 			,@Environment = @Environment
 
@@ -193,10 +194,10 @@ BEGIN
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 3 THEN 54 -- Prizes
 				WHEN ProductId = 87 AND LicensingFeeTypeId = 3 THEN 57 -- Prizes
 				WHEN ProductId = 89 AND LicensingFeeTypeId = 3 THEN 59 -- Prizes
-
+				WHEN ProductId = 0  AND LicensingFeeTypeId = 14 THEN 61 -- Odds BoostBonus
 				END
 		FROM @Result
-		WHERE ProductId IN (10, 32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79, 87, 89) AND LicensingFeeTypeId > 0
+		WHERE ProductId IN (10, 32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79, 87, 89, 0) AND LicensingFeeTypeId > 0
 		GROUP BY
 			CASE
 				WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
@@ -224,6 +225,7 @@ BEGIN
 				WHEN ProductId = 10 AND LicensingFeeTypeId = 3 THEN 54 -- Prizes
 				WHEN ProductId = 87 AND LicensingFeeTypeId = 3 THEN 57 -- Prizes
 				WHEN ProductId = 89 AND LicensingFeeTypeId = 3 THEN 59 -- Prizes
+				WHEN ProductId = 0 AND LicensingFeeTypeId = 14 THEN 61 -- Odds BoostBonus
 				END
 
 		-- AMF, Prepayment and AGPrepayment

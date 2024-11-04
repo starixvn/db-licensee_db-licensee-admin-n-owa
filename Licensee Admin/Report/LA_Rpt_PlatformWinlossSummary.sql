@@ -38,6 +38,7 @@ AS
 		- 20211223@Danny: Using core function to group product under SB [RedmineID: #165971]
 		- 20230407@Danny: Extend betfrom data length [#178060]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+		- 20240923@Sally: Support Odds Boost Voucher [#209884]
 
 	Explanation:
 		@Platforms: DetailPlatform from LA_f_BetFrom_Sel() function
@@ -120,8 +121,8 @@ BEGIN
 		INSERT INTO #bettype (bettype)
 		SELECT DISTINCT bettype FROM dbo.SportBettypeMatrix WITH (NOLOCK) 
 		WHERE ProductId IN (SELECT x.ProductID FROM @ProductTab x) 
-			AND bettype <> 999 -- exclude Odds Spread Adjustment
-
+			AND bettype NOT IN (999, 997) -- 999: exclude Odds Spread Adjustment, 997: exclude Odds Boost Adjustment
+			
 		INSERT INTO #Data (rptDate, Currency, BetFrom, BetCount, Turnover, Winloss)
 		SELECT b.winlostdate, b.currency, b.betfrom, COUNT(1) AS BetCount, SUM(b.stake), SUM(b.winlost - b.actual_stake)
 		FROM dbo.bettrans b WITH (NOLOCK)
@@ -154,7 +155,7 @@ BEGIN
 			SELECT r.winlostdate, r.srecommend, r.recommend, r.Currency, r.betfrom, SUM(r.BetCount) AS BetCount, SUM(r.Turnover) AS Turnover, SUM(r.Winlost) AS Winlost
 			FROM bodb_LicenseeReport.dbo.rptLicWinloss2 r WITH (NOLOCK)
 			WHERE r.winlostdate BETWEEN @FDate AND @TDate
-				AND r.sporttype IN (SELECT x.sporttype FROM @SportTypeTab x) AND r.bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914, 999) -- exclude BT, CO, Odds Spread Adjustment
+				AND r.sporttype IN (SELECT x.sporttype FROM @SportTypeTab x) AND r.bettype NOT IN (901, 902, 903, 904, 911, 912, 913, 914, 999, 997) -- exclude BT, CO, Odds Spread Adjustment, Odds Boost Adjustment
 				AND r.isBA = 0
 				AND r.statusId IN (111, 112, 113, 114, 115)
 				AND r.roleid = 2

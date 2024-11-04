@@ -84,6 +84,7 @@ AS
 		- 20230223@Danny: Integrate Casino promotion [#194808]
 		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+		- 20240920@Sally: Support Odds Boost Voucher [#199292]
 
 	Param's Explanation:  
 	  + @PartyIDs : a string of list LicenseeID, separated by ','
@@ -210,7 +211,7 @@ BEGIN
 		(
 			PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
 			,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000)
-			,BetCount INT, Turnover MONEY, MemberWL MONEY, BACommission MONEY, IsPrevious BIT, ExtraInfo NVARCHAR(4000)
+			,BetCount INT, Turnover MONEY, MemberWL MONEY, BACommission MONEY, IsPrevious BIT, ExtraInfo NVARCHAR(4000), OddsBoostBonus MONEY
 		)
 
 		-- From/To
@@ -279,7 +280,20 @@ BEGIN
 			,@ToDate = @TDate
 			,@IsConvertExRate = @IsConvert
 			,@BaseCurrencyName = @BaseCurrencyName
-			,@LicensingFeeTypeIds = '0,13'
+			,@LicensingFeeTypeIds = '0,13,14' --14 = Odds Boost Adjustment
+
+		IF EXISTS (SELECT TOP 1 1 FROM @Result WHERE LicensingFeeTypeId = 14)
+		BEGIN
+			UPDATE r
+			SET r.OddsBoostBonus = ISNULL(r14.ExtraAmount,0)
+			FROM @Result r
+				INNER JOIN @Result r14 ON r14.PartyId = r.PartyId 
+										AND r14.ProductId = r.ProductId 
+										AND r14.LicensingFeeTypeId = 14
+			WHERE r.ProductId = 0 AND r.LicensingFeeTypeId = 0
+
+			DELETE FROM @Result WHERE LicensingFeeTypeId = 14
+		END
 
 		IF @isRecalRebate =1 AND @FDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
 		BEGIN
@@ -404,7 +418,21 @@ BEGIN
 			,@ToDate = @PrevTDate
 			,@IsConvertExRate = @IsConvert
 			,@BaseCurrencyName = @BaseCurrencyName
-			,@LicensingFeeTypeIds = '0,13'
+			,@LicensingFeeTypeIds = '0,13,14'
+		
+		IF EXISTS (SELECT TOP 1 1 FROM @Result WHERE LicensingFeeTypeId = 14)
+		BEGIN
+			UPDATE r
+			SET r.OddsBoostBonus = ISNULL(r14.ExtraAmount,0)
+			FROM @Result r
+				INNER JOIN @Result r14 ON r14.PartyId = r.PartyId 
+										AND r14.ProductId = r.ProductId 
+										AND r14.LicensingFeeTypeId = 14
+										AND r14.IsPrevious IS NULL
+			WHERE r.ProductId = 0 AND r.LicensingFeeTypeId = 0 AND r.IsPrevious IS NULL
+
+			DELETE FROM @Result WHERE LicensingFeeTypeId = 14
+		END
 
 		IF @isRecalRebate =1 AND @PrevFDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
 		BEGIN
@@ -480,6 +508,7 @@ BEGIN
 		,r.RebateSportsbook, r.PreviousRebateSportsbook, r.RebateOthers, r.PreviousRebateOthers
 		,r.PromotionSportsbook, r.PreviousPromotionSportsbook,  r.PlayerTipsSportsbook, r.PreviousPlayerTipsSportsbook, r.SponsorshipSportsbook, r.PreviousSponsorshipSportsbook
 		,r.PromotionOthers AS PromotionOthers, r.PreviousPromotionOthers AS PreviousPromotionOthers
+		,r.OddsBoostBonusSportsbook, r.PreviousOddsBoostBonusSportsbook
 		,r.TotalLicensingFee, r.PreviousTotalLicensingFee
 		,r.PartyId, CONVERT(BIT, 1) AS IsSelected -- Old format
 	FROM (
@@ -516,18 +545,20 @@ BEGIN
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId = 37 THEN ExtraAmount ELSE 0 END)) AS PreviousSponsorshipSportsbook
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 AND ProductId = -37 THEN ExtraAmount ELSE 0 END)) AS PromotionOthers
 			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 AND ProductId = -37 THEN ExtraAmount ELSE 0 END)) AS PreviousPromotionOthers
+			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 0 THEN ISNULL(OddsBoostBonus, 0) ELSE 0 END)) AS OddsBoostBonusSportsbook
+			,CONVERT(MONEY, SUM(CASE WHEN IsPrevious = 1 THEN ISNULL(OddsBoostBonus, 0) ELSE 0 END)) AS PreviousOddsBoostBonusSportsbook
 			,CONVERT(MONEY, SUM(CASE
 									WHEN IsPrevious = 1 OR ProductId = 3 THEN 0
 									WHEN ProductId = 37 THEN - LicensingFee - ExtraAmount
 									WHEN ProductId = 74 THEN ExtraAmount
 									WHEN ProductId = -37 THEN -ExtraAmount - Rebate
-									ELSE LicensingFee - Discount - Rebate END)) AS TotalLicensingFee
+									ELSE LicensingFee - Discount - Rebate - ISNULL(OddsBoostBonus, 0) END)) AS TotalLicensingFee
 			,CONVERT(MONEY, SUM(CASE
 									WHEN IsPrevious = 0 OR ProductId = 3 THEN 0
 									WHEN ProductId = 37 THEN - LicensingFee - ExtraAmount
 									WHEN ProductId = 74 THEN ExtraAmount
 									WHEN ProductId = -37 THEN -ExtraAmount - Rebate
-									ELSE LicensingFee - Discount - Rebate END)) AS PreviousTotalLicensingFee
+									ELSE LicensingFee - Discount - Rebate - ISNULL(OddsBoostBonus, 0) END)) AS PreviousTotalLicensingFee
 		FROM @Result
 		GROUP BY PartyId
 	) r

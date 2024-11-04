@@ -62,6 +62,7 @@ AS
 		- 20240221@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
 		- 20240730@Danny: Player Tips worksheet [#207863]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+		- 20240923@Sally: Support Odds Boost Voucher [#209884]
 	Param's Explanation:
 */
 BEGIN
@@ -132,7 +133,9 @@ BEGIN
 		TipsAmountDue				MONEY,
 		GrossCompany				MONEY,
 		FreeBetAmount				MONEY,
-		OddsSpreadCost				MONEY
+		OddsSpreadCost				MONEY,
+		GrossWL						MONEY,
+		OddsBoostBonus				MONEY
 	)
 
 	CREATE TABLE #Exchange
@@ -223,19 +226,26 @@ BEGIN
 		,@ToDate			AS WinLostDate
 		,0					AS CurrencyId
 		,''					AS CurrencyName
+		,CAST(0 AS FLOAT)	AS ExchangeRate
 		,CAST(0 AS BIT)		AS IsShowOddsSpread
+		,CAST(0 AS BIT)		AS IsShowOddsBoostBonus
 		,CAST(0 AS MONEY)	AS Betcount
 		,CAST(0 AS MONEY)	AS Turnover
 		,CAST(0 AS MONEY)	AS ActualStake
 		,CAST(0 AS MONEY)	AS BuyBackAmount
+		,CAST(0 AS MONEY)	AS BuyBackAmountSportsbook
+		,CAST(0 AS MONEY)	AS BuyBackAmountBA
 		,CAST(0 AS MONEY)	AS MemberWinLoss
 		,CAST(0 AS MONEY)	AS WinningPrize
 		,CAST(0 AS MONEY)	AS Contribution
 		,CAST(0 AS MONEY)	AS JackpotPrize
+		,CAST(0 AS MONEY)	AS Cashout
 		,CAST(0 AS MONEY)	AS MemberComm
 		,CAST(0 AS MONEY)	AS BettradeComm
 		,CAST(0 AS MONEY)	AS LicenseeWL
+		,CAST(0 AS MONEY)	AS LicenseeChargeRate
 		,CAST(0 AS MONEY)	AS LicenseeComm
+		,CAST(0 AS MONEY)	AS CashInShare
 		,CAST(0 AS MONEY)	AS Company
 		,CAST(0 AS MONEY)	AS TurnoverBase
 		,CAST(0 AS MONEY)	AS ActualStakeBase
@@ -256,6 +266,12 @@ BEGIN
 		,CAST(0 AS MONEY)	AS ProgressivePayoutBase
 		,CAST(0 AS MONEY)	AS ProgressivePayout
 		,CAST(0 AS MONEY)	AS ProgressiveFee
+		,CAST(0 AS MONEY)	AS CashoutTimes
+		,CAST(0 AS MONEY)	AS CashoutTickets
+		,CAST(0 AS MONEY)	AS CashoutValue
+		,CAST(0 AS MONEY)	AS TicketsPayout
+		,CAST(0 AS MONEY)	AS CashoutCommission
+		,CAST(0 AS MONEY)	AS BuyBackAmountAndComm		
 		,CAST(0 AS MONEY)	AS ProgressiveFeeBase
 		,CAST(0 AS MONEY)	AS TipsAmount
 		,CAST(0 AS MONEY)	AS TipsAmountBase
@@ -266,6 +282,21 @@ BEGIN
 		,CAST(0 AS MONEY)	AS GrossCompany
 		,CAST(0 AS MONEY)	AS GrossCompanyBase
 		,CAST(0 AS MONEY)	AS FreeBetAmount
+		,CAST(0 AS MONEY)	AS GrossWL
+		,CAST(0 AS MONEY)	AS OddsBoostBonus
+		,CAST(0 AS MONEY)	AS BuyBackAmountSportsbookBase
+		,CAST(0 AS MONEY)	AS BuyBackAmountBABase
+		,CAST(0 AS MONEY)	AS CashoutBase
+		,CAST(0 AS MONEY)	AS LicenseeChargeRateBase
+		,CAST(0 AS MONEY)	AS CashInShareBase
+		,CAST(0 AS MONEY)	AS CashoutTimesBase
+		,CAST(0 AS MONEY)	AS CashoutTicketsBase
+		,CAST(0 AS MONEY)	AS CashoutValueBase
+		,CAST(0 AS MONEY)	AS TicketsPayoutBase
+		,CAST(0 AS MONEY)	AS CashoutCommissionBase
+		,CAST(0 AS MONEY)	AS BuyBackAmountAndCommBase
+		,CAST(0 AS MONEY)	AS GrossWLBase
+		,CAST(0 AS MONEY)	AS OddsBoostBonusBase
 		,CAST(0 AS MONEY)	AS FreeBetAmountBase
 		RETURN
 	END
@@ -772,15 +803,16 @@ BEGIN
 	END
 	ELSE IF(@ProductCode = 'SB') -- Sportsbook
 	BEGIN
-		DECLARE @OddsSpreadCost_BetType SMALLINT = 999
 		;WITH cte_SB AS
 		(
 			SELECT b.SiteId, b.rptDate, b.CurrencyID
-				,SUM(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN 0 ELSE ISNULL(b.turnover, 0) END)	AS Turnover
-				,SUM(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN 0 ELSE ISNULL(b.MemberWL, 0) END)	AS MemberWinloss
-				,SUM(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN 0 ELSE ISNULL(b.betcount, 0) END)	AS BetCount
-				,SUM(CASE WHEN b.Bettype = @OddsSpreadCost_BetType THEN ISNULL(-b.GrossWL, 0) ELSE 0 END)	AS OddsSpreadCost
+				,SUM(CASE WHEN g.TypeID IN (7, 11) THEN 0 ELSE ISNULL(b.turnover, 0) END)	AS Turnover
+				,SUM(CASE WHEN g.TypeID IN (7, 11) THEN 0 ELSE ISNULL(b.MemberWL, 0) END)	AS MemberWinloss
+				,SUM(CASE WHEN g.TypeID IN (7, 11) THEN 0 ELSE ISNULL(b.betcount, 0) END)	AS BetCount
+				,SUM(CASE WHEN g.TypeID = 7	 THEN ISNULL(-b.GrossWL, 0) ELSE 0 END)			AS OddsSpreadCost
+				,SUM(CASE WHEN g.TypeID = 11 THEN ISNULL(b.ValidBetAmount, 0) ELSE 0 END)	AS OddsBoostBonus
 			FROM bodb_licenseereport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
+				LEFT JOIN bodb_licensee.dbo.LA_f_GroupBettype() g ON g.Bettype = b.Bettype AND g.TypeID IN (7, 11) -- 7:OddsSpread Adjustment, 11:Odds Boost Adjustment
 			WHERE
 				b.SiteID = @LicenseeID
 				AND b.rptDate BETWEEN @FromDate AND @ToDate
@@ -791,20 +823,24 @@ BEGIN
 				AND b.ProductID IN (SELECT ProductId FROM bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCode,@FromDate,@ToDate) WHERE GroupProductId = 0)
 			GROUP BY b.rptdate, b.SiteId, b.CurrencyID
 		)
-		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, LicenseeWL, GrossCompany, Company, Betcount, OddsSpreadCost)
+		INSERT INTO #Result( Winlostdate, CurrencyId, Turnover, Winlost, GrossWL, LicenseeWL, LicenseeChargeRate, GrossCompany, Company, Betcount, OddsSpreadCost, OddsBoostBonus)
 		SELECT rptDate, d.CurrencyID
 			,SUM(Turnover)													AS Turnover
 			,SUM(MemberWinloss)												AS Winlost
-			,SUM(-MemberWinloss * ( 1 - ISNULL(cr.Rate, p.Rate)))			AS LicenseeWL
-			,SUM(-MemberWinloss * ISNULL(cr.Rate, p.Rate))					AS GrossCompany
-			,SUM(-MemberWinloss * ISNULL(cr.Rate, p.Rate))					AS Company
+			,SUM(MemberWinloss - OddsBoostBonus)							AS GrossWL
+			,SUM((-MemberWinloss + OddsBoostBonus) * ( 1 - ISNULL(cr.Rate, p.Rate)))	AS LicenseeWL
+			,SUM((-MemberWinloss + OddsBoostBonus) * ISNULL(cr.Rate, p.Rate))			AS LicenseeChargeRate
+			,SUM((-MemberWinloss + OddsBoostBonus) * ISNULL(cr.Rate, p.Rate))			AS GrossCompany
+			,SUM((-MemberWinloss + OddsBoostBonus) * ISNULL(cr.Rate, p.Rate))			AS Company
 			,SUM(BetCount)													AS BetCount
 			,SUM(OddsSpreadCost)											AS OddsSpreadCost
+			,SUM(-OddsBoostBonus)											AS OddsBoostBonus
 		FROM cte_SB d
 			INNER JOIN @ChargeInfo p ON d.SiteId = p.LicenseeID
 			LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON p.ChargeId = cr.ChargeId AND d.CurrencyID = cr.CurrencyId
 		WHERE d.rptDate BETWEEN p.Fromdate AND p.Todate
-		GROUP BY rptDate, d.CurrencyID
+		GROUP BY rptDate, d.CurrencyID	
+
 	END
 	ELSE
 	BEGIN
@@ -848,7 +884,7 @@ BEGIN
 	END
 	
 	-- Return result
-	IF @ProductCode IN ('BA', 'CB', 'CO', 'BX')
+	IF @ProductCode IN ('BA', 'CB', 'CO', 'BX', 'SB')
 	BEGIN
 		UPDATE #Result SET ActualLicenseeChargeRate = LicenseeChargeRate
 	END
@@ -863,19 +899,21 @@ BEGIN
 	END
 
 	DECLARE @IsShowOddsSpread BIT = 0
+		,@IsShowOddsBoostBonus BIT = 0
 
-	IF EXISTS (
-		SELECT 1
-		FROM #Result d
-			INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
-		HAVING SUM(ISNULL(d.OddsSpreadCost * e.BaseExchangeRate, 0)) > 0
-	)
+	SELECT @IsShowOddsSpread = CASE WHEN SUM(ISNULL(d.OddsSpreadCost * e.BaseExchangeRate, 0)) > 0 THEN 1 ELSE 0 END
+		,@IsShowOddsBoostBonus = CASE WHEN SUM(ISNULL(d.OddsBoostBonus * e.BaseExchangeRate, 0)) <> 0 THEN 1 ELSE 0 END
+	FROM #Result d
+		INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
+
+	 IF (@IsShowOddsSpread = 0)
 	BEGIN
-		SET @IsShowOddsSpread = 1
-		UPDATE #Result SET Company = Company + OddsSpreadCost
+		UPDATE #Result 
+		SET OddsSpreadCost = 0
 	END
-	ELSE
-		UPDATE #Result SET OddsSpreadCost = 0
+
+	UPDATE #Result 
+	SET Company	= Company + OddsSpreadCost
 
 	;WITH sortedExchange AS (
 		SELECT ExchangeID, CurrencyCode, ROW_NUMBER() OVER (PARTITION BY CurrencyCode ORDER BY ExchangeId) RowNumber
@@ -888,6 +926,7 @@ BEGIN
 		, se.CurrencyCode			AS CurrencyName
 		, e.Rate					AS ExchangeRate
 		, @IsShowOddsSpread			AS IsShowOddsSpread
+		, @IsShowOddsBoostBonus		AS IsShowOddsBoostBonus
 		, SUM(Betcount)							AS Betcount
 		--orginal
 		, SUM(ISNULL(d.Turnover, 0))					AS Turnover
@@ -921,7 +960,8 @@ BEGIN
 		, SUM(ISNULL(d.GrossCompany, 0))				AS GrossCompany
 		, SUM(ISNULL(d.OddsSpreadCost, 0))				AS OddsSpreadCost
 		, SUM(ISNULL(d.FreeBetAmount, 0))				AS FreeBetAmount
-
+		, SUM(ISNULL(d.GrossWL, 0))						AS GrossWL
+		, SUM(ISNULL(d.OddsBoostBonus, 0))				AS OddsBoostBonus
 		--Base on currency
 		, CONVERT(MONEY, SUM(ISNULL(d.Turnover * e.Rate, 0)))					AS TurnoverBase
 		, CONVERT(MONEY, SUM(ISNULL(d.ActualStake * e.Rate, 0)))				AS ActualStakeBase
@@ -954,6 +994,8 @@ BEGIN
 		, CONVERT(MONEY, SUM(ISNULL(d.GrossCompany * e.Rate, 0)))				AS GrossCompanyBase
 		, CONVERT(MONEY, SUM(ISNULL(d.OddsSpreadCost * e.Rate, 0)))				AS OddsSpreadCostBase
 		, CONVERT(MONEY, SUM(ISNULL(d.FreeBetAmount * e.Rate, 0)))				AS FreeBetAmountBase
+		, CONVERT(MONEY, SUM(ISNULL(d.GrossWL * e.Rate, 0)))					AS GrossWLBase
+		, CONVERT(MONEY, SUM(ISNULL(d.OddsBoostBonus * e.Rate, 0)))				AS OddsBoostBonusBase	
 	FROM #Result d
 	INNER JOIN #Exchange e ON d.Winlostdate = e.ExchangeDate AND d.CurrencyId = e.ExchangeId
 	INNER JOIN sortedExchange se ON se.CurrencyCode = e.CurrencyCode

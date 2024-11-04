@@ -22,6 +22,8 @@ AS
 		- 20240318@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
 		- 20240301@Danny: Merge virtual sports product [RemineID: #199478]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+		- 20241028@Sally: Support Odds Boost Voucher [#209884]
+
 */
 BEGIN
 	SET NOCOUNT ON
@@ -214,8 +216,8 @@ BEGIN
 		,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), ExtraInfo NVARCHAR(4000)
 	)
 
-	DECLARE @FinalResult TABLE (PartyId INT, ProductId INT, AmountToCompany MONEY, LicensingFee MONEY, Discount MONEY, Rebate MONEY, Promotion MONEY, Sponsorship MONEY, ContributionDiscount MONEY, BetCount INT, OddsSpreadCost MONEY, PlayerTips MONEY)
-	CREATE TABLE #LA_Data (PartyID INT, ProductName VARCHAR(200), ProductID INT, CurrencyName VARCHAR(12), AmountToCompany MONEY , BaseCurrencyID INT, OddsSpreadCost MONEY)
+	DECLARE @FinalResult TABLE (PartyId INT, ProductId INT, AmountToCompany MONEY, LicensingFee MONEY, Discount MONEY, Rebate MONEY, Promotion MONEY, Sponsorship MONEY, ContributionDiscount MONEY, BetCount INT, OddsSpreadCost MONEY, PlayerTips MONEY, OddsBoostBonus MONEY)
+	CREATE TABLE #LA_Data (PartyID INT, ProductName VARCHAR(200), ProductID INT, CurrencyName VARCHAR(12), AmountToCompany MONEY , BaseCurrencyID INT, OddsSpreadCost MONEY, OddsBoostBonus MONEY)
 
 	-- refill data
 	INSERT INTO @LA_BaseCurrency(CurrencyId, CurrencyName)
@@ -239,12 +241,12 @@ BEGIN
 			,@ProductCodes = @LA_ProductCodes
 			,@FromDate = @FromDate
 			,@ToDate = @ToDate
-			,@LicensingFeeTypeIds = '0,7,8,9' -- 7 = ContributionDiscount, 8 = BetCount, 9 = OddsSpeadAdjustment
+			,@LicensingFeeTypeIds = '0,7,8,9,14' -- 7 = ContributionDiscount, 8 = BetCount, 9 = OddsSpeadAdjustment, 14 = Odds Boost Adjustment
 			,@BaseCurrencyName = @bcurr
 
 
-		INSERT INTO @FinalResult (PartyId, ProductId, AmountToCompany, LicensingFee, Discount, Rebate, Promotion, Sponsorship, ContributionDiscount, BetCount, OddsSpreadCost, PlayerTips)
-		SELECT r.PartyId, r.ProductId, r.GrossLicensingFee, r.LicensingFee + r.ExtraAmount, r.Discount, r.Rebate, ISNULL(t.Promotion, 0), ISNULL(t.Sponsorship, 0), ISNULL(t.ContributionDiscount, 0), ISNULL(t.BetCount, 0), ISNULL(t.OddsSpreadAdjustment, 0), ISNULL(t.PlayerTips,0)
+		INSERT INTO @FinalResult (PartyId, ProductId, AmountToCompany, LicensingFee, Discount, Rebate, Promotion, Sponsorship, ContributionDiscount, BetCount, OddsSpreadCost, PlayerTips, OddsBoostBonus)
+		SELECT r.PartyId, r.ProductId, r.GrossLicensingFee, r.LicensingFee + r.ExtraAmount, r.Discount, r.Rebate, ISNULL(t.Promotion, 0), ISNULL(t.Sponsorship, 0), ISNULL(t.ContributionDiscount, 0), ISNULL(t.BetCount, 0), ISNULL(t.OddsSpreadAdjustment, 0), ISNULL(t.PlayerTips,0), ISNULL(t.OddsBoostBonus,0)
 		FROM @Result r
 			LEFT JOIN (
 				SELECT PartyId, CASE WHEN ProductId IN (37, 74) THEN 0 ELSE ProductId END AS ProductId
@@ -254,14 +256,15 @@ BEGIN
 					,SUM(CASE WHEN LicensingFeeTypeId = 8 THEN ExtraAmount ELSE 0 END) AS BetCount
 					,SUM(CASE WHEN LicensingFeeTypeId = 9 AND ExtraAmount < 0 THEN -ExtraAmount ELSE 0 END) AS OddsSpreadAdjustment
 					,SUM(CASE WHEN ProductId = 74 AND LicensingFeeTypeId = 0 THEN -ExtraAmount ELSE 0 END) AS PlayerTips -- Recon Show Negative value
+					,SUM(CASE WHEN ProductId = 0 AND LicensingFeeTypeId = 14 THEN ExtraAmount ELSE 0 END) AS OddsBoostBonus
 				FROM @Result
 				WHERE ProductId IN (37,74) OR LicensingFeeTypeId > 0
 				GROUP BY PartyId,CASE WHEN ProductId IN (37, 74) THEN 0 ELSE ProductId END
 			) t ON r.PartyId = t.PartyId AND r.ProductId = t.ProductId
 		WHERE r.LicensingFeeTypeId = 0 AND r.ProductId NOT IN (37, 74)
 
-		INSERT INTO #LA_Data (PartyID, ProductName, ProductID, CurrencyName, AmountToCompany, BaseCurrencyID, OddsSpreadCost)
-		SELECT r.PartyId, p.ProductName, p.ProductId, UPPER(@bcurr) AS CurrencyName, SUM(r.AmountToCompany) AS AmountToCompany, @bcID, SUM(r.OddsSpreadCost)
+		INSERT INTO #LA_Data (PartyID, ProductName, ProductID, CurrencyName, AmountToCompany, BaseCurrencyID, OddsSpreadCost, OddsBoostBonus)
+		SELECT r.PartyId, p.ProductName, p.ProductId, UPPER(@bcurr) AS CurrencyName, SUM(r.AmountToCompany) AS AmountToCompany, @bcID, SUM(r.OddsSpreadCost), SUM(ISNULL(r.OddsBoostBonus, 0))
 		FROM @FinalResult r
 			INNER JOIN @ProductList p ON r.ProductId = p.ProductId
 		GROUP BY r.PartyId, p.ProductName, p.ProductId
@@ -288,11 +291,11 @@ BEGIN
 			ISNULL(l.CurrencyName, n.CurrencyName) CurrencyName,
 			ISNULL(l.AmountToCompany,0) AS  LA_Amt,
 			ISNULL(n.AmountToCompany,0) AS NAP_Amt,
-			- (ISNULL(l.AmountToCompany,0)- ISNULL(l.OddsSpreadCost,0)) - ISNULL(n.AmountToCompany,0) AS Diff_amt,
+			- (ISNULL(l.AmountToCompany,0)- ISNULL(l.OddsSpreadCost,0)) + ISNULL(l.OddsBoostBonus, 0) - ISNULL(n.AmountToCompany,0) AS Diff_amt,
 			ISNULL(l.BaseCurrencyID, n.BaseCurrencyID) BaseCurrencyID
 	FROM #LA_Data l
 	FULL JOIN #NAP_Data n ON l.PartyID = n.PartyID AND l.ProductID = n.ProductID 
-	WHERE ABS(- (ISNULL(l.AmountToCompany,0)- ISNULL(l.OddsSpreadCost,0)) - ISNULL(n.AmountToCompany,0)) > 1.
+	WHERE ABS(- (ISNULL(l.AmountToCompany,0)- ISNULL(l.OddsSpreadCost,0)) + ISNULL(l.OddsBoostBonus, 0) - ISNULL(n.AmountToCompany,0)) > 1.
 	ORDER BY ISNULL(l.PartyID, n.PartyID), ISNULL(l.ProductID,n.ProductID)
 
 	-- Diff by Adjustment
@@ -584,9 +587,11 @@ BEGIN
 						CASE WHEN x.SubProduct IN ('Jackpot Contribution') THEN 1
 							 WHEN x.SubProduct IN ('Prize','Lucky Draw','Bonus','Promotion') THEN 2
 							 WHEN x.SubProduct IN ('Jackpot Prize') THEN 3
-							 WHEN x.SubProduct IN ('Odds Spread Adjustment') THEN 4 END  TypeId
+							 WHEN x.SubProduct IN ('Odds Spread Adjustment') THEN 4
+							 WHEN x.SubProduct IN ('Odds Boost Adjustment') THEN 5   
+						END  TypeId
 		FROM bodb02.dbo.SportBettypeMatrix x WITH(NOLOCK)
-		WHERE x.SubProduct IN ('Jackpot Contribution','Jackpot Prize','Prize','Lucky Draw','Bonus','Odds Spread Adjustment','Promotion')
+		WHERE x.SubProduct IN ('Jackpot Contribution','Jackpot Prize','Prize','Lucky Draw','Bonus','Odds Spread Adjustment','Promotion','Odds Boost Adjustment')
 
 		INSERT INTO @Bettype (Bettype, TypeId)
 		SELECT s.Bettype, 2 AS TypeId -- Promotion (include Free bets)

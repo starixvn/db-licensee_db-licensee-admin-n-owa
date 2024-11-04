@@ -31,6 +31,7 @@ AS
 		- 20230823@Danny: Incorporate US$KH currency [RedmineID: #192544]
 		- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+		- 20240923@Sally: Support Odds Boost Voucher [#209884]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -96,11 +97,11 @@ BEGIN
 
 	-- Get data
 	BEGIN
-		CREATE TABLE #tmpData (rptDate DATE, SiteId INT, ProductId INT, CurrencyId INT, BetType INT, Winloss MONEY, AWinloss MONEY, AComm MONEY)
+		CREATE TABLE #tmpData (rptDate DATE, SiteId INT, ProductId INT, CurrencyId INT, BetType INT, Winloss MONEY, AWinloss MONEY, AComm MONEY, ValidBetAmount MONEY)
 		CREATE TABLE #tmpResult (PartyId INT, PartyName VARCHAR(50), ProductId INT, ProductName VARCHAR(50), CurrencyId INT, Company MONEY, OddsSpread MONEY, BasedOddsSpread MONEY)
 
-		INSERT INTO #tmpData (rptDate, SiteId, ProductId, CurrencyId, BetType, Winloss, AWinloss, AComm)
-		SELECT rptDate, SiteId, ProductId, CurrencyId, BetType, SUM(MemberWL), SUM(GrossWL), SUM(CommissionA)
+		INSERT INTO #tmpData (rptDate, SiteId, ProductId, CurrencyId, BetType, Winloss, AWinloss, AComm, ValidBetAmount)
+		SELECT rptDate, SiteId, ProductId, CurrencyId, BetType, SUM(MemberWL), SUM(GrossWL), SUM(CommissionA), SUM(ValidBetAmount) AS ValidBetAmount
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct WITH (NOLOCK)
 		WHERE rptDate BETWEEN @FromDate AND @ToDate
 			AND CustomerCategory NOT IN (27, 28)
@@ -126,9 +127,12 @@ BEGIN
 			,SUM(CASE
 					WHEN gb.TypeId = 7 THEN 0 -- OddsSpread Adjustment
 					WHEN gb.TypeId = 2 THEN t.AWinloss -- Contribution
-					ELSE -t.Winloss END * ISNULL(cr.Rate, c.Rate)
-					- CASE WHEN c.ProductId IN (3, 25) THEN t.AComm ELSE 0 END
-				) AS Company
+					ELSE (-t.Winloss 
+							+ CASE WHEN gb.TypeId = 11 AND t.ProductId = 0 THEN t.ValidBetAmount ELSE 0 END -- OddsBoostBonus
+						 )* ISNULL(cr.Rate, c.Rate)
+						- CASE WHEN c.ProductId IN (3, 25) THEN t.AComm ELSE 0 END
+				END
+			) AS Company
 			,SUM(CASE WHEN gb.TypeId = 7 THEN -t.AWinloss ELSE 0 END) AS OddsSpread
 			,SUM(CASE WHEN gb.TypeId = 7 THEN -t.AWinloss * e.Rate ELSE 0 END) AS BasedOddsSpread
 		FROM #tmpData t
@@ -138,7 +142,7 @@ BEGIN
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON c.ChargeId = cr.ChargeId AND t.CurrencyId = cr.CurrencyId
 			INNER JOIN @PartyList pl ON c.PartyId = pl.PartyId
 			INNER JOIN @ExchangeRate e ON t.rptDate = e.ExchangeDate AND t.CurrencyId = e.ExchangeId AND pl.BaseCurrencyId = e.BaseCurrencyId
-		WHERE gb.Bettype IS NULL OR gb.TypeId IN (2, 7)
+		WHERE gb.Bettype IS NULL OR gb.TypeId IN (2, 7, 11) -- 11: Odds Boost Adjustment
 		GROUP BY pl.PartyId, pl.PartyName, p.GroupProductId, p.GroupProductName, e.ExchangeId
 
 		-- Set OddsSpread = 0 if negative value
@@ -155,6 +159,7 @@ BEGIN
 			INNER JOIN CTE_OddsSpread c ON t.PartyId = c.PartyId AND t.ProductId = c.ProductId
 
 		UPDATE #tmpResult SET Company = Company + OddsSpread WHERE OddsSpread <> 0
+
 	END
 	
 	-- Return data

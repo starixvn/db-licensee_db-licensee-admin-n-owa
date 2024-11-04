@@ -34,6 +34,7 @@ AS
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 		- 20240410@Danny: Return biller CompanyName & Address1  [Redmine: #194604]
 		- 20240730@Danny: Player Tips worksheet [#207863]
+		- 20241014@Sally: Support Odds Boost Voucher [#209884]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -255,7 +256,7 @@ BEGIN
 		DECLARE @Result TABLE
 		(
 			PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
-			,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000),ExtraInfo NVARCHAR(4000)
+			,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000),ExtraInfo NVARCHAR(4000), OddsBoostBonus MONEY
 		)
 		
 		WHILE 1 = 1
@@ -278,15 +279,29 @@ BEGIN
 				,@FromDate = @FromDate
 				,@ToDate = @ToDate
 				,@IncludeTierRebate = 0
-				,@LicensingFeeTypeIds = '0,-1,13' -- -1: Deduction (AMF, AGPrepayment, Prepayment, ...) 13: Deduct casino promotion
+				,@LicensingFeeTypeIds = '0,-1,13,14' -- -1: Deduction (AMF, AGPrepayment, Prepayment, ...) 13: Deduct casino promotion, 14 = Odds Boost Adjustment
 				,@BaseCurrencyName = @temp_BaseCurrencyName
 				,@Environment = @Environment
 
 			SET @RowId = @RowId + 1
 		END
 
+				--Get data Odds Boost Bonus
+		IF EXISTS(SELECT 1 FROM @Result WHERE ProductId = 0 AND LicensingFeeTypeId = 14)
+		BEGIN
+			UPDATE r 
+			SET r.OddsBoostBonus = ISNULL(r14.ExtraAmount, 0)
+			FROM @Result r
+				INNER JOIN @Result r14 ON r.PartyId = r14.PartyId AND r.ProductId = r14.ProductId AND r14.LicensingFeeTypeId = 14								
+			WHERE r.ProductId = 0 
+				AND r.LicensingFeeTypeId = 0 			
+
+			DELETE @Result WHERE LicensingFeeTypeId = 14
+		END
+		
 		UPDATE sb
 		SET sb.ExtraAmount = sb.ExtraAmount - (ISNULL(p.LicensingFee,0) + ISNULL(p.ExtraAmount,0)) + ISNULL(p1.ExtraAmount,0) -- Saba Promotion Deducted, Add Tips
+			,sb.LicensingFee = sb.LicensingFee - ISNULL(sb.OddsBoostBonus,0)
 		FROM @Result sb
 			LEFT JOIN @Result p ON sb.PartyId = p.PartyId AND p.ProductId = 37
 			LEFT JOIN @Result p1 ON sb.PartyId = p1.PartyId AND p1.ProductId = 74

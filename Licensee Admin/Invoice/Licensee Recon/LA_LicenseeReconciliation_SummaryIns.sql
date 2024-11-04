@@ -19,6 +19,7 @@ AS
 		- 20220418@Percy: Add Credit for Setup Fees [RedmineID: #164139]
 		- 20221226@Danny: Integrate Player tips [#180703]
 		- 20240401@Danny: Change meta data [#203267]
+		- 20241021@Sally: Support Odds Boost Voucher [#209884]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -41,7 +42,8 @@ BEGIN
 		Promotion,
 		Sponsorship,
 		SettlementDetails,
-		PlayerTips)
+		PlayerTips,
+		OddsBoostBonus)
 	SELECT @Environment,
 		t.Party.value('@ad', 'DATE')	AS AccDate,
 		t.Party.value('@pi', 'INT')		AS PartyId,
@@ -59,7 +61,8 @@ BEGIN
 		t.Party.value('@pm', 'MONEY')	AS Promotion,
 		t.Party.value('@ss', 'MONEY')	AS Sponsorship,
 		t.Party.value('text()[1]', 'VARCHAR(4000)')	AS SettlementDetails,
-		t.Party.value('@pt', 'MONEY')	AS PlayerTips
+		t.Party.value('@pt', 'MONEY')	AS PlayerTips,
+		t.Party.value('@obb', 'MONEY')	AS OddsBoostBonus
 	FROM @XmlData.nodes('/root/r') t(Party)
 
 END

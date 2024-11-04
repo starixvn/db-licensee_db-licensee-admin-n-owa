@@ -70,6 +70,7 @@ AS
 	   - 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
 	   - 20240314@Danny: AGC - JP, Contribution, Promotion prize integration [#197268]
 	   - 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+	   - 20240912@Sally: Support Odds Boost Voucher [#209884]
 
 	Param's Explanation:
 	  + @ReportType: 1-Live; 2-Non-Live; 0: All;
@@ -140,7 +141,8 @@ BEGIN
 		Company			MONEY,
 		Betcount		BIGINT,
 		Playercomm		MONEY,
-		OddsSpreadCost	MONEY
+		OddsSpreadCost	MONEY,
+		OddsBoostBonus	MONEY
 	)
 
 	CREATE INDEX IX_tmpWinloss ON #tmpWinLoss(PartyID, winlostdate, Currency)
@@ -353,29 +355,30 @@ BEGIN
 
 		DELETE bt
 		FROM #Bettype bt
-			INNER JOIN bodb_licensee.dbo.LA_f_GroupBettype() eb ON bt.Bettype = eb.Bettype AND eb.TypeID NOT IN (7,2) -- 7:OddsSpread Adjustment, 2:Jackpot Contribution
+			INNER JOIN bodb_licensee.dbo.LA_f_GroupBettype() eb ON bt.Bettype = eb.Bettype AND eb.TypeID NOT IN (7,2,11) -- 7:OddsSpread Adjustment, 2:Jackpot Contribution, 11:Odds Boost Adjustment
 
 		CREATE TABLE #tmpData (rptDate DATE, LicenseeId INT, CurrencyId INT, ProductId INT, LeagueId INT, Bettype INT
-			,BetCount INT, Turnover MONEY, Winloss MONEY, WinlossA MONEY, CommissionP MONEY)
+			,BetCount INT, Turnover MONEY, Winloss MONEY, WinlossA MONEY, CommissionP MONEY, OddsBoostBonus MONEY)
 
 		IF @SportType = 0 AND @Bettype = 0 AND @ReportBy = 0
 		BEGIN
-			INSERT INTO #tmpData (rptDate, LicenseeId, CurrencyId, ProductId, BetCount, Turnover, Winloss, WinlossA, CommissionP)
+			INSERT INTO #tmpData (rptDate, LicenseeId, CurrencyId, ProductId, BetCount, Turnover, Winloss, WinlossA, CommissionP, OddsBoostBonus)
 			SELECT r.rptDate, r.SiteId, r.CurrencyId, r.ProductId
 				,SUM(r.BetCount * CASE
-									WHEN b.TypeID IN (7,2) THEN 0
+									WHEN b.TypeID IN (7,2,11) THEN 0
 									WHEN @drawfilter = 2 AND r.StatusId = 111 THEN 0
 									ELSE 1 END) AS BetCount
 				,SUM(r.Turnover * CASE
-									WHEN b.TypeID = 7 THEN 0
+									WHEN b.TypeID IN (7,11) THEN 0
 									WHEN @drawfilter IN (2, 3) AND r.StatusId = 111 THEN 0
 									WHEN @drawfilter IN (2, 3) AND r.StatusId IN (114, 115) THEN 0.5
 									ELSE 1 END) AS Turnover
 				,SUM(r.MemberWL * CASE
-									WHEN b.TypeID IN (7,2) THEN 0
+									WHEN b.TypeID IN (7,2,11) THEN 0
 									ELSE 1 END) AS Winloss
-				,SUM(CASE WHEN  b.TypeID IN (7,2) THEN ISNULL(-r.GrossWL, 0) ELSE 0 END) WinlossA
+				,SUM(CASE WHEN b.TypeID IN (7,2) THEN ISNULL(-r.GrossWL, 0) ELSE 0 END) WinlossA
 				,SUM(CASE WHEN r.ProductId = 32 THEN 0 ELSE r.CommissionP END) AS CommissionP
+				,SUM(CASE WHEN b.TypeId = 11 THEN ISNULL(r.ValidBetAmount, 0) ELSE 0 END) OddsBoostBonus
 			FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct r WITH (NOLOCK)
 				LEFT JOIN bodb_licensee.dbo.LA_f_GroupBettype() b ON r.Bettype = b.Bettype 
 			WHERE r.rptDate BETWEEN @FromDate AND @ToDate
@@ -385,31 +388,32 @@ BEGIN
 				AND EXISTS (SELECT 1 FROM #Licensees p WHERE r.SiteId = p.LicenseeId)
 				AND (@CurrencyIds = '' OR ',' + @CurrencyIds + ',' LIKE '%,' + CONVERT(VARCHAR(20), r.CurrencyId) + ',%')
 				AND ISNULL(r.TicketType, 0) <> 2
-				AND (b.Bettype IS NULL OR b.TypeID IN (7,2)) -- 7:OddsSpread Adjustment, 2:Jackpot Contribution
+				AND (b.Bettype IS NULL OR b.TypeID IN (7,2,11)) -- 7:OddsSpread Adjustment, 2:Jackpot Contribution, 11:Odds Boost Adjustment
 			GROUP BY r.rptDate, r.SiteId, r.CurrencyId, r.ProductId
 		END
 		ELSE
 		BEGIN
-			INSERT INTO #tmpData (rptDate, LicenseeId, CurrencyId, ProductId, LeagueId, Bettype, BetCount, Turnover, Winloss, WinlossA, CommissionP)
+			INSERT INTO #tmpData (rptDate, LicenseeId, CurrencyId, ProductId, LeagueId, Bettype, BetCount, Turnover, Winloss, WinlossA, CommissionP, OddsBoostBonus)
 			SELECT r.rptDate, r.SiteId, r.CurrencyId, bt.ProductId, r.LeagueId
 				,CASE WHEN r.Bettype NOT IN (9, 29) AND r.Bettype NOT BETWEEN 31 AND 120 THEN 1 ELSE 0 END AS Bettype
 				,SUM(r.BetCount * CASE
-									WHEN t.TypeID IN (7,2) THEN 0
+									WHEN t.TypeID IN (7,2,11) THEN 0
 									WHEN @drawfilter = 2 AND r.Status = 111 THEN 0
 									ELSE 1 END) AS BetCount
 				,SUM(r.Turnover * CASE
-									WHEN t.TypeID = 7 THEN 0
+									WHEN t.TypeID IN (7, 11) THEN 0
 									WHEN @drawfilter IN (2, 3) AND r.Status = 111 THEN 0
 									WHEN @drawfilter IN (2, 3) AND r.Status IN (114, 115) THEN 0.5
 									ELSE 1 END) AS Turnover
 				,SUM(r.Winloss * CASE
-									WHEN t.TypeID IN (7,2) THEN 0
+									WHEN t.TypeID IN (7,2,11) THEN 0
 									ELSE 1 END) AS Winloss
 				,SUM(CASE WHEN t.TypeID IN (7,2) THEN ISNULL(-r.WinLossA, 0) ELSE 0 END) WinlossA
 				,SUM(CASE WHEN bt.ProductId = 32 THEN 0 ELSE r.CommissionP END) AS CommissionP
+				,SUM(CASE WHEN t.TypeId = 11 THEN ISNULL(r.oddsspread, 0) ELSE 0 END) OddsBoostBonus
 			FROM bodb_LicenseeReport.dbo.rpt_Betting r WITH (NOLOCK)
 				INNER JOIN #Bettype bt ON r.Bettype = bt.Bettype
-				LEFT JOIN bodb_licensee.dbo.LA_f_GroupBettype() t ON r.Bettype = t.Bettype AND t.TypeID IN (7,2) -- 7:OddsSpread Adjustment, 2:Jackpot Contribution
+				LEFT JOIN bodb_licensee.dbo.LA_f_GroupBettype() t ON r.Bettype = t.Bettype AND t.TypeID IN (7,2,11) -- 7:OddsSpread Adjustment, 2:Jackpot Contribution, 11:Odds Boost Adjustment
 			WHERE r.rptDate BETWEEN @FromDate AND @ToDate
 				AND r.Status IN (111, 112, 113, 114, 115)
 				AND r.CustomerCategory NOT IN (27, 28)
@@ -440,11 +444,12 @@ BEGIN
 					,SUM(b.BetCount) AS BetCount
 					,SUM(b.CommissionP) AS Playercomm
 					,SUM(b.WinlossA) AS WinlossA
+					,SUM(b.OddsBoostBonus) AS OddsBoostBonus
 			FROM #tmpData b
 				INNER JOIN #Products p ON b.ProductId = p.ProductId AND b.rptDate BETWEEN p.FromDate AND p.ToDate
 			GROUP BY b.rptDate, b.LicenseeId, b.CurrencyId, p.GroupProductId
 		)
-		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm, OddsSpreadCost)
+		INSERT INTO #tmpWinLoss(Winlostdate, PartyID, Currency, TurnOver, Winlost, LicenseeWL, AmtDueToBA, CommBA, Company, Betcount, Playercomm, OddsSpreadCost, OddsBoostBonus)
 		SELECT a.rptDate
 			   ,p.PartyID
 			   ,a.CurrencyID
@@ -453,10 +458,11 @@ BEGIN
 			   ,-MemberWL
 			   ,0
 			   ,0
-			   ,(-MemberWL - CASE WHEN jp.ProductID IS NOT NULL THEN WinlossA ELSE 0 END) * ISNULL(cc.Rate, p.Rate)
+			   ,(-MemberWL - CASE WHEN jp.ProductID IS NOT NULL THEN WinlossA ELSE 0 END + a.OddsBoostBonus) * ISNULL(cc.Rate, p.Rate) --  SB Service Fee =(Licensee WL + Odds Boost Bonus) * SB charge rate
 			   ,Betcount
 			   ,Playercomm
-			   ,CASE WHEN a.ProductID = 0 THEN WinlossA ELSE 0 END
+			   ,CASE WHEN a.ProductID = 0 THEN WinlossA ELSE 0 END AS OddsSpreadCost
+			   ,CASE WHEN a.ProductID = 0 THEN OddsBoostBonus ELSE 0 END AS OddsBoostBonus
 		FROM cte_Data a
 		INNER JOIN #tmpParty p ON p.LicenseeId = a.LicenseeId AND a.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId=a.ProductId AND p.ChargeType = 1
 		LEFT JOIN bodb_licensee.dbo.LA_ChargeRateByCurrency cc WITH (NOLOCK) ON cc.ChargeID = p.ChargeId AND a.CurrencyId=cc.CurrencyID
@@ -509,10 +515,13 @@ BEGIN
 	-- Result
 	BEGIN
 		CREATE TABLE #Result (PartyId INT, PartyName VARCHAR(50), Currency INT, CurrencyName VARCHAR(20), ReportDate DATETIME
-			,BetCount INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY, CommBA MONEY, AmtDuetoBA MONEY, Company MONEY, Playercomm MONEY, OddsSpreadCost MONEY, IsShowOddsSpread TINYINT)
+			,BetCount INT, Turnover MONEY, Winlost MONEY, LicenseeWL MONEY, CommBA MONEY, AmtDuetoBA MONEY, Company MONEY, Playercomm MONEY
+			,OddsSpreadCost MONEY, IsShowOddsSpread TINYINT
+			,OddsBoostBonus MONEY, IsShowOddsBoostBonus TINYINT
+		)
 
 		INSERT INTO #Result (PartyId, PartyName, Currency, CurrencyName, ReportDate
-			,BetCount, Turnover, Winlost, LicenseeWL, CommBA, AmtDuetoBA, Company, Playercomm, OddsSpreadCost)
+			,BetCount, Turnover, Winlost, LicenseeWL, CommBA, AmtDuetoBA, Company, Playercomm, OddsSpreadCost, OddsBoostBonus)
 		SELECT w.PartyId
 			,CASE
 				WHEN p.PartyName = '18bb' THEN 'PIH'
@@ -528,7 +537,8 @@ BEGIN
 			,SUM(AmtDuetoBA * e.Rate)	AS AmtDuetoBA
 			,SUM(Company * e.Rate)		AS Company
 			,SUM(Playercomm * e.Rate)	AS Playercomm
-			,SUM(OddsSpreadCost*e.Rate)	AS OddsSpreadCost
+			,SUM(ISNULL(OddsSpreadCost, 0) *e.Rate)AS OddsSpreadCost
+			,SUM(ISNULL(OddsBoostBonus, 0) *e.Rate)AS OddsBoostBonus
 		FROM #tmpWinLoss w
 			INNER JOIN #ExchangeRate e ON w.Winlostdate = e.ExchangeDate AND w.currency = e.ExchangeId
 			LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH (NOLOCK) ON w.PartyID = p.PartyID
@@ -559,11 +569,16 @@ BEGIN
 		END
 
 		UPDATE r
-		SET r.OddsSpreadCost = CASE WHEN t.IsShowOddsSpread = 1 THEN r.OddsSpreadCost ELSE 0 END
-			,r.IsShowOddsSpread = t.IsShowOddsSpread
+		SET r.OddsSpreadCost        = CASE WHEN t.IsShowOddsSpread = 1 THEN r.OddsSpreadCost ELSE 0 END
+			,r.IsShowOddsSpread     = t.IsShowOddsSpread
+			--Update flag OddsSpreadCost
+			,r.OddsBoostBonus       = CASE WHEN t.IsShowOddsBoostBonus = 1 THEN r.OddsBoostBonus ELSE 0 END
+			,r.IsShowOddsBoostBonus = t.IsShowOddsBoostBonus
 		FROM #Result r
 			INNER JOIN (
-				SELECT r.PartyId, CASE WHEN SUM(r.OddsSpreadCost * e.Rate) <= 0 THEN 0 ELSE 1 END AS IsShowOddsSpread
+				SELECT r.PartyId
+					,CASE WHEN SUM(ISNULL(r.OddsSpreadCost,0) * e.Rate) <= 0 THEN 0 ELSE 1 END AS IsShowOddsSpread
+					,CASE WHEN SUM(ISNULL(r.OddsBoostBonus,0) * e.Rate) = 0 THEN 0 ELSE 1 END AS IsShowOddsBoostBonus
 				FROM #tmpWinLoss r
 					INNER JOIN #PartyList p ON r.PartyId = p.PartyId
 					INNER JOIN #ExchangeRate e ON p.BaseCurrencyId = e.BaseCurrencyId AND r.currency = e.ExchangeId AND r.Winlostdate = e.ExchangeDate
@@ -574,7 +589,9 @@ BEGIN
 	-- Return data
 	IF @GroupByType = 1 -- Group by Licensee
 		SELECT PartyId, PartyName, Currency, CurrencyName, ReportDate
-				,BetCount, Turnover, Winlost, LicenseeWL, CommBA, AmtDuetoBA, Company, Playercomm, OddsSpreadCost, CONVERT(BIT, IsShowOddsSpread) AS IsShowOddsSpread
+				,BetCount, Turnover, Winlost, LicenseeWL, CommBA, AmtDuetoBA, Company, Playercomm
+				,OddsSpreadCost, CONVERT(BIT, IsShowOddsSpread) AS IsShowOddsSpread
+				,OddsBoostBonus, CONVERT(BIT, IsShowOddsBoostBonus) AS IsShowOddsBoostBonus
 		FROM #Result
 		ORDER BY PartyId, PartyName, CurrencyName, ReportDate
 	ELSE IF @GroupByType = 2 -- Group by Currency
@@ -589,6 +606,8 @@ BEGIN
 			,SUM(Playercomm) AS Playercomm
 			,SUM(OddsSpreadCost) AS OddsSpreadCost
 			,CONVERT(BIT, MAX(IsShowOddsSpread)) AS IsShowOddsSpread
+			,SUM(OddsBoostBonus) AS OddsBoostBonus
+			,CONVERT(BIT, MAX(IsShowOddsBoostBonus)) AS IsShowOddsBoostBonus
 		FROM #Result
 		GROUP BY Currency, CurrencyName
 		ORDER BY CurrencyName
