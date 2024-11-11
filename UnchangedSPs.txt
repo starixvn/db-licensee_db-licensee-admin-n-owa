@@ -1,13 +1,1 @@
-Licensee Admin\Report\VendorPayment\LA_Rpt_3rdProductSettlement.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template10.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template16.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template17.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template5.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template6.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template8.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template9.sql
-Licensee Admin\Report\LA_Rpt_GroupLicensingFeeExtraPayoutWinLoss.sql
-Licensee Admin\Invoice\LA_Inv_InvoiceAmountGenerate.sql
-Licensee Admin\Invoice\LA_Inv_InvoiceWaiveGet.sql
-Licensee Admin\Invoice\GenerateMultipleInvoices\LA_Inv_MultipleGenerationTemporaryInvoiceSel.sql
-Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_StraightDiscountSel.sql
+Licensee Admin\Report\Analysis\LA_GEN_LicPerformanceAnalysis_Adjustment.sql
