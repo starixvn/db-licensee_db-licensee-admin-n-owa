@@ -29,6 +29,7 @@ AS
 		- 20240301@Danny: Merge virtual sports product [RemineID: #199478]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 		- 20241014@Sally: Support Odds Boost Voucher [#209884]
+		- 20241105@Sally: Adjust show value Odds Boost Bonus [#209884]
 */
 
 BEGIN
@@ -212,8 +213,8 @@ BEGIN
 			,ISNULL(t.JackpotPrize, 0) AS JackpotPrize
 			,ISNULL(t.OddsSpread, 0) AS OddsSpread
 			,1 AS IsShowOddsSpread
-			,NULL AS OddsBoostBonus
-			,0 AS IsShowOddsBoostBonus
+			,t.OddsBoostBonus AS OddsBoostBonus
+			,CASE WHEN t.OddsBoostBonus <> 0 THEN 1 ELSE 0 END AS IsShowOddsBoostBonus
 		FROM CTE_Data d
 			FULL OUTER JOIN (
 				SELECT
@@ -221,10 +222,11 @@ BEGIN
 					,SUM(CASE WHEN TypeId = 2 THEN CompanyWL ELSE 0 END) AS Promotion
 					,SUM(CASE WHEN TypeId = 3 THEN CompanyWL ELSE 0 END) AS JackpotPrize
 					,SUM(CASE WHEN TypeId = 4 THEN CompanyWL ELSE 0 END) AS OddsSpread
+					,SUM(CASE WHEN TypeId = 5 THEN CompanyWL ELSE 0 END) AS OddsBoostBonus
 				FROM CTE_Data
 				WHERE TypeId IS NOT NULL
 			) t ON d.TypeId = 0 AND d.RN = 1
-		WHERE ISNULL(d.TypeId, 0) = 0 OR d.TypeId = 5
+		WHERE ISNULL(d.TypeId, 0) = 0
 
 		IF @@ROWCOUNT = 0
 			INSERT INTO @Result (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread, OddsBoostBonus, IsShowOddsBoostBonus)
@@ -254,12 +256,13 @@ BEGIN
 
 		-- Variance
 	SELECT
-		CONVERT(MONEY, ISNULL(l.LicensingFee, 0) + ISNULL(l.OddsBoostBonus, 0)- ISNULL(n.LicensingFee, 0)) AS CompanyWL
+		CONVERT(MONEY, ISNULL(l.LicensingFee, 0) - ISNULL(n.LicensingFee, 0)) AS CompanyWL
 		,CONVERT(MONEY, ISNULL(l.Contribution, 0) - ISNULL(n.Contribution, 0)) AS Contribution
 		,CONVERT(MONEY, ISNULL(l.ContributionDiscount, 0) - ISNULL(n.ContributionDiscount, 0)) AS ContributionDiscount
 		,CONVERT(MONEY, ISNULL(l.Promotion, 0) - ISNULL(n.Promotion, 0)) AS Promotion
 		,CONVERT(MONEY, ISNULL(l.JackpotPrize, 0) - ISNULL(n.JackpotPrize, 0)) AS JackpotPrize
 		,CONVERT(MONEY, ISNULL(l.OddsSpread, 0) - ISNULL(n.OddsSpread, 0)) AS OddsSpreadAdjustment
+		,CONVERT(MONEY, ISNULL(l.OddsBoostBonus, 0) - ISNULL(n.OddsBoostBonus, 0)) AS OddsBoostBonus
 	FROM (
 		SELECT
 			SUM(LicensingFee) AS LicensingFee
@@ -280,6 +283,7 @@ BEGIN
 				,SUM(Promotion) AS Promotion
 				,SUM(JackpotPrize) AS JackpotPrize
 				,SUM(OddsSpread) AS OddsSpread
+				,SUM(OddsBoostBonus) AS OddsBoostBonus
 			FROM @Result
 			WHERE Func = 'NAP'
 		) n ON 1 = 1
