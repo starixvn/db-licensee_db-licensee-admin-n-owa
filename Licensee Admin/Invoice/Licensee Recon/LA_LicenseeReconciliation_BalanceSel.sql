@@ -20,6 +20,7 @@ AS
 		- 20240227@Danny: Extend data type param input [RedmineID: #197267]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 		- 20241010@Danny: exclude some debit note [RedmineID: #212037]
+		- 20241120@Danny: replace strsplit function [RemineID: #212252]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -48,7 +49,7 @@ BEGIN
 	INSERT INTO @tmpCust(CustId,LicenseeCode)
 	SELECT c.CustId, UPPER(c.username)
 	FROM dbo.Customer c WITH(NOLOCK)
-	INNER JOIN dbo.strSplit(@CustIds,',') c2 ON c.CustId = c2.val
+	INNER JOIN STRING_SPLIT(@CustIds,',') c2 ON c.CustId = c2.value
 
 	-- many licensees may have same code, ex: honbet, new honbet
 	--

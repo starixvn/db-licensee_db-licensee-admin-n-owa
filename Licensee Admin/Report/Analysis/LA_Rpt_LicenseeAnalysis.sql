@@ -25,6 +25,7 @@ AS
 		- 20191205@Mason: PP tournament [#123958]
 		- 20190206@Mason: Set billing term by currency [#120005]
 		- 20241016@Danny: Extend parameter data length [RemineID: #212252]
+		- 20241120@Danny: replace strsplit function [RemineID: #212252]
 
 	Notes: @FromDate, @ToDate should be a full month range
 	Example :  EXEC LA_Rpt_LicenseeAnalysis  @PartyIDs = '73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88', 
@@ -61,7 +62,7 @@ BEGIN
 	-- 1.1 Party groups
 	-- select all parties in the same group
 	DECLARE @PartyIdTable TABLE (PartyId INT, IsSelected BIT)
-	INSERT INTO @PartyIdTable SELECT DISTINCT val, 1 FROM dbo.strSplit(@PartyIDs, ',')
+	INSERT INTO @PartyIdTable SELECT DISTINCT value, 1 FROM STRING_SPLIT(@PartyIDs, ',')
 
 	DECLARE @PartyGroup AS TABLE (PartyGroupId INT, PartyId INT)
 	

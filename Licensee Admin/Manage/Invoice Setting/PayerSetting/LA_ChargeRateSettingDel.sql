@@ -21,6 +21,7 @@ AS
 		- 20150917@Victor: Support Chinese on Settings
 		- 20161101@bruce.bui: support delete multiple rate
 		- 20180716@bruce: add new group TEST for credit [#98126]
+		- 20241120@Danny: replace strsplit function [RemineID: #212252]
 		
 	 Params:				
 */
@@ -50,7 +51,7 @@ BEGIN
 	INSERT INTO @ChargeRate(ChargeID, PartyId, ProductId, FromDate, ToDate)
 	SELECT ChargeID, PartyId, ProductId, FromDate, ToDate 
 	FROM dbo.LA_f_ChargeInfo(@PayerID, @MinDate, @MaxDate ,@ProductListAll, 'OA', 1)
-	WHERE ChargeID IN (SELECT CAST(val AS INT) FROM dbo.strSplit( @ChargeIds, ','))
+	WHERE ChargeID IN (SELECT CAST(value AS INT) FROM STRING_SPLIT( @ChargeIds, ','))
 
 	--check validate existing 
 	DECLARE @i INT = 0

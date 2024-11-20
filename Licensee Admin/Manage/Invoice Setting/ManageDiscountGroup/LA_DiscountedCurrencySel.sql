@@ -18,6 +18,7 @@ AS
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+		- 20241120@Danny: replace strsplit function [RemineID: #212252]
 
 	 Params:
 
@@ -58,7 +59,7 @@ BEGIN
 		FROM LA_DiscountGroupAssignment a WITH(NOLOCK)
 		INNER JOIN LA_DiscountGroupHeader h WITH(NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId AND h.DiscountGroupType IN (1, 3, 11, 13) 
 		INNER JOIN LA_DiscountGroupProduct p WITH(NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId 
-																AND p.ProductId IN (SELECT val FROM dbo.strSplit(@ProductIds, ','))
+																AND p.ProductId IN (SELECT value FROM STRING_SPLIT(@ProductIds, ','))
 		WHERE a.PartyID = @PartyId
 		GROUP BY p.ProductId )
 

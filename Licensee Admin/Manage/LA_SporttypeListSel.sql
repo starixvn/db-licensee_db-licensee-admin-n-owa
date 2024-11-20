@@ -1,4 +1,4 @@
-/*<info serverAlias="DBEXT-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBEXT-bodb02" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb02]
 GO
 
@@ -15,6 +15,7 @@ AS
 	
 	Revisions:
 		- 20170816@Percy: Change data type of Sporttype [RedmineID: #73545]
+		- 20241120@Danny: replace strsplit function [RemineID: #212252]
 */
 
 BEGIN
@@ -25,7 +26,7 @@ BEGIN
 
 	INSERT INTO @Products(Code)
 	(
-		SELECT val FROM bodb02.dbo.strSplit(@ProductCodes, ',')
+		SELECT value FROM STRING_SPLIT(@ProductCodes, ',')
 	)
 
 	IF EXISTS (SELECT 1 FROM @Products WHERE Code = 'SB')

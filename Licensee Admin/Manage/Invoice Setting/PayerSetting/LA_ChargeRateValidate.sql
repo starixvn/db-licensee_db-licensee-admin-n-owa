@@ -16,6 +16,7 @@ AS
 	 Revisions:     
 		- 20180716@bruce: add new group TEST for credit [#98126]
 		- 20241016@Danny: Extend parameter data length [RemineID: #212252]
+		- 20241120@Danny: replace strsplit function [RemineID: #212252]
 	 Params:
 		+ @ChargeId : = 0 check all charge infor of Party
 		+ @Mode : 
@@ -63,7 +64,7 @@ BEGIN
 			INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON a.PartyId = p.PartyID
 			INNER JOIN dbo.OAS_PartyDetail pp WITH (NOLOCK) ON p.PartyID = pp.PartyID
 			--INNER JOIN dbo.LA_InvoiceHeader inv WITH(NOLOCK) ON p.PartyId = inv.PartyId  --> todo
-		WHERE a.PartyId IN (SELECT val FROM strSplit(@PayerIdList, ','))
+		WHERE a.PartyId IN (SELECT value FROM STRING_SPLIT(@PayerIdList, ','))
 			--AND inv.Invdate BETWEEN a.FromDate AND a.ToDate
 			
 
