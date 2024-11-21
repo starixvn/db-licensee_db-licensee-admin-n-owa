@@ -23,6 +23,7 @@ AS
 		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
 		- 20241016@Danny: Extend parameter data length [RemineID: #212252]
 		- 20241021@Sally: Support Odds Boost Voucher [#209884]
+		- 20241120@Danny: replace strsplit function [RemineID: #212252]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -57,7 +58,7 @@ BEGIN
 		ISNULL(OddsBoostBonus,0) OddsBoostBonus
 	FROM bodb_licenseeReport.dbo.rptLicenseeReconciliation WITH(NOLOCK)
 	WHERE AccDate = @reportMonth AND Environment = @Environment AND (
-		ISNULL(@PartyIds,'') = '' OR PartyId IN (SELECT val FROM bodb02.dbo.strSplit(@PartyIds,','))
+		ISNULL(@PartyIds,'') = '' OR PartyId IN (SELECT value FROM STRING_SPLIT(@PartyIds,','))
 	)
 END
 GO

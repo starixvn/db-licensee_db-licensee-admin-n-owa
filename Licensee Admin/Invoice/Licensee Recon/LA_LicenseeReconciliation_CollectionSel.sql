@@ -1,4 +1,4 @@
-/*<info serverAlias="DBACC-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBACC-bodb02" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb02
 GO
 
@@ -17,6 +17,7 @@ AS
 		- 20190927@Bruce: Update OpeningBalance, ClosingBalance [#120220]
 		- 20191017@Bruce: Filter by custid [#122229]
 		- 20240227@Danny: Extend data type param input [RedmineID: #197267]
+		- 20241120@Danny: replace strsplit function [RemineID: #212252]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -25,7 +26,7 @@ BEGIN
 	DECLARE @custidList TABLE(CustId INT)
 
 	INSERT INTO @custidList(CustId)
-	SELECT DISTINCT val FROM dbo.strSplit(@CustIds,',')
+	SELECT DISTINCT value FROM STRING_SPLIT(@CustIds,',')
 
 	-- balance up day
 	--

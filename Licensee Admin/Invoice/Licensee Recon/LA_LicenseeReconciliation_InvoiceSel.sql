@@ -45,6 +45,7 @@ AS
 		- 20241010@Danny: exclude some debit note [RedmineID: #212037]
 		- 20241015@Danny: Include saba promotion into promotion column [RedmineID: #210956]
 		- 20241014@Sally: Support Odds Boost Voucher [#209884]
+		- 20241120@Danny: replace strsplit function [RemineID: #212252]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -67,7 +68,7 @@ BEGIN
 
 	IF @PartyIds <> 'All'
 	BEGIN
-		DELETE @partyList WHERE PartyID NOT IN (SELECT val FROM dbo.strSplit(@PartyIds, ','))
+		DELETE @partyList WHERE PartyID NOT IN (SELECT value FROM STRING_SPLIT(@PartyIds, ','))
 	END
 
 	IF ISNULL(@PlatformId, 0) <> 0

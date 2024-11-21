@@ -1,4 +1,4 @@
-/*<info serverAlias="DBACC-bodb02" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBACC-bodb02" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb02
 GO
 
@@ -18,6 +18,7 @@ AS
 		- 20210407@Percy: Support duo base currency - Change code for Collection Summary [RedmineID: #152089]
 		- 20211223@Danny: Split transfer out of bettrans [RedmineID: #163527]
 		- 20240227@Danny: Extend data type param input [RedmineID: #197267]
+		- 20241120@Danny: replace strsplit function [RemineID: #212252]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -36,7 +37,7 @@ BEGIN
 	INSERT INTO @licensees(CustId,LicenseeCode)
 	SELECT c.CustId, UPPER(c.username)
 	FROM dbo.Customer c WITH(NOLOCK)
-	WHERE c.CustId IN (SELECT val FROM dbo.strSplit(@CustIds,','))
+	WHERE c.CustId IN (SELECT value FROM STRING_SPLIT(@CustIds,','))
 
 	-- licensee super
 	--

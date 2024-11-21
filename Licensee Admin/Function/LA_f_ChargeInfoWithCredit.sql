@@ -32,6 +32,7 @@ AS
 		- 20180815@Scofield: Get charge rate for Credits	
 		- 20190718@Bruce: Integrate CN88 data in LA [#116859]
 		- 20241016@Danny: Extend parameter data length [RemineID: #212252]
+		- 20241120@Danny: replace strsplit function [RemineID: #212252]
 */
 
 BEGIN
@@ -46,13 +47,13 @@ BEGIN
 
 	INSERT INTO @ProductTable (ProductID, ProductPrefix)
 	SELECT CASE
-			WHEN s.val = 'SB'
+			WHEN s.value = 'SB'
 				THEN 0
 			ELSE p3.Productid
 			END
-			, s.val
-	FROM bodb02.dbo.strSplit(@ProductCodes, ',') s
-		LEFT JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.val = p3.ProductPrefix
+			, s.value
+	FROM STRING_SPLIT(@ProductCodes, ',') s
+		LEFT JOIN dbo.Product3rd p3 WITH (NOLOCK) ON s.value = p3.ProductPrefix
 	
 	INSERT INTO @Bettype(ProductId, BetTypeRef, Bettype)
 	SELECT pt.ProductID, sbr.BettypeRef, sbm.BetType
@@ -71,7 +72,7 @@ BEGIN
 	    FROM dbo.OAS_Party p WITH (NOLOCK)
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
 	    WHERE ChargeType != 2
-		  AND p.PartyID IN (SELECT VAL FROM strSplit(@PartyIDs, ','))
+		  AND p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIDs, ','))
 		  AND ci.ProductID NOT IN (SELECT Productid FROM dbo.LA_Product3rdSub WITH (NOLOCK))		  
 	    GROUP BY FromParty, ci.ProductID
 	)
@@ -110,8 +111,8 @@ BEGIN
 		LEFT JOIN @Cte_AffectDate cte ON cte.PartyID = p.PartyID
 			AND DI.ProductID = cte.ProductID
 	WHERE p.PartyID IN (
-			SELECT VAL
-			FROM strSplit(@PartyIDs, ',')
+			SELECT value
+			FROM STRING_SPLIT(@PartyIDs, ',')
 			)		
 		AND (
 			@FromDate BETWEEN DI.FromDate AND DI.ToDate
@@ -138,7 +139,7 @@ BEGIN
 			INNER JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON p.PartyID = ci.FromParty
 			INNER JOIN dbo.OAS_ChargeInfoSub s WITH (NOLOCK) ON s.ChargeIDRef = ci.ChargeID AND s.FromParty = ci.FromParty
 	    WHERE ci.ChargeType != 2
-		  AND p.PartyID IN (SELECT VAL FROM strSplit(@PartyIDs, ','))		
+		  AND p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIDs, ','))		
 		  AND ci.ProductID IN (SELECT Productid FROM dbo.LA_Product3rdSub WITH (NOLOCK))	  
 	    GROUP BY ci.FromParty, ci.ProductID
 	)
@@ -179,8 +180,8 @@ BEGIN
 		LEFT JOIN @Cte_AffectDate cte ON cte.PartyID = p.PartyID
 			AND DI.ProductID = cte.ProductID
 	WHERE p.PartyID IN (
-			SELECT VAL
-			FROM strSplit(@PartyIDs, ',')
+			SELECT value
+			FROM STRING_SPLIT(@PartyIDs, ',')
 			)		
 		AND (
 			@FromDate BETWEEN sub.FromDate AND sub.ToDate

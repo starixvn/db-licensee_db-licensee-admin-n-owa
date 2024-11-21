@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -15,6 +15,7 @@ AS
 		- 20150917@Victor: support Chinese on settings
 		- 20161109@bruce.bui: include non-official payers
 		- 20210824@Danny: get licensee status from OIC and relocated SP [#159296]
+		- 20241120@Danny: replace strsplit function [RemineID: #212252]
 
 	Params:
 		+ 0 get all payer
@@ -35,7 +36,7 @@ BEGIN
 
 	DECLARE @statusTab TABLE (StatusId SMALLINT)
 	INSERT INTO @statusTab (StatusId)
-	SELECT CAST (val AS SMALLINT) FROM dbo.strSplit(@PayerStatusIds,',')
+	SELECT CAST (value AS SMALLINT) FROM STRING_SPLIT(@PayerStatusIds,',')
 	
 	CREATE TABLE #tmp_licenseeOIC (RegisteredLicenseeName NVARCHAR(50), LicenseeStatusId TINYINT)
 	INSERT INTO #tmp_licenseeOIC(RegisteredLicenseeName, LicenseeStatusId)

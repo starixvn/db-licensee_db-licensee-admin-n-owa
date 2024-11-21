@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -15,6 +15,7 @@ AS
 	
 	Revisions:
 		- 20171219@Bruce: increase length for variables [#88197]
+		- 20241120@Danny: replace strsplit function [RemineID: #212252]
 	
 	Param's Explanation:
 		+ @CurrencyIds: currency id list
@@ -30,8 +31,8 @@ BEGIN
 	CREATE TABLE #tmpCurrency (CurrencyID INT PRIMARY KEY)
 
 	INSERT INTO #tmpCurrency(CurrencyID)
-	SELECT val
-	FROM strSPlit(@CurrencyIds, ',')
+	SELECT value
+	FROM STRING_SPLIT(@CurrencyIds, ',')
 
 	SELECT DISTINCT ExchangeDate, ExchangeId, Code, BaseCurrencyRate AS Rate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@ExchangeDate, @ExchangeDate, @BaseCurrencyName)
