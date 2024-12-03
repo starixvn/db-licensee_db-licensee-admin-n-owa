@@ -22,6 +22,7 @@ AS
 		- 20221213@Danny: Import HideRebateWorksheet Info from Excel template [RedmineID: #181546]
 		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 		- 20240730@Danny: Player Tips worksheet [#207863]
+		- 20241202@Danny: Remove IncludeRebateWorkSheet column [#214501]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -30,7 +31,6 @@ AS
 				<InvoiceNumber>123</InvoiceNumber>
 				<PartyName>12BET</PartyName>
 				<InvoiceTypeShorten>S</InvoiceTypeShorten>
-				<IsIncludeRebateWorkSheet>N</IsIncludeRebateWorkSheet>
 				<IsIncludePlayerTipsWorkSheet>N</IsIncludePlayerTipsWorkSheet>
 			</InvoiceGenerating>
 		</Root>'
@@ -52,25 +52,22 @@ BEGIN
 		Error BIT DEFAULT(0), 
 		ContentValidation VARCHAR(2000) DEFAULT(''), 
 		SettingValidation VARCHAR(2000) DEFAULT(''),
-		IsIncludeRebateWorkSheet BIT,
 		IsIncludePlayerTipsWorkSheet BIT
 		)
 	
 	BEGIN TRY
 		DECLARE @Party_XML XML = CONVERT(XML, @InvoiceGeneratingData)
 
-		INSERT INTO @PartyList (RowId, InvoiceNumber, PartyName, InvoiceTypeShorten, InvoiceTypeId, InvoiceTypeName, IsIncludeRebateWorkSheet, IsIncludePlayerTipsWorkSheet)
+		INSERT INTO @PartyList (RowId, InvoiceNumber, PartyName, InvoiceTypeShorten, InvoiceTypeId, InvoiceTypeName, IsIncludePlayerTipsWorkSheet)
 		SELECT 1000 * ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS RowId, InvoiceNumber, PartyName, InvoiceTypeShorten
 			,CASE InvoiceTypeShorten WHEN 'S' THEN 1 WHEN 'R' THEN 3 WHEN 'H' THEN 6 END
 			,CASE InvoiceTypeShorten WHEN 'S' THEN 'Software Data & Licensing Fees' WHEN 'R' THEN 'Rebate' WHEN 'H' THEN 'Hosting Fees' END
-			,CASE IncludeRebateWorkSheet WHEN 'Y' THEN 1 ELSE 0 END
 			,CASE IncludePlayerTipsWorkSheet WHEN 'Y' THEN 1 ELSE 0 END
 		FROM (
 			SELECT
 				LTRIM(RTRIM(t.c.value('(InvoiceNumber/text())[1]', 'VARCHAR(20)'))) AS InvoiceNumber
 				,LTRIM(RTRIM(t.c.value('(PartyName/text())[1]', 'VARCHAR(100)'))) AS PartyName
 				,LTRIM(RTRIM(t.c.value('(InvoiceTypeShorten/text())[1]', 'VARCHAR(10)'))) AS InvoiceTypeShorten
-				,LTRIM(RTRIM(t.c.value('(IsIncludeRebateWorkSheet/text())[1]', 'VARCHAR(10)'))) AS IncludeRebateWorkSheet
 				,LTRIM(RTRIM(t.c.value('(IsIncludePlayerTipsWorkSheet/text())[1]', 'VARCHAR(10)'))) AS IncludePlayerTipsWorkSheet
 			FROM @Party_XML.nodes('Root/InvoiceGenerating') t(c)
 		) a
@@ -268,7 +265,7 @@ BEGIN
 	END
 
 	-- Return data
-	SELECT InvalidCellNumber, InvoiceNumber, PartyId, PartyName, InvoiceTypeId, InvoiceTypeShorten, InvoiceTypeName, ContentValidation, SettingValidation, IsIncludeRebateWorkSheet, IsIncludePlayerTipsWorkSheet
+	SELECT InvalidCellNumber, InvoiceNumber, PartyId, PartyName, InvoiceTypeId, InvoiceTypeShorten, InvoiceTypeName, ContentValidation, SettingValidation, IsIncludePlayerTipsWorkSheet
 	FROM @PartyList
 	ORDER BY RowId
 END
