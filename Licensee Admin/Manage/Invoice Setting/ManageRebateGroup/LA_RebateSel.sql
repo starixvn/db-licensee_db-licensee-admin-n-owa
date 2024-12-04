@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -13,6 +13,7 @@ AS
 		- 20180525@Parsons: Get rebate groups info [#94282]
 		- 20220210@Percy: Return RebateGroupType [RedmineID: #163495]
 		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
+		- 20240613@Danny: Rebate on specific currencies [#FeatureID 206143]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -40,12 +41,18 @@ BEGIN
 				WHERE aa.DiscountGroupId = h.DiscountGroupId
 				FOR XML PATH (''), ROOT('str'), TYPE 
 					).value('/str[1]','VARCHAR(MAX)') 
-			  , 1, 2, '') AS PartyList
+			  , 1, 2, '') AS PartyList,
+			 STUFF((
+				SELECT ', ' + ISNULL(CAST(pp.CurrencyId AS VARCHAR), '')
+				FROM dbo.LA_DiscountGroupCurrency pp WITH (NOLOCK)
+				WHERE pp.DiscountGroupId = h.DiscountGroupId
+				FOR XML PATH (''))
+			  , 1, 2, '') AS CurrencyList
 	FROM dbo.LA_DiscountGroupHeader h WITH(NOLOCK)
 		LEFT JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON h.DiscountGroupId = d.DiscountGroupId
 		LEFT JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON h.DiscountGroupId = p.DiscountGroupId
 		LEFT JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
-	WHERE h.DiscountGroupType IN (2, 12, 22) -- Rebate
+	WHERE h.DiscountGroupType IN (2, 12, 22, 32) -- Rebate
 	GROUP BY h.DiscountGroupId, h.DiscountGroupName, h.FromDate, h.ToDate, d.Rate, h.DiscountGroupType
 END
 GO

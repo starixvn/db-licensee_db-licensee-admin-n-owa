@@ -35,6 +35,7 @@ AS
 		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 		- 20240625@Danny: Return Master Currency Codes [RedmineID: #206117]
+		- 20241118@Danny: Rebate on Licensing Fee for specific currencies [RedmineID: #206143]
 
 	Params:
 	+ @PayerId : 0 get all Party
@@ -383,7 +384,7 @@ BEGIN
 				OR r.FromDate BETWEEN c.FromDate AND c.ToDate
 				OR r.ToDate BETWEEN c.FromDate AND c.ToDate
 				)
-				AND r.DiscountGroupType IN (2, 12, 22) -- rebate
+				AND r.DiscountGroupType IN (2, 12, 22, 32) -- rebate
 		WHERE
 			(
 				@DiscountGroup = 0
@@ -392,7 +393,7 @@ BEGIN
 			AND
 			(
 				@RebateGroup = 0
-				OR (r.DiscountGroupId = @RebateGroup AND r.DiscountGroupType IN (2, 12, 22))
+				OR (r.DiscountGroupId = @RebateGroup AND r.DiscountGroupType IN (2, 12, 22, 32))
 			)
 	)
 	SELECT Result.*
