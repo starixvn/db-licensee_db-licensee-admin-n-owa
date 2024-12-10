@@ -50,7 +50,7 @@ AS
 		- 20241008@Danny: return extra amount figures with 4 decimal digits  [RedmineID: #211925]
 		- 20240918@Sally: Support Odds Boost Voucher [#209884]
 		- 20240625@Danny: Rebate on Licensing Fee for specific currencies [RedmineID: #206143]
-
+		- 20240625@Danny: Rebate for 3rd product is incorrect issue [RedmineID: #214929]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -1422,7 +1422,7 @@ BEGIN
 					u.GrossLicensingFee_NonSport, 
 					tr.ExtraAmount AS CasinoPromotion, 
 					CASE WHEN u.GrossLicensingFee_NonSport <= ISNULL(tr.ExtraAmount,0) THEN 1 ELSE 0 END IsConvertRebateToZero
-			FROM u_Sum u LEFT JOIN @tmpResult tr ON u.PartyId = tr.PartyId AND tr.ProductId = -37
+			FROM u_Sum u INNER JOIN @tmpResult tr ON u.PartyId = tr.PartyId AND tr.ProductId = -37
 		)
 		INSERT INTO @RecalFeeRebate (DiscountGroupId, PartyId, IsConvertRebateToZero, ProductID, FeeRebateRate)
 		SELECT	x.DiscountGroupId, x.PartyId, x.IsConvertRebateToZero , u.ProductId, u.FeeRebateRate
