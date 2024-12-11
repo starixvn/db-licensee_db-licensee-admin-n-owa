@@ -5,7 +5,7 @@ GO
 ALTER PROCEDURE [dbo].[LA_Statement_PaymentStatusUpd]
 	@TransferRefno	BIGINT,
 	@StatusId		INT,
-	@VoidTime		SMALLDATETIME,
+	@VoidTime		DATETIME,
 	@UserId			INT,
 	@LoginIp		VARCHAR(20),
 	@ErrCode		INT = 0 OUTPUT,

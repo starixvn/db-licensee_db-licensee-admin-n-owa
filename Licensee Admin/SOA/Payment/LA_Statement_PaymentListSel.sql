@@ -9,7 +9,8 @@ ALTER PROCEDURE [dbo].[LA_Statement_PaymentListSel]
 	@UploadedFromDate	DATE,
 	@UploadedToDate		DATE,
 	@IsHideVoidedPayment BIT = 1,
-	@IsOnlyDisplayNAPReversedPayment BIT = 0
+	@IsOnlyDisplayNAPReversedPayment BIT = 0,
+	@Environment		VARCHAR(10)	= 'LOCAL'
 
 AS
 
@@ -40,12 +41,20 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @PayerTab TABLE (PartyID INT)
-	INSERT INTO @PayerTab (PartyID)
-	SELECT CAST(value AS INT) FROM STRING_SPLIT(@PayerIds,',')
+
+	IF @PayerIds IS NOT NULL AND @PayerIds <> ''
+	BEGIN
+		INSERT INTO @PayerTab (PartyID)
+		SELECT CAST(value AS INT) FROM STRING_SPLIT(@PayerIds,',')
+	END
 
 	DECLARE @PaymentTypeTab TABLE (PaymentType TINYINT)
-	INSERT INTO @PaymentTypeTab(PaymentType)
-	SELECT CAST(value AS INT) FROM STRING_SPLIT(@PaymentTypes,',')
+
+	IF @PaymentTypes IS NOT NULL AND @PaymentTypes <> ''
+	BEGIN
+		INSERT INTO @PaymentTypeTab(PaymentType)
+		SELECT CAST(value AS INT) FROM STRING_SPLIT(@PaymentTypes,',')
+	END
 
 	DECLARE @BalanceUpDay	SMALLDATETIME, @MoveBetsDay		SMALLDATETIME
 		
@@ -54,6 +63,24 @@ BEGIN
 	EXEC bodb02.dbo.Age_SelBalanceUpDay
 
 	SELECT @BalanceUpDay = BalanceUpDay, @MoveBetsDay = MoveBetsDay FROM @tblMoveBetBalanceUp
+
+	DROP TABLE IF EXISTS  #tmp_LA_Biller
+	CREATE TABLE #tmp_LA_Biller (
+		PartyId INT,
+		BillerNameAbbreviation NVARCHAR(10)
+	)
+
+	DROP TABLE IF EXISTS  #tmp_LA_User
+	CREATE TABLE #tmp_LA_User (
+		UserID INT,
+		Username VARCHAR(50)
+	)
+
+	INSERT INTO #tmp_LA_Biller (PartyId, BillerNameAbbreviation)
+	SELECT PartyId, BillerNameAbbreviation FROM OPENQUERY(DBLIC, 'SELECT PartyId, BillerNameAbbreviation FROM bodb_licensee.dbo.LA_BillerInfo WITH(NOLOCK) ')
+
+	INSERT INTO #tmp_LA_User (UserID, Username)
+	SELECT UserID, Username FROM OPENQUERY(DBLIC, 'SELECT UserID, Username FROM bodb_licensee.dbo.LA_User WITH(NOLOCK) ')
 
 	-- Get all payment
 	DROP TABLE IF EXISTS  #tmp_LA_Payment
@@ -77,7 +104,8 @@ BEGIN
 		ModifiedUser	VARCHAR(50),
 		ModifyDate		DATETIME,
 		IsReversedbyNAP BIT DEFAULT 0,
-		AffectedLicensees NVARCHAR(100)
+		AffectedLicensees NVARCHAR(100),
+		isShowUI		BIT DEFAULT 0
 	)
 
 	CREATE INDEX idx_#tmp_LA_Payment_UploadedDate ON #tmp_LA_Payment(UploadedDate)
@@ -98,7 +126,8 @@ BEGIN
 		UploadedDate,
 		PaymentWinlostDate,
 		ModifiedUser,
-		ModifyDate
+		ModifyDate,
+		isShowUI
 	)
 	SELECT	lp.PaymentId,
 			lp.PaymentNo,
@@ -119,15 +148,16 @@ BEGIN
 			lp.CreatedDate AS UploadedDate,
 			CONVERT(DATE,lp.CreatedDate) AS PaymentWinlostDate,
 			lu.Username AS ModifiedUser,
-			CASE WHEN lp.StatusId = -1  THEN lp.ModifyDate ELSE NULL END ModifyDate
+			CASE WHEN lp.StatusId = -1  THEN lp.ModifyDate ELSE NULL END ModifyDate,
+			1 AS IsShowUI
 	FROM	LA_Payment lp WITH(NOLOCK)
 	INNER JOIN OAS_Party op WITH(NOLOCK) ON lp.PartyID = op.PartyID
+	INNER JOIN @PayerTab pt ON pt.PartyID = lp.PartyID
 	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON lp.CurrencyId = e.ExchangeID
-	INNER JOIN LA_BillerInfo bi WITH(NOLOCK) ON bi.PartyId = lp.BillerId
-	LEFT JOIN LA_User lu WITH(NOLOCK) ON lu.UserID = lp.ModifiedBy AND lp.StatusId = -1 
+	INNER JOIN #tmp_LA_Biller bi WITH(NOLOCK) ON bi.PartyId = lp.BillerId
+	LEFT JOIN #tmp_LA_User lu WITH(NOLOCK) ON lu.UserID = lp.ModifiedBy AND lp.StatusId = -1 
 	WHERE ( @PaymentNo = '' OR lp.PaymentNo = @PaymentNo)
 	AND (@RefNo IS NULL OR lp.TransferRefno = @RefNo)
-	AND  (lp.PartyID IN (SELECT z.PartyID FROM @PayerTab z) OR @PayerIds = '')
 	AND lp.Type IN (SELECT x.PaymentType FROM @PaymentTypeTab x)
 	AND lp.ReceivedDate BETWEEN @ReceivedFromDate AND @ReceivedToDate
 	AND lp.CreatedDate >= @UploadedFromDate AND   lp.CreatedDate < DATEADD(DAY,1,@UploadedToDate)
@@ -136,7 +166,57 @@ BEGIN
 			OR 
 			@IsHideVoidedPayment = 0
 		)
+	AND lp.Environment = @Environment
 
+	INSERT INTO #tmp_LA_Payment(
+		PaymentId, 
+		PaymentNo, 
+		RefNo, 
+		Biller,
+		PayerName, 
+		PaymentType, 
+		PaymentTypeName, 
+		PaymentStatus, 
+		CurrencyName, 
+		PaymentAmount, 
+		RemainingAmount, 
+		ReceivedDate, 
+		UploadedDate,
+		PaymentWinlostDate,
+		ModifiedUser,
+		ModifyDate,
+		isShowUI
+	)
+	SELECT	lp.PaymentId,
+			lp.PaymentNo,
+			lp.TransferRefno AS RefNo,
+			bi.BillerNameAbbreviation AS Biller,
+			op.PartyName AS Payer,
+			lp.Type AS PaymentType,
+			CASE WHEN lp.Type = 0 THEN 'Payment'
+				 WHEN lp.Type = 1 THEN 'Transfer between 2 licensees'
+				 WHEN lp.Type = 2 THEN 'Rebate Payment' END PaymentTypeName,
+			CASE WHEN lp.StatusId = 0 THEN 'Active'
+				 WHEN lp.StatusId = 1 THEN 'Closed'
+				 WHEN lp.StatusId = -1 THEN 'Voided' END PaymentStatus,
+			e.Code AS Currency,
+			lp.Amount AS PaymentAmount,
+			lp.RemainingAmount AS RemainingAmount,
+			lp.ReceivedDate AS ReceivedDate,
+			lp.CreatedDate AS UploadedDate,
+			CONVERT(DATE,lp.CreatedDate) AS PaymentWinlostDate,
+			lu.Username AS ModifiedUser,
+			CASE WHEN lp.StatusId = -1  THEN lp.ModifyDate ELSE NULL END ModifyDate,
+			0 AS isShowUI
+	FROM	LA_Payment lp WITH(NOLOCK)
+	INNER JOIN OAS_Party op WITH(NOLOCK) ON lp.PartyID = op.PartyID
+	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON lp.CurrencyId = e.ExchangeID
+	INNER JOIN #tmp_LA_Biller bi WITH(NOLOCK) ON bi.PartyId = lp.BillerId
+	LEFT JOIN #tmp_LA_User lu WITH(NOLOCK) ON lu.UserID = lp.ModifiedBy AND lp.StatusId = -1 
+	LEFT JOIN #tmp_LA_Payment tmp ON  tmp.PaymentId = lp.PaymentId
+	WHERE tmp.PaymentId IS NULL AND EXISTS (SELECT TOP 1 1 FROM #tmp_LA_Payment t WHERE t.RefNo = lp.TransferRefno)
+		AND lp.Environment = @Environment
+	
 	-- Update AffectedLicensees
 	BEGIN
 		UPDATE  #tmp_LA_Payment SET AffectedLicensees = PayerName WHERE PaymentType IN (0,2)
@@ -182,7 +262,8 @@ BEGIN
 	UPDATE t
 	SET t.IsAllowVoid = 1
 	FROM #tmp_LA_Payment t
-	WHERE t.IsReversedbyNAP = 1 AND t.PaymentAmount = t.RemainingAmount
+	CROSS APPLY ( SELECT COUNT(1) AS cnt FROM #tmp_LA_Payment t1 WHERE t.RefNo = t1.RefNo AND t1.IsReversedbyNAP = 1 AND  t1.PaymentAmount <> t1.RemainingAmount) x
+	WHERE x.cnt = 0 AND t.IsReversedbyNAP = 1
 
 	DELETE FROM #tmp_LA_Payment
 	WHERE @IsOnlyDisplayNAPReversedPayment = 1 AND IsReversedbyNAP = 0
@@ -207,6 +288,7 @@ BEGIN
 			AffectedLicensees,
 			CurrencyName
 	FROM #tmp_LA_Payment
+	WHERE isShowUI = 1
 
 
 	
