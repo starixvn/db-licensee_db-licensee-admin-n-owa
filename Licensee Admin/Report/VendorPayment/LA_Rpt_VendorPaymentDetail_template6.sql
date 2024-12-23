@@ -19,6 +19,7 @@ AS
 	- 20240123@Danny: Change Credit licensing fee fomular [RedmineID: #197267]
 	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 	- 20241016@Danny: Extend parameter data length [RemineID: #212252]
+	- 20241223@Danny: Support 3rd Rate by Currency [RemineID: #215383]
  */
 
 BEGIN
@@ -60,14 +61,24 @@ BEGIN
 	LEFT JOIN bodb_Licensee.dbo.LA_f_JVPartyListSel() u ON u.PartyId = t.PartyId
 	
 	-- Get 3rd Rate
-	DECLARE @3rdRate AS TABLE(PartyID INT, ProductID INT, DI_Rate MONEY, IsDeposit INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
-	INSERT INTO @3rdRate (PartyID, ProductID, DI_Rate, IsDeposit, Fromdate, Todate)
-	SELECT DISTINCT p.PartyId, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r.Todate 
-	FROM LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCode, 'OA') r 
-	INNER JOIN #PartyList p on p.ParentId = r.PartyID
+	DECLARE @3rdRate AS TABLE(ChargeID INT, PartyID INT, ProductID INT, DI_Rate MONEY, IsDeposit INT, Fromdate SMALLDATETIME, Todate SMALLDATETIME)
+
+	INSERT INTO @3rdRate (ChargeID, PartyID, ProductID, DI_Rate, IsDeposit, Fromdate, Todate)
+	SELECT DISTINCT r.ChargeID, p.PartyId, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r.Todate 
+	FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCode, 'OA') r 
+	INNER JOIN #PartyList p on p.ParentId = r.PartyID 
+	WHERE  r.IsDeposit = 1
+
+	INSERT INTO @3rdRate (ChargeID, PartyID, ProductID, DI_Rate, IsDeposit, Fromdate, Todate)
+	SELECT DISTINCT r.ChargeID, p.PartyId, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r.Todate 
+	FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCode, 'OA') r 
+	INNER JOIN OAS_ChargeInfo oc on oc.ChargeID = r.ChargeID 
+	INNER JOIN #PartyList p on oc.FromParty = p.PartyID
+	WHERE  r.IsDeposit = 0
 
 	CREATE TABLE #ChargeRate (
 		ChargeId		INT
+		,ChargeID_3rd	INT
 		,PartyID		INT
 		,LicenseeID		INT
 		,isDeposit		INT
@@ -78,8 +89,8 @@ BEGIN
 		,Todate			SMALLDATETIME
 	)
 	
-	INSERT INTO #ChargeRate (ChargeId, PartyID, LicenseeID, isDeposit, ProductID, Rate, Rate3rd, Fromdate, Todate)
-	SELECT  c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate
+	INSERT INTO #ChargeRate (ChargeId, PartyID, LicenseeID, isDeposit, ProductID, Rate, Rate3rd, Fromdate, Todate, ChargeID_3rd)
+	SELECT  c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate, r.ChargeID
 	FROM LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate,@ProductCode) c
 	INNER JOIN @3rdRate r ON r.PartyID = c.PartyID and r.ProductID = c.ProductID
 	WHERE (c.DI_Rate = 0 AND c.isDeposit = 0) OR (c.DI_Rate > 0 and c.isDeposit = 1)
@@ -143,12 +154,13 @@ BEGIN
 				SUM(b.CustomerWinLoss) AS CustomerWinLoss,
 				-SUM(b.CustomerWinLoss) AS LicenseeWinloss,
 				SUM(-b.CustomerWinLoss  * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
-				SUM((-b.CustomerWinLoss * ISNULL(ci.Rate3rd, 0)) -  b.Promotion) AS PayToSupplier,
+				SUM((-b.CustomerWinLoss * ISNULL(cr_3rd.Rate, ci.Rate3rd)) -  b.Promotion) AS PayToSupplier,
 				SUM(b.Promotion) Promotion,
 				ci.isDeposit
 			FROM cte_Summary b WITH (NOLOCK)
 				INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
 				LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND cr.CurrencyID = b.CurrencyId
+				LEFT JOIN dbo.LA_ChargeRateByCurrency cr_3rd WITH (NOLOCK) ON cr_3rd.ChargeID = ci.ChargeID_3rd AND cr_3rd.CurrencyID = b.CurrencyId
 			GROUP BY b.Winlostdate, ci.PartyId, b.CurrencyId, ci.isDeposit
 
 		END
@@ -181,12 +193,13 @@ BEGIN
 				SUM(b.CustomerWinLoss) AS CustomerWinLoss,
 				-SUM(b.CustomerWinLoss) AS LicenseeWinloss,
 				SUM(-b.CustomerWinLoss  * ISNULL(cr.Rate, ci.Rate)) AS LicensingFee,
-				SUM((-b.CustomerWinLoss * ISNULL(ci.Rate3rd, 0)) -  b.Promotion) AS PayToSupplier,
+				SUM((-b.CustomerWinLoss *  ISNULL(cr_3rd.Rate, ci.Rate3rd)) -  b.Promotion) AS PayToSupplier,
 				SUM(b.Promotion) Promotion,
 				ci.isDeposit
 			FROM cte_Summary b WITH (NOLOCK)
 				INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
 				LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON cr.ChargeID = ci.ChargeID AND cr.CurrencyID = b.CurrencyId
+				LEFT JOIN dbo.LA_ChargeRateByCurrency cr_3rd WITH (NOLOCK) ON cr_3rd.ChargeID = ci.ChargeID_3rd AND cr_3rd.CurrencyID = b.CurrencyId
 			GROUP BY b.Winlostdate, ci.PartyId, b.CurrencyId,ci.isDeposit
 		END
 	END
