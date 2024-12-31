@@ -73,6 +73,7 @@ AS
 		- 20231005@Danny: Change charge rate and tier rebate for Alek group from Oct 2023 [RedmineID: #194561]
 		- 20230223@Danny: Integrate Casino promotion [#194808]
 		- 20241014@Sally: Support Odds Boost Voucher [#209884]
+		- 20241225@Danny: Fix Casino promotion Rebate issue [#209884]
 
 */
 BEGIN
@@ -177,7 +178,7 @@ BEGIN
 
 	DECLARE @FinalResult TABLE (PartyId INT, ProductId INT, AmountToCompany MONEY, LicensingFee MONEY, Discount MONEY, Rebate MONEY, Promotion MONEY, Sponsorship MONEY, ContributionDiscount MONEY, BetCount INT, OddsSpreadCost MONEY, PlayerTips MONEY, OddsBoostBonus MONEY)
 	INSERT INTO @FinalResult (PartyId, ProductId, AmountToCompany, LicensingFee, Discount, Rebate, Promotion, Sponsorship, ContributionDiscount, BetCount, OddsSpreadCost, PlayerTips, OddsBoostBonus)
-	SELECT r.PartyId, r.ProductId, r.GrossLicensingFee, r.LicensingFee + r.ExtraAmount, r.Discount, r.Rebate + t.CasinoPromotionRebate, ISNULL(t.Promotion, 0), ISNULL(t.Sponsorship, 0), ISNULL(t.ContributionDiscount, 0), ISNULL(t.BetCount, 0), ISNULL(t.OddsSpreadAdjustment, 0), ISNULL(t.PlayerTips,0), ISNULL(t.OddsBoostBonus,0)
+	SELECT r.PartyId, r.ProductId, r.GrossLicensingFee, r.LicensingFee + r.ExtraAmount, r.Discount, r.Rebate + ISNULL(t.CasinoPromotionRebate,0), ISNULL(t.Promotion, 0), ISNULL(t.Sponsorship, 0), ISNULL(t.ContributionDiscount, 0), ISNULL(t.BetCount, 0), ISNULL(t.OddsSpreadAdjustment, 0), ISNULL(t.PlayerTips,0), ISNULL(t.OddsBoostBonus,0)
 	FROM @Result r
 		LEFT JOIN (
 			SELECT PartyId, CASE WHEN ProductId IN (37, 74, -37) THEN 0 ELSE ProductId END AS ProductId
