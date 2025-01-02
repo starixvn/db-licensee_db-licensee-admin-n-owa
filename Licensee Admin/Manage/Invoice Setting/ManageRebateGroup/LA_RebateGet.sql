@@ -14,6 +14,7 @@ AS
 		- 20180528@Parsons: Get rebate group [#94282]
 		- 20220210@Percy: Return RebateGroupType [RedmineID: #163495]
 		- 20240613@Danny: Rebate on specific currencies [#FeatureID 206143]
+		- 20250102@Danny: Rebate on Licensing winloss for specific currencies [RedmineID: #214767]
 
 	 Params:
 

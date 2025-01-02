@@ -19,6 +19,7 @@ AS
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20230417@Danny: Insert new log with more information [#FeatureID 175125]
 		- 20240613@Danny: Rebate on specific currencies [#FeatureID 206143]
+		- 20250102@Danny: Rebate on Licensing winloss for specific currencies [RedmineID: #214767]
 
 	 Params:
 
@@ -49,7 +50,7 @@ BEGIN
 				pig.val AS 'gs.pig',
 				pig.pid AS 'gs.pid',
 				pa.val AS 'gs.pa',
-				CASE WHEN @RebateGroupType = 32 THEN ca.val ELSE 'All currencies' END AS 'gs.ca'
+				CASE WHEN @RebateGroupType IN (32,42) THEN ca.val ELSE 'All currencies' END AS 'gs.ca'
 		FROM LA_DiscountGroupHeader ld WITH(NOLOCK) 
 		INNER JOIN LA_DiscountGroupDetail ldg WITH(NOLOCK) ON ld.DiscountGroupId = ldg.DiscountGroupId
 		CROSS APPLY (
