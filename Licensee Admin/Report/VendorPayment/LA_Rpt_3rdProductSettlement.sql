@@ -42,6 +42,7 @@ AS
 	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 	- 20241016@Danny: Extend parameter data length [RemineID: #212252]
 	- 20241022@Danny: Integrate Playtech [RemineID:#210957]
+	- 20241226@Danny: Change 3rd billing term [RemineID: #215383]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
@@ -97,7 +98,8 @@ BEGIN
 			@BetBuilderRate3rd  MONEY = 0.04, 
 			@BetBuilderBetTypeId INT = 38,
 			@ExchangeCutoffDate SMALLDATETIME,
-			@MergeVSCutoffDate	SMALLDATETIME = '2024-03-01'
+			@MergeVSCutoffDate	SMALLDATETIME = '2024-03-01',
+			@PPL3rdRateCufoffDate SMALLDATETIME = '2024-12-01'
 
 	SELECT @ExchangeCutoffDate = f.CutoffDate FROM dbo.LA_f_GetCutOffDate() f WHERE f.TypeName = 'ExchangeTerms'
 
@@ -472,7 +474,7 @@ BEGIN
 									)
 								)
 
-	WHERE r.ProductID <> 100
+	WHERE r.ProductID NOT IN (100, 55)
 
 	IF EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes3rd,',') WHERE Value = 'PTRNG')
 	BEGIN
@@ -486,6 +488,22 @@ BEGIN
 		INSERT INTO #3rdRate (ChargeID, PartyID, ProductID, DI_Rate, IsDeposit, Fromdate, Todate)
 		SELECT DISTINCT r.ChargeID, p.PartyId, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r.Todate 
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'PTRNG', 'OA') r 
+		INNER JOIN OAS_ChargeInfo oc on oc.ChargeID = r.ChargeID 
+		INNER JOIN #PartyList p on oc.FromParty = p.PartyID
+		WHERE  r.IsDeposit = 0
+	END
+
+	IF EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes3rd,',') WHERE Value ='PGS')
+	BEGIN
+		INSERT INTO #3rdRate (ChargeID, PartyID, ProductID, DI_Rate, IsDeposit, Fromdate, Todate)
+		SELECT DISTINCT r.ChargeID, p.PartyId, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r.Todate 
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'PGS', 'OA') r 
+		INNER JOIN #PartyList p on p.ParentId = r.PartyID 
+		WHERE  r.IsDeposit = 1
+
+		INSERT INTO #3rdRate (ChargeID, PartyID, ProductID, DI_Rate, IsDeposit, Fromdate, Todate)
+		SELECT DISTINCT r.ChargeID, p.PartyId, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r.Todate 
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'PGS', 'OA') r 
 		INNER JOIN OAS_ChargeInfo oc on oc.ChargeID = r.ChargeID 
 		INNER JOIN #PartyList p on oc.FromParty = p.PartyID
 		WHERE  r.IsDeposit = 0
@@ -553,10 +571,15 @@ BEGIN
 					c.Todate,
 					r.Fromdate AS Fromdate3rd, 
 					r.Todate AS Todate3rd,
-					CASE WHEN c.ProductID = 100 THEN r.ChargeID END
+					CASE WHEN c.ProductID IN (100,55) THEN r.ChargeID END
 	FROM #ChargeInfoWithCredit c
 	INNER JOIN #PartyList p ON c.PartyID = p.PartyId
-	LEFT JOIN #3rdRate r ON r.PartyID = c.PartyID and r.ProductID = c.ProductID AND r.ProductID NOT IN (0, 65)
+	LEFT JOIN #3rdRate r ON r.PartyID = c.PartyID and r.ProductID = c.ProductID AND 
+		(
+			(r.ProductID NOT IN (0, 65) AND @ToDate < @PPL3rdRateCufoffDate)
+			OR
+			(r.ProductID <> 0 AND @ToDate >= @PPL3rdRateCufoffDate)
+		)
 	WHERE 
 		(
 			(c.DI_Rate = 0 AND c.isDeposit = 0) 
@@ -582,6 +605,25 @@ BEGIN
 	
 		LEFT JOIN cte u1 ON t.PartyID = u1.PartyID AND t.ProductID = u1.ProductID AND u1.ChargeType = 11
 		WHERE t.ProductID = 70
+	END
+
+	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID = 65) AND @ToDate >= @PPL3rdRateCufoffDate
+	BEGIN
+		;WITH cte AS
+		(
+			SELECT DISTINCT p.PartyId, r.ProductID, r.DI_Rate, r.ChargeType
+			FROM (	SELECT DISTINCT r.PartyID, r.ProductID, r.DI_Rate, r.ChargeType
+				FROM dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'PPL', 'OA') r 
+				WHERE r.ChargeType = 11
+			 ) r
+			INNER JOIN #PartyList p on p.ParentId = r.PartyID
+		)
+		UPDATE t
+		SET		t.ChargeRate11 = ISNULL(u1.DI_Rate,0)
+		FROM	#ChargeRate t
+	
+		LEFT JOIN cte u1 ON t.PartyID = u1.PartyID AND t.ProductID = u1.ProductID AND u1.ChargeType = 11
+		WHERE t.ProductID = 65
 	END
 
 	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID = 76)
@@ -786,7 +828,7 @@ BEGIN
 	SELECT @MinSite = MIN(LicenseeId), @MaxSite = MAX(LicenseeID) FROM #ChargeRate x
 	WHERE x.ProductID IN (SELECT z.ProductID FROM @bettypeExtraGMT z)
 
-	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID = 65)
+	IF EXISTS (SELECT 1 FROM @productDataView WHERE ProductID = 65 AND @ToDate < @PPL3rdRateCufoffDate)
 	BEGIN
 		INSERT INTO #3rdRatePPL (PartyId, ProductID, FromDate, ToDate, CurrencyId, MinAmount, MaxAmount, Rate)
 		SELECT DISTINCT p.PartyId, r.ProductID, r.FromDate, r.ToDate, c.BaseCurrencyId, c.MinAmount - CASE WHEN c.MinAmount = 0 THEN 0 ELSE 1 END, c.MaxAmount, c.Rate
@@ -875,6 +917,7 @@ BEGIN
 			SUM(b.LicenseeWinloss) AS LicenseeWinloss,
 			SUM((b.LicenseeWinloss - b.LicenseeContribution) * ISNULL(cr.Rate, ci.Rate) + LicenseeContribution - JackpotPrize - Promotion) AS LicensingFee,
 			SUM(CASE WHEN bt.ProductID IN (70, 76, 80) THEN (LicenseeWinloss - (b.ValidBetAmount * ci.ChargeRate11)) * ISNULL(ci_3rd.Rate3rd,0)
+					 WHEN bt.ProductID = 65 AND @ToDate >= @PPL3rdRateCufoffDate THEN (LicenseeWinloss - (b.ValidBetAmount * ci.ChargeRate11)) * ISNULL(ci_3rd.Rate3rd,0)
 					 WHEN bt.ProductID = 32 THEN (b.LicenseeWinloss - b.FullContribution) * ISNULL(ci_3rd.Rate3rd,0)
 				ELSE (b.LicenseeWinloss - b.FullContribution) * ISNULL(cr_3rd.Rate, ci_3rd.Rate3rd) - b.Promotion END
 				) AS PayToSupplier,
@@ -958,8 +1001,9 @@ BEGIN
 					 WHEN b.ProductID = 10  THEN 0
 					 WHEN b.ProductID = 31  THEN  CASE WHEN @FromDate < @ExchangeCutoffDate THEN  b.LicenseeWinloss  * ISNULL(ci_3rd.Rate3rd,0) - (b.CommissionA + b.CommissionP) ELSE -(b.CustomerWinLoss + b.CommissionP)  * ISNULL(ci_3rd.Rate3rd,0) END
 					 WHEN b.ProductID = 80 THEN (LicenseeWinloss - (b.ValidBetAmount * ci.ChargeRate11)) * ISNULL(ci_3rd.Rate3rd,0)
+					 WHEN b.ProductID = 65 AND @ToDate >= @PPL3rdRateCufoffDate THEN (LicenseeWinloss - (b.ValidBetAmount * ci.ChargeRate11)) * ISNULL(ci_3rd.Rate3rd,0)
 					 WHEN b.ProductID IN (3, 6, 38, 66, 63, 72) THEN 0 -- Inhouse products
-					 ELSE b.LicenseeWinloss  * ISNULL(ci_3rd.Rate3rd,0) - b.Promotion
+					 ELSE b.LicenseeWinloss  * ISNULL(cr_3rd.Rate, ci_3rd.Rate3rd) - b.Promotion
 				END) AS PayToSupplier,
 			b.ProductID,
 			SUM(TurnoverForCommision), 
@@ -977,6 +1021,7 @@ BEGIN
 			INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.ProductID = ci.ProductID AND b.Winlostdate BETWEEN ci.FromDate AND ci.ToDate
 			LEFT JOIN #ChargeRate ci_3rd ON b.SiteID = ci_3rd.LicenseeId AND  b.ProductID = ci_3rd.ProductID AND b.Winlostdate BETWEEN ci_3rd.FromDate3rd AND ci_3rd.Todate3rd
 			LEFT JOIN dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK) ON ci.ChargeId = cr.ChargeId AND cr.CurrencyId = b.CurrencyId
+			LEFT JOIN dbo.LA_ChargeRateByCurrency cr_3rd WITH (NOLOCK) ON cr_3rd.ChargeId = ci_3rd.ChargeID_3rd AND cr_3rd.CurrencyId = b.CurrencyId
 		GROUP BY b.Winlostdate, ci.PartyId, b.CurrencyId, b.ProductID, ci.isDeposit
 
 		IF EXISTS (SELECT 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'CO')
@@ -1210,6 +1255,7 @@ BEGIN
 			SUM((b.LicenseeWinloss - b.LicenseeContribution) * ISNULL(cr.Rate, ci.Rate) + LicenseeContribution - JackpotPrize - Promotion) AS LicensingFee,
 			SUM(CASE WHEN bt.ProductID IN (70,76) THEN (LicenseeWinloss - (b.ValidBetAmount * ci.ChargeRate11)) * ISNULL(ci_3rd.Rate3rd,0)
 					WHEN bt.ProductID = 32 THEN (b.LicenseeWinloss - b.FullContribution) * ISNULL(ci_3rd.Rate3rd,0)
+					 WHEN bt.ProductID = 65 AND @ToDate >= @PPL3rdRateCufoffDate THEN (LicenseeWinloss - (b.ValidBetAmount * ci.ChargeRate11)) * ISNULL(ci_3rd.Rate3rd,0)
 				ELSE (b.LicenseeWinloss - b.FullContribution) * ISNULL(cr_3rd.Rate,ci_3rd.Rate3rd) - b.Promotion END
 				) AS PayToSupplier,
 			bt.ProductID,
@@ -1486,7 +1532,7 @@ BEGIN
 			WHERE ProductID = 0 -- MuayThai
 		END 
 
-		IF  EXISTS(SELECT 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'PPL') 
+		IF  EXISTS(SELECT 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'PPL')  AND @ToDate < @PPL3rdRateCufoffDate
 		BEGIN
 			-- Detail
 			;WITH CTE_Sum AS (
@@ -1641,7 +1687,7 @@ BEGIN
 				CASE WHEN  td.PartyId = 14 THEN '12Bet' ELSE td.ParentName END, td.ProductID
 
 
-	IF EXISTS(SELECT 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'PPL') 
+	IF EXISTS(SELECT 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'PPL')  AND @ToDate < @PPL3rdRateCufoffDate
 	BEGIN
 		-- Total
 		;WITH CTE_Sum AS (
