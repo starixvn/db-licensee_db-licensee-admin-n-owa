@@ -23,6 +23,7 @@ AS
 		- 20240301@Danny: Merge virtual sports product [RemineID: #199478]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 		- 20241028@Sally: Support Odds Boost Voucher [#209884]
+		- 20250207@Danny: Change text "LA" to "Settlement Hub" [#214829]
 
 */
 BEGIN
@@ -495,7 +496,7 @@ BEGIN
 					PartyID					INT, 
 					ProductID				INT, 
 					BaseCurrencyID			INT ,
-					Func					VARCHAR(10), 
+					Func					VARCHAR(20), 
 					Currency				VARCHAR(12), 
 					[Type]					VARCHAR(200), 
 					AmountToCompany			MONEY, 
@@ -505,7 +506,7 @@ BEGIN
 				)
 			-- LA
 			INSERT INTO @Result_adj (PartyID, ProductID, BaseCurrencyID, Func, Currency, [Type], ExRate, AmountToCompany, BasedAmountToCompany)
-			SELECT d.PartyID, d.ProductID, d.BaseCurrencyID, 'LA', NULL Currency, 'Actual Bet', NULL ExRate
+			SELECT d.PartyID, d.ProductID, d.BaseCurrencyID, 'Settlement Hub', NULL Currency, 'Actual Bet', NULL ExRate
 				,SUM(CASE WHEN d.ProductId = 31 AND @FromDate >= @ExchangeTerm_CutOffDate THEN (d.MemberWL + d.Pcomm) * ISNULL(bc.Rate, c.Rate)  
 						  WHEN d.ProductID = 10 THEN -((-d.MemberWL) * ISNULL(bc.Rate, c.Rate) + d.LicenseeContribution - d.JackpotPize -d.Promotion)
 				     ELSE d.MemberWL * ISNULL(bc.Rate, c.Rate) + d.Comm END) AS AmountToCompany
@@ -705,7 +706,7 @@ BEGIN
 		END
 
 		DECLARE @Result_PT TABLE (
-			Func					VARCHAR(10), 
+			Func					VARCHAR(20), 
 			LicenseeWL				MONEY, 
 			ChargeRate				SMALLMONEY, 
 			LicensingFee			MONEY,
@@ -725,7 +726,7 @@ BEGIN
 
 		-- LA
 		INSERT INTO @Result_PT (Func, LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, IsShowOddsSpread,PartyID,BaseCurrencyID,ProductID,firstday_PT)
-		SELECT 'LA', LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, 1 AS IsShowOddsSpread,PartyID,BaseCurrencyID,ProductID,firstday_PT
+		SELECT 'Settlement Hub', LicenseeWL, ChargeRate, LicensingFee, Contribution, ContributionDiscount, Promotion, JackpotPrize, OddsSpread, 1 AS IsShowOddsSpread,PartyID,BaseCurrencyID,ProductID,firstday_PT
 		FROM (
 			SELECT
 				CONVERT(SMALLMONEY, ISNULL(bc.Rate, c.Rate)) AS ChargeRate
@@ -750,7 +751,7 @@ BEGIN
 		UPDATE r
 		SET r.OddsSpread = 0, r.IsShowOddsSpread = 0 
 		FROM @Result_PT r 
-		WHERE Func = 'LA' AND -OddsSpread <= 0
+		WHERE Func = 'Settlement Hub' AND -OddsSpread <= 0
 
 		-- NAP
 		;WITH CTE_tmpData AS (
@@ -824,7 +825,7 @@ BEGIN
 					     WHEN t1.cnt = t2.cnt AND t1.maxc = t2.maxc AND t1.minc = t2.minc  AND t1.firstday_PT <= t2.firstday_PT THEN 1
 						 ELSE 0 END IsSamePT
 			FROM  t t1  FULL JOIN t t2 ON t2.Func = 'NAP' AND t1.ProductID = t2.ProductID AND t1.PartyID = t2.PartyID AND t1.BaseCurrencyID = t2.BaseCurrencyID
-			WHERE t1.Func = 'LA'
+			WHERE t1.Func = 'Settlement Hub'
 		)
 		UPDATE pt
 		SET		pt.isSamePT = u.IsSamePT
@@ -840,7 +841,7 @@ BEGIN
 							WHERE la.PartyID = nap.PartyID 
 								AND la.ProductID = nap.ProductID 
 								AND la.BaseCurrencyID = nap.BaseCurrencyID
-								AND la.Func = 'LA'
+								AND la.Func = 'Settlement Hub'
 								AND nap.ChargeRate =la.ChargeRate
 								)
 		AND		nap.Func = 'NAP'
@@ -855,7 +856,7 @@ BEGIN
 		), z AS 
 		(
 			SELECT  uc.Func, uc.PartyID, uc.ProductID, uc.BaseCurrencyID,
-						CASE WHEN uc.Func = 'NAP' THEN 'NAP:' + CHAR(13) ELSE 'LA:' + CHAR(13) END + STRING_AGG ( CASE WHEN uc.Func = 'NAP' THEN CHAR(9) 
+						CASE WHEN uc.Func = 'NAP' THEN 'NAP:' + CHAR(13) ELSE 'Settlement Hub:' + CHAR(13) END + STRING_AGG ( CASE WHEN uc.Func = 'NAP' THEN CHAR(9) 
 															  + CASE WHEN IsInconsistent = 0 THEN  '- Having bet tickets with charge rate ' ELSE '- Having inconsistent bet tickets with charge rate ' END  
 															  + ChargeRate + ' From ' + FORMAT(firstday_PT,'MMM dd, yyyy') 
 						ELSE CHAR(9) +  '- Charge rate setting ' + ChargeRate + ' From ' + FORMAT(firstday_PT,'MMM dd, yyyy') END, CHAR(13)) AS Remark
@@ -879,7 +880,7 @@ BEGIN
 			FROM @Result_adj
 		), u AS
 		(
-		SELECT PartyID, ProductID, BaseCurrencyID, CASE WHEN Func = 'NAP' THEN 'NAP:' + CHAR(13) ELSE 'LA:' + ChAR(13) END +  STRING_AGG(Remark, CHAR(13))  Remark
+		SELECT PartyID, ProductID, BaseCurrencyID, CASE WHEN Func = 'NAP' THEN 'NAP:' + CHAR(13) ELSE 'Settlement Hub:' + ChAR(13) END +  STRING_AGG(Remark, CHAR(13))  Remark
 		FROM t 
 		GROUP BY PartyID, ProductID, BaseCurrencyID, Func
 		)
