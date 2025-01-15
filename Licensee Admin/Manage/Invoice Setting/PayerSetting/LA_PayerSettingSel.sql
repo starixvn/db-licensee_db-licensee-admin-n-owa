@@ -37,6 +37,7 @@ AS
 		- 20240625@Danny: Return Master Currency Codes [RedmineID: #206117]
 		- 20241118@Danny: Rebate on Licensing Fee for specific currencies [RedmineID: #206143]
 		- 20250102@Danny: Rebate on Licensing winloss for specific currencies [RedmineID: #214767]
+		- 20250115@Danny: Support different groups by currencies [RedmineID: #216352]
 
 	Params:
 	+ @PayerId : 0 get all Party
@@ -234,7 +235,7 @@ BEGIN
 			h.ToDate,
 			d.FromAmount,
 			d.ToAmount,
-			d.Rate,
+			CASE WHEN  h.DiscountGroupType IN (3, 13) THEN d.ChargeRateAfterDiscount ELSE d.Rate END,
 			d.DiscountGroupId,
 			h.DiscountGroupName,
 			h.DiscountGroupType
@@ -258,7 +259,7 @@ BEGIN
 					h.DiscountGroupType,
 					d.FromAmount,
 					d.ToAmount,
-					d.Rate
+					CASE WHEN  h.DiscountGroupType IN (3, 13) THEN d.ChargeRateAfterDiscount ELSE d.Rate END
 
 	-- get terminated
 	INSERT INTO @ChargeInfo (ChargeId, PartyId, PartyName, ProductId, ProductName, BettypeRef, Rate, FromDate, ToDate, FirstBilling, ExchangeID, ExchangeName, ChargeType)
@@ -313,12 +314,12 @@ BEGIN
 			w.ToDate		AS WaiveTo,
 			d.DiscountGroupName AS DiscountGroupName,
 			STUFF((SELECT
-					';' + ' Amount From: ' + CONVERT(VARCHAR(100), ii.FromAmount) + ' - '
+					';' + ' Amount From: ' + FORMAT(ii.FromAmount,'N','en-us') + ' - '
 					+ 'Amount To: ' + CASE
 						WHEN ii.ToAmount = 10000000000000 THEN 'Unlimited'
-						ELSE CONVERT(VARCHAR(100), ii.ToAmount)
+						ELSE FORMAT(ii.ToAmount,'N','en-us')
 					END + ' - '
-					+ 'Rate: ' + CONVERT(VARCHAR(10), ii.Rate * 100) + '%'
+					+ 'Charge Rate After Discount: ' + CONVERT(VARCHAR(10), ii.Rate * 100) + '%'
 				FROM @Discount ii
 				WHERE d.DiscountGroupId = ii.DiscountGroupId
 					AND d.ProductId = ii.ProductId

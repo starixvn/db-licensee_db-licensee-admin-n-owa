@@ -52,6 +52,7 @@ AS
 		- 20240625@Danny: Rebate on Licensing Fee for specific currencies [RedmineID: #206143]
 		- 20240625@Danny: Rebate for 3rd product is incorrect issue [RedmineID: #214929]
 		- 20250102@Danny: Rebate on Licensing winloss for specific currencies [RedmineID: #214767]
+		- 20250115@Danny: Support different groups by currencies [RedmineID: #216352]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -697,16 +698,17 @@ BEGIN
 			GroupMinFeeId INT, 
 			GroupId INT, 
 			IsPrimary BIT, 
-			FeeTypeId TINYINT
+			FeeTypeId TINYINT,
+			DiscountGroupId INT
 		)
 
-		INSERT INTO @tmpWLToDiscountByCurrency (PartyId, ProductId, WLToDiscount, CurrencyID, LicenseeAmount, GroupMinFeeId, GroupId, IsPrimary, FeeTypeId)
+		INSERT INTO @tmpWLToDiscountByCurrency (PartyId, ProductId, WLToDiscount, CurrencyID, LicenseeAmount, GroupMinFeeId, GroupId, IsPrimary, FeeTypeId, DiscountGroupId)
 		SELECT	ISNULL(r.PartyId, t.PartyId) PartyId
 				,ISNULL(r.ProductId, t.ProductId) ProductId
 				,SUM(CASE WHEN d.PartyId IS NOT NULL THEN ISNULL(r.LicenseeWL, 0) ELSE 0 END) AS WLToDiscount
 				,r.CurrencyId
 				,SUM(r.LicenseeWL)
-				,t.GroupMinFeeId, t.GroupId, t.IsPrimary, t.FeeTypeId
+				,t.GroupMinFeeId, t.GroupId, t.IsPrimary, t.FeeTypeId, d.DiscountGroupId
 		FROM #tmpResult r
 			FULL OUTER JOIN  #tmpMinFee t ON r.PartyId = t.PartyId AND r.ProductId = t.ProductId AND r.rptDate BETWEEN t.FromDate AND t.ToDate
 			LEFT JOIN #tmpDiscountGroup d ON r.PartyId = d.PartyId AND r.ProductId = d.ProductId
@@ -714,7 +716,7 @@ BEGIN
 											AND (d.IsSpecialTreatment = 0 OR r.CurrencyId <> 51)
 											AND d.DiscountGroupType IN (3, 13)
 											AND d.CurrencyCalculationType IN (2, 3) -- apply discount
-		GROUP BY ISNULL(r.PartyId, t.PartyId), ISNULL(r.ProductId, t.ProductId), r.CurrencyId, t.GroupMinFeeId, t.GroupId, t.IsPrimary, t.FeeTypeId, t.FromDate, t.ToDate
+		GROUP BY ISNULL(r.PartyId, t.PartyId), ISNULL(r.ProductId, t.ProductId), r.CurrencyId, t.GroupMinFeeId, t.GroupId, t.IsPrimary, t.FeeTypeId, t.FromDate, t.ToDate, d.DiscountGroupId
 
 		UPDATE r
 		SET r.LicensingFee = CASE WHEN r.LicensingFee < 0 THEN 0 ELSE r.LicensingFee END
@@ -1118,7 +1120,6 @@ BEGIN
 					INNER JOIN dbo.LA_f_TierRebateSetting(@FromDate) s ON t.BaseCurrencyId = s.BaseCurrencyId AND a.LicenseeWL BETWEEN s.FromAmount AND s.ToAmount
 					INNER JOIN dbo.LA_DiscountGroupDetail dd WITH (NOLOCK) ON t.DiscountGroupId = dd.DiscountGroupId
 					INNER JOIN @PartyChargeInfo p ON t.PartyId = p.PartyId AND t.ProductId = p.ProductId AND p.BettypeRef = -1
-					LEFT JOIN @tmpDiscount d ON t.PartyId = d.PartyId AND t.ProductId = d.ProductId AND d.DiscountGroupType IN (1, 3, 11, 13)
 					LEFT JOIN @tmpDiscount r ON t.PartyId = r.PartyId AND t.ProductId = r.ProductId AND r.DiscountGroupType IN (22,42)
 					LEFT JOIN dbo.LA_DiscountGroupDetail rd WITH (NOLOCK) ON r.DiscountGroupId = rd.DiscountGroupId
 					LEFT JOIN @tmpWLToDiscountByCurrency twl ON t.PartyId = twl.PartyId AND twl.ProductId = t.ProductId
@@ -1525,22 +1526,43 @@ BEGIN
 
 	-- Multiple values discount
 	; WITH t AS (
-		SELECT x.ProductId ,x.PartyId ,COUNT (DISTINCT DiscountRate) AS rn
+		SELECT x.ProductId ,x.PartyId 
+				,COUNT (DISTINCT DiscountRate) AS rn
+				,COUNT(DISTINCT DiscountGroupId) AS rn_group
+				,COUNT(DISTINCT ChargeRateByCurrency) AS rn_cr
 		FROM @tmpWLToDiscountByCurrency x 
 		WHERE x.ChargeRateByCurrency  <> 0
 		GROUP BY 	x.ProductId ,x.PartyId 
 	)
 	UPDATE r
-	SET	r.ExtraInfo = ex.ExtraInfo
+	SET	r.ExtraInfo = CASE WHEN t.rn_group = 1 THEN  ex.ExtraInfo
+						   WHEN t.rn_group > 1 THEN  ex1.ExtraInfo END
 	FROM @Result r
-	INNER JOIN t ON r.ProductId = t.ProductId AND r.PartyId = t.PartyId AND t.rn >= 2
-	CROSS APPLY (
+	INNER JOIN t ON r.ProductId = t.ProductId AND r.PartyId = t.PartyId AND (t.rn >= 2 OR t.rn_cr >=2)
+	OUTER APPLY (
 	SELECT (
 		SELECT DISTINCT CAST(x.DiscountRate AS MONEY) DiscountRate, x.ChargeRateByCurrency
 		FROM @tmpWLToDiscountByCurrency x 
-		WHERE x.ProductId =t.ProductId AND x.PartyId = t.PartyId  AND x.ChargeRateByCurrency<>0
-		FOR JSON PATH ) AS ExtraInfo
-	) ex
+		WHERE x.ProductId =t.ProductId AND x.PartyId = t.PartyId  AND x.ChargeRateByCurrency<>0 
+		FOR JSON PATH ) AS ExtraInfo WHERE t.rn_group = 1
+	) ex 
+	OUTER APPLY (
+	SELECT (
+		SELECT  CAST(x.DiscountRate AS MONEY) DiscountRate, x.ChargeRateByCurrency,  STRING_AGG(exchange1.Currency,', ') AS Currency
+		FROM @tmpWLToDiscountByCurrency x 
+		CROSS APPLY (
+			SELECT CASE WHEN rn > 1 THEN Code + ' (' + currency + ')' ELSE Code END Currency
+			FROM
+			(
+				SELECT ex.Code, ex.currency, COUNT(1) OVER (PARTITION BY ex.Code)  AS rn
+				FROM bodb02.dbo.Exchange ex WITH(NOLOCK)
+				WHERE ex.ExchangeId = x.CurrencyID
+			) exchange
+		) exchange1
+		WHERE x.ProductId =t.ProductId AND x.PartyId = t.PartyId  AND x.ChargeRateByCurrency<>0 
+		GROUP BY CAST(x.DiscountRate AS MONEY), x.ChargeRateByCurrency
+		FOR JSON PATH ) AS ExtraInfo  WHERE t.rn_group > 1
+	) ex1
 	WHERE r.LicensingFeeTypeId = 0 AND r.Discount > 0 
 
 	SELECT

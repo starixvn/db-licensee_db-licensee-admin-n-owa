@@ -20,6 +20,7 @@ AS
 		- 20230417@Danny: Insert new log with more information [#FeatureID 175125]
 		- 20240613@Danny: Rebate on specific currencies [#FeatureID 206143]
 		- 20250102@Danny: Rebate on Licensing winloss for specific currencies [RedmineID: #214767]
+		- 20250102@Danny: Rebate on Licensing winloss for specific currencies [RedmineID: #214767]
 
 	 Params:
 
@@ -90,7 +91,7 @@ BEGIN
 	END
 
 	--remove currency setting 
-	IF @RebateGroupType = 32
+	IF @RebateGroupType IN (32,42)
 	BEGIN
 		DELETE dbo.LA_DiscountGroupCurrency WITH(ROWLOCK)
 		WHERE DiscountGroupId = @GroupId

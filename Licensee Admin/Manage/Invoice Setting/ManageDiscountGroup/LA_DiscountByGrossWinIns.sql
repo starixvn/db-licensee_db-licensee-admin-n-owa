@@ -1,7 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
-USE bodb_licensee
-GO
-
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[LA_DiscountByGrossWinIns]
 	@DiscountGroupName		NVARCHAR(110)
 	,@DiscountGroupType		TINYINT
@@ -32,6 +29,7 @@ AS
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 		- 20230331@Danny: Insert new log with more information [#FeatureID 175125]
 		- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
+		- 20250115@Danny: Support different groups by currencies [RedmineID: #216352]
 	 
 	 Params:
 		@RateSettingsData = '<Root>
@@ -79,7 +77,7 @@ BEGIN
 	SET NOCOUNT ON
 
 	-- For log
-	DECLARE @StartRun DATETIME, @Duration INT, @LogSPData NVARCHAR(MAX), @LogSPDataOld NVARCHAR(MAX)
+	DECLARE @StartRun DATETIME, @Duration INT, @LogSPData NVARCHAR(MAX), @LogSPDataOld NVARCHAR(MAX), @UnavailableCurrenciesList VARCHAR(4000)
 
 	SET @StartRun = GETDATE()
 
@@ -212,6 +210,38 @@ BEGIN
 		)
 		BEGIN
 			SELECT @ErrCode = 511, @ErrMsg = 'Please select licensees who have same Base Currency with discount setting.'
+			RETURN
+		END
+
+		SELECT @UnavailableCurrenciesList = STRING_AGG(e.Code,',')
+		FROM
+		(
+			SELECT DISTINCT CASE WHEN  e.ExchangeID = 142 THEN 'USDT' 
+							WHEN e.ExchangeID IN (96, 202, 206, 208,209) THEN e.Code + ' ('+ e.currency+ ')'
+							ELSE e.Code END Code
+			FROM @CurrencyList c
+			INNER JOIN Custdb.dbo.Exchange e WITH(NOLOCK) ON c.CurrencyId = e.ExchangeID
+			INNER JOIN LA_DiscountGroupCurrency lgd WITH(NOLOCK) ON c.PartyId = lgd.PartyID AND c.CurrencyId = lgd.CurrencyId  
+																	AND (
+																			(lgd.CalculationType = c.CalculationType )
+																		OR 
+																		(	lgd.CalculationType <> c.CalculationType
+																			AND (
+																					(c.CalculationType = 1 AND lgd.CalculationType = 3)
+																					OR
+																					(c.CalculationType = 2 AND lgd.CalculationType = 3)
+																					OR
+																					(c.CalculationType = 3  AND lgd.CalculationType IN (1,2))
+																				)
+																		)
+																	)
+			INNER JOIN LA_DiscountGroupHeader lgh WITH(NOLOCK) ON lgd.DiscountGroupId = lgh.DiscountGroupId
+			WHERE lgh.DiscountGroupType = 13  AND lgh.Todate >= GETDATE()
+		) e
+
+		IF @UnavailableCurrenciesList IS NOT NULL
+		BEGIN
+			SELECT @ErrCode = 513, @ErrMsg = 'The following currencies have already been chosen in another group: ' +@UnavailableCurrenciesList+'. Please select another one.'
 			RETURN
 		END
 	END
