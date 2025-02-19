@@ -41,6 +41,7 @@ AS
 	  - 20230223@Danny: Integrate Casino promotion [#194808]
 	  - 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 	  - 20241007@Sally: Support Odds Boost Voucher [#209884]
+	  - 20250207@Danny: Rebate on Licensing winloss for specific currencies [RedmineID: #214767]
 */
 
 BEGIN
@@ -66,7 +67,7 @@ BEGIN
 			INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
 			INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
 		WHERE a.PartyId = @PartyId
-			AND h.DiscountGroupType IN (2, 22) -- rebate on WL & Fee
+			AND h.DiscountGroupType IN (2, 22, 42) -- rebate on WL & Fee
 			AND h.FromDate <= @TDate AND h.ToDate >= @FDate
 			AND p.ProductId NOT IN (1, 23, 13, 14, 17, 31) -- exclude RB, bettrade, NG2, MGCLC, MGCRNG, BX
 	) r

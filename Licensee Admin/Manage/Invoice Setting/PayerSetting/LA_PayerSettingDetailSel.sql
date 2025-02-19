@@ -38,6 +38,7 @@ AS
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 		- 20240703@Danny: Show chargerate setting = 0 [RedmineID: #206117]
 		- 20241126@Danny: Rebate on specific currencies [#FeatureID 206143]
+		- 20250102@Danny: Rebate on Licensing winloss for specific currencies [RedmineID: #214767]
 
 	 Params:
 		+ @PayerId :specify Party
@@ -186,7 +187,7 @@ BEGIN
 		LEFT JOIN (
 				SELECT PartyId, DiscountGroupId, DiscountGroupName 
 				FROM @Discount 
-				WHERE DiscountGroupType IN (2, 12, 22, 32)
+				WHERE DiscountGroupType IN (2, 12, 22, 32, 42)
 					AND @CurrentDate BETWEEN FromDate AND ToDate
 				) d2 ON c.PartyId = d2.PartyId --Rebate
 

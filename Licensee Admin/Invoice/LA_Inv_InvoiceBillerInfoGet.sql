@@ -7,6 +7,8 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceBillerInfoGet]
 	, @PayerId		INT
 	, @InvoiceType	INT
 	, @Environment	VARCHAR(20)
+	, @FromDate		DATE = NULL
+	, @ToDate		DATE = NULL
 AS
 /*	Header:
 	Created: 2015.08.06 - Bravo.Tran
@@ -35,6 +37,8 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @RebateType VARCHAR(100)
 
 	DECLARE @InvoiceInfo AS TABLE(
 		InvoiceSymbol		NVARCHAR(20),
@@ -116,6 +120,21 @@ BEGIN
 								FROM LA_InvoiceHeader i WITH(NOLOCK)
 								WHERE i.BillerId = @BillerId
 								ORDER BY i.InvoiceNumber DESC)
+
+
+	IF @InvoiceType = 3
+	BEGIN
+		SELECT @RebateType =  STRING_AGG(CAST(x.DiscountGroupType AS VARCHAR(20)),',')
+		FROM
+		(
+			SELECT DISTINCT DiscountGroupType
+			FROM LA_DiscountGroupHeader lgh WITH(NOLOCK)
+			INNER JOIN LA_DiscountGroupAssignment  lga WITH(NOLOCK) ON lgh.DiscountGroupId = lga.DiscountGroupId
+			WHERE lgh.DiscountGroupType IN (2,12,22,32,42)
+			AND lga.PartyID = @PayerId AND @FromDate BETWEEN lgh.FromDate AND lgh.ToDate AND @ToDate BETWEEN lgh.FromDate AND lgh.ToDate
+		)x
+
+	END
 	
 	SELECT TOP 1 ii.InvoiceSymbol
 		, ii.InvoiceNumber
@@ -126,6 +145,7 @@ BEGIN
 		, ISNULL(ii.InvoiceLanguage, 'en-US') AS InvoiceLanguage
 		, ii.CompanyName  AS CompanyName
 		, ii.BillerAddress1 AS BillerAddress1
+		, @RebateType AS RebateType
 	FROM @InvoiceInfo ii
 
 END

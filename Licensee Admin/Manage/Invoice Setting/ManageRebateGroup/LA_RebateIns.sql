@@ -33,6 +33,7 @@ AS
 		- 20241016@Danny: Extend parameter data length [RemineID: #212252]
 		- 20240613@Danny: Rebate on specific currencies [#FeatureID 206143]
 		- 20241209@Danny: Auto add rebate invoice template [#FeatureID 208487]
+		- 20250102@Danny: Rebate on Licensing winloss for specific currencies [RedmineID: #214767]
 */
 
 BEGIN
@@ -50,7 +51,7 @@ BEGIN
 	END
 
 	--check exists
-	IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupName = @GroupName AND DiscountGroupType IN (2, 12, 22, 32))
+	IF EXISTS (SELECT 1 FROM dbo.LA_DiscountGroupHeader WITH(NOLOCK) WHERE DiscountGroupName = @GroupName AND DiscountGroupType IN (2, 12, 22, 32, 42))
 	BEGIN
 		SELECT @ErrCode = 502, @ErrMsg = 'Group name exists. Please try again.'
 		RETURN
@@ -159,6 +160,20 @@ BEGIN
 				SELECT @ErrCode = 503, @ErrMsg = 'Licensee is in another Rebate on Lic Fee for specific curencies group.'
 				RETURN
 			END	
+
+			IF EXISTS (
+				SELECT TOP 1 1 
+				FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
+				INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
+				INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON p.DiscountGroupId = a.DiscountGroupId
+				INNER JOIN @Payers t ON t.PayerId = a.PartyID
+				INNER JOIN @Products pt ON pt.ProductId = p.ProductId
+				WHERE h.DiscountGroupType = 42 AND h.FromDate <= @ToDate AND h.ToDate >= @FromDate
+			)
+			BEGIN
+				SELECT @ErrCode = 503, @ErrMsg = 'Licensee is in another Rebate on Lic win loss for specific curencies group.'
+				RETURN
+			END	
 		END
 
 		IF @RebateGroupType = 32
@@ -204,6 +219,85 @@ BEGIN
 			)
 			BEGIN
 				SELECT @ErrCode = 503, @ErrMsg = 'Licensee is in another Rebate on Lic Fee for specific curencies group.'
+				RETURN
+			END	
+
+			IF EXISTS (
+				SELECT TOP 1 1 
+				FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
+				INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
+				INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON p.DiscountGroupId = a.DiscountGroupId
+				INNER JOIN dbo.LA_DiscountGroupCurrency c WITH (NOLOCK) ON c.DiscountGroupId = a.DiscountGroupId AND c.PartyID = a.PartyID
+				INNER JOIN @Payers t ON t.PayerId = a.PartyID
+				INNER JOIN @Products pt ON pt.ProductId = p.ProductId
+				INNER JOIN @Currencies cs ON cs.CurrencyId = c.CurrencyId
+				WHERE h.DiscountGroupType = 42 AND h.FromDate <= @ToDate AND h.ToDate >= @FromDate
+			)
+			BEGIN
+				SELECT @ErrCode = 503, @ErrMsg = 'Licensee is in another Rebate on Lic win loss for specific curencies group.'
+				RETURN
+			END	
+		END
+
+		IF @RebateGroupType = 42
+		BEGIN
+			IF EXISTS (
+				SELECT TOP 1 1 
+				FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
+				INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
+				INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON p.DiscountGroupId = a.DiscountGroupId
+				INNER JOIN @Payers t ON t.PayerId = a.PartyID
+				INNER JOIN @Products pt ON pt.ProductId = p.ProductId
+				WHERE h.DiscountGroupType = 2 AND h.FromDate <= @ToDate AND h.ToDate >= @FromDate
+			)
+			BEGIN
+				SELECT @ErrCode = 503, @ErrMsg = 'Licensee is in another Rebate on Lic Fee for all currencies group.'
+				RETURN
+			END	
+
+			IF EXISTS (
+				SELECT TOP 1 1 
+				FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
+				INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
+				INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON p.DiscountGroupId = a.DiscountGroupId
+				INNER JOIN @Payers t ON t.PayerId = a.PartyID
+				INNER JOIN @Products pt ON pt.ProductId = p.ProductId
+				WHERE h.DiscountGroupType = 22 AND h.FromDate <= @ToDate AND h.ToDate >= @FromDate
+			)
+			BEGIN
+				SELECT @ErrCode = 503, @ErrMsg = 'Licensee is in another Rebate on Lic WL group.'
+				RETURN
+			END	
+
+			IF EXISTS (
+				SELECT TOP 1 1 
+				FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
+				INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
+				INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON p.DiscountGroupId = a.DiscountGroupId
+				INNER JOIN dbo.LA_DiscountGroupCurrency c WITH (NOLOCK) ON c.DiscountGroupId = a.DiscountGroupId AND c.PartyID = a.PartyID
+				INNER JOIN @Payers t ON t.PayerId = a.PartyID
+				INNER JOIN @Products pt ON pt.ProductId = p.ProductId
+				INNER JOIN @Currencies cs ON cs.CurrencyId = c.CurrencyId
+				WHERE h.DiscountGroupType = 32 AND h.FromDate <= @ToDate AND h.ToDate >= @FromDate
+			)
+			BEGIN
+				SELECT @ErrCode = 503, @ErrMsg = 'Licensee is in another Rebate on Lic Fee for specific curencies group.'
+				RETURN
+			END	
+
+			IF EXISTS (
+				SELECT TOP 1 1 
+				FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
+				INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
+				INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON p.DiscountGroupId = a.DiscountGroupId
+				INNER JOIN dbo.LA_DiscountGroupCurrency c WITH (NOLOCK) ON c.DiscountGroupId = a.DiscountGroupId AND c.PartyID = a.PartyID
+				INNER JOIN @Payers t ON t.PayerId = a.PartyID
+				INNER JOIN @Products pt ON pt.ProductId = p.ProductId
+				INNER JOIN @Currencies cs ON cs.CurrencyId = c.CurrencyId
+				WHERE h.DiscountGroupType = 42 AND h.FromDate <= @ToDate AND h.ToDate >= @FromDate
+			)
+			BEGIN
+				SELECT @ErrCode = 503, @ErrMsg = 'Licensee is in another Rebate on Lic win loss for specific curencies group.'
 				RETURN
 			END	
 		END
@@ -287,7 +381,7 @@ BEGIN
 		RETURN
 	END
 
-	IF @RebateGroupType = 32
+	IF @RebateGroupType IN (32,42)
 	BEGIN
 		INSERT INTO dbo.LA_DiscountGroupCurrency (DiscountGroupId, PartyID, CurrencyId)
 		SELECT @GroupIdOut, PayerId, CAST (x.value AS INT) CurrencyId
@@ -320,12 +414,13 @@ BEGIN
 					 WHEN ld.DiscountGroupType = 12 THEN 'Tier Rebate'
 					 WHEN ld.DiscountGroupType = 22 THEN 'Rebate on Licensing WL'
 					 WHEN ld.DiscountGroupType = 32 THEN 'Rebate on Licensing Fee for specific currencies'
+					 WHEN ld.DiscountGroupType = 42 THEN 'Rebate on Licensing win loss for specific currencies'
 				END 'gs.rt',
 				ld.Remark 'gs.rm',
 				pig.val AS 'gs.pig',
 				pig.pid AS 'gs.pid',
 				pa.val AS 'gs.pa',
-				CASE WHEN @RebateGroupType = 32 THEN ca.val ELSE 'All currencies' END AS 'gs.ca'
+				CASE WHEN @RebateGroupType IN (32,42) THEN ca.val ELSE 'All currencies' END AS 'gs.ca'
 		FROM LA_DiscountGroupHeader ld WITH(NOLOCK) 
 		INNER JOIN LA_DiscountGroupDetail ldg WITH(NOLOCK) ON ld.DiscountGroupId = ldg.DiscountGroupId
 		CROSS APPLY (

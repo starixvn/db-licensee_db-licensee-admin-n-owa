@@ -67,6 +67,7 @@ AS
 		- 20230111@Danny: Discount group - Support many sportsbook charge rates [RedmineID: #169160]
 		- 20230223@Danny: Integrate Casino promotion [#194808]
 		- 20241118@Danny: Rebate on Licensing Fee for specific currencies [RedmineID: #206143]
+		- 20250102@Danny: Rebate on Licensing winloss for specific currencies [RedmineID: #214767]
 */
 
 BEGIN
@@ -133,7 +134,7 @@ BEGIN
 					INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
 					LEFT JOIN dbo.Product3rd pd WITH(NOLOCK) ON p.ProductId = pd.ProductId
 				WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate
-					AND h.DiscountGroupType IN (2, 12, 22, 32) -- Rebate
+					AND h.DiscountGroupType IN (2, 12, 22, 32, 42) -- Rebate
 			) r
 			WHERE ProductCode IS NOT NULL
 

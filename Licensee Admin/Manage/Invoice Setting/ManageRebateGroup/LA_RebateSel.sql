@@ -14,6 +14,7 @@ AS
 		- 20220210@Percy: Return RebateGroupType [RedmineID: #163495]
 		- 20220506@Percy: Add new rebate type: Rebate on Licensee WL [RedmineID: #1732342]
 		- 20240613@Danny: Rebate on specific currencies [#FeatureID 206143]
+		- 20250102@Danny: Rebate on Licensing winloss for specific currencies [RedmineID: #214767]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -52,7 +53,7 @@ BEGIN
 		LEFT JOIN dbo.LA_DiscountGroupDetail d WITH(NOLOCK) ON h.DiscountGroupId = d.DiscountGroupId
 		LEFT JOIN dbo.LA_DiscountGroupProduct p WITH(NOLOCK) ON h.DiscountGroupId = p.DiscountGroupId
 		LEFT JOIN dbo.LA_DiscountGroupAssignment a WITH(NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
-	WHERE h.DiscountGroupType IN (2, 12, 22, 32) -- Rebate
+	WHERE h.DiscountGroupType IN (2, 12, 22, 32, 42) -- Rebate
 	GROUP BY h.DiscountGroupId, h.DiscountGroupName, h.FromDate, h.ToDate, d.Rate, h.DiscountGroupType
 END
 GO
