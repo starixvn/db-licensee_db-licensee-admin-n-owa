@@ -45,6 +45,7 @@ AS
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 		- 20240527@Danny: Automate the PT adjustment when the Exchange charge rate is changed [RemineID: #201477]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+		- 20250219@Danny: Integrate Double S System Inc group Licensees [RedmineID: #217961]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -190,6 +191,7 @@ BEGIN
 						WHEN 'Boping' THEN @BillingGroupName
 						WHEN 'JollySports' THEN @BillingGroupName
 						WHEN 'Zelianta' THEN @BillingGroupName + ' Limited'
+						WHEN 'Double S' THEN @BillingGroupName
 						ELSE '' END
 
 	SELECT @AMF = SUM(ISNULL(d.Income, 0))
@@ -417,18 +419,23 @@ BEGIN
 			SELECT DISTINCT @NewPartyId, @BillerId, ProductId, InvTypeId, InvTemplateId, 0 AS BankId, 1 AS ActiveAddress
 			FROM (
 				SELECT InvTemplateId, InvTemplateName
-					,CASE InvTemplateName
-						WHEN @BillingGroupName THEN 1 -- Software Data & Licensing Fees
-						WHEN 'Credit' + CASE WHEN @BillingGroupName = 'JollySports' THEN '-JollySports' ELSE '' END THEN 4 -- Credit Note
-						ELSE 5 -- Debit Note
-						END AS InvTypeId
+						,CASE InvTemplateName
+							WHEN @BillingGroupName THEN 1	-- Software Data & Licensing Fees
+							WHEN 'Double-S' THEN 1
+							WHEN 'Credit' + CASE WHEN @BillingGroupName = 'JollySports' THEN '-JollySports' ELSE '' END THEN 4 -- Credit Note
+							WHEN 'Credit' + CASE WHEN @BillingGroupName = 'Double S' THEN '-Double-S' ELSE '' END THEN 4 -- Credit Note
+							ELSE 5 -- Debit Note
+							END AS InvTypeId
 				FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
 				WHERE 1 = CASE InvTemplateName
 							WHEN @BillingGroupName THEN 1
-							WHEN 'Credit'+ CASE WHEN @BillingGroupName = 'JollySports' THEN '-JollySports' ELSE '' END THEN 1
+							WHEN 'Double-S' THEN 1
+							WHEN 'Credit'+ CASE WHEN @BillingGroupName = 'JollySports' THEN '-JollySports'
+												WHEN @BillingGroupName = 'Double S' THEN '-Double-S' ELSE '' END THEN 1
 							WHEN 'Debit' + CASE WHEN @BillingGroupName = 'Zelianta' THEN '-Zelianta' 
 												WHEN @BillingGroupName = 'JollySports' THEN '-JollySports'
-											ELSE '' END THEN 1
+												WHEN @BillingGroupName = 'Double S' THEN '-Double-S'
+												ELSE '' END THEN 1
 							ELSE 0 END
 			) ivt
 				OUTER APPLY (
@@ -437,7 +444,7 @@ BEGIN
 						INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON p.ProductId = c.ProductId
 					WHERE c.FromParty = @NewPartyId AND c.ToParty = @BillingGroupId
 						AND c.FromDate = @LaunchDate
-						AND ivt.InvTemplateName IN ('Boping', 'Zelianta', 'JollySports')
+						AND ivt.InvTemplateName IN ('Boping', 'Zelianta', 'JollySports','Double-S')
 				) p
 
 

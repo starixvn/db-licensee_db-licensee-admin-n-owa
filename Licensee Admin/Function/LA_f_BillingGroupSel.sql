@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee, DBLIC-bodb_licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee, DBLIC-bodb_licensee" selecters="wsv_nap" isFunction="1" isNested="1"></info>*/
 USE bodb_licensee
 GO
 
@@ -13,6 +13,7 @@ AS
 	Revisions:
 	- 20190725@Parsons: Validate billing configuration [#109600]
 	- 20231228@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
+	- 20250219@Danny: Integrate Double S System Inc group Licensees [RedmineID: #217961]
 */
 
 BEGIN   
@@ -21,7 +22,8 @@ BEGIN
 		  (9, 'Cozni'), -- Cozni
 		  (11, 'Boping'), -- Boping
 		  (98, 'Zelianta'), -- Zelianta
-		  (962, 'JollySports') -- JollySports
+		  (962, 'JollySports'), -- JollySports
+		  (1235, 'Double S System Inc') -- Double S System Inc
 
 	RETURN
 END
