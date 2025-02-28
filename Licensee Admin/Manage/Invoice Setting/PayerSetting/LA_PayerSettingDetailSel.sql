@@ -39,6 +39,7 @@ AS
 		- 20240703@Danny: Show chargerate setting = 0 [RedmineID: #206117]
 		- 20241126@Danny: Rebate on specific currencies [#FeatureID 206143]
 		- 20250102@Danny: Rebate on Licensing winloss for specific currencies [RedmineID: #214767]
+		- 20250115@Danny: Support different groups by currencies [RedmineID: #216352]
 
 	 Params:
 		+ @PayerId :specify Party
@@ -67,7 +68,7 @@ BEGIN
 	SET @CurrentDate = CONVERT(DATE, GETDATE())
 	DECLARE @ChargeInfo AS TABLE (ChargeId INT, PartyId INT, ProductId INT, BettypeRef INT, Rate MONEY, ChargeType SMALLINT, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), BasisOfBilling NVARCHAR(MAX), ExchangeID INT, ToPartyId INT)	
 	DECLARE @Minfee AS TABLE(FeeId INT, PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, CurrencyId INT, MinFeeTerm NVARCHAR(MAX), FromDate DATE, ToDate DATE)
-	DECLARE @Discount AS TABLE(PartyId INT, ProductId INT, FromDate DATE, ToDate DATE,DiscountGroupId INT, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
+	DECLARE @Discount AS TABLE(PartyId INT, FromDate DATE, ToDate DATE,DiscountGroupId INT, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
 
 	DECLARE @MaxInvoiceDate DATE
 	SELECT  @MaxInvoiceDate = MAX(InvoiceDate) 
@@ -93,6 +94,8 @@ BEGIN
 	WHERE PartyID = @PayerId 
 	ORDER BY ToDate DESC
 
+	SELECT @BaseCurrencyId = ISNULL(@BaseCurrencyId, 6)
+
 	INSERT INTO @ChargeInfo(ChargeId, PartyId, ProductId, BettypeRef, Rate, ChargeType, FromDate, ToDate, FirstBilling, BasisOfBilling, ExchangeID, ToPartyId)
 	SELECT c.ChargeID		
 		, c.PartyID
@@ -107,7 +110,7 @@ BEGIN
 		, c.Todate
 		, CASE WHEN c.ProductID IN (14,17) THEN cs.FirstOfBilling ELSE ci.FirstOfBilling END AS FirstOfBilling
 		, CASE WHEN c.ProductID IN (14,17) THEN cs.BasisOfBilling ELSE ci.BasisOfBilling END AS BasisOfBilling
-		, ISNULL(@BaseCurrencyId, 6) AS BaseCurrencyId
+		, @BaseCurrencyId AS BaseCurrencyId
 		, ci.ToParty
 	FROM dbo.LA_f_ChargeInfo(@PayerId, @MinDate, @MaxDate, @ProductListAll, 'OA', 0) c
 		LEFT JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID		
@@ -128,14 +131,13 @@ BEGIN
 	FROM @Minfee
 
 	--======Discount/ Rebate ===---
-	INSERT INTO @Discount (PartyId, ProductId, FromDate, ToDate, DiscountGroupId, DiscountGroupName, DiscountGroupType)
-	SELECT a.PartyID, p.ProductId, h.FromDate, h.ToDate, d.DiscountGroupId, h.DiscountGroupName, h.DiscountGroupType
+	INSERT INTO @Discount (PartyId, FromDate, ToDate, DiscountGroupId, DiscountGroupName, DiscountGroupType)
+	SELECT a.PartyID, h.FromDate, h.ToDate, d.DiscountGroupId, h.DiscountGroupName, h.DiscountGroupType
 	FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
 		INNER JOIN dbo.LA_DiscountGroupDetail d WITH (NOLOCK) ON a.DiscountGroupId = d.DiscountGroupId 
 		INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON d.DiscountGroupId = h.DiscountGroupId 
-		INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
 	WHERE a.PartyID = @PayerId
-	GROUP BY a.PartyID, p.ProductId, h.FromDate, h.ToDate, d.DiscountGroupId, h.DiscountGroupName, h.DiscountGroupType
+	GROUP BY a.PartyID, h.FromDate, h.ToDate, d.DiscountGroupId, h.DiscountGroupName, h.DiscountGroupType
 
 	-- product order
 	DECLARE @ProductOrder TABLE(ProductId INT, ProductOrder SMALLMONEY)
@@ -150,13 +152,11 @@ BEGIN
 	DECLARE @CurrentBillingGroup INT
 	SELECT @CurrentBillingGroup = ISNULL((SELECT TOP 1 ToPartyId FROM @ChargeInfo ORDER BY FromDate DESC), 0)
 
-	SELECT TOP 1 c.PartyId		AS PayerID	
+	SELECT  p.PartyId		AS PayerID	
 		, g.GroupMinFeeID		AS GroupMinFeeID
 		, g.[Name]				AS GroupMinFeeName
-		, c.ExchangeID
-		, d1.DiscountGroupId	AS DiscountGroupID
+		, @BaseCurrencyId		AS ExchangeID
 		, d1.DiscountGroupName	AS DiscountGroupName
-		, d2.DiscountGroupId	AS RebateGroupID
 		, d2.DiscountGroupName	AS RebateGroupName
 		, CASE WHEN ISNULL(pd.BrandName,'')<>'' THEN pd.BrandName + ' (' +p.PartyName+')' ELSE p.PartyName END PayerName
 		, @CurrentBillingGroup AS CurrentBillingGroup
@@ -165,9 +165,8 @@ BEGIN
 		, pd.LaunchDate
 		, pd.SuspendedDate
 		, pd.TerminatedDate
-	FROM @ChargeInfo c
-		INNER JOIN dbo.OAS_Party p WITH(NOLOCK) ON p.PartyID=c.PartyId
-		INNER JOIN dbo.OAS_PartyDetail pd ON pd.PartyId=c.PartyId
+	FROM dbo.OAS_Party p WITH(NOLOCK) 
+		INNER JOIN dbo.OAS_PartyDetail pd ON pd.PartyId=p.PartyId
 		INNER JOIN	dbo.Licensees t WITH(NOLOCK) ON p.OldRefID = t.LicenseeId
 		LEFT JOIN	#tmp_licenseeOIC u WITH(NOLOCK) ON t.LicenseeName = u.RegisteredLicenseeName
 		LEFT JOIN	#tmp_licenseeOICStatus us WITH(NOLOCK) ON u.LicenseeStatusId = us.LicenseeStatusId
@@ -177,19 +176,27 @@ BEGIN
 				INNER JOIN dbo.LA_GroupMinFeeHeader mfh WITH (NOLOCK) ON  mfa.GroupMinFeeID = mfh.GroupMinFeeID
 				WHERE mfa.PartyID = @PayerId AND mfh.ToDate >= @CurrentDate
 				ORDER BY mfh.ToDate DESC
-				) g ON c.PartyId = g.PartyID -- Group Min Fee
-		LEFT JOIN (
-				SELECT PartyId, DiscountGroupId, DiscountGroupName 
-				FROM @Discount 
+				) g ON p.PartyId = g.PartyID -- Group Min Fee
+		OUTER APPLY (
+				SELECT 
+					  STRING_AGG(dc.DiscountGroupName,', ')  DiscountGroupName
+				FROM @Discount  dc
 				WHERE DiscountGroupType IN (1, 11, 3, 13)
 					AND @CurrentDate BETWEEN FromDate AND ToDate
-				) d1 ON c.PartyId = d1.PartyId --discount
-		LEFT JOIN (
-				SELECT PartyId, DiscountGroupId, DiscountGroupName 
-				FROM @Discount 
+					AND  p.PartyId = dc.PartyId --discount
+				) d1
+		OUTER APPLY (
+				SELECT 
+			
+					   STRING_AGG(dc2.DiscountGroupName,', ')  DiscountGroupName
+				FROM @Discount  dc2
 				WHERE DiscountGroupType IN (2, 12, 22, 32, 42)
 					AND @CurrentDate BETWEEN FromDate AND ToDate
-				) d2 ON c.PartyId = d2.PartyId --Rebate
+					AND p.PartyId = dc2.PartyId --Rebate
+				
+				) d2 
+		WHERE p.PartyID = @PayerId
+	
 
 	-- charge rate setting
 	;WITH Rate AS(
