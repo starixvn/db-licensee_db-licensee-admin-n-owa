@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee,DBACC-bodb_licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee,DBACC-bodb_licensee" selecters="wsv_nap" isFunction="1" isNested="1"></info>*/
 ALTER FUNCTION [dbo].[LA_f_ChargeInfo3rd]
     (
       @FromDate DATETIME ,

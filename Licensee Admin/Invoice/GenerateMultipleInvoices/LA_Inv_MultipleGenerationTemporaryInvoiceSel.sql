@@ -36,6 +36,7 @@ AS
 		- 20240730@Danny: Player Tips worksheet [#207863]
 		- 20241014@Sally: Support Odds Boost Voucher [#209884]
 		- 20241202@Danny: Remove IncludeRebateWorkSheet column [#214501]
+		- 20250221@Danny:  Integrate Double S System Inc group Licensees [#217961]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -154,8 +155,8 @@ BEGIN
 			AND InvoiceType IN (1, 3, 6) -- Software Fee, Rebate, Hosting Fee
 		ORDER BY CreatedDateTime DESC
 		
-		DECLARE @InvoiceSettings TABLE (IndexNumber INT, PartyId INT, BillerId INT, InvTypeId SMALLINT, ProductCodes VARCHAR(200), InvTemplateName VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT,  IsIncludePlayerTipsWorkSheet BIT, CompanyName	NVARCHAR(100), BillerAddress1 NVARCHAR(255))
-		INSERT INTO @InvoiceSettings (IndexNumber, PartyId, BillerId, InvTypeId, InvTemplateName, InvoiceSymbol, InvoiceNumber, ProductCodes, CompanyName, BillerAddress1, IsIncludePlayerTipsWorkSheet)
+		DECLARE @InvoiceSettings TABLE (IndexNumber INT, PartyId INT, BillerId INT, InvTypeId SMALLINT, ProductCodes VARCHAR(200), InvTemplateName VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT,  IsIncludePlayerTipsWorkSheet BIT, CompanyName	NVARCHAR(100), PayerAddress1 NVARCHAR(255), BillerAddress1 NVARCHAR(255))
+		INSERT INTO @InvoiceSettings (IndexNumber, PartyId, BillerId, InvTypeId, InvTemplateName, InvoiceSymbol, InvoiceNumber, ProductCodes, CompanyName, PayerAddress1, IsIncludePlayerTipsWorkSheet, BillerAddress1)
 		SELECT d.IndexNumber, s.FromPartyId, s.ToPartyId, s.InvTypeId, t.InvTemplateName, @InvoiceSymbol, d.InvoiceNumber
 			, STUFF((SELECT ',' + CASE WHEN ls.ProductId = 0 THEN 'SB' ELSE ProductPrefix END
 						FROM dbo.LA_InvoiceSetting ls WITH (NOLOCK)
@@ -166,21 +167,22 @@ BEGIN
 			, CASE WHEN s.ActiveAddress = 1 THEN ps.CompanyName
 			       WHEN s.ActiveAddress = 2 THEN ps.CompanyName2  END CompanyName
 			, CASE WHEN s.ActiveAddress = 1 THEN ps.Address1
-					WHEN s.ActiveAddress = 2 THEN ps.Address2  END BillerAddress1
+					WHEN s.ActiveAddress = 2 THEN ps.Address2  END PayerAddress1
 
             , d.IsIncludePlayerTipsWorkSheet
-				 
+			, bl.Address1	 
 			
 		FROM @PartySettings ps
 			INNER JOIN @InvoiceData d ON ps.PartyId = d.PartyId
 			INNER JOIN dbo.LA_InvoiceSetting s WITH (NOLOCK) ON s.FromPartyId = ps.PartyId AND s.InvTypeId = d.InvoiceTypeId
 			INNER JOIN dbo.LA_InvoiceTemplate t WITH (NOLOCK) ON s.InvTempId = t.InvTemplateId
+			INNER JOIN dbo.LA_BillerInfo bl WITH(NOLOCK) ON s.ToPartyId = bl.PartyId
 		WHERE s.InvTypeId IN (1, 3, 6) AND s.ToPartyId = @BillerId
 		GROUP BY d.IndexNumber, s.FromPartyId, s.ToPartyId, s.InvTypeId, t.InvTemplateName, d.InvoiceNumber, d.IsIncludePlayerTipsWorkSheet,
 			CASE WHEN s.ActiveAddress = 1 THEN ps.CompanyName
 				 WHEN s.ActiveAddress = 2 THEN ps.CompanyName2  END,
 			CASE WHEN s.ActiveAddress = 1 THEN ps.Address1
-					WHEN s.ActiveAddress = 2 THEN ps.Address2  END
+					WHEN s.ActiveAddress = 2 THEN ps.Address2  END,  bl.Address1	 
 
 		-- Handle (Casino Promotion invoice setting)
 		UPDATE @InvoiceSettings
@@ -355,14 +357,14 @@ BEGIN
 			,InvoiceHeaderId BIGINT, InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, InvoicePath NVARCHAR(256)
 			,BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50), ProductCodes VARCHAR(MAX)
 			,LicensingFee MONEY, Discount MONEY, Rebate MONEY, AdjustmentAmount MONEY, AdjustmentNote NVARCHAR(500), IsIncludePlayerTipsWorkSheet BIT
-			,CompanyName NVARCHAR(100), BillerAddress1 NVARCHAR(255)
+			,CompanyName NVARCHAR(100), PayerAddress1 NVARCHAR(255), BillerAddress1  NVARCHAR(255)
 		)
 
 		INSERT INTO @_Result
 		(
 			RowIndex, IndexNumber, PartyId, PartyName, BrandName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath
 			,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsIncludePlayerTipsWorkSheet
-			,CompanyName, BillerAddress1
+			,CompanyName, PayerAddress1, BillerAddress1
 		)
 		SELECT
 			ROW_NUMBER() OVER(ORDER BY ISNULL(r.InvoiceNumber, ivs.InvoiceNumber)) AS RowIndex
@@ -388,6 +390,7 @@ BEGIN
 			,ISNULL(r.AdjustmentNote, N'') AS AdjustmentNote
 			,ivs.IsIncludePlayerTipsWorkSheet
 			,ivs.CompanyName
+			,ivs.PayerAddress1
 			,ivs.BillerAddress1
 		FROM @PartySettings ps
 			INNER JOIN @InvoiceSettings ivs ON ps.PartyId = ivs.PartyId
@@ -412,6 +415,7 @@ BEGIN
 			,ISNULL(r.AdjustmentNote, N'')
 			,ivs.CompanyName
 			,ivs.IsIncludePlayerTipsWorkSheet
+			,ivs.PayerAddress1
 			,ivs.BillerAddress1
 	END
 	-- End Region: Final Result
@@ -419,7 +423,7 @@ BEGIN
 	-- Return data
 	SELECT RowIndex, IndexNumber, PartyId, PartyName, BrandName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath
 		,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsIncludePlayerTipsWorkSheet
-		,CompanyName, BillerAddress1
+		,CompanyName, BillerAddress1, BillerAddress1
 	FROM @_Result
 	ORDER BY InvoiceNumber
 END

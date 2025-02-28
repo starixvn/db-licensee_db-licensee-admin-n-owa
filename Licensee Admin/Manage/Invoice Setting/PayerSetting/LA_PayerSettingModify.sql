@@ -33,6 +33,7 @@ AS
 		- 20221205@Danny: Remove Hx9candy From Crypto Licensee List [RedmineID: #181279]
 		- 20231113@Danny: Support to remove up-coming waive period [RedmineID: #194868]
 		- 20240527@Danny: Automate the PT adjustment when the Exchange charge rate is changed [RemineID: #201477]
+		- 20250225@Danny: Integrate Double S System Inc group Licensees [RedmineID: #217961]
 
 	 Params:	
 		+ @ChargeSettingXML:
@@ -105,7 +106,7 @@ BEGIN
 			OUTER APPLY (SELECT TOP 1 oc.ToParty , pg.GroupName
 						 FROM OAS_ChargeInfo oc WITH(NOLOCK) 
 						 INNER JOIN dbo.LA_f_BillingGroupSel() pg ON pg.PartyId = oc.ToParty
-						 WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
+						 WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 AND GETDATE() BETWEEN oc.FromDate AND oc.Todate ) x
 			OUTER APPLY (
 							SELECT
 							(
@@ -220,7 +221,7 @@ BEGIN
 			OUTER APPLY (SELECT TOP 1 oc.ToParty , pg.GroupName
 						 FROM OAS_ChargeInfo oc WITH(NOLOCK) 
 						 INNER JOIN dbo.LA_f_BillingGroupSel() pg ON pg.PartyId = oc.ToParty
-						 WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
+						 WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 AND GETDATE() BETWEEN oc.FromDate AND oc.Todate ) x
 			OUTER APPLY (
 							SELECT
 							(

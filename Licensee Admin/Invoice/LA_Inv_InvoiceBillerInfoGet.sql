@@ -27,6 +27,7 @@ AS
 		- 20210705@Sophia: Revise, fix the MAX(InvoiceNumber) [Redmine: #158041]
 		- 20240410@Danny: Return biller CompanyName & Address1  [Redmine: #194604]
 		- 20240819@Danny:  get lastest invoice number and symbol by created datetime [#209325]
+		- 20250221@Danny:  Integrate Double S System Inc group Licensees [#217961]
 */
 /*	Example:
 	USE bodb_licensee
@@ -38,7 +39,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @RebateType VARCHAR(100)
+	DECLARE @RebateType VARCHAR(100), @BillerAddress1 NVARCHAR(255)
 
 	DECLARE @InvoiceInfo AS TABLE(
 		InvoiceSymbol		NVARCHAR(20),
@@ -50,7 +51,7 @@ BEGIN
 		InvoiceLanguage		VARCHAR(50),
 		ActiveAddress		TINYINT,
 		CompanyName			NVARCHAR(100), 
-		BillerAddress1		NVARCHAR(255)
+		PayerAddress1		NVARCHAR(255)
 	)
 	INSERT INTO @InvoiceInfo(InvoiceTemplateId,InvoiceTemplateName,InvoiceTemplatePath,ActiveAddress)
 	(
@@ -104,14 +105,14 @@ BEGIN
 			t.InvoiceNumber = @InvoiceNumber,
 			t.InvoiceLanguage = u.InvoiceLanguage,
 			t.CompanyName		= u.CompanyName,
-			t.BillerAddress1	= u.BillerAddress1
+			t.PayerAddress1	= u.PayerAddress1
 	FROM @InvoiceInfo t
 	OUTER APPLY (
 		SELECT TOP 1 d.InvoiceLanguage,
 			   CASE WHEN t.ActiveAddress = 1 THEN d.CompanyName
 					WHEN t.ActiveAddress = 2 THEN d.CompanyName2  END CompanyName, 
 				CASE WHEN t.ActiveAddress = 1 THEN d.Address1
-					WHEN t.ActiveAddress = 2 THEN d.Address2  END BillerAddress1
+					WHEN t.ActiveAddress = 2 THEN d.Address2  END PayerAddress1
 		FROM dbo.OAS_PartyDetail d WHERE d.PartyID=@PayerId
 	) u
 	
@@ -120,6 +121,9 @@ BEGIN
 								FROM LA_InvoiceHeader i WITH(NOLOCK)
 								WHERE i.BillerId = @BillerId
 								ORDER BY i.InvoiceNumber DESC)
+
+	SELECT @BillerAddress1 = Address1
+	FROM LA_BillerInfo WITH(NOLOCK) WHERE PartyId = @BillerId
 
 
 	IF @InvoiceType = 3
@@ -144,7 +148,8 @@ BEGIN
 		, ISNULL(ii.IsSeparateProduct,0) AS IsSeparateProduct
 		, ISNULL(ii.InvoiceLanguage, 'en-US') AS InvoiceLanguage
 		, ii.CompanyName  AS CompanyName
-		, ii.BillerAddress1 AS BillerAddress1
+		, ii.PayerAddress1 AS PayerAddress1
+		, @BillerAddress1 AS BillerAddress1
 		, @RebateType AS RebateType
 	FROM @InvoiceInfo ii
 

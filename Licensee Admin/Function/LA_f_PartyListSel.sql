@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" selecters="wsv_nap" isFunction="1" isNested="1"></info>*/
 USE bodb_licensee
 GO
 ALTER FUNCTION dbo.LA_f_PartyListSel()

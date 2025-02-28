@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee,DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="1"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee,DBCUST-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="1"></info>*/
 USE [bodb_licensee]
 GO
 

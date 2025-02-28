@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -39,6 +39,7 @@ AS
 		- 20210315@Happy: Change BaseCurrency Of Licensee [#151466]
 		- 20210811@Danny: Adding AttnName2, CompanyName2 into OAS_PartyDetail [#FeatureID 158133]
 		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
+		- 20250225@Danny: Integrate Double S System Inc group Licensees [RedmineID: #217961]
 	
 	Param's Explannation: 
 		@BaseCurrencySettingXml = <Root>
@@ -100,7 +101,7 @@ BEGIN
 			OUTER APPLY (SELECT TOP 1 oc.ToParty , pg.GroupName
 						 FROM OAS_ChargeInfo oc WITH(NOLOCK) 
 						 INNER JOIN dbo.LA_f_BillingGroupSel() pg ON pg.PartyId = oc.ToParty
-						 WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
+						 WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 AND GETDATE() BETWEEN oc.FromDate AND oc.Todate ) x
 			OUTER APPLY (
 							SELECT
 							(
@@ -250,7 +251,7 @@ BEGIN
 			OUTER APPLY (SELECT TOP 1 oc.ToParty , pg.GroupName
 						 FROM OAS_ChargeInfo oc WITH(NOLOCK) 
 						 INNER JOIN dbo.LA_f_BillingGroupSel() pg ON pg.PartyId = oc.ToParty
-						 WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 ) x
+						 WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 AND GETDATE() BETWEEN oc.FromDate AND oc.Todate ) x
 			OUTER APPLY (
 							SELECT
 							(
