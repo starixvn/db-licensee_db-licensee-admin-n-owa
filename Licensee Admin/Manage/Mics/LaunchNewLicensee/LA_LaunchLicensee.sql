@@ -46,6 +46,7 @@ AS
 		- 20240527@Danny: Automate the PT adjustment when the Exchange charge rate is changed [RemineID: #201477]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 		- 20250219@Danny: Integrate Double S System Inc group Licensees [RedmineID: #217961]
+		- 20250303@Danny: Integrate Double S System Inc group Licensees [RedmineID: #217961]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -429,7 +430,7 @@ BEGIN
 				FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
 				WHERE 1 = CASE InvTemplateName
 							WHEN @BillingGroupName THEN 1
-							WHEN 'Double-S' THEN 1
+							WHEN CASE WHEN @BillingGroupName = 'Double S' THEN 'Double-S' ELSE '' END THEN 1
 							WHEN 'Credit'+ CASE WHEN @BillingGroupName = 'JollySports' THEN '-JollySports'
 												WHEN @BillingGroupName = 'Double S' THEN '-Double-S' ELSE '' END THEN 1
 							WHEN 'Debit' + CASE WHEN @BillingGroupName = 'Zelianta' THEN '-Zelianta' 
