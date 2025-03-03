@@ -423,7 +423,7 @@ BEGIN
 	-- Return data
 	SELECT RowIndex, IndexNumber, PartyId, PartyName, BrandName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath
 		,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsIncludePlayerTipsWorkSheet
-		,CompanyName, BillerAddress1, BillerAddress1
+		,CompanyName, PayerAddress1, BillerAddress1
 	FROM @_Result
 	ORDER BY InvoiceNumber
 END
