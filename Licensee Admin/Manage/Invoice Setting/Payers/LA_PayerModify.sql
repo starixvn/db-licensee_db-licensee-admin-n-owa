@@ -40,6 +40,7 @@ AS
 		- 20210811@Danny: Adding AttnName2, CompanyName2 into OAS_PartyDetail [#FeatureID 158133]
 		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
 		- 20250225@Danny: Integrate Double S System Inc group Licensees [RedmineID: #217961]
+		- 20250210@Danny: Allow Editing Payer Base Currency Without Affecting Billing [#FeatureID 216841]
 	
 	Param's Explannation: 
 		@BaseCurrencySettingXml = <Root>
@@ -72,6 +73,7 @@ BEGIN
 		, @duration		INT
 		, @logSPData	NVARCHAR(MAX)
 		, @logSPDataOld NVARCHAR(MAX)
+		, @MaxInvoiceDate DATETIME
 
 	-- Time start
 	SET @startRun = GETDATE()
@@ -213,7 +215,57 @@ BEGIN
 				SELECT @ErrMsg = 'Should has at least 1 base currency setting.', @ErrCode = 506
 				RETURN
 			END
+
+			SELECT @MaxInvoiceDate = MAX(InvoiceDate) FROM LA_InvoiceHeader WITH(NOLOCK) WHERE PartyId = @PayerID AND StatusId <> - 1 
+
+			IF @MaxInvoiceDate IS NOT NULL
+			BEGIN
+				DECLARE @Old_MinSettingDate DATETIME, @Old_MaxSettingDate DATETIME, @New_MinSettingDate DATETIME, @New_MaxSettingDate DATETIME, @cnt INT
+
+				SELECT @Old_MinSettingDate = MIN(FromDate), @Old_MaxSettingDate = MAX(Todate)
+				FROM OAS_PartyBaseCurrency  WITH(NOLOCK)
+				WHERE	PartyID = @PayerID
+
+				SELECT @New_MinSettingDate = MIN(FromDate), @New_MaxSettingDate = MAX(Todate)
+				FROM @BaseCurrencySetting  
 			
+				;WITH t AS (
+					SELECT @Old_MinSettingDate as _start, EOMONTH (@Old_MinSettingDate) as _end
+					UNION ALL
+					SELECT DATEADD(MONTH,1,_start), EOMONTH (DATEADD(MONTH,1,_start))
+					FROM t
+					WHERE EOMONTH (DATEADD(MONTH,1,_start)) <= @Old_MaxSettingDate
+				), old_setting AS
+				(
+					SELECT  t._start, t._end, op.BaseCurrencyId
+					FROM	t 
+					INNER JOIN OAS_PartyBaseCurrency op WITH(NOLOCK) ON t._start BETWEEN op.FromDate AND op.ToDate AND t._end BETWEEN op.FromDate AND op.ToDate
+					WHERE op.PartyID = @PayerID AND t._end <= @MaxInvoiceDate
+				),u AS (
+					SELECT @New_MinSettingDate as _start, EOMONTH (@New_MinSettingDate) as _end
+					UNION ALL
+					SELECT DATEADD(MONTH,1,_start), EOMONTH (DATEADD(MONTH,1,_start))
+					FROM u
+					WHERE EOMONTH (DATEADD(MONTH,1,_start)) <= @New_MaxSettingDate
+				), new_setting AS
+				(
+					SELECT  u._start, u._end, op.BaseCurrencyId
+					FROM	u 
+					INNER JOIN @BaseCurrencySetting op ON u._start BETWEEN op.FromDate AND op.ToDate AND u._end BETWEEN op.FromDate AND op.ToDate
+					WHERE u._end <= @MaxInvoiceDate
+				)
+				SELECT @cnt = COUNT(1) 
+				FROM old_setting o INNER JOIN new_setting n ON o._start = n._start AND o._end = n._end 
+				WHERE o.BaseCurrencyId <> n.BaseCurrencyId
+				OPTION (MAXRECURSION 0)
+
+				IF @cnt > 0
+				BEGIN
+					SELECT @ErrMsg = 'Cannot Save the Setting which impacts the past billing data. Please re-check the From Date/To Date!', @ErrCode = 506
+					RETURN
+				END
+			END
+
 			--Region Update Base Currency Settings
 			;MERGE dbo.OAS_PartyBaseCurrency WITH(ROWLOCK, UPDLOCK) AS t
 			USING @BaseCurrencySetting AS s
@@ -226,6 +278,7 @@ BEGIN
 						VALUES(@PayerID, s.BaseCurrencyId, s.LicenseeCode, s.FromDate, s.ToDate)
 			WHEN NOT MATCHED BY SOURCE AND t.PartyID = @PayerID
 				THEN DELETE;
+
 			--Endregion
 		END
 
