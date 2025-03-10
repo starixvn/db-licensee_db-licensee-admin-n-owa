@@ -22,6 +22,7 @@ AS
 		- 20240422@Danny: Add new betfrom I001, W003, W004, A003 [RedmineID: #199197]
 		- 20240626@Danny: Rename betfrom W003, W004 [RedmineID: #206220]
 		- 20250103@Danny: Integrate new betfroms [RedmineID: #215069]
+		- 20250310@Eddie: Integrate new betfroms [RedmineID: #217850]
 */
 
 RETURN
@@ -35,6 +36,9 @@ RETURN
 			(30, 10, '9', 'Desktop Others', 'Desktop'),
 			(30, 10, '>', 'Desktop Others', 'Desktop'),
 			(30, 10, 'W012', 'Desktop Others', 'Desktop'),
+			(30, 10, 'V004', 'Desktop Others', 'Desktop'),
+			(30, 10, 'V006', 'Desktop Others', 'Desktop'),
+			(30, 10, 'V008', 'Desktop Others', 'Desktop'),
 			(40, 20, 'l', 'Mobile Standard', 'Mobile'),
 			(40, 20, ']', 'Mobile Standard', 'Mobile'),
 			(50, 20, '%', 'Mobile Euro', 'Mobile'),
@@ -50,6 +54,9 @@ RETURN
 			(70, 20, '$', 'Mobile Others', 'Mobile'),
 			(70, 20, '}', 'Mobile Others', 'Mobile'),
 			(70, 20, 'W013', 'Mobile Others', 'Mobile'),
+			(70, 20, 'V003', 'Mobile Others', 'Mobile'),
+			(70, 20, 'V005', 'Mobile Others', 'Mobile'),
+			(70, 20, 'V007', 'Mobile Others', 'Mobile'),
 			(80, 10, '1', 'E-Sports Desktop', 'Desktop'),
 			(80, 10, '4', 'E-Sports Desktop', 'Desktop'),
 			(80, 10, 'W005', 'E-Sports Desktop', 'Desktop'),
