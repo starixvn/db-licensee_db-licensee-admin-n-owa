@@ -43,6 +43,7 @@ AS
 	- 20241016@Danny: Extend parameter data length [RemineID: #212252]
 	- 20241022@Danny: Integrate Playtech [RemineID:#210957]
 	- 20241226@Danny: Change 3rd billing term [RemineID: #215383]
+	- 20250218@Danny: Integrate ASK [RemineID:#217674]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
@@ -474,7 +475,7 @@ BEGIN
 									)
 								)
 
-	WHERE r.ProductID NOT IN (100, 55)
+	WHERE r.ProductID NOT IN (100, 55, 103)
 
 	IF EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes3rd,',') WHERE Value = 'PTRNG')
 	BEGIN
@@ -488,6 +489,23 @@ BEGIN
 		INSERT INTO #3rdRate (ChargeID, PartyID, ProductID, DI_Rate, IsDeposit, Fromdate, Todate)
 		SELECT DISTINCT r.ChargeID, p.PartyId, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r.Todate 
 		FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'PTRNG', 'OA') r 
+		INNER JOIN OAS_ChargeInfo oc on oc.ChargeID = r.ChargeID 
+		INNER JOIN #PartyList p on oc.FromParty = p.PartyID
+		WHERE  r.IsDeposit = 0
+	END
+
+	IF EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes3rd,',') WHERE Value = 'ASK')
+	BEGIN
+
+		INSERT INTO #3rdRate (ChargeID, PartyID, ProductID, DI_Rate, IsDeposit, Fromdate, Todate)
+		SELECT DISTINCT r.ChargeID, p.PartyId, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r.Todate 
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'ASK', 'OA') r 
+		INNER JOIN #PartyList p on p.ParentId = r.PartyID 
+		WHERE  r.IsDeposit = 1
+
+		INSERT INTO #3rdRate (ChargeID, PartyID, ProductID, DI_Rate, IsDeposit, Fromdate, Todate)
+		SELECT DISTINCT r.ChargeID, p.PartyId, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r.Todate 
+		FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, 'ASK', 'OA') r 
 		INNER JOIN OAS_ChargeInfo oc on oc.ChargeID = r.ChargeID 
 		INNER JOIN #PartyList p on oc.FromParty = p.PartyID
 		WHERE  r.IsDeposit = 0
@@ -571,7 +589,7 @@ BEGIN
 					c.Todate,
 					r.Fromdate AS Fromdate3rd, 
 					r.Todate AS Todate3rd,
-					CASE WHEN c.ProductID IN (100,55) THEN r.ChargeID END
+					CASE WHEN c.ProductID IN (100,55,103) THEN r.ChargeID END
 	FROM #ChargeInfoWithCredit c
 	INNER JOIN #PartyList p ON c.PartyID = p.PartyId
 	LEFT JOIN #3rdRate r ON r.PartyID = c.PartyID and r.ProductID = c.ProductID AND 
@@ -1660,7 +1678,7 @@ BEGIN
 				
 				 WHEN e.ProductID IS NOT NULL THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END + td.LicenseeContribution - td.JackpotPrize - td.Promotion END 
 				   WHEN td.ProductID IN (21, 34, 55) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  END - td.Promotion
-				  WHEN td.ProductID IN (73, 45, 79, 87, 89) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  - td.Promotion  END
+				  WHEN td.ProductID IN (73, 45, 79, 87, 89, 103) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  - td.Promotion  END
 				 WHEN td.LicensingFee < 0 AND p.isKeepNegativeFee = 0 AND td.IsKeepNegativeAmount = 0  THEN 0 
 				 ELSE td.LicensingFee END + td.CompanyTipShare) AS LicensingFee,
 		SUM(td.ExtraPT),
@@ -1669,7 +1687,7 @@ BEGIN
 		SUM(CASE WHEN td.ProductID = 23 THEN td.LicenseeWinLoss
 				 WHEN e.ProductID IS NOT NULL THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  + td.LicenseeContribution - td.JackpotPrize - td.Promotion END  
 				  WHEN td.ProductID IN (21, 34, 55) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  END - td.Promotion
-				  WHEN td.ProductID IN (73, 45, 79, 87, 89) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  - td.Promotion  END
+				  WHEN td.ProductID IN (73, 45, 79, 87, 89, 103) THEN CASE WHEN td.IsDeposit = 0 THEN 0 ELSE CASE WHEN td.LicenseeChargeRate < 0 AND td.IsKeepNegativeAmount = 0 THEN 0 ELSE td.LicenseeChargeRate END  - td.Promotion  END
 				  WHEN td.LicensingFee < 0 AND p.isKeepNegativeFee = 0 AND td.IsKeepNegativeAmount = 0 THEN 0 
 				 ELSE td.LicensingFee END + td.CompanyTipShare)
 		- SUM(CASE WHEN td.ProductID = 2 THEN td.ExtraPT ELSE 0 END) 
