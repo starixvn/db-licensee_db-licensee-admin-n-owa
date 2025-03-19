@@ -16,9 +16,8 @@ AS
 RETURN
 	SELECT PlatformId, PlatformName
 	FROM (
-		VALUES
-			(1, N'Saba Sports')
-			,(2, N'SabaPlay')
-			,(3, N'SabaSports&SabaPlay')
+		VALUES (1, N'Saba Sports')
+		     , (2, N'SabaPlay')
+		     , (3, N'SabaSports&SabaPlay')
 	) AS Payer_Plarform (PlatformId, PlatformName)
 GO
