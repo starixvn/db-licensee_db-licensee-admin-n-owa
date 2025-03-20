@@ -18,7 +18,6 @@ AS
 */
 
 SET NOCOUNT ON
-
 	-- List payer already launched
 	; WITH t AS
 	(
