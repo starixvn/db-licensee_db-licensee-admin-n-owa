@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" selecters="wsv_nap" isFunction="1" isNested="1"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee,DBCUST-bodb_Licensee" selecters="wsv_nap" isFunction="1" isNested="1"></info>*/
 CREATE FUNCTION [dbo].[LA_f_PayerPlatform_Sel]
 (
 )
@@ -6,7 +6,7 @@ RETURNS TABLE
 AS
 /*
 	Created: 20250319@Eddie
-	DB: DBLIC-bodb_Licensee
+	DB: DBLIC-bodb_Licensee,DBCUST-bodb_Licensee
 	Task: Get Payer Platform
 
 	Revisions:
@@ -19,5 +19,5 @@ RETURN
 		VALUES (1, N'Saba Sports')
 		     , (2, N'SabaPlay')
 		     , (3, N'SabaSports&SabaPlay')
-	) AS Payer_Plarform (PlatformId, PlatformName)
+	) AS Payer_Platform (PlatformId, PlatformName)
 GO

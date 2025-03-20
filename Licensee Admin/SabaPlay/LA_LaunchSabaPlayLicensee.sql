@@ -7,7 +7,6 @@ CREATE PROCEDURE [dbo].[LA_LaunchSabaPlayLicensee]
 	@LicenseeCode			VARCHAR(50)		= '',
 	@BaseCurrencyId			TINYINT,
 	@LaunchDate				DATE, 
-	--@BillingGroupId			INT,
 	@ProductIds				VARCHAR(MAX)	= '',
 	@InvoiceLanguage		VARCHAR(7)		= '',
 	@UserId					INT,
@@ -26,7 +25,7 @@ AS
 	
 	Param's Explannation: 
 	@ProductIds: [{"ProductID":1, "Productname":"abc"}]
-					
+		
 */
 BEGIN
 	SET NOCOUNT ON
@@ -125,7 +124,7 @@ BEGIN
 								WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
 								) AS  baseCurrInfo
 							) ci
-				INNER JOIN dbo.LA_f_PayerPlatform_Sel() lfs ON lfs.PlatformId = op.PlatformId
+				INNER JOIN dbo.LA_f_PayerPlatform_Sel() lfs ON lfs.PlatformId = op2.PlatformId
 				WHERE od.PartyID = @NonOfficialPartyId FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
 			)
 			
@@ -425,7 +424,7 @@ BEGIN
 								WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
 								) AS  baseCurrInfo
 							) ci
-				INNER JOIN dbo.LA_f_PayerPlatform_Sel() lfs ON lfs.PlatformId = op.PlatformId
+				INNER JOIN dbo.LA_f_PayerPlatform_Sel() lfs ON lfs.PlatformId = op2.PlatformId
 				WHERE od.PartyID = @NewPartyId FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
 			)
 

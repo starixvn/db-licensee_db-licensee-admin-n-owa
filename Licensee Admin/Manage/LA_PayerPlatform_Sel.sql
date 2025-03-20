@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee,DBCUST-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 CREATE PROCEDURE [dbo].[LA_PayerPlatform_Sel]
 AS
 
