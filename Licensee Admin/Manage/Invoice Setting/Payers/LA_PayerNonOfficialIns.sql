@@ -3,7 +3,7 @@ USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerNonOfficialIns]
-	@BrandName		VARCHAR (100)	= ''
+	@BrandName			VARCHAR (100)	= ''
 	, @CompanyName		NVARCHAR (100)	= ''
 	, @Description		NVARCHAR (255)	= ''
 	, @AttnName			NVARCHAR (125)	= ''
@@ -21,6 +21,7 @@ ALTER PROCEDURE [dbo].[LA_PayerNonOfficialIns]
 	, @BaseCurrencySettingXml	NVARCHAR(MAX)	= ''
 	, @CompanyName2		NVARCHAR (100)	= ''
 	, @AttnName2		NVARCHAR (125)	= ''
+	, @PlatformId 		TINYINT = 1
 AS
 /*
 	Created: 20161109@bruce.bui
@@ -37,6 +38,10 @@ AS
 		- 20210811@Danny: Adding AttnName2, CompanyName2 into OAS_PartyDetail [#FeatureID 158133]
 		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
 		- 20231228@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
+		- 20250321@Eddie: Add Payer Platform [RedmineID: #217740]
+
+	Param's Explanation:
+		- @PlatformId: 1 (Saba Sports), 2 (SabaPlay), 3 (SabaSports&SabaPlay)
 */
 BEGIN
 
@@ -113,7 +118,7 @@ BEGIN
 			SELECT TOP 1 1
 			FROM @BaseCurrencySetting a 
 				LEFT JOIN @BaseCurrencySetting b ON a.Idx <> b.Idx 
-			WHERE(a.FromDate <= b.ToDate AND a.ToDate >= B.FromDate))
+			WHERE(a.FromDate <= b.ToDate AND a.ToDate >= b.FromDate))
 		BEGIN
 			SELECT @ErrMsg = 'Cannot save the setting, please check From date/To date.', @ErrCode = 506
 			RETURN
@@ -121,7 +126,9 @@ BEGIN
 	END
 	-- End region Get Base currency setting from xml
 	
-	INSERT INTO dbo.OAS_Party(PartyName, Description, PartyType) VALUES (@PayerName, 'Non-Official', 5)
+	INSERT INTO dbo.OAS_Party(PartyName, Description, PartyType, PlatformId)
+	VALUES (@PayerName, 'Non-Official', 5, @PlatformId)
+
 	SET @PayerId = SCOPE_IDENTITY()
 	
 	UPDATE @BaseCurrencySetting
@@ -137,7 +144,7 @@ BEGIN
 	FROM @BaseCurrencySetting b
 
 	SELECT @LogData = (
-			SELECT	 Op2.PartyName							AS 'pi.pn'
+			SELECT	 op2.PartyName							AS 'pi.pn'
 					,x.GroupName							AS 'pi.bg' 
 					,od.BrandName							AS 'pi.bn'
 					,od.Description							AS 'pi.dc'
@@ -145,7 +152,7 @@ BEGIN
 					,FORMAT (od.LaunchDate,'MMM dd, yyyy') 	AS 'pi.ld'
 					,FORMAT (od.SuspendedDate,'MMM dd, yyyy')	AS 'pi.sd'
 					,FORMAT (od.TerminatedDate,'MMM dd, yyyy') AS 'pi.tmd'
-
+					,pl.PlatformName AS 'pi.pl'
 					,od.CompanyName		AS 'a1.cn1'
 					,od.AttnName		AS 'a1.an1'
 					,od.Address1		AS 'a1.ad1'
@@ -154,7 +161,8 @@ BEGIN
 					,od.Address2		AS 'a2.ad2'
 					,ci.baseCurrInfo    AS 'bcs'
 			FROM OAS_PartyDetail od WITH(NOLOCK)
-			INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
+			INNER JOIN OAS_Party op2 WITH(NOLOCK) ON od.PartyID = op2.PartyID
+			INNER JOIN dbo.LA_f_PayerPlatform_Sel() pl ON pl.PlatformId = op2.PlatformId 
 			OUTER APPLY (SELECT TOP 1 oc.ToParty , pg.GroupName
 						 FROM OAS_ChargeInfo oc WITH(NOLOCK) 
 						 INNER JOIN dbo.LA_f_BillingGroupSel() pg ON pg.PartyId = oc.ToParty
