@@ -21,6 +21,7 @@ ALTER PROCEDURE [dbo].[LA_PayerModify]
 	, @BaseCurrencySettingXml	NVARCHAR(MAX)	= ''
 	, @CompanyName2				NVARCHAR (100)	= ''
 	, @AttnName2				NVARCHAR (125)	= ''
+	, @PlatformId				TINYINT
 AS
 /*
 	Created: 20150415@Florent
@@ -41,6 +42,7 @@ AS
 		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
 		- 20250225@Danny: Integrate Double S System Inc group Licensees [RedmineID: #217961]
 		- 20250210@Danny: Allow Editing Payer Base Currency Without Affecting Billing [#FeatureID 216841]
+		- 20250321@Eddie: Update Payer Platform [RedmineID: #217740]
 	
 	Param's Explannation: 
 		@BaseCurrencySettingXml = <Root>
@@ -82,15 +84,15 @@ BEGIN
 	BEGIN
 		--write log old
 		SELECT @logSPDataOld = (
-			SELECT	 Op2.PartyName							AS 'pi.pn'
-					,x.GroupName							AS 'pi.bg' 
-					,od.BrandName							AS 'pi.bn'
-					,od.Description							AS 'pi.dc'
-					,od.InvoiceLanguage						AS 'pi.iv'
-					,FORMAT (od.LaunchDate,'MMM dd, yyyy') 	AS 'pi.ld'
+			SELECT	 Op2.PartyName								AS 'pi.pn'
+					,x.GroupName								AS 'pi.bg' 
+					,od.BrandName								AS 'pi.bn'
+					,od.Description								AS 'pi.dc'
+					,od.InvoiceLanguage							AS 'pi.iv'
+					,FORMAT (od.LaunchDate,'MMM dd, yyyy') 		AS 'pi.ld'
 					,FORMAT (od.SuspendedDate,'MMM dd, yyyy')	AS 'pi.sd'
-					,FORMAT (od.TerminatedDate,'MMM dd, yyyy') AS 'pi.tmd'
-
+					,FORMAT (od.TerminatedDate,'MMM dd, yyyy') 	AS 'pi.tmd'
+					,pl.PlatformName 	AS 'pi.pl'
 					,od.CompanyName		AS 'a1.cn1'
 					,od.AttnName		AS 'a1.an1'
 					,od.Address1		AS 'a1.ad1'
@@ -100,6 +102,7 @@ BEGIN
 					,ci.baseCurrInfo    AS 'bcs'
 			FROM OAS_PartyDetail od WITH(NOLOCK)
 			INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
+			INNER JOIN dbo.LA_f_PayerPlatform_Sel() pl ON pl.PlatformId = op2.PlatformId
 			OUTER APPLY (SELECT TOP 1 oc.ToParty , pg.GroupName
 						 FROM OAS_ChargeInfo oc WITH(NOLOCK) 
 						 INNER JOIN dbo.LA_f_BillingGroupSel() pg ON pg.PartyId = oc.ToParty
@@ -142,16 +145,25 @@ BEGIN
 				SELECT @ErrCode = 101,@ErrMsg = 'Payer Name is existed in the system, please try again!'
 				RETURN
 			END
-			
+
 			UPDATE dbo.OAS_Party WITH (ROWLOCK, UPDLOCK)
-			SET PartyName = @PayerName
+			SET PartyName = @PayerName, PlatformId = @PlatformId
 			WHERE PartyId = @PayerID
 
 			UPDATE dbo.OAS_PartyDetail WITH (ROWLOCK, UPDLOCK)
 			SET StatusId = @IsActive, IsDeposit = @IsDeposit
 			WHERE PartyId = @PayerID
 		END
-		
+
+		--only update PlatformId for diff non-official payer
+		IF (SELECT PartyType FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyID = @PayerID) <> 5
+		BEGIN
+			UPDATE dbo.OAS_Party WITH (ROWLOCK, UPDLOCK)
+			SET PlatformId = @PlatformId
+			WHERE PartyId = @PayerID
+		END
+
+
 		IF EXISTS (
 			SELECT 1 FROM dbo.OAS_PartyDetail WITH(NOLOCK)
 			WHERE PartyId != @PayerID AND @BrandName != '' AND BrandName = @BrandName
@@ -283,15 +295,15 @@ BEGIN
 		END
 
 		SELECT @logSPData = (
-			SELECT	 Op2.PartyName							AS 'pi.pn'
-					,x.GroupName							AS 'pi.bg' 
-					,od.BrandName							AS 'pi.bn'
-					,od.Description							AS 'pi.dc'
-					,od.InvoiceLanguage						AS 'pi.iv'
-					,FORMAT (od.LaunchDate,'MMM dd, yyyy') 	AS 'pi.ld'
+			SELECT	 op2.PartyName								AS 'pi.pn'
+					,x.GroupName								AS 'pi.bg' 
+					,od.BrandName								AS 'pi.bn'
+					,od.Description								AS 'pi.dc'
+					,od.InvoiceLanguage							AS 'pi.iv'
+					,FORMAT (od.LaunchDate,'MMM dd, yyyy') 		AS 'pi.ld'
 					,FORMAT (od.SuspendedDate,'MMM dd, yyyy')	AS 'pi.sd'
-					,FORMAT (od.TerminatedDate,'MMM dd, yyyy') AS 'pi.tmd'
-
+					,FORMAT (od.TerminatedDate,'MMM dd, yyyy') 	AS 'pi.tmd'
+					,pl.PlatformName 	AS 'pi.pl'
 					,od.CompanyName		AS 'a1.cn1'
 					,od.AttnName		AS 'a1.an1'
 					,od.Address1		AS 'a1.ad1'
@@ -300,7 +312,8 @@ BEGIN
 					,od.Address2		AS 'a2.ad2'
 					,ci.baseCurrInfo    AS 'bcs'
 			FROM OAS_PartyDetail od WITH(NOLOCK)
-			INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
+			INNER JOIN OAS_Party op2 WITH(NOLOCK) ON od.PartyID = op2.PartyID
+			INNER JOIN dbo.LA_f_PayerPlatform_Sel() pl ON pl.PlatformId = op2.PlatformId
 			OUTER APPLY (SELECT TOP 1 oc.ToParty , pg.GroupName
 						 FROM OAS_ChargeInfo oc WITH(NOLOCK) 
 						 INNER JOIN dbo.LA_f_BillingGroupSel() pg ON pg.PartyId = oc.ToParty

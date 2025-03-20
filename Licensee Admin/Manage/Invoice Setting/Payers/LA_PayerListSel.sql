@@ -16,6 +16,7 @@ AS
 		- 20161109@bruce.bui: include non-official payers
 		- 20210824@Danny: get licensee status from OIC and relocated SP [#159296]
 		- 20241120@Danny: replace strsplit function [RemineID: #212252]
+		- 20250321@Eddie: Get more Info PlatformId [RedmineID: #217740]
 
 	Params:
 		+ 0 get all payer
@@ -79,6 +80,7 @@ BEGIN
 				 ELSE ISNULL(oict.LicenseeStatusName, 'Unrecognized') END AS  PayerStatusName
 			,CASE WHEN	l.IsDeposit = 0 THEN 3
 				 WHEN	oict.LicenseeStatusId IS NULL THEN 999 ELSE oict.LicenseeStatusId END PayerStatusId
+			, p.PlatformId
 	FROM dbo.OAS_Party p WITH (NOLOCK)
 		INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 		LEFT JOIN dbo.Licensees l	WITH(NOLOCK) ON p.OldRefID = l.LicenseeID
@@ -88,15 +90,15 @@ BEGIN
 	WHERE p.PartyType IN (1,5)
 		AND (@PayerId = 0 OR p.PartyID = @PayerId)
 		
-	GROUP BY p.PartyID, p.PartyName, pd.BrandName, pd.CompanyName, pd.StatusId, p.PartyType, 
+	GROUP BY p.PartyID, p.PartyName, pd.BrandName, pd.CompanyName, pd.StatusId, p.PartyType, p.PlatformId, 
 			CASE WHEN l.IsDeposit = 0 THEN 'Active'
 				 ELSE ISNULL(oict.LicenseeStatusName, 'Unrecognized') END,
 			CASE WHEN	l.IsDeposit = 0 THEN 3
 				 WHEN	oict.LicenseeStatusId IS NULL THEN 999 ELSE oict.LicenseeStatusId END
 	)
-	SELECT PayerID, PayerName, BrandName, CompanyName, NumberOfBillers, BillerList, StatusId, PartyType, PayerStatusName
+	SELECT PayerID, PayerName, BrandName, CompanyName, NumberOfBillers, BillerList, StatusId, PartyType, PayerStatusName, PlatformId
 	FROM cte_BillerPayer_info
-	WHERE PayerStatusId IN (SELECT x.StatusId  FROM @statusTab x)
+	WHERE PayerStatusId IN (SELECT x.StatusId FROM @statusTab x)
 
 
 	DROP TABLE #tmp_licenseeOIC
