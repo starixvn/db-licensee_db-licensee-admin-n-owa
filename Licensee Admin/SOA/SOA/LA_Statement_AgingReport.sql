@@ -8,7 +8,6 @@ ALTER PROCEDURE dbo.LA_Statement_AgingReport
 	@Environment		VARCHAR(10)		= 'LOCAL',
 	@GroupBy			TINYINT = 0 -- 0: Group by Biller, 1: Group by Payer
 AS
-
 /*
 	Created: 20240819@Danny
 	DB: DBLIC.bodb_Licensee
@@ -16,15 +15,16 @@ AS
    
 	Revisions: 
 		- 20241209@Danny: Initialize SP [#206240]
+		- 20250306@Danny: Enhancement [#219206]
 
 	Param's Explanation:
 	EXEC LA_Statement_AgingReport 
 		@BillerIds			 = '192,181,295,189,281,318,178,106,112,833,298,307,113,173,293,187,287,233,310,362,279,8637,270,290,788,428,288,188,125,265,317,666,291,116,222,274,182,208,302,494,309,286,426,280,223,123,297,177,8504,289,197,423,277,8581,320',
 		@PayerIds			  = '14',
 		@AsOfDate			 = '2024-07-31',
-		@IsExcludePayment	= 1,
+		@IsExcludePayment	= 0,
 		@Environment		= 'LOCAL',
-		@GroupBy			= 1
+		@GroupBy			= 0
 
 */
 BEGIN
@@ -40,6 +40,58 @@ BEGIN
 			@End_Aging_61_to_90		 DATE,
 			@Start_AgingMore_Than_90 DATE,
 			@End_AgingMore_Than_90	 DATE
+
+
+	DROP TABLE IF EXISTS #tmp_BillerID
+	CREATE TABLE #tmp_BillerID (BillerID INT)
+	INSERT INTO #tmp_BillerID (BillerID) SELECT CAST(VALUE AS INT) FROM STRING_SPLIT(@BillerIds,',')
+
+	DROP TABLE IF EXISTS #All_Doc_By_Party
+	CREATE TABLE #All_Doc_By_Party 
+	(
+		BillerID				INT,
+		PayerID					INT,
+		Payer					NVARCHAR(100),
+		CurrencyID				INT,
+		DocumentID				INT,
+		DocumentNo				VARCHAR(50),
+		DocumentTypeID			SMALLINT,
+		DocumentDetailTypeID	SMALLINT,
+		DocumentDate			DATE,
+		OrgAmount				MONEY,
+		RemainingAmount			MONEY, 
+		StatusID				SMALLINT
+	)
+
+	DROP TABLE IF EXISTS #D_C_Inv_Detail
+	CREATE TABLE #D_C_Inv_Detail 
+	( 
+		DocumentID		INT, 
+		DocumentDate	DATE, 
+		Refno			VARCHAR(50), 
+		RefAmount		MONEY, 
+		RefStatusID		SMALLINT, 
+		RefInvDate	    DATE,
+		RefInvType		SMALLINT
+	)
+
+	DROP TABLE IF EXISTS #Result
+	CREATE TABLE #Result 
+	(
+		BillerID				INT,
+		PayerID					INT,
+		Payer					NVARCHAR(100),
+		CurrencyID				INT,
+		DocumentID				INT,
+		DocumentNo				VARCHAR(50),
+		DocumentTypeID			SMALLINT,
+		DocumentDetailTypeID	SMALLINT,
+		DocumentDate			DATE,
+		[0_30]					MONEY,
+		[31_60]					MONEY,
+		[61_90]					MONEY,
+		[90+]					MONEY
+	)
 
 	IF EOMONTH(@StatementDate) = @StatementDate
 	BEGIN
@@ -67,38 +119,9 @@ BEGIN
 		WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PayerIds, ',')) 
 	END
 
-
+	DROP TABLE IF EXISTS #tmp_PartyID
 	CREATE TABLE #tmp_PartyID (PartyID INT)
 	INSERT INTO #tmp_PartyID (PartyID) SELECT CAST(VALUE AS INT) FROM STRING_SPLIT(@PayerIds,',')
-
-	CREATE TABLE #tmp_BillerID (BillerID INT)
-	INSERT INTO #tmp_BillerID (BillerID) SELECT CAST(VALUE AS INT) FROM STRING_SPLIT(@BillerIds,',')
-
-	CREATE TABLE #All_Doc_By_Party 
-	(
-		BillerID				INT,
-		PayerID					INT,
-		CurrencyID				INT,
-		DocumentID				INT,
-		DocumentNo				VARCHAR(50),
-		DocumentTypeID			SMALLINT,
-		DocumentDetailTypeID	SMALLINT,
-		DocumentDate			DATE,
-		OrgAmount				MONEY,
-		RemainingAmount			MONEY, 
-		StatusID				SMALLINT
-	)
-
-	CREATE TABLE #D_C_Inv_Detail 
-	( 
-		DocumentID		INT, 
-		DocumentDate	DATE, 
-		Refno			VARCHAR(50), 
-		RefAmount		MONEY, 
-		RefStatusID		SMALLINT, 
-		RefInvDate	    DATE,
-		RefInvType		SMALLINT
-	)
 
 	-- Get all documents
 	BEGIN
@@ -106,6 +129,7 @@ BEGIN
 		(
 			BillerID			,
 			PayerID				,
+			Payer				,
 			CurrencyID			,
 			DocumentID			,
 			DocumentNo			,
@@ -118,6 +142,9 @@ BEGIN
 		)
 		SELECT  li.BillerId,
 				li.PartyId,
+				ISNULL(CASE WHEN li.InvoiceType NOT IN (4,5) THEN CASE WHEN inv.ActiveAddress = 1 THEN opd.CompanyName ELSE opd.CompanyName2 END
+					        WHEN li.InvoiceType  IN (4,5) THEN CASE WHEN inv1.ActiveAddress = 1 THEN opd.CompanyName ELSE opd.CompanyName2   END
+						END,op.PartyName) Payer,
 				li.CurrencyId,
 				li.InvoiceHeaderId, 
 				li.OfficialInvoiceNo,
@@ -130,16 +157,33 @@ BEGIN
 		FROM	dbo.LA_InvoiceHeader li WITH(NOLOCK)
 		INNER JOIN #tmp_PartyID p ON li.PartyId = p.PartyID
 		INNER JOIN #tmp_BillerID b ON li.BillerID = b.BillerID
+		OUTER APPLY 
+		(
+				SELECT MAX(ls.ActiveAddress) ActiveAddress
+				FROM LA_InvoiceSetting ls WITH(NOLOCK)
+				WHERE ls.FromPartyId = li.PartyId AND ls.ToPartyId = li.BillerId AND ls.InvTypeId = li.InvoiceType
+				AND li.InvoiceType NOT IN (4,5)
+		) inv
+		OUTER APPLY 
+		(
+				SELECT MAX(ls.ActiveAddress) ActiveAddress
+				FROM LA_InvoiceStatement lis WITH(NOLOCK)
+				INNER JOIN LA_InvoiceHeader lih WITH(NOLOCK) ON lis.refno = lih.OfficialInvoiceNo AND lih.StatusID <> -1
+				INNER JOIN LA_InvoiceSetting ls WITH(NOLOCK) ON ls.FromPartyId = lih.PartyId AND ls.ToPartyId = lih.BillerId AND ls.InvTypeId = lih.InvoiceType
+				WHERE  li.InvoiceType IN (4,5) AND lis.InvoiceHeaderId = li.InvoiceHeaderId
+		) inv1
+		INNER JOIN OAS_Party op WITH(NOLOCK) ON op.PartyID = li.PartyId
+		INNER JOIN OAS_PartyDetail opd WITH(NOLOCK) ON opd.PartyID = op.PartyID
 		WHERE	li.Environment = @Environment AND li.InvoiceDate <= @StatementDate
-				AND StatusId <> -1 
+				AND li.StatusId <> -1 
 		
-
 		IF @IsExcludePayment = 0 
 		BEGIN
 			INSERT INTO #All_Doc_By_Party 
 			(
 				BillerID			,
 				PayerID				,
+				Payer				,
 				CurrencyID			,
 				DocumentID			,
 				DocumentNo			,
@@ -153,6 +197,9 @@ BEGIN
 			
 			SELECT  lp.BillerId,
 					lp.PartyID,
+					ISNULL(CASE WHEN lp.Type = 2 THEN CASE WHEN inv.ActiveAddress = 2 THEN opd.CompanyName2
+													WHEN inv.ActiveAddress = 1 THEN opd.CompanyName END
+						 ELSE opd.CompanyName END,op.PartyName),
 					lp.CurrencyId,
 					lp.PaymentId, 
 					lp.PaymentNo,
@@ -165,6 +212,14 @@ BEGIN
 			FROM	dbo.LA_Payment lp WITH(NOLOCK)
 			INNER JOIN #tmp_PartyID p ON lp.PartyId = p.PartyID
 			INNER JOIN #tmp_BillerID b ON lp.BillerID = b.BillerID
+			OUTER APPLY 
+			(
+					SELECT MAX(ls.ActiveAddress) ActiveAddress
+					FROM LA_InvoiceSetting ls WITH(NOLOCK)
+					WHERE ls.FromPartyId = lp.PartyId AND ls.ToPartyId = lp.BillerId AND ls.InvTypeId = 3
+			) inv
+			INNER JOIN OAS_Party op WITH(NOLOCK) ON op.PartyID = lp.PartyId
+			INNER JOIN OAS_PartyDetail opd WITH(NOLOCK) ON opd.PartyID = op.PartyID
 			WHERE	lp.Environment = @Environment AND lp.ReceivedDate <= @StatementDate AND lp.StatusId = 0
 			
 		END
@@ -181,26 +236,10 @@ BEGIN
 
 	END
 
-
-	CREATE TABLE #Result 
-	(
-		BillerID				INT,
-		PayerID					INT,
-		CurrencyID				INT,
-		DocumentID				INT,
-		DocumentNo				VARCHAR(50),
-		DocumentTypeID			SMALLINT,
-		DocumentDetailTypeID	SMALLINT,
-		DocumentDate			DATE,
-		[0_30]					MONEY,
-		[31_60]					MONEY,
-		[61_90]					MONEY,
-		[90+]					MONEY
-	)
-
 	INSERT INTO #Result (
 		BillerID				,
 		PayerID					,
+		Payer					,
 		CurrencyID				,
 		DocumentID				,
 		DocumentNo				,
@@ -215,6 +254,7 @@ BEGIN
 	)
 	SELECT  BillerID			,
 			PayerID				,
+			Payer				,
 			CurrencyID			,
 			DocumentID			,
 			DocumentNo			,
@@ -247,6 +287,7 @@ BEGIN
 		INSERT INTO #Result (
 			BillerID				,
 			PayerID					,
+			Payer					,
 			CurrencyID				,
 			DocumentID				,
 			DocumentNo				,
@@ -261,6 +302,7 @@ BEGIN
 		 )
 		SELECT  BillerID			,
 			PayerID				,
+			Payer				,
 			CurrencyID			,
 			DocumentID			,
 			DocumentNo			,
@@ -300,8 +342,8 @@ BEGIN
 	IF @GroupBy = 0
 	BEGIN
 		SELECT
-			lb.BillerNameAbbreviation Biller, 
-			ISNULL(opd.BrandName,op.PartyName) Payer, 
+			lb.CompanyName Biller, 
+			r.Payer, 
 			r.BillerID,
 			r.PayerID,
 			 e.Code AS Currency,
@@ -316,12 +358,12 @@ BEGIN
 		INNER JOIN OAS_PartyDetail opd WITH(NOLOCK) ON op.PartyID =  opd.PartyID
 		INNER JOIN LA_BillerInfo lb WITH(NOLOCK) ON lb.PartyId = r.BillerID
 		INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON r.CurrencyID = e.ExchangeId
-		ORDER BY lb.BillerNameAbbreviation, ISNULL(opd.BrandName,op.PartyName),  e.Code,  r.DocumentDate
+		ORDER BY lb.CompanyName, e.Code DESC, r.Payer,  r.DocumentDate
 	END
 	ELSE 
 	BEGIN
 		SELECT 
-			 ISNULL(opd.BrandName,op.PartyName) Payer, 
+			 r.Payer, 
 			 lb.BillerNameAbbreviation Biller, 
 			r.BillerID,
 			r.PayerID,
@@ -337,14 +379,8 @@ BEGIN
 		INNER JOIN OAS_PartyDetail opd WITH(NOLOCK) ON op.PartyID =  opd.PartyID
 		INNER JOIN LA_BillerInfo lb WITH(NOLOCK) ON lb.PartyId = r.BillerID
 		INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON r.CurrencyID = e.ExchangeId
-		ORDER BY  ISNULL(opd.BrandName,op.PartyName), lb.BillerNameAbbreviation,  e.Code,  r.DocumentDate, r.DocumentNo
+		ORDER BY  r.Payer, e.Code DESC,  lb.BillerNameAbbreviation, r.DocumentDate, r.DocumentNo
 	END
 		
-	DROP TABLE #tmp_BillerID
-	DROP TABLE #tmp_PartyID
-	DROP TABLE #All_Doc_By_Party
-	DROP TABLE #D_C_Inv_Detail
-	DROP TABLE #Result
-
 END
 GO
