@@ -21,6 +21,7 @@ AS
 		- 20190821@Parsons: Improve the ability to maintain systems [#118627]
 		- 20220614@Danny: Use explicit temporary table  [RemineID: #174035]
 		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
+		- 20250324@Eddie: Get more Info "PlatformId" [RedmineID: #217740]
 
 	Params:
 		+ UserID:
@@ -226,10 +227,11 @@ FROM #Party d
     LEFT JOIN dbo.OAS_Party op WITH (NOLOCK) ON d.PartyID = op.PartyID AND op.PartyType = 1
 	LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON op.PartyID = pd.PartyID   	
 
-SELECT PartyID, PartyName, BrandName, ParentID
-FROM #data
-ORDER BY ParentID
-	,PartyID
+SELECT d.PartyID, d.PartyName, d.BrandName, d.ParentID, op.PlatformId
+FROM #data d
+	INNER JOIN OAS_Party op WITH (NOLOCK) ON op.PartyID = d.PartyID
+ORDER BY d.ParentID
+		,d.PartyID
 	
 
 DROP TABLE #Party

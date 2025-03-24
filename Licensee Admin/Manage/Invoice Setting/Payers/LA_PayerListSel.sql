@@ -3,8 +3,9 @@ USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerListSel]
-	@PayerId		INT			 = 0,
-	@PayerStatusIds	VARCHAR(100) = ''
+	@PayerId		INT			 = 0
+   ,@PayerStatusIds	VARCHAR(100) = ''
+   ,@PlatformIds	VARCHAR(100) = ''
 AS
 /*
 	Created: 20150414@Florent
@@ -37,7 +38,11 @@ BEGIN
 
 	DECLARE @statusTab TABLE (StatusId SMALLINT)
 	INSERT INTO @statusTab (StatusId)
-	SELECT CAST (value AS SMALLINT) FROM STRING_SPLIT(@PayerStatusIds,',')
+	SELECT CAST(value AS SMALLINT) FROM STRING_SPLIT(@PayerStatusIds,',')
+
+	DECLARE @Payer_Platform TABLE (PlatformId TINYINT)
+	INSERT INTO @Payer_Platform (PlatformId)
+	SELECT CAST(value AS TINYINT) FROM STRING_SPLIT(@PlatformIds,',')
 	
 	CREATE TABLE #tmp_licenseeOIC (RegisteredLicenseeName NVARCHAR(50), LicenseeStatusId TINYINT)
 	INSERT INTO #tmp_licenseeOIC(RegisteredLicenseeName, LicenseeStatusId)
@@ -96,9 +101,11 @@ BEGIN
 			CASE WHEN	l.IsDeposit = 0 THEN 3
 				 WHEN	oict.LicenseeStatusId IS NULL THEN 999 ELSE oict.LicenseeStatusId END
 	)
-	SELECT PayerID, PayerName, BrandName, CompanyName, NumberOfBillers, BillerList, StatusId, PartyType, PayerStatusName, PlatformId
-	FROM cte_BillerPayer_info
-	WHERE PayerStatusId IN (SELECT x.StatusId FROM @statusTab x)
+	SELECT bi.PayerID, bi.PayerName, bi.BrandName, bi.CompanyName, bi.NumberOfBillers, bi.BillerList, bi.StatusId, bi.PartyType, bi.PayerStatusName, bi.PlatformId, f.PlatformName
+	FROM cte_BillerPayer_info bi
+		INNER JOIN dbo.LA_f_PayerPlatform_Sel() f ON f.PlatformId = bi.PlatformId
+	WHERE bi.PayerStatusId IN (SELECT x.StatusId FROM @statusTab x)
+	  AND bi.PlatformId IN ( SELECT PlatformId FROM @Payer_Platform )
 
 
 	DROP TABLE #tmp_licenseeOIC
