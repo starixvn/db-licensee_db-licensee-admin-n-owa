@@ -23,7 +23,6 @@ SET NOCOUNT ON
 	(
 		SELECT op.OldRefID AS SiteID
 		FROM OAS_Party op WITH(NOLOCK)
-		INNER JOIN OAS_PartyDetail opd WITH(NOLOCK) ON op.PartyID = opd.PartyID
 		WHERE op.PartyType = 1 AND op.PlatformId = 2
 	)
 	SELECT  s.SiteID, s.SiteName 

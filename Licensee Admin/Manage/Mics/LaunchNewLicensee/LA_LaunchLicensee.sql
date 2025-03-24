@@ -19,7 +19,8 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
 	@LoginIP				VARCHAR (50)	= '',
 	@NewPartyId				INT				= 0		OUTPUT,
 	@ErrCode				INT				= 0		OUTPUT,
-	@ErrMsg					VARCHAR(4000)	= ''	OUTPUT
+	@ErrMsg					VARCHAR(4000)	= ''	OUTPUT,
+	@PlatformId				TINYINT			= 1
 AS
 /*
 	Created: 20190107@Parsons
@@ -47,6 +48,7 @@ AS
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 		- 20250219@Danny: Integrate Double S System Inc group Licensees [RedmineID: #217961]
 		- 20250303@Danny: Integrate Double S System Inc group Licensees [RedmineID: #217961]
+		- 20250324@Danny: Add new  @PlatformId parameter
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -222,7 +224,7 @@ BEGIN
 						,FORMAT (od.LaunchDate,'MMM dd, yyyy') 	AS 'pi.ld'
 					    ,FORMAT (od.SuspendedDate,'MMM dd, yyyy')	AS 'pi.sd'
 					    ,FORMAT (od.TerminatedDate,'MMM dd, yyyy') AS 'pi.tmd'
-
+						,lfs.PlatformName	AS 'pi.pp'
 						,od.CompanyName		AS 'a1.cn1'
 						,od.AttnName		AS 'a1.an1'
 						,od.Address1		AS 'a1.ad1'
@@ -250,6 +252,7 @@ BEGIN
 								WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
 								) AS  baseCurrInfo
 							) ci
+				INNER JOIN dbo.LA_f_PayerPlatform_Sel() lfs ON lfs.PlatformId = op2.PlatformId
 				WHERE od.PartyID = @NonOfficialPartyId FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
 			)
 			
@@ -267,8 +270,8 @@ BEGIN
 		END
 		ELSE
 		BEGIN
-			INSERT INTO dbo.OAS_Party (PartyName, PartyType, OldRefID)
-			VALUES (@PayerName, 1, @LicenseeId)
+			INSERT INTO dbo.OAS_Party (PartyName, PartyType, OldRefID, PlatformId)
+			VALUES (@PayerName, 1, @LicenseeId, @PlatformId)
 
 			SET @NewPartyId = SCOPE_IDENTITY()
 			SELECT @IsAddNew = 1, @logPayerSettingActionID = 1000
@@ -581,7 +584,7 @@ BEGIN
 						,FORMAT (od.LaunchDate,'MMM dd, yyyy') 	AS 'pi.ld'
 					    ,FORMAT (od.SuspendedDate,'MMM dd, yyyy')	AS 'pi.sd'
 					    ,FORMAT (od.TerminatedDate,'MMM dd, yyyy') AS 'pi.tmd'
-
+						,lfs.PlatformName	AS 'pi.pp'
 						,od.CompanyName		AS 'a1.cn1'
 						,od.AttnName		AS 'a1.an1'
 						,od.Address1		AS 'a1.ad1'
@@ -610,6 +613,7 @@ BEGIN
 								WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
 								) AS  baseCurrInfo
 							) ci
+				INNER JOIN dbo.LA_f_PayerPlatform_Sel() lfs ON lfs.PlatformId = op2.PlatformId
 				WHERE od.PartyID = @NewPartyId FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
 			)
 

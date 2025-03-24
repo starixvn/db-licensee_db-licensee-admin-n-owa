@@ -251,7 +251,11 @@ BEGIN
 			SELECT DISTINCT @NewPartyId, @BillerId, ProductId, InvTypeId, InvTemplateId, 0 AS BankId, 1 AS ActiveAddress
 			FROM (
 				SELECT InvTemplateId, InvTemplateName, 
-				CASE WHEN InvTemplateName = '' THEN '' ELSE '' END InvTypeId
+						CASE WHEN InvTemplateName = 'SabaPlay' THEN 1
+							WHEN InvTemplateName = 'Credit-SabaPlay' THEN 4
+							WHEN InvTemplateName = 'Debit-SabaPlay' THEN 5
+							WHEN InvTemplateName = 'SetupFees-SabaPlay' THEN 7
+						END InvTypeId
 				FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
 				WHERE InvTemplateName LIKE '%SabaPlay%'
 			) ivt
