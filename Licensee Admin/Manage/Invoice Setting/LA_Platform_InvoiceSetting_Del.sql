@@ -48,7 +48,7 @@ BEGIN
 	ELSE IF @IsCheck = 2
 	BEGIN
 
-		;WITH cte_BillerPayer1(FromPartyId, ToPartyID)
+		;WITH cte_BillerPayer2(FromPartyId, ToPartyID)
 		AS 
 		(
 			SELECT FromPartyId, ToPartyID 
@@ -57,7 +57,7 @@ BEGIN
 		)
 		SELECT @BillerIds = STRING_AGG(b.PartyID, ',')
 		FROM dbo.LA_BillerInfo b WITH (NOLOCK)
-			INNER JOIN cte_BillerPayer1 i ON i.ToPartyId = b.PartyID
+			INNER JOIN cte_BillerPayer2 i ON i.ToPartyId = b.PartyID
 		WHERE i.FromPartyId = @PayerID
 		  AND ISNULL(b.BillerName, '') <> @BillerNameOfSabaPlay
 
@@ -95,13 +95,16 @@ BEGIN
 						,CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END Bank
 							,CASE WHEN li.ActiveAddress = 1 THEN od.Address1
 								WHEN li.ActiveAddress = 2 THEN od.Address2 END ActiveAddress
-						,STRING_AGG(CASE WHEN li.ProductID = 0 THEN 'Sportsbook' ELSE p.ProductName END,', ') ProductIDs
+						,STRING_AGG(CASE WHEN li.ProductID = 0 AND @IsCheck = 1 THEN 'Sportsbook' 
+										 WHEN ISNULL(li.ProductID, 0) <> 0 AND @IsCheck = 1 THEN p.ProductName
+									ELSE vw.ProductName END,', ') ProductIDs
 						,lt.InvTypeId
 				FROM dbo.LA_InvoiceSetting li WITH(NOLOCK) 
 				LEFT JOIN dbo.LA_InvoiceType lt with(nolock) ON li.InvTypeID  = lt.InvTypeID
 				LEFT JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON li.ToPartyId = b.PartyId
 				LEFT JOIN dbo.LA_InvoiceTemplate temp WITH (NOLOCK) ON li.InvTempId = temp.InvTemplateId
-				LEFT JOIN Product3rd p WITH (NOLOCK) ON li.ProductId = p.Productid
+				LEFT JOIN dbo.Product3rd p WITH (NOLOCK) ON li.ProductId = p.Productid
+				LEFT JOIN dbo.vw_SabaPlay_Products vw WITH (NOLOCK) ON vw.ProductId = li.Productid
 				WHERE li.FromPartyId = op.PartyID
 				GROUP BY b.BillerName, lt.InvTypeName, CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END
 					, temp.InvTemplateName ,li.ActiveAddress
@@ -194,14 +197,17 @@ BEGIN
 						,CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END Bank
 							,CASE WHEN li.ActiveAddress = 1 THEN od.Address1
 								WHEN li.ActiveAddress = 2 THEN od.Address2 END ActiveAddress
-						,STRING_AGG(CASE WHEN li.ProductID = 0 THEN 'Sportsbook' ELSE p.ProductName END,', ') ProductIDs
+						,STRING_AGG(CASE WHEN li.ProductID = 0 AND @IsCheck = 1 THEN 'Sportsbook' 
+										 WHEN ISNULL(li.ProductID, 0) <> 0 AND @IsCheck = 1 THEN p.ProductName
+									ELSE vw.ProductName END,', ') ProductIDs
 						,lt.InvTypeId,
 						li.ToPartyId AS FakeID
 				FROM dbo.LA_InvoiceSetting li WITH(NOLOCK) 
 				LEFT JOIN dbo.LA_InvoiceType lt with(nolock) ON li.InvTypeID  = lt.InvTypeID
 				LEFT JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON li.ToPartyId = b.PartyId
 				LEFT JOIN dbo.LA_InvoiceTemplate temp WITH (NOLOCK) ON li.InvTempId = temp.InvTemplateId
-				LEFT JOIN Product3rd p WITH (NOLOCK) ON li.ProductId = p.Productid
+				LEFT JOIN dbo.Product3rd p WITH (NOLOCK) ON li.ProductId = p.Productid
+				LEFT JOIN dbo.vw_SabaPlay_Products vw WITH (NOLOCK) ON vw.ProductId = li.Productid
 				WHERE li.FromPartyId = op.PartyID
 				GROUP BY b.BillerName, lt.InvTypeName, CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END
 					, temp.InvTemplateName ,li.ActiveAddress

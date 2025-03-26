@@ -544,7 +544,7 @@ BEGIN
 			BEGIN
 				INSERT INTO @SabaPlayProducts (ProductId, ProductName)
 				SELECT *
-				FROM OPENJSON(@ProductIds)
+				FROM OPENJSON(@SabaPlayProductIDs)
 				WITH (
 					ProductId INT '$.ProductID',
 					ProductName NVARCHAR(200) '$.ProductName'
@@ -576,7 +576,7 @@ BEGIN
 							LEFT JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON li.ToPartyId = b.PartyId
 							LEFT JOIN dbo.LA_InvoiceTemplate temp WITH (NOLOCK) ON li.InvTempId = temp.InvTemplateId
 							LEFT JOIN @SabaPlayProducts p ON li.ProductId = p.Productid
-							WHERE li.FromPartyId = op.PartyID AND li.ToPartyId = @BillerID
+							WHERE li.FromPartyId = op.PartyID AND li.ToPartyId = @SabaPlayBillerId
 							GROUP BY b.BillerName, lt.InvTypeName, CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END
 								, temp.InvTemplateName ,li.ActiveAddress
 								,CASE WHEN li.ActiveAddress = 1 THEN od.Address1
@@ -641,7 +641,7 @@ BEGIN
 					)
 
 					INSERT INTO dbo.LA_InvoiceSetting (FromPartyId, ToPartyId, ProductId, InvTypeId, InvTempId, BankId, ActiveAddress)
-					SELECT DISTINCT @NewPartyId, @BillerId, ProductId, InvTypeId, InvTemplateId, 0 AS BankId, 1 AS ActiveAddress
+					SELECT DISTINCT @NewPartyId, @SabaPlayBillerId, ProductId, InvTypeId, InvTemplateId, 0 AS BankId, 1 AS ActiveAddress
 					FROM (
 						SELECT InvTemplateId, InvTemplateName, 
 								CASE WHEN InvTemplateName = 'SabaPlay' THEN 1
@@ -678,7 +678,7 @@ BEGIN
 							LEFT JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON li.ToPartyId = b.PartyId
 							LEFT JOIN dbo.LA_InvoiceTemplate temp WITH (NOLOCK) ON li.InvTempId = temp.InvTemplateId
 							LEFT JOIN @SabaPlayProducts p ON li.ProductId = p.Productid
-							WHERE li.FromPartyId = op.PartyID AND li.ToPartyId = @BillerID
+							WHERE li.FromPartyId = op.PartyID AND li.ToPartyId = @SabaPlayBillerId
 							GROUP BY b.BillerName, lt.InvTypeName, CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END
 								, temp.InvTemplateName ,li.ActiveAddress
 								,CASE WHEN li.ActiveAddress = 1 THEN od.Address1

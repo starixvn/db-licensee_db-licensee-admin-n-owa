@@ -161,6 +161,10 @@ BEGIN
 				,InvoiceLanguage = @InvoiceLanguage
 				,LaunchDate = @LaunchDate
 			WHERE PartyID = @NewPartyId
+		ELSE
+			INSERT INTO dbo.OAS_PartyDetail (PartyID, IsDeposit, BrandName, CompanyName, IsAllowedMemberComm, BaseCurrencyId, StatusId, LicenseeCode, InvoiceLanguage, LaunchDate)
+			SELECT @NewPartyId, 1 IsDeposit, @BrandName, '' CompanyName,  0 IsAllowedMemberComm, @BaseCurrencyId, 1, @LicenseeCode, @InvoiceLanguage, @LaunchDate
+			
 
 		-- OAS_PartyBaseCurrency
 		IF EXISTS (SELECT 1 FROM dbo.OAS_PartyBaseCurrency WITH(NOLOCK) WHERE PartyID = @NewPartyId)
