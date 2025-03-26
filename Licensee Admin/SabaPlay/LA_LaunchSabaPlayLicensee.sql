@@ -7,7 +7,7 @@ CREATE PROCEDURE [dbo].[LA_LaunchSabaPlayLicensee]
 	@LicenseeCode			VARCHAR(50)		= '',
 	@BaseCurrencyId			TINYINT,
 	@LaunchDate				DATE, 
-	@ProductIds				VARCHAR(MAX)	= '',
+	@SabaPlayProductIDs				VARCHAR(MAX)	= '',
 	@InvoiceLanguage		VARCHAR(7)		= '',
 	@UserId					INT,
 	@LoginIP				VARCHAR (50)	= '',
@@ -70,9 +70,9 @@ BEGIN
 
 	INSERT INTO @Products (ProductId, ProductName)
 	SELECT *
-	FROM OPENJSON(@ProductIds)
+	FROM OPENJSON(@SabaPlayProductIDs)
 	WITH (
-		ProductId INT '$.ProductId',
+		ProductId INT '$.ProductID',
 		ProductName NVARCHAR(200) '$.ProductName'
 	);
 
@@ -140,6 +140,15 @@ BEGIN
 			SELECT @IsAddNew = 0, @logPayerSettingActionID = 1001
 
 		END
+		ELSE
+		BEGIN
+			INSERT INTO dbo.OAS_Party (PartyName, PartyType, OldRefID, PlatformId)
+			VALUES (@PayerName, 1, @OperatorID, 2)
+
+			SET @NewPartyId = SCOPE_IDENTITY()
+			SELECT @IsAddNew = 1, @logPayerSettingActionID = 1000
+		END
+
 
 
 		-- OAS_PartyDetail
