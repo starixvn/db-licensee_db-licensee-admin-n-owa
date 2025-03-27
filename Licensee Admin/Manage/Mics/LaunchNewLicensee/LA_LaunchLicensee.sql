@@ -647,10 +647,9 @@ BEGIN
 								CASE WHEN InvTemplateName = 'SabaPlay' THEN 1
 									WHEN InvTemplateName = 'Credit-SabaPlay' THEN 4
 									WHEN InvTemplateName = 'Debit-SabaPlay' THEN 5
-									WHEN InvTemplateName = 'SetupFees-SabaPlay' THEN 7
 								END InvTypeId
 						FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
-						WHERE InvTemplateName LIKE '%SabaPlay%'
+						WHERE InvTemplateName IN ('SabaPlay','Credit-SabaPlay','Debit-SabaPlay')
 					) ivt
 						OUTER APPLY (
 							SELECT p.ProductId
