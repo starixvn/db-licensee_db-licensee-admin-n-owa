@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -15,6 +15,7 @@ AS
 		- 20160808@Bravo: Hosting fees
 		- 20161129@Bruce: Add isactive status
 		- 20210811@Danny: return more info  AttnName, CompanyName, Address based on ActiveAddress [#FeatureID 158133]
+		- 20250327@Eddie: Get view log with products of SabaPlay [RedmineID: #217740]
 	 Params:
 		+ 0 get all biller
 		+ <> 0 specify a biller 
@@ -23,6 +24,9 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
+	
+	DECLARE @BillerNameOfSabaPlay NVARCHAR(50) = N'SabaPlay'
+	
 	SELECT ToPartyID			AS BillerId
 		, BillerName			AS BillerName
 		, FromPartyId			AS PayerId
@@ -38,11 +42,13 @@ BEGIN
 		, InvTemplateName		AS InvoiceTemplateName
 		, COUNT(i.ProductId)	AS NumberOfProduct
 		, STUFF((
-				SELECT ', ' + CAST(pp.ProductName AS VARCHAR)
+				SELECT ', ' + CASE WHEN b.BillerName <> @BillerNameOfSabaPlay THEN CAST(pp.ProductName AS VARCHAR) ELSE CAST(vw.ProductName AS VARCHAR) END
 				FROM dbo.LA_InvoiceSetting ii WITH (NOLOCK)
+					INNER JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON ii.ToPartyId = b.PartyId
 					LEFT JOIN dbo.LA_f_Products3rd('') pp ON ii.ProductId = pp.Productid
+					LEFT JOIN dbo.vw_SabaPlay_Products vw WITH (NOLOCK) ON vw.ProductId = ii.Productid
 				WHERE i.FromPartyId = ii.FromPartyId AND i.ToPartyID = ii.ToPartyID
-					AND ii.InvTypeId = i.InvTypeId
+				  AND ii.InvTypeId = i.InvTypeId
 				FOR XML PATH (''))
 			  , 1, 2, '') AS ProductList
 		, i.ActiveAddress
