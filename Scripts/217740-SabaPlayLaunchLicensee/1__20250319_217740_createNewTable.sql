@@ -40,3 +40,5 @@ CREATE CLUSTERED INDEX [CIX_SabaPlay_Products] ON [dbo].[SabaPlay_Products]
 GO
 
 
+grant select ON SabaPlay_Operators to wsv_nap
+grant select ON SabaPlay_Products to wsv_nap
