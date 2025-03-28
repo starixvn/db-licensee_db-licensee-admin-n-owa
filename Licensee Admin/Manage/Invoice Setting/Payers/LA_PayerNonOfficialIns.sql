@@ -152,7 +152,7 @@ BEGIN
 					,FORMAT (od.LaunchDate,'MMM dd, yyyy') 	AS 'pi.ld'
 					,FORMAT (od.SuspendedDate,'MMM dd, yyyy')	AS 'pi.sd'
 					,FORMAT (od.TerminatedDate,'MMM dd, yyyy') AS 'pi.tmd'
-					,pl.PlatformName AS 'pi.pl'
+					,pl.PlatformName AS 'pi.pp'
 					,od.CompanyName		AS 'a1.cn1'
 					,od.AttnName		AS 'a1.an1'
 					,od.Address1		AS 'a1.ad1'
