@@ -53,6 +53,7 @@ AS
 		- 20240625@Danny: Rebate for 3rd product is incorrect issue [RedmineID: #214929]
 		- 20250102@Danny: Rebate on Licensing winloss for specific currencies [RedmineID: #214767]
 		- 20250115@Danny: Support different groups by currencies [RedmineID: #216352]
+		- 20250402@Danny: Number Game promotion [RedmineID: #219671]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -338,7 +339,7 @@ BEGIN
 		,Tips, Contribution, JackpotPrize, Prize, LuckyDraw, Bonus, OddsSpread, FreeBets, PayOut, CommShare, CashInShare, Betcount, Promotion, CasinoPromotion
 		,FullOddsSpreadAmount, OddsBoostBonus)
 	SELECT r.rptDate, r.SiteId, g.GroupProductId, r.CurrencyId
-		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005, 17006) THEN r.Bettype ELSE -1 END
+		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005, 17006, 17031) THEN r.Bettype ELSE -1 END
 		,SUM(CASE WHEN r.TicketType = 2 OR b.Bettype IS NOT NULL THEN 0 ELSE r.MemberWL END) AS MemberWL
 		,SUM(r.CommissionP) AS MemberComm
 		,SUM(r.GrossWL) AS AgentWL
@@ -363,7 +364,7 @@ BEGIN
 		INNER JOIN @Products g ON r.ProductId = g.ProductId AND r.rptDate BETWEEN g.FromDate AND g.ToDate
 		LEFT JOIN dbo.LA_f_GroupBettype() b ON r.Bettype = b.Bettype
 	GROUP BY r.rptDate, r.SiteId, g.GroupProductId, r.CurrencyId
-		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005, 17006) THEN r.Bettype ELSE -1 END
+		,CASE WHEN r.Bettype IN (901, 1706, 3007, 17005, 17006, 17031) THEN r.Bettype ELSE -1 END
 
 	CREATE TABLE #tmpResult (rptDate DATE, PartyId INT, ProductId INT, CurrencyId INT
 		,GrossLicenseeAmount MONEY, LicenseeWL MONEY, LicenseeAmount MONEY, ExtraAmount MONEY DEFAULT(0), OddsSpread MONEY
@@ -513,15 +514,15 @@ BEGIN
 		IF EXISTS (SELECT 1 FROM STRING_SPLIT(@ProductCodes_org,',') WHERE value = 'SPR(CS)')
 			INSERT INTO #tmpResult (rptDate, PartyId, ProductId, CurrencyId, GrossLicenseeAmount, LicenseeAmount, BasedLicenseeAmount, ExtraAmount, BetCount)
 			SELECT t.rptDate, p.PartyId, -37, t.CurrencyId
-				,SUM(CASE WHEN t.BettypeRef = 17006 THEN t.AgentWL ELSE t.MemberWL END * e.Rate) AS GrossLicenseeAmount
-				,SUM(CASE WHEN t.BettypeRef = 17006 THEN 0 ELSE t.MemberWL END * e.Rate) AS LicenseeAmount
-				,SUM(CASE WHEN t.BettypeRef = 17006 THEN 0 ELSE t.MemberWL END) AS BasedLicenseeAmount
-				,SUM(CASE WHEN t.BettypeRef = 17006 THEN t.CasinoPromotion ELSE 0 END * e.Rate) AS ExtraAmount
+				,SUM(CASE WHEN t.BettypeRef IN (17006, 17031) THEN t.AgentWL ELSE t.MemberWL END * e.Rate) AS GrossLicenseeAmount
+				,SUM(CASE WHEN t.BettypeRef IN (17006, 17031) THEN 0 ELSE t.MemberWL END * e.Rate) AS LicenseeAmount
+				,SUM(CASE WHEN t.BettypeRef IN (17006, 17031) THEN 0 ELSE t.MemberWL END) AS BasedLicenseeAmount
+				,SUM(CASE WHEN t.BettypeRef IN (17006, 17031) THEN t.CasinoPromotion ELSE 0 END * e.Rate) AS ExtraAmount
 				,SUM(t.BetCount) AS BetCount
 			FROM #TempData t
 				INNER JOIN #PartyList p ON t.LicenseeId = p.LicenseeId -- AND t.rptDate BETWEEN p.FromDate AND p.ToDate AND p.ProductId = 0
 				INNER JOIN #Exchange e ON t.CurrencyId = e.ExchangeId AND e.BaseCurrencyId = 0
-			WHERE t.ProductId = 37 AND t.BettypeRef = 17006
+			WHERE t.ProductId = 37 AND t.BettypeRef IN (17006, 17031)
 			GROUP BY t.rptDate, p.PartyId, t.CurrencyId
 	END
 
