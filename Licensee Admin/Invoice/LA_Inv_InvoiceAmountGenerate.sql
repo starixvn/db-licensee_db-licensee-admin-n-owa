@@ -68,6 +68,7 @@ AS
 		- 20230223@Danny: Integrate Casino promotion [#194808]
 		- 20241118@Danny: Rebate on Licensing Fee for specific currencies [RedmineID: #206143]
 		- 20250102@Danny: Rebate on Licensing winloss for specific currencies [RedmineID: #214767]
+		- 20250402@Danny: Number Game promotion [RedmineID: #219671]
 */
 
 BEGIN
@@ -233,7 +234,7 @@ BEGIN
 				(	
 					SELECT p.ProductId, p.ProductPrefix, p.ProductName FROM dbo.LA_f_Products3rd('') p
 					UNION ALL
-					SELECT -37 ProductId, 'SPR(CS)'ProductPrefix, 'Casino Promotion' ProductName 
+					SELECT -37 ProductId, 'SPR(CS)'ProductPrefix, 'NonSportsbook Promotion' ProductName 
 					-- Hard code setting Casino Promotion
 				) p ON r.ProductId = p.ProductId
 				CROSS APPLY (
