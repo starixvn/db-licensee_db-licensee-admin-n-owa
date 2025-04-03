@@ -21,7 +21,7 @@ BEGIN
 	IF ISNULL(@PayerID, '') = ''
 		RETURN
 	
-	DECLARE @IsCheck TINYINT = 0, @BillerNameOfSabaPlay NVARCHAR(50) = N'SabaPlay', @BillerIds VARCHAR(100) = '', @IsUpdated BIT = 0 
+	DECLARE @IsCheck TINYINT = 0, @BillerNameOfSabaPlay NVARCHAR(50) = N'Reasternhold Limited', @BillerIds VARCHAR(100) = '', @IsUpdated BIT = 0 
 	
 	SELECT @IsCheck = CASE PlatformId WHEN 2 THEN 2 -- SabaPlay
 									  WHEN 1 THEN 1 -- Saba Sports

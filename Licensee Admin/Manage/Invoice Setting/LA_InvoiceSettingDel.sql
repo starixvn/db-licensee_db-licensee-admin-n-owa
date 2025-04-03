@@ -48,7 +48,7 @@ BEGIN
 	IF ISNULL(@PayerID, '') = '' OR ISNULL(@BillerID, '') = ''
 		RETURN
 
-	DECLARE @BillerNameOfSabaPlay NVARCHAR(50) = N'SabaPlay'
+	DECLARE @BillerNameOfSabaPlay NVARCHAR(50) = N'Reasternhold Limited'
 
 -- For writing log
 	DECLARE 

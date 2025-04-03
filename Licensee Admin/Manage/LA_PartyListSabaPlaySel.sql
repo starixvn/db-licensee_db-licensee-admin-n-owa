@@ -31,6 +31,6 @@ BEGIN
 
 	UNION ALL
 
-	SELECT 9999, 'SabaPlay Licensees', '', 0
+	SELECT 9999, 'Reasternhold Licensees', '', 0
 END
 GO

@@ -25,7 +25,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	
-	DECLARE @BillerNameOfSabaPlay NVARCHAR(50) = N'SabaPlay'
+	DECLARE @BillerNameOfSabaPlay NVARCHAR(50) = N'Reasternhold Limited'
 	
 	SELECT ToPartyID			AS BillerId
 		, BillerName			AS BillerName

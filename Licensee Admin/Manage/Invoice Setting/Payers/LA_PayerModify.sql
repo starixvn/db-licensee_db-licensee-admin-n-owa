@@ -22,6 +22,9 @@ ALTER PROCEDURE [dbo].[LA_PayerModify]
 	, @CompanyName2				NVARCHAR (100)	= ''
 	, @AttnName2				NVARCHAR (125)	= ''
 	, @PlatformId				TINYINT
+	, @LaunchDate				DATE			= NULL
+	, @SuspendedDate			DATE			= NULL
+	, @TerminatedDate			DATE			= NULL
 AS
 /*
 	Created: 20150415@Florent
@@ -173,7 +176,7 @@ BEGIN
 		END
 		
 		UPDATE dbo.OAS_PartyDetail WITH (ROWLOCK, UPDLOCK)
-		SET BrandName = @BrandName
+		SET BrandName = @BrandName, LaunchDate = @LaunchDate, SuspendedDate = @SuspendedDate, TerminatedDate = @TerminatedDate
 		WHERE PartyId = @PayerID
 		
 		-- Update base currency settings

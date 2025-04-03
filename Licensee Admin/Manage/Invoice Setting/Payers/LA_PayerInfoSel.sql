@@ -63,11 +63,14 @@ SET NOCOUNT ON
 		, CASE WHEN t.IsDeposit = 0 THEN 'Active'
 				 ELSE ISNULL(us.LicenseeStatusName, 'Unrecognized') END AS PayerStatusName
 		, p.PlatformId
+		, pd.LaunchDate
+		, pd.SuspendedDate
+		, pd.TerminatedDate
 	FROM dbo.OAS_Party p WITH (NOLOCK)
+		INNER JOIN	dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 		LEFT JOIN	dbo.Licensees t WITH(NOLOCK) ON p.OldRefID = t.LicenseeId
 		LEFT JOIN	#tmp_licenseeOIC u WITH(NOLOCK) ON t.LicenseeName = u.RegisteredLicenseeName
 		LEFT JOIN	#tmp_licenseeOICStatus us WITH(NOLOCK) ON u.LicenseeStatusId = us.LicenseeStatusId
-		LEFT JOIN	dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
 		LEFT JOIN (
 			SELECT i.FromPartyId, i.ToPartyId, i.InvTypeId, ActiveAddress
 			FROM dbo.LA_InvoiceSetting i
