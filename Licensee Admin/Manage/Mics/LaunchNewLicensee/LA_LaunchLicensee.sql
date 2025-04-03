@@ -552,7 +552,7 @@ BEGIN
 
 				SELECT @SabaPlayBillerId = PartyId
 				FROM dbo.LA_BillerInfo WITH(NOLOCK)
-				WHERE BillerName = 'SabaPlay'
+				WHERE BillerName = 'Reasternhold Limited'
 
 				IF @SabaPlayBillerId > 0
 				BEGIN
@@ -644,17 +644,17 @@ BEGIN
 					SELECT DISTINCT @NewPartyId, @SabaPlayBillerId, ProductId, InvTypeId, InvTemplateId, 0 AS BankId, 1 AS ActiveAddress
 					FROM (
 						SELECT InvTemplateId, InvTemplateName, 
-								CASE WHEN InvTemplateName = 'SabaPlay' THEN 1
-									WHEN InvTemplateName = 'Credit-SabaPlay' THEN 4
-									WHEN InvTemplateName = 'Debit-SabaPlay' THEN 5
+								CASE WHEN InvTemplateName = 'Reasternhold' THEN 1
+									WHEN InvTemplateName = 'Credit-Reasternhold' THEN 4
+									WHEN InvTemplateName = 'Debit-Reasternhold' THEN 5
 								END InvTypeId
 						FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
-						WHERE InvTemplateName IN ('SabaPlay','Credit-SabaPlay','Debit-SabaPlay')
+						WHERE InvTemplateName IN ('Reasternhold','Credit-Reasternhold','Debit-Reasternhold')
 					) ivt
 						OUTER APPLY (
 							SELECT p.ProductId
 							FROM @SabaPlayProducts p
-							WHERE ivt.InvTemplateName IN ('SabaPlay')
+							WHERE ivt.InvTemplateName IN ('Reasternhold')
 						) p
 
 					; WITH items AS

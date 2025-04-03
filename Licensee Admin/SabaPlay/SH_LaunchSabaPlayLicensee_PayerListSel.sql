@@ -5,7 +5,6 @@ GO
 CREATE PROCEDURE [dbo].[SH_LaunchSabaPlayLicensee_PayerListSel]
 	@PayerPlatformID INT --2: SabaPlay, 3: SabaPlay And SabaSports
 AS
-
 /*
 	Created: 20250319@Danny
 	Task : get List Party of SabaPlay
@@ -18,10 +17,16 @@ AS
 
 SET NOCOUNT ON
 	
-	SELECT PartyID, PartyName
+	SELECT op.PartyID, op.PartyName, n.LicenseeCode, n.BaseCurrencyId AS BaseCurrency
 	FROM OAS_Party op WITH(NOLOCK)
+	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON op.PartyID = d.PartyID
+		OUTER APPLY (
+			SELECT TOP(1) o.BaseCurrencyId, o.LicenseeCode
+			FROM dbo.OAS_PartyBaseCurrency o WITH(NOLOCK)
+			WHERE o.PartyID = op.PartyID
+			ORDER BY o.ToDate DESC
+		) AS n
 	WHERE op.PartyType = 5 AND op.PlatformId = @PayerPlatformID
-
 
 
 GO

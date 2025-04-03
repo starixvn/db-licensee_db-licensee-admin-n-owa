@@ -9,17 +9,18 @@
 USE bodb_licensee
 GO
 
+
 	-- Add new Invoice template
 	INSERT INTO LA_InvoiceTemplate (InvTemplateName, TemplatePath)
-	VALUES ('SabaPlay', '')
+	VALUES ('Reasternhold', '')
 
 	INSERT INTO LA_InvoiceTemplate (InvTemplateName, TemplatePath)
-	VALUES ('Credit-SabaPlay', '')
+	VALUES ('Reasternhold-SabaPlay', '')
 
 	INSERT INTO LA_InvoiceTemplate (InvTemplateName, TemplatePath)
-	VALUES ('Debit-SabaPlay', '')
+	VALUES ('Reasternhold-SabaPlay', '')
 
 	INSERT INTO LA_InvoiceTemplate (InvTemplateName, TemplatePath)
-	VALUES ('SetupFees-SabaPlay', '')
+	VALUES ('Reasternhold-SabaPlay', '')
 
 	
