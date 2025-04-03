@@ -5,6 +5,7 @@ ALTER PROCEDURE [dbo].[SH_Rpt_SabaPlayLicenseeSettlement]
 	,@ToDate			DATETIME
 	,@ProductIDs		VARCHAR(MAX)
 	,@BaseCurrencyName	VARCHAR(10)		= 'GBP'
+	,@Environment		VARCHAR(50)		= 'LOCAL'
 AS
 /*  Created: 20250403@Danny
 	Task : Report - SabaPlay Licensee Settlement Report
@@ -49,6 +50,7 @@ BEGIN
 			sp.LicenseeChargeRate AS LicenseeChargeRate,
 
 			SUM(ISNULL(sp.BetCount,0)) AS Betcount,
+			SUM(ISNULL(sp.MemberNetTurnover,0)) AS Turnover,
 			SUM(ISNULL(sp.MemberWinLoss,0)) AS GrossWin_CustomerWinloss,
 			SUM(ISNULL(sp.LicenseeContribution,0)) AS GrossWin_Contribution,
 			SUM(ISNULL(sp.LicenseeGrossWin,0)) AS GrossWin_Total,
@@ -57,10 +59,11 @@ BEGIN
 			SUM(ISNULL(sp.LicenseeGrossWinAfterChargeRate,0)) AS GrossWin_ChargeRate,
 			SUM(ISNULL(sp.LicenseeContribution,0)) AS LicenseeContribution,
 			SUM(ISNULL(sp.LicenseeJackpot,0)) AS LicenseeJackpot,
-			SUM(ISNULL(sp.LicenseePromotion,0)) AS LicenseePrommotion,
+			SUM(ISNULL(sp.LicenseePromotion,0)) AS LicenseePromotion,
 			SUM(ISNULL(sp.FinalLicensingFee,0)) AS LicenseeTotal,
 			SUM(ISNULL(sp.FinalLicensingFee,0) * ex.Rate) AS Equivalent,
 
+			SUM(ISNULL(sp.MemberNetTurnover,0) * ex.Rate) AS TurnoverBase,
 			SUM(ISNULL(sp.MemberWinLoss,0) * ex.Rate) AS GrossWin_CustomerWinlossBase,
 			SUM(ISNULL(sp.LicenseeContribution,0) * ex.Rate) AS GrossWin_ContributionBase,
 			SUM(ISNULL(sp.LicenseeGrossWin,0) * ex.Rate) AS GrossWin_TotalBase,
@@ -69,17 +72,21 @@ BEGIN
 			SUM(ISNULL(sp.LicenseeGrossWinAfterChargeRate,0) * ex.Rate) AS GrossWin_ChargeRateBase,
 			SUM(ISNULL(sp.LicenseeContribution,0) * ex.Rate) AS LicenseeContributionBase,
 			SUM(ISNULL(sp.LicenseeJackpot,0) * ex.Rate) AS LicenseeJackpotBase,
-			SUM(ISNULL(sp.LicenseePromotion,0) * ex.Rate) AS LicenseePrommotionBase,
+			SUM(ISNULL(sp.LicenseePromotion,0) * ex.Rate) AS LicenseePromotionBase,
 			SUM(ISNULL(sp.FinalLicensingFee,0) * ex.Rate) AS LicenseeTotalBase
 
 	FROM bodb_LicenseeReport.dbo.SabaPlayPerformance sp WITH(NOLOCK)
 	INNER JOIN @tmp_Product p ON sp.ProductID = p.ProductID
 	CROSS APPLY
-	(	SELECT TOP 1 e.CurrencyCode, e.Rate
-		FROM #Exchange e WHERE sp.RptDate = e.ExchangeDate AND sp.CurrencyCode = e.CurrencyCode
+	(	SELECT TOP 1  e.CurrencyCode, e.Rate
+		FROM #Exchange e 
+		WHERE sp.RptDate = e.ExchangeDate 
+		AND sp.CurrencyCode = e.CurrencyCode
+		AND e.ExchangeId = CASE WHEN  sp.CurrencyCode = 'VND' THEN 51
+								  WHEN sp.CurrencyCode = 'INR' THEN 61 ELSE e.ExchangeId END
 	 ) ex
 
-	WHERE sp.DataType = 2 AND sp.RptDate = @TDate AND SiteID = @OperatorID
+	WHERE sp.DataType = 2 AND sp.RptDate = @TDate AND SiteID = @OperatorID AND Environment = @Environment
 	GROUP BY  ex.CurrencyCode, ex.Rate, sp.ProductID, sp.ProductName, sp.LicenseeChargeRate
 	ORDER BY sp.ProductID, sp.ProductName, sp.LicenseeChargeRate,  ex.CurrencyCode
 
