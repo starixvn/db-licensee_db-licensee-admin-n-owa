@@ -2,7 +2,7 @@
 USE [bodb_licensee]
 GO
 
-CREATE PROCEDURE [dbo].[SH_LaunchSabaPlayLicensee_PayerListSel]
+ALTER PROCEDURE [dbo].[SH_LaunchSabaPlayLicensee_PayerListSel]
 	@PayerPlatformID INT --2: SabaPlay, 3: SabaPlay And SabaSports
 AS
 /*
@@ -17,7 +17,7 @@ AS
 
 SET NOCOUNT ON
 	
-	SELECT op.PartyID, op.PartyName, n.LicenseeCode, n.BaseCurrencyId AS BaseCurrency
+	SELECT op.PartyID, op.PartyName, n.LicenseeCode, n.BaseCurrencyId AS BaseCurrency, d.InvoiceLanguage
 	FROM OAS_Party op WITH(NOLOCK)
 	INNER JOIN dbo.OAS_PartyDetail d WITH(NOLOCK) ON op.PartyID = d.PartyID
 		OUTER APPLY (

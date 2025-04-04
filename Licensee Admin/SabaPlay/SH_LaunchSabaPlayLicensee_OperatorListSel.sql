@@ -5,6 +5,7 @@ GO
 CREATE PROCEDURE [dbo].[SH_LaunchSabaPlayLicensee_OperatorListSel]
 	 @UserID		INT	   = 0
 	,@FunctionKey	NVARCHAR(100)	= ''
+	,@PlatformId	INT  = 2 
 AS
 
 /*
@@ -19,16 +20,29 @@ AS
 
 SET NOCOUNT ON
 	-- List payer already launched
-	; WITH t AS
-	(
-		SELECT op.OldRefID AS SiteID
-		FROM OAS_Party op WITH(NOLOCK)
-		WHERE op.PartyType = 1 AND op.PlatformId = 2
-	)
-	SELECT  s.SiteID, s.SiteName 
-	FROM	bodb_licenseeReport.dbo.SabaPlay_Operators s WITH(NOLOCK)
-	LEFT JOIN t ON s.SiteID = t.SiteID
-	WHERE t.SiteID IS NULL
+	IF @PlatformId = 2
+	BEGIN
+		; WITH t AS
+		(
+			SELECT op.OldRefID AS SiteID
+			FROM OAS_Party op WITH(NOLOCK)
+			WHERE op.PartyType = 1 AND op.PlatformId = @PlatformId
+		)
+		SELECT  s.SiteID, s.SiteName 
+		FROM	bodb_licenseeReport.dbo.SabaPlay_Operators s WITH(NOLOCK)
+		LEFT JOIN t ON s.SiteID = t.SiteID
+		WHERE  (t.SiteID IS NULL AND @PlatformId = 2)
+	END
+
+	IF @PlatformId = 3
+	BEGIN
+		SELECT s.OWSiteName AS SiteName 
+		FROM  bodb_licenseeReport.dbo.SabaPlay_Operators s
+		LEFT JOIN OAS_Party op ON op.PartyName = s.OWSiteName
+		WHERE s.OWSiteName IS NOT NULL AND s.OWSiteName <> '' AND op.PartyID IS NULL
+
+	END
+
 
 
 GO
