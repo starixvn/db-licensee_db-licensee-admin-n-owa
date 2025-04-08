@@ -9,18 +9,18 @@
 USE bodb_licensee
 GO
 
-
+	DELETE FROM LA_InvoiceTemplate WITH(ROWLOCK) WHERE InvTemplateName LIKE '%Reasternhold%'
 	-- Add new Invoice template
 	INSERT INTO LA_InvoiceTemplate (InvTemplateName, TemplatePath)
 	VALUES ('Reasternhold', '')
 
 	INSERT INTO LA_InvoiceTemplate (InvTemplateName, TemplatePath)
-	VALUES ('Reasternhold-SabaPlay', '')
+	VALUES ('Credit-Reasternhold', '')
 
 	INSERT INTO LA_InvoiceTemplate (InvTemplateName, TemplatePath)
-	VALUES ('Reasternhold-SabaPlay', '')
+	VALUES ('Debit-Reasternhold', '')
 
 	INSERT INTO LA_InvoiceTemplate (InvTemplateName, TemplatePath)
-	VALUES ('Reasternhold-SabaPlay', '')
+	VALUES ('SetupFees-Reasternhold', '')
 
 	

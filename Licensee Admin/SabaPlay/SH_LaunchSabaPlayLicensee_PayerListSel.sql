@@ -3,7 +3,7 @@ USE [bodb_licensee]
 GO
 
 ALTER PROCEDURE [dbo].[SH_LaunchSabaPlayLicensee_PayerListSel]
-	@PayerPlatformID INT --2: SabaPlay, 3: SabaPlay And SabaSports
+	@PayerPlatformID INT = 2 --2: SabaPlay, 3: SabaPlay And SabaSports
 AS
 /*
 	Created: 20250319@Danny
