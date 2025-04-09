@@ -48,7 +48,7 @@ BEGIN
 	IF ISNULL(@PayerID, '') = '' OR ISNULL(@BillerID, '') = ''
 		RETURN
 
-	DECLARE @BillerNameOfSabaPlay NVARCHAR(50) = N'Reasternhold Limited'
+	DECLARE @BillerNameOfSabaPlay NVARCHAR(50) = N'Reasternhold Limited', @IsDeleted BIT = 0
 
 -- For writing log
 	DECLARE 
@@ -165,6 +165,9 @@ BEGIN
 			RETURN
 		END
 
+		-- Deleted flag
+		SET @IsDeleted = 1
+
 		--build new log
 		; WITH items AS
 		(
@@ -255,18 +258,21 @@ BEGIN
 		)
 
 		SET @endRun = GETDATE()
-		SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
+		SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun)
 	END
 
-	-- Write Log
-	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
-		@UserId			= @UserID
-		,@IP			= @LoginIP
-		,@SPName		= 'LA_InvoiceSettingDel'
-		,@CustId		= @PayerID
-		,@Duration		= @duration
-		,@TrackingValue2 = @logSPData
-		,@TrackingValue =  @logSPDataOld
-		,@ActionID		= 1004
+	IF @IsDeleted = 1
+	BEGIN
+		-- Write Log
+		EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+			@UserId			 = @UserID
+			,@IP			 = @LoginIP
+			,@SPName		 = 'LA_InvoiceSettingDel'
+			,@CustId		 = @PayerID
+			,@Duration		 = @duration
+			,@TrackingValue2 = @logSPData
+			,@TrackingValue  =  @logSPDataOld
+			,@ActionID		 = 1004
+	END
 END
 GO
