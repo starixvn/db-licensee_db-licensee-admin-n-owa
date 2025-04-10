@@ -19,6 +19,7 @@ AS
 		- 20230223@Danny: SG - Promotion prize integration And Use SportBettypeMatrix  [#183739]
 		- 20230223@Danny: Integrate Casino promotion [#194808]
 		- 20240911@Sally: Support Odds Boost Voucher [#209884]
+		- 20250402@Danny: Number Game promotion [RedmineID: #219671]
 */
 
 RETURN
@@ -29,6 +30,7 @@ RETURN
 		INNER JOIN bodb02.dbo.Products p WITH(NOLOCK) ON x.ProductID = p.ProductID
 		LEFT JOIN Product3rd p3 WITH(NOLOCK) ON p.ProductPrefix = p3.ProductPrefix
 		WHERE x.SubProduct IN ('Tips','Jackpot Contribution','Jackpot Prize','Prize','Lucky Draw','Bonus','Odds Spread Adjustment','Promotion','Casino Promotion','Odds Boost Adjustment' )
+		OR x.bettype  = 17031
 	)
 	SELECT	CONVERT(INT, CASE WHEN ProductID = 1 THEN 0 ELSE ProductID_3rd END) AS ProductId
 			, CONVERT(INT, Bettype) AS Bettype
@@ -40,7 +42,7 @@ RETURN
 									WHEN SubProduct = 'Bonus' THEN 6
 									WHEN SubProduct = 'Odds Spread Adjustment' THEN 7
 									WHEN SubProduct = 'Promotion' THEN 8
-									WHEN SubProduct = 'Casino Promotion' THEN 10
+									WHEN SubProduct = 'Casino Promotion' OR bettype  = 17031 THEN 10
 									WHEN SubProduct = 'Odds Boost Adjustment' THEN 11
 									END
 					 ) AS TypeId

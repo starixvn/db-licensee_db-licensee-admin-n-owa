@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -14,6 +14,7 @@ AS
 	Revisions: 
 		- 20150806@Bravo: Invoice Type Info - Get
 		- 20170717@Bruce: show product for type = 1 only [#79905]
+		- 20250402@Danny: Number Game promotion [RedmineID: #219671]
 */
 /*	Example:
 	USE bodb_licensee
@@ -42,7 +43,7 @@ BEGIN
 
 	IF EXISTS (SELECT TOP 1 1 FROM @data WHERE InvoiceTypeId = 1 AND ProductID > 0)
 		INSERT INTO @data (InvoiceTypeId, InvoiceTypeName, ProductID, ProductCode, ProductName, OrderNo)
-		SELECT 1, 'Software Data & Licensing Fees', -37, 'SPR(CS)', 'Casino Promotion', 1
+		SELECT 1, 'Software Data & Licensing Fees', -37, 'SPR(CS)', 'Non-Sportsbook Promotion', 1
 
 	SELECT 	InvoiceTypeId, 
 			InvoiceTypeName, 

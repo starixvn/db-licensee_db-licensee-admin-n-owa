@@ -28,7 +28,7 @@ BEGIN
 			SELECT ProductID, ProductName, ProductCode ,GroupProductId
 			FROM dbo.LA_f_GroupProduct('',NULL,NULL) 
 			UNION ALL
-			SELECT -37, 'Casino Promotion', 'SPR(CS)', -37
+			SELECT -37, 'Non-Sportsbook Promotion', 'SPR(CS)', -37
 		)p
 		LEFT JOIN dbo.Product3rd pr WITH(NOLOCK) ON p.ProductId = pr.Productid
 	WHERE p.ProductId = p.GroupProductId 
