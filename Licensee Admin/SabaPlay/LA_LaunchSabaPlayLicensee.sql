@@ -387,7 +387,7 @@ BEGIN
 			CROSS APPLY (
 				SELECT a.[Value] FROM OPENJSON(u.Users) a
 			) b
-		WHERE u.[Name] = 'SabaPlay'
+		WHERE u.[Name] = 'Reasternhold'
 
 		INSERT INTO dbo.LA_UserParty (UserID, PartyID, Modifydate, Modifier, StatusID)
 		SELECT UserID, @NewPartyId, GETDATE(), @UserID, 1

@@ -24,21 +24,21 @@ SET NOCOUNT ON
 	BEGIN
 		; WITH t AS
 		(
-			SELECT op.OldRefID AS SiteID
+			SELECT op.PartyName 
 			FROM OAS_Party op WITH(NOLOCK)
-			WHERE op.PartyType = 1 AND op.PlatformId = @PlatformId
+			WHERE op.PartyType = 1 
 		)
 		SELECT  s.SiteID, s.SiteName 
 		FROM	bodb_licenseeReport.dbo.SabaPlay_Operators s WITH(NOLOCK)
-		LEFT JOIN t ON s.SiteID = t.SiteID
-		WHERE  (t.SiteID IS NULL AND @PlatformId = 2)
+		LEFT JOIN t ON s.SiteName = t.PartyName
+		WHERE  t.PartyName IS NULL AND @PlatformId = 2 AND s.OWSiteName IS NULL
 	END
 
 	IF @PlatformId = 3
 	BEGIN
 		SELECT s.OWSiteName AS SiteName 
 		FROM  bodb_licenseeReport.dbo.SabaPlay_Operators s
-		LEFT JOIN OAS_Party op ON op.PartyName = s.OWSiteName
+		LEFT JOIN OAS_Party op ON op.PartyName = s.OWSiteName AND op.PartyType = 1 
 		WHERE s.OWSiteName IS NOT NULL AND s.OWSiteName <> '' AND op.PartyID IS NULL
 
 	END
