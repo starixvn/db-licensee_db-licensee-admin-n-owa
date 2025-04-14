@@ -30,6 +30,8 @@ AS
 		- 20230331@Danny: Insert new log with more information [#FeatureID 175125]
 		- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
 		- 20250115@Danny: Support different groups by currencies [RedmineID: #216352]
+		- 20250414@Eddie: Enhance SP [RedmineID: #223951]
+
 	 Params:
 		@RateSettingsData = '<Root>
 								<RateSetting>
@@ -226,7 +228,7 @@ BEGIN
 		FROM
 		(
 			SELECT DISTINCT CASE WHEN  e.ExchangeID = 142 THEN 'USDT' 
-							WHEN e.ExchangeID IN (96, 202, 206, 208,209) THEN e.Code + ' ('+ e.currency+ ')'
+							WHEN e.ExchangeID IN (96, 202, 206, 208, 209) THEN e.Code + ' ('+ e.currency+ ')'
 							ELSE e.Code END Code
 			FROM @CurrencyList c
 			INNER JOIN Custdb.dbo.Exchange e WITH(NOLOCK) ON c.CurrencyId = e.ExchangeID
@@ -236,16 +238,14 @@ BEGIN
 																		OR 
 																		(	lgd.CalculationType <> c.CalculationType
 																			AND (
-																					c.CalculationType = 1 AND lgd.CalculationType = 3
+																					(c.CalculationType = 2 AND lgd.CalculationType = 3)
 																					OR
-																					c.CalculationType = 2 AND lgd.CalculationType = 3
-																					OR
-																					c.CalculationType = 3  AND lgd.CalculationType IN (1,2)
+																					(c.CalculationType = 3 AND lgd.CalculationType = 2)
 																				)
 																		)
 																	)
 			INNER JOIN LA_DiscountGroupHeader lgh WITH(NOLOCK) ON lgd.DiscountGroupId = lgh.DiscountGroupId
-			WHERE lgh.DiscountGroupType = 13 AND lgd.DiscountGroupId <> @DiscountGroupId  AND lgh.Todate >= GETDATE() AND @ToDate >= lgh.FromDate AND @FromDate <= lgh.ToDate
+			WHERE lgh.DiscountGroupType = 13 AND lgd.DiscountGroupId <> @DiscountGroupId  AND lgh.Todate >= GETDATE() AND @ToDate >= lgh.FromDate AND @FromDate <= lgh.ToDate AND c.CalculationType <> 1
 		) e
 
 		IF @UnavailableCurrenciesList IS NOT NULL
