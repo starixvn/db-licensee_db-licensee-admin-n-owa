@@ -16,12 +16,13 @@ AS
 	Revisions: 
 		- 20241209@Danny: Initialize SP [#206240]
 		- 20250306@Danny: Enhancement [#219206]
+		- 20250409@Danny: Return CurrencyId column [#221841]
 
 	Param's Explanation:
 	EXEC LA_Statement_AgingReport 
 		@BillerIds			 = '192,181,295,189,281,318,178,106,112,833,298,307,113,173,293,187,287,233,310,362,279,8637,270,290,788,428,288,188,125,265,317,666,291,116,222,274,182,208,302,494,309,286,426,280,223,123,297,177,8504,289,197,423,277,8581,320',
 		@PayerIds			  = '14',
-		@AsOfDate			 = '2024-07-31',
+		@AsOfDate			 = '2025-03-31',
 		@IsExcludePayment	= 0,
 		@Environment		= 'LOCAL',
 		@GroupBy			= 0
@@ -346,6 +347,7 @@ BEGIN
 			r.Payer, 
 			r.BillerID,
 			r.PayerID,
+			r.CurrencyID,
 			 e.Code AS Currency,
 			 r.DocumentNo,
 			 r.DocumentDate,
@@ -367,6 +369,7 @@ BEGIN
 			 lb.BillerNameAbbreviation Biller, 
 			r.BillerID,
 			r.PayerID,
+			r.CurrencyID,
 			 e.Code AS Currency,
 			 r.DocumentNo,
 			 r.DocumentDate,
