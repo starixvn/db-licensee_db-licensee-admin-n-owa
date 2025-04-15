@@ -15,7 +15,9 @@ AS
 		- 20150806@Bravo: Invoice Type Info - Get
 		- 20170717@Bruce: show product for type = 1 only [#79905]
 		- 20250402@Danny: Number Game promotion [RedmineID: #219671]
+		- 20250417@Danny: Support billing SabaPlay licensees [RedmineID: #224104]
 */
+
 /*	Example:
 	USE bodb_licensee
 	DECLARE @BillerId INT = 98
@@ -26,27 +28,35 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
+	DECLARE @IsSabaPlayBiller BIT
+	
+	SELECT @IsSabaPlayBiller = CASE WHEN BillerName = 'Reasternhold Limited' THEN 1 ELSE 0 END
+	FROM LA_BillerInfo WITH(NOLOCK)
+	WHERE PartyId = @BillerId 
+
 	DECLARE @data TABLE (InvoiceTypeId SMALLINT, InvoiceTypeName VARCHAR(50), ProductID INT ,ProductCode VARCHAR(10), ProductName VARCHAR(50), OrderNo INT)
 	
 	INSERT INTO @data (InvoiceTypeId, InvoiceTypeName, ProductID, ProductCode, ProductName, OrderNo)
-	SELECT	it.InvTypeId		AS InvoiceTypeId, 
+	SELECT	it.InvTypeId  AS InvoiceTypeId, 
 			it.InvTypeName		AS InvoiceTypeName, 
-			p.ProductID			AS ProductID,
-			p.ProductPrefix		AS ProductCode,
-			p.ProductName		AS ProductName,
+			ivs.ProductID			AS ProductID,
+			CASE WHEN @IsSabaPlayBiller = 0 THEN p.ProductPrefix ELSE NULL END	AS ProductCode,
+			CASE WHEN @IsSabaPlayBiller = 0 THEN p.ProductName	ELSE sp.ProductName END	AS ProductName,
 			p.ProductID * 10	AS OrderNo
 	FROM	dbo.LA_InvoiceSetting ivs WITH(NOLOCK) 
 			INNER JOIN dbo.LA_InvoiceType it WITH(NOLOCK) ON ivs.InvTypeId = it.InvTypeId 
-			LEFT JOIN dbo.LA_f_Products3rd('') p ON ivs.ProductId = p.Productid AND it.InvTypeId = 1 -- software & data fee
+			LEFT JOIN dbo.LA_f_Products3rd('') p ON ivs.ProductId = p.Productid AND it.InvTypeId = 1 AND @IsSabaPlayBiller = 0 -- software & data fee 
+			LEFT JOIN DBLIC.bodb_licenseeReport.dbo.SabaPlay_Products sp  WITH(NOLOCK) ON ivs.ProductId = sp.Productid AND it.InvTypeId = 1 AND @IsSabaPlayBiller =1 
 	WHERE	ivs.FromPartyId = @PayerId AND ivs.ToPartyId = @BillerId
 
 
-	IF EXISTS (SELECT TOP 1 1 FROM @data WHERE InvoiceTypeId = 1 AND ProductID > 0)
+	IF EXISTS (SELECT TOP 1 1 FROM @data WHERE InvoiceTypeId = 1 AND ProductID > 0) AND @IsSabaPlayBiller = 0
 		INSERT INTO @data (InvoiceTypeId, InvoiceTypeName, ProductID, ProductCode, ProductName, OrderNo)
 		SELECT 1, 'Software Data & Licensing Fees', -37, 'SPR(CS)', 'Non-Sportsbook Promotion', 1
 
 	SELECT 	InvoiceTypeId, 
 			InvoiceTypeName, 
+			ProductID,
 			ProductCode,
 			ProductName
 	FROM	@data

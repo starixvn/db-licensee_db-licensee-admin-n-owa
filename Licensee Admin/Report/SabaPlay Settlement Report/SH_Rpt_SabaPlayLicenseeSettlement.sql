@@ -82,8 +82,14 @@ BEGIN
 		FROM #Exchange e 
 		WHERE sp.RptDate = e.ExchangeDate 
 		AND sp.CurrencyCode = e.CurrencyCode
-		AND e.ExchangeId = CASE WHEN  sp.CurrencyCode = 'VND' THEN 51
-								  WHEN sp.CurrencyCode = 'INR' THEN 61 ELSE e.ExchangeId END
+		AND e.ExchangeId =  CASE WHEN sp.CurrencyCode = 'VND' THEN 51
+									WHEN sp.CurrencyCode = 'INR' THEN 61
+									WHEN sp.CurrencyCode = 'COP' THEN 84 
+									WHEN sp.CurrencyCode = 'JPY' THEN 32 
+									WHEN sp.CurrencyCode = 'LBP' THEN 217 
+									WHEN sp.CurrencyCode = 'TZS' THEN 135 
+									WHEN sp.CurrencyCode = 'KRW' THEN 45
+									ELSE e.ExchangeId END
 	 ) ex
 
 	WHERE sp.DataType = 2 AND sp.RptDate = @TDate AND SiteID = @OperatorID AND Environment = @Environment

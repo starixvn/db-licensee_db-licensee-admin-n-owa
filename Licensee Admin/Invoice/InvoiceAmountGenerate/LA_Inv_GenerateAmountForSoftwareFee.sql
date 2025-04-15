@@ -13,6 +13,8 @@ ALTER PROCEDURE [dbo].[LA_Inv_GenerateAmountForSoftwareFee]
 	,@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
 	,@BaseCurrency			VARCHAR(10)		= 'EUR'	OUTPUT
 	,@InvoiceTemplateName	VARCHAR(200)	= ''	OUTPUT
+	,@ProductIDs	VARCHAR(MAX) = ''
+	,@OperatorId	INT = 0 OUTPUT 
 AS
 
 /*	Header:
@@ -58,6 +60,7 @@ AS
 		- 20241001@Sally: Support Odds Boost Voucher [#209884]
 		- 20250225@Danny: Integrate ASK [RemineID:#217674]
 		- 20250416@Corbin: Integrate HOTDOG [RemineID:#221605]
+		- 20250417@Danny: Support billing SabaPlay licensees [RedmineID: #224104]
 		- 20250417@Lionel: Integrate Microgaming Live Casino [RemineID:#223409]
 */
 
@@ -70,6 +73,12 @@ BEGIN
 	DECLARE	@FinalResult TABLE (ProductId INT, ProductCode VARCHAR(100), ProductName VARCHAR(500)
 		,InvoiceAmount MONEY, AmountType TINYINT, Rate MONEY, DeductMonthlyFees MONEY, RemainingAmount MONEY, Remark NVARCHAR(4000), ExtraInfo NVARCHAR(400))
 
+	DECLARE @IsSabaPlayBiller BIT
+	
+	SELECT @IsSabaPlayBiller = CASE WHEN BillerName = 'Reasternhold Limited' THEN 1 ELSE 0 END
+	FROM LA_BillerInfo WITH(NOLOCK)
+	WHERE PartyId = @BillerId 
+
 	-- Get Base Currency
 	DECLARE @BaseCurrencyId INT = 6, @BaseCurrencyName VARCHAR(10) = 'EUR' -- default = EUR
 	SELECT TOP 1 @BaseCurrencyId = ISNULL(BaseCurrencyId, 6)
@@ -78,44 +87,188 @@ BEGIN
 	SELECT @BaseCurrencyName = CASE WHEN Code = 'UST' THEN 'USDT' ELSE Code END  FROM bodb02.dbo.Exchange WITH (NOLOCK) WHERE ExchangeId = @BaseCurrencyId
 	SELECT @BaseCurrency = @BaseCurrencyName
 
-	-- Check Base Currency Setting
+	IF @IsSabaPlayBiller = 0
 	BEGIN
-		-- Individual Min Fee
-		IF EXISTS (
-			SELECT 1
-			FROM dbo.LA_MinFee WITH (NOLOCK)
-			WHERE PartyId = @PartyId AND FeeTypeId = 1 AND FromDate <= @TDate AND ToDate >= @FDate
-				AND CurrencyId <> @BaseCurrencyId
-		)
-			SELECT @ErrCode = 1, @ErrMsg = 'Please check the Exchange settings of Payer''s minfee. Exchange of minfee should be the same with Payer''s exchange.'
+		-- Check Base Currency Setting
+		BEGIN
+			-- Individual Min Fee
+			IF EXISTS (
+				SELECT 1
+				FROM dbo.LA_MinFee WITH (NOLOCK)
+				WHERE PartyId = @PartyId AND FeeTypeId = 1 AND FromDate <= @TDate AND ToDate >= @FDate
+					AND CurrencyId <> @BaseCurrencyId
+			)
+				SELECT @ErrCode = 1, @ErrMsg = 'Please check the Exchange settings of Payer''s minfee. Exchange of minfee should be the same with Payer''s exchange.'
 		
-		-- Group Min Fee
-		ELSE IF EXISTS (
-			SELECT 1
-			FROM dbo.LA_GroupMinFeeAssignment a WITH (NOLOCK)
-				INNER JOIN dbo.LA_GroupMinFeeHeader h WITH (NOLOCK) ON a.GroupMinFeeId = h.GroupMinFeeId
-				INNER JOIN dbo.LA_GroupMinFeeDetail d WITH (NOLOCK) ON a.GroupMinFeeId = d.GroupMinFeeId
-			WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate
-				 AND d.CurrencyId <> @BaseCurrencyId
-		)
-			SELECT @ErrCode = 3, @ErrMsg = 'Please check the Exchange settings of Payer''s group min fee. Exchange of group min fee must be the same with Payer''s exchange.'
+			-- Group Min Fee
+			ELSE IF EXISTS (
+				SELECT 1
+				FROM dbo.LA_GroupMinFeeAssignment a WITH (NOLOCK)
+					INNER JOIN dbo.LA_GroupMinFeeHeader h WITH (NOLOCK) ON a.GroupMinFeeId = h.GroupMinFeeId
+					INNER JOIN dbo.LA_GroupMinFeeDetail d WITH (NOLOCK) ON a.GroupMinFeeId = d.GroupMinFeeId
+				WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate
+					 AND d.CurrencyId <> @BaseCurrencyId
+			)
+				SELECT @ErrCode = 3, @ErrMsg = 'Please check the Exchange settings of Payer''s group min fee. Exchange of group min fee must be the same with Payer''s exchange.'
 		
-		-- Discount
-		ELSE IF EXISTS (
-			SELECT TOP 1 1
-			FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
-				INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
-			WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate AND h.DiscountGroupType IN (1, 3, 11, 13) -- discount
-				AND h.CurrencyId <> @BaseCurrencyId
-			ORDER BY h.ToDate DESC -- latest discount group
-		)
-			SELECT @ErrCode = 2, @ErrMsg = 'Please check the Exchange settings of Payer''s discount. Exchange of discount must be the same with Payer''s exchange.'
-		ELSE
-			SELECT @ErrCode = 0, @ErrMsg = ''
-	END
+			-- Discount
+			ELSE IF EXISTS (
+				SELECT TOP 1 1
+				FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
+					INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
+				WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate AND h.DiscountGroupType IN (1, 3, 11, 13) -- discount
+					AND h.CurrencyId <> @BaseCurrencyId
+				ORDER BY h.ToDate DESC -- latest discount group
+			)
+				SELECT @ErrCode = 2, @ErrMsg = 'Please check the Exchange settings of Payer''s discount. Exchange of discount must be the same with Payer''s exchange.'
+			ELSE
+				SELECT @ErrCode = 0, @ErrMsg = ''
+		END
 
-	IF @ErrCode = 0
+		IF @ErrCode = 0
+		BEGIN
+			-- Get Invoice Template
+			SELECT TOP 1 @InvoiceTemplateName = t.InvTemplateName
+			FROM dbo.LA_InvoiceSetting i WITH (NOLOCK)
+				INNER JOIN dbo.LA_InvoiceTemplate t WITH (NOLOCK) ON i.InvTempId = t.InvTemplateId
+			WHERE i.FromPartyId = @PartyId AND i.ToPartyId = @BillerId
+					AND i.InvTypeId = 1 -- Software Fee
+
+			-- Get Licensing Fee Data
+			DECLARE @PartyIds VARCHAR(MAX) = CONVERT(VARCHAR(MAX), @PartyId)
+			DECLARE @Result TABLE
+			(
+				PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
+				,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), ExtraInfo NVARCHAR(4000)
+			)
+			INSERT INTO @Result
+			(
+				PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
+				,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
+			)
+			EXEC dbo.LA_AmountToCompanyByProduct
+				@PartyIds = @PartyIds
+				,@ProductCodes = @ProductCodes
+				,@FromDate = @FromDate
+				,@ToDate = @ToDate
+				,@LicensingFeeTypeIds = '0,-1,1,2,3,4,5,6,10,13,14' -- Contribution, Prize, ...
+				,@BaseCurrencyName = @BaseCurrencyName
+				,@Environment = @Environment
+
+			INSERT INTO @FinalResult (ProductId, ProductCode, ProductName, InvoiceAmount, AmountType, Rate, Remark, ExtraInfo)
+			SELECT p.ProductId, p.ProductPrefix, p.ProductName, d.InvoiceAmount, d.AmountType, d.Rate, d.Remark, d.ExtraInfo
+			FROM @Result r
+				INNER JOIN dbo.LA_f_Products3rd('') p ON r.ProductId = p.ProductId
+				CROSS APPLY (
+					SELECT Discount AS InvoiceAmount, CONVERT(TINYINT, 4) AS AmountType, DiscountRate AS Rate, DiscountRemark AS Remark, ExtraInfo WHERE Discount > 0 -- Discount
+					--UNION ALL SELECT Rebate, 6, RebateRate, RebateRemark WHERE Rebate > 0 -- Rebate
+					UNION ALL SELECT LicensingFee, 1, NULL, NULL, NULL -- Software Fee
+				) d
+			WHERE r.LicensingFeeTypeId = 0 AND r.ProductId NOT IN (37, 74) -- SB Promotion, Player Tips
+
+			-- SB Promotion
+			IF EXISTS (SELECT 1 FROM @FinalResult WHERE AmountType = 1 AND ProductId = 0)
+				INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
+				SELECT 0, '', '', 29, LicensingFee, 0 FROM @Result WHERE ProductId = 37 AND LicensingFee > 0
+				UNION ALL
+				SELECT 0, '', '', 44, ExtraAmount, 0 FROM @Result WHERE ProductId = 37 AND ExtraAmount > 0
+				UNION ALL
+				SELECT 0, '', '', 48, ExtraAmount, 0 FROM @Result WHERE ProductId = 74 AND ExtraAmount > 0
+
+
+			DELETE FROM @Result
+			WHERE ProductId = -37 AND NOT EXISTS (SELECT 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE Value = 'SPR(CS)')
+
+			-- Prize, Contribution, Promotion, ...
+			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, RemainingAmount, AmountType)
+			SELECT 0, '', '', SUM(ExtraAmount), 0
+				,CASE
+					WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
+					WHEN ProductId = 32 AND LicensingFeeTypeId = 2 THEN 32 -- JackpotPrize
+					WHEN ProductId = 32 AND LicensingFeeTypeId = 3 THEN 30 -- Prizes
+					WHEN ProductId = 42 AND LicensingFeeTypeId = 1 THEN 35 -- Contribution
+					WHEN ProductId = 42 AND LicensingFeeTypeId = 2 THEN 36 -- JackpotPrize
+					WHEN ProductId = 42 AND LicensingFeeTypeId = 6 THEN 34 -- Free Bets
+					WHEN ProductId = 66 AND LicensingFeeTypeId = 1 THEN 40 -- Contribution
+					WHEN ProductId = 66 AND LicensingFeeTypeId = 2 THEN 39 -- JackpotPrize
+					WHEN ProductId = 66 AND LicensingFeeTypeId = 6 THEN 38 -- Free Bets
+					WHEN ProductId = 66 AND LicensingFeeTypeId = 3 THEN 58 -- Prizes
+					WHEN ProductId = 34 AND LicensingFeeTypeId = 4 THEN 33 -- Bonus
+					WHEN ProductId = 45 AND LicensingFeeTypeId = 5 THEN 37 -- Lucky Draw
+					WHEN ProductId = 36 AND LicensingFeeTypeId = 1 THEN 41 -- Contribution
+					WHEN ProductId = 36 AND LicensingFeeTypeId = 2 THEN 42 -- JackpotPrize
+					WHEN ProductId = 36 AND LicensingFeeTypeId = 3 THEN 49 -- Promotion
+					WHEN ProductId = 21 AND LicensingFeeTypeId = 10 THEN 43 -- Promotion
+					WHEN ProductId = 73 AND LicensingFeeTypeId = 3 THEN 47 -- Prizes
+					WHEN ProductId = 55 AND LicensingFeeTypeId = 3 THEN 50 -- Prizes
+					WHEN ProductId = -37 AND LicensingFeeTypeId = 13 THEN 52 -- Casino promotion
+					WHEN ProductId = 79 AND LicensingFeeTypeId = 3 THEN 53 -- Prizes
+					WHEN ProductId = 10 AND LicensingFeeTypeId = 1 THEN 55 -- Contribution
+					WHEN ProductId = 10 AND LicensingFeeTypeId = 2 THEN 56 -- JackpotPrize
+					WHEN ProductId = 10 AND LicensingFeeTypeId = 3 THEN 54 -- Prizes
+					WHEN ProductId = 87 AND LicensingFeeTypeId = 3 THEN 57 -- Prizes
+					WHEN ProductId = 89 AND LicensingFeeTypeId = 3 THEN 59 -- Prizes
+					WHEN ProductId = 0  AND LicensingFeeTypeId = 14 THEN 61 -- Odds BoostBonus
+					WHEN ProductId = 103  AND LicensingFeeTypeId = 3 THEN 62 -- Prizes
+				WHEN ProductId = 95  AND LicensingFeeTypeId = 3 THEN 63 -- Prizes
+				WHEN ProductId = 107  AND LicensingFeeTypeId = 3 THEN 64 -- Prizes
+					END
+			FROM @Result
+		WHERE ProductId IN (10, 32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79, 87, 89, 0, 103, 95, 107) AND LicensingFeeTypeId > 0
+			GROUP BY
+				CASE
+					WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
+					WHEN ProductId = 32 AND LicensingFeeTypeId = 2 THEN 32 -- JackpotPrize
+					WHEN ProductId = 32 AND LicensingFeeTypeId = 3 THEN 30 -- Prizes
+					WHEN ProductId = 42 AND LicensingFeeTypeId = 1 THEN 35 -- Contribution
+					WHEN ProductId = 42 AND LicensingFeeTypeId = 2 THEN 36 -- JackpotPrize
+					WHEN ProductId = 42 AND LicensingFeeTypeId = 6 THEN 34 -- Free Bets
+					WHEN ProductId = 66 AND LicensingFeeTypeId = 1 THEN 40 -- Contribution
+					WHEN ProductId = 66 AND LicensingFeeTypeId = 2 THEN 39 -- JackpotPrize
+					WHEN ProductId = 66 AND LicensingFeeTypeId = 6 THEN 38 -- Free Bets
+					WHEN ProductId = 66 AND LicensingFeeTypeId = 3 THEN 58 -- Prizes
+					WHEN ProductId = 34 AND LicensingFeeTypeId = 4 THEN 33 -- Bonus
+					WHEN ProductId = 45 AND LicensingFeeTypeId = 5 THEN 37 -- Lucky Draw
+					WHEN ProductId = 36 AND LicensingFeeTypeId = 1 THEN 41 -- Contribution
+					WHEN ProductId = 36 AND LicensingFeeTypeId = 2 THEN 42 -- JackpotPrize
+					WHEN ProductId = 36 AND LicensingFeeTypeId = 3 THEN 49 -- Promotion
+					WHEN ProductId = 21 AND LicensingFeeTypeId = 10 THEN 43 -- Promotion
+					WHEN ProductId = 73 AND LicensingFeeTypeId = 3 THEN 47 -- Prizes
+					WHEN ProductId = 55 AND LicensingFeeTypeId = 3 THEN 50 -- Prizes
+					WHEN ProductId = -37 AND LicensingFeeTypeId = 13 THEN 52 -- Casino promotion
+					WHEN ProductId = 79 AND LicensingFeeTypeId = 3 THEN 53 -- Prizes
+					WHEN ProductId = 10 AND LicensingFeeTypeId = 1 THEN 55 -- Contribution
+					WHEN ProductId = 10 AND LicensingFeeTypeId = 2 THEN 56 -- JackpotPrize
+					WHEN ProductId = 10 AND LicensingFeeTypeId = 3 THEN 54 -- Prizes
+					WHEN ProductId = 87 AND LicensingFeeTypeId = 3 THEN 57 -- Prizes
+					WHEN ProductId = 89 AND LicensingFeeTypeId = 3 THEN 59 -- Prizes
+					WHEN ProductId = 0 AND LicensingFeeTypeId = 14 THEN 61 -- Odds BoostBonus
+					WHEN ProductId = 103  AND LicensingFeeTypeId = 3 THEN 62 -- Prizes
+				WHEN ProductId = 95  AND LicensingFeeTypeId = 3 THEN 63 -- Prizes
+				WHEN ProductId = 107  AND LicensingFeeTypeId = 3 THEN 64 -- Prizes
+					END
+
+			-- AMF, Prepayment and AGPrepayment
+			BEGIN
+				-- AMF & AG Prepayment
+				UPDATE f
+				SET f.DeductMonthlyFees = r.LicensingFee, f.RemainingAmount = r.GrossLicensingFee
+				FROM @FinalResult f
+					INNER JOIN @Result r ON f.ProductId = r.ProductId
+				WHERE f.AmountType = 1 AND r.LicensingFeeTypeId = -1
+
+				-- Prepayment
+				IF EXISTS (SELECT 1 FROM @FinalResult WHERE AmountType = 1)
+					INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
+					SELECT 0, '' , '' , 24, 0, GrossLicensingFee
+					FROM @Result WHERE ProductId = -99 AND LicensingFeeTypeId = -1
+			END
+		END
+	END
+	ELSE
 	BEGIN
+		SELECT @OperatorId = OldRefID FROM OAS_Party op WITH(NOLOCK) WHERE PartyID = @PartyId AND PlatformId = 2
+		
 		-- Get Invoice Template
 		SELECT TOP 1 @InvoiceTemplateName = t.InvTemplateName
 		FROM dbo.LA_InvoiceSetting i WITH (NOLOCK)
@@ -123,135 +276,22 @@ BEGIN
 		WHERE i.FromPartyId = @PartyId AND i.ToPartyId = @BillerId
 				AND i.InvTypeId = 1 -- Software Fee
 
-		-- Get Licensing Fee Data
-		DECLARE @PartyIds VARCHAR(MAX) = CONVERT(VARCHAR(MAX), @PartyId)
-		DECLARE @Result TABLE
-		(
-			PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
-			,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), ExtraInfo NVARCHAR(4000)
-		)
-		INSERT INTO @Result
-		(
-			PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
-		)
-		EXEC dbo.LA_AmountToCompanyByProduct
-			@PartyIds = @PartyIds
-			,@ProductCodes = @ProductCodes
+		DROP TABLE IF EXISTS #Result
+		CREATE TABLE #Result (PartyId INT, ProductId INT,LicensingFee MONEY,Discount MONEY)
+		INSERT INTO #Result(PartyId, ProductId, LicensingFee, Discount)
+		EXEC dbo.SH_SabaPLay_AmountToCompanyByProduct
+			@PartyIds = @PartyId
+			,@ProductIDs = @ProductIDs
 			,@FromDate = @FromDate
 			,@ToDate = @ToDate
-			,@LicensingFeeTypeIds = '0,-1,1,2,3,4,5,6,10,13,14' -- Contribution, Prize, ...
 			,@BaseCurrencyName = @BaseCurrencyName
-			,@Environment = @Environment
+			,@Environment	= @Environment
 
 		INSERT INTO @FinalResult (ProductId, ProductCode, ProductName, InvoiceAmount, AmountType, Rate, Remark, ExtraInfo)
-		SELECT p.ProductId, p.ProductPrefix, p.ProductName, d.InvoiceAmount, d.AmountType, d.Rate, d.Remark, d.ExtraInfo
-		FROM @Result r
-			INNER JOIN dbo.LA_f_Products3rd('') p ON r.ProductId = p.ProductId
-			CROSS APPLY (
-				SELECT Discount AS InvoiceAmount, CONVERT(TINYINT, 4) AS AmountType, DiscountRate AS Rate, DiscountRemark AS Remark, ExtraInfo WHERE Discount > 0 -- Discount
-				--UNION ALL SELECT Rebate, 6, RebateRate, RebateRemark WHERE Rebate > 0 -- Rebate
-				UNION ALL SELECT LicensingFee, 1, NULL, NULL, NULL -- Software Fee
-			) d
-		WHERE r.LicensingFeeTypeId = 0 AND r.ProductId NOT IN (37, 74) -- SB Promotion, Player Tips
+		SELECT r.ProductId, NULL, sp.ProductName, LicensingFee AS InvoiceAmount,    1 AS AmountType, NULL AS Rate, NULL Remark, NULL  ExtraInfo
+		FROM #Result r
+		INNER JOIN bodb_LicenseeReport.dbo.SabaPlay_Products sp WITH(NOLOCK) ON r.ProductId = sp.ProductID
 
-		-- SB Promotion
-		IF EXISTS (SELECT 1 FROM @FinalResult WHERE AmountType = 1 AND ProductId = 0)
-			INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
-			SELECT 0, '', '', 29, LicensingFee, 0 FROM @Result WHERE ProductId = 37 AND LicensingFee > 0
-			UNION ALL
-			SELECT 0, '', '', 44, ExtraAmount, 0 FROM @Result WHERE ProductId = 37 AND ExtraAmount > 0
-			UNION ALL
-			SELECT 0, '', '', 48, ExtraAmount, 0 FROM @Result WHERE ProductId = 74 AND ExtraAmount > 0
-
-
-		DELETE FROM @Result
-		WHERE ProductId = -37 AND NOT EXISTS (SELECT 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE Value = 'SPR(CS)')
-
-		-- Prize, Contribution, Promotion, ...
-		INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, InvoiceAmount, RemainingAmount, AmountType)
-		SELECT 0, '', '', SUM(ExtraAmount), 0
-			,CASE
-				WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
-				WHEN ProductId = 32 AND LicensingFeeTypeId = 2 THEN 32 -- JackpotPrize
-				WHEN ProductId = 32 AND LicensingFeeTypeId = 3 THEN 30 -- Prizes
-				WHEN ProductId = 42 AND LicensingFeeTypeId = 1 THEN 35 -- Contribution
-				WHEN ProductId = 42 AND LicensingFeeTypeId = 2 THEN 36 -- JackpotPrize
-				WHEN ProductId = 42 AND LicensingFeeTypeId = 6 THEN 34 -- Free Bets
-				WHEN ProductId = 66 AND LicensingFeeTypeId = 1 THEN 40 -- Contribution
-				WHEN ProductId = 66 AND LicensingFeeTypeId = 2 THEN 39 -- JackpotPrize
-				WHEN ProductId = 66 AND LicensingFeeTypeId = 6 THEN 38 -- Free Bets
-				WHEN ProductId = 66 AND LicensingFeeTypeId = 3 THEN 58 -- Prizes
-				WHEN ProductId = 34 AND LicensingFeeTypeId = 4 THEN 33 -- Bonus
-				WHEN ProductId = 45 AND LicensingFeeTypeId = 5 THEN 37 -- Lucky Draw
-				WHEN ProductId = 36 AND LicensingFeeTypeId = 1 THEN 41 -- Contribution
-				WHEN ProductId = 36 AND LicensingFeeTypeId = 2 THEN 42 -- JackpotPrize
-				WHEN ProductId = 36 AND LicensingFeeTypeId = 3 THEN 49 -- Promotion
-				WHEN ProductId = 21 AND LicensingFeeTypeId = 10 THEN 43 -- Promotion
-				WHEN ProductId = 73 AND LicensingFeeTypeId = 3 THEN 47 -- Prizes
-				WHEN ProductId = 55 AND LicensingFeeTypeId = 3 THEN 50 -- Prizes
-				WHEN ProductId = -37 AND LicensingFeeTypeId = 13 THEN 52 -- Casino promotion
-				WHEN ProductId = 79 AND LicensingFeeTypeId = 3 THEN 53 -- Prizes
-				WHEN ProductId = 10 AND LicensingFeeTypeId = 1 THEN 55 -- Contribution
-				WHEN ProductId = 10 AND LicensingFeeTypeId = 2 THEN 56 -- JackpotPrize
-				WHEN ProductId = 10 AND LicensingFeeTypeId = 3 THEN 54 -- Prizes
-				WHEN ProductId = 87 AND LicensingFeeTypeId = 3 THEN 57 -- Prizes
-				WHEN ProductId = 89 AND LicensingFeeTypeId = 3 THEN 59 -- Prizes
-				WHEN ProductId = 0  AND LicensingFeeTypeId = 14 THEN 61 -- Odds BoostBonus
-				WHEN ProductId = 103  AND LicensingFeeTypeId = 3 THEN 62 -- Prizes
-				WHEN ProductId = 95  AND LicensingFeeTypeId = 3 THEN 63 -- Prizes
-				WHEN ProductId = 107  AND LicensingFeeTypeId = 3 THEN 64 -- Prizes
-				END
-		FROM @Result
-		WHERE ProductId IN (10, 32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79, 87, 89, 0, 103, 95, 107) AND LicensingFeeTypeId > 0
-		GROUP BY
-			CASE
-				WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
-				WHEN ProductId = 32 AND LicensingFeeTypeId = 2 THEN 32 -- JackpotPrize
-				WHEN ProductId = 32 AND LicensingFeeTypeId = 3 THEN 30 -- Prizes
-				WHEN ProductId = 42 AND LicensingFeeTypeId = 1 THEN 35 -- Contribution
-				WHEN ProductId = 42 AND LicensingFeeTypeId = 2 THEN 36 -- JackpotPrize
-				WHEN ProductId = 42 AND LicensingFeeTypeId = 6 THEN 34 -- Free Bets
-				WHEN ProductId = 66 AND LicensingFeeTypeId = 1 THEN 40 -- Contribution
-				WHEN ProductId = 66 AND LicensingFeeTypeId = 2 THEN 39 -- JackpotPrize
-				WHEN ProductId = 66 AND LicensingFeeTypeId = 6 THEN 38 -- Free Bets
-				WHEN ProductId = 66 AND LicensingFeeTypeId = 3 THEN 58 -- Prizes
-				WHEN ProductId = 34 AND LicensingFeeTypeId = 4 THEN 33 -- Bonus
-				WHEN ProductId = 45 AND LicensingFeeTypeId = 5 THEN 37 -- Lucky Draw
-				WHEN ProductId = 36 AND LicensingFeeTypeId = 1 THEN 41 -- Contribution
-				WHEN ProductId = 36 AND LicensingFeeTypeId = 2 THEN 42 -- JackpotPrize
-				WHEN ProductId = 36 AND LicensingFeeTypeId = 3 THEN 49 -- Promotion
-				WHEN ProductId = 21 AND LicensingFeeTypeId = 10 THEN 43 -- Promotion
-				WHEN ProductId = 73 AND LicensingFeeTypeId = 3 THEN 47 -- Prizes
-				WHEN ProductId = 55 AND LicensingFeeTypeId = 3 THEN 50 -- Prizes
-				WHEN ProductId = -37 AND LicensingFeeTypeId = 13 THEN 52 -- Casino promotion
-				WHEN ProductId = 79 AND LicensingFeeTypeId = 3 THEN 53 -- Prizes
-				WHEN ProductId = 10 AND LicensingFeeTypeId = 1 THEN 55 -- Contribution
-				WHEN ProductId = 10 AND LicensingFeeTypeId = 2 THEN 56 -- JackpotPrize
-				WHEN ProductId = 10 AND LicensingFeeTypeId = 3 THEN 54 -- Prizes
-				WHEN ProductId = 87 AND LicensingFeeTypeId = 3 THEN 57 -- Prizes
-				WHEN ProductId = 89 AND LicensingFeeTypeId = 3 THEN 59 -- Prizes
-				WHEN ProductId = 0 AND LicensingFeeTypeId = 14 THEN 61 -- Odds BoostBonus
-				WHEN ProductId = 103  AND LicensingFeeTypeId = 3 THEN 62 -- Prizes
-				WHEN ProductId = 95  AND LicensingFeeTypeId = 3 THEN 63 -- Prizes
-				WHEN ProductId = 107  AND LicensingFeeTypeId = 3 THEN 64 -- Prizes
-				END
-
-		-- AMF, Prepayment and AGPrepayment
-		BEGIN
-			-- AMF & AG Prepayment
-			UPDATE f
-			SET f.DeductMonthlyFees = r.LicensingFee, f.RemainingAmount = r.GrossLicensingFee
-			FROM @FinalResult f
-				INNER JOIN @Result r ON f.ProductId = r.ProductId
-			WHERE f.AmountType = 1 AND r.LicensingFeeTypeId = -1
-
-			-- Prepayment
-			IF EXISTS (SELECT 1 FROM @FinalResult WHERE AmountType = 1)
-				INSERT INTO @FinalResult(ProductId, ProductCode, ProductName, AmountType, InvoiceAmount, RemainingAmount)
-				SELECT 0, '' , '' , 24, 0, GrossLicensingFee
-				FROM @Result WHERE ProductId = -99 AND LicensingFeeTypeId = -1
-		END
 	END
 
 	-- Return data

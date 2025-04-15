@@ -74,128 +74,178 @@ AS
 		- 20230223@Danny: Integrate Casino promotion [#194808]
 		- 20241014@Sally: Support Odds Boost Voucher [#209884]
 		- 20241225@Danny: Fix Casino promotion Rebate issue [#209884]
+		- 20250421@Danny: Support billing SabaPlay licensees [RedmineID: #217742]
 
 */
 BEGIN
 	SET NOCOUNT ON
-	
+
+	DECLARE @FinalResult TABLE (PartyId INT, ProductId INT, AmountToCompany MONEY, LicensingFee MONEY, Discount MONEY, Rebate MONEY, Promotion MONEY, Sponsorship MONEY, ContributionDiscount MONEY, BetCount INT, OddsSpreadCost MONEY, PlayerTips MONEY, OddsBoostBonus MONEY, SabaPlay MONEY)
+
 	-- Get Party List
 	IF ISNULL(@PlatformId, 0) <> 0
 	BEGIN
-		SELECT @PartyIds = ISNULL(STRING_AGG(CONVERT(VARCHAR(50), p.PartyID), ','), '')
-		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
-			INNER JOIN bodb_licensee.dbo.Licensees la WITH(NOLOCK) ON p.OldRefID = la.LicenseeID
-		    INNER JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = la.LicenseeName AND l.PlatformId = @PlatformId
-		WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIds, ',')) 
+		IF @PlatformId <> 99
+		BEGIN
+			SELECT @PartyIds = ISNULL(STRING_AGG(CONVERT(VARCHAR(50), p.PartyID), ','), '')
+			FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+				INNER JOIN bodb_licensee.dbo.Licensees la WITH(NOLOCK) ON p.OldRefID = la.LicenseeID
+				INNER JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = la.LicenseeName AND l.PlatformId = @PlatformId
+			WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIds, ','))  
+		END
+		ELSE
+		BEGIN
+			SELECT @PartyIds = ISNULL(STRING_AGG(CONVERT(VARCHAR(50), p.PartyID), ','), '')
+			FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+			WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIds, ','))  AND @PlatformId = 99 AND p.PlatformId = 2
+		END
 	END
 
-	DECLARE @PartyList TABLE (PartyId INT, LicenseeCode VARCHAR(100))
+	DECLARE @PartyList TABLE (PartyId INT, LicenseeCode VARCHAR(100), PlatformId SMALLINT)
 	INSERT INTO @PartyList (PartyId)
 	SELECT value FROM STRING_SPLIT(@PartyIds, ',')
 
 	UPDATE p
-	SET p.LicenseeCode = UPPER(ISNULL(bc.LicenseeCode, '') + '|' + CONVERT(VARCHAR(20), p.PartyId))
+	SET p.LicenseeCode = UPPER(ISNULL(bc.LicenseeCode, '') + '|' + CONVERT(VARCHAR(20), p.PartyId)),
+		p.PlatformId = op.PlatformId
 	FROM @PartyList p
+	INNER JOIN dbo.OAS_Party op WITH(NOLOCK) ON p.PartyId = op.PartyID
 		LEFT JOIN dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON p.PartyId = bc.PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
 
-	-- Get Product List
-	DECLARE @ProductList TABLE (ProductId INT, ProductCode VARCHAR(50), ProductName VARCHAR(50))
-	INSERT INTO @ProductList (ProductId, ProductCode, ProductName)
-	SELECT ProductId, ProductPrefix, ProductName FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductId <> 16 AND (EndOfSupportDate IS NULL OR EndOfSupportDate >= @FromDate) AND OfferSite IN (0, 2) -- Deposit only
-	UNION ALL SELECT 0, 'SB', 'Sportsbook'
-	UNION ALL SELECT 1003,'OddsBoost', 'Odds Boost Bonus'
 
-	DECLARE @ProductCodes VARCHAR(MAX)
-	SELECT  @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM @ProductList
+	DECLARE @PartyIds_SabaSports VARCHAR(MAX), @PartyIds_SabaPlay VARCHAR(MAX)
 
-	SELECT @ProductCodes = @ProductCodes +',SPR(CS)'
+	SELECT @PartyIds_SabaSports = STRING_AGG(CONVERT(VARCHAR(50), p.PartyID),',')
+	FROM @PartyList p
+	WHERE PlatformId <> 2
 
-	DECLARE @PartyIds_AlekGroup VARCHAR(200), @isRecalRebate BIT = 0, @RecalRebateEffectiveFrom DATETIME , @RecalRebateEffectiveTo DATETIME
+	SELECT @PartyIds_SabaPlay = STRING_AGG(CONVERT(VARCHAR(50), p.PartyID),',')
+	FROM @PartyList p
+	WHERE PlatformId = 2
 
-	SELECT @PartyIds_AlekGroup = STRING_AGG(CONVERT(VARCHAR(50), op.PartyID), ',')
-	FROM bodb_licensee.dbo.OAS_Party op WITH(NOLOCK)
-	INNER JOIN (
-		SELECT CAST(value AS INT ) AS PartyID FROM STRING_SPLIT(@PartyIds, ',')
-	) x ON op.PartyID = x.PartyID
-	WHERE op.PartyName IN ('BigGaming','HuangMa','BGCV','VNS888')
+	IF @PartyIds_SabaSports IS NOT NULL
+	BEGIN
+		-- Get Product List
+		DECLARE @ProductList TABLE (ProductId INT, ProductCode VARCHAR(50), ProductName VARCHAR(50))
+		INSERT INTO @ProductList (ProductId, ProductCode, ProductName)
+		SELECT ProductId, ProductPrefix, ProductName FROM dbo.Product3rd WITH (NOLOCK) WHERE ProductId <> 16 AND (EndOfSupportDate IS NULL OR EndOfSupportDate >= @FromDate) AND OfferSite IN (0, 2) -- Deposit only
+		UNION ALL SELECT 0, 'SB', 'Sportsbook'
+		UNION ALL SELECT 1003,'OddsBoost', 'Odds Boost Bonus'
 
-	IF @PartyIds_AlekGroup IS NOT NULL
-		SELECT @isRecalRebate = 1
+		DECLARE @ProductCodes VARCHAR(MAX)
+		SELECT  @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM @ProductList
 
-	IF @isRecalRebate = 1
+		SELECT @ProductCodes = @ProductCodes +',SPR(CS)'
+
+		DECLARE @PartyIds_AlekGroup VARCHAR(200), @isRecalRebate BIT = 0, @RecalRebateEffectiveFrom DATETIME , @RecalRebateEffectiveTo DATETIME
+	
+		SELECT @PartyIds_AlekGroup = STRING_AGG(CONVERT(VARCHAR(50), op.PartyID), ',')
+		FROM bodb_licensee.dbo.OAS_Party op WITH(NOLOCK)
+		INNER JOIN (
+			SELECT CAST(value AS INT ) AS PartyID FROM STRING_SPLIT(@PartyIds, ',')
+		) x ON op.PartyID = x.PartyID
+		WHERE op.PartyName IN ('BigGaming','HuangMa','BGCV','VNS888')
+
+		IF @PartyIds_AlekGroup IS NOT NULL
+			SELECT @isRecalRebate = 1
+
+		IF @isRecalRebate = 1
 		SELECT @RecalRebateEffectiveFrom = '2023-10-01', @RecalRebateEffectiveTo = '2024-09-01'
 
-	DECLARE @Result TABLE
-	(
-		PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
-		,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), ExtraInfo NVARCHAR(4000)
-	)
-	INSERT INTO @Result
-	(
-		PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-		,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
-	)
-	EXEC dbo.LA_AmountToCompanyByProduct
-		@PartyIds = @PartyIds
-		,@ProductCodes = @ProductCodes
-		,@FromDate = @FromDate
-		,@ToDate = @ToDate
-		,@LicensingFeeTypeIds = '0,7,8,9,13,14' -- 7 = ContributionDiscount, 8 = BetCount, 9 = OddsSpeadAdjustment, 14 = Odds Boost Adjustment
-		,@BaseCurrencyName = @BaseCurrency
-
-	IF @isRecalRebate =1 AND @FromDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
-	BEGIN
-		DECLARE @Result_OldSetting TABLE
+		DECLARE @Result TABLE
 		(
 			PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
-			,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000)
-			,BetCount INT, Turnover MONEY, MemberWL MONEY, BACommission MONEY, IsPrevious BIT, ExtraInfo NVARCHAR(4000)
+			,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), ExtraInfo NVARCHAR(4000)
 		)
-		INSERT INTO @Result_OldSetting
+		INSERT INTO @Result
 		(
 			PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
 			,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
 		)
-		EXEC bodb_Licensee.dbo.LA_AmountToCompanyByProduct
-			@PartyIds = @PartyIds_AlekGroup
-			,@ProductCodes = 'SB'
+		EXEC dbo.LA_AmountToCompanyByProduct
+			@PartyIds = @PartyIds
+			,@ProductCodes = @ProductCodes
+			,@FromDate = @FromDate
+			,@ToDate = @ToDate
+			,@LicensingFeeTypeIds = '0,7,8,9,13,14' -- 7 = ContributionDiscount, 8 = BetCount, 9 = OddsSpeadAdjustment, 14 = Odds Boost Adjustment
+			,@BaseCurrencyName = @BaseCurrency
+
+		IF @isRecalRebate =1 AND @FromDate BETWEEN @RecalRebateEffectiveFrom AND @RecalRebateEffectiveTo AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value = 'SB')
+		BEGIN
+			DECLARE @Result_OldSetting TABLE
+			(
+				PartyId INT, ProductId INT, LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
+				,Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000)
+				,BetCount INT, Turnover MONEY, MemberWL MONEY, BACommission MONEY, IsPrevious BIT, ExtraInfo NVARCHAR(4000)
+			)
+			INSERT INTO @Result_OldSetting
+			(
+				PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
+				,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
+			)
+			EXEC bodb_Licensee.dbo.LA_AmountToCompanyByProduct
+				@PartyIds = @PartyIds_AlekGroup
+				,@ProductCodes = 'SB'
+				,@FromDate = @FromDate
+				,@ToDate = @ToDate
+				,@BaseCurrencyName = @BaseCurrency
+				,@IsUsePreviousSetting = 1
+
+			IF EXISTS (SELECT TOP 1 1 FROM @Result_OldSetting) 
+			BEGIN
+				UPDATE r
+				SET r.Rebate = ri.Rebate
+				FROM @Result r
+				INNER JOIN @Result_OldSetting ri ON r.PartyId = ri.PartyId AND r.ProductId = ri.ProductId AND ri.LicensingFeeTypeId = 0
+				WHERE r.LicensingFeeTypeId = 0 AND r.PartyId IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(@PartyIds_AlekGroup,','))
+				 
+				DELETE FROM @Result_OldSetting
+			END
+		END
+
+		INSERT INTO @FinalResult (PartyId, ProductId, AmountToCompany, LicensingFee, Discount, Rebate, Promotion, Sponsorship, ContributionDiscount, BetCount, OddsSpreadCost, PlayerTips, OddsBoostBonus)
+		SELECT r.PartyId, r.ProductId, r.GrossLicensingFee, r.LicensingFee + r.ExtraAmount, r.Discount, r.Rebate + ISNULL(t.CasinoPromotionRebate,0), ISNULL(t.Promotion, 0), ISNULL(t.Sponsorship, 0), ISNULL(t.ContributionDiscount, 0), ISNULL(t.BetCount, 0), ISNULL(t.OddsSpreadAdjustment, 0), ISNULL(t.PlayerTips,0), ISNULL(t.OddsBoostBonus,0)
+		FROM @Result r
+			LEFT JOIN (
+				SELECT PartyId, CASE WHEN ProductId IN (37, 74, -37) THEN 0 ELSE ProductId END AS ProductId
+					,SUM(CASE WHEN ProductId = 37 AND LicensingFeeTypeId = 0 THEN LicensingFee 
+							  WHEN LicensingFeeTypeId = 13 THEN ExtraAmount ELSE 0 END) AS Promotion
+					,SUM(CASE WHEN ProductId = 37 AND LicensingFeeTypeId = 0 THEN ExtraAmount ELSE 0 END) AS Sponsorship
+					,SUM(CASE WHEN LicensingFeeTypeId = 7 THEN ExtraAmount ELSE 0 END) AS ContributionDiscount
+					,SUM(CASE WHEN LicensingFeeTypeId = 8 THEN ExtraAmount ELSE 0 END) AS BetCount
+					,SUM(CASE WHEN LicensingFeeTypeId = 9 AND ExtraAmount < 0 THEN -ExtraAmount ELSE 0 END) AS OddsSpreadAdjustment
+					,SUM(CASE WHEN ProductId = 74 AND LicensingFeeTypeId = 0 THEN -ExtraAmount ELSE 0 END) AS PlayerTips -- Recon Show Negative value
+					,SUM(CASE WHEN ProductId = -37 AND LicensingFeeTypeId = 13 THEN Rebate ELSE 0 END) AS CasinoPromotionRebate
+					,SUM(CASE WHEN ProductId = 0 AND LicensingFeeTypeId = 14 THEN ExtraAmount ELSE 0 END) AS OddsBoostBonus
+				FROM @Result
+				WHERE ProductId IN (37,74) OR LicensingFeeTypeId > 0
+				GROUP BY PartyId,CASE WHEN ProductId IN (37, 74, -37) THEN 0 ELSE ProductId END
+			) t ON r.PartyId = t.PartyId AND r.ProductId = t.ProductId
+		WHERE r.LicensingFeeTypeId = 0 AND r.ProductId NOT IN (37, 74, -37)
+
+	END
+
+	IF @PartyIds_SabaPlay IS NOT NULL
+	BEGIN
+		DECLARE @SabaPlay_@ProductIDs VARCHAR(MAX)
+
+		SElECT @SabaPlay_@ProductIDs =  STRING_AGG(CONVERT(VARCHAR(50), ProductID),',')
+		FROM bodb_licenseeReport.dbo.SabaPlay_Products WITH(NOLOCK)
+		
+		DECLARE  @SabaPlay_Result TABLE (PartyId INT, ProductId INT,LicensingFee MONEY,Discount MONEY)
+		INSERT INTO @SabaPlay_Result(PartyId, ProductId, LicensingFee, Discount)
+		EXEC dbo.SH_SabaPLay_AmountToCompanyByProduct
+			@PartyIds = @PartyIds_SabaPlay
+			,@ProductIDs = @SabaPlay_@ProductIDs
 			,@FromDate = @FromDate
 			,@ToDate = @ToDate
 			,@BaseCurrencyName = @BaseCurrency
-			,@IsUsePreviousSetting = 1
+			,@Environment	= @Environment
 
-		IF EXISTS (SELECT TOP 1 1 FROM @Result_OldSetting) 
-		BEGIN
-			UPDATE r
-			SET r.Rebate = ri.Rebate
-			FROM @Result r
-			INNER JOIN @Result_OldSetting ri ON r.PartyId = ri.PartyId AND r.ProductId = ri.ProductId AND ri.LicensingFeeTypeId = 0
-			WHERE r.LicensingFeeTypeId = 0 AND r.PartyId IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(@PartyIds_AlekGroup,','))
-				 
-			DELETE FROM @Result_OldSetting
-		END
+		INSERT INTO @FinalResult (PartyId, ProductId, SabaPlay)
+		SELECT PartyId, ProductId, LicensingFee
+		FROM @SabaPlay_Result
 	END
-
-	DECLARE @FinalResult TABLE (PartyId INT, ProductId INT, AmountToCompany MONEY, LicensingFee MONEY, Discount MONEY, Rebate MONEY, Promotion MONEY, Sponsorship MONEY, ContributionDiscount MONEY, BetCount INT, OddsSpreadCost MONEY, PlayerTips MONEY, OddsBoostBonus MONEY)
-	INSERT INTO @FinalResult (PartyId, ProductId, AmountToCompany, LicensingFee, Discount, Rebate, Promotion, Sponsorship, ContributionDiscount, BetCount, OddsSpreadCost, PlayerTips, OddsBoostBonus)
-	SELECT r.PartyId, r.ProductId, r.GrossLicensingFee, r.LicensingFee + r.ExtraAmount, r.Discount, r.Rebate + ISNULL(t.CasinoPromotionRebate,0), ISNULL(t.Promotion, 0), ISNULL(t.Sponsorship, 0), ISNULL(t.ContributionDiscount, 0), ISNULL(t.BetCount, 0), ISNULL(t.OddsSpreadAdjustment, 0), ISNULL(t.PlayerTips,0), ISNULL(t.OddsBoostBonus,0)
-	FROM @Result r
-		LEFT JOIN (
-			SELECT PartyId, CASE WHEN ProductId IN (37, 74, -37) THEN 0 ELSE ProductId END AS ProductId
-				,SUM(CASE WHEN ProductId = 37 AND LicensingFeeTypeId = 0 THEN LicensingFee 
-						  WHEN LicensingFeeTypeId = 13 THEN ExtraAmount ELSE 0 END) AS Promotion
-				,SUM(CASE WHEN ProductId = 37 AND LicensingFeeTypeId = 0 THEN ExtraAmount ELSE 0 END) AS Sponsorship
-				,SUM(CASE WHEN LicensingFeeTypeId = 7 THEN ExtraAmount ELSE 0 END) AS ContributionDiscount
-				,SUM(CASE WHEN LicensingFeeTypeId = 8 THEN ExtraAmount ELSE 0 END) AS BetCount
-				,SUM(CASE WHEN LicensingFeeTypeId = 9 AND ExtraAmount < 0 THEN -ExtraAmount ELSE 0 END) AS OddsSpreadAdjustment
-				,SUM(CASE WHEN ProductId = 74 AND LicensingFeeTypeId = 0 THEN -ExtraAmount ELSE 0 END) AS PlayerTips -- Recon Show Negative value
-				,SUM(CASE WHEN ProductId = -37 AND LicensingFeeTypeId = 13 THEN Rebate ELSE 0 END) AS CasinoPromotionRebate
-				,SUM(CASE WHEN ProductId = 0 AND LicensingFeeTypeId = 14 THEN ExtraAmount ELSE 0 END) AS OddsBoostBonus
-			FROM @Result
-			WHERE ProductId IN (37,74) OR LicensingFeeTypeId > 0
-			GROUP BY PartyId,CASE WHEN ProductId IN (37, 74, -37) THEN 0 ELSE ProductId END
-		) t ON r.PartyId = t.PartyId AND r.ProductId = t.ProductId
-	WHERE r.LicensingFeeTypeId = 0 AND r.ProductId NOT IN (37, 74, -37)
 
 	-- Return data
 	IF @IsShowSettlementDetail = 1
@@ -237,6 +287,7 @@ BEGIN
 				,SUM(r.OddsSpreadCost)			AS OddsSpreadCost
 				,SUM(r.BetCount)				AS BetCount
 				,SUM(r.OddsBoostBonus)			AS OddsBoostBonus
+				,SUM(r.SabaPlay)				AS SabaPlay
 			FROM @FinalResult r
 			GROUP BY r.PartyId
 		ELSE
@@ -253,6 +304,7 @@ BEGIN
 				,SUM(r.OddsSpreadCost)			AS OddsSpreadCost
 				,SUM(r.BetCount)				AS BetCount
 				,SUM(r.OddsBoostBonus)			AS OddsBoostBonus
+				,SUM(r.SabaPlay)				AS SabaPlay
 			FROM @FinalResult r
 				INNER JOIN @PartyList p ON r.PartyId = p.PartyId
 			GROUP BY p.LicenseeCode
