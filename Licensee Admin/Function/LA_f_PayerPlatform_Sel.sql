@@ -18,6 +18,6 @@ RETURN
 	FROM (
 		VALUES (1, N'Saba Sports')
 		     , (2, N'SabaPlay')
-		     , (3, N'Saba Sports & SabaPlay')
+		     --, (3, N'Saba Sports & SabaPlay')
 	) AS Payer_Platform (PlatformId, PlatformName)
 GO
