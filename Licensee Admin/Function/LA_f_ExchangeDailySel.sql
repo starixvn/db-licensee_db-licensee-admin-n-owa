@@ -21,6 +21,7 @@ ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
 		- 20230713@Danny: Incorporate USDT2 currency [RedmineID: #191165]
 		- 20230823@Danny: Incorporate US$KH currency [RedmineID: #192544]
 		- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
+		- 20240415@Danny: Support USD (USDT) base currency [RedmineID: #217740]
 
 	Param's Explanation:				
 */
@@ -71,6 +72,7 @@ BEGIN
 					WHEN @BaseCurrency = 'HKD' THEN t.HKD
 					WHEN @BaseCurrency = 'IDR' THEN t.IDR
 					WHEN @BaseCurrency = 'SGD' THEN t.SGD 
+					WHEN @BaseCurrency = 'USD (USDT)' THEN t.USD 
 					WHEN @BaseCurrency = 'USDT' THEN u.USDT  
 					ELSE 1 END BaseCurrencyRate
 				--, MYR, USD, EUR, CNY, GBP, actualrate

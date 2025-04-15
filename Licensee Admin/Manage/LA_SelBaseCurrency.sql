@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet,dwrs2" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap,dwrs2" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -15,6 +15,7 @@ AS
 		- 20171220@Parsons: increase length for variables [#88197]
 		- 20190408@Bruce: grant permission for dwrs2 [#105205]
 		- 20201003@Danny: Support USDT as base currency [RedmineID: #177718]
+		- 20250415@Danny: Support USD(USDT) as base currency [RedmineID: #217740]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -22,7 +23,9 @@ BEGIN
 	SELECT CurrencyId, CurrencyName
 	FROM (
 			SELECT e.exchangeid AS CurrencyId
-				, CASE WHEN e.exchangeid = 142 THEN 'USDT' ELSE e.Code END AS CurrencyName
+				, CASE WHEN e.exchangeid = 142 THEN 'USDT' 
+					   WHEN e.ExchangeId = 96 THEN 'USD (USDT)'
+				  ELSE e.Code END AS CurrencyName
 				, CASE e.Code WHEN @BaseCurrencyDefault THEN 1 ELSE 0 END AS [Default]
 			FROM bodb02.dbo.Exchange e WITH (NOLOCK)
 			WHERE e.Code IN 
@@ -42,6 +45,7 @@ BEGIN
 								, 12
 								, 13
 								, 142
+								, 96
 							)						
 		) c
 	ORDER BY [Default] DESC
