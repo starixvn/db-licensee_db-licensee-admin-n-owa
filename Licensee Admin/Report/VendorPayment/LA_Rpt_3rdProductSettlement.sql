@@ -44,6 +44,7 @@ AS
 	- 20241022@Danny: Integrate Playtech [RemineID:#210957]
 	- 20241226@Danny: Change 3rd billing term [RemineID: #215383]
 	- 20250218@Danny: Integrate ASK [RemineID:#217674]
+	- 20250415@Winston: Integrate VS7 [RemineID: #218989]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
@@ -433,7 +434,7 @@ BEGIN
 		SELECT @ProductCodes3rd =@ProductCodes3rd + ',SLT'
 
 	IF @FromDate >= @MergeVSCutoffDate 
-		AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value IN ('VS2','LG','VS4','VS5'))
+		AND EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value IN ('VS2','LG','VS4','VS5','VS7'))
 		AND NOT EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value IN ('VS'))
 	BEGIN
 		SELECT @ProductCodes = @ProductCodes + ',VS'
@@ -550,7 +551,7 @@ BEGIN
 
 	IF @FromDate >= @MergeVSCutoffDate 
 	BEGIN
-		DELETE FROM #ChargeInfoWithCredit WHERE ProductID IN (27, 77, 83, 88) 
+		DELETE FROM #ChargeInfoWithCredit WHERE ProductID IN (27, 77, 83, 88, 106) 
 
 		INSERT INTO #ChargeInfoWithCredit (PartyID, ProductID, IsDeposit, Fromdate, Todate, DI_Rate, ChargeType, LicenseeID, ChargeID )
 		SELECT PartyID, x.ProductID AS ProductID, IsDeposit, Fromdate, Todate, CASE WHEN IsDeposit = 0 THEN 0 ELSE  DI_Rate END , ChargeType, LicenseeID, ChargeID  --Clone VS setting 
@@ -560,6 +561,7 @@ BEGIN
 			UNION ALL SELECT 77 --VS3
 			UNION ALL SELECT 83	--VS4
 			UNION ALL SELECT 88	--VS5
+			UNION ALL SELECT 106 --VS7
 		) x
 		WHERE t.ProductID = 5
 
