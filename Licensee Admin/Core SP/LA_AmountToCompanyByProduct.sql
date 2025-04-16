@@ -54,6 +54,7 @@ AS
 		- 20250102@Danny: Rebate on Licensing winloss for specific currencies [RedmineID: #214767]
 		- 20250115@Danny: Support different groups by currencies [RedmineID: #216352]
 		- 20250402@Danny: Number Game promotion [RedmineID: #219671]
+		- 20250416@Danny: Support Discount by currency for a licensee [RedmineID: #223951]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -165,7 +166,6 @@ BEGIN
 				INNER JOIN dbo.LA_DiscountGroupProduct dp WITH (NOLOCK) ON da.DiscountGroupId = dp.DiscountGroupId
 				INNER JOIN #Products pd ON dp.ProductId = pd.ProductId
 			WHERE dh.FromDate <= @ToDate AND dh.ToDate >= @FromDate
-				
 				AND a.DiscountGroupId = da.DiscountGroupId
 		)
 	END
@@ -620,7 +620,7 @@ BEGIN
 					AND (h.DiscountGroupType IN (2, 12, 22, 32, 42) OR c.DiscountGroupId IS NOT NULL)
 					AND p.ProductId NOT IN (37, 74)
 			) t
-			WHERE RN = 1
+			WHERE (RN = 1 AND DiscountGroupType <> 13) OR DiscountGroupType = 13
 		END
 		ELSE -- Cheat Alek group from to.....
 		BEGIN
@@ -824,7 +824,11 @@ BEGIN
 		UPDATE t 
 		SET t.DiscountRate = u.DiscountRate
 		FROM @tmpWLToDiscountByCurrency t
-		INNER JOIN #tmpDiscountGroup u ON t.PartyId = u.PartyId AND t.ProductId = u.ProductId  AND t.CurrencyID = u.CurrencyId AND u.DiscountGroupType IN (3, 13)
+		INNER JOIN #tmpDiscountGroup u ON t.PartyId = u.PartyId 
+						AND t.ProductId = u.ProductId  
+						AND t.CurrencyID = u.CurrencyId 
+						AND u.DiscountGroupType IN (3, 13)
+						AND t.DiscountGroupId = u.DiscountGroupId
 
 		-- Update ChargeRateByCurrency
 		UPDATE t 
