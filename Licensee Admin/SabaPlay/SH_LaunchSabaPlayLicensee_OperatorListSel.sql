@@ -22,16 +22,12 @@ SET NOCOUNT ON
 	-- List payer already launched
 	IF @PlatformId = 2
 	BEGIN
-		; WITH t AS
-		(
-			SELECT op.PartyName 
-			FROM OAS_Party op WITH(NOLOCK)
-			WHERE op.PartyType = 1 
-		)
+		
 		SELECT  s.SiteID, s.SiteName 
 		FROM	bodb_licenseeReport.dbo.SabaPlay_Operators s WITH(NOLOCK)
-		LEFT JOIN t ON s.SiteName = t.PartyName
-		WHERE  t.PartyName IS NULL AND @PlatformId = 2 AND s.OWSiteName IS NULL
+		LEFT JOIN OAS_Party t ON s.SiteID = t.OldRefID AND t.PlatformId = 2
+		WHERE  t.OldRefID IS NULL AND @PlatformId = 2 AND s.OWSiteName IS NULL
+		ORDER BY s.SiteID
 	END
 
 	IF @PlatformId = 3
