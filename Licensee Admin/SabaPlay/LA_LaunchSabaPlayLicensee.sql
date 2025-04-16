@@ -114,7 +114,9 @@ BEGIN
 				OUTER APPLY (
 								SELECT
 								(
-								SELECT CASE WHEN op.BaseCurrencyId = 142 THEN 'USDT' ELSE e.Code END  'c', 
+								SELECT CASE WHEN op.BaseCurrencyId = 142 THEN 'USDT' 
+											WHEN op.BaseCurrencyId = 96 THEN 'USD (USDT)' 
+											ELSE e.Code END  'c', 
 										op.LicenseeCode 'lc', 
 										op.FromDate 'fd', 
 										op.ToDate  'td',
@@ -431,7 +433,9 @@ BEGIN
 				OUTER APPLY (
 								SELECT
 								(
-								SELECT CASE WHEN op.BaseCurrencyId = 142 THEN 'USDT' ELSE e.Code END  'c', 
+								SELECT CASE WHEN op.BaseCurrencyId = 142 THEN 'USDT' 
+											WHEN op.BaseCurrencyId = 96 THEN 'USD (USDT)' 
+											ELSE e.Code END  'c', 
 										op.LicenseeCode 'lc', 
 										op.FromDate 'fd', 
 										op.ToDate  'td',
