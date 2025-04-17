@@ -58,6 +58,7 @@ AS
 		- 20241001@Sally: Support Odds Boost Voucher [#209884]
 		- 20250225@Danny: Integrate ASK [RemineID:#217674]
 		- 20250416@Corbin: Integrate HOTDOG [RemineID:#221605]
+		- 20250417@Lionel: Integrate Microgaming Live Casino [RemineID:#223409]
 */
 
 BEGIN
@@ -199,9 +200,10 @@ BEGIN
 				WHEN ProductId = 0  AND LicensingFeeTypeId = 14 THEN 61 -- Odds BoostBonus
 				WHEN ProductId = 103  AND LicensingFeeTypeId = 3 THEN 62 -- Prizes
 				WHEN ProductId = 95  AND LicensingFeeTypeId = 3 THEN 63 -- Prizes
+				WHEN ProductId = 107  AND LicensingFeeTypeId = 3 THEN 64 -- Prizes
 				END
 		FROM @Result
-		WHERE ProductId IN (10, 32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79, 87, 89, 0, 103, 95) AND LicensingFeeTypeId > 0
+		WHERE ProductId IN (10, 32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79, 87, 89, 0, 103, 95, 107) AND LicensingFeeTypeId > 0
 		GROUP BY
 			CASE
 				WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
@@ -232,6 +234,7 @@ BEGIN
 				WHEN ProductId = 0 AND LicensingFeeTypeId = 14 THEN 61 -- Odds BoostBonus
 				WHEN ProductId = 103  AND LicensingFeeTypeId = 3 THEN 62 -- Prizes
 				WHEN ProductId = 95  AND LicensingFeeTypeId = 3 THEN 63 -- Prizes
+				WHEN ProductId = 107  AND LicensingFeeTypeId = 3 THEN 64 -- Prizes
 				END
 
 		-- AMF, Prepayment and AGPrepayment
