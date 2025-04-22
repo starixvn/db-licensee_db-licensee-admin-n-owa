@@ -6,30 +6,12 @@ Licensee Admin\Invoice\LA_Inv_InvoiceWaiveGet.sql
 Licensee Admin\Invoice\LA_Inv_RebateWorksheetSel.sql
 Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_AmountToCompanySel.sql
 Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_HighForexExplanation.sql
-Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_NAPByProductSel.sql
-Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_ProductDetailSel.sql
 Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_StraightDiscountSel.sql
-Licensee Admin\Manage\Invoice Setting\LA_ProductListByPayerSel.sql
-Licensee Admin\Manage\Invoice Setting\LA_ProductListLauchedSel.sql
-Licensee Admin\Manage\Invoice Setting\LA_ProductListSelAll.sql
-Licensee Admin\Manage\LA_SelProductByParty.sql
-Licensee Admin\Manage\Mics\LaunchNewProduct\LA_LaunchNewProductIns.sql
-Licensee Admin\Manage\Mics\LaunchNewProduct\LA_LaunchNewProductSel.sql
-Licensee Admin\Manage\Mics\LaunchNewProduct\LA_LaunchNewProductValidation.sql
+Licensee Admin\Invoice\LA_Inv_InvoiceAmountGenerate.sql
+Licensee Admin\Invoice\LA_Inv_InvoiceWaiveGet.sql
+Licensee Admin\Invoice\LA_Inv_RebateWorksheetSel.sql
 Licensee Admin\Report\Analysis\LA_GEN_LicPerformanceAnalysis_Invoice.sql
 Licensee Admin\Report\Analysis\LA_GEN_LicPerformanceAnalysis_Report.sql
-Licensee Admin\Report\LA_Rpt_CurrencyWinloss_Details.sql
-Licensee Admin\Report\LA_Rpt_CurrencyWinloss.sql
-Licensee Admin\Report\LA_Rpt_GroupLicensingFeeWinLoss.sql
-Licensee Admin\Report\LA_Rpt_LicenseeBillingDataByProduct.sql
-Licensee Admin\Report\LA_Rpt_LicenseeSettlement.sql
-Licensee Admin\Report\LA_Rpt_LicenseeWinloss_Details.sql
-Licensee Admin\Report\LA_Rpt_LicenseeWinloss.sql
-Licensee Admin\Report\LA_Rpt_LicenseeWinLossByDynamicProduct.sql
-Licensee Admin\Report\LA_Rpt_LicenseeWinLossByProduct.sql
-Licensee Admin\Report\LA_Rpt_PlatformWinloss.sql
-Licensee Admin\Report\LA_Rpt_PlatformWinlossSummary.sql
 Licensee Admin\Report\LicenseePerformance\LA_Rpt_LicPerformance_Detail.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template1.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template17.sql
-Licensee Admin\Report\VendorPayment\LA_Rpt_VendorPaymentDetail_template18.sql
+Licensee Admin\Report\LA_Rpt_LicenseeBillingDataByProduct.sql
+
