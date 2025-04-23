@@ -3,8 +3,9 @@ USE bodb_licensee
 GO
 
 ALTER PROCEDURE [dbo].[LA_PayerListSel]
-	@PayerId		INT			 = 0,
-	@PayerStatusIds	VARCHAR(100) = ''
+	@PayerId		INT			 = 0
+   ,@PayerStatusIds	VARCHAR(100) = ''
+   ,@PlatformIds	VARCHAR(100) = ''
 AS
 /*
 	Created: 20150414@Florent
@@ -16,6 +17,7 @@ AS
 		- 20161109@bruce.bui: include non-official payers
 		- 20210824@Danny: get licensee status from OIC and relocated SP [#159296]
 		- 20241120@Danny: replace strsplit function [RemineID: #212252]
+		- 20250321@Eddie: Get more Info PlatformId and get info follow status [RedmineID: #217740]
 
 	Params:
 		+ 0 get all payer
@@ -36,7 +38,11 @@ BEGIN
 
 	DECLARE @statusTab TABLE (StatusId SMALLINT)
 	INSERT INTO @statusTab (StatusId)
-	SELECT CAST (value AS SMALLINT) FROM STRING_SPLIT(@PayerStatusIds,',')
+	SELECT CAST(value AS SMALLINT) FROM STRING_SPLIT(@PayerStatusIds,',')
+
+	DECLARE @Payer_Platform TABLE (PlatformId TINYINT)
+	INSERT INTO @Payer_Platform (PlatformId)
+	SELECT CAST(value AS TINYINT) FROM STRING_SPLIT(@PlatformIds,',')
 	
 	CREATE TABLE #tmp_licenseeOIC (RegisteredLicenseeName NVARCHAR(50), LicenseeStatusId TINYINT)
 	INSERT INTO #tmp_licenseeOIC(RegisteredLicenseeName, LicenseeStatusId)
@@ -75,28 +81,44 @@ BEGIN
 			), 1, 2, '') AS BillerList
 			, ISNULL(pd.StatusId,0) AS StatusId
 			, p.PartyType
-			,CASE WHEN l.IsDeposit = 0 THEN 'Active'
-				 ELSE ISNULL(oict.LicenseeStatusName, 'Unrecognized') END AS  PayerStatusName
-			,CASE WHEN	l.IsDeposit = 0 THEN 3
-				 WHEN	oict.LicenseeStatusId IS NULL THEN 999 ELSE oict.LicenseeStatusId END PayerStatusId
+			,CASE WHEN ISNULL(p.PlatformId, 2) <> 2 AND l.IsDeposit = 0 THEN 'Active'
+				  WHEN p.PlatformId = 2 AND pd.LaunchDate IS NOT NULL AND pd.SuspendedDate IS NULL AND pd.TerminatedDate IS NULL THEN 'Active'
+				  WHEN p.PlatformId = 2 AND pd.SuspendedDate IS NOT NULL AND pd.TerminatedDate IS NULL THEN 'Suspended'
+				  WHEN p.PlatformId = 2 AND pd.TerminatedDate IS NOT NULL THEN 'Terminated'
+			 ELSE ISNULL(oict.LicenseeStatusName, 'Unrecognized') END AS PayerStatusName
+			,CASE WHEN ISNULL(p.PlatformId, 2) <> 2 AND l.IsDeposit = 0 THEN 3
+				  WHEN p.PlatformId = 2 AND pd.LaunchDate IS NOT NULL AND pd.SuspendedDate IS NULL AND pd.TerminatedDate IS NULL THEN 3
+				  WHEN p.PlatformId = 2 AND pd.SuspendedDate IS NOT NULL AND pd.TerminatedDate IS NULL THEN 6
+				  WHEN p.PlatformId = 2 AND pd.TerminatedDate IS NOT NULL THEN 4
+				  WHEN oict.LicenseeStatusId IS NULL THEN 999
+			 ELSE oict.LicenseeStatusId END AS PayerStatusId
+			, p.PlatformId
 	FROM dbo.OAS_Party p WITH (NOLOCK)
 		INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
-		LEFT JOIN dbo.Licensees l	WITH(NOLOCK) ON p.OldRefID = l.LicenseeID
-		LEFT JOIN  #tmp_licenseeOIC oic WITH(NOLOCK) ON oic.RegisteredLicenseeName = l.LicenseeName
-		LEFT JOIN  #tmp_licenseeOICStatus oict ON oic.LicenseeStatusId = oict.LicenseeStatusId
-		LEFT JOIN  cte_BillerPayer i ON i.FromPartyId = p.PartyID
+		LEFT JOIN dbo.Licensees l WITH (NOLOCK) ON p.OldRefID = l.LicenseeID
+		LEFT JOIN #tmp_licenseeOIC oic WITH(NOLOCK) ON oic.RegisteredLicenseeName = l.LicenseeName
+		LEFT JOIN #tmp_licenseeOICStatus oict ON oic.LicenseeStatusId = oict.LicenseeStatusId
+		LEFT JOIN cte_BillerPayer i ON i.FromPartyId = p.PartyID
 	WHERE p.PartyType IN (1,5)
 		AND (@PayerId = 0 OR p.PartyID = @PayerId)
-		
-	GROUP BY p.PartyID, p.PartyName, pd.BrandName, pd.CompanyName, pd.StatusId, p.PartyType, 
-			CASE WHEN l.IsDeposit = 0 THEN 'Active'
-				 ELSE ISNULL(oict.LicenseeStatusName, 'Unrecognized') END,
-			CASE WHEN	l.IsDeposit = 0 THEN 3
-				 WHEN	oict.LicenseeStatusId IS NULL THEN 999 ELSE oict.LicenseeStatusId END
+	GROUP BY p.PartyID, p.PartyName, pd.BrandName, pd.CompanyName, pd.StatusId, p.PartyType, p.PlatformId, 
+			CASE WHEN ISNULL(p.PlatformId, 2) <> 2 AND l.IsDeposit = 0 THEN 'Active'
+				 WHEN p.PlatformId = 2 AND pd.LaunchDate IS NOT NULL AND pd.SuspendedDate IS NULL AND pd.TerminatedDate IS NULL THEN 'Active'
+				 WHEN p.PlatformId = 2 AND pd.SuspendedDate IS NOT NULL AND pd.TerminatedDate IS NULL THEN 'Suspended'
+				 WHEN p.PlatformId = 2 AND pd.TerminatedDate IS NOT NULL THEN 'Terminated'
+			 ELSE ISNULL(oict.LicenseeStatusName, 'Unrecognized') END,
+			CASE WHEN ISNULL(p.PlatformId, 2) <> 2 AND l.IsDeposit = 0 THEN 3
+				 WHEN p.PlatformId = 2 AND pd.LaunchDate IS NOT NULL AND pd.SuspendedDate IS NULL AND pd.TerminatedDate IS NULL THEN 3
+				 WHEN p.PlatformId = 2 AND pd.SuspendedDate IS NOT NULL AND pd.TerminatedDate IS NULL THEN 6
+				 WHEN p.PlatformId = 2 AND pd.TerminatedDate IS NOT NULL THEN 4
+				 WHEN oict.LicenseeStatusId IS NULL THEN 999
+			 ELSE oict.LicenseeStatusId END
 	)
-	SELECT PayerID, PayerName, BrandName, CompanyName, NumberOfBillers, BillerList, StatusId, PartyType, PayerStatusName
-	FROM cte_BillerPayer_info
-	WHERE PayerStatusId IN (SELECT x.StatusId  FROM @statusTab x)
+	SELECT bi.PayerID, bi.PayerName, bi.BrandName, bi.CompanyName, bi.NumberOfBillers, bi.BillerList, bi.StatusId, bi.PartyType, bi.PayerStatusName, bi.PlatformId, f.PlatformName
+	FROM cte_BillerPayer_info bi
+		INNER JOIN dbo.LA_f_PayerPlatform_Sel() f ON f.PlatformId = bi.PlatformId
+	WHERE bi.PayerStatusId IN (SELECT x.StatusId FROM @statusTab x)
+	  AND bi.PlatformId IN ( SELECT PlatformId FROM @Payer_Platform )
 
 
 	DROP TABLE #tmp_licenseeOIC

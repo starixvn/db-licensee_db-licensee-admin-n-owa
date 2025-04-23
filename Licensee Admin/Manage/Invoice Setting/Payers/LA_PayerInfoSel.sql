@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -24,6 +24,7 @@ AS
 		- 20210811@Danny: Adding AttnName2, CompanyName2 into OAS_PartyDetail [#FeatureID 158133]
 		- 20210824@Danny: get licensee status from OIC And Relocated SP [#159296]
 		- 20201003@Danny: Support USDT as base currency [RedmineID: #177718]
+		- 20250321@Eddie: Get more Info "PlatformId" [RedmineID: #217740]
 		
 	 Params:
 	 Example:
@@ -59,13 +60,20 @@ SET NOCOUNT ON
 		, pd.InvoiceLanguage
 		, pd.AttnName2
 		, pd.CompanyName2
-		, CASE WHEN t.IsDeposit = 0 THEN 'Active'
-				 ELSE ISNULL(us.LicenseeStatusName, 'Unrecognized') END AS PayerStatusName
+		, CASE WHEN ISNULL(p.PlatformId, 2) <> 2 AND t.IsDeposit = 0 THEN 'Active'
+			   WHEN p.PlatformId = 2 AND pd.LaunchDate IS NOT NULL AND pd.SuspendedDate IS NULL AND pd.TerminatedDate IS NULL THEN 'Active'
+			   WHEN p.PlatformId = 2 AND pd.SuspendedDate IS NOT NULL AND pd.TerminatedDate IS NULL THEN 'Suspended'
+			   WHEN p.PlatformId = 2 AND pd.TerminatedDate IS NOT NULL THEN 'Terminated'
+		  ELSE ISNULL(us.LicenseeStatusName, 'Unrecognized') END AS PayerStatusName
+		, p.PlatformId
+		, pd.LaunchDate
+		, pd.SuspendedDate
+		, pd.TerminatedDate
 	FROM dbo.OAS_Party p WITH (NOLOCK)
-		LEFT JOIN	dbo.Licensees t WITH(NOLOCK) ON p.OldRefID = t.LicenseeId
-		LEFT JOIN	#tmp_licenseeOIC u WITH(NOLOCK) ON t.LicenseeName = u.RegisteredLicenseeName
-		LEFT JOIN	#tmp_licenseeOICStatus us WITH(NOLOCK) ON u.LicenseeStatusId = us.LicenseeStatusId
-		LEFT JOIN	dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
+		INNER JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON p.PartyID = pd.PartyID
+		LEFT JOIN dbo.Licensees t WITH(NOLOCK) ON p.OldRefID = t.LicenseeId
+		LEFT JOIN #tmp_licenseeOIC u WITH(NOLOCK) ON t.LicenseeName = u.RegisteredLicenseeName
+		LEFT JOIN #tmp_licenseeOICStatus us WITH(NOLOCK) ON u.LicenseeStatusId = us.LicenseeStatusId
 		LEFT JOIN (
 			SELECT i.FromPartyId, i.ToPartyId, i.InvTypeId, ActiveAddress
 			FROM dbo.LA_InvoiceSetting i

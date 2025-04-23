@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_Licensee
 GO
 
@@ -18,6 +18,7 @@ AS
 	 Revisions:
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
+		- 20250326@Eddie: Get view log with products of SabaPlay [RedmineID: #217740]
 
 	 Params:
 		+ @InvoiceSettingXML: '<InvoiceSettings>
@@ -46,6 +47,9 @@ BEGIN
 	SET NOCOUNT ON
 	IF ISNULL(@PayerID, '') = '' OR ISNULL(@BillerID, '') = ''
 		RETURN
+
+	DECLARE @BillerNameOfSabaPlay NVARCHAR(50) = N'Reasternhold Limited', @IsDeleted BIT = 0
+
 -- For writing log
 	DECLARE 
 		@startRun		DATETIME,
@@ -64,9 +68,9 @@ BEGIN
 		--write old log
 		; WITH items AS
 		(
-			SELECT  op.PartyName,od.BrandName,iv.BillerName,iv.bank,iv.InvTypeName,iv.InvTemplateName,iv.ActiveAddress,iv.ProductIDs,iv.InvTypeId, iv.FakeID
-			FROM	OAS_Party op WITH(NOLOCK)
-			INNER JOIN OAS_PartyDetail od WITH(NOLOCK) ON od.PartyID = op.PartyID
+			SELECT op.PartyName,od.BrandName,iv.BillerName,iv.bank,iv.InvTypeName,iv.InvTemplateName,iv.ActiveAddress,iv.ProductIDs,iv.InvTypeId, iv.FakeID
+			FROM dbo.OAS_Party op WITH(NOLOCK)
+			INNER JOIN dbo.OAS_PartyDetail od WITH(NOLOCK) ON od.PartyID = op.PartyID
 			OUTER APPLY (
 				SELECT	li.ToPartyId AS FakeID
 						,b.BillerName
@@ -75,13 +79,16 @@ BEGIN
 						,CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END Bank
 							,CASE WHEN li.ActiveAddress = 1 THEN od.Address1
 								WHEN li.ActiveAddress = 2 THEN od.Address2 END ActiveAddress
-						,STRING_AGG(CASE WHEN li.ProductID = 0 THEN 'Sportsbook' ELSE p.ProductName END,', ') ProductIDs
+						,STRING_AGG(CASE WHEN li.ProductID = 0 AND b.BillerName <> @BillerNameOfSabaPlay THEN 'Sportsbook' 
+										 WHEN ISNULL(li.ProductID, 0) <> 0 AND b.BillerName <> @BillerNameOfSabaPlay THEN p.ProductName
+									ELSE vw.ProductName END,', ') ProductIDs
 						,lt.InvTypeId
-				FROM LA_InvoiceSetting li WITH(NOLOCK) 
-				LEFT JOIN LA_InvoiceType lt with(nolock) ON li.InvTypeID  = lt.InvTypeID
+				FROM dbo.LA_InvoiceSetting li WITH(NOLOCK) 
+				LEFT JOIN dbo.LA_InvoiceType lt with(nolock) ON li.InvTypeID  = lt.InvTypeID
 				LEFT JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON li.ToPartyId = b.PartyId
 				LEFT JOIN dbo.LA_InvoiceTemplate temp WITH (NOLOCK) ON li.InvTempId = temp.InvTemplateId
-				LEFT JOIN Product3rd p WITH (NOLOCK) ON li.ProductId = p.Productid
+				LEFT JOIN dbo.Product3rd p WITH (NOLOCK) ON li.ProductId = p.Productid
+				LEFT JOIN dbo.vw_SabaPlay_Products vw WITH (NOLOCK) ON vw.ProductId = li.Productid
 				WHERE li.FromPartyId = op.PartyID
 				GROUP BY b.BillerName, lt.InvTypeName, CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END
 					, temp.InvTemplateName ,li.ActiveAddress
@@ -89,7 +96,7 @@ BEGIN
 						WHEN li.ActiveAddress = 2 THEN od.Address2 END, lt.InvTypeId
 					,li.ToPartyId
 			) iv
-			WHERE op.PartyID =@PayerID
+			WHERE op.PartyID = @PayerID
 		), i AS
 		(
 			SELECT i.PartyName, i.BrandName, i.BillerName, i.Bank ,i.FakeID
@@ -122,7 +129,7 @@ BEGIN
 		LEFT JOIN items i12 ON i12.PartyName = i.PartyName AND ISNULL(i12.BrandName,'') = ISNULL(i.BrandName,'') AND  ISNULL(i12.BillerName,'')  = ISNULL(i.BillerName,'') AND ISNULL(i12.Bank,'') = ISNULL(i.Bank,'') AND i12.InvTypeId = 12  
 		)SELECT @logSPDataOld = 
 		(
-			SELECT  l.PartyName as 'pi.pn', l.BrandName AS 'pi.bn' , x.x AS 'bl'
+			SELECT l.PartyName as 'pi.pn', l.BrandName AS 'pi.bn' , x.x AS 'bl'
 			FROM log_detail l
 			OUTER APPLY 
 			(
@@ -158,12 +165,15 @@ BEGIN
 			RETURN
 		END
 
+		-- Deleted flag
+		SET @IsDeleted = 1
+
 		--build new log
 		; WITH items AS
 		(
-			SELECT  op.PartyName,od.BrandName,iv.BillerName,iv.bank,iv.InvTypeName,iv.InvTemplateName,iv.ActiveAddress,iv.ProductIDs,iv.InvTypeId, iv.FakeID
-			FROM	OAS_Party op WITH(NOLOCK)
-			INNER JOIN OAS_PartyDetail od WITH(NOLOCK) ON od.PartyID = op.PartyID
+			SELECT op.PartyName,od.BrandName,iv.BillerName,iv.bank,iv.InvTypeName,iv.InvTemplateName,iv.ActiveAddress,iv.ProductIDs,iv.InvTypeId, iv.FakeID
+			FROM dbo.OAS_Party op WITH(NOLOCK)
+			INNER JOIN dbo.OAS_PartyDetail od WITH(NOLOCK) ON od.PartyID = op.PartyID
 			OUTER APPLY (
 				SELECT b.BillerName
 						,lt.InvTypeName
@@ -171,14 +181,17 @@ BEGIN
 						,CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END Bank
 							,CASE WHEN li.ActiveAddress = 1 THEN od.Address1
 								WHEN li.ActiveAddress = 2 THEN od.Address2 END ActiveAddress
-						,STRING_AGG(CASE WHEN li.ProductID = 0 THEN 'Sportsbook' ELSE p.ProductName END,', ') ProductIDs
-						,lt.InvTypeId,
-						li.ToPartyId AS FakeID
-				FROM LA_InvoiceSetting li WITH(NOLOCK) 
-				LEFT JOIN LA_InvoiceType lt with(nolock) ON li.InvTypeID  = lt.InvTypeID
+						,STRING_AGG(CASE WHEN li.ProductID = 0 AND b.BillerName <> @BillerNameOfSabaPlay THEN 'Sportsbook' 
+										 WHEN ISNULL(li.ProductID, 0) <> 0 AND b.BillerName <> @BillerNameOfSabaPlay THEN p.ProductName
+									ELSE vw.ProductName END,', ') ProductIDs
+						,lt.InvTypeId
+						,li.ToPartyId AS FakeID
+				FROM dbo.LA_InvoiceSetting li WITH(NOLOCK) 
+				LEFT JOIN dbo.LA_InvoiceType lt with(nolock) ON li.InvTypeID  = lt.InvTypeID
 				LEFT JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON li.ToPartyId = b.PartyId
 				LEFT JOIN dbo.LA_InvoiceTemplate temp WITH (NOLOCK) ON li.InvTempId = temp.InvTemplateId
-				LEFT JOIN Product3rd p WITH (NOLOCK) ON li.ProductId = p.Productid
+				LEFT JOIN dbo.Product3rd p WITH (NOLOCK) ON li.ProductId = p.Productid
+				LEFT JOIN dbo.vw_SabaPlay_Products vw WITH (NOLOCK) ON vw.ProductId = li.Productid
 				WHERE li.FromPartyId = op.PartyID
 				GROUP BY b.BillerName, lt.InvTypeName, CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END
 					, temp.InvTemplateName ,li.ActiveAddress
@@ -245,18 +258,21 @@ BEGIN
 		)
 
 		SET @endRun = GETDATE()
-		SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun) 
+		SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun)
 	END
 
-	-- Write Log
-	EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
-		@UserId			= @UserID
-		,@IP			= @LoginIP
-		,@SPName		= 'LA_InvoiceSettingDel'
-		,@CustId		= @PayerID
-		,@Duration		= @duration
-		,@TrackingValue2 = @logSPData
-		,@TrackingValue =  @logSPDataOld
-		,@ActionID		= 1004
+	IF @IsDeleted = 1
+	BEGIN
+		-- Write Log
+		EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
+			@UserId			 = @UserID
+			,@IP			 = @LoginIP
+			,@SPName		 = 'LA_InvoiceSettingDel'
+			,@CustId		 = @PayerID
+			,@Duration		 = @duration
+			,@TrackingValue2 = @logSPData
+			,@TrackingValue  =  @logSPDataOld
+			,@ActionID		 = 1004
+	END
 END
 GO

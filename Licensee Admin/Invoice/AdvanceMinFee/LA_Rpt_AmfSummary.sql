@@ -26,6 +26,8 @@ AS
 		- 20231114@Danny: Change waive month count fomular [RemineID: #191248]
 		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
+		- 20250403@Eddie: More Info "PlatformId" [RedmineID: #217740]
+
 	+ @LicenseeStatusIds:	1	Up Coming
 						2	Soft Launch
 						3	Active
@@ -39,14 +41,14 @@ BEGIN
 
 	-- Get Party List
 	BEGIN
-		DECLARE @PartyList TABLE (PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, LicenseeCode VARCHAR(50), BaseCurrencyId TINYINT, LicenseeStatusId INT, LicenseeStatus VARCHAR(30))
+		DECLARE @PartyList TABLE (PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, LicenseeCode VARCHAR(50), BaseCurrencyId TINYINT, LicenseeStatusId INT, LicenseeStatus VARCHAR(30), PlatformId TINYINT)
 
 		-- Official Licensees
 		INSERT INTO @PartyList (PartyId, PartyName, BrandName, ParentId)
 		EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionKey = @FunctionKey
 
 		-- Non-Official Licensees
-		INSERT INTO @PartyList (PartyId, PartyName, BrandName, ParentId, LicenseeCode, BaseCurrencyId)
+		INSERT INTO @PartyList (PartyId, PartyName, BrandName, ParentId, LicenseeCode, BaseCurrencyId, PlatformId)
 		EXEC dbo.LA_PartyListNonOfficialSel
 
 		-- Filter by OIC status

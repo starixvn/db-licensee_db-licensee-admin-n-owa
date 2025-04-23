@@ -20,6 +20,8 @@ AS
 		- 20220418@Percy: Add Credit note for AMF [RedmineID: #164139]
 		- 20221109@Malcolm: add LicenseeCode, BaseCurrencyId [RedmineID : 175860]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
+		- 20250403@Eddie: More Info "PlatformId" [RedmineID: #217740]
+
 */
 BEGIN
 	SET NOCOUNT ON
@@ -27,11 +29,11 @@ BEGIN
 	DECLARE @InvoiceItemTypes TABLE([Key] VARCHAR(50), [Value] INT)
 	DECLARE @AdvanceMinFee VARCHAR(50) = 'AdvanceMinFee', @Prepayment VARCHAR(50) = 'Prepayment', @AGPrepayment VARCHAR(50) = 'AGPrepayment'
 
-	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, LicenseeCode VARCHAR(50), BaseCurrencyId TINYINT)
+	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, LicenseeCode VARCHAR(50), BaseCurrencyId TINYINT, PlatformId TINYINT)
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionKey=@FunctionKey
 
-	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId, LicenseeCode , BaseCurrencyId)
+	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId, LicenseeCode , BaseCurrencyId, PlatformId)
 	EXEC dbo.LA_PartyListNonOfficialSel
 
 	INSERT INTO @InvoiceItemTypes ([Key], [Value])
