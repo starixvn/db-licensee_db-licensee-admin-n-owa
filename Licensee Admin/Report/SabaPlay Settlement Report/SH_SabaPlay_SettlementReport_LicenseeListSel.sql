@@ -19,7 +19,11 @@ BEGIN
 	SET NOCOUNT ON
 
 	DROP TABLE IF EXISTS #userFunctionParty
-	CREATE TABLE #userFunctionParty (PartyID INT, UserID INT, FunctionID INT, StatusID TINYINT, PartyName NVARCHAR(100), PlatformId INT, OldRefID INT)
+	CREATE TABLE #userFunctionParty (
+		PartyID INT, 
+		UserID INT, 
+		FunctionID INT, 
+		StatusID TINYINT, PartyName NVARCHAR(100), PlatformId INT, OldRefID INT, BrandName VARCHAR(100))
 
 	DECLARE @FunctionID INT, @BillerID INT
 
@@ -37,10 +41,11 @@ BEGIN
 
 	IF (@USERID > 0 AND @FunctionID > 0 ) --get Party List By User and Function
 	BEGIN
-		INSERT INTO #userFunctionParty(PartyID, UserID, FunctionID, StatusID, PartyName, PlatformId, OldRefID)
-		SELECT up.PartyID, Up.UserID, fp.FunctionID, Up.StatusID, op.PartyName, op.PlatformId, op.OldRefID
+		INSERT INTO #userFunctionParty(PartyID, UserID, FunctionID, StatusID, PartyName, PlatformId, OldRefID, BrandName)
+		SELECT up.PartyID, Up.UserID, fp.FunctionID, Up.StatusID, op.PartyName, op.PlatformId, op.OldRefID, opd.BrandName
 		FROM dbo.LA_UserParty Up WITH (NOLOCK)
 			INNER JOIN OAS_Party op WITH (NOLOCK) ON Up.PartyID = op.PartyID
+			INNER JOIN OAS_PartyDetail opd WITH (NOLOCK) ON op.PartyID = opd.PartyID
 		    INNER JOIN dbo.LA_UserFunction UF WITH (NOLOCK) ON up.UserID = uf.UserID --permission of user
 		    INNER JOIN dbo.LA_FunctionParty FP WITH (NOLOCK) ON up.PartyID = fp.PartyID
 			    AND uf.FunctionID = fp.FunctionID --permission of Function - Party
@@ -49,33 +54,44 @@ BEGIN
 			AND op.PlatformId IN (2,3)	 AND op.PartyType = 1
 	END
 
-	SELECT	t.PartyID, 
-			t.PartyName, 
-			CASE WHEN t.PlatformId = 2 THEN 9999 ELSE p.ParentID END AS ParentID, 
-			CASE WHEN t.PlatformId = 2 THEN 'SabaPlay Licensees' ELSE p.ParentName END AS ParentName,
-			CASE WHEN t.PlatformId = 2 THEN t.OldRefID ELSE so.SiteID END OperatorID,
-			x.x AS ProductList
-	FROM #userFunctionParty t
-	LEFT JOIN bodb_licenseeReport.dbo.SabaPlay_Operators so WITH(NOLOCK) ON t.PartyName = so.OWSiteName
-	OUTER APPLY 
+	; WITH t AS
 	(
-		SELECT TOP 1 oc.ToParty AS ParentID, op.PartyName + ' Licensees' AS ParentName FROM OAS_ChargeInfo oc WITH(NOLOCK) 
-		INNER JOIN dbo.OAS_Party op WITH(NOLOCK) ON oc.ToParty = op.PartyID
-		WHERE oc.FromParty = t.PartyID  AND oc.ChargeType = 1 
-	) p
-	OUTER APPLY
-	(
-		SELECT 
+		SELECT	t.PartyID, 
+				ISNULL(t.BrandName,t.PartyName) PartyName, 
+				CASE WHEN t.PlatformId = 2 THEN 9999 ELSE p.ParentID END AS ParentID, 
+				CASE WHEN t.PlatformId = 2 THEN 'SabaPlay Licensees' ELSE p.ParentName END AS ParentName,
+				CASE WHEN t.PlatformId = 2 THEN t.OldRefID ELSE so.SiteID END OperatorID,
+				x.x AS ProductList
+		FROM #userFunctionParty t
+		LEFT JOIN bodb_licenseeReport.dbo.SabaPlay_Operators so WITH(NOLOCK) ON t.PartyName = so.OWSiteName
+		OUTER APPLY 
 		(
-			SELECT lis.ProductId , sp.ProductName
-			FROM LA_InvoiceSetting lis WITH(NOLOCK)
-			INNER JOIN bodb_LicenseeReport.dbo.SabaPlay_Products sp WITH(NOLOCK) ON lis.ProductId = sp.ProductID
-			WHERE lis.FromPartyId = t.PartyID AND lis.ToPartyId = @BillerID  AND lis.ProductId IS NOT NULL 
-			FOR JSON PATH
-		) x
-	)x
-	WHERE 	CASE WHEN t.PlatformId = 2 THEN t.OldRefID ELSE so.SiteID END IS NOT NULL
-	ORDER BY CASE WHEN t.PlatformId = 2 THEN 9999 ELSE p.ParentID END, t.PartyName
+			SELECT TOP 1 oc.ToParty AS ParentID, op.PartyName + ' Licensees' AS ParentName FROM OAS_ChargeInfo oc WITH(NOLOCK) 
+			INNER JOIN dbo.OAS_Party op WITH(NOLOCK) ON oc.ToParty = op.PartyID
+			WHERE oc.FromParty = t.PartyID  AND oc.ChargeType = 1 
+		) p
+		OUTER APPLY
+		(
+			SELECT 
+			(
+				SELECT lis.ProductId , sp.ProductName
+				FROM LA_InvoiceSetting lis WITH(NOLOCK)
+				INNER JOIN bodb_LicenseeReport.dbo.SabaPlay_Products sp WITH(NOLOCK) ON lis.ProductId = sp.ProductID
+				WHERE lis.FromPartyId = t.PartyID AND lis.ToPartyId = @BillerID  AND lis.ProductId IS NOT NULL 
+				FOR JSON PATH
+			) x
+		)x
+		WHERE 	CASE WHEN t.PlatformId = 2 THEN t.OldRefID ELSE so.SiteID END IS NOT NULL
+
+	)
+	SELECT PartyID, PartyName, ParentID, ParentName, OperatorID, ProductList
+	FROM t
+
+	UNION ALL
+	SELECT DISTINCT ParentID AS  PartyID, ParentName AS PartyName, NULL AS ParentID,NULL AS  ParentName, NULL AS OperatorID, NULL AS ProductList
+	FROM t
+
+	ORDER BY ParentID, PartyID
 	
 END
 
