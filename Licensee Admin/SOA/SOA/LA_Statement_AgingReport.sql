@@ -17,8 +17,14 @@ AS
 		- 20241209@Danny: Initialize SP [#206240]
 		- 20250306@Danny: Enhancement [#219206]
 		- 20250409@Danny: Return CurrencyId column [#221841]
+		- 20250421@Eddie: Support Platform for SabaPlay [RemineID: #221990]
 
 	Param's Explanation:
+		- @PlatformId : 
+			1 : Saba Sports
+			2 : White Label China View
+			3 : JollySports
+			99: SabaPlay
 	EXEC LA_Statement_AgingReport 
 		@BillerIds			 = '192,181,295,189,281,318,178,106,112,833,298,307,113,173,293,187,287,233,310,362,279,8637,270,290,788,428,288,188,125,265,317,666,291,116,222,274,182,208,302,494,309,286,426,280,223,123,297,177,8504,289,197,423,277,8581,320',
 		@PayerIds			  = '14',
@@ -113,11 +119,23 @@ BEGIN
 
 	IF ISNULL(@PlatformId, 0) <> 0
 	BEGIN
-		SELECT @PayerIds = STRING_AGG(CONVERT(VARCHAR(50), p.PartyID), ',')
-		FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
-			INNER JOIN bodb_licensee.dbo.Licensees la WITH(NOLOCK) ON p.OldRefID = la.LicenseeID
-		    INNER JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = la.LicenseeName AND l.PlatformId = @PlatformId
-		WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PayerIds, ',')) 
+		SELECT @PayerIds = STRING_AGG(CONVERT(VARCHAR(50), t.PartyID), ',')
+		FROM (
+			SELECT p.PartyID
+			FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)
+				INNER JOIN bodb_licensee.dbo.Licensees la WITH(NOLOCK) ON p.OldRefID = la.LicenseeID
+				INNER JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = la.LicenseeName AND l.PlatformId = @PlatformId
+			WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PayerIds, ','))
+			  AND @PlatformId <> 99
+			
+			UNION ALL
+			
+			SELECT p.PartyID
+			FROM bodb_licensee.dbo.OAS_Party p WITH (NOLOCK)
+			WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PayerIds, ','))
+			  AND p.PlatformId = 2
+			  AND @PlatformId = 99
+		) AS t
 	END
 
 	DROP TABLE IF EXISTS #tmp_PartyID
