@@ -6,6 +6,7 @@ ALTER PROCEDURE [dbo].[LA_LicenseeReconciliation_PartySel](
 	@BillingDate DATE = NULL
 	,@IncludeAll BIT = 0
 	,@PlatformId TINYINT = 0
+	,@IsExcludeSabaPlay	BIT = 0
 )
 AS
 /*	Header:
@@ -21,6 +22,7 @@ AS
 		- 20220218@Percy: Return SuspendedDate, TerminatedDate [RedmineID: #161429]
 		- 20201025@Danny: Support USDT as base currency [RedmineID: #177718]
 		- 20221003@Malcolm: Add platform filter [RedmineID: #165707]
+		- 20250421@Danny: Support billing SabaPlay licensees [RedmineID: #217742]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -52,6 +54,10 @@ BEGIN
 			WHERE @LastDayOfMonth >= bc.FromDate
 				AND p.PartyType IN (1, 5)
 				AND pd.IsDeposit = 1
+				AND (
+					(@IsExcludeSabaPlay = 0 AND p.PlatformId IN (1,2))
+					OR (@IsExcludeSabaPlay = 1 AND p.PlatformId = 1)
+				)
 		) a
 	) b
 	WHERE RN = 1
@@ -69,10 +75,19 @@ BEGIN
 	-- Get CustId from Licensee Code
 	DECLARE @LicenseeCodes TABLE (CustId INT, LicenseeName VARCHAR(50), LicenseeCode VARCHAR(50), BaseCurrencyId INT, FromDate DATE, ToDate DATE, IsBillingCurrency BIT)
 
+	-- Saba Sports
 	INSERT INTO @LicenseeCodes (CustId, LicenseeName, FromDate, ToDate, IsBillingCurrency)
 	SELECT DISTINCT CustId, LicenseeName, FromDate, ToDate, CASE WHEN ToDate >= @LastDayOfMonth THEN 1 ELSE 0 END AS IsBillingCurrency
 	FROM DBCUST.bodb_Licensee.dbo.LicenseeTransferCode WITH (NOLOCK)
 	WHERE @LastDayOfMonth >= FromDate
+
+	-- Saba Play
+	INSERT INTO @LicenseeCodes (CustId, LicenseeName, FromDate, ToDate, IsBillingCurrency)
+	SELECT DISTINCT c.CustId, op.PartyName , FromDate, ToDate, CASE WHEN ToDate >= @LastDayOfMonth THEN 1 ELSE 0 END AS IsBillingCurrency
+	FROM dbo.OAS_party op WITH (NOLOCK)
+	INNER JOIN OAS_PartyBaseCurrency opc  WITH (NOLOCK) ON op.PartyID = opc.PartyID
+	INNER JOIN bodb02.dbo.Customer c WITH(NOLOCK) ON opc.LicenseeCode = c.username
+	WHERE @LastDayOfMonth >= opc.FromDate AND op.PlatformId = 2
 
 	UPDATE lc
 	SET lc.LicenseeCode = UPPER(c.UserName), lc.BaseCurrencyId = c.Currency, lc.FromDate = t.FromDate, lc.ToDate = t.ToDate
@@ -107,11 +122,15 @@ BEGIN
 	WHERE lc.CustId NOT IN (SELECT ISNULL(l.CustId, 0) FROM #Licensees l)
 		AND lc.LicenseeName NOT IN (SELECT ISNULL(l.LicenseeName, '') FROM #Licensees l)
 
-	-- Billing Group
+	-- Billing Group SabaSports
 	DECLARE @partyList TABLE (PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT)
 
 	INSERT INTO @partyList (PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel
+
+	-- Billing Group SabaPlay
+	INSERT INTO @partyList (PartyId, PartyName, BrandName, ParentId)
+	EXEC dbo.[LA_PartyListSabaPlaySel]
 	
 	DELETE @partyList WHERE ParentId = 999 OR (PartyId = 999 AND ParentId = 0) -- Remove credit licensees
 
@@ -128,7 +147,12 @@ BEGIN
 			LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH(NOLOCK) ON li.PartyId = p.PartyID
 			LEFT JOIN bodb_licensee.dbo.Licensees la WITH(NOLOCK) ON la.LicenseeID = p.OldRefID
 			LEFT JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = la.LicenseeName AND l.PlatformId = @PlatformId
-		WHERE l.LicenseeId IS NULL
+		WHERE l.LicenseeId IS NULL AND @PlatformId <> 99
+
+		DELETE li
+		FROM #Licensees li
+			LEFT JOIN bodb_licensee.dbo.OAS_Party p WITH(NOLOCK) ON li.PartyId = p.PartyID AND p.PlatformId = 2
+		WHERE li.PartyId IS NULL AND @PlatformId = 99 -- Saba Play
 	END
 
 	DECLARE @billingGroup TABLE (GroupId INT)

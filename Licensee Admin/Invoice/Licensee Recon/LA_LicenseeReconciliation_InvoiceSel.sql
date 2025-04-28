@@ -49,6 +49,7 @@ AS
 		- 20250107@Danny: add more invoice item type[RemineID: #216417]
 		- 20250225@Danny: Integrate ASK [RemineID:#217674]
 		- 20250416@Corbin: Integrate HOTDOG [RemineID:#221605]
+		- 20250421@Danny: Support billing SabaPlay licensees [RedmineID: #217742]
 		- 20250417@Lionel: Integrate Microgaming Live Casino [RemineID:#223409]
 
 */
@@ -78,12 +79,20 @@ BEGIN
 
 	IF ISNULL(@PlatformId, 0) <> 0
 	BEGIN
-		DELETE p
-		FROM @partyList p
-			INNER JOIN dbo.OAS_Party pt WITH(NOLOCK) ON pt.PartyID = p.PartyId
-			INNER JOIN dbo.Licensees la WITH(NOLOCK) ON la.LicenseeID = pt.OldRefID
-			LEFT JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = la.LicenseeName AND l.PlatformId = @PlatformId
-		WHERE l.LicenseeId IS NULL
+		IF @PlatformId <> 99
+		BEGIN
+			SELECT @PartyIds = ISNULL(STRING_AGG(CONVERT(VARCHAR(50), p.PartyID), ','), '')
+			FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+				INNER JOIN bodb_licensee.dbo.Licensees la WITH(NOLOCK) ON p.OldRefID = la.LicenseeID
+				INNER JOIN DBOIC.bodb_OIC.dbo.Licensee l WITH(NOLOCK) ON l.RegisteredLicenseeName = la.LicenseeName AND l.PlatformId = @PlatformId
+			WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIds, ','))  
+		END
+		ELSE
+		BEGIN
+			SELECT @PartyIds = ISNULL(STRING_AGG(CONVERT(VARCHAR(50), p.PartyID), ','), '')
+			FROM bodb_licensee.dbo.OAS_Party p WITH(NOLOCK)
+			WHERE p.PartyID IN (SELECT value FROM STRING_SPLIT(@PartyIds, ','))  AND @PlatformId = 99 AND p.PlatformId = 2
+		END
 	END
 
 	DECLARE @N_FromDate DATE = DATEADD(MONTH, DATEDIFF(MONTH, 0, @FromDate) + 1, 0)
