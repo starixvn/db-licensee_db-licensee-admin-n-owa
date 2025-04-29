@@ -1,2 +1,1 @@
-Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_AmountToCompanySel.sql
-Licensee Admin\Report\SH_rpt_SabaPlayLicenseeBillingDataByProduct.sql
+Licensee Admin\Manage\Invoice Setting\PayerSetting\LA_PayerSettingModify.sql

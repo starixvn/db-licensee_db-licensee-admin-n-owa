@@ -12,6 +12,7 @@ AS
 		- 20150413@Florent: Initialize SP
 		- 20250403@Eddie: Get template follow Biller [RedmineID: #217740]
 		- 20250428@Eddie: For new Biller [RedmineID: #225376]
+		- 20250507@Danny: For new Internal biller [RedmineID: #222972]
 
 	Params:
 		- @InvoiceTemplateId :
@@ -29,6 +30,7 @@ BEGIN
 										   WHEN N'JollySports' 		   		 THEN 'Jollysports'
 										   WHEN N'Double S' 				 THEN 'Double-S'
 										   WHEN N'Fastlink Services Limited' THEN 'Fastlink'
+										   WHEN N'Internal Settlement'		 THEN 'Internal-Settlement'
 						  ELSE '' END
 
 	IF (@InvTemplate <> 'Fastlink')

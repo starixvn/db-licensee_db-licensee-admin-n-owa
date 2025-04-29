@@ -199,7 +199,7 @@ BEGIN
 						WHEN 'JollySports' THEN @BillingGroupName
 						WHEN 'Zelianta' THEN @BillingGroupName + ' Limited'
 						WHEN 'Double S' THEN @BillingGroupName
-						WHEN 'ONEWorks' THEN 'Internal-Settlement'
+						WHEN 'ONEWorks' THEN 'Internal Settlement'
 						ELSE '' END
 
 	SELECT @AMF = SUM(ISNULL(d.Income, 0))
@@ -431,6 +431,7 @@ BEGIN
 						,CASE InvTemplateName
 							WHEN @BillingGroupName THEN 1	-- Software Data & Licensing Fees
 							WHEN 'Double-S' THEN 1
+							WHEN 'Internal-Settlement' THEN 1
 							WHEN 'Credit' + CASE WHEN @BillingGroupName = 'JollySports' THEN '-JollySports' ELSE '' END THEN 4 -- Credit Note
 							WHEN 'Credit' + CASE WHEN @BillingGroupName = 'Double S' THEN '-Double-S' ELSE '' END THEN 4 -- Credit Note
 							WHEN 'Credit' + CASE WHEN @BillingGroupName = 'ONEWorks' THEN '-Internal-Settlement' ELSE '' END THEN 4 -- Credit Note
@@ -440,6 +441,7 @@ BEGIN
 				WHERE 1 = CASE InvTemplateName
 							WHEN @BillingGroupName THEN 1
 							WHEN CASE WHEN @BillingGroupName = 'Double S' THEN 'Double-S' ELSE '' END THEN 1
+							WHEN CASE WHEN @BillingGroupName = 'ONEWorks' THEN 'Internal-Settlement' ELSE '' END THEN 1
 							WHEN 'Credit'+ CASE WHEN @BillingGroupName = 'JollySports' THEN '-JollySports'
 												WHEN @BillingGroupName = 'Double S' THEN '-Double-S'
 												WHEN @BillingGroupName = 'ONEWorks' THEN '-Internal-Settlement' ELSE '' END THEN 1
@@ -449,6 +451,7 @@ BEGIN
 												WHEN @BillingGroupName = 'ONEWorks' THEN '-Internal-Settlement'
 												ELSE '' END THEN 1
 							ELSE 0 END
+						AND InvTemplateName <> 'ONEWorks'
 			) ivt
 				OUTER APPLY (
 					SELECT p.ProductId
