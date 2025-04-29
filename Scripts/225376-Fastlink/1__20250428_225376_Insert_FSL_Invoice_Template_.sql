@@ -1,0 +1,19 @@
+/*<info serverAlias="DBCUST-bodb_licensee"></info>*/
+/*
+	Created: 20250428@Eddie
+	DB: DBCUST.bodb_licensee
+	Description: Add new invoice template [RedmineID: #225376]
+*/
+
+USE bodb_licensee
+GO
+
+-- Add New Invoice Template
+INSERT INTO dbo.LA_InvoiceTemplate (InvTemplateName, TemplatePath)
+SELECT t.InvTemplateName, '' AS TemplatePath
+FROM (
+		VALUES ('HostingFee-Fastlink')
+
+) t(InvTemplateName)
+	LEFT JOIN dbo.LA_InvoiceTemplate it WITH (NOLOCK) ON it.InvTemplateName = t.InvTemplateName
+WHERE it.InvTemplateName IS NULL
