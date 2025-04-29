@@ -18,6 +18,7 @@ AS
 		- 20240920@Danny: Change to use Customer table Instead of CustInfo [#211108]
 		- 20250219@Danny: Integrate Double S System Inc group Licensees [RedmineID: #217961]
 		- 20250421@Eddie: Add Biller info [RedmineID: #221990]
+		- 20250428@Eddie: Add Biller info [RedmineID: #225376]
 
 	Param's Explanation:
 	Received Date format is mm/dd/yyyy
@@ -338,7 +339,7 @@ BEGIN
 						OR
 						ToPayerID IS NOT NULL 
 					)
-				AND Biller IN ('BHC','ZL','JS','DSS','RHL')
+				AND Biller IN ('BHC','ZL','JS','DSS','RHL','FSL')
 
 			
 		-- Invalid
@@ -350,7 +351,7 @@ BEGIN
 					 WHEN ISDATE(temp.ReceivedDate) = 0 THEN 'Invalid Received Date.' 
 					 WHEN RebatePayment = 'Y' AND CAST(temp.Amount AS MONEY) > 0 THEN 'Invalid Rebate Payment. Amount has to less than 0.'
 					 WHEN RebatePayment = 'Y' AND FromPayerID IS NOT NULL AND ToPayerID IS NOT NULL THEN 'Rebate Payment could not be a transfer overpayment.'
-					 WHEN  Biller NOT IN ('BHC','ZL','JS','DSS','RHL') OR Biller IS NULL  THEN 'Invalid Biller entered. Please ensure the Biller is in (BHC, ZL, JS, DSS, RHL).'
+					 WHEN  Biller NOT IN ('BHC','ZL','JS','DSS','RHL','FSL') OR Biller IS NULL  THEN 'Invalid Biller entered. Please ensure the Biller is in (BHC, ZL, JS, DSS, RHL, FSL).'
 					 WHEN ISNULL(FromCustomer,'') ='' and ISNULL(ToCustomer,'') ='' THEN 'Username cannot be blank.' 
 					 WHEN FromCustomer = ToCustomer THEN 'From Cust must different To Cust.' 
 					 WHEN LEN(Description) > 200 THEN 'Maximum length of Description is 200 characters.' 	
@@ -433,7 +434,7 @@ BEGIN
 						OR ToPayerID IS NOT NULL 
 						
 					)
-				AND Biller IN ('BHC','ZL','JS','DSS','RHL')
+				AND Biller IN ('BHC','ZL','JS','DSS','RHL','FSL')
 			
 
 
@@ -445,7 +446,7 @@ BEGIN
 					 WHEN (LEN(SUBSTRING(temp.Amount, CHARINDEX('.',temp.Amount ) + 1, LEN(temp.Amount))) > 2 AND CHARINDEX('.',temp.Amount) > 0)   OR
 						  (LEN(SUBSTRING(ToAmount, CHARINDEX('.',ToAmount ) + 1, LEN(ToAmount))) > 2  AND CHARINDEX('.',ToAmount) > 0 ) THEN 'Invalid Amount. From Amount and To Amount have 2 decimal digits only.'
 					 WHEN ISDATE(temp.ReceivedDate) = 0 THEN 'Invalid Received Date.' 
-					 WHEN  Biller NOT IN ('BHC','ZL','JS','DSS','RHL') OR Biller IS NULL THEN 'Invalid Biller entered. Please ensure the Biller is in (BHC, ZL, JS, DSS, RHL).'
+					 WHEN  Biller NOT IN ('BHC','ZL','JS','DSS','RHL','FSL') OR Biller IS NULL THEN 'Invalid Biller entered. Please ensure the Biller is in (BHC, ZL, JS, DSS, RHL, FSL).'
 					 WHEN RebatePayment = 'Y' AND ( CAST(temp.Amount AS MONEY) > 0 OR CAST(ToAmount AS MONEY) > 0 )  THEN 'Invalid Rebate Payment. From Amount and To Amount have to less than 0.'
 					 WHEN RebatePayment = 'Y' AND FromPayerID IS NOT NULL AND ToPayerID IS NOT NULL THEN 'Rebate Payment could not be a transfer overpayment.'
 					 WHEN ISNULL(FromCustomer,'') = ''  OR ISNULL(ToCustomer,'') = '' THEN 'Username cannot be blanked.' 

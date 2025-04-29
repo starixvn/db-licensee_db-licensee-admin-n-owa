@@ -11,6 +11,7 @@ AS
 	Revisions:
 		- 20150413@Florent: Initialize SP
 		- 20250403@Eddie: Get template follow Biller [RedmineID: #217740]
+		- 20250428@Eddie: For new Biller [RedmineID: #225376]
 
 	Params:
 		- @InvoiceTemplateId :
@@ -24,14 +25,25 @@ BEGIN
 	
 	DECLARE @InvTemplate NVARCHAR(50) = ''
 	
-	SELECT @InvTemplate = CASE @BillerName WHEN N'Reasternhold Limited' THEN 'Reasternhold'
-										   WHEN N'JollySports' 		   	THEN 'Jollysports'
-										   WHEN N'Double S' 			THEN 'Double-S'
+	SELECT @InvTemplate = CASE @BillerName WHEN N'Reasternhold Limited' 	 THEN 'Reasternhold'
+										   WHEN N'JollySports' 		   		 THEN 'Jollysports'
+										   WHEN N'Double S' 				 THEN 'Double-S'
+										   WHEN N'Fastlink Services Limited' THEN 'Fastlink'
 						  ELSE '' END
 
-	SELECT InvTemplateId, InvTemplateName, TemplatePath
-	FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
-	WHERE (@InvoiceTemplateId = 0 OR InvTemplateId = @InvoiceTemplateId)
-	  AND (@BillerName = '' OR InvTemplateName LIKE '%' + @InvTemplate)
+	IF (@InvTemplate <> 'Fastlink')
+	BEGIN
+		SELECT InvTemplateId, InvTemplateName, TemplatePath
+		FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
+		WHERE (@InvoiceTemplateId = 0 OR InvTemplateId = @InvoiceTemplateId)
+	      AND (@BillerName = '' OR InvTemplateName LIKE '%' + @InvTemplate)
+	END
+	ELSE
+	BEGIN
+		SELECT InvTemplateId, InvTemplateName, TemplatePath
+		FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
+		WHERE (@InvoiceTemplateId = 0 OR InvTemplateId = @InvoiceTemplateId)
+	      AND (InvTemplateName = 'Zelianta' OR InvTemplateName LIKE '%' + @InvTemplate)
+	END
 END
 GO
