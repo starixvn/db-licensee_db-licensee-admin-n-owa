@@ -9,7 +9,7 @@
 USE bodb_Licensee
 GO
 
-DECLARE @RGRNG_Prize INT = 64
+DECLARE @RGRNG_Prize INT = 65
 
 IF NOT EXISTS (SELECT TOP 1 1 FROM dbo.LA_InvoiceItemType WITH(NOLOCK) WHERE InvItemTypeId = @RGRNG_Prize)
 BEGIN
