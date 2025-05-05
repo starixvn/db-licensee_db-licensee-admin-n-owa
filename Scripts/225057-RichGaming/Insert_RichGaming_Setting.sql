@@ -21,7 +21,7 @@ SELECT @PartyId = PartyId FROM dbo.OAS_Party WITH (NOLOCK) WHERE PartyName = 'RG
 INSERT INTO dbo.OAS_ChargeInfo (ProductId, FromParty, ToParty, ParentChargeId, Rate, ChargeType, FromDate, ToDate)
 SELECT t.ProductId, t.FromParty, t.ToParty, t.ParentChargeId, t.Rate, t.ChargeType, t.FromDate, t.ToDate
 FROM (
-	SELECT 108 AS ProductId, p.PartyId AS FromParty, @PartyId AS ToParty, 0 AS ParentChargeId, 0.55 Rate, 1 AS ChargeType, '2025-05-08' AS FromDate, '2050-01-01' AS ToDate 
+	SELECT 108 AS ProductId, p.PartyId AS FromParty, @PartyId AS ToParty, 0 AS ParentChargeId, 0.055 Rate, 1 AS ChargeType, '2025-05-08' AS FromDate, '2050-01-01' AS ToDate 
 	FROM (VALUES (1), (9), (11), (98), (962), (1235), (25), (30)) AS p (PartyId)
 ) t
 	LEFT JOIN dbo.OAS_ChargeInfo c WITH (NOLOCK) ON t.ProductId = c.ProductId AND t.FromParty = c.FromParty AND t.ToParty = c.ToParty AND t.FromDate <= c.ToDate AND t.ToDate >= c.FromDate
