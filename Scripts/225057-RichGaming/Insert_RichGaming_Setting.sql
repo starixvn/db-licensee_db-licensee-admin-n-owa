@@ -21,7 +21,7 @@ SELECT @PartyId = PartyId FROM dbo.OAS_Party WITH (NOLOCK) WHERE PartyName = 'RG
 INSERT INTO dbo.OAS_ChargeInfo (ProductId, FromParty, ToParty, ParentChargeId, Rate, ChargeType, FromDate, ToDate)
 SELECT t.ProductId, t.FromParty, t.ToParty, t.ParentChargeId, t.Rate, t.ChargeType, t.FromDate, t.ToDate
 FROM (
-	SELECT 123 AS ProductId, p.PartyId AS FromParty, @PartyId AS ToParty, 0 AS ParentChargeId, 0.55 Rate, 1 AS ChargeType, '2025-05-08' AS FromDate, '2050-01-01' AS ToDate 
+	SELECT 108 AS ProductId, p.PartyId AS FromParty, @PartyId AS ToParty, 0 AS ParentChargeId, 0.55 Rate, 1 AS ChargeType, '2025-05-08' AS FromDate, '2050-01-01' AS ToDate 
 	FROM (VALUES (1), (9), (11), (98), (962), (1235), (25), (30)) AS p (PartyId)
 ) t
 	LEFT JOIN dbo.OAS_ChargeInfo c WITH (NOLOCK) ON t.ProductId = c.ProductId AND t.FromParty = c.FromParty AND t.ToParty = c.ToParty AND t.FromDate <= c.ToDate AND t.ToDate >= c.FromDate
@@ -32,7 +32,7 @@ INSERT INTO dbo.LA_ChargeInfo_SystemMapping (ChargeId, SystemId)
 SELECT c.ChargeId, 2 AS SystemId
 FROM dbo.OAS_ChargeInfo c WITH (NOLOCK)
 	LEFT JOIN dbo.LA_ChargeInfo_SystemMapping s WITH (NOLOCK) ON c.ChargeId = s.ChargeId AND s.SystemId = 2
-WHERE c.ProductId = 123
+WHERE c.ProductId = 108
 	AND c.FromParty IN (1, 9, 11, 98, 962, 1235, 25, 30)
 	AND c.ToParty = @PartyId
 	AND s.ChargeId IS NULL
@@ -42,7 +42,7 @@ DECLARE @HasInsertSetting BIT = 0;
 IF NOT EXISTS (SELECT ChargeID FROM OAS_ChargeInfo WITH (NOLOCK)
 							   WHERE FromParty IN (25, 30) 
 								 AND ToParty = 1
-								 AND ProductID = 123)
+								 AND ProductID = 108)
 BEGIN
 	-- Insert setting rate for Credit
 	INSERT INTO OAS_ChargeInfo([ProductID]
@@ -59,8 +59,8 @@ BEGIN
 								,[BaseCurrencyId]
 								,[FirstOfBilling]
 								,[BasisOfBilling])
-	VALUES(123, 25, 1, 0, 0, 1, '2025-05-08', '2050-01-01', NULL, NULL, NULL, NULL, NULL, NULL),
-		  (123, 30, 1, 0, 0, 1, '2025-05-08', '2050-01-01', NULL, NULL, NULL, NULL, NULL, NULL)
+	VALUES(108, 25, 1, 0, 0, 1, '2025-05-08', '2050-01-01', NULL, NULL, NULL, NULL, NULL, NULL),
+		  (108, 30, 1, 0, 0, 1, '2025-05-08', '2050-01-01', NULL, NULL, NULL, NULL, NULL, NULL)
 
 	SET @HasInsertSetting = 1
 END
@@ -72,5 +72,5 @@ BEGIN
 	FROM OAS_ChargeInfo WITH (NOLOCK)
 	WHERE FromParty IN (25, 30) 
 	  AND ToParty = 1
-	  AND ProductID = 123 
+	  AND ProductID = 108 
 END
