@@ -26,6 +26,7 @@ AS
 		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
 		- 20231002@Danny: logging currency information with new format [#FeatureID 193214]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
 
 	Params:
 	Example:
@@ -45,7 +46,7 @@ BEGIN
 		FromDate		DATE,
 		ToDate			DATE,
 		Remark			NVARCHAR(200),
-		BaseCurrencyId	TINYINT,
+		BaseCurrencyId	INT,
 		FirstOfBilling	DATE,
 		BasisOfBilling	NVARCHAR(4000),
 		[Status]		INT,

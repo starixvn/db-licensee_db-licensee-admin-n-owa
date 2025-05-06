@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-bodb_licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE bodb_licensee
 GO
 
@@ -6,7 +6,7 @@ ALTER PROCEDURE [dbo].[LA_DiscountUpd]
 	@DiscountGroupId	SMALLINT = 0,
 	@DiscountGroupName	NVARCHAR(110),
 	@DiscountGroupType	TINYINT, 
-	@CurrencyId			TINYINT,
+	@CurrencyId			INT,
 	@FromDate			DATE, 
 	@ToDate				DATE, 
 	@CalculationProductIds VARCHAR(512) = '', 
@@ -30,6 +30,7 @@ AS
 		- 20211101@Percy: Support Discount on Lic WL - Do not allow extend ToDate of Discount Group on Lic Fee [RedmineID: #162158]
 		- 20220210@Percy: Support Tier Rebate [RedmineID: #163495]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
+		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
 
 	 Params:
 		@RateSettingsData = '<Root>

@@ -39,6 +39,7 @@ AS
 		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
 		- 20231228@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 		- 20250321@Eddie: Add Payer Platform [RedmineID: #217740]
+		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
 
 	Param's Explanation:
 		- @PlatformId: 1 (Saba Sports), 2 (SabaPlay), 3 (SabaSports&SabaPlay)
@@ -76,7 +77,7 @@ BEGIN
 	IF ISNULL(@BaseCurrencySettingXml, '') <> ''
 	BEGIN
 		DECLARE @BaseCurrencySetting TABLE(Idx INT IDENTITY(1, 1)
-											, BaseCurrencyId TINYINT
+											, BaseCurrencyId INT
 											, LicenseeCode VARCHAR(50)
 											, FromDate DATE
 											, ToDate DATE)
@@ -87,7 +88,7 @@ BEGIN
 			INSERT INTO @BaseCurrencySetting(BaseCurrencyId, LicenseeCode, FromDate, ToDate)
 			SELECT BaseCurrencyId, LicenseeCode, FromDate, ToDate
 			FROM OPENXML(@docHandler, 'Root/BaseCurrencySetting')
-			WITH(BaseCurrencyId TINYINT 'BaseCurrencyId',
+			WITH(BaseCurrencyId INT 'BaseCurrencyId',
 					LicenseeCode VARCHAR(50) 'LicenseeCode',
 					FromDate DATE 'FromDate',
 					ToDate DATE 'ToDate')

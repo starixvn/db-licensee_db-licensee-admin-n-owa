@@ -9,6 +9,6 @@
 USE bodb_licenseeReport
 
 ALTER TABLE bettrans
-ALTER COLUMN currency INT;
+ALTER COLUMN currency INT ;
 
 

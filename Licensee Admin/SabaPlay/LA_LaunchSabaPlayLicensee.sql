@@ -5,7 +5,7 @@ CREATE PROCEDURE [dbo].[LA_LaunchSabaPlayLicensee]
 	@PayerName				VARCHAR(50),
 	@BrandName				VARCHAR(100)	= '',
 	@LicenseeCode			VARCHAR(50)		= '',
-	@BaseCurrencyId			TINYINT,
+	@BaseCurrencyId			INT,
 	@LaunchDate				DATE, 
 	@SabaPlayProductIDs				VARCHAR(MAX)	= '',
 	@InvoiceLanguage		VARCHAR(7)		= '',
@@ -22,6 +22,7 @@ AS
 
 	Revisions:
 		- 20250320@Danny: Launch new saba play licensee
+		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
 	
 	Param's Explannation: 
 	@ProductIds: [{"ProductID":1, "Productname":"abc"}]

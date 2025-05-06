@@ -46,6 +46,7 @@ AS
 		- 20250225@Danny: Integrate Double S System Inc group Licensees [RedmineID: #217961]
 		- 20250210@Danny: Allow Editing Payer Base Currency Without Affecting Billing [#FeatureID 216841]
 		- 20250321@Eddie: Update Payer Platform [RedmineID: #217740]
+		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
 	
 	Param's Explannation: 
 		@BaseCurrencySettingXml = <Root>
@@ -183,7 +184,7 @@ BEGIN
 		IF ISNULL(@BaseCurrencySettingXml, '') <> ''
 		BEGIN
 			DECLARE @BaseCurrencySetting TABLE(Idx INT IDENTITY(1, 1)
-												, BaseCurrencyId TINYINT
+												, BaseCurrencyId INT
 												, LicenseeCode VARCHAR(50)
 												, FromDate DATE
 												, ToDate DATE)
@@ -194,7 +195,7 @@ BEGIN
 				INSERT INTO @BaseCurrencySetting(BaseCurrencyId, LicenseeCode, FromDate, ToDate)
 				SELECT BaseCurrencyId, LicenseeCode, FromDate, ToDate
 				FROM OPENXML(@docHandler, 'Root/BaseCurrencySetting')
-				WITH(BaseCurrencyId TINYINT 'BaseCurrencyId',
+				WITH(BaseCurrencyId INT 'BaseCurrencyId',
 						LicenseeCode VARCHAR(50) 'LicenseeCode',
 						FromDate DATE 'FromDate',
 						ToDate DATE 'ToDate')

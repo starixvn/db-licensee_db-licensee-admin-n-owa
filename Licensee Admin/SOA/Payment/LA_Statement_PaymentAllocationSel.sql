@@ -14,6 +14,7 @@ AS
 	Revisions: 
 		- 20230908@Danny: Initialize SP [#194603]
 		- 20240719@Danny: Handle dulicate Invoice No. [#194604]
+		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
 
 	Param's Explanation:
 
@@ -47,7 +48,7 @@ BEGIN
 	) 
 
 	-- Get all LicenseeCode
-	CREATE TABLE #LicenseeCode (PartyID	INT, BaseCurrencyId TINYINT, LicenseeCode VARCHAR(50), IsActive BIT DEFAULT 0 , PayerName VARCHAR(50),BaseCurrencyCode VARCHAR(12))
+	CREATE TABLE #LicenseeCode (PartyID	INT, BaseCurrencyId INT, LicenseeCode VARCHAR(50), IsActive BIT DEFAULT 0 , PayerName VARCHAR(50),BaseCurrencyCode VARCHAR(12))
 	INSERT INTO #LicenseeCode (PartyID, BaseCurrencyId, LicenseeCode, PayerName, BaseCurrencyCode)
 	SELECT	DISTINCT op.PartyID, 
 			op.BaseCurrencyId, 
