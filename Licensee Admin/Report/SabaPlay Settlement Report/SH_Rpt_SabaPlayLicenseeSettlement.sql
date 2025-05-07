@@ -12,7 +12,8 @@ AS
 	DB: DBLIC.bodb_licensee
 		
 	Revisions:
-		- 20250403@Danny: create new sp
+		- 20250403@Danny: create new sp [RedmineID: #217741]
+		- 20250506@Danny: use MemberTurnover column instead [RedmineID: #225394]
 	
 	Param's Explanation:
 
@@ -40,8 +41,6 @@ BEGIN
 	SELECT ExchangeDate, ExchangeId, Code, BaseCurrencyRate
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
-
-
 	SELECT @ToDate AS WinLostDate,
 		    ex.CurrencyCode AS CurrencyName,
 			ex.Rate			AS ExchangeRate,
@@ -50,7 +49,7 @@ BEGIN
 			sp.LicenseeChargeRate AS LicenseeChargeRate,
 
 			SUM(ISNULL(sp.BetCount,0)) AS Betcount,
-			SUM(ISNULL(sp.MemberNetTurnover,0)) AS Turnover,
+			SUM(ISNULL(sp.MemberTurnover,0)) AS Turnover,
 			SUM(ISNULL(sp.MemberWinLoss,0)) AS GrossWin_CustomerWinloss,
 			SUM(ISNULL(sp.LicenseeContribution,0)) AS GrossWin_Contribution,
 			SUM(ISNULL(sp.LicenseeGrossWin,0)) AS GrossWin_Total,
