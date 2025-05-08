@@ -10,6 +10,9 @@ AS
 	Revisions:
 		- 20240517@Danny: Create func.  [#204167]
 		- 20241004@Sally: Support Odds Boost Voucher [#209884]
+		- 20250505@Corbin: Integrate HOTDOG [#221605]
+		- 20250505@Corbin: Integrate Microgaming Live Casino [#223409]
+		- 20250505@Corbin: Integrate RichGaming [RemineID:#225057]
 
 */
 
@@ -21,7 +24,7 @@ RETURN
 		UNION ALL
 		SELECT '10', 'Date, Currency, Turnover, Total Trans, Gross Win_Customer Win Loss, Gross Win_Contribution, Gross Win_Total, <Licensee Name> Win Loss, Amount due to <Product Name>_Gross Win * Charge Rate, Amount due to <Product Name>_Contribution, Amount due to <Product Name>_Jackpot Prize, Amount due to <Product Name>_Total, <Billing Currency> equivalent'
 		UNION ALL
-		SELECT '21,34,45,55,73,79,80', 'Date, Currency, Turnover, Total Trans, Customer Win Loss, <Licensee Name> Win Loss, <Licensee Name> Charge Rate, Promotion, Company, <Billing Currency> equivalent'  
+		SELECT '21,34,45,55,73,79,80,95,107,108', 'Date, Currency, Turnover, Total Trans, Customer Win Loss, <Licensee Name> Win Loss, <Licensee Name> Charge Rate, Promotion, Company, <Billing Currency> equivalent'  
 		UNION ALL
 		SELECT '39', 'Date, Currency, Turnover, Total Trans, Customer Win Loss, <Licensee Name> Win Loss, Tips Amount, Tips Amount Due, Company, <Billing Currency> equivalent'
 		UNION ALL

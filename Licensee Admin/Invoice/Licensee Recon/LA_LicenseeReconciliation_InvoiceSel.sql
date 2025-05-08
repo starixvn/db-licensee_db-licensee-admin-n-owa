@@ -51,6 +51,7 @@ AS
 		- 20250416@Corbin: Integrate HOTDOG [RemineID:#221605]
 		- 20250421@Danny: Support billing SabaPlay licensees [RedmineID: #217742]
 		- 20250417@Lionel: Integrate Microgaming Live Casino [RemineID:#223409]
+		- 20250505@Corbin: Integrate RichGaming [RemineID:#225057]
 
 */
 BEGIN
@@ -99,7 +100,7 @@ BEGIN
 	DECLARE @N_ToDate DATE = DATEADD (DAY, -1, DATEADD(MONTH, 1, @N_FromDate))
 
 	SELECT p.LicenseeCode, b.CurrencyName, r.ProductName, p.PartyId
-		,SUM(CASE WHEN InvItemTypeId IN (1,30,31,32,33,34,35,36,37,38,39,40,41,42,43,47,49,50,53,54,55,56,57,58,59,62,63,64) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) LicensingFee
+		,SUM(CASE WHEN InvItemTypeId IN (1,30,31,32,33,34,35,36,37,38,39,40,41,42,43,47,49,50,53,54,55,56,57,58,59,62,63,64,65) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) LicensingFee
 		,SUM(CASE WHEN InvItemTypeId = 4 THEN ISNULL(Expense,0) ELSE 0 END) Discount
 		,SUM(CASE WHEN InvItemTypeId = 6 THEN ISNULL(Expense,0) ELSE 0 END) Rebate
 		,SUM(CASE WHEN InvItemTypeId IN (5,24,26) THEN ISNULL(Income,0) - ISNULL(Expense,0) ELSE 0 END) Prepayment
