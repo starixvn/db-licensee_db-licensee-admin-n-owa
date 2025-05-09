@@ -22,6 +22,7 @@ AS
 		- 20231228@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 		- 20240527@Danny: Automate the PT adjustment when the Exchange charge rate is changed [RemineID: #201477]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+		- 20250429@Danny: Internal Template for OW Billing
 		
 	Param's Explannation: 
 		+ @ChargeSettingsXML: '<ChargeSettings>
@@ -132,6 +133,8 @@ BEGIN
 		WHERE BillerName = CASE c.GroupName WHEN 'Boping' THEN c.GroupName
 											WHEN 'JollySports' THEN c.GroupName
 							                WHEN 'Zelianta' THEN c.GroupName + ' Limited'
+											WHEN 'Double S' THEN c.GroupName
+											WHEN 'ONEWorks' THEN 'Internal Settlement'
 						   ELSE '' END
 	) AS n
 
@@ -406,17 +409,30 @@ BEGIN
 						SELECT InvTemplateId, InvTemplateName
 							,CASE InvTemplateName
 								WHEN @GroupName THEN 1 -- Software Data & Licensing Fees
-								WHEN 'Credit' THEN 4 -- Credit Note
+								WHEN 'Double-S' THEN 1
+								WHEN 'Internal-Settlement' THEN 1
+								WHEN 'Credit' + CASE WHEN @GroupName = 'JollySports' THEN '-JollySports' ELSE '' END THEN 4 -- Credit Note
+								WHEN 'Credit' + CASE WHEN @GroupName = 'Double S' THEN '-Double-S' ELSE '' END THEN 4 -- Credit Note
+								WHEN 'Credit' + CASE WHEN @GroupName = 'ONEWorks' THEN '-Internal-Settlement' ELSE '' END THEN 4 -- Credit Note
 								ELSE 5 -- Debit Note
-								END AS InvTypeId
+							END AS InvTypeId
 						FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
 						WHERE 1 = CASE InvTemplateName
-									WHEN @GroupName THEN 1
-									WHEN 'Credit' THEN 1
-									WHEN 'Debit' + CASE WHEN @GroupName = 'Zelianta' THEN '-Zelianta' ELSE '' END THEN 1
-									ELSE 0 END
+							WHEN @GroupName THEN 1
+							WHEN CASE WHEN @GroupName = 'Double S' THEN 'Double-S' ELSE '' END THEN 1
+							WHEN CASE WHEN @GroupName = 'ONEWorks' THEN 'Internal-Settlement' ELSE '' END THEN 1
+							WHEN 'Credit'+ CASE WHEN @GroupName = 'JollySports' THEN '-JollySports'
+												WHEN @GroupName = 'Double S' THEN '-Double-S'
+												WHEN @GroupName = 'ONEWorks' THEN '-Internal-Settlement' ELSE '' END THEN 1
+							WHEN 'Debit' + CASE WHEN @GroupName = 'Zelianta' THEN '-Zelianta' 
+												WHEN @GroupName = 'JollySports' THEN '-JollySports'
+												WHEN @GroupName = 'Double S' THEN '-Double-S'
+												WHEN @GroupName = 'ONEWorks' THEN '-Internal-Settlement'
+												ELSE '' END THEN 1
+							ELSE 0 END
+						AND InvTemplateName <> 'ONEWorks'
 					) ivt	
-				   WHERE ivt.InvTemplateName IN ('Boping', 'Zelianta', 'JollySports')
+				   WHERE ivt.InvTemplateName IN ('Boping', 'Zelianta', 'JollySports','Double-S','Internal-Settlement')
 						AND NOT EXISTS (
 							SELECT 1 FROM dbo.LA_InvoiceSetting l WITH(NOLOCK) 
 							WHERE l.FromPartyId = @PartyId AND ToPartyId = @BillerId AND l.InvTypeId = ivt.InvTypeId AND l.ProductId = @Product3rdId

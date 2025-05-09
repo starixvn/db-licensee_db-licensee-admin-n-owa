@@ -50,6 +50,7 @@ AS
 		- 20250219@Danny: Integrate Double S System Inc group Licensees [RedmineID: #217961]
 		- 20250303@Danny: Integrate Double S System Inc group Licensees [RedmineID: #217961]
 		- 20250324@Danny: Add new  @PlatformId parameter
+		- 20250429@Danny: Internal Template for OW Billing
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -198,6 +199,7 @@ BEGIN
 						WHEN 'JollySports' THEN @BillingGroupName
 						WHEN 'Zelianta' THEN @BillingGroupName + ' Limited'
 						WHEN 'Double S' THEN @BillingGroupName
+						WHEN 'ONEWorks' THEN 'Internal Settlement'
 						ELSE '' END
 
 	SELECT @AMF = SUM(ISNULL(d.Income, 0))
@@ -429,21 +431,27 @@ BEGIN
 						,CASE InvTemplateName
 							WHEN @BillingGroupName THEN 1	-- Software Data & Licensing Fees
 							WHEN 'Double-S' THEN 1
+							WHEN 'Internal-Settlement' THEN 1
 							WHEN 'Credit' + CASE WHEN @BillingGroupName = 'JollySports' THEN '-JollySports' ELSE '' END THEN 4 -- Credit Note
 							WHEN 'Credit' + CASE WHEN @BillingGroupName = 'Double S' THEN '-Double-S' ELSE '' END THEN 4 -- Credit Note
+							WHEN 'Credit' + CASE WHEN @BillingGroupName = 'ONEWorks' THEN '-Internal-Settlement' ELSE '' END THEN 4 -- Credit Note
 							ELSE 5 -- Debit Note
 							END AS InvTypeId
 				FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
 				WHERE 1 = CASE InvTemplateName
 							WHEN @BillingGroupName THEN 1
 							WHEN CASE WHEN @BillingGroupName = 'Double S' THEN 'Double-S' ELSE '' END THEN 1
+							WHEN CASE WHEN @BillingGroupName = 'ONEWorks' THEN 'Internal-Settlement' ELSE '' END THEN 1
 							WHEN 'Credit'+ CASE WHEN @BillingGroupName = 'JollySports' THEN '-JollySports'
-												WHEN @BillingGroupName = 'Double S' THEN '-Double-S' ELSE '' END THEN 1
+												WHEN @BillingGroupName = 'Double S' THEN '-Double-S'
+												WHEN @BillingGroupName = 'ONEWorks' THEN '-Internal-Settlement' ELSE '' END THEN 1
 							WHEN 'Debit' + CASE WHEN @BillingGroupName = 'Zelianta' THEN '-Zelianta' 
 												WHEN @BillingGroupName = 'JollySports' THEN '-JollySports'
 												WHEN @BillingGroupName = 'Double S' THEN '-Double-S'
+												WHEN @BillingGroupName = 'ONEWorks' THEN '-Internal-Settlement'
 												ELSE '' END THEN 1
 							ELSE 0 END
+						AND InvTemplateName <> 'ONEWorks'
 			) ivt
 				OUTER APPLY (
 					SELECT p.ProductId
@@ -451,7 +459,7 @@ BEGIN
 						INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON p.ProductId = c.ProductId
 					WHERE c.FromParty = @NewPartyId AND c.ToParty = @BillingGroupId
 						AND c.FromDate = @LaunchDate
-						AND ivt.InvTemplateName IN ('Boping', 'Zelianta', 'JollySports','Double-S')
+						AND ivt.InvTemplateName IN ('Boping', 'Zelianta', 'JollySports','Double-S','Internal-Settlement')
 				) p
 
 			

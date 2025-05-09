@@ -37,6 +37,7 @@ AS
 		- 20231002@Danny: logging currency information with new format [#FeatureID 193214]
 		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+		- 20250429@Danny: Internal Template for OW Billing
 
 	 Params:
 		+ @ChargeSettingXML: '<ChargeSettings>
@@ -374,6 +375,8 @@ BEGIN
 							WHEN 'Boping' THEN @BillingGroupName
 							WHEN 'JollySports' THEN @BillingGroupName
 							WHEN 'Zelianta' THEN @BillingGroupName + ' Limited'
+							WHEN 'Double S' THEN @BillingGroupName
+							WHEN 'ONEWorks' THEN 'Internal Settlement'
 							ELSE '' END
 
 		IF ISNULL(@BillerId, 0) <> 0
@@ -383,22 +386,35 @@ BEGIN
 				SELECT InvTemplateId, InvTemplateName
 					,CASE InvTemplateName
 						WHEN @BillingGroupName THEN 1 -- Software Data & Licensing Fees
-						WHEN 'Credit' THEN 4 -- Credit Note
+						WHEN 'Double-S' THEN 1
+						WHEN 'Internal-Settlement' THEN 1
+						WHEN 'Credit' + CASE WHEN @BillingGroupName = 'JollySports' THEN '-JollySports' ELSE '' END THEN 4 -- Credit Note
+						WHEN 'Credit' + CASE WHEN @BillingGroupName = 'Double S' THEN '-Double-S' ELSE '' END THEN 4 -- Credit Note
+						WHEN 'Credit' + CASE WHEN @BillingGroupName = 'ONEWorks' THEN '-Internal-Settlement' ELSE '' END THEN 4 -- Credit Note
 						ELSE 5 -- Debit Note
-						END AS InvTypeId
+					END AS InvTypeId
 				FROM dbo.LA_InvoiceTemplate WITH (NOLOCK)
 				WHERE 1 = CASE InvTemplateName
 							WHEN @BillingGroupName THEN 1
-							WHEN 'Credit' THEN 1
-							WHEN 'Debit' + CASE WHEN @BillingGroupName = 'Zelianta' THEN '-Zelianta' ELSE '' END THEN 1
+							WHEN CASE WHEN @BillingGroupName = 'Double S' THEN 'Double-S' ELSE '' END THEN 1
+							WHEN CASE WHEN @BillingGroupName = 'ONEWorks' THEN 'Internal-Settlement' ELSE '' END THEN 1
+							WHEN 'Credit'+ CASE WHEN @BillingGroupName = 'JollySports' THEN '-JollySports'
+												WHEN @BillingGroupName = 'Double S' THEN '-Double-S'
+												WHEN @BillingGroupName = 'ONEWorks' THEN '-Internal-Settlement' ELSE '' END THEN 1
+							WHEN 'Debit' + CASE WHEN @BillingGroupName = 'Zelianta' THEN '-Zelianta' 
+												WHEN @BillingGroupName = 'JollySports' THEN '-JollySports'
+												WHEN @BillingGroupName = 'Double S' THEN '-Double-S'
+												WHEN @BillingGroupName = 'ONEWorks' THEN '-Internal-Settlement'
+												ELSE '' END THEN 1
 							ELSE 0 END
+					AND InvTemplateName <> 'ONEWorks'
 			) ivt
 				OUTER APPLY (
 					SELECT p.ProductId
 					FROM @ChargeSetting p
 						INNER JOIN dbo.OAS_ChargeInfo c WITH(NOLOCK) ON p.ProductId = c.ProductId AND p.FromDate = c.FromDate
 					WHERE c.FromParty = @PayerID AND c.ToParty = @ToParty
-						AND ivt.InvTemplateName IN ('Boping', 'Zelianta','JollySports')
+						AND ivt.InvTemplateName IN ('Boping', 'Zelianta', 'JollySports','Double-S','Internal-Settlement')
 						AND p.StatusId > 0
 				) p
 			WHERE p.ProductId IS NOT NULL -- @BillingGroupId <> 0 for when lauching licensees
