@@ -37,6 +37,7 @@ AS
 		- 20241014@Sally: Support Odds Boost Voucher [#209884]
 		- 20241202@Danny: Remove IncludeRebateWorkSheet column [#214501]
 		- 20250221@Danny:  Integrate Double S System Inc group Licensees [#217961]
+		- 20250502@Eddie: Support Billing for SabaPlay [#221987]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -53,8 +54,15 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @FinalResult TABLE (PartyId INT, InvoiceHeaderId BIGINT, InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, BillerId INT, InvoiceType TINYINT, InvoicePath NVARCHAR(255), ProductCodes VARCHAR(MAX), LicensingFee MONEY, Discount MONEY, ExtraAmount MONEY, AdjustmentAmount MONEY, AdjustmentNote NVARCHAR(500))
+	DECLARE @FinalResult TABLE (PartyId INT, InvoiceHeaderId BIGINT, InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, BillerId INT, InvoiceType TINYINT, InvoicePath NVARCHAR(255), ProductIds VARCHAR(200), ProductCodes VARCHAR(MAX), LicensingFee MONEY, Discount MONEY, ExtraAmount MONEY, AdjustmentAmount MONEY, AdjustmentNote NVARCHAR(500))
+
+	DECLARE @IsSabaPlayBiller BIT, @BillerName NVARCHAR(50)
 	
+	SELECT @IsSabaPlayBiller = CASE WHEN BillerNameAbbreviation = 'RHL' THEN 1 ELSE 0 END
+	     , @BillerName = BillerName
+	FROM dbo.LA_BillerInfo WITH (NOLOCK)
+	WHERE PartyId = @BillerId 
+
 	-- Get Product List
 	BEGIN
 		DECLARE @Products TABLE (GroupProductId INT, ProductId INT, ProductCode VARCHAR(50))
@@ -70,8 +78,11 @@ BEGIN
 			AND (p.EndOfSupportDate IS NULL OR p.EndOfSupportDate >= @FromDate)
 			AND p.OfferSite IN (0, 2) -- Deposit
 		
-		DECLARE @ProductCodes VARCHAR(MAX)
+		DECLARE @ProductCodes VARCHAR(MAX), @ProductIds VARCHAR(MAX)
 		SELECT  @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM @Products
+		
+		SELECT @ProductIds = STRING_AGG(CONVERT(VARCHAR(10), ProductID),',') FROM bodb_licenseeReport.dbo.SabaPlay_Products WITH (NOLOCK)
+		
 	END
 
 	-- Region: Get Party Settings
@@ -116,16 +127,6 @@ BEGIN
 			PRINT 'Wrong format XML'
 		END CATCH
 
-		DECLARE @BillerInfo  TABLE(PartyID INT, BillerName  NVARCHAR(50))
-		DECLARE  @SQL VARCHAR(MAX)
-		SET @SQL = 'SELECT PartyID, BillerName
-					FROM OPENQUERY(DBCUST, ''SELECT PartyID, BillerName
-											FROM bodb_licensee.dbo.LA_BillerInfo b WITH (NOLOCK) WHERE PartyID = ' + CONVERT(VARCHAR(20), @BillerId) + ''')'
-
-		INSERT INTO @BillerInfo (PartyID, BillerName)
-		EXEC (@SQL)
-
-
 		DECLARE @PartySettings TABLE (
 			PartyId INT, 
 			LicenseeId INT, 
@@ -155,23 +156,32 @@ BEGIN
 			AND InvoiceType IN (1, 3, 6) -- Software Fee, Rebate, Hosting Fee
 		ORDER BY CreatedDateTime DESC
 		
-		DECLARE @InvoiceSettings TABLE (IndexNumber INT, PartyId INT, BillerId INT, InvTypeId SMALLINT, ProductCodes VARCHAR(200), InvTemplateName VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT,  IsIncludePlayerTipsWorkSheet BIT, CompanyName	NVARCHAR(100), PayerAddress1 NVARCHAR(255), BillerAddress1 NVARCHAR(255))
-		INSERT INTO @InvoiceSettings (IndexNumber, PartyId, BillerId, InvTypeId, InvTemplateName, InvoiceSymbol, InvoiceNumber, ProductCodes, CompanyName, PayerAddress1, IsIncludePlayerTipsWorkSheet, BillerAddress1)
+		DECLARE @InvoiceSettings TABLE (IndexNumber INT, PartyId INT, BillerId INT, InvTypeId SMALLINT, ProductIds VARCHAR(200), ProductCodes VARCHAR(200), InvTemplateName VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT,  IsIncludePlayerTipsWorkSheet BIT, CompanyName	NVARCHAR(100), PayerAddress1 NVARCHAR(255), BillerAddress1 NVARCHAR(255))
+
+		INSERT INTO @InvoiceSettings (IndexNumber, PartyId, BillerId, InvTypeId, InvTemplateName, InvoiceSymbol, InvoiceNumber, ProductIds, ProductCodes, CompanyName, PayerAddress1, IsIncludePlayerTipsWorkSheet, BillerAddress1)
 		SELECT d.IndexNumber, s.FromPartyId, s.ToPartyId, s.InvTypeId, t.InvTemplateName, @InvoiceSymbol, d.InvoiceNumber
+			, STUFF((SELECT ',' + CONVERT(VARCHAR(50), p.ProductId)
+					 FROM dbo.LA_InvoiceSetting ls WITH (NOLOCK)
+						LEFT JOIN bodb_LicenseeReport.dbo.SabaPlay_Products p WITH (NOLOCK) ON ls.ProductId = p.ProductId
+					 WHERE s.InvTypeId = ls.InvTypeId
+					   AND s.FromPartyId = ls.FromPartyId
+					   AND s.ToPartyId = ls.ToPartyId
+					   AND ls.InvTypeId = 1 AND ls.ProductId IS NOT NULL
+					   AND @IsSabaPlayBiller = 1
+					FOR XML PATH('')), 1, 1, '') AS ProductIds
 			, STUFF((SELECT ',' + CASE WHEN ls.ProductId = 0 THEN 'SB' ELSE ProductPrefix END
 						FROM dbo.LA_InvoiceSetting ls WITH (NOLOCK)
 							LEFT JOIN dbo.Product3rd p WITH (NOLOCK) ON ls.ProductId = p.ProductId
 						WHERE s.InvTypeId = ls.InvTypeId AND s.FromPartyId = ls.FromPartyId AND s.ToPartyId = ls.ToPartyId
 							AND ls.InvTypeId = 1 AND ls.ProductId IS NOT NULL
+							AND @IsSabaPlayBiller = 0
 						FOR XML PATH('')), 1, 1, '') AS ProductCodes
 			, CASE WHEN s.ActiveAddress = 1 THEN ps.CompanyName
 			       WHEN s.ActiveAddress = 2 THEN ps.CompanyName2  END CompanyName
 			, CASE WHEN s.ActiveAddress = 1 THEN ps.Address1
 					WHEN s.ActiveAddress = 2 THEN ps.Address2  END PayerAddress1
-
             , d.IsIncludePlayerTipsWorkSheet
-			, bl.Address1	 
-			
+			, bl.Address1
 		FROM @PartySettings ps
 			INNER JOIN @InvoiceData d ON ps.PartyId = d.PartyId
 			INNER JOIN dbo.LA_InvoiceSetting s WITH (NOLOCK) ON s.FromPartyId = ps.PartyId AND s.InvTypeId = d.InvoiceTypeId
@@ -182,7 +192,7 @@ BEGIN
 			CASE WHEN s.ActiveAddress = 1 THEN ps.CompanyName
 				 WHEN s.ActiveAddress = 2 THEN ps.CompanyName2  END,
 			CASE WHEN s.ActiveAddress = 1 THEN ps.Address1
-					WHEN s.ActiveAddress = 2 THEN ps.Address2  END,  bl.Address1	 
+					WHEN s.ActiveAddress = 2 THEN ps.Address2  END,  bl.Address1
 
 		-- Handle (Casino Promotion invoice setting)
 		UPDATE @InvoiceSettings
@@ -211,6 +221,7 @@ BEGIN
 	-- End Region: Get Exchange
 
 	-- Region: Get hosting fee
+	IF @IsSabaPlayBiller = 0
 	BEGIN
 		DECLARE @HostingFee TABLE (PartyId INT, SettingType TINYINT, NoOfDate INT, Amount MONEY, CurrencyId INT)
 		INSERT INTO @HostingFee (PartyId, SettingType, NoOfDate, Amount, CurrencyId)
@@ -247,16 +258,17 @@ BEGIN
 	END
 	-- End Region: Get hosting fee
 
-	-- Region: Get Licensing fee
-	BEGIN
-		DECLARE @temp_PartyIds VARCHAR(MAX), @temp_BaseCurrencyId INT, @temp_BaseCurrencyName VARCHAR(10), @RowId SMALLINT = 1
+	DECLARE @temp_PartyIds VARCHAR(MAX), @temp_BaseCurrencyId INT, @temp_BaseCurrencyName VARCHAR(10), @RowId SMALLINT = 1
+	
+	DECLARE @Result TABLE
+	(
+		PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT, Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000),ExtraInfo NVARCHAR(4000), OddsBoostBonus MONEY
+	)
 
-		DECLARE @Result TABLE
-		(
-			PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
-			,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000),ExtraInfo NVARCHAR(4000), OddsBoostBonus MONEY
-		)
-		
+	-- Region: Get Licensing fee
+	IF @IsSabaPlayBiller = 0
+	BEGIN
+
 		WHILE 1 = 1
 		BEGIN
 			SELECT @Temp_PartyIds = NULL, @temp_BaseCurrencyId = NULL, @temp_BaseCurrencyName = NULL
@@ -347,24 +359,47 @@ BEGIN
 
 		UPDATE @FinalResult SET LicensingFee = ISNULL(LicensingFee, 0) + ISNULL(ExtraAmount, 0) WHERE InvoiceType = 1 AND InvoiceHeaderId IS NULL
 	END
+	ELSE
+	BEGIN
+		WHILE 1 = 1
+		BEGIN
+			SELECT @Temp_PartyIds = NULL, @temp_BaseCurrencyId = NULL, @temp_BaseCurrencyName = NULL
+			SELECT @temp_BaseCurrencyId = BaseCurrencyId, @temp_BaseCurrencyName = BaseCurrencyName FROM @BaseCurrencies WHERE RowId = @RowId
+			SELECT @temp_PartyIds = COALESCE(@temp_PartyIds + ',', '') + CONVERT(VARCHAR(20), PartyId) FROM @PartySettings WHERE BaseCurrencyId = @temp_BaseCurrencyId
+
+			IF @temp_PartyIds IS NULL
+				BREAK
+
+			INSERT INTO @Result( PartyId, ProductId, LicensingFee, Discount )
+			EXEC dbo.SH_SabaPLay_AmountToCompanyByProduct
+				@PartyIds = @temp_PartyIds
+				,@ProductIDs = @ProductIds
+				,@FromDate = @FromDate
+				,@ToDate = @ToDate
+				,@BaseCurrencyName = @temp_BaseCurrencyName
+				,@Environment = @Environment
+
+			SET @RowId = @RowId + 1
+		END
+
+		INSERT INTO @FinalResult (PartyId, BillerId, InvoiceType, ProductIds, LicensingFee)
+		SELECT t.PartyId, s.BillerId, 1, s.ProductIds, SUM( ROUND(t.LicensingFee, 2) ) AS LicensingFee
+		FROM @Result t
+			INNER JOIN @InvoiceSettings s ON t.PartyId = s.PartyId AND ',' + s.ProductIds + ',' LIKE '%,' + CONVERT(VARCHAR(10), t.ProductId) + ',%' AND s.InvTypeId = 1 -- Software Fee
+		GROUP BY t.PartyId, s.BillerId, s.ProductIds
+	END
 	-- End Region: Get Licensing fee
 
 	-- Region: Final Result
 	BEGIN
 		DECLARE @_Result TABLE
 		(
-			RowIndex INT, IndexNumber INT, PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(100), ItemType TINYINT, BillerId INT, BillerName NVARCHAR(50)
-			,InvoiceHeaderId BIGINT, InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, InvoicePath NVARCHAR(256)
-			,BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50), ProductCodes VARCHAR(MAX)
-			,LicensingFee MONEY, Discount MONEY, Rebate MONEY, AdjustmentAmount MONEY, AdjustmentNote NVARCHAR(500), IsIncludePlayerTipsWorkSheet BIT
-			,CompanyName NVARCHAR(100), PayerAddress1 NVARCHAR(255), BillerAddress1  NVARCHAR(255)
+			RowIndex INT, IndexNumber INT, PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(100), ItemType TINYINT, BillerId INT, BillerName NVARCHAR(50), InvoiceHeaderId BIGINT, InvoiceSymbol NVARCHAR(20), InvoiceNumber INT, InvoicePath NVARCHAR(256), BaseCurrencyId INT, BaseCurrencyName VARCHAR(10), InvoiceLanguage VARCHAR(50), ProductIds VARCHAR(200), ProductCodes VARCHAR(MAX), LicensingFee MONEY, Discount MONEY, Rebate MONEY, AdjustmentAmount MONEY, AdjustmentNote NVARCHAR(500), IsIncludePlayerTipsWorkSheet BIT, CompanyName NVARCHAR(100), PayerAddress1 NVARCHAR(255), BillerAddress1 NVARCHAR(255)
 		)
 
 		INSERT INTO @_Result
 		(
-			RowIndex, IndexNumber, PartyId, PartyName, BrandName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath
-			,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsIncludePlayerTipsWorkSheet
-			,CompanyName, PayerAddress1, BillerAddress1
+			RowIndex, IndexNumber, PartyId, PartyName, BrandName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductIds, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsIncludePlayerTipsWorkSheet, CompanyName, PayerAddress1, BillerAddress1
 		)
 		SELECT
 			ROW_NUMBER() OVER(ORDER BY ISNULL(r.InvoiceNumber, ivs.InvoiceNumber)) AS RowIndex
@@ -374,7 +409,7 @@ BEGIN
 			,ps.BrandName
 			,ivs.InvTypeId AS ItemType
 			,ivs.BillerId
-			,b.BillerName
+			,@BillerName AS BillerName
 			,r.InvoiceHeaderId
 			,ivs.InvoiceSymbol
 			,ISNULL(r.InvoiceNumber, ivs.InvoiceNumber) AS InvoiceNumber
@@ -382,7 +417,8 @@ BEGIN
 			,ps.BaseCurrencyId
 			,ps.BaseCurrencyName
 			,ps.InvoiceLanguage
-			,CASE WHEN ivs.InvTypeId = 1 THEN ivs.ProductCodes ELSE '' END AS ProductCodes
+			,CASE WHEN ivs.InvTypeId = 1 AND @IsSabaPlayBiller = 1 THEN ivs.ProductIds 	 ELSE '' END AS ProductIds
+			,CASE WHEN ivs.InvTypeId = 1 AND @IsSabaPlayBiller = 0 THEN ivs.ProductCodes ELSE '' END AS ProductCodes
 			,SUM(ISNULL(CASE WHEN r.InvoiceType = 3 THEN 0 ELSE r.LicensingFee END, 0)) AS LicensingFee
 			,-SUM(ISNULL(r.Discount, 0)) AS Discount
 			,SUM(ISNULL(CASE WHEN r.InvoiceType = 3 THEN r.LicensingFee ELSE 0 END, 0)) AS Rebate
@@ -395,7 +431,6 @@ BEGIN
 		FROM @PartySettings ps
 			INNER JOIN @InvoiceSettings ivs ON ps.PartyId = ivs.PartyId
 			LEFT JOIN @FinalResult r ON ps.PartyId = r.PartyId AND ivs.BillerId = r.BillerId AND ivs.InvTypeId = r.InvoiceType
-			INNER JOIN @BillerInfo b  ON ivs.BillerId = b.PartyId
 		GROUP BY
 			ivs.IndexNumber
 			,ps.PartyId
@@ -403,7 +438,6 @@ BEGIN
 			,ps.BrandName
 			,ivs.InvTypeId
 			,ivs.BillerId
-			,b.BillerName
 			,r.InvoiceHeaderId
 			,ivs.InvoiceSymbol
 			,ISNULL(r.InvoiceNumber, ivs.InvoiceNumber)
@@ -411,7 +445,8 @@ BEGIN
 			,ps.BaseCurrencyId
 			,ps.BaseCurrencyName
 			,ps.InvoiceLanguage
-			,CASE WHEN ivs.InvTypeId = 1 THEN ivs.ProductCodes ELSE '' END
+			,CASE WHEN ivs.InvTypeId = 1 AND @IsSabaPlayBiller = 1 THEN ivs.ProductIds 	 ELSE '' END
+			,CASE WHEN ivs.InvTypeId = 1 AND @IsSabaPlayBiller = 0 THEN ivs.ProductCodes ELSE '' END
 			,ISNULL(r.AdjustmentNote, N'')
 			,ivs.CompanyName
 			,ivs.IsIncludePlayerTipsWorkSheet
@@ -421,9 +456,7 @@ BEGIN
 	-- End Region: Final Result
 
 	-- Return data
-	SELECT RowIndex, IndexNumber, PartyId, PartyName, BrandName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath
-		,BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsIncludePlayerTipsWorkSheet
-		,CompanyName, PayerAddress1, BillerAddress1
+	SELECT RowIndex, IndexNumber, PartyId, PartyName, BrandName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductIds, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsIncludePlayerTipsWorkSheet, CompanyName, PayerAddress1, BillerAddress1
 	FROM @_Result
 	ORDER BY InvoiceNumber
 END

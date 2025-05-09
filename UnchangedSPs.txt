@@ -1,2 +1,2 @@
-Licensee Admin\AutoMail\LA_Rpt_LicenseeSettlement_AutoMailSettingSel.sql
-
+Licensee Admin\Invoice\Licensee Recon\LA_LicenseeReconciliation_AmountToCompanySel.sql
+Licensee Admin\Report\SH_rpt_SabaPlayLicenseeBillingDataByProduct.sql

@@ -15,6 +15,7 @@ AS
 
 	Revisions:
 		- 20250417@Danny: Initialize SP [RedmineID: #224104]
+		- 20250507@Eddie: Support Billing for SabaPlay [#221987]
 
 	Param's Explanation:
 
@@ -66,8 +67,9 @@ BEGIN
 
 	DECLARE @Result TABLE(PartyId INT, ProductId INT, LicensingFee MONEY, Discount MONEY)
 	
+	INSERT INTO @Result(PartyId, ProductId, LicensingFee, Discount)
 	SELECT  p.PartyID, pd.ProductID,  SUM(ISNULL(sp.FinalLicensingFee,0) * ex.Rate) AS LicensingFee, NULL AS Discount
-	FROM	bodb_LicenseeReport.dbo.SabaPlayPerformance sp WITH(NOLOCK)
+	FROM bodb_LicenseeReport.dbo.SabaPlayPerformance sp WITH(NOLOCK)
 	INNER JOIN #PartyList p ON sp.SiteID = p.OperatorID
 	INNER JOIN #Products pd ON sp.ProductID = pd.ProductId
 	CROSS APPLY
@@ -85,6 +87,26 @@ BEGIN
 	) ex
 	WHERE sp.DataType =2 AND sp.Environment = @Environment AND sp.RptDate = @ToDate
 	GROUP BY p.PartyID,  pd.ProductID
+
+	-- Get Follow Invoice Setting 
+	DECLARE @LA_InvoiceSetting TABLE (FromPartyId INT, ToPartyId INT, ProductId TINYINT)
 	
+	INSERT INTO @LA_InvoiceSetting (FromPartyId, ToPartyId, ProductId)
+	SELECT iv.FromPartyId, iv.ToPartyId, iv.ProductId
+	FROM dbo.LA_InvoiceSetting iv WITH (NOLOCK)
+		INNER JOIN #PartyList p ON p.PartyId = iv.FromPartyId
+		INNER JOIN #Products ps ON ps.ProductId = iv.ProductId
+
+	MERGE @Result r 
+		USING @LA_InvoiceSetting iv
+	ON (r.PartyId = iv.FromPartyId AND r.ProductId = iv.ProductId)
+	WHEN NOT MATCHED BY TARGET
+		THEN INSERT (PartyId, ProductId, LicensingFee, Discount)
+			 VALUES (iv.FromPartyId, iv.ProductId, 0, 0)
+	WHEN NOT MATCHED BY SOURCE
+		THEN DELETE;
+	
+	SELECT PartyId, ProductId, LicensingFee, Discount
+	FROM @Result
 END
 GO

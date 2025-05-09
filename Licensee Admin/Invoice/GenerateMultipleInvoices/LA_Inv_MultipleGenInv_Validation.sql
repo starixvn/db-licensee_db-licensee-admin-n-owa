@@ -23,6 +23,7 @@ AS
 		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 		- 20240730@Danny: Player Tips worksheet [#207863]
 		- 20241202@Danny: Remove IncludeRebateWorkSheet column [#214501]
+		- 20250205@Eddie: Support Billing for SabaPlay [#221987]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -38,6 +39,10 @@ AS
 
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @AbbreviationBiller NVARCHAR(10) = '', @SabaPlayBiller NVARCHAR(10) = 'RHL'
+
+	SELECT @AbbreviationBiller = BillerNameAbbreviation FROM dbo.LA_BillerInfo WITH (NOLOCK) WHERE PartyId = @BillerId
 
 	DECLARE @PartyList TABLE (
 		RowId INT, 
@@ -130,6 +135,17 @@ BEGIN
 					) n ON p.InvoiceNumber = n.InvoiceNumber
 				WHERE p.Error = 0 AND (d.PartyId IS NOT NULL OR n.InvoiceNumber IS NOT NULL)
 			) c ON p.RowId = c.RowId
+
+		-- Check for SabaPlay
+		UPDATE p
+		SET p.Error = CASE WHEN InvoiceTypeId IN (3, 6) OR IsIncludePlayerTipsWorkSheet = 1 THEN 1 ELSE 0 END
+		  , p.ContentValidation = CASE WHEN InvoiceTypeId IN (3, 6) AND IsIncludePlayerTipsWorkSheet = 1 THEN 'Unsupported invoice type, Player Tips Worksheet.'
+									   WHEN IsIncludePlayerTipsWorkSheet = 1 THEN 'Unsupported Player Tips Worksheet.'
+								       WHEN InvoiceTypeId IN (3, 6) THEN 'Unsupported invoice type.'
+							      ELSE '' END
+		FROM @PartyList p
+		WHERE p.Error = 0 AND @AbbreviationBiller = @SabaPlayBiller
+
 	END
 
 	-- Update Party Info
@@ -141,8 +157,12 @@ BEGIN
 
 	UPDATE p
 	SET p.BaseCurrencyId = bc.BaseCurrencyId
-		,p.Error = CASE WHEN bc.PartyId IS NULL OR ISNULL(bc.BaseCurrencyId, 0) = 0 THEN 1 ELSE 0 END
-		,p.ContentValidation = CASE WHEN bc.PartyId IS NULL OR ISNULL(bc.BaseCurrencyId, 0) = 0 THEN 'Missing setting base currency' ELSE '' END
+		,p.Error = CASE WHEN bc.PartyId IS NULL OR ISNULL(bc.BaseCurrencyId, 0) = 0 THEN 1
+						WHEN @AbbreviationBiller = @SabaPlayBiller AND ISNULL(bc.BaseCurrencyId, 0) <> 3 THEN 1
+				   ELSE 0 END
+		,p.ContentValidation = CASE WHEN bc.PartyId IS NULL OR ISNULL(bc.BaseCurrencyId, 0) = 0 THEN 'Missing setting base currency'
+									WHEN @AbbreviationBiller = @SabaPlayBiller AND ISNULL(bc.BaseCurrencyId, 0) <> 3 THEN 'Licensee''s base currency is not USD.'
+		                       ELSE '' END
 	FROM @PartyList p
 		LEFT JOIN @PartyBaseCurrency bc ON p.PartyId = bc.PartyId
 	WHERE p.Error = 0
@@ -176,6 +196,7 @@ BEGIN
 	WHERE p.Error = 0 AND s.PartyId IS NULL
 
 	-- Check Party Setting
+	IF @AbbreviationBiller <> @SabaPlayBiller
 	BEGIN
 		-- For Discount & Rebate
 		DECLARE @Discount TABLE (PartyId INT, BaseCurrencyId INT, DiscountType TINYINT)
@@ -224,6 +245,7 @@ BEGIN
 	END
 
 	-- Check Base Currency
+	IF @AbbreviationBiller <> @SabaPlayBiller
 	BEGIN
 		-- For Min Fee / Group Min Fee
 		DECLARE @MinFee TABLE (PartyId INT, BaseCurrencyId INT, IsGroup BIT)
