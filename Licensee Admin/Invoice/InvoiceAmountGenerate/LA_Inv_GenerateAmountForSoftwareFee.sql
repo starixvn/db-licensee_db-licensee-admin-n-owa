@@ -13,7 +13,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_GenerateAmountForSoftwareFee]
 	,@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
 	,@BaseCurrency			VARCHAR(10)		= 'EUR'	OUTPUT
 	,@InvoiceTemplateName	VARCHAR(200)	= ''	OUTPUT
-	,@ProductIDs	VARCHAR(MAX) = ''
+	,@ProductIDs	VARCHAR(MAX) = NULL
 	,@OperatorId	INT = 0 OUTPUT 
 AS
 
@@ -63,6 +63,7 @@ AS
 		- 20250417@Danny: Support billing SabaPlay licensees [RedmineID: #224104]
 		- 20250417@Lionel: Integrate Microgaming Live Casino [RemineID:#223409]
 		- 20250505@Corbin: Integrate RichGaming [RemineID:#225057]
+		- 20250505@Eddie: Support Billing for SabaPlay [#221987]
 */
 
 BEGIN
@@ -76,9 +77,9 @@ BEGIN
 
 	DECLARE @IsSabaPlayBiller BIT
 	
-	SELECT @IsSabaPlayBiller = CASE WHEN BillerName = 'Reasternhold Limited' THEN 1 ELSE 0 END
-	FROM LA_BillerInfo WITH(NOLOCK)
-	WHERE PartyId = @BillerId 
+	SELECT @IsSabaPlayBiller = CASE WHEN BillerNameAbbreviation = 'RHL' THEN 1 ELSE 0 END
+	FROM dbo.LA_BillerInfo WITH (NOLOCK)
+	WHERE PartyId = @BillerId
 
 	-- Get Base Currency
 	DECLARE @BaseCurrencyId INT = 6, @BaseCurrencyName VARCHAR(10) = 'EUR' -- default = EUR
@@ -300,5 +301,6 @@ BEGIN
 	-- Return data
 	SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType, Rate, DeductMonthlyFees, RemainingAmount, Remark, ExtraInfo FROM @FinalResult
 	ORDER BY AmountType, ProductId
+
 END
 GO
