@@ -23,6 +23,7 @@ AS
 		- 20240527@Danny: Automate the PT adjustment when the Exchange charge rate is changed [RemineID: #201477]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 		- 20250429@Danny: Internal Template for OW Billing
+		- 20250513@Eddie: Enhance SP [RedmineID: #226204]
 		
 	Param's Explannation: 
 		+ @ChargeSettingsXML: '<ChargeSettings>
@@ -130,12 +131,12 @@ BEGIN
 	CROSS APPLY (
 		SELECT TOP(1) PartyId
 		FROM dbo.LA_BillerInfo WITH(NOLOCK)
-		WHERE BillerName = CASE c.GroupName WHEN 'Boping' THEN c.GroupName
-											WHEN 'JollySports' THEN c.GroupName
-							                WHEN 'Zelianta' THEN c.GroupName + ' Limited'
-											WHEN 'Double S' THEN c.GroupName
-											WHEN 'ONEWorks' THEN 'Internal Settlement'
-						   ELSE '' END
+		WHERE BillerNameAbbreviation = CASE c.GroupName WHEN 'Boping' 	   THEN 'BHC'
+											            WHEN 'JollySports' THEN 'JS'
+							                            WHEN 'Zelianta'    THEN 'ZL'
+											            WHEN 'Double S'    THEN 'DSS'
+											            WHEN 'ONEWorks'    THEN 'IS'
+									   ELSE '' END
 	) AS n
 
 	DECLARE @ID INT = 1

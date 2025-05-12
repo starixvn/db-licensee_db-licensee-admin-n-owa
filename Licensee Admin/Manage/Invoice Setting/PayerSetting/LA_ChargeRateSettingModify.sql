@@ -38,6 +38,7 @@ AS
 		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 		- 20250429@Danny: Internal Template for OW Billing
+		- 20250513@Eddie: Enhance SP [RedmineID: #226204]
 
 	 Params:
 		+ @ChargeSettingXML: '<ChargeSettings>
@@ -371,13 +372,12 @@ BEGIN
 		
 		SELECT @BillerId = PartyId
 		FROM dbo.LA_BillerInfo WITH(NOLOCK)
-		WHERE BillerName = CASE @BillingGroupName
-							WHEN 'Boping' THEN @BillingGroupName
-							WHEN 'JollySports' THEN @BillingGroupName
-							WHEN 'Zelianta' THEN @BillingGroupName + ' Limited'
-							WHEN 'Double S' THEN @BillingGroupName
-							WHEN 'ONEWorks' THEN 'Internal Settlement'
-							ELSE '' END
+		WHERE BillerNameAbbreviation = CASE @BillingGroupName WHEN 'Boping' 	 THEN 'BHC'
+															  WHEN 'JollySports' THEN 'JS'
+															  WHEN 'Zelianta'    THEN 'ZL'
+															  WHEN 'Double S'    THEN 'DSS'
+															  WHEN 'ONEWorks'    THEN 'IS'
+									   ELSE '' END
 
 		IF ISNULL(@BillerId, 0) <> 0
 			INSERT INTO dbo.LA_InvoiceSetting (FromPartyId, ToPartyId, ProductId, InvTypeId, InvTempId, BankId, ActiveAddress)

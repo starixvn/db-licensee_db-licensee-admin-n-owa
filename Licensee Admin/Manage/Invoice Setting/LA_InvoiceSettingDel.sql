@@ -19,6 +19,7 @@ AS
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20230310@Danny: Insert new log with more information [#FeatureID 175125]
 		- 20250326@Eddie: Get view log with products of SabaPlay [RedmineID: #217740]
+		- 20250512@Eddie: Enhance SP [RedmineID: #226204]
 
 	 Params:
 		+ @InvoiceSettingXML: '<InvoiceSettings>
@@ -48,7 +49,7 @@ BEGIN
 	IF ISNULL(@PayerID, '') = '' OR ISNULL(@BillerID, '') = ''
 		RETURN
 
-	DECLARE @BillerNameOfSabaPlay NVARCHAR(50) = N'Reasternhold Limited', @IsDeleted BIT = 0
+	DECLARE @BillerNameAbbr NVARCHAR(10) = N'RHL', @IsDeleted BIT = 0
 
 -- For writing log
 	DECLARE 
@@ -79,8 +80,8 @@ BEGIN
 						,CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END Bank
 							,CASE WHEN li.ActiveAddress = 1 THEN od.Address1
 								WHEN li.ActiveAddress = 2 THEN od.Address2 END ActiveAddress
-						,STRING_AGG(CASE WHEN li.ProductID = 0 AND b.BillerName <> @BillerNameOfSabaPlay THEN 'Sportsbook' 
-										 WHEN ISNULL(li.ProductID, 0) <> 0 AND b.BillerName <> @BillerNameOfSabaPlay THEN p.ProductName
+						,STRING_AGG(CASE WHEN li.ProductID = 0 AND b.BillerNameAbbreviation <> @BillerNameAbbr THEN 'Sportsbook' 
+										 WHEN ISNULL(li.ProductID, 0) <> 0 AND b.BillerNameAbbreviation <> @BillerNameAbbr THEN p.ProductName
 									ELSE vw.ProductName END,', ') ProductIDs
 						,lt.InvTypeId
 				FROM dbo.LA_InvoiceSetting li WITH(NOLOCK) 
@@ -181,8 +182,8 @@ BEGIN
 						,CASE WHEN li.BankId > 0 THEN 'Bank ' + CAST(li.BankId AS VARCHAR(3)) ELSE '' END Bank
 							,CASE WHEN li.ActiveAddress = 1 THEN od.Address1
 								WHEN li.ActiveAddress = 2 THEN od.Address2 END ActiveAddress
-						,STRING_AGG(CASE WHEN li.ProductID = 0 AND b.BillerName <> @BillerNameOfSabaPlay THEN 'Sportsbook' 
-										 WHEN ISNULL(li.ProductID, 0) <> 0 AND b.BillerName <> @BillerNameOfSabaPlay THEN p.ProductName
+						,STRING_AGG(CASE WHEN li.ProductID = 0 AND b.BillerNameAbbreviation <> @BillerNameAbbr THEN 'Sportsbook' 
+										 WHEN ISNULL(li.ProductID, 0) <> 0 AND b.BillerNameAbbreviation <> @BillerNameAbbr THEN p.ProductName
 									ELSE vw.ProductName END,', ') ProductIDs
 						,lt.InvTypeId
 						,li.ToPartyId AS FakeID

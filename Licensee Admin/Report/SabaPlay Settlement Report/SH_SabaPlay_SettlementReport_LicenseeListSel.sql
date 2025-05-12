@@ -9,6 +9,7 @@ AS
 		
 	Revisions:
 		- 20250403@Danny: create new sp
+		- 20250513@Eddie: Enhance SP [RedmineID: #226204]
 	
 	Param's Explanation:
 
@@ -28,7 +29,7 @@ BEGIN
 	DECLARE @FunctionID INT, @BillerID INT
 
 	SELECT @BillerID =  PartyId
-	FROM dbo.LA_BillerInfo WITH(NOLOCK) WHERE BillerName = 'Reasternhold Limited'
+	FROM dbo.LA_BillerInfo WITH(NOLOCK) WHERE BillerNameAbbreviation = 'RHL'
 
 	IF(@FunctionKey = '')
 	BEGIN
