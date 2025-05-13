@@ -13,8 +13,9 @@ ALTER PROCEDURE [dbo].[LA_Inv_GenerateAmountForSoftwareFee]
 	,@ErrMsg				NVARCHAR(1000)	= ''	OUTPUT
 	,@BaseCurrency			VARCHAR(10)		= 'EUR'	OUTPUT
 	,@InvoiceTemplateName	VARCHAR(200)	= ''	OUTPUT
-	,@ProductIDs	VARCHAR(MAX) = NULL
-	,@OperatorId	INT = 0 OUTPUT 
+	,@ProductIDs		VARCHAR(MAX) = NULL
+	,@OperatorId		INT = 0 OUTPUT 
+	,@RateConvertToUSDT	FLOAT = 0 OUTPUT 
 AS
 
 /*	Header:
@@ -64,6 +65,7 @@ AS
 		- 20250417@Lionel: Integrate Microgaming Live Casino [RemineID:#223409]
 		- 20250505@Corbin: Integrate RichGaming [RemineID:#225057]
 		- 20250505@Eddie: Support Billing for SabaPlay [#221987]
+		- 20250513@Danny: Output rate convert from base currency to USD(USDT) currency [#226741]
 */
 
 BEGIN
@@ -88,6 +90,10 @@ BEGIN
 	
 	SELECT @BaseCurrencyName = CASE WHEN Code = 'UST' THEN 'USDT' ELSE Code END  FROM bodb02.dbo.Exchange WITH (NOLOCK) WHERE ExchangeId = @BaseCurrencyId
 	SELECT @BaseCurrency = @BaseCurrencyName
+
+	SELECT TOP 1 @RateConvertToUSDT = BaseCurrencyRate
+	FROM	bodb02.dbo.LA_f_ExchangeDailySel(@ToDate, @ToDate,'USD')
+	WHERE	ExchangeID = @BaseCurrencyId
 
 	IF @IsSabaPlayBiller = 0
 	BEGIN

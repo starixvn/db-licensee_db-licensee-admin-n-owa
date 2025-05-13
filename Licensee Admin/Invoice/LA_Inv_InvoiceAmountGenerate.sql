@@ -19,6 +19,8 @@ ALTER PROCEDURE [dbo].[LA_Inv_InvoiceAmountGenerate]
 	,@HostingFeesAmount			MONEY			= 0		OUTPUT
 	,@HostingFeesMaxPCU			INT				= 0		OUTPUT
 	,@IsWaived					BIT				= 0		OUTPUT
+	,@RateConvertToUSDT			FLOAT			= 0		OUTPUT 
+	,@InvoiceDate				DATETIME		= NULL
 AS
 
 /*	Header:
@@ -74,7 +76,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @FDate DATE = @FromDate, @TDate DATE = @ToDate
+	DECLARE @FDate DATE = @FromDate, @TDate DATE = @ToDate, @ReferencedExchangeDate DATETIME, @maxExchangeDate DATETIME
 	SELECT  @ErrCode = 0, @ErrMsg = '', @InvoiceTemplateName = '', @BaseCurrency = 'EUR' -- default
 			,@HostingFeesExchangeName = '', @HostingFeesExchangeRate = 0, @HostingFeesAmount = 0, @HostingFeesMaxPCU = 0, @IsWaived = 0
 
@@ -87,6 +89,35 @@ BEGIN
 	FROM dbo.OAS_PartyBaseCurrency WITH (NOLOCK) WHERE PartyId = @PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
 	
 	SELECT @BaseCurrency = CASE WHEN Code = 'UST' THEN 'USDT' ELSE Code END FROM bodb02.dbo.Exchange WITH (NOLOCK) WHERE ExchangeId = @BaseCurrencyId
+
+	IF @InvoiceTypeId IN (4,5,7)
+	BEGIN
+		SELECT @maxExchangeDate = MAX(exchangedate) 
+		FROM bodb02.dbo.ExchangeDailyOanda (NOLOCK)
+
+		SELECT @ReferencedExchangeDate = (
+		SELECT a.ExchangeDate FROM (
+			SELECT TOP 1 ExchangeDate, COUNT (1) AS ExchangeCount
+			FROM  bodb02.dbo.ExchangeDailyOanda WITH (NOLOCK)
+			WHERE ExchangeDate BETWEEN CAST( DATEFROMPARTS(YEAR(@maxExchangeDate), MONTH(@maxExchangeDate), 1)  AS SMALLDATETIME) AND CAST(@maxExchangeDate AS SMALLDATETIME)
+			GROUP BY ExchangeDate
+			ORDER BY 2 DESC, 1 DESC
+			) a 
+		)
+
+		IF  @InvoiceDate > @ReferencedExchangeDate
+			SELECT @InvoiceDate = @ReferencedExchangeDate
+		
+		SELECT TOP 1 @RateConvertToUSDT =  t.USD
+		FROM bodb02.dbo.ExchangeDailyOanda t WITH (NOLOCK)
+		WHERE	ExchangeDate = CAST(@InvoiceDate AS SMALLDATETIME) AND  ExchangeID = @BaseCurrencyId
+	END
+	ELSE 
+	BEGIN
+		SELECT TOP 1 @RateConvertToUSDT = BaseCurrencyRate
+		FROM	bodb02.dbo.LA_f_ExchangeDailySel(@ToDate, @ToDate,'USD')
+		WHERE	ExchangeID = @BaseCurrencyId
+	END
 
 	-- Check Base Currency Setting
 	BEGIN
