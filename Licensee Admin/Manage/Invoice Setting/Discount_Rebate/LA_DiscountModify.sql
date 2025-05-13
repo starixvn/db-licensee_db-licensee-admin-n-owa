@@ -6,7 +6,7 @@ ALTER PROCEDURE [dbo].[LA_DiscountModify]
 	  @DiscountGroupId SMALLINT = 0
 	, @GroupName VARCHAR(50)
 	, @DiscountGroupType TINYINT
-	, @CurrencyId TINYINT
+	, @CurrencyId INT
 	, @FromDate DATE
 	, @ToDate DATE
 	, @IsEdit BIT
@@ -31,6 +31,7 @@ AS
 		- 20190510@Percy: Migrate to DBCUST.bodb_Licensee [RedmineID: #103658]
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 		- 20241016@Danny: Extend parameter data length [RemineID: #212252]
+		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
 	 
 	 Params:
 		@RateSettingsData = '<Root>

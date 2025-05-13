@@ -20,12 +20,13 @@ AS
 		- 20221109@Malcolm: add LicenseeCode, BaseCurrencyId [RedmineID : 175860]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 		- 20250403@Eddie: More Info "PlatformId" [RedmineID: #217740]
+		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
 
 */
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, HasAmf BIT,LicenseeCode VARCHAR(50), BaseCurrencyId TINYINT, PlatformId TINYINT)
+	DECLARE @Parties TABLE(PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, HasAmf BIT,LicenseeCode VARCHAR(50), BaseCurrencyId INT, PlatformId TINYINT)
 	INSERT INTO @Parties (PartyId, PartyName, BrandName, ParentId)
 	EXEC dbo.LA_PartyListSel @UserId = @UserId, @FunctionKey=@FunctionKey
 

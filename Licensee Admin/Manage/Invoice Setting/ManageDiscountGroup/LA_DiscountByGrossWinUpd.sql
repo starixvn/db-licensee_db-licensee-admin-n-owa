@@ -3,7 +3,7 @@ ALTER PROCEDURE [dbo].[LA_DiscountByGrossWinUpd]
 	@DiscountGroupId		SMALLINT
 	,@DiscountGroupName		NVARCHAR(110)
 	,@DiscountGroupType		TINYINT
-	,@CurrencyId			TINYINT
+	,@CurrencyId			INT
 	,@FromDate				DATE
 	,@ToDate				DATE
 	,@CalculationProductIds VARCHAR(MAX) = '0'
@@ -31,6 +31,7 @@ AS
 		- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
 		- 20250115@Danny: Support different groups by currencies [RedmineID: #216352]
 		- 20250414@Eddie: Enhance SP [RedmineID: #223951]
+		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
 
 	 Params:
 		@RateSettingsData = '<Root>

@@ -22,6 +22,7 @@ AS
 		- 20220509@Danny: Use String_split built-in function [RemineID: #171831]
 		- 20220812@Danny: Add checking fresh-new licensee step  [RedmineID: #166504]
 		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
+		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
 */
 
 BEGIN
@@ -33,7 +34,7 @@ BEGIN
 
 	CREATE TABLE #ChargeRate (
 		ChargeId INT, FromParty INT, ToParty INT, MinAmount MONEY, MaxAmount MONEY
-		,Remark NVARCHAR(200), BaseCurrencyId TINYINT, FirstOfBilling DATE, BasisOfBilling NVARCHAR(4000)
+		,Remark NVARCHAR(200), BaseCurrencyId INT, FirstOfBilling DATE, BasisOfBilling NVARCHAR(4000)
 		,NewToDate DATE -- for update ToDate
 		,launchDate DATE
 		,isFreshNew BIT

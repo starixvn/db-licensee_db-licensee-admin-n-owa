@@ -27,6 +27,7 @@ AS
 		- 20231225@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
 		- 20250403@Eddie: More Info "PlatformId" [RedmineID: #217740]
+		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
 
 	+ @LicenseeStatusIds:	1	Up Coming
 						2	Soft Launch
@@ -41,7 +42,7 @@ BEGIN
 
 	-- Get Party List
 	BEGIN
-		DECLARE @PartyList TABLE (PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, LicenseeCode VARCHAR(50), BaseCurrencyId TINYINT, LicenseeStatusId INT, LicenseeStatus VARCHAR(30), PlatformId TINYINT)
+		DECLARE @PartyList TABLE (PartyId INT, PartyName VARCHAR(50), BrandName VARCHAR(50), ParentId INT, LicenseeCode VARCHAR(50), BaseCurrencyId INT, LicenseeStatusId INT, LicenseeStatus VARCHAR(30), PlatformId TINYINT)
 
 		-- Official Licensees
 		INSERT INTO @PartyList (PartyId, PartyName, BrandName, ParentId)

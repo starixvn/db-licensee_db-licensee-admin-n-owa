@@ -8,7 +8,7 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
 	@PayerName				VARCHAR(50),
 	@BrandName				VARCHAR(100)	= '',
 	@LicenseeCode			VARCHAR(50)		= '',
-	@BaseCurrencyId			TINYINT,
+	@BaseCurrencyId			INT,
 	@LaunchDate				DATE, 
 	@BillingGroupId			INT,
 	@ProductIds				VARCHAR(1000)	= '',
@@ -51,6 +51,7 @@ AS
 		- 20250303@Danny: Integrate Double S System Inc group Licensees [RedmineID: #217961]
 		- 20250324@Danny: Add new  @PlatformId parameter
 		- 20250429@Danny: Internal Template for OW Billing
+		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
