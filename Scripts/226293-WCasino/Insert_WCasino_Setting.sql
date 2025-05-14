@@ -3,7 +3,7 @@
 /*
 	Created: 20250513@Corbin
 	DB: DBCUST.bodb_licensee
-	Description: Add setting rate Funky Games Terms [RedmineID: #226293]
+	Description: Add setting rate W Casino Terms [RedmineID: #226293]
 */
 
 USE bodb_licensee
