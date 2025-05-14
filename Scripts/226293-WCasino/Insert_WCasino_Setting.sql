@@ -21,7 +21,7 @@ SELECT @PartyId = PartyId FROM dbo.OAS_Party WITH (NOLOCK) WHERE PartyName = 'WL
 INSERT INTO dbo.OAS_ChargeInfo (ProductId, FromParty, ToParty, ParentChargeId, Rate, ChargeType, FromDate, ToDate)
 SELECT t.ProductId, t.FromParty, t.ToParty, t.ParentChargeId, t.Rate, t.ChargeType, t.FromDate, t.ToDate
 FROM (
-	SELECT 98 AS ProductId, p.PartyId AS FromParty, @PartyId AS ToParty, 0 AS ParentChargeId, 0.05 Rate, 1 AS ChargeType, '2025-03-01' AS FromDate, '2050-01-01' AS ToDate 
+	SELECT 98 AS ProductId, p.PartyId AS FromParty, @PartyId AS ToParty, 0 AS ParentChargeId, 0.05 Rate, 1 AS ChargeType, '2025-05-27' AS FromDate, '2050-01-01' AS ToDate 
 	FROM (VALUES (1), (9), (11), (98), (962), (1235), (25), (30)) AS p (PartyId)
 ) t
 	LEFT JOIN dbo.OAS_ChargeInfo c WITH (NOLOCK) ON t.ProductId = c.ProductId AND t.FromParty = c.FromParty AND t.ToParty = c.ToParty AND t.FromDate <= c.ToDate AND t.ToDate >= c.FromDate
@@ -59,8 +59,8 @@ BEGIN
 								,[BaseCurrencyId]
 								,[FirstOfBilling]
 								,[BasisOfBilling])
-	VALUES(98, 25, 1, 0, 0, 1, '2025-03-01', '2050-01-01', NULL, NULL, NULL, NULL, NULL, NULL),
-		  (98, 30, 1, 0, 0, 1, '2025-03-01', '2050-01-01', NULL, NULL, NULL, NULL, NULL, NULL)
+	VALUES(98, 25, 1, 0, 0, 1, '2025-05-27', '2050-01-01', NULL, NULL, NULL, NULL, NULL, NULL),
+		  (98, 30, 1, 0, 0, 1, '2025-05-27', '2050-01-01', NULL, NULL, NULL, NULL, NULL, NULL)
 
 	SET @HasInsertSetting = 1
 END
