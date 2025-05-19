@@ -1,4 +1,4 @@
-/*<info serverAlias="DBEXT-bodb02,DBCUST-CustDB" selecters="bodbAdminNet" isFunction="1" isNested="1"></info>*/
+/*<info serverAlias="DBEXT-bodb02,DBCUST-CustDB" selecters="wsv_nap" isFunction="1" isNested="1"></info>*/
 ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
 	@fromdate DATETIME
 	, @todate DATETIME
@@ -21,6 +21,7 @@ ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
 		- 20230713@Danny: Incorporate USDT2 currency [RedmineID: #191165]
 		- 20230823@Danny: Incorporate US$KH currency [RedmineID: #192544]
 		- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
+		- 20250513@Danny: Modify logic to get the latest exchange date [RedmineID: #226741]
 
 	Param's Explanation:				
 */
@@ -31,28 +32,38 @@ RETURNS @tempDate TABLE (exchangedate DATETIME, ExchangeId INT, Code VARCHAR(65)
 AS 
 BEGIN
 	DECLARE @tmpFromDate DATETIME, @tmpToDate DATETIME, @maxExchangeDate DATETIME
-		, @tmpDate DATETIME, @gapDate DATETIME, @i INT
+		, @tmpDate DATETIME, @gapDate DATETIME, @i INT, @ReferencedExchangeDate DATETIME
 
 	SELECT @maxExchangeDate = MAX(exchangedate) 
 	FROM dbo.ExchangeDailyOanda (NOLOCK)
+
+	SELECT @ReferencedExchangeDate = (
+	SELECT a.ExchangeDate FROM (
+		SELECT TOP 1 ExchangeDate, COUNT (1) AS ExchangeCount
+		FROM ExchangeDailyOanda WITH (NOLOCK)
+		WHERE ExchangeDate BETWEEN CAST( DATEFROMPARTS(YEAR(@maxExchangeDate), MONTH(@maxExchangeDate), 1)  AS SMALLDATETIME) AND CAST(@maxExchangeDate AS SMALLDATETIME)
+		GROUP BY ExchangeDate
+		ORDER BY 2 DESC, 1 DESC
+		) a 
+	)
 
 	SELECT @tmpFromDate = @fromdate, @i = 0
 	WHILE (DATEDIFF (m, @tmpFromDate, @todate) >= 0)
 	BEGIN
 		IF @i = 1
 		BEGIN
-			SET @tmpFromDate = CAST(CONVERT(VARCHAR(10), DATEADD(dd, -(DAY(@tmpFromDate) -1), @tmpFromDate), 111) AS DATETIME)
+			SET @tmpFromDate = CAST(DATEFROMPARTS(YEAR(@tmpFromDate), MONTH(@tmpFromDate), 1) AS DATETIME)
 		END
 
-		SET @tmpToDate = CAST(CONVERT(VARCHAR(10), DATEADD(s, -1, DATEADD(mm, DATEDIFF(m, 0, @tmpFromDate) +1, 0)), 111) AS DATETIME)
+		SET @tmpToDate = CAST(EOMONTH(@tmpFromDate) AS DATETIME)
 
-		IF @tmpToDate > @maxExchangeDate
+		IF @tmpToDate > @ReferencedExchangeDate
 		BEGIN
-			SET @tmpToDate = @maxExchangeDate
+			SET @tmpToDate = @ReferencedExchangeDate
 		END
 
 		SET @tmpDate = @tmpFromDate
-		WHILE (@tmpDate <= @tmpToDate AND @tmpDate <= @todate)
+		WHILE (@tmpDate <= @todate)
 		BEGIN
 			INSERT INTO @tempDate (exchangedate, ExchangeId, Code, BaseCurrencyRate)--, MYR, USD, EUR, CNY, GBP, actualrate)
 			SELECT @tmpDate, t.ExchangeId
