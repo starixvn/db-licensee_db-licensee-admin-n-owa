@@ -16,6 +16,7 @@ AS
 		- 20161129@Bruce: Add isactive status
 		- 20210811@Danny: return more info  AttnName, CompanyName, Address based on ActiveAddress [#FeatureID 158133]
 		- 20250327@Eddie: Get view log with products of SabaPlay [RedmineID: #217740]
+		- 20250512@Eddie: Enhance SP [RedmineID: #226204]
 	 Params:
 		+ 0 get all biller
 		+ <> 0 specify a biller 
@@ -25,7 +26,7 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	
-	DECLARE @BillerNameOfSabaPlay NVARCHAR(50) = N'Reasternhold Limited'
+	DECLARE @BillerNameAbbr NVARCHAR(10) = N'RHL'
 	
 	SELECT ToPartyID			AS BillerId
 		, BillerName			AS BillerName
@@ -42,7 +43,7 @@ BEGIN
 		, InvTemplateName		AS InvoiceTemplateName
 		, COUNT(i.ProductId)	AS NumberOfProduct
 		, STUFF((
-				SELECT ', ' + CASE WHEN b.BillerName <> @BillerNameOfSabaPlay THEN CAST(pp.ProductName AS VARCHAR) ELSE CAST(vw.ProductName AS VARCHAR) END
+				SELECT ', ' + CASE WHEN b.BillerNameAbbreviation <> @BillerNameAbbr THEN CAST(pp.ProductName AS VARCHAR) ELSE CAST(vw.ProductName AS VARCHAR) END
 				FROM dbo.LA_InvoiceSetting ii WITH (NOLOCK)
 					INNER JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON ii.ToPartyId = b.PartyId
 					LEFT JOIN dbo.LA_f_Products3rd('') pp ON ii.ProductId = pp.Productid
@@ -59,7 +60,7 @@ BEGIN
 			   WHEN i.ActiveAddress = 2 THEN pd.AttnName2 END AS AttnName
 		, CASE WHEN i.ActiveAddress = 1 THEN pd.CompanyName
 			   WHEN i.ActiveAddress = 2 THEN pd.CompanyName2 END AS CompanyName
-		
+		, b.BillerNameAbbreviation
 	FROM dbo.OAS_Party p WITH (NOLOCK)
 		INNER JOIN dbo.LA_BillerInfo b WITH (NOLOCK) ON p.PartyID = b.PartyID		
 		INNER JOIN dbo.LA_InvoiceSetting i WITH (NOLOCK) ON i.ToPartyId = p.PartyID
@@ -80,12 +81,12 @@ BEGIN
 		  CASE WHEN i.ActiveAddress = 1 THEN pd.AttnName
 			   WHEN i.ActiveAddress = 2 THEN pd.AttnName2 END,
 		  CASE WHEN i.ActiveAddress = 1 THEN pd.CompanyName
-			   WHEN i.ActiveAddress = 2 THEN pd.CompanyName2 END
-
-	ORDER BY BillerName , CASE 
-			WHEN ISNULL(pd.BrandName, '') != '' 
-				THEN pd.BrandName 
-			ELSE p1.PartyName 
-		  END	
-END			 	
+			   WHEN i.ActiveAddress = 2 THEN pd.CompanyName2 END,
+		  b.BillerNameAbbreviation
+	ORDER BY BillerName , CASE
+			WHEN ISNULL(pd.BrandName, '') != ''
+				THEN pd.BrandName
+			ELSE p1.PartyName
+		  END
+END
 GO

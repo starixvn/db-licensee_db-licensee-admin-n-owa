@@ -13,6 +13,7 @@ AS
    
 	Revisions:
 		- 20250325@Eddie: Initialize SP [RedmineID: #217740]
+		- 20250512@Eddie: Enhance SP [RedmineID: #226204]
 
 */
 BEGIN
@@ -21,7 +22,7 @@ BEGIN
 	IF ISNULL(@PayerID, '') = ''
 		RETURN
 	
-	DECLARE @IsCheck TINYINT = 0, @BillerNameOfSabaPlay NVARCHAR(50) = N'Reasternhold Limited', @BillerIds VARCHAR(100) = '', @IsUpdated BIT = 0 
+	DECLARE @IsCheck TINYINT = 0, @BillerNameAbbr NVARCHAR(10) = N'RHL', @BillerIds VARCHAR(100) = '', @IsUpdated BIT = 0 
 	
 	SELECT @IsCheck = CASE PlatformId WHEN 2 THEN 2 -- SabaPlay
 									  WHEN 1 THEN 1 -- Saba Sports
@@ -42,7 +43,7 @@ BEGIN
 		FROM dbo.LA_BillerInfo b WITH (NOLOCK)
 			INNER JOIN cte_BillerPayer1 i ON i.ToPartyId = b.PartyID
 		WHERE i.FromPartyId = @PayerID
-		  AND ISNULL(b.BillerName, '') = @BillerNameOfSabaPlay
+		  AND ISNULL(b.BillerNameAbbreviation, '') = @BillerNameAbbr
 
 	END
 	ELSE IF @IsCheck = 2
@@ -59,7 +60,7 @@ BEGIN
 		FROM dbo.LA_BillerInfo b WITH (NOLOCK)
 			INNER JOIN cte_BillerPayer2 i ON i.ToPartyId = b.PartyID
 		WHERE i.FromPartyId = @PayerID
-		  AND ISNULL(b.BillerName, '') <> @BillerNameOfSabaPlay
+		  AND ISNULL(b.BillerNameAbbreviation, '') <> @BillerNameAbbr
 
 	END
 	ELSE RETURN

@@ -13,6 +13,7 @@ AS
 		- 20250403@Eddie: Get template follow Biller [RedmineID: #217740]
 		- 20250428@Eddie: For new Biller [RedmineID: #225376]
 		- 20250507@Danny: For new Internal biller [RedmineID: #222972]
+		- 20250512@Eddie: Enhance SP [RedmineID: #226204]
 
 	Params:
 		- @InvoiceTemplateId :
@@ -24,13 +25,21 @@ AS
 BEGIN
 	SET NOCOUNT ON
 	
-	DECLARE @InvTemplate NVARCHAR(50) = ''
+	DECLARE @InvTemplate NVARCHAR(50) = '', @BillerRHL NVARCHAR(50), @BillerJS NVARCHAR(50), @BillerDSS NVARCHAR(50), @BillerFSL NVARCHAR(50), @BillerIS NVARCHAR(50)
 	
-	SELECT @InvTemplate = CASE @BillerName WHEN N'Reasternhold Limited' 	 THEN 'Reasternhold'
-										   WHEN N'JollySports' 		   		 THEN 'Jollysports'
-										   WHEN N'Double S' 				 THEN 'Double-S'
-										   WHEN N'Fastlink Services Limited' THEN 'Fastlink'
-										   WHEN N'Internal Settlement'		 THEN 'Internal-Settlement'
+	SELECT @BillerRHL = MAX(CASE WHEN BillerNameAbbreviation = 'RHL' THEN BillerName END )
+	     , @BillerJS  = MAX(CASE WHEN BillerNameAbbreviation = 'JS'  THEN BillerName END )
+	     , @BillerDSS = MAX(CASE WHEN BillerNameAbbreviation = 'DSS' THEN BillerName END )
+	     , @BillerFSL = MAX(CASE WHEN BillerNameAbbreviation = 'FSL' THEN BillerName END )
+	     , @BillerIS  = MAX(CASE WHEN BillerNameAbbreviation = 'IS'  THEN BillerName END )
+	FROM dbo.LA_BillerInfo WITH (NOLOCK)
+	
+	
+	SELECT @InvTemplate = CASE @BillerName WHEN @BillerRHL THEN 'Reasternhold'
+										   WHEN @BillerJS  THEN 'Jollysports'
+										   WHEN @BillerDSS THEN 'Double-S'
+										   WHEN @BillerFSL THEN 'Fastlink'
+										   WHEN @BillerIS  THEN 'Internal-Settlement'
 						  ELSE '' END
 
 	IF (@InvTemplate <> 'Fastlink')

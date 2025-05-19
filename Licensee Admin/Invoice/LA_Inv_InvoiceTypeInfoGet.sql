@@ -16,6 +16,7 @@ AS
 		- 20170717@Bruce: show product for type = 1 only [#79905]
 		- 20250402@Danny: Number Game promotion [RedmineID: #219671]
 		- 20250417@Danny: Support billing SabaPlay licensees [RedmineID: #224104]
+		- 20250512@Eddie: Enhance SP [RedmineID: #226204]
 */
 
 /*	Example:
@@ -30,7 +31,7 @@ BEGIN
 
 	DECLARE @IsSabaPlayBiller BIT
 	
-	SELECT @IsSabaPlayBiller = CASE WHEN BillerName = 'Reasternhold Limited' THEN 1 ELSE 0 END
+	SELECT @IsSabaPlayBiller = CASE WHEN BillerNameAbbreviation = N'RHL' THEN 1 ELSE 0 END
 	FROM LA_BillerInfo WITH(NOLOCK)
 	WHERE PartyId = @BillerId 
 

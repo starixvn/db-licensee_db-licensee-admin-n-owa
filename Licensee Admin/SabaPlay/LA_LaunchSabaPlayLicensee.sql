@@ -23,6 +23,7 @@ AS
 	Revisions:
 		- 20250320@Danny: Launch new saba play licensee
 		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
+		- 20250513@Eddie: Enhance SP [RedmineID: #226204]
 	
 	Param's Explannation: 
 	@ProductIds: [{"ProductID":1, "Productname":"abc"}]
@@ -36,7 +37,8 @@ BEGIN
 		@EndRun			DATETIME, 
 		@Duration		INT, 
 		@Doing			NVARCHAR(MAX),
-		@IsAddNew		BIT = 0
+		@IsAddNew		BIT = 0,
+		@BillerNameAbbr NVARCHAR(10) = N'RHL'
 
 	SELECT @ErrCode = 0, @ErrMsg = ''
 
@@ -80,8 +82,8 @@ BEGIN
 	SELECT @FirstDateOfMonth = DATEADD(MONTH, DATEDIFF(MONTH, 0, @LaunchDate), 0)
 
 	SELECT @BillerId = PartyId
-	FROM dbo.LA_BillerInfo WITH(NOLOCK)
-	WHERE BillerName = 'Reasternhold Limited'
+	FROM dbo.LA_BillerInfo WITH (NOLOCK)
+	WHERE BillerNameAbbreviation = @BillerNameAbbr
 
 	-- Launch licensee
 	BEGIN TRY
