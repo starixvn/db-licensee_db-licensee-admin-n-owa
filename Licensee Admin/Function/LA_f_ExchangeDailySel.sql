@@ -22,6 +22,7 @@ ALTER FUNCTION [dbo].[LA_f_ExchangeDailySel] (
 		- 20230823@Danny: Incorporate US$KH currency [RedmineID: #192544]
 		- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
 		- 20250513@Danny: Modify logic to get the latest exchange date [RedmineID: #226741]
+		- 20250522@Danny: Modify logic to get the latest exchange date cross month [RedmineID: #228307]
 
 	Param's Explanation:				
 */
@@ -31,7 +32,7 @@ RETURNS @tempDate TABLE (exchangedate DATETIME, ExchangeId INT, Code VARCHAR(65)
 		, UNIQUE CLUSTERED(exchangedate, exchangeid))
 AS 
 BEGIN
-	DECLARE @tmpFromDate DATETIME, @tmpToDate DATETIME, @maxExchangeDate DATETIME
+	DECLARE @tmpFromDate DATETIME, @tmpToDate DATETIME, @maxExchangeDate DATETIME ,@tmpEoMonth DATETIME
 		, @tmpDate DATETIME, @gapDate DATETIME, @i INT, @ReferencedExchangeDate DATETIME
 
 	SELECT @maxExchangeDate = MAX(exchangedate) 
@@ -56,6 +57,7 @@ BEGIN
 		END
 
 		SET @tmpToDate = CAST(EOMONTH(@tmpFromDate) AS DATETIME)
+		SET @tmpEoMonth = CAST(EOMONTH(@tmpFromDate) AS DATETIME)
 
 		IF @tmpToDate > @ReferencedExchangeDate
 		BEGIN
@@ -63,7 +65,7 @@ BEGIN
 		END
 
 		SET @tmpDate = @tmpFromDate
-		WHILE (@tmpDate <= @todate)
+		WHILE (@tmpDate <= @todate AND @tmpDate <= @tmpEoMonth)
 		BEGIN
 			INSERT INTO @tempDate (exchangedate, ExchangeId, Code, BaseCurrencyRate)--, MYR, USD, EUR, CNY, GBP, actualrate)
 			SELECT @tmpDate, t.ExchangeId
