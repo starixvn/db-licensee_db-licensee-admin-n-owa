@@ -48,4 +48,3 @@ Licensee Admin\Invoice\LA_Inv_InvoiceWaiveGet.sql
 Licensee Admin\Invoice\LA_Inv_RebateWorksheetSel.sql
 Licensee Admin\Report\LA_Rpt_LicenseeBillingDataByProduct.sql
 Licensee Admin\Report\SH_rpt_SabaPlayLicenseeBillingDataByProduct.sql
-
