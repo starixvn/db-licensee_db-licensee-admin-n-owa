@@ -6,11 +6,12 @@ AS
 /*  Created: 20250403@Danny
 	Task : Report - SabaPlay Licensee Settlement Report - Load Licensee dropdown 
 	DB: DBLIC.bodb_licensee
-		
+
 	Revisions:
 		- 20250403@Danny: create new sp
 		- 20250513@Eddie: Enhance SP [RedmineID: #226204]
-	
+		- 20250520@Eddie: Change ParentName for SabaPlay [RedmineID: #220534]
+
 	Param's Explanation:
 
 
@@ -60,7 +61,7 @@ BEGIN
 		SELECT	t.PartyID, 
 				ISNULL(t.BrandName,t.PartyName) PartyName, 
 				CASE WHEN t.PlatformId = 2 THEN 9999 ELSE p.ParentID END AS ParentID, 
-				CASE WHEN t.PlatformId = 2 THEN 'SabaPlay Licensees' ELSE p.ParentName END AS ParentName,
+				CASE WHEN t.PlatformId = 2 THEN 'Reasternhold Licensees' ELSE p.ParentName END AS ParentName,
 				CASE WHEN t.PlatformId = 2 THEN t.OldRefID ELSE so.SiteID END OperatorID,
 				x.x AS ProductList
 		FROM #userFunctionParty t
