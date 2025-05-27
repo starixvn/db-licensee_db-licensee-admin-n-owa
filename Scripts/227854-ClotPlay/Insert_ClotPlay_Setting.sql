@@ -19,8 +19,8 @@ select @PartyId = PartyId from dbo.OAS_Party with (nolock) where PartyName = 'CP
 
 DROP TABLE IF EXISTS #CurrencyTemp
 CREATE TABLE #CurrencyTemp (
-    Code NVARCHAR(10),
-    CurrencyName NVARCHAR(10)
+    Code VARCHAR(12),
+    CurrencyName NVARCHAR(50)
 );
 
 INSERT INTO #CurrencyTemp (Code, CurrencyName)
@@ -40,14 +40,6 @@ VALUES
 ('MMK', 'MMK');
 
 BEGIN
--- Delete old setting
-DECLARE @del_row TABLE(ChargeID INT)
-DELETE FROM OAS_ChargeInfo WITH(ROWLOCK, UPDLOCK) 
-OUTPUT deleted.ChargeID INTO @del_row
-WHERE ToParty = @PartyId and ProductID = 109
-
-DELETE FROM dbo.LA_ChargeRateByCurrency WITH(ROWLOCK, UPDLOCK)  WHERE ChargeID IN (SELECT d.ChargeID FROM @del_row d)
-DELETE FROM dbo.LA_ChargeInfo_SystemMapping WITH(ROWLOCK, UPDLOCK)  WHERE ChargeID IN (SELECT d.ChargeID FROM @del_row d)
 
 -- insert 3rd Rate (PaytoSupplier)
 insert into dbo.OAS_ChargeInfo (ProductId, FromParty, ToParty, ParentChargeId, Rate, ChargeType, FromDate, ToDate)
