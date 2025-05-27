@@ -17,6 +17,7 @@ if not exists (select 1 from dbo.OAS_Party with (nolock) where PartyName = 'CPRN
 declare @PartyId int
 select @PartyId = PartyId from dbo.OAS_Party with (nolock) where PartyName = 'CPRNG' and PartyType = 3
 
+DROP TABLE IF EXISTS #CurrencyTemp
 CREATE TABLE #CurrencyTemp (
     Code NVARCHAR(10),
     CurrencyName NVARCHAR(10)
@@ -36,7 +37,6 @@ VALUES
 ('IDR', 'DDD'),
 ('VND', 'INH'),
 ('USD', 'UT'),
-('HKD', 'HKK'),
 ('MMK', 'MMK');
 
 BEGIN
@@ -44,7 +44,7 @@ BEGIN
 DECLARE @del_row TABLE(ChargeID INT)
 DELETE FROM OAS_ChargeInfo WITH(ROWLOCK, UPDLOCK) 
 OUTPUT deleted.ChargeID INTO @del_row
-WHERE ToParty = @PartyId
+WHERE ToParty = @PartyId and ProductID = 109
 
 DELETE FROM dbo.LA_ChargeRateByCurrency WITH(ROWLOCK, UPDLOCK)  WHERE ChargeID IN (SELECT d.ChargeID FROM @del_row d)
 DELETE FROM dbo.LA_ChargeInfo_SystemMapping WITH(ROWLOCK, UPDLOCK)  WHERE ChargeID IN (SELECT d.ChargeID FROM @del_row d)
