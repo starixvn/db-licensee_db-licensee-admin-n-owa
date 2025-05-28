@@ -1,4 +1,4 @@
-/*<info serverAlias="DBLIC-bodb_Licensee" executers="bodbAdminNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBLIC-bodb_Licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 USE [bodb_licensee]
 GO
 
@@ -14,6 +14,7 @@ AS
 		- 20200205@Mason: Create SP [#Feature ID: 120005 Set billing term by currency]
 		- 20200302@Mason: Support HID currency [#128856]
 		- 20231002@Danny: Support Jollysport licensees [#FeatureID 193214]
+		- 20250529@Danny: Get all the currency list [RedmineID: #226207]
 
 	Params:
 	+ @PayerId : 0 get all Party
@@ -83,16 +84,16 @@ BEGIN
 	END
 	ELSE
 	BEGIN
-
+		
 		SELECT 
 			cr.ChargeID		AS ChargeId, 
 			cr.CurrencyID	AS CurrencyId, 
-			ci.CurrencyCode	AS CurrencyCode, 
+			ci.Code + ' (' + ci.currency + ')'		AS CurrencyCode, 
 			cr.Rate			AS Rate,
 			r.ChargeType	AS ChargeType
 		FROM dbo.LA_ChargeRateByCurrency cr WITH (NOLOCK)
 		INNER JOIN @ChargeDetail r ON cr.ChargeID = r.ChargeID
-		LEFT JOIN @CurrencyInfo ci ON ci.CurrencyId = cr.CurrencyID
+		LEFT JOIN bodb02.dbo.Exchange ci ON ci.ExchangeId = cr.CurrencyID
 	END
 END
 GO

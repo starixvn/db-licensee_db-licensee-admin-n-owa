@@ -41,6 +41,7 @@ AS
 		- 20250102@Danny: Rebate on Licensing winloss for specific currencies [RedmineID: #214767]
 		- 20250115@Danny: Support different groups by currencies [RedmineID: #216352]
 		- 20250528@Eddie: Enhancement of deleting the setting [RedmineID: #223299]
+		- 20250528@Danny: return isCrypto licensee status [RedmineID: #226207]
 
 	Params:
 		+ @PayerId :specify Party
@@ -158,6 +159,7 @@ BEGIN
 		 , pd.LaunchDate
 		 , pd.SuspendedDate
 		 , pd.TerminatedDate
+		, CASE WHEN lfc.PartyId IS NOT NULL THEN 1 ELSE 0 END isCrypto
 	FROM dbo.OAS_Party p WITH(NOLOCK) 
 		INNER JOIN dbo.OAS_PartyDetail pd ON pd.PartyId=p.PartyId
 		INNER JOIN dbo.Licensees t WITH (NOLOCK) ON p.OldRefID = t.LicenseeId
@@ -184,6 +186,7 @@ BEGIN
 			  AND @CurrentDate BETWEEN FromDate AND ToDate
 			  AND p.PartyId = dc2.PartyId --Rebate
 		) d2
+		LEFT JOIN dbo.LA_f_CryptoPartyListSel() lfc ON lfc.PartyId = p.PartyId
 		WHERE p.PartyID = @PayerId
 
 	-- Charge rate setting
