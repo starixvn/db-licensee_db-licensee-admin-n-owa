@@ -15,6 +15,7 @@ AS
 		- 20250403@Danny: create new sp [RedmineID: #217741]
 		- 20250506@Danny: use MemberTurnover column instead [RedmineID: #225394]
 		- 20250520@Eddie: return futher discount rate [RedmineID: #220534]
+		- 20250527@Danny: handle USDT currency code [RedmineID: #228187]
 	
 	Param's Explanation:
 
@@ -47,7 +48,7 @@ BEGIN
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@FromDate, @ToDate, @BaseCurrencyName)
 
 	SELECT @ToDate 				 AS WinLostDate
-		  ,ex.CurrencyCode 		 AS CurrencyName
+		  ,sp.CurrencyCode 		 AS CurrencyName
 		  ,ex.Rate				 AS ExchangeRate
 		  ,sp.ProductID    		 AS ProductID
 		  ,sp.ProductName  		 AS ProductName
@@ -85,7 +86,7 @@ BEGIN
 	(	SELECT TOP 1  e.CurrencyCode, e.Rate
 		FROM #Exchange e 
 		WHERE sp.RptDate = e.ExchangeDate 
-		  AND sp.CurrencyCode = e.CurrencyCode
+		  AND CASE WHEN sp.CurrencyCode = 'USDT' THEN 'USD' ELSE sp.CurrencyCode END  = e.CurrencyCode
 		  AND e.ExchangeId =  CASE WHEN sp.CurrencyCode = 'VND' THEN 51
 								   WHEN sp.CurrencyCode = 'INR' THEN 61
 								   WHEN sp.CurrencyCode = 'COP' THEN 84 
@@ -108,8 +109,8 @@ BEGIN
 		  AND h.ToDate >= @TDate
 	) AS ds
 	WHERE sp.DataType = 2 AND sp.RptDate = @TDate AND SiteID = @OperatorID AND Environment = @Environment
-	GROUP BY ex.CurrencyCode, ex.Rate, sp.ProductID, sp.ProductName, sp.LicenseeChargeRate, ISNULL(ds.rate, 0)
-	ORDER BY sp.ProductID, sp.ProductName, sp.LicenseeChargeRate, ex.CurrencyCode
+	GROUP BY sp.CurrencyCode, ex.Rate, sp.ProductID, sp.ProductName, sp.LicenseeChargeRate, ISNULL(ds.rate, 0)
+	ORDER BY sp.ProductID, sp.ProductName, sp.LicenseeChargeRate, sp.CurrencyCode
 
 END
 GO
