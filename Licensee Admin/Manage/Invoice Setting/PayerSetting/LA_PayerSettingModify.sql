@@ -34,6 +34,7 @@ AS
 		- 20231113@Danny: Support to remove up-coming waive period [RedmineID: #194868]
 		- 20240527@Danny: Automate the PT adjustment when the Exchange charge rate is changed [RemineID: #201477]
 		- 20250225@Danny: Integrate Double S System Inc group Licensees [RedmineID: #217961]
+		- 20250529@Eddie: Enhancement of deleting the setting [RedmineID: #223299]
 
 	 Params:	
 		+ @ChargeSettingXML:
@@ -63,17 +64,48 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @ProductListAll VARCHAR(100) = '', @MinDate DATE, @MaxDate DATE, @SiteName VARCHAR(20) ='', @InputPT VARCHAR(MAX) = '', @ChargeRateXML XML, @ChargeSettingXMLOUT XML
-		,@Username VARCHAR(50), @CurrentDate DATE, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX), @LogActionID	INT	= 1001, @startRun DATETIME, @endRun DATETIME,@duration INT
-		,@IsWriteLogPayer BIT, @InputPTExchange VARCHAR(MAX) = '', @ErrCodeExchange INT = 0, @ErrMsgExchange NVARCHAR(1000)	= ''
+	DECLARE @ProductListAll VARCHAR(100) = ''
+		   ,@SiteName VARCHAR(20) = ''
+		   ,@InputPT VARCHAR(MAX) = ''
+		   ,@ChargeSettingXMLOUT XML
+		   ,@Username VARCHAR(50)
+		   ,@CurrentDate DATE
+		   ,@LogSPData NVARCHAR(MAX)
+		   ,@LogSPDataOld NVARCHAR(MAX)
+		   ,@LogActionID INT = 1001
+		   ,@StartRun DATETIME
+		   ,@EndRun DATETIME
+		   ,@Duration INT
+		   ,@IsWriteLogPayer BIT
+		   ,@InputPTExchange VARCHAR(MAX) = ''
+		   ,@ErrCodeExchange INT = 0
+		   ,@ErrMsgExchange NVARCHAR(1000) = ''
+		   ,@MinFeeInsertedList VARCHAR(100)
+		   ,@WaiveInsertedList VARCHAR(100)
+		   ,@Old_LaunchDate DATE
+		   ,@Old_SuspendedDate DATE
+		   ,@Old_TerminatedDate DATE
+		   ,@ChargeSettingsXML XML
+
+	DECLARE @ChargeRate TABLE (ChargeID INT, ProductId INT, ProductName VARCHAR(50), Rate MONEY, CurrencyId INT, FromDate DATETIME, ToDate DATETIME, IsValid BIT DEFAULT(1), IsChangedRate BIT, IsChangedDate BIT)
+
+	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT)
+
+	DECLARE @T_ChargeId TABLE (ChargeID INT)
+
 	-- Time start
-	SET @startRun = GETDATE()
+	SET @StartRun = GETDATE()
+
 	SELECT @Username = Username FROM LA_User WITH(NOLOCK) WHERE UserID = @UserID 
 
-	DECLARE @MinFeeInsertedList VARCHAR(100), @WaiveInsertedList VARCHAR(100)
+	SELECT @ChargeSettingsXML = CONVERT(XML, @ChargeSettingXML)
+	
+	INSERT INTO @T_ChargeId(ChargeID)
+	SELECT DISTINCT t.c.value('(ChargeId/text())[1]', 'INT') AS ChargeID
+	FROM @ChargeSettingsXML.nodes('ChargeSettings/ChargeSetting') AS t(c)
+	OPTION (OPTIMIZE FOR (@ChargeSettingsXML = NULL))
 
 	-- Update LaunchDate/SuspendedDate/TerminatedDate
-	DECLARE @Old_LaunchDate DATE, @Old_SuspendedDate DATE, @Old_TerminatedDate DATE
 	SELECT  @Old_LaunchDate = LaunchDate, @Old_SuspendedDate = SuspendedDate, @Old_TerminatedDate = TerminatedDate
 	FROM dbo.OAS_PartyDetail WITH (NOLOCK)
 	WHERE PartyId = @PayerId
@@ -84,43 +116,47 @@ BEGIN
 	IF @IsWriteLogPayer = 1
 	BEGIN
 		--write log old
-		SELECT @logSPDataOld = (
-			SELECT	 Op2.PartyName							AS 'pi.pn'
-					, x.GroupName							AS 'pi.bg' 
-					,od.BrandName							AS 'pi.bn'
-					,od.Description							AS 'pi.dc'
-					,od.InvoiceLanguage						AS 'pi.iv'
-					,FORMAT (od.LaunchDate,'MMM dd, yyyy') 	AS 'pi.ld'
-					,FORMAT (od.SuspendedDate,'MMM dd, yyyy')	AS 'pi.sd'
-					,FORMAT (od.TerminatedDate,'MMM dd, yyyy') AS 'pi.tmd'
-
-					,od.CompanyName		AS 'a1.cn1'
-					,od.AttnName		AS 'a1.an1'
-					,od.Address1		AS 'a1.ad1'
-					,od.CompanyName2	AS 'a2.cn2'
-					,od.AttnName2		AS 'a2.an2'
-					,od.Address2		AS 'a2.ad2'
-					,ci.baseCurrInfo    AS 'bcs'
-			FROM OAS_PartyDetail od WITH(NOLOCK)
-			INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
-			OUTER APPLY (SELECT TOP 1 oc.ToParty , pg.GroupName
-						 FROM OAS_ChargeInfo oc WITH(NOLOCK) 
-						 INNER JOIN dbo.LA_f_BillingGroupSel() pg ON pg.PartyId = oc.ToParty
-						 WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 AND GETDATE() BETWEEN oc.FromDate AND oc.Todate ) x
-			OUTER APPLY (
-							SELECT
-							(
-							SELECT CASE WHEN op.BaseCurrencyId = 142 THEN 'USDT' ELSE e.Code END  'c', 
-									op.LicenseeCode 'lc', 
-									op.FromDate 'fd', 
-									op.ToDate  'td',
-									CONVERT(VARCHAR(10),op.PartyID) +CONVERT(VARCHAR(10), op.BaseCurrencyId) + Convert(CHAR(8),op.FromDate,112) AS FakeID
-							FROM OAS_PartyBaseCurrency op WITH(NOLOCK) 
-							INNER JOIN CustDB.dbo.exchange e WITh(NOLOCK) ON op.BaseCurrencyId = e.ExchangeId
-							WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
-							) AS  baseCurrInfo
-						) ci
-			WHERE od.PartyID = @PayerID FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
+		SELECT @LogSPDataOld = (
+			SELECT Op2.PartyName							AS 'pi.pn'
+				  ,x.GroupName								AS 'pi.bg' 
+				  ,od.BrandName								AS 'pi.bn'
+				  ,od.Description							AS 'pi.dc'
+				  ,od.InvoiceLanguage						AS 'pi.iv'
+				  ,FORMAT(od.LaunchDate,'MMM dd, yyyy') 	AS 'pi.ld'
+				  ,FORMAT(od.SuspendedDate,'MMM dd, yyyy')	AS 'pi.sd'
+				  ,FORMAT(od.TerminatedDate,'MMM dd, yyyy') AS 'pi.tmd'
+				  ,od.CompanyName							AS 'a1.cn1'
+				  ,od.AttnName								AS 'a1.an1'
+				  ,od.Address1								AS 'a1.ad1'
+				  ,od.CompanyName2							AS 'a2.cn2'
+				  ,od.AttnName2								AS 'a2.an2'
+				  ,od.Address2								AS 'a2.ad2'
+				  ,ci.baseCurrInfo  						AS 'bcs'
+			FROM dbo.OAS_PartyDetail od WITH (NOLOCK)
+				INNER JOIN dbo.OAS_Party op2 WITH (NOLOCK) ON od.PartyID = op2.PartyID
+				OUTER APPLY(
+					SELECT TOP 1 oc.ToParty, pg.GroupName
+					FROM dbo.OAS_ChargeInfo oc WITH (NOLOCK) 
+						INNER JOIN dbo.LA_f_BillingGroupSel() pg ON pg.PartyId = oc.ToParty
+					WHERE od.PartyID = oc.FromParty
+					  AND oc.ChargeType = 1
+					  AND GETDATE() BETWEEN oc.FromDate AND oc.Todate
+				) x
+				OUTER APPLY(
+					SELECT (
+						SELECT CASE WHEN op.BaseCurrencyId = 142 THEN 'USDT' ELSE e.Code END AS 'c'
+							  ,op.LicenseeCode AS 'lc'
+							  ,op.FromDate 	   AS 'fd'
+							  ,op.ToDate 	   AS 'td'
+							  ,CONVERT(VARCHAR(10), op.PartyID) + CONVERT(VARCHAR(10), op.BaseCurrencyId) + CONVERT(CHAR(8), op.FromDate, 112) AS FakeID
+						FROM OAS_PartyBaseCurrency op WITH (NOLOCK)
+							INNER JOIN CustDB.dbo.exchange e WITH (NOLOCK) ON op.BaseCurrencyId = e.ExchangeId
+						WHERE op.PartyID = od.PartyID
+						FOR JSON PATH, INCLUDE_NULL_VALUES
+					) AS  baseCurrInfo
+				) ci
+			WHERE od.PartyID = @PayerID
+			FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES    
 		)
 	END
 
@@ -140,48 +176,77 @@ BEGIN
 		, @MinFeeSettingXML		= @MinFeeSettingXML
 		, @UserID				= @UserID
 		, @LoginIP				= @LoginIP
-		, @ErrCode				= @ErrCode		OUTPUT
-		, @ErrMsg				= @ErrMsg		OUTPUT
-		, @MinfeeInsertedList	= @MinFeeInsertedList  OUTPUT
-		, @FeeTypeId			= 1		
-	IF @ErrCode <> 0 
+		, @ErrCode				= @ErrCode OUTPUT
+		, @ErrMsg				= @ErrMsg OUTPUT
+		, @MinfeeInsertedList	= @MinFeeInsertedList OUTPUT
+		, @FeeTypeId			= 1
+
+	IF @ErrCode <> 0
+	BEGIN
+		--Rollback LaunchDate/SuspendedDate/TerminatedDate
+		UPDATE dbo.OAS_PartyDetail WITH (ROWLOCK)
+		SET LaunchDate = @Old_LaunchDate, SuspendedDate = @Old_SuspendedDate, TerminatedDate = @Old_TerminatedDate
+		WHERE PartyId = @PayerId
+
+		--Rollback Minfee
+		IF ISNULL(@MinFeeInsertedList, 0) <> 0
 		BEGIN
-			RETURN
+			DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK)
+			WHERE PartyId = @PayerID
+			  AND MinFeeId IN (SELECT value FROM STRING_SPLIT(@MinFeeInsertedList, ','))
 		END
+		RETURN
+	END
+
 	--Waive
 	EXEC dbo.LA_MinFeeSettingModify
 		@PayerID				= @PayerID
 		, @MinFeeSettingXML		= @WaiveSettingXML
 		, @UserID				= @UserID
 		, @LoginIP				= @LoginIP
-		, @ErrCode				= @ErrCode		OUTPUT
-		, @ErrMsg				= @ErrMsg		OUTPUT
+		, @ErrCode				= @ErrCode OUTPUT
+		, @ErrMsg				= @ErrMsg OUTPUT
 		, @MinfeeInsertedList	= @WaiveInsertedList OUTPUT
 		, @FeeTypeId			= 2
-	IF @ErrCode <> 0 
-		BEGIN
-			--Rollback LaunchDate/SuspendedDate/TerminatedDate
-			UPDATE dbo.OAS_PartyDetail WITH (ROWLOCK)
-			SET LaunchDate = @Old_LaunchDate, SuspendedDate = @Old_SuspendedDate, TerminatedDate = @Old_TerminatedDate
-			WHERE PartyId = @PayerId
 
-			--Rollback Minfee
-			IF ISNULL(@MinFeeInsertedList, 0) <> 0
-				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT value FROM STRING_SPLIT(@MinFeeInsertedList, ','))
-			RETURN
+	IF @ErrCode <> 0 
+	BEGIN
+		--Rollback LaunchDate/SuspendedDate/TerminatedDate
+		UPDATE dbo.OAS_PartyDetail WITH (ROWLOCK)
+		SET LaunchDate = @Old_LaunchDate, SuspendedDate = @Old_SuspendedDate, TerminatedDate = @Old_TerminatedDate
+		WHERE PartyId = @PayerId
+
+		--Rollback Minfee
+		IF ISNULL(@MinFeeInsertedList, 0) <> 0
+		BEGIN
+			DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK)
+			WHERE PartyId = @PayerID
+			AND MinFeeId IN (SELECT value FROM STRING_SPLIT(@MinFeeInsertedList, ','))
 		END
+
+		--Rollback waive
+		IF ISNULL(@WaiveInsertedList, 0) <> 0
+		BEGIN
+			DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK)
+			WHERE PartyId = @PayerID
+			AND MinFeeId IN (SELECT value FROM STRING_SPLIT(@WaiveInsertedList, ','))
+		END
+		RETURN
+	END
 
 	--Modify Chargerate Setting
-	EXEC dbo.LA_ChargeRateSettingModify
-		@PayerID				= @PayerID
-		,@ChargeSettingXML		= @ChargeSettingXML
-		,@UserID				= @UserID
-		,@LoginIP				= @LoginIP
-		,@ErrCode				= @ErrCode OUTPUT
-		,@ErrMsg				= @ErrMsg OUTPUT		
-		,@ChargeSettingXMLOUT   = @ChargeSettingXMLOUT OUTPUT
+	IF EXISTS ( SELECT 1 FROM @T_ChargeId WHERE ChargeID >= 0 )
+	BEGIN
+		EXEC dbo.LA_ChargeRateSettingModify
+			@PayerID			  = @PayerID
+			,@ChargeSettingXML	  = @ChargeSettingXML
+			,@UserID			  = @UserID
+			,@LoginIP			  = @LoginIP
+			,@ErrCode			  = @ErrCode OUTPUT
+			,@ErrMsg			  = @ErrMsg OUTPUT		
+			,@ChargeSettingXMLOUT = @ChargeSettingXMLOUT OUTPUT
 
-	IF @ErrCode <> 0 
+		IF @ErrCode <> 0
 		BEGIN
 			--Rollback LaunchDate/SuspendedDate/TerminatedDate
 			UPDATE dbo.OAS_PartyDetail WITH (ROWLOCK)
@@ -190,56 +255,106 @@ BEGIN
 
 			--Rollback Minfee
 			IF ISNULL(@MinFeeInsertedList, 0) <> 0
-				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT value FROM STRING_SPLIT(@MinFeeInsertedList, ','))
+			BEGIN
+				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK)
+				WHERE PartyId = @PayerID
+				AND MinFeeId IN (SELECT value FROM STRING_SPLIT(@MinFeeInsertedList, ','))
+			END
+
 			--Rollback waive
-			IF ISNULL(@WaiveInsertedList, 0 ) <> 0
-				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK) WHERE PartyId = @PayerID AND MinFeeId IN (SELECT value FROM STRING_SPLIT(@WaiveInsertedList, ','))
+			IF ISNULL(@WaiveInsertedList, 0) <> 0
+			BEGIN
+				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK)
+				WHERE PartyId = @PayerID
+				AND MinFeeId IN (SELECT value FROM STRING_SPLIT(@WaiveInsertedList, ','))
+			END
 			RETURN
 		END
+	END
+
+	IF EXISTS ( SELECT 1 FROM @T_ChargeId WHERE ChargeID < 0 )
+	BEGIN
+		EXEC dbo.SH_ChargeRateSettingDel
+			@PayerID		   = @PayerID
+			,@ChargeSettingXML = @ChargeSettingXML
+			,@UserID		   = @UserID
+			,@LoginIP		   = @LoginIP
+			,@ErrCode		   = @ErrCode OUTPUT
+			,@ErrMsg		   = @ErrMsg OUTPUT
+
+		IF @ErrCode <> 0
+		BEGIN
+			--Rollback LaunchDate/SuspendedDate/TerminatedDate
+			UPDATE dbo.OAS_PartyDetail WITH (ROWLOCK)
+			SET LaunchDate = @Old_LaunchDate, SuspendedDate = @Old_SuspendedDate, TerminatedDate = @Old_TerminatedDate
+			WHERE PartyId = @PayerId
+
+			--Rollback Minfee
+			IF ISNULL(@MinFeeInsertedList, 0) <> 0
+			BEGIN
+				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK)
+				WHERE PartyId = @PayerID
+				AND MinFeeId IN (SELECT value FROM STRING_SPLIT(@MinFeeInsertedList, ','))
+			END
+
+			--Rollback waive
+			IF ISNULL(@WaiveInsertedList, 0 ) <> 0
+			BEGIN
+				DELETE dbo.LA_MinFee WITH (ROWLOCK, UPDLOCK)
+				WHERE PartyId = @PayerID
+				AND MinFeeId IN (SELECT value FROM STRING_SPLIT(@WaiveInsertedList, ','))
+			END
+			RETURN
+		END
+	END
 
 	IF @IsWriteLogPayer = 1
 	BEGIN
-		SELECT @logSPData = (
-			SELECT	 Op2.PartyName							AS 'pi.pn'
-					,x.GroupName							AS 'pi.bg' 
-					,od.BrandName							AS 'pi.bn'
-					,od.Description							AS 'pi.dc'
-					,od.InvoiceLanguage						AS 'pi.iv'
-					,FORMAT (od.LaunchDate,'MMM dd, yyyy') 	AS 'pi.ld'
-					,FORMAT (od.SuspendedDate,'MMM dd, yyyy')	AS 'pi.sd'
-					,FORMAT (od.TerminatedDate,'MMM dd, yyyy') AS 'pi.tmd'
-
-					,od.CompanyName		AS 'a1.cn1'
-					,od.AttnName		AS 'a1.an1'
-					,od.Address1		AS 'a1.ad1'
-					,od.CompanyName2	AS 'a2.cn2'
-					,od.AttnName2		AS 'a2.an2'
-					,od.Address2		AS 'a2.ad2'
-					,ci.baseCurrInfo    AS 'bcs'
-			FROM OAS_PartyDetail od WITH(NOLOCK)
-			INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
-			OUTER APPLY (SELECT TOP 1 oc.ToParty , pg.GroupName
-						 FROM OAS_ChargeInfo oc WITH(NOLOCK) 
-						 INNER JOIN dbo.LA_f_BillingGroupSel() pg ON pg.PartyId = oc.ToParty
-						 WHERE od.PartyID = oc.FromParty AND oc.ChargeType = 1 AND GETDATE() BETWEEN oc.FromDate AND oc.Todate ) x
-			OUTER APPLY (
-							SELECT
-							(
-							SELECT CASE WHEN op.BaseCurrencyId = 142 THEN 'USDT' ELSE e.Code END  'c', 
-									op.LicenseeCode 'lc', 
-									op.FromDate 'fd', 
-									op.ToDate  'td',
-									CONVERT(VARCHAR(10),op.PartyID) +CONVERT(VARCHAR(10), op.BaseCurrencyId) + Convert(CHAR(8),op.FromDate,112) AS FakeID
-							FROM OAS_PartyBaseCurrency op WITH(NOLOCK) 
-							INNER JOIN CustDB.dbo.exchange e WITh(NOLOCK) ON op.BaseCurrencyId = e.ExchangeId
-							WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
-							) AS  baseCurrInfo
-						) ci
-			WHERE od.PartyID = @PayerID FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
+		SELECT @LogSPData = (
+			SELECT Op2.PartyName							AS 'pi.pn'
+				  ,x.GroupName								AS 'pi.bg' 
+				  ,od.BrandName								AS 'pi.bn'
+				  ,od.Description							AS 'pi.dc'
+				  ,od.InvoiceLanguage						AS 'pi.iv'
+				  ,FORMAT(od.LaunchDate,'MMM dd, yyyy') 	AS 'pi.ld'
+				  ,FORMAT(od.SuspendedDate,'MMM dd, yyyy')	AS 'pi.sd'
+				  ,FORMAT(od.TerminatedDate,'MMM dd, yyyy') AS 'pi.tmd'
+				  ,od.CompanyName							AS 'a1.cn1'
+				  ,od.AttnName								AS 'a1.an1'
+				  ,od.Address1								AS 'a1.ad1'
+				  ,od.CompanyName2							AS 'a2.cn2'
+				  ,od.AttnName2								AS 'a2.an2'
+				  ,od.Address2								AS 'a2.ad2'
+				  ,ci.baseCurrInfo  						AS 'bcs'
+			FROM dbo.OAS_PartyDetail od WITH (NOLOCK)
+				INNER JOIN dbo.OAS_Party op2 WITH (NOLOCK) ON od.PartyID = op2.PartyID
+				OUTER APPLY(
+					SELECT TOP 1 oc.ToParty, pg.GroupName
+					FROM dbo.OAS_ChargeInfo oc WITH(NOLOCK) 
+						INNER JOIN dbo.LA_f_BillingGroupSel() pg ON pg.PartyId = oc.ToParty
+					WHERE od.PartyID = oc.FromParty
+					  AND oc.ChargeType = 1
+					  AND GETDATE() BETWEEN oc.FromDate AND oc.Todate
+				) x
+				OUTER APPLY(
+					SELECT(
+						SELECT CASE WHEN op.BaseCurrencyId = 142 THEN 'USDT' ELSE e.Code END AS 'c'
+							  ,op.LicenseeCode AS 'lc' 
+							  ,op.FromDate 	   AS 'fd'
+							  ,op.ToDate 	   AS 'td'
+							  ,CONVERT(VARCHAR(10), op.PartyID) + CONVERT(VARCHAR(10), op.BaseCurrencyId) + CONVERT(CHAR(8), op.FromDate, 112) AS FakeID
+						FROM OAS_PartyBaseCurrency op WITH (NOLOCK) 
+							INNER JOIN CustDB.dbo.exchange e WITH (NOLOCK) ON op.BaseCurrencyId = e.ExchangeId
+						WHERE op.PartyID = od.PartyID
+						FOR JSON PATH, INCLUDE_NULL_VALUES 
+					) AS baseCurrInfo
+				) ci
+			WHERE od.PartyID = @PayerID
+			FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES
 		)
 
-		SET @endRun = GETDATE()
-		SET @duration = DATEDIFF(MILLISECOND, @startRun, @endRun)
+		SET @EndRun = GETDATE()
+		SET @Duration = DATEDIFF(MILLISECOND, @StartRun, @EndRun)
 
 		-- Write Log
 		EXEC CustDB.dbo.LA_WriteLog_UserLog_RunSP_Wrapper
@@ -247,15 +362,13 @@ BEGIN
 			,@IP			= @LoginIP
 			,@SPName		= 'LA_PayerSettingModify'
 			,@CustId		= @PayerID
-			,@Duration		= @duration
-			,@TrackingValue2 = @logSPData
-			,@TrackingValue = @logSPDataOld
+			,@Duration		= @Duration
+			,@TrackingValue2 = @LogSPData
+			,@TrackingValue = @LogSPDataOld
 			,@ActionID		= @LogActionID
 	END
 
 	-- Update on NAP
-	DECLARE @ChargeRate TABLE (ChargeID INT, ProductId INT, ProductName VARCHAR(50), Rate MONEY, CurrencyId INT, FromDate DATETIME, ToDate DATETIME, IsValid BIT DEFAULT(1), IsChangedRate BIT, IsChangedDate BIT)
-
 	INSERT INTO @ChargeRate (ChargeId, FromDate, ToDate, ProductId, Rate, IsChangedRate, IsChangedDate, CurrencyId)
 	SELECT
 		t.c.value('(ChargeId/text())[1]', 'INT') AS ChargeId
@@ -275,15 +388,13 @@ BEGIN
 		SET IsValid = 0
 	WHERE @CurrentDate NOT BETWEEN FromDate AND ToDate
 
-	DECLARE @tmpPartyOfferCrypto TABLE (PartyId INT)
 	INSERT INTO @tmpPartyOfferCrypto(PartyId)
-	SELECT  PartyID FROM LA_f_CryptoPartyListSel()
+	SELECT PartyID FROM LA_f_CryptoPartyListSel()
 
 	SELECT @SiteName = l.LicenseeName
 	FROM dbo.OAS_Party p WITH(NOLOCK)
 		INNER JOIN dbo.Licensees l WITH(NOLOCK) ON p.OldRefID = l.LicenseeID
 	WHERE l.IsDeposit = 1 AND p.PartyID = @PayerID
-
 
 	DELETE cr
 	FROM @ChargeRate cr
