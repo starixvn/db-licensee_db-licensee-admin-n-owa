@@ -39,6 +39,7 @@ AS
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 		- 20250429@Danny: Internal Template for OW Billing
 		- 20250513@Eddie: Enhance SP [RedmineID: #226204]
+		- 20250529@Eddie: Enhancement of deleting the setting [RedmineID: #223299]
 
 	 Params:
 		+ @ChargeSettingXML: '<ChargeSettings>
@@ -71,8 +72,7 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX),	@xml XML, @ChargeSettingsXML XML, @LicenseeID INT,
-			@LogActionID INT = 1200
+	DECLARE @startRun DATETIME, @endRun	DATETIME, @duration INT, @logSPData NVARCHAR(MAX), @logSPDataOld NVARCHAR(MAX), @ChargeSettingsXML XML, @LogActionID INT = 1200
 	DECLARE @ProductListAll		VARCHAR(500) = ''
 			, @MinDate			DATE
 			, @MaxDate			DATE
@@ -116,7 +116,9 @@ BEGIN
 			t.c.value('(ToDate/text())[1]', 'DATE') AS ToDate,	
 			1 AS StatusId
 	FROM @ChargeSettingsXML.nodes('ChargeSettings/ChargeSetting') AS t(c)
-	OPTION (OPTIMIZE FOR (@ChargeSettingsXML = NULL)) 
+	OPTION (OPTIMIZE FOR (@ChargeSettingsXML = NULL))
+	
+	DELETE @ChargeSetting WHERE ChargeID < 0
 
 	UPDATE c
 		SET c.IsChangedRate = CASE WHEN c.Rate = ci.Rate THEN 0 ELSE 1 END

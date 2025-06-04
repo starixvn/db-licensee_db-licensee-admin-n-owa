@@ -7,11 +7,11 @@ ALTER PROCEDURE [dbo].[LA_PayerSettingDetailSel]
 	@Environment VARCHAR(50) = 'LOCAL'
 AS
 /*  
-	 Created: 20150420@Florent
-	 Task : Get Payer setting
-	 DB: DBLIC.bodb_Licensee  
+	Created: 20150420@Florent
+	Task : Get Payer setting
+	DB: DBLIC.bodb_Licensee  
    
-	 Revisions:  
+	Revisions:  
 		- 20150618@Florent: add column Currency to LA_Minfee   		  
 		- 20150703@Florent: store BaseCurrencyId from OAS_ChargeInfo to OAS_PartyDetail
 		- 20150831@Bravo: fix bug - Min fee term & Basis of billing max length.
@@ -40,12 +40,13 @@ AS
 		- 20241126@Danny: Rebate on specific currencies [#FeatureID 206143]
 		- 20250102@Danny: Rebate on Licensing winloss for specific currencies [RedmineID: #214767]
 		- 20250115@Danny: Support different groups by currencies [RedmineID: #216352]
+		- 20250528@Eddie: Enhancement of deleting the setting [RedmineID: #223299]
 
-	 Params:
+	Params:
 		+ @PayerId :specify Party
-		
-	 Example:
-				exec [LA_PayerSettingDetailSel] 14
+
+	Example:
+		exec [LA_PayerSettingDetailSel] 14
 */
 BEGIN
 	SET NOCOUNT ON
@@ -53,82 +54,74 @@ BEGIN
 	CREATE TABLE #tmp_licenseeOIC (RegisteredLicenseeName NVARCHAR(50), LicenseeStatusId TINYINT)
 	INSERT INTO #tmp_licenseeOIC(RegisteredLicenseeName, LicenseeStatusId)
 	SELECT	RegisteredLicenseeName, LicenseeStatusId
-	FROM	DBOIC.bodb_OIC.dbo.licensee WITH(NOLOCK)
+	FROM DBOIC.bodb_OIC.dbo.licensee WITH (NOLOCK)
 
 	CREATE TABLE #tmp_licenseeOICStatus (LicenseeStatusId TINYINT, LicenseeStatusName NVARCHAR(30))
 	INSERT INTO #tmp_licenseeOICStatus(LicenseeStatusId, LicenseeStatusName)
 	SELECT	LicenseeStatusId, LicenseeStatusName
-	FROM	DBOIC.bodb_OIC.dbo.LicenseeStatus WITH(NOLOCK)
+	FROM DBOIC.bodb_OIC.dbo.LicenseeStatus WITH (NOLOCK)
 
-	DECLARE @ProductListAll		VARCHAR(500) = ''		
-		, @MinDate				DATE 
-		, @MaxDate				DATE
-		, @CurrentDate			DATE
+	DECLARE @ProductListAll	  VARCHAR(500) = ''		
+		  , @MinDate		  DATE 
+		  , @MaxDate		  DATE
+		  , @CurrentDate	  DATE
+		  , @BillingCycleDate DATE
 
 	SET @CurrentDate = CONVERT(DATE, GETDATE())
+
 	DECLARE @ChargeInfo AS TABLE (ChargeId INT, PartyId INT, ProductId INT, BettypeRef INT, Rate MONEY, ChargeType SMALLINT, FromDate DATE, ToDate DATE, FirstBilling VARCHAR(100), BasisOfBilling NVARCHAR(MAX), ExchangeID INT, ToPartyId INT)	
 	DECLARE @Minfee AS TABLE(FeeId INT, PartyId INT, ProductId INT, FeeTypeId TINYINT, FeeAmount MONEY, CurrencyId INT, MinFeeTerm NVARCHAR(MAX), FromDate DATE, ToDate DATE)
-	DECLARE @Discount AS TABLE(PartyId INT, FromDate DATE, ToDate DATE,DiscountGroupId INT, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
+	DECLARE @Discount AS TABLE(PartyId INT, FromDate DATE, ToDate DATE, DiscountGroupId INT, DiscountGroupName VARCHAR(100), DiscountGroupType TINYINT)
 
-	DECLARE @MaxInvoiceDate DATE
-	SELECT  @MaxInvoiceDate = MAX(InvoiceDate) 
-	FROM LA_InvoiceHeader WITH(NOLOCK) 
-	WHERE InvoiceType = 1 AND StatusId <> -1 AND Environment = @Environment AND PartyId = @PayerId
+	SELECT @BillingCycleDate = MAX(InvoiceDate)
+	FROM dbo.LA_InvoiceHeader WITH (NOLOCK) 
+	WHERE InvoiceType = 1 AND StatusId <> -1 AND Environment = @Environment
 
-	--get list Product
+	-- Get list Product
 	SELECT @ProductListAll = @ProductListAll + ProductPrefix + ','
 	FROM dbo.LA_f_Products3rd('')
 	SET @ProductListAll = REPLACE(SUBSTRING(@ProductListAll, 0, LEN(@ProductListAll)), 'RB', '') -- dont support RB
 
-	--get Minium date, maximum date
+	-- Get minium date, maximum date
 	SELECT @MinDate = MIN(ci.FromDate)
-		, @MaxDate = MAX(ci.ToDate)
+		 , @MaxDate = MAX(ci.ToDate)
 	FROM dbo.OAS_ChargeInfo ci WITH (NOLOCK)
 		INNER JOIN dbo.LA_ChargeInfo_SystemMapping cs WITH (NOLOCK) ON ci.ChargeID = cs.ChargeID AND cs.SystemID = 2
 	WHERE ci.FromParty = @PayerId
-	
+
 	DECLARE @BaseCurrencyId INT
 	SELECT TOP 1 @BaseCurrencyId = p.BaseCurrencyId
 	FROM OAS_PartyBaseCurrency p WITH(NOLOCK)
 	LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON p.BaseCurrencyId = e.exchangeid
-	WHERE PartyID = @PayerId 
+	WHERE PartyID = @PayerId
 	ORDER BY ToDate DESC
 
 	SELECT @BaseCurrencyId = ISNULL(@BaseCurrencyId, 6)
 
 	INSERT INTO @ChargeInfo(ChargeId, PartyId, ProductId, BettypeRef, Rate, ChargeType, FromDate, ToDate, FirstBilling, BasisOfBilling, ExchangeID, ToPartyId)
 	SELECT c.ChargeID		
-		, c.PartyID
-		, c.ProductID		
-		, CASE WHEN c.ProductID IN (14,17) THEN 
-					c.Bettype
-				 ELSE 0 END
-		  AS BettypeRef
-		, c.DI_Rate
-		, ci.ChargeType
-		, c.Fromdate
-		, c.Todate
-		, CASE WHEN c.ProductID IN (14,17) THEN cs.FirstOfBilling ELSE ci.FirstOfBilling END AS FirstOfBilling
-		, CASE WHEN c.ProductID IN (14,17) THEN cs.BasisOfBilling ELSE ci.BasisOfBilling END AS BasisOfBilling
-		, @BaseCurrencyId AS BaseCurrencyId
-		, ci.ToParty
+		 , c.PartyID
+		 , c.ProductID		
+		 , CASE WHEN c.ProductID IN (14,17) THEN c.Bettype ELSE 0 END AS BettypeRef
+		 , c.DI_Rate
+		 , ci.ChargeType
+		 , c.Fromdate
+		 , c.Todate
+		 , CASE WHEN c.ProductID IN (14,17) THEN cs.FirstOfBilling ELSE ci.FirstOfBilling END AS FirstOfBilling
+		 , CASE WHEN c.ProductID IN (14,17) THEN cs.BasisOfBilling ELSE ci.BasisOfBilling END AS BasisOfBilling
+		 , @BaseCurrencyId AS BaseCurrencyId
+		 , ci.ToParty
 	FROM dbo.LA_f_ChargeInfo(@PayerId, @MinDate, @MaxDate, @ProductListAll, 'OA', 0) c
 		LEFT JOIN OAS_Party p WITH (NOLOCK) ON c.PartyID = p.PartyID		
 		LEFT JOIN dbo.OAS_ChargeInfo ci WITH (NOLOCK) ON c.ChargeID = ci.ChargeID
 		LEFT JOIN dbo.OAS_ChargeInfoSub cs WITH(NOLOCK) ON ci.ChargeID = cs.ChargeIdRef AND c.Bettype = cs.BettypeRef
 	WHERE c.ChargeID <> 0
-	
+
 	--======Min fee Area ===---
 	INSERT INTO @Minfee(FeeId, PartyId, ProductId, FeeTypeId, FeeAmount, CurrencyId, MinFeeTerm, FromDate, ToDate)
-	SELECT MinFeeId , PartyId, ProductId, FeeTypeId, FeeAmount, CurrencyId, MinFeeTerm, FromDate, ToDate 
+	SELECT MinFeeId, PartyId, ProductId, FeeTypeId, FeeAmount, CurrencyId, MinFeeTerm, FromDate, ToDate 
 	FROM dbo.LA_MinFee WITH (NOLOCK)
 	WHERE PartyId = @PayerId
-
-	DECLARE @Max_MF_FromDate DATE, @Max_Waive_FromDate DATE
-
-	SELECT @Max_MF_FromDate = MAX(CASE WHEN FeeTypeId = 1 THEN FromDate ELSE NULL END),
-		   @Max_Waive_FromDate = MAX(CASE WHEN FeeTypeId = 2 THEN FromDate ELSE NULL END)
-	FROM @Minfee
 
 	--======Discount/ Rebate ===---
 	INSERT INTO @Discount (PartyId, FromDate, ToDate, DiscountGroupId, DiscountGroupName, DiscountGroupType)
@@ -139,80 +132,76 @@ BEGIN
 	WHERE a.PartyID = @PayerId
 	GROUP BY a.PartyID, h.FromDate, h.ToDate, d.DiscountGroupId, h.DiscountGroupName, h.DiscountGroupType
 
-	-- product order
+	-- Product order
 	DECLARE @ProductOrder TABLE(ProductId INT, ProductOrder SMALLMONEY)
 	INSERT INTO @ProductOrder
-	SELECT ProductId, CASE ProductId 
-			WHEN 15/*CB*/ THEN 13.5 -- , make CB after BT and before MGCLC
-			ELSE ProductId -- keep as it is
-		END
+	SELECT ProductId
+		  ,CASE ProductId WHEN 15/*CB*/ THEN 13.5 -- , make CB after BT and before MGCLC
+		   ELSE ProductId -- keep as it is
+		   END
 	FROM dbo.LA_f_Products3rd('')
 		
-	-- payer setting
+	-- Payer setting
 	DECLARE @CurrentBillingGroup INT
 	SELECT @CurrentBillingGroup = ISNULL((SELECT TOP 1 ToPartyId FROM @ChargeInfo ORDER BY FromDate DESC), 0)
 
-	SELECT  p.PartyId		AS PayerID	
-		, g.GroupMinFeeID		AS GroupMinFeeID
-		, g.[Name]				AS GroupMinFeeName
-		, @BaseCurrencyId		AS ExchangeID
-		, d1.DiscountGroupName	AS DiscountGroupName
-		, d2.DiscountGroupName	AS RebateGroupName
-		, CASE WHEN ISNULL(pd.BrandName,'')<>'' THEN pd.BrandName + ' (' +p.PartyName+')' ELSE p.PartyName END PayerName
-		, @CurrentBillingGroup AS CurrentBillingGroup
-		, CASE WHEN t.IsDeposit = 0 THEN 'Active'
-				 ELSE ISNULL(us.LicenseeStatusName, 'Unrecognized') END AS PayerStatusName
-		, pd.LaunchDate
-		, pd.SuspendedDate
-		, pd.TerminatedDate
+	SELECT p.PartyId			AS PayerID
+		 , g.GroupMinFeeID		AS GroupMinFeeID
+		 , g.[Name]				AS GroupMinFeeName
+		 , @BaseCurrencyId		AS ExchangeID
+		 , d1.DiscountGroupName	AS DiscountGroupName
+		 , d2.DiscountGroupName	AS RebateGroupName
+		 , CASE WHEN ISNULL(pd.BrandName,'')<>'' THEN pd.BrandName + ' (' +p.PartyName+')' ELSE p.PartyName END PayerName
+		 , @CurrentBillingGroup AS CurrentBillingGroup
+		 , CASE WHEN t.IsDeposit = 0 THEN 'Active'
+		   ELSE ISNULL(us.LicenseeStatusName, 'Unrecognized') END AS PayerStatusName
+		 , pd.LaunchDate
+		 , pd.SuspendedDate
+		 , pd.TerminatedDate
 	FROM dbo.OAS_Party p WITH(NOLOCK) 
 		INNER JOIN dbo.OAS_PartyDetail pd ON pd.PartyId=p.PartyId
-		INNER JOIN	dbo.Licensees t WITH(NOLOCK) ON p.OldRefID = t.LicenseeId
-		LEFT JOIN	#tmp_licenseeOIC u WITH(NOLOCK) ON t.LicenseeName = u.RegisteredLicenseeName
-		LEFT JOIN	#tmp_licenseeOICStatus us WITH(NOLOCK) ON u.LicenseeStatusId = us.LicenseeStatusId
+		INNER JOIN dbo.Licensees t WITH (NOLOCK) ON p.OldRefID = t.LicenseeId
+		LEFT JOIN #tmp_licenseeOIC u WITH (NOLOCK) ON t.LicenseeName = u.RegisteredLicenseeName
+		LEFT JOIN #tmp_licenseeOICStatus us WITH (NOLOCK) ON u.LicenseeStatusId = us.LicenseeStatusId
 		LEFT JOIN (
-				SELECT TOP 1 mfa.PartyID, mfh.[Name], mfh.GroupMinFeeID
-				FROM dbo.LA_GroupMinFeeAssignment mfa WITH (NOLOCK) 
-				INNER JOIN dbo.LA_GroupMinFeeHeader mfh WITH (NOLOCK) ON  mfa.GroupMinFeeID = mfh.GroupMinFeeID
-				WHERE mfa.PartyID = @PayerId AND mfh.ToDate >= @CurrentDate
-				ORDER BY mfh.ToDate DESC
-				) g ON p.PartyId = g.PartyID -- Group Min Fee
+			SELECT TOP 1 mfa.PartyID, mfh.[Name], mfh.GroupMinFeeID
+			FROM dbo.LA_GroupMinFeeAssignment mfa WITH (NOLOCK)
+				INNER JOIN dbo.LA_GroupMinFeeHeader mfh WITH (NOLOCK) ON mfa.GroupMinFeeID = mfh.GroupMinFeeID
+			WHERE mfa.PartyID = @PayerId AND mfh.ToDate >= @CurrentDate
+			ORDER BY mfh.ToDate DESC
+		) g ON p.PartyId = g.PartyID -- Group Min Fee
 		OUTER APPLY (
-				SELECT 
-					  STRING_AGG(dc.DiscountGroupName,', ')  DiscountGroupName
-				FROM @Discount  dc
-				WHERE DiscountGroupType IN (1, 11, 3, 13)
-					AND @CurrentDate BETWEEN FromDate AND ToDate
-					AND  p.PartyId = dc.PartyId --discount
-				) d1
+			SELECT STRING_AGG(dc.DiscountGroupName,', ') DiscountGroupName
+			FROM @Discount dc
+			WHERE DiscountGroupType IN (1, 11, 3, 13)
+			  AND @CurrentDate BETWEEN FromDate AND ToDate
+			  AND p.PartyId = dc.PartyId --discount
+		) d1
 		OUTER APPLY (
-				SELECT 
-			
-					   STRING_AGG(dc2.DiscountGroupName,', ')  DiscountGroupName
-				FROM @Discount  dc2
-				WHERE DiscountGroupType IN (2, 12, 22, 32, 42)
-					AND @CurrentDate BETWEEN FromDate AND ToDate
-					AND p.PartyId = dc2.PartyId --Rebate
-				
-				) d2 
+			SELECT STRING_AGG(dc2.DiscountGroupName,', ') DiscountGroupName
+			FROM @Discount dc2
+			WHERE DiscountGroupType IN (2, 12, 22, 32, 42)
+			  AND @CurrentDate BETWEEN FromDate AND ToDate
+			  AND p.PartyId = dc2.PartyId --Rebate
+		) d2
 		WHERE p.PartyID = @PayerId
-	
 
-	-- charge rate setting
+	-- Charge rate setting
 	;WITH Rate AS(
-		SELECT c.ChargeId		AS ChargeId
-			, c.PartyId			AS PayerID
-			, c.ProductId		AS ProductId
-			, ProductName		AS ProductName
-			, FirstBilling		AS FirstBilling
-			, REPLACE(c.BasisOfBilling,'&amp;','&') BasisOfBilling
-			, c.BettypeRef
-			, c.Rate			AS Rate
-			, c.ChargeType
-			, c.FromDate
-			, c.ToDate
-			, CASE WHEN @CurrentDate > c.ToDate THEN 1 ELSE 0 END IsExpired
-			, po.ProductOrder
+		SELECT c.ChargeId	  AS ChargeId
+			  ,c.PartyId	  AS PayerID
+			  ,c.ProductId	  AS ProductId
+			  ,pr.ProductName AS ProductName
+			  ,c.FirstBilling AS FirstBilling
+			  ,REPLACE(c.BasisOfBilling,'&amp;','&') AS BasisOfBilling
+			  ,c.BettypeRef
+			  ,c.Rate AS Rate
+			  ,c.ChargeType
+			  ,c.FromDate
+			  ,c.ToDate
+			  ,CASE WHEN @CurrentDate > c.ToDate THEN 1 ELSE 0 END AS IsExpired
+			  ,po.ProductOrder
+			  ,CASE WHEN (c.FromDate > @BillingCycleDate) THEN 1 ELSE 0 END AS IsRemovable
 		FROM @ChargeInfo c
 		INNER JOIN dbo.LA_f_Products3rd('') pr ON c.ProductID = pr.ProductID
 		INNER JOIN @ProductOrder po ON c.ProductID = po.ProductId
@@ -221,18 +210,18 @@ BEGIN
 	FROM Rate
 	ORDER BY IsExpired, ProductOrder, FromDate
 
-	--Minfee Setting
-	SELECT  m.FeeId			AS MinFeeId
-		, PartyId			AS PayerID
-		, m.ProductId		AS ProductId
-		, pr.ProductName	AS ProductName
-		, FeeAmount
-		, CurrencyId
-		, CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END AS CurrencyName
-		, REPLACE(MinFeeTerm,'&amp;','&') MinFeeTerm
-		, FromDate
-		, ToDate
-		, CASE WHEN (FromDate = @Max_MF_FromDate AND @MaxInvoiceDate IS NULL) OR (FromDate > @MaxInvoiceDate AND @MaxInvoiceDate IS NOT NULL) THEN 1 ELSE 0 END IsRemovable
+	-- Minfee Setting
+	SELECT m.FeeId		  AS MinFeeId
+		  ,m.PartyId	  AS PayerID
+		  ,m.ProductId	  AS ProductId
+		  ,pr.ProductName AS ProductName
+		  ,FeeAmount
+		  ,CurrencyId
+		  ,CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END AS CurrencyName
+		  ,REPLACE(MinFeeTerm,'&amp;','&') AS MinFeeTerm
+		  ,FromDate
+		  ,ToDate
+		  ,CASE WHEN (m.FromDate > @BillingCycleDate) THEN 1 ELSE 0 END AS IsRemovable
 	FROM @Minfee m
 		INNER JOIN dbo.LA_f_Products3rd('') pr ON m.ProductID = pr.ProductID
 		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON m.CurrencyId = e.exchangeid
@@ -240,14 +229,14 @@ BEGIN
 	WHERE FeeTypeId = 1 -- Miniumfee
 	ORDER BY po.ProductOrder, m.FromDate
 	 
-	--Waive Setting
-	SELECT w.FeeId			AS WaiveId
-		, PartyId			AS PayerID
-		, w.ProductId		AS ProductId
-		, pr.ProductName	AS ProductName
-		, FromDate
-		, ToDate
-		, CASE WHEN (FromDate = @Max_Waive_FromDate AND @MaxInvoiceDate IS NULL) OR (FromDate > @MaxInvoiceDate AND @MaxInvoiceDate IS NOT NULL)  THEN 1 ELSE 0 END IsRemovable
+	-- Waive Setting
+	SELECT w.FeeId		  AS WaiveId
+		  ,PartyId		  AS PayerID
+		  ,w.ProductId	  AS ProductId
+		  ,pr.ProductName AS ProductName
+		  ,FromDate
+		  ,ToDate
+		  ,CASE WHEN (w.FromDate > @BillingCycleDate) THEN 1 ELSE 0 END IsRemovable
 	FROM @Minfee w
 		INNER JOIN dbo.LA_f_Products3rd('') pr ON w.ProductID = pr.ProductID
 		INNER JOIN @ProductOrder po ON pr.ProductID = po.ProductId
@@ -256,17 +245,17 @@ BEGIN
 
 	-- Charge rate by currency settings
 	SELECT c1.ChargeID, c1.CurrencyID, c1.Rate
-	FROM LA_ChargeRateByCurrency c1 WITH(NOLOCK)
+	FROM LA_ChargeRateByCurrency c1 WITH (NOLOCK)
 		INNER JOIN @ChargeInfo c2 ON c1.ChargeID = c2.ChargeId
 
 	-- Base currency setting
-	SELECT pc.BaseCurrencyId,
-			pc.LicenseeCode,
-			pc.FromDate,
-			pc.ToDate,
-			pc.PartyID,
-			CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END AS CurrencyName,
-			CASE WHEN pc.ToDate < @CurrentDate THEN 0 ELSE 1 END AS IsActive
+	SELECT pc.BaseCurrencyId
+		  ,pc.LicenseeCode
+		  ,pc.FromDate
+		  ,pc.ToDate
+		  ,pc.PartyID
+		  ,CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END AS CurrencyName
+		  ,CASE WHEN pc.ToDate < @CurrentDate THEN 0 ELSE 1 END AS IsActive
 	FROM OAS_PartyBaseCurrency pc
 	LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON pc.BaseCurrencyId = e.exchangeid
 	WHERE pc.PartyID = @PayerId
