@@ -38,6 +38,7 @@ AS
 		- 20241202@Danny: Remove IncludeRebateWorkSheet column [#214501]
 		- 20250221@Danny:  Integrate Double S System Inc group Licensees [#217961]
 		- 20250502@Eddie: Support Billing for SabaPlay [#221987]
+		- 20250604@Danny: Extend data type [#228187]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -156,7 +157,7 @@ BEGIN
 			AND InvoiceType IN (1, 3, 6) -- Software Fee, Rebate, Hosting Fee
 		ORDER BY CreatedDateTime DESC
 		
-		DECLARE @InvoiceSettings TABLE (IndexNumber INT, PartyId INT, BillerId INT, InvTypeId SMALLINT, ProductIds VARCHAR(200), ProductCodes VARCHAR(200), InvTemplateName VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT,  IsIncludePlayerTipsWorkSheet BIT, CompanyName	NVARCHAR(100), PayerAddress1 NVARCHAR(255), BillerAddress1 NVARCHAR(255))
+		DECLARE @InvoiceSettings TABLE (IndexNumber INT, PartyId INT, BillerId INT, InvTypeId SMALLINT, ProductIds VARCHAR(200), ProductCodes VARCHAR(MAX), InvTemplateName VARCHAR(50), InvoiceSymbol NVARCHAR(20), InvoiceNumber INT,  IsIncludePlayerTipsWorkSheet BIT, CompanyName	NVARCHAR(100), PayerAddress1 NVARCHAR(255), BillerAddress1 NVARCHAR(255))
 
 		INSERT INTO @InvoiceSettings (IndexNumber, PartyId, BillerId, InvTypeId, InvTemplateName, InvoiceSymbol, InvoiceNumber, ProductIds, ProductCodes, CompanyName, PayerAddress1, IsIncludePlayerTipsWorkSheet, BillerAddress1)
 		SELECT d.IndexNumber, s.FromPartyId, s.ToPartyId, s.InvTypeId, t.InvTemplateName, @InvoiceSymbol, d.InvoiceNumber
