@@ -53,6 +53,7 @@ AS
 		- 20250429@Danny: Internal Template for OW Billing
 		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
 		- 20250513@Eddie: Enhance SP [RedmineID: #226204]
+		- 20250605@Danny: New format charge rate setting log [RedmineID: #226207]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -639,7 +640,7 @@ BEGIN
 					    FORMAT (oc.FirstOfBilling,'MMM dd, yyyy') FirstOfBilling,
 						oc.BasisOfBilling,
 						CASE WHEN oc.ProductID = 3 THEN '0.25 %' ELSE (CAST (ISNULL(lcr.Rate, oc.Rate) * 100  AS VARCHAR(50) ) + ' %') END Rate,
-						STRING_AGG(x.Code,', ') Currs,
+						CASE WHEN lcr.Rate IS NOT NULL THEN STRING_AGG(x.Code ,', ') ELSE '' END Currs,
 						CASE WHEN lcr.Rate IS NOT NULL THEN 0 ELSE 1 END isMasterRate,
 						oc.ChargeID AS FakeID,
 						z.ChargeTypeName
@@ -648,10 +649,9 @@ BEGIN
 			INNER JOIN Licensees l WITH(NOLOCK) ON op.OldRefID = l.LicenseeID
 			INNER JOIN OAS_ChargeInfo oc WITH(NOLOCK) ON op.PartyID = oc.FromParty
 			CROSS APPLY (
-				SELECT DISTINCT lc.Currency, CASE WHEN e.ExchangeId = 142 THEN 'USDT' WHEN e.ExchangeId IN (96,202,206,208,209) THEN  e.Code + ' (' + e.currency + ')'  ELSE e.Code END Code
-				FROM LicenseeCust lc  WITH(NOLOCK) 
-				INNER JOIN  CustDB.dbo.exchange e with(nolock) on lc.Currency = e.ExchangeId
-				WHERE lc.LicenseeID = l.LicenseeID and lc.roleID = 2 and e.ExchangeId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
+				SELECT  e.ExchangeId AS Currency, e.Code + ' (' + e.currency + ')' Code
+				FROM CustDB.dbo.exchange e with(nolock) 
+				WHERE  e.ExchangeId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 			) x
 			INNER JOIN @ChargeInfo z ON z.ChargeId = oc.ChargeID AND z.ChargeTypeName IS NOT NULL
 			LEFT JOIN  LA_ChargeRateByCurrency lcr WITH(NOLOCK) ON oc.ChargeID = lcr.ChargeID AND x.Currency = lcr.CurrencyID
@@ -667,16 +667,17 @@ BEGIN
 						CASE WHEN oc.ProductID = 3 THEN '0.25 %' ELSE (CAST (ISNULL(lcr.Rate, oc.Rate) * 100  AS VARCHAR(50) ) + ' %') END,
 						CASE WHEN lcr.Rate IS NOT NULL THEN 0 ELSE 1 END,
 						oc.ChargeID,
-						z.ChargeTypeName
+						z.ChargeTypeName,
+						lcr.Rate
 		) 
 		, t1 AS
 		(
 			SELECT t.FakeID, t.PartyName,t.BrandName,t.Product,t.FromDate,t.ToDate,t.FirstOfBilling,t.BasisOfBilling,t.ChargeTypeName,STRING_AGG(cr.r, CHAR(13)) AS r
 			FROM t
 			CROSS APPLY (
-					SELECT CASE WHEN t.isMasterRate = 1 AND EXISTS (SELECT TOP 1 1 FROM t t2 WHERE t2.isMasterRate = 0 AND t2.Product = t.Product and t2.PartyName = t.PartyName) THEN 'Others ' 
-								WHEN t.isMasterRate = 1 AND NOT EXISTS (SELECT TOP 1 1 FROM t t2 WHERE t2.isMasterRate = 0 AND t2.Product = t.Product and t2.PartyName = t.PartyName) THEN 'All ' 
-								ELSE '' END + '('+ t.Currs + ') - ' + Rate AS r
+					SELECT CASE WHEN t.isMasterRate = 1 AND EXISTS (SELECT TOP 1 1 FROM t t2 WHERE t2.isMasterRate = 0 AND t2.Product = t.Product and t2.PartyName = t.PartyName) THEN 'Others - ' 
+								WHEN t.isMasterRate = 1 AND NOT EXISTS (SELECT TOP 1 1 FROM t t2 WHERE t2.isMasterRate = 0 AND t2.Product = t.Product and t2.PartyName = t.PartyName) THEN 'All - ' 
+								ELSE '('+ t.Currs + ') - ' END + Rate AS r
 			) cr
 			GROUP BY t.FakeID, t.PartyName,t.BrandName,t.Product,t.FromDate,t.ToDate,t.FirstOfBilling,t.BasisOfBilling,t.ChargeTypeName
 		) SELECT @logChargeRate = 
