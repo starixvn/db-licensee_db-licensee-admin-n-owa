@@ -23,6 +23,7 @@ AS
 		- 20240626@Danny: Rename betfrom W003, W004 [RedmineID: #206220]
 		- 20250103@Danny: Integrate new betfroms [RedmineID: #215069]
 		- 20250310@Eddie: Integrate new betfroms [RedmineID: #217850]
+		- 20250609@Eddie: Integrate new betfroms [RedmineID: #229519]
 */
 
 RETURN
@@ -86,6 +87,7 @@ RETURN
 			(180, 50, 'A001', 'Odds Direct API', 'Odds Direct API'),
 			(180, 50, 'A002', 'Odds Direct API', 'Odds Direct API'),
 			(180, 50, 'A003', 'Odds Direct API', 'Odds Direct API'),
-			(190, 10, 'Q001', 'Quick Bet Widget	', 'Quick Bet Widget')
+			(190, 10, 'Q001', 'Quick Bet Widget', 'Quick Bet Widget'),
+			(190, 10, 'Q002', 'Quick Bet Widget Odds Feed', 'Quick Bet Widget')
 	) d (OrderDetail, OrderSummary, betfrom, DetailPlatform, SummaryPlatform)
 GO
