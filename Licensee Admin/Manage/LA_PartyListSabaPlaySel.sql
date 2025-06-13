@@ -10,6 +10,7 @@ AS
 
 	Revisions:
 		- 20250321@Eddie: Initialize SP [RedmineID: #217740]
+		- 20250611@Eddie: Enhancement SP [#229500]
 
 	Current settings:
 			1	 : ONEWorks Licensees
@@ -40,9 +41,7 @@ BEGIN
 	ELSE
 	BEGIN
 		SELECT @FunctionID = FunctionID FROM LA_Function WITH(NOLOCK) WHERE FunctionKey = @FunctionKey
-	END	
-
-	CREATE TABLE #Party (PartyID INT, ParentID INT)
+	END
 
 	CREATE TABLE #data ( PartyID   INT
 						,PartyName NVARCHAR(100)
@@ -97,12 +96,18 @@ BEGIN
 		WHERE p.PartyType = 1 AND p.PlatformId = 2
 
 	END
-
-	SELECT PartyID, PartyName, BrandName, ParentID
-	FROM #data
 	
-	UNION ALL
+	SELECT t.PartyID, t.PartyName, t.BrandName, t.ParentID
+	FROM (
+		SELECT PartyID, PartyName, BrandName, ParentID
+		FROM #data
+	
+		UNION ALL
 
-	SELECT 9999, 'Reasternhold Licensees', '', 0
+		SELECT 9999, 'Reasternhold Licensees', '', 0
+	) AS t
+	ORDER BY t.ParentID, t.PartyID
+
+	DROP TABLE #data
 END
 GO
