@@ -7,81 +7,102 @@
 USE bodb_licensee
 GO
 
-DECLARE @KeyName VARCHAR(100) = 'SettlementReport_Templates'
-	  , @KValue  VARCHAR(4000)
+DECLARE @KeyName1 VARCHAR(100) = 'SettlementReport_SB_Templates'
+	  , @KValue1  VARCHAR(4000)
+	  , @KeyName2 VARCHAR(100) = 'SettlementReport_SP_Templates'
+	  , @KValue2  VARCHAR(4000)
 
-DECLARE @KeySetting TABLE ( Template TINYINT, ProductPrefix VARCHAR(10), SPtype TINYINT )
+DECLARE @KeySetting1 TABLE ( Template TINYINT, ProductPrefix VARCHAR(10))
+DECLARE @KeySetting2 TABLE ( Template TINYINT, ProductId TINYINT )
 
-INSERT INTO @KeySetting (Template, ProductPrefix, SPtype)
-SELECT t.Template, t.ProductPrefix, t.SPtype
+INSERT INTO @KeySetting1 (Template, ProductPrefix)
+SELECT t.Template, t.ProductPrefix
 FROM (
-		VALUES (1, 'SB'		, 1)
-			  ,(2, 'BA'		, 1)
-			  ,(3, 'AGC'	, 2)
-			  ,(3, 'SG'		, 2)
-			  ,(3, 'PP'		, 2)
-			  ,(3, 'VGA'	, 2)
-			  ,(4, 'CC'		, 1)
-			  ,(4, 'AB'		, 1)
-			  ,(4, 'SXG'	, 1)
-			  ,(4, 'PGS'	, 1)
-			  ,(4, 'MGRNG'	, 1)
-			  ,(4, 'L22'	, 1)
-			  ,(4, 'FS'		, 1)
-			  ,(4, 'FAC'	, 1)
-			  ,(5, 'GD'		, 1)
-			  ,(5, 'SAG'	, 1)
-			  ,(6, 'WE'		, 1)
-			  ,(6, 'IBCLC'	, 1)
-			  ,(6, 'BBIN'	, 1)
-			  ,(6, 'WM'		, 1)
-			  ,(6, 'ION'	, 1)
-			  ,(6, 'BGG'	, 1)
-			  ,(6, 'PPL'	, 1)
-			  ,(6, 'YB'		, 1)
-			  ,(6, 'ON'		, 1)
-			  ,(6, 'GPILC'	, 1)
-			  ,(6, 'CS'		, 1)
-			  ,(6, 'VB'		, 1)
-			  ,(6, 'JK'		, 1)
-			  ,(6, 'MXG'	, 1)
-			  ,(6, 'HB'		, 1)
-			  ,(6, 'CG'		, 1)
-			  ,(6, 'AP'		, 1)
-			  ,(6, 'APM'	, 1)
-			  ,(6, 'SEA'	, 1)
-			  ,(6, 'JIG'	, 1)
-			  ,(6, 'UUSL'	, 1)
-			  ,(6, 'NS'		, 1)
-			  ,(6, 'GPIRNG'	, 1)
-			  ,(6, 'PTRNG'	, 1)
-			  ,(6, 'KN'		, 1)
-			  ,(6, 'LT'		, 1)
-			  ,(6, 'TG'		, 1)
-			  ,(6, 'FG'		, 1)
-			  ,(6, 'SLT'	, 1)
-			  ,(6, 'NG'		, 1)
-			  ,(6, 'NG2'	, 1)
-			  ,(6, 'VRG'	, 1)
-			  ,(6, 'FGGL'	, 1)
-			  ,(6, 'VS'		, 1)
-			  ,(6, 'VS2'	, 1)
-			  ,(6, 'LG'		, 1)
-			  ,(6, 'VS4'	, 1)
-			  ,(6, 'VS5'	, 1)
-			  ,(7, 'SBC'	, 2)
-) AS t(Template, ProductPrefix, SPtype)
+		VALUES (1, 'SB'		)
+			  ,(2, 'BA'		)
+			  ,(3, 'AGC'	)
+			  ,(3, 'SG'		)
+			  ,(3, 'PP'		)
+			  ,(4, 'CC'		)
+			  ,(4, 'AB'		)
+			  ,(4, 'SXG'	)
+			  ,(4, 'PGS'	)
+			  ,(4, 'MGRNG'	)
+			  ,(4, 'L22'	)
+			  ,(4, 'FS'		)
+			  ,(4, 'FAC'	)
+			  ,(5, 'GD'		)
+			  ,(5, 'SAG'	)
+			  ,(6, 'WE'		)
+			  ,(6, 'IBCLC'	)
+			  ,(6, 'BBIN'	)
+			  ,(6, 'WM'		)
+			  ,(6, 'ION'	)
+			  ,(6, 'BGG'	)
+			  ,(6, 'PPL'	)
+			  ,(6, 'YB'		)
+			  ,(6, 'ON'		)
+			  ,(6, 'GPILC'	)
+			  ,(6, 'CS'		)
+			  ,(6, 'VB'		)
+			  ,(6, 'JK'		)
+			  ,(6, 'MXG'	)
+			  ,(6, 'HB'		)
+			  ,(6, 'CG'		)
+			  ,(6, 'AP'		)
+			  ,(6, 'APM'	)
+			  ,(6, 'SEA'	)
+			  ,(6, 'JIG'	)
+			  ,(6, 'UUSL'	)
+			  ,(6, 'NS'		)
+			  ,(6, 'GPIRNG'	)
+			  ,(6, 'PTRNG'	)
+			  ,(6, 'KN'		)
+			  ,(6, 'LT'		)
+			  ,(6, 'TG'		)
+			  ,(6, 'FG'		)
+			  ,(6, 'SLT'	)
+			  ,(6, 'NG'		)
+			  ,(6, 'NG2'	)
+			  ,(6, 'VRG'	)
+			  ,(6, 'FGGL'	)
+			  ,(6, 'VS'		)
+			  ,(6, 'VS2'	)
+			  ,(6, 'LG'		)
+			  ,(6, 'VS4'	)
+			  ,(6, 'VS5'	)
+			  ,(7, 'VGA'	)
+			  ,(8, 'SBC'	)
+) AS t(Template, ProductPrefix)
 
-SELECT @KValue = (
+SELECT @KValue1 = (
 	SELECT k.Template 		AS 'Template'
 		 , k.ProductPrefix 	AS 'Code'
-		 , k.SPtype			AS 'SP'
-	FROM @KeySetting k
+	FROM @KeySetting1 k
 	FOR JSON PATH
 )
 
-DELETE dbo.LA_SystemSettings WITH (ROWLOCK, UPDLOCK) WHERE [Key] = @KeyName
+INSERT INTO @KeySetting2 (Template, ProductId)
+SELECT 1 AS Template, t.ProductId
+FROM (
+		VALUES (1, 46)
+			  ,(1, 60)
+			  ,(1, 78)
+			  ,(2, 79)
+			  ,(2, 87)
+			  ,(3, 0 )
+) AS t(Template, ProductId)
+
+SELECT @KValue2 = (
+	SELECT k.Template  AS 'Template'
+		 , k.ProductId AS 'Id'
+	FROM @KeySetting2 k
+	FOR JSON PATH
+)
+
+DELETE dbo.LA_SystemSettings WITH (ROWLOCK, UPDLOCK) WHERE [Key] IN (@KeyName1, @KeyName2)
 
 INSERT INTO dbo.LA_SystemSettings ([Key], [Value])
-VALUES (@KeyName, @KValue)
+VALUES (@KeyName1, @KValue1)
+	 , (@KeyName2, @KValue2)
 GO
