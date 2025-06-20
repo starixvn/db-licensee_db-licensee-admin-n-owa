@@ -11,6 +11,7 @@ AS
 
 	Revisions:
 		- 20250319@Eddie: Initialize Function [RedmineID: #217740]
+		- 20250527@Eddie: Remove mix mode [RedmineID: #228189]
 */
 
 RETURN
@@ -18,6 +19,5 @@ RETURN
 	FROM (
 		VALUES (1, N'Saba Sports')
 		     , (2, N'SabaPlay')
-		     --, (3, N'Saba Sports & SabaPlay')
 	) AS Payer_Platform (PlatformId, PlatformName)
 GO

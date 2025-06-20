@@ -1,3 +1,4 @@
-Licensee Admin\Report\LA_GetPlatform.sql
-Licensee Admin\Report\LA_Rpt_PlatformWinlossSummary.sql
-Licensee Admin\Report\LA_Rpt_PlatformWinloss.sql
+Licensee Admin\Manage\Invoice Setting\Payers\LA_PayerListSel.sql
+Licensee Admin\Manage\Invoice Setting\Payers\LA_PayerModify.sql
+Licensee Admin\Manage\LA_PayerPlatform_Sel.sql
+Licensee Admin\SabaPlay\LA_LaunchSabaPlayLicensee.sql

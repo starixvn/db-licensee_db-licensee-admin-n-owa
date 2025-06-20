@@ -40,9 +40,10 @@ AS
 		- 20231228@Danny: Integrate Jollysports group Licensees [RedmineID: #198293]
 		- 20250321@Eddie: Add Payer Platform [RedmineID: #217740]
 		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
+		- 20250527@Eddie: Remove mix mode [RedmineID: #228189]
 
 	Param's Explanation:
-		- @PlatformId: 1 (Saba Sports), 2 (SabaPlay), 3 (SabaSports&SabaPlay)
+		- @PlatformId: 1 (Saba Sports), 2 (SabaPlay)
 */
 BEGIN
 

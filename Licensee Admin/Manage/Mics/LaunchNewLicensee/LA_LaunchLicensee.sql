@@ -20,7 +20,6 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
 	@NewPartyId				INT				= 0		OUTPUT,
 	@ErrCode				INT				= 0		OUTPUT,
 	@ErrMsg					VARCHAR(4000)	= ''	OUTPUT,
-	@PlatformId				TINYINT			= 1,
 	@SabaPlayProductIDs     VARCHAR(MAX)	= ''
 AS
 /*
@@ -54,6 +53,7 @@ AS
 		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
 		- 20250513@Eddie: Enhance SP [RedmineID: #226204]
 		- 20250605@Danny: New format charge rate setting log [RedmineID: #226207]
+		- 20250610@Eddie: Remove @PlatformId parameter [RedmineID: #228189]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -277,7 +277,7 @@ BEGIN
 		ELSE
 		BEGIN
 			INSERT INTO dbo.OAS_Party (PartyName, PartyType, OldRefID, PlatformId)
-			VALUES (@PayerName, 1, @LicenseeId, @PlatformId)
+			VALUES (@PayerName, 1, @LicenseeId, 1)
 
 			SET @NewPartyId = SCOPE_IDENTITY()
 			SELECT @IsAddNew = 1, @logPayerSettingActionID = 1000

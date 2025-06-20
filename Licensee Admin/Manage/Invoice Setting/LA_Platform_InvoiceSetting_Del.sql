@@ -14,6 +14,7 @@ AS
 	Revisions:
 		- 20250325@Eddie: Initialize SP [RedmineID: #217740]
 		- 20250512@Eddie: Enhance SP [RedmineID: #226204]
+		- 20250527@Eddie: Remove mix mode [RedmineID: #228189]
 
 */
 BEGIN
@@ -26,7 +27,7 @@ BEGIN
 	
 	SELECT @IsCheck = CASE PlatformId WHEN 2 THEN 2 -- SabaPlay
 									  WHEN 1 THEN 1 -- Saba Sports
-					  ELSE 0 END -- Saba Sports & SabaPlay
+					  ELSE 0 END
 	FROM dbo.OAS_Party WITH (NOLOCK)
 	WHERE PartyID = @PayerID
 	
