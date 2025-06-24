@@ -125,17 +125,17 @@ BEGIN
 				,BusinessUnit
 			FROM (
 				SELECT
-					LTRIM(RTRIM(t.c.value('(RowId/text())[1]', 'VARCHAR(20)'))) AS RowId
-					,LTRIM(RTRIM(t.c.value('(PaymentNo/text())[1]', 'VARCHAR(50)'))) AS PaymentNo
-					,LTRIM(RTRIM(t.c.value('(ReceivedDate/text())[1]', 'VARCHAR(20)'))) AS ReceivedDate
-					,LTRIM(RTRIM(t.c.value('(Biller/text())[1]', 'NVARCHAR(10)'))) AS Biller
-					,LTRIM(RTRIM(t.c.value('(FromCustomer/text())[1]', 'VARCHAR(30)'))) AS FromCustomer
-					,LTRIM(RTRIM(t.c.value('(ToCustomer/text())[1]', 'VARCHAR(30)'))) AS ToCustomer
-					,LTRIM(RTRIM(t.c.value('(Amount/text())[1]', 'VARCHAR(20)'))) AS Amount
-					,LTRIM(RTRIM(t.c.value('(ActualRate/text())[1]', 'VARCHAR(100)'))) AS ActualRate
-					,LTRIM(RTRIM(t.c.value('(RebatePayment/text())[1]', 'VARCHAR(1)'))) AS RebatePayment
+					LTRIM(RTRIM(t.c.value('(RowId/text())[1]', 'VARCHAR(20)'))) 		 AS RowId
+					,LTRIM(RTRIM(t.c.value('(PaymentNo/text())[1]', 'VARCHAR(50)'))) 	 AS PaymentNo
+					,LTRIM(RTRIM(t.c.value('(ReceivedDate/text())[1]', 'VARCHAR(20)')))  AS ReceivedDate
+					,LTRIM(RTRIM(t.c.value('(Biller/text())[1]', 'NVARCHAR(10)'))) 		 AS Biller
+					,LTRIM(RTRIM(t.c.value('(FromCustomer/text())[1]', 'VARCHAR(30)')))  AS FromCustomer
+					,LTRIM(RTRIM(t.c.value('(ToCustomer/text())[1]', 'VARCHAR(30)'))) 	 AS ToCustomer
+					,LTRIM(RTRIM(t.c.value('(Amount/text())[1]', 'VARCHAR(20)'))) 		 AS Amount
+					,LTRIM(RTRIM(t.c.value('(ActualRate/text())[1]', 'VARCHAR(100)'))) 	 AS ActualRate
+					,LTRIM(RTRIM(t.c.value('(RebatePayment/text())[1]', 'VARCHAR(1)')))  AS RebatePayment
 					,LTRIM(RTRIM(t.c.value('(Description/text())[1]', 'NVARCHAR(200)'))) AS Remark
-					,LTRIM(RTRIM(t.c.value('(BusinessUnit/text())[1]', 'VARCHAR(50)'))) AS BusinessUnit
+					,LTRIM(RTRIM(t.c.value('(BusinessUnit/text())[1]', 'VARCHAR(50)')))  AS BusinessUnit
 				FROM @Payment_XML.nodes('Root/PaymentItem') t(c)
 			) a
 			OPTION (OPTIMIZE FOR (@Payment_XML = NULL))
@@ -159,17 +159,17 @@ BEGIN
 				,BusinessUnit
 			FROM (
 				SELECT
-					LTRIM(RTRIM(t.c.value('(RowId/text())[1]', 'VARCHAR(20)'))) AS RowId
-					,LTRIM(RTRIM(t.c.value('(PaymentNo/text())[1]', 'VARCHAR(50)'))) AS PaymentNo
-					,LTRIM(RTRIM(t.c.value('(ReceivedDate/text())[1]', 'VARCHAR(10)'))) AS ReceivedDate
-					,LTRIM(RTRIM(t.c.value('(Biller/text())[1]', 'NVARCHAR(10)'))) AS Biller
-					,LTRIM(RTRIM(t.c.value('(FromCustomer/text())[1]', 'VARCHAR(30)'))) AS FromCustomer
-					,LTRIM(RTRIM(t.c.value('(ToCustomer/text())[1]', 'VARCHAR(30)'))) AS ToCustomer
-					,LTRIM(RTRIM(t.c.value('(FromAmount/text())[1]', 'VARCHAR(20)'))) AS Amount
-					,LTRIM(RTRIM(t.c.value('(ToAmount/text())[1]', 'VARCHAR(20)'))) AS ToAmount
-					,LTRIM(RTRIM(t.c.value('(RebatePayment/text())[1]', 'VARCHAR(1)'))) AS RebatePayment
+					LTRIM(RTRIM(t.c.value('(RowId/text())[1]', 'VARCHAR(20)'))) 		 AS RowId
+					,LTRIM(RTRIM(t.c.value('(PaymentNo/text())[1]', 'VARCHAR(50)'))) 	 AS PaymentNo
+					,LTRIM(RTRIM(t.c.value('(ReceivedDate/text())[1]', 'VARCHAR(10)')))  AS ReceivedDate
+					,LTRIM(RTRIM(t.c.value('(Biller/text())[1]', 'NVARCHAR(10)'))) 		 AS Biller
+					,LTRIM(RTRIM(t.c.value('(FromCustomer/text())[1]', 'VARCHAR(30)')))  AS FromCustomer
+					,LTRIM(RTRIM(t.c.value('(ToCustomer/text())[1]', 'VARCHAR(30)'))) 	 AS ToCustomer
+					,LTRIM(RTRIM(t.c.value('(FromAmount/text())[1]', 'VARCHAR(20)'))) 	 AS Amount
+					,LTRIM(RTRIM(t.c.value('(ToAmount/text())[1]', 'VARCHAR(20)'))) 	 AS ToAmount
+					,LTRIM(RTRIM(t.c.value('(RebatePayment/text())[1]', 'VARCHAR(1)')))  AS RebatePayment
 					,LTRIM(RTRIM(t.c.value('(Description/text())[1]', 'NVARCHAR(200)'))) AS Remark
-					,LTRIM(RTRIM(t.c.value('(BusinessUnit/text())[1]', 'VARCHAR(50)'))) AS BusinessUnit
+					,LTRIM(RTRIM(t.c.value('(BusinessUnit/text())[1]', 'VARCHAR(50)')))  AS BusinessUnit
 				FROM @Payment_XML.nodes('Root/PaymentItem') t(c)
 			) a
 			OPTION (OPTIMIZE FOR (@Payment_XML = NULL))
@@ -350,6 +350,11 @@ BEGIN
 				ToPayerID IS NOT NULL 
 			  )
 		  AND Biller IN ('BHC', 'ZL', 'JS', 'DSS', 'RHL', 'FSL', 'IS')
+		  AND ( 
+				ISNULL(t.BusinessUnit, '') = ''
+		        OR
+				EXISTS( SELECT 1 FROM bodb02.dbo.f_Transfer_GetBUList() AS f WHERE f.BusinessUnit = t.BusinessUnit )
+		  )
 	
 		-- Invalid
 		INSERT INTO @tblFail(RowId, PaymentNo, ReceivedDate, Biller, FromCustomer, ToCustomer, Amount, ToAmount, ActualRate, RebatePayment, Description, BusinessUnit, ErrorMessage)
@@ -368,13 +373,13 @@ BEGIN
 				WHEN FromPayerID IS NULL THEN 'Invalid From Cust.'
 				WHEN FromPayerID IS NOT NULL AND ToPayerID IS NULL AND EXISTS (SELECT 1 FROM dbo.LA_Payment p WITH (NOLOCK) WHERE p.PaymentNo = PaymentNo AND p.Type IN (0,2)) THEN 'Payment No exists in the system.'
 				WHEN FromPayerID IS NOT NULL AND ToPayerID IS NULL	AND isFinanceAcc = 0 THEN 'Invalid To Cust.'
-				WHEN NOT EXISTS( SELECT 1 FROM dbo.LA_f_BusinessUnit_Sel() WHERE BUName = BusinessUnit) AND ISNULL(BusinessUnit, '') <> '' THEN 'Invalid Business Unit'
+				WHEN NOT EXISTS( SELECT 1 FROM bodb02.dbo.f_Transfer_GetBUList() AS f WHERE f.BusinessUnit = t.BusinessUnit) AND ISNULL(t.BusinessUnit, '') <> '' THEN 'Invalid Business Unit'
 		   ELSE 'Invalid From Cust or To Cust.' END AS Reason
-		FROM @tblInfo
+		FROM @tblInfo AS t
 		WHERE RowId NOT IN (SELECT RowId FROM @tblSucc)
 
 		-- Valid 
-		SELECT RowId, PaymentNo, ReceivedDate, Biller, FromCustomer, ToCustomer, Amount, ActualRate, RebatePayment, BusinessUnit, Description, FromCustID, ToCustID
+		SELECT RowId, PaymentNo, ReceivedDate, Biller, FromCustomer, ToCustomer, Amount, ActualRate, RebatePayment, BusinessUnit AS BU, Description, FromCustID, ToCustID,
 		   CASE WHEN (
 						(FromCurrCode = 'MYR' AND ToCurrCode <> 'MYR') 
 						OR (ToCurrCode = 'MYR' AND FromCurrCode <> 'MYR')
@@ -400,7 +405,7 @@ BEGIN
 		ORDER BY RowId
 
 		-- Invalid
-		SELECT RowId, PaymentNo, ReceivedDate, Biller, FromCustomer, ToCustomer, Amount, ActualRate, RebatePayment, BusinessUnit, Description, ErrorMessage
+		SELECT RowId, PaymentNo, ReceivedDate, Biller, FromCustomer, ToCustomer, Amount, ActualRate, RebatePayment, BusinessUnit AS BU, Description, ErrorMessage
 		FROM @tblFail
 		ORDER BY RowId
 
@@ -439,6 +444,11 @@ BEGIN
 				OR ToPayerID IS NOT NULL 	
 			)
 		  AND Biller IN ('BHC', 'ZL', 'JS', 'DSS', 'RHL', 'FSL', 'IS')
+		  AND ( 
+				ISNULL(t.BusinessUnit, '') = ''
+		        OR
+				EXISTS( SELECT 1 FROM bodb02.dbo.f_Transfer_GetBUList() AS f WHERE f.BusinessUnit = t.BusinessUnit )
+		  )
 
 		-- Invalid
 		INSERT INTO @tblFail(RowId, PaymentNo, ReceivedDate, Biller, FromCustomer, ToCustomer, Amount, ToAmount, ActualRate, RebatePayment, Description, BusinessUnit, ErrorMessage)
@@ -459,18 +469,18 @@ BEGIN
 				WHEN FromPayerID IS NULL THEN 'Invalid From Cust.'
 				WHEN FromPayerID IS NOT NULL AND ToPayerID IS NULL AND EXISTS (SELECT 1 FROM dbo.LA_Payment p WITH (NOLOCK) WHERE p.PaymentNo = PaymentNo AND p.Type IN (0,2)) THEN 'Payment No exists in the system.'
 				WHEN FromPayerID IS NOT NULL AND ToPayerID IS NULL AND isFinanceAcc = 0 THEN 'Invalid To Cust.'
-				WHEN NOT EXISTS( SELECT 1 FROM dbo.LA_f_BusinessUnit_Sel() WHERE BUName = BusinessUnit) AND ISNULL(BusinessUnit, '') <> '' THEN 'Invalid Business Unit'
+				WHEN NOT EXISTS( SELECT 1 FROM bodb02.dbo.f_Transfer_GetBUList() AS f WHERE f.BusinessUnit = t.BusinessUnit) AND ISNULL(t.BusinessUnit, '') <> '' THEN 'Invalid Business Unit'
 		   ELSE 'Invalid From Cust or To Cust.' END AS Reason
-		FROM @tblInfo
+		FROM @tblInfo AS t
 		WHERE RowId NOT IN (SELECT RowId FROM @tblSucc)
 
 		-- Valid
-		SELECT RowId, PaymentNo, ReceivedDate, Biller, FromCustomer, ToCustomer, Amount AS FromAmount, ToAmount, RebatePayment, BusinessUnit, Description, SystemExRate, TransExrate, FromCustID, ToCustID
+		SELECT RowId, PaymentNo, ReceivedDate, Biller, FromCustomer, ToCustomer, Amount AS FromAmount, ToAmount, RebatePayment, BusinessUnit AS BU, Description, SystemExRate, TransExrate, FromCustID, ToCustID
 		FROM @tblSucc
 		ORDER BY RowId
 
 		-- Invalid
-		SELECT RowId, PaymentNo, ReceivedDate, Biller, FromCustomer, ToCustomer, Amount AS FromAmount, ToAmount, RebatePayment, BusinessUnit, Description, ErrorMessage
+		SELECT RowId, PaymentNo, ReceivedDate, Biller, FromCustomer, ToCustomer, Amount AS FromAmount, ToAmount, RebatePayment, BusinessUnit AS BU, Description, ErrorMessage
 		FROM @tblFail
 		ORDER BY RowId
 
