@@ -14,6 +14,7 @@ AS
 
 	Revisions:
 		- 20250417@Danny: Initialize SP [RedmineID: #217738]
+		- 20250625@Danny: remove discount columns [RedmineID: #217743]
 	
 	Parameter explanation:
 
@@ -61,7 +62,7 @@ BEGIN
 
 	DECLARE @Columns NVARCHAR(MAX)
 	DECLARE @SQL NVARCHAR(MAX) = ''
-	SELECT  @Columns = COALESCE(@Columns + ', ', '') + '[' + ProductName + '],' + '[' + ProductName + '-Discount]' FROM #tmp_Products ORDER BY ProductId
+	SELECT  @Columns = COALESCE(@Columns + ', ', '') + '[' + ProductName + ']' FROM #tmp_Products ORDER BY ProductId
 
 	SELECT  @SQL = '
 		SELECT ''Reasternhold'' GroupName ,PartyName, ' + @Columns + '
@@ -70,14 +71,6 @@ BEGIN
 				tp.PartyName,
 				p.ProductName AS ColName,
 				r.LicensingFee AS Value
-			FROM #Result r
-			INNER JOIN #tmp_Products p ON r.ProductId = p.ProductId
-			INNER JOIN #tmp_PartyList tp ON r.PartyId = tp.PartyId
-			UNION ALL
-			SELECT 
-				tp.PartyName,
-				p.ProductName + ''-Discount'' AS ColName,
-				r.Discount AS Value
 			FROM #Result r
 			INNER JOIN #tmp_Products p ON r.ProductId = p.ProductId
 			INNER JOIN #tmp_PartyList tp ON r.PartyId = tp.PartyId

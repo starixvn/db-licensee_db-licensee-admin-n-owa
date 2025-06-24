@@ -11,6 +11,7 @@ AS
 		- 20250403@Danny: create new sp
 		- 20250513@Eddie: Enhance SP [RedmineID: #226204]
 		- 20250520@Eddie: Change ParentName for SabaPlay [RedmineID: #220534]
+		- 20250624@Danny: return all operators in case of @UserID = 0 [RedmineID: #217743]
 
 	Param's Explanation:
 
@@ -22,10 +23,11 @@ BEGIN
 
 	DROP TABLE IF EXISTS #userFunctionParty
 	CREATE TABLE #userFunctionParty (
-		PartyID INT, 
-		UserID INT, 
-		FunctionID INT, 
-		StatusID TINYINT, PartyName NVARCHAR(100), PlatformId INT, OldRefID INT, BrandName VARCHAR(100))
+		PartyID		INT, 
+		PartyName	NVARCHAR(100), 
+		OldRefID	INT, 
+		BrandName	VARCHAR(100)
+	)
 
 	DECLARE @FunctionID INT, @BillerID INT
 
@@ -43,8 +45,8 @@ BEGIN
 
 	IF (@USERID > 0 AND @FunctionID > 0 ) --get Party List By User and Function
 	BEGIN
-		INSERT INTO #userFunctionParty(PartyID, UserID, FunctionID, StatusID, PartyName, PlatformId, OldRefID, BrandName)
-		SELECT up.PartyID, Up.UserID, fp.FunctionID, Up.StatusID, op.PartyName, op.PlatformId, op.OldRefID, opd.BrandName
+		INSERT INTO #userFunctionParty(PartyID, PartyName, OldRefID, BrandName)
+		SELECT up.PartyID, op.PartyName, op.OldRefID, opd.BrandName
 		FROM dbo.LA_UserParty Up WITH (NOLOCK)
 			INNER JOIN OAS_Party op WITH (NOLOCK) ON Up.PartyID = op.PartyID
 			INNER JOIN OAS_PartyDetail opd WITH (NOLOCK) ON op.PartyID = opd.PartyID
@@ -53,25 +55,29 @@ BEGIN
 			    AND uf.FunctionID = fp.FunctionID --permission of Function - Party
 		WHERE up.UserID = @userID
 			AND fp.FunctionID = @FunctionID
-			AND op.PlatformId IN (2,3)	 AND op.PartyType = 1
+			AND op.PlatformId = 2 AND op.PartyType = 1
+
+	END
+
+	IF (@USERID = 0 AND @FunctionID > 0) --get list Party assign to 1 Function
+	BEGIN
+		INSERT INTO #userFunctionParty(PartyID, PartyName, OldRefID, BrandName)
+		SELECT  fp.PartyID, op.PartyName, op.OldRefID, opd.BrandName
+		FROM dbo.LA_FunctionParty fp WITH (NOLOCK)
+		INNER JOIN OAS_Party op WITH (NOLOCK) ON fp.PartyID = op.PartyID
+		INNER JOIN OAS_PartyDetail opd WITH (NOLOCK) ON op.PartyID = opd.PartyID
+		WHERE fp.FunctionID = @FunctionID AND op.PlatformId = 2 AND op.PartyType = 1		
 	END
 
 	; WITH t AS
 	(
 		SELECT	t.PartyID, 
 				ISNULL(t.BrandName,t.PartyName) PartyName, 
-				CASE WHEN t.PlatformId = 2 THEN 9999 ELSE p.ParentID END AS ParentID, 
-				CASE WHEN t.PlatformId = 2 THEN 'Reasternhold Licensees' ELSE p.ParentName END AS ParentName,
-				CASE WHEN t.PlatformId = 2 THEN t.OldRefID ELSE so.SiteID END OperatorID,
+				9999  AS ParentID, 
+				'Reasternhold Licensees' AS ParentName,
+				t.OldRefID AS  OperatorID,
 				x.x AS ProductList
 		FROM #userFunctionParty t
-		LEFT JOIN bodb_licenseeReport.dbo.SabaPlay_Operators so WITH(NOLOCK) ON t.PartyName = so.OWSiteName
-		OUTER APPLY 
-		(
-			SELECT TOP 1 oc.ToParty AS ParentID, op.PartyName + ' Licensees' AS ParentName FROM OAS_ChargeInfo oc WITH(NOLOCK) 
-			INNER JOIN dbo.OAS_Party op WITH(NOLOCK) ON oc.ToParty = op.PartyID
-			WHERE oc.FromParty = t.PartyID  AND oc.ChargeType = 1 
-		) p
 		OUTER APPLY
 		(
 			SELECT 
@@ -83,8 +89,7 @@ BEGIN
 				FOR JSON PATH
 			) x
 		)x
-		WHERE 	CASE WHEN t.PlatformId = 2 THEN t.OldRefID ELSE so.SiteID END IS NOT NULL
-
+		WHERE t.OldRefID IS NOT NULL
 	)
 	SELECT PartyID, PartyName, ParentID, ParentName, OperatorID, ProductList
 	FROM t
@@ -94,6 +99,9 @@ BEGIN
 	FROM t
 
 	ORDER BY ParentID, PartyID
+
+
+
 	
 END
 
