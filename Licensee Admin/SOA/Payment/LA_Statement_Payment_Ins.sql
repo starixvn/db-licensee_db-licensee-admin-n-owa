@@ -114,8 +114,8 @@ BEGIN
 			SELECT @Remark = CASE WHEN @PaymentType IN (0,2) AND @Amount > 0 THEN  'Payment received'
 								  WHEN @PaymentType IN (0,2) AND @Amount < 0 THEN  'Payment made'
 							 END
-			INSERT INTO dbo.LA_Payment ([PaymentNo], [ReceivedDate], [Type], [PartyID], [CurrencyId], [Amount], [RemainingAmount], [TransferRefno], [StatusId], [Environment], [CreatedDate], [CreatedBy], [ModifyDate], [ModifiedBy], [Remark], [BillerId])
-			VALUES (@PaymentNo, @ReceivedDate, @PaymentType, @FromPayerID, @FromPaymentCurrencyID, @Amount, @Amount, @Refno, 0, @Environment, GETDATE(), @UserID, GETDATE(), @UserID, @Remark, @BillerID)
+			INSERT INTO dbo.LA_Payment ([PaymentNo], [ReceivedDate], [Type], [PartyID], [CurrencyId], [Amount], [RemainingAmount], [TransferRefno], [StatusId], [Environment], [CreatedDate], [CreatedBy], [ModifyDate], [ModifiedBy], [Remark], [BillerId], [BusinessUnit])
+			VALUES (@PaymentNo, @ReceivedDate, @PaymentType, @FromPayerID, @FromPaymentCurrencyID, @Amount, @Amount, @Refno, 0, @Environment, GETDATE(), @UserID, GETDATE(), @UserID, @Remark, @BillerID, @BU)
 
 		END
 
@@ -124,11 +124,11 @@ BEGIN
 
 			BEGIN TRY
 				-- New payment (sub-lincensee)
-				INSERT INTO dbo.LA_Payment ([PaymentNo], [ReceivedDate], [Type], [PartyID], [CurrencyId], [Amount], [RemainingAmount], [TransferRefno], [StatusId], [Environment], [CreatedDate], [CreatedBy], [ModifyDate], [ModifiedBy], [Remark], [BillerId])
-				VALUES (@PaymentNo, @ReceivedDate, @PaymentType, @FromPayerID, @FromPaymentCurrencyID, @Amount, @Amount, @Refno, 0, @Environment, GETDATE(), @UserID, GETDATE(), @UserID, 'Transfer from ' + @ToLicenseeName, @BillerID)
+				INSERT INTO dbo.LA_Payment ([PaymentNo], [ReceivedDate], [Type], [PartyID], [CurrencyId], [Amount], [RemainingAmount], [TransferRefno], [StatusId], [Environment], [CreatedDate], [CreatedBy], [ModifyDate], [ModifiedBy], [Remark], [BillerId], [BusinessUnit])
+				VALUES (@PaymentNo, @ReceivedDate, @PaymentType, @FromPayerID, @FromPaymentCurrencyID, @Amount, @Amount, @Refno, 0, @Environment, GETDATE(), @UserID, GETDATE(), @UserID, 'Transfer from ' + @ToLicenseeName, @BillerID, @BU)
 
-				INSERT INTO dbo.LA_Payment ([PaymentNo], [ReceivedDate], [Type], [PartyID], [CurrencyId], [Amount], [RemainingAmount], [TransferRefno], [StatusId], [Environment], [CreatedDate], [CreatedBy], [ModifyDate], [ModifiedBy], [Remark], [BillerId])
-				VALUES (@PaymentNo, @ReceivedDate, @PaymentType, @ToPayerID, @ToPaymentCurrencyID, CASE WHEN @Template = 0 THEN -@ToAmount ELSE -@Amount END, CASE WHEN  @Template = 0 THEN -@ToAmount ELSE -@Amount END, @Refno, 0, @Environment, GETDATE(), @UserID, GETDATE(), @UserID,  'Transfer to ' + @FromLicenseeName, @BillerID)
+				INSERT INTO dbo.LA_Payment ([PaymentNo], [ReceivedDate], [Type], [PartyID], [CurrencyId], [Amount], [RemainingAmount], [TransferRefno], [StatusId], [Environment], [CreatedDate], [CreatedBy], [ModifyDate], [ModifiedBy], [Remark], [BillerId], [BusinessUnit])
+				VALUES (@PaymentNo, @ReceivedDate, @PaymentType, @ToPayerID, @ToPaymentCurrencyID, CASE WHEN @Template = 0 THEN -@ToAmount ELSE -@Amount END, CASE WHEN  @Template = 0 THEN -@ToAmount ELSE -@Amount END, @Refno, 0, @Environment, GETDATE(), @UserID, GETDATE(), @UserID,  'Transfer to ' + @FromLicenseeName, @BillerID, @BU)
 
 			END TRY
 			BEGIN CATCH

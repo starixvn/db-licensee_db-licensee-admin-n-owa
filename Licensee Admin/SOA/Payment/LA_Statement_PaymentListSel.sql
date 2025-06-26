@@ -21,6 +21,7 @@ AS
    
 	Revisions: 
 		- 20240507@Danny: Initialize SP [#206990]
+		- 20250626@Eddie: Add Business Unit [RedmineID: #231003]
 
 	Param's Explanation:
 
@@ -105,7 +106,8 @@ BEGIN
 		ModifyDate		DATETIME,
 		IsReversedbyNAP BIT DEFAULT 0,
 		AffectedLicensees NVARCHAR(100),
-		isShowUI		BIT DEFAULT 0
+		isShowUI		BIT DEFAULT 0,
+		BusinessUnit	VARCHAR(50)
 	)
 
 	CREATE INDEX idx_#tmp_LA_Payment_UploadedDate ON #tmp_LA_Payment(UploadedDate)
@@ -127,7 +129,8 @@ BEGIN
 		PaymentWinlostDate,
 		ModifiedUser,
 		ModifyDate,
-		isShowUI
+		isShowUI,
+		BusinessUnit
 	)
 	SELECT	lp.PaymentId,
 			lp.PaymentNo,
@@ -149,24 +152,25 @@ BEGIN
 			CONVERT(DATE,lp.CreatedDate) AS PaymentWinlostDate,
 			lu.Username AS ModifiedUser,
 			CASE WHEN lp.StatusId = -1  THEN lp.ModifyDate ELSE NULL END ModifyDate,
-			1 AS IsShowUI
-	FROM	LA_Payment lp WITH(NOLOCK)
-	INNER JOIN OAS_Party op WITH(NOLOCK) ON lp.PartyID = op.PartyID
-	INNER JOIN @PayerTab pt ON pt.PartyID = lp.PartyID
-	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON lp.CurrencyId = e.ExchangeID
-	INNER JOIN #tmp_LA_Biller bi WITH(NOLOCK) ON bi.PartyId = lp.BillerId
-	LEFT JOIN #tmp_LA_User lu WITH(NOLOCK) ON lu.UserID = lp.ModifiedBy AND lp.StatusId = -1 
+			1 AS IsShowUI,
+			lp.BusinessUnit
+	FROM dbo.LA_Payment lp WITH (NOLOCK)
+		INNER JOIN dbo.OAS_Party op WITH (NOLOCK) ON lp.PartyID = op.PartyID
+		INNER JOIN @PayerTab pt ON pt.PartyID = lp.PartyID
+		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON lp.CurrencyId = e.ExchangeID
+		INNER JOIN #tmp_LA_Biller bi WITH (NOLOCK) ON bi.PartyId = lp.BillerId
+		LEFT JOIN #tmp_LA_User lu WITH (NOLOCK) ON lu.UserID = lp.ModifiedBy AND lp.StatusId = -1 
 	WHERE ( @PaymentNo = '' OR lp.PaymentNo = @PaymentNo)
-	AND (@RefNo IS NULL OR lp.TransferRefno = @RefNo)
-	AND lp.Type IN (SELECT x.PaymentType FROM @PaymentTypeTab x)
-	AND lp.ReceivedDate BETWEEN @ReceivedFromDate AND @ReceivedToDate
-	AND lp.CreatedDate >= @UploadedFromDate AND   lp.CreatedDate < DATEADD(DAY,1,@UploadedToDate)
-	AND ( 
+	  AND (@RefNo IS NULL OR lp.TransferRefno = @RefNo)
+	  AND lp.Type IN (SELECT x.PaymentType FROM @PaymentTypeTab x)
+	  AND lp.ReceivedDate BETWEEN @ReceivedFromDate AND @ReceivedToDate
+	  AND lp.CreatedDate >= @UploadedFromDate AND   lp.CreatedDate < DATEADD(DAY,1,@UploadedToDate)
+	  AND ( 
 			(lp.StatusId <> -1 AND @IsHideVoidedPayment = 1)
 			OR 
 			@IsHideVoidedPayment = 0
-		)
-	AND lp.Environment = @Environment
+	  )
+	  AND lp.Environment = @Environment
 
 	INSERT INTO #tmp_LA_Payment(
 		PaymentId, 
@@ -185,7 +189,8 @@ BEGIN
 		PaymentWinlostDate,
 		ModifiedUser,
 		ModifyDate,
-		isShowUI
+		isShowUI,
+		BusinessUnit
 	)
 	SELECT	lp.PaymentId,
 			lp.PaymentNo,
@@ -207,13 +212,14 @@ BEGIN
 			CONVERT(DATE,lp.CreatedDate) AS PaymentWinlostDate,
 			lu.Username AS ModifiedUser,
 			CASE WHEN lp.StatusId = -1  THEN lp.ModifyDate ELSE NULL END ModifyDate,
-			0 AS isShowUI
-	FROM	LA_Payment lp WITH(NOLOCK)
-	INNER JOIN OAS_Party op WITH(NOLOCK) ON lp.PartyID = op.PartyID
-	INNER JOIN bodb02.dbo.Exchange e WITH(NOLOCK) ON lp.CurrencyId = e.ExchangeID
-	INNER JOIN #tmp_LA_Biller bi WITH(NOLOCK) ON bi.PartyId = lp.BillerId
-	LEFT JOIN #tmp_LA_User lu WITH(NOLOCK) ON lu.UserID = lp.ModifiedBy AND lp.StatusId = -1 
-	LEFT JOIN #tmp_LA_Payment tmp ON  tmp.PaymentId = lp.PaymentId
+			0 AS isShowUI,
+			lp.BusinessUnit
+	FROM dbo.LA_Payment lp WITH (NOLOCK)
+		INNER JOIN dbo.OAS_Party op WITH (NOLOCK) ON lp.PartyID = op.PartyID
+		INNER JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON lp.CurrencyId = e.ExchangeID
+		INNER JOIN #tmp_LA_Biller bi WITH (NOLOCK) ON bi.PartyId = lp.BillerId
+		LEFT JOIN #tmp_LA_User lu WITH (NOLOCK) ON lu.UserID = lp.ModifiedBy AND lp.StatusId = -1 
+		LEFT JOIN #tmp_LA_Payment tmp ON tmp.PaymentId = lp.PaymentId
 	WHERE tmp.PaymentId IS NULL AND EXISTS (SELECT TOP 1 1 FROM #tmp_LA_Payment t WHERE t.RefNo = lp.TransferRefno)
 		AND lp.Environment = @Environment
 	
@@ -226,8 +232,8 @@ BEGIN
 		FROM #tmp_LA_Payment t 
 		CROSS APPLY (
 			SELECT STRING_AGG(op.PartyName,', ') AffectedLicensees
-			FROM	LA_Payment u WITH(NOLOCK) 
-			INNER JOIN OAS_party op WITH(NOLOCK) ON u.PartyID = op.PartyID
+			FROM dbo.LA_Payment u WITH (NOLOCK)
+				INNER JOIN dbo.OAS_party op WITH (NOLOCK) ON u.PartyID = op.PartyID
 			WHERE u.TransferRefno = t.RefNo AND u.PaymentNo = t.PaymentNo AND  u.Type = 1
 		) u
 		WHERE t.PaymentType = 1
@@ -240,7 +246,7 @@ BEGIN
 		SET t.IsReversedbyNAP = 1
 		FROM #tmp_LA_Payment t
 		WHERE EXISTS (
-			SELECT TOP 1 1  FROM bodb02.dbo.Transfer_Coll tc WITH(NOLOCK)
+			SELECT TOP 1 1 FROM bodb02.dbo.Transfer_Coll tc WITH (NOLOCK)
 			WHERE tc.WinlostDate = t.PaymentWinlostDate AND tc.TransDesc LIKE '(Reversal)%' AND tc.refno = t.RefNo
 		)
 		AND t.PaymentWinlostDate >= @BalanceUpDay
@@ -269,28 +275,27 @@ BEGIN
 	WHERE @IsOnlyDisplayNAPReversedPayment = 1 AND IsReversedbyNAP = 0
 
 	-- Result
-	SELECT	PaymentId,
-			PaymentNo,
-			PayerName,
-			PaymentType,
-			PaymentTypeName,
-			PaymentStatus,
-			PaymentAmount,
-			RemainingAmount,
-			ReceivedDate,
-			UploadedDate,
-			IsReversedbyNAP,
-			IsAllowVoid,
-			ModifiedUser,
-			ModifyDate,
-			RefNo,
-			Biller,
-			AffectedLicensees,
-			CurrencyName
+	SELECT PaymentId
+		  ,PaymentNo
+		  ,PayerName
+		  ,PaymentType
+		  ,PaymentTypeName
+		  ,PaymentStatus
+		  ,PaymentAmount
+		  ,RemainingAmount
+		  ,ReceivedDate
+		  ,UploadedDate
+		  ,IsReversedbyNAP
+		  ,IsAllowVoid
+		  ,ModifiedUser
+		  ,ModifyDate
+		  ,RefNo
+		  ,Biller
+		  ,AffectedLicensees
+		  ,CurrencyName
+		  ,BusinessUnit AS BU
 	FROM #tmp_LA_Payment
 	WHERE isShowUI = 1
 
-
-	
 END
 GO
