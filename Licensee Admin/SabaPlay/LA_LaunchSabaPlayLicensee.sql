@@ -24,6 +24,7 @@ AS
 		- 20250320@Danny: Launch new saba play licensee
 		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
 		- 20250513@Eddie: Enhance SP [RedmineID: #226204]
+		- 20250717@Danny: Change output message [RedmineID: #232176]
 	
 	Param's Explannation: 
 	@ProductIds: [{"ProductID":1, "Productname":"abc"}]
@@ -54,19 +55,19 @@ BEGIN
 	BEGIN
 		IF @NonOfficialPartyId > 0 AND NOT EXISTS (SELECT 1 FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyID = @NonOfficialPartyId) 
 		BEGIN
-			SELECT @ErrMsg = 'Party not found. Please try again.', @ErrCode =  505
+			SELECT @ErrMsg = 'Operator not found. Please try again.', @ErrCode =  505
 			RETURN
 		END
 
 		IF EXISTS (SELECT 1 FROM dbo.OAS_Party WITH(NOLOCK) WHERE PartyID <> @NonOfficialPartyId AND PartyName = @PayerName) 
 		BEGIN
-			SELECT @ErrMsg = 'Party name has already been existed. Please try again.', @ErrCode =  506
+			SELECT @ErrMsg = 'Operator name has already been existed. Please try again.', @ErrCode =  506
 			RETURN
 		END
 
 		IF EXISTS (SELECT 1 FROM dbo.OAS_Party WITH(NOLOCK) WHERE OldRefID = @OperatorID AND PartyType = 1 AND PlatformId = 2) 
 		BEGIN
-			SELECT @ErrMsg = 'Party has already been launched.', @ErrCode =  507
+			SELECT @ErrMsg = 'Operator has already been launched.', @ErrCode =  507
 			RETURN
 		END
 	END
@@ -468,7 +469,7 @@ BEGIN
 		DELETE dbo.LA_UserParty WITH(ROWLOCK, UPDLOCK) WHERE PartyId = @NewPartyId
 		DELETE dbo.LA_FunctionParty WITH(ROWLOCK, UPDLOCK) WHERE PartyId = @NewPartyId
 
-		SELECT @ErrMsg = 'Launch licensee failed. Please try again.', @ErrCode =  503
+		SELECT @ErrMsg = 'Launch Operator failed. Please try again.', @ErrCode =  503
 		RETURN
 	END CATCH
 
