@@ -55,6 +55,7 @@ AS
 		- 20250115@Danny: Support different groups by currencies [RedmineID: #216352]
 		- 20250402@Danny: Number Game promotion [RedmineID: #219671]
 		- 20250416@Danny: Support Discount by currency for a licensee [RedmineID: #223951]
+		- 20250711@Danny: Support rebate start from middle of month [RedmineID: #231926]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -165,7 +166,7 @@ BEGIN
 				INNER JOIN dbo.LA_DiscountGroupHeader dh WITH (NOLOCK) ON da.DiscountGroupId = dh.DiscountGroupId
 				INNER JOIN dbo.LA_DiscountGroupProduct dp WITH (NOLOCK) ON da.DiscountGroupId = dp.DiscountGroupId
 				INNER JOIN #Products pd ON dp.ProductId = pd.ProductId
-			WHERE dh.FromDate <= @ToDate AND dh.ToDate >= @FromDate
+			WHERE DATEADD(MONTH, DATEDIFF(MONTH, 0, dh.FromDate), 0) <= @ToDate AND dh.ToDate >= @FromDate
 				AND a.DiscountGroupId = da.DiscountGroupId
 		)
 	END
@@ -182,7 +183,7 @@ BEGIN
 				INNER JOIN dbo.LA_DiscountGroupHeader dh WITH (NOLOCK) ON da.DiscountGroupId = dh.DiscountGroupId
 				INNER JOIN dbo.LA_DiscountGroupProduct dp WITH (NOLOCK) ON da.DiscountGroupId = dp.DiscountGroupId
 				INNER JOIN #Products pd ON dp.ProductId = pd.ProductId
-			WHERE dh.FromDate <= @ToDate_Setting AND dh.ToDate >= @FromDate_Setting
+			WHERE DATEADD(MONTH, DATEDIFF(MONTH, 0, dh.FromDate), 0) <= @ToDate_Setting AND dh.ToDate >= @FromDate_Setting
 				AND a.DiscountGroupId = da.DiscountGroupId 
 				)
 	END
@@ -607,7 +608,7 @@ BEGIN
 			SELECT DiscountGroupId, DiscountGroupType, BaseCurrencyId, PartyId, Remark, IsApplyDiscount, IsSpecialTreatment, ProductId, CalculationType, CurrencyId, CurrencyCalculationType
 			FROM (
 				SELECT h.DiscountGroupId, h.DiscountGroupType, h.CurrencyId AS BaseCurrencyId, a.PartyId, a.IsApplyDiscount, a.IsSpecialTreatment, p.ProductId, p.CalculationType, c.CurrencyId, c.CalculationType AS CurrencyCalculationType
-					,CASE WHEN h.FromDate < @F_Date THEN @F_Date ELSE h.FromDate END AS FromDate
+					,CASE WHEN DATEADD(MONTH, DATEDIFF(MONTH, 0, h.FromDate), 0) < @F_Date THEN @F_Date ELSE DATEADD(MONTH, DATEDIFF(MONTH, 0, h.FromDate), 0) END AS FromDate
 					,CASE WHEN h.ToDate > @T_Date THEN @T_Date ELSE h.ToDate END AS ToDate
 					,CASE WHEN h.DiscountGroupType IN (2, 12, 22, 32, 42) THEN h.Remark ELSE a.Remark END AS Remark
 					,ROW_NUMBER() OVER(PARTITION BY a.PartyId, p.ProductId, c.CurrencyId, CASE WHEN h.DiscountGroupType IN (2, 12, 22, 32, 42) THEN h.DiscountGroupType ELSE 1 END ORDER BY h.ToDate DESC) AS RN
@@ -616,7 +617,7 @@ BEGIN
 					INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
 					INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
 					LEFT JOIN dbo.LA_DiscountGroupCurrency c WITH (NOLOCK) ON a.DiscountGroupId = c.DiscountGroupId AND a.PartyId = c.PartyId
-				WHERE h.FromDate < @T_Date AND h.ToDate >= @F_Date
+				WHERE DATEADD(MONTH, DATEDIFF(MONTH, 0, h.FromDate), 0) < @T_Date AND h.ToDate >= @F_Date
 					AND (h.DiscountGroupType IN (2, 12, 22, 32, 42) OR c.DiscountGroupId IS NOT NULL)
 					AND p.ProductId NOT IN (37, 74)
 			) t
@@ -630,7 +631,7 @@ BEGIN
 			SELECT DiscountGroupId, DiscountGroupType, BaseCurrencyId, PartyId, Remark, IsApplyDiscount, IsSpecialTreatment, ProductId, CalculationType, CurrencyId, CurrencyCalculationType
 			FROM (
 				SELECT h.DiscountGroupId, h.DiscountGroupType, h.CurrencyId AS BaseCurrencyId, a.PartyId, a.IsApplyDiscount, a.IsSpecialTreatment, p.ProductId, p.CalculationType, c.CurrencyId, c.CalculationType AS CurrencyCalculationType
-					,CASE WHEN h.FromDate < @F_Date THEN @F_Date ELSE h.FromDate END AS FromDate
+					,CASE WHEN DATEADD(MONTH, DATEDIFF(MONTH, 0, h.FromDate), 0) < @F_Date THEN @F_Date ELSE DATEADD(MONTH, DATEDIFF(MONTH, 0, h.FromDate), 0) END AS FromDate
 					,CASE WHEN h.ToDate > @T_Date THEN @T_Date ELSE h.ToDate END AS ToDate
 					,CASE WHEN h.DiscountGroupType IN (2, 12, 22) THEN h.Remark ELSE a.Remark END AS Remark
 					,ROW_NUMBER() OVER(PARTITION BY a.PartyId, p.ProductId, c.CurrencyId, CASE WHEN h.DiscountGroupType IN (2, 12, 22) THEN h.DiscountGroupType ELSE 1 END ORDER BY h.ToDate DESC) AS RN
@@ -640,7 +641,7 @@ BEGIN
 					INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
 					LEFT JOIN dbo.LA_DiscountGroupCurrency c WITH (NOLOCK) ON a.DiscountGroupId = c.DiscountGroupId AND a.PartyId = c.PartyId
 				WHERE
-				    ( h.FromDate < @T_Date_setting AND h.ToDate >= @F_Date_setting
+				    ( DATEADD(MONTH, DATEDIFF(MONTH, 0, h.FromDate), 0) < @T_Date_setting AND h.ToDate >= @F_Date_setting
 					AND (h.DiscountGroupType IN (2, 22) OR c.DiscountGroupId IS NOT NULL)
 					AND p.ProductId NOT IN (37, 74)
 					) OR
