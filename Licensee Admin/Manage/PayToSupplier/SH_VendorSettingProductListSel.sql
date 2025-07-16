@@ -1,7 +1,8 @@
 /*<info serverAlias="DBLIC-bodb_licensee" executers="wsv_nap" isFunction="0" isNested="0"></info>*/
 
-CREATE PROCEDURE dbo.LA_VendorSettingProductListSel
-	@IsConfigurable	BIT	= 0
+ALTER PROCEDURE dbo.LA_VendorSettingProductListSel
+	@IsConfigurable	BIT	= 0,
+	@IsAllowEdit    BIT	= 0
 AS
 /*  
 	Created: 20220324@Danny
@@ -11,11 +12,18 @@ AS
 	Revisions:     
 		- 20250627@Danny: Initialize [Redmine: #212221]
 
-		EXEC LA_VendorSettingProductListSel 0
+		EXEC LA_VendorSettingProductListSel @IsConfigurable = 1, @IsAllowEdit  = 1
 
 */
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @json NVARCHAR(MAX) 
+
+	SELECT TOP (1) @json = [Value]
+  	FROM dbo.LA_SystemSettings
+	WHERE [Key] = 'AllowEditPayToSupplierRate'
+
 
 	; WITH t AS
 	(
@@ -29,12 +37,22 @@ BEGIN
 		SELECT 1001 AS ProductID, 'Muay Thai' AS ProductName
 	), u AS
 	(
-		SELECT t.ProductID, t.ProductName, CASE WHEN vw.ProductID IS NULL THEN 1 ELSE 0 END IsConfigurable
+		SELECT t.ProductID, t.ProductName, CASE WHEN vw.ProductID IS NULL THEN 1 ELSE 0 END IsConfigurable, CASE WHEN x.ProductID IS NOT NULL THEN 1 ELSE 0 END IsAllowEdit
 		FROM t
 		LEFT JOIN vw_SH_VendorSettingSel_NonConfigurable vw ON t.ProductID = vw.ProductID 
+		OUTER APPLY 
+		(
+			SELECT y.ProductID
+			FROM OPENJSON(@json)
+			WITH (
+				ProductID INT
+			) y
+			WHERE y.ProductID = t.ProductID
+		) x
+		
 	)
 	SELECT ProductID, ProductName FROM u
-	WHERE IsConfigurable = @IsConfigurable
+	WHERE IsConfigurable = @IsConfigurable AND IsAllowEdit = @IsAllowEdit
 	ORDER BY  ProductID
 	
 

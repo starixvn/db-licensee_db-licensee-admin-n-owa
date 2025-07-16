@@ -27,7 +27,7 @@ BEGIN
 			      WHEN vw.ProductID = 1001 THEN 'Muay Thai'
 			 ELSE p3.ProductName END AS ProductName
 			,vw.BillingTerms
-			, '' AS Remark
+			, p3.EndOfSupportDate
 	FROM   vw_SH_VendorSettingSel_NonConfigurable vw
 	INNER JOIN @tmp_product tp ON vw.ProductID = tp.ProductID
 	LEFT JOIN Product3rd p3 WITH(NOLOCK) ON vw.ProductID = p3.Productid

@@ -25,7 +25,9 @@ BEGIN
 
 	; WITH t AS 
 	(
-		SELECT PartyID, GroupName from LA_f_BillingGroupSel()
+		SELECT l.PartyID, op.PartyName AS Groupname 
+		FROM LA_f_BillingGroupSel() l
+		INNER JOIN OAS_Party op WITH(NOLOCK) ON l.PartyID = op.PartyID
 		UNION ALL
 		SELECT 25, 'IBC (FDL)'
 		UNION ALL
@@ -33,20 +35,20 @@ BEGIN
 	), tmp_thirdparty AS
 	(
 		SELECT PartyID FROM OAS_party WITH(NOLOCK) WHERE PartyType = 3 AND (OldRefID IS NULL OR OldRefID IN (2, 3, 5, 6))
-	)
+	), d AS
+	(
 	SELECT	p.Productid 
 			,p.ProductName 
-			,oc.Rate
+			,CASE WHEN d.extra IS NULL THEN 'All: ' ELSE 'Others: ' END +   CAST(oc.Rate * 100 AS VARCHAR(10)) 
+			+ CASE WHEN d.extra IS NOT NULL THEN CHAR(13) + d.extra  ELSE  '' END ChargeRate
 			,t.PartyID AS GroupID
 			,t.GroupName
 			,CASE WHEN oc.ChargeType = 11 THEN 'Valid turnover' ELSE 'Gross Win' END ChargeOn
 			, oc.ChargeType
 			, oc.FromDate
 			, oc.ToDate
-			, CASE WHEN oc.FromDate > GETDATE() THEN 1 ELSE 0 END IsAllowDelete
-			, CASE WHEN GETDATE() BETWEEN oc.FromDate AND oc.ToDate THEN 1 ELSE 0 END IsAllowEdit
 			, oc.ChargeID
-			, d.cd
+			, d.extra
 	FROM OAS_ChargeInfo oc  WITH(NOLOCK) 
 	INNER JOIN tmp_thirdparty ttp ON oc.ToParty = ttp.PartyID
 	INNER JOIN t ON oc.FromParty = t.PartyID
@@ -54,18 +56,32 @@ BEGIN
 	INNER JOIN @tmp_product tp ON p.Productid = tp.ProductID
 	OUTER APPLY 
 	(
-		SELECT (
-			SELECT		lcr.Rate, STRING_AGG( e.Code + '(' + e.currency + ')',',') as currencyList
+		SELECT STRING_AGG(d1.ex, CHAR(13)) as extra
+		FROM 
+		(
+			SELECT		 STRING_AGG( e.Code + '(' + e.currency + ')',',') + ':'  + CAST(lcr.Rate * 100 AS VARCHAR(10))  ex
 			FROM		LA_ChargeRateByCurrency lcr WITH(NOLOCK) 
 			INNER JOIN	bodb02.dbo.Exchange e WITH(NOLOCK) ON lcr.CurrencyID = e.ExchangeId
 			WHERE		lcr.ChargeID = oc.ChargeID
 			GROUP BY	lcr.Rate
-			FOR JSON PATH
-		) cd
+		) d1
+
 	) d
 	WHERE (p.EndOfSupportDate IS NULL OR p.EndOfSupportDate = '')
 		AND oc.ChargeType IN (1 ,11)
-	ORDER BY p.Productid , t.PartyID, oc.ChargeType, oc.FromDate
+	)
+
+	SELECT Productid, 
+		  ProductName, 
+		  STRING_AGG(GroupName,', ') GroupName,
+		  ChargeOn, 
+		  ChargeRate,
+		  FromDate, 
+		  ToDate
+	FROM d
+	GROUP BY Productid, ProductName, ChargeOn, FromDate, ToDate, ChargeRate
+	ORDER BY Productid , FromDate, ChargeRate
+
 
 END
 GO
