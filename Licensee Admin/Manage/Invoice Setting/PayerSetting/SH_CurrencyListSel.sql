@@ -3,14 +3,16 @@
 ALTER PROCEDURE [dbo].[SH_CurrencyListSel]		
 	 @currencyType				TINYINT	= 0 -- 0: Fiat, 1: Crypto, 99 --All
 	 ,@IsExcludeTestingCurrency BIT		= 0
+	 ,@OfferSite				VARCHAR(10)		= '0,1,2'
 AS
 /*
 Created: 20250528@Danny
 Task : Get all the currency list
-DB: DBCUST.bodb_Licensee
+DB: DBLIC.bodb_Licensee
 
 Revisions:
     - 20250528@Danny: Get all the currency list [RedmineID: #226207]
+	- 20250708@Danny: add param OfferSite [RedmineID: #231982]
 	
 
 Param's Explanation:
@@ -33,6 +35,7 @@ BEGIN
 	OR 
 		@IsExcludeTestingCurrency  = 0
 	)
+	AND e.OfferSite IN (SELECT CAST(value AS TINYINT) FROM STRING_SPLIT(@OfferSite,','))
 
 	BEGIN
 		UPDATE t1

@@ -6,6 +6,7 @@ ALTER PROCEDURE [dbo].[LA_SelCurrencyByParty]
 	 @PartyID		INT				= 0
 	, @excludeTest	BIT				= 0
 	, @SystemMode	VARCHAR(10)		= 'LA'
+	, @OfferSite    VARCHAR(10)		= '0,1,2'
 AS
 /*
 Created: 20140828@Florent
@@ -20,6 +21,7 @@ Revisions:
 	- 20201003@Danny: Support USDT as base currency [RedmineID: #177718]
 	- 20230919@Danny: Support Jollysport licensees [RedmineID: #193214]
 	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+	- 20250708@Danny: add param OfferSite [RedmineID: #231982]
 
 Param's Explanation:
 */
@@ -65,6 +67,7 @@ BEGIN
 	SELECT t.currency, e.currency, e.Code, e.CurrencyType
 	FROM @temp t
 	INNER JOIN CustDB.dbo.Exchange e WITH (NOLOCK) ON t.currency = e.exchangeid
+	WHERE e.OfferSite IN (SELECT CAST(value AS TINYINT) FROM STRING_SPLIT(@OfferSite,','))
 
 
 	IF ( @PartyID <> 0 
