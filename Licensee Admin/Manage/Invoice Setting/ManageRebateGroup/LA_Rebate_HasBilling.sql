@@ -14,6 +14,7 @@ AS
 	 Revisions:  
 		- 20180529@Parsons: Check this rebate has not belong to any a invoice yet [#94282]
 		- 20240520@Danny: support closed status invoice [RedmineID: #194603]
+		- 20250721@Danny: Support rebate start from middle of month [RedmineID: #231926]
 
 	 Params:
 
@@ -26,7 +27,7 @@ BEGIN
 
 	--#Region Get info of Rebate 
 	-- Get Time range
-	SELECT @FromDateRebate = FromDate, @ToDateRebate = ToDate
+	SELECT @FromDateRebate = DATEADD(MONTH, DATEDIFF(MONTH, 0, FromDate), 0), @ToDateRebate = ToDate
 	FROM LA_DiscountGroupHeader WITH(NOLOCK)
 	WHERE DiscountGroupId = @GroupId
 	-- Get Party List
