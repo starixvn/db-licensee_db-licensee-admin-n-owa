@@ -7,7 +7,6 @@ ALTER PROCEDURE [dbo].[LA_LaunchLicensee]
 	@LicenseeId				INT,
 	@PayerName				VARCHAR(50),
 	@BrandName				VARCHAR(100)	= '',
-	@LicenseeCode			VARCHAR(50)		= '',
 	@BaseCurrencyId			INT,
 	@LaunchDate				DATE, 
 	@BillingGroupId			INT,
@@ -54,6 +53,7 @@ AS
 		- 20250513@Eddie: Enhance SP [RedmineID: #226204]
 		- 20250605@Danny: New format charge rate setting log [RedmineID: #226207]
 		- 20250610@Eddie: Remove @PlatformId parameter [RedmineID: #228189]
+		- 20250725@Danny: Change logic get Licensee Code [RedmineID: #233636]
 
 	Param's Explannation: 
 						@ChargeInfoSettingData = '<Root>
@@ -283,6 +283,23 @@ BEGIN
 			SELECT @IsAddNew = 1, @logPayerSettingActionID = 1000
 		END
 
+		-- Handle @LicenseeCode
+		BEGIN
+			DECLARE @LicenseeCode VARCHAR(50) = '', @FDate_LicCode DATE
+
+			SELECT @LicenseeCode =  ISNULL(LicenseeCode,'') FROM dbo.OAS_PartyBaseCurrency WITH(NOLOCK) WHERE PartyID = @NewPartyId
+
+			IF ISNULL(@LicenseeCode, '') = ''
+			BEGIN
+				SELECT TOP 1  @LicenseeCode = c.username, @FDate_LicCode = l.FromDate
+				FROM dbo.LicenseeTransferCode l WITH(NOLOCK)
+				INNER JOIN CustDB.dbo.custInfo c WITH(NOLOCK) ON l.CustID = c.custid
+				WHERE l.LicenseeName = @PayerName
+				ORDER BY l.FromDate DESC
+			END
+
+		END
+
 		-- OAS_PartyDetail
 		IF EXISTS (SELECT 1 FROM dbo.OAS_PartyDetail WITH(NOLOCK) WHERE PartyID = @NewPartyId)
 			UPDATE dbo.OAS_PartyDetail WITH(ROWLOCK)
@@ -304,7 +321,11 @@ BEGIN
 			DELETE dbo.OAS_PartyBaseCurrency WITH(ROWLOCK) WHERE PartyID = @NewPartyId
 			
 		INSERT INTO dbo.OAS_PartyBaseCurrency (PartyID, BaseCurrencyId, LicenseeCode, FromDate, ToDate)
-		VALUES (@NewPartyId, @BaseCurrencyId, ISNULL(@LicenseeCode, ''), @FirstDateOfMonth, '2050-01-01')
+		SELECT @NewPartyId, 
+			   @BaseCurrencyId, 
+			   ISNULL(@LicenseeCode, ''), 
+			   CASE WHEN @FDate_LicCode IS NULL THEN @FirstDateOfMonth ELSE @FDate_LicCode END, 
+			   '2050-01-01'
 
 		-- OAS_ChargeInfo
 		INSERT INTO dbo.OAS_ChargeInfo (ProductID, FromParty, ToParty, ParentChargeID, Rate, Remark, BasisOfBilling, ChargeType, FirstOfBilling, FromDate, ToDate, BaseCurrencyId)
