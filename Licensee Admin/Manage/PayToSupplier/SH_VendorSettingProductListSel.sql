@@ -53,6 +53,7 @@ BEGIN
 	)
 	SELECT ProductID, ProductName FROM u
 	WHERE IsConfigurable = @IsConfigurable AND IsAllowEdit = @IsAllowEdit
+	AND ProductID NOT IN (16,37,71,74,81)
 	ORDER BY  ProductID
 	
 

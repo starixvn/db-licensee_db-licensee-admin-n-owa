@@ -59,7 +59,7 @@ BEGIN
 		SELECT STRING_AGG(d1.ex, CHAR(13)) as extra
 		FROM 
 		(
-			SELECT		 STRING_AGG( e.Code + '(' + e.currency + ')',',') + ':'  + CAST(lcr.Rate * 100 AS VARCHAR(10))  ex
+			SELECT		 STRING_AGG( e.Code + '(' + e.currency + ')',', ') + ' : '  + CAST(lcr.Rate * 100 AS VARCHAR(10))  ex
 			FROM		LA_ChargeRateByCurrency lcr WITH(NOLOCK) 
 			INNER JOIN	bodb02.dbo.Exchange e WITH(NOLOCK) ON lcr.CurrencyID = e.ExchangeId
 			WHERE		lcr.ChargeID = oc.ChargeID
@@ -67,8 +67,7 @@ BEGIN
 		) d1
 
 	) d
-	WHERE (p.EndOfSupportDate IS NULL OR p.EndOfSupportDate = '')
-		AND oc.ChargeType IN (1 ,11)
+	WHERE  oc.ChargeType IN (1 ,11)
 	)
 
 	SELECT Productid, 
