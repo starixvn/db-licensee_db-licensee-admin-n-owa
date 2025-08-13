@@ -23,6 +23,7 @@ AS
 	   - 20221027@Danny: MG-RNG ofer Tournament prize [RedmineID: #176986]
 	   - 20220227@Danny: Incorporate USDTJP currency [RedmineID: #183461]
 	   - 20240924@Danny: exclude BTS currency [RedmineID: #210422]
+	   - 20250815@Danny: Virtual Sports 2 - Offer Tournament Prize [#235167]
 */
 
 BEGIN
@@ -51,7 +52,7 @@ BEGIN
 
 
 	;WITH cte_Data AS(
-		SELECT b.rptDate, b.SiteID, b.ProductID, b.CurrencyId,
+		SELECT b.rptDate, b.SiteID, lf.GroupProductId ProductID, b.CurrencyId,
 			SUM(CASE WHEN ISNULL(b.TicketType,0) = @FreeBetsTicketType OR g.TypeId IN (2,3,4,5,6,8) THEN 0
 					 ELSE ISNULL(b.BetCount, 0)  
 				END) AS BetCount,
@@ -66,12 +67,13 @@ BEGIN
 			SUM(CASE WHEN g.TypeId IN (4,5,6,8) THEN ISNULL(b.MemberWL, 0) ELSE 0 END) AS PromotionPrize,
 			SUM(CASE WHEN ISNULL(b.TicketType, 0) = @FreeBetsTicketType THEN ISNULL(b.MemberWL, 0) ELSE 0 END)	AS FreeBetAmount
 		FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH(NOLOCK)
-		INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+		INNER JOIN LA_f_GroupProduct(@ProductCodes,@FromDate,@ToDate) lf ON b.ProductID = lf.ProductID
+		INNER JOIN @ChargeInfo ci ON b.SiteID = ci.LicenseeID AND lf.GroupProductId = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 		LEFT JOIN @GroupBettype g ON b.Bettype = g.Bettype
 		WHERE b.CurrencyID NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x)
 		AND b.StatusId NOT IN (-1, 101, 102, 103)
 		AND b.customercategory NOT IN (27, 28)
-		GROUP BY b.SiteID, b.ProductID, b.CurrencyId, b.rptDate
+		GROUP BY b.SiteID, lf.GroupProductId, b.CurrencyId, b.rptDate
 	)
 	INSERT INTO @Data(rptDate, ProductId, PartyId, CurrencyId, Turnover, BetCount, CustomerWL, LicenseeWL, Contribution, JackpotPrize, PromotionPrize, FreeBetAmount, ServiceFee)
 	SELECT d.rptDate, d.ProductID,ci.PartyID, d.CurrencyId,

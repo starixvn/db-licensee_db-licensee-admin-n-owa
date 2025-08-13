@@ -81,6 +81,7 @@ AS
 		- 20230510@Danny: New commercial terms for 12B [RedmineID: #186543]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 		- 20240913@Sally: Support Odds Boost Voucher [#209884]
+		- 20250813@Danny: Virtual Sports 2 - Offer Tournament Prize [#235167]
 */
 		
 /*	Example:
@@ -136,7 +137,9 @@ BEGIN
 		ORDER BY ProductId
 
 		INSERT INTO @ProductHaveExtraAmtList(ProductID)
-		SELECT DISTiNCT ProductId FROM LA_f_GroupBettype() WHERE TypeId NOT IN (1,7,11)
+		SELECT DISTiNCT g.GroupProductId FROM LA_f_GroupBettype() l
+		INNER JOIN dbo.LA_f_GroupProduct('',@FromDate,@ToDate) g ON l.ProductId = g.ProductId
+		WHERE TypeId NOT IN (1,7,11)
 	END
 	
 	-- Handle Licensee status

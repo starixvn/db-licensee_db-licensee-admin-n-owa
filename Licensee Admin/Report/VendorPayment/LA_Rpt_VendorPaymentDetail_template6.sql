@@ -146,6 +146,7 @@ BEGIN
 				WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 					AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x) 
 					AND b.CustomerCategory NOT IN (27,28)
+					AND b.ProductID = @ProductID
 				GROUP BY b.SiteID, b.rptDate, b.CurrencyId
 			)
 			INSERT INTO #TempData (PartyID,Winlostdate,CurrencyId,Turnover,TotalTrans,CustomerWinLoss,LicenseeWinloss,LicensingFee,PayToSupplier,Promotion, isDeposit)

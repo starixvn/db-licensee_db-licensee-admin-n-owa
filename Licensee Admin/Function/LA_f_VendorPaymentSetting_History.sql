@@ -33,7 +33,7 @@ RETURN
 			CAST (0 AS BIT)	IsConvertNegativeFeeToZero , 
 			CAST (0 AS BIT) IsConvertNegativePaytoSupplierToZero	, 
 			CAST('1900-01-01' AS DATE) AS FromDate,
-			CAST('2025-06-30'  AS DATE) AS  Todate
+			CAST('2025-07-31'  AS DATE) AS  Todate
 
 	UNION ALL
 
@@ -43,7 +43,7 @@ RETURN
 			CAST (1 AS BIT)	IsConvertNegativeFeeToZero , 
 			CAST (0 AS BIT) IsConvertNegativePaytoSupplierToZero	, 
 			CAST('1900-01-01' AS DATE) AS FromDate,
-			CAST('2025-06-30'  AS DATE) AS  Todate
+			CAST('2025-07-31'  AS DATE) AS  Todate
 
 GO
 

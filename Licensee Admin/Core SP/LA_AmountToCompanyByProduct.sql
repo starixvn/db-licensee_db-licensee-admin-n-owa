@@ -56,6 +56,7 @@ AS
 		- 20250402@Danny: Number Game promotion [RedmineID: #219671]
 		- 20250416@Danny: Support Discount by currency for a licensee [RedmineID: #223951]
 		- 20250711@Danny: Support rebate start from middle of month [RedmineID: #231926]
+		- 20250813@Danny: Virtual Sports 2 - Offer Tournament Prize [#235167]
 
 	Param's Explanation:
 		. @Currencies: '' = all or '2,3,4,...'
@@ -658,12 +659,12 @@ BEGIN
 			,ProrateMinFee MONEY, SecondaryLicensingFee MONEY, NonMinFee MONEY, LicensingFee MONEY, LicenseeWL MONEY
 			,BasedProrateMinFee MONEY, BasedSecondaryLicensingFee MONEY, BasedNonMinFee MONEY, BasedLicensingFee MONEY, BasedLicenseeWL MONEY
 			,WLToDiscount MONEY, Discount MONEY DEFAULT(0)
-			,GrossLicensingFee MONEY, ExtraAmount MONEY, IsWaived BIT DEFAULT(0), IsChargedByMinFee BIT DEFAULT(0), OddsBoostBonus MONEY)
+			,GrossLicensingFee MONEY, ExtraAmount MONEY, IsWaived BIT DEFAULT(0), IsChargedByMinFee BIT DEFAULT(0), OddsBoostBonus MONEY, Prize MONEY)
 		
 		INSERT INTO @tmpResult (PartyId, ProductId, GroupMinFeeId, GroupId, IsPrimary, FeeTypeId
 			,ProrateMinFee, SecondaryLicensingFee, NonMinFee, LicensingFee, LicenseeWL
 			,BasedProrateMinFee, BasedSecondaryLicensingFee, BasedNonMinFee, BasedLicensingFee, BasedLicenseeWL
-			,WLToDiscount, GrossLicensingFee, ExtraAmount,OddsBoostBonus)
+			,WLToDiscount, GrossLicensingFee, ExtraAmount,OddsBoostBonus, Prize)
 		SELECT ISNULL(r.PartyId, t.PartyId), ISNULL(r.ProductId, t.ProductId), t.GroupMinFeeId, t.GroupId, t.IsPrimary, t.FeeTypeId
 			,MAX(CASE WHEN t.FeeTypeId = 1 THEN t.ProrateMinFee ELSE 0 END) AS ProrateMinFee
 			,0 AS SecondaryLicensingFee
@@ -679,6 +680,7 @@ BEGIN
 			,SUM(ISNULL(r.GrossLicenseeAmount, 0)) AS GrossLicensingFee
 			,SUM(ISNULL(r.ExtraAmount, 0)) AS ExtraAmount
 			,SUM(ISNULL(r.OddsBoostBonus, 0)) AS OddsBoostBonus
+			,SUM(ISNULL(r.Prize, 0)) AS Prize
 		FROM #tmpResult r
 			FULL OUTER JOIN #tmpMinFee t ON r.PartyId = t.PartyId AND r.ProductId = t.ProductId AND r.rptDate BETWEEN t.FromDate AND t.ToDate
 			LEFT JOIN #tmpDiscountGroup d ON r.PartyId = d.PartyId AND r.ProductId = d.ProductId
@@ -886,8 +888,7 @@ BEGIN
 		,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), DiscountType TINYINT
 		,TierRebate MONEY, TierRebateRate MONEY, WLRebate MONEY, WLRebateRate MONEY, FeeRebate MONEY, FeeRebateRate MONEY, TotalRebate MONEY, RebateRemark NVARCHAR(4000)
 		,ProrateMinFee MONEY, SecondaryLicensingFee MONEY, NonMinFee MONEY, IsGroupMinFee BIT, FeeRebateByCurr MONEY, WinlossRebateByCurr MONEY, WinlossRebateByCurrBeforeRate MONEY
-		,ExtraInfo NVARCHAR(4000)
-		,OddsBoostBonus MONEY
+		,ExtraInfo NVARCHAR(4000), OddsBoostBonus MONEY, Prize MONEY
 	)
 	/*
 		DiscountType: 0 = no discount, 1 = discount by licensing fee, 2 = discount by licensee winloss
@@ -896,7 +897,7 @@ BEGIN
 	IF EXISTS (SELECT 1 FROM STRING_SPLIT(@LicensingFeeTypeIds, ',') WHERE CONVERT(INT, value) = 0) -- Normal Licensing Fee
 	BEGIN
 		INSERT INTO @Result (PartyId, ProductId, LicensingFeeTypeId, LicenseeWL, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-			,Discount, DiscountRate, DiscountRemark, DiscountType, ProrateMinFee, SecondaryLicensingFee, NonMinFee, IsGroupMinFee, OddsBoostBonus)
+			,Discount, DiscountRate, DiscountRemark, DiscountType, ProrateMinFee, SecondaryLicensingFee, NonMinFee, IsGroupMinFee, OddsBoostBonus, Prize)
 		SELECT t.PartyId, t.ProductId, 0 AS LicensingFeeTypeId, t.LicenseeWL, t.GrossLicensingFee, t.LicensingFee, t.ExtraAmount, t.IsChargedByGroupMinFee, t.IsChargedByMinFee
 			,CASE WHEN d.DiscountGroupType IN (1, 11) THEN d.Discount ELSE t.Discount END, ISNULL(d.DiscountRate, 0)
 			,CASE WHEN ISNULL(d.DiscountRate, 0) + ISNULL(d.ChargeRateAfterDiscount, 0) = 0 THEN '' ELSE ISNULL(d.DiscountRemark, '') END
@@ -904,7 +905,7 @@ BEGIN
 				WHEN d.DiscountGroupType IN (1, 11) AND d.Discount > 0 THEN 1
 				WHEN d.DiscountGroupType IN (3, 13) AND t.Discount > 0 THEN 2
 				ELSE 0 END AS DiscountType
-			,t.ProrateMinFee, t.SecondaryLicensingFee, t.NonMinFee, t.IsGroupMinFee, OddsBoostBonus
+			,t.ProrateMinFee, t.SecondaryLicensingFee, t.NonMinFee, t.IsGroupMinFee, t.OddsBoostBonus, t.Prize
 		FROM (
 			SELECT r.PartyId, r.ProductId
 				,SUM(r.LicenseeWL) AS LicenseeWL
@@ -919,6 +920,7 @@ BEGIN
 				,MAX(CASE WHEN r.GroupMinFeeId > 0 THEN 1 ELSE 0 END) AS IsGroupMinFee
 				,SUM(ISNULL(r.Discount, 0)) AS Discount
 				,SUM(ISNULL(r.OddsBoostBonus, 0)) AS OddsBoostBonus
+				,SUM(ISNULL(r.Prize, 0)) AS Prize
 			FROM @tmpResult r
 				INNER JOIN #Products pd ON r.ProductId = pd.ProductId AND pd.IsSelected = 1
 			GROUP BY r.PartyId, r.ProductId
@@ -1283,8 +1285,8 @@ BEGIN
 			) d
 
 		UPDATE r
-		SET r.FeeRebate = CASE WHEN @FromDate >= @CutOff_RebateOnLicfee THEN CASE WHEN r.LicensingFee - r.Discount -  ISNULL(t.GrossLicensingFee, 0) - r.OddsBoostBonus < 0
-																   THEN 0 ELSE (r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.OddsBoostBonus) * ISNULL(r.FeeRebateRate, 0) END  -- ServiceFee - Discount - SB Promotion - OddsBoostBonus 
+		SET r.FeeRebate = CASE WHEN @FromDate >= @CutOff_RebateOnLicfee THEN CASE WHEN r.LicensingFee - r.Discount -  ISNULL(t.GrossLicensingFee, 0) - r.OddsBoostBonus - ISNULL(r.Prize,0) < 0
+																   THEN 0 ELSE (r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.OddsBoostBonus - ISNULL(r.Prize,0)) * ISNULL(r.FeeRebateRate, 0) END  -- ServiceFee - Discount - SB Promotion - OddsBoostBonus 
 								ELSE r.FeeRebate END
 			,r.TierRebate = r.TierRebate
 							+ CASE WHEN @FromDate < @CutOff_TierRebate THEN
@@ -1300,8 +1302,8 @@ BEGIN
 									END  -- ServiceFee - Discount - SB Promotion - OddsBoostBonus 
 							  END* r.TierRebateRate
 			,r.TotalRebate = r.WLRebate + ISNULL(r.FeeRebateByCurr,0) + ISNULL(r.WinlossRebateByCurr,0)
-							+ CASE WHEN @FromDate >= @CutOff_RebateOnLicfee THEN CASE WHEN r.LicensingFee - r.Discount -  ISNULL(t.GrossLicensingFee, 0) - r.OddsBoostBonus < 0
-																   THEN 0 ELSE (r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.OddsBoostBonus) * ISNULL(r.FeeRebateRate, 0) END
+							+ CASE WHEN @FromDate >= @CutOff_RebateOnLicfee THEN CASE WHEN r.LicensingFee - r.Discount -  ISNULL(t.GrossLicensingFee, 0) - r.OddsBoostBonus - ISNULL(r.Prize,0) < 0
+																   THEN 0 ELSE (r.LicensingFee - r.Discount - ISNULL(t.GrossLicensingFee, 0) - r.OddsBoostBonus - ISNULL(r.Prize,0)) * ISNULL(r.FeeRebateRate, 0) END
 								ELSE r.FeeRebate END
 							+ CASE
 								WHEN @IncludeTierRebate = 0 THEN 0
