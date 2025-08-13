@@ -20,14 +20,17 @@ AS
 	- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 	- 20241016@Danny: Extend parameter data length [RemineID: #212252]
 	- 20241223@Danny: Support 3rd Rate by Currency [RemineID: #215383]
+	- 20250813@Danny: Virtual Sports 2 - Offer Tournament Prize [#235167]
  */
 
 BEGIN
 	SET NOCOUNT ON
 	-- SXG
-	DECLARE @ProductCode VARCHAR(50)
-	SELECT @ProductCode = ProductPrefix
-	FROM dbo.Product3rd WITH(NOLOCK) WHERE Productid = @ProductID
+	DECLARE @ProductCode VARCHAR(50) ,@3rdProductCode VARCHAR(50)
+
+	-- ProductCode
+	SELECT @ProductCode = GroupProductCode, @3rdProductCode = ProductCode 
+	FROM   dbo.LA_f_GroupProduct('',@FromDate,@ToDate) WHERE ProductId = @ProductID
 
 	IF ISNULL(@PlatformId, 0) <> 0
 	BEGIN
@@ -65,13 +68,13 @@ BEGIN
 
 	INSERT INTO @3rdRate (ChargeID, PartyID, ProductID, DI_Rate, IsDeposit, Fromdate, Todate)
 	SELECT DISTINCT r.ChargeID, p.PartyId, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r.Todate 
-	FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCode, 'OA') r 
+	FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @3rdProductCode, 'OA') r 
 	INNER JOIN #PartyList p on p.ParentId = r.PartyID 
 	WHERE  r.IsDeposit = 1
 
 	INSERT INTO @3rdRate (ChargeID, PartyID, ProductID, DI_Rate, IsDeposit, Fromdate, Todate)
 	SELECT DISTINCT r.ChargeID, p.PartyId, r.ProductID, r.DI_Rate, r.IsDeposit, r.Fromdate, r.Todate 
-	FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @ProductCode, 'OA') r 
+	FROM bodb_licensee.dbo.LA_f_ChargeInfo3rd(@FromDate, @ToDate, @3rdProductCode, 'OA') r 
 	INNER JOIN OAS_ChargeInfo oc on oc.ChargeID = r.ChargeID 
 	INNER JOIN #PartyList p on oc.FromParty = p.PartyID
 	WHERE  r.IsDeposit = 0
@@ -92,7 +95,7 @@ BEGIN
 	INSERT INTO #ChargeRate (ChargeId, PartyID, LicenseeID, isDeposit, ProductID, Rate, Rate3rd, Fromdate, Todate, ChargeID_3rd)
 	SELECT  c.ChargeID, c.PartyID, c.LicenseeID, c.isDeposit, c.ProductID, c.DI_Rate AS Rate, r.DI_Rate AS Rate3rd, c.Fromdate, c.Todate, r.ChargeID
 	FROM LA_f_ChargeInfoWithCredit(@PartyIds, @FromDate, @ToDate,@ProductCode) c
-	INNER JOIN @3rdRate r ON r.PartyID = c.PartyID and r.ProductID = c.ProductID
+	INNER JOIN @3rdRate r ON r.PartyID = c.PartyID AND (r.ProductID = c.ProductID OR @ProductCode <> @3rdProductCode)
 	WHERE (c.DI_Rate = 0 AND c.isDeposit = 0) OR (c.DI_Rate > 0 and c.isDeposit = 1)
 
 	CREATE TABLE #Exchange (
@@ -139,7 +142,7 @@ BEGIN
 					SUM(CASE WHEN bt.bettype IS NOT NULL THEN b.MemberWL ELSE 0 END) Promotion
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 					LEFT JOIN @BonusBettype bt ON bt.bettype = b.Bettype
-					INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND  b.ProductID = ci.ProductID AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
+					INNER JOIN #ChargeRate ci ON b.SiteID = ci.LicenseeId AND b.rptDate BETWEEN ci.FromDate AND ci.ToDate
 				WHERE b.rptDate BETWEEN @FromDate AND @ToDate
 					AND b.StatusId NOT IN (-1, 101, 102, 103) AND b.CurrencyId NOT IN ( SELECT x.ExchangeID FROM LA_f_ExcludedCurrencyListSel() x) 
 					AND b.CustomerCategory NOT IN (27,28)
