@@ -49,12 +49,14 @@ AS
 	- 20250505@Corbin: Integrate Microgaming Live Casino [RemineID: #223409]
 	- 20250505@Corbin: Integrate RichGaming [RemineID: #225057]
 	- 20250808@Danny: Virtual Sports 2 - Offer Tournament Prize [#235167]
+	- 20250815@Danny: Handle GMT +2 [RemineID: #235861]
 	- 20250808@Danny: Integrate Jackpot Prize for Playtech product [#233715]
 
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
 							= 1: GMT-4
-						    = 2: GMT+8	
+						    = 2: GMT+8
+							= 3: GMT+2
 	
  * Example
 	- GTM-4 All Products supported
@@ -80,6 +82,14 @@ AS
 								 @ToDate	= '20210531', 
 								 @BaseCurrencyName = 'EUR', 
 								 @Timezone = 0
+
+	- GTM+2 All Products supported
+	EXEC LA_Rpt_3rdProductSettlement @PartyIDs='14,20,148,493,70,56,275,558,316,459,307,15,142,95,58,460,43,457,526,153,76,101,97,114,383,453,530,218,448,81,555,46,676,143,38,92,271,489,146,89,354,82,210,150,91,78,83,52,533,461,93,64,253,353,491,154,260,675,47,361,39,84,77,85,477,44,48,452,86,42,170,323,475,570,571,572,573,574,575,583,584,586,151,465,19,136,312,29,175,276,348,40,171,167,194,63,470,308,33,90,466,464,455,61,462,525,415,158,59,447,334,41,72,482,124,68,67,433,471,34,387,403,117,487,24,647,74,409,429,213,346,412,217,396,207,652,35,370,331,436,367,347,332,165,398,206,419,439,531,414,168,395,449,582,664,441,62,481,127,374,71,653,169,73,246,456,166,80,36,411,417,578,446,469,534,37,490,364,66,31,360,485,162,488,605,317,418,473,88,96,604,329,333,356,476,75,410,435,397,468,404,434,619,322,576,580,607,608,609,610,611,612,613,614,615,616,617,618,623,624,625,638,639,640,626,627,628,629,630,631,632,633,634,635,636,637,641,642,643,644,645,646,585,69,432,443,55,401,325,349,431,416,369,402,764,524,545,53,392,363,421,305,602,407,606,463,445,60,65,17,450,386,26,674,304,405,100,358,49,87,79,157,16,22,422,420,388,440,451,321,190,45,54,21,389,577,620,621,622,587,588,99,27,444,23,30,385,324,25',
+								 @ProductCodes = 'SS',  
+								 @FromDate	= '20210501', 
+								 @ToDate	= '20210531', 
+								 @BaseCurrencyName = 'EUR', 
+								 @Timezone = 3
  */
 
 BEGIN
@@ -130,6 +140,7 @@ BEGIN
 		,isRptBettingBySportSource		TINYINT
 		,isSupportGMT8					BIT
 		,isSupportGMT0					BIT
+		,isSupportGMT2					BIT
 		,isRptLicCashoutSummarySource	BIT
 	)
 	DECLARE @bettypeExtraGMT TABLE (bettype INT, ProductID INT)
@@ -412,7 +423,7 @@ BEGIN
 	INSERT INTO @PartyIdInput(PartyId) SELECT CAST(value AS INT) FROM STRING_SPLIT(@PartyIds,',')
 	
 	-- Insert product detail by source (rptBetting, rptBettingByProduct, rpt_ThirdPartyWL_ExtraGMT, ....)
-	INSERT INTO @productDataView(ProductID, ProductCode, ProductName, isKeepNegativeFee, isKeepNegativePayToSupplier, isRptBettingSource, isRptBettingBySportSource, isSupportGMT8, isSupportGMT0, isRptLicCashoutSummarySource) 
+	INSERT INTO @productDataView(ProductID, ProductCode, ProductName, isKeepNegativeFee, isKeepNegativePayToSupplier, isRptBettingSource, isRptBettingBySportSource, isSupportGMT8, isSupportGMT0, isSupportGMT2, isRptLicCashoutSummarySource) 
 	EXEC LA_3rdProductByTimeZoneSel @ProductCodes = @ProductCodes, @Timezone = @Timezone, @isShowDetail = 1
 
 	IF @FromDate >= @MergeVSCutoffDate
@@ -428,7 +439,7 @@ BEGIN
 	SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode FROM CTE_Product
 
 	-- Handle @ProductCodesGMT (Include Product support GMT billing)
-	SELECT @ProductCodesGMT = COALESCE(@ProductCodesGMT + ',', '') + CONVERT(VARCHAR(10), ProductCode) FROM @productDataView WHERE isSupportGMT0 = 1 OR isSupportGMT8 = 1
+	SELECT @ProductCodesGMT = COALESCE(@ProductCodesGMT + ',', '') + CONVERT(VARCHAR(10), ProductCode) FROM @productDataView WHERE isSupportGMT0 = 1 OR isSupportGMT8 = 1 OR isSupportGMT2 = 1
 
 	-- Handle @ProductCodes3rd 
 	SET @ProductCodes3rd = @ProductCodes
@@ -1007,6 +1018,7 @@ BEGIN
 				AND p.isRptBettingSource = 0 
 				AND p.isRptBettingBySportSource = 0
 				AND p.isSupportGMT0 = 0 
+				AND p.isSupportGMT2 = 0 
 				AND p.isSupportGMT8 = 0
 				AND p.isRptLicCashoutSummarySource = 0
 			GROUP BY b.SiteID, b.rptDate, b.CurrencyId, b.ProductID
@@ -1247,7 +1259,7 @@ BEGIN
 		END
 	END
 
-	IF @Timezone IN (0,2) 
+	IF @Timezone IN (0,2,3) 
 	BEGIN
 		;WITH cte_Summary AS(
 			SELECT b.RptDate, b.RptDate3rd, b.SiteId, b.BetTypeId, b.CurrencyId,

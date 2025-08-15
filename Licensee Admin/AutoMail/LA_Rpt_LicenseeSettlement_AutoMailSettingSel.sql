@@ -13,6 +13,7 @@ AS
 	Revisions:
 		- 20240506@Danny: Create Sp  [#204167]
 		- 20241004@Sally: Support Odds Boost Voucher [#209884]
+		- 20250820@Danny: Virtual Sports 2 - Offer Tournament Prize [#235167]
 
 	Param's Explanation:
 
@@ -50,6 +51,7 @@ BEGIN
 	UNION ALL SELECT '<Licensee Name> Charge Rate',	'LicenseeChargeRate'
 	UNION ALL SELECT 'Tips Amount',	'TipsAmount'
 	UNION ALL SELECT 'Contribution', 'Contribution'
+	UNION ALL SELECT 'Free Bets', 'FreeBetAmount'
 	UNION ALL SELECT 'Customer Win Loss', 'MemberWinLoss'
 	UNION ALL SELECT 'Turnover', 'Turnover'
 	UNION ALL SELECT 'Date', 'WinLostDate'
