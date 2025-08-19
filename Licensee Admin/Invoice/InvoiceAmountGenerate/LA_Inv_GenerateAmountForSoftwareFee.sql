@@ -66,6 +66,8 @@ AS
 		- 20250505@Corbin: Integrate RichGaming [RemineID:#225057]
 		- 20250505@Eddie: Support Billing for SabaPlay [#221987]
 		- 20250513@Danny: Output rate convert from base currency to USD(USDT) currency [#226741]
+		- 20250808@Danny: Virtual Sports 2 - Offer Tournament Prize [#235167]
+		- 20250808@Danny: Integrate Jackpot Prize for Playtech product [#233715]
 */
 
 BEGIN
@@ -221,9 +223,12 @@ BEGIN
 					WHEN ProductId = 95  AND LicensingFeeTypeId = 3 THEN 63 -- Prizes
 					WHEN ProductId = 107  AND LicensingFeeTypeId = 3 THEN 64 -- Prizes
 					WHEN ProductId = 108  AND LicensingFeeTypeId = 3 THEN 65 -- Prizes
+					WHEN ProductId = 5  AND LicensingFeeTypeId = 3 THEN 66 -- Prizes
+					WHEN ProductId = 100 AND LicensingFeeTypeId = 1 THEN 67 -- Contribution
+					WHEN ProductId = 100 AND LicensingFeeTypeId = 2 THEN 68 -- JackpotPrize
 					END
 			FROM @Result
-		WHERE ProductId IN (10, 32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79, 87, 89, 0, 103, 95, 107, 108) AND LicensingFeeTypeId > 0
+		WHERE ProductId IN (10, 32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79, 87, 89, 0, 103, 95, 107, 108, 100, 5) AND LicensingFeeTypeId > 0
 			GROUP BY
 				CASE
 					WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
@@ -256,6 +261,9 @@ BEGIN
 					WHEN ProductId = 95  AND LicensingFeeTypeId = 3 THEN 63 -- Prizes
 					WHEN ProductId = 107  AND LicensingFeeTypeId = 3 THEN 64 -- Prizes
 					WHEN ProductId = 108  AND LicensingFeeTypeId = 3 THEN 65 -- Prizes
+					WHEN ProductId = 5  AND LicensingFeeTypeId = 3 THEN 66 -- Prizes
+					WHEN ProductId = 100 AND LicensingFeeTypeId = 1 THEN 67 -- Contribution
+					WHEN ProductId = 100 AND LicensingFeeTypeId = 2 THEN 68 -- JackpotPrize
 					END
 
 			-- AMF, Prepayment and AGPrepayment

@@ -63,6 +63,7 @@ AS
 		- 20240730@Danny: Player Tips worksheet [#207863]
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 		- 20240923@Sally: Support Odds Boost Voucher [#209884]
+		- 20250813@Danny: Virtual Sports 2 - Offer Tournament Prize [#235167]
 	Param's Explanation:
 */
 BEGIN
@@ -86,9 +87,10 @@ BEGIN
 
 	DECLARE @ExtraAmtProducts TABLE (ProductID INT, ProductCode VARCHAR(50))
 	INSERT INTO @ExtraAmtProducts
-	SELECT  Productid, ProductPrefix
-	FROM	bodb_licensee.dbo.Product3rd WITH(NOLOCK)
-	WHERE Productid IN 
+	SELECT  g.GroupProductId, g.GroupProductCode
+	FROM	bodb_licensee.dbo.Product3rd p3 WITH(NOLOCK)
+	INNER JOIN bodb_licensee.dbo.LA_f_GroupProduct(@ProductCode,@FromDate,@ToDate)  g ON p3.Productid = g.ProductId
+	WHERE p3.Productid IN 
 	(
 	SELECT  x.ProductID 
 	FROM bodb_licensee.dbo.LA_f_GroupBettype() x
@@ -769,7 +771,7 @@ BEGIN
 				FROM bodb_LicenseeReport.dbo.rpt_BettingByProduct b WITH (NOLOCK)
 				LEFT JOIN bodb_licensee.dbo.LA_f_GroupBettype() bt ON b.Bettype = bt.Bettype
 				WHERE
-					b.ProductID IN (SELECT z.ProductID FROM @ExtraAmtProducts z WHERE z.ProductCode = @ProductCode)
+					b.ProductID IN (SELECT ProductId FROM bodb_Licensee.dbo.LA_f_GroupProduct(@ProductCode,@FromDate,@ToDate))
 					AND	b.SiteID = @LicenseeID
 					AND b.rptDate BETWEEN @FromDate AND @ToDate
 					AND (@CurrencyId = 0 OR b.CurrencyID = @CurrencyId)
