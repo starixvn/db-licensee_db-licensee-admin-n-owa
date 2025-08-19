@@ -32,6 +32,7 @@ AS
 		- 20250115@Danny: Support different groups by currencies [RedmineID: #216352]
 		- 20250414@Eddie: Enhance SP [RedmineID: #223951]
 		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
+		- 20250725@Danny: show error message clearly [RedmineID: #232730]
 
 	 Params:
 		@RateSettingsData = '<Root>
@@ -221,7 +222,16 @@ BEGIN
 			WHERE bc.PartyId IS NULL OR bc.BaseCurrencyId <> @CurrencyId
 		)
 		BEGIN
-			SELECT @ErrCode = 512, @ErrMsg = 'Please select licensees who have same Base Currency with discount setting.'
+
+			DECLARE @PartyNames NVARCHAR(MAX) = ''
+
+			SELECT @PartyNames = STRING_AGG(op.PartyName,', ')
+			FROM @PartyList p
+				INNER JOIN dbo.OAS_Party op WITH(NOLOCK) ON p.PartyId = op.PartyId
+				LEFT JOIN dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON p.PartyId = bc.PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
+			WHERE bc.PartyId IS NULL OR bc.BaseCurrencyId <> @CurrencyId 
+
+			SELECT @ErrCode = 512, @ErrMsg =  @PartyNames + ' do not have the same Base Currency as the Discount setting. Please update their Base Currency to proceed.' 
 			RETURN
 		END
 
