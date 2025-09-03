@@ -13,6 +13,7 @@ AS
 		- 20250505@Corbin: Integrate HOTDOG [#221605]
 		- 20250505@Corbin: Integrate Microgaming Live Casino [#223409]
 		- 20250505@Corbin: Integrate RichGaming [RemineID:#225057]
+		- 20250820@Danny: Virtual Sports 2 - Offer Tournament Prize [#235167]
 
 */
 
@@ -22,13 +23,15 @@ RETURN
 	(								
  		SELECT '0' AS ProductIDs, 'Date, Currency, Turnover, Total Trans, Gross Win_Customer Win Loss, Gross Win_Odds Boost Bonus, Gross Win_Total, <Licensee Name> Win Loss, Amount Due To <Licensee Name>_Gross Win * Charge Rate, Amount Due To <Licensee Name>_Odds Spread Cost, Amount Due To <Licensee Name>_Total, <Billing Currency> equivalent' AS Cols
 		UNION ALL
-		SELECT '10', 'Date, Currency, Turnover, Total Trans, Gross Win_Customer Win Loss, Gross Win_Contribution, Gross Win_Total, <Licensee Name> Win Loss, Amount due to <Product Name>_Gross Win * Charge Rate, Amount due to <Product Name>_Contribution, Amount due to <Product Name>_Jackpot Prize, Amount due to <Product Name>_Total, <Billing Currency> equivalent'
+		SELECT '10,100', 'Date, Currency, Turnover, Total Trans, Gross Win_Customer Win Loss, Gross Win_Contribution, Gross Win_Total, <Licensee Name> Win Loss, Amount due to <Product Name>_Gross Win * Charge Rate, Amount due to <Product Name>_Contribution, Amount due to <Product Name>_Jackpot Prize, Amount due to <Product Name>_Total, <Billing Currency> equivalent'
 		UNION ALL
-		SELECT '21,34,45,55,73,79,80,95,107,108', 'Date, Currency, Turnover, Total Trans, Customer Win Loss, <Licensee Name> Win Loss, <Licensee Name> Charge Rate, Promotion, Company, <Billing Currency> equivalent'  
+		SELECT '5,21,34,45,55,73,79,80,87,89,95,103,107,108', 'Date, Currency, Turnover, Total Trans, Customer Win Loss, <Licensee Name> Win Loss, <Licensee Name> Charge Rate, Promotion, Company, <Billing Currency> equivalent'  
 		UNION ALL
 		SELECT '39', 'Date, Currency, Turnover, Total Trans, Customer Win Loss, <Licensee Name> Win Loss, Tips Amount, Tips Amount Due, Company, <Billing Currency> equivalent'
 		UNION ALL
-		SELECT '66', 'Date, Currency, Turnover, Total Trans, Gross Win_Customer Win Loss, Gross Win_Contribution, Gross Win_Total, <Licensee Name> Win Loss, Amount due to <Product Name>_Gross Win * Charge Rate, Amount due to <Product Name>_Contribution, Amount due to <Product Name>_Jackpot Prize, Amount due to <Product Name>_Total, <Billing Currency> equivalent'
+		SELECT '42', 'Date, Currency, Turnover, Total Trans, Gross Win_Customer Win Loss, Gross Win_Contribution, Gross Win_Total, <Licensee Name> Win Loss, Amount due to <Product Name>_Gross Win * Charge Rate, Amount due to <Product Name>_Contribution, Amount due to <Product Name>_Free Bets ,Amount due to <Product Name>_Jackpot Prize, Amount due to <Product Name>_Total, <Billing Currency> equivalent'
+		UNION ALL
+		SELECT '66', 'Date, Currency, Turnover, Total Trans, Gross Win_Customer Win Loss, Gross Win_Contribution, Gross Win_Total, <Licensee Name> Win Loss, Amount due to <Product Name>_Gross Win * Charge Rate, Amount due to <Product Name>_Contribution, Amount due to <Product Name>_Free Bets ,Amount due to <Product Name>_Jackpot Prize,  Amount due to <Product Name>_Promotion, Amount due to <Product Name>_Total, <Billing Currency> equivalent'
 		UNION ALL
 		SELECT '32,36','Date, Currency, Turnover, Total Trans, Gross Win_Customer Win Loss, Gross Win_Contribution, Gross Win_Total, <Licensee Name> Win Loss, Amount due to <Product Name>_Gross Win * Charge Rate, Amount due to <Product Name>_Contribution, Amount due to <Product Name>_Jackpot Prize,  Amount due to <Product Name>_Promotion, Amount due to <Product Name>_Total, <Billing Currency> equivalent'
 	), t_default AS

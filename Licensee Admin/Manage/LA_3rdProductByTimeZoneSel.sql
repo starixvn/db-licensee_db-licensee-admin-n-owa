@@ -16,15 +16,18 @@ AS
 	- 20240301@Danny: Merge virtual sports product [RemineID: #199478]
 	- 20240918@Danny: Integrate VS5 [RedmineID: #209929]
 	- 20250415@Winston: Integrate VS7 [RemineID: #218989]
+	- 20250815@Danny: Handle GMT +2 [RemineID: #235861]
  * Param's Explanation:
  *				@Timezone:  = 0  GMT 0 
 							= 1: GMT-4
 						    = 2: GMT+8	
+							= 3: GMT+2
  * Example 
 				-- Dropdown
 				EXEC LA_3rdProductByTimeZoneSel @Timezone = 1
 				EXEC LA_3rdProductByTimeZoneSel @Timezone = 2
 				EXEC LA_3rdProductByTimeZoneSel @Timezone = 0
+				EXEC LA_3rdProductByTimeZoneSel @Timezone = 3
 
 				-- 
 				EXEC [LA_3rdProductByTimeZoneSel] @Timezone = 0, @ProductCodes = 'PP,PPL', @isShowDetail = 1
@@ -43,9 +46,10 @@ BEGIN
 		,isRptBettingBySportSource		TINYINT
 		,isSupportGMT8					BIT
 		,isSupportGMT0					BIT
+		,isSupportGMT2					BIT
 		,isRptLicCashoutSummarySource	BIT
 	)
-	INSERT INTO @tbl_All3rdProducts(ProductID, ProductCode,  ProductName,  isKeepNegativeFee, isKeepNegativePayToSupplier, isRptBettingSource, isRptBettingBySportSource, isSupportGMT8, isSupportGMT0, isRptLicCashoutSummarySource) 
+	INSERT INTO @tbl_All3rdProducts(ProductID, ProductCode,  ProductName,  isKeepNegativeFee, isKeepNegativePayToSupplier, isRptBettingSource, isRptBettingBySportSource, isSupportGMT8, isSupportGMT0, isSupportGMT2, isRptLicCashoutSummarySource) 
 	SELECT	ProductID, 
 			ProductPrefix,
 			ProductName,
@@ -55,6 +59,7 @@ BEGIN
 			CASE WHEN ProductPrefix = 'SB_MuayThai' THEN 1 ELSE 0 END isRptBettingBySportSource,
 			CASE WHEN TimezoneIDs LIKE '%2%' THEN 1 ELSE 0 END isSupportGMT8,
 			CASE WHEN TimezoneIDs LIKE '%0%' THEN 1 ELSE 0 END isSupportGMT0,
+			CASE WHEN TimezoneIDs LIKE '%3%' THEN 1 ELSE 0 END isSupportGMT2,
 			CASE WHEN ProductID = 25 THEN 1 ELSE 0 END isRptLicCashoutSummarySource
 	FROM (
 			SELECT	CASE WHEN z.ProductID = 1000 THEN 'SB_BetBuilder'
@@ -74,14 +79,18 @@ BEGIN
 	IF @isShowDetail = 1
 	BEGIN
 
-		SELECT ProductID, ProductCode, ProductName , isKeepNegativeFee, isKeepNegativePayToSupplier, isRptBettingSource, isRptBettingBySportSource, isSupportGMT8, isSupportGMT0, isRptLicCashoutSummarySource
+		SELECT ProductID, ProductCode, ProductName , isKeepNegativeFee, isKeepNegativePayToSupplier, isRptBettingSource, isRptBettingBySportSource, isSupportGMT8, isSupportGMT0, isSupportGMT2, isRptLicCashoutSummarySource
 		FROM @tbl_All3rdProducts
 		WHERE ( ProductCode IN (SELECT value FROM STRING_SPLIT(@ProductCodes, ',')) OR @ProductCodes = '') 
 			AND (
-					 (isSupportGMT8 = CASE WHEN @Timezone = 2 THEN 1 ELSE 0 END AND isSupportGMT0 = CASE WHEN @Timezone = 0 THEN 1 ELSE 0 END)
+					(
+						isSupportGMT8 = CASE WHEN @Timezone = 2 THEN 1 ELSE 0 END 
+						AND isSupportGMT0 = CASE WHEN @Timezone = 0 THEN 1 ELSE 0 END
+						AND isSupportGMT2 = CASE WHEN @Timezone = 3 THEN 1 ELSE 0 END
+					)
 					 OR @Timezone = 1
 				)
-			AND @Timezone IN (0,1,2)
+			AND @Timezone IN (0,1,2,3)
 	END
 	ELSE
 	BEGIN
@@ -89,10 +98,14 @@ BEGIN
 		FROM @tbl_All3rdProducts
 		WHERE ( ProductCode IN (SELECT value FROM STRING_SPLIT(@ProductCodes, ',')) OR @ProductCodes = '') 
 			AND (
-					 (isSupportGMT8 = CASE WHEN @Timezone = 2 THEN 1 ELSE 0 END AND isSupportGMT0 = CASE WHEN @Timezone = 0 THEN 1 ELSE 0 END)
+					 (
+						isSupportGMT8 = CASE WHEN @Timezone = 2 THEN 1 ELSE 0 END 
+						AND isSupportGMT0 = CASE WHEN @Timezone = 0 THEN 1 ELSE 0 END
+						AND isSupportGMT2 = CASE WHEN @Timezone = 3 THEN 1 ELSE 0 END
+					 )
 					 OR @Timezone = 1
 				)
-			AND @Timezone IN (0,1,2)
+			AND @Timezone IN (0,1,2,3)
 		ORDER BY ProductID, ProductName
 	END
 	
