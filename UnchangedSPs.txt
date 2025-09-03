@@ -1,0 +1,2 @@
+Licensee Admin\Report\VendorPayment\Setting\LA_VendorPaymentSettingSel.sql
+Licensee Admin\AutoMail\LA_Rpt_LicenseeSettlement_AutoMailSettingSel.sql
