@@ -39,6 +39,7 @@ AS
 		- 20250221@Danny:  Integrate Double S System Inc group Licensees [#217961]
 		- 20250502@Eddie: Support Billing for SabaPlay [#221987]
 		- 20250604@Danny: Extend data type [#228187]
+		- 20250915@Danny: Balance Carry Forward setting [RedmineID: #225392]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -139,16 +140,18 @@ BEGIN
 			Address1	NVARCHAR(255),
 			Address2	NVARCHAR(255),
 			CompanyName	NVARCHAR(100),
-			CompanyName2	NVARCHAR(100)
+			CompanyName2	NVARCHAR(100),
+			IsBalanceCarryForward BIT 
 		)
-		INSERT INTO @PartySettings (PartyId, LicenseeId, PartyName, BrandName, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, Address1, Address2, CompanyName, CompanyName2)
+		INSERT INTO @PartySettings (PartyId, LicenseeId, PartyName, BrandName, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, Address1, Address2, CompanyName, CompanyName2,IsBalanceCarryForward)
 		SELECT p.PartyId, p.OldRefId, p.PartyName, ISNULL(NULLIF(pd.BrandName, ''), p.PartyName), ISNULL(bc.BaseCurrencyId, 6), ISNULL(CASE WHEN e.Code = 'UST' THEN 'USDT' ELSE e.Code END, 'EUR'), pd.InvoiceLanguage
-				,pd.Address1 , pd.Address2, pd.CompanyName, pd.CompanyName2
+				,pd.Address1 , pd.Address2, pd.CompanyName, pd.CompanyName2, bcf.IsBalanceCarryForward
 		FROM (SELECT DISTINCT PartyId FROM @InvoiceData) i
 			INNER JOIN dbo.OAS_Party p WITH (NOLOCK) ON p.PartyId = i.PartyId
 			LEFT JOIN dbo.OAS_PartyDetail pd WITH (NOLOCK) ON pd.PartyId = p.PartyId
 			LEFT JOIN dbo.OAS_PartyBaseCurrency bc WITH (NOLOCK) ON p.PartyId = bc.PartyId AND bc.FromDate <= @ToDate AND bc.ToDate >= @FromDate
 			LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON e.ExchangeId = bc.BaseCurrencyId
+			LEFT JOIN DBCUST.bodb_licensee.dbo.SH_SabaPlay_BalanceCarryForwardSetting bcf WITH (NOLOCK) ON p.PartyId = bcf.PartyId AND bcf.FromDate <= @ToDate AND bcf.ToDate >= @FromDate
 
 		DECLARE @InvoiceSymbol NVARCHAR(20)
 		SELECT TOP 1 @InvoiceSymbol = InvoiceSymbol
@@ -384,7 +387,7 @@ BEGIN
 		END
 
 		INSERT INTO @FinalResult (PartyId, BillerId, InvoiceType, ProductIds, LicensingFee)
-		SELECT t.PartyId, s.BillerId, 1, s.ProductIds, SUM( ROUND(t.LicensingFee, 2) ) AS LicensingFee
+		SELECT t.PartyId, s.BillerId, 1, s.ProductIds, SUM(ROUND(t.LicensingFee, 2)) AS LicensingFee
 		FROM @Result t
 			INNER JOIN @InvoiceSettings s ON t.PartyId = s.PartyId AND ',' + s.ProductIds + ',' LIKE '%,' + CONVERT(VARCHAR(10), t.ProductId) + ',%' AND s.InvTypeId = 1 -- Software Fee
 		GROUP BY t.PartyId, s.BillerId, s.ProductIds
@@ -453,6 +456,13 @@ BEGIN
 			,ivs.IsIncludePlayerTipsWorkSheet
 			,ivs.PayerAddress1
 			,ivs.BillerAddress1
+
+		-- handle balance carry forward setting
+		UPDATE r
+		SET r.LicensingFee = 0
+		FROM @_Result r 
+		INNER JOIN @PartySettings p ON r.PartyId = p.PartyId 
+		WHERE p.IsBalanceCarryForward = 0 AND r.LicensingFee < 0 AND r.ItemType = 1
 	END
 	-- End Region: Final Result
 

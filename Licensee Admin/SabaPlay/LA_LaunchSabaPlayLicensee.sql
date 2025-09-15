@@ -13,7 +13,8 @@ CREATE PROCEDURE [dbo].[LA_LaunchSabaPlayLicensee]
 	@LoginIP				VARCHAR (50)	= '',
 	@NewPartyId				INT				= 0		OUTPUT,
 	@ErrCode				INT				= 0		OUTPUT,
-	@ErrMsg					VARCHAR(4000)	= ''	OUTPUT
+	@ErrMsg					VARCHAR(4000)	= ''	OUTPUT,
+	@IsNotCarryForwardLosses	BIT			= 0 	
 AS
 /*
 	Created: 20250320@Danny
@@ -25,6 +26,7 @@ AS
 		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
 		- 20250513@Eddie: Enhance SP [RedmineID: #226204]
 		- 20250717@Danny: Change output message [RedmineID: #232176]
+		- 20250717@Danny: Balance Carry Forward setting [RedmineID: #225392]
 	
 	Param's Explannation: 
 	@ProductIds: [{"ProductID":1, "Productname":"abc"}]
@@ -108,6 +110,7 @@ BEGIN
 						,od.AttnName2		AS 'a2.an2'
 						,od.Address2		AS 'a2.ad2'
 						,ci.baseCurrInfo    AS 'bcs'
+						,bcf.bcfInfo		AS 'bcfs'
 				FROM OAS_PartyDetail od WITH(NOLOCK)
 				INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
 				OUTER APPLY (SELECT TOP 1 oc.ToParty , pg.GroupName
@@ -128,6 +131,17 @@ BEGIN
 								WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
 								) AS  baseCurrInfo
 							) ci
+				OUTER APPLY (
+					SELECT
+					(
+					SELECT  CONVERT(VARCHAR(10),op.PartyID)  + CONVERT(CHAR(8),op.FromDate,112) AS FakeID,
+							CASE WHEN op.IsBalanceCarryForward = 0 THEN 'Do not carry forward losses' ELSE 'Carry forward losses' END  'ibcf', 
+							op.FromDate 'bfd', 
+							op.ToDate  'btd'
+					FROM SH_SabaPlay_BalanceCarryForwardSetting op WITH(NOLOCK) 
+					WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
+					) AS  bcfInfo
+				) bcf
 				INNER JOIN dbo.LA_f_PayerPlatform_Sel() lfs ON lfs.PlatformId = op2.PlatformId
 				WHERE od.PartyID = @NonOfficialPartyId FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
 			)
@@ -176,6 +190,13 @@ BEGIN
 			
 		INSERT INTO dbo.OAS_PartyBaseCurrency (PartyID, BaseCurrencyId, LicenseeCode, FromDate, ToDate)
 		VALUES (@NewPartyId, @BaseCurrencyId, ISNULL(@LicenseeCode, ''), @FirstDateOfMonth, '2050-01-01')
+
+		-- SH_SabaPlay_BalanceCarryForwardSetting
+		IF EXISTS (SELECT 1 FROM dbo.SH_SabaPlay_BalanceCarryForwardSetting WITH(NOLOCK) WHERE PartyID = @NewPartyId)
+			DELETE dbo.SH_SabaPlay_BalanceCarryForwardSetting WITH(ROWLOCK) WHERE PartyID = @NewPartyId
+			
+		INSERT INTO dbo.SH_SabaPlay_BalanceCarryForwardSetting (PartyID, FromDate, ToDate, IsBalanceCarryForward)
+		SELECT @NewPartyId, @FirstDateOfMonth, '2050-01-01', CASE WHEN @IsNotCarryForwardLosses = 0 THEN 1 ELSE 0 END
 
 		-- LA_InvoiceSetting
 		IF ISNULL(@BillerId, 0) <> 0
@@ -423,7 +444,7 @@ BEGIN
 						,od.AttnName2		AS 'a2.an2'
 						,od.Address2		AS 'a2.ad2'
 						,ci.baseCurrInfo    AS 'bcs'
-					
+						,bcf.bcfInfo		AS 'bcfs'
 				FROM OAS_PartyDetail od WITH(NOLOCK)
 				INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
 				OUTER APPLY (
@@ -445,6 +466,17 @@ BEGIN
 								WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
 								) AS  baseCurrInfo
 							) ci
+				OUTER APPLY (
+							SELECT
+							(
+							SELECT  CONVERT(VARCHAR(10),op.PartyID)  + CONVERT(CHAR(8),op.FromDate,112) AS FakeID,
+									CASE WHEN op.IsBalanceCarryForward = 0 THEN 'Do not carry forward losses' ELSE 'Carry forward losses' END  'ibcf', 
+									op.FromDate 'bfd', 
+									op.ToDate  'btd'
+							FROM SH_SabaPlay_BalanceCarryForwardSetting op WITH(NOLOCK) 
+							WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
+							) AS  bcfInfo
+				) bcf
 				INNER JOIN dbo.LA_f_PayerPlatform_Sel() lfs ON lfs.PlatformId = op2.PlatformId
 				WHERE od.PartyID = @NewPartyId FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
 			)
