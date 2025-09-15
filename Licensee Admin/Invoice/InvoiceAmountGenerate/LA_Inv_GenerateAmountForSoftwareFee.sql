@@ -68,6 +68,7 @@ AS
 		- 20250513@Danny: Output rate convert from base currency to USD(USDT) currency [#226741]
 		- 20250808@Danny: Virtual Sports 2 - Offer Tournament Prize [#235167]
 		- 20250808@Danny: Integrate Jackpot Prize for Playtech product [#233715]
+		- 20250903@Danny: Playtech Live offer JP [RedmineID: #230452]
 */
 
 BEGIN
@@ -226,9 +227,11 @@ BEGIN
 					WHEN ProductId = 5  AND LicensingFeeTypeId = 3 THEN 66 -- Prizes
 					WHEN ProductId = 100 AND LicensingFeeTypeId = 1 THEN 67 -- Contribution
 					WHEN ProductId = 100 AND LicensingFeeTypeId = 2 THEN 68 -- JackpotPrize
+					WHEN ProductId = 101 AND LicensingFeeTypeId = 1 THEN 69 -- Contribution
+					WHEN ProductId = 101 AND LicensingFeeTypeId = 2 THEN 70 -- JackpotPrize
 					END
 			FROM @Result
-		WHERE ProductId IN (10, 32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79, 87, 89, 0, 103, 95, 107, 108, 100, 5) AND LicensingFeeTypeId > 0
+		WHERE ProductId IN (10, 32, 34, 42, 45, 66, 36, 21, 73, 55, -37, 79, 87, 89, 0, 103, 95, 107, 108, 100, 5, 101) AND LicensingFeeTypeId > 0
 			GROUP BY
 				CASE
 					WHEN ProductId = 32 AND LicensingFeeTypeId = 1 THEN 31 -- Contribution
@@ -264,6 +267,8 @@ BEGIN
 					WHEN ProductId = 5  AND LicensingFeeTypeId = 3 THEN 66 -- Prizes
 					WHEN ProductId = 100 AND LicensingFeeTypeId = 1 THEN 67 -- Contribution
 					WHEN ProductId = 100 AND LicensingFeeTypeId = 2 THEN 68 -- JackpotPrize
+					WHEN ProductId = 101 AND LicensingFeeTypeId = 1 THEN 69 -- Contribution
+					WHEN ProductId = 101 AND LicensingFeeTypeId = 2 THEN 70 -- JackpotPrize
 					END
 
 			-- AMF, Prepayment and AGPrepayment

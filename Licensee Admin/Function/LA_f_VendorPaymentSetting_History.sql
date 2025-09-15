@@ -14,6 +14,7 @@ AS
 		- 20250113@Danny: Initialize SP [RedmineID: #154992]
 		- 20250808@Danny: Virtual Sports 2 - Offer Tournament Prize [#235167]
 		- 20250808@Danny: Integrate Jackpot Prize for Playtech product [#233715]
+		- 20250910@Danny: Playtech Live offer jackpot [#230452]
 */
 
 RETURN
@@ -45,5 +46,17 @@ RETURN
 			CAST('1900-01-01' AS DATE) AS FromDate,
 			CAST('2025-07-31'  AS DATE) AS  Todate
 
+	UNION ALL
+
+	SELECT  101	AS ProductId ,	
+			1 TemplateID	,
+			'0,1' TimezoneIDs	, 
+			CAST (1 AS BIT)	IsConvertNegativeFeeToZero , 
+			CAST (0 AS BIT) IsConvertNegativePaytoSupplierToZero	, 
+			CAST('1900-01-01' AS DATE) AS FromDate,
+			CAST('2025-08-31'  AS DATE) AS  Todate
+
 GO
+
+
 
