@@ -15,6 +15,7 @@ AS
 	Revisions:
 		- 20250417@Danny: Initialize SP [RedmineID: #217738]
 		- 20250625@Danny: remove discount columns [RedmineID: #217743]
+		- 20251001@Danny: remove Terminated Licensee data [RedmineID: #225392]
 	
 	Parameter explanation:
 
@@ -32,10 +33,11 @@ BEGIN
 
 	-- Get Party List
 	DROP TABLE IF EXISTS #tmp_PartyList
-	CREATE TABLE #tmp_PartyList (PartyId INT, PartyName VARCHAR(100))
-	INSERT INTO #tmp_PartyList (PartyId, PartyName)
-	SELECT PartyId, PartyName
+	CREATE TABLE #tmp_PartyList (PartyId INT, PartyName VARCHAR(100), TerminatedDate DATE, SuspendedDate DATE)
+	INSERT INTO #tmp_PartyList (PartyId, PartyName, TerminatedDate, SuspendedDate)
+	SELECT op.PartyId, op.PartyName, opd.TerminatedDate, opd.SuspendedDate
 	FROM OAS_Party op WITH(NOLOCK)
+	INNER JOIN OAS_PartyDetail opd WITH(NOLOCK) ON op.PartyID = opd.PartyID
 	WHERE op.PartyID IN (
 		SELECT CAST(value AS INT) FROM STRING_SPLIT(@PartyIds,',')
 	) AND op.PartyType = 1 AND op.PlatformId = 2
@@ -59,6 +61,15 @@ BEGIN
 		,@ToDate = @ToDate
 		,@BaseCurrencyName = @BaseCurrencyName
 		,@Environment	= @Environment
+
+	-- Remove suspended/terminated licensees with amount = 0
+	;WITH CTE_Party AS (
+		SELECT PartyId FROM #tmp_PartyList WHERE TerminatedDate < @FromDate OR SuspendedDate < @FromDate
+	)
+	DELETE r
+	FROM #Result r
+		INNER JOIN CTE_Party p ON r.PartyId = p.PartyId
+	WHERE r.LicensingFee = 0 
 
 	DECLARE @Columns NVARCHAR(MAX)
 	DECLARE @SQL NVARCHAR(MAX) = ''
