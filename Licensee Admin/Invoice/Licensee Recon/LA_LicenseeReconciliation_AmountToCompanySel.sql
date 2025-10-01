@@ -75,7 +75,7 @@ AS
 		- 20241014@Sally: Support Odds Boost Voucher [#209884]
 		- 20241225@Danny: Fix Casino promotion Rebate issue [#209884]
 		- 20250421@Danny: Support billing SabaPlay licensees [RedmineID: #217742]
-		- 20251001@Danny: Balance Carry Forward setting [RedmineID: #225392]
+
 */
 BEGIN
 	SET NOCOUNT ON
@@ -241,13 +241,6 @@ BEGIN
 			,@ToDate = @ToDate
 			,@BaseCurrencyName = @BaseCurrency
 			,@Environment	= @Environment
-
-
-		UPDATE r
-		SET r.LicensingFee = 0
-		FROM @SabaPlay_Result r 
-		INNER JOIN DBCUST.bodb_licensee.dbo.SH_SabaPlay_BalanceCarryForwardSetting p WITH(NOLOCK)  ON r.PartyId = p.PartyId 
-		WHERE p.IsBalanceCarryForward = 0 AND r.LicensingFee < 0 
 
 		INSERT INTO @FinalResult (PartyId, ProductId, SabaPlay)
 		SELECT PartyId, ProductId, LicensingFee
