@@ -29,7 +29,7 @@ GO
 
 INSERT INTO SH_SabaPlay_BalanceCarryForwardSetting (PartyID, FromDate, ToDate, IsBalanceCarryForward)
 
-SELECT op.PartyID , opd.LaunchDate, '2025-01-01', CASE WHEN op.PartyName IN ('UnicornSP','GLO365SP') THEN 0 ELSE 1 END
+SELECT op.PartyID , opd.LaunchDate, '2050-01-01', CASE WHEN op.PartyName IN ('UnicornSP','GLO365SP') THEN 0 ELSE 1 END
 FROM OAS_Party op WITH(NOLOCK) 
 INNER JOIN OAS_PartyDetail opd WITH(NOLOCK) ON op.PartyID = opd.PartyID
 WHERE op.PlatformId = 2 AND NOT EXISTS (

@@ -386,11 +386,20 @@ BEGIN
 			SET @RowId = @RowId + 1
 		END
 
+		-- handle balance carry forward setting
+		UPDATE r
+		SET r.LicensingFee = 0
+		FROM @Result r 
+		INNER JOIN @PartySettings p ON r.PartyId = p.PartyId 
+		WHERE p.IsBalanceCarryForward = 0 AND r.LicensingFee < 0 
+
 		INSERT INTO @FinalResult (PartyId, BillerId, InvoiceType, ProductIds, LicensingFee)
 		SELECT t.PartyId, s.BillerId, 1, s.ProductIds, SUM(ROUND(t.LicensingFee, 2)) AS LicensingFee
 		FROM @Result t
 			INNER JOIN @InvoiceSettings s ON t.PartyId = s.PartyId AND ',' + s.ProductIds + ',' LIKE '%,' + CONVERT(VARCHAR(10), t.ProductId) + ',%' AND s.InvTypeId = 1 -- Software Fee
 		GROUP BY t.PartyId, s.BillerId, s.ProductIds
+
+
 	END
 	-- End Region: Get Licensing fee
 
@@ -457,12 +466,7 @@ BEGIN
 			,ivs.PayerAddress1
 			,ivs.BillerAddress1
 
-		-- handle balance carry forward setting
-		UPDATE r
-		SET r.LicensingFee = 0
-		FROM @_Result r 
-		INNER JOIN @PartySettings p ON r.PartyId = p.PartyId 
-		WHERE p.IsBalanceCarryForward = 0 AND r.LicensingFee < 0 AND r.ItemType = 1
+	
 	END
 	-- End Region: Final Result
 
