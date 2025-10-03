@@ -25,6 +25,7 @@ AS
 		- 20210824@Danny: get licensee status from OIC And Relocated SP [#159296]
 		- 20201003@Danny: Support USDT as base currency [RedmineID: #177718]
 		- 20250321@Eddie: Get more Info "PlatformId" [RedmineID: #217740]
+		- 20250915@Danny: Balance Carry Forward setting [RedmineID: #225392]
 		
 	 Params:
 	 Example:
@@ -93,6 +94,15 @@ SET NOCOUNT ON
 	FROM OAS_PartyBaseCurrency p WITH(NOLOCK)
 	LEFT JOIN bodb02.dbo.Exchange e WITH (NOLOCK) ON p.BaseCurrencyId = e.exchangeid
 	WHERE PartyID = @PayerId
+	ORDER BY p.ToDate DESC
+
+	SELECT p.PartyID
+		, p.IsBalanceCarryForward
+		, p.FromDate
+		, p.ToDate
+		, CASE WHEN p.ToDate < @CurrentDate THEN 0 ELSE 1 END AS IsActive
+	FROM DBCUST.bodb_licensee.dbo.SH_SabaPlay_BalanceCarryForwardSetting p WITH(NOLOCK)
+	WHERE p.PartyID = @PayerId
 	ORDER BY p.ToDate DESC
 
 	DROP TABLE #tmp_licenseeOIC

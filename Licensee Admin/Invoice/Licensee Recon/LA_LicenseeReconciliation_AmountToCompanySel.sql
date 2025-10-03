@@ -75,12 +75,28 @@ AS
 		- 20241014@Sally: Support Odds Boost Voucher [#209884]
 		- 20241225@Danny: Fix Casino promotion Rebate issue [#209884]
 		- 20250421@Danny: Support billing SabaPlay licensees [RedmineID: #217742]
-
+		- 20251001@Danny: Balance Carry Forward setting [RedmineID: #225392]
 */
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @FinalResult TABLE (PartyId INT, ProductId INT, AmountToCompany MONEY, LicensingFee MONEY, Discount MONEY, Rebate MONEY, Promotion MONEY, Sponsorship MONEY, ContributionDiscount MONEY, BetCount INT, OddsSpreadCost MONEY, PlayerTips MONEY, OddsBoostBonus MONEY, SabaPlay MONEY)
+	DECLARE @FinalResult TABLE (
+		PartyId			INT, 
+		ProductId		INT, 
+		AmountToCompany MONEY, 
+		LicensingFee	MONEY, 
+		Discount		MONEY, 
+		Rebate			MONEY, 
+		Promotion		MONEY, 
+		Sponsorship		MONEY, 
+		ContributionDiscount MONEY, 
+		BetCount		INT, 
+		OddsSpreadCost	MONEY, 
+		PlayerTips		MONEY, 
+		OddsBoostBonus	MONEY, 
+		SabaPlay		MONEY,
+		Actual_SabaPlay MONEY
+	)
 
 	-- Get Party List
 	IF ISNULL(@PlatformId, 0) <> 0
@@ -232,7 +248,7 @@ BEGIN
 		SElECT @SabaPlay_@ProductIDs =  STRING_AGG(CONVERT(VARCHAR(50), ProductID),',')
 		FROM bodb_licenseeReport.dbo.SabaPlay_Products WITH(NOLOCK)
 		
-		DECLARE  @SabaPlay_Result TABLE (PartyId INT, ProductId INT,LicensingFee MONEY,Discount MONEY)
+		DECLARE  @SabaPlay_Result TABLE (PartyId INT, ProductId INT,LicensingFee MONEY,Discount MONEY, Actual_LicensingFee MONEY)
 		INSERT INTO @SabaPlay_Result(PartyId, ProductId, LicensingFee, Discount)
 		EXEC dbo.SH_SabaPLay_AmountToCompanyByProduct
 			@PartyIds = @PartyIds_SabaPlay
@@ -242,8 +258,14 @@ BEGIN
 			,@BaseCurrencyName = @BaseCurrency
 			,@Environment	= @Environment
 
-		INSERT INTO @FinalResult (PartyId, ProductId, SabaPlay)
-		SELECT PartyId, ProductId, LicensingFee
+		UPDATE r
+		SET   r.Actual_LicensingFee = CASE WHEN p.IsBalanceCarryForward = 0 AND r.LicensingFee < 0 THEN 0 ELSE  r.LicensingFee END
+		FROM @SabaPlay_Result r 
+		INNER JOIN DBCUST.bodb_licensee.dbo.SH_SabaPlay_BalanceCarryForwardSetting p WITH(NOLOCK)  ON r.PartyId = p.PartyId 
+			AND p.FromDate <= @ToDate AND p.ToDate >= @FromDate
+
+		INSERT INTO @FinalResult (PartyId, ProductId, SabaPlay, Actual_SabaPlay)
+		SELECT PartyId, ProductId, LicensingFee, Actual_LicensingFee
 		FROM @SabaPlay_Result
 	END
 
@@ -288,6 +310,7 @@ BEGIN
 				,SUM(r.BetCount)				AS BetCount
 				,SUM(r.OddsBoostBonus)			AS OddsBoostBonus
 				,SUM(r.SabaPlay)				AS SabaPlay
+				,SUM(r.Actual_SabaPlay)			AS Actual_SabaPlay
 			FROM @FinalResult r
 			GROUP BY r.PartyId
 		ELSE
@@ -305,6 +328,7 @@ BEGIN
 				,SUM(r.BetCount)				AS BetCount
 				,SUM(r.OddsBoostBonus)			AS OddsBoostBonus
 				,SUM(r.SabaPlay)				AS SabaPlay
+				,SUM(r.Actual_SabaPlay)			AS Actual_SabaPlay
 			FROM @FinalResult r
 				INNER JOIN @PartyList p ON r.PartyId = p.PartyId
 			GROUP BY p.LicenseeCode

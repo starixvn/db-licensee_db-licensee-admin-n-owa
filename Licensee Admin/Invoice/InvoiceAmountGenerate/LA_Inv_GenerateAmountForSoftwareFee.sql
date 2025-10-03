@@ -16,6 +16,7 @@ ALTER PROCEDURE [dbo].[LA_Inv_GenerateAmountForSoftwareFee]
 	,@ProductIDs		VARCHAR(MAX) = NULL
 	,@OperatorId		INT = 0 OUTPUT 
 	,@RateConvertToUSDT	FLOAT = 0 OUTPUT 
+	,@IsBalanceCarryForward	BIT = 0 OUTPUT
 AS
 
 /*	Header:
@@ -69,6 +70,7 @@ AS
 		- 20250808@Danny: Virtual Sports 2 - Offer Tournament Prize [#235167]
 		- 20250808@Danny: Integrate Jackpot Prize for Playtech product [#233715]
 		- 20250903@Danny: Playtech Live offer JP [RedmineID: #230452]
+		- 20250915@Danny: Balance Carry Forward setting [RedmineID: #225392]
 */
 
 BEGIN
@@ -97,6 +99,13 @@ BEGIN
 	SELECT TOP 1 @RateConvertToUSDT = BaseCurrencyRate
 	FROM	bodb02.dbo.LA_f_ExchangeDailySel(@ToDate, @ToDate,'USD')
 	WHERE	ExchangeID = @BaseCurrencyId
+
+	SELECT @IsBalanceCarryForward = IsBalanceCarryForward
+	FROM DBCUST.bodb_licensee.dbo.SH_SabaPlay_BalanceCarryForwardSetting WITH(NOLOCK)
+	WHERE PartyID = @PartyId
+		AND FromDate <= @ToDate AND ToDate >= @FromDate
+
+	SELECT @IsBalanceCarryForward = ISNULL(@IsBalanceCarryForward,1)
 
 	IF @IsSabaPlayBiller = 0
 	BEGIN

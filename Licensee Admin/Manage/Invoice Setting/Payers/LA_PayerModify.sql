@@ -25,6 +25,7 @@ ALTER PROCEDURE [dbo].[LA_PayerModify]
 	, @LaunchDate				DATE			= NULL
 	, @SuspendedDate			DATE			= NULL
 	, @TerminatedDate			DATE			= NULL
+	, @BalanceCarryForwardSettingXml	NVARCHAR(MAX)	= ''
 AS
 /*
 	Created: 20150415@Florent
@@ -47,6 +48,7 @@ AS
 		- 20250210@Danny: Allow Editing Payer Base Currency Without Affecting Billing [#FeatureID 216841]
 		- 20250321@Eddie: Update Payer Platform [RedmineID: #217740]
 		- 20250506@Danny: update ExchangeID data Type [RedmineID: #221242]
+		- 20250915@Danny: Balance Carry Forward setting [RedmineID: #225392]
 	
 	Param's Explannation: 
 		@BaseCurrencySettingXml = <Root>
@@ -68,6 +70,24 @@ AS
 										<FromDate>20210308</FromDate>
 										<ToDate>20500101</ToDate>
 									</BaseCurrencySetting>
+								</Root>
+
+		@BalanceCarryForwardSettingXml = <Root>
+									<BalanceCarryForwardSetting>
+										<IsBalanceCarryForward>1</IsBalanceCarryForward>
+										<FromDate>20100101</FromDate>
+										<ToDate>20500101</ToDate>
+									</BalanceCarryForwardSetting>
+									<BalanceCarryForwardSetting>
+										<IsBalanceCarryForward>1</IsBalanceCarryForward>
+										<FromDate>20210301</FromDate>
+										<ToDate>20500101</ToDate>
+									</BalanceCarryForwardSetting>
+									<BalanceCarryForwardSetting>
+										<IsBalanceCarryForward>0</IsBalanceCarryForward>
+										<FromDate>20210308</FromDate>
+										<ToDate>20500101</ToDate>
+									</BalanceCarryForwardSetting>
 								</Root>
 */
 BEGIN
@@ -104,6 +124,7 @@ BEGIN
 					,od.AttnName2		AS 'a2.an2'
 					,od.Address2		AS 'a2.ad2'
 					,ci.baseCurrInfo    AS 'bcs'
+					,bcf.bcfInfo		AS 'bcfs'
 			FROM OAS_PartyDetail od WITH(NOLOCK)
 			INNER JOIN OAS_Party op2 WITH(NOLOCK)  ON od.PartyID = op2.PartyID
 			INNER JOIN dbo.LA_f_PayerPlatform_Sel() pl ON pl.PlatformId = op2.PlatformId
@@ -124,6 +145,17 @@ BEGIN
 							WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
 							) AS  baseCurrInfo
 						) ci
+			OUTER APPLY (
+							SELECT
+							(
+							SELECT  CONVERT(VARCHAR(10),op.PartyID)  + CONVERT(CHAR(8),op.FromDate,112) AS FakeID,
+									CASE WHEN op.IsBalanceCarryForward = 0 THEN 'Do not carry forward losses' ELSE 'Carry forward losses' END  'ibcf', 
+									op.FromDate 'bfd', 
+									op.ToDate  'btd'
+							FROM SH_SabaPlay_BalanceCarryForwardSetting op WITH(NOLOCK) 
+							WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
+							) AS  bcfInfo
+						) bcf
 			WHERE od.PartyID = @PayerID FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
 		)
 
@@ -298,6 +330,71 @@ BEGIN
 			--Endregion
 		END
 
+			-- Get Balance Carry Forward Setting from xml
+		IF ISNULL(@BalanceCarryForwardSettingXml, '') <> ''
+		BEGIN
+			DECLARE @BalanceCarryForwardSetting TABLE(Idx INT IDENTITY(1, 1)
+												, IsBalanceCarryForward BIT
+												, FromDate DATE
+												, ToDate DATE)
+			DECLARE @docHandler_bcf INT
+			
+			BEGIN TRY
+				EXEC sp_xml_preparedocument @docHandler_bcf OUTPUT, @BalanceCarryForwardSettingXml
+				INSERT INTO @BalanceCarryForwardSetting(IsBalanceCarryForward, FromDate, ToDate)
+				SELECT IsBalanceCarryForward, FromDate, ToDate
+				FROM OPENXML(@docHandler_bcf, 'Root/BalanceCarryForwardSetting')
+				WITH(	IsBalanceCarryForward BIT 'IsBalanceCarryForward',
+						FromDate DATE 'FromDate',
+						ToDate DATE 'ToDate')
+						
+				EXEC sp_xml_removedocument @docHandler_bcf
+			END TRY
+			BEGIN CATCH
+				SELECT @ErrMsg = 'Balance Carry Forward setting data invalid. Please try again.', @ErrCode = 100
+				RETURN
+			END CATCH
+
+			-- Should have at least 1 base currency setting
+			IF NOT EXISTS (SELECT TOP 1 1 FROM @BalanceCarryForwardSetting)
+			BEGIN
+				SELECT @ErrMsg = 'Should have at least 1 balance carry forward setting.', @ErrCode = 506
+				RETURN
+			END
+			
+			--FromDate must less than ToDate
+			IF EXISTS (SELECT TOP 1 1 FROM @BalanceCarryForwardSetting WHERE FromDate > ToDate)
+			BEGIN
+				SELECT @ErrMsg = 'FromDate could not be later than ToDate', @ErrCode = 506
+				RETURN
+			END
+			
+			--Duplicated from date/ to date between settings
+			IF EXISTS (
+				SELECT TOP 1 1
+				FROM @BalanceCarryForwardSetting a 
+					LEFT JOIN @BalanceCarryForwardSetting b ON a.Idx <> b.Idx 
+				WHERE(a.FromDate <= b.ToDate AND a.ToDate >= b.FromDate))
+			BEGIN
+				SELECT @ErrMsg = 'Cannot save the setting, please check From date/To date.', @ErrCode = 506
+				RETURN
+			END
+
+			--Region Update Base Currency Settings
+			;MERGE dbo.SH_SabaPlay_BalanceCarryForwardSetting WITH(ROWLOCK, UPDLOCK) AS t
+			USING @BalanceCarryForwardSetting AS s
+			ON (t.PartyID = @PayerID AND t.FromDate = s.FromDate)
+			WHEN MATCHED
+				THEN UPDATE SET t.IsBalanceCarryForward = s.IsBalanceCarryForward,
+								t.ToDate = s.ToDate
+			WHEN NOT MATCHED BY TARGET
+				THEN INSERT(PartyID, IsBalanceCarryForward, FromDate, ToDate)
+						VALUES(@PayerID, s.IsBalanceCarryForward,  s.FromDate, s.ToDate)
+			WHEN NOT MATCHED BY SOURCE AND t.PartyID = @PayerID
+				THEN DELETE;
+		END
+		-- End region Get Balance Carry Forward Setting from xml
+
 		SELECT @logSPData = (
 			SELECT	 op2.PartyName								AS 'pi.pn'
 					,x.GroupName								AS 'pi.bg' 
@@ -315,6 +412,7 @@ BEGIN
 					,od.AttnName2		AS 'a2.an2'
 					,od.Address2		AS 'a2.ad2'
 					,ci.baseCurrInfo    AS 'bcs'
+					,bcf.bcfInfo		AS 'bcfs'
 			FROM OAS_PartyDetail od WITH(NOLOCK)
 			INNER JOIN OAS_Party op2 WITH(NOLOCK) ON od.PartyID = op2.PartyID
 			INNER JOIN dbo.LA_f_PayerPlatform_Sel() pl ON pl.PlatformId = op2.PlatformId
@@ -335,6 +433,17 @@ BEGIN
 							WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
 							) AS  baseCurrInfo
 						) ci
+			OUTER APPLY (
+						SELECT
+						(
+						SELECT  CONVERT(VARCHAR(10),op.PartyID)  + CONVERT(CHAR(8),op.FromDate,112) AS FakeID,
+								CASE WHEN op.IsBalanceCarryForward = 0 THEN 'Do not carry forward losses' ELSE 'Carry forward losses' END  'ibcf', 
+								op.FromDate 'bfd', 
+								op.ToDate  'btd'
+						FROM SH_SabaPlay_BalanceCarryForwardSetting op WITH(NOLOCK) 
+						WHERE op.PartyID = od.PartyID FOR JSON PATH , INCLUDE_NULL_VALUES    
+						) AS  bcfInfo
+					) bcf
 			WHERE od.PartyID = @PayerID FOR JSON PATH , WITHOUT_ARRAY_WRAPPER , INCLUDE_NULL_VALUES    
 		)
 
