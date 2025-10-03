@@ -16,6 +16,7 @@ AS
 		- 20250417@Danny: Initialize SP [RedmineID: #217738]
 		- 20250625@Danny: remove discount columns [RedmineID: #217743]
 		- 20251001@Danny: remove Terminated Licensee data [RedmineID: #225392]
+		- 20251003@Danny: show data follow balance carry forward setting [RedmineID: #225392]
 	
 	Parameter explanation:
 
@@ -61,6 +62,12 @@ BEGIN
 		,@ToDate = @ToDate
 		,@BaseCurrencyName = @BaseCurrencyName
 		,@Environment	= @Environment
+
+	UPDATE r
+	SET   r.LicensingFee = CASE WHEN p.IsBalanceCarryForward = 0 AND r.LicensingFee < 0 THEN 0 ELSE  r.LicensingFee END
+	FROM #Result r 
+	INNER JOIN DBCUST.bodb_licensee.dbo.SH_SabaPlay_BalanceCarryForwardSetting p WITH(NOLOCK)  ON r.PartyId = p.PartyId 
+		AND p.FromDate <= @ToDate AND p.ToDate >= @FromDate
 
 	-- Remove suspended/terminated licensees with amount = 0
 	;WITH CTE_Party AS (
