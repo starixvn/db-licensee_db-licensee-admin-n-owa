@@ -16,6 +16,7 @@ AS
 	Revisions:
 		- 20250417@Danny: Initialize SP [RedmineID: #224104]
 		- 20250507@Eddie: Support Billing for SabaPlay [#221987]
+		- 20251017@Danny: rebate on licensee winloss [#241642]
 
 	Param's Explanation:
 
@@ -65,13 +66,45 @@ BEGIN
 	FROM bodb02.dbo.LA_f_ExchangeDailySel(@ToDate, @ToDate, @BaseCurrencyName)
 
 
-	DECLARE @Result TABLE(PartyId INT, ProductId INT, LicensingFee MONEY, Discount MONEY)
+	DECLARE @tmpRebateGroup TABLE
+	(
+		GroupId		SMALLINT
+		,PartyId	INT
+		,Remark		NVARCHAR(4000)
+		,ProductId	INT
+		,Rate		FLOAT DEFAULT (0)
+	)
+	INSERT INTO @tmpRebateGroup (GroupId, PartyId, Remark, ProductId, Rate)
+	SELECT lgd.DiscountGroupId, lga.PartyID, lgd.Remark, lgp.ProductId
+	FROM LA_DiscountGroupHeader lgd WITH(NOLOCK)
+	INNER JOIN LA_DiscountGroupProduct lgp WITH(NOLOCK) ON lgd.DiscountGroupId = lgp.DiscountGroupId
+	INNER JOIN LA_DiscountGroupAssignment lga WITH(NOLOCK) ON lgd.DiscountGroupId = lga.DiscountGroupId
+	INNER JOIN #PartyList p ON p.PartyId = lga.PartyID
+	WHERE DATEADD(MONTH, DATEDIFF(MONTH, 0, lgd.FromDate), 0) <= @ToDate AND lgd.ToDate >= @FromDate
+
+	DECLARE @Result TABLE(
+		PartyId			INT, 
+		ProductId		INT, 
+		LicensingFee	MONEY, 
+		Discount		MONEY, 
+		Rebate			MONEY,
+		RebateRemark	NVARCHAR(4000),
+		RebateRate		MONEY
+		)
+
 	
-	INSERT INTO @Result(PartyId, ProductId, LicensingFee, Discount)
-	SELECT  p.PartyID, pd.ProductID,  SUM(ISNULL(sp.FinalLicensingFee,0) * ex.Rate) AS LicensingFee, NULL AS Discount
+	INSERT INTO @Result(PartyId, ProductId, LicensingFee, Discount, Rebate, RebateRemark, RebateRate)
+	SELECT  p.PartyID, 
+			pd.ProductID,  
+			SUM(ISNULL(sp.FinalLicensingFee,0) * ex.Rate) AS LicensingFee, 
+			NULL AS Discount, 
+			SUM(CASE WHEN sp.LicenseeWinLoss < 0 THEN 0 ELSE sp.LicenseeWinLoss * tg.Rate END) Rebate,
+			tg.Remark,
+			tg.Rate
 	FROM bodb_LicenseeReport.dbo.SabaPlayPerformance sp WITH(NOLOCK)
 	INNER JOIN #PartyList p ON sp.SiteID = p.OperatorID
 	INNER JOIN #Products pd ON sp.ProductID = pd.ProductId
+	INNER JOIN @tmpRebateGroup tg ON p.PartyId = tg.PartyId AND sp.ProductID = tg.ProductId
 	CROSS APPLY
 	(	
 		SELECT TOP 1 e.CurrencyCode, e.Rate 
@@ -86,7 +119,7 @@ BEGIN
 									ELSE e.ExchangeId END
 	) ex
 	WHERE sp.DataType =2 AND sp.Environment = @Environment AND sp.RptDate = @ToDate
-	GROUP BY p.PartyID,  pd.ProductID
+	GROUP BY p.PartyID,  pd.ProductID, tg.Remark, tg.Rate
 
 	-- Get Follow Invoice Setting 
 	DECLARE @LA_InvoiceSetting TABLE (FromPartyId INT, ToPartyId INT, ProductId TINYINT)
@@ -101,12 +134,12 @@ BEGIN
 		USING @LA_InvoiceSetting iv
 	ON (r.PartyId = iv.FromPartyId AND r.ProductId = iv.ProductId)
 	WHEN NOT MATCHED BY TARGET
-		THEN INSERT (PartyId, ProductId, LicensingFee, Discount)
-			 VALUES (iv.FromPartyId, iv.ProductId, 0, 0)
+		THEN INSERT (PartyId, ProductId, LicensingFee, Discount, Rebate, RebateRemark, RebateRate)
+			 VALUES (iv.FromPartyId, iv.ProductId, 0, 0, 0, NULL, NULL)
 	WHEN NOT MATCHED BY SOURCE
 		THEN DELETE;
 	
-	SELECT PartyId, ProductId, LicensingFee, Discount
+	SELECT PartyId, ProductId, LicensingFee, Discount, Rebate, RebateRemark, RebateRate
 	FROM @Result
 END
 GO
