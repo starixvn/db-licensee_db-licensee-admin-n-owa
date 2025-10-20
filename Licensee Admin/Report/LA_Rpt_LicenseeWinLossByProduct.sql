@@ -82,6 +82,7 @@ AS
 		- 20240924@Danny: exclude BTS currency [RedmineID: #210422]
 		- 20240913@Sally: Support Odds Boost Voucher [#209884]
 		- 20250813@Danny: Virtual Sports 2 - Offer Tournament Prize [#235167]
+		- 20251020@Danny: Intergrate Gemini [#241240]
 */
 		
 /*	Example:
@@ -98,9 +99,9 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @FreeBetTicketType		TINYINT = 2, 
-			@ProductCodes			VARCHAR(MAX),
-			@ProductCodes_pivot		VARCHAR(MAX),	
-			@SQL					VARCHAR(MAX),	
+			@ProductCodes			NVARCHAR(MAX),
+			@Columns				NVARCHAR(MAX),	
+			@SQL					NVARCHAR(MAX),	
 			@Delimiter				CHAR(1)=',',
 			@CommChargeType			INT = 6,
 	        @CashInShareChargeType	INT = 7,
@@ -132,9 +133,9 @@ BEGIN
 		SELECT	@ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode
 		FROM #Products
 
-		SELECT	@ProductCodes_pivot = COALESCE(@ProductCodes_pivot + ',', '') + '[' + ProductCode + ']'
+		SELECT	@Columns = COALESCE(@Columns + ',', '') + '[' + ProductName + ']'
 		FROM #Products WHERE GroupProductId = ProductId
-		ORDER BY ProductId
+		ORDER BY ProductId ASC
 
 		INSERT INTO @ProductHaveExtraAmtList(ProductID)
 		SELECT DISTiNCT g.GroupProductId FROM LA_f_GroupBettype() l
@@ -202,7 +203,7 @@ BEGIN
 			AND b.StatusId NOT IN (-1, 101, 102, 103)
 			AND b.customercategory NOT IN (27, 28)
 	GROUP BY b.rptdate, b.SiteId, b.CurrencyID, t.GroupProductId, b.Bettype, b.TicketType
-	CREATE CLUSTERED INDEX CIX_#rpt_bettingByProduct ON #rpt_bettingByProduct(ProductId, SiteID)
+	CREATE CLUSTERED INDEX IX_#rpt_bettingByProduct ON #rpt_bettingByProduct(ProductId, SiteID)
 
 	INSERT INTO #TempData (LicenseeId,rptDate,CurrencyId,MemberWL,AWinLoss,AComm,PComm,ProductId,BettypeRef,OddsBoostBonus)
 	SELECT	b.SiteID,
@@ -225,7 +226,7 @@ BEGIN
 			OR b.ProductId NOT IN (SELECT x.ProductID FROM @ProductHaveExtraAmtList x)
 			) AND (eb.Bettype IS NULL OR eb.TypeId IN (1, 7, 11)) --1:Tips, 7:OddsSpread Adjustment, 11:Odds Boost Adjustment
 	GROUP BY b.rptdate, b.SiteId, b.CurrencyID, t.GroupProductId, CASE WHEN eb.TypeId IN (1,7,11) THEN b.Bettype ELSE ISNULL(sbr.BettypeRef, -1) END
-	CREATE CLUSTERED INDEX #TempData ON #TempData(ProductId, LicenseeId)
+	CREATE CLUSTERED INDEX IX_#TempData ON #TempData(ProductId, LicenseeId)
 	-- EndRegion
 
 	-- Region: Generate licensee name & group
@@ -384,19 +385,19 @@ BEGIN
 				AND t.PartyId IN (SELECT Id FROM #PartyIdTable)
 		),u AS
 		(
-		SELECT t.GroupName,t.PartyName, p.ProductCode, r.Amount 
+		SELECT t.GroupName,t.PartyName, p.ProductName, r.Amount 
 		FROM #Result r
 		INNER JOIN #Products p ON r.ProductID = p.ProductID
 		LEFT JOIN t ON r.PartyId = t.PartyId
 		)
-		SELECT GroupName ,PartyName, ' + @ProductCodes_pivot + '
-		FROM (SELECT GroupName, PartyName, ProductCode, Amount  FROM  u) u
+		SELECT GroupName ,PartyName, ' + @Columns + '
+		FROM (SELECT GroupName, PartyName, ProductName, Amount  FROM  u) u
 		PIVOT (
-			MAX(u.Amount) FOR ProductCode IN (' + @ProductCodes_pivot + ')
+			MAX(u.Amount) FOR ProductName IN (' + @Columns + ')
 		) p
-		ORDER BY GroupName, PartyName
+		ORDER BY GroupName ASC, PartyName ASC
 	'
-	EXEC (@SQL)
+	EXEC sp_executesql @SQL;
 	-- EndRegion
 
 	DROP TABLE #Result
