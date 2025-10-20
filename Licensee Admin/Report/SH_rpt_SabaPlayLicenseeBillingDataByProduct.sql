@@ -17,6 +17,7 @@ AS
 		- 20250625@Danny: remove discount columns [RedmineID: #217743]
 		- 20251001@Danny: remove Terminated Licensee data [RedmineID: #225392]
 		- 20251003@Danny: show data follow balance carry forward setting [RedmineID: #225392]
+		- 20251020@Danny: rebate on licensee winloss [#241642]
 	
 	Parameter explanation:
 
@@ -48,13 +49,23 @@ BEGIN
 	CREATE TABLE #tmp_Products (ProductId INT, ProductName NVARCHAR(200))
 	INSERT INTO #tmp_Products (ProductId, ProductName)
 	SELECT ProductID, ProductName FROM bodb_LicenseeReport.dbo.SabaPlay_Products WITH(NOLOCK)
+	UNION ALL
+	SELECT -101, 'Rebate'
 
 	SELECT @ProductIDs = STRING_AGG(CAST(ProductId AS VARCHAR(MAX)),',')
 	FROM #tmp_Products
 
 	DROP TABLE IF EXISTS #Result
-	CREATE TABLE #Result (PartyId INT, ProductId INT,LicensingFee MONEY,Discount MONEY)
-	INSERT INTO #Result(PartyId, ProductId, LicensingFee, Discount)
+	CREATE TABLE #Result (
+		PartyId			INT, 
+		ProductId		INT,
+		LicensingFee	MONEY,
+		Discount		MONEY	,
+		Rebate			MONEY,
+		RebateRemark	NVARCHAR(4000),
+		RebateRate		MONEY
+	)
+	INSERT INTO #Result(PartyId, ProductId, LicensingFee, Discount, Rebate, RebateRemark, RebateRate)
 	EXEC dbo.SH_SabaPLay_AmountToCompanyByProduct
 		@PartyIds = @PartyIds
 		,@ProductIDs = @ProductIDs
@@ -80,7 +91,20 @@ BEGIN
 
 	DECLARE @Columns NVARCHAR(MAX)
 	DECLARE @SQL NVARCHAR(MAX) = ''
-	SELECT  @Columns = COALESCE(@Columns + ', ', '') + '[' + ProductName + ']' FROM #tmp_Products ORDER BY ProductId
+	SELECT  @Columns = COALESCE(@Columns + ', ', '') + '[' + ProductName + ']' FROM #tmp_Products ORDER BY ProductId ASC
+
+	-- Final Result
+	DROP TABLE IF EXISTS #tmp_Result
+	CREATE TABLE #tmp_Result (PartyId INT, ProductId INT, LicensingFee MONEY, BetCount INT)
+
+	INSERT INTO #tmp_Result (PartyId, ProductId, LicensingFee)
+	SELECT PartyId, ProductId, LicensingFee
+	FROM (
+		SELECT r.PartyId, r.ProductId, SUM(LicensingFee) AS LicensingFee
+		FROM #Result r
+		GROUP BY r.PartyId, r.ProductId
+		UNION ALL SELECT PartyId, -101, -SUM(Rebate) FROM #Result GROUP BY PartyId HAVING SUM(Rebate) <> 0
+	) t
 
 	SELECT  @SQL = '
 		SELECT ''Reasternhold'' GroupName ,PartyName, ' + @Columns + '
@@ -89,17 +113,17 @@ BEGIN
 				tp.PartyName,
 				p.ProductName AS ColName,
 				r.LicensingFee AS Value
-			FROM #Result r
+			FROM #tmp_Result r
 			INNER JOIN #tmp_Products p ON r.ProductId = p.ProductId
 			INNER JOIN #tmp_PartyList tp ON r.PartyId = tp.PartyId
 		) AS src
 		PIVOT (
-			SUM(Value)
+			MAX(Value)
 			FOR ColName IN (' + @Columns + ')
 		) AS pvt
 	';
 
-	EXEC (@SQL)
+	EXEC sp_executesql @SQL;
 
 END
 GO

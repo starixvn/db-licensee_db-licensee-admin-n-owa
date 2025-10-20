@@ -27,3 +27,5 @@ BEGIN
 	VALUES (@PLTLive_JP, -1, 'Expense', -1, '', N'Deduct Playtech Live Jackpot Prize')
 END
 
+
+

@@ -76,6 +76,7 @@ AS
 		- 20241225@Danny: Fix Casino promotion Rebate issue [#209884]
 		- 20250421@Danny: Support billing SabaPlay licensees [RedmineID: #217742]
 		- 20251001@Danny: Balance Carry Forward setting [RedmineID: #225392]
+		- 20251020@Danny: rebate on licensee winloss (SabaPlay) [#241642]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -248,8 +249,17 @@ BEGIN
 		SElECT @SabaPlay_@ProductIDs =  STRING_AGG(CONVERT(VARCHAR(50), ProductID),',')
 		FROM bodb_licenseeReport.dbo.SabaPlay_Products WITH(NOLOCK)
 		
-		DECLARE  @SabaPlay_Result TABLE (PartyId INT, ProductId INT,LicensingFee MONEY,Discount MONEY, Actual_LicensingFee MONEY)
-		INSERT INTO @SabaPlay_Result(PartyId, ProductId, LicensingFee, Discount)
+		DECLARE  @SabaPlay_Result TABLE (
+			PartyId			INT, 
+			ProductId		INT,
+			LicensingFee	MONEY,
+			Discount		MONEY, 
+			Actual_LicensingFee MONEY,
+			Rebate			MONEY,
+			RebateRemark	NVARCHAR(4000),
+			RebateRate		MONEY
+		)
+		INSERT INTO @SabaPlay_Result(PartyId, ProductId, LicensingFee, Discount, Rebate, RebateRemark, RebateRate)
 		EXEC dbo.SH_SabaPLay_AmountToCompanyByProduct
 			@PartyIds = @PartyIds_SabaPlay
 			,@ProductIDs = @SabaPlay_@ProductIDs
@@ -264,8 +274,8 @@ BEGIN
 		INNER JOIN DBCUST.bodb_licensee.dbo.SH_SabaPlay_BalanceCarryForwardSetting p WITH(NOLOCK)  ON r.PartyId = p.PartyId 
 			AND p.FromDate <= @ToDate AND p.ToDate >= @FromDate
 
-		INSERT INTO @FinalResult (PartyId, ProductId, SabaPlay, Actual_SabaPlay)
-		SELECT PartyId, ProductId, LicensingFee, Actual_LicensingFee
+		INSERT INTO @FinalResult (PartyId, ProductId, SabaPlay, Actual_SabaPlay, Rebate)
+		SELECT PartyId, ProductId, LicensingFee, Actual_LicensingFee, Rebate
 		FROM @SabaPlay_Result
 	END
 
@@ -291,7 +301,7 @@ BEGIN
 				INNER JOIN @ProductList p ON r.ProductId = p.ProductId
 				INNER JOIN @PartyList pl ON r.PartyId = pl.PartyId
 			GROUP BY pl.LicenseeCode, p.ProductId, p.ProductName
-			ORDER BY p.ProductId
+			ORDER BY p.ProductId ASC
 	END
 	ELSE
 	BEGIN

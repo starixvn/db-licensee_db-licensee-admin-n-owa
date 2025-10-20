@@ -71,6 +71,7 @@ AS
 		- 20250808@Danny: Integrate Jackpot Prize for Playtech product [#233715]
 		- 20250903@Danny: Playtech Live offer JP [RedmineID: #230452]
 		- 20250915@Danny: Balance Carry Forward setting [RedmineID: #225392]
+		- 20251020@Danny: rebate on licensee winloss (SabaPlay) [#241642]
 */
 
 BEGIN
@@ -309,8 +310,16 @@ BEGIN
 				AND i.InvTypeId = 1 -- Software Fee
 
 		DROP TABLE IF EXISTS #Result
-		CREATE TABLE #Result (PartyId INT, ProductId INT,LicensingFee MONEY,Discount MONEY)
-		INSERT INTO #Result(PartyId, ProductId, LicensingFee, Discount)
+		CREATE TABLE #Result (
+			PartyId			INT, 
+			ProductId		INT,
+			LicensingFee	MONEY,
+			Discount		MONEY,
+			Rebate			MONEY,
+			RebateRemark	NVARCHAR(4000),
+			RebateRate		MONEY
+		)
+		INSERT INTO #Result(PartyId, ProductId, LicensingFee, Discount, Rebate, RebateRemark, RebateRate)
 		EXEC dbo.SH_SabaPLay_AmountToCompanyByProduct
 			@PartyIds = @PartyId
 			,@ProductIDs = @ProductIDs
@@ -328,7 +337,7 @@ BEGIN
 
 	-- Return data
 	SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType, Rate, DeductMonthlyFees, RemainingAmount, Remark, ExtraInfo FROM @FinalResult
-	ORDER BY AmountType, ProductId
+	ORDER BY AmountType ASC, ProductId ASC
 
 END
 GO

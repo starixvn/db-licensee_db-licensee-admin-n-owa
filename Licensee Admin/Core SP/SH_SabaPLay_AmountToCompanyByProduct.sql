@@ -75,10 +75,11 @@ BEGIN
 		,Rate		FLOAT DEFAULT (0)
 	)
 	INSERT INTO @tmpRebateGroup (GroupId, PartyId, Remark, ProductId, Rate)
-	SELECT lgd.DiscountGroupId, lga.PartyID, lgd.Remark, lgp.ProductId
+	SELECT lgd.DiscountGroupId, lga.PartyID, lgd.Remark, lgp.ProductId, lgdt.Rate
 	FROM LA_DiscountGroupHeader lgd WITH(NOLOCK)
 	INNER JOIN LA_DiscountGroupProduct lgp WITH(NOLOCK) ON lgd.DiscountGroupId = lgp.DiscountGroupId
 	INNER JOIN LA_DiscountGroupAssignment lga WITH(NOLOCK) ON lgd.DiscountGroupId = lga.DiscountGroupId
+	INNER JOIN LA_DiscountGroupDetail lgdt WITH(NOLOCK) ON lgd.DiscountGroupId = lgdt.DiscountGroupId
 	INNER JOIN #PartyList p ON p.PartyId = lga.PartyID
 	WHERE DATEADD(MONTH, DATEDIFF(MONTH, 0, lgd.FromDate), 0) <= @ToDate AND lgd.ToDate >= @FromDate
 
@@ -120,6 +121,16 @@ BEGIN
 	) ex
 	WHERE sp.DataType =2 AND sp.Environment = @Environment AND sp.RptDate = @ToDate
 	GROUP BY p.PartyID,  pd.ProductID, tg.Remark, tg.Rate
+
+	-- Adjust rebate
+	IF EXISTS (SELECT TOP 1 1 FROM @Result WHERE Rebate > 0 AND LicensingFee > 0 AND Rebate > LicensingFee)
+	BEGIN
+		UPDATE r
+		SET r.Rebate = r.LicensingFee
+		FROM @Result r 
+		WHERE  Rebate > 0 AND LicensingFee > 0 AND Rebate > LicensingFee
+
+	END
 
 	-- Get Follow Invoice Setting 
 	DECLARE @LA_InvoiceSetting TABLE (FromPartyId INT, ToPartyId INT, ProductId TINYINT)

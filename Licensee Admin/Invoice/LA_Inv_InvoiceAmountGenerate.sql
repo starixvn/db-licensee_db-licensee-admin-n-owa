@@ -71,6 +71,7 @@ AS
 		- 20241118@Danny: Rebate on Licensing Fee for specific currencies [RedmineID: #206143]
 		- 20250102@Danny: Rebate on Licensing winloss for specific currencies [RedmineID: #214767]
 		- 20250402@Danny: Number Game promotion [RedmineID: #219671]
+		- 20251020@Danny: rebate on licensee winloss (SabaPlay) [#241642]
 */
 
 BEGIN
@@ -89,6 +90,12 @@ BEGIN
 	FROM dbo.OAS_PartyBaseCurrency WITH (NOLOCK) WHERE PartyId = @PartyId AND FromDate <= @ToDate AND ToDate >= @FromDate
 	
 	SELECT @BaseCurrency = CASE WHEN Code = 'UST' THEN 'USDT' ELSE Code END FROM bodb02.dbo.Exchange WITH (NOLOCK) WHERE ExchangeId = @BaseCurrencyId
+
+	DECLARE @IsSabaPlayBiller BIT
+	
+	SELECT @IsSabaPlayBiller = CASE WHEN BillerNameAbbreviation = 'RHL' THEN 1 ELSE 0 END
+	FROM dbo.LA_BillerInfo WITH (NOLOCK)
+	WHERE PartyId = @BillerId
 
 	IF @InvoiceTypeId IN (4,5,7)
 	BEGIN
@@ -157,24 +164,45 @@ BEGIN
 		--IF @InvoiceTypeId = 6 -- Hosting Fees --> check later
 		IF @InvoiceTypeId = 3 -- Rebate
 		BEGIN
-			SET @ProductCodes = NULL
-			SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode
-			FROM (
-				SELECT CASE WHEN p.ProductId = 0 THEN 'SB' ELSE pd.ProductPrefix END AS ProductCode
-				FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
-					INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
-					INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
-					LEFT JOIN dbo.Product3rd pd WITH(NOLOCK) ON p.ProductId = pd.ProductId
-				WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate
-					AND h.DiscountGroupType IN (2, 12, 22, 32, 42) -- Rebate
-			) r
-			WHERE ProductCode IS NOT NULL
+			IF @IsSabaPlayBiller = 0
+			BEGIN
+				SET @ProductCodes = NULL
+				SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode
+				FROM (
+					SELECT CASE WHEN p.ProductId = 0 THEN 'SB' ELSE pd.ProductPrefix END AS ProductCode
+					FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
+						INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
+						INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
+						LEFT JOIN dbo.Product3rd pd WITH(NOLOCK) ON p.ProductId = pd.ProductId
+					WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate
+						AND h.DiscountGroupType IN (2, 12, 22, 32, 42) -- Rebate
+				) r
+				WHERE ProductCode IS NOT NULL
 
-			SELECT @ProductCodes = @ProductCodes +',SPR(CS)'
-			WHERE EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value <> 'SB')
+				SELECT @ProductCodes = @ProductCodes +',SPR(CS)'
+				WHERE EXISTS (SELECT TOP 1 1 FROM STRING_SPLIT(@ProductCodes,',') WHERE value <> 'SB')
 
-			IF ISNULL(@ProductCodes, '') = ''
-				SELECT @ErrCode = 1, @ErrMsg = 'There is no setting for Rebate in the Rebate Group. Please set it before proceeding further.'
+				IF ISNULL(@ProductCodes, '') = ''
+					SELECT @ErrCode = 1, @ErrMsg = 'There is no setting for Rebate in the Rebate Group. Please set it before proceeding further.'
+			END
+			ELSE
+			BEGIN
+				SET @ProductCodes = NULL
+				SELECT @ProductCodes = COALESCE(@ProductCodes + ',', '') + ProductCode
+				FROM (
+					SELECT CAST(pd.ProductID AS VARCHAR(10)) AS ProductCode
+					FROM dbo.LA_DiscountGroupAssignment a WITH (NOLOCK)
+						INNER JOIN dbo.LA_DiscountGroupHeader h WITH (NOLOCK) ON a.DiscountGroupId = h.DiscountGroupId
+						INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON a.DiscountGroupId = p.DiscountGroupId
+						LEFT JOIN bodb_licenseeReport.dbo.SabaPlay_Products pd WITH(NOLOCK) ON p.ProductId = pd.ProductId
+					WHERE a.PartyId = @PartyId AND h.FromDate <= @TDate AND h.ToDate >= @FDate
+						AND h.DiscountGroupType = 52 -- Rebate
+				) r
+				WHERE ProductCode IS NOT NULL
+
+				IF ISNULL(@ProductCodes, '') = ''
+					SELECT @ErrCode = 1, @ErrMsg = 'There is no setting for Rebate in the Rebate Group. Please set it before proceeding further.'
+			END
 		END
 	END
 
@@ -244,72 +272,115 @@ BEGIN
 				PartyId INT, ProductId INT, ProductCode VARCHAR(10), LicensingFeeTypeId SMALLINT, GrossLicensingFee MONEY, LicensingFee MONEY, ExtraAmount MONEY, IsChargedByGroupMinFee BIT, IsChargedByMinFee BIT
 				,Discount MONEY, DiscountRate MONEY, DiscountRemark NVARCHAR(4000), Rebate MONEY, RebateRate MONEY, RebateRemark NVARCHAR(4000), ExtraInfo NVARCHAR(4000)
 			)
-			INSERT INTO @Result
-			(
-				PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
-				,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
-			)
-			EXEC dbo.LA_AmountToCompanyByProduct
-				@PartyIds = @PartyIds
-				,@ProductCodes = @ProductCodes
-				,@FromDate = @FromDate
-				,@ToDate = @ToDate
-				,@BaseCurrencyName = @BaseCurrency
-				,@IncludeTierRebate = 0
-				,@LicensingFeeTypeIds= '0,13'
 
-			INSERT INTO @FinalResult (ProductId, ProductCode, ProductName, InvoiceAmount, AmountType, Rate, Remark)
-			SELECT p.ProductId, p.ProductPrefix, p.ProductName, d.InvoiceAmount, d.AmountType, d.Rate, d.Remark
-			FROM @Result r
-				INNER  JOIN 
-				(	
-					SELECT p.ProductId, p.ProductPrefix, p.ProductName FROM dbo.LA_f_Products3rd('') p
-					UNION ALL
-					SELECT -37 ProductId, 'SPR(CS)'ProductPrefix, 'NonSportsbook Promotion' ProductName 
-					-- Hard code setting Casino Promotion
-				) p ON r.ProductId = p.ProductId
-				CROSS APPLY (
-					SELECT Discount AS InvoiceAmount, CONVERT(TINYINT, 4) AS AmountType, DiscountRate AS Rate, DiscountRemark AS Remark WHERE Discount > 0 -- Discount
-					UNION ALL SELECT Rebate, 6, RebateRate, RebateRemark -- Rebate
-					UNION ALL SELECT LicensingFee, 1, NULL, NULL -- Software Fee
-				) d
-			WHERE r.ProductId <> 37 -- SB Promotion
-				AND (
-					@InvoiceTypeId <> 3
-					OR (@InvoiceTypeId = 3 AND d.AmountType = 6) -- Rebate
-					OR (@InvoiceTypeId NOT IN (3, 10) AND r.ProductId <> -1)
-				)
-
-			-- Sum data for Rebate
-			IF EXISTS (SELECT 1 FROM @FinalResult WHERE AmountType = 6 HAVING COUNT(1) > 1)
+			IF @IsSabaPlayBiller = 0
 			BEGIN
-				INSERT INTO @FinalResult (InvoiceAmount, AmountType, Rate, Remark, ProductId, ProductCode, ProductName)
-				SELECT SUM(InvoiceAmount), 6, MAX(Rate), MAX(Remark), -1
-					,STUFF((SELECT ',' + f.ProductCode
-							FROM @FinalResult f WHERE f.AmountType = 6 --AND f.Rate = r.Rate AND f.Remark = r.Remark
-							FOR XML PATH('')), 1, 1, '')
-					,STUFF((SELECT ',' + f.ProductName
-							FROM @FinalResult f WHERE f.AmountType = 6 --AND f.Rate = r.Rate AND f.Remark = r.Remark
-							FOR XML PATH('')), 1, 1, '')
-				FROM @FinalResult r
-				--GROUP BY Rate, Remark
 
-				DELETE @FinalResult WHERE AmountType = 6 AND ProductId <> -1
+				INSERT INTO @Result
+				(
+					PartyId, ProductId, LicensingFeeTypeId, GrossLicensingFee, LicensingFee, ExtraAmount, IsChargedByGroupMinFee, IsChargedByMinFee
+					,Discount, DiscountRate, DiscountRemark, Rebate, RebateRate, RebateRemark, ExtraInfo
+				)
+				EXEC dbo.LA_AmountToCompanyByProduct
+					@PartyIds = @PartyIds
+					,@ProductCodes = @ProductCodes
+					,@FromDate = @FromDate
+					,@ToDate = @ToDate
+					,@BaseCurrencyName = @BaseCurrency
+					,@IncludeTierRebate = 0
+					,@LicensingFeeTypeIds= '0,13'
+					,@Environment = @Environment
+
+				INSERT INTO @FinalResult (ProductId, ProductCode, ProductName, InvoiceAmount, AmountType, Rate, Remark)
+				SELECT p.ProductId, p.ProductPrefix, p.ProductName, d.InvoiceAmount, d.AmountType, d.Rate, d.Remark
+				FROM @Result r
+					INNER  JOIN 
+					(	
+						SELECT p.ProductId, p.ProductPrefix, p.ProductName FROM dbo.LA_f_Products3rd('') p
+						UNION ALL
+						SELECT -37 ProductId, 'SPR(CS)'ProductPrefix, 'NonSportsbook Promotion' ProductName 
+						-- Hard code setting Casino Promotion
+					) p ON r.ProductId = p.ProductId
+					CROSS APPLY (
+						SELECT Discount AS InvoiceAmount, CONVERT(TINYINT, 4) AS AmountType, DiscountRate AS Rate, DiscountRemark AS Remark WHERE Discount > 0 -- Discount
+						UNION ALL SELECT Rebate, 6, RebateRate, RebateRemark -- Rebate
+						UNION ALL SELECT LicensingFee, 1, NULL, NULL -- Software Fee
+					) d
+				WHERE r.ProductId <> 37 -- SB Promotion
+					AND (
+						@InvoiceTypeId <> 3
+						OR (@InvoiceTypeId = 3 AND d.AmountType = 6) -- Rebate
+						OR (@InvoiceTypeId NOT IN (3, 10) AND r.ProductId <> -1)
+					)
+
+				-- Sum data for Rebate
+				IF EXISTS (SELECT 1 FROM @FinalResult WHERE AmountType = 6 HAVING COUNT(1) > 1)
+				BEGIN
+					INSERT INTO @FinalResult (InvoiceAmount, AmountType, Rate, Remark, ProductId, ProductCode, ProductName)
+					SELECT SUM(InvoiceAmount), 6, MAX(Rate), MAX(Remark), -1
+						,STUFF((SELECT ',' + f.ProductCode
+								FROM @FinalResult f WHERE f.AmountType = 6 --AND f.Rate = r.Rate AND f.Remark = r.Remark
+								FOR XML PATH('')), 1, 1, '')
+						,STUFF((SELECT ',' + f.ProductName
+								FROM @FinalResult f WHERE f.AmountType = 6 --AND f.Rate = r.Rate AND f.Remark = r.Remark
+								FOR XML PATH('')), 1, 1, '')
+					FROM @FinalResult r
+					--GROUP BY Rate, Remark
+
+					DELETE @FinalResult WHERE AmountType = 6 AND ProductId <> -1
+				END
+
+				IF @InvoiceTypeId = 10 -- sum data
+					INSERT INTO @FinalResult (ProductId, AmountType, Rate, Remark, ProductCode, ProductName, InvoiceAmount)
+					SELECT -1, r.AmountType, r.Rate, r.Remark
+						,STUFF((SELECT ',' + ProductCode
+								FROM @FinalResult f WHERE f.AmountType = r.AmountType AND f.Rate = r.Rate AND f.Remark = r.Remark
+								FOR XML PATH('')), 1, 1, '')
+						,STUFF((SELECT ',' + ProductName
+								FROM @FinalResult f WHERE f.AmountType = r.AmountType AND f.Rate = r.Rate AND f.Remark = r.Remark
+								FOR XML PATH('')), 1, 1, '')
+						,SUM(InvoiceAmount)
+					FROM @FinalResult r
+					WHERE r.AmountType > 1
+					GROUP BY r.AmountType, r.Rate, r.Remark
 			END
+			ELSE
+			BEGIN
+				INSERT INTO @Result( PartyId, ProductId, LicensingFee, Discount ,Rebate, RebateRemark, RebateRate)
+				EXEC dbo.SH_SabaPLay_AmountToCompanyByProduct
+					@PartyIds = @PartyIds
+					,@ProductIDs = @ProductCodes
+					,@FromDate = @FromDate
+					,@ToDate = @ToDate
+					,@BaseCurrencyName = @BaseCurrency
+					,@Environment = @Environment
 
-			IF @InvoiceTypeId = 10 -- sum data
-				INSERT INTO @FinalResult (ProductId, AmountType, Rate, Remark, ProductCode, ProductName, InvoiceAmount)
-				SELECT -1, r.AmountType, r.Rate, r.Remark
-					,STUFF((SELECT ',' + ProductCode
-							FROM @FinalResult f WHERE f.AmountType = r.AmountType AND f.Rate = r.Rate AND f.Remark = r.Remark
-							FOR XML PATH('')), 1, 1, '')
-					,STUFF((SELECT ',' + ProductName
-							FROM @FinalResult f WHERE f.AmountType = r.AmountType AND f.Rate = r.Rate AND f.Remark = r.Remark
-							FOR XML PATH('')), 1, 1, '')
-					,SUM(InvoiceAmount)
-				FROM @FinalResult r
-				WHERE r.AmountType > 1
-				GROUP BY r.AmountType, r.Rate, r.Remark
+				INSERT INTO @FinalResult (ProductId, ProductCode, ProductName, InvoiceAmount, AmountType, Rate, Remark)
+				SELECT p.ProductId, '' ProductPrefix, p.ProductName, d.InvoiceAmount, d.AmountType, d.Rate, d.Remark
+				FROM @Result r
+				INNER JOIN bodb_LicenseeReport.dbo.SabaPlay_Products p WITH(NOLOCK)  ON r.ProductId = p.ProductId
+					CROSS APPLY (
+						 SELECT Rebate AS InvoiceAmount , CONVERT(TINYINT, 6) AS AmountType, RebateRate AS Rate, RebateRemark  AS Remark -- Rebate
+
+					) d
+				WHERE @InvoiceTypeId = 3 AND d.AmountType = 6 -- Rebate
+				
+				-- Sum data for Rebate
+				IF EXISTS (SELECT 1 FROM @FinalResult WHERE AmountType = 6 HAVING COUNT(1) > 1)
+				BEGIN
+					INSERT INTO @FinalResult (InvoiceAmount, AmountType, Rate, Remark, ProductId, ProductCode, ProductName)
+					SELECT SUM(InvoiceAmount), 6, MAX(Rate), MAX(Remark), -1
+						,STUFF((SELECT ',' + f.ProductCode
+								FROM @FinalResult f WHERE f.AmountType = 6 --AND f.Rate = r.Rate AND f.Remark = r.Remark
+								FOR XML PATH('')), 1, 1, '')
+						,STUFF((SELECT ',' + f.ProductName
+								FROM @FinalResult f WHERE f.AmountType = 6 --AND f.Rate = r.Rate AND f.Remark = r.Remark
+								FOR XML PATH('')), 1, 1, '')
+					FROM @FinalResult r
+
+					DELETE @FinalResult WHERE AmountType = 6 AND ProductId <> -1
+				END
+			END
 		END
 	END
 
@@ -323,6 +394,6 @@ BEGIN
 	END
 	ELSE
 		SELECT ProductId, ProductCode, ProductName, InvoiceAmount, AmountType, Rate, DeductMonthlyFees, RemainingAmount, Remark FROM @FinalResult
-		ORDER BY AmountType, ProductId
+		ORDER BY AmountType ASC, ProductId ASC
 END
 GO

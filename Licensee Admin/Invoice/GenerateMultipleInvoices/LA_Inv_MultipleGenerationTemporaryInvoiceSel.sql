@@ -40,6 +40,7 @@ AS
 		- 20250502@Eddie: Support Billing for SabaPlay [#221987]
 		- 20250604@Danny: Extend data type [#228187]
 		- 20250915@Danny: Balance Carry Forward setting [RedmineID: #225392]
+		- 20251020@Danny: rebate on licensee winloss (SabaPlay) [#241642]
 
 	Param's Explanation:
 		@InvoiceGeneratingData:
@@ -120,7 +121,7 @@ BEGIN
 			-- Remove duplicate data
 			DELETE t
 			FROM (
-				SELECT PartyId, ROW_NUMBER() OVER(PARTITION BY PartyId, InvoiceTypeId ORDER BY InvoiceNumber) AS RN
+				SELECT PartyId, ROW_NUMBER() OVER(PARTITION BY PartyId, InvoiceTypeId ORDER BY InvoiceNumber ASC) AS RN
 				FROM @InvoiceData
 			) t
 			WHERE t.RN > 1
@@ -374,7 +375,7 @@ BEGIN
 			IF @temp_PartyIds IS NULL
 				BREAK
 
-			INSERT INTO @Result( PartyId, ProductId, LicensingFee, Discount )
+			INSERT INTO @Result( PartyId, ProductId, LicensingFee, Discount ,Rebate, RebateRemark, RebateRate)
 			EXEC dbo.SH_SabaPLay_AmountToCompanyByProduct
 				@PartyIds = @temp_PartyIds
 				,@ProductIDs = @ProductIds
@@ -399,6 +400,13 @@ BEGIN
 			INNER JOIN @InvoiceSettings s ON t.PartyId = s.PartyId AND ',' + s.ProductIds + ',' LIKE '%,' + CONVERT(VARCHAR(10), t.ProductId) + ',%' AND s.InvTypeId = 1 -- Software Fee
 		GROUP BY t.PartyId, s.BillerId, s.ProductIds
 
+		INSERT INTO @FinalResult (PartyId, BillerId, InvoiceType, LicensingFee)
+		SELECT t.PartyId, r.BillerId, 3, -SUM(ISNULL(t.Rebate, 0))
+		FROM @Result t
+			INNER JOIN @InvoiceSettings r ON t.PartyId = r.PartyId AND r.InvTypeId = 3 -- Rebate
+		WHERE t.Rebate <> 0
+		GROUP BY t.PartyId, r.BillerId
+
 
 	END
 	-- End Region: Get Licensing fee
@@ -415,7 +423,7 @@ BEGIN
 			RowIndex, IndexNumber, PartyId, PartyName, BrandName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductIds, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsIncludePlayerTipsWorkSheet, CompanyName, PayerAddress1, BillerAddress1
 		)
 		SELECT
-			ROW_NUMBER() OVER(ORDER BY ISNULL(r.InvoiceNumber, ivs.InvoiceNumber)) AS RowIndex
+			ROW_NUMBER() OVER(ORDER BY ISNULL(r.InvoiceNumber, ivs.InvoiceNumber) ASC) AS RowIndex
 			,ivs.IndexNumber
 			,ps.PartyId
 			,ps.PartyName
@@ -473,6 +481,6 @@ BEGIN
 	-- Return data
 	SELECT RowIndex, IndexNumber, PartyId, PartyName, BrandName, ItemType, BillerId, BillerName, InvoiceHeaderId, InvoiceSymbol, InvoiceNumber, InvoicePath, BaseCurrencyId, BaseCurrencyName, InvoiceLanguage, ProductIds, ProductCodes, LicensingFee, Discount, Rebate, AdjustmentAmount, AdjustmentNote, IsIncludePlayerTipsWorkSheet, CompanyName, PayerAddress1, BillerAddress1
 	FROM @_Result
-	ORDER BY InvoiceNumber
+	ORDER BY InvoiceNumber ASC
 END
 GO

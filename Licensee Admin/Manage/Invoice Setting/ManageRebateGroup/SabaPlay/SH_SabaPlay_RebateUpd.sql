@@ -98,12 +98,14 @@ BEGIN
 				SELECT TOP 1 1 
 				FROM dbo.LA_DiscountGroupHeader h WITH (NOLOCK)
 				INNER JOIN dbo.LA_DiscountGroupAssignment a WITH (NOLOCK) ON h.DiscountGroupId = a.DiscountGroupId
+				INNER JOIN dbo.LA_DiscountGroupProduct p WITH (NOLOCK) ON p.DiscountGroupId = a.DiscountGroupId
 				INNER JOIN @Payers t ON t.PayerId = a.PartyID
+				INNER JOIN @Products pt ON pt.ProductId = p.ProductId
 				WHERE h.DiscountGroupType = 52 AND h.FromDate <= @ToDate AND h.ToDate >= @FromDate
 					AND h.DiscountGroupId <> @GroupId
 			)
 			BEGIN
-				SELECT @ErrCode = 503, @ErrMsg = 'Licensee is in another Tier Rebate group.'
+				SELECT @ErrCode = 503, @ErrMsg = 'Licensee is in another Rebate on Lic WL group'
 				RETURN
 			END	
 		END
